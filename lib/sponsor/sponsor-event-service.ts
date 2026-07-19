@@ -2,7 +2,7 @@ import { randomUUID } from "@/lib/utils/random-id";
 
 import type { GameState, SponsorEventRecord } from "@/lib/data/olyDataTypes";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
-import { SPONSOR_RARITIES, mapStarTierToRarity } from "@/lib/sponsor/sponsor-curve-shapes";
+import { SPONSOR_RARITIES } from "@/lib/sponsor/sponsor-curve-shapes";
 
 function getStableUnitHash(seed: string) {
   let hash = 2166136261;
@@ -53,9 +53,10 @@ export function maybeGenerateSponsorEvents(gameState: GameState, saveId: string)
       continue;
     }
 
-    // Event-Cash auf die Rarity-Ordnung umgestellt (0..3, gewöhnlich..legendär) statt auf den Sternrang.
-    // Alt-Verträge ohne rarity fallen über mapStarTierToRarity(starTier) zurück (starTier fehlt → magisch).
-    const rarityOrder = SPONSOR_RARITIES[contract.rarity ?? mapStarTierToRarity(contract.starTier)].order;
+    // Event-Cash läuft über die Rarity-Ordnung (0..3, gewöhnlich..legendär). Contracts are backfilled with a
+    // rarity on load (save-repository.ts normalizeLegacySponsors), so this default is only a defensive
+    // fallback for a contract built without going through that path.
+    const rarityOrder = SPONSOR_RARITIES[contract.rarity ?? "magisch"].order;
     const cashDelta =
       eventType === "activation_bonus"
         ? roundCash(2 + (rarityOrder + 1))

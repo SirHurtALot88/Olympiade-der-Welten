@@ -4,10 +4,10 @@ import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management
 import {
   buildLeagueTeamQualityRanks,
   computeSponsorTeamQualityRank,
-  getMaxStarTierForQualityRank,
-  getPercentileTargetStarTier,
+  getMaxRarityForQualityRank,
+  getPercentileTargetRarity,
 } from "@/lib/sponsor/sponsor-team-quality-rank";
-import { mapStarTierToRarity } from "@/lib/sponsor/sponsor-curve-shapes";
+import { SPONSOR_RARITIES } from "@/lib/sponsor/sponsor-curve-shapes";
 
 function createRow(input: {
   teamId: string;
@@ -119,13 +119,12 @@ describe("sponsor team quality rank", () => {
     const bottom = computeSponsorTeamQualityRank({ rows, teamId: "T-32" });
 
     expect(top?.qualityRank).toBeLessThan(bottom?.qualityRank ?? 32);
-    expect(top?.targetStarTier).toBeGreaterThan(bottom?.targetStarTier ?? 1);
+    expect(SPONSOR_RARITIES[top!.targetRarity].order).toBeGreaterThan(SPONSOR_RARITIES[bottom!.targetRarity].order);
 
-    // Neuer Rarity-Layer: maxRarity/targetRarity spiegeln exakt die (weiterhin vorhandenen) Sterngrenzen.
-    expect(top?.maxRarity).toBe(mapStarTierToRarity(top!.maxStarTier));
-    expect(top?.targetRarity).toBe(mapStarTierToRarity(top!.targetStarTier));
-    expect(bottom?.maxRarity).toBe(mapStarTierToRarity(bottom!.maxStarTier));
-    expect(bottom?.targetRarity).toBe(mapStarTierToRarity(bottom!.targetStarTier));
+    // Top-Team (bestes qualityRank, Rang 1) muss die höchste erreichbare Rarity-Decke (legendär) tragen;
+    // Bottom-Team (schlechtestes) die niedrigste (gewöhnlich).
+    expect(top?.maxRarity).toBe("legendär");
+    expect(bottom?.maxRarity).toBe("gewöhnlich");
   });
 
   it("falls back to budget rank when market value is missing", () => {
@@ -150,14 +149,16 @@ describe("sponsor team quality rank", () => {
     expect(fresh?.qualityRank).toBeGreaterThan(0);
   });
 
-  it("maps quality rank and league percentile to star tiers", () => {
-    expect(getMaxStarTierForQualityRank(2)).toBe(5);
-    expect(getMaxStarTierForQualityRank(20)).toBe(2);
-    expect(getPercentileTargetStarTier(1, 32)).toBe(5);
-    expect(getPercentileTargetStarTier(32, 32)).toBe(1);
+  it("maps quality rank and league percentile to rarities (same bucketing as the old star tiers)", () => {
+    // Old star-tier breakpoints: qualityRank<=4 -> ★5(legendär), <=10 -> ★4(selten), <=18 -> ★3(magisch),
+    // <=26 -> ★2(gewöhnlich), else -> ★1(gewöhnlich). Rarity-keyed equivalents assert the identical bucketing.
+    expect(getMaxRarityForQualityRank(2)).toBe("legendär");
+    expect(getMaxRarityForQualityRank(20)).toBe("gewöhnlich");
+    expect(getPercentileTargetRarity(1, 32)).toBe("legendär");
+    expect(getPercentileTargetRarity(32, 32)).toBe("gewöhnlich");
   });
 
-  it("derives maxRarity/targetRarity from the star-tier bounds for every ranked team", () => {
+  it("derives maxRarity/targetRarity consistently (target never exceeds max) for every ranked team", () => {
     const rows = Array.from({ length: 32 }, (_, index) => {
       const rank = index + 1;
       return createRow({
@@ -172,8 +173,10 @@ describe("sponsor team quality rank", () => {
     const ranks = buildLeagueTeamQualityRanks(rows);
     expect(ranks.size).toBe(32);
     for (const entry of ranks.values()) {
-      expect(entry.maxRarity).toBe(mapStarTierToRarity(entry.maxStarTier));
-      expect(entry.targetRarity).toBe(mapStarTierToRarity(entry.targetStarTier));
+      expect(SPONSOR_RARITIES[entry.targetRarity].order).toBeLessThanOrEqual(SPONSOR_RARITIES[entry.maxRarity].order);
     }
+    // Rang 1 muss die Elite-Decke (legendär) tragen, Rang 32 die niedrigste (gewöhnlich).
+    expect(ranks.get("T-01")?.maxRarity).toBe("legendär");
+    expect(ranks.get("T-32")?.maxRarity).toBe("gewöhnlich");
   });
 });

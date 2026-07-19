@@ -3,7 +3,6 @@ import type {
   SponsorCurveFamily,
   SponsorCurveShape,
   SponsorRarity,
-  SponsorStarTier,
 } from "@/lib/data/olyDataTypes";
 
 /**
@@ -175,8 +174,12 @@ export function getSponsorCurveShapeRankMultiplier(shape: SponsorCurveShape, fin
 
 // ── Migration mappers (old star tier / archetype → rarity / curve shape) ────────────────────────────────
 
-/** Deterministic legacy map ★1..★5 → rarity (4 buckets). ★2 folds into gewöhnlich, keeping legendär for ★5. */
-export function mapStarTierToRarity(starTier: SponsorStarTier | number | null | undefined): SponsorRarity {
+/**
+ * Legacy-save migration ONLY: deterministic legacy map ★1..★5 → rarity (4 buckets). ★2 folds into
+ * gewöhnlich, keeping legendär for ★5. The star-tier system itself is gone; this mapper exists purely so
+ * pre-rarity save blobs (which still carry a raw numeric star tier) migrate to a rarity on load.
+ */
+export function mapStarTierToRarity(starTier: number | null | undefined): SponsorRarity {
   const t = typeof starTier === "number" ? starTier : 3;
   if (t >= 5) return "legendär";
   if (t >= 4) return "selten";

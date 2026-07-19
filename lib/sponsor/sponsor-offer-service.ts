@@ -9,7 +9,6 @@ import type {
   SponsorOffer,
   SponsorOfferComponent,
   SponsorRarity,
-  SponsorStarTier,
   SponsorTermSeasons,
   Team,
   TeamIdentity,
@@ -42,14 +41,12 @@ import {
   getNextMilestoneRank,
   getPrizeMoneyReference,
   getSponsorPayoutForFinalRank,
-  getStarTierBaseMultiplier,
   resolveSponsorEconomyAnchors,
 } from "@/lib/sponsor/sponsor-economy-calibration";
-import { SPONSOR_RARITIES, getSponsorCurveFamily } from "@/lib/sponsor/sponsor-curve-shapes";
+import { SPONSOR_RARITIES, getSponsorCurveFamily, mapArchetypeToCurveShape } from "@/lib/sponsor/sponsor-curve-shapes";
 import {
-  getDemandMultiplier,
+  getDemandMultiplierForRarity,
   mapCurveShapeToArchetype,
-  mapRarityToStarTier,
   rollSponsorOfferSlate,
 } from "@/lib/sponsor/sponsor-tier-pool";
 import {
@@ -121,14 +118,12 @@ function buildOffer(input: {
   specialMode?: "standard" | "challenge";
 }): SponsorOffer {
   const { team, identity, profile, curveShape, rarity, rankTarget, startRank, gameState, commercialRating, slotIndex, salaryFactor, leagueMinSalary, teamQualityRank, specialMode } = input;
-  // Transition: legacy archetype/starTier bleiben abgeleitet (family→archetype, rarity→starTier), damit die
-  // bestehende Marken-/Sonderziel-/Cash-Infrastruktur unverändert weiterläuft, während curveShape/rarity die
-  // Payout-Kurve steuern.
+  // Transition: der legacy archetype bleibt abgeleitet (family→archetype), damit die bestehende Marken-/
+  // Sonderziel-/Cash-Infrastruktur unverändert weiterläuft, während curveShape/rarity die Payout-Kurve steuern.
   const archetype: SponsorArchetype = mapCurveShapeToArchetype(curveShape);
-  const starTier: SponsorStarTier = mapRarityToStarTier(rarity);
-  const demandMult = getDemandMultiplier(starTier);
+  const demandMult = getDemandMultiplierForRarity(rarity);
   const improvementBase = startRank != null ? Math.min(3, Math.max(1, Math.round((startRank - rankTarget) / 3) || 1)) : 1;
-  const improvementTarget = improvementBase + (starTier >= 4 ? 1 : 0);
+  const improvementTarget = improvementBase + (rarity === "selten" || rarity === "legendär" ? 1 : 0);
   const { brand, parent, special } = pickSponsorBrandForOffer({
     seasonId: gameState.season.id,
     teamId: team.teamId,
@@ -146,7 +141,7 @@ function buildOffer(input: {
     gameState,
   });
   const isGolden = input.forcePremiumElite === true;
-  const cashAmounts = buildOfferCashAmounts({ archetype, salaryFactor, starTier, leagueMinSalary, teamQualityRank, isGolden });
+  const cashAmounts = buildOfferCashAmounts({ archetype, salaryFactor, rarity, leagueMinSalary, teamQualityRank, isGolden });
   // NEUE Kurven-Payout-Kurve steuert die Rang-Komponente: erreichbarer Upside = Kurven-Payout am Ziel-Rang
   // MINUS Sockel (Platz 32). rarity skaliert das Etat, curveShape verteilt es über die Tabelle. base/special
   // bleiben (Transition) über buildOfferCashAmounts (legacy stern/archetyp) berechnet.
@@ -251,7 +246,7 @@ function buildOffer(input: {
   ];
 
   return {
-    offerId: `${gameState.season.id}:${team.teamId}:${archetype}:${starTier}:${slotIndex}`,
+    offerId: `${gameState.season.id}:${team.teamId}:${archetype}:${rarity}:${slotIndex}`,
     seasonId: gameState.season.id,
     teamId: team.teamId,
     archetype,
@@ -261,7 +256,6 @@ function buildOffer(input: {
     flavor: input.forcePremiumElite ? `★ Golden Card · ${brand.flavor}` : brand.flavor,
     components,
     totalUpsideEstimate: roundCash(components.reduce((sum, component) => sum + component.rewardCash, 0)),
-    starTier,
     commercialRating,
     sponsorBrandId: brand.id,
     sponsorParentBrandId: brand.parentBrandId,
@@ -583,16 +577,13 @@ export function chooseSponsorOffer(input: {
   const baseAnchorSalaryAtSign = getSponsorRank32BaseAnchorSalary(input.gameState);
   const lockedRankPayoutLadder = buildLockedRankPayoutLadder({
     salaryFactor: salaryFactorAtSign,
-    // Neuer Pfad: rarity + curveShape bauen die Leiter über die Kurven-Payout-Kurve. starTier/archetype
-    // bleiben als Legacy-Fallback (Altverträge ohne rarity/curveShape) gefüttert.
-    rarity: offer.rarity,
-    curveShape: offer.curveShape,
-    starTier: offer.starTier ?? 2,
+    // Rarity + curveShape bauen die Leiter über die Kurven-Payout-Kurve. Defensive Fallbacks nur für den
+    // (praktisch nie erreichten) Fall eines Angebots ohne diese Felder — jedes buildSponsorOffersForTeam-
+    // Angebot setzt beide bereits.
+    rarity: offer.rarity ?? "magisch",
+    curveShape: offer.curveShape ?? mapArchetypeToCurveShape(offer.archetype),
     leagueMinSalary: baseAnchorSalaryAtSign,
-    archetype: offer.archetype,
     teamQualityRank: offer.teamQualityRank,
-    // Settlement füttert expectedRank = teamQualityRankAtSign (Feed 2, performance-Überperformance).
-    expectedRank: offer.teamQualityRank,
     isGolden: offer.isGolden,
   });
   let contract: TeamSponsorContract = {
@@ -607,7 +598,6 @@ export function chooseSponsorOffer(input: {
     startRank: row?.startplatz ?? row?.rank ?? null,
     components: offer.components,
     payouts: {},
-    starTier: offer.starTier,
     commercialRating: offer.commercialRating,
     sponsorBrandId: offer.sponsorBrandId,
     sponsorParentBrandId: offer.sponsorParentBrandId,

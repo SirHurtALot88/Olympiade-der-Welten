@@ -49,7 +49,6 @@ import {
   SPONSOR_CURVE_SHAPES,
   SPONSOR_RARITIES,
   mapArchetypeToCurveShape,
-  mapStarTierToRarity,
 } from "@/lib/sponsor/sponsor-curve-shapes";
 import { buildLeagueTeamQualityRanks } from "@/lib/sponsor/sponsor-team-quality-rank";
 import { upsertSeasonSnapshotRecord } from "@/lib/season/season-snapshot-service";
@@ -97,10 +96,10 @@ function pad(s: string | number, n: number) {
 
 /** Rarität + Kurvenform aus einem Vertrag/Angebot auflösen (mit Back-Compat auf Altverträge). */
 function resolveSponsorMeta(
-  contract: { rarity?: SponsorRarity; curveShape?: SponsorCurveShape; starTier?: number; archetype?: string } | null | undefined,
+  contract: { rarity?: SponsorRarity; curveShape?: SponsorCurveShape; archetype?: string } | null | undefined,
 ): { rarity: SponsorRarity | null; curveShape: SponsorCurveShape | null } {
   if (contract == null) return { rarity: null, curveShape: null };
-  const rarity = contract.rarity ?? mapStarTierToRarity(contract.starTier);
+  const rarity = contract.rarity ?? "magisch";
   const curveShape = contract.curveShape ?? mapArchetypeToCurveShape(contract.archetype as never);
   return { rarity, curveShape };
 }

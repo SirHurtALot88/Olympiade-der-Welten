@@ -20,9 +20,7 @@ export type FoundationSponsorsPanelProps = {
     components: SponsorOfferComponent[];
     termSeasons: SponsorTermSeasons;
     negotiationProfile: SponsorNegotiationProfile;
-    /** Legacy Etat-Dial; bleibt optional während der Migration. */
-    starTier?: number;
-    /** Neuer Etat-Dial (Rarität) — ersetzt starTier; optional bis zum Cutover. */
+    /** Etat-Dial (Rarität); optional bis zum vollständigen Cutover. */
     rarity?: SponsorRarity;
   }) => SponsorOfferComponent[];
   getSponsorNegotiationMultiplier: (input: {

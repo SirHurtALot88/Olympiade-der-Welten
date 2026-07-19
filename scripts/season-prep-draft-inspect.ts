@@ -22,7 +22,7 @@ import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/ty
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-service";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
-import { mapArchetypeToCurveShape, mapStarTierToRarity } from "@/lib/sponsor/sponsor-curve-shapes";
+import { mapArchetypeToCurveShape } from "@/lib/sponsor/sponsor-curve-shapes";
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 const OUTPUT_DIR = path.join(PROJECT_ROOT, "outputs", "season-prep");
@@ -187,7 +187,7 @@ function buildTeamExportRow(save: PersistedSaveGame, teamId: string) {
       ? {
           offerId: sponsor.offerId,
           name: sponsor.name,
-          rarity: sponsor.rarity ?? mapStarTierToRarity(sponsor.starTier),
+          rarity: sponsor.rarity ?? "magisch",
           curveShape: sponsor.curveShape ?? mapArchetypeToCurveShape(sponsor.archetype),
           termSeasons: sponsor.termSeasons ?? null,
         }

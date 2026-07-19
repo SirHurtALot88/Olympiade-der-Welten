@@ -57,7 +57,10 @@ describe("sponsor commercial rating service", () => {
   it("builds a higher rating for strong recent performance and prestige", () => {
     const rating = buildSponsorCommercialRating({ gameState: createGameState(), teamId: "M-M" });
     expect(rating.score).toBeGreaterThan(40);
-    expect(rating.tierHint).toBeGreaterThanOrEqual(2);
+    // Rarity-keyed equivalent of the old "tierHint >= 2" check — same score->rarity breakpoints.
+    expect(rating.rarityHint).toBe(
+      rating.score >= 86 ? "legendär" : rating.score >= 71 ? "selten" : rating.score >= 51 ? "magisch" : "gewöhnlich",
+    );
     expect(rating.breakdown.recentPerformance).toBeGreaterThan(0);
   });
 });

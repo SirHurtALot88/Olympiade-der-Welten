@@ -1,4 +1,4 @@
-import type { SponsorArchetype, SponsorCurveShape, SponsorRarity, SponsorStarTier } from "@/lib/data/olyDataTypes";
+import type { SponsorArchetype, SponsorCurveShape, SponsorRarity } from "@/lib/data/olyDataTypes";
 
 import type { SponsorBrandIndustry, SponsorBrandParent } from "@/lib/sponsor/sponsor-brand-parents";
 import { SPONSOR_BRAND_PARENTS } from "@/lib/sponsor/sponsor-brand-parents";
@@ -27,7 +27,8 @@ export type SponsorBrandTemplate = {
   name: string;
   flavor: string;
   archetype: SponsorArchetype;
-  tierRange: [SponsorStarTier, SponsorStarTier];
+  /** Legacy 1..5 star-range this variant was tuned for; only ever consumed via tierRangeToRarityOrder(). */
+  tierRange: [number, number];
   specialTemplates: SponsorSpecialTemplateId[];
   baseCash: number;
   rankCash: number;
@@ -38,7 +39,7 @@ export type SponsorBrandTemplate = {
 type VariantBlueprint = {
   key: SponsorVariantKey;
   archetype: SponsorArchetype;
-  tierRange: [SponsorStarTier, SponsorStarTier];
+  tierRange: [number, number];
   flavorSuffix: string;
   baseCash: number;
   rankCash: number;
@@ -189,7 +190,7 @@ function getStableUnitHash(seed: string) {
  * neue "Tier"-Achse. So filtert die Auswahl nach `SPONSOR_RARITIES[rarity].order` statt nach dem Sternrang,
  * ohne den bestehenden Kanon (Sternbereiche der Blueprints) zu verändern.
  */
-function tierRangeToRarityOrder(tierRange: [SponsorStarTier, SponsorStarTier]): [number, number] {
+function tierRangeToRarityOrder(tierRange: [number, number]): [number, number] {
   return [
     SPONSOR_RARITIES[mapStarTierToRarity(tierRange[0])].order,
     SPONSOR_RARITIES[mapStarTierToRarity(tierRange[1])].order,

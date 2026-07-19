@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildSponsorOffersForTeam, chooseSponsorOffer, getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-service";
-import { rollSponsorOfferSlate, rollSponsorStarTiers } from "@/lib/sponsor/sponsor-tier-pool";
+import { rollSponsorOfferSlate } from "@/lib/sponsor/sponsor-tier-pool";
 import { SPONSOR_RARITIES } from "@/lib/sponsor/sponsor-curve-shapes";
 import type { SponsorTeamQualityRank } from "@/lib/sponsor/sponsor-team-quality-rank";
 import { SPONSOR_BRAND_PARENTS } from "@/lib/sponsor/sponsor-brand-parents";
@@ -92,15 +92,12 @@ describe("sponsor tier pool v2.6", () => {
       teamId: "M-M",
       qualityRank: 1.2,
       components: [],
-      maxStarTier: 5,
-      targetStarTier: 5,
       maxRarity: "legendär",
       targetRarity: "legendär",
       leaguePosition: 1,
       leaguePercentile: 99,
     };
-    // Neuer Slate-Wurf (ersetzt den Sterne-Wurf): ein Elite-Team (Decke legendär) sieht über mehrere Saisons
-    // mindestens einmal ein legendäres Angebot. Legacy-Sternwurf bleibt als Kompatibilitäts-API bestehen.
+    // Ein Elite-Team (Decke legendär) sieht über mehrere Saisons mindestens einmal ein legendäres Angebot.
     const slates = Array.from({ length: 24 }, (_, index) =>
       rollSponsorOfferSlate({
         seasonId: `season-luck-${index}`,
@@ -112,12 +109,6 @@ describe("sponsor tier pool v2.6", () => {
       ...slates.flatMap((slate) => slate.entries.map((entry) => SPONSOR_RARITIES[entry.rarity].order)),
     );
     expect(maxOrderSeen).toBe(SPONSOR_RARITIES.legendär.order);
-
-    // Kompatibilität: der Legacy-Sternwurf liefert für dieselbe Elite-Decke weiterhin bis zu 5★.
-    const starSamples = Array.from({ length: 24 }, (_, index) =>
-      rollSponsorStarTiers({ seasonId: `season-luck-${index}`, teamId: "M-M", qualityRank: eliteQuality }),
-    );
-    expect(starSamples.some((roll) => roll.tiers.includes(5))).toBe(true);
   });
 
   it("deduplicates sponsor parent brands across the three offer slots", () => {

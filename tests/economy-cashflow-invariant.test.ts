@@ -487,7 +487,7 @@ beforeAll(async () => {
       { componentId: "base-economy-invariant", kind: "base", label: "Saisonbasis", targetValue: "season", rewardCash: 20 },
     ],
     payouts: {},
-    starTier: 3,
+    rarity: "magisch",
     teamQualityRankAtSign: 16,
   };
   const preSponsorSave = persistence.getSaveById(saveId)!;

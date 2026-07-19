@@ -23,7 +23,6 @@ import {
   SPONSOR_RARITIES,
   getSponsorCurveFamily,
   mapArchetypeToCurveShape,
-  mapStarTierToRarity,
 } from "@/lib/sponsor/sponsor-curve-shapes";
 import { NlDeltaChip, formatNlNumber, type NlTone } from "@/components/foundation/new-look";
 
@@ -231,8 +230,9 @@ export function SponsorOfferCardNewLook({
 }: SponsorOfferCardNewLookProps) {
   const presentation = buildSponsorOfferPresentation({ offer, gameState, teamId: offer.teamId });
   // Rarität/Kurvenform robust auflösen — Back-Compat für alte Saves ohne die
-  // neuen Felder (Legacy starTier/archetype werden gemappt).
-  const rarity = offer.rarity ?? mapStarTierToRarity(offer.starTier);
+  // neuen Felder (Legacy archetype wird gemappt; rarity wird bereits beim Laden
+  // aus dem alten Sternrang zurückgefüllt, siehe save-repository.ts).
+  const rarity = offer.rarity ?? "magisch";
   const shape = offer.curveShape ?? mapArchetypeToCurveShape(offer.archetype);
   const shapeLabel = SPONSOR_CURVE_SHAPES[shape].labelDe;
   const familyLabel = SPONSOR_CURVE_FAMILIES[getSponsorCurveFamily(shape)].labelDe;

@@ -6,7 +6,6 @@ import type {
   SponsorTermSeasons,
   TeamSponsorContract,
 } from "@/lib/data/olyDataTypes";
-import { mapStarTierToRarity } from "@/lib/sponsor/sponsor-curve-shapes";
 
 const TERM_MULTIPLIERS: Record<SponsorTermSeasons, number> = {
   1: 1.0,
@@ -94,11 +93,9 @@ export function applySponsorNegotiationToComponents(input: {
   components: SponsorOfferComponent[];
   termSeasons: SponsorTermSeasons;
   negotiationProfile: SponsorNegotiationProfile;
-  /** Neuer Etat-Dial (Rarität) — ersetzt starTier. Der Profil-/Term-Effekt ist rarity-/star-unabhängig,
-   *  daher wird der Wert nur als Kontext mitgeführt (kein Branch darauf). starTier bleibt back-compat-optional. */
+  /** Etat-Dial (Rarität). Der Profil-/Term-Effekt ist rarity-unabhängig, daher wird der Wert nur als
+   *  Kontext mitgeführt (kein Branch darauf). */
   rarity?: SponsorRarity;
-  /** @deprecated durch `rarity` ersetzt; nur noch für Alt-Aufrufer geduldet, wird nicht ausgewertet. */
-  starTier?: number;
 }): SponsorOfferComponent[] {
   const termMult = getSponsorTermMultiplier(input.termSeasons);
   const factors = getSponsorProfileComponentFactors(input.negotiationProfile);
@@ -144,7 +141,7 @@ export function applySponsorNegotiationToOffer(
     components: offer.components,
     termSeasons: input.termSeasons,
     negotiationProfile: input.negotiationProfile,
-    rarity: offer.rarity ?? mapStarTierToRarity(offer.starTier),
+    rarity: offer.rarity ?? "magisch",
   });
   return {
     ...offer,
@@ -164,7 +161,7 @@ export function applySponsorNegotiationToContract(
     components: contract.components,
     termSeasons: input.termSeasons,
     negotiationProfile: input.negotiationProfile,
-    rarity: contract.rarity ?? mapStarTierToRarity(contract.starTier),
+    rarity: contract.rarity ?? "magisch",
   });
   return {
     ...contract,

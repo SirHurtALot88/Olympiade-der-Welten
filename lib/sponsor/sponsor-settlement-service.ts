@@ -107,7 +107,8 @@ function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract)
     }
 
     if (component.kind === "rank") {
-      const starTier = contract.starTier ?? 2;
+      // "gewöhnlich" ist hier das exakte Äquivalent des alten Default-Fallbacks (`contract.starTier ?? 2`).
+      const rarity = contract.rarity ?? "gewöhnlich";
       const baseComponent = contract.components.find((entry) => entry.kind === "base");
       const baseTotal = baseComponent?.rewardCash ?? 0;
       // GELOCKTE LEITER (Kern-Fix): existiert `lockedRankPayoutLadder`, wird der Payout aus der bei der
@@ -129,13 +130,14 @@ function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract)
         rankResidual = Math.max(0, targetTotalLocked - baseFloorLocked);
       } else {
         // Kein gelockter Ladder ⇒ ALTVERTRAG (jeder NEUE Vertrag friert die Leiter bei der Unterschrift ein).
-        // Solche Verträge behalten ihre ursprünglichen Sterne-/Archetyp-Werte (die Migration lässt starTier/
-        // archetype unangetastet) und werden bewusst über den LEGACY-Pfad abgerechnet — der Kurven-Payout darf
-        // die Auszahlung eines vor dem Umbau unterschriebenen Vertrags NICHT nachträglich verändern.
+        // Solche Verträge behalten ihre ursprüngliche rarity/ihren archetype (die Load-Migration in
+        // save-repository.ts backfillt rarity aus dem alten Sternrang, ändert aber sonst nichts) und werden
+        // bewusst über den LEGACY-Archetyp-Pfad abgerechnet — der Kurven-Payout darf die Auszahlung eines vor
+        // dem Umbau unterschriebenen Vertrags NICHT nachträglich verändern.
         const targetTotal = getSponsorPayoutForFinalRankAndTier(
           currentRank,
           salaryFactor,
-          starTier,
+          rarity,
           baseAnchorSalary,
           contract.archetype,
           contract.teamQualityRankAtSign,

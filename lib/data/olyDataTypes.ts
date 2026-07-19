@@ -1238,9 +1238,6 @@ export type SponsorOfferComponent = {
 
 export type SponsorDemandProfile = "safe" | "balanced" | "ambitious" | "elite";
 
-/** @deprecated Replaced by SponsorRarity. Retained only so old-save blobs still type-check during migration. */
-export type SponsorStarTier = 1 | 2 | 3 | 4 | 5;
-
 export type SponsorTermSeasons = 1 | 2 | 3;
 
 export type SponsorNegotiationProfile = "safe" | "balanced" | "ambitious";
@@ -1268,13 +1265,12 @@ export type SponsorOffer = {
   archetype: SponsorArchetype;
   /** Curve shape = where the Etat sits across the table (transitional-optional; required after cutover). */
   curveShape?: SponsorCurveShape;
-  /** Rarity = the Etat dial replacing starTier (transitional-optional; required after cutover). */
+  /** Rarity = the Etat dial that replaced the legacy star tier (transitional-optional; required after cutover). */
   rarity?: SponsorRarity;
   name: string;
   flavor: string;
   components: SponsorOfferComponent[];
   totalUpsideEstimate: number;
-  starTier?: SponsorStarTier;
   commercialRating?: number;
   sponsorBrandId?: string;
   sponsorParentBrandId?: string;
@@ -1287,15 +1283,16 @@ export type SponsorOffer = {
   isChallengeOffer?: boolean;
   /**
    * Golden-Sponsor-Los: höchstens EIN Slot/Team kann golden werden (underdog-/beliebtheits-gewichtet,
-   * mit Cooldown). Golden ist KEIN eigener Stern — der Offer behält seinen starTier — sondern hebt die
-   * Rang-Meilenstein-Komponente (gedeckelt). Wird in chooseSponsorOffer in den Vertrag mitkopiert.
+   * mit Cooldown). Golden ist KEIN eigener Rarity-Sprung — der Offer behält seine rarity — sondern hebt
+   * die Rang-Meilenstein-Komponente (gedeckelt). Wird in chooseSponsorOffer in den Vertrag mitkopiert.
    */
   isGolden?: boolean;
 };
 
 export type SponsorCommercialRating = {
   score: number;
-  tierHint: SponsorStarTier;
+  /** Erwartete Rarity aus dem Kommerz-Score (ersetzt den früheren 1..5-Sterne-Hint). */
+  rarityHint: SponsorRarity;
   breakdown: {
     recentPerformance: number;
     rosterPotential: number;
@@ -1327,14 +1324,13 @@ export type TeamSponsorContract = {
   archetype: SponsorArchetype;
   /** Curve shape (transitional-optional; required after cutover). */
   curveShape?: SponsorCurveShape;
-  /** Rarity — the Etat dial replacing starTier (transitional-optional; required after cutover). */
+  /** Rarity — the Etat dial that replaced the legacy star tier (transitional-optional; required after cutover). */
   rarity?: SponsorRarity;
   name: string;
   chosenAt: string;
   startRank: number | null;
   components: SponsorOfferComponent[];
   payouts: TeamSponsorContractPayouts;
-  starTier?: SponsorStarTier;
   commercialRating?: number;
   sponsorBrandId?: string;
   sponsorParentBrandId?: string;

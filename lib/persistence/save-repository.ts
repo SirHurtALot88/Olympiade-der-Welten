@@ -218,10 +218,21 @@ function normalizeLegacyRosterTargets(gameState: GameState): GameState {
 }
 
 /**
- * Back-compat: old saves carry sponsor offers/contracts with `starTier`/`archetype` but no `rarity`/
- * `curveShape`. Backfill the new fields deterministically (star→rarity, archetype→curve shape) on load so
- * every consumer sees them. Signed contracts keep their frozen `lockedRankPayoutLadder`, so payouts are
- * unaffected; this only labels them for the new UI/roller. Idempotent (skips already-migrated entries).
+ * Legacy-save field: pre-rarity save blobs still carry a raw numeric `starTier` (1..5) on their sponsor
+ * offers/contracts. The current `SponsorOffer`/`TeamSponsorContract` types no longer declare that field (the
+ * star-tier system itself is gone), so this reads it defensively off the raw persisted record without
+ * requiring it on the type.
+ */
+function readLegacyStarTier(record: unknown): number | undefined {
+  const raw = (record as { starTier?: unknown } | null | undefined)?.starTier;
+  return typeof raw === "number" ? raw : undefined;
+}
+
+/**
+ * Back-compat: old saves carry sponsor offers/contracts with a legacy `starTier`/`archetype` but no
+ * `rarity`/`curveShape`. Backfill the new fields deterministically (star→rarity, archetype→curve shape) on
+ * load so every consumer sees them. Signed contracts keep their frozen `lockedRankPayoutLadder`, so payouts
+ * are unaffected; this only labels them for the new UI/roller. Idempotent (skips already-migrated entries).
  */
 function normalizeLegacySponsors(gameState: GameState): GameState {
   const seasonState = gameState.seasonState;
@@ -232,7 +243,7 @@ function normalizeLegacySponsors(gameState: GameState): GameState {
     changed = true;
     return {
       ...offer,
-      rarity: offer.rarity ?? mapStarTierToRarity(offer.starTier),
+      rarity: offer.rarity ?? mapStarTierToRarity(readLegacyStarTier(offer)),
       curveShape: offer.curveShape ?? mapArchetypeToCurveShape(offer.archetype),
     };
   };
@@ -250,7 +261,7 @@ function normalizeLegacySponsors(gameState: GameState): GameState {
             teamId,
             {
               ...contract,
-              rarity: contract.rarity ?? mapStarTierToRarity(contract.starTier),
+              rarity: contract.rarity ?? mapStarTierToRarity(readLegacyStarTier(contract)),
               curveShape: contract.curveShape ?? mapArchetypeToCurveShape(contract.archetype),
             },
           ];

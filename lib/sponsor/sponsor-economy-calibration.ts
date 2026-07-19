@@ -1,10 +1,9 @@
 import prizeMoneyNormalized from "@/references/sheets/prize-money-table.normalized.json";
-import type { GameState, SponsorArchetype, SponsorCurveShape, SponsorOffer, SponsorOfferComponent, SponsorRarity, SponsorStarTier } from "@/lib/data/olyDataTypes";
+import type { GameState, SponsorArchetype, SponsorCurveShape, SponsorOffer, SponsorOfferComponent, SponsorRarity } from "@/lib/data/olyDataTypes";
 import {
   getSponsorCurveShapeRankMultiplier,
   getSponsorRarityEtatFactor,
   mapArchetypeToCurveShape,
-  mapStarTierToRarity,
 } from "@/lib/sponsor/sponsor-curve-shapes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamDisplaySalaryTotal, getTeamSponsorBaseReferenceTotal } from "@/lib/sponsor/sponsor-team-salary-display";
@@ -96,9 +95,10 @@ export function getPrizeMoneyReference(rank: number, salaryFactor = 1): number {
  * Survival-Band 38-44, die Kreuzung wandert KOMPLETT in die Upside (Meilenstein-Mults), NICHT in die Basis.
  * Deshalb liegen die BASE_MULT eng beieinander (security 1.07 / identity 1.0 / performance 0.96 → Böden
  * ~43 / 41 / 39), während die MILESTONE_MULT die Spitze auffächern (security 0.85 flach → id 1.0 → perf 1.14
- * steil; ★5-Meister ~85 / 90 / 95). security-BASE_MULT bleibt bei 1.07, weil die Anzeige==Settlement-Bindung
- * security × Tier-Base(2) > 1 verlangt (1.07 × 0.98 = 1.049). Hinweis: der früher hier zitierte Spread-Test
- * "> 1.65" existiert nicht mehr; die realen Constraints stehen in tests/sponsor-economy-balance.test.ts.
+ * steil; legendär-Meister ~85 / 90 / 95). security-BASE_MULT bleibt bei 1.07, weil die Anzeige==Settlement-
+ * Bindung security × Rarity-Base(gewöhnlich) > 1 verlangt (1.07 × 0.98 = 1.049). Hinweis: der früher hier
+ * zitierte Spread-Test "> 1.65" existiert nicht mehr; die realen Constraints stehen in
+ * tests/sponsor-economy-balance.test.ts.
  * ENV: OLY_SPONSOR_ARCH_BASE_* / OLY_SPONSOR_ARCH_MS_*.
  */
 export const SPONSOR_ARCHETYPE_BASE_MULT: Record<SponsorArchetype, number> = {
@@ -176,41 +176,40 @@ export function getArchetypeRankShare(archetype: SponsorArchetype): number {
 }
 
 /**
- * Stern-Tier-Skalierung des BASIS-Sockels — bewusst eng komprimiert (0.96..1.0). Die Basis ist "tier-nah",
- * damit der Boden aller Tiers im 38-44-Band bleibt (perf-★2-Boden ≥ 38 ist mit dem alten 0.94 unlösbar).
- * Die volle Stern-Differenzierung lebt in SPONSOR_TIER_MILESTONE_MULT (0.28..1.0) — schwache Sterne schalten
- * die Rang-Upside kaum frei, nicht den Sockel.
+ * Rarity-Skalierung des BASIS-Sockels — bewusst eng komprimiert (0.96..1.0). Die Basis ist "rarity-nah",
+ * damit der Boden aller Rarities im 38-44-Band bleibt (perf-gewöhnlich-Boden ≥ 38 ist mit dem alten 0.94
+ * unlösbar). Die volle Rarity-Differenzierung lebt in SPONSOR_RARITY_MILESTONE_MULT (0.28..1.0) — niedrige
+ * Rarities schalten die Rang-Upside kaum frei, nicht den Sockel.
+ *
+ * Diese Konstanten sind aus dem alten 1..5-Sterne-Modell BAKED, über die Legacy-Korrespondenz
+ * gewöhnlich=★2, magisch=★3, selten=★4, legendär=★5 (siehe mapStarTierToRarity) — die Zahlen selbst sind
+ * unverändert, nur der Schlüssel ist jetzt Rarity statt Sternrang.
  */
-export const SPONSOR_TIER_BASE_MULT: Record<SponsorStarTier, number> = {
-  1: Number(process.env.OLY_SPONSOR_TIER_BASE_1 ?? 0.97) || 0.97,
-  2: Number(process.env.OLY_SPONSOR_TIER_BASE_2 ?? 0.98) || 0.98,
-  3: Number(process.env.OLY_SPONSOR_TIER_BASE_3 ?? 1.0) || 1.0,
-  4: Number(process.env.OLY_SPONSOR_TIER_BASE_4 ?? 1.02) || 1.02,
-  5: Number(process.env.OLY_SPONSOR_TIER_BASE_5 ?? 1.04) || 1.04,
+export const SPONSOR_RARITY_BASE_MULT: Record<SponsorRarity, number> = {
+  gewöhnlich: Number(process.env.OLY_SPONSOR_RARITY_BASE_COMMON ?? 0.98) || 0.98,
+  magisch: Number(process.env.OLY_SPONSOR_RARITY_BASE_MAGIC ?? 1.0) || 1.0,
+  selten: Number(process.env.OLY_SPONSOR_RARITY_BASE_RARE ?? 1.02) || 1.02,
+  legendär: Number(process.env.OLY_SPONSOR_RARITY_BASE_LEGENDARY ?? 1.04) || 1.04,
 };
 
-/** Low-star sponsors unlock far less of the Gewinnstufen ladder (big jumps 1★→5★). */
-// Gedämpft (früher 0.28..1.0 → ★1-★5-Spitzen-Spread ~43 C, zu krass): ★1 schaltet jetzt gut die Hälfte der
-// Rang-Leiter frei statt nur ~28 %. Star-Tier differenziert die Spitze weiterhin klar, aber ein ★1-Sponsor
-// ist auch bei Erfolg "nicht zu schlecht" (Spitzen-Spread ~20-25 C). ENV-tunebar.
-export const SPONSOR_TIER_MILESTONE_MULT: Record<SponsorStarTier, number> = {
-  1: Number(process.env.OLY_SPONSOR_TIER_MS_1 ?? 0.6) || 0.6,
-  2: Number(process.env.OLY_SPONSOR_TIER_MS_2 ?? 0.72) || 0.72,
-  3: Number(process.env.OLY_SPONSOR_TIER_MS_3 ?? 0.82) || 0.82,
-  4: Number(process.env.OLY_SPONSOR_TIER_MS_4 ?? 0.91) || 0.91,
-  5: Number(process.env.OLY_SPONSOR_TIER_MS_5 ?? 1) || 1,
+/** Low-rarity sponsors unlock far less of the Gewinnstufen ladder (big jumps gewöhnlich→legendär). */
+// Gedämpft (früher ein größerer Spread → gewöhnlich-legendär-Spitzen-Spread zu krass): gewöhnlich schaltet
+// jetzt gut die Hälfte der Rang-Leiter frei statt nur ~28 %. Rarity differenziert die Spitze weiterhin
+// klar, aber ein gewöhnlicher Sponsor ist auch bei Erfolg "nicht zu schlecht" (Spitzen-Spread ~20-25 C).
+// ENV-tunebar. Wie oben aus dem alten Sterne-Modell gebaked (gewöhnlich=★2 .. legendär=★5); Zahlen unverändert.
+export const SPONSOR_RARITY_MILESTONE_MULT: Record<SponsorRarity, number> = {
+  gewöhnlich: Number(process.env.OLY_SPONSOR_RARITY_MS_COMMON ?? 0.72) || 0.72,
+  magisch: Number(process.env.OLY_SPONSOR_RARITY_MS_MAGIC ?? 0.82) || 0.82,
+  selten: Number(process.env.OLY_SPONSOR_RARITY_MS_RARE ?? 0.91) || 0.91,
+  legendär: Number(process.env.OLY_SPONSOR_RARITY_MS_LEGENDARY ?? 1) || 1,
 };
 
-export function getStarTierBaseMultiplier(starTier: SponsorStarTier): number {
-  return SPONSOR_TIER_BASE_MULT[starTier] ?? 1;
+export function getRarityBaseMultiplier(rarity: SponsorRarity): number {
+  return SPONSOR_RARITY_BASE_MULT[rarity] ?? 1;
 }
 
-export function getStarTierMilestoneMultiplier(starTier: SponsorStarTier): number {
-  return SPONSOR_TIER_MILESTONE_MULT[starTier] ?? 1;
-}
-
-export function getRewardMultiplierForTier(starTier: SponsorStarTier): number {
-  return getStarTierMilestoneMultiplier(starTier);
+export function getRarityMilestoneMultiplier(rarity: SponsorRarity): number {
+  return SPONSOR_RARITY_MILESTONE_MULT[rarity] ?? 1;
 }
 
 export { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
@@ -360,7 +359,7 @@ export function getGoldenMilestoneBonus(rawMilestone: number, salaryFactor = 1):
 export function getSponsorPayoutForFinalRankAndTier(
   finalRank: number | null | undefined,
   salaryFactor: number,
-  starTier: SponsorStarTier,
+  rarity: SponsorRarity,
   leagueMinSalary = SPONSOR_BASE_FLOOR_C,
   archetype: SponsorArchetype = "security",
   teamQualityRank?: number | null,
@@ -371,14 +370,14 @@ export function getSponsorPayoutForFinalRankAndTier(
   // Archetyp-Kreuzung: base UND milestone laufen über dieselben Tabellen. Security = hoher Sockel, flache
   // Upside; performance = schlanker Sockel, steile Upside. Die Kreuzung liegt komplett in der Milestone-Mult.
   const rawBase = round1(
-    effectiveBaseFloor * getArchetypeBaseMultiplier(archetype) * getStarTierBaseMultiplier(starTier),
+    effectiveBaseFloor * getArchetypeBaseMultiplier(archetype) * getRarityBaseMultiplier(rarity),
   );
 
-  // Gemeinsame Skalierung der Meilenstein-Leiter (Anker-Pool × globale Stauchung × Stern × Archetyp).
+  // Gemeinsame Skalierung der Meilenstein-Leiter (Anker-Pool × globale Stauchung × Rarity × Archetyp).
   const milestoneCommonScale =
     milestoneScale *
     SPONSOR_MILESTONE_LADDER_SCALE *
-    getStarTierMilestoneMultiplier(starTier) *
+    getRarityMilestoneMultiplier(rarity) *
     getArchetypeMilestoneMultiplier(archetype);
 
   const rebalance = getQualityRebalanceProfile(teamQualityRank);
@@ -448,44 +447,29 @@ export function getSponsorCurveShapePayout(
  * dem Anker + salaryFactor ZUM ZEITPUNKT DER UNTERSCHRIFT berechnet und im Vertrag persistiert. Das Settlement
  * liest die Leiter am erreichten Endrang ab, statt die Kurve aus den (über die Saison gedrifteten) Season-End-
  * Ankern neu abzuleiten — dadurch kann eine Anker-/salaryFactor-Drift die Auszahlung eines bereits
- * unterschriebenen Vertrags NIE mehr ändern. Wenn `rarity` + `curveShape` gesetzt sind, wird die Leiter aus dem
- * neuen Kurven-Payout gebaut; sonst (Altverträge) über den Legacy-Stern-/Archetyp-Pfad.
+ * unterschriebenen Vertrags NIE mehr ändern. Läuft ausschließlich über den Rarity+Kurven-Payout-Pfad (der
+ * frühere Fallback auf den Legacy-Stern-/Archetyp-Pfad ist entfernt — jeder Aufrufer liefert rarity+curveShape).
  */
 export function buildLockedRankPayoutLadder(input: {
   salaryFactor: number;
   leagueMinSalary: number;
-  starTier?: SponsorStarTier;
-  archetype?: SponsorArchetype;
-  rarity?: SponsorRarity;
-  curveShape?: SponsorCurveShape;
+  rarity: SponsorRarity;
+  curveShape: SponsorCurveShape;
   teamQualityRank?: number | null;
-  expectedRank?: number | null;
   isGolden?: boolean;
 }): number[] {
   const ladder: number[] = [];
-  const useShape = input.rarity != null && input.curveShape != null;
   for (let finalRank = 1; finalRank <= 32; finalRank += 1) {
     ladder.push(
-      useShape
-        ? getSponsorCurveShapePayout(
-            finalRank,
-            input.salaryFactor,
-            input.rarity!,
-            input.curveShape!,
-            input.leagueMinSalary,
-            input.teamQualityRank,
-            input.isGolden ?? false,
-          )
-        : getSponsorPayoutForFinalRankAndTier(
-            finalRank,
-            input.salaryFactor,
-            input.starTier ?? 2,
-            input.leagueMinSalary,
-            input.archetype ?? "identity",
-            input.teamQualityRank,
-            input.expectedRank,
-            input.isGolden ?? false,
-          ),
+      getSponsorCurveShapePayout(
+        finalRank,
+        input.salaryFactor,
+        input.rarity,
+        input.curveShape,
+        input.leagueMinSalary,
+        input.teamQualityRank,
+        input.isGolden ?? false,
+      ),
     );
   }
   return ladder;
@@ -506,15 +490,15 @@ export function readLockedRankPayout(ladder: number[], finalRank: number | null 
 export function buildOfferCashAmounts(input: {
   archetype: SponsorArchetype;
   salaryFactor: number;
-  starTier: SponsorStarTier;
+  rarity: SponsorRarity;
   leagueMinSalary?: number;
   teamQualityRank?: number | null;
   isGolden?: boolean;
 }): { baseCash: number; rankCash: number; specialCash: number; totalAtMaxRank: number } {
   const leagueMinSalary = input.leagueMinSalary ?? SPONSOR_BASE_FLOOR_C;
   const { effectiveBaseFloor, milestonePool } = resolveSponsorEconomyAnchors(input.salaryFactor, leagueMinSalary);
-  const baseMult = getStarTierBaseMultiplier(input.starTier);
-  const milestoneMult = getStarTierMilestoneMultiplier(input.starTier);
+  const baseMult = getRarityBaseMultiplier(input.rarity);
+  const milestoneMult = getRarityMilestoneMultiplier(input.rarity);
   // Anzeige==Settlement (WAVE 1): identische Archetyp-Tabellen wie getSponsorPayoutForFinalRankAndTier.
   // rawBase = Sockel-Anteil, rawRank = Meilenstein-Anteil bei Rang 1 (getRankMilestoneBonus(1)*milestoneScale
   // = milestonePool). Summe rawBase*baseScale + rawRank*milestoneScale == Settlement bei Rang 1.
@@ -546,7 +530,7 @@ export function buildOfferCashAmounts(input: {
     getSponsorPayoutForFinalRankAndTier(
       1,
       input.salaryFactor,
-      input.starTier,
+      input.rarity,
       leagueMinSalary,
       input.archetype,
       input.teamQualityRank,
@@ -578,11 +562,12 @@ export function estimateExpectedPayout(
   leagueMinSalary?: number,
 ): number {
   const baseComponent = offer.components.find((component) => component.kind === "base");
-  const starTier = offer.starTier ?? 2;
-  const baseMult = getStarTierBaseMultiplier(starTier);
+  // "gewöhnlich" ist hier das exakte Äquivalent des alten Default-Fallbacks (`offer.starTier ?? 2`).
+  const rarity = offer.rarity ?? "gewöhnlich";
+  const baseMult = getRarityBaseMultiplier(rarity);
   const baseCash = baseComponent?.rewardCash ?? 0;
-  // WAVE 1: baseCash = effectiveBaseFloor * ARCHETYPE_BASE_MULT * starTierBaseMult (* baseScale). Dividiert
-  // man durch (FLOOR * starTierBaseMult * ARCHETYPE_BASE_MULT), fällt der Sockel als ~einheitlicher Faktor
+  // WAVE 1: baseCash = effectiveBaseFloor * ARCHETYPE_BASE_MULT * rarityBaseMult (* baseScale). Dividiert
+  // man durch (FLOOR * rarityBaseMult * ARCHETYPE_BASE_MULT), fällt der Sockel als ~einheitlicher Faktor
   // heraus — konsistent über alle Archetypen (löst die frühere share-basierte Sonderfall-Inferenz ab).
   const archetypeBaseMult = getArchetypeBaseMultiplier(offer.archetype);
   const inferredFactor =
@@ -593,17 +578,16 @@ export function estimateExpectedPayout(
   const resolvedLeagueMin =
     leagueMinSalary ??
     (offer.archetype === "security"
-      ? round1(baseCash / Math.max(0.01, getStarTierBaseMultiplier(starTier) * archetypeBaseMult))
+      ? round1(baseCash / Math.max(0.01, getRarityBaseMultiplier(rarity) * archetypeBaseMult))
       : SPONSOR_BASE_FLOOR_C * salaryFactor);
 
   // Neuer Kurven-Pfad: die AI bewertet das Angebot an ihrem ERWARTETEN Endrang (≈ teamQualityRank), sodass die
   // Kurvenform-Ökonomie tatsächlich in die Wahl einfließt — sonst liefern alle Formen einer Familie denselben
   // erwarteten Payout und die AI wählt beliebig. Ein Team, das ~3. wird, bewertet Titel-/Meisterschale-Formen am
   // höchsten; ein Team, das ~28. wird, die Sicherheits-/Klassenerhalt-Formen. Rarity-Etat + Golden-Bonus stecken
-  // bereits in getSponsorCurveShapePayout. Fallback auf den Legacy-Stern-Pfad nur für Altangebote ohne curveShape.
+  // bereits in getSponsorCurveShapePayout. Fallback auf den Legacy-Archetyp-Pfad nur für Altangebote ohne curveShape.
   if (offer.curveShape != null || offer.rarity != null) {
     const expectedRank = offer.teamQualityRank ?? powerRank;
-    const rarity = offer.rarity ?? mapStarTierToRarity(offer.starTier);
     const curveShape = offer.curveShape ?? mapArchetypeToCurveShape(offer.archetype);
     let expected = getSponsorCurveShapePayout(
       expectedRank,
@@ -624,11 +608,11 @@ export function estimateExpectedPayout(
     return round1(expected);
   }
 
-  // Legacy-Fallback (Altangebote ohne curveShape/rarity): Stern-/Archetyp-Payout am powerRank.
+  // Legacy-Fallback (Altangebote ohne curveShape/rarity): Archetyp-Payout am powerRank.
   const targetTotal = getSponsorPayoutForFinalRankAndTier(
     powerRank,
     salaryFactor,
-    starTier,
+    rarity,
     resolvedLeagueMin,
     offer.archetype,
     offer.teamQualityRank,

@@ -28,7 +28,6 @@ import {
   SPONSOR_RARITIES,
   getSponsorCurveFamily,
   mapArchetypeToCurveShape,
-  mapStarTierToRarity,
 } from "@/lib/sponsor/sponsor-curve-shapes";
 import type { GameState, SponsorOffer, TeamSponsorContract } from "@/lib/data/olyDataTypes";
 
@@ -122,8 +121,9 @@ function ActiveContractHero({
   gameState: GameState;
   formatCash: (value: number) => string;
 }) {
-  // Rarität/Kurvenform robust auflösen (Back-Compat für alte Verträge).
-  const rarity = contract.rarity ?? mapStarTierToRarity(contract.starTier);
+  // Rarität/Kurvenform robust auflösen (Back-Compat für alte Verträge; rarity wird bereits beim Laden aus
+  // dem alten Sternrang zurückgefüllt, siehe save-repository.ts).
+  const rarity = contract.rarity ?? "magisch";
   const shape = contract.curveShape ?? mapArchetypeToCurveShape(contract.archetype);
   const shapeLabel = SPONSOR_CURVE_SHAPES[shape].labelDe;
   const familyLabel = SPONSOR_CURVE_FAMILIES[getSponsorCurveFamily(shape)].labelDe;
@@ -156,7 +156,6 @@ function ActiveContractHero({
             (sum, component) => sum + (typeof component.rewardCash === "number" ? component.rewardCash : 0),
             0,
           ),
-          starTier: contract.starTier,
           sponsorBrandId: contract.sponsorBrandId,
           sponsorParentBrandId: contract.sponsorParentBrandId,
           variantKey: contract.variantKey,
@@ -278,8 +277,7 @@ export default function FoundationSponsorsNewLook({
           components: offer.components,
           termSeasons: 1,
           negotiationProfile,
-          starTier: offer.starTier,
-          rarity: offer.rarity ?? mapStarTierToRarity(offer.starTier),
+          rarity: offer.rarity ?? "magisch",
         });
         const totalCash = adjustedComponents.reduce(
           (sum, component) => sum + (typeof component.rewardCash === "number" ? component.rewardCash : 0),
@@ -340,7 +338,7 @@ export default function FoundationSponsorsNewLook({
         sponsorName: contract?.name ?? null,
         archetype: contract?.archetype ?? null,
         // Rarität/Kurvenform robust auflösen (Back-Compat für alte Verträge).
-        rarity: contract ? (contract.rarity ?? mapStarTierToRarity(contract.starTier)) : null,
+        rarity: contract ? (contract.rarity ?? "magisch") : null,
         curveShape: contract ? (contract.curveShape ?? mapArchetypeToCurveShape(contract.archetype)) : null,
         totalCash,
         // Golden Card = seltener Premium-Elite-Sponsor (Underdog-Glück). Der
@@ -447,10 +445,9 @@ export default function FoundationSponsorsNewLook({
   const animatedKpiContractCash = useCountUp(activeContractCashTotal);
   const animatedKpiAvgOfferCash = useCountUp(avgOfferCashValue);
 
-  // Erwartete Rarität aus dem Kommerz-Rating (Übergangs-Mapping vom tierHint,
-  // bis das Rating direkt eine Rarität liefert).
+  // Erwartete Rarität, direkt aus dem Kommerz-Rating.
   const expectationRarityLabel = selectedTeamCommercialRating
-    ? SPONSOR_RARITIES[mapStarTierToRarity(selectedTeamCommercialRating.tierHint)].labelDe
+    ? SPONSOR_RARITIES[selectedTeamCommercialRating.rarityHint].labelDe
     : null;
 
   return (
@@ -698,8 +695,7 @@ export default function FoundationSponsorsNewLook({
                   components: offer.components,
                   termSeasons: 1,
                   negotiationProfile,
-                  starTier: offer.starTier,
-                  rarity: offer.rarity ?? mapStarTierToRarity(offer.starTier),
+                  rarity: offer.rarity ?? "magisch",
                 });
                 const multiplier = getSponsorNegotiationMultiplier({ termSeasons: 1, negotiationProfile });
                 return (

@@ -121,7 +121,7 @@ describe("sponsor offer service", () => {
     }
 
     // Legacy-Ableitungen bleiben konsistent gefüllt (Marken-/Cash-Infrastruktur läuft weiter).
-    expect(offers.every((offer) => offer.starTier != null && offer.starTier >= 1 && offer.starTier <= 5)).toBe(true);
+    expect(offers.every((offer) => offer.demandProfile != null)).toBe(true);
   });
 
   it("persists sponsor choice and pays first base installment", () => {
@@ -178,7 +178,6 @@ describe("ai sponsor curve-shape preference", () => {
       name: curveShape,
       flavor: "",
       totalUpsideEstimate: 0,
-      starTier: 3,
       teamQualityRank,
       isGolden: false,
       components: [{ kind: "base", label: "Basis", rewardCash: 40 }],

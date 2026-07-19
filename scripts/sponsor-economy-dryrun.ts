@@ -46,7 +46,6 @@ import {
   SPONSOR_RARITIES,
   SPONSOR_RARITY_KEYS,
   mapArchetypeToCurveShape,
-  mapStarTierToRarity,
 } from "@/lib/sponsor/sponsor-curve-shapes";
 import type { GameState, SponsorCurveShape, SponsorRarity } from "@/lib/data/olyDataTypes";
 import type { PersistedSaveGame } from "@/lib/persistence/types";
@@ -212,7 +211,7 @@ function sponsorMetaOf(
 ): { rarity: SponsorRarity | null; curveShape: SponsorCurveShape | null } {
   const contract = getTeamSponsorContract(gameState, teamId);
   if (contract == null) return { rarity: null, curveShape: null };
-  const rarity = contract.rarity ?? mapStarTierToRarity(contract.starTier);
+  const rarity = contract.rarity ?? "magisch";
   const curveShape = contract.curveShape ?? mapArchetypeToCurveShape(contract.archetype);
   return { rarity, curveShape };
 }
