@@ -32,7 +32,7 @@ const NATIVE_PRIMITIVE: Record<string, StagePrimitive> = {
   staffel: "track",
   spurt: "track", // Slalom/Bump-Modell folgt noch — bleibt vorerst Oval
   "takeshis-castle": "parcours", // Schlangen-Parcours (Serpentine)
-  "mini-dm": "track",
+  "mini-dm": "duelhp", // 1v1-Lebensbalken (Fighting-Game-HP)
   battlefield: "track",
   // lanes / Row-Familie — parallele Reihen bis zum Ziel
   "time-trial": "peloton", // Straße: Ausreißer/Hauptfeld
@@ -50,7 +50,7 @@ const NATIVE_PRIMITIVE: Record<string, StagePrimitive> = {
   football: "parcours", // Raumgewinn-Parcours (Serpentine) auf dem Flutlicht-Rasen
   hockey: "rink", // Eisrink von oben
   breaking: "thermometer", // Schmerz-Thermometer (grün → glühend rot)
-  tdm: "towers", // Etagen-Ersatz für das verworfene tiers
+  tdm: "kda", // K/D/A-Scoreboard aus dem Score abgeleitet
 };
 
 export type DisciplineStageArenaProps = {

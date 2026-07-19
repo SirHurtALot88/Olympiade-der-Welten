@@ -50,6 +50,8 @@ export type StagePrimitive =
   | "platter" // Wettessen — leergegessene Teller + 🍴
   | "lamps" // Fechten — Treffer-Lampen (rot/grün)
   | "spybar" // I Spy — Späh-/Sichtfeld-Balken, 🔍 an der Scan-Kante
+  | "kda" // TDM — K/D/A-Scoreboard (aus Score abgeleitet) + KDA-Balken
+  | "duelhp" // Mini-DM — Fighting-Game-Lebensbalken (skewX) + K.O.-Warnung
   // Turm-Familie (Säule je Team, Höhe = Punkte):
   | "barbell" // Gewichtheben — Hantel-Säulen mit Scheiben
   | "sparkbar" // universeller Fallback — schlanke Spark-Säulen
@@ -63,7 +65,7 @@ export type StagePrimitive =
 
 // Familien mit geteilter Geometrie: Row-Familie rechnet wie "lanes",
 // Turm-Familie wie "towers". Nur der Hintergrund/Overlay unterscheidet sie.
-const ROW_FAMILY = new Set<StagePrimitive>(["lanes", "platter", "lamps", "spybar"]);
+const ROW_FAMILY = new Set<StagePrimitive>(["lanes", "platter", "lamps", "spybar", "kda", "duelhp"]);
 const TOWER_FAMILY = new Set<StagePrimitive>(["towers", "barbell", "sparkbar", "thermometer"]);
 // Szenen-Primitive: eigenes atmosphärisches Feld (Straße/Berg/Court/Rink/Parcours).
 const SCENE_PRIMS = new Set<StagePrimitive>(["peloton", "mountain", "court", "rink", "parcours"]);
@@ -474,6 +476,8 @@ const PRIM_GEO: Record<StagePrimitive, { w: number; h: number; r: number; rOwn: 
   platter: { w: 1180, h: 640, r: 8, rOwn: 11 },
   lamps: { w: 1180, h: 640, r: 8, rOwn: 11 },
   spybar: { w: 1180, h: 640, r: 8, rOwn: 11 },
+  kda: { w: 1180, h: 640, r: 8, rOwn: 11 },
+  duelhp: { w: 1180, h: 640, r: 8, rOwn: 11 },
   // Turm-Familie (wie towers)
   barbell: { w: 1180, h: 600, r: 10, rOwn: 14 },
   sparkbar: { w: 1180, h: 600, r: 9, rOwn: 13 },
@@ -849,6 +853,27 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     }
     return Math.max(1, mx);
   }, [teams]);
+
+  // Feld-Minimum der End-Summen — Normierungs-Untergrenze für abgeleitete Stats
+  // (KDA / Duell-HP): n = (score − min) / (max − min), clamped. So klettern die
+  // Werte während des Reveals von der Feld-Untergrenze bis zum Endwert.
+  const finalMin = useMemo(() => {
+    let mn = Infinity;
+    for (const t of teams) {
+      let s = 0;
+      for (const p of t.players) s += playerNet(p);
+      if (s < mn) mn = s;
+    }
+    return Number.isFinite(mn) ? mn : 0;
+  }, [teams]);
+  const fieldNorm = useCallback(
+    (score: number): number => {
+      const span = finalMax - finalMin;
+      if (span <= 0) return score > 0 ? 1 : 0;
+      return Math.max(0, Math.min(1, (score - finalMin) / span));
+    },
+    [finalMax, finalMin],
+  );
 
   const tokenPos = useCallback(
     (t: RT, score: number): { x: number; y: number } => {
@@ -1466,7 +1491,11 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           />
           <span style={{ fontSize: 12.5, color: "var(--nl-mut)" }}>
             {progressLabel ??
-              (prim === "stage"
+              (prim === "kda"
+                ? "K/D/A aus der Feld-Wertung abgeleitet · KDA = (K+A)/D"
+                : prim === "duelhp"
+                ? "Lebensbalken = kumulierte Punkte (100 % = Feldbester)"
+                : prim === "stage"
                 ? "Aufstieg zur Ruhm-Treppe = kumulierte Punkte"
                 : prim === "mountain"
                   ? "Höhe am Berg = kumulierte Punkte"
@@ -1860,6 +1889,64 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                               const col = on ? (k % 2 ? "hsl(140 60% 50%)" : "hsl(2 75% 56%)") : "var(--nl-line)";
                               return <rect key={k} x={x0 + step * k + step * 0.2} y={yy - laneH * 0.28} width={step * 0.6} height={laneH * 0.56} rx={2} fill={col} opacity={on ? 0.9 : 0.32} />;
                             })}
+                          </g>
+                        );
+                      }
+                      if (prim === "kda") {
+                        // TDM — K/D/A deterministisch aus dem Feld-normierten Score
+                        // ableiten (n = (score−min)/(max−min)). K grün · D rot ·
+                        // A blau + KDA-Balken (Fortschritt) + Ratio rechts.
+                        const n = fieldNorm(t.score);
+                        const kills = Math.round(6 + n * 26);
+                        const deaths = Math.round(4 + (1 - n) * 16);
+                        const assists = Math.round(4 + n * 16);
+                        const kdaRatio = ((kills + assists) / Math.max(1, deaths)).toFixed(1);
+                        const barH = Math.min(11, laneH * 0.62);
+                        const fs = Math.min(9.5, Math.max(7, laneH * 0.62));
+                        return (
+                          <g style={{ fontVariantNumeric: "tabular-nums" }}>
+                            <rect x={x0} y={yy - barH / 2} width={x1 - x0} height={barH} rx={3} fill="var(--nl-line)" opacity={0.16} />
+                            <rect x={x0} y={yy - barH / 2} width={Math.max(0, pos.x - x0)} height={barH} rx={3} fill={fillCol} opacity={0.34} />
+                            <text x={x0 + 7} y={yy} dominantBaseline="middle" fontSize={fs} fontWeight={800}>
+                              <tspan fill="hsl(140 62% 56%)">{kills}</tspan>
+                              <tspan fill="var(--nl-mut)"> / </tspan>
+                              <tspan fill="hsl(2 78% 62%)">{deaths}</tspan>
+                              <tspan fill="var(--nl-mut)"> / </tspan>
+                              <tspan fill="hsl(210 82% 64%)">{assists}</tspan>
+                            </text>
+                            <text x={x1 - 6} y={yy} dominantBaseline="middle" textAnchor="end" fontSize={fs} fontWeight={800} fill="var(--nl-ink)">
+                              {kdaRatio}
+                            </text>
+                          </g>
+                        );
+                      }
+                      if (prim === "duelhp") {
+                        // Mini-DM — 1v1-Lebensbalken im Fighting-Game-Look: skewX-
+                        // Slant, Segment-Ticks, HP-Zahl rechts. Farbe hp>60 grün /
+                        // >30 gelb / sonst rot. „K.O.?" unter 25 %. Klar anders als kda.
+                        const n = fieldNorm(t.score);
+                        const hp = Math.round(n * 100);
+                        const col = hp > 60 ? "hsl(140 60% 48%)" : hp > 30 ? "hsl(41 85% 55%)" : "hsl(2 78% 56%)";
+                        const barH = Math.min(13, laneH * 0.72);
+                        const barW = x1 - x0;
+                        const fs = Math.min(10, Math.max(7, laneH * 0.66));
+                        return (
+                          <g>
+                            <g transform={`translate(0 ${yy}) skewX(-14)`}>
+                              <rect x={x0} y={-barH / 2} width={barW} height={barH} rx={2} fill="var(--nl-line)" opacity={0.22} />
+                              <rect x={x0} y={-barH / 2} width={Math.max(0, (hp / 100) * barW)} height={barH} rx={2} fill={col} opacity={0.9} />
+                              {Array.from({ length: 9 }).map((_, k) => (
+                                <line key={k} x1={x0 + ((k + 1) / 10) * barW} y1={-barH / 2} x2={x0 + ((k + 1) / 10) * barW} y2={barH / 2} stroke="var(--nl-bg)" strokeWidth={0.9} opacity={0.5} />
+                              ))}
+                            </g>
+                            {hp < 25 ? (
+                              <text x={x0 + 12} y={yy} dominantBaseline="middle" fontSize={fs} fontWeight={900} fill="hsl(2 88% 64%)" style={{ letterSpacing: "0.08em" }}>
+                                K.O.?
+                              </text>
+                            ) : null}
+                            <text x={x1 - 6} y={yy} dominantBaseline="middle" textAnchor="end" fontSize={fs + 1} fontWeight={900} fill={col}>
+                              {hp}
+                            </text>
                           </g>
                         );
                       }
