@@ -538,8 +538,17 @@ export function createRoomCoopSave(
 export function applyNewGameSetup(
   input: NewGameSetupInput,
   persistence: PersistenceService = createPersistenceService(),
+  options?: {
+    /**
+     * Owner of the acting session (only set when auth is on). When present, the new save becomes
+     * active FOR THAT USER only — their `active_saves` pointer is moved and the other player's
+     * active save is left untouched. Null/undefined -> unchanged global activate (blanket archive).
+     */
+    ownerId?: string | null;
+  },
 ): NewGameSetupApplyResult {
-  const previousActiveSaveId = persistence.getActiveSave()?.saveId ?? null;
+  const ownerId = options?.ownerId ?? null;
+  const previousActiveSaveId = persistence.getActiveSave(ownerId)?.saveId ?? null;
   const preliminary = buildNewGameStateFromBaseline(input);
   if (preliminary.preview.blockers.length > 0) {
     throw new Error(`new_game_setup_blocked:${preliminary.preview.blockers.join(",")}`);
@@ -555,7 +564,7 @@ export function applyNewGameSetup(
     name: prepared.preview.saveName,
   });
   const saved = persistence.saveSingleplayerState(created.saveId, prepared.gameState);
-  persistence.activateSave(saved.saveId);
+  persistence.activateSave(saved.saveId, ownerId);
 
   return {
     mode: "applied",

@@ -42,6 +42,19 @@ import { ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import { runAutoRosterFillForMatchdaySetup } from "@/lib/ai/auto-roster-fill-service";
 import { AUTO_ROSTER_FILL_CONFIRM_TOKEN } from "@/lib/ai/auto-roster-fill-contract";
+import { isAuthEnabled } from "@/lib/auth/config";
+import { getSessionUser } from "@/lib/auth/session";
+
+/**
+ * Owner-ID der eingeloggten Session (nur wenn OLY_AUTH_ENABLED=1). Bei deaktiviertem Login ->
+ * null, damit der globale Aktiv-Save-Pfad (Auth-OFF / Solo) exakt unveraendert bleibt.
+ */
+async function resolveSessionOwnerId(): Promise<string | null> {
+  if (!isAuthEnabled()) {
+    return null;
+  }
+  return (await getSessionUser())?.ownerId ?? null;
+}
 
 type SaveActionBody =
   | { action: "create"; name: string }
@@ -205,7 +218,12 @@ function healSponsorOffersForSave(persistence: PersistenceService, save: Persist
   return persisted.gameState;
 }
 
-function loadSqliteResponse(saveId?: string, requestedSaveMode: FoundationSaveMode = "all", compactInitial = false) {
+function loadSqliteResponse(
+  saveId?: string,
+  requestedSaveMode: FoundationSaveMode = "all",
+  compactInitial = false,
+  ownerId: string | null = null,
+) {
   const persistence = createPersistenceService();
   let allSaves = persistence.listSaves().map(enrichSaveSummary);
   if (allSaves.length === 0) {
@@ -217,7 +235,7 @@ function loadSqliteResponse(saveId?: string, requestedSaveMode: FoundationSaveMo
     requestedSaveMode === "all"
       ? allSaves
       : allSaves.filter((summary) => matchesFoundationSaveMode(requestedSaveMode, summary));
-  const activeSave = persistence.getActiveSave();
+  const activeSave = persistence.getActiveSave(ownerId);
   const activeSaveSummary =
     activeSave && (requestedSaveMode === "all" || matchesFoundationSaveMode(requestedSaveMode, activeSave))
       ? activeSave
@@ -228,7 +246,7 @@ function loadSqliteResponse(saveId?: string, requestedSaveMode: FoundationSaveMo
     : activeSaveSummary
       ? activeSaveSummary
       : fallbackSummary
-      ? persistence.activateSave(fallbackSummary.saveId) ?? persistence.getSaveById(fallbackSummary.saveId)
+      ? persistence.activateSave(fallbackSummary.saveId, ownerId) ?? persistence.getSaveById(fallbackSummary.saveId)
       : null;
   if (!saveId && fallbackSummary) {
     allSaves = persistence.listSaves().map(enrichSaveSummary);
@@ -291,7 +309,8 @@ export async function GET(request: Request) {
     return loadPrismaResponse(saveId);
   }
 
-  return loadSqliteResponse(saveId, saveMode, compactInitial);
+  const ownerId = await resolveSessionOwnerId();
+  return loadSqliteResponse(saveId, saveMode, compactInitial, ownerId);
 }
 
 export async function PUT(request: Request) {
@@ -422,7 +441,10 @@ export async function POST(request: Request) {
       scenarioMeta,
     });
   } else if (body.action === "activate") {
-    save = persistence.activateSave(body.saveId);
+    // Per-user active-save scoping: with auth on, activating only moves THIS owner's pointer and
+    // never archives the other player's active save. Auth off -> ownerId null -> global behavior.
+    const ownerId = await resolveSessionOwnerId();
+    save = persistence.activateSave(body.saveId, ownerId);
   } else if (body.action === "fresh-season-1") {
     const created = persistence.createFreshSeasonOneSave({ name: body.name });
     // A fresh Season 1 seeds all 32 teams with EMPTY rosters; matchdays cannot resolve until every team has a

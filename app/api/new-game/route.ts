@@ -7,6 +7,8 @@ import {
   previewNewGameSetup,
   type NewGamePresetId,
 } from "@/lib/game/new-game-setup-service";
+import { isAuthEnabled } from "@/lib/auth/config";
+import { getSessionUser } from "@/lib/auth/session";
 
 type NewGameRequestBody = {
   presetId?: NewGamePresetId;
@@ -51,8 +53,12 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Per-user active-save scoping: with auth on, the new game becomes active for the acting
+    // user only (their pointer), leaving the other player's active save untouched. Auth off ->
+    // ownerId null -> unchanged global activate.
+    const ownerId = isAuthEnabled() ? (await getSessionUser())?.ownerId ?? null : null;
     return NextResponse.json({
-      result: applyNewGameSetup(input),
+      result: applyNewGameSetup(input, undefined, { ownerId }),
     });
   } catch (error) {
     return NextResponse.json(
