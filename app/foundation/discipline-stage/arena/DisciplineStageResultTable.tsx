@@ -34,9 +34,9 @@ function fmt1(x: number): string {
 }
 function ampel(rank: number): string {
   if (rank <= 3) return "var(--nl-good)";
-  if (rank <= 6) return "var(--nl-warn)";
-  if (rank <= 10) return "var(--nl-risk)";
-  return "var(--nl-mut)";
+  if (rank <= 10) return "var(--nl-warn)";
+  if (rank <= 20) return "var(--nl-mut)";
+  return "var(--nl-risk)";
 }
 function netColor(boniMali: number): string {
   if (boniMali > 0.05) return "var(--nl-good)";
@@ -63,11 +63,12 @@ const HEAD: React.CSSProperties = {
 export default function DisciplineStageResultTable({ rows, slotLabels }: DisciplineStageResultTableProps) {
   return (
     <div
+      data-oly-result
       style={{ background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 12, animation: "olyFadeSlideIn .5s ease" }}
     >
       <style>{`@keyframes olyFadeSlideIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
         @media (prefers-reduced-motion: reduce){[data-oly-result]{animation:none!important}}`}</style>
-      <div data-oly-result style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 10 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 10 }}>
         <span style={{ fontSize: 11, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800 }}>
           Detail-Ergebnis
         </span>

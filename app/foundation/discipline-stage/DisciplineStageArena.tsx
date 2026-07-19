@@ -25,29 +25,29 @@ import DisciplineStageNativeArena, { type StagePrimitive } from "@/app/foundatio
 // die Optik: track (Oval, Position = Punkte), lanes (Bahnen, Fortschritt = Punkte),
 // towers (Türme, Höhe = Punkte).
 const NATIVE_PRIMITIVE: Record<string, StagePrimitive> = {
-  // track — Fortschritt auf einer Bahn
+  // track — Renn-/Parcours-Logik auf einer Bahn
   staffel: "track",
   spurt: "track",
   "takeshis-castle": "track",
-  hockey: "track",
-  wettessen: "track",
-  football: "track",
-  battlefield: "track",
   "mini-dm": "track",
-  "i-spy": "track",
-  tdm: "track",
+  battlefield: "track",
   // lanes — parallele Bahnen bis zum Ziel
   "time-trial": "lanes",
   "speed-schach": "lanes",
   fechten: "lanes",
   tennis: "lanes",
-  breaking: "lanes",
-  // towers — vertikale Höhe = Punkte
+  wettessen: "lanes", // "wer frisst sich zuerst durch" → Ziellinie
+  // towers — Höhe/Wertung = Punkte (Ballsport, Jury, gestapelte Leistung)
   basketball: "towers",
   gewichtheben: "towers",
   climbing: "towers",
   eiskunstlauf: "towers",
   showcase: "towers",
+  football: "towers",
+  hockey: "towers",
+  breaking: "towers", // Jury-Battle wie Eiskunstlauf/Showcase
+  "i-spy": "towers", // gestapelte Funde
+  tdm: "towers", // Etagen-Ersatz für das verworfene tiers
 };
 
 export type DisciplineStageArenaProps = {
@@ -171,37 +171,39 @@ function fmt1(x: number): string {
   return Number.isInteger(v) ? String(v) : v.toFixed(1);
 }
 
-// Disziplin-eigenes Vokabular für die Slot-Labels (Etappen-Button, Ticker,
-// Spotlight, Detail-Tabelle). Fällt sonst auf einen generischen Startplatz zurück.
+// Disziplin-eigene Slot-Labels — die ECHTEN Namen aus den Disziplin-Szenen
+// (Etappen-Button, Ticker, Spotlight, Detail-Tabelle). Hardcodiert übernommen,
+// damit sie den iframe-Abriss überleben. Für 3 Szenen ohne definierte Namen
+// (mini-dm, battlefield, i-spy) ein thematischer Fallback.
 const SLOT_VOCAB: Record<string, string[]> = {
-  staffel: ["Start-Läufer", "Tempo-Läufer", "Kurven-Läufer", "Schluss-Läufer", "Anker"],
-  spurt: ["Sprinter 1", "Sprinter 2", "Sprinter 3", "Sprinter 4", "Sprinter 5"],
-  "time-trial": ["Fahrer 1", "Fahrer 2", "Fahrer 3", "Fahrer 4", "Fahrer 5"],
-  hockey: ["Sturm", "Mittelfeld", "Abwehr", "Verteidiger", "Torwart"],
-  football: ["Angriff", "Mittelfeld", "Abwehr", "Verteidiger", "Torwart"],
-  basketball: ["Center", "Forward", "Guard", "Flügel", "Aufbau"],
-  wettessen: ["Gang 1", "Gang 2", "Gang 3", "Gang 4", "Gang 5"],
-  gewichtheben: ["Reißen", "Stoßen", "Zusatzheben", "Finalheben", "Anker"],
-  climbing: ["Route 1", "Route 2", "Route 3", "Route 4", "Route 5"],
-  eiskunstlauf: ["Kür 1", "Kür 2", "Kür 3", "Kür 4", "Kür 5"],
-  showcase: ["Auftritt 1", "Auftritt 2", "Auftritt 3", "Auftritt 4", "Auftritt 5"],
-  "speed-schach": ["Brett 1", "Brett 2", "Brett 3", "Brett 4", "Brett 5"],
-  fechten: ["Gefecht 1", "Gefecht 2", "Gefecht 3", "Gefecht 4", "Gefecht 5"],
-  tennis: ["Match 1", "Match 2", "Match 3", "Doppel", "Anker"],
-  breaking: ["Battle 1", "Battle 2", "Battle 3", "Battle 4", "Battle 5"],
-  "takeshis-castle": ["Lauf 1", "Lauf 2", "Lauf 3", "Lauf 4", "Lauf 5"],
-  battlefield: ["Welle 1", "Welle 2", "Welle 3", "Welle 4", "Welle 5"],
+  staffel: ["Start Runner", "Tempo Link", "Baton Tech", "Curve Runner", "Anchor"],
+  spurt: ["Block Start", "Acceleration", "Top Speed", "Drive Phase", "Photo Finish"],
+  "time-trial": ["Pacer", "Line Reader", "Aero Drive", "Split Control", "Finish Kick"],
+  hockey: ["Power Forward", "Defensive Wall", "Playmaker", "Slot Finisher", "Captain Line"],
+  football: ["Line Power", "Route Burst", "Field Read", "Red Zone", "Locker Leader"],
+  basketball: ["Tip-Off", "Fast Break", "Downtown", "And-One", "Buzzer Beater"],
+  wettessen: ["Amuse-Bouche", "Suppe", "Hauptgang", "Wildbret", "Dessert"],
+  gewichtheben: ["Power Opener", "Safe Lift", "Pressure Lift", "Technical Lift", "Grip Anchor"],
+  climbing: ["Route Reader", "Grip Specialist", "Pace Climber", "Endurance Wall", "Summit Push"],
+  eiskunstlauf: ["Edge Control", "Jump Setup", "Spin Grace", "Crowd Moment", "Final Pose"],
+  showcase: ["Stage Lead", "Crowd Hook", "Style Tech", "Big Moment", "Finale"],
+  "speed-schach": ["Opening Prep", "Pattern Read", "Clock Pressure", "Calculation Core", "Endgame Anchor"],
+  fechten: ["Duelist", "Aggressor", "Defender", "Technician", "Final Touch"],
+  tennis: ["Serve", "Return", "Rally Control", "Net Pressure", "Tiebreak Clutch"],
+  breaking: ["First Blood", "Pain Threshold", "Stone Face", "Mind Fortress", "Unbroken"],
+  "takeshis-castle": ["Gate Crash", "Balance Run", "Trap Reader", "Chaos Dodge", "Final Wall"],
+  tdm: ["Opener", "Trader", "Anchor", "Lurker", "Closer"],
+  // Szenen ohne definierte SLOTS — thematischer Fallback:
+  battlefield: ["Ansturm", "Flanke", "Verteidigung", "Belagerung", "Sturm-Finale"],
   "mini-dm": ["Runde 1", "Runde 2", "Runde 3", "Runde 4", "Runde 5"],
-  "i-spy": ["Fund 1", "Fund 2", "Fund 3", "Fund 4", "Fund 5"],
-  tdm: ["Runde 1", "Runde 2", "Runde 3", "Runde 4", "Runde 5"],
+  "i-spy": ["Erster Fund", "Zweiter Fund", "Dritter Fund", "Vierter Fund", "Letzter Fund"],
 };
 
 function slotLabel(disciplineId: string, index: number, total: number): string {
   const vocab = SLOT_VOCAB[disciplineId];
-  if (vocab) {
-    return vocab[index] ?? `${vocab[0]?.replace(/\s*\d+$/, "") ?? "Slot"} ${index + 1}`;
-  }
-  return total <= 1 ? "Einzel" : `Platz ${index + 1}`;
+  if (vocab && vocab[index]) return vocab[index];
+  if (total <= 1) return "Einzel";
+  return `Etappe ${index + 1}`;
 }
 
 export default function DisciplineStageArena({
@@ -652,6 +654,7 @@ export default function DisciplineStageArena({
           onOpenPlayer={onOpenPlayer}
           topPlayers={topPlayers}
           primitive={NATIVE_PRIMITIVE[disciplineId] ?? "track"}
+          disciplineName={model.disciplineName}
         />
       ) : scene ? (
         <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>

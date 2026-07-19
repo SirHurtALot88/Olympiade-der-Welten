@@ -36,6 +36,7 @@ export type DisciplineStageNativeArenaProps = {
   topPlayers?: { rows: DisciplineStageTopPlayer[]; ids: (string | null)[] } | null;
   primitive?: StagePrimitive;
   progressLabel?: string; // z.B. "Position auf dem Oval = kumulierte Punkte"
+  disciplineName?: string; // Feld-Wasserzeichen (Identität je Disziplin)
 };
 
 const STAR_MIN = 80;
@@ -57,19 +58,20 @@ function fmt1(x: number): string {
 function modSum(mods: NativeStageMod[]): number {
   return mods.reduce((s, m) => s + m.sign * m.amt, 0);
 }
-function playerNet(p: NativeStagePlayer): number {
+function playerNet(p: NativeStagePlayer | null | undefined): number {
+  if (!p) return 0;
   return Math.max(0, round1(p.val + modSum(p.mods)));
 }
-function hueFor(code: string): number {
-  let h = 0;
-  for (let i = 0; i < code.length; i += 1) h = (h * 31 + code.charCodeAt(i)) % 360;
-  return h;
+// Golden-Angle-Farbverteilung nach fester Team-Position → maximale Spreizung,
+// keine Hash-Kollisionen (früher hueFor über den Code → viele fast gleiche Grüns).
+function hueForIdx(idx: number): number {
+  return Math.round((idx * 137.508) % 360);
 }
 function ampel(rank: number): string {
   if (rank <= 3) return "var(--nl-good)";
-  if (rank <= 6) return "var(--nl-warn)";
-  if (rank <= 10) return "var(--nl-risk)";
-  return "var(--nl-mut)";
+  if (rank <= 10) return "var(--nl-warn)";
+  if (rank <= 20) return "var(--nl-mut)";
+  return "var(--nl-risk)";
 }
 function calcString(p: NativeStagePlayer): string {
   let s = `${fmt1(p.val)}`;
@@ -110,10 +112,10 @@ type RT = {
 type Impact = { tier: 0 | 1 | 2; cause: string; color: string; text: string; delta: number };
 type Pop = { id: number; xPct: number; yPct: number; net: number; mine: boolean };
 type Frag = { id: number; xPct: number; yPct: number; text: string; sign: 1 | -1 };
-type Spot = { crest: NativeStageTeam; kick: string; name: string; sub: string; net: number; chipText: string; chipColor: string; mine: boolean } | null;
-type PodCol = { place: number; code: string; name: string; pts: number; logoUrl: string | null; isOwn: boolean; delayMs: number; loud: boolean };
+type Spot = { crest: NativeStageTeam; idx: number; kick: string; name: string; sub: string; net: number; chipText: string; chipColor: string; mine: boolean } | null;
+type PodCol = { place: number; code: string; name: string; pts: number; logoUrl: string | null; isOwn: boolean; idx: number; delayMs: number; loud: boolean };
 
-export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, topPlayers, primitive = "track", progressLabel }: DisciplineStageNativeArenaProps) {
+export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, topPlayers, primitive = "track", progressLabel, disciplineName }: DisciplineStageNativeArenaProps) {
   const slotCount = Math.max(1, slots.length);
   const prim = primitive;
   const geo = PRIM_GEO[prim];
@@ -125,7 +127,14 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
 
   const reduced = useRef(false);
   useEffect(() => {
-    reduced.current = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    reduced.current = mq.matches;
+    const onChange = (e: MediaQueryListEvent) => {
+      reduced.current = e.matches;
+    };
+    mq.addEventListener?.("change", onChange);
+    return () => mq.removeEventListener?.("change", onChange);
   }, []);
 
   // ---- Laufzeit-Teams (mutabel im Cascade, Re-Render via force()) ----
@@ -253,22 +262,34 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       if (prim === "lanes") {
         const idx = t.seasonRank - 1;
         const y = layout.top + idx * layout.laneH + layout.laneH / 2;
-        const norm = maxScore > 0 ? score / maxScore : 0;
+        // Headroom: Führender bei ~90 %, die Ziellinie bleibt bis zuletzt frei.
+        const norm = maxScore > 0 ? (score / maxScore) * 0.9 : 0;
         return { x: layout.xStart + norm * (layout.xEnd - layout.xStart), y };
       }
       if (prim === "towers") {
         const idx = t.seasonRank - 1;
         const x = layout.lPad + idx * layout.colW + layout.colW / 2;
-        const norm = maxScore > 0 ? score / maxScore : 0;
+        const norm = maxScore > 0 ? (score / maxScore) * 0.9 : 0;
         return { x, y: layout.baseY - norm * (layout.baseY - layout.topY) };
       }
-      // track (Oval)
+      // track (Oval) — Position entlang der Bahn + stabiler Quer-Versatz nach
+      // fester Team-Position, damit sich das Feld in ~6 Bahnen auffächert statt
+      // zu einem Pulk zu kollabieren.
       if (!pathRef.current || pathLen === 0) return { x: W / 2, y: 70 };
       const span = maxScore - minScore;
       const norm = span > 0 ? (score - minScore) / span : 0;
       const frac = 0.06 + norm * 0.86;
-      const pt = pathRef.current.getPointAtLength(frac * pathLen);
-      return { x: pt.x, y: pt.y };
+      const L = frac * pathLen;
+      const pt = pathRef.current.getPointAtLength(L);
+      const p2 = pathRef.current.getPointAtLength(Math.min(pathLen, L + 2));
+      let tx = p2.x - pt.x;
+      let ty = p2.y - pt.y;
+      const tl = Math.hypot(tx, ty) || 1;
+      tx /= tl;
+      ty /= tl;
+      const lane = ((t.seasonRank - 1) % 6) - 2.5; // -2.5 … 2.5
+      const off = lane * 8.5;
+      return { x: pt.x + -ty * off, y: pt.y + tx * off };
     },
     [prim, layout, pathLen, maxScore, minScore, W],
   );
@@ -315,8 +336,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       t.rankHist[rnd] = t.roundRankAfter;
     });
   }
-  function applyReveal(t: RT, slot: number, rt: RT[]): { player: NativeStagePlayer; net: number } {
-    const p = t.players[slot];
+  function applyReveal(t: RT, slot: number, rt: RT[]): { player: NativeStagePlayer | null; net: number } {
+    const p = t.players[slot] ?? null;
     const net = playerNet(p);
     t.prevScore = t.score;
     t.score = round1(t.score + net);
@@ -326,7 +347,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     updateRoundMedals(slot, rt);
     return { player: p, net };
   }
-  function noteReveal(t: RT, slot: number, res: { player: NativeStagePlayer; net: number }, isMine: boolean, rt: RT[]): Impact {
+  function noteReveal(t: RT, slot: number, res: { player: NativeStagePlayer | null; net: number }, isMine: boolean, rt: RT[]): Impact {
+    if (!res.player) return { tier: 0, cause: "tick", color: "gold", text: "", delta: t.roundDelta };
     const net = res.net;
     const p = res.player;
     const bonSum = p.mods.filter((m) => m.sign > 0).reduce((s, m) => s + m.amt, 0);
@@ -420,7 +442,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     (net: number, mine: boolean, pos: { x: number; y: number }) => {
       if (reduced.current) return;
       const id = fxId.current++;
-      setPops((ps) => [...ps, { id, xPct: (pos.x / W) * 100, yPct: (pos.y / H) * 100, net, mine }]);
+      setPops((ps) => [...ps, { id, xPct: (pos.x / W) * 100 + (Math.random() * 3 - 1.5), yPct: (pos.y / H) * 100 - (Math.random() * 3 + 1), net, mine }]);
       later(() => setPops((ps) => ps.filter((p) => p.id !== id)), 950);
     },
     [later, W, H],
@@ -443,9 +465,15 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     },
     [later, W, H],
   );
-  const glow = useCallback((t: RT) => {
-    t.glowUntil = Date.now() + 1500;
-  }, []);
+  const glow = useCallback(
+    (t: RT) => {
+      t.glowUntil = Date.now() + 1500;
+      // Re-Render nach Ablauf, sonst pulsieren die letzten Ringe einer Runde
+      // ewig weiter (nichts rendert mehr nach dem letzten Reveal).
+      later(() => force(), 1550);
+    },
+    [later],
+  );
 
   const showSpotlight = useCallback(
     (o: NonNullable<Spot>, holdMs = 1500) => {
@@ -473,7 +501,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     const rowKey = `${slot}-${t.code}-${fxId.current++}`;
     const node = (
       <div key={rowKey} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 8px", borderRadius: 8, background: t.isOwn ? "color-mix(in srgb, var(--nl-accent) 14%, transparent)" : "transparent", fontVariantNumeric: "tabular-nums" }}>
-        <span aria-hidden style={{ width: 20, height: 20, borderRadius: "50%", flex: "none", overflow: "hidden", background: t.logoUrl ? "transparent" : `hsl(${hueFor(t.code)} 60% 52%)`, display: "grid", placeItems: "center" }}>
+        <span aria-hidden style={{ width: 20, height: 20, borderRadius: "50%", flex: "none", overflow: "hidden", background: t.logoUrl ? "transparent" : `hsl(${hueForIdx(t.idx)} 60% 52%)`, display: "grid", placeItems: "center" }}>
           {t.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={t.logoUrl} alt="" width={20} height={20} style={{ width: 20, height: 20, objectFit: "cover" }} />
@@ -499,7 +527,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         <div style={{ textAlign: "right", flex: "none" }}>
           <div style={{ fontWeight: 800, color: "var(--nl-accent)", fontSize: 13 }}>+{fmt1(res.net)}</div>
           <div style={{ fontSize: 11, fontWeight: 800, color: delta > 0 ? "var(--nl-good)" : delta < 0 ? "var(--nl-risk)" : "var(--nl-mut)" }}>
-            <span style={{ color: ampel(t.rank) }}>#{t.rank}</span>
+            <span style={{ color: ampel(t.roundRankAfter) }}>#{t.roundRankAfter}</span>
             {slot > 0 && delta !== 0 ? ` (${delta > 0 ? "▲" : "▼"}${Math.abs(delta)})` : ""}
           </div>
         </div>
@@ -539,7 +567,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     const cols: PodCol[] = [];
     visual.forEach((t, i) => {
       if (!t) return;
-      cols.push({ place: place[i], code: t.code, name: t.name, pts: t.score, logoUrl: t.logoUrl, isOwn: t.isOwn, delayMs: delayByVisual[i], loud: place[i] === 1 });
+      cols.push({ place: place[i], code: t.code, name: t.name, pts: t.score, logoUrl: t.logoUrl, isOwn: t.isOwn, idx: t.idx, delayMs: delayByVisual[i], loud: place[i] === 1 });
     });
     setPodium(cols);
     fireFlash("gold");
@@ -586,13 +614,19 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       const pos = tokenPos(t, t.score);
       // Bewegung: Token gleitet (CSS-Transition); eigenes Team langsamer (Slow-Mo).
       force();
+      // Leerer Slot (Team mit weniger Spielern): nur weiterrücken, keine FX.
+      if (!res.player) {
+        later(doOne, 90);
+        return;
+      }
       addPop(res.net, isMine, pos);
       addFrags(res.player, pos);
-      pushTicker(t, r, res, impact, rt);
+      pushTicker(t, r, { player: res.player, net: res.net }, impact, rt);
       // Sounds/Highlights nach Tier
       if (impact.tier === 2) {
         showSpotlight({
           crest: { code: t.code, name: t.name, logoUrl: t.logoUrl, isOwn: t.isOwn, players: t.players },
+          idx: t.idx,
           kick: causeKick(impact.cause, isMine),
           name: (isMine ? "★ " : "") + res.player.name,
           sub: `${t.code} · ${t.name}${slots[r] ? " · " + slots[r] : ""}`,
@@ -622,6 +656,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         showSpotlight(
           {
             crest: { code: t.code, name: t.name, logoUrl: t.logoUrl, isOwn: true, players: t.players },
+            idx: t.idx,
             kick: "DEIN LÄUFER",
             name: "★ " + res.player.name,
             sub: `${t.code} · ${t.name}${slots[r] ? " · " + slots[r] : ""}`,
@@ -634,7 +669,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         );
         glow(t);
       }
-      const delay = impact.tier === 2 ? 1550 : isMine ? 750 : impact.tier === 1 ? 240 : 90;
+      const delay = impact.tier === 2 ? 1550 : isMine ? 750 : impact.tier === 1 ? 240 : 130;
       later(doOne, delay);
     };
     doOne();
@@ -792,7 +827,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               // eslint-disable-next-line @next/next/no-img-element
               <img src={spotlight.crest.logoUrl} alt="" width={38} height={38} style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", border: `2px solid ${spotlight.mine ? "var(--nl-accent)" : "var(--nl-warn)"}` }} />
             ) : (
-              <span aria-hidden style={{ width: 38, height: 38, borderRadius: "50%", display: "grid", placeItems: "center", background: `hsl(${hueFor(spotlight.crest.code)} 60% 52%)`, fontWeight: 800, fontSize: 12 }}>{spotlight.crest.code.slice(0, 3)}</span>
+              <span aria-hidden style={{ width: 38, height: 38, borderRadius: "50%", display: "grid", placeItems: "center", background: `hsl(${hueForIdx(spotlight.idx)} 60% 52%)`, fontWeight: 800, fontSize: 12 }}>{spotlight.crest.code.slice(0, 3)}</span>
             )}
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 800, color: spotlight.mine ? "var(--nl-accent)" : "var(--nl-warn)" }}>{spotlight.kick}</div>
@@ -819,6 +854,13 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               )}
             </defs>
 
+            {/* Feld-Wasserzeichen: Disziplin-Identität */}
+            {disciplineName ? (
+              <text x={18} y={30} fontSize={19} fontWeight={800} letterSpacing="0.04em" fill="var(--nl-line-2, var(--nl-line))" opacity={0.85} style={{ textTransform: "uppercase" }}>
+                {disciplineName}
+              </text>
+            ) : null}
+
             {/* Feld je Primitive */}
             {prim === "track" ? (
               <>
@@ -835,12 +877,23 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                 {Array.from({ length: Math.ceil((H - 2 * layout.top) / 12) }).map((_, i) => (
                   <rect key={i} x={layout.xEnd} y={layout.top + i * 12} width={6} height={6} fill={i % 2 ? "var(--nl-ink)" : "var(--nl-mut)"} opacity={0.7} />
                 ))}
+                {rtRef.current.map((t) => (
+                  <text key={`ll-${t.code}`} x={layout.xStart - 8} y={layout.top + (t.seasonRank - 1) * layout.laneH + layout.laneH / 2} dominantBaseline="middle" textAnchor="end" fontSize={9.5} fontWeight={t.isOwn ? 800 : 600} fill={t.isOwn ? "var(--nl-accent)" : "var(--nl-mut)"}>
+                    {t.isOwn ? "★" : ""}
+                    {t.code}
+                  </text>
+                ))}
               </>
             ) : (
               <>
                 <line x1={layout.lPad} y1={layout.baseY} x2={W - layout.rPad} y2={layout.baseY} stroke="var(--nl-mut)" strokeWidth={2} />
                 {[0.25, 0.5, 0.75, 1].map((f, i) => (
                   <line key={i} x1={layout.lPad} y1={layout.baseY - (layout.baseY - layout.topY) * f} x2={W - layout.rPad} y2={layout.baseY - (layout.baseY - layout.topY) * f} stroke="var(--nl-line)" strokeWidth={1} strokeDasharray="3 8" opacity={0.45} />
+                ))}
+                {rtRef.current.map((t) => (
+                  <text key={`tl-${t.code}`} x={layout.lPad + (t.seasonRank - 1) * layout.colW + layout.colW / 2} y={layout.baseY + 13} textAnchor="middle" fontSize={8.5} fontWeight={t.isOwn ? 800 : 600} fill={t.isOwn ? "var(--nl-accent)" : "var(--nl-mut)"}>
+                    {t.code}
+                  </text>
                 ))}
               </>
             )}
@@ -851,7 +904,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               .map((t) => {
                 const pos = tokenPos(t, t.score);
                 const r = t.isOwn ? geo.rOwn : geo.r;
-                const hue = hueFor(t.code);
+                const hue = hueForIdx(t.idx);
                 const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
                 const dur = t.isOwn ? 1300 : 520;
                 const glowing = t.glowUntil > now;
@@ -928,7 +981,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={c.logoUrl} alt="" width={60} height={60} style={{ width: 60, height: 60, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--nl-line)", boxShadow: "0 6px 18px -6px rgba(0,0,0,.7)" }} />
                       ) : (
-                        <span aria-hidden style={{ width: 60, height: 60, borderRadius: "50%", display: "grid", placeItems: "center", background: `hsl(${hueFor(c.code)} 60% 52%)`, fontWeight: 800, boxShadow: "0 6px 18px -6px rgba(0,0,0,.7)" }}>{c.code.slice(0, 3)}</span>
+                        <span aria-hidden style={{ width: 60, height: 60, borderRadius: "50%", display: "grid", placeItems: "center", background: `hsl(${hueForIdx(c.idx)} 60% 52%)`, fontWeight: 800, boxShadow: "0 6px 18px -6px rgba(0,0,0,.7)" }}>{c.code.slice(0, 3)}</span>
                       )}
                       <div style={{ fontSize: 13, fontWeight: 800, textAlign: "center", maxWidth: 120, lineHeight: 1.15, color: c.isOwn ? "var(--nl-accent)" : "inherit" }}>{c.isOwn ? "★ " : ""}{c.name}</div>
                       <div style={{ fontSize: 11.5, color: "var(--nl-mut)", fontVariantNumeric: "tabular-nums" }}>{fmt1(c.pts)} Punkte</div>
@@ -939,6 +992,11 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                   );
                 })}
               </div>
+              {me && me.rank > 3 ? (
+                <div style={{ marginTop: 16, fontSize: 13.5, fontWeight: 800, color: "var(--nl-accent)" }}>
+                  Dein Team {me.code}: Rang {me.rank} / {N} · {fmt1(me.score)} Punkte
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -969,7 +1027,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               // eslint-disable-next-line @next/next/no-img-element
               <img src={t.logoUrl} alt="" width={16} height={16} style={{ width: 16, height: 16, borderRadius: 4, objectFit: "cover", flex: "none" }} />
             ) : (
-              <span aria-hidden style={{ width: 16, height: 16, borderRadius: 4, flex: "none", background: `hsl(${hueFor(t.code)} 60% 52%)` }} />
+              <span aria-hidden style={{ width: 16, height: 16, borderRadius: 4, flex: "none", background: `hsl(${hueForIdx(t.idx)} 60% 52%)` }} />
             )}
             <span style={{ width: 44, fontWeight: 800, color: t.isOwn ? "var(--nl-accent)" : "inherit", fontSize: 12.5 }}>{t.code}</span>
             <span style={{ flex: 1, fontSize: 11.5, color: "var(--nl-mut)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
@@ -1000,7 +1058,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={t.logoUrl} alt="" width={26} height={26} style={{ width: 26, height: 26, borderRadius: "50%", objectFit: "cover" }} />
                   ) : (
-                    <span aria-hidden style={{ width: 26, height: 26, borderRadius: "50%", background: `hsl(${hueFor(t.code)} 60% 52%)`, display: "grid", placeItems: "center", fontSize: 10, fontWeight: 800 }}>{t.code.slice(0, 3)}</span>
+                    <span aria-hidden style={{ width: 26, height: 26, borderRadius: "50%", background: `hsl(${hueForIdx(t.idx)} 60% 52%)`, display: "grid", placeItems: "center", fontSize: 10, fontWeight: 800 }}>{t.code.slice(0, 3)}</span>
                   )}
                   <span style={{ fontWeight: 800 }}>{t.code}</span>
                   <span style={{ fontSize: 12, color: "var(--nl-mut)", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
