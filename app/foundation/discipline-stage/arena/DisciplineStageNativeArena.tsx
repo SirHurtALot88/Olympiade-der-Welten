@@ -64,7 +64,8 @@ export type StagePrimitive =
   | "court" // Basketball — Wurfkarte (Halbfeld)
   | "rink" // Hockey — Eisrink von oben
   // Voll-Feld-Sonderlayouts (kein Token-auf-Feld, aus ALLEN Scores berechnet):
-  | "klassen"; // Schach/Tennis — Liga-Klassen-Bänder nach Punkt-Lücken
+  | "klassen" // Schach/Tennis — Liga-Klassen-Bänder nach Punkt-Lücken
+  | "territory"; // Battlefield — Squarified Treemap, Fläche ∝ Score, %-Label + 🚩
 
 // Familien mit geteilter Geometrie: Row-Familie rechnet wie "lanes",
 // Turm-Familie wie "towers". Nur der Hintergrund/Overlay unterscheidet sie.
@@ -74,7 +75,7 @@ const TOWER_FAMILY = new Set<StagePrimitive>(["towers", "barbell", "sparkbar", "
 const SCENE_PRIMS = new Set<StagePrimitive>(["peloton", "mountain", "court", "rink", "parcours", "bump"]);
 // Voll-Feld-Sonderlayouts: eigener Render-Zweig aus ALLEN Scores (kein gleitendes
 // Token, keine Bahn/Turm/Szene-Geometrie). deco/glow + Token-Schleife entfallen.
-const FIELD_CUSTOM = new Set<StagePrimitive>(["klassen"]);
+const FIELD_CUSTOM = new Set<StagePrimitive>(["klassen", "territory"]);
 export type DisciplineStageNativeArenaProps = {
   teams: NativeStageTeam[];
   slots: string[];
@@ -579,6 +580,136 @@ function renderKlassenBands(sorted: RT[], W: number, H: number, env: StageEnv): 
   return <>{nodes}</>;
 }
 
+// Squarified Treemap (Battlefield-Gebietseroberung): ganzes Feld = 100 %, Zellen-
+// Fläche ∝ Score. Port des klassischen Squarify-Algorithmus (Bruls et al.). Teams
+// ohne Punkte haben noch kein Gebiet erobert und erscheinen nicht. %-Label je Zone,
+// 🚩 auf die größte, Beziehungs-Rahmen. Alle Farben hsl()/rgb()/Token → Lint-sauber.
+type TreemapCell = { t: RT; x: number; y: number; w: number; h: number };
+function squarifyTreemap(items: { v: number; t: RT }[], W: number, H: number): TreemapCell[] {
+  let total = 0;
+  for (const it of items) total += it.v;
+  if (total <= 0) return [];
+  const scale = (W * H) / total;
+  const vals = items.map((it) => ({ it, a: it.v * scale }));
+  const out: TreemapCell[] = [];
+  let x = 0;
+  let y = 0;
+  let w = W;
+  let h = H;
+  let i0 = 0;
+  const worst = (row: { a: number }[], side: number): number => {
+    let s = 0;
+    let mx = -Infinity;
+    let mn = Infinity;
+    for (const rr of row) {
+      s += rr.a;
+      if (rr.a > mx) mx = rr.a;
+      if (rr.a < mn) mn = rr.a;
+    }
+    if (s <= 0) return Infinity;
+    return Math.max((side * side * mx) / (s * s), (s * s) / (side * side * mn));
+  };
+  while (i0 < vals.length) {
+    const side = Math.min(w, h);
+    const row = [vals[i0]!];
+    let j = i0 + 1;
+    while (j < vals.length) {
+      const cur = worst(row, side);
+      row.push(vals[j]!);
+      const nx = worst(row, side);
+      if (nx > cur) {
+        row.pop();
+        break;
+      }
+      j += 1;
+    }
+    let s = 0;
+    for (const rr of row) s += rr.a;
+    if (w >= h) {
+      const rw = s / h;
+      let cy = y;
+      for (const rr of row) {
+        const rh = rr.a / rw;
+        out.push({ t: rr.it.t, x, y: cy, w: rw, h: rh });
+        cy += rh;
+      }
+      x += rw;
+      w -= rw;
+    } else {
+      const rh2 = s / w;
+      let cx = x;
+      for (const rr of row) {
+        const rw2 = rr.a / rh2;
+        out.push({ t: rr.it.t, x: cx, y, w: rw2, h: rh2 });
+        cx += rw2;
+      }
+      y += rh2;
+      h -= rh2;
+    }
+    i0 = j;
+  }
+  return out;
+}
+function renderTerritory(sorted: RT[], W: number, H: number, env: StageEnv): React.ReactNode {
+  const items = sorted.filter((t) => t.score > 0).map((t) => ({ v: t.score, t }));
+  if (items.length === 0) {
+    return (
+      <text x={W / 2} y={H / 2} textAnchor="middle" fontSize={18} fontWeight={800} fill={env.line} opacity={0.6}>
+        Gebiet noch unerobert — erste Wertung startet gleich
+      </text>
+    );
+  }
+  const total = items.reduce((s, it) => s + it.v, 0);
+  const cells = squarifyTreemap(items, W, H);
+  const max = sorted[0]!.score;
+  const min = sorted[sorted.length - 1]!.score;
+  const span = max - min;
+  const topCode = sorted[0]!.code;
+  const INK = "hsl(210 30% 96%)";
+  return (
+    <>
+      {cells.map((c) => {
+        const t = c.t;
+        const nm = span > 0 ? Math.max(0, Math.min(1, (t.score - min) / span)) : 1;
+        const rc = relColor(t.rel);
+        const med = t.rank === 1 ? "var(--nl-warn)" : t.rank === 2 ? "var(--nl-mut)" : t.rank === 3 ? "rgb(205,127,50)" : null;
+        const fill = rc ?? med ?? "hsl(80 40% 42%)";
+        const pv = (t.score / total) * 100;
+        const x = c.x + 1;
+        const y = c.y + 1;
+        const w = Math.max(0, c.w - 2);
+        const h = Math.max(0, c.h - 2);
+        const big = w > 54 && h > 40;
+        const mid = w > 34 && h > 18;
+        return (
+          <g key={t.code}>
+            <rect x={x} y={y} width={w} height={h} rx={4} fill={fill} fillOpacity={0.4 + nm * 0.5} stroke={rc ?? "rgba(0,0,0,0.55)"} strokeWidth={rc ? 2.4 : 1} />
+            {big ? (
+              <>
+                <text x={x + w / 2} y={y + h / 2 - 2} textAnchor="middle" fontSize={w > 90 ? 14 : 11} fontWeight={800} fill={INK}>
+                  {t.code}
+                </text>
+                <text x={x + w / 2} y={y + h / 2 + 14} textAnchor="middle" fontSize={10} fill={INK} opacity={0.85}>
+                  {pv.toFixed(1)}%
+                </text>
+              </>
+            ) : mid ? (
+              <text x={x + w / 2} y={y + h / 2 + 4} textAnchor="middle" fontSize={9.5} fontWeight={800} fill={INK}>
+                {t.code}
+              </text>
+            ) : null}
+            {t.code === topCode && w > 24 && h > 20 ? (
+              <text x={x + w - 4} y={y + 16} textAnchor="end" fontSize={15}>
+                🚩
+              </text>
+            ) : null}
+          </g>
+        );
+      })}
+    </>
+  );
+}
+
 const STAR_MIN = 80;
 // viewBox + Token-Radien je Primitive. Der Rest (Engine/FX/Ticker/Podest/Tabelle)
 // ist geometrieunabhängig; nur Feld-Layout + tokenPos unterscheiden sich.
@@ -607,6 +738,7 @@ const PRIM_GEO: Record<StagePrimitive, { w: number; h: number; r: number; rOwn: 
   court: { w: 1180, h: 620, r: 11, rOwn: 16 },
   rink: { w: 1180, h: 560, r: 11, rOwn: 15 },
   klassen: { w: 1180, h: 640, r: 8, rOwn: 11 },
+  territory: { w: 1180, h: 640, r: 8, rOwn: 11 },
 };
 
 function round1(x: number): number {
@@ -1636,6 +1768,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                 ? "Linien = Rang nach jeder Etappe (oben = Spitze)"
                 : prim === "klassen"
                 ? "Liga-Klassen nach Punkt-Lücken (Meister → Keller)"
+                : prim === "territory"
+                ? "Fläche = eroberter Gebietsanteil (Score als % des Feldes)"
                 : prim === "stage"
                 ? "Aufstieg zur Ruhm-Treppe = kumulierte Punkte"
                 : prim === "mountain"
@@ -1741,6 +1875,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
 
                 {prim === "klassen" ? (
                   renderKlassenBands(sorted, W, H, env)
+                ) : prim === "territory" ? (
+                  renderTerritory(sorted, W, H, env)
                 ) : prim === "track" ? (
                   <>
                     <path d={ovalPath} fill="none" stroke={env.stands} strokeWidth={OVAL_BAND + 30} />

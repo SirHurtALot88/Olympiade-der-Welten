@@ -33,7 +33,7 @@ const NATIVE_PRIMITIVE: Record<string, StagePrimitive> = {
   spurt: "bump", // Slalom/Bump: Rang-über-Etappen-Linien (nutzt rankHistory)
   "takeshis-castle": "parcours", // Schlangen-Parcours (Serpentine)
   "mini-dm": "duelhp", // 1v1-Lebensbalken (Fighting-Game-HP)
-  battlefield: "track",
+  battlefield: "territory", // Squarified Treemap (Gebietseroberung, Fläche ∝ Score)
   // lanes / Row-Familie — parallele Reihen bis zum Ziel
   "time-trial": "peloton", // Straße: Ausreißer/Hauptfeld
   "speed-schach": "klassen", // Liga-Klassen-Bänder (Elo-Klassen)
