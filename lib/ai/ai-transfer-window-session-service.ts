@@ -442,6 +442,15 @@ async function runTeamCycle(input: {
     });
     warnings.push(`organic_squad_builder_buy:decisions=${plan.decisions.length}`);
     if (plan.stoppedBelowMin) warnings.push("organic_squad_builder_stopped_below_min");
+    // Salary-Ceiling-V2 Telemetrie auch auf dem In-Season/Preseason-Pfad (S2+) surfacen — der S1-Draft-
+    // Pfad (ai-picks-run-service) tut das bereits; ohne dies bleibt das Limit im Long-Run unsichtbar.
+    if (plan.salaryCeilingDebug) {
+      const c = plan.salaryCeilingDebug;
+      warnings.push(
+        `salary_ceiling_v2:ceiling=${c.salaryCeiling}:sustainable=${c.sustainableSalary}:trend=${c.trendFactor}:` +
+          `ambitionScale=${c.ambitionScale}:planSalaryAfter=${plan.finalSalaryTotal}`,
+      );
+    }
 
     // PURE BUY (clean two-phase model — see .cursor/rules/balancing-no-sell-floor-full-rebuild.mdc):
     // the preseason cycle only ever BUYS. It spends the team's CURRENT cash to fill toward min/opt with the
