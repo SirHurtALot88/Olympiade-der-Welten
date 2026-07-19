@@ -86,8 +86,9 @@ type PhysNode = {
 
 const ROUND_MS = 5000; // eine Kampfrunde (~5 s, langsam/folgbar) — gemeinsames Reveal-Pacing mit track
 const STEP_MS = 16;
-const VIS = 15; // sichtbare Board-Zeilen
-const ROW_H = 23;
+const VIS = 15; // sichtbare Board-Zeilen (ca. — der Rest ist scrollbar)
+const ROW_H = 26;
+const BOARD_H = 404; // feste sichtbare Board-Höhe (füllt die 430px-Arena); Rest scrollt
 
 export default function MiniDmArenaBattle({
   meta,
@@ -553,6 +554,18 @@ export default function MiniDmArenaBattle({
   const spotRel = spot ? relOf[spot.idx] : null;
   const spotChip = spotRel ? REL_VAR[spotRel] : "hsl(45 90% 62%)";
 
+  // Live-Meldung (rechte Strip-Hälfte) — gespeist aus denselben Events wie der
+  // Ticker: neuester Führungswechsel/CRIT, am Ende der Champion.
+  const latest = tick[0] ?? null;
+  const champCode = board.leader != null ? meta[board.leader]?.code ?? null : null;
+  const liveMsg = done && champCode
+    ? { k: "Champion", node: <span><span className="up">🏆 <b>{champCode}</b></span> gewinnt die Arena</span> }
+    : latest && latest.kind === "crit"
+      ? { k: "Critical Hit", node: <span>☠ <b>{latest.a}</b> <span className="cr">CRIT {grp(latest.dmg ?? 0)}</span> an {latest.b}</span> }
+      : latest && latest.kind === "lead"
+        ? { k: "Führungswechsel", node: <span><span className="up">↑ {latest.a} übernimmt die Führung</span> vor {latest.b}</span> }
+        : { k: "Arena", node: <span>Kampf beginnt, sobald die erste Runde gewertet wird …</span> };
+
   return (
     <div className="mdmb-root">
       <style>{`
@@ -574,7 +587,7 @@ export default function MiniDmArenaBattle({
         .mdmb-te .up{color:var(--nl-good);font-weight:700;}
         .mdmb-te .dead{color:var(--nl-mut);}
 
-        .mdmb-body{position:relative;display:grid;grid-template-columns:1fr 262px;gap:0;}
+        .mdmb-body{position:relative;display:grid;grid-template-columns:1fr 292px;gap:0;}
         @media(max-width:840px){.mdmb-body{grid-template-columns:1fr;}}
 
         .mdmb-arena{position:relative;height:430px;border-right:1px solid var(--nl-line);overflow:hidden;
@@ -609,9 +622,18 @@ export default function MiniDmArenaBattle({
         .mdmb-spark{position:absolute;pointer-events:none;font-size:16px;filter:drop-shadow(0 0 6px hsl(45 100% 64% / .95));animation:mdmbSpark .34s ease-out forwards;}
         @keyframes mdmbSpark{0%{opacity:0;transform:scale(.4)}40%{opacity:1;transform:scale(1.25)}100%{opacity:0;transform:scale(1.5)}}
 
-        .mdmb-spot{position:absolute;left:14px;bottom:14px;z-index:7;display:flex;align-items:center;gap:11px;max-width:290px;
+        .mdmb-strip{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 14px;align-items:stretch;
+          border-bottom:1px solid var(--nl-line);background:linear-gradient(90deg,hsl(24 34% 9%),hsl(20 26% 6%));}
+        @media(max-width:700px){.mdmb-strip{grid-template-columns:1fr;}}
+        .mdmb-spot{display:flex;align-items:center;gap:11px;min-width:0;
           background:linear-gradient(180deg,hsl(340 24% 14% / .94),hsl(20 20% 9% / .94));border:1px solid var(--crit);border-radius:12px;padding:10px 13px 10px 10px;
           box-shadow:0 8px 26px hsl(0 0% 0% / .55),0 0 22px hsl(4 92% 62% / .18);}
+        .mdmb-spot.empty{border-color:var(--nl-line);box-shadow:none;color:var(--nl-mut);align-items:center;justify-content:center;font-size:12px;}
+        .mdmb-msg{display:flex;flex-direction:column;justify-content:center;gap:3px;min-width:0;
+          background:linear-gradient(180deg,hsl(258 24% 13% / .8),hsl(258 22% 9% / .8));border:1px solid var(--nl-line-2,var(--nl-line));border-radius:12px;padding:10px 14px;}
+        .mdmb-msg-k{font-family:ui-monospace,monospace;font-size:9px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);}
+        .mdmb-msg-t{font-size:14px;font-weight:800;line-height:1.2;color:var(--nl-ink);overflow:hidden;text-overflow:ellipsis;}
+        .mdmb-msg-t .cr{color:var(--dmg);}.mdmb-msg-t .up{color:var(--nl-good);}.mdmb-msg-t b{color:var(--gold);}
         .mdmb-spot.pop{animation:mdmbPop .3s ease-out;}
         @keyframes mdmbPop{0%{transform:scale(.9)}45%{transform:scale(1.04)}100%{transform:scale(1)}}
         .mdmb-port{position:relative;width:52px;height:52px;border-radius:10px;flex:none;overflow:hidden;border:1px solid var(--nl-line-2,var(--nl-line));
@@ -623,8 +645,6 @@ export default function MiniDmArenaBattle({
         .mdmb-sname b{color:var(--gold);}
         .mdmb-sdmg{font-family:ui-monospace,monospace;font-size:11px;color:var(--nl-mut);margin-top:1px;}
         .mdmb-sdmg b{color:var(--nl-ink);font-size:15px;}
-        .mdmb-cap{position:absolute;top:9px;right:12px;z-index:7;font-family:ui-monospace,monospace;font-size:9px;color:var(--nl-mut);
-          background:hsl(20 20% 6% / .72);padding:3px 8px;border-radius:6px;border:1px solid var(--nl-line);}
         .mdmb-hcard{position:absolute;z-index:8;min-width:150px;max-width:190px;pointer-events:auto;
           background:linear-gradient(180deg,hsl(258 24% 13% / .97),hsl(258 22% 9% / .97));border:1px solid var(--nl-line-2,var(--nl-line));border-radius:10px;
           padding:7px 10px;box-shadow:0 8px 22px hsl(0 0% 0% / .55);}
@@ -636,25 +656,24 @@ export default function MiniDmArenaBattle({
         .mdmb-hc-p.lnk{cursor:pointer;}.mdmb-hc-p.lnk:hover b{text-decoration:underline;}
 
         .mdmb-side{padding:11px;background:hsl(20 20% 10% / .55);}
-        .mdmb-sh{font-size:10.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--gold);margin-bottom:8px;}
-        .mdmb-lhead,.mdmb-lrow{display:grid;grid-template-columns:20px 30px 44px 1fr 26px;gap:6px;align-items:center;}
-        .mdmb-lhead{font-family:ui-monospace,monospace;font-size:8px;font-weight:800;letter-spacing:.04em;color:var(--nl-mut);text-transform:uppercase;padding:0 4px 5px;}
-        .mdmb-board{position:relative;overflow:hidden;}
-        .mdmb-lrow{position:absolute;left:0;right:0;height:${ROW_H}px;padding:0 4px;border-radius:5px;border-left:3px solid transparent;
+        .mdmb-sh{font-size:12.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--gold);margin-bottom:8px;}
+        .mdmb-lhead,.mdmb-lrow{display:grid;grid-template-columns:22px 30px 1fr 66px;gap:6px;align-items:center;}
+        .mdmb-lhead{font-family:ui-monospace,monospace;font-size:9.5px;font-weight:800;letter-spacing:.04em;color:var(--nl-mut);text-transform:uppercase;padding:0 4px 5px;}
+        .mdmb-board{position:relative;overflow-y:auto;}
+        .mdmb-lrow{position:absolute;top:0;left:0;right:0;height:${ROW_H}px;padding:0 4px;border-radius:5px;border-left:3px solid transparent;
           transition:transform .95s cubic-bezier(.45,0,.2,1),background .3s;}
         .mdmb-lrow.mine{border-left-color:var(--nl-mine);background:color-mix(in srgb,var(--nl-mine) 12%,transparent);}
         .mdmb-lrow.ally{border-left-color:var(--nl-ally);background:color-mix(in srgb,var(--nl-ally) 12%,transparent);}
         .mdmb-lrow.rival{border-left-color:var(--nl-rival);background:color-mix(in srgb,var(--nl-rival) 12%,transparent);}
         .mdmb-lrow.champ{background:linear-gradient(90deg,color-mix(in srgb,var(--gold) 20%,transparent),transparent);}
-        .mdmb-lrk{font-family:ui-monospace,monospace;font-size:9px;font-weight:700;text-align:right;color:var(--nl-mut);}
-        .mdmb-lcr{height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:ui-monospace,monospace;font-size:7.5px;font-weight:800;background:hsl(265 24% 16%);border:1px solid var(--nl-line-2,var(--nl-line));}
-        .mdmb-lcd{font-family:ui-monospace,monospace;font-size:10.5px;font-weight:800;color:var(--nl-ink);}
+        .mdmb-lrk{font-family:ui-monospace,monospace;font-size:11.5px;font-weight:700;text-align:right;color:var(--nl-mut);}
+        .mdmb-lcr{height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:ui-monospace,monospace;font-size:9.5px;font-weight:800;background:hsl(265 24% 16%);border:1px solid var(--nl-line-2,var(--nl-line));}
+        .mdmb-lcd{font-family:ui-monospace,monospace;font-size:13px;font-weight:800;color:var(--nl-ink);}
         .mdmb-lcd.mine{color:var(--nl-mine);}.mdmb-lcd.ally{color:var(--nl-ally);}.mdmb-lcd.rival{color:var(--nl-rival);}
         .mdmb-ldmg{display:flex;flex-direction:column;gap:2px;}
-        .mdmb-ldn{font-family:ui-monospace,monospace;font-size:9.5px;font-weight:800;color:var(--dmg);font-variant-numeric:tabular-nums;}
+        .mdmb-ldn{font-family:ui-monospace,monospace;font-size:12px;font-weight:800;color:var(--dmg);font-variant-numeric:tabular-nums;}
         .mdmb-ldb{height:5px;border-radius:3px;background:hsl(20 20% 6%);border:1px solid hsl(0 0% 0%);overflow:hidden;}
         .mdmb-ldb i{display:block;height:100%;background:linear-gradient(90deg,hsl(40 50% 30%),var(--dmg));transition:width .5s;}
-        .mdmb-lko{font-family:ui-monospace,monospace;font-size:10px;font-weight:800;color:var(--crit);text-align:center;}
         .mdmb-foot{margin-top:9px;font-size:10px;color:var(--nl-mut);border-top:1px solid var(--nl-line);padding-top:8px;}
         @media(prefers-reduced-motion:reduce){.mdmb-tmove{animation:none;padding-left:0;}.mdmb-dmg,.mdmb-spark,.mdmb-crest.hit,.mdmb-spot.pop{animation:none;}.mdmb-lrow{transition:none;}}
       `}</style>
@@ -689,11 +708,35 @@ export default function MiniDmArenaBattle({
           </span>
         </div>
 
+        <div className="mdmb-strip">
+          {spot ? (
+            <div className={`mdmb-spot ${spotPop % 2 === 0 ? "pop" : "pop"}`} key={spotPop}>
+              <div className="mdmb-port">
+                <span className="mdmb-ptag" style={{ background: spotChip }}>{meta[spot.idx]?.code}</span>
+                <svg viewBox="0 0 44 44" aria-hidden="true">
+                  <circle cx="22" cy="16" r="8.5" fill="hsl(280 45% 76%)" />
+                  <path d="M6 44c0-9 7.2-15 16-15s16 6 16 15z" fill="hsl(270 30% 55%)" />
+                </svg>
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div className="mdmb-scrit">✦ CRITICAL HIT</div>
+                <div className="mdmb-sname"><b>{spot.name}</b> trifft hart</div>
+                <div className="mdmb-sdmg">an {spot.victim} · <b>{grp(spot.dmg)}</b> DMG</div>
+              </div>
+            </div>
+          ) : (
+            <div className="mdmb-spot empty">Noch kein Treffer — der Pit füllt sich …</div>
+          )}
+          <div className="mdmb-msg">
+            <div className="mdmb-msg-k">{liveMsg.k}</div>
+            <div className="mdmb-msg-t">{liveMsg.node}</div>
+          </div>
+        </div>
+
         <div className="mdmb-body">
           <div className="mdmb-arena" ref={arenaRef}>
             <div className="mdmb-crowd" />
             <div className="mdmb-pit" />
-            <div className="mdmb-cap">Bewegung live · Rang = Score (Tabelle rechts)</div>
             {meta.map((m, i) => {
               const relCls = m.rel ?? "";
               const isLead = board.leader === m.idx;
@@ -754,34 +797,18 @@ export default function MiniDmArenaBattle({
               );
             })() : null}
             <div className="mdmb-fx" ref={fxRef} />
-            {spot ? (
-              <div className={`mdmb-spot ${spotPop % 2 === 0 ? "pop" : "pop"}`} key={spotPop}>
-                <div className="mdmb-port">
-                  <span className="mdmb-ptag" style={{ background: spotChip }}>{meta[spot.idx]?.code}</span>
-                  <svg viewBox="0 0 44 44" aria-hidden="true">
-                    <circle cx="22" cy="16" r="8.5" fill="hsl(280 45% 76%)" />
-                    <path d="M6 44c0-9 7.2-15 16-15s16 6 16 15z" fill="hsl(270 30% 55%)" />
-                  </svg>
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <div className="mdmb-scrit">✦ CRITICAL HIT</div>
-                  <div className="mdmb-sname"><b>{spot.name}</b> trifft hart</div>
-                  <div className="mdmb-sdmg">an {spot.victim} · <b>{grp(spot.dmg)}</b> DMG</div>
-                </div>
-              </div>
-            ) : null}
           </div>
 
           <div className="mdmb-side">
             <div className="mdmb-sh">📊 Scoring-Tabelle</div>
-            <div className="mdmb-lhead"><span>#</span><span>LOGO</span><span>TEAM</span><span>SCHADEN</span><span>KO</span></div>
-            <div className="mdmb-board" style={{ height: VIS * ROW_H }}>
+            <div className="mdmb-lhead"><span>#</span><span>LOGO</span><span>TEAM</span><span>SCHADEN</span></div>
+            <div className="mdmb-board" style={{ height: BOARD_H }}>
+              <div style={{ height: meta.length * ROW_H }} aria-hidden />
               {meta.map((m, i) => {
                 const pos = rankPos[m.idx]!;
                 const relCls = m.rel ?? "";
                 const champ = pos === 0;
                 const d = board.disp[m.idx] ?? 0;
-                const ko = board.ko[m.idx] ?? 0;
                 const rk = pos === 0 ? "🏆" : pos === 1 ? "🥈" : pos === 2 ? "🥉" : String(pos + 1);
                 const clickable = Boolean(onOpenTeam && m.teamId);
                 return (
@@ -808,12 +835,11 @@ export default function MiniDmArenaBattle({
                       <span className="mdmb-ldn">{grp(d)}</span>
                       <span className="mdmb-ldb"><i style={{ width: `${Math.round((d / maxDisp) * 100)}%` }} /></span>
                     </span>
-                    <span className="mdmb-lko">{ko || 0}</span>
                   </div>
                 );
               })}
             </div>
-            <div className="mdmb-foot">Schaden &amp; KO sind aus dem <b style={{ color: "var(--nl-mut)" }}>einen Score</b> abgeleitet — Deko fürs Gefühl. Der Score bleibt die Wahrheit und bestimmt den Rang.</div>
+            <div className="mdmb-foot">Schaden ist aus dem <b style={{ color: "var(--nl-mut)" }}>einen Score</b> abgeleitet — Deko fürs Gefühl. Der Score bleibt die Wahrheit und bestimmt den Rang.</div>
           </div>
         </div>
       </div>

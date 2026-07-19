@@ -465,6 +465,18 @@ export default function DisciplineStageArena({
   const [mode, setMode] = useState<"real" | "random">("real");
   const [seed, setSeed] = useState<number>(1);
 
+  // Dev-/Test-Chrome (Modus-Umschalter, Modell-Check, Lesehilfe) ist standardmäßig
+  // versteckt: die Bühne wirkt wie ein Spiel, nicht wie ein Dev-Tool. Nur mit ?dev
+  // in der URL oder localStorage-Flag erscheint die Test-Oberfläche wieder. Lesen im
+  // Effect (nicht beim ersten Render) verhindert SSR-Hydration-Mismatch.
+  const [devMode, setDevMode] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hasQuery = new URLSearchParams(window.location.search).has("dev");
+    const hasFlag = window.localStorage.getItem("oly-stage-dev") === "1";
+    if (hasQuery || hasFlag) setDevMode(true);
+  }, []);
+
   const model = useMemo(
     () => buildDisciplineStageModel(gameState, disciplineId, ownTeamId),
     [gameState, disciplineId, ownTeamId],
@@ -749,14 +761,16 @@ export default function DisciplineStageArena({
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 14 }}>
         <div>
           <div style={{ fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800 }}>
-            Disziplin-Bühne · Test-Modus · echte Save-Werte
+            {devMode ? "Disziplin-Bühne · Test-Modus · echte Save-Werte" : "Disziplin-Bühne"}
           </div>
           <h1 style={{ margin: "4px 0 0", fontSize: 30, fontWeight: 800 }}>{model.disciplineName}</h1>
-          <div style={{ fontSize: 13, color: "var(--nl-mut)", marginTop: 4, maxWidth: 720 }}>
-            Alle {model.teams.length} Teams mit ihren echten Top-{model.slotCount}-Spielern aus dem Save.
-            Netto = Grundwert − Fatigue + Form. „🎲 Random" verteilt zusätzlich zufällig Fatigue/Pushes und
-            die 2 Mutator-Traits, damit sichtbar wird, ob das additive Modell korrekt rechnet (Position = Punkte).
-          </div>
+          {devMode ? (
+            <div style={{ fontSize: 13, color: "var(--nl-mut)", marginTop: 4, maxWidth: 720 }}>
+              Alle {model.teams.length} Teams mit ihren echten Top-{model.slotCount}-Spielern aus dem Save.
+              Netto = Grundwert − Fatigue + Form. „🎲 Random" verteilt zusätzlich zufällig Fatigue/Pushes und
+              die 2 Mutator-Traits, damit sichtbar wird, ob das additive Modell korrekt rechnet (Position = Punkte).
+            </div>
+          ) : null}
         </div>
         <label style={{ fontSize: 13, display: "flex", flexDirection: "column", gap: 4 }}>
           <span style={{ color: "var(--nl-mut)", fontWeight: 700 }}>Disziplin</span>
@@ -774,6 +788,7 @@ export default function DisciplineStageArena({
         </label>
       </div>
 
+      {devMode && (
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
         <div style={{ display: "inline-flex", borderRadius: 10, overflow: "hidden", border: "1px solid var(--nl-line)" }}>
           <button
@@ -857,6 +872,7 @@ export default function DisciplineStageArena({
           </div>
         ) : null}
       </div>
+      )}
 
       <DisciplineStageNativeArena
         key={`${disciplineId}-${mode}-${seed}`}
@@ -875,11 +891,13 @@ export default function DisciplineStageArena({
         env={DISCIPLINE_SKIN[disciplineId]?.env}
       />
 
-      <div style={{ marginTop: 8, fontSize: 11.5, color: "var(--nl-mut)", lineHeight: 1.5 }}>
-        Lesehilfe: <b>Sortierung</b> = Saison-Rang (MD1 links) · <b>Farbe/Bewegung</b> = aktueller Rundenstand · <b>Podest</b> = Endrang der Disziplin.
-      </div>
+      {devMode ? (
+        <div style={{ marginTop: 8, fontSize: 11.5, color: "var(--nl-mut)", lineHeight: 1.5 }}>
+          Lesehilfe: <b>Sortierung</b> = Saison-Rang (MD1 links) · <b>Farbe/Bewegung</b> = aktueller Rundenstand · <b>Podest</b> = Endrang der Disziplin.
+        </div>
+      ) : null}
 
-      {ownTeam ? (
+      {devMode && ownTeam ? (
         <div style={{ marginTop: 14, background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 14 }}>
           <div style={{ fontSize: 11, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 8 }}>
             Modell-Check · {ownTeam.shortCode} · {ownTeam.name} — echte Save-Werte (Grundwert − Fatigue + Form = Netto)
