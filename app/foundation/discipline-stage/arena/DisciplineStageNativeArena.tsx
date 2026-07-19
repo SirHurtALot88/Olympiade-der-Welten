@@ -18,6 +18,18 @@ function relColor(rel: TeamRelationshipKind | null | undefined): string | null {
 }
 const REL_GLYPH: Record<TeamRelationshipKind, string> = { mine: "★", ally: "🤝", rival: "⚔" };
 
+// Wiederverwendbarer Kopf-Strip 50/50 (Spec 02): links die „Dein"-Karte
+// (Läufer/Heber/Kämpfer), rechts das Live-Meldungsfeld. Beide teilen sich den Platz
+// hälftig; auf schmalen Viewports untereinander. Breaking & Co. können ihn erben.
+function ArenaKopfStrip({ left, right }: { left: React.ReactNode; right: React.ReactNode }): React.ReactNode {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 10, marginBottom: 10 }}>
+      {left}
+      <div style={{ display: "flex", alignItems: "stretch" }}>{right}</div>
+    </div>
+  );
+}
+
 // Nativer Track-Nachbau der Staffel-Arena — voller Feature-Stand der iframe-Szene:
 // SVG/viewBox (pixelscharf), Bewegungsanimation (Token gleitet, eigenes Team Slow-Mo),
 // Sounds (WebAudio), Highlights (Flash/Shake/Spotlight/Glow/Score-Pop/Splitter),
@@ -1009,6 +1021,12 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const [ticker, setTicker] = useState<TickerData[]>([]);
   const [podium, setPodium] = useState<PodCol[] | null>(null);
   const [hover, setHover] = useState<{ idx: number } | null>(null);
+  // Gewichtheben · Kraft-Turm (barbell): die geforderte Last (goldene Latte) steigt
+  // je Runde. demandKg = aktuelle Last (null = Wettkampf noch nicht gestartet). Alle
+  // noch nicht gerissenen Heber sitzen auf der Latte; wer sie nicht mehr packt (endKg
+  // < Last) reißt und fällt auf sein Endgewicht (= Score-Rang). Endstand = Score.
+  const [demandKg, setDemandKg] = useState<number | null>(null);
+  const [barbellMsg, setBarbellMsg] = useState<{ text: string; kind: "kg" | "red" | "end" } | null>(null);
   // Renn-Highlight-Banner (nur track): kurzer Pop über dem Oval bei Etappensieger,
   // neuer Gesamtführung oder Etappen-Wechsel. Ein Slot, neuester Anlass gewinnt.
   const [banner, setBanner] = useState<{ text: string; kind: "gold" | "cyan"; id: number } | null>(null);
@@ -1022,6 +1040,11 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const tier1Budget = useRef(4);
   const busyRef = useRef(false);
   const endedFiredRef = useRef(false); // onEnded feuert genau einmal je Lauf (Spoiler-Gate)
+  // Barbell: aktuelle Last als Ref (tokenPos/Feld lesen sie beim Render frisch, ohne
+  // Callback-Deps). Und die Barbell-Rangfolge der Vorrunde für die Rang-Pfeile ▲/▼.
+  const barbellDemandRef = useRef<number | null>(null);
+  const barbellPrevDemandRef = useRef<number | null>(null);
+  const barbellPrevRankRef = useRef<Record<string, number>>({});
 
   const clearTimers = useCallback(() => {
     timers.current.forEach((t) => window.clearTimeout(t));
@@ -1076,6 +1099,11 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setPodium(null);
     setHover(null);
     setBanner(null);
+    setDemandKg(null);
+    setBarbellMsg(null);
+    barbellDemandRef.current = null;
+    barbellPrevDemandRef.current = null;
+    barbellPrevRankRef.current = {};
     endedFiredRef.current = false;
     roundTopNet.current = 0;
     tier2Budget.current = 2;
@@ -1234,6 +1262,85 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     [finalMax, finalMin],
   );
 
+  // Gewichtheben · Kraft-Turm: Endgewicht (endKg) je Team, MONOTON im Endscore →
+  // Ranking nach endKg == Ranking nach Score (= Wahrheit). Die Achse startet knapp
+  // unter der schwächsten Kraft; kgMax ist das Maximum (der spätere Champion). Alles
+  // deterministisch aus den Slot-Werten → SSR-stabil, kein Spoiler (Werte werden erst
+  // sichtbar, wenn die Latte sie testet). Nur für prim === "barbell" berechnet.
+  const barbellInfo = useMemo(() => {
+    if (prim !== "barbell") return null;
+    const totals = teams.map((t) => {
+      let s = 0;
+      for (const p of t.players) s += playerNet(p);
+      return s;
+    });
+    let maxTot = 0;
+    let minTot = Infinity;
+    for (const s of totals) {
+      if (s > maxTot) maxTot = s;
+      if (s < minTot) minTot = s;
+    }
+    if (!Number.isFinite(minTot)) minTot = 0;
+    const span = maxTot - minTot || 1;
+    // kg-Skala 150…400 kg (schöne Hantel-Zahlen), monoton im Endscore.
+    const endKg = totals.map((s) => Math.round(150 + ((s - minTot) / span) * 250));
+    let kgMax = 0;
+    let kgMin = Infinity;
+    for (const k of endKg) {
+      if (k > kgMax) kgMax = k;
+      if (k < kgMin) kgMin = k;
+    }
+    if (!Number.isFinite(kgMin)) kgMin = 0;
+    const axTop = Math.max(0, kgMin - 25);
+    return { endKg, kgMax, kgMin, axTop, totals };
+  }, [prim, teams]);
+  // aktuelle Last für tokenPos/Feld ohne Callback-Dep-Churn (Ref im Render aktuell halten)
+  barbellDemandRef.current = demandKg;
+  // Barbell: kg → y auf der Turm-Achse (baseY…topY). Latte + Heber teilen sich diese Skala.
+  const barbellY = useCallback(
+    (kg: number): number => {
+      if (!barbellInfo) return layout.baseY ?? H;
+      const f = (kg - barbellInfo.axTop) / Math.max(1, barbellInfo.kgMax - barbellInfo.axTop);
+      return (layout.baseY ?? H) - Math.max(0, Math.min(1, f)) * ((layout.baseY ?? H) - (layout.topY ?? 0));
+    },
+    [barbellInfo, layout, H],
+  );
+  // aktuelles kg eines Teams: sitzt auf der Latte (min) oder auf seinem Endgewicht (gerissen).
+  const barbellKgOf = useCallback(
+    (idx: number): number => {
+      if (!barbellInfo) return 0;
+      const ek = barbellInfo.endKg[idx] ?? barbellInfo.axTop;
+      return demandKg == null ? barbellInfo.axTop : Math.min(demandKg, ek);
+    },
+    [barbellInfo, demandKg],
+  );
+  const barbellEliminated = useCallback(
+    (idx: number): boolean => {
+      if (!barbellInfo || demandKg == null) return false;
+      return demandKg > (barbellInfo.endKg[idx] ?? Infinity);
+    },
+    [barbellInfo, demandKg],
+  );
+  // Barbell-Rangfolge: Verbliebene (auf der Latte) zuerst, stabil nach laneIdx
+  // (Anti-Spoiler — ihre wahre Kraft bleibt verborgen); Gerissene danach nach
+  // Endgewicht absteigend (= Score). Am Ende sitzen alle auf endKg → Score-Reihenfolge.
+  const barbellOrder = useCallback((): RT[] => {
+    const rt = rtRef.current;
+    if (!barbellInfo) return [...rt];
+    return [...rt].sort((a, b) => {
+      const ea = barbellEliminated(a.idx) ? 1 : 0;
+      const eb = barbellEliminated(b.idx) ? 1 : 0;
+      if (ea !== eb) return ea - eb;
+      if (ea) {
+        const ka = barbellInfo.endKg[a.idx] ?? 0;
+        const kb = barbellInfo.endKg[b.idx] ?? 0;
+        if (kb !== ka) return kb - ka;
+        return a.seasonRank - b.seasonRank;
+      }
+      return a.laneIdx - b.laneIdx;
+    });
+  }, [barbellInfo, barbellEliminated]);
+
   // Mini-DM · Arena-Schlacht: statische Team-Meta (Ziel-Schaden + Aufhol-Kurve).
   // Ziel-Schaden ist monoton im Endscore → bei Fortschritt p=1 steht die Tabelle
   // EXAKT in der Score-Rangliste. Die Gamma-Exponenten erzeugen die dynamische
@@ -1306,6 +1413,17 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         const y = layout.top + t.laneIdx * layout.laneH + layout.laneH / 2;
         return { x: layout.xStart + norm * (layout.xEnd - layout.xStart), y };
       }
+      if (prim === "barbell") {
+        // Kraft-Turm: x = feste Heber-Lane, y = aktuelles kg (auf der Latte bzw. auf
+        // dem Endgewicht). Ignoriert den score-Parameter — das kg leitet sich aus der
+        // geforderten Last (Ref, im Render aktuell) + monotonem Endgewicht ab.
+        const x = layout.lPad + t.laneIdx * layout.colW + layout.colW / 2;
+        if (!barbellInfo) return { x, y: layout.baseY };
+        const ek = barbellInfo.endKg[t.idx] ?? barbellInfo.axTop;
+        const dk = barbellDemandRef.current;
+        const kg = dk == null ? barbellInfo.axTop : Math.min(dk, ek);
+        return { x, y: barbellY(kg) };
+      }
       if (TOWER_FAMILY.has(prim)) {
         const x = layout.lPad + t.laneIdx * layout.colW + layout.colW / 2;
         return { x, y: layout.baseY - norm * (layout.baseY - layout.topY) };
@@ -1375,7 +1493,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       const off = lane * 8.5;
       return { x: pt.x + -ty * off, y: pt.y + tx * off };
     },
-    [prim, layout, pathLen, finalMax, W, N],
+    [prim, layout, pathLen, finalMax, W, N, barbellInfo, barbellY],
   );
 
   // ---- Rang-/Slot-Mathematik (Port der Szene) ----
@@ -1716,6 +1834,38 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         t.displayScore = round1(t.score + playerNet(t.players[r]));
       });
     }
+    // Gewichtheben · Kraft-Turm: die geforderte Last (goldene Latte) steigt eine Stufe.
+    // Alle Heber + die Latte gleiten simultan (dur = TRACK_ROUND_MS). Wer die neue Last
+    // nicht mehr packt (endKg < Last), reißt und fällt auf sein Endgewicht (= Score).
+    // Score bleibt Wahrheit: endKg ist monoton im Endscore → Endstand = Score-Rang.
+    if (prim === "barbell" && barbellInfo) {
+      // Barbell-Rangfolge der Vorrunde merken (für die ▲/▼-Pfeile).
+      const prevRankMap: Record<string, number> = {};
+      barbellOrder().forEach((t, i) => {
+        prevRankMap[t.code] = i + 1;
+      });
+      barbellPrevRankRef.current = prevRankMap;
+      const prevBar = barbellDemandRef.current ?? barbellInfo.axTop;
+      barbellPrevDemandRef.current = prevBar;
+      const isLast = r + 1 >= slotCount;
+      // Letzte Runde: die Latte erreicht kgMax (nur der Champion hält) → Sieg-Hebung.
+      const nextBar = isLast ? barbellInfo.kgMax : Math.round(barbellInfo.axTop + (barbellInfo.kgMax - barbellInfo.axTop) * ((r + 1) / slotCount));
+      const newlyOut = rt.filter((t) => {
+        const ek = barbellInfo.endKg[t.idx] ?? Infinity;
+        return prevBar <= ek && nextBar > ek;
+      });
+      barbellDemandRef.current = nextBar;
+      setDemandKg(nextBar);
+      if (isLast) {
+        const champ = [...rt].sort((a, b) => (barbellInfo.endKg[b.idx] ?? 0) - (barbellInfo.endKg[a.idx] ?? 0) || a.seasonRank - b.seasonRank)[0];
+        setBarbellMsg({ text: champ ? `🏆 Sieg-Hebung · ${champ.code} stemmt ${barbellInfo.endKg[champ.idx]} kg` : "🏆 Endstand", kind: "end" });
+      } else if (newlyOut.length) {
+        const first = newlyOut[0]!;
+        setBarbellMsg({ text: newlyOut.length > 1 ? `🔴 ${first.code} +${newlyOut.length - 1} reißen bei ${nextBar} kg` : `🔴 ${first.code} reißt bei ${nextBar} kg`, kind: "red" });
+      } else {
+        setBarbellMsg({ text: `🏋 Geforderte Last steigt auf ${nextBar} kg`, kind: "kg" });
+      }
+    }
     const order = [...rt].sort((a, b) => b.rank - a.rank); // schlechteste zuerst
     let i = 0;
     const doOne = () => {
@@ -1802,7 +1952,21 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       later(doOne, delay);
     };
     doOne();
-  }, [round, slotCount, audio, tokenPos, addPop, addFrags, pushTicker, pushRoundHeader, showSpotlight, fireFlash, doShake, glow, roundSummary, showPodium, later, slots, popBanner]);
+  }, [round, slotCount, audio, tokenPos, addPop, addFrags, pushTicker, pushRoundHeader, showSpotlight, fireFlash, doShake, glow, roundSummary, showPodium, later, slots, popBanner, barbellInfo, barbellOrder]);
+
+  // Gewichtheben · Auto-Continue: die nächste Runde startet automatisch im
+  // TRACK_ROUND_MS-Takt (kein Klick nötig), bis der Endstand steht — dann hält es an
+  // (kein Auto-Reset). Bei reduced-motion läuft es sofort durch → finaler Endstand.
+  useEffect(() => {
+    if (prim !== "barbell") return;
+    if (done || busy) return;
+    const first = round === 0 && demandKg == null;
+    // Kurzer Puffer nach dem Abschluss der (bereits ~5 s langen, simultan gleitenden)
+    // Runde — die nächste Last steigt zügig, ohne dass die Disziplin zäh wird.
+    const delay = reduced.current ? 0 : first ? 650 : 600;
+    const id = window.setTimeout(() => advance(), delay);
+    return () => window.clearTimeout(id);
+  }, [prim, round, busy, done, demandKg, advance]);
 
   const quickSim = useCallback(() => {
     if (busyRef.current) return; // Busy-Guard: keine Doppel-Auslösung während einer Cascade.
@@ -1897,6 +2061,14 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const me = rtRef.current.find((t) => t.isOwn) ?? null;
   const leader = sorted[0] ?? null;
   const now = Date.now();
+  // ---- Gewichtheben · Kraft-Turm: abgeleitete Render-Werte (Rangfolge nach kg) ----
+  const barbellSorted = prim === "barbell" ? barbellOrder() : sorted;
+  const barbellRankMap: Record<string, number> = {};
+  if (prim === "barbell") barbellSorted.forEach((t, i) => (barbellRankMap[t.code] = i + 1));
+  const barbellLive = prim === "barbell" && barbellInfo ? rtRef.current.filter((t) => !barbellEliminated(t.idx)).length : 0;
+  // aktueller Versuch (Kader durchgeschaltet) — 0…slots-1, folgt der Runde.
+  const barbellTry = Math.min(slotCount - 1, Math.max(0, done ? slotCount - 1 : round));
+  const ladderList = prim === "barbell" ? barbellSorted : sorted;
 
   // Basketball-Court: Treffer/Fehlwurf-Schwelle = Feld-Median der bereits geworfenen
   // Scores; Hot-Hand = deutlich über dem Median. Nur für prim === "court" berechnet.
@@ -2125,6 +2297,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                       ? "Vorstoß in die Angriffszone = kumulierte Punkte"
                       : prim === "peloton" || prim === "parcours"
                         ? "Position auf der Strecke = kumulierte Punkte"
+                        : prim === "barbell"
+                          ? "Geforderte Last steigt — wer reißt, fällt auf sein Endgewicht (= Score)"
                         : TOWER_FAMILY.has(prim)
                           ? "Höhe = kumulierte Punkte"
                           : ROW_FAMILY.has(prim)
@@ -2133,8 +2307,71 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           </span>
         </div>
 
+        {/* Gewichtheben · Kopf-Strip 50/50: links Dein-Heber-Karte, rechts Live-Meldung.
+            Auf dem Feld selbst liegt nichts (freies Spielfeld). Ersetzt für barbell den
+            generischen MyTracker (die Dein-Heber-Karte IST der MyTracker). */}
+        {prim === "barbell" ? (
+          <ArenaKopfStrip
+            left={
+              me
+                ? (() => {
+                    const lifter = me.players[barbellTry] ?? null;
+                    const out = barbellEliminated(me.idx);
+                    const myRank = barbellRankMap[me.code] ?? me.rank;
+                    const clickable = Boolean(onOpenPlayer && lifter?.playerId);
+                    return (
+                      <div
+                        onClick={clickable ? () => onOpenPlayer!(lifter!.playerId!) : undefined}
+                        onMouseEnter={onPreviewPlayer && lifter?.playerId ? () => onPreviewPlayer!(lifter.playerId) : undefined}
+                        onMouseLeave={onPreviewPlayer ? () => onPreviewPlayer!(null) : undefined}
+                        title={clickable ? "Spieler-Karte öffnen" : undefined}
+                        style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px 8px 8px", borderRadius: 12, border: "1px solid var(--nl-accent)", background: "color-mix(in srgb, var(--nl-bg) 84%, var(--nl-accent))", cursor: clickable ? "pointer" : "default" }}
+                      >
+                        <PlayerMark src={lifter?.portraitUrl ?? null} alt={lifter?.name ?? ""} size={46} isOwn medal={null} />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 800, color: "var(--nl-accent)" }}>🏋 Dein Heber · {me.code}</div>
+                          <div style={{ fontSize: 15, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{lifter?.name ?? "—"}</div>
+                          <div style={{ fontSize: 11.5, color: "var(--nl-mut)", fontVariantNumeric: "tabular-nums" }}>
+                            Versuch {barbellTry + 1} / {slotCount} · Platz {myRank}
+                            {" · "}
+                            {out ? (
+                              <span style={{ color: "var(--nl-risk)", fontWeight: 800 }}>🔴 raus · {Math.round(barbellKgOf(me.idx))} kg</span>
+                            ) : (
+                              <span style={{ color: "var(--nl-good)", fontWeight: 800 }}>hebt {Math.round(barbellKgOf(me.idx))} kg</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()
+                : <div />
+            }
+            right={
+              <div
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "9px 15px",
+                  borderRadius: 11,
+                  fontFamily: "ui-monospace, monospace",
+                  fontSize: 12.5,
+                  fontWeight: 800,
+                  letterSpacing: "0.02em",
+                  border: `1px solid ${barbellMsg?.kind === "red" ? "var(--nl-risk)" : barbellMsg?.kind === "end" ? "var(--nl-warn)" : "var(--nl-line-2)"}`,
+                  color: barbellMsg?.kind === "red" ? "var(--nl-risk)" : barbellMsg ? "var(--nl-warn)" : "var(--nl-mut)",
+                  background: barbellMsg?.kind === "end" ? "color-mix(in srgb, var(--nl-warn) 12%, transparent)" : "color-mix(in srgb, var(--nl-panel) 60%, transparent)",
+                }}
+              >
+                {barbellMsg?.text ?? "⚔ Der Wettkampf beginnt — die geforderte Last steigt Runde für Runde."}
+              </div>
+            }
+          />
+        ) : null}
+
         {/* MyTracker */}
-        {me ? (
+        {me && prim !== "barbell" ? (
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 12px", marginBottom: 10, borderRadius: 12, border: "1px solid var(--nl-accent)", background: "color-mix(in srgb, var(--nl-accent) 10%, transparent)" }}>
             <span style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 800, color: "var(--nl-accent)" }}>Dein Team · {me.code}</span>
             <span style={{ fontWeight: 800 }}>Rang {me.rank}</span>
@@ -2436,8 +2673,63 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               </text>
             ) : null}
 
+            {/* Gewichtheben · Kraft-Turm-Feld: kg-Achse, Power-Rack-Rahmen, Podest-Linie
+                oben und DIE geforderte Last (goldene Latte, gleitet). Auf dem Feld liegt
+                sonst nichts außer den Hebern + der Hover-Steckbrief (freies Spielfeld). */}
+            {prim === "barbell" && barbellInfo ? (() => {
+              const baseY = layout.baseY;
+              const topY = layout.topY;
+              const axX = layout.lPad;
+              const rightX = W - layout.rPad;
+              const ticks: number[] = [];
+              for (let k = Math.ceil(barbellInfo.axTop / 50) * 50; k <= barbellInfo.kgMax + 5; k += 50) ticks.push(k);
+              const podY = topY - 10;
+              const dLine = demandKg == null ? barbellInfo.axTop : demandKg;
+              const barY = barbellY(dLine);
+              return (
+                <g>
+                  {/* Power-Rack-Rahmen (Ständer links/rechts) */}
+                  <line x1={axX} y1={topY} x2={axX} y2={baseY} stroke="var(--nl-mut)" strokeWidth={2} opacity={0.35} />
+                  <line x1={rightX} y1={topY} x2={rightX} y2={baseY} stroke="var(--nl-mut)" strokeWidth={2} opacity={0.35} />
+                  <line x1={axX} y1={baseY} x2={rightX} y2={baseY} stroke="var(--nl-line-2)" strokeWidth={2.5} />
+                  {/* kg-Achse mit Tick-Marken */}
+                  {ticks.map((k) => {
+                    const y = barbellY(k);
+                    return (
+                      <g key={`ax-${k}`}>
+                        <line x1={axX - 6} y1={y} x2={rightX} y2={y} stroke="var(--nl-line)" strokeWidth={1} strokeDasharray="3 9" opacity={0.4} />
+                        <text x={axX - 9} y={y + 3} textAnchor="end" fontSize={9} fontFamily="ui-monospace, monospace" fill="var(--nl-mut-2)">{k}</text>
+                      </g>
+                    );
+                  })}
+                  <text x={16} y={(topY + baseY) / 2} textAnchor="middle" fontSize={9} fontWeight={800} fill="var(--nl-mut-2)" letterSpacing="0.14em" transform={`rotate(-90 16 ${(topY + baseY) / 2})`}>kg GESTEMMT</text>
+                  {/* Podest-Linie oben (🏆) */}
+                  <line x1={axX} y1={podY} x2={rightX} y2={podY} stroke="var(--nl-warn)" strokeWidth={1} strokeDasharray="5 6" opacity={0.55} />
+                  <text x={rightX - 6} y={podY - 4} textAnchor="end" fontSize={13}>🏆</text>
+                  {/* DIE geforderte Last — der Star. Alle Verbliebenen sitzen darauf. */}
+                  <g style={{ transition: reduced.current ? "none" : `transform ${TRACK_ROUND_MS}ms cubic-bezier(.45,0,.2,1)` }} transform={`translate(0 ${barY})`}>
+                    <line x1={axX} y1={0} x2={rightX} y2={0} stroke="var(--nl-warn)" strokeWidth={3} />
+                    <rect x={axX - 5} y={-11} width={9} height={22} rx={3} fill="var(--nl-mut)" />
+                    <rect x={rightX - 4} y={-11} width={9} height={22} rx={3} fill="var(--nl-mut)" />
+                    <g transform={`translate(${axX + 8} -22)`}>
+                      <rect x={0} y={0} width={demandKg != null && demandKg >= 100 ? 118 : 108} height={19} rx={5} fill="var(--nl-warn)" />
+                      <text x={7} y={13} fontSize={11} fontWeight={900} fontFamily="ui-monospace, monospace" fill="var(--nl-bg)">
+                        {demandKg == null ? "GEFORDERT —" : done ? `GESTEMMT ${Math.round(dLine)} kg` : `GEFORDERT ${Math.round(dLine)} kg`}
+                      </text>
+                    </g>
+                  </g>
+                  {/* Lane-Kürzel unter der Grundlinie */}
+                  {rtRef.current.map((t) => (
+                    <text key={`bl-${t.code}`} x={layout.lPad + t.laneIdx * layout.colW + layout.colW / 2} y={baseY + 13} textAnchor="middle" fontSize={8} fontWeight={t.isOwn ? 800 : 600} fill={t.isOwn ? "var(--nl-accent)" : "var(--nl-mut-2)"}>
+                      {t.code}
+                    </text>
+                  ))}
+                </g>
+              );
+            })() : null}
+
             {/* Feld je Primitive (schlichte Optik, wenn keine env-Umgebung) */}
-            {(env && (prim === "track" || prim === "stage")) || SCENE_PRIMS.has(prim) || FIELD_CUSTOM.has(prim) ? null : prim === "track" ? (
+            {(env && (prim === "track" || prim === "stage")) || SCENE_PRIMS.has(prim) || FIELD_CUSTOM.has(prim) || prim === "barbell" ? null : prim === "track" ? (
               <>
                 <path d={ovalPath} fill="none" stroke="var(--nl-panel)" strokeWidth={54} />
                 <path ref={pathRef} d={ovalPath} fill="none" stroke={skinAccent} opacity={0.7} strokeWidth={2} strokeDasharray="6 8" />
@@ -2513,7 +2805,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               </>
             )}
 
-            {FIELD_CUSTOM.has(prim) ? null : sorted
+            {FIELD_CUSTOM.has(prim) ? null : (prim === "barbell" ? barbellSorted : sorted)
               .slice()
               .reverse()
               .map((t) => {
@@ -2525,17 +2817,23 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                 const r = t.isOwn ? geo.rOwn : geo.r;
                 const hue = hueForIdx(t.idx);
                 const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
-                // track: langer, gleichmäßiger Gleit-Übergang über eine ganze Runde
-                // (~5 s, TRACK_ROUND_MS) — alle Token gleiten simultan ums Oval statt zu
+                // Gewichtheben: Heber gerissen (auf Endgewicht) bzw. Champion an der Krone.
+                const bbOut = prim === "barbell" && barbellEliminated(t.idx);
+                const bbChamp = prim === "barbell" && done && (barbellRankMap[t.code] ?? 99) === 1;
+                // track/barbell: langer, gleichmäßiger Gleit-Übergang über eine ganze Runde
+                // (~5 s, TRACK_ROUND_MS) — alle Token/die Latte gleiten simultan statt zu
                 // springen. Andere Primitive behalten ihren kürzeren, federnden Übergang.
-                const dur = prim === "track" ? TRACK_ROUND_MS : t.isOwn ? 1300 : 520;
-                const ease = prim === "track" ? "cubic-bezier(.4,0,.2,1)" : "cubic-bezier(.34,1.2,.4,1)";
+                const dur = prim === "track" || prim === "barbell" ? TRACK_ROUND_MS : t.isOwn ? 1300 : 520;
+                const ease = prim === "track" || prim === "barbell" ? "cubic-bezier(.4,0,.2,1)" : "cubic-bezier(.34,1.2,.4,1)";
                 const glowing = t.glowUntil > now;
                 // Primitive-spezifische Spur/Balken (absolute Koordinaten, hinter dem Token)
                 const barW = Math.min(18, (layout.colW ?? 24) * 0.5);
                 return (
                   <g key={t.code}>
-                    {TOWER_FAMILY.has(prim) ? (() => {
+                    {/* Kraft-Turm (barbell): FREIES Feld — kein Balken hinter dem Token.
+                        Nur der Heber selbst sitzt auf der geforderten Last / seinem
+                        Endgewicht. Die restliche Turm-Familie behält ihre Säulen. */}
+                    {TOWER_FAMILY.has(prim) && prim !== "barbell" ? (() => {
                       const bh = Math.max(0, (layout.baseY ?? pos.y) - pos.y);
                       const nf = Math.min(1, t.score / finalMax);
                       const bw2 = prim === "sparkbar" ? Math.min(11, barW) : barW;
@@ -2543,11 +2841,6 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                       return (
                         <g>
                           <rect x={pos.x - bw2 / 2} y={pos.y} width={bw2} height={bh} rx={3} fill={barFill} opacity={prim === "thermometer" ? 0.72 : t.isOwn ? 0.55 : 0.3} />
-                          {prim === "barbell"
-                            ? Array.from({ length: Math.floor(bh / 12) }).map((_, k) => (
-                                <line key={k} x1={pos.x - bw2 / 2} y1={pos.y + 6 + k * 12} x2={pos.x + bw2 / 2} y2={pos.y + 6 + k * 12} stroke="rgba(0,0,0,0.45)" strokeWidth={1.4} />
-                              ))
-                            : null}
                         </g>
                       );
                     })() : null}
@@ -2701,13 +2994,21 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                     ) : null}
                     <g
                       transform={`translate(${pos.x} ${pos.y})`}
-                      style={{ transition: reduced.current ? "none" : `transform ${dur}ms ${ease}`, cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
+                      style={{ transition: reduced.current ? "none" : `transform ${dur}ms ${ease}`, cursor: onOpenTeam && t.teamId ? "pointer" : "default", opacity: bbOut ? 0.5 : 1 }}
                       onMouseEnter={() => openHover(t.idx)}
                       onMouseLeave={scheduleHoverClose}
                       onClick={() => {
                         if (onOpenTeam && t.teamId) onOpenTeam(t.teamId);
                       }}
                     >
+                      {/* Gewichtheben: Sieger-Krone + goldener Ring (Champion), Kampfrichter-
+                          Lampe ⚪ gültig / 🔴 gerissen, roter Ring bei Riss. */}
+                      {bbChamp ? <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={3.5} style={{ animation: reduced.current ? "none" : "olyGlowPulse 1.4s ease-in-out infinite" }} /> : null}
+                      {prim === "barbell" && bbOut ? <circle r={r + 3.5} fill="none" stroke="var(--nl-risk)" strokeWidth={2.4} /> : null}
+                      {prim === "barbell" && demandKg != null ? (
+                        <text x={-(r + 1)} y={r + 4} textAnchor="end" fontSize={11}>{bbOut ? "🔴" : "⚪"}</text>
+                      ) : null}
+                      {bbChamp ? <text y={-(r + 9)} textAnchor="middle" fontSize={14}>🏆</text> : null}
                       {glowing ? <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={4} style={{ animation: reduced.current ? "none" : "olyGlowPulse 1.1s ease-in-out infinite" }} /> : null}
                       {/* Buzzer-Beater-Glow — Führung auf dem Court dauerhaft golden umrandet */}
                       {prim === "court" && t.rank === 1 && t.thrownSlot >= 0 ? (
@@ -2830,8 +3131,32 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                       )}
                       <span style={{ fontWeight: 800 }}>{t.code}</span>
                       <span style={{ fontSize: 12, color: "var(--nl-mut)", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
-                      <span style={{ fontWeight: 800, color: ampel(t.rank) }}>#{t.rank}</span>
+                      <span style={{ fontWeight: 800, color: ampel(prim === "barbell" ? barbellRankMap[t.code] ?? t.rank : t.rank) }}>#{prim === "barbell" ? barbellRankMap[t.code] ?? t.rank : t.rank}</span>
                     </div>
+                    {/* Gewichtheben · Steckbrief: aktuelles kg, Status (im Wettkampf /
+                        gerissen bei X kg), aktueller Heber. Anti-Spoiler — die wahre Kraft
+                        Verbliebener bleibt verborgen, bis die Latte sie testet. */}
+                    {prim === "barbell" && barbellInfo
+                      ? (() => {
+                          const out = barbellEliminated(t.idx);
+                          const kg = Math.round(barbellKgOf(t.idx));
+                          const lifter = t.players[barbellTry] ?? null;
+                          return (
+                            <div style={{ margin: "0 0 7px", padding: "6px 9px", borderRadius: 9, background: "var(--nl-bg)", border: "1px solid var(--nl-line)" }}>
+                              <div style={{ fontSize: 13, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+                                <span style={{ color: "var(--nl-warn)" }}>{kg} kg</span>
+                                <span style={{ color: "var(--nl-mut)" }}> · </span>
+                                {out ? <span style={{ color: "var(--nl-risk)" }}>🔴 gerissen</span> : <span style={{ color: "var(--nl-good)" }}>hebt · an der Latte</span>}
+                              </div>
+                              {lifter ? (
+                                <div style={{ fontSize: 11.5, color: "var(--nl-mut)", marginTop: 2 }}>
+                                  🏋 Heber: <b style={{ color: "var(--nl-ink)" }}>{lifter.name}</b> · Versuch {barbellTry + 1}
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })()
+                      : null}
                     {/* Court: abgeleitete Box-Score (PTS/REB/AST aus der Feld-Wertung) +
                         echter Top-Beitragender aus dem Kader. Score bleibt Wahrheit/Rang. */}
                     {prim === "court" && t.thrownSlot >= 0
@@ -3121,9 +3446,12 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       </div>
 
       {/* Live-Ladder rechts */}
-      <div style={{ flex: "0 0 300px", minWidth: 260, maxHeight: "calc(100vh - 200px)", overflowY: "auto", background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 10, position: "sticky", top: 12 }}>
-        <div style={{ fontSize: 11, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 8 }}>{done ? "Endstand" : "Rundenstand — live"}</div>
-        {sorted.map((t) => {
+      <div data-testid="arena-ladder" style={{ flex: "0 0 300px", minWidth: 260, maxHeight: "calc(100vh - 200px)", overflowY: "auto", overscrollBehavior: "contain", background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 10, position: "sticky", top: 12 }}>
+        <div style={{ fontSize: 11, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+          <span>{prim === "barbell" ? (done ? "Endstand" : "Rangliste · live") : done ? "Endstand" : "Rundenstand — live"}</span>
+          {prim === "barbell" && !done ? <span style={{ marginLeft: "auto", fontFamily: "ui-monospace, monospace", fontSize: 9, color: "var(--nl-mut)", fontWeight: 700 }}>{barbellLive} im Wettkampf</span> : null}
+        </div>
+        {ladderList.map((t) => {
           const teamClickable = Boolean(onOpenTeam && t.teamId);
           const teamHoverable = Boolean(onHoverTeam && t.teamId);
           const rc = relColor(t.rel);
@@ -3134,9 +3462,21 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           const rankDelta = prevRank != null ? prevRank - t.rank : 0;
           const lastGain = t.thrownSlot >= 0 ? playerNet(t.players[t.thrownSlot]) : null;
           const behind = leader ? leader.score - t.score : 0;
+          // Gewichtheben · Kraft-Turm: Rang/kg/Zugewinn aus dem Latten-Modell (Anti-
+          // Spoiler zählt live hoch), Rang-Pfeil aus der Barbell-Vorrunde, aktueller Heber.
+          const bRank = prim === "barbell" ? barbellRankMap[t.code] ?? t.rank : t.rank;
+          const bOut = prim === "barbell" && barbellEliminated(t.idx);
+          const bChamp = prim === "barbell" && done && bRank === 1;
+          const bKg = prim === "barbell" ? Math.round(barbellKgOf(t.idx)) : 0;
+          const bPrevRank = prim === "barbell" ? barbellPrevRankRef.current[t.code] : undefined;
+          const bArrow = bPrevRank != null ? bPrevRank - bRank : 0;
+          const bPrevKg = prim === "barbell" && barbellInfo ? (barbellPrevDemandRef.current == null ? barbellInfo.axTop : Math.min(barbellPrevDemandRef.current, barbellInfo.endKg[t.idx] ?? barbellInfo.axTop)) : 0;
+          const bGain = prim === "barbell" && !bOut ? Math.max(0, bKg - Math.round(bPrevKg)) : 0;
+          const bLifter = prim === "barbell" ? t.players[barbellTry]?.name ?? "" : "";
           return (
           <div
             key={t.code}
+            data-testid="arena-ladder-row"
             onClick={teamClickable ? () => onOpenTeam!(t.teamId!) : undefined}
             onMouseEnter={
               teamHoverable
@@ -3155,11 +3495,11 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                 : undefined
             }
             title={teamClickable ? "Team-Karte öffnen" : undefined}
-            style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 6px", borderRadius: 8, fontVariantNumeric: "tabular-nums", cursor: teamClickable ? "pointer" : "default", background: t.isOwn ? "color-mix(in srgb, var(--nl-accent) 14%, transparent)" : rc ? `color-mix(in srgb, ${rc} 9%, transparent)` : "transparent", boxShadow: rc ? `inset 3px 0 0 ${rc}` : undefined }}>
-            <span style={{ width: 22, textAlign: "right", fontWeight: 800, color: ampel(t.rank), fontSize: 12.5 }}>{t.rank}</span>
-            {prim === "track" ? (
-              <span aria-hidden title="Rang-Änderung seit letzter Etappe" style={{ width: 18, fontSize: 10, fontWeight: 800, textAlign: "left", fontVariantNumeric: "tabular-nums", color: rankDelta > 0 ? "var(--nl-good)" : rankDelta < 0 ? "var(--nl-risk)" : "var(--nl-mut)" }}>
-                {rankDelta > 0 ? "▲" : rankDelta < 0 ? "▼" : ""}
+            style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 6px", borderRadius: 8, fontVariantNumeric: "tabular-nums", cursor: teamClickable ? "pointer" : "default", opacity: bOut ? 0.55 : 1, background: t.isOwn ? "color-mix(in srgb, var(--nl-accent) 14%, transparent)" : bChamp ? "color-mix(in srgb, var(--nl-warn) 16%, transparent)" : rc ? `color-mix(in srgb, ${rc} 9%, transparent)` : "transparent", boxShadow: rc ? `inset 3px 0 0 ${rc}` : undefined }}>
+            <span style={{ width: 22, textAlign: "right", fontWeight: 800, color: prim === "barbell" ? (bChamp ? "var(--nl-warn)" : ampel(bRank)) : ampel(t.rank), fontSize: 12.5 }}>{bChamp ? "🏆" : prim === "barbell" ? bRank : t.rank}</span>
+            {prim === "track" || prim === "barbell" ? (
+              <span aria-hidden title="Rang-Änderung seit letzter Runde" style={{ width: 14, fontSize: 10, fontWeight: 800, textAlign: "left", color: (prim === "barbell" ? bArrow : rankDelta) > 0 ? "var(--nl-good)" : (prim === "barbell" ? bArrow : rankDelta) < 0 ? "var(--nl-risk)" : "var(--nl-mut)" }}>
+                {(prim === "barbell" ? bArrow : rankDelta) > 0 ? "▲" : (prim === "barbell" ? bArrow : rankDelta) < 0 ? "▼" : ""}
               </span>
             ) : null}
             {t.logoUrl ? (
@@ -3168,17 +3508,35 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             ) : (
               <span aria-hidden style={{ width: 16, height: 16, borderRadius: 4, flex: "none", background: `hsl(${hueForIdx(t.idx)} 60% 52%)` }} />
             )}
-            <span style={{ width: 44, fontWeight: 800, color: t.isOwn ? "var(--nl-accent)" : "inherit", fontSize: 12.5 }}>{t.code}</span>
-            {t.rel && !t.isOwn ? (
-              <span title={t.rel === "ally" ? "Verbündet" : t.rel === "rival" ? "Rivale" : "Dein Team"} aria-hidden style={{ fontSize: 11, flex: "none", color: rc ?? undefined }}>{REL_GLYPH[t.rel]}</span>
-            ) : null}
-            <span style={{ flex: 1, fontSize: 11.5, color: "var(--nl-mut)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
+            {prim === "barbell" ? (
+              <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", lineHeight: 1.05 }}>
+                <span style={{ fontWeight: 800, fontSize: 11.5, color: t.isOwn ? "var(--nl-accent)" : rc ?? "inherit", display: "flex", alignItems: "center", gap: 3 }}>
+                  {t.code}
+                  {bOut ? <span style={{ fontSize: 8 }}>🔴</span> : null}
+                  {t.rel && !t.isOwn ? <span aria-hidden style={{ fontSize: 9, color: rc ?? undefined }}>{REL_GLYPH[t.rel]}</span> : null}
+                </span>
+                <span style={{ fontSize: 8.5, color: "var(--nl-mut-2)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{bLifter}</span>
+              </span>
+            ) : (
+              <>
+                <span style={{ width: 44, fontWeight: 800, color: t.isOwn ? "var(--nl-accent)" : "inherit", fontSize: 12.5 }}>{t.code}</span>
+                {t.rel && !t.isOwn ? (
+                  <span title={t.rel === "ally" ? "Verbündet" : t.rel === "rival" ? "Rivale" : "Dein Team"} aria-hidden style={{ fontSize: 11, flex: "none", color: rc ?? undefined }}>{REL_GLYPH[t.rel]}</span>
+                ) : null}
+                <span style={{ flex: 1, fontSize: 11.5, color: "var(--nl-mut)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
+              </>
+            )}
             {prim === "track" ? (
               <span title="Rückstand auf Platz 1" style={{ width: 42, textAlign: "right", fontSize: 11, fontWeight: 700, color: "var(--nl-mut)", fontVariantNumeric: "tabular-nums" }}>
                 {t.rank === 1 ? "—" : `−${fmt1(behind)}`}
               </span>
             ) : null}
-            <span style={{ fontWeight: 800, fontSize: 12.5, fontVariantNumeric: "tabular-nums", minWidth: 34, textAlign: "right" }}>{fmt1(t.score)}</span>
+            {prim === "barbell" ? (
+              <span title="Zugewinn diese Runde" style={{ width: 34, textAlign: "right", fontSize: 9.5, fontWeight: 800, color: bOut ? "var(--nl-mut-2)" : "var(--nl-good)", fontVariantNumeric: "tabular-nums" }}>
+                {bOut ? "raus" : bGain > 0 ? `+${bGain}` : "—"}
+              </span>
+            ) : null}
+            <span style={{ fontWeight: 800, fontSize: 12.5, fontVariantNumeric: "tabular-nums", minWidth: 34, textAlign: "right", color: prim === "barbell" ? (bOut ? "var(--nl-mut)" : "var(--nl-warn)") : "inherit" }}>{prim === "barbell" ? bKg : fmt1(t.score)}</span>
             {prim === "track" ? (
               <span title="Beitrag des aktuellen Läufers" style={{ width: 30, fontSize: 11, fontWeight: 800, textAlign: "left", fontVariantNumeric: "tabular-nums", color: lastGain != null ? "var(--nl-good)" : "transparent" }}>
                 {lastGain != null ? `+${fmt1(lastGain)}` : ""}
