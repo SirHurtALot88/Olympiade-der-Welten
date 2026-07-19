@@ -17,7 +17,7 @@ import DisciplineStageEndScreen from "@/app/foundation/discipline-stage/Discipli
 import DisciplineStageStandingsDelta from "@/app/foundation/discipline-stage/DisciplineStageStandingsDelta";
 import DisciplineStageHighlights from "@/app/foundation/discipline-stage/DisciplineStageHighlights";
 import DisciplineStageTopPlayers, { type DisciplineStageTopPlayer } from "@/app/foundation/discipline-stage/DisciplineStageTopPlayers";
-import DisciplineStageNativeArena, { type StagePrimitive, type StageMotif } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
+import DisciplineStageNativeArena, { type StagePrimitive, type StageMotif, type StageEnv } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
 import { fmt1 } from "@/app/foundation/discipline-stage/stage-format";
 
 // Disziplinen mit fertigem nativem Renderer (löst schrittweise das iframe ab).
@@ -196,9 +196,19 @@ const SLOT_VOCAB: Record<string, string[]> = {
 
 // Skin je Disziplin: Akzentfarbe (Feldlinien + Wasserzeichen) + Hintergrund-
 // Motiv. Farben als hsl() (kein Hex → Design-Token-Lint bleibt sauber).
-const DISCIPLINE_SKIN: Record<string, { accent: string; motif: StageMotif }> = {
-  staffel: { accent: "hsl(14 80% 58%)", motif: "chevrons" },
-  spurt: { accent: "hsl(38 90% 58%)", motif: "chevrons" },
+// Athletik-Stadion (Aschenbahn + Rasen-Innenfeld + Ränge) — die volle Stimmung
+// der Original-Staffel-Arena, Farben als hsl().
+const STADIUM_ATHLETICS: StageEnv = {
+  sky: ["hsl(28 38% 20%)", "hsl(28 42% 9%)"],
+  stands: "hsl(28 36% 22%)",
+  surface: ["hsl(20 74% 46%)", "hsl(12 68% 34%)", "hsl(7 70% 17%)"],
+  line: "hsl(38 50% 88%)",
+  infield: ["hsl(140 45% 32%)", "hsl(148 50% 20%)"],
+};
+
+const DISCIPLINE_SKIN: Record<string, { accent: string; motif: StageMotif; env?: StageEnv }> = {
+  staffel: { accent: "hsl(14 80% 58%)", motif: "chevrons", env: STADIUM_ATHLETICS },
+  spurt: { accent: "hsl(38 90% 58%)", motif: "chevrons", env: STADIUM_ATHLETICS },
   "takeshis-castle": { accent: "hsl(160 55% 50%)", motif: "grid" },
   "mini-dm": { accent: "hsl(350 70% 60%)", motif: "combat" },
   battlefield: { accent: "hsl(80 45% 52%)", motif: "combat" },
@@ -677,6 +687,7 @@ export default function DisciplineStageArena({
           disciplineName={model.disciplineName}
           accent={DISCIPLINE_SKIN[disciplineId]?.accent}
           motif={DISCIPLINE_SKIN[disciplineId]?.motif}
+          env={DISCIPLINE_SKIN[disciplineId]?.env}
         />
       ) : scene ? (
         <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>

@@ -40,9 +40,20 @@ export type DisciplineStageNativeArenaProps = {
   disciplineName?: string; // Feld-Wasserzeichen (Identität je Disziplin)
   accent?: string; // Akzentfarbe der Disziplin (Wasserzeichen + Feldlinien)
   motif?: StageMotif; // dezentes Hintergrund-Motiv
+  env?: StageEnv; // atmosphärische Umgebung (Stadion o.ä.) — überschreibt die schlichte Optik
 };
 
 export type StageMotif = "chevrons" | "combat" | "board" | "court" | "weights" | "grid" | "ice" | "stage" | "plates" | "skyline" | "none";
+
+// Atmosphärische Umgebung je Primitive: Farbschichten für Himmel/Ränge/Belag/
+// Linien/Innenfeld. Alle Werte als hsl()/rgb() (kein Hex → Design-Token-Lint).
+export type StageEnv = {
+  sky: [string, string]; // Hintergrund-Verlauf (oben, unten)
+  stands: string; // Ränge/Tribüne
+  surface: [string, string, string]; // Belag-Verlauf (oben, mitte, unten)
+  line: string; // Bahnmarkierung / Ziel
+  infield: [string, string]; // Innenfeld-Verlauf (oben, unten)
+};
 
 // Dezentes Feld-Motiv je Disziplin (Skin). Bewusst leise (niedrige Deckkraft),
 // die Akzentfarbe kommt aus der Disziplin. Kein DOM-Overhead: wenige SVG-Formen.
@@ -234,7 +245,7 @@ type TickerData = TickerReveal | TickerSummary;
 type Spot = { crest: NativeStageTeam; idx: number; kick: string; name: string; sub: string; net: number; chipText: string; chipColor: string; mine: boolean } | null;
 type PodCol = { place: number; code: string; name: string; pts: number; logoUrl: string | null; isOwn: boolean; idx: number; delayMs: number; loud: boolean };
 
-export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, topPlayers, primitive = "track", progressLabel, disciplineName, accent, motif }: DisciplineStageNativeArenaProps) {
+export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, topPlayers, primitive = "track", progressLabel, disciplineName, accent, motif, env }: DisciplineStageNativeArenaProps) {
   const skinAccent = accent ?? "var(--nl-line-2, var(--nl-line))";
   const slotCount = Math.max(1, slots.length);
   const prim = primitive;
@@ -344,15 +355,22 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   useLayoutEffect(() => {
     if (pathRef.current) setPathLen(pathRef.current.getTotalLength());
   }, [prim]);
-  const ovalPath = useMemo(() => {
-    const m = 70;
-    const x0 = m;
-    const y0 = m;
-    const x1 = W - m;
-    const y1 = H - m;
-    const r = (y1 - y0) / 2;
-    return `M ${x0 + r} ${y0} L ${x1 - r} ${y0} A ${r} ${r} 0 0 1 ${x1 - r} ${y1} L ${x0 + r} ${y1} A ${r} ${r} 0 0 1 ${x0 + r} ${y0} Z`;
-  }, [W, H]);
+  // Stadion-Oval bei beliebigem Rand-Margin (für Bahn-Mittellinie, Bahnlinien
+  // und Innenfeld-Kante). Kleinerer Margin = größeres Oval.
+  const makeOval = useCallback(
+    (m: number): string => {
+      const x0 = m;
+      const y0 = m;
+      const x1 = W - m;
+      const y1 = H - m;
+      const r = (y1 - y0) / 2;
+      return `M ${x0 + r} ${y0} L ${x1 - r} ${y0} A ${r} ${r} 0 0 1 ${x1 - r} ${y1} L ${x0 + r} ${y1} A ${r} ${r} 0 0 1 ${x0 + r} ${y0} Z`;
+    },
+    [W, H],
+  );
+  const OVAL_M = 70;
+  const OVAL_BAND = 54;
+  const ovalPath = useMemo(() => makeOval(OVAL_M), [makeOval]);
 
   // Layout-Koordinaten je Primitive
   const layout = useMemo(() => {
@@ -948,20 +966,82 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                   </clipPath>
                 ) : null,
               )}
+              {env ? (
+                <>
+                  <linearGradient id="envSky" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={env.sky[0]} />
+                    <stop offset="100%" stopColor={env.sky[1]} />
+                  </linearGradient>
+                  <linearGradient id="envSurface" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={env.surface[0]} />
+                    <stop offset="55%" stopColor={env.surface[1]} />
+                    <stop offset="100%" stopColor={env.surface[2]} />
+                  </linearGradient>
+                  <linearGradient id="envInfield" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={env.infield[0]} />
+                    <stop offset="100%" stopColor={env.infield[1]} />
+                  </linearGradient>
+                  <clipPath id="envInfieldClip">
+                    <path d={makeOval(OVAL_M + OVAL_BAND / 2)} />
+                  </clipPath>
+                </>
+              ) : null}
             </defs>
 
-            {/* Skin-Motiv (dezenter Hintergrund je Disziplin) */}
-            {renderMotif(motif, W, H, skinAccent)}
+            {/* Hintergrund: atmosphärische Stadion-Umgebung ODER dezentes Motiv */}
+            {env && prim === "track" ? (
+              <>
+                {/* Himmel / Ambient */}
+                <rect x={0} y={0} width={W} height={H} fill="url(#envSky)" />
+                {/* Ränge / Tribüne (breiter Ring hinter der Bahn) */}
+                <path d={ovalPath} fill="none" stroke={env.stands} strokeWidth={OVAL_BAND + 30} />
+                {/* Bahn-Belag (Aschenbahn-Verlauf) */}
+                <path d={ovalPath} fill="none" stroke="url(#envSurface)" strokeWidth={OVAL_BAND} />
+                {/* Bahn-Trennlinien */}
+                <path d={makeOval(OVAL_M - 18)} fill="none" stroke={env.line} strokeWidth={1.4} opacity={0.35} />
+                <path d={makeOval(OVAL_M + 18)} fill="none" stroke={env.line} strokeWidth={1.4} opacity={0.35} />
+                {/* Innenfeld (Rasen) + Mähstreifen */}
+                <path d={makeOval(OVAL_M + OVAL_BAND / 2)} fill="url(#envInfield)" stroke="none" />
+                <g clipPath="url(#envInfieldClip)">
+                  {Array.from({ length: Math.ceil(W / 46) }).map((_, i) => (
+                    <rect key={i} x={i * 46} y={0} width={23} height={H} fill="rgba(0,0,0,0.08)" />
+                  ))}
+                </g>
+                {/* Start-/Ziellinie (kariert) + ZIEL */}
+                {(() => {
+                  const r = (H - 2 * OVAL_M) / 2;
+                  const sx = OVAL_M + r;
+                  const yTop = OVAL_M - OVAL_BAND / 2;
+                  const steps = Math.round(OVAL_BAND / 8);
+                  return (
+                    <g>
+                      {Array.from({ length: steps }).map((_, i) => (
+                        <rect key={i} x={sx - 3} y={yTop + i * 8} width={6} height={8} fill={i % 2 === 0 ? env.line : "rgba(0,0,0,0.55)"} />
+                      ))}
+                      <text x={sx - 16} y={OVAL_M} transform={`rotate(-90 ${sx - 16} ${OVAL_M})`} textAnchor="middle" fontFamily="Georgia, serif" fontSize={17} fontWeight={800} fill={env.line} opacity={0.9}>
+                        ZIEL
+                      </text>
+                    </g>
+                  );
+                })()}
+                {/* Unsichtbarer Referenz-Pfad für Token-Positionen */}
+                <path ref={pathRef} d={ovalPath} fill="none" stroke="none" />
+              </>
+            ) : (
+              <>
+                {renderMotif(motif, W, H, skinAccent)}
+              </>
+            )}
 
             {/* Feld-Wasserzeichen: Disziplin-Identität */}
             {disciplineName ? (
-              <text x={18} y={30} fontSize={19} fontWeight={800} letterSpacing="0.04em" fill={skinAccent} opacity={0.95} style={{ textTransform: "uppercase" }}>
+              <text x={18} y={30} fontSize={19} fontWeight={800} letterSpacing="0.04em" fill={env ? env.line : skinAccent} opacity={env ? 0.75 : 0.95} style={{ textTransform: "uppercase" }}>
                 {disciplineName}
               </text>
             ) : null}
 
-            {/* Feld je Primitive */}
-            {prim === "track" ? (
+            {/* Feld je Primitive (schlichte Optik, wenn keine env-Umgebung) */}
+            {env && prim === "track" ? null : prim === "track" ? (
               <>
                 <path d={ovalPath} fill="none" stroke="var(--nl-panel)" strokeWidth={54} />
                 <path ref={pathRef} d={ovalPath} fill="none" stroke={skinAccent} opacity={0.7} strokeWidth={2} strokeDasharray="6 8" />
