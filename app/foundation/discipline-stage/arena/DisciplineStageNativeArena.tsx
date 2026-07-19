@@ -2358,29 +2358,40 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                         );
                       }
                       if (prim === "kda") {
-                        // TDM — K/D/A deterministisch aus dem Feld-normierten Score
-                        // ableiten (n = (score−min)/(max−min)). K grün · D rot ·
-                        // A blau + KDA-Balken (Fortschritt) + Ratio rechts.
+                        // TDM — K/D/A/KDA/HS%/PTS deterministisch aus dem Feld-normierten
+                        // Score ableiten (n = (score−min)/(max−min)). K grün · D rot · A blau.
+                        // PTS = Kills×1 + Assists×0,5 aus den CONTINUOUS-Werten (kc/ac), damit
+                        // auch schwächere Teams noch Abstand zeigen. Score bleibt Wahrheit/Rang.
                         const n = fieldNorm(t.score);
-                        const kills = Math.round(6 + n * 26);
-                        const deaths = Math.round(4 + (1 - n) * 16);
-                        const assists = Math.round(4 + n * 16);
-                        const kdaRatio = ((kills + assists) / Math.max(1, deaths)).toFixed(1);
+                        const kc = 6 + n * 26;
+                        const ac = 4 + n * 16;
+                        const k = Math.round(kc);
+                        const d = Math.round(4 + (1 - n) * 16);
+                        const a = Math.round(ac);
+                        const kda = (k + a) / Math.max(1, d);
+                        const hs = Math.round(28 + n * 42);
+                        const pts = kc + ac * 0.5;
+                        const kdaCol = kda >= 3 ? "hsl(140 62% 56%)" : kda >= 1.5 ? "hsl(41 85% 58%)" : "hsl(2 78% 62%)";
                         const barH = Math.min(11, laneH * 0.62);
                         const fs = Math.min(9.5, Math.max(7, laneH * 0.62));
                         return (
                           <g style={{ fontVariantNumeric: "tabular-nums" }}>
+                            <title>{`abgeleitet · K ${k} · D ${d} · A ${a} · KDA ${kda.toFixed(1)} · HS ${hs}% · PTS ${pts.toFixed(1)}`}</title>
                             <rect x={x0} y={yy - barH / 2} width={x1 - x0} height={barH} rx={3} fill="var(--nl-line)" opacity={0.16} />
                             <rect x={x0} y={yy - barH / 2} width={Math.max(0, pos.x - x0)} height={barH} rx={3} fill={fillCol} opacity={0.34} />
                             <text x={x0 + 7} y={yy} dominantBaseline="middle" fontSize={fs} fontWeight={800}>
-                              <tspan fill="hsl(140 62% 56%)">{kills}</tspan>
+                              <tspan fill="hsl(140 62% 56%)">{k}</tspan>
                               <tspan fill="var(--nl-mut)"> / </tspan>
-                              <tspan fill="hsl(2 78% 62%)">{deaths}</tspan>
+                              <tspan fill="hsl(2 78% 62%)">{d}</tspan>
                               <tspan fill="var(--nl-mut)"> / </tspan>
-                              <tspan fill="hsl(210 82% 64%)">{assists}</tspan>
+                              <tspan fill="hsl(210 82% 64%)">{a}</tspan>
                             </text>
-                            <text x={x1 - 6} y={yy} dominantBaseline="middle" textAnchor="end" fontSize={fs} fontWeight={800} fill="var(--nl-ink)">
-                              {kdaRatio}
+                            {/* rechts: KDA (farbcodiert) · PTS (Wertungs-Headline); HS% im Steckbrief/Tooltip */}
+                            <text x={x1 - 52} y={yy} dominantBaseline="middle" textAnchor="end" fontSize={fs} fontWeight={800} fill={kdaCol}>
+                              {kda.toFixed(1)}
+                            </text>
+                            <text x={x1 - 6} y={yy} dominantBaseline="middle" textAnchor="end" fontSize={fs + 0.5} fontWeight={800} fill="var(--nl-accent)">
+                              {pts.toFixed(1)}
                             </text>
                           </g>
                         );
@@ -2614,6 +2625,45 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                               {top ? (
                                 <div style={{ fontSize: 11.5, color: "var(--nl-mut)", marginTop: 2 }}>
                                   Top-Beitrag: <b style={{ color: "var(--nl-ink)" }}>{top.name}</b> · {fmt1(playerNet(top))}
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })()
+                      : null}
+                    {/* TDM: abgeleiteter K/D/A-Steckbrief (K·D·A·KDA·HS%·PTS) + echter
+                        Top-Fragger aus dem Kader. Score bleibt Wahrheit/Rang, Zahlen Flavor. */}
+                    {prim === "kda" && t.thrownSlot >= 0
+                      ? (() => {
+                          const n = fieldNorm(t.score);
+                          const kc = 6 + n * 26;
+                          const ac = 4 + n * 16;
+                          const k = Math.round(kc);
+                          const d = Math.round(4 + (1 - n) * 16);
+                          const a = Math.round(ac);
+                          const kda = ((k + a) / Math.max(1, d)).toFixed(1);
+                          const hs = Math.round(28 + n * 42);
+                          const pts = (kc + ac * 0.5).toFixed(1);
+                          const top = kdaTopFrag(t);
+                          return (
+                            <div style={{ margin: "0 0 7px", padding: "6px 9px", borderRadius: 9, background: "var(--nl-bg)", border: "1px solid var(--nl-line)" }}>
+                              <div style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 3 }}>
+                                K/D/A · abgeleitet{t.rank === 1 ? " · 👑 MVP" : ""}
+                              </div>
+                              <div style={{ fontSize: 12.5, fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>
+                                <span style={{ color: "hsl(140 62% 56%)" }}>K {k}</span>
+                                <span style={{ color: "var(--nl-mut)" }}> · </span>
+                                <span style={{ color: "hsl(2 78% 62%)" }}>D {d}</span>
+                                <span style={{ color: "var(--nl-mut)" }}> · </span>
+                                <span style={{ color: "hsl(210 82% 64%)" }}>A {a}</span>
+                              </div>
+                              <div style={{ fontSize: 12, fontVariantNumeric: "tabular-nums", marginTop: 1 }}>
+                                KDA {kda}<span style={{ color: "var(--nl-mut)" }}> · </span>HS {hs}%<span style={{ color: "var(--nl-mut)" }}> · </span>
+                                <b style={{ color: "var(--nl-accent)" }}>PTS {pts}</b>
+                              </div>
+                              {top ? (
+                                <div style={{ fontSize: 11.5, color: "var(--nl-mut)", marginTop: 2 }}>
+                                  Top-Fragger: <b style={{ color: "var(--nl-ink)" }}>{top.name}</b> · {fmt1(playerNet(top))}
                                 </div>
                               ) : null}
                             </div>
