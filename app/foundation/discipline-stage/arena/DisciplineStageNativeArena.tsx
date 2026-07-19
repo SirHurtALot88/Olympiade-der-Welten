@@ -41,7 +41,32 @@ export type NativeStageTeam = {
   teamId?: string; // für Team-Drawer
   rel?: TeamRelationshipKind | null; // Freund/Feind (mine/ally/rival) → Rahmen-Marker
 };
-export type StagePrimitive = "track" | "lanes" | "towers" | "stage";
+export type StagePrimitive =
+  | "track"
+  | "lanes"
+  | "towers"
+  | "stage"
+  // Row-Familie (eine Reihe je Team, x = Fortschritt, eigenes Reihen-Motiv):
+  | "platter" // Wettessen — leergegessene Teller + 🍴
+  | "lamps" // Fechten — Treffer-Lampen (rot/grün)
+  | "spybar" // I Spy — Späh-/Sichtfeld-Balken, 🔍 an der Scan-Kante
+  // Turm-Familie (Säule je Team, Höhe = Punkte):
+  | "barbell" // Gewichtheben — Hantel-Säulen mit Scheiben
+  | "sparkbar" // universeller Fallback — schlanke Spark-Säulen
+  | "thermometer" // Breaking — Schmerz-Thermometer (grün → glühend rot)
+  // Szenen (atmosphärisches Feld, Score = Position):
+  | "peloton" // Zeitfahren — Straße mit Ausreißer/Feld
+  | "parcours" // Takeshi — Schlangen-Parcours
+  | "mountain" // Climbing — Gipfelsturm (Berg-Serpentine)
+  | "court" // Basketball — Wurfkarte (Halbfeld)
+  | "rink"; // Hockey — Eisrink von oben
+
+// Familien mit geteilter Geometrie: Row-Familie rechnet wie "lanes",
+// Turm-Familie wie "towers". Nur der Hintergrund/Overlay unterscheidet sie.
+const ROW_FAMILY = new Set<StagePrimitive>(["lanes", "platter", "lamps", "spybar"]);
+const TOWER_FAMILY = new Set<StagePrimitive>(["towers", "barbell", "sparkbar", "thermometer"]);
+// Szenen-Primitive: eigenes atmosphärisches Feld (Straße/Berg/Court/Rink/Parcours).
+const SCENE_PRIMS = new Set<StagePrimitive>(["peloton", "mountain", "court", "rink", "parcours"]);
 export type DisciplineStageNativeArenaProps = {
   teams: NativeStageTeam[];
   slots: string[];
@@ -338,6 +363,103 @@ function envDeco(deco: StageDeco, W: number, H: number, groundY: number, key: nu
   return <polygon key={key} points={pts.join(" ")} fill={deco.color} opacity={0.9} />;
 }
 
+// Wegpunkt-Pfad als SVG-d (für Serpentine/Parcours-Route).
+function wpPath(wp: [number, number][]): string {
+  return wp.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
+}
+
+// Atmosphärisches Feld für die Szenen-Primitive. Alle Layer HINTER den Tokens,
+// Farben aus env (hsl/rgba/CSS-Token, kein Hex → Design-Token-Lint bleibt sauber).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function renderSceneEnvBg(prim: StagePrimitive, env: StageEnv, layout: any, W: number, H: number): React.ReactNode {
+  if (prim === "peloton") {
+    const { roadY, padL, padR } = layout;
+    return (
+      <>
+        <rect x={0} y={roadY + 46} width={W} height={H - roadY - 46} fill={env.surface[2]} opacity={0.5} />
+        <line x1={padL} y1={roadY} x2={W - padR} y2={roadY} stroke={env.stands} strokeWidth={78} strokeLinecap="round" />
+        <line x1={padL} y1={roadY} x2={W - padR} y2={roadY} stroke="url(#envSurface)" strokeWidth={64} strokeLinecap="round" />
+        <line x1={padL} y1={roadY} x2={W - padR} y2={roadY} stroke={env.line} strokeWidth={2} strokeDasharray="6 24" opacity={0.5} />
+        <rect x={W - padR - 10} y={roadY - 40} width={5} height={80} fill={env.line} opacity={0.85} />
+        <text x={W - padR - 18} y={roadY - 48} textAnchor="end" fontSize={16} fontWeight={800} fill={env.line} opacity={0.9}>🏁 Ziel</text>
+      </>
+    );
+  }
+  if (prim === "mountain") {
+    const wp: [number, number][] = layout.wp;
+    return (
+      <>
+        <circle cx={W * 0.5} cy={H * 0.1} r={W * 0.11} fill={env.glow?.color ?? env.line} opacity={0.22} />
+        {/* Bergprofil */}
+        <polygon
+          points={`0,${H} ${W * 0.2},${H * 0.62} ${W * 0.37},${H * 0.74} ${W * 0.5},${H * 0.12} ${W * 0.63},${H * 0.46} ${W * 0.83},${H * 0.27} ${W},${H * 0.56} ${W},${H}`}
+          fill={env.surface[2]}
+          stroke={env.stands}
+          strokeWidth={1.5}
+        />
+        {/* Schneegipfel */}
+        <polygon points={`${W * 0.46},${H * 0.2} ${W * 0.5},${H * 0.12} ${W * 0.54},${H * 0.22} ${W * 0.51},${H * 0.24} ${W * 0.5},${H * 0.2} ${W * 0.485},${H * 0.24}`} fill={env.line} opacity={0.85} />
+        {/* Serpentinen-Route */}
+        <path d={wpPath(wp)} fill="none" stroke={env.stands} strokeWidth={11} strokeLinecap="round" strokeLinejoin="round" opacity={0.6} />
+        <path d={wpPath(wp)} fill="none" stroke={env.line} strokeWidth={2} strokeDasharray="3 12" opacity={0.55} />
+        <text x={W * 0.5} y={H * 0.09} textAnchor="middle" fontSize={20}>🚩</text>
+      </>
+    );
+  }
+  if (prim === "parcours") {
+    const wp: [number, number][] = layout.wp;
+    return (
+      <>
+        <rect x={0} y={0} width={W} height={H} fill="url(#envSurface)" opacity={0.35} />
+        <path d={wpPath(wp)} fill="none" stroke={env.stands} strokeWidth={26} strokeLinecap="round" strokeLinejoin="round" opacity={0.85} />
+        <path d={wpPath(wp)} fill="none" stroke={env.surface[0]} strokeWidth={18} strokeLinecap="round" strokeLinejoin="round" opacity={0.7} />
+        <path d={wpPath(wp)} fill="none" stroke={env.line} strokeWidth={2} strokeDasharray="2 12" opacity={0.5} />
+        <circle cx={wp[0]![0]} cy={wp[0]![1]} r={9} fill="none" stroke={env.line} strokeWidth={2.5} />
+        <text x={wp[0]![0]} y={wp[0]![1] - 14} textAnchor="middle" fontSize={12} fontWeight={800} fill={env.line}>START</text>
+        <text x={wp[wp.length - 1]![0]} y={wp[wp.length - 1]![1] + 22} textAnchor="middle" fontSize={16}>🏁</text>
+      </>
+    );
+  }
+  if (prim === "court") {
+    const { cx, hoopY, baseY, baseHalf } = layout;
+    const keyW = baseHalf * 0.42;
+    const keyH = (baseY - hoopY) * 0.5;
+    return (
+      <>
+        <rect x={cx - baseHalf} y={hoopY - 20} width={baseHalf * 2} height={baseY - hoopY + 40} rx={10} fill="url(#envSurface)" />
+        {/* Zonen-Schlüssel */}
+        <rect x={cx - keyW} y={hoopY} width={keyW * 2} height={keyH} fill="none" stroke={env.line} strokeWidth={2.5} opacity={0.7} />
+        <circle cx={cx} cy={hoopY + keyH} r={keyW} fill="none" stroke={env.line} strokeWidth={2.5} opacity={0.7} />
+        {/* Drei-Punkte-Bogen */}
+        <path d={`M ${cx - baseHalf * 0.9} ${hoopY} A ${baseHalf * 0.9} ${baseY - hoopY} 0 0 0 ${cx + baseHalf * 0.9} ${hoopY}`} fill="none" stroke={env.line} strokeWidth={2.5} opacity={0.6} />
+        {/* Korb */}
+        <line x1={cx - 22} y1={hoopY - 10} x2={cx + 22} y2={hoopY - 10} stroke={env.line} strokeWidth={4} />
+        <circle cx={cx} cy={hoopY} r={9} fill="none" stroke={env.glow?.color ?? env.line} strokeWidth={3} />
+        <text x={cx} y={hoopY + keyH * 0.7} textAnchor="middle" fontSize={40} opacity={0.14}>🏀</text>
+      </>
+    );
+  }
+  // rink
+  const { x0, y0, w, hh } = layout;
+  const midX = x0 + w / 2;
+  return (
+    <>
+      <rect x={x0} y={y0} width={w} height={hh} rx={44} fill="url(#envSurface)" stroke={env.stands} strokeWidth={4} />
+      <ellipse cx={midX} cy={y0 + hh * 0.3} rx={w * 0.42} ry={hh * 0.18} fill={env.glow?.color ?? env.line} opacity={0.12} />
+      {/* Blaue Linien (vertikal) + rote Mittellinie */}
+      <line x1={x0 + w * 0.32} y1={y0} x2={x0 + w * 0.32} y2={y0 + hh} stroke={env.line} strokeWidth={3} opacity={0.7} />
+      <line x1={x0 + w * 0.68} y1={y0} x2={x0 + w * 0.68} y2={y0 + hh} stroke={env.line} strokeWidth={3} opacity={0.7} />
+      <line x1={midX} y1={y0} x2={midX} y2={y0 + hh} stroke="hsl(2 70% 55%)" strokeWidth={2.5} opacity={0.8} />
+      <circle cx={midX} cy={y0 + hh / 2} r={hh * 0.14} fill="none" stroke={env.line} strokeWidth={1.6} opacity={0.5} />
+      {/* Tore: rechts = Angriff */}
+      <rect x={x0 + w - 8} y={y0 + hh / 2 - 26} width={12} height={52} rx={3} fill="hsl(41 80% 55%)" opacity={0.85} />
+      <rect x={x0 - 4} y={y0 + hh / 2 - 26} width={12} height={52} rx={3} fill={env.stands} opacity={0.85} />
+      <text x={x0 + w - 20} y={y0 + 22} textAnchor="end" fontSize={14} fill={env.line} opacity={0.8}>🥅 Angriff →</text>
+      <text x={midX} y={y0 + hh / 2 + 8} textAnchor="middle" fontSize={40} opacity={0.14}>🏒</text>
+    </>
+  );
+}
+
 const STAR_MIN = 80;
 // viewBox + Token-Radien je Primitive. Der Rest (Engine/FX/Ticker/Podest/Tabelle)
 // ist geometrieunabhängig; nur Feld-Layout + tokenPos unterscheiden sich.
@@ -348,10 +470,48 @@ const PRIM_GEO: Record<StagePrimitive, { w: number; h: number; r: number; rOwn: 
   towers: { w: 1180, h: 600, r: 10, rOwn: 14 },
   // stage — Showcase-Bühne mit Tiefe: perspektivische Ruhm-Treppe zum Podest.
   stage: { w: 1180, h: 640, r: 10, rOwn: 15 },
+  // Row-Familie (wie lanes)
+  platter: { w: 1180, h: 640, r: 8, rOwn: 11 },
+  lamps: { w: 1180, h: 640, r: 8, rOwn: 11 },
+  spybar: { w: 1180, h: 640, r: 8, rOwn: 11 },
+  // Turm-Familie (wie towers)
+  barbell: { w: 1180, h: 600, r: 10, rOwn: 14 },
+  sparkbar: { w: 1180, h: 600, r: 9, rOwn: 13 },
+  thermometer: { w: 1180, h: 600, r: 9, rOwn: 13 },
+  // Szenen
+  peloton: { w: 1180, h: 460, r: 11, rOwn: 16 },
+  parcours: { w: 1180, h: 560, r: 12, rOwn: 17 },
+  mountain: { w: 1180, h: 620, r: 11, rOwn: 16 },
+  court: { w: 1180, h: 620, r: 11, rOwn: 16 },
+  rink: { w: 1180, h: 560, r: 11, rOwn: 15 },
 };
 
 function round1(x: number): number {
   return Math.round(x * 10) / 10;
+}
+// Piecewise-lineare Interpolation entlang eines Wegpunkt-Pfads (Serpentine/
+// Parcours): f ∈ 0…1 → {x,y}. Für mountain/parcours (Token folgt dem Weg).
+function interpAlong(wp: [number, number][], f: number): { x: number; y: number } {
+  if (wp.length === 0) return { x: 0, y: 0 };
+  if (wp.length === 1) return { x: wp[0]![0], y: wp[0]![1] };
+  let total = 0;
+  const acc: number[] = [0];
+  for (let i = 1; i < wp.length; i += 1) {
+    total += Math.hypot(wp[i]![0] - wp[i - 1]![0], wp[i]![1] - wp[i - 1]![1]);
+    acc.push(total);
+  }
+  const d = Math.max(0, Math.min(1, f)) * total;
+  for (let i = 1; i < wp.length; i += 1) {
+    if (d <= acc[i]! || i === wp.length - 1) {
+      const segLen = acc[i]! - acc[i - 1]!;
+      const tt = segLen > 0 ? (d - acc[i - 1]!) / segLen : 0;
+      return {
+        x: wp[i - 1]![0] + (wp[i]![0] - wp[i - 1]![0]) * tt,
+        y: wp[i - 1]![1] + (wp[i]![1] - wp[i - 1]![1]) * tt,
+      };
+    }
+  }
+  return { x: wp[wp.length - 1]![0], y: wp[wp.length - 1]![1] };
 }
 function modSum(mods: NativeStageMod[]): number {
   return mods.reduce((s, m) => s + m.sign * m.amt, 0);
@@ -609,16 +769,56 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
 
   // Layout-Koordinaten je Primitive
   const layout = useMemo(() => {
-    if (prim === "lanes") {
+    if (ROW_FAMILY.has(prim)) {
       const top = 18;
       const laneH = (H - top * 2) / N;
-      return { top, laneH, xStart: 84, xEnd: W - 96 };
+      // Row-Motive brauchen etwas mehr Platz links (Kürzel) und rechts (Wert).
+      return { top, laneH, xStart: 96, xEnd: W - 150 };
     }
-    if (prim === "towers") {
+    if (TOWER_FAMILY.has(prim)) {
       const lPad = 40;
       const rPad = 24;
       const colW = (W - lPad - rPad) / N;
       return { lPad, rPad, colW, baseY: H - 52, topY: 44 };
+    }
+    if (prim === "peloton") {
+      return { roadY: H * 0.54, padL: W * 0.045, padR: W * 0.045, fan: 15 };
+    }
+    if (prim === "mountain") {
+      const wp: [number, number][] = [
+        [W * 0.11, H * 0.92],
+        [W * 0.86, H * 0.83],
+        [W * 0.2, H * 0.66],
+        [W * 0.84, H * 0.5],
+        [W * 0.28, H * 0.37],
+        [W * 0.73, H * 0.25],
+        [W * 0.5, H * 0.12],
+      ];
+      return { wp };
+    }
+    if (prim === "parcours") {
+      const rows = 4;
+      const padX = W * 0.05;
+      const padY = H * 0.14;
+      const rowH = (H - 2 * padY) / (rows - 1);
+      const wp: [number, number][] = [];
+      for (let r = 0; r < rows; r += 1) {
+        const y = padY + r * rowH;
+        const leftFirst = r % 2 === 0;
+        wp.push([leftFirst ? padX : W - padX, y]);
+        wp.push([leftFirst ? W - padX : padX, y]);
+      }
+      return { wp };
+    }
+    if (prim === "court") {
+      return { cx: W / 2, hoopY: H * 0.15, baseY: H * 0.9, baseHalf: W * 0.4 };
+    }
+    if (prim === "rink") {
+      const x0 = W * 0.03;
+      const y0 = H * 0.07;
+      const w = W * 0.94;
+      const hh = H * 0.8;
+      return { x0, y0, w, hh, margin: 44 };
     }
     if (prim === "stage") {
       // Perspektivische Ruhm-Treppe (Port von showcase-v2 drawStageBG, auf viewBox
@@ -653,13 +853,41 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const tokenPos = useCallback(
     (t: RT, score: number): { x: number; y: number } => {
       const norm = finalMax > 0 ? score / finalMax : 0; // 0…1, kein Headroom
-      if (prim === "lanes") {
+      if (ROW_FAMILY.has(prim)) {
         const y = layout.top + t.laneIdx * layout.laneH + layout.laneH / 2;
         return { x: layout.xStart + norm * (layout.xEnd - layout.xStart), y };
       }
-      if (prim === "towers") {
+      if (TOWER_FAMILY.has(prim)) {
         const x = layout.lPad + t.laneIdx * layout.colW + layout.colW / 2;
         return { x, y: layout.baseY - norm * (layout.baseY - layout.topY) };
+      }
+      if (prim === "peloton") {
+        // Straße: x = Fortschritt, Feld fächert vertikal um die Mittellinie auf.
+        const x = layout.padL + norm * (W - layout.padL - layout.padR);
+        const lane = (t.laneIdx % 7) - 3; // -3…3
+        return { x, y: layout.roadY - lane * layout.fan };
+      }
+      if (prim === "mountain") {
+        return interpAlong(layout.wp, norm);
+      }
+      if (prim === "parcours") {
+        return interpAlong(layout.wp, norm);
+      }
+      if (prim === "court") {
+        // Wurfkarte: höherer Score → näher an den Korb (oben, Mitte). Das Feld
+        // verjüngt sich zur Zone, Teams fächern nach fester Position auf.
+        const f = Math.max(0, Math.min(1, norm));
+        const y = layout.baseY - f * (layout.baseY - layout.hoopY);
+        const spread = layout.baseHalf * (1 - f * 0.62);
+        const x = layout.cx + ((t.laneIdx - (N - 1) / 2) / Math.max(1, N)) * spread * 2;
+        return { x, y };
+      }
+      if (prim === "rink") {
+        // Eisrink von oben: x = Vorstoß in die Angriffszone (rechts = Tor),
+        // y = feste Zeile je Team, damit sich das Feld nicht überlappt.
+        const x = layout.x0 + layout.margin + norm * (layout.w - 2 * layout.margin);
+        const y = layout.y0 + layout.margin + (N > 1 ? t.laneIdx / (N - 1) : 0.5) * (layout.hh - 2 * layout.margin);
+        return { x, y };
       }
       if (prim === "stage") {
         // Port von stairPos mit finalMax-Normierung: bester Score endet exakt am
@@ -1240,11 +1468,19 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             {progressLabel ??
               (prim === "stage"
                 ? "Aufstieg zur Ruhm-Treppe = kumulierte Punkte"
-                : prim === "towers"
-                  ? "Höhe = kumulierte Punkte"
-                  : prim === "lanes"
-                    ? "Fortschritt = kumulierte Punkte"
-                    : "Position auf dem Oval = kumulierte Punkte")}
+                : prim === "mountain"
+                  ? "Höhe am Berg = kumulierte Punkte"
+                  : prim === "court"
+                    ? "Nähe zum Korb = kumulierte Punkte"
+                    : prim === "rink"
+                      ? "Vorstoß in die Angriffszone = kumulierte Punkte"
+                      : prim === "peloton" || prim === "parcours"
+                        ? "Position auf der Strecke = kumulierte Punkte"
+                        : TOWER_FAMILY.has(prim)
+                          ? "Höhe = kumulierte Punkte"
+                          : ROW_FAMILY.has(prim)
+                            ? "Fortschritt = kumulierte Punkte"
+                            : "Position auf dem Oval = kumulierte Punkte")}
           </span>
         </div>
 
@@ -1367,7 +1603,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                     })()}
                     <path ref={pathRef} d={ovalPath} fill="none" stroke="none" />
                   </>
-                ) : prim === "lanes" ? (
+                ) : ROW_FAMILY.has(prim) ? (
                   <>
                     {/* Horizont-Band hinter dem Feld */}
                     <rect x={0} y={0} width={W} height={layout.top} fill={env.stands} opacity={0.6} />
@@ -1461,19 +1697,21 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                       </>
                     );
                   })()
-                ) : (
+                ) : TOWER_FAMILY.has(prim) ? (
                   <>
                     {/* towers: Rückwand oben + Boden ab Grundlinie */}
                     <rect x={0} y={0} width={W} height={layout.baseY} fill={env.stands} opacity={0.28} />
                     <rect x={0} y={layout.baseY} width={W} height={H - layout.baseY} fill={env.surface[2]} />
                     <rect x={0} y={layout.topY} width={W} height={layout.baseY - layout.topY} fill="url(#envSurface)" opacity={0.5} />
                   </>
+                ) : (
+                  renderSceneEnvBg(prim, env, layout, W, H)
                 )}
 
-                {/* Deko-Layer (hinter Tokens) — stage rendert seine Layer selbst (oben) */}
-                {prim !== "stage" ? env.deco?.map((d, i) => envDeco(d, W, H, prim === "towers" ? layout.baseY : prim === "lanes" ? H - layout.top : H - OVAL_M + 30, i)) : null}
+                {/* Deko-Layer (hinter Tokens) — stage/Szenen rendern ihre Layer selbst */}
+                {prim !== "stage" && !SCENE_PRIMS.has(prim) ? env.deco?.map((d, i) => envDeco(d, W, H, TOWER_FAMILY.has(prim) ? layout.baseY : ROW_FAMILY.has(prim) ? H - layout.top : H - OVAL_M + 30, i)) : null}
                 {/* Lichtstimmung */}
-                {prim !== "stage" && env.glow ? envGlow(env.glow, W, H, prim === "towers" ? layout.baseY : H * 0.82, prim === "lanes" ? layout.xEnd : W - 40) : null}
+                {prim !== "stage" && !SCENE_PRIMS.has(prim) && env.glow ? envGlow(env.glow, W, H, TOWER_FAMILY.has(prim) ? layout.baseY : H * 0.82, ROW_FAMILY.has(prim) ? layout.xEnd : W - 40) : null}
               </>
             ) : (
               <>{renderMotif(motif, W, H, skinAccent)}</>
@@ -1487,12 +1725,12 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             ) : null}
 
             {/* Feld je Primitive (schlichte Optik, wenn keine env-Umgebung) */}
-            {env && (prim === "track" || prim === "stage") ? null : prim === "track" ? (
+            {(env && (prim === "track" || prim === "stage")) || SCENE_PRIMS.has(prim) ? null : prim === "track" ? (
               <>
                 <path d={ovalPath} fill="none" stroke="var(--nl-panel)" strokeWidth={54} />
                 <path ref={pathRef} d={ovalPath} fill="none" stroke={skinAccent} opacity={0.7} strokeWidth={2} strokeDasharray="6 8" />
               </>
-            ) : prim === "lanes" ? (
+            ) : ROW_FAMILY.has(prim) ? (
               <>
                 {Array.from({ length: N }).map((_, i) => {
                   const y = layout.top + i * layout.laneH + layout.laneH / 2;
@@ -1577,13 +1815,68 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                 const barW = Math.min(18, (layout.colW ?? 24) * 0.5);
                 return (
                   <g key={t.code}>
-                    {prim === "towers" ? (
-                      <rect x={pos.x - barW / 2} y={pos.y} width={barW} height={Math.max(0, layout.baseY - pos.y)} rx={3} fill={`hsl(${t.isOwn ? 210 : hue} 55% 50%)`} opacity={t.isOwn ? 0.4 : 0.28} />
-                    ) : null}
-                    {prim === "lanes" ? (
-                      <line x1={layout.xStart} y1={pos.y} x2={pos.x} y2={pos.y} stroke={t.isOwn ? "var(--nl-accent)" : `hsl(${hue} 55% 55%)`} strokeWidth={t.isOwn ? 3 : 2} opacity={0.5} />
-                    ) : null}
-                    {prim === "stage" ? (
+                    {TOWER_FAMILY.has(prim) ? (() => {
+                      const bh = Math.max(0, (layout.baseY ?? pos.y) - pos.y);
+                      const nf = Math.min(1, t.score / finalMax);
+                      const bw2 = prim === "sparkbar" ? Math.min(11, barW) : barW;
+                      const barFill = prim === "thermometer" ? `hsl(${Math.round(120 - nf * 120)} 72% 48%)` : `hsl(${t.isOwn ? 210 : hue} 55% 50%)`;
+                      return (
+                        <g>
+                          <rect x={pos.x - bw2 / 2} y={pos.y} width={bw2} height={bh} rx={3} fill={barFill} opacity={prim === "thermometer" ? 0.72 : t.isOwn ? 0.55 : 0.3} />
+                          {prim === "barbell"
+                            ? Array.from({ length: Math.floor(bh / 12) }).map((_, k) => (
+                                <line key={k} x1={pos.x - bw2 / 2} y1={pos.y + 6 + k * 12} x2={pos.x + bw2 / 2} y2={pos.y + 6 + k * 12} stroke="rgba(0,0,0,0.45)" strokeWidth={1.4} />
+                              ))
+                            : null}
+                        </g>
+                      );
+                    })() : null}
+                    {ROW_FAMILY.has(prim) ? (() => {
+                      const laneH = layout.laneH;
+                      const x0 = layout.xStart;
+                      const x1 = layout.xEnd;
+                      const yy = pos.y;
+                      const nf = Math.min(1, t.score / finalMax);
+                      const fillCol = relColor(t.rel) ?? (t.isOwn ? "var(--nl-accent)" : `hsl(${hue} 55% 55%)`);
+                      if (prim === "platter") {
+                        const plates = Math.min(16, Math.max(1, Math.round(nf * 16)));
+                        const step = Math.max(1, (pos.x - x0) / plates);
+                        return (
+                          <g opacity={0.75}>
+                            {Array.from({ length: plates }).map((_, k) => (
+                              <ellipse key={k} cx={x0 + step * (k + 0.5)} cy={yy} rx={Math.min(7, step * 0.42)} ry={4} fill="none" stroke={fillCol} strokeWidth={1.6} />
+                            ))}
+                          </g>
+                        );
+                      }
+                      if (prim === "lamps") {
+                        const lamps = 10;
+                        const lit = Math.round(nf * lamps);
+                        const step = (x1 - x0) / lamps;
+                        return (
+                          <g>
+                            {Array.from({ length: lamps }).map((_, k) => {
+                              const on = k < lit;
+                              const col = on ? (k % 2 ? "hsl(140 60% 50%)" : "hsl(2 75% 56%)") : "var(--nl-line)";
+                              return <rect key={k} x={x0 + step * k + step * 0.2} y={yy - laneH * 0.28} width={step * 0.6} height={laneH * 0.56} rx={2} fill={col} opacity={on ? 0.9 : 0.32} />;
+                            })}
+                          </g>
+                        );
+                      }
+                      // spybar — Sichtfeld-Balken + entdeckte Objekte
+                      const found = Math.max(1, Math.round(nf * 6) + 1);
+                      const glyphs = ["⭐", "🔑", "🧩", "🍀", "💎"];
+                      return (
+                        <g>
+                          <rect x={x0} y={yy - 5} width={x1 - x0} height={10} rx={3} fill="var(--nl-line)" opacity={0.22} />
+                          <rect x={x0} y={yy - 5} width={Math.max(0, pos.x - x0)} height={10} rx={3} fill={fillCol} opacity={0.38} />
+                          {Array.from({ length: found }).map((_, k) => (
+                            <text key={k} x={x0 + ((k + 1) / (found + 1)) * (pos.x - x0)} y={yy + 4} textAnchor="middle" fontSize={11}>{glyphs[k % 5]}</text>
+                          ))}
+                        </g>
+                      );
+                    })() : null}
+                    {prim === "stage" || SCENE_PRIMS.has(prim) ? (
                       <ellipse cx={pos.x} cy={pos.y + r * 0.9} rx={r * 0.9} ry={r * 0.32} fill="rgba(0,0,0,0.4)" />
                     ) : null}
                     <g
@@ -1605,9 +1898,13 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                         <circle r={r} fill={`hsl(${hue} 60% 52%)`} />
                       )}
                       <circle r={r} fill="none" stroke={t.isOwn ? "var(--nl-ink)" : "rgba(255,255,255,.5)"} strokeWidth={t.isOwn ? 2.5 : 1.4} />
-                      {t.isOwn && prim !== "lanes" ? (
+                      {t.isOwn && !ROW_FAMILY.has(prim) ? (
                         <text y={r + 15} textAnchor="middle" fontSize={13} fontWeight={800} fill="var(--nl-accent)">
                           ★ {t.code}
+                        </text>
+                      ) : t.rel && SCENE_PRIMS.has(prim) ? (
+                        <text y={-(r + 7)} textAnchor="middle" fontSize={10} fontWeight={800} fill={relColor(t.rel)!}>
+                          {t.code}
                         </text>
                       ) : null}
                     </g>

@@ -30,26 +30,26 @@ import { buildTeamRelationshipMap } from "@/lib/foundation/team-relationship";
 const NATIVE_PRIMITIVE: Record<string, StagePrimitive> = {
   // track — Renn-/Parcours-Logik auf einer Bahn
   staffel: "track",
-  spurt: "track",
-  "takeshis-castle": "track",
+  spurt: "track", // Slalom/Bump-Modell folgt noch — bleibt vorerst Oval
+  "takeshis-castle": "parcours", // Schlangen-Parcours (Serpentine)
   "mini-dm": "track",
   battlefield: "track",
-  // lanes — parallele Bahnen bis zum Ziel
-  "time-trial": "lanes",
+  // lanes / Row-Familie — parallele Reihen bis zum Ziel
+  "time-trial": "peloton", // Straße: Ausreißer/Hauptfeld
   "speed-schach": "lanes",
-  fechten: "lanes",
-  tennis: "lanes",
-  wettessen: "lanes", // "wer frisst sich zuerst durch" → Ziellinie
-  // towers — Höhe/Wertung = Punkte (Ballsport, Jury, gestapelte Leistung)
-  basketball: "towers",
-  gewichtheben: "towers",
-  climbing: "towers",
-  eiskunstlauf: "towers",
+  fechten: "lamps", // Treffer-Lampen (rot/grün)
+  tennis: "lanes", // Liga-Klassen-Modell folgt noch — bleibt vorerst Bahnen
+  wettessen: "platter", // leergegessene Teller + 🍴
+  "i-spy": "spybar", // Späh-/Sichtfeld-Balken, 🔍 + Funde
+  // Turm-Familie — Höhe/Wertung = Punkte
+  basketball: "court", // Wurfkarte (Halbfeld)
+  gewichtheben: "barbell", // Hantel-Säulen mit Scheiben
+  climbing: "mountain", // Gipfelsturm (Berg-Serpentine)
+  eiskunstlauf: "stage", // Kür auf der Ruhm-Treppe wie Showcase
   showcase: "stage", // Showcase-Bühne mit Tiefe (Ruhm-Treppe → Podest)
   football: "towers",
-  hockey: "towers",
-  breaking: "towers", // Jury-Battle wie Eiskunstlauf/Showcase
-  "i-spy": "towers", // gestapelte Funde
+  hockey: "rink", // Eisrink von oben
+  breaking: "thermometer", // Schmerz-Thermometer (grün → glühend rot)
   tdm: "towers", // Etagen-Ersatz für das verworfene tiers
 };
 
@@ -378,6 +378,25 @@ const ENV_NEON_ARENA: StageEnv = {
   ],
 };
 
+// Berg-Panorama für den Gipfelsturm (Climbing): dämmriger Himmel → warmer Horizont,
+// Fels-Oberfläche, Schnee-Linien, Sonne als Spot-Glow. Farben als hsl().
+const ENV_MOUNTAIN: StageEnv = {
+  sky: ["hsl(214 55% 20%)", "hsl(28 46% 40%)"],
+  stands: "hsl(220 18% 26%)",
+  surface: ["hsl(220 16% 24%)", "hsl(220 16% 17%)", "hsl(222 18% 12%)"],
+  line: "hsl(200 30% 90%)",
+  glow: { color: "hsl(38 90% 78%)", kind: "spot" },
+};
+// Parkett-Court für die Basketball-Wurfkarte: warmes Holz, cremefarbene Linien,
+// Hallen-Spot. Farben als hsl().
+const ENV_COURT: StageEnv = {
+  sky: ["hsl(24 30% 8%)", "hsl(24 30% 12%)"],
+  stands: "hsl(24 30% 14%)",
+  surface: ["hsl(30 55% 55%)", "hsl(28 52% 45%)", "hsl(26 50% 34%)"],
+  line: "hsl(40 60% 90%)",
+  glow: { color: "hsl(45 90% 82%)", kind: "spot" },
+};
+
 const DISCIPLINE_SKIN: Record<string, { accent: string; motif: StageMotif; env?: StageEnv }> = {
   staffel: { accent: "hsl(14 80% 58%)", motif: "chevrons", env: STADIUM_ATHLETICS },
   spurt: { accent: "hsl(38 90% 58%)", motif: "chevrons", env: STADIUM_ATHLETICS },
@@ -389,9 +408,9 @@ const DISCIPLINE_SKIN: Record<string, { accent: string; motif: StageMotif; env?:
   fechten: { accent: "hsl(210 62% 66%)", motif: "combat", env: ENV_FENCING_HALL },
   tennis: { accent: "hsl(90 62% 55%)", motif: "court", env: ENV_TENNIS_NIGHT },
   wettessen: { accent: "hsl(32 78% 60%)", motif: "plates", env: ENV_BANQUET },
-  basketball: { accent: "hsl(24 85% 57%)", motif: "court", env: ENV_SKYLINE },
+  basketball: { accent: "hsl(24 85% 57%)", motif: "court", env: ENV_COURT },
   gewichtheben: { accent: "hsl(210 14% 64%)", motif: "weights", env: ENV_POWER_STAGE },
-  climbing: { accent: "hsl(16 62% 56%)", motif: "grid", env: ENV_CLIMBING_WALL },
+  climbing: { accent: "hsl(16 62% 56%)", motif: "grid", env: ENV_MOUNTAIN },
   eiskunstlauf: { accent: "hsl(195 70% 72%)", motif: "ice", env: ENV_ICE_RINK },
   showcase: { accent: "hsl(310 62% 63%)", motif: "stage", env: ENV_SHOWSTAGE },
   football: { accent: "hsl(140 55% 50%)", motif: "court", env: ENV_FLOODLIT_STADIUM },
