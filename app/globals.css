@@ -11361,6 +11361,60 @@ a {
   font-weight: 700;
 }
 
+/* ---------------------------------------------------------------------------
+   Rivalen-Hervorhebung (additiv): Die Rivalen des aktiven Teams bekommen in den
+   Ranglisten (Ranks-Matrix + Saisonstand) einen roten Kantenakzent + einen
+   "⚔ Rivale"-Chip. Bewusst REIN ADDITIV — die Heat-Farbformatierung der
+   Ranks-Matrix (getRankHeatClass/.rank-*) und das Farbschema des Saisonstands
+   bleiben unangetastet; es kommt nur eine Kante/ein Ring + der Chip hinzu.
+   --------------------------------------------------------------------------- */
+
+/* Ranks-Matrix: roter Kantenakzent an der Sticky-Team-Spalte — verändert KEINE
+   Zell-Hintergründe (nur eine box-shadow-Kante). */
+.is-new-look .ranks-table tbody tr.is-rival .ranks-sticky-team {
+  box-shadow: inset 3px 0 0 var(--nl-risk);
+}
+
+/* Team-Name + Chip nebeneinander in der Sticky-Team-Zelle. */
+.is-new-look .ranks-team-name-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* Wiederverwendbarer "⚔ Rivale"-Chip (Ranks + Saisonstand + später Disziplin-Szenen). */
+.is-new-look .rival-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-risk) 62%, transparent);
+  background: color-mix(in srgb, var(--nl-risk) 16%, transparent);
+  color: var(--nl-risk);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: middle;
+  line-height: 1.4;
+}
+
+/* Saisonstand-Board: roter linker Rand + zarter Ring, additiv über dem
+   bestehenden Team-Tag-Rahmen (Team-Tag-Farbschema bleibt erhalten). */
+.is-new-look .nl-standings-row.is-rival {
+  border-left-color: var(--nl-risk);
+  box-shadow: var(--nl-e1), inset 0 0 0 1px color-mix(in srgb, var(--nl-risk) 45%, transparent);
+}
+
+/* Saisonstand-Tabelle: roter linker Kantenakzent an der ersten Zelle. */
+.is-new-look .nl-standings-table-row.is-rival > td:first-child {
+  box-shadow: inset 3px 0 0 var(--nl-risk);
+}
+
 .discipline-config-table {
   min-width: 980px;
 }

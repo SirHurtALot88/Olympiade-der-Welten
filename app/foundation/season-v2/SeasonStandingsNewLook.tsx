@@ -5,6 +5,7 @@ import { Fragment, useMemo, useRef, useState, type CSSProperties, type KeyboardE
 import "@/app/foundation/season-v2/season-standings-new-look.css";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
+import { RivalTag } from "@/components/foundation/RivalTag";
 import {
   NlBarChart,
   NlCard,
@@ -159,6 +160,7 @@ export default function SeasonStandingsNewLook({
   gmRows,
   archiveRows,
   disciplineLeaders,
+  rivalTeamIds,
   onChangeSeason,
   onOpenTeam,
   onOpenPlayer,
@@ -166,6 +168,7 @@ export default function SeasonStandingsNewLook({
   onOpenPrize,
   isLoading = false,
 }: SeasonStandingsV2ClientProps) {
+  const isRivalTeam = (teamId: string) => rivalTeamIds?.has(teamId) ?? false;
   const [mode, setMode] = useState<NlStandingsMode>("board");
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
   const [boardSort, setBoardSort] = useState<NlBoardSortKey>("rank");
@@ -633,7 +636,7 @@ export default function SeasonStandingsNewLook({
     return (
       <li
         key={row.teamId}
-        className={`nl-standings-row nl-reveal${row.isSelected ? " is-selected" : ""}${isPodium ? " is-podium" : ""}${isExpanded ? " is-expanded" : ""}`}
+        className={`nl-standings-row nl-reveal${row.isSelected ? " is-selected" : ""}${isRivalTeam(row.teamId) ? " is-rival" : ""}${isPodium ? " is-podium" : ""}${isExpanded ? " is-expanded" : ""}`}
         style={{ ...getSeasonV2TeamTagStyle(row.teamCode), "--nl-reveal-i": Math.min(revealIndex, 14) } as CSSProperties}
       >
         <div
@@ -680,7 +683,10 @@ export default function SeasonStandingsNewLook({
               fallback={<span className="nl-standings-crest nl-standings-crest-fallback">{row.logoInitials}</span>}
             />
             <span className="nl-standings-team-copy">
-              <span className="nl-standings-teamname">{row.teamName}</span>
+              <span className="nl-standings-teamname">
+                {row.teamName}
+                {isRivalTeam(row.teamId) ? <RivalTag /> : null}
+              </span>
               <span className="nl-standings-teamcode">{row.teamCode}</span>
             </span>
           </button>
@@ -826,7 +832,7 @@ export default function SeasonStandingsNewLook({
     return (
       <Fragment key={row.teamId}>
         <tr
-          className={`nl-standings-table-row${row.isSelected ? " is-selected" : ""}${isExpanded ? " is-expanded" : ""}`}
+          className={`nl-standings-table-row${row.isSelected ? " is-selected" : ""}${isRivalTeam(row.teamId) ? " is-rival" : ""}${isExpanded ? " is-expanded" : ""}`}
           onClick={() => toggleExpanded(row.teamId)}
         >
           <td className="nl-standings-td-caret">
@@ -864,7 +870,10 @@ export default function SeasonStandingsNewLook({
               }}
               title={`${row.teamName} öffnen`}
             >
-              <span className="nl-standings-teamname">{row.teamName}</span>
+              <span className="nl-standings-teamname">
+                {row.teamName}
+                {isRivalTeam(row.teamId) ? <RivalTag /> : null}
+              </span>
               <span className="nl-standings-teamcode">{row.teamCode}</span>
             </button>
           </td>

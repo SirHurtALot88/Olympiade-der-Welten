@@ -167,6 +167,8 @@ export type SeasonStandingsV2ClientProps = {
   gmRows: SeasonV2GmRow[];
   archiveRows: SeasonV2ArchiveRow[];
   disciplineLeaders: SeasonV2DisciplineLeader[];
+  /** Team-IDs der Rivalen des aktiven Teams (additive Hervorhebung, optional/graceful). */
+  rivalTeamIds?: ReadonlySet<string>;
   onChangeSeason: (seasonId: string) => void;
   onOpenTeam: (teamId: string) => void;
   onOpenPlayer: (playerId: string) => void;

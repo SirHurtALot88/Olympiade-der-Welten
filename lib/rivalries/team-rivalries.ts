@@ -144,6 +144,28 @@ export function buildTeamRivalryLedger(gameState: Pick<GameState, "teams" | "tea
   return rivalries.sort((left, right) => right.intensity - left.intensity || left.label.localeCompare(right.label, "de"));
 }
 
+/**
+ * Reusable selector for the "rival highlight" feature: liefert die Team-IDs aller
+ * Rivalen des aktiven Teams als Set (ein Team kann mehr als einen Rivalen haben).
+ * Graceful: ohne aktives Team oder ohne Rivalitäten kommt ein leeres Set zurück.
+ * Bewusst additiv/presentational — verändert keine bestehende Ranks-/Standings-Logik.
+ */
+export function getActiveTeamRivalTeamIds(
+  gameState: Pick<GameState, "teams" | "teamIdentities">,
+  activeTeamId: string | null | undefined,
+): Set<string> {
+  const rivalTeamIds = new Set<string>();
+  if (!activeTeamId) return rivalTeamIds;
+  for (const entry of buildTeamRivalryLedger(gameState)) {
+    if (entry.teamAId === activeTeamId) {
+      rivalTeamIds.add(entry.teamBId);
+    } else if (entry.teamBId === activeTeamId) {
+      rivalTeamIds.add(entry.teamAId);
+    }
+  }
+  return rivalTeamIds;
+}
+
 export function getPrimaryTeamRivalry(gameState: Pick<GameState, "teams" | "teamIdentities">, teamId: string) {
   return buildTeamRivalryLedger(gameState)
     .filter((entry) => entry.teamAId === teamId || entry.teamBId === teamId)

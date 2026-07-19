@@ -16,6 +16,8 @@ import { useViewWidth } from "@/lib/ui/view-width-preference";
 import { groupGameEncyclopediaEntriesByCategory } from "@/lib/ui/game-encyclopedia";
 import { getFoundationBreadcrumb } from "@/lib/foundation/foundation-breadcrumb";
 import { RanksRankCell } from "@/components/foundation/RanksRankCell";
+import { RivalTag } from "@/components/foundation/RivalTag";
+import { getActiveTeamRivalTeamIds } from "@/lib/rivalries/team-rivalries";
 import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
 import type { RoomParticipant } from "@/types/game";
@@ -795,6 +797,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   wholeSeasonOverwriteExistingLineups,
   wholeSeasonStopOnTie,
   } = props;
+
+  // Rivalen-Hervorhebung (additiv): Team-IDs aller Rivalen des aktiven Teams.
+  // Leeres Set, wenn kein aktives Team oder keine Rivalität existiert (graceful).
+  const activeTeamRivalIds = getActiveTeamRivalTeamIds(gameState, activeManagerTeamId);
 
   const foundationTeamSettingsHostProps = {
     ...props,
@@ -2675,6 +2681,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               gmRows={seasonV2GmRows}
               archiveRows={seasonV2ArchiveRows}
               disciplineLeaders={seasonV2DisciplineLeaders}
+              rivalTeamIds={activeTeamRivalIds}
               isLoading={seasonStandingsLoading}
               onChangeSeason={(seasonId) => {
                 setSeasonOverviewSeasonId(seasonId);
@@ -2852,6 +2859,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                       className={joinClassNames(
                         "ranks-row-clickable",
                         row.team.teamId === activeManagerTeamId && "is-active-team-row",
+                        activeTeamRivalIds.has(row.team.teamId) && "is-rival",
                         getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.team.teamId]),
                       )}
                       onClick={() => openTeamProfileById(row.team.teamId)}
@@ -2861,7 +2869,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                         if (column.id === "team") {
                           return (
                             <td key={column.id} className="ranks-sticky-team">
-                              {row.team.name}
+                              <span className="ranks-team-name-wrap">
+                                {row.team.name}
+                                {activeTeamRivalIds.has(row.team.teamId) ? <RivalTag /> : null}
+                              </span>
                             </td>
                           );
                         }
