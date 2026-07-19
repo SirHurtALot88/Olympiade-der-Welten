@@ -58832,11 +58832,30 @@ button.is-new-look .nl-thist-season-pill,
 }
 
 .is-new-look .nl-sponsor-stackchart-cols {
+  /* Exakt dieselbe Geometrie wie .nl-sponsor-offer-grid, damit jede Säule
+     genau über ihrer Angebots-Karte sitzt — auch wenn die Karten umbrechen. */
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: var(--nl-s2);
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--nl-s4);
   align-items: end;
+}
+
+/* Vergleichskarte: horizontales Card-Padding entfernen, damit das Chart-Grid
+   dieselbe Breite und denselben linken Ursprung wie das darunterliegende
+   .nl-sponsor-offer-grid (ohne Card-Padding) hat. Kopfbereich bleibt eingerückt. */
+.is-new-look .nl-sponsor-compare-card {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.is-new-look .nl-sponsor-compare-card > .nl-card-head {
+  padding-left: var(--nl-s4);
+  padding-right: var(--nl-s4);
+}
+
+.is-new-look .nl-sponsor-compare-card .nl-sponsor-stack-legend {
+  padding-left: var(--nl-s4);
+  padding-right: var(--nl-s4);
 }
 
 .is-new-look .nl-sponsor-stackcol {
