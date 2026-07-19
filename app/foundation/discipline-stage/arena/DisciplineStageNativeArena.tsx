@@ -31,7 +31,7 @@ export type NativeStageTeam = {
   seasonRank?: number; // echter Season-Tabellenrang → Bahn-/Turm-Reihenfolge
   teamId?: string; // für Team-Drawer
 };
-export type StagePrimitive = "track" | "lanes" | "towers";
+export type StagePrimitive = "track" | "lanes" | "towers" | "stage";
 export type DisciplineStageNativeArenaProps = {
   teams: NativeStageTeam[];
   slots: string[];
@@ -336,6 +336,8 @@ const PRIM_GEO: Record<StagePrimitive, { w: number; h: number; r: number; rOwn: 
   // Kompakt: 32 Bahnen passen in einen normalen Viewport (~640px hoch bei voller Breite).
   lanes: { w: 1180, h: 640, r: 8, rOwn: 11 },
   towers: { w: 1180, h: 600, r: 10, rOwn: 14 },
+  // stage — Showcase-Bühne mit Tiefe: perspektivische Ruhm-Treppe zum Podest.
+  stage: { w: 1180, h: 640, r: 10, rOwn: 15 },
 };
 
 function round1(x: number): number {
@@ -604,6 +606,19 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       const colW = (W - lPad - rPad) / N;
       return { lPad, rPad, colW, baseY: H - 52, topY: 44 };
     }
+    if (prim === "stage") {
+      // Perspektivische Ruhm-Treppe (Port von showcase-v2 drawStageBG, auf viewBox
+      // skaliert): Score 0 steht am Boden, das Ruhm-Podest oben ist das Ziel; die
+      // Treppe verjüngt sich zum Podest → Teilnehmer laufen in die Tiefe zusammen.
+      return {
+        floorY: H - 84,
+        podiumY: 118,
+        centerX: W / 2,
+        baseHalf: W / 2 - 46,
+        topHalf: 86,
+        stairBands: 16,
+      };
+    }
     return {};
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   }, [prim, N, W, H]) as any;
@@ -632,6 +647,16 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         const x = layout.lPad + t.laneIdx * layout.colW + layout.colW / 2;
         return { x, y: layout.baseY - norm * (layout.baseY - layout.topY) };
       }
+      if (prim === "stage") {
+        // Port von stairPos mit finalMax-Normierung: bester Score endet exakt am
+        // Ruhm-Podest, die Treppe verjüngt sich (halfW), die Bahnen laufen zur
+        // Mitte zusammen — so klettern die Teilnehmer perspektivisch in die Tiefe.
+        const f = Math.max(0, Math.min(1, norm));
+        const y = layout.floorY - f * (layout.floorY - layout.podiumY);
+        const halfW = layout.baseHalf + (layout.topHalf - layout.baseHalf) * f;
+        const x = layout.centerX + (t.laneIdx - (N - 1) / 2) * ((halfW * 2) / N);
+        return { x, y };
+      }
       // track (Oval, im Uhrzeigersinn) — monoton wachsende frac ⇒ nie rückwärts;
       // Sieger landet nach einer Runde wieder exakt an der ZIEL-Linie. Stabiler
       // Quer-Versatz nach fester Team-Position, damit sich das Feld auffächert.
@@ -649,7 +674,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       const off = lane * 8.5;
       return { x: pt.x + -ty * off, y: pt.y + tx * off };
     },
-    [prim, layout, pathLen, finalMax, W],
+    [prim, layout, pathLen, finalMax, W, N],
   );
 
   // ---- Rang-/Slot-Mathematik (Port der Szene) ----
@@ -1195,11 +1220,13 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           />
           <span style={{ fontSize: 12.5, color: "var(--nl-mut)" }}>
             {progressLabel ??
-              (prim === "towers"
-                ? "Höhe = kumulierte Punkte"
-                : prim === "lanes"
-                  ? "Fortschritt = kumulierte Punkte"
-                  : "Position auf dem Oval = kumulierte Punkte")}
+              (prim === "stage"
+                ? "Aufstieg zur Ruhm-Treppe = kumulierte Punkte"
+                : prim === "towers"
+                  ? "Höhe = kumulierte Punkte"
+                  : prim === "lanes"
+                    ? "Fortschritt = kumulierte Punkte"
+                    : "Position auf dem Oval = kumulierte Punkte")}
           </span>
         </div>
 
@@ -1331,6 +1358,91 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                       <rect key={i} x={layout.xStart} y={layout.top + i * layout.laneH} width={layout.xEnd - layout.xStart} height={layout.laneH} fill={i % 2 ? env.surface[0] : env.surface[1]} opacity={0.55} />
                     ))}
                   </>
+                ) : prim === "stage" ? (
+                  (() => {
+                    // Showcase-Bühne mit Tiefe (Port von showcase-v2 drawStageBG).
+                    // Alle Layer HINTER den Tokens, Farben aus env (hsl/rgba, kein Hex).
+                    const floorY = layout.floorY;
+                    const podiumY = layout.podiumY;
+                    const cx = layout.centerX;
+                    const baseHalf = layout.baseHalf;
+                    const topHalf = layout.topHalf;
+                    const bands: number = layout.stairBands;
+                    const silhouette = env.deco?.find((d) => d.kind === "silhouette") as { kind: "silhouette"; color: string } | undefined;
+                    const crowdColor = silhouette?.color ?? "rgba(0,0,0,0.8)";
+                    // b. Publikums-Silhouette am Fuß (deterministische Zacken, keine Animation)
+                    const crowdPts: string[] = [`0,${H}`];
+                    const cn = 22;
+                    for (let i = 0; i <= cn; i += 1) {
+                      const x = (i / cn) * W;
+                      const h = H - 14 - ((i * 47) % 30);
+                      crowdPts.push(`${x},${h}`, `${x + W / cn / 2},${H - 6}`);
+                    }
+                    crowdPts.push(`${W},${H}`);
+                    // g. Spotlight-Kegel auf dem Führenden (wandert automatisch mit)
+                    const leader = rtRef.current.find((t) => t.rank === 1) ?? null;
+                    const leaderPos = leader ? tokenPos(leader, leader.score) : null;
+                    return (
+                      <>
+                        {/* a. dezenter Rahmen (Himmel-Verlauf liegt bereits als envSky-Rect) */}
+                        <rect x={24} y={24} width={W - 48} height={H - 48} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={10} />
+                        {/* b. Showtreppe — 16 Trapez-Bänder, verjüngen sich zum Podest */}
+                        <g>
+                          {Array.from({ length: bands }).map((_, i) => {
+                            const f0 = i / bands;
+                            const f1 = (i + 1) / bands;
+                            const y0 = floorY - f0 * (floorY - podiumY);
+                            const y1 = floorY - f1 * (floorY - podiumY);
+                            const hw0 = baseHalf + (topHalf - baseHalf) * f0;
+                            const hw1 = baseHalf + (topHalf - baseHalf) * f1;
+                            return (
+                              <polygon
+                                key={i}
+                                points={`${cx - hw0},${y0} ${cx + hw0},${y0} ${cx + hw1},${y1} ${cx - hw1},${y1}`}
+                                fill={`rgba(255,255,255,${(0.02 + f0 * 0.05).toFixed(3)})`}
+                                stroke={env.line}
+                                strokeWidth={1}
+                                opacity={0.16}
+                              />
+                            );
+                          })}
+                        </g>
+                        {/* f. Publikums-Silhouette am Fuß der Treppe */}
+                        <polygon points={crowdPts.join(" ")} fill={crowdColor} opacity={0.85} />
+                        {/* c. Ruhm-Podest oben — das Ziel */}
+                        <rect x={cx - topHalf - 14} y={podiumY - 46} width={(topHalf + 14) * 2} height={60} rx={12} fill="rgba(0,0,0,0.35)" stroke={env.line} strokeWidth={2} />
+                        <text x={cx} y={podiumY - 16} textAnchor="middle" fontSize={12} fontWeight={800} fill={env.line} letterSpacing="0.16em">
+                          RUHM · PODEST
+                        </text>
+                        {/* d. Jury-Lichter entlang der Podest-Oberkante (statisch, gedimmt) */}
+                        <g fill={env.line} opacity={0.32}>
+                          {Array.from({ length: 12 }).map((_, b) => {
+                            const bx = cx - topHalf - 6 + (b / 11) * ((topHalf + 6) * 2);
+                            return <circle key={b} cx={bx} cy={podiumY - 52} r={3.4} />;
+                          })}
+                        </g>
+                        {/* e. Footlights entlang der Vorderkante */}
+                        <g fill={env.line} opacity={0.85}>
+                          {Array.from({ length: Math.floor((W - 100) / 54) + 1 }).map((_, i) => (
+                            <circle key={i} cx={60 + i * 54} cy={H - 24} r={4} />
+                          ))}
+                        </g>
+                        {/* g. statischer Ambient-Kegel überm Podest + Spotlight auf den Führenden */}
+                        <defs>
+                          <radialGradient id="stageAmbientCone">
+                            <stop offset="0%" stopColor={env.line} stopOpacity={0.22} />
+                            <stop offset="100%" stopColor={env.line} stopOpacity={0} />
+                          </radialGradient>
+                          <radialGradient id="stageLeaderCone">
+                            <stop offset="0%" stopColor={env.line} stopOpacity={0.34} />
+                            <stop offset="100%" stopColor={env.line} stopOpacity={0} />
+                          </radialGradient>
+                        </defs>
+                        <circle cx={cx} cy={podiumY} r={190} fill="url(#stageAmbientCone)" />
+                        {leaderPos ? <ellipse cx={leaderPos.x} cy={leaderPos.y} rx={70} ry={62} fill="url(#stageLeaderCone)" /> : null}
+                      </>
+                    );
+                  })()
                 ) : (
                   <>
                     {/* towers: Rückwand oben + Boden ab Grundlinie */}
@@ -1340,10 +1452,10 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                   </>
                 )}
 
-                {/* Deko-Layer (hinter Tokens) */}
-                {env.deco?.map((d, i) => envDeco(d, W, H, prim === "towers" ? layout.baseY : prim === "lanes" ? H - layout.top : H - OVAL_M + 30, i))}
+                {/* Deko-Layer (hinter Tokens) — stage rendert seine Layer selbst (oben) */}
+                {prim !== "stage" ? env.deco?.map((d, i) => envDeco(d, W, H, prim === "towers" ? layout.baseY : prim === "lanes" ? H - layout.top : H - OVAL_M + 30, i)) : null}
                 {/* Lichtstimmung */}
-                {env.glow ? envGlow(env.glow, W, H, prim === "towers" ? layout.baseY : H * 0.82, prim === "lanes" ? layout.xEnd : W - 40) : null}
+                {prim !== "stage" && env.glow ? envGlow(env.glow, W, H, prim === "towers" ? layout.baseY : H * 0.82, prim === "lanes" ? layout.xEnd : W - 40) : null}
               </>
             ) : (
               <>{renderMotif(motif, W, H, skinAccent)}</>
@@ -1357,7 +1469,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             ) : null}
 
             {/* Feld je Primitive (schlichte Optik, wenn keine env-Umgebung) */}
-            {env && prim === "track" ? null : prim === "track" ? (
+            {env && (prim === "track" || prim === "stage") ? null : prim === "track" ? (
               <>
                 <path d={ovalPath} fill="none" stroke="var(--nl-panel)" strokeWidth={54} />
                 <path ref={pathRef} d={ovalPath} fill="none" stroke={skinAccent} opacity={0.7} strokeWidth={2} strokeDasharray="6 8" />
@@ -1379,6 +1491,46 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                   </text>
                 ))}
               </>
+            ) : prim === "stage" ? (
+              // Schlichter Fallback (kein env): dunkler Grund + Treppe in --nl-* Tönen.
+              (() => {
+                const floorY = layout.floorY;
+                const podiumY = layout.podiumY;
+                const cx = layout.centerX;
+                const baseHalf = layout.baseHalf;
+                const topHalf = layout.topHalf;
+                const bands: number = layout.stairBands;
+                return (
+                  <>
+                    <rect x={0} y={0} width={W} height={H} fill="var(--nl-bg)" opacity={0.9} />
+                    <g>
+                      {Array.from({ length: bands }).map((_, i) => {
+                        const f0 = i / bands;
+                        const f1 = (i + 1) / bands;
+                        const y0 = floorY - f0 * (floorY - podiumY);
+                        const y1 = floorY - f1 * (floorY - podiumY);
+                        const hw0 = baseHalf + (topHalf - baseHalf) * f0;
+                        const hw1 = baseHalf + (topHalf - baseHalf) * f1;
+                        return (
+                          <polygon
+                            key={i}
+                            points={`${cx - hw0},${y0} ${cx + hw0},${y0} ${cx + hw1},${y1} ${cx - hw1},${y1}`}
+                            fill="var(--nl-panel)"
+                            opacity={0.35 + f0 * 0.45}
+                            stroke={skinAccent}
+                            strokeWidth={1}
+                            strokeOpacity={0.35}
+                          />
+                        );
+                      })}
+                    </g>
+                    <rect x={cx - topHalf - 14} y={podiumY - 46} width={(topHalf + 14) * 2} height={60} rx={12} fill="var(--nl-panel)" stroke={skinAccent} strokeWidth={2} />
+                    <text x={cx} y={podiumY - 16} textAnchor="middle" fontSize={12} fontWeight={800} fill={skinAccent} letterSpacing="0.16em">
+                      RUHM · PODEST
+                    </text>
+                  </>
+                );
+              })()
             ) : (
               <>
                 <line x1={layout.lPad} y1={layout.baseY} x2={W - layout.rPad} y2={layout.baseY} stroke={skinAccent} strokeWidth={2.5} />
@@ -1412,6 +1564,9 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                     ) : null}
                     {prim === "lanes" ? (
                       <line x1={layout.xStart} y1={pos.y} x2={pos.x} y2={pos.y} stroke={t.isOwn ? "var(--nl-accent)" : `hsl(${hue} 55% 55%)`} strokeWidth={t.isOwn ? 3 : 2} opacity={0.5} />
+                    ) : null}
+                    {prim === "stage" ? (
+                      <ellipse cx={pos.x} cy={pos.y + r * 0.9} rx={r * 0.9} ry={r * 0.32} fill="rgba(0,0,0,0.4)" />
                     ) : null}
                     <g
                       transform={`translate(${pos.x} ${pos.y})`}
