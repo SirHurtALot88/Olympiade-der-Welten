@@ -36,9 +36,9 @@ const NATIVE_PRIMITIVE: Record<string, StagePrimitive> = {
   battlefield: "track",
   // lanes / Row-Familie — parallele Reihen bis zum Ziel
   "time-trial": "peloton", // Straße: Ausreißer/Hauptfeld
-  "speed-schach": "lanes",
+  "speed-schach": "klassen", // Liga-Klassen-Bänder (Elo-Klassen)
   fechten: "lamps", // Treffer-Lampen (rot/grün)
-  tennis: "lanes", // Liga-Klassen-Modell folgt noch — bleibt vorerst Bahnen
+  tennis: "klassen", // Liga-Klassen-Bänder (Setzköpfe)
   wettessen: "platter", // leergegessene Teller + 🍴
   "i-spy": "spybar", // Späh-/Sichtfeld-Balken, 🔍 + Funde
   // Turm-Familie — Höhe/Wertung = Punkte

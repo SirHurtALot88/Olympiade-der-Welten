@@ -62,7 +62,9 @@ export type StagePrimitive =
   | "bump" // Spurt — Slalom/Bump: Rang-über-Etappen-Linien (nutzt rankHistory)
   | "mountain" // Climbing — Gipfelsturm (Berg-Serpentine)
   | "court" // Basketball — Wurfkarte (Halbfeld)
-  | "rink"; // Hockey — Eisrink von oben
+  | "rink" // Hockey — Eisrink von oben
+  // Voll-Feld-Sonderlayouts (kein Token-auf-Feld, aus ALLEN Scores berechnet):
+  | "klassen"; // Schach/Tennis — Liga-Klassen-Bänder nach Punkt-Lücken
 
 // Familien mit geteilter Geometrie: Row-Familie rechnet wie "lanes",
 // Turm-Familie wie "towers". Nur der Hintergrund/Overlay unterscheidet sie.
@@ -70,6 +72,9 @@ const ROW_FAMILY = new Set<StagePrimitive>(["lanes", "platter", "lamps", "spybar
 const TOWER_FAMILY = new Set<StagePrimitive>(["towers", "barbell", "sparkbar", "thermometer"]);
 // Szenen-Primitive: eigenes atmosphärisches Feld (Straße/Berg/Court/Rink/Parcours).
 const SCENE_PRIMS = new Set<StagePrimitive>(["peloton", "mountain", "court", "rink", "parcours", "bump"]);
+// Voll-Feld-Sonderlayouts: eigener Render-Zweig aus ALLEN Scores (kein gleitendes
+// Token, keine Bahn/Turm/Szene-Geometrie). deco/glow + Token-Schleife entfallen.
+const FIELD_CUSTOM = new Set<StagePrimitive>(["klassen"]);
 export type DisciplineStageNativeArenaProps = {
   teams: NativeStageTeam[];
   slots: string[];
@@ -493,6 +498,87 @@ function renderSceneEnvBg(prim: StagePrimitive, env: StageEnv, layout: any, W: n
   );
 }
 
+// Liga-Klassen-Bänder (Schach/Tennis): Teams per Score-Lücken in Klassen gruppiert
+// (adaptiver Schwellwert ≈ 2.2× mittlere Lücke → splittet an echten Clustern), je
+// Band ein Chip-Feld mit Code + Score, Beziehungs-Rahmen, Podest-Medaillen. Voll-
+// flächig aus ALLEN aktuellen Scores berechnet (kein Token-auf-Feld). Alle Farben
+// hsl()/CSS-Token → Design-Token-Lint bleibt sauber.
+const KLASSEN_NAMES = ["Meister", "Anwärter", "Oberhaus", "Mittelfeld", "Abstieg", "Keller"];
+const KLASSEN_MEDALS = ["🥇", "🥈", "🥉"];
+function renderKlassenBands(sorted: RT[], W: number, H: number, env: StageEnv): React.ReactNode {
+  const n = sorted.length;
+  if (n === 0) return null;
+  const max = sorted[0]!.score;
+  const min = sorted[n - 1]!.score;
+  const avgGap = n > 1 ? (max - min) / (n - 1) : 0;
+  const th = Math.max(0.5, avgGap * 2.2);
+  const groups: RT[][] = [[sorted[0]!]];
+  for (let i = 1; i < n; i += 1) {
+    if (sorted[i - 1]!.score - sorted[i]!.score > th) groups.push([sorted[i]!]);
+    else groups[groups.length - 1]!.push(sorted[i]!);
+  }
+  const padX = 40;
+  const padTop = 46;
+  const padBot = 20;
+  const innerW = W - padX * 2;
+  const chipW = 92;
+  const gapX = 8;
+  const gapY = 7;
+  const headH = 22;
+  const bandPadTop = 6;
+  const bandGap = 12;
+  const perRow = Math.max(1, Math.floor((innerW + gapX) / (chipW + gapX)));
+  const bandRows = groups.map((g) => Math.ceil(g.length / perRow));
+  const rowsTotal = bandRows.reduce((s, r) => s + r, 0);
+  const headerBlock = headH + bandPadTop + 8;
+  const availH = H - padTop - padBot;
+  const availForRows = availH - groups.length * headerBlock - bandGap * (groups.length - 1);
+  const rowUnit = Math.max(16, Math.min(26 + gapY, availForRows / Math.max(1, rowsTotal)));
+  const chipH = Math.max(14, rowUnit - gapY);
+  let y = padTop;
+  const nodes: React.ReactNode[] = [];
+  groups.forEach((g, gi) => {
+    const rows = bandRows[gi]!;
+    const bandH = headH + bandPadTop + rows * chipH + (rows - 1) * gapY + 8;
+    const hi = Math.max(...g.map((t) => t.score));
+    const lo = Math.min(...g.map((t) => t.score));
+    const youBand = g.some((t) => t.isOwn);
+    nodes.push(
+      <g key={`band-${gi}`}>
+        <rect x={padX - 12} y={y} width={innerW + 24} height={bandH} rx={12} fill={env.stands} opacity={0.3} stroke={youBand ? "var(--nl-accent)" : env.line} strokeWidth={youBand ? 2 : 1} strokeOpacity={youBand ? 0.9 : 0.22} />
+        <text x={padX} y={y + 15} fontSize={13} fontWeight={800} fill={env.line} style={{ textTransform: "uppercase", letterSpacing: "0.08em" }}>
+          {KLASSEN_NAMES[gi] ?? `Klasse ${gi + 1}`}
+        </text>
+        <text x={padX + innerW} y={y + 15} textAnchor="end" fontSize={11} fontWeight={700} fill={env.line} opacity={0.7}>
+          {`${g.length} · ${fmt1(lo)}–${fmt1(hi)}`}
+        </text>
+        {g.map((t, ci) => {
+          const rr = Math.floor(ci / perRow);
+          const cc = ci % perRow;
+          const cx = padX + cc * (chipW + gapX);
+          const cy = y + headH + bandPadTop + rr * (chipH + gapY);
+          const rc = relColor(t.rel);
+          const med = t.rank <= 3 ? KLASSEN_MEDALS[t.rank - 1] : "";
+          return (
+            <g key={t.code}>
+              <rect x={cx} y={cy} width={chipW} height={chipH} rx={7} fill={t.isOwn ? "color-mix(in srgb, var(--nl-accent) 22%, transparent)" : "var(--nl-panel)"} stroke={rc ?? (t.isOwn ? "var(--nl-accent)" : env.line)} strokeWidth={rc || t.isOwn ? 2 : 1} strokeOpacity={rc || t.isOwn ? 0.95 : 0.3} />
+              <text x={cx + 8} y={cy + chipH / 2 + 4} fontSize={11.5} fontWeight={800} fill={t.isOwn ? "var(--nl-accent)" : env.line}>
+                {med}
+                {t.code}
+              </text>
+              <text x={cx + chipW - 8} y={cy + chipH / 2 + 4} textAnchor="end" fontSize={10.5} fontWeight={700} fill={env.line} opacity={0.78}>
+                {fmt1(t.score)}
+              </text>
+            </g>
+          );
+        })}
+      </g>,
+    );
+    y += bandH + bandGap;
+  });
+  return <>{nodes}</>;
+}
+
 const STAR_MIN = 80;
 // viewBox + Token-Radien je Primitive. Der Rest (Engine/FX/Ticker/Podest/Tabelle)
 // ist geometrieunabhängig; nur Feld-Layout + tokenPos unterscheiden sich.
@@ -520,6 +606,7 @@ const PRIM_GEO: Record<StagePrimitive, { w: number; h: number; r: number; rOwn: 
   mountain: { w: 1180, h: 620, r: 11, rOwn: 16 },
   court: { w: 1180, h: 620, r: 11, rOwn: 16 },
   rink: { w: 1180, h: 560, r: 11, rOwn: 15 },
+  klassen: { w: 1180, h: 640, r: 8, rOwn: 11 },
 };
 
 function round1(x: number): number {
@@ -915,6 +1002,9 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const tokenPos = useCallback(
     (t: RT, score: number): { x: number; y: number } => {
       const norm = finalMax > 0 ? score / finalMax : 0; // 0…1, kein Headroom
+      // Voll-Feld-Sonderlayouts haben kein gleitendes Token — Score-Pops landen
+      // mittig (die Feld-Optik rechnet selbst aus allen Scores).
+      if (FIELD_CUSTOM.has(prim)) return { x: W / 2, y: H / 2 };
       if (ROW_FAMILY.has(prim)) {
         const y = layout.top + t.laneIdx * layout.laneH + layout.laneH / 2;
         return { x: layout.xStart + norm * (layout.xEnd - layout.xStart), y };
@@ -1544,6 +1634,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                 ? "Lebensbalken = kumulierte Punkte (100 % = Feldbester)"
                 : prim === "bump"
                 ? "Linien = Rang nach jeder Etappe (oben = Spitze)"
+                : prim === "klassen"
+                ? "Liga-Klassen nach Punkt-Lücken (Meister → Keller)"
                 : prim === "stage"
                 ? "Aufstieg zur Ruhm-Treppe = kumulierte Punkte"
                 : prim === "mountain"
@@ -1647,7 +1739,9 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                 {/* Himmel / Ambient — alle Primitive */}
                 <rect x={0} y={0} width={W} height={H} fill="url(#envSky)" />
 
-                {prim === "track" ? (
+                {prim === "klassen" ? (
+                  renderKlassenBands(sorted, W, H, env)
+                ) : prim === "track" ? (
                   <>
                     <path d={ovalPath} fill="none" stroke={env.stands} strokeWidth={OVAL_BAND + 30} />
                     <path d={ovalPath} fill="none" stroke="url(#envSurface)" strokeWidth={OVAL_BAND} />
@@ -1787,9 +1881,9 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                 )}
 
                 {/* Deko-Layer (hinter Tokens) — stage/Szenen rendern ihre Layer selbst */}
-                {prim !== "stage" && !SCENE_PRIMS.has(prim) ? env.deco?.map((d, i) => envDeco(d, W, H, TOWER_FAMILY.has(prim) ? layout.baseY : ROW_FAMILY.has(prim) ? H - layout.top : H - OVAL_M + 30, i)) : null}
+                {prim !== "stage" && !SCENE_PRIMS.has(prim) && !FIELD_CUSTOM.has(prim) ? env.deco?.map((d, i) => envDeco(d, W, H, TOWER_FAMILY.has(prim) ? layout.baseY : ROW_FAMILY.has(prim) ? H - layout.top : H - OVAL_M + 30, i)) : null}
                 {/* Lichtstimmung */}
-                {prim !== "stage" && !SCENE_PRIMS.has(prim) && env.glow ? envGlow(env.glow, W, H, TOWER_FAMILY.has(prim) ? layout.baseY : H * 0.82, ROW_FAMILY.has(prim) ? layout.xEnd : W - 40) : null}
+                {prim !== "stage" && !SCENE_PRIMS.has(prim) && !FIELD_CUSTOM.has(prim) && env.glow ? envGlow(env.glow, W, H, TOWER_FAMILY.has(prim) ? layout.baseY : H * 0.82, ROW_FAMILY.has(prim) ? layout.xEnd : W - 40) : null}
               </>
             ) : (
               <>{renderMotif(motif, W, H, skinAccent)}</>
@@ -1803,7 +1897,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             ) : null}
 
             {/* Feld je Primitive (schlichte Optik, wenn keine env-Umgebung) */}
-            {(env && (prim === "track" || prim === "stage")) || SCENE_PRIMS.has(prim) ? null : prim === "track" ? (
+            {(env && (prim === "track" || prim === "stage")) || SCENE_PRIMS.has(prim) || FIELD_CUSTOM.has(prim) ? null : prim === "track" ? (
               <>
                 <path d={ovalPath} fill="none" stroke="var(--nl-panel)" strokeWidth={54} />
                 <path ref={pathRef} d={ovalPath} fill="none" stroke={skinAccent} opacity={0.7} strokeWidth={2} strokeDasharray="6 8" />
@@ -1879,7 +1973,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               </>
             )}
 
-            {sorted
+            {FIELD_CUSTOM.has(prim) ? null : sorted
               .slice()
               .reverse()
               .map((t) => {
