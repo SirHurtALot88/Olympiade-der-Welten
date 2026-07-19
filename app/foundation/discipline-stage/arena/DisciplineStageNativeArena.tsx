@@ -5,6 +5,7 @@ import { useStageAudio } from "./useStageAudio";
 import MiniDmArenaBattle, { type DuelTeamMeta, type DuelLiveInfo } from "./MiniDmArenaBattle";
 import DisciplineStageResultTable, { type ResultTableRow } from "./DisciplineStageResultTable";
 import DisciplineStageTopPlayersRow from "../DisciplineStageTopPlayersRow";
+import PlayerMark from "./PlayerMark";
 import type { DisciplineStageTopPlayer } from "../DisciplineStageTopPlayers";
 import { fmt1, ampel } from "../stage-format";
 import type { TeamRelationshipKind } from "@/lib/foundation/team-relationship";
@@ -1000,6 +1001,10 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const [ticker, setTicker] = useState<TickerData[]>([]);
   const [podium, setPodium] = useState<PodCol[] | null>(null);
   const [hover, setHover] = useState<{ idx: number } | null>(null);
+  // Renn-Highlight-Banner (nur track): kurzer Pop über dem Oval bei Etappensieger,
+  // neuer Gesamtführung oder Etappen-Wechsel. Ein Slot, neuester Anlass gewinnt.
+  const [banner, setBanner] = useState<{ text: string; kind: "gold" | "cyan"; id: number } | null>(null);
+  const bannerId = useRef(0);
   const hoverCloseTimer = useRef<number | null>(null);
   const ladderHoverTimer = useRef<number | null>(null);
   const timers = useRef<number[]>([]);
@@ -1062,6 +1067,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setTicker([]);
     setPodium(null);
     setHover(null);
+    setBanner(null);
     endedFiredRef.current = false;
     roundTopNet.current = 0;
     tier2Budget.current = 2;
@@ -1556,6 +1562,18 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     [later],
   );
 
+  // Highlight-Banner setzen (nur track): ersetzt den laufenden Pop, blendet nach
+  // ~2,6 s wieder aus. Bei reduced-motion bleibt er ohne Dauer-Animation stehen.
+  const popBanner = useCallback(
+    (text: string, kind: "gold" | "cyan" = "cyan") => {
+      if (prim !== "track") return;
+      const id = (bannerId.current += 1);
+      setBanner({ text, kind, id });
+      later(() => setBanner((b) => (b && b.id === id ? null : b)), 2600);
+    },
+    [prim, later],
+  );
+
   const pushTicker = useCallback((t: RT, slot: number, res: { player: NativeStagePlayer; net: number }, impact: Impact, rt: RT[]) => {
     const p = res.player;
     const sr = slotRankOf(slot, t, rt);
@@ -1676,6 +1694,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     tier1Budget.current = 4;
     if (r === 0) audio.gun(0.6);
     pushRoundHeader(r);
+    // Etappen-Wechsel-Banner (track): neue Staffel-Etappe startet.
+    popBanner(`◇ Etappe ${r + 1} / ${slotCount} · Wechsel${slots[r] ? " · " + slots[r] : ""}`, "cyan");
     computeRoundStandings(r, rt);
     const order = [...rt].sort((a, b) => b.rank - a.rank); // schlechteste zuerst
     let i = 0;
@@ -1709,6 +1729,9 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       addPop(res.net, isMine, pos);
       addFrags(res.player, pos);
       pushTicker(t, r, { player: res.player, net: res.net }, impact, rt);
+      // Highlight-Banner (track): neue Gesamtführung schlägt Etappensieger.
+      if (impact.cause === "leader") popBanner(`🏆 Neue Führung · ${res.player.name} (${t.code})`, "gold");
+      else if (impact.cause === "best") popBanner(`🥇 Etappensieger · ${res.player.name} (${t.code})`, "gold");
       // Sounds/Highlights nach Tier
       if (impact.tier === 2) {
         showSpotlight({
@@ -1760,7 +1783,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       later(doOne, delay);
     };
     doOne();
-  }, [round, slotCount, audio, tokenPos, addPop, addFrags, pushTicker, pushRoundHeader, showSpotlight, fireFlash, doShake, glow, roundSummary, showPodium, later, slots]);
+  }, [round, slotCount, audio, tokenPos, addPop, addFrags, pushTicker, pushRoundHeader, showSpotlight, fireFlash, doShake, glow, roundSummary, showPodium, later, slots, popBanner]);
 
   const quickSim = useCallback(() => {
     if (busyRef.current) return; // Busy-Guard: keine Doppel-Auslösung während einer Cascade.
@@ -1789,6 +1812,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setPops([]);
     setFrags([]);
     setTicker([]);
+    setBanner(null);
     force();
     later(showPodium, 200);
   }, [slotCount, clearTimers, buildRT, later, showPodium]);
@@ -2028,6 +2052,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         @keyframes olySpot{0%{opacity:0;transform:translate(-50%,-50%) scale(.8)}10%{opacity:1;transform:translate(-50%,-50%) scale(1.04)}88%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(1)}}
         @keyframes olyPodRise{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
         @keyframes olyGlowPulse{0%,100%{opacity:.35}50%{opacity:.9}}
+        @keyframes olyBanner{0%{opacity:0;transform:translate(-50%,-14px) scale(.92)}12%{opacity:1;transform:translate(-50%,0) scale(1)}85%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-8px) scale(1)}}
         @media (prefers-reduced-motion: reduce){.oly-anim{animation:none!important;opacity:1!important}}
       `}</style>
 
@@ -2242,16 +2267,25 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                       </>
                     ) : null}
                     {(() => {
+                      // ZIEL/START: Karo-Band quer über die volle Bahnbreite, sauber
+                      // auf der oberen Geraden am Rundenanfang (= Token-Startpunkt, so
+                      // landet der Sieger nach einer Runde exakt wieder auf der Linie).
                       const r = (H - 2 * OVAL_M) / 2;
                       const sx = OVAL_M + r;
                       const yTop = OVAL_M - OVAL_BAND / 2;
-                      const steps = Math.round(OVAL_BAND / 8);
+                      const rows = Math.max(2, Math.round(OVAL_BAND / 8));
+                      const sq = OVAL_BAND / rows;
+                      const dark = "rgba(0,0,0,0.6)";
                       return (
                         <g>
-                          {Array.from({ length: steps }).map((_, i) => (
-                            <rect key={i} x={sx - 3} y={yTop + i * 8} width={6} height={8} fill={i % 2 === 0 ? env.line : "rgba(0,0,0,0.55)"} />
+                          {Array.from({ length: rows }).map((_, i) => (
+                            <g key={i}>
+                              <rect x={sx - sq} y={yTop + i * sq} width={sq} height={sq} fill={i % 2 === 0 ? env.line : dark} />
+                              <rect x={sx} y={yTop + i * sq} width={sq} height={sq} fill={i % 2 === 0 ? dark : env.line} />
+                            </g>
                           ))}
-                          <text x={sx - 16} y={OVAL_M} transform={`rotate(-90 ${sx - 16} ${OVAL_M})`} textAnchor="middle" fontFamily="Georgia, serif" fontSize={17} fontWeight={800} fill={env.line} opacity={0.9}>
+                          <rect x={sx - sq} y={yTop} width={sq * 2} height={OVAL_BAND} fill="none" stroke={env.line} strokeWidth={0.8} opacity={0.5} />
+                          <text x={sx} y={yTop - 7} textAnchor="middle" fontFamily="Georgia, serif" fontSize={15} fontWeight={800} letterSpacing="0.12em" fill={env.line} opacity={0.92}>
                             ZIEL
                           </text>
                         </g>
@@ -2467,7 +2501,11 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                 const r = t.isOwn ? geo.rOwn : geo.r;
                 const hue = hueForIdx(t.idx);
                 const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
-                const dur = t.isOwn ? 1300 : 520;
+                // track: langer, gleichmäßiger Gleit-Übergang (0,9–2,6 s), damit die
+                // Logos „laufend" ums Oval ziehen statt zu springen. Andere Primitive
+                // behalten ihren kürzeren, leicht federnden Übergang.
+                const dur = prim === "track" ? (t.isOwn ? 2600 : 1500) : t.isOwn ? 1300 : 520;
+                const ease = prim === "track" ? "cubic-bezier(.4,0,.2,1)" : "cubic-bezier(.34,1.2,.4,1)";
                 const glowing = t.glowUntil > now;
                 // Primitive-spezifische Spur/Balken (absolute Koordinaten, hinter dem Token)
                 const barW = Math.min(18, (layout.colW ?? 24) * 0.5);
@@ -2639,7 +2677,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                     ) : null}
                     <g
                       transform={`translate(${pos.x} ${pos.y})`}
-                      style={{ transition: reduced.current ? "none" : `transform ${dur}ms cubic-bezier(.34,1.2,.4,1)`, cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
+                      style={{ transition: reduced.current ? "none" : `transform ${dur}ms ${ease}`, cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
                       onMouseEnter={() => openHover(t.idx)}
                       onMouseLeave={scheduleHoverClose}
                       onClick={() => {
@@ -2902,6 +2940,92 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               ) : null}
             </div>
           ) : null}
+
+          {/* Renn-Highlight-Banner (track): kurzer Pop oben über dem Oval */}
+          {prim === "track" && banner && !podium ? (
+            <div
+              key={banner.id}
+              className="oly-anim"
+              style={{
+                position: "absolute",
+                top: 12,
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 6,
+                pointerEvents: "none",
+                whiteSpace: "nowrap",
+                padding: "6px 16px",
+                borderRadius: 999,
+                fontSize: 13,
+                fontWeight: 800,
+                letterSpacing: "0.03em",
+                color: "var(--nl-ink)",
+                background: `color-mix(in srgb, ${banner.kind === "gold" ? "var(--nl-warn)" : "var(--nl-accent)"} 22%, var(--nl-bg))`,
+                border: `1px solid ${banner.kind === "gold" ? "var(--nl-warn)" : "var(--nl-accent)"}`,
+                boxShadow: "0 6px 20px rgba(0,0,0,.45)",
+                animation: reduced.current ? "none" : "olyBanner 2.6s ease-out forwards",
+              }}
+            >
+              {banner.text}
+            </div>
+          ) : null}
+
+          {/* „Dein Läufer"-Karte (track): aktueller Etappen-Läufer deines Teams mit
+              Portrait, Name, Etappe k/N, Platz und letzter Slot-Wertung (Slot-Rang + +N) */}
+          {prim === "track" && me && !podium
+            ? (() => {
+                const myThrown = me.thrownSlot;
+                const stageIdx = myThrown >= 0 ? myThrown : Math.min(round, slotCount - 1);
+                const runner = me.players[stageIdx] ?? null;
+                const revealed = myThrown >= 0;
+                const slotRank = revealed ? slotRankOf(myThrown, me, rtRef.current) : null;
+                const gain = revealed && me.players[myThrown] ? playerNet(me.players[myThrown]!) : null;
+                const medal: "gold" | "silver" | "bronze" | null = slotRank === 1 ? "gold" : slotRank === 2 ? "silver" : slotRank === 3 ? "bronze" : null;
+                const clickable = Boolean(onOpenPlayer && runner?.playerId);
+                return (
+                  <div
+                    onClick={clickable ? () => onOpenPlayer!(runner!.playerId!) : undefined}
+                    onMouseEnter={onPreviewPlayer && runner?.playerId ? () => onPreviewPlayer!(runner.playerId) : undefined}
+                    onMouseLeave={onPreviewPlayer ? () => onPreviewPlayer!(null) : undefined}
+                    title={clickable ? "Spieler-Karte öffnen" : undefined}
+                    style={{
+                      position: "absolute",
+                      left: 12,
+                      bottom: 12,
+                      zIndex: 6,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      maxWidth: 300,
+                      padding: "8px 12px 8px 8px",
+                      borderRadius: 12,
+                      border: "1px solid var(--nl-accent)",
+                      background: "color-mix(in srgb, var(--nl-bg) 84%, var(--nl-accent))",
+                      boxShadow: "0 8px 24px rgba(0,0,0,.45)",
+                      cursor: clickable ? "pointer" : "default",
+                    }}
+                  >
+                    <PlayerMark src={runner?.portraitUrl ?? null} alt={runner?.name ?? ""} size={46} isOwn medal={medal} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 800, color: "var(--nl-accent)" }}>🏃 Dein Läufer · {me.code}</div>
+                      <div style={{ fontSize: 15, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{runner?.name ?? "—"}</div>
+                      <div style={{ fontSize: 11.5, color: "var(--nl-mut)", fontVariantNumeric: "tabular-nums" }}>
+                        Etappe {stageIdx + 1} / {slotCount} · Platz {me.rank}
+                        {revealed && slotRank != null ? (
+                          <>
+                            {" · "}
+                            <span style={{ color: "var(--nl-good)", fontWeight: 800 }}>
+                              Slot-Rang {slotRank}
+                              {gain != null ? ` · +${fmt1(gain)}` : ""}
+                            </span>
+                          </>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()
+            : null}
         </div>
 
         {/* Top-Spieler-Zeile unter der Arena, ÜBER dem Ticker (nur bereits aufgedeckte Spieler) */}
@@ -2979,6 +3103,13 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           const teamClickable = Boolean(onOpenTeam && t.teamId);
           const teamHoverable = Boolean(onHoverTeam && t.teamId);
           const rc = relColor(t.rel);
+          // Staffel-Ladder-Politur (nur track): Rang-Änderung ggü. der letzten
+          // gewerteten Etappe (rankHistory), „+N" des aktuellen Läufers (letzter
+          // aufgedeckter Slot) und Rückstand absolut auf Platz 1.
+          const prevRank = t.rankHistory.length ? t.rankHistory[t.rankHistory.length - 1]! : null;
+          const rankDelta = prevRank != null ? prevRank - t.rank : 0;
+          const lastGain = t.thrownSlot >= 0 ? playerNet(t.players[t.thrownSlot]) : null;
+          const behind = leader ? leader.score - t.score : 0;
           return (
           <div
             key={t.code}
@@ -3002,6 +3133,11 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             title={teamClickable ? "Team-Karte öffnen" : undefined}
             style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 6px", borderRadius: 8, fontVariantNumeric: "tabular-nums", cursor: teamClickable ? "pointer" : "default", background: t.isOwn ? "color-mix(in srgb, var(--nl-accent) 14%, transparent)" : rc ? `color-mix(in srgb, ${rc} 9%, transparent)` : "transparent", boxShadow: rc ? `inset 3px 0 0 ${rc}` : undefined }}>
             <span style={{ width: 22, textAlign: "right", fontWeight: 800, color: ampel(t.rank), fontSize: 12.5 }}>{t.rank}</span>
+            {prim === "track" ? (
+              <span aria-hidden title="Rang-Änderung seit letzter Etappe" style={{ width: 18, fontSize: 10, fontWeight: 800, textAlign: "left", fontVariantNumeric: "tabular-nums", color: rankDelta > 0 ? "var(--nl-good)" : rankDelta < 0 ? "var(--nl-risk)" : "var(--nl-mut)" }}>
+                {rankDelta > 0 ? `▲${rankDelta}` : rankDelta < 0 ? `▼${-rankDelta}` : ""}
+              </span>
+            ) : null}
             {t.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={t.logoUrl} alt="" width={16} height={16} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} style={{ width: 16, height: 16, borderRadius: 4, objectFit: "cover", flex: "none" }} />
@@ -3013,7 +3149,17 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               <span title={t.rel === "ally" ? "Verbündet" : t.rel === "rival" ? "Rivale" : "Dein Team"} aria-hidden style={{ fontSize: 11, flex: "none", color: rc ?? undefined }}>{REL_GLYPH[t.rel]}</span>
             ) : null}
             <span style={{ flex: 1, fontSize: 11.5, color: "var(--nl-mut)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
-            <span style={{ fontWeight: 800, fontSize: 12.5 }}>{fmt1(t.score)}</span>
+            {prim === "track" ? (
+              <span title="Rückstand auf Platz 1" style={{ width: 42, textAlign: "right", fontSize: 11, fontWeight: 700, color: "var(--nl-mut)", fontVariantNumeric: "tabular-nums" }}>
+                {t.rank === 1 ? "—" : `−${fmt1(behind)}`}
+              </span>
+            ) : null}
+            <span style={{ fontWeight: 800, fontSize: 12.5, fontVariantNumeric: "tabular-nums", minWidth: 34, textAlign: "right" }}>{fmt1(t.score)}</span>
+            {prim === "track" ? (
+              <span title="Beitrag des aktuellen Läufers" style={{ width: 30, fontSize: 11, fontWeight: 800, textAlign: "left", fontVariantNumeric: "tabular-nums", color: lastGain != null ? "var(--nl-good)" : "transparent" }}>
+                {lastGain != null ? `+${fmt1(lastGain)}` : ""}
+              </span>
+            ) : null}
           </div>
           );
         })}
