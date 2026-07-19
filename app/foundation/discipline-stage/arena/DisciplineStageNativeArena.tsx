@@ -1287,6 +1287,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         rel: t.rel ?? null,
         seasonRank: t.seasonRank ?? idx + 1,
         teamId: t.teamId ?? null,
+        logoUrl: t.logoUrl,
         target: 800 + fnorm(finalScore) * 7000,
         gamma,
       };

@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { TeamRelationshipKind } from "@/lib/foundation/team-relationship";
+import { teamPrimaryColor } from "@/lib/foundation/team-colors";
 
 // Mini-DM · Arena-Schlacht (Auto-Battler) — nativer React-Nachbau des
 // abgenommenen Mockups. 32 Team-Tokens kämpfen live im Dojo-Pit, prallen beim
@@ -20,6 +21,7 @@ export type DuelTeamMeta = {
   rel: TeamRelationshipKind | null;
   seasonRank: number;
   teamId: string | null; // Klick auf Token/Zeile → Team-Ansicht
+  logoUrl: string | null; // Team-Logo; Fallback = Team-Markenfarbe + Code
   target: number; // Ziel-Schaden (aus dem Endscore abgeleitet) — monoton im Score
   gamma: number; // Aufhol-Kurven-Exponent (klein = Frühstarter/Underdog)
 };
@@ -704,14 +706,19 @@ export default function MiniDmArenaBattle({
                     crestRefs.current[i] = el;
                   }}
                   className={`mdmb-crest ${relCls} ${isLead ? "lead" : ""}`}
-                  style={{ left: `${p.fx * 760 - 15}px`, top: `${p.fy * 430 - 15}px`, cursor: clickable ? "pointer" : "default" }}
+                  style={{ left: `${p.fx * 760 - 15}px`, top: `${p.fy * 430 - 15}px`, cursor: clickable ? "pointer" : "default", background: m.logoUrl || isLead ? undefined : teamPrimaryColor(m.code) }}
                   title={m.name}
                   onMouseEnter={() => enterTeam(i, m.teamId, true)}
                   onMouseLeave={leaveTeam}
                   onClick={clickable ? () => onOpenTeam!(m.teamId!) : undefined}
                 >
+                  {m.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={m.logoUrl} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit" }} />
+                  ) : (
+                    m.code
+                  )}
                   {isLead ? <span className="mdmb-crown">🏆</span> : null}
-                  {m.code}
                 </span>
               );
             })}
@@ -788,7 +795,14 @@ export default function MiniDmArenaBattle({
                     onClick={clickable ? () => onOpenTeam!(m.teamId!) : undefined}
                   >
                     <span className="mdmb-lrk">{rk}</span>
-                    <span className="mdmb-lcr">{m.code}</span>
+                    <span className="mdmb-lcr" style={{ background: m.logoUrl ? undefined : teamPrimaryColor(m.code), overflow: "hidden", padding: 0 }}>
+                      {m.logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={m.logoUrl} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      ) : (
+                        m.code
+                      )}
+                    </span>
                     <span className={`mdmb-lcd ${relCls}`}>{m.code}</span>
                     <span className="mdmb-ldmg">
                       <span className="mdmb-ldn">{grp(d)}</span>
