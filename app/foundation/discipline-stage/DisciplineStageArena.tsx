@@ -16,7 +16,7 @@ import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday
 import DisciplineStageEndScreen from "@/app/foundation/discipline-stage/DisciplineStageEndScreen";
 import DisciplineStageStandingsDelta from "@/app/foundation/discipline-stage/DisciplineStageStandingsDelta";
 import DisciplineStageHighlights from "@/app/foundation/discipline-stage/DisciplineStageHighlights";
-import DisciplineStageTopPlayers, { type DisciplineStageTopPlayer } from "@/app/foundation/discipline-stage/DisciplineStageTopPlayers";
+import { type DisciplineStageTopPlayer } from "@/app/foundation/discipline-stage/DisciplineStageTopPlayers";
 import DisciplineStageNativeArena, { type StagePrimitive, type StageMotif, type StageEnv } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
 import DisciplineStageDrawer, { type DisciplineStageDrawerTarget } from "@/app/foundation/discipline-stage/DisciplineStageDrawer";
 import { fmt1 } from "@/app/foundation/discipline-stage/stage-format";
@@ -63,31 +63,6 @@ export type DisciplineStageArenaProps = {
   onAdvanceMatchday?: (() => void | Promise<void>) | null;
   onOpenPlayer?: ((playerId: string) => void) | null;
   onOpenTeam?: ((teamId: string) => void) | null;
-};
-
-// Disziplin-ID → fertige Arena-Szene unter /public/discipline-scenes.
-// Die Szenen sind die abgesegneten Optiken; wir füttern sie mit echten Save-Daten.
-const SCENE_BY_DISCIPLINE: Record<string, string> = {
-  tennis: "tennis-v2",
-  "mini-dm": "minidm-v2",
-  showcase: "showcase-v2",
-  "time-trial": "timetrial-v2",
-  spurt: "spurt-v2",
-  basketball: "basketball-skyline-v2",
-  tdm: "tdm-etagen-v2",
-  battlefield: "battlefield-v2",
-  staffel: "staffel-oval",
-  football: "football-v2",
-  wettessen: "wettessen-tafel",
-  gewichtheben: "gewichtheben-v2",
-  "speed-schach": "schach-v2",
-  "takeshis-castle": "takeshi-v2",
-  hockey: "hockey-v2",
-  eiskunstlauf: "eiskunstlauf-v2",
-  climbing: "climbing-v2",
-  fechten: "fechten-v2",
-  "i-spy": "ispy-v2",
-  breaking: "breakingpoint-v2",
 };
 
 // Mutator-Traits = echte Spielregel (lib/lineups/legacy-lineup-modifiers.ts):
@@ -483,20 +458,12 @@ export default function DisciplineStageArena({
     if (disciplines.some((d) => d.id === "staffel")) {
       return "staffel";
     }
-    return disciplines.find((d) => SCENE_BY_DISCIPLINE[d.id])?.id ?? disciplines[0]?.id ?? "staffel";
+    return disciplines.find((d) => NATIVE_PRIMITIVE[d.id])?.id ?? disciplines[0]?.id ?? "staffel";
   }, [disciplines]);
 
   const [disciplineId, setDisciplineId] = useState<string>(defaultDisciplineId);
   const [mode, setMode] = useState<"real" | "random">("real");
   const [seed, setSeed] = useState<number>(1);
-  const [ready, setReady] = useState<boolean>(false);
-  const [nativeBeta, setNativeBeta] = useState<boolean>(true);
-
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
-
-  const scene = SCENE_BY_DISCIPLINE[disciplineId];
-  const hasNative = Boolean(NATIVE_PRIMITIVE[disciplineId]);
-  const showNative = hasNative && nativeBeta;
 
   const model = useMemo(
     () => buildDisciplineStageModel(gameState, disciplineId, ownTeamId),
@@ -702,15 +669,11 @@ export default function DisciplineStageArena({
           })),
         }));
     return {
-      type: "olyStageData" as const,
-      mode,
-      seed,
       slots: Array.from({ length: slotCount }, (_, i) => slotLabel(disciplineId, i, slotCount)),
       mineCode: ownShortCode,
-      mutatorTraits,
       teams,
     };
-  }, [useEngine, engineTeams, model, mode, seed, disciplineId, mutatorTraits, ownShortCode, gameState.seasonState?.standings]);
+  }, [useEngine, engineTeams, model, mode, disciplineId, mutatorTraits, ownShortCode, gameState.seasonState?.standings]);
 
   // Betroffene Spieler (≥1 Trait-Treffer) für die Player-Points-Anzeige (+0,3 PP je).
   const mutatorImpact = useMemo(() => {
@@ -728,31 +691,6 @@ export default function DisciplineStageArena({
     }
     return { affected: entries.length, entries };
   }, [model, mode, mutatorTraits]);
-
-  // Szenenwechsel → iframe lädt neu → Ready-Status zurücksetzen.
-  useEffect(() => {
-    setReady(false);
-  }, [scene]);
-
-  // Auf das Ready-Signal der Szene hören.
-  useEffect(() => {
-    function onMessage(event: MessageEvent) {
-      const data = event.data as { type?: string } | null;
-      if (data?.type === "olyStageReady" && event.source === iframeRef.current?.contentWindow) {
-        setReady(true);
-      }
-    }
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, []);
-
-  // Sobald bereit (oder Payload sich ändert): echte Daten in die Szene posten.
-  useEffect(() => {
-    if (ready && iframeRef.current?.contentWindow) {
-      // Same-origin-Asset — Ziel-Origin explizit statt "*".
-      iframeRef.current.contentWindow.postMessage(payload, window.location.origin);
-    }
-  }, [ready, payload]);
 
   // Stabile teams-Identität für die native Arena. WICHTIG (B1): früher wurde das
   // Array inline im JSX gemappt → bei jedem Parent-Render (Drawer/Hover) eine neue
@@ -828,9 +766,8 @@ export default function DisciplineStageArena({
             style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--nl-line)", background: "var(--nl-panel)", color: "inherit", fontSize: 14, fontWeight: 700 }}
           >
             {disciplines.map((discipline) => (
-              <option key={discipline.id} value={discipline.id} disabled={!SCENE_BY_DISCIPLINE[discipline.id]}>
+              <option key={discipline.id} value={discipline.id}>
                 {discipline.name}
-                {SCENE_BY_DISCIPLINE[discipline.id] ? "" : " (Szene folgt)"}
               </option>
             ))}
           </select>
@@ -857,26 +794,6 @@ export default function DisciplineStageArena({
             🎲 Random-Test
           </button>
         </div>
-        {!showNative ? (
-          <button
-            type="button"
-            onClick={() => iframeRef.current?.contentWindow?.postMessage({ type: "olyStageQuickSim" }, window.location.origin)}
-            title="Disziplin sofort komplett durchrechnen (ohne Animation) — Endstand + Podium"
-            style={{ padding: "8px 14px", fontWeight: 800, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}
-          >
-            ⏩ Quick-Sim
-          </button>
-        ) : null}
-        {hasNative ? (
-          <button
-            type="button"
-            onClick={() => setNativeBeta((v) => !v)}
-            title="Nativer Renderer (scharf, integriert) vs. eingebettete iframe-Arena"
-            style={{ padding: "8px 14px", fontWeight: 800, fontSize: 13, border: `1px solid ${showNative ? "var(--nl-good)" : "var(--nl-line)"}`, background: showNative ? "color-mix(in srgb, var(--nl-good) 14%, transparent)" : "transparent", color: showNative ? "var(--nl-good)" : "inherit", borderRadius: 10, cursor: "pointer" }}
-          >
-            {showNative ? "✓ Nativ (Beta)" : "Nativ (Beta)"}
-          </button>
-        ) : null}
         {mode === "real" ? (
           <span
             title={useEngine ? "Werte kommen 1:1 aus der Matchday-Resolve-Engine (arena-identisch)" : "Vereinfachte Ansicht: für diese Disziplin/diesen Spieltag liegt keine Engine-Aufstellung vor"}
@@ -941,49 +858,26 @@ export default function DisciplineStageArena({
         ) : null}
       </div>
 
-      {showNative ? (
-        <DisciplineStageNativeArena
-          key={`${disciplineId}-${mode}-${seed}`}
-          slots={payload.slots}
-          teams={nativeTeams}
-          onOpenPlayer={(pid) => openDrawerPinned({ kind: "player", playerId: pid })}
-          onOpenTeam={(teamId) => openDrawerPinned({ kind: "team", teamId })}
-          onHoverTeam={previewTeam}
-          onPreviewPlayer={previewPlayer}
-          onEnded={() => setArenaEnded(true)}
-          topPlayers={topPlayers}
-          primitive={NATIVE_PRIMITIVE[disciplineId] ?? "track"}
-          disciplineName={model.disciplineName}
-          accent={DISCIPLINE_SKIN[disciplineId]?.accent}
-          motif={DISCIPLINE_SKIN[disciplineId]?.motif}
-          env={DISCIPLINE_SKIN[disciplineId]?.env}
-        />
-      ) : scene ? (
-        <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
-          <div style={{ flex: "0 0 340px", minWidth: 280, maxHeight: "calc(100vh - 180px)", overflowY: "auto" }}>
-            <DisciplineStageTopPlayers players={topPlayers.rows} playerIdByRow={topPlayers.ids} onOpenPlayer={(pid) => openDrawerPinned({ kind: "player", playerId: pid })} />
-          </div>
-          <div style={{ flex: "1 1 640px", minWidth: 0, maxWidth: 1240, borderRadius: 14, overflow: "hidden", border: "1px solid var(--nl-line)", background: "var(--nl-bg)" }}>
-            <iframe
-              ref={iframeRef}
-              key={scene}
-              src={`/discipline-scenes/${scene}.html`}
-              title={`Arena — ${model.disciplineName}`}
-              style={{ width: "100%", height: "calc(100vh - 180px)", maxHeight: 860, minHeight: 500, border: 0, display: "block" }}
-            />
-          </div>
-        </div>
-      ) : (
-        <div style={{ padding: 40, textAlign: "center", color: "var(--nl-mut)", border: "1px dashed var(--nl-line)", borderRadius: 14 }}>
-          Für <b>{model.disciplineName}</b> ist die Arena-Szene noch nicht hinterlegt.
-        </div>
-      )}
+      <DisciplineStageNativeArena
+        key={`${disciplineId}-${mode}-${seed}`}
+        slots={payload.slots}
+        teams={nativeTeams}
+        onOpenPlayer={(pid) => openDrawerPinned({ kind: "player", playerId: pid })}
+        onOpenTeam={(teamId) => openDrawerPinned({ kind: "team", teamId })}
+        onHoverTeam={previewTeam}
+        onPreviewPlayer={previewPlayer}
+        onEnded={() => setArenaEnded(true)}
+        topPlayers={topPlayers}
+        primitive={NATIVE_PRIMITIVE[disciplineId] ?? "track"}
+        disciplineName={model.disciplineName}
+        accent={DISCIPLINE_SKIN[disciplineId]?.accent}
+        motif={DISCIPLINE_SKIN[disciplineId]?.motif}
+        env={DISCIPLINE_SKIN[disciplineId]?.env}
+      />
 
-      {showNative ? (
-        <div style={{ marginTop: 8, fontSize: 11.5, color: "var(--nl-mut)", lineHeight: 1.5 }}>
-          Lesehilfe: <b>Sortierung</b> = Saison-Rang (MD1 links) · <b>Farbe/Bewegung</b> = aktueller Rundenstand · <b>Podest</b> = Endrang der Disziplin.
-        </div>
-      ) : null}
+      <div style={{ marginTop: 8, fontSize: 11.5, color: "var(--nl-mut)", lineHeight: 1.5 }}>
+        Lesehilfe: <b>Sortierung</b> = Saison-Rang (MD1 links) · <b>Farbe/Bewegung</b> = aktueller Rundenstand · <b>Podest</b> = Endrang der Disziplin.
+      </div>
 
       {ownTeam ? (
         <div style={{ marginTop: 14, background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 14 }}>
@@ -1043,7 +937,7 @@ export default function DisciplineStageArena({
         </div>
       ) : null}
 
-      {mode === "real" && engineDiscipline && (!showNative || arenaEnded) ? (
+      {mode === "real" && engineDiscipline && arenaEnded ? (
         <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
           <DisciplineStageEndScreen
             disciplineName={engineDiscipline.disciplineName}
