@@ -22,11 +22,17 @@ export type TeamMarkProps = {
   title?: string;
   /** Füllfarbe, wenn kein Logo geladen werden kann (z.B. Team-Markenfarbe). */
   placeholderColor?: string | null;
+  /**
+   * Sekundär-Markenfarbe: ist sie gesetzt (und kein Logo da), wird der
+   * Platzhalter diagonal geteilt (↙ placeholderColor / ↗ placeholderSecondaryColor)
+   * — dieselbe Zweifarb-Identität wie das runde Team-Token.
+   */
+  placeholderSecondaryColor?: string | null;
   /** Kürzel im Platzhalter, wenn kein Logo da ist (z.B. Team-Code). */
   placeholderLabel?: string | null;
 };
 
-export default function TeamMark({ src, alt = "", size = 22, radius = 5, isOwn = false, relation = null, spotlight = false, medal = null, onClick, title, placeholderColor = null, placeholderLabel = null }: TeamMarkProps) {
+export default function TeamMark({ src, alt = "", size = 22, radius = 5, isOwn = false, relation = null, spotlight = false, medal = null, onClick, title, placeholderColor = null, placeholderSecondaryColor = null, placeholderLabel = null }: TeamMarkProps) {
   const [failed, setFailed] = useState(false);
   const ring = markRingColor({ spotlight, isOwn, relation });
   const ringWidth = spotlight || isOwn ? 2 : 1;
@@ -66,7 +72,10 @@ export default function TeamMark({ src, alt = "", size = 22, radius = 5, isOwn =
             borderRadius: radius,
             display: "grid",
             placeItems: "center",
-            background: placeholderColor ?? "var(--nl-bg)",
+            background:
+              placeholderColor && placeholderSecondaryColor
+                ? `linear-gradient(to top right, ${placeholderColor} 0 50%, ${placeholderSecondaryColor} 50% 100%)`
+                : placeholderColor ?? "var(--nl-bg)",
             border: `${ringWidth}px solid ${ring}`,
             color: "var(--nl-bg)",
             fontSize: Math.max(7, Math.round(size * 0.34)),

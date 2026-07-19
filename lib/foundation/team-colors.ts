@@ -74,3 +74,21 @@ export function teamPrimaryColor(code: string | null | undefined): string {
 export function teamHasSecondary(code: string | null | undefined): boolean {
   return Boolean(code && TEAM_COLOR[code]?.secondary);
 }
+
+// Lesbarkeits-Untergrenze für Akzente: die L-Komponente einer `hsl(H S% L%)`-
+// Zeichenkette (das Format, das getTeamColor liefert) wird in den Bereich
+// [44, 72] geklemmt — zu Dunkles wird angehoben, zu Helles gesenkt; H und S
+// bleiben unverändert. So bleibt eine sehr dunkle Team-Primärfarbe (z.B. L-R
+// hsl(220 12% 20%)) als Akzent auf dunklen Panels lesbar, während die rohe
+// Farbe für das Crest verfügbar bleibt. Nicht parsebare Eingaben werden
+// unverändert zurückgegeben.
+const ACCENT_L_MIN = 44;
+const ACCENT_L_MAX = 72;
+
+export function floorTeamAccent(hsl: string): string {
+  const match = /^hsl\(\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%\s*\)$/i.exec(hsl.trim());
+  if (!match) return hsl;
+  const [, h, s, lRaw] = match;
+  const l = Math.min(ACCENT_L_MAX, Math.max(ACCENT_L_MIN, Number(lRaw)));
+  return `hsl(${h} ${s}% ${l}%)`;
+}

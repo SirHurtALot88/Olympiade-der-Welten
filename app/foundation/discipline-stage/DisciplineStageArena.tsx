@@ -998,6 +998,7 @@ export default function DisciplineStageArena({
     <DisciplineStageDrawer
       target={drawerTarget}
       gameState={gameState}
+      disciplineId={disciplineId}
       onClose={() => {
         openedByHover.current = false;
         setDrawerTarget(null);
