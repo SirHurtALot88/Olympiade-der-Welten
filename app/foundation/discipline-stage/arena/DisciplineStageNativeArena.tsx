@@ -28,6 +28,8 @@ export type NativeStageTeam = {
   logoUrl: string | null;
   isOwn: boolean;
   players: NativeStagePlayer[];
+  seasonRank?: number; // echter Season-Tabellenrang → Bahn-/Turm-Reihenfolge
+  teamId?: string; // für Team-Drawer
 };
 export type StagePrimitive = "track" | "lanes" | "towers";
 export type DisciplineStageNativeArenaProps = {

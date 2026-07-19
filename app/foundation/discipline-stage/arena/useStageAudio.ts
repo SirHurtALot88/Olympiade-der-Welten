@@ -9,6 +9,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export type StageAudio = {
   muted: boolean;
   toggleMute: () => void;
+  volume: number; // 0..1 Master-Lautstärke
+  setVolume: (v: number) => void;
   gun: (vol?: number) => void;
   crowdSwell: (vol?: number, dur?: number) => void;
   stumbleThud: (vol?: number) => void;
@@ -18,17 +20,25 @@ export type StageAudio = {
   riser: () => void;
 };
 
+// Default halbiert — die Cues waren live zu laut.
+const DEFAULT_VOLUME = 0.5;
+
 export function useStageAudio(): StageAudio {
   const ctxRef = useRef<AudioContext | null>(null);
+  const masterRef = useRef<GainNode | null>(null);
   const [muted, setMuted] = useState(false);
   const mutedRef = useRef(false);
   mutedRef.current = muted;
+  const [volume, setVolumeState] = useState(DEFAULT_VOLUME);
+  const volumeRef = useRef(DEFAULT_VOLUME);
+  volumeRef.current = volume;
 
   useEffect(
     () => () => {
       if (ctxRef.current) {
         void ctxRef.current.close().catch(() => {});
         ctxRef.current = null;
+        masterRef.current = null;
       }
     },
     [],
@@ -47,8 +57,16 @@ export function useStageAudio(): StageAudio {
     }
     const ctx = ctxRef.current;
     if (ctx.state === "suspended") void ctx.resume();
+    // Master-Gain (alle Cues laufen hier durch) — lazy, Gain = aktuelle Lautstärke.
+    if (!masterRef.current) {
+      masterRef.current = ctx.createGain();
+      masterRef.current.connect(ctx.destination);
+    }
+    masterRef.current.gain.setValueAtTime(Math.max(0, Math.min(1, volumeRef.current)), ctx.currentTime);
     return ctx;
   }, []);
+
+  const setVolume = useCallback((v: number) => setVolumeState(Math.max(0, Math.min(1, v))), []);
 
   const gun = useCallback(
     (vol = 0.6) => {
@@ -70,7 +88,7 @@ export function useStageAudio(): StageAudio {
       g.gain.exponentialRampToValueAtTime(0.001, t0 + len);
       src.connect(hp);
       hp.connect(g);
-      g.connect(a.destination);
+      g.connect(masterRef.current ?? a.destination);
       src.start(t0);
       src.stop(t0 + len);
     },
@@ -99,7 +117,7 @@ export function useStageAudio(): StageAudio {
       g.gain.exponentialRampToValueAtTime(0.001, t0 + d1);
       src.connect(bp);
       bp.connect(g);
-      g.connect(a.destination);
+      g.connect(masterRef.current ?? a.destination);
       src.start(t0);
       src.stop(t0 + d1);
     },
@@ -119,7 +137,7 @@ export function useStageAudio(): StageAudio {
       g.gain.setValueAtTime(vol, t0);
       g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.13);
       o.connect(g);
-      g.connect(a.destination);
+      g.connect(masterRef.current ?? a.destination);
       o.start(t0);
       o.stop(t0 + 0.14);
     },
@@ -140,7 +158,7 @@ export function useStageAudio(): StageAudio {
       og.gain.exponentialRampToValueAtTime(0.9 * vol, t0 + 0.02);
       og.gain.exponentialRampToValueAtTime(0.001, t0 + 0.5);
       o.connect(og);
-      og.connect(a.destination);
+      og.connect(masterRef.current ?? a.destination);
       o.start(t0);
       o.stop(t0 + 0.52);
       const len = 0.05;
@@ -153,7 +171,7 @@ export function useStageAudio(): StageAudio {
       ng.gain.setValueAtTime(0.5 * vol, t0);
       ng.gain.exponentialRampToValueAtTime(0.001, t0 + len);
       src.connect(ng);
-      ng.connect(a.destination);
+      ng.connect(masterRef.current ?? a.destination);
       src.start(t0);
       src.stop(t0 + len);
       [880, 1320, 1760].forEach((f, i) => {
@@ -166,7 +184,7 @@ export function useStageAudio(): StageAudio {
         sg.gain.exponentialRampToValueAtTime(0.14 * vol, st + 0.02);
         sg.gain.exponentialRampToValueAtTime(0.001, st + 0.34);
         s.connect(sg);
-        sg.connect(a.destination);
+        sg.connect(masterRef.current ?? a.destination);
         s.start(st);
         s.stop(st + 0.36);
       });
@@ -188,7 +206,7 @@ export function useStageAudio(): StageAudio {
       g.gain.exponentialRampToValueAtTime(0.15, st + 0.02);
       g.gain.exponentialRampToValueAtTime(0.001, st + 0.4);
       o.connect(g);
-      g.connect(a.destination);
+      g.connect(masterRef.current ?? a.destination);
       o.start(st);
       o.stop(st + 0.42);
     });
@@ -207,7 +225,7 @@ export function useStageAudio(): StageAudio {
       g.gain.exponentialRampToValueAtTime(0.11, t0 + 0.02);
       g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.14);
       o.connect(g);
-      g.connect(a.destination);
+      g.connect(masterRef.current ?? a.destination);
       o.start(t0);
       o.stop(t0 + 0.15);
     },
@@ -231,12 +249,12 @@ export function useStageAudio(): StageAudio {
     g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.3);
     o.connect(lp);
     lp.connect(g);
-    g.connect(a.destination);
+    g.connect(masterRef.current ?? a.destination);
     o.start(t0);
     o.stop(t0 + 0.32);
   }, [ac]);
 
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
 
-  return { muted, toggleMute, gun, crowdSwell, stumbleThud, wumms, star, risingPing, riser };
+  return { muted, toggleMute, volume, setVolume, gun, crowdSwell, stumbleThud, wumms, star, risingPing, riser };
 }

@@ -8,10 +8,19 @@ export function fmt1(x: number | null | undefined): string {
   return Number.isInteger(v) ? String(v) : v.toFixed(1);
 }
 
-/** Rang → Ampelfarbe (Design-Token). 1-3 gut, 4-10 warn, 11-20 neutral, ab 21 rot. */
+/**
+ * Rang → Ampelfarbe (Design-Token). Top-10 klar grün→gelb→rot,
+ * 11-20 neutral-grau, 21-32 gedämpft (abgeschlagen).
+ *   1-3   grün   (Podest-Nähe)
+ *   4-7   gelb   (oberes Mittelfeld)
+ *   8-10  rot    (unteres Top-10)
+ *   11-20 grau   (Mittelfeld)
+ *   21-32 dunkelgrau/gedämpft
+ */
 export function ampel(rank: number): string {
   if (rank <= 3) return "var(--nl-good)";
-  if (rank <= 10) return "var(--nl-warn)";
+  if (rank <= 7) return "var(--nl-warn)";
+  if (rank <= 10) return "var(--nl-risk)";
   if (rank <= 20) return "var(--nl-mut)";
-  return "var(--nl-risk)";
+  return "var(--nl-mut-2, var(--nl-mut))";
 }
