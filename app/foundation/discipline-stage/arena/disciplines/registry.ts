@@ -37,6 +37,8 @@ import CourtField from "./court";
 import RinkField from "./rink";
 import KlassenField from "./klassen";
 import TerritoryField from "./territory";
+import TakeshiField from "./takeshi";
+import FootballField from "./football";
 
 export const DISCIPLINE_FIELD_REGISTRY: Record<StagePrimitive, DisciplineField> = {
   track: TrackField,
@@ -65,9 +67,11 @@ export const DISCIPLINE_FIELD_REGISTRY: Record<StagePrimitive, DisciplineField> 
 // disciplineId (siehe NATIVE_PRIMITIVE in DisciplineStageArena.tsx). Wird von den
 // Wellen-Agents befüllt, sobald die jeweilige 1:1-Datei existiert.
 export const DISCIPLINE_ID_FIELD_REGISTRY: Record<string, DisciplineField> = {
-  // parcours: "takeshis-castle": TakeshiField, football: FootballField,
-  // klassen:  "speed-schach": SchachField, tennis: TennisField,
-  // stage:    eiskunstlauf: EiskunstField, showcase: ShowcaseField,
+  // parcours (geteilt): Takeshi = Burg-Parcours, Football = Flutlicht-Rasen.
+  "takeshis-castle": TakeshiField,
+  football: FootballField,
+  // klassen:  "speed-schach": SchachField, tennis: TennisField,      (Welle 4)
+  // stage:    eiskunstlauf: EiskunstField, showcase: ShowcaseField,  (Welle 4)
 };
 
 export function getDisciplineField(
