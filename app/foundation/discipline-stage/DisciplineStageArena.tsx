@@ -20,8 +20,33 @@ import DisciplineStageTopPlayers, { type DisciplineStageTopPlayer } from "@/app/
 import DisciplineStageNativeArena from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
 
 // Disziplinen mit fertigem nativem Renderer (löst schrittweise das iframe ab).
+// Nativer Renderer je Disziplin. Der Track-Primitive (Oval, "Position = Punkte")
+// ist disziplin-agnostisch: Engine, FX, Sounds, Ticker, Podest, Detail-Tabelle
+// und Top-10 sind für alle 20 gleich. Deshalb laufen alle Disziplinen jetzt auf
+// demselben Feature-Stand über "track". Die im Rebuild-Plan vorgesehenen eigenen
+// Optiken (Lanes/Towers/Tiers) sind die nächste optische Politur — bis dahin
+// steht rechts der Kommentar mit dem Ziel-Primitive.
 const NATIVE_PRIMITIVE: Record<string, "track"> = {
   staffel: "track",
+  spurt: "track",
+  "takeshis-castle": "track",
+  hockey: "track",
+  wettessen: "track",
+  football: "track",
+  battlefield: "track",
+  "mini-dm": "track",
+  "i-spy": "track",
+  "time-trial": "track", // Ziel: lanes
+  "speed-schach": "track", // Ziel: lanes
+  fechten: "track", // Ziel: lanes
+  tennis: "track", // Ziel: lanes
+  breaking: "track", // Ziel: lanes
+  basketball: "track", // Ziel: towers
+  gewichtheben: "track", // Ziel: towers
+  climbing: "track", // Ziel: towers
+  eiskunstlauf: "track", // Ziel: towers
+  showcase: "track", // Ziel: towers
+  tdm: "track", // Ziel: tiers
 };
 
 export type DisciplineStageArenaProps = {
