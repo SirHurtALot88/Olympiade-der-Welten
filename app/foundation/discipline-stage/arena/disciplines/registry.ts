@@ -39,6 +39,8 @@ import KlassenField from "./klassen";
 import TerritoryField from "./territory";
 import TakeshiField from "./takeshi";
 import FootballField from "./football";
+import EiskunstField from "./eiskunst";
+import ShowcaseField from "./showcase";
 
 export const DISCIPLINE_FIELD_REGISTRY: Record<StagePrimitive, DisciplineField> = {
   track: TrackField,
@@ -70,8 +72,11 @@ export const DISCIPLINE_ID_FIELD_REGISTRY: Record<string, DisciplineField> = {
   // parcours (geteilt): Takeshi = Burg-Parcours, Football = Flutlicht-Rasen.
   "takeshis-castle": TakeshiField,
   football: FootballField,
-  // klassen:  "speed-schach": SchachField, tennis: TennisField,      (Welle 4)
-  // stage:    eiskunstlauf: EiskunstField, showcase: ShowcaseField,  (Welle 4)
+  // klassen (geteilt): Speed-Schach + Tennis folgen separat (Token-Sichtbarkeits-Fix) —
+  // bis dahin auf dem funktionierenden klassen-Stub.
+  // stage (geteilt): Eiskunstlauf = Eis-Kür, Showcase = Theater-Bühne.
+  eiskunstlauf: EiskunstField,
+  showcase: ShowcaseField,
 };
 
 export function getDisciplineField(
