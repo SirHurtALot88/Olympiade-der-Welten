@@ -1744,7 +1744,15 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   // Rangfolge muss dann live neu sortiert werden (32 Einträge, günstig).
   const sorted = [...rtRef.current].sort((a, b) => a.rank - b.rank);
   const me = rtRef.current.find((t) => t.isOwn) ?? null;
+  const leader = sorted[0] ?? null;
   const now = Date.now();
+
+  // Basketball-Court: Treffer/Fehlwurf-Schwelle = Feld-Median der bereits geworfenen
+  // Scores; Hot-Hand = deutlich über dem Median. Nur für prim === "court" berechnet.
+  const courtThrown = prim === "court" ? rtRef.current.filter((t) => t.thrownSlot >= 0).map((t) => t.score).sort((a, b) => a - b) : [];
+  const courtMedian = courtThrown.length ? courtThrown[Math.floor((courtThrown.length - 1) / 2)]! : 0;
+  const courtMax = courtThrown.length ? courtThrown[courtThrown.length - 1]! : 0;
+  const courtHotFloor = courtMedian + (courtMax - courtMedian) * 0.5;
 
   // Top-Spieler-Zeile: NUR bereits aufgedeckte Spieler (kein Spoiler). Set aller
   // playerIds bis einschließlich thrownSlot je Team; die statische Host-Liste wird
@@ -1881,6 +1889,26 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               <span style={{ fontSize: 11.5, fontWeight: 800, padding: "3px 10px", borderRadius: 99, color: "var(--nl-bg)", background: `rgb(${FLASH_COLOR[spotlight.chipColor] ?? FLASH_COLOR.gold})` }}>{spotlight.chipText}</span>
             ) : null}
             <div style={{ fontWeight: 800, fontSize: 30, color: "var(--nl-warn)", flex: "none" }}>+{fmt1(spotlight.net)}</div>
+          </div>
+        ) : null}
+
+        {/* Jumbotron (nur Court/Basketball): Führender + dein Team + Etappen-Uhr */}
+        {prim === "court" ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 14px", marginBottom: 10, borderRadius: 12, border: "1px solid var(--nl-line)", background: "linear-gradient(90deg, color-mix(in srgb, var(--nl-panel) 88%, transparent), var(--nl-panel))", flexWrap: "wrap" }}>
+            <span style={{ fontSize: 14, fontWeight: 800, letterSpacing: "0.02em" }}>🏀 {disciplineName ?? "Basketball"}</span>
+            {round > 0 && leader ? (
+              <span style={{ fontSize: 12, fontWeight: 800, padding: "3px 10px", borderRadius: 99, color: "var(--nl-warn)", border: "1px solid var(--nl-warn)" }}>
+                🏆 Führt: {leader.code} · {fmt1(leader.score)}
+              </span>
+            ) : null}
+            {me ? (
+              <span style={{ fontSize: 12, fontWeight: 800, padding: "3px 10px", borderRadius: 99, color: "var(--nl-accent)", border: "1px solid var(--nl-accent)" }}>
+                Dein Team: {me.code} · Platz {me.rank}
+              </span>
+            ) : null}
+            <span style={{ marginLeft: "auto", fontFamily: "ui-monospace, monospace", fontSize: 12.5, fontWeight: 700, color: "var(--nl-warn)", background: "var(--nl-bg)", border: "1px solid var(--nl-line)", borderRadius: 7, padding: "3px 10px" }}>
+              ⏱ Etappe {Math.min(round, slotCount)}/{slotCount}
+            </span>
           </div>
         ) : null}
 
@@ -2332,6 +2360,10 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                       }}
                     >
                       {glowing ? <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={4} style={{ animation: reduced.current ? "none" : "olyGlowPulse 1.1s ease-in-out infinite" }} /> : null}
+                      {/* Buzzer-Beater-Glow — Führung auf dem Court dauerhaft golden umrandet */}
+                      {prim === "court" && t.rank === 1 && t.thrownSlot >= 0 ? (
+                        <circle r={r + 11} fill="none" stroke="var(--nl-warn)" strokeWidth={2.5} opacity={0.5} style={{ animation: reduced.current ? "none" : "olyGlowPulse 1.6s ease-in-out infinite" }} />
+                      ) : null}
                       {/* Freund/Feind-Rahmen (mine/ally/rival) — nur Rahmenfarbe, nie Füllung */}
                       {relColor(t.rel) ? <circle r={r + 5.5} fill="none" stroke={relColor(t.rel)!} strokeWidth={2.4} opacity={0.95} /> : null}
                       {medal ? <circle r={r + 3.5} fill="none" stroke={medal} strokeWidth={t.isOwn ? 4.5 : 3.5} /> : null}
@@ -2349,6 +2381,30 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                         <text y={-(r + 7)} textAnchor="middle" fontSize={10} fontWeight={800} fill={relColor(t.rel)!}>
                           {t.code}
                         </text>
+                      ) : null}
+                      {/* Court: Treffer (grüner Swish) / Fehlwurf (rotes X) + 🔥 Hot-Hand + 🏆 Führung */}
+                      {prim === "court" && t.thrownSlot >= 0 ? (
+                        <g>
+                          <g transform={`translate(${r + 5} ${-(r + 5)})`}>
+                            {t.score >= courtMedian ? (
+                              <>
+                                <circle r={5} fill="hsl(140 58% 42%)" stroke="hsl(140 70% 78%)" strokeWidth={1.4} />
+                                <path d="M -2.4 0 L -0.6 2 L 2.6 -2.4" fill="none" stroke="hsl(140 82% 92%)" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" />
+                              </>
+                            ) : (
+                              <g stroke="hsl(2 78% 62%)" strokeWidth={2} strokeLinecap="round">
+                                <line x1={-3} y1={-3} x2={3} y2={3} />
+                                <line x1={3} y1={-3} x2={-3} y2={3} />
+                              </g>
+                            )}
+                          </g>
+                          {courtMax > courtMedian && t.score > courtHotFloor ? (
+                            <text x={-(r + 4)} y={-(r + 1)} textAnchor="end" fontSize={13}>🔥</text>
+                          ) : null}
+                          {t.rank === 1 ? (
+                            <text y={r + 27} textAnchor="middle" fontSize={16}>🏆</text>
+                          ) : null}
+                        </g>
                       ) : null}
                     </g>
                   </g>
