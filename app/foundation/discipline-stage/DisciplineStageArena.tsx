@@ -367,15 +367,14 @@ const ENV_NEON_SEARCH: StageEnv = {
     { kind: "sheen", color: "hsl(271 60% 70%)" },
   ],
 };
-const ENV_NEON_ARENA: StageEnv = {
-  sky: ["hsl(220 23% 4%)", "hsl(220 20% 8%)"],
-  stands: "hsl(220 22% 12%)",
-  surface: ["hsl(219 22% 11%)", "hsl(220 25% 7%)", "hsl(220 25% 4%)"],
-  line: "hsl(224 60% 82%)",
-  deco: [
-    { kind: "skyline", back: "hsl(220 30% 9%)", front: "hsl(224 40% 6%)", windows: "hsl(224 83% 65%)" },
-    { kind: "grid", color: "hsl(224 83% 60%)" },
-  ],
+// Taktisches Deathmatch-HUD für TDM: kaltes Schwarz mit Neon-Rot-Anflug, rote
+// Rasterlinien statt Skyline — Scoreboard/Kill-Feed statt 3D-Feld. Farben als hsl().
+const ENV_TDM_HUD: StageEnv = {
+  sky: ["hsl(222 28% 4%)", "hsl(2 34% 7%)"],
+  stands: "hsl(2 24% 11%)",
+  surface: ["hsl(222 20% 10%)", "hsl(222 22% 6%)", "hsl(2 26% 5%)"],
+  line: "hsl(2 76% 64%)",
+  deco: [{ kind: "grid", color: "hsl(2 70% 46%)" }],
 };
 
 // Berg-Panorama für den Gipfelsturm (Climbing): dämmriger Himmel → warmer Horizont,
@@ -417,7 +416,7 @@ const DISCIPLINE_SKIN: Record<string, { accent: string; motif: StageMotif; env?:
   hockey: { accent: "hsl(205 72% 63%)", motif: "court", env: ENV_ICE_STADIUM },
   breaking: { accent: "hsl(275 60% 65%)", motif: "stage", env: ENV_BATTLE_STAGE },
   "i-spy": { accent: "hsl(260 58% 65%)", motif: "grid", env: ENV_NEON_SEARCH },
-  tdm: { accent: "hsl(220 68% 62%)", motif: "skyline", env: ENV_NEON_ARENA },
+  tdm: { accent: "hsl(2 78% 62%)", motif: "combat", env: ENV_TDM_HUD },
 };
 
 function slotLabel(disciplineId: string, index: number, total: number): string {

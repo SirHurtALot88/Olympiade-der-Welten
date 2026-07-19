@@ -460,6 +460,33 @@ function renderSceneEnvBg(prim: StagePrimitive, env: StageEnv, layout: any, W: n
       </>
     );
   }
+  if (prim === "kda") {
+    // TDM — taktisches Deathmatch-HUD als Overlay über die Bahn-Reihen (Board):
+    // Neon-rote Scoreboard-Kante, CRT-Scanlines, Fadenkreuz-Wasserzeichen (⌖),
+    // angedeutete Spaltenkanten. Kein 3D-Feld, alles hsl()/rgba().
+    const { top, xStart, xEnd } = layout;
+    const red = "hsl(2 78% 60%)";
+    const lines = Math.floor(H / 3);
+    return (
+      <>
+        {/* neon-rote Trennkante unter dem Scoreboard-Kopf */}
+        <rect x={0} y={top - 2} width={W} height={2} fill={red} opacity={0.5} />
+        {/* CRT-Scanlines übers ganze HUD (statisch) */}
+        <g style={{ pointerEvents: "none" }}>
+          {Array.from({ length: lines }).map((_, i) => (
+            <line key={i} x1={0} y1={i * 3} x2={W} y2={i * 3} stroke={red} strokeWidth={1} opacity={0.035} />
+          ))}
+        </g>
+        {/* Fadenkreuz-Wasserzeichen (⌖) — HUD-Identität */}
+        <text x={W / 2} y={H / 2 + 8} textAnchor="middle" dominantBaseline="central" fontSize={H * 0.62} fill={red} opacity={0.05} style={{ pointerEvents: "none" }}>
+          ⌖
+        </text>
+        {/* angedeutete Board-Spaltenkanten links/rechts */}
+        <line x1={xStart - 8} y1={top} x2={xStart - 8} y2={H - top + 8} stroke={red} strokeWidth={1} opacity={0.22} />
+        <line x1={xEnd + 8} y1={top} x2={xEnd + 8} y2={H - top + 8} stroke={red} strokeWidth={1} opacity={0.22} />
+      </>
+    );
+  }
   if (prim === "court") {
     const { cx, hoopY, baseY, baseHalf } = layout;
     const keyW = baseHalf * 0.42;
@@ -2019,6 +2046,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                     {Array.from({ length: N }).map((_, i) => (
                       <rect key={i} x={layout.xStart} y={layout.top + i * layout.laneH} width={layout.xEnd - layout.xStart} height={layout.laneH} fill={i % 2 ? env.surface[0] : env.surface[1]} opacity={0.55} />
                     ))}
+                    {/* TDM: taktisches HUD-Overlay (Scanlines, Fadenkreuz, Scoreboard-Kante) */}
+                    {prim === "kda" ? renderSceneEnvBg(prim, env, layout, W, H) : null}
                   </>
                 ) : prim === "stage" ? (
                   (() => {
