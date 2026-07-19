@@ -45661,6 +45661,29 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
+/* Einzelner Verlauf-Startpunkt (genau 1 Saison, Geld-Metrik): aktueller Wert als
+   Anker, damit der Verlauf sofort sichtbar startet statt „ab 2 Saisons". */
+.is-new-look .nl-alltime-chart-tile-anchor {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+}
+
+.is-new-look .nl-alltime-chart-tile-anchor-value {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: color-mix(in srgb, var(--nl-tone, var(--nl-ink)) 82%, var(--nl-ink));
+}
+
+.is-new-look .nl-alltime-chart-tile-anchor-caption {
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  color: var(--nl-mut);
+}
+
 .is-new-look .nl-alltime-chart-toggle {
   align-self: center;
   margin-top: var(--nl-s2);

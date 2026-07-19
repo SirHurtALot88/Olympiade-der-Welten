@@ -101,6 +101,11 @@ const CHART_METRICS: Array<{ id: ChartMetricKey; label: string; tone: NlTone }> 
   { id: "rank", label: "Rang", tone: "warn" },
 ];
 
+// Geld-Metriken: hier zeigt schon eine einzelne (laufende) Saison einen sinnvollen
+// Anker — der aktuelle Wert ist der Verlauf-Startpunkt. Punkte/Rang bei S1 (alles 0
+// bzw. kein Rang) bleiben beim schlichten „ab 2 Saisons"-Hinweis.
+const MONEY_CHART_METRICS: ReadonlySet<ChartMetricKey> = new Set<ChartMetricKey>(["mw", "cash", "teamValue"]);
+
 type TableSortKey =
   | "seasonsPlayed"
   | "cumulativePoints"
@@ -413,6 +418,91 @@ export default function AllTimeTableNewLook({ model, selectedTeamId, seasonLabel
     );
   }
 
+  // Verlaufs-Daten für BEIDE Pfade (S1 ohne Archiv & voller Archiv-Pfad) berechnen,
+  // damit die Verlaufskarte schon ab der laufenden Saison den aktuellen MW zeigt.
+  const maxSeasonPoints = Math.max(0, ...model.rows.map((row) => row.seasons.length));
+  // Ab 1 Saison mit finitem Geld-Wert rendert die Verlaufskarte bereits: die
+  // Geld-Metriken zeigen dann den aktuellen Wert als einzelnen Verlauf-Startpunkt
+  // (statt „ab 2 Saisons"). ≥2 Datenpunkte behalten die echte Sparkline.
+  const hasSingleMoneyAnchor = model.rows.some(
+    (row) =>
+      getChartValues(row, "mw").length >= 1 ||
+      getChartValues(row, "cash").length >= 1 ||
+      getChartValues(row, "teamValue").length >= 1,
+  );
+  const canShowCharts = maxSeasonPoints >= 2 || hasSingleMoneyAnchor;
+  const defaultChartRows = sortedRows.slice(0, 8);
+  const ownRow = selectedTeamId != null ? model.rows.find((row) => row.teamId === selectedTeamId) ?? null : null;
+  const chartRows = showAllCharts
+    ? sortedRows
+    : ownRow != null && !defaultChartRows.some((row) => row.teamId === ownRow.teamId)
+      ? [...defaultChartRows, ownRow]
+      : defaultChartRows;
+
+  const renderChartsCard = () => (
+    <NlCard
+      className="nl-alltime-charts-card"
+      title="Entwicklung je Team"
+      eyebrow="Verlauf über die letzten Saisons"
+      actions={
+        <NlSubTabs
+          items={CHART_METRICS.map((metric) => ({ id: metric.id, label: metric.label }))}
+          activeId={chartMetric}
+          onSelect={(id) => setChartMetric(id as ChartMetricKey)}
+          aria-label="Entwicklungs-Kennzahl"
+          className="nl-alltime-chart-subtabs"
+        />
+      }
+    >
+      {!canShowCharts ? (
+        <p className="nl-alltime-chart-hint">Verläufe erscheinen ab 2 Saisons Historie je Team.</p>
+      ) : (
+        <>
+          <div className="nl-alltime-chart-grid">
+            {chartRows.map((row) => {
+              const values = getChartValues(row, chartMetric);
+              const tone = CHART_METRICS.find((metric) => metric.id === chartMetric)?.tone ?? "accent";
+              return (
+                <article
+                  key={row.teamId}
+                  className={`nl-alltime-chart-tile${selectedTeamId != null && row.teamId === selectedTeamId ? " is-own-team" : ""}`}
+                >
+                  <button
+                    type="button"
+                    className="nl-alltime-chart-tile-team"
+                    onClick={() => onOpenTeam(row.teamId)}
+                    title={`${row.teamName} · Profil öffnen`}
+                  >
+                    {row.teamName}
+                  </button>
+                  {values.length >= 2 ? (
+                    <NlSparkline
+                      points={values}
+                      tone={tone}
+                      aria-label={`${row.teamName} · ${CHART_METRICS.find((metric) => metric.id === chartMetric)?.label ?? ""}-Verlauf`}
+                    />
+                  ) : MONEY_CHART_METRICS.has(chartMetric) && values.length === 1 ? (
+                    <span className={`nl-alltime-chart-tile-anchor ${nlToneClass(tone)}`}>
+                      <span className="nl-alltime-chart-tile-anchor-value nl-tnum">{formatNlMoney(values[0])}</span>
+                      <span className="nl-alltime-chart-tile-anchor-caption">aktuell · Verlauf ab Saison 2</span>
+                    </span>
+                  ) : (
+                    <span className="nl-alltime-chart-tile-hint">ab 2 Saisons</span>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+          {sortedRows.length > defaultChartRows.length ? (
+            <button type="button" className="nl-alltime-chart-toggle" onClick={() => setShowAllCharts((current) => !current)}>
+              {showAllCharts ? "Weniger anzeigen" : "Alle anzeigen"}
+            </button>
+          ) : null}
+        </>
+      )}
+    </NlCard>
+  );
+
   if (!model.hasHistory) {
     return (
       <section className="nl-alltime" id="all-time-table" data-testid="foundation-all-time-table" data-new-look="true" aria-label="Ewige Tabelle">
@@ -425,19 +515,11 @@ export default function AllTimeTableNewLook({ model, selectedTeamId, seasonLabel
           data-testid="nl-alltime-empty"
         />
         {renderFocusTableCard()}
+        {/* Geld-Verlauf schon ab S1: aktueller MW/Cash/Teamwert als Anker sichtbar. */}
+        {canShowCharts ? renderChartsCard() : null}
       </section>
     );
   }
-
-  const maxSeasonPoints = Math.max(0, ...model.rows.map((row) => row.seasons.length));
-  const canShowCharts = maxSeasonPoints >= 2;
-  const defaultChartRows = sortedRows.slice(0, 8);
-  const ownRow = selectedTeamId != null ? model.rows.find((row) => row.teamId === selectedTeamId) ?? null : null;
-  const chartRows = showAllCharts
-    ? sortedRows
-    : ownRow != null && !defaultChartRows.some((row) => row.teamId === ownRow.teamId)
-      ? [...defaultChartRows, ownRow]
-      : defaultChartRows;
 
   return (
     <section className="nl-alltime" id="all-time-table" data-testid="foundation-all-time-table" data-new-look="true" aria-label="Ewige Tabelle">
@@ -494,62 +576,7 @@ export default function AllTimeTableNewLook({ model, selectedTeamId, seasonLabel
 
       {renderFocusTableCard()}
 
-      <NlCard
-        className="nl-alltime-charts-card"
-        title="Entwicklung je Team"
-        eyebrow="Verlauf über die letzten Saisons"
-        actions={
-          <NlSubTabs
-            items={CHART_METRICS.map((metric) => ({ id: metric.id, label: metric.label }))}
-            activeId={chartMetric}
-            onSelect={(id) => setChartMetric(id as ChartMetricKey)}
-            aria-label="Entwicklungs-Kennzahl"
-            className="nl-alltime-chart-subtabs"
-          />
-        }
-      >
-        {!canShowCharts ? (
-          <p className="nl-alltime-chart-hint">Verläufe erscheinen ab 2 Saisons Historie je Team.</p>
-        ) : (
-          <>
-            <div className="nl-alltime-chart-grid">
-              {chartRows.map((row) => {
-                const values = getChartValues(row, chartMetric);
-                const tone = CHART_METRICS.find((metric) => metric.id === chartMetric)?.tone ?? "accent";
-                return (
-                  <article
-                    key={row.teamId}
-                    className={`nl-alltime-chart-tile${selectedTeamId != null && row.teamId === selectedTeamId ? " is-own-team" : ""}`}
-                  >
-                    <button
-                      type="button"
-                      className="nl-alltime-chart-tile-team"
-                      onClick={() => onOpenTeam(row.teamId)}
-                      title={`${row.teamName} · Profil öffnen`}
-                    >
-                      {row.teamName}
-                    </button>
-                    {values.length >= 2 ? (
-                      <NlSparkline
-                        points={values}
-                        tone={tone}
-                        aria-label={`${row.teamName} · ${CHART_METRICS.find((metric) => metric.id === chartMetric)?.label ?? ""}-Verlauf`}
-                      />
-                    ) : (
-                      <span className="nl-alltime-chart-tile-hint">ab 2 Saisons</span>
-                    )}
-                  </article>
-                );
-              })}
-            </div>
-            {sortedRows.length > defaultChartRows.length ? (
-              <button type="button" className="nl-alltime-chart-toggle" onClick={() => setShowAllCharts((current) => !current)}>
-                {showAllCharts ? "Weniger anzeigen" : "Alle anzeigen"}
-              </button>
-            ) : null}
-          </>
-        )}
-      </NlCard>
+      {renderChartsCard()}
 
       <NlRankingDrawer
         open={openKpiMetric != null}
