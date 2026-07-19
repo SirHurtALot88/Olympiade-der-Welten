@@ -2475,6 +2475,39 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                       <span style={{ fontSize: 12, color: "var(--nl-mut)", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
                       <span style={{ fontWeight: 800, color: ampel(t.rank) }}>#{t.rank}</span>
                     </div>
+                    {/* Court: abgeleitete Box-Score (PTS/REB/AST aus der Feld-Wertung) +
+                        echter Top-Beitragender aus dem Kader. Score bleibt Wahrheit/Rang. */}
+                    {prim === "court" && t.thrownSlot >= 0
+                      ? (() => {
+                          const n = fieldNorm(t.score);
+                          const pts = Math.round(72 + n * 50);
+                          const reb = Math.round(30 + n * 24);
+                          const ast = Math.round(14 + n * 18);
+                          let top: NativeStagePlayer | null = null;
+                          for (let s = 0; s <= t.thrownSlot; s += 1) {
+                            const p = t.players[s];
+                            if (p && (!top || playerNet(p) > playerNet(top))) top = p;
+                          }
+                          const hot = courtMax > courtMedian && t.score > courtHotFloor;
+                          return (
+                            <div style={{ margin: "0 0 7px", padding: "6px 9px", borderRadius: 9, background: "var(--nl-bg)", border: "1px solid var(--nl-line)" }}>
+                              <div style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 3 }}>
+                                Box-Score · abgeleitet{hot ? " · 🔥 Hot Hand" : ""}
+                              </div>
+                              <div style={{ fontSize: 12.5, fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>
+                                <span style={{ color: "var(--nl-accent)" }}>PTS {pts}</span>
+                                <span style={{ color: "var(--nl-mut)" }}> · </span>REB {reb}
+                                <span style={{ color: "var(--nl-mut)" }}> · </span>AST {ast}
+                              </div>
+                              {top ? (
+                                <div style={{ fontSize: 11.5, color: "var(--nl-mut)", marginTop: 2 }}>
+                                  Top-Beitrag: <b style={{ color: "var(--nl-ink)" }}>{top.name}</b> · {fmt1(playerNet(top))}
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })()
+                      : null}
                     {t.thrownSlot < 0 ? (
                       <div style={{ fontSize: 12, color: "var(--nl-mut)", fontStyle: "italic" }}>noch nicht angetreten</div>
                     ) : (
