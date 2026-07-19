@@ -87,7 +87,13 @@ const COMPOSE_ENABLED = process.env.OLY_DRAFT_COMPOSE === "1";
  * "0" to get the exact pre-existing cash-only path (byte-identical: economy.salaryCeiling stays undefined,
  * see draft-builder.ts's "undefined ⇒ no salary gating" contract) for A/B comparison.
  */
-const SALARY_CEILING_V2_ENABLED = process.env.OLY_SALARY_CEILING_V2 !== "0";
+// Default AUS: ein sauberer same-seed A/B (Flag AN vs AUS ab identischem S1-Stand) zeigte, dass das
+// Limit die Kader SCHRUMPFT (unter Opt 23 vs 18 von 32; A-A 12→8 Spieler) und dadurch die Injuries
+// ERHÖHT (+8%, mehr Fatigue), ohne den gedachten Nutzen (Runaway-Gehälter kappen — Max-Gehalt war in
+// beiden identisch). Ursache: das "tragbare Gehalt" (Sponsor − Fixkosten) liegt unter dem, was Teams
+// cash-finanziert profitabel fahren, also pinnt es sie zu klein. Nur explizit mit "1" aktivierbar,
+// bis das Modell überarbeitet ist (nur echte Über-Extender kappen statt Kader-Aufbau zu bremsen).
+const SALARY_CEILING_V2_ENABLED = process.env.OLY_SALARY_CEILING_V2 === "1";
 /**
  * The cash buffer scales with the club's WAGE BILL ("auch Top-/Aggro-Teams sollen was auf die Seite legen,
  * z.B. 0.25–0.5× Salary"): a club must keep roughly this fraction of its recurring salary as reserve, so a
@@ -518,7 +524,7 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     composition = { counts, brackets };
   }
 
-  // ANPASSUNG SALCEIL (flag-gated OLY_SALARY_CEILING_V2, default ON — see salary-ceiling.ts and the flag
+  // ANPASSUNG SALCEIL (flag-gated OLY_SALARY_CEILING_V2, default AUS nach A/B — see salary-ceiling.ts and the flag
   // doc above). Computed AFTER composition (order doesn't matter between them — independent inputs) but
   // before the plan call since buildOrganicSquadPlan needs it on economy. An ADDITIONAL cap on top of the
   // existing cash/fee budgeting (never a replacement) — see draft-builder.ts's salaryCeilingActive gate.
