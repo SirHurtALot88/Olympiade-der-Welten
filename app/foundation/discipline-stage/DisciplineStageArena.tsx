@@ -17,7 +17,8 @@ import DisciplineStageEndScreen from "@/app/foundation/discipline-stage/Discipli
 import DisciplineStageStandingsDelta from "@/app/foundation/discipline-stage/DisciplineStageStandingsDelta";
 import DisciplineStageHighlights from "@/app/foundation/discipline-stage/DisciplineStageHighlights";
 import DisciplineStageTopPlayers, { type DisciplineStageTopPlayer } from "@/app/foundation/discipline-stage/DisciplineStageTopPlayers";
-import DisciplineStageNativeArena, { type StagePrimitive } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
+import DisciplineStageNativeArena, { type StagePrimitive, type StageMotif } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
+import { fmt1 } from "@/app/foundation/discipline-stage/stage-format";
 
 // Disziplinen mit fertigem nativem Renderer (löst schrittweise das iframe ab).
 // Nativer Renderer je Disziplin. Engine, FX, Sounds, Ticker, Podest, Detail-
@@ -165,12 +166,6 @@ function realMods(slot: DisciplineStageSlot): StageMod[] {
   return mods;
 }
 
-// Skill-Punkte mit max. 1 Nachkommastelle anzeigen (nachlaufende .0 weglassen).
-function fmt1(x: number): string {
-  const v = Math.round(x * 10) / 10;
-  return Number.isInteger(v) ? String(v) : v.toFixed(1);
-}
-
 // Disziplin-eigene Slot-Labels — die ECHTEN Namen aus den Disziplin-Szenen
 // (Etappen-Button, Ticker, Spotlight, Detail-Tabelle). Hardcodiert übernommen,
 // damit sie den iframe-Abriss überleben. Für 3 Szenen ohne definierte Namen
@@ -197,6 +192,31 @@ const SLOT_VOCAB: Record<string, string[]> = {
   battlefield: ["Ansturm", "Flanke", "Verteidigung", "Belagerung", "Sturm-Finale"],
   "mini-dm": ["Runde 1", "Runde 2", "Runde 3", "Runde 4", "Runde 5"],
   "i-spy": ["Erster Fund", "Zweiter Fund", "Dritter Fund", "Vierter Fund", "Letzter Fund"],
+};
+
+// Skin je Disziplin: Akzentfarbe (Feldlinien + Wasserzeichen) + Hintergrund-
+// Motiv. Farben als hsl() (kein Hex → Design-Token-Lint bleibt sauber).
+const DISCIPLINE_SKIN: Record<string, { accent: string; motif: StageMotif }> = {
+  staffel: { accent: "hsl(14 80% 58%)", motif: "chevrons" },
+  spurt: { accent: "hsl(38 90% 58%)", motif: "chevrons" },
+  "takeshis-castle": { accent: "hsl(160 55% 50%)", motif: "grid" },
+  "mini-dm": { accent: "hsl(350 70% 60%)", motif: "combat" },
+  battlefield: { accent: "hsl(80 45% 52%)", motif: "combat" },
+  "time-trial": { accent: "hsl(190 75% 56%)", motif: "chevrons" },
+  "speed-schach": { accent: "hsl(215 28% 64%)", motif: "board" },
+  fechten: { accent: "hsl(210 62% 66%)", motif: "combat" },
+  tennis: { accent: "hsl(90 62% 55%)", motif: "court" },
+  wettessen: { accent: "hsl(32 78% 60%)", motif: "plates" },
+  basketball: { accent: "hsl(24 85% 57%)", motif: "court" },
+  gewichtheben: { accent: "hsl(210 14% 64%)", motif: "weights" },
+  climbing: { accent: "hsl(16 62% 56%)", motif: "grid" },
+  eiskunstlauf: { accent: "hsl(195 70% 72%)", motif: "ice" },
+  showcase: { accent: "hsl(310 62% 63%)", motif: "stage" },
+  football: { accent: "hsl(140 55% 50%)", motif: "court" },
+  hockey: { accent: "hsl(205 72% 63%)", motif: "court" },
+  breaking: { accent: "hsl(275 60% 65%)", motif: "stage" },
+  "i-spy": { accent: "hsl(260 58% 65%)", motif: "grid" },
+  tdm: { accent: "hsl(220 68% 62%)", motif: "skyline" },
 };
 
 function slotLabel(disciplineId: string, index: number, total: number): string {
@@ -655,6 +675,8 @@ export default function DisciplineStageArena({
           topPlayers={topPlayers}
           primitive={NATIVE_PRIMITIVE[disciplineId] ?? "track"}
           disciplineName={model.disciplineName}
+          accent={DISCIPLINE_SKIN[disciplineId]?.accent}
+          motif={DISCIPLINE_SKIN[disciplineId]?.motif}
         />
       ) : scene ? (
         <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>

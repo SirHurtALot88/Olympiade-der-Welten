@@ -1,5 +1,7 @@
 "use client";
 
+import { fmt1 } from "./stage-format";
+
 export type DisciplineStageTopPlayer = {
   rank: number;
   name: string;
@@ -17,11 +19,6 @@ export type DisciplineStageTopPlayersProps = {
   onOpenPlayer?: ((playerId: string) => void) | null;
   playerIdByRow?: (string | null)[];
 };
-
-function fmt1(x: number): string {
-  const v = Math.round(x * 10) / 10;
-  return Number.isInteger(v) ? String(v) : v.toFixed(1);
-}
 
 export default function DisciplineStageTopPlayers({ players, onOpenPlayer, playerIdByRow }: DisciplineStageTopPlayersProps) {
   return (

@@ -1,6 +1,7 @@
 "use client";
 
 import type { DisciplineStageTopPlayer } from "./DisciplineStageTopPlayers";
+import { fmt1 } from "./stage-format";
 
 // Horizontale Top-Spieler-Zeile unter der Arena (statt linker Spalte), damit die
 // Arena die volle Breite bekommt. Sortiert nach Player-Points (kommt bereits
@@ -12,11 +13,6 @@ export type DisciplineStageTopPlayersRowProps = {
   playerIdByRow?: (string | null)[];
   limit?: number;
 };
-
-function fmt1(x: number): string {
-  const v = Math.round(x * 10) / 10;
-  return Number.isInteger(v) ? String(v) : v.toFixed(1);
-}
 
 export default function DisciplineStageTopPlayersRow({ players, onOpenPlayer, playerIdByRow, limit = 10 }: DisciplineStageTopPlayersRowProps) {
   const shown = players.slice(0, limit);

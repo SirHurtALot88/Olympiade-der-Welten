@@ -5,6 +5,7 @@ import { useStageAudio } from "./useStageAudio";
 import DisciplineStageResultTable, { type ResultTableRow } from "./DisciplineStageResultTable";
 import DisciplineStageTopPlayersRow from "../DisciplineStageTopPlayersRow";
 import type { DisciplineStageTopPlayer } from "../DisciplineStageTopPlayers";
+import { fmt1, ampel } from "../stage-format";
 
 // Nativer Track-Nachbau der Staffel-Arena — voller Feature-Stand der iframe-Szene:
 // SVG/viewBox (pixelscharf), Bewegungsanimation (Token gleitet, eigenes Team Slow-Mo),
@@ -37,7 +38,118 @@ export type DisciplineStageNativeArenaProps = {
   primitive?: StagePrimitive;
   progressLabel?: string; // z.B. "Position auf dem Oval = kumulierte Punkte"
   disciplineName?: string; // Feld-Wasserzeichen (Identität je Disziplin)
+  accent?: string; // Akzentfarbe der Disziplin (Wasserzeichen + Feldlinien)
+  motif?: StageMotif; // dezentes Hintergrund-Motiv
 };
+
+export type StageMotif = "chevrons" | "combat" | "board" | "court" | "weights" | "grid" | "ice" | "stage" | "plates" | "skyline" | "none";
+
+// Dezentes Feld-Motiv je Disziplin (Skin). Bewusst leise (niedrige Deckkraft),
+// die Akzentfarbe kommt aus der Disziplin. Kein DOM-Overhead: wenige SVG-Formen.
+function renderMotif(motif: StageMotif | undefined, W: number, H: number, accent: string): React.ReactNode {
+  if (!motif || motif === "none") return null;
+  const c = accent;
+  const op = 0.5;
+  if (motif === "chevrons") {
+    return (
+      <g opacity={op} fill="none" stroke={c} strokeWidth={3}>
+        {Array.from({ length: 6 }).map((_, i) => {
+          const x = W * (0.12 + i * 0.13);
+          return <polyline key={i} points={`${x},${H * 0.3} ${x + 26},${H * 0.5} ${x},${H * 0.7}`} />;
+        })}
+      </g>
+    );
+  }
+  if (motif === "combat") {
+    return (
+      <g opacity={op} stroke={c} strokeWidth={2.5}>
+        {Array.from({ length: 8 }).map((_, i) => {
+          const x = W * (0.1 + i * 0.11);
+          return (
+            <g key={i}>
+              <line x1={x} y1={H * 0.34} x2={x + 40} y2={H * 0.66} />
+              <line x1={x + 40} y1={H * 0.34} x2={x} y2={H * 0.66} />
+            </g>
+          );
+        })}
+      </g>
+    );
+  }
+  if (motif === "board") {
+    return (
+      <g opacity={op * 0.7} fill={c}>
+        {Array.from({ length: 8 }).map((_, r) =>
+          Array.from({ length: 8 }).map((_, col) =>
+            (r + col) % 2 === 0 ? <rect key={`${r}-${col}`} x={W - 220 + col * 26} y={H / 2 - 104 + r * 26} width={26} height={26} /> : null,
+          ),
+        )}
+      </g>
+    );
+  }
+  if (motif === "court") {
+    return (
+      <g opacity={op} fill="none" stroke={c} strokeWidth={2.5}>
+        <line x1={W / 2} y1={H * 0.12} x2={W / 2} y2={H * 0.88} />
+        <circle cx={W / 2} cy={H / 2} r={70} />
+      </g>
+    );
+  }
+  if (motif === "weights") {
+    return (
+      <g opacity={op} fill={c}>
+        <rect x={W / 2 - 130} y={H / 2 - 6} width={260} height={12} rx={6} />
+        {[-150, -120, 120, 150].map((dx, i) => (
+          <rect key={i} x={W / 2 + dx - 6} y={H / 2 - 44} width={12} height={88} rx={4} />
+        ))}
+      </g>
+    );
+  }
+  if (motif === "grid") {
+    return (
+      <g opacity={op * 0.8} fill={c}>
+        {Array.from({ length: 7 }).map((_, r) =>
+          Array.from({ length: 12 }).map((_, col) => <circle key={`${r}-${col}`} cx={W * (0.1 + col * 0.072)} cy={H * (0.16 + r * 0.11)} r={4} />),
+        )}
+      </g>
+    );
+  }
+  if (motif === "ice") {
+    return (
+      <g opacity={op} stroke={c} strokeWidth={2}>
+        {Array.from({ length: 7 }).map((_, i) => (
+          <line key={i} x1={W * 0.08} y1={H * (0.2 + i * 0.1)} x2={W * 0.92} y2={H * (0.2 + i * 0.1)} strokeDasharray="30 22" />
+        ))}
+      </g>
+    );
+  }
+  if (motif === "stage") {
+    return (
+      <g opacity={op * 0.8} fill={c}>
+        <polygon points={`${W * 0.28},0 ${W * 0.4},0 ${W * 0.5},${H} ${W * 0.34},${H}`} />
+        <polygon points={`${W * 0.62},0 ${W * 0.74},0 ${W * 0.66},${H} ${W * 0.5},${H}`} />
+      </g>
+    );
+  }
+  if (motif === "plates") {
+    return (
+      <g opacity={op} fill="none" stroke={c} strokeWidth={2.5}>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <circle key={i} cx={W * (0.18 + i * 0.16)} cy={H / 2} r={44} />
+        ))}
+      </g>
+    );
+  }
+  // skyline
+  return (
+    <g opacity={op} fill={c}>
+      {Array.from({ length: 14 }).map((_, i) => {
+        const bw = W / 16;
+        const bh = H * (0.18 + ((i * 37) % 40) / 100);
+        return <rect key={i} x={W * 0.06 + i * bw} y={H - bh - 4} width={bw - 6} height={bh} />;
+      })}
+    </g>
+  );
+}
 
 const STAR_MIN = 80;
 // viewBox + Token-Radien je Primitive. Der Rest (Engine/FX/Ticker/Podest/Tabelle)
@@ -51,10 +163,6 @@ const PRIM_GEO: Record<StagePrimitive, { w: number; h: number; r: number; rOwn: 
 function round1(x: number): number {
   return Math.round(x * 10) / 10;
 }
-function fmt1(x: number): string {
-  const v = round1(x);
-  return Number.isInteger(v) ? String(v) : v.toFixed(1);
-}
 function modSum(mods: NativeStageMod[]): number {
   return mods.reduce((s, m) => s + m.sign * m.amt, 0);
 }
@@ -66,12 +174,6 @@ function playerNet(p: NativeStagePlayer | null | undefined): number {
 // keine Hash-Kollisionen (früher hueFor über den Code → viele fast gleiche Grüns).
 function hueForIdx(idx: number): number {
   return Math.round((idx * 137.508) % 360);
-}
-function ampel(rank: number): string {
-  if (rank <= 3) return "var(--nl-good)";
-  if (rank <= 10) return "var(--nl-warn)";
-  if (rank <= 20) return "var(--nl-mut)";
-  return "var(--nl-risk)";
 }
 function calcString(p: NativeStagePlayer): string {
   let s = `${fmt1(p.val)}`;
@@ -97,25 +199,43 @@ type RT = {
   players: NativeStagePlayer[];
   seasonRank: number;
   score: number;
-  prevScore: number;
   thrownSlot: number;
   rank: number;
-  prevRank: number;
   roundStartRank: number;
   roundRankAfter: number;
   roundDelta: number;
   roundMedal: 0 | 1 | 2 | 3;
-  rankHist: number[];
   glowUntil: number;
 };
 
 type Impact = { tier: 0 | 1 | 2; cause: string; color: string; text: string; delta: number };
 type Pop = { id: number; xPct: number; yPct: number; net: number; mine: boolean };
 type Frag = { id: number; xPct: number; yPct: number; text: string; sign: 1 | -1 };
+type TickerReveal = {
+  kind: "reveal";
+  id: string;
+  code: string;
+  idx: number;
+  isOwn: boolean;
+  logoUrl: string | null;
+  star: boolean;
+  playerName: string;
+  slotLbl: string;
+  slotRank: number;
+  badge: [string, string] | null;
+  calc: string;
+  net: number;
+  rankAfter: number;
+  delta: number;
+  slot: number;
+};
+type TickerSummary = { kind: "summary"; id: string; text: string };
+type TickerData = TickerReveal | TickerSummary;
 type Spot = { crest: NativeStageTeam; idx: number; kick: string; name: string; sub: string; net: number; chipText: string; chipColor: string; mine: boolean } | null;
 type PodCol = { place: number; code: string; name: string; pts: number; logoUrl: string | null; isOwn: boolean; idx: number; delayMs: number; loud: boolean };
 
-export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, topPlayers, primitive = "track", progressLabel, disciplineName }: DisciplineStageNativeArenaProps) {
+export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, topPlayers, primitive = "track", progressLabel, disciplineName, accent, motif }: DisciplineStageNativeArenaProps) {
+  const skinAccent = accent ?? "var(--nl-line-2, var(--nl-line))";
   const slotCount = Math.max(1, slots.length);
   const prim = primitive;
   const geo = PRIM_GEO[prim];
@@ -149,15 +269,12 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       players: t.players,
       seasonRank: idx + 1,
       score: 0,
-      prevScore: 0,
       thrownSlot: -1,
       rank: idx + 1,
-      prevRank: idx + 1,
       roundStartRank: idx + 1,
       roundRankAfter: idx + 1,
       roundDelta: 0,
       roundMedal: 0 as 0 | 1 | 2 | 3,
-      rankHist: [] as number[],
       glowUntil: 0,
     }));
     recomputeRanks(rt);
@@ -172,7 +289,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const [shake, setShake] = useState<"none" | "hard" | "soft">("none");
   const [pops, setPops] = useState<Pop[]>([]);
   const [frags, setFrags] = useState<Frag[]>([]);
-  const [ticker, setTicker] = useState<React.ReactNode[]>([]);
+  const [ticker, setTicker] = useState<TickerData[]>([]);
   const [podium, setPodium] = useState<PodCol[] | null>(null);
   const [hover, setHover] = useState<{ idx: number; x: number; y: number } | null>(null);
   const timers = useRef<number[]>([]);
@@ -333,16 +450,13 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       .forEach((o, i) => (o.t.roundRankAfter = i + 1));
     rt.forEach((t) => {
       t.roundDelta = t.roundStartRank - t.roundRankAfter;
-      t.rankHist[rnd] = t.roundRankAfter;
     });
   }
   function applyReveal(t: RT, slot: number, rt: RT[]): { player: NativeStagePlayer | null; net: number } {
     const p = t.players[slot] ?? null;
     const net = playerNet(p);
-    t.prevScore = t.score;
     t.score = round1(t.score + net);
     t.thrownSlot = slot;
-    rt.forEach((x) => (x.prevRank = x.rank));
     recomputeRanks(rt);
     updateRoundMedals(slot, rt);
     return { player: p, net };
@@ -497,43 +611,26 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       climb: ["var(--nl-accent)", "Aufholjagd"],
       strong: ["var(--nl-good)", "Stark"],
     };
-    const badge = badgeMap[impact.cause];
-    const rowKey = `${slot}-${t.code}-${fxId.current++}`;
-    const node = (
-      <div key={rowKey} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 8px", borderRadius: 8, background: t.isOwn ? "color-mix(in srgb, var(--nl-accent) 14%, transparent)" : "transparent", fontVariantNumeric: "tabular-nums" }}>
-        <span aria-hidden style={{ width: 20, height: 20, borderRadius: "50%", flex: "none", overflow: "hidden", background: t.logoUrl ? "transparent" : `hsl(${hueForIdx(t.idx)} 60% 52%)`, display: "grid", placeItems: "center" }}>
-          {t.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={t.logoUrl} alt="" width={20} height={20} style={{ width: 20, height: 20, objectFit: "cover" }} />
-          ) : null}
-        </span>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {t.isOwn ? "★ " : ""}
-            {p.val >= STAR_MIN ? "⭐ " : ""}
-            {p.name}
-            <span style={{ color: "var(--nl-mut)", fontWeight: 600 }}>
-              {" "}
-              · {t.code} · {slots[slot]} · Slot-Rang <b style={{ color: ampel(sr) }}>#{sr}</b>
-            </span>
-            {badge ? (
-              <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 800, padding: "1px 7px", borderRadius: 99, color: badge[0], border: `1px solid ${badge[0]}`, background: `color-mix(in srgb, ${badge[0]} 14%, transparent)` }}>{badge[1]}</span>
-            ) : null}
-          </div>
-          <div style={{ fontSize: 11, color: "var(--nl-mut)" }} title={calcString(p)}>
-            {calcString(p)}
-          </div>
-        </div>
-        <div style={{ textAlign: "right", flex: "none" }}>
-          <div style={{ fontWeight: 800, color: "var(--nl-accent)", fontSize: 13 }}>+{fmt1(res.net)}</div>
-          <div style={{ fontSize: 11, fontWeight: 800, color: delta > 0 ? "var(--nl-good)" : delta < 0 ? "var(--nl-risk)" : "var(--nl-mut)" }}>
-            <span style={{ color: ampel(t.roundRankAfter) }}>#{t.roundRankAfter}</span>
-            {slot > 0 && delta !== 0 ? ` (${delta > 0 ? "▲" : "▼"}${Math.abs(delta)})` : ""}
-          </div>
-        </div>
-      </div>
-    );
-    setTicker((rows) => [node, ...rows].slice(0, 8));
+    const badge = badgeMap[impact.cause] ?? null;
+    const row: TickerReveal = {
+      kind: "reveal",
+      id: `${slot}-${t.code}-${fxId.current++}`,
+      code: t.code,
+      idx: t.idx,
+      isOwn: t.isOwn,
+      logoUrl: t.logoUrl,
+      star: p.val >= STAR_MIN,
+      playerName: p.name,
+      slotLbl: slots[slot] ?? `Etappe ${slot + 1}`,
+      slotRank: sr,
+      badge,
+      calc: calcString(p),
+      net: res.net,
+      rankAfter: t.roundRankAfter,
+      delta,
+      slot,
+    };
+    setTicker((rows) => [row, ...rows].slice(0, 8));
   }, [slots]);
 
   const roundSummary = useCallback((rnd: number, rt: RT[]) => {
@@ -546,12 +643,12 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       const p = t.players[rnd];
       return `${t.code} ▲${d} · ${p?.name ?? ""} ${p ? fmt1(playerNet(p)) : ""}`;
     });
-    const node = (
-      <div key={`sum-${rnd}-${fxId.current++}`} style={{ padding: "6px 9px", borderRadius: 8, fontSize: 12, fontWeight: 700, color: "var(--nl-warn)", background: "color-mix(in srgb, var(--nl-warn) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--nl-warn) 40%, transparent)" }}>
-        {jumps.length ? `Runde ${rnd + 1} — Größte Sprünge: ${parts.join(" · ")}` : `Runde ${rnd + 1} — keine Rangsprünge`}
-      </div>
-    );
-    setTicker((rows) => [node, ...rows].slice(0, 8));
+    const row: TickerSummary = {
+      kind: "summary",
+      id: `sum-${rnd}-${fxId.current++}`,
+      text: jumps.length ? `Runde ${rnd + 1} — Größte Sprünge: ${parts.join(" · ")}` : `Runde ${rnd + 1} — keine Rangsprünge`,
+    };
+    setTicker((rows) => [row, ...rows].slice(0, 8));
     jumps.forEach(({ t }) => glow(t));
   }, [glow]);
 
@@ -684,7 +781,6 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         if (p) {
           t.score = round1(t.score + playerNet(p));
           t.thrownSlot = r;
-          t.rankHist[r] = 0;
         }
       });
     }
@@ -854,9 +950,12 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               )}
             </defs>
 
+            {/* Skin-Motiv (dezenter Hintergrund je Disziplin) */}
+            {renderMotif(motif, W, H, skinAccent)}
+
             {/* Feld-Wasserzeichen: Disziplin-Identität */}
             {disciplineName ? (
-              <text x={18} y={30} fontSize={19} fontWeight={800} letterSpacing="0.04em" fill="var(--nl-line-2, var(--nl-line))" opacity={0.85} style={{ textTransform: "uppercase" }}>
+              <text x={18} y={30} fontSize={19} fontWeight={800} letterSpacing="0.04em" fill={skinAccent} opacity={0.95} style={{ textTransform: "uppercase" }}>
                 {disciplineName}
               </text>
             ) : null}
@@ -865,7 +964,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             {prim === "track" ? (
               <>
                 <path d={ovalPath} fill="none" stroke="var(--nl-panel)" strokeWidth={54} />
-                <path ref={pathRef} d={ovalPath} fill="none" stroke="var(--nl-line)" strokeWidth={2} strokeDasharray="6 8" />
+                <path ref={pathRef} d={ovalPath} fill="none" stroke={skinAccent} opacity={0.7} strokeWidth={2} strokeDasharray="6 8" />
               </>
             ) : prim === "lanes" ? (
               <>
@@ -873,7 +972,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                   const y = layout.top + i * layout.laneH + layout.laneH / 2;
                   return <line key={i} x1={layout.xStart} y1={y} x2={layout.xEnd} y2={y} stroke="var(--nl-line)" strokeWidth={1} strokeDasharray="4 7" opacity={0.5} />;
                 })}
-                <line x1={layout.xStart} y1={layout.top} x2={layout.xStart} y2={H - layout.top} stroke="var(--nl-mut)" strokeWidth={2} />
+                <line x1={layout.xStart} y1={layout.top} x2={layout.xStart} y2={H - layout.top} stroke={skinAccent} strokeWidth={2.5} />
                 {Array.from({ length: Math.ceil((H - 2 * layout.top) / 12) }).map((_, i) => (
                   <rect key={i} x={layout.xEnd} y={layout.top + i * 12} width={6} height={6} fill={i % 2 ? "var(--nl-ink)" : "var(--nl-mut)"} opacity={0.7} />
                 ))}
@@ -886,7 +985,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               </>
             ) : (
               <>
-                <line x1={layout.lPad} y1={layout.baseY} x2={W - layout.rPad} y2={layout.baseY} stroke="var(--nl-mut)" strokeWidth={2} />
+                <line x1={layout.lPad} y1={layout.baseY} x2={W - layout.rPad} y2={layout.baseY} stroke={skinAccent} strokeWidth={2.5} />
                 {[0.25, 0.5, 0.75, 1].map((f, i) => (
                   <line key={i} x1={layout.lPad} y1={layout.baseY - (layout.baseY - layout.topY) * f} x2={W - layout.rPad} y2={layout.baseY - (layout.baseY - layout.topY) * f} stroke="var(--nl-line)" strokeWidth={1} strokeDasharray="3 8" opacity={0.45} />
                 ))}
@@ -1007,7 +1106,48 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           {ticker.length === 0 ? (
             <div style={{ fontSize: 12.5, color: "var(--nl-mut)", fontStyle: "italic" }}>Läuft, sobald die erste Etappe startet.</div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>{ticker}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {ticker.map((row) =>
+                row.kind === "summary" ? (
+                  <div key={row.id} style={{ padding: "6px 9px", borderRadius: 8, fontSize: 12, fontWeight: 700, color: "var(--nl-warn)", background: "color-mix(in srgb, var(--nl-warn) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--nl-warn) 40%, transparent)" }}>
+                    {row.text}
+                  </div>
+                ) : (
+                  <div key={row.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 8px", borderRadius: 8, background: row.isOwn ? "color-mix(in srgb, var(--nl-accent) 14%, transparent)" : "transparent", fontVariantNumeric: "tabular-nums" }}>
+                    <span aria-hidden style={{ width: 20, height: 20, borderRadius: "50%", flex: "none", overflow: "hidden", background: row.logoUrl ? "transparent" : `hsl(${hueForIdx(row.idx)} 60% 52%)`, display: "grid", placeItems: "center" }}>
+                      {row.logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={row.logoUrl} alt="" width={20} height={20} style={{ width: 20, height: 20, objectFit: "cover" }} />
+                      ) : null}
+                    </span>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {row.isOwn ? "★ " : ""}
+                        {row.star ? "⭐ " : ""}
+                        {row.playerName}
+                        <span style={{ color: "var(--nl-mut)", fontWeight: 600 }}>
+                          {" "}
+                          · {row.code} · {row.slotLbl} · Slot-Rang <b style={{ color: ampel(row.slotRank) }}>#{row.slotRank}</b>
+                        </span>
+                        {row.badge ? (
+                          <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 800, padding: "1px 7px", borderRadius: 99, color: row.badge[0], border: `1px solid ${row.badge[0]}`, background: `color-mix(in srgb, ${row.badge[0]} 14%, transparent)` }}>{row.badge[1]}</span>
+                        ) : null}
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--nl-mut)" }} title={row.calc}>
+                        {row.calc}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right", flex: "none" }}>
+                      <div style={{ fontWeight: 800, color: "var(--nl-accent)", fontSize: 13 }}>+{fmt1(row.net)}</div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: row.delta > 0 ? "var(--nl-good)" : row.delta < 0 ? "var(--nl-risk)" : "var(--nl-mut)" }}>
+                        <span style={{ color: ampel(row.rankAfter) }}>#{row.rankAfter}</span>
+                        {row.slot > 0 && row.delta !== 0 ? ` (${row.delta > 0 ? "▲" : "▼"}${Math.abs(row.delta)})` : ""}
+                      </div>
+                    </div>
+                  </div>
+                ),
+              )}
+            </div>
           )}
         </div>
 

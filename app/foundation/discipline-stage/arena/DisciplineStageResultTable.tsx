@@ -1,5 +1,7 @@
 "use client";
 
+import { fmt1, ampel } from "../stage-format";
+
 // Detail-Ergebnistabelle nach dem Podest: pro Team eine Zeile, pro Slot eine
 // Spalte (Spieler + Netto, farbcodiert, Slot-Bestwert markiert), plus Gesamt.
 // Sortiert nach finalem Rang, eigenes Team hervorgehoben, horizontal scrollbar,
@@ -28,16 +30,6 @@ export type DisciplineStageResultTableProps = {
   slotLabels: string[];
 };
 
-function fmt1(x: number): string {
-  const v = Math.round(x * 10) / 10;
-  return Number.isInteger(v) ? String(v) : v.toFixed(1);
-}
-function ampel(rank: number): string {
-  if (rank <= 3) return "var(--nl-good)";
-  if (rank <= 10) return "var(--nl-warn)";
-  if (rank <= 20) return "var(--nl-mut)";
-  return "var(--nl-risk)";
-}
 function netColor(boniMali: number): string {
   if (boniMali > 0.05) return "var(--nl-good)";
   if (boniMali < -0.05) return "var(--nl-risk)";
