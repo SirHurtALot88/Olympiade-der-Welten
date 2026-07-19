@@ -166,6 +166,37 @@ export function getActiveTeamRivalTeamIds(
   return rivalTeamIds;
 }
 
+/**
+ * Ally-Schwelle im Beziehungs-Sheet: identisch zur "Verbündete"-Karte in
+ * `buildTeamRelationshipCards` (`value >= 4` ⇒ ally). Bewusst dieselbe
+ * Datenquelle wie die Rivalen, damit Freund/Feind aus demselben Sheet lesen.
+ */
+export const TEAM_ALLY_MIN_VALUE = 4;
+
+/**
+ * Ally-Pendant zu `getActiveTeamRivalTeamIds`: liefert die Team-IDs, denen das
+ * aktive Team im statischen Beziehungs-Sheet stark positiv (>= `TEAM_ALLY_MIN_VALUE`)
+ * gegenübersteht — dieselbe Schwelle/Quelle wie die "Verbündete"-Karten. Graceful:
+ * ohne aktives Team ein leeres Set. Rein presentational; verändert keine Wertung.
+ * Hinweis: Es gibt KEIN Besitz-/Fraktions-Ally-Modell mehr (die `Alliance`-Tabelle
+ * wurde entfernt) — "verbündet" meint hier ausschliesslich die Sheet-Affinität.
+ */
+export function getActiveTeamAllyTeamIds(
+  gameState: Pick<GameState, "teams">,
+  activeTeamId: string | null | undefined,
+): Set<string> {
+  const allyTeamIds = new Set<string>();
+  if (!activeTeamId) return allyTeamIds;
+  for (const team of gameState.teams) {
+    if (team.teamId === activeTeamId) continue;
+    const relation = getTeamRelationship(activeTeamId, team.teamId);
+    if (relation && relation.value >= TEAM_ALLY_MIN_VALUE) {
+      allyTeamIds.add(team.teamId);
+    }
+  }
+  return allyTeamIds;
+}
+
 export function getPrimaryTeamRivalry(gameState: Pick<GameState, "teams" | "teamIdentities">, teamId: string) {
   return buildTeamRivalryLedger(gameState)
     .filter((entry) => entry.teamAId === teamId || entry.teamBId === teamId)

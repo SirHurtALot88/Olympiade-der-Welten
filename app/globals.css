@@ -11403,6 +11403,36 @@ a {
   line-height: 1.4;
 }
 
+/* Freund/Feind-Chip (Matchday-Arena): blau=deine, grün=verbündet, rot=Rival.
+   Gleiche Form/Grösse wie `.rival-tag`, Farbe per Modifier über Tokens. Rein additiv. */
+.is-new-look .relationship-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-rel, var(--nl-mut)) 62%, transparent);
+  background: color-mix(in srgb, var(--nl-rel, var(--nl-mut)) 16%, transparent);
+  color: var(--nl-rel, var(--nl-mut));
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: middle;
+  line-height: 1.4;
+}
+.is-new-look .relationship-tag.is-mine {
+  --nl-rel: var(--nl-mine);
+}
+.is-new-look .relationship-tag.is-ally {
+  --nl-rel: var(--nl-ally);
+}
+.is-new-look .relationship-tag.is-rival {
+  --nl-rel: var(--nl-rival);
+}
+
 /* Saisonstand-Board: roter linker Rand + zarter Ring, additiv über dem
    bestehenden Team-Tag-Rahmen (Team-Tag-Farbschema bleibt erhalten). */
 .is-new-look .nl-standings-row.is-rival {
@@ -42680,6 +42710,11 @@ button.foundation-team-portrait-card {
   --nl-good: #4cc56b;
   --nl-warn: #e0a53a;
   --nl-risk: #e5615a;
+  /* Freund/Feind-Kodierung (Arena): blau=deine, grün=verbündet, rot=Rival.
+     Aliasse auf die Achsen-/Semantik-Tokens, damit Light/Dark automatisch mitzieht. */
+  --nl-mine: var(--nl-men);
+  --nl-ally: var(--nl-spe);
+  --nl-rival: var(--nl-risk);
   /* Radius */
   --nl-r-sm: 8px;
   --nl-r-md: 12px;
@@ -51790,6 +51825,88 @@ button.foundation-team-portrait-card {
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--nl-mut-2);
+}
+
+/* ============================================================
+   Freund/Feind-Kodierung (Arena) — additive Ringe/Kanten je Beziehung.
+   blau=deine (mine), grün=verbündet (ally), rot=Rival. Bewusst additiv:
+   Team-Tag-Rand, Leader-Gold und die Own-Team-Outline bleiben unangetastet.
+   ============================================================ */
+
+/* Seiten-Tabellen (Tageswertung + Ausgangslage): inset linker Kantenakzent,
+   lässt den 3px-Team-Tag-Rand aussen unberührt. Leader-Zeilen (Gold-Glow)
+   behalten ihren box-shadow — dort trägt allein das Chip die Beziehung. */
+.is-new-look .nl-arena-totalrow.is-rel-mine:not(.is-leader) {
+  box-shadow: inset 3px 0 0 var(--nl-mine);
+}
+.is-new-look .nl-arena-totalrow.is-rel-ally:not(.is-leader) {
+  box-shadow: inset 3px 0 0 var(--nl-ally);
+}
+.is-new-look .nl-arena-totalrow.is-rel-rival:not(.is-leader) {
+  box-shadow: inset 3px 0 0 var(--nl-rival);
+}
+.is-new-look .nl-arena-briefing-row.is-rel-mine {
+  box-shadow: inset 3px 0 0 var(--nl-mine);
+}
+.is-new-look .nl-arena-briefing-row.is-rel-ally {
+  box-shadow: inset 3px 0 0 var(--nl-ally);
+}
+.is-new-look .nl-arena-briefing-row.is-rel-rival {
+  box-shadow: inset 3px 0 0 var(--nl-rival);
+}
+
+/* Feld-Marker (Disziplin-Board): farbiger Ring per Outline (unabhängig von
+   Border/Box-Shadow → kein Konflikt mit Team-Tag/Leader-Glow). Das aktive
+   eigene Team behält seine bestehende Accent-Outline und ist ausgeklammert. */
+.is-new-look .nl-arena-row.is-rel-mine:not(.is-own-team) {
+  outline: 2px solid color-mix(in srgb, var(--nl-mine) 80%, transparent);
+  outline-offset: 1px;
+}
+.is-new-look .nl-arena-row.is-rel-ally:not(.is-own-team) {
+  outline: 2px solid color-mix(in srgb, var(--nl-ally) 80%, transparent);
+  outline-offset: 1px;
+}
+.is-new-look .nl-arena-row.is-rel-rival:not(.is-own-team) {
+  outline: 2px solid color-mix(in srgb, var(--nl-rival) 80%, transparent);
+  outline-offset: 1px;
+}
+
+/* Feld-Marker-Wimpel: analog zur "Du"-Fahne, absolut positioniert (out of flow,
+   kein Eingriff ins Zeilen-Grid). */
+.is-new-look .nl-arena-rel-flag {
+  position: absolute;
+  top: -7px;
+  left: 8px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-rel, var(--nl-line-2));
+  background: color-mix(in srgb, var(--nl-rel, var(--nl-panel)) 24%, var(--nl-panel));
+  font-size: 9px;
+  line-height: 1;
+  pointer-events: none;
+}
+.is-new-look .nl-arena-rel-flag.is-rel-mine {
+  --nl-rel: var(--nl-mine);
+}
+.is-new-look .nl-arena-rel-flag.is-rel-ally {
+  --nl-rel: var(--nl-ally);
+}
+.is-new-look .nl-arena-rel-flag.is-rel-rival {
+  --nl-rel: var(--nl-rival);
+}
+
+/* Chip in der Team-Zelle: kompakt andocken, in Flex-Zellen nicht schrumpfen. */
+.is-new-look .nl-arena-rel-tag {
+  flex: 0 0 auto;
+}
+.is-new-look .nl-arena-team .nl-arena-teamname {
+  min-width: 0;
 }
 
 .is-new-look .nl-arena-phase-controls {

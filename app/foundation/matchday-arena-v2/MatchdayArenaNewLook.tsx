@@ -44,6 +44,11 @@ import {
 } from "@/lib/foundation/matchday-arena-session-cache";
 import { getTeamLogoModel } from "@/lib/data/mediaAssets";
 import type { Team } from "@/lib/data/olyDataTypes";
+import { RelationshipTag } from "@/components/foundation/RivalTag";
+import {
+  buildTeamRelationshipMap,
+  type TeamRelationshipKind,
+} from "@/lib/foundation/team-relationship";
 import { getSeasonV2TeamTagStyle } from "@/app/foundation/season-v2/SeasonStandingsV2Client";
 import { useArenaRoomSync } from "@/lib/room/use-arena-room-sync";
 import type { RoomArenaState } from "@/types/game";
@@ -490,6 +495,19 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
   }, [params, source]);
 
   const teamById = useMemo(() => new Map(props.teams.map((team) => [team.teamId, team] as const)), [props.teams]);
+
+  // Freund/Feind-Kodierung (additiv): Beziehung jedes Teams zum aktiven Team
+  // (blau=deine, grün=verbündet, rot=Rival). Einmal aus Teams + Control-Settings
+  // gebaut, danach O(1)-Lookup pro Zeile/Feld-Marker. Präzedenz mine > rival > ally.
+  const teamRelationshipMap = useMemo(
+    () => buildTeamRelationshipMap({ teams: props.teams, teamControlSettings: props.teamControlSettingsMap }, params.teamId),
+    [props.teams, props.teamControlSettingsMap, params.teamId],
+  );
+  const relationshipOf = (teamId: string): TeamRelationshipKind | null => teamRelationshipMap.get(teamId) ?? null;
+  const relationshipRowClass = (teamId: string): string => {
+    const kind = teamRelationshipMap.get(teamId);
+    return kind ? ` is-rel-${kind}` : "";
+  };
 
   // Spoilerfreies Briefing: aktuelle Liga-Ausgangslage vor dem Spieltag.
   // Nur `currentRank` — projizierte Werte bleiben aussen vor, damit das
@@ -1009,9 +1027,17 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
       ? (totalRows.find((row) => row.teamId === params.teamId)?.rank ?? null)
       : (rankMaps.current.get(params.teamId) ?? null);
 
-  function renderTeamButton(teamId: string, teamName: string) {
+  // `relationship` (optional): rendert in den Seiten-Tabellen den Freund/Feind-Chip
+  // direkt in der Team-Zelle (wie das Rivalen-Tag im Saisonstand). Auf dem dichten
+  // Feld-Board bewusst weggelassen — dort trägt die Zeile Ring + Eck-Wimpel.
+  function renderTeamButton(
+    teamId: string,
+    teamName: string,
+    options?: { relationship?: TeamRelationshipKind | null },
+  ) {
     const team = teamById.get(teamId) ?? null;
     const logo = team ? getTeamLogoModel(team, { variant: "thumb" }) : null;
+    const relationship = options?.relationship ?? null;
     return (
       <button
         type="button"
@@ -1033,6 +1059,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
           }
         />
         <span className="nl-arena-teamname">{teamName}</span>
+        {relationship ? <RelationshipTag kind={relationship} className="nl-arena-rel-tag" /> : null}
       </button>
     );
   }
@@ -1117,7 +1144,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
               }}
               role="listitem"
               aria-current={isOwnTeam ? "true" : undefined}
-              className={`nl-arena-row${isOwnTeam ? " is-own-team" : ""}${rankDelta != null && rankDelta !== 0 ? (rankDelta > 0 ? " is-moving-up" : " is-moving-down") : ""}${isExpanded ? " is-expanded" : ""}${isLeaderGlow ? " is-leader" : ""}`}
+              className={`nl-arena-row${isOwnTeam ? " is-own-team" : ""}${relationshipRowClass(row.teamId)}${rankDelta != null && rankDelta !== 0 ? (rankDelta > 0 ? " is-moving-up" : " is-moving-down") : ""}${isExpanded ? " is-expanded" : ""}${isLeaderGlow ? " is-leader" : ""}`}
               style={{
                 ...(team ? getSeasonV2TeamTagStyle(team.shortCode) : undefined),
                 top: Math.max(0, rank - 1) * NL_ARENA_ROW_STRIDE,
@@ -1137,6 +1164,16 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                   </span>
                   <span className="sr-only">Dein Team</span>
                 </>
+              ) : relationshipOf(row.teamId) ? (
+                // Feld-Marker: kleiner Freund/Feind-Wimpel (blau/grün/rot) für
+                // gesteuerte/verbündete/rivalisierende Teams — analog zur "Du"-Fahne,
+                // absolut positioniert (kein Layout-Eingriff ins Zeilen-Grid).
+                <span
+                  className={`nl-arena-rel-flag is-rel-${relationshipOf(row.teamId)}`}
+                  aria-hidden="true"
+                >
+                  {relationshipOf(row.teamId) === "mine" ? "★" : relationshipOf(row.teamId) === "ally" ? "🤝" : "⚔"}
+                </span>
               ) : null}
               <span className="nl-arena-rank">
                 <span className="nl-arena-ranknum nl-tnum">{rank}</span>
@@ -1237,7 +1274,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                   rowNodesRef.current.delete(row.teamId);
                 }
               }}
-              className={`nl-arena-totalrow${isOwnTeam ? " is-own-team" : ""}${row.medal === "gold" ? " is-leader" : ""}`}
+              className={`nl-arena-totalrow${isOwnTeam ? " is-own-team" : ""}${relationshipRowClass(row.teamId)}${row.medal === "gold" ? " is-leader" : ""}`}
               style={team ? getSeasonV2TeamTagStyle(team.shortCode) : undefined}
             >
               <span className="nl-arena-rank">
@@ -1247,7 +1284,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                   <span className="nl-arena-ranknum nl-tnum">{row.rank}</span>
                 )}
               </span>
-              {renderTeamButton(row.teamId, row.teamName)}
+              {renderTeamButton(row.teamId, row.teamName, { relationship: relationshipOf(row.teamId) })}
               <span className="nl-arena-track" aria-hidden="true">
                 <span className="nl-arena-track-fill" style={{ width: `${widthPct}%` }} />
               </span>
@@ -1604,17 +1641,23 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
               </span>
             </div>
             <ol className="nl-arena-briefing-table" aria-label="Aktuelle Liga-Ausgangslage">
-              {arenaBriefing.window.map((row) => (
-                <li
-                  key={row.teamId}
-                  className={`nl-arena-briefing-row${row.isOwn ? " is-own" : ""}`}
-                  aria-current={row.isOwn ? "true" : undefined}
-                >
-                  <span className="nl-arena-briefing-row-rank nl-tnum">{row.rank}</span>
-                  <span className="nl-arena-briefing-row-name">{row.teamName}</span>
-                  <span className="nl-arena-briefing-row-code">{row.teamCode}</span>
-                </li>
-              ))}
+              {arenaBriefing.window.map((row) => {
+                const relationship = relationshipOf(row.teamId);
+                return (
+                  <li
+                    key={row.teamId}
+                    className={`nl-arena-briefing-row${row.isOwn ? " is-own" : ""}${relationshipRowClass(row.teamId)}`}
+                    aria-current={row.isOwn ? "true" : undefined}
+                  >
+                    <span className="nl-arena-briefing-row-rank nl-tnum">{row.rank}</span>
+                    <span className="nl-arena-briefing-row-name">
+                      {row.teamName}
+                      {relationship ? <RelationshipTag kind={relationship} className="nl-arena-rel-tag" /> : null}
+                    </span>
+                    <span className="nl-arena-briefing-row-code">{row.teamCode}</span>
+                  </li>
+                );
+              })}
             </ol>
           </div>
         </NlCard>
