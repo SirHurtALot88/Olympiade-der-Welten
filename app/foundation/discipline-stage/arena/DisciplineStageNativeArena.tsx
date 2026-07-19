@@ -875,7 +875,10 @@ function modSum(mods: NativeStageMod[]): number {
 }
 function playerNet(p: NativeStagePlayer | null | undefined): number {
   if (!p) return 0;
-  return Math.max(0, round1(p.val + modSum(p.mods)));
+  // UNGECLAMPT: kann bei schwachem/verletztem Slot + negativen Team-Debuffs auch
+  // < 0 sein. So bleibt Σ(net) == engine-score exakt (kein Aufrunden auf 0, das den
+  // Team-Total nach oben verzerren würde). Token-Position clampt separat (tokenPos).
+  return round1(p.val + modSum(p.mods));
 }
 // Golden-Angle-Farbverteilung nach fester Team-Position → maximale Spreizung,
 // keine Hash-Kollisionen (früher hueFor über den Code → viele fast gleiche Grüns).
@@ -1013,6 +1016,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const [round, setRound] = useState(0);
   const [busy, setBusy] = useState(false);
   const [ended, setEnded] = useState(false);
+  const [paused, setPaused] = useState(false);
   const [spotlight, setSpotlight] = useState<Spot>(null);
   const [flash, setFlash] = useState<{ color: string; id: number } | null>(null);
   const [shake, setShake] = useState<"none" | "hard" | "soft">("none");
@@ -1054,6 +1058,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const tier1Budget = useRef(4);
   const busyRef = useRef(false);
   const pauseRef = useRef(false); // Hover-Pause: friert die Reveal-Cascade ein (doOne re-polled, ohne zu konsumieren)
+  const manualPauseRef = useRef(false); // Leertaste-Pause (manuell): friert die laufende Sim ein, bis erneut Space
   const endedFiredRef = useRef(false); // onEnded feuert genau einmal je Lauf (Spoiler-Gate)
   // Barbell: aktuelle Last als Ref (tokenPos/Feld lesen sie beim Render frisch, ohne
   // Callback-Deps). Und die Barbell-Rangfolge der Vorrunde für die Rang-Pfeile ▲/▼.
@@ -1138,6 +1143,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     roundTopNet.current = 0;
     tier2Budget.current = 2;
     tier1Budget.current = 4;
+    manualPauseRef.current = false;
+    setPaused(false);
     force();
   }, [buildRT, clearTimers]);
 
@@ -1159,6 +1166,29 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   );
 
   const done = round >= slotCount;
+
+  // Leertaste pausiert/setzt die laufende Arena fort (native Primitive UND Mini-DM).
+  // CAPTURE-Phase-Fenster-Listener: fängt Space VOR dem Shell-Space-Handler ab
+  // (der in use-foundation-shell-router-body-scope als BUBBLE-Phase-Fenster-Listener
+  // registriert ist → "Weiter"). Wir intercepten nur, solange ein Match läuft
+  // (!done && !reduced) — sonst fällt Space durch zur Shell-Bedeutung. Diese
+  // Interception setzt VORAUS, dass der Shell-Space-Handler Bubble-Phase bleibt.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== "Space" || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select" || t?.isContentEditable || t?.closest("[contenteditable='true']")) return;
+      if (done || reduced.current) return;
+      if (document.querySelector("[role='dialog']")) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      manualPauseRef.current = !manualPauseRef.current;
+      setPaused(manualPauseRef.current);
+    };
+    window.addEventListener("keydown", onKey, { capture: true });
+    return () => window.removeEventListener("keydown", onKey, { capture: true });
+  }, [done]);
 
   // ---- Feld-Geometrie ----
   const pathRef = useRef<SVGPathElement | null>(null);
@@ -1435,7 +1465,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
 
   const tokenPos = useCallback(
     (t: RT, score: number): { x: number; y: number } => {
-      const norm = finalMax > 0 ? score / finalMax : 0; // 0…1, kein Headroom
+      const norm = finalMax > 0 ? Math.max(0, score / finalMax) : 0; // 0…1, kein Headroom; nach unten auf 0 geklemmt (playerNet ist ungeclampt → score kann negativ sein)
       // Voll-Feld-Sonderlayouts haben kein gleitendes Token — Score-Pops landen
       // mittig (die Feld-Optik rechnet selbst aus allen Scores).
       if (FIELD_CUSTOM.has(prim)) return { x: W / 2, y: H / 2 };
@@ -1901,7 +1931,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     const doOne = () => {
       // Hover-Pause: re-pollen ohne order[i] zu konsumieren (genau ein Timer,
       // busyRef bleibt true → Reihenfolge/Choreografie unverändert).
-      if (pauseRef.current) {
+      if (pauseRef.current || manualPauseRef.current) {
         later(doOne, 120);
         return;
       }
@@ -1997,14 +2027,14 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   // (kein Auto-Reset). Bei reduced-motion läuft es sofort durch → finaler Endstand.
   useEffect(() => {
     if (prim !== "barbell") return;
-    if (done || busy) return;
+    if (done || busy || paused) return;
     const first = round === 0 && demandKg == null;
     // Kurzer Puffer nach dem Abschluss der (bereits ~5 s langen, simultan gleitenden)
     // Runde — die nächste Last steigt zügig, ohne dass die Disziplin zäh wird.
     const delay = reduced.current ? 0 : first ? 650 : 600;
     const id = window.setTimeout(() => advance(), delay);
     return () => window.clearTimeout(id);
-  }, [prim, round, busy, done, demandKg, advance]);
+  }, [prim, round, busy, done, demandKg, advance, paused]);
 
   const quickSim = useCallback(() => {
     if (busyRef.current) return; // Busy-Guard: keine Doppel-Auslösung während einer Cascade.
@@ -2211,6 +2241,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             <button type="button" onClick={quickSim} style={{ padding: "9px 14px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}>⏩ Quick-Sim</button>
             <button type="button" onClick={reset} style={{ padding: "9px 14px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}>↻ Neu</button>
             <button type="button" onClick={audio.toggleMute} title="Sound an/aus" style={{ padding: "9px 12px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}>{audio.muted ? "🔇 Stumm" : "🔊 Sound"}</button>
+            {paused ? <span style={{ padding: "4px 10px", borderRadius: 999, fontWeight: 800, fontSize: 12, background: "var(--nl-warn)", color: "var(--nl-ink)" }}>⏸ Pausiert · Leertaste</span> : null}
             <span style={{ fontSize: 12.5, color: "var(--nl-mut)" }}>{progressLabel ?? "Arena-Schlacht — Schaden = kumulierte Punkte, Rang = Score"}</span>
           </div>
 
@@ -2244,6 +2275,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             acePortraitsByTeam={acePortraitsByTeam}
             done={done}
             reduced={reduced.current}
+            paused={paused}
             disciplineName={disciplineName}
             leadCode={round > 0 && leader ? leader.code : null}
             myCode={me?.code ?? null}
@@ -2316,6 +2348,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             aria-label="Lautstärke"
             style={{ width: 90, accentColor: "var(--nl-accent)", cursor: "pointer" }}
           />
+          {paused ? <span style={{ padding: "4px 10px", borderRadius: 999, fontWeight: 800, fontSize: 12, background: "var(--nl-warn)", color: "var(--nl-ink)" }}>⏸ Pausiert · Leertaste</span> : null}
           <span style={{ fontSize: 12.5, color: "var(--nl-mut)" }}>
             {progressLabel ??
               (prim === "kda"
@@ -2871,7 +2904,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                         Endgewicht. Die restliche Turm-Familie behält ihre Säulen. */}
                     {TOWER_FAMILY.has(prim) && prim !== "barbell" ? (() => {
                       const bh = Math.max(0, (layout.baseY ?? pos.y) - pos.y);
-                      const nf = Math.min(1, t.score / finalMax);
+                      const nf = Math.max(0, Math.min(1, t.score / finalMax));
                       const bw2 = prim === "sparkbar" ? Math.min(11, barW) : barW;
                       const barFill = prim === "thermometer" ? `hsl(${Math.round(120 - nf * 120)} 72% 48%)` : `hsl(${t.isOwn ? 210 : hue} 55% 50%)`;
                       return (
@@ -2885,7 +2918,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                       const x0 = layout.xStart;
                       const x1 = layout.xEnd;
                       const yy = pos.y;
-                      const nf = Math.min(1, t.score / finalMax);
+                      const nf = Math.max(0, Math.min(1, t.score / finalMax));
                       const fillCol = relColor(t.rel) ?? (t.isOwn ? "var(--nl-accent)" : `hsl(${hue} 55% 55%)`);
                       if (prim === "platter") {
                         const plates = Math.min(16, Math.max(1, Math.round(nf * 16)));

@@ -44,6 +44,7 @@ type Props = {
   acePortraitsByTeam?: (string | null)[][]; // parallel zu acesByTeam: Portrait-URLs (null → Silhouette)
   done: boolean; // Reveal komplett → Fortschritt = 1, Endstand = Score-Rangliste
   reduced: boolean; // prefers-reduced-motion → statischer Fallback ohne rAF
+  paused?: boolean; // Leertaste-Pause: friert Bewegung + Reveal ein (rAF-Loop pausiert)
   disciplineName?: string;
   leadCode?: string | null; // Feld-Führender (Score-Wahrheit) für die Kopfleiste
   myCode?: string | null;
@@ -100,6 +101,7 @@ export default function MiniDmArenaBattle({
   acePortraitsByTeam,
   done,
   reduced,
+  paused,
   disciplineName,
   leadCode,
   myCode,
@@ -508,9 +510,9 @@ export default function MiniDmArenaBattle({
     placeAll();
   };
 
-  // ---- rAF-Schleife (nur ohne reduced-motion) ----
+  // ---- rAF-Schleife (nur ohne reduced-motion; Leertaste-Pause friert sie ein) ----
   useEffect(() => {
-    if (reduced) return;
+    if (reduced || paused) return;
     let raf = 0;
     let acc = 0;
     let last = performance.now();
@@ -528,7 +530,7 @@ export default function MiniDmArenaBattle({
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reduced]);
+  }, [reduced, paused]);
 
   // ---- Reduced-Motion: statischer Fallback (kein rAF) ----
   useEffect(() => {

@@ -658,7 +658,6 @@ export default function DisciplineStageArena({
             portraitUrl: p.portraitUrl,
             traits: [] as string[],
             mods: p.mods,
-            traitMods: [] as { k: string; sign: 1 | -1; amt: number }[],
             pointsAwarded: p.pointsAwarded,
           })),
         }))
@@ -674,9 +673,11 @@ export default function DisciplineStageArena({
             name: s.playerName,
             portraitUrl: s.portraitUrl,
             traits: s.traits,
-            mods: mode === "real" ? realMods(s) : [],
-            // Trait-Mutatoren (+6 je passendem Trait) — nur im Random-Test angewandt.
-            traitMods: mode === "random" ? traitMutatorMods(s.traits, mutatorTraits) : [],
+            // Real-Modus: echte Fatigue/Form-Mods. Random-Test: dieselben echten
+            // Mods PLUS die Trait-Mutatoren (+6 je passendem Trait), damit
+            // Fatigue/Form + Mutatoren als sichtbare Deltas im Feld landen —
+            // nativeTeams liest ausschließlich p.mods (SHOULD-1, Variante a).
+            mods: mode === "real" ? realMods(s) : [...realMods(s), ...traitMutatorMods(s.traits, mutatorTraits)],
             pointsAwarded: null as number | null,
           })),
         }));
