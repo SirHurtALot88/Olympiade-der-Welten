@@ -30,7 +30,7 @@ import { buildTeamRelationshipMap } from "@/lib/foundation/team-relationship";
 const NATIVE_PRIMITIVE: Record<string, StagePrimitive> = {
   // track — Renn-/Parcours-Logik auf einer Bahn
   staffel: "track",
-  spurt: "track", // Slalom/Bump-Modell folgt noch — bleibt vorerst Oval
+  spurt: "bump", // Slalom/Bump: Rang-über-Etappen-Linien (nutzt rankHistory)
   "takeshis-castle": "parcours", // Schlangen-Parcours (Serpentine)
   "mini-dm": "duelhp", // 1v1-Lebensbalken (Fighting-Game-HP)
   battlefield: "track",

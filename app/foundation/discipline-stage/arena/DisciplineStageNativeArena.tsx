@@ -59,6 +59,7 @@ export type StagePrimitive =
   // Szenen (atmosphärisches Feld, Score = Position):
   | "peloton" // Zeitfahren — Straße mit Ausreißer/Feld
   | "parcours" // Takeshi — Schlangen-Parcours
+  | "bump" // Spurt — Slalom/Bump: Rang-über-Etappen-Linien (nutzt rankHistory)
   | "mountain" // Climbing — Gipfelsturm (Berg-Serpentine)
   | "court" // Basketball — Wurfkarte (Halbfeld)
   | "rink"; // Hockey — Eisrink von oben
@@ -68,7 +69,7 @@ export type StagePrimitive =
 const ROW_FAMILY = new Set<StagePrimitive>(["lanes", "platter", "lamps", "spybar", "kda", "duelhp"]);
 const TOWER_FAMILY = new Set<StagePrimitive>(["towers", "barbell", "sparkbar", "thermometer"]);
 // Szenen-Primitive: eigenes atmosphärisches Feld (Straße/Berg/Court/Rink/Parcours).
-const SCENE_PRIMS = new Set<StagePrimitive>(["peloton", "mountain", "court", "rink", "parcours"]);
+const SCENE_PRIMS = new Set<StagePrimitive>(["peloton", "mountain", "court", "rink", "parcours", "bump"]);
 export type DisciplineStageNativeArenaProps = {
   teams: NativeStageTeam[];
   slots: string[];
@@ -422,6 +423,36 @@ function renderSceneEnvBg(prim: StagePrimitive, env: StageEnv, layout: any, W: n
       </>
     );
   }
+  if (prim === "bump") {
+    const { pL, pR, top, bot } = layout;
+    const stages: number = Math.max(1, layout.stagesTotal ?? 1);
+    const innerW = W - pL - pR;
+    const rows = 6;
+    return (
+      <>
+        <rect x={pL - 20} y={top - 20} width={innerW + 40} height={bot - top + 44} rx={12} fill="url(#envSurface)" opacity={0.35} />
+        {/* Rang-Führungslinien (oben = Spitze) */}
+        {Array.from({ length: rows }).map((_, i) => {
+          const y = top + (i / (rows - 1)) * (bot - top);
+          return <line key={i} x1={pL} y1={y} x2={W - pR} y2={y} stroke={env.line} strokeWidth={1} strokeDasharray="2 10" opacity={0.22} />;
+        })}
+        {/* Etappen-Spalten + Labels */}
+        {Array.from({ length: stages }).map((_, s) => {
+          const x = pL + (stages > 1 ? s / (stages - 1) : 0.5) * innerW;
+          return (
+            <g key={s}>
+              <line x1={x} y1={top} x2={x} y2={bot} stroke={env.stands} strokeWidth={1.4} opacity={0.5} />
+              <text x={x} y={bot + 22} textAnchor="middle" fontSize={12} fontWeight={700} fill={env.line} opacity={0.75}>
+                {`E${s + 1}`}
+              </text>
+            </g>
+          );
+        })}
+        <text x={pL - 24} y={top + 4} textAnchor="end" fontSize={11} fontWeight={800} fill={env.line} opacity={0.8}>🏁</text>
+        <text x={pL - 6} y={top - 6} textAnchor="start" fontSize={11} fontWeight={800} fill={env.line} opacity={0.7} style={{ textTransform: "uppercase", letterSpacing: "0.1em" }}>Spitze</text>
+      </>
+    );
+  }
   if (prim === "court") {
     const { cx, hoopY, baseY, baseHalf } = layout;
     const keyW = baseHalf * 0.42;
@@ -485,6 +516,7 @@ const PRIM_GEO: Record<StagePrimitive, { w: number; h: number; r: number; rOwn: 
   // Szenen
   peloton: { w: 1180, h: 460, r: 11, rOwn: 16 },
   parcours: { w: 1180, h: 560, r: 12, rOwn: 17 },
+  bump: { w: 1180, h: 560, r: 7, rOwn: 10 },
   mountain: { w: 1180, h: 620, r: 11, rOwn: 16 },
   court: { w: 1180, h: 620, r: 11, rOwn: 16 },
   rink: { w: 1180, h: 560, r: 11, rOwn: 15 },
@@ -814,6 +846,11 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       }
       return { wp };
     }
+    if (prim === "bump") {
+      // Slalom/Bump-Diagramm: x = Etappe, y = Rang (oben = Spitze). stagesTotal
+      // aus der Slot-Zahl; die Linien liest der Renderer aus RT.rankHistory.
+      return { pL: 88, pR: 66, top: 42, bot: H - 46, stagesTotal: slotCount };
+    }
     if (prim === "court") {
       return { cx: W / 2, hoopY: H * 0.15, baseY: H * 0.9, baseHalf: W * 0.4 };
     }
@@ -839,7 +876,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     }
     return {};
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  }, [prim, N, W, H]) as any;
+  }, [prim, N, W, H, slotCount]) as any;
 
   // Normierungsbasis = größte erreichbare Team-Summe (statisch, aus den Slot-Werten).
   // So endet das beste Team exakt auf der Ziellinie und Tokens rutschen beim Reveal
@@ -897,6 +934,16 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       }
       if (prim === "parcours") {
         return interpAlong(layout.wp, norm);
+      }
+      if (prim === "bump") {
+        // Token = aktueller Rang an der laufenden Etappe. rankHistory hält die
+        // Ränge nach jeder gewerteten Etappe; die Live-Etappe ist hist.length.
+        const stages: number = Math.max(1, layout.stagesTotal ?? 1);
+        const hist = t.rankHistory;
+        const s = Math.min(stages - 1, hist.length);
+        const x = layout.pL + (stages > 1 ? s / (stages - 1) : 0.5) * (W - layout.pL - layout.pR);
+        const y = layout.top + (N > 1 ? (t.rank - 1) / (N - 1) : 0.5) * (layout.bot - layout.top);
+        return { x, y };
       }
       if (prim === "court") {
         // Wurfkarte: höherer Score → näher an den Korb (oben, Mitte). Das Feld
@@ -1495,6 +1542,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                 ? "K/D/A aus der Feld-Wertung abgeleitet · KDA = (K+A)/D"
                 : prim === "duelhp"
                 ? "Lebensbalken = kumulierte Punkte (100 % = Feldbester)"
+                : prim === "bump"
+                ? "Linien = Rang nach jeder Etappe (oben = Spitze)"
                 : prim === "stage"
                 ? "Aufstieg zur Ruhm-Treppe = kumulierte Punkte"
                 : prim === "mountain"
@@ -1960,6 +2009,28 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                           {Array.from({ length: found }).map((_, k) => (
                             <text key={k} x={x0 + ((k + 1) / (found + 1)) * (pos.x - x0)} y={yy + 4} textAnchor="middle" fontSize={11}>{glyphs[k % 5]}</text>
                           ))}
+                        </g>
+                      );
+                    })() : null}
+                    {prim === "bump" ? (() => {
+                      // Rang-über-Etappen-Linie aus RT.rankHistory (kein Score=Position).
+                      // Feld grau/leise, Anker (rel oder Top-3) farbig + Endpunkt-Label.
+                      const stages = Math.max(1, layout.stagesTotal ?? 1);
+                      const hist = t.rankHistory;
+                      const xStage = (s: number) => layout.pL + (stages > 1 ? s / (stages - 1) : 0.5) * (W - layout.pL - layout.pR);
+                      const yRank = (rk: number) => layout.top + (N > 1 ? (rk - 1) / (N - 1) : 0.5) * (layout.bot - layout.top);
+                      const pts: [number, number][] = hist.map((rk, s) => [xStage(s), yRank(rk)]);
+                      // Live-Punkt an der laufenden Etappe (aktueller Rang) → Linie zieht mit.
+                      const liveStage = Math.min(stages - 1, hist.length);
+                      pts.push([xStage(liveStage), yRank(t.rank)]);
+                      const anchor = t.rel != null || t.rank <= 3;
+                      const col = relColor(t.rel) ?? (medal ?? "var(--nl-mut)");
+                      const d = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
+                      const end = pts[pts.length - 1]!;
+                      return (
+                        <g>
+                          <path d={d} fill="none" stroke={anchor ? col : "var(--nl-mut)"} strokeWidth={anchor ? (t.rel ? 2.6 : 1.9) : 1} strokeLinejoin="round" strokeLinecap="round" opacity={anchor ? 0.95 : 0.14} />
+                          {anchor ? <text x={end[0] + 11} y={end[1] + 3} fontSize={9.5} fontWeight={800} fill={col}>{t.code}</text> : null}
                         </g>
                       );
                     })() : null}
