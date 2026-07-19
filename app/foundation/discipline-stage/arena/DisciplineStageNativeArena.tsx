@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useStageAudio } from "./useStageAudio";
-import MiniDmArenaBattle, { type DuelTeamMeta, type DuelLiveInfo } from "./MiniDmArenaBattle";
 import DisciplineStageResultTable, { type ResultTableRow } from "./DisciplineStageResultTable";
 import DisciplineStageTopPlayersRow from "../DisciplineStageTopPlayersRow";
 import PlayerMark from "./PlayerMark";
@@ -67,7 +66,7 @@ export type StagePrimitive =
   | "lamps" // Fechten — Treffer-Lampen (rot/grün)
   | "spybar" // I Spy — Späh-/Sichtfeld-Balken, 🔍 an der Scan-Kante
   | "kda" // TDM — K/D/A-Scoreboard (aus Score abgeleitet) + KDA-Balken
-  | "duelhp" // Mini-DM — Fighting-Game-Lebensbalken (skewX) + K.O.-Warnung
+  | "duelhp" // Mini-DM — Arena-Schlacht (RPG-Battle im Pit, dmg-Zahlen, Rang = Score)
   // Turm-Familie (Säule je Team, Höhe = Punkte):
   | "barbell" // Gewichtheben — Hantel-Säulen mit Scheiben
   | "sparkbar" // universeller Fallback — schlanke Spark-Säulen
@@ -85,13 +84,13 @@ export type StagePrimitive =
 
 // Familien mit geteilter Geometrie: Row-Familie rechnet wie "lanes",
 // Turm-Familie wie "towers". Nur der Hintergrund/Overlay unterscheidet sie.
-export const ROW_FAMILY = new Set<StagePrimitive>(["lanes", "platter", "lamps", "spybar", "kda", "duelhp"]);
+export const ROW_FAMILY = new Set<StagePrimitive>(["lanes", "platter", "lamps", "spybar", "kda"]);
 export const TOWER_FAMILY = new Set<StagePrimitive>(["towers", "barbell", "sparkbar", "thermometer"]);
 // Szenen-Primitive: eigenes atmosphärisches Feld (Straße/Berg/Court/Rink/Parcours).
 export const SCENE_PRIMS = new Set<StagePrimitive>(["peloton", "mountain", "court", "rink", "parcours", "bump"]);
 // Voll-Feld-Sonderlayouts: eigener Render-Zweig aus ALLEN Scores (kein gleitendes
 // Token, keine Bahn/Turm/Szene-Geometrie). deco/glow + Token-Schleife entfallen.
-export const FIELD_CUSTOM = new Set<StagePrimitive>(["klassen", "territory"]);
+export const FIELD_CUSTOM = new Set<StagePrimitive>(["klassen", "territory", "duelhp"]);
 export type DisciplineStageNativeArenaProps = {
   teams: NativeStageTeam[];
   slots: string[];
@@ -812,8 +811,8 @@ export const STAR_MIN = 80;
 // Staffel/track: eine Reveal-Runde dauert ~5 s (langsam, folgbar). Innerhalb einer
 // Runde peilen ALLE Token gleichzeitig ihre Runden-Endposition an und gleiten
 // simultan dorthin (dur = ROUND_MS). Score bleibt Wahrheit; nur die Token-POSITION
-// wird pro Runde gemeinsam animiert. Mini-DM (duelhp) nutzt sein eigenes ROUND_MS
-// (MiniDmArenaBattle) mit demselben ~5 s-Takt.
+// wird pro Runde gemeinsam animiert. Mini-DM (duelhp) läuft über das geteilte
+// Chrome + die Registry-Feld-Komponente (arena/disciplines/duelhp.tsx).
 export const TRACK_ROUND_MS = 5000;
 // viewBox + Token-Radien je Primitive. Der Rest (Engine/FX/Ticker/Podest/Tabelle)
 // ist geometrieunabhängig; nur Feld-Layout + tokenPos unterscheiden sich.
@@ -1402,68 +1401,6 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       return a.laneIdx - b.laneIdx;
     });
   }, [barbellInfo, barbellEliminated]);
-
-  // Mini-DM · Arena-Schlacht: statische Team-Meta (Ziel-Schaden + Aufhol-Kurve).
-  // Ziel-Schaden ist monoton im Endscore → bei Fortschritt p=1 steht die Tabelle
-  // EXAKT in der Score-Rangliste. Die Gamma-Exponenten erzeugen die dynamische
-  // Aufholjagd: ein Mid-Table-Underdog (kleines Gamma) führt anfangs, die
-  // Top-Teams (großes Gamma) starten langsam und holen spät auf. Deterministisch
-  // (FNV-Hash) → SSR-stabil. Nur für prim === "duelhp" berechnet.
-  const duelMeta = useMemo<{ meta: DuelTeamMeta[]; sumFinal: number } | null>(() => {
-    if (prim !== "duelhp") return null;
-    const span = finalMax - finalMin;
-    const fnorm = (s: number) => (span <= 0 ? (s > 0 ? 1 : 0) : Math.max(0, Math.min(1, (s - finalMin) / span)));
-    const hash01 = (str: string) => {
-      let h = 2166136261;
-      for (let i = 0; i < str.length; i += 1) {
-        h ^= str.charCodeAt(i);
-        h = Math.imul(h, 16777619);
-      }
-      return (h >>> 0) / 4294967295;
-    };
-    const withScore = teams.map((t, idx) => {
-      let s = 0;
-      for (const p of t.players) s += playerNet(p);
-      return { t, idx, finalScore: s };
-    });
-    // Endscore-Rang (0-basiert) für die Gamma-Verteilung.
-    const byScore = [...withScore].sort((a, b) => b.finalScore - a.finalScore || (a.t.seasonRank ?? a.idx) - (b.t.seasonRank ?? b.idx));
-    const scoreRank = new Map<number, number>();
-    byScore.forEach((o, i) => scoreRank.set(o.idx, i));
-    // Underdog-Frühstarter: ein Mid-Table-Team (Rang 8…19) mit dem höchsten
-    // Auswahl-Hash bekommt ein sehr kleines Gamma → führt kurz, wird eingeholt.
-    const midField = byScore.filter((_, i) => i >= 8 && i <= 19);
-    let underdogIdx = -1;
-    let bestU = -1;
-    for (const o of midField) {
-      const u = hash01(o.t.code + "underdog");
-      if (u > bestU) {
-        bestU = u;
-        underdogIdx = o.idx;
-      }
-    }
-    const meta: DuelTeamMeta[] = withScore.map(({ t, idx, finalScore }) => {
-      const rank = scoreRank.get(idx) ?? idx;
-      let gamma: number;
-      if (idx === underdogIdx) gamma = 0.4; // Frühstarter
-      else if (rank < 3) gamma = 1.0 + hash01(t.code + "g") * 0.8; // Top starten langsam
-      else gamma = 0.6 + hash01(t.code + "g") * 1.15;
-      return {
-        idx,
-        code: t.code,
-        name: t.name,
-        isOwn: t.isOwn,
-        rel: t.rel ?? null,
-        seasonRank: t.seasonRank ?? idx + 1,
-        teamId: t.teamId ?? null,
-        logoUrl: t.logoUrl,
-        target: 800 + fnorm(finalScore) * 7000,
-        gamma,
-      };
-    });
-    const sumFinal = withScore.reduce((s, o) => s + o.finalScore, 0);
-    return { meta, sumFinal: Math.max(1, sumFinal) };
-  }, [prim, teams, finalMax, finalMin]);
 
   const tokenPos = useCallback(
     (t: RT, score: number): { x: number; y: number } => {
@@ -2207,113 +2144,6 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       })()
     : null;
 
-  // ---- Mini-DM · Arena-Schlacht (eigenes Layout statt SVG-Bahnen) ----
-  // Vollständig von der Reveal-Engine getrieben: die Buttons decken Runden auf,
-  // rtRef hält die kumulierten Scores. Der Fortschritt p der Schlacht = aufge-
-  // deckte Score-Summe / End-Summe (revealFrac). Namen = ECHTE aufgedeckte
-  // Kader-Spieler (Top-Beitrag zuerst → Spotlight/Cycling), keine Fakes.
-  if (prim === "duelhp" && duelMeta) {
-    const sumScore = rtRef.current.reduce((s, t) => s + t.score, 0);
-    const revealFrac = done ? 1 : Math.max(0, Math.min(1, sumScore / duelMeta.sumFinal));
-    const leaderScore = leader?.score ?? 0;
-    const acesByTeam: string[][] = [];
-    const acePortraitsByTeam: (string | null)[][] = [];
-    const duelInfo: DuelLiveInfo[] = [];
-    rtRef.current.forEach((t) => {
-      const revealed: { name: string; id: string | null; net: number; portrait: string | null }[] = [];
-      for (let s = 0; s <= t.thrownSlot; s += 1) {
-        const p = t.players[s];
-        if (p) revealed.push({ name: p.name, id: p.playerId, net: playerNet(p), portrait: p.portraitUrl });
-      }
-      revealed.sort((a, b) => b.net - a.net);
-      const names = revealed.map((r) => r.name);
-      acesByTeam.push(names.length ? names : t.players[0]?.name ? [t.players[0]!.name] : []);
-      acePortraitsByTeam.push(revealed.length ? revealed.map((r) => r.portrait) : [t.players[0]?.portraitUrl ?? null]);
-      const top = revealed[0] ?? null;
-      duelInfo.push({
-        rank: t.rank,
-        score: t.score,
-        deficit: Math.max(0, leaderScore - t.score),
-        topName: top?.name ?? null,
-        topId: top?.id ?? null,
-      });
-    });
-    return (
-      <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
-        <div style={{ flex: "1 1 100%", minWidth: 0 }}>
-          {/* Controls (treiben die Reveal-Engine) */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
-            <button type="button" onClick={advance} disabled={done || busy} style={{ padding: "9px 18px", fontWeight: 800, fontSize: 13, border: 0, borderRadius: 10, cursor: done || busy ? "default" : "pointer", color: "var(--nl-ink)", background: done ? "var(--nl-line)" : "var(--nl-accent)", opacity: busy && !done ? 0.7 : 1 }}>
-              {done ? "✔ Disziplin gewertet" : `▶ Runde ${round + 1} / ${slotCount} — ${slots[round] ?? ""}`}
-            </button>
-            <button type="button" onClick={quickSim} style={{ padding: "9px 14px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}>⏩ Quick-Sim</button>
-            <button type="button" onClick={reset} style={{ padding: "9px 14px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}>↻ Neu</button>
-            <button type="button" onClick={audio.toggleMute} title="Sound an/aus" style={{ padding: "9px 12px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}>{audio.muted ? "🔇 Stumm" : "🔊 Sound"}</button>
-            {paused ? <span style={{ padding: "4px 10px", borderRadius: 999, fontWeight: 800, fontSize: 12, background: "var(--nl-warn)", color: "var(--nl-ink)" }}>⏸ Pausiert · Leertaste</span> : null}
-            <span style={{ fontSize: 12.5, color: "var(--nl-mut)" }}>{progressLabel ?? "Arena-Schlacht — Schaden = kumulierte Punkte, Rang = Score"}</span>
-          </div>
-
-          {/* MyTracker (dein-Team-Verfolger) */}
-          {me ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 12px", marginBottom: 10, borderRadius: 12, border: "1px solid var(--nl-accent)", background: "color-mix(in srgb, var(--nl-accent) 10%, transparent)" }}>
-              <span style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 800, color: "var(--nl-accent)" }}>Dein Team · {me.code}</span>
-              <span style={{ fontWeight: 800 }}>Rang {me.rank}</span>
-              {round > 0 ? (
-                (() => {
-                  const d = me.roundStartRank - me.rank;
-                  return (
-                    <span style={{ fontSize: 12.5, fontWeight: 700, color: d > 0 ? "var(--nl-good)" : d < 0 ? "var(--nl-risk)" : "var(--nl-mut)" }}>
-                      {d > 0 ? "▲ seit Vorrunde" : d < 0 ? "▼ seit Vorrunde" : "gehalten"}
-                    </span>
-                  );
-                })()
-              ) : (
-                <span style={{ fontSize: 12.5, color: "var(--nl-mut)" }}>Runde 1 …</span>
-              )}
-              <span style={{ marginLeft: "auto", fontWeight: 800, color: "var(--nl-accent)" }}>{fmt1(me.score)} Pkt</span>
-            </div>
-          ) : null}
-
-          <MiniDmArenaBattle
-            meta={duelMeta.meta}
-            info={duelInfo}
-            sumFinal={duelMeta.sumFinal}
-            revealFrac={revealFrac}
-            acesByTeam={acesByTeam}
-            acePortraitsByTeam={acePortraitsByTeam}
-            done={done}
-            reduced={reduced.current}
-            paused={paused}
-            disciplineName={disciplineName}
-            leadCode={round > 0 && leader ? leader.code : null}
-            myCode={me?.code ?? null}
-            myRank={me?.rank ?? null}
-            onCrit={(loud) => audio.wumms(loud ? 0.9 : 0.5)}
-            onOpenTeam={onOpenTeam}
-            onHoverTeam={onHoverTeam}
-            onOpenPlayer={onOpenPlayer}
-          />
-
-          {revealedTopPlayers && revealedTopPlayers.rows.length > 0 ? (
-            <DisciplineStageTopPlayersRow
-              players={revealedTopPlayers.rows}
-              playerIdByRow={revealedTopPlayers.ids}
-              onOpenPlayer={onOpenPlayer}
-              onPreviewPlayer={onPreviewPlayer}
-              limit={10}
-            />
-          ) : null}
-        </div>
-
-        {ended ? (
-          <div style={{ flex: "1 1 100%", minWidth: 0 }}>
-            <DisciplineStageResultTable rows={resultRows} slotLabels={slots} onOpenPlayer={onOpenPlayer} />
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-
   // ---- Feld-Delegation: Chrome bleibt im Host, die Feld-Darstellung kommt aus der
   // Disziplin-Registry (arena/disciplines/<primitive>.tsx). Der Host baut den vollen
   // DisciplineFieldProps-Kontext (Engine = Wahrheit) und rendert die Feld-Komponente
@@ -2418,7 +2248,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               (prim === "kda"
                 ? "K/D/A aus der Feld-Wertung abgeleitet · KDA = (K+A)/D"
                 : prim === "duelhp"
-                ? "Lebensbalken = kumulierte Punkte (100 % = Feldbester)"
+                ? "Arena-Schlacht — Schaden aus kumulierten Punkten, Rang = Score"
                 : prim === "bump"
                 ? "Linien = Rang nach jeder Etappe (oben = Spitze)"
                 : prim === "klassen"
