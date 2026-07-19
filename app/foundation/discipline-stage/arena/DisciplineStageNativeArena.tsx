@@ -1799,6 +1799,35 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const courtMax = courtThrown.length ? courtThrown[courtThrown.length - 1]! : 0;
   const courtHotFloor = courtMedian + (courtMax - courtMedian) * 0.5;
 
+  // TDM — Kill-Feed mit ECHTEN Spielernamen: je Team der Top-Fragger (bereits
+  // aufgedeckter Spieler mit höchstem Netto-Beitrag), starke Teams fraggen
+  // schwächere (Rang oben ⚔ Rang unten). Namen aus dem Kader, keine Fakes.
+  const kdaTopFrag = (t: RT): NativeStagePlayer | null => {
+    let top: NativeStagePlayer | null = null;
+    for (let s = 0; s <= t.thrownSlot; s += 1) {
+      const p = t.players[s];
+      if (p && (!top || playerNet(p) > playerNet(top))) top = p;
+    }
+    return top;
+  };
+  const kdaFeed =
+    prim === "kda"
+      ? (() => {
+          const live = sorted.filter((t) => t.thrownSlot >= 0);
+          const out: { killer: string; victim: string }[] = [];
+          for (let i = 0; i < Math.min(live.length, 6); i += 1) {
+            const killer = live[i]!;
+            const victim = live[live.length - 1 - i];
+            if (!victim || victim.code === killer.code) continue;
+            const kp = kdaTopFrag(killer);
+            const vp = kdaTopFrag(victim);
+            if (!kp || !vp) continue;
+            out.push({ killer: kp.name, victim: vp.name });
+          }
+          return out;
+        })()
+      : [];
+
   // Top-Spieler-Zeile: NUR bereits aufgedeckte Spieler (kein Spoiler). Set aller
   // playerIds bis einschließlich thrownSlot je Team; die statische Host-Liste wird
   // darauf gefiltert (Reihenfolge bleibt, Ränge neu 1…k). Vor dem ersten Reveal leer.
@@ -1954,6 +1983,34 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             <span style={{ marginLeft: "auto", fontFamily: "ui-monospace, monospace", fontSize: 12.5, fontWeight: 700, color: "var(--nl-warn)", background: "var(--nl-bg)", border: "1px solid var(--nl-line)", borderRadius: 7, padding: "3px 10px" }}>
               ⏱ Etappe {Math.min(round, slotCount)}/{slotCount}
             </span>
+          </div>
+        ) : null}
+
+        {/* Jumbotron (nur TDM): ACE-Banner + dein Team + Kill-Feed-Ticker (echte Namen) */}
+        {prim === "kda" ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", marginBottom: 10, borderRadius: 12, border: "1px solid color-mix(in srgb, var(--nl-accent) 40%, var(--nl-line))", background: "linear-gradient(90deg, color-mix(in srgb, var(--nl-accent) 12%, var(--nl-panel)), var(--nl-panel))", flexWrap: "wrap" }}>
+            <span style={{ fontSize: 14, fontWeight: 800, letterSpacing: "0.03em" }}>🎯 {disciplineName ?? "TDM"}</span>
+            {round > 0 && leader ? (
+              <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 12, fontWeight: 800, padding: "3px 10px", borderRadius: 6, color: "var(--nl-bg)", background: "var(--nl-accent)", letterSpacing: "0.06em" }}>
+                ⚡ ACE: {leader.code}
+              </span>
+            ) : null}
+            {me ? (
+              <span style={{ fontSize: 12, fontWeight: 800, padding: "3px 10px", borderRadius: 99, color: "var(--nl-mine)", border: "1px solid var(--nl-mine)" }}>
+                Dein Team: {me.code} · Platz {me.rank}
+              </span>
+            ) : null}
+            {kdaFeed.length ? (
+              <span style={{ marginLeft: "auto", fontFamily: "ui-monospace, monospace", fontSize: 11, color: "var(--nl-mut)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 360 }}>
+                <span style={{ color: "var(--nl-accent)", fontWeight: 800 }}>LIVE </span>
+                {kdaFeed.slice(0, 3).map((f, i) => (
+                  <span key={i}>
+                    {i ? "   ·   " : ""}
+                    <b style={{ color: "var(--nl-ink)" }}>{f.killer}</b> ⚔ {f.victim}
+                  </span>
+                ))}
+              </span>
+            ) : null}
           </div>
         ) : null}
 
@@ -2411,6 +2468,10 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                       {prim === "court" && t.rank === 1 && t.thrownSlot >= 0 ? (
                         <circle r={r + 11} fill="none" stroke="var(--nl-warn)" strokeWidth={2.5} opacity={0.5} style={{ animation: reduced.current ? "none" : "olyGlowPulse 1.6s ease-in-out infinite" }} />
                       ) : null}
+                      {/* TDM: MVP — Rang 1 dauerhaft golden umrandet (Krone unten im Marker-Block) */}
+                      {prim === "kda" && t.rank === 1 && t.thrownSlot >= 0 ? (
+                        <circle r={r + 9} fill="none" stroke="var(--nl-warn)" strokeWidth={2.5} opacity={0.6} style={{ animation: reduced.current ? "none" : "olyGlowPulse 1.6s ease-in-out infinite" }} />
+                      ) : null}
                       {/* Freund/Feind-Rahmen (mine/ally/rival) — nur Rahmenfarbe, nie Füllung */}
                       {relColor(t.rel) ? <circle r={r + 5.5} fill="none" stroke={relColor(t.rel)!} strokeWidth={2.4} opacity={0.95} /> : null}
                       {medal ? <circle r={r + 3.5} fill="none" stroke={medal} strokeWidth={t.isOwn ? 4.5 : 3.5} /> : null}
@@ -2452,6 +2513,10 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                             <text y={r + 27} textAnchor="middle" fontSize={16}>🏆</text>
                           ) : null}
                         </g>
+                      ) : null}
+                      {/* TDM: MVP-Krone auf Rang 1 */}
+                      {prim === "kda" && t.rank === 1 && t.thrownSlot >= 0 ? (
+                        <text y={-(r + 5)} textAnchor="middle" fontSize={15}>👑</text>
                       ) : null}
                     </g>
                   </g>
