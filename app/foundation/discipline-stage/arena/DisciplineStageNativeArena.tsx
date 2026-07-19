@@ -3482,7 +3482,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       </div>
 
       {/* Live-Ladder rechts */}
-      <div ref={ladderRef} data-testid="arena-ladder" style={{ flex: "0 0 300px", minWidth: 260, maxHeight: "calc(100vh - 200px)", overflowY: "auto", overscrollBehavior: "contain", background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 10, position: "sticky", top: 12 }}>
+      <div ref={ladderRef} data-testid="arena-ladder" style={{ flex: "0 0 300px", minWidth: 260, maxHeight: "calc(100vh - 130px)", overflowY: "auto", overscrollBehavior: "contain", background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 10, position: "sticky", top: 12 }}>
         <div style={{ fontSize: 11, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
           <span>{prim === "barbell" ? (done ? "Endstand" : "Rangliste · live") : done ? "Endstand" : "Rundenstand — live"}</span>
           {prim === "barbell" && !done ? <span style={{ marginLeft: "auto", fontFamily: "ui-monospace, monospace", fontSize: 9, color: "var(--nl-mut)", fontWeight: 700 }}>{barbellLive} im Wettkampf</span> : null}
@@ -3529,7 +3529,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               }
             }}
             title={teamClickable ? "Team-Karte öffnen" : undefined}
-            style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 6px", borderRadius: 8, fontVariantNumeric: "tabular-nums", cursor: teamClickable ? "pointer" : "default", opacity: bOut ? 0.55 : 1, background: t.isOwn ? "color-mix(in srgb, var(--nl-accent) 14%, transparent)" : bChamp ? "color-mix(in srgb, var(--nl-warn) 16%, transparent)" : rc ? `color-mix(in srgb, ${rc} 9%, transparent)` : "transparent", boxShadow: rc ? `inset 3px 0 0 ${rc}` : undefined }}>
+            style={{ display: "flex", alignItems: "center", gap: 7, padding: "1.5px 6px", borderRadius: 8, fontVariantNumeric: "tabular-nums", cursor: teamClickable ? "pointer" : "default", opacity: bOut ? 0.55 : 1, background: t.isOwn ? "color-mix(in srgb, var(--nl-accent) 14%, transparent)" : bChamp ? "color-mix(in srgb, var(--nl-warn) 16%, transparent)" : rc ? `color-mix(in srgb, ${rc} 9%, transparent)` : "transparent", boxShadow: rc ? `inset 3px 0 0 ${rc}` : undefined }}>
             <span style={{ width: 22, textAlign: "right", fontWeight: 800, color: prim === "barbell" ? (bChamp ? "var(--nl-warn)" : ampel(bRank)) : ampel(t.rank), fontSize: 12.5 }}>{bChamp ? "🏆" : prim === "barbell" ? bRank : t.rank}</span>
             {prim === "track" || prim === "barbell" ? (
               <span aria-hidden title="Rang-Änderung seit letzter Runde" style={{ width: 14, fontSize: 10, fontWeight: 800, textAlign: "left", color: (prim === "barbell" ? bArrow : rankDelta) > 0 ? "var(--nl-good)" : (prim === "barbell" ? bArrow : rankDelta) < 0 ? "var(--nl-risk)" : "var(--nl-mut)" }}>
