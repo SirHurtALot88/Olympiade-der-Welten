@@ -29,6 +29,7 @@ import {
   getCurrentMatchdayDisciplineSchedule,
   getTeamMatchdayLineupDraft,
 } from "@/lib/foundation/matchday-lineup-readiness";
+import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 import { getTeamColor, teamHasSecondary, floorTeamAccent } from "@/lib/foundation/team-colors";
 import { fmt1 } from "./stage-format";
@@ -51,6 +52,12 @@ export type DisciplineStageDrawerProps = {
   onOpenFull?: (target: { kind: "player"; playerId: string } | { kind: "team"; teamId: string }) => void;
   /** Team-View: einen Spieler des Teams anwählen → Drawer wechselt auf Spieler (ohne Navigation). */
   onSelectPlayer?: ((playerId: string) => void) | null;
+  /**
+   * Vom Arena-Payload gefeldete Spieler-IDs je Team. Treibt die Team-Sektion
+   * „In dieser Disziplin" auch im Test/Vorschau-Modus, wo keine lineupDrafts
+   * existieren (dort sind die Drafts leer und alle Spieler fielen auf die Bank).
+   */
+  fieldedPlayerIdsByTeam?: Record<string, string[]>;
 };
 
 // ---------------------------------------------------------------------------
@@ -264,7 +271,16 @@ function PlayerBody({
   // Defensiv: schlägt der Builder fehl, greifen direkte gameState-Felder als Fallback.
   const data: PlayerDetailDrawerData | null = useMemo(() => {
     try {
-      return buildPlayerDrawerDataFromGameState({ gameState, playerId, source: "sqlite" });
+      // Voll-Reveal-Arena-Drawer: Gegner-Stats müssen entmaskt sein. Das Team des
+      // Spielers als „manageable" übergeben → data.pps, data.ppsRank und
+      // axisCards[].seasonPointsRank sind auch für Gegner echt (nicht maskiert).
+      const teamIdOfPlayer = gameState.rosters?.find((r) => r.playerId === playerId)?.teamId ?? null;
+      return buildPlayerDrawerDataFromGameState({
+        gameState,
+        playerId,
+        source: "sqlite",
+        manageableTeamIds: [teamIdOfPlayer].filter(Boolean) as string[],
+      });
     } catch {
       return null;
     }
@@ -288,7 +304,8 @@ function PlayerBody({
   // Kopfzahlen.
   const ovr = data?.ovr ?? playerOverall(player);
   const ovrRank = data?.ovrRank ?? null;
-  const pps = data?.pps ?? player.pps ?? null;
+  // Saison-PP (verdient) — kein Fallback auf player.pps (importiertes Karriere-Rating).
+  const pps = data?.pps ?? null;
   const ppsRank = data?.ppsRank ?? null;
   const mvs = player.economyAfterUpgradePreview?.mvsUnchanged ?? data?.mvs ?? null;
   const mvsRank = data?.mvsRank ?? null;
@@ -405,7 +422,8 @@ function PlayerBody({
           {AXES.map((meta) => {
             const card = axisById.get(meta.id);
             const value = (card?.value ?? player.coreStats?.[meta.coreKey]) ?? null;
-            const rank = card?.valueRank ?? null;
+            // Rang = Saison-Punkte-Rang der Achse (nicht Attribut-Rang).
+            const rank = card?.seasonPointsRank ?? null;
             return <AxisBar key={meta.id} meta={meta} value={value} rank={rank} />;
           })}
         </div>
@@ -459,6 +477,8 @@ function LineupRow({
   slotLabel,
   rank,
   railColor,
+  tintColor,
+  seasonPps,
   unavailable,
   onSelectPlayer,
 }: {
@@ -468,6 +488,10 @@ function LineupRow({
   rank: number | null;
   /** Farbe des 2px-Rails links (Sektions-Marker). */
   railColor?: string | null;
+  /** Optionale, dezente Team-Tönung des Zeilenhintergrunds. */
+  tintColor?: string | null;
+  /** Saison-PP (verdient) aus dem Rating-Contract; kein Karriere-Rating. */
+  seasonPps?: number | null;
   unavailable?: boolean;
   onSelectPlayer?: ((playerId: string) => void) | null;
 }) {
@@ -475,7 +499,7 @@ function LineupRow({
   if (!player) return null;
   const portraitUrl = getPlayerPortraitBrowserUrl(player.id, player.portraitUrl ?? null, player.portraitPath ?? null);
   const ovr = playerOverall(player);
-  const pps = player.pps ?? null;
+  const pps = seasonPps ?? null;
   const clickable = Boolean(onSelectPlayer);
   return (
     <div
@@ -489,11 +513,11 @@ function LineupRow({
         borderRadius: 9,
         cursor: clickable ? "pointer" : "default",
         borderLeft: railColor ? `2px solid ${railColor}` : "2px solid transparent",
-        background: "var(--nl-panel)",
+        background: tintColor ?? "var(--nl-panel)",
         opacity: unavailable ? 0.62 : 1,
       }}
     >
-      <PlayerMark src={portraitUrl} alt={player.name} size={38} title={player.name} />
+      <PlayerMark src={portraitUrl} alt={player.name} size={44} title={player.name} />
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -546,11 +570,13 @@ function TeamBody({
   teamId,
   disciplineId,
   onSelectPlayer,
+  fieldedPlayerIdsByTeam,
 }: {
   gameState: GameState;
   teamId: string;
   disciplineId: string;
   onSelectPlayer?: ((playerId: string) => void) | null;
+  fieldedPlayerIdsByTeam?: Record<string, string[]>;
 }) {
   const team = findTeam(gameState, teamId);
 
@@ -564,6 +590,29 @@ function TeamBody({
     sorted.forEach((x, i) => m.set(x.id, i + 1));
     return m;
   }, [gameState.players]);
+
+  // Roster-IDs des Teams (einmal) — Basis für Saison-PP-Lookup und Ersatzbank.
+  const rosterIds = useMemo(
+    () => (gameState.rosters ?? []).filter((r) => r.teamId === teamId).map((r) => r.playerId),
+    [gameState.rosters, teamId],
+  );
+
+  // Saison-PP je Spieler (verdient, ppsSeason) — EINMAL für die Roster-Spieler des
+  // Teams gebaut (kein schwerer Drawer-Builder pro Zeile). Kanonische Quelle:
+  // buildPlayerRatingContractMap → row.ppsSeason.
+  const seasonPpsById = useMemo(() => {
+    const m = new Map<string, number | null>();
+    if (rosterIds.length === 0) return m;
+    try {
+      const ratingMap = buildPlayerRatingContractMap(gameState, undefined, { playerIds: rosterIds });
+      for (const pid of rosterIds) {
+        m.set(pid, ratingMap.get(pid)?.ppsSeason ?? null);
+      }
+    } catch {
+      // defensiv: keine Ratings → PP bleibt leer statt Crash.
+    }
+    return m;
+  }, [gameState, rosterIds]);
 
   if (!team) {
     return <div style={{ fontSize: 13, color: "var(--nl-mut)", fontStyle: "italic" }}>Team nicht gefunden.</div>;
@@ -587,10 +636,19 @@ function TeamBody({
   const otherDisciplineId =
     (currentSide === "d1" ? schedule?.discipline2?.disciplineId : schedule?.discipline1?.disciplineId) ?? null;
 
+  const hasDraft = (draft?.entries?.length ?? 0) > 0;
   const section1 = entries.filter((e) => e.disciplineSide === currentSide);
   const section2 = entries.filter((e) => e.disciplineSide === otherSide);
-  const deployedIds = new Set(entries.map((e) => e.activePlayerId ?? e.playerId));
-  const rosterIds = (gameState.rosters ?? []).filter((r) => r.teamId === teamId).map((r) => r.playerId);
+
+  // Im Test/Vorschau-Modus sind die Drafts leer; dann feldern wir aus den vom
+  // Arena-Payload übergebenen Spieler-IDs (sonst fielen alle auf die Ersatzbank).
+  const fieldedIds = (fieldedPlayerIdsByTeam?.[teamId] ?? []).filter(Boolean);
+
+  // Gefeldete Menge = entweder die Draft-eingesetzten IDs (echtes Spiel) oder die
+  // übergebenen Arena-IDs (Test/Vorschau). Ersatzbank = Roster ohne diese Menge.
+  const deployedIds = hasDraft
+    ? new Set(entries.map((e) => e.activePlayerId ?? e.playerId))
+    : new Set(fieldedIds);
   const benchIds = rosterIds.filter((id) => !deployedIds.has(id));
 
   const matchdayId = gameState.matchdayState?.matchdayId ?? "";
@@ -604,7 +662,9 @@ function TeamBody({
   };
 
   const secondaryRail = "color-mix(in srgb, var(--accent2) 70%, transparent)";
-  const hasLineupContext = Boolean(schedule || draft);
+  const section1Tint = "color-mix(in srgb, var(--accent) 5%, var(--nl-panel))";
+  const section2Tint = "color-mix(in srgb, var(--accent2) 5%, var(--nl-panel))";
+  const hasLineupContext = Boolean(schedule || draft) || fieldedIds.length > 0;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -643,11 +703,19 @@ function TeamBody({
                   {rank != null ? rank : "–"}
                 </div>
               </div>
-              <div style={{ textAlign: "center", borderRadius: 9, padding: "5px 12px", background: "var(--nl-panel)", border: "1px solid var(--nl-line)" }}>
+              <div
+                style={{
+                  textAlign: "center",
+                  borderRadius: 9,
+                  padding: "5px 12px",
+                  background: "color-mix(in srgb, var(--accent2) 12%, var(--nl-panel))",
+                  border: "1px solid color-mix(in srgb, var(--accent2) 45%, var(--nl-line))",
+                }}
+              >
                 <div style={{ fontSize: 9.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 700 }}>
                   Punkte
                 </div>
-                <div style={{ fontSize: 17, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+                <div style={{ fontSize: 17, fontWeight: 800, color: "var(--accent2)", fontVariantNumeric: "tabular-nums" }}>
                   {typeof points === "number" ? fmt1(points) : "–"}
                 </div>
               </div>
@@ -664,7 +732,7 @@ function TeamBody({
 
       {/* Sektion 1: In dieser Disziplin (--accent, primär) */}
       <Section title="In dieser Disziplin" accentRole="primary" right={<span style={{ fontSize: 11, fontWeight: 700, color: "var(--accent)" }}>{disciplineName(gameState, disciplineId)}</span>}>
-        {section1.length > 0 ? (
+        {hasDraft && section1.length > 0 ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {section1
               .slice()
@@ -679,11 +747,29 @@ function TeamBody({
                     slotLabel={`Slot ${e.slotIndex + 1}`}
                     rank={ovrRankById.get(pid) ?? null}
                     railColor="var(--accent)"
+                    tintColor={section1Tint}
+                    seasonPps={seasonPpsById.get(pid) ?? null}
                     unavailable={isUnavailable(pid)}
                     onSelectPlayer={onSelectPlayer}
                   />
                 );
               })}
+          </div>
+        ) : !hasDraft && fieldedIds.length > 0 ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {fieldedIds.map((pid) => (
+              <LineupRow
+                key={pid}
+                gameState={gameState}
+                playerId={pid}
+                rank={ovrRankById.get(pid) ?? null}
+                railColor="var(--accent)"
+                tintColor={section1Tint}
+                seasonPps={seasonPpsById.get(pid) ?? null}
+                unavailable={isUnavailable(pid)}
+                onSelectPlayer={onSelectPlayer}
+              />
+            ))}
           </div>
         ) : (
           <div style={{ fontSize: 12.5, color: "var(--nl-mut)", fontStyle: "italic" }}>Keine Aufstellung für diese Disziplin.</div>
@@ -691,7 +777,7 @@ function TeamBody({
       </Section>
 
       {/* Sektion 2: Andere Disziplin (Spieltag) (--accent2, sekundär) */}
-      {section2.length > 0 ? (
+      {hasDraft && section2.length > 0 ? (
         <Section
           title="Andere Disziplin (Spieltag)"
           accentRole="secondary"
@@ -715,11 +801,19 @@ function TeamBody({
                     slotLabel={`Slot ${e.slotIndex + 1}`}
                     rank={ovrRankById.get(pid) ?? null}
                     railColor={secondaryRail}
+                    tintColor={section2Tint}
+                    seasonPps={seasonPpsById.get(pid) ?? null}
                     unavailable={isUnavailable(pid)}
                     onSelectPlayer={onSelectPlayer}
                   />
                 );
               })}
+          </div>
+        </Section>
+      ) : !hasDraft && fieldedIds.length > 0 ? (
+        <Section title="Andere Disziplin (Spieltag)" accentRole="secondary">
+          <div style={{ fontSize: 12.5, color: "var(--nl-mut)", fontStyle: "italic" }}>
+            In Test/Vorschau nicht verfügbar
           </div>
         </Section>
       ) : null}
@@ -734,6 +828,7 @@ function TeamBody({
                 gameState={gameState}
                 playerId={pid}
                 rank={ovrRankById.get(pid) ?? null}
+                seasonPps={seasonPpsById.get(pid) ?? null}
                 unavailable={isUnavailable(pid)}
                 onSelectPlayer={onSelectPlayer}
               />
@@ -754,6 +849,7 @@ export default function DisciplineStageDrawer({
   gameState,
   disciplineId,
   onSelectPlayer,
+  fieldedPlayerIdsByTeam,
   onClose,
 }: DisciplineStageDrawerProps): React.JSX.Element | null {
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -926,7 +1022,13 @@ export default function DisciplineStageDrawer({
           {target.kind === "player" ? (
             <PlayerBody gameState={gameState} playerId={target.playerId} disciplineId={disciplineId} />
           ) : (
-            <TeamBody gameState={gameState} teamId={target.teamId} disciplineId={disciplineId} onSelectPlayer={onSelectPlayer} />
+            <TeamBody
+              gameState={gameState}
+              teamId={target.teamId}
+              disciplineId={disciplineId}
+              onSelectPlayer={onSelectPlayer}
+              fieldedPlayerIdsByTeam={fieldedPlayerIdsByTeam}
+            />
           )}
         </div>
       </aside>

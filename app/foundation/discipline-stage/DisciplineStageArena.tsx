@@ -731,6 +731,22 @@ export default function DisciplineStageArena({
     [payload, teamRelationshipMap],
   );
 
+  // Gefeldete Spieler je Team (aus dem Arena-Payload) — treibt im Drawer die
+  // Team-Sektion „In dieser Disziplin", auch im Test/Vorschau-Modus, wo keine
+  // lineupDrafts existieren. teamId kann null sein → überspringen.
+  const fieldedByTeam = useMemo(
+    () =>
+      Object.fromEntries(
+        payload.teams
+          .filter((t) => Boolean(t.teamId))
+          .map((t) => [
+            t.teamId as string,
+            t.players.map((p) => p.playerId).filter((id): id is string => Boolean(id)),
+          ]),
+      ),
+    [payload],
+  );
+
   // Spoiler-Gate (A1): der Real-Modus-Endscreen darf erst erscheinen, wenn die
   // native Arena das Podest erreicht hat. Bei Remount (Disziplin/Modus/Seed) zurück.
   const [arenaEnded, setArenaEnded] = useState(false);
@@ -1017,6 +1033,7 @@ export default function DisciplineStageArena({
       target={drawerTarget}
       gameState={gameState}
       disciplineId={disciplineId}
+      fieldedPlayerIdsByTeam={fieldedByTeam}
       onClose={() => {
         openedByHover.current = false;
         setDrawerTarget(null);
