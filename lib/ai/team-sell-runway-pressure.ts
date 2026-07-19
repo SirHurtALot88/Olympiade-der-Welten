@@ -85,13 +85,31 @@ export function estimateBuyoutLikelihood(input: {
   return round(base * affordabilityFactor, 3);
 }
 
+/**
+ * 0 (strongest roster in the league) .. 1 (weakest). Scales the "proactive strong offer" bar
+ * below: weak teams only need a genuine ~15% premium to be tempted, strong teams need ~25%+.
+ * Never lower than 0.15 and never higher than 0.25 — always a real premium, never marginal profit.
+ */
+export function getProactiveStrongOfferPremiumBar(teamWeaknessScore: number) {
+  const weakness = clamp(teamWeaknessScore, 0, 1);
+  return round(clamp(0.25 - weakness * 0.1, 0.15, 0.25), 3);
+}
+
 export function isAttractiveProfitSell(input: {
   expectedSellValue: number | null;
   marketValue: number | null;
   purchasePrice?: number | null;
   cashPressureScore: number;
+  /**
+   * 0 (strongest roster in the league) .. 1 (weakest). ONLY used for the no-cash-pressure
+   * "proactive strong offer" path: when provided, it REPLACES the flat no-pressure edge below
+   * with a bar that scales from ~15% (weakest teams) up to ~25%+ (strongest teams) — a clear,
+   * deliberate premium, not the marginal profit-taking the flat edge already allows. Omit it
+   * (all pre-existing callers) to keep the original flat no-pressure thresholds untouched.
+   */
+  teamWeaknessScore?: number;
 }) {
-  const { expectedSellValue, marketValue, purchasePrice, cashPressureScore } = input;
+  const { expectedSellValue, marketValue, purchasePrice, cashPressureScore, teamWeaknessScore } = input;
   if (expectedSellValue == null || marketValue == null || marketValue <= 0) {
     return false;
   }
@@ -105,6 +123,11 @@ export function isAttractiveProfitSell(input: {
     if (profitAbsolute >= 3 && vsMarket >= 0.08) return true;
     if (vsPurchase != null && vsPurchase >= 0.05) return true;
     return vsMarket >= 0.05;
+  }
+
+  if (teamWeaknessScore != null) {
+    const strongOfferBar = getProactiveStrongOfferPremiumBar(teamWeaknessScore);
+    return profitAbsolute > 0 && vsMarket >= strongOfferBar;
   }
 
   const minMarketEdge = cashPressureScore >= 0.5 ? 0.05 : 0.07;

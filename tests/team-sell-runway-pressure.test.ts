@@ -8,6 +8,7 @@ import {
   assessTeamSellRunwayPressure,
   countTeamSeasonSells,
   estimateBuyoutLikelihood,
+  getProactiveStrongOfferPremiumBar,
   getProfitWindowSellThreshold,
   isAttractiveProfitSell,
 } from "@/lib/ai/team-sell-runway-pressure";
@@ -101,5 +102,91 @@ describe("team sell runway pressure", () => {
       ],
     } as unknown as GameState;
     expect(countTeamSeasonSells(gameState, "L-K")).toBe(1);
+  });
+});
+
+describe("proactive strong-offer path for weak teams (no cash pressure)", () => {
+  it("scales the strong-offer premium bar from ~15% (weakest) to ~25% (strongest)", () => {
+    expect(getProactiveStrongOfferPremiumBar(1)).toBeCloseTo(0.15, 5);
+    expect(getProactiveStrongOfferPremiumBar(0)).toBeCloseTo(0.25, 5);
+    expect(getProactiveStrongOfferPremiumBar(0.5)).toBeCloseTo(0.2, 5);
+    // Never below the floor or above the ceiling, even for out-of-range input.
+    expect(getProactiveStrongOfferPremiumBar(-1)).toBe(0.25);
+    expect(getProactiveStrongOfferPremiumBar(2)).toBe(0.15);
+  });
+
+  it("does not change legacy no-pressure behaviour when teamWeaknessScore is omitted", () => {
+    // Same cases already covered above without teamWeaknessScore — passing cashPressureScore
+    // alone must be untouched by the new parameter.
+    expect(
+      isAttractiveProfitSell({ expectedSellValue: 51, marketValue: 50, cashPressureScore: 0.1 }),
+    ).toBe(false);
+    expect(
+      isAttractiveProfitSell({ expectedSellValue: 55, marketValue: 50, cashPressureScore: 0.1 }),
+    ).toBe(true);
+  });
+
+  it("a weak team (weaknessScore near 1) fires on a genuine ~20% premium with no cash pressure", () => {
+    expect(
+      isAttractiveProfitSell({
+        expectedSellValue: 60,
+        marketValue: 50,
+        purchasePrice: 200, // keep vs-purchase profit negative so only the new path can fire
+        cashPressureScore: 0.1,
+        teamWeaknessScore: 1,
+      }),
+    ).toBe(true);
+  });
+
+  it("the same weak team does NOT fire on only a marginal ~5% premium", () => {
+    expect(
+      isAttractiveProfitSell({
+        expectedSellValue: 52.5,
+        marketValue: 50,
+        purchasePrice: 200,
+        cashPressureScore: 0.1,
+        teamWeaknessScore: 1,
+      }),
+    ).toBe(false);
+  });
+
+  it("a strong team (weaknessScore 0) needs a much bigger premium than a weak team", () => {
+    // ~20% premium: fires for a weak team, but NOT for a strong one — it needs ~25%+.
+    const twentyPercentPremium = { expectedSellValue: 60, marketValue: 50, purchasePrice: 200, cashPressureScore: 0.1 };
+    expect(isAttractiveProfitSell({ ...twentyPercentPremium, teamWeaknessScore: 1 })).toBe(true);
+    expect(isAttractiveProfitSell({ ...twentyPercentPremium, teamWeaknessScore: 0 })).toBe(false);
+
+    // A big enough premium (~30%) still tempts even the strongest team.
+    expect(
+      isAttractiveProfitSell({
+        expectedSellValue: 65,
+        marketValue: 50,
+        purchasePrice: 200,
+        cashPressureScore: 0.1,
+        teamWeaknessScore: 0,
+      }),
+    ).toBe(true);
+  });
+
+  it("is premium-graded: a bigger overpay clears the bar at a lower weakness than a smaller one", () => {
+    const bar = (weakness: number, premiumRatio: number) =>
+      isAttractiveProfitSell({
+        expectedSellValue: 50 * (1 + premiumRatio),
+        marketValue: 50,
+        purchasePrice: 200,
+        cashPressureScore: 0.1,
+        teamWeaknessScore: weakness,
+      });
+    // At weakness=0.3 a 18% premium doesn't clear the bar, but a 30% one does.
+    expect(bar(0.3, 0.18)).toBe(false);
+    expect(bar(0.3, 0.3)).toBe(true);
+  });
+
+  it("still requires cash pressure OR an explicit weakness score — a plain no-pressure call without it keeps the original (much lower) threshold", () => {
+    // Without teamWeaknessScore, a ~10% edge already clears the legacy no-pressure threshold —
+    // confirming the new path is strictly additive and does not change omitted-param behaviour.
+    expect(
+      isAttractiveProfitSell({ expectedSellValue: 55, marketValue: 50, cashPressureScore: 0.1 }),
+    ).toBe(true);
   });
 });

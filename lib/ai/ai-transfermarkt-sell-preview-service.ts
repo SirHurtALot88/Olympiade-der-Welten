@@ -219,6 +219,56 @@ function getTeamRoster(gameState: GameState, teamId: string) {
     .filter((item): item is { roster: RosterEntry; player: Player } => Boolean(item.player));
 }
 
+type TeamWeaknessInfo = {
+  /** 0 (strongest roster in the league) .. 1 (weakest). */
+  weaknessScore: number;
+  /** Bottom third of the league by roster market value. */
+  isWeakTeam: boolean;
+  rank: number;
+  teamCount: number;
+};
+
+const NEUTRAL_TEAM_WEAKNESS: TeamWeaknessInfo = { weaknessScore: 0, isWeakTeam: false, rank: 1, teamCount: 1 };
+
+/**
+ * Team-weakness signal for the proactive "strong offer" profit-sell path: bottom-table teams
+ * should be readier to cash in a clear premium than top-table ones. Reuses the same
+ * roster-market-value total already computed per team below (no separate ranking engine) and
+ * ranks it across the WHOLE league (not just the requested scope), so a single-team lookup still
+ * reflects true league standing.
+ */
+function buildTeamWeaknessByTeamId(gameState: GameState): Map<string, TeamWeaknessInfo> {
+  const teams = gameState.teams;
+  const teamCount = teams.length;
+  const marketValueTotalByTeamId = new Map<string, number>();
+  for (const team of teams) {
+    const roster = getTeamRoster(gameState, team.teamId);
+    const total = roster.reduce(
+      (sum, item) => sum + (resolvePlayerEconomyContract({ player: item.player, rosterEntry: item.roster }).marketValue ?? 0),
+      0,
+    );
+    marketValueTotalByTeamId.set(team.teamId, total);
+  }
+
+  const sorted = [...teams].sort((left, right) => {
+    const leftValue = marketValueTotalByTeamId.get(left.teamId) ?? 0;
+    const rightValue = marketValueTotalByTeamId.get(right.teamId) ?? 0;
+    if (rightValue !== leftValue) {
+      return rightValue - leftValue;
+    }
+    return left.teamId.localeCompare(right.teamId);
+  });
+
+  const result = new Map<string, TeamWeaknessInfo>();
+  sorted.forEach((team, index) => {
+    const rank = index + 1; // 1 = strongest (highest roster market value)
+    const weaknessScore = teamCount > 1 ? roundValue((rank - 1) / (teamCount - 1), 3) : 0;
+    const isWeakTeam = rank > Math.ceil((teamCount * 2) / 3);
+    result.set(team.teamId, { weaknessScore, isWeakTeam, rank, teamCount });
+  });
+  return result;
+}
+
 function getLatestCompletedSeasonSnapshot(gameState: GameState): SeasonSnapshotRecord | null {
   return [...(gameState.seasonState.seasonSnapshots ?? [])]
     .filter((snapshot) => snapshot.status !== "dry_run" && snapshot.playerPerformances.length > 0)
@@ -438,6 +488,7 @@ function buildCandidate(
   playerMin: number | null,
   playerOpt: number | null,
   cache: SellPreviewRunCache,
+  teamWeakness: TeamWeaknessInfo = NEUTRAL_TEAM_WEAKNESS,
   allowSellBelowRosterMin = false,
 ) {
   const profile = getTeamStrategyProfile(context.gameState, team.teamId);
@@ -508,6 +559,12 @@ function buildCandidate(
   const wagePressureScore = clamp(salaryShare * 0.7 + cashShare * 0.3, 0, 1);
   const profitDelta = expectedSellValue != null && purchasePrice != null ? expectedSellValue - purchasePrice : null;
   const profitScore = profitDelta != null && purchasePrice != null && purchasePrice > 0 ? clamp(profitDelta / purchasePrice, -1, 1) : null;
+  // Premium vs. market value (not purchase price) — used to grade how strong a profit-window
+  // offer is: a huge overpay should pull harder than a barely-strong one.
+  const vsMarketRatio =
+    expectedSellValue != null && marketValue != null && marketValue > 0
+      ? (expectedSellValue - marketValue) / marketValue
+      : null;
   const lowPerformanceScore =
     performance.averageContribution != null ? clamp(1 - performance.averageContribution / 75, 0, 1) : 0;
   const keepPerformanceScore =
@@ -585,20 +642,44 @@ function buildCandidate(
     team,
     salaryTotal,
   });
-  if (sellRunway.cashPressureScore >= 0.45 && !starProtection) {
-    if (sellRunway.salaryExceedsCash) {
-      pushSell("cash_runway_pressure", "Gehaltslast uebersteigt verfuegbares Cash — Verkauf entlastet den Etat");
-    }
-    if (
-      isAttractiveProfitSell({
+  const cashPressureGate = sellRunway.cashPressureScore >= 0.45;
+  const cashPressureProfitAttractive = isAttractiveProfitSell({
+    expectedSellValue,
+    marketValue,
+    purchasePrice,
+    cashPressureScore: sellRunway.cashPressureScore,
+  });
+  // Proactive "strong offer" path: even WITHOUT cash pressure, a genuinely strong (well above
+  // market value) offer should be able to tempt a team into cashing in — this previously only
+  // fired once a team was already bleeding cash, so a bottom-table team sitting on a big premium
+  // offer never converted it into cash unless it was also cash-distressed. Weaker teams need a
+  // smaller (but still real, ~15%+) premium; stronger teams need a much bigger one (~25%+) — see
+  // getProactiveStrongOfferPremiumBar. Star protection still fully applies.
+  const proactiveOfferGate = !cashPressureGate && !starProtection;
+  const proactiveProfitAttractive = proactiveOfferGate
+    ? isAttractiveProfitSell({
         expectedSellValue,
         marketValue,
         purchasePrice,
         cashPressureScore: sellRunway.cashPressureScore,
+        teamWeaknessScore: teamWeakness.weaknessScore,
       })
-    ) {
+    : false;
+
+  if (cashPressureGate && !starProtection) {
+    if (sellRunway.salaryExceedsCash) {
+      pushSell("cash_runway_pressure", "Gehaltslast uebersteigt verfuegbares Cash — Verkauf entlastet den Etat");
+    }
+    if (cashPressureProfitAttractive) {
       pushSell("profit_window", "Verkaufspreis liegt ueber Marktwert — lukrativer Exit moeglich");
     }
+  } else if (proactiveOfferGate && proactiveProfitAttractive) {
+    pushSell(
+      "profit_window",
+      teamWeakness.isWeakTeam
+        ? "Verkaufspreis liegt deutlich ueber Marktwert — starkes Angebot fuer ein Team im unteren Tabellendrittel nutzen"
+        : "Verkaufspreis liegt weit ueber Marktwert — ein derart starkes Angebot lohnt sich auch ohne Cash-Druck",
+    );
   }
 
   if (profitDelta != null && profitDelta > 0) {
@@ -746,17 +827,14 @@ function buildCandidate(
     (expiringStrategicPressure ? 8 : 0) +
     (expiringCoreDecisionPressure ? 10 : 0) +
     buyoutLikelihood * 12 +
-    (sellRunway.cashPressureScore >= 0.45 && !starProtection
-      ? Math.round(sellRunway.cashPressureScore * 14)
-      : 0) +
-    (sellRunway.cashPressureScore >= 0.45 &&
-    isAttractiveProfitSell({
-      expectedSellValue,
-      marketValue,
-      purchasePrice,
-      cashPressureScore: sellRunway.cashPressureScore,
-    })
-      ? 10
+    (cashPressureGate && !starProtection ? Math.round(sellRunway.cashPressureScore * 14) : 0) +
+    (cashPressureGate && cashPressureProfitAttractive ? 10 : 0) +
+    // Premium-graded proactive strong-offer bonus: bigger premiums over market value pull harder,
+    // and weaker teams get a modest extra nudge on top — never enough to force a sale on its own.
+    (proactiveOfferGate && proactiveProfitAttractive
+      ? 8 +
+        Math.round(clamp(vsMarketRatio ?? 0, 0, 0.6) * 14) +
+        Math.round(teamWeakness.weaknessScore * 6)
       : 0) +
     demandPressureScore * 18 +
     strategy.avoidedHits * 6 +
@@ -803,7 +881,7 @@ function buildCandidate(
     adjustedScoreRaw += 5;
   }
 
-  const doctrine = resolveTransferDoctrine(context.gameState, team.teamId);
+  const doctrine = resolveTransferDoctrine(context.gameState, team.teamId, teamWeakness.weaknessScore);
   const gmAdjustedScore = applyGmArchetypeSellScoreModifier({
     baseScore: adjustedScoreRaw,
     gmProfile,
@@ -967,6 +1045,9 @@ export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParam
   const context = await resolvePreviewContext(params);
   const playerRatingsById = getSeasonDerivations({ gameState: context.gameState, saveId: context.saveId }).ratingsById;
   const runCache = buildSellPreviewRunCache(context.gameState);
+  // Computed across the WHOLE league (not just the requested scope) so a single-team lookup
+  // still reflects true league standing.
+  const teamWeaknessByTeamId = buildTeamWeaknessByTeamId(context.gameState);
   const teamScope = params.teamScope === "all" ? "all" : "ai";
   const fullRosterCandidates = params.fullRosterCandidates === true;
   const limit =
@@ -1014,6 +1095,7 @@ export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParam
     const blockingReasons: string[] = [];
     const playerMin = identity?.playerMin ?? profile?.rosterMinTarget ?? null;
     const playerOpt = identity?.playerOpt ?? profile?.rosterOptTarget ?? null;
+    const teamWeakness = teamWeaknessByTeamId.get(team.teamId) ?? NEUTRAL_TEAM_WEAKNESS;
 
     if (teamScope === "all" && control?.controlMode === "manual") {
       warnings.push("manuell gesteuertes Team – Vorschlag nur informativ");
@@ -1041,6 +1123,7 @@ export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParam
           playerMin,
           playerOpt,
           runCache,
+          teamWeakness,
           allowSellBelowRosterMin,
         ),
       )
@@ -1187,6 +1270,7 @@ export function buildSellCoachingCandidateForActivePlayer(input: {
   );
   const playerMin = identity?.playerMin ?? profile?.rosterMinTarget ?? null;
   const playerOpt = identity?.playerOpt ?? profile?.rosterOptTarget ?? null;
+  const teamWeakness = buildTeamWeaknessByTeamId(gameState).get(input.teamId) ?? NEUTRAL_TEAM_WEAKNESS;
 
   return buildCandidate(
     context,
@@ -1199,5 +1283,6 @@ export function buildSellCoachingCandidateForActivePlayer(input: {
     playerMin,
     playerOpt,
     cache,
+    teamWeakness,
   );
 }
