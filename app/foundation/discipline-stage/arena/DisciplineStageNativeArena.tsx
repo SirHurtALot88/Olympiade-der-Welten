@@ -2374,9 +2374,17 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                         const kdaCol = kda >= 3 ? "hsl(140 62% 56%)" : kda >= 1.5 ? "hsl(41 85% 58%)" : "hsl(2 78% 62%)";
                         const barH = Math.min(11, laneH * 0.62);
                         const fs = Math.min(9.5, Math.max(7, laneH * 0.62));
+                        const relC = relColor(t.rel);
                         return (
                           <g style={{ fontVariantNumeric: "tabular-nums" }}>
                             <title>{`abgeleitet · K ${k} · D ${d} · A ${a} · KDA ${kda.toFixed(1)} · HS ${hs}% · PTS ${pts.toFixed(1)}`}</title>
+                            {/* Beziehung: Zeilen-Band + linke Kante (mine=blau/ally=grün/rival=rot) */}
+                            {relC ? (
+                              <>
+                                <rect x={x0 - 16} y={yy - laneH / 2 + 1} width={x1 - x0 + 66} height={laneH - 2} rx={4} fill={relC} opacity={0.14} />
+                                <rect x={x0 - 16} y={yy - laneH / 2 + 1} width={4} height={laneH - 2} rx={2} fill={relC} opacity={0.95} />
+                              </>
+                            ) : null}
                             <rect x={x0} y={yy - barH / 2} width={x1 - x0} height={barH} rx={3} fill="var(--nl-line)" opacity={0.16} />
                             <rect x={x0} y={yy - barH / 2} width={Math.max(0, pos.x - x0)} height={barH} rx={3} fill={fillCol} opacity={0.34} />
                             <text x={x0 + 7} y={yy} dominantBaseline="middle" fontSize={fs} fontWeight={800}>
