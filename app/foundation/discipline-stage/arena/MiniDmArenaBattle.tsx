@@ -82,7 +82,7 @@ type PhysNode = {
   rally: boolean;
 };
 
-const ROUND_MS = 2250; // eine Kampfrunde (langsam/folgbar)
+const ROUND_MS = 5000; // eine Kampfrunde (~5 s, langsam/folgbar) — gemeinsames Reveal-Pacing mit track
 const STEP_MS = 16;
 const VIS = 15; // sichtbare Board-Zeilen
 const ROW_H = 23;
