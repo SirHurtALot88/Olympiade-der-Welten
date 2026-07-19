@@ -84,6 +84,15 @@ export type OrganicSquadPlanInput = {
      * reserve held from min onward) when not provided, so callers that don't opt in are unchanged.
      */
     solvencyFloor?: number;
+    /**
+     * ANPASSUNG SALCEIL (flag-gated OLY_SALARY_CEILING_V2 — see draft-adapter.ts wiring / salary-ceiling.ts
+     * computeTeamSalaryCeiling doc). Soft cap on TOTAL salary (existing roster + planned additions),
+     * anchored on expected sponsor income and team value rather than the volatile cash snapshot. Enforced
+     * ONLY once the roster is at/above rosterMin — reaching the hard minimum always wins over the ceiling
+     * (see the belowMin check at the call site). Undefined ⇒ no salary gating at all ⇒ this builder is
+     * bit-identical to before this field existed (same "undefined ⇒ untouched" contract as `composition`).
+     */
+    salaryCeiling?: number;
   };
   /**
    * Optional per-(save, team) seed for the reproducible buy-utility jitter (see ORGANIC_DRAFT_JITTER).
@@ -138,6 +147,8 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
   const optTarget = input.economy.weights.optTarget;
   // Floor kept while building from min→opt (see solvencyFloor doc). Defaults to cashBuffer = old behaviour.
   const optFillFloor = Math.min(cashBuffer, input.economy.solvencyFloor ?? cashBuffer);
+  // ANPASSUNG SALCEIL: undefined ⇒ no salary gating (flag off / caller opted out) ⇒ bit-identical to before.
+  const salaryCeiling = input.economy.salaryCeiling;
 
   const squad = [...input.startingSquad];
   const pool = [...input.candidates];
@@ -210,10 +221,17 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
     const belowOpt = squad.length < optTarget;
     const affordFloor = belowMin ? 0 : belowOpt ? optFillFloor : cashBuffer;
     // Affordability keeps cash ≥ affordFloor AFTER the buy AND after the reserved min-fill.
+    // ANPASSUNG SALCEIL: once the roster is at/above the hard minimum, a candidate whose salary would push
+    // the TOTAL wage bill past salaryCeiling is treated as unaffordable-by-salary, same as the cash checks
+    // above — an ADDITIONAL cap, not a replacement (a buy must still separately clear the cash affordability
+    // check). Below rosterMin this is skipped entirely: reaching the hard minimum (survival) always wins
+    // over the ceiling, matching the belowMin-ignores-cashBuffer precedent already established above.
+    const salaryCeilingActive = !belowMin && typeof salaryCeiling === "number" && Number.isFinite(salaryCeiling);
     let best: OrganicPlayerView | null = null;
     let bestUtility = -Infinity;
     for (const candidate of pool) {
       if (cash - price(candidate) - reserveForMin < affordFloor) continue;
+      if (salaryCeilingActive && salaryTotal + Math.max(0, candidate.salary) > salaryCeiling!) continue;
       const jitter =
         input.draftSeed && ORGANIC_DRAFT_JITTER > 0
           ? ORGANIC_DRAFT_JITTER * (draftUnit(`${input.draftSeed}:${candidate.playerId}`) - 0.5)

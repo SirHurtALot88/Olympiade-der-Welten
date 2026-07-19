@@ -3040,6 +3040,16 @@ function runOrganicTeamDraftExecute(input: {
   if (plan.stoppedBelowMin) {
     teamWarnings.push("organic_squad_builder_stopped_below_min");
   }
+  // Debug/diagnostics for the long-run harness (scripts/long-run-sandbox-s1-s6.ts): salaryCeiling vs the
+  // salary the plan actually lands on, so a re-run can be eyeballed for headroom-freed vs squeezed teams.
+  // Undefined when OLY_SALARY_CEILING_V2="0" (see draft-adapter.ts) — no warning pushed in that case.
+  if (plan.salaryCeilingDebug) {
+    const c = plan.salaryCeilingDebug;
+    teamWarnings.push(
+      `salary_ceiling_v2:ceiling=${c.salaryCeiling}:sustainable=${c.sustainableSalary}:trend=${c.trendFactor}:` +
+        `ambitionScale=${c.ambitionScale}:planSalaryAfter=${plan.finalSalaryTotal}`,
+    );
+  }
 
   // 4. Execute each decision in order via the shared buy primitive. The plan is a RANKED wishlist,
   //    so a single unbuyable pick (raced/taken between plan and apply, or a transient price/validation

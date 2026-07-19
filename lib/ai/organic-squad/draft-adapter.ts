@@ -19,6 +19,7 @@ import {
   type MarqueeLicenseTeamInput,
 } from "@/lib/ai/organic-squad/marquee-eligibility";
 import { buildOrganicSquadPlan, type OrganicBuyDecision } from "@/lib/ai/organic-squad/draft-builder";
+import { computeTeamSalaryCeiling } from "@/lib/ai/organic-squad/salary-ceiling";
 import {
   CATEGORY_TO_AXIS,
   ROSTER_MAX,
@@ -77,6 +78,16 @@ const FILLQ_B_ENABLED = process.env.OLY_DRAFT_FILLQB === "1";
  * above). This is a SOFT utility nudge only — no hard band filter, no slot sequence, no stopUtility change.
  */
 const COMPOSE_ENABLED = process.env.OLY_DRAFT_COMPOSE === "1";
+
+/**
+ * Env flag for the sponsor-forecast + team-value SALARY CEILING (salary-ceiling.ts computeTeamSalaryCeiling).
+ * Default ON ("0" is the only way to disable) — unlike COMPOSE_ENABLED/FILLQ_B_ENABLED above (opt-in,
+ * default OFF), this is a REPLACEMENT for the cash-only budgeting's blind spot (sponsor-rich teams
+ * under-building because the plan never looked at income/team-value, only cash), so it ships live. Set to
+ * "0" to get the exact pre-existing cash-only path (byte-identical: economy.salaryCeiling stays undefined,
+ * see draft-builder.ts's "undefined ⇒ no salary gating" contract) for A/B comparison.
+ */
+const SALARY_CEILING_V2_ENABLED = process.env.OLY_SALARY_CEILING_V2 !== "0";
 /**
  * The cash buffer scales with the club's WAGE BILL ("auch Top-/Aggro-Teams sollen was auf die Seite legen,
  * z.B. 0.25–0.5× Salary"): a club must keep roughly this fraction of its recurring salary as reserve, so a
@@ -332,6 +343,13 @@ export type OrganicDraftPlanResult = {
   finalRosterSize: number;
   stoppedBelowMin: boolean;
   optTarget: number;
+  /**
+   * Debug/diagnostics snapshot of the SALCEIL computation actually applied this call (undefined when
+   * OLY_SALARY_CEILING_V2="0") — see salary-ceiling.ts computeTeamSalaryCeiling. Exposed so callers (e.g.
+   * scripts/long-run-sandbox-s1-s6.ts's per-team economy rows) can print salaryCeiling vs actual salary
+   * without recomputing it.
+   */
+  salaryCeilingDebug?: ReturnType<typeof computeTeamSalaryCeiling>;
 };
 
 /**
@@ -500,6 +518,14 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     composition = { counts, brackets };
   }
 
+  // ANPASSUNG SALCEIL (flag-gated OLY_SALARY_CEILING_V2, default ON — see salary-ceiling.ts and the flag
+  // doc above). Computed AFTER composition (order doesn't matter between them — independent inputs) but
+  // before the plan call since buildOrganicSquadPlan needs it on economy. An ADDITIONAL cap on top of the
+  // existing cash/fee budgeting (never a replacement) — see draft-builder.ts's salaryCeilingActive gate.
+  const salaryCeilingDebug = SALARY_CEILING_V2_ENABLED
+    ? computeTeamSalaryCeiling(input.gameState, input.team.teamId, { teamCash: ctx.cash })
+    : undefined;
+
   const result = buildOrganicSquadPlan({
     startingSquad,
     candidates,
@@ -518,6 +544,7 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
       weights: planWeights,
       rosterMax: ctx.rosterMax,
       rosterMin: ROSTER_MIN,
+      salaryCeiling: salaryCeilingDebug?.salaryCeiling,
       // Reserve is spendable while building from min→opt: keep only the flat solvency floor here so a
       // team actually reaches its target squad, then holds the full salary-scaled reserve above opt.
       solvencyFloor: ORGANIC_CASH_BUFFER,
@@ -532,6 +559,7 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     finalRosterSize: result.finalSquad.length,
     stoppedBelowMin: result.stoppedBelowMin,
     optTarget: planWeights.optTarget,
+    salaryCeilingDebug,
   };
 }
 
