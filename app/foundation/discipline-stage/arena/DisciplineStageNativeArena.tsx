@@ -2254,7 +2254,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                       const liveStage = Math.min(stages - 1, hist.length);
                       pts.push([xStage(liveStage), yRank(t.rank)]);
                       const anchor = t.rel != null || t.rank <= 3;
-                      const col = relColor(t.rel) ?? (medal ?? "var(--nl-mut)");
+                      const rankMed = t.rank === 1 ? "var(--nl-warn)" : t.rank === 2 ? "var(--nl-mut)" : t.rank === 3 ? "rgb(205,127,50)" : null;
+                      const col = relColor(t.rel) ?? rankMed ?? "var(--nl-mut)";
                       const d = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
                       const end = pts[pts.length - 1]!;
                       return (
