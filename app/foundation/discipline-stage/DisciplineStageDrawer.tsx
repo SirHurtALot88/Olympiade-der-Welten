@@ -20,6 +20,8 @@ export type DisciplineStageDrawerProps = {
   gameState: GameState;
   onClose: () => void;
   onOpenFull?: (target: { kind: "player"; playerId: string } | { kind: "team"; teamId: string }) => void;
+  /** Team-View: einen Spieler des Teams anwählen → Drawer wechselt auf Spieler (ohne Navigation). */
+  onSelectPlayer?: ((playerId: string) => void) | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -252,7 +254,15 @@ function PlayerBody({ gameState, playerId }: { gameState: GameState; playerId: s
 // Inhalt: Team
 // ---------------------------------------------------------------------------
 
-function TeamBody({ gameState, teamId }: { gameState: GameState; teamId: string }) {
+function TeamBody({
+  gameState,
+  teamId,
+  onSelectPlayer,
+}: {
+  gameState: GameState;
+  teamId: string;
+  onSelectPlayer?: ((playerId: string) => void) | null;
+}) {
   const team = findTeam(gameState, teamId);
   if (!team) {
     return <div style={{ fontSize: 13, color: "var(--nl-mut)", fontStyle: "italic" }}>Team nicht gefunden.</div>;
@@ -264,7 +274,7 @@ function TeamBody({ gameState, teamId }: { gameState: GameState; teamId: string 
 
   const topPlayers = [...roster]
     .sort((a, b) => (playerOverall(b) ?? 0) - (playerOverall(a) ?? 0))
-    .slice(0, 3);
+    .slice(0, 6);
 
   const rank = standing?.rank ?? standing?.startplatz ?? null;
 
@@ -362,10 +372,36 @@ function TeamBody({ gameState, teamId }: { gameState: GameState; teamId: string 
             <div style={{ fontSize: 11, color: "var(--nl-mut)", fontWeight: 700 }}>Top nach Rating</div>
             {topPlayers.map((p, i) => {
               const ovr = playerOverall(p);
+              const portraitUrl = getPlayerPortraitBrowserUrl(p.id, p.portraitUrl ?? null, p.portraitPath ?? null);
+              const clickable = Boolean(onSelectPlayer);
               return (
-                <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                  <span style={{ fontSize: 12.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    <span style={{ color: "var(--nl-mut)", fontWeight: 800, marginRight: 6 }}>{i + 1}</span>
+                <div
+                  key={p.id}
+                  onClick={clickable ? () => onSelectPlayer!(p.id) : undefined}
+                  title={clickable ? "Spieler-Karte anzeigen" : undefined}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "4px 6px",
+                    borderRadius: 8,
+                    cursor: clickable ? "pointer" : "default",
+                  }}
+                >
+                  <span style={{ color: "var(--nl-mut)", fontWeight: 800, fontSize: 12, width: 14, flex: "none", textAlign: "right" }}>{i + 1}</span>
+                  {portraitUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={portraitUrl}
+                      alt=""
+                      width={26}
+                      height={26}
+                      style={{ width: 26, height: 26, borderRadius: "50%", objectFit: "cover", flex: "none", border: "1px solid var(--nl-line)" }}
+                    />
+                  ) : (
+                    <span aria-hidden style={{ width: 26, height: 26, borderRadius: "50%", flex: "none", background: "var(--nl-bg)", border: "1px solid var(--nl-line)" }} />
+                  )}
+                  <span style={{ fontSize: 12.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1, minWidth: 0 }}>
                     {p.name}
                   </span>
                   {ovr != null ? (
@@ -392,6 +428,7 @@ export default function DisciplineStageDrawer({
   gameState,
   onClose,
   onOpenFull,
+  onSelectPlayer,
 }: DisciplineStageDrawerProps): React.JSX.Element | null {
   // `prefers-reduced-motion` respektieren (Client-seitig ermittelt).
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -517,7 +554,7 @@ export default function DisciplineStageDrawer({
           {target.kind === "player" ? (
             <PlayerBody gameState={gameState} playerId={target.playerId} />
           ) : (
-            <TeamBody gameState={gameState} teamId={target.teamId} />
+            <TeamBody gameState={gameState} teamId={target.teamId} onSelectPlayer={onSelectPlayer} />
           )}
         </div>
 

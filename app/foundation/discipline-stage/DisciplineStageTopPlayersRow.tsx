@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import type { DisciplineStageTopPlayer } from "./DisciplineStageTopPlayers";
 import { fmt1 } from "./stage-format";
 
@@ -10,12 +11,22 @@ import { fmt1 } from "./stage-format";
 export type DisciplineStageTopPlayersRowProps = {
   players: DisciplineStageTopPlayer[];
   onOpenPlayer?: ((playerId: string) => void) | null;
+  /** Hover-Vorschau: nach kurzer Verzögerung playerId, beim Verlassen null. */
+  onPreviewPlayer?: ((playerId: string | null) => void) | null;
   playerIdByRow?: (string | null)[];
   limit?: number;
 };
 
-export default function DisciplineStageTopPlayersRow({ players, onOpenPlayer, playerIdByRow, limit = 10 }: DisciplineStageTopPlayersRowProps) {
+export default function DisciplineStageTopPlayersRow({ players, onOpenPlayer, onPreviewPlayer, playerIdByRow, limit = 10 }: DisciplineStageTopPlayersRowProps) {
   const shown = players.slice(0, limit);
+  const hoverTimer = useRef<number | null>(null);
+  const clearHoverTimer = () => {
+    if (hoverTimer.current != null) {
+      window.clearTimeout(hoverTimer.current);
+      hoverTimer.current = null;
+    }
+  };
+  useEffect(() => () => clearHoverTimer(), []);
   return (
     <div style={{ marginTop: 12, background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 10 }}>
       <div style={{ fontSize: 11, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 8 }}>
@@ -28,10 +39,27 @@ export default function DisciplineStageTopPlayersRow({ players, onOpenPlayer, pl
           {shown.map((p, index) => {
             const playerId = playerIdByRow?.[index] ?? null;
             const clickable = Boolean(onOpenPlayer && playerId);
+            const previewable = Boolean(onPreviewPlayer && playerId);
             return (
               <div
                 key={`${p.rank}-${p.name}-${p.teamCode}`}
                 onClick={clickable ? () => onOpenPlayer!(playerId!) : undefined}
+                onMouseEnter={
+                  previewable
+                    ? () => {
+                        clearHoverTimer();
+                        hoverTimer.current = window.setTimeout(() => onPreviewPlayer!(playerId), 300);
+                      }
+                    : undefined
+                }
+                onMouseLeave={
+                  previewable
+                    ? () => {
+                        clearHoverTimer();
+                        onPreviewPlayer!(null);
+                      }
+                    : undefined
+                }
                 title={clickable ? "Spieler-Karte öffnen" : undefined}
                 style={{
                   display: "flex",

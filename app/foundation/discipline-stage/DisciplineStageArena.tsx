@@ -18,6 +18,7 @@ import DisciplineStageStandingsDelta from "@/app/foundation/discipline-stage/Dis
 import DisciplineStageHighlights from "@/app/foundation/discipline-stage/DisciplineStageHighlights";
 import DisciplineStageTopPlayers, { type DisciplineStageTopPlayer } from "@/app/foundation/discipline-stage/DisciplineStageTopPlayers";
 import DisciplineStageNativeArena, { type StagePrimitive, type StageMotif, type StageEnv } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
+import DisciplineStageDrawer, { type DisciplineStageDrawerTarget } from "@/app/foundation/discipline-stage/DisciplineStageDrawer";
 import { fmt1 } from "@/app/foundation/discipline-stage/stage-format";
 
 // Disziplinen mit fertigem nativem Renderer (löst schrittweise das iframe ab).
@@ -60,6 +61,7 @@ export type DisciplineStageArenaProps = {
   matchdayId?: string | null;
   onAdvanceMatchday?: (() => void | Promise<void>) | null;
   onOpenPlayer?: ((playerId: string) => void) | null;
+  onOpenTeam?: ((teamId: string) => void) | null;
 };
 
 // Disziplin-ID → fertige Arena-Szene unter /public/discipline-scenes.
@@ -281,8 +283,39 @@ export default function DisciplineStageArena({
   matchdayId,
   onAdvanceMatchday,
   onOpenPlayer,
+  onOpenTeam,
 }: DisciplineStageArenaProps) {
   const ownTeamId = activeManagerTeamId ?? selectedTeamId ?? null;
+
+  // Drawer-Overlay über der laufenden Arena. WICHTIG: drawerTarget fließt NICHT in
+  // den Arena-key oder das teams-Memo ein — sonst würde ein Klick die Arena
+  // remounten und zurücksetzen (genau der Bug, den der Drawer ersetzt).
+  const [drawerTarget, setDrawerTarget] = useState<DisciplineStageDrawerTarget>(null);
+  // Merkt sich, ob der Drawer per Hover geöffnet wurde: ein Klick "pinnt" ihn,
+  // ein Hover-Ende (preview(null)) schließt ihn nur, wenn er per Hover kam.
+  const openedByHover = useRef(false);
+  const openDrawerPinned = (target: NonNullable<DisciplineStageDrawerTarget>) => {
+    openedByHover.current = false;
+    setDrawerTarget(target);
+  };
+  const previewPlayer = (id: string | null) => {
+    if (id != null) {
+      openedByHover.current = true;
+      setDrawerTarget({ kind: "player", playerId: id });
+    } else if (openedByHover.current) {
+      openedByHover.current = false;
+      setDrawerTarget(null);
+    }
+  };
+  const previewTeam = (teamId: string | null) => {
+    if (teamId != null) {
+      openedByHover.current = true;
+      setDrawerTarget({ kind: "team", teamId });
+    } else if (openedByHover.current) {
+      openedByHover.current = false;
+      setDrawerTarget(null);
+    }
+  };
 
   const disciplines = useMemo(
     () =>
@@ -571,6 +604,7 @@ export default function DisciplineStageArena({
   }
 
   return (
+    <>
     <div style={{ width: "100%", margin: "0 auto", padding: "20px 24px", color: "inherit" }}>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 14 }}>
         <div>
@@ -725,7 +759,10 @@ export default function DisciplineStageArena({
               pointsAwarded: p.pointsAwarded,
             })),
           }))}
-          onOpenPlayer={onOpenPlayer}
+          onOpenPlayer={(pid) => openDrawerPinned({ kind: "player", playerId: pid })}
+          onOpenTeam={(teamId) => openDrawerPinned({ kind: "team", teamId })}
+          onHoverTeam={previewTeam}
+          onPreviewPlayer={previewPlayer}
           topPlayers={topPlayers}
           primitive={NATIVE_PRIMITIVE[disciplineId] ?? "track"}
           disciplineName={model.disciplineName}
@@ -736,7 +773,7 @@ export default function DisciplineStageArena({
       ) : scene ? (
         <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
           <div style={{ flex: "0 0 340px", minWidth: 280, maxHeight: "calc(100vh - 180px)", overflowY: "auto" }}>
-            <DisciplineStageTopPlayers players={topPlayers.rows} playerIdByRow={topPlayers.ids} onOpenPlayer={onOpenPlayer} />
+            <DisciplineStageTopPlayers players={topPlayers.rows} playerIdByRow={topPlayers.ids} onOpenPlayer={(pid) => openDrawerPinned({ kind: "player", playerId: pid })} />
           </div>
           <div style={{ flex: "1 1 640px", minWidth: 0, maxWidth: 1240, borderRadius: 14, overflow: "hidden", border: "1px solid var(--nl-line)", background: "var(--nl-bg)" }}>
             <iframe
@@ -766,9 +803,9 @@ export default function DisciplineStageArena({
               {ownTeam.slots.map((slot) => (
                 <div
                   key={slot.playerId}
-                  onClick={onOpenPlayer ? () => onOpenPlayer(slot.playerId) : undefined}
-                  title={onOpenPlayer ? "Spieler-Karte öffnen" : undefined}
-                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid var(--nl-line)", fontVariantNumeric: "tabular-nums", fontSize: 13, cursor: onOpenPlayer ? "pointer" : "default", borderRadius: 6 }}
+                  onClick={() => openDrawerPinned({ kind: "player", playerId: slot.playerId })}
+                  title="Spieler-Karte öffnen"
+                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid var(--nl-line)", fontVariantNumeric: "tabular-nums", fontSize: 13, cursor: "pointer", borderRadius: 6 }}
                 >
                   <span style={{ width: 20, fontWeight: 800, color: "var(--nl-mut)" }}>{slot.slotIndex + 1}</span>
                   {slot.portraitUrl ? (
@@ -856,5 +893,22 @@ export default function DisciplineStageArena({
         </div>
       ) : null}
     </div>
+
+    {/* Drawer-Overlay — Geschwister NACH der Arena, damit die Arena gemountet bleibt
+        und weiterläuft (kein Remount/Reset durch drawerTarget). */}
+    <DisciplineStageDrawer
+      target={drawerTarget}
+      gameState={gameState}
+      onClose={() => {
+        openedByHover.current = false;
+        setDrawerTarget(null);
+      }}
+      onOpenFull={(target) => {
+        if (target.kind === "player") onOpenPlayer?.(target.playerId);
+        else onOpenTeam?.(target.teamId);
+      }}
+      onSelectPlayer={(pid) => openDrawerPinned({ kind: "player", playerId: pid })}
+    />
+    </>
   );
 }

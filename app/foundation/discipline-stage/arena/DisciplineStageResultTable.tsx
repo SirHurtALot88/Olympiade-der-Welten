@@ -9,6 +9,7 @@ import { fmt1, ampel } from "../stage-format";
 
 export type ResultSlotCell = {
   playerName: string;
+  playerId?: string | null; // für Klick → Spieler-Drawer
   net: number;
   slotRank: number;
   boniMali: number; // Σ mods (Vorzeichen entscheidet Farbe)
@@ -28,6 +29,7 @@ export type ResultTableRow = {
 export type DisciplineStageResultTableProps = {
   rows: ResultTableRow[];
   slotLabels: string[];
+  onOpenPlayer?: ((playerId: string) => void) | null;
 };
 
 function netColor(boniMali: number): string {
@@ -52,7 +54,7 @@ const HEAD: React.CSSProperties = {
   whiteSpace: "nowrap",
 };
 
-export default function DisciplineStageResultTable({ rows, slotLabels }: DisciplineStageResultTableProps) {
+export default function DisciplineStageResultTable({ rows, slotLabels, onOpenPlayer }: DisciplineStageResultTableProps) {
   return (
     <div
       data-oly-result
@@ -108,16 +110,25 @@ export default function DisciplineStageResultTable({ rows, slotLabels }: Discipl
                       <span style={{ color: "var(--nl-mut)", fontSize: 11.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 120 }}>{r.name}</span>
                     </div>
                   </td>
-                  {r.slots.map((c, ci) => (
-                    <td key={ci} title={c.calc} style={{ padding: "6px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
-                      <div style={{ fontWeight: 800, color: netColor(c.boniMali) }}>
-                        {c.isBest ? <span style={{ color: "var(--nl-warn)" }}>★ </span> : null}
-                        <span style={{ fontSize: 11, fontWeight: 800, color: ampel(c.slotRank), marginRight: 5 }}>#{c.slotRank}</span>
-                        {fmt1(c.net)}
-                      </div>
-                      <div style={{ fontSize: 10.5, color: "var(--nl-mut)", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 110 }}>{c.playerName}</div>
-                    </td>
-                  ))}
+                  {r.slots.map((c, ci) => {
+                    const nameClickable = Boolean(onOpenPlayer && c.playerId);
+                    return (
+                      <td key={ci} title={c.calc} style={{ padding: "6px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
+                        <div style={{ fontWeight: 800, color: netColor(c.boniMali) }}>
+                          {c.isBest ? <span style={{ color: "var(--nl-warn)" }}>★ </span> : null}
+                          <span style={{ fontSize: 11, fontWeight: 800, color: ampel(c.slotRank), marginRight: 5 }}>#{c.slotRank}</span>
+                          {fmt1(c.net)}
+                        </div>
+                        <div
+                          onClick={nameClickable ? () => onOpenPlayer!(c.playerId!) : undefined}
+                          title={nameClickable ? "Spieler-Karte öffnen" : undefined}
+                          style={{ fontSize: 10.5, color: nameClickable ? "var(--nl-ink)" : "var(--nl-mut)", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 110, cursor: nameClickable ? "pointer" : "default", textDecoration: nameClickable ? "underline dotted" : undefined }}
+                        >
+                          {c.playerName}
+                        </div>
+                      </td>
+                    );
+                  })}
                   <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: 800, color: "var(--nl-accent)", fontSize: 14 }}>{fmt1(r.total)}</td>
                 </tr>
               );

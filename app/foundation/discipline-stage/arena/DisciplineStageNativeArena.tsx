@@ -36,6 +36,9 @@ export type DisciplineStageNativeArenaProps = {
   teams: NativeStageTeam[];
   slots: string[];
   onOpenPlayer?: ((playerId: string) => void) | null;
+  onOpenTeam?: ((teamId: string) => void) | null; // Token/Ladder-Klick → Team-Drawer
+  onHoverTeam?: ((teamId: string | null) => void) | null; // Ladder-Hover → Team-Vorschau
+  onPreviewPlayer?: ((playerId: string | null) => void) | null; // Top-Player-Hover → Vorschau
   topPlayers?: { rows: DisciplineStageTopPlayer[]; ids: (string | null)[] } | null;
   primitive?: StagePrimitive;
   progressLabel?: string; // z.B. "Position auf dem Oval = kumulierte Punkte"
@@ -371,6 +374,7 @@ type RT = {
   name: string;
   logoUrl: string | null;
   isOwn: boolean;
+  teamId: string | null; // für Team-Drawer
   players: NativeStagePlayer[];
   seasonRank: number;
   laneIdx: number; // dichte 0…N-1 Bahn-/Turm-Reihenfolge nach seasonRank (keine Lücken)
@@ -407,11 +411,14 @@ type TickerReveal = {
   slot: number;
 };
 type TickerSummary = { kind: "summary"; id: string; text: string };
-type TickerData = TickerReveal | TickerSummary;
+type TickerHeader = { kind: "header"; id: string; text: string };
+type TickerData = TickerReveal | TickerSummary | TickerHeader;
+
+const TICKER_MAX = 40;
 type Spot = { crest: NativeStageTeam; idx: number; kick: string; name: string; sub: string; net: number; chipText: string; chipColor: string; mine: boolean } | null;
 type PodCol = { place: number; code: string; name: string; pts: number; logoUrl: string | null; isOwn: boolean; idx: number; delayMs: number; loud: boolean };
 
-export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, topPlayers, primitive = "track", progressLabel, disciplineName, accent, motif, env }: DisciplineStageNativeArenaProps) {
+export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, onOpenTeam, onHoverTeam, onPreviewPlayer, topPlayers, primitive = "track", progressLabel, disciplineName, accent, motif, env }: DisciplineStageNativeArenaProps) {
   const skinAccent = accent ?? "var(--nl-line-2, var(--nl-line))";
   const slotCount = Math.max(1, slots.length);
   const prim = primitive;
@@ -443,6 +450,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       name: t.name,
       logoUrl: t.logoUrl,
       isOwn: t.isOwn,
+      teamId: t.teamId ?? null,
       players: t.players,
       seasonRank: t.seasonRank ?? idx + 1,
       laneIdx: idx,
@@ -477,7 +485,9 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const [frags, setFrags] = useState<Frag[]>([]);
   const [ticker, setTicker] = useState<TickerData[]>([]);
   const [podium, setPodium] = useState<PodCol[] | null>(null);
-  const [hover, setHover] = useState<{ idx: number; x: number; y: number } | null>(null);
+  const [hover, setHover] = useState<{ idx: number } | null>(null);
+  const hoverCloseTimer = useRef<number | null>(null);
+  const ladderHoverTimer = useRef<number | null>(null);
   const timers = useRef<number[]>([]);
   const fxId = useRef(1);
   const roundTopNet = useRef(0); // Netto des Etappensiegers der laufenden Runde (vorab bestimmt)
@@ -493,6 +503,33 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     const id = window.setTimeout(fn, reduced.current ? 0 : ms);
     timers.current.push(id);
     return id;
+  }, []);
+
+  // Token-Hovercard: eigener Schließ-Timer (unabhängig von der Reveal-Cascade),
+  // damit die Karte beim Rüberfahren nicht flackert.
+  const cancelHoverClose = useCallback(() => {
+    if (hoverCloseTimer.current != null) {
+      window.clearTimeout(hoverCloseTimer.current);
+      hoverCloseTimer.current = null;
+    }
+  }, []);
+  const openHover = useCallback(
+    (idx: number) => {
+      cancelHoverClose();
+      setHover({ idx });
+    },
+    [cancelHoverClose],
+  );
+  const scheduleHoverClose = useCallback(() => {
+    cancelHoverClose();
+    hoverCloseTimer.current = window.setTimeout(() => setHover(null), 120);
+  }, [cancelHoverClose]);
+  // Ladder-Hover → Team-Vorschau im Host (300ms Verzögerung wie die Top-Player-Row).
+  const clearLadderHoverTimer = useCallback(() => {
+    if (ladderHoverTimer.current != null) {
+      window.clearTimeout(ladderHoverTimer.current);
+      ladderHoverTimer.current = null;
+    }
   }, []);
 
   const reset = useCallback(() => {
@@ -520,7 +557,14 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teams]);
-  useEffect(() => () => clearTimers(), [clearTimers]);
+  useEffect(
+    () => () => {
+      clearTimers();
+      cancelHoverClose();
+      clearLadderHoverTimer();
+    },
+    [clearTimers, cancelHoverClose, clearLadderHoverTimer],
+  );
 
   const done = round >= slotCount;
 
@@ -836,7 +880,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       delta,
       slot,
     };
-    setTicker((rows) => [row, ...rows].slice(0, 8));
+    setTicker((rows) => [row, ...rows].slice(0, TICKER_MAX));
   }, [slots]);
 
   const roundSummary = useCallback((rnd: number, rt: RT[]) => {
@@ -854,9 +898,19 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       id: `sum-${rnd}-${fxId.current++}`,
       text: jumps.length ? `Runde ${rnd + 1} — Größte Sprünge: ${parts.join(" · ")}` : `Runde ${rnd + 1} — keine Rangsprünge`,
     };
-    setTicker((rows) => [row, ...rows].slice(0, 8));
+    setTicker((rows) => [row, ...rows].slice(0, TICKER_MAX));
     jumps.forEach(({ t }) => glow(t));
   }, [glow]);
+
+  // Runden-Kopfzeile (einmal je Runde) — ersetzt das wiederholte Slot-Label in jeder Reveal-Zeile.
+  const pushRoundHeader = useCallback((rnd: number) => {
+    const row: TickerHeader = {
+      kind: "header",
+      id: `hdr-${rnd}-${fxId.current++}`,
+      text: `Runde ${rnd + 1} · ${slots[rnd] ?? `Etappe ${rnd + 1}`}`,
+    };
+    setTicker((rows) => [row, ...rows].slice(0, TICKER_MAX));
+  }, [slots]);
 
   // ---- Podest ----
   const showPodium = useCallback(() => {
@@ -903,6 +957,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     tier2Budget.current = 2;
     tier1Budget.current = 4;
     if (r === 0) audio.gun(0.6);
+    pushRoundHeader(r);
     computeRoundStandings(r, rt);
     const order = [...rt].sort((a, b) => b.rank - a.rank); // schlechteste zuerst
     let i = 0;
@@ -986,7 +1041,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       later(doOne, delay);
     };
     doOne();
-  }, [round, slotCount, audio, tokenPos, addPop, addFrags, pushTicker, showSpotlight, fireFlash, doShake, glow, roundSummary, showPodium, later, slots]);
+  }, [round, slotCount, audio, tokenPos, addPop, addFrags, pushTicker, pushRoundHeader, showSpotlight, fireFlash, doShake, glow, roundSummary, showPodium, later, slots]);
 
   const quickSim = useCallback(() => {
     clearTimers();
@@ -1053,6 +1108,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           const net = p ? playerNet(p) : 0;
           return {
             playerName: p?.name ?? "—",
+            playerId: p?.playerId ?? null,
             net,
             slotRank: p ? slotRankOf(s, t, rt) : rt.length,
             boniMali: p ? modSum(p.mods) : 0,
@@ -1126,6 +1182,17 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           <button type="button" onClick={audio.toggleMute} title="Sound an/aus" style={{ padding: "9px 12px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}>
             {audio.muted ? "🔇 Stumm" : "🔊 Sound"}
           </button>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={audio.volume}
+            onChange={(e) => audio.setVolume(Number(e.target.value))}
+            title="Lautstärke"
+            aria-label="Lautstärke"
+            style={{ width: 90, accentColor: "var(--nl-accent)", cursor: "pointer" }}
+          />
           <span style={{ fontSize: 12.5, color: "var(--nl-mut)" }}>
             {progressLabel ??
               (prim === "towers"
@@ -1348,14 +1415,11 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                     ) : null}
                     <g
                       transform={`translate(${pos.x} ${pos.y})`}
-                      style={{ transition: reduced.current ? "none" : `transform ${dur}ms cubic-bezier(.34,1.2,.4,1)`, cursor: onOpenPlayer ? "pointer" : "default" }}
-                      onMouseEnter={(e) => setHover({ idx: t.idx, x: e.clientX, y: e.clientY })}
-                      onMouseMove={(e) => setHover({ idx: t.idx, x: e.clientX, y: e.clientY })}
-                      onMouseLeave={() => setHover((h) => (h && h.idx === t.idx ? null : h))}
+                      style={{ transition: reduced.current ? "none" : `transform ${dur}ms cubic-bezier(.34,1.2,.4,1)`, cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
+                      onMouseEnter={() => openHover(t.idx)}
+                      onMouseLeave={scheduleHoverClose}
                       onClick={() => {
-                        const slot = Math.max(0, Math.min(t.thrownSlot, t.players.length - 1));
-                        const pid = t.players[slot]?.playerId;
-                        if (onOpenPlayer && pid) onOpenPlayer(pid);
+                        if (onOpenTeam && t.teamId) onOpenTeam(t.teamId);
                       }}
                     >
                       {glowing ? <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={4} style={{ animation: reduced.current ? "none" : "olyGlowPulse 1.1s ease-in-out infinite" }} /> : null}
@@ -1394,6 +1458,79 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             <div key={flash.id} style={{ position: "absolute", inset: 0, pointerEvents: "none", background: `radial-gradient(circle at 50% 46%, rgba(${FLASH_COLOR[flash.color] ?? FLASH_COLOR.gold},.5), transparent 62%)`, animation: reduced.current ? "none" : "olyFlash .5s ease" }} />
           ) : null}
 
+          {/* Team-Hovercard — absolute IM Shake-Container (Fix: kein position:fixed
+              mehr, das durch das Shake-transform verschoben wurde). Position aus
+              tokenPos → % des Containers; Flip-Logik statt Fenster-Clamping. */}
+          {hover && !podium
+            ? (() => {
+                const t = rtRef.current[hover.idx];
+                if (!t) return null;
+                const pos = tokenPos(t, t.score);
+                const xPct = (pos.x / W) * 100;
+                const yPct = (pos.y / H) * 100;
+                const flipX = xPct > 60; // Karte nach links, wenn Token rechts sitzt
+                const below = yPct < 35; // Karte unterhalb, wenn Token oben sitzt
+                const teamClickable = Boolean(onOpenTeam && t.teamId);
+                return (
+                  <div
+                    onMouseEnter={cancelHoverClose}
+                    onMouseLeave={scheduleHoverClose}
+                    onClick={teamClickable ? () => onOpenTeam!(t.teamId!) : undefined}
+                    style={{
+                      position: "absolute",
+                      left: `${xPct}%`,
+                      top: `${yPct}%`,
+                      transform: `translate(${flipX ? "calc(-100% - 14px)" : "14px"}, ${below ? "14px" : "calc(-100% - 14px)"})`,
+                      width: 280,
+                      maxWidth: "72%",
+                      zIndex: 4,
+                      background: "var(--nl-panel)",
+                      border: "1px solid var(--nl-line)",
+                      borderRadius: 12,
+                      padding: 10,
+                      boxShadow: "0 18px 50px -18px rgba(0,0,0,.8)",
+                      pointerEvents: "auto",
+                      cursor: teamClickable ? "pointer" : "default",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                      {t.logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={t.logoUrl} alt="" width={26} height={26} style={{ width: 26, height: 26, borderRadius: "50%", objectFit: "cover" }} />
+                      ) : (
+                        <span aria-hidden style={{ width: 26, height: 26, borderRadius: "50%", background: `hsl(${hueForIdx(t.idx)} 60% 52%)`, display: "grid", placeItems: "center", fontSize: 10, fontWeight: 800 }}>{t.code.slice(0, 3)}</span>
+                      )}
+                      <span style={{ fontWeight: 800 }}>{t.code}</span>
+                      <span style={{ fontSize: 12, color: "var(--nl-mut)", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
+                      <span style={{ fontWeight: 800, color: ampel(t.rank) }}>#{t.rank}</span>
+                    </div>
+                    {t.thrownSlot < 0 ? (
+                      <div style={{ fontSize: 12, color: "var(--nl-mut)", fontStyle: "italic" }}>noch nicht angetreten</div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                        {Array.from({ length: t.thrownSlot + 1 }, (_, s) => {
+                          const p = t.players[s];
+                          if (!p) return null;
+                          return (
+                            <div key={s} style={{ fontSize: 11.5, fontVariantNumeric: "tabular-nums" }}>
+                              <div style={{ fontWeight: 700 }}>
+                                {p.val >= STAR_MIN ? "⭐ " : ""}
+                                {p.name} <span style={{ color: "var(--nl-mut)", fontWeight: 600 }}>· {slots[s]}</span>
+                              </div>
+                              <div style={{ color: "var(--nl-mut)" }}>{calcString(p)}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {teamClickable ? (
+                      <div style={{ marginTop: 6, fontSize: 10.5, color: "var(--nl-mut)", fontWeight: 700 }}>Klicken für Team-Karte</div>
+                    ) : null}
+                  </div>
+                );
+              })()
+            : null}
+
           {/* Podest */}
           {podium ? (
             <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", paddingBottom: 24, background: "color-mix(in srgb, var(--nl-bg) 72%, transparent)", backdropFilter: "blur(3px)", zIndex: 5 }}>
@@ -1429,15 +1566,30 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           ) : null}
         </div>
 
+        {/* Top-Spieler-Zeile unter der Arena, ÜBER dem Ticker (nur bereits aufgedeckte Spieler) */}
+        {revealedTopPlayers && revealedTopPlayers.rows.length > 0 ? (
+          <DisciplineStageTopPlayersRow
+            players={revealedTopPlayers.rows}
+            playerIdByRow={revealedTopPlayers.ids}
+            onOpenPlayer={onOpenPlayer}
+            onPreviewPlayer={onPreviewPlayer}
+            limit={10}
+          />
+        ) : null}
+
         {/* Ticker */}
         <div style={{ marginTop: 12, background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 10 }}>
           <div style={{ fontSize: 11, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 6 }}>Ticker</div>
           {ticker.length === 0 ? (
             <div style={{ fontSize: 12.5, color: "var(--nl-mut)", fontStyle: "italic" }}>Läuft, sobald die erste Etappe startet.</div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2, maxHeight: 260, overflowY: "auto", overscrollBehaviorY: "contain" }}>
               {ticker.map((row) =>
-                row.kind === "summary" ? (
+                row.kind === "header" ? (
+                  <div key={row.id} style={{ padding: "5px 9px", borderRadius: 8, fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--nl-ink)", background: "color-mix(in srgb, var(--nl-accent) 16%, transparent)", border: "1px solid color-mix(in srgb, var(--nl-accent) 45%, transparent)" }}>
+                    {row.text}
+                  </div>
+                ) : row.kind === "summary" ? (
                   <div key={row.id} style={{ padding: "6px 9px", borderRadius: 8, fontSize: 12, fontWeight: 700, color: "var(--nl-warn)", background: "color-mix(in srgb, var(--nl-warn) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--nl-warn) 40%, transparent)" }}>
                     {row.text}
                   </div>
@@ -1456,7 +1608,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                         {row.playerName}
                         <span style={{ color: "var(--nl-mut)", fontWeight: 600 }}>
                           {" "}
-                          · {row.code} · {row.slotLbl} · Slot-Rang <b style={{ color: ampel(row.slotRank) }}>#{row.slotRank}</b>
+                          · {row.code} · Slot-Rang <b style={{ color: ampel(row.slotRank) }}>#{row.slotRank}</b>
                         </span>
                         {row.badge ? (
                           <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 800, padding: "1px 7px", borderRadius: 99, color: row.badge[0], border: `1px solid ${row.badge[0]}`, background: `color-mix(in srgb, ${row.badge[0]} 14%, transparent)` }}>{row.badge[1]}</span>
@@ -1480,17 +1632,36 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           )}
         </div>
 
-        {/* Top-Spieler-Zeile unter der Arena (nur bereits aufgedeckte Spieler) */}
-        {revealedTopPlayers && revealedTopPlayers.rows.length > 0 ? (
-          <DisciplineStageTopPlayersRow players={revealedTopPlayers.rows} playerIdByRow={revealedTopPlayers.ids} onOpenPlayer={onOpenPlayer} limit={10} />
-        ) : null}
       </div>
 
       {/* Live-Ladder rechts */}
       <div style={{ flex: "0 0 300px", minWidth: 260, maxHeight: "calc(100vh - 200px)", overflowY: "auto", background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 10, position: "sticky", top: 12 }}>
         <div style={{ fontSize: 11, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 8 }}>{done ? "Endstand" : "Rundenstand — live"}</div>
-        {sorted.map((t) => (
-          <div key={t.code} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 6px", borderRadius: 8, fontVariantNumeric: "tabular-nums", background: t.isOwn ? "color-mix(in srgb, var(--nl-accent) 14%, transparent)" : "transparent" }}>
+        {sorted.map((t) => {
+          const teamClickable = Boolean(onOpenTeam && t.teamId);
+          const teamHoverable = Boolean(onHoverTeam && t.teamId);
+          return (
+          <div
+            key={t.code}
+            onClick={teamClickable ? () => onOpenTeam!(t.teamId!) : undefined}
+            onMouseEnter={
+              teamHoverable
+                ? () => {
+                    clearLadderHoverTimer();
+                    ladderHoverTimer.current = window.setTimeout(() => onHoverTeam!(t.teamId), 300);
+                  }
+                : undefined
+            }
+            onMouseLeave={
+              teamHoverable
+                ? () => {
+                    clearLadderHoverTimer();
+                    onHoverTeam!(null);
+                  }
+                : undefined
+            }
+            title={teamClickable ? "Team-Karte öffnen" : undefined}
+            style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 6px", borderRadius: 8, fontVariantNumeric: "tabular-nums", cursor: teamClickable ? "pointer" : "default", background: t.isOwn ? "color-mix(in srgb, var(--nl-accent) 14%, transparent)" : "transparent" }}>
             <span style={{ width: 22, textAlign: "right", fontWeight: 800, color: ampel(t.rank), fontSize: 12.5 }}>{t.rank}</span>
             {t.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -1502,60 +1673,16 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             <span style={{ flex: 1, fontSize: 11.5, color: "var(--nl-mut)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
             <span style={{ fontWeight: 800, fontSize: 12.5 }}>{fmt1(t.score)}</span>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Detail-Ergebnistabelle (volle Breite unter der Arena, nach dem Podest) */}
       {ended ? (
         <div style={{ flex: "1 1 100%", minWidth: 0 }}>
-          <DisciplineStageResultTable rows={resultRows} slotLabels={slots} />
+          <DisciplineStageResultTable rows={resultRows} slotLabels={slots} onOpenPlayer={onOpenPlayer} />
         </div>
       ) : null}
-
-      {/* Hovercard */}
-      {hover
-        ? (() => {
-            const t = rtRef.current[hover.idx];
-            if (!t) return null;
-            const pad = 16;
-            const x = Math.min(hover.x + pad, (typeof window !== "undefined" ? window.innerWidth : 1200) - 300);
-            const y = Math.min(hover.y + pad, (typeof window !== "undefined" ? window.innerHeight : 800) - 220);
-            return (
-              <div style={{ position: "fixed", left: Math.max(4, x), top: Math.max(4, y), width: 280, zIndex: 50, background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 12, padding: 10, boxShadow: "0 18px 50px -18px rgba(0,0,0,.8)", pointerEvents: "none" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  {t.logoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={t.logoUrl} alt="" width={26} height={26} style={{ width: 26, height: 26, borderRadius: "50%", objectFit: "cover" }} />
-                  ) : (
-                    <span aria-hidden style={{ width: 26, height: 26, borderRadius: "50%", background: `hsl(${hueForIdx(t.idx)} 60% 52%)`, display: "grid", placeItems: "center", fontSize: 10, fontWeight: 800 }}>{t.code.slice(0, 3)}</span>
-                  )}
-                  <span style={{ fontWeight: 800 }}>{t.code}</span>
-                  <span style={{ fontSize: 12, color: "var(--nl-mut)", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
-                  <span style={{ fontWeight: 800, color: ampel(t.rank) }}>#{t.rank}</span>
-                </div>
-                {t.thrownSlot < 0 ? (
-                  <div style={{ fontSize: 12, color: "var(--nl-mut)", fontStyle: "italic" }}>noch nicht angetreten</div>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                    {Array.from({ length: t.thrownSlot + 1 }, (_, s) => {
-                      const p = t.players[s];
-                      if (!p) return null;
-                      return (
-                        <div key={s} style={{ fontSize: 11.5, fontVariantNumeric: "tabular-nums" }}>
-                          <div style={{ fontWeight: 700 }}>
-                            {p.val >= STAR_MIN ? "⭐ " : ""}
-                            {p.name} <span style={{ color: "var(--nl-mut)", fontWeight: 600 }}>· {slots[s]}</span>
-                          </div>
-                          <div style={{ color: "var(--nl-mut)" }}>{calcString(p)}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })()
-        : null}
     </div>
   );
 }
