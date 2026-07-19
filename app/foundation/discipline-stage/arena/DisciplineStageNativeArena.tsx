@@ -45,15 +45,28 @@ export type DisciplineStageNativeArenaProps = {
 
 export type StageMotif = "chevrons" | "combat" | "board" | "court" | "weights" | "grid" | "ice" | "stage" | "plates" | "skyline" | "none";
 
-// Atmosphärische Umgebung je Primitive: Farbschichten für Himmel/Ränge/Belag/
-// Linien/Innenfeld. Alle Werte als hsl()/rgb() (kein Hex → Design-Token-Lint).
+// Atmosphärische Umgebung je Primitive (Fable-Konzept): Farbschichten +
+// Lichtstimmung + 0-2 Deko-Layer. Alle Werte hsl()/rgb() (kein Hex → Lint).
 export type StageEnv = {
-  sky: [string, string]; // Hintergrund-Verlauf (oben, unten)
-  stands: string; // Ränge/Tribüne
-  surface: [string, string, string]; // Belag-Verlauf (oben, mitte, unten)
-  line: string; // Bahnmarkierung / Ziel
-  infield: [string, string]; // Innenfeld-Verlauf (oben, unten)
+  sky: [string, string]; // Hintergrund-Verlauf (oben, unten) — alle Primitive
+  stands: string; // Rückwand: track=Tribünenring, lanes/towers=Horizontband
+  surface: [string, string, string]; // track=Bahnring; lanes=Bahnfläche; towers=Boden
+  line: string; // Markierungen / Ziel / Grundlinie
+  infield?: [string, string]; // nur track (Rasen)
+  glow?: { color: string; kind: "spot" | "finish" | "floor" | "flood" };
+  deco?: StageDeco[]; // hinter den Tokens
 };
+
+export type StageDeco =
+  | { kind: "skyline"; back: string; front: string; windows: string }
+  | { kind: "spotlights"; color: string; count: number }
+  | { kind: "lanterns"; color: string; halo: string }
+  | { kind: "banners"; cloth: string; trim: string }
+  | { kind: "checker"; light: string; dark: string }
+  | { kind: "grid"; color: string }
+  | { kind: "holds"; colors: string[] }
+  | { kind: "sheen"; color: string }
+  | { kind: "silhouette"; color: string };
 
 // Dezentes Feld-Motiv je Disziplin (Skin). Bewusst leise (niedrige Deckkraft),
 // die Akzentfarbe kommt aus der Disziplin. Kein DOM-Overhead: wenige SVG-Formen.
@@ -160,6 +173,154 @@ function renderMotif(motif: StageMotif | undefined, W: number, H: number, accent
       })}
     </g>
   );
+}
+
+// Lichtstimmung (ein Layer, per kind positioniert). groundY = Boden/Grundlinie.
+function envGlow(glow: NonNullable<StageEnv["glow"]>, W: number, H: number, groundY: number, finishX: number): React.ReactNode {
+  const c = glow.color;
+  if (glow.kind === "spot") {
+    return <ellipse cx={W / 2} cy={groundY - 90} rx={210} ry={72} fill={c} opacity={0.16} />;
+  }
+  if (glow.kind === "floor") {
+    return <rect x={0} y={groundY - 26} width={W} height={30} fill={c} opacity={0.13} />;
+  }
+  if (glow.kind === "finish") {
+    return (
+      <g>
+        <rect x={finishX - 16} y={0} width={32} height={H} fill={c} opacity={0.12} />
+        <rect x={finishX - 2} y={0} width={4} height={H} fill={c} opacity={0.55} />
+      </g>
+    );
+  }
+  // flood — zwei Lichtkegel von oben
+  return (
+    <g fill={c} opacity={0.1}>
+      <polygon points={`${W * 0.3},0 ${W * 0.42},0 ${W * 0.52},${H} ${W * 0.36},${H}`} />
+      <polygon points={`${W * 0.58},0 ${W * 0.7},0 ${W * 0.64},${H} ${W * 0.48},${H}`} />
+    </g>
+  );
+}
+
+// Deko-Layer (Daten → SVG). groundY = Boden für skyline/silhouette.
+function envDeco(deco: StageDeco, W: number, H: number, groundY: number, key: number): React.ReactNode {
+  if (deco.kind === "skyline") {
+    return (
+      <g key={key}>
+        <g fill={deco.back} opacity={0.9}>
+          {Array.from({ length: 11 }).map((_, i) => {
+            const bw = W / 11;
+            const bh = H * (0.16 + ((i * 53) % 34) / 100);
+            return <rect key={i} x={i * bw} y={groundY - bh} width={bw + 1} height={bh} />;
+          })}
+        </g>
+        <g fill={deco.front}>
+          {Array.from({ length: 8 }).map((_, i) => {
+            const bw = W / 8;
+            const bh = H * (0.1 + ((i * 71) % 26) / 100);
+            return <rect key={i} x={i * bw + 12} y={groundY - bh} width={bw - 24} height={bh} />;
+          })}
+        </g>
+        <g fill={deco.windows} opacity={0.85}>
+          {Array.from({ length: 8 }).flatMap((_, i) =>
+            Array.from({ length: 4 }).map((__, r) => {
+              const on = (i * 7 + r * 13) % 3 === 0;
+              return on ? <rect key={`${i}-${r}`} x={i * (W / 8) + 24 + (r % 2) * 14} y={groundY - 34 - r * 16} width={5} height={7} /> : null;
+            }),
+          )}
+        </g>
+      </g>
+    );
+  }
+  if (deco.kind === "spotlights") {
+    return (
+      <g key={key} fill={deco.color} opacity={0.16}>
+        {Array.from({ length: deco.count }).map((_, i) => {
+          const cx = W * (0.5 + (i - (deco.count - 1) / 2) * 0.22);
+          return <polygon key={i} points={`${cx - 12},0 ${cx + 12},0 ${cx + 90},${H} ${cx - 90},${H}`} />;
+        })}
+      </g>
+    );
+  }
+  if (deco.kind === "lanterns") {
+    return (
+      <g key={key}>
+        {Array.from({ length: 6 }).map((_, i) => {
+          const cx = W * (0.12 + i * 0.152);
+          return (
+            <g key={i}>
+              <circle cx={cx} cy={44} r={16} fill={deco.halo} opacity={0.3} />
+              <circle cx={cx} cy={44} r={7} fill={deco.color} />
+            </g>
+          );
+        })}
+      </g>
+    );
+  }
+  if (deco.kind === "banners") {
+    return (
+      <g key={key}>
+        {Array.from({ length: 3 }).map((_, i) => {
+          const cx = W * (0.24 + i * 0.26);
+          return (
+            <g key={i}>
+              <rect x={cx - 16} y={40} width={32} height={72} fill={deco.cloth} opacity={0.85} />
+              <polygon points={`${cx - 16},112 ${cx + 16},112 ${cx},130`} fill={deco.cloth} opacity={0.85} />
+              <rect x={cx - 16} y={40} width={32} height={6} fill={deco.trim} />
+            </g>
+          );
+        })}
+      </g>
+    );
+  }
+  if (deco.kind === "checker") {
+    return (
+      <g key={key} opacity={0.1}>
+        {Array.from({ length: 6 }).map((_, r) =>
+          Array.from({ length: 16 }).map((__, col) =>
+            (r + col) % 2 === 0 ? <rect key={`${r}-${col}`} x={col * (W / 16)} y={H * 0.4 + r * 24} width={W / 16} height={24} fill={deco.light} /> : <rect key={`${r}-${col}`} x={col * (W / 16)} y={H * 0.4 + r * 24} width={W / 16} height={24} fill={deco.dark} />,
+          ),
+        )}
+      </g>
+    );
+  }
+  if (deco.kind === "grid") {
+    return (
+      <g key={key} stroke={deco.color} strokeWidth={1.4} opacity={0.15} fill="none">
+        {[0.55, 0.68, 0.8, 0.92].map((f, i) => (
+          <line key={i} x1={0} y1={H * f} x2={W} y2={H * f} />
+        ))}
+        {Array.from({ length: 13 }).map((_, i) => {
+          const x = (i / 12) * W;
+          return <line key={i} x1={x} y1={H * 0.55} x2={W / 2 + (x - W / 2) * 2.2} y2={H} />;
+        })}
+      </g>
+    );
+  }
+  if (deco.kind === "holds") {
+    return (
+      <g key={key} opacity={0.5}>
+        {Array.from({ length: 26 }).map((_, i) => {
+          const x = ((i * 137.5) % 96) / 100;
+          const y = ((i * 71) % 80) / 100;
+          const col = deco.colors[i % deco.colors.length];
+          return <circle key={i} cx={W * (0.03 + x * 0.94)} cy={H * (0.08 + y)} r={i % 3 === 0 ? 7 : 5} fill={col} />;
+        })}
+      </g>
+    );
+  }
+  if (deco.kind === "sheen") {
+    return <polygon key={key} points={`${W * 0.1},0 ${W * 0.28},0 ${W * 0.6},${H} ${W * 0.42},${H}`} fill={deco.color} opacity={0.12} />;
+  }
+  // silhouette — gezackter Horizont (Palisade/Bäume)
+  const pts: string[] = [`0,${groundY}`];
+  const n = 20;
+  for (let i = 0; i <= n; i += 1) {
+    const x = (i / n) * W;
+    const h = groundY - 26 - ((i * 47) % 34);
+    pts.push(`${x},${h}`, `${x + W / n / 2},${groundY - 14}`);
+  }
+  pts.push(`${W},${groundY}`);
+  return <polygon key={key} points={pts.join(" ")} fill={deco.color} opacity={0.9} />;
 }
 
 const STAR_MIN = 80;
@@ -977,60 +1138,86 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                     <stop offset="55%" stopColor={env.surface[1]} />
                     <stop offset="100%" stopColor={env.surface[2]} />
                   </linearGradient>
-                  <linearGradient id="envInfield" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={env.infield[0]} />
-                    <stop offset="100%" stopColor={env.infield[1]} />
-                  </linearGradient>
-                  <clipPath id="envInfieldClip">
-                    <path d={makeOval(OVAL_M + OVAL_BAND / 2)} />
-                  </clipPath>
+                  {env.infield ? (
+                    <>
+                      <linearGradient id="envInfield" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={env.infield[0]} />
+                        <stop offset="100%" stopColor={env.infield[1]} />
+                      </linearGradient>
+                      <clipPath id="envInfieldClip">
+                        <path d={makeOval(OVAL_M + OVAL_BAND / 2)} />
+                      </clipPath>
+                    </>
+                  ) : null}
                 </>
               ) : null}
             </defs>
 
-            {/* Hintergrund: atmosphärische Stadion-Umgebung ODER dezentes Motiv */}
-            {env && prim === "track" ? (
+            {/* Hintergrund: atmosphärische Umgebung (env) ODER dezentes Motiv */}
+            {env ? (
               <>
-                {/* Himmel / Ambient */}
+                {/* Himmel / Ambient — alle Primitive */}
                 <rect x={0} y={0} width={W} height={H} fill="url(#envSky)" />
-                {/* Ränge / Tribüne (breiter Ring hinter der Bahn) */}
-                <path d={ovalPath} fill="none" stroke={env.stands} strokeWidth={OVAL_BAND + 30} />
-                {/* Bahn-Belag (Aschenbahn-Verlauf) */}
-                <path d={ovalPath} fill="none" stroke="url(#envSurface)" strokeWidth={OVAL_BAND} />
-                {/* Bahn-Trennlinien */}
-                <path d={makeOval(OVAL_M - 18)} fill="none" stroke={env.line} strokeWidth={1.4} opacity={0.35} />
-                <path d={makeOval(OVAL_M + 18)} fill="none" stroke={env.line} strokeWidth={1.4} opacity={0.35} />
-                {/* Innenfeld (Rasen) + Mähstreifen */}
-                <path d={makeOval(OVAL_M + OVAL_BAND / 2)} fill="url(#envInfield)" stroke="none" />
-                <g clipPath="url(#envInfieldClip)">
-                  {Array.from({ length: Math.ceil(W / 46) }).map((_, i) => (
-                    <rect key={i} x={i * 46} y={0} width={23} height={H} fill="rgba(0,0,0,0.08)" />
-                  ))}
-                </g>
-                {/* Start-/Ziellinie (kariert) + ZIEL */}
-                {(() => {
-                  const r = (H - 2 * OVAL_M) / 2;
-                  const sx = OVAL_M + r;
-                  const yTop = OVAL_M - OVAL_BAND / 2;
-                  const steps = Math.round(OVAL_BAND / 8);
-                  return (
-                    <g>
-                      {Array.from({ length: steps }).map((_, i) => (
-                        <rect key={i} x={sx - 3} y={yTop + i * 8} width={6} height={8} fill={i % 2 === 0 ? env.line : "rgba(0,0,0,0.55)"} />
-                      ))}
-                      <text x={sx - 16} y={OVAL_M} transform={`rotate(-90 ${sx - 16} ${OVAL_M})`} textAnchor="middle" fontFamily="Georgia, serif" fontSize={17} fontWeight={800} fill={env.line} opacity={0.9}>
-                        ZIEL
-                      </text>
-                    </g>
-                  );
-                })()}
-                {/* Unsichtbarer Referenz-Pfad für Token-Positionen */}
-                <path ref={pathRef} d={ovalPath} fill="none" stroke="none" />
+
+                {prim === "track" ? (
+                  <>
+                    <path d={ovalPath} fill="none" stroke={env.stands} strokeWidth={OVAL_BAND + 30} />
+                    <path d={ovalPath} fill="none" stroke="url(#envSurface)" strokeWidth={OVAL_BAND} />
+                    <path d={makeOval(OVAL_M - 18)} fill="none" stroke={env.line} strokeWidth={1.4} opacity={0.35} />
+                    <path d={makeOval(OVAL_M + 18)} fill="none" stroke={env.line} strokeWidth={1.4} opacity={0.35} />
+                    {env.infield ? (
+                      <>
+                        <path d={makeOval(OVAL_M + OVAL_BAND / 2)} fill="url(#envInfield)" stroke="none" />
+                        <g clipPath="url(#envInfieldClip)">
+                          {Array.from({ length: Math.ceil(W / 46) }).map((_, i) => (
+                            <rect key={i} x={i * 46} y={0} width={23} height={H} fill="rgba(0,0,0,0.08)" />
+                          ))}
+                        </g>
+                      </>
+                    ) : null}
+                    {(() => {
+                      const r = (H - 2 * OVAL_M) / 2;
+                      const sx = OVAL_M + r;
+                      const yTop = OVAL_M - OVAL_BAND / 2;
+                      const steps = Math.round(OVAL_BAND / 8);
+                      return (
+                        <g>
+                          {Array.from({ length: steps }).map((_, i) => (
+                            <rect key={i} x={sx - 3} y={yTop + i * 8} width={6} height={8} fill={i % 2 === 0 ? env.line : "rgba(0,0,0,0.55)"} />
+                          ))}
+                          <text x={sx - 16} y={OVAL_M} transform={`rotate(-90 ${sx - 16} ${OVAL_M})`} textAnchor="middle" fontFamily="Georgia, serif" fontSize={17} fontWeight={800} fill={env.line} opacity={0.9}>
+                            ZIEL
+                          </text>
+                        </g>
+                      );
+                    })()}
+                    <path ref={pathRef} d={ovalPath} fill="none" stroke="none" />
+                  </>
+                ) : prim === "lanes" ? (
+                  <>
+                    {/* Horizont-Band hinter dem Feld */}
+                    <rect x={0} y={0} width={W} height={layout.top} fill={env.stands} opacity={0.6} />
+                    {/* Bahnflächen (alternierende Tönung aus surface[0]/[1]) */}
+                    {Array.from({ length: N }).map((_, i) => (
+                      <rect key={i} x={layout.xStart} y={layout.top + i * layout.laneH} width={layout.xEnd - layout.xStart} height={layout.laneH} fill={i % 2 ? env.surface[0] : env.surface[1]} opacity={0.55} />
+                    ))}
+                  </>
+                ) : (
+                  <>
+                    {/* towers: Rückwand oben + Boden ab Grundlinie */}
+                    <rect x={0} y={0} width={W} height={layout.baseY} fill={env.stands} opacity={0.28} />
+                    <rect x={0} y={layout.baseY} width={W} height={H - layout.baseY} fill={env.surface[2]} />
+                    <rect x={0} y={layout.topY} width={W} height={layout.baseY - layout.topY} fill="url(#envSurface)" opacity={0.5} />
+                  </>
+                )}
+
+                {/* Deko-Layer (hinter Tokens) */}
+                {env.deco?.map((d, i) => envDeco(d, W, H, prim === "towers" ? layout.baseY : prim === "lanes" ? H - layout.top : H - OVAL_M + 30, i))}
+                {/* Lichtstimmung */}
+                {env.glow ? envGlow(env.glow, W, H, prim === "towers" ? layout.baseY : H * 0.82, prim === "lanes" ? layout.xEnd : W - 40) : null}
               </>
             ) : (
-              <>
-                {renderMotif(motif, W, H, skinAccent)}
-              </>
+              <>{renderMotif(motif, W, H, skinAccent)}</>
             )}
 
             {/* Feld-Wasserzeichen: Disziplin-Identität */}

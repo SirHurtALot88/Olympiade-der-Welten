@@ -206,21 +206,57 @@ const STADIUM_ATHLETICS: StageEnv = {
   infield: ["hsl(140 45% 32%)", "hsl(148 50% 20%)"],
 };
 
+// Weitere atmosphärische Umgebungen (Fable-Konzept) — Abnahme-Slice.
+const ENV_ICE_RINK: StageEnv = {
+  sky: ["hsl(214 78% 5%)", "hsl(210 55% 10%)"],
+  stands: "hsl(210 45% 16%)",
+  surface: ["hsl(200 50% 78%)", "hsl(202 44% 64%)", "hsl(203 42% 40%)"],
+  line: "hsl(199 74% 60%)",
+  glow: { color: "hsl(196 100% 87%)", kind: "spot" },
+  deco: [{ kind: "sheen", color: "hsl(196 100% 90%)" }],
+};
+const ENV_VELODROME: StageEnv = {
+  sky: ["hsl(216 45% 4%)", "hsl(214 40% 9%)"],
+  stands: "hsl(214 35% 14%)",
+  surface: ["hsl(213 35% 15%)", "hsl(212 32% 18%)", "hsl(214 40% 10%)"],
+  line: "hsl(207 48% 80%)",
+  glow: { color: "hsl(215 64% 53%)", kind: "finish" },
+  deco: [{ kind: "spotlights", color: "hsl(48 30% 88%)", count: 2 }],
+};
+const ENV_SKYLINE: StageEnv = {
+  sky: ["hsl(24 60% 6%)", "hsl(25 65% 14%)"],
+  stands: "hsl(24 40% 10%)",
+  surface: ["hsl(28 22% 16%)", "hsl(27 20% 12%)", "hsl(26 18% 8%)"],
+  line: "hsl(41 42% 84%)",
+  deco: [{ kind: "skyline", back: "hsl(24 50% 9%)", front: "hsl(24 77% 6%)", windows: "hsl(35 80% 60%)" }],
+};
+const ENV_JUNGLE: StageEnv = {
+  sky: ["hsl(87 31% 6%)", "hsl(80 25% 10%)"],
+  stands: "hsl(90 20% 9%)",
+  surface: ["hsl(43 39% 67%)", "hsl(43 30% 55%)", "hsl(43 26% 42%)"],
+  line: "hsl(45 45% 82%)",
+  infield: ["hsl(96 30% 22%)", "hsl(100 32% 14%)"],
+  deco: [
+    { kind: "silhouette", color: "hsl(90 22% 7%)" },
+    { kind: "lanterns", color: "hsl(28 90% 55%)", halo: "hsl(20 85% 45%)" },
+  ],
+};
+
 const DISCIPLINE_SKIN: Record<string, { accent: string; motif: StageMotif; env?: StageEnv }> = {
   staffel: { accent: "hsl(14 80% 58%)", motif: "chevrons", env: STADIUM_ATHLETICS },
   spurt: { accent: "hsl(38 90% 58%)", motif: "chevrons", env: STADIUM_ATHLETICS },
-  "takeshis-castle": { accent: "hsl(160 55% 50%)", motif: "grid" },
+  "takeshis-castle": { accent: "hsl(160 55% 50%)", motif: "grid", env: ENV_JUNGLE },
   "mini-dm": { accent: "hsl(350 70% 60%)", motif: "combat" },
   battlefield: { accent: "hsl(80 45% 52%)", motif: "combat" },
-  "time-trial": { accent: "hsl(190 75% 56%)", motif: "chevrons" },
+  "time-trial": { accent: "hsl(190 75% 56%)", motif: "chevrons", env: ENV_VELODROME },
   "speed-schach": { accent: "hsl(215 28% 64%)", motif: "board" },
   fechten: { accent: "hsl(210 62% 66%)", motif: "combat" },
   tennis: { accent: "hsl(90 62% 55%)", motif: "court" },
   wettessen: { accent: "hsl(32 78% 60%)", motif: "plates" },
-  basketball: { accent: "hsl(24 85% 57%)", motif: "court" },
+  basketball: { accent: "hsl(24 85% 57%)", motif: "court", env: ENV_SKYLINE },
   gewichtheben: { accent: "hsl(210 14% 64%)", motif: "weights" },
   climbing: { accent: "hsl(16 62% 56%)", motif: "grid" },
-  eiskunstlauf: { accent: "hsl(195 70% 72%)", motif: "ice" },
+  eiskunstlauf: { accent: "hsl(195 70% 72%)", motif: "ice", env: ENV_ICE_RINK },
   showcase: { accent: "hsl(310 62% 63%)", motif: "stage" },
   football: { accent: "hsl(140 55% 50%)", motif: "court" },
   hockey: { accent: "hsl(205 72% 63%)", motif: "court" },
