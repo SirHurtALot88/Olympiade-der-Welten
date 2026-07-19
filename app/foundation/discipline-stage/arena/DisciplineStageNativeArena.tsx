@@ -1021,6 +1021,20 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const [ticker, setTicker] = useState<TickerData[]>([]);
   const [podium, setPodium] = useState<PodCol[] | null>(null);
   const [hover, setHover] = useState<{ idx: number } | null>(null);
+  // Feld-Höhe wird auf die Höhe der Rangtabelle daneben gedeckelt, damit unter dem Feld
+  // Läufer-Karte + Ticker immer sichtbar bleiben (Feld nie höher als die 32er-Rangliste).
+  // Gilt für alle Primitives — geteilte Layout-Regel.
+  const ladderRef = useRef<HTMLDivElement | null>(null);
+  const [fieldMaxH, setFieldMaxH] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const el = ladderRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const measure = () => setFieldMaxH(Math.round(el.getBoundingClientRect().height) || null);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   // Gewichtheben · Kraft-Turm (barbell): die geforderte Last (goldene Latte) steigt
   // je Runde. demandKg = aktuelle Last (null = Wettkampf noch nicht gestartet). Alle
   // noch nicht gerissenen Heber sitzen auf der Latte; wer sie nicht mehr packt (endKg
@@ -2484,7 +2498,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
 
         {/* Oval-Track + Overlays */}
         <div className={shake !== "none" ? "oly-anim" : undefined} style={{ position: "relative", borderRadius: 14, overflow: "hidden", border: "1px solid var(--nl-line)", background: "var(--nl-bg)", animation: shake === "hard" ? "olyShakeHard .44s ease" : shake === "soft" ? "olyShakeSoft .3s ease" : undefined }}>
-          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
+          <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "auto", maxHeight: fieldMaxH ? fieldMaxH : "calc(100vh - 220px)", display: "block", margin: "0 auto" }}>
             <defs>
               {rtRef.current.map((t) =>
                 t.logoUrl ? (
@@ -3468,7 +3482,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       </div>
 
       {/* Live-Ladder rechts */}
-      <div data-testid="arena-ladder" style={{ flex: "0 0 300px", minWidth: 260, maxHeight: "calc(100vh - 200px)", overflowY: "auto", overscrollBehavior: "contain", background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 10, position: "sticky", top: 12 }}>
+      <div ref={ladderRef} data-testid="arena-ladder" style={{ flex: "0 0 300px", minWidth: 260, maxHeight: "calc(100vh - 200px)", overflowY: "auto", overscrollBehavior: "contain", background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 10, position: "sticky", top: 12 }}>
         <div style={{ fontSize: 11, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
           <span>{prim === "barbell" ? (done ? "Endstand" : "Rangliste · live") : done ? "Endstand" : "Rundenstand — live"}</span>
           {prim === "barbell" && !done ? <span style={{ marginLeft: "auto", fontFamily: "ui-monospace, monospace", fontSize: 9, color: "var(--nl-mut)", fontWeight: 700 }}>{barbellLive} im Wettkampf</span> : null}
