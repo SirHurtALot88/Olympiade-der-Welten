@@ -101,6 +101,7 @@ export type DisciplineStageNativeArenaProps = {
   onEnded?: (() => void) | null; // feuert einmal, sobald das Podest/Endstand erreicht ist (Spoiler-Gate)
   topPlayers?: { rows: DisciplineStageTopPlayer[]; ids: (string | null)[] } | null;
   primitive?: StagePrimitive;
+  disciplineId?: string; // Disziplin-Identität für die Feld-Registry (mehrere Diszis teilen sich ein Primitive)
   progressLabel?: string; // z.B. "Position auf dem Oval = kumulierte Punkte"
   disciplineName?: string; // Feld-Wasserzeichen (Identität je Disziplin)
   accent?: string; // Akzentfarbe der Disziplin (Wasserzeichen + Feldlinien)
@@ -954,7 +955,7 @@ const TICKER_MAX = 40;
 type Spot = { crest: NativeStageTeam; idx: number; kick: string; name: string; sub: string; net: number; chipText: string; chipColor: string; mine: boolean; portraitUrl: string | null } | null;
 type PodCol = { place: number; code: string; name: string; pts: number; logoUrl: string | null; isOwn: boolean; idx: number; delayMs: number; loud: boolean };
 
-export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, onOpenTeam, onHoverTeam, onPreviewPlayer, onEnded, topPlayers, primitive = "track", progressLabel, disciplineName, accent, motif, env }: DisciplineStageNativeArenaProps) {
+export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, onOpenTeam, onHoverTeam, onPreviewPlayer, onEnded, topPlayers, primitive = "track", disciplineId, progressLabel, disciplineName, accent, motif, env }: DisciplineStageNativeArenaProps) {
   const skinAccent = accent ?? "var(--nl-line-2, var(--nl-line))";
   const slotCount = Math.max(1, slots.length);
   const prim = primitive;
@@ -2148,7 +2149,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   // Disziplin-Registry (arena/disciplines/<primitive>.tsx). Der Host baut den vollen
   // DisciplineFieldProps-Kontext (Engine = Wahrheit) und rendert die Feld-Komponente
   // als Kinder des <svg>. ----
-  const FieldComp = getDisciplineField(prim);
+  const FieldComp = getDisciplineField(prim, disciplineId);
   const fieldCtx: DisciplineFieldProps = {
     primitive: prim,
     disciplineName,

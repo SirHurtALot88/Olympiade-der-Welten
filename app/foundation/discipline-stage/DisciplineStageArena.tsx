@@ -902,6 +902,7 @@ export default function DisciplineStageArena({
         onEnded={() => setArenaEnded(true)}
         topPlayers={topPlayers}
         primitive={NATIVE_PRIMITIVE[disciplineId] ?? "track"}
+        disciplineId={disciplineId}
         disciplineName={model.disciplineName}
         accent={DISCIPLINE_SKIN[disciplineId]?.accent}
         motif={DISCIPLINE_SKIN[disciplineId]?.motif}

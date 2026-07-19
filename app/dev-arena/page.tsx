@@ -12,10 +12,31 @@ import DisciplineStageNativeArena, {
   type NativeStageTeam,
 } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
 
-const PRIMS: StagePrimitive[] = [
-  "track", "lanes", "towers", "stage", "platter", "lamps", "spybar", "kda", "duelhp",
-  "barbell", "sparkbar", "thermometer", "peloton", "parcours", "bump", "mountain",
-  "court", "rink", "klassen", "territory",
+// Disziplin-zentrisch (id → primitive), damit sich auch Disziplinen durchklicken lassen,
+// die sich ein Primitive teilen (parcours: takeshi+football, klassen: schach+tennis,
+// stage: eiskunst+showcase). Spiegelt NATIVE_PRIMITIVE aus DisciplineStageArena.tsx.
+type DevDisc = { id: string; prim: StagePrimitive; name: string };
+const DISCIPLINES: DevDisc[] = [
+  { id: "staffel", prim: "track", name: "Staffel" },
+  { id: "spurt", prim: "bump", name: "Spurt" },
+  { id: "takeshis-castle", prim: "parcours", name: "Takeshi's Castle" },
+  { id: "mini-dm", prim: "duelhp", name: "Mini DM" },
+  { id: "battlefield", prim: "territory", name: "Battlefield" },
+  { id: "time-trial", prim: "peloton", name: "Time Trial" },
+  { id: "speed-schach", prim: "klassen", name: "Speed-Schach" },
+  { id: "fechten", prim: "lamps", name: "Fechten" },
+  { id: "tennis", prim: "klassen", name: "Tennis" },
+  { id: "wettessen", prim: "platter", name: "Wettessen" },
+  { id: "i-spy", prim: "spybar", name: "I-Spy" },
+  { id: "basketball", prim: "court", name: "Basketball" },
+  { id: "gewichtheben", prim: "barbell", name: "Gewichtheben" },
+  { id: "climbing", prim: "mountain", name: "Climbing" },
+  { id: "eiskunstlauf", prim: "stage", name: "Eiskunstlauf" },
+  { id: "showcase", prim: "stage", name: "Showcase" },
+  { id: "football", prim: "parcours", name: "Football" },
+  { id: "hockey", prim: "rink", name: "Hockey" },
+  { id: "breaking", prim: "thermometer", name: "Breaking" },
+  { id: "tdm", prim: "kda", name: "TDM" },
 ];
 
 const ENV_TRACK: StageEnv = {
@@ -68,9 +89,10 @@ function buildTeams(): NativeStageTeam[] {
 }
 
 export default function DevArenaPage() {
-  const [prim, setPrim] = useState<StagePrimitive>("track");
+  const [discId, setDiscId] = useState<string>("staffel");
   const teams = useMemo(buildTeams, []);
   const slots = ["Etappe 1", "Etappe 2", "Etappe 3", "Etappe 4"];
+  const disc = DISCIPLINES.find((d) => d.id === discId) ?? DISCIPLINES[0]!;
   return (
     <div style={{ padding: 16, background: "var(--nl-bg, #0a0e15)", color: "var(--nl-ink, #eef4fb)", minHeight: "100vh" }}>
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 14 }}>
@@ -79,27 +101,28 @@ export default function DevArenaPage() {
           Disziplin:{" "}
           <select
             data-testid="prim-select"
-            value={prim}
-            onChange={(e) => setPrim(e.target.value as StagePrimitive)}
+            value={discId}
+            onChange={(e) => setDiscId(e.target.value)}
             style={{ padding: "4px 8px", fontFamily: "monospace" }}
           >
-            {PRIMS.map((p) => (
-              <option key={p} value={p}>
-                {p}
+            {DISCIPLINES.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name} · {d.prim}
               </option>
             ))}
           </select>
         </label>
-        <span data-testid="active-prim">{prim}</span>
+        <span data-testid="active-prim">{disc.prim}</span>
       </div>
       <DisciplineStageNativeArena
-        key={prim}
+        key={disc.id}
         teams={teams}
         slots={slots}
-        primitive={prim}
-        disciplineName={prim.toUpperCase()}
+        primitive={disc.prim}
+        disciplineId={disc.id}
+        disciplineName={disc.name}
         accent="hsl(199 74% 60%)"
-        env={prim === "track" ? ENV_TRACK : undefined}
+        env={disc.prim === "track" ? ENV_TRACK : undefined}
       />
     </div>
   );

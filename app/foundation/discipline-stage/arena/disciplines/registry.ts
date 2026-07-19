@@ -1,16 +1,17 @@
 // =====================================================================================
 // DISCIPLINE FIELD REGISTRY
 // =====================================================================================
-// Der Host wählt anhand des StagePrimitive die Feld-Komponente aus dieser Registry.
-// Jede Disziplin hat GENAU EINE Feld-Datei (arena/disciplines/<primitive>.tsx), die den
-// DisciplineFieldProps-Contract erfüllt. So können 19 Fan-out-Agents je 1 Disziplin
-// unabhängig (neu-)bauen, ohne sich zu blockieren.
+// Der Host wählt die Feld-Komponente aus dieser Registry. Primär über den StagePrimitive;
+// wenn sich MEHRERE Disziplinen ein Primitive teilen (parcours: takeshi+football,
+// klassen: speed-schach+tennis, stage: eiskunstlauf+showcase), gewinnt eine
+// disciplineId-spezifische Feld-Datei, damit jede dieser Disziplinen ihre eigene 1:1-Optik
+// bekommt. So können Fan-out-Agents je 1 Disziplin unabhängig (neu-)bauen, ohne sich zu
+// blockieren.
 //
-// Stand:
-//   • track  → bespoke rebuild (Pilot, rAF-Oval-Glide).
-//   • alle anderen → STUB, delegiert an FieldSvgInner (Verhalten 1:1 wie vorher).
-//   • duelhp → Sonderfall (MiniDmArenaBattle via Host-Early-Return); Eintrag ist ein
-//     dokumentierter No-op, damit die Registry total über StagePrimitive bleibt.
+// Auflösungsreihenfolge in getDisciplineField(primitive, disciplineId):
+//   1. DISCIPLINE_ID_FIELD_REGISTRY[disciplineId]  (bespoke, für geteilte Primitives)
+//   2. DISCIPLINE_FIELD_REGISTRY[primitive]        (Standard: 1 Primitive = 1 Feld)
+//   3. SparkbarField                                (Fallback)
 // =====================================================================================
 
 import type { StagePrimitive } from "../DisciplineStageNativeArena";
@@ -60,6 +61,21 @@ export const DISCIPLINE_FIELD_REGISTRY: Record<StagePrimitive, DisciplineField> 
   territory: TerritoryField,
 };
 
-export function getDisciplineField(primitive: StagePrimitive): DisciplineField {
+// Bespoke Felder für Disziplinen, die sich ein Primitive teilen. Der Key ist die
+// disciplineId (siehe NATIVE_PRIMITIVE in DisciplineStageArena.tsx). Wird von den
+// Wellen-Agents befüllt, sobald die jeweilige 1:1-Datei existiert.
+export const DISCIPLINE_ID_FIELD_REGISTRY: Record<string, DisciplineField> = {
+  // parcours: "takeshis-castle": TakeshiField, football: FootballField,
+  // klassen:  "speed-schach": SchachField, tennis: TennisField,
+  // stage:    eiskunstlauf: EiskunstField, showcase: ShowcaseField,
+};
+
+export function getDisciplineField(
+  primitive: StagePrimitive,
+  disciplineId?: string,
+): DisciplineField {
+  if (disciplineId && DISCIPLINE_ID_FIELD_REGISTRY[disciplineId]) {
+    return DISCIPLINE_ID_FIELD_REGISTRY[disciplineId]!;
+  }
   return DISCIPLINE_FIELD_REGISTRY[primitive] ?? SparkbarField;
 }
