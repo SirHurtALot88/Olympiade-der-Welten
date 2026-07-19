@@ -330,7 +330,8 @@ const STAR_MIN = 80;
 // ist geometrieunabhängig; nur Feld-Layout + tokenPos unterscheiden sich.
 const PRIM_GEO: Record<StagePrimitive, { w: number; h: number; r: number; rOwn: number }> = {
   track: { w: 1180, h: 620, r: 13, rOwn: 20 },
-  lanes: { w: 1180, h: 860, r: 9, rOwn: 13 },
+  // Kompakt: 32 Bahnen passen in einen normalen Viewport (~640px hoch bei voller Breite).
+  lanes: { w: 1180, h: 640, r: 8, rOwn: 11 },
   towers: { w: 1180, h: 600, r: 10, rOwn: 14 },
 };
 
@@ -372,6 +373,7 @@ type RT = {
   isOwn: boolean;
   players: NativeStagePlayer[];
   seasonRank: number;
+  laneIdx: number; // dichte 0…N-1 Bahn-/Turm-Reihenfolge nach seasonRank (keine Lücken)
   score: number;
   thrownSlot: number;
   rank: number;
@@ -379,6 +381,7 @@ type RT = {
   roundRankAfter: number;
   roundDelta: number;
   roundMedal: 0 | 1 | 2 | 3;
+  roundSlotRank: number; // vorab bestimmter Rang im aktuellen Slot (1…N) — kein Spoiler
   glowUntil: number;
 };
 
@@ -441,7 +444,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       logoUrl: t.logoUrl,
       isOwn: t.isOwn,
       players: t.players,
-      seasonRank: idx + 1,
+      seasonRank: t.seasonRank ?? idx + 1,
+      laneIdx: idx,
       score: 0,
       thrownSlot: -1,
       rank: idx + 1,
@@ -449,8 +453,16 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       roundRankAfter: idx + 1,
       roundDelta: 0,
       roundMedal: 0 as 0 | 1 | 2 | 3,
+      roundSlotRank: 0,
       glowUntil: 0,
     }));
+    // Bahn-/Turm-Reihenfolge nach echtem Season-Rang, aber DICHT durchnummeriert
+    // (Season-Ränge können Lücken haben → niemals seasonRank-1 als Array-Index).
+    [...rt]
+      .sort((a, b) => a.seasonRank - b.seasonRank || a.idx - b.idx)
+      .forEach((t, i) => {
+        t.laneIdx = i;
+      });
     recomputeRanks(rt);
     return rt;
   }, [teams]);
@@ -468,7 +480,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const [hover, setHover] = useState<{ idx: number; x: number; y: number } | null>(null);
   const timers = useRef<number[]>([]);
   const fxId = useRef(1);
-  const roundBest = useRef<{ net: number } | null>(null);
+  const roundTopNet = useRef(0); // Netto des Etappensiegers der laufenden Runde (vorab bestimmt)
   const tier2Budget = useRef(2);
   const tier1Budget = useRef(4);
   const busyRef = useRef(false);
@@ -498,7 +510,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setTicker([]);
     setPodium(null);
     setHover(null);
-    roundBest.current = null;
+    roundTopNet.current = 0;
     tier2Budget.current = 2;
     tier1Budget.current = 4;
     force();
@@ -552,31 +564,35 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   }, [prim, N, W, H]) as any;
 
-  const scores = rtRef.current.map((t) => t.score);
-  const maxScore = Math.max(1, ...scores);
-  const minScore = Math.min(0, ...scores);
+  // Normierungsbasis = größte erreichbare Team-Summe (statisch, aus den Slot-Werten).
+  // So endet das beste Team exakt auf der Ziellinie und Tokens rutschen beim Reveal
+  // NICHT kollektiv nach — nur das gerade aufgedeckte Team bewegt sich.
+  const finalMax = useMemo(() => {
+    let mx = 0;
+    for (const t of teams) {
+      let s = 0;
+      for (const p of t.players) s += playerNet(p);
+      if (s > mx) mx = s;
+    }
+    return Math.max(1, mx);
+  }, [teams]);
+
   const tokenPos = useCallback(
     (t: RT, score: number): { x: number; y: number } => {
+      const norm = finalMax > 0 ? score / finalMax : 0; // 0…1, kein Headroom
       if (prim === "lanes") {
-        const idx = t.seasonRank - 1;
-        const y = layout.top + idx * layout.laneH + layout.laneH / 2;
-        // Headroom: Führender bei ~90 %, die Ziellinie bleibt bis zuletzt frei.
-        const norm = maxScore > 0 ? (score / maxScore) * 0.9 : 0;
+        const y = layout.top + t.laneIdx * layout.laneH + layout.laneH / 2;
         return { x: layout.xStart + norm * (layout.xEnd - layout.xStart), y };
       }
       if (prim === "towers") {
-        const idx = t.seasonRank - 1;
-        const x = layout.lPad + idx * layout.colW + layout.colW / 2;
-        const norm = maxScore > 0 ? (score / maxScore) * 0.9 : 0;
+        const x = layout.lPad + t.laneIdx * layout.colW + layout.colW / 2;
         return { x, y: layout.baseY - norm * (layout.baseY - layout.topY) };
       }
-      // track (Oval) — Position entlang der Bahn + stabiler Quer-Versatz nach
-      // fester Team-Position, damit sich das Feld in ~6 Bahnen auffächert statt
-      // zu einem Pulk zu kollabieren.
+      // track (Oval, im Uhrzeigersinn) — monoton wachsende frac ⇒ nie rückwärts;
+      // Sieger landet nach einer Runde wieder exakt an der ZIEL-Linie. Stabiler
+      // Quer-Versatz nach fester Team-Position, damit sich das Feld auffächert.
       if (!pathRef.current || pathLen === 0) return { x: W / 2, y: 70 };
-      const span = maxScore - minScore;
-      const norm = span > 0 ? (score - minScore) / span : 0;
-      const frac = 0.06 + norm * 0.86;
+      const frac = 0.015 + norm * 0.985;
       const L = frac * pathLen;
       const pt = pathRef.current.getPointAtLength(L);
       const p2 = pathRef.current.getPointAtLength(Math.min(pathLen, L + 2));
@@ -585,11 +601,11 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       const tl = Math.hypot(tx, ty) || 1;
       tx /= tl;
       ty /= tl;
-      const lane = ((t.seasonRank - 1) % 6) - 2.5; // -2.5 … 2.5
+      const lane = (t.laneIdx % 6) - 2.5; // -2.5 … 2.5
       const off = lane * 8.5;
       return { x: pt.x + -ty * off, y: pt.y + tx * off };
     },
-    [prim, layout, pathLen, maxScore, minScore, W],
+    [prim, layout, pathLen, finalMax, W],
   );
 
   // ---- Rang-/Slot-Mathematik (Port der Szene) ----
@@ -607,14 +623,6 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       if (p && playerNet(p) > my) better += 1;
     });
     return better + 1;
-  }
-  function updateRoundMedals(slot: number, rt: RT[]): void {
-    const withNet = rt
-      .filter((t) => t.thrownSlot === slot)
-      .map((t) => ({ t, net: playerNet(t.players[slot]) }))
-      .sort((a, b) => b.net - a.net || a.t.seasonRank - b.t.seasonRank);
-    rt.forEach((t) => (t.roundMedal = 0));
-    withNet.slice(0, 3).forEach((o, i) => (o.t.roundMedal = (i + 1) as 1 | 2 | 3));
   }
   function computeRoundStandings(rnd: number, rt: RT[]): void {
     const after = rt.map((t) => {
@@ -639,7 +647,12 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     t.score = round1(t.score + net);
     t.thrownSlot = slot;
     recomputeRanks(rt);
-    updateRoundMedals(slot, rt);
+    // Medaille erscheint erst mit dem Auftritt (gate über thrownSlot === slot),
+    // ist aber sofort final: sie folgt dem vorab bestimmten roundSlotRank und
+    // wandert nicht mehr weiter. Kein Spoiler vor Reveal.
+    if (p && t.roundSlotRank >= 1 && t.roundSlotRank <= 3) {
+      t.roundMedal = t.roundSlotRank as 1 | 2 | 3;
+    }
     return { player: p, net };
   }
   function noteReveal(t: RT, slot: number, res: { player: NativeStagePlayer | null; net: number }, isMine: boolean, rt: RT[]): Impact {
@@ -649,9 +662,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     const bonSum = p.mods.filter((m) => m.sign > 0).reduce((s, m) => s + m.amt, 0);
     const injury = p.mods.some((m) => /verletz|injury/i.test(m.k));
     const delta = t.roundDelta;
-    const prevBest = roundBest.current ? roundBest.current.net : -1;
-    const newBest = net > prevBest;
-    if (newBest) roundBest.current = { net };
+    const topNet = roundTopNet.current; // vorab bestimmter Etappensieger-Wert (kein prevBest)
+    const slotRank = t.roundSlotRank; // vorab bestimmter Rang in dieser Etappe (1…N)
     const leaderBefore = rt.find((x) => x.roundStartRank === 1);
     const leaderChange = t.roundRankAfter === 1 && !!leaderBefore && leaderBefore.code !== t.code;
     const top3jump = t.roundStartRank >= 6 && t.roundRankAfter <= 3;
@@ -681,11 +693,18 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       tier = 2;
       color = "violet";
       text = `P${t.roundStartRank} → P${t.roundRankAfter}`;
-    } else if (newBest) {
+    } else if (slotRank === 1) {
+      // echter Etappensieger (vorab bestimmt): Tier 2, umgeht Drosselung
       cause = "best";
       tier = 2;
       color = "gold";
-      text = `#1 der Etappe · ${fmt1(net)}`;
+      text = `Etappensieger · ${fmt1(net)}`;
+    } else if (slotRank === 2 || slotRank === 3) {
+      // echte Runden-Silber/Bronze: mind. Tier 1 (Ping + Glow) + Medaillenring
+      cause = slotRank === 2 ? "silver" : "bronze";
+      tier = 1;
+      color = "gold";
+      text = slotRank === 2 ? "Runden-Silber" : "Runden-Bronze";
     } else if (bonSum >= 13 && net > p.val) {
       cause = "push";
       tier = 1;
@@ -696,13 +715,17 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       tier = 1;
       color = "violet";
       text = `▲${delta} Plätze`;
-    } else if (prevBest > 0 && net >= prevBest * 0.9) {
+    } else if (topNet > 0 && net >= topNet * 0.9) {
       cause = "strong";
       tier = 1;
       color = "gold";
       text = `stark · ${fmt1(net)}`;
     }
-    if (!isMine && cause !== "injury") {
+    // Budgets drosseln nur die Zusatz-Causes fremder Teams (leader/top3jump/push/
+    // climb/strong). Die echten Top-3 (best/silver/bronze) sowie injury/star sind
+    // ausgenommen und erscheinen immer in voller Tier-Stärke.
+    const exemptFromBudget = cause === "injury" || cause === "star" || cause === "best" || cause === "silver" || cause === "bronze";
+    if (!isMine && !exemptFromBudget) {
       if (tier === 2) {
         if (tier2Budget.current > 0) tier2Budget.current -= 1;
         else tier = 1;
@@ -787,7 +810,9 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       injury: ["var(--nl-risk)", "Verletzung"],
       leader: ["var(--nl-good)", "Neue Spitze"],
       top3: ["var(--nl-good)", "Sprung Top 3"],
-      best: ["var(--nl-good)", "Rundenbestwert"],
+      best: ["var(--nl-good)", "Etappensieger"],
+      silver: ["var(--nl-mut)", "Runden-Silber"],
+      bronze: ["rgb(205,127,50)", "Runden-Bronze"],
       push: ["var(--nl-accent)", "Hart gepusht"],
       climb: ["var(--nl-accent)", "Aufholjagd"],
       strong: ["var(--nl-good)", "Stark"],
@@ -864,7 +889,17 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       t.roundStartRank = t.rank;
       t.roundMedal = 0;
     });
-    roundBest.current = null;
+    // Runden-Slot-Ränge VORAB bestimmen (kein Spoiler: nur gespeichert, erscheint
+    // erst mit dem Auftritt): alle Teams nach playerNet(players[r]) absteigend,
+    // Tiebreak seasonRank. Liefert echte Top-Performer für Medaillen/Highlights.
+    const slotOrder = rt
+      .map((t) => ({ t, net: playerNet(t.players[r]), has: !!t.players[r] }))
+      .sort((a, b) => b.net - a.net || a.t.seasonRank - b.t.seasonRank);
+    slotOrder.forEach((o, i) => {
+      o.t.roundSlotRank = i + 1;
+    });
+    // Etappensieger-Netto = bester Wert eines Teams, das in diesem Slot antritt.
+    roundTopNet.current = slotOrder.find((o) => o.has)?.net ?? 0;
     tier2Budget.current = 2;
     tier1Budget.current = 4;
     if (r === 0) audio.gun(0.6);
@@ -1035,6 +1070,31 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const sorted = [...rtRef.current].sort((a, b) => a.rank - b.rank);
   const me = rtRef.current.find((t) => t.isOwn) ?? null;
   const now = Date.now();
+
+  // Top-Spieler-Zeile: NUR bereits aufgedeckte Spieler (kein Spoiler). Set aller
+  // playerIds bis einschließlich thrownSlot je Team; die statische Host-Liste wird
+  // darauf gefiltert (Reihenfolge bleibt, Ränge neu 1…k). Vor dem ersten Reveal leer.
+  const revealedPlayerIds = new Set<string>();
+  for (const t of rtRef.current) {
+    for (let s = 0; s <= t.thrownSlot; s += 1) {
+      const pid = t.players[s]?.playerId;
+      if (pid) revealedPlayerIds.add(pid);
+    }
+  }
+  const revealedTopPlayers = topPlayers
+    ? (() => {
+        const rows: DisciplineStageTopPlayer[] = [];
+        const ids: (string | null)[] = [];
+        topPlayers.rows.forEach((row, i) => {
+          const id = topPlayers.ids[i];
+          if (id && revealedPlayerIds.has(id)) {
+            rows.push({ ...row, rank: rows.length + 1 });
+            ids.push(id);
+          }
+        });
+        return { rows, ids };
+      })()
+    : null;
 
   return (
     <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
@@ -1246,7 +1306,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                   <rect key={i} x={layout.xEnd} y={layout.top + i * 12} width={6} height={6} fill={i % 2 ? "var(--nl-ink)" : "var(--nl-mut)"} opacity={0.7} />
                 ))}
                 {rtRef.current.map((t) => (
-                  <text key={`ll-${t.code}`} x={layout.xStart - 8} y={layout.top + (t.seasonRank - 1) * layout.laneH + layout.laneH / 2} dominantBaseline="middle" textAnchor="end" fontSize={9.5} fontWeight={t.isOwn ? 800 : 600} fill={t.isOwn ? "var(--nl-accent)" : "var(--nl-mut)"}>
+                  <text key={`ll-${t.code}`} x={layout.xStart - 8} y={layout.top + t.laneIdx * layout.laneH + layout.laneH / 2} dominantBaseline="middle" textAnchor="end" fontSize={9.5} fontWeight={t.isOwn ? 800 : 600} fill={t.isOwn ? "var(--nl-accent)" : "var(--nl-mut)"}>
                     {t.isOwn ? "★" : ""}
                     {t.code}
                   </text>
@@ -1259,7 +1319,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                   <line key={i} x1={layout.lPad} y1={layout.baseY - (layout.baseY - layout.topY) * f} x2={W - layout.rPad} y2={layout.baseY - (layout.baseY - layout.topY) * f} stroke="var(--nl-line)" strokeWidth={1} strokeDasharray="3 8" opacity={0.45} />
                 ))}
                 {rtRef.current.map((t) => (
-                  <text key={`tl-${t.code}`} x={layout.lPad + (t.seasonRank - 1) * layout.colW + layout.colW / 2} y={layout.baseY + 13} textAnchor="middle" fontSize={8.5} fontWeight={t.isOwn ? 800 : 600} fill={t.isOwn ? "var(--nl-accent)" : "var(--nl-mut)"}>
+                  <text key={`tl-${t.code}`} x={layout.lPad + t.laneIdx * layout.colW + layout.colW / 2} y={layout.baseY + 13} textAnchor="middle" fontSize={8.5} fontWeight={t.isOwn ? 800 : 600} fill={t.isOwn ? "var(--nl-accent)" : "var(--nl-mut)"}>
                     {t.code}
                   </text>
                 ))}
@@ -1420,9 +1480,9 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           )}
         </div>
 
-        {/* Top-Spieler-Zeile unter der Arena (nach Player-Points) */}
-        {topPlayers && topPlayers.rows.length > 0 ? (
-          <DisciplineStageTopPlayersRow players={topPlayers.rows} playerIdByRow={topPlayers.ids} onOpenPlayer={onOpenPlayer} limit={10} />
+        {/* Top-Spieler-Zeile unter der Arena (nur bereits aufgedeckte Spieler) */}
+        {revealedTopPlayers && revealedTopPlayers.rows.length > 0 ? (
+          <DisciplineStageTopPlayersRow players={revealedTopPlayers.rows} playerIdByRow={revealedTopPlayers.ids} onOpenPlayer={onOpenPlayer} limit={10} />
         ) : null}
       </div>
 

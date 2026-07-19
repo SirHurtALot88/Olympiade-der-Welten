@@ -461,6 +461,8 @@ export default function DisciplineStageArena({
   }, [gameState?.teams, ownTeamId, model.teams]);
 
   const payload = useMemo(() => {
+    // Echter Season-Tabellenrang je Team → Bahn-/Turm-Reihenfolge in der Arena.
+    const standings = gameState.seasonState?.standings;
     const slotCount = useEngine
       ? engineTeams!.reduce((max, t) => Math.max(max, t.players.length), 0) || model.slotCount
       : model.slotCount;
@@ -469,6 +471,8 @@ export default function DisciplineStageArena({
           code: t.code,
           name: t.name,
           logoUrl: t.logoUrl,
+          teamId: t.teamId,
+          seasonRank: standings?.[t.teamId]?.rank ?? undefined,
           // Engine-Modus: Netto = val + Σmods trägt bereits die volle Engine-Zerlegung.
           players: t.players.map((p) => ({
             playerId: p.playerId,
@@ -485,6 +489,8 @@ export default function DisciplineStageArena({
           code: t.shortCode,
           name: t.name,
           logoUrl: t.logoUrl,
+          teamId: t.teamId,
+          seasonRank: standings?.[t.teamId]?.rank ?? undefined,
           players: t.slots.map((s) => ({
             playerId: s.playerId,
             val: s.base,
@@ -506,7 +512,7 @@ export default function DisciplineStageArena({
       mutatorTraits,
       teams,
     };
-  }, [useEngine, engineTeams, model, mode, seed, disciplineId, mutatorTraits, ownShortCode]);
+  }, [useEngine, engineTeams, model, mode, seed, disciplineId, mutatorTraits, ownShortCode, gameState.seasonState?.standings]);
 
   // Betroffene Spieler (≥1 Trait-Treffer) für die Player-Points-Anzeige (+0,3 PP je).
   const mutatorImpact = useMemo(() => {
@@ -708,6 +714,8 @@ export default function DisciplineStageArena({
             name: t.name,
             logoUrl: t.logoUrl,
             isOwn: t.code === payload.mineCode,
+            teamId: t.teamId,
+            seasonRank: t.seasonRank,
             players: t.players.map((p) => ({
               playerId: p.playerId,
               val: p.val,
