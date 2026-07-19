@@ -53,8 +53,8 @@ export function createPersistenceService(): PersistenceService {
         createdFromSeed: true,
       };
     },
-    getActiveSave() {
-      return saveRepository.getActiveSave();
+    getActiveSave(ownerId) {
+      return saveRepository.getActiveSave(ownerId);
     },
     getSaveById(saveId) {
       if (saveId === "active" || saveId === "current") {
@@ -163,8 +163,8 @@ export function createPersistenceService(): PersistenceService {
         },
       });
     },
-    activateSave(saveId) {
-      return saveRepository.setActiveSave(saveId);
+    activateSave(saveId, ownerId) {
+      return saveRepository.setActiveSave(saveId, ownerId);
     },
     listSaves() {
       return saveRepository.listSaves();

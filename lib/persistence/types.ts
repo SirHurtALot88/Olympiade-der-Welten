@@ -38,11 +38,23 @@ export type PersistenceBootstrapResult = {
 };
 
 export type SaveRepository = {
-  getActiveSave(): PersistedSaveGame | null;
+  /**
+   * Resolves the active save. When `ownerId` is supplied and that owner has a per-owner
+   * `active_saves` pointer to a still-existing save, that save is returned; otherwise it falls
+   * back to the global (status='active', most recent) behavior. Omitting `ownerId` (auth off /
+   * solo) is byte-for-byte the original single-global-active-save behavior.
+   */
+  getActiveSave(ownerId?: string | null): PersistedSaveGame | null;
   getSaveById(saveId: string): PersistedSaveGame | null;
   getSaveVersionMetadata(saveId: string): SaveVersionMetadata | null;
   listSaves(): SaveSummary[];
-  setActiveSave(saveId: string): PersistedSaveGame | null;
+  /**
+   * Activates a save. With `ownerId` it upserts ONLY that owner's `active_saves` pointer (and
+   * marks the save active for compatibility) without archiving any other owner's active save.
+   * Without `ownerId` it keeps the global behavior: blanket-archive every other active save,
+   * then mark this one active.
+   */
+  setActiveSave(saveId: string, ownerId?: string | null): PersistedSaveGame | null;
   createSaveFromSeed(input: {
     saveId: string;
     name: string;
@@ -79,7 +91,8 @@ export type SaveRepository = {
 
 export type PersistenceService = {
   bootstrapSingleplayerSave(): PersistenceBootstrapResult;
-  getActiveSave(): PersistedSaveGame | null;
+  /** See SaveRepository.getActiveSave — resolves the per-owner active save (or global fallback). */
+  getActiveSave(ownerId?: string | null): PersistedSaveGame | null;
   getSaveById(saveId: string): PersistedSaveGame | null;
   getSaveVersionMetadata(saveId: string): SaveVersionMetadata | null;
   saveSingleplayerState(saveId: string, gameState: GameState, input?: { status?: SaveStatus }): PersistedSaveGame;
@@ -92,7 +105,8 @@ export type PersistenceService = {
     status?: SaveStatus;
     scenarioMeta: ScenarioMeta;
   }): PersistedSaveGame;
-  activateSave(saveId: string): PersistedSaveGame | null;
+  /** See SaveRepository.setActiveSave — activates per-owner (no blanket archive) or globally. */
+  activateSave(saveId: string, ownerId?: string | null): PersistedSaveGame | null;
   listSaves(): SaveSummary[];
   /** Deletes a single save (and all child rows). Returns false if the save is the active save or doesn't exist. */
   deleteSave(saveId: string): boolean;

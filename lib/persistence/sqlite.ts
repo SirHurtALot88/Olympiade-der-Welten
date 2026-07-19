@@ -4,6 +4,7 @@ import path from "node:path";
 
 import Database from "better-sqlite3";
 import { assertOlyProjectRoot } from "@/lib/persistence/project-root-guard";
+import { DEFAULT_ACTIVE_OWNER_ID } from "@/lib/foundation/team-control-settings";
 
 let databaseInstance: Database.Database | null = null;
 
@@ -160,9 +161,43 @@ function runMigrations(database: Database.Database) {
       payload_json TEXT NOT NULL,
       FOREIGN KEY (save_id) REFERENCES saves(save_id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS active_saves (
+      owner_id TEXT PRIMARY KEY,
+      save_id TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
   `);
 
   ensureSaveVersionColumns(database);
+  backfillDefaultActiveSavePointer(database);
+}
+
+/**
+ * One-time, idempotent backfill: when the per-owner `active_saves` pointer table is first created
+ * on an existing DB that already has a global status='active' save, seed the DEFAULT_ACTIVE_OWNER_ID
+ * (Chris / "user_local") pointer to that save so Chris keeps his current game after the migration.
+ * Only runs when Chris has no pointer yet — never overwrites an existing pointer, so it is safe to
+ * run on every boot.
+ */
+function backfillDefaultActiveSavePointer(database: Database.Database) {
+  const existingPointer = database
+    .prepare("SELECT save_id FROM active_saves WHERE owner_id = ?")
+    .get(DEFAULT_ACTIVE_OWNER_ID) as { save_id: string } | undefined;
+  if (existingPointer) {
+    return;
+  }
+
+  const activeRow = database
+    .prepare("SELECT save_id FROM saves WHERE status = 'active' ORDER BY updated_at DESC LIMIT 1")
+    .get() as { save_id: string } | undefined;
+  if (!activeRow) {
+    return;
+  }
+
+  database
+    .prepare("INSERT INTO active_saves (owner_id, save_id, updated_at) VALUES (?, ?, ?)")
+    .run(DEFAULT_ACTIVE_OWNER_ID, activeRow.save_id, new Date().toISOString());
 }
 
 function ensureSaveVersionColumns(database: Database.Database) {
