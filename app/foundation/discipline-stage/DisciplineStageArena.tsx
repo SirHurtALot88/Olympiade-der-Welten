@@ -17,16 +17,15 @@ import DisciplineStageEndScreen from "@/app/foundation/discipline-stage/Discipli
 import DisciplineStageStandingsDelta from "@/app/foundation/discipline-stage/DisciplineStageStandingsDelta";
 import DisciplineStageHighlights from "@/app/foundation/discipline-stage/DisciplineStageHighlights";
 import DisciplineStageTopPlayers, { type DisciplineStageTopPlayer } from "@/app/foundation/discipline-stage/DisciplineStageTopPlayers";
-import DisciplineStageNativeArena from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
+import DisciplineStageNativeArena, { type StagePrimitive } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
 
 // Disziplinen mit fertigem nativem Renderer (löst schrittweise das iframe ab).
-// Nativer Renderer je Disziplin. Der Track-Primitive (Oval, "Position = Punkte")
-// ist disziplin-agnostisch: Engine, FX, Sounds, Ticker, Podest, Detail-Tabelle
-// und Top-10 sind für alle 20 gleich. Deshalb laufen alle Disziplinen jetzt auf
-// demselben Feature-Stand über "track". Die im Rebuild-Plan vorgesehenen eigenen
-// Optiken (Lanes/Towers/Tiers) sind die nächste optische Politur — bis dahin
-// steht rechts der Kommentar mit dem Ziel-Primitive.
-const NATIVE_PRIMITIVE: Record<string, "track"> = {
+// Nativer Renderer je Disziplin. Engine, FX, Sounds, Ticker, Podest, Detail-
+// Tabelle und Top-10 sind für alle 20 gleich; nur das Feld-Primitive unterscheidet
+// die Optik: track (Oval, Position = Punkte), lanes (Bahnen, Fortschritt = Punkte),
+// towers (Türme, Höhe = Punkte).
+const NATIVE_PRIMITIVE: Record<string, StagePrimitive> = {
+  // track — Fortschritt auf einer Bahn
   staffel: "track",
   spurt: "track",
   "takeshis-castle": "track",
@@ -36,17 +35,19 @@ const NATIVE_PRIMITIVE: Record<string, "track"> = {
   battlefield: "track",
   "mini-dm": "track",
   "i-spy": "track",
-  "time-trial": "track", // Ziel: lanes
-  "speed-schach": "track", // Ziel: lanes
-  fechten: "track", // Ziel: lanes
-  tennis: "track", // Ziel: lanes
-  breaking: "track", // Ziel: lanes
-  basketball: "track", // Ziel: towers
-  gewichtheben: "track", // Ziel: towers
-  climbing: "track", // Ziel: towers
-  eiskunstlauf: "track", // Ziel: towers
-  showcase: "track", // Ziel: towers
-  tdm: "track", // Ziel: tiers
+  tdm: "track",
+  // lanes — parallele Bahnen bis zum Ziel
+  "time-trial": "lanes",
+  "speed-schach": "lanes",
+  fechten: "lanes",
+  tennis: "lanes",
+  breaking: "lanes",
+  // towers — vertikale Höhe = Punkte
+  basketball: "towers",
+  gewichtheben: "towers",
+  climbing: "towers",
+  eiskunstlauf: "towers",
+  showcase: "towers",
 };
 
 export type DisciplineStageArenaProps = {
@@ -170,10 +171,35 @@ function fmt1(x: number): string {
   return Number.isInteger(v) ? String(v) : v.toFixed(1);
 }
 
+// Disziplin-eigenes Vokabular für die Slot-Labels (Etappen-Button, Ticker,
+// Spotlight, Detail-Tabelle). Fällt sonst auf einen generischen Startplatz zurück.
+const SLOT_VOCAB: Record<string, string[]> = {
+  staffel: ["Start-Läufer", "Tempo-Läufer", "Kurven-Läufer", "Schluss-Läufer", "Anker"],
+  spurt: ["Sprinter 1", "Sprinter 2", "Sprinter 3", "Sprinter 4", "Sprinter 5"],
+  "time-trial": ["Fahrer 1", "Fahrer 2", "Fahrer 3", "Fahrer 4", "Fahrer 5"],
+  hockey: ["Sturm", "Mittelfeld", "Abwehr", "Verteidiger", "Torwart"],
+  football: ["Angriff", "Mittelfeld", "Abwehr", "Verteidiger", "Torwart"],
+  basketball: ["Center", "Forward", "Guard", "Flügel", "Aufbau"],
+  wettessen: ["Gang 1", "Gang 2", "Gang 3", "Gang 4", "Gang 5"],
+  gewichtheben: ["Reißen", "Stoßen", "Zusatzheben", "Finalheben", "Anker"],
+  climbing: ["Route 1", "Route 2", "Route 3", "Route 4", "Route 5"],
+  eiskunstlauf: ["Kür 1", "Kür 2", "Kür 3", "Kür 4", "Kür 5"],
+  showcase: ["Auftritt 1", "Auftritt 2", "Auftritt 3", "Auftritt 4", "Auftritt 5"],
+  "speed-schach": ["Brett 1", "Brett 2", "Brett 3", "Brett 4", "Brett 5"],
+  fechten: ["Gefecht 1", "Gefecht 2", "Gefecht 3", "Gefecht 4", "Gefecht 5"],
+  tennis: ["Match 1", "Match 2", "Match 3", "Doppel", "Anker"],
+  breaking: ["Battle 1", "Battle 2", "Battle 3", "Battle 4", "Battle 5"],
+  "takeshis-castle": ["Lauf 1", "Lauf 2", "Lauf 3", "Lauf 4", "Lauf 5"],
+  battlefield: ["Welle 1", "Welle 2", "Welle 3", "Welle 4", "Welle 5"],
+  "mini-dm": ["Runde 1", "Runde 2", "Runde 3", "Runde 4", "Runde 5"],
+  "i-spy": ["Fund 1", "Fund 2", "Fund 3", "Fund 4", "Fund 5"],
+  tdm: ["Runde 1", "Runde 2", "Runde 3", "Runde 4", "Runde 5"],
+};
+
 function slotLabel(disciplineId: string, index: number, total: number): string {
-  if (disciplineId === "staffel") {
-    const legs = ["Start-Läufer", "Tempo-Läufer", "Kurven-Läufer", "Schluss-Läufer", "Anker"];
-    return legs[index] ?? `Läufer ${index + 1}`;
+  const vocab = SLOT_VOCAB[disciplineId];
+  if (vocab) {
+    return vocab[index] ?? `${vocab[0]?.replace(/\s*\d+$/, "") ?? "Slot"} ${index + 1}`;
   }
   return total <= 1 ? "Einzel" : `Platz ${index + 1}`;
 }
@@ -625,6 +651,7 @@ export default function DisciplineStageArena({
           }))}
           onOpenPlayer={onOpenPlayer}
           topPlayers={topPlayers}
+          primitive={NATIVE_PRIMITIVE[disciplineId] ?? "track"}
         />
       ) : scene ? (
         <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>

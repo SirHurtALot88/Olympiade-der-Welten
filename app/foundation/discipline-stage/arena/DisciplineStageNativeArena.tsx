@@ -28,16 +28,24 @@ export type NativeStageTeam = {
   isOwn: boolean;
   players: NativeStagePlayer[];
 };
+export type StagePrimitive = "track" | "lanes" | "towers";
 export type DisciplineStageNativeArenaProps = {
   teams: NativeStageTeam[];
   slots: string[];
   onOpenPlayer?: ((playerId: string) => void) | null;
   topPlayers?: { rows: DisciplineStageTopPlayer[]; ids: (string | null)[] } | null;
+  primitive?: StagePrimitive;
+  progressLabel?: string; // z.B. "Position auf dem Oval = kumulierte Punkte"
 };
 
 const STAR_MIN = 80;
-const W = 1180;
-const H = 620;
+// viewBox + Token-Radien je Primitive. Der Rest (Engine/FX/Ticker/Podest/Tabelle)
+// ist geometrieunabhängig; nur Feld-Layout + tokenPos unterscheiden sich.
+const PRIM_GEO: Record<StagePrimitive, { w: number; h: number; r: number; rOwn: number }> = {
+  track: { w: 1180, h: 620, r: 13, rOwn: 20 },
+  lanes: { w: 1180, h: 860, r: 9, rOwn: 13 },
+  towers: { w: 1180, h: 600, r: 10, rOwn: 14 },
+};
 
 function round1(x: number): number {
   return Math.round(x * 10) / 10;
@@ -105,8 +113,13 @@ type Frag = { id: number; xPct: number; yPct: number; text: string; sign: 1 | -1
 type Spot = { crest: NativeStageTeam; kick: string; name: string; sub: string; net: number; chipText: string; chipColor: string; mine: boolean } | null;
 type PodCol = { place: number; code: string; name: string; pts: number; logoUrl: string | null; isOwn: boolean; delayMs: number; loud: boolean };
 
-export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, topPlayers }: DisciplineStageNativeArenaProps) {
+export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, topPlayers, primitive = "track", progressLabel }: DisciplineStageNativeArenaProps) {
   const slotCount = Math.max(1, slots.length);
+  const prim = primitive;
+  const geo = PRIM_GEO[prim];
+  const W = geo.w;
+  const H = geo.h;
+  const N = Math.max(1, teams.length);
   const audio = useStageAudio();
   const [, force] = useReducer((x: number) => x + 1, 0);
 
@@ -199,12 +212,12 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
 
   const done = round >= slotCount;
 
-  // ---- Oval-Pfad ----
+  // ---- Feld-Geometrie ----
   const pathRef = useRef<SVGPathElement | null>(null);
   const [pathLen, setPathLen] = useState(0);
   useLayoutEffect(() => {
     if (pathRef.current) setPathLen(pathRef.current.getTotalLength());
-  }, []);
+  }, [prim]);
   const ovalPath = useMemo(() => {
     const m = 70;
     const x0 = m;
@@ -213,13 +226,43 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     const y1 = H - m;
     const r = (y1 - y0) / 2;
     return `M ${x0 + r} ${y0} L ${x1 - r} ${y0} A ${r} ${r} 0 0 1 ${x1 - r} ${y1} L ${x0 + r} ${y1} A ${r} ${r} 0 0 1 ${x0 + r} ${y0} Z`;
-  }, []);
+  }, [W, H]);
+
+  // Layout-Koordinaten je Primitive
+  const layout = useMemo(() => {
+    if (prim === "lanes") {
+      const top = 18;
+      const laneH = (H - top * 2) / N;
+      return { top, laneH, xStart: 84, xEnd: W - 96 };
+    }
+    if (prim === "towers") {
+      const lPad = 40;
+      const rPad = 24;
+      const colW = (W - lPad - rPad) / N;
+      return { lPad, rPad, colW, baseY: H - 52, topY: 44 };
+    }
+    return {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  }, [prim, N, W, H]) as any;
 
   const scores = rtRef.current.map((t) => t.score);
   const maxScore = Math.max(1, ...scores);
   const minScore = Math.min(0, ...scores);
   const tokenPos = useCallback(
-    (score: number): { x: number; y: number } => {
+    (t: RT, score: number): { x: number; y: number } => {
+      if (prim === "lanes") {
+        const idx = t.seasonRank - 1;
+        const y = layout.top + idx * layout.laneH + layout.laneH / 2;
+        const norm = maxScore > 0 ? score / maxScore : 0;
+        return { x: layout.xStart + norm * (layout.xEnd - layout.xStart), y };
+      }
+      if (prim === "towers") {
+        const idx = t.seasonRank - 1;
+        const x = layout.lPad + idx * layout.colW + layout.colW / 2;
+        const norm = maxScore > 0 ? score / maxScore : 0;
+        return { x, y: layout.baseY - norm * (layout.baseY - layout.topY) };
+      }
+      // track (Oval)
       if (!pathRef.current || pathLen === 0) return { x: W / 2, y: 70 };
       const span = maxScore - minScore;
       const norm = span > 0 ? (score - minScore) / span : 0;
@@ -227,7 +270,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       const pt = pathRef.current.getPointAtLength(frac * pathLen);
       return { x: pt.x, y: pt.y };
     },
-    [pathLen, maxScore, minScore],
+    [prim, layout, pathLen, maxScore, minScore, W],
   );
 
   // ---- Rang-/Slot-Mathematik (Port der Szene) ----
@@ -380,7 +423,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       setPops((ps) => [...ps, { id, xPct: (pos.x / W) * 100, yPct: (pos.y / H) * 100, net, mine }]);
       later(() => setPops((ps) => ps.filter((p) => p.id !== id)), 950);
     },
-    [later],
+    [later, W, H],
   );
   const addFrags = useCallback(
     (p: NativeStagePlayer, pos: { x: number; y: number }) => {
@@ -398,7 +441,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       const ids = new Set(created.map((c) => c.id));
       later(() => setFrags((fs) => fs.filter((f) => !ids.has(f.id))), 900);
     },
-    [later],
+    [later, W, H],
   );
   const glow = useCallback((t: RT) => {
     t.glowUntil = Date.now() + 1500;
@@ -540,7 +583,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       const isMine = t.isOwn;
       const res = applyReveal(t, r, rt);
       const impact = noteReveal(t, r, res, isMine, rt);
-      const pos = tokenPos(t.score);
+      const pos = tokenPos(t, t.score);
       // Bewegung: Token gleitet (CSS-Transition); eigenes Team langsamer (Slow-Mo).
       force();
       addPop(res.net, isMine, pos);
@@ -711,7 +754,14 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           <button type="button" onClick={audio.toggleMute} title="Sound an/aus" style={{ padding: "9px 12px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}>
             {audio.muted ? "🔇 Stumm" : "🔊 Sound"}
           </button>
-          <span style={{ fontSize: 12.5, color: "var(--nl-mut)" }}>Position auf dem Oval = kumulierte Punkte</span>
+          <span style={{ fontSize: 12.5, color: "var(--nl-mut)" }}>
+            {progressLabel ??
+              (prim === "towers"
+                ? "Höhe = kumulierte Punkte"
+                : prim === "lanes"
+                  ? "Fortschritt = kumulierte Punkte"
+                  : "Position auf dem Oval = kumulierte Punkte")}
+          </span>
         </div>
 
         {/* MyTracker */}
@@ -763,50 +813,84 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               {rtRef.current.map((t) =>
                 t.logoUrl ? (
                   <clipPath key={`clip-${t.code}`} id={`natclip-${t.code}`}>
-                    <circle cx={0} cy={0} r={t.isOwn ? 20 : 13} />
+                    <circle cx={0} cy={0} r={t.isOwn ? geo.rOwn : geo.r} />
                   </clipPath>
                 ) : null,
               )}
             </defs>
-            <path d={ovalPath} fill="none" stroke="var(--nl-panel)" strokeWidth={54} />
-            <path ref={pathRef} d={ovalPath} fill="none" stroke="var(--nl-line)" strokeWidth={2} strokeDasharray="6 8" />
+
+            {/* Feld je Primitive */}
+            {prim === "track" ? (
+              <>
+                <path d={ovalPath} fill="none" stroke="var(--nl-panel)" strokeWidth={54} />
+                <path ref={pathRef} d={ovalPath} fill="none" stroke="var(--nl-line)" strokeWidth={2} strokeDasharray="6 8" />
+              </>
+            ) : prim === "lanes" ? (
+              <>
+                {Array.from({ length: N }).map((_, i) => {
+                  const y = layout.top + i * layout.laneH + layout.laneH / 2;
+                  return <line key={i} x1={layout.xStart} y1={y} x2={layout.xEnd} y2={y} stroke="var(--nl-line)" strokeWidth={1} strokeDasharray="4 7" opacity={0.5} />;
+                })}
+                <line x1={layout.xStart} y1={layout.top} x2={layout.xStart} y2={H - layout.top} stroke="var(--nl-mut)" strokeWidth={2} />
+                {Array.from({ length: Math.ceil((H - 2 * layout.top) / 12) }).map((_, i) => (
+                  <rect key={i} x={layout.xEnd} y={layout.top + i * 12} width={6} height={6} fill={i % 2 ? "var(--nl-ink)" : "var(--nl-mut)"} opacity={0.7} />
+                ))}
+              </>
+            ) : (
+              <>
+                <line x1={layout.lPad} y1={layout.baseY} x2={W - layout.rPad} y2={layout.baseY} stroke="var(--nl-mut)" strokeWidth={2} />
+                {[0.25, 0.5, 0.75, 1].map((f, i) => (
+                  <line key={i} x1={layout.lPad} y1={layout.baseY - (layout.baseY - layout.topY) * f} x2={W - layout.rPad} y2={layout.baseY - (layout.baseY - layout.topY) * f} stroke="var(--nl-line)" strokeWidth={1} strokeDasharray="3 8" opacity={0.45} />
+                ))}
+              </>
+            )}
+
             {sorted
               .slice()
               .reverse()
               .map((t) => {
-                const pos = tokenPos(t.score);
-                const r = t.isOwn ? 20 : 13;
+                const pos = tokenPos(t, t.score);
+                const r = t.isOwn ? geo.rOwn : geo.r;
                 const hue = hueFor(t.code);
                 const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
                 const dur = t.isOwn ? 1300 : 520;
                 const glowing = t.glowUntil > now;
+                // Primitive-spezifische Spur/Balken (absolute Koordinaten, hinter dem Token)
+                const barW = Math.min(18, (layout.colW ?? 24) * 0.5);
                 return (
-                  <g
-                    key={t.code}
-                    transform={`translate(${pos.x} ${pos.y})`}
-                    style={{ transition: reduced.current ? "none" : `transform ${dur}ms cubic-bezier(.34,1.2,.4,1)`, cursor: onOpenPlayer ? "pointer" : "default" }}
-                    onMouseEnter={(e) => setHover({ idx: t.idx, x: e.clientX, y: e.clientY })}
-                    onMouseMove={(e) => setHover({ idx: t.idx, x: e.clientX, y: e.clientY })}
-                    onMouseLeave={() => setHover((h) => (h && h.idx === t.idx ? null : h))}
-                    onClick={() => {
-                      const slot = Math.max(0, Math.min(t.thrownSlot, t.players.length - 1));
-                      const pid = t.players[slot]?.playerId;
-                      if (onOpenPlayer && pid) onOpenPlayer(pid);
-                    }}
-                  >
-                    {glowing ? <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={4} style={{ animation: reduced.current ? "none" : "olyGlowPulse 1.1s ease-in-out infinite" }} /> : null}
-                    {medal ? <circle r={r + 3.5} fill="none" stroke={medal} strokeWidth={t.isOwn ? 4.5 : 3.5} /> : null}
-                    {t.logoUrl ? (
-                      <image href={t.logoUrl} x={-r} y={-r} width={r * 2} height={r * 2} clipPath={`url(#natclip-${t.code})`} preserveAspectRatio="xMidYMid slice" />
-                    ) : (
-                      <circle r={r} fill={`hsl(${hue} 60% 52%)`} />
-                    )}
-                    <circle r={r} fill="none" stroke={t.isOwn ? "var(--nl-ink)" : "rgba(255,255,255,.5)"} strokeWidth={t.isOwn ? 2.5 : 1.4} />
-                    {t.isOwn ? (
-                      <text y={r + 15} textAnchor="middle" fontSize={13} fontWeight={800} fill="var(--nl-accent)">
-                        ★ {t.code}
-                      </text>
+                  <g key={t.code}>
+                    {prim === "towers" ? (
+                      <rect x={pos.x - barW / 2} y={pos.y} width={barW} height={Math.max(0, layout.baseY - pos.y)} rx={3} fill={`hsl(${t.isOwn ? 210 : hue} 55% 50%)`} opacity={t.isOwn ? 0.4 : 0.28} />
                     ) : null}
+                    {prim === "lanes" ? (
+                      <line x1={layout.xStart} y1={pos.y} x2={pos.x} y2={pos.y} stroke={t.isOwn ? "var(--nl-accent)" : `hsl(${hue} 55% 55%)`} strokeWidth={t.isOwn ? 3 : 2} opacity={0.5} />
+                    ) : null}
+                    <g
+                      transform={`translate(${pos.x} ${pos.y})`}
+                      style={{ transition: reduced.current ? "none" : `transform ${dur}ms cubic-bezier(.34,1.2,.4,1)`, cursor: onOpenPlayer ? "pointer" : "default" }}
+                      onMouseEnter={(e) => setHover({ idx: t.idx, x: e.clientX, y: e.clientY })}
+                      onMouseMove={(e) => setHover({ idx: t.idx, x: e.clientX, y: e.clientY })}
+                      onMouseLeave={() => setHover((h) => (h && h.idx === t.idx ? null : h))}
+                      onClick={() => {
+                        const slot = Math.max(0, Math.min(t.thrownSlot, t.players.length - 1));
+                        const pid = t.players[slot]?.playerId;
+                        if (onOpenPlayer && pid) onOpenPlayer(pid);
+                      }}
+                    >
+                      {glowing ? <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={4} style={{ animation: reduced.current ? "none" : "olyGlowPulse 1.1s ease-in-out infinite" }} /> : null}
+                      {medal ? <circle r={r + 3.5} fill="none" stroke={medal} strokeWidth={t.isOwn ? 4.5 : 3.5} /> : null}
+                      {t.logoUrl ? (
+                        <image href={t.logoUrl} x={-r} y={-r} width={r * 2} height={r * 2} clipPath={`url(#natclip-${t.code})`} preserveAspectRatio="xMidYMid slice" />
+                      ) : (
+                        <circle r={r} fill={`hsl(${hue} 60% 52%)`} />
+                      )}
+                      <circle r={r} fill="none" stroke={t.isOwn ? "var(--nl-ink)" : "rgba(255,255,255,.5)"} strokeWidth={t.isOwn ? 2.5 : 1.4} />
+                      {t.isOwn && prim !== "lanes" ? (
+                        <text y={r + 15} textAnchor="middle" fontSize={13} fontWeight={800} fill="var(--nl-accent)">
+                          ★ {t.code}
+                        </text>
+                      ) : null}
+                    </g>
                   </g>
                 );
               })}
