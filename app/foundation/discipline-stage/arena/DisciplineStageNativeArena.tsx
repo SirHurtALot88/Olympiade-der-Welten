@@ -947,7 +947,7 @@ type TickerHeader = { kind: "header"; id: string; text: string };
 type TickerData = TickerReveal | TickerSummary | TickerHeader;
 
 const TICKER_MAX = 40;
-type Spot = { crest: NativeStageTeam; idx: number; kick: string; name: string; sub: string; net: number; chipText: string; chipColor: string; mine: boolean } | null;
+type Spot = { crest: NativeStageTeam; idx: number; kick: string; name: string; sub: string; net: number; chipText: string; chipColor: string; mine: boolean; portraitUrl: string | null } | null;
 type PodCol = { place: number; code: string; name: string; pts: number; logoUrl: string | null; isOwn: boolean; idx: number; delayMs: number; loud: boolean };
 
 export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, onOpenTeam, onHoverTeam, onPreviewPlayer, onEnded, topPlayers, primitive = "track", progressLabel, disciplineName, accent, motif, env }: DisciplineStageNativeArenaProps) {
@@ -1039,6 +1039,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const tier2Budget = useRef(2);
   const tier1Budget = useRef(4);
   const busyRef = useRef(false);
+  const pauseRef = useRef(false); // Hover-Pause: friert die Reveal-Cascade ein (doOne re-polled, ohne zu konsumieren)
   const endedFiredRef = useRef(false); // onEnded feuert genau einmal je Lauf (Spoiler-Gate)
   // Barbell: aktuelle Last als Ref (tokenPos/Feld lesen sie beim Render frisch, ohne
   // Callback-Deps). Und die Barbell-Rangfolge der Vorrunde für die Rang-Pfeile ▲/▼.
@@ -1056,6 +1057,16 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     return id;
   }, []);
 
+  // Hover-Pause der Reveal-Cascade: solange pauseRef gesetzt ist, re-polled doOne
+  // sich selbst (ohne ein order-Item zu konsumieren) → Reihenfolge bleibt erhalten.
+  // Reduced-Motion pausiert nie (later feuert dort mit 0ms → sonst 0ms-Spin).
+  const pauseCascade = useCallback(() => {
+    if (!reduced.current) pauseRef.current = true;
+  }, []);
+  const resumeCascade = useCallback(() => {
+    pauseRef.current = false;
+  }, []);
+
   // Token-Hovercard: eigener Schließ-Timer (unabhängig von der Reveal-Cascade),
   // damit die Karte beim Rüberfahren nicht flackert.
   const cancelHoverClose = useCallback(() => {
@@ -1067,14 +1078,18 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const openHover = useCallback(
     (idx: number) => {
       cancelHoverClose();
+      pauseCascade();
       setHover({ idx });
     },
-    [cancelHoverClose],
+    [cancelHoverClose, pauseCascade],
   );
   const scheduleHoverClose = useCallback(() => {
     cancelHoverClose();
-    hoverCloseTimer.current = window.setTimeout(() => setHover(null), 120);
-  }, [cancelHoverClose]);
+    hoverCloseTimer.current = window.setTimeout(() => {
+      setHover(null);
+      resumeCascade();
+    }, 120);
+  }, [cancelHoverClose, resumeCascade]);
   // Ladder-Hover → Team-Vorschau im Host (300ms Verzögerung wie die Top-Player-Row).
   const clearLadderHoverTimer = useCallback(() => {
     if (ladderHoverTimer.current != null) {
@@ -1090,6 +1105,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setBusy(false);
     busyRef.current = false;
     setEnded(false);
+    pauseRef.current = false;
     setSpotlight(null);
     setFlash(null);
     setShake("none");
@@ -1869,6 +1885,12 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     const order = [...rt].sort((a, b) => b.rank - a.rank); // schlechteste zuerst
     let i = 0;
     const doOne = () => {
+      // Hover-Pause: re-pollen ohne order[i] zu konsumieren (genau ein Timer,
+      // busyRef bleibt true → Reihenfolge/Choreografie unverändert).
+      if (pauseRef.current) {
+        later(doOne, 120);
+        return;
+      }
       if (i >= order.length) {
         // Rundenende
         roundSummary(r, rt);
@@ -1913,6 +1935,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           chipText: impact.text,
           chipColor: impact.color,
           mine: isMine,
+          portraitUrl: res.player.portraitUrl,
         });
         fireFlash(impact.color);
         doShake(impact.cause === "injury" ? true : !isMine);
@@ -1943,6 +1966,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             chipText: `+${fmt1(res.net)}`,
             chipColor: "gold",
             mine: true,
+            portraitUrl: res.player.portraitUrl,
           },
           900,
         );
@@ -2141,16 +2165,18 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     const revealFrac = done ? 1 : Math.max(0, Math.min(1, sumScore / duelMeta.sumFinal));
     const leaderScore = leader?.score ?? 0;
     const acesByTeam: string[][] = [];
+    const acePortraitsByTeam: (string | null)[][] = [];
     const duelInfo: DuelLiveInfo[] = [];
     rtRef.current.forEach((t) => {
-      const revealed: { name: string; id: string | null; net: number }[] = [];
+      const revealed: { name: string; id: string | null; net: number; portrait: string | null }[] = [];
       for (let s = 0; s <= t.thrownSlot; s += 1) {
         const p = t.players[s];
-        if (p) revealed.push({ name: p.name, id: p.playerId, net: playerNet(p) });
+        if (p) revealed.push({ name: p.name, id: p.playerId, net: playerNet(p), portrait: p.portraitUrl });
       }
       revealed.sort((a, b) => b.net - a.net);
       const names = revealed.map((r) => r.name);
       acesByTeam.push(names.length ? names : t.players[0]?.name ? [t.players[0]!.name] : []);
+      acePortraitsByTeam.push(revealed.length ? revealed.map((r) => r.portrait) : [t.players[0]?.portraitUrl ?? null]);
       const top = revealed[0] ?? null;
       duelInfo.push({
         rank: t.rank,
@@ -2201,6 +2227,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             sumFinal={duelMeta.sumFinal}
             revealFrac={revealFrac}
             acesByTeam={acesByTeam}
+            acePortraitsByTeam={acePortraitsByTeam}
             done={done}
             reduced={reduced.current}
             disciplineName={disciplineName}
@@ -2394,12 +2421,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         {/* Spotlight-Banner */}
         {spotlight ? (
           <div className="oly-anim" style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", marginBottom: 10, borderRadius: 12, border: `1.5px solid ${spotlight.mine ? "var(--nl-accent)" : "var(--nl-warn)"}`, background: `color-mix(in srgb, ${spotlight.mine ? "var(--nl-accent)" : "var(--nl-warn)"} 12%, transparent)` }}>
-            {spotlight.crest.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={spotlight.crest.logoUrl} alt="" width={38} height={38} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", border: `2px solid ${spotlight.mine ? "var(--nl-accent)" : "var(--nl-warn)"}` }} />
-            ) : (
-              <span aria-hidden style={{ width: 38, height: 38, borderRadius: "50%", display: "grid", placeItems: "center", background: `hsl(${hueForIdx(spotlight.idx)} 60% 52%)`, fontWeight: 800, fontSize: 12 }}>{spotlight.crest.code.slice(0, 3)}</span>
-            )}
+            <PlayerMark src={spotlight.portraitUrl} alt={spotlight.name} size={38} spotlight={!spotlight.mine} isOwn={spotlight.mine} />
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 800, color: spotlight.mine ? "var(--nl-accent)" : "var(--nl-warn)" }}>{spotlight.kick}</div>
               <div style={{ fontWeight: 800, fontSize: 16 }}>{spotlight.name}</div>
@@ -3102,7 +3124,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                 const teamClickable = Boolean(onOpenTeam && t.teamId);
                 return (
                   <div
-                    onMouseEnter={cancelHoverClose}
+                    onMouseEnter={() => { cancelHoverClose(); pauseCascade(); }}
                     onMouseLeave={scheduleHoverClose}
                     onClick={teamClickable ? () => onOpenTeam!(t.teamId!) : undefined}
                     style={{
@@ -3478,22 +3500,20 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             key={t.code}
             data-testid="arena-ladder-row"
             onClick={teamClickable ? () => onOpenTeam!(t.teamId!) : undefined}
-            onMouseEnter={
-              teamHoverable
-                ? () => {
-                    clearLadderHoverTimer();
-                    ladderHoverTimer.current = window.setTimeout(() => onHoverTeam!(t.teamId), 300);
-                  }
-                : undefined
-            }
-            onMouseLeave={
-              teamHoverable
-                ? () => {
-                    clearLadderHoverTimer();
-                    onHoverTeam!(null);
-                  }
-                : undefined
-            }
+            onMouseEnter={() => {
+              pauseCascade();
+              if (teamHoverable) {
+                clearLadderHoverTimer();
+                ladderHoverTimer.current = window.setTimeout(() => onHoverTeam!(t.teamId), 300);
+              }
+            }}
+            onMouseLeave={() => {
+              resumeCascade();
+              if (teamHoverable) {
+                clearLadderHoverTimer();
+                onHoverTeam!(null);
+              }
+            }}
             title={teamClickable ? "Team-Karte öffnen" : undefined}
             style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 6px", borderRadius: 8, fontVariantNumeric: "tabular-nums", cursor: teamClickable ? "pointer" : "default", opacity: bOut ? 0.55 : 1, background: t.isOwn ? "color-mix(in srgb, var(--nl-accent) 14%, transparent)" : bChamp ? "color-mix(in srgb, var(--nl-warn) 16%, transparent)" : rc ? `color-mix(in srgb, ${rc} 9%, transparent)` : "transparent", boxShadow: rc ? `inset 3px 0 0 ${rc}` : undefined }}>
             <span style={{ width: 22, textAlign: "right", fontWeight: 800, color: prim === "barbell" ? (bChamp ? "var(--nl-warn)" : ampel(bRank)) : ampel(t.rank), fontSize: 12.5 }}>{bChamp ? "🏆" : prim === "barbell" ? bRank : t.rank}</span>

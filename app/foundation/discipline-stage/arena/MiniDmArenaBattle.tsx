@@ -41,6 +41,7 @@ type Props = {
   sumFinal: number; // Summe aller Endscores (Nenner für den Fortschritt p)
   revealFrac: number; // 0…1 — aufgedeckter Fortschritt aus der Reveal-Engine
   acesByTeam: string[][]; // je Team die AUFGEDECKTEN Kader-Namen (Top-Beitrag zuerst)
+  acePortraitsByTeam?: (string | null)[][]; // parallel zu acesByTeam: Portrait-URLs (null → Silhouette)
   done: boolean; // Reveal komplett → Fortschritt = 1, Endstand = Score-Rangliste
   reduced: boolean; // prefers-reduced-motion → statischer Fallback ohne rAF
   disciplineName?: string;
@@ -96,6 +97,7 @@ export default function MiniDmArenaBattle({
   sumFinal,
   revealFrac,
   acesByTeam,
+  acePortraitsByTeam,
   done,
   reduced,
   disciplineName,
@@ -111,8 +113,8 @@ export default function MiniDmArenaBattle({
 
   // Live-Snapshot der Reveal-gekoppelten Props — die rAF-Schleife liest immer den
   // aktuellsten Stand, ohne dass ein Parent-Render die Schleife neu aufsetzt.
-  const snap = useRef({ revealFrac, acesByTeam, done });
-  snap.current = { revealFrac, acesByTeam, done };
+  const snap = useRef({ revealFrac, acesByTeam, acePortraitsByTeam, done });
+  snap.current = { revealFrac, acesByTeam, acePortraitsByTeam, done };
 
   const onCritRef = useRef(onCrit);
   onCritRef.current = onCrit;
@@ -176,7 +178,7 @@ export default function MiniDmArenaBattle({
     ko: meta.map(() => 0),
     leader: initialOrder[0] ?? 0,
   });
-  const [spot, setSpot] = useState<{ idx: number; name: string; victim: string; dmg: number } | null>(null);
+  const [spot, setSpot] = useState<{ idx: number; name: string; victim: string; dmg: number; portrait: string | null } | null>(null);
   const [spotPop, setSpotPop] = useState(0);
   const [tick, setTick] = useState<{ id: number; kind: "crit" | "lead"; a: string; b: string; dmg?: number; idx: number }[]>([]);
 
@@ -306,6 +308,14 @@ export default function MiniDmArenaBattle({
     return list[cycleRef.current[idx]! % list.length]!;
   };
 
+  // Portrait des aktuell „aktiven" Kämpfers — SELBER Cycling-Index wie aceName,
+  // damit Name und Bild synchron laufen. Kein Portrait → null (→ Silhouette).
+  const acePortrait = (idx: number): string | null => {
+    const list = snap.current.acePortraitsByTeam?.[idx];
+    if (!list || list.length === 0) return null;
+    return list[cycleRef.current[idx]! % list.length] ?? null;
+  };
+
   // ---- eine Kampfrunde: Fortschritt einholen, Schaden verteilen, größter Move = Crit ----
   const runRound = () => {
     const nodes = nodesRef.current;
@@ -360,7 +370,7 @@ export default function MiniDmArenaBattle({
         koRef.current[s.i] = (koRef.current[s.i]! + 1);
         const attName = aceName(s.i);
         const vicName = tgt >= 0 ? aceName(nodes[tgt]!.idx) : "—";
-        setSpot({ idx: s.i, name: attName, victim: vicName, dmg: Math.round(s.d) });
+        setSpot({ idx: s.i, name: attName, victim: vicName, dmg: Math.round(s.d), portrait: acePortrait(s.i) });
         setSpotPop((v) => v + 1);
         setTick((rows) => [{ id: fxIdRef.current++, kind: "crit" as const, a: attName, b: vicName, dmg: Math.round(s.d), idx: s.i }, ...rows].slice(0, 10));
         onCritRef.current?.(Math.round(s.d) >= 400);
@@ -535,7 +545,7 @@ export default function MiniDmArenaBattle({
     // ein statisches Sample-Spotlight (echter Top-Beitragender), keine Animation
     if (p > 0 && order.length > 1) {
       const top = order[0]!;
-      setSpot({ idx: top, name: aceName(top), victim: aceName(order[order.length - 1]!), dmg: Math.round(disp[top]! * 0.14) });
+      setSpot({ idx: top, name: aceName(top), victim: aceName(order[order.length - 1]!), dmg: Math.round(disp[top]! * 0.14), portrait: acePortrait(top) });
     }
     if (!nodesRef.current) nodesRef.current = buildNodes(dimRef.current.W, dimRef.current.H);
     placeAll();
@@ -713,10 +723,15 @@ export default function MiniDmArenaBattle({
             <div className={`mdmb-spot ${spotPop % 2 === 0 ? "pop" : "pop"}`} key={spotPop}>
               <div className="mdmb-port">
                 <span className="mdmb-ptag" style={{ background: spotChip }}>{meta[spot.idx]?.code}</span>
-                <svg viewBox="0 0 44 44" aria-hidden="true">
-                  <circle cx="22" cy="16" r="8.5" fill="hsl(280 45% 76%)" />
-                  <path d="M6 44c0-9 7.2-15 16-15s16 6 16 15z" fill="hsl(270 30% 55%)" />
-                </svg>
+                {spot.portrait ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={spot.portrait} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit" }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                ) : (
+                  <svg viewBox="0 0 44 44" aria-hidden="true">
+                    <circle cx="22" cy="16" r="8.5" fill="hsl(280 45% 76%)" />
+                    <path d="M6 44c0-9 7.2-15 16-15s16 6 16 15z" fill="hsl(270 30% 55%)" />
+                  </svg>
+                )}
               </div>
               <div style={{ minWidth: 0 }}>
                 <div className="mdmb-scrit">✦ CRITICAL HIT</div>

@@ -298,6 +298,14 @@ function PlayerBody({
   const roleLabel = player.referenceClass || player.className || null;
   const bracketLabel = player.bracketLabel || null;
 
+  // Auszeichnungen (echte Live-Daten, kein Builder-Umbau): Saison-MVP/Top-10-Zähler
+  // aus seasonPerformance + laufender Disziplin-MVP-Status aus den Performance-Rows.
+  const mvpCount = data?.seasonPerformance?.mvpCount ?? 0;
+  const top10Count = data?.seasonPerformance?.top10Count ?? 0;
+  const discMvp = (gameState.seasonState.playerDisciplinePerformances ?? []).some(
+    (r) => r.playerId === playerId && r.disciplineId === disciplineId && r.isMvpCandidate,
+  );
+
   // Achsenwerte: Builder-Werte bevorzugt (mit Rang), sonst rohe coreStats.
   const axisById = new Map((data?.axisCards ?? []).map((c) => [c.id, c] as const));
 
@@ -385,6 +393,46 @@ function PlayerBody({
               {bracketLabel ? (
                 <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 999, color: "var(--nl-mut)", border: "1px solid var(--nl-line)" }}>
                   {bracketLabel}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+          {/* Auszeichnungen — Disziplin-MVP (live) + Saison-MVP/Top-10-Zähler */}
+          {(discMvp || mvpCount > 0 || top10Count > 0) ? (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+              {discMvp ? (
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 800,
+                    padding: "3px 9px",
+                    borderRadius: 999,
+                    color: "var(--nl-warn)",
+                    border: "1px solid color-mix(in srgb, var(--nl-warn) 60%, var(--nl-line))",
+                    background: "color-mix(in srgb, var(--nl-warn) 14%, transparent)",
+                  }}
+                >
+                  ★ MVP (Disziplin)
+                </span>
+              ) : null}
+              {mvpCount > 0 ? (
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 800,
+                    padding: "3px 9px",
+                    borderRadius: 999,
+                    color: "var(--nl-warn)",
+                    border: "1px solid color-mix(in srgb, var(--nl-warn) 45%, var(--nl-line))",
+                    background: "color-mix(in srgb, var(--nl-warn) 10%, transparent)",
+                  }}
+                >
+                  MVP ×{mvpCount} Saison
+                </span>
+              ) : null}
+              {top10Count > 0 ? (
+                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 999, color: "var(--nl-mut)", border: "1px solid var(--nl-line)" }}>
+                  Top-10 ×{top10Count}
                 </span>
               ) : null}
             </div>
