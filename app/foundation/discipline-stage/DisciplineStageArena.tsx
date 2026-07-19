@@ -753,6 +753,43 @@ export default function DisciplineStageArena({
     }
   }, [ready, payload]);
 
+  // Stabile teams-Identität für die native Arena. WICHTIG (B1): früher wurde das
+  // Array inline im JSX gemappt → bei jedem Parent-Render (Drawer/Hover) eine neue
+  // Identität → der `[teams]`-Reset-Effekt der Arena feuerte und warf die laufende
+  // Sim auf Runde 0 zurück. payload ist memoisiert, also ändert sich nativeTeams nur,
+  // wenn sich die echten Daten ändern (Disziplin/Modus/Seed) — nicht bei UI-State.
+  const nativeTeams = useMemo(
+    () =>
+      payload.teams.map((t) => ({
+        code: t.code,
+        name: t.name,
+        logoUrl: t.logoUrl,
+        isOwn: t.code === payload.mineCode,
+        teamId: t.teamId,
+        rel: t.teamId ? teamRelationshipMap.get(t.teamId) ?? null : null,
+        seasonRank: t.seasonRank,
+        players: t.players.map((p) => ({
+          playerId: p.playerId,
+          val: p.val,
+          name: p.name,
+          portraitUrl: p.portraitUrl,
+          mods: p.mods,
+          pointsAwarded: p.pointsAwarded,
+        })),
+      })),
+    [payload, teamRelationshipMap],
+  );
+
+  // Spoiler-Gate (A1): der Real-Modus-Endscreen darf erst erscheinen, wenn die
+  // native Arena das Podest erreicht hat. Bei Remount (Disziplin/Modus/Seed) zurück.
+  const [arenaEnded, setArenaEnded] = useState(false);
+  useEffect(() => {
+    setArenaEnded(false);
+  }, [disciplineId, mode, seed]);
+
+  // S2: Doppel-Klick-Schutz für „Spieltag auswerten & weiter".
+  const [advancing, setAdvancing] = useState(false);
+
   const ownTeam = model.teams.find((t) => t.isOwn);
   const ownRank = ownTeam ? model.teams.indexOf(ownTeam) + 1 : null;
 
@@ -907,27 +944,12 @@ export default function DisciplineStageArena({
         <DisciplineStageNativeArena
           key={`${disciplineId}-${mode}-${seed}`}
           slots={payload.slots}
-          teams={payload.teams.map((t) => ({
-            code: t.code,
-            name: t.name,
-            logoUrl: t.logoUrl,
-            isOwn: t.code === payload.mineCode,
-            teamId: t.teamId,
-            rel: t.teamId ? teamRelationshipMap.get(t.teamId) ?? null : null,
-            seasonRank: t.seasonRank,
-            players: t.players.map((p) => ({
-              playerId: p.playerId,
-              val: p.val,
-              name: p.name,
-              portraitUrl: p.portraitUrl,
-              mods: p.mods,
-              pointsAwarded: p.pointsAwarded,
-            })),
-          }))}
+          teams={nativeTeams}
           onOpenPlayer={(pid) => openDrawerPinned({ kind: "player", playerId: pid })}
           onOpenTeam={(teamId) => openDrawerPinned({ kind: "team", teamId })}
           onHoverTeam={previewTeam}
           onPreviewPlayer={previewPlayer}
+          onEnded={() => setArenaEnded(true)}
           topPlayers={topPlayers}
           primitive={NATIVE_PRIMITIVE[disciplineId] ?? "track"}
           disciplineName={model.disciplineName}
@@ -956,6 +978,12 @@ export default function DisciplineStageArena({
         </div>
       )}
 
+      {showNative ? (
+        <div style={{ marginTop: 8, fontSize: 11.5, color: "var(--nl-mut)", lineHeight: 1.5 }}>
+          Lesehilfe: <b>Sortierung</b> = Saison-Rang (MD1 links) · <b>Farbe/Bewegung</b> = aktueller Rundenstand · <b>Podest</b> = Endrang der Disziplin.
+        </div>
+      ) : null}
+
       {ownTeam ? (
         <div style={{ marginTop: 14, background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 14 }}>
           <div style={{ fontSize: 11, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 8 }}>
@@ -980,6 +1008,7 @@ export default function DisciplineStageArena({
                       alt=""
                       width={22}
                       height={22}
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                       style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flex: "none", border: "1px solid var(--nl-line)" }}
                     />
                   ) : (
@@ -1013,7 +1042,7 @@ export default function DisciplineStageArena({
         </div>
       ) : null}
 
-      {mode === "real" && engineDiscipline ? (
+      {mode === "real" && engineDiscipline && (!showNative || arenaEnded) ? (
         <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
           <DisciplineStageEndScreen
             disciplineName={engineDiscipline.disciplineName}
@@ -1039,19 +1068,29 @@ export default function DisciplineStageArena({
               </span>
               <button
                 type="button"
-                onClick={() => void onAdvanceMatchday()}
+                disabled={advancing}
+                onClick={async () => {
+                  if (advancing) return;
+                  setAdvancing(true);
+                  try {
+                    await onAdvanceMatchday();
+                  } finally {
+                    setAdvancing(false);
+                  }
+                }}
                 style={{
                   padding: "11px 22px",
                   fontWeight: 800,
                   fontSize: 14,
                   border: 0,
                   borderRadius: 10,
-                  cursor: "pointer",
+                  cursor: advancing ? "default" : "pointer",
                   color: "var(--nl-ink)",
                   background: "var(--nl-accent)",
+                  opacity: advancing ? 0.6 : 1,
                 }}
               >
-                Spieltag auswerten &amp; weiter →
+                {advancing ? "Wird ausgewertet …" : "Spieltag auswerten & weiter →"}
               </button>
             </div>
           ) : null}

@@ -3,6 +3,8 @@
 import { useEffect, useRef } from "react";
 import type { DisciplineStageTopPlayer } from "./DisciplineStageTopPlayers";
 import { fmt1 } from "./stage-format";
+import PlayerMark from "./arena/PlayerMark";
+import TeamMark from "./arena/TeamMark";
 
 // Horizontale Top-Spieler-Zeile unter der Arena (statt linker Spalte), damit die
 // Arena die volle Breite bekommt. Sortiert nach Player-Points (kommt bereits
@@ -75,22 +77,14 @@ export default function DisciplineStageTopPlayersRow({ players, onOpenPlayer, on
                 }}
               >
                 <span style={{ fontWeight: 800, color: "var(--nl-mut)", fontSize: 12.5, width: 18, textAlign: "right" }}>{p.rank}</span>
-                {p.portraitUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={p.portraitUrl} alt="" width={28} height={28} style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", flex: "none", border: "1px solid var(--nl-line)" }} />
-                ) : (
-                  <span aria-hidden style={{ width: 28, height: 28, borderRadius: "50%", flex: "none", background: "var(--nl-bg)", border: "1px solid var(--nl-line)" }} />
-                )}
+                <PlayerMark src={p.portraitUrl} size={28} isOwn={p.isOwn} />
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 12.5, fontWeight: 700, whiteSpace: "nowrap", maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis" }}>
                     {p.isMvp ? "⭐ " : ""}
                     {p.name}
                   </div>
                   <div style={{ fontSize: 11, color: "var(--nl-mut)", display: "flex", alignItems: "center", gap: 4 }}>
-                    {p.logoUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.logoUrl} alt="" width={12} height={12} style={{ width: 12, height: 12, borderRadius: 3, objectFit: "cover", flex: "none" }} />
-                    ) : null}
+                    {p.logoUrl ? <TeamMark src={p.logoUrl} size={12} radius={3} /> : null}
                     {p.teamCode}
                   </div>
                 </div>

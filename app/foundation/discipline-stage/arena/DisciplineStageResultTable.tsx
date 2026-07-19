@@ -1,6 +1,7 @@
 "use client";
 
 import { fmt1, ampel } from "../stage-format";
+import TeamMark from "./TeamMark";
 
 // Detail-Ergebnistabelle nach dem Podest: pro Team eine Zeile, pro Slot eine
 // Spalte (Spieler + Netto, farbcodiert, Slot-Bestwert markiert), plus Gesamt.
@@ -102,10 +103,7 @@ export default function DisciplineStageResultTable({ rows, slotLabels, onOpenPla
                   <td style={{ padding: "6px 8px", textAlign: "center", position: "sticky", left: 0, background: stickyBg, fontWeight: 800, color: ampel(r.rank), zIndex: 1 }}>{r.rank}</td>
                   <td style={{ padding: "6px 8px", position: "sticky", left: 40, background: stickyBg, zIndex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      {r.logoUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={r.logoUrl} alt="" width={18} height={18} style={{ width: 18, height: 18, borderRadius: 4, objectFit: "cover", flex: "none" }} />
-                      ) : null}
+                      {r.logoUrl ? <TeamMark src={r.logoUrl} size={18} radius={4} isOwn={r.isOwn} medal={r.rank === 1 ? "gold" : r.rank === 2 ? "silver" : r.rank === 3 ? "bronze" : null} /> : null}
                       <span style={{ fontWeight: 800, fontSize: 12.5, color: r.isOwn ? "var(--nl-accent)" : "inherit" }}>{r.isOwn ? "★ " : ""}{r.code}</span>
                       <span style={{ color: "var(--nl-mut)", fontSize: 11.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 120 }}>{r.name}</span>
                     </div>

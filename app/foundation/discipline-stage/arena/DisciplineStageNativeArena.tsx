@@ -83,6 +83,7 @@ export type DisciplineStageNativeArenaProps = {
   onOpenTeam?: ((teamId: string) => void) | null; // Token/Ladder-Klick → Team-Drawer
   onHoverTeam?: ((teamId: string | null) => void) | null; // Ladder-Hover → Team-Vorschau
   onPreviewPlayer?: ((playerId: string | null) => void) | null; // Top-Player-Hover → Vorschau
+  onEnded?: (() => void) | null; // feuert einmal, sobald das Podest/Endstand erreicht ist (Spoiler-Gate)
   topPlayers?: { rows: DisciplineStageTopPlayer[]; ids: (string | null)[] } | null;
   primitive?: StagePrimitive;
   progressLabel?: string; // z.B. "Position auf dem Oval = kumulierte Punkte"
@@ -901,7 +902,7 @@ const TICKER_MAX = 40;
 type Spot = { crest: NativeStageTeam; idx: number; kick: string; name: string; sub: string; net: number; chipText: string; chipColor: string; mine: boolean } | null;
 type PodCol = { place: number; code: string; name: string; pts: number; logoUrl: string | null; isOwn: boolean; idx: number; delayMs: number; loud: boolean };
 
-export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, onOpenTeam, onHoverTeam, onPreviewPlayer, topPlayers, primitive = "track", progressLabel, disciplineName, accent, motif, env }: DisciplineStageNativeArenaProps) {
+export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, onOpenTeam, onHoverTeam, onPreviewPlayer, onEnded, topPlayers, primitive = "track", progressLabel, disciplineName, accent, motif, env }: DisciplineStageNativeArenaProps) {
   const skinAccent = accent ?? "var(--nl-line-2, var(--nl-line))";
   const slotCount = Math.max(1, slots.length);
   const prim = primitive;
@@ -979,6 +980,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const tier2Budget = useRef(2);
   const tier1Budget = useRef(4);
   const busyRef = useRef(false);
+  const endedFiredRef = useRef(false); // onEnded feuert genau einmal je Lauf (Spoiler-Gate)
 
   const clearTimers = useCallback(() => {
     timers.current.forEach((t) => window.clearTimeout(t));
@@ -1032,16 +1034,21 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setTicker([]);
     setPodium(null);
     setHover(null);
+    endedFiredRef.current = false;
     roundTopNet.current = 0;
     tier2Budget.current = 2;
     tier1Budget.current = 4;
     force();
   }, [buildRT, clearTimers]);
 
+  // Nur beim Mount zurücksetzen: der Host remountet die Arena bereits vollständig
+  // via key={`${disciplineId}-${mode}-${seed}`}. Ein Reset bei jeder teams-Identität
+  // würde die laufende Sim bei unbeteiligtem Parent-Render (Drawer/Hover) auf Runde 0
+  // zurückwerfen (B1). reset ist ein useCallback — Mount-only ist gewollt.
   useEffect(() => {
     reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teams]);
+  }, []);
   useEffect(
     () => () => {
       clearTimers();
@@ -1544,8 +1551,15 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setPodium(cols);
     fireFlash("gold");
     cols.forEach((c) => later(() => { audio.wumms(c.loud ? 1.15 : 0.7); if (c.loud) doShake(false); }, c.delayMs));
-    later(() => setEnded(true), 2400);
-  }, [audio, fireFlash, doShake, later]);
+    later(() => {
+      setEnded(true);
+      // Endstand erreicht → Host darf den Real-Modus-Endscreen zeigen (Spoiler-Gate A1).
+      if (!endedFiredRef.current) {
+        endedFiredRef.current = true;
+        onEnded?.();
+      }
+    }, 2400);
+  }, [audio, fireFlash, doShake, later, onEnded]);
 
   // ---- Reveal-Cascade ----
   const advance = useCallback(() => {
@@ -1660,7 +1674,11 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   }, [round, slotCount, audio, tokenPos, addPop, addFrags, pushTicker, pushRoundHeader, showSpotlight, fireFlash, doShake, glow, roundSummary, showPodium, later, slots]);
 
   const quickSim = useCallback(() => {
+    if (busyRef.current) return; // Busy-Guard: keine Doppel-Auslösung während einer Cascade.
     clearTimers();
+    // Frischer Aufbau: NICHT auf bestehende Scores addieren (sonst Doppel-Zählung
+    // nach manuellen Etappen oder erneutem Quick-Sim → z.B. 420 statt 210). (B2)
+    rtRef.current = buildRT();
     const rt = rtRef.current;
     for (let r = 0; r < slotCount; r += 1) {
       rt.forEach((t) => {
@@ -1684,7 +1702,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setTicker([]);
     force();
     later(showPodium, 200);
-  }, [slotCount, clearTimers, later, showPodium]);
+  }, [slotCount, clearTimers, buildRT, later, showPodium]);
 
   function causeKick(cause: string, mine: boolean): string {
     const own = mine ? "DEIN LÄUFER · " : "";
@@ -1876,7 +1894,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           <div className="oly-anim" style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", marginBottom: 10, borderRadius: 12, border: `1.5px solid ${spotlight.mine ? "var(--nl-accent)" : "var(--nl-warn)"}`, background: `color-mix(in srgb, ${spotlight.mine ? "var(--nl-accent)" : "var(--nl-warn)"} 12%, transparent)` }}>
             {spotlight.crest.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={spotlight.crest.logoUrl} alt="" width={38} height={38} style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", border: `2px solid ${spotlight.mine ? "var(--nl-accent)" : "var(--nl-warn)"}` }} />
+              <img src={spotlight.crest.logoUrl} alt="" width={38} height={38} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", border: `2px solid ${spotlight.mine ? "var(--nl-accent)" : "var(--nl-warn)"}` }} />
             ) : (
               <span aria-hidden style={{ width: 38, height: 38, borderRadius: "50%", display: "grid", placeItems: "center", background: `hsl(${hueForIdx(spotlight.idx)} 60% 52%)`, fontWeight: 800, fontSize: 12 }}>{spotlight.crest.code.slice(0, 3)}</span>
             )}
@@ -2467,7 +2485,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                       {t.logoUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={t.logoUrl} alt="" width={26} height={26} style={{ width: 26, height: 26, borderRadius: "50%", objectFit: "cover" }} />
+                        <img src={t.logoUrl} alt="" width={26} height={26} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} style={{ width: 26, height: 26, borderRadius: "50%", objectFit: "cover" }} />
                       ) : (
                         <span aria-hidden style={{ width: 26, height: 26, borderRadius: "50%", background: `hsl(${hueForIdx(t.idx)} 60% 52%)`, display: "grid", placeItems: "center", fontSize: 10, fontWeight: 800 }}>{t.code.slice(0, 3)}</span>
                       )}
@@ -2548,7 +2566,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                     <div key={c.code} className="oly-anim" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, animation: reduced.current ? "none" : `olyPodRise .6s cubic-bezier(.2,1.1,.3,1) ${c.delayMs}ms both` }}>
                       {c.logoUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={c.logoUrl} alt="" width={60} height={60} style={{ width: 60, height: 60, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--nl-line)", boxShadow: "0 6px 18px -6px rgba(0,0,0,.7)" }} />
+                        <img src={c.logoUrl} alt="" width={60} height={60} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} style={{ width: 60, height: 60, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--nl-line)", boxShadow: "0 6px 18px -6px rgba(0,0,0,.7)" }} />
                       ) : (
                         <span aria-hidden style={{ width: 60, height: 60, borderRadius: "50%", display: "grid", placeItems: "center", background: `hsl(${hueForIdx(c.idx)} 60% 52%)`, fontWeight: 800, boxShadow: "0 6px 18px -6px rgba(0,0,0,.7)" }}>{c.code.slice(0, 3)}</span>
                       )}
@@ -2602,7 +2620,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                     <span aria-hidden style={{ width: 20, height: 20, borderRadius: "50%", flex: "none", overflow: "hidden", background: row.logoUrl ? "transparent" : `hsl(${hueForIdx(row.idx)} 60% 52%)`, display: "grid", placeItems: "center" }}>
                       {row.logoUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={row.logoUrl} alt="" width={20} height={20} style={{ width: 20, height: 20, objectFit: "cover" }} />
+                        <img src={row.logoUrl} alt="" width={20} height={20} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} style={{ width: 20, height: 20, objectFit: "cover" }} />
                       ) : null}
                     </span>
                     <div style={{ minWidth: 0, flex: 1 }}>
@@ -2670,7 +2688,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             <span style={{ width: 22, textAlign: "right", fontWeight: 800, color: ampel(t.rank), fontSize: 12.5 }}>{t.rank}</span>
             {t.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={t.logoUrl} alt="" width={16} height={16} style={{ width: 16, height: 16, borderRadius: 4, objectFit: "cover", flex: "none" }} />
+              <img src={t.logoUrl} alt="" width={16} height={16} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} style={{ width: 16, height: 16, borderRadius: 4, objectFit: "cover", flex: "none" }} />
             ) : (
               <span aria-hidden style={{ width: 16, height: 16, borderRadius: 4, flex: "none", background: `hsl(${hueForIdx(t.idx)} 60% 52%)` }} />
             )}

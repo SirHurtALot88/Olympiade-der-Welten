@@ -21,6 +21,9 @@ export type FoundationDisciplineStageHostProps = {
   onAdvanceMatchday?: (() => void | Promise<void>) | null;
   // Öffnet die normale Spieler-Karte (PlayerDetailDrawer), wie im Rest der App.
   onOpenPlayer?: ((playerId: string) => void) | null;
+  // Öffnet die volle Team-Karte — nötig, damit der „Volles Profil"-Button im
+  // Team-Drawer der Bühne nicht ins Leere läuft (S3).
+  onOpenTeam?: ((teamId: string) => void) | null;
 };
 
 // Diagnose-Fehlergrenze: zeigt die ECHTE Fehlermeldung + Stack direkt im Tab an,
