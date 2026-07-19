@@ -123,12 +123,15 @@ function Section({
   accentRole,
   children,
   right,
+  emphasis,
 }: {
   title: string;
   /** "primary" = --accent, "secondary" = --accent2, "neutral" = ungefärbt. */
   accentRole?: "primary" | "secondary" | "neutral";
   children: React.ReactNode;
   right?: React.ReactNode;
+  /** Fokus-Gruppe (aktuelle Disziplin): etwas mehr Titel-Gewicht + Abstand. */
+  emphasis?: boolean;
 }) {
   const role = accentRole ?? "neutral";
   const border =
@@ -143,10 +146,13 @@ function Section({
     role === "primary"
       ? "color-mix(in srgb, var(--accent) 6%, var(--nl-bg))"
       : "var(--nl-bg)";
+  const titleStyle: React.CSSProperties = emphasis
+    ? { ...labelStyle, color: titleColor, marginBottom: 8, fontSize: 12.5, fontWeight: 900, letterSpacing: "0.1em" }
+    : { ...labelStyle, color: titleColor, marginBottom: 8 };
   return (
-    <div style={{ background: bg, border, borderRadius: 12, padding: 12 }}>
+    <div style={{ background: bg, border, borderRadius: 12, padding: 12, marginTop: emphasis ? 4 : undefined }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <div style={{ ...labelStyle, color: titleColor, marginBottom: 8 }}>{title}</div>
+        <div style={titleStyle}>{title}</div>
         {right ?? null}
       </div>
       {children}
@@ -315,7 +321,7 @@ function PlayerBody({
   // Saison-PP (verdient) — kein Fallback auf player.pps (importiertes Karriere-Rating).
   const pps = data?.pps ?? null;
   const ppsRank = data?.ppsRank ?? null;
-  const mvs = player.economyAfterUpgradePreview?.mvsUnchanged ?? data?.mvs ?? null;
+  const mvs = data?.mvs ?? player.economyAfterUpgradePreview?.mvsUnchanged ?? null;
   const mvsRank = data?.mvsRank ?? null;
 
   // Aktuelle Disziplin.
@@ -326,13 +332,13 @@ function PlayerBody({
 
   // Beste Disziplinen (Builder liefert bereits absteigend sortiert) – Top-3.
   let best: Array<{ id: string; label: string; value: number; rank: number | null }> = (data?.disciplineValues ?? [])
-    .filter((d) => typeof d.value === "number")
+    .filter((d) => typeof d.value === "number" && d.id !== disciplineId)
     .slice(0, 3)
     .map((d) => ({ id: d.id, label: d.label, value: d.value as number, rank: d.rank ?? null }));
   if (best.length === 0) {
     const src = player.currentDisciplineValues ?? player.disciplineRatings ?? {};
     best = Object.entries(src)
-      .filter(([, v]) => typeof v === "number")
+      .filter(([id, v]) => typeof v === "number" && id !== disciplineId)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
       .map(([id, v]) => ({ id, label: disciplineName(gameState, id), value: v, rank: null }));
@@ -404,12 +410,12 @@ function PlayerBody({
                 <span
                   style={{
                     fontSize: 11,
-                    fontWeight: 800,
+                    fontWeight: 900,
                     padding: "3px 9px",
                     borderRadius: 999,
                     color: "var(--nl-warn)",
-                    border: "1px solid color-mix(in srgb, var(--nl-warn) 60%, var(--nl-line))",
-                    background: "color-mix(in srgb, var(--nl-warn) 14%, transparent)",
+                    border: "1px solid var(--nl-warn)",
+                    background: "color-mix(in srgb, var(--nl-warn) 22%, var(--nl-panel))",
                   }}
                 >
                   ★ MVP (Disziplin)
@@ -419,19 +425,19 @@ function PlayerBody({
                 <span
                   style={{
                     fontSize: 11,
-                    fontWeight: 800,
+                    fontWeight: 700,
                     padding: "3px 9px",
                     borderRadius: 999,
                     color: "var(--nl-warn)",
                     border: "1px solid color-mix(in srgb, var(--nl-warn) 45%, var(--nl-line))",
-                    background: "color-mix(in srgb, var(--nl-warn) 10%, transparent)",
+                    background: "transparent",
                   }}
                 >
                   MVP ×{mvpCount} Saison
                 </span>
               ) : null}
               {top10Count > 0 ? (
-                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 999, color: "var(--nl-mut)", border: "1px solid var(--nl-line)" }}>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 999, color: "var(--nl-mut)", border: "1px solid var(--nl-line)", background: "transparent" }}>
                   Top-10 ×{top10Count}
                 </span>
               ) : null}
@@ -461,7 +467,7 @@ function PlayerBody({
       <div style={{ display: "flex", gap: 6 }}>
         <HeadlineTile label="OVR" value={ovr != null ? fmt1(ovr) : "–"} rank={rankLabel(ovrRank)} role="primary" big />
         <HeadlineTile label="PP" value={pps != null ? fmt1(pps) : "–"} rank={rankLabel(ppsRank)} />
-        {mvs != null ? <HeadlineTile label="MVS" value={fmt1(mvs)} rank={rankLabel(mvsRank)} /> : null}
+        <HeadlineTile label="MVS" value={mvs != null ? fmt1(mvs) : "–"} rank={mvs != null ? rankLabel(mvsRank) : null} />
       </div>
 
       {/* Achsen (feste Töne, nie team-eingefärbt) */}
@@ -601,10 +607,10 @@ function LineupRow({
           <span style={{ fontSize: 14, fontWeight: 800 }}>{ovr != null ? fmt1(ovr) : "–"}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {pps != null ? <span style={{ fontSize: 10.5, color: "var(--nl-mut)", fontWeight: 700 }}>PP {fmt1(pps)}</span> : null}
+          <span style={{ fontSize: 10.5, color: "var(--nl-mut)", fontWeight: 700 }}>PP {pps != null ? fmt1(pps) : "–"}</span>
           {rankLabel(rank) ? (
             <span style={{ fontSize: 10.5, fontWeight: 800, color: "var(--nl-mut)", border: "1px solid var(--nl-line)", borderRadius: 999, padding: "1px 6px" }}>
-              {rankLabel(rank)}
+              OVR {rankLabel(rank)}
             </span>
           ) : null}
         </div>
@@ -679,10 +685,12 @@ function TeamBody({
   const draft = getTeamMatchdayLineupDraft(gameState, teamId);
   const entries = draft?.entries ?? [];
 
-  const currentSide: "d1" | "d2" = schedule?.discipline1?.disciplineId === disciplineId ? "d1" : "d2";
+  const d1Id = schedule?.discipline1?.disciplineId;
+  const d2Id = schedule?.discipline2?.disciplineId;
+  const onSchedule = d1Id === disciplineId || d2Id === disciplineId;
+  const currentSide: "d1" | "d2" = d1Id === disciplineId ? "d1" : "d2";
   const otherSide: "d1" | "d2" = currentSide === "d1" ? "d2" : "d1";
-  const otherDisciplineId =
-    (currentSide === "d1" ? schedule?.discipline2?.disciplineId : schedule?.discipline1?.disciplineId) ?? null;
+  const otherDisciplineId = (currentSide === "d1" ? d2Id : d1Id) ?? null;
 
   const hasDraft = (draft?.entries?.length ?? 0) > 0;
   const section1 = entries.filter((e) => e.disciplineSide === currentSide);
@@ -733,42 +741,40 @@ function TeamBody({
             {team.name}
           </div>
           <div style={{ fontSize: 12, color: "var(--nl-mut)", marginTop: 2, fontWeight: 800 }}>{team.shortCode}</div>
-          {standing ? (
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <div
-                style={{
-                  textAlign: "center",
-                  borderRadius: 9,
-                  padding: "5px 12px",
-                  background: "color-mix(in srgb, var(--accent) 12%, var(--nl-panel))",
-                  border: "1px solid color-mix(in srgb, var(--accent) 55%, var(--nl-line))",
-                }}
-              >
-                <div style={{ fontSize: 9.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 700 }}>
-                  Saison-Rang
-                </div>
-                <div style={{ fontSize: 17, fontWeight: 800, color: "var(--accent)", fontVariantNumeric: "tabular-nums" }}>
-                  {rank != null ? rank : "–"}
-                </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <div
+              style={{
+                textAlign: "center",
+                borderRadius: 9,
+                padding: "5px 12px",
+                background: "color-mix(in srgb, var(--accent) 12%, var(--nl-panel))",
+                border: "1px solid color-mix(in srgb, var(--accent) 55%, var(--nl-line))",
+              }}
+            >
+              <div style={{ fontSize: 9.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 700 }}>
+                Saison-Rang
               </div>
-              <div
-                style={{
-                  textAlign: "center",
-                  borderRadius: 9,
-                  padding: "5px 12px",
-                  background: "color-mix(in srgb, var(--accent2) 12%, var(--nl-panel))",
-                  border: "1px solid color-mix(in srgb, var(--accent2) 45%, var(--nl-line))",
-                }}
-              >
-                <div style={{ fontSize: 9.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 700 }}>
-                  Punkte
-                </div>
-                <div style={{ fontSize: 17, fontWeight: 800, color: "var(--accent2)", fontVariantNumeric: "tabular-nums" }}>
-                  {typeof points === "number" ? fmt1(points) : "–"}
-                </div>
+              <div style={{ fontSize: 17, fontWeight: 800, color: "var(--accent)", fontVariantNumeric: "tabular-nums" }}>
+                {rank != null ? rank : "–"}
               </div>
             </div>
-          ) : null}
+            <div
+              style={{
+                textAlign: "center",
+                borderRadius: 9,
+                padding: "5px 12px",
+                background: "color-mix(in srgb, var(--accent2) 12%, var(--nl-panel))",
+                border: "1px solid color-mix(in srgb, var(--accent2) 45%, var(--nl-line))",
+              }}
+            >
+              <div style={{ fontSize: 9.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 700 }}>
+                Punkte
+              </div>
+              <div style={{ fontSize: 17, fontWeight: 800, color: "var(--accent2)", fontVariantNumeric: "tabular-nums" }}>
+                {typeof points === "number" ? fmt1(points) : "–"}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -779,8 +785,8 @@ function TeamBody({
       ) : null}
 
       {/* Sektion 1: In dieser Disziplin (--accent, primär) */}
-      <Section title="In dieser Disziplin" accentRole="primary" right={<span style={{ fontSize: 11, fontWeight: 700, color: "var(--accent)" }}>{disciplineName(gameState, disciplineId)}</span>}>
-        {hasDraft && section1.length > 0 ? (
+      <Section title="In dieser Disziplin" accentRole="primary" emphasis right={<span style={{ fontSize: 11, fontWeight: 700, color: "var(--accent)" }}>{disciplineName(gameState, disciplineId)}</span>}>
+        {hasDraft && onSchedule && section1.length > 0 ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {section1
               .slice()
@@ -803,7 +809,7 @@ function TeamBody({
                 );
               })}
           </div>
-        ) : !hasDraft && fieldedIds.length > 0 ? (
+        ) : fieldedIds.length > 0 ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {fieldedIds.map((pid) => (
               <LineupRow
@@ -825,7 +831,7 @@ function TeamBody({
       </Section>
 
       {/* Sektion 2: Andere Disziplin (Spieltag) (--accent2, sekundär) */}
-      {hasDraft && section2.length > 0 ? (
+      {hasDraft && onSchedule && section2.length > 0 ? (
         <Section
           title="Andere Disziplin (Spieltag)"
           accentRole="secondary"
@@ -858,10 +864,10 @@ function TeamBody({
               })}
           </div>
         </Section>
-      ) : !hasDraft && fieldedIds.length > 0 ? (
+      ) : fieldedIds.length > 0 ? (
         <Section title="Andere Disziplin (Spieltag)" accentRole="secondary">
           <div style={{ fontSize: 12.5, color: "var(--nl-mut)", fontStyle: "italic" }}>
-            In Test/Vorschau nicht verfügbar
+            Erscheint, sobald eine Aufstellung vorliegt.
           </div>
         </Section>
       ) : null}
