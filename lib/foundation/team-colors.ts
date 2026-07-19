@@ -20,7 +20,7 @@ export const TEAM_COLOR: Record<string, TeamColor> = {
   "B-P": { primary: "hsl(214 12% 42%)", secondary: "hsl(210 8% 74%)" }, // schwarz-silber Panther
   "C-C": { primary: "hsl(128 58% 50%)", secondary: "hsl(220 10% 16%)" }, // grünes Geld, Dollar
   "C-S": { primary: "hsl(2 78% 52%)", secondary: "hsl(210 12% 78%)" }, // rote Klingen, Stahl
-  "D-L": { primary: "hsl(210 6% 60%)", secondary: "hsl(220 8% 22%)" }, // düster, schwarz-silber
+  "D-L": { primary: "hsl(220 10% 22%)", secondary: "hsl(215 7% 62%)" }, // dunkel-silber, gespiegelt zu A-A
   "D-P": { primary: "hsl(265 45% 74%)", secondary: "hsl(240 10% 10%)" }, // Lavendel auf Schwarz
   "G-G": { primary: "hsl(48 85% 58%)" }, // goldener Gladiator
   "H-R": { primary: "hsl(6 84% 56%)" }, // roter Teufel, Feuer
@@ -40,7 +40,7 @@ export const TEAM_COLOR: Record<string, TeamColor> = {
   "T-C": { primary: "hsl(205 80% 55%)", secondary: "hsl(46 95% 55%)" }, // blaue Flügel, Sonnengelb
   "T-G": { primary: "hsl(24 55% 48%)" }, // brauner Gigant, Bronze
   "T-T": { primary: "hsl(205 55% 65%)", secondary: "hsl(215 45% 26%)" }, // hellblauer Cop, Marine
-  "U-A": { primary: "hsl(210 5% 66%)", secondary: "hsl(220 8% 20%)" }, // schwarz-silber Agent
+  "U-A": { primary: "hsl(35 8% 58%)", secondary: "hsl(30 10% 26%)" }, // warmes Taupe-Grau, Agent
   "V-D": { primary: "hsl(140 55% 42%)", secondary: "hsl(22 80% 52%)" }, // grüne Kriegerin, orange
   "V-V": { primary: "hsl(192 60% 62%)" }, // eisblaue Wikinger
   "V-W": { primary: "hsl(50 95% 55%)", secondary: "hsl(220 12% 16%)" }, // gelber Revolverheld
