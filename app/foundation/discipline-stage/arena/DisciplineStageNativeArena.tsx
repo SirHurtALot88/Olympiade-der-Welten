@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useStageAudio } from "./useStageAudio";
+import MiniDmArenaBattle, { type DuelTeamMeta } from "./MiniDmArenaBattle";
 import DisciplineStageResultTable, { type ResultTableRow } from "./DisciplineStageResultTable";
 import DisciplineStageTopPlayersRow from "../DisciplineStageTopPlayersRow";
 import type { DisciplineStageTopPlayer } from "../DisciplineStageTopPlayers";
@@ -1219,6 +1220,66 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     [finalMax, finalMin],
   );
 
+  // Mini-DM · Arena-Schlacht: statische Team-Meta (Ziel-Schaden + Aufhol-Kurve).
+  // Ziel-Schaden ist monoton im Endscore → bei Fortschritt p=1 steht die Tabelle
+  // EXAKT in der Score-Rangliste. Die Gamma-Exponenten erzeugen die dynamische
+  // Aufholjagd: ein Mid-Table-Underdog (kleines Gamma) führt anfangs, die
+  // Top-Teams (großes Gamma) starten langsam und holen spät auf. Deterministisch
+  // (FNV-Hash) → SSR-stabil. Nur für prim === "duelhp" berechnet.
+  const duelMeta = useMemo<{ meta: DuelTeamMeta[]; sumFinal: number } | null>(() => {
+    if (prim !== "duelhp") return null;
+    const span = finalMax - finalMin;
+    const fnorm = (s: number) => (span <= 0 ? (s > 0 ? 1 : 0) : Math.max(0, Math.min(1, (s - finalMin) / span)));
+    const hash01 = (str: string) => {
+      let h = 2166136261;
+      for (let i = 0; i < str.length; i += 1) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return (h >>> 0) / 4294967295;
+    };
+    const withScore = teams.map((t, idx) => {
+      let s = 0;
+      for (const p of t.players) s += playerNet(p);
+      return { t, idx, finalScore: s };
+    });
+    // Endscore-Rang (0-basiert) für die Gamma-Verteilung.
+    const byScore = [...withScore].sort((a, b) => b.finalScore - a.finalScore || (a.t.seasonRank ?? a.idx) - (b.t.seasonRank ?? b.idx));
+    const scoreRank = new Map<number, number>();
+    byScore.forEach((o, i) => scoreRank.set(o.idx, i));
+    // Underdog-Frühstarter: ein Mid-Table-Team (Rang 8…19) mit dem höchsten
+    // Auswahl-Hash bekommt ein sehr kleines Gamma → führt kurz, wird eingeholt.
+    const midField = byScore.filter((_, i) => i >= 8 && i <= 19);
+    let underdogIdx = -1;
+    let bestU = -1;
+    for (const o of midField) {
+      const u = hash01(o.t.code + "underdog");
+      if (u > bestU) {
+        bestU = u;
+        underdogIdx = o.idx;
+      }
+    }
+    const meta: DuelTeamMeta[] = withScore.map(({ t, idx, finalScore }) => {
+      const rank = scoreRank.get(idx) ?? idx;
+      let gamma: number;
+      if (idx === underdogIdx) gamma = 0.4; // Frühstarter
+      else if (rank < 3) gamma = 1.0 + hash01(t.code + "g") * 0.8; // Top starten langsam
+      else gamma = 0.6 + hash01(t.code + "g") * 1.15;
+      return {
+        idx,
+        code: t.code,
+        name: t.name,
+        isOwn: t.isOwn,
+        rel: t.rel ?? null,
+        seasonRank: t.seasonRank ?? idx + 1,
+        target: 800 + fnorm(finalScore) * 7000,
+        gamma,
+      };
+    });
+    const sumFinal = withScore.reduce((s, o) => s + o.finalScore, 0);
+    return { meta, sumFinal: Math.max(1, sumFinal) };
+  }, [prim, teams, finalMax, finalMin]);
+
   const tokenPos = useCallback(
     (t: RT, score: number): { x: number; y: number } => {
       const norm = finalMax > 0 ? score / finalMax : 0; // 0…1, kein Headroom
@@ -1852,6 +1913,72 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         return { rows, ids };
       })()
     : null;
+
+  // ---- Mini-DM · Arena-Schlacht (eigenes Layout statt SVG-Bahnen) ----
+  // Vollständig von der Reveal-Engine getrieben: die Buttons decken Runden auf,
+  // rtRef hält die kumulierten Scores. Der Fortschritt p der Schlacht = aufge-
+  // deckte Score-Summe / End-Summe (revealFrac). Namen = ECHTE aufgedeckte
+  // Kader-Spieler (Top-Beitrag zuerst → Spotlight/Cycling), keine Fakes.
+  if (prim === "duelhp" && duelMeta) {
+    const sumScore = rtRef.current.reduce((s, t) => s + t.score, 0);
+    const revealFrac = done ? 1 : Math.max(0, Math.min(1, sumScore / duelMeta.sumFinal));
+    const acesByTeam = rtRef.current.map((t) => {
+      const revealed: { name: string; net: number }[] = [];
+      for (let s = 0; s <= t.thrownSlot; s += 1) {
+        const p = t.players[s];
+        if (p) revealed.push({ name: p.name, net: playerNet(p) });
+      }
+      revealed.sort((a, b) => b.net - a.net);
+      const names = revealed.map((r) => r.name);
+      return names.length ? names : t.players[0]?.name ? [t.players[0]!.name] : [];
+    });
+    return (
+      <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
+        <div style={{ flex: "1 1 100%", minWidth: 0 }}>
+          {/* Controls (treiben die Reveal-Engine) */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+            <button type="button" onClick={advance} disabled={done || busy} style={{ padding: "9px 18px", fontWeight: 800, fontSize: 13, border: 0, borderRadius: 10, cursor: done || busy ? "default" : "pointer", color: "var(--nl-ink)", background: done ? "var(--nl-line)" : "var(--nl-accent)", opacity: busy && !done ? 0.7 : 1 }}>
+              {done ? "✔ Disziplin gewertet" : `▶ Runde ${round + 1} / ${slotCount} — ${slots[round] ?? ""}`}
+            </button>
+            <button type="button" onClick={quickSim} style={{ padding: "9px 14px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}>⏩ Quick-Sim</button>
+            <button type="button" onClick={reset} style={{ padding: "9px 14px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}>↻ Neu</button>
+            <button type="button" onClick={audio.toggleMute} title="Sound an/aus" style={{ padding: "9px 12px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}>{audio.muted ? "🔇 Stumm" : "🔊 Sound"}</button>
+            <span style={{ fontSize: 12.5, color: "var(--nl-mut)" }}>{progressLabel ?? "Arena-Schlacht — Schaden = kumulierte Punkte, Rang = Score"}</span>
+          </div>
+
+          <MiniDmArenaBattle
+            meta={duelMeta.meta}
+            sumFinal={duelMeta.sumFinal}
+            revealFrac={revealFrac}
+            acesByTeam={acesByTeam}
+            done={done}
+            reduced={reduced.current}
+            disciplineName={disciplineName}
+            leadCode={round > 0 && leader ? leader.code : null}
+            myCode={me?.code ?? null}
+            myRank={me?.rank ?? null}
+            onCrit={(loud) => audio.wumms(loud ? 0.9 : 0.5)}
+          />
+
+          {revealedTopPlayers && revealedTopPlayers.rows.length > 0 ? (
+            <DisciplineStageTopPlayersRow
+              players={revealedTopPlayers.rows}
+              playerIdByRow={revealedTopPlayers.ids}
+              onOpenPlayer={onOpenPlayer}
+              onPreviewPlayer={onPreviewPlayer}
+              limit={10}
+            />
+          ) : null}
+        </div>
+
+        {ended ? (
+          <div style={{ flex: "1 1 100%", minWidth: 0 }}>
+            <DisciplineStageResultTable rows={resultRows} slotLabels={slots} onOpenPlayer={onOpenPlayer} />
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>

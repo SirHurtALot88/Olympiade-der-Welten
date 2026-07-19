@@ -259,17 +259,6 @@ const ENV_SHOWSTAGE: StageEnv = {
 };
 
 // --- Restliche atmosphärische Umgebungen (Fable-Atmosphären-Vorlage, hsl) ---
-const ENV_COLOSSEUM: StageEnv = {
-  sky: ["hsl(20 18% 4%)", "hsl(15 20% 8%)"],
-  stands: "hsl(18 20% 12%)",
-  surface: ["hsl(35 30% 40%)", "hsl(33 28% 32%)", "hsl(30 26% 22%)"],
-  line: "hsl(37 54% 60%)",
-  infield: ["hsl(24 25% 16%)", "hsl(22 24% 11%)"],
-  deco: [
-    { kind: "silhouette", color: "hsl(18 18% 8%)" },
-    { kind: "banners", cloth: "hsl(356 55% 30%)", trim: "hsl(41 65% 51%)" },
-  ],
-};
 const ENV_BATTLEFIELD: StageEnv = {
   sky: ["hsl(255 12% 4%)", "hsl(260 12% 9%)"],
   stands: "hsl(258 12% 12%)",
@@ -396,11 +385,24 @@ const ENV_COURT: StageEnv = {
   glow: { color: "hsl(45 90% 82%)", kind: "spot" },
 };
 
+// Warme Nahkampf-Dojo-Arena für Mini-DM (Auto-Battler-Pit): warmes Rot/Gold statt
+// TDMs kaltem Schwarz-Rot-HUD. Der native duelhp-Zweig zeichnet den Pit selbst
+// (eigene warme Radial-Stimmung + Gold-Ränder); dieses env hält die Identität für
+// etwaige Nicht-Native-Fallbacks konsistent. Farben als hsl().
+const ENV_ARENA_PIT: StageEnv = {
+  sky: ["hsl(340 30% 12%)", "hsl(20 24% 7%)"],
+  stands: "hsl(20 24% 13%)",
+  surface: ["hsl(35 34% 34%)", "hsl(30 30% 24%)", "hsl(24 26% 15%)"],
+  line: "hsl(45 82% 62%)",
+  glow: { color: "hsl(45 88% 64%)", kind: "spot" },
+  deco: [{ kind: "banners", cloth: "hsl(356 55% 30%)", trim: "hsl(45 65% 55%)" }],
+};
+
 const DISCIPLINE_SKIN: Record<string, { accent: string; motif: StageMotif; env?: StageEnv }> = {
   staffel: { accent: "hsl(14 80% 58%)", motif: "chevrons", env: STADIUM_ATHLETICS },
   spurt: { accent: "hsl(38 90% 58%)", motif: "chevrons", env: STADIUM_ATHLETICS },
   "takeshis-castle": { accent: "hsl(160 55% 50%)", motif: "grid", env: ENV_JUNGLE },
-  "mini-dm": { accent: "hsl(350 70% 60%)", motif: "combat", env: ENV_COLOSSEUM },
+  "mini-dm": { accent: "hsl(45 82% 60%)", motif: "combat", env: ENV_ARENA_PIT },
   battlefield: { accent: "hsl(80 45% 52%)", motif: "combat", env: ENV_BATTLEFIELD },
   "time-trial": { accent: "hsl(190 75% 56%)", motif: "chevrons", env: ENV_VELODROME },
   "speed-schach": { accent: "hsl(215 28% 64%)", motif: "board", env: ENV_CHESS_HALL },
