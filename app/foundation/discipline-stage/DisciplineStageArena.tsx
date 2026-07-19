@@ -47,7 +47,7 @@ const NATIVE_PRIMITIVE: Record<string, StagePrimitive> = {
   climbing: "mountain", // Gipfelsturm (Berg-Serpentine)
   eiskunstlauf: "stage", // Kür auf der Ruhm-Treppe wie Showcase
   showcase: "stage", // Showcase-Bühne mit Tiefe (Ruhm-Treppe → Podest)
-  football: "towers",
+  football: "parcours", // Raumgewinn-Parcours (Serpentine) auf dem Flutlicht-Rasen
   hockey: "rink", // Eisrink von oben
   breaking: "thermometer", // Schmerz-Thermometer (grün → glühend rot)
   tdm: "towers", // Etagen-Ersatz für das verworfene tiers
