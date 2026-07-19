@@ -6,6 +6,15 @@ import DisciplineStageResultTable, { type ResultTableRow } from "./DisciplineSta
 import DisciplineStageTopPlayersRow from "../DisciplineStageTopPlayersRow";
 import type { DisciplineStageTopPlayer } from "../DisciplineStageTopPlayers";
 import { fmt1, ampel } from "../stage-format";
+import type { TeamRelationshipKind } from "@/lib/foundation/team-relationship";
+
+// Freund/Feind-Rahmenfarbe (mine=blau, ally=grün, rival=rot) über die globalen
+// --nl-* Tokens (Light/Dark ziehen automatisch mit). Marker = Rahmen, nie Füllung.
+function relColor(rel: TeamRelationshipKind | null | undefined): string | null {
+  if (!rel) return null;
+  return `var(--nl-${rel})`;
+}
+const REL_GLYPH: Record<TeamRelationshipKind, string> = { mine: "★", ally: "🤝", rival: "⚔" };
 
 // Nativer Track-Nachbau der Staffel-Arena — voller Feature-Stand der iframe-Szene:
 // SVG/viewBox (pixelscharf), Bewegungsanimation (Token gleitet, eigenes Team Slow-Mo),
@@ -30,6 +39,7 @@ export type NativeStageTeam = {
   players: NativeStagePlayer[];
   seasonRank?: number; // echter Season-Tabellenrang → Bahn-/Turm-Reihenfolge
   teamId?: string; // für Team-Drawer
+  rel?: TeamRelationshipKind | null; // Freund/Feind (mine/ally/rival) → Rahmen-Marker
 };
 export type StagePrimitive = "track" | "lanes" | "towers" | "stage";
 export type DisciplineStageNativeArenaProps = {
@@ -377,12 +387,14 @@ type RT = {
   logoUrl: string | null;
   isOwn: boolean;
   teamId: string | null; // für Team-Drawer
+  rel: TeamRelationshipKind | null; // Freund/Feind → Rahmen-Marker
   players: NativeStagePlayer[];
   seasonRank: number;
   laneIdx: number; // dichte 0…N-1 Bahn-/Turm-Reihenfolge nach seasonRank (keine Lücken)
   score: number;
   thrownSlot: number;
   rank: number;
+  rankHistory: number[]; // Rang nach jeder gewerteten Etappe (für Bump/Verlauf)
   roundStartRank: number;
   roundRankAfter: number;
   roundDelta: number;
@@ -453,12 +465,14 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       logoUrl: t.logoUrl,
       isOwn: t.isOwn,
       teamId: t.teamId ?? null,
+      rel: t.rel ?? null,
       players: t.players,
       seasonRank: t.seasonRank ?? idx + 1,
       laneIdx: idx,
       score: 0,
       thrownSlot: -1,
       rank: idx + 1,
+      rankHistory: [],
       roundStartRank: idx + 1,
       roundRankAfter: idx + 1,
       roundDelta: 0,
@@ -990,6 +1004,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       if (i >= order.length) {
         // Rundenende
         roundSummary(r, rt);
+        rt.forEach((t) => t.rankHistory.push(t.rank)); // Rang-Verlauf je Etappe
         const nextRound = r + 1;
         setRound(nextRound);
         later(() => {
@@ -1081,6 +1096,9 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       });
     }
     recomputeRanks(rt);
+    rt.forEach((t) => {
+      t.rankHistory = Array.from({ length: slotCount }, () => t.rank);
+    });
     setRound(slotCount);
     setBusy(false);
     busyRef.current = false;
@@ -1578,6 +1596,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                       }}
                     >
                       {glowing ? <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={4} style={{ animation: reduced.current ? "none" : "olyGlowPulse 1.1s ease-in-out infinite" }} /> : null}
+                      {/* Freund/Feind-Rahmen (mine/ally/rival) — nur Rahmenfarbe, nie Füllung */}
+                      {relColor(t.rel) ? <circle r={r + 5.5} fill="none" stroke={relColor(t.rel)!} strokeWidth={2.4} opacity={0.95} /> : null}
                       {medal ? <circle r={r + 3.5} fill="none" stroke={medal} strokeWidth={t.isOwn ? 4.5 : 3.5} /> : null}
                       {t.logoUrl ? (
                         <image href={t.logoUrl} x={-r} y={-r} width={r * 2} height={r * 2} clipPath={`url(#natclip-${t.code})`} preserveAspectRatio="xMidYMid slice" />
@@ -1795,6 +1815,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         {sorted.map((t) => {
           const teamClickable = Boolean(onOpenTeam && t.teamId);
           const teamHoverable = Boolean(onHoverTeam && t.teamId);
+          const rc = relColor(t.rel);
           return (
           <div
             key={t.code}
@@ -1816,7 +1837,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                 : undefined
             }
             title={teamClickable ? "Team-Karte öffnen" : undefined}
-            style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 6px", borderRadius: 8, fontVariantNumeric: "tabular-nums", cursor: teamClickable ? "pointer" : "default", background: t.isOwn ? "color-mix(in srgb, var(--nl-accent) 14%, transparent)" : "transparent" }}>
+            style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 6px", borderRadius: 8, fontVariantNumeric: "tabular-nums", cursor: teamClickable ? "pointer" : "default", background: t.isOwn ? "color-mix(in srgb, var(--nl-accent) 14%, transparent)" : rc ? `color-mix(in srgb, ${rc} 9%, transparent)` : "transparent", boxShadow: rc ? `inset 3px 0 0 ${rc}` : undefined }}>
             <span style={{ width: 22, textAlign: "right", fontWeight: 800, color: ampel(t.rank), fontSize: 12.5 }}>{t.rank}</span>
             {t.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -1825,6 +1846,9 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               <span aria-hidden style={{ width: 16, height: 16, borderRadius: 4, flex: "none", background: `hsl(${hueForIdx(t.idx)} 60% 52%)` }} />
             )}
             <span style={{ width: 44, fontWeight: 800, color: t.isOwn ? "var(--nl-accent)" : "inherit", fontSize: 12.5 }}>{t.code}</span>
+            {t.rel && !t.isOwn ? (
+              <span title={t.rel === "ally" ? "Verbündet" : t.rel === "rival" ? "Rivale" : "Dein Team"} aria-hidden style={{ fontSize: 11, flex: "none", color: rc ?? undefined }}>{REL_GLYPH[t.rel]}</span>
+            ) : null}
             <span style={{ flex: 1, fontSize: 11.5, color: "var(--nl-mut)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
             <span style={{ fontWeight: 800, fontSize: 12.5 }}>{fmt1(t.score)}</span>
           </div>

@@ -20,6 +20,7 @@ import DisciplineStageTopPlayers, { type DisciplineStageTopPlayer } from "@/app/
 import DisciplineStageNativeArena, { type StagePrimitive, type StageMotif, type StageEnv } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
 import DisciplineStageDrawer, { type DisciplineStageDrawerTarget } from "@/app/foundation/discipline-stage/DisciplineStageDrawer";
 import { fmt1 } from "@/app/foundation/discipline-stage/stage-format";
+import { buildTeamRelationshipMap } from "@/lib/foundation/team-relationship";
 
 // Disziplinen mit fertigem nativem Renderer (löst schrittweise das iframe ab).
 // Nativer Renderer je Disziplin. Engine, FX, Sounds, Ticker, Podest, Detail-
@@ -626,6 +627,17 @@ export default function DisciplineStageArena({
     return own?.shortCode ?? model.teams.find((t) => t.isOwn)?.shortCode ?? null;
   }, [gameState?.teams, ownTeamId, model.teams]);
 
+  // Freund/Feind-Kodierung (mine/ally/rival) — einmal memoisiert, O(1)-Lookup je
+  // Team-Token/Ladder-Zeile in der nativen Arena. Rein presentational (Rahmenfarbe).
+  const teamRelationshipMap = useMemo(
+    () =>
+      buildTeamRelationshipMap(
+        { teams: gameState?.teams ?? [], teamControlSettings: gameState.seasonState?.teamControlSettings ?? {} },
+        ownTeamId,
+      ),
+    [gameState?.teams, gameState.seasonState?.teamControlSettings, ownTeamId],
+  );
+
   const payload = useMemo(() => {
     // Echter Season-Tabellenrang je Team → Bahn-/Turm-Reihenfolge in der Arena.
     const standings = gameState.seasonState?.standings;
@@ -882,6 +894,7 @@ export default function DisciplineStageArena({
             logoUrl: t.logoUrl,
             isOwn: t.code === payload.mineCode,
             teamId: t.teamId,
+            rel: t.teamId ? teamRelationshipMap.get(t.teamId) ?? null : null,
             seasonRank: t.seasonRank,
             players: t.players.map((p) => ({
               playerId: p.playerId,
