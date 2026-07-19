@@ -463,18 +463,72 @@ function renderSceneEnvBg(prim: StagePrimitive, env: StageEnv, layout: any, W: n
     const { cx, hoopY, baseY, baseHalf } = layout;
     const keyW = baseHalf * 0.42;
     const keyH = (baseY - hoopY) * 0.5;
+    const courtL = cx - baseHalf;
+    const courtT = hoopY - 20;
+    const courtBot = baseY + 20;
+    const courtH = courtBot - courtT;
+    const midY = (hoopY + baseY) / 2 + 26;
+    const floodC = env.glow?.color ?? env.line;
+    // Hallen-Bowl: dunkler Rand + Zuschauer-Ränge (Punkt-Reihen) rund um den Court.
+    const seatFill = (i: number) => (i % 4 === 0 ? "hsl(28 48% 42%)" : env.stands);
+    const crowd: React.ReactNode[] = [];
+    for (let row = 0; row < 3; row += 1) {
+      const y = 12 + row * 15;
+      for (let i = 0; i < 42; i += 1) {
+        const x = 22 + i * ((W - 44) / 41);
+        crowd.push(<circle key={`ct${row}-${i}`} cx={x} cy={y} r={2.3} fill={seatFill(i + row)} opacity={0.5} />);
+      }
+    }
+    for (let col = 0; col < 2; col += 1) {
+      for (let i = 0; i < 18; i += 1) {
+        const y = 96 + i * ((baseY - 70) / 17);
+        crowd.push(<circle key={`csl${col}-${i}`} cx={14 + col * 15} cy={y} r={2.3} fill={seatFill(i + col)} opacity={0.45} />);
+        crowd.push(<circle key={`csr${col}-${i}`} cx={W - 14 - col * 15} cy={y} r={2.3} fill={seatFill(i + col + 1)} opacity={0.45} />);
+      }
+    }
     return (
       <>
-        <rect x={cx - baseHalf} y={hoopY - 20} width={baseHalf * 2} height={baseY - hoopY + 40} rx={10} fill="url(#envSurface)" />
+        {/* dunkler Arena-Rand (Bowl) */}
+        <rect x={0} y={0} width={W} height={H} fill={env.sky[1]} opacity={0.55} />
+        {crowd}
+        {/* Parkett-Boden */}
+        <rect x={courtL} y={courtT} width={baseHalf * 2} height={courtH} rx={12} fill="url(#envSurface)" stroke={env.stands} strokeWidth={6} />
+        {/* Parkett-Maserung (Dielen) */}
+        <g stroke="hsl(26 46% 26%)" strokeWidth={1.2} opacity={0.32}>
+          {Array.from({ length: 20 }).map((_, i) => {
+            const x = courtL + 14 + i * ((baseHalf * 2 - 28) / 19);
+            return <line key={i} x1={x} y1={courtT + 5} x2={x} y2={courtBot - 5} />;
+          })}
+        </g>
+        {/* Flutlicht — radialer Aufheller von oben */}
+        <defs>
+          <radialGradient id="courtFlood" cx="50%" cy="0%" r="64%">
+            <stop offset="0%" stopColor={floodC} stopOpacity={0.26} />
+            <stop offset="100%" stopColor={floodC} stopOpacity={0} />
+          </radialGradient>
+        </defs>
+        <rect x={courtL} y={courtT} width={baseHalf * 2} height={courtH} rx={12} fill="url(#courtFlood)" />
+        {/* Center-Court-Logo */}
+        <circle cx={cx} cy={midY} r={keyW * 0.78} fill="none" stroke={env.line} strokeWidth={2} opacity={0.34} />
+        <circle cx={cx} cy={midY} r={keyW * 0.5} fill="none" stroke={env.line} strokeWidth={1.4} opacity={0.26} />
+        <text x={cx} y={midY + 15} textAnchor="middle" fontSize={42} opacity={0.15}>🏀</text>
         {/* Zonen-Schlüssel */}
         <rect x={cx - keyW} y={hoopY} width={keyW * 2} height={keyH} fill="none" stroke={env.line} strokeWidth={2.5} opacity={0.7} />
         <circle cx={cx} cy={hoopY + keyH} r={keyW} fill="none" stroke={env.line} strokeWidth={2.5} opacity={0.7} />
         {/* Drei-Punkte-Bogen */}
         <path d={`M ${cx - baseHalf * 0.9} ${hoopY} A ${baseHalf * 0.9} ${baseY - hoopY} 0 0 0 ${cx + baseHalf * 0.9} ${hoopY}`} fill="none" stroke={env.line} strokeWidth={2.5} opacity={0.6} />
-        {/* Korb */}
-        <line x1={cx - 22} y1={hoopY - 10} x2={cx + 22} y2={hoopY - 10} stroke={env.line} strokeWidth={4} />
-        <circle cx={cx} cy={hoopY} r={9} fill="none" stroke={env.glow?.color ?? env.line} strokeWidth={3} />
-        <text x={cx} y={hoopY + keyH * 0.7} textAnchor="middle" fontSize={40} opacity={0.14}>🏀</text>
+        {/* Backboard + Korb + Netz */}
+        <rect x={cx - 34} y={hoopY - 32} width={68} height={22} rx={2} fill={env.stands} stroke={env.line} strokeWidth={2} opacity={0.92} />
+        <rect x={cx - 13} y={hoopY - 28} width={26} height={13} fill="none" stroke={env.line} strokeWidth={1.6} opacity={0.7} />
+        <line x1={cx - 22} y1={hoopY - 8} x2={cx + 22} y2={hoopY - 8} stroke={floodC} strokeWidth={4} />
+        <circle cx={cx} cy={hoopY} r={9} fill="none" stroke={floodC} strokeWidth={3} />
+        <g stroke={env.line} strokeWidth={1} opacity={0.55} fill="none">
+          {[-8, -4, 0, 4, 8].map((dx, i) => (
+            <line key={i} x1={cx + dx} y1={hoopY + 2} x2={cx + dx * 0.55} y2={hoopY + 20} />
+          ))}
+          <line x1={cx - 8.5} y1={hoopY + 9} x2={cx + 8.5} y2={hoopY + 9} />
+          <line x1={cx - 6} y1={hoopY + 16} x2={cx + 6} y2={hoopY + 16} />
+        </g>
       </>
     );
   }
