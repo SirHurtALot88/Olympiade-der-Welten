@@ -19,12 +19,23 @@ export type DuelTeamMeta = {
   isOwn: boolean;
   rel: TeamRelationshipKind | null;
   seasonRank: number;
+  teamId: string | null; // Klick auf Token/Zeile → Team-Ansicht
   target: number; // Ziel-Schaden (aus dem Endscore abgeleitet) — monoton im Score
   gamma: number; // Aufhol-Kurven-Exponent (klein = Frühstarter/Underdog)
 };
 
+// Live-Steckbrief-Daten je Team (Score-Wahrheit) für Hovercard/Callbacks.
+export type DuelLiveInfo = {
+  rank: number; // echter Live-Rang (Score)
+  score: number; // kumulierte Punkte
+  deficit: number; // Rückstand auf den Führenden
+  topName: string | null; // Top-Beitragender (aufgedeckt)
+  topId: string | null;
+};
+
 type Props = {
   meta: DuelTeamMeta[];
+  info: DuelLiveInfo[]; // indexiert nach team idx — Hover-Steckbrief + Rang/Punkte
   sumFinal: number; // Summe aller Endscores (Nenner für den Fortschritt p)
   revealFrac: number; // 0…1 — aufgedeckter Fortschritt aus der Reveal-Engine
   acesByTeam: string[][]; // je Team die AUFGEDECKTEN Kader-Namen (Top-Beitrag zuerst)
@@ -35,6 +46,9 @@ type Props = {
   myCode?: string | null;
   myRank?: number | null;
   onCrit?: ((loud: boolean) => void) | null; // optionaler Sound-Hook
+  onOpenTeam?: ((teamId: string) => void) | null;
+  onHoverTeam?: ((teamId: string | null) => void) | null;
+  onOpenPlayer?: ((playerId: string) => void) | null;
 };
 
 const REL_VAR: Record<TeamRelationshipKind, string> = {
@@ -75,6 +89,7 @@ const ROW_H = 23;
 
 export default function MiniDmArenaBattle({
   meta,
+  info,
   sumFinal,
   revealFrac,
   acesByTeam,
@@ -85,6 +100,9 @@ export default function MiniDmArenaBattle({
   myCode,
   myRank,
   onCrit,
+  onOpenTeam,
+  onHoverTeam,
+  onOpenPlayer,
 }: Props) {
   const N = meta.length;
 
@@ -95,6 +113,36 @@ export default function MiniDmArenaBattle({
 
   const onCritRef = useRef(onCrit);
   onCritRef.current = onCrit;
+
+  // Hover-Steckbrief + Bewegungs-Freeze: solange ein Token/eine Zeile gehovert
+  // wird, hält die Physik an, damit man bewegte Tokens sauber treffen/lesen kann.
+  const [hover, setHover] = useState<{ idx: number; x: number; y: number } | null>(null);
+  const hoverIdxRef = useRef<number | null>(null);
+  const hoverTimerRef = useRef<number | null>(null);
+  const onHoverTeamRef = useRef(onHoverTeam);
+  onHoverTeamRef.current = onHoverTeam;
+  const clearHoverTimer = () => {
+    if (hoverTimerRef.current != null) {
+      window.clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+  };
+  const enterTeam = (i: number, teamId: string | null, fromToken: boolean) => {
+    hoverIdxRef.current = i;
+    const n = nodesRef.current?.[i];
+    setHover({ idx: i, x: fromToken && n ? n.x : dimRef.current.W - 8, y: fromToken && n ? n.y : 8 });
+    if (teamId && onHoverTeamRef.current) {
+      clearHoverTimer();
+      hoverTimerRef.current = window.setTimeout(() => onHoverTeamRef.current!(teamId), 300);
+    }
+  };
+  const leaveTeam = () => {
+    hoverIdxRef.current = null;
+    setHover(null);
+    clearHoverTimer();
+    onHoverTeamRef.current?.(null);
+  };
+  useEffect(() => () => clearHoverTimer(), []);
 
   const arenaRef = useRef<HTMLDivElement | null>(null);
   const fxRef = useRef<HTMLDivElement | null>(null);
@@ -335,6 +383,12 @@ export default function MiniDmArenaBattle({
   const step = () => {
     const nodes = nodesRef.current;
     if (!nodes) return;
+    // Hover friert die Bewegung ein (Tokens bleiben greif-/lesbar); Positionen
+    // werden weiter geschrieben, damit der Leader-Token/Rahmen aktuell bleibt.
+    if (hoverIdxRef.current != null) {
+      placeAll();
+      return;
+    }
     const { W, H } = dimRef.current;
     const cx = W / 2;
     const cy = H / 2;
@@ -569,6 +623,15 @@ export default function MiniDmArenaBattle({
         .mdmb-sdmg b{color:var(--nl-ink);font-size:15px;}
         .mdmb-cap{position:absolute;top:9px;right:12px;z-index:7;font-family:ui-monospace,monospace;font-size:9px;color:var(--nl-mut);
           background:hsl(20 20% 6% / .72);padding:3px 8px;border-radius:6px;border:1px solid var(--nl-line);}
+        .mdmb-hcard{position:absolute;z-index:8;min-width:150px;max-width:190px;pointer-events:auto;
+          background:linear-gradient(180deg,hsl(258 24% 13% / .97),hsl(258 22% 9% / .97));border:1px solid var(--nl-line-2,var(--nl-line));border-radius:10px;
+          padding:7px 10px;box-shadow:0 8px 22px hsl(0 0% 0% / .55);}
+        .mdmb-hc-t{font-size:12px;font-weight:800;color:var(--nl-ink);line-height:1.2;}
+        .mdmb-hc-t b{color:var(--nl-ink);}
+        .mdmb-hc-r{font-size:11px;color:var(--nl-mut);margin-top:2px;font-variant-numeric:tabular-nums;}
+        .mdmb-hc-r b{color:var(--nl-ink);}
+        .mdmb-hc-p{font-size:11px;color:var(--nl-mut);margin-top:2px;}.mdmb-hc-p b{color:var(--gold);}
+        .mdmb-hc-p.lnk{cursor:pointer;}.mdmb-hc-p.lnk:hover b{text-decoration:underline;}
 
         .mdmb-side{padding:11px;background:hsl(20 20% 10% / .55);}
         .mdmb-sh{font-size:10.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--gold);margin-bottom:8px;}
@@ -633,6 +696,7 @@ export default function MiniDmArenaBattle({
               const relCls = m.rel ?? "";
               const isLead = board.leader === m.idx;
               const p = initPos[i];
+              const clickable = Boolean(onOpenTeam && m.teamId);
               return (
                 <span
                   key={m.code}
@@ -640,13 +704,48 @@ export default function MiniDmArenaBattle({
                     crestRefs.current[i] = el;
                   }}
                   className={`mdmb-crest ${relCls} ${isLead ? "lead" : ""}`}
-                  style={{ left: `${p.fx * 760 - 15}px`, top: `${p.fy * 430 - 15}px` }}
+                  style={{ left: `${p.fx * 760 - 15}px`, top: `${p.fy * 430 - 15}px`, cursor: clickable ? "pointer" : "default" }}
+                  title={m.name}
+                  onMouseEnter={() => enterTeam(i, m.teamId, true)}
+                  onMouseLeave={leaveTeam}
+                  onClick={clickable ? () => onOpenTeam!(m.teamId!) : undefined}
                 >
                   {isLead ? <span className="mdmb-crown">🏆</span> : null}
                   {m.code}
                 </span>
               );
             })}
+            {/* Hover-Steckbrief (Team · Rang · Punkte · Rückstand · Top-Spieler) */}
+            {hover ? (() => {
+              const m = meta[hover.idx]!;
+              const inf = info[hover.idx];
+              const left = Math.max(6, Math.min(dimRef.current.W - 176, hover.x + 20));
+              const top = Math.max(6, Math.min(dimRef.current.H - 96, hover.y - 20));
+              return (
+                <div className="mdmb-hcard" style={{ left, top }}>
+                  <div className="mdmb-hc-t">
+                    <b>{m.isOwn ? "★ " : ""}{m.code}</b> · {m.name}
+                  </div>
+                  {inf ? (
+                    <>
+                      <div className="mdmb-hc-r">
+                        Rang <b>{inf.rank}</b> · <b>{grp(inf.score)}</b> Pkt{inf.deficit > 0 ? ` · −${grp(inf.deficit)} auf Spitze` : " · Spitze"}
+                      </div>
+                      {inf.topName ? (
+                        <div
+                          className={`mdmb-hc-p${inf.topId && onOpenPlayer ? " lnk" : ""}`}
+                          onClick={inf.topId && onOpenPlayer ? (e) => { e.stopPropagation(); onOpenPlayer(inf.topId!); } : undefined}
+                        >
+                          Top: <b>{inf.topName}</b>
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <div className="mdmb-hc-r">noch nicht angetreten</div>
+                  )}
+                </div>
+              );
+            })() : null}
             <div className="mdmb-fx" ref={fxRef} />
             {spot ? (
               <div className={`mdmb-spot ${spotPop % 2 === 0 ? "pop" : "pop"}`} key={spotPop}>
@@ -670,15 +769,24 @@ export default function MiniDmArenaBattle({
             <div className="mdmb-sh">📊 Scoring-Tabelle</div>
             <div className="mdmb-lhead"><span>#</span><span>LOGO</span><span>TEAM</span><span>SCHADEN</span><span>KO</span></div>
             <div className="mdmb-board" style={{ height: VIS * ROW_H }}>
-              {meta.map((m) => {
+              {meta.map((m, i) => {
                 const pos = rankPos[m.idx]!;
                 const relCls = m.rel ?? "";
                 const champ = pos === 0;
                 const d = board.disp[m.idx] ?? 0;
                 const ko = board.ko[m.idx] ?? 0;
                 const rk = pos === 0 ? "🏆" : pos === 1 ? "🥈" : pos === 2 ? "🥉" : String(pos + 1);
+                const clickable = Boolean(onOpenTeam && m.teamId);
                 return (
-                  <div key={m.code} className={`mdmb-lrow ${relCls} ${champ ? "champ" : ""}`} style={{ transform: `translateY(${pos * ROW_H}px)` }}>
+                  <div
+                    key={m.code}
+                    className={`mdmb-lrow ${relCls} ${champ ? "champ" : ""}`}
+                    style={{ transform: `translateY(${pos * ROW_H}px)`, cursor: clickable ? "pointer" : "default" }}
+                    title={clickable ? "Team-Karte öffnen" : m.name}
+                    onMouseEnter={() => enterTeam(i, m.teamId, false)}
+                    onMouseLeave={leaveTeam}
+                    onClick={clickable ? () => onOpenTeam!(m.teamId!) : undefined}
+                  >
                     <span className="mdmb-lrk">{rk}</span>
                     <span className="mdmb-lcr">{m.code}</span>
                     <span className={`mdmb-lcd ${relCls}`}>{m.code}</span>

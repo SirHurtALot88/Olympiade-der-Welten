@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useStageAudio } from "./useStageAudio";
-import MiniDmArenaBattle, { type DuelTeamMeta } from "./MiniDmArenaBattle";
+import MiniDmArenaBattle, { type DuelTeamMeta, type DuelLiveInfo } from "./MiniDmArenaBattle";
 import DisciplineStageResultTable, { type ResultTableRow } from "./DisciplineStageResultTable";
 import DisciplineStageTopPlayersRow from "../DisciplineStageTopPlayersRow";
 import type { DisciplineStageTopPlayer } from "../DisciplineStageTopPlayers";
@@ -1272,6 +1272,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         isOwn: t.isOwn,
         rel: t.rel ?? null,
         seasonRank: t.seasonRank ?? idx + 1,
+        teamId: t.teamId ?? null,
         target: 800 + fnorm(finalScore) * 7000,
         gamma,
       };
@@ -1922,15 +1923,26 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   if (prim === "duelhp" && duelMeta) {
     const sumScore = rtRef.current.reduce((s, t) => s + t.score, 0);
     const revealFrac = done ? 1 : Math.max(0, Math.min(1, sumScore / duelMeta.sumFinal));
-    const acesByTeam = rtRef.current.map((t) => {
-      const revealed: { name: string; net: number }[] = [];
+    const leaderScore = leader?.score ?? 0;
+    const acesByTeam: string[][] = [];
+    const duelInfo: DuelLiveInfo[] = [];
+    rtRef.current.forEach((t) => {
+      const revealed: { name: string; id: string | null; net: number }[] = [];
       for (let s = 0; s <= t.thrownSlot; s += 1) {
         const p = t.players[s];
-        if (p) revealed.push({ name: p.name, net: playerNet(p) });
+        if (p) revealed.push({ name: p.name, id: p.playerId, net: playerNet(p) });
       }
       revealed.sort((a, b) => b.net - a.net);
       const names = revealed.map((r) => r.name);
-      return names.length ? names : t.players[0]?.name ? [t.players[0]!.name] : [];
+      acesByTeam.push(names.length ? names : t.players[0]?.name ? [t.players[0]!.name] : []);
+      const top = revealed[0] ?? null;
+      duelInfo.push({
+        rank: t.rank,
+        score: t.score,
+        deficit: Math.max(0, leaderScore - t.score),
+        topName: top?.name ?? null,
+        topId: top?.id ?? null,
+      });
     });
     return (
       <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
@@ -1946,8 +1958,30 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             <span style={{ fontSize: 12.5, color: "var(--nl-mut)" }}>{progressLabel ?? "Arena-Schlacht — Schaden = kumulierte Punkte, Rang = Score"}</span>
           </div>
 
+          {/* MyTracker (dein-Team-Verfolger) */}
+          {me ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 12px", marginBottom: 10, borderRadius: 12, border: "1px solid var(--nl-accent)", background: "color-mix(in srgb, var(--nl-accent) 10%, transparent)" }}>
+              <span style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 800, color: "var(--nl-accent)" }}>Dein Team · {me.code}</span>
+              <span style={{ fontWeight: 800 }}>Rang {me.rank}</span>
+              {round > 0 ? (
+                (() => {
+                  const d = me.roundStartRank - me.rank;
+                  return (
+                    <span style={{ fontSize: 12.5, fontWeight: 700, color: d > 0 ? "var(--nl-good)" : d < 0 ? "var(--nl-risk)" : "var(--nl-mut)" }}>
+                      {d > 0 ? `▲ ${d} seit Vorrunde` : d < 0 ? `▼ ${-d} seit Vorrunde` : "gehalten"}
+                    </span>
+                  );
+                })()
+              ) : (
+                <span style={{ fontSize: 12.5, color: "var(--nl-mut)" }}>Runde 1 …</span>
+              )}
+              <span style={{ marginLeft: "auto", fontWeight: 800, color: "var(--nl-accent)" }}>{fmt1(me.score)} Pkt</span>
+            </div>
+          ) : null}
+
           <MiniDmArenaBattle
             meta={duelMeta.meta}
+            info={duelInfo}
             sumFinal={duelMeta.sumFinal}
             revealFrac={revealFrac}
             acesByTeam={acesByTeam}
@@ -1958,6 +1992,9 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             myCode={me?.code ?? null}
             myRank={me?.rank ?? null}
             onCrit={(loud) => audio.wumms(loud ? 0.9 : 0.5)}
+            onOpenTeam={onOpenTeam}
+            onHoverTeam={onHoverTeam}
+            onOpenPlayer={onOpenPlayer}
           />
 
           {revealedTopPlayers && revealedTopPlayers.rows.length > 0 ? (
