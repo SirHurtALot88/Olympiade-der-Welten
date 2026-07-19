@@ -384,9 +384,15 @@ export default function FoundationMarketSellShellHost({
                     </small>
                   </div>
                 ) : null}
-                {(marketSellPreview.coaching.boardReaction.requiresStrongAcknowledgment ||
-                  marketSellPreview.coaching.gmSoftBlockStarSell) &&
-                (marketSellPreview.coaching.keepIntentScore ?? 0) >= 55 ? (
+                {/* Sichtbarkeit der Risiko-Bestätigung MUSS exakt der `strongAckPending`-
+                    Bedingung oben entsprechen: sobald die Bestätigung den Verkauf sperrt,
+                    muss die Checkbox auch erscheinen. Sonst gäbe es einen stillen Dead-End
+                    (kritische Board-Reaktion + keepIntent < 55: gesperrt, aber ohne Checkbox
+                    und ohne Weg nach vorn). Der keepIntent≥55-Gate gilt nur für den
+                    GM-Soft-Block, nicht für die zwingende Board-Bestätigung. */}
+                {marketSellPreview.coaching.boardReaction.requiresStrongAcknowledgment ||
+                (marketSellPreview.coaching.gmSoftBlockStarSell &&
+                  (marketSellPreview.coaching.keepIntentScore ?? 0) >= 55) ? (
                   <label className="transfer-sell-risk-ack">
                     <input
                       type="checkbox"
