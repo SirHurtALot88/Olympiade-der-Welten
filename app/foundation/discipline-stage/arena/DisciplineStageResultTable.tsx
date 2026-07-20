@@ -50,6 +50,29 @@ const HEAD: React.CSSProperties = {
 };
 
 export default function DisciplineStageResultTable({ rows, slotLabels, onOpenPlayer }: DisciplineStageResultTableProps) {
+  // Kumulierte Rang-Entwicklung je Etappe: für jede Spalte die Teams nach kumulierter Summe
+  // BIS DAHIN ranken → Δ zur Vorspalte = in DIESER Etappe gewonnene/verlorene Ränge. Die
+  // 1. Etappe hat keinen Vorwert (kein Pfeil). Ersetzt den alten boni/mali-▼ (der durch
+  // Fatigue fast überall negativ war und keine Rang-Aussage hatte).
+  const nSlots = slotLabels.length;
+  const cumRank: number[][] = rows.map(() => new Array(nSlots).fill(0));
+  {
+    const cum = rows.map((r) => {
+      const arr: number[] = [];
+      let s = 0;
+      for (let k = 0; k < nSlots; k += 1) {
+        s += r.slots[k]?.net ?? 0;
+        arr.push(s);
+      }
+      return arr;
+    });
+    for (let k = 0; k < nSlots; k += 1) {
+      const ord = rows.map((_, i) => i).sort((a, b) => (cum[b]?.[k] ?? 0) - (cum[a]?.[k] ?? 0));
+      ord.forEach((rowI, pos) => {
+        cumRank[rowI]![k] = pos + 1;
+      });
+    }
+  }
   return (
     <div
       data-oly-result
@@ -113,7 +136,18 @@ export default function DisciplineStageResultTable({ rows, slotLabels, onOpenPla
                               fast überall rot, wirkte als wären alle Werte schlecht. Farbcodierung
                               trägt der Slot-Rang (#N, ampel). Bonus/Malus steckt weiter im Tooltip (calc). */}
                           {fmt1(c.net)}
-                          {c.boniMali > 0.05 ? <span style={{ color: "var(--nl-good)", fontSize: 10, marginLeft: 3 }}>▲</span> : c.boniMali < -0.05 ? <span style={{ color: "var(--nl-risk)", fontSize: 10, marginLeft: 3 }}>▼</span> : null}
+                          {/* Rang-Δ dieser Etappe: wie viele Ränge das Team seit der Vorrunde
+                              gut-/schlechtgemacht hat. 1. Etappe = kein Vorwert → kein Pfeil. */}
+                          {(() => {
+                            if (ci === 0) return null;
+                            const d = (cumRank[ri]?.[ci - 1] ?? 0) - (cumRank[ri]?.[ci] ?? 0);
+                            if (d === 0) return null;
+                            return d > 0 ? (
+                              <span style={{ color: "var(--nl-good)", fontSize: 10, marginLeft: 4, fontWeight: 800 }}>▲{d}</span>
+                            ) : (
+                              <span style={{ color: "var(--nl-risk)", fontSize: 10, marginLeft: 4, fontWeight: 800 }}>▼{-d}</span>
+                            );
+                          })()}
                         </div>
                         <div
                           onClick={nameClickable ? () => onOpenPlayer!(c.playerId!) : undefined}

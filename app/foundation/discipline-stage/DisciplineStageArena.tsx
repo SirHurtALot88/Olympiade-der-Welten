@@ -1027,13 +1027,12 @@ export default function DisciplineStageArena({
             standings={matchdayPanel.standings}
             d1={matchdayPanel.d1}
             d2={matchdayPanel.d2}
-            d1Revealed={
-              matchdayPanel.d2?.disciplineId === disciplineId
-                ? true
-                : matchdayPanel.d1?.disciplineId === disciplineId
-                  ? arenaEnded
-                  : false
-            }
+            {/* Freigabe robust: die GERADE laufende Disziplin wird 100% gezeigt, sobald ihre
+                Arena fertig ist (arenaEnded) — unabhängig von exaktem ID-Match (Schedule- vs
+                Arena-ID wichen ab → fertige Diszi blieb fälschlich gesperrt). Nur die ANDERE,
+                noch nicht gespielte Disziplin des Spieltags bleibt verdeckt. Spiele ich bereits
+                die zweite (d2), ist die erste (d1) ohnehin gelaufen → dauerhaft sichtbar. */}
+            d1Revealed={matchdayPanel.d2?.disciplineId === disciplineId ? true : arenaEnded}
             d2Revealed={matchdayPanel.d2?.disciplineId === disciplineId ? arenaEnded : false}
             teamMetaById={teamMetaById}
             ownTeamId={ownTeamId}
