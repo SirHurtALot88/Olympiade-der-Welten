@@ -7,6 +7,8 @@
 // und ist `pointer-events:none`, damit es den Hover nicht selbst stiehlt.
 // Farben ausschließlich var(--nl-*)/hsl()/rgb()/color-mix() — kein Hex.
 
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
@@ -51,11 +53,13 @@ function clampToViewport(x: number, y: number, w: number, h: number): { left: nu
     left = x - w - 14;
   }
   left = Math.max(8, Math.min(left, vw - w - 8));
+  // Vertikal cursor-nah bleiben: unter dem Cursor beginnen und bei Überlauf nur so
+  // weit nach oben schieben, dass die Karte gerade in den Viewport passt (Unterkante
+  // am unteren Rand) — NICHT komplett über den Cursor springen (das riss die Karte
+  // bei hohen Karten ~264px vom Cursor weg).
   let top = y + 16;
-  if (top + h > vh - 8) {
-    top = y - h - 12; // nach oben kippen
-  }
-  top = Math.max(8, Math.min(top, vh - h - 8));
+  top = Math.min(top, vh - h - 8); // knapp innerhalb der Unterkante, neben dem Cursor
+  top = Math.max(8, top);
   return { left, top };
 }
 
@@ -206,17 +210,22 @@ export default function DisciplineStageHoverPreview({
   fieldedPlayerIdsByTeam,
   disciplineId,
 }: DisciplineStageHoverPreviewProps): React.JSX.Element | null {
-  if (!target) return null;
-  if (target.kind === "player") {
-    return <PlayerPreview gameState={gameState} target={target} ratingByPlayerId={ratingByPlayerId} />;
-  }
-  return (
-    <TeamPreview
-      gameState={gameState}
-      target={target}
-      ratingByPlayerId={ratingByPlayerId}
-      fieldedPlayerIdsByTeam={fieldedPlayerIdsByTeam}
-      disciplineId={disciplineId}
-    />
-  );
+  // Erst nach dem Mount in document.body portalen (SSR-fest) — so kann kein
+  // ancestor-`transform` die `position:fixed`-Verankerung kapern (analog zum Drawer).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!target || !mounted || typeof document === "undefined") return null;
+  const content =
+    target.kind === "player" ? (
+      <PlayerPreview gameState={gameState} target={target} ratingByPlayerId={ratingByPlayerId} />
+    ) : (
+      <TeamPreview
+        gameState={gameState}
+        target={target}
+        ratingByPlayerId={ratingByPlayerId}
+        fieldedPlayerIdsByTeam={fieldedPlayerIdsByTeam}
+        disciplineId={disciplineId}
+      />
+    );
+  return createPortal(content, document.body);
 }

@@ -16,6 +16,7 @@
 // NIE team-eingefärbt.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import type { GameState, Player, Team } from "@/lib/data/olyDataTypes";
 import { NlProgressBar } from "@/components/foundation/new-look/NlProgressBar";
@@ -975,6 +976,12 @@ export default function DisciplineStageDrawer({
   fieldedPlayerIdsByTeam,
   onClose,
 }: DisciplineStageDrawerProps): React.JSX.Element | null {
+  // Erst nach dem Mount in document.body portalen (SSR-fest) — verhindert, dass ein
+  // ancestor-`transform` das `position:fixed`-Overlay zur containing-block-relativen
+  // Box macht (Bug: Drawer öffnete „oben" statt viewport-fixiert).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const [reducedMotion, setReducedMotion] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
@@ -1030,12 +1037,12 @@ export default function DisciplineStageDrawer({
     };
   }, [target, gameState]);
 
-  if (!target) return null;
+  if (!target || !mounted || typeof document === "undefined") return null;
 
   const translate = entered || reducedMotion ? "0" : "100%";
   const transition = reducedMotion ? "none" : "transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease";
 
-  return (
+  return createPortal(
     <div style={{ position: "fixed", inset: 0, zIndex: 60 }}>
       {/* Backdrop */}
       <div
@@ -1155,6 +1162,7 @@ export default function DisciplineStageDrawer({
           )}
         </div>
       </aside>
-    </div>
+    </div>,
+    document.body,
   );
 }

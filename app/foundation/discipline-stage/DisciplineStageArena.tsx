@@ -951,6 +951,8 @@ export default function DisciplineStageArena({
                 <div
                   key={slot.playerId}
                   onClick={() => openDrawerPinned({ kind: "player", playerId: slot.playerId })}
+                  onMouseEnter={() => previewPlayer(slot.playerId)}
+                  onMouseLeave={() => previewPlayer(null)}
                   title="Spieler-Karte öffnen"
                   style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid var(--nl-line)", fontVariantNumeric: "tabular-nums", fontSize: 13, cursor: "pointer", borderRadius: 6 }}
                 >

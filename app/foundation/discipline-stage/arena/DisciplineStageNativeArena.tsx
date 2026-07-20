@@ -2278,6 +2278,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         name: t.name,
         logoUrl: t.logoUrl,
         isOwn: t.isOwn,
+        teamId: t.teamId ?? null,
         total: t.score,
         slots: Array.from({ length: slotCount }, (_, s) => {
           const p = t.players[s];
@@ -2765,7 +2766,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               über das Feld — entfernt. Der Wert steht live in der Rangliste, den Zugewinn
               zeigt der Ghost der Vorrunde direkt am Token. Highlights kommen als
               Zoom-Slowdown (Nr. 208), nicht als Popup. */}
-          {/* Splitter (Boni/Mali „−8 Form" etc.) (#207): entfernt — poppten überall auf und
+          {/* Splitter (Boni/Mali „−8 Form" etc.) (Nr. 207): entfernt — poppten überall auf und
               störten. Form/Details stehen im Ticker / in der Hovercard, nicht als Feld-Pop. */}
           {/* Flash */}
           {flash ? (
@@ -3190,7 +3191,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       {/* Detail-Ergebnistabelle (volle Breite unter der Arena, nach dem Podest) */}
       {ended ? (
         <div style={{ flex: "1 1 100%", minWidth: 0 }}>
-          <DisciplineStageResultTable rows={resultRows} slotLabels={slots} onOpenPlayer={onOpenPlayer} />
+          <DisciplineStageResultTable rows={resultRows} slotLabels={slots} onOpenPlayer={onOpenPlayer} onPreviewPlayer={onPreviewPlayer} onHoverTeam={onHoverTeam} onOpenTeam={onOpenTeam} />
         </div>
       ) : null}
     </div>
