@@ -26,12 +26,17 @@ export type DisciplineStageHoverPreviewProps = {
   gameState: GameState;
   /** Kanonische Ratings (OVR/Rang/PP/MVS) je Spieler-ID — Quelle wie im Drawer. */
   ratingByPlayerId: Map<string, PlayerRatingContractRow>;
+  /** In der aktuellen Disziplin eingesetzte Spieler je Team-ID (wie im Feld). */
+  fieldedPlayerIdsByTeam?: Record<string, string[]>;
+  /** Aktuelle Disziplin — für den Diszi-Wert der eingesetzten Spieler. */
+  disciplineId?: string;
 };
 
 const PLAYER_W = 184;
 const PLAYER_H = 252;
-const TEAM_W = 240;
-const TEAM_H = 118;
+const TEAM_W = 250;
+const TEAM_H_BASE = 118;
+const FIELDED_ROW_H = 34;
 
 // Cursor-nahe Position, an den Viewport geklammert; kippt nach oben, wenn unten
 // kein Platz ist. Reine Präsentation, keine Slide-Animation (auch reduced-motion-fest).
@@ -85,9 +90,12 @@ function PlayerPreview({ gameState, target, ratingByPlayerId }: {
   );
 }
 
-function TeamPreview({ gameState, target }: {
+function TeamPreview({ gameState, target, ratingByPlayerId, fieldedPlayerIdsByTeam, disciplineId }: {
   gameState: GameState;
   target: { id: string; x: number; y: number };
+  ratingByPlayerId: Map<string, PlayerRatingContractRow>;
+  fieldedPlayerIdsByTeam?: Record<string, string[]>;
+  disciplineId?: string;
 }) {
   const team = gameState.teams?.find((t) => t.teamId === target.id) ?? null;
   if (!team) return null;
@@ -97,7 +105,13 @@ function TeamPreview({ gameState, target }: {
   const standing = gameState.seasonState?.standings?.[team.teamId] ?? null;
   const rank = standing?.rank ?? standing?.startplatz ?? null;
   const points = standing?.points ?? null;
-  const { left, top } = clampToViewport(target.x, target.y, TEAM_W, TEAM_H);
+  // In dieser Disziplin eingesetzte Spieler (wie beim Feld-Icon).
+  const fieldedIds = (fieldedPlayerIdsByTeam?.[team.teamId] ?? []).filter(Boolean);
+  const fielded = fieldedIds
+    .map((pid) => gameState.players?.find((p) => p.id === pid) ?? null)
+    .filter((p): p is NonNullable<typeof p> => Boolean(p));
+  const teamH = TEAM_H_BASE + (fielded.length > 0 ? 22 + fielded.length * FIELDED_ROW_H : 0);
+  const { left, top } = clampToViewport(target.x, target.y, TEAM_W, teamH);
   return (
     <div
       style={{
@@ -107,9 +121,6 @@ function TeamPreview({ gameState, target }: {
         width: TEAM_W,
         zIndex: 70,
         pointerEvents: "none",
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
         padding: 12,
         borderRadius: 12,
         background: "var(--nl-panel)",
@@ -117,31 +128,65 @@ function TeamPreview({ gameState, target }: {
         boxShadow: "0 12px 32px color-mix(in srgb, var(--nl-bg) 74%, transparent)",
       }}
     >
-      <TeamMark
-        src={logoUrl}
-        alt={team.name}
-        size={48}
-        radius={11}
-        placeholderColor={color.primary}
-        placeholderSecondaryColor={hasSecondary ? color.secondary ?? null : null}
-        placeholderLabel={team.shortCode}
-      />
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontSize: 14, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {team.name}
-        </div>
-        <div style={{ fontSize: 11, color: "var(--nl-mut)", fontWeight: 800, marginTop: 1 }}>{team.shortCode}</div>
-        <div style={{ display: "flex", gap: 12, marginTop: 6, fontVariantNumeric: "tabular-nums" }}>
-          <span style={{ fontSize: 11.5 }}>
-            <span style={{ color: "var(--nl-mut)", fontWeight: 700 }}>Rang </span>
-            <span style={{ fontWeight: 800 }}>{rank != null ? rank : "–"}</span>
-          </span>
-          <span style={{ fontSize: 11.5 }}>
-            <span style={{ color: "var(--nl-mut)", fontWeight: 700 }}>Punkte </span>
-            <span style={{ fontWeight: 800 }}>{typeof points === "number" ? fmt1(points) : "–"}</span>
-          </span>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <TeamMark
+          src={logoUrl}
+          alt={team.name}
+          size={48}
+          radius={11}
+          placeholderColor={color.primary}
+          placeholderSecondaryColor={hasSecondary ? color.secondary ?? null : null}
+          placeholderLabel={team.shortCode}
+        />
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {team.name}
+          </div>
+          <div style={{ fontSize: 11, color: "var(--nl-mut)", fontWeight: 800, marginTop: 1 }}>{team.shortCode}</div>
+          <div style={{ display: "flex", gap: 12, marginTop: 6, fontVariantNumeric: "tabular-nums" }}>
+            <span style={{ fontSize: 11.5 }}>
+              <span style={{ color: "var(--nl-mut)", fontWeight: 700 }}>Rang </span>
+              <span style={{ fontWeight: 800 }}>{rank != null ? rank : "–"}</span>
+            </span>
+            <span style={{ fontSize: 11.5 }}>
+              <span style={{ color: "var(--nl-mut)", fontWeight: 700 }}>Punkte </span>
+              <span style={{ fontWeight: 800 }}>{typeof points === "number" ? fmt1(points) : "–"}</span>
+            </span>
+          </div>
         </div>
       </div>
+      {fielded.length > 0 ? (
+        <div style={{ marginTop: 10, borderTop: "1px solid var(--nl-line)", paddingTop: 8 }}>
+          <div style={{ fontSize: 9.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 6 }}>
+            Eingesetzt
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            {fielded.map((player) => {
+              const row = ratingByPlayerId.get(player.id) ?? null;
+              const portraitUrl = getPlayerPortraitBrowserUrl(player.id, player.portraitUrl ?? null, player.portraitPath ?? null);
+              const discVal = disciplineId
+                ? player.currentDisciplineValues?.[disciplineId] ?? player.disciplineRatings?.[disciplineId] ?? null
+                : null;
+              return (
+                <div key={player.id} style={{ display: "flex", alignItems: "center", gap: 8, fontVariantNumeric: "tabular-nums" }}>
+                  {portraitUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={portraitUrl} alt="" width={24} height={24} style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", flex: "none", border: "1px solid var(--nl-line)" }} />
+                  ) : (
+                    <span aria-hidden style={{ width: 24, height: 24, borderRadius: "50%", flex: "none", background: color.primary }} />
+                  )}
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{player.name}</span>
+                  {discVal != null ? (
+                    <span style={{ fontSize: 12, fontWeight: 800, color: "var(--nl-accent)", flex: "none" }}>{fmt1(discVal)}</span>
+                  ) : (
+                    <span style={{ fontSize: 11, color: "var(--nl-mut)", flex: "none" }}>OVR {row?.ovrNormalized != null ? fmt1(row.ovrNormalized) : "–"}</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -150,10 +195,20 @@ export default function DisciplineStageHoverPreview({
   target,
   gameState,
   ratingByPlayerId,
+  fieldedPlayerIdsByTeam,
+  disciplineId,
 }: DisciplineStageHoverPreviewProps): React.JSX.Element | null {
   if (!target) return null;
   if (target.kind === "player") {
     return <PlayerPreview gameState={gameState} target={target} ratingByPlayerId={ratingByPlayerId} />;
   }
-  return <TeamPreview gameState={gameState} target={target} />;
+  return (
+    <TeamPreview
+      gameState={gameState}
+      target={target}
+      ratingByPlayerId={ratingByPlayerId}
+      fieldedPlayerIdsByTeam={fieldedPlayerIdsByTeam}
+      disciplineId={disciplineId}
+    />
+  );
 }

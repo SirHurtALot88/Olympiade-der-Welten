@@ -1072,7 +1072,7 @@ export default function DisciplineStageArena({
     {/* Hover-Vorschau — am Cursor verankert, geklammert, pointer-events:none. Als
         Geschwister NACH der Arena (kein Remount/Reset der laufenden Sim). Öffnet
         NIE den vollen Drawer; der öffnet nur per Klick. */}
-    <DisciplineStageHoverPreview target={hoverPreview} gameState={gameState} ratingByPlayerId={ratingByPlayerId} />
+    <DisciplineStageHoverPreview target={hoverPreview} gameState={gameState} ratingByPlayerId={ratingByPlayerId} fieldedPlayerIdsByTeam={fieldedByTeam} disciplineId={disciplineId} />
     </>
   );
 }
