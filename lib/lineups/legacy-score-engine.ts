@@ -13,6 +13,7 @@ import type {
   LegacyResolveMutatorMode,
   LegacyRosterPlayerRef,
 } from "@/lib/lineups/legacy-lineup-types";
+import { distributePerPlayerFormShares } from "@/lib/lineups/legacy-lineup-modifiers";
 
 function roundPreviewScore(value: number) {
   return Math.round(value * 10) / 10;
@@ -187,6 +188,7 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
       captainBonus: 0,
       mutatorBonus: 0,
       mutatorPpsBonus: 0,
+      formShare: 0,
       finalContribution: moraleAdjustedScore,
       sourceStatus,
       warnings,
@@ -234,6 +236,30 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
     }
   }
 
+  // Form PRO SPIELER statt als Team-Klumpen: jeder aufgestellte Spieler bekommt
+  // den flachen Kartenwert (formModifier/Anzahl) + einen echten Zufalls-Jitter
+  // (±4, deterministisch aus `${playerId}|${disciplineId}`). Der Jitter ist NICHT
+  // zero-sum — die Team-Summe wackelt bewusst mit (Extra-Kick). Weil er hier in
+  // die finalContribution der Spieler fließt, wird die Form NICHT mehr separat als
+  // Team-Term addiert (kein Doppelzählen), und die PP-Verteilung (nach Endscore)
+  // sowie die Bühne zeigen automatisch denselben Wert.
+  let appliedFormModifier = formModifier;
+  if (formModifier != null && formModifier !== 0 && scoredEntries.length > 0) {
+    const seeds = scoredEntries.map((entry) => `${entry.playerId}|${input.disciplineId}`);
+    const shares = distributePerPlayerFormShares({ formModifier, seeds });
+    let applied = 0;
+    scoredEntries.forEach((entry, index) => {
+      const share = shares[index] ?? 0;
+      if (entry.finalContribution != null) {
+        entry.formShare = share;
+        entry.finalContribution = roundPreviewScore((entry.finalContribution ?? 0) + share);
+        entry.score = entry.finalContribution;
+        applied += share;
+      }
+    });
+    appliedFormModifier = roundPreviewScore(applied);
+  }
+
   const baseScore = roundPreviewScore(
     scoredEntries.reduce((sum, entry) => sum + (entry.baseDisciplineScore ?? 0), 0),
   );
@@ -250,11 +276,12 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
   const mutatorTeamOnlyAdjustment =
     mutatorModifier == null ? 0 : roundPreviewScore(Math.max(0, (mutatorModifier ?? 0) - mutatorScoreAlreadyApplied));
   const slotRoleModifier = input.slotRoleModifier ?? 0;
+  // Form ist bereits pro Spieler in finalContribution enthalten (s. oben) —
+  // NICHT erneut als Team-Term addieren, sonst Doppelzählung.
   const prePowerScore = roundPreviewScore(
     scoredEntries.reduce((sum, entry) => sum + (entry.finalContribution ?? 0), 0) +
       intensityModifier +
       slotRoleModifier +
-      (formModifier ?? 0) +
       mutatorTeamOnlyAdjustment,
   );
   const isSelfTeamPower = input.teamPowerEffectType === "self_boost" || input.teamPowerEffectType === "support_boost";
@@ -301,7 +328,7 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
     formCardsSelected: input.formCardsSelected ?? null,
     formCardStatus: input.formCardStatus ?? (input.formCardsAvailable == null ? "missing_source" : "ready"),
     formCardLabel: input.formCardLabel ?? null,
-    formModifier,
+    formModifier: appliedFormModifier,
     mutatorMode: input.mutatorMode ?? "legacy_selected_traits",
     mutatorText: input.mutatorText ?? null,
     mutatorModifier,

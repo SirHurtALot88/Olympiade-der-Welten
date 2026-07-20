@@ -127,6 +127,7 @@ export type LegacyLineupEntryScore = {
   captainBonus?: number | null;
   mutatorBonus?: number | null;
   mutatorPpsBonus?: number | null;
+  formShare?: number | null; // pro Spieler angewandter Form-Anteil (flacher Kartenwert + Jitter)
   finalContribution?: number | null;
   sourceStatus?: "mapped" | "missing_source";
   warnings?: string[];

@@ -4,7 +4,7 @@ import { createFreshSeasonOneGameState } from "@/lib/game-state/singleplayer-sta
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 
 describe("season points ledger", () => {
-  it("uses the real rank-to-points table and distributes team points by base share", () => {
+  it("uses the real rank-to-points table and distributes team points by final-score share", () => {
     const gameState = createFreshSeasonOneGameState();
     const teamA = gameState.teams[0];
     const teamB = gameState.teams[1];
@@ -158,13 +158,16 @@ describe("season points ledger", () => {
     expect(teamBSummary?.reconciliationStatus).toBe("reconciled");
     expect(teamASummary?.playerDerivedTotal).toBe(6.9);
     expect(teamASummary?.mutatorPpsBonus).toBe(0.3);
-    expect(perfA1?.basePoints).toBe(4.95);
+    // PP jetzt nach ENDSCORE (finalPlayerScore) verteilt statt nach baseValue:
+    // Team A 6,6 auf 33/14 → 4,634 / 1,966; Team B 6,2 auf 18/13 → 3,6 / 2,6.
+    // Team-Summe bleibt erhalten (6,9), nur die Aufteilung folgt dem Endscore.
+    expect(perfA1?.basePoints).toBe(4.634);
     expect(perfA1?.mutatorPpsBonus).toBe(0.3);
-    expect(perfA1?.points).toBe(5.25);
-    expect(perfA2?.points).toBe(1.65);
-    expect(perfB1?.points).toBe(3.1);
-    expect(perfB2?.points).toBe(3.1);
-    expect(perfA1?.pointSource).toBe("rank_to_points_base_share");
+    expect(perfA1?.points).toBe(4.934);
+    expect(perfA2?.points).toBe(1.966);
+    expect(perfB1?.points).toBe(3.6);
+    expect(perfB2?.points).toBe(2.6);
+    expect(perfA1?.pointSource).toBe("rank_to_points_final_score_share");
   });
 
   it("keeps a team's earned season points after a contributing player is sold (#180)", () => {
@@ -321,7 +324,7 @@ describe("season points ledger", () => {
     // Kernaussage #180: die erspielten Punkte bleiben Team A erhalten.
     expect(teamAPointsAfter).toBe(teamAPointsBefore);
     // Die eingefrorene Performance des verkauften Spielers zählt weiter für Team A.
-    expect(after.pointEntriesByPerformanceId.get("perf-a-1")?.points).toBe(5.25);
+    expect(after.pointEntriesByPerformanceId.get("perf-a-1")?.points).toBe(4.934);
     expect(after.pointEntriesByPerformanceId.get("perf-a-1")?.teamId).toBe(teamA.teamId);
   });
 });

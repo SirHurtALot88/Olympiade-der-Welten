@@ -532,6 +532,7 @@ export function buildLegacyMatchdayResolvePreview(
           captainBonus: entry.captainBonus ?? null,
           mutatorBonus: entry.mutatorBonus ?? null,
           mutatorPpsBonus: entry.mutatorPpsBonus ?? null,
+          formShare: entry.formShare ?? null,
           finalPlayerScore: entry.finalContribution ?? entry.score,
           pointsAwarded: null,
           isCaptain: Boolean(entry.isCaptain),
@@ -550,7 +551,7 @@ export function buildLegacyMatchdayResolvePreview(
           item.entries.length,
         rank,
       ),
-      pointSource: "rank_to_points_base_share",
+      pointSource: "rank_to_points_final_score_share",
     }));
 
     const rawPlayerEntries = bucket.flatMap(({ context, score, side }) => {
@@ -593,6 +594,7 @@ export function buildLegacyMatchdayResolvePreview(
         captainBonus: entry.captainBonus ?? null,
         mutatorBonus: entry.mutatorBonus ?? null,
         mutatorPpsBonus: entry.mutatorPpsBonus ?? null,
+        formShare: entry.formShare ?? null,
         finalPlayerScore: entry.finalContribution ?? entry.score ?? 0,
         scoreContribution: total > 0 ? (entry.finalContribution ?? entry.score ?? 0) / total : 0,
         pointsAwarded: distributedPoints.entries[index]?.points ?? null,

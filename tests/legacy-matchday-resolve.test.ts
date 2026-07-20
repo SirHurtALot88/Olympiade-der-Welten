@@ -402,17 +402,26 @@ describe("legacy matchday resolve preview", () => {
     const alphaEntryPoints =
       alphaTeam?.entries.reduce((sum, entry) => sum + (entry.pointsAwarded ?? 0), 0) ?? null;
 
-    expect(alphaTeam?.formModifier).toBe(12);
+    // Form ist jetzt PRO SPIELER (flacher Kartenwert + ±4-Jitter). Nominal = 12
+    // (= 6/Spieler × 2 Spieler); die tatsächliche Team-Form-Summe wackelt bewusst
+    // im Band nominal ± 4×Spieleranzahl. Der Rest (Mutator, Ranks, Team-PP) fix.
+    expect(alphaTeam?.formModifier).toBeGreaterThanOrEqual(12 - 8);
+    expect(alphaTeam?.formModifier).toBeLessThanOrEqual(12 + 8);
     expect(alphaTeam?.mutatorModifier).toBe(12);
-    expect(alphaTeam?.finalPreviewScore).toBe(64);
-    expect(betaTeam?.finalPreviewScore).toBe(45);
+    // finalPreviewScore = Basis (64 inkl. Nominalform 12) − Nominalform + tatsächliche Form.
+    expect(alphaTeam?.finalPreviewScore).toBeCloseTo(64 - 12 + (alphaTeam?.formModifier ?? 0), 1);
+    expect(betaTeam?.finalPreviewScore).toBe(45); // Beta hat keine Formkarten → unverändert
     expect(alphaTeam?.rank).toBe(1);
     expect(betaTeam?.rank).toBe(2);
     expect(alphaTeam?.teamPoints).toBe(6.6);
     expect(betaTeam?.teamPoints).toBe(6.2);
     expect(alphaPlayer?.mutatorBonus).toBe(12);
     expect(alphaPlayer?.mutatorPpsBonus).toBe(0.3);
-    expect(alphaPlayer?.finalPlayerScore).toBe(32);
+    // finalPlayerScore enthält jetzt den Pro-Spieler-Form-Anteil (war 32 OHNE Form,
+    // jetzt 32 + Formanteil ≈ 6 ± 4).
+    expect(alphaPlayer?.finalPlayerScore).toBeGreaterThan(32);
+    expect(alphaPlayer?.finalPlayerScore).toBeLessThanOrEqual(32 + 10);
+    // Reconciliation bleibt exakt: Σ verteilte Spieler-PP == Team-PP.
     expect(alphaEntryPoints).toBe(alphaTeam?.teamPoints);
   });
 

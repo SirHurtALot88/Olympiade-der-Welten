@@ -534,14 +534,19 @@ describe("legacy lineup score engine", () => {
     expect(result.baseScore).toBe(45.9);
     expect(result.fatigueModifier).toBe(-15);
     expect(result.captainBonusTotal).toBe(8);
-    expect(result.formModifier).toBe(4);
+    // Form ist jetzt PRO SPIELER (flach 2 = 4/2 + ±4-Jitter, 2 Spieler); die
+    // gemeldete Form-Summe wackelt bewusst um den Nominalwert 4.
+    expect(result.formModifier).toBeGreaterThanOrEqual(4 - 8);
+    expect(result.formModifier).toBeLessThanOrEqual(4 + 8);
     expect(result.mutatorModifier).toBe(12);
     expect(result.entries[0]?.mutatorBonus).toBe(12);
     expect(result.entries[0]?.mutatorPpsBonus).toBe(0.3);
-    expect(result.entries[0]?.finalContribution).toBe(27);
+    // finalContribution enthält jetzt den Pro-Spieler-Form-Anteil (war 27 OHNE Form).
+    expect(result.entries[0]?.finalContribution).toBeCloseTo(27 + (result.entries[0]?.formShare ?? 0), 1);
     expect(result.entries[1]?.captainBonus).toBe(8);
-    expect(result.entries[1]?.finalContribution).toBe(23.9);
-    expect(result.totalScore).toBe(54.9);
+    expect(result.entries[1]?.finalContribution).toBeCloseTo(23.9 + (result.entries[1]?.formShare ?? 0), 1);
+    // totalScore = Beiträge ohne Form (50,9) + tatsächliche Form-Summe.
+    expect(result.totalScore).toBeCloseTo(50.9 + (result.formModifier ?? 0), 1);
   });
 });
 

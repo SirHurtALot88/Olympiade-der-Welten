@@ -669,6 +669,44 @@ export function calculateFormModifierForSide(input: {
   };
 }
 
+// Deterministischer Form-Jitter in [-jitterMax, jitterMax] (1 Dezimale), stabil
+// pro Seed. Reiner FNV-Hash → dieselbe Paarung liefert immer denselben Wert,
+// damit Engine (Score/PP) und Anzeige exakt übereinstimmen.
+export function seededFormJitter(seed: string, jitterMax = 4): number {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i += 1) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  const norm = ((h >>> 0) % 1000) / 1000; // 0..1
+  return Number(((norm * 2 - 1) * jitterMax).toFixed(1));
+}
+
+// Verteilt die Team-Form (formModifier = Kartenwert × Anzahl) ADDITIV auf die
+// Spieler: jeder bekommt den flachen Pro-Spieler-Wert (formModifier/Anzahl) plus
+// einen echten Zufalls-Jitter (±jitterMax). Der Jitter ist bewusst NICHT
+// zero-sum — die Team-Summe wackelt mit (Extra-Kick, wie die zufälligen
+// Formkarten selbst). Reihenfolge der Seeds == Reihenfolge der Spieler; der Seed
+// (z.B. `${playerId}|${disciplineId}`) macht das Ergebnis reproduzierbar, sodass
+// Score-Engine und Bühne identische Werte zeigen.
+export function distributePerPlayerFormShares(input: {
+  formModifier?: number | null;
+  seeds: string[];
+  jitterMax?: number;
+}): number[] {
+  const total = input.formModifier ?? 0;
+  const n = input.seeds.length;
+  if (n === 0) {
+    return [];
+  }
+  if (!Number.isFinite(total) || total === 0) {
+    return input.seeds.map(() => 0);
+  }
+  const flat = total / n;
+  const jitterMax = input.jitterMax ?? 4;
+  return input.seeds.map((seed) => Number((flat + seededFormJitter(seed, jitterMax)).toFixed(1)));
+}
+
 export function calculatePerPlayerFormModifier(input: {
   formModifier?: number | null;
   selectedPlayers?: number | null;

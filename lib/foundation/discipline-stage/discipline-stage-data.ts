@@ -1,5 +1,6 @@
 import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
+import { distributePerPlayerFormShares } from "@/lib/lineups/legacy-lineup-modifiers";
 
 // One aufgestellter Spieler in einem Slot einer Disziplin, mit echter
 // Netto-Leistung aus dem Save (Disziplin-Wert + echtem Fatigue/Form).
@@ -36,33 +37,18 @@ function clamp(value: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, value));
 }
 
-// Deterministischer „Tagesform"-Swing in [-4, 4], fest pro Spieler+Disziplin
-// (reiner Hash aus player.id|disciplineId — für dieselbe Paarung immer gleich).
-// Gibt der Form einen kleinen individuellen Beiwert oben auf player.form.
-function seededJitter(seed: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < seed.length; i += 1) {
-    h ^= seed.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  const norm = ((h >>> 0) % 1000) / 1000; // 0..1
-  return Math.round((norm * 2 - 1) * 4);
-}
-
-function computeSlot(player: Player, disciplineId: string, slotIndex: number): DisciplineStageSlot {
+function computeSlot(player: Player, disciplineId: string, slotIndex: number, formSwing: number): DisciplineStageSlot {
   // Grundwert kann im Save bis zu 2 Nachkommastellen haben — zuerst auf 1
   // Dezimale runden und ALLES daraus ableiten, damit die Anzeige-Identität
   // „Grundwert − Fatigue + Form = Netto" exakt stimmt (keine 0,1-Abweichung).
   const base = Number((player.disciplineRatings?.[disciplineId] ?? 0).toFixed(1));
   const fatigue = clamp(player.fatigue ?? 0, 0, 100);
-  const form = clamp(player.form ?? 50, 0, 100);
   // Fatigue bremst nach vorne: bis zu 25 % des Werts bei voller Erschöpfung.
   const fatiguePenalty = Math.round(((base * fatigue) / 100) * 0.25);
-  // Form wird FLACH angewendet — genau wie die echte Scoring-Engine: eine
-  // Formkarte landet als fester Absolutwert auf jedem aufgestellten Spieler,
-  // UNABHÄNGIG von base/Stärke. Skala ±8 passt zu den Kartenwerten [0,2,4,8].
-  const formBase = Math.round(((form - 50) / 50) * 8);
-  const formSwing = formBase + seededJitter(`${player.id}|${disciplineId}`);
+  // formSwing kommt jetzt vom TEAM (flacher Kartenwert + echter Jitter, s.
+  // buildDisciplineStageModel) statt aus der individuellen player.form-Stärke —
+  // so ist die Verteilung konsistent zur echten Engine (kein „stärkere Spieler
+  // mehr −Form").
   const net = Number(Math.max(0, base - fatiguePenalty + formSwing).toFixed(1));
   const portraitUrl = getPlayerPortraitBrowserUrl(player.id, player.portraitUrl ?? null, player.portraitPath ?? null);
   const traits = [...(player.traitsPositive ?? []), ...(player.traitsNegative ?? [])].map((t) => String(t).trim()).filter(Boolean);
@@ -111,7 +97,20 @@ export function buildDisciplineStageModel(
       (a, b) => (b.disciplineRatings?.[disciplineId] ?? 0) - (a.disciplineRatings?.[disciplineId] ?? 0),
     );
     const chosen = sorted.slice(0, slotCount);
-    const slots = chosen.map((player, idx) => computeSlot(player, disciplineId, idx));
+    // Team-Form FLACH (nicht pro Spieler-Stärke): aus der Durchschnitts-Form des
+    // aufgestellten Teams ein Pro-Spieler-Kartenwert (±8), dann per gemeinsamer
+    // Funktion additiv mit Jitter (±4) auf die Spieler verteilt — identische Logik
+    // wie die echte Engine, damit Modell- und Engine-Pfad gleich aussehen.
+    const avgForm =
+      chosen.length > 0
+        ? chosen.reduce((sum, p) => sum + clamp(p.form ?? 50, 0, 100), 0) / chosen.length
+        : 50;
+    const flatFormPerPlayer = Math.round(((avgForm - 50) / 50) * 8);
+    const formShares = distributePerPlayerFormShares({
+      formModifier: flatFormPerPlayer * chosen.length,
+      seeds: chosen.map((p) => `${p.id}|${disciplineId}`),
+    });
+    const slots = chosen.map((player, idx) => computeSlot(player, disciplineId, idx, formShares[idx] ?? 0));
     const total = slots.reduce((sum, slot) => sum + slot.net, 0);
     return {
       teamId: team.teamId,
