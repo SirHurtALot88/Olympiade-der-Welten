@@ -818,7 +818,7 @@ export const STAR_MIN = 80;
 // simultan dorthin (dur = ROUND_MS). Score bleibt Wahrheit; nur die Token-POSITION
 // wird pro Runde gemeinsam animiert. Mini-DM (duelhp) läuft über das geteilte
 // Chrome + die Registry-Feld-Komponente (arena/disciplines/duelhp.tsx).
-export const TRACK_ROUND_MS = 10000;
+export const TRACK_ROUND_MS = 15000;
 // viewBox + Token-Radien je Primitive. Der Rest (Engine/FX/Ticker/Podest/Tabelle)
 // ist geometrieunabhängig; nur Feld-Layout + tokenPos unterscheiden sich.
 const PRIM_GEO: Record<StagePrimitive, { w: number; h: number; r: number; rOwn: number }> = {
@@ -2566,7 +2566,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       `}</style>
 
       {/* Hauptspalte: Controls · MyTracker · Oval · Ticker */}
-      <div style={{ flex: "1 1 620px", minWidth: 0 }}>
+      <div style={{ flex: "1 1 620px", minWidth: 0, order: 1 }}>
         {/* Controls */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
           <button type="button" onClick={() => { setStarted(true); advance(); }} disabled={done || busy} style={{ padding: "9px 18px", fontWeight: 800, fontSize: 13, border: 0, borderRadius: 10, cursor: done || busy ? "default" : "pointer", color: "var(--nl-ink)", background: done ? "var(--nl-line)" : "var(--nl-accent)", opacity: busy && !done ? 0.7 : 1 }}>
@@ -3033,8 +3033,13 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
 
         {/* („Dein Läufer"-Karte entfernt — in die konsolidierte „Dein Team"-Karte oben
             über dem Oval integriert: Läufer-Mini + Medaillenring + Spieler-Drawer-Klick. */}
+      </div>
 
-        {/* Top-Spieler-Zeile unter der Arena, ÜBER dem Ticker (nur bereits aufgedeckte Spieler) */}
+      {/* Top-Spieler + Ticker: volle Breite UNTER Arena + Rangliste (bündig). order:3 sorgt
+          dafür, dass dieser Block im Flex-Wrap unter die erste Reihe (Arena|Rangliste) rutscht. */}
+      <div style={{ flex: "1 1 100%", minWidth: 0, order: 3 }}>
+
+        {/* Top-Spieler-Zeile (nur bereits aufgedeckte Spieler) */}
         {revealedTopPlayers && revealedTopPlayers.rows.length > 0 ? (
           <DisciplineStageTopPlayersRow
             players={revealedTopPlayers.rows}
@@ -3103,7 +3108,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       </div>
 
       {/* Live-Ladder rechts */}
-      <div ref={ladderRef} data-testid="arena-ladder" style={{ flex: "0 0 340px", minWidth: 300, maxHeight: done ? undefined : "calc(100vh - 130px)", overflowY: done ? "visible" : "auto", overscrollBehavior: "contain", background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 10, position: done ? "static" : "sticky", top: done ? undefined : 12 }}>
+      <div ref={ladderRef} data-testid="arena-ladder" style={{ flex: "0 0 340px", minWidth: 300, maxHeight: done ? undefined : "calc(100vh - 130px)", overflowY: done ? "visible" : "auto", overscrollBehavior: "contain", background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 10, position: done ? "static" : "sticky", top: done ? undefined : 12, order: 2 }}>
         <div style={{ fontSize: 11, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
           <span>{prim === "barbell" ? (done ? "Endstand" : "Rangliste · live") : done ? "Endstand" : "Rundenstand — live"}</span>
           {prim === "barbell" && !done ? <span style={{ marginLeft: "auto", fontFamily: "ui-monospace, monospace", fontSize: 9, color: "var(--nl-mut)", fontWeight: 700 }}>{barbellLive} im Wettkampf</span> : null}
@@ -3225,7 +3230,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
 
       {/* Detail-Ergebnistabelle (volle Breite unter der Arena, nach dem Podest) */}
       {ended ? (
-        <div style={{ flex: "1 1 100%", minWidth: 0 }}>
+        <div style={{ flex: "1 1 100%", minWidth: 0, order: 4 }}>
           <DisciplineStageResultTable rows={resultRows} slotLabels={slots} onOpenPlayer={onOpenPlayer} />
         </div>
       ) : null}
