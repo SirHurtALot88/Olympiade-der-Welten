@@ -70,28 +70,136 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
   // Rangliste; Hover/Pause friert auch den Puck ein). Kein CSS-transform mehr.
   const leader = sorted.length > 0 ? sorted[0] : null;
   const puckRef = useRef<SVGEllipseElement | null>(null);
+  const fxRef = useRef<SVGGElement | null>(null);
+  const goalLightRef = useRef<SVGCircleElement | null>(null);
+  const goalieRef = useRef<SVGGElement | null>(null);
   const hoverRef = useRef<number | null>(hoverIdx);
   hoverRef.current = hoverIdx;
   const pausedRef = useRef<boolean>(props.paused);
   pausedRef.current = props.paused;
+  const reducedRef = useRef<boolean>(reducedMotion);
+  reducedRef.current = reducedMotion;
   const sortedRef = useRef<RT[]>(sorted);
   sortedRef.current = sorted;
+  const rtRef = useRef<RT[]>(rt);
+  rtRef.current = rt;
+
+  const NS = "http://www.w3.org/2000/svg";
   useEffect(() => {
     let raf = 0;
-    const tick = () => {
+    let last = performance.now();
+    const prevScore = new Map<number, number>();
+    // Fliegende Pucks (Schuss → Torraum) — nur Zeichnung, nie Score.
+    const shots: { x: number; y: number; tx: number; ty: number; t: number; g: SVGGElement }[] = [];
+    let lightUntil = 0; // Torlicht-Flash bis-Zeitpunkt
+    let goalieY = CY; // Goalie-Sollposition (folgt dem Führenden weich)
+    let goalieCur = CY;
+
+    const tick = (ts: number) => {
+      const dt = Math.min(64, ts - last);
+      last = ts;
+      const nowMs = ts;
       const frozen = hoverRef.current != null || pausedRef.current;
+      const reduce = reducedRef.current;
+      const rtl = rtRef.current;
       const lead = sortedRef.current[0];
+
+      // Puck beim Führenden (Nose + 5).
       const el = puckRef.current;
       if (el && lead && !frozen) {
-        // Puck NEBEN den Führenden setzen (Nose + 5), nicht auf sein Zentrum — sonst liegt er
-        // komplett unter dem Icon und ist unsichtbar.
         el.setAttribute("cx", String(fracX(lead.animScore) + (lead.isOwn ? geo.rOwn : geo.r) + 5));
         el.setAttribute("cy", String(laneY(lead.idx)));
       }
+
+      // Reveal-Erkennung: jeder spürbare Score-Sprung feuert einen Schuss Richtung rechtes Tor.
+      if (!frozen && !reduce && fxRef.current) {
+        for (const t of rtl) {
+          const prev = prevScore.get(t.idx);
+          prevScore.set(t.idx, t.displayScore);
+          if (prev == null) continue;
+          const gain = t.displayScore - prev;
+          if (gain <= 0.4) continue;
+          const g = document.createElementNS(NS, "g");
+          const p = document.createElementNS(NS, "ellipse");
+          p.setAttribute("rx", "5");
+          p.setAttribute("ry", "3.2");
+          p.setAttribute("fill", "#0c0e11");
+          p.setAttribute("stroke", "#39434f");
+          p.setAttribute("stroke-width", "1");
+          const trail = document.createElementNS(NS, "line");
+          trail.setAttribute("stroke", t.isOwn ? "rgba(87,177,255,.8)" : "rgba(200,215,235,.6)");
+          trail.setAttribute("stroke-width", "2.4");
+          trail.setAttribute("stroke-linecap", "round");
+          g.appendChild(trail);
+          g.appendChild(p);
+          fxRef.current.appendChild(g);
+          shots.push({
+            x: fracX(t.displayScore) + (t.isOwn ? geo.rOwn : geo.r) + 6,
+            y: laneY(t.idx),
+            tx: GR + 6,
+            ty: CY,
+            t: 0,
+            g,
+          });
+        }
+      }
+
+      // Fliegende Pucks integrieren.
+      for (let i = shots.length - 1; i >= 0; i -= 1) {
+        const s = shots[i]!;
+        s.t += dt / 320; // ~320ms Flugzeit
+        const k = s.t < 1 ? s.t : 1;
+        const cx = s.x + (s.tx - s.x) * k;
+        const cy = s.y + (s.ty - s.y) * k - Math.sin(k * Math.PI) * 26; // leichter Bogen
+        const ell = s.g.lastChild as SVGEllipseElement | null;
+        const ln = s.g.firstChild as SVGLineElement | null;
+        if (ell) {
+          ell.setAttribute("cx", String(cx));
+          ell.setAttribute("cy", String(cy));
+        }
+        if (ln) {
+          ln.setAttribute("x1", String(cx - (s.tx - s.x) * 0.05));
+          ln.setAttribute("y1", String(cy));
+          ln.setAttribute("x2", String(cx));
+          ln.setAttribute("y2", String(cy));
+        }
+        if (s.t >= 1) {
+          if (s.g.parentNode) s.g.parentNode.removeChild(s.g);
+          shots.splice(i, 1);
+          lightUntil = nowMs + 520; // Treffer → Torlicht an
+        }
+      }
+
+      // Torlicht-Flash.
+      const gl = goalLightRef.current;
+      if (gl) {
+        if (nowMs < lightUntil) {
+          const pulse = 0.55 + 0.45 * Math.abs(Math.sin(nowMs * 0.02));
+          gl.setAttribute("fill", "#ff3b3b");
+          gl.style.filter = `drop-shadow(0 0 ${(6 + pulse * 8).toFixed(1)}px rgba(255,60,60,${pulse.toFixed(2)}))`;
+        } else {
+          gl.setAttribute("fill", "#4d1717");
+          gl.style.filter = "none";
+        }
+      }
+
+      // Beweglicher Goalie: folgt dem Führenden weich, bleibt vor dem rechten Tor.
+      const targetGoalieY = lead && !frozen ? laneY(lead.idx) : goalieY;
+      goalieY += (targetGoalieY - goalieY) * 0.02;
+      goalieCur += (goalieY - goalieCur) * 0.12;
+      const gk = goalieRef.current;
+      if (gk) {
+        const clampedY = Math.max(228, Math.min(292, goalieCur));
+        gk.setAttribute("transform", `translate(${GR + 27} ${clampedY})`);
+      }
+
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      for (const s of shots) if (s.g.parentNode) s.g.parentNode.removeChild(s.g);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -194,11 +302,11 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
       {/* Kick-line (golden) */}
       <rect x="14" y="16" width="792" height="488" rx="88" fill="none" stroke="rgba(240,205,90,.38)" strokeWidth="3" />
 
-      {/* Goal Light (top-right corner) — animated on goal */}
-      <circle cx={GR + 27} cy="204" r="6.5" fill="#4d1717" stroke="#2c3a49" strokeWidth="2" pointerEvents="none" />
+      {/* Goal Light (top-right corner) — flasht via rAF bei jedem Treffer (Torlicht). */}
+      <circle ref={goalLightRef} cx={GR + 27} cy="204" r="6.5" fill="#4d1717" stroke="#2c3a49" strokeWidth="2" pointerEvents="none" />
 
-      {/* Goalie (static, decorative — before the right goal) */}
-      <g transform={`translate(${GR + 27} 260)`}>
+      {/* Goalie — folgt via rAF weich der Bahn des Führenden (beweglich, kein Statist). */}
+      <g ref={goalieRef} transform={`translate(${GR + 27} 260)`}>
         <rect x="-10" y="-15" width="20" height="30" rx="7" ry="5" fill="#e9eef4" stroke="#55636f" strokeWidth="1.5" />
         <circle cx="0" cy="-17" r="6" fill="#39434f" />
         <rect x="-3" y="8" width="6" height="15" rx="3" fill="#8fa3b8" stroke="#55636f" strokeWidth="1" />
@@ -277,6 +385,9 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
           filter: "drop-shadow(0 1px 2px rgba(8,16,30,.5)) drop-shadow(0 0 7px rgba(87,177,255,.35))",
         }}
       />
+
+      {/* Fliegende Schuss-Pucks (Reveal-Treffer → Torraum) — imperativ via rAF befüllt. */}
+      <g ref={fxRef} pointerEvents="none" />
 
       <style>{`
         @keyframes olyGlowPulse {
