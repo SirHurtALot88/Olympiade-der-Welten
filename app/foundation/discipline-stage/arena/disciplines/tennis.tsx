@@ -88,9 +88,11 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
   const cx = W / 2;
   const cy = H / 2;
   const KX = 1.15; // ellipse X scale
-  const KY = 0.62; // ellipse Y scale
-  const R0 = (Math.min(W, H) / 2) * 0.52; // outer ring (start position)
-  const R1 = (Math.min(W, H) / 2) * 0.19; // center court radius
+  const KY = 0.7; // ellipse Y scale (etwas weniger gestaucht → oben/unten weniger Klumpen)
+  // Außenring an der BREITE ausrichten (nicht min(W,H)) — sonst nutzt der Setzköpfe-Fächer
+  // nur ~⅓ der 1180er-Bühne und links/rechts bleibt totes Gras.
+  const R0 = (W / 2) * 0.52; // outer ring (start position)
+  const R1 = R0 * 0.3; // center court radius (proportional zum Außenring)
   const CCW = 75 * 0.5; // half center court width
   const CCH = 46 * 0.5; // half center court height
 

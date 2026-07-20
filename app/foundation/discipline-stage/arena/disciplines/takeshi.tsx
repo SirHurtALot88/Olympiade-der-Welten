@@ -181,7 +181,7 @@ export default function TakeshiField(props: DisciplineFieldProps): ReactNode {
       <circle cx={340} cy={551} r={3} fill="#8a6a42" opacity={0.8} />
       <circle cx={398} cy={538} r={2.5} fill="#8a6a42" opacity={0.8} />
       <circle cx={428} cy={547} r={3} fill="#8a6a42" opacity={0.8} />
-      <text x={380} y={590} textAnchor="middle" fontFamily="ui-monospace,Menlo,monospace" fontSize={9} fontWeight={800} letterSpacing={2} fill="#3c2f14">
+      <text x={380} y={552} textAnchor="middle" fontFamily="ui-monospace,Menlo,monospace" fontSize={9} fontWeight={800} letterSpacing={2} fill="#3c2f14">
         SCHLAMMGRUBE
       </text>
 
@@ -217,7 +217,7 @@ export default function TakeshiField(props: DisciplineFieldProps): ReactNode {
       <rect x={64} y={545} width={12} height={14} fill="#181a20" />
       <circle cx={70} cy={506} r={4} fill="#e03c30" />
       <path d="M 70 506 V 486 l 14 5 l -14 5" fill="#e03c30" stroke="#7c1810" strokeWidth={1} />
-      <text x={70} y={600} textAnchor="middle" fontFamily="ui-monospace,Menlo,monospace" fontSize={9.5} fontWeight={800} letterSpacing={2} fill="#3c2f14">
+      <text x={70} y={552} textAnchor="middle" fontFamily="ui-monospace,Menlo,monospace" fontSize={9.5} fontWeight={800} letterSpacing={2} fill="#3c2f14">
         START
       </text>
 
