@@ -79,13 +79,13 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
   const X0: number = layout.padL;
   const X1: number = W - layout.padR;
   const roadC: number = layout.roadY;
-  const ROAD_T = roadC - 74;
-  const ROAD_B = roadC + 74;
-  const laneT = ROAD_T + 20;
-  const laneB = ROAD_B - 20;
+  // Breitere Fahrbahn: der Streckenprofil-Strip (#210 „Nutzen prüfen/raus") ist raus, sein
+  // Platz geht an die Straße → das Feld darf sich vertikal weiter auffächern (war „zu gestaucht").
+  const ROAD_T = roadC - 96;
+  const ROAD_B = roadC + 96;
+  const laneT = ROAD_T + 14;
+  const laneB = ROAD_B - 14;
   const SKY_B = ROAD_T - 22;
-  const PR_T = ROAD_B + 34;
-  const PR_B = H - 10;
   const KM = 41;
   const CLUMP_GAP = 40;
   const PACK_GAP = 24;
@@ -107,26 +107,8 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
   const ghostRefs = useRef<Map<number, SVGGElement | null>>(new Map());
   const streakRefs = useRef<Map<number, SVGLineElement | null>>(new Map());
   const packRefs = useRef<Map<number, SVGCircleElement | null>>(new Map());
-  const profmarkRef = useRef<SVGCircleElement | null>(null);
 
   const rOf = (t: RT): number => (t.isOwn ? geo.rOwn : geo.r);
-
-  // ---- Streckenprofil (deterministisch, stabil über SSR/Client) ----------------------
-  const PROF_N = 22;
-  const profile = useMemo(() => {
-    const pts: [number, number][] = [];
-    for (let i = 0; i <= PROF_N; i += 1) {
-      const x = X0 + (i / PROF_N) * (X1 - X0);
-      let hh = Math.sin(i * (0.7 + h01("pw") * 0.5) + 1.7) * 0.35 + h01("pf_" + i) * 0.65;
-      hh = clamp(hh * 0.5 + 0.4, 0.06, 1);
-      const y = PR_B - 6 - hh * (PR_B - PR_T - 14);
-      pts.push([x, y]);
-    }
-    const area = "M " + X0 + " " + (PR_B - 2) + pts.map((p) => " L " + p[0].toFixed(1) + " " + p[1].toFixed(1)).join("") + " L " + X1 + " " + (PR_B - 2) + " Z";
-    const line = "M " + pts.map((p) => p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" L ");
-    return { area, line };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [W, H]);
 
   // ---- Straßen-Deko (Publikum, Wimpel, Absperrgitter, km-Marken) — einmalig ----------
   const roadArt = useMemo(() => {
@@ -218,22 +200,13 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
         <text x={X1 + 13} y={ROAD_T - 22} textAnchor="middle" fontFamily="ui-monospace, Menlo, monospace" fontSize={9.5} fontWeight={800} fill="#f6c750">
           ZIEL
         </text>
-        {/* unterer Grasstreifen + Gitter */}
-        <rect x={0} y={ROAD_B} width={W} height={PR_T - 14 - ROAD_B} fill="#242c1c" />
+        {/* unterer Grasstreifen + Gitter (füllt bis zum Feldrand — Profil-Strip entfernt) */}
+        <rect x={0} y={ROAD_B} width={W} height={H - ROAD_B} fill="#242c1c" />
         {barrier(ROAD_B + 8)}
-        {/* Streckenprofil-Strip */}
-        <rect x={X0 - 14} y={PR_T - 10} width={X1 - X0 + 42} height={PR_B - PR_T + 18} rx={8} fill="rgba(10,13,10,.55)" stroke="#2c3328" strokeWidth={1} />
-        <text x={X0 - 2} y={PR_T + 2} fontFamily="ui-monospace, Menlo, monospace" fontSize={8} fontWeight={800} letterSpacing="2" fill="#7a9a5c" opacity={0.9}>
-          STRECKENPROFIL · {KM} KM
-        </text>
-        <path d={profile.area} fill="rgba(122,150,90,.22)" />
-        <path d={profile.line} fill="none" stroke="#7a9a5c" strokeWidth={1.6} opacity={0.85} />
-        <path d={`M ${X1} ${PR_T + 6} V ${PR_B - 2}`} stroke="#e9ecf2" strokeWidth={1.5} strokeDasharray="3 3" opacity={0.5} />
-        <circle ref={profmarkRef} cx={X0} cy={PR_B - 14} r={4.5} fill="#f6c750" stroke="#2a2410" strokeWidth={1.5} style={{ filter: "drop-shadow(0 0 5px rgba(246,199,80,.6))" }} />
       </>
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [W, H, profile]);
+  }, [W, H]);
 
   // ---- rAF: linearer Glide + organische Peloton-Klumpung + Windschatten ---------------
   useEffect(() => {
@@ -307,7 +280,9 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
         }
         for (const grp of groups) {
           const m = grp.length;
-          const f = m >= 3 ? Math.max(0.32, Math.min(1, (m * 11) / (laneB - laneT))) : 1;
+          // Höherer Boden (0.55 statt 0.32) + mehr Platz je Fahrer (14 statt 11): das Pulk
+          // stapelt sich nicht mehr auf die Mittellinie → Teams bleiben einzeln lesbar (#210).
+          const f = m >= 3 ? Math.max(0.55, Math.min(1, (m * 14) / (laneB - laneT))) : 1;
           for (const st of grp) {
             st.comp = f;
             st.yTo = clamp(roadC + st.baseOff * f, laneT, laneB);
@@ -342,7 +317,6 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
       }
 
       // 4) Integration (LINEARER Glide) + weiche Umordnung/Aufschließen + Platzierung.
-      let frontX = X0;
       for (const t of rtl) {
         const st = g.get(t.idx);
         if (!st) continue;
@@ -371,7 +345,6 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
             gel.setAttribute("opacity", "0");
           }
         }
-        if (st.toX > frontX) frontX = st.toX;
         // Wind-Streak: Länge/Intensität skaliert mit aktueller Geschwindigkeit.
         const v = st.prevDrawn == null ? 0 : Math.max(0, dx - st.prevDrawn);
         st.prevDrawn = dx;
@@ -384,8 +357,6 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
         const pref = packRefs.current.get(t.idx);
         if (pref) pref.style.opacity = st.pack ? "1" : "0";
       }
-      // Fortschritts-Marker (Streckenprofil) folgt dem Führenden.
-      if (profmarkRef.current) profmarkRef.current.setAttribute("cx", String(Math.min(X1, frontX)));
 
       raf = requestAnimationFrame(tick);
     };
