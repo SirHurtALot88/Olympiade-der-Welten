@@ -2,12 +2,12 @@
 // lamps (Fechten · Salle d'Armes) — Lesbarkeits-Rebuild auf dem Staffel-Benchmark.
 //
 // FRÜHER: 30 feste Bahnen (y = laneIdx) → jede Bahn ~H/30, Logos winzig & unlesbar.
-// JETZT: Archetyp ① (geteiltes Feld, Position = Wert). Die x-Position = GESAMMELTE
-// Treffer (score, entstaucht gegen den Live-Führenden via finalMax=posMax). Vertikal
-// werden die Fechter über die Planche GESTREUT (stabile, gleichmäßige Hash-Ordnung)
-// statt in dünne Bahnen gepresst → deutlich GRÖSSERE, lesbare Token; enge Score-Cluster
-// überlappen als „Pulk", statt zu schrumpfen (bewusster Trade-off: lieber groß+überlappt
-// als klein+getrennt). Der Führende/eigene liegen oben.
+// JETZT: Archetyp ① (geteiltes Feld, Position = Wert) — WAAGERECHT: links = Start, RECHTS =
+// Ziel. Die x-Position = GESAMMELTE Treffer (score, min-max gegen das Runden-Fenster → volle
+// Breite pro Etappe). Vertikal bekommt jedes Team eine feste LANE (stabil nach seasonRank), so
+// fechten die Nachbarn sichtbar gegeneinander und die Reihenfolge bleibt lesbar → deutlich
+// GRÖSSERE Token als die alten Fixbahn-Winzlinge; enge Score-Cluster überlappen als „Pulk"
+// (bewusster Trade-off: lieber groß+überlappt als klein+getrennt). Führender = ganz rechts.
 //
 // Bewegung: die Token gleiten über den GETEILTEN animScore-Zeitstrahl des Hosts (rAF liest
 // t.animScore, roundStartScore→displayScore über TRACK_ROUND_MS) → Feld & Rangliste laufen
@@ -43,7 +43,6 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
     W,
     H,
     layout,
-    finalMax,
     rt,
     sorted,
     done,
@@ -78,67 +77,57 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
   const BAND_TOP = 56;
   const BAND_BOT = PY1 - 18;
   const CY = (BAND_TOP + BAND_BOT) / 2;
-  const CXc = W / 2; // Konvergenz-Zentrum (die „Mitte" der Salle)
 
-  // ---- Startaufstellung (Slots): die Teams stehen breit über die ganze Planche verteilt
-  // auf einem Raster — DA, wo sie „gestartet" sind. Reihenfolge stabil nach seasonRank →
-  // lesbare Anfangsordnung, jeder mit Platz. Beim Fortbewegen (Punkte) orientieren sie
-  // sich Richtung Mitte (siehe rAF), Kollisionen werden per Relaxation kleingehalten.
-  const GRID_X0 = PX0 + 70;
-  const GRID_X1 = PX1 - 60;
-  const GRID_TOP = BAND_TOP + 6;
-  const GRID_BOT = BAND_BOT - 6;
-  // Startaufstellung: alle Teams stehen am LINKEN RAND untereinander (Startkolonne),
-  // nach seasonRank sortiert (oben = beste). Bei vielen Teams eine schmale 2er-Kolonne,
-  // damit die großen Token nicht überlappen — liest sich als „links gestapelt". Von dort
-  // ziehen sie beim Punkten Richtung Mitte.
-  const gridByCode = useMemo(() => {
+  // ---- Progress-Achse: WAAGERECHT. Links = Start, RECHTS = Ziel. Wer am weitesten rechts
+  // steht, führt (score-getrieben). Vertikal bekommt jedes Team seine eigene feste LANE
+  // (stabil nach seasonRank, oben = beste Vorsaison) → die Nachbarn fechten sichtbar
+  // gegeneinander und die Reihenfolge bleibt lesbar (kein Zusammenklumpen in der Mitte).
+  const X_START = PX0 + 48;
+  const X_GOAL = PX1 - 48;
+  const LANE_TOP = BAND_TOP + 4;
+  const LANE_BOT = BAND_BOT - 4;
+  const laneByCode = useMemo(() => {
     const order = [...rt].sort((a, b) => a.seasonRank - b.seasonRank);
     const n = order.length;
-    const cols = n > 16 ? 2 : 1; // 1 Kolonne, wenn sie reinpasst; sonst 2 schmale
-    const rows = Math.max(1, Math.ceil(n / cols));
-    const COL_GAP = 46;
-    const m = new Map<string, { x: number; y: number }>();
+    const m = new Map<string, number>();
     order.forEach((t, i) => {
-      const c = i % cols;
-      const r = Math.floor(i / cols);
-      const x = GRID_X0 + c * COL_GAP;
-      const y = rows > 1 ? GRID_TOP + (r / (rows - 1)) * (GRID_BOT - GRID_TOP) : CY;
-      m.set(t.code, { x, y });
+      const y = n > 1 ? LANE_TOP + (i / (n - 1)) * (LANE_BOT - LANE_TOP) : (LANE_TOP + LANE_BOT) / 2;
+      m.set(t.code, y);
     });
     return m;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rt.length]);
-  const gridOf = (t: RT): { x: number; y: number } => gridByCode.get(t.code) ?? { x: (GRID_X0 + GRID_X1) / 2, y: CY };
-  // Frische Spiegel für die rAF-Schleife.
-  const gridRef = useRef(gridByCode);
-  gridRef.current = gridByCode;
-  const finalMaxRef = useRef(finalMax);
-  finalMaxRef.current = finalMax;
-  // Streuungs-Basis = Punkte des aktuellen RUNDEN-Führenden (dynamisch, NICHT die 5-Runden-
-  // Endsumme). So nutzt das Feld JEDE Etappe die volle Breite: der Führende steht ganz an der
-  // Mitte, die anderen anteilig davor → man sieht sofort, wer vorn und hinten ist (statt Klumpen).
-  let spreadMax = 1;
+  const laneOf = (t: RT): number => laneByCode.get(t.code) ?? CY;
+  const laneRef = useRef(laneByCode);
+  laneRef.current = laneByCode;
+
+  // Streuungs-Fenster = min…max der aktuellen RUNDEN-Punkte (dynamisch, NICHT die 5-Runden-
+  // Endsumme). Min-Max-Normalisierung → JEDE Etappe wird die volle Breite genutzt: Letzter ganz
+  // links an der Startlinie, Führender ganz rechts am Ziel. So sieht man sofort, wer vorn/hinten.
+  let spreadMin = Infinity;
+  let spreadMax = -Infinity;
   for (const t of rt) {
     const s = t.displayScore || 0;
+    if (s < spreadMin) spreadMin = s;
     if (s > spreadMax) spreadMax = s;
   }
-  const spreadMaxRef = useRef(spreadMax);
-  spreadMaxRef.current = spreadMax;
+  if (!Number.isFinite(spreadMin)) {
+    spreadMin = 0;
+    spreadMax = 0;
+  }
+  const spreadRange = spreadMax - spreadMin;
+  const spreadMinRef = useRef(spreadMin);
+  spreadMinRef.current = spreadMin;
+  const spreadRangeRef = useRef(spreadRange);
+  spreadRangeRef.current = spreadRange;
 
-  // Ziel-Position eines Teams: vom Startslot Richtung Mitte, Anteil = Fortschritt
-  // (score/finalMax). Bei 0 Punkten steht es auf dem Slot (breit verteilt, sichtbar);
-  // der Führende zieht am weitesten zur Mitte. So bleibt die Streuung früh erhalten und
-  // die Ordnung entsteht erst mit den Punkten. (Ohne Kollisions-Relaxation — die macht die rAF.)
-  const idealOf = (t: RT, score: number): { x: number; y: number } => {
-    const g = gridOf(t);
-    const fm = spreadMax > 0 ? spreadMax : 1;
-    const pull = Math.max(0, Math.min(1, score / fm)) * 0.95;
-    // X zieht kräftig zur Mitte (Führender = Zentrum). Y nur zur HÄLFTE → die vertikale
-    // Streuung der Startkolonne bleibt erhalten, damit die Reihenfolge klar ablesbar ist
-    // (kein Zusammenklumpen auf einen Punkt).
-    return { x: g.x + (CXc - g.x) * pull, y: g.y + (CY - g.y) * pull * 0.5 };
-  };
+  // Fortschritts-Anteil 0…1 (min-max). Range 0 (alle gleich, z.B. Rundenstart) → alle an der
+  // Startlinie links; sie fächern erst mit den Punkten nach rechts auf.
+  const pullOf = (score: number): number => (spreadRange > 0.001 ? Math.max(0, Math.min(1, (score - spreadMin) / spreadRange)) : 0);
+
+  // Ziel-Position: x score-getrieben (Start links → Ziel rechts), y = feste Lane.
+  // (Kollisions-Relaxation gegen Überlappungen macht die rAF-Schleife.)
+  const idealOf = (t: RT, score: number): { x: number; y: number } => ({ x: X_START + (X_GOAL - X_START) * pullOf(score), y: laneOf(t) });
 
   // Treffer-Melder oben mittig.
   const CX = W / 2;
@@ -159,15 +148,16 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
       // der Teams beim Drüberfahren.
       const frozen = hoverRef.current != null || pausedRef.current;
       if (!frozen) {
-        const grid = gridRef.current;
-        const fm = spreadMaxRef.current > 0 ? spreadMaxRef.current : 1;
-        // 1) Ideal-Ziel je Token: vom Startslot Richtung Mitte, Anteil = Fortschritt gegen
-        //    den Runden-Führenden (volle Breite pro Etappe). Y nur zur Hälfte → Streuung bleibt.
+        const lane = laneRef.current;
+        const mn = spreadMinRef.current;
+        const range = spreadRangeRef.current;
+        // 1) Ideal-Ziel je Token: x score-getrieben (Start links → Ziel rechts, min-max des
+        //    Runden-Fensters → volle Breite pro Etappe), y = feste Lane (Nachbarn bleiben lesbar).
         const P: { t: RT; r: number; x: number; y: number }[] = [];
         for (const t of rtRef.current) {
-          const g = grid.get(t.code) ?? { x: (GRID_X0 + GRID_X1) / 2, y: CY };
-          const pull = Math.max(0, Math.min(1, t.animScore / fm)) * 0.95;
-          P.push({ t, r: t.isOwn ? RBOwn : RB, x: g.x + (CXc - g.x) * pull, y: g.y + (CY - g.y) * pull * 0.5 });
+          const y = lane.get(t.code) ?? CY;
+          const p = range > 0.001 ? Math.max(0, Math.min(1, (t.animScore - mn) / range)) : 0;
+          P.push({ t, r: t.isOwn ? RBOwn : RB, x: X_START + (X_GOAL - X_START) * p, y });
         }
         // 2) Kollisions-Relaxation: Überlappungen paarweise auseinanderdrücken (deterministisch
         //    aus den Ideal-Positionen → glatt Frame-zu-Frame, kein Zittern). Wenige Iterationen.
@@ -346,16 +336,17 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
         <rect x={PX0} y={PY0} width={PX1 - PX0} height={PY1 - PY0} fill="url(#lampMesh)" />
         <ellipse cx={CX} cy={H * 0.42} rx={W * 0.46} ry={H * 0.5} fill="rgba(255,255,255,.28)" />
 
-        {/* Mitte = Ziel der Annäherung: konzentrische Ringe (Engagement-Zone). Wer am besten
-            trifft, orientiert sich am weitesten zur Mitte; die Distanz zur Mitte = Rang. */}
-        <g opacity={0.5}>
-          <circle cx={CXc} cy={CY} r={150} fill="none" stroke="#31465c" strokeWidth={1.4} strokeDasharray="2 9" />
-          <circle cx={CXc} cy={CY} r={92} fill="none" stroke="#31465c" strokeWidth={1.4} strokeDasharray="2 9" />
-          <circle cx={CXc} cy={CY} r={40} fill="none" stroke="var(--nl-warn)" strokeWidth={1.6} strokeDasharray="3 6" opacity={0.7} />
-          <line x1={CXc} y1={PY0 + 8} x2={CXc} y2={PY1 - 8} stroke="#31465c" strokeWidth={1.2} strokeDasharray="2 10" opacity={0.6} />
+        {/* Progressachse: Startlinie LINKS, Ziellinie RECHTS. Wer am weitesten rechts steht,
+            führt; die vertikalen Lanes zeigen die fechtenden Nachbarn. */}
+        <g opacity={0.6}>
+          <line x1={X_START} y1={PY0 + 8} x2={X_START} y2={PY1 - 8} stroke="#31465c" strokeWidth={1.4} strokeDasharray="2 9" />
+          <line x1={X_GOAL} y1={PY0 + 8} x2={X_GOAL} y2={PY1 - 8} stroke="var(--nl-warn)" strokeWidth={1.8} strokeDasharray="3 6" opacity={0.8} />
         </g>
-        <text x={CXc} y={PY1 - 12} textAnchor="middle" fontFamily="Georgia, serif" fontSize={12} fontWeight={800} letterSpacing="0.14em" fill="var(--nl-warn)" opacity={0.9}>
-          ◇ MITTE — TREFFER ZIEHEN NACH INNEN
+        <text x={X_START} y={PY1 - 12} textAnchor="middle" fontFamily="Georgia, serif" fontSize={11} fontWeight={800} letterSpacing="0.12em" fill="#5a6b7d" opacity={0.9}>
+          START
+        </text>
+        <text x={X_GOAL} y={PY1 - 12} textAnchor="middle" fontFamily="Georgia, serif" fontSize={12} fontWeight={800} letterSpacing="0.12em" fill="var(--nl-warn)" opacity={0.95}>
+          ZIEL ▸
         </text>
       </g>
       <rect x={PX0} y={PY0} width={PX1 - PX0} height={PY1 - PY0} rx={12} fill="none" stroke="#5c6b7d" strokeWidth={2} />
