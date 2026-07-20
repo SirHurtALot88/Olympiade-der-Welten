@@ -1704,7 +1704,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   // Finale End-Summe eines Teams (ALLE Slots, deterministisch) — der Spoiler-Wert.
   function finalTotal(t: RT): number {
     let s = 0;
-    for (const p of t.players) if (p) s += playerNet(p);
+    for (const p of t.players ?? []) if (p) s += playerNet(p);
     return s;
   }
   function recomputeRanks(rt: RT[]): void {
