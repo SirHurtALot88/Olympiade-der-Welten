@@ -2765,7 +2765,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               über das Feld — entfernt. Der Wert steht live in der Rangliste, den Zugewinn
               zeigt der Ghost der Vorrunde direkt am Token. Highlights kommen als
               Zoom-Slowdown (Nr. 208), nicht als Popup. */}
-          {/* Splitter (Boni/Mali „−8 Form" etc.) (#207): entfernt — poppten überall auf und
+          {/* Splitter (Boni/Mali „−8 Form" etc.) (Ticket 207): entfernt — poppten überall auf und
               störten. Form/Details stehen im Ticker / in der Hovercard, nicht als Feld-Pop. */}
           {/* Flash */}
           {flash ? (
