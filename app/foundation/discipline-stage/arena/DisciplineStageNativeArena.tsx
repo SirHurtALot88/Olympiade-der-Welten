@@ -1701,14 +1701,27 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   }, []);
 
   // ---- Rang-/Slot-Mathematik (Port der Szene) ----
+  // Finale End-Summe eines Teams (ALLE Slots, deterministisch) — der Spoiler-Wert.
+  function finalTotal(t: RT): number {
+    let s = 0;
+    for (const p of t.players) if (p) s += playerNet(p);
+    return s;
+  }
   function recomputeRanks(rt: RT[]): void {
     const order = [...rt].sort((a, b) => b.score - a.score || a.seasonRank - b.seasonRank);
     order.forEach((t, i) => {
       t.rank = i + 1;
-      // Medaille = Gesamt-Top-3 (stabil). Wandert nur bei echtem Überholen — NICHT mehr der
-      // Etappen-Slot-Sieger (der wechselte jede Etappe das Team → wirkte wie „durchswitchen").
-      // Pro Rang genau ein Team: 1=Gold, 2=Silber, 3=Bronze.
-      t.roundMedal = i < 3 ? ((i + 1) as 1 | 2 | 3) : 0;
+    });
+    // Medaille = FINALE Top-3 (bewusster Vorab-Spoiler, vom Nutzer gewünscht): welche 3 Teams
+    // am Ende die höchsten End-Summen haben, tragen VON RUNDE 1 AN dauerhaft Gold/Silber/Bronze
+    // — so kann man die späteren Sieger von Beginn an beobachten. Stabil (wandert nicht mit dem
+    // Live-Rang). 1=Gold, 2=Silber, 3=Bronze.
+    const finals = rt
+      .map((t) => ({ t, s: finalTotal(t) }))
+      .sort((a, b) => b.s - a.s || a.t.seasonRank - b.t.seasonRank);
+    for (const t of rt) t.roundMedal = 0;
+    finals.slice(0, 3).forEach((x, i) => {
+      x.t.roundMedal = (i + 1) as 1 | 2 | 3;
     });
   }
   function slotRankOf(slot: number, team: RT, rt: RT[]): number {

@@ -61,7 +61,10 @@ export default function KdaField(props: DisciplineFieldProps): ReactNode {
   const laneTop = 58;
   const laneBot = H - 44;
   const laneOf = (li: number): number => laneTop + ((li + 0.5) / Math.max(1, N)) * (laneBot - laneTop);
-  const normOf = (s: number): number => clamp(fieldNorm(s), 0, 1);
+  // Vorstoß = ABSOLUTER Fortschritt (score/finalMax), NICHT fieldNorm (= relatives Min-Max →
+  // sonst steht der Führende jede Runde schon in der Frag-Zone). So braucht der Push die vollen
+  // Runden bis rechts; bei Runde 1 stehen alle noch nah an der Spawn-Zone.
+  const normOf = (s: number): number => (finalMax > 0 ? clamp(s / finalMax, 0, 1) : 0);
 
   // ---- lokale tokenPos: x = Vorstoß ∝ Score, y = feste Team-Bahn ----------------------
   const tokenPos = (t: RT, score: number): { x: number; y: number } => ({

@@ -43,6 +43,7 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
     W,
     H,
     layout,
+    finalMax,
     rt,
     sorted,
     done,
@@ -108,29 +109,14 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
   const laneRef = useRef(laneByCode);
   laneRef.current = laneByCode;
 
-  // Streuungs-Fenster = min…max der aktuellen RUNDEN-Punkte (dynamisch, NICHT die 5-Runden-
-  // Endsumme). Min-Max-Normalisierung → JEDE Etappe wird die volle Breite genutzt: Letzter ganz
-  // links an der Startlinie, Führender ganz rechts am Ziel. So sieht man sofort, wer vorn/hinten.
-  let spreadMin = Infinity;
-  let spreadMax = -Infinity;
-  for (const t of rt) {
-    const s = t.displayScore || 0;
-    if (s < spreadMin) spreadMin = s;
-    if (s > spreadMax) spreadMax = s;
-  }
-  if (!Number.isFinite(spreadMin)) {
-    spreadMin = 0;
-    spreadMax = 0;
-  }
-  const spreadRange = spreadMax - spreadMin;
-  const spreadMinRef = useRef(spreadMin);
-  spreadMinRef.current = spreadMin;
-  const spreadRangeRef = useRef(spreadRange);
-  spreadRangeRef.current = spreadRange;
-
-  // Fortschritts-Anteil 0…1 (min-max). Range 0 (alle gleich, z.B. Rundenstart) → alle an der
-  // Startlinie links; sie fächern erst mit den Punkten nach rechts auf.
-  const pullOf = (score: number): number => (spreadRange > 0.001 ? Math.max(0, Math.min(1, (score - spreadMin) / spreadRange)) : 0);
+  // Fortschritt = ABSOLUTE Punkte gegen die 5-Runden-Endsumme (finalMax), NICHT das Runden-
+  // Min-Max. Sonst stünde der Führende JEDE Etappe schon ganz rechts am Ziel (nach 1–2 Runden
+  // durch) — gewünscht ist ein langsamer Vorstoß, der die vollen Runden bis rechts braucht.
+  // Bei Runde 3/5 hat der Führende ~60 % → steht bei ~60 % der Strecke, nicht am Ziel.
+  const fmax = finalMax > 0 ? finalMax : 1;
+  const fmaxRef = useRef(fmax);
+  fmaxRef.current = fmax;
+  const pullOf = (score: number): number => Math.max(0, Math.min(1, score / fmax));
 
   // Ziel-Position: x score-getrieben (Start links → Ziel rechts), y = feste Lane.
   // (Kollisions-Relaxation gegen Überlappungen macht die rAF-Schleife.)
@@ -147,23 +133,79 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
   // ---- Token-Refs für die imperative rAF-Positionierung -------------------------------
   const gRefs = useRef<Map<number, SVGGElement | null>>(new Map());
   const ghostRefs = useRef<Map<number, SVGGElement | null>>(new Map());
+  const fxRef = useRef<SVGGElement | null>(null);
+  // Live-Positionen (nach Relaxation) — die Gefecht-FX liest sie, um Klingen zwischen
+  // benachbarten Fechtern zu kreuzen.
+  const posRef = useRef<Map<number, { x: number; y: number; r: number }>>(new Map());
 
   useEffect(() => {
     let raf = 0;
-    const tick = () => {
+    let last = performance.now();
+    let clashAcc = 0;
+    const NS = "http://www.w3.org/2000/svg";
+
+    // Ein Gefecht: Klinge stößt von A Richtung B (kreuzt die Lane) + Klirr-Funke am Treffpunkt.
+    const clash = (ax: number, ay: number, bx: number, by: number) => {
+      const g = fxRef.current;
+      if (!g) return;
+      const mx = (ax + bx) / 2;
+      const my = (ay + by) / 2;
+      // Klingen-Stoß A→B
+      const blade = document.createElementNS(NS, "line");
+      blade.setAttribute("x1", String(ax));
+      blade.setAttribute("y1", String(ay));
+      blade.setAttribute("x2", String(mx));
+      blade.setAttribute("y2", String(my));
+      blade.setAttribute("stroke", "rgba(230,237,245,.9)");
+      blade.setAttribute("stroke-width", "2");
+      blade.setAttribute("stroke-linecap", "round");
+      const bo = document.createElementNS(NS, "animate");
+      bo.setAttribute("attributeName", "opacity");
+      bo.setAttribute("values", "0;1;0");
+      bo.setAttribute("dur", "0.34s");
+      blade.appendChild(bo);
+      g.appendChild(blade);
+      // Klirr-Funke ✦ am Treffpunkt
+      const spark = document.createElementNS(NS, "text");
+      spark.setAttribute("x", String(mx));
+      spark.setAttribute("y", String(my + 4));
+      spark.setAttribute("text-anchor", "middle");
+      spark.setAttribute("font-size", "13");
+      spark.setAttribute("fill", "var(--nl-warn)");
+      spark.textContent = "✦";
+      const so = document.createElementNS(NS, "animate");
+      so.setAttribute("attributeName", "opacity");
+      so.setAttribute("values", "1;1;0");
+      so.setAttribute("dur", "0.34s");
+      const ss = document.createElementNS(NS, "animateTransform");
+      ss.setAttribute("attributeName", "transform");
+      ss.setAttribute("type", "scale");
+      ss.setAttribute("values", "0.5;1.4;0.9");
+      ss.setAttribute("dur", "0.34s");
+      ss.setAttribute("additive", "sum");
+      spark.appendChild(so);
+      g.appendChild(spark);
+      window.setTimeout(() => {
+        blade.remove();
+        spark.remove();
+      }, 380);
+    };
+
+    const tick = (ts: number) => {
+      const dt = Math.min(64, ts - last);
+      last = ts;
       // Hover/Pause: Positionen komplett EINFRIEREN (nicht neu rechnen) → kein „Splitten"
-      // der Teams beim Drüberfahren.
+      // der Teams beim Drüberfahren; auch die Gefecht-FX pausieren.
       const frozen = hoverRef.current != null || pausedRef.current;
       if (!frozen) {
         const lane = laneRef.current;
-        const mn = spreadMinRef.current;
-        const range = spreadRangeRef.current;
-        // 1) Ideal-Ziel je Token: x score-getrieben (Start links → Ziel rechts, min-max des
-        //    Runden-Fensters → volle Breite pro Etappe), y = feste Lane (Nachbarn bleiben lesbar).
+        const fm = fmaxRef.current;
+        // 1) Ideal-Ziel je Token: x = ABSOLUTER Fortschritt (animScore/finalMax → langsamer
+        //    Vorstoß über alle Runden), y = feste Lane (Nachbarn bleiben lesbar).
         const P: { t: RT; r: number; x: number; y: number }[] = [];
         for (const t of rtRef.current) {
           const y = lane.get(t.code) ?? CY;
-          const p = range > 0.001 ? Math.max(0, Math.min(1, (t.animScore - mn) / range)) : 0;
+          const p = Math.max(0, Math.min(1, t.animScore / fm));
           P.push({ t, r: radiusOf(t), x: X_START + (X_GOAL - X_START) * p, y });
         }
         // 2) Kollisions-Relaxation: Überlappungen paarweise auseinanderdrücken (deterministisch
@@ -192,12 +234,33 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
             }
           }
         }
-        // 3) In die Planche klemmen + anwenden.
+        // 3) In die Planche klemmen + anwenden + Live-Position merken.
+        const pos = posRef.current;
         for (const p of P) {
           const x = Math.max(PX0 + p.r + 2, Math.min(PX1 - p.r - 2, p.x));
           const y = Math.max(BAND_TOP, Math.min(BAND_BOT, p.y));
+          pos.set(p.t.idx, { x, y, r: p.r });
           const el = gRefs.current.get(p.t.idx);
           if (el) el.setAttribute("transform", `translate(${x} ${y})`);
+        }
+        // 3b) GEFECHT: laufend beschießt ein Fechter seinen nächsten Nachbarn — die Klinge
+        //     kreuzt die Lane, Klirr-Funke am Treffpunkt. Rate-limitiert (~5/s) für Action
+        //     ohne Flimmern; Score bleibt Wahrheit (reine Deko, keine Positions-/Punkt-Wirkung).
+        clashAcc += dt;
+        if (clashAcc > 190 && P.length > 1 && fxRef.current && !reducedRef.current) {
+          clashAcc = 0;
+          const a = P[Math.floor(Math.random() * P.length)]!;
+          let b: (typeof P)[number] | null = null;
+          let bd = Infinity;
+          for (const q of P) {
+            if (q === a) continue;
+            const d = Math.hypot(q.x - a.x, q.y - a.y);
+            if (d < bd) {
+              bd = d;
+              b = q;
+            }
+          }
+          if (b && bd < 150) clash(a.x, a.y, b.x, b.y);
         }
         // Ghost der Vorrunde („Was ist passiert?"): sitzt an der Runden-START-Position
         // (idealOf(roundStartScore)); die Lücke Ghost→Token = der Zug nach innen in dieser
@@ -483,6 +546,9 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
             </g>
           );
         })}
+
+      {/* Gefecht-FX (kreuzende Klingen + Klirr-Funken) — imperativ befüllt, über den Token. */}
+      <g ref={fxRef} pointerEvents="none" />
 
       {/* stabiler Key-Anker für die Flash-Gruppe (verhindert Rest-Animationen) */}
       <g data-flash-key={flashKey} />

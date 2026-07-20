@@ -78,6 +78,7 @@ export default function CourtField(props: DisciplineFieldProps): ReactNode {
     rt,
     sorted,
     now,
+    finalMax,
     courtMedian,
     courtMax,
     courtHotFloor,
@@ -100,7 +101,10 @@ export default function CourtField(props: DisciplineFieldProps): ReactNode {
   const arcMaxR = Math.min(baseY - hoopY, baseHalf) * 0.95;
   const localTokenPos = (t: RT, score: number): { x: number; y: number } => {
     const n = Math.max(1, rt.length);
-    const norm = courtMax > 0 ? Math.max(0, Math.min(1, score / courtMax)) : 0;
+    // Nähe zum Korb = ABSOLUTER Fortschritt (score/finalMax), NICHT courtMax (= Max der bisher
+    // Geworfenen → sonst steht der Führende schon in Runde 1 am Korb). So braucht der Vorstoß
+    // die vollen Runden bis zum Ring; bei Runde 1/6 sind alle noch weit außen am Bogen.
+    const norm = finalMax > 0 ? Math.max(0, Math.min(1, score / finalMax)) : 0;
     const radius = arcMaxR * (0.18 + (1 - norm) * 0.82); // Führender ~0.18·R (am Ring), Letzter = R
     const laneFrac = n > 1 ? t.laneIdx / (n - 1) : 0.5;
     const ang = (laneFrac - 0.5) * (Math.PI * 0.86); // ±77° Fächer unter dem Korb
