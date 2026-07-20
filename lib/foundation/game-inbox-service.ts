@@ -25,7 +25,7 @@ import { isTeamMatchdayLineupComplete, isTeamMatchdayLineupSubmitted } from "@/l
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { listOpenSponsorEvents } from "@/lib/sponsor/sponsor-event-service";
 import { getTransferWindowStatus } from "@/lib/market/transfer-window-policy";
-import { hasPersistedTeamCaptain } from "@/lib/morale/team-captain-service";
+import { buildCaptainCandidateProfiles, hasPersistedTeamCaptain } from "@/lib/morale/team-captain-service";
 
 export type GameInboxTargetView =
   | "home"
@@ -641,6 +641,40 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           createdAt,
         }),
       );
+
+      // Hinweis "besserer Kapitän verfügbar": nur wenn bereits ein Kapitän gesetzt ist und
+      // ein Kader-Spieler rein von den Werten deutlich stärker führen würde (Delta ≥ 8).
+      if (captainSet) {
+        const currentCaptain = (input.gameState.teamCaptains ?? []).find(
+          (entry) => entry.seasonId === input.gameState.season.id && entry.teamId === team.teamId,
+        );
+        const bestCandidate = buildCaptainCandidateProfiles(input.gameState, team.teamId)[0] ?? null;
+        if (
+          currentCaptain &&
+          bestCandidate &&
+          bestCandidate.playerId !== currentCaptain.playerId &&
+          bestCandidate.leadershipScore - currentCaptain.leadershipScore >= 8
+        ) {
+          items.push(
+            createItem({
+              itemId: `captain_upgrade:${input.saveId}:${input.gameState.season.id}:${team.teamId}`,
+              saveId: input.saveId,
+              seasonId: input.gameState.season.id,
+              teamId: team.teamId,
+              category: "task",
+              severity: "info",
+              status: "open",
+              title: "Stärkerer Kapitän verfügbar",
+              description: `${team.shortCode}: ${bestCandidate.playerName} hätte als Kapitän stärkere Führungswerte als ${currentCaptain.playerName}.`,
+              targetView: "home",
+              targetParams: { team: team.teamId, panel: "captain-picker" },
+              ctaLabel: "Kapitän prüfen",
+              source: "team_captain_upgrade",
+              createdAt,
+            }),
+          );
+        }
+      }
     }
 
     const formCardUsageAudit = buildFormCardSeasonUsageAudit(input.gameState, input.gameState.season.id).rows.find(

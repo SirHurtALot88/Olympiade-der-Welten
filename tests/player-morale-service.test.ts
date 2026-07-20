@@ -61,6 +61,20 @@ function createPlayer(id: string, partial?: Partial<Player>): Player {
   };
 }
 
+function captainRecord(input: { seasonId: string; teamId: string; playerId: string; playerName: string }): GameState["teamCaptains"][number] {
+  return {
+    seasonId: input.seasonId,
+    teamId: input.teamId,
+    playerId: input.playerId,
+    playerName: input.playerName,
+    leadershipScore: 40,
+    style: "leader",
+    effects: { moraleBuffer: 2, rivalryPressureReductionPct: 8, teamPowerModifierPct: 3, conflictSoftenChancePct: 12 },
+    traitSignals: [],
+    source: "manual_assignment",
+  };
+}
+
 function createRosterEntry(playerId: string, partial?: Partial<RosterEntry>): RosterEntry {
   return {
     id: partial?.id ?? `roster:${partial?.teamId ?? "M-M"}:${playerId}`,
@@ -580,5 +594,42 @@ describe("player morale service", () => {
     });
 
     expect(otherTeamMorale?.morale ?? 0).toBeLessThan(sameTeamMorale?.morale ?? 100);
+  });
+
+  it("gives the appointed team captain a morale boost", () => {
+    const player = createPlayer("p-cap", { name: "Cap", traitsPositive: ["Ambitious"] });
+    const gameState = createGameState({ player, seasonId: "season-2" });
+    gameState.teamCaptains = [captainRecord({ seasonId: "season-2", teamId: "M-M", playerId: player.id, playerName: player.name })];
+
+    const withCaptain = assessPlayerMorale({ gameState, playerId: player.id, teamId: "M-M" });
+    const boost = withCaptain?.reasons.find((reason) => reason.reasonId === "team_captain_role_boost");
+    expect(boost?.valueDelta).toBe(6);
+  });
+
+  it("hits a deposed ego captain with a heavy morale malus the following season", () => {
+    const player = createPlayer("p-ego", { name: "Ego", traitsNegative: ["Egomaniac"] });
+    const gameState = createGameState({ player, seasonId: "season-2" });
+    // Kapitän der Vorsaison war der Ego-Spieler, diese Saison führt ein anderer.
+    gameState.teamCaptains = [
+      captainRecord({ seasonId: "season-1", teamId: "M-M", playerId: player.id, playerName: player.name }),
+      captainRecord({ seasonId: "season-2", teamId: "M-M", playerId: "mate", playerName: "Mate" }),
+    ];
+
+    const deposed = assessPlayerMorale({ gameState, playerId: player.id, teamId: "M-M" });
+    const malus = deposed?.reasons.find((reason) => reason.reasonId === "team_captain_deposed");
+    expect(malus?.valueDelta).toBe(-15);
+  });
+
+  it("does not penalise a deposed captain without captaincy-claiming traits", () => {
+    const player = createPlayer("p-humble", { name: "Humble", traitsPositive: ["Loyal"], traitsNegative: [] });
+    const gameState = createGameState({ player, seasonId: "season-2" });
+    gameState.teamCaptains = [
+      captainRecord({ seasonId: "season-1", teamId: "M-M", playerId: player.id, playerName: player.name }),
+      captainRecord({ seasonId: "season-2", teamId: "M-M", playerId: "mate", playerName: "Mate" }),
+    ];
+
+    const deposed = assessPlayerMorale({ gameState, playerId: player.id, teamId: "M-M" });
+    const malus = deposed?.reasons.find((reason) => reason.reasonId === "team_captain_deposed");
+    expect(malus).toBeUndefined();
   });
 });

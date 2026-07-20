@@ -311,23 +311,6 @@ export function useFoundationCrossTabSeasonBriefing(input: {
         progress: `${rosterCount} Spieler`,
       },
       {
-        stepId: "appoint_captain",
-        title: "Kapitän wählen",
-        kicker: "Führung",
-        detail: "Ernenne einen Saison-Kapitän — Moral-Puffer, Team-Power und Rivalitäts-Druck hängen davon ab.",
-        targetLabel: "Office öffnen",
-        targetView: "home",
-        status: getResolvedStatus(
-          "appoint_captain",
-          Boolean(
-            input.gameState.teamCaptains?.some(
-              (entry) => entry.seasonId === input.gameState.season.id && entry.teamId === selectedTeam.teamId,
-            ),
-          ),
-        ),
-        progress: "Saison-Rolle",
-      },
-      {
         stepId: "first_transfers",
         title: "Erste Transfers",
         kicker: "Markt",
@@ -359,6 +342,23 @@ export function useFoundationCrossTabSeasonBriefing(input: {
         targetView: "trainingV2",
         status: getResolvedStatus("training_facilities", hasTrainingIntent),
         progress: facilityUpgradeCount > 0 ? `${facilityUpgradeCount} Upgrades` : "offen",
+      },
+      {
+        stepId: "appoint_captain",
+        title: "Kapitän wählen",
+        kicker: "Führung",
+        detail: "Ernenne einen Saison-Kapitän — Moral-Puffer, Team-Power und Rivalitäts-Druck hängen davon ab.",
+        targetLabel: "Office öffnen",
+        targetView: "home",
+        status: getResolvedStatus(
+          "appoint_captain",
+          Boolean(
+            input.gameState.teamCaptains?.some(
+              (entry) => entry.seasonId === input.gameState.season.id && entry.teamId === selectedTeam.teamId,
+            ),
+          ),
+        ),
+        progress: "Saison-Rolle",
       },
       {
         stepId: "choose_sponsor",
