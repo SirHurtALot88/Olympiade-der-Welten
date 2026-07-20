@@ -2596,12 +2596,10 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             <FieldComp {...fieldCtx} />
           </svg>
 
-          {/* Score-Pops */}
-          {pops.map((p) => (
-            <div key={p.id} className="oly-anim" style={{ position: "absolute", left: `${p.xPct}%`, top: `${p.yPct}%`, fontWeight: 800, fontSize: 22, color: p.mine ? "var(--nl-accent)" : "var(--nl-warn)", textShadow: "0 2px 8px rgba(0,0,0,.6)", pointerEvents: "none", animation: "olyPop .9s ease forwards" }}>
-              +{fmt1(p.net)}
-            </div>
-          ))}
+          {/* Score-Pops (#207): die großen hochzählenden +N-Zahlen irritieren und bügeln
+              über das Feld — entfernt. Der Wert steht live in der Rangliste, den Zugewinn
+              zeigt der Ghost der Vorrunde direkt am Token. Highlights kommen als
+              Zoom-Slowdown (#208), nicht als Popup. */}
           {/* Splitter (Boni grün / Mali rot) */}
           {frags.map((f) => (
             <div key={f.id} className="oly-anim" style={{ position: "absolute", left: `${f.xPct}%`, top: `${f.yPct}%`, fontWeight: 800, fontSize: 12, color: f.sign < 0 ? "var(--nl-risk)" : "var(--nl-good)", pointerEvents: "none", whiteSpace: "nowrap", animation: "olyFrag .85s ease forwards" }}>

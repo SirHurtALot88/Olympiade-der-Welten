@@ -52,6 +52,9 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
   // Per-Token-Gleit-Zustand (idx → Glide) und die DOM-<g>-Refs (imperative Bewegung).
   const glideRef = useRef<Map<number, Glide>>(new Map());
   const gRefs = useRef<Map<number, SVGGElement | null>>(new Map());
+  // „Was geht ab?"-Schicht: Ghost-Marker (wo das Team letzte Runde stand) — wird
+  // imperativ an fromLen (Glide-Start) positioniert; der Abstand zum Token = Zugewinn.
+  const ghostRefs = useRef<Map<number, SVGGElement | null>>(new Map());
   // Frische Prop-Spiegel für die rAF-Schleife (ohne Neustart).
   const hoverRef = useRef<number | null>(hoverIdx);
   hoverRef.current = hoverIdx;
@@ -137,6 +140,21 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
           if (el) {
             const p = placeAt(t, st.len, PER);
             el.setAttribute("transform", `translate(${p.x} ${p.y})`);
+          }
+          // Ghost der Vorrunde: sitzt am Glide-Start (fromLen). Sichtbar solange sich das
+          // Token noch bewegt (glideT<1); die Lücke Ghost→Token zeigt den Rundenzugewinn.
+          // Eigenes Team deutlich, andere dezent. Bei Bewegungsende ausgeblendet.
+          const gel = ghostRefs.current.get(t.idx);
+          if (gel) {
+            const moved = Math.abs(st.toLen - st.fromLen) > 2 && st.glideT < 0.995;
+            if (moved && !reduce) {
+              const gp = placeAt(t, st.fromLen, PER);
+              const op = (t.isOwn ? 0.6 : 0.28) * (1 - st.glideT * 0.7);
+              gel.setAttribute("transform", `translate(${gp.x} ${gp.y})`);
+              gel.setAttribute("opacity", String(op));
+            } else {
+              gel.setAttribute("opacity", "0");
+            }
           }
         }
       }
@@ -243,12 +261,35 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
         </text>
       ) : null}
 
+      {/* Ghost-Schicht (VOR den Token): wo jedes Team letzte Runde stand. Position +
+          Opazität setzt die rAF-Schleife; die Lücke zum Token zeigt den Zugewinn. */}
+      {sorted.map((t) => {
+        const r = t.isOwn ? geo.rOwn : geo.r;
+        const hue = hueForIdx(t.idx);
+        return (
+          <g
+            key={`ghost-${t.code}`}
+            ref={(el) => {
+              ghostRefs.current.set(t.idx, el);
+            }}
+            opacity={0}
+            style={{ pointerEvents: "none" }}
+          >
+            <circle r={r} fill="none" stroke={t.isOwn ? "var(--nl-accent)" : `hsl(${hue} 55% 60%)`} strokeWidth={t.isOwn ? 2 : 1.3} strokeDasharray="2 3" />
+          </g>
+        );
+      })}
+
       {/* Token — Position imperativ via rAF (transform), Marker per Reveal. In Rang-
           Reihenfolge rückwärts, damit der Führende oben liegt (wie der Host). */}
       {sorted
         .slice()
         .reverse()
         .map((t) => {
+          // Rang-Δ zur Vorrunde (rankHistory: Rang nach jeder gewerteten Etappe).
+          const prevRank = t.rankHistory.length ? t.rankHistory[t.rankHistory.length - 1]! : t.rank;
+          const dRank = prevRank - t.rank; // >0 = verbessert
+          const showBadge = t.isOwn || t.rank <= 3 || hoverIdx === t.idx;
           const r = t.isOwn ? geo.rOwn : geo.r;
           const hue = hueForIdx(t.idx);
           const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
@@ -269,6 +310,10 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
               }}
             >
               {glowing ? <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={4} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.1s ease-in-out infinite" }} /> : null}
+              {/* Eigen-Team-Anker: dauerhafter, weicher Akzent-Puls — man findet sich immer. */}
+              {t.isOwn ? (
+                <circle r={r + 6} fill="none" stroke="var(--nl-accent)" strokeWidth={2} opacity={0.9} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.6s ease-in-out infinite" }} />
+              ) : null}
               {/* Staffelstab-Übergabe (FEATURE 1): kurzer Funke (Strich + →) auf der Vorderkante
                   des Tokens, der beim Etappen-Glide nach vorn gereicht wird. Eigenes Team heller
                   (Akzent), andere gedämpft. Token-lokal, kollidiert nicht mit dem späteren,
@@ -292,10 +337,17 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
                   🏆
                 </text>
               ) : null}
-              {t.isOwn ? (
-                <text y={r + 15} textAnchor="middle" fontSize={13} fontWeight={800} fill="var(--nl-accent)">
-                  ★ {t.code}
-                </text>
+              {/* Rang-Badge + Δ-Pfeil zur Vorrunde (eigenes Team, Podest, oder gehovert).
+                  Macht die Position direkt am Token lesbar — ohne Blick zur Seitentabelle. */}
+              {showBadge ? (
+                <g transform={`translate(0 ${r + 13})`}>
+                  <text textAnchor="middle" fontSize={11.5} fontWeight={900} fill={t.isOwn ? "var(--nl-accent)" : t.rank === 1 ? "var(--nl-warn)" : "var(--nl-ink)"}>
+                    {t.isOwn ? "★ " : ""}#{t.rank}
+                    {dRank !== 0 ? (
+                      <tspan fill={dRank > 0 ? "var(--nl-good)" : "var(--nl-risk)"}> {dRank > 0 ? "▲" : "▼"}{Math.abs(dRank)}</tspan>
+                    ) : null}
+                  </text>
+                </g>
               ) : null}
             </g>
           );
