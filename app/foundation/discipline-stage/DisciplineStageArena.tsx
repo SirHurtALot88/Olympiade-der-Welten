@@ -753,8 +753,29 @@ export default function DisciplineStageArena({
   );
 
   const payload = useMemo(() => {
-    // Echter Season-Tabellenrang je Team → Bahn-/Turm-Reihenfolge in der Arena.
+    // Echter Season-Tabellenrang je Team → Bahn-/Turm-Reihenfolge in der Arena
+    // (bester Saisonstand = Slot 1 oben, schlechtester = Slot 32 unten).
+    // ROBUST: StandingRecord.rank ist optional (kann null sein, während points steht).
+    // War rank null, fiel seasonRank auf undefined → die Arena nutzte dann die Team-
+    // Array-Reihenfolge (nach Stärke/Ergebnis) → perfekte Diagonale („Sieger immer oben").
+    // Deshalb den Rang notfalls aus den points ableiten, damit die Bahn IMMER dem
+    // Saisonstand folgt (und das Disziplin-Ergebnis quer über die Bahnen streut).
     const standings = gameState.seasonState?.standings;
+    const seasonRankByTeam = new Map<string, number>();
+    if (standings) {
+      const rows = Object.entries(standings);
+      const missingRank = rows.some(([, r]) => r.rank == null);
+      if (missingRank) {
+        rows
+          .slice()
+          .sort((a, b) => (b[1].points ?? 0) - (a[1].points ?? 0) || a[0].localeCompare(b[0]))
+          .forEach(([tid], i) => seasonRankByTeam.set(tid, i + 1));
+      } else {
+        rows.forEach(([tid, r]) => seasonRankByTeam.set(tid, r.rank as number));
+      }
+    }
+    const seasonRankOf = (teamId?: string | null): number | undefined =>
+      teamId != null ? seasonRankByTeam.get(teamId) : undefined;
     const slotCount = useEngine
       ? engineTeams!.reduce((max, t) => Math.max(max, t.players.length), 0) || model.slotCount
       : model.slotCount;
@@ -764,7 +785,7 @@ export default function DisciplineStageArena({
           name: t.name,
           logoUrl: t.logoUrl,
           teamId: t.teamId,
-          seasonRank: standings?.[t.teamId]?.rank ?? undefined,
+          seasonRank: seasonRankOf(t.teamId),
           // Engine-Modus: Netto = val + Σmods trägt bereits die volle Engine-Zerlegung.
           players: t.players.map((p) => ({
             playerId: p.playerId,
@@ -781,7 +802,7 @@ export default function DisciplineStageArena({
           name: t.name,
           logoUrl: t.logoUrl,
           teamId: t.teamId,
-          seasonRank: standings?.[t.teamId]?.rank ?? undefined,
+          seasonRank: seasonRankOf(t.teamId),
           players: t.slots.map((s) => ({
             playerId: s.playerId,
             val: s.base,

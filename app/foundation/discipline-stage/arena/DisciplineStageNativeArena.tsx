@@ -1117,11 +1117,15 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   // Läufer-Karte + Ticker immer sichtbar bleiben (Feld nie höher als die 32er-Rangliste).
   // Gilt für alle Primitives — geteilte Layout-Regel.
   const ladderRef = useRef<HTMLDivElement | null>(null);
-  const [fieldMaxH, setFieldMaxH] = useState<number | null>(null);
+  // Rangliste (rechts) soll auf GLEICHER HÖHE enden wie die Arena-Hauptspalte (links):
+  // wir messen die Hauptspalte und kappen die Ladder darauf (intern scrollbar). Früher
+  // war es umgekehrt (Arena an Ladder gekappt) → die Ladder ragte über die Arena hinaus.
+  const mainColRef = useRef<HTMLDivElement | null>(null);
+  const [ladderMaxH, setLadderMaxH] = useState<number | null>(null);
   useLayoutEffect(() => {
-    const el = ladderRef.current;
+    const el = mainColRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
-    const measure = () => setFieldMaxH(Math.round(el.getBoundingClientRect().height) || null);
+    const measure = () => setLadderMaxH(Math.round(el.getBoundingClientRect().height) || null);
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
@@ -2657,7 +2661,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       `}</style>
 
       {/* Hauptspalte: Controls · MyTracker · Oval · Ticker */}
-      <div style={{ flex: "1 1 620px", minWidth: 0, order: 1 }}>
+      <div ref={mainColRef} style={{ flex: "1 1 620px", minWidth: 0, order: 1 }}>
         {/* Controls */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
           <button type="button" onClick={() => { setStarted(true); advance(); }} disabled={done || busy} style={{ padding: "9px 18px", fontWeight: 800, fontSize: 13, border: 0, borderRadius: 10, cursor: done || busy ? "default" : "pointer", color: "var(--nl-ink)", background: done ? "var(--nl-line)" : "var(--nl-accent)", opacity: busy && !done ? 0.7 : 1 }}>
@@ -2870,7 +2874,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
 
         {/* Oval-Track + Overlays */}
         <div className={shake !== "none" ? "oly-anim" : undefined} style={{ position: "relative", borderRadius: 14, overflow: "hidden", border: "1px solid var(--nl-line)", background: "var(--nl-bg)", animation: shake === "hard" ? "olyShakeHard .44s ease" : shake === "soft" ? "olyShakeSoft .3s ease" : undefined }}>
-          <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "auto", maxHeight: fieldMaxH ? fieldMaxH : "calc(100vh - 220px)", display: "block", margin: "0 auto", transform: photoFinish ? "scale(1.6)" : zoom ? `scale(${zoom.scale})` : undefined, transformOrigin: photoFinish ? "26% 11%" : zoom ? `${zoom.ox}% ${zoom.oy}%` : "26% 11%", transition: reduced.current ? undefined : "transform .6s cubic-bezier(.3,0,.2,1)" }}>
+          <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "auto", maxHeight: "calc(100vh - 220px)", display: "block", margin: "0 auto", transform: photoFinish ? "scale(1.6)" : zoom ? `scale(${zoom.scale})` : undefined, transformOrigin: photoFinish ? "26% 11%" : zoom ? `${zoom.ox}% ${zoom.oy}%` : "26% 11%", transition: reduced.current ? undefined : "transform .6s cubic-bezier(.3,0,.2,1)" }}>
             <FieldComp {...fieldCtx} />
           </svg>
 
@@ -3261,7 +3265,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       </div>
 
       {/* Live-Ladder rechts */}
-      <div ref={ladderRef} data-testid="arena-ladder" style={{ flex: "0 0 340px", minWidth: 300, maxHeight: done ? undefined : "calc(100vh - 130px)", overflowY: done ? "visible" : "auto", overscrollBehavior: "contain", background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 10, position: done ? "static" : "sticky", top: done ? undefined : 12, order: 2 }}>
+      <div ref={ladderRef} data-testid="arena-ladder" style={{ flex: "0 0 340px", minWidth: 300, maxHeight: ladderMaxH ?? (done ? undefined : "calc(100vh - 130px)"), overflowY: "auto", overscrollBehavior: "contain", background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 10, position: done ? "static" : "sticky", top: done ? undefined : 12, order: 2 }}>
         <div style={{ fontSize: 11, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
           <span>{prim === "barbell" ? (done ? "Endstand" : "Rangliste · live") : done ? "Endstand" : "Rundenstand — live"}</span>
           {prim === "barbell" && !done ? <span style={{ marginLeft: "auto", fontFamily: "ui-monospace, monospace", fontSize: 9, color: "var(--nl-mut)", fontWeight: 700 }}>{barbellLive} im Wettkampf</span> : null}
