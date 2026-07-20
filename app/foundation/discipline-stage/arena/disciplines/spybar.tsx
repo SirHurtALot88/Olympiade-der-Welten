@@ -145,8 +145,15 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
   }
   const fogX = Math.min(X_END - 40, maxX + 30);
 
+  // Die Sektor-Szene ist für FIELD_W×FIELD_H (900×640) gezeichnet, die echte viewBox ist
+  // aber 1180×640 → ohne Korrektur sitzt alles links, „100%" bei 72% Breite, Titel nicht
+  // zentriert. Uniform skalieren (Radar bleibt rund) + horizontal zentrieren.
+  const sceneS = Math.min(W / FIELD_W, H / FIELD_H);
+  const sceneTX = (W - FIELD_W * sceneS) / 2;
+  const sceneTY = (H - FIELD_H * sceneS) / 2;
+
   return (
-    <>
+    <g transform={`translate(${sceneTX} ${sceneTY}) scale(${sceneS})`}>
       {/* Defs: Gradienten, Pattern, Clip-Paths */}
       <defs>
         {/* Team-Logos clipPath */}
@@ -174,12 +181,19 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
         ) : null}
       </defs>
 
-      {/* Hintergrund */}
-      {env ? (
-        <rect x={0} y={0} width={W} height={H} fill="url(#envSky)" />
-      ) : (
-        <rect x={0} y={0} width={W} height={H} fill={COLORS.bg} />
-      )}
+      {/* Hintergrund — VOLL die echte viewBox decken (die Gruppe ist verschoben/skaliert,
+          also die Deck-Box in Szenen-Koordinaten zurückrechnen, sonst bleiben Ränder leer). */}
+      {(() => {
+        const bx = -sceneTX / sceneS;
+        const by = -sceneTY / sceneS;
+        const bw = W / sceneS;
+        const bh = H / sceneS;
+        return env ? (
+          <rect x={bx} y={by} width={bw} height={bh} fill="url(#envSky)" />
+        ) : (
+          <rect x={bx} y={by} width={bw} height={bh} fill={COLORS.bg} />
+        );
+      })()}
 
       {/* Titel + Status-Text */}
       <text
@@ -570,6 +584,6 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
           }
         }
       `}</style>
-    </>
+    </g>
   );
 }

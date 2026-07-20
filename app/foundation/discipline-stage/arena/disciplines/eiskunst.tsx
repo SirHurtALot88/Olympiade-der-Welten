@@ -52,9 +52,10 @@ export default function EiskunstField(props: DisciplineFieldProps): ReactNode {
   const scaleY = H / LH;
   const scale = Math.min(scaleX, scaleY);
 
-  // Center + ellipse radii (from mockup)
-  const CX = 450 * scale;
-  const CY = 330 * scale;
+  // Center + ellipse radii. Zentrum = ECHTE viewBox-Mitte (nicht 450*scale) — sonst sitzt
+  // die ganze Eis-Szene links, weil scale=min(W/900,H/660)≈0.97 CX auf ~436 statt 590 legt.
+  const CX = W / 2;
+  const CY = H / 2;
   const RX = 328 * scale;
   const RY = 222 * scale;
 

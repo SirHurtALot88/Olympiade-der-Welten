@@ -36,12 +36,15 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
   } = props;
   const trioSet = new Set(highlightIdxs ?? []);
 
-  // Geometrie: Rink-Feld skaliert auf W×H (Mockup: 820×520)
+  // Geometrie: das Rink ist im Mockup-Raum 820×520 gezeichnet, die echte viewBox ist 1180×560.
+  // Die ganze Szene wird uniform skaliert (Kreise bleiben rund) + zentriert in eine Gruppe
+  // gewickelt — sonst quetscht sich das Feld in die linken ~70% und rechts bleibt totes Eis
+  // (die früher berechneten scaleX/scaleY/scale wurden NIE angewandt → toter Code).
   const LW = 820;
   const LH = 520;
-  const scaleX = W / LW;
-  const scaleY = H / LH;
-  const scale = Math.min(scaleX, scaleY);
+  const sceneS = Math.min(W / LW, H / LH);
+  const sceneTX = (W - LW * sceneS) / 2;
+  const sceneTY = (H - LH * sceneS) / 2;
 
   // Rink-Koordinaten im Mockup-Space (820×520)
   const topLane = 46;
@@ -80,7 +83,9 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
       const lead = sortedRef.current[0];
       const el = puckRef.current;
       if (el && lead && !frozen) {
-        el.setAttribute("cx", String(fracX(lead.animScore)));
+        // Puck NEBEN den Führenden setzen (Nose + 5), nicht auf sein Zentrum — sonst liegt er
+        // komplett unter dem Icon und ist unsichtbar.
+        el.setAttribute("cx", String(fracX(lead.animScore) + (lead.isOwn ? geo.rOwn : geo.r) + 5));
         el.setAttribute("cy", String(laneY(lead.idx)));
       }
       raf = requestAnimationFrame(tick);
@@ -98,7 +103,9 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
   const { gRefs, ghostRefs } = useTokenGlide({ ...props, tokenPos });
 
   return (
-    <>
+    <g transform={`translate(${sceneTX} ${sceneTY}) scale(${sceneS})`}>
+      {/* Voll-Bleed-Hallenhintergrund über die ECHTE viewBox (Ecken außerhalb des Rinks). */}
+      <rect x={-sceneTX / sceneS} y={-sceneTY / sceneS} width={W / sceneS} height={H / sceneS} fill="#0d1219" />
       {/* Defs für Eis-Gradient, Kratzer-Pattern, Clippath, und Team-Clippath */}
       <defs>
         <linearGradient id="iceGrad" x1="0" y1="0" x2="0" y2="1">
@@ -190,22 +197,6 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
       {/* Goal Light (top-right corner) — animated on goal */}
       <circle cx={GR + 27} cy="204" r="6.5" fill="#4d1717" stroke="#2c3a49" strokeWidth="2" pointerEvents="none" />
 
-      {/* Puck (follows leader) — Position via rAF (animScore), friert bei Hover/Pause ein. */}
-      <ellipse
-        ref={puckRef}
-        cx={leader ? fracX(leader.animScore) : CX}
-        cy={leader ? laneY(leader.idx) : CY}
-        rx="5.5"
-        ry="3.5"
-        fill="#0c0e11"
-        stroke="#39434f"
-        strokeWidth="1"
-        style={{
-          pointerEvents: "none",
-          filter: "drop-shadow(0 1px 2px rgba(8,16,30,.5)) drop-shadow(0 0 7px rgba(87,177,255,.35))",
-        }}
-      />
-
       {/* Goalie (static, decorative — before the right goal) */}
       <g transform={`translate(${GR + 27} 260)`}>
         <rect x="-10" y="-15" width="20" height="30" rx="7" ry="5" fill="#e9eef4" stroke="#55636f" strokeWidth="1.5" />
@@ -270,6 +261,23 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
           );
         })}
 
+      {/* Puck (folgt dem Führenden) — NACH den Tokens (z-Order, sonst unter dem Icon) und
+          neben ihm platziert; Position via rAF (animScore), friert bei Hover/Pause ein. */}
+      <ellipse
+        ref={puckRef}
+        cx={leader ? fracX(leader.animScore) + (leader.isOwn ? geo.rOwn : geo.r) + 5 : CX}
+        cy={leader ? laneY(leader.idx) : CY}
+        rx="5.5"
+        ry="3.5"
+        fill="#0c0e11"
+        stroke="#39434f"
+        strokeWidth="1"
+        style={{
+          pointerEvents: "none",
+          filter: "drop-shadow(0 1px 2px rgba(8,16,30,.5)) drop-shadow(0 0 7px rgba(87,177,255,.35))",
+        }}
+      />
+
       <style>{`
         @keyframes olyGlowPulse {
           0%, 100% {
@@ -282,6 +290,6 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
           }
         }
       `}</style>
-    </>
+    </g>
   );
 }
