@@ -1,4 +1,4 @@
-import type { GameState, SponsorCommercialRating, SponsorStarTier } from "@/lib/data/olyDataTypes";
+import type { GameState, SponsorCommercialRating, SponsorRarity } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows, type TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 import { computeSponsorTeamQualityRank } from "@/lib/sponsor/sponsor-team-quality-rank";
 
@@ -56,12 +56,17 @@ function computePrestigeScore(row: TeamManagementSnapshotRow, identityAmbition: 
   return clamp(medalScore + ambitionBonus, 0, 20);
 }
 
-function scoreToTierHint(score: number): SponsorStarTier {
-  if (score >= 86) return 5;
-  if (score >= 71) return 4;
-  if (score >= 51) return 3;
-  if (score >= 26) return 2;
-  return 1;
+/**
+ * Rarity-Erwartung aus dem Kommerz-Score. Baked from the old score→★-tier→rarity composition (score>=86 was
+ * ★5→legendär, >=71 was ★4→selten, >=51 was ★3→magisch, everything below folded into gewöhnlich either way
+ * — the old ★2/★1 split at 26 never affected the resulting rarity), so the breakpoints below reproduce the
+ * exact same rarity for every score.
+ */
+function scoreToRarityHint(score: number): SponsorRarity {
+  if (score >= 86) return "legendär";
+  if (score >= 71) return "selten";
+  if (score >= 51) return "magisch";
+  return "gewöhnlich";
 }
 
 export function buildSponsorCommercialRating(input: {
@@ -103,7 +108,8 @@ export function buildSponsorCommercialRating(input: {
 
   return {
     score,
-    tierHint: scoreToTierHint(score),
+    // Treibt "Erwartung: {rarity}" in der UI direkt.
+    rarityHint: scoreToRarityHint(score),
     breakdown: {
       recentPerformance: Number(recentPerformance.toFixed(1)),
       rosterPotential: Number(rosterPotential.toFixed(1)),

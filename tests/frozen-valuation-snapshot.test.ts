@@ -303,4 +303,39 @@ describe("frozen valuation snapshot", () => {
     expect(isValuationFrozen(nextSeason)).toBe(false);
     expect(getFrozenRatingRowsMap(nextSeason)).toBeNull();
   });
+
+  it("ignoreFreeze recomputes live so season-end development yields a non-zero before/after OVR delta while sales stay frozen", () => {
+    const base = createGameState({ gamePhase: "season_active" });
+    // Freeze window during the season-end player-development step (post-MD10, pre next-season transition).
+    const dev = { ...freeze(base), gamePhase: "player_development" as const } as GameState;
+    expect(isValuationFrozen(dev)).toBe(true);
+
+    const grownId = "p8";
+    // A season-end progression that actually grew the player's core stats.
+    const grownState = {
+      ...dev,
+      players: dev.players.map((player) =>
+        player.id === grownId
+          ? { ...player, coreStats: { pow: 95, spe: 95, men: 95, soc: 95 } }
+          : player,
+      ),
+    } as GameState;
+
+    // FIX — the progression audit's freeze-BYPASS: before/after are computed LIVE from the actual
+    // (swapped) players, so a grown player produces a real, non-zero development delta.
+    const baselineLiveOvr = buildPlayerRatingContractMap(dev, undefined, { ignoreFreeze: true }).get(grownId)!
+      .ovrNormalized;
+    const grownLiveOvr = buildPlayerRatingContractMap(grownState, undefined, { ignoreFreeze: true }).get(grownId)!
+      .ovrNormalized;
+    expect(baselineLiveOvr).not.toBeNull();
+    expect(grownLiveOvr).not.toBeNull();
+    expect(grownLiveOvr).not.toBe(baselineLiveOvr);
+    expect(grownLiveOvr! - baselineLiveOvr!).toBeGreaterThan(0);
+
+    // REGRESSION GUARD — without the bypass the sales window stays frozen: both reads collapse to the
+    // MD10 snapshot row (keyed by playerId) → delta ≡ 0. This is the correct locked-stat sales behaviour.
+    const frozenBaseline = buildPlayerRatingContractMap(dev).get(grownId)!.ovrNormalized;
+    const frozenGrown = buildPlayerRatingContractMap(grownState).get(grownId)!.ovrNormalized;
+    expect(frozenGrown).toBe(frozenBaseline);
+  });
 });

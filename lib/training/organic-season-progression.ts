@@ -7,7 +7,13 @@ import type {
   PlayerPotentialRecord,
   TeamFacilityCollection,
 } from "@/lib/data/olyDataTypes";
-import { getFacilityEfficiency, getFacilityLevel, getRecoveryTrainingFatigueReductionPct } from "@/lib/facilities/facility-effects";
+import {
+  getAcademyDevelopmentBoostPct,
+  getFacilityEfficiency,
+  getFacilityLevel,
+  getRecoveryTrainingFatigueReductionPct,
+} from "@/lib/facilities/facility-effects";
+import { getFacilityLevelDefinition } from "@/lib/facilities/facility-catalog";
 import {
   deriveAttributeAffinityProfile,
   getAttributeAffinityKind,
@@ -16,7 +22,6 @@ import {
 } from "@/lib/training/training-levelup-service";
 import {
   getCombinedAttributeTrainingMultiplier,
-  getPotentialGapXpFactor,
 } from "@/lib/foundation/player-potential-display-service";
 import {
   getAttributeHeadroom,
@@ -39,7 +44,7 @@ import { buildPlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scou
 import { getTeamDevelopmentTendency } from "@/lib/foundation/team-development-tendency";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
-import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
+import type { PlayerProgressionRatingTier, PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import { FATIGUE_LOAD_BY_MODE, TRAINING_SETPOINTS_BY_MODE } from "@/lib/training/training-mode-presentation";
 import { getDevelopmentRouteBonusMultiplier } from "@/lib/training/development-route-bonus";
 import type { PlayerDevelopmentRouteSuggestion } from "@/lib/progression/player-potential-service";
@@ -127,8 +132,10 @@ export type OrganicRegressionBreakdown = {
 };
 
 /** Tunable via scripts/long-run-auto-tune-organic.ts (--apply regression scale). */
-export const ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE = 0.28;
-const TRAINING_CENTER_LEVEL_MODIFIER_PCT = [0, 14, 28, 42, 56, 70] as const;
+// 0,28 → 0,30: flacher Standard-Verlust leicht angehoben (+0,02/Attr × 12 ≈ +0,24 Verlust/Spieler/Saison),
+// damit der gap-getriebene Beschleuniger den Liga-Ø-Netto nicht über die Zieldecke drückt — der Peak-
+// Korridor (Talente) bleibt im Band, aber der Durchschnittsspieler sinkt zurück auf ~0,25 (Ziel −0,4…0,4).
+export const ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE = 0.3;
 /** 0,7 % vom Marktwert pro Attribut (nicht MVS). Tunable via auto-tune. */
 export const ORGANIC_MARKET_VALUE_PRESSURE_RATE = 0.0102;
 /**
@@ -248,9 +255,27 @@ function getFacilityTrainingModifierPct(
 ) {
   const level = getFacilityLevel(facilities, "training_center");
   const efficiencyPct = getFacilityEfficiency(facilities, "training_center").efficiencyPct;
-  const levelModifier = TRAINING_CENTER_LEVEL_MODIFIER_PCT[level] ?? TRAINING_CENTER_LEVEL_MODIFIER_PCT.at(-1)!;
+  // Single Source of Truth: der real angewandte Level-Modifier stammt AUSSCHLIESSLICH aus dem
+  // Facility-Katalog (getFacilityLevelDefinition) — kein hartkodiertes Zweit-Array mehr, damit
+  // Anzeige (applyTrainingXpFacilityModifiers/Forecasts/UI) und hier angewandter Wert nie divergieren.
+  // Level 0 (nicht gebaut/kaputt) → 0 %; Katalog-Level 1..5 = [14,28,42,56,70] %.
+  const levelModifier = level <= 0 ? 0 : getFacilityLevelDefinition("training_center", level)?.modifierPct ?? 0;
   const developmentBonus = roundValue(developmentTendencyScore * 15, 2);
   return roundValue((levelModifier * efficiencyPct) / 100 + developmentBonus, 2);
+}
+
+/**
+ * F/E/D = Low-Tier-Einstufung eines Spielers (Rating < 45; C beginnt bei 45, siehe
+ * getProgressionRatingTier in season-end-progression-preview.ts). Bewusst inline gehalten, um keinen
+ * Laufzeit-Import auf das schwere season-end-progression-preview-Modul (potenzieller Zyklus) zu ziehen
+ * — nur die stabile Grade-Grenze wird gespiegelt. Grundlage für den Academy-Youth-Dev-Boost (Fix C).
+ */
+function resolveLowTierGrade(rating: number): PlayerProgressionRatingTier {
+  if (!isFiniteNumber(rating)) return "F";
+  if (rating < 15) return "F";
+  if (rating < 30) return "E";
+  if (rating < 45) return "D";
+  return "C";
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -291,20 +316,40 @@ export function getMarktwertForRegression(player: Player) {
   return value > 1000 ? value / 1000 : value;
 }
 
+// Gap-getriebener Entwicklungs-BESCHLEUNIGER (ersetzt das frühere MAX-PO-Band). Die Entwicklungs-
+// GESCHWINDIGKEIT hängt an der LÜCKE (Potenzial − aktuelle Stärke), NICHT am maximalen Potenzial:
+// ein Spieler mit CA 15 / PO 66 (Lücke 51) entwickelt sich schneller als CA 50 / PO 75 (Lücke 25).
+// Das behebt die frühere Inversion, bei der ein niedriges PO-Band (0,72/0,92) den großen-Lücke-Talenten
+// die Entwicklung ausbremste, obwohl sie den meisten Headroom haben.
+//
+// WICHTIG (User-Vorgabe): NUR Beschleuniger, NIE Bremse — der Rückgabewert ist ≥ 1,0. Das Abbremsen nahe
+// der Potenzialgrenze übernimmt AUSSCHLIESSLICH das Erreichen der MAX-Attribute (die per-Attribut-Headroom-
+// Drossel getAttributeGrowthMultiplier + der Ceiling-Clamp weiter unten), damit es KEINE doppelte Bremse gibt.
+//  - gapAccel: bleibt bis zur neutralen Lücke (GAP_NEUTRAL) bei 1,0 → typische Spieler unverändert, Liga-Ø
+//    stabil; darüber linear mit der Lücke, gedeckelt bei GAP_ACCEL_CAP.
+//  - poSteep: bei GLEICHER Lücke pusht ein höheres Potenzial zusätzlich ("je höher das PO desto mehr", ab
+//    PO 70), ebenfalls nur nach oben.
+export const ORGANIC_GAP_ACCEL_NEUTRAL = Number(process.env.OLY_ORGANIC_GAP_ACCEL_NEUTRAL ?? 10) || 10;
+export const ORGANIC_GAP_ACCEL_SLOPE = Number(process.env.OLY_ORGANIC_GAP_ACCEL_SLOPE ?? 0.03) || 0.03;
+export const ORGANIC_GAP_ACCEL_CAP = Number(process.env.OLY_ORGANIC_GAP_ACCEL_CAP ?? 2.6) || 2.6;
+export const ORGANIC_PO_STEEP_DIVISOR = Number(process.env.OLY_ORGANIC_PO_STEEP_DIVISOR ?? 110) || 110;
+
 function getPotentialTrainingMultiplierFromRecord(gameState: GameState, player: Player) {
   const record = resolvePlayerPotentialRecordFromGameState({ gameState, playerId: player.id });
-  const potential = record?.hiddenPotentialScore ?? null;
+  const potential =
+    record?.hiddenPotentialScore ??
+    (isFiniteNumber(player.potential) && player.potential > 0 ? player.potential : null);
   if (potential == null) return 1;
-  // Monotonic non-decreasing in potential: high-potential players (80+) share an elevated
-  // development plateau so genuine talents grow visibly, while mid/low potential develops
-  // slowly (and sub-58 nets below 1.0 so the league median stays roughly flat). This band
-  // structure is what widens peak-P90 vs the median instead of lifting the whole league.
-  if (potential >= 94) return 2.05;
-  if (potential >= 88) return 1.85;
-  if (potential >= 80) return 1.6;
-  if (potential >= 72) return 1.25;
-  if (potential >= 58) return 0.92;
-  return 0.72;
+  const currentAbility = isFiniteNumber(player.rating) ? player.rating : potential;
+  const gap = Math.max(0, potential - currentAbility);
+  // Reiner Beschleuniger: 1,0 bis zur neutralen Lücke, danach linear mit der Lücke, gedeckelt. Nie < 1,0.
+  const gapAccel = Math.min(
+    ORGANIC_GAP_ACCEL_CAP,
+    1 + ORGANIC_GAP_ACCEL_SLOPE * Math.max(0, gap - ORGANIC_GAP_ACCEL_NEUTRAL),
+  );
+  // Höheres Potenzial pusht bei gleicher Lücke zusätzlich (ab PO 70) — auch das nur nach oben (≥ 1,0).
+  const poSteep = 1 + Math.max(0, potential - 70) / ORGANIC_PO_STEEP_DIVISOR;
+  return roundValue(gapAccel * poSteep, 3);
 }
 
 export function normalizePlayerAttributes(player: Player): PlayerGeneratorAttributes | null {
@@ -494,9 +539,6 @@ function buildPerformanceDeltas(gameState: GameState, playerId: string) {
   };
 }
 
-function getPotentialGapTrainingFactor(gapStars: number) {
-  return getPotentialGapXpFactor(gapStars);
-}
 
 function buildOrganicRegressionBreakdown(input: {
   marktwertBase: number;
@@ -696,6 +738,14 @@ export function buildOrganicSeasonProgression(input: {
     ? getTeamDevelopmentTendency({ team: playerTeam, identity: playerIdentity, profile: playerProfile, gmArchetype: playerGmArchetype })
     : null;
   const facilityModifierPct = getFacilityTrainingModifierPct(input.facilities, developmentTendency?.score ?? 0);
+  // Fix C: Academy beschleunigt die organische Entwicklung junger/Low-Tier-Spieler (F/E/D). Bewusst als
+  // separater, gebundener Trainingsbudget-Multiplikator (analog zum training_center-facilityModifierPct),
+  // NUR für berechtigte Spieler > 0. Für C+ oder ohne Academy = 0 (kein Effekt). Bleibt organisch/moderat
+  // (Wachstumsrate, kein Flat-Cap): L1..L5 = [6,12,18,24,30] % × Effizienz (Katalog = einzige Zahlenquelle).
+  const academyDevelopmentBoostPct = getAcademyDevelopmentBoostPct(
+    resolveLowTierGrade(input.player.rating),
+    input.facilities,
+  );
   const primaryTrainingClass =
     normalizeProgressionClassName(input.player.trainingClass) ??
     normalizeProgressionClassName(input.player.className) ??
@@ -714,9 +764,8 @@ export function buildOrganicSeasonProgression(input: {
   });
   const axisStars = buildPlayerAxisStarProfile({ gameState: input.gameState, player: input.player });
   const axisPoStars = potentialRecord?.hiddenPotentialCeilingByAxis ?? null;
-  const potentialGapFactor = getPotentialGapTrainingFactor(starSnapshot.potentialGap);
-  // talent_builder ONLY: an additive lift on the potential band for high-potential players. The GLOBAL
-  // bands (getPotentialTrainingMultiplierFromRecord) stay untouched so the league median / MW economy
+  // talent_builder ONLY: an additive lift on the gap accelerator for high-potential players. The GLOBAL
+  // accelerator (getPotentialTrainingMultiplierFromRecord) stays untouched so the league median / MW economy
   // does not tip — only this GM's own high-potential talents develop faster.
   const talentBuilderPotentialFactor =
     playerGmArchetype === "talent_builder" && potentialRating != null
@@ -729,7 +778,7 @@ export function buildOrganicSeasonProgression(input: {
             : 1
       : 1;
   const potentialTrainingMultiplier =
-    getPotentialTrainingMultiplierFromRecord(input.gameState, input.player) * potentialGapFactor * talentBuilderPotentialFactor;
+    getPotentialTrainingMultiplierFromRecord(input.gameState, input.player) * talentBuilderPotentialFactor;
   const baseTrainingBudget =
     input.accumulatedBaseTrainingBudget != null && Number.isFinite(input.accumulatedBaseTrainingBudget)
       ? input.accumulatedBaseTrainingBudget
@@ -743,7 +792,12 @@ export function buildOrganicSeasonProgression(input: {
     resolveTeamTrainingFocusAxis(input.gameState, input.player.id),
   );
   const trainingSetpoints = roundValue(
-    baseTrainingBudget * traitSignal.trainingTraitMultiplier * potentialTrainingMultiplier * routeBonusMultiplier * (1 + facilityModifierPct / 100),
+    baseTrainingBudget *
+      traitSignal.trainingTraitMultiplier *
+      potentialTrainingMultiplier *
+      routeBonusMultiplier *
+      (1 + facilityModifierPct / 100) *
+      (1 + academyDevelopmentBoostPct / 100),
     2,
   );
   const primaryShare = secondaryTrainingClass ? 0.7 : 1;
@@ -821,7 +875,16 @@ export function buildOrganicSeasonProgression(input: {
       performanceWeightMultiplier;
     const delta = roundValue(regression + training + performanceDelta, 2);
     const before = attributesBefore[attribute];
-    const after = roundValue(clamp(before + delta, 1, 99), 1);
+    // Harte Ceiling-Bindung: Attributwachstum darf das (reconciled) Attribut-Ceiling
+    // nie ueberschreiten. Damit bindet der Potenzial-Cap (v4) tatsaechlich als
+    // Obergrenze und ein Performer wird nicht ueber sein Limit gedrueckt (was sonst
+    // per Round-Over das Ceiling selbst anheben und den Cap aushebeln wuerde).
+    // Ohne bekanntes Ceiling bleibt es bei der bisherigen 99er-Grenze; Sub-Cap-
+    // Wachstum bleibt unveraendert.
+    const attributeCeilingCap = isFiniteNumber(attributeHeadroom.ceiling)
+      ? Math.min(99, attributeHeadroom.ceiling)
+      : 99;
+    const after = roundValue(clamp(before + delta, 1, Math.max(1, attributeCeilingCap)), 1);
     return {
       attribute,
       before,

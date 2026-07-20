@@ -15,7 +15,7 @@ import { buildTeamControlSettingsMap, DEFAULT_ACTIVE_OWNER_ID, getTeamOwner } fr
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { calculateFacilityIncome, calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { FACILITY_CONDITION_WARNING, getFacilityConditionStatus } from "@/lib/facilities/facility-condition";
-import { buildBeliebtheitLeagueContext, computeTeamBeliebtheit } from "@/lib/economy/team-beliebtheit";
+import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
 import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
 import { buildMatchdaySummary } from "@/lib/foundation/matchday-summary";
 import { formatCockpitReason } from "@/lib/foundation/tabs/cockpit-ui-helpers";
@@ -82,17 +82,7 @@ function formatInboxDetail(value: string | null | undefined) {
   return formatCockpitReason(value);
 }
 
-function parseProgressionInboxDescription(description: string) {
-  const upgradesMatch = description.match(/(\d+) Upgrade\(s\)/);
-  const xpMatch = description.match(/(\d+) XP ausgegeben/);
-  return {
-    upgrades: upgradesMatch ? Number(upgradesMatch[1]) : 0,
-    xpSpent: xpMatch ? Number(xpMatch[1]) : 0,
-  };
-}
-
 const INBOX_CHRONICLE_ONLY_SOURCES = new Set([
-  "player_progression_events",
   "facility_events",
   "cash_prize_apply_logs",
   "matchday_results",
@@ -105,18 +95,10 @@ export function isGameInboxChronicleOnlySource(source: string) {
 }
 
 export function groupInboxItemsForDisplay(items: GameInboxItem[]) {
-  const groupedProgression = new Map<string, GameInboxItem[]>();
   const groupedFacilities = new Map<string, GameInboxItem[]>();
   const passthrough: GameInboxItem[] = [];
 
   for (const item of items) {
-    if (item.source === "player_progression_events") {
-      const key = `${item.teamId ?? "global"}:${item.seasonId ?? "season"}`;
-      const bucket = groupedProgression.get(key) ?? [];
-      bucket.push(item);
-      groupedProgression.set(key, bucket);
-      continue;
-    }
     if (item.source === "facility_events") {
       const key = `${item.teamId ?? "global"}:${item.seasonId ?? "season"}`;
       const bucket = groupedFacilities.get(key) ?? [];
@@ -128,31 +110,6 @@ export function groupInboxItemsForDisplay(items: GameInboxItem[]) {
   }
 
   const result = [...passthrough];
-
-  for (const [key, group] of groupedProgression) {
-    if (group.length === 1) {
-      result.push(group[0]!);
-      continue;
-    }
-    const totals = group.reduce(
-      (summary, item) => {
-        const parsed = parseProgressionInboxDescription(item.description);
-        return {
-          upgrades: summary.upgrades + parsed.upgrades,
-          xpSpent: summary.xpSpent + parsed.xpSpent,
-        };
-      },
-      { upgrades: 0, xpSpent: 0 },
-    );
-    const template = [...group].sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))[0]!;
-    result.push({
-      ...template,
-      itemId: `grouped:player_progression_events:${key}`,
-      title: `${group.length} XP-Upgrades durchgeführt`,
-      description: `${group.length} Spieler · ${totals.upgrades} Upgrade(s) · ${totals.xpSpent} XP ausgegeben.`,
-      createdAt: template.createdAt,
-    });
-  }
 
   for (const [key, group] of groupedFacilities) {
     if (group.length === 1) {
@@ -520,9 +477,6 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
   const items: GameInboxItem[] = [];
   const settingsMap = buildTeamControlSettingsMap(input.gameState.teams, input.gameState.seasonState.teamControlSettings);
   const playerById = new Map(input.gameState.players.map((player) => [player.id, player] as const));
-  // Einmalig für die Liga: Beliebtheit skaliert die Arena-Einnahme in der
-  // Cash-Risiko-Vorschau (konsistent zur echten Season-End-Resolution).
-  const beliebtheitContext = buildBeliebtheitLeagueContext(input.gameState);
 
   for (const team of input.gameState.teams) {
     if (!visibleTeamIds.has(team.teamId)) continue;
@@ -851,8 +805,15 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
       );
     }
     const upkeep = calculateFacilityUpkeep(facilities);
+    // Beliebtheit skaliert die Arena-Einnahme in der Cash-Risiko-Vorschau. Wir
+    // nutzen bewusst computeTeamBeliebtheitFromGameState (bevorzugt den
+    // persistierten, mean-revertenden seasonState.beliebtheitByTeamId-KPI), damit
+    // die Warnung denselben arenaPopularityFactor sieht wie die echte
+    // Season-End-Gutschrift (previewFacilitySeasonEndFinance) und die
+    // Finanzansicht — sonst würde die Warnung ab Saison 2 mit einem anderen
+    // Faktor rechnen und fälschlich (nicht) auslösen.
     const income = calculateFacilityIncome(facilities, {
-      arenaPopularityFactor: computeTeamBeliebtheit(team.teamId, beliebtheitContext).value,
+      arenaPopularityFactor: computeTeamBeliebtheitFromGameState(input.gameState, team.teamId).value,
     });
     if (upkeep > 0 && team.cash + income - upkeep < 0) {
       items.push(
@@ -1122,27 +1083,6 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
     );
   }
 
-  for (const event of input.gameState.playerProgressionEvents ?? []) {
-    if (!teamVisible(event.teamId)) continue;
-    items.push(
-      createItem({
-        itemId: `progression_news:${input.saveId}:${event.eventId}`,
-        saveId: input.saveId,
-        seasonId: event.seasonId ?? seasonId,
-        teamId: event.teamId,
-        playerId: event.playerId,
-        category: "training",
-        severity: "info",
-        title: "XP-Upgrade durchgeführt",
-        description: `${event.upgrades.length} Upgrade(s), ${event.xpSpent} XP ausgegeben.`,
-        targetView: "trainingV2",
-        targetParams: { team: event.teamId, player: event.playerId, panel: "season-end-development" },
-        source: "player_progression_events",
-        createdAt: event.timestamp ?? createdAt,
-      }),
-    );
-  }
-
   const latestCompletedSnapshot = [...(input.gameState.seasonState.seasonSnapshots ?? [])]
     .reverse()
     .find((snapshot) => snapshot.status === "completed");
@@ -1339,8 +1279,8 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
           playerId: event.playerId,
           category: "news",
           severity: "info",
-          title: "Story Card: XP zeigt Wirkung",
-          description: `${getPlayerName(input.gameState, event.playerId)} verbessert ${improvedCount} Diszis durch XP.`,
+          title: "Story Card: Entwicklung zeigt Wirkung",
+          description: `${getPlayerName(input.gameState, event.playerId)} verbessert ${improvedCount} Diszis durch Training.`,
           targetView: "trainingV2",
           targetParams: { team: event.teamId, player: event.playerId, panel: "season-end-development" },
           source: "story:player_progression_discipline_delta",
@@ -1451,20 +1391,29 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
   }
 
   // --- Story Card: Durchbruch-Spieler --------------------------------
-  // Andere Kennzahl als die bestehende "XP zeigt Wirkung"-Karte oben
-  // (OVR-Sprung statt Anzahl verbesserter Diszis) und ein eigener
-  // `story:`-Source, damit `groupInboxItemsForDisplay` (das ausschließlich
-  // nach `source === "player_progression_events"` gruppiert) unberührt bleibt.
+  // Andere Kennzahl als die bestehende "Entwicklung zeigt Wirkung"-Karte oben
+  // (summiertes Attribut-Delta statt Anzahl verbesserter Diszis) und ein
+  // eigener `story:`-Source. Gate auf OVR-Delta wurde entfernt: dieser Sprung
+  // ist strukturell 0 gewesen (die Karte feuerte nie), weshalb hier die real
+  // vorhandene Attribut-Differenz aus dem Progressions-Snapshot (before/after)
+  // genutzt wird — Schwelle 5 Attributpunkte für einen spürbaren Saison-Sprung.
+  const BREAKOUT_ATTRIBUTE_DELTA_THRESHOLD = 5;
   for (const event of (input.gameState.playerProgressionEvents ?? []).slice(-12)) {
     if (!teamVisible(event.teamId)) continue;
-    const beforeOvr = event.progressionSnapshotBefore?.ovr;
-    const afterOvr = event.progressionSnapshotAfter?.ovr;
-    if (typeof beforeOvr !== "number" || typeof afterOvr !== "number") continue;
-    const delta = afterOvr - beforeOvr;
-    if (delta < 5) continue;
+    const beforeAttrs = event.progressionSnapshotBefore?.attributes;
+    const afterAttrs = event.progressionSnapshotAfter?.attributes;
+    if (!beforeAttrs || !afterAttrs) continue;
+    let attributeDelta = 0;
+    for (const [key, afterValue] of Object.entries(afterAttrs)) {
+      const beforeValue = beforeAttrs[key as keyof typeof beforeAttrs];
+      if (typeof afterValue === "number" && typeof beforeValue === "number") {
+        attributeDelta += afterValue - beforeValue;
+      }
+    }
+    if (attributeDelta < BREAKOUT_ATTRIBUTE_DELTA_THRESHOLD) continue;
     items.push(
       createItem({
-        itemId: `story_breakout_player_ovr:${input.saveId}:${event.eventId}`,
+        itemId: `story_breakout_player_attr:${input.saveId}:${event.eventId}`,
         saveId: input.saveId,
         seasonId: event.seasonId ?? seasonId,
         teamId: event.teamId,
@@ -1472,10 +1421,10 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
         category: "news",
         severity: "info",
         title: "Story Card: Durchbruch-Spieler",
-        description: `${getPlayerName(input.gameState, event.playerId)} steigt im OVR um +${delta.toFixed(0)} auf ${afterOvr}.`,
+        description: `${getPlayerName(input.gameState, event.playerId)} legt in einer Saison um +${attributeDelta.toFixed(0)} Attributpunkte zu.`,
         targetView: "trainingV2",
         targetParams: { team: event.teamId, player: event.playerId, panel: "season-end-development" },
-        source: "story:player_breakout_ovr_delta",
+        source: "story:player_breakout_attribute_delta",
         createdAt: event.timestamp ?? createdAt,
       }),
     );
@@ -1629,7 +1578,7 @@ export function isGameInboxChronicleItem(item: GameInboxItem) {
   if (item.source === "season_snapshots" || item.source === "transfer_history") {
     return true;
   }
-  if (item.source === "facility_events" || item.source === "player_progression_events") {
+  if (item.source === "facility_events") {
     return true;
   }
   if (item.source === "cash_prize_apply_logs" || item.source === "matchday_results") {
@@ -1645,9 +1594,6 @@ export function isGameInboxChronicleItem(item: GameInboxItem) {
     return true;
   }
   if (item.category === "facility" && item.source === "facility_events") {
-    return true;
-  }
-  if (item.category === "training" && item.source === "player_progression_events") {
     return true;
   }
   return false;

@@ -24,6 +24,7 @@ import {
   ORGANIC_PEAK_NET_MIN,
 } from "@/lib/season/long-run-organic-progression-audit";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
+import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
 import type { PersistedSaveGame } from "@/lib/persistence/types";
 import { isSoftPhaseAuditRed } from "@/lib/season/long-run-soft-blockers";
 
@@ -672,14 +673,35 @@ function auditSeasonEndPackage(save: PersistedSaveGame, context: LongRunPhaseAud
     if (hidden == null || player.potential == null) return false;
     return Math.abs(hidden - player.potential) > 8;
   });
+  // PO is a ceiling and must never sit below the player's current ability
+  // (see lib/progression/player-potential-service.ts deriveHiddenPotentialScore).
+  // Guard here too so a future regression in the generator surfaces here.
+  const poBelowCaViolations = rostered.filter((player) => {
+    const hidden = potentialByPlayer.get(player.id);
+    if (hidden == null) return false;
+    const currentAbilityScore = computeCurrentAbilityScore(player.coreStats);
+    if (currentAbilityScore == null) return false;
+    return hidden < currentAbilityScore;
+  });
+  const hasParityMismatch = parityMismatches.length > rostered.length * 0.2;
+  const hasPoBelowCa = poBelowCaViolations.length > 0;
   checks.push(
-    parityMismatches.length > rostered.length * 0.2
+    hasParityMismatch || hasPoBelowCa
       ? check(
           "potential_field_parity",
           "WARN",
-          `${parityMismatches.length} Spieler: player.potential weicht >8 von hiddenPotentialScore ab`,
+          [
+            hasParityMismatch
+              ? `${parityMismatches.length} Spieler: player.potential weicht >8 von hiddenPotentialScore ab`
+              : null,
+            hasPoBelowCa
+              ? `${poBelowCaViolations.length} Spieler: hiddenPotentialScore < CA (Potential-Ceiling unter aktueller Fähigkeit)`
+              : null,
+          ]
+            .filter((entry): entry is string => entry != null)
+            .join(" | "),
         )
-      : check("potential_field_parity", "PASS", "Potential-Felder plausibel"),
+      : check("potential_field_parity", "PASS", "Potential-Felder plausibel, PO >= CA"),
   );
 
   return checks;

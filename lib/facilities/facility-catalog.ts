@@ -72,12 +72,17 @@ export const FACILITY_CATALOG: FacilityCatalogEntry[] = [
     maxLevel: 5,
     effectType: "training_xp",
     effectDescription: "Base Training XP Modifier",
+    // WICHTIG (Single Source of Truth): `modifierPct` ist der REAL angewandte Base-Training-XP-Bonus.
+    // Die organische Saison-Progression (organic-season-progression.ts) liest den Modifier über
+    // getFacilityLevelDefinition() aus GENAU diesen Werten — es gibt kein zweites hartkodiertes Array
+    // mehr, damit Anzeige (Trainingspanel/Forecasts/Facility-Cards) und angewandter Wert niemals
+    // divergieren können. Werte = [14,28,42,56,70] % (L1..L5), L5 = +70 %.
     levels: [
-      { level: 1, effectDescription: "+5% Base Training XP", upgradeCost: 8, seasonUpkeep: 0.8, modifierPct: 5 },
-      { level: 2, effectDescription: "+9% Base Training XP", upgradeCost: 15, seasonUpkeep: 1.4, modifierPct: 9 },
-      { level: 3, effectDescription: "+14% Base Training XP", upgradeCost: 25, seasonUpkeep: 2.4, modifierPct: 14 },
-      { level: 4, effectDescription: "+18% Base Training XP", upgradeCost: 40, seasonUpkeep: 3.8, modifierPct: 18 },
-      { level: 5, effectDescription: "+22% Base Training XP", upgradeCost: 62, seasonUpkeep: 5.5, modifierPct: 22 },
+      { level: 1, effectDescription: "+14% Base Training XP", upgradeCost: 8, seasonUpkeep: 0.8, modifierPct: 14 },
+      { level: 2, effectDescription: "+28% Base Training XP", upgradeCost: 15, seasonUpkeep: 1.4, modifierPct: 28 },
+      { level: 3, effectDescription: "+42% Base Training XP", upgradeCost: 25, seasonUpkeep: 2.4, modifierPct: 42 },
+      { level: 4, effectDescription: "+56% Base Training XP", upgradeCost: 40, seasonUpkeep: 3.8, modifierPct: 56 },
+      { level: 5, effectDescription: "+70% Base Training XP", upgradeCost: 62, seasonUpkeep: 5.5, modifierPct: 70 },
     ],
   },
   {
@@ -171,16 +176,22 @@ export const FACILITY_CATALOG: FacilityCatalogEntry[] = [
   {
     facilityId: "academy",
     label: "Academy",
-    description: "Reduziert nur Low-Tier-Upgradekosten F/E/D.",
+    description: "Beschleunigt die organische Entwicklung junger/Low-Tier-Spieler (F/E/D).",
     maxLevel: 5,
     effectType: "low_tier_upgrade_discount",
-    effectDescription: "F/E/D Upgrade Cost Discount",
+    effectDescription: "F/E/D Youth Development Boost",
+    // EFFEKT-REPURPOSE: Der alte Upgrade-Kosten-Rabatt (`discountPct`) war tot — das XP-Kostensystem
+    // ist abgeschafft, der reale Season-End-Apply läuft über die organische Progression zu Kosten 0.
+    // NEU: `modifierPct` beschleunigt das organische Trainingsbudget berechtigter F/E/D-Spieler
+    // (skaliert mit Academy-Level × Effizienz, siehe getAcademyDevelopmentBoostPct). `discountPct`
+    // bleibt aus Kompatibilitätsgründen für die (tote) Preview-/Upgrade-Kosten-Pfad-Anzeige erhalten,
+    // hat aber keinen realen Gameplay-Effekt mehr. Ökonomie (upgradeCost/seasonUpkeep) unverändert.
     levels: [
-      { level: 1, effectDescription: "F/E/D-Upgrades -3%", upgradeCost: 7, seasonUpkeep: 0.7, discountPct: 3 },
-      { level: 2, effectDescription: "F/E/D-Upgrades -6%", upgradeCost: 13, seasonUpkeep: 1.2, discountPct: 6 },
-      { level: 3, effectDescription: "F/E/D-Upgrades -9% + Prospect-Info", upgradeCost: 22, seasonUpkeep: 2, discountPct: 9 },
-      { level: 4, effectDescription: "F/E/D-Upgrades -12%", upgradeCost: 35, seasonUpkeep: 3.1, discountPct: 12 },
-      { level: 5, effectDescription: "F/E/D-Upgrades -15%", upgradeCost: 55, seasonUpkeep: 4.8, discountPct: 15 },
+      { level: 1, effectDescription: "Junge/F-E-D-Spieler +6% Entwicklung", upgradeCost: 7, seasonUpkeep: 0.7, modifierPct: 6, discountPct: 3 },
+      { level: 2, effectDescription: "Junge/F-E-D-Spieler +12% Entwicklung", upgradeCost: 13, seasonUpkeep: 1.2, modifierPct: 12, discountPct: 6 },
+      { level: 3, effectDescription: "Junge/F-E-D-Spieler +18% Entwicklung + Prospect-Info", upgradeCost: 22, seasonUpkeep: 2, modifierPct: 18, discountPct: 9 },
+      { level: 4, effectDescription: "Junge/F-E-D-Spieler +24% Entwicklung", upgradeCost: 35, seasonUpkeep: 3.1, modifierPct: 24, discountPct: 12 },
+      { level: 5, effectDescription: "Junge/F-E-D-Spieler +30% Entwicklung", upgradeCost: 55, seasonUpkeep: 4.8, modifierPct: 30, discountPct: 15 },
     ],
   },
   {

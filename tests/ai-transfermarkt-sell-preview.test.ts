@@ -577,3 +577,199 @@ describe("ai transfermarkt sell preview", () => {
     expect((result.teams[0]?.sellCandidates.length ?? 0) > 0).toBe(true);
   });
 });
+
+describe("proactive strong-offer profit sells for weak teams", () => {
+  // Uses the MD10 "frozen valuation" read-path so the sale-factor bracket rank (and therefore the
+  // premium over market value) is fully deterministic, instead of depending on a large ranked
+  // live player pool. bracket 1 spans factor 0.35..1.5 across a 101-slot pool: rank 27 lands at a
+  // ~20.1% premium, rank 40 at a ~5.15% premium (verified with a throwaway script against the real
+  // sale-factor formula before writing these numbers down).
+  const FROZEN_BASE = {
+    frozenOvr: 40,
+    frozenOvrRank: 40,
+    frozenMvs: 40,
+    frozenMvsRank: 40,
+    frozenPps: 40,
+    frozenPpsRank: 40,
+    frozenPpPow: null,
+    frozenPpPowRank: null,
+    frozenPpSpe: null,
+    frozenPpSpeRank: null,
+    frozenPpMen: null,
+    frozenPpMenRank: null,
+    frozenPpSoc: null,
+    frozenPpSocRank: null,
+    frozenSaleBracket: 1,
+    frozenSaleBracketSize: 101,
+  } as const;
+
+  function buildThreeTeamWeaknessGameState(input: {
+    seasonId: string;
+    strongPlayerRankInBracket?: number;
+    weakPlayerRankInBracket?: number;
+  }): GameState {
+    const teams = [
+      createTeam({ teamId: "T-STRONG", shortCode: "T-STRONG", name: "Strong FC", cash: 500, budget: 500 }),
+      createTeam({ teamId: "T-MID", shortCode: "T-MID", name: "Mid FC", cash: 300, budget: 300 }),
+      createTeam({ teamId: "T-WEAK", shortCode: "T-WEAK", name: "Weak FC", cash: 200, budget: 200 }),
+    ];
+    const identities = teams.map((team) => createIdentity({ teamId: team.teamId, playerMin: 0, playerOpt: 1 }));
+    const coreStats = { pow: 40, spe: 40, men: 40, soc: 40 };
+    const players = [
+      createPlayer("strong-player", { name: "Strong Star", rating: 40, marketValue: 200, displayMarketValue: 200, coreStats }),
+      createPlayer("mid-player", { name: "Mid Rock", rating: 40, marketValue: 100, displayMarketValue: 100, coreStats }),
+      createPlayer("weak-player", { name: "Weak Hopeful", rating: 40, marketValue: 20, displayMarketValue: 20, coreStats }),
+    ];
+    const rosters = [
+      createRosterEntry("r-strong", "T-STRONG", "strong-player", { salary: 5, purchasePrice: 600, currentValue: 200, contractLength: 0 }),
+      createRosterEntry("r-mid", "T-MID", "mid-player", { salary: 5, purchasePrice: 300, currentValue: 100, contractLength: 0 }),
+      createRosterEntry("r-weak", "T-WEAK", "weak-player", { salary: 5, purchasePrice: 60, currentValue: 20, contractLength: 0 }),
+    ];
+
+    const playersById: Record<string, (typeof FROZEN_BASE) & { playerId: string; frozenMw: number; frozenSaleRankInBracket: number }> = {};
+    if (input.strongPlayerRankInBracket != null) {
+      playersById["strong-player"] = {
+        ...FROZEN_BASE,
+        playerId: "strong-player",
+        frozenMw: 200,
+        frozenSaleRankInBracket: input.strongPlayerRankInBracket,
+      };
+    }
+    if (input.weakPlayerRankInBracket != null) {
+      playersById["weak-player"] = {
+        ...FROZEN_BASE,
+        playerId: "weak-player",
+        frozenMw: 20,
+        frozenSaleRankInBracket: input.weakPlayerRankInBracket,
+      };
+    }
+
+    return {
+      season: { id: input.seasonId, name: "Weakness Season", year: 2026, currentMatchday: 1, matchdayIds: ["matchday-1"] },
+      seasonState: {
+        seasonId: input.seasonId,
+        schedule: [],
+        standings: Object.fromEntries(teams.map((team) => [team.teamId, { points: 0 }])),
+        teamControlSettings: Object.fromEntries(
+          teams.map((team) => [
+            team.teamId,
+            {
+              teamId: team.teamId,
+              controlMode: "ai",
+              aiLineupPreviewEnabled: true,
+              aiLineupAutoApplyEnabled: false,
+              aiTransferPreviewEnabled: true,
+              aiTransferAutoApplyEnabled: false,
+              aiSellPreviewEnabled: true,
+              aiSellAutoApplyEnabled: false,
+            },
+          ]),
+        ),
+        playerDisciplinePerformances: [],
+        teamStrategyProfiles: {},
+        frozenValuationSnapshot: {
+          seasonId: input.seasonId,
+          frozenAtMatchdayId: "matchday-1",
+          createdAt: "2026-06-05T10:00:00.000Z",
+          playersById,
+        },
+      },
+      matchdayState: { matchdayId: "matchday-1", status: "planning", pendingTeamIds: [], resolvedFixtureIds: [] },
+      teams,
+      teamIdentities: identities,
+      players,
+      disciplines: [],
+      rosters,
+      contracts: [],
+      transferListings: [],
+      transferHistory: [],
+      logs: [],
+      mappingReport: {
+        mappingSource: "",
+        teamSource: "",
+        generatedAt: "",
+        processedMappingRows: 0,
+        importedPlayerCount: players.length,
+        matchedRosterCount: rosters.length,
+        teamCount: teams.length,
+        unmappedPlayers: [],
+        teamsWithoutPlayers: [],
+        mappingRowsWithoutPlayerMatch: [],
+        duplicateMappedPlayers: [],
+        unknownTeamCodes: [],
+        duplicateTeamCodes: [],
+        warnings: [],
+      },
+    } as unknown as GameState;
+  }
+
+  it("a weak (bottom-third) team fires profit_window for a clear ~20% premium offer without cash pressure", async () => {
+    const seasonId = "season-weak-strong-offer";
+    persistenceState.save = {
+      saveId: "save-weak-strong-offer",
+      gameState: buildThreeTeamWeaknessGameState({ seasonId, weakPlayerRankInBracket: 27 }),
+    };
+
+    const { buildAiTransfermarktSellPreview } = await import("@/lib/ai/ai-transfermarkt-sell-preview-service");
+    const result = await buildAiTransfermarktSellPreview({
+      saveId: "save-weak-strong-offer",
+      seasonId,
+      teamId: "T-WEAK",
+      source: "sqlite",
+    });
+
+    // NOTE: a separate, pre-existing, unconditional check elsewhere in this service already pushes
+    // the generic "profit_window" code whenever the sell value tops the (here, coincidentally
+    // equal) purchase price — so we assert on our NEW proactive-path reason text specifically,
+    // which only appears when the weak-team strong-offer bar above actually fires.
+    const candidate = result.teams[0]?.sellCandidates.find((entry) => entry.playerId === "weak-player");
+    expect(candidate).toBeTruthy();
+    expect(candidate?.expectedSellValue ?? 0).toBeGreaterThan((candidate?.marketValue ?? 0) * 1.15);
+    expect(candidate?.sellReasonCodes ?? []).toContain("profit_window");
+    expect(candidate?.reasonsToSell.some((reason) => reason.includes("unteren Tabellendrittel"))).toBe(true);
+  });
+
+  it("the same weak team does NOT surface the proactive strong-offer reason for only a marginal ~5% offer", async () => {
+    const seasonId = "season-weak-marginal-offer";
+    persistenceState.save = {
+      saveId: "save-weak-marginal-offer",
+      gameState: buildThreeTeamWeaknessGameState({ seasonId, weakPlayerRankInBracket: 40 }),
+    };
+
+    const { buildAiTransfermarktSellPreview } = await import("@/lib/ai/ai-transfermarkt-sell-preview-service");
+    const result = await buildAiTransfermarktSellPreview({
+      saveId: "save-weak-marginal-offer",
+      seasonId,
+      teamId: "T-WEAK",
+      source: "sqlite",
+    });
+
+    const candidate = result.teams[0]?.sellCandidates.find((entry) => entry.playerId === "weak-player");
+    expect(candidate).toBeTruthy();
+    expect(candidate?.expectedSellValue ?? 0).toBeLessThan((candidate?.marketValue ?? 0) * 1.1);
+    expect(candidate?.reasonsToSell.some((reason) => reason.includes("unteren Tabellendrittel"))).toBe(false);
+    expect(candidate?.reasonsToSell.some((reason) => reason.includes("lohnt sich auch ohne Cash-Druck"))).toBe(false);
+  });
+
+  it("a strong (top-of-league) team needs a bigger premium — the same ~20% offer does NOT trigger the proactive path", async () => {
+    const seasonId = "season-strong-needs-more";
+    persistenceState.save = {
+      saveId: "save-strong-needs-more",
+      gameState: buildThreeTeamWeaknessGameState({ seasonId, strongPlayerRankInBracket: 27 }),
+    };
+
+    const { buildAiTransfermarktSellPreview } = await import("@/lib/ai/ai-transfermarkt-sell-preview-service");
+    const result = await buildAiTransfermarktSellPreview({
+      saveId: "save-strong-needs-more",
+      seasonId,
+      teamId: "T-STRONG",
+      source: "sqlite",
+    });
+
+    const candidate = result.teams[0]?.sellCandidates.find((entry) => entry.playerId === "strong-player");
+    expect(candidate).toBeTruthy();
+    expect(candidate?.expectedSellValue ?? 0).toBeGreaterThan((candidate?.marketValue ?? 0) * 1.15);
+    expect(candidate?.reasonsToSell.some((reason) => reason.includes("unteren Tabellendrittel"))).toBe(false);
+    expect(candidate?.reasonsToSell.some((reason) => reason.includes("lohnt sich auch ohne Cash-Druck"))).toBe(false);
+  });
+});

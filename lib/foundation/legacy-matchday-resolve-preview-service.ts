@@ -1,6 +1,13 @@
 import { buildLegacyMatchdayReadiness } from "@/lib/lineups/legacy-matchday-readiness";
 import { loadAllLocalLegacyLineupContexts } from "@/lib/lineups/legacy-lineup-local-service";
 import type { LegacyLineupContextLoadResult } from "@/lib/lineups/legacy-lineup-types";
+import type { GameState } from "@/lib/data/olyDataTypes";
+import { resolveLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
+import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import {
+  attachMatchdayInjuryPerformanceToContexts,
+  buildMatchdayInjuryRollMap,
+} from "@/lib/fatigue/fatigue-injury-service";
 import {
   buildResolveLabPlayerCatalog,
   buildResolveLabSummary,
@@ -46,12 +53,36 @@ export function buildLegacyMatchdayResolvePreviewPayload(input: {
     matchdayId: string;
   };
   contextResults: LegacyLineupContextLoadResult[];
+  /**
+   * GameState der SQLite-Persistenz. Wird — genau wie im echten Apply-Pfad
+   * (legacy-matchday-result-apply-service, matchday-auto-run-service) — nur für
+   * die SQLite-Quelle gebraucht, um die DETERMINISTISCHE Same-Day-Injury-Rolle
+   * (stableHash-Seed) an die Contexts zu heften. Ohne sie fiele die Vorschau auf
+   * injuryMultiplier=1 zurück und würde die Totals gegenüber dem persistierten
+   * Ergebnis systematisch überschätzen. Fehlt der GameState (Prisma, Tests),
+   * bleibt das Verhalten unverändert.
+   */
+  gameState?: GameState | null;
 }): LegacyMatchdayResolvePreviewPayload | null {
   const warnings = input.contextResults.flatMap((result) => result.warnings);
   const contexts = input.contextResults.flatMap((result) => (result.ok ? [result.context] : []));
 
   if (contexts.length === 0) {
     return null;
+  }
+
+  // Deterministische Same-Day-Verletzungs-Performance (0.75x) exakt wie die
+  // Apply-Pfade an die Contexts heften, BEVOR die Vorschau gescored wird — so
+  // zeigt die Vorschau denselben Malus, den das angewandte Ergebnis verhängt
+  // (Vorschau == angewandtes Ergebnis, nicht divergent).
+  if (input.gameState) {
+    const injuryRollMap = buildMatchdayInjuryRollMap({
+      gameState: input.gameState,
+      saveId: input.params.saveId,
+      seasonId: input.params.seasonId,
+      matchdayId: input.params.matchdayId,
+    });
+    attachMatchdayInjuryPerformanceToContexts(contexts, injuryRollMap);
   }
 
   const readinessRows = contexts.map((context) => buildLegacyMatchdayReadiness(context));
@@ -90,10 +121,15 @@ export function loadSqliteLegacyMatchdayResolvePreview(input: {
   seasonId: string;
   matchdayId: string;
 }) {
-  const contextResults = loadAllLocalLegacyLineupContexts(input);
+  // Persistenz einmal auflösen und teilen: Contexts UND GameState stammen so aus
+  // demselben Save-Snapshot, wie es der Apply-Pfad tut.
+  const persistence = createPersistenceService();
+  const { save } = resolveLocalPersistedSave(persistence, input.saveId);
+  const contextResults = loadAllLocalLegacyLineupContexts(input, persistence);
   return buildLegacyMatchdayResolvePreviewPayload({
     source: "sqlite",
     params: input,
     contextResults,
+    gameState: save.gameState,
   });
 }

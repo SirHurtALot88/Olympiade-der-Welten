@@ -481,8 +481,8 @@ function buildWarnings(input: {
   }
 
   for (const row of input.playerRows) {
-    if (row.xpSpent >= 20 || row.attributeDelta >= 8) {
-      warnings.push({ type: "xp_growth_too_fast", severity: "warning", title: `${row.playerName} waechst schnell`, message: `XP ${row.xpSpent}, Attributdelta ${row.attributeDelta}.`, source: row.source, teamId: row.teamId, playerId: row.playerId, value: row.xpSpent });
+    if (row.attributeDelta >= 8) {
+      warnings.push({ type: "xp_growth_too_fast", severity: "warning", title: `${row.playerName} waechst schnell`, message: `Attributdelta ${row.attributeDelta}.`, source: row.source, teamId: row.teamId, playerId: row.playerId, value: row.attributeDelta });
     }
   }
 

@@ -11,6 +11,7 @@ import {
   getInjuryRiskPercent,
   getPlayerAvailabilityView,
   injuryRiskBands,
+  normalizeAvailabilityForNewSeason,
   rollInjuryRisk,
 } from "@/lib/fatigue/fatigue-injury-service";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
@@ -425,10 +426,194 @@ describe("fatigue injury service", () => {
     const benchPlayer = result.gameState.players.find((player) => player.id === "bench-player");
     const benchAvailability = getPlayerAvailabilityView(result.gameState, "bench-player", "A-A", "md-2");
 
-    expect(usedPlayer?.fatigue).toBe(31);
+    expect(usedPlayer?.fatigue).toBe(32);
     expect(benchPlayer?.fatigue).toBe(Math.max(0, Number((48 - recovery.normalRecovery).toFixed(2))));
     expect(benchAvailability.fatigue).toBe(benchPlayer?.fatigue);
     expect(benchAvailability.blocker).toBeNull();
+  });
+
+  it("is idempotent under a forceReplace re-apply of the same matchday for used and benched players", () => {
+    // Vor-Spieltags-Stand: used-0 (Einsatz, fatigue 20), bench-0 (Bank, fatigue 60).
+    const gameState = createGameState("used-0", 20);
+    gameState.players.push({
+      id: "bench-0",
+      name: "Bench Runner",
+      className: "Runner",
+      race: "Human",
+      marketValue: 10,
+      salary: 2,
+      fatigue: 60,
+      attributes: {},
+      disciplineRatings: {},
+    } as never);
+    gameState.rosters.push({
+      teamId: "A-A",
+      playerId: "bench-0",
+      role: "bench",
+      joinedSeasonId: "season-1",
+    } as never);
+    const recovery = calculateTeamRecovery(gameState, "A-A");
+    const load = 12;
+
+    const applyParams = {
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-1",
+      matchdayResultId: "result-md-1",
+      timestamp: "2026-06-13T00:00:00.000Z",
+    };
+
+    const first = applyFatigueAndInjuryAfterMatchday({ gameState, ...applyParams });
+    const usedFirst = getPlayerAvailabilityView(first.gameState, "used-0", "A-A", "md-1").fatigue;
+    const benchFirst = getPlayerAvailabilityView(first.gameState, "bench-0", "A-A", "md-1").fatigue;
+    const usedEventFirst = first.injuryEvents.find((event) => event.playerId === "used-0");
+
+    expect(usedFirst).toBe(20 + load);
+    expect(benchFirst).toBe(Math.max(0, Number((60 - recovery.normalRecovery).toFixed(2))));
+
+    // forceReplace: denselben Spieltag erneut auf dem bereits fortgeschriebenen State anwenden.
+    const second = applyFatigueAndInjuryAfterMatchday({
+      gameState: first.gameState,
+      ...applyParams,
+      isMatchdayReplay: true,
+    });
+    const usedSecond = getPlayerAvailabilityView(second.gameState, "used-0", "A-A", "md-1").fatigue;
+    const benchSecond = getPlayerAvailabilityView(second.gameState, "bench-0", "A-A", "md-1").fatigue;
+    const usedEventSecond = second.injuryEvents.find((event) => event.playerId === "used-0");
+
+    // Idempotent: identisch zum ersten Apply, NICHT verdoppelt (kein F + 2*Load / doppelte Erholung).
+    expect(usedSecond).toBe(usedFirst);
+    expect(usedSecond).not.toBe(20 + 2 * load);
+    expect(benchSecond).toBe(benchFirst);
+    expect(benchSecond).not.toBe(Math.max(0, Number((60 - 2 * recovery.normalRecovery).toFixed(2))));
+
+    // event.fatigueBefore / riskPercent / roll bleiben ebenfalls identisch.
+    expect(usedEventSecond?.fatigueBefore).toBe(usedEventFirst?.fatigueBefore);
+    expect(usedEventSecond?.fatigueBefore).toBe(20 + load);
+    expect(usedEventSecond?.riskPercent).toBe(usedEventFirst?.riskPercent);
+    expect(usedEventSecond?.result).toBe(usedEventFirst?.result);
+
+    // Re-Apply darf keine doppelten Injury-Events für den Spieltag hinterlassen.
+    expect(
+      second.gameState.seasonState.injuryEvents?.filter(
+        (event) => event.seasonId === "season-1" && event.matchdayId === "md-1",
+      ).length,
+    ).toBe(
+      first.gameState.seasonState.injuryEvents?.filter(
+        (event) => event.seasonId === "season-1" && event.matchdayId === "md-1",
+      ).length,
+    );
+  });
+
+  it("still accumulates fatigue on a normal advance to the next distinct matchday", () => {
+    const gameState = createGameState("used-0", 20);
+    // md-2-Aufstellung: used-0 wird erneut eingesetzt.
+    gameState.seasonState.lineupDrafts?.push({
+      lineupId: "lineup-2",
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-2",
+      teamId: "A-A",
+      status: "submitted",
+      entries: [
+        {
+          disciplineId: "tdm",
+          disciplineSide: "d1",
+          slotIndex: 1,
+          playerId: "used-0",
+          activePlayerId: "active-used-0-md2",
+        },
+      ],
+      createdAt: "2026-06-13T00:00:00.000Z",
+      updatedAt: "2026-06-13T00:00:00.000Z",
+    } as never);
+
+    const first = applyFatigueAndInjuryAfterMatchday({
+      gameState,
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-1",
+      matchdayResultId: "result-md-1",
+      timestamp: "2026-06-13T00:00:00.000Z",
+    });
+    expect(getPlayerAvailabilityView(first.gameState, "used-0", "A-A", "md-1").fatigue).toBe(32);
+
+    // Normales Vorrücken md-1 -> md-2 (isMatchdayReplay weggelassen -> false): akkumuliert weiter.
+    const second = applyFatigueAndInjuryAfterMatchday({
+      gameState: first.gameState,
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-2",
+      matchdayResultId: "result-md-2",
+      timestamp: "2026-06-13T00:00:00.000Z",
+    });
+    expect(getPlayerAvailabilityView(second.gameState, "used-0", "A-A", "md-2").fatigue).toBe(44);
+  });
+
+  it("returns a recovering player to healthy once the recovery window has elapsed within the season", () => {
+    const gameState = createGameState("player-1", 40);
+    // Saison mit genügend Spieltagen, damit das Erholungsfenster innerhalb der Saison abläuft.
+    (gameState.season as { matchdayIds: string[] }).matchdayIds = ["md-1", "md-2", "md-3", "md-4", "md-5"];
+    gameState.seasonState.playerAvailabilityState = [
+      {
+        playerId: "player-1",
+        teamId: "A-A",
+        fatigue: 40,
+        injuryStatus: "recovering",
+        injuryUntilMatchday: "md-2",
+        injuredAtSeasonId: "season-1",
+        injuredAtMatchdayId: "md-1",
+        injuryReason: "fatigue_over_30_after_matchday_use",
+      },
+    ];
+
+    // md-3: Ausfallzeit (md-2) vorbei, aber noch im Erholungsfenster -> recovering, verfügbar.
+    const recoveringView = getPlayerAvailabilityView(gameState, "player-1", "A-A", "md-3");
+    expect(recoveringView.injuryStatus).toBe("recovering");
+    expect(recoveringView.isUnavailable).toBe(false);
+
+    // md-4: Erholungsfenster abgelaufen -> zurück auf healthy statt dauerhaft recovering.
+    const healedView = getPlayerAvailabilityView(gameState, "player-1", "A-A", "md-4");
+    expect(healedView.injuryStatus).toBe("healthy");
+    expect(healedView.isUnavailable).toBe(false);
+    expect(healedView.blocker).toBeNull();
+  });
+
+  it("does not freeze a final-matchday injury as permanently injured and heals it at season start", () => {
+    const playerId = findInjuredPlayerId({ saveId: "save-1", seasonId: "season-1", matchdayId: "md-3" });
+    const gameState = createGameState(playerId, 83);
+    // Aufstellung auf den LETZTEN Spieltag der Saison legen (md-3 -> kein Folge-Spieltag).
+    const draft = gameState.seasonState.lineupDrafts?.[0];
+    if (draft) {
+      draft.matchdayId = "md-3";
+    }
+
+    const result = applyFatigueAndInjuryAfterMatchday({
+      gameState,
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-3",
+      matchdayResultId: "result-3",
+      timestamp: "2026-06-13T00:00:00.000Z",
+    });
+
+    expect(result.injuryEvents[0]?.result).toBe("injured");
+    // Kein Folge-Spieltag -> unavailableUntil ist null, injuryUntilMatchday bleibt unbestimmt.
+    expect(result.injuryEvents[0]?.unavailableUntil).toBeNull();
+    const stored = result.gameState.seasonState.playerAvailabilityState?.find(
+      (entry) => entry.playerId === playerId && entry.teamId === "A-A",
+    );
+    expect(stored?.injuryStatus).toBe("injured");
+    expect(stored?.injuryUntilMatchday).toBeUndefined();
+
+    // Der Spieler darf nicht mit eingefrorenem injured-Status in die neue Saison übernommen werden:
+    // die Saisonwechsel-Normalisierung heilt ihn deterministisch aus (Fatigue bleibt erhalten).
+    const normalized = normalizeAvailabilityForNewSeason(result.gameState.seasonState.playerAvailabilityState);
+    const healed = normalized.find((entry) => entry.playerId === playerId && entry.teamId === "A-A");
+    expect(healed?.injuryStatus).toBe("healthy");
+    expect(healed?.injuryUntilMatchday).toBeUndefined();
+    expect(healed?.injuredAtMatchdayId).toBeUndefined();
+    expect(healed?.fatigue).toBe(stored?.fatigue);
   });
 
   it("blocks human lineups that still reference an injured player", () => {

@@ -6,6 +6,7 @@ import {
   buildBonusObjectiveComponent,
   buildChallengeSpecialComponent,
   buildGoldenObjectiveComponent,
+  buildStandardSpecialComponent,
   computeTransferWindowNet,
   getAvailableBonusObjectiveKeys,
   getTeamAxisRank,
@@ -18,6 +19,8 @@ import {
   SPONSOR_GOLDEN_OBJECTIVE_ARCHETYPE,
   type SponsorGoldenObjectiveKey,
 } from "@/lib/sponsor/sponsor-special-objectives";
+import { mapCurveShapeToArchetype } from "@/lib/sponsor/sponsor-tier-pool";
+import type { SponsorArchetype, SponsorCurveShape } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import {
@@ -26,10 +29,17 @@ import {
 } from "@/lib/economy/team-beliebtheit";
 import { computeTeamExpectation } from "@/lib/board/team-season-objectives-service";
 import {
+  computeObjectiveProgressMetric,
   evaluateSpecialComponentForObjective,
   evaluateSpecialComponentStage,
 } from "@/lib/sponsor/sponsor-objective-evaluator";
-import type { GameState } from "@/lib/data/olyDataTypes";
+import {
+  calculateFacilityIncome,
+  calculateFacilityUpkeep,
+  getTeamFacilityState,
+} from "@/lib/facilities/facility-effects";
+import { SPONSOR_OBJ_FATIGUE_CAP } from "@/lib/sponsor/sponsor-special-objectives";
+import type { GameState, SponsorOfferComponent } from "@/lib/data/olyDataTypes";
 
 describe("sponsor special objectives", () => {
   it("never asks weak teams for unrealistic axis top-10 targets", () => {
@@ -52,7 +62,7 @@ describe("sponsor special objectives", () => {
       team,
       identity,
       profile,
-      starTier: 2,
+      rarity: "gewöhnlich",
       rewardCash: 4,
       seasonId: gameState.season.id,
     });
@@ -114,7 +124,7 @@ function bonusInput(gs: GameState, teamId: string, overrides: Record<string, unk
     identity: gs.teamIdentities.find((entry) => entry.teamId === teamId) ?? null,
     profile: null,
     rewardCash: 5,
-    starTier: 3 as const,
+    rarity: "magisch" as const,
     seasonId: gs.season.id,
     ...overrides,
   };
@@ -146,8 +156,9 @@ describe("sponsor bonus objectives (Teil B)", () => {
     expect(computeTransferWindowNet(gs, teamId, seasonId)).toBe(15);
     expect(isTransferTraderAvailableForSeason("season-1")).toBe(false);
     expect(isTransferTraderAvailableForSeason("season-2")).toBe(true);
-    expect(getAvailableBonusObjectiveKeys("security", "season-1")).not.toContain("transfer_trader");
-    expect(getAvailableBonusObjectiveKeys("security", "season-2")).toContain("transfer_trader");
+    // Bucketing läuft über die Kurvenform-Familie: "sicherheit" → Familie sicherheit → security-Pool.
+    expect(getAvailableBonusObjectiveKeys("sicherheit", "season-1")).not.toContain("transfer_trader");
+    expect(getAvailableBonusObjectiveKeys("sicherheit", "season-2")).toContain("transfer_trader");
   }, 60000);
 
   it("keeps the objective spotlight league-centered (Σ ≈ 0)", () => {
@@ -171,17 +182,129 @@ describe("sponsor bonus objectives (Teil B)", () => {
     expect(Math.abs(sumObjective)).toBeLessThan(teamCount * 0.5e-4 + 1e-9);
   });
 
-  it("separates golden objectives from the standard pool and picks them archetype-consistently", () => {
+  it("separates golden objectives from the standard pool and picks them curve-family-consistently", () => {
     const goldenKeys = Object.keys(SPONSOR_GOLDEN_OBJECTIVE_ARCHETYPE) as SponsorGoldenObjectiveKey[];
     const stdKeys = Object.keys(SPONSOR_BONUS_OBJECTIVE_ARCHETYPE);
     expect(goldenKeys.some((k) => stdKeys.includes(k))).toBe(false);
+    // Repräsentative Kurvenform je (Legacy-)Archetyp-Bucket: titel→performance, aufstieg→identity, sicherheit→security.
+    const shapeByArchetype: Record<SponsorArchetype, SponsorCurveShape> = {
+      performance: "titeljaeger",
+      identity: "aufsteiger",
+      security: "sicherheit",
+    };
     for (const archetype of ["performance", "identity", "security"] as const) {
-      const pick = pickGoldenObjective("season-4", "T-1", archetype);
+      const curveShape = shapeByArchetype[archetype];
+      expect(mapCurveShapeToArchetype(curveShape)).toBe(archetype);
+      const pick = pickGoldenObjective("season-4", "T-1", curveShape);
       expect(SPONSOR_GOLDEN_OBJECTIVE_ARCHETYPE[pick]).toBe(archetype);
-      expect(pickGoldenObjective("season-4", "T-1", archetype)).toBe(pick); // deterministisch
-      expect(getAvailableBonusObjectiveKeys(archetype, "season-4")).not.toContain(pick as never);
+      expect(pickGoldenObjective("season-4", "T-1", curveShape)).toBe(pick); // deterministisch
+      expect(getAvailableBonusObjectiveKeys(curveShape, "season-4")).not.toContain(pick as never);
     }
   });
+
+  it("scales standard special difficulty with rarity order and buckets bonus keys by curve family", () => {
+    // Schwierigkeit skaliert mit der Rarity-Ordnung: gewöhnlich (order 0) fordert weniger als legendär (order 3).
+    const easy = buildStandardSpecialComponent({ templateId: "transfer_profit_min", rarity: "gewöhnlich", rewardCash: 5 });
+    const hard = buildStandardSpecialComponent({ templateId: "transfer_profit_min", rarity: "legendär", rewardCash: 5 });
+    expect(Number(hard.targetValue)).toBeGreaterThan(Number(easy.targetValue));
+
+    const discEasy = buildStandardSpecialComponent({ templateId: "discipline_top3_count", rarity: "gewöhnlich", rewardCash: 5 });
+    const discHard = buildStandardSpecialComponent({ templateId: "discipline_top3_count", rarity: "legendär", rewardCash: 5 });
+    expect(Number(discHard.targetValue)).toBeGreaterThan(Number(discEasy.targetValue));
+
+    // Bucketing folgt der Kurvenform-Familie: zwei Formen derselben Familie ziehen den identischen Bonus-Pool,
+    // eine Form einer anderen Familie einen disjunkten.
+    const security1 = getAvailableBonusObjectiveKeys("sicherheit", "season-4"); // Familie sicherheit
+    const security2 = getAvailableBonusObjectiveKeys("klassenerhalt", "season-4"); // gleiche Familie
+    const performance = getAvailableBonusObjectiveKeys("titeljaeger", "season-4"); // Familie titel → performance
+    expect([...security1].sort()).toEqual([...security2].sort());
+    expect(security1.some((key) => performance.includes(key))).toBe(false);
+    expect(performance.length).toBeGreaterThan(0);
+  });
+
+  it("measures fatigue_management against pure availability fatigue, not the training layer", () => {
+    const gs = structuredClone(createSingleplayerGameState());
+    const teamId = gs.teams[0]!.teamId;
+    const rosterPlayerIds = gs.rosters.filter((entry) => entry.teamId === teamId).map((entry) => entry.playerId);
+    expect(rosterPlayerIds.length).toBeGreaterThan(1);
+
+    const comp: SponsorOfferComponent = {
+      componentId: "special-fatigue",
+      kind: "special",
+      label: "Fatigue-Management",
+      targetValue: SPONSOR_OBJ_FATIGUE_CAP,
+      rewardCash: 5,
+      specialKey: "fatigue_management",
+    };
+
+    // Fall 1: EIN Spieler trägt eine hohe Trainings-Fatigue-Schicht (player.fatigue weit über Cap),
+    // aber seine reine Match-Fatigue (availability) liegt unter dem Cap. Er MUSS als frisch zählen.
+    const highTrainingId = rosterPlayerIds[0]!;
+    gs.seasonState.playerAvailabilityState = rosterPlayerIds.map((playerId) => ({
+      playerId,
+      teamId,
+      fatigue: 5,
+      injuryStatus: "healthy" as const,
+    }));
+    gs.players = gs.players.map((player) =>
+      player.id === highTrainingId ? { ...player, fatigue: SPONSOR_OBJ_FATIGUE_CAP + 50 } : player,
+    );
+    const metricFresh = computeObjectiveProgressMetric(gs, teamId, comp);
+    expect(metricFresh).toBe(100); // reine Match-Fatigue → gesamter Kader frisch
+
+    // Fall 2: Umgekehrt — reine Match-Fatigue über Cap zählt NICHT als frisch, auch wenn
+    // player.fatigue (Trainingsschicht) niedrig ist.
+    gs.seasonState.playerAvailabilityState = rosterPlayerIds.map((playerId) => ({
+      playerId,
+      teamId,
+      fatigue: playerId === highTrainingId ? SPONSOR_OBJ_FATIGUE_CAP + 10 : 5,
+      injuryStatus: "healthy" as const,
+    }));
+    gs.players = gs.players.map((player) => (player.id === highTrainingId ? { ...player, fatigue: 0 } : player));
+    const metricTired = computeObjectiveProgressMetric(gs, teamId, comp);
+    expect(metricTired).toBeCloseTo((100 * (rosterPlayerIds.length - 1)) / rosterPlayerIds.length, 5);
+  }, 60000);
+
+  it("measures sustainability_architect income with the arena popularity factor", () => {
+    const gs = structuredClone(createSingleplayerGameState());
+    const teamId = gs.teams[0]!.teamId;
+
+    // Arena gebaut (Beliebtheit skaliert nur die Arena-Einnahme); Beliebtheit = 1.5 (Max).
+    gs.seasonState.teamFacilities = {
+      ...(gs.seasonState.teamFacilities ?? {}),
+      [teamId]: {
+        facilities: {
+          arena_upgrade: { level: 5, enabled: true, conditionPct: 100 },
+        },
+      },
+    } as never;
+    gs.seasonState.beliebtheitByTeamId = {
+      ...(gs.seasonState.beliebtheitByTeamId ?? {}),
+      [teamId]: { value: 1.5 } as never,
+    };
+
+    const comp: SponsorOfferComponent = {
+      componentId: "special-sustainability",
+      kind: "special",
+      label: "Sustainability Architect",
+      targetValue: 5,
+      rewardCash: 5,
+      specialKey: "sustainability_architect",
+    };
+
+    const facilities = getTeamFacilityState(gs, teamId);
+    const upkeep = calculateFacilityUpkeep(facilities);
+    const incomeWithPopularity = calculateFacilityIncome(facilities, { arenaPopularityFactor: 1.5 });
+    const incomeNaive = calculateFacilityIncome(facilities); // ohne Beliebtheitsfaktor (der alte Bug)
+
+    const metric = computeObjectiveProgressMetric(gs, teamId, comp);
+
+    // Ziel spiegelt exakt die tatsächlich gutgeschriebene, beliebtheits-skalierte Einnahme.
+    expect(metric).toBeCloseTo(incomeWithPopularity - upkeep, 5);
+    // Der Faktor wirkt wirklich: die Arena ist gebaut und 1.5 > 1.0 hebt die Einnahme über den naiven Wert.
+    expect(incomeWithPopularity).toBeGreaterThan(incomeNaive);
+    expect(metric).not.toBeCloseTo(incomeNaive - upkeep, 5);
+  }, 60000);
 
   it("gates golden title-shock to weak teams only", () => {
     const gs = structuredClone(createSingleplayerGameState());

@@ -494,13 +494,51 @@ describe("player progression forecast", () => {
   });
 
   it("charges more maintenance for high CA and small CA-PO gaps", () => {
-    // CA is now derived from the player's own core stats (absolute, peak-weighted),
+    // CA is derived from the player's own core stats (absolute, peak-weighted),
     // not from rating/ovrNormalized — so the high-vs-low CA difference must live in
     // coreStats. See lib/scouting/current-ability-score.ts.
-    const lowCa = createPlayer({ id: "low", rating: 45, potential: 90, coreStats: { pow: 45, spe: 45, men: 45, soc: 45 } });
-    const highCa = createPlayer({ id: "high", rating: 88, potential: 90, coreStats: { pow: 88, spe: 88, men: 88, soc: 88 } });
-    const lowForecast = buildPlayerProgressionForecast({ gameState: createGameState(lowCa), player: lowCa, playerRating: createRating({ ovrNormalized: 45 }), seasonPerformance: null });
-    const highForecast = buildPlayerProgressionForecast({ gameState: createGameState(highCa), player: highCa, playerRating: createRating({ ovrNormalized: 88 }), seasonPerformance: null });
+    //
+    // `developmentFactors.potentialGapFactor` is driven by the STAR-space CA->PO
+    // gap (buildPlayerStarScoutingSnapshot / getPotentialGapXpFactor), and CA
+    // stars are percentile-based within the league (player-axis-star-rating.ts).
+    // A single-player "league" makes every player's percentile degenerate to the
+    // same 0.5-star floor, erasing any low-vs-high CA distinction in star-space
+    // even though the raw numeric CA differs — that's why this needs a small
+    // synthetic league (dummy comparison players) to give the two scenarios
+    // genuinely different CA percentiles. Both players get an explicit
+    // hiddenPotentialScore of 90 (>= CA in both cases, honoring the corrected
+    // PO>=CA floor): for the low-CA player that leaves a large CA->PO star gap,
+    // for the high-CA player (whose stats sit near the top of the synthetic
+    // league) it leaves only a small one.
+    const dummyPlayers = [20, 30, 40, 50, 60, 70, 75, 80, 85].map((value, index) =>
+      createPlayer({ id: `dummy-${index}`, coreStats: { pow: value, spe: value, men: value, soc: value } }),
+    );
+    const lowCa = createPlayer({ id: "low", rating: 45, coreStats: { pow: 45, spe: 45, men: 45, soc: 45 } });
+    const highCa = createPlayer({ id: "high", rating: 88, coreStats: { pow: 88, spe: 88, men: 88, soc: 88 } });
+
+    const lowGameState = createGameState(lowCa);
+    lowGameState.players = [lowCa, ...dummyPlayers];
+    lowGameState.playerPotential = [
+      { playerId: "low", potentialBand: "high", hiddenPotentialScore: 90, confidence: 0, source: "generated" },
+    ];
+    const highGameState = createGameState(highCa);
+    highGameState.players = [highCa, ...dummyPlayers];
+    highGameState.playerPotential = [
+      { playerId: "high", potentialBand: "high", hiddenPotentialScore: 90, confidence: 0, source: "generated" },
+    ];
+
+    const lowForecast = buildPlayerProgressionForecast({
+      gameState: lowGameState,
+      player: lowCa,
+      playerRating: createRating({ playerId: "low", ovrNormalized: 45 }),
+      seasonPerformance: null,
+    });
+    const highForecast = buildPlayerProgressionForecast({
+      gameState: highGameState,
+      player: highCa,
+      playerRating: createRating({ playerId: "high", ovrNormalized: 88 }),
+      seasonPerformance: null,
+    });
 
     expect(highForecast.maintenanceXP).toBeGreaterThan(lowForecast.maintenanceXP);
     expect(highForecast.developmentFactors.potentialGapFactor).toBeLessThan(lowForecast.developmentFactors.potentialGapFactor);

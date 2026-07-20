@@ -24,7 +24,7 @@ import { loadEnvConfig } from "@next/env";
 
 loadEnvConfig(path.resolve(__dirname, ".."));
 
-import type { GameState, StandingRecord } from "@/lib/data/olyDataTypes";
+import type { GameState, SponsorCurveShape, SponsorRarity, StandingRecord } from "@/lib/data/olyDataTypes";
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import {
@@ -45,6 +45,11 @@ import {
   getLeagueMinimumSalaryTotal,
 } from "@/lib/sponsor/sponsor-economy-calibration";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
+import {
+  SPONSOR_CURVE_SHAPES,
+  SPONSOR_RARITIES,
+  mapArchetypeToCurveShape,
+} from "@/lib/sponsor/sponsor-curve-shapes";
 import { buildLeagueTeamQualityRanks } from "@/lib/sponsor/sponsor-team-quality-rank";
 import { upsertSeasonSnapshotRecord } from "@/lib/season/season-snapshot-service";
 import type { SeasonSnapshotRecord, SeasonSnapshotTeamRecord } from "@/lib/data/olyDataTypes";
@@ -87,6 +92,22 @@ function sign(v: number) {
 
 function pad(s: string | number, n: number) {
   return String(s).padStart(n);
+}
+
+/** Rarität + Kurvenform aus einem Vertrag/Angebot auflösen (mit Back-Compat auf Altverträge). */
+function resolveSponsorMeta(
+  contract: { rarity?: SponsorRarity; curveShape?: SponsorCurveShape; archetype?: string } | null | undefined,
+): { rarity: SponsorRarity | null; curveShape: SponsorCurveShape | null } {
+  if (contract == null) return { rarity: null, curveShape: null };
+  const rarity = contract.rarity ?? "magisch";
+  const curveShape = contract.curveShape ?? mapArchetypeToCurveShape(contract.archetype as never);
+  return { rarity, curveShape };
+}
+function rarityLabel(rarity: SponsorRarity | null): string {
+  return rarity ? SPONSOR_RARITIES[rarity].labelDe : "—";
+}
+function curveLabel(curveShape: SponsorCurveShape | null): string {
+  return curveShape ? SPONSOR_CURVE_SHAPES[curveShape].labelDe : "—";
 }
 
 // ─── Rank simulation ──────────────────────────────────────────────────────────
@@ -178,7 +199,8 @@ type TeamYearRow = {
   shortCode: string;
   budget: number;
   rank: number;
-  starTier: number | null;
+  rarity: SponsorRarity | null;
+  curveShape: SponsorCurveShape | null;
   qualityRank: number | null;
   sponsorPayout: number;
   prizeMoneyRef: number;
@@ -248,9 +270,9 @@ function runShowcase() {
   console.log("╚══════════════════════════════════════════════════════════════════════════╝\n");
   console.log(`Salary Factor: ×${factor}\n`);
   console.log(
-    `${"Team".padEnd(22)} ${"Pl".padStart(3)} ${"Basis".padStart(7)} ${"Stufen".padStart(7)} ${"Total".padStart(7)} ${"PG-Ref".padStart(7)} ${"Stufen frei".padStart(28)}`,
+    `${"Team".padEnd(28)} ${"Rarität".padEnd(11)} ${"Kurve".padEnd(16)} ${"Pl".padStart(3)} ${"Basis".padStart(7)} ${"Stufen".padStart(7)} ${"Total".padStart(7)} ${"PG-Ref".padStart(7)} ${"Stufen frei".padStart(20)}`,
   );
-  console.log("─".repeat(90));
+  console.log("─".repeat(120));
 
   for (const { team, rank } of showcaseTeams.sort((a, b) => a.rank - b.rank)) {
     const contract = getTeamSponsorContract(gs, team.teamId);
@@ -277,11 +299,10 @@ function runShowcase() {
     const stufen = round1(rankPaid + extraPaid * 0.5);
     const prizeRef = getPrizeMoneyReference(rank, factor);
     const unlocked = getUnlockedMilestones(rank).map((m) => m.label).join(", ") || "—";
-    const archetype = contract?.archetype ?? "?";
-    const stars = contract?.starTier ?? "?";
+    const { rarity, curveShape } = resolveSponsorMeta(contract);
 
     console.log(
-      `${team.shortCode.padEnd(6)} ${archetype.slice(0, 4).padEnd(4)} ${String(stars).padStart(1)}★ ${team.name.substring(0, 10).padEnd(10)} ${pad(rank, 3)} ${pad(basis.toFixed(1), 7)} ${pad(stufen.toFixed(1), 7)} ${pad(total.toFixed(1), 7)} ${pad(prizeRef.toFixed(1), 7)} ${unlocked.substring(0, 28).padEnd(28)}`,
+      `${`${team.shortCode} ${team.name}`.substring(0, 27).padEnd(28)} ${rarityLabel(rarity).padEnd(11)} ${curveLabel(curveShape).padEnd(16)} ${pad(rank, 3)} ${pad(basis.toFixed(1), 7)} ${pad(stufen.toFixed(1), 7)} ${pad(total.toFixed(1), 7)} ${pad(prizeRef.toFixed(1), 7)} ${unlocked.substring(0, 20).padEnd(20)}`,
     );
   }
 
@@ -403,7 +424,7 @@ async function main() {
         shortCode: team.shortCode,
         budget: team.budget ?? 0,
         rank,
-        starTier: contract?.starTier ?? null,
+        ...resolveSponsorMeta(contract),
         qualityRank: quality?.qualityRank ?? null,
         sponsorPayout,
         prizeMoneyRef,
@@ -437,13 +458,13 @@ async function main() {
     console.log(`   Besser als Preisgeld: ${aboveRef}/32 Teams`);
 
     if (VERBOSE) {
-      console.log(`\n   Rang  ${"Team".padEnd(22)} ${"Q".padStart(5)} ${"★".padStart(2)} ${"Budget".padStart(7)} ${"Sponsor".padStart(8)} ${"PGeld".padStart(7)} ${"Delta".padStart(7)} ${"CashNach".padStart(9)}`);
-      console.log(`   ${"─".repeat(78)}`);
+      console.log(`\n   Rang  ${"Team".padEnd(18)} ${"Rarität".padEnd(11)} ${"Kurve".padEnd(16)} ${"Q".padStart(5)} ${"Budget".padStart(7)} ${"Sponsor".padStart(8)} ${"PGeld".padStart(7)} ${"Delta".padStart(7)} ${"CashNach".padStart(9)}`);
+      console.log(`   ${"─".repeat(104)}`);
       for (const t of sorted) {
         const dStr = sign(t.delta);
         const flag = t.delta >= 0 ? " ✓" : "  ";
         console.log(
-          `   ${pad(t.rank, 3)}  ${t.shortCode.padEnd(6)} ${t.name.substring(0, 14).padEnd(15)} ${pad(t.qualityRank?.toFixed(1) ?? "—", 5)} ${pad(t.starTier ?? "—", 2)} ${pad(t.budget, 7)} ${pad(t.sponsorPayout.toFixed(1), 8)} ${pad(t.prizeMoneyRef.toFixed(1), 7)} ${pad(dStr, 7)} ${pad(t.cashAfter.toFixed(1), 9)}${flag}`,
+          `   ${pad(t.rank, 3)}  ${t.shortCode.padEnd(4)} ${t.name.substring(0, 12).padEnd(13)} ${rarityLabel(t.rarity).padEnd(11)} ${curveLabel(t.curveShape).padEnd(16)} ${pad(t.qualityRank?.toFixed(1) ?? "—", 5)} ${pad(t.budget, 7)} ${pad(t.sponsorPayout.toFixed(1), 8)} ${pad(t.prizeMoneyRef.toFixed(1), 7)} ${pad(dStr, 7)} ${pad(t.cashAfter.toFixed(1), 9)}${flag}`,
         );
       }
       console.log();
@@ -561,15 +582,15 @@ async function main() {
   console.log("Platzierungs-Verlauf (8 Teams: Top, Mid, Bottom + stärkste Bewegung):\n");
   const spotlightIds = pickSpotlightTeams(gs.teams, rankHistoryByTeamId);
   console.log(
-    `  ${"Team".padEnd(22)} ${results.map((yr) => `J${yr.year}Pl`.padStart(7)).join(" ")} ${results.map((yr) => `J${yr.year}★`.padStart(6)).join(" ")}`,
+    `  ${"Team".padEnd(22)} ${results.map((yr) => `J${yr.year}Pl`.padStart(7)).join(" ")} ${results.map((yr) => `J${yr.year}Rarität`.padStart(11)).join(" ")}`,
   );
   for (const teamId of spotlightIds) {
     const team = gs.teams.find((entry) => entry.teamId === teamId)!;
     const ranks = rankHistoryByTeamId.get(teamId) ?? [];
-    const stars = results.map((yr) => yr.teams.find((entry) => entry.teamId === teamId)?.starTier ?? "—");
+    const rarities = results.map((yr) => rarityLabel(yr.teams.find((entry) => entry.teamId === teamId)?.rarity ?? null));
     process.stdout.write(`  ${team.shortCode.padEnd(6)} ${team.name.substring(0, 14).padEnd(15)}`);
     ranks.forEach((rank) => process.stdout.write(` ${pad(rank, 7)}`));
-    stars.forEach((star) => process.stdout.write(` ${pad(String(star), 6)}`));
+    rarities.forEach((r) => process.stdout.write(` ${pad(r, 11)}`));
     console.log();
   }
 

@@ -8,6 +8,7 @@ import {
   getAttributeGrowthMultiplier,
   getAttributeHeadroom,
   getPerformanceHeadroomGrowthMultiplier,
+  mapAxisPoStarsToNumericCeiling,
   mapNumericCeilingToAxisPoStars,
 } from "@/lib/scouting/player-attribute-ceiling-service";
 import { buildPlayerPotentialCeilingProfile } from "@/lib/scouting/player-potential-ceiling-service";
@@ -123,6 +124,18 @@ describe("player attribute ceiling service", () => {
     expect(axis.spe).toBe(mapNumericCeilingToAxisPoStars(55));
   });
 
+  it("round-trips stars -> numeric ceiling -> stars as true inverses", () => {
+    // Regression test: the forward and inverse maps used mismatched spans (a stray
+    // +0.5 offset and a /4.5 denominator on the inverse) causing a systematic +0.5★
+    // drift at low/mid ceilings. mapNumericCeilingToAxisPoStars must be the EXACT
+    // mathematical inverse of mapAxisPoStarsToNumericCeiling.
+    for (let stars = 0.5; stars <= 5; stars += 0.5) {
+      const numeric = mapAxisPoStarsToNumericCeiling(stars);
+      const roundTripped = mapNumericCeilingToAxisPoStars(numeric);
+      expect(roundTripped).toBeCloseTo(stars, 1);
+    }
+  });
+
   it("caps attribute growth multiplier at 0.05 when at ceiling", () => {
     expect(getAttributeGrowthMultiplier("capped")).toBe(0.05);
     expect(getAttributeGrowthMultiplier("closing")).toBe(0.45);
@@ -197,5 +210,57 @@ describe("player attribute ceiling service", () => {
         record,
       }),
     );
+  });
+
+  it("reports an at/over-cap attribute as capped with 0 headroom (not open/0.80 multiplier)", () => {
+    // Bugfix: Ein bruchteilig ueber dem ganzzahligen Ceiling liegender Wert wurde frueher
+    // als state:"open"/headroom:2 gemeldet, was den Performance-Wachstumsmultiplikator von
+    // 0.55 (am Limit) auf 0.80 anhob und den Potenzial-Cap durchbrach.
+    const target = player({
+      id: "over-cap-player",
+      attributeSheetStats: {
+        power: 72.4, // gebrochen ueber dem ganzzahligen Ceiling 72
+        health: 70,
+        stamina: 68,
+        speed: 40,
+        dexterity: 38,
+        awareness: 36,
+        intelligence: 35,
+        will: 34,
+        charisma: 40,
+        spirit: 38,
+        determination: 42,
+        torment: 45,
+      },
+    });
+    const record: PlayerPotentialRecord = {
+      playerId: target.id,
+      potentialBand: "medium",
+      hiddenPotentialScore: 70,
+      confidence: 0,
+      source: "generated",
+      hiddenAttributeCeiling: {
+        power: 72,
+        health: 75,
+        stamina: 70,
+        speed: 80,
+        dexterity: 78,
+        awareness: 76,
+        intelligence: 74,
+        will: 72,
+        charisma: 78,
+        spirit: 76,
+        determination: 80,
+        torment: 73,
+      },
+    };
+
+    const headroom = getAttributeHeadroom({ player: target, attribute: "power", record });
+    expect(headroom.state).toBe("capped");
+    expect(headroom.headroom).toBe(0);
+    expect(headroom.ceiling).toBe(72); // echtes Ceiling, kein kuenstliches current+2
+    // At-cap Performance-Multiplikator = 0.55, NICHT 0.80.
+    expect(getPerformanceHeadroomGrowthMultiplier(headroom.headroom)).toBeCloseTo(0.55, 5);
+    expect(getPerformanceHeadroomGrowthMultiplier(headroom.headroom)).toBeLessThan(0.8);
   });
 });

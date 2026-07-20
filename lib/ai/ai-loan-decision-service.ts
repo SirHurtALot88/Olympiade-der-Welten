@@ -305,6 +305,34 @@ export type AiEarlyPayoffDecision = {
   reason: string;
 };
 
+/** Maximaler Anteil des Überschusses, den ein ausgeprägter Spender als Transfer-Trockenpulver zurückhält. */
+const MAX_SPENDER_HOLDBACK = 0.7;
+/** Selbst ein extremer Spender setzt mindestens diesen Anteil des Überschusses für Ablösungen ein. */
+const MIN_PAYOFF_DEPLOY_FRACTION = 0.3;
+
+/**
+ * Wie viel des Ablöse-Überschusses ein Team tatsächlich in vorzeitige Tilgung steckt — organisch nach
+ * GM-Disposition, kein harter Schwellwert. Ein finanziell disziplinierter/vorsichtiger GM (hohe
+ * cashPriority, niedrige riskTolerance/starPriority) setzt den GANZEN Überschuss ein und tilgt teure
+ * Kredite aggressiv; ein Spender (niedrige cashPriority, hohe Risiko-/Star-Gier) behält einen Teil als
+ * Trockenpulver für Transfers zurück und tilgt entsprechend weniger. Neutral (alle Bias = 5) → 1.0,
+ * also unverändertes Verhalten.
+ */
+function resolveEarlyPayoffDeployFraction(gameState: GameState, teamId: string): number {
+  const profile = getTeamStrategyProfile(gameState, teamId);
+  const cashPriority = profile?.bias.cashPriority ?? 5;
+  const riskTolerance = profile?.bias.riskTolerance ?? 5;
+  const starPriority = profile?.bias.starPriority ?? 5;
+  // "spenderness": 0 für einen neutralen/disziplinierten GM, steigt Richtung 1 für einen klassischen
+  // Spender (will Cash lieber in Stars/Transfers stecken als Schulden vorzeitig ablösen).
+  const spenderness = clamp(
+    (5 - cashPriority) * 0.09 + (riskTolerance - 5) * 0.05 + (starPriority - 5) * 0.03,
+    0,
+    1,
+  );
+  return round(clamp(1 - spenderness * MAX_SPENDER_HOLDBACK, MIN_PAYOFF_DEPLOY_FRACTION, 1), 3);
+}
+
 /**
  * Ordnet Ablöse-Kandidaten so, dass mit begrenztem Überschuss möglichst viele Kredite abgelöst
  * werden können: kleinste Ablösesumme zuerst, bei Gleichstand die höher verzinsten Kredite zuerst
@@ -344,8 +372,16 @@ export function resolveAiEarlyPayoffDecision(gameState: GameState, teamId: strin
 
   const needsEur = estimateRosterNeedEur(gameState, teamId);
   const spendableCash = resolveTeamSpendableCashForPlanning(gameState, teamId, team.cash ?? 0);
-  let surplus = round(spendableCash - needsEur, 1);
+  const surplus = round(spendableCash - needsEur, 1);
   if (surplus <= 0) return { loanIdsToPayoff: [], reason: "no_surplus" };
+
+  // Organisch statt „alles-oder-nichts": nur ein disposition-abhängiger Teil des Überschusses fließt
+  // in vorzeitige Tilgung. Ein disziplinierter GM setzt (nahezu) den ganzen Überschuss ein und wird
+  // teure Kredite aggressiv los; ein Spender hält Trockenpulver für Transfers zurück (siehe
+  // resolveEarlyPayoffDeployFraction). Die Ablöse skaliert damit sowohl mit dem Überschuss-Verhältnis
+  // (größerer Überschuss ⇒ mehr Budget) als auch mit der GM-Disposition — kein harter Universalwert.
+  let payoffBudget = round(surplus * resolveEarlyPayoffDeployFraction(gameState, teamId), 1);
+  if (payoffBudget <= 0) return { loanIdsToPayoff: [], reason: "surplus_reserved_for_transfers" };
 
   // Hysterese: ein gerade erst (dieselbe Saison) aufgenommener Kredit wird nicht abgelöst.
   const candidates = activeLoans.filter((loan) => loan.originatedSeasonId !== seasonId);
@@ -353,9 +389,9 @@ export function resolveAiEarlyPayoffDecision(gameState: GameState, teamId: strin
 
   const loanIdsToPayoff: string[] = [];
   for (const { loan, payoff } of sortEarlyPayoffCandidates(candidates)) {
-    if (surplus < payoff) continue;
+    if (payoffBudget < payoff) continue;
     loanIdsToPayoff.push(loan.loanId);
-    surplus = round(surplus - payoff, 1);
+    payoffBudget = round(payoffBudget - payoff, 1);
   }
 
   if (loanIdsToPayoff.length === 0) {

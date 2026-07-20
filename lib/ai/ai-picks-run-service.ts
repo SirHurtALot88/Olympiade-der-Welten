@@ -2930,7 +2930,7 @@ function runSeason1ExecuteEmergencyMinFill(input: {
 }
 
 /**
- * Organic-squad-builder execute path for ONE team (flag: OLY_ORGANIC_SQUAD_BUILDER, default OFF).
+ * Organic-squad-builder execute path for ONE team (flag: OLY_ORGANIC_SQUAD_BUILDER, default ON).
  *
  * SELF-CONTAINED: replaces the entire per-team execute body (frozenTrace loop + spend-down/emergency
  * fills + team-end flush + result push) when the flag is on, so the flag-off default path stays
@@ -3039,6 +3039,16 @@ function runOrganicTeamDraftExecute(input: {
   teamWarnings.push(`organic_squad_builder:decisions=${plan.decisions.length}`);
   if (plan.stoppedBelowMin) {
     teamWarnings.push("organic_squad_builder_stopped_below_min");
+  }
+  // Debug/diagnostics for the long-run harness (scripts/long-run-sandbox-s1-s6.ts): salaryCeiling vs the
+  // salary the plan actually lands on, so a re-run can be eyeballed for headroom-freed vs squeezed teams.
+  // Undefined when OLY_SALARY_CEILING_V2="0" (see draft-adapter.ts) — no warning pushed in that case.
+  if (plan.salaryCeilingDebug) {
+    const c = plan.salaryCeilingDebug;
+    teamWarnings.push(
+      `salary_ceiling_v2:ceiling=${c.salaryCeiling}:sustainable=${c.sustainableSalary}:trend=${c.trendFactor}:` +
+        `ambitionScale=${c.ambitionScale}:planSalaryAfter=${plan.finalSalaryTotal}`,
+    );
   }
 
   // 4. Execute each decision in order via the shared buy primitive. The plan is a RANKED wishlist,

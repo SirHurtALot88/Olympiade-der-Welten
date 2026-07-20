@@ -152,6 +152,11 @@ describe("player star scouting integration", () => {
 
   it("feeds drawer with effective scouting level and axis displays", () => {
     const state = gameState();
+    // Progressive-PO-Reveal: Der exakte Potential-Sterne-Display eigener Spieler
+    // wird erst ab scouting_office L5 freigegeben (der Roster-Zugehörigkeits-Bonus
+    // allein reicht nicht). Für diesen Reveal-Pfad wird das Facility-Level auf 5
+    // gehoben; CURRENT-Sterne (axisStarsDisplay) sind davon unabhängig sichtbar.
+    state.seasonState.teamFacilities!["M-M"]!.facilities.scouting_office!.level = 5;
     const drawer = buildPlayerDrawerDataFromGameState({
       gameState: state,
       playerId: "p-1",

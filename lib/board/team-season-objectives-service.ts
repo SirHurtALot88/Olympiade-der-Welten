@@ -466,11 +466,22 @@ export function getExpectationRankObjective(input: {
   profile: TeamStrategyProfile | null;
   row: TeamManagementSnapshotRow;
   rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
+  // V2: stärke-kalibrierter Zielrang (getSportTargetV2 mit BOARD_V2_CALIBRATION + Dispositions-
+  // Ambition). Überschreibt NUR den Zielrang der gewerteten Slot-1-Sportvorgabe — Belohnung/Strafe
+  // und der Confidence-Swing bleiben (rankDelta-basiert) unverändert. Ohne Override (V1, Flag aus)
+  // greift weiter das statische identity.ambition-Ziel.
+  targetRankOverride?: number | null;
 }): ObjectiveDraft {
   const expectation = computeTeamExpectation({ row: input.row, rowsByTeamId: input.rowsByTeamId, identity: input.identity });
   const ambition = input.identity?.ambition ?? 5;
   const overachieveGap = Math.max(1, Math.round(1 + ambition / 3));
-  const targetRank = clamp(expectation.expectedRank - overachieveGap, 1, expectation.teamCount);
+  const targetRank =
+    input.targetRankOverride != null
+      ? clamp(Math.round(input.targetRankOverride), 1, expectation.teamCount)
+      : clamp(expectation.expectedRank - overachieveGap, 1, expectation.teamCount);
+  // Für den Detail-Text: der tatsächlich geforderte Vorsprung. Ohne Override identisch zu
+  // overachieveGap (V1 unverändert), mit Override das echte Delta zum kalibrierten V2-Ziel.
+  const detailGap = input.targetRankOverride != null ? Math.max(0, expectation.expectedRank - targetRank) : overachieveGap;
   const currentRank = input.row.rank ?? null;
   const status = statusForRank(currentRank, targetRank);
 
@@ -485,7 +496,7 @@ export function getExpectationRankObjective(input: {
     objectiveId: "expectation-rank",
     category: "sport",
     label: `Übertreffe die Erwartung (Top ${targetRank})`,
-    detail: `Kaderstärke erwartet Rang #${expectation.expectedRank}/${expectation.teamCount}. Ziel: mindestens ${overachieveGap} Plätze besser abschneiden.`,
+    detail: `Kaderstärke erwartet Rang #${expectation.expectedRank}/${expectation.teamCount}. Ziel: mindestens ${detailGap} Plätze besser abschneiden.`,
     actionHint: "Transfers und Aufstellung so priorisieren, dass die Erwartung der Kaderstärke übertroffen wird.",
     targetValue: `Top ${targetRank}`,
     currentValue: currentRank ?? "offen",
@@ -810,7 +821,7 @@ export function getSportTargetV2(input: {
  * V2 finance goal (replaces the tautological "cash > 0"): a net transfer-balance target scaled by
  * cash priority + season maturity — a real "run a sustainable transfer economy" objective.
  */
-function getNetTransferBalanceObjective(input: {
+export function getNetTransferBalanceObjective(input: {
   row: TeamManagementSnapshotRow;
   profile: TeamStrategyProfile | null;
   seasonNum: number;
@@ -822,17 +833,48 @@ function getNetTransferBalanceObjective(input: {
     1,
   );
   const current = roundValue(input.row.transferNet ?? 0, 1);
-  const status = statusForMin(input.row.transferNet ?? null, target);
+
+  if (target > 0) {
+    // Cash-focused board: it genuinely demands a transfer surplus. statusForMin keeps the at_risk band
+    // (>= 85% of target) so a near-miss is not a hard fail.
+    const status = statusForMin(input.row.transferNet ?? null, target);
+    return {
+      objectiveId: "finance-net-transfer-balance",
+      category: "finance",
+      label: `Transferbilanz ≥ ${target}M`,
+      targetValue: target,
+      currentValue: current,
+      status,
+      rewardCash: 4,
+      penaltyCash: 3,
+      boardConfidenceDelta: status === "completed" ? 0.4 : status === "failed" ? -0.5 : status === "at_risk" ? -0.15 : 0,
+      source: "board_v2_net_transfer_balance",
+    };
+  }
+
+  // Neutral/low cash-priority board (target 0): a positive surplus is NOT demanded — normal
+  // squad-building net spend is expected. Instead of the old hard binary (any net-buy → failed), treat
+  // it as a soft ceiling on overspend via a statusForMax band with a real at_risk zone. A modest net-buy
+  // within the cash-scaled ceiling is completed; only reckless overspend past the ceiling+15% fails.
+  const netSpend = roundValue(Math.max(0, -(input.row.transferNet ?? 0)), 1);
+  const ceiling = roundValue(
+    Math.max(
+      BOARD_V2_NET_TRANSFER.overspendCeilingFloorM,
+      (input.row.cash ?? 0) * BOARD_V2_NET_TRANSFER.overspendCeilingCashFraction,
+    ),
+    1,
+  );
+  const status = statusForMax(netSpend, ceiling);
   return {
     objectiveId: "finance-net-transfer-balance",
     category: "finance",
-    label: target > 0 ? `Transferbilanz ≥ ${target}M` : "Transferbilanz stabil halten",
-    targetValue: target,
-    currentValue: current,
+    label: `Transferausgaben unter ${ceiling}M halten`,
+    detail: `Aktuelle Netto-Ausgaben ${netSpend}M (Netto-Transfer ${current}M).`,
+    targetValue: ceiling,
+    currentValue: netSpend,
     status,
-    rewardCash: target > 0 ? 4 : undefined,
-    penaltyCash: target > 0 ? 3 : undefined,
-    boardConfidenceDelta: status === "completed" ? 0.4 : status === "failed" ? -0.5 : status === "at_risk" ? -0.15 : 0,
+    penaltyCash: status === "failed" ? 3 : undefined,
+    boardConfidenceDelta: status === "completed" ? 0.2 : status === "failed" ? -0.4 : status === "at_risk" ? -0.1 : 0,
     source: "board_v2_net_transfer_balance",
   };
 }
@@ -1643,7 +1685,18 @@ function buildTeamObjectives(input: {
       getAxisRankObjective({ team, identity, profile, rowsByTeamId }),
       getAllRoundAxisObjective({ team, identity, profile, rowsByTeamId }),
       // From origin/main: richer board objective slate.
-      getExpectationRankObjective({ team, identity, profile, row, rowsByTeamId }),
+      // V2: die tatsächlich gewertete Slot-1-Sportvorgabe (expectation-rank) trägt jetzt den stärke-
+      // kalibrierten V2-Zielrang (getSportTargetV2 mit BOARD_V2_CALIBRATION + Dispositions-Ambition)
+      // statt des statischen identity.ambition-Ziels. Bisher wurde sportTarget nur in den stets
+      // verworfenen sport-rank-* Draft eingebettet — die V2-Kalibrierung erreichte das gewertete Ziel nie.
+      getExpectationRankObjective({
+        team,
+        identity,
+        profile,
+        row,
+        rowsByTeamId,
+        targetRankOverride: boardV2 ? sportTarget.rank : null,
+      }),
       getUpsetAvoidanceObjective({ team, identity, profile, row, rowsByTeamId, gameState }),
       getTransferSpendCeilingObjective({ team, identity, profile, row }),
       getSignatureAxisWinObjective({ team, identity, profile, gameState }),
@@ -1763,6 +1816,12 @@ export function calculateBoardConfidence(input: {
   previousSeasonBoard?: TeamBoardConfidenceRecord | null;
   gmChangedThisSeason?: boolean;
   neutralPreseasonBoard?: boolean;
+  /**
+   * Season 1 (no prior board record): every team starts at the neutral DEFAULT_BOARD_RATING (5/10)
+   * instead of its identity.boardConfidence. Board trust is then earned through performance via the
+   * objective deltas below. Only applies when there is no carried previous-season board value.
+   */
+  initialSeason?: boolean;
   /** Slice 4 (F2): team captain's leadership score; dampens perceivedPressure under V2. */
   captainLeadershipScore?: number | null;
 }): TeamBoardConfidenceRecord {
@@ -1779,7 +1838,11 @@ export function calculateBoardConfidence(input: {
   const identitySeed = normalizeBoardConfidence(input.identity?.boardConfidence ?? input.storedBoard?.value ?? null);
   const prev = input.previousSeasonBoard?.value ?? null;
   let base: number;
-  if (prev != null && !input.gmChangedThisSeason) {
+  if (input.initialSeason && prev == null) {
+    // S1-for-all: uniform neutral start (5/10) regardless of identity.boardConfidence. The objective
+    // deltas below still move it within the season, so the opening rating is neutral but not frozen.
+    base = DEFAULT_BOARD_RATING;
+  } else if (prev != null && !input.gmChangedThisSeason) {
     // Same GM: carry over last season's final confidence, blended slightly toward the
     // identity seed to prevent permanent drift away from the team's natural level.
     base = roundValue(prev * 0.8 + identitySeed * 0.2, 1);
@@ -1892,7 +1955,10 @@ function buildAiBias(input: {
 
   return {
     teamId: input.teamId,
-    pressure: input.board.pressure,
+    // V2: exponiere die *gedämpfte* Wahrnehmungs-Pressure (Kapitän- und Dispositions-Dämpfung),
+    // damit die vier AI-Panik-Gates dieselbe gefühlte Pressure sehen wie die Aggressions-Skalare
+    // oben (~:1889). Fällt unter V1 auf die rohe Pressure zurück. Ziele bleiben unberührt.
+    pressure: input.board.perceivedPressure ?? input.board.pressure,
     transferAggression: roundValue((sellAggression + buyAggression) / 2, 2),
     buyAggression: roundValue(buyAggression, 2),
     sellAggression: roundValue(sellAggression, 2),
@@ -1927,6 +1993,7 @@ export function buildTeamObjectiveOverview(gameState: GameState): TeamObjectiveO
   const aiBiasByTeamId: Record<string, TeamObjectiveAiBias> = {};
   const warnings: string[] = [];
   const neutralPreseasonBoard = isSeasonOnePreseasonNeutralBoard(gameState);
+  const initialSeason = (resolveSeasonNumberFromState(gameState) ?? 1) === 1;
 
   for (const team of gameState.teams) {
     const row = rowsByTeamId.get(team.teamId);
@@ -1957,6 +2024,7 @@ export function buildTeamObjectiveOverview(gameState: GameState): TeamObjectiveO
       previousSeasonBoard,
       gmChangedThisSeason,
       neutralPreseasonBoard,
+      initialSeason,
       captainLeadershipScore,
     });
     boardConfidence[team.teamId] = board;
@@ -1978,8 +2046,15 @@ export function buildTeamSeasonObjectiveSettlement(gameState: GameState): TeamSe
   const overview = buildTeamObjectiveOverview(gameState);
   const teamById = new Map(gameState.teams.map((team) => [team.teamId, team] as const));
   const rows: TeamSeasonObjectiveSettlementRow[] = overview.objectives.map((objective) => {
-    const cashDelta =
-      objective.status === "completed"
+    // KRITISCH (Doppelauszahlung): Objectives aus dem Sponsor-Vertrags-Spiegel (`sponsor_v2_contract`)
+    // tragen dieselben rewardCash/penaltyCash wie die echten Vertragskomponenten — die werden aber bereits
+    // im Sponsor-Settlement (sponsor-settlement-service.ts, VOR diesem Board-Settlement) auf team.cash
+    // gebucht. Hier NUR die Board-Confidence-Wirkung behalten, cashDelta = 0, sonst käme Sponsorgeld ~2×
+    // an (und verfehlte Rangziele würden doppelt bestraft). Nicht-Sponsor-Board-Ziele zahlen normal.
+    const isSponsorContractMirror = (objective.source ?? "").includes("sponsor_v2_contract");
+    const cashDelta = isSponsorContractMirror
+      ? 0
+      : objective.status === "completed"
         ? objective.rewardCash ?? 0
         : objective.status === "failed"
           ? -(objective.penaltyCash ?? 0)
@@ -2202,12 +2277,13 @@ function buildStoredObjectiveAiBiasByTeamId(gameState: GameState) {
     objectivesByTeamId.set(objective.teamId, objectives);
   }
 
+  const initialSeason = (resolveSeasonNumberFromState(gameState) ?? 1) === 1;
   const aiBiasByTeamId: Record<string, TeamObjectiveAiBias> = {};
   for (const team of gameState.teams) {
     const objectives = objectivesByTeamId.get(team.teamId) ?? [];
     const identity = gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
     const storedBoard = storedBoardConfidence[team.teamId] ?? null;
-    const board = storedBoard ?? calculateBoardConfidence({ teamId: team.teamId, identity, objectives, storedBoard: null });
+    const board = storedBoard ?? calculateBoardConfidence({ teamId: team.teamId, identity, objectives, storedBoard: null, initialSeason });
     aiBiasByTeamId[team.teamId] = buildAiBias({ teamId: team.teamId, objectives, board });
   }
 

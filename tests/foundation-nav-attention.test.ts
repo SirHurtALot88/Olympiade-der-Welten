@@ -32,7 +32,7 @@ describe("buildFoundationNavAttention", () => {
               archetype: "tech",
               name: "Tech Sponsor",
               flavor: "Test",
-              starTier: 2,
+              rarity: "gewöhnlich",
               demandProfile: "balanced",
               components: [],
             },

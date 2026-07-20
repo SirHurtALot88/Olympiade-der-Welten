@@ -7,6 +7,7 @@ import type {
   GameState,
   Player,
   PlayerRelationshipEventRecord,
+  PreSeasonWorkflowLogRecord,
   RosterEntry,
   Team,
   TeamStrategyProfile,
@@ -1174,26 +1175,94 @@ function buildPromisedRoleRelationshipEvents(gameState: GameState): PlayerRelati
   });
 }
 
-export function applySeasonEndContractTick(
+// Idempotenz-Marker der Saison-Vertragsalterung. Wird als preSeasonWorkflowLogs-Eintrag je
+// fromSeasonId geführt, damit die Alterung pro echtem Saisonübergang GENAU EINMAL läuft — egal ob
+// sie über den (Vorschau-)Schritt contract_renewal, den Sim-Apply oder den interaktiven
+// Saisonübergang (buildNextSeasonGameState) angestoßen wird. Der stepId ist ein freier String im
+// PreSeasonWorkflowLogRecord-Typ, deshalb keine Änderung an gemeinsamen Typen nötig.
+export const SEASON_END_CONTRACT_TICK_STEP_ID = "season_end_contract_tick";
+
+/** Wurde die Vertragsalterung für die AKTUELLE (auslaufende) Saison bereits angewandt? */
+export function hasSeasonEndContractTickApplied(gameState: GameState): boolean {
+  const seasonId = gameState.season.id;
+  return (gameState.seasonState.preSeasonWorkflowLogs ?? []).some(
+    (log) =>
+      log.stepId === SEASON_END_CONTRACT_TICK_STEP_ID &&
+      log.fromSeasonId === seasonId &&
+      log.status === "applied",
+  );
+}
+
+function buildSeasonEndContractTickLog(input: {
+  save: PersistedSaveGame;
+  renewedPlayers: number;
+  releasedPlayers: number;
+  contractEventsWritten: number;
+}): PreSeasonWorkflowLogRecord {
+  return {
+    logId: `season-end-contract-tick__${input.save.saveId}__${input.save.gameState.season.id}__${randomUUID()}`,
+    saveId: input.save.saveId,
+    fromSeasonId: input.save.gameState.season.id,
+    toSeasonId: input.save.gameState.season.id,
+    stepId: SEASON_END_CONTRACT_TICK_STEP_ID,
+    status: "applied",
+    errors: [],
+    warnings: [
+      `contract_tick_renewed:${input.renewedPlayers}`,
+      `contract_tick_released:${input.releasedPlayers}`,
+      `contract_tick_events:${input.contractEventsWritten}`,
+    ],
+    affectedEntities: [
+      "rosters.contractLength",
+      "rosters.contractStatus",
+      "rosters.yearlySalarySchedule",
+      "teams.cash",
+      "seasonState.contractEvents",
+      "transferHistory",
+    ],
+    timestamp: new Date().toISOString(),
+  };
+}
+
+export type SeasonEndContractTickComputation = {
+  /** Fortgeschriebener GameState (rosters/teams.cash/contractEvents/transferHistory + Marker) — NICHT persistiert. */
+  gameState: GameState;
+  preview: ContractSeasonEndPreview;
+  /** true, wenn in DIESEM Aufruf tatsächlich gealtert wurde. */
+  applied: boolean;
+  /** true, wenn die Alterung für diese Saison bereits vorher lief (No-Op, kein Doppel-Tick). */
+  alreadyApplied: boolean;
+  releasedPlayers: number;
+  renewedPlayers: number;
+  contractEventsWritten: number;
+};
+
+/**
+ * Reine (persistenzfreie) Saison-Vertragsalterung. Schreibt contractLength/Status/Gehaltsplan fort,
+ * lässt 0-Jahres-Verträge auslaufen (Free-Agent-Exit-Cash fließt in team.cash), fährt KI-Verlängern/
+ * -Freigeben und liefert den fortgeschriebenen GameState zurück — OHNE zu persistieren. Idempotent
+ * über hasSeasonEndContractTickApplied: ist der Tick für die auslaufende Saison schon gelaufen, wird
+ * der GameState unverändert zurückgegeben (alreadyApplied=true). Diese Funktion wird sowohl vom
+ * token-geprüften Apply (applySeasonEndContractTick, Route/Sim) als auch vom echten Saisonübergang
+ * (buildNextSeasonGameState) genutzt, damit Verträge im echten Spiel wirklich altern — GENAU EINMAL.
+ */
+export function computeSeasonEndContractTick(
   save: PersistedSaveGame,
-  confirmToken: string | null | undefined,
-  persistence: PersistenceService,
   previewOverride?: ContractSeasonEndPreview,
-): ContractSeasonEndApplyResult {
-  const preview = previewOverride ?? previewSeasonEndContracts(save);
-  if (!confirmToken || confirmToken !== preview.confirmToken) {
+): SeasonEndContractTickComputation {
+  if (hasSeasonEndContractTickApplied(save.gameState)) {
     return {
-      ...preview,
-      dryRun: false,
-      productiveWrites: true,
+      gameState: save.gameState,
+      preview: previewOverride ?? previewSeasonEndContracts(save),
       applied: false,
+      alreadyApplied: true,
       releasedPlayers: 0,
       renewedPlayers: 0,
       contractEventsWritten: 0,
-      blockingReasons: [...preview.blockingReasons, confirmToken ? "contract_preview_stale" : "confirm_token_required"],
     };
   }
 
+  const preview = previewOverride ?? previewSeasonEndContracts(save);
   const rowsByRosterId = new Map(preview.rows.map((row) => [row.rowId, row] as const));
   const teamsById = new Map(save.gameState.teams.map((team) => [team.teamId, team] as const));
   const playersById = new Map(save.gameState.players.map((player) => [player.id, player] as const));
@@ -1341,6 +1410,18 @@ export function applySeasonEndContractTick(
     });
   }
 
+  const releasedPlayers = contractEvents.filter(
+    (event) => event.eventType === "contract_expired" || event.eventType === "player_released" || event.eventType === "contract_expired_exit",
+  ).length;
+  const renewedPlayers = contractEvents.filter((event) => event.eventType === "contract_renewed").length;
+  const contractEventsWritten = contractEvents.length;
+
+  // Idempotenz-Marker der auslaufenden Saison in die Workflow-Logs schreiben. Er wandert beim
+  // Saisonübergang über den seasonState-Spread in die neue Saison mit und verhindert dort einen
+  // zweiten Tick auf denselben (fromSeasonId-)Übergang. Ein SPÄTERER Übergang (neue Saison) hat eine
+  // andere fromSeasonId und altert korrekt erneut.
+  const tickLog = buildSeasonEndContractTickLog({ save, renewedPlayers, releasedPlayers, contractEventsWritten });
+
   const gameState: GameState = {
     ...save.gameState,
     teams: save.gameState.teams.map((team) => {
@@ -1357,6 +1438,7 @@ export function applySeasonEndContractTick(
     seasonState: {
       ...save.gameState.seasonState,
       contractEvents: [...contractEvents, ...(save.gameState.seasonState.contractEvents ?? [])],
+      preSeasonWorkflowLogs: [tickLog, ...(save.gameState.seasonState.preSeasonWorkflowLogs ?? [])],
     },
     logs: [
       {
@@ -1378,18 +1460,69 @@ export function applySeasonEndContractTick(
     ],
   };
 
-  saveGameStateWithContractEvents(save, gameStateWithRelationshipEvents, persistence);
+  return {
+    gameState: gameStateWithRelationshipEvents,
+    preview,
+    applied: true,
+    alreadyApplied: false,
+    releasedPlayers,
+    renewedPlayers,
+    contractEventsWritten,
+  };
+}
+
+/**
+ * Token-geprüfter, PERSISTIERENDER Season-End-Vertrags-Tick (Route/Sim-Pfad). Prüft den Confirm-Token,
+ * ruft die reine computeSeasonEndContractTick und schreibt das Ergebnis über
+ * saveGameStateWithContractEvents. Ist die Alterung für diese Saison bereits gelaufen (z. B. schon über
+ * den echten Saisonübergang), ist der Aufruf ein idempotenter No-Op (applied=false, kein Doppel-Tick).
+ */
+export function applySeasonEndContractTick(
+  save: PersistedSaveGame,
+  confirmToken: string | null | undefined,
+  persistence: PersistenceService,
+  previewOverride?: ContractSeasonEndPreview,
+): ContractSeasonEndApplyResult {
+  const preview = previewOverride ?? previewSeasonEndContracts(save);
+  if (!confirmToken || confirmToken !== preview.confirmToken) {
+    return {
+      ...preview,
+      dryRun: false,
+      productiveWrites: true,
+      applied: false,
+      releasedPlayers: 0,
+      renewedPlayers: 0,
+      contractEventsWritten: 0,
+      blockingReasons: [...preview.blockingReasons, confirmToken ? "contract_preview_stale" : "confirm_token_required"],
+    };
+  }
+
+  const computation = computeSeasonEndContractTick(save, preview);
+  if (computation.alreadyApplied) {
+    // Bereits in dieser Saison gealtert (z. B. über den interaktiven Saisonübergang). Kein zweiter
+    // Tick, keine doppelte Cash-Buchung — sauberer No-Op mit Hinweis-Warnung.
+    return {
+      ...preview,
+      dryRun: false,
+      productiveWrites: true,
+      applied: false,
+      releasedPlayers: 0,
+      renewedPlayers: 0,
+      contractEventsWritten: 0,
+      warnings: Array.from(new Set([...preview.warnings, "season_end_contract_tick_already_applied"])),
+    };
+  }
+
+  saveGameStateWithContractEvents(save, computation.gameState, persistence);
 
   return {
     ...preview,
     dryRun: false,
     productiveWrites: true,
     applied: true,
-    releasedPlayers: contractEvents.filter(
-      (event) => event.eventType === "contract_expired" || event.eventType === "player_released" || event.eventType === "contract_expired_exit",
-    ).length,
-    renewedPlayers: contractEvents.filter((event) => event.eventType === "contract_renewed").length,
-    contractEventsWritten: contractEvents.length,
+    releasedPlayers: computation.releasedPlayers,
+    renewedPlayers: computation.renewedPlayers,
+    contractEventsWritten: computation.contractEventsWritten,
   };
 }
 

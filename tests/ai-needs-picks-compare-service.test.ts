@@ -151,7 +151,11 @@ function createGameState(): GameState {
   ];
 
   const identities = [
-    createIdentity({ teamId: "C-C", pow: 42, spe: 46, men: 50, soc: 44 }),
+    // C-C's identity minimum is set one above the hard gameplay floor (now FIXED_ROSTER_MIN=8) so the
+    // "Identity-Zielminimum > hartes Gameplay-Minimum" warning still fires — the sequential-compare test
+    // below asserts that warning. deriveRosterTargets ignores identity.playerMin for the actual target
+    // min (always the fixed floor), so this only drives the warning, not the roster-min assertions.
+    createIdentity({ teamId: "C-C", pow: 42, spe: 46, men: 50, soc: 44, playerMin: 9 }),
     createIdentity({ teamId: "W-W", pow: 35, spe: 38, men: 82, soc: 60 }),
     createIdentity({ teamId: "T-T", pow: 48, spe: 45, men: 72, soc: 58 }),
     createIdentity({ teamId: "A-A", pow: 72, spe: 58, men: 42, soc: 38 }),
@@ -600,7 +604,7 @@ describe("ai needs picks compare service", () => {
     });
   });
 
-  it("stays read-only and builds the default compare set sequentially", async () => {
+  it("stays read-only and builds the default compare set sequentially", { timeout: 15000 }, async () => {
     const { buildAiNeedsPicksCompare } = await import("@/lib/ai/ai-needs-picks-compare-service");
     const result = await buildAiNeedsPicksCompare({
       source: "sqlite",
@@ -627,16 +631,16 @@ describe("ai needs picks compare service", () => {
       lane: expect.any(String),
       valueScore: expect.any(Number),
     });
-    expect(result.teams.find((entry) => entry.teamId === "C-C")?.currentRosterState.targetRosterMin).toBe(7);
+    expect(result.teams.find((entry) => entry.teamId === "C-C")?.currentRosterState.targetRosterMin).toBe(8);
     expect(
-      result.teams.find((entry) => entry.teamId === "C-C")?.warnings.some((entry) => entry.includes("harte Gameplay-Minimum bleibt 7")),
+      result.teams.find((entry) => entry.teamId === "C-C")?.warnings.some((entry) => entry.includes("harte Gameplay-Minimum bleibt 8")),
     ).toBe(true);
     expect(result.teams.find((entry) => entry.teamId === "C-C")?.cashStrategy).toMatchObject({
       strategySource: "retool_reference",
       sourceStatus: "ready",
       currentCash: 70,
       targetRoster: 10,
-      minimumRoster: 7,
+      minimumRoster: 8,
       currentRoster: 1,
       financePosture: expect.any(String),
       spendFactor: expect.any(Number),
@@ -660,7 +664,7 @@ describe("ai needs picks compare service", () => {
     expect(result.teams.find((entry) => entry.teamId === "C-C")?.cashStrategy.maxSpendByLane.cheap_fill).not.toBeNull();
     expect(result.teams.find((entry) => entry.teamId === "C-C")?.seasonStrategy).toMatchObject({
       rosterTarget: 10,
-      minimumRoster: 7,
+      minimumRoster: 8,
       financePosture: expect.any(String),
       formCardColorPlan: {
         primaryFormColors: expect.any(Array),

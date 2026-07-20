@@ -95,7 +95,10 @@ function buildModifierSidePlan(
   };
 }
 
-function buildAiAuditSummary(preview: AiLegacyLineupPreview): AiLegacyLineupAuditSummary {
+function buildAiAuditSummary(
+  preview: AiLegacyLineupPreview,
+  seasonCaptainSlots: number,
+): AiLegacyLineupAuditSummary {
   const items: AiLegacyLineupAuditSummary["items"] = [];
   for (const side of [preview.d1, preview.d2]) {
     const label = `${side.disciplineSide.toUpperCase()} ${side.disciplineName ?? "Diszi"}`;
@@ -117,7 +120,8 @@ function buildAiAuditSummary(preview: AiLegacyLineupPreview): AiLegacyLineupAudi
   items.push({
     label: "Captain-Budget",
     status: preview.captainSlotsRemaining < 0 ? "blocked" : "ok",
-    detail: `${preview.captainSlotsUsed}/${preview.captainSlotsUsed + preview.captainSlotsRemaining} genutzt`,
+    // captainSlotsRemaining spiegelt nach der Planung dieses Spieltags; genutzt = Saison - Rest.
+    detail: `${Math.max(0, seasonCaptainSlots - preview.captainSlotsRemaining)}/${seasonCaptainSlots} genutzt`,
   });
 
   const status = items.some((item) => item.status === "blocked")
@@ -140,7 +144,7 @@ function enrichAiPreview(context: LegacyLineupLoadedContext, preview: AiLegacyLi
       d1: buildModifierSidePlan(context, preview.d1, "d1", modifiers.d1),
       d2: buildModifierSidePlan(context, preview.d2, "d2", modifiers.d2),
     },
-    auditSummary: buildAiAuditSummary(preview),
+    auditSummary: buildAiAuditSummary(preview, context.captainRule?.seasonCaptainSlots ?? 3),
   };
 }
 

@@ -17,12 +17,19 @@ import {
   type NlTone,
 } from "@/components/foundation/new-look";
 import {
-  SPONSOR_ARCHETYPE_META,
+  RarityPill,
   SponsorCrest,
   SponsorOfferCardNewLook,
 } from "@/components/foundation/sponsor/SponsorOfferCardNewLook";
-import { buildSponsorOfferPresentation, getSponsorComponentKindLabel, getSponsorRarityLabel } from "@/lib/sponsor/sponsor-offer-presenter";
+import { buildSponsorOfferPresentation, getSponsorComponentKindLabel } from "@/lib/sponsor/sponsor-offer-presenter";
 import { formatGameFlowBlocker } from "@/lib/foundation/game-flow-blocker-labels";
+import {
+  SPONSOR_CURVE_FAMILIES,
+  SPONSOR_CURVE_SHAPES,
+  SPONSOR_RARITIES,
+  getSponsorCurveFamily,
+  mapArchetypeToCurveShape,
+} from "@/lib/sponsor/sponsor-curve-shapes";
 import type { GameState, SponsorOffer, TeamSponsorContract } from "@/lib/data/olyDataTypes";
 
 import type { FoundationSponsorsPanelProps } from "@/app/foundation/sponsors-v2/FoundationSponsorsPanel";
@@ -127,7 +134,12 @@ function ActiveContractHero({
   gameState: GameState;
   formatCash: (value: number) => string;
 }) {
-  const archetypeMeta = SPONSOR_ARCHETYPE_META[contract.archetype];
+  // Rarität/Kurvenform robust auflösen (Back-Compat für alte Verträge; rarity wird bereits beim Laden aus
+  // dem alten Sternrang zurückgefüllt, siehe save-repository.ts).
+  const rarity = contract.rarity ?? "magisch";
+  const shape = contract.curveShape ?? mapArchetypeToCurveShape(contract.archetype);
+  const shapeLabel = SPONSOR_CURVE_SHAPES[shape].labelDe;
+  const familyLabel = SPONSOR_CURVE_FAMILIES[getSponsorCurveFamily(shape)].labelDe;
   const payoutTiles = buildContractPayoutTiles(contract);
   const paidCount = payoutTiles.filter((tile) => tile.paid).length;
   const termSeasons = contract.termSeasons ?? null;
@@ -157,7 +169,6 @@ function ActiveContractHero({
             (sum, component) => sum + (typeof component.rewardCash === "number" ? component.rewardCash : 0),
             0,
           ),
-          starTier: contract.starTier,
           sponsorBrandId: contract.sponsorBrandId,
           sponsorParentBrandId: contract.sponsorParentBrandId,
           variantKey: contract.variantKey,
@@ -177,18 +188,10 @@ function ActiveContractHero({
         <SponsorCrest name={contract.name} archetype={contract.archetype} />
         <div className="nl-sponsor-hero-copy">
           <span className="nl-sponsor-hero-kicker">
-            Aktiver Vertrag · {archetypeMeta.label}
+            Aktiver Vertrag · {shapeLabel} · {familyLabel}
             {contract.negotiationProfile ? ` · Profil ${contract.negotiationProfile}` : ""}
           </span>
-          {contract.starTier ? (
-            <span
-              className={`nl-sponsor-rarity is-r${contract.starTier}`}
-              title={`Seltenheitsgrad: ${getSponsorRarityLabel(contract.starTier)} (Stufe ${contract.starTier} von 5)`}
-            >
-              <span className="nl-sponsor-rarity-dot" aria-hidden="true" />
-              {getSponsorRarityLabel(contract.starTier)}
-            </span>
-          ) : null}
+          <RarityPill rarity={rarity} className="nl-sponsor-hero-rarity" />
           <strong className="nl-sponsor-hero-name">{contract.name}</strong>
           <small>
             {contract.variantKey ? `${contract.variantKey.replace(/_/g, " ")} · ` : ""}
@@ -287,7 +290,7 @@ export default function FoundationSponsorsNewLook({
           components: offer.components,
           termSeasons: 1,
           negotiationProfile,
-          starTier: offer.starTier,
+          rarity: offer.rarity ?? "magisch",
         });
         const totalCash = adjustedComponents.reduce(
           (sum, component) => sum + (typeof component.rewardCash === "number" ? component.rewardCash : 0),
@@ -347,7 +350,9 @@ export default function FoundationSponsorsNewLook({
         shortCode: team.shortCode,
         sponsorName: contract?.name ?? null,
         archetype: contract?.archetype ?? null,
-        starTier: contract?.starTier ?? null,
+        // Rarität/Kurvenform robust auflösen (Back-Compat für alte Verträge).
+        rarity: contract ? (contract.rarity ?? "magisch") : null,
+        curveShape: contract ? (contract.curveShape ?? mapArchetypeToCurveShape(contract.archetype)) : null,
         totalCash,
         // Golden Card = seltener Premium-Elite-Sponsor (Underdog-Glück). Der
         // Vertrag erbt `variantKey` vom Angebot (sponsor-offer-service), daher
@@ -373,7 +378,9 @@ export default function FoundationSponsorsNewLook({
         return left.sponsorName.localeCompare(right.sponsorName, "de", { sensitivity: "base" });
       }
       if (leagueSponsorSort === "tier") {
-        return (right.starTier ?? -1) - (left.starTier ?? -1);
+        const leftOrder = left.rarity ? SPONSOR_RARITIES[left.rarity].order : -1;
+        const rightOrder = right.rarity ? SPONSOR_RARITIES[right.rarity].order : -1;
+        return rightOrder - leftOrder;
       }
       return (right.totalCash ?? -1) - (left.totalCash ?? -1);
     });
@@ -451,6 +458,11 @@ export default function FoundationSponsorsNewLook({
   const animatedKpiContractCash = useCountUp(activeContractCashTotal);
   const animatedKpiAvgOfferCash = useCountUp(avgOfferCashValue);
 
+  // Erwartete Rarität, direkt aus dem Kommerz-Rating.
+  const expectationRarityLabel = selectedTeamCommercialRating
+    ? SPONSOR_RARITIES[selectedTeamCommercialRating.rarityHint].labelDe
+    : null;
+
   return (
     <div data-testid="foundation-sponsors">
       <section className="nl-sponsor" data-testid="team-sponsor-choice" id="sponsor-choice" data-new-look="true">
@@ -462,7 +474,7 @@ export default function FoundationSponsorsNewLook({
                 ? formatNlNumber(animatedKpiScore ?? selectedTeamCommercialRating.score, 0)
                 : "—"
             }
-            sub={selectedTeamCommercialRating ? `Erwartung: ${getSponsorRarityLabel(selectedTeamCommercialRating.tierHint)}` : undefined}
+            sub={expectationRarityLabel ? `Erwartung: ${expectationRarityLabel}` : undefined}
             tone="accent"
           />
           <StatChip
@@ -499,13 +511,13 @@ export default function FoundationSponsorsNewLook({
                 label="Kommerz"
                 tone="accent"
                 format={(value) => `${formatNlNumber(value, 0)}`}
-                title={`Commercial Rating ${selectedTeamCommercialRating.score}/100 · Erwartung: ${getSponsorRarityLabel(selectedTeamCommercialRating.tierHint)}`}
+                title={`Commercial Rating ${selectedTeamCommercialRating.score}/100 · Erwartung ${expectationRarityLabel ?? "—"}`}
               />
             ) : null
           }
         >
           <p className="nl-sponsor-header-hint">
-            Drei Angebote pro Saison — Sterne-Tier, Basis, Platzierung, Verbesserung und Sonderziel.
+            Drei Angebote pro Saison — Rarität, Kurvenform, Basis, Platzierung, Verbesserung und Sonderziel.
           </p>
           {selectedTeamCommercialRating ? (
             <div className="nl-sponsor-rating-drivers" aria-label="Kommerz-Rating Treiber">
@@ -533,16 +545,7 @@ export default function FoundationSponsorsNewLook({
                 format={(value) => formatNlNumber(value, 0)}
                 title="Prestige/Medaillenhistorie"
               />
-              <small className="nl-sponsor-rating-hint">
-                Erwartung{" "}
-                <span
-                  className={`nl-sponsor-rarity is-r${selectedTeamCommercialRating.tierHint}`}
-                  title={`Erwarteter Seltenheitsgrad: ${getSponsorRarityLabel(selectedTeamCommercialRating.tierHint)}`}
-                >
-                  <span className="nl-sponsor-rarity-dot" aria-hidden="true" />
-                  {getSponsorRarityLabel(selectedTeamCommercialRating.tierHint)}
-                </span>
-              </small>
+              <small className="nl-sponsor-rating-hint">Erwartung: {expectationRarityLabel ?? "—"}</small>
 
               {/* #D12: Nudge zum schwächsten Rating-Treiber — echter Vergleich
                   über den Füllgrad (Wert/Max-Beitrag), eigene Team-Daten. */}
@@ -705,7 +708,7 @@ export default function FoundationSponsorsNewLook({
                   components: offer.components,
                   termSeasons: 1,
                   negotiationProfile,
-                  starTier: offer.starTier,
+                  rarity: offer.rarity ?? "magisch",
                 });
                 const multiplier = getSponsorNegotiationMultiplier({ termSeasons: 1, negotiationProfile });
                 return (
@@ -750,7 +753,7 @@ export default function FoundationSponsorsNewLook({
               items={[
                 { id: "cash", label: "Cash" },
                 { id: "sponsor", label: "Sponsor" },
-                { id: "tier", label: "Tier" },
+                { id: "tier", label: "Rarität" },
                 { id: "team", label: "Team" },
               ]}
             />
@@ -759,7 +762,6 @@ export default function FoundationSponsorsNewLook({
           <div className="nl-sponsor-league-grid" role="list" aria-label="Sponsoren aller Teams">
             {sortedLeagueSponsorRows.map((row) => {
               const isCurrent = row.teamName === selectedTeamName;
-              const archetypeMeta = row.archetype ? SPONSOR_ARCHETYPE_META[row.archetype] : null;
               const classes = [
                 "nl-sponsor-league-item",
                 isCurrent ? "is-current" : "",
@@ -798,18 +800,13 @@ export default function FoundationSponsorsNewLook({
                           {row.sponsorName}
                         </span>
                         <div className="nl-sponsor-league-meta">
-                          {archetypeMeta ? (
-                            <span className={`nl-sponsor-league-chip is-${row.archetype}`}>{archetypeMeta.label}</span>
-                          ) : null}
-                          {row.starTier ? (
-                            <span
-                              className={`nl-sponsor-rarity is-r${row.starTier}`}
-                              title={`Seltenheitsgrad: ${getSponsorRarityLabel(row.starTier)} (Stufe ${row.starTier} von 5)`}
-                              aria-label={`Seltenheitsgrad: ${getSponsorRarityLabel(row.starTier)}`}
-                            >
-                              <span className="nl-sponsor-rarity-dot" aria-hidden="true" />
-                              {getSponsorRarityLabel(row.starTier)}
+                          {row.curveShape ? (
+                            <span className={`nl-sponsor-league-chip is-${row.archetype ?? "neutral"}`}>
+                              {SPONSOR_CURVE_SHAPES[row.curveShape].labelDe}
                             </span>
+                          ) : null}
+                          {row.rarity ? (
+                            <RarityPill rarity={row.rarity} className="nl-sponsor-league-rarity" />
                           ) : null}
                         </div>
                       </>

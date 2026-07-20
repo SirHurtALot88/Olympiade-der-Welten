@@ -246,6 +246,30 @@ describe("standings preview engine", () => {
     expect(beta?.warnings).toContain("incomplete_result");
   });
 
+  it("does not double-count points when re-applying an already-applied matchday", async () => {
+    // Simulate the state after matchday-1 was already applied: the live points already include the
+    // 23.1 delta (12 + 23.1 = 35.1) and the record carries the pre-matchday baseline (12) tagged with
+    // this matchday. A forceReplace re-apply of the SAME matchday must project from the baseline, i.e.
+    // stay at 35.1 (idempotent) rather than adding the delta again (which would give 58.2).
+    persistenceState.save.gameState.seasonState.standings = {
+      "A-A": { points: 35.1, matchdayBaselinePoints: 12, matchdayBaselineId: "matchday-1" },
+      "W-W": { points: 8 },
+    };
+
+    const result = await buildStandingsPreview({
+      saveId: "save-local",
+      seasonId: "season-1",
+      matchdayId: "matchday-1",
+      source: "sqlite",
+    });
+
+    const alpha = result.items.find((item) => item.teamId === "A-A");
+    expect(alpha?.currentPoints).toBe(35.1);
+    expect(alpha?.pointsDelta).toBe(23.1);
+    // Re-apply is idempotent: projected == baseline (12) + delta (23.1) == current points, NOT doubled.
+    expect(alpha?.projectedPoints).toBe(35.1);
+  });
+
   it("shows missing_result warnings when no stored matchday result exists", async () => {
     persistenceState.save.gameState.seasonState.matchdayResults = [];
     persistenceState.save.gameState.seasonState.disciplineResults = [];

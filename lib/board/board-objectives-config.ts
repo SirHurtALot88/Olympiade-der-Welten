@@ -5,10 +5,11 @@
  * layer + captain channel.
  *
  * Flag default OFF: V2 is behaviour-changing (golden-master / objective tests shift intentionally),
- * so it stays behind OLY_BOARD_OBJECTIVES_V2 until parity/balancing is green. Set "1" to enable.
+ * Flag default ON: V2 (strength-calibrated objectives + perceived-pressure + captain channel) is now
+ * the shipped default. Disable with OLY_BOARD_OBJECTIVES_V2="0" for A/B or regression comparison.
  */
 export function isBoardObjectivesV2Enabled(): boolean {
-  return process.env.OLY_BOARD_OBJECTIVES_V2 === "1";
+  return process.env.OLY_BOARD_OBJECTIVES_V2 !== "0";
 }
 
 /**
@@ -35,6 +36,15 @@ export const BOARD_V2_NET_TRANSFER = {
   /** Base target (M) at neutral cash priority; scaled up by cashPriority and season maturity. */
   baseTargetM: 0,
   perCashPriorityM: 1.2,
+  /**
+   * For boards whose surplus target resolves to 0 (neutral/low cash priority), a positive surplus is
+   * NOT demanded — normal squad-building net spend is fine. The objective instead becomes a soft
+   * ceiling: "don't overspend beyond a cash-scaled budget", with a real at_risk band (via statusForMax)
+   * so a modest net-buy stays completed/at_risk rather than auto-failing. Ceiling = max(floor, cash *
+   * fraction).
+   */
+  overspendCeilingFloorM: 8,
+  overspendCeilingCashFraction: 0.15,
 } as const;
 
 /**

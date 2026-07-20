@@ -16,8 +16,9 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import { withIncrementalSeasonDerivationsAfterTransfer } from "@/lib/foundation/incremental-season-derivations";
 import type { PersistenceService, PersistedSaveGame } from "@/lib/persistence/types";
 import { calculateTransfermarktFit, getTransfermarktBracket, hasMercenaryTrait } from "@/lib/market/transfermarkt-fit";
-import { buildContractNegotiationPreview, recommendContractOfferForPlayer } from "@/lib/market/contract-negotiation-preview";
+import { buildContractNegotiationPreview, recommendContractOfferForPlayer, resolveContractLengthSalaryFactor } from "@/lib/market/contract-negotiation-preview";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
+import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import {
   buildRecentlySoldByTeam,
   getRecentlySoldBySameTeam,
@@ -56,6 +57,8 @@ import { buildSeasonDisciplinePlayerCountMap } from "@/lib/season/season-discipl
 import { getTransfermarktTierFromPoints, type TransfermarktRatingTier } from "@/lib/market/transfermarkt-sheet-stats";
 import { evaluateAiNeeds } from "@/lib/ai/aiNeedsEngine";
 import { computeTeamDisciplineRanks } from "@/lib/lineups/team-discipline-ranks";
+import { buildLegacyMatchdayReadiness, type LegacyMatchdayReadinessStatus } from "@/lib/lineups/legacy-matchday-readiness";
+import { loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-lineup-local-service";
 import type { AiNeedSummary } from "@/lib/ai/types";
 import type {
   TransfermarktBuyExecuteResult,
@@ -1008,6 +1011,36 @@ export function resolveTransferBuyAffordabilityCash(input: {
   });
 }
 
+/**
+ * Bug #12: Der Liquiditaetspuffer aus resolveMarketSpendableCashForPlanner ist eine reine
+ * AI-Planner-Reserve (haelt Cash fuer kuenftige Auto-Entscheidungen zurueck). Fuer einen
+ * menschlichen/interaktiven Kauf darf er die Kaufkraft NICHT beschneiden — sonst blockiert
+ * das Gate einen Spieler, den die Markt-UI aus dem Roh-Guthaben laengst als bezahlbar
+ * markiert (inkonsistentes Verhalten). Die Steuerungsart wird aus den TeamControlSettings
+ * abgeleitet: controlMode "manual" == vom Menschen gesteuert (der AI-Planner ueberspringt
+ * manuelle Teams komplett, siehe ai-market-plan-apply-service). Manuelle Kaeufe werden gegen
+ * das echte Bar-Guthaben gegated, AI-/Auto-Kaeufe behalten den Puffer unveraendert.
+ */
+function isHumanControlledBuyTeam(gameState: GameState, teamId: string): boolean {
+  return getTeamControlSettings(gameState, teamId)?.controlMode === "manual";
+}
+
+/** Buy affordability ceiling that keeps the AI liquidity buffer for AI/auto teams but uses raw on-hand cash for human/manual teams. */
+function resolveControlAwareBuyAffordabilityCash(input: {
+  gameState: GameState;
+  teamId: string;
+  teamCash: number;
+  rosterBefore: number;
+  playerMin: number | null;
+  seasonId: string;
+  transferSource: string | null | undefined;
+}) {
+  if (isHumanControlledBuyTeam(input.gameState, input.teamId)) {
+    return roundValue(Math.max(0, input.teamCash), 2);
+  }
+  return resolveTransferBuyAffordabilityCash(input);
+}
+
 function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): LocalTransfermarktBuyContext {
   const runContext = getLocalRunContext(params);
   const save = runContext?.save ?? resolveLocalSave(params.saveId).save;
@@ -1117,7 +1150,7 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
   if (
     team &&
     purchasePrice != null &&
-    resolveTransferBuyAffordabilityCash({
+    resolveControlAwareBuyAffordabilityCash({
       gameState,
       teamId: params.teamId,
       teamCash: team.cash,
@@ -1855,6 +1888,7 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
             gameState,
             scoutingLevel: playerScoutingLevel,
             topDisciplines: topDisciplineScores,
+            saveId: save.saveId,
           });
 
     return {
@@ -2217,7 +2251,7 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
       ? Math.max(0, roundValue(params.purchasePriceOverride))
       : null;
   const purchasePrice = purchasePriceOverride ?? marketValueReference;
-  const salary = player ? getPlayerSalary(player) : null;
+  const baseSalary = player ? getPlayerSalary(player) : null;
   const teamStrategyProfile = team ? getTeamStrategyProfile(gameState, team.teamId) : null;
   const rosterBefore = rosterEntries.length;
   const salaryBeforeFast = roundValue(
@@ -2264,6 +2298,15 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
   const contractLength = hasExplicitContractLength
     ? Math.max(1, Math.round(params.contractLength!))
     : recommendedContract?.contractLength ?? 1;
+  // "Länger für weniger Gehalt": der AI-Fast-Buy-Pfad schrieb bislang ein pauschales
+  // Flat-Gehalt (getPlayerSalary) unabhängig von der Laufzeit — der Vertragslängen-Rabatt
+  // lebte nur im langsamen buildContractNegotiationPreview (menschlicher Pfad). Wir ziehen
+  // jetzt denselben Längen-Anteil des Verhandlungs-DemandMultipliers auf das Basisgehalt,
+  // damit KI-Signings auf 5-Jahres-Deals ein niedrigeres Jahresgehalt zahlen als auf 1-Jahres.
+  const contractLengthSalaryFactor = player
+    ? resolveContractLengthSalaryFactor({ player, contractLength, teamFit: recommendedTeamFit })
+    : 1;
+  const salary = baseSalary != null ? roundValue(baseSalary * contractLengthSalaryFactor, 2) : null;
   const contractShape =
     params.contractShape != null
       ? normalizeContractShape(params.contractShape)
@@ -2297,7 +2340,7 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
   if (
     team &&
     purchasePrice != null &&
-    resolveTransferBuyAffordabilityCash({
+    resolveControlAwareBuyAffordabilityCash({
       gameState,
       teamId: params.teamId,
       teamCash: team.cash,
@@ -2745,6 +2788,55 @@ export function listLocalTransferHistory(input: TransferHistoryReadParams = {}):
   };
 }
 
+// Bug #11: Der Live-Verkaufspfad laeuft ausschliesslich ueber den Local-Service.
+// Die echte Lineup-Projektion (buildProjectedReadinessAfterSell) lebt nur im
+// Prisma-gestuetzten sell-service, der in Produktion nie aufgerufen wird. Wir
+// replizieren die Logik deterministisch gegen den lokalen gameState: erste
+// Matchday-Kontext laden, den zu verkaufenden Spieler aus den activePlayers
+// entfernen und die Readiness neu berechnen. Gleiche Feld-/Warnform wie im
+// sell-service, damit die UI-Readiness-Karte und die Warnung greifen.
+function buildLocalProjectedReadinessAfterSell(
+  gameState: GameState,
+  params: TransfermarktSellParams,
+  activePlayerId: string,
+): {
+  projectedReadinessAfterSell: LegacyMatchdayReadinessStatus | "unknown" | null;
+  warnings: string[];
+} {
+  const matchdayIds = gameState.season.matchdayIds ?? [];
+  const matchdayId = matchdayIds[0] ?? gameState.matchdayState.matchdayId ?? null;
+  if (!matchdayId) {
+    return {
+      projectedReadinessAfterSell: null,
+      warnings: ["matchday_missing_for_readiness_preview"],
+    };
+  }
+
+  const loaded = loadLocalLegacyLineupContextFromGameState(gameState, {
+    saveId: params.saveId,
+    seasonId: gameState.season.id,
+    matchdayId,
+    teamId: params.teamId,
+  });
+
+  if (!loaded.ok) {
+    return {
+      projectedReadinessAfterSell: "unknown",
+      warnings: ["readiness_context_unavailable_for_sell_preview"],
+    };
+  }
+
+  const projectedContext = {
+    ...loaded.context,
+    activePlayers: loaded.context.activePlayers.filter((row) => row.id !== activePlayerId),
+  };
+
+  return {
+    projectedReadinessAfterSell: buildLegacyMatchdayReadiness(projectedContext).readinessStatus,
+    warnings: loaded.warnings.map((warning) => `readiness_context:${warning}`),
+  };
+}
+
 export function previewLocalTransfermarktSell(params: TransfermarktSellParams): TransfermarktSellPreview {
   const runContext = getLocalRunContext(params);
   const save = runContext?.save ?? resolveLocalSave(params.saveId).save;
@@ -2834,6 +2926,39 @@ export function previewLocalTransfermarktSell(params: TransfermarktSellParams): 
     warnings.push(note);
   }
 
+  // Bug (deep-hunt): Roster-Mindestbestand-Warnungen wie im Referenz-Sell-Service
+  // (transfermarkt-sell-service.ts). Der lokale Pfad hat bisher nur die Readiness-
+  // Warnung emittiert, aber nicht gewarnt, wenn ein Verkauf den Kader unter das
+  // 7er-Minimum, das Pflicht-Minimum (playerMin) oder den Optimalwert (playerOpt)
+  // fallen laesst. Gleiche Warn-Codes/-Form wie die Referenz, damit die UI sie
+  // konsistent rendert. rosterAfter wird nur bei tatsaechlichem Verkauf dekrementiert.
+  if (activePlayer && teamContext) {
+    const rosterAfterForWarnings = Math.max(0, rosterBefore - 1);
+    if (rosterAfterForWarnings < 7) {
+      warnings.push("team_would_fall_under_7");
+    }
+    if (teamContext.playerMin != null && rosterAfterForWarnings < teamContext.playerMin) {
+      warnings.push("team_would_fall_under_player_min");
+    }
+    if (teamContext.playerOpt != null && rosterAfterForWarnings < teamContext.playerOpt) {
+      warnings.push("team_would_fall_under_player_opt");
+    }
+  }
+
+  // Bug #11: Echte Readiness-Projektion nach dem Verkauf statt hartcodiertem "unknown".
+  const readinessPreview =
+    activePlayer && team && activePlayer.teamId === params.teamId
+      ? buildLocalProjectedReadinessAfterSell(gameState, params, activePlayer.id)
+      : { projectedReadinessAfterSell: "unknown" as LegacyMatchdayReadinessStatus | "unknown" | null, warnings: [] as string[] };
+  warnings.push(...readinessPreview.warnings);
+  if (
+    readinessPreview.projectedReadinessAfterSell &&
+    readinessPreview.projectedReadinessAfterSell !== "ready" &&
+    readinessPreview.projectedReadinessAfterSell !== "unknown"
+  ) {
+    warnings.push("team_readiness_would_get_worse");
+  }
+
   return {
     canSell,
     blockingReasons,
@@ -2870,7 +2995,7 @@ export function previewLocalTransfermarktSell(params: TransfermarktSellParams): 
     netProceeds,
     profit,
     salaryReduction,
-    projectedReadinessAfterSell: "unknown",
+    projectedReadinessAfterSell: readinessPreview.projectedReadinessAfterSell,
     coaching,
     pricingPolicyMultiplier: priced.policy.combinedMultiplier,
   };

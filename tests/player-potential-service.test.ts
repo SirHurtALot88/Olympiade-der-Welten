@@ -83,8 +83,60 @@ describe("player potential service", () => {
     expect(potential.warnings).toContain("potential_source_missing");
   });
 
+  it("generates a lower-centered, right-skewed potential-star distribution (no 5-star inflation)", () => {
+    // Regression guard for the reshaped hidden-PO generator. The old generator
+    // was ~uniform (35 + seed*64), producing mean ~67, a ~4.3-star median and
+    // ~40% of players pinned at 5.0 stars — a third of the league was
+    // indistinguishable at max potential. The quantile-anchored generator tracks
+    // the star curve's real-catalog percentile calibration (p50~47 -> 2.5 stars)
+    // so elites are rare and earned. Sampled across many save-seed hashes.
+    //
+    // PO is now floored at the player's own current-ability (CA) score
+    // (`deriveHiddenPotentialScore` in player-potential-service.ts), since
+    // potential can never sit below current ability. `makePlayer`'s single
+    // fixed core-stat profile (CA ~65, a ~p90 player) would push every sampled
+    // PO up to that floor and collapse the distribution to ~4-star median. To
+    // exercise the generator itself (not the CA floor), each synthetic player
+    // below gets a realistic, low-centered CA drawn from a deterministic
+    // min-of-two-hashes distribution (median CA ~40, mirroring the real
+    // catalog), so the CA floor rarely binds and the underlying PO shape shows
+    // through.
+    const N = 6000;
+    const stars: number[] = [];
+    for (let i = 0; i < N; i += 1) {
+      const h1 = ((i * 2654435761) % 100000) / 100000;
+      const h2 = ((i * 40503 + 12345) % 100000) / 100000;
+      const base = 20 + Math.min(h1, h2) * 68;
+      const player = makePlayer({
+        id: `dist-${i}`,
+        coreStats: { pow: base, spe: base, men: base, soc: base },
+        traitsPositive: [],
+        traitsNegative: [],
+      });
+      const record = buildPlayerPotentialRecord({ saveId: "dist-check", player });
+      stars.push(potentialScoreToStars(record.hiddenPotentialScore!));
+    }
+    stars.sort((a, b) => a - b);
+    const median = stars[Math.floor(0.5 * (N - 1))]!;
+    const shareAtLeast = (threshold: number) => stars.filter((s) => s >= threshold).length / N;
+    const pinnedAtFive = stars.filter((s) => s >= 4.99).length / N;
+
+    // Lower-centered: median sits in the 2.5-3.0 star band, not up at ~4.3.
+    expect(median).toBeGreaterThanOrEqual(2.4);
+    expect(median).toBeLessThanOrEqual(3.1);
+    // Elites are rare: only a single-digit share reaches 5.0 stars (was ~40%).
+    expect(pinnedAtFive).toBeLessThan(0.1);
+    expect(shareAtLeast(4.5)).toBeLessThan(0.12);
+    // ...but the spread stays believable — some genuine high-ceiling talent exists.
+    expect(shareAtLeast(4.0)).toBeGreaterThan(0.02);
+  });
+
   it("generates stable save-specific hidden potential records", () => {
-    const player = makePlayer();
+    // Low-CA player: `makePlayer`'s default core stats (CA ~65) exceed the
+    // seed roll in both saves, so the new CA floor would clamp both records
+    // to the same value and hide the save-specific seed variation this test
+    // is meant to exercise. A low CA keeps the floor from binding.
+    const player = makePlayer({ coreStats: { pow: 22, spe: 24, men: 26, soc: 20 } });
     const first = buildPlayerPotentialRecord({ saveId: "save-a", player });
     const second = buildPlayerPotentialRecord({ saveId: "save-a", player });
     const otherSave = buildPlayerPotentialRecord({ saveId: "save-b", player });

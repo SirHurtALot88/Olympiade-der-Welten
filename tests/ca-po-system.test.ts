@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildPlayerPotentialRecord } from "@/lib/progression/player-potential-service";
 import { percentileToCurrentAbilityStars } from "@/lib/scouting/player-axis-star-rating";
+import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
 import type { Player } from "@/lib/data/olyDataTypes";
 
 function makePlayer(overrides: Partial<Player> = {}): Player {
@@ -103,28 +104,53 @@ describe("potential derivation — spread and floor", () => {
     // Limited ceiling should pull score down (or hit the ability floor) for most players
     expect(limitedLower).toBeGreaterThanOrEqual(15);
   });
+
+  it("never generates a hidden potential score below the player's current ability (PO >= CA)", () => {
+    // Regression test: the generator used to draw hiddenPotentialScore purely from a seed
+    // hash + trait bonus, never reading current ability, so ~33% of players could end up
+    // with PO < CA (a ceiling below the floor it's supposed to sit above). The generator
+    // must now floor the roll at CA.
+    const coreStatVariants: Array<Player["coreStats"]> = [
+      { pow: 92, spe: 88, men: 85, soc: 80 }, // elite CA, should force PO up to at least CA
+      { pow: 60, spe: 55, men: 50, soc: 45 },
+      { pow: 20, spe: 18, men: 22, soc: 19 },
+      { pow: 45, spe: 45, men: 45, soc: 45 },
+    ];
+
+    for (const coreStats of coreStatVariants) {
+      const currentAbilityScore = computeCurrentAbilityScore(coreStats) ?? 35;
+      for (let index = 0; index < 25; index += 1) {
+        const player = makePlayer({ id: `ca-po-floor-${index}`, coreStats });
+        const record = buildPlayerPotentialRecord({ saveId: `ca-po-floor-save-${index}`, player });
+        expect(record.hiddenPotentialScore ?? 0).toBeGreaterThanOrEqual(currentAbilityScore);
+      }
+    }
+  });
 });
 
 describe("CA specialist formula — best axis rewarded", () => {
   // Overall is now computed from the percentile of the specialist score in the full league.
   // We test the specialist score ordering and the percentile-to-stars mapping separately.
 
+  // Weights match the corrected computeOverallFromAxisStars in
+  // lib/scouting/player-potential-ceiling-service.ts (sum = 1.0; the old
+  // duplicated `sorted[3] * 0.10` term summed to 1.10 and inflated scores).
   function specialistScore(rawValues: [number, number, number, number]): number {
     const sorted = [...rawValues].sort((a, b) => b - a);
-    return sorted[0]! * 0.45 + sorted[1]! * 0.30 + sorted[2]! * 0.15 + sorted[3]! * 0.10 + sorted[3]! * 0.10;
+    return sorted[0]! * 0.45 + sorted[1]! * 0.30 + sorted[2]! * 0.15 + sorted[3]! * 0.10;
   }
 
   it("specialist score ranks a pure specialist higher than a uniformly weak player", () => {
-    // SPE star (raw 75): score = 75*0.45 + 30*0.30 + 30*0.15 + 30*0.10 + 30*0.10 = 33.75+9+4.5+3+3 = 53.25
-    // vs all-weak (raw 30 each): score = 30*1.10 = 33
+    // SPE star (raw 75): score = 75*0.45 + 30*0.30 + 30*0.15 + 30*0.10 = 33.75+9+4.5+3 = 50.25
+    // vs all-weak (raw 30 each): score = 30*1.0 = 30
     const specialist = specialistScore([75, 30, 30, 30]);
     const weak = specialistScore([30, 30, 30, 30]);
     expect(specialist).toBeGreaterThan(weak);
   });
 
   it("all-rounder (70 everywhere) scores higher than specialist (75/25/25/25)", () => {
-    // all-rounder: 70*1.10 = 77
-    // specialist: 75*0.45+25*0.30+25*0.15+25*0.10+25*0.10 = 33.75+7.5+3.75+2.5+2.5 = 50
+    // all-rounder: 70*1.0 = 70
+    // specialist: 75*0.45+25*0.30+25*0.15+25*0.10 = 33.75+7.5+3.75+2.5 = 47.5
     const allRounder = specialistScore([70, 70, 70, 70]);
     const specialist = specialistScore([75, 25, 25, 25]);
     expect(allRounder).toBeGreaterThan(specialist);

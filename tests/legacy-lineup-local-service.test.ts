@@ -3,11 +3,14 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { LegacyLineupEntryInput } from "@/lib/lineups/legacy-lineup-types";
 import {
   calculateLocalLegacyLineupPreview,
+  calculateLocalLegacyLineupPreviewFromContext,
   generateLocalLegacyFormCardsForSeason,
   getLocalLegacyLineupDraft,
   loadLocalLegacyLineupContext,
   saveLocalLegacyLineupDraft,
 } from "@/lib/lineups/legacy-lineup-local-service";
+import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
+import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { resetDatabaseForTests } from "@/lib/persistence/sqlite";
 import { getSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
@@ -440,5 +443,92 @@ describe("legacy lineup local service", { timeout: 120_000 }, () => {
     expect(seasonCards.length).toBe(mappedPlayers.length * 2);
     expect(seasonCards.every((card) => ["red", "green", "blue", "yellow"].includes(card.cardColor))).toBe(true);
     expect(seasonCards.every((card) => Number.isFinite(card.cardValue))).toBe(true);
+  });
+
+  // Regression guard for BUG B: the resolve engine reads morale + captain from
+  // context.gameState, but no context loader populated it — so morale and the
+  // captain team-power modifier were silently skipped at resolve even though the
+  // preview (which receives the game state via gameStateOverride) applied them.
+  it("populates context.gameState so morale applies at resolve and matches the preview", () => {
+    const persistence = createPersistenceService();
+    const save = persistence.createFreshSeasonOneSave({ name: "Resolve Morale Captain Test" });
+    topUpRosterCoverage(save.saveId);
+    const teamId = pickEligibleTeamId(save);
+    const params = {
+      saveId: save.saveId,
+      seasonId: save.gameState.season.id,
+      matchdayId: save.gameState.matchdayState.matchdayId,
+      teamId,
+    };
+
+    const context0 = loadLocalLegacyLineupContext(params);
+    const entries = buildEntriesFromContext(context0, { d1Captain: true, d2Captain: false });
+    const saveResult = saveLocalLegacyLineupDraft(params, entries);
+    expect(saveResult.ok).toBe(true);
+
+    // Force a clearly non-neutral (high) morale for one lineup player so the
+    // morale multiplier is measurably > 1.0 at resolve.
+    const boostedPlayerId = entries[0]!.playerId;
+    const current = persistence.getSaveById(save.saveId)!;
+    current.gameState.playerMoraleState = [
+      ...(current.gameState.playerMoraleState ?? []),
+      {
+        playerId: boostedPlayerId,
+        teamId,
+        morale: 100,
+        visibleMood: "excellent",
+        lastUpdatedSeasonId: save.gameState.season.id,
+        inactiveSeasons: 0,
+        reasons: [],
+        contractIntent: "willing_to_extend",
+      },
+    ];
+    persistence.saveSingleplayerState(save.saveId, current.gameState);
+
+    const contextResult = loadLocalLegacyLineupContext(params);
+    if (!contextResult.ok) {
+      throw new Error(contextResult.errors.join(" | "));
+    }
+    const context = contextResult.context;
+
+    // The fix: the resolve engine now receives the game state.
+    expect(context.gameState).toBeDefined();
+    // The captain input the resolve engine gates on is now reachable.
+    const captain = selectTeamCaptain(context.gameState!, teamId);
+    expect(captain).not.toBeNull();
+    expect(captain!.effects.teamPowerModifierPct).toBeGreaterThanOrEqual(1);
+
+    const resolveWith = buildLegacyMatchdayResolvePreview([context]);
+    // Reproduces the pre-fix behaviour: no game state -> morale/captain skipped.
+    const resolveWithout = buildLegacyMatchdayResolvePreview([{ ...context, gameState: undefined }]);
+
+    const withScore = resolveWith.disciplinePreviews
+      .flatMap((discipline) => discipline.topPlayers)
+      .find((player) => player.teamId === teamId && player.playerId === boostedPlayerId);
+    const withoutScore = resolveWithout.disciplinePreviews
+      .flatMap((discipline) => discipline.topPlayers)
+      .find((player) => player.teamId === teamId && player.playerId === boostedPlayerId);
+    expect(withScore).toBeDefined();
+    expect(withoutScore).toBeDefined();
+    // Morale (>1.0) raises the resolved score only when gameState is present.
+    expect(withScore!.finalPlayerScore).toBeGreaterThan(withoutScore!.finalPlayerScore);
+
+    // preview == resolve: the shown preview already applied morale via the
+    // gameStateOverride; the resolved per-player score now matches it.
+    const shown = calculateLocalLegacyLineupPreviewFromContext(
+      context,
+      undefined,
+      undefined,
+      context.fatigueByPlayerId ?? null,
+      context.gameState,
+    );
+    expect(shown.ok).toBe(true);
+    const shownPlayer = shown.ok
+      ? shown.disciplineSideScores
+          .flatMap((side) => side.entries)
+          .find((entry) => entry.playerId === boostedPlayerId)
+      : null;
+    expect(shownPlayer).toBeTruthy();
+    expect(shownPlayer!.finalContribution).toBeCloseTo(withScore!.finalPlayerScore, 5);
   });
 });

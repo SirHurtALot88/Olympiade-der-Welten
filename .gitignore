@@ -36,6 +36,7 @@ data/persistence/*.sqlite
 
 # TypeScript / logs
 *.tsbuildinfo
+*.tsbuildinfo-*
 *.log
 npm-debug.log*
 yarn-debug.log*

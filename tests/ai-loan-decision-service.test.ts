@@ -37,6 +37,8 @@ function buildTeamGameState(input: {
   salaryPerPlayer?: number;
   marketValuePerPlayer?: number;
   cashPriority?: number;
+  riskTolerance?: number;
+  starPriority?: number;
   annualRevenue?: number;
   loans?: LoanRecord[];
   seasonId?: string;
@@ -93,7 +95,11 @@ function buildTeamGameState(input: {
       sponsorPayoutLogs,
       aiManagerBudgetReservations: {},
       teamStrategyProfiles: {
-        [teamId]: minimalStrategyProfile(teamId, { cashPriority: input.cashPriority ?? 5 }),
+        [teamId]: minimalStrategyProfile(teamId, {
+          cashPriority: input.cashPriority ?? 5,
+          ...(input.riskTolerance != null ? { riskTolerance: input.riskTolerance } : {}),
+          ...(input.starPriority != null ? { starPriority: input.starPriority } : {}),
+        }),
       },
     },
     matchdayState: { matchdayId: "matchday-1", status: "planning", pendingTeamIds: [], resolvedFixtureIds: [] },
@@ -379,6 +385,40 @@ describe("resolveAiEarlyPayoffDecision", () => {
     const bigPayoff = computeEarlyPayoff(loans[0]!).payoff;
     expect(smallPayoff).toBeLessThan(bigPayoff);
     expect(decision.loanIdsToPayoff).toEqual(["small", "big"]);
+  });
+
+  it("organic disposition: a disciplined GM deploys its surplus to pay debt down where a spender holds it back", () => {
+    // Same moderate surplus for both; only the GM disposition differs. The disciplined saver deploys the
+    // full surplus into early payoff and clears the loan; the spender keeps a chunk as transfer dry powder
+    // and its reduced payoff budget no longer covers the loan.
+    const disciplined = buildTeamGameState({
+      cash: 32,
+      rosterCount: 12,
+      playerOpt: 12,
+      annualRevenue: 50,
+      cashPriority: 10,
+      riskTolerance: 2,
+      starPriority: 3,
+      loans: [loanRecord()],
+    });
+    const spender = buildTeamGameState({
+      cash: 32,
+      rosterCount: 12,
+      playerOpt: 12,
+      annualRevenue: 50,
+      cashPriority: 1,
+      riskTolerance: 9,
+      starPriority: 9,
+      loans: [loanRecord()],
+    });
+
+    const disciplinedDecision = resolveAiEarlyPayoffDecision(disciplined, "T-1");
+    const spenderDecision = resolveAiEarlyPayoffDecision(spender, "T-1");
+
+    expect(disciplinedDecision.reason).toBe("surplus_payoff");
+    expect(disciplinedDecision.loanIdsToPayoff).toEqual(["loan-1"]);
+    // The spender pays down strictly fewer loans out of the identical surplus.
+    expect(spenderDecision.loanIdsToPayoff.length).toBeLessThan(disciplinedDecision.loanIdsToPayoff.length);
   });
 
   it("does not pay off when the team has no active loans", () => {

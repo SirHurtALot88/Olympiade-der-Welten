@@ -1,12 +1,25 @@
 import { describe, expect, it } from "vitest";
 
-import type { GameState, Player, PlayerGeneratorAttributes } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, PlayerGeneratorAttributes, TeamFacilityCollection } from "@/lib/data/olyDataTypes";
 import {
   buildOrganicSeasonProgression,
   ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE,
   resolveOrganicRegressionCombinedTotal,
 } from "@/lib/training/organic-season-progression";
+import { applyTrainingXpFacilityModifiers } from "@/lib/facilities/facility-effects";
 import { PROGRESSION_ATTRIBUTE_ORDER } from "@/lib/training/class-progression-config";
+
+function trainingCenterFacilities(level: number): TeamFacilityCollection {
+  return {
+    facilities: { training_center: { level, enabled: level > 0, conditionPct: 100 } },
+  } as unknown as TeamFacilityCollection;
+}
+
+function academyFacilities(level: number): TeamFacilityCollection {
+  return {
+    facilities: { academy: { level, enabled: level > 0, conditionPct: 100 } },
+  } as unknown as TeamFacilityCollection;
+}
 
 const attrs: PlayerGeneratorAttributes = {
   power: 70,
@@ -262,6 +275,84 @@ describe("organic season progression", () => {
 
     expect(poor.performanceSetpoints).toBeLessThan(average.performanceSetpoints);
     expect(poor.netSetpoints).toBeLessThan(average.netSetpoints);
+  });
+
+  it("binds the attribute ceiling as a hard cap: an at-cap performer does not grow past it", () => {
+    // Bugfix: Der Potenzial-Cap (v4) muss als harte Obergrenze wirken. Ein Performer, der
+    // sein Attribut-Ceiling erreicht hat, darf trotz starker Leistung nicht darueber wachsen –
+    // waehrend derselbe Spieler mit offenem Ceiling sehr wohl weiter waechst.
+    const cappedPlayer = player({ id: "capped-perf" });
+    const openPlayer = player({ id: "open-perf" });
+    const cappedState = gameState(cappedPlayer);
+    const openState = gameState(openPlayer);
+    // Sechs starke Power-Leistungen: appearances >= 4 aktiviert den High-Gap-Performance-Bailout.
+    const strongPerf = (playerId: string) => ({
+      matchdayResults: Array.from({ length: 6 }, (_, index) => ({
+        id: `sp-result-${index + 1}`,
+        seasonId: "season-1",
+        matchdayId: `sp-md-${index + 1}`,
+        status: "preview_applied" as const,
+      })),
+      perfs: Array.from({ length: 6 }, (_, index) => ({
+        id: `sp-perf-${index + 1}`,
+        matchdayResultId: `sp-result-${index + 1}`,
+        teamId: "team-1",
+        playerId,
+        activePlayerId: null,
+        disciplineId: "gewichtheben",
+        disciplineSide: "d1" as const,
+        slotIndex: 0,
+        baseValue: 70,
+        finalPlayerScore: 98,
+        scoreContribution: 30,
+        rankInTeam: 1,
+        rankInDiscipline: 1,
+        isTop10: true,
+        isMvpCandidate: true,
+        storyWeight: null,
+        createdAt: "2026-06-11T00:00:00.000Z",
+      })),
+    });
+    const cappedPerf = strongPerf(cappedPlayer.id);
+    cappedState.seasonState.matchdayResults = cappedPerf.matchdayResults;
+    cappedState.seasonState.playerDisciplinePerformances = cappedPerf.perfs;
+    const openPerf = strongPerf(openPlayer.id);
+    openState.seasonState.matchdayResults = openPerf.matchdayResults;
+    openState.seasonState.playerDisciplinePerformances = openPerf.perfs;
+
+    // power current = 70 (siehe attrs). Capped: Ceiling exakt am aktuellen Wert; Open: klar darueber.
+    cappedState.playerPotential = [
+      {
+        playerId: cappedPlayer.id,
+        potentialBand: "medium",
+        hiddenPotentialScore: 70,
+        confidence: 0,
+        source: "generated",
+        hiddenAttributeCeiling: { power: 70 },
+      },
+    ];
+    openState.playerPotential = [
+      {
+        playerId: openPlayer.id,
+        potentialBand: "high",
+        hiddenPotentialScore: 90,
+        confidence: 0,
+        source: "generated",
+        hiddenAttributeCeiling: { power: 90 },
+      },
+    ];
+
+    const cappedResult = buildOrganicSeasonProgression({ gameState: cappedState, player: cappedPlayer });
+    const openResult = buildOrganicSeasonProgression({ gameState: openState, player: openPlayer });
+    const cappedPower = cappedResult.attributeBreakdown.find((entry) => entry.attribute === "power")!;
+    const openPower = openResult.attributeBreakdown.find((entry) => entry.attribute === "power")!;
+
+    // Harte Obergrenze: der at-cap Spieler ueberschreitet sein Ceiling (70) NICHT.
+    expect(cappedPower.after).toBeLessThanOrEqual(70);
+    // Der offene Spieler waechst mit derselben Leistung ueber 70 hinaus -> der Cap ist das,
+    // was hier bindet (kein Zero-Out legitimen Sub-Cap-Wachstums).
+    expect(openPower.after).toBeGreaterThan(70);
+    expect(openPower.after).toBeGreaterThan(cappedPower.after);
   });
 
   it("lets signature attributes gain a little faster in organic progression", () => {
@@ -592,5 +683,74 @@ describe("resolveOrganicRegressionCombinedTotal", () => {
         marketValuePressureTotal,
       }),
     ).toBe(expected);
+  });
+
+  it("Fix B: training_center display (applyTrainingXpFacilityModifiers) matches the organic-applied modifier per level (no divergence), L5 = +70%", () => {
+    const expectedByLevel = [0, 14, 28, 42, 56, 70];
+    const sourcePlayer = player();
+    const baseline = buildOrganicSeasonProgression({
+      gameState: gameState(sourcePlayer),
+      player: sourcePlayer,
+      facilities: trainingCenterFacilities(0),
+    });
+
+    for (let level = 1; level <= 5; level += 1) {
+      const facilities = trainingCenterFacilities(level);
+      // Display path (training panel / forecasts / facility cards) at 100% condition.
+      const displayPct = applyTrainingXpFacilityModifiers(100, facilities).modifierPct;
+      expect(displayPct).toBe(expectedByLevel[level]);
+
+      // Organic-applied path: facilityModifierPct minus the (level-independent) team development bonus
+      // isolates the training-center modifier the progression actually applies — must equal the display.
+      const applied = buildOrganicSeasonProgression({
+        gameState: gameState(sourcePlayer),
+        player: sourcePlayer,
+        facilities,
+      });
+      const organicModifierPct = applied.facilityModifierPct - baseline.facilityModifierPct;
+      expect(organicModifierPct).toBeCloseTo(displayPct, 5);
+    }
+
+    // L5 truly advertises +70% (the real applied value).
+    expect(applyTrainingXpFacilityModifiers(100, trainingCenterFacilities(5)).modifierPct).toBe(70);
+  });
+
+  it("Fix C: an academy develops an eligible low-tier (F/E/D) player faster than academy level 0", () => {
+    // Rating 30 → tier D (F/E/D eligible for the academy youth-development boost).
+    const lowTier = player({ id: "low-tier", rating: 30 });
+
+    const withoutAcademy = buildOrganicSeasonProgression({
+      gameState: gameState(lowTier),
+      player: lowTier,
+      facilities: academyFacilities(0),
+    });
+    const withAcademy = buildOrganicSeasonProgression({
+      gameState: gameState(lowTier),
+      player: lowTier,
+      facilities: academyFacilities(5),
+    });
+
+    expect(withAcademy.trainingSetpoints).toBeGreaterThan(withoutAcademy.trainingSetpoints);
+    expect(withAcademy.appliedTrainingSetpoints).toBeGreaterThan(withoutAcademy.appliedTrainingSetpoints);
+    // L5 academy at 100% efficiency = +30% training budget (rounding to 2 decimals → tolerance 1 digit).
+    expect(withAcademy.trainingSetpoints).toBeCloseTo(withoutAcademy.trainingSetpoints * 1.3, 1);
+  });
+
+  it("Fix C: the academy boost does NOT apply to non-low-tier (C+) players", () => {
+    // Rating 70 → tier A (not F/E/D) — no academy youth-development boost.
+    const midTier = player({ id: "mid-tier", rating: 70 });
+
+    const withoutAcademy = buildOrganicSeasonProgression({
+      gameState: gameState(midTier),
+      player: midTier,
+      facilities: academyFacilities(0),
+    });
+    const withAcademy = buildOrganicSeasonProgression({
+      gameState: gameState(midTier),
+      player: midTier,
+      facilities: academyFacilities(5),
+    });
+
+    expect(withAcademy.trainingSetpoints).toBe(withoutAcademy.trainingSetpoints);
   });
 });

@@ -768,7 +768,33 @@ describe("team management overview", () => {
     expect(result[0]?.points).toBe(17);
   });
 
-  it("falls back to start-budget rank and startplatz when no current points exist", () => {
+  it("derives rank and startplatz from the carried prior-season final rank at zero visible points", () => {
+    const teams = [
+      createTeam({ teamId: "M-M", shortCode: "M-M", name: "Mayhem Mavericks", cash: 10, budget: 325 }),
+      createTeam({ teamId: "R-R", shortCode: "R-R", name: "Riptide Rivers", cash: 170, budget: 170 }),
+    ];
+
+    const result = buildTeamSeasonOverviewRows({
+      gameState: createGameState({ teams, players: [], rosters: [] }),
+      standingsByTeamId: {
+        // Season start (points=0): the carried previous-season final rank (standing.startplatz) now wins
+        // over the static start-budget rank. M-M holds the higher budget, so the old budget-rank fallback
+        // would have placed it first (start-budget rank 1); the carried startplatz flips the order.
+        "M-M": { rank: 6, points: 0, cash: 10, budget: 325, startplatz: 4 },
+        "R-R": { rank: 1, points: 0, cash: 170, budget: 170, startplatz: 1 },
+      },
+    });
+
+    // Sorted by active rank ascending: R-R (carried final rank 1) ahead of M-M (carried final rank 4).
+    expect(result[0]?.teamId).toBe("R-R");
+    expect(result[0]?.rank).toBe(1);
+    expect(result[0]?.startplatz).toBe(1);
+    expect(result[1]?.teamId).toBe("M-M");
+    expect(result[1]?.rank).toBe(4);
+    expect(result[1]?.startplatz).toBe(4);
+  });
+
+  it("falls back to the start-budget rank at zero visible points when no carried startplatz exists", () => {
     const teams = [
       createTeam({ teamId: "M-M", shortCode: "M-M", name: "Mayhem Mavericks", cash: 10, budget: 325 }),
       createTeam({ teamId: "R-R", shortCode: "R-R", name: "Riptide Rivers", cash: 170, budget: 170 }),
@@ -782,6 +808,7 @@ describe("team management overview", () => {
       },
     });
 
+    // No standing.startplatz → derive from the start-budget rank (higher budget = better start rank).
     expect(result[0]?.teamId).toBe("M-M");
     expect(result[0]?.rank).toBe(1);
     expect(result[0]?.startplatz).toBe(1);

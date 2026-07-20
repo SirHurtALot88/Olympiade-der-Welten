@@ -573,12 +573,20 @@ export function buildPlayerRatingContractRows(input: {
 export function buildPlayerRatingContractMap(
   gameState: GameState,
   seasonPointsLedger?: SeasonPointsLedger,
-  options?: { playerIds?: string[] | null },
+  options?: { playerIds?: string[] | null; ignoreFreeze?: boolean },
 ) {
   // Read-Gate: sobald die Saison eingefroren ist (nach MD10), NICHT mehr pool-relativ live
   // rechnen — sonst verschieben Verkäufe/Roster-Änderungen OVR/MVS/PPs aller anderen Spieler.
   // Stattdessen die zum MD10 eingefrorenen Rows zurückliefern (gefiltert auf die angefragten IDs).
-  const frozenRatingRows = isValuationFrozen(gameState) ? getFrozenRatingRowsMap(gameState) : null;
+  //
+  // Ausnahme `ignoreFreeze`: Der Saison-Ende-Progression-Audit (season-end-xp-apply-service)
+  // MUSS die Before/After-OVR aus den tatsächlich getauschten Spielern LIVE pool-relativ
+  // berechnen, sonst kollabiert das Development-Delta strukturell auf 0 (Before-Row == After-Row,
+  // beide gleicher playerId aus dem MD10-Snapshot). Diese Reads sind rein lesend auf
+  // Wegwerf-States — sie schreiben den Freeze nicht zurück und verschieben daher den Pool im
+  // gesperrten Verkaufsfenster NICHT.
+  const frozenRatingRows =
+    !options?.ignoreFreeze && isValuationFrozen(gameState) ? getFrozenRatingRowsMap(gameState) : null;
   if (frozenRatingRows) {
     const outputPlayerIdSet =
       options?.playerIds != null ? new Set(options.playerIds.filter(Boolean)) : null;

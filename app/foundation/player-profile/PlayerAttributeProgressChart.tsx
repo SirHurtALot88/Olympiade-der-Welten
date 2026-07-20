@@ -23,8 +23,6 @@ type PlayerAttributeProgressChartProps = {
   attributeHistoryRows?: PlayerAttributeHistoryRow[];
   /** "Neuer Look" Entwicklungs-Zeitleiste (#60): reale Klassenwechsel-Events. */
   classHistory?: PlayerDetailDrawerData["classHistory"];
-  /** "Neuer Look" Entwicklungs-Zeitleiste (#60): reale XP-Ausgabe-Events. */
-  progressionEvents?: PlayerDetailDrawerData["progressionEvents"];
 };
 
 const PP_METRICS = [
@@ -162,8 +160,6 @@ function getMarkerKindClass(kind: PlayerCareerEventMarker["kind"]) {
       return "is-injury";
     case "class_change":
       return "is-classup";
-    case "xp_spend":
-      return "is-xp";
     default:
       return "";
   }
@@ -177,8 +173,6 @@ function getMarkerIcon(marker: PlayerCareerEventMarker) {
       return "✚";
     case "class_change":
       return "⇧";
-    case "xp_spend":
-      return "⚡";
     default:
       return "•";
   }
@@ -198,8 +192,6 @@ function buildMarkerLabel(marker: PlayerCareerEventMarker): string {
       return marker.injuriesCount > 1 ? `${marker.injuriesCount} Verletzungen` : "Verletzung";
     case "class_change":
       return `Klassenwechsel: ${marker.previousClassName ?? "—"} → ${marker.className}`;
-    case "xp_spend":
-      return `XP-Ausgabe (${marker.upgradeCount} Upgrade${marker.upgradeCount === 1 ? "" : "s"})`;
     default:
       return "Ereignis";
   }
@@ -217,8 +209,6 @@ function buildMarkerDetail(marker: PlayerCareerEventMarker): string {
         : buildMarkerLabel(marker);
     case "class_change":
       return buildMarkerLabel(marker);
-    case "xp_spend":
-      return `${buildMarkerLabel(marker)} · ${formatChartValue(marker.xpSpent)} XP investiert`;
     default:
       return "";
   }
@@ -350,7 +340,6 @@ export default function PlayerAttributeProgressChart({
   historyRows,
   attributeHistoryRows = [],
   classHistory = [],
-  progressionEvents = [],
 }: PlayerAttributeProgressChartProps) {
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
 
@@ -371,9 +360,9 @@ export default function PlayerAttributeProgressChart({
 
   // "Neuer Look" (flag-gated, additiv, #60 FM-Attribut-Graph): annotierte
   // Entwicklungs-Zeitleiste — season-verortete Marker aus real vorhandenen
-  // Feldern (`historyRows.transferType`/`injuriesCount`, `classHistory`,
-  // `progressionEvents`). Ohne Ereignisse in den Daten bleibt die Zeile leer
-  // (kein Marker wird erfunden).
+  // Feldern (`historyRows.transferType`/`injuriesCount`, `classHistory`).
+  // Ohne Ereignisse in den Daten bleibt die Zeile leer (kein Marker wird
+  // erfunden).
   const eventTimelineRows = useMemo(
     () => buildCareerEventTimelineRows(attributeHistoryRows, sortedRows),
     [attributeHistoryRows, sortedRows],
@@ -383,9 +372,8 @@ export default function PlayerAttributeProgressChart({
       buildPlayerCareerEventMarkers({
         historyRows: sortedRows,
         classHistory,
-        progressionEvents,
       }),
-    [sortedRows, classHistory, progressionEvents],
+    [sortedRows, classHistory],
   );
   const eventMarkersBySeasonKey = useMemo(() => {
     const map = new Map<string, PlayerCareerEventMarker[]>();

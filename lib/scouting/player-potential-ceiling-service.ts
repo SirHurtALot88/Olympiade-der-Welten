@@ -30,6 +30,12 @@ export type RevealedPotentialStars = {
 
 const AXIS_KEYS: PlayerAxisKey[] = ["pow", "spe", "men", "soc"];
 const MIN_AXIS_PO_UPSIDE_STARS = 0.5;
+// Ab welcher ECHTEN Ueberschreitung (current - stored) das gespeicherte Attribut-Ceiling als
+// "PO ist hinter CA zurueckgefallen" gilt und angehoben wird. Ein bruchteiliges Ueberschreiten
+// des ganzzahligen Ceilings (current - stored < 1, inkl. des Round-Over-Bereichs >= ceiling+0.5
+// eines gecappten Performers) zaehlt als "am Limit" und hebt das Ceiling NICHT an. Erst ein
+// echter voller Punkt Rueckstand (current - stored >= 1) gilt als PO-Neubewertung und hebt an.
+const CEILING_SELF_LIFT_MIN_SHORTFALL = 1;
 
 const CLASS_AXIS_AFFINITY: Record<PlayerAxisKey, string[]> = {
   pow: ["charger", "warrior", "tank", "berserker", "power"],
@@ -102,7 +108,6 @@ function computeOverallFromAxisStars(values: Record<PlayerAxisKey, number>) {
     sorted[0] * 0.45 +
       sorted[1] * 0.30 +
       sorted[2] * 0.15 +
-      sorted[3] * 0.10 +
       sorted[3] * 0.10,
   );
 }
@@ -470,14 +475,20 @@ export function reconcilePlayerPotentialRecordToCurrentAbility(input: {
     const stored = attributeCeiling[attribute];
     const currentRounded = Math.round(current);
     // Hybrid-Ceiling:
-    //  - Gespeichertes Ceiling >= CA: unveraendert respektieren. So greift die Near-Ceiling-
-    //    Drosselung am ECHTEN Potenzial (kein kuenstlicher Puffer -> keine Ceiling-Inflation).
-    //  - Gespeichertes Ceiling < CA (PO ist hinter die Faehigkeit zurueckgefallen): auf
-    //    current + 6 anheben, damit der Spieler wieder offenen Wachstums-Headroom bekommt
-    //    (garantiert PA > CA fuer diesen Sonderfall).
+    //  - Gespeichertes Ceiling >= CA (bzw. current nur bruchteilig darueber): unveraendert
+    //    respektieren. So greift die Near-Ceiling-Drosselung am ECHTEN Potenzial und ein
+    //    Performer, der sein Limit ERREICHT hat, hebt sein eigenes Ceiling NICHT an. Frueher
+    //    verglich der Zweig gegen currentRounded (Math.round): ein bruchteilig ueber dem
+    //    ganzzahligen Cap liegender Wert (current >= ceiling + 0.5) rundete auf, wurde als
+    //    "PO hinter CA" fehlgedeutet und hob das Ceiling auf current + 6 -> Cap ausgehebelt.
+    //  - Gespeichertes Ceiling ECHT unter CA (PO ist mehr als einen vollen Punkt hinter die
+    //    Faehigkeit zurueckgefallen): auf current + 6 anheben, damit der Spieler wieder
+    //    offenen Wachstums-Headroom bekommt (garantiert PA > CA fuer diesen Sonderfall,
+    //    z.B. echte Potenzial-Neubewertung). Der reine Round-Over eines gecappten Spielers
+    //    faellt NICHT mehr hierunter.
     //  - Kein Ceiling vorhanden: offener Headroom (current + 12).
     attributeCeiling[attribute] = isFiniteNumber(stored)
-      ? stored >= currentRounded
+      ? current - stored < CEILING_SELF_LIFT_MIN_SHORTFALL
         ? stored
         : Math.min(99, currentRounded + 6)
       : Math.min(99, currentRounded + 12);

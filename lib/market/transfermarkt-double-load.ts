@@ -47,13 +47,14 @@ export function buildTransfermarktDoubleLoadWarnings(input: {
   gameState: GameState;
   scoutingLevel?: number | null;
   topDisciplines: TopDisciplineLike[];
+  saveId?: string | null;
 }) {
   if ((input.scoutingLevel ?? 0) < 3 || input.topDisciplines.length < 2) {
     return [];
   }
 
   return findDoubleLoadWarningsInSchedule({
-    schedule: getSeasonDisciplineSchedule(input.gameState),
+    schedule: getSeasonDisciplineSchedule(input.gameState, { saveId: input.saveId }),
     topDisciplines: input.topDisciplines,
   });
 }

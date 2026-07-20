@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { createFreshSeasonOneGameState } from "@/lib/game-state/singleplayer-state";
+import { applyGameModeOwnership } from "@/lib/foundation/team-control-settings";
 import {
   persistFoundationManagerTeamId,
   readStoredFoundationManagerTeamId,
@@ -85,5 +86,97 @@ describe("foundation active manager team resolution (#183)", () => {
 
     expect(context.teamId).not.toBe(teamB.teamId);
     expect(context.source).toBe("default_human_team");
+  });
+});
+
+// Owner-reported bug: on LOAD the active team was NOT the human-owned team --
+// a stale/AI `team=` URL param (e.g. team=R-C carried over from a previous
+// save/session) was honored unconditionally, stranding the player on an AI club
+// they could not manage. On load a non-owned selection must snap to the owned team.
+describe("foundation active manager team resolution (owned-team guard on load)", () => {
+  const baseGameState = createFreshSeasonOneGameState();
+  const teams = baseGameState.teams;
+  const aiTeam = teams[0]!; // AI-controlled after ownership below
+  const ownedTeam = teams[1]!;
+  const secondOwnedTeam = teams[2]!;
+
+  function withChrisOwnership(chrisTeamIds: string[]) {
+    return applyGameModeOwnership(baseGameState, {
+      saveMode: chrisTeamIds.length > 1 ? "solo_2" : "solo_1",
+      chrisTeamIds,
+      frankyTeamIds: [],
+    });
+  }
+
+  afterEach(() => {
+    delete (globalThis as unknown as { window?: unknown }).window;
+  });
+
+  it("overrides a stale AI team= URL param with the human-owned team (single-owned save)", () => {
+    const owned = withChrisOwnership([ownedTeam.teamId]);
+    installFakeWindow(`http://localhost/foundation?team=${encodeURIComponent(aiTeam.teamId)}`);
+
+    const context = resolvePreferredFoundationTeamContext(owned.teams, {
+      initialTeamId: aiTeam.teamId,
+      activeSaveId: "save-owner",
+      settingsMap: owned.seasonState.teamControlSettings,
+    });
+
+    expect(context.teamId).toBe(ownedTeam.teamId);
+    expect(context.teamId).not.toBe(aiTeam.teamId);
+    expect(context.source).toBe("default_human_team");
+  });
+
+  it("overrides an AI initial/route prop selection with the owned team when no URL param is present", () => {
+    const owned = withChrisOwnership([ownedTeam.teamId]);
+    installFakeWindow("http://localhost/foundation");
+
+    const context = resolvePreferredFoundationTeamContext(owned.teams, {
+      initialTeamId: aiTeam.teamId,
+      activeSaveId: "save-owner",
+      settingsMap: owned.seasonState.teamControlSettings,
+    });
+
+    expect(context.teamId).toBe(ownedTeam.teamId);
+    expect(context.source).toBe("default_human_team");
+  });
+
+  it("keeps a URL selection that points at one of the human's own teams (multi-owned save)", () => {
+    const owned = withChrisOwnership([ownedTeam.teamId, secondOwnedTeam.teamId]);
+    installFakeWindow(`http://localhost/foundation?team=${encodeURIComponent(secondOwnedTeam.teamId)}`);
+
+    const context = resolvePreferredFoundationTeamContext(owned.teams, {
+      activeSaveId: "save-owner",
+      settingsMap: owned.seasonState.teamControlSettings,
+    });
+
+    expect(context.teamId).toBe(secondOwnedTeam.teamId);
+    expect(context.source).toBe("route");
+  });
+
+  it("snaps an AI URL param to the primary owned team in a multi-owned save", () => {
+    const owned = withChrisOwnership([ownedTeam.teamId, secondOwnedTeam.teamId]);
+    installFakeWindow(`http://localhost/foundation?team=${encodeURIComponent(aiTeam.teamId)}`);
+
+    const context = resolvePreferredFoundationTeamContext(owned.teams, {
+      activeSaveId: "save-owner",
+      settingsMap: owned.seasonState.teamControlSettings,
+    });
+
+    // Primary owned team = first Chris-owned team.
+    expect(context.teamId).toBe(ownedTeam.teamId);
+    expect(context.source).toBe("default_human_team");
+  });
+
+  it("leaves the route selection untouched when the save has no owned team (AI-only state)", () => {
+    installFakeWindow(`http://localhost/foundation?team=${encodeURIComponent(aiTeam.teamId)}`);
+
+    const context = resolvePreferredFoundationTeamContext(baseGameState.teams, {
+      activeSaveId: "save-ai-only",
+      settingsMap: baseGameState.seasonState.teamControlSettings,
+    });
+
+    expect(context.teamId).toBe(aiTeam.teamId);
+    expect(context.source).toBe("route");
   });
 });

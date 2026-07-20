@@ -64,6 +64,16 @@ export type OrganicPlayerView = {
    * unaffected. PRICE dimension only — never a quality signal.
    */
   purchasePrice?: number;
+  /**
+   * NET sale proceeds INCLUDING the open buyout/release clause (Ausstiegsklausel): the ground-truth cash
+   * the club actually banks on a sale = grossSalePrice − openBuyoutCost, mirroring
+   * resolveTransfermarktSellProceeds (lib/market/transfermarkt-sell-proceeds.ts) which the real sale
+   * execution credits to team cash. sellUtility scores saleValue (and the profit-flip term) against THIS,
+   * not raw marketValue, so the SELL decision matches what the club nets. May be < marketValue (a clause is
+   * owed on the sale) and even negative (clause exceeds the price). Undefined ⇒ no clause / not a sell view
+   * ⇒ sellUtility falls back to marketValue (net == marketValue), so buy/draft views stay unaffected.
+   */
+  netSaleProceeds?: number;
   /** Build-for-future signal (potential; there is NO age dimension in this game). Null if unknown. */
   potential?: number | null;
   /**

@@ -19,6 +19,7 @@ import {
   type MarqueeLicenseTeamInput,
 } from "@/lib/ai/organic-squad/marquee-eligibility";
 import { buildOrganicSquadPlan, type OrganicBuyDecision } from "@/lib/ai/organic-squad/draft-builder";
+import { computeTeamSalaryCeiling } from "@/lib/ai/organic-squad/salary-ceiling";
 import {
   CATEGORY_TO_AXIS,
   ROSTER_MAX,
@@ -35,7 +36,7 @@ import { DEPTH_REF_COST, sellUtility } from "@/lib/ai/organic-squad/utility";
 import { deriveUtilityWeights, resolveRenewalContractLength } from "@/lib/ai/organic-squad/weights";
 import { draftUnit } from "@/lib/ai/market-pick-engine/slot-sequence";
 import { buildLeagueMarketBrackets, quantilePrice, type MarketBracketLane } from "@/lib/ai/market-pick-engine/market-brackets";
-import type { GameState, Player, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, RosterEntry, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import {
   applyGmBiasToLaneAppetite,
@@ -43,9 +44,18 @@ import {
 } from "@/lib/ai/ai-needs-picks-compare-service";
 import {
   buildTeamThemeCompositionRuntimeContext,
+  classifyIdentityQuotaRole,
   derivePlayerThemeTags,
+  isQuotaScopedTarget,
   type TeamThemeCompositionRuntimeContext,
 } from "@/lib/ai/team-theme-composition-service";
+import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
+import { resolveOpenBuyoutCostForRoster } from "@/lib/market/transfermarkt-sell-proceeds";
+import {
+  applySellPricingPolicyToBreakdown,
+  isBigHaircut,
+  isSellerDistressed,
+} from "@/lib/market/transfermarkt-sell-pricing-policy";
 
 /** Small flat solvency buffer (MW) — the floor of the cash hard blocker; spend above it is emergent. */
 const ORGANIC_CASH_BUFFER = 5;
@@ -68,6 +78,22 @@ const FILLQ_B_ENABLED = process.env.OLY_DRAFT_FILLQB === "1";
  * above). This is a SOFT utility nudge only — no hard band filter, no slot sequence, no stopUtility change.
  */
 const COMPOSE_ENABLED = process.env.OLY_DRAFT_COMPOSE === "1";
+
+/**
+ * Env flag for the sponsor-forecast + team-value SALARY CEILING (salary-ceiling.ts computeTeamSalaryCeiling).
+ * Default ON ("0" is the only way to disable) — unlike COMPOSE_ENABLED/FILLQ_B_ENABLED above (opt-in,
+ * default OFF), this is a REPLACEMENT for the cash-only budgeting's blind spot (sponsor-rich teams
+ * under-building because the plan never looked at income/team-value, only cash), so it ships live. Set to
+ * "0" to get the exact pre-existing cash-only path (byte-identical: economy.salaryCeiling stays undefined,
+ * see draft-builder.ts's "undefined ⇒ no salary gating" contract) for A/B comparison.
+ */
+// Default AUS: ein sauberer same-seed A/B (Flag AN vs AUS ab identischem S1-Stand) zeigte, dass das
+// Limit die Kader SCHRUMPFT (unter Opt 23 vs 18 von 32; A-A 12→8 Spieler) und dadurch die Injuries
+// ERHÖHT (+8%, mehr Fatigue), ohne den gedachten Nutzen (Runaway-Gehälter kappen — Max-Gehalt war in
+// beiden identisch). Ursache: das "tragbare Gehalt" (Sponsor − Fixkosten) liegt unter dem, was Teams
+// cash-finanziert profitabel fahren, also pinnt es sie zu klein. Nur explizit mit "1" aktivierbar,
+// bis das Modell überarbeitet ist (nur echte Über-Extender kappen statt Kader-Aufbau zu bremsen).
+const SALARY_CEILING_V2_ENABLED = process.env.OLY_SALARY_CEILING_V2 === "1";
 /**
  * The cash buffer scales with the club's WAGE BILL ("auch Top-/Aggro-Teams sollen was auf die Seite legen,
  * z.B. 0.25–0.5× Salary"): a club must keep roughly this fraction of its recurring salary as reserve, so a
@@ -114,12 +140,21 @@ function normId(value: number | null | undefined): number {
  * Build the utility player view from a domain Player (quality from stats; marketValue = price only).
  * `purchasePrice` (the roster entry's cost basis) is threaded only for SELL views — it feeds the
  * profit-flip term in sellUtility. Buy/draft views omit it (undefined ⇒ no profit signal).
+ * `openBuyoutCost` (the remaining open buyout/release clause the club owes on a sale) is likewise SELL-only:
+ * it converts marketValue into the NET proceeds the club actually banks (netSaleProceeds = marketValue −
+ * openBuyoutCost), the same net figure resolveTransfermarktSellProceeds credits to cash at execution time.
+ * Omitted / ≤ 0 ⇒ no clause ⇒ netSaleProceeds stays undefined (net == marketValue), so buy/draft views and
+ * clause-free players are bit-identical to before.
  */
 export function toOrganicPlayerView(
   player: Player,
   themeFit?: number,
   purchasePrice?: number | null,
+  openBuyoutCost?: number | null,
 ): OrganicPlayerView {
+  const marketValue = Math.max(0, player.marketValue ?? player.displayMarketValue ?? 0);
+  const buyoutCost =
+    typeof openBuyoutCost === "number" && Number.isFinite(openBuyoutCost) ? Math.max(0, openBuyoutCost) : 0;
   return {
     playerId: player.id,
     pow: player.coreStats?.pow ?? 0,
@@ -127,10 +162,14 @@ export function toOrganicPlayerView(
     men: player.coreStats?.men ?? 0,
     soc: player.coreStats?.soc ?? 0,
     disciplineRatings: player.disciplineRatings ?? {},
-    marketValue: Math.max(0, player.marketValue ?? player.displayMarketValue ?? 0),
+    marketValue,
     salary: Math.max(0, player.salaryDemand ?? player.displaySalary ?? 0),
     purchasePrice:
       typeof purchasePrice === "number" && Number.isFinite(purchasePrice) ? Math.max(0, purchasePrice) : undefined,
+    // Only a real clause (> 0) sets netSaleProceeds — otherwise leave it undefined so sellUtility keeps
+    // using marketValue unchanged (net == marketValue when nothing is owed). Net may be negative when the
+    // clause exceeds the price; sellUtility clamps that to 0.
+    netSaleProceeds: buyoutCost > 0 ? marketValue - buyoutCost : undefined,
     potential: player.potential ?? null,
     themeFit,
   };
@@ -163,6 +202,15 @@ const THEME_AVOID_PENALTY = 0.6;
 const THEME_STRICTNESS_MULT: Record<string, number> = { hard: 8.0, strong: 2.4, medium: 1.2, soft: 0.7 };
 
 /**
+ * Push (in rawFit units) applied to a QUOTA VIOLATOR while the roster is still below its hard quota
+ * floor (e.g. a non-Construct for S-S's ~50% Bot quota, a non-Pirate for P-C's ~50% Crew quota). Same
+ * magnitude as an avoid-tag hit, so a below-quota club actively prefers quota-fit bodies until the floor
+ * is met — then it vanishes and non-quota depth flows normally. Bounded, never a hard block (a much
+ * stronger off-quota player can still win), so the squad stays organic.
+ */
+const THEME_QUOTA_VIOLATE_PENALTY = 0.6;
+
+/**
  * Graded per-(team, player) theme-fit signal (0..1) from actual tag overlap between the player's
  * derived theme tags and the team's target tag sets. Reuses derivePlayerThemeTags (race/class/
  * subclass/gender/trait/alignment) — no reinvented theme rules. Callers build `runtimeContext` ONCE
@@ -179,10 +227,27 @@ export function computeThemeFit(
   const tags = new Set(derivePlayerThemeTags(player).playerThemeTags);
   const countMatches = (list: string[]) => list.reduce((n, tag) => (tags.has(tag) ? n + 1 : n), 0);
 
-  const primaryMatch = countMatches(target.primaryThemeTags) > 0 ? 1 : 0;
+  // Harte Rassen-/Tag-Quote (S-S ~50% Construct, P-C ~50% Pirate): eine "counts"-Rolle zaehlt wie ein
+  // Primary-Treffer (so wird der Top-/Bestpick garantiert quota-fit), ein "violates"-Kandidat wird
+  // unterhalb der Mindestquote wie ein Avoid-Tag nach hinten gedraengt. Oberhalb der Quote neutral.
+  const quotaScoped = isQuotaScopedTarget(target);
+  let quotaPrimary = 0;
+  let quotaViolatePenalty = 0;
+  if (quotaScoped) {
+    const role = classifyIdentityQuotaRole(player, target);
+    const currentShare = runtimeContext.rosterShare?.primaryShare ?? 0;
+    const belowMinimum = currentShare + 1e-9 < target.minimumShare;
+    if (role === "counts") quotaPrimary = 1;
+    else if (role === "violates" && belowMinimum) quotaViolatePenalty = 1;
+  }
+
+  const primaryMatch = countMatches(target.primaryThemeTags) > 0 || quotaPrimary > 0 ? 1 : 0;
   const secondaryMatches = Math.min(countMatches(target.secondaryThemeTags), THEME_SECONDARY_CAP);
   const softMatches = Math.min(countMatches(target.softPreferredTags), THEME_SOFT_CAP);
-  const avoidMatches = countMatches(target.avoidTags);
+  // Quoten-Kern-Spieler (role="counts", z.B. ein menschlicher Pirat, der ueber die "Royal"-Sammelregel
+  // zufaellig einen Avoid-Tag traegt) duerfen NICHT durch Avoid entwertet werden — sonst kanzelt der
+  // Kollateral-Avoid die Quote. Spiegelt hardIdentityOverride aus calculateThemeCompositionScore.
+  const avoidMatches = quotaPrimary > 0 ? 0 : countMatches(target.avoidTags);
   // Off-primary but explicitly allowed (e.g. a female-Amazon team's male animal pets): acceptable,
   // not preferred over themed primary players.
   const outsiderMatch = !primaryMatch && countMatches(target.allowedOutsiderTags) > 0 ? 1 : 0;
@@ -201,7 +266,8 @@ export function computeThemeFit(
     THEME_SECONDARY_WEIGHT * secondaryMatches * flavourCounts +
     THEME_SOFT_WEIGHT * softMatches * flavourCounts +
     THEME_OUTSIDER_WEIGHT * outsiderMatch -
-    THEME_AVOID_PENALTY * avoidMatches;
+    THEME_AVOID_PENALTY * avoidMatches -
+    THEME_QUOTA_VIOLATE_PENALTY * quotaViolatePenalty;
   const strictnessMult = THEME_STRICTNESS_MULT[target.strictness] ?? 1;
   // May be negative (avoid) for hard clubs, so buyUtility actively pushes those players out. Ceiling
   // is generous (×THEME_FIT_VALUE downstream) so a HARD-strictness quota club (V-V ~75% Viking, V-D
@@ -283,6 +349,13 @@ export type OrganicDraftPlanResult = {
   finalRosterSize: number;
   stoppedBelowMin: boolean;
   optTarget: number;
+  /**
+   * Debug/diagnostics snapshot of the SALCEIL computation actually applied this call (undefined when
+   * OLY_SALARY_CEILING_V2="0") — see salary-ceiling.ts computeTeamSalaryCeiling. Exposed so callers (e.g.
+   * scripts/long-run-sandbox-s1-s6.ts's per-team economy rows) can print salaryCeiling vs actual salary
+   * without recomputing it.
+   */
+  salaryCeilingDebug?: ReturnType<typeof computeTeamSalaryCeiling>;
 };
 
 /**
@@ -451,6 +524,14 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     composition = { counts, brackets };
   }
 
+  // ANPASSUNG SALCEIL (flag-gated OLY_SALARY_CEILING_V2, default AUS nach A/B — see salary-ceiling.ts and the flag
+  // doc above). Computed AFTER composition (order doesn't matter between them — independent inputs) but
+  // before the plan call since buildOrganicSquadPlan needs it on economy. An ADDITIONAL cap on top of the
+  // existing cash/fee budgeting (never a replacement) — see draft-builder.ts's salaryCeilingActive gate.
+  const salaryCeilingDebug = SALARY_CEILING_V2_ENABLED
+    ? computeTeamSalaryCeiling(input.gameState, input.team.teamId, { teamCash: ctx.cash })
+    : undefined;
+
   const result = buildOrganicSquadPlan({
     startingSquad,
     candidates,
@@ -469,6 +550,7 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
       weights: planWeights,
       rosterMax: ctx.rosterMax,
       rosterMin: ROSTER_MIN,
+      salaryCeiling: salaryCeilingDebug?.salaryCeiling,
       // Reserve is spendable while building from min→opt: keep only the flat solvency floor here so a
       // team actually reaches its target squad, then holds the full salary-scaled reserve above opt.
       solvencyFloor: ORGANIC_CASH_BUFFER,
@@ -483,6 +565,7 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     finalRosterSize: result.finalSquad.length,
     stoppedBelowMin: result.stoppedBelowMin,
     optTarget: planWeights.optTarget,
+    salaryCeilingDebug,
   };
 }
 
@@ -612,6 +695,46 @@ export type OrganicSellPlanResult = {
 };
 
 /**
+ * Estimate the REALIZED (Stage-B, pre-floor) sale price for one rostered player — the natural market
+ * price including the sell-pricing multiplier (seasonStart × timing × liquidation × identityFit), NOT
+ * the rosier base-only MW the greedy loop credits to cash. Used by the "think twice" floor gate to
+ * detect a voluntary sale that would eat a big haircut (loss > max(25 % MW, 5 mio)).
+ *
+ * Reads only the passed gameState (no mutation). Returns null when the price cannot be estimated —
+ * missing market value, no live roster entry (partial test fixtures), or any pricing error — so the
+ * gate degrades to a no-op and prior behaviour is preserved rather than crashing the pure planner.
+ */
+function estimateRealizedSellPrice(
+  gameState: GameState,
+  teamId: string,
+  player: Player | null,
+  rosterEntry: RosterEntry | null,
+  rosterAfter: number,
+): number | null {
+  if (!player || !rosterEntry) {
+    return null;
+  }
+  try {
+    const base = buildTransfermarktSaleFactorBreakdown(gameState, player, rosterEntry);
+    if (base.baseMarketValue == null) {
+      return null;
+    }
+    const priced = applySellPricingPolicyToBreakdown({
+      gameState,
+      teamId,
+      player,
+      rosterEntry,
+      baseBreakdown: base,
+      rosterAfter,
+    });
+    const realized = priced.preFloorSalePrice ?? priced.breakdown.salePrice ?? null;
+    return realized != null && Number.isFinite(realized) ? realized : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Greedy organic SELL plan for one team (in-season / season-end sell-only path). Mirror of
  * planOrganicDraftForTeam but for shedding: repeatedly scores sellUtility for every still-held roster
  * player, sells the highest-utility one while it clears SELL_THRESHOLD and the roster stays >=
@@ -628,15 +751,40 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
     identity: input.identity,
     draftSeed: input.draftSeed ?? null,
   });
-  const held = input.roster.map((player) =>
-    toOrganicPlayerView(player, undefined, input.purchasePriceByPlayerId?.[player.id]),
+  const rosterEntryByPlayerId = new Map(
+    (input.gameState.rosters ?? [])
+      .filter((entry) => entry.teamId === input.team.teamId)
+      .map((entry) => [entry.playerId, entry] as const),
   );
+  // SELL views carry NET-including-buyout proceeds: for each held player resolve the open buyout/release
+  // clause from its live roster entry (same resolveOpenBuyoutCostForRoster the real sale uses; no
+  // seasonsElapsed, mirroring transfermarkt-sell-service) so sellUtility scores what the club actually banks.
+  const held = input.roster.map((player) => {
+    const rosterEntry = rosterEntryByPlayerId.get(player.id) ?? null;
+    const openBuyoutCost = rosterEntry
+      ? resolveOpenBuyoutCostForRoster({ rosterEntry, gameState: input.gameState })
+      : 0;
+    return toOrganicPlayerView(
+      player,
+      undefined,
+      input.purchasePriceByPlayerId?.[player.id],
+      openBuyoutCost,
+    );
+  });
   // Season-end may empty the roster (rebuild in preseason); in-season keeps a fieldable floor.
   const rosterMin = input.allowBelowMin ? 0 : ROSTER_MIN;
 
   let cash = ctx.cash;
   let salaryTotal = held.reduce((sum, view) => sum + Math.max(0, view.salary), 0);
   const decisions: OrganicSellDecision[] = [];
+
+  // THINK-TWICE floor gate (Part 2): a NON-distressed club prefers to KEEP a surplus body rather than
+  // realize a big haircut on a voluntary sale (loss > max(25 % MW, 5 mio)). Distressed clubs (cash < 0)
+  // bypass the gate so genuine liquidity/wage-relief fire-sales still fire. Players the gate blocks are
+  // parked here and excluded from further selection this run (they are kept, not sold).
+  const teamDistressed = isSellerDistressed(input.gameState, input.team.teamId);
+  const playerById = new Map(input.roster.map((player) => [player.id, player]));
+  const blockedFloorPlayerIds = new Set<string>();
 
   const buildState = (): OrganicTeamState => {
     const disciplineNeeds = computeDisciplineNeeds(held, ctx.identityAxisWeights, ctx.disciplines);
@@ -671,6 +819,7 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
     let best: OrganicPlayerView | null = null;
     let bestUtility = -Infinity;
     for (const view of held) {
+      if (blockedFloorPlayerIds.has(view.playerId)) continue; // kept by the think-twice floor gate
       const jitter =
         input.draftSeed && ORGANIC_SELL_JITTER > 0
           ? ORGANIC_SELL_JITTER * (draftUnit(`${input.draftSeed}:${view.playerId}`) - 0.5)
@@ -689,6 +838,24 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
     // opt on this pressure — refilling below opt is the buy side's job, not this loop's.
     const threshold = held.length > ctx.weights.optTarget ? OPT_SURPLUS_SELL_THRESHOLD : SELL_THRESHOLD;
     if (!best || bestUtility <= threshold) break;
+
+    // THINK-TWICE gate: for a non-distressed (voluntary) club, skip this sale when the market would only
+    // pay a big haircut (loss > max(25 % MW, 5 mio)) — prefer to keep the body. Park it as blocked and
+    // reconsider the rest of the roster (the loop re-scans excluding blocked players until none qualify).
+    // Distressed clubs bypass this entirely so liquidity/wage-relief sells still clear.
+    if (!teamDistressed) {
+      const realized = estimateRealizedSellPrice(
+        input.gameState,
+        input.team.teamId,
+        playerById.get(best.playerId) ?? null,
+        rosterEntryByPlayerId.get(best.playerId) ?? null,
+        Math.max(0, held.length - 1),
+      );
+      if (realized != null && isBigHaircut(best.marketValue, realized)) {
+        blockedFloorPlayerIds.add(best.playerId);
+        continue;
+      }
+    }
 
     held.splice(held.indexOf(best), 1);
     cash += Math.max(0, best.marketValue);

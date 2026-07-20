@@ -38,6 +38,8 @@ import {
   projectExpectedSalaryAtPlannerTarget,
   resolveCombinedLiquidityReserve,
 } from "@/lib/ai/ai-team-cash-reserve-service";
+import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
+import { getTeamDevelopmentTendency } from "@/lib/foundation/team-development-tendency";
 
 export type AiManagementStrategicIntent =
   | "win_now"
@@ -726,6 +728,31 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
   const ambition = identitySignal(context.identity.ambition);
   const finances = identitySignal(context.identity.finances);
   const objectiveBias = context.objectiveAiBias;
+  // Organische Identitäts-Signale (kein harter Team-/Quoten-Gate):
+  // - developmentTendency: 0–1, Entwickler-/Mentor-Prägung (Teacher/Leader/Talent-Builder etc.). Zieht
+  //   Trainings-/Development-Infrastruktur nach vorne, damit ein nährendes Team (z. B. "T-T") früh statt
+  //   erst in S4 in ein Trainingszentrum investiert.
+  // - commercialAppetite: 0–1, wie stark ein Team von Fan-/Kommerz-Einnahmen profitiert (Finanzen,
+  //   Beliebtheit → Arena skaliert mit Beliebtheit, Cash-Fokus).
+  // - surplusSignal: 0–1, wie viel freies Cash über den Reserven idle liegt → produktiver Sink für
+  //   Income-Gebäude statt Horten.
+  const strategyProfile = getTeamStrategyProfile(gameState, context.team.teamId);
+  const developmentTendency = getTeamDevelopmentTendency({
+    team: context.team,
+    identity: context.identity,
+    profile: strategyProfile,
+    gmArchetype: context.gmArchetype,
+  });
+  const popularity = identitySignal(context.identity.popularity ?? 50);
+  const cashPriorityBias = strategyProfile?.bias.cashPriority ?? 5;
+  const commercialAppetite = clamp(
+    ((finances - 50) / 50) * 0.5 +
+      ((popularity - 50) / 50) * 0.35 +
+      ((cashPriorityBias - 5) / 5) * 0.15,
+    0,
+    1,
+  );
+  const surplusSignal = clamp((budgetPlan.freeCashAfterReserves ?? 0) / 40, 0, 1);
   let spendCursor = 0;
   return FACILITY_CATALOG.map((facility) => {
     const currentLevel = teamFacilities.facilities[facility.facilityId]?.level ?? 0;
@@ -742,18 +769,43 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
 
     if (facility.facilityId === "training_center") {
       score += context.youthCount * 10 + (profile.strategicIntent === "youth_development" ? 18 : 0) + (objectiveBias?.developmentPriority ?? 0) * 6;
+      // Entwickler-/Mentor-Identität zieht Trainings-Infrastruktur nach vorne, auch wenn der Kader (noch)
+      // nicht youth-lastig ist — sonst baut ein nährendes, star-getragenes Team (z. B. "T-T") sein
+      // Trainingszentrum erst spät. Additiv, organisch über die 0–1-Tendenz skaliert (kein Team-Gate):
+      // eine ausgeprägte Entwickler-Prägung (score ~0.6+) trägt zusammen mit der abgesenkten Bau-Schwelle
+      // schon ohne Youth-Überhang über die Bauschwelle, mit Prospects entsprechend früher.
+      score += round(developmentTendency.score * 48, 2);
       if (context.injuryCount > 0) score -= 8;
       positive.push("junge/entwickelbare Spieler profitieren");
+      if (developmentTendency.score >= 0.3) positive.push("Entwickler-/Mentor-Identität priorisiert Trainings-Infrastruktur");
       if (context.injuryCount > 0) negative.push("Verletzungen machen XP-Push riskanter");
     } else if (facility.facilityId === "recovery_center") {
       score += context.injuryCount * 18 + context.fatigueCriticalCount * 14 + context.fatigueHighCount * 6;
       score += countTeamHardTrainingDemandPressure(gameState, context.team.teamId) * 8;
       if (context.injuryCount >= 3) score += 22;
-      if (context.prevSeasonInjuryCount >= 8) score += 20;
-      if (context.prevSeasonAvgMatchdayFatigue >= 55) score += 18;
+      // Vorausschauendes Fatigue-/Injury-Signal GRADUIERT (statt binär): die Bau-Entscheidung fällt im
+      // Preseason, wo die aktuelle Fatigue ~0 ist (alle ausgeruht) — die Vorsaison ist daher der einzige
+      // verlässliche Indikator, dass ein Team wieder heiß läuft. Das binäre +18/+20 blieb knapp unter der
+      // (bereits auf 28 gesenkten) Bauschwelle, weshalb heiß gelaufene Teams trotz Druck NICHT bauten. Jetzt
+      // skaliert das Signal mit der tatsächlichen Vorsaison-Belastung, sodass heiße Teams die Schwelle
+      // zuverlässig knacken, kühl gelaufene aber weiter nichts bauen.
+      score += Math.max(0, context.prevSeasonAvgMatchdayFatigue - 30) * 1.5; // Fatigue 55→+37, 66→+54
+      score += Math.max(0, context.prevSeasonInjuryCount - 4) * 3; // 8 Verletzungen→+12, 12→+24
       if (context.fatigueAvg >= 60) score += 12;
       if (context.chronicInjuryPlayerCount >= 2) score += 10;
+      // Dünner Kader = keine Rotationsluft → läuft garantiert heiß. Recovery-Infrastruktur ist der Gegen-
+      // Hebel für Teams, die (bewusst) nahe am Minimum laufen, statt sie in die Fatigue-Spirale zu schicken.
+      if (context.rosterCount <= context.identity.playerOpt) score += 8;
       if (context.rosterCount >= context.identity.playerOpt + 2) score -= 6;
+      // Ladder-Climb: Teams bauten Recovery bislang nur auf Level 1 und blieben dort (der L1-Effekt +2 ist zu
+      // schwach für die Fatigue-Last). Ein noch immer heiß laufendes Team mit vorhandenem Recovery Center soll
+      // es aktiv HOCHZIEHEN (L1→L2→L3: +4/+6/+9 statt +2). Das Signal hält den Score klar über der
+      // Downgrade-/Low-Value-Linie (42), damit die Stufe unter Cash-Druck nicht wieder abgebaut wird — aber nur
+      // solange die Vorsaison-Belastung real hoch war (kühl gelaufene Teams stagnieren korrekt bei ihrem Level).
+      if (currentLevel >= 1 && (context.prevSeasonAvgMatchdayFatigue >= 50 || context.fatigueAvg >= 55)) {
+        score += 16;
+        positive.push("Recovery Center weiter ausbauen (Fatigue-Last bleibt hoch)");
+      }
       positive.push("Fatigue/Injury-Druck ist hoch");
       if (context.rosterCount >= context.identity.playerOpt + 2) negative.push("große Rotation mildert den Druck");
     } else if (facility.facilityId === "scouting_office" || facility.facilityId === "analytics_room") {
@@ -781,6 +833,22 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
           positive.push("Facility Architect: Netto-Cashflow des Income-Gebäudes ist positiv");
         }
       }
+      // Kommerz-/Fan-Kultur + Cash-Überschuss: ein kommerziell veranlagtes, cash-reiches Team lenkt
+      // idle Cash in Income-Infrastruktur (produktiver Sink statt Horten) — aber nur, solange der nächste
+      // Level netto-positiv ist (Einnahmen > Unterhalt), damit der Unterhalt tragbar bleibt. Organisch
+      // über commercialAppetite (Finanzen/Beliebtheit/Cash-Fokus) und surplusSignal skaliert.
+      {
+        const nextIncome = nextDefinition?.seasonIncome ?? 0;
+        const nextUpkeep = nextDefinition?.seasonUpkeep ?? 0;
+        if (nextIncome - nextUpkeep > 0) {
+          const incomeInvestBoost = round(clamp(commercialAppetite * 14 + surplusSignal * 16, 0, 26), 2);
+          if (incomeInvestBoost > 0) {
+            score += incomeInvestBoost;
+            if (commercialAppetite >= 0.4) positive.push("Kommerz-/Fan-Identität profitiert von Income-Gebäuden");
+            if (surplusSignal >= 0.4) positive.push("Cash-Überschuss wird in tragbare Income-Infrastruktur gelenkt");
+          }
+        }
+      }
       if (currentLevel === 0) {
         positive.push("Income-Gebäude fehlt komplett");
       }
@@ -789,6 +857,8 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
       if (profile.strategicIntent === "roster_repair") negative.push("akute Kaderbaustellen sind wichtiger");
     } else if (facility.facilityId === "academy" || facility.facilityId === "specialist_wing") {
       score += context.youthCount * 7 + ambition * 0.12 + (objectiveBias?.developmentPriority ?? 0) * 8;
+      // Entwickler-/Mentor-Identität wertet die Development-Gebäude (Academy/Spezialisten) mit auf.
+      score += round(developmentTendency.score * 18, 2);
       if (context.team.cash < 18) score -= 8;
       positive.push("Development-/Upgrade-Plan profitiert");
       if (context.team.cash < 18) negative.push("wenig freies Cash für Spezial-Investments");
@@ -824,10 +894,15 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
         ? 28
         : 45;
     // Facility architect builds more readily: a lower build threshold across facilities.
-    const buildScoreThreshold =
+    let buildScoreThreshold =
       context.gmArchetype === "facility_architect"
         ? Math.min(baseBuildScoreThreshold, 30)
         : baseBuildScoreThreshold;
+    // Entwickler-/Mentor-Identität senkt die Bau-Schwelle fürs Trainingszentrum (bis ~−20 bei maximaler
+    // Tendenz), damit ein nährendes Team früh investiert statt erst nach Jahren genug Youth anzuhäufen.
+    if (facility.facilityId === "training_center" && developmentTendency.score > 0) {
+      buildScoreThreshold = Math.min(buildScoreThreshold, round(45 - developmentTendency.score * 24, 2));
+    }
     const wantsBuildOrUpgrade =
       score >= buildScoreThreshold && currentLevel < facility.maxLevel && canSpend;
     const action: AiManagementBuildingAction = shouldDowngrade

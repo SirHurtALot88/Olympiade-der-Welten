@@ -48,6 +48,7 @@ export type FoundationActivityInput = {
   seasonStartResetBusy: boolean;
   newGameBusy: boolean;
   rosterFillBusy: boolean;
+  aiTeamsRefillBusy?: boolean;
   adminBalancingBusy: boolean;
   cockpitBusyKey: string | null;
   aiTeamsCount: number;

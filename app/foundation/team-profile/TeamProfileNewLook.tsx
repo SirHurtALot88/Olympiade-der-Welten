@@ -40,6 +40,7 @@ import {
   type LeaguePlayerHeatPools,
 } from "@/lib/foundation/player-league-heat";
 import { groupObjectivesByCategory } from "@/lib/foundation/team-board-objectives";
+import { getTeamGeneralManager, getTeamGeneralManagerProfile } from "@/lib/foundation/team-general-managers";
 import { compareTeamRosterPlayersByOvrOrMarketValue } from "@/lib/foundation/team-roster-player-sort";
 import { getTeamAxisRankTooltip } from "@/lib/foundation/tabs/teams-ui-helpers";
 import { isSeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
@@ -128,6 +129,11 @@ function getRoleLabel(roleTag: string | null | undefined): string {
   // "prospect" ist ein vager Auto-Rollen-Tag und wird nicht mehr als Rolle gezeigt.
   if (roleTag === "prospect") return "";
   return roleTag ?? "—";
+}
+
+function formatGmDismissalReason(reason: "low_board_confidence" | "high_board_pressure"): string {
+  if (reason === "low_board_confidence") return "Board-Vertrauen zu niedrig";
+  return "Board-Druck zu hoch";
 }
 
 function getObjectiveStatusLabel(status: "open" | "completed" | "failed" | "at_risk"): string {
@@ -664,6 +670,57 @@ export default function TeamProfileNewLook({
     }
     return points.length >= 2 ? points : null;
   }, [foundationGameState, data.teamId, data.boardConfidence]);
+
+  // GM-Historie: pro Saison archivierte GM-Amtszeit + Ablösung stecken in
+  // `seasonSnapshots[].gmAssignments` (previousGmId/dismissalReason) — dieselbe
+  // Quelle, aus der der Season-Tab (use-season-v2-panel-model.ts) seine GM-Rows
+  // baut. Hier auf dieses Team gefiltert und um den Live-GM (laufende Saison)
+  // ergänzt, neueste Saison zuerst.
+  const gmHistory = useMemo(() => {
+    if (!foundationGameState) {
+      return [];
+    }
+    const resolveGmName = (gmId: string | null | undefined) =>
+      (gmId ? getTeamGeneralManagerProfile(gmId)?.name : null) ?? gmId ?? null;
+    const snapshots = [...(foundationGameState.seasonState.seasonSnapshots ?? [])].sort((left, right) => {
+      const leftValue = Number(left.seasonId.match(/(\d+)$/)?.[1] ?? NaN);
+      const rightValue = Number(right.seasonId.match(/(\d+)$/)?.[1] ?? NaN);
+      if (Number.isFinite(leftValue) && Number.isFinite(rightValue) && leftValue !== rightValue) {
+        return rightValue - leftValue;
+      }
+      return right.seasonId.localeCompare(left.seasonId, "de", { numeric: true });
+    });
+    const snapshotRows = snapshots
+      .map((snapshot) => {
+        const gm = snapshot.gmAssignments?.find((entry) => entry.teamId === data.teamId) ?? null;
+        if (!gm) return null;
+        return {
+          seasonId: snapshot.seasonId,
+          seasonName: snapshot.seasonName || snapshot.seasonId,
+          gmName: gm.gmName || resolveGmName(gm.gmId) || gm.gmId,
+          gmTitle: gm.gmTitle || getTeamGeneralManagerProfile(gm.gmId)?.title || gm.gmId,
+          isLive: false,
+          previousGmName: gm.previousGmId ? resolveGmName(gm.previousGmId) : null,
+          dismissalReason: gm.dismissalReason ?? null,
+        };
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+    const liveGm = getTeamGeneralManager(foundationGameState, data.teamId);
+    const liveRow = liveGm
+      ? [
+          {
+            seasonId: foundationGameState.season.id,
+            seasonName: foundationGameState.season.name || foundationGameState.season.id,
+            gmName: liveGm.profile.name,
+            gmTitle: liveGm.profile.title,
+            isLive: true,
+            previousGmName: liveGm.assignment.previousGmId ? resolveGmName(liveGm.assignment.previousGmId) : null,
+            dismissalReason: liveGm.assignment.dismissalReason ?? null,
+          },
+        ]
+      : [];
+    return [...liveRow, ...snapshotRows.filter((row) => row.seasonId !== foundationGameState.season.id)];
+  }, [foundationGameState, data.teamId]);
 
   const rosterStressRecord = foundationGameState?.seasonState.teamRosterStressByTeamId?.[data.teamId] ?? null;
 
@@ -1929,6 +1986,30 @@ export default function TeamProfileNewLook({
                   <small className="nl-teamprofile-gm-doctrine">
                     Fokus: {data.generalManager.facilityPriorities.slice(0, 3).join(" · ")}
                   </small>
+                ) : null}
+                {gmHistory.length > 1 ? (
+                  <div className="nl-teamprofile-gm-history" aria-label="GM-Historie">
+                    <span className="nl-teamprofile-lead-label">GM-Historie</span>
+                    <ul className="nl-teamprofile-gm-history-list">
+                      {gmHistory.map((entry) => (
+                        <li key={entry.seasonId} className="nl-teamprofile-gm-history-row">
+                          <span className="nl-teamprofile-gm-history-season nl-tnum">{entry.seasonName}</span>
+                          <span className="nl-teamprofile-gm-history-gm">
+                            {entry.gmName}
+                            {entry.isLive ? " · aktuell" : ""}
+                          </span>
+                          {entry.dismissalReason != null || entry.previousGmName != null ? (
+                            <small className="nl-teamprofile-gm-history-note">
+                              {entry.previousGmName != null ? `Nachfolger von ${entry.previousGmName}` : "Board-Wechsel"}
+                              {entry.dismissalReason != null
+                                ? ` · ${formatGmDismissalReason(entry.dismissalReason)}`
+                                : ""}
+                            </small>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ) : null}
               </article>
             ) : null}

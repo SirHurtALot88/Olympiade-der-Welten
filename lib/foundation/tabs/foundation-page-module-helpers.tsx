@@ -652,9 +652,38 @@ export function resolvePreferredFoundationTeamContext(
     activeSaveId?: string | null;
   },
 ): ActiveManagerTeamContext {
+  // A selection coming from the URL/route/prop/localStorage/save is only honored
+  // when it points at a team the human can actually control. When the save has an
+  // owned (human-controlled) team but the candidate points at an AI team -- e.g. a
+  // stale `team=R-C` URL param carried over from a previous save/session -- snap to
+  // the owned team so LOADING never strands the player on a club they cannot manage.
+  // Owned-team order (via resolveDefaultManagerTeamId): primary user/Chris team ->
+  // first human-controlled team -> teams[0]. Saves without any owned team (AI-only
+  // dev/admin states) keep the candidate unchanged, preserving existing behavior.
+  const settingsMap = options?.settingsMap ?? null;
+  const teamById = new Map(teams.map((team) => [team.teamId, team] as const));
+  const isTeamManaged = (teamId: string | null | undefined) => {
+    if (!teamId) {
+      return false;
+    }
+    const settings = settingsMap?.[teamId];
+    if (settings) {
+      return settings.controlMode === "manual";
+    }
+    return teamById.get(teamId)?.humanControlled === true;
+  };
+  const hasOwnedTeam = teams.some((team) => isTeamManaged(team.teamId));
+  const ownedDefaultTeamId = resolveDefaultManagerTeamId(teams, settingsMap ?? undefined);
+  const withOwnedTeamGuard = (context: ActiveManagerTeamContext): ActiveManagerTeamContext => {
+    if (!hasOwnedTeam || isTeamManaged(context.teamId)) {
+      return context;
+    }
+    return { teamId: ownedDefaultTeamId, source: "default_human_team", warning: context.warning ?? null };
+  };
+
   const requestedFromUrl = parseFoundationTeamIdFromUrl(teams);
   if (requestedFromUrl) {
-    return { teamId: requestedFromUrl, source: "route" };
+    return withOwnedTeamGuard({ teamId: requestedFromUrl, source: "route" });
   }
 
   const rawTeamParam = getRawFoundationTeamParam();
@@ -665,27 +694,27 @@ export function resolvePreferredFoundationTeamContext(
 
   const requestedFromInitial = resolveFoundationTeamId(teams, options?.initialTeamId);
   if (requestedFromInitial) {
-    return { teamId: requestedFromInitial, source: "route", warning: invalidRouteWarning };
+    return withOwnedTeamGuard({ teamId: requestedFromInitial, source: "route", warning: invalidRouteWarning });
   }
 
   const currentTeamId = options?.currentTeamId ?? null;
   if (currentTeamId && teams.some((team) => team.teamId === currentTeamId)) {
-    return { teamId: currentTeamId, source: options?.currentSource ?? "manual_select", warning: invalidRouteWarning };
+    return withOwnedTeamGuard({ teamId: currentTeamId, source: options?.currentSource ?? "manual_select", warning: invalidRouteWarning });
   }
 
   const requestedFromSave = resolveFoundationTeamId(teams, options?.savedTeamId);
   if (requestedFromSave) {
-    return { teamId: requestedFromSave, source: "saved_preference", warning: invalidRouteWarning };
+    return withOwnedTeamGuard({ teamId: requestedFromSave, source: "saved_preference", warning: invalidRouteWarning });
   }
 
   if (!options?.ignoreStoredPreference) {
     const requestedFromStorage = readStoredFoundationManagerTeamId(teams, options?.activeSaveId);
     if (requestedFromStorage) {
-      return { teamId: requestedFromStorage, source: "saved_preference", warning: invalidRouteWarning };
+      return withOwnedTeamGuard({ teamId: requestedFromStorage, source: "saved_preference", warning: invalidRouteWarning });
     }
   }
 
-  return { teamId: resolveDefaultManagerTeamId(teams, options?.settingsMap), source: "default_human_team", warning: invalidRouteWarning };
+  return { teamId: ownedDefaultTeamId, source: "default_human_team", warning: invalidRouteWarning };
 }
 
 export function resolvePreferredFoundationTeamId(

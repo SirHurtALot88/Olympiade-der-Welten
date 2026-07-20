@@ -223,6 +223,15 @@ export type TeamCaptainRecord = {
 export type StandingRecord = {
   points: number;
   rank?: number | null;
+  /**
+   * Idempotency baseline for standings-apply: the team's points BEFORE `matchdayBaselineId`'s delta
+   * was applied, plus which matchday that baseline belongs to. On a `forceReplace` re-apply of the
+   * same matchday, the projected points are recomputed from this baseline (baseline + delta) instead
+   * of the already-incremented live `points`, so the delta is not double-counted. Undefined until a
+   * matchday has been applied to this record.
+   */
+  matchdayBaselinePoints?: number | null;
+  matchdayBaselineId?: string | null;
   cashFc?: number | null;
   startplatz?: number | null;
   rankDiff?: number | null;
@@ -1159,7 +1168,37 @@ export type TeamSeasonObjectiveCategory =
   | "player"
   | "sponsor";
 
+/** @deprecated Legacy star-tier archetype. Superseded by SponsorCurveShape + SponsorRarity. Kept only for
+ * back-compat reading of old saves during migration; the active model no longer assigns it. */
 export type SponsorArchetype = "security" | "performance" | "identity";
+
+/**
+ * Rarity replaces the old 1..5 star tier as the Etat (total-payout) dial. Bounded spread (see
+ * SPONSOR_RARITIES in lib/sponsor/sponsor-curve-shapes.ts): gewöhnlich (lowest) → legendär (highest),
+ * factors 0.90 / 1.00 / 1.07 / 1.15 — salary-anchored, so it never dwarfs a team's wage bill.
+ */
+export type SponsorRarity = "gewöhnlich" | "magisch" | "selten" | "legendär";
+
+/** Thematic family of a curve shape — governs the offer-slate draw ("max 2 per family"). */
+export type SponsorCurveFamily = "titel" | "europa" | "stetig" | "aufstieg" | "sicherheit";
+
+/**
+ * A sponsor's curve shape = WHERE across the final table (Platz 1..32) its fixed Etat sits. Replaces the
+ * old 3 archetypes. 11 shapes in 5 families; each has a unique win-band and a matching weak-band (no shape
+ * is dominated). Data + payout profiles live in lib/sponsor/sponsor-curve-shapes.ts.
+ */
+export type SponsorCurveShape =
+  | "titeljaeger"
+  | "meisterschale"
+  | "koenigsklasse"
+  | "europapokal"
+  | "conference"
+  | "stetig"
+  | "mittelfeld"
+  | "aufsteiger"
+  | "konsolidierung"
+  | "sicherheit"
+  | "klassenerhalt";
 
 export type SponsorOfferComponentKind = "base" | "rank" | "improvement" | "special";
 
@@ -1199,8 +1238,6 @@ export type SponsorOfferComponent = {
 
 export type SponsorDemandProfile = "safe" | "balanced" | "ambitious" | "elite";
 
-export type SponsorStarTier = 1 | 2 | 3 | 4 | 5;
-
 export type SponsorTermSeasons = 1 | 2 | 3;
 
 export type SponsorNegotiationProfile = "safe" | "balanced" | "ambitious";
@@ -1226,11 +1263,14 @@ export type SponsorOffer = {
   seasonId: string;
   teamId: string;
   archetype: SponsorArchetype;
+  /** Curve shape = where the Etat sits across the table (transitional-optional; required after cutover). */
+  curveShape?: SponsorCurveShape;
+  /** Rarity = the Etat dial that replaced the legacy star tier (transitional-optional; required after cutover). */
+  rarity?: SponsorRarity;
   name: string;
   flavor: string;
   components: SponsorOfferComponent[];
   totalUpsideEstimate: number;
-  starTier?: SponsorStarTier;
   commercialRating?: number;
   sponsorBrandId?: string;
   sponsorParentBrandId?: string;
@@ -1243,15 +1283,16 @@ export type SponsorOffer = {
   isChallengeOffer?: boolean;
   /**
    * Golden-Sponsor-Los: höchstens EIN Slot/Team kann golden werden (underdog-/beliebtheits-gewichtet,
-   * mit Cooldown). Golden ist KEIN eigener Stern — der Offer behält seinen starTier — sondern hebt die
-   * Rang-Meilenstein-Komponente (gedeckelt). Wird in chooseSponsorOffer in den Vertrag mitkopiert.
+   * mit Cooldown). Golden ist KEIN eigener Rarity-Sprung — der Offer behält seine rarity — sondern hebt
+   * die Rang-Meilenstein-Komponente (gedeckelt). Wird in chooseSponsorOffer in den Vertrag mitkopiert.
    */
   isGolden?: boolean;
 };
 
 export type SponsorCommercialRating = {
   score: number;
-  tierHint: SponsorStarTier;
+  /** Erwartete Rarity aus dem Kommerz-Score (ersetzt den früheren 1..5-Sterne-Hint). */
+  rarityHint: SponsorRarity;
   breakdown: {
     recentPerformance: number;
     rosterPotential: number;
@@ -1281,12 +1322,15 @@ export type TeamSponsorContract = {
   teamId: string;
   offerId: string;
   archetype: SponsorArchetype;
+  /** Curve shape (transitional-optional; required after cutover). */
+  curveShape?: SponsorCurveShape;
+  /** Rarity — the Etat dial that replaced the legacy star tier (transitional-optional; required after cutover). */
+  rarity?: SponsorRarity;
   name: string;
   chosenAt: string;
   startRank: number | null;
   components: SponsorOfferComponent[];
   payouts: TeamSponsorContractPayouts;
-  starTier?: SponsorStarTier;
   commercialRating?: number;
   sponsorBrandId?: string;
   sponsorParentBrandId?: string;
@@ -1298,6 +1342,17 @@ export type TeamSponsorContract = {
   teamQualityRankAtSign?: number;
   /** Golden-Sponsor-Vertrag (aus dem gewählten Offer mitkopiert) — Rang-Payout-Boost gedeckelt. */
   isGolden?: boolean;
+  /**
+   * LOCKED-AT-SIGNING Rang-Payout-Leiter: `lockedRankPayoutLadder[finalRank - 1]` = die volle
+   * getSponsorPayoutForFinalRankAndTier-Summe für diesen Endrang, berechnet mit dem Anker + salaryFactor
+   * ZUM ZEITPUNKT DER UNTERSCHRIFT. Das Settlement zahlt am erreichten Endrang aus dieser gespeicherten
+   * Leiter (statt die Kurve aus den Season-End-Ankern neu abzuleiten), sodass eine Anker-/salaryFactor-Drift
+   * über die Saison die Auszahlung eines bereits unterschriebenen Vertrags nicht mehr verändert. Fehlt das
+   * Feld (Altsaves vor diesem Fix), fällt das Settlement auf die alte Season-End-Ableitung zurück.
+   */
+  lockedRankPayoutLadder?: number[];
+  /** salaryFactor zum Zeitpunkt der Unterschrift — für konsistente Meilenstein-Anzeige im Settlement. */
+  salaryFactorAtSign?: number;
 };
 
 export type ScoutIntelSource = "watchlist" | "wishlist_mirror" | "passive_need" | "roster";
@@ -1350,6 +1405,16 @@ export type LoanApplyLogRecord = {
   interestPortion: number;
   principalPortion: number;
   createdAt: string;
+  /**
+   * Ledger-Quelle des Eintrags. Fehlt/`"settlement"` = reguläre Saison-End-Ratenbuchung
+   * (`applyLoanSettlement`). `"early_payoff"` = vorzeitige Ablösung (`applyEarlyPayoff`), die
+   * denselben Cash-Effekt trägt (Kreditnehmer −payoff, Team-Verleiher +payoff) und deshalb hier
+   * geloggt wird, damit die Cash-Reconciliation (transfer-finance-audit.ts) sie nicht als Leck
+   * meldet. Die Saison-End-Settlement-Idempotenz (`previewLoanSettlement`/`season-completion-service`)
+   * ignoriert `"early_payoff"`-Einträge bewusst — eine In-Season-Ablösung darf das Settlement
+   * derselben Saison NICHT als "bereits gelaufen" markieren.
+   */
+  kind?: "settlement" | "early_payoff";
 };
 
 /**

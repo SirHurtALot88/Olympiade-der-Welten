@@ -9923,6 +9923,7 @@ export function useFoundationShellRouterBodyScope({
     seasonStartResetBusy,
     newGameBusy,
     rosterFillBusy,
+    aiTeamsRefillBusy: bulkAiPicksRefillBusy,
     adminBalancingBusy,
     cockpitBusyKey,
     aiTeamsCount: aiTeams.length,

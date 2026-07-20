@@ -1,6 +1,7 @@
 import type { GameState, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
 import { resolveTransferDoctrine } from "@/lib/ai/ai-transfer-doctrine-layer";
 import { isMarketBuyTransferEntry } from "@/lib/season/transfer-season-policy";
+import { buildTeamSeasonObjectiveSettlement } from "@/lib/board/team-season-objectives-service";
 
 export type TransferFinanceTeamSeasonRow = {
   seasonId: string;
@@ -14,10 +15,18 @@ export type TransferFinanceTeamSeasonRow = {
   sponsorCashIn: number;
   salaryPaidOut: number;
   netSponsorCash: number;
+  /** Mid-Season-Sponsor-Event-Cash (auto-settle `sponsorEvents`, nicht in sponsorPayoutLogs). */
+  netSponsorEventCash: number;
   /** T-029: Kredit-Cashflows der Saison (loanOriginationLogs + loanApplyLogs, beide Seiten bei Team-Krediten). */
   netLoanCash: number;
   /** T-029: Gebäude-Cashflows der Saison (facilityEvents-Ledger, `-cost` je Event). */
   netFacilityCash: number;
+  /**
+   * Board-Objective-Reward-Cash der Saison (settlement `byTeamId[teamId].cashDelta`, am Saisonende via
+   * `applyTeamSeasonObjectiveRewards` direkt auf `team.cash` gebucht). Nur für die aktuelle Saison
+   * rekonstruierbar (siehe `getSeasonObjectiveRewardCashByTeam`).
+   */
+  netObjectiveRewardCash: number;
   buyCount: number;
   draftBuyCount: number;
   marketBuyCount: number;
@@ -152,6 +161,64 @@ function getSeasonFacilityCashByTeam(gameState: GameState, seasonId: string) {
   return map;
 }
 
+/**
+ * Sponsor-EVENT-Cashflows einer Saison, pro Team aggregiert. Mid-Season-Sponsor-Events
+ * (`sponsorEvents`) werden beim Matchday-Advance sofort verrechnet (Auto-Settle): der `cashDelta`
+ * landet direkt auf `team.cash` und der Datensatz wird mit Status `resolved` abgelegt (siehe
+ * `sponsor-event-service.ts`). Dieses Cash ist BEWUSST NICHT in `sponsorPayoutLogs` (das
+ * Season-End-Settlement arbeitet nur auf Vertragskomponenten), fehlte damit aber komplett in der
+ * Cash-Reconciliation und tauchte als echtes (kleines) Rest-Delta auf. Nur `resolved`-Events sind
+ * cash-wirksam — `open` (noch nicht eingelöst) und `dismissed` (abgelehnt) belasten `team.cash`
+ * nicht.
+ */
+function getSeasonSponsorEventCashByTeam(gameState: GameState, seasonId: string) {
+  const map = new Map<string, number>();
+  for (const event of gameState.seasonState.sponsorEvents ?? []) {
+    if (event.seasonId !== seasonId || event.status !== "resolved") continue;
+    map.set(event.teamId, round((map.get(event.teamId) ?? 0) + event.cashDelta));
+  }
+  return map;
+}
+
+/**
+ * Board-Objective-Reward-Cashflows einer Saison, pro Team aggregiert. Am Saisonende bucht
+ * `applyTeamSeasonObjectiveRewards` (team-season-objectives-service.ts, execute:true) für jedes Team
+ * `team.cash += settlement.byTeamId[teamId].cashDelta` — erfüllte Board-Ziele zahlen `rewardCash`,
+ * verfehlte belasten `-penaltyCash` — und legt EINEN Idempotenz-Log (`objectiveRewardApplyLogs`) je
+ * Saison ab. Dieses Cash landet VOR dem reconcilten Snapshot auf `team.cash`, fehlte bisher aber
+ * komplett in der Cash-Reconciliation: exakt der blinde Fleck, den dieses Audit-Tool absichern soll.
+ * Sponsor-Vertrags-Spiegel-Ziele tragen im Settlement bereits `cashDelta = 0` (siehe
+ * `buildTeamSeasonObjectiveSettlement`), damit gibt es keine Doppelzählung mit `netSponsorCash`.
+ *
+ * WICHTIG (Rekonstruktion): Der Apply-Log trägt NUR die Saison-Summe (`payload.totalCashDelta`), keine
+ * Per-Team-Aufschlüsselung, und `finalStandings` im Snapshot hält den Betrag ebenfalls nicht. Die
+ * einzige deterministische Per-Team-Quelle ist daher, das Settlement neu zu rechnen — das aber immer
+ * `gameState.season.id` abbildet. Deshalb wird der Kanal nur für die AKTUELLE Saison und nur dann
+ * rekonstruiert, wenn für sie ein Apply-Log existiert (= Rewards wurden real gebucht; die Ziele sind
+ * dann eingefroren, Recompute == gebuchter Wert). Für abgeschlossene Vor-Saisons bleibt der Kanal
+ * bewusst 0 — mangels persistierter Per-Team-Daten nicht rekonstruierbar, ohne die Reward-Auszahlung
+ * bzw. das Log-Schema zu ändern.
+ */
+function getSeasonObjectiveRewardCashByTeam(gameState: GameState, seasonId: string) {
+  const map = new Map<string, number>();
+  const hasApplyLog = (gameState.seasonState.objectiveRewardApplyLogs ?? []).some((log) => log.seasonId === seasonId);
+  if (!hasApplyLog || seasonId !== gameState.season.id) {
+    return map;
+  }
+  try {
+    const settlement = buildTeamSeasonObjectiveSettlement(gameState);
+    for (const [teamId, summary] of Object.entries(settlement.byTeamId)) {
+      if (!summary || summary.cashDelta === 0) continue;
+      map.set(teamId, round(summary.cashDelta));
+    }
+  } catch {
+    // "nicht kaputt bauen": Ein Fehler in der Board-Settlement-Rekonstruktion darf das Finanz-Audit
+    // nicht kippen — im Zweifel Kanal 0 (bisheriges Verhalten), statt den Report crashen zu lassen.
+    return new Map<string, number>();
+  }
+  return map;
+}
+
 export function buildBuyEconomics(gameState: GameState) {
   const playerById = new Map(gameState.players.map((player) => [player.id, player]));
   return gameState.transferHistory
@@ -188,6 +255,8 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
     const sponsorLogs = (gameState.seasonState.sponsorPayoutLogs ?? []).filter((log) => log.seasonId === seasonId);
     const loanCashByTeam = getSeasonLoanCashByTeam(gameState, seasonId);
     const facilityCashByTeam = getSeasonFacilityCashByTeam(gameState, seasonId);
+    const sponsorEventCashByTeam = getSeasonSponsorEventCashByTeam(gameState, seasonId);
+    const objectiveRewardCashByTeam = getSeasonObjectiveRewardCashByTeam(gameState, seasonId);
 
     for (const teamId of teamIds) {
       const buys = transfers.filter((entry) => entry.transferType === "buy" && entry.toTeamId === teamId);
@@ -209,6 +278,8 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
       const netSponsorCash = round(teamSponsorLogs.reduce((sum, log) => sum + log.cashDelta, 0));
       const netLoanCash = loanCashByTeam.get(teamId) ?? 0;
       const netFacilityCash = facilityCashByTeam.get(teamId) ?? 0;
+      const netSponsorEventCash = sponsorEventCashByTeam.get(teamId) ?? 0;
+      const netObjectiveRewardCash = objectiveRewardCashByTeam.get(teamId) ?? 0;
       const cashStart = cashStartByTeam.get(teamId) ?? null;
       const cashEnd =
         cashEndByTeam.get(teamId) ??
@@ -216,9 +287,24 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
       // T-029: vorher nur netTransferCash + netSponsorCash — Kredit- und Gebäude-Cashflows fehlten,
       // wodurch echte Lecks in dieser Größenordnung von der (künstlich großen) Toleranz verschluckt
       // wurden. Jetzt vollständig, Toleranz s.u. entsprechend auf Rundungsrauschen gesenkt.
+      // Zusätzlich: mid-season Sponsor-Event-Cash (auto-settle `sponsorEvents`, NICHT in
+      // sponsorPayoutLogs) — sonst blieb dieser reale Einnahmekanal als kleines Rest-Delta übrig.
+      // Und: Board-Objective-Reward-Cash (Saison-End-Settlement, direkt auf team.cash gebucht) — bisher
+      // gar nicht abgezogen, obwohl er im Snapshot-`cashEnd` steckt; genau die Formel-Lücke, die dieses
+      // Tool eigentlich schließen soll. Vorzeichen wie die anderen Gutschriften: `cashEnd` enthält das
+      // Reward-Cash bereits (team.cash += cashDelta), also subtrahieren, damit die Reconciliation aufgeht.
       const cashReconciliationDelta =
         cashStart != null && cashEnd != null
-          ? round(cashEnd - cashStart - netTransferCash - netSponsorCash - netLoanCash - netFacilityCash)
+          ? round(
+              cashEnd -
+                cashStart -
+                netTransferCash -
+                netSponsorCash -
+                netSponsorEventCash -
+                netLoanCash -
+                netFacilityCash -
+                netObjectiveRewardCash,
+            )
           : null;
 
       rows.push({
@@ -233,8 +319,10 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
         sponsorCashIn,
         salaryPaidOut,
         netSponsorCash,
+        netSponsorEventCash,
         netLoanCash,
         netFacilityCash,
+        netObjectiveRewardCash,
         buyCount: marketBuys.length,
         draftBuyCount: draftBuys.length,
         marketBuyCount: marketBuys.length,

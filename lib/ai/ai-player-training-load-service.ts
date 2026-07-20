@@ -9,6 +9,7 @@ import { deriveAttributeAffinityProfile } from "@/lib/training/training-levelup-
 import { normalizeProgressionClassName, type ProgressionClassName } from "@/lib/training/class-progression-config";
 import { FATIGUE_LOAD_BY_MODE } from "@/lib/training/training-mode-presentation";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
+import { resolveFatigueRestFloor, shouldRestForFatigue } from "@/lib/fatigue/fatigue-rest-propensity";
 
 export type AiTeamTrainingIntensity = "light" | "normal" | "hard";
 
@@ -83,6 +84,20 @@ function isHeavyStarter(input: { appearances: number; completedMatchdays: number
 
 function isLikelyStarter(input: { appearances: number; rosterRank: number; completedMatchdays: number }) {
   return input.rosterRank <= 3 || input.appearances >= Math.max(6, input.completedMatchdays - 2);
+}
+
+/**
+ * Star / high-value lean in [0, 0.6] for the fatigue-rest countermeasure: how much
+ * earlier this asset should be spared. Franchise players (high rating/value, top of the
+ * depth chart) rest earlier; squad filler stays near the base fatigue curve.
+ */
+function computeFatigueRestValueLean(player: Player, rosterRank: number): number {
+  const rating = player.ovr ?? player.rating ?? 0;
+  const ratingLean = Math.max(0, Math.min(0.32, (rating - 70) / 60));
+  const marketValue = player.marketValue ?? player.displayMarketValue ?? 0;
+  const valueLean = Math.max(0, Math.min(0.18, marketValue / 250));
+  const rankLean = rosterRank <= 3 ? 0.16 : rosterRank <= 6 ? 0.08 : 0;
+  return Math.min(0.6, ratingLean + valueLean + rankLean);
 }
 
 type TeamAxis = "pow" | "spe" | "men" | "soc";
@@ -182,6 +197,19 @@ function resolveModeForPlayer(input: {
   prevSeasonStress?: boolean;
   gapAxes?: TeamAxis[];
   gmAxisBoost?: number;
+  /** Star / high-value lean for the fatigue-rest countermeasure (see computeFatigueRestValueLean). */
+  restValueLean?: number;
+  /** GM caution in [-1, 1]: positive = cautious (rest earlier), negative = gambler (push longer). */
+  restGmCaution?: number;
+  /** Rotation-depth lean in [0, 0.4]: extra willingness to rest when the squad has cover. */
+  restDepthLean?: number;
+  /**
+   * Kadergroessen-abhaengiger Fatigue-Boden (siehe resolveFatigueRestFloor). Duenne Kader
+   * bekommen einen niedrigeren Boden und werden daher frueher auf "leicht" geschont.
+   */
+  restFloor?: number;
+  /** Deterministic seed per (player, matchday) for the stable rest roll. */
+  restSeed?: string;
 }): Pick<AiPlayerTrainingLoadPlan, "selectedMode" | "projectedInjuryRiskPercent" | "needsLineupRest" | "reasons"> {
   const fatigue = input.player.fatigue ?? 0;
   const currentRisk = getInjuryRiskPercent(fatigue);
@@ -196,6 +224,42 @@ function resolveModeForPlayer(input: {
     completedMatchdays: input.completedMatchdays,
   });
   const reasons: string[] = [];
+
+  // --- Fatigue-Schoner countermeasure: fatigue-scaled LIGHT training + lineup rest ---
+  // A fatigued player — stars earliest — is probabilistically moved to LIGHT ("leicht")
+  // training and flagged for lineup rest (which the legacy lineup engine reads via
+  // playerNeedsLineupRestFromTrainingLoad to bench/spare them in disciplines). Probability
+  // rises with fatigue, is star-protective, GM-caution and rotation-depth aware, and is
+  // deterministic per (player, matchday). This only ever LIGHTENS load; when the roll does
+  // not fire the critical-fatigue safety net below still catches extreme cases.
+  if (input.restSeed) {
+    const restDecision = shouldRestForFatigue({
+      fatigue,
+      valueLean: input.restValueLean,
+      caution: input.restGmCaution,
+      depthLean: input.restDepthLean,
+      floor: input.restFloor,
+      seed: input.restSeed,
+    });
+    if (restDecision.rest) {
+      reasons.push(
+        `Fatigue-Schoner: leicht + Schonen (Fatigue ${Math.round(fatigue)}, p=${restDecision.probability.toFixed(2)})`,
+      );
+      return {
+        selectedMode: "leicht",
+        projectedInjuryRiskPercent: getInjuryRiskPercent(
+          projectedFatigueAfterMode({
+            fatigue,
+            mode: "leicht",
+            recoveryReductionPct: input.recoveryReductionPct,
+            likelyStarter,
+          }),
+        ),
+        needsLineupRest: true,
+        reasons,
+      };
+    }
+  }
 
   if ((fatigue >= 85 || currentRisk >= 25) && (heavyStarter || likelyStarter || fatigue >= 92)) {
     reasons.push("kritische Fatigue/Verletzungsgefahr → leicht + Pause");
@@ -389,6 +453,19 @@ export function buildTeamPlayerTrainingLoadPlans(input: {
           gapAxes.includes("soc") ? (gm?.profile.soc ?? 5) / 10 : 0,
         )
       : 0;
+  // Fatigue-Schoner countermeasure leans (team-level, applied per player below).
+  const gmRiskTolerance = gm?.profile.bias.riskTolerance ?? 5;
+  const restGmCaution = Math.max(-1, Math.min(1, (5 - gmRiskTolerance) / 5));
+  const team = input.gameState.teams.find((entry) => entry.teamId === input.teamId);
+  const rosterOptTarget = team?.rosterOptTarget ?? 6;
+  const restDepthLean = Math.max(
+    0,
+    Math.min(0.4, (rosterEntries.length - rosterOptTarget) / Math.max(1, rosterOptTarget * 2)),
+  );
+  // Kadergroessen-abhaengiger Fatigue-Boden: duenne Kader (wenig Ersatz ueber den Startplaetzen)
+  // schonen frueher auf "leicht", damit nicht der ganze Kader gleichzeitig in Fatigue laeuft.
+  const restFloor = resolveFatigueRestFloor({ rosterSize: rosterEntries.length });
+  const restMatchdayId = input.gameState.matchdayState.matchdayId;
   const currentSchedule =
     input.gameState.seasonState.disciplineSchedule?.find(
       (entry) => entry.matchdayId === input.gameState.matchdayState.matchdayId,
@@ -422,6 +499,11 @@ export function buildTeamPlayerTrainingLoadPlans(input: {
         prevSeasonStress: input.prevSeasonStress,
         gapAxes,
         gmAxisBoost,
+        restValueLean: computeFatigueRestValueLean(player, rosterRank),
+        restGmCaution,
+        restDepthLean,
+        restFloor,
+        restSeed: `${player.id}:${restMatchdayId}:fatigue-rest`,
       });
       const fatigue = player.fatigue ?? 0;
       return {

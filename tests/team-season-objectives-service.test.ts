@@ -11,10 +11,12 @@ import {
   getExpectationRankObjective,
   getSignatureAxisWinObjective,
   getSportTarget,
+  getSportTargetV2,
   getTeamObjectiveAiBias,
   getTransferSpendCeilingObjective,
   getUpsetAvoidanceObjective,
   refreshTeamObjectiveState,
+  resolveBoardDisposition,
 } from "@/lib/board/team-season-objectives-service";
 
 function createTeam(partial?: Partial<Team>): Team {
@@ -533,12 +535,108 @@ describe("team season objectives service", () => {
     expect(["Rebuild ohne Absturz", "Survival: nicht Bottom 5", "Bottom 8 vermeiden"]).toContain(target.label);
   });
 
+  it("V2: the scored sport goal carries the strength-calibrated V2 target (disposition ambition reaches it)", () => {
+    const prevFlag = process.env.OLY_BOARD_OBJECTIVES_V2;
+    process.env.OLY_BOARD_OBJECTIVES_V2 = "1";
+    try {
+      const TEAM_COUNT = 13;
+      const focusId = "F-6"; // mittelstarkes Team -> Erwartungsrang in der Tabellenmitte
+
+      const buildScenario = (previousBoardValue: number): GameState => {
+        const teams = Array.from({ length: TEAM_COUNT }, (_, i) =>
+          createTeam({ teamId: `F-${i}`, shortCode: `F${i}`, name: `Focus ${i}` }),
+        );
+        // Streng monoton fallende Stärke: Marktwert UND coreStats sinken mit dem Index, damit
+        // ppsTotal- und Marktwert-Rang dieselbe Reihenfolge ergeben (Composite-Erwartung ~ Index+1).
+        const players = teams.map((team, i) =>
+          createPlayer(`${team.teamId}-p`, {
+            rating: 90 - i * 4,
+            marketValue: 300 - i * 18,
+            displayMarketValue: 300 - i * 18,
+            coreStats: { pow: 70 - i * 4, spe: 70 - i * 4, men: 70 - i * 4, soc: 70 - i * 4 },
+          }),
+        );
+        const rosters = teams.map((team) => createRoster(`${team.teamId}-p`, { teamId: team.teamId, currentValue: 0 }));
+        const gameState = createGameState({
+          teams,
+          // Gleiche Identity-Ambition für alle -> der Unterschied kommt allein aus der Disposition (F1).
+          identities: teams.map((team) => createIdentity(team.teamId, { ambition: 5 })),
+          players,
+          rosters,
+          standings: Object.fromEntries(teams.map((team, i) => [team.teamId, { points: 100 - i, rank: i + 1 }])),
+        });
+        // Nur die Vorsaison-Board-Bewertung des Fokus-Teams unterscheidet die beiden Szenarien.
+        gameState.seasonState.previousSeasonBoardConfidence = {
+          [focusId]: { teamId: focusId, value: previousBoardValue, pressure: 11 - previousBoardValue, warnings: [] },
+        };
+        return gameState;
+      };
+
+      // Zwei identisch starke Ligen; nur die Disposition-Ambition des Fokus-Teams unterscheidet sich:
+      // überperformt (value 9 -> hohe Ambition) vs. enttäuscht (value 2 -> niedrige Ambition).
+      const overState = buildScenario(9);
+      const underState = buildScenario(2);
+
+      const overSport = buildTeamObjectiveOverview(overState).objectives.find(
+        (objective) => objective.teamId === focusId && objective.category === "sport",
+      );
+      const underSport = buildTeamObjectiveOverview(underState).objectives.find(
+        (objective) => objective.teamId === focusId && objective.category === "sport",
+      );
+
+      // Das Slot-1-Sportziel bleibt expectation-rank — nur sein Zielwert wird V2-kalibriert.
+      expect(overSport?.objectiveId).toBe("expectation-rank");
+      expect(underSport?.objectiveId).toBe("expectation-rank");
+
+      // Beweis 1: gleiche Kaderstärke/Erwartung, aber unterschiedliche Disposition-Ambition ->
+      // UNTERSCHIEDLICHE gewertete Sportziele. Vor dem Fix identisch (nur statische identity.ambition zählte).
+      expect(overSport?.targetValue).not.toBe(underSport?.targetValue);
+
+      // Beweis 2: das gewertete Ziel entspricht exakt getSportTargetV2 (BOARD_V2_CALIBRATION +
+      // Disposition-Ambition), nicht dem statischen expectation-rank-Ziel.
+      const rowsFor = (state: GameState) =>
+        new Map(buildTeamSeasonOverviewRows({ gameState: state }).map((row) => [row.teamId, row] as const));
+      const dispFor = (state: GameState) =>
+        resolveBoardDisposition({
+          identity: state.teamIdentities.find((identity) => identity.teamId === focusId) ?? null,
+          previousSeasonBoard: state.seasonState.previousSeasonBoardConfidence?.[focusId] ?? null,
+        });
+
+      const overRows = rowsFor(overState);
+      const underRows = rowsFor(underState);
+      const v2Over = getSportTargetV2({ identity: null, teamId: focusId, rowsByTeamId: overRows, ambition01: dispFor(overState).ambition });
+      const v2Under = getSportTargetV2({ identity: null, teamId: focusId, rowsByTeamId: underRows, ambition01: dispFor(underState).ambition });
+
+      expect(overSport?.targetValue).toBe(`Top ${v2Over.rank}`);
+      expect(underSport?.targetValue).toBe(`Top ${v2Under.rank}`);
+      // Höhere Disposition-Ambition -> härteres (niedrigeres) Ziel.
+      expect(v2Over.rank).toBeLessThan(v2Under.rank);
+
+      // Beweis 3: das gewertete V2-Ziel weicht vom statischen expectation-rank-Ziel ab (dem alten,
+      // fälschlich weiter genutzten Wert, der auf identity.ambition statt der Kalibrierung basierte).
+      const staticSport = getExpectationRankObjective({
+        team: overState.teams.find((team) => team.teamId === focusId)!,
+        identity: overState.teamIdentities.find((identity) => identity.teamId === focusId) ?? null,
+        profile: null,
+        row: overRows.get(focusId)!,
+        rowsByTeamId: overRows,
+      });
+      expect(overSport?.targetValue).not.toBe(staticSport.targetValue);
+    } finally {
+      if (prevFlag == null) delete process.env.OLY_BOARD_OBJECTIVES_V2;
+      else process.env.OLY_BOARD_OBJECTIVES_V2 = prevFlag;
+    }
+  });
+
   it("updates objective status and board pressure when cash is negative", () => {
     const team = createTeam({ cash: -8 });
     const gameState = createGameState({ teams: [team], identities: [createIdentity(team.teamId, { boardConfidence: 4 })] });
 
     const overview = buildTeamObjectiveOverview(gameState);
-    const cashObjective = overview.objectives.find((objective) => objective.objectiveId === "finance-cash-positive");
+    // V2 migration: the tautological "finance-cash-positive" goal is replaced. Negative cash now
+    // surfaces as a failed "finance-salary-ratio" objective (salary/(cash+salary) blows past target),
+    // which is the finance-distress goal actually selected into the compact V2 slate.
+    const cashObjective = overview.objectives.find((objective) => objective.objectiveId === "finance-salary-ratio");
     const board = overview.boardConfidence[team.teamId];
 
     expect(cashObjective?.status).toBe("failed");
@@ -669,10 +767,14 @@ describe("team season objectives service", () => {
   });
 
   it("refreshes stored objectives without replacing their label or source", () => {
+    // V2 migration: "finance-cash-positive" is no longer generated, so a stored objective keyed to it
+    // would be dropped by the merge (no matching generated goal). Key the saved board-authored objective
+    // onto the V2 finance-distress goal that IS selected on negative cash — "finance-salary-ratio" — to
+    // exercise the same merge path (custom label + source preserved, value/status refreshed from generated).
     const storedObjective: TeamSeasonObjectiveRecord = {
       seasonId: "season-3",
       teamId: "M-M",
-      objectiveId: "finance-cash-positive",
+      objectiveId: "finance-salary-ratio",
       category: "finance",
       label: "Eigener Board-Auftrag: Cash darf nie negativ werden",
       targetValue: "> 0",
@@ -692,12 +794,14 @@ describe("team season objectives service", () => {
     });
 
     const overview = buildTeamObjectiveOverview(gameState);
-    const refreshed = overview.objectives.find((objective) => objective.objectiveId === "finance-cash-positive");
+    const refreshed = overview.objectives.find((objective) => objective.objectiveId === "finance-salary-ratio");
     const board = overview.boardConfidence["M-M"];
 
     expect(refreshed?.label).toBe(storedObjective.label);
     expect(refreshed?.status).toBe("failed");
-    expect(refreshed?.currentValue).toBe(-12);
+    // Refreshed from generated: salary/(cash+salary) with negative cash yields a >100% distress ratio
+    // (a "%" string), proving the stored placeholder value (50) was replaced by the live computed value.
+    expect(String(refreshed?.currentValue)).toContain("%");
     expect(refreshed?.source).toContain("saved_board_objective");
     expect(board?.warnings).toContain("board_confidence_source_saved_state");
   });
@@ -930,9 +1034,19 @@ describe("team season objectives service", () => {
 
     const refreshed = refreshTeamObjectiveState(gameState);
     const refreshedAgain = refreshTeamObjectiveState(refreshed);
+    const refreshedThird = refreshTeamObjectiveState(refreshedAgain);
+
+    const v1 = refreshed.seasonState.boardConfidence?.["M-M"]?.value ?? 0;
+    const v2 = refreshedAgain.seasonState.boardConfidence?.["M-M"]?.value;
+    const v3 = refreshedThird.seasonState.boardConfidence?.["M-M"]?.value;
 
     expect(refreshed.seasonState.teamSeasonObjectives?.length).toBeGreaterThan(0);
-    expect(refreshed.seasonState.boardConfidence?.["M-M"]?.value).toBe(refreshedAgain.seasonState.boardConfidence?.["M-M"]?.value);
+    // Anti-compounding guard: the saved value (10) must NOT carry — it recomputes far below it.
+    expect(v1).toBeLessThan(5);
+    // V2: the F4 dynamic slate size reads the stored perceivedPressure, which is only populated
+    // *after* the first refresh. So the board value settles one extra step (3.0 -> 2.8 as the slate
+    // grows by one goal) and is then idempotent — assert the converged, non-compounding value.
+    expect(v2).toBe(v3);
     expect(refreshed.seasonState.boardConfidence?.["M-M"]?.pressure).toBeGreaterThanOrEqual(7);
   });
 

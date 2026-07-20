@@ -156,7 +156,7 @@ function buildTeamStatus(gameState: GameState, teamId: string, seasonId: string)
 }
 
 function buildLocalFatigueMap(gameState: GameState, params: LegacyLineupKeyParams) {
-  const normalizedGameState = withNormalizedSeasonDisciplineSchedule(gameState);
+  const normalizedGameState = withNormalizedSeasonDisciplineSchedule(gameState, params.saveId);
   const season = normalizedGameState.season.id === params.seasonId ? normalizedGameState.season : null;
   if (!season) {
     return null;
@@ -255,7 +255,7 @@ function getSharedLineupContextBase(gameState: GameState, params: LegacyLineupKe
     return cached;
   }
 
-  const normalizedGameState = withNormalizedSeasonDisciplineSchedule(gameStateWithPowers);
+  const normalizedGameState = withNormalizedSeasonDisciplineSchedule(gameStateWithPowers, params.saveId);
   const season = normalizedGameState.season.id === params.seasonId ? normalizedGameState.season : null;
   const matchdayIndex = season ? season.matchdayIds.findIndex((matchdayId) => matchdayId === params.matchdayId) : -1;
   const scheduleEntry =
@@ -387,7 +387,7 @@ function getSharedLineupContextBase(gameState: GameState, params: LegacyLineupKe
 
 function buildContextFromGameState(gameState: GameState, params: LegacyLineupKeyParams): LegacyLineupContextLoadResult {
   const sharedBase = getSharedLineupContextBase(gameState, params);
-  const normalizedGameState = sharedBase?.normalizedGameState ?? withNormalizedSeasonDisciplineSchedule(gameState);
+  const normalizedGameState = sharedBase?.normalizedGameState ?? withNormalizedSeasonDisciplineSchedule(gameState, params.saveId);
   const season = sharedBase?.season ?? null;
   const matchday = sharedBase?.matchday ?? null;
   const team = sharedBase?.teamById.get(params.teamId) ?? normalizedGameState.teams.find((entry) => entry.teamId === params.teamId) ?? null;
@@ -568,6 +568,12 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
       seasonId: params.seasonId,
       matchdayId: params.matchdayId,
       teamId: params.teamId,
+      // Attach the (normalized) game state so the resolve engine can compute the
+      // player-morale multiplier and captain team-power modifier. Without this the
+      // resolve path silently skips both (buildPlayerMoralePerformanceMap and
+      // selectTeamCaptain are gated on context.gameState), diverging from the
+      // preview path which receives the game state via gameStateOverride.
+      gameState: normalizedGameState,
       lineupStrategy: resolveLineupStrategyForTeam(normalizedGameState, params.teamId),
       entries: existingDraft?.entries ?? [],
       disciplinePlayerCounts: Object.fromEntries(
@@ -968,7 +974,7 @@ export function saveLocalLegacyFormCardPlan(
 } {
   const { persistence: resolvedPersistence, save } = resolveLocalSave(input.saveId, persistence);
   const effectiveSaveId = save.saveId;
-  const gameState = withNormalizedSeasonDisciplineSchedule(save.gameState);
+  const gameState = withNormalizedSeasonDisciplineSchedule(save.gameState, effectiveSaveId);
   const scheduleEntry = (gameState.seasonState.disciplineSchedule ?? []).find(
     (entry) => entry.seasonId === input.seasonId && entry.matchdayId === input.matchdayId,
   );

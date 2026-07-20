@@ -296,7 +296,9 @@ async function runLocalSeasonCompletionUnsafe(
 
   const loanSettlementPreview = previewLoanSettlement(afterSponsorSave.gameState, seasonId);
   const existingLoanSettlementLog =
-    (afterSponsorSave.gameState.seasonState.loanApplyLogs ?? []).some((log) => log.seasonId === seasonId) ?? false;
+    (afterSponsorSave.gameState.seasonState.loanApplyLogs ?? []).some(
+      (log) => log.seasonId === seasonId && log.kind !== "early_payoff",
+    ) ?? false;
   const shouldApplyLoanSettlement = !dryRun && blockingReasons.size === 0 && !existingLoanSettlementLog;
   const loanSettlementApply: LoanSettlementApplyResult = shouldApplyLoanSettlement
     ? applyLoanSettlement(afterSponsorSave.gameState, { execute: true, seasonId })

@@ -10,6 +10,7 @@ import {
   buildTeamContractSeasonTable,
   calculateOpenBuyoutCost,
 } from "@/lib/market/contract-negotiation-preview";
+import { makeScheduleEntry, makeTeamIdentity } from "./_fixtures/game-entity-fixtures";
 
 const persistenceState = {
   save: null as
@@ -1947,5 +1948,159 @@ describe("transfermarkt local service", () => {
     });
 
     expect(preview.negotiationWarnings).toContain("previous_rejected_offer_reduces_trust");
+  });
+
+  // Bug #11: Der Live-Verkaufspfad muss die echte Readiness-Projektion liefern statt "unknown".
+  it("computes a real post-sell readiness projection and fires the readiness warning when the roster drops below the lineup need", async () => {
+    const players = Array.from({ length: 7 }, (_, index) =>
+      createPlayer(`p${index + 1}`, {
+        marketValue: 20,
+        displayMarketValue: 20,
+        salaryDemand: 5,
+        displaySalary: 5,
+      }),
+    );
+    const rosters = Array.from({ length: 7 }, (_, index) =>
+      createRosterEntry(`r${index + 1}`, `p${index + 1}`, {
+        salary: 5,
+        contractLength: 3,
+        currentValue: 20,
+        purchasePrice: 20,
+      }),
+    );
+    const gameState = createGameState({
+      teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 175 })],
+      players,
+      rosters,
+    });
+    // Ohne Team-Identity kann der lokale Lineup-Kontext nicht geladen werden (Readiness bliebe "unknown").
+    gameState.teamIdentities = [makeTeamIdentity({ teamId: "A-A", playerMin: 8, playerOpt: 12 })];
+    // Ein gespeicherter Spieltag-Schedule muss existieren, sonst normalisiert die Season die
+    // matchdayIds auf [] und der lokale Lineup-Kontext findet die Season/den Spieltag nicht.
+    gameState.seasonState.disciplineSchedule = [
+      makeScheduleEntry({ seasonId: "season-1", matchdayId: "matchday-1" }),
+    ];
+    persistenceState.save = { saveId: "save-singleplayer-dev", gameState };
+
+    const { previewLocalTransfermarktSell } = await import("@/lib/market/transfermarkt-local-service");
+    const preview = previewLocalTransfermarktSell({
+      saveId: "save-singleplayer-dev",
+      seasonId: "season-1",
+      teamId: "A-A",
+      activePlayerId: "r1",
+    });
+
+    // Kader faellt nach dem Verkauf von 7 auf 6 -> unter das 7er-Minimum -> echte Readiness-Stufe.
+    expect(preview.projectedReadinessAfterSell).toBe("underfilled_roster");
+    expect(preview.projectedReadinessAfterSell).not.toBe("unknown");
+    expect(preview.warnings).toContain("team_readiness_would_get_worse");
+  }, 30000);
+
+  // Bug (deep-hunt): Der lokale Sell-Preview muss — wie der Referenz-Sell-Service — warnen,
+  // wenn ein Verkauf den Kader unter das Pflicht-Minimum (playerMin) fallen laesst.
+  it("surfaces the roster-minimum fall-below warnings when a local sell drops the roster below its minimum", async () => {
+    const players = Array.from({ length: 8 }, (_, index) =>
+      createPlayer(`p${index + 1}`, {
+        marketValue: 20,
+        displayMarketValue: 20,
+        salaryDemand: 5,
+        displaySalary: 5,
+      }),
+    );
+    const rosters = Array.from({ length: 8 }, (_, index) =>
+      createRosterEntry(`r${index + 1}`, `p${index + 1}`, {
+        salary: 5,
+        contractLength: 3,
+        currentValue: 20,
+        purchasePrice: 20,
+      }),
+    );
+    const gameState = createGameState({
+      teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 175 })],
+      players,
+      rosters,
+    });
+    // Kader (8) == playerMin (8): Nach dem Verkauf faellt er auf 7 -> unter playerMin und playerOpt,
+    // aber nicht unter das harte 7er-Minimum.
+    gameState.teamIdentities = [makeTeamIdentity({ teamId: "A-A", playerMin: 8, playerOpt: 10 })];
+    persistenceState.save = { saveId: "save-singleplayer-dev", gameState };
+
+    const { previewLocalTransfermarktSell } = await import("@/lib/market/transfermarkt-local-service");
+    const preview = previewLocalTransfermarktSell({
+      saveId: "save-singleplayer-dev",
+      seasonId: "season-1",
+      teamId: "A-A",
+      activePlayerId: "r1",
+    });
+
+    // Gleiche Warn-Codes wie der Referenz-Sell-Service, damit die UI konsistent rendert.
+    expect(preview.rosterAfter).toBe(7);
+    expect(preview.warnings).toContain("team_would_fall_under_player_min");
+    expect(preview.warnings).toContain("team_would_fall_under_player_opt");
+    expect(preview.warnings).not.toContain("team_would_fall_under_7");
+  }, 30000);
+
+  // Bug #12: Der AI-Liquiditaetspuffer darf nur AI-/Auto-Kaeufe begrenzen, nicht menschliche.
+  it("gates human buys on raw on-hand cash but keeps the AI liquidity buffer for AI-controlled teams", async () => {
+    // Distinkte saveIds, damit der inhaltsbasierte Market-Context-Cache die beiden
+    // Szenarien nicht vermischt (humanControlled fliesst nicht in die Content-Signatur ein).
+    const buildSave = (saveId: string, humanControlled: boolean) => {
+      const rosterPlayers = Array.from({ length: 10 }, (_, index) =>
+        createPlayer(`p${index + 1}`, {
+          marketValue: 5,
+          displayMarketValue: 5,
+          salaryDemand: 1,
+          displaySalary: 1,
+        }),
+      );
+      const freeAgent = createPlayer("fa-1", {
+        marketValue: 9,
+        displayMarketValue: 9,
+        salaryDemand: 1,
+        displaySalary: 1,
+      });
+      const rosters = Array.from({ length: 10 }, (_, index) =>
+        createRosterEntry(`r${index + 1}`, `p${index + 1}`, {
+          salary: 1,
+          currentValue: 5,
+          purchasePrice: 5,
+        }),
+      );
+      const gameState = createGameState({
+        teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 10, rosterLimit: 14, humanControlled })],
+        players: [...rosterPlayers, freeAgent],
+        rosters,
+      });
+      // S2+ aktiviert die Single-Cash-Planungspolitik und damit den AI-Liquiditaetspuffer.
+      gameState.season = { ...gameState.season, id: "season-2", name: "Season 2", matchdayIds: ["matchday-1"] };
+      gameState.seasonState = { ...gameState.seasonState, seasonId: "season-2" };
+      // Kader (10) auf/ueber Opt (10) -> Puffer-Zweig statt Rebuild-Zweig.
+      gameState.teamIdentities = [makeTeamIdentity({ teamId: "A-A", playerMin: 8, playerOpt: 10 })];
+      return { saveId, gameState };
+    };
+
+    const { previewLocalTransfermarktBuy } = await import("@/lib/market/transfermarkt-local-service");
+
+    // Mensch/manuell: Roh-Guthaben (10) deckt den Preis (9) -> Kauf erlaubt.
+    persistenceState.save = buildSave("save-human-buy", true);
+    const humanPreview = previewLocalTransfermarktBuy({
+      saveId: "save-human-buy",
+      seasonId: "season-2",
+      teamId: "A-A",
+      playerId: "fa-1",
+    });
+    expect(humanPreview.blockingReasons).not.toContain("insufficient_cash");
+    expect(humanPreview.canBuy).toBe(true);
+
+    // AI: gleiches Roh-Guthaben, aber der Puffer drueckt die Kaufkraft unter den Preis -> blockiert.
+    persistenceState.save = buildSave("save-ai-buy", false);
+    const aiPreview = previewLocalTransfermarktBuy({
+      saveId: "save-ai-buy",
+      seasonId: "season-2",
+      teamId: "A-A",
+      playerId: "fa-1",
+    });
+    expect(aiPreview.blockingReasons).toContain("insufficient_cash");
+    expect(aiPreview.canBuy).toBe(false);
   });
 });

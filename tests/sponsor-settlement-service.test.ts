@@ -16,7 +16,7 @@ function withSpecialContract(teamId: string, component: SponsorOfferComponent): 
     startRank: 16,
     components: [component],
     payouts: {},
-    starTier: 3,
+    rarity: "magisch",
     teamQualityRankAtSign: 16,
   };
   gs.seasonState.sponsorContractsByTeamId = {

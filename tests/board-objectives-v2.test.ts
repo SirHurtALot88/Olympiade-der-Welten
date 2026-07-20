@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   calculateBoardConfidence,
+  getNetTransferBalanceObjective,
   getSportTargetV2,
   resolveBoardDisposition,
   selectBoardObjectiveDrafts,
@@ -36,6 +37,19 @@ function withV2<T>(fn: () => T): T {
   }
 }
 
+// V2 is now the shipped default (flag ON unless explicitly disabled with "0"). withV1 forces the
+// legacy path to assert V1-only behaviour (e.g. no perceivedPressure layer).
+function withV1<T>(fn: () => T): T {
+  const prev = process.env.OLY_BOARD_OBJECTIVES_V2;
+  process.env.OLY_BOARD_OBJECTIVES_V2 = "0";
+  try {
+    return fn();
+  } finally {
+    if (prev == null) delete process.env.OLY_BOARD_OBJECTIVES_V2;
+    else process.env.OLY_BOARD_OBJECTIVES_V2 = prev;
+  }
+}
+
 function row(teamId: string, ppsTotal: number, marketValueTotal: number): TeamManagementSnapshotRow {
   return { teamId, ppsTotal, marketValueTotal } as TeamManagementSnapshotRow;
 }
@@ -55,9 +69,12 @@ function identity(ambition: number): TeamIdentity {
 }
 
 describe("Board-Objectives V2 — calibrated sport target", () => {
-  it("defaults the V2 flag OFF unless env enables it", () => {
+  it("defaults the V2 flag ON unless env disables it", () => {
+    // V2 is the shipped default now: unset env -> ON; only "0" disables it.
     const prev = process.env.OLY_BOARD_OBJECTIVES_V2;
     delete process.env.OLY_BOARD_OBJECTIVES_V2;
+    expect(isBoardObjectivesV2Enabled()).toBe(true);
+    process.env.OLY_BOARD_OBJECTIVES_V2 = "0";
     expect(isBoardObjectivesV2Enabled()).toBe(false);
     process.env.OLY_BOARD_OBJECTIVES_V2 = "1";
     expect(isBoardObjectivesV2Enabled()).toBe(true);
@@ -113,7 +130,8 @@ describe("Board-Objectives V2 — perceived-pressure layer", () => {
 
   it("emits perceivedPressure + pressureMomentum only under V2", () => {
     const objectives = failedObjectives(2);
-    const v1 = calculateBoardConfidence({ teamId: "T", identity: boardIdentity(5, 5), objectives });
+    // V2 default is ON, so force the legacy path to assert the V1 record shape (no perceived layer).
+    const v1 = withV1(() => calculateBoardConfidence({ teamId: "T", identity: boardIdentity(5, 5), objectives }));
     expect(v1.perceivedPressure).toBeUndefined();
     expect(v1.pressureMomentum).toBeUndefined();
     const v2 = withV2(() => calculateBoardConfidence({ teamId: "T", identity: boardIdentity(5, 5), objectives }));
@@ -191,4 +209,55 @@ describe("Board-Objectives V2 — disposition (F1) + dynamic slate (F4)", () => 
     expect(three.length).toBe(3);
     expect(five.length).toBe(5);
   });
+});
+
+describe("getNetTransferBalanceObjective (finance)", () => {
+  function financeRow(input: { transferNet: number; cash: number }): TeamManagementSnapshotRow {
+    return { teamId: "T", transferNet: input.transferNet, cash: input.cash } as TeamManagementSnapshotRow;
+  }
+  function profileWithCashPriority(cashPriority: number) {
+    return { bias: { cashPriority } } as unknown as Parameters<typeof getNetTransferBalanceObjective>[0]["profile"];
+  }
+
+  it("does not auto-fail a modest net-buy for a neutral/low cash-priority board (target 0)", () =>
+    withV2(() => {
+      // Regression for the net-transfer auto-fail bug: cashPriority 5 -> surplus target 0. A modest
+      // net-buy (transferNet -5) must NOT be an automatic failure; it becomes a soft overspend ceiling
+      // (max(8, cash*0.15) = 15) with netSpend 5 <= 15 -> completed.
+      const objective = getNetTransferBalanceObjective({
+        row: financeRow({ transferNet: -5, cash: 100 }),
+        profile: profileWithCashPriority(5),
+        seasonNum: 1,
+      });
+      expect(objective.targetValue).toBe(15);
+      expect(objective.status).toBe("completed");
+    }));
+
+  it("keeps an at_risk band and only fails reckless overspend past the ceiling (target 0)", () =>
+    withV2(() => {
+      const cash = 100; // ceiling = 15; at_risk up to 15 * 1.15 = 17.25
+      const atRisk = getNetTransferBalanceObjective({
+        row: financeRow({ transferNet: -16, cash }),
+        profile: profileWithCashPriority(5),
+        seasonNum: 1,
+      });
+      expect(atRisk.status).toBe("at_risk");
+      const failed = getNetTransferBalanceObjective({
+        row: financeRow({ transferNet: -30, cash }),
+        profile: profileWithCashPriority(5),
+        seasonNum: 1,
+      });
+      expect(failed.status).toBe("failed");
+    }));
+
+  it("still demands a real surplus for a cash-focused board (target > 0)", () =>
+    withV2(() => {
+      const objective = getNetTransferBalanceObjective({
+        row: financeRow({ transferNet: 12, cash: 100 }),
+        profile: profileWithCashPriority(8),
+        seasonNum: 1,
+      });
+      expect(objective.targetValue).toBe(3.6);
+      expect(objective.status).toBe("completed");
+    }));
 });

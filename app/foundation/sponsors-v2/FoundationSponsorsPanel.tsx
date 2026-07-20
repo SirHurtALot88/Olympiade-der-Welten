@@ -3,7 +3,7 @@
 import type { Dispatch, SetStateAction } from "react";
 
 import FoundationSponsorsNewLook from "@/app/foundation/sponsors-v2/FoundationSponsorsNewLook";
-import type { GameState, SponsorCommercialRating, SponsorNegotiationProfile, SponsorOffer, SponsorOfferComponent, SponsorTermSeasons, TeamSponsorContract } from "@/lib/data/olyDataTypes";
+import type { GameState, SponsorCommercialRating, SponsorNegotiationProfile, SponsorOffer, SponsorOfferComponent, SponsorRarity, SponsorTermSeasons, TeamSponsorContract } from "@/lib/data/olyDataTypes";
 
 export type FoundationSponsorsPanelProps = {
   gameState: GameState;
@@ -20,7 +20,8 @@ export type FoundationSponsorsPanelProps = {
     components: SponsorOfferComponent[];
     termSeasons: SponsorTermSeasons;
     negotiationProfile: SponsorNegotiationProfile;
-    starTier?: number;
+    /** Etat-Dial (Rarität); optional bis zum vollständigen Cutover. */
+    rarity?: SponsorRarity;
   }) => SponsorOfferComponent[];
   getSponsorNegotiationMultiplier: (input: {
     termSeasons: SponsorTermSeasons;

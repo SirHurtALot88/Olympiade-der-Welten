@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { buildSponsorOffersForTeam, chooseSponsorOffer, getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-service";
-import { rollSponsorStarTiers } from "@/lib/sponsor/sponsor-tier-pool";
+import { rollSponsorOfferSlate } from "@/lib/sponsor/sponsor-tier-pool";
+import { SPONSOR_RARITIES } from "@/lib/sponsor/sponsor-curve-shapes";
 import type { SponsorTeamQualityRank } from "@/lib/sponsor/sponsor-team-quality-rank";
 import { SPONSOR_BRAND_PARENTS } from "@/lib/sponsor/sponsor-brand-parents";
 import { SPONSOR_BRAND_VARIANTS, listSponsorBrandTemplates } from "@/lib/sponsor/sponsor-brand-variants";
@@ -86,24 +87,28 @@ describe("sponsor catalog v2.6", () => {
 });
 
 describe("sponsor tier pool v2.6", () => {
-  it("allows five-star offers for elite commercial ratings via luck roll", () => {
+  it("allows top-rarity (legendär) offers for elite commercial ratings via the slate roller", () => {
     const eliteQuality: SponsorTeamQualityRank = {
       teamId: "M-M",
       qualityRank: 1.2,
       components: [],
-      maxStarTier: 5,
-      targetStarTier: 5,
+      maxRarity: "legendär",
+      targetRarity: "legendär",
       leaguePosition: 1,
       leaguePercentile: 99,
     };
-    const samples = Array.from({ length: 24 }, (_, index) =>
-      rollSponsorStarTiers({
+    // Ein Elite-Team (Decke legendär) sieht über mehrere Saisons mindestens einmal ein legendäres Angebot.
+    const slates = Array.from({ length: 24 }, (_, index) =>
+      rollSponsorOfferSlate({
         seasonId: `season-luck-${index}`,
         teamId: "M-M",
         qualityRank: eliteQuality,
       }),
     );
-    expect(samples.some((roll) => roll.tiers.includes(5))).toBe(true);
+    const maxOrderSeen = Math.max(
+      ...slates.flatMap((slate) => slate.entries.map((entry) => SPONSOR_RARITIES[entry.rarity].order)),
+    );
+    expect(maxOrderSeen).toBe(SPONSOR_RARITIES.legendär.order);
   });
 
   it("deduplicates sponsor parent brands across the three offer slots", () => {

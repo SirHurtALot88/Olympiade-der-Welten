@@ -244,7 +244,12 @@ function createConfirmToken(input: {
 
 export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveId?: string }) {
   const now = input.now ?? new Date().toISOString();
-  const baseGameState = createFreshSeasonOneGameState();
+  // Passing input.saveId (when the caller already generated the real unique saveId, e.g.
+  // applyNewGameSetup/createRoomCoopSave) ensures the very first season-1 discipline schedule
+  // is seeded per-save rather than reusing the shared "local-game-state" default. Preview-only
+  // calls (no saveId yet) still fall back to the default seed, which is fine since previews are
+  // never persisted.
+  const baseGameState = createFreshSeasonOneGameState(input.saveId);
   const validTeamIds = new Set(baseGameState.teams.map((team) => team.teamId));
   const preset = getPreset(input.presetId);
   const chrisTeamIds = uniqueTeamIds(input.chrisTeamIds ?? preset.chrisTeamIds, validTeamIds);

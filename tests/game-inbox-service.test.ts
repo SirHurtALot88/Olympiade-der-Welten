@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { GameInboxItem, GameState, Player, Team } from "@/lib/data/olyDataTypes";
 import { buildGameInboxItems, filterGameInboxItems, filterInboxItemsByMode, getPrimaryInboxTask, groupInboxItemsForDisplay, isGameInboxChronicleItem, isGameInboxDecisionItem } from "@/lib/foundation/game-inbox-service";
+import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
 
 function makeTeam(partial?: Partial<Team>): Team {
   return {
@@ -233,6 +234,59 @@ describe("game inbox service", () => {
     expect(titles(items)).toContain("Facility-Unterhalt gefährdet");
   });
 
+  it("solvency warning uses the persisted beliebtheit (same factor as the facility-season-end credit), not the stateless league value (#7)", () => {
+    // Bug #7: Die Warnung skalierte die Arena-Einnahme mit dem STATELESS
+    // Liga-Beliebtheitswert, während die echte Season-End-Gutschrift und die
+    // Finanzansicht den PERSISTIERTEN (mean-revertenden) seasonState-KPI nutzen.
+    // Ab Saison 2 (persistierter Wert vorhanden) divergierte die Warnung damit
+    // vom real gutgeschriebenen Cash. Setup: Arena Level 5 (Season-Einnahme 15.6,
+    // Upkeep 5.4 bei 100% Zustand), cash = -5. Roster/Tabelle sind in beiden
+    // Szenarien identisch → der STATELESS Wert ist konstant 1.0 (Einnahme 15.6):
+    // damit würde die Warnung in BEIDEN Fällen NICHT feuern (-5 + 15.6 - 5.4 > 0).
+    // Der einzige Unterschied ist der persistierte Beliebtheitswert.
+    const buildState = (persistedBeliebtheit: number) =>
+      makeGameState({
+        teams: [makeTeam({ cash: -5 })],
+        seasonState: {
+          seasonId: "season-3",
+          schedule: [],
+          standings: {},
+          beliebtheitByTeamId: {
+            "M-M": {
+              value: persistedBeliebtheit,
+              spotlightDelta: 0,
+              components: { overperf: 0, bracket: 0, upset: 0, jump: 0, discipline: 0, fanFavorites: 0, objective: 0 },
+            },
+          },
+          teamFacilities: {
+            "M-M": {
+              facilities: {
+                arena_upgrade: { level: 5, enabled: true, conditionPct: 100 },
+              },
+            },
+          },
+        },
+      });
+
+    // Kontrolle: der persistierte Wert ist auch der, den die echte Gutschrift
+    // (computeTeamBeliebtheitFromGameState) verwendet — die Warnung muss dieselbe
+    // Quelle nutzen, damit sie zum gutgeschriebenen Cash passt.
+    const lowState = buildState(0.5);
+    const highState = buildState(1.5);
+    expect(computeTeamBeliebtheitFromGameState(lowState, "M-M").value).toBe(0.5);
+    expect(computeTeamBeliebtheitFromGameState(highState, "M-M").value).toBe(1.5);
+
+    // Niedrige Beliebtheit (0.5 → Arena-Einnahme 7.8): -5 + 7.8 - 5.4 = -2.6 < 0 → Warnung FEUERT.
+    const lowItems = buildGameInboxItems({ gameState: lowState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
+    expect(titles(lowItems)).toContain("Facility-Unterhalt gefährdet");
+
+    // Hohe Beliebtheit (1.5 → Arena-Einnahme 23.4): -5 + 23.4 - 5.4 = 13 > 0 → Warnung feuert NICHT.
+    // Hätte der Code den stateless 1.0-Wert genutzt, wäre das Ergebnis in beiden
+    // Szenarien identisch (keine Warnung) — der Unterschied beweist die persistierte Quelle.
+    const highItems = buildGameInboxItems({ gameState: highState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
+    expect(titles(highItems)).not.toContain("Facility-Unterhalt gefährdet");
+  });
+
   it("creates transfer news from real transfer history", () => {
     const gameState = makeGameState({
       transferHistory: [
@@ -300,7 +354,7 @@ describe("game inbox service", () => {
     });
 
     const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
-    expect(items.some((item) => item.title === "Story Card: XP zeigt Wirkung")).toBe(true);
+    expect(items.some((item) => item.title === "Story Card: Entwicklung zeigt Wirkung")).toBe(true);
   });
 
   it("keeps dismissed stored status for deterministic generated items", () => {
@@ -553,33 +607,13 @@ describe("game inbox service", () => {
     expect(isGameInboxChronicleItem(chronicle.find((item) => item.source === "transfer_history")!)).toBe(true);
   });
 
-  it("keeps progression and facility news out of decisions and groups them for display", () => {
+  it("keeps facility news out of decisions and groups it for display", () => {
+    // XP-Ökonomie abgeschafft: Die frühere „XP-Upgrade durchgeführt"-Inbox-Karte
+    // (Quelle `player_progression_events`) wurde entfernt, da sie strukturell
+    // immer „0 XP ausgegeben" zeigte. Progressions-Ereignisse erscheinen nur
+    // noch als organische Story-Karten (siehe eigener Test). Dieser Test deckt
+    // weiterhin die Facility-Gruppierung ab.
     const gameState = makeGameState({
-      playerProgressionEvents: [
-        {
-          eventId: "prog-1",
-          teamId: "M-M",
-          playerId: "p-1",
-          seasonId: "season-3",
-          upgrades: [{ playerId: "p-1", attribute: "power", fromValue: 40, toValue: 41, cost: 1, source: "manual_xp_spend_preview" }],
-          xpSpent: 0,
-          timestamp: "2026-06-25T00:00:00.000Z",
-          source: "manual_season_end_xp_spend" as const,
-        },
-        {
-          eventId: "prog-2",
-          teamId: "M-M",
-          playerId: "p-2",
-          seasonId: "season-3",
-          upgrades: [
-            { playerId: "p-2", attribute: "speed", fromValue: 40, toValue: 41, cost: 1, source: "manual_xp_spend_preview" },
-            { playerId: "p-2", attribute: "intelligence", fromValue: 40, toValue: 41, cost: 1, source: "manual_xp_spend_preview" },
-          ],
-          xpSpent: 0,
-          timestamp: "2026-06-25T01:00:00.000Z",
-          source: "manual_season_end_xp_spend" as const,
-        },
-      ],
       seasonState: {
         ...(makeGameState().seasonState ?? {}),
         facilityEvents: [
@@ -614,11 +648,9 @@ describe("game inbox service", () => {
 
     expect(decisions.some((item) => item.source === "player_progression_events")).toBe(false);
     expect(decisions.some((item) => item.source === "facility_events")).toBe(false);
-    expect(chronicle.some((item) => item.source === "player_progression_events")).toBe(true);
+    expect(items.some((item) => item.source === "player_progression_events")).toBe(false);
 
     const grouped = groupInboxItemsForDisplay(chronicle);
-    expect(grouped.some((item) => item.itemId.startsWith("grouped:player_progression_events:"))).toBe(true);
-    expect(grouped.some((item) => item.title === "2 XP-Upgrades durchgeführt")).toBe(true);
     expect(grouped.some((item) => item.title === "2 Facility-Events")).toBe(true);
   });
 

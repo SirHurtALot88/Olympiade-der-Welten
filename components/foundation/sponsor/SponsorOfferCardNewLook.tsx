@@ -8,15 +8,22 @@ import type {
   SponsorNegotiationProfile,
   SponsorOffer,
   SponsorOfferComponent,
+  SponsorRarity,
 } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import {
   buildSponsorOfferPresentation,
   buildSponsorRankTierRows,
   getSponsorComponentKindLabel,
-  getSponsorRarityLabel,
   type SponsorChallengeDifficulty,
 } from "@/lib/sponsor/sponsor-offer-presenter";
+import {
+  SPONSOR_CURVE_FAMILIES,
+  SPONSOR_CURVE_SHAPES,
+  SPONSOR_RARITIES,
+  getSponsorCurveFamily,
+  mapArchetypeToCurveShape,
+} from "@/lib/sponsor/sponsor-curve-shapes";
 import { NlDeltaChip, formatNlNumber, type NlTone } from "@/components/foundation/new-look";
 
 /**
@@ -55,6 +62,28 @@ export const SPONSOR_ARCHETYPE_META: Record<SponsorArchetype, { label: string; t
   performance: { label: "Performance", tone: "pow" },
   identity: { label: "Identität", tone: "soc" },
 };
+
+/**
+ * Diablo-style Raritäts-Pill — färbt sich anhand der Loot-Farbe
+ * (`SPONSOR_RARITIES[rarity].colorHex`: gewöhnlich grau, magisch blau, selten
+ * gold, legendär orange) und zeigt das deutsche Raritäts-Label. Klein & lokal
+ * gehalten (kein neues Modul), damit `FoundationSponsorsNewLook` es mitnutzen
+ * kann.
+ */
+export function RarityPill({ rarity, className }: { rarity: SponsorRarity; className?: string }) {
+  const meta = SPONSOR_RARITIES[rarity];
+  return (
+    <span
+      className={`nl-sponsor-rarity-pill${className ? ` ${className}` : ""}`}
+      data-rarity={rarity}
+      style={{ color: meta.colorHex, borderColor: meta.colorHex, background: `${meta.colorHex}22` }}
+      title={`Rarität: ${meta.labelDe}`}
+      aria-label={`Rarität: ${meta.labelDe}`}
+    >
+      {meta.labelDe}
+    </span>
+  );
+}
 
 const NEGOTIATION_PROFILES: Array<{
   value: SponsorNegotiationProfile;
@@ -200,7 +229,13 @@ export function SponsorOfferCardNewLook({
   isBestCashOffer = false,
 }: SponsorOfferCardNewLookProps) {
   const presentation = buildSponsorOfferPresentation({ offer, gameState, teamId: offer.teamId });
-  const archetypeMeta = SPONSOR_ARCHETYPE_META[offer.archetype];
+  // Rarität/Kurvenform robust auflösen — Back-Compat für alte Saves ohne die
+  // neuen Felder (Legacy archetype wird gemappt; rarity wird bereits beim Laden
+  // aus dem alten Sternrang zurückgefüllt, siehe save-repository.ts).
+  const rarity = offer.rarity ?? "magisch";
+  const shape = offer.curveShape ?? mapArchetypeToCurveShape(offer.archetype);
+  const shapeLabel = SPONSOR_CURVE_SHAPES[shape].labelDe;
+  const familyLabel = SPONSOR_CURVE_FAMILIES[getSponsorCurveFamily(shape)].labelDe;
   const specialComponent = adjustedComponents.find((component) => component.kind === "special") ?? null;
   const standardComponents = adjustedComponents.filter((component) => component.kind !== "special");
   const baseCash = adjustedComponents.find((component) => component.kind === "base")?.rewardCash ?? 0;
@@ -220,7 +255,8 @@ export function SponsorOfferCardNewLook({
   return (
     <article
       className={`nl-sponsor-offer is-${offer.archetype}${presentation.isChallenge ? " is-challenge" : ""}${presentation.isGolden ? " is-golden" : ""}`}
-      data-testid={`sponsor-offer-${offer.archetype}`}
+      data-testid={`sponsor-offer-${shape}`}
+      data-rarity={rarity}
       data-challenge={presentation.isChallenge ? "true" : "false"}
       data-golden={presentation.isGolden ? "true" : "false"}
     >
@@ -228,22 +264,15 @@ export function SponsorOfferCardNewLook({
         <SponsorCrest name={offer.name} archetype={offer.archetype} />
         <div className="nl-sponsor-offer-title">
           <span className="nl-sponsor-offer-kicker">
-            {archetypeMeta.label}
+            {shapeLabel}
+            {` · ${familyLabel}`}
             {offer.demandProfile ? ` · ${offer.demandProfile}` : ""}
           </span>
-          {offer.starTier ? (
-            <span
-              className={`nl-sponsor-rarity is-r${offer.starTier}`}
-              title={`Seltenheitsgrad: ${getSponsorRarityLabel(offer.starTier)} (Stufe ${offer.starTier} von 5)`}
-            >
-              <span className="nl-sponsor-rarity-dot" aria-hidden="true" />
-              {getSponsorRarityLabel(offer.starTier)}
-            </span>
-          ) : null}
           <strong>{offer.name}</strong>
           <small>{offer.flavor}</small>
         </div>
         <div className="nl-sponsor-offer-badges">
+          <RarityPill rarity={rarity} />
           {presentation.offerBadge ? (
             <span
               className={`nl-sponsor-offer-badge${presentation.isGolden ? " is-golden" : ""}`}

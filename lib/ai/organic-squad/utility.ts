@@ -433,7 +433,12 @@ export function sellUtility(player: OrganicPlayerView, state: OrganicTeamState):
     state.needAxisWeights,
     state.identityAxisWeights,
   );
-  const saleValue = Math.max(0, player.marketValue);
+  // Sale value = the NET proceeds the club actually banks, INCLUDING the open buyout/release clause
+  // (netSaleProceeds = grossSalePrice − openBuyoutCost, threaded from the adapter using the SAME source
+  // resolveTransfermarktSellProceeds the real sale execution credits to cash). Falls back to raw marketValue
+  // when no clause / not a sell view (net == marketValue), so buy/draft views are unaffected. Clamped at 0
+  // like before, so a clause that exceeds the price simply yields no sale value (never a negative reward).
+  const saleValue = Math.max(0, player.netSaleProceeds ?? player.marketValue);
   const cashOptionGain =
     cashOptionValue({
       cash: state.cash + saleValue,

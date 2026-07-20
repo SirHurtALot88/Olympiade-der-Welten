@@ -169,6 +169,15 @@ export function buildFoundationActivities(input: FoundationActivityInput): Found
     });
   }
 
+  if (input.aiTeamsRefillBusy) {
+    activities.push({
+      id: "ai-teams-refill",
+      label: "KI-Teams picken",
+      detail: "Kader werden nachbesetzt",
+      tone: "running",
+    });
+  }
+
   if (input.adminBalancingBusy) {
     activities.push({
       id: "admin-balancing",

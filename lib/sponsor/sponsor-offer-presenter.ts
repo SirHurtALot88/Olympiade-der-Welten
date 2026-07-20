@@ -82,6 +82,47 @@ function resolveTransferDifficulty(target: number): SponsorChallengeDifficulty {
   return "hart";
 }
 
+/**
+ * Presentation-Metadaten für die Teil-B-Bonusziele (14 Standard + 6 Golden aus sponsor-special-objectives.ts:
+ * buildBonusObjectiveComponent / buildGoldenObjectiveComponent). Ohne diese Tabelle fielen alle Keys außer den
+ * vier Legacy-Keys (axis_rank_top / salary_pressure_max / transfer_profit_min / discipline_top3_count) in den
+ * irreführenden Fallback „Kader-Breite über Form-Farben" (FIX F5a). Jeder Eintrag beschreibt, was das Team tun
+ * muss (aus label/stages abgeleitet), plus eine plausible Schwierigkeit. `salary_pressure_max` (auch von
+ * salary_discipline genutzt) wird weiterhin von der bestehenden Salary-Branch abgedeckt.
+ */
+const BONUS_OBJECTIVE_META: Record<string, { detail: string; difficulty: SponsorChallengeDifficulty }> = {
+  // Standard-Bonusziele
+  underdog_story: { detail: "Die Saison deutlich über der Qualitäts-Erwartung beenden", difficulty: "mittel" },
+  momentum_series: { detail: "Mehrere starke Spieltage in Serie liefern", difficulty: "mittel" },
+  discipline_dominance: { detail: "Großen Kaderanteil in den Disziplin-Spitzenrängen stellen", difficulty: "mittel" },
+  // axis_ascension wird gesondert behandelt (axisKey/axisLabel aus targetValue).
+  fan_cult_player: { detail: "Einen Spieler zum gefeierten Star aufbauen", difficulty: "hart" },
+  homegrown_elevation: { detail: "Ein Eigengewächs in die Bracket-Elite entwickeln", difficulty: "hart" },
+  rival_humiliation: { detail: "Den Rivalen in der Abschlusstabelle hinter sich lassen", difficulty: "mittel" },
+  fan_infrastructure: { detail: "Einkommens-Gebäude ausbauen (Fan-Shop / Arena)", difficulty: "leicht" },
+  form_color_cover: { detail: "Kader-Vielfalt über mehrere Form-Farben abdecken", difficulty: "leicht" },
+  solvency_series: { detail: "Die Kasse über die gesamte Saison positiv halten", difficulty: "leicht" },
+  transfer_trader: { detail: "Positive Netto-Bilanz in der Wechselperiode erzielen", difficulty: "mittel" },
+  sustainability_architect: { detail: "Facility-Bilanz über die Saison netto ≥ 0 halten", difficulty: "mittel" },
+  fatigue_management: { detail: "Den Kader über die Saison frisch halten (niedrige Fatigue)", difficulty: "mittel" },
+  // Golden-Bonusziele
+  golden_fairytale: { detail: "Die Saison weit über der Erwartung beenden (Märchensaison)", difficulty: "hart" },
+  golden_crowd_favorites: { detail: "Mehrere Publikumslieblinge (Bracket-Helden) formen", difficulty: "hart" },
+  golden_talent_forge: { detail: "Mehrere Spieler stark im Marktwert entwickeln", difficulty: "hart" },
+  golden_discipline_monopoly: { detail: "Mehrere Spieler in die Disziplin-Spitze bringen", difficulty: "hart" },
+  golden_title_shock: { detail: "Als schwaches Team ganz nach oben klettern", difficulty: "hart" },
+  golden_rival_deluxe: { detail: "Den Rivalen klar distanzieren (großer Rang-Vorsprung)", difficulty: "hart" },
+};
+
+/** Leitet aus den (optionalen) Stufen einer Bonusziel-Komponente eine kompakte Leiter-Beschreibung ab. */
+function describeStageLadder(component: SponsorOfferComponent): string | null {
+  const stages = component.stages;
+  if (!stages || stages.length === 0) {
+    return null;
+  }
+  return stages.map((entry) => entry.label).join(" / ");
+}
+
 function buildSpecialPresentation(input: {
   component: SponsorOfferComponent;
   gameState?: GameState;
@@ -163,11 +204,45 @@ function buildSpecialPresentation(input: {
     };
   }
 
+  // Teil-B-Achsen-Aufstieg: eigene Branch, damit axisKey/axisLabel (aus targetValue) gesetzt sind.
+  if (specialKey === "axis_ascension") {
+    const parsed = parseAxisTargetValue(input.component.targetValue);
+    const axisKey = parsed?.axis ?? null;
+    const ladder = describeStageLadder(input.component);
+    const difficulty: SponsorChallengeDifficulty = "mittel";
+    const axisLabel = axisKey ? AXIS_LABELS[axisKey] : "Achse";
+    return {
+      ...base,
+      axisKey,
+      axisLabel: axisKey ? AXIS_LABELS[axisKey] : null,
+      difficulty,
+      difficultyLabel: DIFFICULTY_LABELS[difficulty],
+      detail: ladder
+        ? `${axisLabel} in der Saison verbessern · Stufen: ${ladder}`
+        : `${axisLabel} in der Saison verbessern`,
+    };
+  }
+
+  // Übrige Teil-B-Bonusziele (Standard + Golden) über die Metadaten-Tabelle; Detail um die Stufen-Leiter ergänzt.
+  const meta = BONUS_OBJECTIVE_META[specialKey];
+  if (meta) {
+    const ladder = describeStageLadder(input.component);
+    return {
+      ...base,
+      difficulty: meta.difficulty,
+      difficultyLabel: DIFFICULTY_LABELS[meta.difficulty],
+      detail: ladder ? `${meta.detail} · Stufen: ${ladder}` : meta.detail,
+    };
+  }
+
+  // Generisch-korrekter Fallback (statt der irreführenden Kader-Breite-Meldung): wenn Stufen vorhanden sind,
+  // aus ihnen ableiten, sonst neutral auf die Stufen verweisen.
+  const ladder = describeStageLadder(input.component);
   return {
     ...base,
-    difficulty: "leicht",
-    difficultyLabel: DIFFICULTY_LABELS.leicht,
-    detail: "Kader-Breite über Form-Farben",
+    difficulty: "mittel",
+    difficultyLabel: DIFFICULTY_LABELS.mittel,
+    detail: ladder ? `Saison-Bonusziel · Stufen: ${ladder}` : "Saison-Bonusziel — siehe Stufen",
   };
 }
 

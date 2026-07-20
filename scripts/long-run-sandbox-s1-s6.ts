@@ -15,6 +15,7 @@ import { isEmergencyRosterRepairEnabled } from "@/lib/ai/emergency-repair-policy
 import { runTransferWindowSession } from "@/lib/ai/ai-transfer-window-session-service";
 import { buildAiTransfermarktSellPreview } from "@/lib/ai/ai-transfermarkt-sell-preview-service";
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
+import { reevaluateAiTrainingModesForMatchday } from "@/lib/ai/ai-training-mode-reevaluation-service";
 import type { AiPicksRunResult } from "@/lib/ai/ai-picks-run-service";
 import { CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN, runChunkedRedraftTopup } from "@/lib/ai/chunked-redraft-topup-service";
 import { applySeasonEndRosterStressLedger } from "@/lib/ai/season-roster-stress-service";
@@ -42,7 +43,6 @@ import {
   flushLocalTransfermarktRunContext,
 } from "@/lib/market/transfermarkt-local-service";
 import { loadLocalLegacyLineupContext, loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-lineup-local-service";
-import { countSeasonCaptains, SEASON_CAPTAIN_SLOTS } from "@/lib/lineups/lineup-discipline-contract";
 import { buildPlayerMoraleAudit } from "@/lib/morale/player-morale-service";
 import {
   buildPlayerAvailabilityByPlayerId,
@@ -62,6 +62,7 @@ import { ADVANCE_MATCHDAY_CONFIRM_TOKEN, executeMatchdayAdvance } from "@/lib/se
 import { applyPreSeasonNextSeasonSetupLightweight, buildPreSeasonNextSeasonSetupToken } from "@/lib/season/preseason-workflow-service";
 import { patchCompletedSeasonSnapshotAfterPreseasonBuy } from "@/lib/season/season-snapshot-service";
 import { previewCashPrizeApply } from "@/lib/season/cash-prize-apply-service";
+import { buildFrozenValuationSnapshot } from "@/lib/season/frozen-valuation-snapshot";
 import { buildSeasonReview } from "@/lib/season/season-review-service";
 import { applySponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { applyLoanSettlement } from "@/lib/finance/loan-service";
@@ -553,7 +554,7 @@ function runPhaseCheckpoint(
         (result) => result.seasonId === save.gameState.season.id && result.matchdayId === lastMatchdayId,
       );
     if (hasLastMatchdayResult && (save.gameState.gamePhase ?? "") !== "season_completed") {
-      persistence.saveSingleplayerState(saveId, {
+      persistence.saveSingleplayerState(saveId, withFrozenValuationSnapshot({
         ...save.gameState,
         gamePhase: "season_completed",
         matchdayState: {
@@ -563,7 +564,7 @@ function runPhaseCheckpoint(
           pendingTeamIds: [],
           resolvedFixtureIds: [],
         },
-      });
+      }));
       save = persistence.getSaveById(saveId) ?? save;
     }
   }
@@ -1326,43 +1327,47 @@ function buildRosterTargetValidationRows(save: PersistedSaveGame) {
   });
 }
 
+// Durable captain source: `gameState.teamCaptains` persists exactly ONE season captain per
+// team/season (both writers — setTeamCaptain and applyAiTeamPlayerDemandFulfillment — dedup by
+// seasonId+teamId), so the per-completed-season expectation is 1. The previous audit reconstructed
+// usage from `seasonState.lineupDrafts`, which the preseason workflow resets to [] every season
+// (preseason-workflow-service.ts) — for every already-completed season that source was wiped, so
+// the audit reported false `missing_source`/`captain_budget_underused` rows.
+const SEASON_CAPTAIN_RECORD_SLOTS = 1;
+
 function buildCaptainBudgetAuditRows(save: PersistedSaveGame) {
   const currentSeasonNumber = parseSeasonNumber(save.gameState.season.id);
   const completedSeasonCount = (save.gameState.gamePhase ?? "") === "season_completed"
     ? currentSeasonNumber
     : Math.max(0, currentSeasonNumber - 1);
+  const teamCaptains = save.gameState.teamCaptains ?? [];
   const rows: Array<Record<string, unknown>> = [];
   for (const team of save.gameState.teams) {
     let totalCaptainUsesToDate = 0;
     for (let seasonNumber = 1; seasonNumber <= completedSeasonCount; seasonNumber += 1) {
       const seasonId = `season-${seasonNumber}`;
-      const teamSeasonDrafts = (save.gameState.seasonState.lineupDrafts ?? []).filter(
-        (draft) => draft.teamId === team.teamId && draft.seasonId === seasonId,
-      );
-      const sourceStatus = teamSeasonDrafts.length > 0 ? "mapped" : "missing_source";
-      const captainUsedThisSeason = countSeasonCaptains({
-        lineups: save.gameState.seasonState.lineupDrafts ?? [],
-        teamId: team.teamId,
-        seasonId,
-      });
+      const captainUsedThisSeason = teamCaptains.filter(
+        (entry) => entry.teamId === team.teamId && entry.seasonId === seasonId,
+      ).length;
+      const sourceStatus = captainUsedThisSeason > 0 ? "mapped" : "missing_source";
       totalCaptainUsesToDate += captainUsedThisSeason;
-      const expectedCaptainUsesToDate = seasonNumber * SEASON_CAPTAIN_SLOTS;
+      const expectedCaptainUsesToDate = seasonNumber * SEASON_CAPTAIN_RECORD_SLOTS;
       rows.push({
         teamId: team.teamId,
         teamName: team.name,
         season: seasonId,
         captainUsedThisSeason,
-        captainLimitThisSeason: SEASON_CAPTAIN_SLOTS,
-        missingCaptainUsesThisSeason: Math.max(0, SEASON_CAPTAIN_SLOTS - captainUsedThisSeason),
+        captainLimitThisSeason: SEASON_CAPTAIN_RECORD_SLOTS,
+        missingCaptainUsesThisSeason: Math.max(0, SEASON_CAPTAIN_RECORD_SLOTS - captainUsedThisSeason),
         totalCaptainUsesToDate,
         expectedCaptainUsesToDate,
         delta: totalCaptainUsesToDate - expectedCaptainUsesToDate,
         reasonIfMissing:
           sourceStatus === "missing_source"
             ? "missing_source"
-            : captainUsedThisSeason < SEASON_CAPTAIN_SLOTS
+            : captainUsedThisSeason < SEASON_CAPTAIN_RECORD_SLOTS
               ? "captain_budget_underused"
-              : captainUsedThisSeason > SEASON_CAPTAIN_SLOTS
+              : captainUsedThisSeason > SEASON_CAPTAIN_RECORD_SLOTS
                 ? "captain_budget_overused"
                 : "ok",
         captainHistoryMissingSource: sourceStatus === "missing_source",
@@ -1961,6 +1966,27 @@ function buildRepairPerformanceRows(performanceRows: PhaseMetric[]) {
     }));
 }
 
+// MD10-Valuation-Freeze für den Sandbox-Season-End. Spiegelt production
+// (matchday-progress-service.writeLocalMatchdayAdvance), das den Snapshot beim MD10-Abschluss setzt.
+// Die Sandbox überspringt den letzten Matchday-Advance (runSeasonMatchdays: `if (!isLast)`) und wechselt
+// stattdessen über finalizeSeasonIfNeeded/Checkpoints direkt auf season_completed — ohne diesen Freeze
+// würden die Sell-/Buy-Gates im anschließenden Transferfenster LIVE rechnen, sodass sich die Angebote
+// (Verkaufspreise/Kaufliste) verschieben, sobald Spieler verkauft werden bzw. andere aufrücken.
+// Idempotent: nur setzen, wenn noch kein Snapshot existiert, und immer auf einem State OHNE Snapshot
+// berechnen (die Rating-/Sale-Factor-Gates rechnen dann pool-relativ live über den vollen MD10-Kader).
+function withFrozenValuationSnapshot(gameState: GameState): GameState {
+  if (gameState.seasonState.frozenValuationSnapshot != null) {
+    return gameState;
+  }
+  return {
+    ...gameState,
+    seasonState: {
+      ...gameState.seasonState,
+      frozenValuationSnapshot: buildFrozenValuationSnapshot(gameState),
+    },
+  };
+}
+
 function finalizeSeasonIfNeeded(saveId: string, persistence: PersistenceService) {
   const save = persistence.getSaveById(saveId);
   if (!save) throw new Error("Long-run save disappeared during season finalization.");
@@ -1976,7 +2002,7 @@ function finalizeSeasonIfNeeded(saveId: string, persistence: PersistenceService)
     return false;
   }
   const now = new Date().toISOString();
-  persistence.saveSingleplayerState(save.saveId, {
+  persistence.saveSingleplayerState(save.saveId, withFrozenValuationSnapshot({
     ...save.gameState,
     gamePhase: "season_completed",
     season: save.gameState.season,
@@ -2006,7 +2032,7 @@ function finalizeSeasonIfNeeded(saveId: string, persistence: PersistenceService)
         createdAt: now,
       },
     ],
-  });
+  }));
   return true;
 }
 
@@ -2113,6 +2139,17 @@ async function runSeasonMatchdays(saveId: string, delegatePersistence: Persisten
       }
     }
     const matchdayStartedAt = Date.now();
+    // Per-Spieltag: AI-Trainingsmodi anhand der AKTUELLEN Fatigue neu bewerten (Fatigue-Schoner),
+    // BEVOR die AI-Aufstellung gebaut wird. Die frischen Modi speisen sowohl die
+    // Fatigue-Akkumulation (matchday-training-accumulator liest player.trainingMode beim
+    // Result-Apply) als auch die Aufstellungs-/Schonen-Entscheidung dieses Spieltags. Nur
+    // AI-Teams; menschlich gesteuerte Teams bleiben unangetastet.
+    const trainingReeval = reevaluateAiTrainingModesForMatchday({ saveId, persistence });
+    if (trainingReeval.teamsUpdated > 0) {
+      console.error(
+        `[long-run] training-reeval ${seasonId} ${matchdayId}: teams=${trainingReeval.teamsUpdated} players=${trainingReeval.playersReassigned}`,
+      );
+    }
     let startedAt = Date.now();
     const lineupReuse = LONG_RUN_SKIP_LINEUP_REAPPLY
       ? canReuseAutoprepLineupsForMatchday({
@@ -2609,7 +2646,7 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
       (result) => result.seasonId === save.gameState.season.id && result.matchdayId === lastMatchdayId,
     );
   if (hasLastMatchdayResult && (save.gameState.gamePhase ?? "") === "season_active") {
-    persistence.saveSingleplayerState(saveId, {
+    persistence.saveSingleplayerState(saveId, withFrozenValuationSnapshot({
       ...save.gameState,
       gamePhase: "season_completed",
       matchdayState: {
@@ -2619,7 +2656,7 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
         pendingTeamIds: [],
         resolvedFixtureIds: [],
       },
-    });
+    }));
     save = persistence.getSaveById(saveId) ?? save;
   }
   console.error(`[long-run] season-end ${seasonId}: ai-xp`);
@@ -4196,7 +4233,7 @@ async function main() {
       ),
       "",
       "## Captain Budget",
-      `- Erwartet pro abgeschlossener Season/Team: ${SEASON_CAPTAIN_SLOTS}`,
+      `- Erwartet pro abgeschlossener Season/Team: ${SEASON_CAPTAIN_RECORD_SLOTS}`,
       `- Missing Source Rows: ${captainBudgetAuditRows.filter((row) => row.captainHistoryMissingSource).length}`,
       `- Underused Rows: ${captainBudgetAuditRows.filter((row) => row.reasonIfMissing === "captain_budget_underused").length}`,
     ].join("\n"),

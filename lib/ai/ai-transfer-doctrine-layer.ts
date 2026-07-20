@@ -277,7 +277,11 @@ export function resolveDominantPersona(blend: TransferDoctrineBlend): TransferDo
   return (ranked[0]?.[0] as TransferDoctrinePersona | undefined) ?? "balanced";
 }
 
-function buildContinuousScales(profile: TeamStrategyProfile | null, identity: TeamIdentity | null) {
+function buildContinuousScales(
+  profile: TeamStrategyProfile | null,
+  identity: TeamIdentity | null,
+  teamWeaknessScore = 0,
+) {
   const bias = profile?.bias;
   const starPriority = bias?.starPriority ?? 5;
   const cashPriority = bias?.cashPriority ?? 5;
@@ -290,6 +294,10 @@ function buildContinuousScales(profile: TeamStrategyProfile | null, identity: Te
   const finances = normalizeIdentityAxis(identity?.finances, cashPriority);
   const harmony = normalizeIdentityAxis(identity?.harmony, loyalty);
   const cooperation = normalizeIdentityAxis(identity?.cooperation, 5);
+  // 0 (strongest roster in the league) .. 1 (weakest) — a bottom-table team leans a little harder
+  // into cashing in a strong profit-window offer than a top-table one, on top of GM-trait tuning.
+  // Kept modest: this tips borderline strong offers, it does not force a sale on its own.
+  const weakness = clamp(teamWeaknessScore, 0, 1);
 
   const centered = (delta: number, min = 0.65, max = 1.45) => round(clamp(1 + delta, min, max));
 
@@ -302,7 +310,11 @@ function buildContinuousScales(profile: TeamStrategyProfile | null, identity: Te
       0.7,
       1.5,
     ),
-    profitWindowScale: centered((sellAggression - 5) * 0.05 + (valuePriority - 5) * 0.04 + (finances - 5) * 0.01, 0.7, 1.4),
+    profitWindowScale: centered(
+      (sellAggression - 5) * 0.05 + (valuePriority - 5) * 0.04 + (finances - 5) * 0.01 + weakness * 0.12,
+      0.7,
+      1.4,
+    ),
     buyIntentScale: centered(
       (starPriority - 5) * 0.05 + (depth - 5) * 0.03 + (ambition - 5) * 0.015 - (cashPriority - 5) * 0.04,
       0.65,
@@ -421,11 +433,12 @@ export function getPersonaBlendWeight(blend: TransferDoctrineBlend, persona: Tra
 export function resolveTransferDoctrineFromProfile(
   profile: TeamStrategyProfile | null,
   identity: TeamIdentity | null = null,
+  teamWeaknessScore = 0,
 ): TransferDoctrineProfile {
   const axes = resolveTransferDoctrineAxes(profile, identity);
   const personaBlend = resolveTransferDoctrineBlend(axes);
   const persona = resolveDominantPersona(personaBlend);
-  const continuous = buildContinuousScales(profile, identity);
+  const continuous = buildContinuousScales(profile, identity, teamWeaknessScore);
   const tuned = blendDoctrineScales(continuous, personaBlend);
 
   return {
@@ -437,9 +450,17 @@ export function resolveTransferDoctrineFromProfile(
   };
 }
 
-export function resolveTransferDoctrine(gameState: GameState, teamId: string): TransferDoctrineProfile {
+/**
+ * @param teamWeaknessScore 0 (strongest roster in the league) .. 1 (weakest). Optional — omit to
+ * keep doctrine resolution unaffected by league standing (existing call sites).
+ */
+export function resolveTransferDoctrine(
+  gameState: GameState,
+  teamId: string,
+  teamWeaknessScore = 0,
+): TransferDoctrineProfile {
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null;
-  return resolveTransferDoctrineFromProfile(getTeamStrategyProfile(gameState, teamId), identity);
+  return resolveTransferDoctrineFromProfile(getTeamStrategyProfile(gameState, teamId), identity, teamWeaknessScore);
 }
 
 export function adjustSellScoreForDoctrine(input: {

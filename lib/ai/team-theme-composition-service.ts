@@ -64,6 +64,10 @@ export type TeamThemeCompositionTarget = {
   // deren Rasse in `races` liegt, am Gesamtkader (unabhaengig von Theme-Tags). Fuer Teams wie
   // H-R, die mindestens X% einer konkreten Rasse (z.B. Demon) im Kader halten sollen.
   raceQuotaScoped?: { races: string[] };
+  // Wie raceQuotaScoped, aber ueber Theme-Tags statt Rasse: Anteil der Spieler, deren abgeleitete
+  // Theme-Tags mindestens einen der `tags` treffen. Fuer Teams, deren harte Mindestquote an einem
+  // ROLLEN-/KLASSEN-Theme haengt (z.B. P-C ~50% Pirate/Swashbuckler), das keine eigene Rasse ist.
+  themeTagQuotaScoped?: { tags: string[] };
 };
 
 export type IdentityQuotaRole = "counts" | "exempt" | "violates" | "none";
@@ -73,9 +77,13 @@ function normalizeRaceToken(race: string | null | undefined): string {
 }
 
 export function isQuotaScopedTarget(
-  target: Pick<TeamThemeCompositionTarget, "raceQuotaScoped" | "genderQuotaHumanoidScoped">,
+  target: Pick<TeamThemeCompositionTarget, "raceQuotaScoped" | "themeTagQuotaScoped" | "genderQuotaHumanoidScoped">,
 ): boolean {
-  return Boolean((target.raceQuotaScoped && target.raceQuotaScoped.races.length > 0) || target.genderQuotaHumanoidScoped);
+  return Boolean(
+    (target.raceQuotaScoped && target.raceQuotaScoped.races.length > 0) ||
+      (target.themeTagQuotaScoped && target.themeTagQuotaScoped.tags.length > 0) ||
+      target.genderQuotaHumanoidScoped,
+  );
 }
 
 // Klassifiziert einen Spieler relativ zur Identitaets-Mindestquote des Teams:
@@ -84,12 +92,16 @@ export function isQuotaScopedTarget(
 // - "exempt": ausgenommen (z.B. Tiere/Pets bei Gender-Quote) – weder Zaehler noch Nenner
 // - "none": Team hat keine quoten-basierte Identitaet
 export function classifyIdentityQuotaRole(
-  player: Pick<Player, "race" | "gender">,
-  target: Pick<TeamThemeCompositionTarget, "raceQuotaScoped" | "genderQuotaHumanoidScoped">,
+  player: Player,
+  target: Pick<TeamThemeCompositionTarget, "raceQuotaScoped" | "themeTagQuotaScoped" | "genderQuotaHumanoidScoped">,
 ): IdentityQuotaRole {
   if (target.raceQuotaScoped && target.raceQuotaScoped.races.length > 0) {
     const wanted = target.raceQuotaScoped.races.map((entry) => entry.toLowerCase());
     return wanted.includes(normalizeRaceToken(player.race)) ? "counts" : "violates";
+  }
+  if (target.themeTagQuotaScoped && target.themeTagQuotaScoped.tags.length > 0) {
+    const tags = new Set(getCachedPlayerThemeTags(player).playerThemeTags);
+    return hasAny(tags, target.themeTagQuotaScoped.tags) ? "counts" : "violates";
   }
   if (target.genderQuotaHumanoidScoped) {
     if (!isHumanoidForGenderQuota(player)) return "exempt";
@@ -223,16 +235,23 @@ const THEME_TARGETS: Record<string, TeamThemeCompositionTarget> = {
   "G-G": {
     teamId: "G-G",
     primaryThemeTags: ["Divine", "Angel", "Paladin", "Holy"],
-    secondaryThemeTags: ["Guardian", "Saint", "God", "Hero"],
-    softPreferredTags: ["Good", "Lawful", "Royal"],
-    allowedOutsiderTags: ["Human", "Elf", "Knight"],
+    secondaryThemeTags: ["Guardian", "Saint", "God", "Hero", "Knight"],
+    softPreferredTags: ["Good", "Lawful"],
+    // Human/Elf als generische Outsider ENTFERNT: sie liessen jeden Menschen Outsider-Credit ziehen und
+    // verwaesserten das Angel/Paladin-Theme (Top-Pick war ein Construct statt eines Divine). Nur noch
+    // engel-/paladin-nahe Outsider zugelassen; strong-Strictness macht das Divine-Theme sichtbar.
+    allowedOutsiderTags: ["Guardian", "Hero", "Knight"],
     avoidTags: ["Demon", "Undead", "Infernal"],
-    targetShare: 0.5,
-    minimumShare: 0.25,
-    strictness: "soft",
-    exceptionPolicy: "normal_quality_fit_allowed",
-    qualityOverrideThreshold: 8,
-    notes: "Golden Gladiators duennen nicht alles aus, sollen aber Divine/Angel sichtbar halten.",
+    targetShare: 0.6,
+    minimumShare: 0.35,
+    strictness: "strong",
+    exceptionPolicy: "audit_required",
+    qualityOverrideThreshold: 12,
+    // Divine/Angel/Paladin als harte Tag-Quote (mindestens ~35%), damit das Engel-/Paladin-Theme in den
+    // TOP-Picks sichtbar wird statt eines starken Constructs/Menschen. Ueber der Quote fliessen Helden/
+    // Gladiatoren (Human/Knight) normal nach.
+    themeTagQuotaScoped: { tags: ["Divine", "Angel", "Paladin", "Holy"] },
+    notes: "Golden Gladiators: Divine/Angel/Paladin muss klar sichtbar sein (harte ~35% Divine-Tag-Quote; Top-Picks sind starke Divine-Fits, nicht generische Menschen/Constructs).",
   },
   "B-B": {
     teamId: "B-B",
@@ -264,17 +283,21 @@ const THEME_TARGETS: Record<string, TeamThemeCompositionTarget> = {
   },
   "R-C": {
     teamId: "R-C",
-    primaryThemeTags: ["Royal", "Noble", "Court", "Human", "Elf", "Dwarf", "Lord", "Knight"],
-    secondaryThemeTags: ["Paladin", "Prince", "Princess", "King", "Queen"],
-    softPreferredTags: ["Good", "Lawful", "Hero"],
-    allowedOutsiderTags: ["Divine", "Angel"],
-    avoidTags: ["Demon", "Goblin", "Undead"],
-    targetShare: 0.7,
-    minimumShare: 0.45,
-    strictness: "strong",
-    exceptionPolicy: "audit_required",
-    qualityOverrideThreshold: 14,
-    notes: "Royal Court darf breit sein, muss aber Hof-/Adelsfantasie tragen.",
+    // Kein starkes Rassen-Theme: die Identitaet ist HOF/ADEL (Rollen-Tags), nicht "nur Mensch/Elf/Zwerg".
+    // Frueher standen Human/Elf/Dwarf als PRIMARY-Tags bei "strong"-Strictness — und da derive JEDEN
+    // Menschen/Elf/Zwerg als "Royal" markiert, kollabierte der Kader auf genau diese drei Rassen. Jetzt:
+    // Rollen-Tags primaer, weiche Strictness -> breiter, diverser Kader, der die Hoffantasie nur LEHNT.
+    primaryThemeTags: ["Noble", "Court", "Lord", "Knight", "Royal"],
+    secondaryThemeTags: ["Paladin", "Prince", "Princess", "King", "Queen", "Guardian", "Hero"],
+    softPreferredTags: ["Good", "Lawful", "Human", "Elf", "Dwarf"],
+    allowedOutsiderTags: ["Divine", "Angel", "Mercenary", "Mage", "Swordsman", "Beast", "Construct"],
+    avoidTags: ["Demon", "Undead"],
+    targetShare: 0.4,
+    minimumShare: 0.15,
+    strictness: "soft",
+    exceptionPolicy: "normal_quality_fit_allowed",
+    qualityOverrideThreshold: 10,
+    notes: "Royal Court ist ein breites No-Strong-Theme-Team: Hof-/Adelsfantasie leicht bevorzugt, aber diverse Rassen zugelassen (kein Human/Elf/Dwarf-Monopol).",
   },
   "S-S": {
     teamId: "S-S",
@@ -283,12 +306,16 @@ const THEME_TARGETS: Record<string, TeamThemeCompositionTarget> = {
     softPreferredTags: ["Metal", "Order"],
     allowedOutsiderTags: ["Human", "Tactician"],
     avoidTags: ["Plant", "Druid", "Wild"],
-    targetShare: 0.8,
-    minimumShare: 0.6,
+    targetShare: 0.65,
+    minimumShare: 0.5,
     strictness: "hard",
     exceptionPolicy: "only_if_major_upgrade",
     qualityOverrideThreshold: 20,
-    notes: "Silver Soldiers sollen technisch/konstruiert wirken.",
+    // Harte Bot-Quote: mindestens ~50% Construct-RASSE im Kader (mehr ist besser, nie hart blocken).
+    // Erzwingt, dass die Top-/Bestpicks starke Constructs sind statt eines starken Orcs, und dass
+    // Nicht-Constructs (Orc/Human/...) unter der Quote aktiv nach hinten gedraengt werden.
+    raceQuotaScoped: { races: ["construct"] },
+    notes: "Silver Soldiers: mindestens ~50% Construct-Rasse (Bots); Rest technische Verbuendete (Engineer/Tactician/Human).",
   },
   "W-L": {
     teamId: "W-L",
@@ -340,13 +367,20 @@ const THEME_TARGETS: Record<string, TeamThemeCompositionTarget> = {
     secondaryThemeTags: ["Raider", "Sea", "Trickster"],
     softPreferredTags: ["Undead", "Rogue", "Fast"],
     allowedOutsiderTags: ["Aquatic", "Undead", "Mercenary"],
-    avoidTags: ["Royal", "Lawful", "Pacifist"],
-    targetShare: 0.9,
-    minimumShare: 0.75,
+    // "Royal" bewusst NICHT im avoid: derive markiert jeden Menschen als "Royal", und die Mehrheit der
+    // Piraten im Pool ist menschlich — ein Royal-Avoid wuerde genau diese Piraten entwerten und die
+    // Crew-Quote sabotieren. Lawful/Pacifist reichen, um Adels-/Gutmenschen-Vibes fernzuhalten.
+    avoidTags: ["Lawful", "Pacifist"],
+    targetShare: 0.7,
+    minimumShare: 0.5,
     strictness: "hard",
     exceptionPolicy: "only_if_major_upgrade",
     qualityOverrideThreshold: 22,
-    notes: "Pirate Crew pickt eigentlich nur Pirate/Swashbuckler/Wayfarer-Vibes.",
+    // Harte Piraten-Quote ueber Theme-Tags (Pirate ist eine Rolle/Klasse, keine Rasse): mindestens
+    // ~50% des Kaders muessen Pirate/Swashbuckler/Wayfarer/Corsair-Vibes tragen. Draengt Nicht-Piraten
+    // unter der Quote nach hinten, damit der Kader real als Crew liest statt als beliebiger Mix.
+    themeTagQuotaScoped: { tags: ["Pirate", "Swashbuckler", "Wayfarer", "Corsair"] },
+    notes: "Pirate Crew: mindestens ~50% Pirate/Swashbuckler/Wayfarer-Vibes (harte Tag-Quote).",
   },
   "D-L": {
     teamId: "D-L",
@@ -490,17 +524,22 @@ const THEME_TARGETS: Record<string, TeamThemeCompositionTarget> = {
   },
   "T-G": {
     teamId: "T-G",
+    // Grosse Monster mit VARIETY: Groesse bleibt der Kern (primary), aber Drachen/Constructs/Ogr/Tauren/
+    // andere Monster tragen das Team mit. Frueher "hard": off-primary Spieler bekamen KEIN Secondary-/
+    // Soft-Credit (flavourCounts=0) -> reine Tauren-Monokultur, waehrend klar off-theme Fueller (Dwarf,
+    // Demon) als neutrale Generik durchrutschten. Jetzt "strong": off-primary Monster/Power-Spieler
+    // verdienen Flavour-Credit -> Variety; klar off-theme Kleinrassen werden ueber avoid herausgedraengt.
     primaryThemeTags: ["Tall", "Giant", "Colossus", "Titan"],
-    secondaryThemeTags: ["Power", "Strength", "Tank"],
-    softPreferredTags: ["Ogre", "Tauren", "Dragon"],
-    allowedOutsiderTags: ["Orc", "Tauren", "Dragon"],
-    avoidTags: ["Small", "Tiny", "Gnome"],
-    targetShare: 0.9,
-    minimumShare: 0.6,
-    strictness: "hard",
-    exceptionPolicy: "only_if_major_upgrade",
-    qualityOverrideThreshold: 24,
-    notes: "The Giants: mindestens 60% Kader mit Groesse >= 6 (Tall/Giant-Tags).",
+    secondaryThemeTags: ["Power", "Strength", "Tank", "Monster", "Dragon"],
+    softPreferredTags: ["Ogre", "Tauren", "Beast", "Construct"],
+    allowedOutsiderTags: ["Orc", "Tauren", "Dragon", "Monster", "Construct", "Mutant"],
+    avoidTags: ["Small", "Tiny", "Gnome", "Dwarf"],
+    targetShare: 0.6,
+    minimumShare: 0.4,
+    strictness: "strong",
+    exceptionPolicy: "audit_required",
+    qualityOverrideThreshold: 18,
+    notes: "The Giants: grosse Monster mit VARIETY — Groesse (Tall/Giant) als Kern plus Drachen/Constructs/Ogr/andere Monster; kleine/off-theme Rassen (Dwarf/Gnome) werden herausgehalten.",
   },
   "Z-H": {
     teamId: "Z-H",
@@ -719,6 +758,29 @@ export function derivePlayerThemeTags(player: Player): PlayerThemeTagRow {
     if (valueContains(value, ["alien", "extraterrestrial", "xeno", "cosmic"])) addTag(tags, sources, "Alien", source);
     if (valueContains(value, ["lizard", "reptile", "saurian"])) addTag(tags, sources, "Lizard", source);
 
+    // Monstroese/nicht-humanoide Rassen: eigene Rassen-Tags PLUS ein gemeinsamer "Monster"-Tag, damit
+    // Monster-/Kreaturen-Teams (z.B. T-G Giants) thematische VARIETY (Drachen, Ogr, Tauren, ...) statt
+    // nur einer Rasse ziehen koennen. Ohne diese Regeln blieben Dragon/Orc/Goblin/Tauren/Ogre/Mutant
+    // referenziert-aber-nie-emittiert, sodass allowedOutsider/secondary-Tags dieser Rassen leer liefen.
+    if (value.includes("dragon")) {
+      addTag(tags, sources, "Dragon", source);
+      addTag(tags, sources, "Monster", source);
+    }
+    if (valueContains(value, ["orc", "ork"])) addTag(tags, sources, "Orc", source);
+    if (value.includes("goblin")) addTag(tags, sources, "Goblin", source);
+    if (value.includes("tauren")) {
+      addTag(tags, sources, "Tauren", source);
+      addTag(tags, sources, "Monster", source);
+    }
+    if (value.includes("ogre")) {
+      addTag(tags, sources, "Ogre", source);
+      addTag(tags, sources, "Monster", source);
+    }
+    if (value.includes("mutant")) {
+      addTag(tags, sources, "Mutant", source);
+      addTag(tags, sources, "Monster", source);
+    }
+
     if (valueContains(value, ["human", "elf", "dwarf", "lord", "noble", "king", "queen", "knight", "court", "prince", "princess", "royal"])) {
       if (value.includes("human")) addTag(tags, sources, "Human", source);
       if (value.includes("elf")) addTag(tags, sources, "Elf", source);
@@ -871,9 +933,11 @@ export function derivePlayerThemeTags(player: Player): PlayerThemeTagRow {
       if (value.includes("torment")) addTag(tags, sources, "Torment", source);
       if (value.includes("will")) addTag(tags, sources, "Will", source);
       if (value.includes("strength") || value.includes("power")) addTag(tags, sources, "Strength", source);
+      if (value.includes("power")) addTag(tags, sources, "Power", source);
       if (value.includes("executioner")) addTag(tags, sources, "Executioner", source);
       if (value.includes("zealot")) addTag(tags, sources, "Zealot", source);
     }
+    if (valueContains(value, ["tank", "juggernaut", "bulwark", "guardian"])) addTag(tags, sources, "Tank", source);
 
     if (valueContains(value, ["plant", "druid", "nature", "forest", "calm", "neutral"])) addTag(tags, sources, value.includes("plant") ? "Plant" : "Nature", source);
     if (value.includes("forest")) addTag(tags, sources, "Forest", source);

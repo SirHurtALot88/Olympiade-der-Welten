@@ -504,4 +504,57 @@ describe("matchday slot roles", () => {
 
     expect(score.slotRoleModifier).toBe(slotRoleModifier);
   });
+
+  it("threads captain rivalry-pressure reduction into the real resolve side total (push)", () => {
+    const entries = [{ playerId: "p-1", slotIndex: 0 }];
+    const rosterPlayers = [
+      {
+        id: "p-1",
+        attributeStats: {
+          power: 80,
+          health: 70,
+          stamina: 55,
+          intelligence: 45,
+          awareness: 45,
+          determination: 45,
+          speed: 45,
+          dexterity: 45,
+          charisma: 45,
+          will: 45,
+          spirit: 45,
+          torment: 70,
+        },
+      },
+    ];
+    const disciplineScores = [{ playerId: "p-1", disciplineId: "fechten", score: 65 }];
+    const shared = {
+      disciplineId: "fechten",
+      disciplineSide: "d1" as const,
+      entries,
+      rosterPlayers,
+      disciplineScores,
+      requiredPlayers: 1,
+      intensity: "push" as const,
+    };
+
+    const rawRivalryPressure = 1.5;
+    // Ein starker Captain (rivalryPressureReductionPct=24) daempft den Rivalitaetsdruck real.
+    const reducedRivalryPressure = applyCaptainRivalryPressureReduction(rawRivalryPressure, 24);
+    // Kein Captain-Effekt (0% Reduktion) = voller Rivalitaetsdruck.
+    const zeroCaptainReduction = applyCaptainRivalryPressureReduction(rawRivalryPressure, 0);
+
+    const withoutCaptain = calculateSideSlotRoleModifierTotal({ ...shared, rivalryPressure: zeroCaptainReduction });
+    const withCaptain = calculateSideSlotRoleModifierTotal({ ...shared, rivalryPressure: reducedRivalryPressure });
+    const noRivals = calculateSideSlotRoleModifierTotal({ ...shared, rivalryPressure: 0 });
+
+    // Der Captain-Ruhepol hebt den echten Score gegenueber dem vollen Rivalitaetsdruck an.
+    expect(reducedRivalryPressure).toBeLessThan(zeroCaptainReduction);
+    expect(withCaptain).toBeGreaterThan(withoutCaptain);
+    expect(noRivals).toBeGreaterThan(withCaptain);
+
+    // Ausserhalb von Push wirkt der Rivalitaets-Score-Abzug nicht (konsistent mit rivalryLoad/-Modifier).
+    const normalFull = calculateSideSlotRoleModifierTotal({ ...shared, intensity: "normal", rivalryPressure: zeroCaptainReduction });
+    const normalNone = calculateSideSlotRoleModifierTotal({ ...shared, intensity: "normal", rivalryPressure: 0 });
+    expect(normalFull).toBe(normalNone);
+  });
 });

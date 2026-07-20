@@ -84,13 +84,18 @@ describe("buildOrganicSquadPlan — emergent composition", () => {
   });
 
   it("an elite-small-roster GM builds a smaller squad than a depth GM (OPT-driven size)", () => {
+    // The GM roster-size nudge is intentionally gentle now (K=1 on top of the sheet playerOpt, see
+    // deriveUtilityWeights — a larger K used to re-inflate the sheet opt). A one-sided preference (with
+    // the opposite pole left neutral) no longer shifts optTarget enough to change size: both round to
+    // the same target. To exercise the OPT-driven size divergence the test is about, set BOTH poles —
+    // the elite GM strongly prefers a small roster AND weakly wants depth, the depth GM the reverse.
     const eliteWeights = deriveUtilityWeights(
       { ambition: 70, finances: 55, boardConfidence: 45, harmony: 50, playerOpt: 11 },
-      { eliteSmallRosterPreference: 9 },
+      { eliteSmallRosterPreference: 10, rosterDepthPreference: 1 },
     );
     const depthWeights = deriveUtilityWeights(
       { ambition: 55, finances: 55, boardConfidence: 50, harmony: 50, playerOpt: 11 },
-      { rosterDepthPreference: 9 },
+      { rosterDepthPreference: 10, eliteSmallRosterPreference: 1 },
     );
     const elite = buildOrganicSquadPlan(baseInput({ weights: eliteWeights }));
     const depth = buildOrganicSquadPlan(baseInput({ weights: depthWeights }));

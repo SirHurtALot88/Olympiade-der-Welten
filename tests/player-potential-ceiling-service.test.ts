@@ -3,11 +3,13 @@ import { describe, expect, it } from "vitest";
 import type { Player } from "@/lib/data/olyDataTypes";
 import { buildPlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
 import { buildPlayerPotentialRecord } from "@/lib/progression/player-potential-service";
+import type { PlayerPotentialRecord } from "@/lib/data/olyDataTypes";
 import {
   attachPotentialCeilingToRecord,
   buildPlayerPotentialCeilingProfile,
   buildPotentialGap,
   clampPotentialCeilingToCurrentStars,
+  reconcilePlayerPotentialRecordToCurrentAbility,
   revealPotentialStars,
 } from "@/lib/scouting/player-potential-ceiling-service";
 
@@ -96,6 +98,17 @@ describe("player potential ceiling service", () => {
     expect(revealed.overallMin).toBeGreaterThanOrEqual(current.overall);
     expect(revealed.overallMax).toBeGreaterThanOrEqual(current.overall);
     expect(revealed.overallMin).toBeLessThanOrEqual(revealed.overallMax ?? revealed.overallMin);
+  });
+
+  it("computes overall from axis stars with weights summing to 1.0 (no duplicated term)", () => {
+    // Regression test for a copy/paste bug where sorted[3]*0.10 was added twice,
+    // making the weights sum to 1.10 instead of 1.0 and inflating overall by up to 0.5★.
+    // sorted desc [4,3,2,2]: 4*0.45 + 3*0.30 + 2*0.15 + 2*0.10 = 3.2 -> rounds to 3.0★.
+    // With the old duplicated-weight bug this would round to 3.5★ instead.
+    const current = { pow: 2, spe: 2, men: 2, soc: 2, overall: 2, disciplineTags: [] };
+    const staleCeiling = { pow: 4, spe: 3, men: 2, soc: 2, overall: 0 };
+    const clamped = clampPotentialCeilingToCurrentStars(current, staleCeiling);
+    expect(clamped.overall).toBe(3.0);
   });
 
   it("raises stored overall ceiling when CA overall exceeds axis-derived PO overall", () => {
@@ -194,5 +207,81 @@ describe("player potential ceiling service", () => {
     expect(ceiling.pow).toBeGreaterThan(current.pow);
     expect(ceiling.pow - current.pow).toBeGreaterThanOrEqual(1);
     expect(buildPotentialGap({ currentStars: current, ceiling })).toBeGreaterThan(0.5);
+  });
+
+  it("does NOT auto-lift the ceiling for a player who merely rounded fractionally over its cap", () => {
+    // Bugfix: Ein gecappter Performer, dessen aktueller Wert bruchteilig ueber das
+    // ganzzahlige Ceiling geriet (current >= ceiling+0.5, rundet auf), hob frueher sein
+    // eigenes Ceiling auf current+6 an und oeffnete den Headroom wieder -> Cap ausgehebelt.
+    const target: Player = {
+      ...player({ id: "at-cap" }),
+      attributeSheetStats: {
+        power: 60.6, // gebrochen ueber Ceiling 60 (Round-Over), aber < 1 Punkt Rueckstand
+        health: 55,
+        stamina: 55,
+        speed: 55,
+        dexterity: 55,
+        awareness: 55,
+        intelligence: 55,
+        will: 55,
+        charisma: 55,
+        spirit: 55,
+        determination: 55,
+        torment: 50,
+      },
+    };
+    const record: PlayerPotentialRecord = {
+      playerId: target.id,
+      potentialBand: "medium",
+      confidence: 0,
+      source: "generated",
+      hiddenPotentialScore: 70,
+      hiddenAttributeCeiling: { power: 60 },
+    };
+    const currentStars = { pow: 3.5, spe: 3.5, men: 3.5, soc: 3.5, overall: 3.5 };
+    const reconciled = reconcilePlayerPotentialRecordToCurrentAbility({
+      player: target,
+      record,
+      currentStars,
+    });
+    // Ceiling bleibt bei 60 (kein Selbst-Lift auf 60.6->61 + 6 = 67).
+    expect(reconciled.hiddenAttributeCeiling?.power).toBe(60);
+  });
+
+  it("still lifts the ceiling when CA genuinely overtook PO by a full point or more", () => {
+    // Legitimer Sonderfall (PO hinter CA zurueckgefallen) muss weiter funktionieren.
+    const target: Player = {
+      ...player({ id: "ca-overtook" }),
+      attributeSheetStats: {
+        power: 62, // volle 2 Punkte ueber dem gespeicherten Ceiling 60
+        health: 55,
+        stamina: 55,
+        speed: 55,
+        dexterity: 55,
+        awareness: 55,
+        intelligence: 55,
+        will: 55,
+        charisma: 55,
+        spirit: 55,
+        determination: 55,
+        torment: 50,
+      },
+    };
+    const record: PlayerPotentialRecord = {
+      playerId: target.id,
+      potentialBand: "medium",
+      confidence: 0,
+      source: "generated",
+      hiddenPotentialScore: 70,
+      hiddenAttributeCeiling: { power: 60 },
+    };
+    const currentStars = { pow: 3.5, spe: 3.5, men: 3.5, soc: 3.5, overall: 3.5 };
+    const reconciled = reconcilePlayerPotentialRecordToCurrentAbility({
+      player: target,
+      record,
+      currentStars,
+    });
+    // current(62) + 6 = 68 -> echter Headroom wird wieder geoeffnet.
+    expect(reconciled.hiddenAttributeCeiling?.power).toBe(68);
   });
 });

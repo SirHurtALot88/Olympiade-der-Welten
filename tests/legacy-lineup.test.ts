@@ -350,6 +350,59 @@ describe("legacy lineup score engine", () => {
     }).d1).toEqual(sharedTraits);
   });
 
+  it("honors a stored mutator selection over the rolled matchday traits and only falls back to the roll when nothing is stored", () => {
+    const scope = {
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-1",
+      disciplineSide: "d1" as const,
+      disciplineId: "football",
+    };
+    const rolledTraits = rollMatchdayMutatorTraitsForSide(scope);
+    // Der Spieler passt NICHT zu den ausgewürfelten Traits, aber zur gespeicherten Auswahl "Cool".
+    expect(rolledTraits).not.toContain("Cool");
+    const rosterPlayers = [
+      {
+        id: "player-1",
+        name: "Player 1",
+        traitsPositive: ["Cool"],
+        traitsNegative: [],
+        coreStats: { pow: 1, spe: 1, men: 1, soc: 1 },
+      },
+    ];
+
+    const withStoredSelection = calculateMutatorModifierForSide({
+      disciplineSide: "d1",
+      entries: [{ playerId: "player-1" }],
+      rosterPlayers,
+      modifiers: {
+        d1: { primaryFormCardId: null, secondaryFormCardId: null, mutatorTrait1: "Cool", mutatorTrait2: null },
+        d2: { primaryFormCardId: null, secondaryFormCardId: null, mutatorTrait1: null, mutatorTrait2: null },
+      },
+      matchdayMutatorTraits: rolledTraits,
+    });
+
+    // Gespeicherte Auswahl greift trotz vorhandener Roll-Traits: +6 für den passenden Spieler.
+    expect(withStoredSelection.mutatorText).toBe("Cool");
+    expect(withStoredSelection.mutatorModifier).toBe(6);
+    expect(withStoredSelection.playerMutatorPpsBonuses["player-1"]).toBe(0.3);
+
+    const withoutStoredSelection = calculateMutatorModifierForSide({
+      disciplineSide: "d1",
+      entries: [{ playerId: "player-1" }],
+      rosterPlayers,
+      modifiers: {
+        d1: { primaryFormCardId: null, secondaryFormCardId: null, mutatorTrait1: null, mutatorTrait2: null },
+        d2: { primaryFormCardId: null, secondaryFormCardId: null, mutatorTrait1: null, mutatorTrait2: null },
+      },
+      matchdayMutatorTraits: rolledTraits,
+    });
+
+    // Ohne gespeicherte Auswahl bleibt der Roll der deterministische Fallback.
+    expect(withoutStoredSelection.mutatorText).toBe(rolledTraits.join(", "));
+    expect(withoutStoredSelection.mutatorModifier).toBe(0);
+  });
+
   it("uses real active player traits for forced MVP mutators instead of fake labels", () => {
     const result = calculateMvpForcedMutatorModifierForSide({
       disciplineId: "tdm",

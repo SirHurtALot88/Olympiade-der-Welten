@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
-import { previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
+import { computeSeasonEndContractTick, previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
 import { buildFormCardSeasonUsageAudit, buildGeneratedFormCardRecordsForSeason } from "@/lib/lineups/legacy-lineup-modifiers";
 import type { Fixture, GameState, PreSeasonWorkflowLogRecord, SeasonState, StandingRecord } from "@/lib/data/olyDataTypes";
 import { previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-season-end-service";
@@ -34,6 +34,9 @@ import type { PlayerGeneratorAttributeName, PlayerGeneratorAttributes } from "@/
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 
 export const PRESEASON_NEXT_SEASON_SETUP_CONFIRM_TOKEN = "APPLY_PRESEASON_NEXT_SEASON_SETUP";
+
+/** Neutral felt-pressure the board's carried record is reset to at a season boundary (5/10 = neutral). */
+const NEUTRAL_BOARD_PERCEIVED_PRESSURE = 5;
 
 export type PreSeasonWorkflowStepId =
   | "season_review"
@@ -97,10 +100,6 @@ function roundValue(value: number, digits = 2) {
 
 function toFiniteNumber(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
 }
 
 const ATTRIBUTE_KEYS: PlayerGeneratorAttributeName[] = [
@@ -198,14 +197,16 @@ function advancePlayerMoraleCarryState(gameState: GameState) {
   });
 }
 
-export function applySeasonBaselineProgression(gameState: GameState, options: { completedSeasonId?: string } = {}) {
+export function applySeasonBaselineProgression(
+  gameState: GameState,
+  // `completedSeasonId` bleibt in der Signatur (Aufrufer/Tests übergeben ihn), wird hier aber nicht
+  // mehr ausgewertet: Die Season-End-Progression rostered Spieler ist zu diesem Zeitpunkt bereits über
+  // runSeasonEndProgressionBatch (materializeSeasonEndProgressionBeforeNextSeason) auf die Attribute
+  // angewandt. Es gibt daher keinen "progressiert / nicht progressiert"-Fall mehr, der hier verzweigen
+  // müsste — rostered Spieler behalten schlicht ihren aktuellen Wert (siehe unten), Free Agents driften.
+  _options: { completedSeasonId?: string } = {},
+) {
   const rosterPlayerIds = new Set(gameState.rosters.map((entry) => entry.playerId));
-  const completedSeasonId = options.completedSeasonId ?? gameState.season.id;
-  const progressedThisSeasonPlayerIds = new Set(
-    (gameState.playerProgressionEvents ?? [])
-      .filter((event) => event.seasonId === completedSeasonId)
-      .map((event) => event.playerId),
-  );
   const baselineByPlayerId = new Map(
     (gameState.playerBaselines ?? []).map((baseline) => {
       const normalized = normalizePlayerBaselineRecord(baseline);
@@ -250,19 +251,15 @@ export function applySeasonBaselineProgression(gameState: GameState, options: { 
     }
 
     const isRostered = rosterPlayerIds.has(player.id);
-    const hasSeasonEndProgression = progressedThisSeasonPlayerIds.has(player.id);
     const freeAgentRecoveryFraction = 0.12;
     // Unrostered players drift 12% per season toward playerBaselines (attrs, MW, salary).
+    // Rostered Spieler behalten ihren aktuellen (bereits per Season-End-Progression fortgeschriebenen)
+    // Wert; nur wenn der Attributwert fehlt, fällt er auf das Baseline zurück.
     const nextAttributePatch = Object.fromEntries(
       ATTRIBUTE_KEYS.map((attribute) => {
         const currentValue = toFiniteNumber(player.attributeSheetStats?.[attribute]);
         if (isRostered) {
-          return [
-            attribute,
-            hasSeasonEndProgression
-              ? (currentValue ?? baseline.attributes[attribute])
-              : (currentValue ?? baseline.attributes[attribute]),
-          ];
+          return [attribute, currentValue ?? baseline.attributes[attribute]];
         }
         return [
           attribute,
@@ -399,7 +396,13 @@ export function applySeasonBaselineProgression(gameState: GameState, options: { 
       // Anti-cheese Teil B (B.4): clear the per-matchday training accumulator alongside trainingMode /
       // fatigue so the new season starts a fresh mode-count/fatigue tally.
       seasonTrainingAccumulator: null,
-      fatigue: isRostered ? 0 : clamp(player.fatigue ?? 0, 0, 100),
+      // Fatigue an der Saisongrenze für ALLE Spieler auf 0 zurücksetzen — konsistent mit dem geleerten
+      // seasonTrainingAccumulator. player.fatigue ist zusammengesetzt aus Match-Fatigue + der
+      // aufgelaufenen Trainings-Fatigue-Schicht (siehe matchday-training-accumulator). Wird der
+      // Accumulator geleert, aber die volle Vorsaison-Fatigue eines Free Agents behalten, startete der
+      // Free Agent mit stale/aufgeblähter Fatigue OHNE zugehörigen Accumulator. Rostered Spieler wurden
+      // schon immer auf 0 gesetzt; Free Agents werden jetzt genauso normalisiert.
+      fatigue: 0,
     };
   });
 
@@ -507,10 +510,24 @@ function isTransferPipelineFastMode() {
 }
 
 function buildNextSeasonGameState(
-  save: PersistedSaveGame,
+  inputSave: PersistedSaveGame,
   opts?: { transferPipelineFast?: boolean },
 ): { gameState: GameState; auditLog: PreSeasonWorkflowLogRecord } {
   const transferPipelineFast = opts?.transferPipelineFast ?? isTransferPipelineFastMode();
+  // KERN DES SAISON-LOOPS: Vertragsalterung GENAU EINMAL pro echtem Saisonübergang anwenden. Der Tick
+  // schreibt contractLength/Status/Gehaltsplan fort, lässt 0-Jahres-Verträge auslaufen (Free-Agent-
+  // Exit-Cash fließt in team.cash) und fährt KI-Verlängern/-Freigeben. Menschen-Teams altern EBENSO
+  // (kein Verlust der Vertragsalterung), ihre auslaufenden Verträge bleiben aber "renewal_pending" —
+  // die KI-Entscheidung greift nur für KI-Teams. Idempotent über einen preSeasonWorkflowLogs-Marker je
+  // fromSeasonId: wurde der Tick vorher schon über den (Vorschau-)Schritt contract_renewal / den Sim-
+  // Apply angewandt und persistiert (und der Save vor dem Übergang neu geladen), ist dies ein No-Op —
+  // kein Doppel-Tick, keine doppelte Cash-Buchung. Der Tick läuft VOR der Rest-Pipeline (Baseline-Drift
+  // für frisch freigesetzte Free Agents, Sponsoren, Kader-Neuaufbau), damit diese auf dem gealterten
+  // Kader/Cash aufsetzen und nichts doppelt zählen.
+  const contractTick = computeSeasonEndContractTick(inputSave);
+  const save: PersistedSaveGame = contractTick.applied
+    ? { ...inputSave, gameState: contractTick.gameState }
+    : inputSave;
   const { nextSeasonId, nextSeasonLabel, nextSeasonNumber } = buildNextSeasonContext(save.gameState);
   const previousSchedule = save.gameState.seasonState.disciplineSchedule ?? [];
   let schedulePlan = buildSeasonSeededDisciplineSchedule({
@@ -584,6 +601,22 @@ function buildNextSeasonGameState(
     standings: buildZeroStandings(save.gameState),
     // Snapshot the outgoing season's final confidence for carry-over into the next season.
     previousSeasonBoardConfidence: save.gameState.seasonState.boardConfidence ?? {},
+    // Reset the WITHIN-season board momentum/perception at the season boundary. The confidence VALUE
+    // continuity is provided by previousSeasonBoardConfidence above (calculateBoardConfidence blends
+    // that carried value); the transient EMA signals (pressureMomentum) and the felt-pressure
+    // (perceivedPressure) must start fresh, otherwise last season's END pressure seeds the new
+    // season's first slate/pressure and inflates early-season pressure until it decays. value/pressure
+    // are kept so the identity-seed fallback continuity holds.
+    boardConfidence: Object.fromEntries(
+      Object.entries(save.gameState.seasonState.boardConfidence ?? {}).map(([teamId, record]) => [
+        teamId,
+        {
+          ...record,
+          ...(record.pressureMomentum !== undefined ? { pressureMomentum: 0 } : {}),
+          ...(record.perceivedPressure !== undefined ? { perceivedPressure: NEUTRAL_BOARD_PERCEIVED_PRESSURE } : {}),
+        },
+      ]),
+    ),
     formCards: nextFormCards,
     lineupDrafts: [],
     matchdayResults: [],
@@ -629,6 +662,11 @@ function buildNextSeasonGameState(
       `season_economy_factors_advanced:s_plus_4=${economyFactors.rerolledSeasonPlus4.factor}`,
       nextFormCards.length === 0 ? "season_formcards_generation_empty" : null,
       transferPipelineFast ? "transfer_pipeline_fast_skip_expensive_season_prep" : null,
+      contractTick.applied
+        ? `season_end_contract_tick_applied:renewed=${contractTick.renewedPlayers}:released=${contractTick.releasedPlayers}`
+        : contractTick.alreadyApplied
+          ? "season_end_contract_tick_already_applied"
+          : null,
       "season_mutator_state_reset_lineup_modifiers_cleared",
     ].filter((entry): entry is string => Boolean(entry)),
     affectedEntities: [
@@ -647,6 +685,7 @@ function buildNextSeasonGameState(
       "playerProgressionEvents",
       "players.season_baseline_progression",
       "rosters.currentValue",
+      "rosters.contractLength_season_end_tick",
       "arena_state_reset",
     ],
     timestamp: new Date().toISOString(),
@@ -685,7 +724,17 @@ function buildNextSeasonGameState(
   };
 
   const nextGameState = transferPipelineFast
-    ? refreshTeamObjectiveState(advanceSponsorContractsForNewSeason(baseGameState, nextSeasonId))
+    ? // FAST-Pfad (Sims/Long-Run): die teuren Schritte (Season-End-Progression, FormCards, Sponsor-
+      // Angebots-Neugenerierung, Scout-Intel) bleiben übersprungen, ABER die Beliebtheits-KPI-
+      // Fortschreibung läuft AUCH hier — sonst friert die Arena-Kopplung (mean-reverting Beliebtheit)
+      // im Sim-/Fast-Pfad ein und driftet gegenüber dem normalen Übergang. Reihenfolge wie im Normal-
+      // pfad: abgeschlossene Saison lesen, in die frisch aktivierte Folge-Saison fortschreiben.
+      refreshTeamObjectiveState(
+        advanceTeamBeliebtheitForSeasonTransition({
+          completedGameState: save.gameState,
+          nextGameState: advanceSponsorContractsForNewSeason(baseGameState, nextSeasonId),
+        }),
+      )
     : refreshTeamObjectiveState(
         advanceScoutIntelTick({
           gameState: chooseSponsorOfferForAiTeams(
@@ -755,11 +804,19 @@ function buildSaveWithRequiredSeasonSnapshot(save: PersistedSaveGame): {
 } {
   // Benchmark freeze integrity: the authoritative season snapshot is written at
   // season completion (season-completion-service), AFTER sponsor + facility
-  // settlement but BEFORE the transfer window — so its MW/Cash/roster are the
-  // "end of season, post-sponsors, pre-sales" values. This preseason path runs
-  // AFTER sales, so rebuilding + upserting from the current gameState would
-  // clobber those frozen values with post-sale numbers. If a `completed`
-  // snapshot for this season already exists, treat it as immutable and keep it.
+  // settlement but BEFORE the transfer window. The ONE value that must stay
+  // frozen is `cashEnd` — the TRUE, audit-only season-end cash (post-sponsors,
+  // pre-sale). It is deliberately NOT advanced by preseason cash movements:
+  // overwriting it with the current, post-preseason-spend cash would understate
+  // season N's cashStart in the reconciliation audit (getSnapshotCashByTeam) and
+  // double-count the preseason spend as a false-positive cash_reconciliation_delta_hard
+  // (see the NOTE in season-snapshot-service.buildTeamEntryEconomyFromGameState).
+  // Roster/salary/market-value are NOT frozen here — they are refreshed to the
+  // post-preseason-buy entry state separately via
+  // patchCompletedSeasonSnapshotAfterPreseasonBuy, which preserves `cashEnd`.
+  // Therefore: if a `completed` snapshot for this season already exists, keep it
+  // as-is (rebuilding + upserting from the current gameState would clobber the
+  // audit-only frozen `cashEnd` with a post-sale number).
   const existingCompletedSnapshot = (save.gameState.seasonState.seasonSnapshots ?? []).find(
     (snapshot) => snapshot.seasonId === save.gameState.season.id && snapshot.status === "completed",
   );

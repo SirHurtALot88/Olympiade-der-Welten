@@ -563,4 +563,89 @@ describe("legacy ai lineup suggestion", () => {
     expect(wickedWizards?.preferredArchetypes).toContain("mage");
     expect(wickedWizards?.strategySummary).toContain("Magier");
   });
+
+  it("does not activate the captain for a weak, conceding team on matchday 1 (saves the scarce slot)", () => {
+    const context = createContext();
+    // Konservative Aufstellung + durchweg schwache Diszi-Scores => "eh schwach, warum Captain?"
+    context.lineupStrategy = "rotate_depth";
+    context.disciplineScores = context.disciplineScores.map((score) => ({ ...score, score: Math.min(score.score, 58) }));
+
+    const preview = buildAiLegacyLineupPreview(context);
+
+    expect(preview.entries.some((entry) => entry.isCaptain)).toBe(false);
+    expect(preview.captainSlotsRemaining).toBe(3);
+    expect([preview.d1.captainSelectionStatus, preview.d2.captainSelectionStatus]).not.toContain("selected");
+    expect(preview.d1.captainSelectionStatus).toBe("skipped_not_worthwhile");
+    expect(preview.warnings.some((warning) => warning.includes("Captain gespart"))).toBe(true);
+  });
+
+  it("is deterministic: the same context yields the same captain decisions twice", () => {
+    const keyOf = (preview: ReturnType<typeof buildAiLegacyLineupPreview>) =>
+      preview.entries
+        .filter((entry) => entry.isCaptain)
+        .map((entry) => `${entry.disciplineId}::${entry.disciplineSide}::${entry.playerId}`)
+        .sort();
+
+    const first = buildAiLegacyLineupPreview(createContext());
+    const second = buildAiLegacyLineupPreview(createContext());
+
+    expect(keyOf(first)).toEqual(keyOf(second));
+    expect(first.d1.captainSelectionStatus).toBe(second.d1.captainSelectionStatus);
+    expect(first.d2.captainSelectionStatus).toBe(second.d2.captainSelectionStatus);
+    expect(first.captainSlotsRemaining).toBe(second.captainSlotsRemaining);
+  });
+
+  it("spends roughly all three captain slots across a 10-matchday season without front-loading them", () => {
+    const perMatchday: number[] = [];
+    let captainUsedBefore = 0;
+
+    for (let matchdayIndex = 1; matchdayIndex <= 10; matchdayIndex += 1) {
+      const context = createContext();
+      // Mittelmaessiges Team: Kandidat knapp unter der fruehen Huerde, damit Pacing sichtbar wird.
+      context.disciplineScores = context.disciplineScores.map((score) => ({ ...score, score: Math.min(score.score, 60) }));
+      context.matchday = { ...context.matchday, index: matchdayIndex, label: `Spieltag ${matchdayIndex}` };
+      context.season = { ...context.season, currentMatchday: matchdayIndex };
+      context.matchdayContract = {
+        matchdayId: "matchday-1",
+        matchdayLabel: `Spieltag ${matchdayIndex}`,
+        matchdayIndex,
+        totalDisciplineSidesInSeason: 20,
+        seasonCaptainSlots: 3,
+        discipline1: {
+          disciplineId: "tdm",
+          displayName: "TDM",
+          requiredPlayers: 2,
+          requiredCaptains: 0,
+          category: "power",
+          rankSource: null,
+          rankSourceStatus: "mapped",
+          sourceStatus: "season_seed",
+          disciplineSide: "d1",
+        },
+        discipline2: {
+          disciplineId: "mini-dm",
+          displayName: "Mini DM",
+          requiredPlayers: 2,
+          requiredCaptains: 0,
+          category: "power",
+          rankSource: null,
+          rankSourceStatus: "mapped",
+          sourceStatus: "season_seed",
+          disciplineSide: "d2",
+        },
+      };
+      context.teamStatus = { ...context.teamStatus!, captainUsedCount: captainUsedBefore };
+
+      const preview = buildAiLegacyLineupPreview(context);
+      const slotsBeforeDraft = 3 - captainUsedBefore;
+      const consumed = slotsBeforeDraft - preview.captainSlotsRemaining;
+      perMatchday.push(consumed);
+      captainUsedBefore += consumed;
+    }
+
+    const total = perMatchday.reduce((sum, value) => sum + value, 0);
+    expect(total).toBe(3); // nutzt alle Slots -> kein ai_captain_unused-Regress
+    expect(perMatchday[0]).toBe(0); // kein Reinklatschen an Spieltag 1
+    expect(Math.max(...perMatchday)).toBeLessThanOrEqual(1); // nie mehr als ein Captain pro Spieltag
+  });
 });

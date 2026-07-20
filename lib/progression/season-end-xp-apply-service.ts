@@ -32,7 +32,10 @@ import {
   resolveSeasonTrainingAccumulatorInputs,
   type OrganicSeasonProgressionResult,
 } from "@/lib/training/organic-season-progression";
-import { reconcilePlayerPotentialRecordsForGameState } from "@/lib/scouting/player-potential-ceiling-service";
+import {
+  reconcilePlayerPotentialRecordsForGameState,
+  resolvePlayerPotentialRecordForProgression,
+} from "@/lib/scouting/player-potential-ceiling-service";
 import {
   buildCoreStatsFromDisciplineRatings,
   buildPreviewDisciplineRatingsFromAttributes,
@@ -389,8 +392,11 @@ function buildEconomyAudit(input: {
           players: input.gameState.players.map((entry) => (entry.id === input.baselinePlayer!.id ? input.baselinePlayer! : entry)),
         }
       : null;
+  // Freeze-Bypass: Der Progression-Audit muss die Before/After-OVR LIVE aus den getauschten
+  // Spielern rechnen. Ohne `ignoreFreeze` liefert die Map nach MD10 die eingefrorenen Rows
+  // (playerId-keyed) → beforeRating === afterRating → Development-Delta strukturell 0.
   const beforeRating = baselineGameState
-    ? buildPlayerRatingContractMap(baselineGameState).get(input.player.id) ?? input.context.beforeRatings.get(input.player.id) ?? null
+    ? buildPlayerRatingContractMap(baselineGameState, undefined, { ignoreFreeze: true }).get(input.player.id) ?? input.context.beforeRatings.get(input.player.id) ?? null
     : input.context.beforeRatings.get(input.player.id) ?? null;
   const rankTableMarketValueBefore = resolveRankTableMarketValueFromCompareRow(beforeRow);
   const rankTableMarketValueAfter = input.hasAttributeChanges
@@ -403,7 +409,7 @@ function buildEconomyAudit(input: {
       }
     : null;
   const afterRating = afterGameState
-    ? buildPlayerRatingContractMap(afterGameState).get(input.player.id) ?? null
+    ? buildPlayerRatingContractMap(afterGameState, undefined, { ignoreFreeze: true }).get(input.player.id) ?? null
     : beforeRating;
   const marketValueDeltaAbs =
     beforeRow?.calculatedMarketValue != null && input.player.marketValue != null
@@ -590,8 +596,23 @@ function buildPreviewPlayer(input: {
         ? null
         : Math.max(0, Math.round(lifetimeXPBefore ?? 0) + Math.round(earnedSeasonXP));
   if (organicProgression && attributesAfter) {
+    // Harte Ceiling-Bindung an der Persist-Stelle: der organisch gewachsene Wert darf das
+    // (reconciled) Attribut-Ceiling nie ueberschreiten. Redundante Absicherung zur Klammer
+    // in buildOrganicSeasonProgression – identische Ceiling-Quelle (gleicher reconciled
+    // Record), damit der Potenzial-Cap (v4) auch am tatsaechlichen Persist-Site bindet und
+    // eine legitime PO-Neubewertung (angehobenes Ceiling) NICHT zurueckgeklemmt wird.
+    const attributeCeilings =
+      resolvePlayerPotentialRecordForProgression({
+        gameState: input.save.gameState,
+        player: input.player,
+      })?.hiddenAttributeCeiling ?? null;
     for (const attribute of ATTRIBUTE_KEYS) {
-      attributesAfter[attribute] = organicProgression.attributesAfter[attribute];
+      const grown = organicProgression.attributesAfter[attribute];
+      const ceiling = attributeCeilings?.[attribute];
+      attributesAfter[attribute] =
+        typeof ceiling === "number" && Number.isFinite(ceiling)
+          ? Math.min(grown, Math.min(99, ceiling))
+          : grown;
     }
     plannedUpgrades.push(
       ...organicProgression.attributeBreakdown

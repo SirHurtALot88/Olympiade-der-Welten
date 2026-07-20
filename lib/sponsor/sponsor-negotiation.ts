@@ -2,6 +2,7 @@ import type {
   SponsorNegotiationProfile,
   SponsorOffer,
   SponsorOfferComponent,
+  SponsorRarity,
   SponsorTermSeasons,
   TeamSponsorContract,
 } from "@/lib/data/olyDataTypes";
@@ -92,7 +93,9 @@ export function applySponsorNegotiationToComponents(input: {
   components: SponsorOfferComponent[];
   termSeasons: SponsorTermSeasons;
   negotiationProfile: SponsorNegotiationProfile;
-  starTier?: number;
+  /** Etat-Dial (Rarität). Der Profil-/Term-Effekt ist rarity-unabhängig, daher wird der Wert nur als
+   *  Kontext mitgeführt (kein Branch darauf). */
+  rarity?: SponsorRarity;
 }): SponsorOfferComponent[] {
   const termMult = getSponsorTermMultiplier(input.termSeasons);
   const factors = getSponsorProfileComponentFactors(input.negotiationProfile);
@@ -138,7 +141,7 @@ export function applySponsorNegotiationToOffer(
     components: offer.components,
     termSeasons: input.termSeasons,
     negotiationProfile: input.negotiationProfile,
-    starTier: offer.starTier,
+    rarity: offer.rarity ?? "magisch",
   });
   return {
     ...offer,
@@ -158,7 +161,7 @@ export function applySponsorNegotiationToContract(
     components: contract.components,
     termSeasons: input.termSeasons,
     negotiationProfile: input.negotiationProfile,
-    starTier: contract.starTier,
+    rarity: contract.rarity ?? "magisch",
   });
   return {
     ...contract,

@@ -761,9 +761,12 @@ export function calculateMutatorModifierForSide(input: {
         .map((trait) => [normalizeTraitKey(trait), trait] as const),
     ).values(),
   );
+  // Vorrang: Eine vorhandene gespeicherte Spieler-/KI-Auswahl (mutatorTrait1/2) wird
+  // honoriert. Nur wenn KEINE gespeicherte Auswahl existiert, fällt die Wertung
+  // deterministisch auf die ausgewürfelten Matchday-Traits zurück (Roll bleibt Fallback).
   const selectedTraits = Array.from(
     new Map(
-      (matchdayTraits.length > 0 ? matchdayTraits : storedTraits).map(
+      (storedTraits.length > 0 ? storedTraits : matchdayTraits).map(
         (trait) => [normalizeTraitKey(trait), trait] as const,
       ),
     ).values(),

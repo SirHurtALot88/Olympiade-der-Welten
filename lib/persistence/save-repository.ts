@@ -14,11 +14,13 @@ import type {
   SeasonState,
   SeasonTransitionState,
   ScenarioMeta,
+  SponsorOffer,
   Team,
   TeamIdentity,
   TransferHistoryEntry,
   TransferListing,
 } from "@/lib/data/olyDataTypes";
+import { mapArchetypeToCurveShape, mapStarTierToRarity } from "@/lib/sponsor/sponsor-curve-shapes";
 import { createGameStateFromSeed, loadSeedData } from "@/lib/data/dataAdapter";
 import { hydrateGameStateMedia } from "@/lib/data/mediaAssets";
 import { getDatabase } from "@/lib/persistence/sqlite";
@@ -122,6 +124,11 @@ type GameMetadata = {
   playerPotential?: GameState["playerPotential"];
   playerMoraleState?: GameState["playerMoraleState"];
   playerRelationshipEvents?: GameState["playerRelationshipEvents"];
+  // #1: Der zugewiesene Saison-Kapitän (manuell/AI) muss dauerhaft überleben, sonst geht er
+  // beim Kaltladen aus der DB verloren (bisher nur im flüchtigen Session-Cache gehalten).
+  teamCaptains?: GameState["teamCaptains"];
+  // #8: Nutzer-Entscheidungen (erledigt/verworfen) auf Inbox-Items müssen den Reload überleben.
+  gameInboxItems?: GameState["gameInboxItems"];
 };
 
 type PlayerSavePayload =
@@ -207,6 +214,64 @@ function normalizeLegacyRosterTargets(gameState: GameState): GameState {
     ...gameState,
     ...(teamsChanged ? { teams } : {}),
     ...(identitiesChanged ? { teamIdentities } : {}),
+  };
+}
+
+/**
+ * Legacy-save field: pre-rarity save blobs still carry a raw numeric `starTier` (1..5) on their sponsor
+ * offers/contracts. The current `SponsorOffer`/`TeamSponsorContract` types no longer declare that field (the
+ * star-tier system itself is gone), so this reads it defensively off the raw persisted record without
+ * requiring it on the type.
+ */
+function readLegacyStarTier(record: unknown): number | undefined {
+  const raw = (record as { starTier?: unknown } | null | undefined)?.starTier;
+  return typeof raw === "number" ? raw : undefined;
+}
+
+/**
+ * Back-compat: old saves carry sponsor offers/contracts with a legacy `starTier`/`archetype` but no
+ * `rarity`/`curveShape`. Backfill the new fields deterministically (star→rarity, archetype→curve shape) on
+ * load so every consumer sees them. Signed contracts keep their frozen `lockedRankPayoutLadder`, so payouts
+ * are unaffected; this only labels them for the new UI/roller. Idempotent (skips already-migrated entries).
+ */
+function normalizeLegacySponsors(gameState: GameState): GameState {
+  const seasonState = gameState.seasonState;
+  if (!seasonState) return gameState;
+  let changed = false;
+  const migrateOffer = (offer: SponsorOffer): SponsorOffer => {
+    if (offer.rarity != null && offer.curveShape != null) return offer;
+    changed = true;
+    return {
+      ...offer,
+      rarity: offer.rarity ?? mapStarTierToRarity(readLegacyStarTier(offer)),
+      curveShape: offer.curveShape ?? mapArchetypeToCurveShape(offer.archetype),
+    };
+  };
+  const nextOffers = seasonState.sponsorOffersByTeamId
+    ? Object.fromEntries(
+        Object.entries(seasonState.sponsorOffersByTeamId).map(([teamId, list]) => [teamId, list.map(migrateOffer)]),
+      )
+    : seasonState.sponsorOffersByTeamId;
+  const nextContracts = seasonState.sponsorContractsByTeamId
+    ? Object.fromEntries(
+        Object.entries(seasonState.sponsorContractsByTeamId).map(([teamId, contract]) => {
+          if (contract.rarity != null && contract.curveShape != null) return [teamId, contract];
+          changed = true;
+          return [
+            teamId,
+            {
+              ...contract,
+              rarity: contract.rarity ?? mapStarTierToRarity(readLegacyStarTier(contract)),
+              curveShape: contract.curveShape ?? mapArchetypeToCurveShape(contract.archetype),
+            },
+          ];
+        }),
+      )
+    : seasonState.sponsorContractsByTeamId;
+  if (!changed) return gameState;
+  return {
+    ...gameState,
+    seasonState: { ...seasonState, sponsorOffersByTeamId: nextOffers, sponsorContractsByTeamId: nextContracts },
   };
 }
 
@@ -1061,6 +1126,11 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     ...(gameMetadata?.playerRelationshipEvents
       ? { playerRelationshipEvents: gameMetadata.playerRelationshipEvents }
       : {}),
+    // #1: Zugewiesenen Saison-Kapitän aus dem Kalt-Load wiederherstellen (Back-Compat:
+    // fehlt das Feld in älteren Saves, bleibt das bisherige Auto-Select-Verhalten).
+    ...(gameMetadata?.teamCaptains ? { teamCaptains: gameMetadata.teamCaptains } : {}),
+    // #8: Persistierte Inbox-Status-Overrides (erledigt/verworfen) wiederherstellen.
+    ...(gameMetadata?.gameInboxItems ? { gameInboxItems: gameMetadata.gameInboxItems } : {}),
     season,
     seasonState,
     matchdayState,
@@ -1077,6 +1147,7 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   });
   mark("hydrateGameStateMedia done");
   const gameStateWithoutBaseline = withNormalizedSeasonDisciplineSchedule(
+    normalizeLegacySponsors(
     normalizeLegacyRosterTargets(
       normalizeLegacyFinanceScale(
         withNormalizedTeamGeneralManagers(withNormalizedTeamIdentityOverrides(normalizeLegacyCashCreatorsColdSteelCodes(hydrated)), {
@@ -1084,6 +1155,8 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
         }),
       ),
     ),
+    ),
+    saveId,
   );
   mark("legacy normalization done");
   const baselineResult = ensurePlayerBaselines(gameStateWithoutBaseline, {
@@ -1229,6 +1302,7 @@ function createPersistedSaveRecord(input: {
         }),
       ),
     ),
+    input.saveId,
   );
   const baselinePlayerIds = new Set([
     ...normalizedWithoutBaselines.rosters.map((entry) => entry.playerId),
@@ -1344,6 +1418,10 @@ function createPersistedSaveRecord(input: {
       playerPotential: guardedGameState.playerPotential,
       playerMoraleState: guardedGameState.playerMoraleState,
       playerRelationshipEvents: guardedGameState.playerRelationshipEvents,
+      // #1: Zugewiesenen Saison-Kapitän dauerhaft schreiben (nicht nur im Session-Cache).
+      teamCaptains: guardedGameState.teamCaptains,
+      // #8: Inbox-Status-Overrides (erledigt/verworfen) dauerhaft schreiben.
+      gameInboxItems: guardedGameState.gameInboxItems,
     } satisfies GameMetadata);
     replaceSingleton("mapping_reports", input.saveId, guardedGameState.mappingReport);
     replacePlayerBaselinesForSave(input.saveId, guardedGameState.playerBaselines, updatedAt);
@@ -1462,7 +1540,10 @@ export function createSaveRepository(): SaveRepository {
       return this.getSaveById(saveId);
     },
     createSaveFromSeed({ saveId, name, status, seedData }) {
-      const gameState = createGameStateFromSeed(seedData);
+      // scheduleSeedId ties the initial season discipline schedule to this save's unique
+      // saveId so every new save/season gets its own pairing + player-count rolls instead of
+      // reusing the default "local-game-state" seed for every save (see season-discipline-schedule.ts).
+      const gameState = createGameStateFromSeed(seedData, { scheduleSeedId: saveId });
       const persisted = createPersistedSaveRecord({
         saveId,
         name,

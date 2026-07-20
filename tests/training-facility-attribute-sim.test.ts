@@ -129,7 +129,9 @@ describe("training facility attribute simulation", () => {
 
     expect(level5.trainingSetpoints).toBeGreaterThan(level0.trainingSetpoints);
     expect(level5.netSetpoints).toBeGreaterThan(level0.netSetpoints);
-    expect(level5.facilityModifierPct).toBe(50);
+    // Fix B: training_center L5 applies the REAL +70% (catalog = single source of truth), not the
+    // stale +50% this sim previously asserted (which already diverged from the applied value on HEAD).
+    expect(level5.facilityModifierPct).toBe(70);
     expect(level0.facilityModifierPct).toBe(0);
     expect(level5.trainingSetpoints / level0.trainingSetpoints).toBeGreaterThan(1.45);
   });

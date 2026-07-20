@@ -5193,9 +5193,7 @@ function buildPickPlanner(input: {
     rosterGap = Math.max(plannerTargetRosterSize - input.rosterCount, 0);
   }
   const baseLanePhilosophy = computeIdentityLaneAppetite(identity);
-  const gmProfileForLanes = season1OptimumMode
-    ? getTeamGeneralManager(input.gameState, input.team.teamId)?.profile ?? null
-    : null;
+  const gmProfileForLanes = getTeamGeneralManager(input.gameState, input.team.teamId)?.profile ?? null;
   const lanePhilosophy = applyThemeAnchorToLaneAppetite(
     applyGmBiasToLaneAppetite(baseLanePhilosophy, gmProfileForLanes),
     input.gameState,
@@ -7999,10 +7997,7 @@ function buildTeamEntry(input: {
     expectedPrizeSignal,
     runMode: input.runMode,
   });
-  const gmProfileForPickLoop =
-    season1OptimumMode
-      ? getTeamGeneralManager(input.context.gameState, team.teamId)?.profile ?? null
-      : null;
+  const gmProfileForPickLoop = getTeamGeneralManager(input.context.gameState, team.teamId)?.profile ?? null;
   const lanePhilosophyForPickLoop = applyGmBiasToLaneAppetite(
     computeIdentityLaneAppetite(identity),
     gmProfileForPickLoop,

@@ -1,8 +1,9 @@
-import type { GameState, SponsorStarTier } from "@/lib/data/olyDataTypes";
+import type { GameState, SponsorRarity } from "@/lib/data/olyDataTypes";
 import {
   buildTeamSeasonOverviewRows,
   type TeamManagementSnapshotRow,
 } from "@/lib/foundation/team-management-overview";
+import { mapStarTierToRarity } from "@/lib/sponsor/sponsor-curve-shapes";
 
 export type SponsorTeamQualityComponent = {
   key: string;
@@ -15,11 +16,21 @@ export type SponsorTeamQualityRank = {
   teamId: string;
   qualityRank: number;
   components: SponsorTeamQualityComponent[];
-  maxStarTier: SponsorStarTier;
-  targetStarTier: SponsorStarTier;
+  /** Rarity-Obergrenze für die Angebots-/Slate-Roller. */
+  maxRarity: SponsorRarity;
+  /** Rarity-Ziel (der Normalfall unter der Decke). */
+  targetRarity: SponsorRarity;
   leaguePosition: number;
   leaguePercentile: number;
 };
+
+/**
+ * Internal 1..5 ladder step used only to compute maxRarity/targetRarity below — this is NOT a public
+ * star-tier concept, it's the private bucketing the original calibration was tuned against (it folds
+ * 4-to-1 into the 4 public rarities via mapStarTierToRarity, exactly like the legacy save migration does).
+ * Kept private so no consumer can depend on a 5-level tier again.
+ */
+type RarityLadderStep = 1 | 2 | 3 | 4 | 5;
 
 const HISTORY_SLOT_WEIGHTS = [25, 21, 17, 13, 9] as const;
 const HISTORY_SLOT_KEYS = ["seasonN1", "seasonN2", "seasonN3", "seasonN4", "seasonN5"] as const;
@@ -121,41 +132,42 @@ function envNumber(name: string, fallback: number): number {
 }
 
 /**
- * Feed 1 (TEIL A) — Beliebtheit hebt/senkt den Stern-Deckel organisch:
- *  +1 Sternstufe ab Beliebtheit ≥ UP1 (Default 1.20),
+ * Feed 1 (TEIL A) — Beliebtheit hebt/senkt die Rarity-Decke organisch:
+ *  +1 Leiterstufe ab Beliebtheit ≥ UP1 (Default 1.20),
  *  +1 weitere (gesamt bis Deckel 5) ab ≥ UP2 (Default 1.35),
  *  −1 symmetrisch bei ≤ DOWN (Default 0.70).
- * So kann z. B. ein Rang-24-Überperformer mit hoher Beliebtheit 3★ statt 2★ erreichen. ENV-tunebar.
+ * So kann z. B. ein Rang-24-Überperformer mit hoher Beliebtheit magisch statt gewöhnlich erreichen.
+ * ENV-tunebar.
  */
-export const SPONSOR_BELIEBTHEIT_STAR_UP1 = envNumber("OLY_SPONSOR_BELIEBTHEIT_STAR_UP1", 1.2);
-export const SPONSOR_BELIEBTHEIT_STAR_UP2 = envNumber("OLY_SPONSOR_BELIEBTHEIT_STAR_UP2", 1.35);
-export const SPONSOR_BELIEBTHEIT_STAR_DOWN = envNumber("OLY_SPONSOR_BELIEBTHEIT_STAR_DOWN", 0.7);
+export const SPONSOR_BELIEBTHEIT_TIER_UP1 = envNumber("OLY_SPONSOR_BELIEBTHEIT_STAR_UP1", 1.2);
+export const SPONSOR_BELIEBTHEIT_TIER_UP2 = envNumber("OLY_SPONSOR_BELIEBTHEIT_STAR_UP2", 1.35);
+export const SPONSOR_BELIEBTHEIT_TIER_DOWN = envNumber("OLY_SPONSOR_BELIEBTHEIT_STAR_DOWN", 0.7);
 
-export function getBeliebtheitStarTierDelta(beliebtheit?: number | null): number {
+function getBeliebtheitTierDelta(beliebtheit?: number | null): number {
   if (beliebtheit == null || !Number.isFinite(beliebtheit)) {
     return 0;
   }
-  if (beliebtheit >= SPONSOR_BELIEBTHEIT_STAR_UP2) return 2;
-  if (beliebtheit >= SPONSOR_BELIEBTHEIT_STAR_UP1) return 1;
-  if (beliebtheit <= SPONSOR_BELIEBTHEIT_STAR_DOWN) return -1;
+  if (beliebtheit >= SPONSOR_BELIEBTHEIT_TIER_UP2) return 2;
+  if (beliebtheit >= SPONSOR_BELIEBTHEIT_TIER_UP1) return 1;
+  if (beliebtheit <= SPONSOR_BELIEBTHEIT_TIER_DOWN) return -1;
   return 0;
 }
 
-function clampStarTier(tier: number): SponsorStarTier {
-  return Math.max(1, Math.min(5, Math.round(tier))) as SponsorStarTier;
+function clampTierBucket(tier: number): RarityLadderStep {
+  return Math.max(1, Math.min(5, Math.round(tier))) as RarityLadderStep;
 }
 
-export function getMaxStarTierForQualityRank(qualityRank: number, beliebtheit?: number | null): SponsorStarTier {
-  let baseTier: SponsorStarTier;
+function getMaxTierBucketForQualityRank(qualityRank: number, beliebtheit?: number | null): RarityLadderStep {
+  let baseTier: RarityLadderStep;
   if (qualityRank <= 4) baseTier = 5;
   else if (qualityRank <= 10) baseTier = 4;
   else if (qualityRank <= 18) baseTier = 3;
   else if (qualityRank <= 26) baseTier = 2;
   else baseTier = 1;
-  return clampStarTier(baseTier + getBeliebtheitStarTierDelta(beliebtheit));
+  return clampTierBucket(baseTier + getBeliebtheitTierDelta(beliebtheit));
 }
 
-export function getPercentileTargetStarTier(leaguePosition: number, teamCount: number): SponsorStarTier {
+function getPercentileTargetTierBucket(leaguePosition: number, teamCount: number): RarityLadderStep {
   if (teamCount <= 1) {
     return 3;
   }
@@ -165,6 +177,16 @@ export function getPercentileTargetStarTier(leaguePosition: number, teamCount: n
   if (percentile <= 0.6) return 3;
   if (percentile <= 0.85) return 2;
   return 1;
+}
+
+/** Public rarity-keyed equivalent of the max ladder bucket (same bucketing, exposed as a rarity). */
+export function getMaxRarityForQualityRank(qualityRank: number, beliebtheit?: number | null): SponsorRarity {
+  return mapStarTierToRarity(getMaxTierBucketForQualityRank(qualityRank, beliebtheit));
+}
+
+/** Public rarity-keyed equivalent of the percentile target bucket (same bucketing, exposed as a rarity). */
+export function getPercentileTargetRarity(leaguePosition: number, teamCount: number): SponsorRarity {
+  return mapStarTierToRarity(getPercentileTargetTierBucket(leaguePosition, teamCount));
 }
 
 function computeWeightedQualityRank(input: {
@@ -235,7 +257,7 @@ export function buildLeagueTeamQualityRanks(
       teamId: row.teamId,
       qualityRank,
       components,
-      maxStarTier: getMaxStarTierForQualityRank(qualityRank, beliebtheitOf(row.teamId)),
+      maxTierBucket: getMaxTierBucketForQualityRank(qualityRank, beliebtheitOf(row.teamId)),
     };
   });
 
@@ -250,19 +272,19 @@ export function buildLeagueTeamQualityRanks(
   sorted.forEach((entry, index) => {
     const leaguePosition = index + 1;
     const leaguePercentile = round2(((teamCount - leaguePosition) / Math.max(1, teamCount - 1)) * 100);
-    const percentileTier = getPercentileTargetStarTier(leaguePosition, teamCount);
-    // Feed 1: Beliebtheit hebt auch den (perzentil-basierten) Ziel-Stern mit an, damit ein kleiner
+    const percentileTier = getPercentileTargetTierBucket(leaguePosition, teamCount);
+    // Feed 1: Beliebtheit hebt auch die (perzentil-basierte) Ziel-Leiterstufe mit an, damit ein kleiner
     // Überperformer den erhöhten Deckel tatsächlich erreicht (nicht nur der Cap steigt).
-    const beliebtheitDelta = getBeliebtheitStarTierDelta(beliebtheitOf(entry.teamId));
-    const liftedPercentileTier = clampStarTier(percentileTier + beliebtheitDelta);
-    const targetStarTier = Math.min(entry.maxStarTier, liftedPercentileTier) as SponsorStarTier;
+    const beliebtheitDelta = getBeliebtheitTierDelta(beliebtheitOf(entry.teamId));
+    const liftedPercentileTier = clampTierBucket(percentileTier + beliebtheitDelta);
+    const targetTierBucket = Math.min(entry.maxTierBucket, liftedPercentileTier) as RarityLadderStep;
 
     result.set(entry.teamId, {
       teamId: entry.teamId,
       qualityRank: entry.qualityRank,
       components: entry.components,
-      maxStarTier: entry.maxStarTier,
-      targetStarTier,
+      maxRarity: mapStarTierToRarity(entry.maxTierBucket),
+      targetRarity: mapStarTierToRarity(targetTierBucket),
       leaguePosition,
       leaguePercentile,
     });

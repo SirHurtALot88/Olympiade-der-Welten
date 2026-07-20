@@ -122,4 +122,21 @@ describe("ai-transfer-doctrine-layer", () => {
       expect(maxWeight).toBeLessThan(1);
     }
   });
+
+  it("nudges profitWindowScale up modestly for weaker teams, without touching the strong-team baseline", () => {
+    const balanced = profile();
+    const strong = resolveTransferDoctrineFromProfile(balanced, null, 0);
+    const mid = resolveTransferDoctrineFromProfile(balanced, null, 0.5);
+    const weak = resolveTransferDoctrineFromProfile(balanced, null, 1);
+
+    // Omitting the weakness param entirely must match weakness=0 exactly (backward compatible).
+    const omittedParam = resolveTransferDoctrineFromProfile(balanced, null);
+    expect(omittedParam.profitWindowScale).toBe(strong.profitWindowScale);
+
+    expect(weak.profitWindowScale).toBeGreaterThan(strong.profitWindowScale);
+    expect(mid.profitWindowScale).toBeGreaterThanOrEqual(strong.profitWindowScale);
+    expect(mid.profitWindowScale).toBeLessThanOrEqual(weak.profitWindowScale);
+    // "Modest": the weakest possible team should not swing the scale by more than ~15%.
+    expect(weak.profitWindowScale - strong.profitWindowScale).toBeLessThan(0.15);
+  });
 });

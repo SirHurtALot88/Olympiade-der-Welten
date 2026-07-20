@@ -548,10 +548,11 @@ export function buildPlayerDemands(gameState: GameState, playerId: string, teamI
   const context = buildDemandContext(gameState, teamId);
   const player = context.rosterPlayers.find((entry) => entry.id === playerId) ?? null;
   if (!player) return [];
-  const stored = (gameState.playerDemands ?? []).filter(
-    (demand) => demand.seasonId === gameState.season.id && demand.teamId === teamId && demand.playerId === playerId,
-  );
-  if (stored.length > 0) return stored.slice(0, 2);
+  // Spielerforderungen werden IMMER deterministisch aus dem aktuellen Kontext abgeleitet. Es gibt
+  // keinen persistierten Override-Store: `gameState.playerDemands` wurde nie geschrieben (nur hier
+  // gelesen) und die Erfüllung wirkt über den Unterbau (Trainingsmodus/Team-Captain), der die
+  // abgeleitete Forderung beim nächsten Rebuild automatisch auf "fulfilled" setzt. Der frühere
+  // Stored-Override-Read war toter Code und ist entfernt (kein Verhaltensänderung).
   return buildPlayerDemandsForContext(context, player);
 }
 
@@ -653,6 +654,11 @@ export function selectTeamCaptain(gameState: GameState, teamId: string): TeamCap
       moraleBuffer: round(clamp(best.leadershipScore / 18, 1, 6), 1),
       rivalryPressureReductionPct: round(clamp(best.leadershipScore / 3.5, 4, 24), 1),
       teamPowerModifierPct: round(clamp(best.leadershipScore / 9, 1, 8), 1),
+      // Pflichtfeld des geteilten TeamCaptainRecord-Schemas. Wird bewusst NICHT hier konsumiert:
+      // Die "Konflikte abfedern"-Wirkung wurde in Board-Objectives-V2 direkt über `leadershipScore`
+      // umgesetzt (Captain-Damping der perceivedPressure in team-season-objectives-service.ts), nicht
+      // über dieses Feld. Wert bleibt konsistent zu den anderen Captain-Buildern (team-captain-service,
+      // ai-player-demand-fulfillment-service); es gibt keinen separaten Consumer.
       conflictSoftenChancePct: round(clamp(best.leadershipScore / 2.5, 6, 32), 1),
     },
     traitSignals: best.traits.filter((trait) => CAPTAIN_POSITIVE_TRAITS.has(trait) || ["renegade", "scandalous", "gambler"].includes(trait)).slice(0, 4),

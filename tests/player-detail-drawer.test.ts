@@ -276,6 +276,26 @@ function createResultGameState(player: Player): GameState {
   };
 }
 
+// Setzt das scouting_office-Facility-Level für ein Team, damit der
+// Progressive-PO-Reveal (eigene Spieler: exakter PO erst ab L5) getestet werden
+// kann. Enabled + volle Condition, sonst liefert getFacilityLevel() 0 zurück.
+function withScoutingOffice(gameState: GameState, teamId: string, level: number): GameState {
+  return {
+    ...gameState,
+    seasonState: {
+      ...gameState.seasonState,
+      teamFacilities: {
+        ...(gameState.seasonState.teamFacilities ?? {}),
+        [teamId]: {
+          facilities: {
+            scouting_office: { level, enabled: true, conditionPct: 100 },
+          },
+        },
+      },
+    },
+  } as GameState;
+}
+
 describe("player detail drawer", () => {
   it("keeps rating pps separate from season performance totals", () => {
     const player = createPlayer({ id: "player-pps", pps: 54.4, displaySalary: 9.8, salaryDemand: 9.8 });
@@ -1004,7 +1024,7 @@ describe("player detail drawer", () => {
     expect(data?.salarySource).toBe("calculated_stored");
   });
 
-  it("exposes scout potential as a range and training modifier", () => {
+  it("bands own-squad potential without scouting office (L0) instead of leaking the exact score", () => {
     const player = createPlayer({ id: "player-potential", potential: 86 });
     const gameState = createGameState({ player, withRoster: true });
     gameState.playerPotential = [
@@ -1020,12 +1040,73 @@ describe("player detail drawer", () => {
       gameState,
       playerId: player.id,
       source: "sqlite",
+      manageableTeamIds: ["team-1"],
     });
 
-    expect(data?.potential).toBe(86);
+    // Ohne scouting_office (L0) wird der exakte Hidden-PO NICHT durchgereicht,
+    // sondern nur ein grobes Band (±16) angezeigt. CURRENT bleibt sichtbar.
+    expect(data?.attributeVisibility).toBe("exact");
+    expect(data?.potential).toBeNull();
+    expect(data?.potentialOverallStars).toBeNull();
     expect(data?.scoutPotential?.potentialRange).toEqual({ min: 70, max: 99 });
     expect(data?.scoutPotential?.starRating).toBe("5.0 Sterne");
     expect(data?.scoutPotential?.trainingSpeedMultiplier).toBe(1.09);
+  });
+
+  it("reveals the exact own-squad potential at scouting office L5", () => {
+    const player = createPlayer({ id: "player-potential-l5", potential: 86 });
+    const gameState = withScoutingOffice(createGameState({ player, withRoster: true }), "team-1", 5);
+    gameState.playerPotential = [
+      {
+        playerId: player.id,
+        potentialBand: "high",
+        hiddenPotentialScore: 86,
+        confidence: 0,
+        source: "generated",
+      },
+    ];
+    const data = buildPlayerDrawerDataFromGameState({
+      gameState,
+      playerId: player.id,
+      source: "sqlite",
+      manageableTeamIds: ["team-1"],
+    });
+
+    expect(data?.attributeVisibility).toBe("exact");
+    expect(data?.potential).toBe(86);
+  });
+
+  it("tightens the own-squad potential band monotonically with scouting office level", () => {
+    const buildBandWidth = (level: number) => {
+      const player = createPlayer({ id: `player-potential-band-${level}`, potential: 70 });
+      const gameState = withScoutingOffice(createGameState({ player, withRoster: true }), "team-1", level);
+      gameState.playerPotential = [
+        {
+          playerId: player.id,
+          potentialBand: "medium",
+          hiddenPotentialScore: 70,
+          confidence: 0,
+          source: "generated",
+        },
+      ];
+      const data = buildPlayerDrawerDataFromGameState({
+        gameState,
+        playerId: player.id,
+        source: "sqlite",
+        manageableTeamIds: ["team-1"],
+      });
+      const range = data?.scoutPotential?.potentialRange;
+      expect(range).toBeTruthy();
+      // Unterhalb L5 bleibt der exakte Score verborgen (nur Band sichtbar).
+      expect(data?.potential).toBeNull();
+      return range!.max - range!.min;
+    };
+
+    const widths = [0, 1, 2, 3, 4].map(buildBandWidth);
+    for (let index = 1; index < widths.length; index += 1) {
+      // Streng monoton enger werdendes Band mit steigendem Scouting-Level.
+      expect(widths[index]).toBeLessThan(widths[index - 1]!);
+    }
   });
 
   it("shows current contract salary separately from the normal expected salary", () => {
@@ -1808,7 +1889,7 @@ describe("player detail drawer", () => {
     expect(data?.seasonOrganicForecast?.trainingSetpoints).toBeGreaterThanOrEqual(0);
   });
 
-  it("exposes potential delta and route state for own roster players", () => {
+  it("exposes potential delta and route state for own roster players at scouting L5", () => {
     const player = createPlayer({
       id: "own-roster-potential",
       attributeSheetStats: {
@@ -1826,7 +1907,7 @@ describe("player detail drawer", () => {
         torment: 40,
       },
     });
-    const gameState = createGameState({ player, withRoster: true });
+    const gameState = withScoutingOffice(createGameState({ player, withRoster: true }), "team-1", 5);
     gameState.playerPotential = [
       {
         playerId: player.id,
@@ -1863,11 +1944,15 @@ describe("player detail drawer", () => {
       gameState,
       playerId: player.id,
       source: "sqlite",
+      manageableTeamIds: ["team-1"],
     });
 
-    expect(data?.potentialOverallStars).toBe(3);
+    // Corrected ceiling math (overall-from-axis-stars weights now sum to 1.0,
+    // not 1.10, and mapNumericCeilingToAxisPoStars is the exact inverse of the
+    // forward map) yields 2.5★ here, not the old inflated 3★.
+    expect(data?.potentialOverallStars).toBe(2.5);
     expect(data?.potentialOverallStars).toBeGreaterThanOrEqual(data?.currentOverallStars ?? 0);
-    expect(data?.potentialOverallDelta).toBe(-1.5);
+    expect(data?.potentialOverallDelta).toBe(-2);
     expect(data?.potentialAxisStatus.some((entry) => entry.axis === "pow" && entry.routeState === "open")).toBe(true);
     expect(data?.trainingRouteImpact?.note).toContain("POW");
     expect(data?.attributeCeilingPreview.length).toBeGreaterThan(0);

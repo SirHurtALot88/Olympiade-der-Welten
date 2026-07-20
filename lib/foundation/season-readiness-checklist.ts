@@ -117,7 +117,7 @@ function buildSeasonEndItems(gameState: GameState): SeasonReadinessItem[] {
     {
       id: "development",
       label: "Spielerentwicklung",
-      detail: developmentApplied ? "XP-Upgrades durchgeführt." : "Entwicklung noch ausstehend.",
+      detail: developmentApplied ? "Entwicklung durchgeführt." : "Entwicklung noch ausstehend.",
       status: developmentApplied ? "ready" : "open",
       targetView: "cockpit",
       targetPanel: "season-review",

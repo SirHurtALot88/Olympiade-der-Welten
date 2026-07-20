@@ -4,11 +4,16 @@ import type { GameState, LoanRecord, StandingRecord, Team, TeamIdentity } from "
 import {
   applyEarlyPayoff,
   applyLoanSettlement,
+  buildLoanOffers,
   computeBorrowingCapacity,
   computeEarlyPayoff,
   computeLoanTerms,
+  DISTRESS_DEFAULTED_DEBT_REASON,
   estimateTeamAnnualRevenue,
+  getTeamAnnualLoanInterest,
   getTeamOutstandingDebt,
+  getTeamOwedOutstandingDebt,
+  isDefaultedDebtBorrowBlocked,
   originateLoan,
   previewLoanSettlement,
 } from "@/lib/finance/loan-service";
@@ -188,6 +193,109 @@ describe("getTeamOutstandingDebt", () => {
       ],
     });
     expect(getTeamOutstandingDebt(gameState, "A-A")).toBeCloseTo(15, 1);
+  });
+});
+
+/** N Roster-Einträge für ein Team (nur `teamId` zählt für die Kadergröße im Distress-Gate). */
+function makeRosters(teamId: string, count: number): GameState["rosters"] {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `${teamId}-r${index}`,
+    teamId,
+    playerId: `${teamId}-p${index}`,
+    contractLength: 3,
+    salary: 1,
+    upkeep: 0,
+    roleTag: "bench" as const,
+    joinedSeasonId: "season-1",
+  }));
+}
+
+describe("getTeamOwedOutstandingDebt (capacity-facing: active + defaulted)", () => {
+  it("sums active AND defaulted principal (a defaulted loan is still owed), ignores paid", () => {
+    const gameState = createGameState({
+      loans: [
+        { ...baseLoan(), loanId: "l1", borrowerTeamId: "A-A", principalOutstanding: 10, status: "active" },
+        { ...baseLoan(), loanId: "l2", borrowerTeamId: "A-A", principalOutstanding: 8, status: "defaulted" },
+        { ...baseLoan(), loanId: "l3", borrowerTeamId: "A-A", principalOutstanding: 999, status: "paid" },
+        { ...baseLoan(), loanId: "l4", borrowerTeamId: "B-B", principalOutstanding: 999, status: "active" },
+      ],
+    });
+    // Active-only display value ignores the defaulted loan...
+    expect(getTeamOutstandingDebt(gameState, "A-A")).toBeCloseTo(10, 1);
+    // ...but the capacity-facing value includes it (10 + 8 = 18).
+    expect(getTeamOwedOutstandingDebt(gameState, "A-A")).toBeCloseTo(18, 1);
+  });
+});
+
+describe("getTeamAnnualLoanInterest (GuV loan expense = interest only)", () => {
+  it("sums the per-loan interest portion (principalOutstanding * rate), not the full installment", () => {
+    const gameState = createGameState({
+      loans: [
+        { ...baseLoan(), loanId: "l1", borrowerTeamId: "A-A", principalOutstanding: 100, interestRatePerSeason: 0.1, installmentPerSeason: 30, status: "active" },
+        { ...baseLoan(), loanId: "l2", borrowerTeamId: "A-A", principalOutstanding: 50, interestRatePerSeason: 0.2, installmentPerSeason: 20, status: "active" },
+        { ...baseLoan(), loanId: "l3", borrowerTeamId: "A-A", principalOutstanding: 999, interestRatePerSeason: 0.2, installmentPerSeason: 999, status: "defaulted" },
+      ],
+    });
+    // Interest only: 100*0.1 + 50*0.2 = 10 + 10 = 20 (NOT the 30 + 20 = 50 of full installments,
+    // and the defaulted loan is not an active P&L interest expense).
+    expect(getTeamAnnualLoanInterest(gameState, "A-A")).toBeCloseTo(20, 1);
+  });
+});
+
+describe("defaulted-debt distress gate (human + AI, was AI-only)", () => {
+  // Cash-only capacity (no roster players exist -> marketValueTotal 0), so teamwertCap = 0.15 * cash.
+  function stateWithLoan(status: "active" | "defaulted" | "paid", rosterCount: number, principalOutstanding = 12, cash = 200) {
+    const base = createGameState({
+      teams: [createTeam({ teamId: "A-A", cash })],
+      teamIdentities: [createIdentity("A-A", { finances: 5 })],
+      loans: [{ ...baseLoan(), loanId: "loan-x", borrowerTeamId: "A-A", principalOutstanding, status }],
+    });
+    return { ...base, rosters: makeRosters("A-A", rosterCount) };
+  }
+
+  it("blocks a team carrying a defaulted loan that is NOT below the hard roster minimum", () => {
+    const gameState = stateWithLoan("defaulted", 8); // 8 >= playerMin 8 -> not below min
+    expect(isDefaultedDebtBorrowBlocked(gameState, "A-A")).toBe(true);
+
+    const result = originateLoan(gameState, { borrowerTeamId: "A-A", principal: 5, termSeasons: 3 }, { execute: true });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe(DISTRESS_DEFAULTED_DEBT_REASON);
+    expect(result.gameState).toBe(gameState); // no mutation
+    // The marketplace offer list is empty too, so the UI reflects the same restriction.
+    expect(buildLoanOffers(gameState, "A-A", 5, 3)).toHaveLength(0);
+  });
+
+  it("exempts a below-hard-roster-minimum team (survival loan still possible)", () => {
+    const gameState = stateWithLoan("defaulted", 3); // 3 < playerMin 8 -> below min, survival exception
+    expect(isDefaultedDebtBorrowBlocked(gameState, "A-A")).toBe(false);
+
+    const result = originateLoan(gameState, { borrowerTeamId: "A-A", principal: 5, termSeasons: 3 }, { execute: true });
+    expect(result.ok).toBe(true);
+    expect(result.reason).toBeNull();
+    expect(buildLoanOffers(gameState, "A-A", 5, 3).length).toBeGreaterThan(0);
+  });
+
+  it("does not gate a team without any defaulted loan", () => {
+    const gameState = stateWithLoan("active", 10);
+    expect(isDefaultedDebtBorrowBlocked(gameState, "A-A")).toBe(false);
+    expect(originateLoan(gameState, { borrowerTeamId: "A-A", principal: 5, termSeasons: 3 }).ok).toBe(true);
+  });
+
+  it("reduces borrowing capacity by the defaulted principal (defaulted debt still counts against the cap)", () => {
+    // teamwertCap = 0.15 * 200 = 30. Below hard min (3 rosters) so the distress gate does NOT interfere;
+    // capacity is read purely from the debt subtraction. A defaulted loan reduces it exactly like an
+    // active one would, whereas a paid loan does not.
+    const defaultedCapacity = originateLoan(
+      stateWithLoan("defaulted", 3, 12),
+      { borrowerTeamId: "A-A", principal: 1, termSeasons: 3 },
+    ).capacity;
+    const paidCapacity = originateLoan(
+      stateWithLoan("paid", 3, 12),
+      { borrowerTeamId: "A-A", principal: 1, termSeasons: 3 },
+    ).capacity;
+    expect(paidCapacity).toBeCloseTo(30, 1); // 0.15*200, paid loan not counted
+    expect(defaultedCapacity).toBeCloseTo(18, 1); // 30 - 12, defaulted principal counted
+    expect(paidCapacity - defaultedCapacity).toBeCloseTo(12, 1);
   });
 });
 
@@ -498,5 +606,34 @@ describe("applyEarlyPayoff", () => {
     const result = applyEarlyPayoff(gameState, "does-not-exist", { execute: true });
     expect(result.ok).toBe(false);
     expect(result.reason).toBe("loan_not_found");
+  });
+
+  it("emits an early_payoff loanApplyLog (reconciliation ledger) without blocking same-season settlement", () => {
+    const gameState = createGameState({
+      teams: [createTeam({ teamId: "A-A", cash: 50 }), createTeam({ teamId: "B-B", cash: 50 })],
+      loans: [
+        { ...baseLoan(), loanId: "loan-early", borrowerTeamId: "A-A", installmentPerSeason: 6, seasonsRemaining: 3, principalOutstanding: 15 },
+        { ...baseLoan(), loanId: "loan-active", borrowerTeamId: "B-B" },
+      ],
+      seasonId: "season-3",
+    });
+    const result = applyEarlyPayoff(gameState, "loan-early", { execute: true });
+    expect(result.ok).toBe(true);
+
+    // Ledger entry mirrors a season-end installment: installmentCharged = principal + prepayment fee,
+    // with the fee attributed as interestPortion (payoff 15.6 = principal 15 + 0.2 * foregoneInterest 3).
+    const log = result.gameState.seasonState.loanApplyLogs?.find((entry) => entry.loanId === "loan-early");
+    expect(log?.kind).toBe("early_payoff");
+    expect(log?.seasonId).toBe("season-3");
+    expect(log?.installmentCharged).toBeCloseTo(15.6, 1);
+    expect(log?.principalPortion).toBeCloseTo(15, 1);
+    expect(log?.interestPortion).toBeCloseTo(0.6, 1);
+    expect((log?.principalPortion ?? 0) + (log?.interestPortion ?? 0)).toBeCloseTo(log?.installmentCharged ?? 0, 1);
+
+    // The early-payoff entry must NOT trip the season-end settlement idempotency guard, so the still
+    // active loan-active is settled normally in the same season.
+    const preview = previewLoanSettlement(result.gameState, "season-3");
+    expect(preview.duplicateDetected).toBe(false);
+    expect(preview.canApply).toBe(true);
   });
 });
