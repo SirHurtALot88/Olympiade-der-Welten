@@ -22,16 +22,41 @@ export type StageAudio = {
 
 // Default halbiert — die Cues waren live zu laut.
 const DEFAULT_VOLUME = 0.5;
+const LS_VOLUME = "oly-stage-audio-volume";
+const LS_MUTED = "oly-stage-audio-muted";
+
+// Persistierte Startwerte lesen (SSR-sicher: window-Guard). Damit bleibt der
+// Sound-Slider über Reloads hinweg fix statt bei jedem Laden auf Default zu springen.
+function readStoredVolume(): number {
+  if (typeof window === "undefined") return DEFAULT_VOLUME;
+  const raw = window.localStorage.getItem(LS_VOLUME);
+  const v = raw == null ? NaN : Number(raw);
+  return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : DEFAULT_VOLUME;
+}
+function readStoredMuted(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(LS_MUTED) === "1";
+}
 
 export function useStageAudio(): StageAudio {
   const ctxRef = useRef<AudioContext | null>(null);
   const masterRef = useRef<GainNode | null>(null);
-  const [muted, setMuted] = useState(false);
+  const [muted, setMuted] = useState<boolean>(readStoredMuted);
   const mutedRef = useRef(false);
   mutedRef.current = muted;
-  const [volume, setVolumeState] = useState(DEFAULT_VOLUME);
+  const [volume, setVolumeState] = useState<number>(readStoredVolume);
   const volumeRef = useRef(DEFAULT_VOLUME);
   volumeRef.current = volume;
+
+  // Slider-/Mute-Stand persistieren (bleibt über Reloads erhalten).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(LS_VOLUME, String(volume));
+  }, [volume]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(LS_MUTED, muted ? "1" : "0");
+  }, [muted]);
 
   useEffect(
     () => () => {
