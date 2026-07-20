@@ -127,6 +127,12 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
   cfgRef.current = { cx, cy, KX, KY, R0, R1, reduced: reducedMotion, tokenPos };
   const rtRef = useRef<RT[]>(rt);
   rtRef.current = rt;
+  // Pause/Hover-Freeze für die FX-Schleife — sonst laufen Ballbesitz + fliegende Winner
+  // weiter, während die Token via useTokenGlide eingefroren stehen.
+  const hoverRef = useRef<number | null>(hoverIdx);
+  hoverRef.current = hoverIdx;
+  const pausedRef = useRef<boolean>(props.paused);
+  pausedRef.current = props.paused;
 
   // ---- rAF: Ball possession at leader + flying shots per reveal ----
   useEffect(() => {
@@ -199,7 +205,7 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
       const fx = fxRef.current;
       if (!fx) return;
 
-      const from = c.tokenPos(t, t.score);
+      const from = c.tokenPos(t, t.animScore);
       const dist = Math.hypot(from.x - c.cx, from.y - c.cy);
 
       const el = mk("circle");
@@ -236,9 +242,11 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
       const dt = Math.min(64, ts - last);
       last = ts;
       const list = rtRef.current;
+      const frozen = hoverRef.current != null || pausedRef.current;
 
-      // Reveal detection: when a token reveals a new slot, fire ONE shot
-      for (const t of list) {
+      // Reveal detection: when a token reveals a new slot, fire ONE shot.
+      // Bei Pause/Hover: prev-Maps NICHT fortschreiben → beim Entfrieren feuert der Reveal.
+      if (!frozen) for (const t of list) {
         const hadT = prevThrown.has(t.idx);
         const pT = prevThrown.get(t.idx) ?? t.thrownSlot;
         const pS = prevScore.get(t.idx) ?? t.score;
@@ -260,8 +268,8 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
       for (const t of list) if (t.rank === 1 && t.thrownSlot >= 0) leader = t;
       const pb = pballRef.current;
       if (pb) {
-        if (leader && !c.reduced) {
-          const lp = c.tokenPos(leader, leader.score);
+        if (leader && !c.reduced && !frozen) {
+          const lp = c.tokenPos(leader, leader.animScore);
           const tx = lp.x + (c.cx - lp.x) * 0.18;
           const ty = lp.y + (c.cy - lp.y) * 0.18;
           if (!pball.init) {
@@ -281,10 +289,10 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
         }
       }
 
-      // Shot arcs (linear for simplicity) + landing FX
+      // Shot arcs (linear for simplicity) + landing FX. Bei Pause/Hover in der Luft einfrieren.
       for (let j = balls.length - 1; j >= 0; j -= 1) {
         const b = balls[j]!;
-        b.t += dt / b.dur;
+        if (!frozen) b.t += dt / b.dur;
         if (b.t >= 1) {
           balls.splice(j, 1);
           if (b.el.parentNode) b.el.parentNode.removeChild(b.el);

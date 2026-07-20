@@ -237,8 +237,8 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
         🏆
       </text>
 
-      {/* Live-Zähler „N/Total im Wettkampf" — zeigt die laufende Elimination (oben rechts). */}
-      <g transform={`translate(${rightX - 6} 26)`} pointerEvents="none">
+      {/* Live-Zähler „N/Total im Wettkampf" — unter der Podium-Linie (kollidiert sonst mit 🏆). */}
+      <g transform={`translate(${rightX - 6} ${podY + 18})`} pointerEvents="none">
         <rect x={-96} y={-15} width={96} height={22} rx={6} fill="var(--nl-panel)" stroke="var(--nl-line)" strokeWidth={1} opacity={0.92} />
         <text x={-88} y={1} fontSize={9.5} fontWeight={800} fontFamily="ui-monospace, monospace" fill="var(--nl-mut-2)" letterSpacing="0.06em">
           IM WETTKAMPF

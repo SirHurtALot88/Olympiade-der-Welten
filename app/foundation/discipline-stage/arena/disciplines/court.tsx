@@ -133,6 +133,12 @@ export default function CourtField(props: DisciplineFieldProps): ReactNode {
   cfgRef.current = { cx, hoopY, baseY, baseHalf, reduced: reducedMotion, courtMedian, tokenPos: localTokenPos };
   const rtRef = useRef<RT[]>(rt);
   rtRef.current = rt;
+  // Pause/Hover-Freeze für die FX-Schleife (wie rink/football/kda) — sonst laufen Ballbesitz
+  // und fliegende Würfe weiter, während die Token via useTokenGlide eingefroren stehen.
+  const hoverRef = useRef<number | null>(hoverIdx);
+  hoverRef.current = hoverIdx;
+  const pausedRef = useRef<boolean>(props.paused);
+  pausedRef.current = props.paused;
 
   // ---- rAF: Ballbesitz beim Führenden + fliegende Würfe pro Reveal ---------------------
   useEffect(() => {
@@ -223,7 +229,7 @@ export default function CourtField(props: DisciplineFieldProps): ReactNode {
     const fireShot = (c: Cfg, t: RT, gain: number) => {
       const fx = fxRef.current;
       if (!fx) return;
-      const from = c.tokenPos(t, t.score);
+      const from = c.tokenPos(t, t.animScore);
       const dist = Math.hypot(from.x - c.cx, from.y - c.hoopY);
       const make = t.score >= c.courtMedian;
       const drei = from.y - c.hoopY > (c.baseY - c.hoopY) * 0.55;
@@ -257,18 +263,22 @@ export default function CourtField(props: DisciplineFieldProps): ReactNode {
       const dt = Math.min(64, ts - last);
       last = ts;
       const list = rtRef.current;
+      const frozen = hoverRef.current != null || pausedRef.current;
 
       // Reveal-Erkennung: sobald ein Token einen neuen Slot enthüllt (thrownSlot steigt),
       // fliegt EIN Wurf. Beim ersten Frame nur initialisieren (kein Wurf-Sturm).
-      for (const t of list) {
-        const hadT = prevThrown.has(t.idx);
-        const pT = prevThrown.get(t.idx) ?? t.thrownSlot;
-        const pS = prevScore.get(t.idx) ?? t.score;
-        if (hadT && t.thrownSlot > pT && t.thrownSlot >= 0 && !c.reduced) {
-          fireShot(c, t, t.score - pS);
+      // Bei Pause/Hover: prev-Maps NICHT fortschreiben → beim Entfrieren feuert der Reveal.
+      if (!frozen) {
+        for (const t of list) {
+          const hadT = prevThrown.has(t.idx);
+          const pT = prevThrown.get(t.idx) ?? t.thrownSlot;
+          const pS = prevScore.get(t.idx) ?? t.score;
+          if (hadT && t.thrownSlot > pT && t.thrownSlot >= 0 && !c.reduced) {
+            fireShot(c, t, t.score - pS);
+          }
+          prevThrown.set(t.idx, t.thrownSlot);
+          prevScore.set(t.idx, t.score);
         }
-        prevThrown.set(t.idx, t.thrownSlot);
-        prevScore.set(t.idx, t.score);
       }
 
       // Ballbesitz: der Ball gleitet zum Führenden (Rang 1) hin zum Ring.
@@ -276,8 +286,8 @@ export default function CourtField(props: DisciplineFieldProps): ReactNode {
       for (const t of list) if (t.rank === 1 && t.thrownSlot >= 0) leader = t;
       const pb = pballRef.current;
       if (pb) {
-        if (leader && !c.reduced) {
-          const lp = c.tokenPos(leader, leader.score);
+        if (leader && !c.reduced && !frozen) {
+          const lp = c.tokenPos(leader, leader.animScore);
           const tx = lp.x + (c.cx - lp.x) * 0.16;
           const ty = lp.y + (c.hoopY - lp.y) * 0.16;
           if (!pball.init) {
@@ -297,10 +307,10 @@ export default function CourtField(props: DisciplineFieldProps): ReactNode {
         }
       }
 
-      // Wurf-Bögen (Bezier) + Einschlag-FX.
+      // Wurf-Bögen (Bezier) + Einschlag-FX. Bei Pause/Hover in der Luft einfrieren.
       for (let j = balls.length - 1; j >= 0; j -= 1) {
         const b = balls[j]!;
-        b.t += dt / b.dur;
+        if (!frozen) b.t += dt / b.dur;
         if (b.t >= 1) {
           balls.splice(j, 1);
           if (b.el.parentNode) b.el.parentNode.removeChild(b.el);

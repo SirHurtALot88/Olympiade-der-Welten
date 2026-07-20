@@ -39,8 +39,11 @@ export default function ThermometerField(props: DisciplineFieldProps): ReactNode
   // Kern-Fix: die Skala bildet EXAKT die Token-y-Achse ab (Host-Turm: topY=44 … baseY=H−52,
   // Normierung finalMax) — vorher lag sie in einem anderen y-Band + normierte anders → die
   // Zahl neben dem Strich passte nie zur Token-Höhe. Bulb stark gekappt (war ~94px).
-  const bulbRadius = 16;
-  const thermX = 46;
+  // Schmaler + weiter links: die Skala muss LINKS vor den Token-Spalten sitzen (Host-Tower
+  // beginnt bei lPad≈40 → Spalte 0 zentriert ~57). Bulb 16→11, thermX 46→32, damit Rohr/Bulb
+  // die Logos nicht schneiden.
+  const bulbRadius = 11;
+  const thermX = 32;
   const thermTop = 44; // = Host-Turm topY (Token-Oberkante)
   const thermBottom = H - 52; // = Host-Turm baseY (Token-Basis)
   const padBottom = H - 30; // Bulb-Mitte unter dem Rohr
@@ -144,8 +147,6 @@ export default function ThermometerField(props: DisciplineFieldProps): ReactNode
             der Endsumme). Zonen-Label deutsch, Hitze steigt nach oben. */}
         {[0, 0.25, 0.5, 0.75, 1].map((f, i) => {
           const y = thermBottom - f * (thermBottom - thermTop);
-          const hue = 120 - f * 120;
-          const col = `hsl(${hue} 72% 48%)`;
 
           return (
             <g key={`tick-${i}`}>
@@ -170,22 +171,8 @@ export default function ThermometerField(props: DisciplineFieldProps): ReactNode
               >
                 {Math.round(f * 100)}%
               </text>
-
-              {/* Temperature label on right side for key points */}
-              {i > 0 && (
-                <text
-                  x={thermX + bulbRadius * 1.2}
-                  y={y + 3.5}
-                  textAnchor="start"
-                  fontSize={8}
-                  fontWeight={600}
-                  fontFamily="ui-monospace, Menlo, monospace"
-                  fill={col}
-                  opacity={0.65}
-                >
-                  {["", "KÜHL", "WARM", "HEISS", "🔥 GLÜHEND"][i]}
-                </text>
-              )}
+              {/* Temperatur-Wörter rechts der Skala entfernt: lagen unter Token-Spalte 0–1 und
+                  wurden von den Logos verdeckt. Hitze zeigt der Gradient + die Token-Heat-Aura. */}
             </g>
           );
         })}

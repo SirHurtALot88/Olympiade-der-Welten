@@ -214,23 +214,34 @@ export default function TerritoryField(props: DisciplineFieldProps): ReactNode {
     }
     adjRef.current = pairs;
 
-    // rAF-Schleife für Morphs (dt-basiert; friert bei Hover/Pause).
+    // rAF-Schleife für Morphs (dt-basiert; friert bei Hover/Pause). Der Re-Render ist auf
+    // ~25 fps GEDROSSELT: setTerritories rendert bei 32 Sektoren mehrere hundert Elemente neu,
+    // 60 fps × 15 s wäre ein Reconcile-Sturm. morphT läuft weiter jeden Frame (flüssig), nur
+    // der React-Render wird gebündelt; der Schluss-Frame ist garantiert (pending && !anyMorphing).
     let raf = 0;
     let last = performance.now();
+    let acc = 0;
+    let pending = false;
     const tick = (ts: number) => {
       const dt = Math.min(64, ts - last);
       last = ts;
       const frozen = hoverRef.current != null || pausedRef.current;
-      let changed = false;
+      let anyMorphing = false;
       if (!frozen) {
         stateRef.current.forEach((state) => {
           if (state.morphT < 1 && !reducedRef.current) {
             state.morphT = Math.min(1, state.morphT + dt / MORPH_MS);
-            changed = true;
+            anyMorphing = true;
+            pending = true;
           }
         });
       }
-      if (changed) setTerritories(Array.from(stateRef.current.values()));
+      acc += dt;
+      if (pending && (acc >= 40 || !anyMorphing)) {
+        acc = 0;
+        pending = false;
+        setTerritories(Array.from(stateRef.current.values()));
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
