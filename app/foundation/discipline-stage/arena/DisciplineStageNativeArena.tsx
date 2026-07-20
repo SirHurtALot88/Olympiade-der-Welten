@@ -2037,7 +2037,12 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         );
         glow(t);
       }
-      const delay = impact.tier === 2 ? 1550 : isMine ? 750 : impact.tier === 1 ? 240 : 130;
+      // Gleichmäßiger Takt statt variabler Highlight-Pausen: die Reveals verteilen sich
+      // exakt über das 5s-Glide-Fenster (TRACK_ROUND_MS / Teamzahl), damit die Rangliste
+      // SYNCHRON zur Feldbewegung hochläuft und nicht lange nachtrudelt. Highlights
+      // (Spotlight/Zoom) feuern weiter, unterbrechen den Fluss aber NICHT mehr (kein
+      // 1550ms-Stopp). Cinematic Slow-Mo/Zoom kommt als eigene, nicht-blockierende Schicht.
+      const delay = Math.max(70, Math.round(TRACK_ROUND_MS / Math.max(1, order.length)));
       later(doOne, delay);
     };
     doOne();
@@ -2903,11 +2908,26 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       </div>
 
       {/* Live-Ladder rechts */}
-      <div ref={ladderRef} data-testid="arena-ladder" style={{ flex: "0 0 300px", minWidth: 260, maxHeight: done ? undefined : "calc(100vh - 130px)", overflowY: done ? "visible" : "auto", overscrollBehavior: "contain", background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 10, position: done ? "static" : "sticky", top: done ? undefined : 12 }}>
-        <div style={{ fontSize: 11, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+      <div ref={ladderRef} data-testid="arena-ladder" style={{ flex: "0 0 340px", minWidth: 300, maxHeight: done ? undefined : "calc(100vh - 130px)", overflowY: done ? "visible" : "auto", overscrollBehavior: "contain", background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 10, position: done ? "static" : "sticky", top: done ? undefined : 12 }}>
+        <div style={{ fontSize: 11, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
           <span>{prim === "barbell" ? (done ? "Endstand" : "Rangliste · live") : done ? "Endstand" : "Rundenstand — live"}</span>
           {prim === "barbell" && !done ? <span style={{ marginLeft: "auto", fontFamily: "ui-monospace, monospace", fontSize: 9, color: "var(--nl-mut)", fontWeight: 700 }}>{barbellLive} im Wettkampf</span> : null}
         </div>
+        {/* Spaltenköpfe — sonst rät man, was die Zahlen bedeuten. */}
+        {prim === "track" ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "0 6px 5px", marginLeft: 40, fontSize: 8.5, letterSpacing: "0.03em", textTransform: "uppercase", color: "var(--nl-mut-2)", fontWeight: 800 }}>
+            <span style={{ flex: 1 }} />
+            <span style={{ width: 42, textAlign: "right" }}>Rückstand</span>
+            <span style={{ minWidth: 34, textAlign: "right" }}>Punkte</span>
+            <span style={{ width: 30, textAlign: "left" }}>Läufer</span>
+          </div>
+        ) : prim === "barbell" ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "0 6px 5px", marginLeft: 40, fontSize: 8.5, letterSpacing: "0.03em", textTransform: "uppercase", color: "var(--nl-mut-2)", fontWeight: 800 }}>
+            <span style={{ flex: 1 }} />
+            <span style={{ width: 34, textAlign: "right" }}>Zugew.</span>
+            <span style={{ minWidth: 34, textAlign: "right" }}>kg</span>
+          </div>
+        ) : null}
         <div style={trackLadder ? { position: "relative", height: N * LADDER_ROW_H } : undefined}>
         {ladderRows.map((t) => {
           const teamClickable = Boolean(onOpenTeam && t.teamId);
