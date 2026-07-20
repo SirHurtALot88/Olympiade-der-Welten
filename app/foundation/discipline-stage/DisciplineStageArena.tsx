@@ -626,7 +626,31 @@ export default function DisciplineStageArena({
         pointsDelta: s?.pointsDelta ?? null,
       };
     });
-    return { d1, d2, standings };
+    // Mutator-PP (die „0,3er") pro Team, spielergenau + getrennt nach d1/d2. Direkt aus der
+    // Resolve-Preview: jeder Entry trägt mutatorPpsBonus (1:1 dem Spieler gutgeschrieben, kein
+    // Team-Split). So kann das Panel den Mutator-Anteil separat vom Team-PP ausweisen.
+    const mutatorByTeam = new Map<string, { d1Pp: number; d2Pp: number; d1Players: { name: string; pp: number }[]; d2Players: { name: string; pp: number }[] }>();
+    for (const dp of preview.disciplinePreviews ?? []) {
+      const side = dp.disciplineId === d1?.disciplineId ? "d1" : dp.disciplineId === d2?.disciplineId ? "d2" : null;
+      if (!side) continue;
+      for (const tr of dp.teamResults ?? []) {
+        const cur = mutatorByTeam.get(tr.teamId) ?? { d1Pp: 0, d2Pp: 0, d1Players: [], d2Players: [] };
+        for (const e of tr.entries ?? []) {
+          const pp = e.mutatorPpsBonus ?? 0;
+          if (pp > 0.0001) {
+            if (side === "d1") {
+              cur.d1Pp += pp;
+              cur.d1Players.push({ name: e.playerName, pp });
+            } else {
+              cur.d2Pp += pp;
+              cur.d2Players.push({ name: e.playerName, pp });
+            }
+          }
+        }
+        mutatorByTeam.set(tr.teamId, cur);
+      }
+    }
+    return { d1, d2, standings, mutatorByTeam };
   }, [preview, gameState, matchdayId, briefingItems, standingsItems]);
 
   // Engine-Teams für die gewählte Disziplin (nur wenn sie an diesem Spieltag läuft).
@@ -1015,6 +1039,7 @@ export default function DisciplineStageArena({
             ownTeamId={ownTeamId}
             onOpenTeam={(teamId) => openDrawerPinned({ kind: "team", teamId })}
             onHoverTeam={previewTeam}
+            mutatorByTeam={matchdayPanel.mutatorByTeam}
           />
         </div>
       ) : null}

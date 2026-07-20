@@ -40,6 +40,16 @@ export type MatchdayPanelStandingRow = {
 
 export type MatchdayPanelDiscipline = { disciplineId: string; displayName: string };
 
+// Mutator-PP (die „0,3er") pro Team, getrennt nach Disziplin-Seite, MIT Spieler-
+// Zuordnung (1:1 dem Spieler gutgeschrieben, der sie geholt hat — kein Team-Split).
+export type MatchdayPanelMutatorPlayer = { name: string; pp: number };
+export type MatchdayPanelMutatorEntry = {
+  d1Pp: number;
+  d2Pp: number;
+  d1Players: MatchdayPanelMutatorPlayer[];
+  d2Players: MatchdayPanelMutatorPlayer[];
+};
+
 export type MatchdayPanelTeamMeta = { code: string; name: string; logoUrl: string | null };
 
 export type DisciplineStageMatchdayPanelProps = {
@@ -55,6 +65,8 @@ export type DisciplineStageMatchdayPanelProps = {
   ownTeamId: string | null;
   onOpenTeam?: ((teamId: string) => void) | null;
   onHoverTeam?: ((teamId: string | null) => void) | null;
+  /** Mutator-PP (0,3er) je Team, spielergenau — separat vom Team-PP ausgewiesen. */
+  mutatorByTeam?: Map<string, MatchdayPanelMutatorEntry> | null;
 };
 
 function ppText(value: number | null): string {
@@ -101,6 +113,7 @@ export default function DisciplineStageMatchdayPanel({
   ownTeamId,
   onOpenTeam,
   onHoverTeam,
+  mutatorByTeam,
 }: DisciplineStageMatchdayPanelProps) {
   const resultByTeam = new Map(teamResults.map((r) => [r.teamId, r]));
 
@@ -154,7 +167,7 @@ export default function DisciplineStageMatchdayPanel({
           Spieltags-Wertung · Saisonstand
         </div>
         <div style={{ fontSize: 11.5, color: "var(--nl-mut)" }}>
-          Rang <b style={{ color: "var(--nl-ink)" }}>vor</b> → <b style={{ color: "var(--nl-ink)" }}>nach</b> dem Spieltag · beide Disziplinen gemeinsam gewertet
+          Rang <b style={{ color: "var(--nl-ink)" }}>vor</b> → <b style={{ color: "var(--nl-ink)" }}>nach</b> dem Spieltag · beide Disziplinen gemeinsam gewertet · <span style={{ color: "var(--nl-warn)" }}>◆ Mutator-PP</span> dem Spieler gutgeschrieben
         </div>
       </div>
 
@@ -192,6 +205,20 @@ export default function DisciplineStageMatchdayPanel({
             // Spieltags-Summe: nur die bereits aufgedeckten Disziplinen aufsummieren.
             const sum = (d1Revealed ? row.d1Pts ?? 0 : 0) + (d2Revealed ? row.d2Pts ?? 0 : 0);
             const sumShown = d1Revealed || d2Revealed;
+            // Mutator-PP (0,3er): nur aufgedeckte Seiten, spielergenau (kein Team-Split).
+            const mut = mutatorByTeam?.get(row.teamId);
+            const mutPp = (d1Revealed ? mut?.d1Pp ?? 0 : 0) + (d2Revealed ? mut?.d2Pp ?? 0 : 0);
+            const mutPlayers = [...(d1Revealed ? mut?.d1Players ?? [] : []), ...(d2Revealed ? mut?.d2Players ?? [] : [])];
+            const mutatorLine =
+              mutPp > 0.0001 ? (
+                <span
+                  title={mutPlayers.map((p) => `${p.name} +${p.pp.toFixed(1)} PP`).join(" · ")}
+                  style={{ fontSize: 10, fontWeight: 800, color: "var(--nl-warn)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 200 }}
+                >
+                  ◆ Mutator +{mutPp.toFixed(1)} PP
+                  {mutPlayers.length === 1 ? ` · ${mutPlayers[0]!.name}` : mutPlayers.length > 1 ? ` · ${mutPlayers.length} Spieler` : ""}
+                </span>
+              ) : null;
             return (
               <div
                 key={row.teamId}
@@ -248,31 +275,38 @@ export default function DisciplineStageMatchdayPanel({
                       style={{ width: 22, height: 22, borderRadius: 5, flex: "none", background: "var(--nl-bg)", border: `1.5px solid ${accent}` }}
                     />
                   )}
-                  <span
-                    style={{
-                      fontWeight: isOwn ? 900 : 700,
-                      fontSize: 13,
-                      color: isOwn ? "var(--nl-accent)" : "var(--nl-ink)",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {isOwn ? "★ " : ""}
-                    {meta?.code ?? row.teamId}
-                  </span>
-                  {rankDelta != null && rankDelta !== 0 ? (
-                    <span
-                      style={{
-                        fontSize: 11.5,
-                        fontWeight: 900,
-                        fontVariantNumeric: "tabular-nums",
-                        color: rankDelta > 0 ? "var(--nl-good)" : "var(--nl-risk)",
-                      }}
-                    >
-                      {rankDelta > 0 ? `▲${rankDelta}` : `▼${Math.abs(rankDelta)}`}
-                    </span>
-                  ) : null}
+                  <div style={{ display: "flex", flexDirection: "column", minWidth: 0, gap: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                      <span
+                        style={{
+                          fontWeight: isOwn ? 900 : 700,
+                          fontSize: 13,
+                          color: isOwn ? "var(--nl-accent)" : "var(--nl-ink)",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {isOwn ? "★ " : ""}
+                        {meta?.code ?? row.teamId}
+                      </span>
+                      {rankDelta != null && rankDelta !== 0 ? (
+                        <span
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: 900,
+                            fontVariantNumeric: "tabular-nums",
+                            color: rankDelta > 0 ? "var(--nl-good)" : "var(--nl-risk)",
+                          }}
+                        >
+                          {rankDelta > 0 ? `▲${rankDelta}` : `▼${Math.abs(rankDelta)}`}
+                        </span>
+                      ) : null}
+                    </div>
+                    {/* Mutator-PP (0,3er) separat ausgewiesen — 1:1 dem Spieler zugeschrieben,
+                        der sie geholt hat (kein Team-Split). Nur aufgedeckte Disziplinen zählen. */}
+                    {mutatorLine}
+                  </div>
                 </div>
 
                 {/* d1 PP */}
