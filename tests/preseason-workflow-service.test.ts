@@ -1,3 +1,4 @@
+import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GameState, Player, TeamFacilityCollection } from "@/lib/data/olyDataTypes";
@@ -543,7 +544,7 @@ describe("pre-season workflow service", () => {
   it("keeps service source free from Prisma write paths", async () => {
     const source = await import("node:fs/promises").then((fs) =>
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/season/preseason-workflow-service.ts",
+        path.join(process.cwd(), "lib/season/preseason-workflow-service.ts"),
         "utf8",
       ),
     );

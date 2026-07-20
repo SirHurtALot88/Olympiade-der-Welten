@@ -45,6 +45,7 @@ vi.mock("@/lib/ai/ai-needs-picks-compare-service", () => ({
 }));
 
 vi.mock("@/lib/market/transfermarkt-local-service", () => ({
+  resolveTransferBuyAffordabilityCash: (input: { teamCash: number }) => input.teamCash,
   previewLocalTransfermarktBuy,
   executeLocalTransfermarktBuy,
   listLocalTransferHistory,

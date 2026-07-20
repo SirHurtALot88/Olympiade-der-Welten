@@ -532,6 +532,7 @@ export async function buildLegacyLineupPreview(
     return scoreLegacyLineupDisciplineSide({
       disciplineId,
       disciplineSide,
+      matchdayId: contextResult.context.matchdayId, // Form-Jitter pro Spieltag
       entries,
       disciplineScores: contextResult.context.disciplineScores,
       activePlayers: contextResult.context.activePlayers,

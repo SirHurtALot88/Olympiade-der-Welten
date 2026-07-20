@@ -1,3 +1,4 @@
+import path from "node:path";
 import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
@@ -6,11 +7,11 @@ describe("contract offer ui contract", () => {
   it("uses dedicated offer screen without live team-fit percent in transfer UI", async () => {
     const [offerText, transferText] = await Promise.all([
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/contract-offer/ContractOfferClient.tsx",
+        path.join(process.cwd(), "app/foundation/contract-offer/ContractOfferClient.tsx"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx",
+        path.join(process.cwd(), "app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx"),
         "utf8",
       ),
     ]);

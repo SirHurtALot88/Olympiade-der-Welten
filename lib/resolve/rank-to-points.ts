@@ -4,8 +4,8 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 type RankToPointsJsonRow = Record<string, string>;
 
 export type RankToPointsSourceStatus =
-  | "rank_to_points_base_share"
-  | "rank_to_points_final_score_fallback"
+  | "rank_to_points_final_score_share"
+  | "rank_to_points_base_share_fallback"
   | "rank_to_points_score_share_fallback"
   | "rank_to_points_missing";
 
@@ -169,23 +169,26 @@ export function distributeRankPointsToPlayers<T extends {
     };
   }
 
-  const baseDistribution = distributeByValues(input.entries, teamPoints, (entry) => entry.baseValue);
-  if (baseDistribution) {
+  // Primär nach dem ENDSCORE (finalPlayerScore inkl. Fatigue/Moral/Form-Jitter)
+  // verteilen: wer durch schlechte Form/Form-Jitter einen niedrigeren Endscore
+  // hat, bekommt verhältnismäßig weniger Team-PP. (Früher: nach baseValue.)
+  const finalScoreDistribution = distributeByValues(input.entries, teamPoints, (entry) => entry.finalPlayerScore);
+  if (finalScoreDistribution) {
     return {
       teamPoints,
-      pointSource: "rank_to_points_base_share",
-      entries: baseDistribution,
+      pointSource: "rank_to_points_final_score_share",
+      entries: finalScoreDistribution,
       warnings,
     };
   }
 
-  const finalScoreDistribution = distributeByValues(input.entries, teamPoints, (entry) => entry.finalPlayerScore);
-  if (finalScoreDistribution) {
-    warnings.push("rank_to_points_used_final_score_fallback");
+  const baseDistribution = distributeByValues(input.entries, teamPoints, (entry) => entry.baseValue);
+  if (baseDistribution) {
+    warnings.push("rank_to_points_used_base_share_fallback");
     return {
       teamPoints,
-      pointSource: "rank_to_points_final_score_fallback",
-      entries: finalScoreDistribution,
+      pointSource: "rank_to_points_base_share_fallback",
+      entries: baseDistribution,
       warnings,
     };
   }

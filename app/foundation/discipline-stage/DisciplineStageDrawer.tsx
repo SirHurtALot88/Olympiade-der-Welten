@@ -16,11 +16,13 @@
 // NIE team-eingefärbt.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import type { GameState, Player, Team } from "@/lib/data/olyDataTypes";
 import { NlProgressBar } from "@/components/foundation/new-look/NlProgressBar";
 import PlayerMark from "@/app/foundation/discipline-stage/arena/PlayerMark";
 import TeamMark from "@/app/foundation/discipline-stage/arena/TeamMark";
+import type { StageLivePlayerResult, StageLiveResultsByTeam } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
 import {
   buildPlayerDrawerDataFromGameState,
   type PlayerDetailDrawerData,
@@ -60,6 +62,10 @@ export type DisciplineStageDrawerProps = {
    * existieren (dort sind die Drafts leer und alle Spieler fielen auf die Bank).
    */
   fieldedPlayerIdsByTeam?: Record<string, string[]>;
+  /** Live-Ergebnisse aufgedeckter Spieler je Team (Netto + Boni/Abzüge + PP). */
+  liveResultsByTeam?: StageLiveResultsByTeam;
+  /** Die 2 aktiven Mutatoren dieser Disziplin (welche beiden es sind). */
+  disciplineMutators?: string[];
 };
 
 // ---------------------------------------------------------------------------
@@ -631,6 +637,7 @@ function DisciplinePortraitCard({
   row,
   seasonPps,
   unavailable,
+  liveResult,
   onSelectPlayer,
 }: {
   gameState: GameState;
@@ -639,6 +646,7 @@ function DisciplinePortraitCard({
   row?: PlayerRatingContractRow | null;
   seasonPps?: number | null;
   unavailable?: boolean;
+  liveResult?: StageLivePlayerResult | null;
   onSelectPlayer?: ((playerId: string) => void) | null;
 }) {
   const player = findPlayer(gameState, playerId);
@@ -677,7 +685,30 @@ function DisciplinePortraitCard({
       title={clickable ? "Spieler-Karte anzeigen" : undefined}
       style={{ opacity: unavailable ? 0.62 : 1 }}
       footerSlot={
-        discValue != null ? (
+        liveResult ? (
+          // Spieler war in dieser Disziplin schon dran → sofort zeigen, was er
+          // GEHOLT hat (Netto) + die Boni/Abzüge (Basis → Mods) und die Player Points.
+          <div style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, fontVariantNumeric: "tabular-nums" }}>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
+              <span style={{ color: "var(--nl-mut)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Geholt</span>
+              <span style={{ color: "var(--accent, var(--nl-accent))", fontWeight: 800, fontSize: 13, flex: "none" }}>{fmt1(liveResult.net)}</span>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "1px 7px", lineHeight: 1.35 }}>
+              <span style={{ color: "var(--nl-mut-2)", fontWeight: 700 }}>Basis {fmt1(liveResult.base)}</span>
+              {liveResult.mods.map((m, i) => (
+                <span key={i} style={{ fontWeight: 700, color: m.sign > 0 ? "var(--nl-good)" : "var(--nl-risk)" }}>
+                  {m.sign > 0 ? "+" : "−"}{fmt1(m.amt)} {m.k}
+                </span>
+              ))}
+            </div>
+            {liveResult.pointsAwarded != null ? (
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
+                <span style={{ color: "var(--nl-mut)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Player Points</span>
+                <span style={{ fontWeight: 800, flex: "none" }}>{fmt1(liveResult.pointsAwarded)}</span>
+              </div>
+            ) : null}
+          </div>
+        ) : discValue != null ? (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, fontSize: 11, fontVariantNumeric: "tabular-nums" }}>
             <span style={{ color: "var(--nl-mut)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{discLabel}</span>
             <span style={{ color: "var(--accent, var(--nl-accent))", fontWeight: 800, flex: "none" }}>{fmt1(discValue)}</span>
@@ -694,14 +725,24 @@ function TeamBody({
   disciplineId,
   onSelectPlayer,
   fieldedPlayerIdsByTeam,
+  liveResultsByTeam,
+  disciplineMutators,
 }: {
   gameState: GameState;
   teamId: string;
   disciplineId: string;
   onSelectPlayer?: ((playerId: string) => void) | null;
   fieldedPlayerIdsByTeam?: Record<string, string[]>;
+  liveResultsByTeam?: StageLiveResultsByTeam;
+  disciplineMutators?: string[];
 }) {
   const team = findTeam(gameState, teamId);
+  // Live-Ergebnis je Spieler-ID für dieses Team (schnelle Lookup-Map).
+  const liveByPlayerId = useMemo(() => {
+    const map = new Map<string, StageLivePlayerResult>();
+    for (const r of liveResultsByTeam?.[teamId] ?? []) map.set(r.playerId, r);
+    return map;
+  }, [liveResultsByTeam, teamId]);
 
   // Roster-IDs des Teams (einmal) — Basis für Rating-Lookup und Ersatzbank.
   const rosterIds = useMemo(
@@ -856,6 +897,29 @@ function TeamBody({
 
       {/* Sektion 1: In dieser Disziplin (--accent, primär) */}
       <Section title="In dieser Disziplin" accentRole="primary" emphasis right={<span style={{ fontSize: 11, fontWeight: 700, color: "var(--accent)" }}>{disciplineName(gameState, disciplineId)}</span>}>
+        {/* Die 2 aktiven Mutatoren dieser Disziplin — „welche beiden es sind", darf
+            in keiner Disziplin fehlen. */}
+        {disciplineMutators && disciplineMutators.length > 0 ? (
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+            <span style={{ fontSize: 9.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800 }}>Mutatoren</span>
+            {disciplineMutators.map((m, i) => (
+              <span
+                key={i}
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: "var(--accent2, var(--nl-accent))",
+                  padding: "2px 8px",
+                  borderRadius: 999,
+                  background: "color-mix(in srgb, var(--accent2, var(--nl-accent)) 12%, var(--nl-panel))",
+                  border: "1px solid color-mix(in srgb, var(--accent2, var(--nl-accent)) 45%, var(--nl-line))",
+                }}
+              >
+                {m}
+              </span>
+            ))}
+          </div>
+        ) : null}
         {hasDraft && onSchedule && section1.length > 0 ? (
           <div className="dstage-portrait-rail-grid">
             {section1
@@ -872,6 +936,7 @@ function TeamBody({
                     row={ratingById.get(pid) ?? null}
                     seasonPps={seasonPpsById.get(pid) ?? null}
                     unavailable={isUnavailable(pid)}
+                    liveResult={liveByPlayerId.get(pid) ?? null}
                     onSelectPlayer={onSelectPlayer}
                   />
                 );
@@ -888,6 +953,7 @@ function TeamBody({
                 row={ratingById.get(pid) ?? null}
                 seasonPps={seasonPpsById.get(pid) ?? null}
                 unavailable={isUnavailable(pid)}
+                liveResult={liveByPlayerId.get(pid) ?? null}
                 onSelectPlayer={onSelectPlayer}
               />
             ))}
@@ -973,8 +1039,16 @@ export default function DisciplineStageDrawer({
   disciplineId,
   onSelectPlayer,
   fieldedPlayerIdsByTeam,
+  liveResultsByTeam,
+  disciplineMutators,
   onClose,
 }: DisciplineStageDrawerProps): React.JSX.Element | null {
+  // Erst nach dem Mount in document.body portalen (SSR-fest) — verhindert, dass ein
+  // ancestor-`transform` das `position:fixed`-Overlay zur containing-block-relativen
+  // Box macht (Bug: Drawer öffnete „oben" statt viewport-fixiert).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const [reducedMotion, setReducedMotion] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
@@ -1030,12 +1104,12 @@ export default function DisciplineStageDrawer({
     };
   }, [target, gameState]);
 
-  if (!target) return null;
+  if (!target || !mounted || typeof document === "undefined") return null;
 
   const translate = entered || reducedMotion ? "0" : "100%";
   const transition = reducedMotion ? "none" : "transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease";
 
-  return (
+  return createPortal(
     <div style={{ position: "fixed", inset: 0, zIndex: 60 }}>
       {/* Backdrop */}
       <div
@@ -1151,10 +1225,13 @@ export default function DisciplineStageDrawer({
               disciplineId={disciplineId}
               onSelectPlayer={onSelectPlayer}
               fieldedPlayerIdsByTeam={fieldedPlayerIdsByTeam}
+              liveResultsByTeam={liveResultsByTeam}
+              disciplineMutators={disciplineMutators}
             />
           )}
         </div>
       </aside>
-    </div>
+    </div>,
+    document.body,
   );
 }

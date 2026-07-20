@@ -8065,7 +8065,9 @@ export function useFoundationShellRouterBodyScope({
       }
       return (
       seasonStandRows.some((row) => (row.points ?? 0) > 0) ||
-      (gameState.seasonState.matchdayResults ?? []).some((result) => result.seasonId === gameState.season.id)
+      (gameState.seasonState.matchdayResults ?? []).some(
+        (result) => result.seasonId === gameState.season.id && result.status === "preview_applied",
+      )
       );
     },
     [gameState.season.id, gameState.seasonState.matchdayResults, seasonStandRows, shouldBuildHomeV2Overview],

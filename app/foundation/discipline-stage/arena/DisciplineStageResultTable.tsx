@@ -23,6 +23,7 @@ export type ResultTableRow = {
   name: string;
   logoUrl: string | null;
   isOwn: boolean;
+  teamId: string | null; // für Team-Hover/-Drawer
   total: number;
   slots: ResultSlotCell[];
 };
@@ -31,6 +32,12 @@ export type DisciplineStageResultTableProps = {
   rows: ResultTableRow[];
   slotLabels: string[];
   onOpenPlayer?: ((playerId: string) => void) | null;
+  /** Hover über Spielernamen → maus-verankerte Spieler-Vorschau. */
+  onPreviewPlayer?: ((id: string | null) => void) | null;
+  /** Hover über eine Team-Zelle → maus-verankerte Team-Vorschau (mit Aufstellung). */
+  onHoverTeam?: ((teamId: string | null) => void) | null;
+  /** Klick auf eine Team-Zelle → voller Team-Drawer. */
+  onOpenTeam?: ((teamId: string) => void) | null;
 };
 
 const HEAD: React.CSSProperties = {
@@ -49,7 +56,7 @@ const HEAD: React.CSSProperties = {
   whiteSpace: "nowrap",
 };
 
-export default function DisciplineStageResultTable({ rows, slotLabels, onOpenPlayer }: DisciplineStageResultTableProps) {
+export default function DisciplineStageResultTable({ rows, slotLabels, onOpenPlayer, onPreviewPlayer, onHoverTeam, onOpenTeam }: DisciplineStageResultTableProps) {
   // Kumulierte Rang-Entwicklung je Etappe: für jede Spalte die Teams nach kumulierter Summe
   // BIS DAHIN ranken → Δ zur Vorspalte = in DIESER Etappe gewonnene/verlorene Ränge. Die
   // 1. Etappe hat keinen Vorwert (kein Pfeil). Ersetzt den alten boni/mali-▼ (der durch
@@ -118,7 +125,13 @@ export default function DisciplineStageResultTable({ rows, slotLabels, onOpenPla
                   }}
                 >
                   <td style={{ padding: "6px 8px", textAlign: "center", position: "sticky", left: 0, background: stickyBg, fontWeight: 800, color: ampel(r.rank), zIndex: 1 }}>{r.rank}</td>
-                  <td style={{ padding: "6px 8px", position: "sticky", left: 40, background: stickyBg, zIndex: 1 }}>
+                  <td
+                    onMouseEnter={() => r.teamId && onHoverTeam?.(r.teamId)}
+                    onMouseLeave={() => onHoverTeam?.(null)}
+                    onClick={() => r.teamId && onOpenTeam?.(r.teamId)}
+                    title={r.teamId ? "Team-Karte öffnen" : undefined}
+                    style={{ padding: "6px 8px", position: "sticky", left: 40, background: stickyBg, zIndex: 1, cursor: r.teamId ? "pointer" : "default" }}
+                  >
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       {r.logoUrl ? <TeamMark src={r.logoUrl} size={26} radius={6} isOwn={r.isOwn} medal={r.rank === 1 ? "gold" : r.rank === 2 ? "silver" : r.rank === 3 ? "bronze" : null} /> : null}
                       <span style={{ fontWeight: 800, fontSize: 12.5, color: r.isOwn ? "var(--nl-accent)" : "inherit" }}>{r.isOwn ? "★ " : ""}{r.code}</span>
@@ -151,6 +164,8 @@ export default function DisciplineStageResultTable({ rows, slotLabels, onOpenPla
                         </div>
                         <div
                           onClick={nameClickable ? () => onOpenPlayer!(c.playerId!) : undefined}
+                          onMouseEnter={c.playerId ? () => onPreviewPlayer?.(c.playerId!) : undefined}
+                          onMouseLeave={c.playerId ? () => onPreviewPlayer?.(null) : undefined}
                           title={nameClickable ? "Spieler-Karte öffnen" : undefined}
                           style={{ fontSize: 10.5, color: nameClickable ? "var(--nl-ink)" : "var(--nl-mut)", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 110, cursor: nameClickable ? "pointer" : "default", textDecoration: nameClickable ? "underline dotted" : undefined }}
                         >

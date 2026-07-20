@@ -1,3 +1,4 @@
+import path from "node:path";
 import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
@@ -5,11 +6,11 @@ import { describe, expect, it } from "vitest";
 describe("foundation lineup v2 ui contract", () => {
   it("exposes focus mode board, toolbar, candidate tabs, and captain select", async () => {
     const [boardText, clientText, panelText, cssText, routingText] = await Promise.all([
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab-v2/LegacyLineupFocusV2Board.tsx", "utf8"),
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx", "utf8"),
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab/FoundationLineupPanel.tsx", "utf8"),
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/globals.css", "utf8"),
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/foundation-view-routing.ts", "utf8"),
+      fs.readFile(path.join(process.cwd(), "app/foundation/legacy-lineup-lab-v2/LegacyLineupFocusV2Board.tsx"), "utf8"),
+      fs.readFile(path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"), "utf8"),
+      fs.readFile(path.join(process.cwd(), "app/foundation/legacy-lineup-lab/FoundationLineupPanel.tsx"), "utf8"),
+      fs.readFile(path.join(process.cwd(), "app/globals.css"), "utf8"),
+      fs.readFile(path.join(process.cwd(), "lib/foundation/foundation-view-routing.ts"), "utf8"),
     ]);
 
     expect(boardText).toContain('data-testid="legacy-lineup-v2-board"');
@@ -95,9 +96,9 @@ describe("foundation lineup v2 ui contract", () => {
 
   it("exposes sprint I sticky toolbar, discipline progress, tactic preview, and gated arena CTA", async () => {
     const [boardText, clientText, cssText] = await Promise.all([
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab-v2/LegacyLineupFocusV2Board.tsx", "utf8"),
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx", "utf8"),
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/globals.css", "utf8"),
+      fs.readFile(path.join(process.cwd(), "app/foundation/legacy-lineup-lab-v2/LegacyLineupFocusV2Board.tsx"), "utf8"),
+      fs.readFile(path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"), "utf8"),
+      fs.readFile(path.join(process.cwd(), "app/globals.css"), "utf8"),
     ]);
 
     expect(boardText).toContain('data-testid="lineup-v2-sticky-toolbar"');

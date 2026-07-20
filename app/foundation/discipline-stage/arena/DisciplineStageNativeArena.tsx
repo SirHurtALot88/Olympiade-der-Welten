@@ -47,6 +47,17 @@ export type NativeStagePlayer = {
   mods: NativeStageMod[];
   pointsAwarded: number | null;
 };
+// Live-Ergebnis eines bereits AUFGEDECKTEN Spielers (für den Team-Drawer: „was hat
+// der Spieler in dieser Disziplin geholt + Boni/Abzüge"). Nur enthüllte Slots.
+export type StageLivePlayerResult = {
+  playerId: string;
+  slot: number;
+  base: number;
+  net: number;
+  mods: NativeStageMod[];
+  pointsAwarded: number | null;
+};
+export type StageLiveResultsByTeam = Record<string, StageLivePlayerResult[]>;
 export type NativeStageTeam = {
   code: string;
   name: string;
@@ -101,6 +112,7 @@ export type DisciplineStageNativeArenaProps = {
   onPreviewPlayer?: ((playerId: string | null) => void) | null; // Top-Player-Hover → Vorschau
   onEnded?: (() => void) | null; // feuert einmal, sobald das Podest/Endstand erreicht ist (Spoiler-Gate)
   onReset?: (() => void) | null; // „↻ Neu": hebt das Spoiler-Gate im Host wieder auf (arenaEnded=false)
+  onResults?: ((byTeam: StageLiveResultsByTeam) => void) | null; // meldet die Live-Ergebnisse aufgedeckter Spieler an den Host (Team-Drawer)
   topPlayers?: { rows: DisciplineStageTopPlayer[]; ids: (string | null)[] } | null;
   primitive?: StagePrimitive;
   disciplineId?: string; // Disziplin-Identität für die Feld-Registry (mehrere Diszis teilen sich ein Primitive)
@@ -606,7 +618,14 @@ export function renderSceneEnvBg(prim: StagePrimitive, env: StageEnv, layout: an
 // hsl()/CSS-Token → Design-Token-Lint bleibt sauber.
 const KLASSEN_NAMES = ["Meister", "Anwärter", "Oberhaus", "Mittelfeld", "Abstieg", "Keller"];
 const KLASSEN_MEDALS = ["🥇", "🥈", "🥉"];
-export function renderKlassenBands(sorted: RT[], W: number, H: number, env: StageEnv): React.ReactNode {
+export function renderKlassenBands(
+  sorted: RT[],
+  W: number,
+  H: number,
+  env: StageEnv,
+  onOpenTeam?: ((teamId: string) => void) | null,
+  onHoverTeam?: ((teamId: string | null) => void) | null,
+): React.ReactNode {
   const n = sorted.length;
   if (n === 0) return null;
   const max = sorted[0]!.score;
@@ -660,8 +679,18 @@ export function renderKlassenBands(sorted: RT[], W: number, H: number, env: Stag
           const cy = y + headH + bandPadTop + rr * (chipH + gapY);
           const rc = relColor(t.rel);
           const med = t.rank <= 3 ? KLASSEN_MEDALS[t.rank - 1] : "";
+          // Konsistent zu Token/Ladder/Territory/Duelhp: Chip hovern → Team-Vorschau
+          // am Cursor, Klick → Team-Drawer. (Zuvor hatte klassen/Schach+Tennis keine
+          // Feld-Interaktion — Team-Karte war nur über Ladder/Tabelle erreichbar.)
+          const teamClickable = Boolean(onOpenTeam && t.teamId);
           return (
-            <g key={t.code}>
+            <g
+              key={t.code}
+              style={{ cursor: teamClickable ? "pointer" : "default" }}
+              onMouseEnter={onHoverTeam && t.teamId ? () => onHoverTeam(t.teamId!) : undefined}
+              onMouseLeave={onHoverTeam ? () => onHoverTeam(null) : undefined}
+              onClick={teamClickable ? () => onOpenTeam!(t.teamId!) : undefined}
+            >
               <rect x={cx} y={cy} width={chipW} height={chipH} rx={7} fill={t.isOwn ? "color-mix(in srgb, var(--nl-accent) 22%, transparent)" : "var(--nl-panel)"} stroke={rc ?? (t.isOwn ? "var(--nl-accent)" : env.line)} strokeWidth={rc || t.isOwn ? 2 : 1} strokeOpacity={rc || t.isOwn ? 0.95 : 0.3} />
               <text x={cx + 8} y={cy + chipH / 2 + 4} fontSize={11.5} fontWeight={800} fill={t.isOwn ? "var(--nl-accent)" : env.line}>
                 {med}
@@ -984,7 +1013,7 @@ const TICKER_MAX = 40;
 type Spot = { crest: NativeStageTeam; idx: number; kick: string; name: string; sub: string; net: number; chipText: string; chipColor: string; mine: boolean; portraitUrl: string | null } | null;
 type PodCol = { place: number; code: string; name: string; pts: number; logoUrl: string | null; isOwn: boolean; idx: number; delayMs: number; loud: boolean };
 
-export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, onOpenTeam, onHoverTeam, onPreviewPlayer, onEnded, onReset, topPlayers, primitive = "track", disciplineId, progressLabel, disciplineName, accent, motif, env }: DisciplineStageNativeArenaProps) {
+export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, onOpenTeam, onHoverTeam, onPreviewPlayer, onEnded, onReset, onResults, topPlayers, primitive = "track", disciplineId, progressLabel, disciplineName, accent, motif, env }: DisciplineStageNativeArenaProps) {
   const skinAccent = accent ?? "var(--nl-line-2, var(--nl-line))";
   const slotCount = Math.max(1, slots.length);
   const prim = primitive;
@@ -1233,6 +1262,27 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   );
 
   const done = round >= slotCount;
+
+  // Live-Ergebnisse der bereits AUFGEDECKTEN Spieler an den Host melden — der
+  // Team-Drawer zeigt damit sofort „was hat der Spieler in dieser Disziplin
+  // geholt + Boni/Abzüge". Nach jeder Runde / bei Ende / Reset neu (round/done/
+  // podium decken die Reveal-Übergänge ab). Nur enthüllte Slots (kein Spoiler).
+  useEffect(() => {
+    if (!onResults) return;
+    const byTeam: StageLiveResultsByTeam = {};
+    for (const t of rtRef.current) {
+      if (!t.teamId) continue;
+      const arr: StageLivePlayerResult[] = [];
+      for (let s = 0; s <= t.thrownSlot; s += 1) {
+        const p = t.players[s];
+        if (!p?.playerId) continue;
+        arr.push({ playerId: p.playerId, slot: s, base: p.val, net: playerNet(p), mods: p.mods, pointsAwarded: p.pointsAwarded });
+      }
+      if (arr.length > 0) byTeam[t.teamId] = arr;
+    }
+    onResults(byTeam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [round, done, podium, onResults]);
 
   // Leertaste pausiert/setzt die laufende Arena fort (native Primitive UND Mini-DM).
   // CAPTURE-Phase-Fenster-Listener: fängt Space VOR dem Shell-Space-Handler ab
@@ -2336,6 +2386,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         name: t.name,
         logoUrl: t.logoUrl,
         isOwn: t.isOwn,
+        teamId: t.teamId ?? null,
         total: t.score,
         slots: Array.from({ length: slotCount }, (_, s) => {
           const p = t.players[s];
@@ -2827,7 +2878,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               über das Feld — entfernt. Der Wert steht live in der Rangliste, den Zugewinn
               zeigt der Ghost der Vorrunde direkt am Token. Highlights kommen als
               Zoom-Slowdown (Nr. 208), nicht als Popup. */}
-          {/* Splitter (Boni/Mali „−8 Form" etc.) (Ticket 207): entfernt — poppten überall auf und
+          {/* Splitter (Boni/Mali „−8 Form" etc.) (Nr. 207): entfernt — poppten überall auf und
               störten. Form/Details stehen im Ticker / in der Hovercard, nicht als Feld-Pop. */}
           {/* Flash */}
           {flash ? (
@@ -2882,8 +2933,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                       left: `${xPct}%`,
                       top: `${yPct}%`,
                       transform: `translate(${flipX ? "calc(-100% - 14px)" : "14px"}, ${below ? "14px" : "calc(-100% - 14px)"})`,
-                      width: 280,
-                      maxWidth: "72%",
+                      width: 300,
+                      maxWidth: "78%",
                       zIndex: 4,
                       background: "var(--nl-panel)",
                       // Rahmen in der Team-Farbe (getTeamColor) — die Karte gehört sichtbar
@@ -2971,33 +3022,95 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                           );
                         })()
                       : null}
-                    {t.thrownSlot < 0 ? (
-                      <div style={{ fontSize: 12, color: "var(--nl-mut)", fontStyle: "italic" }}>noch nicht angetreten</div>
-                    ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                        {Array.from({ length: t.thrownSlot + 1 }, (_, s) => {
+                    {(() => {
+                      // Schon ab der LAUFENDEN Etappe (auch Etappe 1 / round 0) den
+                      // GERADE antretenden Spieler (nextSlot == laufende Etappe, in
+                      // dieser Etappe noch nicht enthüllt) zeigen — sein Token gleitet
+                      // ja bereits sichtbar über die Bahn, „noch nicht angetreten" wäre
+                      // dort schlicht falsch. Nur Identität (Porträt/Name), NICHT die
+                      // Wertung (Anti-Spoiler bleibt für Score/Rang).
+                      const nextSlot = t.thrownSlot + 1;
+                      const upcoming =
+                        round >= 0 && !podium && nextSlot < slotCount && nextSlot <= round
+                          ? t.players[nextSlot] ?? null
+                          : null;
+                      if (t.thrownSlot < 0 && !upcoming) {
+                        return <div style={{ fontSize: 12, color: "var(--nl-mut)", fontStyle: "italic" }}>noch nicht angetreten</div>;
+                      }
+                      return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {Array.from({ length: Math.max(0, t.thrownSlot + 1) }, (_, s) => {
                           const p = t.players[s];
                           if (!p) return null;
                           // Reihenfolge in der Disziplin = Slot s (1-basiert); erzielter
                           // Rang dieses Spielers in seinem Slot (1…N, ligaweit).
                           const sr = slotRankOf(s, t, rtRef.current);
                           const medalC = sr === 1 ? "var(--nl-gold)" : sr === 2 ? "var(--nl-silver)" : sr === 3 ? "var(--nl-bronze)" : "var(--nl-mut-2)";
+                          const teamAccent = floorTeamAccent(teamPrimaryColor(t.code));
+                          // Grafische Mini-Spielerkarte: Porträtbild links (Fallback: Initialen
+                          // auf Team-Farbe), rechts Name/Slot + Breakdown. „locker Platz für
+                          // die Player Cards als Bilder" — konsistent zum Feld-Token.
+                          const initials = p.name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
                           return (
-                            <div key={s} style={{ fontSize: 11.5, fontVariantNumeric: "tabular-nums", display: "flex", alignItems: "baseline", gap: 6 }}>
-                              <span aria-hidden style={{ flex: "none", fontSize: 9.5, fontWeight: 800, color: "var(--nl-mut-2)", width: 16 }}>#{s + 1}</span>
-                              <div style={{ minWidth: 0, flex: 1 }}>
-                                <div style={{ fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                  {p.val >= STAR_MIN ? "⭐ " : ""}
-                                  {p.name} <span style={{ color: "var(--nl-mut)", fontWeight: 600 }}>· {slots[s]}</span>
+                            <div key={s} style={{ display: "flex", gap: 9, alignItems: "flex-start", padding: 6, borderRadius: 9, background: "var(--nl-bg)", border: "1px solid var(--nl-line)" }}>
+                              <div style={{ position: "relative", flex: "none" }}>
+                                {p.portraitUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={p.portraitUrl}
+                                    alt=""
+                                    width={48}
+                                    height={62}
+                                    onError={(e) => { const el = e.currentTarget as HTMLImageElement; el.style.display = "none"; const sib = el.nextElementSibling as HTMLElement | null; if (sib) sib.style.display = "grid"; }}
+                                    style={{ width: 48, height: 62, borderRadius: 7, objectFit: "cover", objectPosition: "center top", display: "block", border: `1.5px solid ${teamAccent}` }}
+                                  />
+                                ) : null}
+                                <span
+                                  aria-hidden
+                                  style={{ width: 48, height: 62, borderRadius: 7, border: `1.5px solid ${teamAccent}`, display: p.portraitUrl ? "none" : "grid", placeItems: "center", fontSize: 15, fontWeight: 800, color: "var(--nl-ink)", background: `color-mix(in srgb, ${teamPrimaryColor(t.code)} 34%, var(--nl-panel))` }}
+                                >
+                                  {initials}
+                                </span>
+                                <span aria-hidden style={{ position: "absolute", left: -4, top: -4, minWidth: 15, height: 15, padding: "0 3px", borderRadius: 8, background: "var(--nl-panel)", border: "1px solid var(--nl-line)", display: "grid", placeItems: "center", fontSize: 9, fontWeight: 800, color: "var(--nl-mut-2)", fontVariantNumeric: "tabular-nums" }}>{s + 1}</span>
+                              </div>
+                              <div style={{ minWidth: 0, flex: 1, fontVariantNumeric: "tabular-nums" }}>
+                                <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                                  <span style={{ minWidth: 0, flex: 1, fontWeight: 700, fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                    {p.val >= STAR_MIN ? "⭐ " : ""}
+                                    {p.name} <span style={{ color: "var(--nl-mut)", fontWeight: 600 }}>· {slots[s]}</span>
+                                  </span>
+                                  <span title={`Rang in ${slots[s]}`} style={{ flex: "none", fontSize: 10.5, fontWeight: 800, color: medalC }}>#{sr}</span>
                                 </div>
                                 <div style={{ marginTop: 2 }}>{renderBreakdown(p)}</div>
                               </div>
-                              <span title={`Rang in ${slots[s]}`} style={{ flex: "none", fontSize: 10.5, fontWeight: 800, color: medalC }}>#{sr}</span>
                             </div>
                           );
                         })}
+                        {upcoming ? (() => {
+                          const teamAccent = floorTeamAccent(teamPrimaryColor(t.code));
+                          const initials = upcoming.name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+                          return (
+                            <div key="upcoming" style={{ display: "flex", gap: 9, alignItems: "center", padding: 6, borderRadius: 9, background: "color-mix(in srgb, var(--nl-accent) 8%, var(--nl-bg))", border: "1px dashed var(--nl-accent)" }}>
+                              <div style={{ position: "relative", flex: "none" }}>
+                                {upcoming.portraitUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={upcoming.portraitUrl} alt="" width={48} height={62} onError={(e) => { const el = e.currentTarget as HTMLImageElement; el.style.display = "none"; const sib = el.nextElementSibling as HTMLElement | null; if (sib) sib.style.display = "grid"; }} style={{ width: 48, height: 62, borderRadius: 7, objectFit: "cover", objectPosition: "center top", display: "block", border: `1.5px solid ${teamAccent}` }} />
+                                ) : null}
+                                <span aria-hidden style={{ width: 48, height: 62, borderRadius: 7, border: `1.5px solid ${teamAccent}`, display: upcoming.portraitUrl ? "none" : "grid", placeItems: "center", fontSize: 15, fontWeight: 800, color: "var(--nl-ink)", background: `color-mix(in srgb, ${teamPrimaryColor(t.code)} 34%, var(--nl-panel))` }}>{initials}</span>
+                                <span aria-hidden style={{ position: "absolute", left: -4, top: -4, minWidth: 15, height: 15, padding: "0 3px", borderRadius: 8, background: "var(--nl-panel)", border: "1px solid var(--nl-line)", display: "grid", placeItems: "center", fontSize: 9, fontWeight: 800, color: "var(--nl-mut-2)", fontVariantNumeric: "tabular-nums" }}>{nextSlot + 1}</span>
+                              </div>
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ fontWeight: 700, fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                  {upcoming.name} <span style={{ color: "var(--nl-mut)", fontWeight: 600 }}>· {slots[nextSlot]}</span>
+                                </div>
+                                <div style={{ marginTop: 3, fontSize: 10.5, fontWeight: 800, color: "var(--nl-accent)", letterSpacing: "0.04em" }}>tritt gerade an …</div>
+                              </div>
+                            </div>
+                          );
+                        })() : null}
                       </div>
-                    )}
+                      );
+                    })()}
                     {teamClickable ? (
                       <div style={{ marginTop: 6, fontSize: 10.5, color: "var(--nl-mut)", fontWeight: 700 }}>Klicken für Team-Karte</div>
                     ) : null}
@@ -3271,7 +3384,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       {/* Detail-Ergebnistabelle (volle Breite unter der Arena, nach dem Podest) */}
       {ended ? (
         <div style={{ flex: "1 1 100%", minWidth: 0, order: 4 }}>
-          <DisciplineStageResultTable rows={resultRows} slotLabels={slots} onOpenPlayer={onOpenPlayer} />
+          <DisciplineStageResultTable rows={resultRows} slotLabels={slots} onOpenPlayer={onOpenPlayer} onPreviewPlayer={onPreviewPlayer} onHoverTeam={onHoverTeam} onOpenTeam={onOpenTeam} />
+
         </div>
       ) : null}
     </div>

@@ -8,8 +8,8 @@ import type {
 import { distributeRankPointsToPlayers, resolveDisciplinePlayerCount } from "@/lib/resolve/rank-to-points";
 
 type LedgerPointSource =
-  | "rank_to_points_base_share"
-  | "rank_to_points_final_score_fallback"
+  | "rank_to_points_final_score_share"
+  | "rank_to_points_base_share_fallback"
   | "rank_to_points_score_share_fallback"
   | "final_player_score"
   | "score_contribution"

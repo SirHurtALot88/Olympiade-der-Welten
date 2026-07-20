@@ -1,3 +1,4 @@
+import path from "node:path";
 import fs from "node:fs";
 
 import { describe, expect, it } from "vitest";
@@ -6,7 +7,7 @@ import { buildRetoolAttributeMappingAudit } from "@/scripts/audit-retool-attribu
 import { extractRetoolPlayerAttributes } from "@/scripts/extract-retool-player-attributes";
 
 describe("audit retool attribute mapping", () => {
-  const base = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/references/retool-player-attributes";
+  const base = path.join(process.cwd(), "references/retool-player-attributes");
 
   it("marks blocked when only query metadata exists", () => {
     extractRetoolPlayerAttributes();
@@ -158,7 +159,7 @@ describe("audit retool attribute mapping", () => {
 
   it("stays read-only without write operations to prisma", () => {
     const text = fs.readFileSync(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/scripts/audit-retool-attribute-mapping.ts",
+      path.join(process.cwd(), "scripts/audit-retool-attribute-mapping.ts"),
       "utf8",
     );
 

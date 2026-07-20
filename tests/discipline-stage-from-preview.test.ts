@@ -26,6 +26,7 @@ type EntryInput = {
   fatigueAdjustedValue?: number | null;
   captainBonus?: number | null;
   mutatorBonus?: number | null;
+  formShare?: number | null;
   finalPlayerScore?: number | null;
   pointsAwarded?: number | null;
 };
@@ -40,6 +41,7 @@ function makeEntry(input: EntryInput): DisciplineTeamResolvePreview["entries"][n
     fatigueAdjustedValue: input.fatigueAdjustedValue ?? null,
     captainBonus: input.captainBonus ?? null,
     mutatorBonus: input.mutatorBonus ?? null,
+    formShare: input.formShare ?? null,
     finalPlayerScore: input.finalPlayerScore ?? null,
     pointsAwarded: input.pointsAwarded ?? null,
     isCaptain: false,
@@ -287,8 +289,10 @@ describe("Robustheit gegen leere / null-Felder", () => {
 });
 
 describe("saubere Verteilung: jeder Spieler traegt seine volle finalPlayerScore, Team-Effekte beschriftet obendrauf", () => {
-  // Team mit echten Team-Level-Modifikatoren: score = Σ finalPlayerScore + Form + Team-Power.
-  const TEAM_MODS = new Set(["Form", "Intensität", "Team-Power", "Team-PPs", "Team"]);
+  // Team mit Team-Level-Modifikator (Team-Power) + PRO-SPIELER-Form (formShare).
+  // Form ist jetzt Teil von finalPlayerScore → KEIN Team-Mod mehr, sondern eine
+  // pro Spieler beschriftete "Form"-Zeile. score = Σ finalPlayerScore + Team-Power.
+  const TEAM_MODS = new Set(["Intensität", "Team-Power", "Team-PPs", "Team"]);
   const base = makeTeam({
     teamId: "tx",
     teamName: "Xi",
@@ -296,18 +300,17 @@ describe("saubere Verteilung: jeder Spieler traegt seine volle finalPlayerScore,
     score: 0,
     teamPoints: 12,
     entries: [
-      { playerId: "x0", playerName: "X0", baseValue: 20, fatigueAdjustedValue: 18, finalPlayerScore: 18 }, // Moral/Fatigue -2
-      { playerId: "x1", playerName: "X1", baseValue: 15, captainBonus: 4, finalPlayerScore: 21 }, // Captain +4, Moral +2
-      { playerId: "x2", playerName: "X2", baseValue: 12, mutatorBonus: 6, finalPlayerScore: 18 }, // Mutator +6
+      { playerId: "x0", playerName: "X0", baseValue: 20, fatigueAdjustedValue: 18, formShare: 2, finalPlayerScore: 20 }, // Fatigue -2, Form +2
+      { playerId: "x1", playerName: "X1", baseValue: 15, captainBonus: 4, formShare: 1, finalPlayerScore: 22 }, // Captain +4, Moral +2, Form +1
+      { playerId: "x2", playerName: "X2", baseValue: 12, mutatorBonus: 6, formShare: 1, finalPlayerScore: 19 }, // Mutator +6, Form +1
     ],
   });
-  const sumFinal = 18 + 21 + 18; // 57
+  const sumFinal = 20 + 22 + 19; // 61 (Form bereits pro Spieler enthalten)
   const team = {
     ...base,
-    formModifier: 4,
     teamPowerModifier: 9,
-    score: sumFinal + 4 + 9, // 70
-    finalPreviewScore: sumFinal + 4 + 9,
+    score: sumFinal + 9, // 70
+    finalPreviewScore: sumFinal + 9,
   };
   const [mapped] = buildDisciplineStageTeamsFromPreview(makePreview([team]), new Map(), new Map());
 
@@ -315,10 +318,10 @@ describe("saubere Verteilung: jeder Spieler traegt seine volle finalPlayerScore,
     return round1(player.val + player.mods.filter((m) => !TEAM_MODS.has(m.k)).reduce((s, m) => s + m.sign * m.amt, 0));
   }
 
-  it("jeder Spieler-Netto (ohne Team-Mods) == echte finalPlayerScore", () => {
-    expect(individualNet(mapped.players[0])).toBeCloseTo(18, 1);
-    expect(individualNet(mapped.players[1])).toBeCloseTo(21, 1);
-    expect(individualNet(mapped.players[2])).toBeCloseTo(18, 1);
+  it("jeder Spieler-Netto (inkl. Pro-Spieler-Form, ohne Team-Mods) == echte finalPlayerScore", () => {
+    expect(individualNet(mapped.players[0])).toBeCloseTo(20, 1);
+    expect(individualNet(mapped.players[1])).toBeCloseTo(22, 1);
+    expect(individualNet(mapped.players[2])).toBeCloseTo(19, 1);
   });
 
   it("Team-Effekte sind beschriftet (Form / Team-Power) und liegen auf den Spielern", () => {

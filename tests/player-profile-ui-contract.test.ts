@@ -1,3 +1,4 @@
+import path from "node:path";
 import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
@@ -9,28 +10,28 @@ describe("player profile ui contract", () => {
     const [profileText, foundationText, foundationSurfaceText, scopeText, serviceText, previewText, drawerText, trainingControlsText, chartText, trainingSharedText] =
       await Promise.all([
         fs.readFile(
-          "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/player-profile/PlayerProfileClient.tsx",
+          path.join(process.cwd(), "app/foundation/player-profile/PlayerProfileClient.tsx"),
           "utf8",
         ),
         readFoundationOrchestratorSource(),
         readFoundationSurfaceSource(),
         fs.readFile(
-          "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx",
+          path.join(process.cwd(), "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx"),
           "utf8",
         ),
-        fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/player-profile-service.ts", "utf8"),
-        fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/projected-class-preview.ts", "utf8"),
-        fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/PlayerDetailDrawer.tsx", "utf8"),
+        fs.readFile(path.join(process.cwd(), "lib/foundation/player-profile-service.ts"), "utf8"),
+        fs.readFile(path.join(process.cwd(), "lib/foundation/projected-class-preview.ts"), "utf8"),
+        fs.readFile(path.join(process.cwd(), "app/foundation/PlayerDetailDrawer.tsx"), "utf8"),
         fs.readFile(
-          "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/player-profile/PlayerTrainingControls.tsx",
-          "utf8",
-        ),
-        fs.readFile(
-          "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/player-profile/PlayerAttributeProgressChart.tsx",
+          path.join(process.cwd(), "app/foundation/player-profile/PlayerTrainingControls.tsx"),
           "utf8",
         ),
         fs.readFile(
-          "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/training-facilities-v2/training-view-shared.tsx",
+          path.join(process.cwd(), "app/foundation/player-profile/PlayerAttributeProgressChart.tsx"),
+          "utf8",
+        ),
+        fs.readFile(
+          path.join(process.cwd(), "app/foundation/training-facilities-v2/training-view-shared.tsx"),
           "utf8",
         ),
       ]);

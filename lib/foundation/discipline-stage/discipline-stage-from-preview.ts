@@ -64,6 +64,12 @@ export function buildDisciplineStageTeamsFromPreview(
       if (entry.mutatorBonus) {
         mods.push({ k: "Mutator", sign: entry.mutatorBonus < 0 ? -1 : 1, amt: round1(Math.abs(entry.mutatorBonus)) });
       }
+      // Form ist jetzt PRO SPIELER (flacher Kartenwert + Jitter) und steckt schon
+      // in finalPlayerScore — hier als eigene, beschriftete Zeile ausweisen, damit
+      // der Moral-Rest sie nicht verschluckt.
+      if (entry.formShare && Math.abs(entry.formShare) >= 0.05) {
+        mods.push({ k: entry.formShare < 0 ? "Formtief" : "Form", sign: entry.formShare < 0 ? -1 : 1, amt: round1(Math.abs(entry.formShare)) });
+      }
       // Rest je Spieler, damit das Netto EXAKT die echte Engine-Contribution
       // trifft (Moral u.a. per-Spieler-Effekte, die nicht als eigenes Feld
       // vorliegen) — so trägt jeder Spieler seine volle individuelle Leistung.
@@ -89,8 +95,9 @@ export function buildDisciplineStageTeamsFromPreview(
     // Slot-Reveal verteilen wir sie GLEICHMÄSSIG auf die Slots — aber BESCHRIFTET,
     // damit im Hover/Reveal transparent bleibt, woher die Punkte kommen.
     if (players.length > 0) {
+      // Form NICHT mehr team-weit gleichverteilen — sie ist bereits pro Spieler
+      // (formShare, s. oben) berücksichtigt. Nur die echten Team-Effekte bleiben.
       const teamLevelMods: { k: string; value: number }[] = [
-        { k: "Form", value: teamResult.formModifier ?? 0 },
         { k: "Intensität", value: teamResult.intensityModifier ?? 0 },
         { k: "Team-Power", value: teamResult.teamPowerModifier ?? 0 },
         { k: "Team-PPs", value: teamResult.teamPpsModifier ?? 0 },

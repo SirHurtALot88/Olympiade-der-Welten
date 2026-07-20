@@ -336,7 +336,10 @@ export default function BumpField(props: DisciplineFieldProps): ReactNode {
       </text>
 
       {/* Rasenkante + Windmesser */}
-      <rect x={0} y={TR_B} width={LW} height={((680 - 566) / 680) * LH} fill="#1c1512" />
+      {/* Füllung UNTER der Bahn (y=TR_B bis Unterkante). Vorher war die Höhe
+          verrechnet ((62 − (566/680)·LH)·LH) → riesig negativer Wert → SVG-Fehler
+          „<rect> height: negativer Wert". Jetzt schlicht die Fläche bis unten. */}
+      <rect x={0} y={TR_B} width={LW} height={Math.max(0, LH - TR_B)} fill="#1c1512" />
       <g dangerouslySetInnerHTML={{ __html: windPanel() }} />
 
       {/* Fotofinish-Lichtschranke (Ziel-Marker) */}

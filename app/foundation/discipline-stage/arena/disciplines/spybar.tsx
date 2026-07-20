@@ -96,8 +96,13 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
   // Zielposition X für einen Score
   const xOfScore = (score: number): number => {
     const fm = finalMaxRef.current;
-    if (fm <= 0) return X_START;
-    const norm = Math.min(1, score / fm);
+    // Non-finiter Score (z.B. displayScore vor dem ersten Reveal = undefined)
+    // MUSS abgefangen werden — sonst propagiert NaN durch die Glide-State und
+    // erzeugt `translate(NaN …)` / `<line> x2: NaN` in jedem Frame.
+    // fm (finalMax) MUSS ebenfalls finit geprüft werden: bei fm = NaN wäre
+    // `fm <= 0` false → score/NaN = NaN würde durchrutschen (Mock ohne finalMax).
+    if (!Number.isFinite(score) || !Number.isFinite(fm) || fm <= 0) return X_START;
+    const norm = Math.min(1, Math.max(0, score / fm));
     return X_START + (X_END - X_START) * norm;
   };
 

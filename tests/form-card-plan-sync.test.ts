@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
@@ -103,7 +104,7 @@ describe("form card plan sync", () => {
   it("wires game-flow form-board deep link into lineup formplan tab", async () => {
     const fs = await import("node:fs/promises");
     const foundationText = await fs.readFile(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx",
+      path.join(process.cwd(), "app/foundation/FoundationPageClient.tsx"),
       "utf8",
     );
     expect(foundationText).toContain('targetPanel === "form-board"');

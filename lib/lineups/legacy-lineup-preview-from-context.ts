@@ -181,6 +181,7 @@ export function calculateLocalLegacyLineupPreviewFromContext(
       score: scoreLegacyLineupDisciplineSide({
         disciplineId,
         disciplineSide,
+        matchdayId: context.matchdayId, // Form-Jitter pro Spieltag (Vorschau == Ergebnis)
         entries: previewEntries,
         disciplineScores: context.disciplineScores,
         activePlayers: context.activePlayers,

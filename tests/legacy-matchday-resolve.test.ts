@@ -402,18 +402,47 @@ describe("legacy matchday resolve preview", () => {
     const alphaEntryPoints =
       alphaTeam?.entries.reduce((sum, entry) => sum + (entry.pointsAwarded ?? 0), 0) ?? null;
 
-    expect(alphaTeam?.formModifier).toBe(12);
+    // Form ist jetzt PRO SPIELER (flacher Kartenwert + ±4-Jitter). Nominal = 12
+    // (= 6/Spieler × 2 Spieler); die tatsächliche Team-Form-Summe wackelt bewusst
+    // im Band nominal ± 4×Spieleranzahl. Der Rest (Mutator, Ranks, Team-PP) fix.
+    expect(alphaTeam?.formModifier).toBeGreaterThanOrEqual(12 - 8);
+    expect(alphaTeam?.formModifier).toBeLessThanOrEqual(12 + 8);
     expect(alphaTeam?.mutatorModifier).toBe(12);
-    expect(alphaTeam?.finalPreviewScore).toBe(64);
-    expect(betaTeam?.finalPreviewScore).toBe(45);
+    // finalPreviewScore = Basis (64 inkl. Nominalform 12) − Nominalform + tatsächliche Form.
+    expect(alphaTeam?.finalPreviewScore).toBeCloseTo(64 - 12 + (alphaTeam?.formModifier ?? 0), 1);
+    expect(betaTeam?.finalPreviewScore).toBe(45); // Beta hat keine Formkarten → unverändert
     expect(alphaTeam?.rank).toBe(1);
     expect(betaTeam?.rank).toBe(2);
     expect(alphaTeam?.teamPoints).toBe(6.6);
     expect(betaTeam?.teamPoints).toBe(6.2);
     expect(alphaPlayer?.mutatorBonus).toBe(12);
     expect(alphaPlayer?.mutatorPpsBonus).toBe(0.3);
-    expect(alphaPlayer?.finalPlayerScore).toBe(32);
+    // finalPlayerScore enthält jetzt den Pro-Spieler-Form-Anteil (war 32 OHNE Form,
+    // jetzt 32 + Formanteil ≈ 6 ± 4).
+    expect(alphaPlayer?.finalPlayerScore).toBeGreaterThan(32);
+    expect(alphaPlayer?.finalPlayerScore).toBeLessThanOrEqual(32 + 10);
+    // Reconciliation bleibt exakt: Σ verteilte Spieler-PP == Team-PP.
     expect(alphaEntryPoints).toBe(alphaTeam?.teamPoints);
+  });
+
+  it("assigns team-entry pointsAwarded to the correct player when slot order != score order", () => {
+    // Slot 0 schwächer (10) als Slot 1 (30): distributedPoints ist score-absteigend
+    // sortiert, rankedTeam.entries in Slot-Reihenfolge. Ein Index-Zip würde die PP
+    // vertauschen (der 10er-Spieler bekäme den 30er-Anteil). Kein Fatigue/Form →
+    // finalPlayerScore == base, deterministisch.
+    const preview = buildLegacyMatchdayResolvePreview([
+      createContext({ teamId: "A-A", teamName: "Alpha", d1Scores: [10, 30], d2Scores: [40], fatigueByPlayerId: {}, fatigueSourceStatus: "mapped" }),
+      createContext({ teamId: "B-B", teamName: "Beta", d1Scores: [5, 6], d2Scores: [35], fatigueByPlayerId: {}, fatigueSourceStatus: "mapped" }),
+    ]);
+    const d1 = preview.disciplinePreviews.find((discipline) => discipline.disciplineId === "mini-dm");
+    const alpha = d1?.teamResults.find((team) => team.teamId === "A-A");
+    const weak = alpha?.entries.find((entry) => entry.playerId === "A-A-d1-0"); // Score 10
+    const strong = alpha?.entries.find((entry) => entry.playerId === "A-A-d1-1"); // Score 30
+    // Der stärkere Spieler MUSS in der Team-Entries-Ansicht mehr PP haben.
+    expect(strong?.pointsAwarded ?? 0).toBeGreaterThan(weak?.pointsAwarded ?? 0);
+    // Und die pro Spieler zugeordneten PP stimmen mit dem topPlayers-Pfad überein.
+    const strongTop = d1?.topPlayers.find((player) => player.playerId === "A-A-d1-1");
+    expect(strong?.pointsAwarded).toBe(strongTop?.pointsAwarded);
   });
 
   it("marks missing discipline scores clearly", () => {

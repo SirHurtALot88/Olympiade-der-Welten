@@ -293,6 +293,7 @@ export function buildLegacyMatchdayResolvePreview(
       const score = scoreLegacyLineupDisciplineSide({
         disciplineId: meta.disciplineId,
         disciplineSide: meta.disciplineSide,
+        matchdayId: context.matchday?.id ?? null, // Form-Jitter pro Spieltag neu würfeln
         entries: draft?.entries ?? [],
         disciplineScores: context.disciplineScores,
         activePlayers: context.activePlayers,
@@ -532,6 +533,7 @@ export function buildLegacyMatchdayResolvePreview(
           captainBonus: entry.captainBonus ?? null,
           mutatorBonus: entry.mutatorBonus ?? null,
           mutatorPpsBonus: entry.mutatorPpsBonus ?? null,
+          formShare: entry.formShare ?? null,
           finalPlayerScore: entry.finalContribution ?? entry.score,
           pointsAwarded: null,
           isCaptain: Boolean(entry.isCaptain),
@@ -550,7 +552,7 @@ export function buildLegacyMatchdayResolvePreview(
           item.entries.length,
         rank,
       ),
-      pointSource: "rank_to_points_base_share",
+      pointSource: "rank_to_points_final_score_share",
     }));
 
     const rawPlayerEntries = bucket.flatMap(({ context, score, side }) => {
@@ -574,9 +576,17 @@ export function buildLegacyMatchdayResolvePreview(
         rankedTeam.pointSource = distributedPoints.pointSource;
         rankedTeam.teamPoints = distributedPoints.teamPoints;
         rankedTeam.warnings = Array.from(new Set([...rankedTeam.warnings, ...distributedPoints.warnings]));
-        rankedTeam.entries = rankedTeam.entries.map((entry, index) => ({
+        // PP nach playerId zuordnen, NICHT nach Index: distributedPoints.entries
+        // folgt der score-absteigenden `rankedWithinTeam`-Reihenfolge, während
+        // rankedTeam.entries in Slot-Reihenfolge vorliegt — ein Index-Zip würde
+        // die Punkte dem falschen Spieler geben (nur die Summe stimmt).
+        const pointsByPlayerId = new Map<string, number | null>();
+        rankedWithinTeam.forEach(({ entry }, index) => {
+          pointsByPlayerId.set(entry.playerId, distributedPoints.entries[index]?.points ?? null);
+        });
+        rankedTeam.entries = rankedTeam.entries.map((entry) => ({
           ...entry,
-          pointsAwarded: distributedPoints.entries[index]?.points ?? entry.pointsAwarded ?? null,
+          pointsAwarded: pointsByPlayerId.get(entry.playerId) ?? entry.pointsAwarded ?? null,
         }));
       }
 
@@ -593,6 +603,7 @@ export function buildLegacyMatchdayResolvePreview(
         captainBonus: entry.captainBonus ?? null,
         mutatorBonus: entry.mutatorBonus ?? null,
         mutatorPpsBonus: entry.mutatorPpsBonus ?? null,
+        formShare: entry.formShare ?? null,
         finalPlayerScore: entry.finalContribution ?? entry.score ?? 0,
         scoreContribution: total > 0 ? (entry.finalContribution ?? entry.score ?? 0) / total : 0,
         pointsAwarded: distributedPoints.entries[index]?.points ?? null,

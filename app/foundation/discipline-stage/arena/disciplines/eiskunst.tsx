@@ -267,14 +267,15 @@ export default function EiskunstField(props: DisciplineFieldProps): ReactNode {
         fill="rgba(235,246,255,.06)"
       />
 
-      {/* Spotlight beams */}
-      <polygon points={`180,0 300,${CY} 480,${CY} Z`} fill="url(#beam)" />
+      {/* Spotlight beams. Kein „Z" in <polygon points> — das ist ein Pfad-Befehl,
+          im points-Attribut ungültig („Expected number"). Polygone schließen selbst. */}
+      <polygon points={`180,0 300,${CY} 480,${CY}`} fill="url(#beam)" />
       <polygon
-        points={`720,0 430,${CY + 40} 620,${CY + 30} Z`}
+        points={`720,0 430,${CY + 40} 620,${CY + 30}`}
         fill="url(#beam)"
       />
       <polygon
-        points={`450,0 380,${CY - 40} 530,${CY - 40} Z`}
+        points={`450,0 380,${CY - 40} 530,${CY - 40}`}
         fill="url(#beam2)"
       />
 

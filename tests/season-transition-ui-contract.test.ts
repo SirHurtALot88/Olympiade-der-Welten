@@ -1,9 +1,10 @@
+import path from "node:path";
 import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
-const foundationClientPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx";
-const typesPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/data/olyDataTypes.ts";
+const foundationClientPath = path.join(process.cwd(), "app/foundation/FoundationPageClient.tsx");
+const typesPath = path.join(process.cwd(), "lib/data/olyDataTypes.ts");
 
 describe("season transition ui contract", () => {
   it("exposes game phases, close-season button and preview-first wizard", async () => {

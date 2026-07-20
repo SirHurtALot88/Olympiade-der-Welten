@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 
@@ -127,7 +128,7 @@ describe("fresh season one management loop seed", () => {
 
   it("keeps the full local season smoke free of hidden tie seeds and includes explicit matchday progress", () => {
     const source = fs.readFileSync(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/scripts/smoke-local-season-loop.ts",
+      path.join(process.cwd(), "scripts/smoke-local-season-loop.ts"),
       "utf8",
     );
 
@@ -139,10 +140,10 @@ describe("fresh season one management loop seed", () => {
 
   it("provides a multi-matchday smoke that reuses the first local loop and runs a second configured matchday", () => {
     const packageJson = JSON.parse(
-      fs.readFileSync("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/package.json", "utf8"),
+      fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
     ) as { scripts?: Record<string, string> };
     const source = fs.readFileSync(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/scripts/smoke-local-multi-matchday-loop.ts",
+      path.join(process.cwd(), "scripts/smoke-local-multi-matchday-loop.ts"),
       "utf8",
     );
 
@@ -155,18 +156,18 @@ describe("fresh season one management loop seed", () => {
 
   it("provides a dedicated local matchday auto-run service, route and smoke script", () => {
     const packageJson = JSON.parse(
-      fs.readFileSync("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/package.json", "utf8"),
+      fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
     ) as { scripts?: Record<string, string> };
     const serviceText = fs.readFileSync(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/season/matchday-auto-run-service.ts",
+      path.join(process.cwd(), "lib/season/matchday-auto-run-service.ts"),
       "utf8",
     );
     const routeText = fs.readFileSync(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/api/season/matchday-auto-run/route.ts",
+      path.join(process.cwd(), "app/api/season/matchday-auto-run/route.ts"),
       "utf8",
     );
     const smokeText = fs.readFileSync(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/scripts/smoke-matchday-auto-run.ts",
+      path.join(process.cwd(), "scripts/smoke-matchday-auto-run.ts"),
       "utf8",
     );
 
@@ -195,11 +196,11 @@ describe("fresh season one management loop seed", () => {
 
   it("documents the transfer window policy as a separate phase outside matchday auto-run", () => {
     const policyText = fs.readFileSync(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/docs/TRANSFER_WINDOW_POLICY.md",
+      path.join(process.cwd(), "docs/TRANSFER_WINDOW_POLICY.md"),
       "utf8",
     );
     const marketApplyRouteText = fs.readFileSync(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/api/ai/market-plan-apply/route.ts",
+      path.join(process.cwd(), "app/api/ai/market-plan-apply/route.ts"),
       "utf8",
     );
 
@@ -210,30 +211,30 @@ describe("fresh season one management loop seed", () => {
 
   it("provides a whole-season dryrun service, route and cockpit entry without real execute mode", () => {
     const packageJson = JSON.parse(
-      fs.readFileSync("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/package.json", "utf8"),
+      fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
     ) as { scripts?: Record<string, string> };
     const serviceText = fs.readFileSync(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/season/whole-season-dryrun-service.ts",
+      path.join(process.cwd(), "lib/season/whole-season-dryrun-service.ts"),
       "utf8",
     );
     const aliasServiceText = fs.readFileSync(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/season/whole-season-dry-run-service.ts",
+      path.join(process.cwd(), "lib/season/whole-season-dry-run-service.ts"),
       "utf8",
     );
     const routeText = fs.readFileSync(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/api/season/whole-season-dryrun/route.ts",
+      path.join(process.cwd(), "app/api/season/whole-season-dryrun/route.ts"),
       "utf8",
     );
     const aliasRouteText = fs.readFileSync(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/api/season/whole-season-dry-run/route.ts",
+      path.join(process.cwd(), "app/api/season/whole-season-dry-run/route.ts"),
       "utf8",
     );
     const smokeText = fs.readFileSync(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/scripts/smoke-whole-season-dry-run.ts",
+      path.join(process.cwd(), "scripts/smoke-whole-season-dry-run.ts"),
       "utf8",
     );
     const foundationText = fs.readFileSync(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx",
+      path.join(process.cwd(), "app/foundation/FoundationPageClient.tsx"),
       "utf8",
     );
 

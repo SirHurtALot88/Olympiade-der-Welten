@@ -17,7 +17,7 @@ import DisciplineStageEndScreen from "@/app/foundation/discipline-stage/Discipli
 import DisciplineStageStandingsDelta from "@/app/foundation/discipline-stage/DisciplineStageStandingsDelta";
 import DisciplineStageHighlights from "@/app/foundation/discipline-stage/DisciplineStageHighlights";
 import { type DisciplineStageTopPlayer } from "@/app/foundation/discipline-stage/DisciplineStageTopPlayers";
-import DisciplineStageNativeArena, { type StagePrimitive, type StageMotif, type StageEnv } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
+import DisciplineStageNativeArena, { type StagePrimitive, type StageMotif, type StageEnv, type StageLiveResultsByTeam } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
 import DisciplineStageDrawer, { type DisciplineStageDrawerTarget } from "@/app/foundation/discipline-stage/DisciplineStageDrawer";
 import DisciplineStageMatchdayPanel, { type MatchdayPanelStandingRow } from "@/app/foundation/discipline-stage/DisciplineStageMatchdayPanel";
 import { getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
@@ -652,6 +652,12 @@ export default function DisciplineStageArena({
     }
     return { d1, d2, standings, mutatorByTeam };
   }, [preview, gameState, matchdayId, briefingItems, standingsItems]);
+  // Die 2 aktiven Mutatoren dieser Disziplin (disziplin-weit gleich) — für die
+  // Anzeige „welche beiden es sind". Aus den mutatorSlots eines beliebigen Teams.
+  const disciplineMutators = useMemo<string[]>(() => {
+    const slots = engineDiscipline?.teamResults?.[0]?.mutatorSlots ?? [];
+    return slots.map((s) => s.label).filter((l): l is string => Boolean(l && l.trim()));
+  }, [engineDiscipline]);
 
   // Engine-Teams für die gewählte Disziplin (nur wenn sie an diesem Spieltag läuft).
   const engineTeams = useMemo(() => {
@@ -670,6 +676,11 @@ export default function DisciplineStageArena({
     () => (mode === "random" ? pickMutatorTraits(seed + hashStr(disciplineId)) : []),
     [mode, seed, disciplineId],
   );
+
+  // Anzuzeigende 2 Mutatoren dieser Disziplin: primär aus der echten Engine-
+  // Preview, sonst die Test-/Random-Traits — damit die Mutatoren in JEDER
+  // Disziplin sichtbar sind und nicht fehlen.
+  const shownMutators = disciplineMutators.length > 0 ? disciplineMutators : mutatorTraits;
 
   // Top-Spieler (links): aus der Engine-Preview oder — im Test/Modell-Modus —
   // die besten Netto-Werte über alle Teams.
@@ -855,6 +866,9 @@ export default function DisciplineStageArena({
   // Spoiler-Gate (A1): der Real-Modus-Endscreen darf erst erscheinen, wenn die
   // native Arena das Podest erreicht hat. Bei Remount (Disziplin/Modus/Seed) zurück.
   const [arenaEnded, setArenaEnded] = useState(false);
+  // Live-Ergebnisse aufgedeckter Spieler (aus der Arena gemeldet) → Team-Drawer
+  // zeigt „geholt + Boni/Abzüge" für Spieler, die schon dran waren.
+  const [liveResultsByTeam, setLiveResultsByTeam] = useState<StageLiveResultsByTeam>({});
   useEffect(() => {
     setArenaEnded(false);
   }, [disciplineId, mode, seed]);
@@ -885,6 +899,29 @@ export default function DisciplineStageArena({
             {devMode ? "Disziplin-Bühne · Test-Modus · echte Save-Werte" : "Disziplin-Bühne"}
           </div>
           <h1 style={{ margin: "4px 0 0", fontSize: 30, fontWeight: 800 }}>{model.disciplineName}</h1>
+          {/* Die 2 aktiven Mutatoren dieser Disziplin — sichtbar direkt an der
+              Disziplin, in JEDER Disziplin (darf nicht fehlen). */}
+          {shownMutators.length > 0 ? (
+            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+              <span style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800 }}>Mutatoren</span>
+              {shownMutators.map((m, i) => (
+                <span
+                  key={i}
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 800,
+                    color: "var(--nl-accent)",
+                    padding: "3px 10px",
+                    borderRadius: 999,
+                    background: "color-mix(in srgb, var(--nl-accent) 12%, var(--nl-panel))",
+                    border: "1px solid color-mix(in srgb, var(--nl-accent) 45%, var(--nl-line))",
+                  }}
+                >
+                  {m}
+                </span>
+              ))}
+            </div>
+          ) : null}
           {devMode ? (
             <div style={{ fontSize: 13, color: "var(--nl-mut)", marginTop: 4, maxWidth: 720 }}>
               Alle {model.teams.length} Teams mit ihren echten Top-{model.slotCount}-Spielern aus dem Save.
@@ -1005,6 +1042,7 @@ export default function DisciplineStageArena({
         onPreviewPlayer={previewPlayer}
         onEnded={() => setArenaEnded(true)}
         onReset={() => setArenaEnded(false)}
+        onResults={setLiveResultsByTeam}
         topPlayers={topPlayers}
         primitive={NATIVE_PRIMITIVE[disciplineId] ?? "track"}
         disciplineId={disciplineId}
@@ -1057,6 +1095,8 @@ export default function DisciplineStageArena({
                 <div
                   key={slot.playerId}
                   onClick={() => openDrawerPinned({ kind: "player", playerId: slot.playerId })}
+                  onMouseEnter={() => previewPlayer(slot.playerId)}
+                  onMouseLeave={() => previewPlayer(null)}
                   title="Spieler-Karte öffnen"
                   style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid var(--nl-line)", fontVariantNumeric: "tabular-nums", fontSize: 13, cursor: "pointer", borderRadius: 6 }}
                 >
@@ -1165,6 +1205,8 @@ export default function DisciplineStageArena({
       gameState={gameState}
       disciplineId={disciplineId}
       fieldedPlayerIdsByTeam={fieldedByTeam}
+      liveResultsByTeam={liveResultsByTeam}
+      disciplineMutators={shownMutators}
       onClose={() => {
         setDrawerTarget(null);
       }}

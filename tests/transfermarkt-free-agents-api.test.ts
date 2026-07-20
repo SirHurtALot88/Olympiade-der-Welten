@@ -9,6 +9,7 @@ vi.mock("@/lib/market/transfermarkt-read-service", () => ({
 
 vi.mock("@/lib/market/transfermarkt-local-service", () => ({
   listLocalTransfermarktFreeAgents,
+  resolveTransferBuyAffordabilityCash: vi.fn((input: { teamCash: number }) => input.teamCash),
 }));
 
 describe("transfermarkt free agents api", () => {
@@ -61,7 +62,10 @@ describe("transfermarkt free agents api", () => {
       search: "ark",
       minMarketValue: null,
       maxMarketValue: null,
+      minSalary: null,
+      maxSalary: null,
       scoutingLevel: null,
+      compactList: true,
     });
     expect(listTransfermarktFreeAgents).not.toHaveBeenCalled();
     expect(body.total).toBe(1);
@@ -119,7 +123,10 @@ describe("transfermarkt free agents api", () => {
       search: null,
       minMarketValue: null,
       maxMarketValue: null,
+      minSalary: null,
+      maxSalary: null,
       scoutingLevel: null,
+      compactList: true,
     });
     expect(listLocalTransfermarktFreeAgents).not.toHaveBeenCalled();
     expect(body.scope.saveId).toBe("save-initial");

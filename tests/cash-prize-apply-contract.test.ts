@@ -1,3 +1,4 @@
+import path from "node:path";
 import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
@@ -5,7 +6,7 @@ import { describe, expect, it } from "vitest";
 describe("cash prize apply contract", () => {
   it("exists as a blocked skeleton route", async () => {
     const route = await fs.readFile(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/api/season/cash-prize-apply/route.ts",
+      path.join(process.cwd(), "app/api/season/cash-prize-apply/route.ts"),
       "utf8",
     );
 
@@ -16,11 +17,11 @@ describe("cash prize apply contract", () => {
 
   it("documents allowed and forbidden tables for future apply paths", async () => {
     const standingsPlan = await fs.readFile(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/docs/STANDINGS_APPLY_PLAN.md",
+      path.join(process.cwd(), "docs/STANDINGS_APPLY_PLAN.md"),
       "utf8",
     );
     const cashPlan = await fs.readFile(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/docs/CASH_PRIZE_APPLY_PLAN.md",
+      path.join(process.cwd(), "docs/CASH_PRIZE_APPLY_PLAN.md"),
       "utf8",
     );
 

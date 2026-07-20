@@ -1,3 +1,4 @@
+import path from "node:path";
 import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
@@ -122,15 +123,15 @@ describe("legacy lineup lab helpers", () => {
 
   it("keeps ai preview adoption inside the local ui draft without auto-saving", async () => {
     const fileText = await fs.readFile(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx",
+      path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"),
       "utf8",
     );
     const slotRoleText = await fs.readFile(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/lineups/matchday-slot-roles.ts",
+      path.join(process.cwd(), "lib/lineups/matchday-slot-roles.ts"),
       "utf8",
     );
     const dragDropText = await fs.readFile(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/lineups/legacy-lineup-drag-drop.ts",
+      path.join(process.cwd(), "lib/lineups/legacy-lineup-drag-drop.ts"),
       "utf8",
     );
 

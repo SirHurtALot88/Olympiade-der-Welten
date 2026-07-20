@@ -30,6 +30,7 @@ export type PlayerPerformancePreview = {
   captainBonus?: number | null;
   mutatorBonus?: number | null;
   mutatorPpsBonus?: number | null;
+  formShare?: number | null; // pro Spieler angewandter Form-Anteil (flach + Jitter)
   finalPlayerScore: number;
   scoreContribution: number;
   pointsAwarded: number | null;
@@ -104,6 +105,7 @@ export type DisciplineTeamResolvePreview = {
     captainBonus: number | null;
     mutatorBonus?: number | null;
     mutatorPpsBonus?: number | null;
+    formShare?: number | null; // pro Spieler angewandter Form-Anteil (flach + Jitter)
     finalPlayerScore: number | null;
     pointsAwarded?: number | null;
     isCaptain: boolean;
