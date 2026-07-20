@@ -309,8 +309,11 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
 
         return (
           <g key={`tower-${t.code}`}>
-            {/* Gewichts-Turm: von baseY (unten) bis y (oben) — Stäbe + Platten */}
-            {colH > 2 && (
+            {/* Gewichts-Turm: von baseY (unten) bis y (oben) — Stäbe + Platten.
+                Erst NACH dem ersten Versuch (thrownSlot ≥ 0) zeichnen — vorher lagen die
+                Platten von Anfang an da und überlagerten die Team-Logos. Der Turm wird VOR
+                den Token gerendert → liegt ohnehin UNTER dem Logo. */}
+            {colH > 2 && t.thrownSlot >= 0 && (
               <g opacity={bbOut ? 0.42 : 1} style={{ transition: reducedMotion ? "none" : `transform ${TRACK_ROUND_MS}ms cubic-bezier(.45,0,.2,1)` }}>
                 {/* Dünner Haupt-Stab (the bar) */}
                 <rect x={laneX - 1.5} y={y} width={3} height={colH} fill="rgba(143,166,192,.5)" />
