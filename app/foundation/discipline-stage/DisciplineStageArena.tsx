@@ -990,14 +990,13 @@ export default function DisciplineStageArena({
         env={DISCIPLINE_SKIN[disciplineId]?.env}
       />
 
-      {/* Team-Matchday-PP-Panel (Ticket 205): unter der Arena, immer sichtbar sobald echte
-          Spieltags-Daten vorliegen und die aktive Disziplin zu diesem Spieltag gehört.
-          Enthüllt schrittweise (d1 nach Disziplin-1-Ende, d2 + finaler Saison-Rang nach
-          Disziplin-2-Ende) — kein Spoiler. */}
-      {mode === "real" &&
-      preview &&
-      matchdayPanel &&
-      (matchdayPanel.d1?.disciplineId === disciplineId || matchdayPanel.d2?.disciplineId === disciplineId) ? (
+      {/* Team-Matchday-PP-Panel (Ticket 205 · Pflicht-Feature Ticket 219): unter der Arena, IMMER
+          sichtbar sobald echte Spieltags-Daten vorliegen — in JEDER Disziplin, nicht nur den
+          zwei geplanten. Ist die offene Disziplin eine der beiden Spieltags-Disziplinen, wird
+          schrittweise enthüllt (d1 nach Disziplin-1-Ende, d2 + finaler Saison-Rang nach
+          Disziplin-2-Ende); sonst zeigt es den Spieltags-Fahrplan + Saisonstand (PP gesperrt,
+          kein Spoiler). Beide Disziplinen des Spieltags werden zusammengefasst. */}
+      {mode === "real" && preview && matchdayPanel ? (
         <div style={{ marginTop: 14 }}>
           <DisciplineStageMatchdayPanel
             teamResults={preview.teamResults}
