@@ -115,6 +115,16 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
   gridRef.current = gridByCode;
   const finalMaxRef = useRef(finalMax);
   finalMaxRef.current = finalMax;
+  // Streuungs-Basis = Punkte des aktuellen RUNDEN-Führenden (dynamisch, NICHT die 5-Runden-
+  // Endsumme). So nutzt das Feld JEDE Etappe die volle Breite: der Führende steht ganz an der
+  // Mitte, die anderen anteilig davor → man sieht sofort, wer vorn und hinten ist (statt Klumpen).
+  let spreadMax = 1;
+  for (const t of rt) {
+    const s = t.displayScore || 0;
+    if (s > spreadMax) spreadMax = s;
+  }
+  const spreadMaxRef = useRef(spreadMax);
+  spreadMaxRef.current = spreadMax;
 
   // Ziel-Position eines Teams: vom Startslot Richtung Mitte, Anteil = Fortschritt
   // (score/finalMax). Bei 0 Punkten steht es auf dem Slot (breit verteilt, sichtbar);
@@ -122,9 +132,12 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
   // die Ordnung entsteht erst mit den Punkten. (Ohne Kollisions-Relaxation — die macht die rAF.)
   const idealOf = (t: RT, score: number): { x: number; y: number } => {
     const g = gridOf(t);
-    const fm = finalMax > 0 ? finalMax : 1;
-    const pull = Math.max(0, Math.min(1, score / fm)) * 0.9;
-    return { x: g.x + (CXc - g.x) * pull, y: g.y + (CY - g.y) * pull };
+    const fm = spreadMax > 0 ? spreadMax : 1;
+    const pull = Math.max(0, Math.min(1, score / fm)) * 0.95;
+    // X zieht kräftig zur Mitte (Führender = Zentrum). Y nur zur HÄLFTE → die vertikale
+    // Streuung der Startkolonne bleibt erhalten, damit die Reihenfolge klar ablesbar ist
+    // (kein Zusammenklumpen auf einen Punkt).
+    return { x: g.x + (CXc - g.x) * pull, y: g.y + (CY - g.y) * pull * 0.5 };
   };
 
   // Treffer-Melder oben mittig.
@@ -147,13 +160,14 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
       const frozen = hoverRef.current != null || pausedRef.current;
       if (!frozen) {
         const grid = gridRef.current;
-        const fm = finalMaxRef.current > 0 ? finalMaxRef.current : 1;
-        // 1) Ideal-Ziel je Token: vom Startslot Richtung Mitte, Anteil = Fortschritt.
+        const fm = spreadMaxRef.current > 0 ? spreadMaxRef.current : 1;
+        // 1) Ideal-Ziel je Token: vom Startslot Richtung Mitte, Anteil = Fortschritt gegen
+        //    den Runden-Führenden (volle Breite pro Etappe). Y nur zur Hälfte → Streuung bleibt.
         const P: { t: RT; r: number; x: number; y: number }[] = [];
         for (const t of rtRef.current) {
           const g = grid.get(t.code) ?? { x: (GRID_X0 + GRID_X1) / 2, y: CY };
-          const pull = Math.max(0, Math.min(1, t.animScore / fm)) * 0.9;
-          P.push({ t, r: t.isOwn ? RBOwn : RB, x: g.x + (CXc - g.x) * pull, y: g.y + (CY - g.y) * pull });
+          const pull = Math.max(0, Math.min(1, t.animScore / fm)) * 0.95;
+          P.push({ t, r: t.isOwn ? RBOwn : RB, x: g.x + (CXc - g.x) * pull, y: g.y + (CY - g.y) * pull * 0.5 });
         }
         // 2) Kollisions-Relaxation: Überlappungen paarweise auseinanderdrücken (deterministisch
         //    aus den Ideal-Positionen → glatt Frame-zu-Frame, kein Zittern). Wenige Iterationen.
