@@ -64,6 +64,8 @@ export type DisciplineStageDrawerProps = {
   fieldedPlayerIdsByTeam?: Record<string, string[]>;
   /** Live-Ergebnisse aufgedeckter Spieler je Team (Netto + Boni/Abzüge + PP). */
   liveResultsByTeam?: StageLiveResultsByTeam;
+  /** Die 2 aktiven Mutatoren dieser Disziplin (welche beiden es sind). */
+  disciplineMutators?: string[];
 };
 
 // ---------------------------------------------------------------------------
@@ -724,6 +726,7 @@ function TeamBody({
   onSelectPlayer,
   fieldedPlayerIdsByTeam,
   liveResultsByTeam,
+  disciplineMutators,
 }: {
   gameState: GameState;
   teamId: string;
@@ -731,6 +734,7 @@ function TeamBody({
   onSelectPlayer?: ((playerId: string) => void) | null;
   fieldedPlayerIdsByTeam?: Record<string, string[]>;
   liveResultsByTeam?: StageLiveResultsByTeam;
+  disciplineMutators?: string[];
 }) {
   const team = findTeam(gameState, teamId);
   // Live-Ergebnis je Spieler-ID für dieses Team (schnelle Lookup-Map).
@@ -893,6 +897,29 @@ function TeamBody({
 
       {/* Sektion 1: In dieser Disziplin (--accent, primär) */}
       <Section title="In dieser Disziplin" accentRole="primary" emphasis right={<span style={{ fontSize: 11, fontWeight: 700, color: "var(--accent)" }}>{disciplineName(gameState, disciplineId)}</span>}>
+        {/* Die 2 aktiven Mutatoren dieser Disziplin — „welche beiden es sind", darf
+            in keiner Disziplin fehlen. */}
+        {disciplineMutators && disciplineMutators.length > 0 ? (
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+            <span style={{ fontSize: 9.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800 }}>Mutatoren</span>
+            {disciplineMutators.map((m, i) => (
+              <span
+                key={i}
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: "var(--accent2, var(--nl-accent))",
+                  padding: "2px 8px",
+                  borderRadius: 999,
+                  background: "color-mix(in srgb, var(--accent2, var(--nl-accent)) 12%, var(--nl-panel))",
+                  border: "1px solid color-mix(in srgb, var(--accent2, var(--nl-accent)) 45%, var(--nl-line))",
+                }}
+              >
+                {m}
+              </span>
+            ))}
+          </div>
+        ) : null}
         {hasDraft && onSchedule && section1.length > 0 ? (
           <div className="dstage-portrait-rail-grid">
             {section1
@@ -1013,6 +1040,7 @@ export default function DisciplineStageDrawer({
   onSelectPlayer,
   fieldedPlayerIdsByTeam,
   liveResultsByTeam,
+  disciplineMutators,
   onClose,
 }: DisciplineStageDrawerProps): React.JSX.Element | null {
   // Erst nach dem Mount in document.body portalen (SSR-fest) — verhindert, dass ein
@@ -1198,6 +1226,7 @@ export default function DisciplineStageDrawer({
               onSelectPlayer={onSelectPlayer}
               fieldedPlayerIdsByTeam={fieldedPlayerIdsByTeam}
               liveResultsByTeam={liveResultsByTeam}
+              disciplineMutators={disciplineMutators}
             />
           )}
         </div>
