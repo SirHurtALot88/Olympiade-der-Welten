@@ -46,6 +46,7 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
     openHover,
     scheduleHoverClose,
     onOpenTeam,
+    handoffActive,
   } = props;
 
   // Per-Token-Gleit-Zustand (idx → Glide) und die DOM-<g>-Refs (imperative Bewegung).
@@ -268,6 +269,16 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
               }}
             >
               {glowing ? <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={4} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.1s ease-in-out infinite" }} /> : null}
+              {/* Staffelstab-Übergabe (FEATURE 1): kurzer Funke (Strich + →) auf der Vorderkante
+                  des Tokens, der beim Etappen-Glide nach vorn gereicht wird. Eigenes Team heller
+                  (Akzent), andere gedämpft. Token-lokal, kollidiert nicht mit dem späteren,
+                  gestaffelten Spotlight/Flash. Reduced-Motion: der Host liefert handoffActive=false. */}
+              {!reducedMotion && handoffActive ? (
+                <g transform={`translate(${r + 3} 0)`} style={{ animation: "olyHandoff 600ms ease-out" }} opacity={t.isOwn ? 1 : 0.7}>
+                  <line x1={0} y1={0} x2={9} y2={0} stroke={t.isOwn ? "var(--nl-accent)" : "var(--nl-warn)"} strokeWidth={2.6} strokeLinecap="round" />
+                  <text x={13} y={0} dominantBaseline="central" fontSize={11} fontWeight={900} fill={t.isOwn ? "var(--nl-accent)" : "var(--nl-warn)"}>→</text>
+                </g>
+              ) : null}
               {rc ? <circle r={r + 5.5} fill="none" stroke={rc} strokeWidth={2.4} opacity={0.95} /> : null}
               {medal ? <circle r={r + 3.5} fill="none" stroke={medal} strokeWidth={t.isOwn ? 4.5 : 3.5} /> : null}
               {t.logoUrl ? (

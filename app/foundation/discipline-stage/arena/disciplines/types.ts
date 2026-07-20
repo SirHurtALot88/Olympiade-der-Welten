@@ -58,6 +58,10 @@ export type DisciplineFieldProps = {
   reducedMotion: boolean; // prefers-reduced-motion → keine Animation
   paused: boolean; // Leertaste-Pause (manuell) — rAF-getriebene Felder frieren die Bewegung ein
 
+  // Staffelstab-Übergabe (nur track): true im ~600ms-Fenster nach einem Etappen-Glide-Start.
+  // Der Host berechnet es (now < handoffTs + 600); das Track-Feld zeigt dann den Stab-Funken.
+  handoffActive?: boolean;
+
   // ---- Viewport / Geometrie ---------------------------------------------------------
   W: number; // viewBox-Breite
   H: number; // viewBox-Höhe

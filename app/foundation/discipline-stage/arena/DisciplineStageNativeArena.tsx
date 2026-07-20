@@ -99,6 +99,7 @@ export type DisciplineStageNativeArenaProps = {
   onHoverTeam?: ((teamId: string | null) => void) | null; // Ladder-Hover → Team-Vorschau
   onPreviewPlayer?: ((playerId: string | null) => void) | null; // Top-Player-Hover → Vorschau
   onEnded?: (() => void) | null; // feuert einmal, sobald das Podest/Endstand erreicht ist (Spoiler-Gate)
+  onReset?: (() => void) | null; // „↻ Neu": hebt das Spoiler-Gate im Host wieder auf (arenaEnded=false)
   topPlayers?: { rows: DisciplineStageTopPlayer[]; ids: (string | null)[] } | null;
   primitive?: StagePrimitive;
   disciplineId?: string; // Disziplin-Identität für die Feld-Registry (mehrere Diszis teilen sich ein Primitive)
@@ -771,7 +772,9 @@ export function renderTerritory(sorted: RT[], W: number, H: number, env: StageEn
         const nm = span > 0 ? Math.max(0, Math.min(1, (t.score - min) / span)) : 1;
         const rc = relColor(t.rel);
         const med = t.rank === 1 ? "var(--nl-warn)" : t.rank === 2 ? "var(--nl-mut)" : t.rank === 3 ? "rgb(205,127,50)" : null;
-        const fill = rc ?? med ?? "hsl(80 40% 42%)";
+        // Beziehungsfarbe (rc) ist NUR Rahmen, nie Füllung (zell-übergreifender Kontrakt):
+        // die Zellfläche bleibt Medaillen-/Teamfarbe, rc kommt unten als stroke dazu (FIX B).
+        const fill = med ?? "hsl(80 40% 42%)";
         const pv = (t.score / total) * 100;
         const x = c.x + 1;
         const y = c.y + 1;
@@ -955,7 +958,7 @@ const TICKER_MAX = 40;
 type Spot = { crest: NativeStageTeam; idx: number; kick: string; name: string; sub: string; net: number; chipText: string; chipColor: string; mine: boolean; portraitUrl: string | null } | null;
 type PodCol = { place: number; code: string; name: string; pts: number; logoUrl: string | null; isOwn: boolean; idx: number; delayMs: number; loud: boolean };
 
-export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, onOpenTeam, onHoverTeam, onPreviewPlayer, onEnded, topPlayers, primitive = "track", disciplineId, progressLabel, disciplineName, accent, motif, env }: DisciplineStageNativeArenaProps) {
+export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, onOpenTeam, onHoverTeam, onPreviewPlayer, onEnded, onReset, topPlayers, primitive = "track", disciplineId, progressLabel, disciplineName, accent, motif, env }: DisciplineStageNativeArenaProps) {
   const skinAccent = accent ?? "var(--nl-line-2, var(--nl-line))";
   const slotCount = Math.max(1, slots.length);
   const prim = primitive;
@@ -1027,6 +1030,12 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const [ticker, setTicker] = useState<TickerData[]>([]);
   const [podium, setPodium] = useState<PodCol[] | null>(null);
   const [hover, setHover] = useState<{ idx: number } | null>(null);
+  // Staffelstab-Übergabe (nur track): kurzer Funke, der bei jedem Etappen-Glide-Start
+  // auf jedem Token nach vorn gereicht wird. handoffTs = Zeitstempel des letzten Wechsels.
+  const [handoffTs, setHandoffTs] = useState(0);
+  // Fotofinish (nur track): enges Rennen um Gold → Zeitlupen-Zoom auf den Zieleinlauf,
+  // bevor das eigentliche Podest erscheint.
+  const [photoFinish, setPhotoFinish] = useState(false);
   // Feld-Höhe wird auf die Höhe der Rangtabelle daneben gedeckelt, damit unter dem Feld
   // Läufer-Karte + Ticker immer sichtbar bleiben (Feld nie höher als die 32er-Rangliste).
   // Gilt für alle Primitives — geteilte Layout-Regel.
@@ -1136,6 +1145,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setPodium(null);
     setHover(null);
     setBanner(null);
+    setHandoffTs(0);
+    setPhotoFinish(false);
     setDemandKg(null);
     setBarbellMsg(null);
     barbellDemandRef.current = null;
@@ -1147,8 +1158,11 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     tier1Budget.current = 4;
     manualPauseRef.current = false;
     setPaused(false);
+    // „↻ Neu": Host-seitiges Spoiler-Gate (arenaEnded) wieder aufheben, damit der
+    // Real-Modus-Endscreen + „Spieltag auswerten"-Button beim Replay verschwinden (FIX A).
+    onReset?.();
     force();
-  }, [buildRT, clearTimers]);
+  }, [buildRT, clearTimers, onReset]);
 
   // Nur beim Mount zurücksetzen: der Host remountet die Arena bereits vollständig
   // via key={`${disciplineId}-${mode}-${seed}`}. Ein Reset bei jeder teams-Identität
@@ -1701,9 +1715,13 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     [prim, later],
   );
 
-  const pushTicker = useCallback((t: RT, slot: number, res: { player: NativeStagePlayer; net: number }, impact: Impact, rt: RT[]) => {
+  const pushTicker = useCallback((t: RT, slot: number, res: { player: NativeStagePlayer; net: number }, impact: Impact, _rt: RT[]) => {
     const p = res.player;
-    const sr = slotRankOf(slot, t, rt);
+    // Ticker-Slot-Rang MUSS mit dem Medaillen-Rang übereinstimmen: beide lesen den
+    // vorab bestimmten roundSlotRank (Ties → eindeutig via seasonRank), nicht slotRankOf
+    // (Ties → gleicher Rang) — sonst weichen Ticker-Zahl und Medaillenring bei Gleichstand
+    // um eins ab (FIX C).
+    const sr = t.roundSlotRank;
     const delta = t.roundDelta;
     const badgeMap: Record<string, [string, string]> = {
       star: ["var(--nl-warn)", "⭐ Star"],
@@ -1773,27 +1791,47 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     const rt = rtRef.current;
     const top3 = [...rt].sort((a, b) => b.score - a.score || a.seasonRank - b.seasonRank).slice(0, 3);
     if (top3.length === 0) return;
-    // visuelle Reihenfolge [P2, P1, P3]; Aufstieg P3→P2→P1
-    const visual: (RT | undefined)[] = [top3[1], top3[0], top3[2]];
-    const place = [2, 1, 3];
-    const delayByVisual = [740, 1180, 300];
-    const cols: PodCol[] = [];
-    visual.forEach((t, i) => {
-      if (!t) return;
-      cols.push({ place: place[i], code: t.code, name: t.name, pts: t.score, logoUrl: t.logoUrl, isOwn: t.isOwn, idx: t.idx, delayMs: delayByVisual[i], loud: place[i] === 1 });
-    });
-    setPodium(cols);
-    fireFlash("gold");
-    cols.forEach((c) => later(() => { audio.wumms(c.loud ? 1.15 : 0.7); if (c.loud) doShake(false); }, c.delayMs));
-    later(() => {
-      setEnded(true);
-      // Endstand erreicht → Host darf den Real-Modus-Endscreen zeigen (Spoiler-Gate A1).
-      if (!endedFiredRef.current) {
-        endedFiredRef.current = true;
-        onEnded?.();
-      }
-    }, 2400);
-  }, [audio, fireFlash, doShake, later, onEnded]);
+    // Eigentliche Podest-Enthüllung — als innere Funktion gehalten, damit ein
+    // Fotofinish (enges Rennen) sie um ~1,2 s verzögern kann (FEATURE 2). onEnded
+    // feuert ausschließlich hier drin (endedFiredRef-Guard) → genau einmal je Lauf.
+    const revealPodium = () => {
+      // visuelle Reihenfolge [P2, P1, P3]; Aufstieg P3→P2→P1
+      const visual: (RT | undefined)[] = [top3[1], top3[0], top3[2]];
+      const place = [2, 1, 3];
+      const delayByVisual = [740, 1180, 300];
+      const cols: PodCol[] = [];
+      visual.forEach((t, i) => {
+        if (!t) return;
+        cols.push({ place: place[i], code: t.code, name: t.name, pts: t.score, logoUrl: t.logoUrl, isOwn: t.isOwn, idx: t.idx, delayMs: delayByVisual[i], loud: place[i] === 1 });
+      });
+      setPodium(cols);
+      fireFlash("gold");
+      cols.forEach((c) => later(() => { audio.wumms(c.loud ? 1.15 : 0.7); if (c.loud) doShake(false); }, c.delayMs));
+      later(() => {
+        setEnded(true);
+        // Endstand erreicht → Host darf den Real-Modus-Endscreen zeigen (Spoiler-Gate A1).
+        if (!endedFiredRef.current) {
+          endedFiredRef.current = true;
+          onEnded?.();
+        }
+      }, 2400);
+    };
+    // Fotofinish (nur track): Gold-Abstand winzig → Zeitlupen-Zoom auf den Zieleinlauf,
+    // dann erst das Podest. Reduced-Motion: direkt enthüllen (kein Zoom, keine Verzögerung).
+    const close = top3.length >= 2 && (top3[0]!.score - top3[1]!.score) <= Math.max(2.5, finalMax * 0.015);
+    if (close && !reduced.current) {
+      popBanner("📸 Fotofinish · Zieleinlauf", "gold");
+      setPhotoFinish(true);
+      audio.riser();
+      later(() => {
+        setPhotoFinish(false);
+        audio.star();
+        revealPodium();
+      }, 1200);
+    } else {
+      revealPodium();
+    }
+  }, [audio, fireFlash, doShake, later, onEnded, finalMax, popBanner]);
 
   // ---- Reveal-Cascade ----
   const advance = useCallback(() => {
@@ -1833,6 +1871,14 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       rt.forEach((t) => {
         t.displayScore = round1(t.score + playerNet(t.players[r]));
       });
+      // Staffelstab-Übergabe (FEATURE 1): bei jedem Etappenwechsel (ab Etappe 2 — Etappe 1
+      // hat keinen abgebenden Läufer) reicht jedes Token seinen Stab nach vorn. Ein einziger
+      // leiser globaler Cue (nicht pro Token). Reduced-Motion: komplett übersprungen.
+      if (r >= 1 && !reduced.current) {
+        setHandoffTs(Date.now());
+        audio.risingPing(4);
+        later(() => force(), 650);
+      }
     }
     // Gewichtheben · Kraft-Turm: die geforderte Last (goldene Latte) steigt eine Stufe.
     // Alle Heber + die Latte gleiten simultan (dur = TRACK_ROUND_MS). Wer die neue Last
@@ -2005,6 +2051,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setFrags([]);
     setTicker([]);
     setBanner(null);
+    setHandoffTs(0);
+    setPhotoFinish(false);
     force();
     later(showPodium, 200);
   }, [slotCount, clearTimers, buildRT, later, showPodium]);
@@ -2069,6 +2117,66 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const me = rtRef.current.find((t) => t.isOwn) ?? null;
   const leader = sorted[0] ?? null;
   const now = Date.now();
+
+  // ---- Konsolidierte „Dein Team"-Karte (nur track) (FEATURE 3) ----
+  // Ersetzt den früheren MyTracker-Streifen UND die separate „Dein Läufer"-Karte durch
+  // eine kompakte 2-Zeilen-Karte: Kopf (Wappen · Name · Rang · Punkte · Δ zur Spitze ·
+  // aktueller Läufer-Mini mit Medaillenring + Spieler-Drawer-Klick) und ein Split-Strip
+  // mit einem Chip je Etappe. Als lokale Render-Funktion (wiederverwendbar, nicht nur inline).
+  const renderMyTeamCard = () => {
+    if (!me) return null;
+    const stageIdx = me.thrownSlot >= 0 ? me.thrownSlot : Math.min(round, slotCount - 1);
+    const runner = me.players[stageIdx] ?? null;
+    const revealed = me.thrownSlot >= 0;
+    const runnerSlotRank = revealed ? slotRankOf(me.thrownSlot, me, rtRef.current) : null;
+    const runnerMedal: "gold" | "silver" | "bronze" | null = runnerSlotRank === 1 ? "gold" : runnerSlotRank === 2 ? "silver" : runnerSlotRank === 3 ? "bronze" : null;
+    const clickable = Boolean(onOpenPlayer && runner?.playerId);
+    const deltaToLeader = me.rank === 1 ? "Führung" : "−" + fmt1((leader?.score ?? me.score) - me.score);
+    return (
+      <div style={{ marginBottom: 10, borderRadius: 12, border: "1px solid var(--nl-accent)", background: "color-mix(in srgb, var(--nl-accent) 10%, transparent)", padding: "8px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
+        {/* Kopfzeile: Wappen · Name · Rang · Punkte · Δ · Läufer-Mini (rechts) */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span aria-hidden style={{ width: 22, height: 22, borderRadius: "50%", flex: "none", overflow: "hidden", background: me.logoUrl ? "transparent" : `hsl(${hueForIdx(me.idx)} 60% 52%)`, display: "grid", placeItems: "center" }}>
+            {me.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={me.logoUrl} alt="" width={22} height={22} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} style={{ width: 22, height: 22, objectFit: "cover" }} />
+            ) : null}
+          </span>
+          <span style={{ fontWeight: 800, color: "var(--nl-accent)" }}>★ {me.name} ({me.code})</span>
+          <span style={{ fontWeight: 800, color: ampel(me.rank) }}>Rang {me.rank}</span>
+          <span style={{ fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{fmt1(me.score)} Pkt</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: me.rank === 1 ? "var(--nl-good)" : "var(--nl-mut)" }}>{deltaToLeader}</span>
+          <div
+            onClick={clickable ? () => onOpenPlayer!(runner!.playerId!) : undefined}
+            onMouseEnter={onPreviewPlayer && runner?.playerId ? () => onPreviewPlayer!(runner.playerId) : undefined}
+            onMouseLeave={onPreviewPlayer ? () => onPreviewPlayer!(null) : undefined}
+            title={clickable ? "Spieler-Karte öffnen" : undefined}
+            style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0, cursor: clickable ? "pointer" : "default" }}
+          >
+            <PlayerMark src={runner?.portraitUrl ?? null} alt={runner?.name ?? ""} size={26} isOwn medal={runnerMedal} />
+            <span style={{ fontSize: 12.5, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>🏃 {runner?.name ?? "—"}</span>
+          </div>
+        </div>
+        {/* Split-Strip: ein Chip je Etappe (Wert erst nach Auftritt; Etappen-Bester golden). */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, fontSize: 11, fontVariantNumeric: "tabular-nums" }}>
+          {Array.from({ length: slotCount }, (_, s) => {
+            const thrown = me.thrownSlot >= 0 && s <= me.thrownSlot;
+            const best = thrown && slotRankOf(s, me, rtRef.current) === 1;
+            const histRank = me.rankHistory[s];
+            return (
+              <div key={s} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, minWidth: 32, opacity: thrown ? 1 : 0.45 }}>
+                <span style={{ padding: "2px 6px", borderRadius: 6, fontWeight: 800, whiteSpace: "nowrap", border: `1px solid ${best ? "var(--nl-warn)" : "var(--nl-line)"}`, color: best ? "var(--nl-warn)" : "inherit", background: best ? "color-mix(in srgb, var(--nl-warn) 14%, transparent)" : "transparent" }}>
+                  {best ? "🥇 " : ""}{slots[s] ?? "E" + (s + 1)} {thrown ? "+" + fmt1(playerNet(me.players[s])) : "—"}
+                </span>
+                <span aria-hidden style={{ width: 6, height: 6, borderRadius: "50%", background: histRank != null ? ampel(histRank) : "var(--nl-line)" }} />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   // ---- Gewichtheben · Kraft-Turm: abgeleitete Render-Werte (Rangfolge nach kg) ----
   const barbellSorted = prim === "barbell" ? barbellOrder() : sorted;
   const barbellRankMap: Record<string, number> = {};
@@ -2159,6 +2267,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     env,
     reducedMotion: reduced.current,
     paused, // Leertaste-Pause → rAF-Felder frieren ein
+    // Staffelstab-Übergabe (FEATURE 1): aktiv im 600ms-Fenster nach einem Etappen-Glide-Start.
+    handoffActive: !reduced.current && now < handoffTs + 600,
     W,
     H,
     N,
@@ -2214,6 +2324,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         @keyframes olyPodRise{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
         @keyframes olyGlowPulse{0%,100%{opacity:.35}50%{opacity:.9}}
         @keyframes olyBanner{0%{opacity:0;transform:translate(-50%,-14px) scale(.92)}12%{opacity:1;transform:translate(-50%,0) scale(1)}85%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-8px) scale(1)}}
+        @keyframes olyHandoff{0%{opacity:0}22%{opacity:1}100%{opacity:0}}
+        @keyframes olyScan{from{top:0}to{top:100%}}
         @media (prefers-reduced-motion: reduce){.oly-anim{animation:none!important;opacity:1!important}}
       `}</style>
 
@@ -2340,8 +2452,12 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           />
         ) : null}
 
-        {/* MyTracker */}
-        {me && prim !== "barbell" ? (
+        {/* Dein Team (track): EINE konsolidierte Karte (ersetzt MyTracker-Streifen +
+            „Dein Läufer"-Karte). Andere Nicht-Barbell-Primitive behalten den schlanken
+            MyTracker-Streifen. */}
+        {me && prim === "track" ? (
+          renderMyTeamCard()
+        ) : me && prim !== "barbell" ? (
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 12px", marginBottom: 10, borderRadius: 12, border: "1px solid var(--nl-accent)", background: "color-mix(in srgb, var(--nl-accent) 10%, transparent)" }}>
             <span style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 800, color: "var(--nl-accent)" }}>Dein Team · {me.code}</span>
             <span style={{ fontWeight: 800 }}>Rang {me.rank}</span>
@@ -2427,7 +2543,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
 
         {/* Oval-Track + Overlays */}
         <div className={shake !== "none" ? "oly-anim" : undefined} style={{ position: "relative", borderRadius: 14, overflow: "hidden", border: "1px solid var(--nl-line)", background: "var(--nl-bg)", animation: shake === "hard" ? "olyShakeHard .44s ease" : shake === "soft" ? "olyShakeSoft .3s ease" : undefined }}>
-          <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "auto", maxHeight: fieldMaxH ? fieldMaxH : "calc(100vh - 220px)", display: "block", margin: "0 auto" }}>
+          <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "auto", maxHeight: fieldMaxH ? fieldMaxH : "calc(100vh - 220px)", display: "block", margin: "0 auto", transform: photoFinish ? "scale(1.6)" : undefined, transformOrigin: "26% 11%", transition: reduced.current ? undefined : "transform .5s ease" }}>
             <FieldComp {...fieldCtx} />
           </svg>
 
@@ -2446,6 +2562,17 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           {/* Flash */}
           {flash ? (
             <div key={flash.id} style={{ position: "absolute", inset: 0, pointerEvents: "none", background: `radial-gradient(circle at 50% 46%, rgba(${FLASH_COLOR[flash.color] ?? FLASH_COLOR.gold},.5), transparent 62%)`, animation: reduced.current ? "none" : "olyFlash .5s ease" }} />
+          ) : null}
+
+          {/* Fotofinish-Overlay (FEATURE 2, nur track, enges Rennen): abdunkelnde/entsättigende
+              Vignette lässt den Zieleinlauf (oben links, 26%/11%) hell, plus eine Scan-Linie,
+              die von oben nach unten wandert. Nur während photoFinish. overflow:hidden des
+              Shake-Containers beschneidet das gezoomte SVG. */}
+          {photoFinish ? (
+            <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 5 }}>
+              <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 26% 11%, transparent 0%, transparent 18%, color-mix(in srgb, var(--nl-bg) 60%, transparent) 46%, color-mix(in srgb, var(--nl-bg) 88%, transparent) 100%)" }} />
+              <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 2, background: "var(--nl-warn)", boxShadow: "0 0 10px var(--nl-warn)", animation: "olyScan 1.1s linear" }} />
+            </div>
           ) : null}
 
           {/* Team-Hovercard — absolute IM Shake-Container (Fix: kein position:fixed
@@ -2690,61 +2817,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
 
         </div>
 
-        {/* „Dein Läufer"-Karte (track): aktueller Etappen-Läufer deines Teams mit
-            Portrait, Name, Etappe k/N, Platz und letzter Slot-Wertung (Slot-Rang + +N).
-            Rendert UNTER dem Oval (nicht mehr als Overlay über der Laufstrecke), damit
-            die Bahn/Token-Bewegung frei bleibt. Inhalte unverändert (Feature-Parität). */}
-        {prim === "track" && me && !podium
-          ? (() => {
-              const myThrown = me.thrownSlot;
-              const stageIdx = myThrown >= 0 ? myThrown : Math.min(round, slotCount - 1);
-              const runner = me.players[stageIdx] ?? null;
-              const revealed = myThrown >= 0;
-              const slotRank = revealed ? slotRankOf(myThrown, me, rtRef.current) : null;
-              const gain = revealed && me.players[myThrown] ? playerNet(me.players[myThrown]!) : null;
-              const medal: "gold" | "silver" | "bronze" | null = slotRank === 1 ? "gold" : slotRank === 2 ? "silver" : slotRank === 3 ? "bronze" : null;
-              const clickable = Boolean(onOpenPlayer && runner?.playerId);
-              return (
-                <div
-                  onClick={clickable ? () => onOpenPlayer!(runner!.playerId!) : undefined}
-                  onMouseEnter={onPreviewPlayer && runner?.playerId ? () => onPreviewPlayer!(runner.playerId) : undefined}
-                  onMouseLeave={onPreviewPlayer ? () => onPreviewPlayer!(null) : undefined}
-                  title={clickable ? "Spieler-Karte öffnen" : undefined}
-                  style={{
-                    marginTop: 12,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 10,
-                    maxWidth: 340,
-                    padding: "8px 14px 8px 8px",
-                    borderRadius: 12,
-                    border: "1px solid var(--nl-accent)",
-                    background: "color-mix(in srgb, var(--nl-bg) 84%, var(--nl-accent))",
-                    boxShadow: "0 8px 24px rgba(0,0,0,.45)",
-                    cursor: clickable ? "pointer" : "default",
-                  }}
-                >
-                  <PlayerMark src={runner?.portraitUrl ?? null} alt={runner?.name ?? ""} size={46} isOwn medal={medal} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 800, color: "var(--nl-accent)" }}>🏃 Dein Läufer · {me.code}</div>
-                    <div style={{ fontSize: 15, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{runner?.name ?? "—"}</div>
-                    <div style={{ fontSize: 11.5, color: "var(--nl-mut)", fontVariantNumeric: "tabular-nums" }}>
-                      Etappe {stageIdx + 1} / {slotCount} · Platz {me.rank}
-                      {revealed && slotRank != null ? (
-                        <>
-                          {" · "}
-                          <span style={{ color: "var(--nl-good)", fontWeight: 800 }}>
-                            Slot-Rang {slotRank}
-                            {gain != null ? ` · +${fmt1(gain)}` : ""}
-                          </span>
-                        </>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              );
-            })()
-          : null}
+        {/* („Dein Läufer"-Karte entfernt — in die konsolidierte „Dein Team"-Karte oben
+            über dem Oval integriert: Läufer-Mini + Medaillenring + Spieler-Drawer-Klick. */}
 
         {/* Top-Spieler-Zeile unter der Arena, ÜBER dem Ticker (nur bereits aufgedeckte Spieler) */}
         {revealedTopPlayers && revealedTopPlayers.rows.length > 0 ? (

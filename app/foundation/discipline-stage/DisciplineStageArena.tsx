@@ -900,6 +900,7 @@ export default function DisciplineStageArena({
         onHoverTeam={previewTeam}
         onPreviewPlayer={previewPlayer}
         onEnded={() => setArenaEnded(true)}
+        onReset={() => setArenaEnded(false)}
         topPlayers={topPlayers}
         primitive={NATIVE_PRIMITIVE[disciplineId] ?? "track"}
         disciplineId={disciplineId}
