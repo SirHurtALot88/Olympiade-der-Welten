@@ -156,6 +156,10 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
   const dLine = demandKg == null ? barbellInfo.axTop : demandKg;
   const barY = barbellY(dLine);
 
+  // Live-Zähler: wie viele Heber sind noch im Wettkampf (nicht an der Last gescheitert).
+  // Macht die Eliminations-Mechanik lesbar — „N/32 stemmen die geforderte Last noch".
+  const liveCount = demandKg == null ? rt.length : rt.filter((t) => !barbellEliminated(t.idx)).length;
+
   return (
     <>
       <defs>
@@ -232,6 +236,17 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
       <text x={rightX - 6} y={podY - 4} textAnchor="end" fontSize={13} pointerEvents="none">
         🏆
       </text>
+
+      {/* Live-Zähler „N/Total im Wettkampf" — zeigt die laufende Elimination (oben rechts). */}
+      <g transform={`translate(${rightX - 6} 26)`} pointerEvents="none">
+        <rect x={-96} y={-15} width={96} height={22} rx={6} fill="var(--nl-panel)" stroke="var(--nl-line)" strokeWidth={1} opacity={0.92} />
+        <text x={-88} y={1} fontSize={9.5} fontWeight={800} fontFamily="ui-monospace, monospace" fill="var(--nl-mut-2)" letterSpacing="0.06em">
+          IM WETTKAMPF
+        </text>
+        <text x={-8} y={1} textAnchor="end" fontSize={12} fontWeight={900} fontFamily="ui-monospace, monospace" fill={liveCount <= 3 ? "var(--nl-warn)" : "var(--nl-ink)"}>
+          {liveCount}/{rt.length}
+        </text>
+      </g>
 
       {/* DIE geforderte Last — der Star (mit CSS-Transition) */}
       <g style={{ transition: reducedMotion ? "none" : `transform ${TRACK_ROUND_MS}ms cubic-bezier(.45,0,.2,1)` }} transform={`translate(0 ${barY})`} pointerEvents="none">
