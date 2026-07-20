@@ -338,9 +338,13 @@ export default function SchachField(props: DisciplineFieldProps): ReactNode {
       {/* TOKENS: 32 Bahnen, X = Team-Index (horizontal spread), Y = Elo-Score */}
       {/* ========================================================================== */}
       {sorted.map((t, sortedIndex) => {
-        const elo = BASE + Math.round(t.score);
+        // Score → Elo über die VOLLE Klassen-Spanne skalieren (finalMax = Spitzenwert),
+        // sonst landen alle Roh-Scores (~30–334) in KLASSE C. So verteilen sich die
+        // Teams vertikal über alle Klassen (Spitze = Grossmeister, Keller = Klasse C).
+        const eloNorm = maxTotal > 0 ? Math.max(0, Math.min(1, t.score / maxTotal)) : 0;
+        const elo = Math.round(BASE + eloNorm * (maxElo - BASE));
         const x = laneX(sortedIndex); // Spread horizontally by position in sorted array
-        const y = yOf(elo); // Elo-based vertical position (yOf erwartet Elo, nicht Roh-Score)
+        const y = yOf(elo); // Elo-basierte vertikale Position (yOf erwartet Elo)
         const r = t.isOwn ? geo.rOwn : geo.r;
         const hue = hueForIdx(t.idx);
         const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;

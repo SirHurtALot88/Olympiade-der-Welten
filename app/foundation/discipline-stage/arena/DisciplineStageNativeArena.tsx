@@ -2596,13 +2596,21 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                         {Array.from({ length: t.thrownSlot + 1 }, (_, s) => {
                           const p = t.players[s];
                           if (!p) return null;
+                          // Reihenfolge in der Disziplin = Slot s (1-basiert); erzielter
+                          // Rang dieses Spielers in seinem Slot (1…N, ligaweit).
+                          const sr = slotRankOf(s, t, rtRef.current);
+                          const medalC = sr === 1 ? "var(--nl-warn)" : sr === 2 ? "var(--nl-mut)" : sr === 3 ? "rgb(205,127,50)" : "var(--nl-mut-2)";
                           return (
-                            <div key={s} style={{ fontSize: 11.5, fontVariantNumeric: "tabular-nums" }}>
-                              <div style={{ fontWeight: 700 }}>
-                                {p.val >= STAR_MIN ? "⭐ " : ""}
-                                {p.name} <span style={{ color: "var(--nl-mut)", fontWeight: 600 }}>· {slots[s]}</span>
+                            <div key={s} style={{ fontSize: 11.5, fontVariantNumeric: "tabular-nums", display: "flex", alignItems: "baseline", gap: 6 }}>
+                              <span aria-hidden style={{ flex: "none", fontSize: 9.5, fontWeight: 800, color: "var(--nl-mut-2)", width: 16 }}>#{s + 1}</span>
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                  {p.val >= STAR_MIN ? "⭐ " : ""}
+                                  {p.name} <span style={{ color: "var(--nl-mut)", fontWeight: 600 }}>· {slots[s]}</span>
+                                </div>
+                                <div style={{ color: "var(--nl-mut)" }}>{calcString(p)}</div>
                               </div>
-                              <div style={{ color: "var(--nl-mut)" }}>{calcString(p)}</div>
+                              <span title={`Rang in ${slots[s]}`} style={{ flex: "none", fontSize: 10.5, fontWeight: 800, color: medalC }}>#{sr}</span>
                             </div>
                           );
                         })}
@@ -2855,7 +2863,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             }}
             title={teamClickable ? "Team-Karte öffnen" : undefined}
             style={{ display: "flex", alignItems: "center", gap: 7, padding: "1.5px 6px", borderRadius: 8, fontVariantNumeric: "tabular-nums", cursor: teamClickable ? "pointer" : "default", opacity: bOut ? 0.55 : 1, background: t.isOwn ? "color-mix(in srgb, var(--nl-accent) 14%, transparent)" : bChamp ? "color-mix(in srgb, var(--nl-warn) 16%, transparent)" : rc ? `color-mix(in srgb, ${rc} 9%, transparent)` : "transparent", boxShadow: rc ? `inset 3px 0 0 ${rc}` : undefined, ...(trackLadder ? { position: "absolute" as const, left: 0, right: 0, height: LADDER_ROW_H, transform: `translateY(${(t.rank - 1) * LADDER_ROW_H}px)`, transition: reduced.current ? "none" : "transform .6s cubic-bezier(.45,0,.2,1)" } : null) }}>
-            <span style={{ width: 22, textAlign: "right", fontWeight: 800, color: prim === "barbell" ? (bChamp ? "var(--nl-warn)" : ampel(bRank)) : ampel(t.rank), fontSize: 12.5 }}>{bChamp ? "🏆" : prim === "barbell" ? bRank : t.rank}</span>
+            <span style={{ width: 26, textAlign: "right", fontWeight: 800, color: prim === "barbell" ? (bChamp ? "var(--nl-warn)" : ampel(bRank)) : ampel(t.rank), fontSize: 12.5 }}>{bChamp ? "🏆" : `#${prim === "barbell" ? bRank : t.rank}`}</span>
             {prim === "track" || prim === "barbell" ? (
               <span aria-hidden title="Rang-Änderung seit letzter Runde" style={{ width: 14, fontSize: 10, fontWeight: 800, textAlign: "left", color: (prim === "barbell" ? bArrow : rankDelta) > 0 ? "var(--nl-good)" : (prim === "barbell" ? bArrow : rankDelta) < 0 ? "var(--nl-risk)" : "var(--nl-mut)" }}>
                 {(prim === "barbell" ? bArrow : rankDelta) > 0 ? "▲" : (prim === "barbell" ? bArrow : rankDelta) < 0 ? "▼" : ""}

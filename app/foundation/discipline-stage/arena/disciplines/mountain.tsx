@@ -123,7 +123,9 @@ export default function ClimbingField(props: DisciplineFieldProps): ReactNode {
 
         const el = gRefs.current.get(t.idx);
         if (el) {
-          const laneIdx = rt.findIndex((rt) => rt.idx === t.idx);
+          // Stabile, dichte Bahn 0…N-1 direkt aus dem RT (nicht via Closure-findIndex,
+          // das bei Idx-Mismatch −1 lieferte → alle Kletterer klebten links am Rand).
+          const laneIdx = t.laneIdx;
           const x = xOf(laneIdx) + swayOf(t.code, y);
           el.setAttribute("transform", `translate(${x} ${y})`);
         }
@@ -311,6 +313,10 @@ export default function ClimbingField(props: DisciplineFieldProps): ReactNode {
           const glowing = t.glowUntil > now;
           const rc = relColor(t.rel);
 
+          // Defensive Startposition (falls die rAF-Schleife noch nicht getickt hat):
+          // dichte Bahn horizontal, Score → Höhe. Die rAF gleitet danach weiter.
+          const x0 = xOf(t.laneIdx) + swayOf(t.code, yOf(t.displayScore ?? t.score));
+          const y0 = yOf(t.displayScore ?? t.score);
           return (
             <g
               key={t.code}
@@ -318,6 +324,7 @@ export default function ClimbingField(props: DisciplineFieldProps): ReactNode {
               ref={(el) => {
                 gRefs.current.set(t.idx, el);
               }}
+              transform={`translate(${x0} ${y0})`}
               style={{ cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
               onMouseEnter={() => openHover(t.idx)}
               onMouseLeave={scheduleHoverClose}
