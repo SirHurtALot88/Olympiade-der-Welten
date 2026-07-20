@@ -1,27 +1,29 @@
 // =====================================================================================
-// lamps (Fechten · Salle d'Armes) — bespoke Feld, 1:1 aus scratchpad/fechten.html.
+// lamps (Fechten · Salle d'Armes) — Lesbarkeits-Rebuild auf dem Staffel-Benchmark.
 //
-// Archetyp ① (Rennen), aber KEIN Wettlauf zu einer Linie: Fechten ist dauerhaftes
-// Zustoßen über die ganze Disziplin. Eine große leitende Metall-Planche füllt die
-// dunkle Salle. Die x-Position eines Tokens = GESAMMELTE Treffer (Touch-Tally) —
-// Meilenstein-Ticks (60 · 120 · 180 …), keine Ziel-/Renn-Linie, die Zählleiste wächst
-// einfach weiter. Jedes Team hat eine eigene Bahn (y = laneIdx). Landet ein Team einen
-// Rundengewinn (score steigt), macht sein Fechter einen Ausfall (Lunge, Klinge streckt
-// sich) und der Treffer-Melder über der Planche flammt rot bzw. grün auf (TOUCHÉ).
+// FRÜHER: 30 feste Bahnen (y = laneIdx) → jede Bahn ~H/30, Logos winzig & unlesbar.
+// JETZT: Archetyp ① (geteiltes Feld, Position = Wert). Die x-Position = GESAMMELTE
+// Treffer (score, entstaucht gegen den Live-Führenden via finalMax=posMax). Vertikal
+// werden die Fechter über die Planche GESTREUT (stabile, gleichmäßige Hash-Ordnung)
+// statt in dünne Bahnen gepresst → deutlich GRÖSSERE, lesbare Token; enge Score-Cluster
+// überlappen als „Pulk", statt zu schrumpfen (bewusster Trade-off: lieber groß+überlappt
+// als klein+getrennt). Der Führende/eigene liegen oben.
 //
-// Score bleibt Wahrheit: x = score/finalMax (identisch zu host.tokenPos für ROW_FAMILY →
-// Score-Pops/Hovercard/Ladder bleiben konsistent). Endstand = Score-Reihenfolge, Runden-
-// Medaillen-Ringe der Top-3, Führungs-Glow + Krone (done), Beziehungs-Rahmen, Own-Team-
-// Stern: unverändert. Geteiltes Chrome (Topbar/Strip/Rangliste/Ticker/Overlays) kommt
-// vom Host — hier wird NUR das Feld gerendert.
+// Bewegung: die Token gleiten über den GETEILTEN animScore-Zeitstrahl des Hosts (rAF liest
+// t.animScore, roundStartScore→displayScore über TRACK_ROUND_MS) → Feld & Rangliste laufen
+// frame-synchron, und die Highlight-Zeitlupe/der Zoom greifen automatisch. Ghost der
+// Vorrunde zeigt den Zugewinn; Rang-Badge + Eigen-Anker liefern die „Was geht ab?"-Schicht.
+// Landet ein Treffer (score steigt), macht der Fechter einen Ausfall (Klinge streckt sich)
+// und der Treffer-Melder flammt rot/grün auf (TOUCHÉ). Score bleibt Wahrheit.
 // =====================================================================================
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { hueForIdx, relColor } from "../DisciplineStageNativeArena";
-import type { DisciplineFieldProps } from "./types";
+import { teamPrimaryColor, floorTeamAccent } from "@/lib/foundation/team-colors";
+import type { DisciplineFieldProps, RT } from "./types";
 
-// Deterministischer 0…1-Hash (FNV-1a) — Treffer-Seite (rot/grün) reproduzierbar.
+// Deterministischer 0…1-Hash (FNV-1a) — Treffer-Seite (rot/grün) + vertikale Streuung.
 function hash01(s: string): number {
   let h = 2166136261;
   for (let i = 0; i < s.length; i += 1) {
@@ -51,30 +53,59 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
     H,
     layout,
     finalMax,
-    tokenPos,
     rt,
     sorted,
     done,
     now,
-    geo,
     hoverIdx,
     openHover,
     scheduleHoverClose,
     onOpenTeam,
+    highlightIdxs,
   } = props;
+  const trioSet = new Set(highlightIdxs ?? []);
 
-  // Planche-Geometrie: die Metall-Platte füllt die Salle, deckt alle Bahnen ab.
+  // Frische Prop-Spiegel für die rAF-Schleife (ohne Neustart).
+  const hoverRef = useRef<number | null>(hoverIdx);
+  hoverRef.current = hoverIdx;
+  const pausedRef = useRef<boolean>(props.paused);
+  pausedRef.current = props.paused;
+  const reducedRef = useRef<boolean>(reducedMotion);
+  reducedRef.current = reducedMotion;
+  const rtRef = useRef<RT[]>(rt);
+  rtRef.current = rt;
+
+  // Planche-Geometrie: die Metall-Platte füllt die Salle.
   const PX0 = 34;
   const PX1 = W - 26;
   const PY0 = 8;
   const PY1 = H - 12;
-  // Treffer-Achse aus dem HOST-Layout (identisch zu tokenPos für ROW_FAMILY) — so
-  // sitzen Meilensteine, Tokens und Host-Overlays exakt deckungsgleich.
-  const X0: number = layout.xStart; // gesammelte Treffer = 0
-  const X1: number = layout.xEnd; // = finalMax (Normierungsbasis)
-  const axisX = (v: number): number => X0 + (finalMax > 0 ? v / finalMax : 0) * (X1 - X0);
+  // Treffer-Achse (x = gesammelte Treffer). X0/X1 aus dem Host-Layout, damit Meilensteine
+  // und Host-Overlays (Pops/Hovercard) deckungsgleich bleiben; Normierung gegen finalMax.
+  const X0: number = layout.xStart;
+  const X1: number = layout.xEnd;
+  const fracX = (v: number): number => X0 + (finalMax > 0 ? Math.max(0, v / finalMax) : 0) * (X1 - X0);
 
-  // Treffer-Melder oben mittig (mounted apparatus).
+  // GROSSE, lesbare Token (unabhängig von der Teamzahl — kein Bahn-Zwang mehr).
+  const RB = 17;
+  const RBOwn = 21;
+
+  // Vertikale Streuung: gleichmäßig über die Planche verteilt in stabiler Hash-Ordnung
+  // (jedes Team behält seine Höhe → man kann es verfolgen). Kein score-korrelierter Wert,
+  // damit enge Score-Cluster wenigstens vertikal auseinanderziehen.
+  const BAND_TOP = 66;
+  const BAND_BOT = PY1 - 26;
+  const yByCode = new Map<string, number>();
+  {
+    const order = rt
+      .map((t) => ({ code: t.code, h: hash01(t.code + "fenc-y") }))
+      .sort((a, b) => a.h - b.h);
+    const n = Math.max(1, order.length - 1);
+    order.forEach((o, i) => yByCode.set(o.code, BAND_TOP + (i / n) * (BAND_BOT - BAND_TOP)));
+  }
+  const yOf = (t: RT): number => yByCode.get(t.code) ?? (BAND_TOP + BAND_BOT) / 2;
+
+  // Treffer-Melder oben mittig.
   const CX = W / 2;
   const MELDER_Y = 26;
   const LAMP_R_X = CX - 66;
@@ -86,6 +117,41 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
   const ticks: number[] = [];
   for (let v = step; v <= finalMax + 0.5; v += step) ticks.push(v);
 
+  // ---- Token-Refs für die imperative rAF-Positionierung -------------------------------
+  const gRefs = useRef<Map<number, SVGGElement | null>>(new Map());
+  const ghostRefs = useRef<Map<number, SVGGElement | null>>(new Map());
+
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const frozen = hoverRef.current != null || pausedRef.current;
+      const reduce = reducedRef.current;
+      for (const t of rtRef.current) {
+        const el = gRefs.current.get(t.idx);
+        const y = yOf(t);
+        if (el && !frozen) {
+          el.setAttribute("transform", `translate(${fracX(t.animScore)} ${y})`);
+        }
+        // Ghost der Vorrunde bei roundStartScore — die Lücke Ghost→Token = Zugewinn.
+        const gel = ghostRefs.current.get(t.idx);
+        if (gel) {
+          const span = t.displayScore - t.roundStartScore;
+          const prog = span > 0.5 ? Math.max(0, Math.min(1, (t.animScore - t.roundStartScore) / span)) : 1;
+          if (span > 0.5 && !reduce && prog < 0.98) {
+            gel.setAttribute("transform", `translate(${fracX(t.roundStartScore)} ${y})`);
+            gel.setAttribute("opacity", String((t.isOwn ? 0.55 : 0.26) * (1 - prog * 0.7)));
+          } else {
+            gel.setAttribute("opacity", "0");
+          }
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ---- Touché-FX: score-Anstieg → Lunge + Melder-Lampe (rot/grün) --------------------
   const prevScore = useRef<Record<string, number>>({});
   const [flashes, setFlashes] = useState<Flash[]>([]);
@@ -95,7 +161,6 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
 
   const scoreSig = rt.map((t) => `${t.code}:${t.score}`).join("|");
   useEffect(() => {
-    // prev synchronisieren + Anstiege erkennen.
     if (reducedMotion) {
       const p: Record<string, number> = {};
       for (const t of rt) p[t.code] = t.score;
@@ -131,7 +196,6 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scoreSig, reducedMotion]);
 
-  // Timer-Aufräumen bei Unmount.
   useEffect(() => {
     const list = timers.current;
     return () => {
@@ -159,7 +223,7 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
         {rt.map((t) =>
           t.logoUrl ? (
             <clipPath key={`clip-${t.code}`} id={`natclip-${t.code}`}>
-              <circle cx={0} cy={0} r={t.isOwn ? geo.rOwn : geo.r} />
+              <circle cx={0} cy={0} r={t.isOwn ? RBOwn : RB} />
             </clipPath>
           ) : null,
         )}
@@ -207,13 +271,13 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
         <rect x={PX0} y={PY0} width={PX1 - PX0} height={PY1 - PY0} fill="url(#lampMesh)" />
         <ellipse cx={CX} cy={H * 0.42} rx={W * 0.46} ry={H * 0.5} fill="rgba(255,255,255,.28)" />
 
-        {/* Meilenstein-Ticks: x = GESAMMELTE Treffer (keine Ziel-Linie, wachsende Zählleiste) */}
+        {/* Meilenstein-Ticks: x = GESAMMELTE Treffer (wachsende Zählleiste) */}
         <line x1={X0} y1={PY0 + 6} x2={X0} y2={PY1 - 6} stroke="#f2f6fa" strokeWidth={2.5} opacity={0.7} />
         <text x={X0} y={PY0 + 18} textAnchor="middle" fontFamily="ui-monospace, Menlo, monospace" fontSize={11} fontWeight={700} fill="#33445a" opacity={0.9}>
           0
         </text>
         {ticks.map((v) => {
-          const x = axisX(v);
+          const x = fracX(v);
           return (
             <g key={`tick-${v}`}>
               <line x1={x} y1={PY0 + 6} x2={x} y2={PY1 - 6} stroke="#31465c" strokeWidth={1.6} strokeDasharray="3 8" opacity={0.5} />
@@ -242,13 +306,10 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
         <text x={CX} y={MELDER_Y - 11} textAnchor="middle" fontFamily="ui-monospace, Menlo, monospace" fontSize={8.5} fontWeight={700} letterSpacing="2.5" fill="#657286">
           TREFFER-MELDER
         </text>
-        {/* Basis-Lampen: groß rot · 2× weiß (Passé) · groß grün */}
         <rect x={LAMP_R_X - 9} y={MELDER_Y - 3} width={18} height={18} rx={5} fill={activeR ? "#ff4545" : "#391114"} stroke="#3d4855" strokeWidth={1.5} />
         <circle cx={LAMP_W1_X} cy={MELDER_Y + 6} r={5.5} fill="#23282f" stroke="#3d4855" strokeWidth={1.2} />
         <circle cx={LAMP_W2_X} cy={MELDER_Y + 6} r={5.5} fill="#23282f" stroke="#3d4855" strokeWidth={1.2} />
         <rect x={LAMP_G_X - 9} y={MELDER_Y - 3} width={18} height={18} rx={5} fill={activeG ? "#3ddc6e" : "#0f2e1a"} stroke="#3d4855" strokeWidth={1.5} />
-
-        {/* Aufflammen (rot/grün) — Glow + heller Lampenkörper, spielt 2× und verschwindet */}
         {flashes.map((f) => {
           const lx = f.side === "r" ? LAMP_R_X : LAMP_G_X;
           const col = f.side === "r" ? "#ff4545" : "#3ddc6e";
@@ -261,28 +322,45 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
         })}
       </g>
 
-      {/* Tokens — Fechter je Bahn (y = laneIdx). x = gesammelte Treffer via host.tokenPos.
+      {/* Ghost-Marker (Vorrunde) — Position setzt die rAF-Schleife imperativ. */}
+      {rt.map((t) => {
+        const r = t.isOwn ? RBOwn : RB;
+        return (
+          <g
+            key={`ghost-${t.code}`}
+            ref={(el) => {
+              ghostRefs.current.set(t.idx, el);
+            }}
+            opacity={0}
+          >
+            <circle r={r} fill="none" stroke={floorTeamAccent(teamPrimaryColor(t.code))} strokeWidth={1.4} strokeDasharray="3 3" />
+          </g>
+        );
+      })}
+
+      {/* Tokens — Fechter. x = animScore (geteilter Zeitstrahl, rAF), y = stabile Streuung.
           In Rang-Reihenfolge rückwärts, damit der Führende oben liegt (wie der Host). */}
       {sorted
         .slice()
         .reverse()
         .map((t) => {
-          const pos = tokenPos(t, t.displayScore);
-          const r = t.isOwn ? geo.rOwn : geo.r;
+          const r = t.isOwn ? RBOwn : RB;
           const hue = hueForIdx(t.idx);
           const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
           const glowing = t.glowUntil > now;
           const rc = relColor(t.rel);
           const lunging = !reducedMotion && lunges[t.code] != null;
-          const dur = 5000;
+          const showBadge = t.isOwn || t.rank <= 3 || hoverIdx === t.idx;
           return (
             <g
               key={t.code}
               data-token-code={t.code}
+              ref={(el) => {
+                gRefs.current.set(t.idx, el);
+              }}
               className={lunging ? "f-lunge" : undefined}
-              transform={`translate(${pos.x} ${pos.y})`}
+              transform={`translate(${fracX(t.animScore)} ${yOf(t)})`}
               style={{
-                transition: reducedMotion ? "none" : `transform ${dur}ms cubic-bezier(.4,0,.2,1)`,
                 cursor: onOpenTeam && t.teamId ? "pointer" : "default",
                 opacity: hoverIdx != null && hoverIdx !== t.idx ? 0.82 : 1,
               }}
@@ -296,23 +374,37 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
               <rect className="f-blade" x={r - 1} y={-1.1} width={12} height={2.2} rx={1} fill="url(#lampBlade)" />
 
               {glowing ? <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={4} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.1s ease-in-out infinite" }} /> : null}
+              {/* Highlight-Trio (Aufholjagd): pulsierender Ring an den 3 größten Aufsteigern. */}
+              {trioSet.has(t.idx) ? <circle r={r + 10} fill="none" stroke="var(--nl-warn)" strokeWidth={3.5} opacity={0.95} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 0.85s ease-in-out infinite" }} /> : null}
+              {/* Eigen-Team-Anker: dauerhafter, weicher Akzent-Puls. */}
+              {t.isOwn ? <circle r={r + 6} fill="none" stroke="var(--nl-accent)" strokeWidth={2} opacity={0.9} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.6s ease-in-out infinite" }} /> : null}
               {t.rank === 1 && done ? <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={2.5} opacity={0.6} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.6s ease-in-out infinite" }} /> : null}
-              {rc ? <circle r={r + 5.5} fill="none" stroke={rc} strokeWidth={2.4} opacity={0.95} /> : null}
-              {medal ? <circle r={r + 3.5} fill="none" stroke={medal} strokeWidth={t.isOwn ? 4.5 : 3.5} /> : null}
+              {/* Relations-Marker (Rivalen rot / Verbündete): eng am Icon. */}
+              {rc ? <circle r={r + 3} fill="none" stroke={rc} strokeWidth={2.6} opacity={0.95} /> : null}
+              {medal ? <circle r={r + 4.6} fill="none" stroke={medal} strokeWidth={t.isOwn ? 4.5 : 3.5} /> : null}
               {t.logoUrl ? (
                 <image href={t.logoUrl} x={-r} y={-r} width={r * 2} height={r * 2} clipPath={`url(#natclip-${t.code})`} preserveAspectRatio="xMidYMid slice" />
               ) : (
                 <circle r={r} fill={`hsl(${hue} 60% 52%)`} />
               )}
-              <circle r={r} fill="none" stroke={t.isOwn ? "var(--nl-ink)" : "rgba(255,255,255,.5)"} strokeWidth={t.isOwn ? 2.5 : 1.4} />
+              {/* Team-Farb-Rahmen (getTeamColor) — jedes Team sichtbar; eigenes hervorgehoben. */}
+              {t.isOwn ? (
+                <>
+                  <circle r={r + 1.6} fill="none" stroke="var(--nl-accent)" strokeWidth={3} />
+                  <circle r={r + 0.2} fill="none" stroke="var(--nl-ink)" strokeWidth={1.4} opacity={0.9} />
+                </>
+              ) : (
+                <circle r={r + 1.4} fill="none" stroke={floorTeamAccent(teamPrimaryColor(t.code))} strokeWidth={2.4} />
+              )}
               {t.rank === 1 ? (
                 <text y={-(r + 9)} textAnchor="middle" fontSize={14}>
                   🏆
                 </text>
               ) : null}
-              {t.isOwn ? (
-                <text y={r + 15} textAnchor="middle" fontSize={13} fontWeight={800} fill="var(--nl-accent)">
-                  ★ {t.code}
+              {/* Rang-Badge (eigenes Team / Podest / gehovert) — Position ohne Blick zur Tabelle. */}
+              {showBadge ? (
+                <text y={r + 15} textAnchor="middle" fontSize={11.5} fontWeight={900} fill={t.isOwn ? "var(--nl-accent)" : t.rank === 1 ? "var(--nl-warn)" : "var(--nl-ink)"}>
+                  {t.isOwn ? `★ ${t.code}` : `#${t.rank}`}
                 </text>
               ) : null}
             </g>
