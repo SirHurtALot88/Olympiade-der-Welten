@@ -33,15 +33,6 @@ function hash01(s: string): number {
   return (h >>> 0) / 4294967295;
 }
 
-// „Runde" Tick-Schrittweite → ~6 Meilensteine über finalMax.
-function niceStep(max: number): number {
-  const raw = Math.max(1, max) / 6;
-  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
-  const n = raw / mag;
-  const s = (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * mag;
-  return Math.max(1, Math.round(s));
-}
-
 type Flash = { id: number; side: "r" | "g" };
 
 export default function LampsField(props: DisciplineFieldProps): ReactNode {
@@ -62,14 +53,8 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
     scheduleHoverClose,
     onOpenTeam,
     highlightIdxs,
-    started,
-    round,
   } = props;
   const trioSet = new Set(highlightIdxs ?? []);
-  const startedRef = useRef<boolean>(!!started);
-  startedRef.current = !!started;
-  const roundRef = useRef<number>(round);
-  roundRef.current = round;
 
   // Frische Prop-Spiegel für die rAF-Schleife (ohne Neustart).
   const hoverRef = useRef<number | null>(hoverIdx);
@@ -86,25 +71,23 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
   const PX1 = W - 26;
   const PY0 = 8;
   const PY1 = H - 12;
-  // Treffer-Achse (x = gesammelte Treffer). X0/X1 aus dem Host-Layout, damit Meilensteine
-  // und Host-Overlays (Pops/Hovercard) deckungsgleich bleiben; Normierung gegen finalMax.
-  const X0: number = layout.xStart;
-  const X1: number = layout.xEnd;
-  const fracX = (v: number): number => X0 + (finalMax > 0 ? Math.max(0, v / finalMax) : 0) * (X1 - X0);
-
   // GROSSE, lesbare Token (unabhängig von der Teamzahl — kein Bahn-Zwang mehr). Deutlich
   // größer als die alten Fixbahn-Winzlinge (geo.r war 8/11).
   const RB = 20;
   const RBOwn = 25;
-  const BAND_TOP = 58;
-  const BAND_BOT = PY1 - 20;
+  const BAND_TOP = 56;
+  const BAND_BOT = PY1 - 18;
   const CY = (BAND_TOP + BAND_BOT) / 2;
+  const CXc = W / 2; // Konvergenz-Zentrum (die „Mitte" der Salle)
 
-  // ---- Startaufstellung (Slots): vor dem ▶ stehen die Teams BREIT über die Planche
-  // verteilt auf einem gleichmäßigen Raster (Startslots), jeder mit Platz. Reihenfolge
-  // stabil nach seasonRank → lesbare Anfangsordnung. Beim Start gleiten sie ins Feld.
-  const GRID_X0 = PX0 + 54;
-  const GRID_X1 = PX1 - 40;
+  // ---- Startaufstellung (Slots): die Teams stehen breit über die ganze Planche verteilt
+  // auf einem Raster — DA, wo sie „gestartet" sind. Reihenfolge stabil nach seasonRank →
+  // lesbare Anfangsordnung, jeder mit Platz. Beim Fortbewegen (Punkte) orientieren sie
+  // sich Richtung Mitte (siehe rAF), Kollisionen werden per Relaxation kleingehalten.
+  const GRID_X0 = PX0 + 70;
+  const GRID_X1 = PX1 - 60;
+  const GRID_TOP = BAND_TOP + 6;
+  const GRID_BOT = BAND_BOT - 6;
   const gridByCode = useMemo(() => {
     const order = [...rt].sort((a, b) => a.seasonRank - b.seasonRank);
     const n = order.length;
@@ -115,47 +98,29 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
       const c = i % cols;
       const r = Math.floor(i / cols);
       const x = cols > 1 ? GRID_X0 + (c / (cols - 1)) * (GRID_X1 - GRID_X0) : (GRID_X0 + GRID_X1) / 2;
-      const y = rows > 1 ? BAND_TOP + (r / (rows - 1)) * (BAND_BOT - BAND_TOP) : CY;
+      const y = rows > 1 ? GRID_TOP + (r / (rows - 1)) * (GRID_BOT - GRID_TOP) : CY;
       m.set(t.code, { x, y });
     });
     return m;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rt.length]);
-
-  // ---- Beeswarm-Auffächerung: x = Treffer (Runden-Ziel), y wird kollisionsfrei um die
-  // Mittellinie gepackt → jeder Token behält Platz (hoverbar/erkennbar), Einzelläufer
-  // sitzen mittig, enge Score-Cluster fächern nach oben/unten auf („in die Mitte
-  // zurechtfinden"). Stabil je Runde (aus displayScore) → kein Y-Zittern beim Gleiten.
-  const dispSig = rt.map((t) => `${t.code}:${t.displayScore}`).join("|");
-  const packByCode = useMemo(() => {
-    const items = rt.map((t) => ({ code: t.code, x: fracX(t.displayScore), r: t.isOwn ? RBOwn : RB }));
-    items.sort((a, b) => a.x - b.x);
-    const placed: { x: number; y: number; r: number }[] = [];
-    const m = new Map<string, number>();
-    for (const it of items) {
-      const step = it.r * 1.1;
-      let y = CY;
-      for (let k = 0; k < 260; k += 1) {
-        const cand = CY + (k % 2 === 0 ? 1 : -1) * Math.ceil(k / 2) * step;
-        if (cand < BAND_TOP || cand > BAND_BOT) continue;
-        const hit = placed.some((p) => Math.abs(p.x - it.x) < p.r + it.r + 3 && Math.abs(p.y - cand) < p.r + it.r + 3);
-        y = cand;
-        if (!hit) break;
-      }
-      y = Math.max(BAND_TOP, Math.min(BAND_BOT, y));
-      placed.push({ x: it.x, y, r: it.r });
-      m.set(it.code, y);
-    }
-    return m;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispSig, finalMax]);
-  const packY = (t: RT): number => packByCode.get(t.code) ?? CY;
   const gridOf = (t: RT): { x: number; y: number } => gridByCode.get(t.code) ?? { x: (GRID_X0 + GRID_X1) / 2, y: CY };
   // Frische Spiegel für die rAF-Schleife.
-  const packRef = useRef(packByCode);
-  packRef.current = packByCode;
   const gridRef = useRef(gridByCode);
   gridRef.current = gridByCode;
+  const finalMaxRef = useRef(finalMax);
+  finalMaxRef.current = finalMax;
+
+  // Ziel-Position eines Teams: vom Startslot Richtung Mitte, Anteil = Fortschritt
+  // (score/finalMax). Bei 0 Punkten steht es auf dem Slot (breit verteilt, sichtbar);
+  // der Führende zieht am weitesten zur Mitte. So bleibt die Streuung früh erhalten und
+  // die Ordnung entsteht erst mit den Punkten. (Ohne Kollisions-Relaxation — die macht die rAF.)
+  const idealOf = (t: RT, score: number): { x: number; y: number } => {
+    const g = gridOf(t);
+    const fm = finalMax > 0 ? finalMax : 1;
+    const pull = Math.max(0, Math.min(1, score / fm)) * 0.9;
+    return { x: g.x + (CXc - g.x) * pull, y: g.y + (CY - g.y) * pull };
+  };
 
   // Treffer-Melder oben mittig.
   const CX = W / 2;
@@ -165,59 +130,57 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
   const LAMP_W2_X = CX + 14;
   const LAMP_G_X = CX + 66;
 
-  const step = niceStep(finalMax);
-  const ticks: number[] = [];
-  for (let v = step; v <= finalMax + 0.5; v += step) ticks.push(v);
-
   // ---- Token-Refs für die imperative rAF-Positionierung -------------------------------
   const gRefs = useRef<Map<number, SVGGElement | null>>(new Map());
-  const ghostRefs = useRef<Map<number, SVGGElement | null>>(new Map());
 
   useEffect(() => {
     let raf = 0;
     const tick = () => {
+      // Hover/Pause: Positionen komplett EINFRIEREN (nicht neu rechnen) → kein „Splitten"
+      // der Teams beim Drüberfahren.
       const frozen = hoverRef.current != null || pausedRef.current;
-      const reduce = reducedRef.current;
-      const on = startedRef.current;
-      const pack = packRef.current;
-      const grid = gridRef.current;
-      const firstStage = roundRef.current === 0;
-      for (const t of rtRef.current) {
-        const el = gRefs.current.get(t.idx);
-        const g = grid.get(t.code) ?? { x: (GRID_X0 + GRID_X1) / 2, y: CY };
-        const py = pack.get(t.code) ?? CY;
-        // Ziel im Feld (Beeswarm) für den aktuellen animScore.
-        const fx = fracX(t.animScore);
-        // Vor dem Start: Startaufstellung (Slots). In Etappe 1 gleiten sie vom Slot ins
-        // Feld (blend nach Runden-Fortschritt) → „breit starten, in die Mitte zurechtfinden".
-        let x: number;
-        let y: number;
-        if (!on) {
-          x = g.x;
-          y = g.y;
-        } else if (firstStage) {
-          const span = t.displayScore - t.roundStartScore;
-          const p = span > 0.5 ? Math.max(0, Math.min(1, (t.animScore - t.roundStartScore) / span)) : 1;
-          const e = p * p * (3 - 2 * p); // smoothstep
-          x = g.x + (fx - g.x) * e;
-          y = g.y + (py - g.y) * e;
-        } else {
-          x = fx;
-          y = py;
+      if (!frozen) {
+        const grid = gridRef.current;
+        const fm = finalMaxRef.current > 0 ? finalMaxRef.current : 1;
+        // 1) Ideal-Ziel je Token: vom Startslot Richtung Mitte, Anteil = Fortschritt.
+        const P: { t: RT; r: number; x: number; y: number }[] = [];
+        for (const t of rtRef.current) {
+          const g = grid.get(t.code) ?? { x: (GRID_X0 + GRID_X1) / 2, y: CY };
+          const pull = Math.max(0, Math.min(1, t.animScore / fm)) * 0.9;
+          P.push({ t, r: t.isOwn ? RBOwn : RB, x: g.x + (CXc - g.x) * pull, y: g.y + (CY - g.y) * pull });
         }
-        if (el && !frozen) el.setAttribute("transform", `translate(${x} ${y})`);
-        // Ghost der Vorrunde bei roundStartScore — die Lücke Ghost→Token = Zugewinn. Erst
-        // ab Etappe 2 sinnvoll (in Etappe 1 kommen die Token frisch aus der Aufstellung).
-        const gel = ghostRefs.current.get(t.idx);
-        if (gel) {
-          const span = t.displayScore - t.roundStartScore;
-          const prog = span > 0.5 ? Math.max(0, Math.min(1, (t.animScore - t.roundStartScore) / span)) : 1;
-          if (on && !firstStage && span > 0.5 && !reduce && prog < 0.98) {
-            gel.setAttribute("transform", `translate(${fracX(t.roundStartScore)} ${py})`);
-            gel.setAttribute("opacity", String((t.isOwn ? 0.55 : 0.26) * (1 - prog * 0.7)));
-          } else {
-            gel.setAttribute("opacity", "0");
+        // 2) Kollisions-Relaxation: Überlappungen paarweise auseinanderdrücken (deterministisch
+        //    aus den Ideal-Positionen → glatt Frame-zu-Frame, kein Zittern). Wenige Iterationen.
+        for (let iter = 0; iter < 7; iter += 1) {
+          for (let i = 0; i < P.length; i += 1) {
+            for (let j = i + 1; j < P.length; j += 1) {
+              const a = P[i]!;
+              const b = P[j]!;
+              let dx = b.x - a.x;
+              let dy = b.y - a.y;
+              let d = Math.hypot(dx, dy);
+              const min = a.r + b.r + 5;
+              if (d === 0) {
+                a.x -= 1.5;
+                b.x += 1.5;
+              } else if (d < min) {
+                const push = (min - d) / 2;
+                dx /= d;
+                dy /= d;
+                a.x -= dx * push;
+                a.y -= dy * push;
+                b.x += dx * push;
+                b.y += dy * push;
+              }
+            }
           }
+        }
+        // 3) In die Planche klemmen + anwenden.
+        for (const p of P) {
+          const x = Math.max(PX0 + p.r + 2, Math.min(PX1 - p.r - 2, p.x));
+          const y = Math.max(BAND_TOP, Math.min(BAND_BOT, p.y));
+          const el = gRefs.current.get(p.t.idx);
+          if (el) el.setAttribute("transform", `translate(${x} ${y})`);
         }
       }
       raf = requestAnimationFrame(tick);
@@ -346,30 +309,16 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
         <rect x={PX0} y={PY0} width={PX1 - PX0} height={PY1 - PY0} fill="url(#lampMesh)" />
         <ellipse cx={CX} cy={H * 0.42} rx={W * 0.46} ry={H * 0.5} fill="rgba(255,255,255,.28)" />
 
-        {/* Meilenstein-Ticks: x = GESAMMELTE Treffer (wachsende Zählleiste) */}
-        <line x1={X0} y1={PY0 + 6} x2={X0} y2={PY1 - 6} stroke="#f2f6fa" strokeWidth={2.5} opacity={0.7} />
-        <text x={X0} y={PY0 + 18} textAnchor="middle" fontFamily="ui-monospace, Menlo, monospace" fontSize={11} fontWeight={700} fill="#33445a" opacity={0.9}>
-          0
-        </text>
-        {ticks.map((v) => {
-          const x = fracX(v);
-          return (
-            <g key={`tick-${v}`}>
-              <line x1={x} y1={PY0 + 6} x2={x} y2={PY1 - 6} stroke="#31465c" strokeWidth={1.6} strokeDasharray="3 8" opacity={0.5} />
-              <text x={x} y={PY0 + 18} textAnchor="middle" fontFamily="ui-monospace, Menlo, monospace" fontSize={11} fontWeight={700} letterSpacing="1" fill="#33445a" opacity={0.9}>
-                {v}
-              </text>
-            </g>
-          );
-        })}
-        <text x={X0 + 14} y={PY1 - 14} textAnchor="start" fontFamily="ui-monospace, Menlo, monospace" fontSize={11} fontWeight={700} letterSpacing="2" fill="#33445a" opacity={0.85}>
-          ⚡ GESAMMELTE TREFFER →
-        </text>
-        {/* ZIEL-Linie = höchster (End-)Wert (finalMax → X1). Feste Normierung: der Führende
-            landet am Ende genau hier; die Skala steht still, alle bewegen sich nur vorwärts. */}
-        <line x1={X1} y1={PY0 + 4} x2={X1} y2={PY1 - 4} stroke="var(--nl-warn)" strokeWidth={2.5} opacity={0.85} strokeDasharray="6 5" />
-        <text x={X1 - 8} y={PY0 + 18} textAnchor="end" fontFamily="Georgia, serif" fontSize={13} fontWeight={800} letterSpacing="0.12em" fill="var(--nl-warn)" opacity={0.95}>
-          ZIEL
+        {/* Mitte = Ziel der Annäherung: konzentrische Ringe (Engagement-Zone). Wer am besten
+            trifft, orientiert sich am weitesten zur Mitte; die Distanz zur Mitte = Rang. */}
+        <g opacity={0.5}>
+          <circle cx={CXc} cy={CY} r={150} fill="none" stroke="#31465c" strokeWidth={1.4} strokeDasharray="2 9" />
+          <circle cx={CXc} cy={CY} r={92} fill="none" stroke="#31465c" strokeWidth={1.4} strokeDasharray="2 9" />
+          <circle cx={CXc} cy={CY} r={40} fill="none" stroke="var(--nl-warn)" strokeWidth={1.6} strokeDasharray="3 6" opacity={0.7} />
+          <line x1={CXc} y1={PY0 + 8} x2={CXc} y2={PY1 - 8} stroke="#31465c" strokeWidth={1.2} strokeDasharray="2 10" opacity={0.6} />
+        </g>
+        <text x={CXc} y={PY1 - 12} textAnchor="middle" fontFamily="Georgia, serif" fontSize={12} fontWeight={800} letterSpacing="0.14em" fill="var(--nl-warn)" opacity={0.9}>
+          ◇ MITTE — TREFFER ZIEHEN NACH INNEN
         </text>
       </g>
       <rect x={PX0} y={PY0} width={PX1 - PX0} height={PY1 - PY0} rx={12} fill="none" stroke="#5c6b7d" strokeWidth={2} />
@@ -403,24 +352,8 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
         })}
       </g>
 
-      {/* Ghost-Marker (Vorrunde) — Position setzt die rAF-Schleife imperativ. */}
-      {rt.map((t) => {
-        const r = t.isOwn ? RBOwn : RB;
-        return (
-          <g
-            key={`ghost-${t.code}`}
-            ref={(el) => {
-              ghostRefs.current.set(t.idx, el);
-            }}
-            opacity={0}
-          >
-            <circle r={r} fill="none" stroke={floorTeamAccent(teamPrimaryColor(t.code))} strokeWidth={1.4} strokeDasharray="3 3" />
-          </g>
-        );
-      })}
-
-      {/* Tokens — Fechter. x = animScore (geteilter Zeitstrahl, rAF), y = stabile Streuung.
-          In Rang-Reihenfolge rückwärts, damit der Führende oben liegt (wie der Host). */}
+      {/* Tokens — Fechter. Position: Startslot → Mitte (Anteil = Punkte), Kollisions-
+          Relaxation in der rAF. In Rang-Reihenfolge rückwärts (Führender oben). */}
       {sorted
         .slice()
         .reverse()
@@ -440,7 +373,7 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
                 gRefs.current.set(t.idx, el);
               }}
               className={lunging ? "f-lunge" : undefined}
-              transform={`translate(${started ? fracX(t.animScore) : gridOf(t).x} ${started ? packY(t) : gridOf(t).y})`}
+              transform={(() => { const p = idealOf(t, t.animScore); return `translate(${p.x} ${p.y})`; })()}
               style={{
                 cursor: onOpenTeam && t.teamId ? "pointer" : "default",
                 opacity: hoverIdx != null && hoverIdx !== t.idx ? 0.82 : 1,
