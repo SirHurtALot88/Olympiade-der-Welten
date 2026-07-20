@@ -15,6 +15,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { hueForIdx, relColor } from "../DisciplineStageNativeArena";
+import { teamPrimaryColor, floorTeamAccent } from "@/lib/foundation/team-colors";
 import type { DisciplineFieldProps, RT } from "./types";
 
 export default function TrackField(props: DisciplineFieldProps): ReactNode {
@@ -40,7 +41,9 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
     scheduleHoverClose,
     onOpenTeam,
     handoffActive,
+    highlightIdxs,
   } = props;
+  const trioSet = new Set(highlightIdxs ?? []);
 
   // DOM-<g>-Refs (imperative Bewegung — Position folgt dem Host-animScore).
   const gRefs = useRef<Map<number, SVGGElement | null>>(new Map());
@@ -267,6 +270,10 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
               }}
             >
               {glowing ? <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={4} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.1s ease-in-out infinite" }} /> : null}
+              {/* Highlight-Trio (Aufholjagd): kräftiger, pulsierender goldener Ring an den 3
+                  größten Aufsteigern der Etappe — während der Zeitlupe/des Zooms leuchtet er,
+                  damit man diese Token im Feld sofort findet und ihre Jagd verfolgt. */}
+              {trioSet.has(t.idx) ? <circle r={r + 10} fill="none" stroke="var(--nl-warn)" strokeWidth={3.5} opacity={0.95} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 0.85s ease-in-out infinite" }} /> : null}
               {/* Eigen-Team-Anker: dauerhafter, weicher Akzent-Puls — man findet sich immer. */}
               {t.isOwn ? (
                 <circle r={r + 6} fill="none" stroke="var(--nl-accent)" strokeWidth={2} opacity={0.9} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.6s ease-in-out infinite" }} />
@@ -288,7 +295,9 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
               ) : (
                 <circle r={r} fill={`hsl(${hue} 60% 52%)`} />
               )}
-              <circle r={r} fill="none" stroke={t.isOwn ? "var(--nl-ink)" : "rgba(255,255,255,.5)"} strokeWidth={t.isOwn ? 2.5 : 1.4} />
+              {/* Leichter Team-Farb-Rahmen (getTeamColor) — dezent, nicht so fett wie das
+                  Highlight/Medaille. Eigenes Team behält seinen kräftigen Ink-Rand. */}
+              <circle r={r} fill="none" stroke={t.isOwn ? "var(--nl-ink)" : floorTeamAccent(teamPrimaryColor(t.code))} strokeWidth={t.isOwn ? 2.5 : 2} opacity={t.isOwn ? 1 : 0.85} />
               {t.rank === 1 ? (
                 <text y={-(r + 9)} textAnchor="middle" fontSize={14}>
                   🏆

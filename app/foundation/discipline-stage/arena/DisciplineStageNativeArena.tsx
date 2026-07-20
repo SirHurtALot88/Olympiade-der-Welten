@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
+import { teamPrimaryColor, floorTeamAccent } from "@/lib/foundation/team-colors";
 import { useStageAudio } from "./useStageAudio";
 import DisciplineStageResultTable, { type ResultTableRow } from "./DisciplineStageResultTable";
 import DisciplineStageTopPlayersRow from "../DisciplineStageTopPlayersRow";
@@ -1056,10 +1057,20 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const [frags, setFrags] = useState<Frag[]>([]);
   // Geteilter 5s-Zeitstrahl (Feld↔Tabelle-Sync): animScore rampt roundStartScore→
   // displayScore, treibt Feldposition UND Ranglisten-Sortierung. + Highlight-Zoom.
-  const [zoom, setZoom] = useState<{ ox: number; oy: number } | null>(null);
+  const [zoom, setZoom] = useState<{ ox: number; oy: number; scale: number } | null>(null);
   const roundAnimStartRef = useRef<number>(0);
   const zoomFiredRef = useRef<boolean>(false);
   const svgRef = useRef<SVGSVGElement | null>(null); // für korrekte Zoom-Origin (getScreenCTM)
+  // Highlight-Slow-Motion: die 3 größten Aufsteiger einer Etappe werden kurz
+  // hervorgehoben (Ring am Token) und der geteilte Zeitstrahl läuft für ~1,5 s in
+  // Zeitlupe, damit man ihre Aufholjagd beobachten kann — statt eines harten Stopps.
+  const [highlightTrio, setHighlightTrio] = useState<number[]>([]);
+  const highlightTrioRef = useRef<number[]>([]); // Spiegel für den rAF (ohne Re-Mount)
+  highlightTrioRef.current = highlightTrio;
+  const highlightHoldRef = useRef<number>(0); // Date.now()-Ziel, bis wann Zeitlupe läuft
+  const animClockRef = useRef<number>(0); // virtuelle (zeitlupen-fähige) Etappen-Uhr in ms
+  const lastTsRef = useRef<number>(0); // letzter rAF-Zeitstempel (für dt)
+  const prevStartRef = useRef<number>(0); // erkennt Etappenwechsel → Uhr zurücksetzen
   const [ticker, setTicker] = useState<TickerData[]>([]);
   const [podium, setPodium] = useState<PodCol[] | null>(null);
   const [hover, setHover] = useState<{ idx: number } | null>(null);
@@ -1569,7 +1580,24 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     const tick = () => {
       const rt = rtRef.current;
       const start = roundAnimStartRef.current;
-      const elapsed = start ? Date.now() - start : Infinity;
+      const now = Date.now();
+      // Etappenwechsel erkannt → virtuelle Uhr + Highlight-Hold zurücksetzen.
+      if (start !== prevStartRef.current) {
+        prevStartRef.current = start;
+        animClockRef.current = 0;
+        lastTsRef.current = now;
+        highlightHoldRef.current = 0;
+        if (highlightTrioRef.current.length) setHighlightTrio([]);
+      }
+      // Virtuelle Etappen-Uhr: läuft normal mit 1×, während eines Highlights nur mit
+      // 0,2× (Zeitlupe). So gleiten Feld UND Rangliste in der Aufholjagd-Phase langsam
+      // weiter (beobachtbar), ohne den Fluss ganz zu stoppen.
+      const dtReal = lastTsRef.current ? now - lastTsRef.current : 0;
+      lastTsRef.current = now;
+      const inHold = highlightHoldRef.current > now;
+      const speed = inHold ? 0.2 : 1;
+      if (start) animClockRef.current = Math.min(TRACK_ROUND_MS, animClockRef.current + dtReal * speed);
+      const elapsed = start ? animClockRef.current : Infinity;
       const tRaw = reduced.current || elapsed >= TRACK_ROUND_MS ? 1 : elapsed / TRACK_ROUND_MS;
       const done1 = tRaw >= 1;
       let changed = false;
@@ -1589,51 +1617,55 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           changed = true;
         }
       }
-      // Highlight-Zoom (nicht blockierend): der GRÖSSTE RANG-AUFSTEIGER dieser Etappe
-      // (das „Aufhol"-Team) — falls keiner klettert, der größte Netto-Zugewinn. Einmalig
-      // pro Etappe. Origin exakt über getScreenCTM (sonst landet der Zoom daneben, weil
-      // die SVG skaliert/geletterboxed ist).
-      if (start && !zoomFiredRef.current && tRaw > 0.45 && tRaw < 0.85 && !reduced.current) {
+      // Highlight-Zeitlupe (nicht blockierend): die 3 GRÖSSTEN RANG-AUFSTEIGER dieser
+      // Etappe (die „Aufhol"-Teams) — falls keiner klettert, die 3 größten Netto-
+      // Zugewinne. Einmalig pro Etappe: Ring an ihren Token + geteilter Zeitstrahl
+      // ~1,5 s in Zeitlupe (0,2×) + enger Zoom auf ihren Schwerpunkt, damit man ihre
+      // Aufholjagd in Ruhe beobachten kann. Origin exakt über getScreenCTM (sonst landet
+      // der Zoom daneben, weil die SVG skaliert/geletterboxed ist).
+      if (start && !zoomFiredRef.current && tRaw > 0.42 && tRaw < 0.72 && !reduced.current) {
         zoomFiredRef.current = true;
         const finalOrder = [...rt].sort((a, b) => b.displayScore - a.displayScore || a.seasonRank - b.seasonRank);
         const finalRank = new Map<number, number>();
         finalOrder.forEach((t, i) => finalRank.set(t.idx, i + 1));
-        let mover: RT | null = null;
-        let bestClimb = 0;
-        for (const t of rt) {
-          const climb = t.roundStartRank - (finalRank.get(t.idx) ?? t.roundStartRank);
-          if (climb > bestClimb) {
-            bestClimb = climb;
-            mover = t;
-          }
-        }
-        if (!mover) {
-          let bestGain = 0.5;
-          for (const t of rt) {
-            const d = t.displayScore - t.roundStartScore;
-            if (d > bestGain) {
-              bestGain = d;
-              mover = t;
-            }
-          }
-        }
-        if (mover) {
-          const p = tokenPosRef.current(mover, mover.animScore);
+        // Ranking der Kandidaten: Rang-Aufstieg zuerst, dann Netto-Zugewinn.
+        const climbers = rt
+          .map((t) => ({
+            t,
+            climb: t.roundStartRank - (finalRank.get(t.idx) ?? t.roundStartRank),
+            gain: t.displayScore - t.roundStartScore,
+          }))
+          .sort((a, b) => b.climb - a.climb || b.gain - a.gain);
+        // Nur echte Aufsteiger/Zugewinne (früh in der Etappe legt evtl. jeder zu → Top-3
+        // Zugewinne als Fallback). Trio = die spannendsten Bewegungen dieser Etappe.
+        let trio = climbers.filter((c) => c.climb > 0).slice(0, 3);
+        if (trio.length === 0) trio = climbers.filter((c) => c.gain > 0.5).slice(0, 3);
+        if (trio.length) {
+          setHighlightTrio(trio.map((c) => c.t.idx));
+          const HOLD_MS = 1500;
+          highlightHoldRef.current = now + HOLD_MS;
+          // Zoom-Zentrum = Schwerpunkt der Trio-Token (rahmt die Gruppe), eng (1,55×).
           const svg = svgRef.current;
-          let origin = { ox: (p.x / W) * 100, oy: (p.y / H) * 100 };
+          const pts = trio.map((c) => tokenPosRef.current(c.t, c.t.animScore));
+          const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+          const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+          let origin = { ox: (cx / W) * 100, oy: (cy / H) * 100, scale: 1.55 };
           const ctm = svg?.getScreenCTM?.();
           if (svg && ctm) {
             const rect = svg.getBoundingClientRect();
             const spt = svg.createSVGPoint();
-            spt.x = p.x;
-            spt.y = p.y;
+            spt.x = cx;
+            spt.y = cy;
             const sp = spt.matrixTransform(ctm);
             if (rect.width > 0 && rect.height > 0) {
-              origin = { ox: ((sp.x - rect.left) / rect.width) * 100, oy: ((sp.y - rect.top) / rect.height) * 100 };
+              origin = { ox: ((sp.x - rect.left) / rect.width) * 100, oy: ((sp.y - rect.top) / rect.height) * 100, scale: 1.55 };
             }
           }
           setZoom(origin);
-          window.setTimeout(() => setZoom(null), 1300);
+          window.setTimeout(() => {
+            setZoom(null);
+            setHighlightTrio([]);
+          }, HOLD_MS);
         }
       }
       // Rangliste gedrosselt neu rendern (~13 fps) solange die Runde rampt.
@@ -2061,8 +2093,10 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     let i = 0;
     const doOne = () => {
       // Hover-Pause: re-pollen ohne order[i] zu konsumieren (genau ein Timer,
-      // busyRef bleibt true → Reihenfolge/Choreografie unverändert).
-      if (pauseRef.current || manualPauseRef.current) {
+      // busyRef bleibt true → Reihenfolge/Choreografie unverändert). Gleiches gilt für
+      // die Highlight-Zeitlupe: während der ~1,5 s hält die Reveal-Cascade an (nur der
+      // geteilte Zeitstrahl gleitet in Zeitlupe weiter) → Feld & Tabelle bleiben synchron.
+      if (pauseRef.current || manualPauseRef.current || highlightHoldRef.current > Date.now()) {
         later(doOne, 120);
         return;
       }
@@ -2445,6 +2479,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     paused, // Leertaste-Pause → rAF-Felder frieren ein
     // Staffelstab-Übergabe (FEATURE 1): aktiv im 600ms-Fenster nach einem Etappen-Glide-Start.
     handoffActive: !reduced.current && now < handoffTs + 600,
+    // Highlight-Trio (die 3 Aufsteiger der Etappe) → Feld setzt einen Puls-Ring an ihre Token.
+    highlightIdxs: highlightTrio,
     W,
     H,
     N,
@@ -2721,7 +2757,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
 
         {/* Oval-Track + Overlays */}
         <div className={shake !== "none" ? "oly-anim" : undefined} style={{ position: "relative", borderRadius: 14, overflow: "hidden", border: "1px solid var(--nl-line)", background: "var(--nl-bg)", animation: shake === "hard" ? "olyShakeHard .44s ease" : shake === "soft" ? "olyShakeSoft .3s ease" : undefined }}>
-          <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "auto", maxHeight: fieldMaxH ? fieldMaxH : "calc(100vh - 220px)", display: "block", margin: "0 auto", transform: photoFinish ? "scale(1.6)" : zoom ? "scale(1.32)" : undefined, transformOrigin: photoFinish ? "26% 11%" : zoom ? `${zoom.ox}% ${zoom.oy}%` : "26% 11%", transition: reduced.current ? undefined : "transform .65s cubic-bezier(.3,0,.2,1)" }}>
+          <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "auto", maxHeight: fieldMaxH ? fieldMaxH : "calc(100vh - 220px)", display: "block", margin: "0 auto", transform: photoFinish ? "scale(1.6)" : zoom ? `scale(${zoom.scale})` : undefined, transformOrigin: photoFinish ? "26% 11%" : zoom ? `${zoom.ox}% ${zoom.oy}%` : "26% 11%", transition: reduced.current ? undefined : "transform .6s cubic-bezier(.3,0,.2,1)" }}>
             <FieldComp {...fieldCtx} />
           </svg>
 
@@ -2774,7 +2810,10 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                       maxWidth: "72%",
                       zIndex: 4,
                       background: "var(--nl-panel)",
-                      border: "1px solid var(--nl-line)",
+                      // Rahmen in der Team-Farbe (getTeamColor) — die Karte gehört sichtbar
+                      // zum Team; oben ein kräftigerer Farbstreifen als Anker.
+                      border: `1.5px solid ${floorTeamAccent(teamPrimaryColor(t.code))}`,
+                      borderTop: `3px solid ${floorTeamAccent(teamPrimaryColor(t.code))}`,
                       borderRadius: 12,
                       padding: 10,
                       boxShadow: "0 18px 50px -18px rgba(0,0,0,.8)",

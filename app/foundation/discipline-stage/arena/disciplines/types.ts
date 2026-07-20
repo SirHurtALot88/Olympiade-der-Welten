@@ -62,6 +62,11 @@ export type DisciplineFieldProps = {
   // Der Host berechnet es (now < handoffTs + 600); das Track-Feld zeigt dann den Stab-Funken.
   handoffActive?: boolean;
 
+  // Highlight-Trio: idx der 3 größten Aufsteiger der laufenden Etappe (während der ~1,5 s
+  // Zeitlupe gesetzt, sonst leer). Felder heben diese Token mit einem Puls-Ring hervor,
+  // damit man ihre Aufholjagd im Zoom verfolgen kann.
+  highlightIdxs?: number[];
+
   // ---- Viewport / Geometrie ---------------------------------------------------------
   W: number; // viewBox-Breite
   H: number; // viewBox-Höhe
