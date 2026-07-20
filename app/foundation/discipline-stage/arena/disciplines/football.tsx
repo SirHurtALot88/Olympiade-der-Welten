@@ -306,12 +306,20 @@ export default function FootballField(props: DisciplineFieldProps): ReactNode {
         );
       })}
 
-      {/* SVG-Defs für Ball-Gradient */}
+      {/* SVG-Defs für Ball-Gradient + Team-Logo-ClipPaths (natclip). Ohne diese rendern die
+          Logos in TokenChrome unbeschnitten quadratisch über den runden Rahmen (Grafikfehler). */}
       <defs>
         <radialGradient id="ballGrad" cx="38%" cy="30%">
           <stop offset="0%" stopColor="#d68f45" />
           <stop offset="100%" stopColor="#7a3d12" />
         </radialGradient>
+        {rt.map((t) =>
+          t.logoUrl ? (
+            <clipPath key={`clip-${t.code}`} id={`natclip-${t.code}`}>
+              <circle cx={0} cy={0} r={t.isOwn ? geo.rOwn : geo.r} />
+            </clipPath>
+          ) : null,
+        )}
       </defs>
     </>
   );

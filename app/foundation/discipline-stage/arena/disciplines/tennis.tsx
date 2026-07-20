@@ -242,7 +242,9 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
         const pS = prevScore.get(t.idx) ?? t.score;
         if (hadT && t.thrownSlot > pT && t.thrownSlot >= 0 && !c.reduced) {
           // Determine if this is an ace (random but consistent per team/round)
-          const hashVal = (Math.sin(t.idx * 12.9898 + t.thrownSlot * 78.233) * 43758.5453) % 1;
+          // Math.abs: (x % 1) behält das Vorzeichen → ~50% negativ, dann war isAce IMMER wahr
+          // (real ~65% Ass statt 30%). Betrag → korrekte Wahrscheinlichkeiten.
+          const hashVal = Math.abs((Math.sin(t.idx * 12.9898 + t.thrownSlot * 78.233) * 43758.5453) % 1);
           const isAce = hashVal < 0.3; // 30% chance
           const isNet = !isAce && hashVal < 0.55; // 25% chance (net roller)
           fireShot(c, t, t.score - pS, isAce, isNet);

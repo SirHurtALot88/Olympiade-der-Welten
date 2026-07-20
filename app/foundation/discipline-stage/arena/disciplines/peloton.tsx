@@ -490,7 +490,9 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
                   🏆
                 </text>
               ) : roundMed ? (
-                <text y={r + 13} textAnchor="middle" fontSize={11}>
+                // Medaillen-Emoji ÜBER das Token (nicht y=r+13) — dort sitzt der TokenChrome-
+                // Rang-Badge, sonst überlagern sich Emoji und „#N".
+                <text y={-(r + 7)} textAnchor="middle" fontSize={11}>
                   {roundMed}
                 </text>
               ) : null}

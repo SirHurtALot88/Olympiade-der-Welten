@@ -585,8 +585,9 @@ export default function ShowcaseField(props: DisciplineFieldProps): ReactNode {
               if (onOpenTeam && t.teamId) onOpenTeam(t.teamId);
             }}
           >
-            {/* Champion crown (rank 1 at end) */}
-            {done && t.rank === 1 ? (
+            {/* Champion crown — LIVE am Rang 1 (Benchmark-Parität; kein Spoiler, der Rang-Badge
+                ist ohnehin live sichtbar). Vorher nur bei `done`. */}
+            {t.rank === 1 ? (
               <text y={-(r + 9)} textAnchor="middle" fontSize={14}>
                 🏆
               </text>
