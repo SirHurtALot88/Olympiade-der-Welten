@@ -2493,6 +2493,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     handoffActive: !reduced.current && now < handoffTs + 600,
     // Highlight-Trio (die 3 Aufsteiger der Etappe) → Feld setzt einen Puls-Ring an ihre Token.
     highlightIdxs: highlightTrio,
+    // Start-Gate → Felder zeigen vor dem ersten ▶ eine Startaufstellung.
+    started,
     W,
     H,
     N,

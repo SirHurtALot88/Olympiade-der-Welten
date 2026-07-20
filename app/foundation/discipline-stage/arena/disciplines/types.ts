@@ -67,6 +67,10 @@ export type DisciplineFieldProps = {
   // damit man ihre Aufholjagd im Zoom verfolgen kann.
   highlightIdxs?: number[];
 
+  // Start-Gate: true, sobald der erste ▶-Etappe-Klick erfolgt ist. Felder können vorher
+  // eine „Startaufstellung" (Slots) zeigen und beim Start ins Feld gleiten lassen.
+  started?: boolean;
+
   // ---- Viewport / Geometrie ---------------------------------------------------------
   W: number; // viewBox-Breite
   H: number; // viewBox-Höhe

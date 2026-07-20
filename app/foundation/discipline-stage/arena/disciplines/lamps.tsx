@@ -18,7 +18,7 @@
 // =====================================================================================
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { hueForIdx, relColor } from "../DisciplineStageNativeArena";
 import { teamPrimaryColor, floorTeamAccent } from "@/lib/foundation/team-colors";
 import type { DisciplineFieldProps, RT } from "./types";
@@ -62,8 +62,14 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
     scheduleHoverClose,
     onOpenTeam,
     highlightIdxs,
+    started,
+    round,
   } = props;
   const trioSet = new Set(highlightIdxs ?? []);
+  const startedRef = useRef<boolean>(!!started);
+  startedRef.current = !!started;
+  const roundRef = useRef<number>(round);
+  roundRef.current = round;
 
   // Frische Prop-Spiegel für die rAF-Schleife (ohne Neustart).
   const hoverRef = useRef<number | null>(hoverIdx);
@@ -88,23 +94,68 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
 
   // GROSSE, lesbare Token (unabhängig von der Teamzahl — kein Bahn-Zwang mehr). Deutlich
   // größer als die alten Fixbahn-Winzlinge (geo.r war 8/11).
-  const RB = 23;
-  const RBOwn = 28;
-
-  // Vertikale Streuung: gleichmäßig über die (fast volle) Planchehöhe verteilt in stabiler
-  // Hash-Ordnung (jedes Team behält seine Höhe → man kann es verfolgen). Kein score-
-  // korrelierter Wert, damit enge Score-Cluster wenigstens vertikal auseinanderziehen.
+  const RB = 20;
+  const RBOwn = 25;
   const BAND_TOP = 58;
   const BAND_BOT = PY1 - 20;
-  const yByCode = new Map<string, number>();
-  {
-    const order = rt
-      .map((t) => ({ code: t.code, h: hash01(t.code + "fenc-y") }))
-      .sort((a, b) => a.h - b.h);
-    const n = Math.max(1, order.length - 1);
-    order.forEach((o, i) => yByCode.set(o.code, BAND_TOP + (i / n) * (BAND_BOT - BAND_TOP)));
-  }
-  const yOf = (t: RT): number => yByCode.get(t.code) ?? (BAND_TOP + BAND_BOT) / 2;
+  const CY = (BAND_TOP + BAND_BOT) / 2;
+
+  // ---- Startaufstellung (Slots): vor dem ▶ stehen die Teams BREIT über die Planche
+  // verteilt auf einem gleichmäßigen Raster (Startslots), jeder mit Platz. Reihenfolge
+  // stabil nach seasonRank → lesbare Anfangsordnung. Beim Start gleiten sie ins Feld.
+  const GRID_X0 = PX0 + 54;
+  const GRID_X1 = PX1 - 40;
+  const gridByCode = useMemo(() => {
+    const order = [...rt].sort((a, b) => a.seasonRank - b.seasonRank);
+    const n = order.length;
+    const cols = Math.max(1, Math.min(8, Math.ceil(Math.sqrt(n * 2.4))));
+    const rows = Math.max(1, Math.ceil(n / cols));
+    const m = new Map<string, { x: number; y: number }>();
+    order.forEach((t, i) => {
+      const c = i % cols;
+      const r = Math.floor(i / cols);
+      const x = cols > 1 ? GRID_X0 + (c / (cols - 1)) * (GRID_X1 - GRID_X0) : (GRID_X0 + GRID_X1) / 2;
+      const y = rows > 1 ? BAND_TOP + (r / (rows - 1)) * (BAND_BOT - BAND_TOP) : CY;
+      m.set(t.code, { x, y });
+    });
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rt.length]);
+
+  // ---- Beeswarm-Auffächerung: x = Treffer (Runden-Ziel), y wird kollisionsfrei um die
+  // Mittellinie gepackt → jeder Token behält Platz (hoverbar/erkennbar), Einzelläufer
+  // sitzen mittig, enge Score-Cluster fächern nach oben/unten auf („in die Mitte
+  // zurechtfinden"). Stabil je Runde (aus displayScore) → kein Y-Zittern beim Gleiten.
+  const dispSig = rt.map((t) => `${t.code}:${t.displayScore}`).join("|");
+  const packByCode = useMemo(() => {
+    const items = rt.map((t) => ({ code: t.code, x: fracX(t.displayScore), r: t.isOwn ? RBOwn : RB }));
+    items.sort((a, b) => a.x - b.x);
+    const placed: { x: number; y: number; r: number }[] = [];
+    const m = new Map<string, number>();
+    for (const it of items) {
+      const step = it.r * 1.1;
+      let y = CY;
+      for (let k = 0; k < 260; k += 1) {
+        const cand = CY + (k % 2 === 0 ? 1 : -1) * Math.ceil(k / 2) * step;
+        if (cand < BAND_TOP || cand > BAND_BOT) continue;
+        const hit = placed.some((p) => Math.abs(p.x - it.x) < p.r + it.r + 3 && Math.abs(p.y - cand) < p.r + it.r + 3);
+        y = cand;
+        if (!hit) break;
+      }
+      y = Math.max(BAND_TOP, Math.min(BAND_BOT, y));
+      placed.push({ x: it.x, y, r: it.r });
+      m.set(it.code, y);
+    }
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispSig, finalMax]);
+  const packY = (t: RT): number => packByCode.get(t.code) ?? CY;
+  const gridOf = (t: RT): { x: number; y: number } => gridByCode.get(t.code) ?? { x: (GRID_X0 + GRID_X1) / 2, y: CY };
+  // Frische Spiegel für die rAF-Schleife.
+  const packRef = useRef(packByCode);
+  packRef.current = packByCode;
+  const gridRef = useRef(gridByCode);
+  gridRef.current = gridByCode;
 
   // Treffer-Melder oben mittig.
   const CX = W / 2;
@@ -127,19 +178,42 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
     const tick = () => {
       const frozen = hoverRef.current != null || pausedRef.current;
       const reduce = reducedRef.current;
+      const on = startedRef.current;
+      const pack = packRef.current;
+      const grid = gridRef.current;
+      const firstStage = roundRef.current === 0;
       for (const t of rtRef.current) {
         const el = gRefs.current.get(t.idx);
-        const y = yOf(t);
-        if (el && !frozen) {
-          el.setAttribute("transform", `translate(${fracX(t.animScore)} ${y})`);
+        const g = grid.get(t.code) ?? { x: (GRID_X0 + GRID_X1) / 2, y: CY };
+        const py = pack.get(t.code) ?? CY;
+        // Ziel im Feld (Beeswarm) für den aktuellen animScore.
+        const fx = fracX(t.animScore);
+        // Vor dem Start: Startaufstellung (Slots). In Etappe 1 gleiten sie vom Slot ins
+        // Feld (blend nach Runden-Fortschritt) → „breit starten, in die Mitte zurechtfinden".
+        let x: number;
+        let y: number;
+        if (!on) {
+          x = g.x;
+          y = g.y;
+        } else if (firstStage) {
+          const span = t.displayScore - t.roundStartScore;
+          const p = span > 0.5 ? Math.max(0, Math.min(1, (t.animScore - t.roundStartScore) / span)) : 1;
+          const e = p * p * (3 - 2 * p); // smoothstep
+          x = g.x + (fx - g.x) * e;
+          y = g.y + (py - g.y) * e;
+        } else {
+          x = fx;
+          y = py;
         }
-        // Ghost der Vorrunde bei roundStartScore — die Lücke Ghost→Token = Zugewinn.
+        if (el && !frozen) el.setAttribute("transform", `translate(${x} ${y})`);
+        // Ghost der Vorrunde bei roundStartScore — die Lücke Ghost→Token = Zugewinn. Erst
+        // ab Etappe 2 sinnvoll (in Etappe 1 kommen die Token frisch aus der Aufstellung).
         const gel = ghostRefs.current.get(t.idx);
         if (gel) {
           const span = t.displayScore - t.roundStartScore;
           const prog = span > 0.5 ? Math.max(0, Math.min(1, (t.animScore - t.roundStartScore) / span)) : 1;
-          if (span > 0.5 && !reduce && prog < 0.98) {
-            gel.setAttribute("transform", `translate(${fracX(t.roundStartScore)} ${y})`);
+          if (on && !firstStage && span > 0.5 && !reduce && prog < 0.98) {
+            gel.setAttribute("transform", `translate(${fracX(t.roundStartScore)} ${py})`);
             gel.setAttribute("opacity", String((t.isOwn ? 0.55 : 0.26) * (1 - prog * 0.7)));
           } else {
             gel.setAttribute("opacity", "0");
@@ -366,7 +440,7 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
                 gRefs.current.set(t.idx, el);
               }}
               className={lunging ? "f-lunge" : undefined}
-              transform={`translate(${fracX(t.animScore)} ${yOf(t)})`}
+              transform={`translate(${started ? fracX(t.animScore) : gridOf(t).x} ${started ? packY(t) : gridOf(t).y})`}
               style={{
                 cursor: onOpenTeam && t.teamId ? "pointer" : "default",
                 opacity: hoverIdx != null && hoverIdx !== t.idx ? 0.82 : 1,
