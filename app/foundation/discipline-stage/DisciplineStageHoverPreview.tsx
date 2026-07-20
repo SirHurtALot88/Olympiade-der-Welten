@@ -43,7 +43,14 @@ const FIELDED_ROW_H = 34;
 function clampToViewport(x: number, y: number, w: number, h: number): { left: number; top: number } {
   const vw = typeof window !== "undefined" ? window.innerWidth : 1280;
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;
-  const left = Math.max(8, Math.min(x + 12, vw - w - 8));
+  // Standard: rechts neben dem Cursor. Wenn dort kein Platz ist (Hover nah am
+  // rechten Rand, z.B. die Rangliste), nach LINKS neben den Cursor kippen —
+  // sonst würde die Karte rechts aus dem Screen laufen.
+  let left = x + 14;
+  if (left + w > vw - 8) {
+    left = x - w - 14;
+  }
+  left = Math.max(8, Math.min(left, vw - w - 8));
   let top = y + 16;
   if (top + h > vh - 8) {
     top = y - h - 12; // nach oben kippen
@@ -119,6 +126,7 @@ function TeamPreview({ gameState, target, ratingByPlayerId, fieldedPlayerIdsByTe
         left,
         top,
         width: TEAM_W,
+        boxSizing: "border-box",
         zIndex: 70,
         pointerEvents: "none",
         padding: 12,
