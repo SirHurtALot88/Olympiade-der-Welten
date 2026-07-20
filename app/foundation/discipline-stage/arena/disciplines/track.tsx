@@ -288,16 +288,26 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
                   <text x={13} y={0} dominantBaseline="central" fontSize={11} fontWeight={900} fill={t.isOwn ? "var(--nl-accent)" : "var(--nl-warn)"}>→</text>
                 </g>
               ) : null}
-              {rc ? <circle r={r + 5.5} fill="none" stroke={rc} strokeWidth={2.4} opacity={0.95} /> : null}
-              {medal ? <circle r={r + 3.5} fill="none" stroke={medal} strokeWidth={t.isOwn ? 4.5 : 3.5} /> : null}
+              {/* Relations-Marker (Rivalen rot / Verbündete): eng am Icon (hugt den Team-
+                  Rahmen), nicht mehr als abstehender Halo — sitzt direkt außen am Rahmen. */}
+              {rc ? <circle r={r + 3} fill="none" stroke={rc} strokeWidth={2.6} opacity={0.95} /> : null}
+              {medal ? <circle r={r + 4.6} fill="none" stroke={medal} strokeWidth={t.isOwn ? 4.5 : 3.5} /> : null}
               {t.logoUrl ? (
                 <image href={t.logoUrl} x={-r} y={-r} width={r * 2} height={r * 2} clipPath={`url(#natclip-${t.code})`} preserveAspectRatio="xMidYMid slice" />
               ) : (
                 <circle r={r} fill={`hsl(${hue} 60% 52%)`} />
               )}
-              {/* Leichter Team-Farb-Rahmen (getTeamColor) — dezent, nicht so fett wie das
-                  Highlight/Medaille. Eigenes Team behält seinen kräftigen Ink-Rand. */}
-              <circle r={r} fill="none" stroke={t.isOwn ? "var(--nl-ink)" : floorTeamAccent(teamPrimaryColor(t.code))} strokeWidth={t.isOwn ? 2.5 : 2} opacity={t.isOwn ? 1 : 0.85} />
+              {/* Team-Farb-Rahmen (getTeamColor) — JEDES Team hat sichtbar seinen Rahmen,
+                  knapp außen ums Icon. Eigenes Team zusätzlich hervorgehoben: kräftiger
+                  Akzent-Rahmen + Doppelring (plus der weiche Akzent-Puls oben). */}
+              {t.isOwn ? (
+                <>
+                  <circle r={r + 1.6} fill="none" stroke="var(--nl-accent)" strokeWidth={3} />
+                  <circle r={r + 0.2} fill="none" stroke="var(--nl-ink)" strokeWidth={1.4} opacity={0.9} />
+                </>
+              ) : (
+                <circle r={r + 1.4} fill="none" stroke={floorTeamAccent(teamPrimaryColor(t.code))} strokeWidth={2.4} opacity={1} />
+              )}
               {t.rank === 1 ? (
                 <text y={-(r + 9)} textAnchor="middle" fontSize={14}>
                   🏆
