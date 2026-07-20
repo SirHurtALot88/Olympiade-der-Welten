@@ -401,7 +401,13 @@ export default function SchachField(props: DisciplineFieldProps): ReactNode {
         .slice()
         .reverse()
         .map((t) => {
-        const i = sorted.indexOf(t);
+        // Initial-Spalte = LIVE-Rang (animScore) — identisch zur Ladder (liveRankByCode)
+        // und zur rAF-Ordnung. Vorher kam der Startindex aus sorted (Score-Rang) → das Token
+        // sprang im ersten Frame in eine andere Spalte und passte kurz nicht zur Rangliste.
+        const liveIdx = [...rtRef.current]
+          .sort((a, b) => b.animScore - a.animScore || a.seasonRank - b.seasonRank)
+          .findIndex((o) => o.idx === t.idx);
+        const i = liveIdx >= 0 ? liveIdx : sorted.indexOf(t);
         const r = t.isOwn ? geo.rOwn : geo.r;
         // Figuren-Glyph (Promotion) aus dem aktuellen Runden-Elo.
         const band = bandOf(Math.round(eloOf(t.displayScore)));
