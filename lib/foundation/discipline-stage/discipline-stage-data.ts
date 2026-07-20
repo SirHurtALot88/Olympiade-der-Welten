@@ -1,6 +1,7 @@
 import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
 import { distributePerPlayerFormShares, seededFormJitter } from "@/lib/lineups/legacy-lineup-modifiers";
+import { buildLeagueDisciplineRatingsWithAttributeOverrides } from "@/lib/player-formulas/discipline-rating-engine";
 
 // One aufgestellter Spieler in einem Slot einer Disziplin, mit echter
 // Netto-Leistung aus dem Save (Disziplin-Wert + echtem Fatigue/Form).
@@ -37,11 +38,11 @@ function clamp(value: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, value));
 }
 
-function computeSlot(player: Player, disciplineId: string, slotIndex: number, formSwing: number): DisciplineStageSlot {
+function computeSlot(player: Player, disciplineId: string, slotIndex: number, formSwing: number, rawBase: number): DisciplineStageSlot {
   // Grundwert kann im Save bis zu 2 Nachkommastellen haben — zuerst auf 1
   // Dezimale runden und ALLES daraus ableiten, damit die Anzeige-Identität
   // „Grundwert − Fatigue + Form = Netto" exakt stimmt (keine 0,1-Abweichung).
-  const base = Number((player.disciplineRatings?.[disciplineId] ?? 0).toFixed(1));
+  const base = Number(rawBase.toFixed(1));
   const fatigue = clamp(player.fatigue ?? 0, 0, 100);
   // Fatigue bremst nach vorne: bis zu 25 % des Werts bei voller Erschöpfung.
   const fatiguePenalty = Math.round(((base * fatigue) / 100) * 0.25);
@@ -75,6 +76,30 @@ export function buildDisciplineStageModel(
   const discipline = (gameState.disciplines ?? []).find((d) => d.id === disciplineId);
   const slotCount = discipline?.playerCount ?? 5;
 
+  // Backfill für Alt-Saves: manche Spieler haben keine disciplineRatings-Einträge für
+  // Disziplinen, die erst später in die offizielle Liste kamen (z. B. Showcase) → base
+  // fiel auf 0 → die ganze Disziplin zeigte 0 Punkte. Fehlt der Wert, rechnen wir die
+  // liga-weiten Ratings EINMAL (lazy) aus den Spieler-Attributen nach (korrekte Skala,
+  // gleiche Engine wie die Generierung). Gesunde Saves lösen den Backfill nie aus.
+  let backfillTried = false;
+  let backfillMap: Map<string, Record<string, number>> | null = null;
+  const getBackfill = (): Map<string, Record<string, number>> | null => {
+    if (!backfillTried) {
+      backfillTried = true;
+      try {
+        backfillMap = buildLeagueDisciplineRatingsWithAttributeOverrides(gameState.players ?? []);
+      } catch {
+        backfillMap = null;
+      }
+    }
+    return backfillMap;
+  };
+  const ratingOf = (player: Player): number => {
+    const own = player.disciplineRatings?.[disciplineId];
+    if (own != null) return own;
+    return getBackfill()?.get(player.id)?.[disciplineId] ?? 0;
+  };
+
   const playersById = new Map<string, Player>();
   for (const player of gameState.players ?? []) {
     playersById.set(player.id, player);
@@ -101,7 +126,7 @@ export function buildDisciplineStageModel(
     // tauschen). Reihenfolge ist ohnehin summenneutral, entscheidend ist die Auswahl.
     const chosen = [...roster]
       .map((p) => {
-        const base = Number((p.disciplineRatings?.[disciplineId] ?? 0).toFixed(1));
+        const base = Number(ratingOf(p).toFixed(1));
         const fatiguePenalty = Math.round(((base * clamp(p.fatigue ?? 0, 0, 100)) / 100) * 0.25);
         const formEst = Math.round(((clamp(p.form ?? 50, 0, 100) - 50) / 50) * 8);
         return { p, key: base - fatiguePenalty + formEst + seededFormJitter(`sel|${p.id}|${disciplineId}`, 5) };
@@ -122,7 +147,7 @@ export function buildDisciplineStageModel(
       formModifier: flatFormPerPlayer * chosen.length,
       seeds: chosen.map((p) => `${p.id}|${disciplineId}`),
     });
-    const slots = chosen.map((player, idx) => computeSlot(player, disciplineId, idx, formShares[idx] ?? 0));
+    const slots = chosen.map((player, idx) => computeSlot(player, disciplineId, idx, formShares[idx] ?? 0, ratingOf(player)));
     const total = slots.reduce((sum, slot) => sum + slot.net, 0);
     return {
       teamId: team.teamId,
