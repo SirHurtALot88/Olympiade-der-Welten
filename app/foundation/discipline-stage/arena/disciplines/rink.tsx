@@ -89,11 +89,41 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
     let raf = 0;
     let last = performance.now();
     const prevScore = new Map<number, number>();
-    // Fliegende Pucks (Schuss → Torraum) — nur Zeichnung, nie Score.
-    const shots: { x: number; y: number; tx: number; ty: number; t: number; g: SVGGElement }[] = [];
+    // Fliegende Pucks (Schuss → Torraum) — nur Zeichnung, nie Score. outcome = Tor oder Save.
+    const shots: { x: number; y: number; tx: number; ty: number; t: number; g: SVGGElement; outcome: "goal" | "save" }[] = [];
     let lightUntil = 0; // Torlicht-Flash bis-Zeitpunkt
+    let saveUntil = 0; // Goalie-Fanghandschuh-Flash bis-Zeitpunkt
+    let shotAcc = 0; // Rhythmus-Akku fürs LAUFENDE Schießen (nicht nur bei Reveals)
     let goalieY = CY; // Goalie-Sollposition (folgt dem Führenden weich)
     let goalieCur = CY;
+
+    // Einen Schuss vom Team t Richtung rechtes Tor abfeuern (outcome vorab bestimmt).
+    const fireShot = (t: RT, outcome: "goal" | "save") => {
+      const g = document.createElementNS(NS, "g");
+      const p = document.createElementNS(NS, "ellipse");
+      p.setAttribute("rx", "5");
+      p.setAttribute("ry", "3.2");
+      p.setAttribute("fill", "#0c0e11");
+      p.setAttribute("stroke", "#39434f");
+      p.setAttribute("stroke-width", "1");
+      const trail = document.createElementNS(NS, "line");
+      trail.setAttribute("stroke", t.isOwn ? "rgba(87,177,255,.8)" : "rgba(200,215,235,.6)");
+      trail.setAttribute("stroke-width", "2.4");
+      trail.setAttribute("stroke-linecap", "round");
+      g.appendChild(trail);
+      g.appendChild(p);
+      if (fxRef.current) fxRef.current.appendChild(g);
+      shots.push({
+        x: fracX(t.animScore) + (t.isOwn ? geo.rOwn : geo.r) + 6,
+        y: laneY(t.idx),
+        // Save → der Puck landet knapp VOR dem Torraum (Goalie pariert); Tor → in den Kasten.
+        tx: outcome === "goal" ? GR + 6 : GR - 10,
+        ty: CY + (outcome === "save" ? (Math.random() - 0.5) * 30 : 0),
+        t: 0,
+        g,
+        outcome,
+      });
+    };
 
     const tick = (ts: number) => {
       const dt = Math.min(64, ts - last);
@@ -111,43 +141,31 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
         el.setAttribute("cy", String(laneY(lead.idx)));
       }
 
-      // Reveal-Erkennung: jeder spürbare Score-Sprung feuert einen Schuss Richtung rechtes Tor.
-      if (!frozen && !reduce && fxRef.current) {
+      if (!frozen && !reduce && fxRef.current && shots.length < 6) {
+        // LAUFENDES Schießen (nicht nur bei Reveals): im Rhythmus feuert ein Team auf das Tor,
+        // Ausgang Tor/Save zufällig — stärkere (weiter rechts) treffen etwas häufiger. So gibt es
+        // ständig Action: Schuss → Save oder Tor. Reveals feuern zusätzlich einen Extra-Schuss.
+        shotAcc += dt;
+        if (shotAcc > 620 && rtl.length > 0) {
+          shotAcc = 0;
+          const shooter = rtl[Math.floor(Math.random() * rtl.length)]!;
+          const chance = 0.4 + 0.4 * (finalMax > 0 ? Math.min(1, shooter.animScore / finalMax) : 0);
+          fireShot(shooter, Math.random() < chance ? "goal" : "save");
+        }
         for (const t of rtl) {
           const prev = prevScore.get(t.idx);
           prevScore.set(t.idx, t.displayScore);
           if (prev == null) continue;
-          const gain = t.displayScore - prev;
-          if (gain <= 0.4) continue;
-          const g = document.createElementNS(NS, "g");
-          const p = document.createElementNS(NS, "ellipse");
-          p.setAttribute("rx", "5");
-          p.setAttribute("ry", "3.2");
-          p.setAttribute("fill", "#0c0e11");
-          p.setAttribute("stroke", "#39434f");
-          p.setAttribute("stroke-width", "1");
-          const trail = document.createElementNS(NS, "line");
-          trail.setAttribute("stroke", t.isOwn ? "rgba(87,177,255,.8)" : "rgba(200,215,235,.6)");
-          trail.setAttribute("stroke-width", "2.4");
-          trail.setAttribute("stroke-linecap", "round");
-          g.appendChild(trail);
-          g.appendChild(p);
-          fxRef.current.appendChild(g);
-          shots.push({
-            x: fracX(t.displayScore) + (t.isOwn ? geo.rOwn : geo.r) + 6,
-            y: laneY(t.idx),
-            tx: GR + 6,
-            ty: CY,
-            t: 0,
-            g,
-          });
+          if (t.displayScore - prev > 0.4) fireShot(t, "goal"); // Reveal-Zugewinn = sicherer Treffer
         }
+      } else {
+        for (const t of rtl) prevScore.set(t.idx, t.displayScore);
       }
 
-      // Fliegende Pucks integrieren.
+      // Fliegende Pucks integrieren + Einschlag (Tor → Torlicht, Save → Fanghandschuh).
       for (let i = shots.length - 1; i >= 0; i -= 1) {
         const s = shots[i]!;
-        s.t += dt / 320; // ~320ms Flugzeit
+        if (!frozen) s.t += dt / 320; // ~320ms Flugzeit
         const k = s.t < 1 ? s.t : 1;
         const cx = s.x + (s.tx - s.x) * k;
         const cy = s.y + (s.ty - s.y) * k - Math.sin(k * Math.PI) * 26; // leichter Bogen
@@ -166,11 +184,12 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
         if (s.t >= 1) {
           if (s.g.parentNode) s.g.parentNode.removeChild(s.g);
           shots.splice(i, 1);
-          lightUntil = nowMs + 520; // Treffer → Torlicht an
+          if (s.outcome === "goal") lightUntil = nowMs + 620; // TOR → Torlicht an
+          else saveUntil = nowMs + 300; // SAVE → Goalie-Fanghandschuh
         }
       }
 
-      // Torlicht-Flash.
+      // Torlicht-Flash (Tor).
       const gl = goalLightRef.current;
       if (gl) {
         if (nowMs < lightUntil) {
@@ -190,7 +209,10 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
       const gk = goalieRef.current;
       if (gk) {
         const clampedY = Math.max(228, Math.min(292, goalieCur));
-        gk.setAttribute("transform", `translate(${GR + 27} ${clampedY})`);
+        // Save-Reaktion: kurzer Fanghandschuh-Pop (heller + leichter Ausfall zur Seite).
+        const saving = nowMs < saveUntil;
+        gk.setAttribute("transform", `translate(${GR + 27} ${clampedY})${saving ? " scale(1.18)" : ""}`);
+        gk.style.filter = saving ? "drop-shadow(0 0 5px rgba(220,235,255,.9))" : "none";
       }
 
       raf = requestAnimationFrame(tick);
