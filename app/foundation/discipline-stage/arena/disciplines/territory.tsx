@@ -15,7 +15,9 @@ import type { DisciplineFieldProps, RT } from "./types";
 const BASE = 60;
 const POW = 1.3;
 const GAP = 3;
-const MORPH_MS = 5000;
+// Morph-Dauer = Runden-Glide des Hosts (TRACK_ROUND_MS = 15s). Vorher 5s → die Karte zeigte
+// das Runden-Endbild nach 5s, während Feld/Ladder noch 10s weiter rampten (Sync-Bruch).
+const MORPH_MS = 15000;
 const M = 26;
 
 // Hash für deterministisch Team-Hues
@@ -379,9 +381,6 @@ export default function TerritoryField(props: DisciplineFieldProps): ReactNode {
               stroke={inTrio ? "var(--nl-warn)" : relBorder}
               strokeWidth={inTrio ? 2.5 : relStroke}
               rx={4}
-              style={{
-                filter: "drop-shadow(inset 0 0 0 1px rgba(0,0,0,.28)) drop-shadow(inset 0 -18px 30px rgba(0,0,0,.26))",
-              }}
             />
             {/* Highlight-Trio (Aufholjagd): goldener Puls-Rahmen ums Gebiet. */}
             {inTrio ? (

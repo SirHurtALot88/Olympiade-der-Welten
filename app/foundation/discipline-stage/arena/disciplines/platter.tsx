@@ -83,6 +83,11 @@ export default function PlatterField(props: DisciplineFieldProps): ReactNode {
     }
   };
 
+  // Score-Signatur: rt ist die STABILE rtRef-Referenz des Hosts (in place mutiert) → als
+  // Effekt-Dep nutzlos (Effekt lief nur beim Mount bei Score 0 → Stapel/Meter blieben leer,
+  // die ganze Erzähl-Schicht war unsichtbar). Die Signatur ändert sich pro Runde und triggert
+  // das Neu-Zeichnen von Stapeln + Gorge/Gabel.
+  const scoreSig = rt.map((t) => `${t.code}:${Math.round(t.displayScore || 0)}`).join("|");
   // Render-Update: Token-Positionen und Stacks aktualisieren (imperativ)
   useEffect(() => {
     rt.forEach((t) => {
@@ -101,7 +106,8 @@ export default function PlatterField(props: DisciplineFieldProps): ReactNode {
       gorgeRef.current.setAttribute("width", gorgeW.toString());
       forkRef.current.setAttribute("x", leaderX.toString());
     }
-  }, [rt, top, laneH, xStart, finalMax, fieldW]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scoreSig, top, laneH, xStart, finalMax, fieldW]);
 
   // Feld-Kunst: Banquet-Tisch mit rot-weiß Karierung, Neon-Schild, Dekoration
   const renderBanquetArt = (): React.ReactNode => {
@@ -378,25 +384,15 @@ export default function PlatterField(props: DisciplineFieldProps): ReactNode {
                 if (onOpenTeam && t.teamId) onOpenTeam(t.teamId);
               }}
             >
-              {/* Tellerstapel (bespoke, wächst unter dem Esser) */}
+              {/* Tellerstapel (bespoke, wächst unter dem Esser) — REIN imperativ befüllt
+                  (updateStackHeight). KEIN React-Kind hier: das while(firstChild)-Redraw würde
+                  sonst React-verwaltete Knoten löschen (Crash-/Drift-Risiko). */}
               <g
                 ref={(el) => {
                   stackRefs.current.set(t.idx, el);
                 }}
                 transform={`translate(0 ${r + 2})`}
-              >
-                {/* Stapel-Balken: repeating-linear-gradient als rect mit Pattern */}
-                <rect
-                  data-stack-bar
-                  x={-Math.min(4, r * 0.4)}
-                  y={0}
-                  width={Math.min(8, r * 0.8)}
-                  height={0}
-                  rx={1.5}
-                  fill="url(#plateFill)"
-                  opacity={0.85}
-                />
-              </g>
+              />
 
               {/* Glow (aktive Runde, bespoke) */}
               {glowing ? (
