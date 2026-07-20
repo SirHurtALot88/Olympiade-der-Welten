@@ -54,6 +54,7 @@ export type DisciplineStageMatchdayPanelProps = {
   teamMetaById: Map<string, MatchdayPanelTeamMeta>;
   ownTeamId: string | null;
   onOpenTeam?: ((teamId: string) => void) | null;
+  onHoverTeam?: ((teamId: string | null) => void) | null;
 };
 
 function ppText(value: number | null): string {
@@ -99,6 +100,7 @@ export default function DisciplineStageMatchdayPanel({
   teamMetaById,
   ownTeamId,
   onOpenTeam,
+  onHoverTeam,
 }: DisciplineStageMatchdayPanelProps) {
   const resultByTeam = new Map(teamResults.map((r) => [r.teamId, r]));
 
@@ -195,6 +197,12 @@ export default function DisciplineStageMatchdayPanel({
                 key={row.teamId}
                 onClick={() => {
                   if (onOpenTeam && row.teamId) onOpenTeam(row.teamId);
+                }}
+                onMouseEnter={() => {
+                  if (onHoverTeam && row.teamId) onHoverTeam(row.teamId);
+                }}
+                onMouseLeave={() => {
+                  if (onHoverTeam) onHoverTeam(null);
                 }}
                 style={{
                   display: "grid",

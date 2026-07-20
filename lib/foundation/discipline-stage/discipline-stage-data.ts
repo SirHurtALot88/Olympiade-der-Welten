@@ -36,9 +36,11 @@ function clamp(value: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, value));
 }
 
-// Deterministischer „Tagesform"-Swing in [-4, 4], fest pro Spieler+Disziplin
+// Deterministischer „Tagesform"-Swing in [-2, 2], fest pro Spieler+Disziplin
 // (reiner Hash aus player.id|disciplineId — für dieselbe Paarung immer gleich).
-// Gibt der Form einen kleinen individuellen Beiwert oben auf player.form.
+// Gibt der Form einen kleinen individuellen Beiwert oben auf player.form. Bewusst
+// KLEIN gehalten (früher ±4): über 5 Spieler summiert sich der Zufall sonst zu stark
+// und wirft Teams um viele Ränge hoch/runter, die sie nicht halten (zu hohe Varianz).
 function seededJitter(seed: string): number {
   let h = 2166136261;
   for (let i = 0; i < seed.length; i += 1) {
@@ -46,7 +48,7 @@ function seededJitter(seed: string): number {
     h = Math.imul(h, 16777619);
   }
   const norm = ((h >>> 0) % 1000) / 1000; // 0..1
-  return Math.round((norm * 2 - 1) * 4);
+  return Math.round((norm * 2 - 1) * 2);
 }
 
 function computeSlot(player: Player, disciplineId: string, slotIndex: number): DisciplineStageSlot {

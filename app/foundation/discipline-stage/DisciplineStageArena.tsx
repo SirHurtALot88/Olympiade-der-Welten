@@ -158,7 +158,7 @@ const SLOT_VOCAB: Record<string, string[]> = {
   "time-trial": ["Pacer", "Line Reader", "Aero Drive", "Split Control", "Finish Kick"],
   hockey: ["Power Forward", "Defensive Wall", "Playmaker", "Slot Finisher", "Captain Line"],
   football: ["Line Power", "Route Burst", "Field Read", "Red Zone", "Locker Leader"],
-  basketball: ["Tip-Off", "Fast Break", "Downtown", "And-One", "Buzzer Beater"],
+  basketball: ["Tip-Off", "Fast Break", "Downtown", "And-One", "Buzzer Beater", "Overtime"],
   wettessen: ["Amuse-Bouche", "Suppe", "Hauptgang", "Wildbret", "Dessert"],
   gewichtheben: ["Power Opener", "Safe Lift", "Pressure Lift", "Technical Lift", "Grip Anchor"],
   climbing: ["Route Reader", "Grip Specialist", "Pace Climber", "Endurance Wall", "Summit Push"],
@@ -1014,6 +1014,7 @@ export default function DisciplineStageArena({
             teamMetaById={teamMetaById}
             ownTeamId={ownTeamId}
             onOpenTeam={(teamId) => openDrawerPinned({ kind: "team", teamId })}
+            onHoverTeam={previewTeam}
           />
         </div>
       ) : null}

@@ -33,12 +33,6 @@ export type DisciplineStageResultTableProps = {
   onOpenPlayer?: ((playerId: string) => void) | null;
 };
 
-function netColor(boniMali: number): string {
-  if (boniMali > 0.05) return "var(--nl-good)";
-  if (boniMali < -0.05) return "var(--nl-risk)";
-  return "var(--nl-ink)";
-}
-
 const HEAD: React.CSSProperties = {
   padding: "8px 10px",
   color: "var(--nl-mut)",
@@ -103,7 +97,7 @@ export default function DisciplineStageResultTable({ rows, slotLabels, onOpenPla
                   <td style={{ padding: "6px 8px", textAlign: "center", position: "sticky", left: 0, background: stickyBg, fontWeight: 800, color: ampel(r.rank), zIndex: 1 }}>{r.rank}</td>
                   <td style={{ padding: "6px 8px", position: "sticky", left: 40, background: stickyBg, zIndex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      {r.logoUrl ? <TeamMark src={r.logoUrl} size={18} radius={4} isOwn={r.isOwn} medal={r.rank === 1 ? "gold" : r.rank === 2 ? "silver" : r.rank === 3 ? "bronze" : null} /> : null}
+                      {r.logoUrl ? <TeamMark src={r.logoUrl} size={26} radius={6} isOwn={r.isOwn} medal={r.rank === 1 ? "gold" : r.rank === 2 ? "silver" : r.rank === 3 ? "bronze" : null} /> : null}
                       <span style={{ fontWeight: 800, fontSize: 12.5, color: r.isOwn ? "var(--nl-accent)" : "inherit" }}>{r.isOwn ? "★ " : ""}{r.code}</span>
                       <span style={{ color: "var(--nl-mut)", fontSize: 11.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 120 }}>{r.name}</span>
                     </div>
@@ -112,10 +106,14 @@ export default function DisciplineStageResultTable({ rows, slotLabels, onOpenPla
                     const nameClickable = Boolean(onOpenPlayer && c.playerId);
                     return (
                       <td key={ci} title={c.calc} style={{ padding: "6px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
-                        <div style={{ fontWeight: 800, color: netColor(c.boniMali) }}>
+                        <div style={{ fontWeight: 800, color: "var(--nl-ink)" }}>
                           {c.isBest ? <span style={{ color: "var(--nl-warn)" }}>★ </span> : null}
                           <span style={{ fontSize: 11, fontWeight: 800, color: ampel(c.slotRank), marginRight: 5 }}>#{c.slotRank}</span>
+                          {/* Netto NEUTRAL (ink): früher nach Mod-Vorzeichen gefärbt → durch Fatigue
+                              fast überall rot, wirkte als wären alle Werte schlecht. Farbcodierung
+                              trägt der Slot-Rang (#N, ampel). Bonus/Malus steckt weiter im Tooltip (calc). */}
                           {fmt1(c.net)}
+                          {c.boniMali > 0.05 ? <span style={{ color: "var(--nl-good)", fontSize: 10, marginLeft: 3 }}>▲</span> : c.boniMali < -0.05 ? <span style={{ color: "var(--nl-risk)", fontSize: 10, marginLeft: 3 }}>▼</span> : null}
                         </div>
                         <div
                           onClick={nameClickable ? () => onOpenPlayer!(c.playerId!) : undefined}
