@@ -1059,6 +1059,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const [zoom, setZoom] = useState<{ ox: number; oy: number } | null>(null);
   const roundAnimStartRef = useRef<number>(0);
   const zoomFiredRef = useRef<boolean>(false);
+  const svgRef = useRef<SVGSVGElement | null>(null); // für korrekte Zoom-Origin (getScreenCTM)
   const [ticker, setTicker] = useState<TickerData[]>([]);
   const [podium, setPodium] = useState<PodCol[] | null>(null);
   const [hover, setHover] = useState<{ idx: number } | null>(null);
@@ -1570,33 +1571,69 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       const start = roundAnimStartRef.current;
       const elapsed = start ? Date.now() - start : Infinity;
       const tRaw = reduced.current || elapsed >= TRACK_ROUND_MS ? 1 : elapsed / TRACK_ROUND_MS;
-      const e = tRaw >= 1 ? 1 : 1 - Math.pow(1 - tRaw, 2); // ease-out (wie Feld-Glide)
+      const done1 = tRaw >= 1;
       let changed = false;
       for (const t of rt) {
         const from = t.roundStartScore;
         const target = t.displayScore;
-        const v = tRaw >= 1 ? target : round1(from + (target - from) * e);
+        // Per-Token-Dynamik: jedes Token hat eine eigene Easing-Kurve (gamma) → mal
+        // besserer Start (gamma<1: früh vorn, dann gehalten), mal besseres Ende (gamma>1:
+        // spät aufholend, Sprint-Finish). Start & Ende bleiben identisch → das ERGEBNIS
+        // ändert sich nicht, nur die DARSTELLUNG der Bewegung. gamma deterministisch aus
+        // idx + Runden-Start (stabil in der Etappe, variiert je Runde) → lebendiges Feld.
+        const gamma = 0.55 + (((t.idx * 73 + Math.floor(start / 997)) % 100) / 100) * 1.25; // 0.55…1.80
+        const te = done1 ? 1 : Math.pow(tRaw, gamma);
+        const v = done1 ? target : round1(from + (target - from) * te);
         if (v !== t.animScore) {
           t.animScore = v;
           changed = true;
         }
       }
-      // Highlight-Zoom (nicht blockierend): größter Aufsteiger dieser Runde, einmalig.
-      if (start && !zoomFiredRef.current && tRaw > 0.5 && tRaw < 0.9 && !reduced.current) {
+      // Highlight-Zoom (nicht blockierend): der GRÖSSTE RANG-AUFSTEIGER dieser Etappe
+      // (das „Aufhol"-Team) — falls keiner klettert, der größte Netto-Zugewinn. Einmalig
+      // pro Etappe. Origin exakt über getScreenCTM (sonst landet der Zoom daneben, weil
+      // die SVG skaliert/geletterboxed ist).
+      if (start && !zoomFiredRef.current && tRaw > 0.45 && tRaw < 0.85 && !reduced.current) {
         zoomFiredRef.current = true;
+        const finalOrder = [...rt].sort((a, b) => b.displayScore - a.displayScore || a.seasonRank - b.seasonRank);
+        const finalRank = new Map<number, number>();
+        finalOrder.forEach((t, i) => finalRank.set(t.idx, i + 1));
         let mover: RT | null = null;
-        let best = -Infinity;
+        let bestClimb = 0;
         for (const t of rt) {
-          const d = t.displayScore - t.roundStartScore;
-          if (d > best) {
-            best = d;
+          const climb = t.roundStartRank - (finalRank.get(t.idx) ?? t.roundStartRank);
+          if (climb > bestClimb) {
+            bestClimb = climb;
             mover = t;
           }
         }
-        if (mover && best > 0.5) {
+        if (!mover) {
+          let bestGain = 0.5;
+          for (const t of rt) {
+            const d = t.displayScore - t.roundStartScore;
+            if (d > bestGain) {
+              bestGain = d;
+              mover = t;
+            }
+          }
+        }
+        if (mover) {
           const p = tokenPosRef.current(mover, mover.animScore);
-          setZoom({ ox: (p.x / W) * 100, oy: (p.y / H) * 100 });
-          window.setTimeout(() => setZoom(null), 1150);
+          const svg = svgRef.current;
+          let origin = { ox: (p.x / W) * 100, oy: (p.y / H) * 100 };
+          const ctm = svg?.getScreenCTM?.();
+          if (svg && ctm) {
+            const rect = svg.getBoundingClientRect();
+            const spt = svg.createSVGPoint();
+            spt.x = p.x;
+            spt.y = p.y;
+            const sp = spt.matrixTransform(ctm);
+            if (rect.width > 0 && rect.height > 0) {
+              origin = { ox: ((sp.x - rect.left) / rect.width) * 100, oy: ((sp.y - rect.top) / rect.height) * 100 };
+            }
+          }
+          setZoom(origin);
+          window.setTimeout(() => setZoom(null), 1300);
         }
       }
       // Rangliste gedrosselt neu rendern (~13 fps) solange die Runde rampt.
@@ -2121,16 +2158,16 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     doOne();
   }, [round, slotCount, audio, tokenPos, addPop, addFrags, pushTicker, pushRoundHeader, showSpotlight, fireFlash, doShake, glow, roundSummary, showPodium, later, slots, popBanner, barbellInfo, barbellOrder]);
 
-  // Gewichtheben · Auto-Continue: die nächste Runde startet automatisch im
-  // TRACK_ROUND_MS-Takt (kein Klick nötig), bis der Endstand steht — dann hält es an
-  // (kein Auto-Reset). Bei reduced-motion läuft es sofort durch → finaler Endstand.
+  // Auto-Continue (ALLE Disziplinen): die Disziplin läuft ab Start von selbst durch —
+  // Etappe für Etappe im TRACK_ROUND_MS-Takt, ohne Klick — bis der Endstand steht.
+  // Pausiert man (Leertaste), stoppt es; Hover friert die laufende Etappe ein. Der
+  // ▶-Button bleibt für manuelles Weiterklicken erhalten (busyRef schützt vor Doppel).
   useEffect(() => {
-    if (prim !== "barbell") return;
     if (done || busy || paused) return;
-    const first = round === 0 && demandKg == null;
-    // Kurzer Puffer nach dem Abschluss der (bereits ~5 s langen, simultan gleitenden)
-    // Runde — die nächste Last steigt zügig, ohne dass die Disziplin zäh wird.
-    const delay = reduced.current ? 0 : first ? 650 : 600;
+    const first = round === 0 && (prim !== "barbell" || demandKg == null);
+    // Kurzer Puffer nach dem Abschluss der (bereits ~10 s langen, simultan gleitenden)
+    // Etappe, dann startet die nächste zügig.
+    const delay = reduced.current ? 0 : first ? 700 : 600;
     const id = window.setTimeout(() => advance(), delay);
     return () => window.clearTimeout(id);
   }, [prim, round, busy, done, demandKg, advance, paused]);
@@ -2684,7 +2721,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
 
         {/* Oval-Track + Overlays */}
         <div className={shake !== "none" ? "oly-anim" : undefined} style={{ position: "relative", borderRadius: 14, overflow: "hidden", border: "1px solid var(--nl-line)", background: "var(--nl-bg)", animation: shake === "hard" ? "olyShakeHard .44s ease" : shake === "soft" ? "olyShakeSoft .3s ease" : undefined }}>
-          <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "auto", maxHeight: fieldMaxH ? fieldMaxH : "calc(100vh - 220px)", display: "block", margin: "0 auto", transform: photoFinish ? "scale(1.6)" : zoom ? "scale(1.32)" : undefined, transformOrigin: photoFinish ? "26% 11%" : zoom ? `${zoom.ox}% ${zoom.oy}%` : "26% 11%", transition: reduced.current ? undefined : "transform .65s cubic-bezier(.3,0,.2,1)" }}>
+          <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "auto", maxHeight: fieldMaxH ? fieldMaxH : "calc(100vh - 220px)", display: "block", margin: "0 auto", transform: photoFinish ? "scale(1.6)" : zoom ? "scale(1.32)" : undefined, transformOrigin: photoFinish ? "26% 11%" : zoom ? `${zoom.ox}% ${zoom.oy}%` : "26% 11%", transition: reduced.current ? undefined : "transform .65s cubic-bezier(.3,0,.2,1)" }}>
             <FieldComp {...fieldCtx} />
           </svg>
 
@@ -2692,12 +2729,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               über das Feld — entfernt. Der Wert steht live in der Rangliste, den Zugewinn
               zeigt der Ghost der Vorrunde direkt am Token. Highlights kommen als
               Zoom-Slowdown (Nr. 208), nicht als Popup. */}
-          {/* Splitter (Boni grün / Mali rot) */}
-          {frags.map((f) => (
-            <div key={f.id} className="oly-anim" style={{ position: "absolute", left: `${f.xPct}%`, top: `${f.yPct}%`, fontWeight: 800, fontSize: 12, color: f.sign < 0 ? "var(--nl-risk)" : "var(--nl-good)", pointerEvents: "none", whiteSpace: "nowrap", animation: "olyFrag .85s ease forwards" }}>
-              {f.text}
-            </div>
-          ))}
+          {/* Splitter (Boni/Mali „−8 Form" etc.) (#207): entfernt — poppten überall auf und
+              störten. Form/Details stehen im Ticker / in der Hovercard, nicht als Feld-Pop. */}
           {/* Flash */}
           {flash ? (
             <div key={flash.id} style={{ position: "absolute", inset: 0, pointerEvents: "none", background: `radial-gradient(circle at 50% 46%, rgba(${FLASH_COLOR[flash.color] ?? FLASH_COLOR.gold},.5), transparent 62%)`, animation: reduced.current ? "none" : "olyFlash .5s ease" }} />
@@ -3004,7 +3037,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         {prim === "track" ? (
           <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "0 6px 5px", marginLeft: 40, fontSize: 8.5, letterSpacing: "0.03em", textTransform: "uppercase", color: "var(--nl-mut-2)", fontWeight: 800 }}>
             <span style={{ flex: 1 }} />
-            <span style={{ width: 42, textAlign: "right" }}>Rückstand</span>
+            <span style={{ width: 42, textAlign: "right" }}>Rang Δ</span>
             <span style={{ minWidth: 34, textAlign: "right" }}>Punkte</span>
             <span style={{ width: 30, textAlign: "left" }}>Läufer</span>
           </div>
@@ -3064,9 +3097,9 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             title={teamClickable ? "Team-Karte öffnen" : undefined}
             style={{ display: "flex", alignItems: "center", gap: 7, padding: "1.5px 6px", borderRadius: 8, fontVariantNumeric: "tabular-nums", cursor: teamClickable ? "pointer" : "default", opacity: bOut ? 0.55 : 1, background: t.isOwn ? "color-mix(in srgb, var(--nl-accent) 14%, transparent)" : bChamp ? "color-mix(in srgb, var(--nl-warn) 16%, transparent)" : rc ? `color-mix(in srgb, ${rc} 9%, transparent)` : "transparent", boxShadow: rc ? `inset 3px 0 0 ${rc}` : undefined, ...(trackLadder ? { position: "absolute" as const, left: 0, right: 0, height: LADDER_ROW_H, transform: `translateY(${(dispRank - 1) * LADDER_ROW_H}px)`, transition: reduced.current ? "none" : "transform .35s cubic-bezier(.45,0,.2,1)" } : null) }}>
             <span style={{ width: 26, textAlign: "right", fontWeight: 800, color: prim === "barbell" ? (bChamp ? "var(--nl-warn)" : ampel(bRank)) : ampel(dispRank), fontSize: 12.5 }}>{bChamp ? "🏆" : `#${prim === "barbell" ? bRank : dispRank}`}</span>
-            {prim === "track" || prim === "barbell" ? (
-              <span aria-hidden title="Rang-Änderung seit letzter Runde" style={{ width: 14, fontSize: 10, fontWeight: 800, textAlign: "left", color: (prim === "barbell" ? bArrow : rankDelta) > 0 ? "var(--nl-good)" : (prim === "barbell" ? bArrow : rankDelta) < 0 ? "var(--nl-risk)" : "var(--nl-mut)" }}>
-                {(prim === "barbell" ? bArrow : rankDelta) > 0 ? "▲" : (prim === "barbell" ? bArrow : rankDelta) < 0 ? "▼" : ""}
+            {prim === "barbell" ? (
+              <span aria-hidden title="Rang-Änderung seit letzter Runde" style={{ width: 14, fontSize: 10, fontWeight: 800, textAlign: "left", color: bArrow > 0 ? "var(--nl-good)" : bArrow < 0 ? "var(--nl-risk)" : "var(--nl-mut)" }}>
+                {bArrow > 0 ? "▲" : bArrow < 0 ? "▼" : ""}
               </span>
             ) : null}
             {t.logoUrl ? (
@@ -3094,8 +3127,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               </>
             )}
             {prim === "track" ? (
-              <span title="Rückstand auf Platz 1" style={{ width: 42, textAlign: "right", fontSize: 11, fontWeight: 700, color: "var(--nl-mut)", fontVariantNumeric: "tabular-nums" }}>
-                {t.rank === 1 ? "—" : `−${fmt1(behind)}`}
+              <span title={`Rang-Änderung diese Etappe${behind > 0 ? ` · ${fmt1(behind)} hinter Platz 1` : ""}`} style={{ width: 42, textAlign: "right", fontSize: 11.5, fontWeight: 800, color: rankDelta > 0 ? "var(--nl-good)" : rankDelta < 0 ? "var(--nl-risk)" : "var(--nl-mut)", fontVariantNumeric: "tabular-nums" }}>
+                {rankDelta > 0 ? `▲${rankDelta}` : rankDelta < 0 ? `▼${Math.abs(rankDelta)}` : "—"}
               </span>
             ) : null}
             {prim === "barbell" ? (

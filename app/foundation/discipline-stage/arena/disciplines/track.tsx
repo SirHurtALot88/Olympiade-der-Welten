@@ -244,9 +244,8 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
         .slice()
         .reverse()
         .map((t) => {
-          // Rang-Δ zur Vorrunde (rankHistory: Rang nach jeder gewerteten Etappe).
-          const prevRank = t.rankHistory.length ? t.rankHistory[t.rankHistory.length - 1]! : t.rank;
-          const dRank = prevRank - t.rank; // >0 = verbessert
+          // Nur der Rang am Token (klar & aufgeräumt); die Rang-Änderung (▲/▼) steht in der
+          // Rangliste rechts, nicht zusätzlich im Feld (sonst Unübersicht).
           const showBadge = t.isOwn || t.rank <= 3 || hoverIdx === t.idx;
           const r = t.isOwn ? geo.rOwn : geo.r;
           const hue = hueForIdx(t.idx);
@@ -301,9 +300,6 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
                 <g transform={`translate(0 ${r + 13})`}>
                   <text textAnchor="middle" fontSize={11.5} fontWeight={900} fill={t.isOwn ? "var(--nl-accent)" : t.rank === 1 ? "var(--nl-warn)" : "var(--nl-ink)"}>
                     {t.isOwn ? "★ " : ""}#{t.rank}
-                    {dRank !== 0 ? (
-                      <tspan fill={dRank > 0 ? "var(--nl-good)" : "var(--nl-risk)"}> {dRank > 0 ? "▲" : "▼"}{Math.abs(dRank)}</tspan>
-                    ) : null}
                   </text>
                 </g>
               ) : null}
