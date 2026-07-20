@@ -71,6 +71,7 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
     N,
     geo,
     layout,
+    finalMax,
     tokenPos: providedTokenPos,
     rt,
     sorted,
@@ -97,34 +98,18 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
   const zB = R1 + (R0 - R1) * 0.36; // Court 1 boundary
   const zA = R1 + (R0 - R1) * 0.70; // Court 2 boundary
 
-  // ---- Override tokenPos to spread 32 tokens across court (avoid center stack) ----
-  // Use rank index for horizontal spread, score for radius/tier
+  // ---- tokenPos: Nähe zum Center Court = Punkte (Score → Radius, Rang → Winkel) ----
+  // Außenring (R0) = schwach, Center Court (R1) = stark. Der Radius kommt aus dem SCORE
+  // (kontinuierlich → echter animScore-Glide + sichtbarer Ghost-Zugewinn); der Winkel aus
+  // dem Live-Rang, damit sich die 32 Setzköpfe gleichmäßig um den Court verteilen (kein
+  // Center-Stack). Ellipsen-Skalierung KX/KY wie die gezeichneten Zonenringe.
   const tokenPos = (t: RT, scoreVal: number): { x: number; y: number } => {
-    // Find rank position in sorted array (0-31)
     const rankIdx = sorted.findIndex((st) => st.idx === t.idx);
     const rankPos = rankIdx >= 0 ? rankIdx : t.idx;
-
-    // Horizontal spread: divide court width into 32 lanes
-    const lPad = 48;
-    const rPad = 48;
-    const effectiveW = W - lPad - rPad;
-    const laneW = effectiveW / N;
-    const tokenX = lPad + (rankPos * laneW) + laneW / 2;
-
-    // Vertical spread: use score to determine distance from center court
-    // Score 0 = outer ring (R0), score at max = center (R1)
-    const norm = scoreVal > 0 ? Math.min(1, scoreVal / (R0 * 2)) : 0;
-    const radius = R0 * (1 - norm * 0.75) + R1 * 0.25;
-
-    // Position on vertical axis: outer teams spread around the oval
-    const topPad = 60;
-    const botPad = 80;
-    const effectiveH = H - topPad - botPad;
-    const tierH = effectiveH / Math.ceil(N / 8); // 8 tiers for 32 teams
-    const tier = Math.floor(rankPos / 8);
-    const tokenY = topPad + tier * tierH + tierH / 2;
-
-    return { x: tokenX, y: tokenY };
+    const norm = finalMax > 0 ? Math.max(0, Math.min(1, scoreVal / finalMax)) : 0;
+    const radius = R0 - norm * (R0 - R1);
+    const ang = (rankPos / Math.max(1, N)) * Math.PI * 2 - Math.PI / 2;
+    return { x: cx + Math.cos(ang) * radius * KX, y: cy + Math.sin(ang) * radius * KY };
   };
 
   // Benchmark-Bewegung + Ghost: Token folgen animScore (Frame-Sync mit Rangliste,

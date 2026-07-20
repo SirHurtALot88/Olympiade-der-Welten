@@ -391,9 +391,15 @@ export default function SchachField(props: DisciplineFieldProps): ReactNode {
       <GhostLayer sorted={sorted} geo={geo} ghostRefs={ghostRefs} />
 
       {/* ========================================================================== */}
-      {/* TOKENS: X = Live-Rang-Spalte (Bump), Y = Elo-Score — Position via rAF (animScore) */}
+      {/* TOKENS: X = Live-Rang-Spalte (Bump), Y = Elo-Score — Position via rAF (animScore).
+          Rang-Reihenfolge rückwärts gerendert, damit der Führende oben liegt (wie der Host);
+          der Initial-Index kommt weiter aus der Rang-Ordnung (rankIdx). */}
       {/* ========================================================================== */}
-      {sorted.map((t, i) => {
+      {sorted
+        .slice()
+        .reverse()
+        .map((t) => {
+        const i = sorted.indexOf(t);
         const r = t.isOwn ? geo.rOwn : geo.r;
         // Figuren-Glyph (Promotion) aus dem aktuellen Runden-Elo.
         const band = bandOf(Math.round(eloOf(t.displayScore)));

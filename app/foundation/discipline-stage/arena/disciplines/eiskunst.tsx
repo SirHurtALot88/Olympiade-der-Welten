@@ -522,14 +522,16 @@ export default function EiskunstField(props: DisciplineFieldProps): ReactNode {
                 />
               ) : null}
 
-              {/* Kufen-Glanz (skate shine, decorative line below token) */}
+              {/* Kufen-Glanz (skate shine, decorative line below token) — SVG-Paint braucht
+                  eine echte Farbe (kein CSS linear-gradient), sonst rendert die Linie nie. */}
               <line
                 x1={0}
                 y1={r * 0.88}
                 x2={0}
                 y2={r * 0.88 + 9}
-                stroke="linear-gradient(180deg,rgba(191,230,255,.5),transparent)"
+                stroke="rgba(191,230,255,.5)"
                 strokeWidth={2}
+                strokeLinecap="round"
                 opacity={0.6}
               />
 

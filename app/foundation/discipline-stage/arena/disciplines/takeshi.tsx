@@ -11,8 +11,8 @@
 // =====================================================================================
 "use client";
 
-import { type ReactNode } from "react";
-import type { DisciplineFieldProps } from "./types";
+import { useRef, type ReactNode } from "react";
+import type { DisciplineFieldProps, RT, Vec2 } from "./types";
 import { useTokenGlide, tokenRef, GhostLayer, TokenChrome } from "./benchmark";
 
 export default function TakeshiField(props: DisciplineFieldProps): ReactNode {
@@ -24,10 +24,10 @@ export default function TakeshiField(props: DisciplineFieldProps): ReactNode {
     W,
     H,
     geo,
+    finalMax,
     rt,
     sorted,
     now,
-    tokenPos,
     hoverIdx,
     highlightIdxs,
     openHover,
@@ -35,12 +35,31 @@ export default function TakeshiField(props: DisciplineFieldProps): ReactNode {
     onOpenTeam,
   } = props;
   const trioSet = new Set(highlightIdxs ?? []);
-  // Benchmark-Bewegung + Ghost: Token folgen animScore (parcours-Pfad via tokenPos,
-  // Hover/Pause friert ein). Siehe benchmark.tsx.
-  const { gRefs, ghostRefs } = useTokenGlide(props);
 
-  // Band-Path für SVG
+  // Band-Path (der GEZEICHNETE Burg-Parcours) — die Token laufen GENAU hier entlang.
   const bandD = "M 70 545 H 760 A 85 85 0 0 0 760 375 H 140 A 85 85 0 0 1 140 205 H 800";
+  // Lokaler tokenPos: Fortschritt ENTLANG des gezeichneten Bandes (Bogenlänge) = Score.
+  // Der Host-parcours-tokenPos nutzt einen anderen Wegpunkt-Pfad → Läufer verließen die
+  // gezeichnete Strecke. Ein unsichtbarer Mess-Pfad (pathRef) liefert getPointAtLength.
+  const pathRef = useRef<SVGPathElement | null>(null);
+  const localTokenPos = (t: RT, score: number): Vec2 => {
+    const path = pathRef.current;
+    if (!path) return { x: 70, y: 545 };
+    const PER = path.getTotalLength();
+    const norm = finalMax > 0 ? Math.max(0, Math.min(1, score / finalMax)) : 0;
+    const L = (0.02 + norm * 0.96) * PER;
+    const pt = path.getPointAtLength(L);
+    const p2 = path.getPointAtLength(Math.min(PER, L + 2));
+    let tx = p2.x - pt.x;
+    let ty = p2.y - pt.y;
+    const tl = Math.hypot(tx, ty) || 1;
+    tx /= tl;
+    ty /= tl;
+    const lane = (t.laneIdx % 5) - 2; // Quer-Versatz für Auffächerung (kein Stapel)
+    return { x: pt.x + -ty * lane * 9, y: pt.y + tx * lane * 9 };
+  };
+  // Benchmark-Bewegung + Ghost: Token folgen animScore ENTLANG des Bandes (Hover/Pause friert ein).
+  const { gRefs, ghostRefs } = useTokenGlide({ ...props, tokenPos: localTokenPos });
 
   // Hilfsfunktionen für Course-Artwork
   const crowd = (): string => {
@@ -147,6 +166,9 @@ export default function TakeshiField(props: DisciplineFieldProps): ReactNode {
       {/* Grass field */}
       <rect x={0} y={118} width={W} height={H - 118} fill="url(#grass)" />
 
+      {/* Mess-Pfad (unsichtbar) — localTokenPos liest getPointAtLength für die Bewegung. */}
+      <path ref={pathRef} d={bandD} fill="none" stroke="none" />
+
       {/* Serpentinen-Band: Erdweg mit heller Lauffläche + gestrichelter Mittellinie */}
       <path d={bandD} fill="none" stroke="#a97c46" strokeWidth={58} strokeLinecap="round" />
       <path d={bandD} fill="none" stroke="#d8b078" strokeWidth={46} strokeLinecap="round" />
@@ -223,7 +245,7 @@ export default function TakeshiField(props: DisciplineFieldProps): ReactNode {
             <g
               key={t.code}
               data-token-code={t.code}
-              ref={tokenRef(gRefs, t, tokenPos)}
+              ref={tokenRef(gRefs, t, localTokenPos)}
               style={{ cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
               onMouseEnter={() => openHover(t.idx)}
               onMouseLeave={scheduleHoverClose}

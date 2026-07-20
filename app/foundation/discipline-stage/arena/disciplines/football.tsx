@@ -264,10 +264,15 @@ export default function FootballField(props: DisciplineFieldProps): ReactNode {
       {/* Ghost der Vorrunde (Benchmark) — VOR den Token. */}
       <GhostLayer sorted={sorted} geo={geo} ghostRefs={ghostRefs} />
 
-      {/* Tokens: Helm-Stil mit Ball in der Hand — Position via rAF (animScore, Benchmark-Sync). */}
-      {sorted.map((t) => {
+      {/* Tokens: Helm-Stil mit Ball in der Hand — Position via rAF (animScore, Benchmark-Sync).
+          Rang-Reihenfolge rückwärts, damit der Führende oben liegt (wie der Host). */}
+      {sorted
+        .slice()
+        .reverse()
+        .map((t) => {
         const r = t.isOwn ? geo.rOwn : geo.r;
         const isLeader = t.rank === 1;
+        const glowing = t.glowUntil > now;
 
         return (
           <g
@@ -286,6 +291,8 @@ export default function FootballField(props: DisciplineFieldProps): ReactNode {
               if (onOpenTeam && t.teamId) onOpenTeam(t.teamId);
             }}
           >
+            {/* Impuls-Glow (host glow()/glowUntil). */}
+            {glowing ? <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={4} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.1s ease-in-out infinite" }} /> : null}
             {/* Benchmark-Chrome: Trio/Anker/Relation/Medaille/Logo/Team-Rahmen/Rang-Badge.
                 trophy={false} — Football trägt seine eigene 👑-Krone. */}
             <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} trophy={false} />

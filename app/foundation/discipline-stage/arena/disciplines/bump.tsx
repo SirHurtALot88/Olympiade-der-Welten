@@ -336,7 +336,7 @@ export default function BumpField(props: DisciplineFieldProps): ReactNode {
       </text>
 
       {/* Rasenkante + Windmesser */}
-      <rect x={0} y={TR_B} width={LW} height={(62 - (566 / 680) * LH) * LH} fill="#1c1512" />
+      <rect x={0} y={TR_B} width={LW} height={((680 - 566) / 680) * LH} fill="#1c1512" />
       <g dangerouslySetInnerHTML={{ __html: windPanel() }} />
 
       {/* Fotofinish-Lichtschranke (Ziel-Marker) */}

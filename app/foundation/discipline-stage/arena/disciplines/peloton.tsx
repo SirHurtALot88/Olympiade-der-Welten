@@ -437,8 +437,12 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
               data-token-code={t.code}
               ref={(el) => {
                 gRefs.current.set(t.idx, el);
+                // Startposition EINMAL setzen (danach besitzt das rAF die Position — kein
+                // JSX-transform, das bei jedem Reveal-Rerender den rAF-Wert überschreibt).
+                if (el && !el.getAttribute("transform")) {
+                  el.setAttribute("transform", `translate(${initX} ${initY})`);
+                }
               }}
-              transform={`translate(${initX} ${initY})`}
               style={{ cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
               onMouseEnter={() => openHover(t.idx)}
               onMouseLeave={scheduleHoverClose}

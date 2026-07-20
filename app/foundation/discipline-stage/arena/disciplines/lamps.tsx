@@ -465,7 +465,7 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
               {/* Rang-Badge (eigenes Team / Podest / gehovert) — Position ohne Blick zur Tabelle. */}
               {showBadge ? (
                 <text y={r + 15} textAnchor="middle" fontSize={11.5} fontWeight={900} fill={t.isOwn ? "var(--nl-accent)" : t.rank === 1 ? "var(--nl-warn)" : "var(--nl-ink)"}>
-                  {t.isOwn ? `★ ${t.code}` : `#${t.rank}`}
+                  {t.isOwn ? `★ #${t.rank}` : `#${t.rank}`}
                 </text>
               ) : null}
             </g>

@@ -70,7 +70,7 @@ export default function ClimbingField(props: DisciplineFieldProps): ReactNode {
 
   // Griff-Linie: jede Route schwingt leicht horizontal (keine Sehne, folgt der Route)
   const swayOf = (teamCode: string, y: number): number => {
-    const hash = teamCode.charCodeAt(0) + teamCode.charCodeAt(1 || 0) * 256;
+    const hash = teamCode.charCodeAt(0) + (teamCode.charCodeAt(1) || 0) * 256;
     const amplitude = 3 + (hash % 6);
     const freq = 0.014 + ((hash >> 8) % 8) * 0.002;
     const phase = ((hash >> 16) % 63) * 0.1;

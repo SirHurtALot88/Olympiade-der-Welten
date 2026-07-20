@@ -9,7 +9,7 @@
 // =====================================================================================
 "use client";
 
-import { type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { DisciplineFieldProps, RT } from "./types";
 import { useTokenGlide, tokenRef, GhostLayer, TokenChrome } from "./benchmark";
 
@@ -63,10 +63,32 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
     return X0 + norm * (X1 - X0);
   };
 
-  // Puck-Position (folgt dem Führenden)
+  // Puck folgt dem Führenden — Position via rAF aus animScore (Benchmark-Sync mit Feld +
+  // Rangliste; Hover/Pause friert auch den Puck ein). Kein CSS-transform mehr.
   const leader = sorted.length > 0 ? sorted[0] : null;
-  const puckX = leader ? fracX(leader.displayScore) : CX;
-  const puckY = leader ? laneY(leader.idx) : CY;
+  const puckRef = useRef<SVGEllipseElement | null>(null);
+  const hoverRef = useRef<number | null>(hoverIdx);
+  hoverRef.current = hoverIdx;
+  const pausedRef = useRef<boolean>(props.paused);
+  pausedRef.current = props.paused;
+  const sortedRef = useRef<RT[]>(sorted);
+  sortedRef.current = sorted;
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const frozen = hoverRef.current != null || pausedRef.current;
+      const lead = sortedRef.current[0];
+      const el = puckRef.current;
+      if (el && lead && !frozen) {
+        el.setAttribute("cx", String(fracX(lead.animScore)));
+        el.setAttribute("cy", String(laneY(lead.idx)));
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Benchmark-Bewegung + Ghost: Token folgen animScore (Frame-Sync mit Rangliste,
   // Hover/Pause friert ein). Lokale tokenPos bildet das Rink-Layout (x = Vorstoß ∝ Score,
@@ -168,10 +190,11 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
       {/* Goal Light (top-right corner) — animated on goal */}
       <circle cx={GR + 27} cy="204" r="6.5" fill="#4d1717" stroke="#2c3a49" strokeWidth="2" pointerEvents="none" />
 
-      {/* Puck (follows leader) */}
+      {/* Puck (follows leader) — Position via rAF (animScore), friert bei Hover/Pause ein. */}
       <ellipse
-        cx={puckX}
-        cy={puckY}
+        ref={puckRef}
+        cx={leader ? fracX(leader.animScore) : CX}
+        cy={leader ? laneY(leader.idx) : CY}
         rx="5.5"
         ry="3.5"
         fill="#0c0e11"
@@ -179,7 +202,6 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
         strokeWidth="1"
         style={{
           pointerEvents: "none",
-          transition: reducedMotion ? "none" : `cx 5s cubic-bezier(.45,0,.2,1), cy 5s cubic-bezier(.45,0,.2,1)`,
           filter: "drop-shadow(0 1px 2px rgba(8,16,30,.5)) drop-shadow(0 0 7px rgba(87,177,255,.35))",
         }}
       />

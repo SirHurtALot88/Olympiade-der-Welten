@@ -239,10 +239,11 @@ export default function ThermometerField(props: DisciplineFieldProps): ReactNode
                 if (onOpenTeam && t.teamId) onOpenTeam(t.teamId);
               }}
             >
-              {/* Heat bar: red glow at high temps (bespoke) */}
+              {/* Heat bar: red glow at high temps (bespoke) — r+13, damit er nicht
+                  mit dem Benchmark-Trio-Ring (r+10) kollidiert. */}
               {heatHueVal < 30 ? (
                 <circle
-                  r={r + 10}
+                  r={r + 13}
                   fill="none"
                   stroke={`hsl(${heatHueVal} 82% 60%)`}
                   strokeWidth={5}

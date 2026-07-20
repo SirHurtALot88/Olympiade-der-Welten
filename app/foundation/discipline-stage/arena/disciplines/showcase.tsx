@@ -562,8 +562,12 @@ export default function ShowcaseField(props: DisciplineFieldProps): ReactNode {
       {/* Ghost der Vorrunde (Benchmark) — VOR den Performern. */}
       <GhostLayer sorted={sorted} geo={geo} ghostRefs={ghostRefs} />
 
-      {/* Tokens — Position via rAF (animScore, Benchmark-Sync). */}
-      {sorted.map((t) => {
+      {/* Tokens — Position via rAF (animScore, Benchmark-Sync). Rang-Reihenfolge rückwärts,
+          damit der Führende oben liegt (wie der Host). */}
+      {sorted
+        .slice()
+        .reverse()
+        .map((t) => {
         const r = t.isOwn ? geo.rOwn : geo.r;
         const glowing = t.glowUntil > now;
 

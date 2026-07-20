@@ -10,7 +10,6 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { hueForIdx, relColor } from "../DisciplineStageNativeArena";
 import type { DisciplineFieldProps, RT } from "./types";
 
 const BASE = 60;
@@ -160,7 +159,12 @@ export default function TerritoryField(props: DisciplineFieldProps): ReactNode {
     return squarify(items, IX, IY, IW, IH);
   };
 
-  // Initialisierung + Layout Trigger
+  // Re-Layout-Trigger: `rt` ist eine stabile, in-place mutierte Referenz (Identität ändert
+  // sich nie) — deshalb MUSS die Runden-Erkennung an einer Score-Signatur hängen, sonst
+  // baut sich die Treemap nach dem Mount NIE neu (Flächen bleiben eingefroren).
+  const scoreSig = rt.map((t) => `${t.code}:${Math.round(t.displayScore || 0)}`).join("|");
+
+  // Initialisierung + Layout-Morph pro Runde.
   useEffect(() => {
     const layout = calcLayout();
     const newStates: TerritoryState[] = [];
@@ -186,15 +190,18 @@ export default function TerritoryField(props: DisciplineFieldProps): ReactNode {
     });
     setTerritories(newStates);
 
-    // rAF-Schleife für Morphs
+    // rAF-Schleife für Morphs (dt-basiert → framerate-unabhängig; friert bei Hover/Pause).
     let raf = 0;
-    const tick = () => {
+    let last = performance.now();
+    const tick = (ts: number) => {
+      const dt = Math.min(64, ts - last);
+      last = ts;
       const frozen = hoverRef.current != null || pausedRef.current;
       let changed = false;
       if (!frozen) {
         stateRef.current.forEach((state) => {
           if (state.morphT < 1 && !reducedRef.current) {
-            state.morphT = Math.min(1, state.morphT + 16.67 / MORPH_MS);
+            state.morphT = Math.min(1, state.morphT + dt / MORPH_MS);
             changed = true;
           }
         });
@@ -206,7 +213,8 @@ export default function TerritoryField(props: DisciplineFieldProps): ReactNode {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [rt]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scoreSig]);
 
   // Smooth Easing
   const smooth = (t: number) => t * t * (3 - 2 * t);
@@ -247,7 +255,7 @@ export default function TerritoryField(props: DisciplineFieldProps): ReactNode {
         </>
       ) : (
         <>
-          <rect x={0} y={0} width={W} height={H} fill="var(--bg)" />
+          <rect x={0} y={0} width={W} height={H} fill="var(--nl-bg)" />
           <rect x={IX - 2} y={IY - 2} width={IW + 4} height={IH + 4} fill="#10130b" stroke="#2c3018" strokeWidth={1.5} />
         </>
       )}

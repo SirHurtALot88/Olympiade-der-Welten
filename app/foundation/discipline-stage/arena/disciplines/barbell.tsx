@@ -50,11 +50,6 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
   } = props;
   const trioSet = new Set(highlightIdxs ?? []);
 
-  // Early exit if no barbell info
-  if (!barbellInfo) {
-    return null;
-  }
-
   // Pro-Token Gleit-Zustand + DOM-Refs für imperatives Positioning
   const barbellRef = useRef<Map<number, BarbellState>>(new Map());
   const gRefs = useRef<Map<number, SVGGElement | null>>(new Map());
@@ -142,6 +137,11 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Ohne Kraft-Turm-Infos gibt es kein Feld (Guard NACH den Hooks — Rules of Hooks).
+  if (!barbellInfo) {
+    return null;
+  }
 
   // Tick-Marks für die kg-Achse
   const ticks: number[] = [];
@@ -392,9 +392,10 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
                 />
               ) : null}
 
-              {/* Benchmark-Chrome: Trio/Anker/Relation/Medaille/Logo/Team-Rahmen/Rang-Badge.
-                  trophy={false} — der Champion trägt seine eigene Krone (oben). */}
-              <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} trophy={false} />
+              {/* Benchmark-Chrome: Trio/Anker/Relation/Medaille/Logo/Team-Rahmen. trophy={false}
+                  — eigene Krone (oben). badge={false} — die Eliminations-Rangliste (barbellSorted,
+                  Verbliebene zuerst) ist maßgeblich; ein Score-Rang-Badge würde sie spoilern. */}
+              <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} trophy={false} badge={false} />
             </g>
           );
         })}

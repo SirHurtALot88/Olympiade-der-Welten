@@ -11,7 +11,7 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import type { DisciplineFieldProps, Vec2 } from "./types";
+import type { DisciplineFieldProps, RT, Vec2 } from "./types";
 import { useTokenGlide, tokenRef, GhostLayer, TokenChrome } from "./benchmark";
 
 // Geometry constants für I-Spy (im Sektor skaliert)
@@ -39,13 +39,6 @@ const COLORS = {
   lead: "#f6c750",
 };
 
-type Glide = {
-  fromX: number;
-  toX: number;
-  glideT: number;
-  targetScore: number;
-};
-
 export default function SpybarField(props: DisciplineFieldProps): ReactNode {
   const {
     primitive: prim,
@@ -56,7 +49,6 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
     H,
     geo,
     finalMax,
-    tokenPos,
     rt,
     sorted,
     round,
@@ -70,12 +62,20 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
   } = props;
 
   const trioSet = new Set(highlightIdxs ?? []);
-  // Benchmark-Bewegung + Ghost: Token folgen animScore (Frame-Sync, Hover/Pause friert ein).
-  const { gRefs, ghostRefs } = useTokenGlide(props);
 
-  // Per-Token-Gleit-Zustand (Beams/Ziele — bespoke rAF, unten)
-  const glideRef = useRef<Map<number, Glide>>(new Map());
-  const tokenGRefs = useRef<Map<number, SVGGElement | null>>(new Map());
+  // Lokaler tokenPos in der GEZEICHNETEN Sektor-Geometrie (X_START…X_END, Lane = t.idx),
+  // damit Token, Späh-Balken und Ziele exakt übereinanderliegen. Der Host-tokenPos nutzt
+  // eine andere ROW_FAMILY-Geometrie (volle Breite, andere Lane-Höhe) → wäre versetzt.
+  // Speist Glide + Ghost, damit beide der Sektor-Choreografie folgen.
+  const localTokenPos = (t: RT, score: number): Vec2 => {
+    const norm = finalMax > 0 ? Math.min(1, Math.max(0, score / finalMax)) : 0;
+    const pitch = (BOT_LANE - TOP_LANE) / Math.max(1, rt.length - 1);
+    return { x: X_START + (X_END - X_START) * norm, y: TOP_LANE + pitch * t.idx };
+  };
+  // Benchmark-Bewegung + Ghost: Token folgen animScore (Frame-Sync, Hover/Pause friert ein).
+  const { gRefs, ghostRefs } = useTokenGlide({ ...props, tokenPos: localTokenPos });
+
+  // Späh-Balken (bespoke rAF, unten) — folgen dem Token via animScore.
   const beamGRefs = useRef<Map<number, SVGLineElement | null>>(new Map());
 
   // Frische Prop-Spiegel für rAF
@@ -104,75 +104,27 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
     return TOP_LANE + pitch * i;
   };
 
-  // Sync Glide-Ziele + Starten neuer Glides bei Runden-Wechsel
-  const syncGlides = () => {
-    const g = glideRef.current;
-    for (const t of rtRef.current) {
-      const target = xOfScore(t.displayScore);
-      let st = g.get(t.idx);
-      if (!st) {
-        st = { fromX: X_START, toX: target, glideT: 1, targetScore: 0 };
-        g.set(t.idx, st);
-      }
-      if (Math.abs(target - st.targetScore) > 0.001) {
-        st.fromX = st.toX;
-        st.toX = target;
-        st.glideT = 0;
-        st.targetScore = target;
-      }
-    }
-  };
-
-  // rAF-Schleife: Gleit-Animation + Beam-Update
+  // rAF-Schleife (Benchmark-Sync): der Späh-Balken folgt dem Token — Länge = animScore-
+  // Position minus Start. Token selbst positioniert useTokenGlide (gleiche localTokenPos);
+  // Hover/Pause friert beides ein.
   useEffect(() => {
     let raf = 0;
-    let last = performance.now();
-
-    const tick = (ts: number) => {
-      const dt = Math.min(64, ts - last);
-      last = ts;
-
+    const tick = () => {
       const frozen = hoverRef.current != null || pausedRef.current;
-      const reduce = reducedRef.current;
-      const g = glideRef.current;
-
-      syncGlides();
-
       if (!frozen) {
         for (const t of rtRef.current) {
-          const st = g.get(t.idx);
-          if (!st) continue;
-
-          if (reduce) {
-            st.glideT = 1;
-            st.fromX = st.toX;
-          } else if (st.glideT < 1) {
-            st.glideT = Math.min(1, st.glideT + dt / ROUND_MS);
-          }
-
-          // Eased Lerp (pow für leichte Beschleunigung)
-          const ease = Math.pow(st.glideT, 1.2);
-          st.fromX = st.fromX + (st.toX - st.fromX) * ease;
-
-          const el = tokenGRefs.current.get(t.idx);
           const beam = beamGRefs.current.get(t.idx);
-          if (el) {
-            const y = yOfLane(t.idx);
-            el.setAttribute("transform", `translate(${st.fromX} ${y})`);
-          }
           if (beam) {
-            const beamWidth = Math.max(0, st.fromX - X_START);
+            const y = yOfLane(t.idx);
             beam.setAttribute("x1", `${X_START}`);
-            beam.setAttribute("y1", `${yOfLane(t.idx)}`);
-            beam.setAttribute("x2", `${X_START + beamWidth}`);
-            beam.setAttribute("y2", `${yOfLane(t.idx)}`);
+            beam.setAttribute("y1", `${y}`);
+            beam.setAttribute("x2", `${xOfScore(t.animScore)}`);
+            beam.setAttribute("y2", `${y}`);
           }
         }
       }
-
       raf = requestAnimationFrame(tick);
     };
-
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -474,9 +426,8 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
           const norm = (hash % 10000) / 10000;
           const x = X_START + 46 + norm * (X_END - X_START - 76);
 
-          // Späher bewegt sich nach rechts → Ziel wird aufgeklärt
-          const glide = glideRef.current.get(t.idx);
-          const tokenX = glide ? glide.fromX : X_START;
+          // Späher bewegt sich nach rechts → Ziel wird beim Erreichen des Runden-Ziels aufgeklärt.
+          const tokenX = xOfScore(t.displayScore);
           const isHit = tokenX >= x - 4;
 
           return (
@@ -522,7 +473,7 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
             <g
               key={`token-${t.code}`}
               data-token-code={t.code}
-              ref={tokenRef(gRefs, t, tokenPos)}
+              ref={tokenRef(gRefs, t, localTokenPos)}
               style={{ cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
               onMouseEnter={() => openHover(t.idx)}
               onMouseLeave={scheduleHoverClose}
