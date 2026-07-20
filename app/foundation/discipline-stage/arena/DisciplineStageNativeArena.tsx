@@ -1440,9 +1440,19 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     });
   }, [barbellInfo, barbellEliminated]);
 
+  // Entstauch-Normierung (ENTKLUMPEN): Token-Positionen werden gegen den AKTUELL
+  // Führenden (posMaxRef) normiert statt gegen den theoretischen Voll-Spiel-Max
+  // (finalMax). Sonst kleben in frühen Runden alle Teams am Start, weil ihre
+  // kumulierten Scores nur ein Bruchteil des End-Totals sind. Mit dem Live-Führenden
+  // als Bezug fächert sich das Feld in JEDER Runde über den ganzen Platz auf
+  // (Führender vorn, Feld dahinter gespreizt) — so wie die Mockups es zeigen.
+  // Wird im Render-Body je Render aus displayScore gesetzt (siehe unten).
+  const posMaxRef = useRef<number>(1);
+
   const tokenPos = useCallback(
     (t: RT, score: number): { x: number; y: number } => {
-      const norm = finalMax > 0 ? Math.max(0, score / finalMax) : 0; // 0…1, kein Headroom; nach unten auf 0 geklemmt (playerNet ist ungeclampt → score kann negativ sein)
+      const posMax = posMaxRef.current > 0 ? posMaxRef.current : 1;
+      const norm = Math.max(0, score / posMax); // 0…1, nach unten auf 0 geklemmt (playerNet ungeclampt → score kann negativ sein)
       // Voll-Feld-Sonderlayouts haben kein gleitendes Token — Score-Pops landen
       // mittig (die Feld-Optik rechnet selbst aus allen Scores).
       if (FIELD_CUSTOM.has(prim)) return { x: W / 2, y: H / 2 };
@@ -2143,6 +2153,18 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const leader = sorted[0] ?? null;
   const now = Date.now();
 
+  // Entstauch-Normierungsbasis: der aktuell Führende (displayScore = Runden-Ziel) plus
+  // etwas Headroom. Wird an tokenPos (posMaxRef) UND als `finalMax`-Prop an die Felder
+  // gegeben → jedes Feld fächert das Team-Feld über den ganzen Platz auf, in jeder Runde.
+  // Fällt auf den echten finalMax zurück, falls noch nichts aufgedeckt wurde (Start).
+  let posLeader = 0;
+  for (const t of rtRef.current) {
+    const d = t.displayScore > 0 ? t.displayScore : t.score;
+    if (d > posLeader) posLeader = d;
+  }
+  const posMax = Math.max(1, posLeader > 0 ? posLeader * 1.06 : finalMax);
+  posMaxRef.current = posMax;
+
   // ---- Konsolidierte „Dein Team"-Karte (nur track) (FEATURE 3) ----
   // Ersetzt den früheren MyTracker-Streifen UND die separate „Dein Läufer"-Karte durch
   // eine kompakte 2-Zeilen-Karte: Kopf (Wappen · Name · Rang · Punkte · Δ zur Spitze ·
@@ -2299,7 +2321,9 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     N,
     geo,
     layout,
-    finalMax,
+    // Entstauch: Felder bekommen posMax (Live-Führender) als Normierungsbasis statt des
+    // theoretischen Voll-Spiel-Max → Team-Feld fächert sich in jeder Runde über den Platz.
+    finalMax: posMax,
     makeOval,
     ovalPath,
     OVAL_M,
