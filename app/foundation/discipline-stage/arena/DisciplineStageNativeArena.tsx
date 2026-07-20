@@ -847,7 +847,7 @@ export const STAR_MIN = 80;
 // simultan dorthin (dur = ROUND_MS). Score bleibt Wahrheit; nur die Token-POSITION
 // wird pro Runde gemeinsam animiert. Mini-DM (duelhp) läuft über das geteilte
 // Chrome + die Registry-Feld-Komponente (arena/disciplines/duelhp.tsx).
-export const TRACK_ROUND_MS = 15000;
+export const TRACK_ROUND_MS = 10000;
 // viewBox + Token-Radien je Primitive. Der Rest (Engine/FX/Ticker/Podest/Tabelle)
 // ist geometrieunabhängig; nur Feld-Layout + tokenPos unterscheiden sich.
 const PRIM_GEO: Record<StagePrimitive, { w: number; h: number; r: number; rOwn: number }> = {
