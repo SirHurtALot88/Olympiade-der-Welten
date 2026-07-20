@@ -25,6 +25,9 @@ const CENTER_X = FIELD_W / 2;
 const CENTER_Y = (TOP_LANE + BOT_LANE) / 2;
 const TARGET_N = 40; // Ziele im Sektor
 const ROUND_MS = 5000;
+// Deutlich größere, lesbare Späher-Token (Host-geo.r war zu klein). Eigenes Team etwas größer.
+const R_BASE = 18;
+const R_OWN = 22;
 
 // Phosphor-grüne Farb-Palette (aus mockup)
 const COLORS = {
@@ -116,9 +119,13 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
           const beam = beamGRefs.current.get(t.idx);
           if (beam) {
             const y = yOfLane(t.idx);
-            beam.setAttribute("x1", `${X_START}`);
+            // Nur ein KURZER Kometenschweif hinter dem Token (nicht die volle Linie ab der
+            // Startlinie) → liest sich als Bewegung, nicht als vorgezeichnete Bahn/Spoiler.
+            const tx = xOfScore(t.animScore);
+            const TAIL = 62;
+            beam.setAttribute("x1", `${Math.max(X_START, tx - TAIL)}`);
             beam.setAttribute("y1", `${y}`);
-            beam.setAttribute("x2", `${xOfScore(t.animScore)}`);
+            beam.setAttribute("x2", `${tx}`);
             beam.setAttribute("y2", `${y}`);
           }
         }
@@ -146,7 +153,7 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
         {rt.map((t) =>
           t.logoUrl ? (
             <clipPath key={`clip-${t.code}`} id={`natclip-${t.code}`}>
-              <circle cx={0} cy={0} r={t.isOwn ? geo.rOwn : geo.r} />
+              <circle cx={0} cy={0} r={t.isOwn ? R_OWN : R_BASE} />
             </clipPath>
           ) : null,
         )}
@@ -466,7 +473,7 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
         .slice()
         .reverse()
         .map((t) => {
-          const r = t.isOwn ? geo.rOwn : geo.r;
+          const r = t.isOwn ? R_OWN : R_BASE;
           const glowing = t.glowUntil > now;
 
           return (
@@ -495,7 +502,7 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
               ) : null}
 
               {/* Benchmark-Chrome: Trio/Anker/Relation/Medaille/Logo/Team-Rahmen/Rang-Badge. */}
-              <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} />
+              <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} radius={r} />
 
               {/* Sichtkegel (::after im Mockup — Dreieck nach rechts, bespoke) */}
               <polygon

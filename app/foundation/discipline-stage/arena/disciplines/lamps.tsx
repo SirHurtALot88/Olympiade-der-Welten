@@ -70,10 +70,17 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
   const PX1 = W - 26;
   const PY0 = 8;
   const PY1 = H - 12;
-  // GROSSE, lesbare Token (unabhängig von der Teamzahl — kein Bahn-Zwang mehr). Deutlich
-  // größer als die alten Fixbahn-Winzlinge (geo.r war 8/11).
-  const RB = 20;
-  const RBOwn = 25;
+  // GROSSE, lesbare Token (unabhängig von der Teamzahl — kein Bahn-Zwang mehr). Die
+  // ICON-GRÖSSE skaliert mit dem RANG (= Punkten): der Führende hat das größte Icon, je
+  // schwächer ein Team steht, desto kleiner wird es → man sieht die Hackordnung auf einen Blick.
+  const RB_MAX = 24; // Führender (#1)
+  const RB_MIN = 11; // Schlusslicht
+  const radiusOf = (t: RT): number => {
+    const n = rt.length;
+    const frac = n > 1 ? Math.max(0, Math.min(1, (Math.max(1, t.rank) - 1) / (n - 1))) : 0;
+    const base = RB_MAX - frac * (RB_MAX - RB_MIN);
+    return t.isOwn ? base + 2 : base; // eigenes Team minimal hervorgehoben (plus Akzentring)
+  };
   const BAND_TOP = 56;
   const BAND_BOT = PY1 - 18;
   const CY = (BAND_TOP + BAND_BOT) / 2;
@@ -157,7 +164,7 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
         for (const t of rtRef.current) {
           const y = lane.get(t.code) ?? CY;
           const p = range > 0.001 ? Math.max(0, Math.min(1, (t.animScore - mn) / range)) : 0;
-          P.push({ t, r: t.isOwn ? RBOwn : RB, x: X_START + (X_GOAL - X_START) * p, y });
+          P.push({ t, r: radiusOf(t), x: X_START + (X_GOAL - X_START) * p, y });
         }
         // 2) Kollisions-Relaxation: Überlappungen paarweise auseinanderdrücken (deterministisch
         //    aus den Ideal-Positionen → glatt Frame-zu-Frame, kein Zittern). Wenige Iterationen.
@@ -288,7 +295,7 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
         {rt.map((t) =>
           t.logoUrl ? (
             <clipPath key={`clip-${t.code}`} id={`natclip-${t.code}`}>
-              <circle cx={0} cy={0} r={t.isOwn ? RBOwn : RB} />
+              <circle cx={0} cy={0} r={radiusOf(t)} />
             </clipPath>
           ) : null,
         )}
@@ -383,7 +390,7 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
       {/* Ghost-Marker (Vorrunde) — Position/Deckkraft setzt die rAF-Schleife imperativ.
           Zeigt, von wo das Team diese Etappe nach innen gezogen ist (Zugewinn). */}
       {rt.map((t) => {
-        const r = t.isOwn ? RBOwn : RB;
+        const r = radiusOf(t);
         return (
           <g
             key={`ghost-${t.code}`}
@@ -403,7 +410,7 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
         .slice()
         .reverse()
         .map((t) => {
-          const r = t.isOwn ? RBOwn : RB;
+          const r = radiusOf(t);
           const hue = hueForIdx(t.idx);
           const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
           const glowing = t.glowUntil > now;

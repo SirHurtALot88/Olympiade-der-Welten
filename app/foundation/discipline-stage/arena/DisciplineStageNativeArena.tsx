@@ -1702,6 +1702,10 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     const order = [...rt].sort((a, b) => b.score - a.score || a.seasonRank - b.seasonRank);
     order.forEach((t, i) => {
       t.rank = i + 1;
+      // Medaille = Gesamt-Top-3 (stabil). Wandert nur bei echtem Überholen — NICHT mehr der
+      // Etappen-Slot-Sieger (der wechselte jede Etappe das Team → wirkte wie „durchswitchen").
+      // Pro Rang genau ein Team: 1=Gold, 2=Silber, 3=Bronze.
+      t.roundMedal = i < 3 ? ((i + 1) as 1 | 2 | 3) : 0;
     });
   }
   function slotRankOf(slot: number, team: RT, rt: RT[]): number {
@@ -1735,13 +1739,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     const net = playerNet(p);
     t.score = round1(t.score + net);
     t.thrownSlot = slot;
-    recomputeRanks(rt);
-    // Medaille erscheint erst mit dem Auftritt (gate über thrownSlot === slot),
-    // ist aber sofort final: sie folgt dem vorab bestimmten roundSlotRank und
-    // wandert nicht mehr weiter. Kein Spoiler vor Reveal.
-    if (p && t.roundSlotRank >= 1 && t.roundSlotRank <= 3) {
-      t.roundMedal = t.roundSlotRank as 1 | 2 | 3;
-    }
+    recomputeRanks(rt); // setzt Rang + Gesamt-Top-3-Medaille (Gold/Silber/Bronze, stabil)
     return { player: p, net };
   }
   function noteReveal(t: RT, slot: number, res: { player: NativeStagePlayer | null; net: number }, isMine: boolean, rt: RT[]): Impact {
@@ -2030,7 +2028,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     rt.forEach((t) => {
       t.roundStartRank = t.rank;
       t.roundStartScore = t.score; // Basis der 5s-animScore-Rampe (Feld↔Tabelle-Sync)
-      t.roundMedal = 0;
+      // roundMedal NICHT mehr zurücksetzen: die Gesamt-Top-3-Medaille bleibt stabil und
+      // wird in recomputeRanks bei jedem Reveal frisch gesetzt (kein Blinken am Etappenstart).
     });
     // Runden-Slot-Ränge VORAB bestimmen (kein Spoiler: nur gespeichert, erscheint
     // erst mit dem Auftritt): alle Teams nach playerNet(players[r]) absteigend,
