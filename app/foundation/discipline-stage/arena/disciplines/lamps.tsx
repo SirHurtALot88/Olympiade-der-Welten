@@ -369,11 +369,18 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
             <g
               key={t.code}
               data-token-code={t.code}
+              className={lunging ? "f-lunge" : undefined}
               ref={(el) => {
                 gRefs.current.set(t.idx, el);
+                // Initial-Position NUR einmal setzen (wenn noch kein transform da ist) →
+                // kein 1-Frame-Sprung von (0,0). Danach ist die rAF alleiniger Positionsgeber;
+                // würde React bei jedem force()-Render neu setzen, kämpfte es gegen die
+                // relaxierte rAF-Position → das war der „2 Positionen"-Effekt.
+                if (el && !el.getAttribute("transform")) {
+                  const p = idealOf(t, t.animScore);
+                  el.setAttribute("transform", `translate(${p.x} ${p.y})`);
+                }
               }}
-              className={lunging ? "f-lunge" : undefined}
-              transform={(() => { const p = idealOf(t, t.animScore); return `translate(${p.x} ${p.y})`; })()}
               style={{
                 cursor: onOpenTeam && t.teamId ? "pointer" : "default",
                 opacity: hoverIdx != null && hoverIdx !== t.idx ? 0.82 : 1,
