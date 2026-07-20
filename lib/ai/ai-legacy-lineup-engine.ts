@@ -14,6 +14,7 @@ import type { AiLineupStrategy } from "@/lib/data/olyDataTypes";
 import { deriveTeamIdentityAxisWeightMap } from "@/lib/foundation/team-identity-settings";
 import { getFatiguePerformanceMultiplier, getInjuryRiskPercent } from "@/lib/fatigue/fatigue-calibration";
 import { buildLegacyLineupAggregateScore } from "@/lib/lineups/legacy-score-engine";
+import { seededFormJitter } from "@/lib/lineups/legacy-lineup-modifiers";
 import { scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
 import type { DisciplineSide, LegacyLineupEntryInput, LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
@@ -181,7 +182,15 @@ function buildEntriesForDisciplineSide(
       const score = disciplineScore?.score ?? Number.NEGATIVE_INFINITY;
       const tieBreak = getIdentityTieBreakScore(context, player.playerId, focusAxes);
       const health = getRosterHealth(context, player.playerId);
-      const selectionScore = getSelectionScore(context, player.playerId, score, lineupStrategy);
+      const baseSelectionScore = getSelectionScore(context, player.playerId, score, lineupStrategy);
+      // Gebundener taktischer Jitter (±5, deterministisch pro Spieler|Disziplin|
+      // Spieltag): die AI wählt schon nach Fatigue-adjustiertem Erwartungswert,
+      // nimmt aber nicht mehr stur die perfekt Besten — knappe Kandidaten tauschen
+      // gelegentlich (etwas Abwechslung), ohne die Team-Summe nennenswert zu
+      // verschenken. Fehlende Werte (−∞) bleiben unangetastet.
+      const selectionScore = Number.isFinite(baseSelectionScore)
+        ? baseSelectionScore + seededFormJitter(`sel|${player.playerId}|${disciplineId}|${context.matchdayId ?? ""}`, 5)
+        : baseSelectionScore;
 
       return {
         activePlayerId: player.id,

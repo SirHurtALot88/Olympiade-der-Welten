@@ -1,6 +1,6 @@
 import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
-import { distributePerPlayerFormShares } from "@/lib/lineups/legacy-lineup-modifiers";
+import { distributePerPlayerFormShares, seededFormJitter } from "@/lib/lineups/legacy-lineup-modifiers";
 
 // One aufgestellter Spieler in einem Slot einer Disziplin, mit echter
 // Netto-Leistung aus dem Save (Disziplin-Wert + echtem Fatigue/Form).
@@ -93,10 +93,22 @@ export function buildDisciplineStageModel(
 
   const teams: DisciplineStageTeam[] = (gameState.teams ?? []).map((team) => {
     const roster = rosterByTeam.get(team.teamId) ?? [];
-    const sorted = [...roster].sort(
-      (a, b) => (b.disciplineRatings?.[disciplineId] ?? 0) - (a.disciplineRatings?.[disciplineId] ?? 0),
-    );
-    const chosen = sorted.slice(0, slotCount);
+    // Auswahl nach ERWARTETEM Beitrag (Rating − Fatigue + Form) statt Roh-Rating:
+    // ein müder Star fällt hinter einen frischen, knapp schwächeren Spieler zurück
+    // (sonst verschenkt das Team Punkte). Plus gebundener taktischer Jitter (±5,
+    // deterministisch pro Spieler|Disziplin) — die Teams nehmen nicht immer stur die
+    // perfekt Besten, aber die Team-Summe bleibt nahe optimal (nur knappe Kandidaten
+    // tauschen). Reihenfolge ist ohnehin summenneutral, entscheidend ist die Auswahl.
+    const chosen = [...roster]
+      .map((p) => {
+        const base = Number((p.disciplineRatings?.[disciplineId] ?? 0).toFixed(1));
+        const fatiguePenalty = Math.round(((base * clamp(p.fatigue ?? 0, 0, 100)) / 100) * 0.25);
+        const formEst = Math.round(((clamp(p.form ?? 50, 0, 100) - 50) / 50) * 8);
+        return { p, key: base - fatiguePenalty + formEst + seededFormJitter(`sel|${p.id}|${disciplineId}`, 5) };
+      })
+      .sort((a, b) => b.key - a.key)
+      .slice(0, slotCount)
+      .map((s) => s.p);
     // Team-Form FLACH (nicht pro Spieler-Stärke): aus der Durchschnitts-Form des
     // aufgestellten Teams ein Pro-Spieler-Kartenwert (±8), dann per gemeinsamer
     // Funktion additiv mit Jitter (±4) auf die Spieler verteilt — identische Logik
