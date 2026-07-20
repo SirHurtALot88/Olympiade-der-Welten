@@ -75,7 +75,9 @@ function AnchoredCard({ x, y, width, cardStyle, children }: {
         left: pos ? pos.left : x + 14,
         top: pos ? pos.top : y + 16,
         width,
-        zIndex: 70,
+        // Hoch genug, um IMMER über Rangliste/ENDSTAND-Panel zu liegen — sonst scheint
+        // deren Text durch die (eigentlich deckende) Karte und sie wirkt „transparent".
+        zIndex: 1000,
         pointerEvents: "none",
         visibility: pos ? "visible" : "hidden",
         ...cardStyle,

@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { teamPrimaryColor, floorTeamAccent } from "@/lib/foundation/team-colors";
 import { useStageAudio } from "./useStageAudio";
 import DisciplineStageResultTable, { type ResultTableRow } from "./DisciplineStageResultTable";
@@ -1012,6 +1013,79 @@ type TickerData = TickerReveal | TickerSummary | TickerHeader;
 const TICKER_MAX = 40;
 type Spot = { crest: NativeStageTeam; idx: number; kick: string; name: string; sub: string; net: number; chipText: string; chipColor: string; mine: boolean; portraitUrl: string | null } | null;
 type PodCol = { place: number; code: string; name: string; pts: number; logoUrl: string | null; isOwn: boolean; idx: number; delayMs: number; loud: boolean };
+
+// Team-Hovercard als PORTAL (document.body) mit position:fixed + Viewport-Clamping.
+// Löst die Karte aus dem Feld-Container (overflow:hidden für die gezoomte SVG +
+// Shake-transform) heraus, damit sie NIE mehr am oberen/seitlichen Feldrand
+// abgeschnitten wird und IMMER vorne liegt. Anker = Viewport-Mitte des Tokens;
+// horizontal neben das Token gekippt, vertikal auf Tokenhöhe zentriert und voll in
+// den sichtbaren Bereich geklemmt.
+function HoverTeamCardPortal({
+  anchorX,
+  anchorY,
+  accent,
+  clickable,
+  onEnter,
+  onLeave,
+  onClick,
+  children,
+}: {
+  anchorX: number;
+  anchorY: number;
+  accent: string;
+  clickable: boolean;
+  onEnter?: () => void;
+  onLeave?: () => void;
+  onClick?: () => void;
+  children: ReactNode;
+}): React.JSX.Element | null {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || typeof document === "undefined") return;
+    const r = el.getBoundingClientRect();
+    const vw = document.documentElement.clientWidth || window.innerWidth;
+    const vh = document.documentElement.clientHeight || window.innerHeight;
+    const w = r.width || 300;
+    const h = r.height || 0;
+    let left = anchorX + 16; // rechts neben das Token
+    if (left + w > vw - 8) left = anchorX - w - 16; // nahe rechtem Rand nach links kippen
+    left = Math.max(8, Math.min(left, vw - w - 8));
+    let top = anchorY - h / 2; // vertikal auf Tokenhöhe zentrieren
+    top = Math.max(8, Math.min(top, vh - h - 8)); // voll in den Viewport klemmen (kein Clip oben/unten)
+    setPos({ left, top });
+  }, [anchorX, anchorY]);
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div
+      ref={ref}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+      onClick={onClick}
+      style={{
+        position: "fixed",
+        left: pos ? pos.left : anchorX + 16,
+        top: pos ? pos.top : 8,
+        width: 300,
+        maxWidth: "92vw",
+        zIndex: 1000,
+        background: "var(--nl-panel)",
+        border: `1.5px solid ${accent}`,
+        borderTop: `3px solid ${accent}`,
+        borderRadius: 12,
+        padding: 10,
+        boxShadow: "0 18px 50px -18px rgba(0,0,0,.8)",
+        pointerEvents: "auto",
+        cursor: clickable ? "pointer" : "default",
+        visibility: pos ? "visible" : "hidden",
+      }}
+    >
+      {children}
+    </div>,
+    document.body,
+  );
+}
 
 export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, onOpenTeam, onHoverTeam, onPreviewPlayer, onEnded, onReset, onResults, topPlayers, primitive = "track", disciplineId, progressLabel, disciplineName, accent, motif, env }: DisciplineStageNativeArenaProps) {
   const skinAccent = accent ?? "var(--nl-line-2, var(--nl-line))";
@@ -2896,57 +2970,43 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             </div>
           ) : null}
 
-          {/* Team-Hovercard — absolute IM Shake-Container (Fix: kein position:fixed
-              mehr, das durch das Shake-transform verschoben wurde). Position aus
-              tokenPos → % des Containers; Flip-Logik statt Fenster-Clamping. */}
+          {/* Team-Hovercard — via Portal (document.body) + position:fixed, damit sie den
+              overflow:hidden-/Shake-transform-Feldcontainer VERLÄSST und nie mehr am
+              Feldrand abgeschnitten wird bzw. hinter der Rangliste verschwindet. Anker =
+              echte Viewport-Mitte des Tokens (getBoundingClientRect). */}
           {hover && !podium
             ? (() => {
                 const t = rtRef.current[hover.idx];
                 if (!t) return null;
-                // Position bevorzugt aus der ECHT gerenderten Token-DOM-Lage lesen (Felder
-                // platzieren Token selbst — Oval, Streuung …); Fallback host.tokenPos. So
-                // sitzt die Karte am Token, egal wie das Feld es platziert.
-                let xPct: number;
-                let yPct: number;
+                // Anker bevorzugt aus der ECHT gerenderten Token-DOM-Lage (Felder platzieren
+                // Token selbst — Oval, Streuung …); Fallback host.tokenPos → in Viewport-Px
+                // über die SVG-Bounding-Box. Ohne beides: nicht rendern (sehr selten).
                 const svgEl = svgRef.current;
                 const tokEl = svgEl?.querySelector(`[data-token-code="${t.code}"]`) as SVGGraphicsElement | null;
                 const svgRect = svgEl?.getBoundingClientRect();
                 const tokRect = tokEl?.getBoundingClientRect();
-                if (svgRect && tokRect && svgRect.width > 0 && svgRect.height > 0 && (tokRect.width > 0 || tokRect.height > 0)) {
-                  xPct = ((tokRect.left + tokRect.width / 2 - svgRect.left) / svgRect.width) * 100;
-                  yPct = ((tokRect.top + tokRect.height / 2 - svgRect.top) / svgRect.height) * 100;
-                } else {
+                let anchorX: number;
+                let anchorY: number;
+                if (tokRect && (tokRect.width > 0 || tokRect.height > 0)) {
+                  anchorX = tokRect.left + tokRect.width / 2;
+                  anchorY = tokRect.top + tokRect.height / 2;
+                } else if (svgRect && svgRect.width > 0 && svgRect.height > 0) {
                   const pos = tokenPos(t, animField ? t.displayScore : t.score);
-                  xPct = (pos.x / W) * 100;
-                  yPct = (pos.y / H) * 100;
+                  anchorX = svgRect.left + (pos.x / W) * svgRect.width;
+                  anchorY = svgRect.top + (pos.y / H) * svgRect.height;
+                } else {
+                  return null;
                 }
-                const flipX = xPct > 60; // Karte nach links, wenn Token rechts sitzt
-                const below = yPct < 35; // Karte unterhalb, wenn Token oben sitzt
                 const teamClickable = Boolean(onOpenTeam && t.teamId);
                 return (
-                  <div
-                    onMouseEnter={() => { cancelHoverClose(); pauseCascade(); }}
-                    onMouseLeave={scheduleHoverClose}
+                  <HoverTeamCardPortal
+                    anchorX={anchorX}
+                    anchorY={anchorY}
+                    accent={floorTeamAccent(teamPrimaryColor(t.code))}
+                    clickable={teamClickable}
+                    onEnter={() => { cancelHoverClose(); pauseCascade(); }}
+                    onLeave={scheduleHoverClose}
                     onClick={teamClickable ? () => onOpenTeam!(t.teamId!) : undefined}
-                    style={{
-                      position: "absolute",
-                      left: `${xPct}%`,
-                      top: `${yPct}%`,
-                      transform: `translate(${flipX ? "calc(-100% - 14px)" : "14px"}, ${below ? "14px" : "calc(-100% - 14px)"})`,
-                      width: 300,
-                      maxWidth: "78%",
-                      zIndex: 4,
-                      background: "var(--nl-panel)",
-                      // Rahmen in der Team-Farbe (getTeamColor) — die Karte gehört sichtbar
-                      // zum Team; oben ein kräftigerer Farbstreifen als Anker.
-                      border: `1.5px solid ${floorTeamAccent(teamPrimaryColor(t.code))}`,
-                      borderTop: `3px solid ${floorTeamAccent(teamPrimaryColor(t.code))}`,
-                      borderRadius: 12,
-                      padding: 10,
-                      boxShadow: "0 18px 50px -18px rgba(0,0,0,.8)",
-                      pointerEvents: "auto",
-                      cursor: teamClickable ? "pointer" : "default",
-                    }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                       {t.logoUrl ? (
@@ -2957,7 +3017,14 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                       )}
                       <span style={{ fontWeight: 800 }}>{t.code}</span>
                       <span style={{ fontSize: 12, color: "var(--nl-mut)", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
-                      <span style={{ fontWeight: 800, color: ampel(prim === "barbell" ? barbellRankMap[t.code] ?? t.rank : t.rank) }}>#{prim === "barbell" ? barbellRankMap[t.code] ?? t.rank : t.rank}</span>
+                      {/* Rang EXAKT wie in der Rangliste rechts: barbell → Eliminations-Rang,
+                          sonst der live aus animScore abgeleitete Rang (liveRankByCode) —
+                          NICHT der Cascade-Sprung-Rang t.rank, sonst weicht die Hovercard
+                          von der Ladder ab. */}
+                      {(() => {
+                        const cardRank = prim === "barbell" ? barbellRankMap[t.code] ?? t.rank : liveRankByCode[t.code] ?? t.rank;
+                        return <span style={{ fontWeight: 800, color: ampel(cardRank) }}>#{cardRank}</span>;
+                      })()}
                     </div>
                     {/* Gewichtheben · Steckbrief: aktuelles kg, Status (im Wettkampf /
                         gerissen bei X kg), aktueller Heber. Anti-Spoiler — die wahre Kraft
@@ -3114,7 +3181,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                     {teamClickable ? (
                       <div style={{ marginTop: 6, fontSize: 10.5, color: "var(--nl-mut)", fontWeight: 700 }}>Klicken für Team-Karte</div>
                     ) : null}
-                  </div>
+                  </HoverTeamCardPortal>
                 );
               })()
             : null}
