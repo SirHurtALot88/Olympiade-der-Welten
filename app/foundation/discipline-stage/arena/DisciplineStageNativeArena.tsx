@@ -606,7 +606,14 @@ export function renderSceneEnvBg(prim: StagePrimitive, env: StageEnv, layout: an
 // hsl()/CSS-Token → Design-Token-Lint bleibt sauber.
 const KLASSEN_NAMES = ["Meister", "Anwärter", "Oberhaus", "Mittelfeld", "Abstieg", "Keller"];
 const KLASSEN_MEDALS = ["🥇", "🥈", "🥉"];
-export function renderKlassenBands(sorted: RT[], W: number, H: number, env: StageEnv): React.ReactNode {
+export function renderKlassenBands(
+  sorted: RT[],
+  W: number,
+  H: number,
+  env: StageEnv,
+  onOpenTeam?: ((teamId: string) => void) | null,
+  onHoverTeam?: ((teamId: string | null) => void) | null,
+): React.ReactNode {
   const n = sorted.length;
   if (n === 0) return null;
   const max = sorted[0]!.score;
@@ -660,8 +667,18 @@ export function renderKlassenBands(sorted: RT[], W: number, H: number, env: Stag
           const cy = y + headH + bandPadTop + rr * (chipH + gapY);
           const rc = relColor(t.rel);
           const med = t.rank <= 3 ? KLASSEN_MEDALS[t.rank - 1] : "";
+          // Konsistent zu Token/Ladder/Territory/Duelhp: Chip hovern → Team-Vorschau
+          // am Cursor, Klick → Team-Drawer. (Zuvor hatte klassen/Schach+Tennis keine
+          // Feld-Interaktion — Team-Karte war nur über Ladder/Tabelle erreichbar.)
+          const teamClickable = Boolean(onOpenTeam && t.teamId);
           return (
-            <g key={t.code}>
+            <g
+              key={t.code}
+              style={{ cursor: teamClickable ? "pointer" : "default" }}
+              onMouseEnter={onHoverTeam && t.teamId ? () => onHoverTeam(t.teamId!) : undefined}
+              onMouseLeave={onHoverTeam ? () => onHoverTeam(null) : undefined}
+              onClick={teamClickable ? () => onOpenTeam!(t.teamId!) : undefined}
+            >
               <rect x={cx} y={cy} width={chipW} height={chipH} rx={7} fill={t.isOwn ? "color-mix(in srgb, var(--nl-accent) 22%, transparent)" : "var(--nl-panel)"} stroke={rc ?? (t.isOwn ? "var(--nl-accent)" : env.line)} strokeWidth={rc || t.isOwn ? 2 : 1} strokeOpacity={rc || t.isOwn ? 0.95 : 0.3} />
               <text x={cx + 8} y={cy + chipH / 2 + 4} fontSize={11.5} fontWeight={800} fill={t.isOwn ? "var(--nl-accent)" : env.line}>
                 {med}

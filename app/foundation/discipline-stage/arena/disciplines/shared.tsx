@@ -62,6 +62,7 @@ export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactN
     openHover,
     scheduleHoverClose,
     onOpenTeam,
+    onHoverTeam,
   } = props;
   return (
     <>
@@ -106,7 +107,7 @@ export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactN
                 <rect x={0} y={0} width={W} height={H} fill="url(#envSky)" />
 
                 {prim === "klassen" ? (
-                  renderKlassenBands(sorted, W, H, env)
+                  renderKlassenBands(sorted, W, H, env, onOpenTeam, onHoverTeam)
                 ) : prim === "territory" ? (
                   renderTerritory(sorted, W, H, env)
                 ) : prim === "track" ? (
