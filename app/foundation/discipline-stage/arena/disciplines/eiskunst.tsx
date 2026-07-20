@@ -477,7 +477,7 @@ export default function EiskunstField(props: DisciplineFieldProps): ReactNode {
         .slice()
         .reverse()
         .map((t) => {
-          const pos = routePos(t, uOf(t.score));
+          const pos = routePos(t, uOf(t.displayScore));
           const r = t.isOwn ? geo.rOwn : geo.r;
           const hue = hueForIdx(t.idx);
           const medal =
@@ -497,6 +497,7 @@ export default function EiskunstField(props: DisciplineFieldProps): ReactNode {
               transform={`translate(${pos.x} ${pos.y})`}
               style={{
                 cursor: onOpenTeam && t.teamId ? "pointer" : "default",
+                transition: reducedMotion ? "none" : "transform 5s cubic-bezier(.4,0,.2,1)",
               }}
               onMouseEnter={() => openHover(t.idx)}
               onMouseLeave={scheduleHoverClose}

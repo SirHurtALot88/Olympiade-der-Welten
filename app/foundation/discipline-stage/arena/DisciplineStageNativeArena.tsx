@@ -1862,15 +1862,17 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     // Etappen-Wechsel-Banner (track): neue Staffel-Etappe startet.
     popBanner(`◇ Etappe ${r + 1} / ${slotCount} · Wechsel${slots[r] ? " · " + slots[r] : ""}`, "cyan");
     computeRoundStandings(r, rt);
-    // Staffel/track: ALLE Token peilen ihre Runden-Endposition GEMEINSAM an und
-    // gleiten simultan dorthin (dur = TRACK_ROUND_MS). displayScore = kumulierter
-    // Score NACH diesem Slot; wird für alle Teams in DEMSELBEN Render gesetzt →
-    // gemeinsamer Start des Gleitens. Der echte score (Wahrheit) zählt weiter Slot
-    // für Slot in der Cascade hoch (Ladder/Ticker/Medaillen bleiben sequenziell).
+    // ALLE Disziplinen (nicht nur track): sämtliche Token peilen ihre Runden-
+    // Endposition GEMEINSAM an und gleiten simultan über TRACK_ROUND_MS (5s) dorthin.
+    // displayScore = kumulierter Score NACH diesem Slot; für alle Teams im DEMSELBEN
+    // Render gesetzt → gemeinsamer, gleichmäßiger Start des Gleitens (kein „Batch-
+    // Sprung" am Ende). Der echte score (Wahrheit) zählt weiter Slot für Slot in der
+    // Cascade hoch (Ladder/Ticker/Medaillen bleiben sequenziell). Felder positionieren
+    // ihre Token über displayScore (siehe types.ts / shared.tsx posScore).
+    rt.forEach((t) => {
+      t.displayScore = round1(t.score + playerNet(t.players[r]));
+    });
     if (prim === "track") {
-      rt.forEach((t) => {
-        t.displayScore = round1(t.score + playerNet(t.players[r]));
-      });
       // Staffelstab-Übergabe (FEATURE 1): bei jedem Etappenwechsel (ab Etappe 2 — Etappe 1
       // hat keinen abgebenden Läufer) reicht jedes Token seinen Stab nach vorn. Ein einziger
       // leiser globaler Cue (nicht pro Token). Reduced-Motion: komplett übersprungen.
@@ -2639,39 +2641,6 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                               {lifter ? (
                                 <div style={{ fontSize: 11.5, color: "var(--nl-mut)", marginTop: 2 }}>
                                   🏋 Heber: <b style={{ color: "var(--nl-ink)" }}>{lifter.name}</b> · Versuch {barbellTry + 1}
-                                </div>
-                              ) : null}
-                            </div>
-                          );
-                        })()
-                      : null}
-                    {/* Court: abgeleitete Box-Score (PTS/REB/AST aus der Feld-Wertung) +
-                        echter Top-Beitragender aus dem Kader. Score bleibt Wahrheit/Rang. */}
-                    {prim === "court" && t.thrownSlot >= 0
-                      ? (() => {
-                          const n = fieldNorm(t.score);
-                          const pts = Math.round(72 + n * 50);
-                          const reb = Math.round(30 + n * 24);
-                          const ast = Math.round(14 + n * 18);
-                          let top: NativeStagePlayer | null = null;
-                          for (let s = 0; s <= t.thrownSlot; s += 1) {
-                            const p = t.players[s];
-                            if (p && (!top || playerNet(p) > playerNet(top))) top = p;
-                          }
-                          const hot = courtMax > courtMedian && t.score > courtHotFloor;
-                          return (
-                            <div style={{ margin: "0 0 7px", padding: "6px 9px", borderRadius: 9, background: "var(--nl-bg)", border: "1px solid var(--nl-line)" }}>
-                              <div style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 3 }}>
-                                Box-Score · abgeleitet{hot ? " · 🔥 Hot Hand" : ""}
-                              </div>
-                              <div style={{ fontSize: 12.5, fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>
-                                <span style={{ color: "var(--nl-accent)" }}>PTS {pts}</span>
-                                <span style={{ color: "var(--nl-mut)" }}> · </span>REB {reb}
-                                <span style={{ color: "var(--nl-mut)" }}> · </span>AST {ast}
-                              </div>
-                              {top ? (
-                                <div style={{ fontSize: 11.5, color: "var(--nl-mut)", marginTop: 2 }}>
-                                  Top-Beitrag: <b style={{ color: "var(--nl-ink)" }}>{top.name}</b> · {fmt1(playerNet(top))}
                                 </div>
                               ) : null}
                             </div>

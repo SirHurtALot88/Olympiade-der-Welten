@@ -55,7 +55,7 @@ export default function PlatterField(props: DisciplineFieldProps): ReactNode {
   // Effekte: Stack wächst mit Score (visuell synchron)
   const updateStackHeight = (t: RT, stackEl: SVGGElement | null) => {
     if (!stackEl) return;
-    const norm = finalMax > 0 ? t.score / finalMax : 0;
+    const norm = finalMax > 0 ? t.displayScore / finalMax : 0;
     // Stapel: max 13 Teller, Höhe 0–13px (1px pro Teller)
     const plateCount = Math.max(0, Math.min(13, Math.round(norm * 13)));
     // Entfernen alter Teller und neu zeichnen
@@ -82,7 +82,7 @@ export default function PlatterField(props: DisciplineFieldProps): ReactNode {
     rt.forEach((t) => {
       const gEl = gRefs.current.get(t.idx);
       if (gEl) {
-        const xPos = xOfScore(t.score);
+        const xPos = xOfScore(t.displayScore);
         const yPos = top + t.laneIdx * laneH + laneH / 2;
         gEl.setAttribute("transform", `translate(${xPos} ${yPos})`);
       }
@@ -95,7 +95,7 @@ export default function PlatterField(props: DisciplineFieldProps): ReactNode {
     // Gabel-Marker und Gorge-Meter (Führender) aktualisieren
     const leader = rt.find((t) => t.rank === 1);
     if (leader && gorgeRef.current && forkRef.current) {
-      const leaderX = xOfScore(leader.score);
+      const leaderX = xOfScore(leader.displayScore);
       const gorgeW = Math.max(0, Math.min(fieldW, leaderX - xStart));
       gorgeRef.current.setAttribute("width", gorgeW.toString());
       forkRef.current.setAttribute("x", leaderX.toString());
@@ -365,6 +365,9 @@ export default function PlatterField(props: DisciplineFieldProps): ReactNode {
           const glowing = t.glowUntil > now;
           const rc = relColor(t.rel);
           const yPos = top + t.laneIdx * laneH + laneH / 2;
+          // Position via displayScore direkt im JSX-transform (React setzt es bei jedem
+          // Render → CSS-Transition gleitet 5s zum Runden-Ziel; unabhängig vom useEffect).
+          const xPos = xOfScore(t.displayScore);
 
           return (
             <g
@@ -373,8 +376,9 @@ export default function PlatterField(props: DisciplineFieldProps): ReactNode {
               ref={(el) => {
                 gRefs.current.set(t.idx, el);
               }}
+              transform={`translate(${xPos} ${yPos})`}
               style={{
-                transition: reducedMotion ? "none" : "transform 520ms cubic-bezier(.34,1.2,.4,1)",
+                transition: reducedMotion ? "none" : "transform 5s cubic-bezier(.4,0,.2,1)",
                 cursor: onOpenTeam && t.teamId ? "pointer" : "default",
               }}
               onMouseEnter={() => openHover(t.idx)}

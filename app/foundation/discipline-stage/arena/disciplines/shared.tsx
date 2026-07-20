@@ -411,10 +411,11 @@ export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactN
               .slice()
               .reverse()
               .map((t) => {
-                // track: Token-Position folgt displayScore (pro Runde für ALLE Teams
-                // gemeinsam gesetzt → simultanes Gleiten). Andere Primitive nutzen den
-                // sequenziell aufgedeckten score (Optik unverändert).
-                const posScore = prim === "track" ? t.displayScore : t.score;
+                // ALLE Disziplinen: Token-Position folgt displayScore (Runden-Ziel,
+                // pro Runde für ALLE Teams gemeinsam gesetzt → simultanes, gleichmäßiges
+                // 5s-Gleiten statt Batch-Sprung). Wert-LABELS zeigen weiter den echten
+                // sequenziellen score (Wahrheit) — nur die Bewegung folgt dem Ziel.
+                const posScore = t.displayScore;
                 const pos = tokenPos(t, posScore);
                 const r = t.isOwn ? geo.rOwn : geo.r;
                 const hue = hueForIdx(t.idx);
@@ -422,11 +423,11 @@ export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactN
                 // Gewichtheben: Heber gerissen (auf Endgewicht) bzw. Champion an der Krone.
                 const bbOut = prim === "barbell" && barbellEliminated(t.idx);
                 const bbChamp = prim === "barbell" && done && (barbellRankMap[t.code] ?? 99) === 1;
-                // track/barbell: langer, gleichmäßiger Gleit-Übergang über eine ganze Runde
-                // (~5 s, TRACK_ROUND_MS) — alle Token/die Latte gleiten simultan statt zu
-                // springen. Andere Primitive behalten ihren kürzeren, federnden Übergang.
-                const dur = prim === "track" || prim === "barbell" ? TRACK_ROUND_MS : t.isOwn ? 1300 : 520;
-                const ease = prim === "track" || prim === "barbell" ? "cubic-bezier(.4,0,.2,1)" : "cubic-bezier(.34,1.2,.4,1)";
+                // ALLE Disziplinen: langer, gleichmäßiger Gleit-Übergang über eine ganze
+                // Runde (~5 s, TRACK_ROUND_MS) — alle Token gleiten simultan zum Runden-Ziel
+                // statt zu springen. Einheitlicher, sauberer Flow.
+                const dur = TRACK_ROUND_MS;
+                const ease = "cubic-bezier(.4,0,.2,1)";
                 const glowing = t.glowUntil > now;
                 // Primitive-spezifische Spur/Balken (absolute Koordinaten, hinter dem Token)
                 const barW = Math.min(18, (layout.colW ?? 24) * 0.5);

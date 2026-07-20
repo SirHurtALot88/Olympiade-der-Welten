@@ -267,14 +267,14 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
         .slice()
         .reverse()
         .map((t) => {
-          const pos = tokenPos(t, t.score);
+          const pos = tokenPos(t, t.displayScore);
           const r = t.isOwn ? geo.rOwn : geo.r;
           const hue = hueForIdx(t.idx);
           const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
           const glowing = t.glowUntil > now;
           const rc = relColor(t.rel);
           const lunging = !reducedMotion && lunges[t.code] != null;
-          const dur = t.isOwn ? 1200 : 800;
+          const dur = 5000;
           return (
             <g
               key={t.code}

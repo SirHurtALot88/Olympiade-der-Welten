@@ -215,10 +215,10 @@ export default function ThermometerField(props: DisciplineFieldProps): ReactNode
         .slice()
         .reverse()
         .map((t) => {
-          const pos = tokenPos(t, t.score);
+          const pos = tokenPos(t, t.displayScore);
           const r = t.isOwn ? geo.rOwn : geo.r;
           const hue = hueForIdx(t.idx);
-          const heatHueVal = heatHue(t.score);
+          const heatHueVal = heatHue(t.displayScore);
           const glowing = t.glowUntil > now;
           const medal =
             t.roundMedal === 1
@@ -238,7 +238,7 @@ export default function ThermometerField(props: DisciplineFieldProps): ReactNode
                 cursor: onOpenTeam && t.teamId ? "pointer" : "default",
                 transition: reducedMotion
                   ? "none"
-                  : `transform 520ms cubic-bezier(.34,1.2,.4,1)`,
+                  : `transform 5s cubic-bezier(.4,0,.2,1)`,
               }}
               data-token-code={t.code}
               onMouseEnter={() => openHover(t.idx)}

@@ -67,6 +67,20 @@ const ALLOWED_FILES = new Set<string>([
   "components/foundation/new-look/nl-tones.ts",
 ]);
 
+// Verzeichnis-Ausnahmen (Präfix-Match auf den relativen Pfad). Wie ALLOWED_FILES,
+// nur für ganze Bäume.
+//
+// Disziplin-Feld-Komponenten sind ILLUSTRATION, kein themebares UI-Chrome: jede
+// Datei baut das Feld einer Disziplin 1:1 aus dem Mockup nach (Eisrink-Blau,
+// Rasengrün, Schachbrett-Braun, Burg-/Routen-Farben, Kletter-Griffe …). Diese
+// Kunst-Farben haben bewusst kein `var(--nl-*)`-Pendant — sie auf Theme-Tokens zu
+// zwingen würde die 1:1-Mockup-Treue zerstören und existiert-nicht-Tokens erfinden.
+// Chrome (Ladder/Ticker/Hovercard/Podest) lebt im Host (DisciplineStageNativeArena)
+// bzw. den geteilten NL-Komponenten und bleibt weiterhin gelintet.
+const ALLOWED_DIR_PREFIXES = [
+  "app/foundation/discipline-stage/arena/disciplines/",
+];
+
 // CSS-Dateien definieren die Tokens selbst (z.B. `--nl-pow: #ff6b6b;` in
 // app/globals.css) und werden generell nicht als TS/TSX-Quellcode behandelt
 // — die Hex-Regel gilt nur für `.ts`/`.tsx`, CSS ist strukturell ausgenommen.
@@ -131,7 +145,7 @@ function scanAll(): Violation[] {
     const absoluteRoot = path.join(ROOT, root);
     for (const filePath of collectSourceFiles(absoluteRoot)) {
       const relativePath = path.relative(ROOT, filePath).split(path.sep).join("/");
-      if (ALLOWED_FILES.has(relativePath)) {
+      if (ALLOWED_FILES.has(relativePath) || ALLOWED_DIR_PREFIXES.some((p) => relativePath.startsWith(p))) {
         continue;
       }
       const source = fs.readFileSync(filePath, "utf8");

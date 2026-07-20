@@ -255,10 +255,12 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
       const reduce = reducedRef.current;
       const frozen = hoverRef.current != null || pausedRef.current;
 
-      // 1) Ziele einlesen (x = Score-Position via host.tokenPos); Glide bei Änderung neu starten.
+      // 1) Ziele einlesen (x = displayScore-Position via host.tokenPos); Glide bei Änderung
+      //    neu starten. displayScore = Runden-Ziel für ALLE Teams gemeinsam → simultanes
+      //    5s-Gleiten (GLIDE_MS = TRACK_ROUND_MS) statt sequenzieller Batch-Sprünge.
       const arr: GP[] = [];
       for (const t of rtl) {
-        const tgt = tp(t, t.score);
+        const tgt = tp(t, t.displayScore);
         let st = g.get(t.idx);
         if (!st) {
           st = {

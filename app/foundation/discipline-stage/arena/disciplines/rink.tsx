@@ -62,7 +62,7 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
 
   // Puck-Position (folgt dem Führenden)
   const leader = sorted.length > 0 ? sorted[0] : null;
-  const puckX = leader ? fracX(leader.score) : CX;
+  const puckX = leader ? fracX(leader.displayScore) : CX;
   const puckY = leader ? laneY(leader.idx) : CY;
 
   // Refs für SVG-Gruppen (CSS-Transitions)
@@ -73,7 +73,7 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
     for (const t of rt) {
       const el = gRefs.current.get(t.idx);
       if (el) {
-        const x = fracX(t.score);
+        const x = fracX(t.displayScore);
         const y = laneY(t.idx);
         el.setAttribute("transform", `translate(${x} ${y})`);
       }
@@ -213,7 +213,7 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
           const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
           const glowing = t.glowUntil > now;
           const rc = relColor(t.rel);
-          const x = fracX(t.score);
+          const x = fracX(t.displayScore);
           const y = laneY(t.idx);
 
           return (

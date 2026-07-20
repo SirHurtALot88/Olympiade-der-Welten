@@ -425,20 +425,19 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
         .slice()
         .reverse()
         .map((t) => {
-          const pos = tokenPos(t, t.score);
+          const pos = tokenPos(t, t.displayScore);
           const r = t.isOwn ? geo.rOwn : geo.r;
           const hue = hueForIdx(t.idx);
           const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
           const glowing = t.glowUntil > now;
           const rc = relColor(t.rel);
-          const dur = t.isOwn ? 1300 : 520;
           const isSeed = t.rank <= 8 ? t.rank : 0;
 
           return (
             <g
               key={t.code}
               transform={`translate(${pos.x} ${pos.y})`}
-              style={{ transition: reducedMotion ? "none" : `transform ${dur}ms cubic-bezier(.34,1.2,.4,1)`, cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
+              style={{ transition: reducedMotion ? "none" : `transform 5s cubic-bezier(.4,0,.2,1)`, cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
               onMouseEnter={() => openHover(t.idx)}
               onMouseLeave={scheduleHoverClose}
               onClick={() => {

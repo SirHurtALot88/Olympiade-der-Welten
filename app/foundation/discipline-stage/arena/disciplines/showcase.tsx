@@ -539,7 +539,7 @@ export default function ShowcaseField(props: DisciplineFieldProps): ReactNode {
 
       {/* Token shadow (below each performer) */}
       {sorted.map((t) => {
-        const pos = posTokenBy(t, t.score);
+        const pos = posTokenBy(t, t.displayScore);
         const r = t.isOwn ? geo.rOwn : geo.r;
         return (
           <ellipse
@@ -555,13 +555,13 @@ export default function ShowcaseField(props: DisciplineFieldProps): ReactNode {
 
       {/* Tokens */}
       {sorted.map((t) => {
-        const pos = posTokenBy(t, t.score);
+        const pos = posTokenBy(t, t.displayScore);
         const r = t.isOwn ? geo.rOwn : geo.r;
         const hue = hueForIdx(t.idx);
         const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
         const glowing = t.glowUntil > now;
-        const dur = reducedMotion ? 0 : 520;
-        const ease = "cubic-bezier(.34,1.2,.4,1)";
+        const dur = reducedMotion ? 0 : 5000;
+        const ease = "cubic-bezier(.4,0,.2,1)";
 
         return (
           <g

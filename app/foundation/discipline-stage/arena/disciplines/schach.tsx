@@ -341,7 +341,7 @@ export default function SchachField(props: DisciplineFieldProps): ReactNode {
         // Score → Elo über die VOLLE Klassen-Spanne skalieren (finalMax = Spitzenwert),
         // sonst landen alle Roh-Scores (~30–334) in KLASSE C. So verteilen sich die
         // Teams vertikal über alle Klassen (Spitze = Grossmeister, Keller = Klasse C).
-        const eloNorm = maxTotal > 0 ? Math.max(0, Math.min(1, t.score / maxTotal)) : 0;
+        const eloNorm = maxTotal > 0 ? Math.max(0, Math.min(1, t.displayScore / maxTotal)) : 0;
         const elo = Math.round(BASE + eloNorm * (maxElo - BASE));
         const x = laneX(sortedIndex); // Spread horizontally by position in sorted array
         const y = yOf(elo); // Elo-basierte vertikale Position (yOf erwartet Elo)
@@ -356,7 +356,7 @@ export default function SchachField(props: DisciplineFieldProps): ReactNode {
           <g
             key={t.code}
             transform={`translate(${x} ${y})`}
-            style={{ transition: reducedMotion ? "none" : "transform 520ms cubic-bezier(.34,1.2,.4,1)", cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
+            style={{ transition: reducedMotion ? "none" : "transform 5s cubic-bezier(.4,0,.2,1)", cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
             onMouseEnter={() => openHover(t.idx)}
             onMouseLeave={scheduleHoverClose}
             onClick={() => {
