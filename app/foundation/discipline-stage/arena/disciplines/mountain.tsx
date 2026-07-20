@@ -209,7 +209,10 @@ export default function ClimbingField(props: DisciplineFieldProps): ReactNode {
       {/* Routen-Griffe (deterministisch pro Team) */}
       <g opacity={0.75}>
         {rt.map((t) => {
-          const laneIdx = rt.indexOf(t);
+          // Dieselbe dichte Bahn wie der Token (t.laneIdx), damit der Kletterer exakt
+          // auf SEINER Griff-/Routenlinie hochklettert (swayOf ist identisch) und nicht
+          // auf einer versetzten Spalte daneben.
+          const laneIdx = t.laneIdx;
           const cx = xOf(laneIdx);
           const routeColors = ["#e05c6e", "#4a9dff", "#3ddc9d", "#f2a13c", "#c77dff", "#5cd0e0"];
           const routeColor = routeColors[laneIdx % routeColors.length];
