@@ -2800,9 +2800,23 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             ? (() => {
                 const t = rtRef.current[hover.idx];
                 if (!t) return null;
-                const pos = tokenPos(t, prim === "track" ? t.displayScore : t.score);
-                const xPct = (pos.x / W) * 100;
-                const yPct = (pos.y / H) * 100;
+                // Position bevorzugt aus der ECHT gerenderten Token-DOM-Lage lesen (Felder
+                // platzieren Token selbst — Oval, Streuung …); Fallback host.tokenPos. So
+                // sitzt die Karte am Token, egal wie das Feld es platziert.
+                let xPct: number;
+                let yPct: number;
+                const svgEl = svgRef.current;
+                const tokEl = svgEl?.querySelector(`[data-token-code="${t.code}"]`) as SVGGraphicsElement | null;
+                const svgRect = svgEl?.getBoundingClientRect();
+                const tokRect = tokEl?.getBoundingClientRect();
+                if (svgRect && tokRect && svgRect.width > 0 && svgRect.height > 0 && (tokRect.width > 0 || tokRect.height > 0)) {
+                  xPct = ((tokRect.left + tokRect.width / 2 - svgRect.left) / svgRect.width) * 100;
+                  yPct = ((tokRect.top + tokRect.height / 2 - svgRect.top) / svgRect.height) * 100;
+                } else {
+                  const pos = tokenPos(t, prim === "track" ? t.displayScore : t.score);
+                  xPct = (pos.x / W) * 100;
+                  yPct = (pos.y / H) * 100;
+                }
                 const flipX = xPct > 60; // Karte nach links, wenn Token rechts sitzt
                 const below = yPct < 35; // Karte unterhalb, wenn Token oben sitzt
                 const teamClickable = Boolean(onOpenTeam && t.teamId);
