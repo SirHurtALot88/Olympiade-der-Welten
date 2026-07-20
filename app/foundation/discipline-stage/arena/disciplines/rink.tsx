@@ -88,7 +88,6 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
   useEffect(() => {
     let raf = 0;
     let last = performance.now();
-    const prevScore = new Map<number, number>();
     // Fliegende Pucks (Schuss → Torraum) — nur Zeichnung, nie Score. outcome = Tor oder Save.
     const shots: { x: number; y: number; tx: number; ty: number; t: number; g: SVGGElement; outcome: "goal" | "save" }[] = [];
     let lightUntil = 0; // Torlicht-Flash bis-Zeitpunkt
@@ -142,9 +141,10 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
       }
 
       if (!frozen && !reduce && fxRef.current && shots.length < 6) {
-        // LAUFENDES Schießen (nicht nur bei Reveals): im Rhythmus feuert ein Team auf das Tor,
-        // Ausgang Tor/Save zufällig — stärkere (weiter rechts) treffen etwas häufiger. So gibt es
-        // ständig Action: Schuss → Save oder Tor. Reveals feuern zusätzlich einen Extra-Schuss.
+        // LAUFENDES Schießen: im Rhythmus feuert IMMER NUR EIN Team auf das Tor, Ausgang
+        // Tor/Save zufällig — stärkere (weiter rechts) treffen etwas häufiger. So gibt es
+        // ständig gestaffelte Action (Schuss → Save oder Tor). KEIN gemeinsamer Reveal-Volley
+        // mehr (früher feuerten bei jedem Etappen-Reveal ALLE Teams gleichzeitig).
         shotAcc += dt;
         if (shotAcc > 620 && rtl.length > 0) {
           shotAcc = 0;
@@ -152,14 +152,6 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
           const chance = 0.4 + 0.4 * (finalMax > 0 ? Math.min(1, shooter.animScore / finalMax) : 0);
           fireShot(shooter, Math.random() < chance ? "goal" : "save");
         }
-        for (const t of rtl) {
-          const prev = prevScore.get(t.idx);
-          prevScore.set(t.idx, t.displayScore);
-          if (prev == null) continue;
-          if (t.displayScore - prev > 0.4) fireShot(t, "goal"); // Reveal-Zugewinn = sicherer Treffer
-        }
-      } else {
-        for (const t of rtl) prevScore.set(t.idx, t.displayScore);
       }
 
       // Fliegende Pucks integrieren + Einschlag (Tor → Torlicht, Save → Fanghandschuh).
@@ -211,7 +203,7 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
         const clampedY = Math.max(228, Math.min(292, goalieCur));
         // Save-Reaktion: kurzer Fanghandschuh-Pop (heller + leichter Ausfall zur Seite).
         const saving = nowMs < saveUntil;
-        gk.setAttribute("transform", `translate(${GR + 27} ${clampedY})${saving ? " scale(1.18)" : ""}`);
+        gk.setAttribute("transform", `translate(${GR - 16} ${clampedY})${saving ? " scale(1.18)" : ""}`);
         gk.style.filter = saving ? "drop-shadow(0 0 5px rgba(220,235,255,.9))" : "none";
       }
 
@@ -327,8 +319,9 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
       {/* Goal Light (top-right corner) — flasht via rAF bei jedem Treffer (Torlicht). */}
       <circle ref={goalLightRef} cx={GR + 27} cy="204" r="6.5" fill="#4d1717" stroke="#2c3a49" strokeWidth="2" pointerEvents="none" />
 
-      {/* Goalie — folgt via rAF weich der Bahn des Führenden (beweglich, kein Statist). */}
-      <g ref={goalieRef} transform={`translate(${GR + 27} 260)`}>
+      {/* Goalie — steht IM Torraum (Crease, vor dem Netz) und folgt via rAF weich der Bahn
+          des Führenden. GR−16 = knapp links vor dem rechten Kasten, wo die Saves landen. */}
+      <g ref={goalieRef} transform={`translate(${GR - 16} 260)`}>
         <rect x="-10" y="-15" width="20" height="30" rx="7" ry="5" fill="#e9eef4" stroke="#55636f" strokeWidth="1.5" />
         <circle cx="0" cy="-17" r="6" fill="#39434f" />
         <rect x="-3" y="8" width="6" height="15" rx="3" fill="#8fa3b8" stroke="#55636f" strokeWidth="1" />
