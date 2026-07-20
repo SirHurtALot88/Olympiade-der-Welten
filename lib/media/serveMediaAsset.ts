@@ -159,7 +159,7 @@ export async function serveMediaAsset(options: {
       return new NextResponse(null, {
         status: 304,
         headers: {
-          "Cache-Control": "public, max-age=31536000, immutable",
+          "Cache-Control": "public, max-age=0, must-revalidate",
           ETag: etag,
         },
       });
@@ -171,7 +171,7 @@ export async function serveMediaAsset(options: {
       headers: {
         "Content-Type": variantResult.contentType,
         "Content-Length": String(variantResult.buffer.byteLength),
-        "Cache-Control": "public, max-age=31536000, immutable",
+        "Cache-Control": "public, max-age=0, must-revalidate",
         ETag: etag,
       },
     });
@@ -182,7 +182,7 @@ export async function serveMediaAsset(options: {
     return new NextResponse(null, {
       status: 304,
       headers: {
-        "Cache-Control": "public, max-age=31536000, immutable",
+        "Cache-Control": "public, max-age=0, must-revalidate",
         ETag: etag,
       },
     });
@@ -196,7 +196,7 @@ export async function serveMediaAsset(options: {
     headers: {
       "Content-Type": mimeType,
       "Content-Length": String(fileBuffer.byteLength),
-      "Cache-Control": "public, max-age=31536000, immutable",
+      "Cache-Control": "public, max-age=0, must-revalidate",
       ETag: etag,
     },
   });

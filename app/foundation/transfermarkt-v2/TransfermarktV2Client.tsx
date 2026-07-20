@@ -1839,6 +1839,7 @@ export default function TransfermarktV2Client({
   const canSellRoster = Boolean(onSell && selectedTeamId && manageableTeamIdSet.has(selectedTeamId) && transferCanSell);
   return (
     <TransfermarktV2NewLook
+        onOpenHistory={onOpenHistory}
         teamName={selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : null}
         teamShortCode={selectedTeam?.shortCode ?? null}
         availabilityLabel={availabilityLabel}
@@ -1865,6 +1866,9 @@ export default function TransfermarktV2Client({
         onToggleHidePoorFit={() => setHidePoorFit((current) => !current)}
         minRatioFilter={maxRatio}
         onMinRatioFilterChange={(value) => setMaxRatio(value)}
+        maxValueFilter={maxValue}
+        onMaxValueFilterChange={(value) => setMaxValue(value)}
+        maxValueSliderMax={valueSliderMax}
         onResetFilters={resetMarketFilters}
         activeFilterCount={
           selectedClassNames.length +

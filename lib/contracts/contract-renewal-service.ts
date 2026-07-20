@@ -19,6 +19,7 @@ import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factor
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
+import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import {
   buildContractNegotiationPreview,
@@ -205,6 +206,7 @@ function getRecommendedLength(
   rating: PlayerRatingContractRow | null,
   team: Team | null,
   teamStrategyProfile: TeamStrategyProfile | null,
+  gmArchetype?: string | null,
 ) {
   const role = entry.roleTag;
   const highValue =
@@ -231,6 +233,13 @@ function getRecommendedLength(
   } else {
     min = 1;
     max = conservativeTeam ? 2 : 3;
+  }
+
+  // Culture keeper binds good players longer: a direct archetype floor of 3-4 seasons for high-value
+  // players, independent of the diluted blended long/loyalty bias which rarely clears its own gates.
+  if (gmArchetype === "culture_keeper" && highValue) {
+    min = Math.max(min, 3);
+    max = Math.max(max, 4);
   }
 
   const organicBaseline = buildPlayerContractPreference(player, teamStrategyProfile)?.idealLength ?? 2;
@@ -468,6 +477,7 @@ function shouldAiRenewContract(input: {
   exitValue?: number | null;
   currentSalary?: number | null;
   renewLength?: number;
+  gmArchetype?: string | null;
 }) {
   const {
     entry,
@@ -484,6 +494,7 @@ function shouldAiRenewContract(input: {
     exitValue,
     currentSalary,
     renewLength,
+    gmArchetype,
   } = input;
   if (contractStrategy === "do_not_renew") {
     return false;
@@ -575,10 +586,18 @@ function shouldAiRenewContract(input: {
     renewalYearCost: renewalTco.renewalYearCost,
   };
 
+  // Culture keeper actively renews its good/core players (rank <= 40) instead of letting them run
+  // toward a market exit — the same strategy-level renew bias the extend_core strategy already grants.
+  const cultureKeeperHighValue =
+    gmArchetype === "culture_keeper" &&
+    ((rating?.ovrRank != null && rating.ovrRank <= 40) ||
+      (rating?.ppsSeasonRank != null && rating.ppsSeasonRank <= 40) ||
+      (rating?.mvsRank != null && rating.mvsRank <= 40));
   const strategyRenewBias =
     contractStrategy === "extend_core" ||
     contractStrategy === "prospect_hold" ||
-    contractStrategy === "wait_and_see";
+    contractStrategy === "wait_and_see" ||
+    cultureKeeperHighValue;
 
   return (
     strategyRenewBias ||
@@ -804,7 +823,8 @@ function buildPreviewRow(input: {
   const tick = statusAfterSeasonTick(entry);
   const statusBeforeTick = normalizeRosterContractStatus(entry);
   const teamStrategyProfile = getTeamStrategyProfile(save.gameState, entry.teamId);
-  const recommendedLength = getRecommendedLength(entry, player, rating, team, teamStrategyProfile);
+  const gmArchetype = getTeamGeneralManager(save.gameState, entry.teamId)?.profile?.archetype ?? null;
+  const recommendedLength = getRecommendedLength(entry, player, rating, team, teamStrategyProfile, gmArchetype);
   if (tick.nextStatus !== "out_of_contract") {
     const marketValue = player ? resolvePlayerEconomyContract({ player, rosterEntry: entry }).marketValue : null;
     return {
@@ -837,7 +857,7 @@ function buildPreviewRow(input: {
       ovr: rating?.ovrNormalized ?? null,
       mvs: rating?.mvs ?? null,
       pps: rating?.ppsSeason ?? null,
-      xpAvailable: typeof player?.currentXP === "number" ? player.currentXP : null,
+      xpAvailable: null, // XP-System abgeschafft: kein currentXP-Read mehr (Feld deprecated, immer null).
       teamFit: null,
       warnings: [],
       blockingReasons: [],
@@ -959,6 +979,7 @@ function buildPreviewRow(input: {
     exitValue: exit.exitValue,
     currentSalary: entry.salary ?? null,
     renewLength: recommendedLength,
+    gmArchetype,
   });
 
   const recommendedAction =
@@ -1053,7 +1074,7 @@ function buildPreviewRow(input: {
     ovr: rating?.ovrNormalized ?? null,
     mvs: rating?.mvs ?? null,
     pps: rating?.ppsSeason ?? null,
-    xpAvailable: typeof player?.currentXP === "number" ? player.currentXP : null,
+    xpAvailable: null, // XP-System abgeschafft: kein currentXP-Read mehr (Feld deprecated, immer null).
     teamFit: negotiationPreview.teamFit,
     warnings: Array.from(new Set(warnings)),
     blockingReasons: negotiationPreview.blockingReasons,

@@ -22,6 +22,22 @@ import {
 const IDENTITY_WEIGHT = 0.5;
 const GAP_WEIGHT = 0.5;
 
+// ANPASSUNG B3 (flag-gated OLY_DRAFT_IDFIT): on a near-empty roster the gap term is a uniform 1.0
+// (ANCHORS[0]) for EVERY discipline, so the plain 0.5/0.5 blend adds a flat +0.5 sockel that plättet
+// the identity spread — the first (most expensive) picks come out almost identity-blind. To fix, the
+// identity share of the blend ramps up when the squad is sparse and fades back to the base 0.5 by
+// EMPTINESS_REF players. This is draft/rebuild-scoped BY CONSTRUCTION: a filled follow-season roster
+// (~15-18) has emptiness 0 → exactly the old behaviour, so in-season need derivation is untouched.
+const IDFIT_NEED_BOOST_ENABLED = process.env.OLY_DRAFT_IDFIT === "1";
+const IDENTITY_WEIGHT_EMPTY = 0.85;
+const EMPTINESS_REF = 8;
+
+function identityBlendWeight(squadSize: number): number {
+  if (!IDFIT_NEED_BOOST_ENABLED) return IDENTITY_WEIGHT;
+  const emptiness = clamp01(1 - squadSize / EMPTINESS_REF);
+  return IDENTITY_WEIGHT + (IDENTITY_WEIGHT_EMPTY - IDENTITY_WEIGHT) * emptiness;
+}
+
 /**
  * Compute a per-discipline need for a squad: how covered it already is, and a 0–1 needWeight
  * blending team identity (axis weight) with the roster gap (fewer covered players → higher
@@ -41,7 +57,8 @@ export function computeDisciplineNeeds(
     const axis = CATEGORY_TO_AXIS[discipline.category];
     const identityWeight = identityAxisWeights[axis] ?? 0;
     const gapTerm = marginalCoverageValue(coveredCount);
-    const needWeight = clamp01(IDENTITY_WEIGHT * identityWeight + GAP_WEIGHT * gapTerm);
+    const idW = identityBlendWeight(squad.length);
+    const needWeight = clamp01(idW * identityWeight + (1 - idW) * gapTerm);
 
     return {
       disciplineId: discipline.id,

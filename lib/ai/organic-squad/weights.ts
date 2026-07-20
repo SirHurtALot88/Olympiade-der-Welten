@@ -163,7 +163,10 @@ export function deriveUtilityWeights(
   let wProfitVaried = wProfit;
 
   // --- Soft roster target: identity base, shifted by depth vs. elite-small-roster GM bias. ---
-  const K = 3.5;
+  // The per-team playerOpt now comes from an explicit sheet (data/source/team-identities.json), so it —
+  // not a formula — is the intended roster size. Keep only a GENTLE depth/elite nudge (K small) on top of
+  // the sheet value; a large K re-inflated the sheet opt (e.g. an 11 depth-team drifted to 14).
+  const K = 1;
   const optTargetRaw =
     (Number.isFinite(identity?.playerOpt) ? Number(identity.playerOpt) : (ROSTER_MIN + ROSTER_MAX) / 2) +
     K * rosterDepthPreference -

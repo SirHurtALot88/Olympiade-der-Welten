@@ -55,7 +55,7 @@ export default function RaceIcon({ race, showLabel = true, className = "", iconC
           alt={label}
           width={32}
           height={32}
-          loading="lazy"
+          loading="eager"
           decoding="async"
           fetchPriority="low"
         />

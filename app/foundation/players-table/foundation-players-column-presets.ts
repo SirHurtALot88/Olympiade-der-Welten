@@ -70,7 +70,10 @@ export const NL_PLAYERS_COLUMN_PRESETS: ReadonlyArray<NlPlayersColumnPreset> = [
   {
     id: "finanzen",
     label: "Finanzen",
-    visible: ["ovr", "mvs", "mw", "salary", "contract", "careerLeague"],
+    // `team` bewusst dabei (T-037): bei Scope "Alle"/"Aktive" mischt die Zeilenliste
+    // Spieler mehrerer Teams — ohne Team-Spalte ist die Gehalts-/Vertragsansicht
+    // nicht mehr einem Team zuordenbar.
+    visible: ["team", "ovr", "mvs", "mw", "salary", "contract", "careerLeague"],
   },
   {
     id: "alles",

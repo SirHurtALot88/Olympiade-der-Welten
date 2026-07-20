@@ -24,7 +24,7 @@ import ClassColorChip, { getClassColorClassName } from "@/app/foundation/ClassCo
 import ClassIcon from "@/app/foundation/ClassIcon";
 import DisciplineIcon from "@/app/foundation/DisciplineIcon";
 import RaceIcon from "@/app/foundation/RaceIcon";
-import type { TeamDetailDrawerData, TeamDetailDrawerHistoryRow } from "@/app/foundation/TeamDetailDrawer";
+import type { TeamDetailDrawerData, TeamDetailDrawerHistoryRow } from "@/lib/foundation/team-detail-drawer-types";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import { GameTerm } from "@/components/ui/GameTerm";
 import {
@@ -192,7 +192,6 @@ import {
   getTeamTransferWishlistEntries,
 } from "@/lib/scouting/scouting-wishlist-slots";
 import { shouldAutoOpenSeasonBriefing, type GameFlowView } from "@/lib/foundation/game-flow-controller";
-import { isTrainingIntensityLockedForSeason } from "@/lib/foundation/game-phase-action-policy";
 import { formatGameFlowBlocker, formatGameFlowBlockerList } from "@/lib/foundation/game-flow-blocker-labels";
 import { buildGameInboxItems, filterGameInboxItems, getPrimaryInboxTask } from "@/lib/foundation/game-inbox-service";
 import { buildMatchdaySummary, getMatchdaySummaryOptions } from "@/lib/foundation/matchday-summary";
@@ -286,13 +285,20 @@ import {
   foundationNavigateBack,
   mergeFoundationHistoryReplaceState,
   parseFoundationFacilityFromUrl,
+  parseFoundationNewGameIntentFromUrl,
   parseFoundationPanelFromUrl,
   parseFoundationUrlStateFromLocation,
   readFoundationHistoryState,
   writeFoundationUrlState,
   type FoundationPanelId,
 } from "@/lib/foundation/foundation-navigation-history";
-import { parseFoundationPlayerIdFromUrl, parseFoundationTabFromUrl, syncFoundationUrlState, type FoundationUrlState } from "@/lib/foundation/foundation-url-state";
+import {
+  parseFoundationPlayerIdFromUrl,
+  parseFoundationSaveIdFromUrl,
+  parseFoundationTabFromUrl,
+  syncFoundationUrlState,
+  type FoundationUrlState,
+} from "@/lib/foundation/foundation-url-state";
 import { useFoundationKeyboardNavigation } from "@/lib/foundation/use-foundation-keyboard-navigation";
 import { buildFoundationActivities } from "@/lib/foundation/foundation-activity-registry";
 import type { FoundationStateContextValue } from "@/lib/foundation/foundation-state-context";
@@ -373,6 +379,8 @@ import {
 import type { FoundationDiszisHostProps } from "@/app/foundation/ranks-v2/FoundationDiszisHost";
 import type { FoundationRanksHostProps } from "@/app/foundation/ranks-v2/FoundationRanksHost";
 import type { FoundationLeagueLeadersHostProps } from "@/app/foundation/league-leaders-v2/FoundationLeagueLeadersHost";
+import type { FoundationAllTimeTableHostProps } from "@/app/foundation/all-time-table-v2/FoundationAllTimeTableHost";
+import { buildAllTimeTableModel } from "@/lib/foundation/all-time-table";
 import type { FoundationMarketV2ShellHostProps } from "@/app/foundation/transfermarkt-v2/FoundationMarketV2ShellHost";
 import FoundationTeamSettingsHost from "@/app/foundation/team-settings/FoundationTeamSettingsHost";
 import FoundationTeamsViewHost from "@/app/foundation/teams-v2/FoundationTeamsViewHost";
@@ -585,6 +593,7 @@ import {
   resolvePreferredFoundationTeamId,
   scrollToFoundationTarget,
   seasonBriefingDismissStorageKey,
+  syncFoundationSaveIdInUrl,
   syncFoundationTeamIdInUrl,
   syncFoundationViewInUrl,
   uniqueColumnIds,
@@ -1083,7 +1092,8 @@ export function useFoundationShellRouterBodyScope({
     activeView === "prize" ||
     activeView === "ranks" ||
     activeView === "diszis" ||
-    activeView === "leagueLeaders";
+    activeView === "leagueLeaders" ||
+    activeView === "allTimeTable";
   const shouldLoadTeamsHistoryOverview = activeView === "teams" && showExtendedTeamPanels;
   const shouldLoadSeasonOverviewFeedActive = shouldLoadSeasonOverviewFeed || shouldLoadTeamsHistoryOverview;
   const shouldLoadSeasonArchive =
@@ -1092,6 +1102,7 @@ export function useFoundationShellRouterBodyScope({
     activeView === "prize" ||
     activeView === "ranks" ||
     activeView === "leagueLeaders" ||
+    activeView === "allTimeTable" ||
     activeView === "teams" ||
     activeView === "teamProfile" ||
     activeView === "players" ||
@@ -1300,6 +1311,7 @@ export function useFoundationShellRouterBodyScope({
     activeView === "leagueLeaders" ||
     activeView === "prize";
   const shouldBuildLeagueLeaderBoards = activeView === "ranks" || activeView === "leagueLeaders";
+  const shouldBuildAllTimeTable = activeView === "allTimeTable";
   const shouldLoadSeasonLedger = shouldBuildPlayerDirectory;
   const shouldLoadSeasonRatings = shouldBuildPlayerRatings || shouldBuildTrainingView;
   const shouldFetchSeasonRatingsFromApi = shouldLoadSeasonRatings && !shouldLoadSeasonLedger;
@@ -1337,7 +1349,15 @@ export function useFoundationShellRouterBodyScope({
     seasonManagementFeed,
     teamOverviewSlice,
   });
+  // Teams-Detail (Verträge/Kader) zeigt pro Spieler ausklappbare Disziplin-PPs.
+  // Die dafür nötigen echten Pro-Disziplin-Punkte liegen NUR im Season-Ledger
+  // (aggregierte Achsen-PPs kommen aus dem Ratings-Slice) — daher wird das
+  // (gecachte) `useSeasonDerivations` hier zusätzlich aktiviert, sobald die
+  // Teams-Ansicht offen ist. Andere Ledger-Konsumenten bleiben über ihre
+  // eigenen `shouldLoad*`-Gates unberührt (Ratings kommen weiter aus dem Slice).
+  const shouldLoadTeamsRosterDisciplineLedger = shouldBuildTeamsView;
   const shouldLoadSeasonDerivations =
+    shouldLoadTeamsRosterDisciplineLedger ||
     (shouldLoadSeasonLedger && Boolean(playerDirectorySlice.error)) ||
     (shouldLoadSeasonRatings && (Boolean(seasonRatingsSlice.error) || seasonRatingsSlice.ratingsById.size === 0));
   const deferredGameState = useDeferredValue(gameState);
@@ -1393,6 +1413,20 @@ export function useFoundationShellRouterBodyScope({
   const loadedSeasonArchiveSignatureRef = useRef<string | null>(null);
   const pendingPlayerProfileHydrationRef = useRef<{ playerId: string; tab: PlayerProfileTabId } | null>(null);
   const briefingUrlHydratedRef = useRef(false);
+  // Startbildschirm-"Neues Spiel" (?newGame=1): Die Absicht wird EINMAL beim Mount
+  // festgehalten. Der URL-Parameter selbst überlebt die erste Foundation-URL-
+  // Synchronisierung nicht (er ist kein Teil von FoundationUrlState), deshalb kann
+  // shouldSuppressSeasonBriefingReopen ihn nicht später erneut aus der URL lesen.
+  // Gemerkt wird zusätzlich der Save, der beim Betreten aktiv war ("Baseline"):
+  // Solange dieser Save aktiv bleibt, wird sein Season-Einstieg unterdrückt, damit
+  // der New-Game-Assistent nicht sofort verdeckt wird. Sobald ein anderer Save
+  // aktiv ist (= das neue Spiel wurde erstellt), greift wieder die normale Logik
+  // und der Season-Einstieg des NEUEN Spiels läuft ganz regulär.
+  const newGameIntentRef = useRef<boolean | null>(null);
+  if (newGameIntentRef.current === null) {
+    newGameIntentRef.current = parseFoundationNewGameIntentFromUrl();
+  }
+  const newGameIntentBaselineSaveIdRef = useRef<string | null>(null);
   const playerProfileHydrationAttemptRef = useRef<string | null>(null);
   const playerProfileHydrationSequenceRef = useRef(0);
   const previousFoundationViewRef = useRef<FoundationView | null>(null);
@@ -1876,14 +1910,11 @@ export function useFoundationShellRouterBodyScope({
       return;
     }
 
-    if (isTrainingIntensityLockedForSeason(gameState)) {
-      setFoundationActionFeedback({
-        tone: "warning",
-        title: "Training gesperrt",
-        detail: "Trainingsintensität ist für diese Season bereits festgelegt (seit dem ersten Spieltag versiegelt). Änderung erst zum nächsten Saisonstart möglich.",
-      });
-      return;
-    }
+    // T-009: Kein Season-Phasen-Lock mehr für Trainingsintensität — Training
+    // bleibt für das eigene (steuerbare) Team immer einstellbar. Siehe
+    // lib/foundation/game-phase-action-policy.ts (isTrainingIntensityLockedForSeason
+    // liefert dauerhaft `false`); readMeta.readOnly oben deckt weiterhin den
+    // "fremdes Team / reine Ansicht"-Fall ab.
 
     setTrainingModeDraft((current) => ({
       ...current,
@@ -2453,15 +2484,7 @@ export function useFoundationShellRouterBodyScope({
     }));
   }
 
-  // Nur die tatsächlich gelesenen Felder — so kann `buildWishlistEntry` sowohl
-  // vom vollen Transfermarkt-Item als auch vom leichten playerId-Pfad (Spieler-
-  // Verzeichnis, P1) genutzt werden, ohne ein ~40-Feld-Item zu erfinden.
-  type WishlistEntrySource = Pick<
-    TransfermarktFreeAgentItem,
-    "playerId" | "name" | "className" | "race" | "marketValue" | "salary" | "bracket" | "pow" | "spe" | "men" | "soc"
-  >;
-
-  function buildWishlistEntry(item: WishlistEntrySource): TransferWishlistEntry {
+  function buildWishlistEntry(item: TransfermarktFreeAgentItem): TransferWishlistEntry {
     return {
       id:
         typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -2504,54 +2527,6 @@ export function useFoundationShellRouterBodyScope({
     }
 
     saveTransferWishlist([buildWishlistEntry(item), ...currentEntries]);
-  }
-
-  /**
-   * playerId-Variante von `toggleTransferWishlist` (P1, #3) für das Spieler-
-   * Verzeichnis, das kein volles `TransfermarktFreeAgentItem` hat. Nutzt EXAKT
-   * dieselbe Logik (Slot-Check, `buildWishlistEntry`, `saveTransferWishlist`);
-   * die Spielerdaten kommen aus den bereits abgeleiteten `playerScopeRows`.
-   */
-  function toggleTransferWishlistByPlayerId(playerId: string) {
-    const currentEntries = gameState.seasonState.transferWishlist ?? [];
-    const existing = currentEntries.find((entry) => entry.playerId === playerId);
-    if (existing) {
-      saveTransferWishlist(currentEntries.filter((entry) => entry.playerId !== playerId));
-      return;
-    }
-    const teamId = marketTeamId || selectedTeam?.teamId || null;
-    if (!teamId) {
-      return;
-    }
-    const slotCheck = canAddPlayerToTransferWishlist(gameState, teamId, playerId);
-    if (!slotCheck.ok) {
-      showScoutingWishlistSlotNotice(teamId, playerId);
-      return;
-    }
-    const row = playerScopeRows.find((entry) => entry.player.id === playerId);
-    if (!row) {
-      return;
-    }
-    const marketValue = getPlayerDisplayMarketValue(row.player);
-    const salary = row.roster
-      ? getRosterEntryDisplaySalary(row.roster, row.player)
-      : getPlayerDisplaySalary(row.player);
-    saveTransferWishlist([
-      buildWishlistEntry({
-        playerId: row.player.id,
-        name: row.player.name,
-        className: row.player.className,
-        race: row.player.race,
-        marketValue,
-        salary,
-        bracket: getTransfermarktBracket(marketValue),
-        pow: row.player.coreStats.pow ?? null,
-        spe: row.player.coreStats.spe ?? null,
-        men: row.player.coreStats.men ?? null,
-        soc: row.player.coreStats.soc ?? null,
-      }),
-      ...currentEntries,
-    ]);
   }
 
   function removeTransferWishlistEntry(playerId: string) {
@@ -2807,6 +2782,7 @@ export function useFoundationShellRouterBodyScope({
       panel: null,
       facilityId: null,
       facilityAction: null,
+      saveId: parseFoundationSaveIdFromUrl(),
     }, { mode: "push" });
   }
 
@@ -2980,6 +2956,19 @@ export function useFoundationShellRouterBodyScope({
   }
 
   function shouldSuppressSeasonBriefingReopen() {
+    // Startbildschirm-"Neues Spiel": Solange die beim Mount festgehaltene New-Game-
+    // Absicht gilt UND noch der Bestands-Save aktiv ist (Baseline noch nicht bekannt
+    // oder unverändert), bleibt der Season-Einstieg des ALTEN Saves unterdrückt —
+    // sonst würde der Assistent (Team-Settings → Saves) sofort von der Vorschau des
+    // Bestandsspiels überdeckt. Sobald ein neuer Save aktiv ist, endet die
+    // Unterdrückung und der Season-Einstieg des NEUEN Spiels läuft ganz normal.
+    if (
+      newGameIntentRef.current &&
+      (newGameIntentBaselineSaveIdRef.current === null ||
+        activeSaveId === newGameIntentBaselineSaveIdRef.current)
+    ) {
+      return true;
+    }
     const briefingKey = buildSeasonBriefingDismissKey(activeSaveId, gameState.season.id);
     const seasonIntroStep = gameState.seasonState.newGameFlow?.steps?.find((step) => step.stepId === "season_intro");
     return (
@@ -4265,6 +4254,8 @@ export function useFoundationShellRouterBodyScope({
       currentTeamId: selectedTeamId,
       currentSource: activeManagerTeamSource,
       initialTeamId: initialSelectedTeamId,
+      savedTeamId: initialClientGameState.seasonState.newGameFlow?.selectedTeamId ?? null,
+      activeSaveId,
       settingsMap: buildTeamControlSettingsMap(initialClientGameState.teams, initialClientGameState.seasonState.teamControlSettings),
     });
     if (requestedTeamContext.teamId && requestedTeamContext.teamId !== "loading-team") {
@@ -4285,6 +4276,7 @@ export function useFoundationShellRouterBodyScope({
         panel: requestedPanel,
         facilityId: facilityTarget.facilityId,
         facilityAction: facilityTarget.facilityAction,
+        saveId: parseFoundationSaveIdFromUrl(),
       },
       "replace",
     );
@@ -4370,6 +4362,8 @@ export function useFoundationShellRouterBodyScope({
         currentTeamId: null,
         currentSource: activeManagerTeamSource,
         initialTeamId: initialSelectedTeamId,
+        savedTeamId: gameState.seasonState.newGameFlow?.selectedTeamId ?? null,
+        activeSaveId,
         settingsMap: buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings),
       });
       setSelectedTeamId(nextContext.teamId);
@@ -4411,19 +4405,33 @@ export function useFoundationShellRouterBodyScope({
     }
 
     fullSeasonArchiveLoadKeyRef.current = archiveLoadKey;
-    void loadSave(activeSaveId, foundationSaveMode, { compactInitial: false }).then((nextGameState) => {
-      if (nextGameState?.seasonState.seasonSnapshots === undefined) {
-        return;
-      }
-      setGameState((previous) => ({
-        ...previous,
-        seasonState: {
-          ...previous.seasonState,
-          seasonSnapshots: nextGameState.seasonState.seasonSnapshots,
-        },
-      }));
-      void reloadSeasonStandingsOverview(seasonOverviewSeasonId || nextGameState.season.id);
-    });
+    void loadSave(activeSaveId, foundationSaveMode, { compactInitial: false })
+      .then((nextGameState) => {
+        if (!nextGameState) {
+          // Full-save load returned nothing — clear the key so a later render
+          // can retry instead of leaving archive-gated views (Ewige Tabelle)
+          // on a loading skeleton that never resolves.
+          fullSeasonArchiveLoadKeyRef.current = null;
+          return;
+        }
+        // Materialize an archive even when the save carries none: `?? []` flips
+        // `hasArchive` true so archive-gated views degrade to their honest
+        // empty-state ("keine archivierten Saisons") instead of an eternal
+        // skeleton. A real archive is used verbatim; a concurrently-loaded one
+        // is never clobbered.
+        const loadedSnapshots = nextGameState.seasonState.seasonSnapshots ?? [];
+        setGameState((previous) => ({
+          ...previous,
+          seasonState: {
+            ...previous.seasonState,
+            seasonSnapshots: previous.seasonState.seasonSnapshots ?? loadedSnapshots,
+          },
+        }));
+        void reloadSeasonStandingsOverview(seasonOverviewSeasonId || nextGameState.season.id);
+      })
+      .catch(() => {
+        fullSeasonArchiveLoadKeyRef.current = null;
+      });
   }, [
     activeSaveId,
     foundationSaveMode,
@@ -4750,6 +4758,44 @@ export function useFoundationShellRouterBodyScope({
     }
   }
 
+  /**
+   * Dry-run-Preview für die Gehaltsverhandlung (Verlängern-Fenster). Reine
+   * Lese-Operation gegen /api/contracts/renewal — liefert die vollständige
+   * `negotiationPreview` (Forderung, Accept/Counter/Reject, Gehaltstreppe,
+   * Moral) für die aktuell eingestellten Konditionen. Kein State-Write.
+   */
+  async function requestContractRenewalPreview(input: {
+    teamId: string;
+    playerId: string;
+    contractLength: number;
+    offeredSalary: number | null;
+    contractShape?: ContractShape;
+  }): Promise<ContractRenewalApiResponse | null> {
+    if (readMeta.source === "prisma") {
+      return null;
+    }
+    try {
+      const response = await fetch("/api/contracts/renewal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({
+          saveId: activeSaveId,
+          teamId: input.teamId,
+          playerId: input.playerId,
+          action: "renew",
+          contractLength: input.contractLength,
+          offeredSalary: input.offeredSalary,
+          contractShape: input.contractShape ?? "balanced",
+          dryRun: true,
+          source: readMeta.source,
+        })),
+      });
+      return (await response.json()) as ContractRenewalApiResponse;
+    } catch {
+      return null;
+    }
+  }
+
   async function openContractRenewalNegotiation(input: {
     teamId: string;
     playerId: string;
@@ -4766,6 +4812,10 @@ export function useFoundationShellRouterBodyScope({
       return;
     }
 
+    const rosterEntry = gameState.rosters.find(
+      (entry) => entry.teamId === input.teamId && entry.playerId === input.playerId,
+    ) ?? null;
+    const startLength = input.contractLength ?? 2;
     setContractRenewalBusy(`preview:${input.teamId}:${input.playerId}`);
     setContractRenewalError(null);
     try {
@@ -4777,7 +4827,8 @@ export function useFoundationShellRouterBodyScope({
           teamId: input.teamId,
           playerId: input.playerId,
           action: "renew",
-          contractLength: input.contractLength ?? 2,
+          contractLength: startLength,
+          contractShape: "balanced",
           dryRun: true,
           source: readMeta.source,
         })),
@@ -4791,15 +4842,24 @@ export function useFoundationShellRouterBodyScope({
         );
         return;
       }
+      // Start-Angebot: moral-adjustierte Erwartung (falls vorhanden), sonst
+      // die rohe Forderung — derselbe Default, den auch der Season-End-Tick
+      // beim Auto-Renewal ansetzt.
       const expectedSalary = previewPayload.summary.negotiationPreview?.expectedSalary ?? null;
+      const startOffer = previewPayload.summary.moraleAdjustedExpectedSalary ?? expectedSalary;
       setContractRenewalNegotiation({
         teamId: input.teamId,
         playerId: input.playerId,
         playerName: input.playerName,
-        contractLength: input.contractLength ?? 2,
-        offeredSalary: expectedSalary,
+        contractLength: startLength,
+        offeredSalary: startOffer,
         expectedSalary,
         confirmToken: previewPayload.summary.confirmToken,
+        contractShape: "balanced",
+        currentSalary: rosterEntry?.salary ?? null,
+        currentLength: rosterEntry?.contractLength ?? null,
+        currentShape: rosterEntry?.contractShape ?? null,
+        initialPreview: previewPayload.summary,
       });
     } catch {
       setContractRenewalError(`${input.playerName}: Verhandlungsvorschau konnte nicht geladen werden.`);
@@ -4808,19 +4868,36 @@ export function useFoundationShellRouterBodyScope({
     }
   }
 
-  async function confirmContractRenewalNegotiation() {
+  /**
+   * Bestätigt die Gehaltsverhandlung. `draft` trägt die im Fenster zuletzt
+   * eingestellten Konditionen (Gehalt/Laufzeit/Form); ohne draft gelten die
+   * beim Öffnen gespeicherten Werte. Der Apply-Pfad holt sich server-seitig
+   * einen frischen confirmToken (Preview + Apply in `runContractRenewalAction`),
+   * daher ist der Token aus dem Öffnen-Preview hier nicht stale-gefährdet.
+   */
+  async function confirmContractRenewalNegotiation(draft?: {
+    contractLength?: number;
+    offeredSalary?: number | null;
+    contractShape?: ContractShape;
+  }) {
     if (!contractRenewalNegotiation) {
       return;
     }
-    await runContractRenewalAction({
+    const applied = await runContractRenewalAction({
       teamId: contractRenewalNegotiation.teamId,
       playerId: contractRenewalNegotiation.playerId,
       playerName: contractRenewalNegotiation.playerName,
       action: "renew",
-      contractLength: contractRenewalNegotiation.contractLength,
-      offeredSalary: contractRenewalNegotiation.offeredSalary,
+      contractLength: draft?.contractLength ?? contractRenewalNegotiation.contractLength,
+      offeredSalary:
+        draft && "offeredSalary" in draft ? draft.offeredSalary ?? null : contractRenewalNegotiation.offeredSalary,
+      contractShape: draft?.contractShape ?? contractRenewalNegotiation.contractShape ?? "balanced",
     });
-    setContractRenewalNegotiation(null);
+    // Fenster bleibt bei Fehlschlag offen, damit der Gate-Grund (z. B.
+    // Phase-Sperre bis Season-End) direkt im Verhandlungsfenster sichtbar ist.
+    if (applied) {
+      setContractRenewalNegotiation(null);
+    }
   }
 
   async function chooseTeamSponsor(offerId: string) {
@@ -4962,15 +5039,16 @@ export function useFoundationShellRouterBodyScope({
     action: "renew" | "release";
     contractLength?: number | null;
     offeredSalary?: number | null;
-  }) {
+    contractShape?: ContractShape;
+  }): Promise<boolean> {
     if (readMeta.readOnly || readMeta.source === "prisma") {
       showReadOnlyNotice();
-      return;
+      return false;
     }
     if (!canManageTeamId(input.teamId)) {
       setContractRenewalError(`${getTeamLockedName(input.teamId)} gehört nicht zu deinen steuerbaren Teams. Vertragsaktionen sind gesperrt.`);
       showTeamManagementLockedNotice(getTeamLockedName(input.teamId));
-      return;
+      return false;
     }
 
     const busyKey = `${input.action}:${input.teamId}:${input.playerId}`;
@@ -4989,6 +5067,7 @@ export function useFoundationShellRouterBodyScope({
           action: input.action,
           contractLength: input.contractLength,
           offeredSalary: input.offeredSalary,
+          contractShape: input.contractShape,
           dryRun: true,
           source: readMeta.source,
         })),
@@ -5000,7 +5079,7 @@ export function useFoundationShellRouterBodyScope({
             previewPayload.summary?.blockingReasons?.[0] ??
             `${input.playerName}: Vertragsvorschau blockiert.`,
         );
-        return;
+        return false;
       }
 
       const applyResponse = await fetch("/api/contracts/renewal", {
@@ -5013,6 +5092,7 @@ export function useFoundationShellRouterBodyScope({
           action: input.action,
           contractLength: input.contractLength,
           offeredSalary: input.offeredSalary ?? previewPayload.summary.negotiationPreview?.expectedSalary ?? null,
+          contractShape: input.contractShape,
           dryRun: false,
           confirmToken: previewPayload.summary.confirmToken,
           source: readMeta.source,
@@ -5025,7 +5105,7 @@ export function useFoundationShellRouterBodyScope({
             applyPayload.summary?.blockingReasons?.[0] ??
             `${input.playerName}: Vertragsaktion blockiert.`,
         );
-        return;
+        return false;
       }
 
       setContractRenewalMessage(
@@ -5048,8 +5128,10 @@ export function useFoundationShellRouterBodyScope({
         reloadSeasonManagementOverview(),
       ]);
       setMarketReloadToken((current) => current + 1);
+      return true;
     } catch {
       setContractRenewalError(`${input.playerName}: Vertragsaktion konnte nicht ausgeführt werden.`);
+      return false;
     } finally {
       setContractRenewalBusy(null);
     }
@@ -5158,6 +5240,10 @@ export function useFoundationShellRouterBodyScope({
         const nextSaveMode = normalizeFoundationSaveMode(payload.result.preview.presetId);
         setFoundationSaveMode(nextSaveMode);
         await loadSave(payload.result.save.saveId, nextSaveMode);
+        // Pin the freshly created + activated save into the URL so a reload,
+        // new tab, or the homepage "Solo spielen" link loads exactly this
+        // save instead of falling back to the global active save row.
+        syncFoundationSaveIdInUrl(payload.result.save.saveId);
         const firstTeamId = payload.result.preview.chrisTeamIds[0] ?? payload.result.preview.frankyTeamIds[0] ?? null;
         if (firstTeamId) {
           setActiveManagerTeam(firstTeamId, "manual_select");
@@ -5461,8 +5547,6 @@ export function useFoundationShellRouterBodyScope({
     );
   }
 
-  const trainingIntensityLockedForSeason = isTrainingIntensityLockedForSeason(gameState);
-
   const playerProfileTrainingReadOnly =
     readMeta.readOnly ||
     !playerProfileData?.teamId ||
@@ -5539,7 +5623,11 @@ export function useFoundationShellRouterBodyScope({
     if (typeof gameState.season.currentMatchday === "number" && Number.isFinite(gameState.season.currentMatchday)) {
       return `Spieltag ${gameState.season.currentMatchday}`;
     }
-    return gameState.matchdayState.matchdayId;
+    // Fallback: never surface the raw slug (e.g. "matchday-1") as a user-facing
+    // label — extract the trailing number so it still reads "Spieltag N".
+    const matchdayId = gameState.matchdayState.matchdayId;
+    const slugNumber = matchdayId.match(/(\d+)\s*$/);
+    return slugNumber ? `Spieltag ${slugNumber[1]}` : matchdayId;
   }, [gameState.matchdayState.matchdayId, gameState.season.currentMatchday]);
   const {
     gameFlowState,
@@ -7014,7 +7102,8 @@ export function useFoundationShellRouterBodyScope({
     saveId: activeSaveId,
     contentSignature: seasonContentSignature,
   });
-  const seasonPointsLedger = shouldLoadSeasonLedger ? seasonDerivations.ledger : null;
+  const seasonPointsLedger =
+    shouldLoadSeasonLedger || shouldLoadTeamsRosterDisciplineLedger ? seasonDerivations.ledger : null;
 
   // Feld-Rennen-Ledger (Wave D · D1/D2/D4): geteilte, fog-sichere Datenquelle
   // für Feld-Form-Strip (letzte 5 Spieltage), feld-relative Home-KPIs und
@@ -8176,6 +8265,19 @@ export function useFoundationShellRouterBodyScope({
           ? aiPreseasonFeed.run
           : aiPreseasonStoredRun,
     );
+  // "Neues Spiel"-Baseline festhalten: sobald der Assistent mit New-Game-Absicht
+  // betreten wurde und ein echter (nicht-Bootstrap) Save aktiv ist, merken wir
+  // dessen ID. shouldSuppressSeasonBriefingReopen unterdrückt den Season-Einstieg
+  // nur, solange genau dieser Save aktiv bleibt — nach dem Erstellen wechselt der
+  // aktive Save und die Unterdrückung endet automatisch.
+  useEffect(() => {
+    if (!newGameIntentRef.current) {
+      return;
+    }
+    if (newGameIntentBaselineSaveIdRef.current === null && activeSaveId && !isFoundationBootstrapState) {
+      newGameIntentBaselineSaveIdRef.current = activeSaveId;
+    }
+  }, [activeSaveId, isFoundationBootstrapState]);
   useEffect(() => {
     seasonBriefingAutoOpenedRef.current = null;
     briefingUrlHydratedRef.current = false;
@@ -8662,7 +8764,8 @@ export function useFoundationShellRouterBodyScope({
             marketValue,
             marketValueDelta: getPlayerDisplayMarketValueDelta(row.player, row.entry, gameState),
             salaryDelta: getRosterEntrySalaryDelta(row.entry, row.player, gameState),
-            xp: row.player.currentXP ?? 0,
+            // XP-System abgeschafft: XP-Badge/Kachel entfällt (currentXP ist immer 0).
+            xp: 0,
             fatigue: row.player.fatigue ?? 0,
             ppPow: rating?.ppPow ?? seasonPerformance?.pointsByArea.pow ?? null,
             ppSpe: rating?.ppSpe ?? seasonPerformance?.pointsByArea.spe ?? null,
@@ -8820,9 +8923,10 @@ export function useFoundationShellRouterBodyScope({
           player: row.player,
           playerRating: rating,
           seasonPerformance,
-          currentXP: row.player.currentXP ?? 0,
-          spentXP: row.player.spentXP ?? 0,
-          lifetimeXP: row.player.lifetimeXP ?? null,
+          // XP-System abgeschafft: XP-Inputs neutralisiert (0/organisch).
+          currentXP: 0,
+          spentXP: 0,
+          lifetimeXP: null,
         });
         const developmentInsight = buildPlayerDevelopmentInsight({
           gameState,
@@ -9146,6 +9250,56 @@ export function useFoundationShellRouterBodyScope({
     });
   }, [leagueTrainingLeaderRows, seasonTopPlayerRows, shouldBuildLeagueLeaderBoards]);
 
+  // Ewige Tabelle — Live-Stand der laufenden Saison je Team, direkt aus dem
+  // Season-Standings-Feed (siehe `shouldLoadSeasonOverviewFeed`, das den
+  // Feed für "allTimeTable" mit-lädt). Ohne geladenen Feed bleibt die Ewige
+  // Tabelle ehrlich auf Archiv-Saisons beschränkt (kein erfundener Live-Wert).
+  const allTimeTableLiveStandingsByTeamId = useMemo(() => {
+    if (!shouldBuildAllTimeTable || !seasonStandingsFeed) {
+      return undefined;
+    }
+    // Der Standings-Feed liefert den Team-Marktwert nicht immer (z. B. an MD1) —
+    // dann zeigte die Ewige-Tabelle-Live-Sicht bei allen Teams "—". Fallback auf
+    // den live aus dem Kader summierten Marktwert (identisch zur Teams-Tabelle).
+    // Client-sicher inline berechnet (kein Import aus AI-/Persistenz-Services,
+    // die better-sqlite3/fs ins Client-Bundle ziehen wuerden).
+    const playerMwById = new Map(
+      gameState.players.map((player) => [
+        player.id,
+        player.displayMarketValue ?? player.marketValue ?? 0,
+      ]),
+    );
+    const rosterMwByTeamId = new Map<string, number>();
+    for (const entry of gameState.rosters ?? []) {
+      rosterMwByTeamId.set(
+        entry.teamId,
+        (rosterMwByTeamId.get(entry.teamId) ?? 0) + (playerMwById.get(entry.playerId) ?? 0),
+      );
+    }
+    return Object.fromEntries(
+      seasonStandingsFeed.items.map((item) => [
+        item.teamId,
+        {
+          rank: item.rank ?? null,
+          points: item.points ?? null,
+          marketValue: item.marketValueTotal ?? rosterMwByTeamId.get(item.teamId) ?? null,
+          cash: item.cashTotal ?? item.cash ?? null,
+        },
+      ]),
+    );
+  }, [gameState, seasonStandingsFeed, shouldBuildAllTimeTable]);
+
+  const allTimeTableModel = useMemo(() => {
+    if (!shouldBuildAllTimeTable) {
+      return null;
+    }
+    return buildAllTimeTableModel({
+      gameState,
+      selectedTeamId: activeManagerTeamId,
+      liveStandingsByTeamId: allTimeTableLiveStandingsByTeamId,
+    });
+  }, [activeManagerTeamId, allTimeTableLiveStandingsByTeamId, gameState, shouldBuildAllTimeTable]);
+
   const seasonV2StandingsRows = useMemo(
     () =>
       sortedSeasonStandRows.map((row) => {
@@ -9226,10 +9380,18 @@ export function useFoundationShellRouterBodyScope({
       })),
     [sortedPpAreaRows],
   );
+  // T-073 (Performance): `seasonV2TopPlayers` und `seasonV2PlayerRows` bauten
+  // beide `new Map(gameState.players.map(...))` mit identischem Deps-Array —
+  // hier einmal extrahiert und in beiden Nachbar-Memos wiederverwendet.
+  // `seasonV2PlayerById` referenziert nur `gameState.players`, genau wie
+  // zuvor beide Inline-Maps, daher identische Invalidierung/Ergebnis.
+  const seasonV2PlayerById = useMemo(
+    () => new Map(gameState.players.map((player) => [player.id, player] as const)),
+    [gameState.players],
+  );
   const seasonV2TopPlayers = useMemo(() => {
-    const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
     return sortedSeasonTopPlayerRows.slice(0, SEASON_V2_TOP_PLAYER_LIMIT).map((row) => {
-      const player = playerById.get(row.playerId) ?? null;
+      const player = seasonV2PlayerById.get(row.playerId) ?? null;
       const portrait = player ? getPlayerPortraitModel(player) : { src: null, initials: row.name.slice(0, 2).toUpperCase() };
       return {
         playerId: row.playerId,
@@ -9250,11 +9412,10 @@ export function useFoundationShellRouterBodyScope({
         ppSoc: row.ppSoc ?? null,
       };
     });
-  }, [gameState.players, sortedSeasonTopPlayerRows]);
+  }, [seasonV2PlayerById, sortedSeasonTopPlayerRows]);
   const seasonV2PlayerRows = useMemo(() => {
-    const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
     return sortedSeasonTopPlayerRows.map((row) => {
-      const player = playerById.get(row.playerId) ?? null;
+      const player = seasonV2PlayerById.get(row.playerId) ?? null;
       const portrait = player ? getPlayerPortraitModel(player) : { src: null, initials: row.name.slice(0, 2).toUpperCase() };
       return {
         playerId: row.playerId,
@@ -9275,7 +9436,7 @@ export function useFoundationShellRouterBodyScope({
         ppSoc: row.ppSoc ?? null,
       };
     });
-  }, [gameState.players, sortedSeasonTopPlayerRows]);
+  }, [seasonV2PlayerById, sortedSeasonTopPlayerRows]);
   const seasonV2SelectedTeamSummary = useMemo(
     () =>
       selectedStandingRow
@@ -10300,6 +10461,13 @@ export function useFoundationShellRouterBodyScope({
     onOpenPlayer: openPlayerProfileById,
   };
 
+  const foundationAllTimeTableHostProps: FoundationAllTimeTableHostProps = {
+    model: allTimeTableModel,
+    selectedTeamId: activeManagerTeamId,
+    seasonLabel: canonicalSeasonLabel,
+    onOpenTeam: openTeamProfileById,
+  };
+
   const foundationRanksHostProps: FoundationRanksHostProps = {
     sortedPpAreaRows: sortedPpAreaRows as unknown as FoundationRanksHostProps["sortedPpAreaRows"],
     ppAreaRankClassMaps,
@@ -10307,6 +10475,7 @@ export function useFoundationShellRouterBodyScope({
     tableSorts: { ppArea: tableSorts.ppArea },
     toggleTableSort,
     openTeamProfileById,
+    ownTeamId: activeManagerTeamId ?? selectedTeamId ?? null,
     renderPpAreaMetricCell: (value, formBonus, options: { tone: string; pool: Array<number | null | undefined>; fallbackMax: number }) =>
       renderMetricBar(value, {
         tone: options.tone as Parameters<typeof renderMetricBar>[1]["tone"],
@@ -10355,14 +10524,15 @@ export function useFoundationShellRouterBodyScope({
     onSetTrainingDevelopmentFilter: setTrainingDevelopmentFilter,
     selectedTeamControlMode: formatTeamControlModeLabel(selectedTeamControl?.controlMode),
     seasonLabel: canonicalSeasonLabel,
-    managementLocked: isSelectedTeamManagementLocked || trainingIntensityLockedForSeason,
+    // T-009: kein Season-Phasen-Lock mehr — `managementLocked` deckt nur noch
+    // den "fremdes Team / reine Ansicht"-Fall ab, Training bleibt fürs eigene
+    // Team immer einstellbar.
+    managementLocked: isSelectedTeamManagementLocked,
     managementLockedReason: isSelectedTeamManagementLocked
       ? selectedTeam
         ? `${selectedTeam.name} gehört nicht zu deinen steuerbaren Teams. Training ist nur zur Ansicht offen.`
         : null
-      : trainingIntensityLockedForSeason
-        ? "Trainingsintensität für diese Season festgelegt — Änderung erst zum nächsten Saisonstart möglich (versiegelt seit dem ersten Spieltag)."
-        : null,
+      : null,
     trainingClassOptions: PROGRESSION_CLASS_ORDER.map((className) => ({ value: className, label: className })),
     onSetTrainingMode: (playerId, mode) => {
       void setPlayerTrainingMode(playerId, mode);
@@ -10618,6 +10788,7 @@ export function useFoundationShellRouterBodyScope({
     newGameSaveName,
     newGameSuccess,
     openContractRenewalNegotiation,
+    requestContractRenewalPreview,
     openFacilityPanel,
     openFoundationViewCommand,
     openMarketOfferPanel,
@@ -10883,6 +11054,7 @@ export function useFoundationShellRouterBodyScope({
     foundationPrizeFinanceShellHostProps,
     foundationRanksHostProps,
     foundationLeagueLeadersHostProps,
+    foundationAllTimeTableHostProps,
     foundationDiszisHostProps,
     foundationMarketV2ShellHostProps,
     foundationTrainingCompactHostProps,
@@ -10906,7 +11078,6 @@ export function useFoundationShellRouterBodyScope({
     toggleTableSort,
     toggleTransferSellMarker,
     toggleTransferWishlist,
-    toggleTransferWishlistByPlayerId,
     trainingDevelopmentFilter,
     trainingDevelopmentSummary,
     teamBeliebtheit,

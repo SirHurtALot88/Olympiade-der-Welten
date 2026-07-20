@@ -10,6 +10,7 @@ import {
   NlSubTabs,
   StatChip,
   StatChipRow,
+  formatNlMoney,
   formatNlNumber,
 } from "@/components/foundation/new-look";
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
@@ -171,7 +172,6 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
     selectedTeamGmBiasHighlights,
     selectedTeamHasUnsavedChanges,
     selectedTeamId,
-    selectedTeamSettingsIndex,
     selectedTeamStrategyDraft,
     selectedTeamStrategyProfile,
     setActiveView,
@@ -484,7 +484,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                     <span className="nl-newgame-club-body">
                       <span className="nl-newgame-club-code">{team.shortCode}</span>
                       <span className="nl-newgame-club-name">{team.name}</span>
-                      <span className="nl-newgame-club-budget nl-tnum">Budget {formatMoney(team.budget)}</span>
+                      <span className="nl-newgame-club-budget nl-tnum">Budget {formatNlMoney(team.budget)}</span>
                     </span>
                     {isChris ? (
                       <span className="nl-newgame-club-badge">DEIN TEAM ✓</span>
@@ -657,7 +657,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                         <td>
                           {team.shortCode} · {team.name}
                         </td>
-                        <td>{formatMoney(team.budget)}</td>
+                        <td>{formatNlMoney(team.budget)}</td>
                         <td>{team.ownerLabel}</td>
                         <td>{formatTeamControlModeLabel(team.controlMode)}</td>
                       </tr>
@@ -1160,6 +1160,12 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
   }
 
   function renderTeamSection() {
+    // T-014: Prev/Next muss über die gefilterte Liste laufen, nicht über
+    // gameState.teams — sonst springt der Wechsel zu Teams, die das Grid
+    // (filteredTeamSettingsTeams) wegen des Suchfilters gar nicht anzeigt.
+    const filteredSelectedTeamSettingsIndex = filteredTeamSettingsTeams.findIndex(
+      (team: Team) => team.teamId === selectedTeamId,
+    );
     return (
       <>
         <NlCard
@@ -1193,14 +1199,14 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
             <button
               type="button"
               className="nl-teamsettings-btn"
-              disabled={selectedTeamSettingsIndex <= 0}
+              disabled={filteredSelectedTeamSettingsIndex <= 0}
               title={
-                selectedTeamSettingsIndex <= 0
-                  ? "Du bist bereits beim ersten Team der Liste."
-                  : "Springt zum vorherigen Team in der aktuellen Liste."
+                filteredSelectedTeamSettingsIndex <= 0
+                  ? "Du bist bereits beim ersten Team der gefilterten Liste."
+                  : "Springt zum vorherigen Team in der gefilterten Liste."
               }
               onClick={() => {
-                const previousTeam = gameState.teams[selectedTeamSettingsIndex - 1];
+                const previousTeam = filteredTeamSettingsTeams[filteredSelectedTeamSettingsIndex - 1];
                 if (previousTeam) {
                   selectTeamSettingsTeam(previousTeam.teamId);
                 }
@@ -1211,14 +1217,18 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
             <button
               type="button"
               className="nl-teamsettings-btn"
-              disabled={selectedTeamSettingsIndex < 0 || selectedTeamSettingsIndex >= gameState.teams.length - 1}
+              disabled={
+                filteredSelectedTeamSettingsIndex < 0 ||
+                filteredSelectedTeamSettingsIndex >= filteredTeamSettingsTeams.length - 1
+              }
               title={
-                selectedTeamSettingsIndex < 0 || selectedTeamSettingsIndex >= gameState.teams.length - 1
-                  ? "Du bist bereits beim letzten Team der Liste."
-                  : "Springt zum nächsten Team in der aktuellen Liste."
+                filteredSelectedTeamSettingsIndex < 0 ||
+                filteredSelectedTeamSettingsIndex >= filteredTeamSettingsTeams.length - 1
+                  ? "Du bist bereits beim letzten Team der gefilterten Liste."
+                  : "Springt zum nächsten Team in der gefilterten Liste."
               }
               onClick={() => {
-                const nextTeam = gameState.teams[selectedTeamSettingsIndex + 1];
+                const nextTeam = filteredTeamSettingsTeams[filteredSelectedTeamSettingsIndex + 1];
                 if (nextTeam) {
                   selectTeamSettingsTeam(nextTeam.teamId);
                 }
@@ -1299,22 +1309,22 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
             />
             <NlMetric
               label="Cash"
-              value={selectedStandingRow?.cash != null ? formatMoney(selectedStandingRow.cash) : "—"}
+              value={selectedStandingRow?.cash != null ? formatNlMoney(selectedStandingRow.cash) : "—"}
               sub="liquide Mittel"
             />
             <NlMetric
               label="Gehalt"
-              value={selectedStandingRow?.salaryTotal != null ? formatMoney(selectedStandingRow.salaryTotal) : "—"}
+              value={selectedStandingRow?.salaryTotal != null ? formatNlMoney(selectedStandingRow.salaryTotal) : "—"}
               sub="aktueller Kader"
             />
             <NlMetric
               label="MW"
-              value={selectedStandingRow?.marketValueTotal != null ? formatMoney(selectedStandingRow.marketValueTotal) : "—"}
+              value={selectedStandingRow?.marketValueTotal != null ? formatNlMoney(selectedStandingRow.marketValueTotal) : "—"}
               sub="gesamter Kader"
             />
             <NlMetric
               label="Sponsor"
-              value={selectedStandingRow?.sponsorTotal != null ? formatMoney(selectedStandingRow.sponsorTotal) : "—"}
+              value={selectedStandingRow?.sponsorTotal != null ? formatNlMoney(selectedStandingRow.sponsorTotal) : "—"}
               sub="pro Season"
             />
           </div>

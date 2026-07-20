@@ -8,7 +8,6 @@ import type {
   PlayerDemandRecord,
   RosterEntry,
   Team,
-  TeamCaptainRecord,
   TeamIdentity,
 } from "@/lib/data/olyDataTypes";
 import { buildPlayerSeasonPerformance } from "@/lib/foundation/player-season-performance";
@@ -473,22 +472,6 @@ function applyPlayerDemandMoraleImpact(input: {
   return cappedDelta;
 }
 
-function parseSeasonOrdinal(seasonId: string | null | undefined): number | null {
-  const match = /(\d+)\s*$/.exec(seasonId ?? "");
-  return match ? Number(match[1]) : null;
-}
-
-/** Der persistierte Kapitän der Folge-Season direkt vor der aktuellen (für den Absetzungs-Malus). */
-function findPreviousSeasonTeamCaptain(gameState: GameState, teamId: string): TeamCaptainRecord | null {
-  const currentOrdinal = parseSeasonOrdinal(gameState.season.id);
-  if (currentOrdinal == null) return null;
-  return (
-    (gameState.teamCaptains ?? []).find(
-      (record) => record.teamId === teamId && parseSeasonOrdinal(record.seasonId) === currentOrdinal - 1,
-    ) ?? null
-  );
-}
-
 function getRosterPlayers(gameState: GameState, teamId: string, excludedPlayerId: string) {
   const ids = new Set(gameState.rosters.filter((entry) => entry.teamId === teamId && entry.playerId !== excludedPlayerId).map((entry) => entry.playerId));
   return gameState.players.filter((player) => ids.has(player.id));
@@ -885,31 +868,6 @@ function computePlayerMorale(input: {
     warnings,
   });
   morale += demandDelta;
-
-  // Team-Kapitän: Moral-Schub für den amtierenden Kapitän, Malus für einen abgesetzten Ego-Kapitän.
-  // Es zählt nur der tatsächlich benannte (persistierte) Kapitän, nicht ein rechnerischer Vorschlag.
-  const currentCaptain = (gameState.teamCaptains ?? []).find(
-    (entry) => entry.seasonId === gameState.season.id && entry.teamId === team.teamId,
-  );
-  if (currentCaptain && currentCaptain.playerId === player.id) {
-    morale += 6;
-    addReason(reasons, "team_captain_role_boost", "Traegt die Kapitaensbinde", 6, "team_captain");
-  } else {
-    const priorCaptain = findPreviousSeasonTeamCaptain(gameState, team.teamId);
-    if (priorCaptain && priorCaptain.playerId === player.id) {
-      // Abgesetzt: nur wenn der Spieler sich selbst fuer Kapitaensmaterial haelt (Ego-/Anspruchs-Traits).
-      const deposedDelta =
-        hasTrait(player, "egomaniac") || hasTrait(player, "diva")
-          ? -15
-          : hasTrait(player, "ambitious") || hasTrait(player, "eloquent")
-            ? -12
-            : 0;
-      if (deposedDelta < 0) {
-        morale += deposedDelta;
-        addReason(reasons, "team_captain_deposed", "Als Kapitaen abgesetzt", deposedDelta, "team_captain");
-      }
-    }
-  }
 
   morale = roundValue(clamp(50 + (morale - 50) * 1.2, 0, 100));
   const visibleMood = getVisibleMood(morale);

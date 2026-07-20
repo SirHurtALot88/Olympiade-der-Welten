@@ -50,7 +50,7 @@ import {
   NlSparkline,
   NlSubTabs,
   NlTable,
-  formatNlNumber,
+  formatNlNumber, formatNlMoney,
   type NlRadarAxis,
   type NlTableColumn,
 } from "@/components/foundation/new-look";
@@ -94,10 +94,10 @@ function formatMoney(value: number | null | undefined) {
     return "—";
   }
 
-  return new Intl.NumberFormat("de-DE", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 1,
-  }).format(value);
+  // Route through the canonical New-Look money formatter so economy values
+  // render with the "Mio"/"k" unit suffix (previously a bare de-DE number),
+  // consistent with the rest of the app.
+  return formatNlMoney(value);
 }
 
 function formatSignedMoney(value: number | null | undefined) {
@@ -365,7 +365,7 @@ function getDisciplineAreaClass(category: "power" | "speed" | "mental" | "social
 }
 
 function formatRankLabel(rank: number | null | undefined) {
-  return rank == null ? "#" : `#${rank}`;
+  return rank == null ? "—" : `#${rank}`;
 }
 
 function buildAxisChipTooltip(card: PlayerDetailDrawerData["axisCards"][number]) {
@@ -569,24 +569,6 @@ function getFogSeedValue(seed: string) {
   }
   return (hash >>> 0) / 4294967295;
 }
-
-// Mischt eine Liste für Fog-of-War-Anzeigen deterministisch per Spieler-Seed,
-// sodass die WAHRE (best-first) Rangfolge nicht ablesbar ist — analog zur
-// Transfermarkt-Scouting-Anzeige, die die Attribut-/Diszi-Reihenfolge ebenfalls
-// per Seed verschiebt (`buildTransfermarktScoutedAttributeRows`).
-function shuffleFoggedByPlayer<T>(items: T[], playerId: string, keyOf: (item: T) => string): T[] {
-  return [...items].sort((left, right) => {
-    const leftKey = keyOf(left);
-    const rightKey = keyOf(right);
-    const leftSeed = getFogSeedValue(`${playerId}:${leftKey}`);
-    const rightSeed = getFogSeedValue(`${playerId}:${rightKey}`);
-    if (leftSeed !== rightSeed) {
-      return leftSeed - rightSeed;
-    }
-    return leftKey.localeCompare(rightKey, "de");
-  });
-}
-
 
 function HelpLabel({
   children,
@@ -1524,7 +1506,7 @@ function PlayerComparePanel({
             <div className="nl-compare-metrics" role="group" aria-label="Kennzahlen-Vergleich">
               {compareMetrics.map((metric) => (
                 <div className="nl-compare-metric-row" key={metric.key}>
-                  <span className="nl-compare-metric-a nl-tnum">{formatNlNumber(metric.aValue, 1)}</span>
+                  <span className="nl-compare-metric-a nl-tnum">{metric.key === "mw" ? formatNlMoney(metric.aValue) : formatNlNumber(metric.aValue, 1)}</span>
                   <span className="nl-compare-metric-label">{metric.label}</span>
                   {metric.aValue != null && metric.bValue != null ? (
                     <NlDeltaChip
@@ -1534,7 +1516,7 @@ function PlayerComparePanel({
                   ) : (
                     <span className="nl-compare-metric-gap">—</span>
                   )}
-                  <span className="nl-compare-metric-b nl-tnum">{formatNlNumber(metric.bValue, 1)}</span>
+                  <span className="nl-compare-metric-b nl-tnum">{metric.key === "mw" ? formatNlMoney(metric.bValue) : formatNlNumber(metric.bValue, 1)}</span>
                 </div>
               ))}
             </div>
@@ -2048,27 +2030,24 @@ export default function PlayerDetailDrawer({
   // exakten Attributwerte. Für verdeckte Spieler (Free Agent / gescoutet / nicht
   // im eigenen Kader) darf KEINE exakte Zahl durchsickern — stattdessen ein
   // grobes Klassen-Band (Balkenhöhe ≈ Band, Beschriftung = Klasse, s.
-  // `attributeTierBandValue`/`formatDisciplineTier`), und die Reihenfolge wird
-  // per Spieler-Seed gemischt (`shuffleFoggedByPlayer`), damit die wahre
-  // Bestenreihenfolge nicht ablesbar ist. Labels: konsistent 3-buchstabig
+  // `attributeTierBandValue`/`formatDisciplineTier`). Die Reihenfolge bleibt in
+  // BEIDEN Fällen die kanonische Attribut-Reihenfolge (POW zuerst) — identisch
+  // zur Attribut-Liste direkt unter dem Chart —, damit Chart und Liste sich
+  // decken. Labels: konsistent 3-buchstabig
   // (POW/HEA/STA/INT/AWA/DET/SPE/DEX/CHA/WIL/SPI/TOR).
   const attributeChartFogged = !abilitiesKnown;
   const attributeBarChartBars = abilitiesKnown
     ? data.attributeStats
         .filter((entry) => entry.value != null && Number.isFinite(entry.value))
         .map((entry) => ({ label: entry.label.slice(0, 3).toUpperCase(), value: entry.value as number }))
-    : shuffleFoggedByPlayer(
-        data.attributeStats
-          .map((entry) => {
-            const bandValue = attributeTierBandValue(entry.ratingLabel);
-            return bandValue != null
-              ? { key: entry.key, label: entry.label.slice(0, 3).toUpperCase(), value: bandValue }
-              : null;
-          })
-          .filter((bar): bar is { key: string; label: string; value: number } => bar != null),
-        data.playerId,
-        (bar) => bar.key,
-      );
+    : data.attributeStats
+        .map((entry) => {
+          const bandValue = attributeTierBandValue(entry.ratingLabel);
+          return bandValue != null
+            ? { key: entry.key, label: entry.label.slice(0, 3).toUpperCase(), value: bandValue }
+            : null;
+        })
+        .filter((bar): bar is { key: string; label: string; value: number } => bar != null);
   const showOwnPotentialSnapshot = !isScoutedProfile && data.potentialOverallStars != null;
   const aiDevelopmentPlanByAttribute = new Map<string, { steps: number; cost: number; reasons: string[] }>();
   if (data.teamHumanControlled === false) {
@@ -2342,8 +2321,18 @@ export default function PlayerDetailDrawer({
                     // würde die Bestenreihenfolge verraten. Stattdessen die
                     // Reihenfolge per Spieler-Seed mischen und erst dann 5 nehmen.
                     const axisCategoryDisciplines = data.disciplineValues.filter((entry) => entry.category === card.tone);
+                    // Fog: nach dem ANGEZEIGTEN (verwässerten) Band-Wert sortieren,
+                    // damit die Reihenfolge zur sichtbaren Balkenhöhe/Klasse passt —
+                    // der Scout sieht das Wahrgenommene als "Top", nicht die echte
+                    // Reihenfolge. Die Streuung (`scoutedTier`) verschleiert die
+                    // Wahrheit; bei Band-Gleichstand nach id (deterministisch, ohne
+                    // die echte Rangfolge innerhalb eines Bands zu verraten).
+                    const foggedBandValue = (entry: (typeof axisCategoryDisciplines)[number]) =>
+                      attributeTierBandValue(entry.scoutedTier ?? formatDisciplineTier(entry.value)) ?? -1;
                     const axisDisciplines = disciplineStatFogged
-                      ? shuffleFoggedByPlayer(axisCategoryDisciplines, data.playerId, (entry) => entry.id).slice(0, 5)
+                      ? [...axisCategoryDisciplines]
+                          .sort((a, b) => foggedBandValue(b) - foggedBandValue(a) || a.id.localeCompare(b.id))
+                          .slice(0, 5)
                       : axisCategoryDisciplines.slice(0, 5);
                     const disciplineListId = `player-drawer-axis-disciplines-${card.id}`;
                     const cardBody = (
@@ -3369,34 +3358,77 @@ export default function PlayerDetailDrawer({
 
             {data.injuryHistoryRows.length > 0 ? (
               (() => {
+                // Verletzungshistorie wird pro Season zusammengefasst (statt einer
+                // Zeile je Spieltag) — analog zur saisonweisen "Sportlichen
+                // Historie". Aggregation rein auf Präsentationsebene aus den
+                // vorhandenen `injuryHistoryRows` (Ø Fatigue / max. Risiko trivial
+                // ableitbar), keine neuen Daten.
+                type InjurySeasonSummaryRow = {
+                  seasonId: string;
+                  seasonName: string;
+                  injuriesCount: number;
+                  matchdaysMissed: number;
+                  worstRisk: number | null;
+                  avgFatigue: number | null;
+                };
+                const injurySeasonSummaries: InjurySeasonSummaryRow[] = (() => {
+                  const bySeason = new Map<
+                    string,
+                    InjurySeasonSummaryRow & { fatigueSum: number; fatigueCount: number }
+                  >();
+                  for (const row of data.injuryHistoryRows) {
+                    const bucket =
+                      bySeason.get(row.seasonId) ?? {
+                        seasonId: row.seasonId,
+                        seasonName: row.seasonName ?? row.seasonId,
+                        injuriesCount: 0,
+                        matchdaysMissed: 0,
+                        worstRisk: null,
+                        avgFatigue: null,
+                        fatigueSum: 0,
+                        fatigueCount: 0,
+                      };
+                    bucket.injuriesCount += 1;
+                    bucket.matchdaysMissed += row.matchdaysMissed;
+                    if (Number.isFinite(row.riskPercent)) {
+                      bucket.worstRisk =
+                        bucket.worstRisk == null ? row.riskPercent : Math.max(bucket.worstRisk, row.riskPercent);
+                    }
+                    if (Number.isFinite(row.fatigueBefore)) {
+                      bucket.fatigueSum += row.fatigueBefore;
+                      bucket.fatigueCount += 1;
+                    }
+                    bySeason.set(row.seasonId, bucket);
+                  }
+                  return [...bySeason.values()]
+                    .map(({ fatigueSum, fatigueCount, ...summary }) => ({
+                      ...summary,
+                      avgFatigue: fatigueCount > 0 ? fatigueSum / fatigueCount : null,
+                    }))
+                    .sort((left, right) => right.seasonId.localeCompare(left.seasonId, "de", { numeric: true }));
+                })();
                 const injuryHistoryTable = (
                   <PlayerDrawerLegacyHistoryTable
                     newLookEnabled={true}
                     ariaLabel="Verletzungshistorie"
-                    rows={data.injuryHistoryRows}
-                    rowKey={(row) => row.eventId}
+                    rows={injurySeasonSummaries}
+                    rowKey={(row) => row.seasonId}
                     columns={[
                       { key: "season", label: "Saison" },
-                      { key: "matchday", label: "Spieltag" },
-                      { key: "fatigue", label: "Fatigue" },
-                      { key: "risk", label: "Risiko" },
-                      { key: "unavailableUntil", label: "Ausfall bis" },
-                      { key: "recovery", label: "Recovery" },
+                      { key: "summary", label: "Verletzungen" },
+                      { key: "worstRisk", label: "Max. Risiko" },
+                      { key: "avgFatigue", label: "Ø Fatigue" },
                     ]}
                     renderCell={(row, columnKey) => {
                       switch (columnKey) {
                         case "season":
                           return row.seasonName ?? row.seasonId;
-                        case "matchday":
-                          return row.matchdayLabel ?? row.matchdayId;
-                        case "fatigue":
-                          return formatValue(row.fatigueBefore, 0);
-                        case "risk":
-                          return `${formatValue(row.riskPercent, 0)}%`;
-                        case "unavailableUntil":
-                          return row.unavailableUntil ?? "—";
-                        case "recovery":
-                          return `${formatValue(row.injuryRecoveryPct, 0)}%`;
+                        case "summary":
+                          return `${row.injuriesCount} Verletzung${row.injuriesCount === 1 ? "" : "en"} · ${row.matchdaysMissed} Spieltag${row.matchdaysMissed === 1 ? "" : "e"} ausgefallen`;
+                        case "worstRisk":
+                          return row.worstRisk == null ? "—" : `${formatValue(row.worstRisk, 0)}%`;
+                        case "avgFatigue":
+                          return row.avgFatigue == null ? "—" : formatValue(row.avgFatigue, 0);
                         default:
                           return "—";
                       }

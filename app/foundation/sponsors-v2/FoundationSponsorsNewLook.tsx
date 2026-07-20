@@ -3,24 +3,26 @@
 import { useMemo, useState } from "react";
 
 import {
-  NlBarChart,
   NlCard,
   NlDeltaChip,
   NlEmptyState,
   NlGauge,
   NlProgressBar,
   NlSubTabs,
+  NL_TONE_VAR,
   StatChip,
   StatChipRow,
   formatNlNumber,
   useCountUp,
+  type NlTone,
 } from "@/components/foundation/new-look";
 import {
   SPONSOR_ARCHETYPE_META,
   SponsorCrest,
   SponsorOfferCardNewLook,
 } from "@/components/foundation/sponsor/SponsorOfferCardNewLook";
-import { buildSponsorOfferPresentation, getSponsorComponentKindLabel } from "@/lib/sponsor/sponsor-offer-presenter";
+import { buildSponsorOfferPresentation, getSponsorComponentKindLabel, getSponsorRarityLabel } from "@/lib/sponsor/sponsor-offer-presenter";
+import { formatGameFlowBlocker } from "@/lib/foundation/game-flow-blocker-labels";
 import type { GameState, SponsorOffer, TeamSponsorContract } from "@/lib/data/olyDataTypes";
 
 import type { FoundationSponsorsPanelProps } from "@/app/foundation/sponsors-v2/FoundationSponsorsPanel";
@@ -30,6 +32,33 @@ function formatSignedCash(formatCash: (value: number) => string, value: number) 
   const abs = formatCash(Math.abs(value));
   return `${value > 0 ? "+" : value < 0 ? "-" : ""}${abs}`;
 }
+
+/**
+ * Sponsor-Choice-Meldungen können entweder freundliche Sätze sein oder ein
+ * roher Reason-Slug aus dem API-Fehlerpfad (z. B.
+ * `phase_blocked:sponsor_choice:season_active`). Slug-artige Meldungen (ohne
+ * Leerzeichen, aber mit `:`/`_`) werden durch den geteilten Blocker-Labeler in
+ * freundliches Deutsch übersetzt; echte Sätze bleiben unverändert.
+ */
+function formatSponsorChoiceMessage(message: string): string {
+  const looksLikeReasonSlug = !/\s/.test(message) && /[:_]/.test(message);
+  return looksLikeReasonSlug ? formatGameFlowBlocker(message) : message;
+}
+
+type SponsorComponentKind = SponsorOffer["components"][number]["kind"];
+
+/**
+ * Segment-Reihenfolge + Farbe für das gestapelte Angebots-Cash-Chart
+ * (Angebotsvergleich). Reihenfolge = Stapelung von unten (Basis) nach oben
+ * (Sonderziel); Labels kommen aus `getSponsorComponentKindLabel`, damit sie
+ * exakt zu den Angebotskarten passen.
+ */
+const SPONSOR_STACK_SEGMENTS: Array<{ kind: SponsorComponentKind; tone: NlTone }> = [
+  { kind: "base", tone: "accent" },
+  { kind: "rank", tone: "warn" },
+  { kind: "improvement", tone: "spe" },
+  { kind: "special", tone: "good" },
+];
 
 /**
  * "Neuer Look" Sponsoren — flag-gated, additiv (nur wenn `useNewLook` aktiv ist).
@@ -149,9 +178,17 @@ function ActiveContractHero({
         <div className="nl-sponsor-hero-copy">
           <span className="nl-sponsor-hero-kicker">
             Aktiver Vertrag · {archetypeMeta.label}
-            {contract.starTier ? ` · ★${contract.starTier}` : ""}
             {contract.negotiationProfile ? ` · Profil ${contract.negotiationProfile}` : ""}
           </span>
+          {contract.starTier ? (
+            <span
+              className={`nl-sponsor-rarity is-r${contract.starTier}`}
+              title={`Seltenheitsgrad: ${getSponsorRarityLabel(contract.starTier)} (Stufe ${contract.starTier} von 5)`}
+            >
+              <span className="nl-sponsor-rarity-dot" aria-hidden="true" />
+              {getSponsorRarityLabel(contract.starTier)}
+            </span>
+          ) : null}
           <strong className="nl-sponsor-hero-name">{contract.name}</strong>
           <small>
             {contract.variantKey ? `${contract.variantKey.replace(/_/g, " ")} · ` : ""}
@@ -216,7 +253,7 @@ function ActiveContractHero({
   );
 }
 
-type LeagueSponsorSort = "cash" | "sponsor" | "team";
+type LeagueSponsorSort = "cash" | "sponsor" | "team" | "tier";
 
 export default function FoundationSponsorsNewLook({
   gameState,
@@ -256,7 +293,22 @@ export default function FoundationSponsorsNewLook({
           (sum, component) => sum + (typeof component.rewardCash === "number" ? component.rewardCash : 0),
           0,
         );
-        return { offerId: offer.offerId, name: offer.name, archetype: offer.archetype, totalCash };
+        // Cash je Komponenten-Art (nur positive Beträge) für das gestapelte
+        // Vergleichs-Chart — Segmente zerlegen den Gesamtbetrag in Basis /
+        // Gewinnstufen / Tabellenziel / Sonderziel.
+        const kindTotals = new Map<SponsorComponentKind, number>();
+        for (const component of adjustedComponents) {
+          const cash = typeof component.rewardCash === "number" ? component.rewardCash : 0;
+          if (cash <= 0) continue;
+          kindTotals.set(component.kind, (kindTotals.get(component.kind) ?? 0) + cash);
+        }
+        const segments = SPONSOR_STACK_SEGMENTS.filter((seg) => (kindTotals.get(seg.kind) ?? 0) > 0).map((seg) => ({
+          kind: seg.kind,
+          label: getSponsorComponentKindLabel(seg.kind),
+          tone: seg.tone,
+          value: kindTotals.get(seg.kind) ?? 0,
+        }));
+        return { offerId: offer.offerId, name: offer.name, archetype: offer.archetype, totalCash, segments };
       }),
     [selectedTeamSponsorOffers, sponsorChoiceProfiles, applySponsorNegotiationToComponents],
   );
@@ -297,12 +349,20 @@ export default function FoundationSponsorsNewLook({
         archetype: contract?.archetype ?? null,
         starTier: contract?.starTier ?? null,
         totalCash,
+        // Golden Card = seltener Premium-Elite-Sponsor (Underdog-Glück). Der
+        // Vertrag erbt `variantKey` vom Angebot (sponsor-offer-service), daher
+        // ist das der verlaessliche Golden-Indikator auf Vertragsebene.
+        isGolden: contract?.variantKey === "premium_elite",
       };
     });
   }, [gameState.teams, gameState.seasonState.sponsorContractsByTeamId]);
   const sortedLeagueSponsorRows = useMemo(() => {
     const list = [...leagueSponsorRows];
     list.sort((left, right) => {
+      // Golden-Card-Sponsoren immer zuerst — unabhaengig vom Sortier-Modus.
+      if (left.isGolden !== right.isGolden) {
+        return left.isGolden ? -1 : 1;
+      }
       if (leagueSponsorSort === "team") {
         return left.teamName.localeCompare(right.teamName, "de", { sensitivity: "base" });
       }
@@ -311,6 +371,9 @@ export default function FoundationSponsorsNewLook({
         if (left.sponsorName == null) return 1;
         if (right.sponsorName == null) return -1;
         return left.sponsorName.localeCompare(right.sponsorName, "de", { sensitivity: "base" });
+      }
+      if (leagueSponsorSort === "tier") {
+        return (right.starTier ?? -1) - (left.starTier ?? -1);
       }
       return (right.totalCash ?? -1) - (left.totalCash ?? -1);
     });
@@ -399,7 +462,7 @@ export default function FoundationSponsorsNewLook({
                 ? formatNlNumber(animatedKpiScore ?? selectedTeamCommercialRating.score, 0)
                 : "—"
             }
-            sub={selectedTeamCommercialRating ? `Erwartung ★${selectedTeamCommercialRating.tierHint}` : undefined}
+            sub={selectedTeamCommercialRating ? `Erwartung: ${getSponsorRarityLabel(selectedTeamCommercialRating.tierHint)}` : undefined}
             tone="accent"
           />
           <StatChip
@@ -436,7 +499,7 @@ export default function FoundationSponsorsNewLook({
                 label="Kommerz"
                 tone="accent"
                 format={(value) => `${formatNlNumber(value, 0)}`}
-                title={`Commercial Rating ${selectedTeamCommercialRating.score}/100 · Erwartung ★${selectedTeamCommercialRating.tierHint}`}
+                title={`Commercial Rating ${selectedTeamCommercialRating.score}/100 · Erwartung: ${getSponsorRarityLabel(selectedTeamCommercialRating.tierHint)}`}
               />
             ) : null
           }
@@ -470,7 +533,16 @@ export default function FoundationSponsorsNewLook({
                 format={(value) => formatNlNumber(value, 0)}
                 title="Prestige/Medaillenhistorie"
               />
-              <small className="nl-sponsor-rating-hint">Erwartung ★{selectedTeamCommercialRating.tierHint}</small>
+              <small className="nl-sponsor-rating-hint">
+                Erwartung{" "}
+                <span
+                  className={`nl-sponsor-rarity is-r${selectedTeamCommercialRating.tierHint}`}
+                  title={`Erwarteter Seltenheitsgrad: ${getSponsorRarityLabel(selectedTeamCommercialRating.tierHint)}`}
+                >
+                  <span className="nl-sponsor-rarity-dot" aria-hidden="true" />
+                  {getSponsorRarityLabel(selectedTeamCommercialRating.tierHint)}
+                </span>
+              </small>
 
               {/* #D12: Nudge zum schwächsten Rating-Treiber — echter Vergleich
                   über den Füllgrad (Wert/Max-Beitrag), eigene Team-Daten. */}
@@ -512,7 +584,7 @@ export default function FoundationSponsorsNewLook({
                     />
                   ) : null}
                   {selectedTeamCommercialRating.inputs.qualityRank != null ? (
-                    <StatChip label="Qualitäts-Rang" value={`#${selectedTeamCommercialRating.inputs.qualityRank}`} tone="neutral" />
+                    <StatChip label="Qualitäts-Rang" value={`#${Math.round(selectedTeamCommercialRating.inputs.qualityRank)}`} tone="neutral" />
                   ) : null}
                   <StatChip
                     label="MW-Perzentil"
@@ -538,7 +610,7 @@ export default function FoundationSponsorsNewLook({
 
         {sponsorChoiceMessage ? (
           <div className="nl-sponsor-banner" role="status">
-            {sponsorChoiceMessage}
+            {formatSponsorChoiceMessage(sponsorChoiceMessage)}
           </div>
         ) : null}
 
@@ -574,16 +646,56 @@ export default function FoundationSponsorsNewLook({
             {/* #76: Angebotsvergleich — Cash-Gesamt pro Angebot */}
             {offerCashSummaries.length > 1 ? (
               <NlCard className="nl-sponsor-compare-card" eyebrow="Angebotsvergleich" title="Cash-Gesamt pro Angebot">
-                <NlBarChart
-                  bars={offerCashSummaries.map((entry) => ({
-                    label: entry.name.length > 10 ? `${entry.name.slice(0, 9)}…` : entry.name,
-                    value: entry.totalCash,
-                    tone: SPONSOR_ARCHETYPE_META[entry.archetype].tone,
-                  }))}
-                  format={(value) => formatMoney(value)}
-                  aria-label="Cash-Gesamt Vergleich der aktuellen Sponsor-Angebote"
-                  className="nl-sponsor-compare-chart"
-                />
+                <div className="nl-sponsor-stackchart">
+                  <div
+                    className="nl-sponsor-stackchart-cols"
+                    role="img"
+                    aria-label="Cash-Gesamt je Angebot, gestapelt nach Basis, Gewinnstufen, Tabellenziel und Sonderziel"
+                  >
+                    {offerCashSummaries.map((entry) => {
+                      const maxTotal = Math.max(...offerCashSummaries.map((item) => item.totalCash), 1e-9);
+                      const fillPct = Math.max(0, Math.min(100, (entry.totalCash / maxTotal) * 100));
+                      return (
+                        <div className="nl-sponsor-stackcol" key={entry.offerId}>
+                          <span className="nl-sponsor-stackcol-total nl-tnum">{formatMoney(entry.totalCash)}</span>
+                          <div className="nl-sponsor-stackcol-track">
+                            <div
+                              className="nl-sponsor-stackcol-bar"
+                              style={{ height: `${fillPct}%` }}
+                              title={entry.segments
+                                .map((seg) => `${seg.label}: ${formatMoney(seg.value)}`)
+                                .join(" · ")}
+                            >
+                              {entry.segments.map((seg) => (
+                                <span
+                                  key={seg.kind}
+                                  className="nl-sponsor-stackseg"
+                                  style={{ flexGrow: seg.value, background: NL_TONE_VAR[seg.tone] }}
+                                  title={`${seg.label}: ${formatMoney(seg.value)}`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <span className="nl-sponsor-stackcol-label" title={entry.name}>
+                            {entry.name}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <ul className="nl-sponsor-stack-legend">
+                    {SPONSOR_STACK_SEGMENTS.map((seg) => (
+                      <li key={seg.kind}>
+                        <span
+                          className="nl-sponsor-stack-legend-dot"
+                          style={{ background: NL_TONE_VAR[seg.tone] }}
+                          aria-hidden="true"
+                        />
+                        {getSponsorComponentKindLabel(seg.kind)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </NlCard>
             ) : null}
             <div className="nl-sponsor-offer-grid">
@@ -638,35 +750,79 @@ export default function FoundationSponsorsNewLook({
               items={[
                 { id: "cash", label: "Cash" },
                 { id: "sponsor", label: "Sponsor" },
+                { id: "tier", label: "Tier" },
                 { id: "team", label: "Team" },
               ]}
             />
           }
         >
-          <div className="nl-sponsor-league-list" role="list" aria-label="Sponsoren aller Teams">
-            {sortedLeagueSponsorRows.map((row) => (
-              <div
-                key={row.teamId}
-                role="listitem"
-                className={`nl-sponsor-league-row${row.teamName === selectedTeamName ? " is-current" : ""}`}
-              >
-                <span className="nl-sponsor-league-team">
-                  <span className="nl-sponsor-league-code">{row.shortCode}</span>
-                  <strong>{row.teamName}</strong>
-                </span>
-                {row.sponsorName ? (
-                  <span className={`nl-sponsor-league-sponsor is-${row.archetype ?? "none"}`}>
-                    {row.sponsorName}
-                    {row.starTier ? ` · ★${row.starTier}` : ""}
+          <div className="nl-sponsor-league-grid" role="list" aria-label="Sponsoren aller Teams">
+            {sortedLeagueSponsorRows.map((row) => {
+              const isCurrent = row.teamName === selectedTeamName;
+              const archetypeMeta = row.archetype ? SPONSOR_ARCHETYPE_META[row.archetype] : null;
+              const classes = [
+                "nl-sponsor-league-item",
+                isCurrent ? "is-current" : "",
+                row.isGolden ? "is-golden" : "",
+                row.sponsorName ? "" : "is-empty",
+              ]
+                .filter(Boolean)
+                .join(" ");
+              return (
+                <div key={row.teamId} role="listitem" className={classes}>
+                  {row.isGolden ? (
+                    <span className="nl-sponsor-league-golden-badge" title="Golden Card — seltener Premium-Sponsor">
+                      ✦ Golden Card
+                    </span>
+                  ) : null}
+                  <span className="nl-sponsor-league-crest">
+                    {row.sponsorName && row.archetype ? (
+                      <SponsorCrest name={row.sponsorName} archetype={row.archetype} />
+                    ) : (
+                      <span className="nl-sponsor-league-crest-empty" aria-hidden="true">
+                        ✕
+                      </span>
+                    )}
                   </span>
-                ) : (
-                  <span className="nl-sponsor-league-sponsor is-empty">Kein Sponsor</span>
-                )}
-                <span className="nl-sponsor-league-cash nl-tnum">
-                  {row.totalCash != null ? formatMoney(row.totalCash) : "—"}
-                </span>
-              </div>
-            ))}
+                  <div className="nl-sponsor-league-body">
+                    <div className="nl-sponsor-league-teamline">
+                      <span className="nl-sponsor-league-code">{row.shortCode}</span>
+                      <span className="nl-sponsor-league-teamname" title={row.teamName}>
+                        {row.teamName}
+                      </span>
+                      {isCurrent ? <span className="nl-sponsor-league-you">Dein Team</span> : null}
+                    </div>
+                    {row.sponsorName ? (
+                      <>
+                        <span className="nl-sponsor-league-sponsor" title={row.sponsorName}>
+                          {row.sponsorName}
+                        </span>
+                        <div className="nl-sponsor-league-meta">
+                          {archetypeMeta ? (
+                            <span className={`nl-sponsor-league-chip is-${row.archetype}`}>{archetypeMeta.label}</span>
+                          ) : null}
+                          {row.starTier ? (
+                            <span
+                              className={`nl-sponsor-rarity is-r${row.starTier}`}
+                              title={`Seltenheitsgrad: ${getSponsorRarityLabel(row.starTier)} (Stufe ${row.starTier} von 5)`}
+                              aria-label={`Seltenheitsgrad: ${getSponsorRarityLabel(row.starTier)}`}
+                            >
+                              <span className="nl-sponsor-rarity-dot" aria-hidden="true" />
+                              {getSponsorRarityLabel(row.starTier)}
+                            </span>
+                          ) : null}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="nl-sponsor-league-sponsor is-empty">Kein Sponsor</span>
+                    )}
+                  </div>
+                  <span className="nl-sponsor-league-cash nl-tnum">
+                    {row.totalCash != null ? formatMoney(row.totalCash) : "—"}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </NlCard>
       </section>

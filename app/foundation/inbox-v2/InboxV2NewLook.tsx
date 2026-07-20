@@ -306,6 +306,56 @@ export default function InboxV2NewLook({
     [displayedItems],
   );
 
+  // Bulk-Aktion (T-104): reine Info-Items ("severity: info", offen, nicht
+  // auto-resolving) mussten bisher einzeln über den Karten-Button abgehakt
+  // werden — bei vielen Items unnötige Klickarbeit trotz vorhandenem
+  // Einzel-Handler (`onMarkDone`). Nur im Entscheidungen-Modus relevant.
+  //
+  // `onMarkDone` ist ein Einzel-Item-Handler: der Host
+  // (FoundationInboxV2Host → `updateInboxItemStatus` in
+  // use-foundation-shell-router-body-scope.tsx, geteilter Helper, hier nicht
+  // geändert) liest `gameState` aus einem Render-Closure und ruft
+  // `setGameState(nextGameState)` NICHT als funktionales Update auf. Mehrere
+  // synchrone `onMarkDone`-Aufrufe im selben Tick würden sich daher
+  // gegenseitig überschreiben (nur der letzte Aufruf würde durchschlagen).
+  // Die Queue unten verarbeitet deshalb ein Item pro Render-Zyklus (ein
+  // `onMarkDone`-Aufruf pro Effect-Lauf, danach wartet der Effect auf den
+  // nächsten Commit mit frischem `gameState`), statt die Items in einer
+  // einzigen Schleife abzufeuern.
+  const [bulkMarkDoneQueue, setBulkMarkDoneQueue] = useState<string[] | null>(null);
+
+  const bulkMarkableInfoIds = useMemo(
+    () =>
+      mode === "decisions"
+        ? displayedItems
+            .filter(
+              (item) => item.severity === "info" && item.status === "open" && !isAutoResolvingInboxItemId(item.id),
+            )
+            .map((item) => item.id)
+        : [],
+    [displayedItems, mode],
+  );
+
+  useEffect(() => {
+    if (!bulkMarkDoneQueue || bulkMarkDoneQueue.length === 0 || !onMarkDone) {
+      return;
+    }
+    const [nextId, ...rest] = bulkMarkDoneQueue;
+    onMarkDone(nextId);
+    setBulkMarkDoneQueue(rest.length > 0 ? rest : null);
+  }, [bulkMarkDoneQueue, onMarkDone]);
+
+  const startBulkMarkDone = () => {
+    if (bulkMarkDoneQueue || bulkMarkableInfoIds.length === 0 || !onMarkDone) {
+      return;
+    }
+    // Snapshot der sichtbaren Ids zum Klick-Zeitpunkt — Items verschwinden aus
+    // `displayedItems`, sobald sie erledigt sind, die Queue soll davon aber
+    // unbeeinflusst bleiben (analog zu `sortedTableRows`/`displayedItems`-
+    // Snapshots an anderen Stellen im neuen Look).
+    setBulkMarkDoneQueue(bulkMarkableInfoIds);
+  };
+
   // Mode-Umschaltung existiert nur, wenn der Mount einen Handler liefert —
   // ohne Handler zeigt die Leiste den aktiven Modus als Kontext an.
   const modeTabs = onModeChange
@@ -520,7 +570,7 @@ export default function InboxV2NewLook({
         })}
       </div>
 
-      {onIncludeDoneChange || onIncludeDismissedChange ? (
+      {onIncludeDoneChange || onIncludeDismissedChange || bulkMarkableInfoIds.length > 1 ? (
         <div className="nl-inbox-toggle-row">
           {onIncludeDoneChange ? (
             <label className="nl-inbox-toggle">
@@ -533,6 +583,22 @@ export default function InboxV2NewLook({
               <input type="checkbox" checked={includeDismissed} onChange={(event) => onIncludeDismissedChange(event.target.checked)} />
               <span>Ausgeblendete anzeigen</span>
             </label>
+          ) : null}
+          {/* T-104: Sammel-Aktion für reine Info-Items — nur sichtbar, wenn es
+              mindestens zwei gibt (bei einem einzelnen Item deckt der
+              Karten-Button "Erledigt" den Fall bereits ab). */}
+          {bulkMarkableInfoIds.length > 1 ? (
+            <button
+              type="button"
+              className="nl-inbox-card-action"
+              data-testid="inbox-v2-bulk-mark-info-done"
+              disabled={bulkMarkDoneQueue != null}
+              onClick={startBulkMarkDone}
+            >
+              {bulkMarkDoneQueue != null
+                ? `Wird erledigt … (${bulkMarkDoneQueue.length} verbleibend)`
+                : `Alle Info-Items erledigt (${bulkMarkableInfoIds.length})`}
+            </button>
           ) : null}
         </div>
       ) : null}

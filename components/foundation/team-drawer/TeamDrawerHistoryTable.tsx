@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 
-import type { TeamDetailDrawerHistoryRow } from "@/app/foundation/TeamDetailDrawer";
+import type { TeamDetailDrawerHistoryRow } from "@/lib/foundation/team-detail-drawer-types";
 import {
   SEASON_DISCIPLINE_AREA_GROUPS,
   SEASON_DISCIPLINE_LABELS,

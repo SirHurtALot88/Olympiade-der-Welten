@@ -2,7 +2,7 @@
 
 import { formatTrainingModeRecoveryLabel } from "@/lib/training/training-mode-presentation";
 
-import { formatVeloNumber } from "@/components/foundation/velo-ui/formatters";
+import { formatNlNumber } from "@/components/foundation/new-look/nl-tones";
 
 export type VeloIntensitySegment = {
   value: string;
@@ -77,12 +77,12 @@ export function buildTrainingModeSegments(options: TrainingModeSegmentInput[]): 
     toneClass: `is-${option.value}`,
     note:
       option.baseXp != null
-        ? `${option.note ?? ""}${option.note ? " " : ""}Separat: +${formatVeloNumber(option.baseXp, 0)} Saison-Bonus-XP zum manuellen Ausgeben am Saisonende.`.trim()
+        ? `${option.note ?? ""}${option.note ? " " : ""}Separat: +${formatNlNumber(option.baseXp, 0)} Saison-Bonus-XP zum manuellen Ausgeben am Saisonende.`.trim()
         : option.note,
     lines: [
-      `+${formatVeloNumber(option.trainingSetpoints, 1)} Trainingsbudget`,
+      `+${formatNlNumber(option.trainingSetpoints, 1)} Trainingsbudget`,
       formatTrainingModeRecoveryLabel(option.recoveryDeltaPct),
-      `Fatigue ${formatVeloNumber(option.fatigueLoad, 0)}`,
+      `Fatigue ${formatNlNumber(option.fatigueLoad, 0)}`,
     ],
   }));
 }

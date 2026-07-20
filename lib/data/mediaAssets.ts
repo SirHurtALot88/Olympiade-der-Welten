@@ -49,7 +49,7 @@ for (const filename of portraitFileBasenames) {
   }
 }
 
-function getStaticPortraitUrl(playerId: string): string | null {
+export function getStaticPortraitUrl(playerId: string): string | null {
   if (portraitFileByKey.size === 0) {
     return null;
   }
@@ -100,7 +100,7 @@ for (const filename of teamLogoFileBasenames) {
   }
 }
 
-function getStaticTeamLogoUrl(teamId: string): string | null {
+export function getStaticTeamLogoUrl(teamId: string): string | null {
   if (teamLogoFileByKey.size === 0) {
     return null;
   }

@@ -1,7 +1,6 @@
 import type { GameState, SeasonSnapshotPlayerPerformanceRecord } from "@/lib/data/olyDataTypes";
 import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
 import type { SeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
-import { clampSeasonSnapshotsToCurrentSeason } from "@/lib/foundation/season-history-clamp";
 
 export type PlayerLeagueCareerStats = {
   appearances: number;
@@ -81,7 +80,7 @@ export function buildPlayerLeagueCareerStatsMap(
     seasonContributionsByPlayerId.set(playerId, bySeason);
   };
 
-  for (const snapshot of clampSeasonSnapshotsToCurrentSeason(gameState)) {
+  for (const snapshot of gameState.seasonState.seasonSnapshots ?? []) {
     snapshotSeasonIds.add(snapshot.seasonId);
     for (const row of snapshot.playerPerformances ?? []) {
       rememberSeasonContribution(

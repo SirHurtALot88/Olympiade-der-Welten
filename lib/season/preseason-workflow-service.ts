@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
 import { buildFormCardSeasonUsageAudit, buildGeneratedFormCardRecordsForSeason } from "@/lib/lineups/legacy-lineup-modifiers";
-import type { Fixture, GameState, PreSeasonWorkflowLogRecord, SeasonState, StandingRecord, TeamCaptainRecord } from "@/lib/data/olyDataTypes";
+import type { Fixture, GameState, PreSeasonWorkflowLogRecord, SeasonState, StandingRecord } from "@/lib/data/olyDataTypes";
 import { previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-season-end-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
@@ -20,9 +20,9 @@ import { buildPrizeMoneyPreview } from "@/lib/season/prize-money-preview";
 import { buildSeasonSnapshotDryRun, upsertSeasonSnapshotRecord } from "@/lib/season/season-snapshot-service";
 import { advanceSeasonEconomyFactorWindow, parseSalaryFactorPatternEnv } from "@/lib/season/season-economy-factors";
 import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
-import { buildCaptainRecordForPlayer } from "@/lib/morale/team-captain-service";
 import { advanceScoutIntelTick } from "@/lib/scouting/facility-scout-pipeline-service";
 import { advanceSponsorContractsForNewSeason } from "@/lib/sponsor/sponsor-contract-lifecycle";
+import { advanceTeamBeliebtheitForSeasonTransition } from "@/lib/economy/team-beliebtheit";
 import {
   buildSponsorChoiceSummary,
   chooseSponsorOfferForAiTeams,
@@ -396,6 +396,9 @@ export function applySeasonBaselineProgression(gameState: GameState, options: { 
       bracketLabel: baseline.bracket ?? player.bracketLabel,
       currentXP: isRostered ? player.currentXP : coolOffFreeAgentXp(player.currentXP),
       trainingMode: null,
+      // Anti-cheese Teil B (B.4): clear the per-matchday training accumulator alongside trainingMode /
+      // fatigue so the new season starts a fresh mode-count/fatigue tally.
+      seasonTrainingAccumulator: null,
       fatigue: isRostered ? 0 : clamp(player.fatigue ?? 0, 0, 100),
     };
   });
@@ -455,14 +458,27 @@ function getSalaryTotal(gameState: GameState, teamId: string) {
 }
 
 function buildZeroStandings(gameState: GameState): Record<string, StandingRecord> {
+  // Endrang der ABGESCHLOSSENEN Saison (gameState = save.gameState mit finalen Standings) als `startplatz`
+  // in die neue Saison tragen. Ohne diesen Carry fällt ab Season 2 (a) der Auf-/Absteiger-Bonus im Preisgeld
+  // aus (start_rank_source_missing) UND (b) das Sponsor-Verbesserungsziel wird gegen den statischen
+  // Budget-Rang statt den echten Vorsaison-Endrang gemessen → kumulierender Economy-Skew. rankDiff startet
+  // bei 0 (noch kein Spieltag in der neuen Saison).
+  const previousStandings = gameState.seasonState.standings ?? {};
   return Object.fromEntries(
-    gameState.teams.map((team, index) => [
-      team.teamId,
-      {
-        points: 0,
-        rank: index + 1,
-      } satisfies StandingRecord,
-    ]),
+    gameState.teams.map((team, index) => {
+      const previousRank = previousStandings[team.teamId]?.rank;
+      const startplatz =
+        typeof previousRank === "number" && Number.isFinite(previousRank) ? previousRank : index + 1;
+      return [
+        team.teamId,
+        {
+          points: 0,
+          rank: startplatz,
+          startplatz,
+          rankDiff: 0,
+        } satisfies StandingRecord,
+      ];
+    }),
   );
 }
 
@@ -488,42 +504,6 @@ function signatureSchedule(entries: NonNullable<SeasonState["disciplineSchedule"
 
 function isTransferPipelineFastMode() {
   return process.env.OLY_TRANSFER_PIPELINE_FAST === "1";
-}
-
-/**
- * Trägt den Saison-Kapitän automatisch in die Folge-Season, sofern der Spieler noch
- * im Kader steht. So muss der Kapitän nicht jedes Jahr neu benannt werden – die
- * Wahl wird nur noch (optional) bestätigt oder über einen Hinweis geändert.
- * Kapitäne der abgelaufenen Season werden verworfen, wenn der Spieler das Team
- * verlassen hat (dann greift die Neubenennungs-Pflicht im Game-Flow).
- */
-function carryOverTeamCaptains(previousGameState: GameState, nextSeasonId: string): TeamCaptainRecord[] {
-  const previousSeasonId = previousGameState.season.id;
-  // Nur die Datensätze der gerade abgelaufenen Season behalten – sie werden in der
-  // Folge-Season für die Absetzungs-Historie (Ex-Kapitän-Malus) gebraucht.
-  const previousSeasonRecords = (previousGameState.teamCaptains ?? []).filter(
-    (record) => record.seasonId === previousSeasonId,
-  );
-  const carried: TeamCaptainRecord[] = [];
-  for (const record of previousSeasonRecords) {
-    const stillOnRoster = previousGameState.rosters.some(
-      (entry) => entry.teamId === record.teamId && entry.playerId === record.playerId,
-    );
-    if (!stillOnRoster) {
-      continue;
-    }
-    const player = previousGameState.players.find((entry) => entry.id === record.playerId);
-    if (!player) {
-      continue;
-    }
-    const refreshed = buildCaptainRecordForPlayer(previousGameState, record.teamId, player);
-    carried.push({
-      ...refreshed,
-      seasonId: nextSeasonId,
-      source: "carried_over",
-    });
-  }
-  return [...previousSeasonRecords, ...carried];
 }
 
 function buildNextSeasonGameState(
@@ -615,6 +595,9 @@ function buildNextSeasonGameState(
     matchdayAdvanceLogs: [],
     cashPrizeApplyLogs: save.gameState.seasonState.cashPrizeApplyLogs ?? [],
     aiManagerBudgetReservations: undefined,
+    // Valuation-Freeze der abgelaufenen Saison auflösen — die neue Saison rechnet OVR/MVS/PPs/MW
+    // wieder live pool-relativ (season_active).
+    frozenValuationSnapshot: undefined,
     playerAvailabilityState: [],
     newGameFlow: {
       active: true,
@@ -628,7 +611,6 @@ function buildNextSeasonGameState(
         { stepId: "first_transfers", status: "open" },
         { stepId: "fill_roster", status: "open" },
         { stepId: "training_facilities", status: "open" },
-        { stepId: "appoint_captain", status: "open" },
         { stepId: "choose_sponsor", status: "open" },
         { stepId: "set_lineup", status: "open" },
       ],
@@ -673,7 +655,6 @@ function buildNextSeasonGameState(
   const baseGameState: GameState = {
     ...save.gameState,
     gamePhase: "season_active",
-    teamCaptains: carryOverTeamCaptains(save.gameState, nextSeasonId),
     season: {
       ...save.gameState.season,
       id: nextSeasonId,
@@ -708,11 +689,17 @@ function buildNextSeasonGameState(
     : refreshTeamObjectiveState(
         advanceScoutIntelTick({
           gameState: chooseSponsorOfferForAiTeams(
+            // TEIL A: Beliebtheits-KPI 1×/Saison fortschreiben — VOR regenerateSponsorOffersForSeason, damit
+            // der Stern-Deckel (Feed 1) den frisch fortgeschriebenen Wert nutzt. Liest die abgeschlossene
+            // Saison (save.gameState), schreibt in die frisch aktivierte Folge-Saison fort.
             regenerateSponsorOffersForSeason(
-              advanceSponsorContractsForNewSeason(
-                applySeasonBaselineProgression(baseGameState, { completedSeasonId: save.gameState.season.id }),
-                nextSeasonId,
-              ),
+              advanceTeamBeliebtheitForSeasonTransition({
+                completedGameState: save.gameState,
+                nextGameState: advanceSponsorContractsForNewSeason(
+                  applySeasonBaselineProgression(baseGameState, { completedSeasonId: save.gameState.season.id }),
+                  nextSeasonId,
+                ),
+              }),
             ),
           ),
           phase: "preseason",
@@ -766,6 +753,25 @@ function buildSaveWithRequiredSeasonSnapshot(save: PersistedSaveGame): {
   blockingReasons: string[];
   warnings: string[];
 } {
+  // Benchmark freeze integrity: the authoritative season snapshot is written at
+  // season completion (season-completion-service), AFTER sponsor + facility
+  // settlement but BEFORE the transfer window — so its MW/Cash/roster are the
+  // "end of season, post-sponsors, pre-sales" values. This preseason path runs
+  // AFTER sales, so rebuilding + upserting from the current gameState would
+  // clobber those frozen values with post-sale numbers. If a `completed`
+  // snapshot for this season already exists, treat it as immutable and keep it.
+  const existingCompletedSnapshot = (save.gameState.seasonState.seasonSnapshots ?? []).find(
+    (snapshot) => snapshot.seasonId === save.gameState.season.id && snapshot.status === "completed",
+  );
+  if (existingCompletedSnapshot) {
+    return {
+      save,
+      snapshotId: existingCompletedSnapshot.snapshotId ?? null,
+      blockingReasons: [],
+      warnings: ["season_snapshot_already_frozen_pre_sale"],
+    };
+  }
+
   const snapshotPreview = buildSeasonSnapshotDryRun(save.gameState, {
     saveId: save.saveId,
     seasonId: save.gameState.season.id,
@@ -1006,9 +1012,10 @@ export async function buildPreSeasonWorkflowPreview(
           playerRating: null,
           seasonPerformance: null,
           trainingModeByPlayerId: {},
-          currentXP: player.currentXP ?? 0,
-          spentXP: player.spentXP ?? 0,
-          lifetimeXP: player.lifetimeXP ?? null,
+          // XP-System abgeschafft: XP-Inputs neutralisiert (0/organisch).
+          currentXP: 0,
+          spentXP: 0,
+          lifetimeXP: null,
         }),
       ] as const;
     }).filter((entry) => Boolean(entry[1])),

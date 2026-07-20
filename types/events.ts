@@ -49,6 +49,13 @@ export type ApplyRoomPresetRequest = {
   preset: RoomOwnershipPreset;
 };
 
+export type SetTeamSelectionRequest = {
+  roomCode: string;
+  seatToken: string;
+  chrisTeamIds: string[];
+  frankyTeamIds: string[];
+};
+
 export type SetReadyStateRequest = {
   roomCode: string;
   seatToken: string;
@@ -135,6 +142,7 @@ export type ClientToServerEvents = {
   joinRoom: (payload: JoinRoomRequest) => void;
   rejoinRoom: (payload: RejoinRoomRequest) => void;
   applyRoomPreset: (payload: ApplyRoomPresetRequest) => void;
+  setTeamSelection: (payload: SetTeamSelectionRequest) => void;
   setReadyState: (payload: SetReadyStateRequest) => void;
   startRoom: (payload: StartRoomRequest) => void;
   runRoomAiAutoStep: (payload: RunRoomAiAutoStepRequest) => void;

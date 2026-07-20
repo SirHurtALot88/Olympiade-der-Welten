@@ -7,7 +7,7 @@ import {
 } from "@/lib/ai/player-board-trust-service";
 import type { PlayerEconomyCompareRow } from "@/lib/foundation/player-economy-compare-service";
 import { buildPlayerEconomyCompareMap } from "@/lib/foundation/player-economy-compare-service";
-import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { resolvePlayerEconomyContract, type PlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getFatiguePerformancePenaltyPercent } from "@/lib/fatigue/fatigue-calibration";
 import { calculateTeamRecovery, getInjuryRiskBand, getInjuryRiskPercent, getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 import {
@@ -40,6 +40,8 @@ import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 import {
   clampSeasonSnapshotsToCurrentSeason,
   clampTransferHistoryToCurrentSeason,
+  extractSeasonNumber,
+  getCurrentSeasonNumber,
 } from "@/lib/foundation/season-history-clamp";
 import { buildPlayerAttributeHistoryRows, type PlayerAttributeHistoryRow } from "@/lib/foundation/player-attribute-history";
 import {
@@ -65,6 +67,7 @@ import { buildPlayerDemands } from "@/lib/morale/player-demands-service";
 import { assessPlayerMorale, type PlayerMoraleAssessment } from "@/lib/morale/player-morale-service";
 import {
   buildPlayerDevelopmentInsight,
+  buildPlayerScoutPotential,
   type PlayerDevelopmentInsight,
   type PlayerScoutPotential,
 } from "@/lib/progression/player-potential-service";
@@ -112,7 +115,7 @@ type PlayerDisciplineDrawerDetail = {
   slotLabels: string[];
 };
 
-type AttributeVisibility = "exact" | "scouted";
+export type AttributeVisibility = "exact" | "scouted";
 
 type DisciplineGlobalRankMaps = {
   valueRanksByDiscipline: Map<string, Map<string, number | null>>;
@@ -817,6 +820,49 @@ function maskAxisCardsForVisibility(
   }));
 }
 
+// T-023 (Fog-of-War-Leak): resolvePlayerEconomyContract() (lib/foundation/player-economy-contract.ts)
+// reicht salary/marketValue/purchasePrice unconditional durch. Da diese Funktion geteilt ist
+// (>60 Call-Sites), wird sie NICHT angefasst — stattdessen wird ihr Ergebnis hier, direkt im
+// Drawer-Layer, nachträglich anhand derselben resolveAttributeVisibility()-Auflösung maskiert.
+// annualSalary wird mitmaskiert, weil `salary ?? annualSalary` sonst als Fallback den exakten
+// Wert durchreichen würde (siehe Verwendung weiter unten).
+function maskEconomyForVisibility(
+  economy: PlayerEconomyContract,
+  visibility: AttributeVisibility,
+): PlayerEconomyContract {
+  if (visibility === "exact") {
+    return economy;
+  }
+  return {
+    ...economy,
+    marketValue: null,
+    marketValueSource: "missing_source",
+    salary: null,
+    annualSalary: null,
+    salarySource: "missing_source",
+    purchasePrice: null,
+    purchasePriceSource: "missing_source",
+  };
+}
+
+// T-024 (Fog-of-War-Leak): player.potential ist der exakte, interne Hidden-Score. Bei
+// visibility !== "exact" wird er durch die vorhandene scoutingLevel-Bandbreite
+// (buildPlayerScoutPotential) ersetzt statt roh durchgereicht zu werden.
+function maskPotentialForVisibility(
+  player: Pick<Player, "potential">,
+  visibility: AttributeVisibility,
+  scoutingLevel: number | null | undefined,
+  scoutPotential: PlayerScoutPotential | null,
+): { potential: number | null; scoutPotential: PlayerScoutPotential | null } {
+  if (visibility === "exact") {
+    return { potential: player.potential ?? null, scoutPotential };
+  }
+  return {
+    potential: null,
+    scoutPotential: buildPlayerScoutPotential({ player, scoutingLevel }),
+  };
+}
+
 function getGameStateScoutingSeed(gameState: GameState) {
   return [
     gameState.scenarioMeta?.sourceSaveId,
@@ -878,7 +924,7 @@ function buildScoutedDisciplineValuesFromPlayer(input: {
   });
 }
 
-function resolveAttributeVisibility(input: {
+export function resolveAttributeVisibility(input: {
   teamId: string | null | undefined;
   teamHumanControlled: boolean | null | undefined;
   manageableTeamIds?: string[] | null;
@@ -1336,7 +1382,7 @@ function buildPlayerRatingWithSeasonFallback(
   };
 }
 
-function resolveRosterEntry(
+export function resolveRosterEntry(
   rosters: RosterEntry[],
   playerId: string,
   activePlayerId?: string | null,
@@ -1348,7 +1394,7 @@ function resolveRosterEntry(
   return rosters.find((entry) => entry.playerId === playerId) ?? null;
 }
 
-function resolveTeam(
+export function resolveTeam(
   teams: Team[],
   rosterEntry: Pick<RosterEntry, "teamId"> | null,
 ) {
@@ -1773,6 +1819,23 @@ export function mergePlayerHistoryRowsWithSeasonTimeline(input: {
     left.seasonId.localeCompare(right.seasonId, "de", { numeric: true }),
   );
 
+  // Liefert für eine Season-ID die echte Row oder eine Platzhalter-Zeile.
+  const resolveTimelineRow = (seasonId: string): PlayerDrawerHistoryRow => {
+    const existing = rowBySeasonId.get(seasonId);
+    if (existing) {
+      return existing;
+    }
+    const snapshot = snapshotSeasons.find((entry) => entry.seasonId === seasonId) ?? null;
+    return buildEmptyHistoryRow({
+      seasonId,
+      seasonName:
+        snapshot?.seasonName ??
+        getCanonicalSeasonLabel({ seasonId, seasonName: null }) ??
+        seasonId,
+      isActiveSeason: seasonId === input.gameState.season.id,
+    });
+  };
+
   const timelineSeasonIds = [
     ...snapshotSeasons.map((snapshot) => snapshot.seasonId),
     input.gameState.season.id,
@@ -1793,21 +1856,43 @@ export function mergePlayerHistoryRowsWithSeasonTimeline(input: {
     );
   }
 
-  return visibleTimelineSeasonIds.map((seasonId) => {
-    const existing = rowBySeasonId.get(seasonId);
-    if (existing) {
-      return existing;
+  // Lückenlose Season-Enumeration: statt nur die bekannten (Snapshot-/Row-)
+  // Seasons zu zeigen, wird der Bereich von der frühest sichtbaren Season bis zur
+  // aktuellen Season durchgezählt. Fehlt für eine Season ein echter Datensatz,
+  // entsteht eine Platzhalter-Zeile — so erscheint z. B. Season 4 auch dann, wenn
+  // dafür (Snapshot-Persistenz-Lücke) kein Snapshot existiert. `joinedSeasonId`
+  // bleibt die Untergrenze (Spät-Einsteiger sehen keine Seasons vor ihrem
+  // Beitritt), die Zukunfts-Clamp (via `visibleTimelineSeasonIds`) die Obergrenze.
+  const currentSeasonNumber = getCurrentSeasonNumber(input.gameState);
+  const seasonNumberById = new Map(
+    visibleTimelineSeasonIds
+      .map((seasonId) => [seasonId, extractSeasonNumber({ seasonId, seasonName: null })] as const)
+      .filter((entry): entry is readonly [string, number] => entry[1] != null),
+  );
+  const firstKnownSeasonNumber = seasonNumberById.size > 0 ? Math.min(...seasonNumberById.values()) : null;
+
+  // Fail-open: sobald die kanonische Season-Nummerierung nicht auflösbar ist (oder
+  // die Untergrenze hinter der aktuellen Season läge), bleibt die alte,
+  // mengenbasierte Enumeration erhalten.
+  if (currentSeasonNumber == null || firstKnownSeasonNumber == null || firstKnownSeasonNumber > currentSeasonNumber) {
+    return visibleTimelineSeasonIds.map((seasonId) => resolveTimelineRow(seasonId));
+  }
+
+  // Echte Season-IDs (samt korrektem Label) je Season-Nummer wiederverwenden,
+  // fehlende Jahre als kanonische `season-<n>`-ID synthetisieren.
+  const seasonIdByNumber = new Map<number, string>();
+  for (const [seasonId, number] of seasonNumberById) {
+    if (!seasonIdByNumber.has(number)) {
+      seasonIdByNumber.set(number, seasonId);
     }
-    const snapshot = snapshotSeasons.find((entry) => entry.seasonId === seasonId) ?? null;
-    return buildEmptyHistoryRow({
-      seasonId,
-      seasonName:
-        snapshot?.seasonName ??
-        getCanonicalSeasonLabel({ seasonId, seasonName: null }) ??
-        seasonId,
-      isActiveSeason: seasonId === input.gameState.season.id,
-    });
-  });
+  }
+
+  const contiguousSeasonIds: string[] = [];
+  for (let number = firstKnownSeasonNumber; number <= currentSeasonNumber; number += 1) {
+    contiguousSeasonIds.push(seasonIdByNumber.get(number) ?? `season-${number}`);
+  }
+
+  return contiguousSeasonIds.map((seasonId) => resolveTimelineRow(seasonId));
 }
 
 function buildHistoryRows(input: {
@@ -2258,25 +2343,37 @@ export function buildPlayerDrawerDataFromGameState(input: {
     referenceSeasonId: seasonPerformance?.seasonId ?? input.gameState.season.id,
   });
   const economyCompare = buildPlayerEconomyCompareMap({ gameState: input.gameState }).get(player.id) ?? null;
-  const economy = resolvePlayerEconomyContract({
-    playerId: player.id,
-    player,
-    rosterEntry,
-  });
-  const boardTrust = buildBoardTrust({
-    gameState: input.gameState,
-    team,
-    player,
-    rosterEntry,
-    playerRating,
-    economy: {
-      marketValue: economy.marketValue,
-      salary: economy.salary,
-    },
-    coreAxisRankMaps,
-    rankPoolSize: playerRatingsById.size,
-    seasonPerformance,
-  });
+  // T-023: economy wird direkt nach der Auflösung maskiert, sodass jede nachgelagerte
+  // Verwendung (Output-Felder, historyRows, boardTrust-Input, transferContext) automatisch
+  // die maskierte Fassung sieht.
+  const economy = maskEconomyForVisibility(
+    resolvePlayerEconomyContract({
+      playerId: player.id,
+      player,
+      rosterEntry,
+    }),
+    attributeVisibility,
+  );
+  // T-025: boardTrust ist eine interne AI-Bewertung (nutzt u. a. exakte marketValue/salary als
+  // Input) und wird bei nicht-exakter Visibility komplett unterdrückt statt maskierter Werte
+  // durchzureichen.
+  const boardTrust =
+    attributeVisibility === "exact"
+      ? buildBoardTrust({
+          gameState: input.gameState,
+          team,
+          player,
+          rosterEntry,
+          playerRating,
+          economy: {
+            marketValue: economy.marketValue,
+            salary: economy.salary,
+          },
+          coreAxisRankMaps,
+          rankPoolSize: playerRatingsById.size,
+          seasonPerformance,
+        })
+      : null;
   const moraleAssessment = team && rosterEntry
     ? assessPlayerMorale({
         gameState: input.gameState,
@@ -2330,6 +2427,14 @@ export function buildPlayerDrawerDataFromGameState(input: {
     spentXP: player.spentXP ?? 0,
     lifetimeXP: player.lifetimeXP ?? null,
   });
+  // T-024: player.potential (exakter Hidden-Score) und der davon abgeleitete scoutPotential
+  // werden bei nicht-exakter Visibility durch eine scoutingLevel-Bandbreite ersetzt.
+  const maskedPotential = maskPotentialForVisibility(
+    player,
+    attributeVisibility,
+    scoutingLevel,
+    progressionForecast.scoutPotential,
+  );
   const seasonOrganicForecast =
     team && rosterEntry && (team.humanControlled !== false || DEBUG_FORCE_PLAYER_VISIBILITY)
       ? buildOrganicSeasonProgression({
@@ -2591,8 +2696,8 @@ export function buildPlayerDrawerDataFromGameState(input: {
     injurySummary,
     injuryHistoryRows,
     form: player.form ?? null,
-    potential: player.potential ?? null,
-    scoutPotential: progressionForecast.scoutPotential,
+    potential: maskedPotential.potential,
+    scoutPotential: maskedPotential.scoutPotential,
     developmentInsight: buildPlayerDevelopmentInsight({
       gameState: input.gameState,
       player,
@@ -2651,6 +2756,11 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
   source: "sqlite" | "prisma";
   activePlayerId?: string | null;
   playerCatalogById?: Map<string, Player>;
+  // T-026: optional, damit Aufrufer außerhalb des eigenen Team-Kontexts (Scouting fremder
+  // Teams) dieselbe manageableTeamIds-gestützte Visibility-Auflösung nutzen können wie der
+  // gameState-Hauptpfad. Ohne Angabe verhält es sich wie bisher (context.team gilt als
+  // verwaltbar), da diese Funktion historisch nur für die eigene Lineup-Ansicht genutzt wird.
+  manageableTeamIds?: string[] | null;
 }): PlayerDetailDrawerData | null {
   const catalogPlayer = input.playerCatalogById?.get(input.playerId) ?? null;
   const rosterPlayer = input.context.rosterPlayers.find((entry) => entry.id === input.playerId) ?? null;
@@ -2661,11 +2771,16 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
   const activePlayer = input.context.activePlayers.find((entry) =>
     input.activePlayerId ? entry.id === input.activePlayerId : entry.playerId === input.playerId,
   ) ?? null;
-  const attributeVisibility: AttributeVisibility = DEBUG_FORCE_PLAYER_VISIBILITY
-    ? "exact"
-    : (input.context.team as { humanControlled?: boolean }).humanControlled === false
-      ? "scouted"
-      : "exact";
+  // T-026: dieselbe resolveAttributeVisibility()-Logik wie buildPlayerDrawerDataFromGameState
+  // statt einer eigenen, nur ans Debug-Flag gekoppelten Ad-hoc-Bedingung. Der Debug-Kurzschluss
+  // (DEBUG_FORCE_PLAYER_VISIBILITY -> "exact") lebt zentral in resolveAttributeVisibility.
+  const attributeVisibility: AttributeVisibility = resolveAttributeVisibility({
+    teamId: input.context.team.id,
+    teamHumanControlled: (input.context.team as { humanControlled?: boolean }).humanControlled !== false,
+    manageableTeamIds: input.manageableTeamIds ?? [input.context.team.id],
+    scoutingLevel: null,
+    isOnViewingTeamRoster: Boolean(activePlayer),
+  });
   const playerCatalog = input.playerCatalogById ? [...input.playerCatalogById.values()] : catalogPlayer ? [catalogPlayer] : [];
   const activePlayerIds = Array.from(new Set(input.context.activePlayers.map((entry) => entry.playerId).filter(Boolean)));
   const coreAxisRankMaps = buildCoreAxisRankMaps(playerCatalog, activePlayerIds);
@@ -2674,18 +2789,22 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     normalizationPoolPlayerIds: activePlayerIds,
     rankPoolPlayerIds: activePlayerIds,
   }).find((entry) => entry.playerId === input.playerId) ?? null;
-  const economy = resolvePlayerEconomyContract({
-    playerId: input.playerId,
-    player: catalogPlayer,
-    rosterEntry: activePlayer
-      ? {
-          salary: activePlayer.salary ?? null,
-          purchasePrice: null,
-          currentValue: activePlayer.marketValue ?? null,
-          contractLength: activePlayer.contractLength ?? null,
-        }
-      : null,
-  });
+  // T-023: dieselbe zentrale Maskierung wie im gameState-Hauptpfad.
+  const economy = maskEconomyForVisibility(
+    resolvePlayerEconomyContract({
+      playerId: input.playerId,
+      player: catalogPlayer,
+      rosterEntry: activePlayer
+        ? {
+            salary: activePlayer.salary ?? null,
+            purchasePrice: null,
+            currentValue: activePlayer.marketValue ?? null,
+            contractLength: activePlayer.contractLength ?? null,
+          }
+        : null,
+    }),
+    attributeVisibility,
+  );
 
   const disciplineValues = catalogPlayer
     ? buildDisciplineValuesFromPlayer(catalogPlayer, input.context.disciplines)
@@ -2946,7 +3065,9 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     },
     injuryHistoryRows: [],
     form: catalogPlayer?.form ?? rosterPlayer?.form ?? null,
-    potential: catalogPlayer?.potential ?? rosterPlayer?.potential ?? null,
+    // T-024: gleiche Kopplung an attributeVisibility wie im Hauptpfad — der exakte Hidden-Score
+    // wird bei nicht-exakter Visibility unterdrückt statt roh durchgereicht.
+    potential: attributeVisibility === "exact" ? catalogPlayer?.potential ?? rosterPlayer?.potential ?? null : null,
     scoutPotential: null,
     developmentInsight: null,
     organicProgression: detailPlayer?.lastOrganicProgression ?? null,

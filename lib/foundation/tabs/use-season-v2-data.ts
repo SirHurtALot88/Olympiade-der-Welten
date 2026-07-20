@@ -6,6 +6,7 @@ import type { SortState } from "@/lib/foundation/tabs/cockpit-types";
 import { shouldBuildSeasonTopPlayerRows } from "@/lib/foundation/tabs/season-v2-derivations";
 import { sortFoundationTableRows } from "@/lib/foundation/foundation-table-sort";
 import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
+import { getSnapshotPlayerPerformances } from "@/lib/foundation/snapshot-player-performance";
 
 function roundViewNumber(value: number, digits = 4) {
   return Number(value.toFixed(digits));
@@ -108,7 +109,10 @@ export function useSeasonV2Data(input: UseSeasonV2DataInput) {
     const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
 
     if (selectedSeasonSnapshot) {
-      return [...(selectedSeasonSnapshot.playerPerformances ?? [])]
+      // Merge beide Snapshot-Arrays (playerPerformances + playerPerformanceSnapshots)
+      // statt nur des ersten — robust gegen ältere Snapshots, die nur das
+      // Legacy-Array befüllt haben (sonst leere Archiv-Top-Spieler-Tabelle).
+      return [...getSnapshotPlayerPerformances(selectedSeasonSnapshot)]
         .map((player) => {
           const activePlayer = playerById.get(player.playerId) ?? null;
           const team = player.teamId ? teamById.get(player.teamId) ?? null : null;

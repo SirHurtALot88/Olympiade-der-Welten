@@ -9,6 +9,7 @@ import { formatScoutedImpactDelta } from "@/lib/market/transfermarkt-scouting";
 import type { ScoutingReportData } from "@/lib/scouting/scouting-report-service";
 import { NlAbilityStars, VeloPotentialStars, VeloScoutMetric, VeloStarRating, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
 import { NlEmptyState, StatChip, StatChipRow } from "@/components/foundation/new-look";
+import { formatNlNumber } from "@/components/foundation/new-look/nl-tones";
 
 type ScoutingReportPanelProps = {
   report: ScoutingReportData | null;
@@ -32,7 +33,7 @@ function getInitials(name: string) {
 }
 
 function formatCompactNumber(value: number, digits = 1) {
-  return value.toFixed(digits);
+  return formatNlNumber(value, digits);
 }
 
 function getDeltaTone(delta: number | null) {
@@ -197,10 +198,10 @@ export default function ScoutingReportPanel({
           <span className="eyebrow">Top-6 Impact (dein Team)</span>
           <p className="scouting-report-impact-summary">
             Top-6 Achsen-Schnitt{" "}
-            <strong>{report.axisImpactComposite.before != null ? report.axisImpactComposite.before.toFixed(1) : "—"}</strong>
+            <strong>{report.axisImpactComposite.before != null ? formatNlNumber(report.axisImpactComposite.before, 1) : "—"}</strong>
             {" → "}
             <strong className={getDeltaTone(report.axisImpactComposite.delta)}>
-              {report.axisImpactComposite.after != null ? report.axisImpactComposite.after.toFixed(1) : "—"} (
+              {report.axisImpactComposite.after != null ? formatNlNumber(report.axisImpactComposite.after, 1) : "—"} (
               {formatImpactDelta(report.axisImpactComposite.delta)})
             </strong>
           </p>
@@ -214,7 +215,7 @@ export default function ScoutingReportPanel({
               <span key={row.axis} className={`scouting-report-axis-pill ${getDeltaTone(row.delta)}`}>
                 <b>{AXIS_LABELS[row.axis]}</b>
                 <small>
-                  {row.before != null ? row.before.toFixed(1) : "—"} → {row.after != null ? row.after.toFixed(1) : "—"} (
+                  {row.before != null ? formatNlNumber(row.before, 1) : "—"} → {row.after != null ? formatNlNumber(row.after, 1) : "—"} (
                   {formatImpactDelta(row.delta)})
                 </small>
               </span>

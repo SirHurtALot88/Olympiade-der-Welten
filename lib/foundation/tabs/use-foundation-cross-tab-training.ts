@@ -17,10 +17,6 @@ import {
 } from "@/lib/facilities/facility-effects";
 import { getTeamDevelopmentTrainingBonusPct } from "@/lib/foundation/team-development-tendency";
 import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
-import {
-  evaluateGamePhaseAction,
-  isTrainingIntensityLockedForSeason,
-} from "@/lib/foundation/game-phase-action-policy";
 import { buildTrainingPlayerRowView } from "@/lib/foundation/training-player-row-view";
 import { BASE_MATCHDAY_RECOVERY } from "@/lib/fatigue/fatigue-injury-service";
 import { buildOrganicSeasonProgression } from "@/lib/training/organic-season-progression";
@@ -302,18 +298,12 @@ export function useFoundationCrossTabTraining(input: {
     });
   }, [input.gameState, input.selectedTeam, shouldBuildTrainingCompactDerivations]);
 
-  const trainingIntensityLocked = useMemo(
-    () => isTrainingIntensityLockedForSeason(input.gameState),
-    [input.gameState],
-  );
-  const trainingIntensityLockWarning = useMemo(
-    () =>
-      evaluateGamePhaseAction(input.gameState, "set_training").warnings.includes(
-        "early_season_setup_allowed_before_first_result",
-      ),
-    [input.gameState],
-  );
-
+  // T-009: Der Season-Phasen-Lock fuer Trainingsintensitaet wurde entfernt
+  // (isTrainingIntensityLockedForSeason() liefert dauerhaft `false`, siehe
+  // lib/foundation/game-phase-action-policy.ts). Training muss fuer das
+  // eigene Team IMMER einstellbar bleiben — daher hier keine
+  // trainingIntensityLocked/trainingIntensityLockWarning-Berechnung mehr;
+  // die einzig verbleibende Sperre ist `managementLocked` (fremdes Team).
   const trainingPlayerRowViews = useMemo(() => {
     if (!shouldBuildTrainingCompactDerivations) {
       return [];
@@ -322,39 +312,24 @@ export function useFoundationCrossTabTraining(input: {
       const view = buildTrainingPlayerRowView({ ...row, gameState: input.gameState }, TRAINING_ATTRIBUTE_LABELS);
       const plan = trainingLoadPlanByPlayerId.get(row.player.id);
       if (!plan) {
-        return { ...view, trainingIntensityLocked, trainingIntensityLockWarning };
+        return view;
       }
       return {
         ...view,
         recommendedTrainingMode: plan.selectedMode,
         recommendedTrainingDetail: plan.reasons[0] ?? null,
         recommendedTrainingMatchesCurrent: plan.selectedMode === row.mode,
-        trainingIntensityLocked,
-        trainingIntensityLockWarning,
       };
     });
-  }, [
-    filteredTrainingPlayerForecastRows,
-    input.gameState,
-    shouldBuildTrainingCompactDerivations,
-    trainingLoadPlanByPlayerId,
-    trainingIntensityLocked,
-    trainingIntensityLockWarning,
-  ]);
+  }, [filteredTrainingPlayerForecastRows, input.gameState, shouldBuildTrainingCompactDerivations, trainingLoadPlanByPlayerId]);
 
   const playerProfileTrainingRow = useMemo(() => {
     if (!input.playerProfileData) {
       return null;
     }
     const row = trainingPlayerForecastRows.find((entry) => entry.player.id === input.playerProfileData?.playerId);
-    return row
-      ? {
-          ...buildTrainingPlayerRowView({ ...row, gameState: input.gameState }, TRAINING_ATTRIBUTE_LABELS),
-          trainingIntensityLocked,
-          trainingIntensityLockWarning,
-        }
-      : null;
-  }, [input.playerProfileData, input.gameState, trainingPlayerForecastRows, trainingIntensityLocked, trainingIntensityLockWarning]);
+    return row ? buildTrainingPlayerRowView({ ...row, gameState: input.gameState }, TRAINING_ATTRIBUTE_LABELS) : null;
+  }, [input.playerProfileData, input.gameState, trainingPlayerForecastRows]);
 
   const trainingFacilityRows = useMemo(() => {
     if (!shouldBuildTrainingFacilitiesDerivations) {

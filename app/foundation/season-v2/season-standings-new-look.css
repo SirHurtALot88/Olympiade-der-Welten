@@ -1,0 +1,60 @@
+/*
+ * Co-located Overrides für den "Neuer Look"-Saisonstand (season-v2).
+ * Additiv zu den Basis-Regeln in `app/globals.css`. Die Selektoren sind
+ * bewusst spezifischer (zwei Klassen auf demselben Element) als ihre
+ * globalen Gegenstücke, damit sie unabhängig von der Bundle-Reihenfolge
+ * gewinnen.
+ */
+
+/* ------------------------------------------------------------------ *
+ * FINDING B — GM-Büro: kein ultra-breiter Horizontal-Scroll mehr.
+ * Statt des flex-Streifens (`.nl-standings-players`) reflowt das GM-Büro
+ * in ein responsives Grid, sodass alle Vereine ohne Riesen-Scroll
+ * erreichbar sind (auto-fill/minmax wickelt in mehrere Zeilen um).
+ * ------------------------------------------------------------------ */
+.is-new-look .nl-standings-players.nl-standings-gm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--nl-s2);
+  overflow: visible;
+  /* Scroll-Shadow-Affordanz & Snap des Streifens sind im Grid unnötig. */
+  background: none;
+  scroll-snap-type: none;
+}
+
+.is-new-look .nl-standings-players.nl-standings-gm-grid > li {
+  flex: initial;
+  min-width: 0;
+  scroll-snap-align: none;
+}
+
+.is-new-look .nl-standings-players.nl-standings-gm-grid > li > .nl-standings-player {
+  width: 100%;
+}
+
+/* Lange GM-/Team-Namen dürfen im Grid ellipsieren statt die Zelle zu
+ * sprengen (der Streifen nutzte `white-space: nowrap` ohne Begrenzung). */
+.is-new-look .nl-standings-players.nl-standings-gm-grid .nl-standings-player-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.is-new-look .nl-standings-players.nl-standings-gm-grid .nl-standings-player-name,
+.is-new-look .nl-standings-players.nl-standings-gm-grid .nl-standings-player-team {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ *
+ * FINDING C — Daten-Tabelle: Seite scrollt nie seitlich.
+ * `.nl-standings-table-shell` hat bereits `overflow-x: auto`, wächst aber
+ * in der Spalten-Flexbox `.nl-standings` auf die `min-width: 1180px` der
+ * Tabelle. `max-width: 100%` + `min-width: 0` geben die Breite frei, sodass
+ * der interne Container scrollt (wie `.nl-players-table-shell`) statt die
+ * ganze Seite.
+ * ------------------------------------------------------------------ */
+.is-new-look .nl-standings-table-shell {
+  max-width: 100%;
+  min-width: 0;
+}

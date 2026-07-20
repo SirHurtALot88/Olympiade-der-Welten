@@ -15,6 +15,7 @@ export function shouldLoadSeasonArchiveForView(
     activeView === "ranks" ||
     activeView === "diszis" ||
     activeView === "leagueLeaders" ||
+    activeView === "allTimeTable" ||
     (activeView === "teams" && options.showExtendedTeamPanels === true)
   ) {
     return true;

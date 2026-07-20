@@ -9,12 +9,15 @@ import {
   NlDeltaChip,
   NlMedalBadge,
   NlProgressBar,
+  NlRankingDrawer,
   NlSparkline,
   NlSubTabs,
   StatChip,
   StatChipRow,
   formatNlNumber,
   nlToneClass,
+  type NlRankingDrawerRow,
+  type NlTone,
 } from "@/components/foundation/new-look";
 import { VeloImpactStrip } from "@/components/foundation/velo-ui";
 import type { MatchdayArenaV2ClientProps } from "@/app/foundation/matchday-arena-v2/MatchdayArenaV2Client";
@@ -41,6 +44,11 @@ import {
 } from "@/lib/foundation/matchday-arena-session-cache";
 import { getTeamLogoModel } from "@/lib/data/mediaAssets";
 import type { Team } from "@/lib/data/olyDataTypes";
+import { RelationshipTag } from "@/components/foundation/RivalTag";
+import {
+  buildTeamRelationshipMap,
+  type TeamRelationshipKind,
+} from "@/lib/foundation/team-relationship";
 import { getSeasonV2TeamTagStyle } from "@/app/foundation/season-v2/SeasonStandingsV2Client";
 import { useArenaRoomSync } from "@/lib/room/use-arena-room-sync";
 import type { RoomArenaState } from "@/types/game";
@@ -66,6 +74,12 @@ import type { RoomArenaState } from "@/types/game";
  */
 
 type ArenaNewLookBoardSide = "d1" | "d2" | "total";
+
+/**
+ * MVP-Drilldown: welche Disziplin-Spalte der Tages-MVP-Rangliste im
+ * NlRankingDrawer geöffnet ist ("d1"/"d2"/"pp"; `null` = geschlossen).
+ */
+type ArenaMvpDrawerKey = "d1" | "d2" | "pp";
 
 type ArenaNewLookLoadState = "loading" | "ready" | "error";
 
@@ -261,6 +275,8 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
   const [speedIndex, setSpeedIndex] = useState(1);
   const [standingsPreview, setStandingsPreview] = useState<ArenaNewLookStandingsPreview | null>(null);
+  // MVP-Drilldown: geöffnete Disziplin-Spalte des Ranglisten-Drawers (null = zu).
+  const [mvpDrawerKey, setMvpDrawerKey] = useState<ArenaMvpDrawerKey | null>(null);
   const rowNodesRef = useRef<Map<string, HTMLElement>>(new Map());
 
   // Phase 3 (Teilen): Zustand der Kopier-Bestätigung am eigenen Ergebnis-Recap.
@@ -480,6 +496,19 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
 
   const teamById = useMemo(() => new Map(props.teams.map((team) => [team.teamId, team] as const)), [props.teams]);
 
+  // Freund/Feind-Kodierung (additiv): Beziehung jedes Teams zum aktiven Team
+  // (blau=deine, grün=verbündet, rot=Rival). Einmal aus Teams + Control-Settings
+  // gebaut, danach O(1)-Lookup pro Zeile/Feld-Marker. Präzedenz mine > rival > ally.
+  const teamRelationshipMap = useMemo(
+    () => buildTeamRelationshipMap({ teams: props.teams, teamControlSettings: props.teamControlSettingsMap }, params.teamId),
+    [props.teams, props.teamControlSettingsMap, params.teamId],
+  );
+  const relationshipOf = (teamId: string): TeamRelationshipKind | null => teamRelationshipMap.get(teamId) ?? null;
+  const relationshipRowClass = (teamId: string): string => {
+    const kind = teamRelationshipMap.get(teamId);
+    return kind ? ` is-rel-${kind}` : "";
+  };
+
   // Spoilerfreies Briefing: aktuelle Liga-Ausgangslage vor dem Spieltag.
   // Nur `currentRank` — projizierte Werte bleiben aussen vor, damit das
   // Reveal-Ergebnis nicht vorweggenommen wird. Zeigt Top 3 + die eigene
@@ -536,6 +565,31 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
   const resultsUnlocked = isResultPhase || boardSide === "total";
   const finalPhaseIndex = MATCHDAY_ARENA_PHASES.findIndex((phase) => phase.id === "final");
   const mvpsRevealed = phaseIndex >= finalPhaseIndex || boardSide === "total";
+
+  // MVP-Drilldown: Konfiguration der drei Disziplin-Spalten (Label/Ton/Quelle).
+  // Quelle ist die bereits berechnete, vollständige Top-Liste (bis zu 10) — es
+  // wird nichts neu berechnet oder nachgeladen.
+  const mvpDrawerConfig: Record<
+    ArenaMvpDrawerKey,
+    { label: string; tone: NlTone; subtitle: string; players: MatchdayMvpTopPlayerRow[] }
+  > = {
+    d1: { label: d1Label, tone: "pow", subtitle: "Beste Einzelwertungen · Endscore", players: scoreFeed?.d1TopPlayers ?? [] },
+    d2: { label: d2Label, tone: "men", subtitle: "Beste Einzelwertungen · Endscore", players: scoreFeed?.d2TopPlayers ?? [] },
+    pp: { label: "PP-Gewinner", tone: "soc", subtitle: "Beste Einzelwertungen · Endscore", players: scoreFeed?.ppWinners ?? [] },
+  };
+  const activeMvpDrawer = mvpDrawerKey ? mvpDrawerConfig[mvpDrawerKey] : null;
+  const activeMvpDrawerRows: NlRankingDrawerRow[] = activeMvpDrawer
+    ? activeMvpDrawer.players.map((player, index) => ({
+        id: `${player.playerId}-${player.slotIndex}`,
+        rank: index + 1,
+        name: player.playerName,
+        sub: player.teamName,
+        value: player.finalPlayerScore,
+        displayValue: formatNlNumber(player.finalPlayerScore, 1),
+        tone: activeMvpDrawer.tone,
+        isOwn: player.teamId === params.teamId,
+      }))
+    : [];
 
   const activeView = boardSide === "d2" ? d2View : d1View;
 
@@ -973,9 +1027,17 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
       ? (totalRows.find((row) => row.teamId === params.teamId)?.rank ?? null)
       : (rankMaps.current.get(params.teamId) ?? null);
 
-  function renderTeamButton(teamId: string, teamName: string) {
+  // `relationship` (optional): rendert in den Seiten-Tabellen den Freund/Feind-Chip
+  // direkt in der Team-Zelle (wie das Rivalen-Tag im Saisonstand). Auf dem dichten
+  // Feld-Board bewusst weggelassen — dort trägt die Zeile Ring + Eck-Wimpel.
+  function renderTeamButton(
+    teamId: string,
+    teamName: string,
+    options?: { relationship?: TeamRelationshipKind | null },
+  ) {
     const team = teamById.get(teamId) ?? null;
     const logo = team ? getTeamLogoModel(team, { variant: "thumb" }) : null;
+    const relationship = options?.relationship ?? null;
     return (
       <button
         type="button"
@@ -985,7 +1047,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
       >
         <BudgetedMediaImage
           src={logo?.src ?? null}
-          alt={`${teamName} Logo`}
+          alt=""
           className="nl-arena-crest"
           width={26}
           height={26}
@@ -997,6 +1059,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
           }
         />
         <span className="nl-arena-teamname">{teamName}</span>
+        {relationship ? <RelationshipTag kind={relationship} className="nl-arena-rel-tag" /> : null}
       </button>
     );
   }
@@ -1081,7 +1144,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
               }}
               role="listitem"
               aria-current={isOwnTeam ? "true" : undefined}
-              className={`nl-arena-row${isOwnTeam ? " is-own-team" : ""}${rankDelta != null && rankDelta !== 0 ? (rankDelta > 0 ? " is-moving-up" : " is-moving-down") : ""}${isExpanded ? " is-expanded" : ""}${isLeaderGlow ? " is-leader" : ""}`}
+              className={`nl-arena-row${isOwnTeam ? " is-own-team" : ""}${relationshipRowClass(row.teamId)}${rankDelta != null && rankDelta !== 0 ? (rankDelta > 0 ? " is-moving-up" : " is-moving-down") : ""}${isExpanded ? " is-expanded" : ""}${isLeaderGlow ? " is-leader" : ""}`}
               style={{
                 ...(team ? getSeasonV2TeamTagStyle(team.shortCode) : undefined),
                 top: Math.max(0, rank - 1) * NL_ARENA_ROW_STRIDE,
@@ -1101,6 +1164,16 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                   </span>
                   <span className="sr-only">Dein Team</span>
                 </>
+              ) : relationshipOf(row.teamId) ? (
+                // Feld-Marker: kleiner Freund/Feind-Wimpel (blau/grün/rot) für
+                // gesteuerte/verbündete/rivalisierende Teams — analog zur "Du"-Fahne,
+                // absolut positioniert (kein Layout-Eingriff ins Zeilen-Grid).
+                <span
+                  className={`nl-arena-rel-flag is-rel-${relationshipOf(row.teamId)}`}
+                  aria-hidden="true"
+                >
+                  {relationshipOf(row.teamId) === "mine" ? "★" : relationshipOf(row.teamId) === "ally" ? "🤝" : "⚔"}
+                </span>
               ) : null}
               <span className="nl-arena-rank">
                 <span className="nl-arena-ranknum nl-tnum">{rank}</span>
@@ -1139,7 +1212,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                   className="nl-arena-score-toggle"
                   aria-expanded={isExpanded}
                   aria-label={`Score-Herkunft von ${row.teamName} ${isExpanded ? "einklappen" : "aufklappen"}`}
-                  title="Score-Herkunft aufklappen"
+                  title={`Score-Herkunft ${isExpanded ? "einklappen" : "aufklappen"}`}
                   onClick={() => setExpandedTeamId((current) => (current === row.teamId ? null : row.teamId))}
                 >
                   {/* Score als Count-Up (~400 ms) — konsistent mit dem Ergebnis-Screen.
@@ -1201,7 +1274,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                   rowNodesRef.current.delete(row.teamId);
                 }
               }}
-              className={`nl-arena-totalrow${isOwnTeam ? " is-own-team" : ""}${row.medal === "gold" ? " is-leader" : ""}`}
+              className={`nl-arena-totalrow${isOwnTeam ? " is-own-team" : ""}${relationshipRowClass(row.teamId)}${row.medal === "gold" ? " is-leader" : ""}`}
               style={team ? getSeasonV2TeamTagStyle(team.shortCode) : undefined}
             >
               <span className="nl-arena-rank">
@@ -1211,7 +1284,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                   <span className="nl-arena-ranknum nl-tnum">{row.rank}</span>
                 )}
               </span>
-              {renderTeamButton(row.teamId, row.teamName)}
+              {renderTeamButton(row.teamId, row.teamName, { relationship: relationshipOf(row.teamId) })}
               <span className="nl-arena-track" aria-hidden="true">
                 <span className="nl-arena-track-fill" style={{ width: `${widthPct}%` }} />
               </span>
@@ -1312,15 +1385,24 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
     );
   }
 
-  function renderMvpColumn(title: string, tone: "pow" | "men" | "soc", players: MatchdayMvpTopPlayerRow[]) {
+  // `players` ist die vollständige (bereits berechnete, bis zu 10 Einträge)
+  // Disziplin-Liste; die Karte zeigt weiter nur die Top-3, der Rest ist über den
+  // MVP-Drilldown-Drawer erreichbar (`drawerKey`). Keine neuen Daten/Server-Calls.
+  function renderMvpColumn(
+    title: string,
+    tone: "pow" | "men" | "soc",
+    drawerKey: ArenaMvpDrawerKey,
+    players: MatchdayMvpTopPlayerRow[],
+  ) {
+    const shown = players.slice(0, 3);
     return (
       <div className={`nl-arena-mvp-column ${nlToneClass(tone)}`}>
         <span className="nl-arena-mvp-title">{title}</span>
-        {players.length === 0 ? (
+        {shown.length === 0 ? (
           <p className="nl-arena-mvp-empty">Noch keine Wertung.</p>
         ) : (
           <ol className="nl-arena-mvp-list">
-            {players.map((player, index) => (
+            {shown.map((player, index) => (
               <li key={`${player.playerId}-${player.slotIndex}`} className="nl-arena-mvp-row">
                 <span className="nl-arena-mvp-rank">
                   {index < 3 ? (
@@ -1358,6 +1440,17 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
             ))}
           </ol>
         )}
+        {players.length > shown.length ? (
+          // Drilldown-Trigger: nur wenn die volle Liste über die Top-3 hinausgeht.
+          <button
+            type="button"
+            className="nl-arena-mvp-more"
+            onClick={() => setMvpDrawerKey(drawerKey)}
+            data-testid={`nl-arena-mvp-more-${drawerKey}`}
+          >
+            Alle {players.length} anzeigen
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -1548,17 +1641,23 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
               </span>
             </div>
             <ol className="nl-arena-briefing-table" aria-label="Aktuelle Liga-Ausgangslage">
-              {arenaBriefing.window.map((row) => (
-                <li
-                  key={row.teamId}
-                  className={`nl-arena-briefing-row${row.isOwn ? " is-own" : ""}`}
-                  aria-current={row.isOwn ? "true" : undefined}
-                >
-                  <span className="nl-arena-briefing-row-rank nl-tnum">{row.rank}</span>
-                  <span className="nl-arena-briefing-row-name">{row.teamName}</span>
-                  <span className="nl-arena-briefing-row-code">{row.teamCode}</span>
-                </li>
-              ))}
+              {arenaBriefing.window.map((row) => {
+                const relationship = relationshipOf(row.teamId);
+                return (
+                  <li
+                    key={row.teamId}
+                    className={`nl-arena-briefing-row${row.isOwn ? " is-own" : ""}${relationshipRowClass(row.teamId)}`}
+                    aria-current={row.isOwn ? "true" : undefined}
+                  >
+                    <span className="nl-arena-briefing-row-rank nl-tnum">{row.rank}</span>
+                    <span className="nl-arena-briefing-row-name">
+                      {row.teamName}
+                      {relationship ? <RelationshipTag kind={relationship} className="nl-arena-rel-tag" /> : null}
+                    </span>
+                    <span className="nl-arena-briefing-row-code">{row.teamCode}</span>
+                  </li>
+                );
+              })}
             </ol>
           </div>
         </NlCard>
@@ -2154,9 +2253,9 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
           >
             {mvpsRevealed ? (
               <div className="nl-arena-mvp-grid">
-                {renderMvpColumn(d1Label, "pow", (scoreFeed?.d1TopPlayers ?? []).slice(0, 3))}
-                {renderMvpColumn(d2Label, "men", (scoreFeed?.d2TopPlayers ?? []).slice(0, 3))}
-                {renderMvpColumn("PP-Gewinner", "soc", (scoreFeed?.ppWinners ?? []).slice(0, 3))}
+                {renderMvpColumn(d1Label, "pow", "d1", scoreFeed?.d1TopPlayers ?? [])}
+                {renderMvpColumn(d2Label, "men", "d2", scoreFeed?.d2TopPlayers ?? [])}
+                {renderMvpColumn("PP-Gewinner", "soc", "pp", scoreFeed?.ppWinners ?? [])}
               </div>
             ) : (
               <p className="nl-arena-mvp-teaser">
@@ -2165,6 +2264,29 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
               </p>
             )}
           </NlCard>
+
+          {/* MVP-Drilldown: die volle Disziplin-Rangliste (bis zu 10, bereits
+              berechnet) im leichten NlRankingDrawer — nur im Finale/Ergebnis
+              erreichbar (`mvpsRevealed`), also spoilerfrei. Reihen-Klick öffnet
+              das Spielerprofil, wie schon die Namens-Buttons in der Karte. */}
+          {mvpsRevealed && activeMvpDrawer ? (
+            <NlRankingDrawer
+              open={mvpDrawerKey != null}
+              onClose={() => setMvpDrawerKey(null)}
+              metricLabel={activeMvpDrawer.label}
+              metricKey={`mvp-${mvpDrawerKey}`}
+              subtitle={activeMvpDrawer.subtitle}
+              rows={activeMvpDrawerRows}
+              emptyLabel="Noch keine Wertung."
+              onSelectRow={(row) => {
+                // rank == index+1 in `players` → Spieler eindeutig auflösen.
+                const player = activeMvpDrawer.players[row.rank - 1];
+                if (player) {
+                  props.onOpenPlayerDetails?.({ playerId: player.playerId });
+                }
+              }}
+            />
+          ) : null}
 
           {renderDiagnose(true, 0)}
         </>

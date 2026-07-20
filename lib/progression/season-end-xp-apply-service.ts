@@ -11,8 +11,7 @@ import type {
   PlayerProgressionSpendUpgradeRecord,
   TeamFacilityCollection,
 } from "@/lib/data/olyDataTypes";
-import { getTeamFacilityState, applyTrainingXpFacilityModifiers } from "@/lib/facilities/facility-effects";
-import { getTeamDevelopmentTrainingBonusPct } from "@/lib/foundation/team-development-tendency";
+import { getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import {
   buildPlayerEconomyCompareReport,
   resolveRankTableMarketValueFromCompareRow,
@@ -28,9 +27,11 @@ import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-con
 import { buildPlayerSeasonPerformance } from "@/lib/foundation/player-season-performance";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
-import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
-import { buildPlayerDevelopmentLevelupModel, type DevelopmentRegressionEventPreview } from "@/lib/training/training-levelup-service";
-import { buildOrganicSeasonProgression, type OrganicSeasonProgressionResult } from "@/lib/training/organic-season-progression";
+import {
+  buildOrganicSeasonProgression,
+  resolveSeasonTrainingAccumulatorInputs,
+  type OrganicSeasonProgressionResult,
+} from "@/lib/training/organic-season-progression";
 import { reconcilePlayerPotentialRecordsForGameState } from "@/lib/scouting/player-potential-ceiling-service";
 import {
   buildCoreStatsFromDisciplineRatings,
@@ -140,11 +141,16 @@ export type EconomyPreviewContext = {
  * when the cloned gameState invalidates WeakMap caches.
  */
 export type PreComputedSeasonXpEntry = {
+  /** @deprecated XP-System abgeschafft — immer 0. Reale Entwicklung läuft organisch. */
   earnedSeasonXP: number;
+  /** @deprecated XP-System abgeschafft — immer 0. */
   trainingXPAfterFacilities: number;
+  /** @deprecated XP-System abgeschafft — immer 0. */
   performanceXP: number;
-  forecast: ReturnType<typeof buildPlayerProgressionForecast> | null;
-  regressionEvent: DevelopmentRegressionEventPreview | null;
+  /** @deprecated XP-System abgeschafft — immer null. */
+  forecast: null;
+  /** @deprecated XP-System abgeschafft — immer null. */
+  regressionEvent: null;
   warnings: string[];
   organicProgression: OrganicSeasonProgressionResult | null;
   /** Season appearance count, pre-computed from the initial gameState to avoid per-team cache rebuilds. */
@@ -250,6 +256,28 @@ export function buildEconomyPreviewContext(gameState: GameState): EconomyPreview
   return getEconomyPreviewContext(gameState);
 }
 
+function resolveSeasonTotalMatchdays(gameState: GameState): number {
+  const declared = gameState.season.totalMatchdays;
+  if (typeof declared === "number" && Number.isFinite(declared) && declared > 0) return Math.floor(declared);
+  const fromIds = gameState.season.matchdayIds?.length ?? 0;
+  return fromIds > 0 ? fromIds : 10;
+}
+
+/**
+ * Anti-cheese (Teil B, B.1/B.2): resolves the per-matchday-accumulator overrides for
+ * `buildOrganicSeasonProgression`. Spread into the call — when there is no usable accumulator the
+ * result is `{}`, so both params stay undefined and the organic module falls back to mode-at-season-end.
+ */
+function accumulatorProgressionOverrides(gameState: GameState, player: Player) {
+  return (
+    resolveSeasonTrainingAccumulatorInputs({
+      accumulator: player.seasonTrainingAccumulator,
+      seasonId: gameState.season.id,
+      totalMatchdays: resolveSeasonTotalMatchdays(gameState),
+    }) ?? {}
+  );
+}
+
 /**
  * Pre-computes per-player season XP and organic progression for all rostered players
  * using the provided save's gameState. Call this ONCE before the team loop and pass the
@@ -274,7 +302,12 @@ export function buildPreComputedSeasonXpMap(save: PersistedSaveGame): Map<string
     const facilities = facilitiesByTeamId.get(rosterEntry.teamId)!;
 
     const seasonXp = getSeasonXp({ save, player, teamId: rosterEntry.teamId, facilities, playerRating: ratings.get(player.id) ?? null });
-    const organicProgression = buildOrganicSeasonProgression({ gameState, player, facilities });
+    const organicProgression = buildOrganicSeasonProgression({
+      gameState,
+      player,
+      facilities,
+      ...accumulatorProgressionOverrides(gameState, player),
+    });
     const seasonPerf = buildPlayerSeasonPerformance(gameState, player.id);
 
     result.set(player.id, { ...seasonXp, organicProgression, appearances: seasonPerf?.appearances ?? null });
@@ -291,57 +324,33 @@ function getLifetimeXPBefore(player: Player) {
   return null;
 }
 
+// XP-System abgeschafft: Das Saison-Ende erzeugt keine XP mehr. Die reale
+// Entwicklung läuft ausschließlich organisch (buildOrganicSeasonProgression,
+// cost 0) und ist von dieser Funktion unabhängig. `earnedSeasonXP` war im
+// organischen Regelbetrieb ohnehin immer 0 (siehe buildPreviewPlayer:
+// `organicProgression ? 0 : …`) — die Forecast-/Levelup-XP-Berechnung lief nur
+// noch in den toten Legacy-Pfad. Diese Funktion liefert daher nur noch die
+// Materialisierungs-Warnung; alle XP-Kennzahlen sind konstant 0/null.
+// Die Signatur bleibt (teamId/facilities/playerRating werden nicht mehr
+// gelesen), damit die bestehenden Aufrufstellen unverändert bleiben.
 function getSeasonXp(input: {
   save: PersistedSaveGame;
   player: Player;
   teamId: string;
   facilities: TeamFacilityCollection;
   playerRating: ReturnType<typeof buildPlayerRatingContractMap> extends Map<string, infer Row> ? Row | null : never;
-}) {
+}): Omit<PreComputedSeasonXpEntry, "organicProgression" | "appearances"> {
   const gameState = input.save.gameState;
   const alreadyMaterialized = (gameState.playerProgressionEvents ?? []).some(
     (event) => event.seasonId === gameState.season.id && event.playerId === input.player.id,
   );
-  if (alreadyMaterialized) {
-    return {
-      earnedSeasonXP: 0,
-      trainingXPAfterFacilities: 0,
-      performanceXP: 0,
-      forecast: null,
-      regressionEvent: null,
-      warnings: ["season_xp_already_materialized"],
-    };
-  }
-
-  const seasonPerformance = buildPlayerSeasonPerformance(gameState, input.player.id);
-  const forecast = buildPlayerProgressionForecast({
-    gameState,
-    player: input.player,
-    playerRating: input.playerRating,
-    seasonPerformance,
-    trainingModeByPlayerId: input.player.trainingMode ? { [input.player.id]: input.player.trainingMode } : null,
-    currentXP: input.player.currentXP ?? 0,
-    spentXP: input.player.spentXP ?? 0,
-    lifetimeXP: input.player.lifetimeXP ?? null,
-  });
-  const trainingFacilityXp = applyTrainingXpFacilityModifiers(forecast.baseTrainingXP, input.facilities, {
-    developmentTrainingBonusPct: getTeamDevelopmentTrainingBonusPct(gameState, input.teamId),
-  });
-  const facilityTrainingDelta = trainingFacilityXp.after - trainingFacilityXp.before;
-  const earnedSeasonXP = Math.max(0, forecast.netDevelopmentXP + facilityTrainingDelta);
-  const development = buildPlayerDevelopmentLevelupModel({
-    gameState,
-    player: input.player,
-    forecast,
-    potentialRecord: gameState.playerPotential?.find((entry) => entry.playerId === input.player.id) ?? null,
-  });
   return {
-    earnedSeasonXP,
-    trainingXPAfterFacilities: trainingFacilityXp.after,
-    performanceXP: forecast.performanceXP,
-    forecast,
-    regressionEvent: development.regressionEvent,
-    warnings: forecast.audit.warnings,
+    earnedSeasonXP: 0,
+    trainingXPAfterFacilities: 0,
+    performanceXP: 0,
+    forecast: null,
+    regressionEvent: null,
+    warnings: alreadyMaterialized ? ["season_xp_already_materialized"] : [],
   };
 }
 
@@ -565,10 +574,13 @@ function buildPreviewPlayer(input: {
         gameState: input.save.gameState,
         player: input.player,
         facilities: input.facilities,
+        ...accumulatorProgressionOverrides(input.save.gameState, input.player),
       }))
     : null;
   const currentXPBefore = Math.max(0, Math.round(input.player.currentXP ?? 0));
-  const earnedSeasonXP = organicProgression ? 0 : seasonXp.earnedSeasonXP;
+  // XP-System abgeschafft: Am Saison-Ende wird keine XP mehr verdient. Attribute
+  // werden ausschließlich organisch gesetzt (unten via organicProgression, cost 0).
+  const earnedSeasonXP = 0;
   const availableXP = currentXPBefore + earnedSeasonXP;
   const lifetimeXPBefore = getLifetimeXPBefore(input.player);
   const lifetimeXPAfter =
@@ -598,25 +610,11 @@ function buildPreviewPlayer(input: {
       warnings.push(`${input.player.id}:class_changed:${organicProgression.classBefore}->${organicProgression.classAfter}`);
     }
   }
-  const regressionEvent = seasonXp.regressionEvent;
-  if (!organicProgression && attributesAfter && regressionEvent?.attribute && regressionEvent.delta < 0) {
-    const currentValue = attributesAfter[regressionEvent.attribute];
-    if (isFiniteNumber(currentValue) && currentValue > 0) {
-      const toValue = Math.max(0, currentValue + regressionEvent.delta);
-      attributesAfter[regressionEvent.attribute] = toValue;
-      plannedUpgrades.push({
-        playerId: input.player.id,
-        attribute: regressionEvent.attribute,
-        fromValue: currentValue,
-        toValue,
-        cost: 0,
-        source: "season_end_regression",
-      });
-      warnings.push(`${input.player.id}:regression_applied:${regressionEvent.attribute}`);
-    } else {
-      warnings.push(`${input.player.id}:regression_blocked_attribute_floor:${regressionEvent.attribute}`);
-    }
-  }
+  // Legacy-Regression-Zweig entfernt: Er lief nur bei `!organicProgression`, was
+  // impliziert `attributesAfter == null` (organicProgression ist genau dann null,
+  // wenn attributesAfter null ist → attribute_source_missing-Blocker). Die Bedingung
+  // `!organicProgression && attributesAfter` war damit strukturell nie erfüllt —
+  // toter Code. Regression läuft im Regelbetrieb über organicProgression (oben).
 
   const leaguePlayers = input.fastDisciplineLeague
     ? input.economyContext.rosterLeaguePlayers
@@ -1073,7 +1071,10 @@ export function applySeasonEndXpSpend(
       currentXP: Math.max(0, playerPreview.remainingXP),
       spentXP: (player.spentXP ?? 0) + playerPreview.plannedXP,
       lifetimeXP: playerPreview.lifetimeXPAfter,
-      fatigue: Math.min(100, Math.max(0, roundValue((player.fatigue ?? 0) + (playerPreview.organicProgression?.fatigueLoad ?? 0), 1))),
+      // Anti-cheese Teil B (B.3): training fatigue is accumulated per matchday (see
+      // `accumulateMatchdayTrainingProgress`), NOT booked in a lump at season end. `organicProgression
+      // .fatigueLoad` remains a forecast/preview field only. Fatigue carries as-is into the reset.
+      fatigue: Math.min(100, Math.max(0, roundValue(player.fatigue ?? 0, 1))),
       previousDisciplineRatings: baselineDisciplineRatings,
       lastSeasonDisciplineValues: baselineDisciplineRatings,
       currentDisciplineValues: nextDisciplineRatings,
@@ -1266,10 +1267,8 @@ export function applySeasonEndProgressionMutations(input: {
       currentXP: Math.max(0, playerPreview.remainingXP),
       spentXP: (player.spentXP ?? 0) + playerPreview.plannedXP,
       lifetimeXP: playerPreview.lifetimeXPAfter,
-      fatigue: Math.min(
-        100,
-        Math.max(0, roundValue((player.fatigue ?? 0) + (playerPreview.organicProgression?.fatigueLoad ?? 0), 1)),
-      ),
+      // Anti-cheese Teil B (B.3): training fatigue accumulates per matchday, not at season end.
+      fatigue: Math.min(100, Math.max(0, roundValue(player.fatigue ?? 0, 1))),
       classHistory: playerPreview.organicProgression?.classChanged
         ? [
             ...(player.classHistory ?? []),

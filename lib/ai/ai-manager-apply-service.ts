@@ -336,8 +336,26 @@ function buildBuildingActions(save: PersistedSaveGame, preview: AiLeagueManageme
   return actions;
 }
 
+/**
+ * Anti-cheese Teil B (B.5): with the season-long training lock removed, the AI could otherwise re-issue
+ * training changes EVERY matchday, which would churn the league's development balance. Throttle mid-season
+ * AI training changes to a fixed cadence (every Nth resolved matchday). Pre-first-result (initial setup)
+ * is always allowed. The human player is NOT throttled — this gate only guards the AI apply path.
+ */
+export const AI_TRAINING_MIDSEASON_CADENCE_MATCHDAYS = 3;
+
+export function isAiMidseasonTrainingChangeAllowed(save: PersistedSaveGame): boolean {
+  const seasonId = save.gameState.season.id;
+  const resolvedCount = (save.gameState.seasonState.matchdayResults ?? []).filter(
+    (result) => (result.seasonId ?? seasonId) === seasonId,
+  ).length;
+  if (resolvedCount === 0) return true;
+  return resolvedCount % AI_TRAINING_MIDSEASON_CADENCE_MATCHDAYS === 0;
+}
+
 function buildTrainingActions(save: PersistedSaveGame, preview: AiLeagueManagementPreview, sourcePlanId: string) {
   const longRunFast = isLongRunFastProfile();
+  const midseasonTrainingChangeAllowed = isAiMidseasonTrainingChangeAllowed(save);
   return preview.teams.flatMap((teamPlan) => {
     const training = previewTeamTrainingSettings({
       save,
@@ -354,8 +372,10 @@ function buildTrainingActions(save: PersistedSaveGame, preview: AiLeagueManageme
       cashBefore: teamPlan.budgetPlan.cash,
       cashAfter: teamPlan.budgetPlan.cash,
       sourcePlanId,
-      canApply: training.ok,
-      blockers: training.blockingReasons,
+      canApply: training.ok && midseasonTrainingChangeAllowed,
+      blockers: midseasonTrainingChangeAllowed
+        ? training.blockingReasons
+        : [...training.blockingReasons, "ai_training_change_cadence_throttled"],
       warnings: trainingWarnings,
     };
     return [

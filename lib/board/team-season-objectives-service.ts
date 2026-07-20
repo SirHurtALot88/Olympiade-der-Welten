@@ -2095,7 +2095,10 @@ export function applyTeamSeasonObjectiveRewards(
     }
     return {
       ...team,
-      cash: roundValue(Math.max(0, (team.cash ?? 0) + summary.cashDelta), 1),
+      // KEIN Math.max(0,…): negatives Cash ist ein valider Zustand (auch das Sponsor-Settlement clampt nicht).
+      // Ein Clamp würde bei bereits negativem Cash eine Board-STRAFE stillschweigend in Schuldenerlass
+      // verwandeln (Cash springt auf 0). Strafe muss voll greifen.
+      cash: roundValue((team.cash ?? 0) + summary.cashDelta, 1),
     };
   });
 

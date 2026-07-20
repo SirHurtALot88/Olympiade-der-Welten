@@ -31,7 +31,7 @@ export default function ClassIcon({
           alt={label}
           width={32}
           height={32}
-          loading="lazy"
+          loading="eager"
           decoding="async"
           fetchPriority="low"
         />

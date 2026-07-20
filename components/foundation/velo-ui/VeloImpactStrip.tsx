@@ -1,6 +1,6 @@
 "use client";
 
-import { formatVeloNumber, formatVeloSignedNumber, formatVeloSignedPercent } from "@/components/foundation/velo-ui/formatters";
+import { formatNlNumber, formatNlSignedNumber, formatNlSignedPercent } from "@/components/foundation/new-look/nl-tones";
 
 export type VeloImpactItem = {
   key: string;
@@ -44,27 +44,27 @@ export function buildTrainingImpactItems(input: {
 }): VeloImpactItem[] {
   const performanceLabel =
     input.performanceSetpoints > 0
-      ? `+${formatVeloNumber(input.performanceSetpoints, 1)} Performance-Anteil`
+      ? `+${formatNlNumber(input.performanceSetpoints, 1)} Performance-Anteil`
       : "kein Performance-Anteil aus Matchdays";
   return [
     {
       key: "xp",
       label: "Netto-Statwachstum",
-      value: formatVeloSignedNumber(input.netSetpoints, 1),
-      detail: `+${formatVeloNumber(input.trainingSetpoints, 1)} Trainingsbudget · ${performanceLabel}`,
+      value: formatNlSignedNumber(input.netSetpoints, 1),
+      detail: `+${formatNlNumber(input.trainingSetpoints, 1)} Trainingsbudget · ${performanceLabel}`,
       tone: input.netSetpoints >= 0 ? "positive" : "negative",
     },
     {
       key: "recovery",
       label: "Regeneration",
-      value: `${formatVeloNumber(input.recoveryBefore, 1)} → ${formatVeloNumber(input.recoveryAfter, 1)}`,
-      detail: input.recoveryDeltaPct === 0 ? "normale Erholung" : `${formatVeloSignedPercent(input.recoveryDeltaPct)} Reg`,
+      value: `${formatNlNumber(input.recoveryBefore, 1)} → ${formatNlNumber(input.recoveryAfter, 1)}`,
+      detail: input.recoveryDeltaPct === 0 ? "normale Erholung" : `${formatNlSignedPercent(input.recoveryDeltaPct)} Reg`,
       tone: input.recoveryDeltaPct >= 0 ? "positive" : "warning",
     },
     {
       key: "dev",
       label: "Saison-Risiko",
-      value: formatVeloSignedNumber(input.netSetpoints, 1),
+      value: formatNlSignedNumber(input.netSetpoints, 1),
       detail: `Gleicher Netto-Wert, diesmal mit Regressionsrisiko: ${input.regressionRisk ?? "—"}`,
       tone: input.netSetpoints >= 0 ? "positive" : "negative",
     },

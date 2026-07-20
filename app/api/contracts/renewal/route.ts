@@ -59,7 +59,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "save_not_found", summary: null }, { status: 404 });
     }
     const phaseGate = evaluateGamePhaseAction(save.gameState, "renew_contract");
-    if (!phaseGate.allowed) {
+    // Phase gate blocks only PRODUCTIVE writes. Dry-run previews pass through,
+    // so the negotiation window can show real numbers mid-season (preview-only,
+    // same graceful pattern as the sell dialog); the phase reason is appended
+    // to the preview's blockingReasons below so the UI can explain the gate.
+    if (!phaseGate.allowed && !dryRun) {
       return NextResponse.json(
         {
           success: false,
@@ -135,12 +139,16 @@ export async function POST(request: Request) {
       success,
     });
 
+    const phaseBlockers = !phaseGate.allowed && phaseGate.reason ? [phaseGate.reason] : [];
     return NextResponse.json(
       {
         success,
-        summary,
+        summary:
+          phaseBlockers.length > 0
+            ? { ...summary, ok: false, blockingReasons: Array.from(new Set([...summary.blockingReasons, ...phaseBlockers])) }
+            : summary,
         warnings: [...phaseGate.warnings, ...writeAuth.warnings, ...summary.warnings],
-        blockingReasons: summary.blockingReasons,
+        blockingReasons: Array.from(new Set([...summary.blockingReasons, ...phaseBlockers])),
       },
       { status: success || dryRun ? 200 : 409 },
     );

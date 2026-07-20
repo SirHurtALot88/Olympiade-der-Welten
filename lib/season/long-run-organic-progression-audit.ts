@@ -3,8 +3,15 @@ import type { GameState, PlayerProgressionSpendEventRecord } from "@/lib/data/ol
 /** Liga-Δ Ø pro Spieler: min −0.4 (max. Regression), max +0.4 (max. Wachstum). */
 export const ORGANIC_LEAGUE_NET_AVG_MIN = -0.4;
 export const ORGANIC_LEAGUE_NET_AVG_MAX = 0.4;
-export const ORGANIC_PEAK_NET_MIN = 5;
-export const ORGANIC_PEAK_NET_MAX = 8;
+// Peak-P90 corridor for the top season improvers' net setpoint gain. Recalibrated for the
+// intended (buffed) training: a multi-season S1–S5 run measured Peak-P90 ≈ 13.6→17.2 with a
+// rock-stable Top10-Median ≈ 13, which realizes the target ~2-3M MW/season gain for top
+// developers while league MW stays bounded (no runaway). The old [5,8] band was calibrated for
+// the weaker pre-buff training and flagged the intended level as a false RED. New band keeps a
+// floor that still catches genuine under-training and a ceiling with headroom above the observed
+// drift to catch true runaway.
+export const ORGANIC_PEAK_NET_MIN = 8;
+export const ORGANIC_PEAK_NET_MAX = 20;
 
 export type SeasonOrganicProgressionMetrics = {
   seasonId: string;

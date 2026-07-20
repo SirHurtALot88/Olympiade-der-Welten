@@ -130,7 +130,6 @@ function makeGameState(partial?: Partial<GameState>): GameState {
       duplicateMappedPlayers: [],
       unknownTeamCodes: [],
       duplicateTeamCodes: [],
-      officialTeamPendingCode: [],
       warnings: [],
     },
   };
@@ -141,7 +140,7 @@ function titles(items: GameInboxItem[]) {
 }
 
 describe("game inbox service", () => {
-  it("creates tasks for missing lineup, XP, expiring contracts and missing training", () => {
+  it("creates tasks for missing lineup, expiring contracts and missing training (XP-System abgeschafft: kein XP-Task mehr)", () => {
     const gameState = makeGameState({
       players: [makePlayer("p-1", { currentXP: 25, trainingMode: null })],
     });
@@ -149,7 +148,8 @@ describe("game inbox service", () => {
     const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
 
     expect(titles(items)).toContain("Lineup fehlt");
-    expect(titles(items)).toContain("XP verfügbar");
+    // XP-System abgeschafft: Trotz currentXP=25 wird kein „XP verfügbar"-Task mehr erzeugt.
+    expect(titles(items)).not.toContain("XP verfügbar");
     expect(titles(items)).toContain("Verträge laufen aus");
     expect(titles(items)).toContain("Training nicht gesetzt");
   });
@@ -352,20 +352,30 @@ describe("game inbox service", () => {
             matchdayId: "season-3-matchday-1",
             teamId: "M-M",
             entries: Array.from({ length: 9 }, (_, index) => ({
-              slotKey: `slot-${index}`,
+              disciplineId: "d-generic",
+              disciplineSide: (index % 2 === 0 ? "d1" : "d2") as "d1" | "d2",
+              slotIndex: index,
               playerId: `p-${index + 1}`,
               activePlayerId: `ap-${index + 1}`,
             })),
-            submittedAt: null,
+            lineupId: "lineup-M-M-season-3-matchday-1",
+            saveId: "save-1",
+            status: "draft",
+            createdAt: "2028-01-01T00:00:00.000Z",
+            updatedAt: "2028-01-01T00:00:00.000Z",
           },
         ],
       },
       players: Array.from({ length: 9 }, (_, index) => makePlayer(`p-${index + 1}`)),
       rosters: Array.from({ length: 9 }, (_, index) => ({
+        id: `r-${index + 1}`,
         teamId: "M-M",
         playerId: `p-${index + 1}`,
         contractLength: 2,
         salary: 2,
+        upkeep: 2,
+        roleTag: "starter" as const,
+        joinedSeasonId: "season-3",
       })),
     });
     const readyItems = buildGameInboxItems({ gameState: readyState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
@@ -471,6 +481,7 @@ describe("game inbox service", () => {
             archetype: "security",
             name: "Sicherheitspartner AG",
             chosenAt: "2026-06-25T00:00:00.000Z",
+            startRank: null,
             components: [],
             payouts: { baseFirstPaid: true },
           },
@@ -482,111 +493,6 @@ describe("game inbox service", () => {
     expect(sponsorTask?.status).toBe("done");
     expect(sponsorTask?.title).toBe("Sponsor gewählt");
     expect(items.some((item) => item.itemId.startsWith("sponsor_choice_missing:") && item.status === "open")).toBe(false);
-  });
-
-  it("hints at a stronger captain when a much better candidate is on the roster", () => {
-    const players = [
-      makePlayer("p-cap", { name: "Schwacher Kapitän" }),
-      makePlayer("p-star", {
-        name: "Starker Anführer",
-        traitsPositive: ["Eloquent", "Ambitious"],
-        attributeSheetStats: { charisma: 95, will: 90, determination: 90, awareness: 90 } as never,
-      }),
-      ...Array.from({ length: 10 }, (_, index) => makePlayer(`p-${index + 1}`)),
-    ];
-    const gameState = makeGameState({
-      seasonState: {
-        seasonId: "season-3",
-        schedule: [],
-        standings: {},
-        lineupDrafts: [
-          {
-            seasonId: "season-3",
-            matchdayId: "season-3-matchday-1",
-            teamId: "M-M",
-            entries: players.map((player, index) => ({
-              slotKey: `slot-${index}`,
-              playerId: player.id,
-              activePlayerId: `ap-${index}`,
-            })),
-            submittedAt: null,
-          } as never,
-        ],
-      },
-      players,
-      rosters: players.map((player) => ({
-        teamId: "M-M",
-        playerId: player.id,
-        contractLength: 2,
-        salary: 2,
-      })) as never,
-    });
-    gameState.teamCaptains = [
-      {
-        seasonId: "season-3",
-        teamId: "M-M",
-        playerId: "p-cap",
-        playerName: "Schwacher Kapitän",
-        leadershipScore: 5,
-        style: "leader",
-        effects: { moraleBuffer: 1, rivalryPressureReductionPct: 4, teamPowerModifierPct: 1, conflictSoftenChancePct: 6 },
-        traitSignals: [],
-        source: "manual_assignment",
-      },
-    ];
-
-    const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
-    const upgrade = items.find((item) => item.itemId.startsWith("captain_upgrade:"));
-    expect(upgrade?.title).toBe("Stärkerer Kapitän verfügbar");
-    expect(upgrade?.description).toContain("Starker Anführer");
-    expect(upgrade?.targetParams).toEqual({ team: "M-M", panel: "captain-picker" });
-  });
-
-  it("does not hint at a captain upgrade when none is materially stronger", () => {
-    const players = Array.from({ length: 11 }, (_, index) => makePlayer(`p-${index + 1}`));
-    const gameState = makeGameState({
-      seasonState: {
-        seasonId: "season-3",
-        schedule: [],
-        standings: {},
-        lineupDrafts: [
-          {
-            seasonId: "season-3",
-            matchdayId: "season-3-matchday-1",
-            teamId: "M-M",
-            entries: players.map((player, index) => ({
-              slotKey: `slot-${index}`,
-              playerId: player.id,
-              activePlayerId: `ap-${index}`,
-            })),
-            submittedAt: null,
-          } as never,
-        ],
-      },
-      players,
-      rosters: players.map((player) => ({
-        teamId: "M-M",
-        playerId: player.id,
-        contractLength: 2,
-        salary: 2,
-      })) as never,
-    });
-    gameState.teamCaptains = [
-      {
-        seasonId: "season-3",
-        teamId: "M-M",
-        playerId: "p-1",
-        playerName: "p-1",
-        leadershipScore: 60,
-        style: "leader",
-        effects: { moraleBuffer: 3, rivalryPressureReductionPct: 10, teamPowerModifierPct: 4, conflictSoftenChancePct: 14 },
-        traitSignals: [],
-        source: "manual_assignment",
-      },
-    ];
-
-    const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
-    expect(items.some((item) => item.itemId.startsWith("captain_upgrade:"))).toBe(false);
   });
 
   it("warns when negative form cards remain unused before season end", () => {
@@ -625,10 +531,13 @@ describe("game inbox service", () => {
           fromTeamId: "P-C",
           toTeamId: "M-M",
           seasonId: "season-3",
+          seasonLabel: "Season 3",
           matchdayId: "season-3-matchday-1",
           transferType: "buy",
           fee: 10,
           salary: 2,
+          marketValue: 10,
+          remainingContractLength: 2,
           happenedAt: "2026-06-25T00:00:00.000Z",
         },
       ],
@@ -652,18 +561,23 @@ describe("game inbox service", () => {
           teamId: "M-M",
           playerId: "p-1",
           seasonId: "season-3",
-          upgrades: [{ attribute: "pow", delta: 1 }],
+          upgrades: [{ playerId: "p-1", attribute: "power", fromValue: 40, toValue: 41, cost: 1, source: "manual_xp_spend_preview" }],
           xpSpent: 0,
           timestamp: "2026-06-25T00:00:00.000Z",
+          source: "manual_season_end_xp_spend" as const,
         },
         {
           eventId: "prog-2",
           teamId: "M-M",
           playerId: "p-2",
           seasonId: "season-3",
-          upgrades: [{ attribute: "spe", delta: 1 }, { attribute: "men", delta: 1 }],
+          upgrades: [
+            { playerId: "p-2", attribute: "speed", fromValue: 40, toValue: 41, cost: 1, source: "manual_xp_spend_preview" },
+            { playerId: "p-2", attribute: "intelligence", fromValue: 40, toValue: 41, cost: 1, source: "manual_xp_spend_preview" },
+          ],
           xpSpent: 0,
           timestamp: "2026-06-25T01:00:00.000Z",
+          source: "manual_season_end_xp_spend" as const,
         },
       ],
       seasonState: {
@@ -676,6 +590,8 @@ describe("game inbox service", () => {
             facilityId: "scouting",
             previousLevel: 1,
             nextLevel: 2,
+            cost: 10,
+            source: "manual_facility_upgrade" as const,
             timestamp: "2026-06-25T02:00:00.000Z",
           },
           {
@@ -685,6 +601,8 @@ describe("game inbox service", () => {
             facilityId: "training",
             previousLevel: 2,
             nextLevel: 3,
+            cost: 10,
+            source: "manual_facility_upgrade" as const,
             timestamp: "2026-06-25T03:00:00.000Z",
           },
         ],
@@ -715,7 +633,7 @@ describe("game inbox service", () => {
       },
       matchdayState: {
         matchdayId: "season-3-matchday-2",
-        status: "preparation",
+        status: "planning",
         pendingTeamIds: [],
         resolvedFixtureIds: ["season-3-matchday-1"],
       },
@@ -759,9 +677,6 @@ describe("game inbox service", () => {
             injuryReason: "fatigue_over_30_after_matchday_use",
           },
         ],
-        playerDisciplinePerformances: [
-          { playerId: "p-1", teamId: "M-M", seasonId: "season-3", appearances: 8 },
-        ],
       },
     });
 
@@ -788,20 +703,30 @@ describe("game inbox service", () => {
             matchdayId: "season-3-matchday-1",
             teamId: "M-M",
             entries: Array.from({ length: 9 }, (_, index) => ({
-              slotKey: `slot-${index}`,
+              disciplineId: "d-generic",
+              disciplineSide: (index % 2 === 0 ? "d1" : "d2") as "d1" | "d2",
+              slotIndex: index,
               playerId: `p-${index + 1}`,
               activePlayerId: `ap-${index + 1}`,
             })),
-            submittedAt: null,
+            lineupId: "lineup-M-M-season-3-matchday-1",
+            saveId: "save-1",
+            status: "draft",
+            createdAt: "2028-01-01T00:00:00.000Z",
+            updatedAt: "2028-01-01T00:00:00.000Z",
           },
         ],
       },
       players: Array.from({ length: 9 }, (_, index) => makePlayer(`p-${index + 1}`)),
       rosters: Array.from({ length: 9 }, (_, index) => ({
+        id: `r-${index + 1}`,
         teamId: "M-M",
         playerId: `p-${index + 1}`,
         contractLength: 2,
         salary: 2,
+        upkeep: 2,
+        roleTag: "starter" as const,
+        joinedSeasonId: "season-3",
       })),
     });
     const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });

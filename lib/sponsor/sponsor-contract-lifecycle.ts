@@ -40,6 +40,16 @@ export function isActiveSponsorContract(contract: TeamSponsorContract | null | u
 export function advanceSponsorContractsForNewSeason(gameState: GameState, nextSeasonId: string): GameState {
   const contracts = { ...(gameState.seasonState.sponsorContractsByTeamId ?? {}) };
   const offers = { ...(gameState.seasonState.sponsorOffersByTeamId ?? {}) };
+  // Golden-Cooldown (Abschnitt 2.2): festhalten, welche Teams in der ABGESCHLOSSENEN Saison einen golden
+  // Vertrag hatten (aus den Verträgen VOR der Mutation gelesen), damit rollGoldenLuck ihnen im Folgejahr den
+  // COOLDOWN_PENALTY gibt und kein Team dauerhaft golden bleibt. Ohne diesen Writer war hadGoldenLastSeason
+  // immer false und der Cooldown wirkungslos.
+  const goldenSponsorHistoryByTeamId: Record<string, boolean> = {};
+  for (const [teamId, contract] of Object.entries(gameState.seasonState.sponsorContractsByTeamId ?? {})) {
+    if (contract?.isGolden === true) {
+      goldenSponsorHistoryByTeamId[teamId] = true;
+    }
+  }
   let nextGameState = gameState;
 
   for (const team of gameState.teams) {
@@ -73,6 +83,7 @@ export function advanceSponsorContractsForNewSeason(gameState: GameState, nextSe
       ...nextGameState.seasonState,
       sponsorContractsByTeamId: contracts,
       sponsorOffersByTeamId: offers,
+      goldenSponsorHistoryByTeamId,
     },
   };
 

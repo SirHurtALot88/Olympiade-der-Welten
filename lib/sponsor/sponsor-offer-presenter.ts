@@ -5,6 +5,7 @@ import {
   SPONSOR_RANK_MILESTONES,
 } from "@/lib/sponsor/sponsor-economy-calibration";
 import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
+import { formatNlNumber } from "@/components/foundation/new-look/nl-tones";
 import {
   getTeamAxisRank,
   parseAxisTargetValue,
@@ -25,6 +26,7 @@ export type SponsorSpecialPresentation = {
 
 export type SponsorOfferPresentation = {
   isChallenge: boolean;
+  isGolden: boolean;
   offerBadge: string | null;
   special: SponsorSpecialPresentation | null;
 };
@@ -136,7 +138,7 @@ function buildSpecialPresentation(input: {
       difficultyLabel: DIFFICULTY_LABELS[difficulty],
       detail:
         currentSalary > 0
-          ? `Aktuell ${currentSalary.toFixed(1)} C · Deckel ${Number.isFinite(target) ? target.toFixed(1) : "—"} C`
+          ? `Aktuell ${formatNlNumber(currentSalary, 1)} C · Deckel ${Number.isFinite(target) ? formatNlNumber(target, 1) : "—"} C`
           : "Gehaltsdeckel einhalten",
     };
   }
@@ -173,16 +175,26 @@ export function isChallengeSponsorOffer(offer: SponsorOffer): boolean {
   return offer.isChallengeOffer === true || offer.flavor.includes("Challenge-Sponsor");
 }
 
+export function isGoldenSponsorOffer(offer: SponsorOffer): boolean {
+  return offer.isGolden === true;
+}
+
 export function buildSponsorOfferPresentation(input: {
   offer: SponsorOffer;
   gameState?: GameState;
   teamId?: string;
 }): SponsorOfferPresentation {
   const isChallenge = isChallengeSponsorOffer(input.offer);
+  const isGolden = isGoldenSponsorOffer(input.offer);
   const specialComponent = input.offer.components.find((component) => component.kind === "special") ?? null;
+  // Golden koexistiert mit Challenge (kein CSS/Karten-Umbau hier — nur das Badge-Feld für die spätere UI).
+  const badgeParts = [isGolden ? "Golden" : null, isChallenge ? "Challenge" : null].filter(
+    (part): part is string => part != null,
+  );
   return {
     isChallenge,
-    offerBadge: isChallenge ? "Challenge" : null,
+    isGolden,
+    offerBadge: badgeParts.length > 0 ? badgeParts.join(" · ") : null,
     special: specialComponent
       ? buildSpecialPresentation({
           component: specialComponent,
@@ -200,6 +212,23 @@ export function getSponsorComponentKindLabel(kind: SponsorOfferComponent["kind"]
   return "Sonderziel";
 }
 
+/**
+ * Seltenheitsgrad-Label je Sponsor-Stufe (1–5). Ersetzt die frühere
+ * Stern-Anzeige (`★n`) durch eine benannte, farbcodierbare Rarität
+ * (Farben je Stufe: `.nl-sponsor-rarity.is-r{1..5}` in globals.css).
+ */
+export const SPONSOR_RARITY_LABELS: Record<number, string> = {
+  1: "Gewöhnlich",
+  2: "Solide",
+  3: "Selten",
+  4: "Episch",
+  5: "Legendär",
+};
+
+export function getSponsorRarityLabel(tier: number): string {
+  return SPONSOR_RARITY_LABELS[tier] ?? `Stufe ${tier}`;
+}
+
 export type SponsorRankTierRow = {
   label: string;
   rankAt: number;
@@ -210,13 +239,26 @@ function roundOfferCash(value: number) {
   return Math.round(value * 10) / 10;
 }
 
+/**
+ * Letzter Liga-Rang = garantierter Boden: hier ist keine Gewinnstufe freigeschaltet,
+ * der Sponsor zahlt nur die Basis. Sichtbar gemacht, damit Teams auch den Worst-Case
+ * (Tabellen-Letzter, Platz 32) auf der Leiter sehen — nicht nur ab „Top 28".
+ */
+export const SPONSOR_RANK_FLOOR_AT = 32;
+export const SPONSOR_RANK_FLOOR_LABEL = `Platz ${SPONSOR_RANK_FLOOR_AT}`;
+
 /** Absolute sponsor cash (basis + unlocked rank share) at each Gewinnstufe threshold. */
 export function buildSponsorRankTierRows(input: {
   baseCash: number;
   rankCash: number;
+  /**
+   * Zeigt die garantierte Boden-Stufe (letzter Rang, nur Basis) als unterste Sprosse an.
+   * Opt-in, damit der bestehende Milestone-Contract (8 Stufen ab „Top 28") stabil bleibt.
+   */
+  includeFloorRung?: boolean;
 }): SponsorRankTierRow[] {
   const totalMilestoneBonus = SPONSOR_RANK_MILESTONES.reduce((sum, milestone) => sum + milestone.bonusC, 0);
-  return SPONSOR_RANK_MILESTONES.map((milestone) => {
+  const milestoneRows = SPONSOR_RANK_MILESTONES.map((milestone) => {
     const unlockedBonus = getRankMilestoneBonus(milestone.maxRank, 1);
     const rankPortion =
       totalMilestoneBonus > 0 && input.rankCash > 0
@@ -228,4 +270,13 @@ export function buildSponsorRankTierRows(input: {
       absolutePayout: roundOfferCash(input.baseCash + rankPortion),
     };
   });
+  if (!input.includeFloorRung) {
+    return milestoneRows;
+  }
+  // Boden-Stufe (garantierte Basis, keine Gewinnstufe) an den Anfang — die Leiter
+  // ist aufsteigend nach Schwierigkeit (schlechtester Rang zuerst).
+  return [
+    { label: SPONSOR_RANK_FLOOR_LABEL, rankAt: SPONSOR_RANK_FLOOR_AT, absolutePayout: roundOfferCash(input.baseCash) },
+    ...milestoneRows,
+  ];
 }

@@ -17,6 +17,7 @@ import { withIncrementalSeasonDerivationsAfterTransfer } from "@/lib/foundation/
 import type { PersistenceService, PersistedSaveGame } from "@/lib/persistence/types";
 import { calculateTransfermarktFit, getTransfermarktBracket, hasMercenaryTrait } from "@/lib/market/transfermarkt-fit";
 import { buildContractNegotiationPreview, recommendContractOfferForPlayer } from "@/lib/market/contract-negotiation-preview";
+import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import {
   buildRecentlySoldByTeam,
   getRecentlySoldBySameTeam,
@@ -1063,6 +1064,7 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
           : (marketValueReference ?? 0) <= 25
             ? "depth"
             : "rotation";
+  const recommendedGmArchetype = getTeamGeneralManager(gameState, params.teamId)?.profile?.archetype ?? null;
   const recommendedContract = recommendContractOfferForPlayer({
     player,
     teamStrategyProfile,
@@ -1076,6 +1078,8 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
     teamRosterMin: teamContext?.playerMin ?? null,
     teamRosterOpt: teamContext?.playerOpt ?? null,
     isFirstSeason: gameState.season.id === "season-1",
+    gmArchetype: recommendedGmArchetype,
+    highValue: (marketValueReference ?? 0) >= 35,
   });
   const contractLength =
     typeof params.contractLength === "number" && Number.isFinite(params.contractLength)
@@ -2253,6 +2257,8 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
           teamRosterMin: rosterTargets?.playerMin ?? null,
           teamRosterOpt: rosterTargets?.playerOpt ?? null,
           isFirstSeason: gameState.season.id === "season-1",
+          gmArchetype: getTeamGeneralManager(gameState, params.teamId)?.profile?.archetype ?? null,
+          highValue: (marketValueReference ?? 0) >= 35,
         })
       : null;
   const contractLength = hasExplicitContractLength

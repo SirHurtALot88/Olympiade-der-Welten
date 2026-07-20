@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 
 import type { ScoutingReportData } from "@/lib/scouting/scouting-report-service";
+import { formatNlNumber } from "@/components/foundation/new-look/nl-tones";
 
 /**
  * "Erkenntnis-Ladder" — visualisiert, wie tief das Scouting-Wissen zu EINEM
@@ -141,8 +142,8 @@ export default function ScoutingKnowledgeLadder({ report }: ScoutingKnowledgeLad
             <div className="nl-scout-ladder-reveal-row">
               <span>PO-Range</span>
               <strong className="nl-tnum">
-                {previous.poStarMin?.toFixed(1)}–{previous.poStarMax?.toFixed(1)}★ → {current.poStarMin?.toFixed(1)}–
-                {current.poStarMax?.toFixed(1)}★
+                {formatNlNumber(previous.poStarMin, 1)}–{formatNlNumber(previous.poStarMax, 1)}★ → {formatNlNumber(current.poStarMin, 1)}–
+                {formatNlNumber(current.poStarMax, 1)}★
               </strong>
             </div>
           ) : null}

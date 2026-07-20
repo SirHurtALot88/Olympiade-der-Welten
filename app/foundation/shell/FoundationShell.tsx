@@ -27,10 +27,6 @@ type FoundationShellProps = {
   // Banner + Titel fraßen die halbe Seite). Wiring bleibt bei der Router-Body,
   // hier nur Platzierung.
   teamPicker?: ReactNode;
-  // Kompaktes Multiplayer-Room-Badge, direkt unter dem Team-Picker in der
-  // Sidebar statt im großen horizontalen Context-Banner (Owner-Feedback: Save +
-  // Room-Block oben nach links in die Nav schieben und komprimieren).
-  roomBadge?: ReactNode;
 };
 
 function buildSeasonContextLabel(
@@ -62,7 +58,6 @@ export default function FoundationShell({
   isPending = false,
   activities = [],
   teamPicker,
-  roomBadge,
 }: FoundationShellProps) {
   const seasonContextLabel =
     seasonLabel && matchdayDisplayLabel
@@ -78,7 +73,6 @@ export default function FoundationShell({
         attentionByViewId={attentionByViewId}
         seasonContextLabel={seasonContextLabel}
         teamPicker={teamPicker}
-        roomBadge={roomBadge}
       />
       <div className="foundation-shell-main" id="foundation-main-content" tabIndex={-1}>
         <FoundationActivityStrip activities={activities} />
@@ -87,7 +81,14 @@ export default function FoundationShell({
           <div className="foundation-shell-header-actions">{headerActions}</div>
         </header>
         {subNav}
-        <div className="foundation-shell-content">{children}</div>
+        {/* key={activeView}: der Content-Wrapper wird bei jedem echten
+            View-Wechsel neu gemountet, damit die `foundation-view-enter`-
+            Animation (Fade + sanftes Aufsteigen) erneut spielt und sich mit
+            dem panelinternen `.nl-reveal`-Stagger überlagert. Reduced-Motion
+            schaltet das per CSS ab. */}
+        <div key={activeView} className="foundation-shell-content foundation-view-enter">
+          {children}
+        </div>
       </div>
     </div>
   );

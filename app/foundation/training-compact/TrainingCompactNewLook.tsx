@@ -4,12 +4,21 @@ import { useMemo, useState } from "react";
 
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import { getPlayerPortraitModel } from "@/lib/foundation/tabs/foundation-page-module-helpers";
-import { EmptyState } from "@/components/foundation/EmptyState";
 import FoundationPlayerPortraitPreview, {
   type FoundationPlayerPortraitPreviewProps,
 } from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
-import { NlCard, NlDeltaChip, NlWhatIfSlider, StatChip, StatChipRow, formatNlNumber, useCountUp } from "@/components/foundation/new-look";
-import { NlAbilityStars, VeloIntensityRail, buildTrainingModeSegments, formatVeloNumber, formatVeloSignedNumber } from "@/components/foundation/velo-ui";
+import {
+  NlCard,
+  NlDeltaChip,
+  NlEmptyState,
+  NlWhatIfSlider,
+  StatChip,
+  StatChipRow,
+  formatNlNumber,
+  formatNlSignedNumber,
+  useCountUp,
+} from "@/components/foundation/new-look";
+import { NlAbilityStars, VeloIntensityRail, buildTrainingModeSegments } from "@/components/foundation/velo-ui";
 import { getTrainingModePresentation } from "@/lib/training/training-mode-presentation";
 import { sortTrainingAttributeForecastByClassProfile } from "@/lib/training/training-forecast-display";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
@@ -205,10 +214,10 @@ function sortTrainingPlayerRows(rows: TrainingPlayerRowView[], sortKey: Training
 function getCoreTakeaway(row: TrainingPlayerRowView): string {
   if (row.organicForecast.netSetpoints < 0) {
     const missing = Math.abs(row.organicForecast.netSetpoints);
-    return `Regression drückt stärker als Training + Performance — es fehlen ca. ${formatVeloNumber(missing, 1)} SP zum Halten.`;
+    return `Regression drückt stärker als Training + Performance — es fehlen ca. ${formatNlNumber(missing, 1)} SP zum Halten.`;
   }
   if (row.forecast.regressionRisk === "high") {
-    return `Wächst noch, aber hohes Rückschritt-Risiko (Druck ${formatVeloNumber(row.forecast.regressionPressure, 0)}) — kippt der Druck weiter, fällt das Netto ins Minus.`;
+    return `Wächst noch, aber hohes Rückschritt-Risiko (Druck ${formatNlNumber(row.forecast.regressionPressure, 0)}) — kippt der Druck weiter, fällt das Netto ins Minus.`;
   }
   if (row.organicForecast.netSetpoints >= 2) {
     return "Training und Performance überwiegen deutlich — Upgrade in Reichweite.";
@@ -241,8 +250,8 @@ function NlTrainingForecastBar({
   // Ceiling-Hinweis ("Potential erreicht/fast erreicht") steht bewusst NICHT hier —
   // der Cap-Marker unten trägt exakt diesen Text bereits in seinem eigenen `title`
   // (Deklutter: keine zweite, identische Tooltip-Kopie für dieselbe Zeile).
-  const tooltip = `${entry.attribute}: ${formatVeloNumber(entry.before, 1)} → ${formatVeloNumber(entry.after, 1)} (${formatVeloSignedNumber(entry.delta, 1)}) · T ${formatVeloSignedNumber(entry.training, 1)} · P ${formatVeloSignedNumber(entry.performance, 1)} · R ${formatVeloSignedNumber(entry.regression, 1)}${
-    regression ? ` · kann fallen: fehlen ca. ${formatVeloNumber(Math.abs(entry.delta), 1)} SP zum Halten` : ""
+  const tooltip = `${entry.attribute}: ${formatNlNumber(entry.before, 1)} → ${formatNlNumber(entry.after, 1)} (${formatNlSignedNumber(entry.delta, 1)}) · T ${formatNlSignedNumber(entry.training, 1)} · P ${formatNlSignedNumber(entry.performance, 1)} · R ${formatNlSignedNumber(entry.regression, 1)}${
+    regression ? ` · kann fallen: fehlen ca. ${formatNlNumber(Math.abs(entry.delta), 1)} SP zum Halten` : ""
   }`;
 
   return (
@@ -284,9 +293,9 @@ function NlTrainingForecastBar({
         ) : null}
       </div>
       <span className="nl-training-forecast-numbers nl-tnum">
-        {formatVeloNumber(entry.before, 1)} → {formatVeloNumber(entry.after, 1)}
+        {formatNlNumber(entry.before, 1)} → {formatNlNumber(entry.after, 1)}
       </span>
-      <NlDeltaChip value={entry.delta} format={(n) => formatVeloSignedNumber(n, 1)} className="nl-training-forecast-chip" />
+      <NlDeltaChip value={entry.delta} format={(n) => formatNlSignedNumber(n, 1)} className="nl-training-forecast-chip" />
     </div>
   );
 }
@@ -340,7 +349,7 @@ function NlTrainingIntensityProjection({
           className={`nl-training-potential is-${potentialTone}`}
           title="Potential-Trainingsspeed: höheres Potential ⇒ mehr Zuwachs pro Intensität. Dieser Faktor steckt in jeder Prognose unten."
         >
-          <NlTrainingGlyph kind="signature" /> Potential ×{formatVeloNumber(potentialMultiplier, 2)}
+          <NlTrainingGlyph kind="signature" /> Potential ×{formatNlNumber(potentialMultiplier, 2)}
         </span>
       </div>
       <div className="nl-training-intensity-rows">
@@ -355,7 +364,7 @@ function NlTrainingIntensityProjection({
             aria-checked={entry.isCurrent}
             disabled={readOnly}
             onClick={() => onSelectMode(entry.mode as PlayerTrainingMode)}
-            title={`${entry.label} wählen · Fatigue-Last ${formatVeloNumber(entry.fatigueLoad, 0)} · Erholungs-Tempo ${formatSignedPercent(entry.recoveryDeltaPct)} (Erholungs-Rate, nicht Fatigue-Last)`}
+            title={`${entry.label} wählen · Fatigue-Last ${formatNlNumber(entry.fatigueLoad, 0)} · Erholungs-Tempo ${formatSignedPercent(entry.recoveryDeltaPct)} (Erholungs-Rate, nicht Fatigue-Last)`}
           >
             <span className="nl-training-intensity-label">
               {entry.label}
@@ -371,7 +380,7 @@ function NlTrainingIntensityProjection({
               />
             </span>
             <span className="nl-training-intensity-gain nl-tnum" title="Erwarteter Zuwachs durch Training bei dieser Intensität">
-              +{formatVeloNumber(entry.trainingGain, 1)} <small>Training</small>
+              +{formatNlNumber(entry.trainingGain, 1)} <small>Training</small>
             </span>
             <span
               className={`nl-training-intensity-recovery nl-tnum${entry.recoveryDeltaPct < 0 ? " is-negative" : entry.recoveryDeltaPct > 0 ? " is-positive" : ""}`}
@@ -381,14 +390,14 @@ function NlTrainingIntensityProjection({
             </span>
             <NlDeltaChip
               value={entry.net}
-              format={(n) => `${formatVeloSignedNumber(n, 1)} SP`}
+              format={(n) => `${formatNlSignedNumber(n, 1)} SP`}
               className="nl-training-intensity-net"
             />
           </button>
         ))}
       </div>
       <small className="nl-training-intensity-foot nl-tnum">
-        Regression konstant {formatVeloSignedNumber(projection[0]?.regression ?? 0, 1)} · höheres Potential ⇒ größerer
+        Regression konstant {formatNlSignedNumber(projection[0]?.regression ?? 0, 1)} · höheres Potential ⇒ größerer
         Trainings-Zuwachs · höhere Intensität kostet Regeneration (Verletzungsrisiko steigt)
       </small>
     </div>
@@ -428,7 +437,7 @@ function NlTrainingClassRanking({
     >
       <span
         className="nl-training-class-ranking-title"
-        title={`Schätzung: Trainingsbudget (${formatVeloNumber(row.organicForecast.trainingSetpoints, 1)} SP) nach Klassen-Attributgewichtung verteilt, abgeschwächt an Attributen nahe der Potential-Decke, gewichtet nach Signature-/Weak-Attribut-Affinität und Development-Route-Bonus. Reale Werte hängen zusätzlich vom Performance-Anteil ab.`}
+        title={`Schätzung: Trainingsbudget (${formatNlNumber(row.organicForecast.trainingSetpoints, 1)} SP) nach Klassen-Attributgewichtung verteilt, abgeschwächt an Attributen nahe der Potential-Decke, gewichtet nach Signature-/Weak-Attribut-Affinität und Development-Route-Bonus. Reale Werte hängen zusätzlich vom Performance-Anteil ab.`}
       >
         Beste Klassen + deine aktuelle · SP-Zugewinn{" "}
         {readOnly ? "" : <span className="nl-training-intensity-hint-inline">· tippen zum Wählen</span>}
@@ -445,7 +454,7 @@ function NlTrainingClassRanking({
             aria-checked={entry.isCurrent}
             disabled={readOnly}
             onClick={() => onSelectClass(entry.className)}
-            title={`${entry.label} als Trainingsklasse wählen: Rang ${entry.rank} · ca. +${formatVeloNumber(entry.estimatedGain, 1)} SP${
+            title={`${entry.label} als Trainingsklasse wählen: Rang ${entry.rank} · ca. +${formatNlNumber(entry.estimatedGain, 1)} SP${
               entry.isCurrent ? " · wird aktuell trainiert" : ""
             }`}
           >
@@ -465,7 +474,7 @@ function NlTrainingClassRanking({
                 style={{ width: `${Math.min(100, (entry.estimatedGain / best) * 100)}%` }}
               />
             </span>
-            <span className="nl-training-class-ranking-value nl-tnum">≈+{formatVeloNumber(entry.estimatedGain, 1)} SP</span>
+            <span className="nl-training-class-ranking-value nl-tnum">≈+{formatNlNumber(entry.estimatedGain, 1)} SP</span>
           </button>
         ))}
       </div>
@@ -552,7 +561,7 @@ function NlTrainingPlayerCard({
     contextData: {
       training: {
         caRating: row.developmentStars.currentAbilityRating,
-        poDisplay: row.developmentStars.potentialStars ?? formatVeloNumber(row.developmentStars.potentialRating, 0),
+        poDisplay: row.developmentStars.potentialStars ?? formatNlNumber(row.developmentStars.potentialRating, 0),
         netSetpoints: row.organicForecast.netSetpoints,
         regressionRisk: row.forecast.regressionRisk,
         trainingModeLabel: getTrainingModePresentation(row.mode).label,
@@ -633,15 +642,15 @@ function NlTrainingPlayerCard({
       <div className="nl-training-takeaway" data-testid="nl-training-takeaway">
         <NlDeltaChip
           value={row.organicForecast.netSetpoints}
-          format={(n) => `${formatVeloSignedNumber(n, 1)} SP`}
+          format={(n) => `${formatNlSignedNumber(n, 1)} SP`}
           title="Netto-Forecast: Training + Performance − Regression über alle 12 Attribute"
         />
         <p>{getCoreTakeaway(row)}</p>
       </div>
       <small className="nl-training-takeaway-split nl-tnum">
-        Training +{formatVeloNumber(row.organicForecast.trainingSetpoints, 1)} · Performance +
-        {formatVeloNumber(row.organicForecast.performanceSetpoints, 1)} · Fatigue{" "}
-        {formatVeloNumber(row.organicForecast.fatigueLoad, 1)} ·{" "}
+        Training +{formatNlNumber(row.organicForecast.trainingSetpoints, 1)} · Performance +
+        {formatNlNumber(row.organicForecast.performanceSetpoints, 1)} · Fatigue{" "}
+        {formatNlNumber(row.organicForecast.fatigueLoad, 1)} ·{" "}
         <span
           className="nl-training-hint"
           title={`Strain-Risiko bei ${getTrainingModePresentation(row.mode).label}: ${row.fatigueWarning}`}
@@ -689,7 +698,7 @@ function NlTrainingPlayerCard({
               className={`nl-training-chip is-trait${row.modifiers.traitModifierPct >= 0 ? " is-positive" : " is-negative"}`}
               title={
                 row.traitBoosts
-                  .map((entry) => `${entry.trait} ${entry.pct >= 0 ? "+" : ""}${formatVeloNumber(entry.pct, 1)}%`)
+                  .map((entry) => `${entry.trait} ${entry.pct >= 0 ? "+" : ""}${formatNlNumber(entry.pct, 1)}%`)
                   .join(" · ") || "Trait Training Boost"
               }
             >
@@ -707,7 +716,7 @@ function NlTrainingPlayerCard({
           {isHighRisk ? (
             <span
               className="nl-training-chip is-risk"
-              title={`Regressions-Druck ${formatVeloNumber(row.forecast.regressionPressure, 0)} (Alterung, Marktwert-Druck, Belastung) — Begründung im Kurztext oben.`}
+              title={`Regressions-Druck ${formatNlNumber(row.forecast.regressionPressure, 0)} (Alterung, Marktwert-Druck, Belastung) — Begründung im Kurztext oben.`}
             >
               <NlTrainingGlyph kind="risk" /> Rückschritt-Risiko
             </span>
@@ -805,13 +814,13 @@ function NlTrainingWhatIf({
   const netDelta = projected.net - baselineNet;
   const trainingDelta = projected.trainingGain - baselineTrainingBudget;
   const fatigue = option.fatigueLoad * squadSize;
-  const valueText = `${option.label}: projizierter Trainings-Zuwachs +${formatVeloNumber(
+  const valueText = `${option.label}: projizierter Trainings-Zuwachs +${formatNlNumber(
     projected.trainingGain,
     1,
-  )} SP (${formatVeloSignedNumber(trainingDelta, 1)} SP), Netto ${formatVeloSignedNumber(
+  )} SP (${formatNlSignedNumber(trainingDelta, 1)} SP), Netto ${formatNlSignedNumber(
     projected.net,
     1,
-  )} SP (${formatVeloSignedNumber(netDelta, 1)} SP gegenüber aktuell)`;
+  )} SP (${formatNlSignedNumber(netDelta, 1)} SP gegenüber aktuell)`;
 
   return (
     <NlWhatIfSlider
@@ -830,21 +839,21 @@ function NlTrainingWhatIf({
       <StatChipRow aria-label="What-if-Prognose: projizierter Trainings-Zuwachs, Netto, Belastung">
         <StatChip
           label="Trainings-Zuwachs"
-          value={`+${formatVeloNumber(projected.trainingGain, 1)} SP`}
-          sub={`${formatVeloSignedNumber(trainingDelta, 1)} SP ggü. aktuell`}
+          value={`+${formatNlNumber(projected.trainingGain, 1)} SP`}
+          sub={`${formatNlSignedNumber(trainingDelta, 1)} SP ggü. aktuell`}
           tone="accent"
           title="Projizierter Team-Trainings-Zuwachs, wenn alle Spieler auf diesen Modus trainierten (Summe der pro-Spieler-Prognose, potentialgewichtet)."
         />
         <StatChip
           label="Netto"
-          value={`${formatVeloSignedNumber(projected.net, 1)} SP`}
+          value={`${formatNlSignedNumber(projected.net, 1)} SP`}
           sub="Performance + Training − Regression"
           tone={projected.net >= 0 ? "good" : "risk"}
           title="Projizierter Team-Netto-Forecast bei diesem Modus. Positiv = Kader wächst im Schnitt."
         />
         <StatChip
           label="Belastung"
-          value={formatVeloNumber(fatigue, 0)}
+          value={formatNlNumber(fatigue, 0)}
           sub="Fatigue-Last (Verletzungsrisiko)"
           tone="risk"
           title="Aufsummierte Fatigue-Last dieses Modus über den Kader — höhere Intensität kostet mehr Regeneration."
@@ -853,11 +862,11 @@ function NlTrainingWhatIf({
       <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
         <NlDeltaChip
           value={netDelta}
-          format={(n) => `${formatVeloSignedNumber(n, 1)} SP Netto`}
+          format={(n) => `${formatNlSignedNumber(n, 1)} SP Netto`}
           title="Veränderung des Team-Netto-Forecasts gegenüber der aktuellen Aufstellung."
         />
         <small className="nl-tnum" style={{ color: "var(--nl-mut)" }}>
-          Regression konstant {formatVeloSignedNumber(regressionTotal, 1)} SP (intensitätsunabhängig)
+          Regression konstant {formatNlSignedNumber(regressionTotal, 1)} SP (intensitätsunabhängig)
         </small>
       </div>
     </NlWhatIfSlider>
@@ -1036,7 +1045,7 @@ export default function TrainingCompactNewLook({
           />
           <StatChip
             label="Netto"
-            value={`${formatVeloSignedNumber(animatedTeamNet ?? teamKpis.net, 1)} SP`}
+            value={`${formatNlSignedNumber(animatedTeamNet ?? teamKpis.net, 1)} SP`}
             sub="Performance + Training − Regression"
             tone={teamKpis.net >= 0 ? "good" : "risk"}
             title="Summe aus Performance + Trainings-Zugewinn − Regression über den ganzen Kader. Positiv = Kader wächst im Schnitt, negativ = Kader baut im Schnitt ab."
@@ -1046,9 +1055,9 @@ export default function TrainingCompactNewLook({
           Regeneration Ø {formatNlNumber(summary.recoveryBeforeTraining, 1)} → {formatNlNumber(summary.recoveryAfterTraining, 1)} ·
           Leicht {summary.lightModeCount} · Hart {summary.hardModeCount} · Top:{" "}
           <strong>{topGrowth?.player.name ?? "—"}</strong>
-          {topGrowth ? ` (${formatVeloSignedNumber(topGrowth.organicForecast.netSetpoints, 1)})` : ""} · Risiko:{" "}
+          {topGrowth ? ` (${formatNlSignedNumber(topGrowth.organicForecast.netSetpoints, 1)})` : ""} · Risiko:{" "}
           <strong>{topRisk?.player.name ?? "—"}</strong>
-          {topRisk ? ` (Druck ${formatVeloNumber(topRisk.forecast.regressionPressure, 0)})` : ""} ·{" "}
+          {topRisk ? ` (Druck ${formatNlNumber(topRisk.forecast.regressionPressure, 0)})` : ""} ·{" "}
           <button
             type="button"
             className="nl-training-topline-link"
@@ -1092,9 +1101,9 @@ export default function TrainingCompactNewLook({
             const team = teamProjectionByMode.get(option.value);
             return (
               <small key={`team-preview-${option.value}`} className="nl-tnum">
-                Alle {option.label}: +{formatVeloNumber(team?.trainingGain ?? option.trainingSetpoints * playerRows.length, 1)}{" "}
-                durch Training · Netto {formatVeloSignedNumber(team?.net ?? 0, 1)} SP · Fatigue{" "}
-                {formatVeloNumber(option.fatigueLoad * playerRows.length, 0)}
+                Alle {option.label}: +{formatNlNumber(team?.trainingGain ?? option.trainingSetpoints * playerRows.length, 1)}{" "}
+                durch Training · Netto {formatNlSignedNumber(team?.net ?? 0, 1)} SP · Fatigue{" "}
+                {formatNlNumber(option.fatigueLoad * playerRows.length, 0)}
               </small>
             );
           })}
@@ -1147,11 +1156,10 @@ export default function TrainingCompactNewLook({
       </div>
 
       {playerRows.length === 0 ? (
-        <EmptyState
+        <NlEmptyState
           title="Keine Trainingsdaten"
-          text="Für dieses Team liegen aktuell keine Spieler oder kein passender Entwicklungsfilter vor."
-          actionLabel={onOpenTeams ? "Teams öffnen" : undefined}
-          onAction={onOpenTeams}
+          message="Für dieses Team liegen aktuell keine Spieler oder kein passender Entwicklungsfilter vor."
+          action={onOpenTeams ? { label: "Teams öffnen", onClick: onOpenTeams } : undefined}
         />
       ) : (
         <div className="nl-training-grid">

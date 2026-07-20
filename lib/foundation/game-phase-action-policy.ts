@@ -145,16 +145,17 @@ export function evaluateGamePhaseAction(gameState: GameState, action: GamePhaseA
 }
 
 /**
- * Training intensity (leicht/mittel/hart) feeds a single season-end batch
- * calculation (see lib/training/organic-season-progression.ts), so it must be
- * fixed for the whole season once matches are underway — otherwise a team
- * could run "leicht" all season for low fatigue/injury risk and switch to
- * "hart" right before the season-end XP is booked. This reuses the existing
- * "set_training" preseason-management gate (same window as facility/transfer
- * setup) as the single source of truth for the lock: open during preseason
- * and until the season's first matchday result is recorded, sealed for the
- * rest of the season afterwards. See docs/training-intensity-season-lock.md.
+ * Anti-cheese Teil B (B.5): the season-long training-intensity LOCK is REMOVED.
+ *
+ * The lock existed because training intensity used to feed a single season-end batch calculation, so a
+ * team could run "leicht" all season and flip to "hart" right before the season-end booking. That cheese
+ * no longer works: training is now accumulated PER MATCHDAY (see `seasonTrainingAccumulator` /
+ * `buildOrganicSeasonProgression`'s `accumulatedBaseTrainingBudget`) — a late "hart" switch only affects
+ * the few matchdays it is actually active for. Mid-season intensity changes are therefore now allowed
+ * for the human player; the AI's change cadence is throttled separately (see ai-manager-apply-service).
+ *
+ * Kept (always `false`) so existing callers / UI hints degrade gracefully to "never locked".
  */
-export function isTrainingIntensityLockedForSeason(gameState: GameState): boolean {
-  return !evaluateGamePhaseAction(gameState, "set_training").allowed;
+export function isTrainingIntensityLockedForSeason(_gameState: GameState): boolean {
+  return false;
 }

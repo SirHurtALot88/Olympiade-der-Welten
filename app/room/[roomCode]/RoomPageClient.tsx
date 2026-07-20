@@ -4,10 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
-import { describeRoomFlowButton, getRoomFlowStep } from "@/lib/room/room-flow-controller";
+import { ONLINE_ROOM_TEAM_IDS } from "@/lib/room/online-room-model";
+import { describeRoomFlowButton, getRoomFlowStep, isSandboxRoomSave } from "@/lib/room/room-flow-controller";
 import { SocketProvider, useSocket } from "@/lib/socket/socket-context";
 import type { RoomErrorPayload, RoomJoinedPayload, RoomOwnershipPreset } from "@/types/events";
 import type { OlyRoomState } from "@/types/game";
+
+const MAX_TEAMS_PER_HUMAN = 4;
+type TeamAssignmentTarget = "chris" | "franky" | "ai";
 
 const PRESET_OPTIONS: Array<{ value: RoomOwnershipPreset; label: string }> = [
   { value: "chris_1_rest_ai", label: "1 Team Chris, Rest KI" },
@@ -154,7 +158,57 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
     return "Ins Spiel";
   }, [state]);
 
+  const isLobby = state?.multiplayerRoom.status === "lobby";
+  // A real (non-sandbox) save already bound to the room means "Spiel starten" continues it
+  // rather than creating a fresh one - surface that to the host in the lobby.
+  const hasExistingRealSave = Boolean(state && !isSandboxRoomSave(state.multiplayerRoom.saveId));
+  // In the lobby the host's start action still creates/binds the real save, so relabel the
+  // generic flow CTA ("Room starten") to the clearer "Spiel starten".
+  const roomFlowButtonLabel =
+    isLobby && roomFlowButton?.isHostAction && roomFlowButton?.canClick ? "Spiel starten" : roomFlowButton?.label ?? "Lädt ...";
+
   const teamRosterParticipants = state?.roomParticipants.filter((participant) => participant.controlledTeamIds.length > 0) ?? [];
+
+  // Mirrors the server-side host/Franky resolution in buildExplicitTeamOwnership /
+  // buildOwnershipForPreset so the picker shows exactly who a click would assign teams to.
+  const chrisParticipant = state?.roomParticipants.find((participant) => participant.role === "host") ?? null;
+  const frankyParticipant =
+    state?.roomParticipants.find((participant) => /franky/i.test(participant.displayName)) ??
+    state?.roomParticipants.find((participant) => participant.role === "player") ??
+    null;
+  const chrisDisplayName = chrisParticipant?.displayName ?? "Chris";
+  const frankyDisplayName = frankyParticipant?.displayName ?? "Franky";
+
+  const teamAssignment: Record<string, TeamAssignmentTarget> = {};
+  if (state) {
+    for (const entry of state.teamOwnership) {
+      if (entry.controllerType === "human" && chrisParticipant && entry.participantId === chrisParticipant.participantId) {
+        teamAssignment[entry.teamId] = "chris";
+      } else if (entry.controllerType === "human" && frankyParticipant && entry.participantId === frankyParticipant.participantId) {
+        teamAssignment[entry.teamId] = "franky";
+      } else {
+        teamAssignment[entry.teamId] = "ai";
+      }
+    }
+  }
+  const pickerChrisTeamIds = ONLINE_ROOM_TEAM_IDS.filter((teamId) => teamAssignment[teamId] === "chris");
+  const pickerFrankyTeamIds = ONLINE_ROOM_TEAM_IDS.filter((teamId) => teamAssignment[teamId] === "franky");
+
+  function assignTeam(teamId: string, target: TeamAssignmentTarget) {
+    if (!seatToken) return;
+    const nextChris = new Set(pickerChrisTeamIds);
+    const nextFranky = new Set(pickerFrankyTeamIds);
+    nextChris.delete(teamId);
+    nextFranky.delete(teamId);
+    if (target === "chris") nextChris.add(teamId);
+    if (target === "franky") nextFranky.add(teamId);
+    socket.emit("setTeamSelection", {
+      roomCode: roomCode.toUpperCase(),
+      seatToken,
+      chrisTeamIds: Array.from(nextChris),
+      frankyTeamIds: Array.from(nextFranky),
+    });
+  }
 
   return (
     <main className="app-shell">
@@ -239,7 +293,7 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
               </div>
               <div className="form-stack">
                 <label className="filter-field">
-                  <span>Verteilung</span>
+                  <span>Schnellauswahl (Preset)</span>
                   <select
                     className="input"
                     onChange={(event) => {
@@ -259,6 +313,75 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
                     ))}
                   </select>
                 </label>
+
+                <div className="room-meta">
+                  <span className={`pill${pickerChrisTeamIds.length >= MAX_TEAMS_PER_HUMAN ? " is-warning" : " is-ready"}`}>
+                    {chrisDisplayName}: {pickerChrisTeamIds.length}/{MAX_TEAMS_PER_HUMAN} Teams
+                  </span>
+                  {frankyParticipant ? (
+                    <span className={`pill${pickerFrankyTeamIds.length >= MAX_TEAMS_PER_HUMAN ? " is-warning" : " is-ready"}`}>
+                      {frankyDisplayName}: {pickerFrankyTeamIds.length}/{MAX_TEAMS_PER_HUMAN} Teams
+                    </span>
+                  ) : (
+                    <span className="pill is-warning">Franky ist noch nicht im Raum</span>
+                  )}
+                </div>
+                <p className="muted">
+                  Waehle pro Team, wer es steuert: {chrisDisplayName}, {frankyDisplayName} oder KI. Maximal {MAX_TEAMS_PER_HUMAN} Teams pro
+                  Mitspieler.
+                </p>
+
+                <div className="table-shell">
+                  <table className="data-table compact-table" data-testid="team-selection-picker">
+                    <thead>
+                      <tr>
+                        <th>Team</th>
+                        <th>Zuweisung</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ONLINE_ROOM_TEAM_IDS.map((teamId) => {
+                        const assignment = teamAssignment[teamId] ?? "ai";
+                        const chrisDisabled = assignment !== "chris" && pickerChrisTeamIds.length >= MAX_TEAMS_PER_HUMAN;
+                        const frankyDisabled =
+                          !frankyParticipant || (assignment !== "franky" && pickerFrankyTeamIds.length >= MAX_TEAMS_PER_HUMAN);
+                        return (
+                          <tr key={teamId}>
+                            <td>{teamId}</td>
+                            <td>
+                              <div className="pill-toggle-group">
+                                <button
+                                  type="button"
+                                  className={`pill-toggle${assignment === "chris" ? " is-selected" : ""}`}
+                                  disabled={!seatToken || chrisDisabled}
+                                  onClick={() => assignTeam(teamId, "chris")}
+                                >
+                                  {chrisDisplayName}
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`pill-toggle${assignment === "franky" ? " is-selected" : ""}`}
+                                  disabled={!seatToken || frankyDisabled}
+                                  onClick={() => assignTeam(teamId, "franky")}
+                                >
+                                  {frankyDisplayName}
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`pill-toggle${assignment === "ai" ? " is-selected" : ""}`}
+                                  disabled={!seatToken}
+                                  onClick={() => assignTeam(teamId, "ai")}
+                                >
+                                  KI
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </section>
           ) : null}
@@ -289,6 +412,13 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
                   </span>
                 ) : null}
               </div>
+              {isHost && isLobby ? (
+                <p className="muted">
+                  {hasExistingRealSave
+                    ? "Für diesen Raum existiert bereits ein Spielstand. Mit „Spiel starten“ wird der bestehende Spielstand fortgesetzt."
+                    : "Mit „Spiel starten“ wird ein frischer Spielstand mit genau den gewählten Teams erstellt und beiden Spielern zugewiesen."}
+                </p>
+              ) : null}
               <div className="foundation-flow-actions">
                 <button
                   className={`primary-button foundation-flow-button ${roomFlowButton?.status === "waiting_for_player" ? "is-blocked" : ""}`}
@@ -324,11 +454,25 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
                     });
                   }}
                 >
-                  {roomFlowButton?.label ?? "Lädt ..."}
+                  {roomFlowButtonLabel}
                 </button>
-                <Link className="primary-button inline-button oly-primary-cta" href={foundationHref}>
-                  {primaryCtaLabel}
-                </Link>
+                {isLobby ? (
+                  // Do NOT navigate while still in the lobby: the room save is only bound the
+                  // moment the host presses "Spiel starten". Entering now would carry the stale
+                  // sandbox saveId, so keep the CTA inert until status leaves "lobby".
+                  <button
+                    type="button"
+                    className="primary-button inline-button oly-primary-cta"
+                    disabled
+                    title="Erst nach dem Spielstart verfügbar"
+                  >
+                    {primaryCtaLabel}
+                  </button>
+                ) : (
+                  <Link className="primary-button inline-button oly-primary-cta" href={foundationHref}>
+                    {primaryCtaLabel}
+                  </Link>
+                )}
               </div>
             </div>
           </section>

@@ -9,13 +9,18 @@ import {
   resolveMarketPlannerCashBuffer,
   resolveTeamCashRunwayReserve,
 } from "@/lib/ai/ai-team-cash-reserve-service";
+import {
+  makePlayer,
+  makeRosterEntry,
+  makeScheduleEntry,
+  makeScheduleSlot,
+  makeTeam,
+  makeTeamIdentity,
+  makeTeamStrategyProfile,
+} from "./_fixtures/game-entity-fixtures";
 
 function minimalStrategyProfile(teamId: string, bias: Record<string, number>) {
-  return {
-    teamId,
-    strategySummary: "Test profile",
-    preferredArchetypes: [] as string[],
-    secondaryArchetypes: [] as string[],
+  return makeTeamStrategyProfile(teamId, {
     bias: {
       cashPriority: 5,
       valuePriority: 5,
@@ -31,7 +36,18 @@ function minimalStrategyProfile(teamId: string, bias: Record<string, number>) {
       eliteSmallRosterPreference: 5,
       ...bias,
     },
-  };
+  });
+}
+
+function defaultDisciplineSchedule() {
+  return [
+    makeScheduleEntry({
+      seasonId: "season-2",
+      matchdayId: "md-1",
+      discipline1: makeScheduleSlot({ disciplineId: "d1", playerCount: 4 }),
+      discipline2: makeScheduleSlot({ disciplineId: "d2", playerCount: 4 }),
+    }),
+  ];
 }
 
 function buildGameState(overrides?: Partial<GameState>): GameState {
@@ -43,34 +59,37 @@ function buildGameState(overrides?: Partial<GameState>): GameState {
       standings: {},
       teamControlSettings: {},
       teamStrategyProfiles: {},
-      disciplineSchedule: [{ seasonId: "season-2", discipline1: { playerCount: 4 }, discipline2: { playerCount: 4 } }],
+      disciplineSchedule: defaultDisciplineSchedule(),
     },
     matchdayState: { matchdayId: "md-1", status: "planning", pendingTeamIds: [], resolvedFixtureIds: [] },
-    teams: [{ teamId: "C-S", name: "C-S", shortCode: "C-S", cash: 180, humanControlled: false }],
+    teams: [makeTeam({ teamId: "C-S", cash: 180 })],
     teamIdentities: [
-      {
+      makeTeamIdentity({
         teamId: "C-S",
         playerMin: 10,
         playerOpt: 12,
         finances: 9.5,
         ambition: 7,
-      },
+      }),
     ],
-    rosters: Array.from({ length: 10 }, (_, index) => ({
-      id: `r-cs-${index}`,
-      teamId: "C-S",
-      playerId: `p-cs-${index}`,
-      slot: index,
-      salary: 4.8,
-    })),
-    players: Array.from({ length: 10 }, (_, index) => ({
-      id: `p-cs-${index}`,
-      name: `P${index}`,
-      marketValue: 15,
-      displayMarketValue: 15,
-      rating: 55,
-      salary: 4.8,
-    })),
+    rosters: Array.from({ length: 10 }, (_, index) =>
+      makeRosterEntry({
+        id: `r-cs-${index}`,
+        teamId: "C-S",
+        playerId: `p-cs-${index}`,
+        salary: 4.8,
+      }),
+    ),
+    players: Array.from({ length: 10 }, (_, index) =>
+      makePlayer({
+        id: `p-cs-${index}`,
+        name: `P${index}`,
+        marketValue: 15,
+        displayMarketValue: 15,
+        rating: 55,
+        salaryDemand: 4.8,
+      }),
+    ),
     disciplines: [],
     transferHistory: [],
     ...overrides,
@@ -88,7 +107,7 @@ describe("ai team cash reserve service", () => {
         teamStrategyProfiles: {
           "C-S": minimalStrategyProfile("C-S", { cashPriority: 8, valuePriority: 8, wageSensitivity: 8 }),
         },
-        disciplineSchedule: [{ seasonId: "season-2", discipline1: { playerCount: 4 }, discipline2: { playerCount: 4 } }],
+        disciplineSchedule: defaultDisciplineSchedule(),
       },
     });
     expect(resolveHoardMultiplier(gameState, "C-S")).toBeGreaterThan(0.55);
@@ -105,7 +124,7 @@ describe("ai team cash reserve service", () => {
         teamStrategyProfiles: {
           "C-S": minimalStrategyProfile("C-S", { cashPriority: 8, valuePriority: 8, wageSensitivity: 8 }),
         },
-        disciplineSchedule: [{ seasonId: "season-2", discipline1: { playerCount: 4 }, discipline2: { playerCount: 4 } }],
+        disciplineSchedule: defaultDisciplineSchedule(),
       },
     });
     const projected = projectExpectedSalaryAtPlannerTarget(gameState, "C-S", 12);
@@ -117,7 +136,7 @@ describe("ai team cash reserve service", () => {
 
   it("keeps planner target at playerOpt while roster is below opt", () => {
     const gameState = buildGameState({
-      teams: [{ teamId: "C-S", name: "C-S", shortCode: "C-S", cash: 20, humanControlled: false }],
+      teams: [makeTeam({ teamId: "C-S", cash: 20 })],
       seasonState: {
         seasonId: "season-2",
         schedule: [],
@@ -126,16 +145,7 @@ describe("ai team cash reserve service", () => {
         teamStrategyProfiles: {
           "C-S": minimalStrategyProfile("C-S", { cashPriority: 8, valuePriority: 8, wageSensitivity: 8 }),
         },
-        seasonStrategyStates: {
-          "C-S": {
-            teamId: "C-S",
-            seasonId: "season-2",
-            seasonStrategy: "balanced_growth",
-            doctrineCompatibility: "green",
-            updatedAt: "",
-          },
-        },
-        disciplineSchedule: [{ seasonId: "season-2", discipline1: { playerCount: 4 }, discipline2: { playerCount: 4 } }],
+        disciplineSchedule: defaultDisciplineSchedule(),
       },
     });
     expect(getTeamPlannerRosterTarget(gameState, "C-S")).toBe(12);
@@ -143,21 +153,25 @@ describe("ai team cash reserve service", () => {
 
   it("lowers planner target by one only after opt is reached and cash is tight", () => {
     const gameState = buildGameState({
-      teams: [{ teamId: "C-S", name: "C-S", shortCode: "C-S", cash: 8, humanControlled: false }],
-      rosters: Array.from({ length: 12 }, (_, index) => ({
-        id: `r-cs-${index}`,
-        teamId: "C-S",
-        playerId: `p-cs-${index}`,
-        salary: 4.8,
-      })),
-      players: Array.from({ length: 12 }, (_, index) => ({
-        id: `p-cs-${index}`,
-        name: `P${index}`,
-        marketValue: 15,
-        displayMarketValue: 15,
-        rating: 55,
-        salary: 4.8,
-      })),
+      teams: [makeTeam({ teamId: "C-S", cash: 8 })],
+      rosters: Array.from({ length: 12 }, (_, index) =>
+        makeRosterEntry({
+          id: `r-cs-${index}`,
+          teamId: "C-S",
+          playerId: `p-cs-${index}`,
+          salary: 4.8,
+        }),
+      ),
+      players: Array.from({ length: 12 }, (_, index) =>
+        makePlayer({
+          id: `p-cs-${index}`,
+          name: `P${index}`,
+          marketValue: 15,
+          displayMarketValue: 15,
+          rating: 55,
+          salaryDemand: 4.8,
+        }),
+      ),
       seasonState: {
         seasonId: "season-2",
         schedule: [],
@@ -166,16 +180,7 @@ describe("ai team cash reserve service", () => {
         teamStrategyProfiles: {
           "C-S": minimalStrategyProfile("C-S", { cashPriority: 8, valuePriority: 8, wageSensitivity: 8 }),
         },
-        seasonStrategyStates: {
-          "C-S": {
-            teamId: "C-S",
-            seasonId: "season-2",
-            seasonStrategy: "balanced_growth",
-            doctrineCompatibility: "green",
-            updatedAt: "",
-          },
-        },
-        disciplineSchedule: [{ seasonId: "season-2", discipline1: { playerCount: 4 }, discipline2: { playerCount: 4 } }],
+        disciplineSchedule: defaultDisciplineSchedule(),
       },
     });
     expect(getTeamPlannerRosterTarget(gameState, "C-S")).toBe(11);
@@ -183,22 +188,25 @@ describe("ai team cash reserve service", () => {
 
   it("zeros market planner cash buffer while roster is below Opt", () => {
     const gameState = buildGameState({
-      teams: [{ teamId: "C-S", name: "C-S", shortCode: "C-S", cash: 45, humanControlled: false }],
-      rosters: Array.from({ length: 5 }, (_, index) => ({
-        id: `r-cs-${index}`,
-        teamId: "C-S",
-        playerId: `p-cs-${index}`,
-        slot: index,
-        salary: 4.8,
-      })),
-      players: Array.from({ length: 5 }, (_, index) => ({
-        id: `p-cs-${index}`,
-        name: `P${index}`,
-        marketValue: 15,
-        displayMarketValue: 15,
-        rating: 55,
-        salary: 4.8,
-      })),
+      teams: [makeTeam({ teamId: "C-S", cash: 45 })],
+      rosters: Array.from({ length: 5 }, (_, index) =>
+        makeRosterEntry({
+          id: `r-cs-${index}`,
+          teamId: "C-S",
+          playerId: `p-cs-${index}`,
+          salary: 4.8,
+        }),
+      ),
+      players: Array.from({ length: 5 }, (_, index) =>
+        makePlayer({
+          id: `p-cs-${index}`,
+          name: `P${index}`,
+          marketValue: 15,
+          displayMarketValue: 15,
+          rating: 55,
+          salaryDemand: 4.8,
+        }),
+      ),
     });
     expect(isTeamRosterBelowOpt(gameState, "C-S")).toBe(true);
     expect(resolveMarketPlannerCashBuffer(gameState, "C-S")).toBe(0);
@@ -207,22 +215,25 @@ describe("ai team cash reserve service", () => {
 
   it("restores market planner cash buffer once roster reaches Opt", () => {
     const gameState = buildGameState({
-      teams: [{ teamId: "C-S", name: "C-S", shortCode: "C-S", cash: 45, humanControlled: false }],
-      rosters: Array.from({ length: 12 }, (_, index) => ({
-        id: `r-cs-${index}`,
-        teamId: "C-S",
-        playerId: `p-cs-${index}`,
-        slot: index,
-        salary: 4.8,
-      })),
-      players: Array.from({ length: 12 }, (_, index) => ({
-        id: `p-cs-${index}`,
-        name: `P${index}`,
-        marketValue: 15,
-        displayMarketValue: 15,
-        rating: 55,
-        salary: 4.8,
-      })),
+      teams: [makeTeam({ teamId: "C-S", cash: 45 })],
+      rosters: Array.from({ length: 12 }, (_, index) =>
+        makeRosterEntry({
+          id: `r-cs-${index}`,
+          teamId: "C-S",
+          playerId: `p-cs-${index}`,
+          salary: 4.8,
+        }),
+      ),
+      players: Array.from({ length: 12 }, (_, index) =>
+        makePlayer({
+          id: `p-cs-${index}`,
+          name: `P${index}`,
+          marketValue: 15,
+          displayMarketValue: 15,
+          rating: 55,
+          salaryDemand: 4.8,
+        }),
+      ),
     });
     expect(isTeamRosterBelowOpt(gameState, "C-S")).toBe(false);
     expect(resolveMarketPlannerCashBuffer(gameState, "C-S")).toBeGreaterThan(0);
@@ -230,7 +241,7 @@ describe("ai team cash reserve service", () => {
 
   it("uses a smaller reserve multiplier for spender profiles", () => {
     const gameState = buildGameState({
-      teamIdentities: [{ teamId: "C-S", playerMin: 10, playerOpt: 12, finances: 3, ambition: 8 }],
+      teamIdentities: [makeTeamIdentity({ teamId: "C-S", playerMin: 10, playerOpt: 12, finances: 3, ambition: 8 })],
       seasonState: {
         seasonId: "season-2",
         schedule: [],
@@ -239,7 +250,7 @@ describe("ai team cash reserve service", () => {
         teamStrategyProfiles: {
           "C-S": minimalStrategyProfile("C-S", { cashPriority: 1, starPriority: 9, riskTolerance: 8 }),
         },
-        disciplineSchedule: [{ seasonId: "season-2", discipline1: { playerCount: 4 }, discipline2: { playerCount: 4 } }],
+        disciplineSchedule: defaultDisciplineSchedule(),
       },
     });
     const projected = projectExpectedSalaryAtPlannerTarget(gameState, "C-S", 12);

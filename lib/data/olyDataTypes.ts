@@ -234,6 +234,43 @@ export type StandingRecord = {
   cashTotal?: number | null;
 };
 
+/**
+ * Fortgeschriebener Beliebtheits-KPI eines Teams (TEIL A). Anders als der frühere stateless,
+ * größen-korrelierte KPI wird dieser Wert Saison für Saison FORTGESCHRIEBEN (siehe
+ * `advanceTeamBeliebtheitForSeasonTransition` in lib/economy/team-beliebtheit.ts):
+ *   value[t] = clamp(REVERT*1.0 + (1-REVERT)*value[t-1] + GAIN*spotlightDelta[t], 0.5, 1.5)
+ * `value` bleibt in [0.5, 1.5], neutral 1.0 (= Liga-Durchschnitt), und speist weiter die
+ * Arena-Kopplung (facility-season-end-service liest `.value` als arenaPopularityFactor).
+ * `spotlightDelta` ist LIGA-ZENTRIERT um 0 (Σ über die Liga ≈ 0) und aus überwiegend
+ * größen-neutralen End-of-Season-Signalen zusammengesetzt (siehe `components`).
+ */
+export type TeamBeliebtheitRecord = {
+  /** Fortgeschriebener Faktor, geclampt auf [0.5, 1.5]; 1.0 = Liga-Durchschnitt. */
+  value: number;
+  /** Liga-zentrierter Spotlight-Impuls dieser Saison (Σ über die Liga ≈ 0). */
+  spotlightDelta: number;
+  /** Bereits gewichtete, liga-zentrierte Einzelbeiträge zum spotlightDelta (Summe = spotlightDelta). */
+  components: {
+    /** Rang-Überperformance: expectedRank − finalRank (größen-neutral). */
+    overperf: number;
+    /** Bracket-Helden: Anteil Kader mit bracketScore≈1 (größen-neutral). */
+    bracket: number;
+    /** Upsets: zugelassene/erzielte Aufholjagden schwächer erwarteter Teams. */
+    upset: number;
+    /** Saison-Sprung: finalRank vs. bisher bester/mittlerer historischer Rang. */
+    jump: number;
+    /** Disziplin-Spotlight: Anteil Kader mit rankInDiscipline<=3 pro Kadergröße. */
+    discipline: number;
+    /** FanFavorites + Kosmetik-Trait-Term (bestehende weiche Effekte). */
+    fanFavorites: number;
+    /**
+     * TEIL B — erfüllte Sponsor-Bonusziele mit spotlightBonus (liga-zentriert). Rückwärtskompatibel
+     * optional: fehlt der Beitrag (Alt-Saves, keine Ziele), zählt er als 0.
+     */
+    objective?: number;
+  };
+};
+
 export type StandingsApplyAuditLogRecord = {
   id: string;
   saveId: string;
@@ -764,6 +801,21 @@ export type Player = {
   lifetimeXP?: number | null;
   trainingMode?: "leicht" | "mittel" | "hart" | null;
   trainingClass?: string | null;
+  /**
+   * Per-matchday training accumulation for the current season (anti-cheese). Instead of a single
+   * season-end training budget derived from whatever `trainingMode` happens to be set at season end,
+   * each resolved matchday records the mode that was active for that matchday. The season-end organic
+   * progression then derives its base training budget + performance-weight from the EXACT per-mode
+   * matchday counts (see `resolveSeasonTrainingAccumulatorInputs`). Additive/optional: absent/null →
+   * legacy behaviour (mode-at-season-end). Reset to null every preseason baseline pass.
+   */
+  seasonTrainingAccumulator?: {
+    seasonId: string;
+    matchdaysCounted: number;
+    modeByMatchday: Record<string, "leicht" | "mittel" | "hart">;
+    accumulatedTrainingFatigue: number;
+    updatedAt: string;
+  } | null;
   cost?: number;
   upkeepBase?: number;
   className: string;
@@ -1111,6 +1163,17 @@ export type SponsorArchetype = "security" | "performance" | "identity";
 
 export type SponsorOfferComponentKind = "base" | "rank" | "improvement" | "special";
 
+/**
+ * Eine Stufe eines mehrstufigen Sonderziels (TEIL B). `threshold` ist die (aufsteigend sortierte)
+ * Mindest-Metrik, ab der die Stufe erreicht ist; `fraction` der Anteil des `rewardCash`, der bei dieser
+ * Stufe ausgezahlt wird (z. B. 0.4 / 0.7 / 1.0 für 40/70/100 %). `label` ist die UI-Beschriftung der Stufe.
+ */
+export type SponsorObjectiveStage = {
+  threshold: number;
+  fraction: number;
+  label: string;
+};
+
 export type SponsorOfferComponent = {
   componentId: string;
   kind: SponsorOfferComponentKind;
@@ -1119,6 +1182,19 @@ export type SponsorOfferComponent = {
   rewardCash: number;
   penaltyCash?: number;
   specialKey?: string | null;
+  /**
+   * TEIL B — mehrstufiges Sonderziel: anteilige Auszahlung je erreichter Stufe. Rückwärtskompatibel
+   * optional: fehlt `stages`, bleibt das Sonderziel binär (Fraction 0 oder 1 über den bestehenden
+   * Evaluator-Pfad). Stufen sind aufsteigend nach `threshold` zu lesen; der Evaluator liefert die höchste
+   * erreichte Stufen-Fraction, die Settlement zahlt `rewardCash * fraction`.
+   */
+  stages?: SponsorObjectiveStage[];
+  /**
+   * TEIL B — Beliebtheits-Impuls (Spotlight) bei Erfüllung. Roh-Magnitude (grob 0..1), die als
+   * ZUSÄTZLICHES, LIGA-ZENTRIERTES Signal in die Beliebtheits-Fortschreibung der Folge-Saison einfließt
+   * (Σ über die Liga ≈ 0). Skaliert mit der erreichten Stufen-Fraction. Rückwärtskompatibel optional.
+   */
+  spotlightBonus?: number;
 };
 
 export type SponsorDemandProfile = "safe" | "balanced" | "ambitious" | "elite";
@@ -1165,6 +1241,12 @@ export type SponsorOffer = {
   teamQualityRank?: number;
   /** Exactly one offer per team uses challenge specials (axis / salary / transfer). */
   isChallengeOffer?: boolean;
+  /**
+   * Golden-Sponsor-Los: höchstens EIN Slot/Team kann golden werden (underdog-/beliebtheits-gewichtet,
+   * mit Cooldown). Golden ist KEIN eigener Stern — der Offer behält seinen starTier — sondern hebt die
+   * Rang-Meilenstein-Komponente (gedeckelt). Wird in chooseSponsorOffer in den Vertrag mitkopiert.
+   */
+  isGolden?: boolean;
 };
 
 export type SponsorCommercialRating = {
@@ -1214,6 +1296,8 @@ export type TeamSponsorContract = {
   negotiationProfile?: SponsorNegotiationProfile;
   demandProfile?: SponsorDemandProfile;
   teamQualityRankAtSign?: number;
+  /** Golden-Sponsor-Vertrag (aus dem gewählten Offer mitkopiert) — Rang-Payout-Boost gedeckelt. */
+  isGolden?: boolean;
 };
 
 export type ScoutIntelSource = "watchlist" | "wishlist_mirror" | "passive_need" | "roster";
@@ -1265,6 +1349,24 @@ export type LoanApplyLogRecord = {
   installmentCharged: number;
   interestPortion: number;
   principalPortion: number;
+  createdAt: string;
+};
+
+/**
+ * Ledger-Eintrag für die Kredit-AUSZAHLUNG (Origination), analog `loanApplyLogs` (die nur die
+ * Saison-End-Raten abdecken). Ohne diesen Log war der Cash-Sprung bei Kreditaufnahme aus dem
+ * Ledger nicht rekonstruierbar (siehe tests/economy-cashflow-invariant.test.ts, das die Auszahlung
+ * bislang selbst als "loan:origination(unlogged)" markiert hat).
+ */
+export type LoanOriginationLogRecord = {
+  loanId: string;
+  seasonId: string;
+  borrowerTeamId: string;
+  borrowerCashDelta: number; // = +principal
+  lenderType: LoanLenderType;
+  lenderTeamId?: string; // nur bei lenderType === "team"
+  lenderCashDelta?: number; // = -principal, nur bei lenderType === "team"
+  principal: number;
   createdAt: string;
 };
 
@@ -2243,6 +2345,43 @@ export type LeagueSetupTeamWarning = {
   status: string;
 };
 
+/**
+ * Frozen per-player valuation row captured at MD10 season end. Once the season is completed
+ * (gamePhase !== "season_active"), OVR/MVS/PPs/MW and the sale-factor bracket rank are read from
+ * this snapshot instead of being recomputed pool-relative, so post-season sales/roster changes do
+ * NOT shift the valuations of the remaining players. All fields are null-tolerant for draft/import
+ * players without ratings.
+ */
+export type FrozenValuationPlayerRow = {
+  playerId: string;
+  frozenOvr: number | null;
+  frozenOvrRank: number | null;
+  frozenMvs: number | null;
+  frozenMvsRank: number | null;
+  frozenPps: number | null;
+  frozenPpsRank: number | null;
+  frozenPpPow: number | null;
+  frozenPpPowRank: number | null;
+  frozenPpSpe: number | null;
+  frozenPpSpeRank: number | null;
+  frozenPpMen: number | null;
+  frozenPpMenRank: number | null;
+  frozenPpSoc: number | null;
+  frozenPpSocRank: number | null;
+  frozenMw: number | null;
+  frozenSaleBracket: number | null;
+  frozenSaleRankInBracket: number | null;
+  frozenSaleBracketSize: number | null;
+};
+
+export type FrozenValuationSnapshot = {
+  seasonId: string;
+  frozenAtMatchdayId: string;
+  createdAt: string;
+  playersById: Record<string, FrozenValuationPlayerRow>;
+  teamAggregatesByTeamId?: Record<string, { frozenTeamOvr: number | null; frozenTeamMvs: number | null }>;
+};
+
 export type SeasonState = {
   seasonId: string;
   schedule: Fixture[];
@@ -2292,8 +2431,23 @@ export type SeasonState = {
   sponsorBrandHistoryByTeamId?: Record<string, string[]>;
   sponsorEvents?: SponsorEventRecord[];
   sponsorPayoutLogs?: SponsorPayoutLogRecord[];
+  /**
+   * Fortgeschriebener Beliebtheits-KPI pro Team (TEIL A). Wird 1×/Saison am Saison-Ende (vor der
+   * Sponsor-Angebots-Generierung des nächsten Zyklus) fortgeschrieben. Rückwärtskompatibel optional:
+   * fehlt der Eintrag, fällt die Fortschreibung auf einen neutralen Vorwert 1.0 zurück.
+   */
+  beliebtheitByTeamId?: Record<string, TeamBeliebtheitRecord>;
+  /** Zeitreihe der fortgeschriebenen Beliebtheits-`value`s pro Team (älteste zuerst), für Debug/Balance. */
+  beliebtheitHistoryByTeamId?: Record<string, number[]>;
+  /**
+   * Golden-Sponsor-Cooldown: true, wenn das Team in der VORSAISON einen golden Slot hatte. Speist den
+   * COOLDOWN_PENALTY-Term in rollGoldenLuck, damit kein Team dauerhaft golden bleibt. Rückwärtskompatibel
+   * optional: fehlt der Eintrag, gilt hadGoldenLastSeason = false.
+   */
+  goldenSponsorHistoryByTeamId?: Record<string, boolean>;
   loans?: LoanRecord[];
   loanApplyLogs?: LoanApplyLogRecord[]; // Idempotenz-Log analog objectiveRewardApplyLogs
+  loanOriginationLogs?: LoanOriginationLogRecord[]; // Ledger für Kredit-Auszahlung (Origination), siehe T-016
   scoutingWatchlist?: ScoutingWatchlistEntry[];
   scoutIntelByTeamId?: Record<string, PlayerScoutIntelRecord[]>;
   formCards?: FormCardRecord[];
@@ -2323,6 +2477,11 @@ export type SeasonState = {
   adminBalancingConfig?: AdminBalancingConfigInput;
   /** Pre-computed ledger + OVR/PPS/MVS ratings; invalidated via contentSignature. */
   persistedSeasonDerivations?: unknown;
+  /**
+   * Snapshot of OVR/MVS/PPs/MW + sale-factor bracket ranks taken at MD10 season end. Present only
+   * after the season completes; cleared when a new season activates. See FrozenValuationSnapshot.
+   */
+  frozenValuationSnapshot?: FrozenValuationSnapshot;
 };
 
 export type SeasonEconomyFactorRecord = {

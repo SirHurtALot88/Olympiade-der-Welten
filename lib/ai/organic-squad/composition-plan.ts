@@ -1,0 +1,319 @@
+/**
+ * Organic marginal-utility squad builder — explicit role-composition PLANNING (soft utility term).
+ *
+ * See draft-adapter.ts (COMPOSE_ENABLED) and utility.ts (buyUtility's compositionValue term). This
+ * module is PURE and reads NO env — the flag gate lives entirely at the call site (draft-adapter.ts),
+ * matching the IDFIT_ENABLED pattern in utility.ts:38. When the caller never builds a `composition`
+ * input (flag off), nothing here is ever invoked and the draft stays bit-identical.
+ *
+ * The idea: instead of hard slot quotas or band filters, derive a target ROLE PYRAMID (how many
+ * Superstar/Star/Core/Depth/Backup players a team should end up with, given its budget and premium
+ * appetite) and hand it to the greedy loop as a soft nudge — each pick earns a bonus while its tier is
+ * still under target, and a malus once its tier is full/over. Composition still EMERGES pick by pick;
+ * this only shapes which of several similarly-attractive picks gets chosen.
+ *
+ * Tier bands are the fixed MW brackets from market-brackets.ts (classifyMarketBracket /
+ * buildLeagueMarketBrackets): Superstar≥65, Star 45–65, Core 30–45, Depth 20–30, Backup 12–20,
+ * Reserve<12. The target pyramid is Depth-heaviest, Core≈Backup, few Star, very few Superstar, and
+ * Reserve is NEVER planned (a squad may still end up owning Reserve-tier bodies from its starting
+ * roster, but the plan never adds MORE of them).
+ */
+
+import { planSlotsFromBudget } from "@/lib/ai/market-pick-engine/budget-slot-allocator";
+import type { PlannerExplicitCounts } from "@/lib/ai/market-pick-engine/budget-envelope";
+import {
+  classifyMarketBracket,
+  type LeagueMarketBrackets,
+  type MarketBracketLane,
+  type MarketBracketTierLabel,
+} from "@/lib/ai/market-pick-engine/market-brackets";
+import { MARQUEE_TARGET_MW_FLOOR } from "@/lib/ai/organic-squad/marquee-eligibility";
+
+const LANES: readonly MarketBracketLane[] = ["superstar", "star", "core", "depth", "backup", "reserve"];
+
+const TIER_LABEL_TO_LANE: Record<MarketBracketTierLabel, MarketBracketLane> = {
+  Superstar: "superstar",
+  Star: "star",
+  Core: "core",
+  Depth: "depth",
+  Backup: "backup",
+  Reserve: "reserve",
+};
+
+/**
+ * classifyMarketBracket returns a capitalized MarketBracketTierLabel ("Superstar", ...); the composition
+ * plan (and its counts/boughtTiers bookkeeping) is keyed by the lowercase MarketBracketLane instead — this
+ * is the single shared mapping, reused by draft-adapter.ts (existingTiers), draft-builder.ts (boughtTiers)
+ * and utility.ts (per-pick tier lookup) so the label↔lane convention never drifts between call sites.
+ */
+export function classifyCompositionLane(
+  marketValue: number | null,
+  brackets: LeagueMarketBrackets,
+): MarketBracketLane {
+  return TIER_LABEL_TO_LANE[classifyMarketBracket(marketValue, brackets)];
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+/** premiumAppetite at/above which a team plans one Star slot. Raised so Stars stay rare (planning a Star
+ *  for most teams drained their budget on a 45-65 body → below-opt spiked and Star count inflated). */
+const STAR_APPETITE_THRESHOLD = 0.95;
+/** premiumAppetite at/above which (with a large-enough roster) a team plans a SECOND Star slot. */
+const STAR_DOUBLE_APPETITE_THRESHOLD = 1.55;
+/** optTarget at/above which the second Star slot is allowed (a small roster can't spare two premium slots). */
+const STAR_DOUBLE_OPT_TARGET_MIN = 10;
+
+/** coreShare = CORE_SHARE_BASE + CORE_SHARE_SLOPE·r — 0.27 (arm) → 0.33 (reich). Aimed high because
+ *  realized Core lags the plan (30-45MW bodies cost more, poor teams degrade to Depth). */
+const CORE_SHARE_BASE = 0.27;
+const CORE_SHARE_SLOPE = 0.06;
+/** backupShare = BACKUP_SHARE_BASE − BACKUP_SHARE_SLOPE·r — 0.27 (arm) → 0.23 (reich). Core≈Backup as a
+ *  WISH; the affordability waterfall then demotes some Core/Depth into Backup for cash-thin teams (they
+ *  genuinely can't afford Depth), so league-wide Backup ends up ≈ Depth rather than Depth strictly largest
+ *  — the honest economic outcome. Do NOT lower this to force Depth-largest: that only pushes poor teams
+ *  toward Depth they can't afford → below-opt spikes. */
+const BACKUP_SHARE_BASE = 0.27;
+const BACKUP_SHARE_SLOPE = 0.04;
+
+/** Order in which excess planned need is trimmed back to `slotsToFill` — Premium (superstar/star) is never touched. */
+const EXCESS_TRIM_ORDER: readonly MarketBracketLane[] = ["depth", "backup", "core"];
+
+/**
+ * Position within a band [floor..target] at which a planned body slot is COSTED for the affordability
+ * waterfall (step 5b): cost = floor + β·(target − floor). β = 1.0 budgets at the role mean (targetMw,
+ * the literal "Mittelwert pro Rolle") but over-trims Core, because the buy-side band fade
+ * (COMPOSITION_TOPBAND_FADE) already steers real purchases BELOW target — double-counting the margin.
+ * β = 0.5 costs the realistic expected spend (lower-mid band), keeping teams feasible (reach opt) without
+ * needlessly collapsing Core to all-Backup. Turn toward 1.0 if a re-run shows below-opt creeping back,
+ * toward 0.35 if Core collapses / finalCash balloons.
+ */
+const PLAN_COST_BAND_POS = 0.5;
+
+/** Poorer teams plan a few cheap Reserve rotation bodies ("kleine Teams dürfen 2–3 Reserve holen für
+ *  Rotation/günstige Karten"), scaled by BUDGET-PER-SLOT (the real poverty measure): RESERVE_FLOOR_MAX at
+ *  a budget/slot of RESERVE_FLOOR_BUDGET_REF − RESERVE_FLOOR_BUDGET_SPAN, fading to 0 at REF (a team that
+ *  can afford Depth-grade bodies plans no Reserve). */
+const RESERVE_FLOOR_MAX = 3;
+const RESERVE_FLOOR_BUDGET_REF = 22; // ~Depth mid-price; at/above this budget/slot no Reserve floor
+const RESERVE_FLOOR_BUDGET_SPAN = 8; // full RESERVE_FLOOR_MAX once budget/slot is this far below REF
+
+/**
+ * Largest-remainder rounding of three non-negative shares that already sum (as floats) to `total`, so
+ * the rounded integers ALSO sum to `total` exactly (no drift from independent per-lane rounding).
+ */
+function roundTripleToTotal(
+  raw: { core: number; backup: number; depth: number },
+  total: number,
+): { core: number; backup: number; depth: number } {
+  const totalInt = Math.round(total);
+  const floors = {
+    core: Math.floor(raw.core),
+    backup: Math.floor(raw.backup),
+    depth: Math.floor(raw.depth),
+  };
+  const flooredSum = floors.core + floors.backup + floors.depth;
+  let remainder = totalInt - flooredSum;
+  const order = (["core", "backup", "depth"] as const)
+    .map((lane) => ({ lane, frac: raw[lane] - floors[lane] }))
+    .sort((a, b) => b.frac - a.frac);
+  const result = { ...floors };
+  for (let i = 0; i < order.length && remainder > 0; i += 1) {
+    result[order[i].lane] += 1;
+    remainder -= 1;
+  }
+  return result;
+}
+
+export type CompositionCountsInput = {
+  /** The team's (GM-modulated) soft roster-size target. */
+  optTarget: number;
+  /** Tier counts already on the roster (classifyMarketBracket over the starting squad). */
+  existingTiers: Record<MarketBracketLane, number>;
+  /** Cash actually spendable toward the draft (already net of the club's cash buffer). */
+  spendableNet: number;
+  /** League MW brackets (buildLeagueMarketBrackets over the candidate pool). */
+  brackets: LeagueMarketBrackets;
+  /** Continuous premium-appetite score (Season1LanePhilosophy.premiumAppetite, post GM-bias tilt). */
+  premiumAppetite: number;
+  /** Max premium (Superstar+Star) slots allowed (deriveLaneCapsFromAppetite.premiumCap). */
+  premiumCap: number;
+  /** Max Superstar slots allowed (deriveLaneCapsFromAppetite.superstarCap, 0 or 1). */
+  superstarCap: number;
+  /** Hard roster minimum (defensive floor for optTarget; ROSTER_MIN in practice). */
+  rosterMin: number;
+  /**
+   * League-scaled marquee target price (MW) for a Superstar slot — see marquee-eligibility.ts
+   * MARQUEE_TARGET_MW_FLOOR doc: the caller (draft-adapter.ts) derives this from
+   * max(MARQUEE_TARGET_MW_FLOOR, quantilePrice(candidate MWs, 0.98)) so it inflates with the league across
+   * seasons. Optional for callers/tests that don't care about the marquee-price nuance — defaults to
+   * max(brackets.superstar.targetMw, MARQUEE_TARGET_MW_FLOOR), the same floor-only behaviour as before this
+   * field existed.
+   */
+  marqueeTargetMw?: number;
+};
+
+/**
+ * Derives the target role-composition pyramid (TOTAL desired tier counts across the whole roster,
+ * i.e. existing + planned) for one team. Pure function, no env reads.
+ *
+ * Steps (see module doc + PR description for the full rationale):
+ *  1. r = budget-richness ratio (0 poor .. 1 rich), spendableNet relative to optTarget·core.targetMw.
+ *  2. Existing-tiers accounting: how many slots this team has already filled, and how many are still open
+ *     (slotsToFill = optTarget − currently-owned) — computed early because step 3 needs slotsToFill.
+ *  3. Premium slot count. Superstar (0/1) is now a LEAGUE-ALLOCATED marquee license (see
+ *     marquee-eligibility.ts deriveLeagueSuperstarLicenses / draft-adapter.ts): the caller sets
+ *     superstarCap to 1 only for the (few) teams the league license allocation picked, so here it is
+ *     purely `superstarCap >= 1 AND superstarAffordable` — no premiumAppetite threshold. Star (0/1/2)
+ *     still comes from premiumAppetite (that balancing knob is unaffected), capped by premiumCap.
+ *  4. The remaining (non-premium) slots F split into core/backup/depth by budget-scaled shares — Depth is
+ *     always the largest cohort by construction (its share is the residual ≈48–52% of F). Reserve is never
+ *     planned (0).
+ *  5. S2+ complement: subtract existingTiers to get the incremental need, then deterministically cap the
+ *     total need down to slotsToFill, trimming excess from Depth first, then Backup, then Core — Premium
+ *     (Superstar/Star) is never trimmed here.
+ *  6. Budget-feasibility pass via planSlotsFromBudget (may further demote/reshuffle the capped need — e.g.
+ *     drop a Superstar the club can't actually afford once slot-by-slot tail reserves are considered).
+ *
+ * Returns TOTAL target counts per lane (existingTiers + the budget-feasible planned need), because the
+ * caller compares live `boughtTiers` (which itself starts at existingTiers) against this same total — see
+ * utility.ts buyUtility's compositionValue term.
+ */
+export function deriveCompositionCounts(input: CompositionCountsInput): Record<MarketBracketLane, number> {
+  // Defensive floor: optTarget is GM-derived and already clamped to [ROSTER_MIN, ROSTER_MAX] upstream, so
+  // this is normally a no-op — it only guards against a degenerate caller passing optTarget < rosterMin.
+  const optTarget = Math.max(input.optTarget, input.rosterMin);
+  const coreTargetMw = Math.max(1, input.brackets.core.targetMw);
+
+  // 1. Budget-richness ratio.
+  const r = clamp(input.spendableNet / (optTarget * coreTargetMw), 0, 1);
+
+  // 2. Existing-tiers accounting (moved ahead of step 3: superstarAffordable below needs slotsToFill).
+  const existingOf = (lane: MarketBracketLane) => Math.max(0, input.existingTiers[lane] ?? 0);
+  const existingTotal = LANES.reduce((sum, lane) => sum + existingOf(lane), 0);
+  const slotsToFill = Math.max(0, optTarget - existingTotal);
+
+  // 3. Premium slot count. Superstar is license-gated by the caller (superstarCap ∈ {0,1} from the league
+  // allocation), not by premiumAppetite here — costed against the slots actually still open, not the raw
+  // optTarget, so an S2+ team with most slots already filled isn't held to a S1-sized affordability bar.
+  // The marquee price floor (~75 MW, shared with marquee-eligibility.ts's license gate) makes this a REAL
+  // affordability check: a moderate-budget team (e.g. S-C-calibre) fails it and gets 0 here even if it
+  // somehow held a license, and settles for its normal Star instead.
+  const superstarTargetMw =
+    typeof input.marqueeTargetMw === "number" && Number.isFinite(input.marqueeTargetMw)
+      ? Math.max(input.marqueeTargetMw, MARQUEE_TARGET_MW_FLOOR)
+      : Math.max(input.brackets.superstar.targetMw, MARQUEE_TARGET_MW_FLOOR);
+  const superstarAffordable =
+    input.spendableNet >= superstarTargetMw + Math.max(0, slotsToFill - 1) * input.brackets.depth.floorMw;
+  const superstar = input.superstarCap >= 1 && superstarAffordable ? 1 : 0;
+  let star = input.premiumAppetite >= STAR_APPETITE_THRESHOLD ? 1 : 0;
+  if (input.premiumAppetite >= STAR_DOUBLE_APPETITE_THRESHOLD && optTarget >= STAR_DOUBLE_OPT_TARGET_MIN) {
+    star = 2;
+  }
+  star = clamp(star, 0, Math.max(0, input.premiumCap - superstar));
+
+  // 4. Rest-slot pyramid (core/backup/depth), largest-remainder rounded so it sums exactly to F.
+  const F = Math.max(0, optTarget - superstar - star);
+  const coreShare = CORE_SHARE_BASE + CORE_SHARE_SLOPE * r;
+  const backupShare = BACKUP_SHARE_BASE - BACKUP_SHARE_SLOPE * r;
+  const rawCore = coreShare * F;
+  const rawBackup = backupShare * F;
+  const rawDepth = F - rawCore - rawBackup;
+  const { core, backup, depth } = roundTripleToTotal({ core: rawCore, backup: rawBackup, depth: rawDepth }, F);
+
+  const target: Record<MarketBracketLane, number> = { superstar, star, core, depth, backup, reserve: 0 };
+
+  // 5. S2+ complement: incremental need over what's already owned, capped to the slots actually still open.
+  const need: Record<MarketBracketLane, number> = { superstar: 0, star: 0, core: 0, depth: 0, backup: 0, reserve: 0 };
+  for (const lane of LANES) {
+    need[lane] = Math.max(0, target[lane] - existingOf(lane));
+  }
+  let needTotal = LANES.reduce((sum, lane) => sum + need[lane], 0);
+  let excess = needTotal - slotsToFill;
+  for (const lane of EXCESS_TRIM_ORDER) {
+    if (excess <= 0) break;
+    const take = Math.min(need[lane], excess);
+    need[lane] -= take;
+    excess -= take;
+  }
+
+  // 6. Budget-feasibility pass. premiumCap MUST be set on the counts input — planSlotsFromBudget zeroes
+  // every premium slot otherwise (see budget-slot-allocator.ts:52,73-76).
+  const counts: PlannerExplicitCounts = {
+    superstarAllowed: need.superstar,
+    starAllowed: need.star,
+    coreNeeded: need.core,
+    specialistNeeded: 0,
+    depthNeeded: need.depth,
+    backupNeeded: need.backup,
+    cheapFillNeeded: 0,
+    premiumCap: input.premiumCap,
+  };
+  // planSlotsFromBudget only budget-gates PREMIUM slots (Superstar/Star, via premiumCap + tail reserve);
+  // for core/depth/backup it does slot-count reconciliation only — there is NO body-tier cost check
+  // anywhere in it. So it settles premium affordability, but the body-tier counts come back unpriced.
+  const allocated = planSlotsFromBudget({
+    counts,
+    spendable: input.spendableNet,
+    spendableIsNet: true,
+    slotsToFill,
+    brackets: input.brackets,
+    superstarCap: input.superstarCap,
+  });
+
+  // 6b. Affordability WATERFALL (the real budget-per-slot allocation). The budget-blind shares above are
+  // only a WISH; here we cost the planned body slots at a realistic per-role price (the cheaper half of
+  // each band — the buy-side fade steers picks below band target) and, while the plan overruns the team's
+  // spendable cash, demote one body slot at a time Core→Depth→Backup. Every demotion is 1:1 so the slot
+  // count is invariant (the plan can never induce below-opt), and each remaining slot ends up on a tier
+  // whose realistic body price fits the remaining per-slot budget — a poor team gets Depth/Backup instead
+  // of unaffordable Core it would only fail to buy (planned Core 107 vs realized 61). Premium is left as-is
+  // (base economy owns it) but its target cost is counted so it doesn't starve the body tiers.
+  let coreN = allocated.coreNeeded + allocated.specialistNeeded;
+  let depthN = allocated.depthNeeded + allocated.cheapFillNeeded;
+  let backupN = allocated.backupNeeded;
+  let reserveN = 0;
+  const planCostOf = (lane: MarketBracketLane) => {
+    const band = input.brackets[lane];
+    return band.floorMw + PLAN_COST_BAND_POS * (Math.max(band.targetMw, band.floorMw) - band.floorMw);
+  };
+  // Reserve floor: poorer/smaller teams deliberately keep a couple of cheap Reserve rotation bodies
+  // ("2–3 günstige Karten für Rotation"), scaled inversely with budget-richness r — rich teams plan 0.
+  // Converted from the cheapest body tier (Backup). This is a WANTED feature, not a degradation.
+  const budgetPerSlot = input.spendableNet / Math.max(1, optTarget);
+  const reserveFloor = Math.min(
+    backupN,
+    Math.round(clamp((RESERVE_FLOOR_BUDGET_REF - budgetPerSlot) / RESERVE_FLOOR_BUDGET_SPAN, 0, 1) * RESERVE_FLOOR_MAX),
+  );
+  backupN -= reserveFloor;
+  reserveN += reserveFloor;
+
+  const premiumCost = allocated.superstarAllowed * superstarTargetMw + allocated.starAllowed * input.brackets.star.targetMw;
+  const depthMax = Math.ceil(0.5 * F); // demoted Core prefers Depth up to this, then spills to (cheaper) Backup
+  const coreCost = planCostOf("core"), depthCost = planCostOf("depth"), backupCost = planCostOf("backup"), reserveCost = planCostOf("reserve");
+  let planCost = premiumCost + coreN * coreCost + depthN * depthCost + backupN * backupCost + reserveN * reserveCost;
+  // Each body slot can step down up to 3 tiers (Core→Depth→Backup→Reserve), so bound the loop generously.
+  let guard = (coreN + depthN + backupN) * 3 + 4;
+  // Affordability waterfall: Core→Depth→Backup→Reserve, one slot at a time, until the plan fits budget.
+  while (planCost > input.spendableNet && coreN + depthN + backupN > 0 && guard-- > 0) {
+    if (coreN > 0) {
+      coreN -= 1;
+      if (depthN < depthMax) { depthN += 1; planCost -= coreCost - depthCost; }
+      else { backupN += 1; planCost -= coreCost - backupCost; }
+    } else if (depthN > 0) {
+      depthN -= 1; backupN += 1; planCost -= depthCost - backupCost;
+    } else {
+      backupN -= 1; reserveN += 1; planCost -= backupCost - reserveCost;
+    }
+  }
+
+  return {
+    superstar: existingOf("superstar") + allocated.superstarAllowed,
+    star: existingOf("star") + allocated.starAllowed,
+    core: existingOf("core") + coreN,
+    depth: existingOf("depth") + depthN,
+    backup: existingOf("backup") + backupN,
+    reserve: existingOf("reserve") + reserveN,
+  };
+}

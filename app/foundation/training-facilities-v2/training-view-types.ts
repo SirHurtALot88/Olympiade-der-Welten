@@ -44,6 +44,8 @@ export type TrainingPlayerRowView = {
       men: number;
       soc: number;
     };
+    /** Current in-season fatigue (0–100), including per-matchday accumulated training fatigue. */
+    fatigue: number;
   };
   mode: PlayerTrainingMode;
   trainingClass: string;
@@ -115,6 +117,20 @@ export type TrainingPlayerRowView = {
       label: "niedrig" | "mittel" | "hoch";
     };
   };
+  /**
+   * Anti-cheese Teil B (B.6): per-matchday training accumulation forecast. `accumulatedBudget` is the
+   * base training budget already locked in from the matchdays played so far; `forecastBudget` projects
+   * the season-end base budget if the remaining matchdays are trained at the currently-drafted `mode`
+   * (`accumulatedBudget + (totalMatchdays - matchdaysCounted) * share(currentMode)`). Null before the
+   * first matchday of the season (nothing accumulated yet).
+   */
+  trainingAccumulatorForecast?: {
+    matchdaysCounted: number;
+    totalMatchdays: number;
+    accumulatedBudget: number;
+    forecastBudget: number;
+    currentMode: PlayerTrainingMode;
+  } | null;
   recommendedTrainingMode?: PlayerTrainingMode | null;
   recommendedTrainingDetail?: string | null;
   recommendedTrainingMatchesCurrent?: boolean;
@@ -125,19 +141,6 @@ export type TrainingPlayerRowView = {
    * `buildTrainingClassGainRanking` — null means no focus is set (bonus dormant everywhere).
    */
   trainingFocusAxis?: "pow" | "spe" | "men" | "soc" | null;
-  /**
-   * True once the team's training intensity is sealed for the current season
-   * (preseason setup window closed / first matchday result recorded). See
-   * `evaluateGamePhaseAction(gameState, "set_training")` and
-   * docs/training-intensity-season-lock.md.
-   */
-  trainingIntensityLocked?: boolean;
-  /**
-   * True during the short early-season grace window before the first result is
-   * recorded. Training mode can still be changed now, but the lock will snap
-   * shut as soon as the first matchday result exists.
-   */
-  trainingIntensityLockWarning?: boolean;
 };
 
 export type TrainingDevelopmentFilter = "all" | "growth" | "stable" | "regression";

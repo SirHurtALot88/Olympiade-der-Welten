@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
-import { NlEmptyState } from "@/components/foundation/new-look";
+import { NlEmptyState, NlProgressBar } from "@/components/foundation/new-look";
 import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 
 export type ScoutingQueueRow = {
@@ -30,6 +30,43 @@ type ScoutingPriorityQueueProps = {
   onOpenMarket?: () => void;
   /** Neuer Look: NL-Leerzustand (NlEmptyState) statt Legacy-Placeholder-Text. */
   newLook?: boolean;
+};
+
+// #T-082 — Tastatur-Alternative zur reinen HTML5-Drag&Drop-Sortierung.
+// Inline-Styles bewusst statt neuer app/globals.css-Regeln: geteilte Styles
+// sind außerhalb des T-082-Scopes (siehe Backlog-Auftrag), und die Buttons
+// leben in der bestehenden "scouting-queue-drag-handle"-Grid-Zelle, damit das
+// 6-spaltige Grid (grid-template-columns) unangetastet bleibt.
+const reorderHandleWrapStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  gap: 4,
+};
+const reorderButtonGroupStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 2,
+};
+const reorderButtonStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 18,
+  height: 14,
+  padding: 0,
+  lineHeight: 1,
+  fontSize: "9px",
+  color: "inherit",
+  background: "rgba(148, 163, 184, 0.12)",
+  border: "1px solid rgba(148, 163, 184, 0.3)",
+  borderRadius: 4,
+  cursor: "pointer",
+};
+const reorderButtonDisabledStyle: CSSProperties = {
+  ...reorderButtonStyle,
+  opacity: 0.35,
+  cursor: "default",
 };
 
 function getInitials(name: string) {
@@ -136,9 +173,35 @@ export default function ScoutingPriorityQueue({
               <span className="scouting-queue-rank" aria-hidden="true">
                 {index + 1}
               </span>
-              <span className="scouting-queue-drag-handle" title="Ziehen zum Umsortieren" aria-hidden="true">
-                ⠿
-              </span>
+              <div className="scouting-queue-drag-handle" style={reorderHandleWrapStyle}>
+                <span title="Ziehen zum Umsortieren" aria-hidden="true">
+                  ⠿
+                </span>
+                {/* #T-082 — Tastatur-Alternative zum Drag&Drop: dieselben onReorder-Semantiken
+                    wie onDrop oben (Ziel-Index im vollen entries-Array), per Button statt Ziehen. */}
+                <div className="scouting-queue-reorder-buttons" role="group" aria-label={`${entry.playerName}: Position in der Warteschlange ändern`} style={reorderButtonGroupStyle}>
+                  <button
+                    type="button"
+                    style={index === 0 ? reorderButtonDisabledStyle : reorderButtonStyle}
+                    onClick={() => onReorder(entry.playerId, index - 1)}
+                    disabled={index === 0}
+                    aria-label={`${entry.playerName} in der Warteschlange nach oben verschieben`}
+                    title="Nach oben"
+                  >
+                    <span aria-hidden="true">▲</span>
+                  </button>
+                  <button
+                    type="button"
+                    style={index === entries.length - 1 ? reorderButtonDisabledStyle : reorderButtonStyle}
+                    onClick={() => onReorder(entry.playerId, index + 1)}
+                    disabled={index === entries.length - 1}
+                    aria-label={`${entry.playerName} in der Warteschlange nach unten verschieben`}
+                    title="Nach unten"
+                  >
+                    <span aria-hidden="true">▼</span>
+                  </button>
+                </div>
+              </div>
               <button
                 type="button"
                 className="scouting-queue-portrait"
@@ -166,14 +229,15 @@ export default function ScoutingPriorityQueue({
                   {entry.className} · {entry.race}
                 </small>
                 {entry.isFocusTarget ? (
-                  <div className="scouting-queue-progress" aria-label={`Fokus-Ziel, ${entry.certainty}% Intel`}>
-                    <div className="scouting-queue-progress-track">
-                      <div className="scouting-queue-progress-fill" style={{ width: `${Math.min(100, entry.certainty)}%` }} />
-                    </div>
-                    <span className="scouting-queue-progress-label">
-                      {entry.certainty}% Intel{focusEtaLabel ? ` · ${focusEtaLabel}` : ""}
-                    </span>
-                  </div>
+                  <NlProgressBar
+                    className="scouting-queue-progress-bar"
+                    value={entry.certainty}
+                    max={100}
+                    tone="accent"
+                    label="Fokus"
+                    format={(v) => `${Math.round(v)}% Intel${focusEtaLabel ? ` · ${focusEtaLabel}` : ""}`}
+                    title={`Fokus-Ziel, ${entry.certainty}% Intel`}
+                  />
                 ) : (
                   <span className="scouting-queue-status muted">
                     {entry.isFullyScouted

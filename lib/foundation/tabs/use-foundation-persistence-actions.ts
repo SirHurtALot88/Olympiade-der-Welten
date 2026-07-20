@@ -33,6 +33,7 @@ import {
   persistFoundationSaveMode,
   resolveFoundationTeamId,
   resolvePreferredFoundationTeamContext,
+  syncFoundationSaveIdInUrl,
   syncFoundationTeamIdInUrl,
   withNormalizedLocalTeamSettings,
   type syncFoundationViewInUrl,
@@ -238,6 +239,16 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
   const persistRequestVersionRef = useRef(0);
   const persistSnapshotRef = useRef<{ requestVersion: number; snapshot: GameState } | null>(null);
   const loadedWithCompactInitialRef = useRef(true);
+  // Serialisiert ALLE lokalen Save-PUTs (Sofort-Persist + Auto-Save), damit
+  // zwei schnelle Schreibaktionen sich nicht selbst einen 409-Konflikt bauen
+  // (die zweite würde sonst mit veralteter saveVersion abschicken, bevor die
+  // erste die Version hochgezählt hat). `lastKnownSaveVersionRef` hält die
+  // zuletzt vom Server bestätigte Version synchron vor, sodass ein in der
+  // Queue wartender Write seine expectedSaveVersion auf den frischen Stand
+  // heben kann. Ein echter Fremdkonflikt (Version steigt serverseitig, ohne
+  // dass wir das über einen Load erfahren) führt weiterhin zu 409 + Reload.
+  const saveWriteChainRef = useRef<Promise<unknown>>(Promise.resolve());
+  const lastKnownSaveVersionRef = useRef(0);
 
   const feedSettersRef = useRef(feedSetters);
   feedSettersRef.current = feedSetters;
@@ -365,7 +376,11 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
         }>(buildStateApiPath(saveId, saveMode, { compactInitial: options.compactInitial ?? true }), {}, fetchRetryOptions);
         if (!fetchResult.ok) {
           console.warn("Save konnte gerade nicht geladen werden.", fetchResult.error, fetchResult.cause);
-          if (saveId || !hasLoadedPersistentState.current) {
+          // Nur melden, wenn tatsächlich ein ANDERER Save geladen werden sollte
+          // oder noch gar kein Stand geladen wurde. Ein transienter Re-Load des
+          // bereits aktiven Saves (dev slow-compile/timeout) soll die Meldung
+          // nicht dauerhaft stehen lassen, obwohl der Stand angezeigt wird.
+          if ((saveId && saveId !== activeSaveId) || !hasLoadedPersistentState.current) {
             setPersistenceError("Der Spielstand konnte nicht geladen werden.");
           }
           return null;
@@ -373,7 +388,11 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
         const payload = fetchResult.data;
 
         if (!payload.save?.gameState) {
-          if (saveId || !hasLoadedPersistentState.current) {
+          // Nur melden, wenn tatsächlich ein ANDERER Save geladen werden sollte
+          // oder noch gar kein Stand geladen wurde. Ein transienter Re-Load des
+          // bereits aktiven Saves (dev slow-compile/timeout) soll die Meldung
+          // nicht dauerhaft stehen lassen, obwohl der Stand angezeigt wird.
+          if ((saveId && saveId !== activeSaveId) || !hasLoadedPersistentState.current) {
             setPersistenceError("Der Spielstand konnte nicht geladen werden.");
           }
           return null;
@@ -394,7 +413,13 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
         loadedWithCompactInitialRef.current = options.compactInitial ?? true;
         autoPersistContentSignatureRef.current = buildAutoPersistContentSignature(nextGameState);
         setGameState(nextGameState);
+        noteKnownSaveVersion(nextGameState.saveVersion);
         setPersistenceError(null);
+        // Ein erfolgreicher Load räumt AUCH einen evtl. hängengebliebenen
+        // Bootstrap-Fehler weg (beide Pfade setzen sonst nur ihren eigenen
+        // State → sonst blieb "konnte nicht geladen werden" stehen, obwohl der
+        // Spielstand längst geladen ist).
+        setBootstrapError(null);
         onFetchSlowClear?.();
         if (
           sponsorOffersHydrated &&
@@ -428,6 +453,8 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
               currentTeamId: selectedTeamId,
               currentSource: activeManagerTeamSource,
               initialTeamId: initialSelectedTeamId,
+              savedTeamId: nextGameState.seasonState.newGameFlow?.selectedTeamId ?? null,
+              activeSaveId: payload.save.saveId,
               settingsMap: buildTeamControlSettingsMap(nextGameState.teams, nextGameState.seasonState.teamControlSettings),
             });
         setSelectedTeamId(nextTeamContext.teamId);
@@ -447,11 +474,37 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
         return nextGameState;
       } catch (error) {
         console.warn("Save konnte gerade nicht geladen werden.", error);
-        if (saveId || !hasLoadedPersistentState.current) {
+        if ((saveId && saveId !== activeSaveId) || !hasLoadedPersistentState.current) {
           setPersistenceError("Der Spielstand konnte nicht geladen werden.");
         }
         return null;
       }
+  }
+
+  // Merkt sich die zuletzt server-bestätigte saveVersion (nur aus eigenen
+  // erfolgreichen Writes und aus Loads — nicht künstlich hochzählen, sonst
+  // würden echte Fremdkonflikte verschluckt).
+  function noteKnownSaveVersion(version: number | null | undefined) {
+    if (typeof version === "number" && version > lastKnownSaveVersionRef.current) {
+      lastKnownSaveVersionRef.current = version;
+    }
+  }
+
+  // Hebt die expectedSaveVersion eines wartenden Writes auf den zuletzt
+  // bekannten Stand — der Inhalt (kumulativer React-State) bleibt gültig.
+  function withFreshSaveVersion(snapshot: GameState): GameState {
+    const fresh = Math.max(snapshot.saveVersion ?? 0, lastKnownSaveVersionRef.current);
+    return (snapshot.saveVersion ?? 0) === fresh ? snapshot : { ...snapshot, saveVersion: fresh };
+  }
+
+  // Serialisiert einen Save-Write hinter allen bereits laufenden/wartenden.
+  function enqueueSaveWrite<T>(task: () => Promise<T>): Promise<T> {
+    const result = saveWriteChainRef.current.then(task, task);
+    saveWriteChainRef.current = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
   }
 
   async function persistLocalGameStateImmediately(
@@ -461,10 +514,18 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
     const requestVersion = ++persistRequestVersionRef.current;
     persistSnapshotRef.current = { requestVersion, snapshot: nextGameState };
 
+    return enqueueSaveWrite(() => persistLocalGameStateImmediatelyInner(nextGameState, requestVersion, options));
+  }
+
+  async function persistLocalGameStateImmediatelyInner(
+    nextGameState: GameState,
+    requestVersion: number,
+    options?: { materializeSeasonDerivations?: boolean },
+  ): Promise<GameState> {
     const response = await putFoundationGameState(
       buildFoundationPersistPutBody({
         saveId: activeSaveId,
-        gameState: nextGameState,
+        gameState: withFreshSaveVersion(nextGameState),
         compactPut: loadedWithCompactInitialRef.current,
         materializeSeasonDerivations: options?.materializeSeasonDerivations,
       }),
@@ -497,6 +558,7 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
     if (payload.save?.saveVersion != null) {
       onFetchSlowClear?.();
       const newSaveVersion = payload.save.saveVersion;
+      noteKnownSaveVersion(newSaveVersion);
       autoPersistContentSignatureRef.current = buildAutoPersistContentSignature({
         ...nextGameState,
         saveVersion: newSaveVersion,
@@ -586,6 +648,10 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
           if (requestVersion !== saveActionRequestVersion.current) {
             return;
           }
+          // Pin the save this action just switched us to into the URL so a
+          // reload / new tab deterministically loads it instead of falling
+          // back to the global active save row.
+          syncFoundationSaveIdInUrl(payload.save.saveId);
           if (body.action === "fresh-season-1") {
             setActiveView("season");
             syncFoundationViewInUrl("season");
@@ -660,6 +726,7 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
       }
 
       setBootstrapError(null);
+      setPersistenceError(null);
       onFetchSlowClear?.();
 
       const nextGameState = applyCompactSeasonArchiveSentinelIfNeeded(
@@ -671,6 +738,7 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
       hasLoadedPersistentState.current = true;
       autoPersistContentSignatureRef.current = buildAutoPersistContentSignature(nextGameState);
       setGameState(nextGameState);
+      noteKnownSaveVersion(nextGameState.saveVersion);
       setActiveSaveId(payload.save.saveId);
       setActiveSaveName(payload.save.name ?? "Oly Save");
       setSaveSummaries(payload.saves ?? []);
@@ -687,6 +755,8 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
             currentTeamId: selectedTeamId,
             currentSource: activeManagerTeamSource,
             initialTeamId: initialSelectedTeamId,
+            savedTeamId: nextGameState.seasonState.newGameFlow?.selectedTeamId ?? null,
+            activeSaveId: payload.save.saveId,
             settingsMap: buildTeamControlSettingsMap(nextGameState.teams, nextGameState.seasonState.teamControlSettings),
           });
       setSelectedTeamId(nextTeamContext.teamId);
@@ -760,33 +830,38 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
       }
 
       autoPersistInFlightRef.current = true;
-      void putFoundationGameState(
-        buildFoundationPersistPutBody({
-          saveId: activeSaveId,
-          gameState: snapshot,
-          compactPut: loadedWithCompactInitialRef.current,
-        }),
-      )
-        .then(async (response) => {
-          if (response.status === 409) {
-            setPersistenceError("Save-Konflikt erkannt. Stand wird neu geladen.");
-            const reloaded = await loadSave(activeSaveId, foundationSaveMode, { compactInitial: true });
-            if (reloaded) {
-              await applySaveConflictReload(reloaded);
-            }
-            return null;
+      // Das GANZE Response-Handling (inkl. json() + noteKnownSaveVersion + der
+      // 409-Reload) läuft INNERHALB der Queue-Task — sonst könnte ein danach
+      // eingereihter Write sein withFreshSaveVersion berechnen, bevor diese
+      // Version notiert ist, und sich erneut selbst einen 409 bauen.
+      void enqueueSaveWrite(async () => {
+        const response = await putFoundationGameState(
+          buildFoundationPersistPutBody({
+            saveId: activeSaveId,
+            gameState: withFreshSaveVersion(snapshot),
+            compactPut: loadedWithCompactInitialRef.current,
+          }),
+        );
+        if (response.status === 409) {
+          setPersistenceError("Save-Konflikt erkannt. Stand wird neu geladen.");
+          const reloaded = await loadSave(activeSaveId, foundationSaveMode, { compactInitial: true });
+          if (reloaded) {
+            await applySaveConflictReload(reloaded);
           }
-          if (!response.ok) {
-            setPersistenceError("Auto-Save fehlgeschlagen.");
-            return null;
-          }
-
-          setPersistenceError(null);
-          return (await response.json()) as {
-            save?: { saveId: string; name?: string; saveVersion?: number };
-            saves?: SaveSummary[];
-          };
-        })
+          return null;
+        }
+        if (!response.ok) {
+          setPersistenceError("Auto-Save fehlgeschlagen.");
+          return null;
+        }
+        setPersistenceError(null);
+        const payload = (await response.json()) as {
+          save?: { saveId: string; name?: string; saveVersion?: number };
+          saves?: SaveSummary[];
+        };
+        noteKnownSaveVersion(payload.save?.saveVersion);
+        return payload;
+      })
         .then((payload) => {
           if (!payload) {
             return;

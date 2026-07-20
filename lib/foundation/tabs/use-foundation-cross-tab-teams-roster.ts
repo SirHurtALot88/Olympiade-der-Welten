@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 
-import type { TeamDetailDrawerData, TeamDetailDrawerHistoryRow } from "@/app/foundation/TeamDetailDrawer";
+import type { TeamDetailDrawerData, TeamDetailDrawerHistoryRow } from "@/lib/foundation/team-detail-drawer-types";
 import type { TeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
 import type { GameState, Player, RosterEntry } from "@/lib/data/olyDataTypes";
 import { getTeamLogoModel } from "@/lib/data/mediaAssets";
@@ -44,8 +44,25 @@ import {
   buildTeamHistoryDisciplineValuesFromRecord,
   buildTeamHistoryDisciplineValuesFromSnapshot,
   resolveSeasonDisciplineAreaTotal,
+  type SeasonDisciplineAreaId,
 } from "@/lib/season/season-discipline-area-groups";
 import { resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
+import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
+import { extractSeasonNumber, getCurrentSeasonNumber } from "@/lib/foundation/season-history-clamp";
+
+/**
+ * Pro-Achse aufgeschlüsselte Season-PPs eines Roster-Spielers (POW/SPE/MEN/SOC),
+ * inklusive der einzelnen Disziplin-PPs je Achse. Speist die ausklappbare
+ * Disziplin-PPs-Ansicht der Verträge/Kader-Rostertabelle. Die Disziplin-Punkte
+ * kommen direkt aus `seasonPointsLedger.playerSummariesByPlayerId.<id>.pointsByDiscipline`
+ * (echte Ligapunkte je Disziplin) — nicht neu erfunden, nur nach Achse gruppiert.
+ */
+export type RosterAxisDisciplinePps = {
+  axis: SeasonDisciplineAreaId;
+  label: string;
+  axisPps: number | null;
+  disciplines: Array<{ id: string; name: string; pps: number }>;
+};
 
 export type FoundationRosterTableRow = {
   entry: RosterEntry;
@@ -60,6 +77,7 @@ export type FoundationRosterTableRow = {
   ppSpe: number | null;
   ppMen: number | null;
   ppSoc: number | null;
+  disciplinePpsByAxis: RosterAxisDisciplinePps[];
   saleBreakdown: ReturnType<typeof buildTransfermarktSaleFactorBreakdown>;
   /** "Neuer Look" CA/PO-Sterne (Tier-3 Rosterkarten) — fog-korrekt über den Scouting-Bridge-Snapshot. */
   known: boolean;
@@ -139,7 +157,70 @@ type SeasonPointsLedger = {
       };
     }
   >;
+  playerSummariesByPlayerId?: Map<
+    string,
+    {
+      pointsByDiscipline?: Record<string, number> | null;
+      pointsByArea?: Record<string, number | null | undefined> | null;
+    }
+  > | null;
 } | null;
+
+/**
+ * Reihenfolge + Achse↔Kategorie-Zuordnung für die Disziplin-PPs-Aufschlüsselung.
+ * `category` ist die `DisciplineCategory` (power/speed/mental/social) am
+ * `Discipline`-Objekt, `axis` die kurze POW/SPE/MEN/SOC-Kennung (Ton-Tokens).
+ */
+const ROSTER_PPS_AXES: Array<{ axis: SeasonDisciplineAreaId; label: string; category: string }> = [
+  { axis: "pow", label: "POW", category: "power" },
+  { axis: "spe", label: "SPE", category: "speed" },
+  { axis: "men", label: "MEN", category: "mental" },
+  { axis: "soc", label: "SOC", category: "social" },
+];
+
+/**
+ * Gruppiert die echten Disziplin-PPs eines Spielers (aus dem Season-Ledger) nach
+ * den vier Achsen POW/SPE/MEN/SOC. Der Achsen-Gesamtwert stammt aus dem bereits
+ * berechneten `playerRating` (ppPow/…) — die Disziplin-Einzelwerte aus
+ * `pointsByDiscipline`. Es wird nichts neu erfunden: fehlt ein Ledger-Eintrag,
+ * steht die Disziplin mit 0 PPs (der Katalog kommt aus `gameState.disciplines`).
+ */
+function buildRosterDisciplinePpsByAxis(input: {
+  disciplines: GameState["disciplines"];
+  pointsByDiscipline: Record<string, number> | null | undefined;
+  pointsByArea: Record<string, number | null | undefined> | null | undefined;
+  axisTotals: Record<SeasonDisciplineAreaId, number | null>;
+}): RosterAxisDisciplinePps[] {
+  const orderedDisciplines = [...input.disciplines].sort(
+    (left, right) =>
+      (left.displayOrder ?? left.originalOrder ?? 0) - (right.displayOrder ?? right.originalOrder ?? 0),
+  );
+  return ROSTER_PPS_AXES.map(({ axis, label, category }) => {
+    // Achsen-Gesamtwert bevorzugt aus derselben Ledger-Quelle wie die Disziplinen
+    // (damit das aufgeklappte Panel in sich stimmig ist: Achsentotal = Summe der
+    // gezeigten Disziplinen), sonst Fallback auf den Ratings-Achsenwert.
+    const ledgerAreaTotal = input.pointsByArea?.[category];
+    const axisPps =
+      typeof ledgerAreaTotal === "number" && Number.isFinite(ledgerAreaTotal)
+        ? roundViewNumber(ledgerAreaTotal, 1)
+        : input.axisTotals[axis] ?? null;
+    return {
+      axis,
+      label,
+      axisPps,
+      disciplines: orderedDisciplines
+        .filter((discipline) => discipline.category === category)
+        .map((discipline) => {
+          const raw = input.pointsByDiscipline?.[discipline.id];
+          return {
+            id: discipline.id,
+            name: discipline.name,
+            pps: Number.isFinite(raw) ? roundViewNumber(raw as number, 1) : 0,
+          };
+        }),
+    };
+  });
+}
 
 function buildTeamProfileContentSignature(input: {
   saveId: string;
@@ -252,6 +333,21 @@ export function useFoundationCrossTabTeamsRoster(input: {
           ppSpe: playerRating?.ppSpe ?? null,
           ppMen: playerRating?.ppMen ?? null,
           ppSoc: playerRating?.ppSoc ?? null,
+          disciplinePpsByAxis: (() => {
+            const ledgerSummary =
+              input.seasonPointsLedger?.playerSummariesByPlayerId?.get(player.id) ?? null;
+            return buildRosterDisciplinePpsByAxis({
+              disciplines: input.gameState.disciplines,
+              pointsByDiscipline: ledgerSummary?.pointsByDiscipline ?? null,
+              pointsByArea: ledgerSummary?.pointsByArea ?? null,
+              axisTotals: {
+                pow: playerRating?.ppPow ?? null,
+                spe: playerRating?.ppSpe ?? null,
+                men: playerRating?.ppMen ?? null,
+                soc: playerRating?.ppSoc ?? null,
+              },
+            });
+          })(),
           saleBreakdown: buildTransfermarktSaleFactorBreakdown(input.gameState, player, entry),
           ...caPoStarFields,
         };
@@ -278,6 +374,7 @@ export function useFoundationCrossTabTeamsRoster(input: {
     input.manageableTeamIds,
     input.playerRatingsById,
     input.rosterPlayers,
+    input.seasonPointsLedger,
     shouldBuildSelectedRosterTableRows,
   ]);
 
@@ -447,10 +544,72 @@ export function useFoundationCrossTabTeamsRoster(input: {
         averageFatigue: currentAverageFatigue,
         disciplineValues: liveDisciplineValues,
       };
-      const history = [
-        currentHistoryRow,
-        ...archivedHistoryRows.filter((row) => row.seasonId !== input.gameState.season.id),
-      ];
+      // Lückenlose Team-Historie: jede Season von Season 1 (bzw. der frühesten
+      // Snapshot-Season) bis zur aktuellen Season erhält eine Zeile. Seasons ohne
+      // Snapshot bekommen eine Platzhalter-Zeile (Rang/Punkte/MW/Cash = null),
+      // damit die Historie-Tabelle die komplette Timeline zeigt.
+      const buildTeamHistoryPlaceholderRow = (seasonId: string): TeamDetailDrawerHistoryRow => ({
+        seasonId,
+        seasonName: getCanonicalSeasonLabel({ seasonId, seasonName: null }),
+        isLive: false,
+        rank: null,
+        points: null,
+        pps: null,
+        ppPow: null,
+        ppSpe: null,
+        ppMen: null,
+        ppSoc: null,
+        cash: null,
+        salaryTotal: null,
+        marketValue: null,
+        guv: null,
+        topBuyPlayer: null,
+        topBuyPlayerId: null,
+        topBuyAmount: null,
+        topSellPlayer: null,
+        topSellPlayerId: null,
+        topSellAmount: null,
+        topSellProfit: null,
+        injuriesCount: null,
+        averageFatigue: null,
+        disciplineValues: {},
+      });
+      const archivedHistoryRowsBySeasonId = new Map(
+        archivedHistoryRows
+          .filter((row) => row.seasonId !== input.gameState.season.id)
+          .map((row) => [row.seasonId, row] as const),
+      );
+      const currentTeamSeasonNumber = getCurrentSeasonNumber(input.gameState);
+      let history: TeamDetailDrawerHistoryRow[];
+      if (currentTeamSeasonNumber == null) {
+        // Fail-open: ohne auflösbare Season-Nummer bleibt die bisherige Logik.
+        history = [currentHistoryRow, ...archivedHistoryRowsBySeasonId.values()];
+      } else {
+        const archivedSeasonNumbers = [...archivedHistoryRowsBySeasonId.keys()]
+          .map((seasonId) => extractSeasonNumber({ seasonId, seasonName: null }))
+          .filter((value): value is number => value != null);
+        const firstTeamSeasonNumber =
+          archivedSeasonNumbers.length > 0 ? Math.min(1, ...archivedSeasonNumbers) : 1;
+        // Echte Snapshot-Season-IDs je Nummer wiederverwenden, fehlende Jahre als
+        // kanonische `season-<n>`-ID synthetisieren.
+        const seasonIdByNumber = new Map<number, string>();
+        for (const seasonId of archivedHistoryRowsBySeasonId.keys()) {
+          const number = extractSeasonNumber({ seasonId, seasonName: null });
+          if (number != null && !seasonIdByNumber.has(number)) {
+            seasonIdByNumber.set(number, seasonId);
+          }
+        }
+        // Live-Zeile zuerst, danach absteigend (neueste zuerst) — wie zuvor.
+        const rows: TeamDetailDrawerHistoryRow[] = [currentHistoryRow];
+        for (let number = currentTeamSeasonNumber - 1; number >= firstTeamSeasonNumber; number -= 1) {
+          const seasonId = seasonIdByNumber.get(number) ?? `season-${number}`;
+          if (seasonId === input.gameState.season.id) {
+            continue;
+          }
+          rows.push(archivedHistoryRowsBySeasonId.get(seasonId) ?? buildTeamHistoryPlaceholderRow(seasonId));
+        }
+        history = rows;
+      }
 
       if (scope === "history-summary") {
         return {

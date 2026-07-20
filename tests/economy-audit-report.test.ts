@@ -18,7 +18,11 @@ function buildMinimalGameState(overrides: Partial<GameState> = {}): GameState {
 }
 
 describe("buildEconomyAuditReport", () => {
-  it("flags benchmark cash prize apply and negative cash teams", () => {
+  // T-032: executeCashPrizeApply ist ein klar gekennzeichneter Debug-/Benchmark-Endpoint
+  // (CASH_PRIZE_BENCHMARK_ONLY=true in cash-prize-apply-service.ts) und bewegt in diesem Modus
+  // garantiert kein echtes Cash — ein ausgeführter Benchmark-Apply ist daher kein Verstoß mehr,
+  // bleibt aber über cashPrizeApplyLogs/cashPrizeApplyBenchmarkOnly sichtbar/nachvollziehbar.
+  it("counts a benchmark cash prize apply as informational (not a violation) while still flagging negative cash", () => {
     const report = buildEconomyAuditReport({
       saveId: "save-1",
       gameState: buildMinimalGameState({
@@ -31,7 +35,9 @@ describe("buildEconomyAuditReport", () => {
     });
 
     expect(report.ok).toBe(false);
-    expect(report.violations.some((entry) => entry.startsWith("cash_prize_apply_executed"))).toBe(true);
+    expect(report.violations.some((entry) => entry.startsWith("cash_prize_apply_executed"))).toBe(false);
+    expect(report.cashPrizeApplyLogs).toBe(1);
+    expect(report.cashPrizeApplyBenchmarkOnly).toBe(true);
     expect(report.violations.some((entry) => entry.startsWith("negative_cash_teams"))).toBe(true);
   });
 

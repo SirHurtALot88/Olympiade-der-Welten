@@ -502,6 +502,39 @@ export function previewNewGameSetup(input: NewGameSetupInput): NewGameSetupPrevi
   return buildNewGameStateFromBaseline(input).preview;
 }
 
+/**
+ * Token-free helper for the co-op room flow: builds a fresh Season-1 online_4v4 save with the
+ * host-chosen team split (Chris teams -> user_local human, Franky teams -> franky human, rest AI)
+ * and persists it under a brand-new saveId so the room can bind and both players load it by URL.
+ *
+ * Unlike applyNewGameSetup this deliberately does NOT activate the save (co-op loads via the URL
+ * saveId, so activating would clobber the global active/solo save). It is created with "archived"
+ * status precisely so getActiveSave() - which picks the newest status='active' row - never returns
+ * it; getSaveById(saveId) still loads it for the Foundation room bootstrap.
+ */
+export function createRoomCoopSave(
+  input: { chrisTeamIds: string[]; frankyTeamIds: string[]; roomCode: string; now?: string },
+  persistence: PersistenceService = createPersistenceService(),
+): { saveId: string; name: string } {
+  const saveId = `new-game-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const saveName = `Oly Online 4v4 - Raum ${input.roomCode}`;
+  const prepared = buildNewGameStateFromBaseline({
+    presetId: "online_4v4",
+    chrisTeamIds: input.chrisTeamIds,
+    frankyTeamIds: input.frankyTeamIds,
+    saveId,
+    saveName,
+    now: input.now,
+  });
+  const created: PersistedSaveGame = persistence.createFreshSeasonOneSave({
+    saveId,
+    name: saveName,
+    status: "archived",
+  });
+  const saved = persistence.saveSingleplayerState(created.saveId, prepared.gameState);
+  return { saveId: saved.saveId, name: saved.name };
+}
+
 export function applyNewGameSetup(
   input: NewGameSetupInput,
   persistence: PersistenceService = createPersistenceService(),

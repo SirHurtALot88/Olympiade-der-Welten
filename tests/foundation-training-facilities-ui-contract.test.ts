@@ -146,7 +146,8 @@ describe("foundation training and facilities ui contract", () => {
     expect(trainingCompactText).toContain("TrainingModeComparePanel");
     expect(trainingCompactText).toContain("compareActivePlayerId");
 
-    expect(trainingSharedText).toContain("TrainingAttributeUpgradeStrip");
+    // XP-System abgeschafft: TrainingAttributeUpgradeStrip (dekorativer „+1 ~40 SP"-Streifen) entfernt.
+    expect(trainingSharedText).not.toContain("TrainingAttributeUpgradeStrip");
     expect(trainingSharedText).toContain("TrainingWhyDisclosure");
     expect(trainingSharedText).toContain("is-compare-active");
     expect(trainingSharedText).toContain("is-signature");
@@ -156,7 +157,8 @@ describe("foundation training and facilities ui contract", () => {
     expect(facilitiesOverviewText).toContain("facilities-overview-v2-upgrade-preview");
 
     expect(cssText).toContain(".training-v2-global-mode-chips");
-    expect(cssText).toContain(".training-v2-upgrade-strip");
+    // XP-System abgeschafft: .training-v2-upgrade-strip / -tile CSS entfernt.
+    expect(cssText).not.toContain(".training-v2-upgrade-strip");
     expect(cssText).toContain(".training-v2-rider-card.is-compare-active");
     expect(cssText).toContain(".facilities-overview-v2-maintenance-card");
   });

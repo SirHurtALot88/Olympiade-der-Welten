@@ -1,6 +1,7 @@
 "use client";
 
 import type * as React from "react";
+import { memo, useMemo } from "react";
 import type { CSSProperties, Dispatch, SetStateAction } from "react";
 
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
@@ -236,7 +237,11 @@ export interface FoundationCockpitPanelProps {
   syncFoundationViewInUrl: (view: FoundationView, tab?: string | null, playerId?: string | null, options?: { panel?: FoundationPanelId; push?: boolean; facilityId?: string | null; facilityAction?: string | null; team?: string | null; }) => void;
 }
 
-export default function FoundationCockpitPanel(props: FoundationCockpitPanelProps) {
+// T-074 (Performance, konservativ): `memo` verhindert Re-Renders, wenn der
+// Parent (FoundationCockpitHost) mit referenzgleichen Props erneut rendert —
+// reine Zusatz-Absicherung, keine Verhaltensänderung (gleiche Props liefern
+// weiterhin exakt denselben Render-Output).
+function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
   const {
     cockpitAiBatchApplyFeed,
     cockpitAiIncludeWarningTeams,
@@ -402,6 +407,17 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
     SortableHeader,
     syncFoundationViewInUrl,
   } = props;
+
+  // T-074 (Performance, konservativ): war zuvor zweimal identisch inline im
+  // JSX berechnet (einmal für die Top-5-Liste, einmal für den "Keine
+  // AI-Blocker"-Leerzustand) — hier einmal abgeleitet und an beiden Stellen
+  // wiederverwendet. Ergebnis/Reihenfolge unverändert.
+  const cockpitAiSeasonAuditWarningTeams = useMemo(
+    () => (seasonCompletionFeed?.aiSeasonAudit?.teams ?? []).filter(
+      (team) => team.controlMode === "ai" && team.warnings.length > 0,
+    ),
+    [seasonCompletionFeed],
+  );
 
   return (
     <section className="panel" id="foundation-cockpit" data-testid="foundation-cockpit">
@@ -2793,7 +2809,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                             {seasonCompletionFeed.aiSeasonAudit?.totals.mutatorTraits ?? 0}
                           </small>
                         </div>
-                        {(seasonCompletionFeed.aiSeasonAudit?.teams ?? []).filter((team) => team.controlMode === "ai" && team.warnings.length > 0).slice(0, 5).map((team) => (
+                        {cockpitAiSeasonAuditWarningTeams.slice(0, 5).map((team) => (
                           <div className="season-completion-ai-team" key={`completion-ai-${team.teamId}`}>
                             <strong>{team.teamCode} · {team.teamName}</strong>
                             <span>
@@ -2801,7 +2817,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                             </span>
                           </div>
                         ))}
-                        {(seasonCompletionFeed.aiSeasonAudit?.teams ?? []).filter((team) => team.controlMode === "ai" && team.warnings.length > 0).length === 0 ? (
+                        {cockpitAiSeasonAuditWarningTeams.length === 0 ? (
                           <div className="season-completion-ai-team is-clean">
                             <strong>Keine AI-Blocker</strong>
                             <span>Captain, Form, Push und Mutatoren werden im Save genutzt oder sind bewusst nicht auffaellig.</span>
@@ -3106,3 +3122,9 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
     </section>
   );
 }
+
+FoundationCockpitPanelComponent.displayName = "FoundationCockpitPanel";
+
+const FoundationCockpitPanel = memo(FoundationCockpitPanelComponent);
+
+export default FoundationCockpitPanel;

@@ -27,6 +27,7 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
       { id: "inboxV2", label: "Inbox", tooltip: "Offene Aufgaben & Warnungen für dein Team.", icon: "✉" },
       { id: "lineup", label: "Einsatzliste", tooltip: "Spieler setzen, Formplan und Team-Taktik — Focus Mode.", icon: "▣" },
       { id: "matchdayArena", label: "Arena", tooltip: "Spieltag als Reveal/Event.", icon: "◉" },
+      { id: "disciplineStage", label: "Disziplin-Bühne", tooltip: "Disziplin wählen und mit echten Save-Werten (Wert/Fatigue/Form) durchspielen — Prototyp.", icon: "◈" },
       { id: "seasonV2", label: "Saisonstand", tooltip: "Tabelle, Cards und Teamstärken.", icon: "▤" },
     ],
   },
@@ -38,6 +39,12 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
       { id: "players", label: "Spieler", tooltip: "Spieler suchen und Profil öffnen.", icon: "◎" },
       { id: "trainingCompact", label: "Training", tooltip: "Trainingssteuerung pro Spieler.", icon: "↑" },
       { id: "trainingV2", label: "Gebäude", tooltip: "Facilities, Upgrade und Wirkung.", icon: "▦" },
+      {
+        id: "allTimeTable",
+        label: "Ewige Tabelle",
+        tooltip: "Team-Entwicklung über alle Saisons: Punkte, MW, Cash und der ewige Leader.",
+        icon: "∑",
+      },
     ],
   },
   {
@@ -50,6 +57,7 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
       ...(CREDITS_TAB_ENABLED
         ? [{ id: "credits", label: "Kredite", tooltip: "Kreditrahmen, laufende Kredite und Angebote.", icon: "₤" } as FoundationNavItem]
         : []),
+      { id: "finances", label: "Finanzen", tooltip: "Einnahmen, Ausgaben und GuV deines Teams.", icon: "€" },
     ],
   },
   {
@@ -57,20 +65,23 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
     label: "Welt",
     items: [
       { id: "ranks", label: "Ranks", tooltip: "Team- und Disziplinranks.", icon: "▥" },
-      { id: "diszis", label: "Diszis", tooltip: "Disziplinen und Mutatoren.", icon: "◫" },
+      {
+        id: "diszis",
+        label: "Spielplan",
+        tooltip: "Saison-Spielplan: welche Disziplinen an welchem Spieltag laufen — farbcodiert nach Achse.",
+        icon: "≣",
+      },
       { id: "leagueLeaders", label: "Leaders", tooltip: "Liga-Leaders je Kategorie plus Rekorde, Trophäenschrank und legendäre Spieler.", icon: "★" },
-      { id: "prize", label: "Sponsoren", tooltip: "Sponsor-Vertrag wählen und Saisonfinanzen prüfen.", icon: "€" },
+      { id: "prize", label: "Sponsoren", tooltip: "Sponsor-Vertrag wählen und Saisonfinanzen prüfen.", icon: "$" },
       { id: "encyclopedia", label: "Lexikon", tooltip: "Spielbegriffe und Regeln.", icon: "?" },
     ],
   },
   {
     id: "admin",
-    label: "Admin",
+    label: "Verwaltung",
     items: [
-      { id: "cockpit", label: "Spieltag", tooltip: "Spieltag steuern.", icon: "⏵" },
       { id: "generator", label: "Generator", tooltip: "Spieler generieren.", icon: "+" },
-      { id: "teamSettings", label: "Settings", tooltip: "Team-Konfiguration.", icon: "⚙" },
-      { id: "admin", label: "Admin", tooltip: "Technische Steuerung.", icon: "⚒" },
+      { id: "teamSettings", label: "Settings", tooltip: "Team-Konfiguration und Speicherstände.", icon: "⚙" },
     ],
   },
 ];

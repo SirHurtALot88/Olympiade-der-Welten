@@ -11,7 +11,13 @@
  */
 
 import { projectCashFlow } from "@/lib/ai/organic-squad/cash-flow-forecast";
+import { classifyCompositionLane, deriveCompositionCounts } from "@/lib/ai/organic-squad/composition-plan";
 import { computeDisciplineNeeds, deriveNeedAxisWeights } from "@/lib/ai/organic-squad/discipline-need";
+import {
+  deriveLeagueSuperstarLicenses,
+  MARQUEE_TARGET_MW_FLOOR,
+  type MarqueeLicenseTeamInput,
+} from "@/lib/ai/organic-squad/marquee-eligibility";
 import { buildOrganicSquadPlan, type OrganicBuyDecision } from "@/lib/ai/organic-squad/draft-builder";
 import {
   CATEGORY_TO_AXIS,
@@ -25,11 +31,16 @@ import {
   type OrganicTeamState,
   type OrganicUtilityWeights,
 } from "@/lib/ai/organic-squad/types";
-import { sellUtility } from "@/lib/ai/organic-squad/utility";
+import { DEPTH_REF_COST, sellUtility } from "@/lib/ai/organic-squad/utility";
 import { deriveUtilityWeights, resolveRenewalContractLength } from "@/lib/ai/organic-squad/weights";
 import { draftUnit } from "@/lib/ai/market-pick-engine/slot-sequence";
+import { buildLeagueMarketBrackets, quantilePrice, type MarketBracketLane } from "@/lib/ai/market-pick-engine/market-brackets";
 import type { GameState, Player, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
+import {
+  applyGmBiasToLaneAppetite,
+  computeIdentityLaneAppetite,
+} from "@/lib/ai/ai-needs-picks-compare-service";
 import {
   buildTeamThemeCompositionRuntimeContext,
   derivePlayerThemeTags,
@@ -38,6 +49,25 @@ import {
 
 /** Small flat solvency buffer (MW) — the floor of the cash hard blocker; spend above it is emergent. */
 const ORGANIC_CASH_BUFFER = 5;
+
+/**
+ * Env flag for ANPASSUNG B (cash-scaled opt-trim). optTarget is otherwise cash-blind (weights.ts derives
+ * it purely from identity playerOpt + GM depth/elite bias), so a cash-thin club spreads its small budget
+ * over too many slots → budget-per-slot collapses → the last slots become Backup/Reserve scraps. When a
+ * club can't fund Depth-grade bodies across all its open slots, trim the target by up to 2 slots so the
+ * budget-per-slot rises enough to afford Depth — fewer but better bodies. Rich clubs (strain 0) untouched;
+ * below-opt is measured against the trimmed target so it does NOT rise. Default OFF.
+ */
+const FILLQ_B_ENABLED = process.env.OLY_DRAFT_FILLQB === "1";
+
+/**
+ * Env flag for the EXPLICIT role-composition planner (see composition-plan.ts deriveCompositionCounts +
+ * utility.ts compositionValue term). Default OFF ("0"/unset) — when off, planOrganicDraftForTeam never
+ * builds a `composition` input, so OrganicTeamState.composition stays undefined and the draft is
+ * bit-identical to before this flag existed (same pattern as IDFIT_ENABLED in utility.ts:38/FILLQ_B_ENABLED
+ * above). This is a SOFT utility nudge only — no hard band filter, no slot sequence, no stopUtility change.
+ */
+const COMPOSE_ENABLED = process.env.OLY_DRAFT_COMPOSE === "1";
 /**
  * The cash buffer scales with the club's WAGE BILL ("auch Top-/Aggro-Teams sollen was auf die Seite legen,
  * z.B. 0.25–0.5× Salary"): a club must keep roughly this fraction of its recurring salary as reserve, so a
@@ -57,6 +87,20 @@ function resolveRosterSalaryTotal(gameState: GameState, teamId: string): number 
     if (player) total += Math.max(0, player.salaryDemand ?? player.displaySalary ?? 0);
   }
   return total;
+}
+
+/** Market values of an arbitrary team's current roster (same value source as toOrganicPlayerView). Used
+ *  by the MARQUEE league-input builder below to count each team's existing Superstar-tier holdings — a
+ *  live gameState lookup, unlike the current-team startingSquad view already built in the caller. */
+function resolveRosterMarketValues(gameState: GameState, teamId: string): number[] {
+  const values: number[] = [];
+  const players = gameState.players ?? [];
+  for (const entry of gameState.rosters ?? []) {
+    if (entry.teamId !== teamId) continue;
+    const player = players.find((candidate) => candidate.id === entry.playerId);
+    if (player) values.push(Math.max(0, player.marketValue ?? player.displayMarketValue ?? 0));
+  }
+  return values;
 }
 
 /** 0..100 (or 0..10 legacy) management value → 0..1, matching normalizeManagementValue. */
@@ -312,11 +356,107 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     .filter((view) => view.marketValue > 0);
   const salaryTotal = startingSquad.reduce((sum, view) => sum + view.salary, 0);
 
+  // ANPASSUNG B: cash-scaled opt-trim. If the club can't fund Depth-grade bodies across every open slot,
+  // trim optTarget by up to 2 (never below ROSTER_MIN) so per-slot budget rises and Depth becomes
+  // affordable — fewer, better bodies instead of a Reserve tail. Rich clubs get strain 0 (untouched).
+  let planWeights = ctx.weights;
+  if (FILLQ_B_ENABLED) {
+    const slotsToFill = Math.max(1, ctx.weights.optTarget - startingSquad.length);
+    const budgetPerSlot = (ctx.cash - ORGANIC_CASH_BUFFER) / slotsToFill;
+    const strain = Math.min(1, Math.max(0, 1 - budgetPerSlot / DEPTH_REF_COST));
+    const trimmedOpt = Math.max(ROSTER_MIN, ctx.weights.optTarget - Math.round(2 * strain));
+    if (trimmedOpt !== ctx.weights.optTarget) {
+      planWeights = { ...ctx.weights, optTarget: trimmedOpt };
+    }
+  }
+
+  // ANPASSUNG COMPOSE (flag-gated): derive an EXPLICIT target role pyramid for this team and hand it to
+  // buildOrganicSquadPlan as a soft utility nudge (see composition-plan.ts + utility.ts compositionValue).
+  // Reuses the SAME premium-appetite/cap derivation the S1/S2 market-pick planner already uses — no new
+  // magic numbers here. Deliberately built AFTER the FILLQ_B opt-trim above so the plan targets the final
+  // (possibly trimmed) optTarget, not the pre-trim one.
+  let composition: { counts: Record<MarketBracketLane, number>; brackets: ReturnType<typeof buildLeagueMarketBrackets> } | undefined;
+  if (COMPOSE_ENABLED) {
+    const brackets = buildLeagueMarketBrackets(candidates.map((view) => view.marketValue));
+    const existingTiers: Record<MarketBracketLane, number> = {
+      superstar: 0,
+      star: 0,
+      core: 0,
+      depth: 0,
+      backup: 0,
+      reserve: 0,
+    };
+    for (const view of startingSquad) {
+      existingTiers[classifyCompositionLane(view.marketValue, brackets)] += 1;
+    }
+    // computeIdentityLaneAppetite + applyGmBiasToLaneAppetite already derive premiumCap/superstarCap
+    // internally via deriveLaneCapsFromAppetite (ai-needs-picks-compare-service.ts:2063,2090,2141) — the
+    // returned lanePhilosophy.premiumCap/premiumAppetite ARE that function's output for the final (post-GM-
+    // tilt) premiumAppetite, so reading them off lanePhilosophy directly avoids a redundant second call.
+    // superstarCap, however, is NOT taken from lanePhilosophy any more (see MARQUEE license derivation
+    // below) — the identity-only premiumAppetite formula folds `(1 − financesN)` in, so it systematically
+    // under-scores exactly the richest star-chasing clubs for the Superstar slot; premiumCap/Star stay on
+    // the original appetite path (that balancing knob is unaffected, only Superstar moves to the league
+    // license).
+    const gmProfile = getTeamGeneralManager(input.gameState, input.team.teamId)?.profile ?? null;
+    const lanePhilosophy = applyGmBiasToLaneAppetite(computeIdentityLaneAppetite(input.identity ?? null), gmProfile);
+
+    // League-scaled marquee target price: MARQUEE_TARGET_MW_FLOOR (~75) is only a LOWER bound — the actual
+    // price rides the league's own top-end candidate pricing (98th percentile), so a late-season inflated
+    // league naturally prices its marquee at ~85-90 MW instead of staying pinned at the S1 floor forever.
+    // Computed once per call from THIS team's candidate pool and reused for every team below (a league-wide
+    // scalar this draft pass, not a per-team one — matches how `brackets` itself is reused).
+    const marqueeTargetMw = Math.max(
+      MARQUEE_TARGET_MW_FLOOR,
+      quantilePrice(candidates.map((view) => view.marketValue), 0.98),
+    );
+
+    // MARQUEE league license derivation (marquee-eligibility.ts): built fresh from gameState on every call,
+    // over ALL teams, so — being a pure function of gameState — it returns the SAME license set for every
+    // team call that sees the same gameState snapshot (a scarce league-wide resource, not a per-team roll).
+    // Because this runs once per team INSIDE a sequential draft pass, gameState (rosters/cash) shifts a
+    // little call to call as earlier teams' picks land, so the license set can drift slightly over the
+    // course of one pass — acceptable here (same tradeoff `brackets` above already makes) since the goal is
+    // "the league licenses ~2-3 teams this pass", not perfect single-snapshot simultaneity.
+    const leagueInput: MarqueeLicenseTeamInput[] = (input.gameState.teams ?? []).map((leagueTeam) => {
+      const leagueIdentity = (input.gameState.teamIdentities ?? []).find((i) => i.teamId === leagueTeam.teamId) ?? null;
+      const leagueGmProfile = getTeamGeneralManager(input.gameState, leagueTeam.teamId)?.profile ?? null;
+      const rosterMarketValues = resolveRosterMarketValues(input.gameState, leagueTeam.teamId);
+      const rosterSize = rosterMarketValues.length;
+      const leagueSlotsToFill = Math.max(1, (leagueIdentity?.playerOpt ?? ROSTER_MIN) - rosterSize);
+      const ssPlanCost = marqueeTargetMw + Math.max(0, leagueSlotsToFill - 1) * brackets.depth.floorMw;
+      return {
+        teamId: leagueTeam.teamId,
+        ambitionN: normId(leagueIdentity?.ambition),
+        starPriority: leagueGmProfile?.bias?.starPriority ?? 5,
+        archetype: leagueGmProfile?.archetype ?? "",
+        spendableNet: (leagueTeam.cash ?? 0) - ORGANIC_CASH_BUFFER,
+        ssPlanCost,
+        existingSuperstarCount: rosterMarketValues.filter((mv) => mv >= brackets.superstar.floorMw).length,
+      };
+    });
+    const licenses = deriveLeagueSuperstarLicenses(leagueInput);
+
+    const counts = deriveCompositionCounts({
+      optTarget: planWeights.optTarget,
+      existingTiers,
+      spendableNet: ctx.cash - ORGANIC_CASH_BUFFER,
+      brackets,
+      premiumAppetite: lanePhilosophy.premiumAppetite,
+      premiumCap: lanePhilosophy.premiumCap,
+      superstarCap: licenses.has(input.team.teamId) ? 1 : 0,
+      rosterMin: ROSTER_MIN,
+      marqueeTargetMw,
+    });
+    composition = { counts, brackets };
+  }
+
   const result = buildOrganicSquadPlan({
     startingSquad,
     candidates,
     identityAxisWeights: ctx.identityAxisWeights,
     disciplines: ctx.disciplines,
+    composition,
     economy: {
       cash: ctx.cash,
       cashBuffer: ctx.cashBuffer,
@@ -326,7 +466,7 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
       sponsorIncome: input.forecast?.sponsorIncome ?? 0,
       facilityNet: input.forecast?.facilityNet ?? 0,
       netTransfer: input.forecast?.netTransfer ?? 0,
-      weights: ctx.weights,
+      weights: planWeights,
       rosterMax: ctx.rosterMax,
       rosterMin: ROSTER_MIN,
       // Reserve is spendable while building from min→opt: keep only the flat solvency floor here so a
@@ -342,7 +482,7 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     finalSalaryTotal: result.finalSalaryTotal,
     finalRosterSize: result.finalSquad.length,
     stoppedBelowMin: result.stoppedBelowMin,
-    optTarget: ctx.weights.optTarget,
+    optTarget: planWeights.optTarget,
   };
 }
 
@@ -520,6 +660,7 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
       weights: ctx.weights,
       disciplineNeeds,
       needAxisWeights,
+      identityAxisWeights: ctx.identityAxisWeights,
     };
   };
 

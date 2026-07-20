@@ -1,6 +1,8 @@
+import path from "node:path";
+
 import { NextResponse } from "next/server";
 
-import { getPlayerPortraitPathById } from "@/lib/data/mediaAssets";
+import { getPlayerPortraitPathById, getStaticPortraitUrl } from "@/lib/data/mediaAssets";
 import { serveMediaAsset } from "@/lib/media/serveMediaAsset";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +12,12 @@ export async function GET(
   context: { params: Promise<{ playerId: string }> },
 ) {
   const { playerId } = await context.params;
-  const portraitPath = getPlayerPortraitPathById(playerId);
+  // Prefer the repo-relative static index (public/portraits/…); fall back to
+  // the legacy absolute-path map only when no static file is indexed.
+  const staticUrl = getStaticPortraitUrl(playerId);
+  const portraitPath = staticUrl
+    ? path.join(process.cwd(), "public", staticUrl)
+    : getPlayerPortraitPathById(playerId);
 
   if (!portraitPath) {
     return NextResponse.json({ error: "portrait_not_found" }, { status: 404 });

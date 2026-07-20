@@ -1,6 +1,6 @@
 "use client";
 
-import { formatVeloNumber } from "@/components/foundation/velo-ui/formatters";
+import { formatNlNumber } from "@/components/foundation/new-look/nl-tones";
 
 type VeloPotentialStarsProps = {
   rating: number | null;
@@ -15,12 +15,12 @@ export function VeloPotentialStars({ rating, className = "" }: VeloPotentialStar
   return (
     <span
       className={`velo-potential-stars training-v2-rider-stars${className ? ` ${className}` : ""}`}
-      aria-label={`Potential ${formatVeloNumber(rating, 0)}`}
+      aria-label={`Potential ${formatNlNumber(rating, 0)}`}
     >
       {Array.from({ length: 5 }, (_, index) => (
         <span key={index} className={index < filled ? "is-filled" : ""} />
       ))}
-      <small>{formatVeloNumber(rating, 0)}</small>
+      <small>{formatNlNumber(rating, 0)}</small>
     </span>
   );
 }

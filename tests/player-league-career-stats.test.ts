@@ -113,35 +113,6 @@ describe("player-league-career-stats", () => {
     });
   });
 
-  it("drops snapshots for seasons newer than the live season", () => {
-    // Contaminated save: a fresh Season-1 save that still carries a Season-3 snapshot.
-    const stats = buildPlayerLeagueCareerStatsMap(
-      buildGameState({
-        season: { id: "season-1", name: "Season 1" },
-        seasonState: {
-          seasonSnapshots: [
-            {
-              seasonId: "season-1",
-              seasonName: "Season 1",
-              playerPerformances: [{ playerId: "p1", playerName: "A", appearances: 10, totalPoints: 20 }],
-            },
-            {
-              seasonId: "season-3",
-              seasonName: "Season 3",
-              playerPerformances: [{ playerId: "p1", playerName: "A", appearances: 99, totalPoints: 999 }],
-            },
-          ],
-        } as GameState["seasonState"],
-      }),
-    );
-
-    expect(stats.get("p1")).toEqual({
-      appearances: 10,
-      totalPps: 20,
-      seasonsPlayed: 1,
-    });
-  });
-
   it("does not double-count the live season when it is already archived", () => {
     const currentSeason = new Map<string, PlayerSeasonPerformanceSummary>([
       ["p1", buildSummary({ appearances: 99, totalPoints: 999 })],

@@ -104,6 +104,7 @@ import {
   formatNlMoney,
   formatNlNumber,
   nlToneClass,
+  NL_TONE_VAR,
   useCountUp,
   type NlAxisKey,
   type NlRankingDrawerRow,
@@ -127,6 +128,7 @@ import {
   type FoundationPlayerScopeRow,
 } from "@/lib/foundation/tabs/use-foundation-cross-tab-player-directory";
 import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
+import { potentialScoreToStars } from "@/lib/progression/player-potential-service";
 import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
 
 import FoundationPlayersCompareOverlay from "@/app/foundation/players-table/FoundationPlayersCompareOverlay";
@@ -394,6 +396,49 @@ const NL_PLAYERS_COLUMNS: ReadonlyArray<{
   { id: "traits", label: "Traits", sortKey: "traits", align: "left" },
 ];
 
+/**
+ * Trait-Chips (statt kommasepariertem Text): positive Traits im Good-Ton,
+ * negative im Risk-Ton. Kompakt (leben in einer Tabellenzelle), Inline-Styles
+ * über die vorhandenen Ton-Tokens (`NL_TONE_VAR`) — keine neue globals.css.
+ * Rendert nichts, wenn der Spieler keine Traits hat (Fallback "—" übernimmt der Aufrufer).
+ */
+function renderTraitChips(traitsPositive: string[], traitsNegative: string[]) {
+  const entries: Array<{ label: string; tone: "good" | "risk" }> = [
+    ...traitsPositive.map((label) => ({ label, tone: "good" as const })),
+    ...traitsNegative.map((label) => ({ label, tone: "risk" as const })),
+  ];
+  if (entries.length === 0) {
+    return null;
+  }
+  return (
+    <span style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
+      {entries.map((entry, index) => {
+        const tone = NL_TONE_VAR[entry.tone];
+        return (
+          <span
+            key={`${entry.tone}-${entry.label}-${index}`}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              padding: "1px 6px",
+              borderRadius: "999px",
+              lineHeight: 1.45,
+              fontSize: "var(--nl-fs-xs)",
+              fontWeight: 700,
+              whiteSpace: "nowrap",
+              border: `1px solid color-mix(in srgb, ${tone} 45%, transparent)`,
+              background: `color-mix(in srgb, ${tone} 14%, transparent)`,
+              color: `color-mix(in srgb, ${tone} 80%, var(--nl-ink))`,
+            }}
+          >
+            {entry.label}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
 const NL_PLAYERS_PAGE_SIZE = 100;
 
 /**
@@ -607,6 +652,14 @@ export default function FoundationPlayersTableNewLook({
   const [activeColumnPreset, setActiveColumnPreset] = useState<NlPlayersColumnPresetId>(NL_PLAYERS_DEFAULT_PRESET_ID);
   /** Auf-/zugeklapptes "Spalten"-Menü (Popover). */
   const [columnMenuOpen, setColumnMenuOpen] = useState(false);
+  /**
+   * Rückmeldung nach "Liste kopieren"/"Als CSV exportieren" (T-105) — z. B.
+   * "42 Spieler kopiert." oder ein Fehlertext, wenn die Zwischenablage
+   * verweigert wird. Gleiches Muster wie `copySeed`/`message` in
+   * `PlayerGeneratorPanelNewLook.tsx` (persistiert bis zur nächsten Aktion,
+   * kein Timer nötig).
+   */
+  const [exportStatus, setExportStatus] = useState<string | null>(null);
 
   // Gespeicherte Spalten-Präferenzen beim Mount nachladen (rein clientseitig).
   useEffect(() => {
@@ -728,6 +781,15 @@ export default function FoundationPlayersTableNewLook({
   /** Rasse-Optionen für den Query-Chip-Builder — aus denselben `rows` wie die bestehenden Klassen-Optionen. */
   const raceOptions = useMemo(
     () => Array.from(new Set(rows.map((row) => row.player.race))).sort((left, right) => left.localeCompare(right)),
+    [rows],
+  );
+
+  /** Beste-Disziplin-Optionen für den Query-Chip-Kategorie-Picker — nur real vorkommende Labels (kein erfundener Katalog). */
+  const bestDisciplineOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(rows.map((row) => row.bestDiscipline).filter((label): label is string => Boolean(label))),
+      ).sort((left, right) => left.localeCompare(right)),
     [rows],
   );
 
@@ -1387,7 +1449,7 @@ export default function FoundationPlayersTableNewLook({
         {isColumnVisible("mw") ? (
         <td className={`nl-players-td-money${sortCellClass("mw")}`}>
           <span className="nl-players-money">
-            <span className="nl-tnum">{formatLocalePoints(marketValue, 2)}</span>
+            <span className="nl-tnum">{formatNlMoney(marketValue)}</span>
             {marketValueDelta != null && marketValueDelta !== 0 ? (
               <NlDeltaChip
                 value={marketValueDelta}
@@ -1401,7 +1463,7 @@ export default function FoundationPlayersTableNewLook({
         {isColumnVisible("salary") ? (
         <td className={`nl-players-td-money${sortCellClass("salary")}`}>
           <span className="nl-players-money">
-            <span className="nl-tnum">{formatLocalePoints(annualSalary, 2)}</span>
+            <span className="nl-tnum">{formatNlMoney(annualSalary)}</span>
             {salaryDelta != null && salaryDelta !== 0 ? (
               <NlDeltaChip
                 value={salaryDelta}
@@ -1412,7 +1474,7 @@ export default function FoundationPlayersTableNewLook({
             ) : null}
             {showSeasonSalarySubline ? (
               <small className="nl-players-salary-season" title="Gehalt diese Saison (Vertragsjahr 1)">
-                Saison: {formatLocalePoints(currentSeasonSalary, 2)}
+                Saison: {formatNlMoney(currentSeasonSalary)}
               </small>
             ) : null}
           </span>
@@ -1467,7 +1529,8 @@ export default function FoundationPlayersTableNewLook({
         ) : null}
         {isColumnVisible("traits") ? (
         <td className={`nl-players-td-traits${sortCellClass("traits")}`} title={traitsText}>
-          {traitsText}
+          {/* Trait-Chips statt Kommatext: positiv = Good-Ton, negativ = Risk-Ton (Fallback "—"). */}
+          {renderTraitChips(row.player.traitsPositive, row.player.traitsNegative) ?? "—"}
         </td>
         ) : null}
       </tr>
@@ -1485,6 +1548,180 @@ export default function FoundationPlayersTableNewLook({
         </td>
       </tr>,
     ];
+  }
+
+  /**
+   * Export/Kopieren der gefilterten Spielerliste (T-105, Backlog Juli 2026).
+   * Zellwerte spiegeln bewusst den TEXT, der pro Spalte in `renderRow`
+   * gerendert wird — inkl. Fog-of-War-Maskierung (fremde Spieler bekommen nur
+   * den unscharfen CA/PO-Sternbereich, nie das rohe `potential`, siehe
+   * `renderAbilityStars` oben) statt der zugrundeliegenden Rohdaten.
+   *
+   * Spalten = `visibleColumns` (dieselbe aktive Spaltenkonfiguration wie der
+   * Tabellenkopf) MINUS der beiden reinen UI-Strukturspalten "Vgl."-Checkbox
+   * und Portraitbild, die keinen sinnvollen Textwert haben. Zeilen =
+   * `queryChipFilteredRows` (Scope-/Team-/Klassen-/MW-Bracket-/Vertrags-/
+   * Query-Chip-gefiltert, VOR der "Mehr anzeigen"-Pagination) — nicht nur die
+   * aktuell eingeblendete `visibleRows`-Seite, sonst würde Export/Kopieren nur
+   * einen Bruchteil der gefilterten Treffer erfassen.
+   */
+  const exportColumns = useMemo(
+    () => visibleColumns.filter((column) => column.id !== "compare" && column.id !== "image"),
+    [visibleColumns],
+  );
+
+  /** Klartext-Zellwert einer Export-Spalte für eine Zeile — spiegelt `renderRow` je Spalten-ID. */
+  function getExportCellText(columnId: string, row: FoundationPlayerScopeRow): string {
+    switch (columnId) {
+      case "name":
+        return row.player.name;
+      case "team":
+        return row.team?.name ?? "Free Agent";
+      case "class":
+        return row.player.className;
+      case "race":
+        return row.player.race;
+      case "abilityStars": {
+        // Gleiche Sternmathematik + Klammerung wie `NlAbilityStars`
+        // (`resolveCaStars`/`resolvePoStarRange`) — PO fällt nie unter CA.
+        const owned = row.team?.humanControlled ?? false;
+        const caScore = computeCurrentAbilityScore(row.player.coreStats);
+        const caStars = caScore != null ? potentialScoreToStars(caScore) : null;
+        const potential = row.player.potential ?? null;
+        let poText = "—";
+        if (owned) {
+          if (potential != null) {
+            const poStars = potentialScoreToStars(potential);
+            poText = `${formatNlNumber(caStars != null ? Math.max(poStars, caStars) : poStars, 2)}★`;
+          }
+        } else {
+          // Fog of War: NIE den rohen `potential`-Wert exportieren — nur den
+          // unscharfen Bereich, den `getFoggedPoScoreRange` auch der UI liefert.
+          const range = getFoggedPoScoreRange(potential);
+          if (range != null) {
+            let min = potentialScoreToStars(range.min);
+            let max = potentialScoreToStars(range.max);
+            if (caStars != null) {
+              min = Math.max(min, caStars);
+              max = Math.max(max, caStars, min);
+            }
+            poText = `${formatNlNumber(min, 2)}–${formatNlNumber(max, 2)}★ (geschätzt)`;
+          }
+        }
+        return `CA ${caStars != null ? `${formatNlNumber(caStars, 2)}★` : "—"} / PO ${poText}`;
+      }
+      case "axes":
+        return NL_PLAYERS_AXES.map(
+          ({ key, label }) => `${label} ${formatNlNumber(row.player.coreStats[key] ?? null, 0)}`,
+        ).join(" ");
+      case "pps":
+        return row.playerPps != null ? formatPpsValue(row.playerPps) : "—";
+      case "ovr":
+        return formatWholeNumber(row.playerOvr);
+      case "mvs":
+        return row.playerMvs != null ? formatPpsValue(row.playerMvs) : "—";
+      case "mw":
+        return formatNlMoney(getPlayerDisplayMarketValue(row.player));
+      case "salary": {
+        const annualSalary = row.roster
+          ? getRosterEntryDisplaySalary(row.roster, row.player)
+          : getPlayerDisplaySalary(row.player);
+        return formatNlMoney(annualSalary);
+      }
+      case "contract": {
+        if (!row.roster) {
+          return "—";
+        }
+        const shapeShort = formatContractShapeShortLabel(row.roster.contractShape);
+        return `${shapeShort ? `${shapeShort} ` : ""}${row.roster.contractLength}J`;
+      }
+      case "appearances":
+        return row.seasonPerformance ? String(row.seasonPerformance.appearances) : "—";
+      case "bestDiscipline":
+        return row.bestDiscipline ?? "—";
+      case "careerLeague":
+        return row.careerLeagueStats
+          ? `${row.careerLeagueStats.appearances} / ${formatLocalePoints(row.careerLeagueStats.totalPps, 1)} (${row.careerLeagueStats.seasonsPlayed} Saison(en))`
+          : "—";
+      case "traits": {
+        const traits = [...row.player.traitsPositive, ...row.player.traitsNegative.map((trait) => `-${trait}`)];
+        return traits.length > 0 ? traits.join(", ") : "—";
+      }
+      default:
+        return "—";
+    }
+  }
+
+  type PlayersExportTable = { headers: string[]; rows: string[][] };
+
+  /** Kopf- + Datenzeilen über die aktuell sichtbaren Export-Spalten und die gefilterte Zeilenliste. */
+  function buildPlayersExportTable(): PlayersExportTable {
+    const headers = exportColumns.map((column) => column.label);
+    const rows = queryChipFilteredRows.map((row) =>
+      // Whitespace normalisieren (z. B. der Zeilenumbruch in der "Saison: …"-Gehaltszeile
+      // gibt es hier nicht, aber Achsen-/CA-PO-Text kombiniert mehrere Werte mit Leerzeichen).
+      exportColumns.map((column) => getExportCellText(column.id, row).replace(/\s+/g, " ").trim()),
+    );
+    return { headers, rows };
+  }
+
+  /** Tab-getrennt (TSV) fürs Einfügen in Tabellenkalkulation/Chat — "Liste kopieren". */
+  function buildPlayersExportTsv(table: PlayersExportTable): string {
+    return [table.headers, ...table.rows].map((line) => line.map((cell) => cell.replace(/\t/g, " ")).join("\t")).join("\n");
+  }
+
+  function escapeCsvField(value: string): string {
+    return /[",;\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+  }
+
+  /**
+   * CSV-Download. Semikolon statt Komma als Feldtrenner (deutsche Excel-
+   * Konvention) — `formatNlNumber`/`formatNlMoney` rendern Dezimalwerte mit
+   * Komma (`de-DE`-Locale), ein Komma-Trenner würde jede Zahl in zwei Felder
+   * zerreißen. Führendes BOM, damit Excel unter Windows Umlaute (ä/ö/ü/ß)
+   * zuverlässig als UTF-8 statt Latin-1 erkennt.
+   */
+  function buildPlayersExportCsv(table: PlayersExportTable): string {
+    const BOM = "﻿";
+    return (
+      BOM + [table.headers, ...table.rows].map((line) => line.map(escapeCsvField).join(";")).join("\r\n")
+    );
+  }
+
+  async function handleCopyPlayersList() {
+    const table = buildPlayersExportTable();
+    if (table.rows.length === 0) {
+      setExportStatus("Keine Spieler zum Kopieren — Filter ergibt 0 Treffer.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(buildPlayersExportTsv(table));
+      setExportStatus(`${formatNlNumber(table.rows.length, 0)} Spieler in die Zwischenablage kopiert.`);
+    } catch {
+      setExportStatus("Kopieren im Browser nicht möglich (Zwischenablage-Zugriff verweigert).");
+    }
+  }
+
+  function handleExportPlayersCsv() {
+    const table = buildPlayersExportTable();
+    if (table.rows.length === 0) {
+      setExportStatus("Keine Spieler zum Exportieren — Filter ergibt 0 Treffer.");
+      return;
+    }
+    try {
+      const blob = new Blob([buildPlayersExportCsv(table)], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `spielerliste-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setExportStatus(`${formatNlNumber(table.rows.length, 0)} Spieler als CSV exportiert.`);
+    } catch {
+      setExportStatus("CSV-Export im Browser fehlgeschlagen.");
+    }
   }
 
   /**
@@ -1819,6 +2056,7 @@ export default function FoundationPlayersTableNewLook({
           onChipsChange={setQueryChips}
           classOptions={playerClassOptions}
           raceOptions={raceOptions}
+          bestDisciplineOptions={bestDisciplineOptions}
         />
       ) : null}
 
@@ -1867,12 +2105,37 @@ export default function FoundationPlayersTableNewLook({
           eyebrow="Sortierbare Daten"
           title="Spielerliste"
           actions={
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
-              <span className="nl-players-shown nl-tnum" aria-live="polite">
-                {formatNlNumber(visibleRows.length, 0)} von {formatNlNumber(queryChipFilteredRows.length, 0)} Spielern
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <span className="nl-players-shown nl-tnum" aria-live="polite">
+                  {formatNlNumber(visibleRows.length, 0)} von {formatNlNumber(queryChipFilteredRows.length, 0)} Spielern
+                </span>
+                {/* T-105: Export/Kopieren der gefilterten (nicht nur eingeblendeten) Spielerliste
+                    über die sichtbaren Spalten — TSV in die Zwischenablage bzw. CSV-Download. */}
+                <button
+                  type="button"
+                  className="nl-players-more-button"
+                  onClick={handleCopyPlayersList}
+                  title="Sichtbare Spalten der gefilterten Spielerliste als Text (TSV) in die Zwischenablage kopieren"
+                >
+                  Liste kopieren
+                </button>
+                <button
+                  type="button"
+                  className="nl-players-more-button"
+                  onClick={handleExportPlayersCsv}
+                  title="Sichtbare Spalten der gefilterten Spielerliste als CSV-Datei herunterladen"
+                >
+                  Als CSV exportieren
+                </button>
+                {renderColumnMenu()}
               </span>
-              {renderColumnMenu()}
-            </span>
+              {exportStatus ? (
+                <small className="muted" role="status" aria-live="polite">
+                  {exportStatus}
+                </small>
+              ) : null}
+            </div>
           }
         >
           <div className="nl-players-table-shell">

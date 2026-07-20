@@ -10,6 +10,16 @@ export type GameEncyclopediaEntry = {
   caveat?: string;
 };
 
+/** Stabile Anzeige-Reihenfolge der Lexikon-Kategorien fuer Filter/Gruppierung. */
+export const GAME_ENCYCLOPEDIA_CATEGORIES: GameEncyclopediaEntry["category"][] = [
+  "Kennzahl",
+  "Spieltag",
+  "Kader",
+  "Training",
+  "Finanzen",
+  "System",
+];
+
 export const GAME_ENCYCLOPEDIA_ENTRIES: GameEncyclopediaEntry[] = [
   {
     id: "ovr",
@@ -554,4 +564,24 @@ export function getGameTermTooltip(term: string | null | undefined) {
 export function getGameTermShort(term: string | null | undefined) {
   const entry = getGameEncyclopediaEntry(term);
   return entry ? `${entry.term}: ${entry.short}` : null;
+}
+
+export type GameEncyclopediaGroup = {
+  category: GameEncyclopediaEntry["category"];
+  entries: GameEncyclopediaEntry[];
+};
+
+/**
+ * Gruppiert Lexikon-Eintraege nach Kategorie in stabiler Reihenfolge
+ * (`GAME_ENCYCLOPEDIA_CATEGORIES`) fuer einen strukturierten Index mit
+ * Kategorie-Headern statt einer flachen Liste. Leere Kategorien werden
+ * uebersprungen.
+ */
+export function groupGameEncyclopediaEntriesByCategory(
+  entries: GameEncyclopediaEntry[] = GAME_ENCYCLOPEDIA_ENTRIES,
+): GameEncyclopediaGroup[] {
+  return GAME_ENCYCLOPEDIA_CATEGORIES.map((category) => ({
+    category,
+    entries: entries.filter((entry) => entry.category === category),
+  })).filter((group) => group.entries.length > 0);
 }

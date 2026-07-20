@@ -790,6 +790,7 @@ function buildCandidate(
     pressure: gmPressure,
     sellReasonCodes,
     keepReasonCodes,
+    contractLength: roster.contractLength,
   });
   const sellPriority = Math.round(clamp(gmAdjustedScore, 0, 100));
   const sellDecision = evaluateAiSellDecision({

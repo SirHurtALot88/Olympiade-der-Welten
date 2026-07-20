@@ -12,11 +12,15 @@ import { getTransfermarktTierFromPoints } from "@/lib/market/transfermarkt-sheet
 describe("transfermarkt formatting contract", () => {
   it("contains only confirmed productive color rules", () => {
     expect(TRANSFERMARKT_CONFIRMED_COLOR_RULES.every((rule) => rule.certainty === "confirmed")).toBe(true);
-    expect(TRANSFERMARKT_CONFIRMED_COLOR_RULES.flatMap((rule) => rule.colors)).toContain("#1565C0");
+    // Die Heat-Skalen wurden von rohen Hex-Werten auf die zentrale Heat-Palette
+    // (CSS-Variablen) umgestellt.
+    expect(TRANSFERMARKT_CONFIRMED_COLOR_RULES.flatMap((rule) => rule.colors)).toContain("var(--heat-blue-dark)");
   });
 
-  it("formats market value and salary as euro values", () => {
-    expect(formatTransfermarktCurrency(100000)).toBe("100.000 €");
+  it("formats market value and salary in the app-wide Mio convention", () => {
+    // Werte liegen in Mio-Einheit vor — konsistent zu formatNlMoney.
+    expect(formatTransfermarktCurrency(506.4)).toBe("506,4 Mio");
+    expect(formatTransfermarktCurrency(0.75)).toBe("750k");
     expect(formatTransfermarktCurrency(null)).toBe("—");
   });
 
@@ -26,9 +30,10 @@ describe("transfermarkt formatting contract", () => {
   });
 
   it("maps confirmed axis heat colors from Retool thresholds", () => {
-    expect(getConfirmedAxisHeatStyle(90)?.backgroundColor).toBe("#1565C0");
-    expect(getConfirmedAxisHeatStyle(50)?.backgroundColor).toBe("#F9A825");
-    expect(getConfirmedAxisHeatStyle(10)?.backgroundColor).toBe("#EF5350");
+    // Rohe Hex-Werte wurden auf die zentrale Heat-Palette (CSS-Variablen) umgestellt.
+    expect(getConfirmedAxisHeatStyle(90)?.backgroundColor).toBe("var(--heat-best-bg)");
+    expect(getConfirmedAxisHeatStyle(50)?.backgroundColor).toBe("var(--heat-neutral-bg)");
+    expect(getConfirmedAxisHeatStyle(10)?.backgroundColor).toBe("var(--heat-danger-bg)");
   });
 
   it("maps raw stat points to Retool-style S+ to F tiers", () => {
@@ -39,8 +44,9 @@ describe("transfermarkt formatting contract", () => {
   });
 
   it("maps tier badges to the confirmed Retool palette", () => {
-    expect(getConfirmedTierStyle("S+")?.backgroundColor).toBe("#1565C0");
-    expect(getConfirmedTierStyle("C")?.backgroundColor).toBe("#F9A825");
-    expect(getConfirmedTierStyle("F")?.backgroundColor).toBe("#EF5350");
+    // Rohe Hex-Werte wurden auf die zentrale Heat-Palette (CSS-Variablen) umgestellt.
+    expect(getConfirmedTierStyle("S+")?.backgroundColor).toBe("var(--heat-best-bg)");
+    expect(getConfirmedTierStyle("C")?.backgroundColor).toBe("var(--heat-neutral-bg)");
+    expect(getConfirmedTierStyle("F")?.backgroundColor).toBe("var(--heat-danger-bg)");
   });
 });

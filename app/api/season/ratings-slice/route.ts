@@ -8,6 +8,7 @@ import {
   tryResolvePersistedRatingsSlice,
 } from "@/lib/foundation/resolve-slice-save-context";
 import { respondWithSliceEtag } from "@/lib/foundation/season-slice-http";
+import { DEBUG_FORCE_PLAYER_VISIBILITY } from "@/lib/foundation/debug-player-visibility";
 
 export async function GET(request: Request) {
   try {
@@ -20,6 +21,8 @@ export async function GET(request: Request) {
       .split(",")
       .map((entry) => entry.trim())
       .filter(Boolean);
+    // Requesting-Team-Kontext für die Fog-of-War-Maskierung (T-021).
+    const requestingTeamId = searchParams.get("teamId")?.trim() || null;
 
     if (source !== "sqlite") {
       return NextResponse.json(
@@ -34,12 +37,21 @@ export async function GET(request: Request) {
       );
     }
 
-    const persistedSlice = tryResolvePersistedRatingsSlice({
-      saveId,
-      seasonId,
-      contentSignature,
-      playerIds: playerIds.length > 0 ? playerIds : undefined,
-    });
+    // Der persisted-Fast-Path liest nur das materialisierte Rating-Sidecar
+    // und hat keinen Zugriff auf Roster/Team/Scouting-Daten — er kann daher
+    // nicht maskieren. Solange der globale Debug-Schalter aktiv ist (aktuell
+    // Default), ist das folgenlos ("exact" wäre ohnehin das Ergebnis).
+    // Sobald Fog-of-War scharf ist, überspringen wir den Fast-Path und
+    // materialisieren stattdessen den vollen GameState (unten), der immer
+    // Roster-/Team-Kontext für die Maskierung mitliefert.
+    const persistedSlice = DEBUG_FORCE_PLAYER_VISIBILITY
+      ? tryResolvePersistedRatingsSlice({
+          saveId,
+          seasonId,
+          contentSignature,
+          playerIds: playerIds.length > 0 ? playerIds : undefined,
+        })
+      : null;
     if (persistedSlice) {
       return respondWithSliceEtag(request, {
         slice: "ratings-slice",
@@ -97,6 +109,7 @@ export async function GET(request: Request) {
       seasonId: seasonId ?? resolved.gameState.season.id,
       contentSignature: contentSignature ?? null,
       playerIds: playerIds.length > 0 ? playerIds : undefined,
+      requestingTeamId,
     });
 
     return respondWithSliceEtag(request, {

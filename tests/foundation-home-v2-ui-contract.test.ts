@@ -226,11 +226,9 @@ describe("foundation ui v2 roadmap contract", () => {
     expect(overviewDerivationsText).toContain("homeTodayCards");
     expect(overviewDerivationsText).toContain("sortTodayCardsByUrgency");
 
-    // Save-Identität + Multiplayer-Room leben jetzt kompakt in der Sidebar
-    // (Brand bzw. roomBadgeNode), nicht mehr im breiten horizontalen
-    // Context-Banner (Owner-Feedback: nach links schieben & komprimieren).
-    expect(shellText).toContain("roomBadgeNode");
-    expect(shellText).toContain('data-testid="foundation-room-context-badge"');
+    expect(shellText).toContain('data-testid="foundation-save-compact-menu"');
+    // Der rohe Save-ID-Chip (formatShortSaveId(activeSaveId)) wurde bewusst
+    // entfernt — Save-Name/Season/Spieltag leben in der Sidebar.
     // HomeV2 is rendered inline in the shell via FoundationHomeV2Panel (deliberate: the
     // FoundationShellRouterHomeV2 wrapper was reverted in fd984c8 because it caused page-load
     // ReferenceErrors; the wrapper migration is tracked in docs/foundation-monolith-split-plan.md).

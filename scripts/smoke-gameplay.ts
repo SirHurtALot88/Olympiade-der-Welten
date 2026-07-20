@@ -593,6 +593,29 @@ async function main() {
     const steps: SmokeStep[] = [];
     const viewTimeoutMs = Math.max(args.timeoutMs, 90_000);
 
+    // Warmup: the first /foundation navigation pays the Next.js dev-server cold-compile cost
+    // (route + client chunks). On cold CI runners this exceeds the per-check timeout, so the first
+    // timed check ("Save-Kontext") deterministically flakes while every later check — hitting the
+    // already-compiled route — passes. Pre-compile the route here, outside any check, with a
+    // generous timeout and swallowed errors so a slow cold start never fails the smoke; the real
+    // timed checks below still assert correctness against the (now warm) route.
+    const warmupTimeoutMs = Math.max(args.timeoutMs, 240_000);
+    try {
+      const warmupUrl = new URL("/foundation", args.baseUrl);
+      warmupUrl.searchParams.set("view", "seasonV2");
+      warmupUrl.searchParams.set("team", expectedTeamId);
+      if (expectedSaveId) {
+        warmupUrl.searchParams.set("saveId", expectedSaveId);
+      }
+      await page.goto(warmupUrl.toString(), { waitUntil: "domcontentloaded", timeout: warmupTimeoutMs });
+      await page
+        .getByTestId("foundation-context-banner")
+        .waitFor({ state: "visible", timeout: warmupTimeoutMs })
+        .catch(() => undefined);
+    } catch {
+      // Best-effort warmup only — never fail the smoke here.
+    }
+
     steps.push(await runStep({
       id: "save-context",
       label: "Save-Kontext",

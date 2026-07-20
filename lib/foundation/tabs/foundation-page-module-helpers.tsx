@@ -40,7 +40,12 @@ import {
   readFoundationHistoryState,
   type FoundationPanelId,
 } from "@/lib/foundation/foundation-navigation-history";
-import { parseFoundationPlayerIdFromUrl, parseFoundationTabFromUrl, syncFoundationUrlState } from "@/lib/foundation/foundation-url-state";
+import {
+  parseFoundationPlayerIdFromUrl,
+  parseFoundationSaveIdFromUrl,
+  parseFoundationTabFromUrl,
+  syncFoundationUrlState,
+} from "@/lib/foundation/foundation-url-state";
 import {
   getDefaultGlobalTableWidths,
   normalizeGlobalTablePreferenceEntry,
@@ -190,7 +195,7 @@ export const homeTaskLabelContract = [
   "Spieler verkaufen",
   "Spieler kaufen",
   "Training prüfen",
-  "XP verteilen",
+  // XP-System abgeschafft: Home-Task „XP verteilen" entfernt.
   "Facility Upgrade möglich",
   "Formkarten setzen",
   "Arena starten",
@@ -278,6 +283,8 @@ export function getFoundationViewScrollTarget(view: FoundationView | GameFlowVie
       return "foundation-diszis";
     case "leagueLeaders":
       return "league-leaders";
+    case "allTimeTable":
+      return "all-time-table";
     default:
       return null;
   }
@@ -391,6 +398,7 @@ export function syncFoundationViewInUrl(
     facilityId?: string | null;
     facilityAction?: string | null;
     team?: string | null;
+    saveId?: string | null;
   },
 ) {
   if (typeof window === "undefined") {
@@ -400,6 +408,10 @@ export function syncFoundationViewInUrl(
   const team =
     options?.team ??
     (typeof window !== "undefined" ? new URL(window.location.href).searchParams.get("team") : null);
+  // Preserve whatever save the URL is currently pinned to unless the caller
+  // is explicitly switching saves -- otherwise every in-app navigation would
+  // silently drop the saveId param and fall back to the global active save.
+  const saveId = options?.saveId ?? parseFoundationSaveIdFromUrl();
 
   syncFoundationUrlState(
     {
@@ -410,6 +422,7 @@ export function syncFoundationViewInUrl(
       panel: options?.panel ?? null,
       facilityId: options?.facilityId ?? null,
       facilityAction: options?.facilityAction ?? null,
+      saveId,
     },
     { mode: options?.push ? "push" : "replace" },
   );
@@ -452,7 +465,7 @@ export function getRawFoundationTeamParam() {
   return new URL(window.location.href).searchParams.get("team");
 }
 
-export function readStoredFoundationManagerTeamId(teams: Team[]) {
+export function readStoredFoundationManagerTeamId(teams: Team[], activeSaveId?: string | null) {
   if (typeof window === "undefined") {
     return null;
   }
@@ -462,7 +475,18 @@ export function readStoredFoundationManagerTeamId(teams: Team[]) {
     if (!raw) {
       return null;
     }
-    const parsed = JSON.parse(raw) as { teamId?: string | null };
+    const parsed = JSON.parse(raw) as { teamId?: string | null; saveId?: string | null };
+    // Save-scope the preference. It is written together with the save it belongs
+    // to (see persistFoundationManagerTeamId), but was previously read back for
+    // ANY save. Because every save shares the same 32-team league, a teamId
+    // remembered from a different save still validates here -- that is how
+    // starting fresh with team P-S ended up opening on M-M (the active team of a
+    // previously played save). Only honor the stored team for the save we are
+    // actually loading. When no saveId is supplied (legacy callers) keep the old
+    // permissive behavior.
+    if (activeSaveId != null && parsed.saveId !== activeSaveId) {
+      return null;
+    }
     return resolveFoundationTeamId(teams, parsed.teamId);
   } catch {
     return null;
@@ -619,6 +643,13 @@ export function resolvePreferredFoundationTeamContext(
     initialTeamId?: string | null;
     settingsMap?: Record<string, TeamControlSettings> | null;
     ignoreStoredPreference?: boolean;
+    // The team the human picked for THIS save (persisted in the save itself,
+    // typically newGameFlow.selectedTeamId). Outranks the browser-global
+    // localStorage preference so loading a save always restores its own
+    // controlled team instead of a team remembered from a different save.
+    savedTeamId?: string | null;
+    // Scopes the localStorage manager-team preference to a specific save.
+    activeSaveId?: string | null;
   },
 ): ActiveManagerTeamContext {
   const requestedFromUrl = parseFoundationTeamIdFromUrl(teams);
@@ -642,8 +673,13 @@ export function resolvePreferredFoundationTeamContext(
     return { teamId: currentTeamId, source: options?.currentSource ?? "manual_select", warning: invalidRouteWarning };
   }
 
+  const requestedFromSave = resolveFoundationTeamId(teams, options?.savedTeamId);
+  if (requestedFromSave) {
+    return { teamId: requestedFromSave, source: "saved_preference", warning: invalidRouteWarning };
+  }
+
   if (!options?.ignoreStoredPreference) {
-    const requestedFromStorage = readStoredFoundationManagerTeamId(teams);
+    const requestedFromStorage = readStoredFoundationManagerTeamId(teams, options?.activeSaveId);
     if (requestedFromStorage) {
       return { teamId: requestedFromStorage, source: "saved_preference", warning: invalidRouteWarning };
     }
@@ -676,6 +712,32 @@ export function syncFoundationTeamIdInUrl(teamId: string) {
     panel: current?.panel ?? parseFoundationPanelFromUrl(),
     facilityId: current?.facilityId ?? parseFoundationFacilityFromUrl().facilityId,
     facilityAction: current?.facilityAction ?? parseFoundationFacilityFromUrl().facilityAction,
+    saveId: current?.saveId ?? parseFoundationSaveIdFromUrl(),
+  });
+}
+
+/**
+ * Pins the given saveId into the Foundation URL so a reload / new tab of
+ * this URL deterministically loads this exact save instead of falling back
+ * to the single global "active" save row. Preserves all other URL state
+ * (view/tab/player/team/panel/facility) the same way syncFoundationTeamIdInUrl
+ * does.
+ */
+export function syncFoundationSaveIdInUrl(saveId: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const current = readFoundationHistoryState();
+  syncFoundationUrlState({
+    view: (current?.view ?? parseFoundationViewFromUrl() ?? "homeV2") as FoundationViewId,
+    tab: current?.tab ?? parseFoundationTabFromUrl(),
+    playerId: current?.playerId ?? parseFoundationPlayerIdFromUrl(),
+    team: current?.team ?? getRawFoundationTeamParam(),
+    panel: current?.panel ?? parseFoundationPanelFromUrl(),
+    facilityId: current?.facilityId ?? parseFoundationFacilityFromUrl().facilityId,
+    facilityAction: current?.facilityAction ?? parseFoundationFacilityFromUrl().facilityAction,
+    saveId,
   });
 }
 

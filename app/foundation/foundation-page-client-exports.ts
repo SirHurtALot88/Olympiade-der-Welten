@@ -50,6 +50,7 @@ export {
   getCockpitStepTone,
   getGameFlowStatusLabel,
   getSeasonCompletionStepTone,
+  HOME_HIDDEN_WARNING_KEYS,
   mapAutoRunStatusToCockpitStatus,
 } from "@/lib/foundation/tabs/cockpit-ui-helpers";
 export {

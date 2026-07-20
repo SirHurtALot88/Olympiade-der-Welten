@@ -3244,7 +3244,25 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       slots.map((slot) => {
         const currentProjected = slotPreviewByKey.get(slot.key)?.projected.totalProjected ?? null;
         const role = slotRoleByKey.get(slot.key) ?? null;
-        const topCandidates = sortOptionsByDisciplineSkill(getAvailableOptionsForSlot(slot.key), slot.disciplineId)
+        // Bug T-002: getAvailableOptionsForSlot() prüft nur Slot-Kollision, NICHT
+        // Verfügbarkeit/Captain-Regel/Slot-Regel. Ohne diesen Filter konnte
+        // Best-Fit/Top-Pick einen laut Kandidatenliste blockierten Spieler
+        // vorschlagen & zuweisen. Denselben Check wie teamdeckCandidateEntries
+        // (resolveLegacyLineupDragBlockReason) anwenden, BEVOR sortiert/geslict wird.
+        const topCandidates = sortOptionsByDisciplineSkill(
+          getAvailableOptionsForSlot(slot.key).filter((option) => {
+            const rosterCard = rosterCardByActivePlayerId.get(option.activePlayerId) ?? null;
+            const blockReason = resolveLegacyLineupDragBlockReason({
+              availabilityBlocker: rosterCard?.availabilityBlocker ?? null,
+              selectedSides: rosterCard?.selectedSides ?? [],
+              targetDisciplineSide: slot.disciplineSide,
+              captainSide: captainSideByActivePlayerId.get(option.activePlayerId) ?? null,
+              hasBaseScore: option.disciplineScores[slot.disciplineId] != null,
+            });
+            return blockReason == null;
+          }),
+          slot.disciplineId,
+        )
           .slice(0, 3)
           .map((option) => {
             const rosterCard = rosterCardByActivePlayerId.get(option.activePlayerId) ?? null;
@@ -3282,7 +3300,16 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         return [slot.key, { topCandidates, currentProjected }] as const;
       }),
     );
-  }, [context?.disciplinePlayerCounts, getDisciplineIntensity, rivalryPressureByDiscipline, rosterCardByActivePlayerId, slotPreviewByKey, slotRoleByKey, slots]);
+  }, [
+    captainSideByActivePlayerId,
+    context?.disciplinePlayerCounts,
+    getDisciplineIntensity,
+    rivalryPressureByDiscipline,
+    rosterCardByActivePlayerId,
+    slotPreviewByKey,
+    slotRoleByKey,
+    slots,
+  ]);
   const playerBestSlotSummaryByActivePlayerId = useMemo(() => {
     return new Map(
       playerOptions.map((option) => {
@@ -5866,6 +5893,30 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     activePlayerId: string,
     options?: { advanceFocusToNextOpenSlot?: boolean },
 	  ) {
+	    // Bug T-002 (defensive net): updateSelection ist der EINE Ort, an dem jede
+	    // Zuweisung (Klick, Drag&Drop, Best-Fit, Top-Pick, Optimieren, Enter-Taste)
+	    // letztlich landet. Blockierte Kandidaten (schon anderswo gesetzt, nicht
+	    // verfügbar, Captain-Regel, Slot-Regel) dürfen NIE zugewiesen werden —
+	    // unabhängig davon, ob der jeweilige Aufrufer schon selbst gefiltert hat.
+	    // Gleicher Check wie die Kandidatenliste (resolveLegacyLineupDragBlockReason).
+	    if (activePlayerId) {
+	      const targetSlot = slots.find((slot) => slot.key === slotKey);
+	      if (targetSlot) {
+	        const rosterCard = rosterCardByActivePlayerId.get(activePlayerId) ?? null;
+	        const option = getSelectedOptionMeta(activePlayerId);
+	        const blockReason = resolveLegacyLineupDragBlockReason({
+	          availabilityBlocker: rosterCard?.availabilityBlocker ?? null,
+	          selectedSides: rosterCard?.selectedSides ?? [],
+	          targetDisciplineSide: targetSlot.disciplineSide,
+	          captainSide: captainSideByActivePlayerId.get(activePlayerId) ?? null,
+	          hasBaseScore: option?.disciplineScores[targetSlot.disciplineId] != null,
+	        });
+	        if (blockReason) {
+	          setMessage(formatLegacyLineupDragBlockReason(blockReason) ?? "Kandidat passt nicht in den aktiven Slot.");
+	          return;
+	        }
+	      }
+	    }
 	    setPreview(null);
 	    setMatchdayScorePreview(null);
 	    setVisibleScoreboardSide(null);

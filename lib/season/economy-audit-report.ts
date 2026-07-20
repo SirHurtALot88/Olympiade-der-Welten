@@ -1,4 +1,5 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { CASH_PRIZE_BENCHMARK_ONLY } from "@/lib/season/cash-prize-apply-service";
 
 function round(value: number, digits = 2) {
   return Number(value.toFixed(digits));
@@ -10,8 +11,16 @@ export function buildEconomyAuditReport(input: { saveId: string; gameState: Game
   const sponsorLogs = gameState.seasonState.sponsorPayoutLogs ?? [];
   const violations: string[] = [];
 
+  // T-032: `executeCashPrizeApply` ist ein klar gekennzeichneter Debug-/Benchmark-Endpoint
+  // (siehe CASH_PRIZE_BENCHMARK_ONLY in cash-prize-apply-service.ts) — solange dieses Flag aktiv
+  // ist, bewegt der Pfad garantiert kein echtes Cash, d.h. ein `apply`-Log ist erwartetes
+  // Benchmark-Verhalten, kein Verstoß. Der Log-Count bleibt informativ im Report sichtbar
+  // (`cashPrizeApplyLogs`/`cashPrizeApplyBenchmarkOnly`); nur die Verstoß-Wertung entfällt. Sollte
+  // der Payout-Pfad je scharf geschaltet werden (CASH_PRIZE_BENCHMARK_ONLY=false), zählt ein
+  // ausgeführter Apply wieder als `cash_prize_apply_executed`-Verstoß, bis dieser Report bewusst
+  // um eine echte Payout-Prüfung erweitert wird.
   const appliedCashPrize = cashPrizeLogs.filter((log) => log.action === "apply");
-  if (appliedCashPrize.length > 0) {
+  if (appliedCashPrize.length > 0 && !CASH_PRIZE_BENCHMARK_ONLY) {
     violations.push(`cash_prize_apply_executed:${appliedCashPrize.length}`);
   }
 
@@ -52,6 +61,7 @@ export function buildEconomyAuditReport(input: { saveId: string; gameState: Game
     ok: violations.length === 0,
     violations,
     cashPrizeApplyLogs: appliedCashPrize.length,
+    cashPrizeApplyBenchmarkOnly: CASH_PRIZE_BENCHMARK_ONLY,
     sponsorBaseFirstLogs: baseFirst.length,
     sponsorSeasonEndLogs: seasonEnd.length,
     seasonsWithSponsorEndSettlement: [...new Set(seasonEnd.map((log) => log.seasonId))].sort(),

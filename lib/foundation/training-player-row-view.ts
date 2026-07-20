@@ -2,7 +2,9 @@ import type { GameState, Player, PlayerGeneratorAttributeName, PlayerPotentialRe
 import type { TrainingPlayerRowView } from "@/app/foundation/training-facilities-v2/training-view-types";
 import { buildAffinityAlignedTopGains, buildAffinityForecastFocus } from "@/lib/training/affinity-forecast-focus";
 import type { OrganicProgressionAttributeBreakdown } from "@/lib/training/organic-season-progression";
-import { resolveTeamTrainingFocusAxis } from "@/lib/training/organic-season-progression";
+import { resolveSeasonTrainingAccumulatorInputs, resolveTeamTrainingFocusAxis } from "@/lib/training/organic-season-progression";
+import { resolveSeasonTotalMatchdays } from "@/lib/training/matchday-training-accumulator";
+import { TRAINING_SETPOINTS_BY_MODE } from "@/lib/training/training-mode-presentation";
 import type { TrainingModeDemandView } from "@/lib/training/training-mode-demand-service";
 import { getAttributeHeadroom, getHeadroomLabel } from "@/lib/scouting/player-attribute-ceiling-service";
 
@@ -122,6 +124,7 @@ export function buildTrainingPlayerRowView(
     weakAttribute: row.organicProgression.attributeAffinity.weakAttribute,
   });
   const trainingFocusAxis = row.gameState ? resolveTeamTrainingFocusAxis(row.gameState, row.player.id) : null;
+  const trainingAccumulatorForecast = buildTrainingAccumulatorForecast(row);
 
   return {
     entryId: row.entry.id,
@@ -195,5 +198,37 @@ export function buildTrainingPlayerRowView(
     forecast: row.forecast,
     adminBalancingConfig: row.adminBalancingConfig ?? null,
     trainingFocusAxis,
+    trainingAccumulatorForecast,
+  };
+}
+
+/**
+ * Anti-cheese Teil B (B.6): "Bisher + Rest" training-budget forecast. Combines the base training budget
+ * already accumulated over the matchdays played so far with a projection of the remaining matchdays at
+ * the currently-drafted mode. Returns null before the first matchday (nothing accumulated yet).
+ */
+function buildTrainingAccumulatorForecast(
+  row: TrainingForecastRowInput,
+): TrainingPlayerRowView["trainingAccumulatorForecast"] {
+  if (!row.gameState) return null;
+  const accumulator = (row.player as Player).seasonTrainingAccumulator ?? null;
+  const totalMatchdays = resolveSeasonTotalMatchdays(row.gameState);
+  const inputs = resolveSeasonTrainingAccumulatorInputs({
+    accumulator,
+    seasonId: row.gameState.season.id,
+    totalMatchdays,
+  });
+  if (!inputs || !accumulator) return null;
+  const matchdaysCounted = accumulator.matchdaysCounted;
+  const accumulatedBudget = inputs.accumulatedBaseTrainingBudget;
+  const remainingMatchdays = Math.max(0, totalMatchdays - matchdaysCounted);
+  const currentModeShare = TRAINING_SETPOINTS_BY_MODE[row.mode] / totalMatchdays;
+  const forecastBudget = accumulatedBudget + remainingMatchdays * currentModeShare;
+  return {
+    matchdaysCounted,
+    totalMatchdays,
+    accumulatedBudget: Number(accumulatedBudget.toFixed(2)),
+    forecastBudget: Number(forecastBudget.toFixed(2)),
+    currentMode: row.mode,
   };
 }

@@ -16,7 +16,7 @@ import {
   formatProgressDelta,
   sortPlayerProgressHistoryRows,
 } from "@/lib/foundation/player-progress-summary";
-import { NlDeltaChip } from "@/components/foundation/new-look";
+import { NL_TONE_VAR, NlDeltaChip } from "@/components/foundation/new-look";
 
 type PlayerAttributeProgressChartProps = {
   historyRows: PlayerDrawerHistoryRow[];
@@ -34,14 +34,19 @@ const PP_METRICS = [
   { id: "soc" as const, label: "SOC", className: "is-social", rankKey: "socRank" as const },
 ];
 
+// `power`/`speed` reuse the shared `NL_TONE_VAR.pow`/`.spe` axis tokens (single
+// source of truth, no independent hex drift vs. the rest of the New-Look UI).
+// The other five keys have no per-axis NL token (they're granular attributes,
+// not one of the four pow/spe/men/soc axes) and keep their own distinct hex so
+// the multi-attribute legend/chart stays visually distinguishable.
 const ATTRIBUTE_COLORS: Record<string, string> = {
-  power: "#ff6b57",
+  power: NL_TONE_VAR.pow,
   health: "#ff9d57",
   stamina: "#ffd057",
   intelligence: "#57c7ff",
   awareness: "#7aa0ff",
   determination: "#b58cff",
-  speed: "#57ffd6",
+  speed: NL_TONE_VAR.spe,
   dexterity: "#e0c06a",
 };
 

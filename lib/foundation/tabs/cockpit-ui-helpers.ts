@@ -152,6 +152,14 @@ export function formatAiLineupAuditWarning(warning: string) {
   return mapped[warning] ?? formatCockpitReason(warning);
 }
 
+// Raw `homeWarnings` keys (see use-home-v2-overview-derivations.ts /
+// use-foundation-shell-router-body-scope.tsx) that the Home v2 UI intentionally
+// never surfaces as warning chips because a dedicated CTA already covers them.
+// Must be filtered BEFORE formatHomeWarningLabel() runs — matching against the
+// already-translated label here would silently stop filtering the moment the
+// German copy changes.
+export const HOME_HIDDEN_WARNING_KEYS = ["no_active_team", "season_started_no_results"];
+
 export function formatHomeWarningLabel(warning: string) {
   const mapped: Record<string, string> = {
     no_active_team: "Kein aktives Team",

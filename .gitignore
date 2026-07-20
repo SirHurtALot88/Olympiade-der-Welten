@@ -52,3 +52,9 @@ pnpm-debug.log*
 
 # Bulk-import staging for team logos (originals; renamed copies get committed)
 public/team-logos-src/
+
+# Local balancing/diagnostic run artifacts (temp, do not commit)
+scratchpad/
+
+# Claude Code agent worktrees (transient, harness-managed)
+.claude/worktrees/

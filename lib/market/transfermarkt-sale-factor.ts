@@ -1,5 +1,12 @@
-import type { GameState, Player, RosterEntry, SeasonSnapshotRecord } from "@/lib/data/olyDataTypes";
+import type {
+  FrozenValuationPlayerRow,
+  GameState,
+  Player,
+  RosterEntry,
+  SeasonSnapshotRecord,
+} from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { getFrozenValuationRow, isValuationFrozen } from "@/lib/season/frozen-valuation-snapshot";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
@@ -284,6 +291,70 @@ export function getSaleFactorRankContext(
   return context;
 }
 
+/**
+ * Rekonstruiert den Sale-Factor-Breakdown ausschließlich aus dem MD10-Freeze-Row: eingefrorener MW,
+ * Bracket, Rang und Bracket-Größe. Damit bleibt der Verkaufspreis eines Spielers im Freeze-Fenster
+ * stabil — egal welche Bracket-Nachbarn verkauft werden — und identisch zum MD10-Live-Wert.
+ */
+function buildFrozenSaleFactorBreakdown(frozen: FrozenValuationPlayerRow): TransfermarktSaleFactorBreakdown {
+  const baseMarketValue = frozen.frozenMw;
+  if (baseMarketValue == null || baseMarketValue <= 0) {
+    return {
+      bracket: frozen.frozenSaleBracket,
+      bracketGroupSize: frozen.frozenSaleBracketSize ?? 0,
+      baseMarketValue: null,
+      mvs: frozen.frozenMvs,
+      ppsSeason: frozen.frozenPps,
+      rankInBracket: null,
+      baseFactor: null,
+      rankBonus: null,
+      saleFactor: null,
+      salePrice: null,
+      factorSource: "missing_market_value",
+    };
+  }
+
+  const bracket = frozen.frozenSaleBracket;
+  const rankInBracket = frozen.frozenSaleRankInBracket;
+  const bracketGroupSize = frozen.frozenSaleBracketSize ?? 0;
+
+  if (bracket == null || rankInBracket == null || !isBracketRankPoolEligible(bracketGroupSize)) {
+    return {
+      bracket,
+      bracketGroupSize,
+      baseMarketValue,
+      mvs: frozen.frozenMvs,
+      ppsSeason: frozen.frozenPps,
+      rankInBracket,
+      baseFactor: 1,
+      rankBonus: 0,
+      saleFactor: 1,
+      salePrice: baseMarketValue,
+      factorSource: "fallback_no_ranked_group",
+    };
+  }
+
+  const bracketRange = getBracketRange(bracket);
+  const step = (bracketRange.maxFactor - bracketRange.minFactor) / Math.max(1, bracketGroupSize - 1);
+  const baseFactor = bracketRange.maxFactor - (rankInBracket - 1) * step;
+  const rankBonus = getRankBonus(rankInBracket, bracketGroupSize);
+  const saleFactor = Math.max(baseFactor + rankBonus, MIN_SALE_FACTOR_FLOOR);
+
+  return {
+    bracket,
+    bracketGroupSize,
+    baseMarketValue,
+    mvs: frozen.frozenMvs,
+    ppsSeason: frozen.frozenPps,
+    rankInBracket,
+    baseFactor: roundValue(baseFactor, 3),
+    rankBonus: roundValue(rankBonus, 2),
+    saleFactor: roundValue(saleFactor, 3),
+    salePrice: roundValue(baseMarketValue * saleFactor, 2),
+    factorSource: "bracket_mvs_live",
+  };
+}
+
 export function buildTransfermarktSaleFactorBreakdown(
   gameState: GameState,
   player: Player | null | undefined,
@@ -291,6 +362,17 @@ export function buildTransfermarktSaleFactorBreakdown(
   options?: { saveId?: string | null; playerRatingsById?: Map<string, PlayerRatingContractRow> | null },
 ): TransfermarktSaleFactorBreakdown {
   const saveId = options?.saveId ?? null;
+
+  // Read-Gate: im Freeze-Fenster (nach MD10) den eingefrorenen MW + Bracket-Rang nutzen, damit
+  // Verkäufe im Fenster den Preis der übrigen Spieler nicht mehr über das Live-Pool-Ranking bewegen.
+  if (player && isValuationFrozen(gameState)) {
+    const frozen = getFrozenValuationRow(gameState, player.id);
+    if (frozen) {
+      return buildFrozenSaleFactorBreakdown(frozen);
+    }
+    // Kein Freeze-Row (z. B. im Freeze-Fenster neu gekaufter Spieler) → Live-Pfad als Fallback.
+  }
+
   const economy = resolvePlayerEconomyContract({ player, rosterEntry });
   const baseMarketValue = economy.marketValue ?? null;
 

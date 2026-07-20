@@ -18,20 +18,30 @@ export function applyGmArchetypeSellScoreModifier(input: {
   pressure: GmPressureBehavior | null;
   sellReasonCodes?: AiSellReasonCode[];
   keepReasonCodes?: AiKeepReasonCode[];
+  /** Remaining contract length — lets culture_keeper's loyalty malus also bite on medium (2y) deals. */
+  contractLength?: number | null;
 }) {
   let adjusted = input.baseScore;
   const archetype = input.gmProfile?.archetype ?? null;
   const pressure = input.pressure;
   const sellReasons = input.sellReasonCodes ?? [];
+  const keepReasons = input.keepReasonCodes ?? [];
 
   if (archetype === "bargain_hunter" && hasSellReason(sellReasons, "profit_window")) {
-    adjusted += 6;
+    adjusted += 10;
   }
-  if (archetype === "star_chaser" && hasKeepReason(input.keepReasonCodes ?? [], "star_core_protection")) {
+  if (archetype === "star_chaser" && hasKeepReason(keepReasons, "star_core_protection")) {
     adjusted -= 10;
   }
-  if (archetype === "culture_keeper" && hasKeepReason(input.keepReasonCodes ?? [], "good_team_fit")) {
-    adjusted -= 8;
+  if (archetype === "culture_keeper") {
+    // Culture keeper protects the working core far beyond a soft team-fit nudge: good/core players
+    // are pushed below the sell threshold, and the loyalty malus also applies on medium (2-year)
+    // contracts, not just long ones. Keeps chemistry intact instead of trading proven contributors.
+    if (hasKeepReason(keepReasons, "good_team_fit")) adjusted -= 8;
+    if (hasKeepReason(keepReasons, "star_core_protection")) adjusted -= 12;
+    if (hasKeepReason(keepReasons, "strong_contribution")) adjusted -= 10;
+    if (hasKeepReason(keepReasons, "top10_presence")) adjusted -= 8;
+    if ((input.contractLength ?? 0) === 2) adjusted -= 6;
   }
   if (archetype === "risk_gambler" && pressure?.isHotSeat) {
     adjusted += hasSellReason(sellReasons, "underperformance") ? 8 : 4;

@@ -587,6 +587,12 @@ export default function PlayerGeneratorPanelNewLook({
       setMessage("Prisma / Referenzmodus bleibt read-only. Drafts können hier nicht gelöscht werden.");
       return;
     }
+    // T-040: Draft-Löschen war zuvor ohne Bestätigung sofort wirksam —
+    // inkonsistent zur Save-Löschung (siehe FoundationTeamSettingsNewLook.tsx
+    // `deleteSaves`). Gleiches window.confirm-Pattern für Konsistenz.
+    if (!window.confirm("Draft wirklich löschen? Das kann nicht rückgängig gemacht werden.")) {
+      return;
+    }
 
     const nextDrafts = drafts.filter((entry) => entry.draftId !== draftId);
     onSaveDrafts(nextDrafts);
@@ -1276,9 +1282,15 @@ export default function PlayerGeneratorPanelNewLook({
                             <span>Draft speichern</span>
                             <strong>{readOnly ? "Read-only in Prisma" : "Aktiv für lokalen Entwurf"}</strong>
                           </article>
-                          <article className={`nl-gen-status-card ${nlToneClass("warn")}`}>
+                          <article className={`nl-gen-status-card ${nlToneClass(commitDisabled ? "warn" : "good")}`}>
                             <span>Free-Agent-Commit</span>
-                            <strong>Deaktiviert</strong>
+                            <strong>
+                              {readOnly
+                                ? "Deaktiviert (Read-only)"
+                                : commitBlockers.length > 0
+                                  ? "Blockiert"
+                                  : "Aktiv"}
+                            </strong>
                           </article>
                         </div>
                         <ul className="nl-gen-list">

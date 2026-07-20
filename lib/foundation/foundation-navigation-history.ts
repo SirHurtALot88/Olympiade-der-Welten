@@ -11,6 +11,12 @@ export type FoundationUrlState = {
   panel?: FoundationPanelId;
   facilityId?: string | null;
   facilityAction?: string | null;
+  /**
+   * Pins the Foundation shell to a specific save. When present, a fresh
+   * navigation (reload, new tab, deep link) to this URL loads exactly this
+   * save instead of falling back to the single global "active" save row.
+   */
+  saveId?: string | null;
 };
 
 export type FoundationRoomUrlParams = {
@@ -64,6 +70,24 @@ export function parseFoundationPanelFromUrl(): FoundationPanelId {
   return null;
 }
 
+export function parseFoundationSaveIdFromUrl(): string | null {
+  if (typeof window === "undefined") return null;
+  return new URL(window.location.href).searchParams.get("saveId");
+}
+
+/**
+ * "Neues Spiel"-Absicht vom Startbildschirm: `?newGame=1` signalisiert, dass die
+ * Person direkt in den New-Game-Assistenten (Team-Settings → Saves) will und der
+ * bestehende Save NICHT mit seinem Season-Einstieg-Overlay dazwischenfunken soll.
+ * Der Parameter ist bewusst nicht Teil von FoundationUrlState: Sobald irgendeine
+ * reguläre URL-Synchronisierung läuft (spätestens beim Erstellen des neuen Saves),
+ * fällt er von selbst wieder aus der URL und die Unterdrückung endet.
+ */
+export function parseFoundationNewGameIntentFromUrl(): boolean {
+  if (typeof window === "undefined") return false;
+  return new URL(window.location.href).searchParams.get("newGame") === "1";
+}
+
 export function parseFoundationUrlStateFromLocation(): FoundationUrlState {
   if (typeof window === "undefined") {
     return {
@@ -74,6 +98,7 @@ export function parseFoundationUrlStateFromLocation(): FoundationUrlState {
       panel: null,
       facilityId: null,
       facilityAction: null,
+      saveId: null,
     };
   }
 
@@ -88,6 +113,7 @@ export function parseFoundationUrlStateFromLocation(): FoundationUrlState {
     panel: parseFoundationPanelFromUrl(),
     facilityId: facility.facilityId,
     facilityAction: facility.facilityAction,
+    saveId: url.searchParams.get("saveId"),
   };
 }
 
@@ -132,6 +158,7 @@ export function buildFoundationSearchParams(
   if (state.panel) params.set("panel", state.panel);
   if (state.facilityId) params.set("facilityId", state.facilityId);
   if (state.facilityAction) params.set("facilityAction", state.facilityAction);
+  if (state.saveId) params.set("saveId", state.saveId);
 
   const roomParams =
     options?.roomParams ??

@@ -133,6 +133,43 @@ describe("foundation initial compact state", () => {
     expect(rehydrated.players[0]?.attributeSheetStats).toEqual({ power: 70 });
   });
 
+  it("does not let the empty season-archive sentinel [] wipe the durable archive", () => {
+    // The compact client re-stamps seasonSnapshots/standingsApplyLogs to an EMPTY
+    // sentinel [] (apply-compact-season-archive-sentinel), NOT undefined. A naive
+    // `incoming ?? existing` guard kept that [] and wiped every prior-season snapshot.
+    const existing = createGameState();
+    const compactClientState = compactFoundationInitialGameState(existing);
+    const sentinelClientState: GameState = {
+      ...compactClientState,
+      seasonState: {
+        ...compactClientState.seasonState,
+        seasonSnapshots: [],
+        standingsApplyLogs: [],
+      },
+    };
+
+    const rehydrated = rehydrateGameStateAfterCompactPut(existing, sentinelClientState);
+    expect(rehydrated.seasonState.seasonSnapshots).toEqual(existing.seasonState.seasonSnapshots);
+    expect(rehydrated.seasonState.standingsApplyLogs).toEqual(existing.seasonState.standingsApplyLogs);
+  });
+
+  it("accepts a legitimately grown season archive on PUT", () => {
+    // A freshly completed season appends a snapshot → incoming is longer → it wins.
+    const existing = createGameState();
+    const grownClientState: GameState = {
+      ...compactFoundationInitialGameState(existing),
+      seasonState: {
+        ...compactFoundationInitialGameState(existing).seasonState,
+        seasonSnapshots: [{ id: "snap-1" } as never, { id: "snap-2" } as never],
+        standingsApplyLogs: [{ id: "standings-log-1" } as never, { id: "standings-log-2" } as never],
+      },
+    };
+
+    const rehydrated = rehydrateGameStateAfterCompactPut(existing, grownClientState);
+    expect(rehydrated.seasonState.seasonSnapshots).toHaveLength(2);
+    expect(rehydrated.seasonState.standingsApplyLogs).toHaveLength(2);
+  });
+
   it("keeps intentional client edits to compact-visible slices", () => {
     const existing = createGameState();
     const compactClientState = compactFoundationInitialGameState(existing);

@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import {
   advanceRoomFlow,
   advanceRoomArenaStep,
+  applyRoomTeamSelection,
   createRoom,
   getRoom,
   joinRoom,
@@ -20,11 +21,25 @@ import type { RoomOwnershipPreset } from "@/types/events";
 import type { TeamWriteAction } from "@/lib/room/online-room-model";
 
 type RoomPostBody = {
-  action?: "create" | "join" | "rejoin" | "ready" | "start" | "aiAutoStep" | "advance" | "arenaStart" | "arenaReady" | "arenaNextStep" | "authorizeWrite";
+  action?:
+    | "create"
+    | "join"
+    | "rejoin"
+    | "ready"
+    | "start"
+    | "aiAutoStep"
+    | "advance"
+    | "arenaStart"
+    | "arenaReady"
+    | "arenaNextStep"
+    | "authorizeWrite"
+    | "setTeamSelection";
   roomCode?: string | null;
   displayName?: string | null;
   saveId?: string | null;
   preset?: RoomOwnershipPreset | null;
+  chrisTeamIds?: string[] | null;
+  frankyTeamIds?: string[] | null;
   seatToken?: string | null;
   participantId?: string | null;
   userId?: string | null;
@@ -220,6 +235,17 @@ export async function POST(request: Request) {
     const result = advanceRoomArenaStep(body.roomCode?.trim() ?? "", body.seatToken?.trim() ?? "", {
       maxSlotRevealIndex: body.maxSlotRevealIndex,
       force: body.force,
+    });
+    if (!result.ok) {
+      return NextResponse.json({ success: false, error: result.error }, { status: 403 });
+    }
+    return NextResponse.json({ success: true, room: publicRoomPayload(result.room.roomCode) });
+  }
+
+  if (action === "setTeamSelection") {
+    const result = applyRoomTeamSelection(body.roomCode?.trim() ?? "", body.seatToken?.trim() ?? "", {
+      chrisTeamIds: body.chrisTeamIds ?? [],
+      frankyTeamIds: body.frankyTeamIds ?? [],
     });
     if (!result.ok) {
       return NextResponse.json({ success: false, error: result.error }, { status: 403 });

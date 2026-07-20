@@ -47,13 +47,21 @@ import {
 } from "@/lib/sponsor/sponsor-tier-pool";
 import {
   buildBeatExpectedRankSpecialComponent,
+  buildBonusObjectiveComponent,
   buildFanInfrastructureSpecialComponent,
+  buildGoldenObjectiveComponent,
+  pickBonusObjective,
+  pickGoldenObjective,
   resolveChallengeSlotIndex,
 } from "@/lib/sponsor/sponsor-special-objectives";
 import { calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 
 function roundCash(value: number) {
   return Number(value.toFixed(1));
+}
+
+function clampCash(value: number, min: number, max: number) {
+  return roundCash(Math.max(min, Math.min(max, value)));
 }
 
 function getCurrentSalaryFactor(gameState: GameState): number {
@@ -105,7 +113,8 @@ function buildOffer(input: {
     specialMode: specialMode ?? "standard",
     gameState,
   });
-  const cashAmounts = buildOfferCashAmounts({ archetype, salaryFactor, starTier, leagueMinSalary, teamQualityRank });
+  const isGolden = input.forcePremiumElite === true;
+  const cashAmounts = buildOfferCashAmounts({ archetype, salaryFactor, starTier, leagueMinSalary, teamQualityRank, isGolden });
   const improvementCash = roundCash(cashAmounts.totalAtMaxRank * 0.04);
   const baseSpecialCash =
     specialMode === "challenge"
@@ -131,6 +140,43 @@ function buildOffer(input: {
     rewardCash: overachieveReward,
   });
 
+  // TEIL B: das Saison-Sonderziel ist jetzt ein echtes Bonusziel aus dem 14+6-Pool (staged, anteilige
+  // Auszahlung + Spotlight-Impuls in die Beliebtheit) statt des Legacy-Templates. Golden-Angebote bekommen
+  // ein Golden-Ziel, Challenge-Angebote behalten ihr Achsen-Rang-Sonderziel (eigenes UI-Panel), Standard-
+  // Angebote ziehen deterministisch ein archetyp-passendes Bonusziel. Fällt der Pool aus (kein Ziel für den
+  // Archetyp), bleibt das Legacy-Sonderziel. `specialCash` (an den Gebäude-Unterhalt gekoppelt) bleibt der
+  // Reward-Betrag. Teil-B-Ziele sind staged (kein Malus); die Legacy-/Challenge-Variante behält ihren Malus.
+  const legacySpecialComponent: SponsorOfferComponent = {
+    ...special,
+    rewardCash: specialCash,
+    penaltyCash:
+      special.penaltyCash != null
+        ? clampCash((specialCash * 0.4) / demandMult, 0.5, specialCash * 0.5)
+        : undefined,
+  };
+  const bonusObjectiveInput = {
+    gameState,
+    team,
+    identity,
+    profile,
+    rewardCash: specialCash,
+    starTier,
+    seasonId: gameState.season.id,
+    teamQualityRank,
+  };
+  let specialComponent: SponsorOfferComponent = legacySpecialComponent;
+  if (isGolden) {
+    specialComponent = buildGoldenObjectiveComponent(
+      pickGoldenObjective(gameState.season.id, team.teamId, archetype),
+      bonusObjectiveInput,
+    );
+  } else if (specialMode !== "challenge") {
+    const bonusKey = pickBonusObjective(gameState.season.id, team.teamId, archetype, slotIndex);
+    if (bonusKey) {
+      specialComponent = buildBonusObjectiveComponent(bonusKey, bonusObjectiveInput);
+    }
+  }
+
   const components: SponsorOfferComponent[] = [
     {
       componentId: "base-cash",
@@ -145,7 +191,10 @@ function buildOffer(input: {
       label: `Gewinnstufen: ${buildMilestoneRankLabel()}`,
       targetValue: rankTarget,
       rewardCash: cashAmounts.rankCash,
-      penaltyCash: Math.max(0.5, roundCash(cashAmounts.rankCash * 0.05 * demandMult)),
+      // WAVE 1 (Punkt 3): Rang-Malus 0.05→0.15, aber relativ zur Upside gedeckelt (max halber Rang-Reward),
+      // damit der Malus nie die mögliche Belohnung übersteigt. Der ambitious-penaltyMult ×2 kommt on top
+      // (applySponsorNegotiationToComponents).
+      penaltyCash: clampCash(cashAmounts.rankCash * 0.15 * demandMult, 0.5, cashAmounts.rankCash * 0.5),
     },
     {
       componentId: "improvement-target",
@@ -154,11 +203,7 @@ function buildOffer(input: {
       targetValue: improvementTarget,
       rewardCash: improvementCash,
     },
-    {
-      ...special,
-      rewardCash: specialCash,
-      penaltyCash: special.penaltyCash != null ? roundCash(specialCash * 0.25 / demandMult) : undefined,
-    },
+    specialComponent,
     buildFanInfrastructureSpecialComponent({ rewardCash: fanInfraReward }),
     ...(beatExpectedComponent ? [beatExpectedComponent] : []),
   ];
@@ -180,6 +225,7 @@ function buildOffer(input: {
     demandProfile: getDemandProfile(starTier),
     teamQualityRank: teamQualityRank ?? undefined,
     isChallengeOffer: specialMode === "challenge",
+    isGolden,
   };
 }
 
@@ -197,23 +243,35 @@ export function buildSponsorOffersForTeam(input: {
   const profile = getTeamStrategyProfile(input.gameState, input.teamId);
   const startRank = row?.startplatz ?? row?.rank ?? null;
   const commercialRating = buildSponsorCommercialRating({ gameState: input.gameState, teamId: input.teamId });
-  const qualityRanks = buildLeagueTeamQualityRanks(rows);
+  // Feed 1 (TEIL A): fortgeschriebene Beliebtheit hebt/senkt den Stern-Deckel der Angebots-Generierung.
+  const qualityRanks = buildLeagueTeamQualityRanks(rows, input.gameState.seasonState.beliebtheitByTeamId);
   const qualityRank = qualityRanks.get(input.teamId);
   if (!qualityRank) {
     return [];
   }
+  // Golden-Los (Abschnitt 2.2): Beliebtheit hebt die Wahrscheinlichkeit, der Cooldown senkt sie.
+  const beliebtheit = input.gameState.seasonState.beliebtheitByTeamId?.[input.teamId]?.value ?? null;
+  const hadGoldenLastSeason =
+    input.gameState.seasonState.goldenSponsorHistoryByTeamId?.[input.teamId] === true;
+  // 5 Angebote statt 3: alle 3 Archetypen garantiert + 2 Extra (1 safe-lastig, 1 aggressiv-lastig),
+  // als Risiko-Rampe von sicher → aggressiv. Jeder Slot bekommt eigenen Stern-Roll + Golden + Varianz,
+  // und über usedParentBrandIds (unten) unterschiedliche Marken für die doppelten Typen.
+  const archetypes: SponsorArchetype[] = ["security", "security", "identity", "performance", "performance"];
   const tierRoll = rollSponsorStarTiers({
     seasonId: input.gameState.season.id,
     teamId: input.teamId,
     qualityRank,
+    beliebtheit,
+    hadGoldenLastSeason,
+    teamCount: rows.length,
+    slotCount: archetypes.length,
   });
-  const archetypes: SponsorArchetype[] = ["security", "performance", "identity"];
   const usedParentBrandIds: string[] = [];
   const recentParentBrandIds = getRecentSponsorParentIds(input.gameState, input.teamId);
   const globalParentUsage = buildGlobalParentUsageFromOffers(input.gameState.seasonState.sponsorOffersByTeamId);
   const salaryFactor = getCurrentSalaryFactor(input.gameState);
   const baseAnchorSalary = getSponsorRank32BaseAnchorSalary(input.gameState);
-  const challengeSlotIndex = resolveChallengeSlotIndex(input.gameState.season.id, input.teamId);
+  const challengeSlotIndex = resolveChallengeSlotIndex(input.gameState.season.id, input.teamId, archetypes.length);
 
   return archetypes.map((archetype, slotIndex) => {
     const starTier = tierRoll.tiers[slotIndex] ?? 2;
@@ -365,7 +423,7 @@ export function ensureSeasonSponsorOffers(gameState: GameState): GameState {
     }
     const currentOffers = existingOffers[team.teamId] ?? [];
     const hasCurrentSeasonOffers =
-      currentOffers.length === 3 && currentOffers.every((offer) => offer.seasonId === seasonId);
+      currentOffers.length === 5 && currentOffers.every((offer) => offer.seasonId === seasonId);
     if (!hasCurrentSeasonOffers) {
       nextOffers[team.teamId] = buildSponsorOffersForTeam({ gameState, teamId: team.teamId });
       changed = true;
@@ -483,6 +541,7 @@ export function chooseSponsorOffer(input: {
     negotiationProfile,
     demandProfile: offer.demandProfile,
     teamQualityRankAtSign: offer.teamQualityRank,
+    isGolden: offer.isGolden,
   };
   contract = applySponsorNegotiationToContract(contract, { termSeasons, negotiationProfile });
 

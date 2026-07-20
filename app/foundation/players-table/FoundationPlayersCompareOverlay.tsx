@@ -299,6 +299,8 @@ export default function FoundationPlayersCompareOverlay({
   const dialogRef = useRef<HTMLElement | null>(null);
   // Rohwerte (Standard) vs. Liga-Perzentil ("shape = standing", Feature 1).
   const [valueMode, setValueMode] = useState<CompareValueMode>("value");
+  // Klassenschnitt-Ghost im Radar (Sofascore "average player") — standardmäßig sichtbar, faint.
+  const [showClassAverage, setShowClassAverage] = useState(true);
 
   // ESC schließt, wie beim PlayerDetailDrawer/NlRankingDrawer (nur aktiv, solange offen).
   useEffect(() => {
@@ -352,6 +354,83 @@ export default function FoundationPlayersCompareOverlay({
               },
       })),
     [series, valueMode, leaguePlayerHeatPools],
+  );
+
+  /**
+   * Klassenschnitt-Ghost (Feature 3, Sofascore "average player") — Durchschnitt
+   * von POW/SPE/MEN/SOC ALLER Spieler der Klasse des ersten (Anker-)Spielers,
+   * rein aus den bereits geladenen `allRows`. FOG: nur sichtbare Achsen, nie
+   * PO/Potenzial. `null`, wenn keine Klasse/keine Werte vorliegen. `count` für
+   * den Tooltip; die Rohschnitte werden je nach Modus zusätzlich ins Perzentil
+   * übersetzt (gleiche Skala wie die Spieler-Serien im Perzentil-Modus).
+   */
+  const classAverage = useMemo(() => {
+    const anchor = compareRows[0];
+    const className = anchor?.player.className;
+    if (!className) {
+      return null;
+    }
+    const classRows = allRows.filter((row) => row.player.className === className);
+    const sums: Record<NlAxisKey, { total: number; count: number }> = {
+      pow: { total: 0, count: 0 },
+      spe: { total: 0, count: 0 },
+      men: { total: 0, count: 0 },
+      soc: { total: 0, count: 0 },
+    };
+    for (const row of classRows) {
+      for (const axis of RADAR_AXIS_ORDER) {
+        const value = row.player.coreStats[axis];
+        if (value != null && Number.isFinite(value)) {
+          sums[axis].total += value;
+          sums[axis].count += 1;
+        }
+      }
+    }
+    // Nur zeichnen, wenn jede Achse mindestens einen realen Wert hat — keine 0-Auffüllung erfinden.
+    if (RADAR_AXIS_ORDER.some((axis) => sums[axis].count === 0)) {
+      return null;
+    }
+    const averages: Record<NlAxisKey, number> = {
+      pow: sums.pow.total / sums.pow.count,
+      spe: sums.spe.total / sums.spe.count,
+      men: sums.men.total / sums.men.count,
+      soc: sums.soc.total / sums.soc.count,
+    };
+    return { className, count: classRows.length, averages };
+  }, [compareRows, allRows]);
+
+  /**
+   * Ghost-Serie für den Radar: eine zusätzliche, neutral-getönte, gestrichelte
+   * Serie hinter den Spieler-Polygonen (in `combinedRadarSeries` vorangestellt →
+   * zuerst gezeichnet = im Hintergrund). Im Perzentil-Modus trägt sie das
+   * Liga-Perzentil der Klassen-Durchschnitte (gleiche Skala wie die Spieler).
+   */
+  const classAverageSeries = useMemo<NlRadarSeries | null>(() => {
+    if (!showClassAverage || !classAverage) {
+      return null;
+    }
+    const { averages } = classAverage;
+    return {
+      id: "class-average",
+      label: `Klassenschnitt · ${classAverage.className} (${classAverage.count})`,
+      tone: "neutral",
+      dashPattern: "3 3",
+      values:
+        valueMode === "percentile"
+          ? {
+              pow: leaguePercentileValue(averages.pow, leaguePlayerHeatPools.pow),
+              spe: leaguePercentileValue(averages.spe, leaguePlayerHeatPools.spe),
+              men: leaguePercentileValue(averages.men, leaguePlayerHeatPools.men),
+              soc: leaguePercentileValue(averages.soc, leaguePlayerHeatPools.soc),
+            }
+          : { pow: averages.pow, spe: averages.spe, men: averages.men, soc: averages.soc },
+    };
+  }, [showClassAverage, classAverage, valueMode, leaguePlayerHeatPools]);
+
+  // Ghost zuerst → hinter den Spieler-Polygonen; ohne Ghost unverändert.
+  const combinedRadarSeries = useMemo<NlRadarSeries[]>(
+    () => (classAverageSeries ? [classAverageSeries, ...radarSeries] : radarSeries),
+    [classAverageSeries, radarSeries],
   );
 
   /**
@@ -491,6 +570,29 @@ export default function FoundationPlayersCompareOverlay({
               Liga-Perzentil
             </button>
           </div>
+          {/* Klassenschnitt-Ghost umschalten (Feature 3) — nur anbieten, wenn ein
+              Durchschnitt existiert. Inline-Styles statt neuer globals.css-Klasse. */}
+          {classAverage ? (
+            <label
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                fontSize: "var(--nl-fs-xs)",
+                color: "var(--nl-mut)",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+              title={`Durchschnitt aller ${classAverage.count} Spieler der Klasse ${classAverage.className} als Ghost-Polygon`}
+            >
+              <input
+                type="checkbox"
+                checked={showClassAverage}
+                onChange={(event) => setShowClassAverage(event.target.checked)}
+              />
+              Klassenschnitt
+            </label>
+          ) : null}
           <button type="button" className="nl-pcompare-close" onClick={onClose}>
             Schließen
           </button>
@@ -545,7 +647,7 @@ export default function FoundationPlayersCompareOverlay({
           <NlRadar
             className="nl-pcompare-radar"
             axisDefs={RADAR_AXIS_DEFS}
-            series={radarSeries}
+            series={combinedRadarSeries}
             aria-label={
               valueMode === "percentile"
                 ? `Achsen-Radar (Liga-Perzentil) POW/SPE/MEN/SOC: ${series

@@ -12,6 +12,7 @@ import {
   NlProgressBar,
   StatChip,
   StatChipRow,
+  formatNlMoney,
   formatNlNumber,
   useCountUp,
   type NlBarChartBar,
@@ -42,6 +43,34 @@ import { getCockpitStatusPillClass } from "@/lib/foundation/tabs/cockpit-ui-help
  */
 
 const NL_PRIZE_MAX_RANK = 32;
+
+/**
+ * Deutsche Labels für Status-/Warnungs-Tokens, die sonst als roher Key
+ * (`missing_rank`, `missing_prize`, …) in der Tabelle/den Hinweisboxen sichtbar
+ * wären. Unbekannte Tokens werden humanisiert (Unterstriche → Leerzeichen).
+ */
+const NL_PRIZE_STATUS_LABELS: Record<string, string> = {
+  missing_rank: "Rang offen",
+  missing_prize: "Preisgeld offen",
+  missing_cash: "Cash offen",
+  blocked: "Blockiert",
+  ready: "Bereit",
+};
+
+/** Wandelt ein Status-/Warnungs-Token in ein lesbares deutsches Label (mit robustem Fallback). */
+function formatNlStatusToken(token: string): string {
+  const key = token.trim();
+  return NL_PRIZE_STATUS_LABELS[key] ?? key.replace(/_/g, " ");
+}
+
+/** Vorzeichenbehaftetes `formatNlMoney` — hält GuV/Bonus-Malus-Spalten konsistent mit den Mio/k-formatierten Geldzellen in derselben Tabelle. */
+function formatSignedNlMoney(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) {
+    return "—";
+  }
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${formatNlMoney(value)}`;
+}
 
 function compareByRank(left: FoundationPrizePreviewItem, right: FoundationPrizePreviewItem): number {
   const leftRank = left.rank != null && Number.isFinite(left.rank) ? left.rank : Number.POSITIVE_INFINITY;
@@ -157,6 +186,20 @@ export default function FoundationPrizeV2NewLook({
       ),
     [sortedTableRows],
   );
+
+  // Preisgeld ist eine reine Funktion des Tabellenrangs (Rang → Preisgeld).
+  // Damit lässt sich für jedes Team auch das Preisgeld an seinem STARTPLATZ
+  // nachschlagen — als Vergleich zum Preisgeld am aktuellen Platz. Quelle sind
+  // die realen Feed-Items (alle 32 Ränge belegt), also deckt die Map 1–32 ab.
+  const prizeByRank = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const item of distributionItems) {
+      if (item.rank != null && item.prizeMoney != null && Number.isFinite(item.prizeMoney)) {
+        map.set(item.rank, item.prizeMoney);
+      }
+    }
+    return map;
+  }, [distributionItems]);
 
   const championLogo = seasonEndChampionRow ? getTeamLogoModel(seasonEndChampionRow.team) : null;
 
@@ -351,11 +394,11 @@ export default function FoundationPrizeV2NewLook({
         >
           <p className="nl-prize-story-line nl-tnum">
             {prizeV2SelectedTeamSummary
-              ? `#${prizeV2SelectedTeamSummary.rank ?? "—"} · ${formatLocalePoints(prizeV2SelectedTeamSummary.currentCash, 1)} → ${formatLocalePoints(prizeV2SelectedTeamSummary.projectedCash, 1)}`
+              ? `#${prizeV2SelectedTeamSummary.rank ?? "—"} · ${formatNlMoney(prizeV2SelectedTeamSummary.currentCash)} → ${formatNlMoney(prizeV2SelectedTeamSummary.projectedCash)}`
               : "kein Team aktiv"}
           </p>
           {outlookOutstandingDebt != null ? (
-            <p className="nl-prize-story-line nl-tnum">Restschuld {formatLocalePoints(outlookOutstandingDebt, 1)}</p>
+            <p className="nl-prize-story-line nl-tnum">Restschuld {formatNlMoney(outlookOutstandingDebt)}</p>
           ) : null}
         </NlCard>
         <NlCard
@@ -378,7 +421,7 @@ export default function FoundationPrizeV2NewLook({
         >
           <p className="nl-prize-story-line nl-tnum">
             {prizeV2RiskRow
-              ? `Cash danach ${formatLocalePoints(prizeV2RiskRow.projectedCash, 1)} · ${prizeV2RiskRow.warnings.length} Hinweise`
+              ? `Cash danach ${formatNlMoney(prizeV2RiskRow.projectedCash)} · ${prizeV2RiskRow.warnings.length} Hinweise`
               : "kein Drucksignal"}
           </p>
         </NlCard>
@@ -395,7 +438,7 @@ export default function FoundationPrizeV2NewLook({
             ownDistributionItem ? (
               <StatChip
                 label={`Dein Platz #${ownDistributionItem.rank}`}
-                value={formatLocalePoints(ownDistributionItem.prizeMoney, 1)}
+                value={formatNlMoney(ownDistributionItem.prizeMoney)}
                 tone="accent"
                 onClick={() => openTeamProfileById(ownDistributionItem.teamId)}
                 title={`${ownDistributionItem.teamName} öffnen`}
@@ -478,7 +521,7 @@ export default function FoundationPrizeV2NewLook({
               label="Cash vorher"
               value={
                 prizeV2SelectedTeamSummary?.currentCash != null
-                  ? formatLocalePoints(animatedForecastCashBefore ?? prizeV2SelectedTeamSummary.currentCash, 1)
+                  ? formatNlMoney(animatedForecastCashBefore ?? prizeV2SelectedTeamSummary.currentCash)
                   : "—"
               }
             />
@@ -486,7 +529,7 @@ export default function FoundationPrizeV2NewLook({
               label="Preisgeld"
               value={
                 prizeForecastRankRow?.prizeMoney != null
-                  ? formatLocalePoints(animatedForecastPrizeMoney ?? prizeForecastRankRow.prizeMoney, 1)
+                  ? formatNlMoney(animatedForecastPrizeMoney ?? prizeForecastRankRow.prizeMoney)
                   : "—"
               }
               sub={prizeForecastRankRow ? `bei Platz ${prizeForecastRank}` : "kein Rang-Datum"}
@@ -501,16 +544,16 @@ export default function FoundationPrizeV2NewLook({
               label="Cash nachher"
               value={
                 firstForecastRow?.cashAfter != null
-                  ? formatLocalePoints(animatedForecastCashAfter ?? firstForecastRow.cashAfter, 1)
+                  ? formatNlMoney(animatedForecastCashAfter ?? firstForecastRow.cashAfter)
                   : "—"
               }
             />
             {outlookLoanInstallment != null ? (
               <StatChip
                 label="Kreditrate"
-                value={formatLocalePoints(outlookLoanInstallment, 1)}
+                value={formatNlMoney(outlookLoanInstallment)}
                 tone="warn"
-                sub={outlookOutstandingDebt != null ? `Restschuld ${formatLocalePoints(outlookOutstandingDebt, 1)}` : undefined}
+                sub={outlookOutstandingDebt != null ? `Restschuld ${formatNlMoney(outlookOutstandingDebt)}` : undefined}
                 title="Jährliche Kreditrate — bereits in Bonus/Malus und Cash nachher eingerechnet"
               />
             ) : null}
@@ -544,23 +587,23 @@ export default function FoundationPrizeV2NewLook({
                     <tr key={row.label}>
                       <td>{row.label}</td>
                       <td>{formatLocalePoints(row.factor ?? null, 2)}</td>
-                      <td>{row.prizeMoney != null ? formatLocalePoints(row.prizeMoney, 1) : "—"}</td>
-                      <td>{row.salaryTotal != null ? formatLocalePoints(row.salaryTotal, 1) : "—"}</td>
+                      <td>{row.prizeMoney != null ? formatNlMoney(row.prizeMoney) : "—"}</td>
+                      <td>{row.salaryTotal != null ? formatNlMoney(row.salaryTotal) : "—"}</td>
                       {outlookLoanInstallment != null ? (
-                        <td>{row.loanInstallment != null ? formatLocalePoints(row.loanInstallment, 1) : "—"}</td>
+                        <td>{row.loanInstallment != null ? formatNlMoney(row.loanInstallment) : "—"}</td>
                       ) : null}
                       <td>
                         {row.guv != null ? (
                           <NlDeltaChip
                             value={row.guv}
-                            format={(n) => formatSignedDisplayMoney(n)}
+                            format={(n) => formatSignedNlMoney(n)}
                             title={outlookLoanInstallment != null ? "Gewinn und Verlust — inkl. Kreditrate" : "Gewinn und Verlust"}
                           />
                         ) : (
                           "—"
                         )}
                       </td>
-                      <td>{row.cashAfter != null ? formatLocalePoints(row.cashAfter, 1) : "—"}</td>
+                      <td>{row.cashAfter != null ? formatNlMoney(row.cashAfter) : "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -573,32 +616,54 @@ export default function FoundationPrizeV2NewLook({
       <NlCard className="nl-prize-table-card" eyebrow="Haupttabelle" title="Preisgeld-Tabelle">
         {prizePreviewHardBlocked.length > 0 ? (
           <div className="nl-prize-warning-box is-blocked">
-            <strong>Blocker</strong>
+            <strong>Blocker{prizePreviewHardBlocked.length > 4 ? ` (${prizePreviewHardBlocked.length})` : ""}</strong>
             <ul>
               {prizePreviewHardBlocked.slice(0, 4).map((rule) => (
-                <li key={rule}>{rule}</li>
+                <li key={rule}>{formatNlStatusToken(rule)}</li>
               ))}
+              {/* T-039: die Liste wurde zuvor still auf 4 Einträge gekürzt — Titel
+                  nennt jetzt die Gesamtanzahl, diese Zeile ergänzt "+N weitere". */}
+              {prizePreviewHardBlocked.length > 4 ? (
+                <li style={{ opacity: 0.75, fontStyle: "italic" }}>
+                  +{prizePreviewHardBlocked.length - 4} weitere
+                </li>
+              ) : null}
             </ul>
           </div>
         ) : null}
         {prizePreviewGlobalWarnings.length > 0 ? (
           <div className="nl-prize-warning-box">
-            <strong>Hinweise</strong>
+            <strong>Hinweise{prizePreviewGlobalWarnings.length > 4 ? ` (${prizePreviewGlobalWarnings.length})` : ""}</strong>
             <ul>
               {prizePreviewGlobalWarnings.slice(0, 4).map((warning) => (
-                <li key={warning}>{warning}</li>
+                <li key={warning}>{formatNlStatusToken(warning)}</li>
               ))}
+              {prizePreviewGlobalWarnings.length > 4 ? (
+                <li style={{ opacity: 0.75, fontStyle: "italic" }}>
+                  +{prizePreviewGlobalWarnings.length - 4} weitere
+                </li>
+              ) : null}
             </ul>
           </div>
         ) : null}
-        <div className="nl-prize-table-shell">
+        {/* Finding C: Die breite Preisgeld-Tabelle scrollt intern (overflow-x),
+            statt die ganze Seite bei 1024px horizontal zu weiten. `minWidth: 0`
+            erlaubt dem Shell, innerhalb seines Grid-/Flex-Elternteils zu schrumpfen,
+            `maxWidth: 100%` deckelt ihn auf die Viewport-Breite. Inline gesetzt,
+            damit es unabhängig vom `.is-new-look`-Gate greift. */}
+        <div className="nl-prize-table-shell" style={{ overflowX: "auto", maxWidth: "100%", minWidth: 0 }}>
           <table className="nl-prize-table nl-tnum">
             <thead>
               <tr>
                 <th className="nl-prize-th-rank">Rang</th>
                 <th className="nl-prize-th-team">Team</th>
                 <th>Cash vorher</th>
-                <th className="nl-prize-th-money">Preisgeld</th>
+                <th className="nl-prize-th-money" title="Preisgeld, das dieses Team an seinem Startplatz bekäme">
+                  Preisgeld · Start
+                </th>
+                <th className="nl-prize-th-money" title="Preisgeld am aktuellen Saisonstand-Platz">
+                  Preisgeld · Aktuell
+                </th>
                 <th>Bonus/Malus</th>
                 <th>Cash danach</th>
                 <th>Hinweise</th>
@@ -609,11 +674,30 @@ export default function FoundationPrizeV2NewLook({
                 const team = teamsById.get(row.teamId) ?? null;
                 const logo = team ? getTeamLogoModel(team) : null;
                 const medalKind = row.rank === 1 ? "gold" : row.rank === 2 ? "silver" : row.rank === 3 ? "bronze" : null;
+                const startRank = row.rankChangePrize?.startRank ?? null;
+                const startPrizeMoney =
+                  startRank != null && Number.isFinite(startRank) ? prizeByRank.get(startRank) ?? null : null;
                 return (
                   <tr
                     key={row.teamId}
                     className={`nl-prize-table-row${row.teamId === selectedTeamId ? " is-selected" : ""}`}
                     onClick={() => openTeamProfileById(row.teamId)}
+                    // A11y-Fix (T-080-Prize): Die Zeile war nur per Maus-Klick bedienbar
+                    // (kein tabIndex/role/onKeyDown) — analog zum Muster in
+                    // FoundationTeamsNewLook.tsx (T-080). `target === currentTarget`
+                    // verhindert, dass Enter/Space auf verschachtelten Elementen die
+                    // Zeilen-Aktion zusätzlich auslöst.
+                    tabIndex={0}
+                    role="button"
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) {
+                        return;
+                      }
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openTeamProfileById(row.teamId);
+                      }
+                    }}
                     title={`${row.teamName} öffnen`}
                   >
                     <td className="nl-prize-td-rank">
@@ -640,9 +724,38 @@ export default function FoundationPrizeV2NewLook({
                         </span>
                       </span>
                     </td>
-                    <td>{row.currentCash != null ? formatLocalePoints(row.currentCash, 1) : "—"}</td>
+                    <td>{row.currentCash != null ? formatNlMoney(row.currentCash) : "—"}</td>
                     <td className="nl-prize-td-money">
-                      <span className="nl-prize-money-value">{row.prizeMoney != null ? formatLocalePoints(row.prizeMoney, 1) : "—"}</span>
+                      <span className="nl-prize-money-head">
+                        <span className="nl-prize-money-value">
+                          {startPrizeMoney != null ? formatNlMoney(startPrizeMoney) : "—"}
+                        </span>
+                        {startRank != null ? (
+                          <span className="nl-prize-money-rank" title={`Startplatz #${startRank}`}>
+                            #{startRank}
+                          </span>
+                        ) : null}
+                      </span>
+                      {startPrizeMoney != null && Number.isFinite(startPrizeMoney) ? (
+                        <NlProgressBar
+                          value={startPrizeMoney}
+                          max={maxPrizeMoney > 0 ? maxPrizeMoney : 1}
+                          tone="neutral"
+                          showValue={false}
+                          className="nl-prize-money-bar"
+                          title={`Preisgeld am Startplatz #${startRank ?? "—"}, relativ zur Top-Auszahlung (${formatNlMoney(maxPrizeMoney)})`}
+                        />
+                      ) : null}
+                    </td>
+                    <td className="nl-prize-td-money">
+                      <span className="nl-prize-money-head">
+                        <span className="nl-prize-money-value">{row.prizeMoney != null ? formatNlMoney(row.prizeMoney) : "—"}</span>
+                        {row.rank != null ? (
+                          <span className="nl-prize-money-rank" title={`Aktueller Platz #${row.rank}`}>
+                            #{row.rank}
+                          </span>
+                        ) : null}
+                      </span>
                       {row.prizeMoney != null && Number.isFinite(row.prizeMoney) ? (
                         <NlProgressBar
                           value={row.prizeMoney}
@@ -650,7 +763,7 @@ export default function FoundationPrizeV2NewLook({
                           tone="accent"
                           showValue={false}
                           className="nl-prize-money-bar"
-                          title={`Preisgeld relativ zur Top-Auszahlung (${formatLocalePoints(maxPrizeMoney, 1)})`}
+                          title={`Preisgeld am aktuellen Platz #${row.rank ?? "—"}, relativ zur Top-Auszahlung (${formatNlMoney(maxPrizeMoney)})`}
                         />
                       ) : null}
                     </td>
@@ -658,7 +771,7 @@ export default function FoundationPrizeV2NewLook({
                       {row.rankChangePrize?.bonusMalus != null ? (
                         <NlDeltaChip
                           value={row.rankChangePrize.bonusMalus}
-                          format={(n) => formatSignedDisplayMoney(n)}
+                          format={(n) => formatSignedNlMoney(n)}
                           title="Rank-Bonus/-Malus"
                         />
                       ) : (
@@ -666,9 +779,11 @@ export default function FoundationPrizeV2NewLook({
                       )}
                     </td>
                     <td className={row.projectedCash != null && row.projectedCash < 0 ? "nl-prize-cash-risk" : undefined}>
-                      {row.projectedCash != null ? formatLocalePoints(row.projectedCash, 1) : "—"}
+                      {row.projectedCash != null ? formatNlMoney(row.projectedCash) : "—"}
                     </td>
-                    <td className="nl-prize-td-warnings">{row.warnings.length > 0 ? row.warnings.join(", ") : "—"}</td>
+                    <td className="nl-prize-td-warnings">
+                      {row.warnings.length > 0 ? row.warnings.map(formatNlStatusToken).join(", ") : "—"}
+                    </td>
                   </tr>
                 );
               })}

@@ -2,7 +2,7 @@
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
-import type { TeamDetailDrawerData } from "@/app/foundation/TeamDetailDrawer";
+import type { TeamDetailDrawerData } from "@/lib/foundation/team-detail-drawer-types";
 import TeamProfileNewLook from "@/app/foundation/team-profile/TeamProfileNewLook";
 
 export type TeamProfileClientProps = {

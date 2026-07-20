@@ -1,14 +1,23 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 
-import PlayerDetailDrawer from "@/app/foundation/PlayerDetailDrawer";
 import type { DisciplineCategory } from "@/lib/data/olyDataTypes";
 import type { LegacyMatchdayReadinessStatus } from "@/lib/lineups/legacy-matchday-readiness";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
 import type { PlayerHistoryDisciplineValues } from "@/lib/season/season-discipline-area-groups";
 import type { DisciplineHighlightCandidate, LegacyMatchdayResolvePreview, ResolvePreviewStatus } from "@/lib/resolve/legacy-matchday-resolve-types";
+
+// T-075 (Performance): PlayerDetailDrawer ist 3617 Zeilen und chart-schwer —
+// per next/dynamic laden statt statisch. Verhalten identisch: PlayerDetailDrawer
+// rendert `null`, solange `data` fehlt (hier der Regelfall bis zum ersten
+// Player-Klick), daher ist ein `null`-Ladefallback äquivalent.
+const PlayerDetailDrawer = dynamic(() => import("@/app/foundation/PlayerDetailDrawer"), {
+  ssr: false,
+  loading: () => null,
+});
 
 type ResolveLabResponse = {
   source: "sqlite" | "prisma";

@@ -19,7 +19,7 @@ type SeasonIdentity = {
   seasonName?: string | null;
 };
 
-function extractSeasonNumber(input: SeasonIdentity): number | null {
+export function extractSeasonNumber(input: SeasonIdentity): number | null {
   const idMatch = String(input.seasonId ?? "").match(/season-(\d+)/i);
   if (idMatch) {
     return Number(idMatch[1]);

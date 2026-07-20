@@ -237,28 +237,3 @@ describe("lineup portrait hover preview ui contract", () => {
     expect(lineupText).toContain("player.coreStats.pow");
   });
 });
-
-describe("teams portraits tab contract", () => {
-  it("adds a portraits subnav tab and grid in the teams detail panel", async () => {
-    const fs = await import("node:fs/promises");
-    const path = await import("node:path");
-    const root = process.cwd();
-
-    const [shellText, panelText, portraitsTabText] = await Promise.all([
-      fs.readFile(path.join(root, "app/foundation/FoundationShellRouterBody.tsx"), "utf8"),
-      fs.readFile(path.join(root, "app/foundation/teams-v2/FoundationTeamsDetailPanel.tsx"), "utf8"),
-      fs.readFile(path.join(root, "app/foundation/teams-v2/FoundationTeamsPortraitsTab.tsx"), "utf8"),
-    ]);
-
-    expect(shellText).toContain('{ id: "portraits", label: "Portraits" }');
-    expect(shellText).toContain('"roster" | "contracts" | "portraits"');
-    expect(panelText).toContain('selectedTeamDetailTab === "portraits"');
-    expect(panelText).toContain("FoundationTeamsPortraitsTab");
-    expect(portraitsTabText).toContain('data-testid="team-portraits-grid"');
-    expect(panelText).toContain("team-contracts-table");
-    expect(portraitsTabText).toContain("FoundationPlayerPortraitCard");
-    expect(portraitsTabText).toContain("roleTag={entry.roleTag}");
-    expect(portraitsTabText).toContain("playerClassName={player.className}");
-    expect(panelText).toContain("FoundationPlayerPortraitPreview");
-  });
-});

@@ -512,9 +512,16 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
               tone="neutral"
               sub={heroRow?.d2Score != null ? `${formatNlNumber(heroRow.d2Score, 1)} Score` : undefined}
             />
-            {/* De-Dup: der Tagessieger erschien 4× (Hero-Chip, Reveal, Podium-Gold,
-                Board-Zeile). Der schwächste — dieser Hero-StatChip — entfällt; der
-                Tagessieger-Reveal, das Podium-Gold und die Board-Zeile bleiben. */}
+            {championRow ? (
+              <StatChip
+                label="Tagessieger"
+                value={championRow.teamName}
+                tone="accent"
+                sub={championRow.matchdayPoints != null ? `${formatNlNumber(championRow.matchdayPoints, 1)} Punkte` : undefined}
+                onClick={() => openTeamProfileById(championRow.teamId)}
+                title={`${championRow.teamName} öffnen`}
+              />
+            ) : null}
           </StatChipRow>
         </div>
       </NlCard>

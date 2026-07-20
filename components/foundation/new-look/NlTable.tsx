@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 export type NlTableAlign = "left" | "right" | "center";
 
@@ -37,6 +37,23 @@ export type NlTableProps<Row> = {
   renderCell?: (row: Row, column: NlTableColumn<Row>) => ReactNode;
   sortState?: NlTableSortState | null;
   onSort?: (key: string) => void;
+  /**
+   * Optional aufklappbare Detailzeile je Datenzeile (additiv). Ist
+   * `isRowExpanded(row)` wahr, wird direkt unter der Zeile eine zusätzliche
+   * `<tr class="nl-table-expanded-row">` mit `colSpan` über alle Spalten
+   * gerendert, deren Inhalt aus `renderExpandedRow(row)` stammt. Ohne beide
+   * Props verhält sich die Tabelle exakt wie bisher (kein Mehr-Markup).
+   */
+  renderExpandedRow?: (row: Row, index: number) => ReactNode;
+  isRowExpanded?: (row: Row, index: number) => boolean;
+  /**
+   * Optionaler Zeilen-Klick (z. B. "Team-/Spielerprofil öffnen"). Macht die
+   * gesamte Zeile klick-/tastaturbedienbar (Enter/Space), ohne dass jede
+   * Zelle einen eigenen Button braucht. Klicks auf verschachtelte
+   * interaktive Elemente (Buttons/Links) innerhalb einer Zelle lösen die
+   * Zeile NICHT zusätzlich aus (Guard über `event.target`).
+   */
+  onRowClick?: (row: Row, index: number) => void;
   /** Zebra-Streifen (Standard: an). */
   zebra?: boolean;
   /** Hover-Hervorhebung der Zeile (Standard: an). */
@@ -79,6 +96,9 @@ export function NlTable<Row>({
   renderCell = defaultRenderCell,
   sortState,
   onSort,
+  renderExpandedRow,
+  isRowExpanded,
+  onRowClick,
   zebra = true,
   hoverable = true,
   stickyHeader = true,
@@ -143,10 +163,43 @@ export function NlTable<Row>({
         <tbody>
           {rows.map((row, rowIndex) => {
             const rowExtra = rowClassName?.(row, rowIndex);
+            const rowClasses = [rowExtra ?? "", onRowClick ? "is-clickable" : ""].filter(Boolean).join(" ");
+            const expanded = Boolean(renderExpandedRow && isRowExpanded?.(row, rowIndex));
             return (
+            <Fragment key={rowKey ? rowKey(row, rowIndex) : rowIndex}>
             <tr
-              key={rowKey ? rowKey(row, rowIndex) : rowIndex}
-              className={rowExtra || undefined}
+              className={rowClasses || undefined}
+              onClick={
+                onRowClick
+                  ? (event) => {
+                      // Verschachtelte interaktive Elemente (z. B. ein Team-Link in einer
+                      // Zelle) sollen ihre eigene Aktion auslösen, nicht zusätzlich den
+                      // Zeilen-Klick — Klicks, die von einem <button>/<a> aufsteigen, werden
+                      // ignoriert.
+                      if ((event.target as HTMLElement).closest("button, a")) {
+                        return;
+                      }
+                      onRowClick(row, rowIndex);
+                    }
+                  : undefined
+              }
+              role={onRowClick ? "button" : undefined}
+              tabIndex={onRowClick ? 0 : undefined}
+              onKeyDown={
+                onRowClick
+                  ? (event) => {
+                      if (event.target !== event.currentTarget) {
+                        return;
+                      }
+                      if (event.key === "Enter" || event.key === " ") {
+                        if (event.key === " ") {
+                          event.preventDefault();
+                        }
+                        onRowClick(row, rowIndex);
+                      }
+                    }
+                  : undefined
+              }
             >
               {columns.map((column) => (
                 <td
@@ -157,6 +210,12 @@ export function NlTable<Row>({
                 </td>
               ))}
             </tr>
+            {expanded ? (
+              <tr className="nl-table-expanded-row">
+                <td colSpan={columns.length}>{renderExpandedRow?.(row, rowIndex)}</td>
+              </tr>
+            ) : null}
+            </Fragment>
             );
           })}
         </tbody>

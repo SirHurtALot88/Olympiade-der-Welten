@@ -7,7 +7,12 @@ import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat"
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
 import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
-import { formatCockpitReason, formatHomeWarningLabel, getGameFlowStatusLabel } from "@/lib/foundation/tabs/cockpit-ui-helpers";
+import {
+  formatCockpitReason,
+  formatHomeWarningLabel,
+  getGameFlowStatusLabel,
+  HOME_HIDDEN_WARNING_KEYS,
+} from "@/lib/foundation/tabs/cockpit-ui-helpers";
 import {
   formatTeamControlModeLabel,
   type HomeV2RosterTableRow,
@@ -195,7 +200,9 @@ export default function FoundationHomeV2Host({
               : "Flow bereit — weiter zum nächsten Schritt.",
         nextStepBlocked:
           gameFlowActionStep.blockers.length > 0 || gameFlowActionStep.warnings.length > 0,
-        warnings: overviewDerivations.homeWarnings.map(formatHomeWarningLabel),
+        warnings: overviewDerivations.homeWarnings
+          .filter((warning) => !HOME_HIDDEN_WARNING_KEYS.includes(warning))
+          .map(formatHomeWarningLabel),
         topPlayers: overviewDerivations.homeV2TopPlayers,
         leagueHeatPools: leaguePlayerHeatPools,
         facilities: overviewDerivations.homeV2Facilities,

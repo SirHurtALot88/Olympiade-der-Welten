@@ -14,6 +14,7 @@ export const FOUNDATION_VIEW_IDS = [
   "lineup",
   "lineupV2",
   "matchdayArena",
+  "disciplineStage",
   "matchdayResult",
   "teams",
   "training",
@@ -25,6 +26,7 @@ export const FOUNDATION_VIEW_IDS = [
   "ranks",
   "diszis",
   "leagueLeaders",
+  "allTimeTable",
   "prize",
   "market",
   "marketV2",
@@ -35,6 +37,7 @@ export const FOUNDATION_VIEW_IDS = [
   "encyclopedia",
   "admin",
   "credits",
+  "finances",
 ] as const;
 
 export type FoundationViewId = (typeof FOUNDATION_VIEW_IDS)[number];
@@ -86,8 +89,14 @@ export function normalizeFoundationViewParam(view: string | null | undefined): F
   if (view === "home-v2" || view === "homev2" || view === "home") {
     return "homeV2";
   }
+  if (view === "ewige-tabelle" || view === "all-time-table" || view === "alltime") {
+    return "allTimeTable";
+  }
   if (view === "kredite" || view === "credit" || view === "loans" || view === "credits-v2") {
     return "credits";
+  }
+  if (view === "finanzen" || view === "finance" || view === "finances-v2") {
+    return "finances";
   }
   if (view === "facilities-overview-v2" || view === "facilities-v2-overview") {
     return "facilitiesOverviewV2";

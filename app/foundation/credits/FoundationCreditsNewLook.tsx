@@ -12,6 +12,7 @@ import {
   StatChip,
   StatChipRow,
   formatNlMoney,
+  formatNlNumber,
   useCountUp,
   type NlTableColumn,
   type NlTone,
@@ -39,7 +40,7 @@ function formatRate(rate: number | null | undefined): string {
   if (rate == null || !Number.isFinite(rate)) {
     return "—";
   }
-  return `${(rate * 100).toLocaleString("de-DE", { maximumFractionDigits: 1 })}%`;
+  return `${formatNlNumber(rate * 100, 1)}%`;
 }
 
 function formatRateRange(minRate: number, maxRate: number): string {
@@ -51,6 +52,23 @@ function formatRateRange(minRate: number, maxRate: number): string {
   const low = Math.min(minRate, maxRate);
   const high = Math.max(minRate, maxRate);
   return `${formatRate(low)} – ${formatRate(high)}`;
+}
+
+/**
+ * German-decimal parse for the loan-amount field. Users type the amount in
+ * German notation: "," is the decimal separator ("3,5" = 3.5) and "." may
+ * appear as a thousands separator ("1.250,5" = 1250.5). Plain `Number("3,5")`
+ * is NaN and a native <input type="number"> would strip the comma entirely
+ * ("3,5" → 35), so normalize the raw string first: only when a decimal comma
+ * is present do the dots count as thousands separators (drop them), then turn
+ * the comma into a "." for parseFloat. A string without a comma is left as-is,
+ * so plain integer input ("5") and English-style dot input ("3.5") keep working.
+ * Returns NaN for empty/partial input so callers can leave it untouched while typing.
+ */
+function parseGermanDecimalAmount(raw: string): number {
+  const trimmed = raw.trim();
+  const normalized = trimmed.includes(",") ? trimmed.replace(/\./g, "").replace(",", ".") : trimmed;
+  return Number.parseFloat(normalized);
 }
 
 /** Eine Zeile der Aktive-Kredite-Tabelle — `index` wird für das "Kredit N"-Label gebraucht. */
@@ -152,7 +170,7 @@ function CreditUtilizationGauge({ outstanding, capacity, ratio }: { outstanding:
   const needle = gaugePolarPoint(endDeg);
   const pct = Math.round(safeRatio * 1000) / 10;
   const zoneBounds = [0, GAUGE_WARN_RATIO, GAUGE_DANGER_RATIO, 1];
-  const ariaLabel = `Kreditrahmen-Auslastung: ${formatNlMoney(outstanding)} Schulden von ${formatNlMoney(capacity)} Bank-Rahmen, ${pct.toLocaleString("de-DE", { maximumFractionDigits: 1 })}%`;
+  const ariaLabel = `Kreditrahmen-Auslastung: ${formatNlMoney(outstanding)} Schulden von ${formatNlMoney(capacity)} Bank-Rahmen, ${formatNlNumber(pct, 1)}%`;
 
   return (
     <div className="nl-credits-gauge" role="img" aria-label={ariaLabel} title={ariaLabel}>
@@ -178,7 +196,7 @@ function CreditUtilizationGauge({ outstanding, capacity, ratio }: { outstanding:
         <circle cx={needle.x} cy={needle.y} r={GAUGE_STROKE * 0.55} className="nl-credits-gauge-needle" fill={NL_TONE_VAR[tone]} />
       </svg>
       <div className="nl-credits-gauge-copy">
-        <span className="nl-credits-gauge-value nl-tnum">{pct.toLocaleString("de-DE", { maximumFractionDigits: 1 })}%</span>
+        <span className="nl-credits-gauge-value nl-tnum">{formatNlNumber(pct, 1)}%</span>
         <span className="nl-credits-gauge-label">Auslastung</span>
         <span className="nl-credits-gauge-sub nl-tnum">
           {formatNlMoney(outstanding)} / {formatNlMoney(capacity)}
@@ -262,7 +280,7 @@ function LoanBurdenChart({
       <svg
         className="nl-credits-burden-chart"
         viewBox={`0 0 ${BURDEN_W} ${BURDEN_H}`}
-        preserveAspectRatio="xMidYMid meet"
+        preserveAspectRatio="none"
         role="img"
         aria-label={ariaLabel}
       >
@@ -596,11 +614,14 @@ function LoanOfferFilterPanel({
           />
           <div className="nl-credits-amount-field" style={{ borderColor: maxAmount > 0 ? amountToneColor : undefined }}>
             <input
-              type="number"
+              // Text + inputMode="decimal" statt type="number": ein natives
+              // Zahlenfeld verschluckt bei deutscher Eingabe das Dezimalkomma
+              // ("3,5" → 35), bevor der Handler es sieht. Als Textfeld erreicht
+              // der Rohtext den Handler unverändert und wird dort deutsch geparst
+              // (siehe parseGermanDecimalAmount); geklemmt wird ohnehin in JS.
+              type="text"
+              inputMode="decimal"
               className="nl-credits-amount-input nl-tnum"
-              min={0}
-              max={maxAmount}
-              step={0.1}
               value={amountInput}
               disabled={maxAmount <= 0}
               onChange={(event) => onAmountInputChange(event.target.value)}
@@ -792,7 +813,7 @@ export default function FoundationCreditsNewLook({
   const maxAmount = Math.max(0, team?.maxOfferAmount ?? 0);
 
   const [amount, setAmount] = useState<number>(() => Math.round((maxAmount / 2) * 10) / 10);
-  const [amountInput, setAmountInput] = useState<string>(() => String(Math.round((maxAmount / 2) * 10) / 10));
+  const [amountInput, setAmountInput] = useState<string>(() => formatNlNumber(Math.round((maxAmount / 2) * 10) / 10, 1));
   const [termSeasons, setTermSeasons] = useState<number>(team?.minTermSeasons ?? 1);
 
   // Anders als früher (die Slider-Form mountete erst, sobald `team.canBorrow`
@@ -807,12 +828,12 @@ export default function FoundationCreditsNewLook({
       didInitializeAmountRef.current = true;
       const initial = Math.round((maxAmount / 2) * 10) / 10;
       setAmount(initial);
-      setAmountInput(String(initial));
+      setAmountInput(formatNlNumber(initial, 1));
       return;
     }
     setAmount((current) => {
       const clamped = Math.min(Math.max(0, current), maxAmount);
-      setAmountInput(String(clamped));
+      setAmountInput(formatNlNumber(clamped, 1));
       return clamped;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -821,8 +842,79 @@ export default function FoundationCreditsNewLook({
   function applyAmount(next: number) {
     const clamped = Math.min(Math.max(0, next), maxAmount);
     setAmount(clamped);
-    setAmountInput(String(clamped));
+    setAmountInput(formatNlNumber(clamped, 1));
   }
+
+  // #182: Liga-Kreditübersicht — welche Teams aktuell wie viel Kredit laufen
+  // haben. Aggregiert aktive Kredite (`gameState.loans`) je Borrower-Team;
+  // Rest reines Read-Modell, absteigend nach Restschuld sortiert.
+  const leagueCreditRows = useMemo(() => {
+    const loans = gameState.seasonState.loans ?? [];
+    const byTeam = new Map<string, { outstanding: number; installment: number; count: number; missed: number }>();
+    for (const loan of loans) {
+      if (loan.status !== "active") continue;
+      const agg = byTeam.get(loan.borrowerTeamId) ?? { outstanding: 0, installment: 0, count: 0, missed: 0 };
+      agg.outstanding += loan.principalOutstanding;
+      agg.installment += loan.installmentPerSeason;
+      agg.count += 1;
+      agg.missed += loan.missedPayments;
+      byTeam.set(loan.borrowerTeamId, agg);
+    }
+    return gameState.teams
+      .map((team) => {
+        const agg = byTeam.get(team.teamId) ?? null;
+        return {
+          teamId: team.teamId,
+          teamName: team.name,
+          shortCode: team.shortCode,
+          outstanding: agg?.outstanding ?? 0,
+          installment: agg?.installment ?? 0,
+          count: agg?.count ?? 0,
+          missed: agg?.missed ?? 0,
+        };
+      })
+      .filter((row) => row.count > 0)
+      .sort((left, right) => right.outstanding - left.outstanding);
+  }, [gameState.seasonState.loans, gameState.teams]);
+  const leagueCreditMaxOutstanding = leagueCreditRows[0]?.outstanding ?? 0;
+  const leagueCreditTotal = leagueCreditRows.reduce((sum, row) => sum + row.outstanding, 0);
+
+  // T-106: Kredit-Historie — abgelöste/ausgelaufene Kredite verschwinden
+  // sonst spurlos, sobald sie auf `status !== "active"` wechseln (siehe
+  // `applyLoanSettlement`/`applyEarlyPayoff` in `lib/finance/loan-service.ts`,
+  // die den Kredit im selben `gameState.seasonState.loans`-Array auf "paid"/
+  // "defaulted" setzen statt ihn zu entfernen). Gezahlte Zinsen kommen aus
+  // `loanApplyLogs` (Saison-End-Ratenbuchungen je `loanId`, über die gesamte
+  // Kredit-Laufzeit summiert) — keine neue Persistenz, nur bereits
+  // vorhandene Ledger-Daten gelesen.
+  const loanHistoryRows = useMemo(() => {
+    if (!teamId) return [];
+    const loans = gameState.seasonState.loans ?? [];
+    const applyLogs = gameState.seasonState.loanApplyLogs ?? [];
+    return loans
+      .filter(
+        (loan): loan is typeof loan & { status: "paid" | "defaulted" } =>
+          loan.borrowerTeamId === teamId && loan.status !== "active",
+      )
+      .map((loan) => {
+        const interestPaid = applyLogs
+          .filter((log) => log.loanId === loan.loanId)
+          .reduce((sum, log) => sum + log.interestPortion, 0);
+        const lenderName =
+          loan.lenderType === "team"
+            ? (gameState.teams.find((candidate) => candidate.teamId === loan.lenderTeamId)?.name ?? "Team")
+            : "Bank";
+        return {
+          id: loan.loanId,
+          originatedSeasonId: loan.originatedSeasonId,
+          lenderName,
+          principal: loan.principalOriginal,
+          interestPaid: Number(interestPaid.toFixed(1)),
+          status: loan.status,
+        };
+      })
+      .sort((left, right) => right.originatedSeasonId.localeCompare(left.originatedSeasonId, "de", { numeric: true }));
+  }, [gameState.seasonState.loans, gameState.seasonState.loanApplyLogs, gameState.teams, teamId]);
 
   // Live offer recompute on every filter change — pure/derived, no mutation,
   // never cached across renders so team cards appear/disappear immediately
@@ -970,11 +1062,24 @@ export default function FoundationCreditsNewLook({
             termSeasons={termSeasons}
             onAmountChange={applyAmount}
             onAmountInputChange={(raw) => {
-              setAmountInput(raw);
-              const parsed = Number(raw);
-              if (Number.isFinite(parsed)) {
-                setAmount(Math.min(Math.max(0, parsed), maxAmount));
+              // Deutsches Dezimalkomma korrekt parsen: "3,5" → 3.5 (nicht 35).
+              // `parseGermanDecimalAmount` wandelt Komma→Punkt und ignoriert
+              // Tausenderpunkte; siehe Helper oben.
+              const parsed = parseGermanDecimalAmount(raw);
+              // Zwischenstände (leer, nur "-", "3,", …) beim Tippen unangetastet lassen — aber sobald der
+              // Rohtext eine gültige Zahl ergibt, sofort auf [0, maxAmount] klemmen, damit Feld &
+              // Slider/Chip nie auseinanderlaufen (vorher: nur `amount` geklemmt, Feld zeigte
+              // unbegrenzt weiter den Rohwert bis zum onBlur).
+              if (raw.trim() === "" || !Number.isFinite(parsed)) {
+                setAmountInput(raw);
+                return;
               }
+              const clamped = Math.min(Math.max(0, parsed), maxAmount);
+              setAmount(clamped);
+              // Rohtext beibehalten, solange er im Rahmen liegt (klemmt nichts), damit ein gerade
+              // getipptes Komma nicht sofort zu "3.5"/"3" umgeschrieben wird; nur bei echter
+              // Klemmung das Feld auf den geklemmten Wert setzen. onBlur normalisiert die Anzeige.
+              setAmountInput(clamped === parsed ? raw : String(clamped));
             }}
             onAmountBlur={() => applyAmount(amount)}
             onTermSeasonsChange={setTermSeasons}
@@ -1056,6 +1161,134 @@ export default function FoundationCreditsNewLook({
           )}
         </NlCard>
       )}
+
+      {/* T-106: abgelöste/ausgelaufene Kredite verschwinden sonst spurlos, sobald sie aktiv nicht mehr sind. */}
+      {showVaultEmptyState ? null : (
+        <NlCard className="nl-credits-history-card" eyebrow="Kredite" title="Kredit-Historie" data-testid="nl-credits-history-card">
+          {loanHistoryRows.length > 0 ? (
+            <NlTable
+              columns={NL_CREDITS_HISTORY_COLUMNS}
+              rows={loanHistoryRows}
+              rowKey={(row) => row.id}
+              renderCell={renderCreditsHistoryCell}
+              data-testid="nl-credits-history-table"
+              aria-label="Kredit-Historie"
+            />
+          ) : (
+            <NlEmptyState title="Noch keine abgelösten oder ausgelaufenen Kredite." />
+          )}
+        </NlCard>
+      )}
+
+      {/* Issue 182: Liga-Kreditübersicht — welche Teams wie viel Kredit laufen haben. */}
+      <NlCard
+        className="nl-credits-league-card"
+        eyebrow="Liga"
+        title={`Kreditübersicht · ${leagueCreditRows.length} Team${leagueCreditRows.length === 1 ? "" : "s"} mit Kredit`}
+        actions={
+          leagueCreditRows.length > 0 ? (
+            <span className="nl-credits-league-total nl-tnum" title="Gesamte Restschuld aller Teams">
+              Σ {formatNlMoney(leagueCreditTotal)}
+            </span>
+          ) : undefined
+        }
+      >
+        {leagueCreditRows.length > 0 ? (
+          <div className="nl-credits-league-list" role="list" aria-label="Kredite aller Teams">
+            {leagueCreditRows.map((row) => {
+              const isCurrent = row.teamId === teamId;
+              const barPct =
+                leagueCreditMaxOutstanding > 0
+                  ? Math.max(4, (row.outstanding / leagueCreditMaxOutstanding) * 100)
+                  : 0;
+              const classes = [
+                "nl-credits-league-row",
+                isCurrent ? "is-current" : "",
+                row.missed > 0 ? "is-risk" : "",
+              ]
+                .filter(Boolean)
+                .join(" ");
+              return (
+                <div key={row.teamId} role="listitem" className={classes}>
+                  <span className="nl-credits-league-team">
+                    <span className="nl-credits-league-code">{row.shortCode}</span>
+                    <span className="nl-credits-league-name" title={row.teamName}>
+                      {row.teamName}
+                    </span>
+                    {isCurrent ? <span className="nl-credits-league-you">Dein Team</span> : null}
+                    {row.missed > 0 ? (
+                      <span className="nl-credits-league-missed" title={`${row.missed} verpasste Rate(n)`}>
+                        ⚠ {row.missed}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="nl-credits-league-bartrack" aria-hidden="true">
+                    <span className="nl-credits-league-bar" style={{ width: `${barPct}%` }} />
+                  </span>
+                  <span className="nl-credits-league-figures">
+                    <span className="nl-credits-league-outstanding nl-tnum" title="Restschuld">
+                      {formatNlMoney(row.outstanding)}
+                    </span>
+                    <span className="nl-credits-league-sub nl-tnum">
+                      {formatNlMoney(row.installment)}/Saison · {row.count} Kredit{row.count === 1 ? "" : "e"}
+                    </span>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <NlEmptyState title="Aktuell hat kein Team einen laufenden Kredit." />
+        )}
+      </NlCard>
     </div>
   );
+}
+
+// --- Kredit-Historie (T-106) ---------------------------------------------
+// Am Dateiende deklariert (statt neben `NL_CREDITS_LOAN_COLUMNS` oben), damit
+// bestehende Design-Token-Baseline-Zeilen (`scripts/design-token-baseline.json`)
+// weiter oben im File nicht durch Einfügungen verschoben werden — reine
+// Bauform-Entscheidung, keine funktionale Notwendigkeit.
+
+type NlCreditsHistoryRow = {
+  id: string;
+  originatedSeasonId: string;
+  lenderName: string;
+  principal: number;
+  interestPaid: number;
+  status: "paid" | "defaulted";
+};
+
+function loanHistoryStatusLabel(status: NlCreditsHistoryRow["status"]): string {
+  return status === "paid" ? "Getilgt" : "Ausgefallen";
+}
+
+const NL_CREDITS_HISTORY_COLUMNS: NlTableColumn<NlCreditsHistoryRow>[] = [
+  { key: "season", label: "Saison" },
+  { key: "lender", label: "Kreditgeber" },
+  { key: "principal", label: "Aufgenommen", align: "right" },
+  { key: "interestPaid", label: "Gezahlte Zinsen", align: "right", tooltip: "Summe der Zinsanteile aller Raten dieses Kredits" },
+  { key: "status", label: "Status" },
+];
+
+function renderCreditsHistoryCell(row: NlCreditsHistoryRow, column: NlTableColumn<NlCreditsHistoryRow>) {
+  switch (column.key) {
+    case "season":
+      return row.originatedSeasonId;
+    case "lender":
+      return row.lenderName;
+    case "principal":
+      return formatNlMoney(row.principal);
+    case "interestPaid":
+      return formatNlMoney(row.interestPaid);
+    case "status":
+      return row.status === "defaulted" ? (
+        <span className="nl-tone-risk">{loanHistoryStatusLabel(row.status)}</span>
+      ) : (
+        loanHistoryStatusLabel(row.status)
+      );
+    default:
+      return null;
+  }
 }

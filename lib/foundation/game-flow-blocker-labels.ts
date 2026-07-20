@@ -59,6 +59,10 @@ export function formatGameFlowBlocker(reason: string) {
     return "Verkaufsphase ist geschlossen — Verkäufe sind nur im Transferfenster oder vor dem ersten Resultat möglich.";
   }
 
+  if (reason.startsWith("phase_blocked:sponsor_choice:")) {
+    return "In dieser Phase nicht wählbar: Sponsorenwahl erst außerhalb der laufenden Saison.";
+  }
+
   if (reason.startsWith("phase_blocked:facility_apply:")) {
     return "Bauen ist in dieser Phase noch nicht dran. Du kannst die Kosten trotzdem prüfen; bestätigen geht erst im Management-Fenster.";
   }

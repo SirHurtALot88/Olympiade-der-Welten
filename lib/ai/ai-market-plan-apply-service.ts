@@ -991,7 +991,18 @@ function buildEffectiveBuyPlan(
   const allowedBuyCount = getAllowedBuyCount(team, rosterBase, maxBuysPerTeam, buyGateOpts);
   const batchCap = applyBuyStepsInBatch != null ? Math.min(allowedBuyCount, applyBuyStepsInBatch) : allowedBuyCount;
   const excludeSet = new Set(excludeBuyPlayerIds ?? []);
-  const minUpgradeBuyPrice = buyGateOpts?.minUpgradeBuyPrice ?? null;
+  // The upgrade-price floor only applies to a team that already reached its (effective) Opt and is
+  // spending leftover cash on a genuine quality upgrade (see the atOrAboveOpt guard in
+  // buildFinalBuyGate + the 2026-07-06 note in planner-post-opt-upgrade-policy.ts). Below Opt this is
+  // an ordinary gap-fill/rebuild buy and must take the best affordable candidate regardless of price.
+  // resolveTeamBuyGateOpts can hand us a non-null minUpgradeBuyPrice (via estimateUpgradeBuyFloorMw)
+  // even for a below-Opt team whose excess-cash mandate reports postOptUpgradeDeploy: true, so mirror
+  // buildFinalBuyGate's guard here or the resolved candidate would be silently dropped again.
+  const rosterBaseForOpt = rosterBase ?? team.currentState.rosterCount ?? 0;
+  const minRosterForOpt = Math.max(team.currentState.playerMin ?? 0, GAMEPLAY_HARD_ROSTER_MIN);
+  const playerOptForFloor = team.currentState.playerOpt ?? minRosterForOpt;
+  const atOrAboveOptForFloor = rosterBaseForOpt >= playerOptForFloor;
+  const minUpgradeBuyPrice = atOrAboveOptForFloor ? (buyGateOpts?.minUpgradeBuyPrice ?? null) : null;
   const sourceCandidates = (buyCandidateOverride ?? team.buyPlan.candidates).filter(
     (candidate) =>
       !excludeSet.has(candidate.playerId) &&

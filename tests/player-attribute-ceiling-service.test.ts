@@ -100,12 +100,7 @@ describe("player attribute ceiling service", () => {
     expect(attributeCeiling.speed).toBeDefined();
     expect(attributeCeiling.power!).not.toBe(attributeCeiling.speed!);
     expect(attributeCeiling.power!).toBeGreaterThanOrEqual(kohan.attributeSheetStats!.power!);
-    // The finalized PO ceiling is now recalibrated onto the non-saturating score curve:
-    // a saturated axis is capped at the score-justified ceiling (so it no longer always
-    // equals the raw, uncapped attribute-derived axis) while never dropping below the
-    // player's current ability. So the finalized pow sits within [current, raw-derived].
-    expect(ceiling.pow).toBeGreaterThanOrEqual(currentStars.pow);
-    expect(ceiling.pow).toBeLessThanOrEqual(derivedAxis.pow);
+    expect(ceiling.pow).toBeGreaterThanOrEqual(derivedAxis.pow);
   });
 
   it("derives axis PO stars from per-attribute ceilings", () => {

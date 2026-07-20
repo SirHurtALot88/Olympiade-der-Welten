@@ -74,16 +74,6 @@ function formatScatterValue(value: number | null, key: ScatterXKey | ScatterYKey
   return formatWholeNumber(value);
 }
 
-/** Median einer Zahlenliste (leer → `null`) — eine Sortierung, Basis für die Quadranten-Leitlinien. */
-function median(values: number[]): number | null {
-  if (values.length === 0) {
-    return null;
-  }
-  const sorted = [...values].sort((left, right) => left - right);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) / 2 : sorted[mid]!;
-}
-
 const CHART_WIDTH = 620;
 const CHART_HEIGHT = 300;
 const PAD_LEFT = 46;
@@ -150,13 +140,7 @@ export default function FoundationPlayersScatterCard({ rows, openPlayerDrawerByI
       return { value, y: scaleY(value) };
     });
 
-    // Median-Leitlinien (Feature 3): teilen die Wolke in vier Quadranten, damit
-    // ablesbar ist, welche Ecke "gut" ist (hoher X-Wert = stark, niedriger
-    // Y-Wert = günstig ⇒ Schnäppchen rechts unten). Eine Sortierung je Achse.
-    const medianX = median(xValues);
-    const medianY = median(yValues);
-
-    return { domainXMin, domainXMax, scaleX, scaleY, gridLines, medianX, medianY };
+    return { domainXMin, domainXMax, scaleX, scaleY, gridLines };
   }, [points]);
 
   const activeX = SCATTER_X_AXES.find((axis) => axis.key === xKey) ?? SCATTER_X_AXES[0]!;
@@ -240,44 +224,6 @@ export default function FoundationPlayersScatterCard({ rows, openPlayerDrawerByI
               <text x={(PAD_LEFT + CHART_WIDTH - PAD_RIGHT) / 2} y={CHART_HEIGHT - 8} textAnchor="middle" className="nl-phub-scatter-axis-label">
                 {activeX.label} →
               </text>
-              {/* Median-Leitlinien + Quadranten-Hinweis (Feature 3): gestrichelt (inline),
-                  damit sie sich von den durchgezogenen Achsen absetzen. "Schnäppchen"
-                  markiert die gute Ecke (rechts unten: viel {activeX.label} für wenig {activeY.label}). */}
-              {geometry.medianX != null ? (
-                <line
-                  x1={geometry.scaleX(geometry.medianX)}
-                  x2={geometry.scaleX(geometry.medianX)}
-                  y1={PAD_TOP}
-                  y2={CHART_HEIGHT - PAD_BOTTOM}
-                  className="nl-phub-scatter-axis-line"
-                  style={{ strokeDasharray: "5 4", opacity: 0.7 }}
-                >
-                  <title>Median {activeX.label}: {formatScatterValue(geometry.medianX, xKey)}</title>
-                </line>
-              ) : null}
-              {geometry.medianY != null ? (
-                <line
-                  x1={PAD_LEFT}
-                  x2={CHART_WIDTH - PAD_RIGHT}
-                  y1={geometry.scaleY(geometry.medianY)}
-                  y2={geometry.scaleY(geometry.medianY)}
-                  className="nl-phub-scatter-axis-line"
-                  style={{ strokeDasharray: "5 4", opacity: 0.7 }}
-                >
-                  <title>Median {activeY.label}: {formatScatterValue(geometry.medianY, yKey)}</title>
-                </line>
-              ) : null}
-              {geometry.medianX != null && geometry.medianY != null ? (
-                <text
-                  x={CHART_WIDTH - PAD_RIGHT - 6}
-                  y={CHART_HEIGHT - PAD_BOTTOM - 8}
-                  textAnchor="end"
-                  className="nl-phub-scatter-axis-label"
-                  style={{ fill: "var(--nl-good)", opacity: 0.85 }}
-                >
-                  Schnäppchen ↘
-                </text>
-              ) : null}
               {orderedPoints.map(({ row, x, y, isOwn }) => (
                 <circle
                   key={row.player.id}

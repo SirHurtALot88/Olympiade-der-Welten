@@ -75,6 +75,21 @@ body {
   font-weight: 700;
 }
 
+/* Velo (Neuer Look) ist der permanente Look. Der dunkle Shell fuellt nicht
+   immer die ganze Viewport-Breite/-Hoehe (z. B. im Standard-Breitenmodus auf
+   breiten Monitoren), sodass frueher der helle Legacy-Body-Verlauf rechts und
+   unten neben dem Shell durchschien. Sobald der Neuer-Look-Shell im Dokument
+   ist, faerben wir den Body-Void im gleichen dunklen Velo-Ton wie den Shell.
+   Werte spiegeln --nl-bg-2/--nl-bg + --nl-accent/--nl-ink (die Tokens liegen
+   auf .is-new-look, nicht auf :root, und sind hier daher nicht referenzierbar). */
+body:has(.foundation-app.is-new-look) {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(91, 155, 255, 0.06), transparent 36%),
+    linear-gradient(180deg, #0e131d 0%, #0b0f17 100%);
+  background-attachment: fixed;
+  color: #eaf0fa;
+}
+
 .foundation-app,
 .foundation-app .foundation-shell {
   font-family: "RaniraSeason", Georgia, "Times New Roman", serif;
@@ -551,6 +566,25 @@ a {
   justify-items: start;
 }
 
+.oly-solo-actions {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.oly-solo-choice {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  align-content: start;
+}
+
+.oly-solo-choice .inline-button {
+  width: 100%;
+  text-align: center;
+}
+
 .oly-section-heading {
   display: grid;
   gap: 4px;
@@ -879,9 +913,30 @@ a {
   opacity: 0.75;
 }
 
+.foundation-sidebar-icon-svg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.foundation-sidebar-icon-svg svg {
+  display: block;
+}
+
 .foundation-shell-main {
   display: grid;
   gap: 12px;
+  min-width: 0;
+  /* Die implizite Grid-Spalte darf nie über die verfügbare Breite wachsen —
+     sonst zwingt ein breites Kind (z. B. eine Tabelle) die Spalte auf sein
+     max-content und die Seite scrollt seitlich (Header/Strip/Content wurden
+     sonst 741px in einer 696px-Spalte). */
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Grid-Kinder mit `min-width: 0`, damit breiter Inhalt intern scrollt statt
+   die Spalte (und damit die Seite) aufzuweiten. */
+.foundation-shell-main > * {
   min-width: 0;
 }
 
@@ -1811,6 +1866,14 @@ a {
   padding: 7px 12px;
   border-radius: 999px;
   white-space: nowrap;
+}
+
+/* Laptop/1024: der Shell-Header-Button darf die Zeile nicht über den Viewport
+   drücken — engere Kappung, der Mittel-Text ellipsiert weiterhin. */
+@media (max-width: 1080px) {
+  .foundation-global-next-button {
+    max-width: min(260px, 30vw);
+  }
 }
 
 .foundation-global-next-button strong {
@@ -2802,6 +2865,45 @@ a {
 
 .foundation-context-banner.is-compact .foundation-ai-preseason-copy strong,
 .foundation-context-banner.is-compact .foundation-ai-preseason-copy span {
+  font-size: 0.78rem;
+}
+
+/* Kompakter Multiplayer-Room-Chip: schlanke Pill-Zeile am rechten Rand des
+   Kontext-Banners statt großem, zentralem Block. `order` schiebt den Chip an
+   das Ende der Flex-Zeile, `margin-left: auto` hält ihn bündig an der Kante. */
+.foundation-room-chip {
+  order: 5;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  max-width: 100%;
+  padding: 3px 5px 3px 4px;
+  border: 1px solid rgba(93, 143, 214, 0.32);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.foundation-room-chip .pill {
+  padding: 3px 9px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.foundation-room-chip-code {
+  font-weight: 600;
+}
+
+.foundation-room-chip-participant {
+  overflow: hidden;
+  max-width: 12ch;
+  text-overflow: ellipsis;
+}
+
+.foundation-room-chip-link {
+  flex: 0 0 auto;
+  white-space: nowrap;
   font-size: 0.78rem;
 }
 
@@ -6218,6 +6320,181 @@ a {
   color: rgba(147, 197, 253, 0.98);
 }
 
+/* PPs nach POW/SPE/MEN/SOC — kompakte Mini-Anzeige ("at a glance") plus
+   ausklappbare Disziplin-PPs je Zeile. Nur unter `.is-new-look`, Ton-Tokens
+   (--nl-pow/--nl-spe/--nl-men/--nl-soc via `.nl-tone-*` → --nl-tone). */
+.is-new-look .selected-roster-pps-axes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px 6px;
+  margin-top: 6px;
+}
+
+.is-new-look .selected-roster-pps-axis {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px;
+  min-width: 0;
+  padding: 2px 6px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--nl-tone, rgba(148, 163, 184, 0.6)) 30%, transparent);
+  background: color-mix(in srgb, var(--nl-tone, rgba(148, 163, 184, 0.6)) 12%, transparent);
+}
+
+.is-new-look .selected-roster-pps-axis-label {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--nl-tone, rgba(203, 213, 225, 0.9));
+}
+
+.is-new-look .selected-roster-pps-axis-value {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: rgba(241, 245, 249, 0.96);
+}
+
+.is-new-look .selected-roster-pps-diszi-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  padding: 3px 6px;
+  border-radius: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(148, 163, 184, 0.08);
+  color: rgba(191, 219, 254, 0.92);
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.is-new-look .selected-roster-pps-diszi-toggle:hover {
+  border-color: rgba(147, 197, 253, 0.4);
+  color: rgba(147, 197, 253, 0.98);
+}
+
+.is-new-look .selected-roster-pps-diszi-chevron {
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
+  transition: transform 120ms ease;
+}
+
+.is-new-look .selected-roster-pps-diszi-toggle.is-open .selected-roster-pps-diszi-chevron {
+  transform: rotate(180deg);
+}
+
+.is-new-look .selected-roster-pps-diszi-row > td,
+.is-new-look .nl-table-expanded-row > td {
+  padding: 0;
+}
+
+.is-new-look .nl-table-expanded-row:hover > td {
+  background: transparent;
+}
+
+.is-new-look .selected-roster-pps-diszi-panel {
+  display: grid;
+  gap: 10px;
+  margin: 4px 0 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.4);
+}
+
+.is-new-look .selected-roster-pps-diszi-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.is-new-look .selected-roster-pps-diszi-head strong {
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: rgba(241, 245, 249, 0.98);
+}
+
+.is-new-look .selected-roster-pps-diszi-head .muted {
+  font-size: 0.72rem;
+}
+
+.is-new-look .selected-roster-pps-diszi-axes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.is-new-look .selected-roster-pps-diszi-axis {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--nl-tone, rgba(148, 163, 184, 0.6)) 26%, transparent);
+  background: color-mix(in srgb, var(--nl-tone, rgba(148, 163, 184, 0.6)) 8%, transparent);
+}
+
+.is-new-look .selected-roster-pps-diszi-axis-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid color-mix(in srgb, var(--nl-tone, rgba(148, 163, 184, 0.6)) 22%, transparent);
+}
+
+.is-new-look .selected-roster-pps-diszi-axis-label {
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  color: var(--nl-tone, rgba(203, 213, 225, 0.92));
+}
+
+.is-new-look .selected-roster-pps-diszi-axis-total {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: rgba(241, 245, 249, 0.98);
+}
+
+.is-new-look .selected-roster-pps-diszi-list {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.is-new-look .selected-roster-pps-diszi-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.76rem;
+}
+
+.is-new-look .selected-roster-pps-diszi-item-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(203, 213, 225, 0.88);
+}
+
+.is-new-look .selected-roster-pps-diszi-item-value {
+  flex: 0 0 auto;
+  font-weight: 700;
+  color: rgba(226, 232, 240, 0.96);
+}
+
+.is-new-look .selected-roster-pps-diszi-item.is-empty {
+  justify-content: flex-start;
+}
+
 .selected-team-roster-pps-pill {
   display: inline-flex;
   align-items: center;
@@ -6457,8 +6734,106 @@ a {
 
 .foundation-content {
   display: grid;
+  /* Grid-Spalte auf minmax(0,1fr) klemmen: sonst bekommt die implizite Spalte
+     das Default min-width:auto und wächst auf die max-content-Breite des
+     breitesten Panels (Teams/Ranks ~722-725px) → 14-17px H-Scroll auf schmalen
+     Viewports (1024px). Kinder duerfen unter ihre Inhalts-Mindestbreite
+     schrumpfen, damit innere Scroller/Ellipsis greifen statt die Seite zu weiten. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   align-self: start;
+}
+
+.foundation-content > * {
+  min-width: 0;
+}
+
+/* Route-Error-Boundary (app/foundation/error.tsx) — bewusst self-contained mit
+   Fallback-Werten, damit die Karte auch dann sauber aussieht, wenn der Fehler
+   im View-CSS/Chunk selbst liegt. */
+.foundation-error-boundary {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+}
+
+.foundation-error-card {
+  max-width: 460px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  padding: 32px 28px;
+  border-radius: var(--nl-r-lg, 16px);
+  border: 1px solid var(--nl-line, rgba(255, 255, 255, 0.1));
+  background: var(--nl-panel, rgba(20, 26, 38, 0.96));
+  box-shadow: var(--nl-e2, 0 18px 48px rgba(0, 0, 0, 0.45));
+}
+
+.foundation-error-icon {
+  font-size: 34px;
+  line-height: 1;
+  color: var(--nl-warn, #f0b84c);
+}
+
+.foundation-error-title {
+  margin: 0;
+  font-size: var(--nl-fs-4, 20px);
+  font-weight: 700;
+  color: var(--nl-ink, #e8eef7);
+  text-wrap: balance;
+}
+
+.foundation-error-copy {
+  margin: 0;
+  font-size: var(--nl-fs-2, 14px);
+  line-height: 1.5;
+  color: var(--nl-mut, rgba(214, 224, 240, 0.72));
+}
+
+.foundation-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.foundation-error-btn {
+  padding: 9px 18px;
+  border-radius: var(--nl-r-pill, 999px);
+  border: 1px solid var(--nl-line-2, rgba(255, 255, 255, 0.16));
+  background: transparent;
+  color: var(--nl-ink, #e8eef7);
+  font-size: var(--nl-fs-2, 14px);
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.foundation-error-btn:hover {
+  border-color: var(--nl-accent, #6ea8fe);
+}
+
+.foundation-error-btn.is-primary {
+  background: var(--nl-accent, #6ea8fe);
+  border-color: var(--nl-accent, #6ea8fe);
+  color: var(--nl-on-accent, #0b1220);
+}
+
+.foundation-error-btn.is-primary:hover {
+  filter: brightness(1.06);
+}
+
+.foundation-error-digest {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--nl-mut-2, rgba(160, 174, 196, 0.6));
+  font-family: var(--nl-mono, ui-monospace, monospace);
 }
 
 .foundation-encyclopedia-panel {
@@ -10936,6 +11311,138 @@ a {
   font-size: 0.82rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* --- Ranks-Matrix Modernisierung (Chrome only — Heat-Farbformatierung der
+   Rang-Zellen bleibt unangetastet: getRankHeatClass/.rank-* werden NICHT
+   überschrieben). Ziel: modernerer Rahmen + sichtbare Klickbarkeit der
+   Team-Zeilen (→ Teamprofil). --- */
+#discipline-ranks .table-shell {
+  border-radius: 14px;
+  border: 1px solid var(--nl-line, rgba(255, 255, 255, 0.1));
+  box-shadow: 0 18px 42px -30px rgba(0, 0, 0, 0.7);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Kopfzeile: ruhigere, dichtere Typo für die Sticky-Kopfzeile. */
+.ranks-table thead th {
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+/* Team-Zeilen sind anklickbar → Teamprofil. Cursor + Hover-Feedback machen
+   das sichtbar, ohne die farbcodierten Rang-Zellen umzufärben. */
+.ranks-table tbody tr.ranks-row-clickable {
+  cursor: pointer;
+  transition: box-shadow 0.14s ease;
+}
+
+.ranks-table tbody tr.ranks-row-clickable:hover td {
+  box-shadow: inset 0 1px 0 rgba(120, 170, 255, 0.28), inset 0 -1px 0 rgba(120, 170, 255, 0.28);
+}
+
+.ranks-table tbody tr.ranks-row-clickable:hover .ranks-sticky-team {
+  background: color-mix(in srgb, var(--nl-accent, #5aa0ff) 20%, rgba(43, 43, 43, 0.995)) !important;
+  box-shadow: inset 3px 0 0 var(--nl-accent, #5aa0ff), 1px 0 0 rgba(255, 255, 255, 0.08),
+    10px 0 14px rgba(0, 0, 0, 0.18);
+}
+
+.ranks-table tbody tr.ranks-row-clickable:focus-visible {
+  outline: 2px solid var(--nl-accent, #5aa0ff);
+  outline-offset: -2px;
+}
+
+/* Klickbarkeit wird — wie auf den anderen Seiten — allein über Hover kenntlich
+   gemacht (cursor:pointer, Akzent-Rand + aufgehellte Team-Spalte oben), kein
+   dauerhaftes „Profil"-Label. Der Team-Name bekommt bei Hover Akzentfarbe. */
+.ranks-table tbody tr.ranks-row-clickable:hover .ranks-sticky-team {
+  color: var(--nl-accent, #7fb0ff);
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------------------------
+   Rivalen-Hervorhebung (additiv): Die Rivalen des aktiven Teams bekommen in den
+   Ranglisten (Ranks-Matrix + Saisonstand) einen roten Kantenakzent + einen
+   "⚔ Rivale"-Chip. Bewusst REIN ADDITIV — die Heat-Farbformatierung der
+   Ranks-Matrix (getRankHeatClass/.rank-*) und das Farbschema des Saisonstands
+   bleiben unangetastet; es kommt nur eine Kante/ein Ring + der Chip hinzu.
+   --------------------------------------------------------------------------- */
+
+/* Ranks-Matrix: roter Kantenakzent an der Sticky-Team-Spalte — verändert KEINE
+   Zell-Hintergründe (nur eine box-shadow-Kante). */
+.is-new-look .ranks-table tbody tr.is-rival .ranks-sticky-team {
+  box-shadow: inset 3px 0 0 var(--nl-risk);
+}
+
+/* Team-Name + Chip nebeneinander in der Sticky-Team-Zelle. */
+.is-new-look .ranks-team-name-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* Wiederverwendbarer "⚔ Rivale"-Chip (Ranks + Saisonstand + später Disziplin-Szenen). */
+.is-new-look .rival-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-risk) 62%, transparent);
+  background: color-mix(in srgb, var(--nl-risk) 16%, transparent);
+  color: var(--nl-risk);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: middle;
+  line-height: 1.4;
+}
+
+/* Freund/Feind-Chip (Matchday-Arena): blau=deine, grün=verbündet, rot=Rival.
+   Gleiche Form/Grösse wie `.rival-tag`, Farbe per Modifier über Tokens. Rein additiv. */
+.is-new-look .relationship-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-rel, var(--nl-mut)) 62%, transparent);
+  background: color-mix(in srgb, var(--nl-rel, var(--nl-mut)) 16%, transparent);
+  color: var(--nl-rel, var(--nl-mut));
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: middle;
+  line-height: 1.4;
+}
+.is-new-look .relationship-tag.is-mine {
+  --nl-rel: var(--nl-mine);
+}
+.is-new-look .relationship-tag.is-ally {
+  --nl-rel: var(--nl-ally);
+}
+.is-new-look .relationship-tag.is-rival {
+  --nl-rel: var(--nl-rival);
+}
+
+/* Saisonstand-Board: roter linker Rand + zarter Ring, additiv über dem
+   bestehenden Team-Tag-Rahmen (Team-Tag-Farbschema bleibt erhalten). */
+.is-new-look .nl-standings-row.is-rival {
+  border-left-color: var(--nl-risk);
+  box-shadow: var(--nl-e1), inset 0 0 0 1px color-mix(in srgb, var(--nl-risk) 45%, transparent);
+}
+
+/* Saisonstand-Tabelle: roter linker Kantenakzent an der ersten Zelle. */
+.is-new-look .nl-standings-table-row.is-rival > td:first-child {
+  box-shadow: inset 3px 0 0 var(--nl-risk);
 }
 
 .discipline-config-table {
@@ -25821,6 +26328,15 @@ a {
   font-size: 0.78rem;
 }
 
+/* LZ = 1 → letzte Vertragssaison: als „läuft aus" statt bare „1" anzeigen
+   (endet nach MD10, danach Verkauf → Transfermarkt). */
+.team-contract-lz-chip.is-expiring {
+  white-space: nowrap;
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
 /* --- Verträge-Tabelle: Card-Look, Status-/Intent-Chips, Gehaltsverlauf-
    Treppe & Fußzeilen-Streifen. Übernimmt die Amber/Blau/Slate-Palette der
    Gehaltsforecast-/Vertragsmix-Panels darüber, damit Chart, Panels und
@@ -38841,33 +39357,17 @@ button.foundation-team-portrait-card {
   font-size: 0.72rem;
 }
 
-.scouting-queue-progress {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* T-059: ersetzt die vormals handgerollte scouting-queue-progress-*-Bar
+   durch die geteilte `NlProgressBar` (siehe ScoutingPriorityQueue.tsx) —
+   nur noch die kompakte Track-Höhe für den dichten Listen-Kontext bleibt
+   als lokaler Override. */
+.is-new-look .scouting-queue-progress-bar {
   width: 100%;
   margin-top: 2px;
 }
-
-.scouting-queue-progress-track {
-  flex: 1 1 auto;
+.is-new-look .scouting-queue-progress-bar .nl-progress-track {
   max-width: 140px;
   height: 6px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.18);
-  overflow: hidden;
-}
-
-.scouting-queue-progress-fill {
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--heat-yellow-dark), var(--heat-green-light));
-}
-
-.scouting-queue-progress-label {
-  font-size: 0.7rem;
-  color: rgba(226, 232, 240, 0.7);
-  white-space: nowrap;
 }
 
 .scouting-queue-badge.is-focus {
@@ -41583,8 +42083,7 @@ button.foundation-team-portrait-card {
 .arena-v2-next-step-links { display: grid; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.08); }
 .arena-v2-next-step-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .training-v2-global-mode-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.training-v2-upgrade-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.training-v2-upgrade-tile { display: grid; gap: 2px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); font-size: 0.72rem; }
+/* XP-System abgeschafft: .training-v2-upgrade-strip / -tile (dekorativer "+1 ~40 SP"-Streifen) entfernt. */
 .training-v2-rider-card.is-compare-active { outline: 1px solid rgba(96,165,250,0.45); }
 .training-v2-why-disclosure summary { cursor: pointer; font-size: 0.78rem; color: rgba(147,197,253,0.95); }
 .facilities-overview-v2-maintenance-card,
@@ -42211,6 +42710,16 @@ button.foundation-team-portrait-card {
   --nl-good: #4cc56b;
   --nl-warn: #e0a53a;
   --nl-risk: #e5615a;
+  /* Medaillen (Podest / Top-3-Rahmen) — metallisch, theme-übergreifend lesbar. Silber ist
+     bewusst HELL (nicht --nl-mut, das als „deaktiviert" liest); Bronze löst das rgb-Literal ab. */
+  --nl-gold: #f6c750;
+  --nl-silver: #c7d0dc;
+  --nl-bronze: #cd7f32;
+  /* Freund/Feind-Kodierung (Arena): blau=deine, grün=verbündet, rot=Rival.
+     Aliasse auf die Achsen-/Semantik-Tokens, damit Light/Dark automatisch mitzieht. */
+  --nl-mine: var(--nl-men);
+  --nl-ally: var(--nl-spe);
+  --nl-rival: var(--nl-risk);
   /* Radius */
   --nl-r-sm: 8px;
   --nl-r-md: 12px;
@@ -42589,6 +43098,15 @@ button.foundation-team-portrait-card {
 }
 .is-new-look .nl-table tbody tr.is-active-row td:first-child {
   box-shadow: inset 3px 0 0 var(--nl-accent);
+}
+/* Klickbare Zeile (`onRowClick`) — Zeiger + Tastatur-Fokusring, konsistent
+   mit den übrigen interaktiven Neuer-Look-Oberflächen. */
+.is-new-look .nl-table tbody tr.is-clickable {
+  cursor: pointer;
+}
+.is-new-look .nl-table tbody tr.is-clickable:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: -2px;
 }
 /* Sortierbare Köpfe: echter Button, Pfeil zeigt Zustand. */
 .is-new-look .nl-table-sort-th {
@@ -44423,6 +44941,15 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
+/* --- Laptop/1024: engere Spaltenminima, damit die Board-Zeile nicht über
+   den Viewport läuft (die volle Kartenauflösung greift erst ≤900px). ----- */
+@media (max-width: 1080px) {
+  .is-new-look .nl-standings-rowmain {
+    grid-template-columns: 56px minmax(116px, 1.2fr) minmax(84px, 0.9fr) minmax(150px, 1.5fr) auto 18px;
+    gap: var(--nl-s2);
+  }
+}
+
 /* --- Mobile: Board-Zeilen werden zu Karten ------------------------- */
 @media (max-width: 900px) {
   .is-new-look .nl-standings-rowmain {
@@ -44587,6 +45114,24 @@ button.foundation-team-portrait-card {
   text-align: left;
   cursor: pointer;
   transition: background-color var(--nl-t-fast) var(--nl-ease);
+}
+
+/* Laptop/1024: engere Spaltenminima, damit die Ranking-Zeile in die
+   Content-Spalte passt statt die Seite seitlich zu schieben. Summaryrow teilt
+   dasselbe Raster; die Scroll-Container werden auf die Elternbreite geklemmt,
+   damit ihr overflow-x tatsächlich greift (Flex-Column-Cross-Axis). */
+@media (max-width: 1080px) {
+  .is-new-look .nl-ranks-row,
+  .is-new-look .nl-ranks-summaryrow {
+    grid-template-columns: 44px minmax(104px, 1.2fr) minmax(150px, 1.4fr) auto;
+    gap: var(--nl-s2);
+  }
+}
+
+.is-new-look .nl-ranks-board-scroll,
+.is-new-look .nl-ranks-metric-chart-scroll {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .is-new-look .nl-ranks-row:hover,
@@ -45025,6 +45570,232 @@ button.foundation-team-portrait-card {
 }
 
 /* ============================================================
+   NEUER LOOK — Ewige Tabelle (nl-alltime-*)
+   Nur aktiv unterhalb von `.is-new-look` (Flag an).
+   ============================================================ */
+.is-new-look .nl-alltime {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  font-family: var(--nl-sans);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-alltime-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-alltime-season-badge {
+  padding: 4px 10px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-pill, 999px);
+  background: var(--nl-panel-2);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-alltime-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-alltime-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-top: 3px solid var(--nl-tone, var(--nl-accent));
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+  box-shadow: var(--nl-e1);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-alltime-kpi:hover,
+.is-new-look .nl-alltime-kpi:focus-visible {
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 10%, var(--nl-panel));
+}
+
+.is-new-look .nl-alltime-kpi:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: -2px;
+}
+
+.is-new-look .nl-alltime-kpi.is-own-team {
+  outline: 1px solid var(--nl-accent);
+  outline-offset: 1px;
+}
+
+.is-new-look .nl-alltime-kpi-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-alltime-kpi-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--nl-tone, var(--nl-accent));
+}
+
+.is-new-look .nl-alltime-kpi-holder {
+  font-size: 12px;
+  color: var(--nl-mut);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-alltime-kpi-empty {
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-alltime-team-cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.is-new-look .nl-alltime-team-cell strong {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-alltime-team-cell small {
+  font-size: 10px;
+  color: var(--nl-mut);
+  letter-spacing: 0.05em;
+}
+
+.is-new-look .nl-alltime-table-card .nl-table tbody tr.is-own-team td,
+.is-new-look .nl-alltime-live-card .nl-table tbody tr.is-own-team td {
+  background: var(--nl-accent-soft);
+}
+
+.is-new-look .nl-alltime-table-card .nl-table tbody tr.is-own-team td:first-child,
+.is-new-look .nl-alltime-live-card .nl-table tbody tr.is-own-team td:first-child {
+  box-shadow: inset 3px 0 0 var(--nl-accent);
+}
+
+.is-new-look .nl-alltime-chart-subtabs {
+  margin: 0;
+}
+
+.is-new-look .nl-alltime-chart-hint {
+  margin: 0;
+  padding: var(--nl-s3);
+  font-size: 12px;
+  color: var(--nl-mut);
+  text-align: center;
+}
+
+.is-new-look .nl-alltime-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-alltime-chart-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: var(--nl-s2);
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-alltime-chart-tile.is-own-team {
+  outline: 1px solid var(--nl-accent);
+  outline-offset: 1px;
+}
+
+.is-new-look .nl-alltime-chart-tile-team {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--nl-ink);
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.is-new-look .nl-alltime-chart-tile-team:hover,
+.is-new-look .nl-alltime-chart-tile-team:focus-visible {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-alltime-chart-tile .nl-sparkline {
+  width: 100%;
+  height: 32px;
+}
+
+.is-new-look .nl-alltime-chart-tile-hint {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+/* Einzelner Verlauf-Startpunkt (genau 1 Saison, Geld-Metrik): aktueller Wert als
+   Anker, damit der Verlauf sofort sichtbar startet statt „ab 2 Saisons". */
+.is-new-look .nl-alltime-chart-tile-anchor {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+}
+
+.is-new-look .nl-alltime-chart-tile-anchor-value {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: color-mix(in srgb, var(--nl-tone, var(--nl-ink)) 82%, var(--nl-ink));
+}
+
+.is-new-look .nl-alltime-chart-tile-anchor-caption {
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-alltime-chart-toggle {
+  align-self: center;
+  margin-top: var(--nl-s2);
+  padding: 5px 12px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.is-new-look .nl-alltime-chart-toggle:hover,
+.is-new-look .nl-alltime-chart-toggle:focus-visible {
+  border-color: var(--nl-accent);
+}
+
+/* ============================================================
    NEUER LOOK — Preisgeld (nl-prize-*)
    Nur aktiv unterhalb von `.is-new-look` (Flag an).
    ============================================================ */
@@ -45137,6 +45908,14 @@ button.foundation-team-portrait-card {
   height: auto;
 }
 
+/* Laptop/1024: die 720px-Mindestbreite darf die Seite nicht seitlich sprengen —
+   das Chart ist width:100% und skaliert sauber mit. */
+@media (max-width: 1080px) {
+  .is-new-look .nl-prize-distribution-chart {
+    min-width: 0;
+  }
+}
+
 .is-new-look .nl-prize-forecast-chart {
   width: 100%;
   max-width: 420px;
@@ -45209,6 +45988,14 @@ button.foundation-team-portrait-card {
   background: var(--nl-panel-2);
 }
 
+/* A11y-Fix (T-080-Prize): Zeile ist jetzt per Tastatur fokussierbar
+   (tabIndex/role="button") — sichtbarer Fokusring analog zu den übrigen
+   interaktiven Elementen im neuen Look. */
+.is-new-look .nl-prize-table-row:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: -2px;
+}
+
 .is-new-look .nl-prize-table-row.is-selected {
   background: color-mix(in srgb, var(--nl-accent) 10%, transparent);
   outline: 1px solid var(--nl-accent);
@@ -45259,6 +46046,21 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-prize-money-value {
   display: block;
   font-weight: 700;
+}
+
+/* Preisgeld-Zelle: Betrag + zugehöriger Rang (#Start bzw. #Aktuell) in einer Zeile. */
+.is-new-look .nl-prize-money-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-prize-money-rank {
+  flex: 0 0 auto;
+  font-size: var(--nl-fs-xs);
+  font-weight: 700;
+  color: var(--nl-mut);
 }
 
 .is-new-look .nl-prize-money-bar .nl-progress-track {
@@ -45753,6 +46555,14 @@ button.foundation-team-portrait-card {
   background: var(--nl-panel-2);
 }
 
+/* A11y-Fix (T-080): Zeile ist jetzt per Tastatur fokussierbar
+   (tabIndex/role="button") — sichtbarer Fokusring analog zu den übrigen
+   interaktiven Elementen im neuen Look. */
+.is-new-look .nl-teams-table-row:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: -2px;
+}
+
 .is-new-look .nl-teams-table-row.is-contract-expiring .nl-teams-playername {
   color: var(--nl-warn);
 }
@@ -45829,6 +46639,250 @@ button.foundation-team-portrait-card {
   cursor: default;
 }
 
+/* T-036: „Verkaufen" ist destruktiv (öffnet die Verkaufs-Vorschau) und
+   stand bislang optisch ununterscheidbar direkt neben „Verlängern" →
+   Fehlklick-Gefahr. Eigene Gruppe mit sichtbarem Abstand (`margin-left`)
+   trennt sie von den unkritischen Aktionen; die Warnfarbe (`--nl-risk`)
+   macht die Destruktivität zusätzlich sichtbar. */
+.is-new-look .nl-teams-action-danger-group {
+  display: inline-flex;
+  margin-left: 10px;
+  padding-left: 10px;
+  border-left: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-teams-action-danger {
+  margin-right: 0;
+  color: var(--nl-risk);
+  border-color: color-mix(in srgb, var(--nl-risk) 45%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-risk) 8%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-teams-action-danger:hover:not(:disabled),
+.is-new-look .nl-teams-action-danger:focus-visible {
+  color: var(--nl-risk);
+  border-color: var(--nl-risk);
+  background: color-mix(in srgb, var(--nl-risk) 14%, var(--nl-panel-2));
+}
+
+/* --- Vertrags-Auslauf-Center (Verträge-Tab) --------------------------
+   Fokussiertes „verlängern-oder-verkaufen"-Cockpit über der Verträge-
+   Tabelle: kompakte Entscheidungskarten je auslaufendem Vertrag (LZ ≤ 1),
+   Performance + Vertragsdaten nebeneinander. Bewusst dicht & scrollbar,
+   damit auch der S1·MD1-Fall (ganzer Kader läuft aus) kompakt bleibt. */
+.is-new-look .team-auslauf-center {
+  border-color: color-mix(in srgb, var(--nl-warn) 32%, var(--nl-line));
+}
+
+.is-new-look .team-auslauf-explainer {
+  margin: 0 0 var(--nl-s3);
+  font-size: var(--nl-fs-md);
+  line-height: 1.45;
+  color: var(--nl-mut);
+}
+
+.is-new-look .team-auslauf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: var(--nl-s3);
+  margin-top: var(--nl-s3);
+  max-height: 460px;
+  overflow-y: auto;
+  padding-right: var(--nl-s1);
+}
+
+.is-new-look .team-auslauf-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  padding: var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .team-auslauf-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .team-auslauf-portrait {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  border-radius: var(--nl-r-sm);
+  object-fit: cover;
+  border: 1px solid var(--nl-line);
+}
+
+.is-new-look span.team-auslauf-portrait {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--nl-fs-sm);
+  font-weight: 700;
+  color: var(--nl-mut);
+  background: var(--nl-panel);
+}
+
+.is-new-look .team-auslauf-card-ident {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.is-new-look .team-auslauf-lz {
+  align-self: flex-start;
+  font-size: var(--nl-fs-xs);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.is-new-look .team-auslauf-perf {
+  display: flex;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .team-auslauf-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  padding: var(--nl-s1) var(--nl-s2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel);
+  border: 1px solid var(--nl-line);
+}
+
+.is-new-look .team-auslauf-stat small {
+  font-size: var(--nl-fs-xs);
+  color: var(--nl-mut);
+}
+
+.is-new-look .team-auslauf-stat strong {
+  font-size: var(--nl-fs-lg);
+  font-variant-numeric: tabular-nums;
+  color: var(--nl-ink);
+}
+
+.is-new-look .team-auslauf-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px var(--nl-s3);
+  margin: 0;
+}
+
+.is-new-look .team-auslauf-facts > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+  min-width: 0;
+}
+
+.is-new-look .team-auslauf-facts dt {
+  font-size: var(--nl-fs-xs);
+  color: var(--nl-mut);
+}
+
+.is-new-look .team-auslauf-facts dd {
+  margin: 0;
+  font-size: var(--nl-fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--nl-ink);
+  text-align: right;
+}
+
+.is-new-look .team-auslauf-moral {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .team-auslauf-morale-val {
+  font-size: var(--nl-fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--nl-mut);
+}
+
+.is-new-look .team-auslauf-risk {
+  font-size: var(--nl-fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--nl-warn);
+}
+
+.is-new-look .team-auslauf-actions {
+  display: flex;
+  align-items: center;
+  margin-top: auto;
+  padding-top: var(--nl-s1);
+}
+
+.is-new-look .team-auslauf-actions .nl-teams-action {
+  flex: 1;
+  text-align: center;
+}
+
+/* Umfang-Umschalter (Auslaufend / Ganzer Kader) im Kartenkopf. */
+.is-new-look .team-auslauf-scope {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line);
+}
+
+.is-new-look .team-auslauf-scope-btn {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: calc(var(--nl-r-sm) - 2px);
+  padding: var(--nl-s1) var(--nl-s2);
+  font-size: var(--nl-fs-xs);
+  font-weight: 600;
+  color: var(--nl-mut);
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.is-new-look .team-auslauf-scope-btn:hover {
+  color: var(--nl-ink);
+}
+
+.is-new-look .team-auslauf-scope-btn.is-active {
+  color: var(--nl-ink);
+  background: var(--nl-panel);
+  border-color: var(--nl-line);
+}
+
+/* Neutrale LZ-Chip-Variante für länger laufende Verträge (kein „läuft aus"). */
+.is-new-look .team-auslauf-lz-neutral {
+  white-space: nowrap;
+  font-size: var(--nl-fs-xs);
+  font-weight: 600;
+  color: var(--nl-mut);
+  background: var(--nl-panel);
+  border: 1px solid var(--nl-line);
+}
+
+/* Netto-bei-Verkauf: gut (VK > Buyout) vs. Risiko (VK < Buyout). */
+.is-new-look .team-auslauf-net {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.is-new-look .team-auslauf-net.is-good {
+  color: var(--nl-good);
+}
+
+.is-new-look .team-auslauf-net.is-bad {
+  color: var(--nl-risk);
+}
+
 /* --- Liga-Board (Teamtabelle als Board-Zeilen) ----------------------- */
 .is-new-look .nl-teams-board {
   list-style: none;
@@ -45837,6 +46891,119 @@ button.foundation-team-portrait-card {
   display: flex;
   flex-direction: column;
   gap: var(--nl-s2);
+}
+
+/* Verträge & Auslauf (unten im Teams-Reiter, ersetzt die entfernte
+   „Alle Teams"-Tabelle). Kader-Vertragsliste nach Restlaufzeit sortiert. */
+.is-new-look .nl-teams-contracts-load {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Wenige Balken (Saison-Offsets) → SVG NICHT auf volle Kartenbreite hochskalieren
+   (sonst Riesen-Labels, die sich überlappen). Feste Höhe, Breite folgt dem
+   viewBox-Seitenverhältnis. */
+.is-new-look .nl-teams-contracts-load-chart {
+  height: 132px;
+  width: auto;
+  max-width: 100%;
+}
+
+/* Werte-Labels kleiner, damit „138,6 Mio" in den schmalen Balken-Slot passt und
+   nicht in den Nachbarbalken überläuft (nur für diesen kompakten 3-Balken-Chart). */
+.is-new-look .nl-teams-contracts-load-chart .nl-barchart-value {
+  font-size: 7.5px;
+}
+
+.is-new-look .nl-teams-contracts-load-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teams-contracts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.is-new-look .nl-teams-contracts-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: var(--nl-r-sm);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+  font-size: 13px;
+}
+
+.is-new-look .nl-teams-contracts-row.is-expiring {
+  border-color: color-mix(in srgb, var(--nl-warn) 55%, var(--nl-line));
+  box-shadow: inset 3px 0 0 var(--nl-warn);
+}
+
+.is-new-look .nl-teams-contracts-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 650;
+  color: var(--nl-ink);
+  cursor: pointer;
+}
+
+.is-new-look .nl-teams-contracts-name:hover {
+  color: var(--nl-accent);
+  text-decoration: underline;
+}
+
+.is-new-look .nl-teams-contracts-role {
+  font-size: 11px;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-teams-contracts-salary {
+  min-width: 72px;
+  text-align: right;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-teams-contracts-term {
+  min-width: 84px;
+  text-align: right;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-teams-contracts-term small {
+  color: var(--nl-mut-2);
+}
+
+.is-new-look .nl-teams-contracts-flag {
+  justify-self: end;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teams-contracts-flag.is-expiring {
+  color: var(--nl-warn);
 }
 
 .is-new-look .nl-teams-boardrow {
@@ -46132,6 +47299,37 @@ button.foundation-team-portrait-card {
   color: var(--nl-ink);
 }
 
+/* F2 — "VERPFLICHTET"-Erfolgskarte im Kaufmodal: Ablöse + Gehalt zählen hoch
+   (NlCountUpValue), die Karte fährt über `.nl-reveal` dezent ein. */
+.is-new-look .market-v2-buy-signed-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s4);
+  margin-top: var(--nl-s2);
+}
+
+.is-new-look .market-v2-buy-signed-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.is-new-look .market-v2-buy-signed-figure small {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .market-v2-buy-signed-value {
+  font-family: var(--nl-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--nl-good);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Aktionen */
 .is-new-look .nl-market-primary-action,
 .is-new-look .nl-scout-primary-action {
@@ -46416,6 +47614,103 @@ button.foundation-team-portrait-card {
   cursor: default;
 }
 
+/* F(neu) — "Erweitert"-Akkordeon der Controls-Karte: volle Breite, Toggle-Kopf
+   mit Aktiv-Zähler; das Panel bündelt Achs-Mindestwerte + Fit/Value-Filter,
+   damit die Quick-Zeile (Suche/Sortierung/Achsen-Pills) schlank bleibt. */
+.is-new-look .nl-market-advanced {
+  width: 100%;
+  border-top: 1px solid var(--nl-line);
+  padding-top: var(--nl-s2);
+}
+
+.is-new-look .nl-market-advanced-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px;
+  border: none;
+  background: transparent;
+  color: var(--nl-ink);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.is-new-look .nl-market-advanced-toggle:hover,
+.is-new-look .nl-market-advanced-toggle:focus-visible {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-market-advanced-title {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.is-new-look .nl-market-advanced-count {
+  color: var(--nl-warn);
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .nl-market-advanced-caret {
+  color: var(--nl-mut);
+  font-size: 11px;
+}
+
+.is-new-look .nl-market-advanced-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+  margin-top: var(--nl-s2);
+}
+
+/* Dauerhaft sichtbare "Erweitert"-Sektion (kein Akkordeon mehr):
+   Titel als eigenständiger Sektions-Header statt klickbarer Toggle-Button. */
+.is-new-look .nl-market-advanced.is-static .nl-market-advanced-title {
+  display: block;
+  color: var(--nl-mut);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* F(neu) — Head-to-Head-Vergleich (angeheftet vs. Fokus) in der Fokus-Karte:
+   überlagerter Mehrserien-Radar + paarige StatChip-Zeilen. */
+.is-new-look .nl-market-compare {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  padding: var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-market-compare-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-market-compare-radar {
+  display: flex;
+  justify-content: center;
+}
+
+.is-new-look .nl-market-compare-radar .nl-radar {
+  width: 200px;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Zeilen-Label je Kandidat in der jeweiligen Serienfarbe (Pin=Accent, Fokus=Good). */
+.is-new-look .nl-market-compare-row.is-pinned .nl-stat-chip-row-label {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-market-compare-row.is-selected .nl-stat-chip-row-label {
+  color: var(--nl-good);
+}
+
 /* CA-Sterne inline (ersetzt den entfernten OVR-Wert): nur die CA-Zeile zeigen,
    die PO-Zeile ausblenden — kompakter Ability-Blick in Kachel/Kader/Fokus. */
 .is-new-look .nl-market-ca-stars .nl-ability-metric:last-child {
@@ -46428,9 +47723,18 @@ button.foundation-team-portrait-card {
 /* Hauptraster */
 .is-new-look .nl-market-main-grid {
   display: grid;
-  grid-template-columns: minmax(280px, 0.9fr) minmax(340px, 1.25fr) minmax(280px, 0.9fr);
+  /* Deal-Spalte (rechts) schlanker: nimmt weniger Breite, mehr Raum fürs
+     Scouting-Profil in der Mitte. */
+  grid-template-columns: minmax(280px, 0.92fr) minmax(340px, 1.4fr) minmax(250px, 0.78fr);
   gap: var(--nl-s4);
   align-items: start;
+}
+
+/* Deal-/Impact-Karten dichter stapeln, damit der rechte Block weniger
+   Vertikalraum frisst. */
+.is-new-look .nl-market-deal-card .nl-card-body,
+.is-new-look .nl-market-impact-card .nl-card-body {
+  gap: var(--nl-s2);
 }
 
 .is-new-look .nl-market-focus-column {
@@ -46908,29 +48212,48 @@ button.foundation-team-portrait-card {
 
 /* Deal-Desk */
 .is-new-look .nl-market-deal-topline {
-  margin: var(--nl-s3) 0;
+  margin: 0;
 }
 
 .is-new-look .nl-market-deal-rows {
   display: flex;
   flex-direction: column;
-  gap: var(--nl-s2);
+  gap: 6px;
 }
 
+/* Kompakte Deal-Zeile: Label + Delta oben, Vorher→Nachher einzeilig darunter
+   über die volle Breite. Vorher hatte die 3-Spalten-Grid-Variante die Werte in
+   der schmalen rechten Spalte auf bis zu 4 Zeilen umgebrochen
+   ("175,0 / Mio → / 163,7 / Mio"); jetzt zwei saubere Zeilen ohne Umbruch. */
 .is-new-look .nl-market-deal-row {
-  display: grid;
-  grid-template-columns: 64px 1fr auto;
-  align-items: center;
-  gap: var(--nl-s2);
-  padding: var(--nl-s2) var(--nl-s3);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 5px 9px;
   border-radius: var(--nl-r-sm);
   border: 1px solid var(--nl-line);
   background: var(--nl-panel-2);
-  font-size: 13px;
+}
+
+.is-new-look .nl-market-deal-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.is-new-look .nl-market-deal-row-values {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--nl-ink);
 }
 
 .is-new-look .nl-market-deal-row-label {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -46939,7 +48262,7 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-market-deal-arrow {
   color: var(--nl-mut-2);
-  margin: 0 4px;
+  margin: 0 3px;
 }
 
 .is-new-look .nl-market-deal-flat {
@@ -47029,13 +48352,25 @@ button.foundation-team-portrait-card {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin: var(--nl-s3) 0;
+  margin: 0;
 }
 
-/* Phase-2 F2 — Gehalts-What-if-Slider im Deal-Desk (nur Abstand; der Regler selbst
-   nutzt die token-gestylte .nl-credits-slider-Optik aus NlWhatIfSlider). */
+/* Phase-2 F2 — Gehalts-What-if-Slider im Deal-Desk (Abstand über den Card-Body-Gap;
+   der Regler selbst nutzt die token-gestylte .nl-credits-slider-Optik aus
+   NlWhatIfSlider). Eigene Ränder entfernt, damit kein doppelter Leerraum
+   (Flex-Gap + Margin) entsteht. */
 .is-new-look .nl-market-salary-whatif {
-  margin: var(--nl-s3) 0;
+  margin: 0;
+  gap: 6px;
+}
+
+/* Bugfix: .nl-credits-slider trägt `flex: 1 1 220px` — im Kredite-View sitzt der
+   Regler in einem ROW-Flex (Basis = Breite, korrekt). NlWhatIfSlider stapelt ihn
+   aber in einem COLUMN-Flex, wo die 220px-Basis + flex-grow zur HÖHE werden und
+   ein ~220px hoher, fast leerer Regler entsteht. Hier auf natürliche Höhe zwingen. */
+.is-new-look .nl-whatif-slider input.nl-credits-slider {
+  flex: 0 0 auto;
+  height: 6px;
 }
 
 /* Phase-2 F3 — Mehrsaison-Budget-Leiste (Gehaltslast je Saison + Buyout-Fußnote). */
@@ -47043,7 +48378,7 @@ button.foundation-team-portrait-card {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin: var(--nl-s3) 0;
+  margin: 0;
 }
 .is-new-look .nl-market-deal-budget .nl-market-budget-barchart {
   width: 100%;
@@ -48217,6 +49552,38 @@ button.foundation-team-portrait-card {
   align-items: start;
 }
 
+/* Zwei-Fokus-Rework: eigene Tab-Leiste + zwei separate Layouts. */
+.is-new-look .nl-thist-focus-tabs {
+  margin: var(--nl-s1) 0 calc(var(--nl-s2) * -1);
+}
+
+/* Spieler-Fokus: Deal-Strom breit, Deal-Spotlight daneben. */
+.is-new-look .nl-thist-players-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr);
+  gap: var(--nl-s4);
+  align-items: start;
+}
+
+/* Teams-Fokus: Transferbilanzen + Season-Charts über die volle Breite. */
+.is-new-look .nl-thist-teams-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--nl-s4);
+  align-items: start;
+}
+
+.is-new-look .nl-thist-players-layout > *,
+.is-new-look .nl-thist-teams-layout > * {
+  min-width: 0;
+}
+
+@media (max-width: 1080px) {
+  .is-new-look .nl-thist-players-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* Timeline */
 .is-new-look .nl-thist-timeline {
   display: flex;
@@ -48755,7 +50122,13 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-training-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  /* Min-Track auf 372px: die dichte Intensitaets-Zeile (Label + Bar + 3 Wert-
+     Chips mit Einheiten) braucht ~312px Innenbreite + Padding. Bei 330px passten
+     im 696px-Lane 2 Spalten, deren Karten aber zu schmal fuers Zeilen-Raster
+     waren → ~24px H-Scroll. Ab 372px legt auto-fill im schmalen Lane nur EINE
+     Spalte (volle Breite, Inhalt passt locker) und auf breiten Screens weiter
+     mehrere — responsiv ohne Media-Query. */
+  grid-template-columns: repeat(auto-fill, minmax(372px, 1fr));
   gap: var(--nl-s4);
 }
 
@@ -49408,6 +50781,13 @@ button.foundation-team-portrait-card {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  /* Flex-Item: min-width:0 damit der lange Beschreibungs-Text umbricht statt
+     die Zeile (und die Seite) zu weiten. */
+  min-width: 0;
+}
+
+.is-new-look .nl-facility-action-copy small {
+  overflow-wrap: anywhere;
 }
 
 .is-new-look .nl-facility-action-copy small {
@@ -49727,6 +51107,25 @@ button.foundation-team-portrait-card {
   border-top-color: var(--nl-soc);
 }
 
+/* Golden Card: goldener Rahmen + Schimmer auf der Angebotskarte (Parität zur
+   Liga-Sponsorenübersicht). Additiv über den Archetyp-Rahmen. */
+.is-new-look .nl-sponsor-offer.is-golden {
+  border-color: color-mix(in srgb, var(--nl-warn) 65%, transparent);
+  border-top-color: var(--nl-warn);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--nl-warn) 12%, transparent), transparent 46%),
+    var(--nl-panel);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--nl-warn) 30%, transparent),
+    0 8px 26px color-mix(in srgb, var(--nl-warn) 20%, transparent);
+}
+
+.is-new-look .nl-sponsor-offer-badge.is-golden {
+  border-color: color-mix(in srgb, var(--nl-warn) 65%, transparent);
+  background: color-mix(in srgb, var(--nl-warn) 22%, var(--nl-panel));
+  color: var(--nl-warn);
+  font-weight: 800;
+}
+
 .is-new-look .nl-sponsor-offer-head {
   display: flex;
   align-items: flex-start;
@@ -49756,6 +51155,51 @@ button.foundation-team-portrait-card {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--nl-mut);
+}
+
+/* Seltenheitsgrad-Chip — ersetzt die alte `★n`-Stern-Anzeige durch eine
+   Farbmarkierung nach Stufe (1 Gewöhnlich → 5 Legendär). Die Rang-Farben
+   (grau/grün/blau/violett/gold) leben nur hier in globals.css. */
+.is-new-look .nl-sponsor-rarity {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 1px 0 2px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.7;
+  color: var(--rarity, var(--nl-mut));
+  border: 1px solid color-mix(in srgb, var(--rarity, var(--nl-mut)) 55%, transparent);
+  background: color-mix(in srgb, var(--rarity, var(--nl-mut)) 14%, transparent);
+}
+
+.is-new-look .nl-sponsor-rarity-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--rarity, var(--nl-mut));
+  box-shadow: 0 0 6px color-mix(in srgb, var(--rarity, var(--nl-mut)) 60%, transparent);
+}
+
+.is-new-look .nl-sponsor-rarity.is-r1 {
+  --rarity: #9aa7bd;
+}
+.is-new-look .nl-sponsor-rarity.is-r2 {
+  --rarity: #57d08a;
+}
+.is-new-look .nl-sponsor-rarity.is-r3 {
+  --rarity: #4ea1ff;
+}
+.is-new-look .nl-sponsor-rarity.is-r4 {
+  --rarity: #b57bff;
+}
+.is-new-look .nl-sponsor-rarity.is-r5 {
+  --rarity: #f4c150;
 }
 
 .is-new-look .nl-sponsor-offer-badges {
@@ -49864,6 +51308,84 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-sponsor-challenge-reward {
   font-size: 12px;
   color: var(--nl-warn);
+}
+
+/* --- Staged-Bonusziel-Leiter (TEIL B) ----------------------------- */
+.is-new-look .nl-sponsor-stage-ladder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+  margin-top: var(--nl-s1);
+}
+
+.is-new-look .nl-sponsor-stage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.is-new-look .nl-sponsor-stage-rung {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+  padding: 2px 6px;
+  border-radius: var(--nl-r-sm);
+  background: color-mix(in srgb, var(--nl-panel-2) 70%, transparent);
+  font-size: 11px;
+}
+
+.is-new-look .nl-sponsor-stage-rung-label {
+  color: var(--nl-mut);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-sponsor-stage-rung-payout {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-sponsor-stage-spotlight {
+  align-self: flex-start;
+  padding: 1px 8px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-soc) 45%, transparent);
+  background: color-mix(in srgb, var(--nl-soc) 12%, transparent);
+  color: var(--nl-soc);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* Feed 2 — Performance-Überperformance-Hinweis (Angebotskarte). */
+.is-new-look .nl-sponsor-overperf-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nl-s2);
+  margin-top: var(--nl-s2);
+  padding: var(--nl-s2);
+  border-radius: var(--nl-r-sm);
+  border: 1px solid color-mix(in srgb, var(--nl-pow) 35%, transparent);
+  background: color-mix(in srgb, var(--nl-pow) 9%, transparent);
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-sponsor-overperf-hint strong {
+  color: var(--nl-pow);
+}
+
+.is-new-look .nl-sponsor-overperf-icon {
+  flex-shrink: 0;
+  color: var(--nl-pow);
+  font-size: 13px;
+  line-height: 1.2;
 }
 
 /* --- Verhandlungs-Segment ---------------------------------------- */
@@ -50310,6 +51832,88 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut-2);
 }
 
+/* ============================================================
+   Freund/Feind-Kodierung (Arena) — additive Ringe/Kanten je Beziehung.
+   blau=deine (mine), grün=verbündet (ally), rot=Rival. Bewusst additiv:
+   Team-Tag-Rand, Leader-Gold und die Own-Team-Outline bleiben unangetastet.
+   ============================================================ */
+
+/* Seiten-Tabellen (Tageswertung + Ausgangslage): inset linker Kantenakzent,
+   lässt den 3px-Team-Tag-Rand aussen unberührt. Leader-Zeilen (Gold-Glow)
+   behalten ihren box-shadow — dort trägt allein das Chip die Beziehung. */
+.is-new-look .nl-arena-totalrow.is-rel-mine:not(.is-leader) {
+  box-shadow: inset 3px 0 0 var(--nl-mine);
+}
+.is-new-look .nl-arena-totalrow.is-rel-ally:not(.is-leader) {
+  box-shadow: inset 3px 0 0 var(--nl-ally);
+}
+.is-new-look .nl-arena-totalrow.is-rel-rival:not(.is-leader) {
+  box-shadow: inset 3px 0 0 var(--nl-rival);
+}
+.is-new-look .nl-arena-briefing-row.is-rel-mine {
+  box-shadow: inset 3px 0 0 var(--nl-mine);
+}
+.is-new-look .nl-arena-briefing-row.is-rel-ally {
+  box-shadow: inset 3px 0 0 var(--nl-ally);
+}
+.is-new-look .nl-arena-briefing-row.is-rel-rival {
+  box-shadow: inset 3px 0 0 var(--nl-rival);
+}
+
+/* Feld-Marker (Disziplin-Board): farbiger Ring per Outline (unabhängig von
+   Border/Box-Shadow → kein Konflikt mit Team-Tag/Leader-Glow). Das aktive
+   eigene Team behält seine bestehende Accent-Outline und ist ausgeklammert. */
+.is-new-look .nl-arena-row.is-rel-mine:not(.is-own-team) {
+  outline: 2px solid color-mix(in srgb, var(--nl-mine) 80%, transparent);
+  outline-offset: 1px;
+}
+.is-new-look .nl-arena-row.is-rel-ally:not(.is-own-team) {
+  outline: 2px solid color-mix(in srgb, var(--nl-ally) 80%, transparent);
+  outline-offset: 1px;
+}
+.is-new-look .nl-arena-row.is-rel-rival:not(.is-own-team) {
+  outline: 2px solid color-mix(in srgb, var(--nl-rival) 80%, transparent);
+  outline-offset: 1px;
+}
+
+/* Feld-Marker-Wimpel: analog zur "Du"-Fahne, absolut positioniert (out of flow,
+   kein Eingriff ins Zeilen-Grid). */
+.is-new-look .nl-arena-rel-flag {
+  position: absolute;
+  top: -7px;
+  left: 8px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-rel, var(--nl-line-2));
+  background: color-mix(in srgb, var(--nl-rel, var(--nl-panel)) 24%, var(--nl-panel));
+  font-size: 9px;
+  line-height: 1;
+  pointer-events: none;
+}
+.is-new-look .nl-arena-rel-flag.is-rel-mine {
+  --nl-rel: var(--nl-mine);
+}
+.is-new-look .nl-arena-rel-flag.is-rel-ally {
+  --nl-rel: var(--nl-ally);
+}
+.is-new-look .nl-arena-rel-flag.is-rel-rival {
+  --nl-rel: var(--nl-rival);
+}
+
+/* Chip in der Team-Zelle: kompakt andocken, in Flex-Zellen nicht schrumpfen. */
+.is-new-look .nl-arena-rel-tag {
+  flex: 0 0 auto;
+}
+.is-new-look .nl-arena-team .nl-arena-teamname {
+  min-width: 0;
+}
+
 .is-new-look .nl-arena-phase-controls {
   display: flex;
   align-items: center;
@@ -50589,6 +52193,24 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-arena-mvp-stats small {
   color: var(--nl-mut);
+}
+
+/* MVP-Drilldown-Trigger: dezenter Textbutton unter den Top-3, öffnet die
+   volle Disziplin-Rangliste im NlRankingDrawer. */
+.is-new-look .nl-arena-mvp-more {
+  margin-top: var(--nl-s2);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--nl-tone, var(--nl-accent));
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.is-new-look .nl-arena-mvp-more:hover {
+  text-decoration: underline;
 }
 
 .is-new-look .nl-arena-mvp-empty,
@@ -51570,6 +53192,29 @@ button.foundation-team-portrait-card {
   padding: 0 var(--nl-s4);
   min-width: 72px;
   text-align: center;
+}
+/* T-103/T-083: Knoten-Inhalt ist jetzt ein echter <button> (klickbar,
+   fokussierbar) statt eines dekorativen <li>-Textknotens. */
+.is-new-look .nl-home-schedule-node-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nl-s1);
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  border-radius: var(--nl-r-sm);
+  scroll-margin-inline: var(--nl-s4);
+}
+.is-new-look .nl-home-schedule-node-button:hover .nl-home-schedule-label {
+  color: var(--nl-ink);
+}
+.is-new-look .nl-home-schedule-node-button:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
 }
 .is-new-look .nl-home-schedule-node::before,
 .is-new-look .nl-home-schedule-node::after {
@@ -54032,11 +55677,40 @@ button.foundation-team-portrait-card {
   font-size: 16px;
   font-weight: 700;
   color: var(--nl-ink);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
 }
 
 .is-new-look .nl-lineup-slot-score small {
   font-size: 10px;
   color: var(--nl-mut);
+}
+
+/* "Pkt"-Einheit an der projizierten Punktzahl: macht sie eindeutig als
+   erwartete Punktzahl lesbar, ohne auf eine zweite Zeile umzubrechen. */
+.is-new-look .nl-lineup-slot-score-unit {
+  font-size: 8.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--nl-mut);
+}
+
+/* Punktzahl ist die primäre Kennzahl der Karte, die Fatigue-Gauge daneben
+   nur zweitrangiger Kontext — kleiner & gedämpft, damit sie das Auge nicht
+   mehr auf sich zieht als die Punktzahl (Tooltip/Titel bleibt erhalten). */
+.is-new-look .nl-lineup-slot-score .nl-fatigue-gauge {
+  width: 40px;
+  opacity: 0.72;
+}
+
+.is-new-look .nl-lineup-slot-score .nl-fatigue-gauge .nl-gauge-value {
+  font-size: 11px;
+}
+
+.is-new-look .nl-lineup-slot-score .nl-fatigue-gauge .nl-gauge-label {
+  font-size: 7.5px;
 }
 
 .is-new-look .nl-lineup-captain-badge {
@@ -56595,6 +58269,9 @@ span.nl-facility-ampel-chip {
   display: flex;
   flex-wrap: wrap;
   gap: var(--nl-s4) var(--nl-s5);
+  /* Flex-Item der Card-Body: ohne min-width:0 zwingt der Inhalt (Kurven + Achsen-
+     Labels) die Breite auf und leckt auf schmalen Viewports (1024px) ~118px H-Scroll. */
+  min-width: 0;
 }
 
 .is-new-look .nl-facility-curve-col {
@@ -56603,7 +58280,11 @@ span.nl-facility-ampel-chip {
   flex-direction: column;
   gap: var(--nl-s2);
   flex: 1 1 260px;
-  min-width: 240px;
+  /* min-width:0 statt 240px-Boden: die Spalte darf unter ihre Inhaltsbreite
+     schrumpfen (Chart hat max-width, Kopf-Label darf umbrechen), damit im
+     schmalen Lane keine Seite-Breite erzwungen wird. flex-wrap sorgt weiter
+     dafuer, dass beide Kurven bei zu wenig Platz untereinander landen. */
+  min-width: 0;
   max-width: 360px;
 }
 
@@ -56617,6 +58298,8 @@ span.nl-facility-ampel-chip {
   display: flex;
   align-items: center;
   gap: var(--nl-s1);
+  min-width: 0;
+  flex-wrap: wrap;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -56680,15 +58363,29 @@ span.nl-facility-ampel-chip {
   text-align: left;
   white-space: normal;
   opacity: 0;
-  visibility: hidden;
+  /* display:none statt nur visibility:hidden: eine 260px breite, links-verankerte
+     Bubble mit visibility:hidden zaehlt weiterhin zur scrollWidth — an einem
+     rechtsstehenden Infotip (z.B. Gebäude-Kurvenkopf) leckt das ~118px H-Scroll
+     auf die Seite. display:none nimmt sie komplett aus dem Layout; per
+     allow-discrete + @starting-style bleibt das Einblenden trotzdem weich. */
+  display: none;
   pointer-events: none;
-  transition: opacity var(--nl-t-fast) var(--nl-ease), visibility var(--nl-t-fast) var(--nl-ease);
+  transition:
+    opacity var(--nl-t-fast) var(--nl-ease),
+    display var(--nl-t-fast) var(--nl-ease) allow-discrete;
 }
 
 .is-new-look .nl-facility-infotip:hover::after,
 .is-new-look .nl-facility-infotip:focus::after {
   opacity: 1;
-  visibility: visible;
+  display: block;
+}
+
+@starting-style {
+  .is-new-look .nl-facility-infotip:hover::after,
+  .is-new-look .nl-facility-infotip:focus::after {
+    opacity: 0;
+  }
 }
 
 /* In der sticky Aktionsleiste öffnet die Bubble nach oben. */
@@ -57325,6 +59022,117 @@ button.is-new-look .nl-thist-season-pill,
   max-width: 480px;
 }
 
+/* Gestapeltes Angebots-Cash-Chart: eine Säule je Angebot, Segmente von unten
+   (Basis) nach oben (Sonderziel); Labels je eigener Spalte -> keine Überlappung. */
+.is-new-look .nl-sponsor-stackchart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-sponsor-stackchart-cols {
+  /* Exakt dieselbe Geometrie wie .nl-sponsor-offer-grid, damit jede Säule
+     genau über ihrer Angebots-Karte sitzt — auch wenn die Karten umbrechen. */
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--nl-s4);
+  align-items: end;
+}
+
+/* Vergleichskarte: horizontales Card-Padding entfernen, damit das Chart-Grid
+   dieselbe Breite und denselben linken Ursprung wie das darunterliegende
+   .nl-sponsor-offer-grid (ohne Card-Padding) hat. Kopfbereich bleibt eingerückt. */
+.is-new-look .nl-sponsor-compare-card {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.is-new-look .nl-sponsor-compare-card > .nl-card-head {
+  padding-left: var(--nl-s4);
+  padding-right: var(--nl-s4);
+}
+
+.is-new-look .nl-sponsor-compare-card .nl-sponsor-stack-legend {
+  padding-left: var(--nl-s4);
+  padding-right: var(--nl-s4);
+}
+
+.is-new-look .nl-sponsor-stackcol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.is-new-look .nl-sponsor-stackcol-total {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-sponsor-stackcol-track {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  height: 160px;
+}
+
+.is-new-look .nl-sponsor-stackcol-bar {
+  display: flex;
+  flex-direction: column-reverse;
+  width: 34px;
+  max-width: 70%;
+  min-height: 3px;
+  border-radius: 5px;
+  overflow: hidden;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.28);
+}
+
+.is-new-look .nl-sponsor-stackseg {
+  display: block;
+  width: 100%;
+  min-height: 2px;
+}
+
+.is-new-look .nl-sponsor-stackseg + .nl-sponsor-stackseg {
+  border-top: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+.is-new-look .nl-sponsor-stackcol-label {
+  max-width: 100%;
+  font-size: 11px;
+  color: var(--nl-mut);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-sponsor-stack-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.is-new-look .nl-sponsor-stack-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-sponsor-stack-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
 .is-new-look .nl-sponsor-offer-badge.is-cash-best {
   border-color: color-mix(in srgb, var(--nl-good) 55%, transparent);
   color: var(--nl-good);
@@ -57361,34 +59169,100 @@ button.is-new-look .nl-thist-season-pill,
   flex-wrap: wrap;
 }
 
-.is-new-look .nl-sponsor-league-list {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  max-height: 520px;
+/* Moderne Liga-Sponsorenübersicht: responsives Karten-Grid statt flacher Liste. */
+.is-new-look .nl-sponsor-league-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+  gap: var(--nl-s2);
+  max-height: 560px;
   overflow-y: auto;
+  padding: 2px;
 }
 
-.is-new-look .nl-sponsor-league-row {
-  display: flex;
-  align-items: center;
-  gap: var(--nl-s3);
-  padding: 6px var(--nl-s2);
-  border-radius: var(--nl-r-sm);
-  border: 1px solid transparent;
-}
-
-.is-new-look .nl-sponsor-league-row.is-current {
-  border-color: color-mix(in srgb, var(--nl-accent) 45%, transparent);
-  background: var(--nl-accent-soft);
-}
-
-.is-new-look .nl-sponsor-league-team {
+.is-new-look .nl-sponsor-league-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--nl-s2);
+  padding: var(--nl-s2) var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-sponsor-league-item.is-current {
+  border-color: color-mix(in srgb, var(--nl-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--nl-accent) 10%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-sponsor-league-item.is-empty {
+  border-style: dashed;
+  border-color: var(--nl-line-2);
+  opacity: 0.72;
+}
+
+/* Golden Card: goldener Rahmen + zarter Schimmer, oben angepinnt. */
+.is-new-look .nl-sponsor-league-item.is-golden {
+  border-color: color-mix(in srgb, var(--nl-warn) 70%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--nl-warn) 16%, transparent), transparent 62%),
+    var(--nl-panel-2);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--nl-warn) 35%, transparent),
+    0 6px 20px color-mix(in srgb, var(--nl-warn) 22%, transparent);
+}
+
+.is-new-look .nl-sponsor-league-golden-badge {
+  position: absolute;
+  top: -8px;
+  right: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--nl-warn) 60%, transparent);
+  background: color-mix(in srgb, var(--nl-warn) 26%, var(--nl-panel));
+  color: var(--nl-warn);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-sponsor-league-crest {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 34px;
+}
+
+.is-new-look .nl-sponsor-league-crest .nl-sponsor-crest {
+  width: 34px;
+  height: 38px;
+  display: block;
+}
+
+.is-new-look .nl-sponsor-league-crest-empty {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 34px;
+  border-radius: var(--nl-r-sm);
+  border: 1px dashed var(--nl-line-2);
+  color: var(--nl-mut-2);
+  font-size: 12px;
+}
+
+.is-new-look .nl-sponsor-league-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   min-width: 0;
   flex: 1;
+}
+
+.is-new-look .nl-sponsor-league-teamline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .is-new-look .nl-sponsor-league-code {
@@ -57401,37 +59275,92 @@ button.is-new-look .nl-thist-season-pill,
   color: var(--nl-mut);
 }
 
-.is-new-look .nl-sponsor-league-sponsor {
-  flex: 1;
+.is-new-look .nl-sponsor-league-teamname {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-sponsor-league-you {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--nl-accent) 45%, transparent);
+  color: var(--nl-accent);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.is-new-look .nl-sponsor-league-sponsor {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--nl-ink);
-}
-
-.is-new-look .nl-sponsor-league-sponsor.is-security {
-  color: var(--nl-men);
-}
-
-.is-new-look .nl-sponsor-league-sponsor.is-performance {
-  color: var(--nl-pow);
-}
-
-.is-new-look .nl-sponsor-league-sponsor.is-identity {
-  color: var(--nl-soc);
 }
 
 .is-new-look .nl-sponsor-league-sponsor.is-empty {
   color: var(--nl-mut-2);
   font-style: italic;
+  font-weight: 400;
+}
+
+.is-new-look .nl-sponsor-league-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-sponsor-league-chip {
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid var(--nl-line-2);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--nl-mut);
+  line-height: 1.7;
+}
+
+.is-new-look .nl-sponsor-league-chip.is-security {
+  border-color: color-mix(in srgb, var(--nl-men) 45%, transparent);
+  color: var(--nl-men);
+}
+
+.is-new-look .nl-sponsor-league-chip.is-performance {
+  border-color: color-mix(in srgb, var(--nl-pow) 45%, transparent);
+  color: var(--nl-pow);
+}
+
+.is-new-look .nl-sponsor-league-chip.is-identity {
+  border-color: color-mix(in srgb, var(--nl-soc) 45%, transparent);
+  color: var(--nl-soc);
+}
+
+.is-new-look .nl-sponsor-league-stars {
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  color: var(--nl-warn);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-sponsor-league-stars-dim {
+  color: var(--nl-line-2);
 }
 
 .is-new-look .nl-sponsor-league-cash {
   flex-shrink: 0;
-  font-size: 12px;
-  color: var(--nl-mut);
+  align-self: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nl-ink);
 }
 
 /* --- Sponsoren #79: Rank-Ladder — aktuell erreichte Gewinnstufe --- */
@@ -57909,7 +59838,12 @@ button.is-new-look .nl-thist-season-pill,
   display: block;
   width: 100%;
   max-width: 100%;
-  height: auto;
+  /* Feste, schlanke Balkenhoehe: der Balken soll die Kartenbreite fuellen, aber
+     nicht proportional mitwachsen (sonst wurde er auf breiten Karten zu einem
+     ~70px hohen Vollblock, vor allem wenn nur ein Segment Wert hat). Zusammen
+     mit preserveAspectRatio="none" streckt sich der 320x60-Viewport auf 100%
+     Breite bei fixer 60px Hoehe (vertikal 1:1, keine Hoehenverzerrung). */
+  height: 60px;
 }
 
 .is-new-look .nl-credits-burden-track {
@@ -58083,6 +60017,131 @@ button.is-new-look .nl-thist-season-pill,
   border-radius: 999px;
   background: var(--nl-warn);
   color: #1a1200;
+}
+
+/* --- #182: Liga-Kreditübersicht --- */
+.is-new-look .nl-credits-league-total {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-credits-league-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+.is-new-look .nl-credits-league-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(64px, 1fr) auto;
+  align-items: center;
+  gap: var(--nl-s3);
+  padding: 7px var(--nl-s2);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-credits-league-row.is-current {
+  border-color: color-mix(in srgb, var(--nl-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--nl-accent) 10%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-credits-league-row.is-risk {
+  border-color: color-mix(in srgb, var(--nl-risk) 50%, transparent);
+}
+
+.is-new-look .nl-credits-league-team {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.is-new-look .nl-credits-league-code {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: var(--nl-r-sm);
+  border: 1px solid var(--nl-line-2);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-credits-league-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-credits-league-you {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--nl-accent) 45%, transparent);
+  color: var(--nl-accent);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.is-new-look .nl-credits-league-missed {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-credits-league-bartrack {
+  height: 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--nl-line) 60%, transparent);
+  overflow: hidden;
+}
+
+.is-new-look .nl-credits-league-bar {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--nl-warn) 70%, var(--nl-accent)), var(--nl-warn));
+}
+
+.is-new-look .nl-credits-league-figures {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-credits-league-outstanding {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-credits-league-sub {
+  font-size: 10px;
+  color: var(--nl-mut);
+}
+
+@media (max-width: 640px) {
+  .is-new-look .nl-credits-league-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .is-new-look .nl-credits-league-bartrack {
+    display: none;
+  }
 }
 
 /* --- Reduced Motion (Batch b9) ------------------------------------ */
@@ -58372,6 +60431,11 @@ button.is-new-look .nl-thist-season-pill,
   display: inline-flex;
 }
 
+/* A11y-Fix (T-079): Sichtbarkeit wird jetzt vom `hidden`-Attribut (React-
+   State in `TeamsKpiHoverPortal`, gesetzt via Hover UND Fokus) gesteuert
+   statt über `:hover`/`:focus-within` — so bleibt CSS-Sichtbarkeit und
+   Accessibility-Tree-Zugehörigkeit (kein `aria-hidden="true"` mehr) immer
+   synchron. Spiegelt `.nl-kpipop-panel`/`[hidden]` im Team-Profil. */
 .is-new-look .nl-teams-rank-preview {
   position: absolute;
   top: calc(100% + 6px);
@@ -58386,21 +60450,23 @@ button.is-new-look .nl-thist-season-pill,
   border-radius: var(--nl-r-md);
   background: var(--nl-panel);
   box-shadow: var(--nl-e3);
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-4px);
-  transition:
-    opacity var(--nl-t-fast) var(--nl-ease),
-    transform var(--nl-t-fast) var(--nl-ease),
-    visibility var(--nl-t-fast) var(--nl-ease);
   pointer-events: none;
+  animation: nl-teams-rank-preview-in var(--nl-t-fast, 0.14s) var(--nl-ease, ease-out);
 }
 
-.is-new-look .nl-teams-rank-portal:hover .nl-teams-rank-preview,
-.is-new-look .nl-teams-rank-portal:focus-within .nl-teams-rank-preview {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
+.is-new-look .nl-teams-rank-preview[hidden] {
+  display: none;
+}
+
+@keyframes nl-teams-rank-preview-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .is-new-look .nl-teams-rank-preview-title {
@@ -58462,8 +60528,7 @@ button.is-new-look .nl-thist-season-pill,
 
 @media (prefers-reduced-motion: reduce) {
   .is-new-look .nl-teams-rank-preview {
-    transition: none;
-    transform: none;
+    animation: none;
   }
 }
 
@@ -59724,6 +61789,14 @@ button.nl-players-axis:focus-visible {
 
 .is-new-look .nl-teamprofile-table-row:hover {
   background: var(--nl-panel-2);
+}
+
+/* A11y-Fix (T-080): Zeile ist jetzt per Tastatur fokussierbar
+   (tabIndex/role="button") — sichtbarer Fokusring analog zu den übrigen
+   interaktiven Elementen im neuen Look. */
+.is-new-look .nl-teamprofile-table-row:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: -2px;
 }
 
 .is-new-look .nl-teamprofile-table-row.is-contract-expiring td {
@@ -61954,6 +64027,37 @@ button.nl-players-axis:focus-visible {
     animation: none;
     opacity: 1;
     transform: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   1b) View-Transition: der Content-Wrapper (key={activeView}) fährt bei jedem
+   Tab-/View-Wechsel sanft ein (Fade + kurzer Auftrieb). Bewusst schneller und
+   dezenter als der panelinterne `.nl-reveal`-Stagger, damit sich beide
+   überlagern statt zu konkurrieren. Nur transform/opacity → GPU-freundlich.
+   -------------------------------------------------------------------------- */
+.is-new-look .foundation-view-enter {
+  animation: foundation-view-enter 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+
+@keyframes foundation-view-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.994);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .foundation-view-enter {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    will-change: auto;
   }
 }
 
@@ -66554,6 +68658,10 @@ button.nl-players-axis:focus-visible {
   height: 72px;
   border-radius: 50%;
   object-fit: cover;
+  /* Klemmt jeden Broken-Image-Alt-Text (falls das native <img>-Fehlerbild
+     kurz vor dem React-`fallback`-Swap aufblitzt) hart an den Ring — sonst
+     kann Name-Text aus dem runden Portrait herauslaufen/abgeschnitten wirken. */
+  overflow: hidden;
   border: 3px solid var(--nl-line-2);
   background: var(--nl-panel-2);
   box-shadow: var(--nl-e2);
@@ -66651,9 +68759,14 @@ button.nl-players-axis:focus-visible {
   display: inline-flex;
   align-items: baseline;
   gap: 4px;
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 800;
   color: var(--nl-tone, var(--nl-accent));
+}
+
+/* Platz 1 bekommt — wie schon Portrait & Sockel — die auffälligste Kennzahl. */
+.is-new-look .nl-podium-plinth.is-rank-1 .nl-podium-value {
+  font-size: 28px;
 }
 
 .is-new-look .nl-podium-value-label {
@@ -67492,4 +69605,848 @@ button.nl-players-axis:focus-visible {
 .is-new-look .nl-gen-saved-item strong {
   font-size: 13px;
   color: var(--nl-ink);
+}
+
+/* ============================================================
+   Finanzen (Neuer Look) — Saison-Einnahmen/Ausgaben-Übersicht
+   des eigenen Teams. Read-only, gleicher Karten-/Chip-Wortschatz
+   wie Kredite (siehe .nl-credits-* weiter oben), eigener Namespace
+   `.nl-fin-*`.
+   ============================================================ */
+.is-new-look .nl-fin {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  color: var(--nl-ink);
+  font-family: var(--nl-sans);
+}
+
+.is-new-look .nl-fin-kpi-hero {
+  margin-top: var(--nl-s2);
+}
+
+/* --- Cashflow-Balken: Einnahmen- und Ausgaben-Bar übereinander --- */
+.is-new-look .nl-fin-flow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-fin-flow-chart {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  /* Feste, schlanke Balkenhoehe (wie .nl-credits-burden-chart): der
+     Balken soll die Kartenbreite fuellen, aber nicht mit ihr mitwachsen. */
+  height: 60px;
+}
+
+.is-new-look .nl-fin-flow-track {
+  fill: var(--nl-bg-2);
+  stroke: var(--nl-line);
+}
+
+.is-new-look .nl-fin-flow-seg {
+  transition: width var(--nl-t-fast, 0.15s) var(--nl-ease, ease);
+}
+
+.is-new-look .nl-fin-flow-empty {
+  margin: 0;
+  font-size: 13px;
+}
+
+.is-new-look .nl-fin-flow-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s4);
+}
+
+.is-new-look .nl-fin-flow-legend-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-fin-flow-legend-heading {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-fin-flow-legend-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.is-new-look .nl-fin-flow-legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  align-self: center;
+}
+
+.is-new-look .nl-fin-flow-legend-label {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-fin-flow-legend-value {
+  font-weight: 700;
+  color: var(--nl-ink);
+}
+
+/* --- Einnahmen-/Ausgaben-Spalten ------------------------------------ */
+.is-new-look .nl-fin-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--nl-s4);
+}
+
+@media (max-width: 720px) {
+  .is-new-look .nl-fin-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.is-new-look .nl-fin-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-fin-line {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: help;
+}
+
+.is-new-look .nl-fin-line-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-fin-line-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-fin-line-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-fin-line-bartrack {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--nl-line) 60%, transparent);
+  overflow: hidden;
+}
+
+.is-new-look .nl-fin-line-bar {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width var(--nl-t-fast, 0.15s) var(--nl-ease, ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-fin-flow-seg,
+  .is-new-look .nl-fin-line-bar {
+    transition: none;
+  }
+}
+
+/* --- Liga · Finanzvergleich (unten in der Finanzen-View) ------------ */
+.is-new-look .nl-fin-league-hint {
+  margin: 0 0 var(--nl-s3);
+  font-size: 12px;
+}
+
+.is-new-look .nl-fin-league-team {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.is-new-look .nl-fin-league-code {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: var(--nl-r-sm);
+  border: 1px solid var(--nl-line-2);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-fin-league-name {
+  min-width: 0;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.is-new-look .nl-fin-league-you {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--nl-accent) 45%, transparent);
+  color: var(--nl-accent);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* GuV-Zelle: Ton kommt von `nlToneClass` (good/risk), Farbe via `--nl-tone`. */
+.is-new-look .nl-fin-league-card .nl-table td .nl-tone-good,
+.is-new-look .nl-fin-league-card .nl-table td .nl-tone-risk {
+  color: var(--nl-tone);
+  font-weight: 700;
+}
+
+/* ============================================================
+   NEUER LOOK — Spielplan / Diszis (nl-diszis-*)
+   Saison-Spielplan als Hero: Achsen-Farblegende + Spieltag-Kartenraster,
+   damit sofort klar ist, welche Achsen-Farbe (POW/SPE/MEN/SOC) welche
+   Disziplin trägt. Nur aktiv unterhalb von `.is-new-look` (Flag an).
+   ============================================================ */
+.is-new-look .nl-diszis-axis-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2, 8px);
+  margin: 0 0 var(--nl-s3, 12px);
+}
+
+.is-new-look .nl-diszis-axis-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.is-new-look .nl-diszis-axis-legend-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--nl-ink) 12%, transparent);
+}
+
+.is-new-look .nl-diszis-schedule-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--nl-s3, 12px);
+  width: 100%;
+}
+
+.is-new-look .nl-diszis-md-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2, 8px);
+  padding: var(--nl-s3, 12px);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+  box-shadow: var(--nl-e1);
+  min-width: 0;
+}
+
+.is-new-look .nl-diszis-md-card.is-current {
+  border-color: color-mix(in srgb, var(--nl-accent) 55%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-accent) 8%, var(--nl-panel));
+  box-shadow: var(--nl-e1), 0 0 0 1px color-mix(in srgb, var(--nl-accent) 45%, transparent);
+}
+
+.is-new-look .nl-diszis-md-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-diszis-md-current-tag {
+  color: var(--nl-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.is-new-look .nl-diszis-md-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.is-new-look .nl-diszis-md-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  border-left: 3px solid var(--slot-color, var(--nl-line-2));
+  border-radius: var(--nl-r-sm);
+  background: color-mix(in srgb, var(--slot-color, var(--nl-mut)) 10%, var(--nl-panel-2));
+  min-width: 0;
+}
+
+.is-new-look .nl-diszis-md-slot.is-empty {
+  border-left-color: var(--nl-line-2);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-diszis-md-slot-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nl-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-diszis-md-slot-meta {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.is-new-look .nl-diszis-md-slot-axis {
+  font-weight: 700;
+}
+
+.is-new-look .nl-diszis-md-card-foot {
+  font-size: 11px;
+}
+
+/* --- Gehaltsverhandlung („Verlängern") — Overlay-Modal -------------------
+   Verhandlungsfenster für Vertragsverlängerungen (ContractRenewalNegotiationModal,
+   Teams → Verträge/Kader). Nutzt den bestehenden `foundation-modal-backdrop`/
+   `foundation-modal`-Rahmen; hier nur die New-Look-Innereien (Tokens only). */
+
+.is-new-look .nl-negotiation-modal {
+  width: min(1080px, calc(100vw - 32px));
+  padding: 20px 24px 18px;
+  display: grid;
+  gap: 14px;
+  background: var(--nl-panel);
+  border-color: var(--nl-line-2);
+}
+
+.is-new-look .nl-negotiation-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.is-new-look .nl-negotiation-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-negotiation-title {
+  margin: 2px 0 4px;
+  font-size: 20px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-negotiation-sub {
+  margin: 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-negotiation-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 960px) {
+  .is-new-look .nl-negotiation-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.is-new-look .nl-negotiation-panel {
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+  padding: 12px 14px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.is-new-look .nl-negotiation-panel-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-negotiation-busy {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-negotiation-field {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-negotiation-salary-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-negotiation-salary-input {
+  width: 110px;
+  padding: 6px 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--nl-ink);
+  background: var(--nl-bg-2);
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-sm);
+}
+
+.is-new-look .nl-negotiation-salary-input:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-negotiation-choice-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-negotiation-choice {
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nl-mut);
+  background: var(--nl-bg-2);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.is-new-look .nl-negotiation-choice:hover,
+.is-new-look .nl-negotiation-choice:focus-visible {
+  color: var(--nl-ink);
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-negotiation-choice.is-active {
+  color: var(--nl-ink);
+  border-color: var(--nl-accent);
+  background: var(--nl-accent-soft);
+}
+
+.is-new-look .nl-negotiation-choice.is-limited {
+  color: var(--nl-mut-2);
+  border-style: dashed;
+}
+
+.is-new-look .nl-negotiation-choice small {
+  margin-left: 3px;
+  color: var(--nl-warn);
+}
+
+.is-new-look .nl-negotiation-hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-negotiation-hint.is-risk {
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-negotiation-facts {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.is-new-look .nl-negotiation-facts > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.is-new-look .nl-negotiation-facts dt {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-negotiation-facts dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nl-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .nl-negotiation-facts dd small {
+  font-weight: 400;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-negotiation-offer.is-good {
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-negotiation-offer.is-warn {
+  color: var(--nl-warn);
+}
+
+.is-new-look .nl-negotiation-offer.is-risk {
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-negotiation-chances {
+  display: grid;
+  gap: 6px;
+}
+
+.is-new-look .nl-negotiation-chance-bar {
+  display: flex;
+  height: 10px;
+  border-radius: var(--nl-r-pill);
+  overflow: hidden;
+  background: var(--nl-bg-2);
+  border: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-negotiation-chance-bar .is-accept {
+  background: var(--nl-good);
+}
+
+.is-new-look .nl-negotiation-chance-bar .is-counter {
+  background: var(--nl-warn);
+}
+
+.is-new-look .nl-negotiation-chance-bar .is-reject {
+  background: var(--nl-risk);
+}
+
+.is-new-look .nl-negotiation-chance-legend {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .nl-negotiation-chance-legend .is-accept {
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-negotiation-chance-legend .is-counter {
+  color: var(--nl-warn);
+}
+
+.is-new-look .nl-negotiation-chance-legend .is-reject {
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-negotiation-schedule {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.is-new-look .nl-negotiation-schedule li {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 64px;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-negotiation-schedule-bar {
+  display: block;
+  height: 8px;
+  border-radius: var(--nl-r-pill);
+  background: color-mix(in srgb, var(--nl-accent) 65%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-negotiation-schedule-value {
+  text-align: right;
+  font-weight: 700;
+  color: var(--nl-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .nl-negotiation-notes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.is-new-look .nl-negotiation-note {
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-negotiation-note strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.is-new-look .nl-negotiation-note ul {
+  margin: 0;
+  padding-left: 16px;
+  display: grid;
+  gap: 3px;
+}
+
+.is-new-look .nl-negotiation-note.is-blocked {
+  border-color: color-mix(in srgb, var(--nl-risk) 45%, var(--nl-line));
+}
+
+.is-new-look .nl-negotiation-note.is-blocked strong {
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-negotiation-note.is-warning {
+  border-color: color-mix(in srgb, var(--nl-warn) 45%, var(--nl-line));
+}
+
+.is-new-look .nl-negotiation-note.is-warning strong {
+  color: var(--nl-warn);
+}
+
+.is-new-look .nl-negotiation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid var(--nl-line);
+  padding-top: 12px;
+}
+
+.is-new-look .nl-negotiation-blocked-reason {
+  margin: -6px 0 0;
+  text-align: right;
+  font-size: 11px;
+  color: var(--nl-risk);
+}
+
+/* --- Verkaufsfenster (transfer-sell-page): verschlankte Struktur "Neuer Look" ---
+   Entscheidungs-Zone oben (Hero-KPIs, Team-Auswirkung, Board/GM), Detail-Sektionen
+   als kompakte <details>-Disclosures. Nur Tokens, Scope .is-new-look. */
+
+.is-new-look .transfer-sell-page .transfer-buy-modal-body {
+  gap: var(--nl-s3);
+}
+
+.is-new-look .transfer-sell-page .transfer-modal-section {
+  gap: var(--nl-s2);
+}
+
+.is-new-look .transfer-sell-disclosure {
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+  padding: var(--nl-s2) var(--nl-s3);
+}
+
+.is-new-look .transfer-sell-disclosure > summary {
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nl-ink);
+  list-style-position: inside;
+}
+
+.is-new-look .transfer-sell-disclosure > summary:hover {
+  color: var(--nl-accent);
+}
+
+.is-new-look .transfer-sell-disclosure > summary .muted {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nl-mut);
+  text-align: right;
+}
+
+.is-new-look .transfer-sell-disclosure-body {
+  display: grid;
+  gap: var(--nl-s2);
+  margin-top: var(--nl-s2);
+}
+
+.is-new-look .transfer-sell-page .transfer-sell-metric-grid .metric-card {
+  min-height: 0;
+  padding: var(--nl-s2) var(--nl-s3);
+}
+
+@media (min-width: 1180px) {
+  .is-new-look .transfer-sell-page .transfer-sell-kpis {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+/* Disziplin-Bühne · Drawer-Sektion "In dieser Disziplin": größere Portrait-Karten
+   als Rail-Tiles (1:1 Full-Art, 108er-Raster). Farben ausschließlich rgba/rgb —
+   kein Hex (Design-Token-Lint bleibt sauber). Reuse der Rail-Tile-Optik aus
+   .market-v2-candidate-card, hier eigenständig gescoped auf das Drawer-Raster. */
+.dstage-portrait-rail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px;
+}
+
+.dstage-portrait-rail-grid .foundation-player-portrait-card.is-portrait-rail {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.dstage-portrait-rail-grid .foundation-player-portrait-rail-tile {
+  width: 100%;
+}
+
+.dstage-portrait-rail-grid .foundation-player-portrait-hero.is-rail-tile {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 8px 18px rgba(8, 14, 26, 0.28);
+}
+
+.dstage-portrait-rail-grid .foundation-player-portrait-hero.is-rail-tile .home-v2-player-portrait {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+}
+
+.dstage-portrait-rail-grid .foundation-player-portrait-overlay.is-rail-tile {
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background:
+    linear-gradient(180deg, rgba(8, 12, 20, 0.08) 0%, rgba(8, 12, 20, 0.04) 34%, rgba(8, 12, 20, 0.72) 72%, rgba(8, 12, 20, 0.92) 100%);
+  pointer-events: none;
+}
+
+.dstage-portrait-rail-grid .foundation-player-portrait-overlay.is-rail-tile .home-v2-player-overlay-top {
+  padding: 5px 6px 0;
+}
+
+.dstage-portrait-rail-grid .foundation-player-portrait-overlay.is-rail-tile .home-v2-player-overlay-bottom {
+  display: grid;
+  gap: 3px;
+  padding: 6px;
+  min-width: 0;
+}
+
+.dstage-portrait-rail-grid .foundation-player-portrait-submeta.is-rail-tile {
+  font-size: 0.54rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(214, 223, 238, 0.78);
+}
+
+.dstage-portrait-rail-grid .home-v2-player-name.is-rail-tile {
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.05;
+  color: rgba(248, 251, 255, 0.98);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dstage-portrait-rail-grid .foundation-player-portrait-stats.is-rail-tile-overlay {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.dstage-portrait-rail-grid .foundation-player-portrait-stats.is-rail-tile-overlay .foundation-player-portrait-stat {
+  display: inline-grid;
+  min-height: 18px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(8, 12, 20, 0.58);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.dstage-portrait-rail-grid .foundation-player-portrait-stats.is-rail-tile-overlay .foundation-player-portrait-stat small {
+  font-size: 0.48rem;
+  letter-spacing: 0.04em;
+}
+
+.dstage-portrait-rail-grid .foundation-player-portrait-stats.is-rail-tile-overlay .foundation-player-portrait-stat strong {
+  font-size: 0.6rem;
+  line-height: 1;
+}
+
+.dstage-portrait-rail-grid .home-v2-player-badge {
+  min-height: 16px;
+  padding: 0 5px;
+  font-size: 0.5rem;
+  letter-spacing: 0.04em;
 }

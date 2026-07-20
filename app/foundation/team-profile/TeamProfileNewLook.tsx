@@ -28,7 +28,7 @@ import type {
   TeamDetailDrawerData,
   TeamDetailDrawerHistoryRow,
   TeamDetailDrawerPlayerCard,
-} from "@/app/foundation/TeamDetailDrawer";
+} from "@/lib/foundation/team-detail-drawer-types";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import { getClassColorClassName } from "@/app/foundation/classVisuals";
 import { getSeasonV2TeamTagStyle } from "@/app/foundation/season-v2/SeasonStandingsV2Client";
@@ -137,6 +137,22 @@ function getObjectiveStatusLabel(status: "open" | "completed" | "failed" | "at_r
   return "offen";
 }
 
+/**
+ * Board-Vertrauen-Warnungen kommen als rohe Token-Keys aus
+ * `computeTeamSeasonBoardConfidence` (lib/board/team-season-objectives-service.ts,
+ * Feld `warnings`) und dürfen nicht als roher Text erscheinen. Bekannte Keys
+ * werden auf knappe deutsche Labels gemappt, unbekannte fallen lesbar zurück.
+ */
+function formatBoardConfidenceWarning(warning: string): string {
+  const mapped: Record<string, string> = {
+    board_confidence_source_saved_state: "Board-Vertrauen: gespeicherter Stand",
+    board_objectives_failed: "Board-Ziele verfehlt",
+    board_objectives_at_risk: "Board-Ziele gefährdet",
+    high_board_pressure: "Hoher Board-Druck",
+  };
+  return mapped[warning] ?? warning.replaceAll("_", " ");
+}
+
 function getObjectiveStatusTone(status: "open" | "completed" | "failed" | "at_risk"): string {
   if (status === "completed") return "is-good";
   if (status === "failed") return "is-risk";
@@ -177,8 +193,13 @@ const DEPTH_CAPABLE_RATING_FLOOR = 60;
 const DEPTH_FATIGUE_WARN_THRESHOLD = 70;
 
 function getDepthRatingTone(rating: number): NlTone {
-  if (rating >= 80) return "good";
-  if (rating >= DEPTH_CAPABLE_RATING_FLOOR) return "accent";
+  // Aufsteigende Qualitäts-Skala: rot → gelb → grün → blau(elite). Vorher sprang
+  // sie von gelb (40–59) direkt auf blau (60–79) und zeigte grün erst ab 80 —
+  // die grüne "fähig"-Stufe fehlte damit praktisch immer. Jetzt ist die reale
+  // Fähig-Schwelle (`DEPTH_CAPABLE_RATING_FLOOR`, 60) grün, blau bleibt als
+  // oberste Elite-Stufe (≥80) erhalten.
+  if (rating >= 80) return "accent";
+  if (rating >= DEPTH_CAPABLE_RATING_FLOOR) return "good";
   if (rating >= 40) return "warn";
   return "risk";
 }
@@ -921,6 +942,23 @@ export default function TeamProfileNewLook({
                   key={player.activePlayerId}
                   className={`nl-teamprofile-table-row${isContractExpiring ? " is-contract-expiring" : ""}`}
                   onClick={() => onOpenPlayer(player.playerId, player.activePlayerId)}
+                  // A11y-Fix (T-080): Die Zeile war nur per Maus-Klick bedienbar
+                  // (kein tabIndex/role/onKeyDown). `target === currentTarget`
+                  // verhindert, dass Enter/Space auf dem verschachtelten
+                  // Spielerlink-Button die Zeilen-Aktion zusätzlich auslöst —
+                  // der Button hat sein eigenes Verhalten bereits (inkl.
+                  // `stopPropagation` bei Klick).
+                  tabIndex={0}
+                  role="button"
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) {
+                      return;
+                    }
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onOpenPlayer(player.playerId, player.activePlayerId);
+                    }
+                  }}
                   title={`${player.name} öffnen${player.issueTags.length > 0 ? ` · Hinweise: ${player.issueTags.join(", ")}` : ""}`}
                 >
                   <td className="nl-teamprofile-td-player">
@@ -1104,7 +1142,7 @@ export default function TeamProfileNewLook({
                 <button
                   type="button"
                   className="nl-kpipop-playbtn"
-                  onClick={() => onOpenPlayer(row.playerId, row.playerId)}
+                  onClick={() => onOpenPlayer(row.playerId, row.id)}
                   title={`${row.name} öffnen`}
                 >
                   <span className="nl-kpipop-playname">{row.name}</span>
@@ -1147,7 +1185,7 @@ export default function TeamProfileNewLook({
                   <button
                     type="button"
                     className="nl-kpipop-playbtn"
-                    onClick={() => onOpenPlayer(row.playerId, row.playerId)}
+                    onClick={() => onOpenPlayer(row.playerId, row.id)}
                     title={`${row.name} öffnen · Vertrag: ${shape.label}`}
                   >
                     <span className="nl-kpipop-playname">
@@ -1229,7 +1267,7 @@ export default function TeamProfileNewLook({
                   chip={
                     <StatChip
                       label="Cash"
-                      value={formatNlNumber(data.cash, 1)}
+                      value={formatNlMoney(data.cash)}
                       tone={data.cash != null && data.cash < 0 ? "risk" : "neutral"}
                       title="Liquide Mittel — GuV im Hover"
                     />
@@ -1242,7 +1280,7 @@ export default function TeamProfileNewLook({
                   ariaLabel={`Marktwert ${data.teamName} — Zusammensetzung`}
                   align="end"
                   chip={
-                    <StatChip label="MW" value={formatNlNumber(data.marketValueTotal, 2)} title="Marktwert gesamt — Aufschlüsselung im Hover" />
+                    <StatChip label="MW" value={formatNlMoney(data.marketValueTotal)} title="Marktwert gesamt — Aufschlüsselung im Hover" />
                   }
                 >
                   {renderMwPanel()}
@@ -1252,7 +1290,7 @@ export default function TeamProfileNewLook({
                   ariaLabel={`Gehalt ${data.teamName} — Aufschlüsselung`}
                   align="end"
                   chip={
-                    <StatChip label="Gehalt" value={formatNlNumber(data.salaryTotal, 2)} title="Gehaltsblock des Kaders — Aufschlüsselung im Hover" />
+                    <StatChip label="Gehalt" value={formatNlMoney(data.salaryTotal)} title="Gehaltsblock des Kaders — Aufschlüsselung im Hover" />
                   }
                 >
                   {renderGehaltPanel()}
@@ -1843,7 +1881,7 @@ export default function TeamProfileNewLook({
                 {data.boardConfidence.warnings.length > 0 ? (
                   <ul className="nl-teamprofile-board-warnings">
                     {data.boardConfidence.warnings.slice(0, 3).map((warning, index) => (
-                      <li key={index}>{warning}</li>
+                      <li key={index}>{formatBoardConfidenceWarning(warning)}</li>
                     ))}
                   </ul>
                 ) : null}

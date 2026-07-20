@@ -27,6 +27,10 @@ describe("foundation page surfaces contract", () => {
       `${root}/app/foundation/transfermarkt-v2/FoundationMarketBuyShellHost.tsx`,
       "utf8",
     );
+    const sellHostText = await fs.readFile(
+      `${root}/app/foundation/transfermarkt-v2/FoundationMarketSellShellHost.tsx`,
+      "utf8",
+    );
     const orchestratorText = await readFoundationOrchestratorSource(root);
     const foundationText = await readFoundationSurfaceSource(root);
     const facilityText = await fs.readFile(`${root}/app/foundation/facilities-v2/facility-ui-shared.tsx`, "utf8");
@@ -34,7 +38,11 @@ describe("foundation page surfaces contract", () => {
     expect(buyHostText).toContain("foundation-drilldown-page");
     expect(buyHostText).toContain('data-testid="transfer-offer-page"');
     expect(transferText).not.toContain("foundation-modal-backdrop");
-    expect(foundationText).toContain('data-testid="transfer-sell-page"');
+    // Verkaufs-Drilldown lebt im dedizierten Shell-Host, der Body rendert ihn
+    // über FoundationShellRouterMarketSell (Strangler Phase 5.3 abgeschlossen).
+    expect(sellHostText).toContain("foundation-drilldown-page");
+    expect(sellHostText).toContain('data-testid="transfer-sell-page"');
+    expect(foundationText).toContain("FoundationShellRouterMarketSell");
     expect(foundationText).toContain('data-testid="season-briefing-page"');
     expect(orchestratorText).not.toContain("season-briefing-modal");
     expect(orchestratorText).not.toContain("foundation-modal-backdrop");
@@ -47,18 +55,18 @@ describe("foundation page surfaces contract", () => {
 
 describe("team profile ui contract", () => {
   it("exposes full-page team dossier with roster navigation to player profile", async () => {
-    const [teamProfileText, drawerText] = await Promise.all([
+    const [teamProfileText, newLookText] = await Promise.all([
       fs.readFile(`${root}/app/foundation/team-profile/TeamProfileClient.tsx`, "utf8"),
-      fs.readFile(`${root}/app/foundation/TeamDetailDrawer.tsx`, "utf8"),
+      fs.readFile(`${root}/app/foundation/team-profile/TeamProfileNewLook.tsx`, "utf8"),
     ]);
 
-    expect(teamProfileText).toContain('variant="page"');
-    expect(drawerText).toContain('data-testid="foundation-team-profile"');
-    expect(drawerText).toContain("onOpenPlayer");
-    expect(drawerText).toContain("team-drawer-lead-summary");
-    expect(drawerText).toContain("team-drawer-relations-panel");
-    expect(drawerText).toContain("team-drawer-objective-board");
-    expect(drawerText).toContain("team-drawer-objective-row-main");
+    // The canonical team dossier is TeamProfileNewLook, rendered by TeamProfileClient.
+    expect(teamProfileText).toContain("<TeamProfileNewLook");
+    expect(newLookText).toContain('data-testid="foundation-team-profile"');
+    expect(newLookText).toContain("onOpenPlayer");
+    expect(newLookText).toContain("renderRelationshipColumn");
+    expect(newLookText).toContain('data-testid="nl-teamprofile-board"');
+    expect(newLookText).toContain('data-testid="nl-teamprofile-roster"');
   });
 });
 

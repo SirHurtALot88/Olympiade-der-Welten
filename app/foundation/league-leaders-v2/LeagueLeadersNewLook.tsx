@@ -283,6 +283,10 @@ export default function LeagueLeadersNewLook({
           const tone = NL_LEADER_TONE_MAP[category.tone] ?? "accent";
           const leader = category.entries.length > 0 ? category.entries[0] : null;
           const topValue = leader != null && Number.isFinite(leader.value) ? leader.value : 0;
+          // Vor dem ersten Spieltag sind Performance-Kategorien (PP POW/SPE/MEN/…)
+          // bei allen Spielern 0 — dann lieber EIN "noch keine Werte"-Hinweis als
+          // eine Liste aus fuenf Nullen. OVR/CA sind nie 0, greift also nur dort.
+          const hasData = leader != null && Number.isFinite(topValue) && topValue > 0;
           const chasers = category.entries.slice(1);
           const median = getCategoryMedian(category);
           const statDecimals = getCategoryStatDecimals(category.id);
@@ -303,7 +307,7 @@ export default function LeagueLeadersNewLook({
                 <span className="nl-leaders-card-label">{category.label}</span>
               </header>
 
-              {leader ? (
+              {hasData && leader ? (
                 <button
                   type="button"
                   className={`nl-leaders-hero${leader.teamId != null && leader.teamId === selectedTeamId ? " is-own-team" : ""}`}
@@ -321,10 +325,10 @@ export default function LeagueLeadersNewLook({
                   <span className="nl-leaders-hero-value nl-tnum">{leader.displayValue}</span>
                 </button>
               ) : (
-                <p className="nl-leaders-empty">Keine Werte</p>
+                <p className="nl-leaders-empty">Noch keine Werte diese Saison — erscheint nach dem ersten Spieltag.</p>
               )}
 
-              {chasers.length > 0 ? (
+              {hasData && chasers.length > 0 ? (
                 <div className="nl-leaders-list">
                   {chasers.map((entry) => (
                     <button
@@ -356,7 +360,7 @@ export default function LeagueLeadersNewLook({
                 </div>
               ) : null}
 
-              {leader ? (
+              {hasData && leader ? (
                 <StatChipRow className="nl-leaders-stats" aria-label={`Einordnung ${category.label}`}>
                   <StatChip
                     label="Leader"

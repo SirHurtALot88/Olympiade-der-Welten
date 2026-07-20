@@ -855,11 +855,18 @@ describe("player detail drawer", () => {
       source: "sqlite",
     });
 
+    // Lückenlose Enumeration: Season 2 und 3 haben keinen Snapshot, erscheinen
+    // aber als Platzhalter zwischen der frühesten (Season 1) und der aktuellen
+    // Season (Season 5).
     expect(data?.historyRows.map((row) => row.seasonId)).toEqual([
       "season-1",
+      "season-2",
+      "season-3",
       "season-4",
       "season-5",
     ]);
+    expect(data?.historyRows.find((row) => row.seasonId === "season-2")?.pps).toBeNull();
+    expect(data?.historyRows.find((row) => row.seasonId === "season-3")?.teamName).toBeNull();
     expect(data?.historyRows.find((row) => row.seasonId === "season-1")?.pps).toBeNull();
     expect(data?.historyRows.find((row) => row.seasonId === "season-4")?.pow).toBe(12);
     expect(data?.historyRows.find((row) => row.seasonId === "season-5")?.isActiveSeason).toBe(true);

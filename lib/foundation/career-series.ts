@@ -5,7 +5,6 @@ import {
 } from "@/lib/foundation/snapshot-player-performance";
 import { resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
-import { clampSeasonSnapshotsToCurrentSeason } from "@/lib/foundation/season-history-clamp";
 
 /**
  * Career series selectors for the Werdegang panel.
@@ -124,9 +123,7 @@ function countMedals(medals: Array<CareerMedal | null>): CareerMedalCabinet {
 }
 
 function getSortedSnapshots(gameState: GameState) {
-  // Drop any snapshot for a season newer than the live season (contaminated saves)
-  // so career tables never show future seasons.
-  return clampSeasonSnapshotsToCurrentSeason(gameState).sort(compareSeasonSnapshotsAsc);
+  return [...(gameState.seasonState.seasonSnapshots ?? [])].sort(compareSeasonSnapshotsAsc);
 }
 
 export function buildPlayerCareerSeries(gameState: GameState, playerId: string): PlayerCareerSeries {

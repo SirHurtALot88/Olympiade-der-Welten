@@ -94,8 +94,13 @@ const BASE_THRESHOLD: Record<CompositeSellTeamProfile, number> = {
 export function resolveCompositeSellTeamProfile(
   teamId: string,
   sellForProfitAggression: number | null | undefined,
+  gmArchetype?: string | null,
 ): CompositeSellTeamProfile {
-  if (teamId === "C-C" || (sellForProfitAggression ?? 0) >= 8) return "flip_shop";
+  // Direct archetype hook: a bargain_hunter GM must reliably run the flip-shop profile (buy-low →
+  // sell-high) instead of relying on the diluted, blended sellForProfitAggression bias ever reaching 8.
+  if (teamId === "C-C" || gmArchetype === "bargain_hunter" || (sellForProfitAggression ?? 0) >= 8) {
+    return "flip_shop";
+  }
   if (teamId === "T-T") return "development";
   if (teamId === "M-S") return "harmony";
   return "default";
@@ -129,6 +134,8 @@ export type CompositeSellScoreInput = {
   cashPressureScore: number;
   explanation?: string;
   sellForProfitAggression?: number | null;
+  /** GM archetype for direct identity hooks (e.g. bargain_hunter → flip_shop + stronger loss resistance). */
+  gmArchetype?: string | null;
 };
 
 export type CompositeSellScoreResult = {
@@ -158,7 +165,7 @@ export function resolveEffectiveSellThreshold(input: {
 }
 
 export function computeCompositeSellScore(input: CompositeSellScoreInput): CompositeSellScoreResult {
-  const teamProfile = resolveCompositeSellTeamProfile(input.teamId, input.sellForProfitAggression);
+  const teamProfile = resolveCompositeSellTeamProfile(input.teamId, input.sellForProfitAggression, input.gmArchetype);
   const weights = WEIGHTS[teamProfile];
   const purchasePrice = input.roster.purchasePrice ?? null;
   const currentMw = input.marketValue;
@@ -246,7 +253,11 @@ export function computeCompositeSellScore(input: CompositeSellScoreInput): Compo
     isFreshPurchase && sellBelowPurchase
       ? -round((0.25 + lossMagnitude * 2.4) * weights.lossResistance * (1 + clamp01(realizedLossAbs / 20)))
       : 0;
-  const lossResistance = round(baseLossResistance + freshBuyLossResistance);
+  // bargain_hunter: a not-yet-upgraded fresh buy must NOT be dumped below its purchase price — that is
+  // exactly the buy-high/sell-low spiral that produces the negative average profitDelta. Strengthen the
+  // (already negative) loss resistance so such sells fall below the sell threshold.
+  const lossResistanceScale = input.gmArchetype === "bargain_hunter" ? 1.6 : 1;
+  const lossResistance = round((baseLossResistance + freshBuyLossResistance) * lossResistanceScale);
 
   const total = round(
     clamp(
@@ -294,7 +305,17 @@ export function selectCompositeSellCandidates<T extends { expectedSellValue?: nu
   const sorted = [...input.candidates].sort((left, right) => right.score - left.score);
   if (sorted.length === 0) return [];
   if (input.teamProfile === "flip_shop") {
-    return sorted.map((entry) => entry.candidate);
+    // Only real profit flips: when a purchase price is known, require a positive realized delta
+    // (expectedSell − purchasePrice). Missing purchase info (e.g. draft-origin players) keeps the
+    // prior permissive behaviour. Prevents the profile from becoming a wholesale roster sell-off.
+    return sorted
+      .filter((entry) => {
+        const sell = entry.candidate.expectedSellValue ?? null;
+        const buy = entry.candidate.purchasePrice ?? null;
+        if (sell != null && buy != null) return sell - buy > 0;
+        return true;
+      })
+      .map((entry) => entry.candidate);
   }
 
   let projectedCash = input.teamCash;

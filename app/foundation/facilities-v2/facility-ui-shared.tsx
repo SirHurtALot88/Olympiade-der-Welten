@@ -41,6 +41,18 @@ export function formatLocaleNumber(value: number | null | undefined, digits = 0)
   }).format(value);
 }
 
+/**
+ * Effekt-Beschreibungen kommen als vorformatierte Roh-Strings aus dem
+ * Facility-Katalog (z. B. "+3.25 Cash/Saison") — mit englischem Dezimalpunkt.
+ * Für die Anzeige auf Deutsch nur den Dezimalpunkt INNERHALB einer Zahl
+ * (Ziffer.Ziffer) in ein Komma wandeln ("+3,25 Cash/Saison"). Rein
+ * presentational: Punkte außerhalb von Ziffern (z. B. Abkürzungen) bleiben
+ * unberührt, Werte werden nicht gerundet oder neu berechnet.
+ */
+export function formatFacilityEffectText(text: string): string {
+  return text.replace(/(\d)\.(\d)/g, "$1,$2");
+}
+
 export function formatFacilityActionReason(reason: string) {
   const mapped: Record<string, string> = {
     insufficient_cash: "Nicht genug Cash.",
@@ -96,10 +108,10 @@ export function FacilityLevelStrip({ facilityId, level }: { facilityId: Facility
           <div
             key={`${facilityId}-l${targetLevel}`}
             className={`facilities-v2-level-step${targetLevel <= level ? " is-active" : ""}`}
-            title={definition?.effectDescription ?? undefined}
+            title={definition ? formatFacilityEffectText(definition.effectDescription) : undefined}
           >
             <span>L{targetLevel}</span>
-            <strong>{definition?.effectDescription ?? "—"}</strong>
+            <strong>{definition ? formatFacilityEffectText(definition.effectDescription) : "—"}</strong>
           </div>
         );
       })}
@@ -180,11 +192,11 @@ export function FacilityDecisionModal({
           <section className="training-v2-facility-modal-hero">
             <div>
               <span>Jetzt</span>
-              <strong>{selectedFacility.currentEffect}</strong>
+              <strong>{formatFacilityEffectText(selectedFacility.currentEffect)}</strong>
             </div>
             <div>
               <span>Nächstes Level</span>
-              <strong>{selectedFacility.nextLevelEffect}</strong>
+              <strong>{formatFacilityEffectText(selectedFacility.nextLevelEffect)}</strong>
               <small>
                 {selectedFacility.upgradeCost != null ? formatTransfermarktCurrency(selectedFacility.upgradeCost) : "Max"} · Unterhalt{" "}
                 {formatTransfermarktCurrency(selectedFacility.currentUpkeep)} → {formatTransfermarktCurrency(selectedFacility.nextUpkeep)}
@@ -238,7 +250,11 @@ export function FacilityDecisionModal({
               onClick={() => onRunAction("downgrade")}
             >
               <span>Downgrade</span>
-              <strong>25%</strong>
+              <strong>
+                {facilityDialog.action === "downgrade" && matchingUpgradePreview?.refundAmount != null
+                  ? formatTransfermarktCurrency(matchingUpgradePreview.refundAmount)
+                  : "wird berechnet …"}
+              </strong>
             </button>
             <button
               className={`training-v2-facility-action-tab${facilityDialog.action === "maintenance" ? " is-active" : ""}`}
