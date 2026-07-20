@@ -575,9 +575,17 @@ export function buildLegacyMatchdayResolvePreview(
         rankedTeam.pointSource = distributedPoints.pointSource;
         rankedTeam.teamPoints = distributedPoints.teamPoints;
         rankedTeam.warnings = Array.from(new Set([...rankedTeam.warnings, ...distributedPoints.warnings]));
-        rankedTeam.entries = rankedTeam.entries.map((entry, index) => ({
+        // PP nach playerId zuordnen, NICHT nach Index: distributedPoints.entries
+        // folgt der score-absteigenden `rankedWithinTeam`-Reihenfolge, während
+        // rankedTeam.entries in Slot-Reihenfolge vorliegt — ein Index-Zip würde
+        // die Punkte dem falschen Spieler geben (nur die Summe stimmt).
+        const pointsByPlayerId = new Map<string, number | null>();
+        rankedWithinTeam.forEach(({ entry }, index) => {
+          pointsByPlayerId.set(entry.playerId, distributedPoints.entries[index]?.points ?? null);
+        });
+        rankedTeam.entries = rankedTeam.entries.map((entry) => ({
           ...entry,
-          pointsAwarded: distributedPoints.entries[index]?.points ?? entry.pointsAwarded ?? null,
+          pointsAwarded: pointsByPlayerId.get(entry.playerId) ?? entry.pointsAwarded ?? null,
         }));
       }
 
