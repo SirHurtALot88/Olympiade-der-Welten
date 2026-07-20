@@ -817,7 +817,7 @@ export const STAR_MIN = 80;
 // simultan dorthin (dur = ROUND_MS). Score bleibt Wahrheit; nur die Token-POSITION
 // wird pro Runde gemeinsam animiert. Mini-DM (duelhp) läuft über das geteilte
 // Chrome + die Registry-Feld-Komponente (arena/disciplines/duelhp.tsx).
-export const TRACK_ROUND_MS = 5000;
+export const TRACK_ROUND_MS = 10000;
 // viewBox + Token-Radien je Primitive. Der Rest (Engine/FX/Ticker/Podest/Tabelle)
 // ist geometrieunabhängig; nur Feld-Layout + tokenPos unterscheiden sich.
 const PRIM_GEO: Record<StagePrimitive, { w: number; h: number; r: number; rOwn: number }> = {
@@ -941,6 +941,8 @@ export type RT = {
   laneIdx: number; // dichte 0…N-1 Bahn-/Turm-Reihenfolge nach seasonRank (keine Lücken)
   score: number;
   displayScore: number; // track: Runden-Ziel für die Token-Position (alle Teams gemeinsam gesetzt → simultanes Gleiten). Sonst = score.
+  roundStartScore: number; // Score zu Rundenbeginn — Basis der 5s-Rang-Interpolation (Feld↔Tabelle-Sync)
+  animScore: number; // laufend interpolierter Anzeige-Score (ramped roundStartScore→displayScore über 5s)
   thrownSlot: number;
   rank: number;
   rankHistory: number[]; // Rang nach jeder gewerteten Etappe (für Bump/Verlauf)
@@ -1020,6 +1022,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       laneIdx: idx,
       score: 0,
       displayScore: 0,
+      roundStartScore: 0,
+      animScore: 0,
       thrownSlot: -1,
       rank: idx + 1,
       rankHistory: [],
@@ -1050,6 +1054,11 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const [shake, setShake] = useState<"none" | "hard" | "soft">("none");
   const [pops, setPops] = useState<Pop[]>([]);
   const [frags, setFrags] = useState<Frag[]>([]);
+  // Geteilter 5s-Zeitstrahl (Feld↔Tabelle-Sync): animScore rampt roundStartScore→
+  // displayScore, treibt Feldposition UND Ranglisten-Sortierung. + Highlight-Zoom.
+  const [zoom, setZoom] = useState<{ ox: number; oy: number } | null>(null);
+  const roundAnimStartRef = useRef<number>(0);
+  const zoomFiredRef = useRef<boolean>(false);
   const [ticker, setTicker] = useState<TickerData[]>([]);
   const [podium, setPodium] = useState<PodCol[] | null>(null);
   const [hover, setHover] = useState<{ idx: number } | null>(null);
@@ -1543,6 +1552,65 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     [prim, layout, pathLen, finalMax, W, N, barbellInfo, barbellY],
   );
 
+  // Frischer tokenPos-Spiegel für den (mount-once) Anim-rAF, ohne ihn neu zu starten.
+  const tokenPosRef = useRef(tokenPos);
+  tokenPosRef.current = tokenPos;
+
+  // ---- Geteilter 5s-Zeitstrahl (Feld↔Tabelle-Sync + Highlight-Zoom) ----
+  // Eine rAF-Schleife rampt animScore = lerp(roundStartScore → displayScore) über
+  // TRACK_ROUND_MS. Das FELD (track liest animScore) und die RANGLISTE (sortiert nach
+  // animScore) laufen so exakt auf demselben Zeitstrahl → Ränge ändern sich langsam &
+  // synchron zur Bewegung statt nachzutrudeln. Bei ~55 % feuert ein nicht-blockierender
+  // Zoom-Slowmo auf den größten Aufsteiger (Highlight ohne Fluss-Stopp).
+  useEffect(() => {
+    let raf = 0;
+    let lastForce = 0;
+    const tick = () => {
+      const rt = rtRef.current;
+      const start = roundAnimStartRef.current;
+      const elapsed = start ? Date.now() - start : Infinity;
+      const tRaw = reduced.current || elapsed >= TRACK_ROUND_MS ? 1 : elapsed / TRACK_ROUND_MS;
+      const e = tRaw >= 1 ? 1 : 1 - Math.pow(1 - tRaw, 2); // ease-out (wie Feld-Glide)
+      let changed = false;
+      for (const t of rt) {
+        const from = t.roundStartScore;
+        const target = t.displayScore;
+        const v = tRaw >= 1 ? target : round1(from + (target - from) * e);
+        if (v !== t.animScore) {
+          t.animScore = v;
+          changed = true;
+        }
+      }
+      // Highlight-Zoom (nicht blockierend): größter Aufsteiger dieser Runde, einmalig.
+      if (start && !zoomFiredRef.current && tRaw > 0.5 && tRaw < 0.9 && !reduced.current) {
+        zoomFiredRef.current = true;
+        let mover: RT | null = null;
+        let best = -Infinity;
+        for (const t of rt) {
+          const d = t.displayScore - t.roundStartScore;
+          if (d > best) {
+            best = d;
+            mover = t;
+          }
+        }
+        if (mover && best > 0.5) {
+          const p = tokenPosRef.current(mover, mover.animScore);
+          setZoom({ ox: (p.x / W) * 100, oy: (p.y / H) * 100 });
+          window.setTimeout(() => setZoom(null), 1150);
+        }
+      }
+      // Rangliste gedrosselt neu rendern (~13 fps) solange die Runde rampt.
+      if (changed && tRaw < 1 && Date.now() - lastForce > 75) {
+        lastForce = Date.now();
+        force();
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ---- Rang-/Slot-Mathematik (Port der Szene) ----
   function recomputeRanks(rt: RT[]): void {
     const order = [...rt].sort((a, b) => b.score - a.score || a.seasonRank - b.seasonRank);
@@ -1875,6 +1943,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     const rt = rtRef.current;
     rt.forEach((t) => {
       t.roundStartRank = t.rank;
+      t.roundStartScore = t.score; // Basis der 5s-animScore-Rampe (Feld↔Tabelle-Sync)
       t.roundMedal = 0;
     });
     // Runden-Slot-Ränge VORAB bestimmen (kein Spoiler: nur gespeichert, erscheint
@@ -1905,6 +1974,10 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     rt.forEach((t) => {
       t.displayScore = round1(t.score + playerNet(t.players[r]));
     });
+    // Geteilten 5s-Zeitstrahl starten: animScore rampt jetzt roundStartScore→displayScore
+    // (Feld ↔ Rangliste synchron). Zoom-Highlight für diese Runde neu scharf schalten.
+    roundAnimStartRef.current = Date.now();
+    zoomFiredRef.current = false;
     if (prim === "track") {
       // Staffelstab-Übergabe (FEATURE 1): bei jedem Etappenwechsel (ab Etappe 2 — Etappe 1
       // hat keinen abgebenden Läufer) reicht jedes Token seinen Stab nach vorn. Ein einziger
@@ -2082,7 +2155,9 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     rt.forEach((t) => {
       t.rankHistory = Array.from({ length: slotCount }, () => t.rank);
       t.displayScore = t.score; // Token-Position sofort auf Endstand (kein Nach-Gleiten)
+      t.animScore = t.score; // Sync-Rampe direkt auf Endstand (Quick-Sim: kein Ramp)
     });
+    roundAnimStartRef.current = 0; // Anim-Rampe aus (Endstand steht sofort)
     setRound(slotCount);
     setBusy(false);
     busyRef.current = false;
@@ -2169,6 +2244,18 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   }
   const posMax = Math.max(1, posLeader > 0 ? posLeader * 1.06 : finalMax);
   posMaxRef.current = posMax;
+
+  // Live-Rang aus animScore (geteilter 5s-Zeitstrahl) → die Rangliste ändert sich langsam
+  // & synchron zur Feldbewegung statt in Cascade-Sprüngen. Nur track (Benchmark); andere
+  // Prims behalten ihren sequenziellen rank, bis sie ihren Rebuild bekommen.
+  const liveRankByCode: Record<string, number> = {};
+  if (prim === "track") {
+    [...rtRef.current]
+      .sort((a, b) => b.animScore - a.animScore || a.seasonRank - b.seasonRank)
+      .forEach((t, i) => {
+        liveRankByCode[t.code] = i + 1;
+      });
+  }
 
   // ---- Konsolidierte „Dein Team"-Karte (nur track) (FEATURE 3) ----
   // Ersetzt den früheren MyTracker-Streifen UND die separate „Dein Läufer"-Karte durch
@@ -2597,7 +2684,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
 
         {/* Oval-Track + Overlays */}
         <div className={shake !== "none" ? "oly-anim" : undefined} style={{ position: "relative", borderRadius: 14, overflow: "hidden", border: "1px solid var(--nl-line)", background: "var(--nl-bg)", animation: shake === "hard" ? "olyShakeHard .44s ease" : shake === "soft" ? "olyShakeSoft .3s ease" : undefined }}>
-          <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "auto", maxHeight: fieldMaxH ? fieldMaxH : "calc(100vh - 220px)", display: "block", margin: "0 auto", transform: photoFinish ? "scale(1.6)" : undefined, transformOrigin: "26% 11%", transition: reduced.current ? undefined : "transform .5s ease" }}>
+          <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "auto", maxHeight: fieldMaxH ? fieldMaxH : "calc(100vh - 220px)", display: "block", margin: "0 auto", transform: photoFinish ? "scale(1.6)" : zoom ? "scale(1.32)" : undefined, transformOrigin: photoFinish ? "26% 11%" : zoom ? `${zoom.ox}% ${zoom.oy}%` : "26% 11%", transition: reduced.current ? undefined : "transform .65s cubic-bezier(.3,0,.2,1)" }}>
             <FieldComp {...fieldCtx} />
           </svg>
 
@@ -2937,9 +3024,13 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           // gewerteten Etappe (rankHistory), „+N" des aktuellen Läufers (letzter
           // aufgedeckter Slot) und Rückstand absolut auf Platz 1.
           const prevRank = t.rankHistory.length ? t.rankHistory[t.rankHistory.length - 1]! : null;
-          const rankDelta = prevRank != null ? prevRank - t.rank : 0;
+          // track: Live-Rang/-Score aus dem geteilten 5s-Zeitstrahl (animScore) → Zeile
+          // wandert synchron zur Feldbewegung. Sonst der sequenzielle rank/score.
+          const dispRank = prim === "track" ? liveRankByCode[t.code] ?? t.rank : t.rank;
+          const dispScore = prim === "track" ? t.animScore : t.score;
+          const rankDelta = prevRank != null ? prevRank - dispRank : 0;
           const lastGain = t.thrownSlot >= 0 ? playerNet(t.players[t.thrownSlot]) : null;
-          const behind = leader ? leader.score - t.score : 0;
+          const behind = leader ? (prim === "track" ? leader.animScore : leader.score) - dispScore : 0;
           // Gewichtheben · Kraft-Turm: Rang/kg/Zugewinn aus dem Latten-Modell (Anti-
           // Spoiler zählt live hoch), Rang-Pfeil aus der Barbell-Vorrunde, aktueller Heber.
           const bRank = prim === "barbell" ? barbellRankMap[t.code] ?? t.rank : t.rank;
@@ -2971,8 +3062,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               }
             }}
             title={teamClickable ? "Team-Karte öffnen" : undefined}
-            style={{ display: "flex", alignItems: "center", gap: 7, padding: "1.5px 6px", borderRadius: 8, fontVariantNumeric: "tabular-nums", cursor: teamClickable ? "pointer" : "default", opacity: bOut ? 0.55 : 1, background: t.isOwn ? "color-mix(in srgb, var(--nl-accent) 14%, transparent)" : bChamp ? "color-mix(in srgb, var(--nl-warn) 16%, transparent)" : rc ? `color-mix(in srgb, ${rc} 9%, transparent)` : "transparent", boxShadow: rc ? `inset 3px 0 0 ${rc}` : undefined, ...(trackLadder ? { position: "absolute" as const, left: 0, right: 0, height: LADDER_ROW_H, transform: `translateY(${(t.rank - 1) * LADDER_ROW_H}px)`, transition: reduced.current ? "none" : "transform .6s cubic-bezier(.45,0,.2,1)" } : null) }}>
-            <span style={{ width: 26, textAlign: "right", fontWeight: 800, color: prim === "barbell" ? (bChamp ? "var(--nl-warn)" : ampel(bRank)) : ampel(t.rank), fontSize: 12.5 }}>{bChamp ? "🏆" : `#${prim === "barbell" ? bRank : t.rank}`}</span>
+            style={{ display: "flex", alignItems: "center", gap: 7, padding: "1.5px 6px", borderRadius: 8, fontVariantNumeric: "tabular-nums", cursor: teamClickable ? "pointer" : "default", opacity: bOut ? 0.55 : 1, background: t.isOwn ? "color-mix(in srgb, var(--nl-accent) 14%, transparent)" : bChamp ? "color-mix(in srgb, var(--nl-warn) 16%, transparent)" : rc ? `color-mix(in srgb, ${rc} 9%, transparent)` : "transparent", boxShadow: rc ? `inset 3px 0 0 ${rc}` : undefined, ...(trackLadder ? { position: "absolute" as const, left: 0, right: 0, height: LADDER_ROW_H, transform: `translateY(${(dispRank - 1) * LADDER_ROW_H}px)`, transition: reduced.current ? "none" : "transform .35s cubic-bezier(.45,0,.2,1)" } : null) }}>
+            <span style={{ width: 26, textAlign: "right", fontWeight: 800, color: prim === "barbell" ? (bChamp ? "var(--nl-warn)" : ampel(bRank)) : ampel(dispRank), fontSize: 12.5 }}>{bChamp ? "🏆" : `#${prim === "barbell" ? bRank : dispRank}`}</span>
             {prim === "track" || prim === "barbell" ? (
               <span aria-hidden title="Rang-Änderung seit letzter Runde" style={{ width: 14, fontSize: 10, fontWeight: 800, textAlign: "left", color: (prim === "barbell" ? bArrow : rankDelta) > 0 ? "var(--nl-good)" : (prim === "barbell" ? bArrow : rankDelta) < 0 ? "var(--nl-risk)" : "var(--nl-mut)" }}>
                 {(prim === "barbell" ? bArrow : rankDelta) > 0 ? "▲" : (prim === "barbell" ? bArrow : rankDelta) < 0 ? "▼" : ""}
@@ -3012,7 +3103,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                 {bOut ? "raus" : bGain > 0 ? `+${bGain}` : "—"}
               </span>
             ) : null}
-            <span style={{ fontWeight: 800, fontSize: 12.5, fontVariantNumeric: "tabular-nums", minWidth: 34, textAlign: "right", color: prim === "barbell" ? (bOut ? "var(--nl-mut)" : "var(--nl-warn)") : "inherit" }}>{prim === "barbell" ? bKg : fmt1(t.score)}</span>
+            <span style={{ fontWeight: 800, fontSize: 12.5, fontVariantNumeric: "tabular-nums", minWidth: 34, textAlign: "right", color: prim === "barbell" ? (bOut ? "var(--nl-mut)" : "var(--nl-warn)") : "inherit" }}>{prim === "barbell" ? bKg : fmt1(dispScore)}</span>
             {prim === "track" ? (
               <span title="Beitrag des aktuellen Läufers" style={{ width: 30, fontSize: 11, fontWeight: 800, textAlign: "left", fontVariantNumeric: "tabular-nums", color: lastGain != null ? "var(--nl-good)" : "transparent" }}>
                 {lastGain != null ? `+${fmt1(lastGain)}` : ""}

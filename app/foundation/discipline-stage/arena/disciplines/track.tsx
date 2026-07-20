@@ -17,13 +17,6 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { hueForIdx, relColor } from "../DisciplineStageNativeArena";
 import type { DisciplineFieldProps, RT } from "./types";
 
-type Glide = { len: number; fromLen: number; toLen: number; glideT: number; gamma: number; target: number };
-
-// Deterministisch-variierendes Easing pro Token/Runde (Renn-Spannung): pow(t, gamma).
-function easedPow(t: number, gamma: number): number {
-  return Math.pow(Math.max(0, Math.min(1, t)), gamma);
-}
-
 export default function TrackField(props: DisciplineFieldProps): ReactNode {
   const {
     disciplineName,
@@ -49,8 +42,7 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
     handoffActive,
   } = props;
 
-  // Per-Token-Gleit-Zustand (idx → Glide) und die DOM-<g>-Refs (imperative Bewegung).
-  const glideRef = useRef<Map<number, Glide>>(new Map());
+  // DOM-<g>-Refs (imperative Bewegung — Position folgt dem Host-animScore).
   const gRefs = useRef<Map<number, SVGGElement | null>>(new Map());
   // „Was geht ab?"-Schicht: Ghost-Marker (wo das Team letzte Runde stand) — wird
   // imperativ an fromLen (Glide-Start) positioniert; der Abstand zum Token = Zugewinn.
@@ -88,68 +80,34 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
     return { x: pt.x + -ty * off, y: pt.y + tx * off };
   };
 
-  // Runden-Erkennung: sobald sich das displayScore-Ziel eines Tokens ändert, startet
-  // EIN neuer Glide über den vollen Rundenbetrag (fromLen = aktuelle Position).
-  const syncTargets = (PER: number): void => {
-    const g = glideRef.current;
-    for (const t of rtRef.current) {
-      const target = fracLen(t.displayScore, PER);
-      let st = g.get(t.idx);
-      if (!st) {
-        // Initial: direkt an der Startlinie sitzen (kein Auf-Sprung).
-        st = { len: fracLen(0, PER), fromLen: fracLen(0, PER), toLen: target, glideT: 1, gamma: 1, target };
-        g.set(t.idx, st);
-      }
-      if (Math.abs(target - st.target) > 0.001) {
-        st.fromLen = st.len;
-        st.toLen = target;
-        st.glideT = 0;
-        st.gamma = 0.62 + Math.random() * 1.05; // dynamisches Easing je Runde/Token
-        st.target = target;
-      }
-    }
-  };
-
-  // rAF-Schleife: gleitet alle Token simultan über ROUND_MS, positioniert die <g>
-  // imperativ (kein React-Re-Render pro Frame → smooth). Hover friert ein.
+  // rAF-Schleife: positioniert die Token imperativ an fracLen(animScore) — animScore
+  // rampt der HOST über den geteilten 5s-Zeitstrahl (roundStartScore→displayScore). So
+  // laufen FELD und RANGLISTE exakt synchron (beide lesen animScore). Hover/Pause friert
+  // ein (Position wird dann nicht aktualisiert). reduced-motion: Host setzt animScore
+  // sofort auf displayScore → Token sitzt direkt am Ziel.
   useEffect(() => {
     let raf = 0;
-    let last = performance.now();
-    const ROUND_MS = 5000;
-    const tick = (ts: number) => {
+    const tick = () => {
       const path = pathRef.current;
       const PER = path ? path.getTotalLength() : 0;
-      const dt = Math.min(64, ts - last);
-      last = ts;
       if (PER > 0) {
-        syncTargets(PER);
         const frozen = hoverRef.current != null || pausedRef.current;
         const reduce = reducedRef.current;
-        const g = glideRef.current;
         for (const t of rtRef.current) {
-          const st = g.get(t.idx);
-          if (!st) continue;
-          if (reduce) {
-            st.len = st.toLen;
-            st.glideT = 1;
-          } else if (!frozen && st.glideT < 1) {
-            st.glideT = Math.min(1, st.glideT + dt / ROUND_MS);
-            st.len = st.fromLen + (st.toLen - st.fromLen) * easedPow(st.glideT, st.gamma);
-          }
           const el = gRefs.current.get(t.idx);
-          if (el) {
-            const p = placeAt(t, st.len, PER);
+          if (el && !frozen) {
+            const p = placeAt(t, fracLen(t.animScore, PER), PER);
             el.setAttribute("transform", `translate(${p.x} ${p.y})`);
           }
-          // Ghost der Vorrunde: sitzt am Glide-Start (fromLen). Sichtbar solange sich das
-          // Token noch bewegt (glideT<1); die Lücke Ghost→Token zeigt den Rundenzugewinn.
-          // Eigenes Team deutlich, andere dezent. Bei Bewegungsende ausgeblendet.
+          // Ghost der Vorrunde: sitzt bei roundStartScore. Sichtbar solange das Token noch
+          // ramp­t (animScore < displayScore); die Lücke Ghost→Token zeigt den Zugewinn.
           const gel = ghostRefs.current.get(t.idx);
           if (gel) {
-            const moved = Math.abs(st.toLen - st.fromLen) > 2 && st.glideT < 0.995;
-            if (moved && !reduce) {
-              const gp = placeAt(t, st.fromLen, PER);
-              const op = (t.isOwn ? 0.6 : 0.28) * (1 - st.glideT * 0.7);
+            const span = t.displayScore - t.roundStartScore;
+            const prog = span > 0.5 ? Math.max(0, Math.min(1, (t.animScore - t.roundStartScore) / span)) : 1;
+            if (span > 0.5 && !reduce && prog < 0.98) {
+              const gp = placeAt(t, fracLen(t.roundStartScore, PER), PER);
+              const op = (t.isOwn ? 0.6 : 0.28) * (1 - prog * 0.7);
               gel.setAttribute("transform", `translate(${gp.x} ${gp.y})`);
               gel.setAttribute("opacity", String(op));
             } else {
