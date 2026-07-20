@@ -1,3 +1,4 @@
+import path from "node:path";
 import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
@@ -8,12 +9,12 @@ describe("gameplay flow scan contract", () => {
   it("keeps a single form-card write path and flow deep-link into formplan", async () => {
     const [lineupText, foundationText, formBoardText] = await Promise.all([
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx",
+        path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"),
         "utf8",
       ),
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx", "utf8"),
+      fs.readFile(path.join(process.cwd(), "app/foundation/FoundationPageClient.tsx"), "utf8"),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab/FormBoardPanel.tsx",
+        path.join(process.cwd(), "app/foundation/legacy-lineup-lab/FormBoardPanel.tsx"),
         "utf8",
       ),
     ]);
@@ -65,18 +66,18 @@ describe("gameplay flow scan contract", () => {
   it("wires prep performance markers for lineup, season and arena", async () => {
     const [lineupText, seasonText, arenaText, packageText] = await Promise.all([
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx",
+        path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/season-v2/SeasonStandingsV2Client.tsx",
+        path.join(process.cwd(), "app/foundation/season-v2/SeasonStandingsV2Client.tsx"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-arena-v2/MatchdayArenaV2Client.tsx",
+        path.join(process.cwd(), "app/foundation/matchday-arena-v2/MatchdayArenaV2Client.tsx"),
         "utf8",
       ),
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/package.json", "utf8"),
+      fs.readFile(path.join(process.cwd(), "package.json"), "utf8"),
     ]);
 
     expect(packageText).toContain("@tanstack/react-virtual");

@@ -1,3 +1,4 @@
+import path from "node:path";
 import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
@@ -6,71 +7,71 @@ describe("matchday arena ui contract", () => {
   it("wires a dedicated foundation arena view with reveal controls and score lanes", async () => {
     const [foundationPageClientText, shellRouterBodyText, shellRouterBodyScopeText, homeOverviewDerivationsText, globalNextActionsText, shellRouterText, routingText, arenaText, arenaPanelText, arenaHostText, resultHostText, arenaRevealPanelText, arenaTimelineText, legacyLineupText, presenterText, cssText, moduleHelpersText] = await Promise.all([
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx",
+        path.join(process.cwd(), "app/foundation/FoundationPageClient.tsx"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationShellRouterBody.tsx",
+        path.join(process.cwd(), "app/foundation/FoundationShellRouterBody.tsx"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx",
+        path.join(process.cwd(), "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/use-home-v2-overview-derivations.ts",
+        path.join(process.cwd(), "lib/foundation/tabs/use-home-v2-overview-derivations.ts"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/foundation-global-next-actions.ts",
+        path.join(process.cwd(), "lib/foundation/tabs/foundation-global-next-actions.ts"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationShellRouter.tsx",
+        path.join(process.cwd(), "app/foundation/FoundationShellRouter.tsx"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/foundation-view-routing.ts",
+        path.join(process.cwd(), "lib/foundation/foundation-view-routing.ts"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-arena-v2/MatchdayArenaV2Client.tsx",
+        path.join(process.cwd(), "app/foundation/matchday-arena-v2/MatchdayArenaV2Client.tsx"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-arena-v2/FoundationMatchdayArenaPanel.tsx",
+        path.join(process.cwd(), "app/foundation/matchday-arena-v2/FoundationMatchdayArenaPanel.tsx"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-arena-v2/FoundationMatchdayArenaShellHost.tsx",
+        path.join(process.cwd(), "app/foundation/matchday-arena-v2/FoundationMatchdayArenaShellHost.tsx"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-result-v2/FoundationMatchdayResultShellHost.tsx",
+        path.join(process.cwd(), "app/foundation/matchday-result-v2/FoundationMatchdayResultShellHost.tsx"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-arena-v2/ArenaRevealPlaybackPanel.tsx",
+        path.join(process.cwd(), "app/foundation/matchday-arena-v2/ArenaRevealPlaybackPanel.tsx"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/components/matchday-arena/MatchdayArenaTimeline.tsx",
+        path.join(process.cwd(), "components/matchday-arena/MatchdayArenaTimeline.tsx"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx",
+        path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/season/matchday-arena-presenter.ts",
+        path.join(process.cwd(), "lib/season/matchday-arena-presenter.ts"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/globals.css",
+        path.join(process.cwd(), "app/globals.css"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/foundation-page-module-helpers.tsx",
+        path.join(process.cwd(), "lib/foundation/tabs/foundation-page-module-helpers.tsx"),
         "utf8",
       ),
     ]);
@@ -291,23 +292,23 @@ describe("matchday arena ui contract", () => {
   it("wires Spieltag-abschliessen button and lineup blocker in arena view", async () => {
     const [shellRouterBodyText, shellRouterBodyScopeText, homeOverviewDerivationsText, arenaPanelText, arenaHostText] = await Promise.all([
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationShellRouterBody.tsx",
+        path.join(process.cwd(), "app/foundation/FoundationShellRouterBody.tsx"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx",
+        path.join(process.cwd(), "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/use-home-v2-overview-derivations.ts",
+        path.join(process.cwd(), "lib/foundation/tabs/use-home-v2-overview-derivations.ts"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-arena-v2/FoundationMatchdayArenaPanel.tsx",
+        path.join(process.cwd(), "app/foundation/matchday-arena-v2/FoundationMatchdayArenaPanel.tsx"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-arena-v2/FoundationMatchdayArenaShellHost.tsx",
+        path.join(process.cwd(), "app/foundation/matchday-arena-v2/FoundationMatchdayArenaShellHost.tsx"),
         "utf8",
       ),
     ]);
@@ -324,18 +325,18 @@ describe("matchday arena ui contract", () => {
   it("exposes sprint J broadcast mode, result reasons, training hint, and return focus handoff", async () => {
     const [arenaText, arenaHostText, legacyLineupText, cssText] = await Promise.all([
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-arena-v2/MatchdayArenaV2Client.tsx",
+        path.join(process.cwd(), "app/foundation/matchday-arena-v2/MatchdayArenaV2Client.tsx"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-arena-v2/FoundationMatchdayArenaShellHost.tsx",
+        path.join(process.cwd(), "app/foundation/matchday-arena-v2/FoundationMatchdayArenaShellHost.tsx"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx",
+        path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"),
         "utf8",
       ),
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/globals.css", "utf8"),
+      fs.readFile(path.join(process.cwd(), "app/globals.css"), "utf8"),
     ]);
 
     expect(arenaText).toContain("broadcastFocusMode");

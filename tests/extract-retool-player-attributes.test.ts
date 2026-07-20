@@ -1,3 +1,4 @@
+import path from "node:path";
 import fs from "node:fs";
 
 import { describe, expect, it } from "vitest";
@@ -15,7 +16,7 @@ describe("extract retool player attributes", () => {
   });
 
   it("writes read-only extraction outputs", () => {
-    const base = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/references/retool-player-attributes";
+    const base = path.join(process.cwd(), "references/retool-player-attributes");
     extractRetoolPlayerAttributes();
 
     expect(fs.existsSync(`${base}/attribute-query.sql`)).toBe(true);

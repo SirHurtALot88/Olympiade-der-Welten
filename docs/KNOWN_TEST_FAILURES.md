@@ -1,4 +1,42 @@
-# Bekannte Test-Failures — Triage (offen)
+# Bekannte Test-Failures — Triage
+
+## Triage-Runde 1 — Ergebnis (Test-Only, 0 Regressionen)
+
+**166 → 144 fehlgeschlagene Tests** (22 repariert), **ausschließlich Testdateien**
+angefasst, kein Produktcode, keine Assertion künstlich gelockert.
+
+**Gefixt & übernommen (17 Testdateien):**
+- **Pfad-Portabilität (15 Dateien):** hartkodierte macOS-Absolutpfade
+  (`/Users/chrisfalk/…`) → `path.join(process.cwd(), …)`. Behebt ENOENT auf jeder
+  Nicht-Autor-Maschine (CI!). Reine Portabilität, keine Assertion geändert. Bei
+  den UI-Contract-Dateien bleiben die *Inhalts*-Mismatches bestehen (s. u.) —
+  jetzt als echte Assertion statt ENOENT-Crash.
+- **`transfermarkt-free-agents-api` → voll grün (3/3):** Mock-Drift (fehlender
+  Export `resolveTransferBuyAffordabilityCash`) + veralteter Route-Contract
+  (`minSalary`/`maxSalary`/`compactList`) nachgezogen.
+- **`ai-picks-run-service`:** Mock-Drift-Stub ergänzt (deckt 2 echte Fails auf,
+  keine Verschlechterung).
+
+**NICHT übernommen:** `ai-market-plan-apply-service.test.ts` — unsere Branch-Version
+nutzt bereits einen `importOriginal`-Mock (anderer, neuerer Ansatz); der Agent-Stub
+war für eine ältere Basis. Bewusst unberührt gelassen.
+
+**Braucht noch Entscheidung (echte Bugs / Refactor-Drift, NICHT angefasst):**
+- **Foundation-Refactor-Cluster:** viele UI-Contract-Tests lesen
+  `FoundationPageClient.tsx` und erwarten Markup, das per Refactor in modulare
+  Panels gewandert ist (`FoundationShellRouterBody`, `team-settings/*`,
+  `cockpit-v2/*`). Fix = Tests auf die neuen Dateien umbiegen, pro String prüfen
+  (Risiko, echte Entfernungen zu maskieren).
+- `draft-repair-economy` (Export `resolveGmDraftBufferPct` fehlt, nur privat),
+  `media-assets` (API-Media-Routing mit `?variant=thumb` fehlt/zurückgebaut),
+  `data-adapter` (Startbudget 225/325 vs 175), `transfermarkt-formatting-contract`
+  (Hex→CSS-Var + Euro-Format), + diverse AI-/Season-Logik-Fails (numerische Drift).
+- **Flaky/ENV:** Playwright-Spec in vitest, Produktskripte `extract-retool-*`
+  scannen `/Users/chrisfalk/Downloads` (Produktcode-Hardcode!), DB/Timeout-Cluster.
+
+---
+
+# Ausgangsaufnahme (vor Triage)
 
 **Stand:** aufgenommen während der Form-Jitter/PP-Arbeit auf Branch
 `claude/discipline-stage-tab`.

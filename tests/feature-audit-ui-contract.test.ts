@@ -1,8 +1,9 @@
+import path from "node:path";
 import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
-const foundationClientPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx";
+const foundationClientPath = path.join(process.cwd(), "app/foundation/FoundationPageClient.tsx");
 
 describe("feature audit ui contract", () => {
   it("renders the feature audit matrix in the cockpit with filters and export links", async () => {
