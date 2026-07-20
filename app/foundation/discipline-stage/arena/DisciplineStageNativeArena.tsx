@@ -2947,13 +2947,15 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                         })()
                       : null}
                     {(() => {
-                      // Ab der 2. Runde (round >= 1) den GERADE antretenden Spieler
-                      // (nextSlot == laufende Runde, noch nicht enthüllt) schon zeigen —
-                      // nur Identität (Porträt/Name), NICHT die Wertung (Anti-Spoiler
-                      // bleibt für den Score/Rang).
+                      // Schon ab der LAUFENDEN Etappe (auch Etappe 1 / round 0) den
+                      // GERADE antretenden Spieler (nextSlot == laufende Etappe, in
+                      // dieser Etappe noch nicht enthüllt) zeigen — sein Token gleitet
+                      // ja bereits sichtbar über die Bahn, „noch nicht angetreten" wäre
+                      // dort schlicht falsch. Nur Identität (Porträt/Name), NICHT die
+                      // Wertung (Anti-Spoiler bleibt für Score/Rang).
                       const nextSlot = t.thrownSlot + 1;
                       const upcoming =
-                        round >= 1 && !podium && nextSlot < slotCount && nextSlot <= round
+                        round >= 0 && !podium && nextSlot < slotCount && nextSlot <= round
                           ? t.players[nextSlot] ?? null
                           : null;
                       if (t.thrownSlot < 0 && !upcoming) {
