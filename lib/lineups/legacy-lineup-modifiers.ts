@@ -687,7 +687,7 @@ export function seededFormJitter(seed: string, jitterMax = 4): number {
 // einen echten Zufalls-Jitter (±jitterMax). Der Jitter ist bewusst NICHT
 // zero-sum — die Team-Summe wackelt mit (Extra-Kick, wie die zufälligen
 // Formkarten selbst). Reihenfolge der Seeds == Reihenfolge der Spieler; der Seed
-// (z.B. `${playerId}|${disciplineId}`) macht das Ergebnis reproduzierbar, sodass
+// (z.B. `${playerId}|${disciplineId}|${matchdayId}`) macht das Ergebnis reproduzierbar, sodass
 // Score-Engine und Bühne identische Werte zeigen.
 export function distributePerPlayerFormShares(input: {
   formModifier?: number | null;

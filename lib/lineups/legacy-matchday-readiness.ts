@@ -104,6 +104,7 @@ function buildScoreCoverage(entries: LegacyLineupEntryInput[], context: LegacyLi
     return scoreLegacyLineupDisciplineSide({
       disciplineId,
       disciplineSide,
+      matchdayId: context.matchdayId, // Form-Jitter pro Spieltag
       entries,
       disciplineScores: context.disciplineScores,
     });

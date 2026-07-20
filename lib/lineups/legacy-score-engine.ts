@@ -36,6 +36,10 @@ function buildScoreMap(disciplineScores: LegacyDisciplineScoreRef[]) {
 type ScoreSideInput = {
   disciplineId: string;
   disciplineSide: DisciplineSide;
+  /** Spieltag — geht in den Form-Jitter-Seed ein, damit der „Zufall" pro
+   *  Spieltag neu würfelt (echte Tagesform) statt ein fixer Pro-Spieler-Offset
+   *  zu sein. Optional: ohne matchdayId bleibt der Jitter stabil pro Disziplin. */
+  matchdayId?: string | null;
   entries: LegacyLineupEntryInput[];
   disciplineScores: LegacyDisciplineScoreRef[];
   activePlayers?: LegacyActivePlayerRef[];
@@ -238,14 +242,15 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
 
   // Form PRO SPIELER statt als Team-Klumpen: jeder aufgestellte Spieler bekommt
   // den flachen Kartenwert (formModifier/Anzahl) + einen echten Zufalls-Jitter
-  // (±4, deterministisch aus `${playerId}|${disciplineId}`). Der Jitter ist NICHT
+  // (±4, deterministisch aus `${playerId}|${disciplineId}|${matchdayId}` → würfelt
+  // pro Spieltag neu = echte Tagesform, nicht ein fixer Pro-Spieler-Offset). NICHT
   // zero-sum — die Team-Summe wackelt bewusst mit (Extra-Kick). Weil er hier in
   // die finalContribution der Spieler fließt, wird die Form NICHT mehr separat als
   // Team-Term addiert (kein Doppelzählen), und die PP-Verteilung (nach Endscore)
   // sowie die Bühne zeigen automatisch denselben Wert.
   let appliedFormModifier = formModifier;
   if (formModifier != null && formModifier !== 0 && scoredEntries.length > 0) {
-    const seeds = scoredEntries.map((entry) => `${entry.playerId}|${input.disciplineId}`);
+    const seeds = scoredEntries.map((entry) => `${entry.playerId}|${input.disciplineId}|${input.matchdayId ?? ""}`);
     const shares = distributePerPlayerFormShares({ formModifier, seeds });
     let applied = 0;
     scoredEntries.forEach((entry, index) => {

@@ -293,6 +293,7 @@ export function buildLegacyMatchdayResolvePreview(
       const score = scoreLegacyLineupDisciplineSide({
         disciplineId: meta.disciplineId,
         disciplineSide: meta.disciplineSide,
+        matchdayId: context.matchday?.id ?? null, // Form-Jitter pro Spieltag neu würfeln
         entries: draft?.entries ?? [],
         disciplineScores: context.disciplineScores,
         activePlayers: context.activePlayers,
