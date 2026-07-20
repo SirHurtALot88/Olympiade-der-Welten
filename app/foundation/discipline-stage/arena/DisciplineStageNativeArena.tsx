@@ -2331,10 +2331,12 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const posMax = finalMax;
   posMaxRef.current = posMax;
 
-  // Disziplinen, deren FELD den geteilten animScore-Zeitstrahl liest (Benchmark-Umbauten):
-  // Für sie läuft die Rangliste live & synchron zur Feldbewegung (statt Cascade-Sprüngen).
-  // track = Staffel, lamps = Fechten. Weitere kommen mit ihrem jeweiligen Rebuild dazu.
-  const animField = prim === "track" || prim === "lamps";
+  // Disziplinen, deren FELD den geteilten animScore-Zeitstrahl liest (Benchmark): für sie
+  // läuft die Rangliste live & exakt synchron zur Feldbewegung (statt Cascade-Sprüngen),
+  // Hover/Pause friert Feld UND Tabelle gemeinsam ein. Nach dem Benchmark-Transfer erfüllen
+  // ALLE Disziplinen diesen Contract — Ausnahme: barbell (Gewichtheben) behält seine eigene
+  // kg-Glide-Bewegung + Eliminations-Rangliste (barbellSorted) und wird separat (Ticket 209) umgebaut.
+  const animField = prim !== "barbell";
   // Live-Rang aus animScore (geteilter 5s-Zeitstrahl) → die Rangliste ändert sich langsam
   // & synchron zur Feldbewegung statt in Cascade-Sprüngen.
   const liveRankByCode: Record<string, number> = {};

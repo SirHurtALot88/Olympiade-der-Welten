@@ -8,15 +8,15 @@
 // =====================================================================================
 "use client";
 
-import type { ReactNode } from "react";
-import { hueForIdx, relColor } from "../DisciplineStageNativeArena";
-import type { DisciplineFieldProps } from "./types";
+import { useEffect, useRef, type ReactNode } from "react";
+import type { DisciplineFieldProps, RT } from "./types";
+import { GhostLayer, TokenChrome } from "./benchmark";
 
 export default function SchachField(props: DisciplineFieldProps): ReactNode {
   const {
+    primitive: prim,
     disciplineName,
     skinAccent,
-    env,
     reducedMotion,
     W,
     H,
@@ -25,13 +25,13 @@ export default function SchachField(props: DisciplineFieldProps): ReactNode {
     finalMax,
     rt,
     sorted,
-    now,
     hoverIdx,
+    highlightIdxs,
     openHover,
     scheduleHoverClose,
     onOpenTeam,
-    tokenPos,
   } = props;
+  const trioSet = new Set(highlightIdxs ?? []);
 
   const LW = W;
   const LH = H;
@@ -83,6 +83,59 @@ export default function SchachField(props: DisciplineFieldProps): ReactNode {
   const rPad = 48;
   const colW = (WX1 - WX0 - lPad - rPad) / N;
   const laneX = (i: number): number => WX0 + lPad + i * colW + colW / 2;
+
+  // Score → Elo (volle Klassen-Spanne).
+  const eloOf = (score: number): number => {
+    const n = maxTotal > 0 ? Math.max(0, Math.min(1, score / maxTotal)) : 0;
+    return BASE + n * (maxElo - BASE);
+  };
+
+  // ---- Benchmark-Bewegung: Position folgt dem Host-`animScore` (rAF, Frame-Sync mit der
+  // Rangliste; Hover/Pause friert ein). X = Live-Rang-Spalte (Bump-Umsortierung), Y = Elo. ----
+  const gRefs = useRef<Map<number, SVGGElement | null>>(new Map());
+  const ghostRefs = useRef<Map<number, SVGGElement | null>>(new Map());
+  const hoverRef = useRef<number | null>(hoverIdx);
+  hoverRef.current = hoverIdx;
+  const pausedRef = useRef<boolean>(props.paused);
+  pausedRef.current = props.paused;
+  const reducedRef = useRef<boolean>(reducedMotion);
+  reducedRef.current = reducedMotion;
+  const rtRef = useRef<RT[]>(rt);
+  rtRef.current = rt;
+
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const frozen = hoverRef.current != null || pausedRef.current;
+      const reduce = reducedRef.current;
+      const list = rtRef.current;
+      // Live-Ordnung nach animScore → weiche Bump-Umsortierung der Spalten.
+      const order = [...list].sort((a, b) => b.animScore - a.animScore || a.seasonRank - b.seasonRank);
+      const liveIdx = new Map<number, number>();
+      order.forEach((t, i) => liveIdx.set(t.idx, i));
+      for (const t of list) {
+        const el = gRefs.current.get(t.idx);
+        if (el && !frozen) {
+          el.setAttribute("transform", `translate(${laneX(liveIdx.get(t.idx) ?? 0)} ${yOf(eloOf(t.animScore))})`);
+        }
+        const gel = ghostRefs.current.get(t.idx);
+        if (gel) {
+          const span = t.displayScore - t.roundStartScore;
+          const p = span > 0.5 ? Math.max(0, Math.min(1, (t.animScore - t.roundStartScore) / span)) : 1;
+          if (span > 0.5 && !reduce && p < 0.98) {
+            gel.setAttribute("transform", `translate(${laneX(Math.max(0, (t.roundStartRank ?? 1) - 1))} ${yOf(eloOf(t.roundStartScore))})`);
+            gel.setAttribute("opacity", String((t.isOwn ? 0.6 : 0.28) * (1 - p * 0.7)));
+          } else {
+            gel.setAttribute("opacity", "0");
+          }
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>
@@ -334,83 +387,41 @@ export default function SchachField(props: DisciplineFieldProps): ReactNode {
         return tables;
       })()}
 
+      {/* Ghost der Vorrunde (Benchmark) — VOR den Token. */}
+      <GhostLayer sorted={sorted} geo={geo} ghostRefs={ghostRefs} />
+
       {/* ========================================================================== */}
-      {/* TOKENS: 32 Bahnen, X = Team-Index (horizontal spread), Y = Elo-Score */}
+      {/* TOKENS: X = Live-Rang-Spalte (Bump), Y = Elo-Score — Position via rAF (animScore) */}
       {/* ========================================================================== */}
-      {sorted.map((t, sortedIndex) => {
-        // Score → Elo über die VOLLE Klassen-Spanne skalieren (finalMax = Spitzenwert),
-        // sonst landen alle Roh-Scores (~30–334) in KLASSE C. So verteilen sich die
-        // Teams vertikal über alle Klassen (Spitze = Grossmeister, Keller = Klasse C).
-        const eloNorm = maxTotal > 0 ? Math.max(0, Math.min(1, t.displayScore / maxTotal)) : 0;
-        const elo = Math.round(BASE + eloNorm * (maxElo - BASE));
-        const x = laneX(sortedIndex); // Spread horizontally by position in sorted array
-        const y = yOf(elo); // Elo-basierte vertikale Position (yOf erwartet Elo)
+      {sorted.map((t, i) => {
         const r = t.isOwn ? geo.rOwn : geo.r;
-        const hue = hueForIdx(t.idx);
-        const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
-        const relC = relColor(t.rel);
-        const band = bandOf(elo);
-        const isLeader = t.rank === 1;
+        // Figuren-Glyph (Promotion) aus dem aktuellen Runden-Elo.
+        const band = bandOf(Math.round(eloOf(t.displayScore)));
 
         return (
           <g
             key={t.code}
-            transform={`translate(${x} ${y})`}
-            style={{ transition: reducedMotion ? "none" : "transform 5s cubic-bezier(.4,0,.2,1)", cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
+            data-token-code={t.code}
+            ref={(el) => {
+              gRefs.current.set(t.idx, el);
+              if (el && !el.getAttribute("transform")) {
+                el.setAttribute("transform", `translate(${laneX(i)} ${yOf(eloOf(t.animScore))})`);
+              }
+            }}
+            style={{ cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
             onMouseEnter={() => openHover(t.idx)}
             onMouseLeave={scheduleHoverClose}
             onClick={() => {
               if (onOpenTeam && t.teamId) onOpenTeam(t.teamId);
             }}
           >
-            {/* Token-Basis (mit oder ohne Logo) */}
-            {t.logoUrl ? (
-              <image
-                href={t.logoUrl}
-                x={-r}
-                y={-r}
-                width={r * 2}
-                height={r * 2}
-                clipPath={`url(#natclip-${t.code})`}
-                preserveAspectRatio="xMidYMid slice"
-              />
-            ) : (
-              <circle r={r} fill={`hsl(${hue} 60% 52%)`} />
-            )}
-
-            {/* Token-Rand: Lead goldener Ring oder Beziehung (mine/ally/rival) */}
-            {isLeader ? (
-              <>
-                <circle r={r + 5.5} fill="none" stroke="var(--nl-warn)" strokeWidth={3} opacity={0.7} />
-                <circle r={r} fill="none" stroke="var(--nl-ink)" strokeWidth={2.5} />
-              </>
-            ) : relC ? (
-              <circle r={r + 5.5} fill="none" stroke={relC} strokeWidth={2.4} opacity={0.95} />
-            ) : (
-              <circle r={r} fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth={1.4} />
-            )}
-
-            {/* Medaillen-Ring (Top-3) */}
-            {medal ? <circle r={r + 3.5} fill="none" stroke={medal} strokeWidth={t.isOwn ? 4.5 : 3.5} /> : null}
+            {/* Benchmark-Chrome: Trio/Anker/Relation/Medaille/Logo/Team-Rahmen/🏆/Rang-Badge. */}
+            <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} />
 
             {/* Figuren-Glyph (oben, Promotion pro Klasse) — in Farbe wenn Grossmeister */}
             <text y={-(r + 1)} textAnchor="middle" fontSize={10} fontWeight={800} fill={band[0] >= 2400 ? "var(--nl-warn)" : "#bfb397"} style={{ textShadow: "0 1px 2px rgba(8,6,2,0.8)" }}>
               {band[3]}
             </text>
-
-            {/* Champion-Krone (nur Rang 1) */}
-            {isLeader ? (
-              <text y={-(r + 9)} textAnchor="middle" fontSize={14}>
-                🏆
-              </text>
-            ) : null}
-
-            {/* Team-Code (klein, unten für Lesbarkeit, nur eigenes Team betont) */}
-            {t.isOwn ? (
-              <text y={r + 10} textAnchor="middle" fontSize={9} fontWeight={800} fill="var(--nl-ink)">
-                {t.code}
-              </text>
-            ) : null}
           </g>
         );
       })}

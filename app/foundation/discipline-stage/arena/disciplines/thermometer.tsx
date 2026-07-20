@@ -4,12 +4,13 @@
 // =====================================================================================
 "use client";
 
-import { useRef, type ReactNode } from "react";
-import { hueForIdx, relColor } from "../DisciplineStageNativeArena";
-import type { DisciplineFieldProps, RT } from "./types";
+import { type ReactNode } from "react";
+import type { DisciplineFieldProps } from "./types";
+import { useTokenGlide, tokenRef, GhostLayer, TokenChrome } from "./benchmark";
 
 export default function ThermometerField(props: DisciplineFieldProps): ReactNode {
   const {
+    primitive: prim,
     disciplineName,
     skinAccent,
     env,
@@ -23,12 +24,16 @@ export default function ThermometerField(props: DisciplineFieldProps): ReactNode
     rt,
     sorted,
     now,
+    hoverIdx,
+    highlightIdxs,
     openHover,
     scheduleHoverClose,
     onOpenTeam,
   } = props;
 
-  const gRefs = useRef<Map<number, SVGGElement | null>>(new Map());
+  const trioSet = new Set(highlightIdxs ?? []);
+  // Benchmark-Bewegung + Ghost: Token folgen animScore (Frame-Sync, Hover/Pause friert ein).
+  const { gRefs, ghostRefs } = useTokenGlide(props);
 
   // Thermometer geometry: vertical scale
   const padTop = Math.max(60, H * 0.12);
@@ -210,44 +215,31 @@ export default function ThermometerField(props: DisciplineFieldProps): ReactNode
         </text>
       ) : null}
 
-      {/* Tokens: positioned by score, with heat-colored aura */}
+      {/* Ghost der Vorrunde (Benchmark) — VOR den Token. */}
+      <GhostLayer sorted={sorted} geo={geo} ghostRefs={ghostRefs} />
+
+      {/* Tokens: positioned by score (rAF/animScore), with heat-colored aura */}
       {sorted
         .slice()
         .reverse()
         .map((t) => {
-          const pos = tokenPos(t, t.displayScore);
           const r = t.isOwn ? geo.rOwn : geo.r;
-          const hue = hueForIdx(t.idx);
           const heatHueVal = heatHue(t.displayScore);
           const glowing = t.glowUntil > now;
-          const medal =
-            t.roundMedal === 1
-              ? "var(--nl-warn)"
-              : t.roundMedal === 2
-                ? "var(--nl-mut)"
-                : t.roundMedal === 3
-                  ? "rgb(205,127,50)"
-                  : null;
-          const rc = relColor(t.rel);
 
           return (
             <g
               key={t.code}
-              transform={`translate(${pos.x} ${pos.y})`}
-              style={{
-                cursor: onOpenTeam && t.teamId ? "pointer" : "default",
-                transition: reducedMotion
-                  ? "none"
-                  : `transform 5s cubic-bezier(.4,0,.2,1)`,
-              }}
               data-token-code={t.code}
+              ref={tokenRef(gRefs, t, tokenPos)}
+              style={{ cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
               onMouseEnter={() => openHover(t.idx)}
               onMouseLeave={scheduleHoverClose}
               onClick={() => {
                 if (onOpenTeam && t.teamId) onOpenTeam(t.teamId);
               }}
             >
-              {/* Heat bar: red glow at high temps */}
+              {/* Heat bar: red glow at high temps (bespoke) */}
               {heatHueVal < 30 ? (
                 <circle
                   r={r + 10}
@@ -263,7 +255,7 @@ export default function ThermometerField(props: DisciplineFieldProps): ReactNode
                 />
               ) : null}
 
-              {/* Glowing aura for leader (yellow/gold) */}
+              {/* Glowing aura for leader (bespoke) */}
               {glowing ? (
                 <circle
                   r={r + 8}
@@ -278,69 +270,8 @@ export default function ThermometerField(props: DisciplineFieldProps): ReactNode
                 />
               ) : null}
 
-              {/* Relation border (mine/ally/rival) */}
-              {rc ? (
-                <circle
-                  r={r + 5.5}
-                  fill="none"
-                  stroke={rc}
-                  strokeWidth={2.4}
-                  opacity={0.95}
-                />
-              ) : null}
-
-              {/* Medal rings for top 3 */}
-              {medal ? (
-                <circle
-                  r={r + 3.5}
-                  fill="none"
-                  stroke={medal}
-                  strokeWidth={t.isOwn ? 4.5 : 3.5}
-                />
-              ) : null}
-
-              {/* Logo or hue circle */}
-              {t.logoUrl ? (
-                <image
-                  href={t.logoUrl}
-                  x={-r}
-                  y={-r}
-                  width={r * 2}
-                  height={r * 2}
-                  clipPath={`url(#natclip-${t.code})`}
-                  preserveAspectRatio="xMidYMid slice"
-                />
-              ) : (
-                <circle r={r} fill={`hsl(${hue} 60% 52%)`} />
-              )}
-
-              {/* Token border */}
-              <circle
-                r={r}
-                fill="none"
-                stroke={t.isOwn ? "var(--nl-ink)" : "rgba(255,255,255,.5)"}
-                strokeWidth={t.isOwn ? 2.5 : 1.4}
-              />
-
-              {/* Crown for rank 1 */}
-              {t.rank === 1 ? (
-                <text y={-(r + 9)} textAnchor="middle" fontSize={14}>
-                  🏆
-                </text>
-              ) : null}
-
-              {/* Own team label */}
-              {t.isOwn ? (
-                <text
-                  y={r + 15}
-                  textAnchor="middle"
-                  fontSize={13}
-                  fontWeight={800}
-                  fill="var(--nl-accent)"
-                >
-                  ★ {t.code}
-                </text>
-              ) : null}
+              {/* Benchmark-Chrome: Trio/Anker/Relation/Medaille/Logo/Team-Rahmen/Rang-Badge. */}
+              <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} />
             </g>
           );
         })}

@@ -114,10 +114,17 @@ export default function TerritoryField(props: DisciplineFieldProps): ReactNode {
     rt,
     sorted,
     hoverIdx,
+    highlightIdxs,
     openHover,
     scheduleHoverClose,
     onOpenTeam,
   } = props;
+  const trioSet = new Set(highlightIdxs ?? []);
+  // Benchmark: Hover/Pause friert den Gebiets-Morph ein (wie Feld + Rangliste überall).
+  const hoverRef = useRef<number | null>(hoverIdx);
+  hoverRef.current = hoverIdx;
+  const pausedRef = useRef<boolean>(props.paused);
+  pausedRef.current = props.paused;
 
   // Farbpalette (aus dem Mockup)
   const COLORS = {
@@ -182,13 +189,16 @@ export default function TerritoryField(props: DisciplineFieldProps): ReactNode {
     // rAF-Schleife für Morphs
     let raf = 0;
     const tick = () => {
+      const frozen = hoverRef.current != null || pausedRef.current;
       let changed = false;
-      stateRef.current.forEach((state) => {
-        if (state.morphT < 1 && !reducedRef.current) {
-          state.morphT = Math.min(1, state.morphT + 16.67 / MORPH_MS);
-          changed = true;
-        }
-      });
+      if (!frozen) {
+        stateRef.current.forEach((state) => {
+          if (state.morphT < 1 && !reducedRef.current) {
+            state.morphT = Math.min(1, state.morphT + 16.67 / MORPH_MS);
+            changed = true;
+          }
+        });
+      }
       if (changed) {
         setTerritories(Array.from(stateRef.current.values()));
       }
@@ -348,8 +358,9 @@ export default function TerritoryField(props: DisciplineFieldProps): ReactNode {
                 : COLORS.neutral;
         const relStroke = t.rel ? 1.5 : 1;
 
+        const inTrio = trioSet.has(t.idx);
         return (
-          <g key={t.code}>
+          <g key={t.code} data-token-code={t.code}>
             {/* Territorium-Rechteck */}
             <rect
               x={rx}
@@ -357,13 +368,17 @@ export default function TerritoryField(props: DisciplineFieldProps): ReactNode {
               width={rw}
               height={rh}
               fill={bgColor}
-              stroke={relBorder}
-              strokeWidth={relStroke}
+              stroke={inTrio ? "var(--nl-warn)" : relBorder}
+              strokeWidth={inTrio ? 2.5 : relStroke}
               rx={4}
               style={{
                 filter: "drop-shadow(inset 0 0 0 1px rgba(0,0,0,.28)) drop-shadow(inset 0 -18px 30px rgba(0,0,0,.26))",
               }}
             />
+            {/* Highlight-Trio (Aufholjagd): goldener Puls-Rahmen ums Gebiet. */}
+            {inTrio ? (
+              <rect x={rx} y={ry} width={rw} height={rh} fill="none" stroke="var(--nl-warn)" strokeWidth={2.5} rx={4} opacity={0.95} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 0.85s ease-in-out infinite" }} />
+            ) : null}
 
             {/* Führer-Reich Gold (⚑) */}
             {isLead && (

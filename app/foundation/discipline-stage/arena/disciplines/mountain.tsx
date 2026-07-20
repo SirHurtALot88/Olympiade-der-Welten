@@ -8,18 +8,12 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { hueForIdx, relColor } from "../DisciplineStageNativeArena";
-import type { DisciplineFieldProps, RT, Vec2 } from "./types";
-
-type ClimbState = {
-  fromY: number;
-  toY: number;
-  glideT: number;
-  dip: number;
-};
+import type { DisciplineFieldProps, RT } from "./types";
+import { GhostLayer, TokenChrome } from "./benchmark";
 
 export default function ClimbingField(props: DisciplineFieldProps): ReactNode {
   const {
+    primitive: prim,
     disciplineName,
     skinAccent,
     env,
@@ -34,27 +28,28 @@ export default function ClimbingField(props: DisciplineFieldProps): ReactNode {
     sorted,
     round,
     now,
+    hoverIdx,
+    highlightIdxs,
     openHover,
     scheduleHoverClose,
     onOpenTeam,
   } = props;
+  const trioSet = new Set(highlightIdxs ?? []);
 
-  // Pro-Token Gleit-Zustand + DOM-Refs für imperatives Positioning
-  const climbRef = useRef<Map<number, ClimbState>>(new Map());
+  // DOM-Refs für imperatives Positioning (Token + Ghost der Vorrunde)
   const gRefs = useRef<Map<number, SVGGElement | null>>(new Map());
+  const ghostRefs = useRef<Map<number, SVGGElement | null>>(new Map());
 
   // Frische Prop-Spiegel für rAF-Schleife
   const hoverRef = useRef<number | null>(null);
   const reducedRef = useRef<boolean>(reducedMotion);
   const rtRef = useRef<RT[]>(rt);
-  const sortedRef = useRef<RT[]>(sorted);
 
-  hoverRef.current = props.hoverIdx;
+  hoverRef.current = hoverIdx;
   const pausedRef = useRef<boolean>(props.paused);
   pausedRef.current = props.paused;
   reducedRef.current = reducedMotion;
   rtRef.current = rt;
-  sortedRef.current = sorted;
 
   // Wandgeometrie: vertikal, Score-normiert zu y-Position
   const wallTop = Math.max(60, H * 0.15); // Gipfel oben
@@ -82,60 +77,35 @@ export default function ClimbingField(props: DisciplineFieldProps): ReactNode {
     return amplitude * Math.sin(y * freq + phase);
   };
 
-  // rAF-Schleife: gleitet alle Token 5s pro Runde
+  // rAF-Schleife (Benchmark-Sync): Höhe folgt dem Host-`animScore` (geteilter Zeitstrahl)
+  // → Wand-Kletterung UND Rangliste laufen synchron; Hover/Pause friert beides ein.
   useEffect(() => {
     let raf = 0;
-    let last = performance.now();
-    const ROUND_MS = 5000;
-
-    const tick = (ts: number) => {
-      const dt = Math.min(64, ts - last);
-      last = ts;
-
+    const tick = () => {
       const frozen = hoverRef.current != null || pausedRef.current;
       const reduce = reducedRef.current;
-      const c = climbRef.current;
-
       for (const t of rtRef.current) {
-        let st = c.get(t.idx);
-        if (!st) {
-          st = { fromY: wallBottom, toY: wallBottom, glideT: 1, dip: 0 };
-          c.set(t.idx, st);
-        }
-
-        // Zielposition: Score → y
-        const targetY = yOf(t.displayScore ?? t.score);
-        if (Math.abs(targetY - st.toY) > 0.5) {
-          st.fromY = st.glideT < 1 ? st.fromY + (st.toY - st.fromY) * st.glideT : st.fromY;
-          st.toY = targetY;
-          st.glideT = 0;
-          st.dip = 0;
-        }
-
-        if (reduce) {
-          st.glideT = 1;
-          st.dip = 0;
-        } else if (!frozen && st.glideT < 1) {
-          st.glideT = Math.min(1, st.glideT + dt / ROUND_MS);
-        }
-
-        // Position + Wackler-Dip
-        const dipAmount = st.dip && st.glideT < 0.45 ? st.dip * Math.sin(Math.PI * Math.min(1, st.glideT / 0.45)) : 0;
-        const y = st.fromY + (st.toY - st.fromY) * st.glideT + dipAmount;
-
         const el = gRefs.current.get(t.idx);
-        if (el) {
-          // Stabile, dichte Bahn 0…N-1 direkt aus dem RT (nicht via Closure-findIndex,
-          // das bei Idx-Mismatch −1 lieferte → alle Kletterer klebten links am Rand).
-          const laneIdx = t.laneIdx;
-          const x = xOf(laneIdx) + swayOf(t.code, y);
-          el.setAttribute("transform", `translate(${x} ${y})`);
+        if (el && !frozen) {
+          const y = yOf(t.animScore);
+          el.setAttribute("transform", `translate(${xOf(t.laneIdx) + swayOf(t.code, y)} ${y})`);
+        }
+        // Ghost der Vorrunde: bei yOf(roundStartScore) auf derselben Route.
+        const gel = ghostRefs.current.get(t.idx);
+        if (gel) {
+          const span = t.displayScore - t.roundStartScore;
+          const p = span > 0.5 ? Math.max(0, Math.min(1, (t.animScore - t.roundStartScore) / span)) : 1;
+          if (span > 0.5 && !reduce && p < 0.98) {
+            const gy = yOf(t.roundStartScore);
+            gel.setAttribute("transform", `translate(${xOf(t.laneIdx) + swayOf(t.code, gy)} ${gy})`);
+            gel.setAttribute("opacity", String((t.isOwn ? 0.6 : 0.28) * (1 - p * 0.7)));
+          } else {
+            gel.setAttribute("opacity", "0");
+          }
         }
       }
-
       raf = requestAnimationFrame(tick);
     };
-
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -307,32 +277,30 @@ export default function ClimbingField(props: DisciplineFieldProps): ReactNode {
         );
       })()}
 
+      {/* Ghost der Vorrunde (Benchmark) — VOR den Kletterern. */}
+      <GhostLayer sorted={sorted} geo={geo} ghostRefs={ghostRefs} />
+
       {/* === Token: Kletterer === */}
       {sorted
         .slice()
         .reverse()
         .map((t) => {
           const r = t.isOwn ? geo.rOwn : geo.r;
-          const hue = hueForIdx(t.idx);
-          const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205, 127, 50)" : null;
           const glowing = t.glowUntil > now;
-          const rc = relColor(t.rel);
 
-          // KONSTANTE Startposition am Wand-Fuß (dichte Bahn, Höhe = Einstieg).
-          // Score-UNABHÄNGIG, damit React dieses transform-Attribut bei Re-Renders
-          // (Pops/Ticker) NICHT auf die Zielhöhe zurücksetzt und so die laufende
-          // rAF-Kletteranimation überschreibt (sonst: 1 Ruck, dann Stillstand). Ab
-          // dem 1. rAF-Tick besitzt die Schleife die Position und klettert hoch.
-          const x0 = xOf(t.laneIdx) + swayOf(t.code, wallBottom);
-          const y0 = wallBottom;
           return (
             <g
               key={t.code}
               data-token-code={t.code}
               ref={(el) => {
                 gRefs.current.set(t.idx, el);
+                // Startposition EINMAL setzen (danach besitzt die rAF-Schleife die
+                // Position — ein Reveal-Rerender überschreibt sie nicht).
+                if (el && !el.getAttribute("transform")) {
+                  const y = yOf(t.animScore);
+                  el.setAttribute("transform", `translate(${xOf(t.laneIdx) + swayOf(t.code, y)} ${y})`);
+                }
               }}
-              transform={`translate(${x0} ${y0})`}
               style={{ cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
               onMouseEnter={() => openHover(t.idx)}
               onMouseLeave={scheduleHoverClose}
@@ -343,36 +311,17 @@ export default function ClimbingField(props: DisciplineFieldProps): ReactNode {
               {/* Glow-Ring beim Führenden */}
               {glowing ? <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={4} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.1s ease-in-out infinite" }} /> : null}
 
-              {/* Beziehungs-Rahmen (mine/ally/rival) */}
-              {rc ? <circle r={r + 5.5} fill="none" stroke={rc} strokeWidth={2.4} opacity={0.95} /> : null}
-
-              {/* Medaillen-Ringe (Top-3) */}
-              {medal ? <circle r={r + 3.5} fill="none" stroke={medal} strokeWidth={t.isOwn ? 4.5 : 3.5} /> : null}
-
               {/* Seil nach unten (visuell) */}
               <line x1={0} y1={r} x2={0} y2={r + 11} stroke="rgba(230, 236, 244, 0.3)" strokeWidth={1.5} opacity={0.6} />
 
-              {/* Logo oder Farb-Kreis */}
-              {t.logoUrl ? (
-                <image href={t.logoUrl} x={-r} y={-r} width={r * 2} height={r * 2} clipPath={`url(#natclip-${t.code})`} preserveAspectRatio="xMidYMid slice" />
-              ) : (
-                <circle r={r} fill={`hsl(${hue} 60% 52%)`} />
-              )}
-
-              {/* Kreis-Rahmen */}
-              <circle r={r} fill="none" stroke={t.isOwn ? "var(--nl-ink)" : "rgba(255, 255, 255, 0.5)"} strokeWidth={t.isOwn ? 2.5 : 1.4} />
+              {/* Benchmark-Chrome: Trio/Anker/Relation/Medaille/Logo/Team-Rahmen/Rang-Badge.
+                  trophy={false} — Climbing trägt seine eigene 🏆-Krone. */}
+              <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} trophy={false} />
 
               {/* Krone (Champion) */}
               {t.rank === 1 ? (
                 <text y={-(r + 9)} textAnchor="middle" fontSize={14}>
                   🏆
-                </text>
-              ) : null}
-
-              {/* Team-Code label (nur eigenes Team) */}
-              {t.isOwn ? (
-                <text y={r + 15} textAnchor="middle" fontSize={13} fontWeight={800} fill="var(--nl-accent)">
-                  ★ {t.code}
                 </text>
               ) : null}
             </g>

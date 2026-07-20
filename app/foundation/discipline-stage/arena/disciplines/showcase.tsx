@@ -10,8 +10,8 @@
 "use client";
 
 import React, { type ReactNode } from "react";
-import { hueForIdx, relColor } from "../DisciplineStageNativeArena";
 import type { DisciplineFieldProps, RT } from "./types";
+import { useTokenGlide, tokenRef, GhostLayer, TokenChrome } from "./benchmark";
 
 export default function ShowcaseField(props: DisciplineFieldProps): ReactNode {
   const {
@@ -35,7 +35,13 @@ export default function ShowcaseField(props: DisciplineFieldProps): ReactNode {
     openHover,
     scheduleHoverClose,
     onOpenTeam,
+    hoverIdx,
+    highlightIdxs,
   } = props;
+  const trioSet = new Set(highlightIdxs ?? []);
+  // Benchmark-Bewegung + Ghost: Token folgen animScore (Frame-Sync mit Rangliste,
+  // Hover/Pause friert ein). Score-basierte Host-tokenPos. Siehe benchmark.tsx.
+  const { gRefs, ghostRefs } = useTokenGlide(props);
 
   // Layout: theatrical showcase stage with depth
   const floorY = layout.floorY ?? H * 0.74; // Stage floor (Y0 in mockup = 474)
@@ -95,7 +101,7 @@ export default function ShowcaseField(props: DisciplineFieldProps): ReactNode {
         {/* Clip paths for team logos */}
         {rt.map((t) =>
           t.logoUrl ? (
-            <clipPath key={`clip-${t.code}`} id={`showcaseclip-${t.code}`}>
+            <clipPath key={`clip-${t.code}`} id={`natclip-${t.code}`}>
               <circle cx={0} cy={0} r={t.isOwn ? geo.rOwn : geo.r} />
             </clipPath>
           ) : null,
@@ -553,22 +559,20 @@ export default function ShowcaseField(props: DisciplineFieldProps): ReactNode {
         );
       })}
 
-      {/* Tokens */}
+      {/* Ghost der Vorrunde (Benchmark) — VOR den Performern. */}
+      <GhostLayer sorted={sorted} geo={geo} ghostRefs={ghostRefs} />
+
+      {/* Tokens — Position via rAF (animScore, Benchmark-Sync). */}
       {sorted.map((t) => {
-        const pos = posTokenBy(t, t.displayScore);
         const r = t.isOwn ? geo.rOwn : geo.r;
-        const hue = hueForIdx(t.idx);
-        const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
         const glowing = t.glowUntil > now;
-        const dur = reducedMotion ? 0 : 5000;
-        const ease = "cubic-bezier(.4,0,.2,1)";
 
         return (
           <g
             key={t.code}
-            transform={`translate(${pos.x} ${pos.y})`}
+            data-token-code={t.code}
+            ref={tokenRef(gRefs, t, tokenPos)}
             style={{
-              transition: reducedMotion ? "none" : `transform ${dur}ms ${ease}`,
               cursor: onOpenTeam && t.teamId ? "pointer" : "default",
             }}
             onMouseEnter={() => openHover(t.idx)}
@@ -597,57 +601,9 @@ export default function ShowcaseField(props: DisciplineFieldProps): ReactNode {
               />
             ) : null}
 
-            {/* Medal rings (top-3) */}
-            {medal ? (
-              <circle r={r + 3.5} fill="none" stroke={medal} strokeWidth={t.isOwn ? 4.5 : 3.5} />
-            ) : null}
-
-            {/* Relation border (mine/ally/rival) */}
-            {relColor(t.rel) ? (
-              <circle
-                r={r + 5.5}
-                fill="none"
-                stroke={relColor(t.rel)!}
-                strokeWidth={2.4}
-                opacity={0.95}
-              />
-            ) : null}
-
-            {/* Team logo or hue circle */}
-            {t.logoUrl ? (
-              <image
-                href={t.logoUrl}
-                x={-r}
-                y={-r}
-                width={r * 2}
-                height={r * 2}
-                clipPath={`url(#showcaseclip-${t.code})`}
-                preserveAspectRatio="xMidYMid slice"
-              />
-            ) : (
-              <circle r={r} fill={`hsl(${hue} 60% 52%)`} />
-            )}
-
-            {/* Outer border (white for own, semi-white for others) */}
-            <circle
-              r={r}
-              fill="none"
-              stroke={t.isOwn ? "var(--nl-ink)" : "rgba(255,255,255,.5)"}
-              strokeWidth={t.isOwn ? 2.5 : 1.4}
-            />
-
-            {/* Team code label */}
-            {t.isOwn ? (
-              <text
-                y={r + 15}
-                textAnchor="middle"
-                fontSize={13}
-                fontWeight={800}
-                fill="var(--nl-accent)"
-              >
-                ★ {t.code}
-              </text>
-            ) : null}
+            {/* Benchmark-Chrome: Trio/Anker/Relation/Medaille/Logo/Team-Rahmen/Rang-Badge.
+                trophy={false} — Showcase trägt seine eigene Champion-Krone (bei done). */}
+            <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} trophy={false} />
           </g>
         );
       })}

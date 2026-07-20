@@ -11,8 +11,8 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { hueForIdx, relColor } from "../DisciplineStageNativeArena";
 import type { DisciplineFieldProps, Vec2 } from "./types";
+import { useTokenGlide, tokenRef, GhostLayer, TokenChrome } from "./benchmark";
 
 // Geometry constants für I-Spy (im Sektor skaliert)
 const FIELD_W = 900;
@@ -48,6 +48,7 @@ type Glide = {
 
 export default function SpybarField(props: DisciplineFieldProps): ReactNode {
   const {
+    primitive: prim,
     skinAccent,
     env,
     reducedMotion,
@@ -55,18 +56,24 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
     H,
     geo,
     finalMax,
+    tokenPos,
     rt,
     sorted,
     round,
     done,
     now,
     hoverIdx,
+    highlightIdxs,
     openHover,
     scheduleHoverClose,
     onOpenTeam,
   } = props;
 
-  // Per-Token-Gleit-Zustand
+  const trioSet = new Set(highlightIdxs ?? []);
+  // Benchmark-Bewegung + Ghost: Token folgen animScore (Frame-Sync, Hover/Pause friert ein).
+  const { gRefs, ghostRefs } = useTokenGlide(props);
+
+  // Per-Token-Gleit-Zustand (Beams/Ziele — bespoke rAF, unten)
   const glideRef = useRef<Map<number, Glide>>(new Map());
   const tokenGRefs = useRef<Map<number, SVGGElement | null>>(new Map());
   const beamGRefs = useRef<Map<number, SVGLineElement | null>>(new Map());
@@ -186,7 +193,7 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
         {/* Team-Logos clipPath */}
         {rt.map((t) =>
           t.logoUrl ? (
-            <clipPath key={`clip-${t.code}`} id={`spybar-clip-${t.code}`}>
+            <clipPath key={`clip-${t.code}`} id={`natclip-${t.code}`}>
               <circle cx={0} cy={0} r={t.isOwn ? geo.rOwn : geo.r} />
             </clipPath>
           ) : null,
@@ -500,31 +507,22 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
         });
       })}
 
-      {/* Tokens (Späher als Scope-Blips mit Sichtkegel) */}
+      {/* Ghost der Vorrunde (Benchmark) — VOR den Späher-Tokens. */}
+      <GhostLayer sorted={sorted} geo={geo} ghostRefs={ghostRefs} />
+
+      {/* Tokens (Späher als Scope-Blips mit Sichtkegel) — Position via rAF (animScore) */}
       {sorted
         .slice()
         .reverse()
         .map((t) => {
           const r = t.isOwn ? geo.rOwn : geo.r;
-          const hue = hueForIdx(t.idx);
-          const medal = t.roundMedal
-            ? t.roundMedal === 1
-              ? COLORS.lead
-              : t.roundMedal === 2
-                ? "var(--nl-mut)"
-                : "rgb(205,127,50)"
-            : null;
           const glowing = t.glowUntil > now;
-          const rc = relColor(t.rel);
-          const isLead = sorted[0] && sorted[0].idx === t.idx;
 
           return (
             <g
               key={`token-${t.code}`}
               data-token-code={t.code}
-              ref={(el) => {
-                tokenGRefs.current.set(t.idx, el);
-              }}
+              ref={tokenRef(gRefs, t, tokenPos)}
               style={{ cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
               onMouseEnter={() => openHover(t.idx)}
               onMouseLeave={scheduleHoverClose}
@@ -532,7 +530,7 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
                 if (onOpenTeam && t.teamId) onOpenTeam(t.teamId);
               }}
             >
-              {/* Glow-Puls (Führender) */}
+              {/* Glow-Puls (Führender, bespoke) */}
               {glowing ? (
                 <circle
                   r={r + 8}
@@ -545,53 +543,10 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
                 />
               ) : null}
 
-              {/* Relations-Rahmen */}
-              {rc ? (
-                <circle r={r + 5.5} fill="none" stroke={rc} strokeWidth={2.4} opacity={0.95} />
-              ) : null}
+              {/* Benchmark-Chrome: Trio/Anker/Relation/Medaille/Logo/Team-Rahmen/Rang-Badge. */}
+              <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} />
 
-              {/* Medaillen-Ring (Top-3) */}
-              {medal ? (
-                <circle r={r + 3.5} fill="none" stroke={medal} strokeWidth={t.isOwn ? 4.5 : 3.5} />
-              ) : null}
-
-              {/* Team-Logo oder Farbkreis */}
-              {t.logoUrl ? (
-                <image
-                  href={t.logoUrl}
-                  x={-r}
-                  y={-r}
-                  width={r * 2}
-                  height={r * 2}
-                  clipPath={`url(#spybar-clip-${t.code})`}
-                  preserveAspectRatio="xMidYMid slice"
-                />
-              ) : (
-                <circle r={r} fill={`hsl(${hue} 60% 52%)`} />
-              )}
-
-              {/* Token-Rand */}
-              <circle
-                r={r}
-                fill="none"
-                stroke={t.isOwn ? "var(--nl-ink)" : "rgba(255,255,255,.5)"}
-                strokeWidth={t.isOwn ? 2.5 : 1.4}
-              />
-
-              {/* Team-Code Label */}
-              <text
-                y={r + 12}
-                textAnchor="middle"
-                fontSize={9}
-                fontFamily="ui-monospace,Menlo,monospace"
-                fontWeight={800}
-                fill={COLORS.ink}
-                opacity={0.85}
-              >
-                {t.code}
-              </text>
-
-              {/* Sichtkegel (::after in mockup — dreieck nach rechts) */}
+              {/* Sichtkegel (::after im Mockup — Dreieck nach rechts, bespoke) */}
               <polygon
                 points={`${r} 0, ${r + 12} -5, ${r + 12} 5`}
                 fill={
@@ -604,20 +559,6 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
                         : "rgba(63,224,139,.17)"
                 }
               />
-
-              {/* Krone (Sieger) */}
-              {t.rank === 1 ? (
-                <text y={-(r + 9)} textAnchor="middle" fontSize={14}>
-                  🏆
-                </text>
-              ) : null}
-
-              {/* Eigenes Team Marker */}
-              {t.isOwn ? (
-                <text y={-(r + 9)} textAnchor="middle" fontSize={13} fontWeight={800} fill="var(--nl-accent)">
-                  ★
-                </text>
-              ) : null}
             </g>
           );
         })}

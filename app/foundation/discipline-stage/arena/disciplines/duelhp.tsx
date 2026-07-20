@@ -16,8 +16,8 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { hueForIdx, relColor } from "../DisciplineStageNativeArena";
 import type { DisciplineFieldProps, RT } from "./types";
+import { TokenChrome } from "./benchmark";
 
 const SVGNS = "http://www.w3.org/2000/svg";
 
@@ -44,16 +44,18 @@ type Node = {
 
 export default function DuelhpField(props: DisciplineFieldProps): ReactNode {
   const {
+    primitive: prim,
     disciplineName,
     W,
     H,
     reducedMotion,
-    finalMax,
+    geo,
     fieldNorm,
     rt,
     sorted,
     now,
     hoverIdx,
+    highlightIdxs,
     openHover,
     scheduleHoverClose,
     onOpenTeam,
@@ -61,6 +63,7 @@ export default function DuelhpField(props: DisciplineFieldProps): ReactNode {
     fireFlash,
     glow,
   } = props;
+  const trioSet = new Set(highlightIdxs ?? []);
 
   // Pit-Geometrie (Ellipse, nutzt fast die volle Arena).
   const cx = W / 2;
@@ -444,12 +447,8 @@ export default function DuelhpField(props: DisciplineFieldProps): ReactNode {
         .reverse()
         .map((t) => {
           const r = tokenR(t);
-          const hue = hueForIdx(t.idx);
           const lead = t.rank === 1;
-          const medal =
-            t.rank === 1 ? "var(--nl-warn)" : t.rank === 2 ? "var(--nl-mut)" : t.rank === 3 ? "rgb(205,127,50)" : null;
           const glowing = t.glowUntil > now;
-          const rc = relColor(t.rel);
           return (
             <g
               key={t.code}
@@ -477,27 +476,13 @@ export default function DuelhpField(props: DisciplineFieldProps): ReactNode {
               {glowing ? (
                 <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={4} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.1s ease-in-out infinite" }} />
               ) : null}
-              {/* Freund/Feind-Rahmen */}
-              {rc ? <circle r={r + 5.5} fill="none" stroke={rc} strokeWidth={2.4} opacity={0.95} /> : null}
-              {/* Medaillen-Ring der Top-3 */}
-              {medal ? <circle r={r + 3.5} fill="none" stroke={medal} strokeWidth={lead || t.isOwn ? 4 : 3} /> : null}
-              {/* Logo (echte Team-Optik) bzw. Farb-Kreis */}
-              {t.logoUrl ? (
-                <image href={t.logoUrl} x={-r} y={-r} width={r * 2} height={r * 2} clipPath={`url(#natclip-${t.code})`} preserveAspectRatio="xMidYMid slice" />
-              ) : (
-                <circle r={r} fill={`hsl(${hue} 60% 52%)`} />
-              )}
-              <circle r={r} fill="none" stroke={t.isOwn ? "var(--nl-ink)" : "rgba(255,255,255,.5)"} strokeWidth={t.isOwn ? 2.5 : 1.4} />
+              {/* Benchmark-Chrome: Trio/Anker/Relation/Medaille/Logo/Team-Rahmen/Rang-Badge
+                  (radius = Pit-Token-Größe). trophy={false} — der Pit trägt seine eigene Krone. */}
+              <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} trophy={false} radius={r} />
               {/* Krone (Führender) */}
               {lead ? (
                 <text y={-(r + 8)} textAnchor="middle" fontSize={15}>
                   🏆
-                </text>
-              ) : null}
-              {/* Eigenes Team markieren */}
-              {t.isOwn ? (
-                <text y={r + 15} textAnchor="middle" fontSize={12.5} fontWeight={800} fill="var(--nl-accent)">
-                  ★ {t.code}
                 </text>
               ) : null}
             </g>

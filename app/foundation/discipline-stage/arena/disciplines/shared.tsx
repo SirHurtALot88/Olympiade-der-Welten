@@ -1,13 +1,23 @@
+"use client";
+
 // =====================================================================================
-// FieldSvgInner — die geteilte, 1:1 aus dem Host übernommene Feld-Darstellung ALLER
-// nicht-track-Primitive (Feldkunst + Fallback + Token-Loop mit den on-Feld-FX).
+// FieldSvgInner — die geteilte Feld-Darstellung ALLER nicht-track/lamps-Primitive
+// (Feldkunst + Fallback + Token-Loop mit den on-Feld-FX).
 //
-// Die per-Primitive-Dateien (lanes.tsx, court.tsx, barbell.tsx …) delegieren aktuell
-// hierher (VERHALTEN UNVERÄNDERT). Ein Fan-out-Agent, der EINE Disziplin neu baut,
-// ersetzt in seiner <Primitive>.tsx die Delegation durch bespoke Code — genau wie es
-// track.tsx bereits vormacht.
+// BENCHMARK-CONTRACT (1:1 aus track.tsx übernommen): Die Token-Position folgt dem
+// Host-`animScore` imperativ via rAF (Frame-Sync mit der Rangliste; Hover/Pause friert
+// ALLES ein). Jedes Token trägt die volle Verständnis-Schicht — Team-Farb-Rahmen (alle),
+// Eigen-Anker + Akzent/Ink-Doppelring, Rang-Badge, Relations-Ring (r+3), Medaillen-Ring
+// (r+4.6), Highlight-Trio-Ring (r+10) und einen Ghost der Vorrunde. `data-token-code`
+// macht die Token für Host-Zoom/Hovercard auffindbar. NUR die Feldkunst (Bahnen/Türme/
+// Szenen + die primitive-spezifischen Balken/Spuren) unterscheidet sich je Disziplin.
+//
+// Die per-Primitive-Dateien (lanes.tsx, towers.tsx, kda.tsx …) delegieren hierher und
+// erben damit den kompletten Benchmark. Ein Fan-out-Agent, der EINE Disziplin bespoke
+// neu baut, ersetzt in seiner <Primitive>.tsx die Delegation durch eigenen Code — genau
+// wie es track.tsx / lamps.tsx bereits vormachen.
 // =====================================================================================
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
   ROW_FAMILY,
   TOWER_FAMILY,
@@ -23,7 +33,8 @@ import {
   hueForIdx,
   TRACK_ROUND_MS,
 } from "../DisciplineStageNativeArena";
-import type { DisciplineFieldProps } from "./types";
+import { teamPrimaryColor, floorTeamAccent } from "@/lib/foundation/team-colors";
+import type { DisciplineFieldProps, RT } from "./types";
 
 export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactNode {
   const {
@@ -62,7 +73,64 @@ export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactN
     openHover,
     scheduleHoverClose,
     onOpenTeam,
+    hoverIdx,
+    paused,
+    highlightIdxs,
   } = props;
+  const trioSet = new Set(highlightIdxs ?? []);
+
+  // ---- Benchmark-Bewegung (1:1 aus track.tsx) -------------------------------------
+  // DOM-<g>-Refs: Token-Position + Ghost der Vorrunde setzt die rAF-Schleife imperativ
+  // aus dem Host-`animScore`. So laufen FELD und RANGLISTE exakt synchron; Hover/Pause
+  // friert BEIDES an Ort und Stelle ein (kein CSS-Nachlaufen).
+  const gRefs = useRef<Map<number, SVGGElement | null>>(new Map());
+  const ghostRefs = useRef<Map<number, SVGGElement | null>>(new Map());
+  const hoverRef = useRef<number | null>(hoverIdx);
+  hoverRef.current = hoverIdx;
+  const pausedRef = useRef<boolean>(paused);
+  pausedRef.current = paused;
+  const reducedRef = useRef<boolean>(reducedMotion);
+  reducedRef.current = reducedMotion;
+  const rtRef = useRef<RT[]>(rt);
+  rtRef.current = rt;
+  const tokenPosRef = useRef(tokenPos);
+  tokenPosRef.current = tokenPos;
+
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const frozen = hoverRef.current != null || pausedRef.current;
+      const reduce = reducedRef.current;
+      const tp = tokenPosRef.current;
+      for (const t of rtRef.current) {
+        const el = gRefs.current.get(t.idx);
+        if (el && !frozen) {
+          const p = tp(t, t.animScore);
+          el.setAttribute("transform", `translate(${p.x} ${p.y})`);
+        }
+        // Ghost der Vorrunde: sitzt bei roundStartScore, verblasst während das Token
+        // ramp­t (animScore→displayScore). Die Lücke Ghost→Token = Zugewinn der Etappe.
+        const gel = ghostRefs.current.get(t.idx);
+        if (gel) {
+          const span = t.displayScore - t.roundStartScore;
+          const prog = span > 0.5 ? Math.max(0, Math.min(1, (t.animScore - t.roundStartScore) / span)) : 1;
+          if (span > 0.5 && !reduce && prog < 0.98) {
+            const gp = tp(t, t.roundStartScore);
+            const op = (t.isOwn ? 0.6 : 0.28) * (1 - prog * 0.7);
+            gel.setAttribute("transform", `translate(${gp.x} ${gp.y})`);
+            gel.setAttribute("opacity", String(op));
+          } else {
+            gel.setAttribute("opacity", "0");
+          }
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <>
             <defs>
@@ -407,6 +475,25 @@ export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactN
               </>
             )}
 
+            {/* Ghost-Schicht (Benchmark, VOR den Token): wo jedes Team letzte Runde stand.
+                Position + Opazität setzt die rAF-Schleife; die Lücke zum Token = Zugewinn. */}
+            {FIELD_CUSTOM.has(prim) ? null : sorted.map((t) => {
+              const gr = t.isOwn ? geo.rOwn : geo.r;
+              const ghue = hueForIdx(t.idx);
+              return (
+                <g
+                  key={`ghost-${t.code}`}
+                  ref={(el) => {
+                    ghostRefs.current.set(t.idx, el);
+                  }}
+                  opacity={0}
+                  style={{ pointerEvents: "none" }}
+                >
+                  <circle r={gr} fill="none" stroke={t.isOwn ? "var(--nl-accent)" : `hsl(${ghue} 55% 60%)`} strokeWidth={t.isOwn ? 2 : 1.3} strokeDasharray="2 3" />
+                </g>
+              );
+            })}
+
             {FIELD_CUSTOM.has(prim) ? null : (prim === "barbell" ? barbellSorted : sorted)
               .slice()
               .reverse()
@@ -423,12 +510,12 @@ export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactN
                 // Gewichtheben: Heber gerissen (auf Endgewicht) bzw. Champion an der Krone.
                 const bbOut = prim === "barbell" && barbellEliminated(t.idx);
                 const bbChamp = prim === "barbell" && done && (barbellRankMap[t.code] ?? 99) === 1;
-                // ALLE Disziplinen: langer, gleichmäßiger Gleit-Übergang über eine ganze
-                // Runde (~5 s, TRACK_ROUND_MS) — alle Token gleiten simultan zum Runden-Ziel
-                // statt zu springen. Einheitlicher, sauberer Flow.
-                const dur = TRACK_ROUND_MS;
-                const ease = "cubic-bezier(.4,0,.2,1)";
+                // Bewegung: Die Token-Position setzt die rAF-Schleife oben imperativ aus
+                // `animScore` (Benchmark-Sync mit der Rangliste). Die Balken/Spuren unten
+                // liegen weiter am Runden-Ziel (displayScore) — das Token gleitet hinein.
                 const glowing = t.glowUntil > now;
+                const showBadge = t.isOwn || t.rank <= 3 || hoverIdx === t.idx;
+                const rc = relColor(t.rel);
                 // Primitive-spezifische Spur/Balken (absolute Koordinaten, hinter dem Token)
                 const barW = Math.min(18, (layout.colW ?? 24) * 0.5);
                 return (
@@ -596,8 +683,15 @@ export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactN
                       <ellipse cx={pos.x} cy={pos.y + r * 0.9} rx={r * 0.9} ry={r * 0.32} fill="rgba(0,0,0,0.4)" />
                     ) : null}
                     <g
-                      transform={`translate(${pos.x} ${pos.y})`}
-                      style={{ transition: reducedMotion ? "none" : `transform ${dur}ms ${ease}`, cursor: onOpenTeam && t.teamId ? "pointer" : "default", opacity: bbOut ? 0.5 : 1 }}
+                      data-token-code={t.code}
+                      ref={(el) => {
+                        gRefs.current.set(t.idx, el);
+                        if (el && !el.getAttribute("transform")) {
+                          const ap = tokenPos(t, t.animScore);
+                          el.setAttribute("transform", `translate(${ap.x} ${ap.y})`);
+                        }
+                      }}
+                      style={{ cursor: onOpenTeam && t.teamId ? "pointer" : "default", opacity: bbOut ? 0.5 : 1 }}
                       onMouseEnter={() => openHover(t.idx)}
                       onMouseLeave={scheduleHoverClose}
                       onClick={() => {
@@ -613,6 +707,11 @@ export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactN
                       ) : null}
                       {bbChamp ? <text y={-(r + 9)} textAnchor="middle" fontSize={14}>🏆</text> : null}
                       {glowing ? <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={4} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.1s ease-in-out infinite" }} /> : null}
+                      {/* Highlight-Trio (Aufholjagd, Benchmark): kräftiger goldener Puls-Ring an
+                          den 3 größten Aufsteigern der Etappe — im Zoom/der Zeitlupe leuchtet er. */}
+                      {trioSet.has(t.idx) ? <circle r={r + 10} fill="none" stroke="var(--nl-warn)" strokeWidth={3.5} opacity={0.95} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 0.85s ease-in-out infinite" }} /> : null}
+                      {/* Eigen-Team-Anker (Benchmark): dauerhafter, weicher Akzent-Puls. */}
+                      {t.isOwn ? <circle r={r + 6} fill="none" stroke="var(--nl-accent)" strokeWidth={2} opacity={0.9} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.6s ease-in-out infinite" }} /> : null}
                       {/* Buzzer-Beater-Glow — Führung auf dem Court dauerhaft golden umrandet */}
                       {prim === "court" && t.rank === 1 && t.thrownSlot >= 0 ? (
                         <circle r={r + 11} fill="none" stroke="var(--nl-warn)" strokeWidth={2.5} opacity={0.5} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.6s ease-in-out infinite" }} />
@@ -621,20 +720,31 @@ export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactN
                       {prim === "kda" && t.rank === 1 && t.thrownSlot >= 0 ? (
                         <circle r={r + 9} fill="none" stroke="var(--nl-warn)" strokeWidth={2.5} opacity={0.6} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.6s ease-in-out infinite" }} />
                       ) : null}
-                      {/* Freund/Feind-Rahmen (mine/ally/rival) — nur Rahmenfarbe, nie Füllung */}
-                      {relColor(t.rel) ? <circle r={r + 5.5} fill="none" stroke={relColor(t.rel)!} strokeWidth={2.4} opacity={0.95} /> : null}
-                      {medal ? <circle r={r + 3.5} fill="none" stroke={medal} strokeWidth={t.isOwn ? 4.5 : 3.5} /> : null}
+                      {/* Relations-Marker (Rivalen rot / Verbündete) — eng am Rahmen (r+3). */}
+                      {rc ? <circle r={r + 3} fill="none" stroke={rc} strokeWidth={2.6} opacity={0.95} /> : null}
+                      {/* Medaillen-Ring (Runden-Podest) r+4.6. */}
+                      {medal ? <circle r={r + 4.6} fill="none" stroke={medal} strokeWidth={t.isOwn ? 4.5 : 3.5} /> : null}
                       {t.logoUrl ? (
                         <image href={t.logoUrl} x={-r} y={-r} width={r * 2} height={r * 2} clipPath={`url(#natclip-${t.code})`} preserveAspectRatio="xMidYMid slice" />
                       ) : (
                         <circle r={r} fill={`hsl(${hue} 60% 52%)`} />
                       )}
-                      <circle r={r} fill="none" stroke={t.isOwn ? "var(--nl-ink)" : "rgba(255,255,255,.5)"} strokeWidth={t.isOwn ? 2.5 : 1.4} />
-                      {t.isOwn && !ROW_FAMILY.has(prim) ? (
-                        <text y={r + 15} textAnchor="middle" fontSize={13} fontWeight={800} fill="var(--nl-accent)">
-                          ★ {t.code}
-                        </text>
-                      ) : t.rel && SCENE_PRIMS.has(prim) ? (
+                      {/* Team-Farb-Rahmen (getTeamColor) — JEDES Team sichtbar umrandet. Eigenes
+                          Team zusätzlich Akzent-Rahmen + Ink-Doppelring. */}
+                      {t.isOwn ? (
+                        <>
+                          <circle r={r + 1.6} fill="none" stroke="var(--nl-accent)" strokeWidth={3} />
+                          <circle r={r + 0.2} fill="none" stroke="var(--nl-ink)" strokeWidth={1.4} opacity={0.9} />
+                        </>
+                      ) : (
+                        <circle r={r + 1.4} fill="none" stroke={floorTeamAccent(teamPrimaryColor(t.code))} strokeWidth={2.4} opacity={1} />
+                      )}
+                      {/* Pokal auf Rang 1 (court/kda tragen ihre eigene Krone weiter unten). */}
+                      {t.rank === 1 && prim !== "court" && prim !== "kda" && !bbChamp ? (
+                        <text y={-(r + 9)} textAnchor="middle" fontSize={14}>🏆</text>
+                      ) : null}
+                      {/* Szene-Beziehungs-Label (Eigen-Team identifiziert jetzt der Rang-Badge). */}
+                      {!t.isOwn && t.rel && SCENE_PRIMS.has(prim) ? (
                         <text y={-(r + 7)} textAnchor="middle" fontSize={10} fontWeight={800} fill={relColor(t.rel)!}>
                           {t.code}
                         </text>
@@ -666,6 +776,15 @@ export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactN
                       {/* TDM: MVP-Krone auf Rang 1 */}
                       {prim === "kda" && t.rank === 1 && t.thrownSlot >= 0 ? (
                         <text y={-(r + 5)} textAnchor="middle" fontSize={15}>👑</text>
+                      ) : null}
+                      {/* Rang-Badge (Benchmark): macht die Position direkt am Token lesbar —
+                          Eigen-Team, Podest oder gehovert. ★ markiert das eigene Team. */}
+                      {showBadge ? (
+                        <g transform={`translate(0 ${r + 13})`}>
+                          <text textAnchor="middle" fontSize={11.5} fontWeight={900} fill={t.isOwn ? "var(--nl-accent)" : t.rank === 1 ? "var(--nl-warn)" : "var(--nl-ink)"}>
+                            {t.isOwn ? "★ " : ""}#{t.rank}
+                          </text>
+                        </g>
                       ) : null}
                     </g>
                   </g>

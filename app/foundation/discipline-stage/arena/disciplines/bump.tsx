@@ -8,20 +8,14 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { hueForIdx, relColor } from "../DisciplineStageNativeArena";
 import type { DisciplineFieldProps, RT } from "./types";
-
-type Glide = { x: number; fromX: number; toX: number; glideT: number; gamma: number; target: number };
-
-function easedPow(t: number, gamma: number): number {
-  return Math.pow(Math.max(0, Math.min(1, t)), gamma);
-}
+import { GhostLayer, TokenChrome } from "./benchmark";
 
 export default function BumpField(props: DisciplineFieldProps): ReactNode {
   const {
+    primitive: prim,
     disciplineName,
     skinAccent,
-    env,
     reducedMotion,
     W,
     H,
@@ -31,13 +25,15 @@ export default function BumpField(props: DisciplineFieldProps): ReactNode {
     sorted,
     now,
     hoverIdx,
+    highlightIdxs,
     openHover,
     scheduleHoverClose,
     onOpenTeam,
   } = props;
+  const trioSet = new Set(highlightIdxs ?? []);
 
-  const glideRef = useRef<Map<number, Glide>>(new Map());
   const gRefs = useRef<Map<number, SVGGElement | null>>(new Map());
+  const ghostRefs = useRef<Map<number, SVGGElement | null>>(new Map());
   const hoverRef = useRef<number | null>(hoverIdx);
   hoverRef.current = hoverIdx;
   const pausedRef = useRef<boolean>(props.paused);
@@ -65,53 +61,36 @@ export default function BumpField(props: DisciplineFieldProps): ReactNode {
     return X0 + (0.015 + norm * 0.985) * (X1 - X0);
   };
 
-  // Runden-Erkennung: neuer Glide wenn displayScore sich ändert.
-  const syncTargets = (): void => {
-    const g = glideRef.current;
-    for (const t of rtRef.current) {
-      const target = fracX(t.displayScore);
-      let st = g.get(t.idx);
-      if (!st) {
-        st = { x: X0, fromX: X0, toX: target, glideT: 1, gamma: 1, target };
-        g.set(t.idx, st);
-      }
-      if (Math.abs(target - st.target) > 0.001) {
-        st.fromX = st.x;
-        st.toX = target;
-        st.glideT = 0;
-        st.gamma = 0.4 + Math.random() * 1.2; // explosiv, Sprint-ähnlich
-        st.target = target;
-      }
-    }
-  };
-
-  // rAF-Schleife: gleitet alle Token simultan über ROUND_MS in X-Richtung.
+  // rAF-Schleife (Benchmark-Sync): Position folgt dem Host-`animScore` (geteilter
+  // Zeitstrahl) → Feld UND Rangliste laufen synchron, Hover/Pause friert beides ein.
+  // Der Sprint-Lean (skewX) bleibt als bespoke Feld-Detail — abgeleitet aus dem
+  // Etappen-Fortschritt (animScore zwischen roundStartScore und displayScore).
   useEffect(() => {
     let raf = 0;
-    let last = performance.now();
-    const ROUND_MS = 5000;
-    const tick = (ts: number) => {
-      const dt = Math.min(64, ts - last);
-      last = ts;
-      syncTargets();
+    const tick = () => {
       const frozen = hoverRef.current != null || pausedRef.current;
       const reduce = reducedRef.current;
-      const g = glideRef.current;
       for (const t of rtRef.current) {
-        const st = g.get(t.idx);
-        if (!st) continue;
-        if (reduce) {
-          st.x = st.toX;
-          st.glideT = 1;
-        } else if (!frozen && st.glideT < 1) {
-          st.glideT = Math.min(1, st.glideT + dt / ROUND_MS);
-          st.x = st.fromX + (st.toX - st.fromX) * easedPow(st.glideT, st.gamma);
-        }
         const el = gRefs.current.get(t.idx);
-        if (el) {
+        if (el && !frozen) {
+          const x = fracX(t.animScore);
           const y = laneY(t.laneIdx);
-          const lean = Math.max(0, (st.glideT - 0.3) / 0.7) * 12; // Neigung nach vorn beim Sprint
-          el.setAttribute("transform", `translate(${st.x} ${y}) skewX(${-lean})`);
+          const span = t.displayScore - t.roundStartScore;
+          const prog = span > 0.5 ? Math.max(0, Math.min(1, (t.animScore - t.roundStartScore) / span)) : 1;
+          const lean = Math.max(0, (prog - 0.3) / 0.7) * 12; // Neigung nach vorn beim Sprint
+          el.setAttribute("transform", `translate(${x} ${y}) skewX(${-lean})`);
+        }
+        // Ghost der Vorrunde: bei fracX(roundStartScore) auf derselben Bahn.
+        const gel = ghostRefs.current.get(t.idx);
+        if (gel) {
+          const span = t.displayScore - t.roundStartScore;
+          const p = span > 0.5 ? Math.max(0, Math.min(1, (t.animScore - t.roundStartScore) / span)) : 1;
+          if (span > 0.5 && !reduce && p < 0.98) {
+            gel.setAttribute("transform", `translate(${fracX(t.roundStartScore)} ${laneY(t.laneIdx)})`);
+            gel.setAttribute("opacity", String((t.isOwn ? 0.6 : 0.28) * (1 - p * 0.7)));
+          } else {
+            gel.setAttribute("opacity", "0");
+          }
         }
       }
       raf = requestAnimationFrame(tick);
@@ -370,16 +349,16 @@ export default function BumpField(props: DisciplineFieldProps): ReactNode {
         </text>
       ) : null}
 
-      {/* Token — Position imperativ via rAF (transform), Marker per Reveal. */}
+      {/* Ghost der Vorrunde (Benchmark) — VOR den Token. */}
+      <GhostLayer sorted={sorted} geo={geo} ghostRefs={ghostRefs} />
+
+      {/* Token — Position imperativ via rAF (animScore, Benchmark-Sync). */}
       {sorted
         .slice()
         .reverse()
         .map((t) => {
-          const r = t.isOwn ? geo.rOwn : geo.r;
-          const hue = hueForIdx(t.idx);
-          const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
           const glowing = t.glowUntil > now;
-          const rc = relColor(t.rel);
+          const r = t.isOwn ? geo.rOwn : geo.r;
           return (
             <g
               key={t.code}
@@ -395,24 +374,8 @@ export default function BumpField(props: DisciplineFieldProps): ReactNode {
               }}
             >
               {glowing ? <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={4} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.1s ease-in-out infinite" }} /> : null}
-              {rc ? <circle r={r + 5.5} fill="none" stroke={rc} strokeWidth={2.4} opacity={0.95} /> : null}
-              {medal ? <circle r={r + 3.5} fill="none" stroke={medal} strokeWidth={t.isOwn ? 4.5 : 3.5} /> : null}
-              {t.logoUrl ? (
-                <image href={t.logoUrl} x={-r} y={-r} width={r * 2} height={r * 2} clipPath={`url(#natclip-${t.code})`} preserveAspectRatio="xMidYMid slice" />
-              ) : (
-                <circle r={r} fill={`hsl(${hue} 60% 52%)`} />
-              )}
-              <circle r={r} fill="none" stroke={t.isOwn ? "var(--nl-ink)" : "rgba(255,255,255,.5)"} strokeWidth={t.isOwn ? 2.5 : 1.4} />
-              {t.rank === 1 ? (
-                <text y={-(r + 9)} textAnchor="middle" fontSize={14}>
-                  🏆
-                </text>
-              ) : null}
-              {t.isOwn ? (
-                <text y={r + 15} textAnchor="middle" fontSize={13} fontWeight={800} fill="var(--nl-accent)">
-                  ★ {t.code}
-                </text>
-              ) : null}
+              {/* Benchmark-Chrome: Trio/Anker/Relation/Medaille/Logo/Team-Rahmen/🏆/Rang-Badge. */}
+              <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} />
             </g>
           );
         })}

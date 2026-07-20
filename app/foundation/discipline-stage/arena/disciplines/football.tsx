@@ -13,20 +13,12 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { hueForIdx, relColor } from "../DisciplineStageNativeArena";
 import type { DisciplineFieldProps, RT } from "./types";
-
-type Glide = { x: number; fromX: number; toX: number; glideT: number; gamma: number; target: number };
-
-function easedPow(t: number, gamma: number): number {
-  return Math.pow(Math.max(0, Math.min(1, t)), gamma);
-}
+import { GhostLayer, TokenChrome } from "./benchmark";
 
 export default function FootballField(props: DisciplineFieldProps): ReactNode {
   const {
-    disciplineName,
-    skinAccent,
-    env,
+    primitive: prim,
     reducedMotion,
     W,
     H,
@@ -36,13 +28,15 @@ export default function FootballField(props: DisciplineFieldProps): ReactNode {
     sorted,
     now,
     hoverIdx,
+    highlightIdxs,
     openHover,
     scheduleHoverClose,
     onOpenTeam,
   } = props;
+  const trioSet = new Set(highlightIdxs ?? []);
 
-  const glideRef = useRef<Map<number, Glide>>(new Map());
   const gRefs = useRef<Map<number, SVGGElement | null>>(new Map());
+  const ghostRefs = useRef<Map<number, SVGGElement | null>>(new Map());
   const hoverRef = useRef<number | null>(hoverIdx);
   hoverRef.current = hoverIdx;
   const pausedRef = useRef<boolean>(props.paused);
@@ -76,53 +70,29 @@ export default function FootballField(props: DisciplineFieldProps): ReactNode {
     return X0 + (0.015 + norm * 0.985) * (X1 - X0);
   };
 
-  // Runden-Erkennung: neuer Glide wenn displayScore sich ändert.
-  const syncTargets = (): void => {
-    const g = glideRef.current;
-    const X0 = GL0 + (40 / 840) * LW;
-    for (const t of rtRef.current) {
-      const target = fracX(t.displayScore);
-      let st = g.get(t.idx);
-      if (!st) {
-        st = { x: X0, fromX: X0, toX: target, glideT: 1, gamma: 1, target };
-        g.set(t.idx, st);
-      }
-      if (Math.abs(target - st.target) > 0.001) {
-        st.fromX = st.x;
-        st.toX = target;
-        st.glideT = 0;
-        st.gamma = 0.4 + Math.random() * 1.2; // explosiv, Sprint-ähnlich
-        st.target = target;
-      }
-    }
-  };
-
-  // rAF-Schleife: gleitet alle Token simultan über ROUND_MS in X-Richtung.
+  // rAF-Schleife (Benchmark-Sync): Position folgt dem Host-`animScore` (geteilter
+  // Zeitstrahl) → Feld UND Rangliste laufen synchron, Hover/Pause friert beides ein.
   useEffect(() => {
     let raf = 0;
-    let last = performance.now();
-    const ROUND_MS = 5000;
-    const tick = (ts: number) => {
-      const dt = Math.min(64, ts - last);
-      last = ts;
-      syncTargets();
+    const tick = () => {
       const frozen = hoverRef.current != null || pausedRef.current;
       const reduce = reducedRef.current;
-      const g = glideRef.current;
       for (const t of rtRef.current) {
-        const st = g.get(t.idx);
-        if (!st) continue;
-        if (reduce) {
-          st.x = st.toX;
-          st.glideT = 1;
-        } else if (!frozen && st.glideT < 1) {
-          st.glideT = Math.min(1, st.glideT + dt / ROUND_MS);
-          st.x = st.fromX + (st.toX - st.fromX) * easedPow(st.glideT, st.gamma);
-        }
         const el = gRefs.current.get(t.idx);
-        if (el) {
-          const y = laneY(t.laneIdx);
-          el.setAttribute("transform", `translate(${st.x} ${y})`);
+        if (el && !frozen) {
+          el.setAttribute("transform", `translate(${fracX(t.animScore)} ${laneY(t.laneIdx)})`);
+        }
+        // Ghost der Vorrunde: bei fracX(roundStartScore) auf derselben Bahn.
+        const gel = ghostRefs.current.get(t.idx);
+        if (gel) {
+          const span = t.displayScore - t.roundStartScore;
+          const p = span > 0.5 ? Math.max(0, Math.min(1, (t.animScore - t.roundStartScore) / span)) : 1;
+          if (span > 0.5 && !reduce && p < 0.98) {
+            gel.setAttribute("transform", `translate(${fracX(t.roundStartScore)} ${laneY(t.laneIdx)})`);
+            gel.setAttribute("opacity", String((t.isOwn ? 0.6 : 0.28) * (1 - p * 0.7)));
+          } else {
+            gel.setAttribute("opacity", "0");
+          }
         }
       }
       raf = requestAnimationFrame(tick);
@@ -291,68 +261,34 @@ export default function FootballField(props: DisciplineFieldProps): ReactNode {
       {/* Feldkunst: Gridiron mit Yard-Linien, Goalposts, Flutlichter */}
       <g dangerouslySetInnerHTML={{ __html: renderFieldArt() }} />
 
-      {/* Tokens: Helm-Stil mit Ball in der Hand, medaillen-umrandet, mit Hover + Click */}
+      {/* Ghost der Vorrunde (Benchmark) — VOR den Token. */}
+      <GhostLayer sorted={sorted} geo={geo} ghostRefs={ghostRefs} />
+
+      {/* Tokens: Helm-Stil mit Ball in der Hand — Position via rAF (animScore, Benchmark-Sync). */}
       {sorted.map((t) => {
-        const st = glideRef.current.get(t.idx);
-        const x = st?.x ?? GL0;
-        const y = laneY(t.laneIdx);
         const r = t.isOwn ? geo.rOwn : geo.r;
-        const hue = hueForIdx(t.idx);
-        const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
-        const relC = relColor(t.rel);
         const isLeader = t.rank === 1;
 
         return (
           <g
             key={t.code}
+            data-token-code={t.code}
             ref={(el) => {
-              if (el) gRefs.current.set(t.idx, el);
+              gRefs.current.set(t.idx, el);
+              if (el && !el.getAttribute("transform")) {
+                el.setAttribute("transform", `translate(${fracX(t.animScore)} ${laneY(t.laneIdx)})`);
+              }
             }}
-            transform={`translate(${x} ${y})`}
-            style={{ cursor: onOpenTeam && t.teamId ? "pointer" : "default", opacity: 1 }}
+            style={{ cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
             onMouseEnter={() => openHover(t.idx)}
             onMouseLeave={scheduleHoverClose}
             onClick={() => {
               if (onOpenTeam && t.teamId) onOpenTeam(t.teamId);
             }}
           >
-            {/* Helm-Basis (mit oder ohne Logo) */}
-            {t.logoUrl ? (
-              <image
-                href={t.logoUrl}
-                x={-r}
-                y={-r}
-                width={r * 2}
-                height={r * 2}
-                clipPath={`url(#natclip-${t.code})`}
-                preserveAspectRatio="xMidYMid slice"
-              />
-            ) : (
-              <circle r={r} fill={`hsl(${hue} 60% 52%)`} />
-            )}
-
-            {/* Helm-Rand (Beziehung oder Lead) */}
-            {isLeader ? (
-              <>
-                {/* Lead: goldener Ring + größerer Helm */}
-                <circle r={r + 5.5} fill="none" stroke="var(--nl-warn)" strokeWidth={3} opacity={0.7} />
-                <circle r={r} fill="none" stroke="var(--nl-ink)" strokeWidth={2.5} />
-              </>
-            ) : relC ? (
-              <circle r={r + 5.5} fill="none" stroke={relC} strokeWidth={2.4} opacity={0.95} />
-            ) : (
-              <circle r={r} fill="none" stroke="rgba(255,255,255,.5)" strokeWidth={1.4} />
-            )}
-
-            {/* Medaillen-Ring (Top-3) */}
-            {medal ? <circle r={r + 3.5} fill="none" stroke={medal} strokeWidth={t.isOwn ? 4.5 : 3.5} /> : null}
-
-            {/* Team-Code (klein, unten rechts für Lesbarkeit) */}
-            {t.isOwn ? (
-              <text y={r + 10} textAnchor="middle" fontSize={9} fontWeight={800} fill="var(--nl-ink)">
-                {t.code}
-              </text>
-            ) : null}
+            {/* Benchmark-Chrome: Trio/Anker/Relation/Medaille/Logo/Team-Rahmen/Rang-Badge.
+                trophy={false} — Football trägt seine eigene 👑-Krone. */}
+            <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} trophy={false} />
 
             {/* Ball in der Hand (kleines Oval, rechts-unten auf dem Helm) */}
             <ellipse cx={r - 3} cy={r - 3} rx={5.5} ry={3.5} fill="url(#ballGrad)" stroke="#4f2809" strokeWidth={1} />

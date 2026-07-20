@@ -16,8 +16,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
-import { hueForIdx, relColor, TRACK_ROUND_MS } from "../DisciplineStageNativeArena";
 import type { DisciplineFieldProps, RT } from "./types";
+import { GhostLayer, TokenChrome } from "./benchmark";
 
 // Deterministischer 0…1-Hash (FNV-1a) — Feld-Deko/Fahrer-Phasen ohne Hydration-Mismatch.
 function h01(s: string): number {
@@ -55,6 +55,7 @@ type GP = {
 
 export default function PelotonField(props: DisciplineFieldProps): ReactNode {
   const {
+    primitive: prim,
     disciplineName,
     reducedMotion,
     W,
@@ -67,10 +68,12 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
     done,
     now,
     hoverIdx,
+    highlightIdxs,
     openHover,
     scheduleHoverClose,
     onOpenTeam,
   } = props;
+  const trioSet = new Set(highlightIdxs ?? []);
 
   // ---- Straßen-Geometrie (aus host-Layout abgeleitet) --------------------------------
   const X0: number = layout.padL;
@@ -86,7 +89,6 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
   const KM = 41;
   const CLUMP_GAP = 40;
   const PACK_GAP = 24;
-  const GLIDE_MS = TRACK_ROUND_MS;
 
   // Frische Prop-Spiegel für die rAF-Schleife (ohne Neustart).
   const rtRef = useRef<RT[]>(rt);
@@ -102,6 +104,7 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
 
   const glideRef = useRef<Map<number, GP>>(new Map());
   const gRefs = useRef<Map<number, SVGGElement | null>>(new Map());
+  const ghostRefs = useRef<Map<number, SVGGElement | null>>(new Map());
   const streakRefs = useRef<Map<number, SVGLineElement | null>>(new Map());
   const packRefs = useRef<Map<number, SVGCircleElement | null>>(new Map());
   const profmarkRef = useRef<SVGCircleElement | null>(null);
@@ -343,11 +346,11 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
       for (const t of rtl) {
         const st = g.get(t.idx);
         if (!st) continue;
-        if (!frozen && !reduce && st.glideT < 1) {
-          st.glideT = Math.min(1, st.glideT + dt / GLIDE_MS);
-          st.x = st.fromX + (st.toX - st.fromX) * st.glideT; // konstante Geschwindigkeit, kein Ruck
-        }
         if (!frozen) {
+          // Basis-x folgt dem Host-`animScore` (Benchmark-Sync: Feld + Rangliste laufen
+          // exakt synchron; Hover/Pause friert beides ein). Die Windschatten-/Pack-Offsets
+          // (draft/comp/bob) verschieben nur die Zeichnung, nie die Score-Position.
+          st.x = tp(t, t.animScore).x;
           st.draft += (st.draftTo - st.draft) * 0.045;
           st.y += (st.yTo - st.y) * 0.028;
         }
@@ -355,6 +358,19 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
         const dy = st.y + (reduce ? 0 : Math.cos(nowT * 0.0013 + st.wPh * 1.7) * 1.2);
         const el = gRefs.current.get(t.idx);
         if (el) el.setAttribute("transform", `translate(${dx} ${dy})`);
+        // Ghost der Vorrunde (Benchmark): bei tokenPos(roundStartScore); die Lücke = Zugewinn.
+        const gel = ghostRefs.current.get(t.idx);
+        if (gel) {
+          const span = t.displayScore - t.roundStartScore;
+          const p = span > 0.5 ? clamp((t.animScore - t.roundStartScore) / span, 0, 1) : 1;
+          if (span > 0.5 && !reduce && p < 0.98) {
+            const gp = tp(t, t.roundStartScore);
+            gel.setAttribute("transform", `translate(${gp.x} ${clamp(roadC + st.baseOff, laneT, laneB)})`);
+            gel.setAttribute("opacity", String((t.isOwn ? 0.6 : 0.28) * (1 - p * 0.7)));
+          } else {
+            gel.setAttribute("opacity", "0");
+          }
+        }
         if (st.toX > frontX) frontX = st.toX;
         // Wind-Streak: Länge/Intensität skaliert mit aktueller Geschwindigkeit.
         const v = st.prevDrawn == null ? 0 : Math.max(0, dx - st.prevDrawn);
@@ -400,17 +416,17 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
         </text>
       ) : null}
 
+      {/* Ghost der Vorrunde (Benchmark) — VOR den Fahrern. */}
+      <GhostLayer sorted={sorted} geo={geo} ghostRefs={ghostRefs} />
+
       {/* Fahrer-Tokens — in Rang-Reihenfolge rückwärts, damit der Führende oben liegt. */}
       {sorted
         .slice()
         .reverse()
         .map((t) => {
           const r = rOf(t);
-          const hue = hueForIdx(t.idx);
-          const rc = relColor(t.rel);
           const glowing = t.glowUntil > now;
           const isLead = t.rank === 1;
-          const medal = t.rank === 1 ? "var(--nl-warn)" : t.rank === 2 ? "var(--nl-mut)" : t.rank === 3 ? "rgb(205,127,50)" : null;
           const roundMed = t.roundMedal === 1 ? "🥇" : t.roundMedal === 2 ? "🥈" : t.roundMedal === 3 ? "🥉" : null;
           const st = glideRef.current.get(t.idx);
           const initX = st ? st.x : X0;
@@ -461,17 +477,9 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
               {glowing ? <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={3.5} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.1s ease-in-out infinite" }} /> : null}
               {/* Gelbes-Trikot-Glow für den Führenden. */}
               {isLead ? <circle r={r + 7} fill="none" stroke="#f6c750" strokeWidth={2.4} opacity={0.85} style={{ filter: "drop-shadow(0 0 8px rgba(246,199,80,.6))" }} /> : null}
-              {/* Beziehungs-Rahmen (mine/ally/rival). */}
-              {rc ? <circle r={r + 5.5} fill="none" stroke={rc} strokeWidth={2.4} opacity={0.95} /> : null}
-              {/* Medaillen-Ring der aktuellen Top-3. */}
-              {medal ? <circle r={r + 3.5} fill="none" stroke={medal} strokeWidth={t.isOwn ? 4.5 : 3.5} /> : null}
-              {/* Wappen / Logo im Aero-Hocker. */}
-              {t.logoUrl ? (
-                <image href={t.logoUrl} x={-r} y={-r} width={r * 2} height={r * 2} clipPath={`url(#natclip-${t.code})`} preserveAspectRatio="xMidYMid slice" />
-              ) : (
-                <circle r={r} fill={`hsl(${hue} 60% 52%)`} />
-              )}
-              <circle r={r} fill="none" stroke={t.isOwn ? "var(--nl-ink)" : "rgba(255,255,255,.5)"} strokeWidth={t.isOwn ? 2.5 : 1.4} />
+              {/* Benchmark-Chrome: Trio/Anker/Relation/Medaille/Logo/Team-Rahmen/Rang-Badge.
+                  trophy={false} — Peloton trägt seine eigene 🏆-Krone / Runden-Medaille. */}
+              <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} trophy={false} />
               {/* Champion-Krone (Endstand) bzw. Runden-Medaille. */}
               {done && isLead ? (
                 <text y={-(r + 9)} textAnchor="middle" fontSize={14}>
@@ -480,11 +488,6 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
               ) : roundMed ? (
                 <text y={r + 13} textAnchor="middle" fontSize={11}>
                   {roundMed}
-                </text>
-              ) : null}
-              {t.isOwn ? (
-                <text y={r + (roundMed && !(done && isLead) ? 26 : 15)} textAnchor="middle" fontSize={13} fontWeight={800} fill="var(--nl-accent)">
-                  ★ {t.code}
                 </text>
               ) : null}
             </g>

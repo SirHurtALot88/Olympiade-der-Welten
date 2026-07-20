@@ -15,11 +15,12 @@
 "use client";
 
 import React, { type ReactNode } from "react";
-import { hueForIdx, relColor } from "../DisciplineStageNativeArena";
-import type { DisciplineFieldProps } from "./types";
+import type { DisciplineFieldProps, RT } from "./types";
+import { useTokenGlide, tokenRef, GhostLayer, TokenChrome } from "./benchmark";
 
 export default function EiskunstField(props: DisciplineFieldProps): ReactNode {
   const {
+    primitive: prim,
     disciplineName,
     skinAccent,
     env,
@@ -30,14 +31,16 @@ export default function EiskunstField(props: DisciplineFieldProps): ReactNode {
     geo,
     layout,
     finalMax,
-    tokenPos,
     rt,
     sorted,
     now,
     openHover,
     scheduleHoverClose,
     onOpenTeam,
+    hoverIdx,
+    highlightIdxs,
   } = props;
+  const trioSet = new Set(highlightIdxs ?? []);
 
   // ============================================================================
   // Geometry: Ice rink from above, elliptical
@@ -106,6 +109,13 @@ export default function EiskunstField(props: DisciplineFieldProps): ReactNode {
       y: CY + Math.sin(th) * RY * r,
     };
   };
+
+  // Benchmark-Bewegung + Ghost: Token folgen animScore (Frame-Sync mit Rangliste,
+  // Hover/Pause friert ein). Eiskunst positioniert per bespoke Choreografie-Route
+  // (routePos über normalisierten Fortschritt uOf(score)); dieser Adapter speist die
+  // Glide-Schleife, damit Ghost + Token derselben Kür folgen. Siehe benchmark.tsx.
+  const glidePos = (t: RT, score: number): { x: number; y: number } => routePos(t, uOf(score));
+  const { gRefs, ghostRefs } = useTokenGlide({ ...props, tokenPos: glidePos });
 
   // ============================================================================
   // Render functions for field art (SVG children only)
@@ -472,32 +482,24 @@ export default function EiskunstField(props: DisciplineFieldProps): ReactNode {
         );
       })()}
 
-      {/* === Tokens: 32 Skaters === */}
+      {/* Ghost der Vorrunde (Benchmark) — VOR den Skatern. */}
+      <GhostLayer sorted={sorted} geo={geo} ghostRefs={ghostRefs} />
+
+      {/* === Tokens: 32 Skaters === Position via rAF (animScore, Benchmark-Sync). */}
       {sorted
         .slice()
         .reverse()
         .map((t) => {
-          const pos = routePos(t, uOf(t.displayScore));
           const r = t.isOwn ? geo.rOwn : geo.r;
-          const hue = hueForIdx(t.idx);
-          const medal =
-            t.roundMedal === 1
-              ? "var(--nl-warn)"
-              : t.roundMedal === 2
-                ? "var(--nl-mut)"
-                : t.roundMedal === 3
-                  ? "rgb(205,127,50)"
-                  : null;
-          const relC = relColor(t.rel);
           const glowing = t.glowUntil > now;
 
           return (
             <g
               key={t.code}
-              transform={`translate(${pos.x} ${pos.y})`}
+              data-token-code={t.code}
+              ref={tokenRef(gRefs, t, glidePos)}
               style={{
                 cursor: onOpenTeam && t.teamId ? "pointer" : "default",
-                transition: reducedMotion ? "none" : "transform 5s cubic-bezier(.4,0,.2,1)",
               }}
               onMouseEnter={() => openHover(t.idx)}
               onMouseLeave={scheduleHoverClose}
@@ -520,27 +522,6 @@ export default function EiskunstField(props: DisciplineFieldProps): ReactNode {
                 />
               ) : null}
 
-              {/* Relation ring (mine/ally/rival) */}
-              {relC ? (
-                <circle
-                  r={r + 5.5}
-                  fill="none"
-                  stroke={relC}
-                  strokeWidth={2.4}
-                  opacity={0.95}
-                />
-              ) : null}
-
-              {/* Medal ring (Top-3) */}
-              {medal ? (
-                <circle
-                  r={r + 3.5}
-                  fill="none"
-                  stroke={medal}
-                  strokeWidth={t.isOwn ? 4.5 : 3.5}
-                />
-              ) : null}
-
               {/* Kufen-Glanz (skate shine, decorative line below token) */}
               <line
                 x1={0}
@@ -552,41 +533,9 @@ export default function EiskunstField(props: DisciplineFieldProps): ReactNode {
                 opacity={0.6}
               />
 
-              {/* Logo or colored circle */}
-              {t.logoUrl ? (
-                <image
-                  href={t.logoUrl}
-                  x={-r}
-                  y={-r}
-                  width={r * 2}
-                  height={r * 2}
-                  clipPath={`url(#natclip-${t.code})`}
-                  preserveAspectRatio="xMidYMid slice"
-                />
-              ) : (
-                <circle r={r} fill={`hsl(${hue} 60% 52%)`} />
-              )}
-
-              {/* Token border */}
-              <circle
-                r={r}
-                fill="none"
-                stroke={t.isOwn ? "var(--nl-ink)" : "rgba(255,255,255,.5)"}
-                strokeWidth={t.isOwn ? 2.5 : 1.4}
-              />
-
-              {/* Team code label (own team only, with star) */}
-              {t.isOwn ? (
-                <text
-                  y={r + 15}
-                  textAnchor="middle"
-                  fontSize={13}
-                  fontWeight={800}
-                  fill="var(--nl-accent)"
-                >
-                  ★ {t.code}
-                </text>
-              ) : null}
+              {/* Benchmark-Chrome: Trio/Anker/Relation/Medaille/Logo/Team-Rahmen/Rang-Badge.
+                  trophy={false} — Eiskunst trägt seine eigene Champion-Krone. */}
+              <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} trophy={false} />
 
               {/* Champion crown (rank 1) */}
               {t.rank === 1 ? (

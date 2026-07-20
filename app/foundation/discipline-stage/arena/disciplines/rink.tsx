@@ -9,12 +9,13 @@
 // =====================================================================================
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
-import { hueForIdx, relColor } from "../DisciplineStageNativeArena";
+import { type ReactNode } from "react";
 import type { DisciplineFieldProps, RT } from "./types";
+import { useTokenGlide, tokenRef, GhostLayer, TokenChrome } from "./benchmark";
 
 export default function RinkField(props: DisciplineFieldProps): ReactNode {
   const {
+    primitive: prim,
     disciplineName,
     skinAccent,
     env,
@@ -28,10 +29,12 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
     sorted,
     now,
     hoverIdx,
+    highlightIdxs,
     openHover,
     scheduleHoverClose,
     onOpenTeam,
   } = props;
+  const trioSet = new Set(highlightIdxs ?? []);
 
   // Geometrie: Rink-Feld skaliert auf W×H (Mockup: 820×520)
   const LW = 820;
@@ -65,20 +68,12 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
   const puckX = leader ? fracX(leader.displayScore) : CX;
   const puckY = leader ? laneY(leader.idx) : CY;
 
-  // Refs für SVG-Gruppen (CSS-Transitions)
-  const gRefs = useRef<Map<number, SVGGElement | null>>(new Map());
-
-  // Update Token-Positionen imperativ (rAF-ähnlich oder direkt)
-  useEffect(() => {
-    for (const t of rt) {
-      const el = gRefs.current.get(t.idx);
-      if (el) {
-        const x = fracX(t.displayScore);
-        const y = laneY(t.idx);
-        el.setAttribute("transform", `translate(${x} ${y})`);
-      }
-    }
-  }, [rt, finalMax]);
+  // Benchmark-Bewegung + Ghost: Token folgen animScore (Frame-Sync mit Rangliste,
+  // Hover/Pause friert ein). Lokale tokenPos bildet das Rink-Layout (x = Vorstoß ∝ Score,
+  // y = feste Bahn je Team) im Mockup-Raum ab — so bleibt das Eis-Feld-Bild unverändert
+  // und Ghost + Token teilen dieselbe Choreografie. Siehe benchmark.tsx.
+  const tokenPos = (t: RT, score: number): { x: number; y: number } => ({ x: fracX(score), y: laneY(t.idx) });
+  const { gRefs, ghostRefs } = useTokenGlide({ ...props, tokenPos });
 
   return (
     <>
@@ -203,30 +198,23 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
         </text>
       ) : null}
 
-      {/* Tokens: SVG groups positioned by score + lane */}
+      {/* Ghost der Vorrunde (Benchmark) — VOR den Tokens. */}
+      <GhostLayer sorted={sorted} geo={geo} ghostRefs={ghostRefs} />
+
+      {/* Tokens: SVG groups — Position via rAF (animScore, Benchmark-Sync). */}
       {sorted
         .slice()
         .reverse()
         .map((t) => {
           const r = t.isOwn ? geo.rOwn : geo.r;
-          const hue = hueForIdx(t.idx);
-          const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
           const glowing = t.glowUntil > now;
-          const rc = relColor(t.rel);
-          const x = fracX(t.displayScore);
-          const y = laneY(t.idx);
 
           return (
             <g
               key={t.code}
-              ref={(el) => {
-                if (el) gRefs.current.set(t.idx, el);
-              }}
-              transform={`translate(${x} ${y})`}
-              style={{
-                cursor: onOpenTeam && t.teamId ? "pointer" : "default",
-                transition: reducedMotion ? "none" : "transform 5s cubic-bezier(.45,0,.2,1)",
-              }}
+              data-token-code={t.code}
+              ref={tokenRef(gRefs, t, tokenPos)}
+              style={{ cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
               onMouseEnter={() => openHover(t.idx)}
               onMouseLeave={scheduleHoverClose}
               onClick={() => {
@@ -246,41 +234,14 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
                 />
               ) : null}
 
-              {/* Relation border */}
-              {rc ? <circle r={r + 5.5} fill="none" stroke={rc} strokeWidth={2.4} opacity={0.95} /> : null}
-
-              {/* Medal ring */}
-              {medal ? <circle r={r + 3.5} fill="none" stroke={medal} strokeWidth={t.isOwn ? 4.5 : 3.5} /> : null}
-
-              {/* Team logo or colored circle */}
-              {t.logoUrl ? (
-                <image
-                  href={t.logoUrl}
-                  x={-r}
-                  y={-r}
-                  width={r * 2}
-                  height={r * 2}
-                  clipPath={`url(#natclip-${t.code})`}
-                  preserveAspectRatio="xMidYMid slice"
-                />
-              ) : (
-                <circle r={r} fill={`hsl(${hue} 60% 52%)`} />
-              )}
-
-              {/* Token border */}
-              <circle r={r} fill="none" stroke={t.isOwn ? "var(--nl-ink)" : "rgba(255,255,255,.5)"} strokeWidth={t.isOwn ? 2.5 : 1.4} />
+              {/* Benchmark-Chrome: Trio/Anker/Relation/Medaille/Logo/Team-Rahmen/Rang-Badge.
+                  trophy={false} — Rink trägt seine eigene 🏆-Krone. */}
+              <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} trophy={false} />
 
               {/* Champion crown */}
               {t.rank === 1 ? (
                 <text y={-(r + 9)} textAnchor="middle" fontSize={14}>
                   🏆
-                </text>
-              ) : null}
-
-              {/* Own team label */}
-              {t.isOwn ? (
-                <text y={r + 15} textAnchor="middle" fontSize={13} fontWeight={800} fill="var(--nl-accent)">
-                  ★ {t.code}
                 </text>
               ) : null}
             </g>

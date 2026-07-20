@@ -10,8 +10,9 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { hueForIdx, relColor, TRACK_ROUND_MS } from "../DisciplineStageNativeArena";
+import { hueForIdx, TRACK_ROUND_MS } from "../DisciplineStageNativeArena";
 import type { DisciplineFieldProps, RT } from "./types";
+import { TokenChrome } from "./benchmark";
 
 type BarbellState = {
   fromY: number;
@@ -21,6 +22,7 @@ type BarbellState = {
 
 export default function BarbellField(props: DisciplineFieldProps): ReactNode {
   const {
+    primitive: prim,
     disciplineName,
     skinAccent,
     env,
@@ -40,10 +42,13 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
     demandKg,
     done,
     now,
+    hoverIdx,
+    highlightIdxs,
     openHover,
     scheduleHoverClose,
     onOpenTeam,
   } = props;
+  const trioSet = new Set(highlightIdxs ?? []);
 
   // Early exit if no barbell info
   if (!barbellInfo) {
@@ -283,13 +288,8 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
         const laneX = axX + laneIdx * colW + colW / 2;
         const kg = barbellKgOf(t.idx);
         const y = barbellY(kg);
-        const r = t.isOwn ? geo.rOwn : geo.r;
         const hue = hueForIdx(t.idx);
-        const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
         const bbOut = barbellEliminated(t.idx);
-        const bbChamp = done && (barbellRankMap[t.code] ?? 99) === 1;
-        const glowing = t.glowUntil > now;
-        const rc = relColor(t.rel);
         const colH = baseY - y; // Höhe der Säule
 
         return (
@@ -331,12 +331,9 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
         .reverse()
         .map((t) => {
           const r = t.isOwn ? geo.rOwn : geo.r;
-          const hue = hueForIdx(t.idx);
-          const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
           const bbOut = barbellEliminated(t.idx);
           const bbChamp = done && (barbellRankMap[t.code] ?? 99) === 1;
           const glowing = t.glowUntil > now;
-          const rc = relColor(t.rel);
 
           return (
             <g
@@ -395,28 +392,9 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
                 />
               ) : null}
 
-              {/* Beziehungs-Rahmen (mine/ally/rival) */}
-              {rc ? <circle r={r + 5.5} fill="none" stroke={rc} strokeWidth={2.4} opacity={0.95} /> : null}
-
-              {/* Medaillen-Ringe (Top-3) */}
-              {medal ? <circle r={r + 3.5} fill="none" stroke={medal} strokeWidth={t.isOwn ? 4.5 : 3.5} /> : null}
-
-              {/* Logo oder Farb-Kreis */}
-              {t.logoUrl ? (
-                <image href={t.logoUrl} x={-r} y={-r} width={r * 2} height={r * 2} clipPath={`url(#natclip-${t.code})`} preserveAspectRatio="xMidYMid slice" />
-              ) : (
-                <circle r={r} fill={`hsl(${hue} 60% 52%)`} />
-              )}
-
-              {/* Kreis-Rahmen */}
-              <circle r={r} fill="none" stroke={t.isOwn ? "var(--nl-ink)" : "rgba(255,255,255,.5)"} strokeWidth={t.isOwn ? 2.5 : 1.4} />
-
-              {/* Team-Code label (nur eigenes Team) */}
-              {t.isOwn ? (
-                <text y={r + 15} textAnchor="middle" fontSize={13} fontWeight={800} fill="var(--nl-accent)">
-                  ★ {t.code}
-                </text>
-              ) : null}
+              {/* Benchmark-Chrome: Trio/Anker/Relation/Medaille/Logo/Team-Rahmen/Rang-Badge.
+                  trophy={false} — der Champion trägt seine eigene Krone (oben). */}
+              <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} trophy={false} />
             </g>
           );
         })}

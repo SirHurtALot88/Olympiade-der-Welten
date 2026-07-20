@@ -15,8 +15,8 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { hueForIdx, relColor } from "../DisciplineStageNativeArena";
 import type { DisciplineFieldProps, RT } from "./types";
+import { useTokenGlide, tokenRef, GhostLayer, TokenChrome } from "./benchmark";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -62,6 +62,7 @@ type Ball = {
 
 export default function TennisField(props: DisciplineFieldProps): ReactNode {
   const {
+    primitive: prim,
     disciplineName,
     skinAccent,
     reducedMotion,
@@ -77,7 +78,10 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
     openHover,
     scheduleHoverClose,
     onOpenTeam,
+    hoverIdx,
+    highlightIdxs,
   } = props;
+  const trioSet = new Set(highlightIdxs ?? []);
 
   // Center court geometry from mockup
   const cx = W / 2;
@@ -122,6 +126,12 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
 
     return { x: tokenX, y: tokenY };
   };
+
+  // Benchmark-Bewegung + Ghost: Token folgen animScore (Frame-Sync mit Rangliste,
+  // Hover/Pause friert ein). Tennis überschreibt tokenPos lokal (Rang-Spread statt
+  // reiner Score-Radius) — die lokale Variante speist die Glide-Schleife, damit
+  // Ghost + Token derselben Choreografie folgen. Siehe benchmark.tsx.
+  const { gRefs, ghostRefs } = useTokenGlide({ ...props, tokenPos });
 
   // ---- Prop mirrors for rAF loop ----
   const fxRef = useRef<SVGGElement | null>(null);
@@ -419,25 +429,25 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
         </text>
       ) : null}
 
+      {/* Ghost der Vorrunde (Benchmark) — VOR den Wappen. */}
+      <GhostLayer sorted={sorted} geo={geo} ghostRefs={ghostRefs} />
+
       {/* Team wappens positioned by score (elliptical via tokenPos).
-          Reversed sort so leader is on top (z-index like host). */}
+          Reversed sort so leader is on top (z-index like host). Position via rAF. */}
       {sorted
         .slice()
         .reverse()
         .map((t) => {
-          const pos = tokenPos(t, t.displayScore);
           const r = t.isOwn ? geo.rOwn : geo.r;
-          const hue = hueForIdx(t.idx);
-          const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
           const glowing = t.glowUntil > now;
-          const rc = relColor(t.rel);
           const isSeed = t.rank <= 8 ? t.rank : 0;
 
           return (
             <g
               key={t.code}
-              transform={`translate(${pos.x} ${pos.y})`}
-              style={{ transition: reducedMotion ? "none" : `transform 5s cubic-bezier(.4,0,.2,1)`, cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
+              data-token-code={t.code}
+              ref={tokenRef(gRefs, t, tokenPos)}
+              style={{ cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
               onMouseEnter={() => openHover(t.idx)}
               onMouseLeave={scheduleHoverClose}
               onClick={() => {
@@ -449,18 +459,9 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
               {t.rank === 1 && t.thrownSlot >= 0 ? (
                 <circle r={r + 11} fill="none" stroke="var(--nl-warn)" strokeWidth={2.5} opacity={0.5} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.6s ease-in-out infinite" }} />
               ) : null}
-              {/* Freund/Feind-Rahmen (mine/ally/rival) */}
-              {rc ? <circle r={r + 5.5} fill="none" stroke={rc} strokeWidth={2.4} opacity={0.95} /> : null}
-              {/* Medaillen-Ring (Top-3) */}
-              {medal ? <circle r={r + 3.5} fill="none" stroke={medal} strokeWidth={t.isOwn ? 4.5 : 3.5} /> : null}
-              {/* Logo oder Farbkreis */}
-              {t.logoUrl ? (
-                <image href={t.logoUrl} x={-r} y={-r} width={r * 2} height={r * 2} clipPath={`url(#natclip-${t.code})`} preserveAspectRatio="xMidYMid slice" />
-              ) : (
-                <circle r={r} fill={`hsl(${hue} 60% 52%)`} />
-              )}
-              {/* Token border */}
-              <circle r={r} fill="none" stroke={t.isOwn ? "var(--nl-ink)" : "rgba(255,255,255,.5)"} strokeWidth={t.isOwn ? 2.5 : 1.4} />
+              {/* Benchmark-Chrome: Trio/Anker/Relation/Medaille/Logo/Team-Rahmen/Rang-Badge.
+                  trophy={false} — Tennis trägt seine eigene Champion-Krone. */}
+              <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} trophy={false} />
               {/* Champion crown */}
               {t.rank === 1 && t.thrownSlot >= 0 ? (
                 <text y={-(r + 9)} textAnchor="middle" fontSize={14}>
@@ -471,12 +472,6 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
               {isSeed > 0 ? (
                 <text y={-(r + 5)} textAnchor="middle" fontSize={7} fontWeight={900} fill="var(--nl-warn)" letterSpacing="0.08em">
                   {isSeed}
-                </text>
-              ) : null}
-              {/* Own team label */}
-              {t.isOwn ? (
-                <text y={r + 15} textAnchor="middle" fontSize={13} fontWeight={800} fill="var(--nl-accent)">
-                  ★ {t.code}
                 </text>
               ) : null}
             </g>

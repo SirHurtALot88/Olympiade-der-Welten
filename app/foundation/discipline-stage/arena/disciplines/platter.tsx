@@ -9,11 +9,12 @@
 "use client";
 
 import { useRef, useEffect, type ReactNode } from "react";
-import { relColor, hueForIdx } from "../DisciplineStageNativeArena";
 import type { DisciplineFieldProps, RT } from "./types";
+import { useTokenGlide, tokenRef, GhostLayer, TokenChrome } from "./benchmark";
 
 export default function PlatterField(props: DisciplineFieldProps): ReactNode {
   const {
+    primitive: prim,
     disciplineName,
     skinAccent,
     env,
@@ -24,15 +25,20 @@ export default function PlatterField(props: DisciplineFieldProps): ReactNode {
     geo,
     layout,
     finalMax,
+    tokenPos,
     rt,
     sorted,
     now,
+    hoverIdx,
+    highlightIdxs,
     openHover,
     scheduleHoverClose,
     onOpenTeam,
   } = props;
 
-  const gRefs = useRef<Map<number, SVGGElement | null>>(new Map());
+  const trioSet = new Set(highlightIdxs ?? []);
+  // Benchmark-Bewegung + Ghost: Token folgen animScore (Frame-Sync, Hover/Pause friert ein).
+  const { gRefs, ghostRefs } = useTokenGlide(props);
   const stackRefs = useRef<Map<number, SVGGElement | null>>(new Map());
   const gorgeRef = useRef<SVGRectElement | null>(null);
   const forkRef = useRef<SVGTextElement | null>(null);
@@ -80,12 +86,7 @@ export default function PlatterField(props: DisciplineFieldProps): ReactNode {
   // Render-Update: Token-Positionen und Stacks aktualisieren (imperativ)
   useEffect(() => {
     rt.forEach((t) => {
-      const gEl = gRefs.current.get(t.idx);
-      if (gEl) {
-        const xPos = xOfScore(t.displayScore);
-        const yPos = top + t.laneIdx * laneH + laneH / 2;
-        gEl.setAttribute("transform", `translate(${xPos} ${yPos})`);
-      }
+      // Token-Position gehört jetzt dem Benchmark-rAF (useTokenGlide); hier nur der Stapel.
       const stackEl = stackRefs.current.get(t.idx);
       if (stackEl) {
         updateStackHeight(t, stackEl);
@@ -354,40 +355,30 @@ export default function PlatterField(props: DisciplineFieldProps): ReactNode {
         </text>
       ) : null}
 
-      {/* Tokens: Esser mit Latz-Serviette + Tellerstapel */}
+      {/* Ghost der Vorrunde (Benchmark) — VOR den Esser-Tokens. */}
+      <GhostLayer sorted={sorted} geo={geo} ghostRefs={ghostRefs} />
+
+      {/* Tokens: Esser mit Latz-Serviette + Tellerstapel — Position via rAF (animScore). */}
       {sorted
         .slice()
         .reverse()
         .map((t) => {
           const r = t.isOwn ? geo.rOwn : geo.r;
-          const hue = hueForIdx(t.idx);
-          const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
           const glowing = t.glowUntil > now;
-          const rc = relColor(t.rel);
-          const yPos = top + t.laneIdx * laneH + laneH / 2;
-          // Position via displayScore direkt im JSX-transform (React setzt es bei jedem
-          // Render → CSS-Transition gleitet 5s zum Runden-Ziel; unabhängig vom useEffect).
-          const xPos = xOfScore(t.displayScore);
 
           return (
             <g
               key={t.code}
               data-token-code={t.code}
-              ref={(el) => {
-                gRefs.current.set(t.idx, el);
-              }}
-              transform={`translate(${xPos} ${yPos})`}
-              style={{
-                transition: reducedMotion ? "none" : "transform 5s cubic-bezier(.4,0,.2,1)",
-                cursor: onOpenTeam && t.teamId ? "pointer" : "default",
-              }}
+              ref={tokenRef(gRefs, t, tokenPos)}
+              style={{ cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
               onMouseEnter={() => openHover(t.idx)}
               onMouseLeave={scheduleHoverClose}
               onClick={() => {
                 if (onOpenTeam && t.teamId) onOpenTeam(t.teamId);
               }}
             >
-              {/* Tellerstapel (wächst unter dem Esser) */}
+              {/* Tellerstapel (bespoke, wächst unter dem Esser) */}
               <g
                 ref={(el) => {
                   stackRefs.current.set(t.idx, el);
@@ -407,15 +398,7 @@ export default function PlatterField(props: DisciplineFieldProps): ReactNode {
                 />
               </g>
 
-              {/* Medaillen-Ringe (Top-3) */}
-              {medal ? (
-                <circle r={r + 3} fill="none" stroke={medal} strokeWidth={t.isOwn ? 3.5 : 2.5} opacity={0.9} />
-              ) : null}
-
-              {/* Freund/Feind-Rahmen */}
-              {rc ? <circle r={r + 5} fill="none" stroke={rc} strokeWidth={2} opacity={0.9} /> : null}
-
-              {/* Glow (aktive Runde) */}
+              {/* Glow (aktive Runde, bespoke) */}
               {glowing ? (
                 <circle
                   r={r + 6}
@@ -427,25 +410,10 @@ export default function PlatterField(props: DisciplineFieldProps): ReactNode {
                 />
               ) : null}
 
-              {/* Esser-Token (Wappen oder Farbe) */}
-              {t.logoUrl ? (
-                <image
-                  href={t.logoUrl}
-                  x={-r}
-                  y={-r}
-                  width={r * 2}
-                  height={r * 2}
-                  clipPath={`url(#natclip-${t.code})`}
-                  preserveAspectRatio="xMidYMid slice"
-                />
-              ) : (
-                <circle r={r} fill={`hsl(${hue} 60% 52%)`} />
-              )}
+              {/* Benchmark-Chrome: Trio/Anker/Relation/Medaille/Logo/Team-Rahmen/Rang-Badge. */}
+              <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} />
 
-              {/* Token-Rand */}
-              <circle r={r} fill="none" stroke={t.isOwn ? "var(--nl-ink)" : "rgba(255,255,255,.5)"} strokeWidth={t.isOwn ? 2 : 1.2} />
-
-              {/* Latz-Serviette mit rot-weiß Streifen (oben) */}
+              {/* Latz-Serviette mit rot-weiß Streifen (bespoke, oben) */}
               <g transform={`translate(0 ${-r - 2.5})`}>
                 {Array.from({ length: 4 }).map((_, i) => (
                   <rect
@@ -460,20 +428,6 @@ export default function PlatterField(props: DisciplineFieldProps): ReactNode {
                   />
                 ))}
               </g>
-
-              {/* Krone (Rang 1) */}
-              {t.rank === 1 ? (
-                <text y={-(r + 7)} textAnchor="middle" fontSize={12}>
-                  🏆
-                </text>
-              ) : null}
-
-              {/* Eigenes Team: Stern + Code */}
-              {t.isOwn ? (
-                <text y={r + 12} textAnchor="middle" fontSize={11} fontWeight={800} fill="var(--nl-accent)">
-                  ★ {t.code}
-                </text>
-              ) : null}
             </g>
           );
         })}
