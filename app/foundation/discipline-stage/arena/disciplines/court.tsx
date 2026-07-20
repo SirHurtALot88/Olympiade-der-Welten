@@ -88,14 +88,28 @@ export default function CourtField(props: DisciplineFieldProps): ReactNode {
     highlightIdxs,
   } = props;
   const trioSet = new Set(highlightIdxs ?? []);
-  // Benchmark-Bewegung + Ghost: Token folgen animScore (Frame-Sync mit Rangliste,
-  // Hover/Pause friert ein). Siehe benchmark.tsx.
-  const { gRefs, ghostRefs } = useTokenGlide(props);
-
   const cx = Number(layout?.cx ?? W / 2);
   const hoopY = Number(layout?.hoopY ?? H * 0.15);
   const baseY = Number(layout?.baseY ?? H * 0.9);
   const baseHalf = Number(layout?.baseHalf ?? W * 0.4);
+
+  // Halbkreis-Fächer UM DEN KORB (statt flacher Bodenreihe / Host-Funnel): jedes Team hat eine
+  // feste Winkel-Lane, der RADIUS = Nähe zum Korb ∝ Punkte → der Führende steht am Ring, die
+  // schwächeren weiter außen auf dem Bogen, alle nähern sich beim Punkten dem Korb. Score bleibt
+  // Wahrheit (kontinuierlich → animScore-Glide + Ghost). Pops sind DOM-basiert → treffen mit.
+  const arcMaxR = Math.min(baseY - hoopY, baseHalf) * 0.95;
+  const localTokenPos = (t: RT, score: number): { x: number; y: number } => {
+    const n = Math.max(1, rt.length);
+    const norm = courtMax > 0 ? Math.max(0, Math.min(1, score / courtMax)) : 0;
+    const radius = arcMaxR * (0.18 + (1 - norm) * 0.82); // Führender ~0.18·R (am Ring), Letzter = R
+    const laneFrac = n > 1 ? t.laneIdx / (n - 1) : 0.5;
+    const ang = (laneFrac - 0.5) * (Math.PI * 0.86); // ±77° Fächer unter dem Korb
+    return { x: cx + Math.sin(ang) * radius, y: hoopY + Math.cos(ang) * radius };
+  };
+
+  // Benchmark-Bewegung + Ghost: Token folgen animScore über die lokale Polar-tokenPos
+  // (Frame-Sync mit Rangliste, Hover/Pause friert ein). Siehe benchmark.tsx.
+  const { gRefs, ghostRefs } = useTokenGlide({ ...props, tokenPos: localTokenPos });
 
   const courtL = cx - baseHalf;
   const courtR = cx + baseHalf;
@@ -115,8 +129,8 @@ export default function CourtField(props: DisciplineFieldProps): ReactNode {
   // ---- Frische Prop-Spiegel für die rAF-FX-Schleife (ohne Neustart) --------------------
   const fxRef = useRef<SVGGElement | null>(null);
   const pballRef = useRef<SVGCircleElement | null>(null);
-  const cfgRef = useRef<Cfg>({ cx, hoopY, baseY, baseHalf, reduced: reducedMotion, courtMedian, tokenPos });
-  cfgRef.current = { cx, hoopY, baseY, baseHalf, reduced: reducedMotion, courtMedian, tokenPos };
+  const cfgRef = useRef<Cfg>({ cx, hoopY, baseY, baseHalf, reduced: reducedMotion, courtMedian, tokenPos: localTokenPos });
+  cfgRef.current = { cx, hoopY, baseY, baseHalf, reduced: reducedMotion, courtMedian, tokenPos: localTokenPos };
   const rtRef = useRef<RT[]>(rt);
   rtRef.current = rt;
 
@@ -441,7 +455,7 @@ export default function CourtField(props: DisciplineFieldProps): ReactNode {
             <g
               key={t.code}
               data-token-code={t.code}
-              ref={tokenRef(gRefs, t, tokenPos)}
+              ref={tokenRef(gRefs, t, localTokenPos)}
               style={{ cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
               onMouseEnter={() => openHover(t.idx)}
               onMouseLeave={scheduleHoverClose}
