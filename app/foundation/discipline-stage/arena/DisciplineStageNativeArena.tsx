@@ -2807,8 +2807,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                       left: `${xPct}%`,
                       top: `${yPct}%`,
                       transform: `translate(${flipX ? "calc(-100% - 14px)" : "14px"}, ${below ? "14px" : "calc(-100% - 14px)"})`,
-                      width: 280,
-                      maxWidth: "72%",
+                      width: 300,
+                      maxWidth: "78%",
                       zIndex: 4,
                       background: "var(--nl-panel)",
                       // Rahmen in der Team-Farbe (getTeamColor) — die Karte gehört sichtbar
@@ -2899,7 +2899,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                     {t.thrownSlot < 0 ? (
                       <div style={{ fontSize: 12, color: "var(--nl-mut)", fontStyle: "italic" }}>noch nicht angetreten</div>
                     ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         {Array.from({ length: t.thrownSlot + 1 }, (_, s) => {
                           const p = t.players[s];
                           if (!p) return null;
@@ -2907,17 +2907,43 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                           // Rang dieses Spielers in seinem Slot (1…N, ligaweit).
                           const sr = slotRankOf(s, t, rtRef.current);
                           const medalC = sr === 1 ? "var(--nl-warn)" : sr === 2 ? "var(--nl-mut)" : sr === 3 ? "rgb(205,127,50)" : "var(--nl-mut-2)";
+                          const teamAccent = floorTeamAccent(teamPrimaryColor(t.code));
+                          // Grafische Mini-Spielerkarte: Porträtbild links (Fallback: Initialen
+                          // auf Team-Farbe), rechts Name/Slot + Breakdown. „locker Platz für
+                          // die Player Cards als Bilder" — konsistent zum Feld-Token.
+                          const initials = p.name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
                           return (
-                            <div key={s} style={{ fontSize: 11.5, fontVariantNumeric: "tabular-nums", display: "flex", alignItems: "baseline", gap: 6 }}>
-                              <span aria-hidden style={{ flex: "none", fontSize: 9.5, fontWeight: 800, color: "var(--nl-mut-2)", width: 16 }}>#{s + 1}</span>
-                              <div style={{ minWidth: 0, flex: 1 }}>
-                                <div style={{ fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                  {p.val >= STAR_MIN ? "⭐ " : ""}
-                                  {p.name} <span style={{ color: "var(--nl-mut)", fontWeight: 600 }}>· {slots[s]}</span>
+                            <div key={s} style={{ display: "flex", gap: 9, alignItems: "flex-start", padding: 6, borderRadius: 9, background: "var(--nl-bg)", border: "1px solid var(--nl-line)" }}>
+                              <div style={{ position: "relative", flex: "none" }}>
+                                {p.portraitUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={p.portraitUrl}
+                                    alt=""
+                                    width={48}
+                                    height={62}
+                                    onError={(e) => { const el = e.currentTarget as HTMLImageElement; el.style.display = "none"; const sib = el.nextElementSibling as HTMLElement | null; if (sib) sib.style.display = "grid"; }}
+                                    style={{ width: 48, height: 62, borderRadius: 7, objectFit: "cover", objectPosition: "center top", display: "block", border: `1.5px solid ${teamAccent}` }}
+                                  />
+                                ) : null}
+                                <span
+                                  aria-hidden
+                                  style={{ width: 48, height: 62, borderRadius: 7, border: `1.5px solid ${teamAccent}`, display: p.portraitUrl ? "none" : "grid", placeItems: "center", fontSize: 15, fontWeight: 800, color: "var(--nl-ink)", background: `color-mix(in srgb, ${teamPrimaryColor(t.code)} 34%, var(--nl-panel))` }}
+                                >
+                                  {initials}
+                                </span>
+                                <span aria-hidden style={{ position: "absolute", left: -4, top: -4, minWidth: 15, height: 15, padding: "0 3px", borderRadius: 8, background: "var(--nl-panel)", border: "1px solid var(--nl-line)", display: "grid", placeItems: "center", fontSize: 9, fontWeight: 800, color: "var(--nl-mut-2)", fontVariantNumeric: "tabular-nums" }}>{s + 1}</span>
+                              </div>
+                              <div style={{ minWidth: 0, flex: 1, fontVariantNumeric: "tabular-nums" }}>
+                                <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                                  <span style={{ minWidth: 0, flex: 1, fontWeight: 700, fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                    {p.val >= STAR_MIN ? "⭐ " : ""}
+                                    {p.name} <span style={{ color: "var(--nl-mut)", fontWeight: 600 }}>· {slots[s]}</span>
+                                  </span>
+                                  <span title={`Rang in ${slots[s]}`} style={{ flex: "none", fontSize: 10.5, fontWeight: 800, color: medalC }}>#{sr}</span>
                                 </div>
                                 <div style={{ marginTop: 2 }}>{renderBreakdown(p)}</div>
                               </div>
-                              <span title={`Rang in ${slots[s]}`} style={{ flex: "none", fontSize: 10.5, fontWeight: 800, color: medalC }}>#{sr}</span>
                             </div>
                           );
                         })}
