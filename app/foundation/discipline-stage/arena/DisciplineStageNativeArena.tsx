@@ -1594,12 +1594,15 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         if (highlightTrioRef.current.length) setHighlightTrio([]);
       }
       // Virtuelle Etappen-Uhr: läuft normal mit 1×, während eines Highlights nur mit
-      // 0,2× (Zeitlupe). So gleiten Feld UND Rangliste in der Aufholjagd-Phase langsam
-      // weiter (beobachtbar), ohne den Fluss ganz zu stoppen.
+      // 0,2× (Zeitlupe). Bei Hover- ODER Leertaste-Pause STOPPT sie komplett (Speed 0) →
+      // weil Feld UND Rangliste denselben animScore lesen, bleibt beim Pausieren ALLES
+      // exakt zu diesem Zeitpunkt stehen (Icons, Tabelle, Ränge). So gleiten sie sonst in
+      // der Aufholjagd-Phase langsam weiter (beobachtbar), ohne den Fluss ganz zu stoppen.
       const dtReal = lastTsRef.current ? now - lastTsRef.current : 0;
       lastTsRef.current = now;
+      const frozen = pauseRef.current || manualPauseRef.current;
       const inHold = highlightHoldRef.current > now;
-      const speed = inHold ? 0.2 : 1;
+      const speed = frozen ? 0 : inHold ? 0.2 : 1;
       if (start) animClockRef.current = Math.min(TRACK_ROUND_MS, animClockRef.current + dtReal * speed);
       const elapsed = start ? animClockRef.current : Infinity;
       const tRaw = reduced.current || elapsed >= TRACK_ROUND_MS ? 1 : elapsed / TRACK_ROUND_MS;
