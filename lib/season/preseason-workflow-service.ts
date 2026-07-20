@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { computeSeasonEndContractTick, previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
 import { buildFormCardSeasonUsageAudit, buildGeneratedFormCardRecordsForSeason } from "@/lib/lineups/legacy-lineup-modifiers";
-import type { Fixture, GameState, PreSeasonWorkflowLogRecord, SeasonState, StandingRecord } from "@/lib/data/olyDataTypes";
+import type { Fixture, GameState, PreSeasonWorkflowLogRecord, SeasonState, StandingRecord, TeamCaptainRecord } from "@/lib/data/olyDataTypes";
 import { previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-season-end-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
@@ -20,6 +20,7 @@ import { buildPrizeMoneyPreview } from "@/lib/season/prize-money-preview";
 import { buildSeasonSnapshotDryRun, upsertSeasonSnapshotRecord } from "@/lib/season/season-snapshot-service";
 import { advanceSeasonEconomyFactorWindow, parseSalaryFactorPatternEnv } from "@/lib/season/season-economy-factors";
 import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
+import { buildCaptainRecordForPlayer } from "@/lib/morale/team-captain-service";
 import { advanceScoutIntelTick } from "@/lib/scouting/facility-scout-pipeline-service";
 import { advanceSponsorContractsForNewSeason } from "@/lib/sponsor/sponsor-contract-lifecycle";
 import { advanceTeamBeliebtheitForSeasonTransition } from "@/lib/economy/team-beliebtheit";
@@ -509,6 +510,42 @@ function isTransferPipelineFastMode() {
   return process.env.OLY_TRANSFER_PIPELINE_FAST === "1";
 }
 
+/**
+ * Trägt den Saison-Kapitän automatisch in die Folge-Season, sofern der Spieler noch
+ * im Kader steht. So muss der Kapitän nicht jedes Jahr neu benannt werden – die
+ * Wahl wird nur noch (optional) bestätigt oder über einen Hinweis geändert.
+ * Kapitäne der abgelaufenen Season werden verworfen, wenn der Spieler das Team
+ * verlassen hat (dann greift die Neubenennungs-Pflicht im Game-Flow).
+ */
+function carryOverTeamCaptains(previousGameState: GameState, nextSeasonId: string): TeamCaptainRecord[] {
+  const previousSeasonId = previousGameState.season.id;
+  // Nur die Datensätze der gerade abgelaufenen Season behalten – sie werden in der
+  // Folge-Season für die Absetzungs-Historie (Ex-Kapitän-Malus) gebraucht.
+  const previousSeasonRecords = (previousGameState.teamCaptains ?? []).filter(
+    (record) => record.seasonId === previousSeasonId,
+  );
+  const carried: TeamCaptainRecord[] = [];
+  for (const record of previousSeasonRecords) {
+    const stillOnRoster = previousGameState.rosters.some(
+      (entry) => entry.teamId === record.teamId && entry.playerId === record.playerId,
+    );
+    if (!stillOnRoster) {
+      continue;
+    }
+    const player = previousGameState.players.find((entry) => entry.id === record.playerId);
+    if (!player) {
+      continue;
+    }
+    const refreshed = buildCaptainRecordForPlayer(previousGameState, record.teamId, player);
+    carried.push({
+      ...refreshed,
+      seasonId: nextSeasonId,
+      source: "carried_over",
+    });
+  }
+  return [...previousSeasonRecords, ...carried];
+}
+
 function buildNextSeasonGameState(
   inputSave: PersistedSaveGame,
   opts?: { transferPipelineFast?: boolean },
@@ -644,6 +681,7 @@ function buildNextSeasonGameState(
         { stepId: "first_transfers", status: "open" },
         { stepId: "fill_roster", status: "open" },
         { stepId: "training_facilities", status: "open" },
+        { stepId: "appoint_captain", status: "open" },
         { stepId: "choose_sponsor", status: "open" },
         { stepId: "set_lineup", status: "open" },
       ],
@@ -694,6 +732,7 @@ function buildNextSeasonGameState(
   const baseGameState: GameState = {
     ...save.gameState,
     gamePhase: "season_active",
+    teamCaptains: carryOverTeamCaptains(save.gameState, nextSeasonId),
     season: {
       ...save.gameState.season,
       id: nextSeasonId,

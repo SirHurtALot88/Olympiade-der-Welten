@@ -489,6 +489,78 @@ describe("pre-season workflow service", () => {
     expect(secondTick.gameState.rosters.find((entry) => entry.id === "r-multi")?.contractLength).toBe(1);
   });
 
+  it("adds the appoint_captain step to the follow-up season flow after training, before sponsor", async () => {
+    const sourceSave = save();
+    const { persistence, saveSingleplayerState } = persistenceMock(sourceSave);
+    const preview = await buildPreSeasonWorkflowPreview(sourceSave, persistence);
+    const token = preview.steps.find((step) => step.stepId === "next_season_setup")?.confirmToken;
+
+    await applyPreSeasonNextSeasonSetup(sourceSave, token, persistence);
+    const savedState = saveSingleplayerState.mock.calls.at(-1)?.[1];
+    if (!savedState) throw new Error("Expected next season setup to persist state.");
+
+    const stepIds = savedState.seasonState.newGameFlow?.steps?.map((step) => step.stepId) ?? [];
+    expect(stepIds).toContain("appoint_captain");
+    expect(stepIds.indexOf("appoint_captain")).toBeGreaterThan(stepIds.indexOf("training_facilities"));
+    expect(stepIds.indexOf("appoint_captain")).toBeLessThan(stepIds.indexOf("choose_sponsor"));
+  });
+
+  it("carries the season captain into the next season when the player is still on the roster", async () => {
+    const sourceSave = save();
+    sourceSave.gameState.teamCaptains = [
+      {
+        seasonId: "season-1",
+        teamId: "human-1",
+        playerId: "p-human",
+        playerName: "Human Player",
+        leadershipScore: 42,
+        style: "leader",
+        effects: { moraleBuffer: 3, rivalryPressureReductionPct: 10, teamPowerModifierPct: 4, conflictSoftenChancePct: 14 },
+        traitSignals: [],
+        source: "manual_assignment",
+      },
+    ];
+    const { persistence, saveSingleplayerState } = persistenceMock(sourceSave);
+    const preview = await buildPreSeasonWorkflowPreview(sourceSave, persistence);
+    const token = preview.steps.find((step) => step.stepId === "next_season_setup")?.confirmToken;
+
+    await applyPreSeasonNextSeasonSetup(sourceSave, token, persistence);
+    const savedState = saveSingleplayerState.mock.calls.at(-1)?.[1];
+    if (!savedState) throw new Error("Expected next season setup to persist state.");
+
+    const carried = savedState.teamCaptains?.find((entry) => entry.seasonId === "season-2" && entry.teamId === "human-1");
+    expect(carried?.playerId).toBe("p-human");
+    expect(carried?.source).toBe("carried_over");
+    // Alt-Record der abgelaufenen Saison bleibt für die Absetzungs-Historie erhalten.
+    expect(savedState.teamCaptains?.some((entry) => entry.seasonId === "season-1")).toBe(true);
+  });
+
+  it("does not carry the captain forward when the player left the roster", async () => {
+    const sourceSave = save();
+    sourceSave.gameState.teamCaptains = [
+      {
+        seasonId: "season-1",
+        teamId: "human-1",
+        playerId: "p-gone",
+        playerName: "Gone Player",
+        leadershipScore: 42,
+        style: "leader",
+        effects: { moraleBuffer: 3, rivalryPressureReductionPct: 10, teamPowerModifierPct: 4, conflictSoftenChancePct: 14 },
+        traitSignals: [],
+        source: "manual_assignment",
+      },
+    ];
+    const { persistence, saveSingleplayerState } = persistenceMock(sourceSave);
+    const preview = await buildPreSeasonWorkflowPreview(sourceSave, persistence);
+    const token = preview.steps.find((step) => step.stepId === "next_season_setup")?.confirmToken;
+
+    await applyPreSeasonNextSeasonSetup(sourceSave, token, persistence);
+    const savedState = saveSingleplayerState.mock.calls.at(-1)?.[1];
+    if (!savedState) throw new Error("Expected next season setup to persist state.");
+
+    expect(savedState.teamCaptains?.some((entry) => entry.seasonId === "season-2")).toBe(false);
+  });
+
   it("also snapshots the completed season in the lightweight next-season setup path", () => {
     const sourceSave = save();
     const { persistence, saveSingleplayerState } = persistenceMock(sourceSave);
