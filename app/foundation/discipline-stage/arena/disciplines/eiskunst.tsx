@@ -536,6 +536,37 @@ export default function EiskunstField(props: DisciplineFieldProps): ReactNode {
                 opacity={0.6}
               />
 
+              {/* Pirouette / Kür-Spray: zwei rotierende Eis-Spray-Bögen um den Skater
+                  (SMIL rotiert um den Token-Mittelpunkt 0,0 — unabhängig vom rAF-Translate).
+                  Tempo je Team leicht variiert; der Führende dreht schneller & heller.
+                  reduced-motion → kein Spin. */}
+              {!reducedMotion ? (
+                <g opacity={t.rank === 1 ? 0.7 : 0.42}>
+                  <path
+                    d={`M ${-(r + 3)} 0 A ${r + 3} ${r + 3} 0 0 1 0 ${-(r + 3)}`}
+                    stroke="rgba(191,230,255,.75)"
+                    strokeWidth={1.6}
+                    fill="none"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d={`M ${r + 3} 0 A ${r + 3} ${r + 3} 0 0 1 0 ${r + 3}`}
+                    stroke="rgba(246,199,80,.55)"
+                    strokeWidth={1.4}
+                    fill="none"
+                    strokeLinecap="round"
+                  />
+                  <animateTransform
+                    attributeName="transform"
+                    type="rotate"
+                    from="0 0 0"
+                    to="360 0 0"
+                    dur={`${(t.rank === 1 ? 1.1 : 1.7 + hash(t.code + "spin") * 1.3).toFixed(2)}s`}
+                    repeatCount="indefinite"
+                  />
+                </g>
+              ) : null}
+
               {/* Benchmark-Chrome: Trio/Anker/Relation/Medaille/Logo/Team-Rahmen/Rang-Badge.
                   trophy={false} — Eiskunst trägt seine eigene Champion-Krone. */}
               <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} trophy={false} />
