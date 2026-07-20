@@ -166,6 +166,10 @@ export default function TakeshiField(props: DisciplineFieldProps): ReactNode {
       {/* Grass field */}
       <rect x={0} y={118} width={W} height={H - 118} fill="url(#grass)" />
 
+      {/* Ganzen Parcours (Strecke + Hindernisse + Burg) ~24px höher schieben — die untere
+          START-Reihe war knapp abgeschnitten. Mess-Pfad + Token sitzen im selben Group,
+          also bleibt die Bewegung deckungsgleich. */}
+      <g transform="translate(0 -24)">
       {/* Mess-Pfad (unsichtbar) — localTokenPos liest getPointAtLength für die Bewegung. */}
       <path ref={pathRef} d={bandD} fill="none" stroke="none" />
 
@@ -223,14 +227,17 @@ export default function TakeshiField(props: DisciplineFieldProps): ReactNode {
 
       {/* Takeshis Burg */}
       <g dangerouslySetInnerHTML={{ __html: castle() }} />
+      </g>
 
-      {/* Disziplin-Wasserzeichen */}
+      {/* Disziplin-Wasserzeichen (bleibt oben, nicht mitverschoben) */}
       {disciplineName ? (
         <text x={18} y={30} fontSize={19} fontWeight={800} letterSpacing="0.04em" fill={skinAccent} opacity={0.95} style={{ textTransform: "uppercase" }}>
           {disciplineName}
         </text>
       ) : null}
 
+      {/* Ghost + Läufer im selben −24-Versatz wie die Strecke (sonst laufen sie neben dem Band). */}
+      <g transform="translate(0 -24)">
       {/* Ghost der Vorrunde (Benchmark) — VOR den Läufern. */}
       <GhostLayer sorted={sorted} geo={geo} ghostRefs={ghostRefs} />
 
@@ -260,6 +267,7 @@ export default function TakeshiField(props: DisciplineFieldProps): ReactNode {
             </g>
           );
         })}
+      </g>
     </>
   );
 }
