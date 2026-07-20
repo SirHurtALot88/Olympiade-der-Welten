@@ -47,6 +47,17 @@ export type NativeStagePlayer = {
   mods: NativeStageMod[];
   pointsAwarded: number | null;
 };
+// Live-Ergebnis eines bereits AUFGEDECKTEN Spielers (für den Team-Drawer: „was hat
+// der Spieler in dieser Disziplin geholt + Boni/Abzüge"). Nur enthüllte Slots.
+export type StageLivePlayerResult = {
+  playerId: string;
+  slot: number;
+  base: number;
+  net: number;
+  mods: NativeStageMod[];
+  pointsAwarded: number | null;
+};
+export type StageLiveResultsByTeam = Record<string, StageLivePlayerResult[]>;
 export type NativeStageTeam = {
   code: string;
   name: string;
@@ -101,6 +112,7 @@ export type DisciplineStageNativeArenaProps = {
   onPreviewPlayer?: ((playerId: string | null) => void) | null; // Top-Player-Hover → Vorschau
   onEnded?: (() => void) | null; // feuert einmal, sobald das Podest/Endstand erreicht ist (Spoiler-Gate)
   onReset?: (() => void) | null; // „↻ Neu": hebt das Spoiler-Gate im Host wieder auf (arenaEnded=false)
+  onResults?: ((byTeam: StageLiveResultsByTeam) => void) | null; // meldet die Live-Ergebnisse aufgedeckter Spieler an den Host (Team-Drawer)
   topPlayers?: { rows: DisciplineStageTopPlayer[]; ids: (string | null)[] } | null;
   primitive?: StagePrimitive;
   disciplineId?: string; // Disziplin-Identität für die Feld-Registry (mehrere Diszis teilen sich ein Primitive)
@@ -1001,7 +1013,7 @@ const TICKER_MAX = 40;
 type Spot = { crest: NativeStageTeam; idx: number; kick: string; name: string; sub: string; net: number; chipText: string; chipColor: string; mine: boolean; portraitUrl: string | null } | null;
 type PodCol = { place: number; code: string; name: string; pts: number; logoUrl: string | null; isOwn: boolean; idx: number; delayMs: number; loud: boolean };
 
-export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, onOpenTeam, onHoverTeam, onPreviewPlayer, onEnded, onReset, topPlayers, primitive = "track", disciplineId, progressLabel, disciplineName, accent, motif, env }: DisciplineStageNativeArenaProps) {
+export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, onOpenTeam, onHoverTeam, onPreviewPlayer, onEnded, onReset, onResults, topPlayers, primitive = "track", disciplineId, progressLabel, disciplineName, accent, motif, env }: DisciplineStageNativeArenaProps) {
   const skinAccent = accent ?? "var(--nl-line-2, var(--nl-line))";
   const slotCount = Math.max(1, slots.length);
   const prim = primitive;
@@ -1243,6 +1255,27 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   );
 
   const done = round >= slotCount;
+
+  // Live-Ergebnisse der bereits AUFGEDECKTEN Spieler an den Host melden — der
+  // Team-Drawer zeigt damit sofort „was hat der Spieler in dieser Disziplin
+  // geholt + Boni/Abzüge". Nach jeder Runde / bei Ende / Reset neu (round/done/
+  // podium decken die Reveal-Übergänge ab). Nur enthüllte Slots (kein Spoiler).
+  useEffect(() => {
+    if (!onResults) return;
+    const byTeam: StageLiveResultsByTeam = {};
+    for (const t of rtRef.current) {
+      if (!t.teamId) continue;
+      const arr: StageLivePlayerResult[] = [];
+      for (let s = 0; s <= t.thrownSlot; s += 1) {
+        const p = t.players[s];
+        if (!p?.playerId) continue;
+        arr.push({ playerId: p.playerId, slot: s, base: p.val, net: playerNet(p), mods: p.mods, pointsAwarded: p.pointsAwarded });
+      }
+      if (arr.length > 0) byTeam[t.teamId] = arr;
+    }
+    onResults(byTeam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [round, done, podium, onResults]);
 
   // Leertaste pausiert/setzt die laufende Arena fort (native Primitive UND Mini-DM).
   // CAPTURE-Phase-Fenster-Listener: fängt Space VOR dem Shell-Space-Handler ab

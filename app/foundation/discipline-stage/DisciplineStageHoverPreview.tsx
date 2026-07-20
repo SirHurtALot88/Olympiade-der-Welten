@@ -7,7 +7,7 @@
 // und ist `pointer-events:none`, damit es den Hover nicht selbst stiehlt.
 // Farben ausschließlich var(--nl-*)/hsl()/rgb()/color-mix() — kein Hex.
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
@@ -35,32 +35,55 @@ export type DisciplineStageHoverPreviewProps = {
 };
 
 const PLAYER_W = 184;
-const PLAYER_H = 252;
 const TEAM_W = 250;
-const TEAM_H_BASE = 118;
-const FIELDED_ROW_H = 34;
 
-// Cursor-nahe Position, an den Viewport geklammert; kippt nach oben, wenn unten
-// kein Platz ist. Reine Präsentation, keine Slide-Animation (auch reduced-motion-fest).
-function clampToViewport(x: number, y: number, w: number, h: number): { left: number; top: number } {
-  const vw = typeof window !== "undefined" ? window.innerWidth : 1280;
-  const vh = typeof window !== "undefined" ? window.innerHeight : 800;
-  // Standard: rechts neben dem Cursor. Wenn dort kein Platz ist (Hover nah am
-  // rechten Rand, z.B. die Rangliste), nach LINKS neben den Cursor kippen —
-  // sonst würde die Karte rechts aus dem Screen laufen.
-  let left = x + 14;
-  if (left + w > vw - 8) {
-    left = x - w - 14;
-  }
-  left = Math.max(8, Math.min(left, vw - w - 8));
-  // Vertikal cursor-nah bleiben: unter dem Cursor beginnen und bei Überlauf nur so
-  // weit nach oben schieben, dass die Karte gerade in den Viewport passt (Unterkante
-  // am unteren Rand) — NICHT komplett über den Cursor springen (das riss die Karte
-  // bei hohen Karten ~264px vom Cursor weg).
-  let top = y + 16;
-  top = Math.min(top, vh - h - 8); // knapp innerhalb der Unterkante, neben dem Cursor
-  top = Math.max(8, top);
-  return { left, top };
+// Cursor-verankerte, am SICHTBAREN Viewport geklammerte Karte. Klammert NACH dem
+// Render anhand der ECHTEN Größe (getBoundingClientRect) statt einer Schätzung —
+// so kann eine hohe/variable Karte (z.B. Team-Vorschau mit Aufstellungsliste) nie
+// mehr teilweise aus dem Bild laufen. Nutzt documentElement.clientWidth/Height
+// (ohne Scrollbar). Erst unsichtbar an der Schätzposition, dann exakt gesetzt.
+function AnchoredCard({ x, y, width, cardStyle, children }: {
+  x: number;
+  y: number;
+  width: number;
+  cardStyle?: React.CSSProperties;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || typeof document === "undefined") return;
+    const rect = el.getBoundingClientRect();
+    const vw = document.documentElement.clientWidth || window.innerWidth;
+    const vh = document.documentElement.clientHeight || window.innerHeight;
+    const w = rect.width || width;
+    const h = rect.height || 0;
+    let left = x + 14;
+    if (left + w > vw - 8) left = x - w - 14; // nahe rechtem Rand nach links kippen
+    left = Math.max(8, Math.min(left, vw - w - 8));
+    let top = y + 16;
+    top = Math.min(top, vh - h - 8); // Unterkante klemmen statt über den Cursor springen
+    top = Math.max(8, top);
+    setPos({ left, top });
+  }, [x, y, width]);
+  return (
+    <div
+      ref={ref}
+      style={{
+        position: "fixed",
+        left: pos ? pos.left : x + 14,
+        top: pos ? pos.top : y + 16,
+        width,
+        zIndex: 70,
+        pointerEvents: "none",
+        visibility: pos ? "visible" : "hidden",
+        ...cardStyle,
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 
 function PlayerPreview({ gameState, target, ratingByPlayerId }: {
@@ -72,9 +95,8 @@ function PlayerPreview({ gameState, target, ratingByPlayerId }: {
   if (!player) return null;
   const row = ratingByPlayerId.get(player.id) ?? null;
   const portraitUrl = getPlayerPortraitBrowserUrl(player.id, player.portraitUrl ?? null, player.portraitPath ?? null);
-  const { left, top } = clampToViewport(target.x, target.y, PLAYER_W, PLAYER_H);
   return (
-    <div style={{ position: "fixed", left, top, width: PLAYER_W, zIndex: 70, pointerEvents: "none" }}>
+    <AnchoredCard x={target.x} y={target.y} width={PLAYER_W}>
       <FoundationPlayerPortraitCard
         playerId={player.id}
         name={player.name}
@@ -97,7 +119,7 @@ function PlayerPreview({ gameState, target, ratingByPlayerId }: {
         known
         interactive={false}
       />
-    </div>
+    </AnchoredCard>
   );
 }
 
@@ -121,18 +143,13 @@ function TeamPreview({ gameState, target, ratingByPlayerId, fieldedPlayerIdsByTe
   const fielded = fieldedIds
     .map((pid) => gameState.players?.find((p) => p.id === pid) ?? null)
     .filter((p): p is NonNullable<typeof p> => Boolean(p));
-  const teamH = TEAM_H_BASE + (fielded.length > 0 ? 22 + fielded.length * FIELDED_ROW_H : 0);
-  const { left, top } = clampToViewport(target.x, target.y, TEAM_W, teamH);
   return (
-    <div
-      style={{
-        position: "fixed",
-        left,
-        top,
-        width: TEAM_W,
+    <AnchoredCard
+      x={target.x}
+      y={target.y}
+      width={TEAM_W}
+      cardStyle={{
         boxSizing: "border-box",
-        zIndex: 70,
-        pointerEvents: "none",
         padding: 12,
         borderRadius: 12,
         background: "var(--nl-panel)",
@@ -199,7 +216,7 @@ function TeamPreview({ gameState, target, ratingByPlayerId, fieldedPlayerIdsByTe
           </div>
         </div>
       ) : null}
-    </div>
+    </AnchoredCard>
   );
 }
 

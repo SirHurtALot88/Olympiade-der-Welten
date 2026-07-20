@@ -22,6 +22,7 @@ import type { GameState, Player, Team } from "@/lib/data/olyDataTypes";
 import { NlProgressBar } from "@/components/foundation/new-look/NlProgressBar";
 import PlayerMark from "@/app/foundation/discipline-stage/arena/PlayerMark";
 import TeamMark from "@/app/foundation/discipline-stage/arena/TeamMark";
+import type { StageLivePlayerResult, StageLiveResultsByTeam } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
 import {
   buildPlayerDrawerDataFromGameState,
   type PlayerDetailDrawerData,
@@ -61,6 +62,8 @@ export type DisciplineStageDrawerProps = {
    * existieren (dort sind die Drafts leer und alle Spieler fielen auf die Bank).
    */
   fieldedPlayerIdsByTeam?: Record<string, string[]>;
+  /** Live-Ergebnisse aufgedeckter Spieler je Team (Netto + Boni/Abzüge + PP). */
+  liveResultsByTeam?: StageLiveResultsByTeam;
 };
 
 // ---------------------------------------------------------------------------
@@ -632,6 +635,7 @@ function DisciplinePortraitCard({
   row,
   seasonPps,
   unavailable,
+  liveResult,
   onSelectPlayer,
 }: {
   gameState: GameState;
@@ -640,6 +644,7 @@ function DisciplinePortraitCard({
   row?: PlayerRatingContractRow | null;
   seasonPps?: number | null;
   unavailable?: boolean;
+  liveResult?: StageLivePlayerResult | null;
   onSelectPlayer?: ((playerId: string) => void) | null;
 }) {
   const player = findPlayer(gameState, playerId);
@@ -678,7 +683,30 @@ function DisciplinePortraitCard({
       title={clickable ? "Spieler-Karte anzeigen" : undefined}
       style={{ opacity: unavailable ? 0.62 : 1 }}
       footerSlot={
-        discValue != null ? (
+        liveResult ? (
+          // Spieler war in dieser Disziplin schon dran → sofort zeigen, was er
+          // GEHOLT hat (Netto) + die Boni/Abzüge (Basis → Mods) und die Player Points.
+          <div style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, fontVariantNumeric: "tabular-nums" }}>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
+              <span style={{ color: "var(--nl-mut)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Geholt</span>
+              <span style={{ color: "var(--accent, var(--nl-accent))", fontWeight: 800, fontSize: 13, flex: "none" }}>{fmt1(liveResult.net)}</span>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "1px 7px", lineHeight: 1.35 }}>
+              <span style={{ color: "var(--nl-mut-2)", fontWeight: 700 }}>Basis {fmt1(liveResult.base)}</span>
+              {liveResult.mods.map((m, i) => (
+                <span key={i} style={{ fontWeight: 700, color: m.sign > 0 ? "var(--nl-good)" : "var(--nl-risk)" }}>
+                  {m.sign > 0 ? "+" : "−"}{fmt1(m.amt)} {m.k}
+                </span>
+              ))}
+            </div>
+            {liveResult.pointsAwarded != null ? (
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
+                <span style={{ color: "var(--nl-mut)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Player Points</span>
+                <span style={{ fontWeight: 800, flex: "none" }}>{fmt1(liveResult.pointsAwarded)}</span>
+              </div>
+            ) : null}
+          </div>
+        ) : discValue != null ? (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, fontSize: 11, fontVariantNumeric: "tabular-nums" }}>
             <span style={{ color: "var(--nl-mut)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{discLabel}</span>
             <span style={{ color: "var(--accent, var(--nl-accent))", fontWeight: 800, flex: "none" }}>{fmt1(discValue)}</span>
@@ -695,14 +723,22 @@ function TeamBody({
   disciplineId,
   onSelectPlayer,
   fieldedPlayerIdsByTeam,
+  liveResultsByTeam,
 }: {
   gameState: GameState;
   teamId: string;
   disciplineId: string;
   onSelectPlayer?: ((playerId: string) => void) | null;
   fieldedPlayerIdsByTeam?: Record<string, string[]>;
+  liveResultsByTeam?: StageLiveResultsByTeam;
 }) {
   const team = findTeam(gameState, teamId);
+  // Live-Ergebnis je Spieler-ID für dieses Team (schnelle Lookup-Map).
+  const liveByPlayerId = useMemo(() => {
+    const map = new Map<string, StageLivePlayerResult>();
+    for (const r of liveResultsByTeam?.[teamId] ?? []) map.set(r.playerId, r);
+    return map;
+  }, [liveResultsByTeam, teamId]);
 
   // Roster-IDs des Teams (einmal) — Basis für Rating-Lookup und Ersatzbank.
   const rosterIds = useMemo(
@@ -873,6 +909,7 @@ function TeamBody({
                     row={ratingById.get(pid) ?? null}
                     seasonPps={seasonPpsById.get(pid) ?? null}
                     unavailable={isUnavailable(pid)}
+                    liveResult={liveByPlayerId.get(pid) ?? null}
                     onSelectPlayer={onSelectPlayer}
                   />
                 );
@@ -889,6 +926,7 @@ function TeamBody({
                 row={ratingById.get(pid) ?? null}
                 seasonPps={seasonPpsById.get(pid) ?? null}
                 unavailable={isUnavailable(pid)}
+                liveResult={liveByPlayerId.get(pid) ?? null}
                 onSelectPlayer={onSelectPlayer}
               />
             ))}
@@ -974,6 +1012,7 @@ export default function DisciplineStageDrawer({
   disciplineId,
   onSelectPlayer,
   fieldedPlayerIdsByTeam,
+  liveResultsByTeam,
   onClose,
 }: DisciplineStageDrawerProps): React.JSX.Element | null {
   // Erst nach dem Mount in document.body portalen (SSR-fest) — verhindert, dass ein
@@ -1158,6 +1197,7 @@ export default function DisciplineStageDrawer({
               disciplineId={disciplineId}
               onSelectPlayer={onSelectPlayer}
               fieldedPlayerIdsByTeam={fieldedPlayerIdsByTeam}
+              liveResultsByTeam={liveResultsByTeam}
             />
           )}
         </div>

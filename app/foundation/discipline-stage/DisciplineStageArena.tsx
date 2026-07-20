@@ -17,7 +17,7 @@ import DisciplineStageEndScreen from "@/app/foundation/discipline-stage/Discipli
 import DisciplineStageStandingsDelta from "@/app/foundation/discipline-stage/DisciplineStageStandingsDelta";
 import DisciplineStageHighlights from "@/app/foundation/discipline-stage/DisciplineStageHighlights";
 import { type DisciplineStageTopPlayer } from "@/app/foundation/discipline-stage/DisciplineStageTopPlayers";
-import DisciplineStageNativeArena, { type StagePrimitive, type StageMotif, type StageEnv } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
+import DisciplineStageNativeArena, { type StagePrimitive, type StageMotif, type StageEnv, type StageLiveResultsByTeam } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
 import DisciplineStageDrawer, { type DisciplineStageDrawerTarget } from "@/app/foundation/discipline-stage/DisciplineStageDrawer";
 import DisciplineStageHoverPreview, { type DisciplineStageHoverTarget } from "@/app/foundation/discipline-stage/DisciplineStageHoverPreview";
 import { fmt1 } from "@/app/foundation/discipline-stage/stage-format";
@@ -773,6 +773,9 @@ export default function DisciplineStageArena({
   // Spoiler-Gate (A1): der Real-Modus-Endscreen darf erst erscheinen, wenn die
   // native Arena das Podest erreicht hat. Bei Remount (Disziplin/Modus/Seed) zurück.
   const [arenaEnded, setArenaEnded] = useState(false);
+  // Live-Ergebnisse aufgedeckter Spieler (aus der Arena gemeldet) → Team-Drawer
+  // zeigt „geholt + Boni/Abzüge" für Spieler, die schon dran waren.
+  const [liveResultsByTeam, setLiveResultsByTeam] = useState<StageLiveResultsByTeam>({});
   useEffect(() => {
     setArenaEnded(false);
   }, [disciplineId, mode, seed]);
@@ -923,6 +926,7 @@ export default function DisciplineStageArena({
         onPreviewPlayer={previewPlayer}
         onEnded={() => setArenaEnded(true)}
         onReset={() => setArenaEnded(false)}
+        onResults={setLiveResultsByTeam}
         topPlayers={topPlayers}
         primitive={NATIVE_PRIMITIVE[disciplineId] ?? "track"}
         disciplineId={disciplineId}
@@ -1061,6 +1065,7 @@ export default function DisciplineStageArena({
       gameState={gameState}
       disciplineId={disciplineId}
       fieldedPlayerIdsByTeam={fieldedByTeam}
+      liveResultsByTeam={liveResultsByTeam}
       onClose={() => {
         setDrawerTarget(null);
       }}
