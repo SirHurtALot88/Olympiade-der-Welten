@@ -35,15 +35,17 @@ export default function ThermometerField(props: DisciplineFieldProps): ReactNode
   // Benchmark-Bewegung + Ghost: Token folgen animScore (Frame-Sync, Hover/Pause friert ein).
   const { gRefs, ghostRefs } = useTokenGlide(props);
 
-  // Thermometer geometry: vertical scale
-  const padTop = Math.max(60, H * 0.12);
-  const padBottom = Math.max(padTop + 80, H * 0.88);
-  const bulbRadius = Math.max(20, W * 0.08);
-  const thermX = W / 2;
-  const thermTop = padTop;
-  const thermBottom = padBottom - bulbRadius;
+  // Thermometer als schlanke LINKE Achse (nicht mehr zentral über den 32 Token-Spalten).
+  // Kern-Fix: die Skala bildet EXAKT die Token-y-Achse ab (Host-Turm: topY=44 … baseY=H−52,
+  // Normierung finalMax) — vorher lag sie in einem anderen y-Band + normierte anders → die
+  // Zahl neben dem Strich passte nie zur Token-Höhe. Bulb stark gekappt (war ~94px).
+  const bulbRadius = 16;
+  const thermX = 46;
+  const thermTop = 44; // = Host-Turm topY (Token-Oberkante)
+  const thermBottom = H - 52; // = Host-Turm baseY (Token-Basis)
+  const padBottom = H - 30; // Bulb-Mitte unter dem Rohr
 
-  // y-position for a score (normalized 0..finalMax)
+  // y-position for a score (normalized 0..finalMax) — identisch zur Token-Achse.
   const yOf = (score: number): number => {
     const norm = finalMax > 0 ? score / finalMax : 0;
     const clamped = Math.max(0, Math.min(1, norm));
@@ -138,11 +140,10 @@ export default function ThermometerField(props: DisciplineFieldProps): ReactNode
           opacity={0.85}
         />
 
-        {/* Scale tick marks + labels */}
+        {/* Scale tick marks + labels. % statt absoluter Punkte (finalMax wäre ein Spoiler
+            der Endsumme). Zonen-Label deutsch, Hitze steigt nach oben. */}
         {[0, 0.25, 0.5, 0.75, 1].map((f, i) => {
           const y = thermBottom - f * (thermBottom - thermTop);
-          const score = f * finalMax;
-          const temp = Math.round(score);
           const hue = 120 - f * 120;
           const col = `hsl(${hue} 72% 48%)`;
 
@@ -167,7 +168,7 @@ export default function ThermometerField(props: DisciplineFieldProps): ReactNode
                 fill={skinAccent}
                 opacity={0.8}
               >
-                {temp}
+                {Math.round(f * 100)}%
               </text>
 
               {/* Temperature label on right side for key points */}
@@ -182,7 +183,7 @@ export default function ThermometerField(props: DisciplineFieldProps): ReactNode
                   fill={col}
                   opacity={0.65}
                 >
-                  {["COOL", "WARM", "HOT", "VERY HOT", "🔥"][i]}
+                  {["", "KÜHL", "WARM", "HEISS", "🔥 GLÜHEND"][i]}
                 </text>
               )}
             </g>
