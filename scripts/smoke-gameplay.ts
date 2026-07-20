@@ -628,9 +628,13 @@ async function main() {
         await waitForGamePhaseVisible(page, viewTimeoutMs);
         const bannerText = await elementTextContent(page, "foundation-context-banner");
         const text = await pageText(page);
+        // Save-Name/Team/Spieltag leben seit dem UI-Umbau kompakt in der Sidebar; das
+        // beibehaltene foundation-context-banner traegt jetzt nur noch Szenario-/Status-Chips.
+        // Darum wie bei Season/GamePhase auch die Gesamtseite als Fallback zulassen.
         assertStep(
           step,
-          hasAny(bannerText, ["Spielstand", "Team", "Aktiver Kontext", "Spieltag"]),
+          hasAny(bannerText, ["Spielstand", "Team", "Aktiver Kontext", "Spieltag", "Szenario"]) ||
+            hasAny(text, ["Spielstand", "Team", "Aktiver Kontext", "Spieltag"]),
           "Foundation zeigt den Kontext-Banner.",
         );
         assertStep(

@@ -37849,7 +37849,10 @@ button.market-v2-bucket-card.is-selected {
   position: fixed;
   z-index: 1200;
   width: 200px;
-  pointer-events: auto;
+  /* Reines Hover-Vorschaupanel: darf keine Pointer-Events fangen, sonst deckt es
+     das darunterliegende Spieler-Element ab und schluckt den Klick (der Klick
+     landete auf dem Tooltip statt auf "Profil oeffnen"). */
+  pointer-events: none;
 }
 
 .foundation-player-portrait-preview-panel .foundation-player-portrait-card {
