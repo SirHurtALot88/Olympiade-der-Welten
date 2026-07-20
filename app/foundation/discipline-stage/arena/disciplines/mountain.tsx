@@ -315,10 +315,13 @@ export default function ClimbingField(props: DisciplineFieldProps): ReactNode {
           const glowing = t.glowUntil > now;
           const rc = relColor(t.rel);
 
-          // Defensive Startposition (falls die rAF-Schleife noch nicht getickt hat):
-          // dichte Bahn horizontal, Score → Höhe. Die rAF gleitet danach weiter.
-          const x0 = xOf(t.laneIdx) + swayOf(t.code, yOf(t.displayScore ?? t.score));
-          const y0 = yOf(t.displayScore ?? t.score);
+          // KONSTANTE Startposition am Wand-Fuß (dichte Bahn, Höhe = Einstieg).
+          // Score-UNABHÄNGIG, damit React dieses transform-Attribut bei Re-Renders
+          // (Pops/Ticker) NICHT auf die Zielhöhe zurücksetzt und so die laufende
+          // rAF-Kletteranimation überschreibt (sonst: 1 Ruck, dann Stillstand). Ab
+          // dem 1. rAF-Tick besitzt die Schleife die Position und klettert hoch.
+          const x0 = xOf(t.laneIdx) + swayOf(t.code, wallBottom);
+          const y0 = wallBottom;
           return (
             <g
               key={t.code}
