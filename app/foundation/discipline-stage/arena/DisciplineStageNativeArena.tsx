@@ -2913,11 +2913,22 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                           );
                         })()
                       : null}
-                    {t.thrownSlot < 0 ? (
-                      <div style={{ fontSize: 12, color: "var(--nl-mut)", fontStyle: "italic" }}>noch nicht angetreten</div>
-                    ) : (
+                    {(() => {
+                      // Ab der 2. Runde (round >= 1) den GERADE antretenden Spieler
+                      // (nextSlot == laufende Runde, noch nicht enthüllt) schon zeigen —
+                      // nur Identität (Porträt/Name), NICHT die Wertung (Anti-Spoiler
+                      // bleibt für den Score/Rang).
+                      const nextSlot = t.thrownSlot + 1;
+                      const upcoming =
+                        round >= 1 && !podium && nextSlot < slotCount && nextSlot <= round
+                          ? t.players[nextSlot] ?? null
+                          : null;
+                      if (t.thrownSlot < 0 && !upcoming) {
+                        return <div style={{ fontSize: 12, color: "var(--nl-mut)", fontStyle: "italic" }}>noch nicht angetreten</div>;
+                      }
+                      return (
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        {Array.from({ length: t.thrownSlot + 1 }, (_, s) => {
+                        {Array.from({ length: Math.max(0, t.thrownSlot + 1) }, (_, s) => {
                           const p = t.players[s];
                           if (!p) return null;
                           // Reihenfolge in der Disziplin = Slot s (1-basiert); erzielter
@@ -2964,8 +2975,31 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                             </div>
                           );
                         })}
+                        {upcoming ? (() => {
+                          const teamAccent = floorTeamAccent(teamPrimaryColor(t.code));
+                          const initials = upcoming.name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+                          return (
+                            <div key="upcoming" style={{ display: "flex", gap: 9, alignItems: "center", padding: 6, borderRadius: 9, background: "color-mix(in srgb, var(--nl-accent) 8%, var(--nl-bg))", border: "1px dashed var(--nl-accent)" }}>
+                              <div style={{ position: "relative", flex: "none" }}>
+                                {upcoming.portraitUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={upcoming.portraitUrl} alt="" width={48} height={62} onError={(e) => { const el = e.currentTarget as HTMLImageElement; el.style.display = "none"; const sib = el.nextElementSibling as HTMLElement | null; if (sib) sib.style.display = "grid"; }} style={{ width: 48, height: 62, borderRadius: 7, objectFit: "cover", objectPosition: "center top", display: "block", border: `1.5px solid ${teamAccent}` }} />
+                                ) : null}
+                                <span aria-hidden style={{ width: 48, height: 62, borderRadius: 7, border: `1.5px solid ${teamAccent}`, display: upcoming.portraitUrl ? "none" : "grid", placeItems: "center", fontSize: 15, fontWeight: 800, color: "var(--nl-ink)", background: `color-mix(in srgb, ${teamPrimaryColor(t.code)} 34%, var(--nl-panel))` }}>{initials}</span>
+                                <span aria-hidden style={{ position: "absolute", left: -4, top: -4, minWidth: 15, height: 15, padding: "0 3px", borderRadius: 8, background: "var(--nl-panel)", border: "1px solid var(--nl-line)", display: "grid", placeItems: "center", fontSize: 9, fontWeight: 800, color: "var(--nl-mut-2)", fontVariantNumeric: "tabular-nums" }}>{nextSlot + 1}</span>
+                              </div>
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ fontWeight: 700, fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                  {upcoming.name} <span style={{ color: "var(--nl-mut)", fontWeight: 600 }}>· {slots[nextSlot]}</span>
+                                </div>
+                                <div style={{ marginTop: 3, fontSize: 10.5, fontWeight: 800, color: "var(--nl-accent)", letterSpacing: "0.04em" }}>tritt gerade an …</div>
+                              </div>
+                            </div>
+                          );
+                        })() : null}
                       </div>
-                    )}
+                      );
+                    })()}
                     {teamClickable ? (
                       <div style={{ marginTop: 6, fontSize: 10.5, color: "var(--nl-mut)", fontWeight: 700 }}>Klicken für Team-Karte</div>
                     ) : null}
