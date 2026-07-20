@@ -88,16 +88,21 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
   const GRID_X1 = PX1 - 60;
   const GRID_TOP = BAND_TOP + 6;
   const GRID_BOT = BAND_BOT - 6;
+  // Startaufstellung: alle Teams stehen am LINKEN RAND untereinander (Startkolonne),
+  // nach seasonRank sortiert (oben = beste). Bei vielen Teams eine schmale 2er-Kolonne,
+  // damit die großen Token nicht überlappen — liest sich als „links gestapelt". Von dort
+  // ziehen sie beim Punkten Richtung Mitte.
   const gridByCode = useMemo(() => {
     const order = [...rt].sort((a, b) => a.seasonRank - b.seasonRank);
     const n = order.length;
-    const cols = Math.max(1, Math.min(8, Math.ceil(Math.sqrt(n * 2.4))));
+    const cols = n > 16 ? 2 : 1; // 1 Kolonne, wenn sie reinpasst; sonst 2 schmale
     const rows = Math.max(1, Math.ceil(n / cols));
+    const COL_GAP = 46;
     const m = new Map<string, { x: number; y: number }>();
     order.forEach((t, i) => {
       const c = i % cols;
       const r = Math.floor(i / cols);
-      const x = cols > 1 ? GRID_X0 + (c / (cols - 1)) * (GRID_X1 - GRID_X0) : (GRID_X0 + GRID_X1) / 2;
+      const x = GRID_X0 + c * COL_GAP;
       const y = rows > 1 ? GRID_TOP + (r / (rows - 1)) * (GRID_BOT - GRID_TOP) : CY;
       m.set(t.code, { x, y });
     });
@@ -132,6 +137,7 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
 
   // ---- Token-Refs für die imperative rAF-Positionierung -------------------------------
   const gRefs = useRef<Map<number, SVGGElement | null>>(new Map());
+  const ghostRefs = useRef<Map<number, SVGGElement | null>>(new Map());
 
   useEffect(() => {
     let raf = 0;
@@ -181,6 +187,23 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
           const y = Math.max(BAND_TOP, Math.min(BAND_BOT, p.y));
           const el = gRefs.current.get(p.t.idx);
           if (el) el.setAttribute("transform", `translate(${x} ${y})`);
+        }
+        // Ghost der Vorrunde („Was ist passiert?"): sitzt an der Runden-START-Position
+        // (idealOf(roundStartScore)); die Lücke Ghost→Token = der Zug nach innen in dieser
+        // Etappe. Sichtbar solange das Team noch gleitet, blasst mit dem Fortschritt aus.
+        const reduce = reducedRef.current;
+        for (const t of rtRef.current) {
+          const gel = ghostRefs.current.get(t.idx);
+          if (!gel) continue;
+          const span = t.displayScore - t.roundStartScore;
+          const prog = span > 0.5 ? Math.max(0, Math.min(1, (t.animScore - t.roundStartScore) / span)) : 1;
+          if (span > 0.5 && !reduce && prog < 0.95) {
+            const gp = idealOf(t, t.roundStartScore);
+            gel.setAttribute("transform", `translate(${gp.x} ${gp.y})`);
+            gel.setAttribute("opacity", String((t.isOwn ? 0.5 : 0.24) * (1 - prog * 0.7)));
+          } else {
+            gel.setAttribute("opacity", "0");
+          }
         }
       }
       raf = requestAnimationFrame(tick);
@@ -351,6 +374,23 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
           );
         })}
       </g>
+
+      {/* Ghost-Marker (Vorrunde) — Position/Deckkraft setzt die rAF-Schleife imperativ.
+          Zeigt, von wo das Team diese Etappe nach innen gezogen ist (Zugewinn). */}
+      {rt.map((t) => {
+        const r = t.isOwn ? RBOwn : RB;
+        return (
+          <g
+            key={`ghost-${t.code}`}
+            ref={(el) => {
+              ghostRefs.current.set(t.idx, el);
+            }}
+            opacity={0}
+          >
+            <circle r={r} fill="none" stroke={floorTeamAccent(teamPrimaryColor(t.code))} strokeWidth={1.4} strokeDasharray="3 3" />
+          </g>
+        );
+      })}
 
       {/* Tokens — Fechter. Position: Startslot → Mitte (Anteil = Punkte), Kollisions-
           Relaxation in der rAF. In Rang-Reihenfolge rückwärts (Führender oben). */}
