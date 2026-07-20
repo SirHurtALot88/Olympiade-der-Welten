@@ -77,7 +77,7 @@ function ppText(value: number | null): string {
 // Rang-Badge (klein, tabellarisch) — Gold/Silber/Bronze für die Top-3, gleiche
 // Farbsprache wie die Arena-Leiter (warn/mut/Bronze-rgb, dezent hinterlegt).
 function RankBadge({ rank, dim }: { rank: number | null; dim?: boolean }) {
-  const medal = rank === 1 ? "var(--nl-warn)" : rank === 2 ? "var(--nl-mut)" : rank === 3 ? "rgb(205,127,50)" : null;
+  const medal = rank === 1 ? "var(--nl-gold)" : rank === 2 ? "var(--nl-silver)" : rank === 3 ? "var(--nl-bronze)" : null;
   return (
     <span
       style={{

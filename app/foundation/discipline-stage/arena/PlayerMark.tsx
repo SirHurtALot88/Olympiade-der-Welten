@@ -24,9 +24,9 @@ export function markRingColor(opts: { spotlight?: boolean; isOwn?: boolean; rela
 
 // Medaillenfarbe (Badge, nicht Ring): Gold/Silber/Bronze.
 export function markMedalColor(medal: MarkMedal): string | null {
-  if (medal === "gold") return "var(--nl-warn)";
-  if (medal === "silver") return "var(--nl-mut)";
-  if (medal === "bronze") return "rgb(205,127,50)";
+  if (medal === "gold") return "var(--nl-gold)";
+  if (medal === "silver") return "var(--nl-silver)";
+  if (medal === "bronze") return "var(--nl-bronze)";
   return null;
 }
 

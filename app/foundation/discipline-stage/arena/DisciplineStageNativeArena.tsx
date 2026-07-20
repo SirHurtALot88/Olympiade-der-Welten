@@ -772,7 +772,7 @@ export function renderTerritory(sorted: RT[], W: number, H: number, env: StageEn
         const t = c.t;
         const nm = span > 0 ? Math.max(0, Math.min(1, (t.score - min) / span)) : 1;
         const rc = relColor(t.rel);
-        const med = t.rank === 1 ? "var(--nl-warn)" : t.rank === 2 ? "var(--nl-mut)" : t.rank === 3 ? "rgb(205,127,50)" : null;
+        const med = t.rank === 1 ? "var(--nl-gold)" : t.rank === 2 ? "var(--nl-silver)" : t.rank === 3 ? "var(--nl-bronze)" : null;
         // Beziehungsfarbe (rc) ist NUR Rahmen, nie Füllung (zell-übergreifender Kontrakt):
         // die Zellfläche bleibt Medaillen-/Teamfarbe, rc kommt unten als stroke dazu (FIX B).
         const fill = med ?? "hsl(80 40% 42%)";
@@ -1180,6 +1180,9 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     clearTimers();
     rtRef.current = buildRT();
     setRound(0);
+    // Start-Gate zurücksetzen: sonst feuert der Auto-Continue-Effekt (started noch true)
+    // nach „↻ Neu" sofort advance() → die Disziplin läuft ohne ▶-Klick von selbst wieder los.
+    setStarted(false);
     setBusy(false);
     busyRef.current = false;
     setEnded(false);
@@ -1843,23 +1846,45 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     },
     [later],
   );
+  // FX-Position in Feld-% — BEVORZUGT aus der echt gerenderten Token-DOM-Lage (jedes Feld
+  // platzt Token selbst; die Overlays Hovercard/Zoom lesen längst so). Der Host-tokenPos
+  // ist die Row/Serpentine-Geometrie und weicht bei bespoke Feldern ab → Pops landen sonst
+  // daneben. Fallback: host.tokenPos in %.
+  const fxPct = useCallback(
+    (code: string, fallback: { x: number; y: number }): { xPct: number; yPct: number } => {
+      const svgEl = svgRef.current;
+      const tokEl = svgEl?.querySelector(`[data-token-code="${code}"]`) as SVGGraphicsElement | null;
+      const svgRect = svgEl?.getBoundingClientRect();
+      const tokRect = tokEl?.getBoundingClientRect();
+      if (svgRect && tokRect && svgRect.width > 0 && svgRect.height > 0 && (tokRect.width > 0 || tokRect.height > 0)) {
+        return {
+          xPct: ((tokRect.left + tokRect.width / 2 - svgRect.left) / svgRect.width) * 100,
+          yPct: ((tokRect.top + tokRect.height / 2 - svgRect.top) / svgRect.height) * 100,
+        };
+      }
+      return { xPct: (fallback.x / W) * 100, yPct: (fallback.y / H) * 100 };
+    },
+    [W, H],
+  );
   const addPop = useCallback(
-    (net: number, mine: boolean, pos: { x: number; y: number }) => {
+    (net: number, mine: boolean, pos: { x: number; y: number }, code?: string) => {
       if (reduced.current) return;
       const id = fxId.current++;
-      setPops((ps) => [...ps, { id, xPct: (pos.x / W) * 100 + (Math.random() * 3 - 1.5), yPct: (pos.y / H) * 100 - (Math.random() * 3 + 1), net, mine }]);
-      later(() => setPops((ps) => ps.filter((p) => p.id !== id)), 950);
+      const p = code ? fxPct(code, pos) : { xPct: (pos.x / W) * 100, yPct: (pos.y / H) * 100 };
+      setPops((ps) => [...ps, { id, xPct: p.xPct + (Math.random() * 3 - 1.5), yPct: p.yPct - (Math.random() * 3 + 1), net, mine }]);
+      later(() => setPops((ps) => ps.filter((p2) => p2.id !== id)), 950);
     },
-    [later, W, H],
+    [later, W, H, fxPct],
   );
   const addFrags = useCallback(
-    (p: NativeStagePlayer, pos: { x: number; y: number }) => {
+    (p: NativeStagePlayer, pos: { x: number; y: number }, code?: string) => {
       if (reduced.current) return;
       const items = p.mods.filter((m) => Math.abs(m.amt) >= 0.05).slice(0, 4);
+      const at = code ? fxPct(code, pos) : { xPct: (pos.x / W) * 100, yPct: (pos.y / H) * 100 };
       const created: Frag[] = items.map((m) => ({
         id: fxId.current++,
-        xPct: (pos.x / W) * 100 + (Math.random() * 4 - 2),
-        yPct: (pos.y / H) * 100 - 2,
+        xPct: at.xPct + (Math.random() * 4 - 2),
+        yPct: at.yPct - 2,
         text: `${m.sign < 0 ? "−" : "+"}${fmt1(m.amt)} ${m.k}`,
         sign: m.sign,
       }));
@@ -1868,7 +1893,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       const ids = new Set(created.map((c) => c.id));
       later(() => setFrags((fs) => fs.filter((f) => !ids.has(f.id))), 900);
     },
-    [later, W, H],
+    [later, W, H, fxPct],
   );
   const glow = useCallback(
     (t: RT) => {
@@ -1914,8 +1939,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       leader: ["var(--nl-good)", "Neue Spitze"],
       top3: ["var(--nl-good)", "Sprung Top 3"],
       best: ["var(--nl-good)", "Etappensieger"],
-      silver: ["var(--nl-mut)", "Runden-Silber"],
-      bronze: ["rgb(205,127,50)", "Runden-Bronze"],
+      silver: ["var(--nl-silver)", "Runden-Silber"],
+      bronze: ["var(--nl-bronze)", "Runden-Bronze"],
       push: ["var(--nl-accent)", "Hart gepusht"],
       climb: ["var(--nl-accent)", "Aufholjagd"],
       strong: ["var(--nl-good)", "Stark"],
@@ -2003,7 +2028,10 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     };
     // Fotofinish (nur track): Gold-Abstand winzig → Zeitlupen-Zoom auf den Zieleinlauf,
     // dann erst das Podest. Reduced-Motion: direkt enthüllen (kein Zoom, keine Verzögerung).
-    const close = top3.length >= 2 && (top3[0]!.score - top3[1]!.score) <= Math.max(2.5, finalMax * 0.015);
+    // Fotofinish NUR bei Staffel (track): der scale(1.6)-Zoom + das harte Origin „26% 11%"
+    // sind auf den Oval-Zieleinlauf getunt — bei jeder anderen Geometrie zoomt er auf eine
+    // bedeutungslose Ecke und das erklärende Banner erscheint gar nicht.
+    const close = prim === "track" && top3.length >= 2 && (top3[0]!.score - top3[1]!.score) <= Math.max(2.5, finalMax * 0.015);
     if (close && !reduced.current) {
       popBanner("📸 Fotofinish · Zieleinlauf", "gold");
       setPhotoFinish(true);
@@ -2016,7 +2044,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     } else {
       revealPodium();
     }
-  }, [audio, fireFlash, doShake, later, onEnded, finalMax, popBanner]);
+  }, [audio, fireFlash, doShake, later, onEnded, finalMax, popBanner, prim]);
 
   // ---- Reveal-Cascade ----
   const advance = useCallback(() => {
@@ -2142,8 +2170,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         later(doOne, 90);
         return;
       }
-      addPop(res.net, isMine, pos);
-      addFrags(res.player, pos);
+      addPop(res.net, isMine, pos, t.code);
+      addFrags(res.player, pos, t.code);
       pushTicker(t, r, { player: res.player, net: res.net }, impact, rt);
       // Highlight-Banner (track): neue Gesamtführung schlägt Etappensieger.
       if (impact.cause === "leader") popBanner(`🏆 Neue Führung · ${res.player.name} (${t.code})`, "gold");
@@ -2940,7 +2968,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                           // Reihenfolge in der Disziplin = Slot s (1-basiert); erzielter
                           // Rang dieses Spielers in seinem Slot (1…N, ligaweit).
                           const sr = slotRankOf(s, t, rtRef.current);
-                          const medalC = sr === 1 ? "var(--nl-warn)" : sr === 2 ? "var(--nl-mut)" : sr === 3 ? "rgb(205,127,50)" : "var(--nl-mut-2)";
+                          const medalC = sr === 1 ? "var(--nl-gold)" : sr === 2 ? "var(--nl-silver)" : sr === 3 ? "var(--nl-bronze)" : "var(--nl-mut-2)";
                           return (
                             <div key={s} style={{ fontSize: 11.5, fontVariantNumeric: "tabular-nums", display: "flex", alignItems: "baseline", gap: 6 }}>
                               <span aria-hidden style={{ flex: "none", fontSize: 9.5, fontWeight: 800, color: "var(--nl-mut-2)", width: 16 }}>#{s + 1}</span>
@@ -2973,7 +3001,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               <div style={{ display: "flex", alignItems: "flex-end", gap: 14 }}>
                 {podium.map((c) => {
                   const h = c.place === 1 ? 132 : c.place === 2 ? 100 : 76;
-                  const grad = c.place === 1 ? "linear-gradient(180deg, color-mix(in srgb, var(--nl-warn) 85%, white), var(--nl-warn))" : c.place === 2 ? "linear-gradient(180deg, color-mix(in srgb, var(--nl-mut) 60%, white), var(--nl-mut))" : "linear-gradient(180deg, rgb(224,167,101), rgb(205,127,50))";
+                  const grad = c.place === 1 ? "linear-gradient(180deg, color-mix(in srgb, var(--nl-gold) 85%, white), var(--nl-gold))" : c.place === 2 ? "linear-gradient(180deg, color-mix(in srgb, var(--nl-silver) 70%, white), var(--nl-silver))" : "linear-gradient(180deg, color-mix(in srgb, var(--nl-bronze) 70%, white), var(--nl-bronze))";
                   return (
                     <div key={c.code} className="oly-anim" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, animation: reduced.current ? "none" : `olyPodRise .6s cubic-bezier(.2,1.1,.3,1) ${c.delayMs}ms both` }}>
                       {c.logoUrl ? (

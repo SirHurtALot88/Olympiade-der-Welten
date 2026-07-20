@@ -162,13 +162,15 @@ export function TokenChrome(props: {
   const { t, prim, geo, trioSet, hoverIdx, reducedMotion, trophy = true, badge = true, radius } = props;
   const r = radius ?? (t.isOwn ? geo.rOwn : geo.r);
   const hue = hueForIdx(t.idx);
-  const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
+  const medal = t.roundMedal === 1 ? "var(--nl-gold)" : t.roundMedal === 2 ? "var(--nl-silver)" : t.roundMedal === 3 ? "var(--nl-bronze)" : null;
   const rc = relColor(t.rel);
   const showBadge = badge && (t.isOwn || t.rank <= 3 || hoverIdx === t.idx);
   return (
     <>
-      {/* Highlight-Trio (Aufholjagd): goldener Puls an den 3 größten Aufsteigern (Zoom). */}
-      {trioSet.has(t.idx) ? <circle r={r + 10} fill="none" stroke="var(--nl-warn)" strokeWidth={3.5} opacity={0.95} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 0.85s ease-in-out infinite" }} /> : null}
+      {/* Highlight-Trio (Aufholjagd): grüner Aufhol-Puls an den 3 größten Aufsteigern (Zoom).
+          Bewusst GRÜN (--nl-good) statt Gold — sonst kollidiert der Ring mit der Gold-Medaille
+          und dem Glow (alles war --nl-warn → „Gold-Overload"). */}
+      {trioSet.has(t.idx) ? <circle r={r + 10} fill="none" stroke="var(--nl-good)" strokeWidth={3.5} opacity={0.95} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 0.85s ease-in-out infinite" }} /> : null}
       {/* Eigen-Team-Anker: dauerhafter, weicher Akzent-Puls. */}
       {t.isOwn ? <circle r={r + 6} fill="none" stroke="var(--nl-accent)" strokeWidth={2} opacity={0.9} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.6s ease-in-out infinite" }} /> : null}
       {/* Relations-Ring (Rivalen rot / Verbündete) — eng am Rahmen. */}
@@ -201,7 +203,7 @@ export function TokenChrome(props: {
       {/* Rang-Badge unter dem Token: macht die Position direkt lesbar. */}
       {showBadge ? (
         <g transform={`translate(0 ${r + 13})`}>
-          <text textAnchor="middle" fontSize={11.5} fontWeight={900} fill={t.isOwn ? "var(--nl-accent)" : t.rank === 1 ? "var(--nl-warn)" : "var(--nl-ink)"}>
+          <text textAnchor="middle" fontSize={11.5} fontWeight={900} fill={t.isOwn ? "var(--nl-accent)" : t.rank === 1 ? "var(--nl-gold)" : "var(--nl-ink)"}>
             {t.isOwn ? "★ " : ""}#{t.rank}
           </text>
         </g>

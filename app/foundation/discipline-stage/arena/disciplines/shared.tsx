@@ -506,7 +506,7 @@ export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactN
                 const pos = tokenPos(t, posScore);
                 const r = t.isOwn ? geo.rOwn : geo.r;
                 const hue = hueForIdx(t.idx);
-                const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
+                const medal = t.roundMedal === 1 ? "var(--nl-gold)" : t.roundMedal === 2 ? "var(--nl-silver)" : t.roundMedal === 3 ? "var(--nl-bronze)" : null;
                 // Gewichtheben: Heber gerissen (auf Endgewicht) bzw. Champion an der Krone.
                 const bbOut = prim === "barbell" && barbellEliminated(t.idx);
                 const bbChamp = prim === "barbell" && done && (barbellRankMap[t.code] ?? 99) === 1;
@@ -668,7 +668,7 @@ export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactN
                       const liveStage = Math.min(stages - 1, hist.length);
                       pts.push([xStage(liveStage), yRank(t.rank)]);
                       const anchor = t.rel != null || t.rank <= 3;
-                      const rankMed = t.rank === 1 ? "var(--nl-warn)" : t.rank === 2 ? "var(--nl-mut)" : t.rank === 3 ? "rgb(205,127,50)" : null;
+                      const rankMed = t.rank === 1 ? "var(--nl-gold)" : t.rank === 2 ? "var(--nl-silver)" : t.rank === 3 ? "var(--nl-bronze)" : null;
                       const col = relColor(t.rel) ?? rankMed ?? "var(--nl-mut)";
                       const d = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
                       const end = pts[pts.length - 1]!;

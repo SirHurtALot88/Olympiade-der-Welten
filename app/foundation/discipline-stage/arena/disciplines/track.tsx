@@ -252,7 +252,7 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
           const showBadge = t.isOwn || t.rank <= 3 || hoverIdx === t.idx;
           const r = t.isOwn ? geo.rOwn : geo.r;
           const hue = hueForIdx(t.idx);
-          const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
+          const medal = t.roundMedal === 1 ? "var(--nl-gold)" : t.roundMedal === 2 ? "var(--nl-silver)" : t.roundMedal === 3 ? "var(--nl-bronze)" : null;
           const glowing = t.glowUntil > now;
           const rc = relColor(t.rel);
           return (
@@ -273,7 +273,7 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
               {/* Highlight-Trio (Aufholjagd): kräftiger, pulsierender goldener Ring an den 3
                   größten Aufsteigern der Etappe — während der Zeitlupe/des Zooms leuchtet er,
                   damit man diese Token im Feld sofort findet und ihre Jagd verfolgt. */}
-              {trioSet.has(t.idx) ? <circle r={r + 10} fill="none" stroke="var(--nl-warn)" strokeWidth={3.5} opacity={0.95} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 0.85s ease-in-out infinite" }} /> : null}
+              {trioSet.has(t.idx) ? <circle r={r + 10} fill="none" stroke="var(--nl-good)" strokeWidth={3.5} opacity={0.95} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 0.85s ease-in-out infinite" }} /> : null}
               {/* Eigen-Team-Anker: dauerhafter, weicher Akzent-Puls — man findet sich immer. */}
               {t.isOwn ? (
                 <circle r={r + 6} fill="none" stroke="var(--nl-accent)" strokeWidth={2} opacity={0.9} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.6s ease-in-out infinite" }} />
@@ -317,7 +317,7 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
                   Macht die Position direkt am Token lesbar — ohne Blick zur Seitentabelle. */}
               {showBadge ? (
                 <g transform={`translate(0 ${r + 13})`}>
-                  <text textAnchor="middle" fontSize={11.5} fontWeight={900} fill={t.isOwn ? "var(--nl-accent)" : t.rank === 1 ? "var(--nl-warn)" : "var(--nl-ink)"}>
+                  <text textAnchor="middle" fontSize={11.5} fontWeight={900} fill={t.isOwn ? "var(--nl-accent)" : t.rank === 1 ? "var(--nl-gold)" : "var(--nl-ink)"}>
                     {t.isOwn ? "★ " : ""}#{t.rank}
                   </text>
                 </g>

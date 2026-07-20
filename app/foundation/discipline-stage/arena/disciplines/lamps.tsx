@@ -412,7 +412,7 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
         .map((t) => {
           const r = radiusOf(t);
           const hue = hueForIdx(t.idx);
-          const medal = t.roundMedal === 1 ? "var(--nl-warn)" : t.roundMedal === 2 ? "var(--nl-mut)" : t.roundMedal === 3 ? "rgb(205,127,50)" : null;
+          const medal = t.roundMedal === 1 ? "var(--nl-gold)" : t.roundMedal === 2 ? "var(--nl-silver)" : t.roundMedal === 3 ? "var(--nl-bronze)" : null;
           const glowing = t.glowUntil > now;
           const rc = relColor(t.rel);
           const lunging = !reducedMotion && lunges[t.code] != null;

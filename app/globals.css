@@ -42710,6 +42710,11 @@ button.foundation-team-portrait-card {
   --nl-good: #4cc56b;
   --nl-warn: #e0a53a;
   --nl-risk: #e5615a;
+  /* Medaillen (Podest / Top-3-Rahmen) — metallisch, theme-übergreifend lesbar. Silber ist
+     bewusst HELL (nicht --nl-mut, das als „deaktiviert" liest); Bronze löst das rgb-Literal ab. */
+  --nl-gold: #f6c750;
+  --nl-silver: #c7d0dc;
+  --nl-bronze: #cd7f32;
   /* Freund/Feind-Kodierung (Arena): blau=deine, grün=verbündet, rot=Rival.
      Aliasse auf die Achsen-/Semantik-Tokens, damit Light/Dark automatisch mitzieht. */
   --nl-mine: var(--nl-men);
