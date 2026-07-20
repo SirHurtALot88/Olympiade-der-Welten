@@ -37,6 +37,7 @@ export default function FootballField(props: DisciplineFieldProps): ReactNode {
 
   const gRefs = useRef<Map<number, SVGGElement | null>>(new Map());
   const ghostRefs = useRef<Map<number, SVGGElement | null>>(new Map());
+  const ezFlashRef = useRef<SVGRectElement | null>(null);
   const hoverRef = useRef<number | null>(hoverIdx);
   hoverRef.current = hoverIdx;
   const pausedRef = useRef<boolean>(props.paused);
@@ -74,14 +75,16 @@ export default function FootballField(props: DisciplineFieldProps): ReactNode {
   // Zeitstrahl) → Feld UND Rangliste laufen synchron, Hover/Pause friert beides ein.
   useEffect(() => {
     let raf = 0;
-    const tick = () => {
+    const tick = (ts: number) => {
       const frozen = hoverRef.current != null || pausedRef.current;
       const reduce = reducedRef.current;
+      let anyInZone = false;
       for (const t of rtRef.current) {
         const el = gRefs.current.get(t.idx);
         if (el && !frozen) {
           el.setAttribute("transform", `translate(${fracX(t.animScore)} ${laneY(t.laneIdx)})`);
         }
+        if (fracX(t.animScore) >= GL100) anyInZone = true;
         // Ghost der Vorrunde: bei fracX(roundStartScore) auf derselben Bahn.
         const gel = ghostRefs.current.get(t.idx);
         if (gel) {
@@ -94,6 +97,13 @@ export default function FootballField(props: DisciplineFieldProps): ReactNode {
             gel.setAttribute("opacity", "0");
           }
         }
+      }
+      // Touchdown-Flash: sobald ein Team in der rechten End Zone steht, pulst sie rot auf
+      // (der „Lauf zur End Zone" bekommt seine Belohnung). reduced-motion → ruhiges Glimmen.
+      const ez = ezFlashRef.current;
+      if (ez) {
+        const pulse = reduce ? 0.16 : 0.1 + 0.16 * Math.abs(Math.sin(ts * 0.006));
+        ez.setAttribute("opacity", anyInZone && !frozen ? pulse.toFixed(3) : "0");
       }
       raf = requestAnimationFrame(tick);
     };
@@ -260,6 +270,18 @@ export default function FootballField(props: DisciplineFieldProps): ReactNode {
     <>
       {/* Feldkunst: Gridiron mit Yard-Linien, Goalposts, Flutlichter */}
       <g dangerouslySetInnerHTML={{ __html: renderFieldArt() }} />
+
+      {/* Touchdown-Flash über der rechten End Zone (Opacity via rAF, s.o.). */}
+      <rect
+        ref={ezFlashRef}
+        x={GL100}
+        y={PY0}
+        width={EZR1 - GL100}
+        height={PY1 - PY0}
+        fill="#ff3b3b"
+        opacity={0}
+        pointerEvents="none"
+      />
 
       {/* Ghost der Vorrunde (Benchmark) — VOR den Token. */}
       <GhostLayer sorted={sorted} geo={geo} ghostRefs={ghostRefs} />
