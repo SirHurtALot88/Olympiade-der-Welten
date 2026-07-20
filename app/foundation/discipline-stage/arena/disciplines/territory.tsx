@@ -18,8 +18,8 @@ import type { DisciplineFieldProps, RT } from "./types";
 const BASE = 60;
 const POW = 1.3;
 const GAP = 3;
-// Morph-Dauer = Runden-Glide des Hosts (TRACK_ROUND_MS = 15s). Feld + Ladder + Morph laufen synchron.
-const MORPH_MS = 15000;
+// Morph-Dauer = Runden-Glide des Hosts (TRACK_ROUND_MS = 10s). Feld + Ladder + Morph laufen synchron.
+const MORPH_MS = 10000;
 const M = 26;
 const NS = "http://www.w3.org/2000/svg";
 

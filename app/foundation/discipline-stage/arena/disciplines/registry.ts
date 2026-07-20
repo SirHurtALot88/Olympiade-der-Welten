@@ -43,6 +43,7 @@ import SchachField from "./schach";
 import TennisField from "./tennis";
 import EiskunstField from "./eiskunst";
 import ShowcaseField from "./showcase";
+import BreakingField from "./breaking";
 
 export const DISCIPLINE_FIELD_REGISTRY: Record<StagePrimitive, DisciplineField> = {
   track: TrackField,
@@ -80,6 +81,9 @@ export const DISCIPLINE_ID_FIELD_REGISTRY: Record<string, DisciplineField> = {
   // stage (geteilt): Eiskunstlauf = Eis-Kür, Showcase = Theater-Bühne.
   eiskunstlauf: EiskunstField,
   showcase: ShowcaseField,
+  // thermometer-Primitive überschrieben: Breaking Point = lila Survival-Cypher (nach innen
+  // zum SURVIVOR), NICHT das Schmerz-Thermometer.
+  breaking: BreakingField,
 };
 
 export function getDisciplineField(
