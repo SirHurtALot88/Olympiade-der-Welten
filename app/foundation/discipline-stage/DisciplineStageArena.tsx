@@ -579,24 +579,55 @@ export default function DisciplineStageArena({
     [preview, disciplineId],
   );
 
-  // Die ZWEI Disziplinen dieses Spieltags (d1 + d2) aus dem Saison-Spielplan — Grundlage
-  // fürs Team-Matchday-PP-Panel unten (welche Spalte ist d1, welche d2, und wie heißen sie).
-  const matchdaySchedule = useMemo(() => {
-    if (!matchdayId) return null;
-    try {
-      const entry = getSeasonDisciplineScheduleEntry(gameState, matchdayId);
-      if (!entry) return null;
-      const d1 = entry.discipline1?.disciplineId
-        ? { disciplineId: entry.discipline1.disciplineId, displayName: entry.discipline1.displayName }
-        : null;
-      const d2 = entry.discipline2?.disciplineId
-        ? { disciplineId: entry.discipline2.disciplineId, displayName: entry.discipline2.displayName }
-        : null;
-      return { d1, d2 };
-    } catch {
-      return null;
+  // Team-Matchday-PP-Panel (unten): alles aus der Resolve-Preview ableiten (die IMMER
+  // vorliegt, wenn die Engine-Arena läuft) — so erscheint das Panel zuverlässig, statt an
+  // fehlender Standings-/Spielplan-Nebenquelle zu scheitern. d1/d2 kommen kanonisch aus den
+  // teamResults (d1DisciplineId/d2DisciplineId), Namen aus den disciplinePreviews (Fallback:
+  // Spielplan). Rang vor/nach: Standings-Preview (projectedRank), Briefing als Vorher-Fallback.
+  const matchdayPanel = useMemo(() => {
+    if (!preview) return null;
+    const results = preview.teamResults ?? [];
+    if (results.length === 0) return null;
+    const d1Id = results.find((r) => r.d1DisciplineId)?.d1DisciplineId ?? null;
+    const d2Id = results.find((r) => r.d2DisciplineId)?.d2DisciplineId ?? null;
+    const nameById = new Map(preview.disciplinePreviews.map((d) => [d.disciplineId, d.disciplineName] as const));
+    let schedule: { d1?: { disciplineId: string; displayName: string } | null; d2?: { disciplineId: string; displayName: string } | null } | null = null;
+    if (matchdayId) {
+      try {
+        const entry = getSeasonDisciplineScheduleEntry(gameState, matchdayId);
+        if (entry) {
+          schedule = {
+            d1: entry.discipline1?.disciplineId ? { disciplineId: entry.discipline1.disciplineId, displayName: entry.discipline1.displayName } : null,
+            d2: entry.discipline2?.disciplineId ? { disciplineId: entry.discipline2.disciplineId, displayName: entry.discipline2.displayName } : null,
+          };
+        }
+      } catch {
+        schedule = null;
+      }
     }
-  }, [gameState, matchdayId]);
+    const nameOf = (id: string | null): string =>
+      id ? nameById.get(id) ?? (schedule?.d1?.disciplineId === id ? schedule.d1.displayName : schedule?.d2?.disciplineId === id ? schedule?.d2?.displayName ?? id : id) : id ?? "";
+    const d1 = d1Id ? { disciplineId: d1Id, displayName: nameOf(d1Id) } : schedule?.d1 ?? null;
+    const d2 = d2Id ? { disciplineId: d2Id, displayName: nameOf(d2Id) } : schedule?.d2 ?? null;
+    // Rang-Quelle je Team zusammenführen: Standings (Rang vor+nach) > Briefing (nur vorher).
+    const rankByTeam = new Map<string, MatchdayPanelStandingRow>();
+    for (const b of briefingItems) {
+      rankByTeam.set(b.teamId, { teamId: b.teamId, currentRank: b.currentRank, projectedRank: b.projectedRank ?? null, currentPoints: null, projectedPoints: null, pointsDelta: null });
+    }
+    for (const s of standingsItems) rankByTeam.set(s.teamId, s);
+    const standings: MatchdayPanelStandingRow[] = results.map((r) => {
+      const s = rankByTeam.get(r.teamId);
+      return {
+        teamId: r.teamId,
+        currentRank: s?.currentRank ?? null,
+        projectedRank: s?.projectedRank ?? null,
+        currentPoints: s?.currentPoints ?? null,
+        projectedPoints: s?.projectedPoints ?? null,
+        pointsDelta: s?.pointsDelta ?? null,
+      };
+    });
+    return { d1, d2, standings };
+  }, [preview, gameState, matchdayId, briefingItems, standingsItems]);
 
   // Engine-Teams für die gewählte Disziplin (nur wenn sie an diesem Spieltag läuft).
   const engineTeams = useMemo(() => {
@@ -965,23 +996,22 @@ export default function DisciplineStageArena({
           Disziplin-2-Ende) — kein Spoiler. */}
       {mode === "real" &&
       preview &&
-      standingsItems.length > 0 &&
-      matchdaySchedule &&
-      (matchdaySchedule.d1?.disciplineId === disciplineId || matchdaySchedule.d2?.disciplineId === disciplineId) ? (
+      matchdayPanel &&
+      (matchdayPanel.d1?.disciplineId === disciplineId || matchdayPanel.d2?.disciplineId === disciplineId) ? (
         <div style={{ marginTop: 14 }}>
           <DisciplineStageMatchdayPanel
             teamResults={preview.teamResults}
-            standings={standingsItems}
-            d1={matchdaySchedule.d1}
-            d2={matchdaySchedule.d2}
+            standings={matchdayPanel.standings}
+            d1={matchdayPanel.d1}
+            d2={matchdayPanel.d2}
             d1Revealed={
-              matchdaySchedule.d2?.disciplineId === disciplineId
+              matchdayPanel.d2?.disciplineId === disciplineId
                 ? true
-                : matchdaySchedule.d1?.disciplineId === disciplineId
+                : matchdayPanel.d1?.disciplineId === disciplineId
                   ? arenaEnded
                   : false
             }
-            d2Revealed={matchdaySchedule.d2?.disciplineId === disciplineId ? arenaEnded : false}
+            d2Revealed={matchdayPanel.d2?.disciplineId === disciplineId ? arenaEnded : false}
             teamMetaById={teamMetaById}
             ownTeamId={ownTeamId}
             onOpenTeam={(teamId) => openDrawerPinned({ kind: "team", teamId })}

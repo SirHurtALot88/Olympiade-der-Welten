@@ -1644,21 +1644,31 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           setHighlightTrio(trio.map((c) => c.t.idx));
           const HOLD_MS = 1500;
           highlightHoldRef.current = now + HOLD_MS;
-          // Zoom-Zentrum = Schwerpunkt der Trio-Token (rahmt die Gruppe), eng (1,55×).
+          // Zoom-Zentrum = Schwerpunkt der ECHT gerenderten Trio-Token. Wir lesen die
+          // Bildschirmposition direkt aus dem DOM (data-token-code → getBoundingClientRect),
+          // nicht aus host.tokenPos — denn die Felder platzieren die Token selbst (Oval,
+          // Streuung …); host.tokenPos traf die reale Position nicht und der Zoom landete
+          // daneben (z.B. unten rechts). Jetzt trifft er die Tokens zum Feuer-Zeitpunkt.
           const svg = svgRef.current;
-          const pts = trio.map((c) => tokenPosRef.current(c.t, c.t.animScore));
-          const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-          const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-          let origin = { ox: (cx / W) * 100, oy: (cy / H) * 100, scale: 1.55 };
-          const ctm = svg?.getScreenCTM?.();
-          if (svg && ctm) {
+          let origin = { ox: 50, oy: 50, scale: 1.65 };
+          if (svg) {
             const rect = svg.getBoundingClientRect();
-            const spt = svg.createSVGPoint();
-            spt.x = cx;
-            spt.y = cy;
-            const sp = spt.matrixTransform(ctm);
-            if (rect.width > 0 && rect.height > 0) {
-              origin = { ox: ((sp.x - rect.left) / rect.width) * 100, oy: ((sp.y - rect.top) / rect.height) * 100, scale: 1.55 };
+            const centers: { x: number; y: number }[] = [];
+            for (const c of trio) {
+              const el = svg.querySelector(`[data-token-code="${c.t.code}"]`) as SVGGraphicsElement | null;
+              if (el) {
+                const b = el.getBoundingClientRect();
+                if (b.width > 0 || b.height > 0) centers.push({ x: b.left + b.width / 2, y: b.top + b.height / 2 });
+              }
+            }
+            if (centers.length && rect.width > 0 && rect.height > 0) {
+              const mx = centers.reduce((s, p) => s + p.x, 0) / centers.length;
+              const my = centers.reduce((s, p) => s + p.y, 0) / centers.length;
+              origin = {
+                ox: Math.max(6, Math.min(94, ((mx - rect.left) / rect.width) * 100)),
+                oy: Math.max(6, Math.min(94, ((my - rect.top) / rect.height) * 100)),
+                scale: 1.65,
+              };
             }
           }
           setZoom(origin);
