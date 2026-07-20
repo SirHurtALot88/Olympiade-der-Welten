@@ -1,16 +1,18 @@
 // =====================================================================================
-// tennis — BESPOKE · 1:1 aus scratchpad/tennis.html rebuildet.
+// tennis — BESPOKE · REWORK (Grand-Slam-Bahn, waagerecht).
 //
-// Turnier-Anlage von oben: konzentrische Zonen (Außenplätze → Court 2 → Court 1 →
-// Center Court unter Flutlicht). Alle 32 Teams rücken simultan von außen nach innen vor,
-// Nähe zum Center Court = gewonnene Punkte. Der Filzball liegt beim Führenden; pro Reveal
-// jagen die Top-Mover Winner in den Center Court: ⚡ ASS (Kreidestaub + Surge), Netzroller.
-// Score = Wahrheit, monoton zum Endstand.
+// Alte konzentrische Ring-Anlage war unübersichtlich. Neu: ein klarer Rasen-Court von
+// oben, WAAGERECHT wie die Staffel lesbar. Links = Aufschlag-Linie (Start), rechts =
+// Championship-Netz (Ziel). x-Position = kumulierte Punkte (score/finalMax) → die Teams
+// rücken über die vollen Runden nach rechts zum Netz. y = feste Team-Bahn (laneIdx),
+// damit man jedes Team über die Runden verfolgen kann (kein Rang-Springen). Setzköpfe
+// (Top-8) nummeriert, Führer mit 🏆 + goldenem Puls, Ballwechsel zwischen den Führenden,
+// ✦-Ass-Funke bei Punktgewinn.
 //
-// Der Host bleibt WAHRHEIT: Score/Reveal/Ladder/Ticker/Kopf-Strip/Hover/Pops kommen vom
-// Host (tokenPos → Hover/Pops bleiben konsistent). Diese Datei rendert NUR die Feld-
-// Kinder des <svg> + die on-Feld-FX (Ball, Kreidestaub, Winner-Shots). Score=Wahrheit,
-// Endstand, Medaillen-Ringe, Champion-Krone, Setzköpfe bleiben.
+// Host bleibt WAHRHEIT: Score/Reveal/Ladder/Ticker/Hover/Pops kommen vom Host; die lokale
+// tokenPos (waagerecht) speist die Benchmark-Glide-Schleife (useTokenGlide) → Ghost +
+// Token + Rangliste folgen derselben Choreografie. Diese Datei rendert nur die Feldkunst
+// (Court) + die on-Feld-FX (Ball, Ass-Funke). Endstand/Medaillen/Champion unverändert.
 // =====================================================================================
 "use client";
 
@@ -22,27 +24,19 @@ const NS = "http://www.w3.org/2000/svg";
 
 // Tennis-Farben (aus dem Mockup)
 const GRASS_A = "#1d5238";
-const GRASS_B = "#245c41";
-const GRASS_C = "#2b6a4b";
-const GRASS_D = "#347c58";
-const COURT_FILL = "#3a7cba";
-const COURT_STROKE = "#f2f6f2";
-const LINES = "rgba(235,240,244,.85)";
-const ZONE_DASH = "rgba(235,240,244,.15)";
-const ZONE_LINE_GOLDEN = "rgba(246,199,80,.4)";
-const CHALK = "rgba(240,246,241,.6)";
-const GLOW = "rgba(201,230,74,.08)";
-const NET_STROKE = "rgba(235,240,244,.8)";
+const GRASS_B = "#164028";
+const COURT_BG = "#0d1a12";
 const GRASS_PERIMETER = "#3c7a5c";
-const FLOODLIGHT = "rgba(246,233,160,.16)";
+const LINES = "rgba(235,240,244,.85)";
+const NET_WHITE = "rgba(233,236,242,.9)";
+const BALL_FILL = "#f0ff7a";
+const BALL_STROKE = "#b8d426";
+const POST_FILL = "#c6ced4";
+const POST_STROKE = "#5a6a60";
 
 type Cfg = {
-  cx: number;
-  cy: number;
-  KX: number;
-  KY: number;
-  R0: number;
-  R1: number;
+  X0: number;
+  X1: number;
   reduced: boolean;
   tokenPos: (t: RT, score: number) => { x: number; y: number };
 };
@@ -60,6 +54,10 @@ type Ball = {
   gain: number;
 };
 
+function clamp(v: number, lo: number, hi: number): number {
+  return v < lo ? lo : v > hi ? hi : v;
+}
+
 export default function TennisField(props: DisciplineFieldProps): ReactNode {
   const {
     primitive: prim,
@@ -70,9 +68,7 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
     H,
     N,
     geo,
-    layout,
     finalMax,
-    tokenPos: providedTokenPos,
     rt,
     sorted,
     now,
@@ -84,64 +80,50 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
   } = props;
   const trioSet = new Set(highlightIdxs ?? []);
 
-  // Center court geometry from mockup
-  const cx = W / 2;
-  const cy = H / 2;
-  const KX = 1.15; // ellipse X scale
-  const KY = 0.7; // ellipse Y scale (etwas weniger gestaucht → oben/unten weniger Klumpen)
-  // Außenring an der BREITE ausrichten (nicht min(W,H)) — sonst nutzt der Setzköpfe-Fächer
-  // nur ~⅓ der 1180er-Bühne und links/rechts bleibt totes Gras.
-  const R0 = (W / 2) * 0.52; // outer ring (start position)
-  const R1 = R0 * 0.3; // center court radius (proportional zum Außenring)
-  const CCW = 75 * 0.5; // half center court width
-  const CCH = 46 * 0.5; // half center court height
+  // ---- Court-Geometrie (waagerecht) ------------------------------------------------
+  const courtX0 = 70;
+  const courtX1 = W - 70;
+  const courtY0 = 70;
+  const courtY1 = H - 70;
+  const X0 = courtX0 + 80; // Aufschlag-Linie (Start)
+  const X1 = courtX1 - 80; // Championship-Netz (Ziel)
+  const laneTop = courtY0 + 30;
+  const laneBot = courtY1 - 30;
 
-  // Zone boundaries (from mockup ratios)
-  const zB = R1 + (R0 - R1) * 0.36; // Court 1 boundary
-  const zA = R1 + (R0 - R1) * 0.70; // Court 2 boundary
+  // feste Team-Bahn (laneIdx) → y bleibt konstant, Team über die Runden verfolgbar.
+  const laneY = (t: RT): number => (N > 1 ? laneTop + (t.laneIdx / (N - 1)) * (laneBot - laneTop) : (laneTop + laneBot) / 2);
 
-  // ---- tokenPos: Nähe zum Center Court = Punkte (Score → Radius, Rang → Winkel) ----
-  // Außenring (R0) = schwach, Center Court (R1) = stark. Der Radius kommt aus dem SCORE
-  // (kontinuierlich → echter animScore-Glide + sichtbarer Ghost-Zugewinn); der Winkel aus
-  // dem Live-Rang, damit sich die 32 Setzköpfe gleichmäßig um den Court verteilen (kein
-  // Center-Stack). Ellipsen-Skalierung KX/KY wie die gezeichneten Zonenringe.
-  const tokenPos = (t: RT, scoreVal: number): { x: number; y: number } => {
-    const rankIdx = sorted.findIndex((st) => st.idx === t.idx);
-    const rankPos = rankIdx >= 0 ? rankIdx : t.idx;
-    const norm = finalMax > 0 ? Math.max(0, Math.min(1, scoreVal / finalMax)) : 0;
-    const radius = R0 - norm * (R0 - R1);
-    const ang = (rankPos / Math.max(1, N)) * Math.PI * 2 - Math.PI / 2;
-    return { x: cx + Math.cos(ang) * radius * KX, y: cy + Math.sin(ang) * radius * KY };
-  };
+  // ---- tokenPos: x = Punkte (score/finalMax, ABSOLUT über die Runden), y = Bahn ----
+  const normOf = (s: number): number => (finalMax > 0 ? clamp(s / finalMax, 0, 1) : 0);
+  const tokenPos = (t: RT, scoreVal: number): { x: number; y: number } => ({
+    x: X0 + (0.015 + normOf(scoreVal) * 0.985) * (X1 - X0),
+    y: laneY(t),
+  });
 
   // Benchmark-Bewegung + Ghost: Token folgen animScore (Frame-Sync mit Rangliste,
-  // Hover/Pause friert ein). Tennis überschreibt tokenPos lokal (Rang-Spread statt
-  // reiner Score-Radius) — die lokale Variante speist die Glide-Schleife, damit
-  // Ghost + Token derselben Choreografie folgen. Siehe benchmark.tsx.
+  // Hover/Pause friert ein). Lokale waagerechte tokenPos speist die Glide-Schleife.
   const { gRefs, ghostRefs } = useTokenGlide({ ...props, tokenPos });
 
-  // ---- Prop mirrors for rAF loop ----
+  // ---- Prop-Spiegel für die rAF-FX-Schleife ----
   const fxRef = useRef<SVGGElement | null>(null);
-  const pballRef = useRef<SVGCircleElement | null>(null);
-  const cfgRef = useRef<Cfg>({ cx, cy, KX, KY, R0, R1, reduced: reducedMotion, tokenPos });
-  cfgRef.current = { cx, cy, KX, KY, R0, R1, reduced: reducedMotion, tokenPos };
+  const rallyRef = useRef<SVGCircleElement | null>(null);
+  const cfgRef = useRef<Cfg>({ X0, X1, reduced: reducedMotion, tokenPos });
+  cfgRef.current = { X0, X1, reduced: reducedMotion, tokenPos };
   const rtRef = useRef<RT[]>(rt);
   rtRef.current = rt;
-  // Pause/Hover-Freeze für die FX-Schleife — sonst laufen Ballbesitz + fliegende Winner
-  // weiter, während die Token via useTokenGlide eingefroren stehen.
   const hoverRef = useRef<number | null>(hoverIdx);
   hoverRef.current = hoverIdx;
   const pausedRef = useRef<boolean>(props.paused);
   pausedRef.current = props.paused;
 
-  // ---- rAF: Ball possession at leader + flying shots per reveal ----
+  // ---- rAF: Ballwechsel zwischen den Führenden + Ass-Funke pro Reveal ----
   useEffect(() => {
     const prevThrown = new Map<number, number>();
     const prevScore = new Map<number, number>();
     const balls: Ball[] = [];
-    const pball = { x: cx, y: cy, init: false };
     let raf = 0;
     let last = performance.now();
+    let rallyT = 0; // 0..1 Ping-Pong-Phase des Ballwechsels
 
     const mk = <K extends keyof SVGElementTagNameMap>(tag: K): SVGElementTagNameMap[K] =>
       document.createElementNS(NS, tag);
@@ -151,41 +133,37 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
         if (el.parentNode) el.parentNode.removeChild(el);
       });
 
-    // Ace: chalk dust poof + surge
+    // Ass: Funke + Punkt-Label am Netz.
     const ace = (x: number, y: number, gain: number) => {
       const fx = fxRef.current;
       if (!fx) return;
-
-      // Poof cloud
       const poof = mk("circle");
       poof.setAttribute("cx", String(x));
       poof.setAttribute("cy", String(y));
-      poof.setAttribute("r", "12");
-      poof.setAttribute("fill", CHALK);
+      poof.setAttribute("r", "10");
+      poof.setAttribute("fill", "rgba(240,246,241,.6)");
       poof.setAttribute("class", "tfx-poof");
       dropAfter(poof);
       fx.appendChild(poof);
 
-      // Ace label
       const tx = mk("text");
-      tx.setAttribute("x", String(x - 12));
+      tx.setAttribute("x", String(x));
       tx.setAttribute("y", String(y - 16));
       tx.setAttribute("text-anchor", "middle");
       tx.setAttribute("font-family", "ui-monospace, monospace");
       tx.setAttribute("font-weight", "900");
-      tx.setAttribute("font-size", "13");
+      tx.setAttribute("font-size", "12");
       tx.setAttribute("fill", "var(--nl-warn)");
       tx.setAttribute("class", "tfx-pop");
-      tx.textContent = `⚡ ASS${gain > 0 ? " +" + Math.round(gain) : ""}`;
+      tx.textContent = `✦ ASS${gain > 0 ? " +" + Math.round(gain) : ""}`;
       dropAfter(tx);
       fx.appendChild(tx);
     };
 
-    // Net roller: ball droops before court
+    // Netzroller: Ball bleibt im Netz hängen.
     const netRoller = (x: number, y: number) => {
       const fx = fxRef.current;
       if (!fx) return;
-
       const tx = mk("text");
       tx.setAttribute("x", String(x));
       tx.setAttribute("y", String(y - 14));
@@ -200,18 +178,18 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
       fx.appendChild(tx);
     };
 
-    // Fire a shot from a team to center court
+    // Aufschlag: Ball fliegt vom Token WAAGERECHT zum Netz (X1) auf gleicher Bahn.
     const fireShot = (c: Cfg, t: RT, gain: number, isAce: boolean, isNet: boolean) => {
       const fx = fxRef.current;
       if (!fx) return;
-
       const from = c.tokenPos(t, t.animScore);
-      const dist = Math.hypot(from.x - c.cx, from.y - c.cy);
+      const netX = c.X1;
+      const landX = isNet ? netX - 26 : netX;
 
       const el = mk("circle");
       el.setAttribute("r", "4.5");
-      el.setAttribute("fill", "#f0ff7a");
-      el.setAttribute("stroke", "#b8d426");
+      el.setAttribute("fill", BALL_FILL);
+      el.setAttribute("stroke", BALL_STROKE);
       el.setAttribute("stroke-width", "0.8");
       el.setAttribute("class", "tfx-ball");
       el.setAttribute("cx", String(from.x));
@@ -219,16 +197,12 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
       el.setAttribute("opacity", "1");
       fx.appendChild(el);
 
-      const landing = isNet
-        ? { x: c.cx + (c.R1 - 8) * Math.cos(Math.atan2(from.y - c.cy, from.x - c.cx)), y: c.cy + (c.R1 - 8) * Math.sin(Math.atan2(from.y - c.cy, from.x - c.cx)) }
-        : { x: c.cx + (14 + dist * 0.2) * Math.cos(Math.atan2(from.y - c.cy, from.x - c.cx)), y: c.cy + (14 + dist * 0.2) * Math.sin(Math.atan2(from.y - c.cy, from.x - c.cx)) };
-
       balls.push({
         el,
         startX: from.x,
         startY: from.y,
-        endX: landing.x,
-        endY: landing.y,
+        endX: landX,
+        endY: from.y,
         t: 0,
         dur: 520,
         isAce,
@@ -244,68 +218,61 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
       const list = rtRef.current;
       const frozen = hoverRef.current != null || pausedRef.current;
 
-      // Reveal detection: when a token reveals a new slot, fire ONE shot.
-      // Bei Pause/Hover: prev-Maps NICHT fortschreiben → beim Entfrieren feuert der Reveal.
+      // Reveal-Erkennung: neuer Slot → EIN Aufschlag.
       if (!frozen) for (const t of list) {
         const hadT = prevThrown.has(t.idx);
         const pT = prevThrown.get(t.idx) ?? t.thrownSlot;
         const pS = prevScore.get(t.idx) ?? t.score;
         if (hadT && t.thrownSlot > pT && t.thrownSlot >= 0 && !c.reduced) {
-          // Determine if this is an ace (random but consistent per team/round)
-          // Math.abs: (x % 1) behält das Vorzeichen → ~50% negativ, dann war isAce IMMER wahr
-          // (real ~65% Ass statt 30%). Betrag → korrekte Wahrscheinlichkeiten.
           const hashVal = Math.abs((Math.sin(t.idx * 12.9898 + t.thrownSlot * 78.233) * 43758.5453) % 1);
-          const isAce = hashVal < 0.3; // 30% chance
-          const isNet = !isAce && hashVal < 0.55; // 25% chance (net roller)
+          const isAce = hashVal < 0.3; // 30%
+          const isNet = !isAce && hashVal < 0.55; // 25%
           fireShot(c, t, t.score - pS, isAce, isNet);
         }
         prevThrown.set(t.idx, t.thrownSlot);
         prevScore.set(t.idx, t.score);
       }
 
-      // Ball possession: gleich zum Führenden
-      let leader: RT | null = null;
-      for (const t of list) if (t.rank === 1 && t.thrownSlot >= 0) leader = t;
-      const pb = pballRef.current;
-      if (pb) {
-        if (leader && !c.reduced && !frozen) {
-          const lp = c.tokenPos(leader, leader.animScore);
-          const tx = lp.x + (c.cx - lp.x) * 0.18;
-          const ty = lp.y + (c.cy - lp.y) * 0.18;
-          if (!pball.init) {
-            pball.x = tx;
-            pball.y = ty;
-            pball.init = true;
-          } else {
-            pball.x += (tx - pball.x) * 0.12;
-            pball.y += (ty - pball.y) * 0.12;
-          }
-          pb.setAttribute("cx", String(pball.x));
-          pb.setAttribute("cy", String(pball.y));
-          pb.setAttribute("opacity", "1");
+      // Ballwechsel: Ping-Pong zwischen Führer (#1) und Verfolger (#2), beide rechts.
+      let lead: RT | null = null;
+      let second: RT | null = null;
+      for (const t of list) {
+        if (t.thrownSlot < 0) continue;
+        if (t.rank === 1) lead = t;
+        else if (t.rank === 2) second = t;
+      }
+      const rb = rallyRef.current;
+      if (rb) {
+        if (lead && second && !c.reduced && !frozen) {
+          rallyT += dt / 1100;
+          if (rallyT > 1) rallyT -= 1;
+          const ph = 0.5 - 0.5 * Math.cos(rallyT * Math.PI * 2); // 0..1..0
+          const a = c.tokenPos(lead, lead.animScore);
+          const b = c.tokenPos(second, second.animScore);
+          const bx = a.x + (b.x - a.x) * ph;
+          const by = a.y + (b.y - a.y) * ph - Math.sin(ph * Math.PI) * 14; // Bogen
+          rb.setAttribute("cx", String(bx));
+          rb.setAttribute("cy", String(by));
+          rb.setAttribute("opacity", "1");
         } else {
-          pb.setAttribute("opacity", "0");
-          pball.init = false;
+          rb.setAttribute("opacity", "0");
         }
       }
 
-      // Shot arcs (linear for simplicity) + landing FX. Bei Pause/Hover in der Luft einfrieren.
+      // Flugbälle (waagerecht) + Landung-FX. Bei Pause/Hover einfrieren.
       for (let j = balls.length - 1; j >= 0; j -= 1) {
         const b = balls[j]!;
         if (!frozen) b.t += dt / b.dur;
         if (b.t >= 1) {
           balls.splice(j, 1);
           if (b.el.parentNode) b.el.parentNode.removeChild(b.el);
-          if (b.isNet) {
-            netRoller(b.endX, b.endY);
-          } else if (b.isAce) {
-            ace(b.endX, b.endY, b.gain);
-          }
+          if (b.isNet) netRoller(b.endX, b.endY);
+          else if (b.isAce) ace(b.endX, b.endY, b.gain);
           continue;
         }
         const u = b.t;
         const bx = (1 - u) * b.startX + u * b.endX;
-        const by = (1 - u) * b.startY + u * b.endY;
+        const by = (1 - u) * b.startY + u * b.endY - Math.sin(u * Math.PI) * 10; // Flugbogen
         b.el.setAttribute("cx", String(bx));
         b.el.setAttribute("cy", String(by));
       }
@@ -320,6 +287,9 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Mähstreifen (vertikale Bänder) für den Rasen-Look.
+  const stripeW = (courtX1 - courtX0) / 8;
+
   return (
     <>
       <defs>
@@ -329,7 +299,7 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
           .tfx-pop{transform-box:fill-box;transform-origin:center;animation:tfxPop 1.4s ease-out forwards;}
           @keyframes tfxPoof{0%{opacity:0;transform:scale(.4)}25%{opacity:.95}100%{opacity:0;transform:scale(2)}}
           @keyframes tfxBall{0%{opacity:1}100%{opacity:.6}}
-          @keyframes tfxPop{0%{opacity:0;transform:translateY(0)}18%{opacity:1;transform:translateY(-16px)}100%{opacity:0;transform:translateY(-46px)}}
+          @keyframes tfxPop{0%{opacity:0;transform:translateY(0)}18%{opacity:1;transform:translateY(-14px)}100%{opacity:0;transform:translateY(-40px)}}
         `}</style>
         {rt.map((t) =>
           t.logoUrl ? (
@@ -342,81 +312,55 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
           <stop offset="0" stopColor={GRASS_A} />
           <stop offset="1" stopColor={GRASS_B} />
         </linearGradient>
-        <linearGradient id="tCourt" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={COURT_FILL} />
-          <stop offset="1" stopColor="#2c619b" />
-        </linearGradient>
-        <radialGradient id="tFlood" cx="50%" cy="42%" r="120%">
-          <stop offset="0%" stopColor={GLOW} />
-          <stop offset="100%" stopColor="rgba(255,255,255,.05)" />
+        <radialGradient id="tFlood" cx="70%" cy="26%" r="80%">
+          <stop offset="0" stopColor="rgba(201,230,74,.10)" />
+          <stop offset="1" stopColor="rgba(201,230,74,0)" />
         </radialGradient>
       </defs>
 
-      {/* Terrain (grass with elliptical zones) */}
-      <rect x={16} y={24} width={W - 32} height={H - 48} rx={16} fill={GRASS_A} stroke={GRASS_PERIMETER} strokeWidth={2} />
+      {/* Stage-Hintergrund */}
+      <rect x={0} y={0} width={W} height={H} fill={COURT_BG} />
 
-      {/* Concentric zone ellipses (outer to inner) */}
-      <ellipse cx={cx} cy={cy} rx={R0 * KX} ry={R0 * KY} fill={GRASS_A} strokeWidth={0} />
-      <ellipse cx={cx} cy={cy} rx={zA * KX} ry={zA * KY} fill={GRASS_B} strokeWidth={0} />
-      <ellipse cx={cx} cy={cy} rx={zB * KX} ry={zB * KY} fill={GRASS_C} strokeWidth={0} />
-      <ellipse cx={cx} cy={cy} rx={R1 * KX} ry={R1 * KY} fill={GRASS_D} strokeWidth={0} />
+      {/* Rasen-Court */}
+      <rect x={courtX0} y={courtY0} width={courtX1 - courtX0} height={courtY1 - courtY0} rx={6} fill="url(#tGrass)" stroke={GRASS_PERIMETER} strokeWidth={2} />
+      {/* Mähstreifen */}
+      <g fill="rgba(255,255,255,.03)">
+        {[0, 2, 4, 6].map((i) => (
+          <rect key={`stripe-${i}`} x={courtX0 + i * stripeW} y={courtY0} width={stripeW} height={courtY1 - courtY0} />
+        ))}
+      </g>
+      {/* Flutlicht-Schimmer */}
+      <rect x={courtX0} y={courtY0} width={courtX1 - courtX0} height={courtY1 - courtY0} fill="url(#tFlood)" />
 
-      {/* Zone boundary strokes */}
-      <ellipse cx={cx} cy={cy} rx={R0 * KX} ry={R0 * KY} fill="none" stroke={ZONE_DASH} strokeWidth={1.5} strokeDasharray="4 8" />
-      <ellipse cx={cx} cy={cy} rx={zA * KX} ry={zA * KY} fill="none" stroke={ZONE_DASH} strokeWidth={1.5} strokeDasharray="4 8" />
-      <ellipse cx={cx} cy={cy} rx={zB * KX} ry={zB * KY} fill="none" stroke={ZONE_DASH} strokeWidth={1.5} strokeDasharray="4 8" />
-      <ellipse cx={cx} cy={cy} rx={R1 * KX} ry={R1 * KY} fill="none" stroke={ZONE_LINE_GOLDEN} strokeWidth={1.5} strokeDasharray="5 6" />
+      {/* Court-Linien (Doppel-Außenlinie + Aufschlag-Korridore oben/unten) */}
+      <g stroke={LINES} strokeWidth={2} fill="none" opacity={0.85}>
+        <rect x={courtX0 + 26} y={courtY0 + 22} width={courtX1 - courtX0 - 52} height={courtY1 - courtY0 - 44} />
+        <line x1={courtX0 + 26} y1={laneTop + (laneBot - laneTop) * 0.2} x2={courtX1 - 26} y2={laneTop + (laneBot - laneTop) * 0.2} />
+        <line x1={courtX0 + 26} y1={laneTop + (laneBot - laneTop) * 0.8} x2={courtX1 - 26} y2={laneTop + (laneBot - laneTop) * 0.8} />
+      </g>
 
-      {/* Zone labels */}
-      <text x={cx - (R0 + zA) / 2 * KX} y={cy + 3} textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize={7.5} fontWeight={800} letterSpacing={1} fill="rgba(242,246,242,.42)">
-        AUSSEN
-      </text>
-      <text x={cx - (zA + zB) / 2 * KX} y={cy + 3} textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize={7.5} fontWeight={800} letterSpacing={1} fill="rgba(242,246,242,.42)">
-        COURT 2
-      </text>
-      <text x={cx - (zB + R1) / 2 * KX} y={cy + 3} textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize={7.5} fontWeight={800} letterSpacing={1} fill="rgba(242,246,242,.42)">
-        COURT 1
-      </text>
-
-      {/* Floodlight glow over center court */}
-      <ellipse cx={cx} cy={cy} rx={150} ry={96} fill={GLOW} />
-      <ellipse cx={cx} cy={cy - 6} rx={108} ry={66} fill="rgba(255,255,255,.05)" />
-
-      {/* Center Court (mini tennis court with net, service boxes, baseline) */}
-      <rect x={cx - CCW} y={cy - CCH} width={CCW * 2} height={CCH * 2} fill="url(#tCourt)" stroke={COURT_STROKE} strokeWidth={2} />
-
-      {/* Baseline (top and bottom) */}
-      <line x1={cx - CCW} x2={cx + CCW} y1={cy - 33} y2={cy - 33} stroke={LINES} strokeWidth={1.2} opacity={0.85} />
-      <line x1={cx - CCW} x2={cx + CCW} y1={cy + 33} y2={cy + 33} stroke={LINES} strokeWidth={1.2} opacity={0.85} />
-
-      {/* Service lines (vertical dividers) */}
-      <line x1={cx - 30} x2={cx - 30} y1={cy - 33} y2={cy + 33} stroke={LINES} strokeWidth={1.2} opacity={0.85} />
-      <line x1={cx + 30} x2={cx + 30} y1={cy - 33} y2={cy + 33} stroke={LINES} strokeWidth={1.2} opacity={0.85} />
-
-      {/* Net (center line and net post markers) */}
-      <line x1={cx - 30} x2={cx + 30} y1={cy} y2={cy} stroke={LINES} strokeWidth={1.1} opacity={0.85} />
-      <rect x={cx - 1.5} y={cy - CCH - 6} width={3} height={CCH * 2 + 12} fill="rgba(235,240,244,.8)" />
-
-      {/* Net posts */}
-      <circle cx={cx} cy={cy - CCH - 8} r={2.6} fill="#c6ced4" stroke="#5a6a60" strokeWidth={1} />
-      <circle cx={cx} cy={cy + CCH + 8} r={2.6} fill="#c6ced4" stroke="#5a6a60" strokeWidth={1} />
-
-      {/* Floodlight poles at court corners (glow orbs) */}
-      {[[cx - 96, cy - 60], [cx + 96, cy - 60], [cx - 96, cy + 60], [cx + 96, cy + 60]].map((p, i) => (
-        <g key={`pole-${i}`}>
-          <circle cx={p[0]} cy={p[1]} r={8} fill={FLOODLIGHT} />
-          <circle cx={p[0]} cy={p[1]} r={2.6} fill="#f6e9a0" stroke="#5a6a60" strokeWidth={1} />
-        </g>
-      ))}
-
-      {/* Center court caption */}
-      <text x={cx} y={cy + CCH + 26} textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize={9} fontWeight={800} letterSpacing={3} fill="rgba(246,199,80,.8)">
-        CENTER COURT · FINALE
+      {/* Aufschlag-Linie (links, Start) */}
+      <line x1={X0} y1={courtY0 + 10} x2={X0} y2={courtY1 - 10} stroke="rgba(138,160,176,.9)" strokeWidth={2} strokeDasharray="4 6" />
+      <text x={X0} y={courtY1 + 18} textAnchor="middle" fontSize={10} fontWeight={800} letterSpacing={1} fill="rgba(122,154,134,.95)" fontFamily="Georgia, serif">
+        AUFSCHLAG · START
       </text>
 
-      {/* Tournament title watermark */}
-      <text x={cx} y={24 + 27} textAnchor="middle" fontFamily="Georgia, serif" fontStyle="italic" fontWeight={800} fontSize={15} letterSpacing={5} fill="#d9ead9" opacity={0.35}>
-        OLY OPEN · TURNIER-ANLAGE · NIGHT SESSION
+      {/* Championship-Netz (rechts, Ziel) */}
+      <rect x={X1} y={courtY0 + 6} width={4} height={courtY1 - courtY0 - 12} fill={NET_WHITE} />
+      <circle cx={X1 + 2} cy={courtY0 + 4} r={5} fill={POST_FILL} stroke={POST_STROKE} strokeWidth={1} />
+      <circle cx={X1 + 2} cy={courtY1 - 4} r={5} fill={POST_FILL} stroke={POST_STROKE} strokeWidth={1} />
+      <text x={X1 + 26} y={(courtY0 + courtY1) / 2} textAnchor="middle" fontSize={12} fontWeight={900} letterSpacing={3} fill="rgba(246,199,80,.9)" transform={`rotate(-90 ${X1 + 26} ${(courtY0 + courtY1) / 2})`}>
+        CHAMPIONSHIP ▸
+      </text>
+      {/* Schiedsrichter-Stuhl */}
+      <g transform={`translate(${courtX1 - 22} ${(courtY0 + courtY1) / 2 - 16})`}>
+        <rect x={-7} y={0} width={14} height={30} rx={2} fill="#3a4a3e" />
+        <rect x={-10} y={-9} width={20} height={11} rx={2} fill="#54636a" />
+      </g>
+
+      {/* Turnier-Titel */}
+      <text x={(courtX0 + courtX1) / 2} y={courtY0 - 8} textAnchor="middle" fontFamily="Georgia, serif" fontStyle="italic" fontWeight={800} fontSize={13} letterSpacing={4} fill="#d9ead9" opacity={0.4}>
+        OLY OPEN · CENTER COURT · NIGHT SESSION
       </text>
 
       {/* Feld-Wasserzeichen */}
@@ -429,8 +373,8 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
       {/* Ghost der Vorrunde (Benchmark) — VOR den Wappen. */}
       <GhostLayer sorted={sorted} geo={geo} ghostRefs={ghostRefs} />
 
-      {/* Team wappens positioned by score (elliptical via tokenPos).
-          Reversed sort so leader is on top (z-index like host). Position via rAF. */}
+      {/* Team-Wappen: x = Punkte (rAF/animScore), y = feste Bahn. Rückwärts, damit der
+          Führende oben liegt (wie der Host). */}
       {sorted
         .slice()
         .reverse()
@@ -438,6 +382,7 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
           const r = t.isOwn ? geo.rOwn : geo.r;
           const glowing = t.glowUntil > now;
           const isSeed = t.rank <= 8 ? t.rank : 0;
+          const seedMark = "①②③④⑤⑥⑦⑧"[isSeed - 1] ?? "";
 
           return (
             <g
@@ -452,33 +397,33 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
               }}
             >
               {glowing ? <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={4} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.1s ease-in-out infinite" }} /> : null}
-              {/* Führung — dauerhaft golden umrandet (Spieler am Center Court) */}
+              {/* Führung — dauerhaft golden umrandet (am Netz). */}
               {t.rank === 1 && t.thrownSlot >= 0 ? (
-                <circle r={r + 11} fill="none" stroke="var(--nl-warn)" strokeWidth={2.5} opacity={0.5} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.6s ease-in-out infinite" }} />
+                <circle r={r + 7} fill="none" stroke="var(--nl-warn)" strokeWidth={2.4} opacity={0.6} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.6s ease-in-out infinite" }} />
               ) : null}
               {/* Benchmark-Chrome: Trio/Anker/Relation/Medaille/Logo/Team-Rahmen/Rang-Badge.
                   trophy={false} — Tennis trägt seine eigene Champion-Krone. */}
               <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} trophy={false} />
-              {/* Champion crown */}
+              {/* Champion-Krone */}
               {t.rank === 1 && t.thrownSlot >= 0 ? (
                 <text y={-(r + 9)} textAnchor="middle" fontSize={14}>
                   🏆
                 </text>
               ) : null}
-              {/* Seeding number (golden, Setzköpfe 1-8) */}
-              {isSeed > 0 ? (
-                <text y={-(r + 5)} textAnchor="middle" fontSize={7} fontWeight={900} fill="var(--nl-warn)" letterSpacing="0.08em">
-                  {isSeed}
+              {/* Setzkopf-Nummer (Top-8, golden) */}
+              {isSeed > 0 && t.rank !== 1 ? (
+                <text y={-(r + 5)} textAnchor="middle" fontSize={9} fontWeight={900} fill="var(--nl-warn)">
+                  {seedMark}
                 </text>
               ) : null}
             </g>
           );
         })}
 
-      {/* Ball possession marker (tennis ball, gleicht zum Führenden) */}
-      <circle ref={pballRef} r={4.5} fill="#f0ff7a" stroke="#b8d426" strokeWidth={0.8} opacity={0} className="tfx-ball" cx={cx} cy={cy} />
+      {/* Ballwechsel-Ball (zwischen Führer und Verfolger) */}
+      <circle ref={rallyRef} r={4.5} fill={BALL_FILL} stroke={BALL_STROKE} strokeWidth={0.8} opacity={0} className="tfx-ball" cx={X1} cy={(courtY0 + courtY1) / 2} />
 
-      {/* Shot FX layer (balls, chalk dust, labels) — imperatively filled */}
+      {/* Shot-FX-Schicht (Aufschläge, Ass-Funken) — imperativ befüllt */}
       <g ref={fxRef} />
     </>
   );
