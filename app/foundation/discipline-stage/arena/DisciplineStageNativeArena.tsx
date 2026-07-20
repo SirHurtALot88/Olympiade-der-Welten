@@ -2158,6 +2158,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     motif,
     env,
     reducedMotion: reduced.current,
+    paused, // Leertaste-Pause → rAF-Felder frieren ein
     W,
     H,
     N,

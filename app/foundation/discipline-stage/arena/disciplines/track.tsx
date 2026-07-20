@@ -54,6 +54,8 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
   // Frische Prop-Spiegel für die rAF-Schleife (ohne Neustart).
   const hoverRef = useRef<number | null>(hoverIdx);
   hoverRef.current = hoverIdx;
+  const pausedRef = useRef<boolean>(props.paused);
+  pausedRef.current = props.paused;
   const reducedRef = useRef<boolean>(reducedMotion);
   reducedRef.current = reducedMotion;
   const rtRef = useRef<RT[]>(rt);
@@ -117,7 +119,7 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
       last = ts;
       if (PER > 0) {
         syncTargets(PER);
-        const frozen = hoverRef.current != null;
+        const frozen = hoverRef.current != null || pausedRef.current;
         const reduce = reducedRef.current;
         const g = glideRef.current;
         for (const t of rtRef.current) {

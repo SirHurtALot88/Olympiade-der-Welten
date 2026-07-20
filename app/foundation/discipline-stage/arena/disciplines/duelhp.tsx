@@ -84,6 +84,8 @@ export default function DuelhpField(props: DisciplineFieldProps): ReactNode {
   // Frische Prop-Spiegel für die rAF-Schleife / FX-Effekte.
   const hoverRef = useRef<number | null>(hoverIdx);
   hoverRef.current = hoverIdx;
+  const pausedRef = useRef<boolean>(props.paused);
+  pausedRef.current = props.paused;
   const reducedRef = useRef(reducedMotion);
   reducedRef.current = reducedMotion;
   const rtRef = useRef<RT[]>(rt);
@@ -251,7 +253,7 @@ export default function DuelhpField(props: DisciplineFieldProps): ReactNode {
     const tick = (ts: number): void => {
       const dt = Math.min(48, ts - lastTs);
       lastTs = ts;
-      const frozen = hoverRef.current != null;
+      const frozen = hoverRef.current != null || pausedRef.current;
       const nodes = Array.from(nodesRef.current.values());
 
       // Führenden-Größe live nachführen.

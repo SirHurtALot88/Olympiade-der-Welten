@@ -44,6 +44,8 @@ export default function TakeshiField(props: DisciplineFieldProps): ReactNode {
   const gRefs = useRef<Map<number, SVGGElement | null>>(new Map());
   const hoverRef = useRef<number | null>(hoverIdx);
   hoverRef.current = hoverIdx;
+  const pausedRef = useRef<boolean>(props.paused);
+  pausedRef.current = props.paused;
   const reducedRef = useRef<boolean>(reducedMotion);
   reducedRef.current = reducedMotion;
   const rtRef = useRef<RT[]>(rt);
@@ -144,7 +146,7 @@ export default function TakeshiField(props: DisciplineFieldProps): ReactNode {
       const dt = Math.min(64, ts - last);
       last = ts;
       syncTargets();
-      const frozen = hoverRef.current != null;
+      const frozen = hoverRef.current != null || pausedRef.current;
       const reduce = reducedRef.current;
       const g = glideRef.current;
       for (const t of rtRef.current) {

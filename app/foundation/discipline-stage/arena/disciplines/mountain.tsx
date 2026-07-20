@@ -50,6 +50,8 @@ export default function ClimbingField(props: DisciplineFieldProps): ReactNode {
   const sortedRef = useRef<RT[]>(sorted);
 
   hoverRef.current = props.hoverIdx;
+  const pausedRef = useRef<boolean>(props.paused);
+  pausedRef.current = props.paused;
   reducedRef.current = reducedMotion;
   rtRef.current = rt;
   sortedRef.current = sorted;
@@ -90,7 +92,7 @@ export default function ClimbingField(props: DisciplineFieldProps): ReactNode {
       const dt = Math.min(64, ts - last);
       last = ts;
 
-      const frozen = hoverRef.current != null;
+      const frozen = hoverRef.current != null || pausedRef.current;
       const reduce = reducedRef.current;
       const c = climbRef.current;
 

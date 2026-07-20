@@ -56,6 +56,7 @@ export type DisciplineFieldProps = {
   motif?: StageMotif; // dezentes Hintergrund-Motiv (wenn kein env)
   env?: StageEnv; // atmosphärische Umgebung (Stadion o.ä.)
   reducedMotion: boolean; // prefers-reduced-motion → keine Animation
+  paused: boolean; // Leertaste-Pause (manuell) — rAF-getriebene Felder frieren die Bewegung ein
 
   // ---- Viewport / Geometrie ---------------------------------------------------------
   W: number; // viewBox-Breite

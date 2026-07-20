@@ -74,6 +74,8 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
   // Frische Prop-Spiegel für rAF
   const hoverRef = useRef<number | null>(hoverIdx);
   hoverRef.current = hoverIdx;
+  const pausedRef = useRef<boolean>(props.paused);
+  pausedRef.current = props.paused;
   const reducedRef = useRef<boolean>(reducedMotion);
   reducedRef.current = reducedMotion;
   const rtRef = useRef<typeof rt>(rt);
@@ -123,7 +125,7 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
       const dt = Math.min(64, ts - last);
       last = ts;
 
-      const frozen = hoverRef.current != null;
+      const frozen = hoverRef.current != null || pausedRef.current;
       const reduce = reducedRef.current;
       const g = glideRef.current;
 

@@ -95,6 +95,8 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
   tokenPosRef.current = tokenPos;
   const hoverRef = useRef<number | null>(hoverIdx);
   hoverRef.current = hoverIdx;
+  const pausedRef = useRef<boolean>(props.paused);
+  pausedRef.current = props.paused;
   const reducedRef = useRef<boolean>(reducedMotion);
   reducedRef.current = reducedMotion;
 
@@ -251,7 +253,7 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
       const rtl = rtRef.current;
       const tp = tokenPosRef.current;
       const reduce = reducedRef.current;
-      const frozen = hoverRef.current != null;
+      const frozen = hoverRef.current != null || pausedRef.current;
 
       // 1) Ziele einlesen (x = Score-Position via host.tokenPos); Glide bei Änderung neu starten.
       const arr: GP[] = [];

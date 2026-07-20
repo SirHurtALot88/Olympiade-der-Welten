@@ -64,6 +64,8 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
   const barbellYRef = useRef<(kg: number) => number>(barbellY);
 
   hoverRef.current = props.hoverIdx;
+  const pausedRef = useRef<boolean>(props.paused);
+  pausedRef.current = props.paused;
   reducedRef.current = reducedMotion;
   rtRef.current = rt;
   barbellSortedRef.current = barbellSorted;
@@ -90,7 +92,7 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
       const dt = Math.min(64, ts - last);
       last = ts;
 
-      const frozen = hoverRef.current != null;
+      const frozen = hoverRef.current != null || pausedRef.current;
       const reduce = reducedRef.current;
       const c = barbellRef.current;
 
