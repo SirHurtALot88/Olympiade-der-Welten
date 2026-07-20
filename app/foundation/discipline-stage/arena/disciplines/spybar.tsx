@@ -86,8 +86,13 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
   // Zielposition X für einen Score
   const xOfScore = (score: number): number => {
     const fm = finalMaxRef.current;
-    if (fm <= 0) return X_START;
-    const norm = Math.min(1, score / fm);
+    // Non-finiter Score (z.B. displayScore vor dem ersten Reveal = undefined)
+    // MUSS abgefangen werden — sonst propagiert NaN durch die Glide-State und
+    // erzeugt `translate(NaN …)` / `<line> x2: NaN` in jedem Frame.
+    // fm (finalMax) MUSS ebenfalls finit geprüft werden: bei fm = NaN wäre
+    // `fm <= 0` false → score/NaN = NaN würde durchrutschen (Mock ohne finalMax).
+    if (!Number.isFinite(score) || !Number.isFinite(fm) || fm <= 0) return X_START;
+    const norm = Math.min(1, Math.max(0, score / fm));
     return X_START + (X_END - X_START) * norm;
   };
 
@@ -146,19 +151,23 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
           // Eased Lerp (pow für leichte Beschleunigung)
           const ease = Math.pow(st.glideT, 1.2);
           st.fromX = st.fromX + (st.toX - st.fromX) * ease;
+          // Harte Absicherung: sollte fromX/toX je non-finit werden (z.B. Mock ohne
+          // finalMax), NICHT NaN in die DOM-Attribute schreiben — sonst spamt jeder
+          // Frame „transform: translate(NaN …)" / „<line> x2: NaN".
+          if (!Number.isFinite(st.fromX)) st.fromX = X_START;
 
           const el = tokenGRefs.current.get(t.idx);
           const beam = beamGRefs.current.get(t.idx);
-          if (el) {
-            const y = yOfLane(t.idx);
+          const y = yOfLane(t.idx);
+          if (el && Number.isFinite(st.fromX) && Number.isFinite(y)) {
             el.setAttribute("transform", `translate(${st.fromX} ${y})`);
           }
-          if (beam) {
+          if (beam && Number.isFinite(st.fromX) && Number.isFinite(y)) {
             const beamWidth = Math.max(0, st.fromX - X_START);
             beam.setAttribute("x1", `${X_START}`);
-            beam.setAttribute("y1", `${yOfLane(t.idx)}`);
+            beam.setAttribute("y1", `${y}`);
             beam.setAttribute("x2", `${X_START + beamWidth}`);
-            beam.setAttribute("y2", `${yOfLane(t.idx)}`);
+            beam.setAttribute("y2", `${y}`);
           }
         }
       }

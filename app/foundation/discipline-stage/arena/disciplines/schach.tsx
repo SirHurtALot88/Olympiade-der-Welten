@@ -159,7 +159,9 @@ export default function SchachField(props: DisciplineFieldProps): ReactNode {
             const h = Math.min(q, Y0 - y);
             squares.push(
               <rect
-                key={`checker-${rx}-${ry}`}
+                // Key über den Akkumulator-Index (garantiert eindeutig) — die
+                // gefloorten rx/ry kollidierten (doppelte React-Keys „checker-1-1").
+                key={`checker-${squares.length}`}
                 x={x}
                 y={y}
                 width={w}
