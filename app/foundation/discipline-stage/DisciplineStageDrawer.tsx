@@ -627,6 +627,7 @@ function LineupRow({
 function DisciplinePortraitCard({
   gameState,
   playerId,
+  disciplineId,
   row,
   seasonPps,
   unavailable,
@@ -634,6 +635,7 @@ function DisciplinePortraitCard({
 }: {
   gameState: GameState;
   playerId: string;
+  disciplineId: string;
   row?: PlayerRatingContractRow | null;
   seasonPps?: number | null;
   unavailable?: boolean;
@@ -643,6 +645,10 @@ function DisciplinePortraitCard({
   if (!player) return null;
   const portraitUrl = getPlayerPortraitBrowserUrl(player.id, player.portraitUrl ?? null, player.portraitPath ?? null);
   const clickable = Boolean(onSelectPlayer);
+  // Wert der AKTUELLEN Disziplin (z.B. Staffel) — unten auf der Karte, damit die
+  // Spieler direkt an ihrer Diszi-Stärke ablesbar sind, nicht nur an OVR.
+  const discValue = player.currentDisciplineValues?.[disciplineId] ?? player.disciplineRatings?.[disciplineId] ?? null;
+  const discLabel = disciplineName(gameState, disciplineId);
   return (
     <FoundationPlayerPortraitCard
       playerId={player.id}
@@ -670,6 +676,14 @@ function DisciplinePortraitCard({
       onOpen={clickable ? () => onSelectPlayer!(player.id) : undefined}
       title={clickable ? "Spieler-Karte anzeigen" : undefined}
       style={{ opacity: unavailable ? 0.62 : 1 }}
+      footerSlot={
+        discValue != null ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, fontSize: 11, fontVariantNumeric: "tabular-nums" }}>
+            <span style={{ color: "var(--nl-mut)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{discLabel}</span>
+            <span style={{ color: "var(--accent, var(--nl-accent))", fontWeight: 800, flex: "none" }}>{fmt1(discValue)}</span>
+          </div>
+        ) : null
+      }
     />
   );
 }
@@ -854,6 +868,7 @@ function TeamBody({
                     key={`${e.disciplineSide}-${e.slotIndex}-${pid}`}
                     gameState={gameState}
                     playerId={pid}
+                    disciplineId={disciplineId}
                     row={ratingById.get(pid) ?? null}
                     seasonPps={seasonPpsById.get(pid) ?? null}
                     unavailable={isUnavailable(pid)}
@@ -869,6 +884,7 @@ function TeamBody({
                 key={pid}
                 gameState={gameState}
                 playerId={pid}
+                disciplineId={disciplineId}
                 row={ratingById.get(pid) ?? null}
                 seasonPps={seasonPpsById.get(pid) ?? null}
                 unavailable={isUnavailable(pid)}
