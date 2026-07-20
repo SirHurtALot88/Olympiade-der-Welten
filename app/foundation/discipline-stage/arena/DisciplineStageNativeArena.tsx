@@ -1050,6 +1050,10 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const [busy, setBusy] = useState(false);
   const [ended, setEnded] = useState(false);
   const [paused, setPaused] = useState(false);
+  // Start-Gate: die Disziplin läuft NICHT von allein los — erst der erste ▶-Etappe-Klick
+  // (oder Quick-Sim) startet sie; danach läuft sie automatisch durch (bis Pause/Ende).
+  // Bei Remount (Disziplin/Modus/Seed → neuer key) ist started wieder false → wartet.
+  const [started, setStarted] = useState(false);
   const [spotlight, setSpotlight] = useState<Spot>(null);
   const [flash, setFlash] = useState<{ color: string; id: number } | null>(null);
   const [shake, setShake] = useState<"none" | "hard" | "soft">("none");
@@ -2207,14 +2211,15 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   // Pausiert man (Leertaste), stoppt es; Hover friert die laufende Etappe ein. Der
   // ▶-Button bleibt für manuelles Weiterklicken erhalten (busyRef schützt vor Doppel).
   useEffect(() => {
-    if (done || busy || paused) return;
-    const first = round === 0 && (prim !== "barbell" || demandKg == null);
+    // Start-Gate: NICHT von allein loslaufen — erst nach dem ersten ▶-Klick (started).
+    // Danach automatisch Etappe für Etappe weiter, bis Pause/Ende.
+    if (!started || done || busy || paused) return;
     // Kurzer Puffer nach dem Abschluss der (bereits ~10 s langen, simultan gleitenden)
     // Etappe, dann startet die nächste zügig.
-    const delay = reduced.current ? 0 : first ? 700 : 600;
+    const delay = reduced.current ? 0 : 600;
     const id = window.setTimeout(() => advance(), delay);
     return () => window.clearTimeout(id);
-  }, [prim, round, busy, done, demandKg, advance, paused]);
+  }, [prim, round, busy, done, demandKg, advance, paused, started]);
 
   const quickSim = useCallback(() => {
     if (busyRef.current) return; // Busy-Guard: keine Doppel-Auslösung während einer Cascade.
@@ -2314,16 +2319,13 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const leader = sorted[0] ?? null;
   const now = Date.now();
 
-  // Entstauch-Normierungsbasis: der aktuell Führende (displayScore = Runden-Ziel) plus
-  // etwas Headroom. Wird an tokenPos (posMaxRef) UND als `finalMax`-Prop an die Felder
-  // gegeben → jedes Feld fächert das Team-Feld über den ganzen Platz auf, in jeder Runde.
-  // Fällt auf den echten finalMax zurück, falls noch nichts aufgedeckt wurde (Start).
-  let posLeader = 0;
-  for (const t of rtRef.current) {
-    const d = t.displayScore > 0 ? t.displayScore : t.score;
-    if (d > posLeader) posLeader = d;
-  }
-  const posMax = Math.max(1, posLeader > 0 ? posLeader * 1.06 : finalMax);
+  // Normierungsbasis = FESTER Endwert des besten Teams (finalMax) → dieser höchste Wert
+  // bildet die ZIEL-Linie für ALLE Disziplinen. Die Skala steht damit die ganze Disziplin
+  // über still (kein Verschieben je Runde), die Token bewegen sich nur VORWÄRTS Richtung
+  // Ziel, und der Führende landet am Ende exakt auf der Linie. (Früher gegen den Live-
+  // Führenden normiert — das entstauchte zwar, ließ aber Skala + Feld bei jedem Runden-
+  // wechsel neu springen, was als „Zurückrutschen" wahrgenommen wurde.)
+  const posMax = finalMax;
   posMaxRef.current = posMax;
 
   // Live-Rang aus animScore (geteilter 5s-Zeitstrahl) → die Rangliste ändert sich langsam
@@ -2557,8 +2559,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       <div style={{ flex: "1 1 620px", minWidth: 0 }}>
         {/* Controls */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
-          <button type="button" onClick={advance} disabled={done || busy} style={{ padding: "9px 18px", fontWeight: 800, fontSize: 13, border: 0, borderRadius: 10, cursor: done || busy ? "default" : "pointer", color: "var(--nl-ink)", background: done ? "var(--nl-line)" : "var(--nl-accent)", opacity: busy && !done ? 0.7 : 1 }}>
-            {done ? "✔ Disziplin gewertet" : `▶ Etappe ${round + 1} / ${slotCount} — ${slots[round] ?? ""}`}
+          <button type="button" onClick={() => { setStarted(true); advance(); }} disabled={done || busy} style={{ padding: "9px 18px", fontWeight: 800, fontSize: 13, border: 0, borderRadius: 10, cursor: done || busy ? "default" : "pointer", color: "var(--nl-ink)", background: done ? "var(--nl-line)" : "var(--nl-accent)", opacity: busy && !done ? 0.7 : 1 }}>
+            {done ? "✔ Disziplin gewertet" : !started ? `▶ Start · Etappe 1 / ${slotCount}` : `▶ Etappe ${round + 1} / ${slotCount} — ${slots[round] ?? ""}`}
           </button>
           <button type="button" onClick={quickSim} style={{ padding: "9px 14px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}>
             ⏩ Quick-Sim

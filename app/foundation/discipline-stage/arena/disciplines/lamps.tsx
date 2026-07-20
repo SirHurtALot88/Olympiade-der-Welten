@@ -86,15 +86,16 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
   const X1: number = layout.xEnd;
   const fracX = (v: number): number => X0 + (finalMax > 0 ? Math.max(0, v / finalMax) : 0) * (X1 - X0);
 
-  // GROSSE, lesbare Token (unabhängig von der Teamzahl — kein Bahn-Zwang mehr).
-  const RB = 17;
-  const RBOwn = 21;
+  // GROSSE, lesbare Token (unabhängig von der Teamzahl — kein Bahn-Zwang mehr). Deutlich
+  // größer als die alten Fixbahn-Winzlinge (geo.r war 8/11).
+  const RB = 23;
+  const RBOwn = 28;
 
-  // Vertikale Streuung: gleichmäßig über die Planche verteilt in stabiler Hash-Ordnung
-  // (jedes Team behält seine Höhe → man kann es verfolgen). Kein score-korrelierter Wert,
-  // damit enge Score-Cluster wenigstens vertikal auseinanderziehen.
-  const BAND_TOP = 66;
-  const BAND_BOT = PY1 - 26;
+  // Vertikale Streuung: gleichmäßig über die (fast volle) Planchehöhe verteilt in stabiler
+  // Hash-Ordnung (jedes Team behält seine Höhe → man kann es verfolgen). Kein score-
+  // korrelierter Wert, damit enge Score-Cluster wenigstens vertikal auseinanderziehen.
+  const BAND_TOP = 58;
+  const BAND_BOT = PY1 - 20;
   const yByCode = new Map<string, number>();
   {
     const order = rt
@@ -289,6 +290,12 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
         })}
         <text x={X0 + 14} y={PY1 - 14} textAnchor="start" fontFamily="ui-monospace, Menlo, monospace" fontSize={11} fontWeight={700} letterSpacing="2" fill="#33445a" opacity={0.85}>
           ⚡ GESAMMELTE TREFFER →
+        </text>
+        {/* ZIEL-Linie = höchster (End-)Wert (finalMax → X1). Feste Normierung: der Führende
+            landet am Ende genau hier; die Skala steht still, alle bewegen sich nur vorwärts. */}
+        <line x1={X1} y1={PY0 + 4} x2={X1} y2={PY1 - 4} stroke="var(--nl-warn)" strokeWidth={2.5} opacity={0.85} strokeDasharray="6 5" />
+        <text x={X1 - 8} y={PY0 + 18} textAnchor="end" fontFamily="Georgia, serif" fontSize={13} fontWeight={800} letterSpacing="0.12em" fill="var(--nl-warn)" opacity={0.95}>
+          ZIEL
         </text>
       </g>
       <rect x={PX0} y={PY0} width={PX1 - PX0} height={PY1 - PY0} rx={12} fill="none" stroke="#5c6b7d" strokeWidth={2} />
