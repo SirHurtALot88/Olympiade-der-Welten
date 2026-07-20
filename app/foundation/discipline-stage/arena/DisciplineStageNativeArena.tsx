@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import { useStageAudio } from "./useStageAudio";
 import DisciplineStageResultTable, { type ResultTableRow } from "./DisciplineStageResultTable";
 import DisciplineStageTopPlayersRow from "../DisciplineStageTopPlayersRow";
@@ -896,6 +896,29 @@ export function calcString(p: NativeStagePlayer): string {
     s += m.sign < 0 ? ` − ${fmt1(m.amt)} ${m.k}` : ` + ${fmt1(m.amt)} ${m.k}`;
   });
   return `${s} = ${fmt1(playerNet(p))}`;
+}
+// Sauberer vertikaler Breakdown-Stack für die Hovercard: Grundwert oben, je eine
+// Zeile pro echtem Mod aus p.mods (Zahl rechtsbündig, Vorzeichen-farbig), dünner
+// Trenner, dann die fett hervorgehobene Netto-Summe.
+export function renderBreakdown(p: NativeStagePlayer): ReactNode {
+  const row = (label: ReactNode, num: string, color: string, opts?: { bold?: boolean }) => (
+    <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontVariantNumeric: "tabular-nums", lineHeight: 1.45 }}>
+      <span style={{ flex: "none", minWidth: 52, textAlign: "right", fontWeight: opts?.bold ? 800 : 700, color }}>{num}</span>
+      <span style={{ minWidth: 0, flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontWeight: opts?.bold ? 800 : 500, color: opts?.bold ? color : "var(--nl-mut)" }}>{label}</span>
+    </div>
+  );
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+      {row("Grundwert", fmt1(p.val), "var(--nl-mut)")}
+      {p.mods.map((m, i) =>
+        <Fragment key={i}>
+          {row(m.k, `${m.sign > 0 ? "+" : "−"}${fmt1(m.amt)}`, m.sign > 0 ? "var(--nl-good)" : "var(--nl-risk)")}
+        </Fragment>,
+      )}
+      <div style={{ borderTop: "1px solid var(--nl-line)", margin: "3px 0 2px" }} />
+      {row("Total", fmt1(playerNet(p)), "var(--nl-ink)", { bold: true })}
+    </div>
+  );
 }
 
 const FLASH_COLOR: Record<string, string> = {
@@ -2705,7 +2728,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                                   {p.val >= STAR_MIN ? "⭐ " : ""}
                                   {p.name} <span style={{ color: "var(--nl-mut)", fontWeight: 600 }}>· {slots[s]}</span>
                                 </div>
-                                <div style={{ color: "var(--nl-mut)" }}>{calcString(p)}</div>
+                                <div style={{ marginTop: 2 }}>{renderBreakdown(p)}</div>
                               </div>
                               <span title={`Rang in ${slots[s]}`} style={{ flex: "none", fontSize: 10.5, fontWeight: 800, color: medalC }}>#{sr}</span>
                             </div>

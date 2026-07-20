@@ -58,8 +58,10 @@ function computeSlot(player: Player, disciplineId: string, slotIndex: number): D
   const form = clamp(player.form ?? 50, 0, 100);
   // Fatigue bremst nach vorne: bis zu 25 % des Werts bei voller Erschöpfung.
   const fatiguePenalty = Math.round(((base * fatigue) / 100) * 0.25);
-  // Form über/unter 50 gibt bis zu ±12 %, plus kleiner Tagesform-Swing.
-  const formBase = Math.round(((form - 50) / 50) * base * 0.12);
+  // Form wird FLACH angewendet — genau wie die echte Scoring-Engine: eine
+  // Formkarte landet als fester Absolutwert auf jedem aufgestellten Spieler,
+  // UNABHÄNGIG von base/Stärke. Skala ±8 passt zu den Kartenwerten [0,2,4,8].
+  const formBase = Math.round(((form - 50) / 50) * 8);
   const formSwing = formBase + seededJitter(`${player.id}|${disciplineId}`);
   const net = Number(Math.max(0, base - fatiguePenalty + formSwing).toFixed(1));
   const portraitUrl = getPlayerPortraitBrowserUrl(player.id, player.portraitUrl ?? null, player.portraitPath ?? null);
