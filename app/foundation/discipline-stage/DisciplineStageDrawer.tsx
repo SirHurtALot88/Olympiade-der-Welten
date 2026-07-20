@@ -29,7 +29,9 @@ import {
   getCurrentMatchdayDisciplineSchedule,
   getTeamMatchdayLineupDraft,
 } from "@/lib/foundation/matchday-lineup-readiness";
-import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
+import { buildPlayerRatingContractMap, type PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
+import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
+import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import { getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 import { getTeamColor, teamHasSecondary, floorTeamAccent } from "@/lib/foundation/team-colors";
 import { fmt1 } from "./stage-format";
@@ -76,12 +78,6 @@ function findTeamOfPlayer(gameState: GameState, playerId: string): Team | null {
   const entry = gameState.rosters?.find((r) => r.playerId === playerId);
   if (!entry) return null;
   return findTeam(gameState, entry.teamId);
-}
-
-function playerOverall(p: Player): number | null {
-  if (typeof p.ovr === "number") return p.ovr;
-  if (typeof p.rating === "number") return p.rating;
-  return null;
 }
 
 function disciplineName(gameState: GameState, disciplineId: string): string {
@@ -316,7 +312,9 @@ function PlayerBody({
   const axisById = new Map((data?.axisCards ?? []).map((c) => [c.id, c] as const));
 
   // Kopfzahlen.
-  const ovr = data?.ovr ?? playerOverall(player);
+  // Kanonisch: data.ovr = ovrNormalized. Kein Fallback auf den rohen, inkonsistenten
+  // player.ovr-Wert (sonst weicht die Karte von der Zeile ab, die sie öffnet).
+  const ovr = data?.ovr ?? null;
   const ovrRank = data?.ovrRank ?? null;
   // Saison-PP (verdient) — kein Fallback auf player.pps (importiertes Karriere-Rating).
   const pps = data?.pps ?? null;
@@ -529,6 +527,7 @@ function LineupRow({
   gameState,
   playerId,
   slotLabel,
+  ovr,
   rank,
   railColor,
   tintColor,
@@ -539,6 +538,8 @@ function LineupRow({
   gameState: GameState;
   playerId: string;
   slotLabel?: string | null;
+  /** Kanonischer OVR (ovrNormalized) aus dem Rating-Contract; kein roher player.ovr. */
+  ovr: number | null;
   rank: number | null;
   /** Farbe des 2px-Rails links (Sektions-Marker). */
   railColor?: string | null;
@@ -552,7 +553,6 @@ function LineupRow({
   const player = findPlayer(gameState, playerId);
   if (!player) return null;
   const portraitUrl = getPlayerPortraitBrowserUrl(player.id, player.portraitUrl ?? null, player.portraitPath ?? null);
-  const ovr = playerOverall(player);
   const pps = seasonPps ?? null;
   const clickable = Boolean(onSelectPlayer);
   return (
@@ -571,7 +571,7 @@ function LineupRow({
         opacity: unavailable ? 0.62 : 1,
       }}
     >
-      <PlayerMark src={portraitUrl} alt={player.name} size={44} title={player.name} />
+      <PlayerMark src={portraitUrl} alt={player.name} size={52} title={player.name} />
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -619,6 +619,61 @@ function LineupRow({
   );
 }
 
+/**
+ * Größere Portrait-Karte (Rail-Tile, 1:1 Full-Art) für die Spieler der aktuellen
+ * Disziplin. Kanonische Ratings kommen aus dem Rating-Contract (row), damit OVR/
+ * Rang exakt zur geöffneten Spieler-Karte passen. Klick → onSelectPlayer.
+ */
+function DisciplinePortraitCard({
+  gameState,
+  playerId,
+  row,
+  seasonPps,
+  unavailable,
+  onSelectPlayer,
+}: {
+  gameState: GameState;
+  playerId: string;
+  row?: PlayerRatingContractRow | null;
+  seasonPps?: number | null;
+  unavailable?: boolean;
+  onSelectPlayer?: ((playerId: string) => void) | null;
+}) {
+  const player = findPlayer(gameState, playerId);
+  if (!player) return null;
+  const portraitUrl = getPlayerPortraitBrowserUrl(player.id, player.portraitUrl ?? null, player.portraitPath ?? null);
+  const clickable = Boolean(onSelectPlayer);
+  return (
+    <FoundationPlayerPortraitCard
+      playerId={player.id}
+      name={player.name}
+      portraitUrl={portraitUrl}
+      portraitInitials={player.name.slice(0, 2).toUpperCase()}
+      playerOvr={row?.ovrNormalized ?? null}
+      ovrRank={row?.ovrRank ?? null}
+      playerPps={seasonPps ?? row?.ppsSeason ?? null}
+      ppsRank={row?.ppsSeasonRank ?? null}
+      playerMvs={row?.mvs ?? null}
+      mvsRank={row?.mvsRank ?? null}
+      pow={player.coreStats?.pow ?? null}
+      spe={player.coreStats?.spe ?? null}
+      men={player.coreStats?.men ?? null}
+      soc={player.coreStats?.soc ?? null}
+      leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+      variant="team"
+      context="roster"
+      density="full"
+      portraitLayout="rail"
+      known
+      highlight={unavailable ? "Fehlt" : null}
+      interactive={clickable}
+      onOpen={clickable ? () => onSelectPlayer!(player.id) : undefined}
+      title={clickable ? "Spieler-Karte anzeigen" : undefined}
+      style={{ opacity: unavailable ? 0.62 : 1 }}
+    />
+  );
+}
+
 function TeamBody({
   gameState,
   teamId,
@@ -634,38 +689,39 @@ function TeamBody({
 }) {
   const team = findTeam(gameState, teamId);
 
-  // Liga-weiter OVR-Rang (leichtgewichtig, einmal je Render) für die Rang-Badges.
-  const ovrRankById = useMemo(() => {
-    const sorted = (gameState.players ?? [])
-      .map((p) => ({ id: p.id, ovr: playerOverall(p) }))
-      .filter((x): x is { id: string; ovr: number } => x.ovr != null)
-      .sort((a, b) => b.ovr - a.ovr);
-    const m = new Map<string, number>();
-    sorted.forEach((x, i) => m.set(x.id, i + 1));
-    return m;
-  }, [gameState.players]);
-
-  // Roster-IDs des Teams (einmal) — Basis für Saison-PP-Lookup und Ersatzbank.
+  // Roster-IDs des Teams (einmal) — Basis für Rating-Lookup und Ersatzbank.
   const rosterIds = useMemo(
     () => (gameState.rosters ?? []).filter((r) => r.teamId === teamId).map((r) => r.playerId),
     [gameState.rosters, teamId],
   );
 
-  // Saison-PP je Spieler (verdient, ppsSeason) — EINMAL für die Roster-Spieler des
-  // Teams gebaut (kein schwerer Drawer-Builder pro Zeile). Kanonische Quelle:
-  // buildPlayerRatingContractMap → row.ppsSeason.
-  const seasonPpsById = useMemo(() => {
-    const m = new Map<string, number | null>();
-    if (rosterIds.length === 0) return m;
+  // Kanonische Ratings je Roster-Spieler — EINMAL gebaut (kein schwerer Drawer-Builder
+  // pro Zeile). Quelle: buildPlayerRatingContractMap OHNE playerIds-Filter → Normalisierung
+  // UND Rang über den vollen aktiven/gerosterten Pool (stabil) — exakt derselbe Pool, den
+  // der Karten-Builder (buildPlayerDrawerData…) und die Hover-Vorschau nutzen. Würde man
+  // hier { playerIds: rosterIds } übergeben, kollabierte der OVR-Normalisierungs-/Rang-Pool
+  // auf ein einzelnes Team → OVR + „OVR #N" wichen von der geöffneten Karte ab.
+  const { ratingById, ovrById, ovrRankById, seasonPpsById } = useMemo(() => {
+    const rows = new Map<string, PlayerRatingContractRow>();
+    const ovr = new Map<string, number | null>();
+    const ovrRank = new Map<string, number | null>();
+    const pps = new Map<string, number | null>();
+    if (rosterIds.length === 0) {
+      return { ratingById: rows, ovrById: ovr, ovrRankById: ovrRank, seasonPpsById: pps };
+    }
     try {
-      const ratingMap = buildPlayerRatingContractMap(gameState, undefined, { playerIds: rosterIds });
+      const ratingMap = buildPlayerRatingContractMap(gameState);
       for (const pid of rosterIds) {
-        m.set(pid, ratingMap.get(pid)?.ppsSeason ?? null);
+        const r = ratingMap.get(pid);
+        if (r) rows.set(pid, r);
+        ovr.set(pid, r?.ovrNormalized ?? null);
+        ovrRank.set(pid, r?.ovrRank ?? null);
+        pps.set(pid, r?.ppsSeason ?? null);
       }
     } catch {
-      // defensiv: keine Ratings → PP bleibt leer statt Crash.
+      // defensiv: keine Ratings → Werte bleiben leer statt Crash.
     }
-    return m;
+    return { ratingById: rows, ovrById: ovr, ovrRankById: ovrRank, seasonPpsById: pps };
   }, [gameState, rosterIds]);
 
   if (!team) {
@@ -787,21 +843,18 @@ function TeamBody({
       {/* Sektion 1: In dieser Disziplin (--accent, primär) */}
       <Section title="In dieser Disziplin" accentRole="primary" emphasis right={<span style={{ fontSize: 11, fontWeight: 700, color: "var(--accent)" }}>{disciplineName(gameState, disciplineId)}</span>}>
         {hasDraft && onSchedule && section1.length > 0 ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div className="dstage-portrait-rail-grid">
             {section1
               .slice()
               .sort((a, b) => a.slotIndex - b.slotIndex)
               .map((e) => {
                 const pid = e.activePlayerId ?? e.playerId;
                 return (
-                  <LineupRow
+                  <DisciplinePortraitCard
                     key={`${e.disciplineSide}-${e.slotIndex}-${pid}`}
                     gameState={gameState}
                     playerId={pid}
-                    slotLabel={`Slot ${e.slotIndex + 1}`}
-                    rank={ovrRankById.get(pid) ?? null}
-                    railColor="var(--accent)"
-                    tintColor={section1Tint}
+                    row={ratingById.get(pid) ?? null}
                     seasonPps={seasonPpsById.get(pid) ?? null}
                     unavailable={isUnavailable(pid)}
                     onSelectPlayer={onSelectPlayer}
@@ -810,15 +863,13 @@ function TeamBody({
               })}
           </div>
         ) : fieldedIds.length > 0 ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div className="dstage-portrait-rail-grid">
             {fieldedIds.map((pid) => (
-              <LineupRow
+              <DisciplinePortraitCard
                 key={pid}
                 gameState={gameState}
                 playerId={pid}
-                rank={ovrRankById.get(pid) ?? null}
-                railColor="var(--accent)"
-                tintColor={section1Tint}
+                row={ratingById.get(pid) ?? null}
                 seasonPps={seasonPpsById.get(pid) ?? null}
                 unavailable={isUnavailable(pid)}
                 onSelectPlayer={onSelectPlayer}
@@ -853,6 +904,7 @@ function TeamBody({
                     gameState={gameState}
                     playerId={pid}
                     slotLabel={`Slot ${e.slotIndex + 1}`}
+                    ovr={ovrById.get(pid) ?? null}
                     rank={ovrRankById.get(pid) ?? null}
                     railColor={secondaryRail}
                     tintColor={section2Tint}
@@ -881,6 +933,7 @@ function TeamBody({
                 key={pid}
                 gameState={gameState}
                 playerId={pid}
+                ovr={ovrById.get(pid) ?? null}
                 rank={ovrRankById.get(pid) ?? null}
                 seasonPps={seasonPpsById.get(pid) ?? null}
                 unavailable={isUnavailable(pid)}

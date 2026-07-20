@@ -19,8 +19,10 @@ import DisciplineStageHighlights from "@/app/foundation/discipline-stage/Discipl
 import { type DisciplineStageTopPlayer } from "@/app/foundation/discipline-stage/DisciplineStageTopPlayers";
 import DisciplineStageNativeArena, { type StagePrimitive, type StageMotif, type StageEnv } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
 import DisciplineStageDrawer, { type DisciplineStageDrawerTarget } from "@/app/foundation/discipline-stage/DisciplineStageDrawer";
+import DisciplineStageHoverPreview, { type DisciplineStageHoverTarget } from "@/app/foundation/discipline-stage/DisciplineStageHoverPreview";
 import { fmt1 } from "@/app/foundation/discipline-stage/stage-format";
 import { buildTeamRelationshipMap } from "@/lib/foundation/team-relationship";
+import { buildPlayerRatingContractMap, type PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 
 // Disziplinen mit fertigem nativem Renderer (löst schrittweise das iframe ab).
 // Nativer Renderer je Disziplin. Engine, FX, Sounds, Ticker, Podest, Detail-
@@ -420,29 +422,39 @@ export default function DisciplineStageArena({
   // den Arena-key oder das teams-Memo ein — sonst würde ein Klick die Arena
   // remounten und zurücksetzen (genau der Bug, den der Drawer ersetzt).
   const [drawerTarget, setDrawerTarget] = useState<DisciplineStageDrawerTarget>(null);
-  // Merkt sich, ob der Drawer per Hover geöffnet wurde: ein Klick "pinnt" ihn,
-  // ein Hover-Ende (preview(null)) schließt ihn nur, wenn er per Hover kam.
-  const openedByHover = useRef(false);
+  // Hover zeigt eine kompakte, am MAUS-CURSOR verankerte Vorschau (NICHT den vollen
+  // rechten Drawer). Der volle Drawer öffnet ausschließlich per KLICK (gepinnt).
+  const [hoverPreview, setHoverPreview] = useState<DisciplineStageHoverTarget>(null);
+  // Letzte Cursor-Position (window-weit). Die Hover-Handler der Arena tragen keine
+  // Koordinaten, daher lesen wir hier die aktuelle Position beim Hover-Eintritt aus.
+  const cursorRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onMove = (event: MouseEvent) => {
+      cursorRef.current = { x: event.clientX, y: event.clientY };
+    };
+    window.addEventListener("mousemove", onMove, { passive: true });
+    return () => window.removeEventListener("mousemove", onMove);
+  }, []);
+
   const openDrawerPinned = (target: NonNullable<DisciplineStageDrawerTarget>) => {
-    openedByHover.current = false;
+    setHoverPreview(null); // Klick pinnt den vollen Drawer → Hovercard schließen
     setDrawerTarget(target);
   };
   const previewPlayer = (id: string | null) => {
     if (id != null) {
-      openedByHover.current = true;
-      setDrawerTarget({ kind: "player", playerId: id });
-    } else if (openedByHover.current) {
-      openedByHover.current = false;
-      setDrawerTarget(null);
+      const { x, y } = cursorRef.current;
+      setHoverPreview({ kind: "player", id, x, y });
+    } else {
+      setHoverPreview(null);
     }
   };
   const previewTeam = (teamId: string | null) => {
     if (teamId != null) {
-      openedByHover.current = true;
-      setDrawerTarget({ kind: "team", teamId });
-    } else if (openedByHover.current) {
-      openedByHover.current = false;
-      setDrawerTarget(null);
+      const { x, y } = cursorRef.current;
+      setHoverPreview({ kind: "team", id: teamId, x, y });
+    } else {
+      setHoverPreview(null);
     }
   };
 
@@ -510,6 +522,16 @@ export default function DisciplineStageArena({
     }
     return map;
   }, [gameState?.players]);
+
+  // Kanonische Ratings (OVR/Rang/PP/MVS) je Spieler für die Hover-Vorschau — EINMAL
+  // je gameState memoisiert (identische Quelle wie der Drawer, keine Neuberechnung).
+  const ratingByPlayerId = useMemo<Map<string, PlayerRatingContractRow>>(() => {
+    try {
+      return buildPlayerRatingContractMap(gameState);
+    } catch {
+      return new Map<string, PlayerRatingContractRow>();
+    }
+  }, [gameState]);
 
   // Echte Resolve-Preview der Arena laden (nur wenn Matchday-Kontext vorhanden).
   const [preview, setPreview] = useState<LegacyMatchdayResolvePreview | null>(null);
@@ -1038,7 +1060,6 @@ export default function DisciplineStageArena({
       disciplineId={disciplineId}
       fieldedPlayerIdsByTeam={fieldedByTeam}
       onClose={() => {
-        openedByHover.current = false;
         setDrawerTarget(null);
       }}
       onOpenFull={(target) => {
@@ -1047,6 +1068,11 @@ export default function DisciplineStageArena({
       }}
       onSelectPlayer={(pid) => openDrawerPinned({ kind: "player", playerId: pid })}
     />
+
+    {/* Hover-Vorschau — am Cursor verankert, geklammert, pointer-events:none. Als
+        Geschwister NACH der Arena (kein Remount/Reset der laufenden Sim). Öffnet
+        NIE den vollen Drawer; der öffnet nur per Klick. */}
+    <DisciplineStageHoverPreview target={hoverPreview} gameState={gameState} ratingByPlayerId={ratingByPlayerId} />
     </>
   );
 }
