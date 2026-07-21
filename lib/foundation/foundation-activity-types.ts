@@ -1,11 +1,27 @@
 export type FoundationActivityTone = "running" | "success" | "warning" | "blocked" | "info";
 
+export type FoundationActivityStat = {
+  label: string;
+  value: string;
+  tone?: "default" | "muted" | "warning";
+};
+
 export type FoundationActivityItem = {
   id: string;
   label: string;
   detail?: string;
   tone: FoundationActivityTone;
   progressPct?: number | null;
+  /**
+   * Aufgeschlüsselte Kennzahlen der laufenden Aktion (z. B. Teams, Picks, Käufe,
+   * Setup-Aktionen). Wird — wenn gesetzt — als volle Zeile mit großem Fortschrittsbalken
+   * gerendert statt als kompakter Chip.
+   */
+  stats?: FoundationActivityStat[];
+  /** Menschenlesbare aktuelle Teilaktion, z. B. "Training · A-A". */
+  currentLabel?: string | null;
+  /** Nächster anstehender Schritt, z. B. "danach: Einsatzlisten". */
+  nextLabel?: string | null;
 };
 
 export type FoundationActivityPreseasonRunSnapshot = {

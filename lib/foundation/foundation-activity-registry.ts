@@ -2,6 +2,7 @@ import type {
   FoundationActivityInput,
   FoundationActivityItem,
   FoundationActivityPreseasonRunSnapshot,
+  FoundationActivityStat,
 } from "@/lib/foundation/foundation-activity-types";
 
 const COCKPIT_BUSY_LABELS: Record<string, string> = {
@@ -44,21 +45,65 @@ function getPreseasonModeLabel(mode: FoundationActivityPreseasonRunSnapshot["mod
   return "Preseason";
 }
 
-function buildPreseasonDetail(run: FoundationActivityPreseasonRunSnapshot, aiTeamsCount: number) {
-  const parts = [`${run.aiTeamsCompleted}/${run.aiTeamsTotal || aiTeamsCount} Teams`];
+// Rohe AI-Aktionscodes (teamCode:actionType:…) in menschenlesbare Kategorien übersetzen,
+// damit die Aktivitätszeile "Training · A-A" statt "A-A:set_train…" zeigt.
+const AI_ACTION_CATEGORY_LABELS: Record<string, string> = {
+  set_training_focus: "Training",
+  set_training_intensity: "Training",
+  set_player_training_modes: "Training",
+  set_player_training_classes: "Training",
+  maintain_building: "Gebäude",
+  upgrade_building: "Gebäude",
+  buy_building: "Gebäude",
+  downgrade_building: "Gebäude",
+  reserve_transfer_budget: "Budgetplanung",
+  reserve_salary_budget: "Budgetplanung",
+  reserve_maintenance_budget: "Budgetplanung",
+  mark_contract_strategy: "Verträge",
+  mark_sell_strategy: "Verkaufsplan",
+};
+
+function friendlyAiActionLabel(raw: string | undefined | null): string | null {
+  if (!raw) return null;
+  const [teamCode, actionType] = raw.split(":");
+  const category = actionType ? AI_ACTION_CATEGORY_LABELS[actionType] : null;
+  if (!category) return null;
+  return teamCode ? `${category} · ${teamCode}` : category;
+}
+
+function buildPreseasonStats(
+  run: FoundationActivityPreseasonRunSnapshot,
+  aiTeamsCount: number,
+): FoundationActivityStat[] {
+  const stats: FoundationActivityStat[] = [
+    { label: "Teams", value: `${run.aiTeamsCompleted}/${run.aiTeamsTotal || aiTeamsCount}` },
+  ];
   if (run.transferBuysApplied > 0) {
-    parts.push(`${run.transferBuysApplied} ${run.mode === "setup_draft" ? "Picks" : "Käufe"}`);
+    stats.push({ label: run.mode === "setup_draft" ? "Picks" : "Käufe", value: `${run.transferBuysApplied}` });
   }
   if (run.transferSellsApplied > 0) {
-    parts.push(`${run.transferSellsApplied} Verkäufe`);
+    stats.push({ label: "Verkäufe", value: `${run.transferSellsApplied}` });
   }
   if (run.managerActionsApplied > 0) {
-    parts.push(`${run.managerActionsApplied} Setup-Aktionen`);
+    stats.push({ label: "Setup-Aktionen", value: `${run.managerActionsApplied}` });
   }
-  if (run.blockingReasons[0]) {
-    parts.push(run.blockingReasons[0]);
+  if (run.blockingReasons.length > 0) {
+    stats.push({ label: "blockiert", value: `${run.blockingReasons.length}`, tone: "warning" });
   }
-  return parts.join(" · ");
+  return stats;
+}
+
+// Nächster anstehender Schritt der Preseason-Automatik (grob nach Modus abgeleitet).
+function preseasonNextStep(mode: FoundationActivityPreseasonRunSnapshot["mode"]): string | null {
+  if (mode === "setup_draft") return "danach: Einsatzlisten & Training";
+  if (mode === "season_market") return "danach: Saisonstart";
+  return null;
+}
+
+function buildPreseasonDetail(run: FoundationActivityPreseasonRunSnapshot, aiTeamsCount: number) {
+  return buildPreseasonStats(run, aiTeamsCount)
+    .map((stat) => `${stat.value} ${stat.label}`)
+    .join(" · ");
 }
 
 export function buildFoundationActivities(input: FoundationActivityInput): FoundationActivityItem[] {
@@ -77,6 +122,7 @@ export function buildFoundationActivities(input: FoundationActivityInput): Found
     input.aiPreseasonBusy || input.aiPreseasonRun?.status === "running";
   if (preseasonRunning) {
     const run = input.aiPreseasonRun;
+    const currentLabel = run ? friendlyAiActionLabel(run.blockingReasons[0]) : null;
     activities.push({
       id: "ai-preseason",
       label: run ? getPreseasonModeLabel(run.mode) : "AI-Preseason",
@@ -86,6 +132,9 @@ export function buildFoundationActivities(input: FoundationActivityInput): Found
         run && run.aiTeamsTotal > 0
           ? Math.round((run.aiTeamsCompleted / run.aiTeamsTotal) * 100)
           : null,
+      stats: run ? buildPreseasonStats(run, input.aiTeamsCount) : undefined,
+      currentLabel,
+      nextLabel: run ? preseasonNextStep(run.mode) : null,
     });
   }
 
