@@ -1508,9 +1508,19 @@ export function createSaveRepository(): SaveRepository {
           .prepare("SELECT save_id FROM active_saves WHERE owner_id = ?")
           .get(ownerId) as { save_id: string } | undefined;
         if (pointer) {
-          const pointedRow = loadSaveRow(pointer.save_id);
-          if (pointedRow) {
-            return materializePersistedSaveCached(pointedRow);
+          // Only honor the pointer if the pointed-to save is STILL active. A global
+          // activate (auth-off new game) archives the previous save via saves.status but
+          // does not rewrite this pointer table — so a stale pointer can still reference a
+          // now-archived save. Trusting it blindly resurrects the old save ("new game, old
+          // save stays active"). If the pointer is stale, fall through to the global row.
+          const pointerStatus = database
+            .prepare("SELECT status FROM saves WHERE save_id = ?")
+            .get(pointer.save_id) as { status?: string } | undefined;
+          if (pointerStatus && pointerStatus.status !== "archived") {
+            const pointedRow = loadSaveRow(pointer.save_id);
+            if (pointedRow) {
+              return materializePersistedSaveCached(pointedRow);
+            }
           }
         }
       }
@@ -1578,10 +1588,18 @@ export function createSaveRepository(): SaveRepository {
             .run(ownerId, saveId, now);
           database.prepare("UPDATE saves SET status = 'active', updated_at = ? WHERE save_id = ?").run(now, saveId);
         } else {
-          // Global (auth-off / solo) behavior — unchanged: blanket-archive every other active
-          // save, then mark this one active.
+          // Global (auth-off / solo) behavior: blanket-archive every other active save, then
+          // mark this one active.
           database.prepare("UPDATE saves SET status = 'archived' WHERE status = 'active' AND save_id != ?").run(saveId);
           database.prepare("UPDATE saves SET status = 'active', updated_at = ? WHERE save_id = ?").run(now, saveId);
+          // Keep the per-owner pointer table consistent: a global activate is THE active save
+          // for the solo/auth-off world (only DEFAULT_ACTIVE_OWNER_ID has a pointer here), so
+          // repoint any pointer that still references another (now-archived) save. Without this
+          // the DEFAULT pointer keeps pointing at the archived previous save and getActiveSave
+          // resurrects it — the "new game created but old save stays active" bug.
+          database
+            .prepare("UPDATE active_saves SET save_id = ?, updated_at = ? WHERE save_id != ?")
+            .run(saveId, now, saveId);
         }
         enforceRollingSaveRetention(database, [saveId]);
       });

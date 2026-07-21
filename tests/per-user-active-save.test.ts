@@ -108,6 +108,32 @@ describe("per-user active-save scoping", () => {
   );
 
   it(
+    "creating a new game (global activate) does not leave the old save active via a stale pointer",
+    () => {
+      const repository = createSaveRepository();
+      createRealSave(repository, "save-old");
+      createRealSave(repository, "save-new");
+
+      // Boot state: the old save is the global active one and DEFAULT owner points at it
+      // (exactly what backfillDefaultActiveSavePointer seeds).
+      repository.setActiveSave("save-old", DEFAULT_ACTIVE_OWNER_ID);
+      expect(repository.getActiveSave(DEFAULT_ACTIVE_OWNER_ID)?.saveId).toBe("save-old");
+
+      // "New game" in the solo/auth-off flow: a global activate (no ownerId) of the new save.
+      repository.setActiveSave("save-new");
+
+      // The old save must NOT resurface via the stale DEFAULT pointer.
+      expect(readStatus("save-old")).toBe("archived");
+      expect(readStatus("save-new")).toBe("active");
+      expect(repository.getActiveSave(DEFAULT_ACTIVE_OWNER_ID)?.saveId).toBe("save-new");
+      expect(repository.getActiveSave()?.saveId).toBe("save-new");
+      // Pointer was repointed to the freshly activated save.
+      expect(readActivePointer(DEFAULT_ACTIVE_OWNER_ID)).toBe("save-new");
+    },
+    30_000,
+  );
+
+  it(
     "owner pointer to a deleted save falls back to the global active save",
     () => {
       const repository = createSaveRepository();
