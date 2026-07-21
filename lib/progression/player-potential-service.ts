@@ -474,10 +474,14 @@ export function buildPlayerPotentialRecordsForSave(input: {
 }
 
 /**
- * Auto-Reveal-Tick: hebt die Reveal-Confidence jedes Potenzial-Records an, sodass sich
- * das (verdeckte) Potenzial über die Zeit von selbst aufdeckt — eigene Spieler schneller
- * als der Rest der Liga. Wird pro Matchday aufgerufen. Rein additiv, deterministisch,
- * idempotent bei confidence=100.
+ * Auto-Reveal-Tick: hebt die Reveal-Confidence pro Matchday an, sodass sich das
+ * (verdeckte) Attribut-Potenzial über die Zeit von selbst aufdeckt.
+ *   - Eigene Kaderspieler: +8 → ~1 Unschärfe-Band-Punkt/MD (man braucht die volle Saison).
+ *   - Watchlist-Spieler (aktives Beobachten): +15 → ~2 Punkte/MD (schneller).
+ *   - Free Agents (auf keinem Kader): +0.8 → ~0.1 Punkt/MD, deckt sich über mehrere
+ *     Saisons ganz von selbst auf (irgendwann kennt man alle ungebundenen Talente).
+ *   - AI-gebundene Spieler: 0 → bleiben verschleiert, bis man sie ownt/scoutet.
+ * Rein additiv, deterministisch, idempotent bei confidence=100.
  */
 export function advancePlayerPotentialRevealTick(gameState: GameState): GameState {
   const records = gameState.playerPotential;
@@ -485,14 +489,34 @@ export function advancePlayerPotentialRevealTick(gameState: GameState): GameStat
   const humanTeamIds = new Set(
     (gameState.teams ?? []).filter((team) => team.humanControlled).map((team) => team.teamId),
   );
-  const teamByPlayerId = new Map(
-    (gameState.rosters ?? []).map((entry) => [entry.playerId, entry.teamId] as const),
+  const ownPlayerIds = new Set(
+    (gameState.rosters ?? [])
+      .filter((entry) => humanTeamIds.has(entry.teamId))
+      .map((entry) => entry.playerId),
   );
+  // Alle irgendwo gebundenen Spieler (jedes Team) — der Rest sind Free Agents.
+  const rosteredPlayerIds = new Set((gameState.rosters ?? []).map((entry) => entry.playerId));
+  // Watchlist des/der menschlichen Teams (aktuelle Saison) — inline gelesen, um
+  // Import-Zyklen mit dem Scouting-Layer zu vermeiden.
+  const seasonId = gameState.season.id;
+  const watchlistPlayerIds = new Set(
+    (gameState.seasonState?.scoutingWatchlist ?? [])
+      .filter((entry) => entry.seasonId === seasonId && humanTeamIds.has(entry.teamId))
+      .map((entry) => entry.playerId),
+  );
+  const OWN_GAIN = 8; // ≈ 1 Band-Punkt / MD
+  const WATCHLIST_GAIN = 15; // ≈ 2 Band-Punkte / MD
+  const FREE_AGENT_GAIN = 0.8; // ≈ 0.1 Band-Punkt / MD (Auto-Reveal über mehrere Saisons)
   let changed = false;
   const nextRecords = records.map((record) => {
-    const teamId = teamByPlayerId.get(record.playerId);
-    const isOwnPlayer = teamId != null && humanTeamIds.has(teamId);
-    const gain = isOwnPlayer ? 8 : 3;
+    const gain = watchlistPlayerIds.has(record.playerId)
+      ? WATCHLIST_GAIN
+      : ownPlayerIds.has(record.playerId)
+        ? OWN_GAIN
+        : rosteredPlayerIds.has(record.playerId)
+          ? 0 // von einem AI-Team gebunden → nur über aktives Scouting sichtbar
+          : FREE_AGENT_GAIN; // Free Agent
+    if (gain === 0) return record;
     const confidence = clamp((record.confidence ?? 0) + gain, 0, 100);
     if (confidence === record.confidence) return record;
     changed = true;
