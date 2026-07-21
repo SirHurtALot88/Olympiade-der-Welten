@@ -1,6 +1,7 @@
 import prizeMoneyNormalized from "@/references/sheets/prize-money-table.normalized.json";
 import type { GameState, SponsorArchetype, SponsorCurveShape, SponsorOffer, SponsorOfferComponent, SponsorRarity } from "@/lib/data/olyDataTypes";
 import {
+  SPONSOR_RARITIES,
   getSponsorCurveShapeRankMultiplier,
   getSponsorRarityEtatFactor,
   mapArchetypeToCurveShape,
@@ -337,6 +338,16 @@ function applyQualityRebalanceToPayout(input: {
 export const SPONSOR_OVERPERFORMANCE_SHARE = Number(process.env.OLY_SPONSOR_OVERPERF_SHARE ?? 0.6) || 0.6;
 
 /**
+ * P2 Sonderziel-Buff — der Sonderziel-Reward als Anteil des Titel-Etats (totalAtMaxRank), rarity-gestaffelt:
+ * `share = BASE_SHARE + RARITY_STEP × rarityOrder` (order 0..3). Default 6 % + 3 %/Stufe → 6/9/12/15 %,
+ * gedeckelt bei BASE_CAP_FRAC (30 %) der garantierten Basis. Löst den alten flachen 4 %-Anteil ab, unter dem
+ * ein volles Sonderziel nur ~5–12 % der Basis wert war (zu wenig, um dafür die Saison zu steuern). ENV-tunebar.
+ */
+export const SPONSOR_SPECIAL_BASE_SHARE = Number(process.env.OLY_SPONSOR_SPECIAL_BASE_SHARE ?? 0.06) || 0.06;
+export const SPONSOR_SPECIAL_RARITY_STEP = Number(process.env.OLY_SPONSOR_SPECIAL_RARITY_STEP ?? 0.03) || 0.03;
+export const SPONSOR_SPECIAL_BASE_CAP_FRAC = Number(process.env.OLY_SPONSOR_SPECIAL_BASE_CAP ?? 0.3) || 0.3;
+
+/**
  * Golden-Sponsor Rang-Payout-Boost (Wave-1-schonend). Ein golden markierter Vertrag hebt NUR die
  * Rang-Meilenstein-Komponente um (MULT − 1), aber absolut gedeckelt bei GOLDEN_MS_ABS_CAP_C (salaryFactor-
  * skaliert). Der Sockel (Bottom-5-Schutz) bleibt unangetastet. IDENTISCH angewandt in
@@ -538,7 +549,14 @@ export function buildOfferCashAmounts(input: {
       input.isGolden ?? false,
     ),
   );
-  const specialCash = round1(totalAtMaxRank * 0.04);
+  // P2 Sonderziel-Buff: der Sonderziel-Reward ist jetzt rarity-gestaffelt (order 0..3 → 6/9/12/15 % des
+  // Titel-Etats) statt eines flachen 4 %-Anteils — ein voll erfülltes Sonderziel lohnt sich damit spürbar
+  // (typisch ~5/8/10/13 C statt ~2–4 C). Gedeckelt bei 30 % der garantierten Basis, damit das Sonderziel eine
+  // Belohnung bleibt und nicht die Basis-Ökonomie kippt (Invariante: volles Sonderziel ≤ 30 % Basis).
+  const rarityOrder = SPONSOR_RARITIES[input.rarity].order;
+  const specialCash = round1(
+    Math.min(totalAtMaxRank * (SPONSOR_SPECIAL_BASE_SHARE + SPONSOR_SPECIAL_RARITY_STEP * rarityOrder), baseCash * SPONSOR_SPECIAL_BASE_CAP_FRAC),
+  );
   return { baseCash, rankCash, specialCash, totalAtMaxRank };
 }
 
@@ -602,7 +620,7 @@ export function estimateExpectedPayout(
       if (component.kind === "improvement") {
         expected += component.rewardCash * 0.2;
       } else if (component.kind === "special") {
-        expected += component.rewardCash * 0.12;
+        expected += component.rewardCash * 0.45;
       }
     }
     return round1(expected);
@@ -622,7 +640,7 @@ export function estimateExpectedPayout(
     if (component.kind === "improvement") {
       expected += component.rewardCash * 0.2;
     } else if (component.kind === "special") {
-      expected += component.rewardCash * 0.12;
+      expected += component.rewardCash * 0.45;
     }
   }
   return round1(expected);

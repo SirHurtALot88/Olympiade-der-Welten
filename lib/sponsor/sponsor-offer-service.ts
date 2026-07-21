@@ -148,10 +148,14 @@ function buildOffer(input: {
     ),
   );
   const improvementCash = roundCash(cashAmounts.totalAtMaxRank * 0.04);
+  // P2 Sonderziel-Buff: den (jetzt rarity-gestaffelten, in buildOfferCashAmounts gedeckelten) specialCash
+  // DIREKT als Sonderziel-Reward verwenden — die frühere 0.65/0.35-Verdünnung ist entfallen, damit ein
+  // volles Sonderziel spürbar zahlt (~5/8/10/13 C je Rarity statt ~2–4 C). Challenge-Slot: Boden von 5 % auf
+  // 8 % des Titel-Etats angehoben (sein Achsen-Rang-Ziel soll ebenfalls lohnender sein).
   const baseSpecialCash =
     specialMode === "challenge"
-      ? roundCash(Math.max(cashAmounts.specialCash, cashAmounts.totalAtMaxRank * 0.05))
-      : roundCash(Math.max(special.rewardCash > 0 ? cashAmounts.specialCash * 0.65 : 0, cashAmounts.specialCash * 0.35));
+      ? roundCash(Math.max(cashAmounts.specialCash, cashAmounts.totalAtMaxRank * 0.08))
+      : cashAmounts.specialCash;
   // Enhancement 1 (Kern): das (bereits erreichbare) Saison-Sonderziel soll den Unterhaltskosten-Teil
   // plus etwas extra abdecken — aber über ein Ziel, nicht über den Basisbetrag. Der Reward bekommt einen
   // an den tatsächlichen Gebäude-Unterhalt des Teams gekoppelten Floor (halber Unterhalt, gedeckelt,
@@ -198,9 +202,10 @@ function buildOffer(input: {
   };
   let specialComponent: SponsorOfferComponent = legacySpecialComponent;
   if (isGolden) {
+    // Golden-Ziel zahlt 25 % über dem Standard-Sonderziel (das Golden-Los ist die seltene, dickste Karte).
     specialComponent = buildGoldenObjectiveComponent(
       pickGoldenObjective(gameState.season.id, team.teamId, curveShape, teamQualityRank),
-      bonusObjectiveInput,
+      { ...bonusObjectiveInput, rewardCash: roundCash(specialCash * 1.25) },
     );
   } else if (specialMode !== "challenge") {
     const bonusKey = pickBonusObjective(gameState.season.id, team.teamId, curveShape, slotIndex, teamQualityRank);

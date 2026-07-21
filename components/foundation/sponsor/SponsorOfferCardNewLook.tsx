@@ -372,22 +372,32 @@ export function SponsorOfferCardNewLook({
                       );
                     })}
                 </ul>
-                {/* Feed 2: Performance zahlt einen konkaven Bonus fürs Übertreffen des Erwartungsrangs
-                    (teamQualityRankAtSign). Die Rang-Leiter oben ist der Basis-Fall; ein Aufstieg über die
-                    Erwartung legt oben drauf — je schwerer (näher an der Spitze), desto mehr. */}
-                {offer.archetype === "performance" ? (
-                  <div className="nl-sponsor-overperf-hint" data-testid="sponsor-overperf-hint">
-                    <span className="nl-sponsor-overperf-icon" aria-hidden="true">
-                      ✦
-                    </span>
-                    <span>
-                      <strong>Überperformance zahlt extra.</strong>{" "}
-                      {offer.teamQualityRank != null
-                        ? `Übertriffst du deinen Erwartungsrang #${Math.round(offer.teamQualityRank)}, legt dieser Sponsor oben drauf — je schwerer der Aufstieg, desto mehr (ein Sprung nahe der Spitze zählt mehr als im gepackten Mittelfeld).`
-                        : "Übertriffst du deine Saison-Erwartung, legt dieser Sponsor oben drauf — je schwerer der Aufstieg, desto mehr."}
-                    </span>
-                  </div>
-                ) : null}
+                {/* P2 — ehrliche Überperformance-Zeile: an die tatsächlich zahlende `beat_expected_rank`-
+                    Klausel gekoppelt und BEZIFFERT (früher stand generisch „zahlt extra" ohne Zahl, und nur
+                    bei performance-Sponsoren, obwohl die Klausel auf fast allen Angeboten liegt). Fehlt die
+                    Komponente (Team ohne Luft nach oben), wird die Zeile GAR NICHT gerendert — Abwesenheit
+                    ist ehrlich statt eines leeren Versprechens. Der volle familien-differenzierte Bonus folgt
+                    in P3 als eigenes Overperformance-Modul. */}
+                {(() => {
+                  const overperf = offer.components.find((entry) => entry.specialKey === "beat_expected_rank");
+                  if (!overperf) return null;
+                  const targetRank = typeof overperf.targetValue === "number" ? overperf.targetValue : null;
+                  return (
+                    <div className="nl-sponsor-overperf-hint" data-testid="sponsor-overperf-hint">
+                      <span className="nl-sponsor-overperf-icon" aria-hidden="true">
+                        ✦
+                      </span>
+                      <span>
+                        <strong>Überperformance: +{formatCash(overperf.rewardCash)}</strong>{" "}
+                        {targetRank != null
+                          ? `wenn du die Saison auf Platz ≤ #${targetRank} beendest${
+                              offer.teamQualityRank != null ? ` (über deinem Erwartungsrang #${Math.round(offer.teamQualityRank)})` : ""
+                            }.`
+                          : "wenn du deine Saison-Erwartung übertriffst."}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
             );
           }
