@@ -673,7 +673,7 @@ describe("pre-season workflow service", () => {
     }
   });
 
-  it("pulls free agents gradually back toward their original baseline next season", () => {
+  it("keeps free agents at their developed values next season (no baseline regression)", () => {
     const sourceSave = save();
     const freeAgent = createPlayer({
       id: "fa-1",
@@ -760,12 +760,16 @@ describe("pre-season workflow service", () => {
 
     expect(result.applied).toBe(true);
     expect(savedFreeAgent).toBeDefined();
-    expect(savedFreeAgent?.attributeSheetStats?.power).toBeLessThan(40);
-    expect(savedFreeAgent?.attributeSheetStats?.intelligence).toBeGreaterThan(27);
-    expect(savedFreeAgent?.marketValue).toBeLessThan(42);
-    expect(savedFreeAgent?.marketValue).toBeGreaterThan(20);
-    expect(savedFreeAgent?.salaryDemand).toBeLessThan(5);
-    expect(savedFreeAgent?.salaryDemand).toBeGreaterThan(2);
+    // Die Multi-Season-Free-Agent-Abwertung ist entfernt: der Free Agent wird NICHT mehr Richtung
+    // seines (niedrigeren) Baseline zurückgezogen. Direkter Nachweis = die Attribute bleiben exakt auf
+    // ihrem entwickelten Wert (früher drifteten sie 12% Richtung Baseline 31: power 40→~39, int 27→~27.5).
+    expect(savedFreeAgent?.attributeSheetStats?.power).toBe(40);
+    expect(savedFreeAgent?.attributeSheetStats?.intelligence).toBe(27);
+    // Marktwert/Gehalt werden separat pool-relativ neu berechnet (nicht Teil der entfernten Abwertung),
+    // aber sie werden nicht mehr Richtung Baseline (MW 20 / Gehalt 2) heruntergezogen.
+    expect(savedFreeAgent?.marketValue).toBeGreaterThanOrEqual(42);
+    expect(savedFreeAgent?.salaryDemand).toBeGreaterThanOrEqual(5);
+    // Der XP-Cooloff für inaktive Free Agents bleibt bestehen (unabhängig von der Baseline-Abwertung).
     expect(savedFreeAgent?.currentXP).toBeLessThan(30);
     expect(savedState?.playerMoraleState?.find((entry) => entry.playerId === "fa-1")?.inactiveSeasons).toBe(1);
   });

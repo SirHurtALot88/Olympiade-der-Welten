@@ -131,48 +131,6 @@ function normalizePlayerAttributes(
   return values as PlayerGeneratorAttributes;
 }
 
-function driftTowardBaseline(input: {
-  current: number | null | undefined;
-  baseline: number | null | undefined;
-  fraction: number;
-  minStep: number;
-  digits?: number;
-}) {
-  const current = toFiniteNumber(input.current);
-  const baseline = toFiniteNumber(input.baseline);
-  if (current == null) return baseline;
-  if (baseline == null) return current;
-  const delta = baseline - current;
-  if (Math.abs(delta) < 0.001) return roundValue(baseline, input.digits ?? 0);
-  const step = Math.min(Math.abs(delta), Math.max(input.minStep, Math.abs(delta) * input.fraction));
-  return roundValue(current + Math.sign(delta) * step, input.digits ?? 0);
-}
-
-function getStableEconomyTarget(input: {
-  currentVisible: number | null | undefined;
-  currentRaw: number | null | undefined;
-  baselineRaw: number | null | undefined;
-  rawScaleDivisor: number;
-  maxVisible: number;
-}) {
-  const baselineRaw = toFiniteNumber(input.baselineRaw);
-  if (baselineRaw != null) {
-    return baselineRaw > input.maxVisible ? roundValue(baselineRaw / input.rawScaleDivisor, 2) : baselineRaw;
-  }
-
-  const currentVisible = toFiniteNumber(input.currentVisible);
-  if (currentVisible != null && currentVisible > 0 && currentVisible <= input.maxVisible) {
-    return currentVisible;
-  }
-
-  const currentRaw = toFiniteNumber(input.currentRaw);
-  if (currentRaw != null && currentRaw > 0 && currentRaw <= input.maxVisible) {
-    return currentRaw;
-  }
-
-  return currentVisible ?? currentRaw ?? null;
-}
-
 function coolOffFreeAgentXp(value: number | null | undefined) {
   const current = toFiniteNumber(value);
   if (current == null || current <= 0) return 0;
@@ -204,7 +162,8 @@ export function applySeasonBaselineProgression(
   // mehr ausgewertet: Die Season-End-Progression rostered Spieler ist zu diesem Zeitpunkt bereits über
   // runSeasonEndProgressionBatch (materializeSeasonEndProgressionBeforeNextSeason) auf die Attribute
   // angewandt. Es gibt daher keinen "progressiert / nicht progressiert"-Fall mehr, der hier verzweigen
-  // müsste — rostered Spieler behalten schlicht ihren aktuellen Wert (siehe unten), Free Agents driften.
+  // müsste — ALLE Spieler (rostered wie Free Agents) behalten schlicht ihren aktuellen Wert. Die frühere
+  // Multi-Season-Free-Agent-Abwertung (Drift Richtung playerBaselines) ist entfernt (siehe unten).
   _options: { completedSeasonId?: string } = {},
 ) {
   const rosterPlayerIds = new Set(gameState.rosters.map((entry) => entry.playerId));
@@ -252,25 +211,16 @@ export function applySeasonBaselineProgression(
     }
 
     const isRostered = rosterPlayerIds.has(player.id);
-    const freeAgentRecoveryFraction = 0.12;
-    // Unrostered players drift 12% per season toward playerBaselines (attrs, MW, salary).
-    // Rostered Spieler behalten ihren aktuellen (bereits per Season-End-Progression fortgeschriebenen)
-    // Wert; nur wenn der Attributwert fehlt, fällt er auf das Baseline zurück.
+    // Multi-Season-Free-Agent-Abwertung ENTFERNT: Früher drifteten unrostered Spieler jede Season 12%
+    // zurück Richtung playerBaselines (Attribute, MW, Gehalt). Das ist raus — sowohl rostered als auch
+    // Free Agents behalten jetzt schlicht ihren aktuellen (organisch entwickelten) Wert. So können sich
+    // Spieler mit dem Potential-System frei organisch entwickeln, ohne dass ein entlassener, hochgezogener
+    // Spieler künstlich auf seinen Ursprungswert zurückgezogen wird. Das Baseline dient nur noch als
+    // Fallback für fehlende Attributwerte (und für bracketLabel weiter unten).
     const nextAttributePatch = Object.fromEntries(
       ATTRIBUTE_KEYS.map((attribute) => {
         const currentValue = toFiniteNumber(player.attributeSheetStats?.[attribute]);
-        if (isRostered) {
-          return [attribute, currentValue ?? baseline.attributes[attribute]];
-        }
-        return [
-          attribute,
-          driftTowardBaseline({
-            current: player.attributeSheetStats?.[attribute],
-            baseline: baseline.attributes[attribute],
-            fraction: freeAgentRecoveryFraction,
-            minStep: 1,
-          }),
-        ];
+        return [attribute, currentValue ?? baseline.attributes[attribute]];
       }),
     ) as PlayerGeneratorAttributes;
     const attributesAfter = normalizePlayerAttributes({
@@ -281,56 +231,11 @@ export function applySeasonBaselineProgression(
       attributesAfterByPlayerId.set(player.id, attributesAfter);
     }
     const currentEconomy = resolvePlayerEconomyContract({ player });
-    const baselineMarketValue = getStableEconomyTarget({
-      currentVisible: player.displayMarketValue,
-      currentRaw: currentEconomy.marketValue ?? player.marketValue,
-      baselineRaw: baseline.marketValue,
-      rawScaleDivisor: 1000,
-      maxVisible: 500,
-    });
-    const baselineSalary = getStableEconomyTarget({
-      currentVisible: player.displaySalary,
-      currentRaw: currentEconomy.salary ?? player.salaryDemand,
-      baselineRaw: baseline.salary,
-      rawScaleDivisor: 1000,
-      maxVisible: 80,
-    });
-    const nextMarketValue = isRostered
-      ? (player.marketValue ?? currentEconomy.marketValue)
-      : driftTowardBaseline({
-          current: player.marketValue ?? currentEconomy.marketValue,
-          baseline: baselineMarketValue,
-          fraction: freeAgentRecoveryFraction,
-          minStep: 0.6,
-          digits: 2,
-        }) ?? currentEconomy.marketValue ?? player.marketValue;
-    const nextDisplayMarketValue = isRostered
-      ? (player.displayMarketValue ?? player.marketValue ?? currentEconomy.marketValue)
-      : driftTowardBaseline({
-          current: player.displayMarketValue ?? player.marketValue ?? currentEconomy.marketValue,
-          baseline: baselineMarketValue,
-          fraction: freeAgentRecoveryFraction,
-          minStep: 0.6,
-          digits: 2,
-        }) ?? nextMarketValue;
-    const nextSalaryDemand = isRostered
-      ? (player.salaryDemand ?? currentEconomy.salary)
-      : driftTowardBaseline({
-          current: player.salaryDemand ?? currentEconomy.salary,
-          baseline: baselineSalary,
-          fraction: freeAgentRecoveryFraction,
-          minStep: 0.08,
-          digits: 2,
-        }) ?? currentEconomy.salary ?? player.salaryDemand;
-    const nextDisplaySalary = isRostered
-      ? (player.displaySalary ?? player.salaryDemand ?? currentEconomy.salary)
-      : driftTowardBaseline({
-          current: player.displaySalary ?? player.salaryDemand ?? currentEconomy.salary,
-          baseline: baselineSalary,
-          fraction: freeAgentRecoveryFraction,
-          minStep: 0.08,
-          digits: 2,
-        }) ?? nextSalaryDemand;
+    const nextMarketValue = player.marketValue ?? currentEconomy.marketValue;
+    const nextDisplayMarketValue =
+      player.displayMarketValue ?? player.marketValue ?? currentEconomy.marketValue;
+    const nextSalaryDemand = player.salaryDemand ?? currentEconomy.salary;
+    const nextDisplaySalary = player.displaySalary ?? player.salaryDemand ?? currentEconomy.salary;
 
     pendingByPlayerId.set(player.id, {
       baseline,
