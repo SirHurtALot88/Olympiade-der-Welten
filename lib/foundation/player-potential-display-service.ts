@@ -147,18 +147,11 @@ export function buildPlayerPotentialDisplaySnapshot(input: {
     };
   });
 
-  // Reveal-Confidence (0..1): wie sicher der Attribut-Max bekannt ist. Wächst über
-  // Zeit (record.confidence, per Auto-Reveal-Tick) + Bonus für eigene Spieler. Bei 0
-  // (frisch, unscouted) ist die Unschärfe am größten. Bei ~1 wird der Max exakt gezeigt.
-  const ownerRoster = input.gameState.rosters?.find((entry) => entry.playerId === input.player.id) ?? null;
-  const ownerTeam = ownerRoster
-    ? input.gameState.teams?.find((team) => team.teamId === ownerRoster.teamId) ?? null
-    : null;
-  const isOwnPlayer = ownerTeam?.humanControlled === true;
-  const potentialRevealConfidence = Math.min(
-    1,
-    Math.max(0, (record.confidence ?? 0) / 100 + (isOwnPlayer ? 0.2 : 0)),
-  );
+  // Reveal-Confidence (0..1): wie sicher der Attribut-Max bekannt ist. Wächst rein über
+  // die Zeit (record.confidence, per Auto-Reveal-Tick — eigene Spieler schneller). Kein
+  // Sofort-Bonus: ein frischer Spieler startet VOLL verschleiert (breiteste Range) und
+  // deckt sich erst über die Saison auf (~1 Genauigkeits-Schritt pro Matchday).
+  const potentialRevealConfidence = Math.min(1, Math.max(0, (record.confidence ?? 0) / 100));
   const POTENTIAL_CEILING_BAND_MAX = 13;
 
   const attributeCeilingPreview: PlayerAttributeCeilingPreview[] = playerGeneratorAttributeKeys.map((attribute) => {
