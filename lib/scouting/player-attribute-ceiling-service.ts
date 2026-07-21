@@ -161,23 +161,26 @@ export function buildHiddenAttributeCeilingsFromPotentialScore(input: {
     99,
   );
   const traitModifier = getTalentTraitCeilingModifier(input.player);
-  // Zentrum leicht unter dem Gesamt-Score, damit die peak-gewichtete Achsen-Aggregation
-  // der gestreuten Attribut-Potenziale in etwa wieder beim Gesamt-Potenzial landet.
-  const centerPotential = hiddenPotentialScore - 6;
-  const SPREAD = 18;
+  // Korridor-Obergrenze: der HÖCHSTMÖGLICHE Attribut-Max dieses Spielers, skaliert mit
+  // dem Gesamt-Potenzial (+ Talent-Trait). Nur high-PO-Spieler erreichen den 99er-Bereich;
+  // schwächere bleiben in einem niedrigeren Korridor. So passt die Streuung „zu den
+  // Sternen, die er als Potenzial hat".
+  const corridorMax = clamp(Math.round(hiddenPotentialScore + 22 + traitModifier * 4), 40, 99);
   const ceilings = {} as Partial<Record<PlayerGeneratorAttributeName, number>>;
 
   for (const attribute of playerGeneratorAttributeKeys) {
     const axis = ATTRIBUTE_PRIMARY_AXIS[attribute];
     const current = getPlayerAttributeValue(input.player, attribute) ?? 35;
-    const attributeSeed = getPlayerSeedValue(`${input.saveId}:${input.player.id}:${attribute}:attr-ceiling-v3`);
-    // Ziel-Potenzial des Attributs — zentriert am Gesamt-Potenzial, breit gestreut,
-    // UNABHÄNGIG vom aktuellen Wert.
-    const classNudge = (getClassAxisAffinity(input.player.trainingClass ?? input.player.className, axis) - 1) * 22;
-    const attributePotential =
-      centerPotential + (attributeSeed - 0.5) * 2 * SPREAD + classNudge + traitModifier * 6;
-    // Untergrenze = aktueller Wert (verliert nichts), sonst das gezogene Potenzial.
-    ceilings[attribute] = clamp(Math.round(Math.max(current, attributePotential)), 1, 99);
+    const attributeSeed = getPlayerSeedValue(`${input.saveId}:${input.player.id}:${attribute}:attr-ceiling-v4`);
+    // Jedes Attribut zieht seinen Max-Wert ZUFÄLLIG zwischen aktuellem Wert und
+    // Korridor-Obergrenze. Dadurch echte Streuung UND entkoppelt vom Ist-Wert: ein
+    // aktuell hohes Attribut KANN trotzdem weit hoch (z.B. 73 → 99), ein niedriges KANN
+    // klein bleiben — rein aus dem Seed. Die zur Klasse passende Achse zieht im Schnitt
+    // etwas höher (milder Nudge, keine Garantie).
+    const classNudge = (getClassAxisAffinity(input.player.trainingClass ?? input.player.className, axis) - 1) * 0.35;
+    const headroomFrac = clamp(attributeSeed + classNudge, 0, 1);
+    const attributeMax = current + headroomFrac * Math.max(0, corridorMax - current);
+    ceilings[attribute] = clamp(Math.round(Math.max(current, attributeMax)), 1, 99);
   }
 
   return ceilings;

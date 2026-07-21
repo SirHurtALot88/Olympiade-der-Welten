@@ -210,8 +210,10 @@ export function potentialScoreToStars(score: number) {
  * v7: Per-Attribut-Ceilings entkoppelt vom aktuellen Wert + gestreut
  *     (buildHiddenAttributeCeilingsFromPotentialScore) — hohe Base-Stats ≠ höchste
  *     Attribut-Potenziale. Erfordert Neuberechnung der Attribut-Decken bestehender Saves.
+ * v8: Attribut-Decken als Korridor-Zufallsziehung zwischen aktuellem Wert und einer
+ *     potenzial-skalierten Obergrenze — echter Zufall, auch 73→99 möglich.
  */
-export const POTENTIAL_MODEL_VERSION = 7;
+export const POTENTIAL_MODEL_VERSION = 8;
 
 /**
  * Inverse zu {@link potentialScoreToStars}: gibt zu einem Ziel-Stern (0.5–5) den
