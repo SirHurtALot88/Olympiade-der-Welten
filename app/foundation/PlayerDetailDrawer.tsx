@@ -2717,7 +2717,10 @@ export default function PlayerDetailDrawer({
                         }`}
                       >
                         <span className="player-drawer-attr-ceiling-label">Potenzial</span>
-                        <span className="player-drawer-attr-ceiling-value">{formatValue(ceilingPreview.ceiling, 0)}</span>
+                        <span className="player-drawer-attr-ceiling-value">
+                          {entry.value != null ? `${formatValue(entry.value, 0)} → ` : ""}
+                          {formatValue(ceilingPreview.ceiling, 0)}
+                        </span>
                       </span>
                     ) : null}
                     {showAttributeSparkline ? (
