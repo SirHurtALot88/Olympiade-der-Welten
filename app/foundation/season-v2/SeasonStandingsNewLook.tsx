@@ -88,9 +88,17 @@ type NlTableSortKey =
   | SeasonDisciplineAreaId
   | "mw"
   | "cash"
+  | "sponsor"
   | "salary"
   | "buildingCost"
+  | "transfers"
   | "guv";
+
+/** " is-pos"/" is-neg"-Suffix für Geldwerte, die positiv oder negativ sein können. */
+function nlMoneySignClass(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value) || value === 0) return "";
+  return value > 0 ? " is-pos" : " is-neg";
+}
 
 function getTableSortValue(row: SeasonV2StandingsRow, key: NlTableSortKey): number | string {
   switch (key) {
@@ -110,10 +118,14 @@ function getTableSortValue(row: SeasonV2StandingsRow, key: NlTableSortKey): numb
         : Number.NEGATIVE_INFINITY;
     case "cash":
       return row.cash != null && Number.isFinite(row.cash) ? row.cash : Number.NEGATIVE_INFINITY;
+    case "sponsor":
+      return row.sponsorTotal != null && Number.isFinite(row.sponsorTotal) ? row.sponsorTotal : Number.NEGATIVE_INFINITY;
     case "salary":
       return row.salaryTotal != null && Number.isFinite(row.salaryTotal) ? row.salaryTotal : Number.NEGATIVE_INFINITY;
     case "buildingCost":
       return row.buildingCost != null && Number.isFinite(row.buildingCost) ? row.buildingCost : Number.NEGATIVE_INFINITY;
+    case "transfers":
+      return row.transferNet != null && Number.isFinite(row.transferNet) ? row.transferNet : Number.NEGATIVE_INFINITY;
     case "guv":
       return row.guv != null && Number.isFinite(row.guv) ? row.guv : Number.NEGATIVE_INFINITY;
     default: {
@@ -838,8 +850,10 @@ export default function SeasonStandingsNewLook({
               ))}
               <th>{renderTableSortHeader("mw", "MW")}</th>
               <th className="nl-standings-th-fin">{renderTableSortHeader("cash", "Cash")}</th>
+              <th className="nl-standings-th-fin">{renderTableSortHeader("sponsor", "Sponsoren")}</th>
               <th className="nl-standings-th-fin">{renderTableSortHeader("salary", "Gehälter")}</th>
               <th className="nl-standings-th-fin">{renderTableSortHeader("buildingCost", "Gebäude")}</th>
+              <th className="nl-standings-th-fin">{renderTableSortHeader("transfers", "Transfers")}</th>
               <th className="nl-standings-th-fin">{renderTableSortHeader("guv", "GuV")}</th>
             </tr>
           </thead>
@@ -908,17 +922,15 @@ export default function SeasonStandingsNewLook({
           ))}
           <td className="nl-standings-td-mw">{formatNlMoney(row.marketValueTotal)}</td>
           <td className="nl-standings-td-fin">{formatNlMoney(row.cash)}</td>
+          <td className={`nl-standings-td-fin${row.sponsorTotal ? " is-pos" : ""}`}>{formatNlMoney(row.sponsorTotal)}</td>
           <td className="nl-standings-td-fin">{formatNlMoney(row.salaryTotal)}</td>
           <td className="nl-standings-td-fin">{formatNlMoney(row.buildingCost)}</td>
-          <td
-            className={`nl-standings-td-fin${row.guv != null && Number.isFinite(row.guv) ? (row.guv >= 0 ? " is-pos" : " is-neg") : ""}`}
-          >
-            {formatNlMoney(row.guv)}
-          </td>
+          <td className={`nl-standings-td-fin${nlMoneySignClass(row.transferNet)}`}>{formatNlMoney(row.transferNet)}</td>
+          <td className={`nl-standings-td-fin${nlMoneySignClass(row.guv)}`}>{formatNlMoney(row.guv)}</td>
         </tr>
         {isExpanded ? (
           <tr className="nl-standings-table-detailrow">
-            <td className="nl-standings-table-detailcell" colSpan={14} id={`nl-standings-tdetails-${row.teamId}`}>
+            <td className="nl-standings-table-detailcell" colSpan={16} id={`nl-standings-tdetails-${row.teamId}`}>
               <span className="nl-standings-table-detailtitle">Disziplinen nach Bereich</span>
               {renderDisciplineGroups(row)}
             </td>

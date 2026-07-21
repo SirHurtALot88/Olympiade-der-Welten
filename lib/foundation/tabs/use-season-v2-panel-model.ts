@@ -120,6 +120,7 @@ export function useSeasonV2PanelModel({
           buildingCost: computeTeamBuildingCost(gameState, row.teamId),
           guv: row.guv ?? null,
           sponsorTotal: row.sponsorTotal ?? null,
+          transferNet: row.transferNet ?? row.transfersSeasonValue ?? null,
           marketValueTotal: row.marketValueTotal ?? null,
           disciplineValues: {
             bonuspunkte: row.disciplineValues.bonuspunkte ?? null,

@@ -58,6 +58,8 @@ export type SeasonV2StandingsRow = {
   buildingCost: number | null;
   guv: number | null;
   sponsorTotal: number | null;
+  /** Transferbilanz der Saison = Verkäufe − Käufe (S1 nur Käufe → großes Minus). */
+  transferNet: number | null;
   marketValueTotal: number | null;
   disciplineValues: Record<SeasonV2DisciplineKey, number | null>;
   rosterCount: number;

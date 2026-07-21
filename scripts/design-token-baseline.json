@@ -1,6 +1,6 @@
 {
   "_comment": "Ratchet-Baseline fuer scripts/lint-design-tokens.ts. Key-Format: '<datei>:<zeile>:<regel>'. Regel-IDs: EUR (rohes Euro-Zeichen), LOCALE (toLocaleString/Intl.NumberFormat), HEX (hartkodierte Hex-Farbe). Neu generieren mit: npx tsx scripts/lint-design-tokens.ts --update-baseline",
-  "generatedAt": "2026-07-21T21:24:41.142Z",
+  "generatedAt": "2026-07-21T22:10:39.775Z",
   "count": 100,
   "violations": [
     "app/foundation/FoundationShellRouterBody.tsx:3039:LOCALE",
@@ -46,8 +46,6 @@
     "app/foundation/scouting-center-v2/ScoutingShortlistBoard.tsx:64:EUR",
     "app/foundation/scouting-center-v2/ScoutingShortlistBoard.tsx:68:EUR",
     "app/foundation/scouting-center-v2/ScoutingShortlistBoard.tsx:69:EUR",
-    "app/foundation/season-v2/SeasonStandingsV2Client.tsx:185:HEX",
-    "app/foundation/season-v2/SeasonStandingsV2Client.tsx:186:HEX",
     "app/foundation/season-v2/SeasonStandingsV2Client.tsx:187:HEX",
     "app/foundation/season-v2/SeasonStandingsV2Client.tsx:188:HEX",
     "app/foundation/season-v2/SeasonStandingsV2Client.tsx:189:HEX",
@@ -78,6 +76,8 @@
     "app/foundation/season-v2/SeasonStandingsV2Client.tsx:214:HEX",
     "app/foundation/season-v2/SeasonStandingsV2Client.tsx:215:HEX",
     "app/foundation/season-v2/SeasonStandingsV2Client.tsx:216:HEX",
+    "app/foundation/season-v2/SeasonStandingsV2Client.tsx:217:HEX",
+    "app/foundation/season-v2/SeasonStandingsV2Client.tsx:218:HEX",
     "app/foundation/sponsors-v2/FoundationSponsorsNewLook.tsx:390:HEX",
     "app/foundation/sponsors-v2/FoundationSponsorsNewLook.tsx:548:HEX",
     "app/foundation/team-settings/FoundationTeamSettingsNewLook.tsx:1060:LOCALE",
