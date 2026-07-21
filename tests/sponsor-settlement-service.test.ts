@@ -114,6 +114,98 @@ describe("sponsor settlement — special component fraction payout (Teil B)", ()
   }, 60000);
 });
 
+describe("sponsor settlement — P3 overperformance + per-place improvement", () => {
+  function withComponentAtRank(
+    component: SponsorOfferComponent,
+    currentRank: number,
+    startRank = 16,
+  ): { gs: GameState; teamId: string } {
+    const teamId = gs0Team();
+    const gs = structuredClone(createSingleplayerGameState());
+    const contract: TeamSponsorContract = {
+      seasonId: gs.season.id,
+      teamId,
+      offerId: "p3-test-offer",
+      archetype: "performance",
+      name: "P3 Test",
+      chosenAt: new Date().toISOString(),
+      startRank,
+      components: [component],
+      payouts: {},
+      rarity: "magisch",
+      teamQualityRankAtSign: 16,
+    };
+    gs.seasonState.sponsorContractsByTeamId = {
+      ...(gs.seasonState.sponsorContractsByTeamId ?? {}),
+      [teamId]: contract,
+    };
+    gs.seasonState.standings = {
+      ...(gs.seasonState.standings ?? {}),
+      [teamId]: { rank: currentRank, points: 100 },
+    } as GameState["seasonState"]["standings"];
+    return { gs, teamId };
+  }
+  function rowFor(gs: GameState, teamId: string, kind: SponsorOfferComponent["kind"]) {
+    return previewSponsorSettlement(gs, "season_end").rows.find((r) => r.teamId === teamId && r.kind === kind) ?? null;
+  }
+
+  it("overperformance pays min(cap, rate × ranks above the frozen expected rank)", () => {
+    const comp: SponsorOfferComponent = {
+      componentId: "overperformance",
+      kind: "overperformance",
+      label: "Überperformance",
+      targetValue: 16, // eingefrorener Erwartungsrang
+      rewardCash: 14, // Cap
+      ratePerUnitC: 1.8,
+    };
+    // Endrang 12 → 4 Plätze über Erwartung #16 → 1.8×4 = 7.2 C
+    const a = withComponentAtRank(comp, 12);
+    expect(rowFor(a.gs, a.teamId, "overperformance")?.cashDelta).toBeCloseTo(7.2, 1);
+    // Endrang 2 → 14 Plätze → 1.8×14 = 25.2, gedeckelt bei 14
+    const b = withComponentAtRank(comp, 2);
+    expect(rowFor(b.gs, b.teamId, "overperformance")?.cashDelta).toBe(14);
+    // Endrang = Erwartung (16) → 0, skipped
+    const c = withComponentAtRank(comp, 16);
+    expect(rowFor(c.gs, c.teamId, "overperformance")?.cashDelta).toBe(0);
+    expect(rowFor(c.gs, c.teamId, "overperformance")?.status).toBe("skipped");
+  }, 60000);
+
+  it("per-place improvement pays min(cap, rate × places improved vs start rank)", () => {
+    const comp: SponsorOfferComponent = {
+      componentId: "improvement-target",
+      kind: "improvement",
+      label: "Tabellenziel",
+      targetValue: 1,
+      rewardCash: 9, // Cap = rate × maxUnits
+      ratePerUnitC: 1.5,
+      maxUnits: 6,
+    };
+    // startRank 16, Endrang 13 → +3 Plätze → 1.5×3 = 4.5 C
+    const a = withComponentAtRank(comp, 13, 16);
+    expect(rowFor(a.gs, a.teamId, "improvement")?.cashDelta).toBeCloseTo(4.5, 1);
+    // Endrang 4 → +12 Plätze → 1.5×12 = 18, gedeckelt bei 9
+    const b = withComponentAtRank(comp, 4, 16);
+    expect(rowFor(b.gs, b.teamId, "improvement")?.cashDelta).toBe(9);
+    // schlechter als Start (Endrang 20) → 0
+    const c = withComponentAtRank(comp, 20, 16);
+    expect(rowFor(c.gs, c.teamId, "improvement")?.cashDelta).toBe(0);
+  }, 60000);
+
+  it("keeps legacy binary improvement (no ratePerUnitC) backward-compatible", () => {
+    const comp: SponsorOfferComponent = {
+      componentId: "improvement-target",
+      kind: "improvement",
+      label: "≥ 2 Plätze verbessern",
+      targetValue: 2,
+      rewardCash: 3,
+    };
+    const a = withComponentAtRank(comp, 13, 16); // +3 ≥ 2 → voller Reward 3
+    expect(rowFor(a.gs, a.teamId, "improvement")?.cashDelta).toBe(3);
+    const b = withComponentAtRank(comp, 15, 16); // +1 < 2 → 0
+    expect(rowFor(b.gs, b.teamId, "improvement")?.cashDelta).toBe(0);
+  }, 60000);
+});
+
 function gs0Team(): string {
   return createSingleplayerGameState().teams[0]!.teamId;
 }

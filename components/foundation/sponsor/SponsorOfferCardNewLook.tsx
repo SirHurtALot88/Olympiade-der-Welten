@@ -218,7 +218,11 @@ export function SponsorOfferCardNewLook({
   const shapeLabel = SPONSOR_CURVE_SHAPES[shape].labelDe;
   const familyLabel = SPONSOR_CURVE_FAMILIES[getSponsorCurveFamily(shape)].labelDe;
   const specialComponent = offer.components.find((component) => component.kind === "special") ?? null;
-  const standardComponents = offer.components.filter((component) => component.kind !== "special");
+  // "overperformance" wird als eigene Zeile unter der Rang-Leiter gerendert (nicht als generische Kachel),
+  // fließt aber weiter in die Gesamt-Summe (totalCash) ein.
+  const standardComponents = offer.components.filter(
+    (component) => component.kind !== "special" && component.kind !== "overperformance",
+  );
   const baseCash = offer.components.find((component) => component.kind === "base")?.rewardCash ?? 0;
   const totalCash = offer.components.reduce(
     (sum, component) => sum + (typeof component.rewardCash === "number" ? component.rewardCash : 0),
@@ -372,28 +376,26 @@ export function SponsorOfferCardNewLook({
                       );
                     })}
                 </ul>
-                {/* P2 — ehrliche Überperformance-Zeile: an die tatsächlich zahlende `beat_expected_rank`-
-                    Klausel gekoppelt und BEZIFFERT (früher stand generisch „zahlt extra" ohne Zahl, und nur
-                    bei performance-Sponsoren, obwohl die Klausel auf fast allen Angeboten liegt). Fehlt die
-                    Komponente (Team ohne Luft nach oben), wird die Zeile GAR NICHT gerendert — Abwesenheit
-                    ist ehrlich statt eines leeren Versprechens. Der volle familien-differenzierte Bonus folgt
-                    in P3 als eigenes Overperformance-Modul. */}
+                {/* P3 — Überperformance-Modul (familien-differenziert) als konkrete, bezifferte Zeile unter der
+                    Rang-Leiter: Rate je Platz über dem Erwartungsrang + Cap, exakt die beim Signieren
+                    eingefrorenen Werte (Anzeige == Settlement). Sponsoren OHNE das Modul (Sicherheits-Familie
+                    oder Team ohne Luft nach oben) zeigen die Zeile gar nicht — Abwesenheit ist ehrlich. */}
                 {(() => {
-                  const overperf = offer.components.find((entry) => entry.specialKey === "beat_expected_rank");
+                  const overperf = offer.components.find((entry) => entry.kind === "overperformance");
                   if (!overperf) return null;
-                  const targetRank = typeof overperf.targetValue === "number" ? overperf.targetValue : null;
+                  const expectedRank = typeof overperf.targetValue === "number" ? overperf.targetValue : null;
                   return (
                     <div className="nl-sponsor-overperf-hint" data-testid="sponsor-overperf-hint">
                       <span className="nl-sponsor-overperf-icon" aria-hidden="true">
                         ✦
                       </span>
                       <span>
-                        <strong>Überperformance: +{formatCash(overperf.rewardCash)}</strong>{" "}
-                        {targetRank != null
-                          ? `wenn du die Saison auf Platz ≤ #${targetRank} beendest${
-                              offer.teamQualityRank != null ? ` (über deinem Erwartungsrang #${Math.round(offer.teamQualityRank)})` : ""
-                            }.`
-                          : "wenn du deine Saison-Erwartung übertriffst."}
+                        <strong>
+                          Überperformance: +{overperf.ratePerUnitC != null ? formatCash(overperf.ratePerUnitC) : "?"} je Platz
+                        </strong>{" "}
+                        {expectedRank != null
+                          ? `über deinem Erwartungsrang #${expectedRank} — max ${formatCash(overperf.rewardCash)}.`
+                          : `über deiner Erwartung — max ${formatCash(overperf.rewardCash)}.`}
                       </span>
                     </div>
                   );

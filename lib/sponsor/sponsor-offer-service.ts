@@ -36,6 +36,8 @@ import {
   getNextMilestoneRank,
   getPrizeMoneyReference,
   getSponsorPayoutForFinalRank,
+  getSponsorOverperfConfig,
+  getSponsorImprovementConfig,
   resolveSponsorEconomyAnchors,
 } from "@/lib/sponsor/sponsor-economy-calibration";
 import { SPONSOR_RARITIES, getSponsorCurveFamily, mapArchetypeToCurveShape } from "@/lib/sponsor/sponsor-curve-shapes";
@@ -45,10 +47,10 @@ import {
   rollSponsorOfferSlate,
 } from "@/lib/sponsor/sponsor-tier-pool";
 import {
-  buildBeatExpectedRankSpecialComponent,
   buildBonusObjectiveComponent,
   buildFanInfrastructureSpecialComponent,
   buildGoldenObjectiveComponent,
+  buildOverperformanceComponent,
   pickBonusObjective,
   pickGoldenObjective,
   resolveChallengeSlotIndex,
@@ -117,8 +119,12 @@ function buildOffer(input: {
   // Sonderziel-/Cash-Infrastruktur unverändert weiterläuft, während curveShape/rarity die Payout-Kurve steuern.
   const archetype: SponsorArchetype = mapCurveShapeToArchetype(curveShape);
   const demandMult = getDemandMultiplierForRarity(rarity);
-  const improvementBase = startRank != null ? Math.min(3, Math.max(1, Math.round((startRank - rankTarget) / 3) || 1)) : 1;
-  const improvementTarget = improvementBase + (rarity === "selten" || rarity === "legendär" ? 1 : 0);
+  const family = getSponsorCurveFamily(curveShape);
+  const rarityOrder = SPONSOR_RARITIES[rarity].order;
+  // P3: Verbesserungs-Modul jetzt PER PLATZ (familien-differenziert) statt binär; Überperformance-Modul
+  // (familien-differenziert, rarity-skaliert) ersetzt das binäre beat_expected_rank-Special.
+  const improvementCfg = getSponsorImprovementConfig(family, salaryFactor);
+  const overperfCfg = getSponsorOverperfConfig(family, rarityOrder, salaryFactor);
   const { brand, parent, special } = pickSponsorBrandForOffer({
     seasonId: gameState.season.id,
     teamId: team.teamId,
@@ -147,7 +153,6 @@ function buildOffer(input: {
         getSponsorCurveShapePayout(32, salaryFactor, rarity, curveShape, leagueMinSalary, teamQualityRank ?? null, isGolden),
     ),
   );
-  const improvementCash = roundCash(cashAmounts.totalAtMaxRank * 0.04);
   // P2 Sonderziel-Buff: den (jetzt rarity-gestaffelten, in buildOfferCashAmounts gedeckelten) specialCash
   // DIREKT als Sonderziel-Reward verwenden — die frühere 0.65/0.35-Verdünnung ist entfallen, damit ein
   // volles Sonderziel spürbar zahlt (~5/8/10/13 C je Rarity statt ~2–4 C). Challenge-Slot: Boden von 5 % auf
@@ -169,12 +174,16 @@ function buildOffer(input: {
   // konservativ, salaryFactor-skaliert, binär bzw. gedeckelt — nur ausgezahlt, wenn das jeweilige Ziel
   // erreicht wird (siehe Settlement/Evaluator).
   const fanInfraReward = roundCash(2.5 * salaryFactor);
-  const overachieveReward = roundCash(3 * salaryFactor);
-  const beatExpectedComponent = buildBeatExpectedRankSpecialComponent({
-    expectedRank: teamQualityRank,
-    margin: 3,
-    rewardCash: overachieveReward,
-  });
+  // P3: Überperformance als eigenes, sichtbares, familien-differenziertes Modul (min(cap, rate × Plätze über
+  // Erwartung), beim Signieren eingefroren) statt des binären 3-C-beat_expected_rank. Sicherheits-Familie hat
+  // keins (overperfCfg == null → dafür XL-Basis); Teams ohne Luft nach oben ebenfalls (Builder gibt null).
+  const overperfComponent = overperfCfg
+    ? buildOverperformanceComponent({
+        expectedRank: teamQualityRank,
+        ratePerUnitC: overperfCfg.ratePerUnitC,
+        cap: overperfCfg.cap,
+      })
+    : null;
 
   // TEIL B: das Saison-Sonderziel ist jetzt ein echtes Bonusziel aus dem 14+6-Pool (staged, anteilige
   // Auszahlung + Spotlight-Impuls in die Beliebtheit) statt des Legacy-Templates. Golden-Angebote bekommen
@@ -236,9 +245,13 @@ function buildOffer(input: {
     {
       componentId: "improvement-target",
       kind: "improvement",
-      label: `≥ ${improvementTarget} Plätze verbessern`,
-      targetValue: improvementTarget,
-      rewardCash: improvementCash,
+      // P3: per-Platz statt binär — zahlt ratePerUnitC je verbessertem Platz ggü. Startrang, gedeckelt bei
+      // maxUnits Plätzen. rewardCash = Cap (max) für Anzeige/Total; targetValue 1 = min. 1 Platz zum Zahlen.
+      label: `+${improvementCfg.ratePerUnitC} C je verbessertem Platz · max ${improvementCfg.maxUnits}`,
+      targetValue: 1,
+      rewardCash: improvementCfg.cap,
+      ratePerUnitC: improvementCfg.ratePerUnitC,
+      maxUnits: improvementCfg.maxUnits,
     },
     specialComponent,
     // Immer-an Fan-Infrastruktur-Klausel — ABER nur, wenn das gezogene Sonderziel (specialComponent)
@@ -248,7 +261,7 @@ function buildOffer(input: {
     ...(specialComponent.specialKey === "fan_infrastructure"
       ? []
       : [buildFanInfrastructureSpecialComponent({ rewardCash: fanInfraReward })]),
-    ...(beatExpectedComponent ? [beatExpectedComponent] : []),
+    ...(overperfComponent ? [overperfComponent] : []),
   ];
 
   return {

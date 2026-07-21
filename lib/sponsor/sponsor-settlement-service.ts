@@ -179,8 +179,30 @@ function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract)
     }
 
     if (component.kind === "improvement") {
-      const target = typeof component.targetValue === "number" ? component.targetValue : 2;
       const improvement = startRank != null && currentRank != null ? startRank - currentRank : 0;
+      if (typeof component.ratePerUnitC === "number") {
+        // P3 — per-Platz-Verbesserung: min(cap=rewardCash, rate × verbesserte Plätze). Gedeckelt über
+        // maxUnits (rewardCash = rate × maxUnits beim Signieren). Anzeige == Settlement per Konstruktion.
+        const paidUnits = Math.max(0, improvement);
+        const rawPayout = roundCash(component.ratePerUnitC * paidUnits);
+        const payout = Math.min(component.rewardCash, rawPayout);
+        rows.push({
+          teamId: contract.teamId,
+          teamName: team?.name ?? contract.teamId,
+          componentId: component.componentId,
+          kind: component.kind,
+          label: component.label,
+          status: payout > 0 ? "paid" : "skipped",
+          cashDelta: payout,
+          reason:
+            payout > 0
+              ? `Verbesserung +${improvement} Plätze → ${payout} C (${component.ratePerUnitC} C/Platz)`
+              : `Verbesserung +${improvement} — kein Klettern ggü. Startrang`,
+        });
+        continue;
+      }
+      // Legacy-Binärziel (Alt-Verträge ohne ratePerUnitC): Auszahlung bei ≥ targetValue verbesserten Plätzen.
+      const target = typeof component.targetValue === "number" ? component.targetValue : 2;
       const completed = improvement >= target;
       rows.push({
         teamId: contract.teamId,
@@ -193,6 +215,30 @@ function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract)
         reason: completed
           ? `Verbesserung +${improvement} (Ziel ${target})`
           : `Verbesserung +${improvement} unter Ziel ${target}`,
+      });
+      continue;
+    }
+
+    if (component.kind === "overperformance") {
+      // P3 — Überperformance: min(cap=rewardCash, rate × Plätze über Erwartungsrang). Der Erwartungsrang ist
+      // als targetValue eingefroren; die Rate in ratePerUnitC. Monoton im Endrang (additiv auf die Rang-Leiter),
+      // kein Tanking-Anreiz. Anzeige == Settlement.
+      const expectedRank = typeof component.targetValue === "number" ? component.targetValue : null;
+      const rate = component.ratePerUnitC ?? 0;
+      const ranksAbove = expectedRank != null && currentRank != null ? Math.max(0, expectedRank - currentRank) : 0;
+      const payout = Math.min(component.rewardCash, roundCash(rate * ranksAbove));
+      rows.push({
+        teamId: contract.teamId,
+        teamName: team?.name ?? contract.teamId,
+        componentId: component.componentId,
+        kind: component.kind,
+        label: component.label,
+        status: payout > 0 ? "paid" : "skipped",
+        cashDelta: payout,
+        reason:
+          payout > 0
+            ? `Überperformance +${ranksAbove} Plätze über Erwartung #${expectedRank} → ${payout} C`
+            : `Rang ${currentRank ?? "—"} — Erwartung #${expectedRank ?? "—"} nicht übertroffen`,
       });
       continue;
     }
