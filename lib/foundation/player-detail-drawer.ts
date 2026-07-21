@@ -74,7 +74,10 @@ import {
 import { getEffectiveScoutingLevel } from "@/lib/scouting/facility-scout-pipeline-service";
 import { buildPlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scouting-bridge";
 import { buildPlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
-import { resolvePlayerFlavorDe } from "@/lib/foundation/player-flavor-catalog";
+// Hinweis: Der Flavor-Text kommt direkt vom Player-Objekt (Feld flavorDe).
+// Der frühere Katalog-Fallback (player-flavor-catalog) zog den kompletten
+// 6,6-MB-Seed-Datensatz in den Client-Chunk des Drawers — dafür nicht nötig,
+// da Kader-/Katalog-Spieler flavorDe bereits mitführen.
 import { clampPotentialOverallToCurrent } from "@/lib/scouting/player-potential-ceiling-service";
 import {
   buildPlayerPotentialDisplaySnapshot,
@@ -2584,7 +2587,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
     sourceLabel: getSourceLabel(input.source),
     name: player.name,
     portraitUrl: getPlayerPortraitBrowserUrl(player.id, player.portraitUrl ?? null, player.portraitPath ?? null),
-    flavorDe: resolvePlayerFlavorDe(player),
+    flavorDe: player.flavorDe?.trim() || null,
     teamId: team?.teamId ?? null,
     teamName: team?.name ?? null,
     teamCode: team?.shortCode ?? null,
@@ -3028,7 +3031,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
           catalogPlayer.portraitPath ?? null,
         )
       : getPlayerPortraitBrowserUrl(input.playerId, rosterPlayer?.portraitUrl ?? null, null),
-    flavorDe: catalogPlayer ? resolvePlayerFlavorDe(catalogPlayer) : null,
+    flavorDe: catalogPlayer?.flavorDe?.trim() || null,
     teamId: input.context.team.id,
     teamName: input.context.team.name,
     teamCode: input.context.team.shortCode,

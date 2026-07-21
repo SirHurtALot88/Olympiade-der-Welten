@@ -1685,8 +1685,11 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           aria-label="Hauptaktion dieser Ansicht"
         >
           <div className="foundation-screen-action-cta">
+            {/* Nur EIN Primary pro Ansicht: der Header-"Weiter"-Button ist der
+                globale Akzent; die View-Hauptaktion wird als Secondary abgestuft,
+                damit klar ist, was DER nächste Schritt ist. */}
             <button
-              className={`primary-button foundation-screen-action-button${screenPrimaryAction.disabled ? " is-disabled" : ""}`}
+              className={`secondary-button foundation-screen-action-button${screenPrimaryAction.disabled ? " is-disabled" : ""}`}
               type="button"
               onClick={screenPrimaryAction.onClick}
               disabled={screenPrimaryAction.disabled}

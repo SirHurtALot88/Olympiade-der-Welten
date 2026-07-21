@@ -3,6 +3,7 @@ import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { getTeamBoardFlowSignals } from "@/lib/board/team-season-objectives-service";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 import { isTeamMatchdayLineupComplete, isTeamMatchdayLineupSubmitted } from "@/lib/foundation/matchday-lineup-readiness";
+import { isTeamTrainingComplete } from "@/lib/foundation/team-training-status";
 
 export type SeasonReadinessItemStatus = "ready" | "open" | "blocked";
 
@@ -28,12 +29,8 @@ function rosterPlayerIds(gameState: GameState, teamId: string) {
 }
 
 function teamTrainingComplete(gameState: GameState, teamId: string) {
-  const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
-  const rosterIds = rosterPlayerIds(gameState, teamId);
-  if (rosterIds.length === 0) {
-    return false;
-  }
-  return rosterIds.every((playerId) => playersById.get(playerId)?.trainingMode != null);
+  // Einheitliche Quelle der Wahrheit (siehe team-training-status).
+  return isTeamTrainingComplete(gameState, teamId);
 }
 
 function activeLineupDraft(gameState: GameState, teamId: string) {

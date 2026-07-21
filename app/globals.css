@@ -1882,6 +1882,28 @@ a {
   text-overflow: ellipsis;
 }
 
+/* Touch/Mobile (UX-Audit P2): der "Leertaste"-Hint ist ohne Tastatur sinnlos,
+   der Next-Button darf nicht auf 30vw gequetscht werden, und Tabs/Pills müssen
+   das 44px-Touch-Ziel erreichen. */
+@media (max-width: 760px) {
+  .foundation-global-next-button small {
+    display: none;
+  }
+  .foundation-global-next-button {
+    max-width: 100%;
+    width: 100%;
+    min-height: 44px;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .foundation-topnav .pill,
+  .foundation-topnav .foundation-tab,
+  .foundation-utility-strip .pill,
+  .foundation-utility-strip .foundation-tab {
+    min-height: 44px;
+    padding: 11px 14px;
+  }
+}
+
 .foundation-global-next-button small {
   padding: 2px 6px;
   border-radius: 999px;

@@ -4,6 +4,7 @@ import type { DisciplineCategory, GameState, NewGameFlowStepId, NewGameFlowStepS
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { getFacilityLevel } from "@/lib/facilities/facility-effects";
 import { buildSeasonReadinessChecklist } from "@/lib/foundation/season-readiness-checklist";
+import { isTeamTrainingComplete } from "@/lib/foundation/team-training-status";
 import { formatWholeNumber } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 import type {
   FoundationPrizePreviewResponse,
@@ -233,7 +234,10 @@ export function useFoundationCrossTabSeasonBriefing(input: {
       (sum, facility) => sum + (getFacilityLevel(input.selectedTeamFacilityState, facility.facilityId) > 1 ? 1 : 0),
       0,
     );
-    const hasTrainingIntent = facilityUpgradeCount > 0;
+    // "Training gesetzt" einheitlich wie Game-Flow/Readiness bestimmen (nicht
+    // mehr über facilityUpgradeCount), damit alle Oberflächen denselben
+    // Abschlusszustand zeigen.
+    const trainingComplete = isTeamTrainingComplete(input.gameState, selectedTeam.teamId);
     const axisAverages = [
       {
         label: "POW",
@@ -332,16 +336,15 @@ export function useFoundationCrossTabSeasonBriefing(input: {
       },
       {
         stepId: "training_facilities",
-        title: "Scouting & Gebäude prüfen",
+        title: "Training setzen",
         kicker: "Basis",
-        detail:
-          facilityUpgradeCount > 0
-            ? `${facilityUpgradeCount} Facility-Upgrades aktiv. Scouting und Training kurz gegenchecken.`
-            : "Nach dem Markt kurz prüfen: Scouting verbessern, Training setzen oder bewusst sparen.",
-        targetLabel: "Basis prüfen",
+        detail: trainingComplete
+          ? `Trainingsmodi gesetzt.${facilityUpgradeCount > 0 ? ` ${facilityUpgradeCount} Facility-Upgrades aktiv.` : ""}`
+          : "Jedem Kader-Spieler einen Trainingsmodus geben (Scouting/Gebäude optional).",
+        targetLabel: "Training öffnen",
         targetView: "trainingV2",
-        status: getResolvedStatus("training_facilities", hasTrainingIntent),
-        progress: facilityUpgradeCount > 0 ? `${facilityUpgradeCount} Upgrades` : "offen",
+        status: getResolvedStatus("training_facilities", trainingComplete),
+        progress: trainingComplete ? "gesetzt" : "offen",
       },
       {
         stepId: "appoint_captain",
