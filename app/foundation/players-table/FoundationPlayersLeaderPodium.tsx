@@ -43,6 +43,7 @@ import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat"
 import type { FoundationPlayerScopeRow } from "@/lib/foundation/tabs/use-foundation-cross-tab-player-directory";
 
 import { getFoggedPoScoreRange } from "@/app/foundation/players-table/foundation-players-fog-of-war";
+import { DEBUG_FORCE_PLAYER_VISIBILITY } from "@/lib/foundation/debug-player-visibility";
 import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
 
 type NlPodiumMetricKey = "ovr" | "pps" | "mvs";
@@ -131,7 +132,9 @@ export default function FoundationPlayersLeaderPodium({
         <div className="nl-podium" role="list" aria-label={`Top ${topThree.length} der Auswahl nach ${activeMetric.label}`}>
           {topThree.map(({ row, value, rank }) => {
             const portrait = getPlayerPortraitModel(row.player);
-            const playerOwned = row.team?.humanControlled ?? false;
+            // Build-Phase-Override wie in der Tabelle: `DEBUG_FORCE_PLAYER_VISIBILITY`
+            // überbrückt den PO-Fog, damit exakte PO-Sterne für alle Spieler sichtbar sind.
+            const playerOwned = (row.team?.humanControlled ?? false) || DEBUG_FORCE_PLAYER_VISIBILITY;
             const medalKind = NL_PODIUM_MEDAL_BY_RANK[rank] ?? "bronze";
             return (
               <div key={row.player.id} className={`nl-podium-plinth is-rank-${rank}`} role="listitem">

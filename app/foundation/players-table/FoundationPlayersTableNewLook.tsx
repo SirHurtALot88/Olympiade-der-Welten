@@ -133,6 +133,7 @@ import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score
 
 import FoundationPlayersCompareOverlay from "@/app/foundation/players-table/FoundationPlayersCompareOverlay";
 import { getFoggedPoScoreRange } from "@/app/foundation/players-table/foundation-players-fog-of-war";
+import { DEBUG_FORCE_PLAYER_VISIBILITY } from "@/lib/foundation/debug-player-visibility";
 import {
   getActiveSaveIdFromLocation,
   rowMatchesQueryChips,
@@ -1122,7 +1123,11 @@ export default function FoundationPlayersTableNewLook({
     // exakter Wert bleibt erhalten (`known`, solide Sterne). Für fremde Spieler
     // ist PO verdeckt: unscharfer Bereich statt Einzelwert, damit kein volles
     // ★★★★★ das verdeckte Potenzial leakt (siehe getFoggedPoScoreRange).
-    const owned = row.team?.humanControlled ?? false;
+    // Build-Phase-Override: der zentrale `DEBUG_FORCE_PLAYER_VISIBILITY`-Schalter
+    // (Env `NEXT_PUBLIC_DEBUG_PLAYER_ATTRIBUTES`) überbrückt den PO-Fog auch hier,
+    // damit exakte PO-Sterne für ALLE Spieler sichtbar sind — nicht nur fürs eigene
+    // Team. Auf 0 setzen reaktiviert die scouting-basierte Unschärfe.
+    const owned = (row.team?.humanControlled ?? false) || DEBUG_FORCE_PLAYER_VISIBILITY;
     const potential = row.player.potential ?? null;
     return (
       <NlAbilityStars
@@ -1200,7 +1205,7 @@ export default function FoundationPlayersTableNewLook({
     const isPpsExpanded = expandedPlayerId === row.player.id;
     const ppsDetailId = `nl-players-pps-detail-${row.player.id}`;
     // Fog of war: nur eigene Spieler haben ein bekanntes PO (siehe renderAbilityStars).
-    const playerOwned = row.team?.humanControlled ?? false;
+    const playerOwned = (row.team?.humanControlled ?? false) || DEBUG_FORCE_PLAYER_VISIBILITY;
     const isCompareSelected = comparePlayerIds.includes(row.player.id);
     const compareDisabled = !isCompareSelected && comparePlayerIds.length >= 4;
     // Wishlist-Schreibpfad (P1, #3): der Stern ist interaktiv, sobald ein eigenes
@@ -1596,7 +1601,11 @@ export default function FoundationPlayersTableNewLook({
       case "abilityStars": {
         // Gleiche Sternmathematik + Klammerung wie `NlAbilityStars`
         // (`resolveCaStars`/`resolvePoStarRange`) — PO fällt nie unter CA.
-        const owned = row.team?.humanControlled ?? false;
+        // Build-Phase-Override: der zentrale `DEBUG_FORCE_PLAYER_VISIBILITY`-Schalter
+    // (Env `NEXT_PUBLIC_DEBUG_PLAYER_ATTRIBUTES`) überbrückt den PO-Fog auch hier,
+    // damit exakte PO-Sterne für ALLE Spieler sichtbar sind — nicht nur fürs eigene
+    // Team. Auf 0 setzen reaktiviert die scouting-basierte Unschärfe.
+    const owned = (row.team?.humanControlled ?? false) || DEBUG_FORCE_PLAYER_VISIBILITY;
         const caScore = computeCurrentAbilityScore(row.player.coreStats);
         const caStars = caScore != null ? potentialScoreToStars(caScore) : null;
         const potential = row.player.potential ?? null;
