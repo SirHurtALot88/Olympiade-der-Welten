@@ -1054,6 +1054,25 @@ export function useFoundationShellRouterBodyScope({
     setHistoryPage(1);
   }, [activeSaveId]);
 
+  // Aktions-Feedback beim View-Wechsel leeren, damit ein "Kapitän ernannt" o.ä.
+  // nicht veraltet über anderen Ansichten stehen bleibt.
+  useEffect(() => {
+    setFoundationActionFeedback(null);
+  }, [activeView, setFoundationActionFeedback]);
+
+  // Erfolg/Info/Warnung nach kurzer Zeit selbst ausblenden; Fehler bleiben
+  // stehen, bis sie manuell geschlossen werden oder der User wegnavigiert.
+  useEffect(() => {
+    if (!foundationActionFeedback) {
+      return;
+    }
+    if (foundationActionFeedback.tone === "error" || foundationActionFeedback.tone === "blocked") {
+      return;
+    }
+    const timer = setTimeout(() => setFoundationActionFeedback(null), 6000);
+    return () => clearTimeout(timer);
+  }, [foundationActionFeedback, setFoundationActionFeedback]);
+
   const activeTransferMarketTab = "v2" as const;
   const isTransferMarketViewActive = activeView === "marketV2";
   const activeTransferHistoryTab = "v2" as const;
