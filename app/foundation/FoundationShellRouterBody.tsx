@@ -2564,6 +2564,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             onAdvanceMatchday={null}
             onOpenPlayer={(playerId) => openPlayerDrawerById(playerId)}
             onOpenTeam={(teamId) => openTeamDrawerById(teamId)}
+            roomContext={roomContext}
           />
               <section className="panel arena-result-summary" id="arena-result-summary" data-testid="arena-result-summary">
                 <div className="panel-header">

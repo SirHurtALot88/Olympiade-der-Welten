@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
+import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
 import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import {
   buildDisciplineStageModel,
@@ -67,6 +68,8 @@ export type DisciplineStageArenaProps = {
   onAdvanceMatchday?: (() => void | Promise<void>) | null;
   onOpenPlayer?: ((playerId: string) => void) | null;
   onOpenTeam?: ((teamId: string) => void) | null;
+  /** Multiplayer-Room-Kontext — aktiviert Co-op-Ready-Gate + host-getriebenen Lockstep-Reveal. */
+  roomContext?: FoundationRoomContext | null;
 };
 
 // Mutator-Traits = echte Spielregel (lib/lineups/legacy-lineup-modifiers.ts):
@@ -417,6 +420,7 @@ export default function DisciplineStageArena({
   onAdvanceMatchday,
   onOpenPlayer,
   onOpenTeam,
+  roomContext,
 }: DisciplineStageArenaProps) {
   const ownTeamId = activeManagerTeamId ?? selectedTeamId ?? null;
 
