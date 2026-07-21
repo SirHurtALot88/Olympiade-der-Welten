@@ -28,7 +28,6 @@ import KdaField from "./kda";
 import DuelhpField from "./duelhp";
 import BarbellField from "./barbell";
 import SparkbarField from "./sparkbar";
-import ThermometerField from "./thermometer";
 import PelotonField from "./peloton";
 import ParcoursField from "./parcours";
 import BumpField from "./bump";
@@ -57,7 +56,10 @@ export const DISCIPLINE_FIELD_REGISTRY: Record<StagePrimitive, DisciplineField> 
   duelhp: DuelhpField,
   barbell: BarbellField,
   sparkbar: SparkbarField,
-  thermometer: ThermometerField,
+  // thermometer-Primitive existiert nur noch als Geometrie-Key für Breaking Point; das
+  // alte Schmerz-Thermometer-Feld ist gelöscht. Fällt hier BreakingField ein (statt des
+  // Thermometers), falls je direkt aufs Primitive statt auf die disciplineId aufgelöst wird.
+  thermometer: BreakingField,
   peloton: PelotonField,
   parcours: ParcoursField,
   bump: BumpField,
