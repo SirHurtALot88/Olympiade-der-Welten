@@ -24,6 +24,10 @@ import type { PersistedSaveGame } from "@/lib/persistence/types";
 
 loadEnvConfig(process.cwd());
 
+// WICHTIG: `--only-if-empty` importiert NUR, wenn der lokale Store noch keine Saves hat.
+// So kann der SessionStart-Hook eine frische Umgebung befüllen, ohne eine Umgebung zu
+// überschreiben, in der bereits echte Spielstände liegen (kein Clobbern des aktiven Saves).
+
 const ONLINE_SAVES_DIR = path.join(process.cwd(), "data", "online-saves");
 const MANIFEST_PATH = path.join(ONLINE_SAVES_DIR, "manifest.json");
 
@@ -38,9 +42,11 @@ type Manifest = {
 function parseArgs(argv: string[]) {
   const ids: string[] = [];
   let activate = true;
+  let onlyIfEmpty = false;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--no-activate") activate = false;
+    else if (arg === "--only-if-empty") onlyIfEmpty = true;
     else if (arg === "--id") {
       const next = argv[i + 1];
       if (next) {
@@ -49,7 +55,7 @@ function parseArgs(argv: string[]) {
       }
     }
   }
-  return { ids, activate };
+  return { ids, activate, onlyIfEmpty };
 }
 
 function main() {
@@ -57,9 +63,14 @@ function main() {
     console.error(`Kein Manifest gefunden: ${MANIFEST_PATH}. Zuerst exportieren (scripts/save-export.ts).`);
     process.exit(1);
   }
-  const { ids, activate } = parseArgs(process.argv.slice(2));
+  const { ids, activate, onlyIfEmpty } = parseArgs(process.argv.slice(2));
   const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8")) as Manifest;
   const repo = createSaveRepository();
+
+  if (onlyIfEmpty && repo.listSaves().length > 0) {
+    console.log("Store enthält bereits Saves → Import übersprungen (--only-if-empty). Bestehende Spielstände bleiben unangetastet.");
+    return;
+  }
 
   let entries = manifest.saves;
   if (ids.length > 0) {

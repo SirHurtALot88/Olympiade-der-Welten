@@ -16,9 +16,10 @@ if [ ! -d node_modules ]; then
   npm install
 fi
 
-# Online-Saves in den lokalen Store laden, falls vorhanden (Upsert, legt fehlende Saves neu an).
+# Online-Saves NUR in einen leeren Store laden (frische Umgebung) — niemals eine Umgebung
+# ueberschreiben, in der schon echte Spielstaende liegen (--only-if-empty schuetzt davor).
 if [ -f data/online-saves/manifest.json ]; then
-  npm run saves:import || echo "[session-start] save-import fehlgeschlagen (uebersprungen)"
+  npm run saves:import -- --only-if-empty || echo "[session-start] save-import uebersprungen"
 fi
 
 echo "[session-start] Online-Saves importiert."
