@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import next from "next";
 
 import { ensureSocketServer } from "@/lib/socket/server";
+import { startOnlineSaveAutoExport } from "@/lib/persistence/online-save-auto-export";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "0.0.0.0";
@@ -23,6 +24,9 @@ app
     ensureSocketServer(httpServer);
     httpServer.listen(port, hostname, () => {
       console.log(`Oly Room laeuft auf http://localhost:${port}`);
+      // Hält data/online-saves/ im Hintergrund aktuell (und pusht optional nach GitHub),
+      // damit die Saves "online" und überall zugänglich bleiben. Env-gesteuert, siehe Modul.
+      startOnlineSaveAutoExport();
     });
   })
   .catch((error) => {

@@ -124,7 +124,9 @@
     "retool:extract-ai": "tsx scripts/extract-retool-ai-golden-master.ts",
     "retool:extract-player-attributes": "tsx scripts/extract-retool-player-attributes.ts",
     "retool:extract-transfermarkt-columns": "tsx scripts/extract-retool-transfermarkt-columns.ts",
-    "retool:extract-standings-economy": "tsx scripts/extract-retool-standings-economy.ts"
+    "retool:extract-standings-economy": "tsx scripts/extract-retool-standings-economy.ts",
+    "saves:export": "tsx scripts/save-export.ts",
+    "saves:import": "tsx scripts/save-import.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
