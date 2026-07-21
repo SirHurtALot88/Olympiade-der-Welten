@@ -204,8 +204,17 @@ describe("player potential ceiling service", () => {
     });
 
     expect(current.overall).toBeLessThanOrEqual(1.5);
-    expect(ceiling.pow).toBeGreaterThan(current.pow);
-    expect(ceiling.pow - current.pow).toBeGreaterThanOrEqual(1);
+    // Star-Uniform + ENTKOPPELTES Attribut-Modell (v7): ein schwacher Spieler trägt
+    // echtes Potenzial — aber nicht zwingend auf der pow-Achse (Potenzial ist vom
+    // aktuellen Wert entkoppelt, hohe Base-Stats ≠ höchstes Potenzial). Geprüft wird
+    // daher, dass IRGENDEINE Achse deutlichen Headroom trägt und der Gesamt-Abstand real ist.
+    const axisHeadrooms = [
+      ceiling.pow - current.pow,
+      ceiling.spe - current.spe,
+      ceiling.men - current.men,
+      ceiling.soc - current.soc,
+    ];
+    expect(Math.max(...axisHeadrooms)).toBeGreaterThanOrEqual(1);
     expect(buildPotentialGap({ currentStars: current, ceiling })).toBeGreaterThan(0.5);
   });
 

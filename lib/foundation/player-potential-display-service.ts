@@ -39,6 +39,8 @@ export type PlayerAttributeCeilingPreview = {
   attribute: PlayerGeneratorAttributeName;
   label: string;
   current: number | null;
+  /** Max erreichbarer Attributwert (Potenzial-Decke), numerisch. */
+  ceiling: number | null;
   state: AttributeHeadroomState;
   headroomLabel: string;
   growthMultiplier: number;
@@ -142,6 +144,7 @@ export function buildPlayerPotentialDisplaySnapshot(input: {
       attribute,
       label: TRAINING_ATTRIBUTE_LABELS[attribute],
       current: headroom.current,
+      ceiling: headroom.ceiling,
       state: headroom.state,
       headroomLabel: getHeadroomLabel(headroom.state, headroom.headroom),
       growthMultiplier: getAttributeGrowthMultiplier(headroom.state),

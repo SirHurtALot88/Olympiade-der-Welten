@@ -207,8 +207,11 @@ export function potentialScoreToStars(score: number) {
  * v6: PO wird pro CA-Sternband gleichmäßig über [CA, 5] gezogen (statt festem
  *     Punkte-Gap). Junge/schwache Spieler bekommen echte, breit gestreute
  *     Ausbau-Reserve; Veteranen nahe der Decke bleiben gedeckelt.
+ * v7: Per-Attribut-Ceilings entkoppelt vom aktuellen Wert + gestreut
+ *     (buildHiddenAttributeCeilingsFromPotentialScore) — hohe Base-Stats ≠ höchste
+ *     Attribut-Potenziale. Erfordert Neuberechnung der Attribut-Decken bestehender Saves.
  */
-export const POTENTIAL_MODEL_VERSION = 6;
+export const POTENTIAL_MODEL_VERSION = 7;
 
 /**
  * Inverse zu {@link potentialScoreToStars}: gibt zu einem Ziel-Stern (0.5–5) den
@@ -459,6 +462,11 @@ export function buildPlayerPotentialRecordsForSave(input: {
       ceiling,
       player,
       saveId: input.saveId,
+      // currentStars durchreichen, damit attach die per-Attribut-Decken über den
+      // NEUEN, entkoppelten Generator (buildHiddenAttributeCeilingsFromPotentialScore)
+      // erzeugt statt über den achsen-abgeleiteten Fallback (der die Base-Stats
+      // spiegelte und aufblähte).
+      currentStars,
     });
   });
 }

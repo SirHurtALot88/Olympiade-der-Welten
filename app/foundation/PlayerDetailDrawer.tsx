@@ -2707,6 +2707,19 @@ export default function PlayerDetailDrawer({
                       {attributePrimaryLabel}
                       {showExactAttribute && plannedAttributeDelta ? ` → ${formatValue(plannedNextValue, 0)}` : ""}
                     </strong>
+                    {showExactAttribute && ceilingPreview?.ceiling != null ? (
+                      <span
+                        className="player-drawer-attr-ceiling"
+                        title={`Max erreichbares Potenzial für ${entry.label}: ${formatValue(ceilingPreview.ceiling, 0)}${
+                          entry.value != null
+                            ? ` · Ausbau-Reserve +${Math.max(0, Math.round(ceilingPreview.ceiling - entry.value))}`
+                            : ""
+                        }`}
+                      >
+                        <span className="player-drawer-attr-ceiling-label">Potenzial</span>
+                        <span className="player-drawer-attr-ceiling-value">{formatValue(ceilingPreview.ceiling, 0)}</span>
+                      </span>
+                    ) : null}
                     {showAttributeSparkline ? (
                       <span
                         className="is-new-look nl-attr-spark"

@@ -127,7 +127,26 @@ function getStrongestAttributeValueOnAxis(player: Player, axis: PlayerAxisKey) {
   return values.length > 0 ? Math.max(...values) : null;
 }
 
-/** Primary source of truth: per-attribute numeric ceilings from global upside budget. */
+/**
+ * Primary source of truth: per-attribute numeric ceilings (max erreichbarer Wert je
+ * Attribut), abgeleitet aus dem GESAMT-Potenzial-Score.
+ *
+ * Design (bewusst so, Produkt-Feedback):
+ *   - ENTKOPPELT vom aktuellen Attributwert: jedes Attribut zieht sein eigenes
+ *     Ziel-Potenzial rund um den Gesamt-Potenzial-Score (± Streuung), NICHT
+ *     current + fester Headroom. Hohe Base-Stats bedeuten also NICHT automatisch die
+ *     höchsten Potenziale — ein aktuell schwaches Attribut kann das größte Potenzial
+ *     tragen (versteckte Perle), ein starkes kann nahe am Limit sein.
+ *   - GESTREUT: pro Attribut ± ~18 Punkte Streuung (seed-deterministisch), sodass das
+ *     Potenzialprofil variiert statt flach dem aktuellen Profil zu folgen.
+ *   - Klassen-Affinität als milder Nudge (die zur Klasse passende Achse bekommt etwas
+ *     mehr Potenzial), Talent-Traits als kleiner globaler Auf-/Abschlag.
+ *   - Ceiling = max(current, gezogenes Potenzial): ein bereits hoher Wert ist die
+ *     Untergrenze (er verliert nichts), erhält aber keinen garantierten Headroom.
+ * Der frühere Ansatz hob das STÄRKSTE aktuelle Attribut jeder Achse an (strongest-on-
+ * axis-Bonus) → Potenzial folgte den Base-Stats und blähte fast jeden auf ~5★. Das ist
+ * hier ersetzt.
+ */
 export function buildHiddenAttributeCeilingsFromPotentialScore(input: {
   saveId: string;
   player: Player;
@@ -142,33 +161,23 @@ export function buildHiddenAttributeCeilingsFromPotentialScore(input: {
     99,
   );
   const traitModifier = getTalentTraitCeilingModifier(input.player);
-  const budget = mapHiddenScoreToUpsideBudget(hiddenPotentialScore);
+  // Zentrum leicht unter dem Gesamt-Score, damit die peak-gewichtete Achsen-Aggregation
+  // der gestreuten Attribut-Potenziale in etwa wieder beim Gesamt-Potenzial landet.
+  const centerPotential = hiddenPotentialScore - 6;
+  const SPREAD = 18;
   const ceilings = {} as Partial<Record<PlayerGeneratorAttributeName, number>>;
 
   for (const attribute of playerGeneratorAttributeKeys) {
     const axis = ATTRIBUTE_PRIMARY_AXIS[attribute];
     const current = getPlayerAttributeValue(input.player, attribute) ?? 35;
-    const currentAttrStars = mapNumericCeilingToAxisPoStars(current);
-    const attributeSeed = getPlayerSeedValue(`${input.saveId}:${input.player.id}:${attribute}:attr-ceiling-v2`);
-    const skew = 0.25 + attributeSeed * 1.65;
-    let upside = budget * skew;
-
-    const strongestOnAxis = getStrongestAttributeValueOnAxis(input.player, axis);
-    if (strongestOnAxis != null && current >= strongestOnAxis - 0.01) {
-      upside += 0.75 + attributeSeed * 1.25;
-    } else if (attributeSeed > 0.72) {
-      upside += attributeSeed * 0.75;
-    }
-
-    upside *= getClassAxisAffinity(input.player.trainingClass ?? input.player.className, axis);
-    upside += traitModifier * (0.35 + attributeSeed * 0.4);
-
-    const attributePoStars = roundHalfStar(clamp(currentAttrStars + upside, currentAttrStars, 5));
-    const baseNumeric = mapAxisPoStarsToNumericCeiling(attributePoStars);
-    const spread = 4 + attributeSeed * 6;
-    const direction = attributeSeed > 0.5 ? 1 : -1;
-    const rawCeiling = baseNumeric + direction * spread;
-    ceilings[attribute] = clamp(Math.max(current, Math.round(rawCeiling)), 1, 99);
+    const attributeSeed = getPlayerSeedValue(`${input.saveId}:${input.player.id}:${attribute}:attr-ceiling-v3`);
+    // Ziel-Potenzial des Attributs — zentriert am Gesamt-Potenzial, breit gestreut,
+    // UNABHÄNGIG vom aktuellen Wert.
+    const classNudge = (getClassAxisAffinity(input.player.trainingClass ?? input.player.className, axis) - 1) * 22;
+    const attributePotential =
+      centerPotential + (attributeSeed - 0.5) * 2 * SPREAD + classNudge + traitModifier * 6;
+    // Untergrenze = aktueller Wert (verliert nichts), sonst das gezogene Potenzial.
+    ceilings[attribute] = clamp(Math.round(Math.max(current, attributePotential)), 1, 99);
   }
 
   return ceilings;

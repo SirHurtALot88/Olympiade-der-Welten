@@ -15074,6 +15074,32 @@ a {
   color: var(--heat-weak-text);
 }
 
+/* Max-Potenzial pro Attribut (erreichbare Decke). Kleine Sekundärzeile unter dem
+   aktuellen Wert — dezent, akzentuierter Zahlenwert. Fog-of-War-gated über
+   `showExactAttribute` in der TSX (aktuell durch Debug-Sicht immer sichtbar). */
+.player-drawer-attr-ceiling {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-top: 2px;
+  line-height: 1;
+}
+
+.player-drawer-attr-ceiling-label {
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--nl-ink);
+  opacity: 0.55;
+}
+
+.player-drawer-attr-ceiling-value {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--nl-accent);
+  font-variant-numeric: tabular-nums;
+}
+
 .player-drawer-attribute-title {
   display: flex;
   align-items: center;
