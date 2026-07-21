@@ -3115,8 +3115,17 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                           // auf Team-Farbe), rechts Name/Slot + Breakdown. „locker Platz für
                           // die Player Cards als Bilder" — konsistent zum Feld-Token.
                           const initials = p.name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+                          // Spieler-Zeile klickbar → Spieler-Karte (alle Disziplinen). stopPropagation,
+                          // damit der Klick NICHT zusätzlich die Team-Karte öffnet. Die Reveal-Cascade
+                          // ist beim Hover ohnehin pausiert (onEnter der Hovercard) → genug Zeit zum Klick.
+                          const playerClickable = Boolean(onOpenPlayer && p.playerId);
                           return (
-                            <div key={s} style={{ display: "flex", gap: 9, alignItems: "flex-start", padding: 6, borderRadius: 9, background: "var(--nl-bg)", border: "1px solid var(--nl-line)" }}>
+                            <div
+                              key={s}
+                              onClick={playerClickable ? (e) => { e.stopPropagation(); onOpenPlayer!(p.playerId!); } : undefined}
+                              title={playerClickable ? "Spieler-Karte öffnen" : undefined}
+                              style={{ display: "flex", gap: 9, alignItems: "flex-start", padding: 6, borderRadius: 9, background: "var(--nl-bg)", border: "1px solid var(--nl-line)", cursor: playerClickable ? "pointer" : "default" }}
+                            >
                               <div style={{ position: "relative", flex: "none" }}>
                                 {p.portraitUrl ? (
                                   // eslint-disable-next-line @next/next/no-img-element
@@ -3153,8 +3162,14 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                         {upcoming ? (() => {
                           const teamAccent = floorTeamAccent(teamPrimaryColor(t.code));
                           const initials = upcoming.name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+                          const upClickable = Boolean(onOpenPlayer && upcoming.playerId);
                           return (
-                            <div key="upcoming" style={{ display: "flex", gap: 9, alignItems: "center", padding: 6, borderRadius: 9, background: "color-mix(in srgb, var(--nl-accent) 8%, var(--nl-bg))", border: "1px dashed var(--nl-accent)" }}>
+                            <div
+                              key="upcoming"
+                              onClick={upClickable ? (e) => { e.stopPropagation(); onOpenPlayer!(upcoming.playerId!); } : undefined}
+                              title={upClickable ? "Spieler-Karte öffnen" : undefined}
+                              style={{ display: "flex", gap: 9, alignItems: "center", padding: 6, borderRadius: 9, background: "color-mix(in srgb, var(--nl-accent) 8%, var(--nl-bg))", border: "1px dashed var(--nl-accent)", cursor: upClickable ? "pointer" : "default" }}
+                            >
                               <div style={{ position: "relative", flex: "none" }}>
                                 {upcoming.portraitUrl ? (
                                   // eslint-disable-next-line @next/next/no-img-element
