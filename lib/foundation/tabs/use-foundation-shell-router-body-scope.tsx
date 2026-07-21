@@ -5411,15 +5411,13 @@ export function useFoundationShellRouterBodyScope({
           if (!response.ok || payload.error) {
             hadError = true;
             if (payload.error) blockersAll.push(payload.error);
-          } else {
-            const applied = (payload.teams ?? []).some(
-              (entry) =>
-                entry.rosterAfter != null &&
-                entry.rosterBefore != null &&
-                entry.rosterAfter - entry.rosterBefore > 0,
-            );
-            if (applied) filledTeams += 1;
-            else if (payload.blockingReasons?.length) blockersAll.push(...payload.blockingReasons);
+          } else if (payload.executed === true) {
+            // Nur zählen, wenn die Picks TATSÄCHLICH angewendet+persistiert wurden. `rosterAfter` ist der
+            // GEPLANTE Kader (auch bei geblockten Teams befüllt), executed=false ⇒ nichts persistiert —
+            // die alte rosterAfter>rosterBefore-Heuristik zählte geblockte Teams fälschlich als aufgefüllt.
+            filledTeams += 1;
+          } else if (payload.blockingReasons?.length) {
+            blockersAll.push(...payload.blockingReasons);
           }
         } catch {
           hadError = true;
@@ -8590,6 +8588,86 @@ export function useFoundationShellRouterBodyScope({
       window.clearInterval(intervalId);
     };
   }, [activeSaveId, foundationSaveMode, leagueSetupStatus, loadSave, readMeta.source, setGameState]);
+
+  // CHUNKED league-setup completion. The server's fresh-S1 whole-league draft is a single long (~40s)
+  // detached task; a server-side time limit on long background tasks can cut it short, so the league is
+  // flagged "ready" while many teams are still empty (the "Draft nach ~11 Teams abgebrochen" symptom).
+  // Fix: once "ready", if several teams are still below their roster minimum in a fresh S1 preseason,
+  // FINISH the draft CLIENT-side in SMALL chunks — each a separate scoped picks-run request (the same
+  // endpoint the "KI-Teams nachpicken" button uses), ~4 teams/request so every call stays well under the
+  // server task limit. Idempotent + resumable (only under-min teams are drafted; a reload mid-fill just
+  // continues) and ref-guarded to run once per save. A normal mid-season load is excluded by the
+  // preseason + "several teams under min" gate, so this never auto-drafts an established league.
+  const leagueSetupAutoFinishRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      readMeta.source !== "sqlite" ||
+      readMeta.readOnly ||
+      !activeSaveId ||
+      activeSaveId === "loading-save" ||
+      leagueSetupStatus !== "ready" ||
+      gameState.gamePhase !== "preseason_management"
+    ) {
+      return undefined;
+    }
+    const rosterCountByTeamId = new Map<string, number>();
+    for (const entry of gameState.rosters) {
+      rosterCountByTeamId.set(entry.teamId, (rosterCountByTeamId.get(entry.teamId) ?? 0) + 1);
+    }
+    const teamsToDraft = gameState.teams
+      .filter((team) => {
+        const identity = gameState.teamIdentities.find((entry) => entry.teamId === team.teamId);
+        const { playerMin } = deriveRosterTargets(team, identity);
+        return (rosterCountByTeamId.get(team.teamId) ?? 0) < playerMin;
+      })
+      .map((team) => team.teamId);
+    // >= 4 under-min teams ⇒ an incomplete fresh-setup draft, not a normal single-team roster gap.
+    if (teamsToDraft.length < 4 || leagueSetupAutoFinishRef.current === activeSaveId) {
+      return undefined;
+    }
+    leagueSetupAutoFinishRef.current = activeSaveId;
+
+    let cancelled = false;
+    void (async () => {
+      const CHUNK_SIZE = 4;
+      for (let index = 0; index < teamsToDraft.length; index += CHUNK_SIZE) {
+        if (cancelled) return;
+        const chunk = teamsToDraft.slice(index, index + CHUNK_SIZE);
+        try {
+          await fetch(`/api/ai/picks-run?${buildCockpitScopeParams().toString()}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(
+              withRoomContextBody(
+                {
+                  dryRun: false,
+                  confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
+                  teamScope: "all",
+                  teamIds: chunk,
+                  allowSetupAllTeams: true,
+                },
+                roomContext,
+              ),
+            ),
+          });
+        } catch {
+          // A failed chunk must not abort the rest — later chunks (and a reload) still make progress.
+        }
+      }
+      if (cancelled) return;
+      const nextGameState = await loadSave(activeSaveId, foundationSaveMode, { compactInitial: true });
+      if (!cancelled && nextGameState) {
+        setGameState(nextGameState);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Intentionally keyed only on save + status: the draft runs once per save (ref-guarded); rosters/teams
+    // are read at fire time (freshly loaded) and must not re-trigger the effect as they fill in.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSaveId, leagueSetupStatus, gameState.gamePhase]);
+
   const retryLeagueSetup = async () => {
     if (readMeta.readOnly) {
       showReadOnlyNotice();
