@@ -5354,6 +5354,10 @@ export function useFoundationShellRouterBodyScope({
   const [bulkAiPicksRefillMessage, setBulkAiPicksRefillMessage] = useState<
     { tone: "success" | "error"; text: string } | null
   >(null);
+  // Live-Draft-Fortschritt: {done, total} während "KI-Teams picken" läuft, sonst null.
+  // Getrieben durch die team-granulare Schleife unten (statt einem Batch-Call), damit
+  // man den Draft oben in der Rang-Tabelle live mitverfolgen kann.
+  const [bulkAiPicksProgress, setBulkAiPicksProgress] = useState<{ done: number; total: number } | null>(null);
 
   const runBulkAiTeamsRefill = useCallback(async () => {
     if (readMeta.readOnly || readMeta.source === "prisma") {
@@ -5371,65 +5375,78 @@ export function useFoundationShellRouterBodyScope({
 
     setBulkAiPicksRefillBusy(true);
     setBulkAiPicksRefillMessage(null);
+    setBulkAiPicksProgress({ done: 0, total: teamIds.length });
+    let filledTeams = 0;
+    let hadError = false;
+    const blockersAll: string[] = [];
     try {
-      const response = await fetch(`/api/ai/picks-run?${buildCockpitScopeParams().toString()}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          withRoomContextBody(
-            {
-              dryRun: false,
-              confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
-              teamScope: "all",
-              teamIds,
-              allowSetupAllTeams: true,
-            },
-            roomContext,
-          ),
-        ),
-      });
-      const payload = (await response.json().catch(() => ({}))) as {
-        error?: string;
-        executed?: boolean;
-        blockingReasons?: string[];
-        teams?: Array<{ teamId: string; rosterBefore?: number; rosterAfter?: number; blockingReasons?: string[] }>;
-      };
-
-      if (!response.ok || payload.error) {
-        setBulkAiPicksRefillMessage({
-          tone: "error",
-          text: payload.error ?? payload.blockingReasons?.join(" · ") ?? "KI-Picks konnten nicht angewendet werden.",
-        });
-        return;
+      // Team-granular statt Batch: pro KI-Team ein eigener picks-run, damit der
+      // Fortschritt (X/Y Teams) LIVE hochzählt. Server-Semantik bleibt gleich; jeder
+      // Lauf persistiert, der nächste sieht den bereits geschrumpften Free-Agent-Pool.
+      for (let index = 0; index < teamIds.length; index += 1) {
+        const teamId = teamIds[index]!;
+        try {
+          const response = await fetch(`/api/ai/picks-run?${buildCockpitScopeParams().toString()}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(
+              withRoomContextBody(
+                {
+                  dryRun: false,
+                  confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
+                  teamScope: "all",
+                  teamIds: [teamId],
+                  allowSetupAllTeams: true,
+                },
+                roomContext,
+              ),
+            ),
+          });
+          const payload = (await response.json().catch(() => ({}))) as {
+            error?: string;
+            executed?: boolean;
+            blockingReasons?: string[];
+            teams?: Array<{ teamId: string; rosterBefore?: number; rosterAfter?: number }>;
+          };
+          if (!response.ok || payload.error) {
+            hadError = true;
+            if (payload.error) blockersAll.push(payload.error);
+          } else {
+            const applied = (payload.teams ?? []).some(
+              (entry) =>
+                entry.rosterAfter != null &&
+                entry.rosterBefore != null &&
+                entry.rosterAfter - entry.rosterBefore > 0,
+            );
+            if (applied) filledTeams += 1;
+            else if (payload.blockingReasons?.length) blockersAll.push(...payload.blockingReasons);
+          }
+        } catch {
+          hadError = true;
+        }
+        setBulkAiPicksProgress({ done: index + 1, total: teamIds.length });
       }
 
-      const filledTeams = (payload.teams ?? []).filter((entry) => {
-        const applied =
-          entry.rosterAfter != null && entry.rosterBefore != null ? entry.rosterAfter - entry.rosterBefore : 0;
-        return applied > 0;
-      }).length;
-
-      if (!payload.executed || filledTeams <= 0) {
-        const blockers = payload.blockingReasons ?? [];
+      if (filledTeams > 0) {
+        setBulkAiPicksRefillMessage({
+          tone: "success",
+          text: `${filledTeams} KI-${filledTeams === 1 ? "Team" : "Teams"} aufgefüllt.`,
+        });
+      } else {
         setBulkAiPicksRefillMessage({
           tone: "error",
-          text:
-            blockers.length > 0
-              ? blockers.slice(0, 3).join(" · ")
+          text: hadError
+            ? "KI-Picks konnten nicht (vollständig) angewendet werden."
+            : blockersAll.length > 0
+              ? Array.from(new Set(blockersAll)).slice(0, 3).join(" · ")
               : "Keine neuen Picks angewendet (kein passender Spieler oder Budget).",
         });
-        return;
       }
-
-      setBulkAiPicksRefillMessage({
-        tone: "success",
-        text: `${filledTeams} KI-${filledTeams === 1 ? "Team" : "Teams"} aufgefüllt.`,
-      });
+      // Nur EINMAL am Ende neu laden (nicht pro Team) → kein N-facher Full-Reload.
       await reloadAfterMarketRosterApply();
-    } catch {
-      setBulkAiPicksRefillMessage({ tone: "error", text: "KI-Picks konnten nicht angewendet werden." });
     } finally {
       setBulkAiPicksRefillBusy(false);
+      setBulkAiPicksProgress(null);
     }
   }, [
     buildCockpitScopeParams,
@@ -10662,6 +10679,7 @@ export function useFoundationShellRouterBodyScope({
     bootstrapError,
     bulkAiPicksRefillBusy,
     bulkAiPicksRefillMessage,
+    bulkAiPicksProgress,
     runBulkAiTeamsRefill,
     underFilledAiTeamIds,
     buildTeamDetailDrawerData,

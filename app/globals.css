@@ -10926,6 +10926,38 @@ a {
   gap: 8px 12px;
 }
 
+/* Live-Draft-Fortschritt beim „KI-Teams picken": zeigt X/Y Teams + Mini-Balken,
+   damit man den Draft oben mitverfolgen kann (Fortschritt zählt team-granular hoch). */
+.ranks-draft-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ranks-draft-progress-count {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.ranks-draft-progress-bar {
+  position: relative;
+  display: inline-block;
+  width: 96px;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--nl-accent) 22%, transparent);
+  overflow: hidden;
+}
+
+.ranks-draft-progress-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--nl-accent);
+  transition: width 0.3s ease;
+}
+
 .ranks-season-select {
   min-width: 180px;
 }

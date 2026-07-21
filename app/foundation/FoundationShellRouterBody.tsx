@@ -319,6 +319,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   bootstrapError,
   bulkAiPicksRefillBusy,
   bulkAiPicksRefillMessage,
+  bulkAiPicksProgress,
   runBulkAiTeamsRefill,
   underFilledAiTeamIds,
   buildTeamDetailDrawerData,
@@ -2758,13 +2759,34 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                       onClick={() => void runBulkAiTeamsRefill()}
                     >
                       {bulkAiPicksRefillBusy
-                        ? "Wirbt an…"
+                        ? bulkAiPicksProgress
+                          ? `Draftet… ${bulkAiPicksProgress.done}/${bulkAiPicksProgress.total}`
+                          : "Wirbt an…"
                         : (underFilledAiTeamIds?.length ?? 0) === 0
                           ? "KI-Teams gefüllt"
                           : `KI-Teams nachpicken (${underFilledAiTeamIds?.length ?? 0})`}
                     </button>
                   ) : null}
-                  {bulkAiPicksRefillMessage ? (
+                  {bulkAiPicksRefillBusy && bulkAiPicksProgress ? (
+                    <span className="pill is-running ranks-draft-progress" title="KI-Draft läuft — Teams werden nacheinander besetzt">
+                      <span className="ranks-draft-progress-count">
+                        <strong>{bulkAiPicksProgress.done}</strong>
+                        <span className="muted"> / {bulkAiPicksProgress.total} Teams gepickt</span>
+                      </span>
+                      <span className="ranks-draft-progress-bar" aria-hidden="true">
+                        <span
+                          style={{
+                            width: `${
+                              bulkAiPicksProgress.total > 0
+                                ? Math.round((bulkAiPicksProgress.done / bulkAiPicksProgress.total) * 100)
+                                : 0
+                            }%`,
+                          }}
+                        />
+                      </span>
+                    </span>
+                  ) : null}
+                  {!bulkAiPicksRefillBusy && bulkAiPicksRefillMessage ? (
                     <span
                       className={`pill ${bulkAiPicksRefillMessage.tone === "success" ? "is-ready" : "is-warning"}`}
                       title={bulkAiPicksRefillMessage.text}
