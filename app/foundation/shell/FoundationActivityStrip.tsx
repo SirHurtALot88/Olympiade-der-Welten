@@ -159,6 +159,16 @@ export default function FoundationActivityStrip({ activities }: FoundationActivi
                   <span />
                 </div>
               )}
+              {activity.reasons && activity.reasons.length > 0 ? (
+                <div className="foundation-activity-reasons">
+                  <span className="foundation-activity-reasons-title">Grund</span>
+                  <ul>
+                    {activity.reasons.map((reason, index) => (
+                      <li key={`${activity.id}-reason-${index}`}>{reason.replace(/:/g, " · ")}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
               {history.length > 0 ? (
                 <div className="foundation-activity-history" role="tooltip">
                   <span className="foundation-activity-history-title">Zuletzt erledigt</span>

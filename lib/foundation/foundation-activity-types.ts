@@ -22,6 +22,12 @@ export type FoundationActivityItem = {
   currentLabel?: string | null;
   /** Nächster anstehender Schritt, z. B. "danach: Einsatzlisten". */
   nextLabel?: string | null;
+  /**
+   * Fehler-/Blockier-Gründe (weitgehend roh, fürs Debuggen) — wird bei abgebrochenem
+   * oder blockiertem Lauf direkt in der Zeile angezeigt, damit man oben sofort sieht,
+   * WARUM z. B. der Draft gestoppt ist.
+   */
+  reasons?: string[];
 };
 
 export type FoundationActivityPreseasonRunSnapshot = {

@@ -136,6 +136,28 @@ export function buildFoundationActivities(input: FoundationActivityInput): Found
       currentLabel,
       nextLabel: run ? preseasonNextStep(run.mode) : null,
     });
+  } else if (
+    input.aiPreseasonRun &&
+    (input.aiPreseasonRun.status === "failed" || input.aiPreseasonRun.blockingReasons.length > 0)
+  ) {
+    // Der Lauf ist NICHT mehr aktiv, aber abgebrochen/blockiert stehengeblieben: persistente
+    // rote Zeile mit den echten Gründen, damit man oben sofort sieht WARUM (Debugging).
+    const run = input.aiPreseasonRun;
+    const failed = run.status === "failed";
+    const reasons = run.blockingReasons.slice(0, 8);
+    if (run.blockingReasons.length > 8) {
+      reasons.push(`… +${run.blockingReasons.length - 8} weitere`);
+    }
+    activities.push({
+      id: "ai-preseason-blocked",
+      label: `${getPreseasonModeLabel(run.mode)} ${failed ? "abgebrochen" : "blockiert"}`,
+      detail: buildPreseasonDetail(run, input.aiTeamsCount),
+      tone: "blocked",
+      progressPct: run.aiTeamsTotal > 0 ? Math.round((run.aiTeamsCompleted / run.aiTeamsTotal) * 100) : null,
+      stats: buildPreseasonStats(run, input.aiTeamsCount),
+      currentLabel: failed ? "Abgebrochen" : "Teilweise blockiert",
+      reasons,
+    });
   }
 
   if (input.aiLineupEnsureBusy) {
