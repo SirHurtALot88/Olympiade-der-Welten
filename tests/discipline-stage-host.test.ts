@@ -24,10 +24,10 @@ describe("discipline-stage render robustness", () => {
   });
   it("bootstrap/partial state (empty object) does NOT throw", () => {
     const html = render({});                 // gameState with no arrays at all
-    expect(html).toContain("Disziplin-Bühne");
+    expect(html).toContain("Arena");
   });
   it("undefined-ish arrays do NOT throw", () => {
     const html = render({ disciplines: undefined, teams: undefined, players: undefined, rosters: undefined });
-    expect(html).toContain("Disziplin-Bühne");
+    expect(html).toContain("Arena");
   });
 });

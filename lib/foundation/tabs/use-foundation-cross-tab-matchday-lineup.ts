@@ -248,7 +248,8 @@ export function useFoundationCrossTabMatchdayLineup(input: {
     const resultAvailable = (input.gameState.seasonState.matchdayResults ?? []).some(
       (result) =>
         result.seasonId === input.gameState.season.id &&
-        result.matchdayId === input.gameState.matchdayState.matchdayId,
+        result.matchdayId === input.gameState.matchdayState.matchdayId &&
+        result.status === "preview_applied",
     );
     const formCardFlow = getFormCardFlowStatus(input.gameState, input.activeManagerTeamId);
 

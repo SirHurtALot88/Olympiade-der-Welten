@@ -79,6 +79,9 @@ function AnchoredCard({ x, y, width, cardStyle, children }: {
         // deren Text durch die (eigentlich deckende) Karte und sie wirkt „transparent".
         zIndex: 1000,
         pointerEvents: "none",
+        // Sehr hohe Karte nie über die Fensterkanten hinaus: auf Viewport-Höhe deckeln.
+        maxHeight: "calc(100vh - 16px)",
+        overflowY: "auto",
         visibility: pos ? "visible" : "hidden",
         ...cardStyle,
       }}

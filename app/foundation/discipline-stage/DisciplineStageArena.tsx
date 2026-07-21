@@ -903,7 +903,7 @@ export default function DisciplineStageArena({
   if (disciplines.length === 0) {
     return (
       <div style={{ maxWidth: 1080, margin: "0 auto", padding: 40, textAlign: "center", opacity: 0.75 }}>
-        <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>Disziplin-Bühne</div>
+        <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>Arena</div>
         <div style={{ fontSize: 14 }}>
           Daten werden geladen … Falls dieser Hinweis bleibt, ist noch keine Saison mit Disziplinen aktiv.
         </div>
@@ -917,7 +917,7 @@ export default function DisciplineStageArena({
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 14 }}>
         <div>
           <div style={{ fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800 }}>
-            {devMode ? "Disziplin-Bühne · Test-Modus · echte Save-Werte" : "Disziplin-Bühne"}
+            {devMode ? "Arena · Test-Modus · echte Save-Werte" : "Arena"}
           </div>
           <h1 style={{ margin: "4px 0 0", fontSize: 30, fontWeight: 800 }}>{model.disciplineName}</h1>
           {/* Die 2 aktiven Mutatoren dieser Disziplin — sichtbar direkt an der

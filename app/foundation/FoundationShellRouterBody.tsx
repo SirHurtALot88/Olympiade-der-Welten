@@ -262,7 +262,7 @@ const FoundationDiszisHost = dynamic(() => import("@/app/foundation/ranks-v2/Fou
 });
 const FoundationDisciplineStageHost = dynamic(() => import("@/app/foundation/discipline-stage/FoundationDisciplineStageHost"), {
   ssr: false,
-  loading: () => <FoundationPanelSkeleton label="Disziplin-Bühne wird geladen…" />,
+  loading: () => <FoundationPanelSkeleton label="Arena wird geladen…" />,
 });
 const FoundationCreditsHost = dynamic(() => import("@/app/foundation/credits/FoundationCreditsHost"), {
   ssr: false,
@@ -2548,37 +2548,24 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           ) : null}
 
           {activeView === "matchdayArena" ? (
-          <FoundationMatchdayArenaPanel
-            active
-            ready={saveSummaries.length > 0 && Boolean(selectedTeamId)}
-            sourceBadgeLabel={getViewSourceBadgeLabel("matchdayArena", activeContextMeta)}
-            contextLabel={`${activeSaveName} · ${gameState.season.id} · ${gameState.matchdayState.matchdayId}`}
-            blockerSummary={matchdayArenaBlockerSummary}
-            blockerGapDetail={activeManagerArenaGapDetail}
-            onOpenLineup={() => setFoundationView("lineup", setActiveView)}
-            clientKey={`${activeSaveId}-${gameState.season.id}-${gameState.matchdayState.matchdayId}-${activeManagerTeamId}`}
-            client={{
-              initialSource: "sqlite",
-              defaultSaveId: activeSaveId,
-              defaultSeasonId: gameState.season.id,
-              defaultMatchdayId: gameState.matchdayState.matchdayId,
-              defaultTeamId: activeManagerTeamId,
-              playerCatalog: gameState.players,
-              teams: gameState.teams,
-              teamControlSettingsMap: teamControlDraft,
-              roomContext: roomContext,
-              onOpenPlayerDetails: (payload) => openPlayerDrawerById(payload.playerId, payload.activePlayerId),
-              onOpenTeam: openTeamDrawerById,
-              onBackToLineup: shouldShowArenaBackToLineup ? () => setFoundationView("lineup", setActiveView) : null,
-              onOpenMatchdayResult: () => {
-                setSelectedMatchdaySummaryId(gameState.matchdayState.matchdayId);
-                window.setTimeout(() => {
-                  document.getElementById("arena-result-summary")?.scrollIntoView({ behavior: "smooth", block: "start" });
-                }, 40);
-              },
-              onOpenSeason: () => setFoundationView("seasonV2", setActiveView),
-            }}
-            resultSummary={
+          <>
+          {/* Arena = die (ehemalige) Disziplin-Bühne. Der View bleibt `matchdayArena`
+              (überall im Season-Flow verdrahtet), rendert aber jetzt die native Bühne.
+              Der eigene Advance-Button der Bühne ist unterdrückt (onAdvanceMatchday=null) —
+              der flow-kritische Abschluss läuft weiter über die „Spieltagsergebnis"-Sektion
+              unten (runFinishMatchdaySimple / triggerGlobalNext). Die alte Arena-Panel-UI
+              (matchday-arena-v2) ist damit ausgeblendet. */}
+          <FoundationDisciplineStageHost
+            gameState={gameState}
+            selectedTeamId={selectedTeamId}
+            activeManagerTeamId={activeManagerTeamId}
+            saveId={activeSaveId}
+            seasonId={gameState.season.id}
+            matchdayId={gameState.matchdayState.matchdayId}
+            onAdvanceMatchday={null}
+            onOpenPlayer={(playerId) => openPlayerDrawerById(playerId)}
+            onOpenTeam={(teamId) => openTeamDrawerById(teamId)}
+          />
               <section className="panel arena-result-summary" id="arena-result-summary" data-testid="arena-result-summary">
                 <div className="panel-header">
                   <div className="stack">
@@ -2652,8 +2639,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   </div>
                 )}
               </section>
-            }
-          />
+          </>
           ) : null}
 
           <FoundationShellRouterMatchdayResult
@@ -2947,18 +2933,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           {activeView === "allTimeTable" ? <FoundationAllTimeTableHost {...foundationAllTimeTableHostProps} /> : null}
 
           {activeView === "diszis" ? <FoundationDiszisHost {...foundationDiszisHostProps} /> : null}
-          {activeView === "disciplineStage" ? (
-            <FoundationDisciplineStageHost
-              gameState={gameState}
-              selectedTeamId={selectedTeamId}
-              activeManagerTeamId={activeManagerTeamId}
-              saveId={activeSaveId}
-              seasonId={gameState.season.id}
-              matchdayId={gameState.matchdayState.matchdayId}
-              onAdvanceMatchday={triggerGlobalNext}
-              onOpenPlayer={(playerId) => openPlayerDrawerById(playerId)} onOpenTeam={(teamId) => openTeamDrawerById(teamId)}
-            />
-          ) : null}
+          {/* Der frühere Standalone-View `disciplineStage` ist entfallen — die Bühne
+              rendert jetzt im `matchdayArena`-View (siehe oben). */}
 
           <FoundationShellRouterPrize
             active={activeView === "prize"}

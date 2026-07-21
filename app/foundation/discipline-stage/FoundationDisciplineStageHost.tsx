@@ -41,7 +41,7 @@ class DisciplineStageErrorBoundary extends Component<{ children: ReactNode }, { 
       const err = this.state.error;
       return (
         <div style={{ maxWidth: 900, margin: "0 auto", padding: 20, color: "inherit" }}>
-          <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 4 }}>Disziplin-Bühne — Fehler (Diagnose)</div>
+          <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 4 }}>Arena — Fehler (Diagnose)</div>
           <div style={{ fontSize: 13, color: "var(--nl-mut)", marginBottom: 10 }}>
             Bitte diese Meldung abfotografieren/kopieren — damit lässt sich die Ursache genau beheben.
           </div>

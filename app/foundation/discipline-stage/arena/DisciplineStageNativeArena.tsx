@@ -1075,6 +1075,10 @@ function HoverTeamCardPortal({
         borderTop: `3px solid ${accent}`,
         borderRadius: 12,
         padding: 10,
+        // Sehr hohe Karte (viele Etappen, kleines Fenster) nie über die Fensterkanten
+        // hinaus — auf Viewport-Höhe deckeln und intern scrollen statt unten rauslaufen.
+        maxHeight: "calc(100vh - 16px)",
+        overflowY: "auto",
         boxShadow: "0 18px 50px -18px rgba(0,0,0,.8)",
         pointerEvents: "auto",
         cursor: clickable ? "pointer" : "default",
