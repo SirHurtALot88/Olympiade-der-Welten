@@ -252,6 +252,7 @@ export default function DuelhpField(props: DisciplineFieldProps): ReactNode {
     let rallyY = cy;
     let rallyT = 0;
     let rallyOn = false;
+    let atkAcc = 0; // Rhythmus-Akku für den KONTINUIERLICHEN Kampf über die ganze Runde (~10s)
 
     const tick = (ts: number): void => {
       const dt = Math.min(48, ts - lastTs);
@@ -280,6 +281,47 @@ export default function DuelhpField(props: DisciplineFieldProps): ReactNode {
               .sort((a, b) => Math.hypot(a.x - rallyX, a.y - rallyY) - Math.hypot(b.x - rallyX, b.y - rallyY));
             for (const n of nodes) n.rally = false;
             for (let q = 0; q < 9 && q < sortedByDist.length; q += 1) sortedByDist[q]!.rally = true;
+          }
+        }
+
+        // KONTINUIERLICHER Kampf über die ganze Runde (nicht nur 1× pro Reveal): im Rhythmus
+        // greift EIN Team an — gewichtet nach Stärke (Live-Rang), sodass stärkere Teams
+        // sichtbar ÖFTER treffen. Kosmetische Chip-Schadenszahl; die echte Wertung bleibt
+        // die Ladder + die große Reveal-Crit. So brodelt der Pit die vollen ~10s.
+        // Erst ab dem ersten Auftritt (thrownSlot ≥ 0), damit vor dem Start keine
+        // Schadenszahlen im leeren Pit poppen.
+        if (nodes.length > 1 && rtRef.current.some((t) => t.thrownSlot >= 0)) {
+          atkAcc += dt;
+          if (atkAcc > 400) {
+            atkAcc = 0;
+            const N = nodes.length;
+            // Gewicht ∝ (N − Rang + 1): Führer am häufigsten, Schlusslicht am seltensten.
+            let total = 0;
+            const weights = nodes.map((n) => {
+              const w = N - (rankByIdx.get(n.idx) ?? N) + 1;
+              total += w;
+              return w;
+            });
+            let pick = Math.random() * total;
+            let ai = 0;
+            for (let i = 0; i < nodes.length; i += 1) {
+              pick -= weights[i]!;
+              if (pick <= 0) { ai = i; break; }
+            }
+            const A = nodes[ai]!;
+            const tgt = nearest(A);
+            if (tgt) {
+              const dx = tgt.x - A.x;
+              const dy = tgt.y - A.y;
+              const dl = Math.hypot(dx, dy) || 1;
+              A.vx += (dx / dl) * 2.4;
+              A.vy += (dy / dl) * 2.4;
+              A.lungeT = 240;
+              const strength = 1 - ((rankByIdx.get(A.idx) ?? N) - 1) / Math.max(1, N - 1); // 1 = Führer
+              const dmg = Math.round(60 + strength * 340 + Math.random() * 40);
+              spawnHit((A.x + tgt.x) / 2, (A.y + tgt.y) / 2 - 6, dmg, dmg < 150 ? "sm" : "norm");
+              recoil(tgt.idx);
+            }
           }
         }
 
