@@ -1313,6 +1313,7 @@ export function useFoundationShellRouterBodyScope({
     isMarketOfferPanelOpen ||
     shouldBuildExtendedTeamPanels ||
     activeView === "teams" ||
+    activeView === "teamProfile" ||
     activeView === "seasonV2" ||
     activeView === "ranks" ||
     activeView === "diszis" ||

@@ -66450,15 +66450,20 @@ button.nl-players-axis:focus-visible {
   color: var(--nl-ink);
 }
 
-/* Im aktiv sortierten Zustand erzwingt die bestehende
-   `.is-active-sort .nl-ptable-percentile`-Regel bereits dunklen Text
-   (#0b1220) für Kontrast auf der helleren Wäsche (app/globals.css Fix #4)
-   — hier nur der Chip-Hintergrund kräftiger, damit er sich weiterhin von
-   der Zellen-Wäsche abhebt. Vier Klassen + Element: gewinnt gegenüber der
+/* Im aktiv sortierten Zustand DARF der OVR-Rang-Chip NICHT den dunklen Text
+   (#0b1220) der generischen `.is-active-sort .nl-ptable-percentile`-Regel
+   (Fix #4) erben: der Chip behält seinen eigenen dunklen, akzent-getönten
+   Grund (NICHT `transparent` — sonst scheint die helle Sortier-Wäsche durch
+   und der dunkle Text landet auf hellem Grund → „dunkel auf dunkel"/„dunkel
+   auf hell", beides unlesbar, Feedback „OVR ist in dunkel kaum lesbar!").
+   Stattdessen: kräftiger, deckender Akzent-auf-Panel-Grund + heller
+   `--nl-ink`-Text — dasselbe Hell-auf-dunkel-Muster wie im Basis-Zustand,
+   nur eine Stufe kräftiger. Vier Klassen + Element gewinnt gegenüber der
    3-Klassen-Regel aus Fix #4 und der 3-Klassen-Basisregel oben, ohne
    `!important`. */
 .is-new-look td.is-active-sort .nl-ptable-percentile.nl-ptable-ovr-rank {
-  background: color-mix(in srgb, var(--nl-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--nl-accent) 55%, var(--nl-panel-2, #0f1621) 45%);
+  color: var(--nl-ink);
 }
 
 /* ============================================================
