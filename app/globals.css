@@ -1061,6 +1061,7 @@ a {
 
 /* Volle Zeile für die laufende AI-Aktion: Kennzahlen-Chips + großer Fortschrittsbalken. */
 .foundation-activity-row {
+  position: relative;
   flex: 1 1 100%;
   display: grid;
   gap: 8px;
@@ -1158,6 +1159,98 @@ a {
   margin-left: auto;
   color: rgba(191, 205, 232, 0.78);
   font-size: 0.72rem;
+  font-style: italic;
+}
+
+/* Verlauf-Hinweis + Hover-Popover mit den zuletzt abgeschlossenen Schritten. */
+.foundation-activity-row-histhint {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px dashed rgba(163, 194, 255, 0.4);
+  color: rgba(191, 205, 232, 0.82);
+  font-size: 0.66rem;
+  cursor: help;
+}
+
+.foundation-activity-row:hover,
+.foundation-activity-row:focus-within {
+  z-index: 5;
+}
+
+.foundation-activity-history {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 60;
+  display: none;
+  min-width: 250px;
+  max-width: min(90vw, 400px);
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(130, 156, 205, 0.4);
+  background: linear-gradient(180deg, rgba(20, 27, 40, 0.99), rgba(12, 18, 28, 0.99));
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+
+.foundation-activity-row:hover .foundation-activity-history,
+.foundation-activity-row:focus-within .foundation-activity-history {
+  display: block;
+}
+
+.foundation-activity-history-title {
+  display: block;
+  margin-bottom: 6px;
+  color: rgba(214, 223, 241, 0.66);
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.foundation-activity-history ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.foundation-activity-history li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.foundation-activity-history li:last-child {
+  border-bottom: none;
+}
+
+.foundation-activity-history-label {
+  color: rgba(240, 245, 255, 0.94);
+  font-size: 0.74rem;
+  line-height: 1.25;
+}
+
+.foundation-activity-history-dur {
+  flex: 0 0 auto;
+  color: rgba(255, 208, 132, 0.94);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.foundation-activity-history-note {
+  display: block;
+  margin-top: 6px;
+  color: rgba(191, 205, 232, 0.5);
+  font-size: 0.6rem;
   font-style: italic;
 }
 
