@@ -83,21 +83,20 @@ describe("player potential service", () => {
     expect(potential.warnings).toContain("potential_source_missing");
   });
 
-  it("generates a CA-decoupled potential distribution with a thin elite tail", () => {
-    // Regression guard for the CA→PO HEADROOM generator. Potential is drawn as
-    // CA + a decoupled gap (`GAP_QUANTILE_ANCHORS` / `seedToPotentialGap` in
-    // player-potential-service.ts): an upside draw ABOVE current ability that is
-    // independent of CA. This replaces the earlier absolute-PO curve, which drew
-    // a score with a median well above the median CA and floored it at CA
-    // (`max(rawRoll, CA)`) — automatically lifting genuinely weak players to a
-    // ~2.5★ floor and making the CA→PO gap suspiciously stable/CA-coupled.
+  it("generates a star-uniform potential distribution spread across [CA, 5]", () => {
+    // Regression guard for the STAR-UNIFORM potential generator (model v6,
+    // `deriveHiddenPotentialScore` in player-potential-service.ts). Potential is a
+    // ZIEL-PO-STERN drawn UNIFORMLY over [CA-star, 5] and mapped back to score space.
+    // Effect (per design request): within each CA band the potential is roughly
+    // evenly spread across the reachable stars (1★ → PO 1–5, 3★ → 3–5, 5★ → 5), so
+    // young/weak players get real, broadly-distributed headroom to develop — while
+    // the earlier "tight gap" curve left >50% of players with zero upside.
     //
-    // The gap curve is deliberately TIGHT and right-skewed: most players carry
-    // little headroom (median ~0.5★), the elite tail stays THIN (the top is NOT
-    // broadened — a 3★→5★ wonder kid is a rare outlier), and genuine low-ceiling
-    // players persist. Each synthetic player gets a realistic, low-centered CA
-    // (median ~40, a deterministic min-of-two-hashes mirroring the real catalog)
-    // so the gap shows through without the [35,99] band dominating.
+    // Each synthetic player gets a realistic, low-centered CA (a deterministic
+    // min-of-two-hashes mirroring the real catalog). Because most synthetic CAs are
+    // low-to-mid (~2★), the uniform draw over [CA,5] centers the potential around
+    // ~3.5–4★ with a genuine spread and NO 5★ pile-up (the ceiling is per-band, not
+    // an absolute bonus).
     const N = 6000;
     const stars: number[] = [];
     for (let i = 0; i < N; i += 1) {
@@ -119,16 +118,18 @@ describe("player potential service", () => {
     const shareAtMost = (threshold: number) => stars.filter((s) => s <= threshold).length / N;
     const pinnedAtFive = stars.filter((s) => s >= 4.99).length / N;
 
-    // Lower-centered: median stays in the ~2.5-3.0★ band, not lifted to ~4.3★.
-    expect(median).toBeGreaterThanOrEqual(2.2);
-    expect(median).toBeLessThanOrEqual(3.0);
-    // Thin elite tail — the top is NOT broadened (well under the old ~40% pin).
-    expect(pinnedAtFive).toBeLessThan(0.14);
-    expect(shareAtLeast(4.5)).toBeLessThan(0.22);
-    // ...genuine high-ceiling talent still exists (rare 3★→5★ wonder kids).
-    expect(shareAtLeast(4.0)).toBeGreaterThan(0.1);
-    // ...and so do genuine low-ceiling players — the bottom is not auto-lifted.
-    expect(shareAtMost(1.5)).toBeGreaterThan(0.1);
+    // Meaningfully stronger than the old tight curve: median lifts into the ~3.3–4.3★
+    // band (real development headroom exists league-wide).
+    expect(median).toBeGreaterThanOrEqual(3.3);
+    expect(median).toBeLessThanOrEqual(4.3);
+    // NO 5★ pile-up despite the higher center — the per-band uniform draw keeps the
+    // very top rare (the ceiling comes from the CA band, not a flat bonus).
+    expect(pinnedAtFive).toBeLessThan(0.1);
+    // Real high-ceiling talent is common (this is the point — you can develop people).
+    expect(shareAtLeast(4.0)).toBeGreaterThan(0.3);
+    expect(shareAtLeast(4.0)).toBeLessThan(0.6);
+    // ...and genuine low-ceiling players still persist — the bottom is not all lifted.
+    expect(shareAtMost(2.0)).toBeGreaterThan(0.05);
   });
 
   it("generates stable save-specific hidden potential records", () => {

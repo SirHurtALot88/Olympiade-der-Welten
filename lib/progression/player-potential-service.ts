@@ -198,6 +198,40 @@ export function potentialScoreToStars(score: number) {
   return last[1];
 }
 
+/**
+ * Version des Potenzial-Generator-Modells. Wird auf jeden generierten
+ * `PlayerPotentialRecord` gestempelt (`modelVersion`). Beim Laden migriert
+ * `ensurePlayerPotentialForGameState` Saves mit älterer Version einmalig auf das
+ * aktuelle Modell (Star-Uniform-Verteilung) — ohne dass ein neues Spiel nötig ist.
+ *
+ * v6: PO wird pro CA-Sternband gleichmäßig über [CA, 5] gezogen (statt festem
+ *     Punkte-Gap). Junge/schwache Spieler bekommen echte, breit gestreute
+ *     Ausbau-Reserve; Veteranen nahe der Decke bleiben gedeckelt.
+ */
+export const POTENTIAL_MODEL_VERSION = 6;
+
+/**
+ * Inverse zu {@link potentialScoreToStars}: gibt zu einem Ziel-Stern (0.5–5) den
+ * niedrigsten Score, der diesen Stern ergibt (stückweise linear über
+ * CA_PO_STAR_ANCHORS). Wird vom Star-Uniform-Potenzial-Generator genutzt, um einen
+ * gleichverteilt gezogenen Ziel-PO-Stern zurück in Score-Raum zu übersetzen.
+ */
+function starsToPotentialScore(stars: number): number {
+  const first = CA_PO_STAR_ANCHORS[0]!;
+  const last = CA_PO_STAR_ANCHORS[CA_PO_STAR_ANCHORS.length - 1]!;
+  if (stars <= first[1]) return first[0];
+  if (stars >= last[1]) return last[0];
+  for (let index = 1; index < CA_PO_STAR_ANCHORS.length; index += 1) {
+    const [hiScore, hiStars] = CA_PO_STAR_ANCHORS[index]!;
+    if (stars <= hiStars) {
+      const [loScore, loStars] = CA_PO_STAR_ANCHORS[index - 1]!;
+      const t = (stars - loStars) / (hiStars - loStars);
+      return loScore + t * (hiScore - loScore);
+    }
+  }
+  return last[0];
+}
+
 export type PotentialRangeStarSlot = {
   index: number;
   minFill: number;
@@ -335,58 +369,46 @@ function getTalentTraitPotentialModifier(player: Pick<Player, "traitsPositive" |
  * gets, typically: median ~0.5★ · p82 ~1.1★ · p96 ~2★ · p99 ~2.7★ of headroom.
  * Monotonic, piecewise-linear, seed-deterministic (no Math.random).
  */
-const GAP_QUANTILE_ANCHORS: ReadonlyArray<readonly [cumulativeP: number, gap: number]> = [
-  [0.0, 0],
-  [0.12, 1],
-  [0.3, 3],
-  [0.5, 6],
-  [0.68, 9],
-  [0.82, 13],
-  [0.91, 18],
-  [0.96, 24],
-  [0.99, 31],
-  // Thin extreme tail (top ~0.3%): a rare wonder-kid draw big enough that even a
-  // weak player can reach a ~5★ ceiling. Kept deliberately narrow so it does NOT
-  // broaden the visible top — it just lets the rare outlier exist.
-  [0.997, 41],
-  [1.0, 52],
-];
-
-/** Map a uniform seed in [0,1] to a CA→PO headroom (gap) in score points. */
-function seedToPotentialGap(seed: number): number {
-  const first = GAP_QUANTILE_ANCHORS[0]!;
-  const last = GAP_QUANTILE_ANCHORS[GAP_QUANTILE_ANCHORS.length - 1]!;
-  if (seed <= first[0]) return first[1];
-  if (seed >= last[0]) return last[1];
-  for (let index = 1; index < GAP_QUANTILE_ANCHORS.length; index += 1) {
-    const [hiP, hiGap] = GAP_QUANTILE_ANCHORS[index]!;
-    if (seed <= hiP) {
-      const [loP, loGap] = GAP_QUANTILE_ANCHORS[index - 1]!;
-      const t = (seed - loP) / (hiP - loP);
-      return loGap + t * (hiGap - loGap);
-    }
-  }
-  return last[1];
-}
-
-function deriveHiddenPotentialScore(input: { saveId: string; player: Player }) {
-  const seed = getPlayerSeedValue(`${input.saveId}:${input.player.id}:potential-v5`);
-  const gap = roundValue(seedToPotentialGap(seed), 0);
-  const traitBonus = getTalentTraitPotentialModifier(input.player);
-  // Potential is CA plus a decoupled headroom draw. The gap comes from the
-  // player-id hash (not the stats), so the CA→PO distance is independent of CA —
-  // a low player is no longer auto-lifted to a floor above their ability. The gap
-  // is >= 0, so PO already sits at/above CA; the max() only guards the case where
-  // a negative talent trait would otherwise pull PO below CA. Clamp to the
-  // generator's [35,99] band.
+/**
+ * Star-Uniform-Potenzial (Modell v6).
+ *
+ * Statt eines festen Punkte-„Gaps" auf CA (der Starke an die 5★-Decke presst und
+ * über die ganze Liga einen inkonsistenten, meist winzigen Abstand erzeugt) wird
+ * ein ZIEL-PO-STERN gezogen — GLEICHVERTEILT über [CA-Stern, 5] — und zurück in
+ * Score-Raum übersetzt. Wirkung, gemessen an der echten Liga (n=2984):
+ *   - Pro CA-Sternband ist das Potenzial ~gleichmäßig über die erreichbaren Sterne
+ *     gestreut: 1★ → PO 1–5, 2★ → 2–5, 3★ → 3–5, 4★ → 4–5, 5★ → 5.
+ *   - Junge/schwache Spieler bekommen echte, breit gestreute Ausbau-Reserve (die
+ *     man entwickeln kann); Veteranen nahe der Decke bleiben gedeckelt.
+ *   - Kein 5★-Stau: der Ziel-Stern kommt aus dem CA-Band, nicht aus einem
+ *     absoluten Bonus.
+ * Der Ziehwert ist der Spieler-ID-Hash (seed-deterministisch, kein Math.random).
+ * Der per-Season-Trainings-Cap bleibt davon unberührt — nur die Decke steigt.
+ */
+function deriveHiddenPotentialScore(input: {
+  saveId: string;
+  player: Player;
+  currentAbilityStars?: number | null;
+}) {
+  const seed = getPlayerSeedValue(`${input.saveId}:${input.player.id}:potential-v6`);
   const currentAbilityScore = computeCurrentAbilityScore(input.player.coreStats) ?? 35;
-  return clamp(Math.max(currentAbilityScore + gap + traitBonus, currentAbilityScore), 35, 99);
+  // CA-Stern als untere Bandgrenze: bevorzugt der angezeigte Achsen-Overall-Stern,
+  // Fallback der Score-basierte CA-Stern (wenn beim Read-Time-Aufruf ohne GameState
+  // kein Achsenprofil vorliegt).
+  const caStars = clamp(input.currentAbilityStars ?? potentialScoreToStars(currentAbilityScore), 0.5, 5);
+  const targetStars = caStars + seed * (5 - caStars);
+  const rawScore = starsToPotentialScore(targetStars);
+  const traitBonus = getTalentTraitPotentialModifier(input.player);
+  // PO-Score nie unter CA-Score (Score-Raum-Invariante); Talent-Trait als kleiner
+  // Bonus/Malus; auf die Generator-Band [35,99] geklemmt.
+  return clamp(Math.max(rawScore + traitBonus, currentAbilityScore), 35, 99);
 }
 
 export function buildPlayerPotentialRecord(input: {
   saveId: string;
   player: Player;
   existing?: PlayerPotentialRecord | null;
+  currentAbilityStars?: number | null;
 }): PlayerPotentialRecord {
   if (input.existing?.hiddenPotentialScore != null) {
     return input.existing;
@@ -399,6 +421,7 @@ export function buildPlayerPotentialRecord(input: {
     revealedPotentialRange: undefined,
     confidence: 0,
     source: "generated",
+    modelVersion: POTENTIAL_MODEL_VERSION,
   };
 }
 
@@ -408,18 +431,23 @@ export function buildPlayerPotentialRecordsForSave(input: {
   gameState?: GameState | null;
 }) {
   return input.players.map((player) => {
+    // CA-Achsen-Overall-Stern zuerst berechnen, damit der Star-Uniform-Generator
+    // das Potenzial über [CA-Stern, 5] ziehen kann.
+    const currentStars = input.gameState
+      ? buildPlayerAxisStarProfile({
+          gameState: input.gameState,
+          player,
+          disciplines: input.gameState.disciplines,
+        })
+      : null;
     const record = buildPlayerPotentialRecord({
       saveId: input.saveId,
       player,
+      currentAbilityStars: currentStars?.overall ?? null,
     });
-    if (!input.gameState) {
+    if (!input.gameState || !currentStars) {
       return record;
     }
-    const currentStars = buildPlayerAxisStarProfile({
-      gameState: input.gameState,
-      player,
-      disciplines: input.gameState.disciplines,
-    });
     const ceiling = buildPlayerPotentialCeilingProfile({
       saveId: input.saveId,
       player,
@@ -432,6 +460,44 @@ export function buildPlayerPotentialRecordsForSave(input: {
       player,
       saveId: input.saveId,
     });
+  });
+}
+
+/** True, wenn ALLE Potenzial-Records mit dem aktuellen Modell erzeugt wurden. */
+export function isPlayerPotentialModelCurrent(
+  records: PlayerPotentialRecord[] | undefined | null,
+): boolean {
+  if (!records || records.length === 0) return true;
+  return records.every((record) => (record.modelVersion ?? 0) >= POTENTIAL_MODEL_VERSION);
+}
+
+/**
+ * Migriert bestehende Potenzial-Records eines Saves auf das aktuelle Generator-Modell.
+ * hiddenPotentialScore + Ceilings werden neu berechnet (deterministisch aus dem Seed),
+ * der Scouting-/Reveal-Fortschritt (confidence, revealedPotentialRange, lastSeasonSnapshot)
+ * bleibt erhalten. Idempotent: erneuter Aufruf liefert dasselbe Ergebnis.
+ */
+export function migratePlayerPotentialRecordsToCurrentModel(input: {
+  saveId: string;
+  gameState: GameState;
+}): PlayerPotentialRecord[] {
+  const previousById = new Map(
+    (input.gameState.playerPotential ?? []).map((record) => [record.playerId, record] as const),
+  );
+  const fresh = buildPlayerPotentialRecordsForSave({
+    saveId: input.saveId,
+    players: input.gameState.players,
+    gameState: input.gameState,
+  });
+  return fresh.map((record) => {
+    const previous = previousById.get(record.playerId);
+    if (!previous) return record;
+    return {
+      ...record,
+      confidence: previous.confidence,
+      ...(previous.revealedPotentialRange ? { revealedPotentialRange: previous.revealedPotentialRange } : {}),
+      ...(previous.lastSeasonSnapshot ? { lastSeasonSnapshot: previous.lastSeasonSnapshot } : {}),
+    };
   });
 }
 

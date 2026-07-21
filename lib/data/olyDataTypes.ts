@@ -954,6 +954,12 @@ export type PlayerPotentialRecord = {
   };
   confidence: number;
   source: PlayerPotentialSource;
+  /**
+   * Version des Potenzial-Generator-Modells, mit dem hiddenPotentialScore erzeugt
+   * wurde (siehe POTENTIAL_MODEL_VERSION). Fehlt/älter → Save wird beim Laden einmalig
+   * auf das aktuelle Modell migriert.
+   */
+  modelVersion?: number;
 };
 
 export type Team = {

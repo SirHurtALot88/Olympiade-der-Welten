@@ -48,7 +48,11 @@ import {
 } from "@/lib/persistence/save-session-cache";
 import { ensurePlayerBaselines, guardPlayerBaselineWrite } from "@/lib/players/player-baseline-service";
 import { ensurePlayerInjuryHistoryForGameState } from "@/lib/foundation/player-injury-history";
-import { buildPlayerPotentialRecordsForSave } from "@/lib/progression/player-potential-service";
+import {
+  buildPlayerPotentialRecordsForSave,
+  isPlayerPotentialModelCurrent,
+  migratePlayerPotentialRecordsToCurrentModel,
+} from "@/lib/progression/player-potential-service";
 import { reconcilePlayerPotentialRecordsForGameState } from "@/lib/scouting/player-potential-ceiling-service";
 import { withNormalizedSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import type {
@@ -1049,17 +1053,29 @@ function replacePlayerBaselinesForSave(
 }
 
 function ensurePlayerPotentialForGameState(saveId: string, gameState: GameState): GameState {
-  const withRecords =
-    (gameState.playerPotential?.length ?? 0) > 0
-      ? gameState
-      : {
-          ...gameState,
-          playerPotential: buildPlayerPotentialRecordsForSave({
-            saveId,
-            players: gameState.players,
-            gameState,
-          }),
-        };
+  const hasRecords = (gameState.playerPotential?.length ?? 0) > 0;
+  let withRecords: GameState;
+  if (!hasRecords) {
+    withRecords = {
+      ...gameState,
+      playerPotential: buildPlayerPotentialRecordsForSave({
+        saveId,
+        players: gameState.players,
+        gameState,
+      }),
+    };
+  } else if (!isPlayerPotentialModelCurrent(gameState.playerPotential)) {
+    // Einmalige Migration bestehender Saves auf das aktuelle Potenzial-Modell
+    // (Star-Uniform). Deterministisch aus dem Seed; kein neues Spiel nötig. Der
+    // gestempelte modelVersion persistiert beim nächsten Speichern → läuft danach
+    // nicht erneut.
+    withRecords = {
+      ...gameState,
+      playerPotential: migratePlayerPotentialRecordsToCurrentModel({ saveId, gameState }),
+    };
+  } else {
+    withRecords = gameState;
+  }
   return {
     ...withRecords,
     playerPotential: reconcilePlayerPotentialRecordsForGameState({ gameState: withRecords }),
