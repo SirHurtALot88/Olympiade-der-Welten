@@ -2485,8 +2485,13 @@ export function buildPlayerDrawerDataFromGameState(input: {
   // Scouting-Reveal-Logik unverändert (potentialDisplay ist dort ohnehin null, die
   // PO-Sterne stammen aus dem scoutingLevel-gebänderten starSnapshot). CURRENT-Werte
   // (OVR, aktuelle Sterne, Attribute) bleiben in JEDEM Fall unberührt.
+  // Debug-Sicht (DEBUG_FORCE_PLAYER_VISIBILITY) überbrückt auch die Attribut-Decken-
+  // Freigabe, damit die per-Attribut-Max-Potenziale zum Prüfen sichtbar sind — sonst
+  // hängt exaktes Potenzial am Scouting-Büro-Level ≥ 5 (frischer Save hat das nicht).
+  // Sobald echter Fog-of-War zurückkommt, greift wieder das Facility-Gate.
   const revealExactOwnedPotential =
-    attributeVisibility === "exact" ? ownedPotentialRevealsExact(facilityScoutingLevel) : true;
+    DEBUG_FORCE_PLAYER_VISIBILITY ||
+    (attributeVisibility === "exact" ? ownedPotentialRevealsExact(facilityScoutingLevel) : true);
   const seasonOrganicForecast =
     team && rosterEntry && (team.humanControlled !== false || DEBUG_FORCE_PLAYER_VISIBILITY)
       ? buildOrganicSeasonProgression({
