@@ -3,6 +3,7 @@ import { assessPlayerMorale, buildMoraleLookupIndex } from "@/lib/morale/player-
 import type { PersistenceService } from "@/lib/persistence/types";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { advanceScoutIntelTick } from "@/lib/scouting/facility-scout-pipeline-service";
+import { advancePlayerPotentialRevealTick } from "@/lib/progression/player-potential-service";
 import { maybeGenerateSponsorEvents } from "@/lib/sponsor/sponsor-event-service";
 import { buildFrozenValuationSnapshot } from "@/lib/season/frozen-valuation-snapshot";
 
@@ -296,7 +297,7 @@ function writeLocalMatchdayAdvance(prepared: PreparedMatchdayProgress, persisten
   };
 
   const nextGameState: GameState = maybeGenerateSponsorEvents(
-    advanceScoutIntelTick({
+    advancePlayerPotentialRevealTick(advanceScoutIntelTick({
       gameState: {
         ...save.gameState,
         gamePhase: prepared.nextMatchdayId ? "season_active" : "season_completed",
@@ -322,7 +323,7 @@ function writeLocalMatchdayAdvance(prepared: PreparedMatchdayProgress, persisten
         ],
       },
       phase: "matchday",
-    }),
+    })),
     prepared.saveId,
   );
 

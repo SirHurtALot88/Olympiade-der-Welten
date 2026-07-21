@@ -2708,20 +2708,39 @@ export default function PlayerDetailDrawer({
                       {showExactAttribute && plannedAttributeDelta ? ` → ${formatValue(plannedNextValue, 0)}` : ""}
                     </strong>
                     {showExactAttribute && ceilingPreview?.ceiling != null ? (
-                      <span
-                        className="player-drawer-attr-ceiling"
-                        title={`Max erreichbares Potenzial für ${entry.label}: ${formatValue(ceilingPreview.ceiling, 0)}${
-                          entry.value != null
-                            ? ` · Ausbau-Reserve +${Math.max(0, Math.round(ceilingPreview.ceiling - entry.value))}`
-                            : ""
-                        }`}
-                      >
-                        <span className="player-drawer-attr-ceiling-label">Potenzial</span>
-                        <span className="player-drawer-attr-ceiling-value">
-                          {entry.value != null ? `${formatValue(entry.value, 0)} → ` : ""}
-                          {formatValue(ceilingPreview.ceiling, 0)}
-                        </span>
-                      </span>
+                      (() => {
+                        const revealed =
+                          ceilingPreview.ceilingRevealed ||
+                          ceilingPreview.ceilingMin == null ||
+                          ceilingPreview.ceilingMax == null ||
+                          ceilingPreview.ceilingMin === ceilingPreview.ceilingMax;
+                        return (
+                          <span
+                            className={`player-drawer-attr-ceiling${revealed ? "" : " is-fogged"}`}
+                            title={
+                              revealed
+                                ? `Max erreichbares Potenzial für ${entry.label}: ${formatValue(ceilingPreview.ceiling, 0)}`
+                                : `Potenzial für ${entry.label} noch nicht voll aufgedeckt — geschätzter Bereich ${formatValue(
+                                    ceilingPreview.ceilingMin,
+                                    0,
+                                  )}–${formatValue(
+                                    ceilingPreview.ceilingMax,
+                                    0,
+                                  )}. Wird mit Scouting und über die Zeit genauer.`
+                            }
+                          >
+                            <span className="player-drawer-attr-ceiling-label">Potenzial</span>
+                            <span className="player-drawer-attr-ceiling-value">
+                              {revealed
+                                ? formatValue(ceilingPreview.ceiling, 0)
+                                : `${formatValue(ceilingPreview.ceilingMin, 0)}–${formatValue(
+                                    ceilingPreview.ceilingMax,
+                                    0,
+                                  )}`}
+                            </span>
+                          </span>
+                        );
+                      })()
                     ) : null}
                     {showAttributeSparkline ? (
                       <span

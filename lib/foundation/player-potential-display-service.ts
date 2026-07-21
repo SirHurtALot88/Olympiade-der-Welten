@@ -41,6 +41,15 @@ export type PlayerAttributeCeilingPreview = {
   current: number | null;
   /** Max erreichbarer Attributwert (Potenzial-Decke), numerisch. */
   ceiling: number | null;
+  /**
+   * Fog-of-War-Unschärfe auf den Max: solange das Potenzial nicht voll aufgedeckt
+   * ist, wird der Max als Bereich [ceilingMin, ceilingMax] gezeigt (breit bei niedriger
+   * Reveal-Confidence, eng bei hoher). Bei voller Aufdeckung gilt ceilingRevealed=true
+   * und min=max=ceiling (exakter Wert).
+   */
+  ceilingMin: number | null;
+  ceilingMax: number | null;
+  ceilingRevealed: boolean;
   state: AttributeHeadroomState;
   headroomLabel: string;
   growthMultiplier: number;
@@ -138,13 +147,46 @@ export function buildPlayerPotentialDisplaySnapshot(input: {
     };
   });
 
+  // Reveal-Confidence (0..1): wie sicher der Attribut-Max bekannt ist. Wächst über
+  // Zeit (record.confidence, per Auto-Reveal-Tick) + Bonus für eigene Spieler. Bei 0
+  // (frisch, unscouted) ist die Unschärfe am größten. Bei ~1 wird der Max exakt gezeigt.
+  const ownerRoster = input.gameState.rosters?.find((entry) => entry.playerId === input.player.id) ?? null;
+  const ownerTeam = ownerRoster
+    ? input.gameState.teams?.find((team) => team.teamId === ownerRoster.teamId) ?? null
+    : null;
+  const isOwnPlayer = ownerTeam?.humanControlled === true;
+  const potentialRevealConfidence = Math.min(
+    1,
+    Math.max(0, (record.confidence ?? 0) / 100 + (isOwnPlayer ? 0.2 : 0)),
+  );
+  const POTENTIAL_CEILING_BAND_MAX = 13;
+
   const attributeCeilingPreview: PlayerAttributeCeilingPreview[] = playerGeneratorAttributeKeys.map((attribute) => {
     const headroom = getAttributeHeadroom({ player: input.player, attribute, record });
+    // Fog-Unschärfe auf den Max: Bandbreite skaliert mit (1 − Reveal-Confidence).
+    const band = Math.round((1 - potentialRevealConfidence) * POTENTIAL_CEILING_BAND_MAX);
+    const floor = headroom.current ?? 1;
+    const ceilingRevealed = headroom.ceiling == null || band <= 1;
+    const ceilingMin =
+      headroom.ceiling == null
+        ? null
+        : ceilingRevealed
+          ? headroom.ceiling
+          : Math.min(99, Math.max(floor, Math.round(headroom.ceiling - band)));
+    const ceilingMax =
+      headroom.ceiling == null
+        ? null
+        : ceilingRevealed
+          ? headroom.ceiling
+          : Math.min(99, Math.max(floor, Math.round(headroom.ceiling + band)));
     return {
       attribute,
       label: TRAINING_ATTRIBUTE_LABELS[attribute],
       current: headroom.current,
       ceiling: headroom.ceiling,
+      ceilingMin,
+      ceilingMax,
+      ceilingRevealed,
       state: headroom.state,
       headroomLabel: getHeadroomLabel(headroom.state, headroom.headroom),
       growthMultiplier: getAttributeGrowthMultiplier(headroom.state),

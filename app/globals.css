@@ -15132,6 +15132,20 @@ a {
   font-variant-numeric: tabular-nums;
 }
 
+/* Fog-Unschärfe: der Max ist noch nicht voll aufgedeckt und wird als Range gezeigt —
+   dezent gedämpft + „~"-Präfix, damit klar ist, dass es eine Schätzung ist. */
+.player-drawer-attr-ceiling.is-fogged .player-drawer-attr-ceiling-value {
+  color: var(--nl-ink);
+  opacity: 0.72;
+  font-weight: 600;
+}
+
+.player-drawer-attr-ceiling.is-fogged .player-drawer-attr-ceiling-value::before {
+  content: "~";
+  opacity: 0.7;
+  margin-right: 1px;
+}
+
 .player-drawer-attribute-title {
   display: flex;
   align-items: center;

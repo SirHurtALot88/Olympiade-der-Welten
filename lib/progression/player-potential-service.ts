@@ -473,6 +473,34 @@ export function buildPlayerPotentialRecordsForSave(input: {
   });
 }
 
+/**
+ * Auto-Reveal-Tick: hebt die Reveal-Confidence jedes Potenzial-Records an, sodass sich
+ * das (verdeckte) Potenzial über die Zeit von selbst aufdeckt — eigene Spieler schneller
+ * als der Rest der Liga. Wird pro Matchday aufgerufen. Rein additiv, deterministisch,
+ * idempotent bei confidence=100.
+ */
+export function advancePlayerPotentialRevealTick(gameState: GameState): GameState {
+  const records = gameState.playerPotential;
+  if (!records?.length) return gameState;
+  const humanTeamIds = new Set(
+    (gameState.teams ?? []).filter((team) => team.humanControlled).map((team) => team.teamId),
+  );
+  const teamByPlayerId = new Map(
+    (gameState.rosters ?? []).map((entry) => [entry.playerId, entry.teamId] as const),
+  );
+  let changed = false;
+  const nextRecords = records.map((record) => {
+    const teamId = teamByPlayerId.get(record.playerId);
+    const isOwnPlayer = teamId != null && humanTeamIds.has(teamId);
+    const gain = isOwnPlayer ? 8 : 3;
+    const confidence = clamp((record.confidence ?? 0) + gain, 0, 100);
+    if (confidence === record.confidence) return record;
+    changed = true;
+    return { ...record, confidence };
+  });
+  return changed ? { ...gameState, playerPotential: nextRecords } : gameState;
+}
+
 /** True, wenn ALLE Potenzial-Records mit dem aktuellen Modell erzeugt wurden. */
 export function isPlayerPotentialModelCurrent(
   records: PlayerPotentialRecord[] | undefined | null,
