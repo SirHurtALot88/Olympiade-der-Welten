@@ -2545,9 +2545,11 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           ) : null}
 
           {activeView === "matchdayArena" ? (
-          <>
+          <div id="foundation-matchday-arena" data-testid="foundation-matchday-arena">
           {/* Arena = die (ehemalige) Disziplin-Bühne. Der View bleibt `matchdayArena`
               (überall im Season-Flow verdrahtet), rendert aber jetzt die native Bühne.
+              Die Landmark-ID `foundation-matchday-arena` bleibt am Container (Scroll-Target
+              via getFoundationViewScrollTarget + Gameplay-Smoke-Locator).
               Der eigene Advance-Button der Bühne ist unterdrückt (onAdvanceMatchday=null) —
               der flow-kritische Abschluss läuft weiter über die „Spieltagsergebnis"-Sektion
               unten (runFinishMatchdaySimple / triggerGlobalNext). Die alte Arena-Panel-UI
@@ -2636,7 +2638,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   </div>
                 )}
               </section>
-          </>
+          </div>
           ) : null}
 
           <FoundationShellRouterMatchdayResult

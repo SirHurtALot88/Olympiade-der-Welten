@@ -573,7 +573,7 @@ async function main() {
     const expectedSaveId = beforeBody.save?.saveId ?? null;
     const expectedTeamId = beforeBody.save?.gameState?.teams?.[0]?.teamId ?? "A-A";
 
-    browser = await chromium.launch({ headless: true });
+    browser = await chromium.launch({ headless: true, executablePath: process.env.PW_EXEC || undefined });
     const page = await browser.newPage({ viewport: { width: 1680, height: 1200 } });
     page.setDefaultTimeout(args.timeoutMs);
     page.setDefaultNavigationTimeout(args.timeoutMs);
@@ -910,6 +910,14 @@ async function main() {
           )
           .first()
           .waitFor({ state: "visible", timeout: viewTimeoutMs });
+        // Die Arena (Disziplin-Bühne) lädt ihre Steuerung asynchron aus /api/matchday/arena-base.
+        // Vor den (instant) Button-Checks unten warten, bis die Controls tatsächlich gerendert
+        // sind — sonst racet der arena-reset-/step-Check gegen den Bühnen-Render.
+        await page
+          .locator("[data-testid='arena-primary-step'], [data-testid='arena-reset'], [data-testid='arena-lineup-blocker'], [data-testid='arena-finish-matchday-button']")
+          .first()
+          .waitFor({ state: "visible", timeout: viewTimeoutMs })
+          .catch(() => {});
         const text = await pageText(page);
         assertStep(
           step,
@@ -933,10 +941,16 @@ async function main() {
           .isVisible()
           .catch(() => false);
         const stepButtonVisible =
+          // Neue Arena (Disziplin-Bühne): primärer ▶ Start/Etappe-Button bzw. der
+          // „Spieltag abschliessen"-Button der Ergebnis-Sektion. Fallbacks: Alt-Labels.
+          (await page.getByTestId("arena-primary-step").isVisible().catch(() => false)) ||
+          (await page.getByTestId("arena-finish-matchday-button").isVisible().catch(() => false)) ||
           (await page.getByRole("button", { name: /^Step$/ }).isVisible().catch(() => false)) ||
           (await page.getByRole("button", { name: /^Weiter$/ }).first().isVisible().catch(() => false)) ||
           (await page.getByRole("button", { name: /^Play$/ }).isVisible().catch(() => false));
-        const resetButtonVisible = await page.getByRole("button", { name: /^Reset$/ }).isVisible().catch(() => false);
+        const resetButtonVisible =
+          (await page.getByTestId("arena-reset").isVisible().catch(() => false)) ||
+          (await page.getByRole("button", { name: /^Reset$/ }).isVisible().catch(() => false));
         assertStep(
           step,
           laneOrEmptyVisible ||

@@ -2742,13 +2742,13 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       <div ref={mainColRef} style={{ flex: "1 1 620px", minWidth: 0, order: 1 }}>
         {/* Controls */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
-          <button type="button" onClick={() => { setStarted(true); advance(); }} disabled={done || busy} style={{ padding: "9px 18px", fontWeight: 800, fontSize: 13, border: 0, borderRadius: 10, cursor: done || busy ? "default" : "pointer", color: "var(--nl-ink)", background: done ? "var(--nl-line)" : "var(--nl-accent)", opacity: busy && !done ? 0.7 : 1 }}>
+          <button type="button" data-testid="arena-primary-step" onClick={() => { setStarted(true); advance(); }} disabled={done || busy} style={{ padding: "9px 18px", fontWeight: 800, fontSize: 13, border: 0, borderRadius: 10, cursor: done || busy ? "default" : "pointer", color: "var(--nl-ink)", background: done ? "var(--nl-line)" : "var(--nl-accent)", opacity: busy && !done ? 0.7 : 1 }}>
             {done ? "✔ Disziplin gewertet" : !started ? `▶ Start · Etappe 1 / ${slotCount}` : `▶ Etappe ${round + 1} / ${slotCount} — ${slots[round] ?? ""}`}
           </button>
           <button type="button" onClick={quickSim} style={{ padding: "9px 14px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}>
             ⏩ Quick-Sim
           </button>
-          <button type="button" onClick={reset} style={{ padding: "9px 14px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}>
+          <button type="button" data-testid="arena-reset" onClick={reset} style={{ padding: "9px 14px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}>
             ↻ Neu
           </button>
           <button type="button" onClick={audio.toggleMute} title="Sound an/aus" style={{ padding: "9px 12px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}>
