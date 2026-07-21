@@ -21,13 +21,12 @@ export function latestRecordSignature(records: unknown[] | undefined) {
     return "0:";
   }
 
-  const latest = records.reduce<unknown | null>((currentLatest, record) => {
-    if (!currentLatest) {
-      return record;
-    }
-
-    return getRecordTimestamp(record) > getRecordTimestamp(currentLatest) ? record : currentLatest;
-  }, null);
+  // Ergebnis-/Log-/Snapshot-Arrays sind append-only → das letzte Element ist der
+  // jüngste Datensatz. O(1) statt eines O(n)-reduce über das ganze Array (das
+  // mit gespielten Saisons wächst und bei nicht-memoisierten Aufrufen messbar
+  // wurde). Länge + letzte ID + letzter Zeitstempel ändern sich bei jedem
+  // Append, taugen also weiterhin als Cache-Signatur.
+  const latest = records[records.length - 1];
 
   return `${records.length}:${getRecordId(latest)}:${getRecordTimestamp(latest)}`;
 }

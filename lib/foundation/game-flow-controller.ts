@@ -18,6 +18,7 @@ import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { hasPersistedTeamCaptain } from "@/lib/morale/team-captain-service";
+import { isTeamTrainingComplete } from "@/lib/foundation/team-training-status";
 
 export type GameFlowPhase =
   | "preseason"
@@ -128,10 +129,8 @@ function isCurrentMatchdayLineupComplete(gameState: GameState, lineup: ReturnTyp
 
 
 function activeTeamTrainingComplete(gameState: GameState, activeTeamId: string | null) {
-  const rosterPlayerIds = getActiveTeamRosterPlayerIds(gameState, activeTeamId);
-  if (rosterPlayerIds.length === 0) return false;
-  const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
-  return rosterPlayerIds.every((playerId) => playersById.get(playerId)?.trainingMode != null);
+  // Einheitliche Quelle der Wahrheit (siehe team-training-status).
+  return isTeamTrainingComplete(gameState, activeTeamId);
 }
 
 function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null): GameFlowStep[] {
@@ -500,6 +499,17 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
         ? ["lineup_not_submitted"]
         : ["missing_lineup"];
   const trainingComplete = activeTeamTrainingComplete(gameState, activeTeamId);
+  // Am letzten Spieltag beendet "advance" die Saison (gamePhase → season_completed),
+  // führt also nicht zu einem nächsten Spieltag — Label/CTA müssen das signalisieren.
+  const totalMatchdays = gameState.season.matchdayIds?.length ?? 0;
+  const currentMatchdayNo = gameState.season.currentMatchday ?? 1;
+  const isFinalMatchday = totalMatchdays > 0 && currentMatchdayNo >= totalMatchdays;
+  // Weicher Kapitän-Reminder vor der ersten Disziplin für menschliche Teams:
+  // die Onboarding-Ernennung ist die eigentliche Pflicht, aber falls der Kapitän
+  // mitten in der Saison wegfällt, erinnert die Arena-Stufe hier (blockiert nicht).
+  const activeTeam = activeTeamId ? gameState.teams.find((team) => team.teamId === activeTeamId) ?? null : null;
+  const humanTeamMissingCaptain =
+    activeTeamId != null && Boolean(activeTeam?.humanControlled) && !hasPersistedTeamCaptain(gameState, activeTeamId);
   const storedNewGameFlow = gameState.seasonState.newGameFlow ?? null;
   const seasonIntroStep = storedNewGameFlow?.steps?.find((entry) => entry.stepId === "season_intro");
   const trainingFacilitiesStep = storedNewGameFlow?.steps?.find((entry) => entry.stepId === "training_facilities");
@@ -680,7 +690,7 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       targetView: "matchdayArena",
       teamId: activeTeamId,
       blockers: openArenaBlockers,
-      warnings: boardFlowWarnings,
+      warnings: humanTeamMissingCaptain && !hasResults ? [...boardFlowWarnings, "captain_recommended"] : boardFlowWarnings,
     }),
     step({
       stepId: "run_reveal",
@@ -728,8 +738,8 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
     }),
     step({
       stepId: "advance_to_next_matchday",
-      label: "Zum nächsten Spieltag",
-      cta: "Weiter: Matchday fortsetzen",
+      label: isFinalMatchday ? "Saison abschließen" : "Zum nächsten Spieltag",
+      cta: isFinalMatchday ? "Weiter: Zur Saison-Auswertung" : "Weiter: Matchday fortsetzen",
       status: hasResults ? (boardSignals.blockers.length > 0 ? "warning" : "ready") : "blocked",
       targetView: "cockpit",
       teamId: activeTeamId,

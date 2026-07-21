@@ -717,4 +717,39 @@ describe("game flow controller", () => {
     // Früher "blocked" ohne Begründung — jetzt frei wählbar (unabhängig vom Training).
     expect(sponsor?.status).not.toBe("blocked");
   });
+
+  it("relabels the advance step to 'Saison abschließen' on the final matchday", () => {
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        players: [player("p-1", "mittel")],
+        season: { id: "season-2", name: "Season 2", year: 2027, currentMatchday: 1, matchdayIds: ["season-2-md-1"] },
+        matchdayState: { matchdayId: "season-2-md-1", status: "resolved", pendingTeamIds: [], resolvedFixtureIds: [] },
+        seasonState: { seasonId: "season-2", schedule: [], standings: {} },
+      }),
+      activeTeamId: "M-M",
+    });
+    const advance = flow.steps.find((step) => step.stepId === "advance_to_next_matchday");
+    expect(advance?.label).toBe("Saison abschließen");
+    expect(advance?.cta).toContain("Auswertung");
+  });
+
+  it("surfaces a soft captain reminder on the arena step for a human team without a captain", () => {
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        players: [player("p-1", "mittel")],
+        seasonState: {
+          seasonId: "season-2",
+          schedule: [],
+          standings: {},
+          disciplineSchedule: [{ seasonId: "season-2", matchdayId: "season-2-md-1", discipline1: { disciplineId: "d1", playerCount: 1 }, discipline2: null }],
+          lineupDrafts: [{ lineupId: "lineup-1", saveId: "save-1", seasonId: "season-2", matchdayId: "season-2-md-1", teamId: "M-M", status: "submitted", entries: [{ disciplineId: "d1", disciplineSide: "d1", slotIndex: 0, playerId: "p-1", activePlayerId: "r-1" }], createdAt: "2026-06-12T00:00:00.000Z", updatedAt: "2026-06-12T00:00:00.000Z" }],
+        },
+      }),
+      activeTeamId: "M-M",
+    });
+    const arena = flow.steps.find((step) => step.stepId === "open_arena");
+    // Weicher Hinweis (blockiert nicht): der Schritt bleibt spielbar.
+    expect(arena?.warnings).toContain("captain_recommended");
+    expect(arena?.status).not.toBe("blocked");
+  });
 });

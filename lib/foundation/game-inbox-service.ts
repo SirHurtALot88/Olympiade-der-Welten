@@ -573,7 +573,10 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
       );
     }
 
-    if (controlMode === "manual" && rosterCount >= rosterMinTarget && lineupComplete) {
+    // Kapitän-Aufgabe schon anbieten, sobald der Kader das Ziel erreicht — die
+    // Flow-Reihenfolge fragt den Kapitän vor dem Lineup, also nicht mehr erst
+    // nach vollständigem Lineup nudgen (vorher: && lineupComplete).
+    if (controlMode === "manual" && rosterCount >= rosterMinTarget) {
       const captainSet = hasPersistedTeamCaptain(input.gameState, team.teamId);
       items.push(
         createItem({

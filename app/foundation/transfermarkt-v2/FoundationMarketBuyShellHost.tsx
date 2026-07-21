@@ -683,10 +683,14 @@ export default function FoundationMarketBuyShellHost({
                     </NlCard>
                   </div>
                 </>
+              ) : previewBusy ? (
+                <p className="muted transfer-empty-hint">Kaufvorschau wird berechnet …</p>
+              ) : !selectedPlayer ? (
+                <p className="muted transfer-empty-hint">Wähle links einen Spieler, um die Kaufvorschau zu sehen.</p>
+              ) : source !== "sqlite" ? (
+                <p className="muted transfer-empty-hint">Nur-Ansicht-Modus — in diesem Kontext ist kein Kauf möglich.</p>
               ) : (
-                <p className="muted transfer-empty-hint">
-                  Kaufvorschau wird geladen oder ist für diesen Kontext noch nicht verfügbar.
-                </p>
+                <p className="muted transfer-empty-hint">Für diese Auswahl ist derzeit keine Kaufvorschau verfügbar.</p>
               )}
             </div>
 
