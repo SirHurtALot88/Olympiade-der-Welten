@@ -1753,7 +1753,18 @@ export function useFoundationShellRouterBodyScope({
     await saveAdminBalancingConfig(defaults);
   }
 
-  function setActiveManagerTeam(teamId: string, source: ActiveManagerTeamSource = "manual_select") {
+  function setActiveManagerTeam(
+    teamId: string,
+    source: ActiveManagerTeamSource = "manual_select",
+    // `saveIdOverride` scopes the persisted team preference to a specific save id.
+    // Needed right after creating a new game: at that point the `activeSaveId`
+    // captured in this closure is still the PREVIOUS save's id (the new save's
+    // setActiveSaveId has not re-rendered this closure yet), so persisting under
+    // the closure value would scope the new team to the wrong save — and the
+    // previous save's team could then resurface. Callers that already know the
+    // freshly created save id pass it here.
+    saveIdOverride?: string | null,
+  ) {
     const resolvedTeamId = resolveFoundationTeamId(gameState.teams, teamId);
     if (!resolvedTeamId) {
       setActiveManagerTeamWarning(`Team ${teamId} ist in diesem Save nicht vorhanden.`);
@@ -1769,7 +1780,7 @@ export function useFoundationShellRouterBodyScope({
       setMarketTeamId(resolvedTeamId);
     }
     syncFoundationTeamIdInUrl(resolvedTeamId);
-    persistFoundationManagerTeamId(resolvedTeamId, activeSaveId, source);
+    persistFoundationManagerTeamId(resolvedTeamId, saveIdOverride ?? activeSaveId, source);
   }
 
   function clearPendingTeamActivation() {
@@ -5250,17 +5261,28 @@ export function useFoundationShellRouterBodyScope({
       }
 
       if (payload.result?.save.saveId) {
+        const newSaveId = payload.result.save.saveId;
         clearSaveScopedFeeds();
         const nextSaveMode = normalizeFoundationSaveMode(payload.result.preview.presetId);
         setFoundationSaveMode(nextSaveMode);
-        await loadSave(payload.result.save.saveId, nextSaveMode);
+        await loadSave(newSaveId, nextSaveMode);
+        // The new save is now active, so the "Neues Spiel"-intent that suppressed
+        // the PREVIOUS save's season briefing must end here — otherwise the intent
+        // refs stay latched for the whole session (they are never reset elsewhere)
+        // and leak onto the fresh save, permanently suppressing ITS season intro.
+        newGameIntentRef.current = false;
+        newGameIntentBaselineSaveIdRef.current = null;
         // Pin the freshly created + activated save into the URL so a reload,
         // new tab, or the homepage "Solo spielen" link loads exactly this
         // save instead of falling back to the global active save row.
-        syncFoundationSaveIdInUrl(payload.result.save.saveId);
+        syncFoundationSaveIdInUrl(newSaveId);
         const firstTeamId = payload.result.preview.chrisTeamIds[0] ?? payload.result.preview.frankyTeamIds[0] ?? null;
         if (firstTeamId) {
-          setActiveManagerTeam(firstTeamId, "manual_select");
+          // Scope the active-team preference to the NEW save id explicitly: the
+          // `activeSaveId` in this closure is still the previous save's id, so
+          // without the override the new team would be persisted under the old
+          // save and the previous save's team (e.g. P-S) could resurface.
+          setActiveManagerTeam(firstTeamId, "manual_select", newSaveId);
         }
         setNewGamePreview(payload.result.preview);
         setNewGameSuccess(`Neuer Spielstand aktiv: ${payload.result.save.name}`);
