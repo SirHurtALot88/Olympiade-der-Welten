@@ -64,17 +64,13 @@ describe("gameplay flow scan contract", () => {
   });
 
   it("wires prep performance markers for lineup, season and arena", async () => {
-    const [lineupText, seasonText, arenaText, packageText] = await Promise.all([
+    const [lineupText, seasonText, packageText] = await Promise.all([
       fs.readFile(
         path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"),
         "utf8",
       ),
       fs.readFile(
         path.join(process.cwd(), "app/foundation/season-v2/SeasonStandingsV2Client.tsx"),
-        "utf8",
-      ),
-      fs.readFile(
-        path.join(process.cwd(), "app/foundation/matchday-arena-v2/MatchdayArenaV2Client.tsx"),
         "utf8",
       ),
       fs.readFile(path.join(process.cwd(), "package.json"), "utf8"),
@@ -85,8 +81,5 @@ describe("gameplay flow scan contract", () => {
     expect(lineupText).toContain("scheduleHoveredCandidate");
     expect(lineupText).toContain("expertPlayerTableVirtualWindow");
     expect(seasonText).toContain("standingsTableVirtualWindow");
-    expect(arenaText).toContain("handleBoardScroll");
-    expect(arenaText).toContain("matchdayWinnerByTeamId");
-    expect(arenaText).toContain("ArenaRevealPlaybackPanel");
   });
 });

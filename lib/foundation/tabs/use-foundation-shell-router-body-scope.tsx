@@ -7,7 +7,6 @@ import {
   FoundationShellRouterInboxV2,
   FoundationShellRouterLineup,
   FoundationShellRouterMarketSell,
-  FoundationShellRouterMatchdayArena,
   FoundationShellRouterMatchdayResult,
   FoundationShellRouterPrize,
   FoundationShellRouterSeasonPreview,
@@ -783,10 +782,6 @@ const FoundationLineupPanel = dynamic(() => import("@/app/foundation/legacy-line
   ssr: false,
   loading: () => <FoundationPanelSkeleton variant="lineup" label="Einsatzliste wird geladen…" />,
 });
-const FoundationMatchdayArenaPanel = dynamic(
-  () => import("@/app/foundation/matchday-arena-v2/FoundationMatchdayArenaPanel"),
-  { ssr: false },
-);
 const FoundationTeamsDetailPanel = dynamic(() => import("@/app/foundation/teams-v2/FoundationTeamsDetailPanel"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton variant="teams" label="Teams werden geladen…" />,
@@ -11151,7 +11146,6 @@ export {
   FacilitiesV2Client,
   FoundationHomeV2Panel,
   FoundationLineupPanel,
-  FoundationMatchdayArenaPanel,
   FoundationPlayerPortraitPreview,
   FoundationSeasonV2Panel,
   FoundationShell,

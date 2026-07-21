@@ -607,13 +607,6 @@ describe("foundation performance architecture helpers", () => {
       "utf8",
     );
     expect(transfermarktV2Text).toContain("FoundationShellRouterMarketBuy");
-    const arenaHostText = await fs.readFile(
-      path.join(root, "app/foundation/matchday-arena-v2/FoundationMatchdayArenaShellHost.tsx"),
-      "utf8",
-    );
-    expect(arenaHostText).toContain("use-matchday-arena-derivations");
-    expect(arenaHostText).toContain("FoundationMatchdayArenaPanel");
-    expect(arenaHostText).toContain("useFoundationShared");
     const resultHostText = await fs.readFile(
       path.join(root, "app/foundation/matchday-result-v2/FoundationMatchdayResultShellHost.tsx"),
       "utf8",

@@ -8,7 +8,6 @@ const scoutingPath = path.join(root, "app/foundation/scouting-center-v2/Scouting
 const scoutingQueuePath = path.join(root, "app/foundation/scouting-center-v2/ScoutingPriorityQueue.tsx");
 const scoutingReportPath = path.join(root, "app/foundation/scouting-center-v2/ScoutingReportPanel.tsx");
 const legacyLineupPath = path.join(root, "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx");
-const arenaCardPath = path.join(root, "components/matchday-arena/MatchdayArenaPlayerCard.tsx");
 const globalsPath = path.join(root, "app/globals.css");
 
 describe("foundation scouting and workflow portrait ui contract", () => {
@@ -46,13 +45,4 @@ describe("foundation scouting and workflow portrait ui contract", () => {
     expect(lineupText).toContain("interactive={false}");
   });
 
-  it("wraps matchday arena player cards around the arena portrait preset", async () => {
-    const arenaText = await fs.readFile(arenaCardPath, "utf8");
-
-    expect(arenaText).toContain("FoundationPlayerPortraitCard");
-    expect(arenaText).toContain('context="arena"');
-    expect(arenaText).toContain("is-portrait-card");
-    expect(arenaText).toContain("scoreLabel");
-    expect(arenaText).toContain("contributionLabel");
-  });
 });

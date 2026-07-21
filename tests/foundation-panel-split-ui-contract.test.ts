@@ -22,8 +22,6 @@ describe("foundation panel split ui contract", () => {
     expect(foundationSurfaceText).toContain("FoundationShellRouterSeasonV2");
     expect(foundationSurfaceText).toContain("FoundationShellRouterLineup");
     expect(foundationSurfaceText).toContain("FoundationShellRouterMarketV2");
-    expect(foundationSurfaceText).toContain("FoundationShellRouterMatchdayArena");
-    expect(foundationSurfaceText).toContain("FoundationShellRouterMatchdayArena");
     expect(pageClientText).not.toContain("FoundationMatchdayArenaPanel");
     expect(foundationSurfaceText).toContain("FoundationShellRouterTeams");
     expect(foundationText).toContain("shouldBuildHomeV2Overview");

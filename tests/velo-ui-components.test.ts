@@ -32,10 +32,9 @@ describe("velo ui rollout contract", () => {
     expect(fileText).toContain("teams-v2-focus-card");
   });
 
-  it("wires velo rollout across lineup, arena, drawer and facilities", async () => {
-    const [lineupText, arenaText, drawerText, cssText] = await Promise.all([
+  it("wires velo rollout across lineup, drawer and facilities", async () => {
+    const [lineupText, drawerText, cssText] = await Promise.all([
       fs.readFile(path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"), "utf8"),
-      fs.readFile(path.join(process.cwd(), "app/foundation/matchday-arena-v2/MatchdayArenaV2Client.tsx"), "utf8"),
       fs.readFile(path.join(process.cwd(), "app/foundation/PlayerDetailDrawer.tsx"), "utf8"),
       fs.readFile(globalsPath, "utf8"),
     ]);
@@ -43,13 +42,9 @@ describe("velo ui rollout contract", () => {
     expect(lineupText).toContain("FoundationPlayerPortraitCard");
     expect(lineupText).toContain("VeloImpactStrip");
     expect(lineupText).toContain("legacy-lineup-scoreboard-impact-strip");
-    expect(arenaText).toContain("VeloImpactStrip");
-    expect(arenaText).toContain("arena-v2-slot-impact-strip");
-    expect(arenaText).toContain("mutatorBonus");
     expect(drawerText).toContain("player-drawer-axis-chip");
     expect(drawerText).toContain("player-drawer-scouting-disclosure");
     expect(cssText).toContain(".player-drawer-axis-orbit");
-    expect(cssText).toContain(".arena-v2-slot-impact-strip");
   });
 
   it("keeps draft intensity preview data for form board while removing duplicate header strip", async () => {

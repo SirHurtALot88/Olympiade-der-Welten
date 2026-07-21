@@ -12,7 +12,6 @@ export { default as FacilitiesV2Client } from "@/app/foundation/facilities-v2/Fa
 export { default as FoundationHomeV2Panel } from "@/app/foundation/home-v2/FoundationHomeV2Panel";
 export { default as InboxV2Client } from "@/app/foundation/inbox-v2/InboxV2Client";
 export { default as FoundationLineupPanel } from "@/app/foundation/legacy-lineup-lab/FoundationLineupPanel";
-export { default as FoundationMatchdayArenaPanel } from "@/app/foundation/matchday-arena-v2/FoundationMatchdayArenaPanel";
 export { default as PlayerProfileClient } from "@/app/foundation/player-profile/PlayerProfileClient";
 export { default as ScoutingCenterV2Client } from "@/app/foundation/scouting-center-v2/ScoutingCenterV2Client";
 export { default as FoundationSeasonV2Panel } from "@/app/foundation/season-v2/FoundationSeasonV2Panel";

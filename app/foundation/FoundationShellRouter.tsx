@@ -35,9 +35,6 @@ import FoundationMarketBuyShellHost, {
 import FoundationMarketSellShellHost, {
   type FoundationMarketSellShellHostProps,
 } from "@/app/foundation/transfermarkt-v2/FoundationMarketSellShellHost";
-import FoundationMatchdayArenaShellHost, {
-  type FoundationMatchdayArenaShellHostProps,
-} from "@/app/foundation/matchday-arena-v2/FoundationMatchdayArenaShellHost";
 import FoundationMatchdayResultShellHost, {
   type FoundationMatchdayResultShellHostProps,
 } from "@/app/foundation/matchday-result-v2/FoundationMatchdayResultShellHost";
@@ -389,26 +386,6 @@ export function FoundationShellRouterMarketV2({ active, hostProps }: FoundationS
   return (
     <FoundationTabActiveHost active={active}>
       <FoundationMarketV2ShellHost {...hostProps} />
-    </FoundationTabActiveHost>
-  );
-}
-
-export type FoundationShellRouterMatchdayArenaProps = {
-  active: boolean;
-  hostProps: FoundationMatchdayArenaShellHostProps;
-};
-
-/**
- * Incremental Phase 5.3 shell slice: Matchday Arena route with unmount gate.
- */
-export function FoundationShellRouterMatchdayArena({ active, hostProps }: FoundationShellRouterMatchdayArenaProps) {
-  if (!active) {
-    return null;
-  }
-
-  return (
-    <FoundationTabActiveHost active={active}>
-      <FoundationMatchdayArenaShellHost {...hostProps} />
     </FoundationTabActiveHost>
   );
 }

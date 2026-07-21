@@ -222,13 +222,6 @@ const FoundationLineupPanel = dynamic(() => import("@/app/foundation/legacy-line
   ssr: false,
   loading: () => <FoundationPanelSkeleton variant="lineup" label="Einsatzliste wird geladen…" />,
 });
-const FoundationMatchdayArenaPanel = dynamic(
-  () => import("@/app/foundation/matchday-arena-v2/FoundationMatchdayArenaPanel"),
-  {
-    ssr: false,
-    loading: () => <FoundationPanelSkeleton label="Matchday Arena wird geladen…" />,
-  },
-);
 const FoundationSeasonV2Panel = dynamic(() => import("@/app/foundation/season-v2/FoundationSeasonV2Panel"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton variant="seasonV2" label="Saisonstand wird geladen…" />,
@@ -2555,7 +2548,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               Der eigene Advance-Button der Bühne ist unterdrückt (onAdvanceMatchday=null) —
               der flow-kritische Abschluss läuft weiter über die „Spieltagsergebnis"-Sektion
               unten (runFinishMatchdaySimple / triggerGlobalNext). Die alte Arena-Panel-UI
-              (matchday-arena-v2) ist damit ausgeblendet. */}
+              (matchday-arena-v2) wurde entfernt. */}
           <FoundationDisciplineStageHost
             gameState={gameState}
             selectedTeamId={selectedTeamId}
