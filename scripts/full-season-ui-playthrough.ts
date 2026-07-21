@@ -683,12 +683,25 @@ async function main() {
         passStep(mdStep, "Training gesetzt.");
       }
 
-      prepManualLineup({
-        saveId: save.saveId,
-        seasonId,
-        matchdayId,
-        teamId: manualTeamId,
-      });
+      try {
+        prepManualLineup({
+          saveId: save.saveId,
+          seasonId,
+          matchdayId,
+          teamId: manualTeamId,
+        });
+      } catch (prepError) {
+        // Season matchdays exhausted: once the last matchday has been played the
+        // lineup draft is locked (`lineup_draft_is_locked`) and there is no next
+        // matchday to prepare. Stop the loop cleanly and proceed to the season-end
+        // phase instead of crashing (max-matchdays can exceed the season length).
+        const message = prepError instanceof Error ? prepError.message : String(prepError);
+        if (message.includes("lineup_draft_is_locked") || message.includes("no_active_matchday")) {
+          log(`Matchday-Loop endet nach ${matchdaySummaries.length} Spieltagen (Saison ausgespielt: ${message}).`);
+          break;
+        }
+        throw prepError;
+      }
       passStep(mdStep, "Lineup submitted (AI-assisted prep für manual team).");
 
       if (!args.skipUi && browser) {
