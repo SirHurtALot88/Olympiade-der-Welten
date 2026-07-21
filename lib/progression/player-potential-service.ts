@@ -313,65 +313,74 @@ function getTalentTraitPotentialModifier(player: Pick<Player, "traitsPositive" |
 }
 
 /**
- * Inverse-CDF (quantile) anchors for the hidden PO generator, expressed as
- * [cumulativeProbability, potentialScore]. This reshapes the seed — a ~uniform
- * value in [0,1] — into a realistic, lower-centered, RIGHT-SKEWED league where
- * elite ceilings are rare, instead of the old uniform 35..99+trait roll (mean
- * ~67, which pinned ~40% of players at 5.0★ and made a third of the league
- * indistinguishable at max potential).
+ * Inverse-CDF (quantile) anchors for the hidden CA→PO *headroom* generator,
+ * expressed as [cumulativeProbability, gapScorePoints]: the amount of upside a
+ * player has ABOVE their current ability, in raw score points (~11–12 points ≈
+ * one star on the `CA_PO_STAR_ANCHORS` curve above).
  *
- * The anchors deliberately track the MEASURED real-catalog CA/PO percentile
- * shape the star curve above was calibrated against
- *   (p5≈29 p25≈39 p50≈46 p75≈54 p90≈62 p95≈68 p99≈78),
- * sitting a hair above it since PO is an upside ceiling (>= current ability).
- * Feeding these through `potentialScoreToStars` yields, across many seeds:
- *   median ~2.5★ · ~5% ≥4.5★ · only ~3% pinned at 5.0★ · a long thin elite tail.
- * A talent-trait modifier is layered on top so gifted/prodigy players earn their
- * higher ceilings organically — the elites that DO exist are the ones with a
- * natural-gift trait, not a flat lucky roll. Monotonic, piecewise-linear,
- * seed-deterministic (no Math.random). The [35,99] clamp is unchanged.
+ * Why a GAP curve, not an absolute-PO curve: the previous generator drew an
+ * absolute score independent of CA and then floored it at CA (`max(rawRoll, CA)`).
+ * Because the raw draw was right-skewed with a median (~46) well ABOVE the median
+ * CA, it landed above CA for most low-CA players and pinned their PO at that
+ * ~46/2.5★ floor — so a genuine 1★ was AUTOMATICALLY lifted to ~2.5★ potential,
+ * the observed CA→PO gap was suspiciously stable, and headroom was negatively
+ * coupled to CA. Drawing the gap directly, decoupled from CA, fixes all three:
+ * a 1★ with a small draw stays ~1.5★, headroom varies freely, and it no longer
+ * tracks CA.
+ *
+ * Shape: deliberately TIGHT and right-skewed — most players carry only a little
+ * headroom (median ~0.5★), the spread is real (so the gap is no longer "stable"),
+ * and the elite tail stays THIN so the top is NOT broadened (a 3★→5★ wonder kid
+ * is a rare outlier, not a common outcome). Across many seeds a low-/mid-CA player
+ * gets, typically: median ~0.5★ · p82 ~1.1★ · p96 ~2★ · p99 ~2.7★ of headroom.
+ * Monotonic, piecewise-linear, seed-deterministic (no Math.random).
  */
-const PO_QUANTILE_ANCHORS: ReadonlyArray<readonly [cumulativeP: number, score: number]> = [
-  [0.0, 35],
-  [0.05, 37],
-  [0.2, 41],
-  [0.4, 45],
-  [0.55, 48],
-  [0.7, 52],
-  [0.82, 57],
-  [0.9, 62],
-  [0.95, 68],
-  [0.98, 74],
-  [0.995, 82],
-  [1.0, 95],
+const GAP_QUANTILE_ANCHORS: ReadonlyArray<readonly [cumulativeP: number, gap: number]> = [
+  [0.0, 0],
+  [0.12, 1],
+  [0.3, 3],
+  [0.5, 6],
+  [0.68, 9],
+  [0.82, 13],
+  [0.91, 18],
+  [0.96, 24],
+  [0.99, 31],
+  // Thin extreme tail (top ~0.3%): a rare wonder-kid draw big enough that even a
+  // weak player can reach a ~5★ ceiling. Kept deliberately narrow so it does NOT
+  // broaden the visible top — it just lets the rare outlier exist.
+  [0.997, 41],
+  [1.0, 52],
 ];
 
-/** Map a uniform seed in [0,1] to a PO score via the right-skewed quantile curve. */
-function seedToPotentialScore(seed: number): number {
-  const first = PO_QUANTILE_ANCHORS[0]!;
-  const last = PO_QUANTILE_ANCHORS[PO_QUANTILE_ANCHORS.length - 1]!;
+/** Map a uniform seed in [0,1] to a CA→PO headroom (gap) in score points. */
+function seedToPotentialGap(seed: number): number {
+  const first = GAP_QUANTILE_ANCHORS[0]!;
+  const last = GAP_QUANTILE_ANCHORS[GAP_QUANTILE_ANCHORS.length - 1]!;
   if (seed <= first[0]) return first[1];
   if (seed >= last[0]) return last[1];
-  for (let index = 1; index < PO_QUANTILE_ANCHORS.length; index += 1) {
-    const [hiP, hiScore] = PO_QUANTILE_ANCHORS[index]!;
+  for (let index = 1; index < GAP_QUANTILE_ANCHORS.length; index += 1) {
+    const [hiP, hiGap] = GAP_QUANTILE_ANCHORS[index]!;
     if (seed <= hiP) {
-      const [loP, loScore] = PO_QUANTILE_ANCHORS[index - 1]!;
+      const [loP, loGap] = GAP_QUANTILE_ANCHORS[index - 1]!;
       const t = (seed - loP) / (hiP - loP);
-      return loScore + t * (hiScore - loScore);
+      return loGap + t * (hiGap - loGap);
     }
   }
   return last[1];
 }
 
 function deriveHiddenPotentialScore(input: { saveId: string; player: Player }) {
-  const seed = getPlayerSeedValue(`${input.saveId}:${input.player.id}:potential-v4`);
-  const rawRoll = roundValue(seedToPotentialScore(seed), 0);
+  const seed = getPlayerSeedValue(`${input.saveId}:${input.player.id}:potential-v5`);
+  const gap = roundValue(seedToPotentialGap(seed), 0);
   const traitBonus = getTalentTraitPotentialModifier(input.player);
-  // Potential is a ceiling: it must never sit below the player's current
-  // ability. Floor the (seed + trait) roll at CA on the same 1-100 scale
-  // before clamping to the generator's [35,99] band.
+  // Potential is CA plus a decoupled headroom draw. The gap comes from the
+  // player-id hash (not the stats), so the CA→PO distance is independent of CA —
+  // a low player is no longer auto-lifted to a floor above their ability. The gap
+  // is >= 0, so PO already sits at/above CA; the max() only guards the case where
+  // a negative talent trait would otherwise pull PO below CA. Clamp to the
+  // generator's [35,99] band.
   const currentAbilityScore = computeCurrentAbilityScore(input.player.coreStats) ?? 35;
-  return clamp(Math.max(rawRoll + traitBonus, currentAbilityScore), 35, 99);
+  return clamp(Math.max(currentAbilityScore + gap + traitBonus, currentAbilityScore), 35, 99);
 }
 
 export function buildPlayerPotentialRecord(input: {

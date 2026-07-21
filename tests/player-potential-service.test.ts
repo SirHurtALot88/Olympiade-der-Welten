@@ -83,24 +83,21 @@ describe("player potential service", () => {
     expect(potential.warnings).toContain("potential_source_missing");
   });
 
-  it("generates a lower-centered, right-skewed potential-star distribution (no 5-star inflation)", () => {
-    // Regression guard for the reshaped hidden-PO generator. The old generator
-    // was ~uniform (35 + seed*64), producing mean ~67, a ~4.3-star median and
-    // ~40% of players pinned at 5.0 stars — a third of the league was
-    // indistinguishable at max potential. The quantile-anchored generator tracks
-    // the star curve's real-catalog percentile calibration (p50~47 -> 2.5 stars)
-    // so elites are rare and earned. Sampled across many save-seed hashes.
+  it("generates a CA-decoupled potential distribution with a thin elite tail", () => {
+    // Regression guard for the CA→PO HEADROOM generator. Potential is drawn as
+    // CA + a decoupled gap (`GAP_QUANTILE_ANCHORS` / `seedToPotentialGap` in
+    // player-potential-service.ts): an upside draw ABOVE current ability that is
+    // independent of CA. This replaces the earlier absolute-PO curve, which drew
+    // a score with a median well above the median CA and floored it at CA
+    // (`max(rawRoll, CA)`) — automatically lifting genuinely weak players to a
+    // ~2.5★ floor and making the CA→PO gap suspiciously stable/CA-coupled.
     //
-    // PO is now floored at the player's own current-ability (CA) score
-    // (`deriveHiddenPotentialScore` in player-potential-service.ts), since
-    // potential can never sit below current ability. `makePlayer`'s single
-    // fixed core-stat profile (CA ~65, a ~p90 player) would push every sampled
-    // PO up to that floor and collapse the distribution to ~4-star median. To
-    // exercise the generator itself (not the CA floor), each synthetic player
-    // below gets a realistic, low-centered CA drawn from a deterministic
-    // min-of-two-hashes distribution (median CA ~40, mirroring the real
-    // catalog), so the CA floor rarely binds and the underlying PO shape shows
-    // through.
+    // The gap curve is deliberately TIGHT and right-skewed: most players carry
+    // little headroom (median ~0.5★), the elite tail stays THIN (the top is NOT
+    // broadened — a 3★→5★ wonder kid is a rare outlier), and genuine low-ceiling
+    // players persist. Each synthetic player gets a realistic, low-centered CA
+    // (median ~40, a deterministic min-of-two-hashes mirroring the real catalog)
+    // so the gap shows through without the [35,99] band dominating.
     const N = 6000;
     const stars: number[] = [];
     for (let i = 0; i < N; i += 1) {
@@ -119,24 +116,28 @@ describe("player potential service", () => {
     stars.sort((a, b) => a - b);
     const median = stars[Math.floor(0.5 * (N - 1))]!;
     const shareAtLeast = (threshold: number) => stars.filter((s) => s >= threshold).length / N;
+    const shareAtMost = (threshold: number) => stars.filter((s) => s <= threshold).length / N;
     const pinnedAtFive = stars.filter((s) => s >= 4.99).length / N;
 
-    // Lower-centered: median sits in the 2.5-3.0 star band, not up at ~4.3.
-    expect(median).toBeGreaterThanOrEqual(2.4);
-    expect(median).toBeLessThanOrEqual(3.1);
-    // Elites are rare: only a single-digit share reaches 5.0 stars (was ~40%).
-    expect(pinnedAtFive).toBeLessThan(0.1);
-    expect(shareAtLeast(4.5)).toBeLessThan(0.12);
-    // ...but the spread stays believable — some genuine high-ceiling talent exists.
-    expect(shareAtLeast(4.0)).toBeGreaterThan(0.02);
+    // Lower-centered: median stays in the ~2.5-3.0★ band, not lifted to ~4.3★.
+    expect(median).toBeGreaterThanOrEqual(2.2);
+    expect(median).toBeLessThanOrEqual(3.0);
+    // Thin elite tail — the top is NOT broadened (well under the old ~40% pin).
+    expect(pinnedAtFive).toBeLessThan(0.14);
+    expect(shareAtLeast(4.5)).toBeLessThan(0.22);
+    // ...genuine high-ceiling talent still exists (rare 3★→5★ wonder kids).
+    expect(shareAtLeast(4.0)).toBeGreaterThan(0.1);
+    // ...and so do genuine low-ceiling players — the bottom is not auto-lifted.
+    expect(shareAtMost(1.5)).toBeGreaterThan(0.1);
   });
 
   it("generates stable save-specific hidden potential records", () => {
-    // Low-CA player: `makePlayer`'s default core stats (CA ~65) exceed the
-    // seed roll in both saves, so the new CA floor would clamp both records
-    // to the same value and hide the save-specific seed variation this test
-    // is meant to exercise. A low CA keeps the floor from binding.
-    const player = makePlayer({ coreStats: { pow: 22, spe: 24, men: 26, soc: 20 } });
+    // Mid-CA player (CA ~45): potential is now CA + a save-specific gap draw, so
+    // the [35,99] band must not bind for the save-variation to show. A very low CA
+    // would let a small gap round back down to the 35 floor in more than one save
+    // (collapsing the records); a very high CA would saturate at the 99/5★ ceiling.
+    // A mid CA keeps both bounds off so the gap draw shows through.
+    const player = makePlayer({ coreStats: { pow: 45, spe: 45, men: 45, soc: 45 } });
     const first = buildPlayerPotentialRecord({ saveId: "save-a", player });
     const second = buildPlayerPotentialRecord({ saveId: "save-a", player });
     const otherSave = buildPlayerPotentialRecord({ saveId: "save-b", player });

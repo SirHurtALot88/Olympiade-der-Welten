@@ -46,9 +46,11 @@ describe("potential derivation — spread and floor", () => {
     const max = Math.max(...scores);
     const spread = max - min;
 
+    // Wide spread, no clustering: the decoupled gap draw gives a CA-40 player
+    // anything from ~no headroom up to a ~4★ ceiling across different ids.
     expect(spread).toBeGreaterThan(20);
     expect(min).toBeLessThan(65);
-    expect(max).toBeGreaterThan(70);
+    expect(max).toBeGreaterThan(64);
   });
 
   it("hidden potential score is not anchored to legacy player.potential field", () => {
@@ -62,7 +64,11 @@ describe("potential derivation — spread and floor", () => {
     expect(record.source).toBe("generated");
   });
 
-  it("weak players can still roll high hidden potential scores", () => {
+  it("weak players are not auto-lifted but keep a spread of upside", () => {
+    // The decoupled gap generator must NOT auto-lift weak players to a floor
+    // above their ability (the old `max(rawRoll, CA)` bug lifted a genuine 1★ to
+    // ~2.5★ potential). Most weak players now keep low potential; a minority
+    // carries real headroom, and a rare tail can climb toward a high ceiling.
     const scores = Array.from({ length: 40 }, (_, index) =>
       buildPlayerPotentialRecord({
         saveId: "weak-upside",
@@ -73,7 +79,12 @@ describe("potential derivation — spread and floor", () => {
         }),
       }).hiddenPotentialScore ?? 0,
     );
-    expect(Math.max(...scores)).toBeGreaterThan(70);
+    scores.sort((a, b) => a - b);
+    const median = scores[Math.floor(0.5 * (scores.length - 1))]!;
+    // No auto-lift: the typical weak player stays low (near their own ability).
+    expect(median).toBeLessThan(45);
+    // ...but upside genuinely exists — some weak players roll meaningful headroom.
+    expect(Math.max(...scores)).toBeGreaterThan(48);
   });
 
   it("talent traits (prodigy, gifted) push potential up; ceiling traits pull it down", () => {
