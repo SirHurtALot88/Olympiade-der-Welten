@@ -12,6 +12,7 @@ import {
   getTeamAxisRank,
   isTransferTraderAvailableForSeason,
   parseAxisTargetValue,
+  pickChallengeSpecialKind,
   pickGoldenObjective,
   resolveChallengeSlotIndex,
   resolveRealisticAxisTargetRank,
@@ -102,6 +103,33 @@ describe("sponsor special objectives", () => {
       specialKey: "axis_rank_top",
     });
     expect(status).toBe(powRank <= 3 ? "completed" : powRank <= 5 ? "at_risk" : "open");
+  }, 60000);
+
+  it("never offers the transfer-profit challenge in S1 (draft = only buys), but can from S2", () => {
+    const gameState = createSingleplayerGameState();
+    const rows = buildTeamSeasonOverviewRows({ gameState });
+    // Transfer-fokussiertes Profil erzwingen (sellForProfitAggression ≥ 7), damit
+    // "transfer_profit_min" überhaupt in den Optionen landen KÖNNTE.
+    const transferFocusInput = (seasonId: string, team: (typeof gameState.teams)[number]) => {
+      const base = getTeamStrategyProfile(gameState, team.teamId);
+      return {
+        seasonId,
+        teamId: team.teamId,
+        team,
+        identity: gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null,
+        profile: { ...base, bias: { ...base.bias, sellForProfitAggression: 10 } },
+        rows,
+      };
+    };
+
+    // S1: für KEIN Team darf das Transfergewinn-Ziel angeboten werden.
+    for (const team of gameState.teams) {
+      expect(pickChallengeSpecialKind(transferFocusInput("season-1", team))).not.toBe("transfer_profit_min");
+    }
+
+    // S2: es ist wieder erreichbar (sonst wäre der Gate ein Blankett-Entfernen).
+    const s2Kinds = gameState.teams.map((team) => pickChallengeSpecialKind(transferFocusInput("season-2", team)));
+    expect(s2Kinds).toContain("transfer_profit_min");
   }, 60000);
 });
 

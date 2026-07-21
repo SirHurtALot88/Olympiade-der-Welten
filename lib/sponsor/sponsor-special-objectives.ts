@@ -231,7 +231,10 @@ export function pickChallengeSpecialKind(input: {
   if (expensiveTeam) {
     options.push("salary_pressure_max");
   }
-  if (transferFocus) {
+  // Transfergewinn-Ziel („Transfergewinn ≥ X") ist in S1 unfair/unmöglich: der Draft
+  // erzeugt zwangsläufig ein Transferminus (nur Käufe, keine Verkäufe). Deshalb — wie beim
+  // transfer_trader-Bonusziel (isTransferTraderAvailableForSeason) — in S1 nicht anbieten.
+  if (transferFocus && isTransferTraderAvailableForSeason(input.seasonId)) {
     options.push("transfer_profit_min");
   }
   const index = Math.floor(getStableUnitHash(`${input.seasonId}:${input.teamId}:challenge-kind`) * options.length);
