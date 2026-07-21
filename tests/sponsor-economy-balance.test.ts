@@ -30,7 +30,6 @@ import {
   SPONSOR_REFERENCE_BASE_FLOOR,
 } from "@/lib/sponsor/sponsor-curve-shapes";
 import { applySponsorSettlement, previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
-import { applySponsorNegotiationToComponents } from "@/lib/sponsor/sponsor-negotiation";
 import type { SponsorOfferComponent } from "@/lib/data/olyDataTypes";
 
 function createTeam(index: number): Team {
@@ -180,7 +179,6 @@ function runSingleTeamSettlement(gameState: GameState, teamId: string) {
     },
     teamId,
     offerId: securityOffer.offerId,
-    negotiationProfile: "balanced",
   }).gameState;
 
   return applySponsorSettlement({
@@ -458,7 +456,6 @@ describe("sponsor economy balance (preserved invariants)", () => {
       teamId,
       offerId: offers[0]!.offerId,
       termSeasons: 3,
-      negotiationProfile: "balanced",
     });
 
     expect(result.contract?.termSeasons).toBe(1);
@@ -479,7 +476,6 @@ describe("sponsor economy balance (preserved invariants)", () => {
       },
       teamId,
       offerId: offers[0]!.offerId,
-      negotiationProfile: "balanced",
     }).gameState;
 
     const advanced = advanceSponsorContractsForNewSeason(
@@ -511,7 +507,6 @@ describe("sponsor economy balance (preserved invariants)", () => {
       },
       teamId,
       offerId: chosen.offerId,
-      negotiationProfile: "balanced",
     }).gameState;
   }
 
@@ -674,29 +669,4 @@ describe("sponsor economy balance (preserved invariants)", () => {
     expect(top).toBeGreaterThanOrEqual(floor);
   }, 15000);
 
-  it("gives ambitious a real downside: base shrinks, upside grows vs safe/balanced", () => {
-    const components: SponsorOfferComponent[] = [
-      { componentId: "base-cash", kind: "base", label: "Basis", targetValue: 50, rewardCash: 50 },
-      { componentId: "rank-target", kind: "rank", label: "Rang", targetValue: 8, rewardCash: 20, penaltyCash: 2 },
-    ];
-    const apply = (profile: "safe" | "balanced" | "ambitious") =>
-      applySponsorNegotiationToComponents({ components, termSeasons: 1, negotiationProfile: profile });
-    const baseReward = (list: SponsorOfferComponent[]) => list.find((c) => c.kind === "base")!.rewardCash;
-    const rankReward = (list: SponsorOfferComponent[]) => list.find((c) => c.kind === "rank")!.rewardCash;
-    const rankPenalty = (list: SponsorOfferComponent[]) => list.find((c) => c.kind === "rank")!.penaltyCash ?? 0;
-
-    const safe = apply("safe");
-    const balanced = apply("balanced");
-    const ambitious = apply("ambitious");
-
-    // Bei schlechter Platzierung (nur Basis greift): safe > balanced > ambitious.
-    expect(baseReward(safe)).toBeGreaterThan(baseReward(balanced));
-    expect(baseReward(balanced)).toBeGreaterThan(baseReward(ambitious));
-    // Bei Titel (Rang-Upside): ambitious > balanced > safe.
-    expect(rankReward(ambitious)).toBeGreaterThan(rankReward(balanced));
-    expect(rankReward(balanced)).toBeGreaterThan(rankReward(safe));
-    // Echtes Risiko: ambitious verdoppelt den Malus, safe halbiert ihn.
-    expect(rankPenalty(ambitious)).toBeGreaterThan(rankPenalty(balanced));
-    expect(rankPenalty(balanced)).toBeGreaterThan(rankPenalty(safe));
-  });
 });

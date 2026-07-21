@@ -5,7 +5,6 @@ import type {
   SponsorArchetype,
   SponsorCurveShape,
   SponsorDemandProfile,
-  SponsorNegotiationProfile,
   SponsorOffer,
   SponsorOfferComponent,
   SponsorRarity,
@@ -26,10 +25,6 @@ import { buildSponsorCommercialRating } from "@/lib/sponsor/sponsor-commercial-r
 import {
   buildLeagueTeamQualityRanks,
 } from "@/lib/sponsor/sponsor-team-quality-rank";
-import {
-  applySponsorNegotiationToContract,
-  defaultAiSponsorNegotiation,
-} from "@/lib/sponsor/sponsor-negotiation";
 import {
   buildLockedRankPayoutLadder,
   buildMilestoneRankLabel,
@@ -559,7 +554,6 @@ export function chooseSponsorOffer(input: {
   offerId: string;
   saveId?: string;
   termSeasons?: SponsorTermSeasons;
-  negotiationProfile?: SponsorNegotiationProfile;
   /** When true, skip immediate base_first payout (used for AI auto-sign / balancing sims). */
   deferBaseFirstPayout?: boolean;
 }): { gameState: GameState; contract: TeamSponsorContract | null; error?: string } {
@@ -570,7 +564,6 @@ export function chooseSponsorOffer(input: {
   }
 
   const termSeasons: SponsorTermSeasons = 1;
-  const negotiationProfile = input.negotiationProfile ?? "balanced";
 
   const rows = buildTeamSeasonOverviewRows({ gameState: input.gameState });
   const row = rows.find((entry) => entry.teamId === input.teamId) ?? null;
@@ -610,14 +603,14 @@ export function chooseSponsorOffer(input: {
     variantKey: offer.variantKey,
     termSeasons,
     seasonsRemaining: termSeasons,
-    negotiationProfile,
+    // Verhandlungs-Achse entfernt: neue Verträge tragen KEIN negotiationProfile mehr (Settlement behandelt
+    // ein fehlendes Profil als „balanced" = Identität). demandProfile bleibt rein rarity-abgeleitet.
     demandProfile: offer.demandProfile,
     teamQualityRankAtSign: offer.teamQualityRank,
     isGolden: offer.isGolden,
     lockedRankPayoutLadder,
     salaryFactorAtSign,
   };
-  contract = applySponsorNegotiationToContract(contract, { termSeasons, negotiationProfile });
 
   let nextGameState: GameState = {
     ...input.gameState,
@@ -747,8 +740,6 @@ export function chooseSponsorOfferForAiTeams(gameState: GameState, settingsMap?:
     const row = rowByTeamId.get(team.teamId) ?? null;
     const cashPressure = row?.cash != null && row.cash < 0 ? 10 : row?.cash != null && row.cash < 20 ? 7 : 3;
     const powerRank = row?.rank ?? null;
-    const ambition = identity?.ambition ?? profile?.bias.starPriority ?? 5;
-    const negotiation = defaultAiSponsorNegotiation({ cashPressure, ambition });
     const bestOffer = [...offers].sort(
       (left, right) =>
         scoreOfferForAi({ offer: right, profile, identity, cashPressure, powerRank, teamId: team.teamId }) -
@@ -761,8 +752,6 @@ export function chooseSponsorOfferForAiTeams(gameState: GameState, settingsMap?:
       gameState: nextGameState,
       teamId: team.teamId,
       offerId: bestOffer.offerId,
-      termSeasons: negotiation.termSeasons,
-      negotiationProfile: negotiation.negotiationProfile,
       deferBaseFirstPayout: true,
     });
     nextGameState = result.gameState;

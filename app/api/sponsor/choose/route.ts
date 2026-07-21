@@ -18,6 +18,7 @@ type SponsorChooseBody = {
   teamId?: string;
   offerId?: string;
   termSeasons?: 1 | 2 | 3;
+  /** @deprecated Verhandlungs-Achse entfernt. Feld wird bei Alt-Requests ignoriert (kein 400). */
   negotiationProfile?: "safe" | "balanced" | "ambitious";
   dryRun?: boolean;
   source?: "sqlite" | "prisma";
@@ -112,7 +113,6 @@ export async function POST(request: Request) {
       offerId,
       saveId,
       termSeasons: 1,
-      negotiationProfile: body.negotiationProfile ?? "balanced",
     });
     if (result.error) {
       return NextResponse.json({ success: false, error: result.error, summary: null }, { status: 400 });

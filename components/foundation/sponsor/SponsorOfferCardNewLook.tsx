@@ -5,7 +5,6 @@ import { useMemo } from "react";
 import type {
   GameState,
   SponsorArchetype,
-  SponsorNegotiationProfile,
   SponsorOffer,
   SponsorOfferComponent,
   SponsorRarity,
@@ -24,7 +23,7 @@ import {
   getSponsorCurveFamily,
   mapArchetypeToCurveShape,
 } from "@/lib/sponsor/sponsor-curve-shapes";
-import { NlDeltaChip, formatNlNumber, type NlTone } from "@/components/foundation/new-look";
+import { NlDeltaChip, type NlTone } from "@/components/foundation/new-look";
 
 /**
  * "Neuer Look" Sponsor-Angebotskarte — flag-gated, additiv. Wird nur von
@@ -32,9 +31,8 @@ import { NlDeltaChip, formatNlNumber, type NlTone } from "@/components/foundatio
  * bleibt unverändert der Flag-aus-Pfad.
  *
  * Nutzt ausschließlich die echten Werte/Handler aus den Props:
- * `adjustedComponents` (bereits verhandlungs-adjustiert), `multiplier`
- * (echter Cash-Faktor), `onNegotiationProfileChange` (echter Profil-State im
- * Parent), `onChoose` (echter Sponsor-Wahl-Flow).
+ * `offer.components` (die echten Vertragskomponenten) und `onChoose` (echter
+ * Sponsor-Wahl-Flow).
  *
  * Laufzeit (`termSeasons`) ist bewusst NUR Anzeige: der echte Apply-Pfad
  * (`chooseTeamSponsor` → POST /api/sponsor/choose → `chooseSponsorOffer`)
@@ -45,12 +43,8 @@ import { NlDeltaChip, formatNlNumber, type NlTone } from "@/components/foundatio
 export type SponsorOfferCardNewLookProps = {
   offer: SponsorOffer;
   gameState: GameState;
-  adjustedComponents: SponsorOfferComponent[];
-  negotiationProfile: SponsorNegotiationProfile;
-  multiplier: number;
   chooseBusy: boolean;
   canManage: boolean;
-  onNegotiationProfileChange: (profile: SponsorNegotiationProfile) => void;
   onChoose: () => void;
   formatCash: (value: number) => string;
   /** #76: markiert dieses Angebot als Cash-stärkstes der aktuellen Saisonauswahl. */
@@ -84,17 +78,6 @@ export function RarityPill({ rarity, className }: { rarity: SponsorRarity; class
     </span>
   );
 }
-
-const NEGOTIATION_PROFILES: Array<{
-  value: SponsorNegotiationProfile;
-  label: string;
-  hint: string;
-  toneClass: string;
-}> = [
-  { value: "safe", label: "Sicher", hint: "−5 % Cash, weniger Risiko", toneClass: "is-safe" },
-  { value: "balanced", label: "Ausgewogen", hint: "Neutraler Cash-Faktor", toneClass: "is-balanced" },
-  { value: "ambitious", label: "Ambitioniert", hint: "+8 % Cash, mehr Erwartungsdruck", toneClass: "is-ambitious" },
-];
 
 function difficultyClassName(difficulty: SponsorChallengeDifficulty) {
   return `nl-sponsor-difficulty is-${difficulty}`;
@@ -218,12 +201,8 @@ function SponsorStageLadder({
 export function SponsorOfferCardNewLook({
   offer,
   gameState,
-  adjustedComponents,
-  negotiationProfile,
-  multiplier,
   chooseBusy,
   canManage,
-  onNegotiationProfileChange,
   onChoose,
   formatCash,
   isBestCashOffer = false,
@@ -238,10 +217,10 @@ export function SponsorOfferCardNewLook({
   const shape = offer.curveShape ?? mapArchetypeToCurveShape(offer.archetype);
   const shapeLabel = SPONSOR_CURVE_SHAPES[shape].labelDe;
   const familyLabel = SPONSOR_CURVE_FAMILIES[getSponsorCurveFamily(shape)].labelDe;
-  const specialComponent = adjustedComponents.find((component) => component.kind === "special") ?? null;
-  const standardComponents = adjustedComponents.filter((component) => component.kind !== "special");
-  const baseCash = adjustedComponents.find((component) => component.kind === "base")?.rewardCash ?? 0;
-  const totalCash = adjustedComponents.reduce(
+  const specialComponent = offer.components.find((component) => component.kind === "special") ?? null;
+  const standardComponents = offer.components.filter((component) => component.kind !== "special");
+  const baseCash = offer.components.find((component) => component.kind === "base")?.rewardCash ?? 0;
+  const totalCash = offer.components.reduce(
     (sum, component) => sum + (typeof component.rewardCash === "number" ? component.rewardCash : 0),
     0,
   );
@@ -329,24 +308,7 @@ export function SponsorOfferCardNewLook({
       ) : null}
 
       <div className="nl-sponsor-negotiation" data-testid="nl-sponsor-negotiation">
-        <div className="nl-sponsor-negotiation-segment" role="group" aria-label="Verhandlungsprofil">
-          {NEGOTIATION_PROFILES.map((profile) => (
-            <button
-              key={profile.value}
-              type="button"
-              className={`nl-sponsor-profile-segment ${profile.toneClass}${negotiationProfile === profile.value ? " is-active" : ""}`}
-              aria-pressed={negotiationProfile === profile.value}
-              title={profile.hint}
-              onClick={() => onNegotiationProfileChange(profile.value)}
-            >
-              {profile.label}
-            </button>
-          ))}
-        </div>
         <div className="nl-sponsor-negotiation-live nl-tnum" aria-live="polite">
-          <span>
-            Cash-Faktor <strong>×{formatNlNumber(multiplier, 2)}</strong>
-          </span>
           <span>
             Gesamt <strong>{formatCash(totalCash)}</strong>
           </span>

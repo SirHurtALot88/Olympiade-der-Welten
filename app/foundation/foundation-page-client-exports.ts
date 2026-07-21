@@ -152,7 +152,6 @@ export {
   getTeamTransferWishlistEntries,
   isTeamSetupDraftWishlistPhase,
 } from "@/lib/scouting/scouting-wishlist-slots";
-export { applySponsorNegotiationToComponents, getSponsorNegotiationMultiplier } from "@/lib/sponsor/sponsor-negotiation";
 export { GAME_ENCYCLOPEDIA_ENTRIES } from "@/lib/ui/game-encyclopedia";
 export { MappingHighlight } from "@/app/foundation/MappingHighlight";
 

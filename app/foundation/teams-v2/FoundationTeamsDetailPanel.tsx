@@ -361,19 +361,16 @@ export type FoundationTeamsDetailPanelProps = {
   selectedRosterTableRows: unknown;
   shouldBuildTeamContracts: unknown;
   playerSeasonPerformanceMap: unknown;
-  applySponsorNegotiationToComponents: unknown;
   chooseTeamSponsor: unknown;
   confirmContractRenewalNegotiation: unknown;
   formatObjectiveStatusLabel: unknown;
   formatCockpitReason: unknown;
   getPoolHeatClass: unknown;
   getResponsiveTableImageSize: unknown;
-  getSponsorNegotiationMultiplier: unknown;
   getTeamLogoModel: unknown;
   setContractRenewalNegotiation: unknown;
   setShowSelectedRosterPpsBreakdown: unknown;
   setShowTeamDisciplines: unknown;
-  setSponsorChoiceProfiles: unknown;
   toggleTransferSellMarker: unknown;
   transferSellMarkerKeySet: unknown;
   selectedBoardConfidence: unknown;
@@ -384,7 +381,6 @@ export type FoundationTeamsDetailPanelProps = {
   contractRenewalNegotiation: unknown;
   showSelectedRosterPpsBreakdown: unknown;
   sponsorChoiceMessage: unknown;
-  sponsorChoiceProfiles: unknown;
   sponsorChoiceBusy: unknown;
   selectedTeamCanManage: unknown;
   selectedTeamRosterActionsAvailable: unknown;
@@ -494,19 +490,16 @@ function FoundationTeamsDetailPanel({
   selectedRosterTableRows,
   shouldBuildTeamContracts,
   playerSeasonPerformanceMap,
-  applySponsorNegotiationToComponents,
   chooseTeamSponsor,
   confirmContractRenewalNegotiation,
   formatObjectiveStatusLabel,
   formatCockpitReason,
   getPoolHeatClass,
   getResponsiveTableImageSize,
-  getSponsorNegotiationMultiplier,
   getTeamLogoModel,
   setContractRenewalNegotiation,
   setShowSelectedRosterPpsBreakdown,
   setShowTeamDisciplines,
-  setSponsorChoiceProfiles,
   toggleTransferSellMarker,
   transferSellMarkerKeySet,
   selectedBoardConfidence,
@@ -517,7 +510,6 @@ function FoundationTeamsDetailPanel({
   contractRenewalNegotiation,
   showSelectedRosterPpsBreakdown,
   sponsorChoiceMessage,
-  sponsorChoiceProfiles,
   sponsorChoiceBusy,
   selectedTeamCanManage,
   selectedTeamRosterActionsAvailable,
