@@ -45,6 +45,13 @@ function enrichSaveSummary(save: SaveSummary): SaveSummary {
 export function loadFoundationInitialPersistenceState(input?: {
   saveId?: string | null;
   saveMode?: string | null;
+  /**
+   * Owner of the current session (only set when auth is on). When present, the active-save
+   * fallback resolves and (re)activates THIS owner's active save instead of the shared global
+   * one, so Chris and Franky never overwrite each other's active pointer. Null/undefined ->
+   * unchanged global behavior.
+   */
+  ownerId?: string | null;
 }): FoundationInitialPersistenceState | null {
   const requestedSaveMode = normalizeFoundationSaveMode(input?.saveMode?.trim());
   const persistence = createPersistenceService();
@@ -55,11 +62,12 @@ export function loadFoundationInitialPersistenceState(input?: {
   }
 
   const saveId = input?.saveId?.trim() || undefined;
+  const ownerId = input?.ownerId?.trim() || undefined;
   const modeSaves =
     requestedSaveMode === "all"
       ? allSaves
       : allSaves.filter((summary) => matchesFoundationSaveMode(requestedSaveMode, summary));
-  const activeSave = persistence.getActiveSave();
+  const activeSave = persistence.getActiveSave(ownerId);
   const activeSaveSummary =
     activeSave && (requestedSaveMode === "all" || matchesFoundationSaveMode(requestedSaveMode, activeSave))
       ? activeSave
@@ -70,7 +78,7 @@ export function loadFoundationInitialPersistenceState(input?: {
     : activeSaveSummary
       ? activeSaveSummary
       : fallbackSummary
-        ? persistence.activateSave(fallbackSummary.saveId) ?? persistence.getSaveById(fallbackSummary.saveId)
+        ? persistence.activateSave(fallbackSummary.saveId, ownerId) ?? persistence.getSaveById(fallbackSummary.saveId)
         : null;
 
   if (!save) {

@@ -1479,8 +1479,26 @@ function createPersistedSaveRecord(input: {
 
 export function createSaveRepository(): SaveRepository {
   return {
-    getActiveSave() {
+    getActiveSave(ownerId?: string | null) {
       const database = getDatabase();
+
+      // Per-owner pointer: when an ownerId is supplied AND that owner has an active_saves
+      // pointer AND the pointed-to save still exists, return THAT save. Otherwise fall through
+      // to the global (status='active', most recent) behavior. So: no ownerId (auth off) is
+      // byte-for-byte the original behavior, and an owner without a pointer yet degrades
+      // gracefully to the global active save.
+      if (ownerId) {
+        const pointer = database
+          .prepare("SELECT save_id FROM active_saves WHERE owner_id = ?")
+          .get(ownerId) as { save_id: string } | undefined;
+        if (pointer) {
+          const pointedRow = loadSaveRow(pointer.save_id);
+          if (pointedRow) {
+            return materializePersistedSaveCached(pointedRow);
+          }
+        }
+      }
+
       const row = database
         .prepare("SELECT save_id, name, status, created_at, updated_at FROM saves WHERE status = 'active' ORDER BY updated_at DESC LIMIT 1")
         .get() as SaveRow | undefined;
@@ -1523,7 +1541,7 @@ export function createSaveRepository(): SaveRepository {
         saveMode: resolveFoundationSaveMode(summary),
       }));
     },
-    setActiveSave(saveId: string) {
+    setActiveSave(saveId: string, ownerId?: string | null) {
       const existing = this.getSaveById(saveId);
       if (!existing) {
         return null;
@@ -1531,8 +1549,24 @@ export function createSaveRepository(): SaveRepository {
 
       const database = getDatabase();
       const transaction = database.transaction(() => {
-        database.prepare("UPDATE saves SET status = 'archived' WHERE status = 'active' AND save_id != ?").run(saveId);
-        database.prepare("UPDATE saves SET status = 'active', updated_at = ? WHERE save_id = ?").run(new Date().toISOString(), saveId);
+        const now = new Date().toISOString();
+        if (ownerId) {
+          // Per-owner activate: move ONLY this owner's pointer to the save and mark it active for
+          // compatibility. Crucially we do NOT run the blanket archive — archiving every other
+          // active save is exactly what would steal the other player's active save.
+          database
+            .prepare(
+              "INSERT INTO active_saves (owner_id, save_id, updated_at) VALUES (?, ?, ?) " +
+                "ON CONFLICT(owner_id) DO UPDATE SET save_id = excluded.save_id, updated_at = excluded.updated_at",
+            )
+            .run(ownerId, saveId, now);
+          database.prepare("UPDATE saves SET status = 'active', updated_at = ? WHERE save_id = ?").run(now, saveId);
+        } else {
+          // Global (auth-off / solo) behavior — unchanged: blanket-archive every other active
+          // save, then mark this one active.
+          database.prepare("UPDATE saves SET status = 'archived' WHERE status = 'active' AND save_id != ?").run(saveId);
+          database.prepare("UPDATE saves SET status = 'active', updated_at = ? WHERE save_id = ?").run(now, saveId);
+        }
         enforceRollingSaveRetention(database, [saveId]);
       });
       transaction();

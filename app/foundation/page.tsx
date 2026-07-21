@@ -24,18 +24,22 @@ export default async function FoundationPage({ searchParams }: FoundationPagePro
   const saveId = resolvedSearchParams?.saveId;
   const initialView = normalizeFoundationViewParam(resolvedSearchParams?.view);
   const initialReadSource = source === "prisma" ? "prisma" : "sqlite";
-  const initialPersistenceState =
-    initialReadSource === "sqlite"
-      ? loadFoundationInitialPersistenceState({
-          saveId,
-          saveMode: resolvedSearchParams?.saveMode,
-        })
-      : null;
 
   // Identitaets-Verdrahtung (Phase 1, nur bei OLY_AUTH_ENABLED=1): die echte
   // Owner-ID der eingeloggten Person seedet activeOwnerId im Client-State, statt
   // dass jeder Browser auf den hartcodierten Chris-Default zurueckfaellt.
   const initialActiveOwnerId = isAuthEnabled() ? ((await getSessionUser())?.ownerId ?? null) : null;
+
+  const initialPersistenceState =
+    initialReadSource === "sqlite"
+      ? loadFoundationInitialPersistenceState({
+          saveId,
+          saveMode: resolvedSearchParams?.saveMode,
+          // Per-user active-save scoping: resolve THIS session's active save (auth on),
+          // otherwise null -> unchanged global active-save behavior.
+          ownerId: initialActiveOwnerId,
+        })
+      : null;
 
   return (
     <FoundationPageClient
