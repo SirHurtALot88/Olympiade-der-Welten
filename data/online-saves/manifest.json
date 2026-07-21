@@ -1,6 +1,6 @@
 {
   "schemaVersion": "oly-online-saves-v1",
-  "exportedAt": "2026-07-21T12:21:13.394Z",
+  "exportedAt": "2026-07-21T13:03:38.072Z",
   "activeSaveId": "fresh-season-1-1784625881771",
   "saves": [
     {
@@ -9,23 +9,7 @@
       "status": "active",
       "file": "fresh-season-1-1784625881771.json.gz",
       "uncompressedBytes": 24728485,
-      "gzipBytes": 2627149
-    },
-    {
-      "saveId": "fresh-season-1-1784617810967",
-      "name": "Full Season UI Playthrough 2026-07-21T07:10:10.967Z",
-      "status": "archived",
-      "file": "fresh-season-1-1784617810967.json.gz",
-      "uncompressedBytes": 16689364,
-      "gzipBytes": 2237945
-    },
-    {
-      "saveId": "fresh-season-1-1784617568448",
-      "name": "Full Season UI Playthrough 2026-07-21T07:06:08.448Z",
-      "status": "archived",
-      "file": "fresh-season-1-1784617568448.json.gz",
-      "uncompressedBytes": 12016156,
-      "gzipBytes": 1768096
+      "gzipBytes": 2627152
     },
     {
       "saveId": "save-singleplayer-dev",
@@ -33,7 +17,23 @@
       "status": "archived",
       "file": "save-singleplayer-dev.json.gz",
       "uncompressedBytes": 11749111,
-      "gzipBytes": 1700376
+      "gzipBytes": 1699733
+    },
+    {
+      "saveId": "fresh-season-1-1784617568448",
+      "name": "Full Season UI Playthrough 2026-07-21T07:06:08.448Z",
+      "status": "archived",
+      "file": "fresh-season-1-1784617568448.json.gz",
+      "uncompressedBytes": 12016156,
+      "gzipBytes": 1768097
+    },
+    {
+      "saveId": "fresh-season-1-1784617810967",
+      "name": "Full Season UI Playthrough 2026-07-21T07:10:10.967Z",
+      "status": "archived",
+      "file": "fresh-season-1-1784617810967.json.gz",
+      "uncompressedBytes": 16689364,
+      "gzipBytes": 2237952
     }
   ]
 }
