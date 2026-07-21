@@ -15,6 +15,7 @@ import type {
   SeasonTransitionState,
   ScenarioMeta,
   SponsorOffer,
+  SponsorRarity,
   Team,
   TeamIdentity,
   TransferHistoryEntry,
@@ -234,6 +235,18 @@ function readLegacyStarTier(record: unknown): number | undefined {
 }
 
 /**
+ * Rarity-Backfill für Alt-Angebote/-Verträge OHNE `rarity`. Existiert ein legacy `starTier`, wird er
+ * ★→Rarity gefaltet; fehlt jeder Sternrang (uralte Prä-Rarity-Blobs), fällt es KONSERVATIV auf
+ * `"gewöhnlich"` zurück — deckungsgleich mit dem Settlement-Fallback (`sponsor-settlement-service.ts`),
+ * statt wie früher implizit auf „magisch" (das ließ jeden Alt-Save auf jeder Karte „Magisch" zeigen und
+ * war zudem gegenüber der Abrechnung inkonsistent).
+ */
+function legacyRarityBackfill(record: unknown): SponsorRarity {
+  const starTier = readLegacyStarTier(record);
+  return starTier != null ? mapStarTierToRarity(starTier) : "gewöhnlich";
+}
+
+/**
  * Back-compat: old saves carry sponsor offers/contracts with a legacy `starTier`/`archetype` but no
  * `rarity`/`curveShape`. Backfill the new fields deterministically (star→rarity, archetype→curve shape) on
  * load so every consumer sees them. Signed contracts keep their frozen `lockedRankPayoutLadder`, so payouts
@@ -248,7 +261,7 @@ function normalizeLegacySponsors(gameState: GameState): GameState {
     changed = true;
     return {
       ...offer,
-      rarity: offer.rarity ?? mapStarTierToRarity(readLegacyStarTier(offer)),
+      rarity: offer.rarity ?? legacyRarityBackfill(offer),
       curveShape: offer.curveShape ?? mapArchetypeToCurveShape(offer.archetype),
     };
   };
@@ -266,7 +279,7 @@ function normalizeLegacySponsors(gameState: GameState): GameState {
             teamId,
             {
               ...contract,
-              rarity: contract.rarity ?? mapStarTierToRarity(readLegacyStarTier(contract)),
+              rarity: contract.rarity ?? legacyRarityBackfill(contract),
               curveShape: contract.curveShape ?? mapArchetypeToCurveShape(contract.archetype),
             },
           ];

@@ -232,7 +232,9 @@ export function SponsorOfferCardNewLook({
   // Rarität/Kurvenform robust auflösen — Back-Compat für alte Saves ohne die
   // neuen Felder (Legacy archetype wird gemappt; rarity wird bereits beim Laden
   // aus dem alten Sternrang zurückgefüllt, siehe save-repository.ts).
-  const rarity = offer.rarity ?? "magisch";
+  // Fallback konservativ auf „gewöhnlich" (deckungsgleich mit Settlement) statt „magisch" — sonst rendert
+  // jedes Angebot ohne rarity-Feld (Alt-Save vor der Rarity-Migration) fälschlich als Magisch.
+  const rarity = offer.rarity ?? "gewöhnlich";
   const shape = offer.curveShape ?? mapArchetypeToCurveShape(offer.archetype);
   const shapeLabel = SPONSOR_CURVE_SHAPES[shape].labelDe;
   const familyLabel = SPONSOR_CURVE_FAMILIES[getSponsorCurveFamily(shape)].labelDe;
