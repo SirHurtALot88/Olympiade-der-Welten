@@ -29,7 +29,21 @@ import type { RoomOwnershipPreset } from "@/types/events";
 import type { CoachRole, RoomRealtimeEventType } from "@/types/game";
 import type { RoomSeat, RuntimeRoom } from "@/types/room";
 
-const runtimeRooms = new Map<string, RuntimeRoom>();
+declare global {
+  /**
+   * Prozessweit geteilter Runtime-Room-Store. WICHTIG: Der Socket-Server
+   * (server.ts via tsx) und die Next.js-Route-Handler (separat gebuendelt) laden
+   * sonst je eine EIGENE Modul-Instanz mit eigener Map. Dann findet ein
+   * HTTP-Write im Raum (z. B. Spielerkauf/Aufstellung, die ueber /api/... mit
+   * Room-Kontext laufen) den per Socket erstellten Raum nicht -> room_not_found,
+   * und die Aenderung wird nie an den Mitspieler gebroadcastet. Gleiche Technik
+   * wie global.__olyIo (siehe lib/socket/server.ts).
+   */
+  // eslint-disable-next-line no-var
+  var __olyRuntimeRooms: Map<string, RuntimeRoom> | undefined;
+}
+
+const runtimeRooms: Map<string, RuntimeRoom> = (globalThis.__olyRuntimeRooms ??= new Map<string, RuntimeRoom>());
 
 function getSeatCount(room: RuntimeRoom) {
   return Object.values(room.seats).filter(Boolean).length;

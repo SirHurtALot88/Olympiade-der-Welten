@@ -41,6 +41,7 @@
     "deploy:hetzner": "sh scripts/deploy-hetzner-with-backup.sh",
     "app:check-live": "tsx scripts/check-local-live-app.ts",
     "app:smoke-gameplay": "tsx scripts/smoke-gameplay.ts",
+    "app:smoke-coop-sync": "tsx scripts/smoke-coop-sync.ts",
     "app:smoke-gameplay-write": "tsx scripts/smoke-gameplay.ts --write --confirm-testsave",
     "test:e2e": "playwright test",
     "save:repair-team-control": "tsx scripts/repair-save-team-control.ts",
