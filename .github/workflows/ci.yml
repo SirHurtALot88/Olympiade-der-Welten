@@ -27,9 +27,15 @@ jobs:
       - run: npm run ci:import-exists
       - run: npm run ci:flow-smoke
       - run: npm run perf:regression-smoke
-      - name: Start dev server for browser smokes
+      # Serve the browser smokes from the PRODUCTION server (npm run start =
+      # NODE_ENV=production, using the build from the step above). The dev server
+      # (npm run dev) compiles every route on-demand on first hit, which on the CI
+      # runner takes 1.5-3 min per view — the player-profile dynamic() chunk cold-
+      # compiled past the 90s waitFor and made app:smoke-gameplay flaky/red. Prod
+      # serves the prebuilt bundle instantly.
+      - name: Start production server for browser smokes
         run: |
-          npm run dev &
+          npm run start &
           echo $! > .dev-server.pid
       - run: npm run app:check-live -- --startup-retries 90 --startup-delay-ms 2000
       - run: npm run ci:ensure-gameplay-smoke-save
