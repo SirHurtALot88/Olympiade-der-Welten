@@ -22,7 +22,6 @@ export default function SchachField(props: DisciplineFieldProps): ReactNode {
     H,
     N,
     geo,
-    finalMax,
     rt,
     sorted,
     hoverIdx,
@@ -39,7 +38,6 @@ export default function SchachField(props: DisciplineFieldProps): ReactNode {
   // Elo-Basis und Normalisierung (aus Mockup: BASE=1000, maxElo=2600)
   const BASE = 1000;
   const maxElo = 2600;
-  const maxTotal = finalMax; // Team-Punkte → Elo
 
   // Geometrie (aus Mockup: LW=900, LH=620, Y0=540 bottom start, Y1=92 top)
   // Skaliert auf tatsächliche ViewBox
@@ -84,9 +82,11 @@ export default function SchachField(props: DisciplineFieldProps): ReactNode {
   const colW = (WX1 - WX0 - lPad - rPad) / N;
   const laneX = (i: number): number => WX0 + lPad + i * colW + colW / 2;
 
-  // Score → Elo (volle Klassen-Spanne).
-  const eloOf = (score: number): number => {
-    const n = maxTotal > 0 ? Math.max(0, Math.min(1, score / maxTotal)) : 0;
+  // Score → Elo RELATIV zum aktuellen Führer (nicht zu finalMax): der Führende sitzt IMMER
+  // oben an der Wand (Super-GM), die Verfolger nach ihrem Rückstand darunter. So deckt sich
+  // die vertikale Position mit dem Live-Rang der Rangliste (statt „Führer klebt früh unten").
+  const eloOf = (score: number, ref: number): number => {
+    const n = ref > 0 ? Math.max(0, Math.min(1, score / ref)) : 0;
     return BASE + n * (maxElo - BASE);
   };
 
@@ -113,17 +113,19 @@ export default function SchachField(props: DisciplineFieldProps): ReactNode {
       const order = [...list].sort((a, b) => b.animScore - a.animScore || a.seasonRank - b.seasonRank);
       const liveIdx = new Map<number, number>();
       order.forEach((t, i) => liveIdx.set(t.idx, i));
+      // Bezug für die relative Elo-Höhe = animScore des aktuellen Führers.
+      const leadAnim = list.reduce((m, t) => Math.max(m, t.animScore), 0);
       for (const t of list) {
         const el = gRefs.current.get(t.idx);
         if (el && !frozen) {
-          el.setAttribute("transform", `translate(${laneX(liveIdx.get(t.idx) ?? 0)} ${yOf(eloOf(t.animScore))})`);
+          el.setAttribute("transform", `translate(${laneX(liveIdx.get(t.idx) ?? 0)} ${yOf(eloOf(t.animScore, leadAnim))})`);
         }
         const gel = ghostRefs.current.get(t.idx);
         if (gel) {
           const span = t.displayScore - t.roundStartScore;
           const p = span > 0.5 ? Math.max(0, Math.min(1, (t.animScore - t.roundStartScore) / span)) : 1;
           if (span > 0.5 && !reduce && p < 0.98) {
-            gel.setAttribute("transform", `translate(${laneX(Math.max(0, (t.roundStartRank ?? 1) - 1))} ${yOf(eloOf(t.roundStartScore))})`);
+            gel.setAttribute("transform", `translate(${laneX(Math.max(0, (t.roundStartRank ?? 1) - 1))} ${yOf(eloOf(t.roundStartScore, leadAnim))})`);
             gel.setAttribute("opacity", String((t.isOwn ? 0.6 : 0.28) * (1 - p * 0.7)));
           } else {
             gel.setAttribute("opacity", "0");
@@ -409,8 +411,11 @@ export default function SchachField(props: DisciplineFieldProps): ReactNode {
           .findIndex((o) => o.idx === t.idx);
         const i = liveIdx >= 0 ? liveIdx : sorted.indexOf(t);
         const r = t.isOwn ? geo.rOwn : geo.r;
-        // Figuren-Glyph (Promotion) aus dem aktuellen Runden-Elo.
-        const band = bandOf(Math.round(eloOf(t.displayScore)));
+        // Bezug für die relative Elo-Höhe (Render-Snapshot): Führer nach anim/displayScore.
+        const leadAnimR = rt.reduce((m, o) => Math.max(m, o.animScore), 0);
+        const leadDispR = rt.reduce((m, o) => Math.max(m, o.displayScore), 0);
+        // Figuren-Glyph (Promotion) aus dem aktuellen Runden-Elo (relativ zum Führer).
+        const band = bandOf(Math.round(eloOf(t.displayScore, leadDispR)));
 
         return (
           <g
@@ -419,7 +424,7 @@ export default function SchachField(props: DisciplineFieldProps): ReactNode {
             ref={(el) => {
               gRefs.current.set(t.idx, el);
               if (el && !el.getAttribute("transform")) {
-                el.setAttribute("transform", `translate(${laneX(i)} ${yOf(eloOf(t.animScore))})`);
+                el.setAttribute("transform", `translate(${laneX(i)} ${yOf(eloOf(t.animScore, leadAnimR))})`);
               }
             }}
             style={{ cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
