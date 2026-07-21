@@ -566,7 +566,14 @@ async function main() {
     steps.push(setupStep);
 
     if (!args.skipUi) {
-      browser = await chromium.launch({ headless: true });
+      // In managed/sandboxed environments the bundled chrome-headless-shell may be missing while a
+      // full Chromium exists at a known path — allow pointing at it via PLAYWRIGHT_CHROMIUM_PATH.
+      // When unset, fall back to Playwright's default resolution (works in normal/CI setups).
+      const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_PATH;
+      browser = await chromium.launch({
+        headless: true,
+        ...(chromiumExecutablePath ? { executablePath: chromiumExecutablePath } : {}),
+      });
       const page = await browser.newPage({ viewport: { width: 1680, height: 1200 } });
       page.setDefaultTimeout(args.timeoutMs);
       page.setDefaultNavigationTimeout(args.timeoutMs);

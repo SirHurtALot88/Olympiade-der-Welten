@@ -241,7 +241,13 @@ function buildOffer(input: {
       rewardCash: improvementCash,
     },
     specialComponent,
-    buildFanInfrastructureSpecialComponent({ rewardCash: fanInfraReward }),
+    // Immer-an Fan-Infrastruktur-Klausel — ABER nur, wenn das gezogene Sonderziel (specialComponent)
+    // nicht ohnehin schon `fan_infrastructure` ist. Sonst landete die Klausel doppelt im Offer
+    // (doppelter React-Key `special-fan-infrastructure` in der Reward-Liste + doppelt gezählter
+    // rewardCash in totalUpsideEstimate).
+    ...(specialComponent.specialKey === "fan_infrastructure"
+      ? []
+      : [buildFanInfrastructureSpecialComponent({ rewardCash: fanInfraReward })]),
     ...(beatExpectedComponent ? [beatExpectedComponent] : []),
   ];
 

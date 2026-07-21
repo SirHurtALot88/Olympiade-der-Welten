@@ -124,6 +124,22 @@ describe("sponsor offer service", () => {
     expect(offers.every((offer) => offer.demandProfile != null)).toBe(true);
   });
 
+  it("never emits duplicate componentIds within a single offer", () => {
+    // Regression: die Immer-an Fan-Infrastruktur-Klausel wurde zusätzlich zum gezogenen Sonderziel
+    // angehängt — zog dieses Sonderziel selbst `fan_infrastructure`, tauchte `special-fan-infrastructure`
+    // ZWEIMAL im Offer auf (doppelter React-Key in der Reward-Liste + doppelt gezählter rewardCash in
+    // totalUpsideEstimate). Angebote über mehrere Teams/Slots prüfen, damit der fan_infrastructure-Fall
+    // aus dem deterministischen Bonus-Pool sicher getroffen wird.
+    const gameState = ensureSeasonSponsorOffers(createGameState());
+    for (const team of gameState.teams) {
+      const offers = buildSponsorOffersForTeam({ gameState, teamId: team.teamId });
+      for (const offer of offers) {
+        const ids = offer.components.map((component) => component.componentId);
+        expect(new Set(ids).size, `Duplicate componentIds in offer ${offer.offerId}: ${ids.join(", ")}`).toBe(ids.length);
+      }
+    }
+  });
+
   it("persists sponsor choice and pays first base installment", () => {
     const gameState = ensureSeasonSponsorOffers(createGameState());
     const offers = buildSponsorOffersForTeam({ gameState, teamId: "M-M" });
