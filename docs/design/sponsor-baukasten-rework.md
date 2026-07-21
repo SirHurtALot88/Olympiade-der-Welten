@@ -1,6 +1,25 @@
 # Sponsor-Baukasten-Rework — Design-Dokument
 
-> Status: **Entwurf, zur Implementierung freigegeben** · Stand 2026-07-21
+> Status: **P0–P4 implementiert** (Branch `claude/board-goals-targets-slvmw2`, PR #132) · Stand 2026-07-21
+>
+> Umsetzungsstand:
+> - **P0 Rarity-Fix** ✅ (Seed-Präfix, `gewöhnlich`-Fallbacks, Varianz-Test) — Commit `ff30126`
+> - **P1 Stufen entfernt** ✅ (balance-neutral, Legacy-Settlement-Shim für Alt-Verträge) — Commit `244ab17`
+> - **P2 Sonderziel-Buff + ehrliche Überperf-Zeile** ✅ (rarity-gestaffelt 6/9/12/15 %, Cap 30 % Basis) — Commit `fe4a003`
+> - **P3 Überperformance-/Verbesserungs-Module** ✅ (familien-differenziert, per-Platz, beim Signieren gelockt) — Commit `1551cf3`
+> - **P4 Baukasten** ✅ *safe-modular variant*: `sponsor-modules.ts` (Modul-Modell + `moduleIds`), Spotlight-Perk
+>   (legendär/golden, cash-neutral), Modul-Anzahl-Chip auf der Karte. Die bewährte P0–P3-Payout-Mathematik
+>   bleibt unangetastet; die tiefere EV-Budget-Umverteilung mit rarity-gegateten Cash-Modulen und
+>   Klausel-Modulen (§3 unten) ist als **P4b (future)** dokumentiert — sie braucht eigene Sim-Rekalibrierung.
+> - **P5 Feinschliff**: Perk-Effekt + Modul-Chip sind bereits in P4 gelandet; Settlement-Shim aus P1 wird
+>   **erst eine Saison nach Release** entfernt (solange können noch Alt-Verträge laufen).
+>
+> Balance über P0–P4 (sponsor-economy-dryrun): Liga-Sponsor-Summe +1,3 % vs. Baseline (Ziel ±5 %), 0 Pleiten,
+> Deckung 1,05×. Voller Sponsor-Test-Suite grün inkl. neuer Varianz-, Settlement- und Modul-Tests.
+>
+> ---
+>
+> Ursprünglicher Entwurf (zur Implementierung freigegeben) · Stand 2026-07-21
 > Vorgänger-Notiz: `docs/design/sponsor-system-v2.md` (V2.5, Sterne→Rarity-Migration bereits gelaufen)
 >
 > Auslöser (Spieler-Feedback):

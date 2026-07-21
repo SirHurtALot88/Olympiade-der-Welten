@@ -2,6 +2,10 @@
 
 > Status: **V2.5 implementiert (Sterne-Tiers + Commercial Rating)**  
 > Wave 1 MVP ist live; V2.5 ergänzt Prestige-Ranking und 1–5-Sterne-Angebote.
+>
+> **Nachfolger:** Der aktuelle Umbau (Rarity-Fix, Entfernen der Risiko-Profile, Sonderziel-Buff,
+> familien-differenzierte Überperformance und der modulare Baukasten) ist in
+> [`sponsor-baukasten-rework.md`](./sponsor-baukasten-rework.md) beschrieben — dort steht der aktuelle Stand.
 
 ## Commercial Rating & Star Tiers (V2.5)
 
