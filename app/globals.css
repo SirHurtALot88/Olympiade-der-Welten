@@ -57179,6 +57179,27 @@ button.foundation-team-portrait-card {
   font-variant-numeric: tabular-nums;
 }
 
+/* Finanz-Spalten im Daten-Modus: Cash · Gehälter · Gebäude · GuV */
+.is-new-look .nl-standings-th-fin {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-standings-td-fin {
+  text-align: right;
+  color: var(--nl-mut);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-standings-td-fin.is-pos {
+  color: var(--nl-good, #6ec97e);
+}
+
+.is-new-look .nl-standings-td-fin.is-neg {
+  color: var(--nl-bad, #dc6357);
+}
+
 /* Aufklapp-Zeile: Disziplinen nach Bereich gruppiert */
 .is-new-look .nl-standings-table-detailrow > .nl-standings-table-detailcell {
   padding: var(--nl-s2) var(--nl-s3) var(--nl-s3);

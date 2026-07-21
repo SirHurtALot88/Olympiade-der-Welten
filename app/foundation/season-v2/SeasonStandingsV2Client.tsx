@@ -54,6 +54,8 @@ export type SeasonV2StandingsRow = {
   soc: number | null;
   cash: number | null;
   salaryTotal: number | null;
+  /** Gebäude-Unterhalt p.a. (Summe der Season-Upkeeps gebauter Anlagen). */
+  buildingCost: number | null;
   guv: number | null;
   sponsorTotal: number | null;
   marketValueTotal: number | null;

@@ -9,6 +9,18 @@ import {
 } from "@/lib/foundation/team-general-managers";
 import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 import { resolveSeasonDisciplineAreaTotal } from "@/lib/season/season-discipline-area-groups";
+import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
+import { calculateFacilitySeasonUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+
+/** Gebäude-Unterhalt p.a. für ein Team — Summe der Season-Upkeeps aller gebauten
+ * Anlagen (gleiche Rechnung wie die Liga-Finanzübersicht, client-safe, kein Leak). */
+function computeTeamBuildingCost(gameState: GameState, teamId: string): number {
+  const teamFacilities = getTeamFacilityState(gameState, teamId);
+  return FACILITY_CATALOG.reduce(
+    (sum, entry) => sum + calculateFacilitySeasonUpkeep(entry.facilityId, teamFacilities),
+    0,
+  );
+}
 
 const SEASON_V2_TOP_PLAYER_LIMIT = 32;
 
@@ -105,6 +117,7 @@ export function useSeasonV2PanelModel({
           soc: resolveSeasonDisciplineAreaTotal(row.disciplineValues, "soc", row.ppsSoc),
           cash: row.cash ?? null,
           salaryTotal: row.salaryTotal ?? null,
+          buildingCost: computeTeamBuildingCost(gameState, row.teamId),
           guv: row.guv ?? null,
           sponsorTotal: row.sponsorTotal ?? null,
           marketValueTotal: row.marketValueTotal ?? null,

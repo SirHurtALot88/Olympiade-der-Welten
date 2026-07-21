@@ -80,7 +80,17 @@ const NL_BOARD_SORT_ITEMS: Array<{ id: NlBoardSortKey; label: string }> = [
 ];
 
 /** Spalten der Daten-Tabelle, die per Klick sortierbar sind. */
-type NlTableSortKey = "rank" | "team" | "points" | "bonus" | SeasonDisciplineAreaId | "mw";
+type NlTableSortKey =
+  | "rank"
+  | "team"
+  | "points"
+  | "bonus"
+  | SeasonDisciplineAreaId
+  | "mw"
+  | "cash"
+  | "salary"
+  | "buildingCost"
+  | "guv";
 
 function getTableSortValue(row: SeasonV2StandingsRow, key: NlTableSortKey): number | string {
   switch (key) {
@@ -98,6 +108,14 @@ function getTableSortValue(row: SeasonV2StandingsRow, key: NlTableSortKey): numb
       return row.marketValueTotal != null && Number.isFinite(row.marketValueTotal)
         ? row.marketValueTotal
         : Number.NEGATIVE_INFINITY;
+    case "cash":
+      return row.cash != null && Number.isFinite(row.cash) ? row.cash : Number.NEGATIVE_INFINITY;
+    case "salary":
+      return row.salaryTotal != null && Number.isFinite(row.salaryTotal) ? row.salaryTotal : Number.NEGATIVE_INFINITY;
+    case "buildingCost":
+      return row.buildingCost != null && Number.isFinite(row.buildingCost) ? row.buildingCost : Number.NEGATIVE_INFINITY;
+    case "guv":
+      return row.guv != null && Number.isFinite(row.guv) ? row.guv : Number.NEGATIVE_INFINITY;
     default: {
       const value = getAreaValue(row, key);
       return value != null && Number.isFinite(value) ? value : Number.NEGATIVE_INFINITY;
@@ -819,6 +837,10 @@ export default function SeasonStandingsNewLook({
                 </th>
               ))}
               <th>{renderTableSortHeader("mw", "MW")}</th>
+              <th className="nl-standings-th-fin">{renderTableSortHeader("cash", "Cash")}</th>
+              <th className="nl-standings-th-fin">{renderTableSortHeader("salary", "Gehälter")}</th>
+              <th className="nl-standings-th-fin">{renderTableSortHeader("buildingCost", "Gebäude")}</th>
+              <th className="nl-standings-th-fin">{renderTableSortHeader("guv", "GuV")}</th>
             </tr>
           </thead>
           <tbody>{sortedTableRows.map((row) => renderTableRow(row))}</tbody>
@@ -885,10 +907,18 @@ export default function SeasonStandingsNewLook({
             </td>
           ))}
           <td className="nl-standings-td-mw">{formatNlMoney(row.marketValueTotal)}</td>
+          <td className="nl-standings-td-fin">{formatNlMoney(row.cash)}</td>
+          <td className="nl-standings-td-fin">{formatNlMoney(row.salaryTotal)}</td>
+          <td className="nl-standings-td-fin">{formatNlMoney(row.buildingCost)}</td>
+          <td
+            className={`nl-standings-td-fin${row.guv != null && Number.isFinite(row.guv) ? (row.guv >= 0 ? " is-pos" : " is-neg") : ""}`}
+          >
+            {formatNlMoney(row.guv)}
+          </td>
         </tr>
         {isExpanded ? (
           <tr className="nl-standings-table-detailrow">
-            <td className="nl-standings-table-detailcell" colSpan={10} id={`nl-standings-tdetails-${row.teamId}`}>
+            <td className="nl-standings-table-detailcell" colSpan={14} id={`nl-standings-tdetails-${row.teamId}`}>
               <span className="nl-standings-table-detailtitle">Disziplinen nach Bereich</span>
               {renderDisciplineGroups(row)}
             </td>
