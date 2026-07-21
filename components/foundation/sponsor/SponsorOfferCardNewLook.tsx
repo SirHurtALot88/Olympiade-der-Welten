@@ -23,6 +23,7 @@ import {
   getSponsorCurveFamily,
   mapArchetypeToCurveShape,
 } from "@/lib/sponsor/sponsor-curve-shapes";
+import { describeSponsorOfferModules } from "@/lib/sponsor/sponsor-modules";
 import { NlDeltaChip, type NlTone } from "@/components/foundation/new-look";
 
 /**
@@ -217,6 +218,9 @@ export function SponsorOfferCardNewLook({
   const shape = offer.curveShape ?? mapArchetypeToCurveShape(offer.archetype);
   const shapeLabel = SPONSOR_CURVE_SHAPES[shape].labelDe;
   const familyLabel = SPONSOR_CURVE_FAMILIES[getSponsorCurveFamily(shape)].labelDe;
+  // P4 Baukasten: die Modul-Zusammensetzung des Angebots (Cash-Komponenten + evtl. Perk) fürs UI.
+  const offerModules = describeSponsorOfferModules(offer);
+  const offerPerk = offerModules.find((module) => module.kind === "perk") ?? null;
   const specialComponent = offer.components.find((component) => component.kind === "special") ?? null;
   // "overperformance" wird als eigene Zeile unter der Rang-Leiter gerendert (nicht als generische Kachel),
   // fließt aber weiter in die Gesamt-Summe (totalCash) ein.
@@ -258,6 +262,21 @@ export function SponsorOfferCardNewLook({
         </div>
         <div className="nl-sponsor-offer-badges">
           <RarityPill rarity={rarity} />
+          {/* P4 Baukasten: Modul-Anzahl als Rarity-Wertigkeits-Signal; Perk-Chip (Spotlight ×2) bei legendär/golden. */}
+          {offerModules.length > 0 ? (
+            <span
+              className="nl-sponsor-module-chip"
+              data-testid="sponsor-module-chip"
+              title={`Baukasten: ${offerModules.map((module) => module.labelDe).join(" · ")}`}
+            >
+              {offerModules.length} Module
+            </span>
+          ) : null}
+          {offerPerk ? (
+            <span className="nl-sponsor-module-chip is-perk" data-testid="sponsor-perk-chip" title="Perk: verdoppelter Beliebtheits-Impuls (Spotlight) bei erfülltem Sonderziel.">
+              ✦ {offerPerk.labelDe}
+            </span>
+          ) : null}
           {presentation.offerBadge ? (
             <span
               className={`nl-sponsor-offer-badge${presentation.isGolden ? " is-golden" : ""}`}

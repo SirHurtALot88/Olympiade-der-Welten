@@ -1303,6 +1303,12 @@ export type SponsorOffer = {
    * die Rang-Meilenstein-Komponente (gedeckelt). Wird in chooseSponsorOffer in den Vertrag mitkopiert.
    */
   isGolden?: boolean;
+  /**
+   * P4 — Baukasten: stabile Liste der Modul-IDs, aus denen dieses Angebot zusammengesetzt ist (Cash-Module
+   * = die `components`, plus nicht-Cash-Perks wie „Spotlight ×2" bei legendär/golden). Rein deskriptiv für
+   * UI/Debug; die Auszahlung läuft weiter über `components`. Optional/rückwärtskompatibel.
+   */
+  moduleIds?: string[];
 };
 
 export type SponsorCommercialRating = {

@@ -41,6 +41,7 @@ import {
   resolveSponsorEconomyAnchors,
 } from "@/lib/sponsor/sponsor-economy-calibration";
 import { SPONSOR_RARITIES, getSponsorCurveFamily, mapArchetypeToCurveShape } from "@/lib/sponsor/sponsor-curve-shapes";
+import { applySpotlightPerkToComponents, buildSponsorOfferModuleIds } from "@/lib/sponsor/sponsor-modules";
 import {
   getDemandMultiplierForRarity,
   mapCurveShapeToArchetype,
@@ -264,7 +265,11 @@ function buildOffer(input: {
     ...(overperfComponent ? [overperfComponent] : []),
   ];
 
-  return {
+  // P4 Baukasten: Spotlight-Perk (nur legendär/golden) verstärkt den Beliebtheits-Impuls des Sonderziels —
+  // rein Popularity-wirksam, cash-neutral, damit die P0–P3-Payout-Balance exakt erhalten bleibt.
+  const perkedComponents = applySpotlightPerkToComponents(components, rarity, isGolden);
+
+  const offer: SponsorOffer = {
     offerId: `${gameState.season.id}:${team.teamId}:${archetype}:${rarity}:${slotIndex}`,
     seasonId: gameState.season.id,
     teamId: team.teamId,
@@ -273,8 +278,8 @@ function buildOffer(input: {
     rarity,
     name: parent.name,
     flavor: input.forcePremiumElite ? `★ Golden Card · ${brand.flavor}` : brand.flavor,
-    components,
-    totalUpsideEstimate: roundCash(components.reduce((sum, component) => sum + component.rewardCash, 0)),
+    components: perkedComponents,
+    totalUpsideEstimate: roundCash(perkedComponents.reduce((sum, component) => sum + component.rewardCash, 0)),
     commercialRating,
     sponsorBrandId: brand.id,
     sponsorParentBrandId: brand.parentBrandId,
@@ -284,6 +289,9 @@ function buildOffer(input: {
     isChallengeOffer: specialMode === "challenge",
     isGolden,
   };
+  // P4: Baukasten-Modulliste (Cash-Komponenten + evtl. Perk) fürs UI/Debug ableiten und anhängen.
+  offer.moduleIds = buildSponsorOfferModuleIds(offer);
+  return offer;
 }
 
 export function buildSponsorOffersForTeam(input: {
