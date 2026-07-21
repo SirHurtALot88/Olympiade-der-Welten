@@ -28,24 +28,20 @@ rm -f "$TMP_DB"
 echo "      Groesse: $(du -h "$TMP_GZ" | cut -f1)"
 
 echo "[2/3] Commit bauen (main + Arbeitsbaum bleiben unberuehrt) ..."
+# Bewusst ein ELTERNLOSER Einzel-Commit + Force-Push: der Branch "live-save" bleibt so
+# immer genau EIN Commit (~wenige MB) statt bei jedem Cron-Lauf zu wachsen → kein Repo-Muell.
 export GIT_INDEX_FILE=/tmp/oly-live-index
 rm -f "$GIT_INDEX_FILE"
 git read-tree --empty
 BLOB="$(git hash-object -w "$TMP_GZ")"
 git update-index --add --cacheinfo 100644 "$BLOB" "data/online-saves/hetzner-live.sqlite.gz"
 TREE="$(git write-tree)"
-git fetch origin "$BRANCH" --quiet 2>/dev/null || true
-PARENT="$(git rev-parse -q --verify "origin/$BRANCH" || true)"
-if [ -n "$PARENT" ]; then
-  COMMIT="$(printf 'chore(saves): live Hetzner save snapshot' | git commit-tree "$TREE" -p "$PARENT")"
-else
-  COMMIT="$(printf 'chore(saves): live Hetzner save snapshot' | git commit-tree "$TREE")"
-fi
+COMMIT="$(printf 'chore(saves): live Hetzner save snapshot' | git commit-tree "$TREE")"
 unset GIT_INDEX_FILE
 rm -f "$TMP_GZ"
 
 echo "[3/3] Push nach GitHub (Branch $BRANCH) ..."
-git push origin "$COMMIT:refs/heads/$BRANCH"
+git push -f origin "$COMMIT:refs/heads/$BRANCH"
 
 echo ""
 echo "FERTIG — dein Live-Save liegt jetzt auf GitHub (Branch '$BRANCH')."
