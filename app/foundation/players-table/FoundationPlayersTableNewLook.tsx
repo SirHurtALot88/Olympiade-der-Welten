@@ -1161,8 +1161,7 @@ export default function FoundationPlayersTableNewLook({
           })}
         </div>
         <p className="nl-players-pps-detail-note">
-          Zeigt die Kernwerte POW/SPE/MEN/SOC (0–100) als Näherung. Echte Pro-Areal-PPs-Punkte (Performance-Punkte je
-          Bereich) sind für Spieler in dieser Ansicht nicht gespeichert — nur der Gesamtwert oben.
+          Zeigt die Kernwerte POW/SPE/MEN/SOC (0–100) als Näherung.
         </p>
       </div>
     );

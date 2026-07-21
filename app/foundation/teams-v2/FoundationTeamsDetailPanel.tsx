@@ -1319,11 +1319,13 @@ function FoundationTeamsDetailPanel({
                                 </div>
                               }
                             >
-                              <p className="team-auslauf-explainer">
-                                Verträge mit LZ ≤ 1 enden nach MD10 dieser Saison — verlängere jetzt, sonst wird der Spieler
-                                beim Verkauf auf den Transfermarkt gestellt. Auch länger laufende Verträge lassen sich per
-                                Buyout auflösen — liegt VK/Ablöse über dem Buyout, lohnt sich der Verkauf.
-                              </p>
+                              <span
+                                className="team-auslauf-info"
+                                title="Verträge mit LZ ≤ 1 enden nach MD10 dieser Saison — verlängere jetzt, sonst wird der Spieler beim Verkauf auf den Transfermarkt gestellt. Auch länger laufende Verträge lassen sich per Buyout auflösen — liegt VK/Ablöse über dem Buyout, lohnt sich der Verkauf."
+                                aria-label="Hinweis zu Vertrags-Auslauf"
+                              >
+                                ⓘ
+                              </span>
                               <StatChipRow aria-label="Auslauf-Kennzahlen">
                                 <StatChip
                                   label={auslaufIsAll ? "Angezeigt" : "Auslaufend"}

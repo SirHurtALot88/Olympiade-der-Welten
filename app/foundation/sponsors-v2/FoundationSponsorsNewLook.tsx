@@ -516,9 +516,7 @@ export default function FoundationSponsorsNewLook({
             ) : null
           }
         >
-          <p className="nl-sponsor-header-hint">
-            Drei Angebote pro Saison — Rarität, Kurvenform, Basis, Platzierung, Verbesserung und Sonderziel.
-          </p>
+          <p className="nl-sponsor-header-hint">Drei Angebote pro Saison.</p>
           {selectedTeamCommercialRating ? (
             <div className="nl-sponsor-rating-drivers" aria-label="Kommerz-Rating Treiber">
               <NlProgressBar

@@ -678,7 +678,7 @@ function TrainingCardDetails({ row }: { row: TrainingPlayerRowView }) {
 
           <p
             className="muted training-v2-reality-note"
-            title="Der Performance-Anteil wird separat aus den einzelnen Matchday-Ergebnissen berechnet und spiegelt dieselbe Spielpraxis wie PPs/MVS, nur auf die Stat-Skala übersetzt."
+            title="Performance-Anteil aus den Matchday-Ergebnissen."
           >
             Saison-PPs {row.playerPps != null ? formatNlNumber(row.playerPps, 1) : "—"} · MVS{" "}
             {row.playerMvs != null ? formatNlNumber(row.playerMvs, 1) : "—"}

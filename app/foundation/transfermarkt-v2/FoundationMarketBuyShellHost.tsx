@@ -571,9 +571,9 @@ export default function FoundationMarketBuyShellHost({
                       <p className="nl-market-muted">Noch kein Jahresplan verfügbar.</p>
                     )}
                     <p className="market-v2-buy-schedule-note">
-                      Forderungsweg: Basis {formatTransfermarktCurrency(buyPreview.baseExpectedSalary ?? null)} · aktuelle Forderung{" "}
-                      {formatTransfermarktCurrency(buyPreview.expectedSalary ?? null)} · Gesamtverschiebung {formatTransfermarktCurrency(marketAndFitDelta)}
-                      {fitSalaryDiscountActive ? " · Fit-Bonus zuletzt aktiv" : ""}
+                      Basis {formatTransfermarktCurrency(buyPreview.baseExpectedSalary ?? null)} · Forderung{" "}
+                      {formatTransfermarktCurrency(buyPreview.expectedSalary ?? null)} · Δ {formatTransfermarktCurrency(marketAndFitDelta)}
+                      {fitSalaryDiscountActive ? " · Fit-Bonus" : ""}
                     </p>
                   </NlCard>
 

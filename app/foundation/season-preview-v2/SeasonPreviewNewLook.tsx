@@ -428,10 +428,6 @@ export default function SeasonPreviewNewLook(props: FoundationSeasonPreviewShell
           ) : null
         }
       >
-        <p className="nl-spreview-intro">
-          Diese Vorschau kombiniert das gespeicherte Spieltagsergebnis mit dem aktuellen Punktestand und zeigt, wohin
-          sich jedes Team bewegen würde. Sie schreibt nichts zurück.
-        </p>
         {blockedHint ? (
           <p
             className="nl-spreview-blocked-hint"

@@ -206,9 +206,12 @@ export default function ScoutingReportPanel({
             </strong>
           </p>
           {!report.impactIsExact ? (
-            <small className="scouting-report-impact-note muted">
-              Schätzwerte auf Basis des Scouting-Standes — genaue Teamwirkung erst nach mehr Intel.
-            </small>
+            <span
+              className="scouting-report-impact-badge"
+              title="Schätzwerte auf Basis des Scouting-Standes — genaue Teamwirkung erst nach mehr Intel."
+            >
+              ≈ geschätzt
+            </span>
           ) : null}
           <div className="scouting-report-axis-impact-row">
             {report.axisImpact.map((row) => (

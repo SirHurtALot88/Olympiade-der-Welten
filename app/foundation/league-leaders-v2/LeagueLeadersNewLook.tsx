@@ -258,9 +258,6 @@ export default function LeagueLeadersNewLook({
           ) : null
         }
       >
-        <p className="nl-leaders-hint">
-          Top 5 ligaweit je Kategorie. Eigene Kader-Spieler sind hervorgehoben. Klick öffnet das Spielerprofil.
-        </p>
         {footprint.hasTeam ? <OwnTeamFootprintSummary footprint={footprint} onOpenPlayer={onOpenPlayer} /> : null}
         <NlSubTabs
           items={NL_LEADERS_SUBTABS}

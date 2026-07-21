@@ -2766,8 +2766,12 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             style={{ width: 90, accentColor: "var(--nl-accent)", cursor: "pointer" }}
           />
           {paused ? <span style={{ padding: "4px 10px", borderRadius: 999, fontWeight: 800, fontSize: 12, background: "var(--nl-warn)", color: "var(--nl-ink)" }}>⏸ Pausiert · Leertaste</span> : null}
-          <span style={{ fontSize: 12.5, color: "var(--nl-mut)" }}>
-            {progressLabel ??
+          {/* Feld-Legende nur noch als dezentes ⓘ-Hover (früher permanente „Manual"-Zeile je
+              Disziplin) — die Felder labeln sich inzwischen selbst (START/ZIEL/Netz/Elo…). */}
+          <span
+            aria-label="Feld-Legende"
+            title={
+              progressLabel ??
               (prim === "kda"
                 ? "K/D/A aus der Feld-Wertung abgeleitet · KDA = (K+A)/D"
                 : prim === "duelhp"
@@ -2794,7 +2798,11 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                           ? "Höhe = kumulierte Punkte"
                           : ROW_FAMILY.has(prim)
                             ? "Fortschritt = kumulierte Punkte"
-                            : "Position auf dem Oval = kumulierte Punkte")}
+                            : "Position auf dem Oval = kumulierte Punkte")
+            }
+            style={{ fontSize: 13, color: "var(--nl-mut)", cursor: "help", opacity: 0.7 }}
+          >
+            ⓘ
           </span>
         </div>
 
@@ -2861,30 +2869,11 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           />
         ) : null}
 
-        {/* Dein Team (track): EINE konsolidierte Karte (ersetzt MyTracker-Streifen +
-            „Dein Läufer"-Karte). Andere Nicht-Barbell-Primitive behalten den schlanken
-            MyTracker-Streifen. */}
-        {me && animField ? (
-          renderMyTeamCard()
-        ) : me && prim !== "barbell" ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 12px", marginBottom: 10, borderRadius: 12, border: "1px solid var(--nl-accent)", background: "color-mix(in srgb, var(--nl-accent) 10%, transparent)" }}>
-            <span style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 800, color: "var(--nl-accent)" }}>Dein Team · {me.code}</span>
-            <span style={{ fontWeight: 800 }}>Rang {me.rank}</span>
-            {round > 0 ? (
-              (() => {
-                const d = me.roundStartRank - me.rank;
-                return (
-                  <span style={{ fontSize: 12.5, fontWeight: 700, color: d > 0 ? "var(--nl-good)" : d < 0 ? "var(--nl-risk)" : "var(--nl-mut)" }}>
-                    {d > 0 ? "▲ seit Vorrunde" : d < 0 ? "▼ seit Vorrunde" : "gehalten"}
-                  </span>
-                );
-              })()
-            ) : (
-              <span style={{ fontSize: 12.5, color: "var(--nl-mut)" }}>Runde 1 …</span>
-            )}
-            <span style={{ marginLeft: "auto", fontWeight: 800, color: "var(--nl-accent)" }}>{fmt1(me.score)} Pkt</span>
-          </div>
-        ) : null}
+        {/* „Dein Team"-Karte: EINE konsolidierte Karte (Live-Rang · Δ zur Vorrunde · Punkte ·
+            aktueller Spieler mit Profil-Klick) für JEDE Disziplin — animField deckt alle außer
+            Gewichtheben ab, das oben seine eigene „Dein Heber"-Karte hat. (Der frühere schlanke
+            MyTracker-Fallback war toter Code: animField ≡ prim !== "barbell".) */}
+        {me && animField ? renderMyTeamCard() : null}
 
         {/* Spotlight-Banner */}
         {spotlight ? (

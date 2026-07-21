@@ -520,9 +520,6 @@ function FacilityNextBestUpgradeCard({
           );
         })}
       </ol>
-      <p className="nl-facility-overview-next-hint">
-        Rangfolge: Einnahmen-Gebäude nach Amortisationszeit, übrige Upgrades nach günstigsten Ausbaukosten.
-      </p>
     </NlCard>
   );
 }

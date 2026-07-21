@@ -20,6 +20,8 @@ import {
   type NlTableSortDirection,
   type NlTone,
 } from "@/components/foundation/new-look";
+import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
+import { getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import type { AllTimeTableClientProps } from "@/app/foundation/all-time-table-v2/AllTimeTableClient";
 import type { AllTimeTableRow } from "@/lib/foundation/all-time-table";
 
@@ -262,13 +264,26 @@ function renderAllTimeCell(row: AllTimeTableRow, column: NlTableColumn<AllTimeTa
   switch (column.key) {
     case "allTimeRank":
       return row.allTimeRank;
-    case "teamName":
+    case "teamName": {
+      const logoSrc = getTeamLogoBrowserUrl(row.teamId, null, { variant: "thumb" });
       return (
-        <span className="nl-alltime-team-cell">
-          <strong>{row.teamName}</strong>
-          <small>{row.teamCode}</small>
+        <span className="nl-alltime-team-cell" style={{ flexDirection: "row", alignItems: "center", gap: "8px" }}>
+          <BudgetedMediaImage
+            src={logoSrc}
+            alt={`${row.teamName} Logo`}
+            className="nl-spreview-crest"
+            width={24}
+            height={24}
+            loading="lazy"
+            fallback={<span className="nl-spreview-crest nl-spreview-crest-fallback">{row.teamCode}</span>}
+          />
+          <span className="nl-spreview-team-copy">
+            <strong>{row.teamName}</strong>
+            <small>{row.teamCode}</small>
+          </span>
         </span>
       );
+    }
     case "seasonsPlayed":
       return formatNlNumber(row.seasons.length, 0);
     case "cumulativePoints":
@@ -406,9 +421,7 @@ export default function AllTimeTableNewLook({ model, selectedTeamId, seasonLabel
   if (!model || !model.hasArchive) {
     return (
       <section className="nl-alltime" id="all-time-table" data-testid="foundation-all-time-table" data-new-look="true" aria-label="Ewige Tabelle">
-        <NlCard className="nl-alltime-header-card" eyebrow={seasonLabel} title="Ewige Tabelle">
-          <p className="nl-alltime-hint">Team-Entwicklung über alle Saisons: Punkte, Marktwert, Cash und der ewige Leader.</p>
-        </NlCard>
+        <NlCard className="nl-alltime-header-card" eyebrow={seasonLabel} title="Ewige Tabelle" />
         <div role="status" aria-busy="true">
           <span className="sr-only">Ewige Tabelle wird geladen …</span>
           <NlSkeletonCard lines={2} />
@@ -506,9 +519,7 @@ export default function AllTimeTableNewLook({ model, selectedTeamId, seasonLabel
   if (!model.hasHistory) {
     return (
       <section className="nl-alltime" id="all-time-table" data-testid="foundation-all-time-table" data-new-look="true" aria-label="Ewige Tabelle">
-        <NlCard className="nl-alltime-header-card" eyebrow={seasonLabel} title="Ewige Tabelle">
-          <p className="nl-alltime-hint">Team-Entwicklung über alle Saisons: Punkte, Marktwert, Cash und der ewige Leader.</p>
-        </NlCard>
+        <NlCard className="nl-alltime-header-card" eyebrow={seasonLabel} title="Ewige Tabelle" />
         <NlEmptyState
           title="Noch keine abgeschlossene Saison archiviert"
           message="Die Aufteilung unten zeigt bereits die laufende Saison. Medaillen (🥇/🥈/🥉), Top-5/Top-10, Ø-Punkte und Ø-Rang füllen sich, sobald die erste Saison abgeschlossen ist; Verläufe & ewiger Leader ab der zweiten Saison."
