@@ -1128,7 +1128,9 @@ export default function FoundationPlayersTableNewLook({
     // damit exakte PO-Sterne für ALLE Spieler sichtbar sind — nicht nur fürs eigene
     // Team. Auf 0 setzen reaktiviert die scouting-basierte Unschärfe.
     const owned = (row.team?.humanControlled ?? false) || DEBUG_FORCE_PLAYER_VISIBILITY;
-    const potential = row.player.potential ?? null;
+    // Echter Potenzial-Score (nicht die driftende player.potential-Kopie) → PO-Stern
+    // stimmt mit Kader/Scouting/Profil überein.
+    const potential = row.potentialScore ?? row.player.potential ?? null;
     return (
       <NlAbilityStars
         caScore={computeCurrentAbilityScore(row.player.coreStats)}
@@ -1248,8 +1250,8 @@ export default function FoundationPlayersTableNewLook({
       // NICHT `row.playerOvr` (liga-relativ), siehe `renderAbilityStars` oben.
       caScore: computeCurrentAbilityScore(row.player.coreStats),
       ...(playerOwned
-        ? { poScore: row.player.potential ?? null }
-        : { poScoreRange: getFoggedPoScoreRange(row.player.potential ?? null) }),
+        ? { poScore: row.potentialScore ?? row.player.potential ?? null }
+        : { poScoreRange: getFoggedPoScoreRange(row.potentialScore ?? row.player.potential ?? null) }),
     };
 
     const rowElement = (
@@ -1608,7 +1610,7 @@ export default function FoundationPlayersTableNewLook({
     const owned = (row.team?.humanControlled ?? false) || DEBUG_FORCE_PLAYER_VISIBILITY;
         const caScore = computeCurrentAbilityScore(row.player.coreStats);
         const caStars = caScore != null ? potentialScoreToStars(caScore) : null;
-        const potential = row.player.potential ?? null;
+        const potential = row.potentialScore ?? row.player.potential ?? null;
         let poText = "—";
         if (owned) {
           if (potential != null) {
@@ -2395,7 +2397,7 @@ function FoundationPlayersHub({
         if (!row.team?.humanControlled) {
           return null;
         }
-        const potential = row.player.potential;
+        const potential = row.potentialScore ?? row.player.potential;
         const ovr = row.playerOvr;
         if (potential == null || !Number.isFinite(potential) || ovr == null || !Number.isFinite(ovr)) {
           return null;

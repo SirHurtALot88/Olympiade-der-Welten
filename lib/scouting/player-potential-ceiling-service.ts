@@ -225,10 +225,28 @@ export function revealPotentialStars(input: {
   ceiling: PlayerPotentialCeilingProfile;
   currentStars: PlayerAxisStarProfile;
   scoutingLevel: number;
+  /**
+   * Anzeige-Override für den GESAMT-Potenzial-Stern (nicht die Achsen). Wird dies
+   * gesetzt, kommt der Overall-Wert aus dem echten Potenzial-Score
+   * (potentialScoreToStars(hiddenPotentialScore)) statt aus dem peak-gewichteten
+   * Achsen-Ceiling. Hintergrund: das Attribut-Ceiling (buildHiddenAttributeCeilings…)
+   * bläht das stärkste Attribut jeder Achse unabhängig vom Score bis ~5★ auf, wodurch
+   * fast jeder Spieler „Overall 5★" bekam — inkonsistent zum echten Score (der Kader/
+   * Scouting/Spielerliste sonst unterschiedliche PO-Sterne für DENSELBEN Spieler zeigten).
+   * Die Achsen-Detailwerte (byAxis) bleiben unberührt (nur Tooltip/Detail).
+   */
+  overallStarsOverride?: number | null;
 }): RevealedPotentialStars {
   const ceiling = finalizePotentialCeilingProfile(input.currentStars, input.ceiling);
   const level = clamp(Math.round(input.scoutingLevel), 0, 5);
-  const gap = buildPotentialGap({ currentStars: input.currentStars, ceiling });
+  const overallCeiling =
+    typeof input.overallStarsOverride === "number" && Number.isFinite(input.overallStarsOverride)
+      ? roundHalfStar(Math.max(input.currentStars.overall, input.overallStarsOverride))
+      : ceiling.overall;
+  const gap =
+    typeof input.overallStarsOverride === "number" && Number.isFinite(input.overallStarsOverride)
+      ? roundHalfStar(clamp(overallCeiling - input.currentStars.overall, 0, 5))
+      : buildPotentialGap({ currentStars: input.currentStars, ceiling });
 
   if (level <= 2) {
     const band =
@@ -250,8 +268,8 @@ export function revealPotentialStars(input: {
   }
 
   const blur = level >= 5 ? 0.25 : level >= 4 ? 0.5 : 1;
-  const overallMin = roundHalfStar(Math.max(input.currentStars.overall, ceiling.overall - blur));
-  const overallMax = roundHalfStar(Math.max(overallMin, Math.min(5, ceiling.overall + blur)));
+  const overallMin = roundHalfStar(Math.max(input.currentStars.overall, overallCeiling - blur));
+  const overallMax = roundHalfStar(Math.max(overallMin, Math.min(5, overallCeiling + blur)));
 
   if (level <= 3) {
     return {

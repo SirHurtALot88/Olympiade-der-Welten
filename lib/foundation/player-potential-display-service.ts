@@ -13,7 +13,7 @@ import {
   type AttributeHeadroomState,
   type AxisRouteState,
 } from "@/lib/scouting/player-attribute-ceiling-service";
-import { buildPlayerPotentialRecord } from "@/lib/progression/player-potential-service";
+import { buildPlayerPotentialRecord, potentialScoreToStars } from "@/lib/progression/player-potential-service";
 import { clampPotentialCeilingToCurrentStars, reconcilePlayerPotentialRecordToCurrentAbility } from "@/lib/scouting/player-potential-ceiling-service";
 import { playerGeneratorAttributeKeys } from "@/lib/player-generator/official-discipline-weights";
 import type { PlayerGeneratorAttributeName } from "@/lib/data/olyDataTypes";
@@ -110,7 +110,13 @@ export function buildPlayerPotentialDisplaySnapshot(input: {
         soc: ceiling.soc,
       }
     : null;
-  const overallPo = ceiling?.overall ?? null;
+  // GESAMT-Potenzial-Stern aus dem echten Potenzial-Score (nicht dem aufgeblähten
+  // Achsen-Ceiling), damit Profil-Header, Kader, Scouting & Spielerliste denselben
+  // PO-Stern zeigen. Achsen-Detail (axisPo) bleibt unberührt.
+  const overallPo =
+    reconciledRecord.hiddenPotentialScore != null
+      ? roundHalf(Math.max(currentStars.overall, potentialScoreToStars(reconciledRecord.hiddenPotentialScore)))
+      : ceiling?.overall ?? null;
   const snapshot = record.lastSeasonSnapshot ?? null;
 
   const potentialAxisStatus: PlayerPotentialAxisStatus[] = (["pow", "spe", "men", "soc"] as const).map((axis) => {

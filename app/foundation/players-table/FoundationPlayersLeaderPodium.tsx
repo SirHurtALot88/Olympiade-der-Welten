@@ -170,8 +170,8 @@ export default function FoundationPlayersLeaderPodium({
                     // `lib/scouting/current-ability-score.ts`.
                     caScore={computeCurrentAbilityScore(row.player.coreStats)}
                     {...(playerOwned
-                      ? { poScore: row.player.potential ?? null }
-                      : { poScoreRange: getFoggedPoScoreRange(row.player.potential ?? null) })}
+                      ? { poScore: row.potentialScore ?? row.player.potential ?? null }
+                      : { poScoreRange: getFoggedPoScoreRange(row.potentialScore ?? row.player.potential ?? null) })}
                   >
                     {portrait.src ? (
                       <BudgetedMediaImage

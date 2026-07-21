@@ -7,13 +7,13 @@ import {
 } from "@/lib/scouting/player-axis-star-rating";
 import {
   buildPlayerPotentialCeilingProfile,
-  buildPotentialGap,
   revealPotentialStars,
   type PlayerPotentialCeilingProfile,
   type RevealedPotentialStars,
 } from "@/lib/scouting/player-potential-ceiling-service";
 import {
   buildPlayerPotentialRecord,
+  potentialScoreToStars,
 } from "@/lib/progression/player-potential-service";
 
 export type PlayerStarScoutingSnapshot = {
@@ -65,12 +65,22 @@ export function buildPlayerStarScoutingSnapshot(input: {
     profile: currentStars,
     scoutingLevel: input.scoutingLevel,
   });
+  // Der GESAMT-Potenzial-Stern kommt aus dem echten Potenzial-Score, nicht aus dem
+  // aufgeblähten Achsen-Ceiling (siehe revealPotentialStars.overallStarsOverride). So zeigen
+  // Kader, Scouting, Transfermarkt, Spielerliste & Profil überall denselben PO-Stern.
+  const potentialOverallStars =
+    baseRecord.hiddenPotentialScore != null ? potentialScoreToStars(baseRecord.hiddenPotentialScore) : null;
   const revealedPotentialStars = revealPotentialStars({
     ceiling: potentialCeiling,
     currentStars,
     scoutingLevel: input.scoutingLevel,
+    overallStarsOverride: potentialOverallStars,
   });
-  const potentialGap = buildPotentialGap({ currentStars, ceiling: potentialCeiling });
+  const overallForGap = potentialOverallStars ?? currentStars.overall;
+  const potentialGap = Math.min(
+    5,
+    Math.max(0, Math.round((overallForGap - currentStars.overall) * 2) / 2),
+  );
   const fairValue = estimateFairValueFromStars(
     currentStars.overall,
     input.player.marketValue ?? null,

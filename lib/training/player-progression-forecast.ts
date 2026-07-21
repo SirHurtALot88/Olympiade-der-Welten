@@ -10,7 +10,7 @@ import { resolvePlayerPotentialRecordFromGameState } from "@/lib/scouting/player
 import { resolvePlayerPotentialRecordForProgression } from "@/lib/scouting/player-potential-ceiling-service";
 import { buildPlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scouting-bridge";
 import { getEffectiveScoutingLevel } from "@/lib/scouting/facility-scout-pipeline-service";
-import { buildPlayerScoutPotentialFromGameState } from "@/lib/progression/player-potential-service";
+import { buildPlayerScoutPotentialFromGameState, potentialScoreToStars } from "@/lib/progression/player-potential-service";
 import { playerGeneratorAttributeKeys } from "@/lib/player-generator/official-discipline-weights";
 import type { PlayerGeneratorAttributeName } from "@/lib/data/olyDataTypes";
 import {
@@ -842,12 +842,16 @@ export function buildPlayerProgressionForecast(input: {
     currentAbilityStars: axisStarSnapshot?.revealedCurrentStars.displayLabel ?? getStarLabel(currentAbilityRating),
     potentialRating,
     potentialTier: getRatingTier(potentialRating),
-    // PO-Sterne aus dem GESAMT-Potenzial (potentialRating), NICHT aus dem
-    // besten Achsen-Ceiling: revealedPotentialStars nahm das stärkste Attribut-
-    // Ceiling, wodurch fast jeder Spieler auf ★★★★★ sprang (Potenzial 60er →
-    // eigentlich ~3 Sterne). Gesamt-Potenzial macht die PO-Sterne wieder
-    // aussagekräftig (gestreut 2–5). CA-Sterne bleiben achsenbasiert.
-    potentialStars: getStarLabel(potentialRating),
+    // PO-Sterne aus dem GESAMT-Potenzial (potentialRating = hiddenPotentialScore),
+    // NICHT aus dem besten Achsen-Ceiling: revealedPotentialStars nahm das stärkste
+    // Attribut-Ceiling, wodurch fast jeder Spieler auf ★★★★★ sprang. Wir nutzen hier
+    // dieselbe kanonische Kurve `potentialScoreToStars` wie Kader/Scouting/Spielerliste/
+    // Profil (statt der linearen /20-Näherung getStarLabel), damit der PO-Stern für
+    // DENSELBEN Spieler überall identisch ist. CA-Sterne bleiben achsenbasiert.
+    potentialStars: (() => {
+      const stars = potentialScoreToStars(potentialRating);
+      return isFiniteNumber(stars) ? `${stars.toLocaleString("de-DE", { maximumFractionDigits: 1 })} Sterne` : null;
+    })(),
     developmentFactors: netDevelopment.developmentFactors,
     maintenanceBreakdown: netDevelopment.maintenanceBreakdown,
     regressionBreakdown: netDevelopment.regressionBreakdown,

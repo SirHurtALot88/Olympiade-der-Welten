@@ -21,6 +21,7 @@ import {
   getRosterEntrySalarySortValue,
 } from "@/lib/foundation/tabs/season-stand-render-helpers";
 import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
+import { resolvePlayerPotentialRecordFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 
 export type FoundationPlayerScopeRow = {
   player: Player;
@@ -31,6 +32,8 @@ export type FoundationPlayerScopeRow = {
     totalPoints: number | null;
     bestDisciplineLabel: string | null;
   } | null;
+  /** Echter Potenzial-Score (hiddenPotentialScore) für den kanonischen PO-Stern. */
+  potentialScore: number | null;
   playerOvr: number | null;
   playerMvs: number | null;
   playerPps: number | null;
@@ -251,12 +254,19 @@ export function useFoundationCrossTabPlayerDirectory(input: {
         const playerRating = input.playerRatingsById.get(player.id) ?? null;
         const isActive = roster != null;
         const isFreeAgent = !isActive;
+        // Echter Potenzial-Score (nicht die driftende player.potential-Kopie), damit der
+        // PO-Stern der Spielerliste mit Kader/Scouting/Profil übereinstimmt.
+        const potentialRecord = resolvePlayerPotentialRecordFromGameState({
+          gameState: input.gameState,
+          playerId: player.id,
+        });
 
         return {
           player,
           roster,
           team,
           seasonPerformance,
+          potentialScore: potentialRecord?.hiddenPotentialScore ?? player.potential ?? null,
           playerOvr: playerRating?.ovrNormalized ?? null,
           playerMvs: playerRating?.mvs ?? null,
           playerPps: playerRating?.ppsSeason ?? null,
