@@ -442,6 +442,19 @@ function renderTraitChips(traitsPositive: string[], traitsNegative: string[]) {
 const NL_PLAYERS_PAGE_SIZE = 100;
 
 /**
+ * Perf (Spieler-Verzeichnis, first paint): das ERSTE Rendering zeigt weniger
+ * Zeilen als der reguläre "Mehr anzeigen"-Schritt (`NL_PLAYERS_PAGE_SIZE`,
+ * unverändert 100 — der Button bleibt "Mehr anzeigen (+100)"). Jede Zeile
+ * trägt CA/PO-Sterne, 4 sortierbare Achsen-Buttons, Trait-Chips und einen
+ * MW-Sparkline — bei ~2984 Spielern/Liga macht ein satter erster Commit mit
+ * 100 Zeilen den Erstaufbau träge (siehe `NlAbilityStars` DOM-Perf-Notiz).
+ * Klick auf "Mehr anzeigen" lädt weiterhin in vollen 100er-Schritten nach,
+ * nur die ALLERERSTE Seite ist kleiner. Keine Feature-/Datenänderung — nur
+ * wie viele Zeilen der allererste Commit ans DOM hängt.
+ */
+const NL_PLAYERS_INITIAL_PAGE_SIZE = 45;
+
+/**
  * Obergrenze für den "Alle anzeigen"-Sprung (P1, #Alle-anzeigen-Jank). Bewusst
  * KEINE Virtualisierung: die Zeilen tragen aufklappbare PPs-Detailzeilen,
  * Vergleichs-Checkboxen, sortierbare Achsen-Buttons und Portrait-Hover-Anchor —
@@ -605,7 +618,7 @@ export default function FoundationPlayersTableNewLook({
   openTeamProfileById,
   onToggleWishlist,
 }: FoundationPlayersTableNewLookProps) {
-  const [visibleCount, setVisibleCount] = useState(NL_PLAYERS_PAGE_SIZE);
+  const [visibleCount, setVisibleCount] = useState(NL_PLAYERS_INITIAL_PAGE_SIZE);
   /** Namenssuche im Verzeichnis (P1) — Substring, case-insensitiv, ganz vorn im Filter-Stack. */
   const [nameQuery, setNameQuery] = useState("");
   /** Welche Zeile ist gerade per PPs-Klick aufgeklappt (max. eine gleichzeitig). */
@@ -718,7 +731,7 @@ export default function FoundationPlayersTableNewLook({
 
   // Bei Filterwechsel wieder auf die erste "Seite" zurück.
   useEffect(() => {
-    setVisibleCount(NL_PLAYERS_PAGE_SIZE);
+    setVisibleCount(NL_PLAYERS_INITIAL_PAGE_SIZE);
     setExpandedPlayerId(null);
   }, [playerScope, playerTeamFilter, playerClassFilter, selectedMwBracket, selectedExpiryBucket, queryChips, nameQuery]);
 

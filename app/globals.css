@@ -34221,10 +34221,20 @@ button.market-v2-bucket-card.is-selected {
   color: rgba(235, 239, 247, 0.62);
 }
 
+/* Perf note: a star row used to be 5 separate DOM elements (one per star,
+   each with its own fill/uncertain sub-layers) — up to ~15-20 nodes per
+   CA/PO pair. It's now 1 row wrapper + up to 3 stacked "★★★★★" text layers
+   (track/uncertain/fill), clipped by width % instead of looped per star.
+   All layers share font-size/letter-spacing via inheritance from
+   `.nl-ability-star-row`, so they stay pixel-aligned and a fractional
+   fill still lands inside the correct glyph, same as the old per-star math. */
 .nl-ability-star-row {
-  display: inline-flex;
-  gap: 1px;
+  position: relative;
+  display: inline-block;
   line-height: 1;
+  font-size: 0.94rem;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
   filter: drop-shadow(0 0 9px rgba(255, 198, 64, 0.45));
 }
 
@@ -34236,24 +34246,13 @@ button.market-v2-bucket-card.is-selected {
   filter: drop-shadow(0 0 9px rgba(255, 96, 86, 0.35));
 }
 
-.nl-ability-star {
-  position: relative;
-  display: inline-block;
-  width: 0.86em;
-  color: rgba(111, 91, 48, 0.72);
-  font-size: 0.94rem;
-}
-
-.nl-ability-stars.is-compact .nl-ability-star {
+.nl-ability-stars.is-compact .nl-ability-star-row {
   font-size: 0.82rem;
 }
 
-.nl-ability-star-empty {
+.nl-ability-star-track {
+  display: inline-block;
   color: rgba(103, 89, 61, 0.58);
-}
-
-.nl-ability-star.is-inactive .nl-ability-star-empty {
-  color: rgba(103, 89, 61, 0.28);
 }
 
 .nl-ability-star-fill {
@@ -34261,6 +34260,7 @@ button.market-v2-bucket-card.is-selected {
   inset: 0 auto 0 0;
   width: 0;
   overflow: hidden;
+  white-space: nowrap;
   color: #ffd76a;
   text-shadow:
     0 0 3px rgba(255, 245, 181, 0.95),
@@ -34279,13 +34279,11 @@ button.market-v2-bucket-card.is-selected {
   position: absolute;
   inset: 0 auto 0 0;
   overflow: hidden;
+  white-space: nowrap;
   color: #12151c;
   text-shadow:
     0 0 1px rgba(255, 255, 255, 0.18),
     0 1px 0 rgba(0, 0, 0, 0.85);
-}
-
-.nl-ability-star.has-uncertain .nl-ability-star-uncertain {
   filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.55));
 }
 

@@ -25,16 +25,21 @@
  * No numeric CA/PO text / ranges are rendered — the legacy `caScore` (used as the
  * CA scale driver), `poScore` and `poScoreRange` props feed the star math only.
  *
- * Star fill + uncertain-overlay math is promoted from
- * `lib/progression/player-potential-service.ts` (`buildAbilityStarRangeSlots`,
- * `potentialScoreToStars`). Styling: `.nl-ability-*` in `app/globals.css`.
+ * Star fill + uncertain-overlay math is derived from the same absolute scale as
+ * `lib/progression/player-potential-service.ts` (`potentialScoreToStars`). Each
+ * 5-star row is rendered as a fixed "★★★★★" background layer plus 1-2 absolutely
+ * positioned copies of the same glyph string clipped to a `min/max` percentage of
+ * the row's width (perf: this is DOM-node-per-row, not per-star — a fractional
+ * fill/uncertain boundary still lands inside the right glyph because all layers
+ * share identical text/font/letter-spacing, so they stay pixel-aligned). This
+ * replaces an earlier per-star (5x) element loop; same visual result, far fewer
+ * nodes — the players table mounts ~288+ of these per paint, so node count here
+ * multiplies directly into total page DOM weight. Styling: `.nl-ability-*` in
+ * `app/globals.css`.
  */
 
 import { formatNlNumber } from "@/components/foundation/new-look/nl-tones";
-import {
-  buildAbilityStarRangeSlots,
-  potentialScoreToStars,
-} from "@/lib/progression/player-potential-service";
+import { potentialScoreToStars } from "@/lib/progression/player-potential-service";
 
 type NlRange = { min: number; max: number };
 
@@ -124,54 +129,52 @@ function resolvePoStarRange(props: NlAbilityStarsProps, caStars: number | null):
   return range;
 }
 
-/** Renders the 5-star row for a star range. Solid fill when `uncertain` is false; adds the dark uncertain overlay otherwise. */
+const STAR_GLYPHS = "★★★★★";
+const STAR_COUNT = 5;
+
+function starPercent(stars: number): number {
+  return Math.max(0, Math.min(100, (stars / STAR_COUNT) * 100));
+}
+
+/**
+ * Renders the 5-star row for a star range. Instead of one DOM element per
+ * star (5x wrapper + fill/uncertain layers = up to ~15-20 nodes), this draws
+ * the same "★★★★★" glyph string 2-3 times, stacked absolutely and clipped to
+ * a width percentage — because every layer is the identical text in the
+ * identical font/letter-spacing, the layers stay pixel-aligned and a
+ * fractional fill still lands inside the correct star glyph, exactly as the
+ * old per-star fill math did. Solid fill only when `uncertain` is false;
+ * adds the hollow amber-stroke uncertain overlay (fog-of-war) otherwise.
+ */
 function StarRow({ min, max, uncertain }: { min: number; max: number; uncertain: boolean }) {
-  const slots = buildAbilityStarRangeSlots(min, max);
+  const minPct = starPercent(min);
+  const maxPct = starPercent(max);
+  const showUncertain = uncertain && maxPct > minPct;
+  const fillPct = uncertain ? minPct : maxPct;
   return (
     <span className={`nl-ability-star-row${uncertain ? " is-range" : ""}`} aria-hidden="true">
-      {slots.map((slot) => {
-        if (uncertain && slot.maxFill <= 0) {
-          return (
-            <span key={slot.index} className="nl-ability-star is-inactive">
-              <span className="nl-ability-star-empty">★</span>
-            </span>
-          );
-        }
-        return (
-          <span key={slot.index} className={`nl-ability-star${slot.showUncertain ? " has-uncertain" : ""}`}>
-            <span className="nl-ability-star-empty">★</span>
-            {/* Alle Fill-/Uncertain-Ebenen sind bei left:0 verankert (CSS inset:0 auto 0 0)
-                und clippen nur über die Breite — so bleiben die Stern-Glyphen deckungs-
-                gleich übereinander. Reihenfolge = Mal-Reihenfolge: erst die unsichere
-                Hollow-Fläche (0..max), dann der solide Fill (0..min) OBEN drauf. Früher
-                bekam die Uncertain-Ebene ein left:min% + Breite (max-min)% — dadurch zeigte
-                ihr Glyph die linke Spitze eines Sterns mitten im Stern (kaputt wirkende PO). */}
-            {uncertain && slot.showUncertain ? (
-              // Fog-of-war-Oberbereich: HOLLOW-Outline-Stern (transparent + amber Stroke),
-              // bewusst KEIN solider Fill, damit unsicher ≠ bestätigt (nie als ★★★★★ lesbar).
-              <span
-                className="nl-ability-star-uncertain nl-fog-uncertain"
-                style={{
-                  width: `${slot.maxFill * 100}%`,
-                  color: "transparent",
-                  WebkitTextStroke: "1.1px rgba(255, 209, 112, 0.95)",
-                  textShadow: "none",
-                }}
-              >
-                ★
-              </span>
-            ) : null}
-            {slot.minFill > 0 || !uncertain ? (
-              <span
-                className="nl-ability-star-fill"
-                style={{ width: `${(uncertain ? slot.minFill : slot.maxFill) * 100}%` }}
-              >
-                ★
-              </span>
-            ) : null}
-          </span>
-        );
-      })}
+      <span className="nl-ability-star-track">{STAR_GLYPHS}</span>
+      {/* Mal-Reihenfolge wie zuvor: erst die unsichere Hollow-Fläche (0..max),
+          dann der solide Fill (0..min) OBEN drauf — beide bei inset:0 auto 0 0
+          verankert (siehe CSS), damit sie exakt über der Track-Ebene liegen. */}
+      {showUncertain ? (
+        // Fog-of-war-Oberbereich: HOLLOW-Outline-Stern (transparent + amber Stroke),
+        // bewusst KEIN solider Fill, damit unsicher ≠ bestätigt (nie als ★★★★★ lesbar).
+        <span
+          className="nl-ability-star-uncertain nl-fog-uncertain"
+          style={{
+            width: `${maxPct}%`,
+            color: "transparent",
+            WebkitTextStroke: "1.1px rgba(255, 209, 112, 0.95)",
+            textShadow: "none",
+          }}
+        >
+          {STAR_GLYPHS}
+        </span>
+      ) : null}
+      <span className="nl-ability-star-fill" style={{ width: `${fillPct}%` }}>
+        {STAR_GLYPHS}
+      </span>
     </span>
   );
 }

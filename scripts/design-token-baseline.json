@@ -1,9 +1,9 @@
 {
   "_comment": "Ratchet-Baseline fuer scripts/lint-design-tokens.ts. Key-Format: '<datei>:<zeile>:<regel>'. Regel-IDs: EUR (rohes Euro-Zeichen), LOCALE (toLocaleString/Intl.NumberFormat), HEX (hartkodierte Hex-Farbe). Neu generieren mit: npx tsx scripts/lint-design-tokens.ts --update-baseline",
-  "generatedAt": "2026-07-21T05:15:22.770Z",
+  "generatedAt": "2026-07-21T09:20:37.167Z",
   "count": 100,
   "violations": [
-    "app/foundation/FoundationShellRouterBody.tsx:3018:LOCALE",
+    "app/foundation/FoundationShellRouterBody.tsx:3017:LOCALE",
     "app/foundation/PlayerDetailDrawer.tsx:2197:HEX",
     "app/foundation/PlayerDetailDrawer.tsx:242:HEX",
     "app/foundation/PlayerDetailDrawer.tsx:2823:HEX",
@@ -41,8 +41,8 @@
     "app/foundation/player-profile/PlayerAttributeProgressChart.tsx:619:HEX",
     "app/foundation/players-table/FoundationPlayersCompareOverlay.tsx:10:HEX",
     "app/foundation/players-table/FoundationPlayersCompareOverlay.tsx:129:HEX",
-    "app/foundation/players-table/FoundationPlayersTableNewLook.tsx:1801:HEX",
-    "app/foundation/players-table/FoundationPlayersTableNewLook.tsx:507:HEX",
+    "app/foundation/players-table/FoundationPlayersTableNewLook.tsx:1814:HEX",
+    "app/foundation/players-table/FoundationPlayersTableNewLook.tsx:520:HEX",
     "app/foundation/scouting-center-v2/ScoutingShortlistBoard.tsx:64:EUR",
     "app/foundation/scouting-center-v2/ScoutingShortlistBoard.tsx:68:EUR",
     "app/foundation/scouting-center-v2/ScoutingShortlistBoard.tsx:69:EUR",
