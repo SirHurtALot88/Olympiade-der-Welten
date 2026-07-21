@@ -22,7 +22,7 @@ import {
   type OrganicPlayerView,
   type OrganicUtilityWeights,
 } from "@/lib/ai/organic-squad/types";
-import { buyUtility, stopUtility } from "@/lib/ai/organic-squad/utility";
+import { buyUtility, computeCoreAxisPeakQuality, stopUtility } from "@/lib/ai/organic-squad/utility";
 import { draftUnit } from "@/lib/ai/market-pick-engine/slot-sequence";
 import type { LeagueMarketBrackets, MarketBracketLane } from "@/lib/ai/market-pick-engine/market-brackets";
 
@@ -192,6 +192,9 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
       disciplineNeeds,
       needAxisWeights,
       identityAxisWeights: input.identityAxisWeights,
+      // Self-limiting signal for the flag-gated PEAK front-load: the best on-identity quality already on
+      // the roster. Once this crosses the star line the front-load stops (see peakFrontLoadFactor).
+      coreAxisPeakQuality: computeCoreAxisPeakQuality(squad, input.identityAxisWeights, needAxisWeights),
       composition:
         input.composition && boughtTiers
           ? { counts: input.composition.counts, brackets: input.composition.brackets, boughtTiers }

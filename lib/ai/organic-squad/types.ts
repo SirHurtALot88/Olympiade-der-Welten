@@ -185,6 +185,13 @@ export type OrganicTeamState = {
    */
   identityAxisWeights?: Record<CoreAxis, number>;
   /**
+   * Best quality among the CURRENT squad's on-identity bodies (see computeCoreAxisPeakQuality in
+   * utility.ts). Only read by the flag-gated PEAK front-load to make it self-limiting — once a core-axis
+   * peak is on the roster the front-load stops. Optional so pre-existing callers/tests are unaffected
+   * (undefined ⇒ treated as 0 ⇒ the front-load may still fire, which is the intended draft-from-empty case).
+   */
+  coreAxisPeakQuality?: number;
+  /**
    * Optional EXPLICIT role-composition plan (flag-gated OLY_DRAFT_COMPOSE — see draft-adapter.ts
    * planOrganicDraftForTeam / lib/ai/organic-squad/composition-plan.ts). Feeds the soft compositionValue
    * term in utility.ts buyUtility: a pick earns a bonus while its own tier still sits under `counts`, a

@@ -55,6 +55,22 @@ const STRAIN_ENABLED = process.env.OLY_DRAFT_STRAIN === "1";
 const FILLQ_A_ENABLED = process.env.OLY_DRAFT_FILLQA === "1";
 
 /**
+ * Env flag for ANPASSUNG PEAK (core-axis "one peak" front-load, see peakFrontLoadFactor / buyUtility).
+ * A concentrated, cash-poor team divides its budget evenly per slot and never affords a single standout
+ * in its own strong axis — all bodies land below the star line (SUPPORT_QUALITY_BASELINE), a flat pack
+ * with no peak. This lets exactly ONE high-quality on-identity candidate draw on the team's discretionary
+ * budget so a concentrated squad gets one real peak instead of a uniform mid pack. Self-limiting (fades
+ * once a core-axis peak is on the roster), concentration-scaled (balanced teams unaffected), and it only
+ * relaxes the PRICE side — the min-fill affordability guard in draft-builder is untouched, so there is no
+ * roster-min risk. Default ON (validated on a full-league S1 A/B: concentrated squads gained one clear
+ * core-axis peak, depth and the roster-min floor preserved, balanced teams barely moved). OLY_DRAFT_PEAK=0
+ * disables it and restores the flat even-per-slot behaviour.
+ */
+const PEAK_ENABLED = process.env.OLY_DRAFT_PEAK !== "0";
+/** Max extra effective per-slot budget the one core-axis peak may draw (effective multiplier ≤ 1 + this). */
+const PEAK_FRONTLOAD_STRENGTH = 2.5;
+
+/**
  * Reference effective cost of a Depth-grade body (~22-25 MW + capitalized wage). Used to gauge whether
  * a team's per-slot budget can afford Depth-grade fill (Anpassung A + B). Exported for draft-adapter B.
  */
@@ -72,6 +88,16 @@ const FILL_QUALITY_VALUE = 30;
  * whole draft — a lone star keeps full base body value but loses most of its premium.
  */
 const SUPPORT_QUALITY_BASELINE = 68;
+
+/**
+ * Quality line a candidate must clear to count as the team's "standout" for the flag-gated PEAK front-load,
+ * and the level the roster's best on-identity body must reach for the allowance to switch OFF (self-limiting).
+ * Set a notch BELOW SUPPORT_QUALITY_BASELINE because a CONCENTRATED team's standout is a strong SINGLE-axis
+ * specialist — `computePlayerQuality` need-weights across all four axes, so even a top specialist tops out
+ * ~10 points under the all-rounder star line; using the 68 line would mean no affordable candidate ever
+ * qualifies for a single-axis identity. This catches "the one who clearly stands out from the flat pack".
+ */
+const PEAK_QUALITY_FLOOR = SUPPORT_QUALITY_BASELINE - 10;
 
 /**
  * Converts the budget-relative "price in slots" into a penalty comparable to ΔStrength (~0..90).
@@ -348,6 +374,73 @@ function wageStrain(player: OrganicPlayerView, state: OrganicTeamState): number 
 }
 
 /**
+ * Alignment of a player's stat mass with the team's identity axes: 1.0 neutral, >1 on-identity, <1 off.
+ * Both distributions sum-normalized (identityAxisWeights already sums to 1; the player's axes are divided
+ * by their own sum), ×4 so a clean single-axis match reads well above 1. Independent of the IDFIT gate —
+ * used by the PEAK front-load and its self-limiting roster signal.
+ */
+export function identityAlignment(
+  player: OrganicPlayerView,
+  identityAxisWeights: Record<CoreAxis, number> | undefined,
+): number {
+  if (!identityAxisWeights) return 1;
+  const axisSum = CORE_AXES.reduce((sum, axis) => sum + Math.max(0, player[axis]), 0);
+  if (axisSum <= 0) return 1;
+  return (
+    CORE_AXES.reduce(
+      (sum, axis) => sum + (identityAxisWeights[axis] ?? 0) * (Math.max(0, player[axis]) / axisSum),
+      0,
+    ) * CORE_AXES.length
+  );
+}
+
+/**
+ * Best quality among the current squad's on-identity bodies — the "does this team already have a peak in
+ * its core axis" signal that makes the PEAK front-load self-limiting (it fires only until one is secured).
+ * Returns 0 for an empty/off-identity squad. Cheap: O(squad) with squad ≤ ROSTER_MAX.
+ */
+export function computeCoreAxisPeakQuality(
+  squad: OrganicPlayerView[],
+  identityAxisWeights: Record<CoreAxis, number> | undefined,
+  needAxisWeights: Record<CoreAxis, number>,
+): number {
+  let best = 0;
+  for (const player of squad) {
+    if (identityAlignment(player, identityAxisWeights) <= 1) continue;
+    best = Math.max(best, computePlayerQuality(player, needAxisWeights));
+  }
+  return best;
+}
+
+/**
+ * ANPASSUNG PEAK (flag-gated OLY_DRAFT_PEAK): multiplier on the candidate's effective per-slot budget so
+ * ONE high-quality on-identity body can draw on the team's discretionary budget instead of the even
+ * per-slot share — lifting a single standout above the flat pack. Returns 1 (no-op) unless the flag is on
+ * AND the team is a concentrated identity, still below opt, has no core-axis peak yet, and the candidate is
+ * itself a peak (quality above the star line) aligned to that identity. Scaled by identity concentration
+ * and alignment, capped at 1 + PEAK_FRONTLOAD_STRENGTH. Only the price side is relaxed; the min-fill
+ * affordability guard (draft-builder) still independently caps the absolute spend, so the peak stays
+ * economy-scaled (a poorer team affords a smaller peak) and roster-min is never at risk.
+ */
+function peakFrontLoadFactor(player: OrganicPlayerView, state: OrganicTeamState): number {
+  if (!PEAK_ENABLED) return 1;
+  const identity = state.identityAxisWeights;
+  if (!identity) return 1;
+  if (state.rosterSize >= state.weights.optTarget) return 1; // only while building the squad
+  if ((state.coreAxisPeakQuality ?? 0) >= PEAK_QUALITY_FLOOR) return 1; // already secured a standout
+  const quality = computePlayerQuality(player, state.needAxisWeights);
+  if (quality < PEAK_QUALITY_FLOOR) return 1; // not a standout — normal depth economics apply
+  const fit = identityAlignment(player, identity);
+  if (fit <= 1) return 1; // an off-identity peak gets no help
+  const maxWeight = CORE_AXES.reduce((max, axis) => Math.max(max, identity[axis] ?? 0), 0);
+  // Concentration: 0 at a balanced identity (~0.25 each), 1 at a strongly concentrated axis (≥0.6).
+  const concentration = clamp((maxWeight - 0.25) / 0.35, 0, 1);
+  if (concentration <= 0) return 1; // balanced teams don't force a peak
+  const alignFactor = clamp((fit - 1) / 0.5, 0, 1);
+  return 1 + PEAK_FRONTLOAD_STRENGTH * concentration * alignFactor;
+}
+
+/**
  * Utility of BUYING this free agent. Market value is used as PRICE only; budget-relativity comes
  * through wThrift (which rises for poorer teams), not from reading marketValue as quality.
  */
@@ -360,7 +453,11 @@ export function buyUtility(player: OrganicPlayerView, state: OrganicTeamState): 
     identityAxisTilt(player, state);
   // Budget-relative cost measured in remaining-OPT-slots of budget: transfer price + capitalized wage.
   const optSlotsRemaining = Math.max(1, w.optTarget - state.rosterSize);
-  const budgetPerOptSlot = Math.max(1, state.cash / optSlotsRemaining);
+  // ANPASSUNG PEAK (flag-gated): a qualifying single on-identity peak may draw on the team's discretionary
+  // budget instead of the even per-slot share, so a concentrated squad affords one standout. No-op (factor
+  // 1) for every other pick and whenever OLY_DRAFT_PEAK is off. The min-fill affordability guard in
+  // draft-builder still independently caps the spend, so this only decides WHICH affordable pick wins.
+  const budgetPerOptSlot = Math.max(1, (state.cash * peakFrontLoadFactor(player, state)) / optSlotsRemaining);
   const effectiveCost = Math.max(0, player.marketValue) + SALARY_CAPITALIZATION * Math.max(0, player.salary);
   const priceInSlots = effectiveCost / budgetPerOptSlot;
   // ANPASSUNG B2 (flag-gated): once a single pick eats more than the GM's own "star appetite" worth of
