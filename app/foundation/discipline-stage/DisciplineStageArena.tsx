@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
+import { useArenaRoomSync } from "@/lib/room/use-arena-room-sync";
+import type { RoomArenaState } from "@/types/game";
 import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import {
   buildDisciplineStageModel,
@@ -663,6 +665,61 @@ export default function DisciplineStageArena({
     return slots.map((s) => s.label).filter((l): l is string => Boolean(l && l.trim()));
   }, [engineDiscipline]);
 
+  // ---- Co-op-Room-Sync (Multiplayer): host-getriebener Lockstep-Reveal ----
+  // Die Bühne ist eine Ein-Disziplin-Ansicht → wir tragen die aktuell gezeigte
+  // Disziplin als „active phase" und den Reveal-Schritt (round) als slotRevealIndex.
+  // Nur der Host advanced; der Guest folgt via onApplyRevealSync. Die Hover-/Space-
+  // Pause des Hosts propagiert automatisch (Host sendet dann keinen nächsten Schritt).
+  const [syncedRound, setSyncedRound] = useState(0);
+  // Welche Spieltags-Seite die aktuell gewählte Disziplin ist (für den Room-State).
+  const activeDisciplineSide: "d1" | "d2" | "overall" =
+    matchdayPanel?.d1?.disciplineId === disciplineId ? "d1" : matchdayPanel?.d2?.disciplineId === disciplineId ? "d2" : "overall";
+  const roomArenaSync = useArenaRoomSync({
+    roomContext,
+    saveId,
+    seasonId,
+    matchdayId,
+    onApplyRevealSync: (normalized: RoomArenaState) => {
+      // Diszi-Sync: die vom Host gewählte Seite auf die lokale Disziplin mappen.
+      const phase = normalized.activeDisciplinePhase;
+      const targetDiscId =
+        phase === "d1" ? matchdayPanel?.d1?.disciplineId ?? null : phase === "d2" ? matchdayPanel?.d2?.disciplineId ?? null : null;
+      if (targetDiscId && targetDiscId !== disciplineId) {
+        setDisciplineId(targetDiscId);
+      }
+      // Reveal-Schritt: Host-slotRevealIndex → lokaler Zielround (Guest zieht nach).
+      setSyncedRound(normalized.slotRevealIndex);
+    },
+  });
+  // Host meldet den Sync einmalig an, sobald die Preview steht (idle → running).
+  useEffect(() => {
+    if (!roomContext || !roomArenaSync.isRoomHost || !preview) return;
+    if ((roomArenaSync.roomArenaSyncState?.status ?? "idle") !== "idle") return;
+    roomArenaSync.emitStartRoomArena({
+      seasonId: seasonId ?? null,
+      matchdayId: matchdayId ?? null,
+      disciplineSide: activeDisciplineSide,
+      maxSlotRevealCountByDiscipline: { d1: 0, d2: 0 },
+    });
+  }, [roomContext, roomArenaSync, preview, seasonId, matchdayId, activeDisciplineSide]);
+  // Prop-Bündel für die NativeArena (nur im Room aktiv; solo bleibt alles inert).
+  const nativeRoomSync = roomContext
+    ? {
+        active: roomArenaSync.isRoomRevealSyncActive,
+        isHost: roomArenaSync.isRoomHost,
+        canControl: roomArenaSync.canControlArenaReveal,
+        waitingForHost: roomArenaSync.roomRevealWaitingForHost,
+        syncedRound,
+        onHostAdvanced: () => roomArenaSync.emitHostRoomArenaAdvance({ d1: 0, d2: 0 }),
+        coopGate: {
+          active: roomArenaSync.arenaCoopReadyGateActive,
+          isSelfReady: roomArenaSync.isSelfArenaReady,
+          waitingNames: roomArenaSync.arenaCoopWaitingNames,
+          onToggleReady: roomArenaSync.emitArenaCoopReadyToggle,
+        },
+      }
+    : null;
+
   // Engine-Teams für die gewählte Disziplin (nur wenn sie an diesem Spieltag läuft).
   const engineTeams = useMemo(() => {
     const disc = preview?.disciplinePreviews.find((d) => d.disciplineId === disciplineId);
@@ -1075,6 +1132,7 @@ export default function DisciplineStageArena({
         accent={DISCIPLINE_SKIN[disciplineId]?.accent}
         motif={DISCIPLINE_SKIN[disciplineId]?.motif}
         env={DISCIPLINE_SKIN[disciplineId]?.env}
+        roomSync={nativeRoomSync}
       />
 
       {/* Team-Matchday-PP-Panel (Ticket 205 · Pflicht-Feature Ticket 219): unter der Arena, IMMER
