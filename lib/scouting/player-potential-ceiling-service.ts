@@ -52,6 +52,50 @@ function roundHalfStar(value: number) {
   return clamp(Math.round(value * 2) / 2, 0.5, 5);
 }
 
+/** Deterministischer PRNG (FNV-Hash → xorshift), stabil pro Seed. */
+function createSeededRandom(seed: string): () => number {
+  let state = 2166136261;
+  for (let index = 0; index < seed.length; index += 1) {
+    state ^= seed.charCodeAt(index);
+    state = Math.imul(state, 16777619);
+  }
+  state = state >>> 0 || 1;
+  return () => {
+    state = Math.imul(state ^ (state >>> 15), 1 | state);
+    state ^= state + Math.imul(state ^ (state >>> 7), 61 | state);
+    return ((state ^ (state >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Fog-Range für einen Potenzial-STERN. Wie bei den Attribut-Maxima darf der echte Wert
+ * NIE in der Mitte des Bandes liegen (sonst verrät der Mittelwert alles). Der Wert sitzt
+ * an einer zufälligen, deterministischen Position; die Spanne skaliert mit `blur` und
+ * zieht sich mit steigendem Scouting zusammen. Ohne Seed → symmetrischer Fallback.
+ */
+function foggedStarBand(input: {
+  ceiling: number;
+  floor: number;
+  blur: number;
+  seed: string | null;
+  hiCap?: number;
+}): { min: number; max: number } {
+  const { ceiling, floor, blur } = input;
+  const hiCap = input.hiCap ?? 5;
+  if (blur <= 0 || !input.seed) {
+    const min = roundHalfStar(Math.max(floor, ceiling - blur));
+    return { min, max: roundHalfStar(Math.max(min, Math.min(hiCap, ceiling + blur))) };
+  }
+  const width = blur * 2;
+  let posFrac = 0.2 + 0.6 * createSeededRandom(`fog-star:${input.seed}`)();
+  if (Math.abs(posFrac - 0.5) < 0.1) posFrac += posFrac < 0.5 ? -0.15 : 0.15;
+  const marginLow = width * posFrac;
+  const marginHigh = width - marginLow;
+  const min = roundHalfStar(Math.max(floor, ceiling - marginLow));
+  const max = roundHalfStar(Math.max(min, Math.min(hiCap, ceiling + marginHigh)));
+  return { min, max };
+}
+
 function isFiniteNumber(value: number | null | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
@@ -236,6 +280,11 @@ export function revealPotentialStars(input: {
    * Die Achsen-Detailwerte (byAxis) bleiben unberührt (nur Tooltip/Detail).
    */
   overallStarsOverride?: number | null;
+  /**
+   * Seed (i.d.R. playerId) für die asymmetrische Fog-Range: der echte Potenzial-Stern
+   * liegt NIE zentriert im [min,max]-Band. Ohne Seed → symmetrischer Fallback.
+   */
+  seed?: string | null;
 }): RevealedPotentialStars {
   const ceiling = finalizePotentialCeilingProfile(input.currentStars, input.ceiling);
   const level = clamp(Math.round(input.scoutingLevel), 0, 5);
@@ -268,8 +317,15 @@ export function revealPotentialStars(input: {
   }
 
   const blur = level >= 5 ? 0.25 : level >= 4 ? 0.5 : 1;
-  const overallMin = roundHalfStar(Math.max(input.currentStars.overall, overallCeiling - blur));
-  const overallMax = roundHalfStar(Math.max(overallMin, Math.min(5, overallCeiling + blur)));
+  const seed = input.seed ?? null;
+  const overallBand = foggedStarBand({
+    ceiling: overallCeiling,
+    floor: input.currentStars.overall,
+    blur,
+    seed: seed ? `${seed}:overall` : null,
+  });
+  const overallMin = overallBand.min;
+  const overallMax = overallBand.max;
 
   if (level <= 3) {
     return {
@@ -283,12 +339,15 @@ export function revealPotentialStars(input: {
 
   const byAxis: RevealedPotentialStars["byAxis"] = {};
   for (const axis of AXIS_KEYS) {
-    byAxis[axis] = {
-      min: roundHalfStar(Math.max(input.currentStars[axis], ceiling[axis] - blur)),
-      max: roundHalfStar(
-        Math.max(input.currentStars[axis], Math.min(5, ceiling[axis] + (level >= 5 ? 0 : blur))),
-      ),
-    };
+    // Achsen-Band ebenfalls asymmetrisch (echter Wert nie zentriert). Bei Level 5 ist
+    // der Blur nach oben 0 → praktisch aufgedeckt, deshalb schmale Restspanne.
+    const axisBlur = level >= 5 ? 0.25 : blur;
+    byAxis[axis] = foggedStarBand({
+      ceiling: ceiling[axis],
+      floor: input.currentStars[axis],
+      blur: axisBlur,
+      seed: seed ? `${seed}:${axis}` : null,
+    });
   }
 
   const axisLabels = AXIS_KEYS.map((axis) => {

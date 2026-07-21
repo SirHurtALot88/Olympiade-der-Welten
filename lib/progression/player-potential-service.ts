@@ -476,9 +476,12 @@ export function buildPlayerPotentialRecordsForSave(input: {
 /**
  * Auto-Reveal-Tick: hebt die Reveal-Confidence pro Matchday an, sodass sich das
  * (verdeckte) Attribut-Potenzial über die Zeit von selbst aufdeckt.
- *   - Eigene Kaderspieler: +8 → ~1 Unschärfe-Band-Punkt/MD (man braucht die volle Saison).
- *   - Watchlist-Spieler (aktives Beobachten): +15 → ~2 Punkte/MD (schneller).
- *   - Free Agents (auf keinem Kader): +0.8 → ~0.1 Punkt/MD, deckt sich über mehrere
+ * Die confidence (0..100) steuert die Fog-Range auf dem Attribut-Max: Gesamt-Unschärfe
+ * 20 Wertepunkte, pro aufgedecktem Punkt rückt die Range von einer zufälligen Seite 1
+ * näher. Bei den Gains hier:
+ *   - Eigene Kaderspieler: +5 → ~1 aufgedeckter Punkt/MD (voll in ~20 Spieltagen).
+ *   - Watchlist-Spieler (aktives Beobachten): +10 → ~2 Punkte/MD (doppelt so schnell).
+ *   - Free Agents (auf keinem Kader): +0.5 → ~0.1 Punkt/MD, deckt sich über mehrere
  *     Saisons ganz von selbst auf (irgendwann kennt man alle ungebundenen Talente).
  *   - AI-gebundene Spieler: 0 → bleiben verschleiert, bis man sie ownt/scoutet.
  * Rein additiv, deterministisch, idempotent bei confidence=100.
@@ -504,9 +507,9 @@ export function advancePlayerPotentialRevealTick(gameState: GameState): GameStat
       .filter((entry) => entry.seasonId === seasonId && humanTeamIds.has(entry.teamId))
       .map((entry) => entry.playerId),
   );
-  const OWN_GAIN = 8; // ≈ 1 Band-Punkt / MD
-  const WATCHLIST_GAIN = 15; // ≈ 2 Band-Punkte / MD
-  const FREE_AGENT_GAIN = 0.8; // ≈ 0.1 Band-Punkt / MD (Auto-Reveal über mehrere Saisons)
+  const OWN_GAIN = 5; // ≈ 1 aufgedeckter Punkt / MD (Fog-Range 20 → voll in ~20 MD)
+  const WATCHLIST_GAIN = 10; // ≈ 2 Punkte / MD
+  const FREE_AGENT_GAIN = 0.5; // ≈ 0.1 Punkt / MD (Auto-Reveal über mehrere Saisons)
   let changed = false;
   const nextRecords = records.map((record) => {
     const gain = watchlistPlayerIds.has(record.playerId)

@@ -75,6 +75,7 @@ export function buildPlayerStarScoutingSnapshot(input: {
     currentStars,
     scoutingLevel: input.scoutingLevel,
     overallStarsOverride: potentialOverallStars,
+    seed: input.player.id,
   });
   const overallForGap = potentialOverallStars ?? currentStars.overall;
   const potentialGap = Math.min(
