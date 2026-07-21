@@ -1638,8 +1638,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         ) : null}
         {foundationActionFeedback ? (
           <div
-            className={`foundation-action-feedback is-${foundationActionFeedback.tone}`}
+            className={`foundation-action-feedback is-toast is-${foundationActionFeedback.tone}`}
             role="status"
+            aria-live="polite"
             data-testid="foundation-action-feedback"
           >
             <div className="foundation-ai-preseason-copy">

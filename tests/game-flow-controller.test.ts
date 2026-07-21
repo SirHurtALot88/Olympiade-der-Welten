@@ -668,4 +668,53 @@ describe("game flow controller", () => {
     });
     expect(withCaptain.steps.find((step) => step.stepId === "appoint_captain")?.status).toBe("completed");
   });
+
+  it("points the training onboarding step at the training view (where it is actually completed)", () => {
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        seasonState: {
+          seasonId: "season-2",
+          schedule: [],
+          standings: {},
+          newGameFlow: {
+            active: true,
+            selectedTeamId: "M-M",
+            dismissed: false,
+            steps: [{ stepId: "training_facilities", status: "open" }],
+          },
+        },
+      }),
+      activeTeamId: "M-M",
+    });
+    const training = flow.steps.find((step) => step.stepId === "training_facilities");
+    expect(training?.targetView).toBe("trainingV2");
+    expect(training?.targetView).not.toBe("scoutingCenterV2");
+  });
+
+  it("does not block the onboarding sponsor step while training is still open", () => {
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        // player without a training mode → training_facilities stays incomplete
+        players: [player("p-1")],
+        seasonState: {
+          seasonId: "season-2",
+          schedule: [],
+          standings: {},
+          newGameFlow: {
+            active: true,
+            selectedTeamId: "M-M",
+            dismissed: false,
+            steps: [
+              { stepId: "training_facilities", status: "open" },
+              { stepId: "choose_sponsor", status: "open" },
+            ],
+          },
+        },
+      }),
+      activeTeamId: "M-M",
+    });
+    const sponsor = flow.steps.find((step) => step.stepId === "choose_sponsor");
+    // Früher "blocked" ohne Begründung — jetzt frei wählbar (unabhängig vom Training).
+    expect(sponsor?.status).not.toBe("blocked");
+  });
 });

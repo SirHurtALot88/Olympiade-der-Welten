@@ -424,11 +424,13 @@ function buildOnboardingFlowSteps(gameState: GameState, activeTeamId: string | n
       })(),
     }),
     step({
+      // CTA muss dorthin führen, wo die Abschlussbedingung (Trainingsmodus je Spieler)
+      // erfüllt wird — also in die Trainingsansicht, nicht ins Scouting-Center.
       stepId: "training_facilities",
-      label: "Scouting & Gebäude",
-      cta: "Weiter: Scouting prüfen",
+      label: "Training setzen",
+      cta: "Weiter: Training setzen",
       status: resolveOnboardingStepStatus(flow, "training_facilities", gameState, teamId),
-      targetView: "scoutingCenterV2",
+      targetView: "trainingV2",
       teamId,
     }),
     // Kapitän erst NACH dem finalen Kader (Käufe) + Training ernennen.
@@ -443,6 +445,8 @@ function buildOnboardingFlowSteps(gameState: GameState, activeTeamId: string | n
       blockers: teamId ? [] : ["no_active_team"],
     }),
     step({
+      // Sponsor ist unabhängig vom Training (wie im Folge-Season-Pfad) — kein künstlicher
+      // "blocked"-Zustand ohne Begründung mehr, nur die Reihenfolge im Flow leitet.
       stepId: "choose_sponsor",
       label: "Sponsor wählen",
       cta: "Weiter: Sponsor wählen",
@@ -451,13 +455,7 @@ function buildOnboardingFlowSteps(gameState: GameState, activeTeamId: string | n
           ? "blocked"
           : getTeamSponsorContract(gameState, teamId)
             ? "completed"
-            : (() => {
-                const trainingStatus = resolveOnboardingStepStatus(flow, "training_facilities", gameState, teamId);
-                if (trainingStatus !== "completed") {
-                  return "blocked";
-                }
-                return resolveOnboardingStepStatus(flow, "choose_sponsor", gameState, teamId);
-              })(),
+            : resolveOnboardingStepStatus(flow, "choose_sponsor", gameState, teamId),
       targetView: "prize",
       targetPanel: "sponsor-choice",
       teamId,

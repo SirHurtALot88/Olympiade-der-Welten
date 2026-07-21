@@ -19,6 +19,12 @@ type OptimizedMediaImageProps = {
    */
   fallbackLabel?: string;
   onErrorClassName?: string;
+  /**
+   * Feuert genau einmal pro `src`, sobald das Bild fertig geladen ODER
+   * gescheitert ist. Wird von `BudgetedMediaImage` genutzt, um den Ladeslot
+   * erst nach der echten Netzwerkarbeit freizugeben.
+   */
+  onSettled?: () => void;
 };
 
 /**
@@ -59,10 +65,23 @@ export default function OptimizedMediaImage({
   fallback = null,
   fallbackLabel,
   onErrorClassName,
+  onSettled,
 }: OptimizedMediaImageProps) {
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const imgRef = useRef<HTMLImageElement | null>(null);
+  // Merkt sich die bereits "abgeschlossene" Quelle, damit onSettled je src
+  // genau einmal feuert — race-frei ohne Reset-Effekt.
+  const settledSrcRef = useRef<string | null | undefined>(undefined);
+  const onSettledRef = useRef(onSettled);
+  onSettledRef.current = onSettled;
+  const settle = () => {
+    if (settledSrcRef.current === src) {
+      return;
+    }
+    settledSrcRef.current = src;
+    onSettledRef.current?.();
+  };
 
   // Ein per SSR gerendertes Bild kann bereits 404en, bevor React hydriert und
   // den onError-Handler anhängt — das Fehler-Event geht dann verloren, sodass
@@ -74,9 +93,17 @@ export default function OptimizedMediaImage({
     const node = imgRef.current;
     if (node && node.complete && node.naturalWidth === 0) {
       setFailed(true);
+      // Bild ist schon vor dem Hydrieren gescheitert — onError feuert nicht
+      // mehr, also den Ladeslot hier freigeben.
+      settle();
+    } else if (node && node.complete && node.naturalWidth > 0) {
+      // Bereits (aus dem Cache) geladen, bevor onLoad greifen konnte.
+      setFailed(false);
+      settle();
     } else {
       setFailed(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [src, placeholderSrc]);
 
   if (!src || failed) {
@@ -125,8 +152,14 @@ export default function OptimizedMediaImage({
           loading={loading}
           decoding="async"
           fetchPriority={fetchPriority}
-          onLoad={() => setLoaded(true)}
-          onError={() => setFailed(true)}
+          onLoad={() => {
+            setLoaded(true);
+            settle();
+          }}
+          onError={() => {
+            setFailed(true);
+            settle();
+          }}
         />
       </span>
     );
@@ -144,7 +177,11 @@ export default function OptimizedMediaImage({
       loading={loading}
       decoding="async"
       fetchPriority={fetchPriority}
-      onError={() => setFailed(true)}
+      onLoad={() => settle()}
+      onError={() => {
+        setFailed(true);
+        settle();
+      }}
     />
   );
 }

@@ -20,6 +20,12 @@ const MIME_TYPE_BY_EXT: Record<string, string> = {
   ".webp": "image/webp",
 };
 
+// Portraits/Logos sind content-adressiert (ETag enthält Größe + mtime): ändert
+// sich ein Bild, ändert sich der ETag. Deshalb ist echtes Caching sicher — der
+// Browser muss nicht mehr bei JEDEM Anzeigen (Tab-Wechsel, Tabelle, Profil)
+// revalidieren. Eine Stunde frisch, danach still im Hintergrund revalidieren.
+const MEDIA_CACHE_CONTROL = "public, max-age=3600, stale-while-revalidate=86400";
+
 // Portrait/logo maps store absolute paths captured on the original macOS machine
 // (under the user's Dropbox). On other machines (e.g. Windows) set
 // OLY_MEDIA_DROPBOX_ROOT to the local Dropbox root so those Mac paths resolve to
@@ -159,7 +165,7 @@ export async function serveMediaAsset(options: {
       return new NextResponse(null, {
         status: 304,
         headers: {
-          "Cache-Control": "public, max-age=0, must-revalidate",
+          "Cache-Control": MEDIA_CACHE_CONTROL,
           ETag: etag,
         },
       });
@@ -171,7 +177,7 @@ export async function serveMediaAsset(options: {
       headers: {
         "Content-Type": variantResult.contentType,
         "Content-Length": String(variantResult.buffer.byteLength),
-        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Cache-Control": MEDIA_CACHE_CONTROL,
         ETag: etag,
       },
     });
@@ -182,7 +188,7 @@ export async function serveMediaAsset(options: {
     return new NextResponse(null, {
       status: 304,
       headers: {
-        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Cache-Control": MEDIA_CACHE_CONTROL,
         ETag: etag,
       },
     });
@@ -196,7 +202,7 @@ export async function serveMediaAsset(options: {
     headers: {
       "Content-Type": mimeType,
       "Content-Length": String(fileBuffer.byteLength),
-      "Cache-Control": "public, max-age=0, must-revalidate",
+      "Cache-Control": MEDIA_CACHE_CONTROL,
       ETag: etag,
     },
   });
