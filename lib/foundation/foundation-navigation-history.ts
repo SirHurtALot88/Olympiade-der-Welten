@@ -31,11 +31,32 @@ const HISTORY_STATE_KEY = "foundationNav";
 
 const ROOM_URL_PARAM_KEYS = ["roomCode", "participantId", "userId", "seatToken", "saveId"] as const;
 
+/**
+ * Liest den in localStorage hinterlegten Seat-Token (gleicher Schluessel wie
+ * lib/room/foundation-room-context-client.ts). Der Token ist ein Geheimnis und
+ * lebt bevorzugt in localStorage, nicht dauerhaft in der URL.
+ */
+function readSeatTokenFromStorage(roomCode: string): string {
+  if (!roomCode || typeof window === "undefined") {
+    return "";
+  }
+  try {
+    return window.localStorage.getItem(`oly-seat:${roomCode.toUpperCase()}`)?.trim() ?? "";
+  } catch {
+    return "";
+  }
+}
+
 export function readFoundationRoomParamsFromSearchParams(source: URLSearchParams): FoundationRoomUrlParams | null {
   const roomCode = source.get("roomCode")?.trim().toUpperCase() ?? "";
   const participantId = source.get("participantId")?.trim() ?? "";
   const userId = source.get("userId")?.trim() ?? "";
-  const seatToken = source.get("seatToken")?.trim() ?? "";
+  // Seat-Token: erst URL, dann localStorage-Fallback (spiegelt
+  // readFoundationRoomContextFromLocation). Ohne diesen Fallback lieferte die
+  // Preserve-Logik null, sobald der Token nicht in der URL stand -- dann wurden
+  // beim naechsten View-Wechsel ALLE Room-Params aus der URL entfernt und ein
+  // Reload verlor die Raum-/Teilnehmer-Identitaet.
+  const seatToken = (source.get("seatToken")?.trim() ?? "") || readSeatTokenFromStorage(roomCode);
   const saveId = source.get("saveId")?.trim() ?? "";
 
   if (!roomCode || !participantId || !userId || !seatToken || !saveId) {
