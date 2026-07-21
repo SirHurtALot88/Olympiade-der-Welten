@@ -48,6 +48,7 @@ import {
 } from "@/lib/persistence/save-session-cache";
 import { ensurePlayerBaselines, guardPlayerBaselineWrite } from "@/lib/players/player-baseline-service";
 import { ensurePlayerInjuryHistoryForGameState } from "@/lib/foundation/player-injury-history";
+import { ensureNulaOnProjectSuicide } from "@/lib/foundation/ensure-nula-on-project-suicide";
 import {
   buildPlayerPotentialRecordsForSave,
   isPlayerPotentialModelCurrent,
@@ -1182,8 +1183,11 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   mark("ensurePlayerBaselines done");
   const withInjuryHistory = ensurePlayerInjuryHistoryForGameState(baselineResult.gameState);
   mark("ensurePlayerInjuryHistoryForGameState done");
-  const gameState = ensurePlayerPotentialForGameState(saveId, withInjuryHistory);
+  const gameStateWithPotential = ensurePlayerPotentialForGameState(saveId, withInjuryHistory);
   mark("ensurePlayerPotentialForGameState done");
+  // Sonderregel: Nula gehört immer zu Project Suicide (idempotenter Backfill für bestehende Saves).
+  const gameState = ensureNulaOnProjectSuicide(gameStateWithPotential);
+  mark("ensureNulaOnProjectSuicide done");
   const gameStateWithScenarioMeta = gameState.scenarioMeta
     ? gameState
     : {
