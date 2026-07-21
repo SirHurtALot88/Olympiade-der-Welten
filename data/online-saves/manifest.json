@@ -1,6 +1,6 @@
 {
   "schemaVersion": "oly-online-saves-v1",
-  "exportedAt": "2026-07-21T13:06:44.937Z",
+  "exportedAt": "2026-07-21T13:46:22.779Z",
   "activeSaveId": "fresh-season-1-1784625881771",
   "saves": [
     {
@@ -12,12 +12,12 @@
       "gzipBytes": 2627155
     },
     {
-      "saveId": "save-singleplayer-dev",
-      "name": "Singleplayer Foundation",
+      "saveId": "fresh-season-1-1784617810967",
+      "name": "Full Season UI Playthrough 2026-07-21T07:10:10.967Z",
       "status": "archived",
-      "file": "save-singleplayer-dev.json.gz",
-      "uncompressedBytes": 11749111,
-      "gzipBytes": 1699730
+      "file": "fresh-season-1-1784617810967.json.gz",
+      "uncompressedBytes": 16689364,
+      "gzipBytes": 2237946
     },
     {
       "saveId": "fresh-season-1-1784617568448",
@@ -25,15 +25,15 @@
       "status": "archived",
       "file": "fresh-season-1-1784617568448.json.gz",
       "uncompressedBytes": 12016156,
-      "gzipBytes": 1768097
+      "gzipBytes": 1768096
     },
     {
-      "saveId": "fresh-season-1-1784617810967",
-      "name": "Full Season UI Playthrough 2026-07-21T07:10:10.967Z",
+      "saveId": "save-singleplayer-dev",
+      "name": "Singleplayer Foundation",
       "status": "archived",
-      "file": "fresh-season-1-1784617810967.json.gz",
-      "uncompressedBytes": 16689364,
-      "gzipBytes": 2237952
+      "file": "save-singleplayer-dev.json.gz",
+      "uncompressedBytes": 11749111,
+      "gzipBytes": 1699726
     }
   ]
 }
