@@ -105,6 +105,12 @@ type BuildPrizeMoneyPreviewInput = {
   seasonId?: string | null;
   source?: StandingsPreviewSource;
   phase?: "season_end" | "matchday";
+  /**
+   * Nur die UI-Sponsor-Tabelle braucht die (teure) Sponsor-Settlement- + Gebäude-Einnahme-Berechnung pro
+   * Team. Auf dem AI-Planungs-Hotpfad (ai-needs-picks-compare-service) und in den Season-Workflows bleibt das
+   * aus (Default false) — sonst würden 32× Sponsor-Settlements pro Aufruf den Event-Loop blockieren (502).
+   */
+  includeSponsorIncome?: boolean;
 };
 
 function round1(value: number) {
@@ -468,28 +474,31 @@ export async function buildPrizeMoneyPreview(
     : new Map<string, number>();
 
   // Sponsor-Einnahmen pro Team = Summe der positiven Cash-Komponenten aus der Settlement-Vorschau (Basis +
-  // Rang-Meilenstein beim aktuellen Rang + bereits erfüllte Sonderziele/Quests + Fan-Infrastruktur). Einmal
-  // liga-weit berechnet, dann pro Team aufsummiert.
+  // Rang-Meilenstein beim aktuellen Rang + bereits erfüllte Sonderziele/Quests + Fan-Infrastruktur). NUR für
+  // die UI-Sponsor-Tabelle (includeSponsorIncome) — sonst zu teuer für den AI-/Season-Hotpfad (siehe Input-Doc).
+  const includeSponsorIncome = input.includeSponsorIncome === true;
   const sponsorCashByTeamId = new Map<string, number>();
-  try {
-    for (const row of previewSponsorSettlement(save.gameState).rows) {
-      if (row.cashDelta > 0) {
-        sponsorCashByTeamId.set(row.teamId, (sponsorCashByTeamId.get(row.teamId) ?? 0) + row.cashDelta);
-      }
-    }
-  } catch {
-    // Sponsor-Vorschau ist optional — fehlt sie (z. B. ohne Verträge), bleibt die Sponsor-Spalte leer.
-  }
   const facilityIncomeByTeamId = new Map<string, number>();
-  for (const team of save.gameState.teams) {
+  if (includeSponsorIncome) {
     try {
-      const facilities = getTeamFacilityState(save.gameState, team.teamId);
-      const arenaPopularityFactor = computeTeamBeliebtheitFromGameState(save.gameState, team.teamId).value;
-      const income = calculateFacilityIncome(facilities, { arenaPopularityFactor });
-      const upkeep = calculateFacilityUpkeep(facilities);
-      facilityIncomeByTeamId.set(team.teamId, round1(income - upkeep));
+      for (const row of previewSponsorSettlement(save.gameState).rows) {
+        if (row.cashDelta > 0) {
+          sponsorCashByTeamId.set(row.teamId, (sponsorCashByTeamId.get(row.teamId) ?? 0) + row.cashDelta);
+        }
+      }
     } catch {
-      // Gebäude-Einnahmen optional.
+      // Sponsor-Vorschau ist optional — fehlt sie (z. B. ohne Verträge), bleibt die Sponsor-Spalte leer.
+    }
+    for (const team of save.gameState.teams) {
+      try {
+        const facilities = getTeamFacilityState(save.gameState, team.teamId);
+        const arenaPopularityFactor = computeTeamBeliebtheitFromGameState(save.gameState, team.teamId).value;
+        const income = calculateFacilityIncome(facilities, { arenaPopularityFactor });
+        const upkeep = calculateFacilityUpkeep(facilities);
+        facilityIncomeByTeamId.set(team.teamId, round1(income - upkeep));
+      } catch {
+        // Gebäude-Einnahmen optional.
+      }
     }
   }
 
@@ -532,15 +541,22 @@ export async function buildPrizeMoneyPreview(
       warnings.add(rankChangePrize.warning);
     }
 
-    const sponsorCash = sponsorCashByTeamId.get(team.teamId) ?? null;
-    const facilityIncome = facilityIncomeByTeamId.get(team.teamId) ?? null;
+    const sponsorCash = includeSponsorIncome ? sponsorCashByTeamId.get(team.teamId) ?? null : null;
+    const facilityIncome = includeSponsorIncome ? facilityIncomeByTeamId.get(team.teamId) ?? null : null;
 
-    // Cash danach = Cash vorher + Sponsor-Einnahmen + Gebäude-Einnahmen − Gehälter. Preisgeld wird NICHT mehr
-    // eingerechnet (nicht mehr genutzt); die Sponsoren sind die tragende Einnahme.
-    const projectedCash =
-      currentCash == null || salaryTotal == null
+    // UI-Sponsor-Tabelle: Cash danach = Cash vorher + Sponsor + Gebäude − Gehälter (kein Preisgeld mehr).
+    // AI-/Season-Pfad (includeSponsorIncome=false): unverändert die alte preisgeld-basierte Projektion, damit
+    // sich die AI-Budgetplanung durch den UI-Umbau NICHT ändert.
+    const projectedCash = includeSponsorIncome
+      ? currentCash == null || salaryTotal == null
         ? null
-        : round1(currentCash - salaryTotal + (sponsorCash ?? 0) + (facilityIncome ?? 0));
+        : round1(currentCash - salaryTotal + (sponsorCash ?? 0) + (facilityIncome ?? 0))
+      : projectSeasonEndCash({
+          currentCash,
+          prizeMoney,
+          salaryTotal,
+          rankChangePrize: rankChangePrize.bonusMalus,
+        });
 
     const buildPlacementScenario = (direction: "better" | "worse") => {
       if (rank == null || prizeMoney == null || currentCash == null || salaryTotal == null) {

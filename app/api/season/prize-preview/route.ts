@@ -12,7 +12,8 @@ export async function GET(request: Request) {
     const source = searchParams.get("source")?.trim() === "prisma" ? "prisma" : "sqlite";
     const phase = searchParams.get("phase")?.trim() === "matchday" ? "matchday" : "season_end";
 
-    const result = await buildPrizeMoneyPreview({ saveId, seasonId, source, phase });
+    // Nur die UI-Tabelle braucht die (teure) Sponsor-Einnahme-/Gebäude-Berechnung pro Team.
+    const result = await buildPrizeMoneyPreview({ saveId, seasonId, source, phase, includeSponsorIncome: true });
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Prize preview could not be loaded.";

@@ -127,7 +127,7 @@ describe("prize money preview", () => {
   it("maps rank 1-32 prize rows from the normalized sheet and projects cash locally", async () => {
     const { persistence } = createPersistenceMock();
     const result = await buildPrizeMoneyPreview(
-      { saveId: "save-local", seasonId: "season-1", source: "sqlite" },
+      { saveId: "save-local", seasonId: "season-1", source: "sqlite", includeSponsorIncome: true },
       persistence as never,
     );
 
@@ -220,7 +220,7 @@ describe("prize money preview", () => {
     }
 
     const result = await buildPrizeMoneyPreview(
-      { saveId: "save-local", seasonId: "season-1", source: "sqlite" },
+      { saveId: "save-local", seasonId: "season-1", source: "sqlite", includeSponsorIncome: true },
       persistence as never,
     );
 
@@ -235,7 +235,7 @@ describe("prize money preview", () => {
   it("marks missing rank without faking a zero prize", async () => {
     const { persistence } = createPersistenceMock();
     const result = await buildPrizeMoneyPreview(
-      { saveId: "save-local", seasonId: "season-1", source: "sqlite" },
+      { saveId: "save-local", seasonId: "season-1", source: "sqlite", includeSponsorIncome: true },
       persistence as never,
     );
 
@@ -295,7 +295,7 @@ describe("prize money preview", () => {
     }
 
     const result = await buildPrizeMoneyPreview(
-      { saveId: "save-local", seasonId: "season-1", source: "sqlite" },
+      { saveId: "save-local", seasonId: "season-1", source: "sqlite", includeSponsorIncome: true },
       persistence as never,
     );
 
@@ -329,7 +329,7 @@ describe("prize money preview", () => {
     }
 
     const result = await buildPrizeMoneyPreview(
-      { saveId: "save-local", seasonId: "season-2", source: "sqlite" },
+      { saveId: "save-local", seasonId: "season-2", source: "sqlite", includeSponsorIncome: true },
       persistence as never,
     );
 
@@ -354,7 +354,7 @@ describe("prize money preview", () => {
   it("blocks cleanly in prisma mode", async () => {
     const { persistence } = createPersistenceMock();
     const result = await buildPrizeMoneyPreview(
-      { saveId: "save-local", seasonId: "season-1", source: "prisma" },
+      { saveId: "save-local", seasonId: "season-1", source: "prisma", includeSponsorIncome: true },
       persistence as never,
     );
 
