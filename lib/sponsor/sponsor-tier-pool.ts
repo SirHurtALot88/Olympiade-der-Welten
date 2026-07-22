@@ -31,14 +31,6 @@ export const GOLDEN_BELIEBTHEIT_W = envNum("OLY_SPONSOR_GOLDEN_BELIEBTHEIT_W", 0
 export const GOLDEN_COOLDOWN_PENALTY = envNum("OLY_SPONSOR_GOLDEN_COOLDOWN_PENALTY", 0.05);
 export const GOLDEN_P_MAX = envNum("OLY_SPONSOR_GOLDEN_P_MAX", 0.12);
 
-/**
- * Draw weight of the single rarity ONE step above a team's cap in rollSponsorOfferSlate (the "lucky better
- * sponsor" chance). Small vs the in-cap drawWeights (50/30/14/6), so the expected rarity stays near the cap
- * but every team — including the gewöhnlich-capped bottom — occasionally sees a better tier. Beliebtheit lifts
- * it. Set 0 to restore a hard cap.
- */
-export const RARITY_OVERCAP_LUCK_WEIGHT = envNum("OLY_SPONSOR_RARITY_OVERCAP_W", 5);
-
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
@@ -169,27 +161,20 @@ export function rollSponsorOfferSlate(input: {
   const slotCount = Math.min(requestedSlotCount, SPONSOR_CURVE_SHAPE_KEYS.length);
   const teamCount = input.teamCount ?? 32;
 
-  // Cap: keine Rarity über der maxRarity des Teams. (targetRarity liegt darunter und bleibt der Normalfall
-  // dank drawWeight; der Cap begrenzt nur die Obergrenze.)
-  const maxRarity = input.qualityRank.maxRarity;
-  const maxOrder = SPONSOR_RARITIES[maxRarity].order;
+  // Rebalance (2026-07): KEIN qualitäts-rang-basierter Rarity-Deckel mehr. Früher deckelte der Team-
+  // Qualitätsrang die maximale Rarity (die untere Liga-Hälfte saß hart auf `gewöhnlich`), sodass schwache
+  // Teams praktisch nie ein selten/legendäres Angebot sahen und Top-Teams bevorzugt wurden. Jetzt zieht
+  // JEDES Team — Tabellenführer wie Schlusslicht — aus DERSELBEN vollen Rarity-Verteilung
+  // (gewöhnlich 50 / magisch 30 / selten 14 / legendär 6). Damit hat auch das schwächste Team die (kleine,
+  // ~6 %/Slot) Chance auf ein legendäres Angebot; niemand wird über den Rang bestraft oder belohnt.
+  // Beliebtheit bleibt als milder, VERDIENTER Aufwärts-Lift erhalten (nur nach oben, kein Rang-Malus).
   const beliebtheitLift = beliebtheitTerm(input.beliebtheit);
-
-  // Rarity pro Slot: gewichteter Zug (drawWeight). Der maxRarity-Deckel ist der NORMALFALL, aber wie die
-  // frühere Sterne-Varianz darf SELTEN eine Rarity EINE Stufe ÜBER dem Deckel gezogen werden (kleines
-  // "Glücks"-Gewicht, beliebtheits-gehoben). Ohne diese Über-Deckel-Chance säße die schwache Liga-Hälfte
-  // (maxRarity gewöhnlich) permanent auf reinen gewöhnlich-Slates ohne jede Loot-Varianz — genau die Teams,
-  // die der Rebalance schützen soll. ENV-tunebar über OLY_SPONSOR_RARITY_OVERCAP_W.
+  const fallbackRarity = SPONSOR_RARITY_KEYS[0]!;
   const rarities: SponsorRarity[] = [];
-  const candidates = SPONSOR_RARITY_KEYS.filter((r) => SPONSOR_RARITIES[r].order <= maxOrder);
+  const candidates = [...SPONSOR_RARITY_KEYS];
   const weights = candidates.map(
     (r) => SPONSOR_RARITIES[r].drawWeight * (1 + beliebtheitLift * SPONSOR_RARITIES[r].order * 0.15),
   );
-  const overCapRarity = SPONSOR_RARITY_KEYS.find((r) => SPONSOR_RARITIES[r].order === maxOrder + 1);
-  if (overCapRarity) {
-    candidates.push(overCapRarity);
-    weights.push(RARITY_OVERCAP_LUCK_WEIGHT * (1 + beliebtheitLift));
-  }
   const weightTotal = weights.reduce((sum, w) => sum + w, 0);
   for (let slot = 0; slot < slotCount; slot += 1) {
     // WICHTIG: Slot MUSS am Seed-Anfang stehen. FNV-1a avalanched nur nach dem variierenden Zeichen; ein
@@ -200,7 +185,7 @@ export function rollSponsorOfferSlate(input: {
     // Marginalverteilung pro Slot bleibt unverändert.
     const roll = getStableUnitHash(`sponsor-rarity:${slot}:${input.seasonId}:${input.teamId}`) * weightTotal;
     let acc = 0;
-    let picked: SponsorRarity = candidates[candidates.length - 1] ?? maxRarity;
+    let picked: SponsorRarity = candidates[candidates.length - 1] ?? fallbackRarity;
     for (let i = 0; i < candidates.length; i += 1) {
       acc += weights[i]!;
       if (roll < acc) {
@@ -243,7 +228,7 @@ export function rollSponsorOfferSlate(input: {
 
   const entries: SponsorSlateEntry[] = shapes.map((curveShape, i) => ({
     curveShape,
-    rarity: rarities[i] ?? maxRarity,
+    rarity: rarities[i] ?? fallbackRarity,
   }));
 
   // Golden bleibt orthogonal zur Rarity: derselbe Golden-Los-Pfad (Wahrscheinlichkeit + Seeds), höchstens

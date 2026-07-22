@@ -342,12 +342,15 @@ export function buildStandardSpecialComponent(input: {
       specialKey: "discipline_top3_count",
     };
   }
-  const colors = order >= 2 ? 5 : 4;
+  // "form_color_cover" wird vom Evaluator als Anzahl DISTINKTER Spielerklassen ausgewertet (13 Klassen im
+  // Spiel), nicht als Formkarten-Farben (davon gibt es nur 4). Deshalb heißt das Ziel jetzt ehrlich
+  // "Klassen": Ziel-Zahlen bis 6 sind erreichbar, weil der Klassen-Raum viel größer ist als 4.
+  const klassen = order >= 2 ? 6 : 5;
   return {
     componentId: "special-roster-form",
     kind: "special",
-    label: `Kader-Form ${colors} Farben`,
-    targetValue: `${colors} Farben`,
+    label: `Kader-Vielfalt ${klassen} Klassen`,
+    targetValue: `${klassen} Klassen`,
     rewardCash: input.rewardCash,
     specialKey: "form_color_cover",
   };
@@ -697,14 +700,17 @@ export function buildBonusObjectiveComponent(
         specialKey: "fan_infrastructure",
       };
     case "roster_diversity": {
-      const colors = rarityOrder(input.rarity) >= 2 ? 5 : 4;
+      // "form_color_cover" zählt DISTINKTE Spielerklassen (13 im Spiel), nicht die 4 Formkarten-Farben.
+      // Früher als "N Farben" beschriftet — irreführend, weil es nur 4 Farben gibt und "5 Farben" damit nie
+      // erreichbar war. Jetzt ehrlich als "Klassen" mit erreichbaren Zielzahlen (5/6) im größeren Klassenraum.
+      const klassen = rarityOrder(input.rarity) >= 2 ? 6 : 5;
       return {
         ...base,
         componentId: "special-roster-diversity",
-        label: `Kader-Vielfalt (${colors} Farben)`,
-        targetValue: `${colors} Farben`,
+        label: `Kader-Vielfalt (${klassen} Klassen)`,
+        targetValue: `${klassen} Klassen`,
         specialKey: "form_color_cover",
-        stages: [stage(3, 0.4, "3 Farben"), stage(4, 0.7, "4 Farben"), stage(5, 1.0, "5 Farben")],
+        stages: [stage(4, 0.4, "4 Klassen"), stage(5, 0.7, "5 Klassen"), stage(6, 1.0, "6 Klassen")],
       };
     }
     case "solvency_series":
@@ -717,8 +723,22 @@ export function buildBonusObjectiveComponent(
         stages: [stage(0.01, 1.0, "Kasse positiv")],
       };
     case "salary_discipline": {
-      const salaryTotal = getTeamDisplaySalaryTotal(input.gameState, input.team.teamId);
-      const targetSalary = round1(Math.max(20, salaryTotal * (rarityOrder(input.rarity) >= 2 ? 0.9 : 0.93)));
+      const ownSalary = getTeamDisplaySalaryTotal(input.gameState, input.team.teamId);
+      // Reachability-Anker: Wird das Angebot generiert, während DIESES Team seinen Kader noch aufbaut, ist
+      // sein Gehalts-Total ~0 → der alte `Math.max(20, …)`-Boden erzeugte ein absurdes „≤ 20 C"-Ziel,
+      // unter dem Gehalt eines EINZIGEN Spielers (~35-40). Statt eines Fix-Bodens auf die typische VOLLE
+      // Kader-Gehaltssumme der Liga (Median über Teams mit echtem Kader) ankern, sodass das Disziplin-Ziel
+      // immer eine reale, trimmbare Gehaltslast widerspiegelt. Bei einem großen Team (eigenes Gehalt über
+      // Median) bleibt es die eigene Summe (mildes Trimmen); bei noch leerem Kader greift der Liga-Median.
+      const leagueSalaries = input.gameState.teams
+        .map((team) => getTeamDisplaySalaryTotal(input.gameState, team.teamId))
+        .filter((value) => value > 0)
+        .sort((left, right) => left - right);
+      const leagueMedian = leagueSalaries.length
+        ? leagueSalaries[Math.floor(leagueSalaries.length / 2)]!
+        : ownSalary;
+      const basis = Math.max(ownSalary, leagueMedian);
+      const targetSalary = round1(basis * (rarityOrder(input.rarity) >= 2 ? 0.9 : 0.93));
       return {
         ...base,
         componentId: "special-salary-discipline",

@@ -100,7 +100,7 @@ const BONUS_OBJECTIVE_META: Record<string, { detail: string; difficulty: Sponsor
   homegrown_elevation: { detail: "Ein Eigengewächs in die Bracket-Elite entwickeln", difficulty: "hart" },
   rival_humiliation: { detail: "Den Rivalen in der Abschlusstabelle hinter sich lassen", difficulty: "mittel" },
   fan_infrastructure: { detail: "Einkommens-Gebäude ausbauen (Fan-Shop / Arena)", difficulty: "leicht" },
-  form_color_cover: { detail: "Kader-Vielfalt über mehrere Form-Farben abdecken", difficulty: "leicht" },
+  form_color_cover: { detail: "Kader-Vielfalt über mehrere verschiedene Spielerklassen abdecken", difficulty: "leicht" },
   solvency_series: { detail: "Die Kasse über die gesamte Saison positiv halten", difficulty: "leicht" },
   transfer_trader: { detail: "Positive Netto-Bilanz in der Wechselperiode erzielen", difficulty: "mittel" },
   sustainability_architect: { detail: "Facility-Bilanz über die Saison netto ≥ 0 halten", difficulty: "mittel" },

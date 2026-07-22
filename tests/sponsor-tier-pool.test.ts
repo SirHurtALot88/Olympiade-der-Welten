@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { SponsorTeamQualityRank } from "@/lib/sponsor/sponsor-team-quality-rank";
 import { getDemandMultiplierForRarity, rollSponsorOfferSlate } from "@/lib/sponsor/sponsor-tier-pool";
-import { SPONSOR_RARITIES, getSponsorCurveFamily } from "@/lib/sponsor/sponsor-curve-shapes";
+import { getSponsorCurveFamily } from "@/lib/sponsor/sponsor-curve-shapes";
 import type { SponsorCurveFamily } from "@/lib/data/olyDataTypes";
 
 function createQualityRank(overrides: Partial<SponsorTeamQualityRank> & Pick<SponsorTeamQualityRank, "teamId">): SponsorTeamQualityRank {
@@ -52,48 +52,46 @@ describe("sponsor offer slate (rarity + curve shapes)", () => {
     }
   });
 
-  it("never lets a slate rarity exceed the team's quality-rank cap by more than the +1 luck step", () => {
-    // maxRarity magisch (order 1). Der Cap ist der Normalfall, aber die Über-Cap-Glücksstufe
-    // (RARITY_OVERCAP_LUCK_WEIGHT) darf SELTEN eine Rarity EINE Stufe darüber ziehen (order+1), nie mehr.
-    // Über viele Teams: die Über-Cap-Stufe bleibt die Ausnahme, keine Rarity > maxOrder+1.
-    const maxOrder = SPONSOR_RARITIES.magisch.order;
-    let overCapCount = 0;
-    let total = 0;
-    for (let t = 0; t < 100; t += 1) {
-      const capped = rollSponsorOfferSlate({
-        seasonId: "season-cap",
-        teamId: `MID-${t}`,
-        qualityRank: createQualityRank({ teamId: `MID-${t}`, qualityRank: 16, maxRarity: "magisch", targetRarity: "magisch" }),
-      });
-      for (const entry of capped.entries) {
-        total += 1;
-        const order = SPONSOR_RARITIES[entry.rarity].order;
-        expect(order).toBeLessThanOrEqual(maxOrder + 1); // never more than one step over the cap
-        if (order > maxOrder) overCapCount += 1;
+  it("gives EVERY team the same full rarity distribution — no quality-rank cap (bottom teams can roll legendär)", () => {
+    // Rebalance: der frühere Qualitäts-Rang-Deckel ist weg. Tabellenführer wie Schlusslicht ziehen aus
+    // DERSELBEN vollen Verteilung (gewöhnlich 50 / magisch 30 / selten 14 / legendär 6). Ein Bottom-Team
+    // darf also — selten, aber eben doch — legendäre Angebote sehen, genau wie ein Top-Team.
+    const sample = (teamPrefix: string, leaguePosition: number) => {
+      const counts: Record<string, number> = { gewöhnlich: 0, magisch: 0, selten: 0, legendär: 0 };
+      let total = 0;
+      for (let t = 0; t < 300; t += 1) {
+        const slate = rollSponsorOfferSlate({
+          seasonId: "season-equal",
+          teamId: `${teamPrefix}-${t}`,
+          // maxRarity ist bewusst noch gewöhnlich gesetzt, um zu beweisen, dass der Deckel NICHT mehr greift.
+          qualityRank: createQualityRank({ teamId: `${teamPrefix}-${t}`, qualityRank: leaguePosition, maxRarity: "gewöhnlich", targetRarity: "gewöhnlich", leaguePosition }),
+        });
+        for (const entry of slate.entries) {
+          counts[entry.rarity] += 1;
+          total += 1;
+        }
       }
-    }
-    // Over-cap draws are the rare exception, not the norm.
-    expect(overCapCount).toBeGreaterThan(0);
-    expect(overCapCount / total).toBeLessThan(0.2);
+      return { counts, total };
+    };
 
-    // Bottom-Team (maxRarity gewöhnlich, order 0). Der Normalfall bleibt gewöhnlich, aber die
-    // Über-Cap-Glücksstufe darf SELTEN magisch (order 1) ziehen — nie höher. So bekommt auch die schwache
-    // Liga-Hälfte etwas Loot-Varianz, ohne im Schnitt überzahlt zu werden.
-    let bottomGewoehnlich = 0;
-    let bottomTotal = 0;
-    for (let t = 0; t < 100; t += 1) {
-      const bottom = rollSponsorOfferSlate({
-        seasonId: "season-cap-bottom",
-        teamId: `R-${t}`,
-        qualityRank: createQualityRank({ teamId: `R-${t}`, qualityRank: 31, maxRarity: "gewöhnlich", targetRarity: "gewöhnlich", leaguePosition: 32 }),
-      });
-      for (const entry of bottom.entries) {
-        bottomTotal += 1;
-        expect(SPONSOR_RARITIES[entry.rarity].order).toBeLessThanOrEqual(1); // gewöhnlich or the +1 magisch
-        if (entry.rarity === "gewöhnlich") bottomGewoehnlich += 1;
-      }
-    }
-    expect(bottomGewoehnlich / bottomTotal).toBeGreaterThan(0.7); // gewöhnlich stays the norm
+    const bottom = sample("BOT", 32);
+    const top = sample("TOP", 1);
+
+    // Das Bottom-Team zieht ALLE Rarities inklusive legendär — der Deckel ist wirklich weg.
+    expect(bottom.counts.legendär).toBeGreaterThan(0);
+    expect(bottom.counts.selten).toBeGreaterThan(0);
+
+    // Marginalverteilung entspricht ~ den Draw-Weights (50/30/14/6), nicht mehr ~91 % gewöhnlich.
+    const bottomCommonShare = bottom.counts.gewöhnlich / bottom.total;
+    expect(bottomCommonShare).toBeGreaterThan(0.4);
+    expect(bottomCommonShare).toBeLessThan(0.6);
+
+    // Bottom- und Top-Team haben (ohne Beliebtheits-Lift) statistisch dieselbe Verteilung.
+    const topCommonShare = top.counts.gewöhnlich / top.total;
+    expect(Math.abs(bottomCommonShare - topCommonShare)).toBeLessThan(0.08);
+    const bottomLegendaryShare = bottom.counts.legendär / bottom.total;
+    const topLegendaryShare = top.counts.legendär / top.total;
+    expect(Math.abs(bottomLegendaryShare - topLegendaryShare)).toBeLessThan(0.05);
   });
 
   it("produces intra-slate rarity variance — slates are NOT all-one-rarity (seed-correlation regression)", () => {
