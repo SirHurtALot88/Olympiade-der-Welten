@@ -43861,11 +43861,6 @@ button.foundation-team-portrait-card {
   width: 100%;
   max-width: 100%;
   height: auto;
-  /* Das SVG hat eine feste Eigenhöhe (BAR_HEIGHT=148). Ohne Höhen-Deckel
-     streckt width:100% in breiten Containern die Höhe proportional mit hoch
-     (Aspect-Ratio) — bei einem einzelnen Balken wird daraus eine >1000px hohe
-     „Monstersäule". Der Deckel hält das Chart auf seiner Design-Höhe. */
-  max-height: 148px;
 }
 .is-new-look .nl-barchart.is-empty,
 .is-new-look .nl-radar.is-empty {
