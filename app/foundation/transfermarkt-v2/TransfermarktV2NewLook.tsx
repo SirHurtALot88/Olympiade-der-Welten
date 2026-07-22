@@ -32,6 +32,14 @@ import {
 } from "@/lib/market/transfermarkt-formatting-contract";
 import { getTransfermarktPortraitModel } from "@/lib/market/transfermarkt-lab";
 import { getAttributeTierClass, getTransfermarktTierFromPoints } from "@/lib/market/transfermarkt-sheet-stats";
+import type { TransfermarktRatingTier } from "@/lib/market/transfermarkt-sheet-stats";
+import {
+  TRANSFERMARKT_ATTRIBUTE_KEYS,
+  TRANSFERMARKT_ATTRIBUTE_META,
+  TRANSFERMARKT_TIER_FILTER_OPTIONS,
+  type AttributeTierFilters,
+  type TransfermarktAttributeKey,
+} from "@/lib/market/transfermarkt-attribute-filter";
 import { getCoreStatGrade } from "@/lib/matchday-arena/arena-stat-visuals";
 import type { TransferHistoryItem } from "@/lib/market/transfer-history-read-service";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
@@ -77,7 +85,17 @@ import {
  * nur nicht dupliziert.
  */
 
-export type TransfermarktNewLookSortMode = "need" | "fit" | "value" | "cheap" | "potential" | "salary";
+export type TransfermarktNewLookSortMode =
+  | "need"
+  | "fit"
+  | "value"
+  | "cheap"
+  | "potential"
+  | "salary"
+  | "pow"
+  | "spe"
+  | "men"
+  | "soc";
 
 const NL_MARKET_SORT_LABELS: Record<TransfermarktNewLookSortMode, string> = {
   need: "Größter Bedarf",
@@ -86,6 +104,10 @@ const NL_MARKET_SORT_LABELS: Record<TransfermarktNewLookSortMode, string> = {
   potential: "Meistes Potenzial",
   cheap: "Günstigste",
   salary: "Niedriges Gehalt",
+  pow: "POW",
+  spe: "SPE",
+  men: "MEN",
+  soc: "SOC",
 };
 
 /** Erklär-Tooltips je Sort-Modus (Value = MW ÷ Gehalt; Potenzial = Markt-Prämie + Scouting-Konfidenz). */
@@ -97,9 +119,24 @@ const NL_MARKET_SORT_TITLES: Record<TransfermarktNewLookSortMode, string> = {
     "Sortiert nach der markt-bepreisten Potenzial-Prämie (Aufschlag im Marktwert) plus Scouting-Konfidenz — NICHT nach dem exakten, noch verdeckten Potenzial.",
   cheap: "Sortiert nach dem niedrigsten Marktwert (Ablöse) zuerst.",
   salary: "Sortiert nach dem niedrigsten Gehalt p.a. zuerst.",
+  pow: "Sortiert nach POWER-Achswert (absteigend).",
+  spe: "Sortiert nach SPEED-Achswert (absteigend).",
+  men: "Sortiert nach MENTAL-Achswert (absteigend).",
+  soc: "Sortiert nach SOCIAL-Achswert (absteigend).",
 };
 
-const NL_MARKET_SORT_ORDER: TransfermarktNewLookSortMode[] = ["need", "fit", "value", "potential", "cheap", "salary"];
+const NL_MARKET_SORT_ORDER: TransfermarktNewLookSortMode[] = [
+  "need",
+  "fit",
+  "value",
+  "potential",
+  "cheap",
+  "salary",
+  "pow",
+  "spe",
+  "men",
+  "soc",
+];
 const NL_MARKET_AXES: NlAxisKey[] = ["pow", "spe", "men", "soc"];
 /** Obergrenze des Mindest-MW/Gehalt-Sliders (Value = MW ÷ Gehalt); 0 = Filter aus. */
 const NL_MARKET_RATIO_SLIDER_MAX = 8;
@@ -276,6 +313,9 @@ export type TransfermarktV2NewLookProps = {
   /** Mindestwert-Filter je Achse (POW/SPE/MEN/SOC); Wert > 0 filtert unabhängig. */
   axisMinimums: Record<NlAxisKey, number>;
   onAxisMinimumChange: (axis: NlAxisKey, value: number) => void;
+  /** Mindest-Tier je Feinattribut (S+…F, „A" = A und höher); fehlt = egal. */
+  attributeTierMinimums: AttributeTierFilters;
+  onAttributeTierMinimumChange: (attribute: TransfermarktAttributeKey, tier: TransfermarktRatingTier | null) => void;
   /** Blendet Kandidaten mit negativem Fit aus (Söldner immer sichtbar); Default an. */
   hidePoorFit: boolean;
   onToggleHidePoorFit: () => void;
@@ -749,6 +789,8 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     onToggleClassAxis,
     axisMinimums,
     onAxisMinimumChange,
+    attributeTierMinimums,
+    onAttributeTierMinimumChange,
     hidePoorFit,
     onToggleHidePoorFit,
     minRatioFilter,
@@ -870,6 +912,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
   // abgewichen wurde (sonst würde die Badge schon beim Laden "1 aktiv" zeigen).
   const advancedActiveCount =
     NL_MARKET_AXES.reduce((sum, axis) => sum + (axisMinimums[axis] > 0 ? 1 : 0), 0) +
+    TRANSFERMARKT_ATTRIBUTE_KEYS.reduce((sum, key) => sum + (attributeTierMinimums[key] ? 1 : 0), 0) +
     (maxValueFilter > 0 ? 1 : 0) +
     (minRatioFilter > 0 ? 1 : 0) +
     (hidePoorFit ? 0 : 1);
@@ -1090,6 +1133,43 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     }}
                   />
                 </div>
+              );
+            })}
+          </div>
+          {/* 12 Feinattribut-Mindest-Tiers (S+…F, „A" = A und höher). Kompaktes
+              Dropdown je Attribut mit Kürzel; „–" = egal. Gefiltert wird auf die
+              (percentilbasierte) Tier-Note, die auch das Profil anzeigt. */}
+          <div className="nl-market-attr-filter-group" role="group" aria-label="Mindest-Tier je Attribut">
+            {TRANSFERMARKT_ATTRIBUTE_KEYS.map((key) => {
+              const meta = TRANSFERMARKT_ATTRIBUTE_META[key];
+              const selected = attributeTierMinimums[key] ?? "";
+              return (
+                <label
+                  key={`nl-attr-tier-${key}`}
+                  className={`nl-market-attr-filter ${nlToneClass(meta.axis)}${selected ? " is-active" : ""}`}
+                  title={`${meta.label} · Mindest-Tier (– = egal, „${selected || "A"}" = ${selected || "A"} und höher)`}
+                >
+                  <span className="nl-market-attr-filter-label">{meta.abbr}</span>
+                  <select
+                    className="nl-market-attr-filter-select nl-tnum"
+                    value={selected}
+                    aria-label={`${meta.label} Mindest-Tier`}
+                    onChange={(event) => {
+                      const next = event.target.value;
+                      onAttributeTierMinimumChange(
+                        key,
+                        next ? (next as TransfermarktRatingTier) : null,
+                      );
+                    }}
+                  >
+                    <option value="">–</option>
+                    {TRANSFERMARKT_TIER_FILTER_OPTIONS.map((tier) => (
+                      <option key={`${key}-${tier}`} value={tier}>
+                        {tier}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               );
             })}
           </div>

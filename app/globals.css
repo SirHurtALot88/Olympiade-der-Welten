@@ -48205,6 +48205,67 @@ button.foundation-team-portrait-card {
   font-variant-numeric: tabular-nums;
 }
 
+/* 12 Feinattribut-Mindest-Tier-Dropdowns: kompaktes 3er/4er-Raster mit
+   Kürzel + kleinem Grade-Select je Attribut, achsgetönt. */
+.is-new-look .nl-market-attr-filter-group {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.is-new-look .nl-market-attr-filter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 2px 4px 2px 7px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-market-attr-filter.nl-tone-pow {
+  --nl-tone: var(--nl-pow);
+}
+.is-new-look .nl-market-attr-filter.nl-tone-spe {
+  --nl-tone: var(--nl-spe);
+}
+.is-new-look .nl-market-attr-filter.nl-tone-men {
+  --nl-tone: var(--nl-men);
+}
+.is-new-look .nl-market-attr-filter.nl-tone-soc {
+  --nl-tone: var(--nl-soc);
+}
+
+.is-new-look .nl-market-attr-filter.is-active {
+  border-color: color-mix(in srgb, var(--nl-tone) 60%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-tone) 12%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-market-attr-filter-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: color-mix(in srgb, var(--nl-tone) 70%, var(--nl-ink));
+}
+
+.is-new-look .nl-market-attr-filter-select {
+  width: 40px;
+  padding: 2px 2px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel);
+  color: var(--nl-ink);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.is-new-look .nl-market-attr-filter.is-active .nl-market-attr-filter-select {
+  color: color-mix(in srgb, var(--nl-tone) 55%, var(--nl-ink));
+  font-weight: 700;
+}
+
 /* Achsen-Filter-Pills in kanonischen Achsfarben (POW=rot, SPE=grün, MEN=blau,
    SOC=gold). Höhere Spezifität als `.nl-market-pill` (das lokal --nl-tone auf
    Accent setzt), damit die Achstönung greift — aktiv wie im Ruhezustand. */
@@ -48680,18 +48741,18 @@ button.foundation-team-portrait-card {
   --nl-tone: var(--nl-mut);
   display: inline-flex;
   align-items: baseline;
-  gap: 5px;
-  padding: 2px 8px;
+  gap: 7px;
+  padding: 5px 13px;
   border-radius: var(--nl-r-pill);
   border: 1px solid color-mix(in srgb, var(--nl-tone) 45%, var(--nl-line));
   background: color-mix(in srgb, var(--nl-tone) 12%, transparent);
   color: var(--nl-ink);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .is-new-look .nl-market-detail-axis-chip b {
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.04em;
   color: var(--nl-mut);
 }

@@ -12,6 +12,15 @@ import type { TransferHistoryReadResult } from "@/lib/market/transfer-history-re
 import type { TransfermarktBuyPreview } from "@/lib/market/transfermarkt-buy-service";
 import type { TransfermarktFreeAgentItem, TransfermarktReadResult } from "@/lib/market/transfermarkt-read-service";
 import { getScoutingTierWindow, resolveScoutingConfidenceFromLevel } from "@/lib/market/transfermarkt-scouting";
+import {
+  TRANSFERMARKT_ATTRIBUTE_KEYS,
+  TRANSFERMARKT_TIER_FILTER_OPTIONS,
+  countActiveAttributeTierFilters,
+  passesAttributeTierFilters,
+  type AttributeTierFilters,
+  type TransfermarktAttributeKey,
+} from "@/lib/market/transfermarkt-attribute-filter";
+import type { TransfermarktRatingTier } from "@/lib/market/transfermarkt-sheet-stats";
 import { computeCompositeTopSixAverage, computeDisciplineTopSixImpact, computeTopSixAxisImpact, computeCandidateAxisTeamRankEstimates } from "@/lib/market/transfermarkt-roster-impact";
 import { officialDisciplineWeightOrder, type OfficialDisciplineWeightId } from "@/lib/player-generator/official-discipline-weights";
 import { appendRoomContextToParams, readFoundationRoomContextFromLocation, withRoomContextBody, type FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
@@ -79,7 +88,7 @@ type MarketBuyResponse = {
 type MarketHistoryResponse = TransferHistoryReadResult & {
   error?: string;
 };
-type MarketSortMode = "need" | "fit" | "value" | "cheap" | "potential" | "salary";
+type MarketSortMode = "need" | "fit" | "value" | "cheap" | "potential" | "salary" | "pow" | "spe" | "men" | "soc";
 type MarketAxisKey = keyof typeof AXIS_META;
 type MarketClassAxisFilter = "pow" | "spe" | "men" | "soc";
 type MarketFilterSnapshot = {
@@ -88,6 +97,8 @@ type MarketFilterSnapshot = {
   selectedDisciplineLens: OfficialDisciplineWeightId | "";
   selectedAxes: MarketAxisKey[];
   axisMinimums: Record<MarketAxisKey, number>;
+  /** Mindest-Tier je Feinattribut (nur gesetzte Keys; fehlt = egal). */
+  attributeTierMinimums: AttributeTierFilters;
   selectedClassNames: string[];
   selectedClassAxes: MarketClassAxisFilter[];
   selectedRaceNames: string[];
@@ -153,7 +164,8 @@ const DEFAULT_MAX_RATIO = 0;
 const MARKET_FILTER_STORAGE_VERSION = 1;
 const MARKET_FILTER_STORAGE_PREFIX = "oly.transfermarkt.v2.filters";
 const MARKET_AXIS_ORDER: MarketAxisKey[] = ["pow", "spe", "men", "soc"];
-const MARKET_SORT_MODES: MarketSortMode[] = ["need", "fit", "value", "cheap", "potential", "salary"];
+const MARKET_SORT_MODES: MarketSortMode[] = ["need", "fit", "value", "cheap", "potential", "salary", "pow", "spe", "men", "soc"];
+const MARKET_AXIS_SORT_MODES = new Set<MarketSortMode>(["pow", "spe", "men", "soc"]);
 const MARKET_CLASS_AXIS_FILTERS: MarketClassAxisFilter[] = ["pow", "spe", "men", "soc"];
 const HIDDEN_RACE_FILTER_VALUES = new Set(["unknown"]);
 const AXIS_META = {
@@ -197,6 +209,7 @@ function createDefaultMarketFilterSnapshot(): MarketFilterSnapshot {
     selectedDisciplineLens: "",
     selectedAxes: [],
     axisMinimums: { pow: 0, spe: 0, men: 0, soc: 0 },
+    attributeTierMinimums: {},
     selectedClassNames: [],
     selectedClassAxes: [],
     selectedRaceNames: [],
@@ -227,6 +240,20 @@ function sanitizeStringArray(value: unknown, allowedValues?: readonly string[]) 
     .filter((entry) => !allowedValues || allowedValues.includes(entry));
 }
 
+function sanitizeAttributeTierMinimums(value: unknown): AttributeTierFilters {
+  if (!isRecord(value)) {
+    return {};
+  }
+  const result: AttributeTierFilters = {};
+  for (const key of TRANSFERMARKT_ATTRIBUTE_KEYS) {
+    const raw = value[key];
+    if (typeof raw === "string" && TRANSFERMARKT_TIER_FILTER_OPTIONS.includes(raw as TransfermarktRatingTier)) {
+      result[key] = raw as TransfermarktRatingTier;
+    }
+  }
+  return result;
+}
+
 function sanitizeMarketFilterSnapshot(value: unknown): MarketFilterSnapshot {
   const defaults = createDefaultMarketFilterSnapshot();
   if (!isRecord(value)) {
@@ -250,6 +277,7 @@ function sanitizeMarketFilterSnapshot(value: unknown): MarketFilterSnapshot {
       men: sanitizeNumber(rawAxisMinimums.men, defaults.axisMinimums.men, 0, 100),
       soc: sanitizeNumber(rawAxisMinimums.soc, defaults.axisMinimums.soc, 0, 100),
     },
+    attributeTierMinimums: sanitizeAttributeTierMinimums(value.attributeTierMinimums),
     selectedClassNames: sanitizeStringArray(value.selectedClassNames),
     selectedClassAxes: sanitizeStringArray(value.selectedClassAxes, MARKET_CLASS_AXIS_FILTERS) as MarketClassAxisFilter[],
     selectedRaceNames: sanitizeStringArray(value.selectedRaceNames).filter((raceName) => !HIDDEN_RACE_FILTER_VALUES.has(raceName.toLowerCase())),
@@ -409,6 +437,26 @@ function passesMarketAxisFilters(
   });
 }
 
+/** Liest die 12 (percentilbasierten) Feinattribut-Tiers eines Kandidaten aus. */
+function getItemAttributeRatings(
+  item: TransfermarktFreeAgentItem,
+): Partial<Record<TransfermarktAttributeKey, TransfermarktRatingTier | null>> {
+  return {
+    power: item.powerRating,
+    health: item.healthRating,
+    stamina: item.staminaRating,
+    speed: item.speedRating,
+    dexterity: item.dexterityRating,
+    intelligence: item.intelligenceRating,
+    awareness: item.awarenessRating,
+    determination: item.determinationRating,
+    charisma: item.charismaRating,
+    will: item.willRating,
+    spirit: item.spiritRating,
+    torment: item.tormentRating,
+  };
+}
+
 function getWishlistAxisValue(
   entry: TransferWishlistEntry,
   marketItem: TransfermarktFreeAgentItem | undefined,
@@ -457,6 +505,12 @@ function sortCandidates(items: TransfermarktFreeAgentItem[], mode: MarketSortMod
     if (mode === "salary") {
       const salaryDelta = (left.salary ?? Number.POSITIVE_INFINITY) - (right.salary ?? Number.POSITIVE_INFINITY);
       if (salaryDelta !== 0) return salaryDelta;
+    }
+    if (MARKET_AXIS_SORT_MODES.has(mode)) {
+      // Nach Achswert (POW/SPE/MEN/SOC) absteigend sortieren.
+      const axis = mode as MarketAxisKey;
+      const axisDelta = (right[axis] ?? Number.NEGATIVE_INFINITY) - (left[axis] ?? Number.NEGATIVE_INFINITY);
+      if (axisDelta !== 0) return axisDelta;
     }
 
     const ovrDelta = (right.ovr ?? 0) - (left.ovr ?? 0);
@@ -574,6 +628,7 @@ export default function TransfermarktV2Client({
     men: 0,
     soc: 0,
   });
+  const [attributeTierMinimums, setAttributeTierMinimums] = useState<AttributeTierFilters>({});
   const [selectedClassNames, setSelectedClassNames] = useState<string[]>([]);
   const [selectedClassAxes, setSelectedClassAxes] = useState<MarketClassAxisFilter[]>([]);
   const [selectedRaceNames, setSelectedRaceNames] = useState<string[]>([]);
@@ -637,6 +692,7 @@ export default function TransfermarktV2Client({
     setSelectedDisciplineLens(snapshot.selectedDisciplineLens);
     setSelectedAxes(snapshot.selectedAxes);
     setAxisMinimums(snapshot.axisMinimums);
+    setAttributeTierMinimums(snapshot.attributeTierMinimums);
     setSelectedClassNames(snapshot.selectedClassNames);
     setSelectedClassAxes(snapshot.selectedClassAxes);
     setSelectedRaceNames(snapshot.selectedRaceNames);
@@ -694,6 +750,7 @@ export default function TransfermarktV2Client({
       selectedDisciplineLens,
       selectedAxes,
       axisMinimums,
+      attributeTierMinimums,
       selectedClassNames,
       selectedClassAxes,
       selectedRaceNames,
@@ -703,7 +760,7 @@ export default function TransfermarktV2Client({
       minFit,
       hidePoorFit,
     }),
-    [axisMinimums, hidePoorFit, maxRatio, maxSalary, maxValue, minFit, search, selectedAxes, selectedClassAxes, selectedClassNames, selectedDisciplineLens, selectedRaceNames, sortMode],
+    [attributeTierMinimums, axisMinimums, hidePoorFit, maxRatio, maxSalary, maxValue, minFit, search, selectedAxes, selectedClassAxes, selectedClassNames, selectedDisciplineLens, selectedRaceNames, sortMode],
   );
 
   useEffect(() => {
@@ -756,6 +813,8 @@ export default function TransfermarktV2Client({
   const activeAxisMinimumCount = (Object.keys(axisMinimums) as MarketAxisKey[]).filter(
     (axis) => axisMinimums[axis] > 0,
   ).length;
+  const activeAttributeTierCount = countActiveAttributeTierFilters(attributeTierMinimums);
+  const hasActiveAttributeTierFilter = activeAttributeTierCount > 0;
 
   const visibleItems = useMemo(() => {
     const filtered = marketItems.filter((item) => {
@@ -789,11 +848,14 @@ export default function TransfermarktV2Client({
       if (!passesMarketAxisFilters(item, axisMinimums)) {
         return false;
       }
+      if (hasActiveAttributeTierFilter && !passesAttributeTierFilters(getItemAttributeRatings(item), attributeTierMinimums)) {
+        return false;
+      }
       return true;
     });
 
     return sortCandidates(filtered, sortMode);
-  }, [axisMinimums, effectiveMinRatio, effectiveMaxSalary, effectiveMaxValue, hidePoorFit, marketItems, minFit, selectedClassAxes, selectedClassNames, selectedRaceNames, sortMode]);
+  }, [attributeTierMinimums, axisMinimums, effectiveMinRatio, effectiveMaxSalary, effectiveMaxValue, hasActiveAttributeTierFilter, hidePoorFit, marketItems, minFit, selectedClassAxes, selectedClassNames, selectedRaceNames, sortMode]);
   const selectedPlayer = useMemo(
     () =>
       visibleItems.find((item) => item.playerId === selectedPlayerId) ??
@@ -1862,6 +1924,18 @@ export default function TransfermarktV2Client({
         onToggleClassAxis={(axis) => setSelectedClassAxes((current) => toggleSelection(current, axis))}
         axisMinimums={axisMinimums}
         onAxisMinimumChange={(axis, value) => setAxisMinimums((current) => ({ ...current, [axis]: value }))}
+        attributeTierMinimums={attributeTierMinimums}
+        onAttributeTierMinimumChange={(attribute, tier) =>
+          setAttributeTierMinimums((current) => {
+            const next = { ...current };
+            if (tier) {
+              next[attribute] = tier;
+            } else {
+              delete next[attribute];
+            }
+            return next;
+          })
+        }
         hidePoorFit={hidePoorFit}
         onToggleHidePoorFit={() => setHidePoorFit((current) => !current)}
         minRatioFilter={maxRatio}
@@ -1874,6 +1948,7 @@ export default function TransfermarktV2Client({
           selectedClassNames.length +
           selectedRaceNames.length +
           activeAxisMinimumCount +
+          activeAttributeTierCount +
           selectedClassAxes.length
         }
         filterPresets={filterPresets.map((preset) => ({ id: preset.id, name: preset.name }))}
