@@ -4,7 +4,8 @@ import { NextResponse } from "next/server";
 
 import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-contract";
 import { applyAiMarketPlanLocally } from "@/lib/ai/ai-market-plan-apply-service";
-import { applyAiManagerPlan, type AiManagerActionType } from "@/lib/ai/ai-manager-apply-service";
+import { applyAiManagerPlan, type AiManagerAction, type AiManagerActionType } from "@/lib/ai/ai-manager-apply-service";
+import { buildAiActionBreakdown } from "@/lib/ai/ai-action-breakdown";
 import { AI_PRESEASON_RUN_STALE_MS } from "@/lib/ai/ai-preseason-run-timing";
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
@@ -154,6 +155,9 @@ async function executeAiPreseasonBackgroundWork(input: {
       let managerActionsApplied = preDraftManager.actions.filter((action) => action.applied).length;
       const warnings = [...preDraftManager.warnings];
       const blockingReasons = [...preDraftManager.blockers];
+      // Kategorie-Aufstellung (angewandt/blockiert) über alle Manager-Runden hinweg sammeln,
+      // damit das Diagnose-UI angewandt vs. blockiert je Kategorie ohne Neu-Ableitung zeigen kann.
+      let managerActions: AiManagerAction[] = [...preDraftManager.actions];
 
       for (const teamId of aiTeamIds) {
         const picksRun = await runAiPicksExecutePreview(
@@ -210,6 +214,7 @@ async function executeAiPreseasonBackgroundWork(input: {
           persistence,
         });
         managerActionsApplied += trainingManager.actions.filter((action) => action.applied).length;
+        managerActions = [...managerActions, ...trainingManager.actions];
         warnings.push(...trainingManager.warnings);
         blockingReasons.push(...trainingManager.blockers);
       } else {
@@ -227,6 +232,7 @@ async function executeAiPreseasonBackgroundWork(input: {
         transferSellsApplied: 0,
         warnings: Array.from(new Set(warnings)),
         blockingReasons: Array.from(new Set(blockingReasons)),
+        actionBreakdown: buildAiActionBreakdown(managerActions),
       };
       writeRunRecord(saveId, finalRecord);
       return finalRecord;
@@ -268,6 +274,7 @@ async function executeAiPreseasonBackgroundWork(input: {
       transferSellsApplied: market.summary.appliedSells,
       warnings: [...managerResult.warnings, ...market.warnings],
       blockingReasons: [...managerResult.blockers, ...market.blockingReasons],
+      actionBreakdown: buildAiActionBreakdown(managerResult.actions),
     };
     writeRunRecord(saveId, finalRecord);
     return finalRecord;

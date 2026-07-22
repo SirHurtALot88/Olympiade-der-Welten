@@ -140,6 +140,14 @@ export type AiPreseasonAutomationRunRecord = {
   transferSellsApplied: number;
   warnings: string[];
   blockingReasons: string[];
+  /**
+   * Optionale, kompakte Kategorie-Aufstellung (angewandt vs. blockiert) der
+   * angewandten AI-Manager-Aktionen, damit ein Diagnose-UI angewandt/blockiert
+   * pro Kategorie ("Training", "Gebäude", …) zeigen kann, ohne aus den rohen
+   * `blockingReasons` neu abzuleiten. Rückwärtskompatibel optional: alte Records
+   * ohne dieses Feld rendern weiterhin (das UI leitet dann einen Fallback ab).
+   */
+  actionBreakdown?: { category: string; applied: number; blocked: number }[];
 };
 
 export type PlayerMoraleVisibleMood = "angry" | "unhappy" | "neutral" | "happy" | "excellent";
