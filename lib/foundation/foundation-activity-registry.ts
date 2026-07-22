@@ -45,32 +45,6 @@ function getPreseasonModeLabel(mode: FoundationActivityPreseasonRunSnapshot["mod
   return "Preseason";
 }
 
-// Rohe AI-Aktionscodes (teamCode:actionType:…) in menschenlesbare Kategorien übersetzen,
-// damit die Aktivitätszeile "Training · A-A" statt "A-A:set_train…" zeigt.
-const AI_ACTION_CATEGORY_LABELS: Record<string, string> = {
-  set_training_focus: "Training",
-  set_training_intensity: "Training",
-  set_player_training_modes: "Training",
-  set_player_training_classes: "Training",
-  maintain_building: "Gebäude",
-  upgrade_building: "Gebäude",
-  buy_building: "Gebäude",
-  downgrade_building: "Gebäude",
-  reserve_transfer_budget: "Budgetplanung",
-  reserve_salary_budget: "Budgetplanung",
-  reserve_maintenance_budget: "Budgetplanung",
-  mark_contract_strategy: "Verträge",
-  mark_sell_strategy: "Verkaufsplan",
-};
-
-function friendlyAiActionLabel(raw: string | undefined | null): string | null {
-  if (!raw) return null;
-  const [teamCode, actionType] = raw.split(":");
-  const category = actionType ? AI_ACTION_CATEGORY_LABELS[actionType] : null;
-  if (!category) return null;
-  return teamCode ? `${category} · ${teamCode}` : category;
-}
-
 function buildPreseasonStats(
   run: FoundationActivityPreseasonRunSnapshot,
   aiTeamsCount: number,
@@ -122,7 +96,16 @@ export function buildFoundationActivities(input: FoundationActivityInput): Found
     input.aiPreseasonBusy || input.aiPreseasonRun?.status === "running";
   if (preseasonRunning) {
     const run = input.aiPreseasonRun;
-    const currentLabel = run ? friendlyAiActionLabel(run.blockingReasons[0]) : null;
+    // Während ein Lauf LÄUFT, den aktuellen Label an der Phase (Modus) ausrichten — NICHT am ersten
+    // Blocker. Der erste Blocker (z. B. "Training · A-A") suggeriert sonst fälschlich, gerade laufe das
+    // Training, obwohl im Setup-Draft zuerst der Kader-Draft läuft (das Training kommt erst danach).
+    const currentLabel = run
+      ? run.mode === "setup_draft"
+        ? "Kader-Draft läuft"
+        : run.mode === "season_market"
+          ? "Transfers laufen"
+          : null
+      : null;
     activities.push({
       id: "ai-preseason",
       label: run ? getPreseasonModeLabel(run.mode) : "AI-Preseason",
