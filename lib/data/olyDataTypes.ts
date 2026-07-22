@@ -1206,7 +1206,7 @@ export type SponsorCurveShape =
   | "sicherheit"
   | "klassenerhalt";
 
-export type SponsorOfferComponentKind = "base" | "rank" | "improvement" | "special" | "overperformance";
+export type SponsorOfferComponentKind = "base" | "rank" | "improvement" | "special" | "overperformance" | "clause";
 
 /**
  * Eine Stufe eines mehrstufigen Sonderziels (TEIL B). `threshold` ist die (aufsteigend sortierte)
@@ -1250,6 +1250,12 @@ export type SponsorOfferComponent = {
   ratePerUnitC?: number;
   /** P3 — Kappungsgrenze in Plätzen für die per-Einheit-Module (max. vergütete Ränge/Plätze). */
   maxUnits?: number;
+  /**
+   * P4b — Klausel-Modul (`kind: "clause"`): ein beim SIGNIEREN eingefrorener Malus, wenn das Team in der
+   * Abstiegszone landet, im Tausch gegen eine höhere garantierte Basis. `targetValue` = eingefrorene
+   * Abstiegs-Schwelle (finalRank ≥ targetValue ⇒ Malus), `penaltyCash` = eingefrorener Malus, `rewardCash` = 0.
+   * Anzeige == Settlement per Konstruktion (Schwelle + Malus stehen fest im Vertrag).
+   */
 };
 
 export type SponsorDemandProfile = "safe" | "balanced" | "ambitious" | "elite";
@@ -1309,6 +1315,14 @@ export type SponsorOffer = {
    * UI/Debug; die Auszahlung läuft weiter über `components`. Optional/rückwärtskompatibel.
    */
   moduleIds?: string[];
+  /**
+   * P4b — Erwartungs-Budget des Angebots (E[Payout] am Erwartungsrang): Basis + Rang-Leiter-EV + Σ
+   * attainment×Reward der Bonus-Module. Die P4b-Komposition VERTEILT dieses Budget nur um (Basis vs. Upside),
+   * ohne es zu erhöhen — deshalb wird es hier separat gespeichert, damit die AI-Bewertung
+   * (`estimateExpectedPayout`) den EV nicht aus der umverteilten (aufgeblähten) Basis rück-inferieren muss.
+   * Optional/rückwärtskompatibel (nur P4b-Angebote setzen es).
+   */
+  evBudget?: number;
 };
 
 export type SponsorCommercialRating = {
