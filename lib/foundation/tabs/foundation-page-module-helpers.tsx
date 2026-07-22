@@ -14,6 +14,7 @@ import { useState } from "react";
 import type { CSSProperties } from "react";
 
 import type { GameInboxItem, GameState, Player, Team, TeamControlSettings, TeamIdentity, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
+import { AI_PRESEASON_RUN_STALE_MS } from "@/lib/ai/ai-preseason-run-timing";
 import { getPlayerPortraitMediaModel } from "@/lib/data/mediaAssets";
 import {
   DEFAULT_ACTIVE_OWNER_ID,
@@ -912,7 +913,7 @@ export function isStaleAiPreseasonRun(run: FoundationAiPreseasonAutomationRun | 
   if (!Number.isFinite(startedAt)) {
     return true;
   }
-  return Date.now() - startedAt > 120_000;
+  return Date.now() - startedAt > AI_PRESEASON_RUN_STALE_MS;
 }
 
 export function normalizeAiPreseasonRun(run: FoundationAiPreseasonAutomationRun | null | undefined) {

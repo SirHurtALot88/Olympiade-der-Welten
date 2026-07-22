@@ -8431,13 +8431,19 @@ export function useFoundationShellRouterBodyScope({
   ]);
   useEffect(() => {
     const isFirstSeason = /season[-_\s]*1\b/i.test(`${gameState.season.id} ${gameState.season.name}`);
+    // Verwaister „running"-Lauf (Server-Prozess während der ~131 s-Draft-Laufzeit abgebrochen — Hot-Reload,
+    // Navigation, Proxy-Timeout): am ROHEN Datensatz erkennen, BEVOR normalizeAiPreseasonRun ihn zu „failed"
+    // umschreibt. Ohne diese Erkennung bliebe der (jetzt „failed" wirkende) Lauf als „bereits behandelt"
+    // stehen und der Draft würde NIE erneut angestoßen → „KI pickt gar nicht / hängt für immer".
+    const staleOrphanRun = isStaleAiPreseasonRun(aiPreseasonStoredRun);
     const normalizedStoredRun = normalizeAiPreseasonRun(aiPreseasonStoredRun);
     const storedStatus = normalizedStoredRun?.status ?? null;
     const alreadyHandled =
-      storedStatus === "running" ||
-      storedStatus === "completed" ||
-      storedStatus === "skipped" ||
-      storedStatus === "failed";
+      !staleOrphanRun &&
+      (storedStatus === "running" ||
+        storedStatus === "completed" ||
+        storedStatus === "skipped" ||
+        storedStatus === "failed");
     const seasonIntroHandled =
       seasonBriefingStepStatus === "completed" || seasonBriefingStepStatus === "skipped";
     const firstSeasonTrigger =
@@ -8449,6 +8455,11 @@ export function useFoundationShellRouterBodyScope({
       gameFlowState.phase === "preseason" &&
       gameFlowState.currentStepId === "buy_players";
     const runKey = `${activeSaveId}:${gameState.season.id}`;
+
+    if (staleOrphanRun) {
+      // Verwaisten Lauf: den Session-Guard freigeben, damit der Draft (Bedingungen unten erfüllt) neu startet.
+      aiPreseasonRunStartedRef.current.delete(runKey);
+    }
 
     if (
       readMeta.source !== "sqlite" ||
