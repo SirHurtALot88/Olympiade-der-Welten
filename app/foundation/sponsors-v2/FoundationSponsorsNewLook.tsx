@@ -22,6 +22,7 @@ import {
   SponsorOfferCardNewLook,
 } from "@/components/foundation/sponsor/SponsorOfferCardNewLook";
 import { buildSponsorOfferPresentation, getSponsorComponentKindLabel } from "@/lib/sponsor/sponsor-offer-presenter";
+import { getTeamObjectives } from "@/lib/board/team-season-objectives-service";
 import { formatGameFlowBlocker } from "@/lib/foundation/game-flow-blocker-labels";
 import {
   SPONSOR_CURVE_FAMILIES,
@@ -53,6 +54,62 @@ function formatSponsorChoiceMessage(message: string): string {
 }
 
 type SponsorComponentKind = SponsorOffer["components"][number]["kind"];
+
+/** Status-Wort + Farbton für ein Board-Ziel in der Sponsor-Abgleich-Liste. */
+const BOARD_TARGET_STATUS_META: Record<string, { label: string; tone: NlTone }> = {
+  completed: { label: "erfüllt", tone: "good" },
+  at_risk: { label: "wackelt", tone: "warn" },
+  open: { label: "offen", tone: "neutral" },
+};
+
+/**
+ * Kompakte Board-Ziel-Liste über dem Angebotsraster, damit der Spieler bei der Sponsorenwahl direkt sieht,
+ * welche Vorstandsziele diese Saison offen sind — und ob ein Sponsor-Sonderziel darauf einzahlt (dann
+ * arbeitet EINE Aktion an beidem). Zieht dieselbe Quelle wie das Team-Profil (getTeamObjectives, auf
+ * gameState memoisiert), also keine zusätzlichen Props/Fetches nötig.
+ */
+function SponsorBoardTargetsPanel({ gameState, teamId }: { gameState: GameState; teamId: string }) {
+  const objectives = useMemo(() => getTeamObjectives(gameState, teamId), [gameState, teamId]);
+  if (objectives.length === 0) {
+    return null;
+  }
+  return (
+    <NlCard className="nl-sponsor-boardtargets-card" eyebrow="Zum Abgleich" title="Board-Ziele diese Saison">
+      <p className="nl-sponsor-boardtargets-hint">
+        Deckt sich ein Sponsor-Sonderziel mit einem dieser Vorstandsziele, arbeitest du mit einer Aktion an beidem.
+      </p>
+      <ul className="nl-sponsor-boardtargets-list" style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: "0.35rem" }}>
+        {objectives.map((objective) => {
+          const meta = BOARD_TARGET_STATUS_META[objective.status] ?? BOARD_TARGET_STATUS_META.open!;
+          return (
+            <li
+              key={objective.objectiveId}
+              className="nl-sponsor-boardtarget"
+              style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+            >
+              <span
+                className="nl-sponsor-boardtarget-dot"
+                aria-hidden="true"
+                style={{ flex: "0 0 auto", width: 8, height: 8, borderRadius: 999, background: NL_TONE_VAR[meta.tone] }}
+              />
+              <span className="nl-sponsor-boardtarget-label" style={{ flex: "1 1 auto", minWidth: 0 }}>
+                {objective.label}
+              </span>
+              {objective.targetValue != null && String(objective.targetValue).trim() !== "" ? (
+                <span className="nl-sponsor-boardtarget-target nl-tnum" style={{ flex: "0 0 auto", opacity: 0.75 }}>
+                  {String(objective.targetValue)}
+                </span>
+              ) : null}
+              <span className="nl-sponsor-boardtarget-status" style={{ flex: "0 0 auto", color: NL_TONE_VAR[meta.tone], fontWeight: 600 }}>
+                {meta.label}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </NlCard>
+  );
+}
 
 /**
  * Segment-Reihenfolge + Farbe für das gestapelte Angebots-Cash-Chart
@@ -680,6 +737,9 @@ export default function FoundationSponsorsNewLook({
                   </ul>
                 </div>
               </NlCard>
+            ) : null}
+            {selectedTeamSponsorOffers[0]?.teamId ? (
+              <SponsorBoardTargetsPanel gameState={gameState} teamId={selectedTeamSponsorOffers[0].teamId} />
             ) : null}
             <div className="nl-sponsor-offer-grid">
               {selectedTeamSponsorOffers.map((offer) => {
