@@ -122,6 +122,25 @@ export type DisciplineStageNativeArenaProps = {
   accent?: string; // Akzentfarbe der Disziplin (Wasserzeichen + Feldlinien)
   motif?: StageMotif; // dezentes Hintergrund-Motiv
   env?: StageEnv; // atmosphärische Umgebung (Stadion o.ä.) — überschreibt die schlichte Optik
+  roomSync?: NativeArenaRoomSync | null; // Co-op-Lockstep (Multiplayer) — solo: null/inert
+};
+
+// Co-op-Lockstep-Steuerung aus dem Room (DisciplineStageArena verdrahtet den Hook).
+// Nur der Host advanced; der Guest zieht `round` auf `syncedRound` nach. Die Pause des
+// Hosts (Hover/Space) propagiert implizit — er sendet dann keinen weiteren Schritt.
+export type NativeArenaRoomSync = {
+  active: boolean; // Reveal-Sync im Room aktiv (mind. 2 Teilnehmer / Sync läuft)
+  isHost: boolean; // dieser Client ist der Host (Rolle A)
+  canControl: boolean; // darf lokal starten/advancen (Host, oder solo-im-Room)
+  waitingForHost: boolean; // Guest: eigenes Auto-Advance gesperrt, wartet auf Host-Schritte
+  syncedRound: number; // vom Host getriebener Ziel-Reveal-Index (slotRevealIndex)
+  onHostAdvanced: () => void; // Host: bei jedem eigenen Schritt an den Room melden
+  coopGate: {
+    active: boolean; // „beide bereit"-Gate aktiv → Reveal blockiert bis alle ready
+    isSelfReady: boolean; // eigener Ready-Status
+    waitingNames: string[]; // Namen der noch nicht bereiten Teilnehmer
+    onToggleReady: () => void; // eigenen Ready-Status umschalten
+  };
 };
 
 export type StageMotif = "chevrons" | "combat" | "board" | "court" | "weights" | "grid" | "ice" | "stage" | "plates" | "skyline" | "none";
@@ -1091,7 +1110,7 @@ function HoverTeamCardPortal({
   );
 }
 
-export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, onOpenTeam, onHoverTeam, onPreviewPlayer, onEnded, onReset, onResults, topPlayers, primitive = "track", disciplineId, progressLabel, disciplineName, accent, motif, env }: DisciplineStageNativeArenaProps) {
+export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, onOpenTeam, onHoverTeam, onPreviewPlayer, onEnded, onReset, onResults, topPlayers, primitive = "track", disciplineId, progressLabel, disciplineName, accent, motif, env, roomSync }: DisciplineStageNativeArenaProps) {
   const skinAccent = accent ?? "var(--nl-line-2, var(--nl-line))";
   const slotCount = Math.max(1, slots.length);
   const prim = primitive;
@@ -2389,12 +2408,39 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     // Start-Gate: NICHT von allein loslaufen — erst nach dem ersten ▶-Klick (started).
     // Danach automatisch Etappe für Etappe weiter, bis Pause/Ende.
     if (!started || done || busy || paused) return;
+    // Co-op: der GUEST advanced nie von allein — er folgt nur den Host-Schritten
+    // (Effekt unten). Und solange der „beide bereit"-Gate aktiv ist, läuft nichts.
+    if (roomSync?.waitingForHost || roomSync?.coopGate.active) return;
     // Kurzer Puffer nach dem Abschluss der (bereits ~10 s langen, simultan gleitenden)
     // Etappe, dann startet die nächste zügig.
     const delay = reduced.current ? 0 : 600;
     const id = window.setTimeout(() => advance(), delay);
     return () => window.clearTimeout(id);
-  }, [prim, round, busy, done, demandKg, advance, paused, started]);
+  }, [prim, round, busy, done, demandKg, advance, paused, started, roomSync?.waitingForHost, roomSync?.coopGate.active]);
+
+  // Co-op GUEST: zieht `round` auf den vom Host getriebenen `syncedRound` nach —
+  // spielt dieselbe Reveal-Cascade, aber host-getaktet. Pausiert der Host (Hover),
+  // steigt syncedRound nicht → der Guest bleibt automatisch stehen.
+  useEffect(() => {
+    if (!roomSync?.waitingForHost || busy || done) return;
+    if (roomSync.syncedRound > round) {
+      advance();
+    }
+  }, [roomSync?.waitingForHost, roomSync?.syncedRound, round, busy, done, advance]);
+
+  // Co-op HOST: meldet jeden eigenen Reveal-Schritt an den Room (nur bei Increment,
+  // nicht beim initialen round=0 und nicht nach „↻ Neu"-Reset).
+  const prevSyncRoundRef = useRef(0);
+  useEffect(() => {
+    if (!roomSync?.active || !roomSync.isHost) {
+      prevSyncRoundRef.current = round;
+      return;
+    }
+    if (round > prevSyncRoundRef.current) {
+      roomSync.onHostAdvanced();
+    }
+    prevSyncRoundRef.current = round;
+  }, [round, roomSync]);
 
   const quickSim = useCallback(() => {
     if (busyRef.current) return; // Busy-Guard: keine Doppel-Auslösung während einer Cascade.
@@ -2742,13 +2788,32 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       <div ref={mainColRef} style={{ flex: "1 1 620px", minWidth: 0, order: 1 }}>
         {/* Controls */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
-          <button type="button" data-testid="arena-primary-step" onClick={() => { setStarted(true); advance(); }} disabled={done || busy} style={{ padding: "9px 18px", fontWeight: 800, fontSize: 13, border: 0, borderRadius: 10, cursor: done || busy ? "default" : "pointer", color: "var(--nl-ink)", background: done ? "var(--nl-line)" : "var(--nl-accent)", opacity: busy && !done ? 0.7 : 1 }}>
+          {/* Co-op-Status/Ready-Gate (nur im Multiplayer-Room). */}
+          {roomSync?.active ? (
+            <div data-testid="arena-coop-status" style={{ display: "flex", alignItems: "center", gap: 10, flexBasis: "100%", flexWrap: "wrap", padding: "6px 10px", borderRadius: 10, border: "1px solid var(--nl-line)", background: "var(--nl-bg)" }}>
+              {roomSync.coopGate.active ? (
+                <>
+                  <button type="button" data-testid="arena-coop-ready" onClick={roomSync.coopGate.onToggleReady} style={{ padding: "8px 16px", fontWeight: 800, fontSize: 13, border: 0, borderRadius: 9, cursor: "pointer", color: "var(--nl-ink)", background: roomSync.coopGate.isSelfReady ? "var(--nl-line)" : "var(--nl-accent)" }}>
+                    {roomSync.coopGate.isSelfReady ? "✔ Bereit" : "Bereit"}
+                  </button>
+                  <span style={{ fontSize: 12, color: "var(--nl-mut)" }}>
+                    {roomSync.coopGate.waitingNames.length > 0 ? `Warte auf: ${roomSync.coopGate.waitingNames.join(", ")}` : "Alle bereit — Host kann starten."}
+                  </span>
+                </>
+              ) : roomSync.waitingForHost ? (
+                <span data-testid="arena-coop-follow" style={{ fontSize: 12, color: "var(--nl-mut)", fontWeight: 700 }}>👥 Co-op · Der Host steuert den Reveal — du siehst live mit.</span>
+              ) : (
+                <span style={{ fontSize: 12, color: "var(--nl-accent)", fontWeight: 700 }}>👥 Co-op · Du bist Host — dein Reveal läuft synchron bei allen.</span>
+              )}
+            </div>
+          ) : null}
+          <button type="button" data-testid="arena-primary-step" onClick={() => { setStarted(true); advance(); }} disabled={done || busy || Boolean(roomSync?.active && !roomSync.canControl) || Boolean(roomSync?.coopGate.active)} style={{ padding: "9px 18px", fontWeight: 800, fontSize: 13, border: 0, borderRadius: 10, cursor: done || busy ? "default" : "pointer", color: "var(--nl-ink)", background: done ? "var(--nl-line)" : "var(--nl-accent)", opacity: busy && !done ? 0.7 : 1 }}>
             {done ? "✔ Disziplin gewertet" : !started ? `▶ Start · Etappe 1 / ${slotCount}` : `▶ Etappe ${round + 1} / ${slotCount} — ${slots[round] ?? ""}`}
           </button>
-          <button type="button" onClick={quickSim} style={{ padding: "9px 14px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}>
+          <button type="button" onClick={quickSim} disabled={Boolean(roomSync?.active && !roomSync.canControl)} style={{ padding: "9px 14px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: roomSync?.active && !roomSync.canControl ? "default" : "pointer", opacity: roomSync?.active && !roomSync.canControl ? 0.5 : 1 }}>
             ⏩ Quick-Sim
           </button>
-          <button type="button" data-testid="arena-reset" onClick={reset} style={{ padding: "9px 14px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}>
+          <button type="button" data-testid="arena-reset" onClick={reset} disabled={Boolean(roomSync?.active && !roomSync.canControl)} style={{ padding: "9px 14px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: roomSync?.active && !roomSync.canControl ? "default" : "pointer", opacity: roomSync?.active && !roomSync.canControl ? 0.5 : 1 }}>
             ↻ Neu
           </button>
           <button type="button" onClick={audio.toggleMute} title="Sound an/aus" style={{ padding: "9px 12px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}>
