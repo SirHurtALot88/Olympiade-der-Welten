@@ -356,17 +356,19 @@ export function computeObjectiveProgressMetric(
       const arenaPopularityFactor = computeTeamBeliebtheitFromGameState(gameState, teamId).value;
       const income = calculateFacilityIncome(facilities, { arenaPopularityFactor });
       const upkeep = calculateFacilityUpkeep(facilities);
-      // FIX (Fable-Review): "nichts bauen" ergab income 0 − upkeep 0 = 0 ≥ 0 und damit vollen Payout
-      // fürs Nichtstun. Wer keinerlei Gebäude betreibt (weder Einnahme noch Unterhalt), hat das Ziel nicht
-      // erfüllt, sondern schlicht nichts getan → offen (null), kein Gratis-Bonus. (Die vollständige
-      // "Selbsttragende Infrastruktur"-Neufassung folgt in der Ziel-Redesign-Phase.)
-      if (income <= 0 && upkeep <= 0) return null;
-      return income - upkeep;
+      // Neufassung "Selbsttragende Infrastruktur" (Fable #6): Deckungsgrad = wie viel % des Unterhalts durch
+      // Einnahmen gedeckt werden. Teilnahme-Gate: ohne Einkommensgebäude (Level-Summe ≥ 2) ist das Ziel
+      // offen (null) — kein Gratis-Payout fürs Nichtstun, und reine Nicht-Einkommens-Gebäude erfüllen es nicht.
+      if (fanInfrastructureLevelSum(gameState, teamId) < 2) return null;
+      if (upkeep <= 0) return income > 0 ? 100 : 0;
+      return Math.max(0, (100 * income) / upkeep);
     }
     case "fatigue_management": {
       const rosterIds = rosterPlayerIdsForTeam(gameState, teamId);
       if (rosterIds.size === 0) return 0;
-      const cap = SPONSOR_OBJ_FATIGUE_CAP;
+      // Frische-Cap ist stärke-skaliert im targetValue eingefroren (Fable #7); Fallback auf die Konstante.
+      const capTarget = typeof component.targetValue === "number" ? component.targetValue : Number(component.targetValue);
+      const cap = Number.isFinite(capTarget) && capTarget > 0 ? capTarget : SPONSOR_OBJ_FATIGUE_CAP;
       // Die Mechanik (Verletzungs-Rolls, Match-Scoring) misst gegen die REINE Match-Fatigue aus
       // playerAvailabilityState (via getPlayerCurrentFatigue), NICHT gegen player.fatigue — letztere
       // trägt zusätzlich die aufsummierte Trainings-Fatigue-Schicht. Das Ziel spiegelt deshalb genau

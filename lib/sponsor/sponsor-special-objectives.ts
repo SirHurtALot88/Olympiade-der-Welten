@@ -296,6 +296,60 @@ export function pickChallengeSpecialKind(input: {
   return options[index] ?? "axis_rank_top";
 }
 
+/**
+ * Gehaltsdisziplin-Ziel (Fable #5): stärke-relativer Deckel auf das EIGENE, beim Signing eingefrorene
+ * Gehalts-Total, mit an die Enge gekoppeltem Payout. Kernidee: „Budget stärker einschränken ⇒ mehr Cash".
+ * - Anker = eigenes Gehalt, aber nie unter 60 % des Liga-Medians (schützt vor absurden Zielen bei noch
+ *   leerem/aufbauendem Kader).
+ * - Teure Teams (obere Gehaltshälfte) bekommen engere Deckel und dafür höhere Belohnung; günstige Teams
+ *   mildere Deckel (ein schlanker Kader lässt sich prozentual schwerer weiter kürzen) und kleinere Belohnung.
+ * - Die Enge steigt zusätzlich mit der Rarity. Der Evaluator (salary_pressure_max, salary ≤ target) bleibt
+ *   unverändert — nur Zielwert und rewardCash ändern sich.
+ */
+export function resolveSalaryDisciplineTarget(input: {
+  gameState: GameState;
+  teamId: string;
+  ownSalary: number;
+  rarityOrder: number;
+  rewardCash: number;
+}): { targetSalary: number; rewardCash: number; expensive: boolean } {
+  const leagueSalaries = input.gameState.teams
+    .map((team) => getTeamDisplaySalaryTotal(input.gameState, team.teamId))
+    .filter((value) => value > 0)
+    .sort((left, right) => left - right);
+  const median = leagueSalaries.length ? leagueSalaries[Math.floor(leagueSalaries.length / 2)]! : input.ownSalary;
+  const basis = Math.max(input.ownSalary, 0.6 * median);
+  const expensive = input.ownSalary >= median;
+  const order = input.rarityOrder;
+  const tightness = expensive
+    ? order >= 2
+      ? 0.85
+      : order >= 1
+        ? 0.92
+        : 0.97
+    : order >= 2
+      ? 0.93
+      : order >= 1
+        ? 0.96
+        : 0.99;
+  const rewardMult = expensive
+    ? order >= 2
+      ? 1.4
+      : order >= 1
+        ? 1.0
+        : 0.7
+    : order >= 2
+      ? 1.1
+      : order >= 1
+        ? 0.85
+        : 0.6;
+  return {
+    targetSalary: round1(basis * tightness),
+    rewardCash: round1(Math.max(1, input.rewardCash * rewardMult)),
+    expensive,
+  };
+}
+
 export function buildChallengeSpecialComponent(input: {
   gameState: GameState;
   team: Team;
@@ -319,15 +373,21 @@ export function buildChallengeSpecialComponent(input: {
   const demandBoost = order >= 2 ? 1 : order >= 1 ? 0 : -1;
 
   if (kind === "salary_pressure_max" && row) {
-    const salaryTotal = row.salaryTotal ?? getTeamDisplaySalaryTotal(input.gameState, input.team.teamId);
-    const targetSalary = round1(Math.max(20, salaryTotal * (order >= 2 ? 0.9 : 0.93)));
+    const ownSalary = row.salaryTotal ?? getTeamDisplaySalaryTotal(input.gameState, input.team.teamId);
+    const salary = resolveSalaryDisciplineTarget({
+      gameState: input.gameState,
+      teamId: input.team.teamId,
+      ownSalary,
+      rarityOrder: order,
+      rewardCash: input.rewardCash,
+    });
     return {
       componentId: "special-salary-pressure",
       kind: "special",
-      label: `Gehalt ≤ ${targetSalary} C`,
-      targetValue: targetSalary,
-      rewardCash: input.rewardCash,
-      penaltyCash: Math.max(1, round1(input.rewardCash * 0.2)),
+      label: `Gehalt ≤ ${salary.targetSalary} C`,
+      targetValue: salary.targetSalary,
+      rewardCash: salary.rewardCash,
+      penaltyCash: Math.max(1, round1(salary.rewardCash * 0.2)),
       specialKey: "salary_pressure_max",
     };
   }
@@ -664,17 +724,34 @@ function primaryAxisBaseline(input: BonusObjectiveBuildInput): { axis: SponsorAx
 }
 
 /**
- * Wählt heuristisch einen Rivalen: das im Snapshot direkt vor dem Team platzierte Team (nächststärkerer
- * Nachbar). Deterministisch, ohne eigene Rival-Datenquelle.
+ * Wählt einen Rivalen nach ÄHNLICHER STÄRKE (Fable #2): das marktwert-nächste andere Team (Marktwert als
+ * Stärke-Proxy), bei Gleichstand das leicht stärkere. Ein „Rivalen schlagen"-Ziel ergibt nur bei
+ * vergleichbarer Stärke Sinn — der frühere Tabellen-Nachbar konnte qualitativ weit entfernt sein.
+ * Deterministisch, ohne eigene Rival-Datenquelle.
  */
 export function resolveDefaultRivalTeamId(gameState: GameState, teamId: string): string | null {
   const rows = buildTeamSeasonOverviewRows({ gameState });
-  const ordered = [...rows].sort((left, right) => (left.rank ?? 99) - (right.rank ?? 99));
-  const index = ordered.findIndex((row) => row.teamId === teamId);
-  if (index <= 0) {
-    return ordered[1]?.teamId ?? null;
+  const self = rows.find((row) => row.teamId === teamId) ?? null;
+  if (!self) {
+    return null;
   }
-  return ordered[index - 1]?.teamId ?? null;
+  const ownStrength = self.marketValueTotal ?? 0;
+  let bestTeamId: string | null = null;
+  let bestDelta = Number.POSITIVE_INFINITY;
+  let bestStrength = -1;
+  for (const row of rows) {
+    if (row.teamId === teamId) {
+      continue;
+    }
+    const strength = row.marketValueTotal ?? 0;
+    const delta = Math.abs(strength - ownStrength);
+    if (delta < bestDelta || (delta === bestDelta && strength > bestStrength)) {
+      bestTeamId = row.teamId;
+      bestDelta = delta;
+      bestStrength = strength;
+    }
+  }
+  return bestTeamId;
 }
 
 /**
@@ -739,15 +816,30 @@ export function buildBonusObjectiveComponent(
         stages: threeStage(2, 4, 6, "+Ränge"),
       };
     }
-    case "fan_cult_player":
+    case "fan_cult_player": {
+      // Ehrliche Stufen (Fable #4): die Metrik ist der bracketScore des besten Spielers (0..100). 80/90/100
+      // bedeuten „Top 20 % / Top 10 % / #1 seiner Marktwert-Klasse". Schwache/Aufbau-Teams stellen v. a.
+      // Spieler in den DICHTEST besetzten unteren MW-Klassen, wo #1 am schwersten ist → voller Payout schon
+      // bei Top 10 %. Was den Wert bewegt (MVS des Spielers trainieren, FanFavorite-Trait) steht im Detailtext.
+      const weakTier =
+        resolveSponsorStrengthTier(input.teamQualityRank, input.gameState.teams.length) === "schwach" ||
+        resolveSponsorStrengthTier(input.teamQualityRank, input.gameState.teams.length) === "aufbau";
+      const stages = weakTier
+        ? [stage(80, 0.5, "Top 20 % der MW-Klasse"), stage(90, 1.0, "Top 10 % der MW-Klasse")]
+        : [
+            stage(80, 0.4, "Top 20 % der MW-Klasse"),
+            stage(90, 0.7, "Top 10 % der MW-Klasse"),
+            stage(100, 1.0, "#1 der MW-Klasse"),
+          ];
       return {
         ...base,
         componentId: "special-fan-cult-player",
         label: "Fan-Kult um einen Spieler",
         targetValue: "fan_cult",
         specialKey: "fan_cult_player",
-        stages: [stage(80, 0.5, "Star ≥80"), stage(90, 0.8, "Star ≥90"), stage(100, 1.0, "Star =100")],
+        stages,
       };
+    }
     case "homegrown_elevation":
       return {
         ...base,
@@ -765,7 +857,8 @@ export function buildBonusObjectiveComponent(
         label: "Rivalen-Demütigung (Rival hinter sich lassen)",
         targetValue: `rival:${rivalTeamId ?? ""}`,
         specialKey: "rival_humiliation",
-        stages: threeStage(1, 4, 8, "+Ränge vor Rival"),
+        // Weichere Stufen (Fable #2): mit einem stärke-ähnlichen Rivalen ist +8 Ränge kaum spielbar.
+        stages: threeStage(1, 3, 5, "+Ränge vor Rival"),
       };
     }
     case "fan_infrastructure":
@@ -802,27 +895,22 @@ export function buildBonusObjectiveComponent(
         stages: [stage(0.01, 1.0, "Kasse positiv")],
       };
     case "salary_discipline": {
+      // Stärke-relativer Gehaltsdeckel mit Payout-Kopplung (Fable #5) — teure Teams enger + höhere
+      // Belohnung, günstige milder + kleinere Belohnung; Anker = eigenes Gehalt (≥ 60 % Liga-Median-Schutz).
       const ownSalary = getTeamDisplaySalaryTotal(input.gameState, input.team.teamId);
-      // Reachability-Anker: Wird das Angebot generiert, während DIESES Team seinen Kader noch aufbaut, ist
-      // sein Gehalts-Total ~0 → der alte `Math.max(20, …)`-Boden erzeugte ein absurdes „≤ 20 C"-Ziel,
-      // unter dem Gehalt eines EINZIGEN Spielers (~35-40). Statt eines Fix-Bodens auf die typische VOLLE
-      // Kader-Gehaltssumme der Liga (Median über Teams mit echtem Kader) ankern, sodass das Disziplin-Ziel
-      // immer eine reale, trimmbare Gehaltslast widerspiegelt. Bei einem großen Team (eigenes Gehalt über
-      // Median) bleibt es die eigene Summe (mildes Trimmen); bei noch leerem Kader greift der Liga-Median.
-      const leagueSalaries = input.gameState.teams
-        .map((team) => getTeamDisplaySalaryTotal(input.gameState, team.teamId))
-        .filter((value) => value > 0)
-        .sort((left, right) => left - right);
-      const leagueMedian = leagueSalaries.length
-        ? leagueSalaries[Math.floor(leagueSalaries.length / 2)]!
-        : ownSalary;
-      const basis = Math.max(ownSalary, leagueMedian);
-      const targetSalary = round1(basis * (rarityOrder(input.rarity) >= 2 ? 0.9 : 0.93));
+      const salary = resolveSalaryDisciplineTarget({
+        gameState: input.gameState,
+        teamId: input.team.teamId,
+        ownSalary,
+        rarityOrder: rarityOrder(input.rarity),
+        rewardCash: base.rewardCash ?? 0,
+      });
       return {
         ...base,
         componentId: "special-salary-discipline",
-        label: `Gehaltsdisziplin ≤ ${targetSalary} C`,
-        targetValue: targetSalary,
+        label: `Gehaltsdisziplin ≤ ${salary.targetSalary} C`,
+        targetValue: salary.targetSalary,
+        rewardCash: salary.rewardCash,
         specialKey: "salary_pressure_max",
       };
     }
@@ -838,23 +926,36 @@ export function buildBonusObjectiveComponent(
       };
     }
     case "sustainability_architect":
+      // Neufassung (Fable #6): statt „Facilities netto ≥ 0" (das reine Nichtstun mit vollem Payout belohnte
+      // und echte Gebäude bestrafte) jetzt „Selbsttragende Infrastruktur" = Deckungsgrad Einnahmen/Unterhalt.
+      // Teilnahme-Gate im Evaluator (Einkommensgebäude-Level ≥ 2). In einer Saison erreichbar (fan_shop L2
+      // deckt viel Unterhalt) und belohnt den Bau BEIDER Gebäudearten.
       return {
         ...base,
         componentId: "special-sustainability-architect",
-        label: "Nachhaltigkeits-Architekt (Facilities netto ≥ 0)",
-        targetValue: "net_facility",
+        label: "Selbsttragende Infrastruktur (Einnahmen decken Unterhalt)",
+        targetValue: "self_supporting",
         specialKey: "sustainability_architect",
-        stages: [stage(0, 1.0, "Netto ≥ 0")],
+        stages: [stage(50, 0.4, "50 % gedeckt"), stage(80, 0.7, "80 % gedeckt"), stage(100, 1.0, "100 % gedeckt")],
       };
-    case "fatigue_management":
+    case "fatigue_management": {
+      // Erreichbar formuliert (Fable #7): Top-Stufe 95→90 (eine müde Person darf einen 15er-Kader nicht
+      // reißen). Dünne Kader (schwach/aufbau) rotieren weniger → Frische-Cap 55 statt 45. Cap wird im
+      // targetValue eingefroren; der Evaluator liest ihn daraus.
+      const cap =
+        resolveSponsorStrengthTier(input.teamQualityRank, input.gameState.teams.length) === "schwach" ||
+        resolveSponsorStrengthTier(input.teamQualityRank, input.gameState.teams.length) === "aufbau"
+          ? 55
+          : SPONSOR_OBJ_FATIGUE_CAP;
       return {
         ...base,
         componentId: "special-fatigue-management",
-        label: `Fatigue-Management (Kader frisch, ≤ ${SPONSOR_OBJ_FATIGUE_CAP})`,
-        targetValue: SPONSOR_OBJ_FATIGUE_CAP,
+        label: `Fatigue-Management (Kader frisch, ≤ ${cap})`,
+        targetValue: cap,
         specialKey: "fatigue_management",
-        stages: threeStage(50, 75, 95, "% frisch"),
+        stages: threeStage(50, 75, 90, "% frisch"),
       };
+    }
   }
 }
 

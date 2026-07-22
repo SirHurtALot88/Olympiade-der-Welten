@@ -337,11 +337,28 @@ describe("sponsor bonus objectives (Teil B)", () => {
 
     const metric = computeObjectiveProgressMetric(gs, teamId, comp);
 
-    // Ziel spiegelt exakt die tatsächlich gutgeschriebene, beliebtheits-skalierte Einnahme.
-    expect(metric).toBeCloseTo(incomeWithPopularity - upkeep, 5);
-    // Der Faktor wirkt wirklich: die Arena ist gebaut und 1.5 > 1.0 hebt die Einnahme über den naiven Wert.
+    // Neufassung "Selbsttragend": Metrik = Deckungsgrad Einnahmen/Unterhalt in % (beliebtheits-skaliert).
+    const expectedCoverage = upkeep > 0 ? (100 * incomeWithPopularity) / upkeep : incomeWithPopularity > 0 ? 100 : 0;
+    expect(metric).toBeCloseTo(expectedCoverage, 5);
+    // Der Beliebtheitsfaktor wirkt: 1.5 > 1.0 hebt die Einnahme und damit den Deckungsgrad über den naiven Wert.
     expect(incomeWithPopularity).toBeGreaterThan(incomeNaive);
-    expect(metric).not.toBeCloseTo(incomeNaive - upkeep, 5);
+    const naiveCoverage = upkeep > 0 ? (100 * incomeNaive) / upkeep : incomeNaive > 0 ? 100 : 0;
+    expect(metric).not.toBeCloseTo(naiveCoverage, 5);
+  }, 60000);
+
+  it("returns null for sustainability_architect when no income buildings are built (no free payout)", () => {
+    const gs = structuredClone(createSingleplayerGameState());
+    const teamId = gs.teams[0]!.teamId;
+    gs.seasonState.teamFacilities = { ...(gs.seasonState.teamFacilities ?? {}), [teamId]: { facilities: {} } } as never;
+    const comp: SponsorOfferComponent = {
+      componentId: "special-sustainability",
+      kind: "special",
+      label: "Sustainability Architect",
+      targetValue: "self_supporting",
+      rewardCash: 5,
+      specialKey: "sustainability_architect",
+    };
+    expect(computeObjectiveProgressMetric(gs, teamId, comp)).toBeNull();
   }, 60000);
 
   it("gates golden title-shock to weak teams only", () => {

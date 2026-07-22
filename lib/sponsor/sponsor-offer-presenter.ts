@@ -96,15 +96,15 @@ const BONUS_OBJECTIVE_META: Record<string, { detail: string; difficulty: Sponsor
   momentum_series: { detail: "Mehrere starke Spieltage im oberen Ligadrittel liefern (Gesamtzahl, nicht am Stück)", difficulty: "mittel" },
   discipline_dominance: { detail: "Großen Kaderanteil in den Disziplin-Spitzenrängen stellen", difficulty: "mittel" },
   // axis_ascension wird gesondert behandelt (axisKey/axisLabel aus targetValue).
-  fan_cult_player: { detail: "Einen Spieler zum gefeierten Star aufbauen", difficulty: "hart" },
+  fan_cult_player: { detail: "Einen Spieler an die Spitze seiner Marktwert-Klasse bringen (MVS trainieren, FanFavorite-Trait hilft)", difficulty: "hart" },
   homegrown_elevation: { detail: "Ein Eigengewächs in die Bracket-Elite entwickeln", difficulty: "hart" },
   rival_humiliation: { detail: "Den Rivalen in der Abschlusstabelle hinter sich lassen", difficulty: "mittel" },
   fan_infrastructure: { detail: "Einkommens-Gebäude ausbauen (Fan-Shop / Arena)", difficulty: "leicht" },
   form_color_cover: { detail: "Kader-Vielfalt über mehrere verschiedene Spielerklassen abdecken", difficulty: "leicht" },
   solvency_series: { detail: "Zum Saisonende mit positiver Kasse dastehen", difficulty: "leicht" },
   transfer_trader: { detail: "Positive Netto-Bilanz in der Wechselperiode erzielen", difficulty: "mittel" },
-  sustainability_architect: { detail: "Facility-Bilanz über die Saison netto ≥ 0 halten", difficulty: "mittel" },
-  fatigue_management: { detail: "Den Kader über die Saison frisch halten (niedrige Fatigue)", difficulty: "mittel" },
+  sustainability_architect: { detail: "Gebäude-Einnahmen decken deren Unterhalt (selbsttragend, Einkommensgebäude nötig)", difficulty: "mittel" },
+  fatigue_management: { detail: "Den Kader bis zum Saisonende frisch halten (niedrige Match-Fatigue)", difficulty: "mittel" },
   // Golden-Bonusziele
   golden_fairytale: { detail: "Die Saison weit über der Erwartung beenden (Märchensaison)", difficulty: "hart" },
   golden_crowd_favorites: { detail: "Mehrere Publikumslieblinge (Bracket-Helden) formen", difficulty: "hart" },
