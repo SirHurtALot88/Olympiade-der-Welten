@@ -7,6 +7,9 @@ import {
 } from "@/lib/season/prize-money-sheet";
 import { buildPrizeMoneyTable } from "@/lib/season/prize-money";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
+import { previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
+import { calculateFacilityIncome, calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
 import type { StandingsPreviewSource } from "@/lib/standings/standings-preview-engine";
 
 export type PrizeMoneyPreviewFutureSeason = {
@@ -41,6 +44,10 @@ export type PrizeMoneyPreviewItem = {
   points: number | null;
   currentCash: number | null;
   prizeMoney: number | null;
+  /** Projizierte Sponsor-Einnahme beim aktuellen Rang, inkl. bereits erfüllter Ziele/Quests (Netto positiv). */
+  sponsorCash: number | null;
+  /** Gebäude-Einnahmen netto (Einnahmen − Unterhalt) der Saison. */
+  facilityIncome: number | null;
   rankChangePrize: PrizeMoneyRankChangePrize;
   projectedCash: number | null;
   status: "ready" | "missing_rank" | "missing_prize" | "missing_cash" | "blocked";
@@ -460,6 +467,32 @@ export async function buildPrizeMoneyPreview(
     ? buildSeasonOneStartRankByTeamId(save.gameState.teams)
     : new Map<string, number>();
 
+  // Sponsor-Einnahmen pro Team = Summe der positiven Cash-Komponenten aus der Settlement-Vorschau (Basis +
+  // Rang-Meilenstein beim aktuellen Rang + bereits erfüllte Sonderziele/Quests + Fan-Infrastruktur). Einmal
+  // liga-weit berechnet, dann pro Team aufsummiert.
+  const sponsorCashByTeamId = new Map<string, number>();
+  try {
+    for (const row of previewSponsorSettlement(save.gameState).rows) {
+      if (row.cashDelta > 0) {
+        sponsorCashByTeamId.set(row.teamId, (sponsorCashByTeamId.get(row.teamId) ?? 0) + row.cashDelta);
+      }
+    }
+  } catch {
+    // Sponsor-Vorschau ist optional — fehlt sie (z. B. ohne Verträge), bleibt die Sponsor-Spalte leer.
+  }
+  const facilityIncomeByTeamId = new Map<string, number>();
+  for (const team of save.gameState.teams) {
+    try {
+      const facilities = getTeamFacilityState(save.gameState, team.teamId);
+      const arenaPopularityFactor = computeTeamBeliebtheitFromGameState(save.gameState, team.teamId).value;
+      const income = calculateFacilityIncome(facilities, { arenaPopularityFactor });
+      const upkeep = calculateFacilityUpkeep(facilities);
+      facilityIncomeByTeamId.set(team.teamId, round1(income - upkeep));
+    } catch {
+      // Gebäude-Einnahmen optional.
+    }
+  }
+
   const items: PrizeMoneyPreviewItem[] = save.gameState.teams.map((team) => {
     const standing = save.gameState.seasonState.standings[team.teamId] ?? null;
     const storedRank = toFiniteNumber(standing?.rank) ?? null;
@@ -480,10 +513,9 @@ export async function buildPrizeMoneyPreview(
       warnings.add("missing_rank");
       status = "missing_rank";
     }
-    if (storedRank != null && (!prizeRow || prizeMoney == null)) {
-      warnings.add("missing_prize");
-      status = "missing_prize";
-    } else if (currentCash == null) {
+    // Preisgeld wird nicht mehr genutzt → ein fehlender Preisgeld-Eintrag blockiert nicht mehr. Nur fehlender
+    // Cash (Basis der Cash-danach-Projektion) markiert das Team als unvollständig.
+    if (currentCash == null) {
       warnings.add("missing_cash");
       status = "missing_cash";
     }
@@ -500,12 +532,15 @@ export async function buildPrizeMoneyPreview(
       warnings.add(rankChangePrize.warning);
     }
 
-    const projectedCash = projectSeasonEndCash({
-      currentCash,
-      prizeMoney,
-      salaryTotal,
-      rankChangePrize: rankChangePrize.bonusMalus,
-    });
+    const sponsorCash = sponsorCashByTeamId.get(team.teamId) ?? null;
+    const facilityIncome = facilityIncomeByTeamId.get(team.teamId) ?? null;
+
+    // Cash danach = Cash vorher + Sponsor-Einnahmen + Gebäude-Einnahmen − Gehälter. Preisgeld wird NICHT mehr
+    // eingerechnet (nicht mehr genutzt); die Sponsoren sind die tragende Einnahme.
+    const projectedCash =
+      currentCash == null || salaryTotal == null
+        ? null
+        : round1(currentCash - salaryTotal + (sponsorCash ?? 0) + (facilityIncome ?? 0));
 
     const buildPlacementScenario = (direction: "better" | "worse") => {
       if (rank == null || prizeMoney == null || currentCash == null || salaryTotal == null) {
@@ -595,6 +630,8 @@ export async function buildPrizeMoneyPreview(
       points,
       currentCash,
       prizeMoney,
+      sponsorCash,
+      facilityIncome,
       rankChangePrize,
       projectedCash,
       status,

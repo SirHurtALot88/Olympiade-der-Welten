@@ -139,6 +139,9 @@ describe("prize money preview", () => {
       points: 22,
       currentCash: 37.9,
       prizeMoney: 91.4,
+      // Sponsor-basierter Umbau: kein Vertrag im Mock → sponsorCash null, keine Gebäude → facilityIncome 0.
+      sponsorCash: null,
+      facilityIncome: 0,
       rankChangePrize: {
         source: "sheet",
         startRankSource: "standing_startplatz",
@@ -147,7 +150,8 @@ describe("prize money preview", () => {
         rankDelta: 10,
         bonusMalus: 12.84,
       },
-      projectedCash: 142.1,
+      // Cash danach = Cash vorher − Gehälter + Sponsor + Gebäude (Preisgeld fließt nicht mehr ein): 37.9 − 0.
+      projectedCash: 37.9,
       basisCash: 15,
       seasonCash: 76.3,
       payoutIfTenBetter: 91.4,
@@ -166,7 +170,7 @@ describe("prize money preview", () => {
         rankDelta: -1,
         bonusMalus: -0.96,
       },
-      projectedCash: 136.8,
+      projectedCash: 49.8,
       status: "ready",
     });
     expect(result.items[2]).toMatchObject({
@@ -222,8 +226,9 @@ describe("prize money preview", () => {
 
     const row = result.items.find((item) => item.teamId === "W-W");
     expect(row?.salaryTotal).toBe(20);
-    expect(row?.projectedCash).toBe(122.1);
-    expect(row?.projectedCash).not.toBe(142.1);
+    // Cash danach = 37.9 − 20 (Gehalt) + 0 (kein Sponsor) + 0 (keine Gebäude) = 17.9.
+    expect(row?.projectedCash).toBe(17.9);
+    expect(row?.projectedCash).not.toBe(37.9);
     expect(row?.futureSeasons.find((entry) => entry.seasonLabel === "Season +1")?.projectedCash).toBe(117.6);
   });
 
@@ -238,7 +243,8 @@ describe("prize money preview", () => {
     expect(row?.status).toBe("missing_rank");
     expect(row?.prizeMoney).toBeNull();
     expect(row?.rankChangePrize.warning).toBe("missing_rank");
-    expect(row?.projectedCash).toBeNull();
+    // Cash danach hängt nicht mehr am (fehlenden) Preisgeld: currentCash 0 − Gehalt 0 = 0.
+    expect(row?.projectedCash).toBe(0);
     expect(row?.warnings).toContain("missing_rank");
   });
 
@@ -330,7 +336,8 @@ describe("prize money preview", () => {
     const row = result.items.find((item) => item.teamId === "P-S");
     expect(row).toMatchObject({
       prizeMoney: 88,
-      projectedCash: 137.8,
+      // Sponsor-basiert: 49.8 Cash − 0 Gehalt (Preisgeld fließt nicht mehr ein).
+      projectedCash: 49.8,
       rankChangePrize: {
         source: "missing",
         startRankSource: "missing",

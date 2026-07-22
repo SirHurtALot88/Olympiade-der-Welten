@@ -2423,6 +2423,10 @@ export type FoundationPrizePreviewItem = {
   points: number | null;
   currentCash: number | null;
   prizeMoney: number | null;
+  /** Projizierte Sponsor-Einnahme beim aktuellen Rang inkl. bereits erfüllter Ziele/Quests. */
+  sponsorCash?: number | null;
+  /** Gebäude-Einnahmen netto (Einnahmen − Unterhalt). */
+  facilityIncome?: number | null;
   rankChangePrize?: {
     source: "retool" | "sheet" | "missing";
     startRankSource?: "standing_startplatz" | "standing_rank_diff" | "season1_start_budget" | "missing";
