@@ -65,10 +65,31 @@ export function getPlayerScoutCertainty(gameState: GameState, teamId: string, pl
   return record?.certainty ?? 0;
 }
 
+/**
+ * Auto-Reveal-Fortschritt (0..100) aus dem playerPotential-Record — wächst über die
+ * Zeit per advancePlayerPotentialRevealTick (eigene/Watchlist/Free-Agents). Wird mit
+ * der aktiven Scout-Certainty zusammengeführt, damit sich das Potenzial auch OHNE
+ * aktives Scouting mit den Spieltagen von selbst aufdeckt (und man den Fortschritt sieht).
+ */
+export function getPlayerRevealConfidence(gameState: GameState, playerId: string): number {
+  const record = gameState.playerPotential?.find((entry) => entry.playerId === playerId);
+  return clamp(record?.confidence ?? 0, 0, 100);
+}
+
+/**
+ * Effektive Reveal-Sicherheit (0..100): das Maximum aus aktivem Scouting (certainty)
+ * und dem zeitbasierten Auto-Reveal-Fortschritt. Einziger, glatt steigender Fortschritt,
+ * an dem sowohl Anzeige (%) als auch das effektive Scouting-Level hängen.
+ */
+export function getEffectiveRevealConfidence(gameState: GameState, teamId: string, playerId: string): number {
+  const certainty = getPlayerScoutCertainty(gameState, teamId, playerId);
+  return Math.max(certainty, getPlayerRevealConfidence(gameState, playerId));
+}
+
 export function getEffectiveScoutingLevel(gameState: GameState, teamId: string, playerId: string) {
   const teamFacilities = getTeamFacilityState(gameState, teamId);
   const facilityLevel = getFacilityLevel(teamFacilities, "scouting_office");
-  const certainty = getPlayerScoutCertainty(gameState, teamId, playerId);
+  const certainty = getEffectiveRevealConfidence(gameState, teamId, playerId);
   return clamp(facilityLevel + Math.floor(certainty / 25), 0, 5);
 }
 

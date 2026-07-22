@@ -2930,7 +2930,10 @@ export default function PlayerDetailDrawer({
                           ? `${gapValue > 0 ? "+" : ""}${formatValue(gapValue, 1)}`
                           : null;
                       const track = buildPotentialTrackGeometry(currentRating, potentialMin, potentialMax);
-                      const confidence = scoutPotential.confidence;
+                      // Glatt steigender Reveal-Fortschritt: der höhere aus level-basierter
+                      // Scout-Confidence und dem zeitbasierten Auto-Reveal (record.confidence),
+                      // damit man den Fortschritt pro Spieltag sieht statt nur in Level-Sprüngen.
+                      const confidence = Math.max(scoutPotential.confidence, data.revealConfidencePct ?? 0);
                       const filledConfidenceSegments = Math.max(
                         0,
                         Math.min(

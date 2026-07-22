@@ -71,7 +71,7 @@ import {
   type PlayerDevelopmentInsight,
   type PlayerScoutPotential,
 } from "@/lib/progression/player-potential-service";
-import { getEffectiveScoutingLevel } from "@/lib/scouting/facility-scout-pipeline-service";
+import { getEffectiveScoutingLevel, getEffectiveRevealConfidence } from "@/lib/scouting/facility-scout-pipeline-service";
 import { buildPlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scouting-bridge";
 import { buildPlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
 // Hinweis: Der Flavor-Text kommt direkt vom Player-Objekt (Feld flavorDe).
@@ -195,6 +195,8 @@ export type PlayerDetailDrawerData = {
   traitsNegative: string[];
   scoutingLevel: number | null;
   effectiveScoutingLevel: number | null;
+  /** Glatt steigender Reveal-Fortschritt 0..100 (Scouting + Auto-Reveal, max). */
+  revealConfidencePct: number;
   axisStarsDisplay: string | null;
   potentialStarsDisplay: string | null;
   potentialGapStars: number | null;
@@ -2323,6 +2325,11 @@ export function buildPlayerDrawerDataFromGameState(input: {
       ? getEffectiveScoutingLevel(input.gameState, scoutingTeamId, player.id)
       : facilityScoutingLevel;
   const scoutingLevel = effectiveScoutingLevel;
+  // Glatt steigender Reveal-Fortschritt (0..100): max aus aktivem Scouting und dem
+  // zeitbasierten Auto-Reveal (record.confidence). Damit man den Fortschritt pro
+  // Spieltag sieht, statt nur in groben Level-Sprüngen.
+  const revealConfidencePct =
+    scoutingTeamId != null ? Math.round(getEffectiveRevealConfidence(input.gameState, scoutingTeamId, player.id)) : 0;
   const starSnapshot =
     scoutingLevel > 0
       ? buildPlayerStarScoutingSnapshot({
@@ -2607,6 +2614,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
     traitsNegative: traitView.visibleNegativeTraits,
     scoutingLevel,
     effectiveScoutingLevel,
+    revealConfidencePct,
     axisStarsDisplay: starSnapshot?.revealedCurrentStars.displayLabel ?? null,
     potentialStarsDisplay: revealExactOwnedPotential
       ? starSnapshot?.revealedPotentialStars.displayLabel ?? null
@@ -3050,6 +3058,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     traitsPositive: legacyTraitView.visiblePositiveTraits,
     traitsNegative: legacyTraitView.visibleNegativeTraits,
     scoutingLevel: 0,
+    revealConfidencePct: 0,
     scoutingDisclosure: legacyTraitView.disclosure,
     hiddenPositiveTraitCount: legacyTraitView.hiddenPositiveTraitCount,
     hiddenNegativeTraitCount: legacyTraitView.hiddenNegativeTraitCount,
