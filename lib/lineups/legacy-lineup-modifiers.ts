@@ -467,8 +467,21 @@ export function buildGeneratedFormCardRecordsForSeason(
 
 export function ensureLocalFormCardsForSeason(gameState: GameState, saveId: string, seasonId: string): GameState {
   const existing = gameState.seasonState.formCards ?? [];
-  const hasCurrentSeasonCards = existing.some((card) => card.seasonId === seasonId);
-  if (hasCurrentSeasonCards) {
+  // Selbstheilend / pro Spieler: Formkarten-IDs sind deterministisch pro (Season, Team, Spieler, Vorzeichen).
+  // Wir erzeugen NUR die Karten, die es noch nicht gibt, statt season-global genau einmal für ALLE Teams.
+  //
+  // Das behebt den Reihenfolge-Bug: Wenn KI-Teams ihren Draft abschließen und die Generierung anstoßen, während
+  // der menschliche Kader noch leer ist, wurde früher der leere Kader eingefroren (0 Formkarten für immer, weil
+  // danach „season hat schon Karten" jeden weiteren Lauf blockierte). Jetzt überspringt ein leerer/teilweiser
+  // Kader einfach die noch fehlenden Spieler-Karten — sobald der Kader wächst, kommen deren Karten beim nächsten
+  // Aufstellungs-/Finalisieren-Pfad automatisch additiv dazu. Keine Duplikate (ID-dedupliziert), kein Einfrieren.
+  const existingSeasonCardIds = new Set(
+    existing.filter((card) => card.seasonId === seasonId).map((card) => card.id),
+  );
+  const missing = buildGeneratedFormCardRecordsForSeason(gameState, saveId, seasonId).filter(
+    (card) => !existingSeasonCardIds.has(card.id),
+  );
+  if (missing.length === 0) {
     return gameState;
   }
 
@@ -476,7 +489,7 @@ export function ensureLocalFormCardsForSeason(gameState: GameState, saveId: stri
     ...gameState,
     seasonState: {
       ...gameState.seasonState,
-      formCards: [...existing, ...buildGeneratedFormCardRecordsForSeason(gameState, saveId, seasonId)],
+      formCards: [...existing, ...missing],
     },
   };
 }
