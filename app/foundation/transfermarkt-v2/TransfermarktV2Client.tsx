@@ -1394,6 +1394,26 @@ export default function TransfermarktV2Client({
     return () => window.cancelAnimationFrame(frame);
   }, [buyModalOpen, buyNegotiationOutcome?.status]);
 
+  // Vertragsform + Länge standardmäßig auf den Spielerwunsch setzen, sobald die
+  // Preview die Präferenz kennt. Nur solange der Nutzer sie noch nicht selbst
+  // angefasst hat (State ist dann noch `null` → Server-Default 1 Saison/balanced).
+  // Wird beim Modal-Öffnen zurückgesetzt, greift also je Kandidat neu.
+  useEffect(() => {
+    if (!buyModalOpen) {
+      return;
+    }
+    const preference = buyPreview?.contractPreference ?? null;
+    if (!preference) {
+      return;
+    }
+    if (contractLength == null && typeof preference.idealLength === "number") {
+      setContractLength(preference.idealLength);
+    }
+    if (contractShape == null && preference.shapePreference) {
+      setContractShape(preference.shapePreference);
+    }
+  }, [buyModalOpen, buyPreview, contractLength, contractShape]);
+
   useEffect(() => {
     if (!bootstrapReady || defaultSeasonId === "loading" || !defaultSaveId || defaultSaveId === "loading-save") {
       return;
