@@ -578,9 +578,13 @@ export function getTransferSpendCeilingObjective(input: {
   identity: TeamIdentity | null;
   profile: TeamStrategyProfile | null;
   row: TeamManagementSnapshotRow;
+  seasonId: string | number | null;
 }): ObjectiveDraft | null {
   const cashPriority = input.profile?.bias.cashPriority ?? input.identity?.finances ?? 5;
   if (cashPriority < 7) return null;
+  // In Season 1 kaufen die Teams ihren KOMPLETTEN Kader ein — ein Netto-Transferausgaben-Deckel würde genau
+  // diesen notwendigen Aufbau bestrafen. Deshalb wird das Ziel in S1 nicht gestellt (ab S2 wieder).
+  if (getSeasonNumber(input.seasonId) <= 1) return null;
 
   const netSpend = Math.max(0, -(input.row.transferNet ?? 0));
   // Cap scales with the team's declared budget/finances discipline: financially disciplined
@@ -1706,7 +1710,7 @@ function buildTeamObjectives(input: {
         targetRankOverride: boardV2 ? sportTarget.rank : null,
       }),
       getUpsetAvoidanceObjective({ team, identity, profile, row, rowsByTeamId, gameState }),
-      getTransferSpendCeilingObjective({ team, identity, profile, row }),
+      getTransferSpendCeilingObjective({ team, identity, profile, row, seasonId: gameState.season.id }),
       getSignatureAxisWinObjective({ team, identity, profile, gameState }),
       // From the balancing branch: V2 replaces the tautological "cash > 0" with a real
       // net-transfer-balance goal; V1 keeps the plain cash-positive objective (so no duplicate with the

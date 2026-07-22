@@ -1456,6 +1456,7 @@ describe("board goal targets: expectation, upset-avoidance, transfer ceiling, si
       identity: createIdentity("spender", { finances: 3 }),
       profile: null,
       row: createRow("spender", { transferNet: -50 }),
+      seasonId: "season-2",
     });
 
     expect(objective).toBeNull();
@@ -1470,12 +1471,14 @@ describe("board goal targets: expectation, upset-avoidance, transfer ceiling, si
       identity,
       profile: null,
       row: createRow("disciplined", { transferNet: -5 }), // net spend 5, cap = max(4, 100*0.2)=20
+      seasonId: "season-2",
     });
     const overCap = getTransferSpendCeilingObjective({
       team,
       identity,
       profile: null,
       row: createRow("disciplined", { transferNet: -60 }), // net spend 60, well above cap 20
+      seasonId: "season-2",
     });
 
     expect(underCap?.status).toBe("completed");
