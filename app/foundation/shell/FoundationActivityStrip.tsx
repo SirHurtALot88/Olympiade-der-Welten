@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useReducer, useRef } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 
 import type { FoundationActivityItem } from "@/lib/foundation/foundation-activity-types";
 
@@ -103,6 +103,20 @@ function useActivityStepHistory(activities: FoundationActivityItem[]) {
 
 export default function FoundationActivityStrip({ activities }: FoundationActivityStripProps) {
   const getHistory = useActivityStepHistory(activities);
+  // Der „Grund"-Block ist standardmäßig eingeklappt (kompakte Zeile) und lässt
+  // sich pro Aktivität aufklappen — die lange Blocker-Liste soll nicht dauerhaft
+  // Platz fressen, aber zum Debuggen erreichbar bleiben.
+  const [expandedReasons, setExpandedReasons] = useState<Set<string>>(new Set());
+  const toggleReasons = (id: string) =>
+    setExpandedReasons((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
 
   if (activities.length === 0) {
     return null;
@@ -148,6 +162,19 @@ export default function FoundationActivityStrip({ activities }: FoundationActivi
                 {activity.nextLabel ? (
                   <span className="foundation-activity-row-next">{activity.nextLabel}</span>
                 ) : null}
+                {activity.reasons && activity.reasons.length > 0 ? (
+                  <button
+                    type="button"
+                    className="foundation-activity-reasons-toggle"
+                    onClick={() => toggleReasons(activity.id)}
+                    aria-expanded={expandedReasons.has(activity.id)}
+                    title={expandedReasons.has(activity.id) ? "Grund ausblenden" : "Grund anzeigen"}
+                  >
+                    {expandedReasons.has(activity.id)
+                      ? "Grund ausblenden ▴"
+                      : `Grund anzeigen (${activity.reasons.length}) ▾`}
+                  </button>
+                ) : null}
               </div>
               {pct != null ? (
                 <div className="foundation-activity-row-bar" aria-label={`${pct}%`}>
@@ -159,7 +186,7 @@ export default function FoundationActivityStrip({ activities }: FoundationActivi
                   <span />
                 </div>
               )}
-              {activity.reasons && activity.reasons.length > 0 ? (
+              {activity.reasons && activity.reasons.length > 0 && expandedReasons.has(activity.id) ? (
                 <div className="foundation-activity-reasons">
                   <span className="foundation-activity-reasons-title">Grund</span>
                   <ul>

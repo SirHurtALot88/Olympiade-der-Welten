@@ -110,6 +110,23 @@ function round(value: number, digits = 2) {
   return Number(value.toFixed(digits));
 }
 
+/**
+ * Blocker/Warning-Strings NUR fuer die tatsaechlich ausgewaehlten Aktionen (gleicher Format wie
+ * `buildAiManagerApplyPreview`). `buildAiManagerApplyPreview` baut IMMER alle Aktionstypen (Budget,
+ * Gebaeude, Training, Vertrag) und meldet deren Blocker/Warnungen gesammelt zurueck — unabhaengig von
+ * `actionTypes`. Laeuft der Aufrufer nur mit einer Teilmenge (z. B. der Setup-Draft ruft die
+ * Vor-Draft-Runde ausschliesslich mit Budget/Gebaeude/Strategie auf, waehrend die Kader noch LEER
+ * sind), wuerden sonst die roster-abhaengigen Trainings-Blocker (`team_roster_empty`) faelschlich in
+ * das Ergebnis lecken. Blocker/Warnungen muessen daher auf die selektierten Aktionen beschraenkt sein.
+ */
+function scopedManagerPlanBlockers(actions: AiManagerAction[]) {
+  return actions.flatMap((action) => action.blockers.map((blocker) => `${action.teamCode}:${action.actionType}:${blocker}`));
+}
+
+function scopedManagerPlanWarnings(actions: AiManagerAction[]) {
+  return actions.flatMap((action) => action.warnings.map((warning) => `${action.teamCode}:${action.actionType}:${warning}`));
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
@@ -627,7 +644,13 @@ export function applyAiManagerPlan(input: {
     );
   }
   if (dryRun) {
-    return { ...preview, dryRun: true, actions: selectedActions };
+    return {
+      ...preview,
+      dryRun: true,
+      actions: selectedActions,
+      blockers: scopedManagerPlanBlockers(selectedActions),
+      warnings: scopedManagerPlanWarnings(selectedActions),
+    };
   }
 
   const leaguePlanPreview = buildAiLeagueManagementPreview(input.save.gameState);
@@ -798,6 +821,8 @@ export function applyAiManagerPlan(input: {
     ...preview,
     dryRun: false,
     applied: true,
+    blockers: scopedManagerPlanBlockers(selectedActions),
+    warnings: scopedManagerPlanWarnings(selectedActions),
     actions: selectedActions.map((action) => ({
       ...action,
       applied:

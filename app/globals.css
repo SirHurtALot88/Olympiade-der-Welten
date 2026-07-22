@@ -1162,6 +1162,28 @@ a {
   font-style: italic;
 }
 
+/* Ein-/Ausklapp-Umschalter für den „Grund"-Block: standardmäßig eingeklappt,
+   damit die lange Blocker-Liste nicht dauerhaft die Zeile aufbläht. */
+.foundation-activity-reasons-toggle {
+  margin-left: auto;
+  padding: 1px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(163, 194, 255, 0.35);
+  background: rgba(163, 194, 255, 0.08);
+  color: rgba(191, 205, 232, 0.9);
+  font-size: 0.66rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.foundation-activity-reasons-toggle:hover,
+.foundation-activity-reasons-toggle:focus-visible {
+  border-color: rgba(163, 194, 255, 0.7);
+  background: rgba(163, 194, 255, 0.16);
+}
+
 /* Verlauf-Hinweis + Hover-Popover mit den zuletzt abgeschlossenen Schritten. */
 .foundation-activity-row-histhint {
   display: inline-flex;
@@ -49048,6 +49070,9 @@ button.foundation-team-portrait-card {
   width: 100%;
   max-width: 100%;
   height: auto;
+  /* Kompakt halten, damit im Kauf-Panel Buyout, Blocker, Kaufen-Button und der
+     Team-Impact (Top-6) ohne Scrollen sichtbar bleiben. */
+  max-height: 96px;
 }
 .is-new-look .nl-market-deal-budget-buyout {
   color: var(--nl-mut);

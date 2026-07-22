@@ -6,6 +6,7 @@ import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-con
 import { applyAiMarketPlanLocally } from "@/lib/ai/ai-market-plan-apply-service";
 import { applyAiManagerPlan, type AiManagerAction, type AiManagerActionType } from "@/lib/ai/ai-manager-apply-service";
 import { buildAiActionBreakdown } from "@/lib/ai/ai-action-breakdown";
+import { AI_PRESEASON_RUN_STALE_MS } from "@/lib/ai/ai-preseason-run-timing";
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
 import type { AiPreseasonAutomationRunRecord, GameState } from "@/lib/data/olyDataTypes";
@@ -81,7 +82,9 @@ function isStaleRunningRun(run: AiPreseasonAutomationRunRecord | null) {
   if (run?.status !== "running") return false;
   const started = Date.parse(run.startedAt);
   if (!Number.isFinite(started)) return true;
-  return Date.now() - started > 120_000;
+  // Schwelle über der realen ~131 s-Laufzeit (siehe AI_PRESEASON_RUN_STALE_MS), damit ein echt laufender
+  // 31-Team-Draft nicht fälschlich als stale gilt und der Server keinen Duplikat-Lauf startet.
+  return Date.now() - started > AI_PRESEASON_RUN_STALE_MS;
 }
 
 function getSetupRosterTarget(gameState: GameState, teamId: string) {
