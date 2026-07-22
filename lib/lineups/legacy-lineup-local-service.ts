@@ -929,30 +929,31 @@ export function ensureLocalLegacyFormCardsForSeason(
   const existingSeasonCards = (save.gameState.seasonState.formCards ?? []).filter(
     (card) => card.seasonId === effectiveParams.seasonId,
   );
-  if (existingSeasonCards.length > 0) {
-    return {
-      ok: true as const,
-      source: "sqlite" as const,
-      seasonId: effectiveParams.seasonId,
-      generatedCardCount: 0,
-      existingCardCount: existingSeasonCards.length,
-      warnings: [],
-    };
-  }
 
+  // KEIN season-globaler Kurzschluss mehr: früher brach die Funktion ab, sobald IRGENDEIN Team eine Karte für die
+  // Season hatte. Dadurch bekam ein Team, das seinen Kader erst NACH der KI fertigstellt (typisch: der Mensch),
+  // nie Formkarten. `ensureLocalFormCardsForSeason` arbeitet jetzt pro Spieler additiv, also lassen wir es immer
+  // laufen — es fügt genau die noch fehlenden Karten hinzu (z. B. für frisch gekaufte Spieler) und ist bei bereits
+  // vollständigem Kader ein reiner No-op.
   const nextGameState = ensureLocalFormCardsForSeason(save.gameState, effectiveParams.saveId, effectiveParams.seasonId);
-  resolvedPersistence.saveSingleplayerState(save.saveId, nextGameState);
-  const generatedCardCount = (nextGameState.seasonState.formCards ?? []).filter(
+  const cardsChanged = nextGameState !== save.gameState;
+  if (cardsChanged) {
+    resolvedPersistence.saveSingleplayerState(save.saveId, nextGameState);
+  }
+  const totalSeasonCardCount = (nextGameState.seasonState.formCards ?? []).filter(
     (card) => card.seasonId === effectiveParams.seasonId,
   ).length;
+  const generatedCardCount = totalSeasonCardCount - existingSeasonCards.length;
 
   return {
     ok: true as const,
     source: "sqlite" as const,
     seasonId: effectiveParams.seasonId,
     generatedCardCount,
-    existingCardCount: 0,
-    warnings: generatedCardCount === 0 ? ["In dieser Season wurden keine Formkartenquellen gefunden."] : [],
+    existingCardCount: existingSeasonCards.length,
+    // Nur warnen, wenn wirklich GAR keine Karten existieren (weder vorher noch neu) — sonst ist
+    // generatedCardCount === 0 der normale „Kader schon vollständig abgedeckt"-No-op.
+    warnings: totalSeasonCardCount === 0 ? ["In dieser Season wurden keine Formkartenquellen gefunden."] : [],
   };
 }
 

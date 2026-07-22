@@ -1112,7 +1112,8 @@ export function applyAiLegacyLineupBatchLocally(
 	  try {
 	    preparedGameState = ensureLocalFormCardsForSeason(save.gameState, scope.saveId, scope.seasonId);
 	    const preparedSeasonCards = (preparedGameState.seasonState?.formCards ?? []).filter((card) => card.seasonId === scope.seasonId);
-	    formCardEnsure.generatedCardCount = existingSeasonCards.length > 0 ? 0 : preparedSeasonCards.length;
+	    // Additive Generierung: echte Differenz melden (nicht 0, sobald irgendeine Karte schon existierte).
+	    formCardEnsure.generatedCardCount = Math.max(0, preparedSeasonCards.length - existingSeasonCards.length);
 	  } catch (error) {
 	    formCardEnsure.warnings.push(error instanceof Error ? `form_card_prepare_skipped:${error.message}` : "form_card_prepare_skipped");
 	  }
