@@ -634,13 +634,15 @@ export function buildBonusObjectiveComponent(
         stages: threeStage(3, 6, 9, "+"),
       };
     case "momentum_series":
+      // Label-Ehrlichkeit (Fable-Review): der Evaluator zählt die GESAMTZAHL starker Spieltage (oberes
+      // Ligadrittel beim Tagesscore), KEINE Serie am Stück. Deshalb "Starke Spieltage" statt "Serie".
       return {
         ...base,
         componentId: "special-momentum-series",
-        label: "Momentum-Serie (starke Spieltage)",
+        label: "Starke Spieltage (oberes Drittel)",
         targetValue: "momentum",
         specialKey: "momentum_series",
-        stages: threeStage(3, 5, 7, "Spieltage"),
+        stages: threeStage(3, 5, 7, "starke Spieltage"),
       };
     case "discipline_dominance":
       return {
@@ -717,7 +719,9 @@ export function buildBonusObjectiveComponent(
       return {
         ...base,
         componentId: "special-solvency-series",
-        label: "Solvenz-Serie (Kasse positiv halten)",
+        // Label-Ehrlichkeit (Fable-Review): der Evaluator liest die Kasse NUR zum Settlement (Saisonende),
+        // nicht über die ganze Saison. Deshalb "zum Saisonende" statt der impliziten Dauer-"Serie".
+        label: "Solvenz (Kasse zum Saisonende positiv)",
         targetValue: "solvency",
         specialKey: "solvency_series",
         stages: [stage(0.01, 1.0, "Kasse positiv")],
@@ -821,10 +825,12 @@ export function buildGoldenObjectiveComponent(
         stages: [stage(1, 0.4, "1 Sprung"), stage(2, 0.7, "2 Sprünge"), stage(3, 1.0, "3 Sprünge")],
       };
     case "golden_discipline_monopoly":
+      // Label-Ehrlichkeit (Fable-Review): der Evaluator zählt DISTINKTE Spieler mit einem Top-K-Rang in
+      // IRGENDEINER Disziplin — kein Monopol auf EINE Disziplin. Deshalb "Disziplin-Elite".
       return {
         ...base,
         componentId: "special-golden-discipline-monopoly",
-        label: `Disziplin-Monopol (Spieler in Top-${SPONSOR_OBJ_GOLDEN_DISCIPLINE_RANK})`,
+        label: `Disziplin-Elite (Spieler in Top-${SPONSOR_OBJ_GOLDEN_DISCIPLINE_RANK})`,
         targetValue: SPONSOR_OBJ_GOLDEN_DISCIPLINE_RANK,
         specialKey: "golden_discipline_monopoly",
         stages: [stage(2, 0.4, "2 Spieler"), stage(3, 0.7, "3 Spieler"), stage(4, 1.0, "4 Spieler")],

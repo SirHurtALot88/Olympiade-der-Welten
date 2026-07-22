@@ -82,10 +82,16 @@ export function evaluateSpecialComponentForObjective(
     return (row?.transferNet ?? 0) >= target ? "completed" : (row?.transferNet ?? 0) >= target - 2 ? "at_risk" : "open";
   }
   if (specialKey === "discipline_top3_count") {
-    const performances = (gameState.seasonState.playerDisciplinePerformances ?? []).filter(
-      (entry) => entry.teamId === teamId && (entry.rankInDiscipline ?? 99) <= 3,
+    // FIX (Fable-Review): vorher wurde nur nach teamId + Rang gefiltert, OHNE Saison-Filter — dadurch
+    // leckten Disziplin-Performances aus Vorsaisons in die Zählung. Jetzt über currentSeasonPerformances
+    // (dieselbe saison-korrekte Quelle wie discipline_dominance) laufen. Der Rang-Schwellwert wird — falls
+    // im targetValue als "rank:N;count:M" kodiert — daraus gelesen, sonst der Legacy-Default Top 3.
+    const parsed = parseRankCountTargetValue(component.targetValue);
+    const rankThreshold = parsed?.rank ?? 3;
+    const target = parsed?.count ?? (typeof component.targetValue === "number" ? component.targetValue : 2);
+    const performances = currentSeasonPerformances(gameState, teamId).filter(
+      (entry) => (entry.rankInDiscipline ?? 99) <= rankThreshold,
     );
-    const target = typeof component.targetValue === "number" ? component.targetValue : 2;
     return performances.length >= target ? "completed" : performances.length >= target - 1 ? "at_risk" : "open";
   }
   if (specialKey === "fan_infrastructure") {
@@ -220,6 +226,24 @@ function parseRivalTeamId(targetValue: SponsorOfferComponent["targetValue"]): st
 }
 
 /**
+ * Parst ein "rank:N;count:M"-targetValue (stärke-skalierte Disziplin-Ziele, Fable-Review). N = geforderter
+ * Disziplin-Rang (z. B. Top 5), M = geforderte Spielerzahl. Gibt null zurück, wenn das Format nicht passt
+ * (dann greift der Legacy-Default). Reihenfolge/Whitespace tolerant.
+ */
+export function parseRankCountTargetValue(
+  targetValue: SponsorOfferComponent["targetValue"],
+): { rank: number; count: number } | null {
+  if (typeof targetValue !== "string") return null;
+  const rankMatch = /rank:\s*(\d+)/.exec(targetValue);
+  const countMatch = /count:\s*(\d+)/.exec(targetValue);
+  if (!rankMatch || !countMatch) return null;
+  const rank = Number(rankMatch[1]);
+  const count = Number(countMatch[1]);
+  if (!Number.isFinite(rank) || !Number.isFinite(count) || rank <= 0 || count <= 0) return null;
+  return { rank, count };
+}
+
+/**
  * Roh-Metrik ("höher = besser") eines Bonusziels. null → nicht berechenbar (Ziel gilt als offen).
  * Behandelt sowohl die 14 Standard- als auch die 6 Golden-Keys.
  */
@@ -329,6 +353,11 @@ export function computeObjectiveProgressMetric(
       const arenaPopularityFactor = computeTeamBeliebtheitFromGameState(gameState, teamId).value;
       const income = calculateFacilityIncome(facilities, { arenaPopularityFactor });
       const upkeep = calculateFacilityUpkeep(facilities);
+      // FIX (Fable-Review): "nichts bauen" ergab income 0 − upkeep 0 = 0 ≥ 0 und damit vollen Payout
+      // fürs Nichtstun. Wer keinerlei Gebäude betreibt (weder Einnahme noch Unterhalt), hat das Ziel nicht
+      // erfüllt, sondern schlicht nichts getan → offen (null), kein Gratis-Bonus. (Die vollständige
+      // "Selbsttragende Infrastruktur"-Neufassung folgt in der Ziel-Redesign-Phase.)
+      if (income <= 0 && upkeep <= 0) return null;
       return income - upkeep;
     }
     case "fatigue_management": {

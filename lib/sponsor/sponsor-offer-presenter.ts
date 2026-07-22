@@ -93,7 +93,7 @@ function resolveTransferDifficulty(target: number): SponsorChallengeDifficulty {
 const BONUS_OBJECTIVE_META: Record<string, { detail: string; difficulty: SponsorChallengeDifficulty }> = {
   // Standard-Bonusziele
   underdog_story: { detail: "Die Saison deutlich über der Qualitäts-Erwartung beenden", difficulty: "mittel" },
-  momentum_series: { detail: "Mehrere starke Spieltage in Serie liefern", difficulty: "mittel" },
+  momentum_series: { detail: "Mehrere starke Spieltage im oberen Ligadrittel liefern (Gesamtzahl, nicht am Stück)", difficulty: "mittel" },
   discipline_dominance: { detail: "Großen Kaderanteil in den Disziplin-Spitzenrängen stellen", difficulty: "mittel" },
   // axis_ascension wird gesondert behandelt (axisKey/axisLabel aus targetValue).
   fan_cult_player: { detail: "Einen Spieler zum gefeierten Star aufbauen", difficulty: "hart" },
@@ -101,7 +101,7 @@ const BONUS_OBJECTIVE_META: Record<string, { detail: string; difficulty: Sponsor
   rival_humiliation: { detail: "Den Rivalen in der Abschlusstabelle hinter sich lassen", difficulty: "mittel" },
   fan_infrastructure: { detail: "Einkommens-Gebäude ausbauen (Fan-Shop / Arena)", difficulty: "leicht" },
   form_color_cover: { detail: "Kader-Vielfalt über mehrere verschiedene Spielerklassen abdecken", difficulty: "leicht" },
-  solvency_series: { detail: "Die Kasse über die gesamte Saison positiv halten", difficulty: "leicht" },
+  solvency_series: { detail: "Zum Saisonende mit positiver Kasse dastehen", difficulty: "leicht" },
   transfer_trader: { detail: "Positive Netto-Bilanz in der Wechselperiode erzielen", difficulty: "mittel" },
   sustainability_architect: { detail: "Facility-Bilanz über die Saison netto ≥ 0 halten", difficulty: "mittel" },
   fatigue_management: { detail: "Den Kader über die Saison frisch halten (niedrige Fatigue)", difficulty: "mittel" },
