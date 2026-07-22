@@ -56,6 +56,18 @@ function createPersistenceMock() {
           "U-U": { points: 18, rank: 3, startplatz: 3 },
           "X-X": { points: 17, rank: undefined },
         },
+        // The salary factor is a per-save random roll now (see season-economy-factors); pin an explicit
+        // window here so the prize-math assertions stay deterministic and independent of the roll.
+        seasonEconomyFactors: [1.09, 1.21, 1.16, 0.97, 0.9].map((factor, horizonIndex) => ({
+          seasonId: "season-1",
+          seasonLabel: horizonIndex === 0 ? "Aktuell" : `Season +${horizonIndex}`,
+          horizonIndex,
+          factor,
+          source: "sheet_seed" as const,
+          rollSeed: null,
+          carriedFromSeasonId: null,
+          generatedAt: "2026-06-04T00:00:00.000Z",
+        })),
       },
       matchdayState: {
         matchdayId: "matchday-1",

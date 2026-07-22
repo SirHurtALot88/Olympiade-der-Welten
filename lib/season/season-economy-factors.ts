@@ -12,18 +12,18 @@ export const SEASON_ECONOMY_FACTOR_WINDOW_SIZE = 5;
  * pattern; keep any value modest because it compounds.
  */
 const SALARY_FACTOR_SHIFT = Number(process.env.OLY_SALARY_FACTOR_SHIFT ?? 0) || 0;
-/** Random roll range for future (beyond-default-window) seasons, both ends shiftable via SALARY_FACTOR_SHIFT. */
+/**
+ * Random roll span for the salary factor, both ends shiftable via SALARY_FACTOR_SHIFT. This is the
+ * canonical span every season's factor is drawn from — [0.82, 1.24] at the neutral shift. The old
+ * design pinned Season 1 (and its carried-forward window) to a fixed sheet pattern whose first value
+ * was 1.09, so every new game started at exactly 1.09. Per owner request the factor must be a fresh
+ * random draw within this span for EVERY new game and EVERY follow-up season (deterministic per save
+ * via the seeded roll, so it stays stable across reloads and prize/economy re-reads within a season).
+ * The only thing that pins the factor to scripted values now is an explicit balancing pattern
+ * (OLY_LONG_RUN_SALARY_FACTOR_PATTERN); normal gameplay always rolls.
+ */
 const SALARY_FACTOR_ROLL_MIN = 0.82 + SALARY_FACTOR_SHIFT;
 const SALARY_FACTOR_ROLL_WIDTH = 0.42;
-
-const DEFAULT_SEASON_FACTOR_VALUES = [1.09, 1.21, 1.16, 0.97, 0.9].map(
-  (value) => Math.round((value + SALARY_FACTOR_SHIFT) * 100) / 100,
-);
-
-type SheetFactorInput = {
-  seasonLabel: string;
-  factor: number | null;
-};
 
 function round2(value: number) {
   return Math.round(value * 100) / 100;
@@ -61,18 +61,10 @@ function rollFutureSeasonFactor(seed: string) {
   return round2(SALARY_FACTOR_ROLL_MIN + random() * SALARY_FACTOR_ROLL_WIDTH);
 }
 
-function normalizeSheetFactors(sheetFactors?: SheetFactorInput[]) {
-  const values = (sheetFactors ?? [])
-    .map((entry) => (typeof entry.factor === "number" && Number.isFinite(entry.factor) ? round2(entry.factor) : null))
-    .filter((value): value is number => value != null);
-
-  return values.length > 0 ? values : DEFAULT_SEASON_FACTOR_VALUES;
-}
-
 /**
  * Reads OLY_LONG_RUN_SALARY_FACTOR_PATTERN, e.g. "1.18,1.15,0.85,0.85,0.88" for Season 1-5.
  * Used only for the initial (Season 1, unseeded) window so balancing runs can deterministically
- * script "N good seasons then M bad seasons" scenarios instead of relying on the randomized/default
+ * script "N good seasons then M bad seasons" scenarios instead of relying on the randomized
  * factor rolls. The window then shifts season-by-season via advanceSeasonEconomyFactorWindow as usual.
  */
 export function parseSalaryFactorPatternEnv(): number[] | null {
@@ -88,24 +80,28 @@ export function parseSalaryFactorPatternEnv(): number[] | null {
 function buildSeedWindow(input: {
   saveId: string;
   seasonId: string;
-  sheetFactors?: SheetFactorInput[];
+  patternFactors?: number[] | null;
   generatedAt?: string;
 }) {
-  const baseFactors = normalizeSheetFactors(input.sheetFactors);
   const seasonOffset = parseSeasonNumber(input.seasonId) - 1;
   const generatedAt = input.generatedAt ?? new Date().toISOString();
+  // Scripted balancing pattern (explicit param or OLY_LONG_RUN_SALARY_FACTOR_PATTERN) pins the factor;
+  // otherwise every horizon is a fresh per-save random draw within the salary-factor span. This is what
+  // makes a new game start on a random factor instead of the old fixed 1.09.
+  const pattern = input.patternFactors ?? parseSalaryFactorPatternEnv();
 
   return Array.from({ length: SEASON_ECONOMY_FACTOR_WINDOW_SIZE }, (_, horizonIndex) => {
     const absoluteIndex = seasonOffset + horizonIndex;
-    const seededFactor = baseFactors[absoluteIndex];
+    const scripted = pattern?.[absoluteIndex];
+    const hasScripted = typeof scripted === "number" && Number.isFinite(scripted);
     const rollSeed = `${input.saveId}:${input.seasonId}:season-economy-factor:${absoluteIndex + 1}`;
     return {
       seasonId: input.seasonId,
       seasonLabel: getHorizonLabel(horizonIndex),
       horizonIndex,
-      factor: seededFactor != null ? seededFactor : rollFutureSeasonFactor(rollSeed),
-      source: seededFactor != null ? "sheet_seed" : "rolled",
-      rollSeed: seededFactor != null ? null : rollSeed,
+      factor: hasScripted ? round2(scripted as number) : rollFutureSeasonFactor(rollSeed),
+      source: hasScripted ? "sheet_seed" : "rolled",
+      rollSeed: hasScripted ? null : rollSeed,
       carriedFromSeasonId: null,
       generatedAt,
     } satisfies SeasonEconomyFactorRecord;
@@ -129,7 +125,12 @@ export function getSeasonEconomyFactorWindow(input: {
   saveId: string;
   seasonId: string;
   seasonState?: Pick<SeasonState, "seasonEconomyFactors">;
-  sheetFactors?: SheetFactorInput[];
+  /**
+   * Explicit scripted balancing pattern (Season 1-indexed). When omitted, buildSeedWindow falls back
+   * to OLY_LONG_RUN_SALARY_FACTOR_PATTERN; when that is unset too (normal gameplay) every season's
+   * factor is a fresh per-save random roll within the salary-factor span.
+   */
+  patternFactors?: number[] | null;
 }) {
   const existingWindow = normalizeWindow(input.seasonState?.seasonEconomyFactors ?? [], input.seasonId);
   if (existingWindow.length === SEASON_ECONOMY_FACTOR_WINDOW_SIZE) {

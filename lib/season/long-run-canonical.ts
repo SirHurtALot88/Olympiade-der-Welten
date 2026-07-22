@@ -94,7 +94,7 @@ export function ensureSalaryFactorWindowSeeded(save: PersistedSaveGame, persiste
     saveId: save.saveId,
     seasonId,
     seasonState: save.gameState.seasonState,
-    sheetFactors: patternOverride?.map((factor) => ({ seasonLabel: "", factor })),
+    patternFactors: patternOverride,
   });
   return persistence.saveSingleplayerState(save.saveId, {
     ...save.gameState,

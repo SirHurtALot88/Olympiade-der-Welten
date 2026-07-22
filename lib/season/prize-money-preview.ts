@@ -365,17 +365,12 @@ export async function buildPrizeMoneyPreview(
       .filter((row) => row.placementAmount != null)
       .map((row) => [row.rankDelta, row.placementAmount as number] as const),
   );
-  const sheetSeasonFactors = sourceBundle.seasonFactors
-    .filter((row) => row.factor != null)
-    .map((row) => ({
-      seasonLabel: row.seasonLabel,
-      factor: row.factor,
-    }));
+  // The salary factor is now a per-save random roll within its span (see season-economy-factors),
+  // not a fixed sheet pattern — so the sheet's season-factor rows are no longer used to seed it here.
   const seasonFactors = getSeasonEconomyFactorWindow({
     saveId,
     seasonId,
     seasonState: save.gameState.seasonState,
-    sheetFactors: sheetSeasonFactors,
   }).map((row) => ({
     seasonLabel: row.seasonLabel,
     factor: row.factor,

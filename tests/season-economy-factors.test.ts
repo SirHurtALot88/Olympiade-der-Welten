@@ -7,21 +7,39 @@ import {
   SEASON_ECONOMY_FACTOR_WINDOW_SIZE,
 } from "@/lib/season/season-economy-factors";
 
+// Salary-factor roll span at the neutral shift (OLY_SALARY_FACTOR_SHIFT unset/0): [0.82, 1.24].
+const ROLL_MIN = 0.82;
+const ROLL_MAX = 0.82 + 0.42;
+
 describe("season economy factors", () => {
-  it("builds the initial five-season factor window from seed values", () => {
+  it("rolls every Season 1 horizon randomly within the salary-factor span (no fixed 1.09 seed)", () => {
     const window = getSeasonEconomyFactorWindow({
       saveId: "save-test",
       seasonId: "season-1",
     });
 
     expect(window).toHaveLength(SEASON_ECONOMY_FACTOR_WINDOW_SIZE);
-    // Default OLY_SALARY_FACTOR_SHIFT is 0.1, so the canonical pattern [1.09,1.21,1.16,0.97,0.9] is lifted
-    // uniformly by +0.1 (see season-economy-factors SALARY_FACTOR_SHIFT). Set the env to 0 to restore it.
-    expect(window.map((entry) => entry.factor)).toEqual([1.19, 1.31, 1.26, 1.07, 1]);
     expect(window.map((entry) => entry.horizonIndex)).toEqual([0, 1, 2, 3, 4]);
+    // Every season is a rolled draw within span — NOT the old fixed sheet pattern that pinned S1 to 1.09.
+    expect(window.every((entry) => entry.source === "rolled")).toBe(true);
+    for (const entry of window) {
+      expect(entry.factor).toBeGreaterThanOrEqual(ROLL_MIN);
+      expect(entry.factor).toBeLessThanOrEqual(ROLL_MAX);
+    }
+  });
+
+  it("is deterministic per save but differs across saves (random per new game)", () => {
+    const first = () => getSeasonEconomyFactorWindow({ saveId: "save-a", seasonId: "season-1" });
+    // Same save → identical window (stable across reloads / prize re-reads within a season).
+    expect(first().map((entry) => entry.factor)).toEqual(first().map((entry) => entry.factor));
+    // Different save → a different opening factor (each new game gets its own random draw).
+    const windowA = getSeasonEconomyFactorWindow({ saveId: "save-a", seasonId: "season-1" });
+    const windowB = getSeasonEconomyFactorWindow({ saveId: "save-b", seasonId: "season-1" });
+    expect(windowA[0].factor).not.toEqual(windowB[0].factor);
   });
 
   it("moves the five-season factor window forward and rolls a new S+4 value", () => {
+    const seed = getSeasonEconomyFactorWindow({ saveId: "save-test", seasonId: "season-1" });
     const advanced = advanceSeasonEconomyFactorWindow({
       saveId: "save-test",
       fromSeasonId: "season-1",
@@ -29,12 +47,13 @@ describe("season economy factors", () => {
     });
 
     expect(advanced.nextWindow).toHaveLength(SEASON_ECONOMY_FACTOR_WINDOW_SIZE);
-    // +0.1 default shift applied to the canonical pattern (see note above).
-    expect(advanced.nextWindow.slice(0, 4).map((entry) => entry.factor)).toEqual([1.31, 1.26, 1.07, 1]);
+    // The window shifts: the outgoing season drops off and horizons 1-4 of the seed carry forward.
+    expect(advanced.nextWindow.slice(0, 4).map((entry) => entry.factor)).toEqual(
+      seed.slice(1).map((entry) => entry.factor),
+    );
     expect(advanced.rerolledSeasonPlus4.horizonIndex).toBe(4);
-    // Roll range is also shifted +0.1 at both ends: [0.82,1.24] → [0.92,1.34].
-    expect(advanced.rerolledSeasonPlus4.factor).toBeGreaterThanOrEqual(0.92);
-    expect(advanced.rerolledSeasonPlus4.factor).toBeLessThanOrEqual(1.34);
+    expect(advanced.rerolledSeasonPlus4.factor).toBeGreaterThanOrEqual(ROLL_MIN);
+    expect(advanced.rerolledSeasonPlus4.factor).toBeLessThanOrEqual(ROLL_MAX);
   });
 
   describe("OLY_LONG_RUN_SALARY_FACTOR_PATTERN override", () => {
@@ -54,16 +73,25 @@ describe("season economy factors", () => {
       expect(parseSalaryFactorPatternEnv()).toBeNull();
     });
 
-    it("feeds the pattern into the initial window via sheetFactors", () => {
-      process.env.OLY_LONG_RUN_SALARY_FACTOR_PATTERN = "1.18,1.15,0.85,0.85,0.88";
-      const pattern = parseSalaryFactorPatternEnv();
+    it("feeds an explicit pattern into the initial window via patternFactors", () => {
+      const pattern = [1.18, 1.15, 0.85, 0.85, 0.88];
       const window = getSeasonEconomyFactorWindow({
         saveId: "save-test",
         seasonId: "season-1",
-        sheetFactors: pattern?.map((factor) => ({ seasonLabel: "", factor })),
+        patternFactors: pattern,
       });
       expect(window.map((entry) => entry.factor)).toEqual([1.18, 1.15, 0.85, 0.85, 0.88]);
       expect(window.map((entry) => entry.source)).toEqual(["sheet_seed", "sheet_seed", "sheet_seed", "sheet_seed", "sheet_seed"]);
+    });
+
+    it("pins the initial window when OLY_LONG_RUN_SALARY_FACTOR_PATTERN is set (env fallback)", () => {
+      process.env.OLY_LONG_RUN_SALARY_FACTOR_PATTERN = "1.18,1.15,0.85,0.85,0.88";
+      const window = getSeasonEconomyFactorWindow({
+        saveId: "save-test",
+        seasonId: "season-1",
+      });
+      expect(window.map((entry) => entry.factor)).toEqual([1.18, 1.15, 0.85, 0.85, 0.88]);
+      expect(window.every((entry) => entry.source === "sheet_seed")).toBe(true);
     });
 
     it("keeps a >5-season pattern in effect beyond the initial window (regression: values past index 4 used to be silently dropped)", () => {
@@ -73,7 +101,7 @@ describe("season economy factors", () => {
       let window = getSeasonEconomyFactorWindow({
         saveId: "save-test",
         seasonId: "season-1",
-        sheetFactors: pattern.map((factor) => ({ seasonLabel: "", factor })),
+        patternFactors: pattern,
       });
       let seasonState = { seasonEconomyFactors: window };
       const seasonIds = ["season-2", "season-3", "season-4", "season-5", "season-6", "season-7"];
