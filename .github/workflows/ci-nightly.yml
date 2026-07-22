@@ -1,8 +1,10 @@
 name: CI Nightly
 
 on:
-  schedule:
-    - cron: "0 0 * * *"
+  # Nightly-Schedule deaktiviert (Owner-Wunsch): der tägliche Full-Season-Durchlauf erzeugte rotes CI bei
+  # Spiel-/Balancing-Themen (z. B. incomplete_lineups an einem Spieltag) ohne praktischen Nutzen. Der Job
+  # bleibt erhalten und kann bei Bedarf jederzeit manuell über „Run workflow" (workflow_dispatch) gestartet
+  # werden — er läuft nur nicht mehr automatisch um Mitternacht.
   workflow_dispatch:
 
 jobs:
