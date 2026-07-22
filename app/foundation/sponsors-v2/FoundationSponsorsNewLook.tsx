@@ -22,6 +22,7 @@ import {
   SponsorOfferCardNewLook,
 } from "@/components/foundation/sponsor/SponsorOfferCardNewLook";
 import { buildSponsorOfferPresentation, getSponsorComponentKindLabel } from "@/lib/sponsor/sponsor-offer-presenter";
+import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { getTeamObjectives } from "@/lib/board/team-season-objectives-service";
 import { formatGameFlowBlocker } from "@/lib/foundation/game-flow-blocker-labels";
 import {
@@ -371,12 +372,15 @@ export default function FoundationSponsorsNewLook({
       .sort((left, right) => left.matchday - right.matchday || Date.parse(left.createdAt) - Date.parse(right.createdAt));
   }, [gameState.seasonState.sponsorEvents, activeContractTeamId]);
 
-  // #78: Liga-Sponsorenübersicht — wer hat wen, aus `sponsorContractsByTeamId`
-  // über alle Teams (`gameState.teams`), sortierbar.
+  // #78: Liga-Sponsorenübersicht — wer hat wen, über alle Teams
+  // (`gameState.teams`), sortierbar. Liest den unterschriebenen Vertrag über
+  // `getTeamSponsorContract`, damit nur der aktuell für DIESE Saison gültige
+  // Sponsor angezeigt wird (der Helfer filtert abgelaufene/Vorsaison-Verträge
+  // aus `sponsorContractsByTeamId` heraus — sonst würde ein Team fälschlich mit
+  // seinem alten Sponsor der Vorsaison gelistet).
   const leagueSponsorRows = useMemo(() => {
-    const contracts = gameState.seasonState.sponsorContractsByTeamId ?? {};
     return gameState.teams.map((team) => {
-      const contract = contracts[team.teamId] ?? null;
+      const contract = getTeamSponsorContract(gameState, team.teamId);
       const totalCash = contract
         ? contract.components.reduce(
             (sum, component) => sum + (typeof component.rewardCash === "number" ? component.rewardCash : 0),
@@ -399,7 +403,7 @@ export default function FoundationSponsorsNewLook({
         isGolden: contract?.variantKey === "premium_elite",
       };
     });
-  }, [gameState.teams, gameState.seasonState.sponsorContractsByTeamId]);
+  }, [gameState]);
   const sortedLeagueSponsorRows = useMemo(() => {
     const list = [...leagueSponsorRows];
     list.sort((left, right) => {
@@ -834,7 +838,7 @@ export default function FoundationSponsorsNewLook({
                         </div>
                       </>
                     ) : (
-                      <span className="nl-sponsor-league-sponsor is-empty">Kein Sponsor</span>
+                      <span className="nl-sponsor-league-sponsor is-empty">— noch keiner —</span>
                     )}
                   </div>
                   <span className="nl-sponsor-league-cash nl-tnum">
