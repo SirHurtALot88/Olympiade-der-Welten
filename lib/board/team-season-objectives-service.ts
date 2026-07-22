@@ -1330,11 +1330,19 @@ function getRebuildCashObjective(input: {
   row: TeamManagementSnapshotRow;
   identity: TeamIdentity | null;
   profile: TeamStrategyProfile | null;
+  seasonId: string | number | null;
 }): ObjectiveDraft | null {
   const cashPriority = input.profile?.bias.cashPriority ?? input.identity?.finances ?? 5;
   const ambition = input.identity?.ambition ?? 5;
   if (cashPriority < 8 && ambition > 4) return null;
-  const target = roundValue(Math.max(0, input.team.budget * 0.65), 1);
+  // In Season 1 bauen die Teams ihren Kader noch KOMPLETT auf und müssen dafür fast ihr gesamtes Cash
+  // ausgeben — 65 % des Budgets als Puffer zu verlangen ist da unerfüllbar. Deshalb S1 nur ein kleiner
+  // Liquiditätspuffer (~20-30). Ab Season 2 (Kader steht) gilt wieder das reguläre 65 %-Ziel.
+  const seasonNumber = getSeasonNumber(input.seasonId);
+  const target =
+    seasonNumber <= 1
+      ? roundValue(Math.min(30, Math.max(20, input.team.budget * 0.1)), 1)
+      : roundValue(Math.max(0, input.team.budget * 0.65), 1);
   const status = statusForMin(input.row.cash, target);
 
   return {
@@ -1731,7 +1739,7 @@ function buildTeamObjectives(input: {
       getPlayerTop20Objective({ gameState, team, identity, profile }),
       getPlayerTop50Objective({ gameState, team, identity, profile }),
       getTopPlayerObjective({ gameState, team, identity, profile }),
-      getRebuildCashObjective({ team, row, identity, profile }),
+      getRebuildCashObjective({ team, row, identity, profile, seasonId: gameState.season.id }),
       getRivalryObjective({ gameState, team, row, rowsByTeamId }),
     ].filter((objective): objective is ObjectiveDraft => Boolean(objective)),
   });
