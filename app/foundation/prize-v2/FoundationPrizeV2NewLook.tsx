@@ -97,6 +97,8 @@ export default function FoundationPrizeV2NewLook({
   displayPrizePreviewRows,
   prizeV2Summary,
   prizeV2LeaderRow,
+  prizeV2TopSponsorRow,
+  prizeV2TotalSponsorCash,
   prizeV2SelectedTeamSummary,
   prizeV2SwingRow,
   prizeV2RiskRow,
@@ -119,7 +121,7 @@ export default function FoundationPrizeV2NewLook({
 
   const selectedTeamId = selectedTeam?.teamId ?? null;
 
-  /** Reale Verteilung Rang → Preisgeld aus dem Preview-Feed (Ränge 1–32). */
+  /** Verteilung Rang → Sponsor-Einnahme aus dem Preview-Feed (Ränge 1–32). */
   const distributionItems = useMemo(() => {
     const items = (prizePreviewFeed?.items ?? [])
       .filter(
@@ -128,8 +130,8 @@ export default function FoundationPrizeV2NewLook({
           Number.isFinite(item.rank) &&
           item.rank >= 1 &&
           item.rank <= NL_PRIZE_MAX_RANK &&
-          item.prizeMoney != null &&
-          Number.isFinite(item.prizeMoney),
+          item.sponsorCash != null &&
+          Number.isFinite(item.sponsorCash),
       )
       .sort(compareByRank);
     return items;
@@ -138,7 +140,7 @@ export default function FoundationPrizeV2NewLook({
   const maxDistributionMoney = useMemo(
     () =>
       distributionItems.reduce(
-        (max, item) => (item.prizeMoney != null && Number.isFinite(item.prizeMoney) && item.prizeMoney > max ? item.prizeMoney : max),
+        (max, item) => (item.sponsorCash != null && Number.isFinite(item.sponsorCash) && item.sponsorCash > max ? item.sponsorCash : max),
         0,
       ),
     [distributionItems],
@@ -170,9 +172,8 @@ export default function FoundationPrizeV2NewLook({
 
   // Headline-Geldbeträge zählen hoch (#Wave2) — die Haupttabelle und die
   // Verteilungsbalken bleiben unverändert (sortierbar/groß, kein Zähler).
-  const animatedSummaryBonusMalus = useCountUp(prizePreviewFeed?.summary.totalRankChangePrize ?? null);
   const animatedForecastCashBefore = useCountUp(prizeV2SelectedTeamSummary?.currentCash ?? null);
-  const animatedForecastPrizeMoney = useCountUp(prizeForecastRankRow?.prizeMoney ?? null);
+  const animatedForecastSponsorCash = useCountUp(firstForecastRow?.sponsorCash ?? null);
   const animatedForecastBonusMalus = useCountUp(firstForecastRow?.guv ?? null);
   const animatedForecastCashAfter = useCountUp(firstForecastRow?.cashAfter ?? null);
 
@@ -198,6 +199,7 @@ export default function FoundationPrizeV2NewLook({
   // Story-/Champion-Karten sind Portale: nur wenn die Zeile ein Team mit
   // Profil benennt, wird die Karte klickbar (öffnet das Teamprofil).
   const leaderTeamId = prizeV2LeaderRow?.teamId ?? null;
+  const topSponsorTeamId = prizeV2TopSponsorRow?.teamId ?? null;
   const outlookTeamId = (prizeV2SelectedTeamSummary?.teamId as string | null | undefined) ?? null;
   // Kredit-Kern (Fog of War, own-team-only — siehe `use-prize-v2-panel-model.ts`):
   // nur für das ausgewählte eigene Team, nicht für Leader/Swing/Risiko-Karten,
@@ -307,7 +309,7 @@ export default function FoundationPrizeV2NewLook({
           </div>
         }
       >
-        <StatChipRow className="nl-prize-summary-chips" aria-label="Preisgeld-Kennzahlen">
+        <StatChipRow className="nl-prize-summary-chips" aria-label="Sponsor-Einnahmen-Kennzahlen">
           <StatChip
             label="Teams"
             value={`${prizeV2Summary.calculableTeams}/${prizeV2Summary.totalTeams}`}
@@ -326,18 +328,10 @@ export default function FoundationPrizeV2NewLook({
             sub="Sponsor-Einnahmen-Tabelle"
           />
           <StatChip
-            label="Bonus/Malus"
-            value={
-              prizePreviewFeed?.summary.totalRankChangePrize != null
-                ? formatSignedDisplayMoney(animatedSummaryBonusMalus ?? prizePreviewFeed.summary.totalRankChangePrize)
-                : "—"
-            }
+            label="Sponsor gesamt"
+            value={prizeV2TotalSponsorCash > 0 ? formatNlMoney(prizeV2TotalSponsorCash) : "—"}
             sub="Liga gesamt"
-            tone={
-              prizePreviewFeed?.summary.totalRankChangePrize != null && prizePreviewFeed.summary.totalRankChangePrize < 0
-                ? "risk"
-                : "good"
-            }
+            tone="good"
           />
           <StatChip
             label="Blocker"
@@ -360,17 +354,17 @@ export default function FoundationPrizeV2NewLook({
         ) : null}
       </NlCard>
 
-      <div className="nl-prize-story-grid" aria-label="Preisgeld-Fokus">
+      <div className="nl-prize-story-grid" aria-label="Sponsor-Einnahmen-Fokus">
         <NlCard
           className="nl-prize-story-card"
-          eyebrow="Top Auszahlung"
-          title={prizeV2LeaderRow?.teamName ?? "—"}
-          onClick={leaderTeamId ? () => openTeamProfileById(leaderTeamId) : undefined}
+          eyebrow="Top Sponsor-Einnahme"
+          title={prizeV2TopSponsorRow?.teamName ?? "—"}
+          onClick={topSponsorTeamId ? () => openTeamProfileById(topSponsorTeamId) : undefined}
         >
           <p className="nl-prize-story-line nl-tnum">
-            {prizeV2LeaderRow
-              ? `#${prizeV2LeaderRow.rank ?? "—"} · ${formatNullableMoney(prizeV2LeaderRow.prizeMoney)}`
-              : "kein Leader"}
+            {prizeV2TopSponsorRow
+              ? `#${prizeV2TopSponsorRow.rank ?? "—"} · ${formatNullableMoney(prizeV2TopSponsorRow.sponsorCash)}`
+              : "kein Sponsor"}
           </p>
         </NlCard>
         <NlCard
@@ -420,12 +414,12 @@ export default function FoundationPrizeV2NewLook({
         <NlCard
           className="nl-prize-distribution-card"
           eyebrow="Verteilung"
-          title="Preisgeld nach Endplatz"
+          title="Sponsor-Einnahmen nach Endplatz"
           actions={
             ownDistributionItem ? (
               <StatChip
                 label={`Dein Platz #${ownDistributionItem.rank}`}
-                value={formatNlMoney(ownDistributionItem.prizeMoney)}
+                value={formatNlMoney(ownDistributionItem.sponsorCash)}
                 tone="accent"
                 onClick={() => openTeamProfileById(ownDistributionItem.teamId)}
                 title={`${ownDistributionItem.teamName} öffnen`}
@@ -437,10 +431,10 @@ export default function FoundationPrizeV2NewLook({
             <div className="nl-prize-distribution-scroll">
               <ol
                 className="nl-prize-dist-bars"
-                aria-label="Preisgeld-Verteilung über die Endplätze — Balken öffnen das Teamprofil"
+                aria-label="Sponsor-Einnahmen-Verteilung über die Endplätze — Balken öffnen das Teamprofil"
               >
                 {distributionItems.map((item) => {
-                  const money = item.prizeMoney as number;
+                  const money = item.sponsorCash as number;
                   const heightPct = maxDistributionMoney > 0 ? Math.max(3, (money / maxDistributionMoney) * 100) : 0;
                   const isOwn = item.teamId === selectedTeamId;
                   const clickable = item.teamId != null && teamsById.has(item.teamId);
@@ -476,7 +470,7 @@ export default function FoundationPrizeV2NewLook({
               </ol>
             </div>
           ) : (
-            <p className="nl-prize-empty">Verteilung wartet auf Preisgeld-Preview mit Rängen.</p>
+            <p className="nl-prize-empty">Verteilung wartet auf Sponsor-Preview mit Rängen.</p>
           )}
         </NlCard>
 
@@ -513,13 +507,13 @@ export default function FoundationPrizeV2NewLook({
               }
             />
             <StatChip
-              label="Preisgeld"
+              label="Sponsor-Einnahmen"
               value={
-                prizeForecastRankRow?.prizeMoney != null
-                  ? formatNlMoney(animatedForecastPrizeMoney ?? prizeForecastRankRow.prizeMoney)
+                firstForecastRow?.sponsorCash != null
+                  ? formatNlMoney(animatedForecastSponsorCash ?? firstForecastRow.sponsorCash)
                   : "—"
               }
-              sub={prizeForecastRankRow ? `bei Platz ${prizeForecastRank}` : "kein Rang-Datum"}
+              sub="je Saison (flach)"
               tone="accent"
             />
             <StatChip
@@ -553,7 +547,7 @@ export default function FoundationPrizeV2NewLook({
               className="nl-prize-forecast-chart"
             />
           ) : (
-            <p className="nl-prize-empty">Forecast wartet auf Preisgeld-Preview, Team-Cash und Gehaltssumme.</p>
+            <p className="nl-prize-empty">Forecast wartet auf Sponsor-Preview, Team-Cash und Gehaltssumme.</p>
           )}
           {prizeForecastRows.length > 0 ? (
             <div className="nl-prize-forecast-table-shell">
@@ -561,8 +555,8 @@ export default function FoundationPrizeV2NewLook({
                 <thead>
                   <tr>
                     <th>Season</th>
-                    <th>Faktor</th>
-                    <th>Preisgeld</th>
+                    <th>Sponsor</th>
+                    <th>Gebäude</th>
                     <th>Gehalt</th>
                     {outlookLoanInstallment != null ? <th>Kreditrate</th> : null}
                     <th>GuV</th>
@@ -573,8 +567,8 @@ export default function FoundationPrizeV2NewLook({
                   {prizeForecastRows.map((row) => (
                     <tr key={row.label}>
                       <td>{row.label}</td>
-                      <td>{formatLocalePoints(row.factor ?? null, 2)}</td>
-                      <td>{row.prizeMoney != null ? formatNlMoney(row.prizeMoney) : "—"}</td>
+                      <td>{row.sponsorCash != null ? formatNlMoney(row.sponsorCash) : "—"}</td>
+                      <td>{row.facilityIncome != null ? formatNlMoney(row.facilityIncome) : "—"}</td>
                       <td>{row.salaryTotal != null ? formatNlMoney(row.salaryTotal) : "—"}</td>
                       {outlookLoanInstallment != null ? (
                         <td>{row.loanInstallment != null ? formatNlMoney(row.loanInstallment) : "—"}</td>
@@ -600,7 +594,7 @@ export default function FoundationPrizeV2NewLook({
         </NlCard>
       </div>
 
-      <NlCard className="nl-prize-table-card" eyebrow="Haupttabelle" title="Preisgeld-Tabelle">
+      <NlCard className="nl-prize-table-card" eyebrow="Haupttabelle" title="Sponsor-Einnahmen-Tabelle">
         {prizePreviewHardBlocked.length > 0 ? (
           <div className="nl-prize-warning-box is-blocked">
             <strong>Blocker{prizePreviewHardBlocked.length > 4 ? ` (${prizePreviewHardBlocked.length})` : ""}</strong>

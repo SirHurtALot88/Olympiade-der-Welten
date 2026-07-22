@@ -30,6 +30,8 @@ export interface FoundationPrizeV2PanelProps {
     label: string;
     factor: number | null;
     prizeMoney: number | null;
+    sponsorCash: number | null;
+    facilityIncome: number | null;
     salaryTotal: number | null;
     loanInstallment: number | null;
     guv: number | null;
@@ -43,6 +45,8 @@ export interface FoundationPrizeV2PanelProps {
     totalTeams: number;
   };
   prizeV2LeaderRow: PrizeV2Row | null;
+  prizeV2TopSponsorRow: PrizeV2Row | null;
+  prizeV2TotalSponsorCash: number;
   prizeV2SelectedTeamSummary: ReturnType<typeof Object> | null;
   prizeV2SwingRow: PrizeV2Row | null;
   prizeV2RiskRow: PrizeV2Row | null;

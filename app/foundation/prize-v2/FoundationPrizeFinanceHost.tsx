@@ -57,6 +57,8 @@ function FoundationPrizeV2HostInner(props: PrizeV2HostInnerProps) {
       displayPrizePreviewRows={model.displayPrizePreviewRows}
       prizeV2Summary={model.prizeV2Summary}
       prizeV2LeaderRow={model.prizeV2LeaderRow}
+      prizeV2TopSponsorRow={model.prizeV2TopSponsorRow}
+      prizeV2TotalSponsorCash={model.prizeV2TotalSponsorCash}
       prizeV2SelectedTeamSummary={model.prizeV2SelectedTeamSummary}
       prizeV2SwingRow={model.prizeV2SwingRow}
       prizeV2RiskRow={model.prizeV2RiskRow}
@@ -79,6 +81,8 @@ export type FoundationPrizeFinanceHostProps = {
     | "displayPrizePreviewRows"
     | "prizeV2Summary"
     | "prizeV2LeaderRow"
+    | "prizeV2TopSponsorRow"
+    | "prizeV2TotalSponsorCash"
     | "prizeV2SelectedTeamSummary"
     | "prizeV2SwingRow"
     | "prizeV2RiskRow"

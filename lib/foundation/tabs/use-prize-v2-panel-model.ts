@@ -75,6 +75,8 @@ export interface PrizeV2Row {
   seasonCash: number | null;
   currentFactor: number | null;
   prizeMoney: number | null;
+  sponsorCash: number | null;
+  facilityIncome: number | null;
   bonusMalus: number | null;
   startRank: number | null;
   rankDelta: number | null;
@@ -162,53 +164,35 @@ export function usePrizeV2PanelModel({
   const prizeForecastRows = useMemo(() => {
     const startCash = selectedPrizePreviewRow?.currentCash ?? selectedTeam?.cash ?? null;
     const salaryTotal = prizeForecastSalaryTotal;
-    const rankRow = prizeForecastRankRow;
-    const currentFactor = prizePreviewFeed?.summary.currentFactor ?? null;
-    // Vereinfachende Annahme (analog zum bereits flach projizierten
-    // `salaryTotal` oben): die aktuelle Kreditrate wird für alle 5
-    // Forecast-Seasons konstant angenommen, auch wenn ein Kredit vorher
-    // ausläuft. Keine Simulation künftiger Kreditaufnahmen/-tilgungen.
+    // Sponsor-basierter Forecast: die aktuelle Sponsor- + Gebäude-Einnahme wird für 5 Seasons konstant
+    // fortgeschrieben (Sponsoren werden pro Saison neu verhandelt → flache Annahme, kein Preisgeld mehr).
+    const sponsorCash = selectedPrizePreviewRow?.sponsorCash ?? 0;
+    const facilityIncome = selectedPrizePreviewRow?.facilityIncome ?? 0;
     const loanInstallment = selectedTeamLoanInstallment;
 
-    if (startCash == null || salaryTotal == null || !rankRow) {
+    if (startCash == null || salaryTotal == null) {
       return [];
     }
 
-    const seasonPrizeRows = [
-      { label: "GuV", factor: currentFactor, prizeMoney: rankRow.prizeMoney ?? null, salaryGrowthFactor: 1 },
-      ...(rankRow.futureSeasons ?? []).slice(0, 4).map((entry, index) => ({
-        label: `GuV +${index + 1}`,
-        factor: entry.factor ?? null,
-        prizeMoney: entry.prizeMoney ?? null,
-        salaryGrowthFactor: entry.salaryGrowthFactor ?? null,
-      })),
-    ];
-
-    const paddedRows = [
-      ...seasonPrizeRows,
-      ...Array.from({ length: Math.max(0, 5 - seasonPrizeRows.length) }, (_, index) => ({
-        label: `GuV +${seasonPrizeRows.length + index}`,
-        factor: null,
-        prizeMoney: rankRow.prizeMoney ?? null,
-        salaryGrowthFactor: 1,
-      })),
-    ].slice(0, 5);
-
+    const labels = ["GuV", "GuV +1", "GuV +2", "GuV +3", "GuV +4"];
     let runningCash = startCash;
-    return paddedRows.map((row) => {
+    return labels.map((label) => {
       const projectedSalaryTotal = roundViewNumber(salaryTotal, 1);
       const projectedLoanInstallment = loanInstallment > 0 ? roundViewNumber(loanInstallment, 1) : null;
-      const guv =
-        row.prizeMoney == null
-          ? null
-          : roundViewNumber(row.prizeMoney - projectedSalaryTotal - (projectedLoanInstallment ?? 0), 1);
-      const cashAfter = guv == null ? null : roundViewNumber(runningCash + guv, 1);
-      if (cashAfter != null) {
-        runningCash = cashAfter;
-      }
+      const guv = roundViewNumber(
+        sponsorCash + facilityIncome - projectedSalaryTotal - (projectedLoanInstallment ?? 0),
+        1,
+      );
+      const cashAfter = roundViewNumber(runningCash + guv, 1);
+      runningCash = cashAfter;
 
       return {
-        ...row,
+        label,
+        factor: null as number | null,
+        prizeMoney: null as number | null,
+        sponsorCash: roundViewNumber(sponsorCash, 1),
+        facilityIncome: roundViewNumber(facilityIncome, 1),
+        salaryGrowthFactor: 1,
         salaryTotal: projectedSalaryTotal,
         loanInstallment: projectedLoanInstallment,
         guv,
@@ -216,10 +200,10 @@ export function usePrizeV2PanelModel({
       };
     });
   }, [
-    prizeForecastRankRow,
     prizeForecastSalaryTotal,
-    prizePreviewFeed?.summary.currentFactor,
     selectedPrizePreviewRow?.currentCash,
+    selectedPrizePreviewRow?.sponsorCash,
+    selectedPrizePreviewRow?.facilityIncome,
     selectedTeam?.cash,
     selectedTeamLoanInstallment,
   ]);
@@ -338,6 +322,8 @@ export function usePrizeV2PanelModel({
           seasonCash: row.seasonCash ?? null,
           currentFactor: prizePreviewFeed?.summary.currentFactor ?? null,
           prizeMoney: row.prizeMoney ?? null,
+          sponsorCash: row.sponsorCash ?? null,
+          facilityIncome: row.facilityIncome ?? null,
           bonusMalus: row.rankChangePrize?.bonusMalus ?? null,
           startRank: row.rankChangePrize?.startRank ?? null,
           rankDelta: row.rankChangePrize?.rankDelta ?? null,
@@ -376,6 +362,16 @@ export function usePrizeV2PanelModel({
   }, [selectedPrizePreviewRow, selectedTeamLoanInstallment, selectedTeamOutstandingDebt]);
 
   const prizeV2LeaderRow = prizeV2Rows[0] ?? null;
+
+  // Sponsor-Umbau: Team mit der höchsten projizierten Sponsor-Einnahme ("Top-Einnahme"-Story) + Liga-Summe.
+  const prizeV2TopSponsorRow = useMemo(
+    () => [...prizeV2Rows].sort((left, right) => (right.sponsorCash ?? -Infinity) - (left.sponsorCash ?? -Infinity))[0] ?? null,
+    [prizeV2Rows],
+  );
+  const prizeV2TotalSponsorCash = useMemo(
+    () => prizeV2Rows.reduce((sum, row) => sum + (row.sponsorCash ?? 0), 0),
+    [prizeV2Rows],
+  );
 
   const prizeV2SwingRow = useMemo(
     () =>
@@ -429,6 +425,8 @@ export function usePrizeV2PanelModel({
     prizeV2Rows,
     prizeV2SelectedTeamSummary,
     prizeV2LeaderRow,
+    prizeV2TopSponsorRow,
+    prizeV2TotalSponsorCash,
     prizeV2SwingRow,
     prizeV2RiskRow,
     prizeV2FactorRows,
