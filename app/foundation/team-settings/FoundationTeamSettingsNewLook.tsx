@@ -3,6 +3,11 @@
 import { useEffect, useState, type ReactNode } from "react";
 
 import { parseFoundationTabFromUrl } from "@/lib/foundation/foundation-url-state";
+import {
+  type AiActionBreakdownEntry,
+  deriveBlockedBreakdownFromReasons,
+} from "@/lib/ai/ai-action-breakdown";
+import type { AiPreseasonAutomationRunRecord } from "@/lib/data/olyDataTypes";
 
 import {
   NlCard,
@@ -87,6 +92,158 @@ function NlMetric({ label, value, sub }: { label: string; value: ReactNode; sub?
       <strong className="nl-teamsettings-metric-value nl-tnum">{value}</strong>
       {sub != null ? <small className="nl-teamsettings-metric-sub">{sub}</small> : null}
     </article>
+  );
+}
+
+const AI_PRESEASON_MODE_LABELS: Record<AiPreseasonAutomationRunRecord["mode"], string> = {
+  setup_draft: "Setup-Draft",
+  season_market: "Preseason-Markt",
+  none: "keine AI-Teams",
+};
+
+const AI_PRESEASON_STATUS_LABELS: Record<AiPreseasonAutomationRunRecord["status"], string> = {
+  running: "läuft",
+  completed: "abgeschlossen",
+  failed: "fehlgeschlagen",
+  skipped: "übersprungen",
+};
+
+/** Rohe Blocker-/Warn-Strings (`teamCode:actionType:reason`) für die Anzeige aufhübschen. */
+function formatAiPreseasonReason(raw: string): string {
+  const parts = raw.split(":");
+  if (parts.length >= 3) {
+    const [teamCode, actionType, ...rest] = parts;
+    return `${teamCode} · ${actionType} · ${rest.join(":")}`;
+  }
+  return raw;
+}
+
+/**
+ * Read-only Diagnose einer einzelnen AI-Preseason-Automatik: Modus, Teams
+ * fertig/gesamt und eine Kategorie-Tabelle (angewandt/blockiert) plus
+ * ausklappbare Blocker-/Warnungs-Listen. Nutzt bevorzugt das im Run-Record
+ * gespeicherte `actionBreakdown`; für alte Records ohne dieses Feld wird ein
+ * Fallback aus den rohen `blockingReasons` abgeleitet.
+ */
+function AiPreseasonRunDiagnostic({
+  run,
+  seasonKey,
+  defaultOpen,
+}: {
+  run: AiPreseasonAutomationRunRecord;
+  seasonKey: string;
+  defaultOpen: boolean;
+}) {
+  const breakdown: AiActionBreakdownEntry[] =
+    run.actionBreakdown && run.actionBreakdown.length > 0
+      ? run.actionBreakdown
+      : deriveBlockedBreakdownFromReasons(run.blockingReasons);
+  const hasExplicitBreakdown = Boolean(run.actionBreakdown && run.actionBreakdown.length > 0);
+  const totalApplied = breakdown.reduce((sum, entry) => sum + entry.applied, 0);
+  const totalBlocked = run.blockingReasons.length;
+  const teamsComplete = run.aiTeamsTotal > 0 && run.aiTeamsCompleted >= run.aiTeamsTotal;
+  const allClean = totalBlocked === 0 && run.status !== "failed";
+  const startedLabel = (() => {
+    const parsed = Date.parse(run.startedAt);
+    return Number.isFinite(parsed) ? new Date(parsed).toLocaleString("de-DE") : run.startedAt;
+  })();
+
+  return (
+    <details
+      className="nl-teamsettings-details nl-ai-audit-run"
+      open={defaultOpen}
+      data-testid={`ai-preseason-run-${seasonKey}`}
+    >
+      <summary>
+        <span className="nl-ai-audit-run-title">
+          {seasonKey} · {AI_PRESEASON_MODE_LABELS[run.mode]}
+        </span>
+        <span className={`nl-teamsettings-status${allClean ? " is-good" : totalBlocked > 0 ? " is-risk" : " is-warn"}`}>
+          {allClean ? "alles sauber ✓" : `${totalBlocked} blockiert`}
+        </span>
+      </summary>
+
+      <div className="nl-teamsettings-metric-grid">
+        <NlMetric label="Modus" value={AI_PRESEASON_MODE_LABELS[run.mode]} sub={AI_PRESEASON_STATUS_LABELS[run.status]} />
+        <NlMetric
+          label="Teams"
+          value={`${run.aiTeamsCompleted}/${run.aiTeamsTotal}`}
+          sub={teamsComplete ? "vollständig" : "unvollständig"}
+        />
+        <NlMetric label="angewandt" value={hasExplicitBreakdown ? totalApplied : run.managerActionsApplied} sub="Manager-Aktionen" />
+        <NlMetric label="blockiert" value={totalBlocked} sub={totalBlocked === 0 ? "keine" : "siehe unten"} />
+        <NlMetric label="Käufe / Verkäufe" value={`${run.transferBuysApplied} / ${run.transferSellsApplied}`} sub="Transfermarkt" />
+        <NlMetric label="Start" value={startedLabel} sub="letzter Lauf" />
+      </div>
+
+      <div className="nl-teamsettings-table-shell">
+        <table className="nl-teamsettings-table nl-tnum">
+          <thead>
+            <tr>
+              <th>Kategorie</th>
+              <th>angewandt</th>
+              <th>blockiert</th>
+            </tr>
+          </thead>
+          <tbody>
+            {breakdown.length === 0 ? (
+              <tr>
+                <td colSpan={3} className="nl-teamsettings-note">
+                  Keine kategorisierten Manager-Aktionen erfasst.
+                </td>
+              </tr>
+            ) : (
+              breakdown.map((entry) => (
+                <tr key={`${seasonKey}-cat-${entry.category}`}>
+                  <td>{entry.category}</td>
+                  <td>
+                    <span className={entry.applied > 0 ? "nl-teamsettings-status is-good" : ""}>{entry.applied}</span>
+                  </td>
+                  <td>
+                    <span className={entry.blocked > 0 ? "nl-teamsettings-status is-risk" : "nl-teamsettings-status is-good"}>
+                      {entry.blocked}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {!hasExplicitBreakdown ? (
+        <p className="nl-teamsettings-note">
+          Älterer Lauf ohne gespeicherte Kategorie-Aufstellung — die „angewandt&quot;-Zahl ist die Gesamtzahl der
+          Manager-Aktionen, die Blocker-Kategorien sind aus den Blocker-Gründen abgeleitet.
+        </p>
+      ) : null}
+
+      {run.blockingReasons.length > 0 ? (
+        <details className="nl-teamsettings-details is-nested">
+          <summary>Blockierte Aktionen ({run.blockingReasons.length})</summary>
+          <ul className="nl-ai-audit-list">
+            {run.blockingReasons.map((reason, index) => (
+              <li key={`${seasonKey}-block-${index}`} className="nl-teamsettings-note">
+                {formatAiPreseasonReason(reason)}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+
+      {run.warnings.length > 0 ? (
+        <details className="nl-teamsettings-details is-nested">
+          <summary>Warnungen ({run.warnings.length})</summary>
+          <ul className="nl-ai-audit-list">
+            {run.warnings.map((warning, index) => (
+              <li key={`${seasonKey}-warn-${index}`} className="nl-teamsettings-note">
+                {formatAiPreseasonReason(warning)}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </details>
   );
 }
 
@@ -1390,8 +1547,52 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
     );
   }
 
+  function renderAiPreseasonAuditCard() {
+    const runsMap: Record<string, AiPreseasonAutomationRunRecord> =
+      gameState.seasonState.aiPreseasonAutomationRuns ?? {};
+    const runs = Object.entries(runsMap)
+      .map(([seasonKey, run]) => ({ seasonKey, run }))
+      .sort((a, b) => {
+        const aTime = Date.parse(a.run.startedAt);
+        const bTime = Date.parse(b.run.startedAt);
+        return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0);
+      });
+    return (
+      <NlCard
+        className="nl-teamsettings-card"
+        eyebrow="Diagnose"
+        title="AI-Preseason: was die KI-Teams gemacht haben"
+        data-testid="nl-teamsettings-ai-preseason-audit"
+      >
+        <p className="nl-teamsettings-note">
+          Read-only Kontrolle der Preseason-Automatik: was die AI-Teams tatsächlich angewandt haben
+          (Training, Gebäude, Budget, Verträge, Verkaufsplan) und was mit welchem Grund blockiert wurde.
+          „blockiert = 0&quot; bedeutet: alles ist sauber durchgelaufen.
+        </p>
+        {runs.length === 0 ? (
+          <p className="nl-teamsettings-msg is-warn">
+            <strong>Noch kein Preseason-Lauf erfasst.</strong> Sobald die AI-Preseason einmal gelaufen ist,
+            erscheint hier je Saison eine Aufstellung.
+          </p>
+        ) : (
+          <div className="nl-ai-audit-runs">
+            {runs.map((entry, index) => (
+              <AiPreseasonRunDiagnostic
+                key={`ai-preseason-audit-${entry.seasonKey}`}
+                run={entry.run}
+                seasonKey={entry.seasonKey}
+                defaultOpen={index === 0}
+              />
+            ))}
+          </div>
+        )}
+      </NlCard>
+    );
+  }
+
   function renderControlSection() {
     return (
+      <>
       <NlCard
         className="nl-teamsettings-card"
         eyebrow="Steuerung"
@@ -1660,6 +1861,8 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           <p className="nl-teamsettings-msg is-warn">Warum nicht: {exportDisabledReason}</p>
         ) : null}
       </NlCard>
+      {renderAiPreseasonAuditCard()}
+      </>
     );
   }
 

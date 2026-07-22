@@ -64024,6 +64024,46 @@ button.nl-players-axis:focus-visible {
   margin-top: var(--nl-s3);
 }
 
+/* --- AI-Preseason Diagnose ------------------------------------------------- */
+.is-new-look .nl-ai-audit-runs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-ai-audit-run > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-ai-audit-run-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--nl-fg);
+}
+
+.is-new-look .nl-ai-audit-run > .nl-teamsettings-metric-grid,
+.is-new-look .nl-ai-audit-run > .nl-teamsettings-table-shell {
+  margin-top: var(--nl-s3);
+}
+
+.is-new-look .nl-teamsettings-details.is-nested {
+  margin-top: var(--nl-s3);
+  background: var(--nl-panel);
+}
+
+.is-new-look .nl-ai-audit-list {
+  margin: var(--nl-s2) 0 0;
+  padding-left: var(--nl-s3);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: disc;
+}
+
 /* --- Responsive ------------------------------------------------------------ */
 @media (max-width: 900px) {
   .is-new-look .nl-teamsettings-header {
