@@ -14,6 +14,7 @@ import {
 } from "@/lib/market/transfermarkt-roster-previous-season-axis";
 import { getTransferWindowStatus } from "@/lib/market/transfer-window-policy";
 import { getTransfermarktBracket, getTransfermarktBracketRange } from "@/lib/market/transfermarkt-fit";
+import { buildTeamDisciplineRankRowsFromGameState } from "@/lib/foundation/team-discipline-rank-engine";
 import { isFoundationTeamManagementLocked } from "@/lib/foundation/foundation-admin-dev-flags";
 import { buildPlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scouting-bridge";
 import { buildPlayerDevelopmentInsight } from "@/lib/progression/player-potential-service";
@@ -267,6 +268,17 @@ export function useMarketV2Derivations(input: UseMarketV2DerivationsInput) {
     [input.selectedTeamObjectives],
   );
 
+  // Aktueller Liga-Rang je Team & Disziplin (Top-6-Summe der Disziplin-Ratings).
+  // Speist die „#Rang"-Anzeige in der Kader-Disziplin-Aufschlüsselung.
+  const transferMarketDisciplineRanksByTeamId = useMemo(() => {
+    const rows = buildTeamDisciplineRankRowsFromGameState(input.gameState, input.gameState.disciplines);
+    const map: Record<string, Record<string, number>> = {};
+    for (const row of rows) {
+      map[row.teamId] = row.disciplineRanks;
+    }
+    return map;
+  }, [input.gameState]);
+
   return {
     transferWindowStatus,
     clientKey,
@@ -275,5 +287,6 @@ export function useMarketV2Derivations(input: UseMarketV2DerivationsInput) {
     transferMarketScoutingIntelByPlayerId,
     transferMarketActiveWishlistPlayerIds,
     selectedTransfermarktBoardObjectives,
+    transferMarketDisciplineRanksByTeamId,
   };
 }

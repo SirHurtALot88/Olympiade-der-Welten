@@ -45,6 +45,8 @@ export type TransfermarktV2ClientProps = {
   teamControlOwnersByTeamId?: Record<string, { ownerId?: string | null; ownerSlot?: string | null }>;
   teams: Team[];
   disciplines?: Discipline[];
+  disciplineRanksByTeamId?: Record<string, Record<string, number>>;
+  leagueTeamCount?: number;
   rosterRows?: TransfermarktV2RosterRow[];
   playerRatingsById?: Map<
     string,
@@ -573,6 +575,8 @@ export default function TransfermarktV2Client({
   teamControlOwnersByTeamId = {},
   teams,
   disciplines = [],
+  disciplineRanksByTeamId = {},
+  leagueTeamCount,
   rosterRows = [],
   playerRatingsById = new Map(),
   wishlistEntries = [],
@@ -2088,6 +2092,8 @@ export default function TransfermarktV2Client({
         marketItemsById={marketItemByPlayerId}
         rosterRows={selectedRosterRows}
         disciplines={orderedDisciplines}
+        disciplineRankByDisciplineId={selectedTeamId ? disciplineRanksByTeamId[selectedTeamId] ?? null : null}
+        leagueTeamCount={leagueTeamCount ?? teams.length}
         budgetStatusLabel={marketContext?.affordabilityStatus ? formatToneLabel(marketContext.affordabilityStatus) : null}
         readinessStatusLabel={marketContext?.readinessStatus ? formatReadinessLabel(marketContext.readinessStatus) : null}
         onSellRow={

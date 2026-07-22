@@ -271,6 +271,10 @@ type NlSquadDisciplineSummary = {
   topAvg: number | null;
   squadAvg: number | null;
   ratedCount: number;
+  /** Wie viele Spieler die Disziplin je Spieltag einsetzt (Discipline.playerCount). */
+  neededPlayers: number | null;
+  /** Aktueller Liga-Rang des Teams in dieser Disziplin (Top-6-Summe). */
+  teamRank: number | null;
 };
 
 type NlSquadAxisSummary = {
@@ -405,6 +409,10 @@ export type TransfermarktV2NewLookProps = {
   rosterRows: TransfermarktV2RosterRow[];
   /** Sortierte Disziplin-Liste (POW→SOC) für die Sub-Diszi-Aufschlüsselung des Kaders. */
   disciplines: Discipline[];
+  /** Aktueller Liga-Rang des ausgewählten Teams je Disziplin (disciplineId → Rang). */
+  disciplineRankByDisciplineId?: Record<string, number> | null;
+  /** Anzahl Teams in der Liga (für „#23/32"-Anzeige). */
+  leagueTeamCount?: number | null;
   /** null = unbekannt → Chip wird ausgeblendet statt "Budget —" zu zeigen. */
   budgetStatusLabel: string | null;
   /** null = unbekannt → Chip wird ausgeblendet statt "Status unbekannt" zu zeigen. */
@@ -885,6 +893,8 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     marketItemsById,
     rosterRows,
     disciplines,
+    disciplineRankByDisciplineId,
+    leagueTeamCount,
     budgetStatusLabel,
     readinessStatusLabel,
     onSellRow,
@@ -969,12 +979,18 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
           const scores = rosterRows
             .map((row) => row.disciplineRatings?.[discipline.id])
             .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+          const teamRank = disciplineRankByDisciplineId?.[discipline.id] ?? null;
           return {
             disciplineId: discipline.id,
             disciplineName: discipline.name,
             topAvg: computeTopSixAxisAverage(scores, topSixCount),
             squadAvg: nlAverage(scores),
             ratedCount: scores.length,
+            neededPlayers:
+              typeof discipline.playerCount === "number" && discipline.playerCount > 0
+                ? discipline.playerCount
+                : null,
+            teamRank: teamRank != null && teamRank > 0 ? teamRank : null,
           };
         })
         // Nur Disziplinen mit echten Kader-Werten zeigen — nichts erfinden.
@@ -999,7 +1015,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
         disciplines: axisDisciplines,
       };
     });
-  }, [disciplines, rosterRows, topSixCount]);
+  }, [disciplineRankByDisciplineId, disciplines, rosterRows, topSixCount]);
 
   const squadTopComposite = useMemo(
     () => nlAverage(squadAxisSummaries.map((entry) => entry.topAvg).filter((value): value is number => value != null)),
@@ -2575,9 +2591,34 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                                   title={`${discipline.disciplineName}: Top-${topSixCount} Ø ${formatNlNumber(
                                     discipline.topAvg,
                                     1,
-                                  )} · Kader Ø ${formatNlNumber(discipline.squadAvg, 1)} (${discipline.ratedCount} Spieler)`}
+                                  )} · Kader Ø ${formatNlNumber(discipline.squadAvg, 1)} (${discipline.ratedCount} Spieler)${
+                                    discipline.neededPlayers != null
+                                      ? ` · ${discipline.neededPlayers} Einsatz-Plätze`
+                                      : ""
+                                  }${
+                                    discipline.teamRank != null
+                                      ? ` · Liga-Rang #${discipline.teamRank}${
+                                          leagueTeamCount ? `/${leagueTeamCount}` : ""
+                                        }`
+                                      : ""
+                                  }`}
                                 >
-                                  <span className="nl-market-squad-disc-label">{discipline.disciplineName}</span>
+                                  <span className="nl-market-squad-disc-label">
+                                    {discipline.disciplineName}
+                                    {discipline.neededPlayers != null || discipline.teamRank != null ? (
+                                      <small className="nl-market-squad-disc-meta">
+                                        {discipline.neededPlayers != null ? (
+                                          <span>{discipline.neededPlayers} Spieler</span>
+                                        ) : null}
+                                        {discipline.teamRank != null ? (
+                                          <span className="nl-tnum">
+                                            #{discipline.teamRank}
+                                            {leagueTeamCount ? `/${leagueTeamCount}` : ""}
+                                          </span>
+                                        ) : null}
+                                      </small>
+                                    ) : null}
+                                  </span>
                                   <span className="nl-market-squad-disc-track" aria-hidden="true">
                                     <span
                                       className="nl-market-squad-disc-fill"

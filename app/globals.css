@@ -49860,9 +49860,25 @@ button.foundation-team-portrait-card {
 }
 
 .is-new-look .nl-market-squad-disc-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.is-new-look .nl-market-squad-disc-label > :first-child,
+.is-new-look .nl-market-squad-disc-label {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.is-new-look .nl-market-squad-disc-meta {
+  display: inline-flex;
+  gap: 8px;
+  font-size: var(--nl-fs-2xs, 11px);
+  color: var(--nl-text-muted, rgba(255, 255, 255, 0.55));
+  font-weight: 500;
 }
 
 .is-new-look .nl-market-squad-disc-track {

@@ -145,6 +145,7 @@ export default function FoundationMarketV2ShellHost({
     transferMarketScoutingIntelByPlayerId,
     transferMarketActiveWishlistPlayerIds,
     selectedTransfermarktBoardObjectives,
+    transferMarketDisciplineRanksByTeamId,
   } = useMarketV2Derivations({
     gameState,
     activeSaveId,
@@ -191,6 +192,8 @@ export default function FoundationMarketV2ShellHost({
         ),
         teams: gameState.teams,
         disciplines: gameState.disciplines as Discipline[],
+        disciplineRanksByTeamId: transferMarketDisciplineRanksByTeamId,
+        leagueTeamCount: gameState.teams.length,
         rosterRows: transferMarketV2RosterRows,
         playerRatingsById,
         wishlistEntries: transferWishlistEntriesForMarketV2,
