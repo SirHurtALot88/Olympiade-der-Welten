@@ -149,6 +149,7 @@ export default function FoundationMarketV2ShellHost({
     gameState,
     activeSaveId,
     activeManagerTeamId,
+    manageableTeamIds: foundationManageableTeamIds,
     playerRatingsById,
     seasonPointsLedger,
     selectedTeamObjectives,

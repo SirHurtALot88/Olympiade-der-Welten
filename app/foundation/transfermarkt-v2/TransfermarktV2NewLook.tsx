@@ -56,6 +56,7 @@ import {
   isScoutedImpactExact,
   type TransfermarktAttributeRatings,
 } from "@/lib/market/transfermarkt-scouting";
+import { getTransfermarktBracketRange } from "@/lib/market/transfermarkt-fit";
 
 /**
  * "Neuer Look" Transfermarkt — flag-gated, additiv.
@@ -452,6 +453,27 @@ function getNlCandidateAbilityStarProps(item: TransfermarktFreeAgentItem): {
     poScoreRange,
     poStars: item.potentialStarsMax ?? item.potentialStarsDisplay,
   };
+}
+
+/**
+ * Kompaktes Bracket-Label aus Marktwert-Bracket (1–9) + MW-Spanne (Mio).
+ * z.B. „Bracket 5 · 30–37,5 Mio". Das oberste Bracket (kein max) → „70+ Mio".
+ */
+function formatNlBracketLabel(
+  bracket: number | null | undefined,
+  range: { min: number; max: number | null } | null | undefined,
+): string | null {
+  if (bracket == null || !Number.isFinite(bracket)) {
+    return null;
+  }
+  if (!range) {
+    return `Bracket ${bracket}`;
+  }
+  const spanLabel =
+    range.max == null
+      ? `${formatNlNumber(range.min, 0)}+ Mio`
+      : `${formatNlNumber(range.min, 0)}–${formatNlNumber(range.max, range.max % 1 === 0 ? 0 : 1)} Mio`;
+  return `Bracket ${bracket} · ${spanLabel}`;
 }
 
 function getNlFitTone(fit: number | null | undefined): NlTone {
@@ -956,7 +978,16 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
           };
         })
         // Nur Disziplinen mit echten Kader-Werten zeigen — nichts erfinden.
-        .filter((entry) => entry.ratedCount > 0);
+        .filter((entry) => entry.ratedCount > 0)
+        // Absteigend nach Top-6 Ø: stärkste Disziplin zuerst (null-Werte ans Ende).
+        .sort((left, right) => {
+          const leftTop = left.topAvg ?? Number.NEGATIVE_INFINITY;
+          const rightTop = right.topAvg ?? Number.NEGATIVE_INFINITY;
+          if (rightTop !== leftTop) {
+            return rightTop - leftTop;
+          }
+          return (right.squadAvg ?? Number.NEGATIVE_INFINITY) - (left.squadAvg ?? Number.NEGATIVE_INFINITY);
+        });
       return {
         axis,
         topAvg: computeTopSixAxisAverage(values, topSixCount),
@@ -986,6 +1017,20 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     () => (selectedPlayer ? computeNlSimilarCandidates(candidates, selectedPlayer) : []),
     [candidates, selectedPlayer],
   );
+
+  // Bracket-Verteilung über den geladenen Kandidaten-Pool: pro Marktwert-Bracket
+  // (1–9) die Anzahl Spieler. Speist die "Bracket X · N Spieler"-Kachel im
+  // Scouting-Profil — Bracket & MW sind sichtbar (kein Fog), daher unbedenklich.
+  const bracketCountByBracket = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const item of candidates) {
+      if (item.bracket == null || !Number.isFinite(item.bracket)) {
+        continue;
+      }
+      counts.set(item.bracket, (counts.get(item.bracket) ?? 0) + 1);
+    }
+    return counts;
+  }, [candidates]);
 
   // F2/F3 — Kader-Zähler im Kopf kohärent zur sichtbaren Liste: wenn ein
   // Kader gelistet ist, zählt genau diese Liste; sonst der Server-Wert.
@@ -1570,6 +1615,34 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                         value={selectedPlayer.fitDisplay}
                         tone={getNlFitTone(selectedPlayer.fit)}
                       />
+                      {/* Marktwert-Bracket + wie viele andere Spieler im Pool im selben
+                          Bracket liegen — hilft die Preisklasse einzuordnen (Bracket & MW
+                          sind sichtbar, kein Fog). */}
+                      {(() => {
+                        const bracket = selectedPlayer.bracket;
+                        if (bracket == null || !Number.isFinite(bracket)) {
+                          return null;
+                        }
+                        const range = getTransfermarktBracketRange(bracket);
+                        const spanLabel =
+                          range.max == null
+                            ? `${formatNlNumber(range.min, 0)}+ Mio`
+                            : `${formatNlNumber(range.min, 0)}–${formatNlNumber(
+                                range.max,
+                                range.max % 1 === 0 ? 0 : 1,
+                              )} Mio`;
+                        // "andere" = Pool-Spieler im Bracket ohne den ausgewählten selbst.
+                        const inBracket = bracketCountByBracket.get(bracket) ?? 0;
+                        const others = Math.max(0, inBracket - 1);
+                        return (
+                          <StatChip
+                            label="Bracket"
+                            value={`${bracket} · ${others} weitere`}
+                            tone="pow"
+                            title={`Bracket ${bracket} (${spanLabel}) — ${inBracket} Spieler im Pool, ${others} weitere neben diesem`}
+                          />
+                        );
+                      })()}
                     </StatChipRow>
                   </div>
                 </div>
@@ -2602,18 +2675,38 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                       </span>
                     </button>
                     <StatChipRow className="nl-market-roster-stats" aria-label={`${row.name} Kennzahlen`}>
-                      {typeof row.ovr === "number" && Number.isFinite(row.ovr) ? (
-                        <NlAbilityStars
-                          caScore={row.ovr}
-                          known
-                          compact
-                          label="Aktuell"
-                          className="nl-market-ca-stars"
-                        />
-                      ) : null}
+                      {(() => {
+                        const caScore =
+                          typeof row.caScore === "number" && Number.isFinite(row.caScore)
+                            ? row.caScore
+                            : typeof row.ovr === "number" && Number.isFinite(row.ovr)
+                              ? row.ovr
+                              : null;
+                        const hasPo = row.poScoreRange != null || row.poStarRange != null;
+                        if (caScore == null && !hasPo) {
+                          return null;
+                        }
+                        return (
+                          <NlAbilityStars
+                            caScore={caScore}
+                            poScoreRange={row.poScoreRange ?? null}
+                            poStarRange={row.poStarRange ?? null}
+                            known={row.known ?? true}
+                            compact
+                            label="CA/PO"
+                            className="nl-market-ca-stars"
+                          />
+                        );
+                      })()}
                       <StatChip label="PPs" value={formatNullablePps(row.pps)} tone="accent" />
                       <StatChip label="MVS" value={formatNullablePps(row.mvs)} tone="neutral" />
                       <StatChip label="MW" value={formatTransfermarktCurrency(row.marketValue)} tone="soc" />
+                      {(() => {
+                        const bracketLabel = formatNlBracketLabel(row.bracket, row.bracketRange);
+                        return bracketLabel ? (
+                          <StatChip label="Bracket" value={bracketLabel} tone="pow" />
+                        ) : null;
+                      })()}
                     </StatChipRow>
                     {/* #17 — Achsen mit Vorsaison-Entwicklung: aktueller Achswert + Vorsaison-PPs & -Rang. */}
                     <span className="nl-market-roster-axes" aria-label={`${row.name} Achsen mit Vorsaison`}>

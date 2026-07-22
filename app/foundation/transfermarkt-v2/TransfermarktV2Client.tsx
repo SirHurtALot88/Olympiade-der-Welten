@@ -146,6 +146,13 @@ export type TransfermarktV2RosterRow = {
   men: number | null;
   soc: number | null;
   disciplineRatings?: Record<string, number | null>;
+  known?: boolean;
+  caStars?: number | null;
+  poStarRange?: { min: number; max: number } | null;
+  caScore?: number | null;
+  poScoreRange?: { min: number; max: number } | null;
+  bracket?: number | null;
+  bracketRange?: { min: number; max: number | null } | null;
   previousSeasonAxis?: {
     seasonId: string;
     ppPow: number | null;

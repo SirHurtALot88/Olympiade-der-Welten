@@ -13,6 +13,11 @@ import {
   type MarketRosterPreviousSeasonAxisStats,
 } from "@/lib/market/transfermarkt-roster-previous-season-axis";
 import { getTransferWindowStatus } from "@/lib/market/transfer-window-policy";
+import { getTransfermarktBracket, getTransfermarktBracketRange } from "@/lib/market/transfermarkt-fit";
+import { isFoundationTeamManagementLocked } from "@/lib/foundation/foundation-admin-dev-flags";
+import { buildPlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scouting-bridge";
+import { buildPlayerDevelopmentInsight } from "@/lib/progression/player-potential-service";
+import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
 import { buildScoutPipelineSummary } from "@/lib/scouting/facility-scout-pipeline-service";
 import { getActiveScoutingWishlistEntries } from "@/lib/scouting/scouting-wishlist-slots";
 import { getScoutingWatchlistForTeam } from "@/lib/scouting/scouting-watchlist-service";
@@ -38,6 +43,15 @@ export type TransferMarketV2RosterRow = {
   soc: number | null;
   disciplineRatings: Player["disciplineRatings"];
   previousSeasonAxis: MarketRosterPreviousSeasonAxisStats | null;
+  /** "Neuer Look" CA/PO-Sterne — fog-korrekt: bekannte (eigene) Teams voll aufgedeckt. */
+  known: boolean;
+  caStars: number | null;
+  poStarRange: { min: number; max: number } | null;
+  caScore: number | null;
+  poScoreRange: { min: number; max: number } | null;
+  /** Marktwert-Bracket (1–9) + zugehörige MW-Spanne (Mio). */
+  bracket: number | null;
+  bracketRange: { min: number; max: number | null } | null;
 };
 
 export function buildMarketV2ClientKey(activeSaveId: string, seasonId: string): string {
@@ -48,6 +62,8 @@ export function buildTransferMarketV2RosterRows(input: {
   gameState: GameState;
   playerRatingsById: Map<string, PlayerRatingContractRow>;
   seasonPointsLedger?: SeasonPointsLedger | null;
+  saveId?: string;
+  manageableTeamIds?: string[];
   getRosterEntryDisplayMarketValue: (
     entry?: Pick<RosterEntry, "currentValue" | "purchasePrice"> | null,
     player?: Player | null,
@@ -58,6 +74,7 @@ export function buildTransferMarketV2RosterRows(input: {
   const seasonPointsLedger =
     input.seasonPointsLedger === undefined ? buildSeasonPointsLedger(input.gameState) : input.seasonPointsLedger;
   const previousSeasonAxisByPlayerId = buildMarketRosterPreviousSeasonAxisByPlayerId(input.gameState);
+  const saveId = input.saveId ?? "default";
 
   return input.gameState.rosters
     .map((entry): TransferMarketV2RosterRow | null => {
@@ -74,7 +91,41 @@ export function buildTransferMarketV2RosterRows(input: {
         playerId: player.id,
       });
       const mvs = resolvePlayerDisplayMvs({ playerRating });
+      const marketValue = input.getRosterEntryDisplayMarketValue(entry, player);
+      const bracket = marketValue == null ? null : getTransfermarktBracket(marketValue);
+      const bracketRange = bracket == null ? null : getTransfermarktBracketRange(bracket);
+      // CA/PO-Sterne fog-korrekt: nur eigene (steuerbare) Teams voll aufgedeckt
+      // (Scouting-Level 5), fremde Teams bleiben ungescoutet (Level 0). Nutzt den
+      // gemeinsamen Sterne-Bridge-Snapshot wie Kader/Scouting — keine eigene Fog-Logik.
+      const known = !isFoundationTeamManagementLocked(entry.teamId, input.manageableTeamIds);
+      const scoutingLevel = known ? 5 : 0;
+      const starSnapshot = buildPlayerStarScoutingSnapshot({
+        gameState: input.gameState,
+        player,
+        saveId,
+        scoutingLevel,
+      });
+      const developmentInsight = buildPlayerDevelopmentInsight({
+        gameState: input.gameState,
+        player,
+        currentRating: computeCurrentAbilityScore(player.coreStats),
+        scoutingLevel,
+      });
       return {
+        known,
+        caStars: starSnapshot.revealedCurrentStars.overall,
+        poStarRange:
+          starSnapshot.revealedPotentialStars.overallMin != null &&
+          starSnapshot.revealedPotentialStars.overallMax != null
+            ? {
+                min: starSnapshot.revealedPotentialStars.overallMin,
+                max: starSnapshot.revealedPotentialStars.overallMax,
+              }
+            : null,
+        caScore: developmentInsight.currentRating ?? null,
+        poScoreRange: developmentInsight.potentialRangeDisplay ?? null,
+        bracket,
+        bracketRange,
         activePlayerId: entry.id,
         playerId: player.id,
         teamId: entry.teamId,
@@ -82,7 +133,7 @@ export function buildTransferMarketV2RosterRows(input: {
         className: player.className,
         race: player.race,
         portraitUrl: portrait.src ?? null,
-        marketValue: input.getRosterEntryDisplayMarketValue(entry, player),
+        marketValue,
         salary,
         contractLength: entry.contractLength ?? null,
         pps,
@@ -151,6 +202,7 @@ export interface UseMarketV2DerivationsInput {
   gameState: GameState;
   activeSaveId: string;
   activeManagerTeamId: string | null;
+  manageableTeamIds?: string[];
   playerRatingsById: Map<string, PlayerRatingContractRow>;
   seasonPointsLedger?: SeasonPointsLedger | null;
   selectedTeamObjectives: TeamSeasonObjectiveRecord[];
@@ -179,13 +231,17 @@ export function useMarketV2Derivations(input: UseMarketV2DerivationsInput) {
         gameState: input.gameState,
         playerRatingsById: input.playerRatingsById,
         seasonPointsLedger: input.seasonPointsLedger,
+        saveId: input.activeSaveId,
+        manageableTeamIds: input.manageableTeamIds,
         getRosterEntryDisplayMarketValue: input.getRosterEntryDisplayMarketValue,
         getRosterEntryDisplaySalary: input.getRosterEntryDisplaySalary,
       }),
     [
+      input.activeSaveId,
       input.gameState,
       input.getRosterEntryDisplayMarketValue,
       input.getRosterEntryDisplaySalary,
+      input.manageableTeamIds,
       input.playerRatingsById,
       input.seasonPointsLedger,
     ],
