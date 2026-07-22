@@ -145,9 +145,9 @@ const RARITY_WEIGHT = {
 };
 
 export const SPONSOR_RARITIES: Record<SponsorRarity, SponsorRarityDef> = {
-  gewöhnlich: { labelDe: "Gewöhnlich", etatFactor: Number(process.env.OLY_SPONSOR_RARITY_F_COMMON ?? 0.9) || 0.9, colorHex: "#98a2ab", drawWeight: RARITY_WEIGHT.gewöhnlich, order: 0 },
+  gewöhnlich: { labelDe: "Gewöhnlich", etatFactor: Number(process.env.OLY_SPONSOR_RARITY_F_COMMON ?? 0.92) || 0.92, colorHex: "#98a2ab", drawWeight: RARITY_WEIGHT.gewöhnlich, order: 0 },
   magisch: { labelDe: "Magisch", etatFactor: Number(process.env.OLY_SPONSOR_RARITY_F_MAGIC ?? 1.0) || 1.0, colorHex: "#4f9be0", drawWeight: RARITY_WEIGHT.magisch, order: 1 },
-  selten: { labelDe: "Selten", etatFactor: Number(process.env.OLY_SPONSOR_RARITY_F_RARE ?? 1.07) || 1.07, colorHex: "#e0b83a", drawWeight: RARITY_WEIGHT.selten, order: 2 },
+  selten: { labelDe: "Selten", etatFactor: Number(process.env.OLY_SPONSOR_RARITY_F_RARE ?? 1.08) || 1.08, colorHex: "#e0b83a", drawWeight: RARITY_WEIGHT.selten, order: 2 },
   legendär: { labelDe: "Legendär", etatFactor: Number(process.env.OLY_SPONSOR_RARITY_F_LEGENDARY ?? 1.15) || 1.15, colorHex: "#e07f2e", drawWeight: RARITY_WEIGHT.legendär, order: 3 },
 };
 

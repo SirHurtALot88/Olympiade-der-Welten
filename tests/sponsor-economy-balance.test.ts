@@ -236,7 +236,7 @@ describe("sponsor curve-shape + rarity economy", () => {
     const magischSum = sumCurvePayout("magisch", "sicherheit");
     for (const rarity of SPONSOR_RARITY_KEYS) {
       const ratio = sumCurvePayout(rarity, "sicherheit") / magischSum;
-      // Σ skaliert mit dem Etat-Faktor der Rarity (≈ 0.90 / 1.0 / 1.07 / 1.15).
+      // Σ skaliert mit dem Etat-Faktor der Rarity (≈ 0.92 / 1.0 / 1.08 / 1.15).
       expect(ratio).toBeCloseTo(getSponsorRarityEtatFactor(rarity), 1);
     }
     // strikt monoton in der Rarity-Ordnung
