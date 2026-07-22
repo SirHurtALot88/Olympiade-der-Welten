@@ -230,6 +230,13 @@ function parseRivalTeamId(targetValue: SponsorOfferComponent["targetValue"]): st
  * Disziplin-Rang (z. B. Top 5), M = geforderte Spielerzahl. Gibt null zurück, wenn das Format nicht passt
  * (dann greift der Legacy-Default). Reihenfolge/Whitespace tolerant.
  */
+/** Liest den Wert eines `tag:value`-Segments aus einem targetValue (z. B. "mvbase:123.4" → "123.4"). */
+function taggedTargetValue(targetValue: SponsorOfferComponent["targetValue"], tag: string): string | null {
+  if (typeof targetValue !== "string") return null;
+  const match = new RegExp(`(?:^|;)${tag}:([^;]*)`).exec(targetValue);
+  return match ? match[1] ?? null : null;
+}
+
 export function parseRankCountTargetValue(
   targetValue: SponsorOfferComponent["targetValue"],
 ): { rank: number; count: number } | null {
@@ -396,6 +403,85 @@ export function computeObjectiveProgressMetric(
         gameState.players.filter((player) => rosterIds.has(player.id)).map((player) => player.className).filter(Boolean),
       );
       return colors.size;
+    }
+    case "market_value_growth": {
+      const baseRaw = taggedTargetValue(component.targetValue, "mvbase");
+      const baseMv = baseRaw != null ? Number(baseRaw) : NaN;
+      if (!Number.isFinite(baseMv) || baseMv <= 0) return null;
+      const nowMv = row?.marketValueTotal ?? 0;
+      return (100 * (nowMv - baseMv)) / baseMv;
+    }
+    case "discipline_specialist": {
+      const discId = taggedTargetValue(component.targetValue, "discipline");
+      if (!discId) return null;
+      const teamCount = gameState.teams.length || 32;
+      const scoreByTeam = new Map<string, number>();
+      for (const result of gameState.seasonState.disciplineResults ?? []) {
+        if (result.disciplineId !== discId) continue;
+        scoreByTeam.set(result.teamId, (scoreByTeam.get(result.teamId) ?? 0) + (result.totalScore ?? 0));
+      }
+      if (scoreByTeam.size === 0) return null;
+      const ranked = [...scoreByTeam.entries()].sort((left, right) => right[1] - left[1]);
+      const index = ranked.findIndex(([id]) => id === teamId);
+      if (index < 0) return null;
+      // Invertierter Rang: Rang 1 → teamCount (höchster Metrikwert), damit die Stufen "höher = besser" passen.
+      return teamCount - (index + 1) + 1;
+    }
+    case "beliebtheit_climb":
+      return computeTeamBeliebtheitFromGameState(gameState, teamId).value * 100;
+    case "captain_era": {
+      const rosterIds = rosterPlayerIdsForTeam(gameState, teamId);
+      const captainRecord = (gameState.teamCaptains ?? []).find(
+        (entry) => entry.teamId === teamId && entry.seasonId === gameState.season.id,
+      );
+      const captainPlayerId = captainRecord?.playerId ?? null;
+      if (!captainPlayerId || !rosterIds.has(captainPlayerId)) return 0;
+      const topResult = currentSeasonPerformances(gameState, teamId).some(
+        (perf) => perf.playerId === captainPlayerId && (perf.rankInDiscipline ?? 99) <= 10,
+      );
+      return topResult ? 3 : 1;
+    }
+    case "injury_prevention": {
+      const rosterIds = rosterPlayerIdsForTeam(gameState, teamId);
+      const injuries = (gameState.seasonState.playerAvailabilityState ?? []).filter(
+        (entry) =>
+          entry.teamId === teamId &&
+          rosterIds.has(entry.playerId) &&
+          entry.injuryStatus === "injured" &&
+          (entry.injuredAtSeasonId == null || entry.injuredAtSeasonId === gameState.season.id),
+      ).length;
+      return injuries === 0 ? 3 : injuries <= 2 ? 2 : injuries <= 4 ? 1 : 0;
+    }
+    case "debt_payoff": {
+      const baseRaw = taggedTargetValue(component.targetValue, "debtbase");
+      const baseDebt = baseRaw != null ? Number(baseRaw) : NaN;
+      if (!Number.isFinite(baseDebt) || baseDebt <= 0) return null;
+      const outstanding = (gameState.seasonState.loans ?? [])
+        .filter((loan) => loan.borrowerTeamId === teamId && loan.status === "active")
+        .reduce((sum, loan) => sum + (loan.principalOutstanding ?? 0), 0);
+      return Math.max(0, Math.min(100, (100 * (baseDebt - outstanding)) / baseDebt));
+    }
+    case "facility_condition": {
+      const facilities = getTeamFacilityState(gameState, teamId);
+      const conditions = Object.values(facilities.facilities ?? {})
+        .filter((facility) => facility?.enabled)
+        .map((facility) => facility.conditionPct ?? 0);
+      if (conditions.length < 2) return null;
+      return conditions.reduce((sum, value) => sum + value, 0) / conditions.length;
+    }
+    case "contract_stability": {
+      const raw = taggedTargetValue(component.targetValue, "expiring");
+      const ids = raw ? raw.split(",").filter(Boolean) : [];
+      if (ids.length === 0) return null;
+      const rosterByPlayerId = new Map(
+        gameState.rosters.filter((entry) => entry.teamId === teamId).map((entry) => [entry.playerId, entry] as const),
+      );
+      let renewed = 0;
+      for (const id of ids) {
+        const entry = rosterByPlayerId.get(id);
+        if (entry && (entry.contractLength ?? 0) > 1) renewed += 1;
+      }
+      return renewed;
     }
     case "golden_crowd_favorites": {
       const rosterIds = rosterPlayerIdsForTeam(gameState, teamId);

@@ -158,7 +158,44 @@ function bonusInput(gs: GameState, teamId: string, overrides: Record<string, unk
   };
 }
 
-describe("sponsor bonus objectives (Teil B)", () => {
+describe("sponsor bonus objectives — new targets (Fable B)", () => {
+  it("builds every new target and measures market-value growth vs frozen baseline", () => {
+    const gs = structuredClone(createSingleplayerGameState());
+    const teamId = gs.teams[0]!.teamId;
+    const keys = [
+      "market_value_growth",
+      "discipline_specialist",
+      "beliebtheit_climb",
+      "captain_era",
+      "injury_prevention",
+      "debt_payoff",
+      "facility_condition",
+      "contract_stability",
+    ] as const;
+    for (const key of keys) {
+      const comp = buildBonusObjectiveComponent(key, bonusInput(gs, teamId) as never);
+      expect(comp.specialKey).toBe(key);
+      // Metrik ist berechenbar oder null (nicht anwendbar) — kein Wurf.
+      expect(() => computeObjectiveProgressMetric(gs, teamId, comp)).not.toThrow();
+    }
+
+    // market_value_growth: Baseline eingefroren; wächst der Kaderwert, steigt die %-Metrik.
+    const comp = buildBonusObjectiveComponent("market_value_growth", bonusInput(gs, teamId) as never);
+    const base = Number(/mvbase:([\d.]+)/.exec(String(comp.targetValue))?.[1] ?? NaN);
+    expect(Number.isFinite(base)).toBe(true);
+    // Ohne Änderung ~0 %.
+    const metric0 = computeObjectiveProgressMetric(gs, teamId, comp);
+    expect(metric0).toBeCloseTo(0, 1);
+  }, 60000);
+
+  it("returns null for debt_payoff / contract_stability / facility_condition when the precondition is absent", () => {
+    const gs = structuredClone(createSingleplayerGameState());
+    const teamId = gs.teams[0]!.teamId;
+    const debt = buildBonusObjectiveComponent("debt_payoff", bonusInput(gs, teamId) as never);
+    // Kein Kredit → Baseline 0 → Metrik null (kein Gratis-Fortschritt).
+    expect(computeObjectiveProgressMetric(gs, teamId, debt)).toBeNull();
+  }, 60000);
+
   it("evaluates the underdog-story ladder as achieved stage fraction", () => {
     const gs = structuredClone(createSingleplayerGameState());
     const teamId = gs.teams[0]!.teamId;

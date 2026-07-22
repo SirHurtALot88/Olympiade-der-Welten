@@ -105,6 +105,15 @@ const BONUS_OBJECTIVE_META: Record<string, { detail: string; difficulty: Sponsor
   transfer_trader: { detail: "Positive Netto-Bilanz in der Wechselperiode erzielen", difficulty: "mittel" },
   sustainability_architect: { detail: "Gebäude-Einnahmen decken deren Unterhalt (selbsttragend, Einkommensgebäude nötig)", difficulty: "mittel" },
   fatigue_management: { detail: "Den Kader bis zum Saisonende frisch halten (niedrige Match-Fatigue)", difficulty: "mittel" },
+  // Neue Ziele (Fable B)
+  market_value_growth: { detail: "Den Gesamt-Marktwert des Kaders über die Saison steigern", difficulty: "mittel" },
+  discipline_specialist: { detail: "In EINER benannten Disziplin einen Team-Spitzenplatz erreichen", difficulty: "mittel" },
+  beliebtheit_climb: { detail: "Die Beliebtheit des Teams steigern (Siege, Helden, Infrastruktur)", difficulty: "mittel" },
+  captain_era: { detail: "Einen Captain ernennen und ihn in der Disziplin-Spitze abliefern lassen", difficulty: "mittel" },
+  injury_prevention: { detail: "Wenige Verletzungen über die Saison (Rotation/Belastung steuern)", difficulty: "mittel" },
+  debt_payoff: { detail: "Bestehende Kredite über die Saison abbauen/tilgen", difficulty: "mittel" },
+  facility_condition: { detail: "Die gebauten Gebäude gut instand halten (Ø Zustand hoch)", difficulty: "leicht" },
+  contract_stability: { detail: "Auslaufende Verträge bis Saisonende verlängern", difficulty: "leicht" },
   // Golden-Bonusziele
   golden_fairytale: { detail: "Die Saison weit über der Erwartung beenden (Märchensaison)", difficulty: "hart" },
   golden_crowd_favorites: { detail: "Mehrere Publikumslieblinge (Bracket-Helden) formen", difficulty: "hart" },

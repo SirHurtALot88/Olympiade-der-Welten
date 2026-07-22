@@ -228,6 +228,7 @@ function buildOffer(input: {
       slotIndex,
       teamQualityRank,
       input.usedSpecialFamilies,
+      gameState,
     );
     if (bonusKey) {
       specialComponent = buildBonusObjectiveComponent(bonusKey, bonusObjectiveInput);

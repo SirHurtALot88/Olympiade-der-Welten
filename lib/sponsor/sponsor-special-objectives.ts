@@ -606,7 +606,16 @@ export type SponsorBonusObjectiveKey =
   | "salary_discipline"
   | "transfer_trader"
   | "sustainability_architect"
-  | "fatigue_management";
+  | "fatigue_management"
+  // Neue Ziele (Fable-Review B) — gegen Wiederholung, nutzen bislang ungenutzte Mechaniken
+  | "market_value_growth"
+  | "discipline_specialist"
+  | "beliebtheit_climb"
+  | "captain_era"
+  | "injury_prevention"
+  | "debt_payoff"
+  | "facility_condition"
+  | "contract_stability";
 
 /** Die 6 Golden-Bonusziele (nur bei isGolden-Angeboten). */
 export type SponsorGoldenObjectiveKey =
@@ -687,6 +696,15 @@ export const SPONSOR_BONUS_OBJECTIVE_ARCHETYPE: Record<SponsorBonusObjectiveKey,
   transfer_trader: "security",
   sustainability_architect: "security",
   fatigue_management: "security",
+  // Neue Ziele (Fable B) — auf die drei Archetyp-Pools verteilt.
+  market_value_growth: "performance",
+  discipline_specialist: "performance",
+  beliebtheit_climb: "identity",
+  captain_era: "identity",
+  injury_prevention: "security",
+  debt_payoff: "security",
+  facility_condition: "security",
+  contract_stability: "security",
 };
 
 export const SPONSOR_GOLDEN_OBJECTIVE_ARCHETYPE: Record<SponsorGoldenObjectiveKey, SponsorArchetype> = {
@@ -741,6 +759,15 @@ export const SPONSOR_OBJECTIVE_FAMILY: Record<string, SponsorObjectiveFamily> = 
   // Bonus-KEY-Aliase (die Bonus-Keys unterscheiden sich bei diesen beiden vom specialKey der Komponente).
   roster_diversity: "identity",
   salary_discipline: "finance",
+  // Neue Ziele (Fable B).
+  market_value_growth: "player_dev",
+  discipline_specialist: "discipline",
+  beliebtheit_climb: "identity",
+  captain_era: "player_dev",
+  injury_prevention: "freshness",
+  debt_payoff: "finance",
+  facility_condition: "infrastructure",
+  contract_stability: "player_dev",
 };
 
 /** Familie eines Sonderziels (null, wenn unbekannt/nicht zuzuordnen). */
@@ -1008,6 +1035,123 @@ export function buildBonusObjectiveComponent(
         stages: threeStage(50, 75, 90, "% frisch"),
       };
     }
+    case "market_value_growth": {
+      // Freeze: aktueller Kader-Marktwert; Metrik = prozentuales Wachstum. Junge/günstige Kader wachsen
+      // relativ schneller → höhere Zielstufen für schwache/Aufbau-Teams.
+      const rowsMv = buildTeamSeasonOverviewRows({ gameState: input.gameState });
+      const ownMv = rowsMv.find((entry) => entry.teamId === input.team.teamId)?.marketValueTotal ?? 0;
+      const weakMv =
+        resolveSponsorStrengthTier(input.teamQualityRank, input.gameState.teams.length) === "schwach" ||
+        resolveSponsorStrengthTier(input.teamQualityRank, input.gameState.teams.length) === "aufbau";
+      const g = weakMv ? [8, 15, 25] : [5, 10, 15];
+      return {
+        ...base,
+        componentId: "special-market-value-growth",
+        label: `Kaderwert-Wachstum +${g[0]}/${g[1]}/${g[2]} %`,
+        targetValue: `mvbase:${round1(ownMv)}`,
+        specialKey: "market_value_growth",
+        stages: [stage(g[0]!, 0.4, `+${g[0]} %`), stage(g[1]!, 0.7, `+${g[1]} %`), stage(g[2]!, 1.0, `+${g[2]} %`)],
+      };
+    }
+    case "discipline_specialist": {
+      // Freeze: eine Disziplin (marken-/team-signatur). Metrik = invertierter Team-Rang in dieser Disziplin
+      // (Rang 1 = höchster Metrikwert). Nutzt die per-Disziplin-TEAM-Wertung, die kein anderes Ziel abdeckt.
+      const teamCount = input.gameState.teams.length || 32;
+      const disciplines = input.gameState.disciplines ?? [];
+      const disc = disciplines.length
+        ? disciplines[Math.floor(getStableUnitHash(`${input.seasonId}:${input.team.teamId}:disc-specialist`) * disciplines.length)]
+        : null;
+      const discId = disc?.id ?? "";
+      const discName = disc?.name ?? "einer Disziplin";
+      const upperHalfMetric = Math.max(1, teamCount - Math.ceil(teamCount / 2) + 1);
+      const top8Metric = Math.max(1, teamCount - 7);
+      const top3Metric = Math.max(1, teamCount - 2);
+      return {
+        ...base,
+        componentId: "special-discipline-specialist",
+        label: `Haus-Disziplin: ${discName} stark platzieren`,
+        targetValue: `discipline:${discId}`,
+        specialKey: "discipline_specialist",
+        stages: [
+          stage(upperHalfMetric, 0.4, "obere Hälfte"),
+          stage(top8Metric, 0.7, "Top 8"),
+          stage(top3Metric, 1.0, "Top 3"),
+        ],
+      };
+    }
+    case "beliebtheit_climb":
+      // Metrik = Beliebtheit ×100 (0,50..1,50 → 50..150). Absolute Zielstufen, für Unter-Durchschnitt-Teams
+      // über Teilstufen erreichbar. Sponsoren zahlen für Reichweite — passt thematisch perfekt.
+      return {
+        ...base,
+        componentId: "special-beliebtheit-climb",
+        label: "Publikums-Magnet (Beliebtheit steigern)",
+        targetValue: "beliebtheit",
+        specialKey: "beliebtheit_climb",
+        stages: [stage(90, 0.4, "Beliebtheit ≥ 0,90"), stage(100, 0.7, "≥ 1,00"), stage(115, 1.0, "≥ 1,15")],
+      };
+    case "captain_era":
+      // Metrik: 0 (kein Captain) / 1 (Captain im Kader) / 3 (Captain mit Top-10-Disziplinergebnis). Nutzt die
+      // bislang von KEINEM Sponsor-Ziel angefasste Captain-Mechanik.
+      return {
+        ...base,
+        componentId: "special-captain-era",
+        label: "Kapitäns-Ära (Captain ernennen + liefern)",
+        targetValue: "captain",
+        specialKey: "captain_era",
+        stages: [stage(1, 0.4, "Captain im Kader"), stage(3, 1.0, "Captain in Disziplin-Spitze")],
+      };
+    case "injury_prevention":
+      // Metrik = diskrete Stufe aus der Saison-Verletzungszahl (weniger = besser): 0 Verletzte → 3, ≤2 → 2,
+      // ≤4 → 1, sonst 0.
+      return {
+        ...base,
+        componentId: "special-injury-prevention",
+        label: "Eiserner Kader (wenige Verletzungen)",
+        targetValue: "injuries",
+        specialKey: "injury_prevention",
+        stages: [stage(1, 0.4, "≤ 4 Verletzte"), stage(2, 0.7, "≤ 2 Verletzte"), stage(3, 1.0, "0 Verletzte")],
+      };
+    case "debt_payoff": {
+      // Freeze: Restschuld beim Signing; Metrik = getilgter Anteil in %. Nur relevant mit bestehender Schuld
+      // (Applicability-Filter in pickBonusObjective sorgt dafür, dass es schuldenfreien Teams nicht angeboten wird).
+      const outstanding = (input.gameState.seasonState.loans ?? [])
+        .filter((loan) => loan.borrowerTeamId === input.team.teamId && loan.status === "active")
+        .reduce((sum, loan) => sum + (loan.principalOutstanding ?? 0), 0);
+      return {
+        ...base,
+        componentId: "special-debt-payoff",
+        label: "Schuldenfrei (Kredite tilgen)",
+        targetValue: `debtbase:${round1(outstanding)}`,
+        specialKey: "debt_payoff",
+        stages: [stage(1, 0.4, "Tilgung begonnen"), stage(50, 0.7, "halb getilgt"), stage(100, 1.0, "schuldenfrei")],
+      };
+    }
+    case "facility_condition":
+      // Metrik = Ø Zustand (%) der gebauten Gebäude. Belohnt Instandhaltung (nicht Bau, das macht das Board).
+      return {
+        ...base,
+        componentId: "special-facility-condition",
+        label: "Gepflegtes Haus (Gebäude in Schuss halten)",
+        targetValue: "facility_condition",
+        specialKey: "facility_condition",
+        stages: [stage(70, 0.4, "Ø ≥ 70 %"), stage(80, 0.7, "Ø ≥ 80 %"), stage(90, 1.0, "Ø ≥ 90 %")],
+      };
+    case "contract_stability": {
+      // Freeze: die beim Signing auslaufenden Verträge (contractLength ≤ 1); Metrik = wie viele davon bis
+      // Saisonende verlängert wurden.
+      const expiring = input.gameState.rosters
+        .filter((entry) => entry.teamId === input.team.teamId && (entry.contractLength ?? 99) <= 1)
+        .map((entry) => entry.playerId);
+      return {
+        ...base,
+        componentId: "special-contract-stability",
+        label: "Vertragstreue (auslaufende Verträge verlängern)",
+        targetValue: `expiring:${expiring.join(",")}`,
+        specialKey: "contract_stability",
+        stages: [stage(1, 0.4, "1 verlängert"), stage(2, 0.7, "2 verlängert"), stage(3, 1.0, "3 verlängert")],
+      };
+    }
   }
 }
 
@@ -1211,6 +1355,32 @@ export function filterBonusObjectivesByStrength(
  *
  * Liefert null, wenn für den Archetyp kein Ziel verfügbar ist (Fallback auf Legacy-Sonderziel im Aufrufer).
  */
+/**
+ * Applicability-Gate für Ziele mit Vorbedingung (Fable B): nur anbieten, wenn die Mechanik überhaupt greift
+ * — Schuldenabbau nur mit Schulden, Vertragstreue nur mit ≥2 auslaufenden Verträgen, Gebäude-Pflege nur mit
+ * ≥2 gebauten Gebäuden. Ohne gameState (rückwärtskompatibel) wird nicht gefiltert.
+ */
+function isBonusObjectiveApplicable(gameState: GameState, teamId: string, key: SponsorBonusObjectiveKey): boolean {
+  if (key === "debt_payoff") {
+    return (gameState.seasonState.loans ?? []).some(
+      (loan) => loan.borrowerTeamId === teamId && loan.status === "active" && (loan.principalOutstanding ?? 0) > 0,
+    );
+  }
+  if (key === "contract_stability") {
+    return (
+      gameState.rosters.filter((entry) => entry.teamId === teamId && (entry.contractLength ?? 99) <= 1).length >= 2
+    );
+  }
+  if (key === "facility_condition") {
+    const facilities =
+      (gameState.seasonState.teamFacilities as Record<string, { facilities?: Record<string, { enabled?: boolean }> }> | undefined)?.[
+        teamId
+      ]?.facilities ?? {};
+    return Object.values(facilities).filter((facility) => facility?.enabled).length >= 2;
+  }
+  return true;
+}
+
 export function pickBonusObjective(
   seasonId: string,
   teamId: string,
@@ -1219,20 +1389,26 @@ export function pickBonusObjective(
   teamQualityRank?: number | null,
   /** Bereits im Slate belegte Ziel-Familien (Slate-Anti-Wiederholung, Fable C3). */
   usedFamilies?: Set<string>,
+  /** Optional: erlaubt das Applicability-Gate (Schulden/Verträge/Gebäude) für die neuen Ziele (Fable B). */
+  gameState?: GameState,
 ): SponsorBonusObjectiveKey | null {
   const archetype = mapCurveShapeToArchetype(curveShape);
-  const allKeys = filterBonusObjectivesByStrength(
+  const strengthKeys = filterBonusObjectivesByStrength(
     getAvailableBonusObjectiveKeys(curveShape, seasonId).filter((key) => key !== "transfer_trader"),
     teamQualityRank,
   );
-  if (allKeys.length === 0) {
+  if (strengthKeys.length === 0) {
     return null;
   }
+  const applicable = gameState
+    ? strengthKeys.filter((key) => isBonusObjectiveApplicable(gameState, teamId, key))
+    : strengthKeys;
+  const poolKeys = applicable.length > 0 ? applicable : strengthKeys;
   // Familien meiden, die im Slate schon vorkommen; nur wenn dadurch nichts übrig bliebe, den vollen Pool.
   const fresh = usedFamilies
-    ? allKeys.filter((key) => !usedFamilies.has(SPONSOR_OBJECTIVE_FAMILY[key] ?? ""))
-    : allKeys;
-  const keys = fresh.length > 0 ? fresh : allKeys;
+    ? poolKeys.filter((key) => !usedFamilies.has(SPONSOR_OBJECTIVE_FAMILY[key] ?? ""))
+    : poolKeys;
+  const keys = fresh.length > 0 ? fresh : poolKeys;
   const index = Math.floor(getStableUnitHash(`${seasonId}:${teamId}:${archetype}:${slotIndex}:bonus-objective`) * keys.length);
   return keys[Math.min(keys.length - 1, index)] ?? keys[0]!;
 }
