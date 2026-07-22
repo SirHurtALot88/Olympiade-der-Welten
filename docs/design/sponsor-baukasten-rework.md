@@ -9,8 +9,16 @@
 > - **P3 Überperformance-/Verbesserungs-Module** ✅ (familien-differenziert, per-Platz, beim Signieren gelockt) — Commit `1551cf3`
 > - **P4 Baukasten** ✅ *safe-modular variant*: `sponsor-modules.ts` (Modul-Modell + `moduleIds`), Spotlight-Perk
 >   (legendär/golden, cash-neutral), Modul-Anzahl-Chip auf der Karte. Die bewährte P0–P3-Payout-Mathematik
->   bleibt unangetastet; die tiefere EV-Budget-Umverteilung mit rarity-gegateten Cash-Modulen und
->   Klausel-Modulen (§3 unten) ist als **P4b (future)** dokumentiert — sie braucht eigene Sim-Rekalibrierung.
+>   bleibt unangetastet.
+> - **P4b Baukasten (tief)** ✅: `composeSponsorOfferComponentsP4b` (sponsor-modules.ts, in `buildOffer`
+>   verdrahtet). Rarity steuert die ANZAHL der Cash-Module (gewöhnlich 2 + XL-Basis · magisch 3 · selten 4 ·
+>   legendär 5); ein EV-Budget (`SponsorOffer.evBudget`, aus der unverteilten Liste) wird zwischen Basis und
+>   Upside UMVERTEILT statt erhöht — niedrige Rarity = basislastig/verlässlich, hohe Rarity = upside-reich.
+>   Risikoprämie 1.2 auf behaltenes bedingtes Geld (EV-neutral, macht Bonus-lastige Karten attraktiv);
+>   familien-gegatetes Klausel-Modul (`kind: "clause"`, Abstiegs-Malus beim Signieren eingefroren, kauft Basis
+>   frei). Anzeige==Settlement gewahrt (Rang-Leiter unverändert/gelockt). Toggle `OLY_SPONSOR_P4B=0` für
+>   In-Process-Vergleichsläufe. Balance (dryrun): Liga-Sponsor-Summe **+0,97 %** vs. Baseline (Ziel 0..+5 %),
+>   0 Pleiten, Deckung 1,05–1,09×; 5-Jahres-Sim +4,7 %. Worked-Example: `scripts/sponsor-standard-vs-bonus.ts`.
 > - **P5 Feinschliff**: Perk-Effekt + Modul-Chip sind bereits in P4 gelandet; Settlement-Shim aus P1 wird
 >   **erst eine Saison nach Release** entfernt (solange können noch Alt-Verträge laufen).
 >

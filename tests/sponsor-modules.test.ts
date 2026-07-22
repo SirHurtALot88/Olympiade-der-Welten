@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import type { SponsorOffer, SponsorOfferComponent } from "@/lib/data/olyDataTypes";
+import type { SponsorCurveFamily, SponsorOffer, SponsorOfferComponent, SponsorRarity } from "@/lib/data/olyDataTypes";
 import {
+  SPONSOR_MODULE_COUNT_BY_RARITY,
   SPONSOR_PERK_SPOTLIGHT_X2,
+  SPONSOR_RISK_PREMIUM,
   applySpotlightPerkToComponents,
   buildSponsorOfferModuleIds,
+  composeSponsorOfferComponentsP4b,
   describeSponsorOfferModules,
   offerQualifiesForSpotlightPerk,
 } from "@/lib/sponsor/sponsor-modules";
@@ -63,5 +66,102 @@ describe("sponsor Baukasten modules (P4)", () => {
     const cashBefore = base.reduce((s, c) => s + c.rewardCash, 0);
     const cashAfter = legendary.reduce((s, c) => s + c.rewardCash, 0);
     expect(cashAfter).toBe(cashBefore);
+  });
+});
+
+// ── P4b: tiefe modulare Komposition ───────────────────────────────────────────────────────────────────
+describe("sponsor Baukasten P4b — modular composition", () => {
+  // Volle P0–P3-Komponentenliste (base + rank + improvement + special[+fanInfra] + overperf) als Ausgangs-
+  // punkt der Umverteilung. rankEvAtExpected getrennt (kommt aus der gelockten Kurve).
+  function fullComponents(): SponsorOfferComponent[] {
+    return [
+      { componentId: "base-cash", kind: "base", label: "Basis", targetValue: 46, rewardCash: 46 },
+      { componentId: "rank-target", kind: "rank", label: "Gewinnstufen", targetValue: 8, rewardCash: 28 },
+      { componentId: "improvement-target", kind: "improvement", label: "Tabellenziel", targetValue: 1, rewardCash: 7.5, ratePerUnitC: 1.5, maxUnits: 5 },
+      { componentId: "special-x", kind: "special", label: "Sonderziel", targetValue: "x", rewardCash: 9, specialKey: "momentum_series", spotlightBonus: 0.2 },
+      { componentId: "special-fan-infrastructure", kind: "special", label: "Fan-Infrastruktur", targetValue: 1, rewardCash: 2.5, specialKey: "fan_infrastructure" },
+      { componentId: "overperformance", kind: "overperformance", label: "Überperformance", targetValue: 14, rewardCash: 12, ratePerUnitC: 1.5 },
+    ];
+  }
+
+  function compose(rarity: SponsorRarity, family: SponsorCurveFamily = "stetig") {
+    return composeSponsorOfferComponentsP4b({
+      components: fullComponents(),
+      rarity,
+      family,
+      expectedRank: 14,
+      teamCount: 32,
+      rankEvAtExpected: 20,
+    });
+  }
+
+  function cashModuleCount(components: SponsorOfferComponent[]): number {
+    return components.length;
+  }
+
+  // Honest EV am Erwartungsrang: base + rankEvAtExpected(behalten) + Σ attainment×Reward (behaltene Boni)
+  // + Klausel-EV. Rein aus den komponierten Komponenten rekonstruiert (Basis absorbiert weggelassene EV).
+  function composedEv(components: SponsorOfferComponent[], rankEv: number, clauseDropP: number): number {
+    let ev = 0;
+    for (const c of components) {
+      if (c.kind === "base") ev += c.rewardCash;
+      else if (c.kind === "rank") ev += rankEv;
+      else if (c.kind === "special") ev += 0.45 * c.rewardCash;
+      else if (c.kind === "overperformance") ev += 0.25 * c.rewardCash;
+      else if (c.kind === "improvement") ev += 0.2 * c.rewardCash;
+      else if (c.kind === "clause") ev += -(c.penaltyCash ?? 0) * clauseDropP;
+    }
+    return ev;
+  }
+
+  it("rarity controls the number of cash modules (2/3/4/5)", () => {
+    expect(cashModuleCount(compose("gewöhnlich"))).toBe(SPONSOR_MODULE_COUNT_BY_RARITY.gewöhnlich);
+    expect(cashModuleCount(compose("magisch"))).toBe(SPONSOR_MODULE_COUNT_BY_RARITY.magisch);
+    expect(cashModuleCount(compose("selten"))).toBe(SPONSOR_MODULE_COUNT_BY_RARITY.selten);
+    expect(cashModuleCount(compose("legendär"))).toBe(SPONSOR_MODULE_COUNT_BY_RARITY.legendär);
+    expect([2, 3, 4, 5]).toEqual([
+      SPONSOR_MODULE_COUNT_BY_RARITY.gewöhnlich,
+      SPONSOR_MODULE_COUNT_BY_RARITY.magisch,
+      SPONSOR_MODULE_COUNT_BY_RARITY.selten,
+      SPONSOR_MODULE_COUNT_BY_RARITY.legendär,
+    ]);
+  });
+
+  it("every composed offer keeps exactly one base module", () => {
+    for (const rarity of ["gewöhnlich", "magisch", "selten", "legendär"] as SponsorRarity[]) {
+      expect(compose(rarity).filter((c) => c.kind === "base")).toHaveLength(1);
+    }
+  });
+
+  it("preserves the EV budget within ±3% across rarities (redistribution, not inflation)", () => {
+    // Referenz-EV der vollen Liste (mittelfeld-team, drop-P ≈ 0 bei Erwartung 14).
+    const referenceEv = composedEv(fullComponents(), 20, 0);
+    for (const rarity of ["gewöhnlich", "magisch", "selten", "legendär"] as SponsorRarity[]) {
+      const ev = composedEv(compose(rarity), 20, 0);
+      expect(Math.abs(ev - referenceEv) / referenceEv).toBeLessThan(0.03);
+    }
+  });
+
+  it("makes gewöhnlich base-heavier than legendär (low rarity = XL base)", () => {
+    const commonBase = compose("gewöhnlich").find((c) => c.kind === "base")!.rewardCash;
+    const legendaryBase = compose("legendär").find((c) => c.kind === "base")!.rewardCash;
+    expect(commonBase).toBeGreaterThan(legendaryBase);
+  });
+
+  it("gates the clause to sicherheit/aufstieg families and scales upside by the risk premium", () => {
+    // sicherheit-Familie: kein overperformance, dafür Klausel; gewöhnlich = base + clause.
+    const safety = compose("gewöhnlich", "sicherheit");
+    expect(safety.some((c) => c.kind === "clause")).toBe(true);
+    expect(safety.some((c) => c.kind === "overperformance")).toBe(false);
+
+    // titel-Familie: keine Klausel.
+    const titel = compose("legendär", "titel");
+    expect(titel.some((c) => c.kind === "clause")).toBe(false);
+
+    // Risikoprämie: behaltenes Sonderziel ist um ρ vergrößert vs. Ausgangswert.
+    const special = titel.find((c) => c.kind === "special");
+    if (special) {
+      expect(special.rewardCash).toBeCloseTo(9 * SPONSOR_RISK_PREMIUM, 1);
+    }
   });
 });

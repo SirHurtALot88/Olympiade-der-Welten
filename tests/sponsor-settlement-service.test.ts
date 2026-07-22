@@ -204,6 +204,30 @@ describe("sponsor settlement — P3 overperformance + per-place improvement", ()
     const b = withComponentAtRank(comp, 15, 16); // +1 < 2 → 0
     expect(rowFor(b.gs, b.teamId, "improvement")?.cashDelta).toBe(0);
   }, 60000);
+
+  it("P4b clause fires a frozen malus only in the drop zone", () => {
+    const clause: SponsorOfferComponent = {
+      componentId: "clause-relegation",
+      kind: "clause",
+      label: "Abstiegs-Klausel: −7 C bei Platz ≥ 29",
+      targetValue: 29,
+      rewardCash: 0,
+      penaltyCash: 7,
+    };
+    // Endrang 30 (≥ Schwelle 29) → Malus feuert.
+    const dropZone = withComponentAtRank(clause, 30, 16);
+    const dropRow = rowFor(dropZone.gs, dropZone.teamId, "clause");
+    expect(dropRow?.cashDelta).toBe(-7);
+    expect(dropRow?.status).toBe("failed_penalty");
+    // Endrang 20 (< Schwelle) → kein Effekt.
+    const safe = withComponentAtRank(clause, 20, 16);
+    const safeRow = rowFor(safe.gs, safe.teamId, "clause");
+    expect(safeRow?.cashDelta).toBe(0);
+    expect(safeRow?.status).toBe("skipped");
+    // Genau AUF der Schwelle (29) → feuert ebenfalls (≥).
+    const onThreshold = withComponentAtRank(clause, 29, 16);
+    expect(rowFor(onThreshold.gs, onThreshold.teamId, "clause")?.cashDelta).toBe(-7);
+  }, 60000);
 });
 
 function gs0Team(): string {
