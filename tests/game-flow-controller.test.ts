@@ -752,4 +752,20 @@ describe("game flow controller", () => {
     expect(arena?.warnings).toContain("captain_recommended");
     expect(arena?.status).not.toBe("blocked");
   });
+
+  it("never makes 'Spieler verkaufen' the guided next action in the preseason", () => {
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        gamePhase: "preseason_management",
+        players: [player("p-1", "mittel")],
+      }),
+      activeTeamId: "M-M",
+    });
+    const sell = flow.steps.find((step) => step.stepId === "sell_players");
+    // Verkaufen ist optional und darf nie die "Weiter"-Aktion sein (Bug: nach
+    // einem Kauf schlug der Flow "Spieler verkaufen" vor).
+    expect(sell?.status).toBe("optional");
+    expect(flow.currentStepId).not.toBe("sell_players");
+    expect(flow.nextStepId).not.toBe("sell_players");
+  });
 });

@@ -210,16 +210,17 @@ function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null):
       warnings: hasSeasonHistory && !playerDevelopmentDone ? ["player_development_pending"] : [],
     }),
     step({
+      // Verkaufen ist opportunistisch (eigene transfer_sell_phase + Inbox-Aufgaben
+      // bei Cash-Druck) und darf NIE die geführte "Weiter"-Aktion überschreiben —
+      // sonst schlägt der Flow direkt nach einem Kauf fälschlich "Spieler verkaufen"
+      // vor. Als optional markiert wählt chooseCurrentStep bevorzugt die echten
+      // Schritte (kaufen → training → Season vorbereiten). Der Verkauf bleibt als
+      // optionaler Schritt verfügbar.
       stepId: "sell_players",
       label: "Spieler verkaufen",
-      cta: "Weiter: Spieler verkaufen",
-      status: !hasActiveTeam
-        ? "blocked"
-        : activeRosterCount === 0
-          ? "completed"
-          : buildTransferStepGate(gameState, "sell_players").allowed
-            ? "ready"
-            : "blocked",
+      cta: "Optional: Spieler verkaufen",
+      status: !hasActiveTeam ? "blocked" : activeRosterCount === 0 ? "completed" : "optional",
+      optional: hasActiveTeam && activeRosterCount > 0,
       targetView: "teams",
       targetPanel: "roster",
       teamId: activeTeamId,
