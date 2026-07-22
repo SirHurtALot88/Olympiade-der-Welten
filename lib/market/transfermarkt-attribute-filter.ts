@@ -81,8 +81,17 @@ export function tierMeetsMinimum(
 }
 
 /**
- * Prüft alle gesetzten Attribut-Mindest-Tiers gegen die (echten Sheet-)Ratings
- * eines Kandidaten. `ratings` ist der per-Attribut-Tier-Record des Spielers.
+ * Prüft alle gesetzten Attribut-Mindest-Tiers gegen die (FOG-gegateten) Ratings
+ * eines Kandidaten. `ratings` ist der per-Attribut-Tier-Record des Spielers, in
+ * dem NUR gescoutete/aufgedeckte Attribute einen Tier tragen; nicht gescoutete
+ * Attribute sind `null`/fehlen.
+ *
+ * Fog-Regel (wichtig): Ein Attribut, das man NICHT gescoutet hat, kann einen
+ * Kandidaten NICHT ausschließen — sonst filtert man auf unbekannte Werte und
+ * bekäme (a) fast immer 0 Treffer und (b) ein Scouting-Leck (aus „bleibt trotz
+ * S+-Filter übrig" ließe sich der wahre Wert ableiten). Unbekannte Attribute
+ * werden daher übersprungen (= bestehen den Filter). Nur tatsächlich gescoutete
+ * Attribute werden gegen das Mindest-Tier geprüft.
  */
 export function passesAttributeTierFilters(
   ratings: Partial<Record<TransfermarktAttributeKey, TransfermarktRatingTier | null>>,
@@ -93,7 +102,12 @@ export function passesAttributeTierFilters(
     if (!minimum) {
       continue;
     }
-    if (!tierMeetsMinimum(ratings[key] ?? null, minimum)) {
+    const tier = ratings[key] ?? null;
+    if (tier == null) {
+      // Nicht gescoutet → unbekannt → schließt nicht aus (Fog-sicher).
+      continue;
+    }
+    if (!tierMeetsMinimum(tier, minimum)) {
       return false;
     }
   }

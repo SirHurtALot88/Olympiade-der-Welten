@@ -22,7 +22,7 @@ describe("transfermarkt-attribute-filter", () => {
     expect(tierMeetsMinimum("F", "A")).toBe(false);
   });
 
-  it("excludes candidates with an unknown/null rating on an active filter", () => {
+  it("treats an unknown/null tier as not meeting a minimum (tier-level check)", () => {
     expect(tierMeetsMinimum(null, "C")).toBe(false);
     expect(tierMeetsMinimum(undefined, "F")).toBe(false);
   });
@@ -35,6 +35,19 @@ describe("transfermarkt-attribute-filter", () => {
     expect(passesAttributeTierFilters(ratings, { power: "A", speed: "A" })).toBe(false);
     // power ≥ A und speed ≥ C → beide erfüllt.
     expect(passesAttributeTierFilters(ratings, { power: "A", speed: "C" })).toBe(true);
+  });
+
+  it("does NOT exclude on an unscouted (unknown) attribute — fog-safe", () => {
+    // torment ist nicht gescoutet (fehlt/null) → der torment-Filter darf den
+    // Kandidaten NICHT ausschließen (sonst 0 Treffer + Scouting-Leck).
+    const ratings = { power: "S" as const };
+    expect(passesAttributeTierFilters(ratings, { torment: "D" })).toBe(true);
+    expect(passesAttributeTierFilters(ratings, { torment: "S+" })).toBe(true);
+    expect(passesAttributeTierFilters({ torment: null }, { torment: "D" })).toBe(true);
+    // Gescoutetes Attribut daneben greift weiterhin: power ≥ A erfüllt, egal ob
+    // torment unbekannt ist.
+    expect(passesAttributeTierFilters(ratings, { power: "A", torment: "S+" })).toBe(true);
+    expect(passesAttributeTierFilters(ratings, { power: "S+", torment: "F" })).toBe(false);
   });
 
   it("counts active filters", () => {
