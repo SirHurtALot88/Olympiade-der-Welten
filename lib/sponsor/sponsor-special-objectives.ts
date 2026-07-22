@@ -139,14 +139,69 @@ export function getTeamAxisRank(
 }
 
 /** Realistisches Top-X: erreichbar, aber kein Top-10-Wunsch von Platz 20+. */
-export function resolveRealisticAxisTargetRank(currentRank: number | null, teamCount: number): number {
+/** Team-Stärke-Einstufung für stärke-skalierte Sponsor-Ziele (Fable-Review C1). */
+export type SponsorStrengthTier = "elite" | "stark" | "mittel" | "schwach" | "aufbau";
+
+/**
+ * Gemeinsame Stärke-Einstufung eines Teams. Bricht an denselben Grenzen wie die Rarity-Leiter
+ * (getMaxTierBucketForQualityRank: 4/10/18/26), damit Rarity-Deckel-Historie und Ziel-Skalierung dasselbe
+ * Stärkebild teilen. `qualityRank`/Tabellenplatz: KLEINER = STÄRKER (1 = bestes Team). Fehlt der Wert, wird
+ * konservativ „mittel" angenommen. Alle stärke-abhängigen Zielzahlen werden beim Signing eingefroren.
+ */
+export function resolveSponsorStrengthTier(
+  qualityRank: number | null | undefined,
+  teamCount: number,
+): SponsorStrengthTier {
+  const count = teamCount > 0 ? teamCount : 32;
+  const rank = qualityRank != null && Number.isFinite(qualityRank) ? qualityRank : Math.ceil(count * 0.5);
+  if (rank <= 4) return "elite";
+  if (rank <= 10) return "stark";
+  if (rank <= 18) return "mittel";
+  if (rank <= 26) return "schwach";
+  return "aufbau";
+}
+
+/**
+ * Bester (kleinster) Achsen-Zielrang je Stärke-Tier — die Ziel-Obergrenze der Schwierigkeit. Ein Mittelfeld-
+ * Team mit STARKER Achse bekommt so legitim „Top 8/10" auf dieser Achse, auch wenn es insgesamt Platz 20 ist.
+ */
+export const STRENGTH_TIER_AXIS_TARGET_RANK: Record<SponsorStrengthTier, number> = {
+  elite: 3,
+  stark: 5,
+  mittel: 8,
+  schwach: 10,
+  aufbau: 12,
+};
+
+/**
+ * Geforderter Disziplin-Rang je Stärke-Tier (Top-N in einer Disziplin). Schwache/Aufbau-Teams zielen auf die
+ * obere Tabellenhälfte der Disziplin (Top 16 bei 32), statt auf das für sie unerreichbare Top-3.
+ */
+export const STRENGTH_TIER_DISCIPLINE_RANK: Record<SponsorStrengthTier, number> = {
+  elite: 3,
+  stark: 5,
+  mittel: 10,
+  schwach: 16,
+  aufbau: 16,
+};
+
+export function resolveRealisticAxisTargetRank(
+  currentRank: number | null,
+  teamCount: number,
+  /** Stärke-Tier-Zielrang (Fable #1): das Ziel wird nie besser (kleiner) als dieser Wert. */
+  tierTargetRank?: number,
+): number {
   const rank = currentRank ?? Math.max(20, Math.ceil(teamCount * 0.75));
   if (rank <= 3) {
     return rank;
   }
   const maxJump = rank <= 8 ? 2 : rank <= 14 ? 3 : rank <= 22 ? 4 : rank <= 28 ? 5 : 6;
   let rawTarget = rank - maxJump;
-  if (rank > 20) {
+  if (tierTargetRank != null && Number.isFinite(tierTargetRank)) {
+    // Der Tier-Zielrang ist die Schwierigkeits-Obergrenze: das Ziel darf nie besser als er sein, aber ein
+    // in dieser Achse schon starkes Team bekommt ihn als erreichbaren Anker (= max gegen den Roh-Zielrang).
+    rawTarget = Math.max(tierTargetRank, rawTarget);
+  } else if (rank > 20) {
     rawTarget = Math.max(14, rawTarget);
   } else if (rank > 14) {
     rawTarget = Math.max(10, rawTarget);
@@ -296,7 +351,15 @@ export function buildChallengeSpecialComponent(input: {
     profile: input.profile,
   });
   const axisRank = getTeamAxisRank(rows, input.team.teamId, axis, input.gameState);
-  const targetRank = resolveRealisticAxisTargetRank(axisRank.rank, axisRank.teamCount || rows.length);
+  // Stärke-Tier aus dem aktuellen Tabellenplatz (Signing-Snapshot, wird über targetValue eingefroren) →
+  // ein Mittelfeld-Team mit starker Achse bekommt legitim „Top 8/10" statt eines für es unerreichbaren Top-3.
+  const overallRank = row?.rank ?? row?.startplatz ?? Math.ceil((rows.length || 32) / 2);
+  const strengthTier = resolveSponsorStrengthTier(overallRank, rows.length);
+  const targetRank = resolveRealisticAxisTargetRank(
+    axisRank.rank,
+    axisRank.teamCount || rows.length,
+    STRENGTH_TIER_AXIS_TARGET_RANK[strengthTier],
+  );
   const label =
     axisRank.rank != null && axisRank.rank <= 3
       ? `${AXIS_META[axis].label} Top ${targetRank} halten`
@@ -317,6 +380,9 @@ export function buildStandardSpecialComponent(input: {
   templateId: SponsorSpecialTemplateId;
   rarity: SponsorRarity;
   rewardCash: number;
+  /** Eingefrorene Qualitäts-Platzierung (KLEINER = STÄRKER) für stärke-skalierte Ziele (Fable #3). */
+  teamQualityRank?: number | null;
+  teamCount?: number;
 }): SponsorOfferComponent {
   const order = rarityOrder(input.rarity);
   const demandBoost = order >= 2 ? 1 : order >= 1 ? 0 : -1;
@@ -332,12 +398,16 @@ export function buildStandardSpecialComponent(input: {
     };
   }
   if (input.templateId === "discipline_top3_count") {
-    const target = Math.max(1, 2 + demandBoost + (order >= 3 ? 1 : 0));
+    // Stärke-Skalierung (Fable #3): schwache Teams müssen nicht mehr Top-3 treffen, sondern die obere
+    // Disziplin-Tabellenhälfte (Top 16). Rang + Spielerzahl werden als "rank:N;count:M" eingefroren; der
+    // Evaluator liest beides daraus (parseRankCountTargetValue).
+    const count = Math.max(1, 2 + demandBoost + (order >= 3 ? 1 : 0));
+    const rank = STRENGTH_TIER_DISCIPLINE_RANK[resolveSponsorStrengthTier(input.teamQualityRank, input.teamCount ?? 32)];
     return {
       componentId: "special-discipline-top3",
       kind: "special",
-      label: `≥ ${target} Disziplin-Top-3`,
-      targetValue: target,
+      label: `≥ ${count} Disziplin-Top-${rank}`,
+      targetValue: `rank:${rank};count:${count}`,
       rewardCash: input.rewardCash,
       specialKey: "discipline_top3_count",
     };
@@ -644,15 +714,20 @@ export function buildBonusObjectiveComponent(
         specialKey: "momentum_series",
         stages: threeStage(3, 5, 7, "starke Spieltage"),
       };
-    case "discipline_dominance":
+    case "discipline_dominance": {
+      // Stärke-Skalierung (Fable #3): schwache Teams zielen auf die obere Disziplin-Tabellenhälfte statt
+      // auf ein für sie unerreichbares Top-5. Der Rang wird im targetValue eingefroren, der Evaluator liest
+      // ihn daraus (nicht mehr aus der ENV-Konstante).
+      const dominanceRank = STRENGTH_TIER_DISCIPLINE_RANK[resolveSponsorStrengthTier(input.teamQualityRank, input.gameState.teams.length)];
       return {
         ...base,
         componentId: "special-discipline-dominance",
-        label: `Disziplin-Dominanz (Kaderanteil Top-${SPONSOR_OBJ_DISCIPLINE_GOOD_RANK})`,
-        targetValue: SPONSOR_OBJ_DISCIPLINE_GOOD_RANK,
+        label: `Disziplin-Dominanz (Kaderanteil Top-${dominanceRank})`,
+        targetValue: dominanceRank,
         specialKey: "discipline_dominance",
         stages: threeStage(20, 35, 50, "% Kader"),
       };
+    }
     case "axis_ascension": {
       const { axis, baselineRank } = primaryAxisBaseline(input);
       return {

@@ -236,9 +236,19 @@ describe("sponsor bonus objectives (Teil B)", () => {
     const hard = buildStandardSpecialComponent({ templateId: "transfer_profit_min", rarity: "legendär", rewardCash: 5 });
     expect(Number(hard.targetValue)).toBeGreaterThan(Number(easy.targetValue));
 
-    const discEasy = buildStandardSpecialComponent({ templateId: "discipline_top3_count", rarity: "gewöhnlich", rewardCash: 5 });
-    const discHard = buildStandardSpecialComponent({ templateId: "discipline_top3_count", rarity: "legendär", rewardCash: 5 });
-    expect(Number(discHard.targetValue)).toBeGreaterThan(Number(discEasy.targetValue));
+    // discipline_top3_count kodiert jetzt "rank:N;count:M" (stärke-skalierter Rang + rarity-skalierte
+    // Spielerzahl). Die geforderte Spielerzahl (count) steigt mit der Rarity.
+    const parseCount = (value: string | number) => Number(/count:\s*(\d+)/.exec(String(value))?.[1] ?? NaN);
+    const discEasy = buildStandardSpecialComponent({ templateId: "discipline_top3_count", rarity: "gewöhnlich", rewardCash: 5, teamQualityRank: 16 });
+    const discHard = buildStandardSpecialComponent({ templateId: "discipline_top3_count", rarity: "legendär", rewardCash: 5, teamQualityRank: 16 });
+    expect(parseCount(discHard.targetValue)).toBeGreaterThan(parseCount(discEasy.targetValue));
+
+    // Stärke-Skalierung: ein schwaches Team (hoher qualityRank) bekommt einen leichteren Disziplin-Rang
+    // (höhere Rangzahl = obere Tabellenhälfte) als ein Elite-Team.
+    const parseRank = (value: string | number) => Number(/rank:\s*(\d+)/.exec(String(value))?.[1] ?? NaN);
+    const discWeak = buildStandardSpecialComponent({ templateId: "discipline_top3_count", rarity: "gewöhnlich", rewardCash: 5, teamQualityRank: 30 });
+    const discElite = buildStandardSpecialComponent({ templateId: "discipline_top3_count", rarity: "gewöhnlich", rewardCash: 5, teamQualityRank: 2 });
+    expect(parseRank(discWeak.targetValue)).toBeGreaterThan(parseRank(discElite.targetValue));
 
     // Bucketing folgt der Kurvenform-Familie: zwei Formen derselben Familie ziehen den identischen Bonus-Pool,
     // eine Form einer anderen Familie einen disjunkten.

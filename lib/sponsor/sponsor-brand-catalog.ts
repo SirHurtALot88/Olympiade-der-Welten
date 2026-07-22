@@ -203,10 +203,20 @@ function pickSpecialTemplate(input: {
   return input.brand.specialTemplates[fallbackIndex] ?? "form_color_cover";
 }
 
+/** Aktueller Tabellenplatz eines Teams (rank → startplatz), als Stärke-Snapshot fürs Signing. null wenn unbekannt. */
+function resolveTeamOverallRankFromGameState(gameState: GameState | undefined, teamId: string): number | null {
+  const standing = gameState?.seasonState?.standings?.[teamId] as { rank?: number; startplatz?: number } | undefined;
+  if (typeof standing?.rank === "number" && Number.isFinite(standing.rank)) return standing.rank;
+  if (typeof standing?.startplatz === "number" && Number.isFinite(standing.startplatz)) return standing.startplatz;
+  return null;
+}
+
 function buildSpecialComponent(input: {
   templateId: SponsorSpecialTemplateId;
   rarity: SponsorRarity;
   rewardCash: number;
+  teamQualityRank?: number | null;
+  teamCount?: number;
 }) {
   return buildStandardSpecialComponent(input);
 }
@@ -253,6 +263,10 @@ export function pickSponsorBrandForOffer(input: {
           }),
           rarity: input.rarity,
           rewardCash,
+          // Stärke-Snapshot aus dem aktuellen Tabellenplatz (falls gameState vorhanden), damit
+          // discipline_top3_count den Zielrang stärke-skaliert einfriert (Fable #3).
+          teamQualityRank: resolveTeamOverallRankFromGameState(input.gameState, input.teamId),
+          teamCount: input.gameState?.teams.length,
         });
   return {
     parent,

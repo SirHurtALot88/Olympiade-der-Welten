@@ -291,7 +291,10 @@ export function computeObjectiveProgressMetric(
     case "discipline_dominance": {
       const rosterSize = rosterPlayerIdsForTeam(gameState, teamId).size;
       if (rosterSize === 0) return 0;
-      const goodRank = SPONSOR_OBJ_DISCIPLINE_GOOD_RANK;
+      // Der geforderte Disziplin-Rang ist stärke-skaliert im targetValue eingefroren (Fable #3); Fallback
+      // auf die ENV-Konstante für Alt-Angebote ohne eingefrorenen Rang.
+      const targetRank = typeof component.targetValue === "number" ? component.targetValue : Number(component.targetValue);
+      const goodRank = Number.isFinite(targetRank) && targetRank > 0 ? targetRank : SPONSOR_OBJ_DISCIPLINE_GOOD_RANK;
       const good = new Set(
         currentSeasonPerformances(gameState, teamId)
           .filter((perf) => (perf.rankInDiscipline ?? 99) <= goodRank)
