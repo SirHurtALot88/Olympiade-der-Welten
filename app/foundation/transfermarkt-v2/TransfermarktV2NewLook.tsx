@@ -1137,9 +1137,13 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
             })}
           </div>
           {/* 12 Feinattribut-Mindest-Tiers (S+…F, „A" = A und höher). Kompaktes
-              Dropdown je Attribut mit Kürzel; „–" = egal. Gefiltert wird auf die
-              (percentilbasierte) Tier-Note, die auch das Profil anzeigt. */}
-          <div className="nl-market-attr-filter-group" role="group" aria-label="Mindest-Tier je Attribut">
+              Dropdown je Attribut mit Kürzel; „–" = egal. FOG-KORREKT: gefiltert
+              wird nur auf gescoutete (sichtbare) Attribute — ungescoutete Spieler
+              erscheinen NICHT, weil ihr Wert unbekannt ist (kein Scouting-Bypass). */}
+          <span className="nl-market-eyebrow nl-market-attr-filter-hint">
+            Attribut-Mindest-Tier · nur gescoutete Werte
+          </span>
+          <div className="nl-market-attr-filter-group" role="group" aria-label="Mindest-Tier je Attribut (nur gescoutete Werte)">
             {TRANSFERMARKT_ATTRIBUTE_KEYS.map((key) => {
               const meta = TRANSFERMARKT_ATTRIBUTE_META[key];
               const selected = attributeTierMinimums[key] ?? "";

@@ -48207,6 +48207,10 @@ button.foundation-team-portrait-card {
 
 /* 12 Feinattribut-Mindest-Tier-Dropdowns: kompaktes 3er/4er-Raster mit
    Kürzel + kleinem Grade-Select je Attribut, achsgetönt. */
+.is-new-look .nl-market-attr-filter-hint {
+  display: block;
+  margin-top: 8px;
+}
 .is-new-look .nl-market-attr-filter-group {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

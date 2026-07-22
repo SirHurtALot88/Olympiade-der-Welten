@@ -11,7 +11,12 @@ import { getTransfermarktPortraitModel } from "@/lib/market/transfermarkt-lab";
 import type { TransferHistoryReadResult } from "@/lib/market/transfer-history-read-service";
 import type { TransfermarktBuyPreview } from "@/lib/market/transfermarkt-buy-service";
 import type { TransfermarktFreeAgentItem, TransfermarktReadResult } from "@/lib/market/transfermarkt-read-service";
-import { getScoutingTierWindow, resolveScoutingConfidenceFromLevel } from "@/lib/market/transfermarkt-scouting";
+import {
+  buildTransfermarktScoutedAttributeRows,
+  getScoutingTierWindow,
+  resolveScoutingConfidenceFromLevel,
+  type TransfermarktAttributeRatings,
+} from "@/lib/market/transfermarkt-scouting";
 import {
   TRANSFERMARKT_ATTRIBUTE_KEYS,
   TRANSFERMARKT_TIER_FILTER_OPTIONS,
@@ -437,11 +442,22 @@ function passesMarketAxisFilters(
   });
 }
 
-/** Liest die 12 (percentilbasierten) Feinattribut-Tiers eines Kandidaten aus. */
+/**
+ * Liefert die für den Filter nutzbaren Feinattribut-Tiers eines Kandidaten —
+ * FOG-KORREKT: nur Attribute, die bei seinem Scouting-Level tatsächlich
+ * freigeschaltet sind, tragen eine Tier-Note; verdeckte bleiben `null`.
+ *
+ * So lässt sich Scouting NICHT aushebeln: Wählt man z. B. „S+", tauchen
+ * ungescoutete Spieler nicht auf (ihr Wert ist unbekannt → `null` → erfüllt den
+ * Filter nicht). Man kann nur nach dem filtern, was man wirklich sieht (exakte
+ * Tier-Note ab Level 4, sonst die sichtbare Range → wahre Tier-Stufe, die die
+ * Range ohnehin verrät). Reveal-Reihenfolge exakt wie im Profil
+ * (ratings + scoutingLevel + playerId, ohne saveId → Standard-Reihenfolge).
+ */
 function getItemAttributeRatings(
   item: TransfermarktFreeAgentItem,
 ): Partial<Record<TransfermarktAttributeKey, TransfermarktRatingTier | null>> {
-  return {
+  const ratings: TransfermarktAttributeRatings = {
     power: item.powerRating,
     health: item.healthRating,
     stamina: item.staminaRating,
@@ -455,6 +471,19 @@ function getItemAttributeRatings(
     spirit: item.spiritRating,
     torment: item.tormentRating,
   };
+  const rows = buildTransfermarktScoutedAttributeRows({
+    ratings,
+    scoutingLevel: item.scoutingLevel,
+    playerId: item.playerId,
+  });
+  const visible: Partial<Record<TransfermarktAttributeKey, TransfermarktRatingTier | null>> = {};
+  for (const row of rows) {
+    // Nur freigeschaltete Attribute liefern eine Note; verdeckte bleiben unbekannt.
+    visible[row.key as TransfermarktAttributeKey] = row.revealed
+      ? ratings[row.key] ?? null
+      : null;
+  }
+  return visible;
 }
 
 function getWishlistAxisValue(
