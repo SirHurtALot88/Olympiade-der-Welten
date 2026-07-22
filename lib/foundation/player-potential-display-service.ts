@@ -101,6 +101,11 @@ const FOG_FULL_WIDTH = 20;
  * Wert sitzt an einer zufälligen, deterministischen Position; pro aufgedecktem Punkt
  * (≈ pro Spieltag) rückt eine ZUFÄLLIGE Seite um 1 näher heran — pro Attribut eigen.
  */
+// Maximale Vorlauf/Nachlauf-Streuung (in Confidence-Punkten), mit der einzelne Attribute
+// unabhängig voneinander aufdecken (nicht im Gleichschritt). Verschwindet an den Rändern
+// (conf=0/100) via sin, damit bei 0 alles verschleiert und bei 100 alles exakt ist.
+const FOG_ATTR_STAGGER = 22;
+
 function computeFoggedCeilingRange(input: {
   ceiling: number;
   floor: number;
@@ -109,7 +114,15 @@ function computeFoggedCeilingRange(input: {
   confidence: number;
 }): { min: number; max: number; revealed: boolean } {
   const { ceiling, floor, playerId, attribute } = input;
-  const conf = Math.min(100, Math.max(0, input.confidence)) / 100;
+  const baseConf = Math.min(100, Math.max(0, input.confidence));
+  // Unabhängige Aufdeckung pro Attribut: seed-basierter Versatz (−1..+1), skaliert mit
+  // sin(π·conf/100) → 0 an den Enden, maximal in der Mitte. So decken manche Attribute
+  // früher, manche später auf, ohne dass conf=0 (alles verdeckt) / conf=100 (alles exakt)
+  // verletzt wird. Kein zusätzlicher Speicher nötig (deterministisch aus playerId+attr).
+  const stagger = (createSeededRandom(`fog-stagger:${playerId}:${attribute}`)() * 2 - 1) *
+    FOG_ATTR_STAGGER *
+    Math.sin((Math.PI * baseConf) / 100);
+  const conf = Math.min(100, Math.max(0, baseConf + stagger)) / 100;
   const removed = Math.round(conf * FOG_FULL_WIDTH);
   if (removed >= FOG_FULL_WIDTH) {
     return { min: ceiling, max: ceiling, revealed: true };
