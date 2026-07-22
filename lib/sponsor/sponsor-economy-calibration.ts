@@ -632,6 +632,12 @@ export function estimateExpectedPayout(
   powerRank: number | null,
   leagueMinSalary?: number,
 ): number {
+  // P4b: liegt ein explizites EV-Budget vor (E[Payout] am Erwartungsrang, aus der unverteilten
+  // Komponentenliste), bewertet die AI direkt daran — so kann die P4b-Umverteilung von Upside in die Basis
+  // die Bewertung nicht verzerren (eine aufgeblähte Basis würde sonst einen höheren salaryFactor vortäuschen).
+  if (typeof offer.evBudget === "number" && Number.isFinite(offer.evBudget)) {
+    return round1(offer.evBudget);
+  }
   const baseComponent = offer.components.find((component) => component.kind === "base");
   // "gewöhnlich" ist hier das exakte Äquivalent des alten Default-Fallbacks (`offer.starTier ?? 2`).
   const rarity = offer.rarity ?? "gewöhnlich";

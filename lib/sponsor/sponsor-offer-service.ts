@@ -41,7 +41,12 @@ import {
   resolveSponsorEconomyAnchors,
 } from "@/lib/sponsor/sponsor-economy-calibration";
 import { SPONSOR_RARITIES, getSponsorCurveFamily, mapArchetypeToCurveShape } from "@/lib/sponsor/sponsor-curve-shapes";
-import { applySpotlightPerkToComponents, buildSponsorOfferModuleIds } from "@/lib/sponsor/sponsor-modules";
+import {
+  applySpotlightPerkToComponents,
+  buildSponsorOfferModuleIds,
+  composeSponsorOfferComponentsP4b,
+  isSponsorP4bEnabled,
+} from "@/lib/sponsor/sponsor-modules";
 import {
   getDemandMultiplierForRarity,
   mapCurveShapeToArchetype,
@@ -265,9 +270,39 @@ function buildOffer(input: {
     ...(overperfComponent ? [overperfComponent] : []),
   ];
 
+  // P4b Baukasten (tief): Rarity steuert die ANZAHL der Cash-Module (gewöhnlich 2 … legendär 5). Die volle
+  // P0–P3-Komponentenliste wird EV-erhaltend umverteilt — weggelassene Upside-Module wandern in die Basis
+  // (niedrige Rarity → XL-Basis, verlässlich; hohe Rarity → kleinere Basis, mehr Upside), plus eine
+  // Risikoprämie auf behaltenes bedingtes Geld und ein familien-gegatetes Klausel-Modul. Anzeige==Settlement
+  // bleibt gewahrt (Rang-Leiter unverändert/gelockt; alle neuen Parameter beim Signieren eingefroren).
+  const rankEvAtExpected = Math.max(
+    0,
+    getSponsorCurveShapePayout(teamQualityRank ?? 32, salaryFactor, rarity, curveShape, leagueMinSalary, teamQualityRank ?? null, isGolden) -
+      getSponsorCurveShapePayout(32, salaryFactor, rarity, curveShape, leagueMinSalary, teamQualityRank ?? null, isGolden),
+  );
+  const p4bEnabled = isSponsorP4bEnabled();
+  // Challenge-Angebote (1/Team, achsen-/rang-getriebenes Sonderziel mit eigenem UI-Panel) behalten das
+  // klassische Template — ihr Challenge-Sonderziel darf nicht von der Rarity-Modul-Staffel weggelassen werden.
+  const composedComponents = p4bEnabled && specialMode !== "challenge"
+    ? composeSponsorOfferComponentsP4b({
+        components,
+        rarity,
+        family,
+        expectedRank: teamQualityRank ?? null,
+        teamCount: gameState.teams.length,
+        rankEvAtExpected,
+      })
+    : components;
+  // EV-Budget (E[Payout] am Erwartungsrang) aus der UNVERTEILTEN Komponentenliste — die AI bewertet Angebote
+  // daran, unabhängig davon wie P4b die Basis vs. Upside verteilt (sonst überschätzt sie basislastige Angebote).
+  const evSpecialTotal = components.filter((component) => component.kind === "special").reduce((sum, component) => sum + component.rewardCash, 0);
+  const evOverperf = components.find((component) => component.kind === "overperformance")?.rewardCash ?? 0;
+  const evImprovement = components.find((component) => component.kind === "improvement")?.rewardCash ?? 0;
+  const evBudget = roundCash(cashAmounts.baseCash + rankEvAtExpected + 0.45 * evSpecialTotal + 0.25 * evOverperf + 0.2 * evImprovement);
+
   // P4 Baukasten: Spotlight-Perk (nur legendär/golden) verstärkt den Beliebtheits-Impuls des Sonderziels —
   // rein Popularity-wirksam, cash-neutral, damit die P0–P3-Payout-Balance exakt erhalten bleibt.
-  const perkedComponents = applySpotlightPerkToComponents(components, rarity, isGolden);
+  const perkedComponents = applySpotlightPerkToComponents(composedComponents, rarity, isGolden);
 
   const offer: SponsorOffer = {
     offerId: `${gameState.season.id}:${team.teamId}:${archetype}:${rarity}:${slotIndex}`,
@@ -289,9 +324,57 @@ function buildOffer(input: {
     isChallengeOffer: specialMode === "challenge",
     isGolden,
   };
+  if (p4bEnabled) {
+    offer.evBudget = evBudget;
+  }
   // P4: Baukasten-Modulliste (Cash-Komponenten + evtl. Perk) fürs UI/Debug ableiten und anhängen.
   offer.moduleIds = buildSponsorOfferModuleIds(offer);
   return offer;
+}
+
+/**
+ * SIM/DEBUG-Helfer: baut EIN Angebot mit ERZWUNGENER Rarity + Kurvenform für ein Team (statt Slate-Wurf).
+ * Nur für Vergleichs-Skripte (sponsor-standard-vs-bonus) — der Live-Pfad bleibt buildSponsorOffersForTeam.
+ */
+export function buildSingleSponsorOfferForSim(input: {
+  gameState: GameState;
+  teamId: string;
+  rarity: SponsorRarity;
+  curveShape: SponsorCurveShape;
+  slotIndex?: number;
+  forcePremiumElite?: boolean;
+  specialMode?: "standard" | "challenge";
+}): SponsorOffer | null {
+  const team = input.gameState.teams.find((entry) => entry.teamId === input.teamId);
+  if (!team) return null;
+  const rows = buildTeamSeasonOverviewRows({ gameState: input.gameState });
+  const row = rows.find((entry) => entry.teamId === input.teamId) ?? null;
+  const identity = input.gameState.teamIdentities.find((entry) => entry.teamId === input.teamId) ?? null;
+  const profile = getTeamStrategyProfile(input.gameState, input.teamId);
+  const startRank = row?.startplatz ?? row?.rank ?? null;
+  const commercialRating = buildSponsorCommercialRating({ gameState: input.gameState, teamId: input.teamId });
+  const qualityRanks = buildLeagueTeamQualityRanks(rows, input.gameState.seasonState.beliebtheitByTeamId);
+  const qualityRank = qualityRanks.get(input.teamId);
+  if (!qualityRank) return null;
+  const salaryFactor = getCurrentSalaryFactor(input.gameState);
+  const baseAnchorSalary = getSponsorRank32BaseAnchorSalary(input.gameState);
+  return buildOffer({
+    gameState: input.gameState,
+    team,
+    identity,
+    profile,
+    curveShape: input.curveShape,
+    rarity: input.rarity,
+    rankTarget: getSportTargetRank(startRank),
+    startRank,
+    commercialRating: commercialRating.score,
+    slotIndex: input.slotIndex ?? 0,
+    salaryFactor,
+    leagueMinSalary: baseAnchorSalary,
+    forcePremiumElite: input.forcePremiumElite,
+    teamQualityRank: qualityRank.qualityRank,
+    specialMode: input.specialMode ?? "standard",
+  });
 }
 
 export function buildSponsorOffersForTeam(input: {

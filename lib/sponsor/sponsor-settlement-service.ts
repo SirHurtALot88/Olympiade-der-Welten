@@ -243,6 +243,28 @@ function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract)
       continue;
     }
 
+    if (component.kind === "clause") {
+      // P4b — Abstiegs-Klausel: Malus, wenn der Endrang die eingefrorene Schwelle (targetValue) erreicht/
+      // unterschreitet (= schlechter als Schwelle). Sonst kein Effekt. Schwelle + Malus stehen beim
+      // Signieren fest → Anzeige == Settlement. Kauft im Gegenzug eine höhere garantierte Basis frei.
+      const threshold = typeof component.targetValue === "number" ? component.targetValue : null;
+      const inDropZone = threshold != null && currentRank != null && currentRank >= threshold;
+      const malus = inDropZone ? roundCash(component.penaltyCash ?? 0) : 0;
+      rows.push({
+        teamId: contract.teamId,
+        teamName: team?.name ?? contract.teamId,
+        componentId: component.componentId,
+        kind: component.kind,
+        label: component.label,
+        status: malus > 0 ? "failed_penalty" : "skipped",
+        cashDelta: malus > 0 ? -malus : 0,
+        reason: inDropZone
+          ? `Abstiegs-Klausel: Platz ${currentRank} ≥ #${threshold} → −${malus} C`
+          : `Abstiegs-Klausel nicht ausgelöst (Platz ${currentRank ?? "—"} < #${threshold ?? "—"})`,
+      });
+      continue;
+    }
+
     if (component.kind === "special") {
       // TEIL B — generalisierter Skalier-Pfad: der Evaluator liefert eine ERREICHTE STUFE (Fraction 0..1),
       // die Settlement zahlt `rewardCash * fraction`. Bestehende binäre Sonderziele (ohne `stages`) liefern
