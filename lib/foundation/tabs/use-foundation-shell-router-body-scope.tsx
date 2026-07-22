@@ -10319,6 +10319,12 @@ export function useFoundationShellRouterBodyScope({
     runTeamPicksRefill,
     teamPicksRefillBusyTeamId,
     teamPicksRefillMessage,
+    // Saison-Kapitän wählen direkt aus dem Kader-Tab (wie AI-Teams). Kandidaten
+    // + Führungs-Breakdown baut die Kaderansicht selbst aus `gameState`; hier
+    // reicht der aktuelle Kapitän, der Assign-Handler und der Busy-State.
+    selectedTeamCaptainPlayerId,
+    assignTeamCaptainForSelectedTeam,
+    assignTeamCaptainBusy,
     // D1 Feld-Form-Strip auf dem Team-Profil (Neuer Look).
     fieldRaceRecentForm: selectedTeamFieldRaceForm,
     fieldRacePlayedMatchdayCount,

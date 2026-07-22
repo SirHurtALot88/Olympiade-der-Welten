@@ -47042,6 +47042,262 @@ button.foundation-team-portrait-card {
   cursor: default;
 }
 
+.is-new-look .nl-teams-action.is-primary {
+  color: var(--nl-ink);
+  border-color: var(--nl-accent);
+  background: color-mix(in srgb, var(--nl-accent) 16%, var(--nl-panel-2));
+  padding: 5px 14px;
+  font-size: 12px;
+}
+
+.is-new-look .nl-teams-action.is-primary:hover:not(:disabled),
+.is-new-look .nl-teams-action.is-primary:focus-visible {
+  background: color-mix(in srgb, var(--nl-accent) 26%, var(--nl-panel-2));
+}
+
+/* Saison-Kapitän-Wahl im Kader-Tab — transparente Führungswertung mit
+   aufklappbarer „Warum?"-Aufschlüsselung pro Kandidat. */
+.is-new-look .nl-teams-captain-active {
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teams-captain-active strong {
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-teams-captain-active.is-open {
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-teams-captain-intro {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teams-captain-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.is-new-look .nl-teams-captain-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: stretch;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-teams-captain-row.is-current {
+  border-color: color-mix(in srgb, var(--nl-accent) 55%, var(--nl-line));
+}
+
+.is-new-look .nl-teams-captain-row.is-draft {
+  border-color: var(--nl-accent);
+  background: color-mix(in srgb, var(--nl-accent) 10%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-teams-captain-pick {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 6px;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.is-new-look .nl-teams-captain-pick:disabled {
+  cursor: default;
+}
+
+.is-new-look .nl-teams-captain-order {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--nl-mut);
+  background: var(--nl-panel);
+  border-radius: 999px;
+}
+
+.is-new-look .nl-teams-captain-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.is-new-look .nl-teams-captain-identity strong {
+  color: var(--nl-ink);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-teams-captain-identity small {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.is-new-look .nl-teams-captain-style {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teams-captain-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--nl-ink);
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--nl-accent) 22%, transparent);
+}
+
+.is-new-look .nl-teams-captain-demand {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--nl-warn, #c98a1a);
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--nl-warn, #c98a1a) 16%, transparent);
+}
+
+.is-new-look .nl-teams-captain-score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.1;
+}
+
+.is-new-look .nl-teams-captain-score b {
+  font-size: 16px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-teams-captain-score small {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teams-captain-effects {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 10px;
+  color: var(--nl-mut);
+  text-align: right;
+}
+
+.is-new-look .nl-teams-captain-why {
+  align-self: center;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--nl-mut);
+  background: var(--nl-panel);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  cursor: pointer;
+}
+
+.is-new-look .nl-teams-captain-why:hover,
+.is-new-look .nl-teams-captain-why:focus-visible {
+  color: var(--nl-ink);
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-teams-captain-breakdown {
+  grid-column: 1 / -1;
+  margin: 4px 6px 6px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border-top: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-teams-captain-factor {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.is-new-look .nl-teams-captain-factor dt {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teams-captain-factor dd {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.is-new-look .nl-teams-captain-factor-raw {
+  font-size: 10px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teams-captain-factor-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--nl-panel);
+  overflow: hidden;
+}
+
+.is-new-look .nl-teams-captain-factor-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--nl-accent);
+}
+
+.is-new-look .nl-teams-captain-factor dd b {
+  font-size: 11px;
+  color: var(--nl-ink);
+  text-align: right;
+}
+
+.is-new-look .nl-teams-captain-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.is-new-look .nl-teams-captain-hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--nl-mut);
+  flex: 1 1 240px;
+}
+
 /* T-036: „Verkaufen" ist destruktiv (öffnet die Verkaufs-Vorschau) und
    stand bislang optisch ununterscheidbar direkt neben „Verlängern" →
    Fehlklick-Gefahr. Eigene Gruppe mit sichtbarem Abstand (`margin-left`)

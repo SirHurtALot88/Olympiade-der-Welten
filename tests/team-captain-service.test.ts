@@ -91,6 +91,28 @@ describe("team-captain-service", () => {
     expect(candidates[0]?.effects.moraleBuffer).toBeGreaterThan(0);
   });
 
+  it("exposes a transparent leadership breakdown whose points sum to the score", () => {
+    const gameState = createCaptainTestGameState();
+    const [candidate] = buildCaptainCandidateProfiles(gameState, "M-M");
+    expect(candidate).toBeDefined();
+    const breakdown = candidate!.leadershipBreakdown;
+    // Alle Faktoren vorhanden, in fester Reihenfolge, mit lesbaren Labels.
+    expect(breakdown.map((factor) => factor.key)).toEqual([
+      "charisma",
+      "will",
+      "determination",
+      "awareness",
+      "rating",
+      "traits",
+    ]);
+    // Der Charakter-Bonus für „Motivated" schlägt sich sichtbar nieder.
+    const traits = breakdown.find((factor) => factor.key === "traits");
+    expect(traits?.points).toBeGreaterThan(0);
+    // Summe der Beiträge entspricht (bis auf Rundung) der Führungswertung.
+    const sum = breakdown.reduce((total, factor) => total + factor.points, 0);
+    expect(Math.abs(sum - candidate!.leadershipScore)).toBeLessThanOrEqual(0.6);
+  });
+
   it("persists a manual team captain assignment", () => {
     const gameState = createCaptainTestGameState();
     expect(hasPersistedTeamCaptain(gameState, "M-M")).toBe(false);

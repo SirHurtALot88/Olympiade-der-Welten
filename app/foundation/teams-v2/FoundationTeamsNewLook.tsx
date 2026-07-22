@@ -43,6 +43,10 @@ import type {
 } from "@/lib/foundation/tabs/use-teams-roster-table-derivations";
 import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
 import { SEASON_DISCIPLINE_LABELS, isSeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
+import {
+  buildCaptainCandidateProfiles,
+  getTeamCaptainEffectsTooltip,
+} from "@/lib/morale/team-captain-service";
 
 /**
  * "Neuer Look" Teams-Ansicht (flag-gated, additiv).
@@ -209,6 +213,15 @@ export type FoundationTeamsNewLookProps = {
    * Optional: fehlt der Handler, bleibt die Rang-Kachel beim Team-Profil.
    */
   onOpenSeason?: () => void;
+  /**
+   * Saison-Kapitän: aktueller Kapitän (playerId) + Assign-Handler + Busy-State.
+   * Die Kandidatenliste inkl. Führungs-Breakdown baut die Kaderansicht selbst
+   * aus `gameState` (fog-frei, reine Ableitung). Fehlt der Handler oder ist das
+   * Team nicht steuerbar, bleibt die Kapitänswahl schreibgeschützt (nur Anzeige).
+   */
+  selectedTeamCaptainPlayerId?: string | null;
+  assignTeamCaptainForSelectedTeam?: (playerId: string) => void | Promise<void>;
+  assignTeamCaptainBusy?: boolean;
 };
 
 const NL_TEAMS_ROSTER_MODE_ITEMS: Array<{ id: NlTeamsRosterMode; label: string }> = [
@@ -690,6 +703,9 @@ export default function FoundationTeamsNewLook({
   openMarketSellModal,
   openContractRenewalNegotiation,
   onOpenSeason,
+  selectedTeamCaptainPlayerId,
+  assignTeamCaptainForSelectedTeam,
+  assignTeamCaptainBusy,
 }: FoundationTeamsNewLookProps) {
   const [rosterMode, setRosterMode] = useState<NlTeamsRosterMode>(() =>
     defaultRosterModeForTab(selectedTeamDetailTab),
@@ -705,6 +721,17 @@ export default function FoundationTeamsNewLook({
   const [boardSort, setBoardSort] = useState<NlTeamsBoardSort>({ key: "rank", dir: "asc" });
   const [hoveredBoardTeamId, setHoveredBoardTeamId] = useState<string | null>(null);
   const [disciplineSort, setDisciplineSort] = useState<"strength" | "category">("strength");
+  // Saison-Kapitän: welcher Kandidat ist gerade zum Bestätigen ausgewählt +
+  // welcher Führungs-Breakdown ist aufgeklappt. Beim Team-Wechsel (ohne Remount)
+  // die Auswahl zurücksetzen, damit kein Fremdkader-Spieler „hängen bleibt".
+  const [draftCaptainPlayerId, setDraftCaptainPlayerId] = useState<string | null>(null);
+  const [expandedCaptainPlayerId, setExpandedCaptainPlayerId] = useState<string | null>(null);
+  const [captainSyncedTeamId, setCaptainSyncedTeamId] = useState<string>(selectedTeam.teamId);
+  if (captainSyncedTeamId !== selectedTeam.teamId) {
+    setCaptainSyncedTeamId(selectedTeam.teamId);
+    setDraftCaptainPlayerId(null);
+    setExpandedCaptainPlayerId(null);
+  }
 
   const heroCardRef = useRef<HTMLDivElement | null>(null);
   const disciplineCardRef = useRef<HTMLDivElement | null>(null);
@@ -796,6 +823,19 @@ export default function FoundationTeamsNewLook({
   // `TeamProfileNewLook` (`data.controlMode === "manual"`), hier über den
   // kanonischen `team.humanControlled`-Marker (Ligavergleich zeigt jedes Team).
   const heroIsOwnTeam = selectedTeam.humanControlled;
+
+  // Saison-Kapitän: Kandidaten inkl. Führungs-Breakdown ("warum") direkt aus
+  // dem GameState ableiten — identische Formel wie AI-Teams und der HQ-Picker.
+  const captainCandidates = useMemo(
+    () => buildCaptainCandidateProfiles(gameState, selectedTeam.teamId).slice(0, 8),
+    [gameState, selectedTeam.teamId],
+  );
+  const currentCaptain = useMemo(
+    () => captainCandidates.find((candidate) => candidate.playerId === selectedTeamCaptainPlayerId) ?? null,
+    [captainCandidates, selectedTeamCaptainPlayerId],
+  );
+  const captainEffectsTooltip = getTeamCaptainEffectsTooltip();
+  const canManageCaptain = heroIsOwnTeam && typeof assignTeamCaptainForSelectedTeam === "function";
 
   // CASH-Hover (alle Teams): kompakte GuV-Projektion. Cash & Gehaltsblock aus
   // der Team-Zeile, Gebäude-Unterhalt/-Einnahmen und Sponsoren-Basis aus dem
@@ -2173,6 +2213,144 @@ export default function FoundationTeamsNewLook({
                 Noch keine abgeschlossenen Saisons — der Verlauf entsteht ab der zweiten Saison
                 {liveHistoryRow?.rank != null ? ` (aktuell Rang #${formatNlNumber(liveHistoryRow.rank, 0)})` : ""}.
               </p>
+            )}
+          </NlCard>
+        </div>
+      ) : null}
+
+      {heroIsOwnTeam ? (
+        <div className="nl-teams-anchor">
+          <NlCard
+            className="nl-teams-captain-card"
+            eyebrow="Saison-Führung"
+            title="Kapitän wählen"
+            actions={
+              currentCaptain ? (
+                <span className="nl-teams-captain-active" title={captainEffectsTooltip}>
+                  Aktiv: <strong>{currentCaptain.playerName}</strong> · {currentCaptain.style}
+                </span>
+              ) : (
+                <span className="nl-teams-captain-active is-open">Noch kein Kapitän</span>
+              )
+            }
+          >
+            <p className="nl-teams-captain-intro">{captainEffectsTooltip}</p>
+            {captainCandidates.length === 0 ? (
+              <p className="nl-teams-action-hint is-locked">
+                <strong>Kein Kader</strong>
+                <span>Erst nach den Käufen stehen Kapitäns-Kandidaten bereit.</span>
+              </p>
+            ) : (
+              <>
+                <ul className="nl-teams-captain-list" aria-label="Kapitäns-Kandidaten nach Führungswertung">
+                  {captainCandidates.map((candidate, index) => {
+                    const isCurrent = candidate.playerId === selectedTeamCaptainPlayerId;
+                    const isDraft = candidate.playerId === draftCaptainPlayerId;
+                    const isExpanded = candidate.playerId === expandedCaptainPlayerId;
+                    const maxFactorPoints = Math.max(
+                      1,
+                      ...candidate.leadershipBreakdown.map((factor) => Math.abs(factor.points)),
+                    );
+                    return (
+                      <li
+                        key={`nl-captain-${candidate.playerId}`}
+                        className={`nl-teams-captain-row${isDraft ? " is-draft" : ""}${isCurrent ? " is-current" : ""}`}
+                      >
+                        <button
+                          type="button"
+                          className="nl-teams-captain-pick"
+                          onClick={() => canManageCaptain && setDraftCaptainPlayerId(candidate.playerId)}
+                          disabled={!canManageCaptain || Boolean(assignTeamCaptainBusy)}
+                          aria-pressed={isDraft}
+                          title={canManageCaptain ? "Als Kapitän vormerken" : "Nur beim eigenen Team wählbar"}
+                        >
+                          <span className="nl-teams-captain-order">{index + 1}</span>
+                          <span className="nl-teams-captain-identity">
+                            <strong>{candidate.playerName}</strong>
+                            <small>
+                              <span className="nl-teams-captain-style">{candidate.style}</span>
+                              {isCurrent ? <span className="nl-teams-captain-badge">Kapitän</span> : null}
+                              {candidate.hasCaptaincyDemand ? (
+                                <span className="nl-teams-captain-demand" title={candidate.demandLabel ?? "Will Kapitän sein"}>
+                                  {candidate.demandLabel ?? "Will Kapitän sein"}
+                                </span>
+                              ) : null}
+                            </small>
+                          </span>
+                          <span className="nl-teams-captain-score nl-tnum" title="Führungswertung">
+                            <b>{formatNlNumber(candidate.leadershipScore, 1)}</b>
+                            <small>Führung</small>
+                          </span>
+                          <span className="nl-teams-captain-effects nl-tnum">
+                            <span title="Moral-Puffer">Moral +{formatNlNumber(candidate.effects.moraleBuffer, 1)}</span>
+                            <span title="Team-Power-Bonus">Power +{formatNlNumber(candidate.effects.teamPowerModifierPct, 1)}%</span>
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          className="nl-teams-captain-why"
+                          onClick={() =>
+                            setExpandedCaptainPlayerId((prev) => (prev === candidate.playerId ? null : candidate.playerId))
+                          }
+                          aria-expanded={isExpanded}
+                          title="Aufschlüsselung der Führungswertung"
+                        >
+                          {isExpanded ? "Warum ▲" : "Warum ▾"}
+                        </button>
+                        {isExpanded ? (
+                          <dl className="nl-teams-captain-breakdown" aria-label={`Führungs-Aufschlüsselung ${candidate.playerName}`}>
+                            {candidate.leadershipBreakdown.map((factor) => (
+                              <div key={`${candidate.playerId}-${factor.key}`} className="nl-teams-captain-factor">
+                                <dt>{factor.label}</dt>
+                                <dd className="nl-tnum">
+                                  <span className="nl-teams-captain-factor-raw">
+                                    {factor.key === "traits"
+                                      ? `+${formatNlNumber(factor.rawValue, 1)}`
+                                      : `${formatNlNumber(factor.rawValue, 0)} × ${factor.weight}`}
+                                  </span>
+                                  <span className="nl-teams-captain-factor-bar" aria-hidden>
+                                    <span
+                                      className="nl-teams-captain-factor-fill"
+                                      style={{ width: `${Math.min(100, (Math.abs(factor.points) / maxFactorPoints) * 100)}%` }}
+                                    />
+                                  </span>
+                                  <b>+{formatNlNumber(factor.points, 1)}</b>
+                                </dd>
+                              </div>
+                            ))}
+                          </dl>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+                {canManageCaptain ? (
+                  <div className="nl-teams-captain-confirm">
+                    <button
+                      type="button"
+                      className="nl-teams-action is-primary"
+                      disabled={
+                        !draftCaptainPlayerId ||
+                        Boolean(assignTeamCaptainBusy) ||
+                        draftCaptainPlayerId === selectedTeamCaptainPlayerId
+                      }
+                      onClick={() => {
+                        if (draftCaptainPlayerId) {
+                          void assignTeamCaptainForSelectedTeam?.(draftCaptainPlayerId);
+                        }
+                      }}
+                    >
+                      {assignTeamCaptainBusy ? "Speichert …" : "Kapitän bestätigen"}
+                    </button>
+                    <span className="nl-teams-captain-hint">
+                      Führung = Charisma, Wille, Entschlossenheit, Übersicht, Klasse & Charakter-Boni. Der Kapitän puffert
+                      Moral, senkt Rivalitäts-Druck und stärkt die Team-Power.
+                    </span>
+                  </div>
+                ) : (
+                  <p className="nl-teams-captain-hint">Kapitänswahl ist nur für dein eigenes, gesteuertes Team möglich.</p>
+                )}
+              </>
             )}
           </NlCard>
         </div>

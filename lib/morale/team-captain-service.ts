@@ -24,6 +24,54 @@ export function getTeamCaptainEffectsTooltip() {
   return "Der Saison-Kapitän puffert Moral, reduziert Rivalitäts-Druck, stärkt Team-Power leicht und kann Konflikte abfedern.";
 }
 
+/**
+ * Ein einzelner Beitrag zur Führungswertung — macht transparent, WARUM ein
+ * Spieler wie gut als Kapitän ist (welcher Attributwert mit welchem Gewicht
+ * wie viele Punkte beisteuert).
+ */
+export type CaptainLeadershipFactor = {
+  key: "charisma" | "will" | "determination" | "awareness" | "rating" | "traits";
+  label: string;
+  /** Rohwert des Attributs (bzw. Trait-Bonus-Rohsumme) vor Gewichtung. */
+  rawValue: number;
+  /** Gewicht in der Formel (Trait-Bonus fließt 1:1 ein → weight 1). */
+  weight: number;
+  /** Beigetragene Führungspunkte (rawValue × weight, gerundet). */
+  points: number;
+};
+
+/**
+ * Zerlegt die Führungswertung eines Spielers in ihre Einzelbeiträge. Nutzt
+ * dieselben Attribut-Fallbacks wie {@link buildCaptainRecordForPlayer}, damit
+ * die Summe der `points` (bis auf Rundung) dem `leadershipScore` entspricht.
+ */
+export function buildCaptainLeadershipBreakdown(
+  gameState: GameState,
+  player: Player,
+  ratings = buildPlayerRatingContractMap(gameState),
+): CaptainLeadershipFactor[] {
+  const stats = player.attributeSheetStats;
+  const traits = getTraits(player);
+  const traitBonus = traits.reduce(
+    (sum, trait) => sum + (CAPTAIN_POSITIVE_TRAITS.has(trait) ? 4 : trait === "renegade" || trait === "scandalous" ? 1.5 : 0),
+    0,
+  );
+  const charisma = stats?.charisma ?? player.coreStats.soc ?? 0;
+  const will = stats?.will ?? player.coreStats.men ?? 0;
+  const determination = stats?.determination ?? player.coreStats.pow ?? 0;
+  const awareness = stats?.awareness ?? player.coreStats.men ?? 0;
+  const rating = ratings.get(player.id)?.mvs ?? player.ovr ?? 0;
+
+  return [
+    { key: "charisma", label: "Charisma", rawValue: round(charisma, 0), weight: 0.32, points: round(charisma * 0.32, 1) },
+    { key: "will", label: "Wille", rawValue: round(will, 0), weight: 0.2, points: round(will * 0.2, 1) },
+    { key: "determination", label: "Entschlossenheit", rawValue: round(determination, 0), weight: 0.18, points: round(determination * 0.18, 1) },
+    { key: "awareness", label: "Spielübersicht", rawValue: round(awareness, 0), weight: 0.16, points: round(awareness * 0.16, 1) },
+    { key: "rating", label: "Klasse (MVS)", rawValue: round(rating, 0), weight: 0.08, points: round(rating * 0.08, 1) },
+    { key: "traits", label: "Charakter-Boni", rawValue: round(traitBonus, 1), weight: 1, points: round(traitBonus, 1) },
+  ];
+}
+
 export function buildCaptainRecordForPlayer(gameState: GameState, teamId: string, player: Player): TeamCaptainRecord {
   const ratings = buildPlayerRatingContractMap(gameState);
   const traits = getTraits(player);
@@ -75,12 +123,15 @@ export function buildCaptainRecordForPlayer(gameState: GameState, teamId: string
 export type TeamCaptainCandidateProfile = TeamCaptainRecord & {
   hasCaptaincyDemand: boolean;
   demandLabel: string | null;
+  /** Transparente Zerlegung der Führungswertung — „warum" dieser Spieler wie gut ist. */
+  leadershipBreakdown: CaptainLeadershipFactor[];
 };
 
 export function buildCaptainCandidateProfiles(gameState: GameState, teamId: string): TeamCaptainCandidateProfile[] {
   const rosterIds = new Set(gameState.rosters.filter((entry) => entry.teamId === teamId).map((entry) => entry.playerId));
   const players = gameState.players.filter((player) => rosterIds.has(player.id));
   const demandMap = buildTeamPlayerDemandMap(gameState, teamId);
+  const ratings = buildPlayerRatingContractMap(gameState);
 
   return players
     .map((player) => {
@@ -90,6 +141,7 @@ export function buildCaptainCandidateProfiles(gameState: GameState, teamId: stri
         ...record,
         hasCaptaincyDemand: Boolean(captaincyDemand),
         demandLabel: captaincyDemand?.label ?? null,
+        leadershipBreakdown: buildCaptainLeadershipBreakdown(gameState, player, ratings),
       };
     })
     .sort(

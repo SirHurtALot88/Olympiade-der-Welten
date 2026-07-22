@@ -98,6 +98,11 @@ type FoundationTeamsViewHostProps = Omit<
   showTeamDisciplines: boolean;
   /** Öffnet die Saisonstand-Seite (seasonV2) — Portal-Ziel der Rang-Kachel im Neuen Look. */
   onOpenSeason?: () => void;
+  /** Aktueller Saison-Kapitän des gewählten Teams (playerId) — für die Kader-Kapitänswahl. */
+  selectedTeamCaptainPlayerId?: string | null;
+  /** Ernennt einen Spieler zum Saison-Kapitän (nur eigenes, steuerbares Team). */
+  assignTeamCaptainForSelectedTeam?: (playerId: string) => void | Promise<void>;
+  assignTeamCaptainBusy?: boolean;
 };
 
 export type { FoundationTeamsViewHostProps };
@@ -342,6 +347,15 @@ export default function FoundationTeamsViewHost({
         openMarketSellModal={panelProps.openMarketSellModal as FoundationTeamsNewLookProps["openMarketSellModal"]}
         openContractRenewalNegotiation={
           panelProps.openContractRenewalNegotiation as FoundationTeamsNewLookProps["openContractRenewalNegotiation"]
+        }
+        selectedTeamCaptainPlayerId={
+          panelProps.selectedTeamCaptainPlayerId as FoundationTeamsNewLookProps["selectedTeamCaptainPlayerId"]
+        }
+        assignTeamCaptainForSelectedTeam={
+          panelProps.assignTeamCaptainForSelectedTeam as FoundationTeamsNewLookProps["assignTeamCaptainForSelectedTeam"]
+        }
+        assignTeamCaptainBusy={
+          panelProps.assignTeamCaptainBusy as FoundationTeamsNewLookProps["assignTeamCaptainBusy"]
         }
       />
     );
