@@ -239,6 +239,13 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
   const persistRequestVersionRef = useRef(0);
   const persistSnapshotRef = useRef<{ requestVersion: number; snapshot: GameState } | null>(null);
   const loadedWithCompactInitialRef = useRef(true);
+  // Aktueller Save-Mode als Ref, damit der Bootstrap-Load-Effect ihn LESEN kann, ohne ihn als Dependency
+  // zu führen. Sonst würde jedes Umsetzen von `foundationSaveMode` (z. B. beim „Neues Spiel erstellen"
+  // all→custom) den Bootstrap-Effect neu feuern und einen konkurrierenden Load mit dem VERALTETEN
+  // `initialSaveId` (dem vorherigen Save aus der Seiten-URL) auslösen — der den frisch erstellten aktiven
+  // Save wieder auf den alten zurückwirft (Race). Mode-Wechsel laufen ohnehin über changeFoundationSaveMode.
+  const foundationSaveModeRef = useRef(foundationSaveMode);
+  foundationSaveModeRef.current = foundationSaveMode;
   // Serialisiert ALLE lokalen Save-PUTs (Sofort-Persist + Auto-Save), damit
   // zwei schnelle Schreibaktionen sich nicht selbst einen 409-Konflikt bauen
   // (die zweite würde sonst mit veralteter saveVersion abschicken, bevor die
@@ -717,7 +724,7 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
         save?: { saveId: string; name?: string; gameState: GameState };
         saves?: SaveSummary[];
         _meta?: FoundationReadMeta;
-      }>(buildStateApiPath(initialSaveId ?? undefined, foundationSaveMode, { compactInitial: true }), {}, fetchRetryOptions);
+      }>(buildStateApiPath(initialSaveId ?? undefined, foundationSaveModeRef.current, { compactInitial: true }), {}, fetchRetryOptions);
 
       if (cancelled) {
         return;
@@ -794,7 +801,13 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
     return () => {
       cancelled = true;
     };
-  }, [foundationSaveMode, initialSaveId]);
+    // ACHTUNG: `foundationSaveMode` bewusst NICHT in den Deps — der Bootstrap-Load soll nur auf Mount /
+    // Wechsel von `initialSaveId` laufen. Ein Re-Fire bei Save-Mode-Änderung würde mit dem veralteten
+    // `initialSaveId` konkurrierend laden und den frisch erstellten New-Game-Save zurück auf den alten
+    // werfen (Team-Auswahl startet dann nie). Der aktuelle Mode wird über `foundationSaveModeRef` gelesen;
+    // echte Mode-Wechsel laufen über changeFoundationSaveMode (eigener loadSave).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSaveId]);
 
   useEffect(() => {
     if (!hasLoadedPersistentState.current) {
