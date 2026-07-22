@@ -145,6 +145,14 @@ function SponsorRewardIcon({ kind }: { kind: SponsorRewardKind }) {
           <path d="M10.5 4.6H14v3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
+    case "clause":
+      // Schild (Klausel/Abstiegs-Malus)
+      return (
+        <svg {...shared}>
+          <path d="M8 1.5 13.5 4v4.5c0 3.5-2.6 5.4-5.5 6.5C5.1 13.9 2.5 12 2.5 8.5V4L8 1.5Z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+          <path d="M5.5 8h5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        </svg>
+      );
     default:
       // Zielscheibe (Sonderziel)
       return (
@@ -428,7 +436,12 @@ export function SponsorOfferCardNewLook({
                 <SponsorRewardIcon kind={component.kind} />
                 <span>{getSponsorComponentKindLabel(component.kind)}</span>
                 <strong className="nl-tnum">
-                  {typeof component.rewardCash === "number" ? formatCash(component.rewardCash) : component.rewardCash}
+                  {/* P4b — Klausel: statt des (0-)Rewards den eingefrorenen Malus zeigen. */}
+                  {component.kind === "clause" && component.penaltyCash
+                    ? `−${formatCash(component.penaltyCash)}`
+                    : typeof component.rewardCash === "number"
+                      ? formatCash(component.rewardCash)
+                      : component.rewardCash}
                 </strong>
               </div>
               <small>{component.label}</small>

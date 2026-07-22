@@ -285,6 +285,7 @@ export function getSponsorComponentKindLabel(kind: SponsorOfferComponent["kind"]
   if (kind === "rank") return "Gewinnstufen";
   if (kind === "improvement") return "Tabellenziel";
   if (kind === "overperformance") return "Überperformance";
+  if (kind === "clause") return "Klausel";
   return "Sonderziel";
 }
 
