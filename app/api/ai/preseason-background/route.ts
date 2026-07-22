@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-contract";
 import { applyAiMarketPlanLocally } from "@/lib/ai/ai-market-plan-apply-service";
-import { applyAiManagerPlan } from "@/lib/ai/ai-manager-apply-service";
+import { applyAiManagerPlan, type AiManagerActionType } from "@/lib/ai/ai-manager-apply-service";
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
 import type { AiPreseasonAutomationRunRecord, GameState } from "@/lib/data/olyDataTypes";
@@ -19,6 +19,36 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import type { PersistenceService } from "@/lib/persistence/types";
 import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
+
+// Roster-abhängige Manager-Aktionen: Training/Einsatzlisten-Setup braucht Spieler im Kader. Im Setup-Draft
+// (Season 1, frische Teams) sind die Kader zu Beginn LEER — laufen diese Aktionen vor dem Draft, werden sie
+// alle mit `team_roster_empty` blockiert (das vom Owner beobachtete „120 blockiert"). Daher werden sie
+// bewusst NACH dem Draft ausgeführt.
+const ROSTER_DEPENDENT_MANAGER_ACTIONS: AiManagerActionType[] = [
+  "set_training_focus",
+  "set_training_intensity",
+  "set_player_training_modes",
+  "set_player_training_classes",
+];
+
+// Vor-Draft-Aktionen: Budget-Reservierung, Gebäude, Strategie-Marker — hängen NICHT vom Kader ab und dürfen
+// (bzw. sollen, damit der Draft das reservierte Budget nutzt) vor dem Draft laufen.
+const PRE_DRAFT_MANAGER_ACTIONS: AiManagerActionType[] = [
+  "reserve_transfer_budget",
+  "reserve_salary_budget",
+  "reserve_maintenance_budget",
+  "maintain_building",
+  "upgrade_building",
+  "buy_building",
+  "mark_contract_strategy",
+  "mark_sell_strategy",
+];
+
+// Season-Market-Modus (Kader existieren bereits): eine Runde mit allen Aktionen.
+const ALL_PRESEASON_MANAGER_ACTIONS: AiManagerActionType[] = [
+  ...PRE_DRAFT_MANAGER_ACTIONS,
+  ...ROSTER_DEPENDENT_MANAGER_ACTIONS,
+];
 
 const inFlightRunKeys = new Set<string>();
 
@@ -100,32 +130,27 @@ async function executeAiPreseasonBackgroundWork(input: {
 
   try {
     const latestBeforeManager = persistence.getSaveById(saveId) ?? protectedSave;
-    const managerResult = applyAiManagerPlan({
-      save: latestBeforeManager,
-      dryRun: false,
-      teamIds: aiTeamIds,
-      actionTypes: [
-        "reserve_transfer_budget",
-        "reserve_salary_budget",
-        "reserve_maintenance_budget",
-        "maintain_building",
-        "upgrade_building",
-        "buy_building",
-        "set_training_focus",
-        "set_training_intensity",
-        "set_player_training_modes",
-        "set_player_training_classes",
-        "mark_contract_strategy",
-        "mark_sell_strategy",
-      ],
-      persistence,
-    });
 
     if (setupDraftMode) {
+      // REIHENFOLGE-FIX: Im Setup-Draft (frische Teams, leere Kader) MUSS erst der Draft die Kader füllen,
+      // bevor Training/Einsatzlisten-Setup läuft — sonst blockiert jede dieser Aktionen mit
+      // `team_roster_empty` (das vom Owner beobachtete „120 blockiert"). Ablauf:
+      //   1) Vor-Draft-Manageraktionen (Budget/Gebäude/Strategie, kader-unabhängig)
+      //   2) Draft pro Team (füllt die Kader)
+      //   3) roster-abhängiges Training/Setup ERST DANACH, gegen den frischen Save mit gefüllten Kadern
+      const preDraftManager = applyAiManagerPlan({
+        save: latestBeforeManager,
+        dryRun: false,
+        teamIds: aiTeamIds,
+        actionTypes: PRE_DRAFT_MANAGER_ACTIONS,
+        persistence,
+      });
+
       let completedTeams = 0;
       let transferBuysApplied = 0;
-      const warnings = [...managerResult.warnings];
-      const blockingReasons = [...managerResult.blockers];
+      let managerActionsApplied = preDraftManager.actions.filter((action) => action.applied).length;
+      const warnings = [...preDraftManager.warnings];
+      const blockingReasons = [...preDraftManager.blockers];
 
       for (const teamId of aiTeamIds) {
         const picksRun = await runAiPicksExecutePreview(
@@ -160,7 +185,7 @@ async function executeAiPreseasonBackgroundWork(input: {
           status: "running",
           completedAt: null,
           aiTeamsCompleted: completedTeams,
-          managerActionsApplied: managerResult.actions.filter((action) => action.applied).length,
+          managerActionsApplied,
           transferBuysApplied,
           transferSellsApplied: 0,
           warnings: Array.from(new Set(warnings)),
@@ -168,12 +193,33 @@ async function executeAiPreseasonBackgroundWork(input: {
         });
       }
 
+      // 3) Training/Einsatzlisten-Setup ERST, wenn ALLE AI-Teams einen gefüllten Kader haben (Owner-Wunsch).
+      //    Ist der Draft unvollständig (Bug/Kadertiefe), wird das Training NICHT gefeuert — es würde nur mit
+      //    `team_roster_empty` blockieren. Stattdessen bleibt es aufgeschoben: der Owner kann nachpicken und
+      //    den Preseason-Lauf erneut anstoßen, dann greift Schritt 3 sauber.
+      if (completedTeams >= aiTeamIds.length) {
+        const latestAfterPicks = persistence.getSaveById(saveId) ?? latestBeforeManager;
+        const trainingManager = applyAiManagerPlan({
+          save: latestAfterPicks,
+          dryRun: false,
+          teamIds: aiTeamIds,
+          actionTypes: ROSTER_DEPENDENT_MANAGER_ACTIONS,
+          persistence,
+        });
+        managerActionsApplied += trainingManager.actions.filter((action) => action.applied).length;
+        warnings.push(...trainingManager.warnings);
+        blockingReasons.push(...trainingManager.blockers);
+      } else {
+        // Aufgeschoben, damit die 120 „team_roster_empty"-Blocker nicht mehr entstehen; klare Meldung fürs UI.
+        warnings.push("setup_draft_training_deferred_until_rosters_complete");
+      }
+
       const finalRecord: AiPreseasonAutomationRunRecord = {
         ...baseRecord,
         status: completedTeams >= aiTeamIds.length ? "completed" : "failed",
         completedAt: nowIso(),
         aiTeamsCompleted: completedTeams,
-        managerActionsApplied: managerResult.actions.filter((action) => action.applied).length,
+        managerActionsApplied,
         transferBuysApplied,
         transferSellsApplied: 0,
         warnings: Array.from(new Set(warnings)),
@@ -182,6 +228,15 @@ async function executeAiPreseasonBackgroundWork(input: {
       writeRunRecord(saveId, finalRecord);
       return finalRecord;
     }
+
+    // Season-Market-Modus: Kader existieren bereits → alle Manager-Aktionen in einer Runde, dann Markt.
+    const managerResult = applyAiManagerPlan({
+      save: latestBeforeManager,
+      dryRun: false,
+      teamIds: aiTeamIds,
+      actionTypes: ALL_PRESEASON_MANAGER_ACTIONS,
+      persistence,
+    });
 
     const market = await applyAiMarketPlanLocally({
       source: "sqlite",
