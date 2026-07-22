@@ -96,6 +96,29 @@ describe("sponsor offer slate (rarity + curve shapes)", () => {
     expect(bottomGewoehnlich / bottomTotal).toBeGreaterThan(0.7); // gewöhnlich stays the norm
   });
 
+  it("produces intra-slate rarity variance — slates are NOT all-one-rarity (seed-correlation regression)", () => {
+    // Regression gegen den FNV-1a-Seed-Korrelations-Bug: als der Slot als SUFFIX im Seed stand
+    // (`…:sponsor-rarity:${slot}`), lagen die 5 Slot-Rolls nur ~0.0039 auseinander → 94 % aller Slates
+    // waren komplett einfarbig (jede Saison „5× dieselbe Rarity"). Mit Slot-PRÄFIX muss der Anteil
+    // einfarbiger Slates auf die statistische Erwartung (~8 %) fallen. Cap legendär, damit alle 4
+    // Rarities ziehbar sind und Varianz überhaupt sichtbar werden kann.
+    let uniform = 0;
+    let total = 0;
+    for (let season = 0; season < 60; season += 1) {
+      for (let team = 0; team < 12; team += 1) {
+        const slate = rollSponsorOfferSlate({
+          seasonId: `season-${season}`,
+          teamId: `T-${team}`,
+          qualityRank: createQualityRank({ teamId: `T-${team}`, qualityRank: 3, maxRarity: "legendär", targetRarity: "selten", leaguePosition: 3 }),
+        });
+        total += 1;
+        if (new Set(slate.entries.map((entry) => entry.rarity)).size === 1) uniform += 1;
+      }
+    }
+    // Vor dem Fix: ~0.94. Nach dem Fix erwartet ~0.08; großzügige Obergrenze gegen Flakiness.
+    expect(uniform / total).toBeLessThan(0.25);
+  });
+
   it("is deterministic — identical input yields an identical slate", () => {
     const input = {
       seasonId: "season-det",

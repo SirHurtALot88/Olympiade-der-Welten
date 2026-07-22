@@ -51633,6 +51633,23 @@ button.foundation-team-portrait-card {
   white-space: nowrap;
 }
 
+/* P4 Baukasten: Modul-Anzahl-Chip (Rarity-Wertigkeit) + Perk-Chip (Spotlight ×2). */
+.is-new-look .nl-sponsor-module-chip {
+  padding: 2px 9px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  color: var(--nl-mut);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-sponsor-module-chip.is-perk {
+  border-color: color-mix(in srgb, var(--nl-warn) 55%, transparent);
+  color: var(--nl-warn);
+}
+
 /* --- Challenge-Panel ---------------------------------------------- */
 .is-new-look .nl-sponsor-challenge {
   display: flex;

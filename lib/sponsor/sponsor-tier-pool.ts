@@ -192,7 +192,13 @@ export function rollSponsorOfferSlate(input: {
   }
   const weightTotal = weights.reduce((sum, w) => sum + w, 0);
   for (let slot = 0; slot < slotCount; slot += 1) {
-    const roll = getStableUnitHash(`${input.seasonId}:${input.teamId}:sponsor-rarity:${slot}`) * weightTotal;
+    // WICHTIG: Slot MUSS am Seed-Anfang stehen. FNV-1a avalanched nur nach dem variierenden Zeichen; ein
+    // Suffix-Slot (`…:sponsor-rarity:${slot}`) unterscheidet die 5 Würfe nur in den niederwertigen Bits →
+    // benachbarte Slots lagen exakt 16777619/2^32 ≈ 0.0039 auseinander, wodurch 94 % aller Slates komplett
+    // EINFARBIG waren (jede Saison „5× dieselbe Rarity"). Slot vorne lässt ihn durch alle FNV-Runden laufen
+    // → echte Intra-Slate-Varianz (einfarbige Quote fällt auf die statistische Erwartung ~8 %), die
+    // Marginalverteilung pro Slot bleibt unverändert.
+    const roll = getStableUnitHash(`sponsor-rarity:${slot}:${input.seasonId}:${input.teamId}`) * weightTotal;
     let acc = 0;
     let picked: SponsorRarity = candidates[candidates.length - 1] ?? maxRarity;
     for (let i = 0; i < candidates.length; i += 1) {

@@ -48,7 +48,6 @@ describe("sponsor event service", () => {
       teamId: "M-M",
       offerId: offers[0]!.offerId,
       termSeasons: 2,
-      negotiationProfile: "balanced",
     }).gameState;
 
     const forcedSeedState: GameState = {

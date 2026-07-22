@@ -1206,7 +1206,7 @@ export type SponsorCurveShape =
   | "sicherheit"
   | "klassenerhalt";
 
-export type SponsorOfferComponentKind = "base" | "rank" | "improvement" | "special";
+export type SponsorOfferComponentKind = "base" | "rank" | "improvement" | "special" | "overperformance";
 
 /**
  * Eine Stufe eines mehrstufigen Sonderziels (TEIL B). `threshold` ist die (aufsteigend sortierte)
@@ -1240,6 +1240,16 @@ export type SponsorOfferComponent = {
    * (Σ über die Liga ≈ 0). Skaliert mit der erreichten Stufen-Fraction. Rückwärtskompatibel optional.
    */
   spotlightBonus?: number;
+  /**
+   * P3 — beim SIGNIEREN eingefrorene Rate für lineare, gedeckelte Module (Anzeige == Settlement):
+   * - `kind: "overperformance"` zahlt `min(rewardCash, ratePerUnitC × max(0, targetValue − finalRank))`,
+   *   wobei `targetValue` der eingefrorene Erwartungsrang und `rewardCash` der Cap ist.
+   * - `kind: "improvement"` (neuer per-Platz-Modus) zahlt `min(rewardCash, ratePerUnitC × max(0, startRank − finalRank))`.
+   * Fehlt `ratePerUnitC`, gilt der Legacy-Binär-Pfad (Improvement: rewardCash bei ≥ targetValue Plätzen).
+   */
+  ratePerUnitC?: number;
+  /** P3 — Kappungsgrenze in Plätzen für die per-Einheit-Module (max. vergütete Ränge/Plätze). */
+  maxUnits?: number;
 };
 
 export type SponsorDemandProfile = "safe" | "balanced" | "ambitious" | "elite";
@@ -1293,6 +1303,12 @@ export type SponsorOffer = {
    * die Rang-Meilenstein-Komponente (gedeckelt). Wird in chooseSponsorOffer in den Vertrag mitkopiert.
    */
   isGolden?: boolean;
+  /**
+   * P4 — Baukasten: stabile Liste der Modul-IDs, aus denen dieses Angebot zusammengesetzt ist (Cash-Module
+   * = die `components`, plus nicht-Cash-Perks wie „Spotlight ×2" bei legendär/golden). Rein deskriptiv für
+   * UI/Debug; die Auszahlung läuft weiter über `components`. Optional/rückwärtskompatibel.
+   */
+  moduleIds?: string[];
 };
 
 export type SponsorCommercialRating = {

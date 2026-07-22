@@ -65,7 +65,6 @@ import {
   getTeamStrategyProfile,
   withNormalizedTeamStrategyProfiles,
 } from "@/lib/foundation/team-strategy-profiles";
-import type { SponsorNegotiationProfile } from "@/lib/data/olyDataTypes";
 import {
   appendRoomContextToParams,
   readFoundationRoomContextFromLocation,
@@ -576,7 +575,6 @@ export function useFoundationPageState({
   } | null>(null);
   const [sponsorChoiceBusy, setSponsorChoiceBusy] = useState<string | null>(null);
   const [sponsorChoiceMessage, setSponsorChoiceMessage] = useState<string | null>(null);
-  const [sponsorChoiceProfiles, setSponsorChoiceProfiles] = useState<Record<string, SponsorNegotiationProfile>>({});
   const [marketSellSubject, setMarketSellSubject] = useState<TransfermarktSellPreviewSubject | null>(null);
   const [marketSellRiskAcknowledged, setMarketSellRiskAcknowledged] = useState<boolean>(false);
   const [marketContractLengthDraft, setMarketContractLengthDraft] = useState<number | null>(null);
@@ -966,8 +964,6 @@ export function useFoundationPageState({
     setSponsorChoiceBusy,
     sponsorChoiceMessage,
     setSponsorChoiceMessage,
-    sponsorChoiceProfiles,
-    setSponsorChoiceProfiles,
     marketSellSubject,
     setMarketSellSubject,
     marketSellRiskAcknowledged,

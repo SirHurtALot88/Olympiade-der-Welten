@@ -5,7 +5,6 @@ import { useMemo } from "react";
 import type {
   GameState,
   SponsorArchetype,
-  SponsorNegotiationProfile,
   SponsorOffer,
   SponsorOfferComponent,
   SponsorRarity,
@@ -24,7 +23,8 @@ import {
   getSponsorCurveFamily,
   mapArchetypeToCurveShape,
 } from "@/lib/sponsor/sponsor-curve-shapes";
-import { NlDeltaChip, formatNlNumber, type NlTone } from "@/components/foundation/new-look";
+import { describeSponsorOfferModules } from "@/lib/sponsor/sponsor-modules";
+import { NlDeltaChip, type NlTone } from "@/components/foundation/new-look";
 
 /**
  * "Neuer Look" Sponsor-Angebotskarte — flag-gated, additiv. Wird nur von
@@ -32,9 +32,8 @@ import { NlDeltaChip, formatNlNumber, type NlTone } from "@/components/foundatio
  * bleibt unverändert der Flag-aus-Pfad.
  *
  * Nutzt ausschließlich die echten Werte/Handler aus den Props:
- * `adjustedComponents` (bereits verhandlungs-adjustiert), `multiplier`
- * (echter Cash-Faktor), `onNegotiationProfileChange` (echter Profil-State im
- * Parent), `onChoose` (echter Sponsor-Wahl-Flow).
+ * `offer.components` (die echten Vertragskomponenten) und `onChoose` (echter
+ * Sponsor-Wahl-Flow).
  *
  * Laufzeit (`termSeasons`) ist bewusst NUR Anzeige: der echte Apply-Pfad
  * (`chooseTeamSponsor` → POST /api/sponsor/choose → `chooseSponsorOffer`)
@@ -45,12 +44,8 @@ import { NlDeltaChip, formatNlNumber, type NlTone } from "@/components/foundatio
 export type SponsorOfferCardNewLookProps = {
   offer: SponsorOffer;
   gameState: GameState;
-  adjustedComponents: SponsorOfferComponent[];
-  negotiationProfile: SponsorNegotiationProfile;
-  multiplier: number;
   chooseBusy: boolean;
   canManage: boolean;
-  onNegotiationProfileChange: (profile: SponsorNegotiationProfile) => void;
   onChoose: () => void;
   formatCash: (value: number) => string;
   /** #76: markiert dieses Angebot als Cash-stärkstes der aktuellen Saisonauswahl. */
@@ -84,17 +79,6 @@ export function RarityPill({ rarity, className }: { rarity: SponsorRarity; class
     </span>
   );
 }
-
-const NEGOTIATION_PROFILES: Array<{
-  value: SponsorNegotiationProfile;
-  label: string;
-  hint: string;
-  toneClass: string;
-}> = [
-  { value: "safe", label: "Sicher", hint: "−5 % Cash, weniger Risiko", toneClass: "is-safe" },
-  { value: "balanced", label: "Ausgewogen", hint: "Neutraler Cash-Faktor", toneClass: "is-balanced" },
-  { value: "ambitious", label: "Ambitioniert", hint: "+8 % Cash, mehr Erwartungsdruck", toneClass: "is-ambitious" },
-];
 
 function difficultyClassName(difficulty: SponsorChallengeDifficulty) {
   return `nl-sponsor-difficulty is-${difficulty}`;
@@ -218,12 +202,8 @@ function SponsorStageLadder({
 export function SponsorOfferCardNewLook({
   offer,
   gameState,
-  adjustedComponents,
-  negotiationProfile,
-  multiplier,
   chooseBusy,
   canManage,
-  onNegotiationProfileChange,
   onChoose,
   formatCash,
   isBestCashOffer = false,
@@ -232,14 +212,23 @@ export function SponsorOfferCardNewLook({
   // Rarität/Kurvenform robust auflösen — Back-Compat für alte Saves ohne die
   // neuen Felder (Legacy archetype wird gemappt; rarity wird bereits beim Laden
   // aus dem alten Sternrang zurückgefüllt, siehe save-repository.ts).
-  const rarity = offer.rarity ?? "magisch";
+  // Fallback konservativ auf „gewöhnlich" (deckungsgleich mit Settlement) statt „magisch" — sonst rendert
+  // jedes Angebot ohne rarity-Feld (Alt-Save vor der Rarity-Migration) fälschlich als Magisch.
+  const rarity = offer.rarity ?? "gewöhnlich";
   const shape = offer.curveShape ?? mapArchetypeToCurveShape(offer.archetype);
   const shapeLabel = SPONSOR_CURVE_SHAPES[shape].labelDe;
   const familyLabel = SPONSOR_CURVE_FAMILIES[getSponsorCurveFamily(shape)].labelDe;
-  const specialComponent = adjustedComponents.find((component) => component.kind === "special") ?? null;
-  const standardComponents = adjustedComponents.filter((component) => component.kind !== "special");
-  const baseCash = adjustedComponents.find((component) => component.kind === "base")?.rewardCash ?? 0;
-  const totalCash = adjustedComponents.reduce(
+  // P4 Baukasten: die Modul-Zusammensetzung des Angebots (Cash-Komponenten + evtl. Perk) fürs UI.
+  const offerModules = describeSponsorOfferModules(offer);
+  const offerPerk = offerModules.find((module) => module.kind === "perk") ?? null;
+  const specialComponent = offer.components.find((component) => component.kind === "special") ?? null;
+  // "overperformance" wird als eigene Zeile unter der Rang-Leiter gerendert (nicht als generische Kachel),
+  // fließt aber weiter in die Gesamt-Summe (totalCash) ein.
+  const standardComponents = offer.components.filter(
+    (component) => component.kind !== "special" && component.kind !== "overperformance",
+  );
+  const baseCash = offer.components.find((component) => component.kind === "base")?.rewardCash ?? 0;
+  const totalCash = offer.components.reduce(
     (sum, component) => sum + (typeof component.rewardCash === "number" ? component.rewardCash : 0),
     0,
   );
@@ -273,6 +262,21 @@ export function SponsorOfferCardNewLook({
         </div>
         <div className="nl-sponsor-offer-badges">
           <RarityPill rarity={rarity} />
+          {/* P4 Baukasten: Modul-Anzahl als Rarity-Wertigkeits-Signal; Perk-Chip (Spotlight ×2) bei legendär/golden. */}
+          {offerModules.length > 0 ? (
+            <span
+              className="nl-sponsor-module-chip"
+              data-testid="sponsor-module-chip"
+              title={`Baukasten: ${offerModules.map((module) => module.labelDe).join(" · ")}`}
+            >
+              {offerModules.length} Module
+            </span>
+          ) : null}
+          {offerPerk ? (
+            <span className="nl-sponsor-module-chip is-perk" data-testid="sponsor-perk-chip" title="Perk: verdoppelter Beliebtheits-Impuls (Spotlight) bei erfülltem Sonderziel.">
+              ✦ {offerPerk.labelDe}
+            </span>
+          ) : null}
           {presentation.offerBadge ? (
             <span
               className={`nl-sponsor-offer-badge${presentation.isGolden ? " is-golden" : ""}`}
@@ -327,24 +331,7 @@ export function SponsorOfferCardNewLook({
       ) : null}
 
       <div className="nl-sponsor-negotiation" data-testid="nl-sponsor-negotiation">
-        <div className="nl-sponsor-negotiation-segment" role="group" aria-label="Verhandlungsprofil">
-          {NEGOTIATION_PROFILES.map((profile) => (
-            <button
-              key={profile.value}
-              type="button"
-              className={`nl-sponsor-profile-segment ${profile.toneClass}${negotiationProfile === profile.value ? " is-active" : ""}`}
-              aria-pressed={negotiationProfile === profile.value}
-              title={profile.hint}
-              onClick={() => onNegotiationProfileChange(profile.value)}
-            >
-              {profile.label}
-            </button>
-          ))}
-        </div>
         <div className="nl-sponsor-negotiation-live nl-tnum" aria-live="polite">
-          <span>
-            Cash-Faktor <strong>×{formatNlNumber(multiplier, 2)}</strong>
-          </span>
           <span>
             Gesamt <strong>{formatCash(totalCash)}</strong>
           </span>
@@ -408,22 +395,30 @@ export function SponsorOfferCardNewLook({
                       );
                     })}
                 </ul>
-                {/* Feed 2: Performance zahlt einen konkaven Bonus fürs Übertreffen des Erwartungsrangs
-                    (teamQualityRankAtSign). Die Rang-Leiter oben ist der Basis-Fall; ein Aufstieg über die
-                    Erwartung legt oben drauf — je schwerer (näher an der Spitze), desto mehr. */}
-                {offer.archetype === "performance" ? (
-                  <div className="nl-sponsor-overperf-hint" data-testid="sponsor-overperf-hint">
-                    <span className="nl-sponsor-overperf-icon" aria-hidden="true">
-                      ✦
-                    </span>
-                    <span>
-                      <strong>Überperformance zahlt extra.</strong>{" "}
-                      {offer.teamQualityRank != null
-                        ? `Übertriffst du deinen Erwartungsrang #${Math.round(offer.teamQualityRank)}, legt dieser Sponsor oben drauf — je schwerer der Aufstieg, desto mehr (ein Sprung nahe der Spitze zählt mehr als im gepackten Mittelfeld).`
-                        : "Übertriffst du deine Saison-Erwartung, legt dieser Sponsor oben drauf — je schwerer der Aufstieg, desto mehr."}
-                    </span>
-                  </div>
-                ) : null}
+                {/* P3 — Überperformance-Modul (familien-differenziert) als konkrete, bezifferte Zeile unter der
+                    Rang-Leiter: Rate je Platz über dem Erwartungsrang + Cap, exakt die beim Signieren
+                    eingefrorenen Werte (Anzeige == Settlement). Sponsoren OHNE das Modul (Sicherheits-Familie
+                    oder Team ohne Luft nach oben) zeigen die Zeile gar nicht — Abwesenheit ist ehrlich. */}
+                {(() => {
+                  const overperf = offer.components.find((entry) => entry.kind === "overperformance");
+                  if (!overperf) return null;
+                  const expectedRank = typeof overperf.targetValue === "number" ? overperf.targetValue : null;
+                  return (
+                    <div className="nl-sponsor-overperf-hint" data-testid="sponsor-overperf-hint">
+                      <span className="nl-sponsor-overperf-icon" aria-hidden="true">
+                        ✦
+                      </span>
+                      <span>
+                        <strong>
+                          Überperformance: +{overperf.ratePerUnitC != null ? formatCash(overperf.ratePerUnitC) : "?"} je Platz
+                        </strong>{" "}
+                        {expectedRank != null
+                          ? `über deinem Erwartungsrang #${expectedRank} — max ${formatCash(overperf.rewardCash)}.`
+                          : `über deiner Erwartung — max ${formatCash(overperf.rewardCash)}.`}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
             );
           }

@@ -71,16 +71,11 @@ const SPONSOR_STACK_SEGMENTS: Array<{ kind: SponsorComponentKind; tone: NlTone }
  * "Neuer Look" Sponsoren — flag-gated, additiv (nur wenn `useNewLook` aktiv ist).
  *
  * Konsumiert exakt dieselben Props wie `FoundationSponsorsPanel` und läuft über
- * dieselben echten Pfade: Profil-State (`sponsorChoiceProfiles` /
- * `setSponsorChoiceProfiles`), echte Verhandlungs-Mathematik
- * (`applySponsorNegotiationToComponents`, `getSponsorNegotiationMultiplier`)
- * und der echte Abschluss (`chooseTeamSponsor`).
+ * den echten Abschluss (`chooseTeamSponsor`).
  *
  * Laufzeit (`termSeasons`): NUR Anzeige, kein Selector — der Apply-Pfad
  * (`chooseTeamSponsor(offerId)` → POST /api/sponsor/choose) nimmt keine
- * Laufzeit an und rechnet serverseitig fest mit `termSeasons: 1`. Deshalb
- * bleibt auch die Verhandlungs-Vorschau bei `termSeasons: 1` (Parität zum
- * echten Abschluss).
+ * Laufzeit an und rechnet serverseitig fest mit `termSeasons: 1`.
  */
 
 type ContractPayoutTile = {
@@ -136,7 +131,7 @@ function ActiveContractHero({
 }) {
   // Rarität/Kurvenform robust auflösen (Back-Compat für alte Verträge; rarity wird bereits beim Laden aus
   // dem alten Sternrang zurückgefüllt, siehe save-repository.ts).
-  const rarity = contract.rarity ?? "magisch";
+  const rarity = contract.rarity ?? "gewöhnlich";
   const shape = contract.curveShape ?? mapArchetypeToCurveShape(contract.archetype);
   const shapeLabel = SPONSOR_CURVE_SHAPES[shape].labelDe;
   const familyLabel = SPONSOR_CURVE_FAMILIES[getSponsorCurveFamily(shape)].labelDe;
@@ -173,7 +168,6 @@ function ActiveContractHero({
           sponsorParentBrandId: contract.sponsorParentBrandId,
           variantKey: contract.variantKey,
           termSeasons: contract.termSeasons,
-          negotiationProfile: contract.negotiationProfile,
           demandProfile: contract.demandProfile,
           teamQualityRank: contract.teamQualityRankAtSign,
         } satisfies SponsorOffer,
@@ -189,7 +183,6 @@ function ActiveContractHero({
         <div className="nl-sponsor-hero-copy">
           <span className="nl-sponsor-hero-kicker">
             Aktiver Vertrag · {shapeLabel} · {familyLabel}
-            {contract.negotiationProfile ? ` · Profil ${contract.negotiationProfile}` : ""}
           </span>
           <RarityPill rarity={rarity} className="nl-sponsor-hero-rarity" />
           <strong className="nl-sponsor-hero-name">{contract.name}</strong>
@@ -265,13 +258,9 @@ export default function FoundationSponsorsNewLook({
   selectedTeamSponsorContract,
   selectedTeamSponsorOffers,
   sponsorChoiceMessage,
-  sponsorChoiceProfiles,
   sponsorChoiceBusy,
   selectedTeamCanManage,
   formatMoney,
-  applySponsorNegotiationToComponents,
-  getSponsorNegotiationMultiplier,
-  setSponsorChoiceProfiles,
   chooseTeamSponsor,
 }: FoundationSponsorsPanelProps) {
   // "Neuer Look" Hooks laufen unconditionally vor jedem Return (dieser
@@ -280,19 +269,12 @@ export default function FoundationSponsorsNewLook({
   const [ratingDetailsOpen, setRatingDetailsOpen] = useState(false);
   const [leagueSponsorSort, setLeagueSponsorSort] = useState<LeagueSponsorSort>("cash");
 
-  // #76: Angebotsvergleich — echte Cash-Summe je Angebot unter dem aktuell
-  // gewählten Verhandlungsprofil (dieselbe Formel wie in der Angebotskarte).
+  // #76: Angebotsvergleich — echte Cash-Summe je Angebot (dieselbe Formel wie
+  // in der Angebotskarte).
   const offerCashSummaries = useMemo(
     () =>
       selectedTeamSponsorOffers.map((offer) => {
-        const negotiationProfile = sponsorChoiceProfiles[offer.offerId] ?? "balanced";
-        const adjustedComponents = applySponsorNegotiationToComponents({
-          components: offer.components,
-          termSeasons: 1,
-          negotiationProfile,
-          rarity: offer.rarity ?? "magisch",
-        });
-        const totalCash = adjustedComponents.reduce(
+        const totalCash = offer.components.reduce(
           (sum, component) => sum + (typeof component.rewardCash === "number" ? component.rewardCash : 0),
           0,
         );
@@ -300,7 +282,7 @@ export default function FoundationSponsorsNewLook({
         // Vergleichs-Chart — Segmente zerlegen den Gesamtbetrag in Basis /
         // Gewinnstufen / Tabellenziel / Sonderziel.
         const kindTotals = new Map<SponsorComponentKind, number>();
-        for (const component of adjustedComponents) {
+        for (const component of offer.components) {
           const cash = typeof component.rewardCash === "number" ? component.rewardCash : 0;
           if (cash <= 0) continue;
           kindTotals.set(component.kind, (kindTotals.get(component.kind) ?? 0) + cash);
@@ -313,7 +295,7 @@ export default function FoundationSponsorsNewLook({
         }));
         return { offerId: offer.offerId, name: offer.name, archetype: offer.archetype, totalCash, segments };
       }),
-    [selectedTeamSponsorOffers, sponsorChoiceProfiles, applySponsorNegotiationToComponents],
+    [selectedTeamSponsorOffers],
   );
   const bestCashOfferId = useMemo(() => {
     if (offerCashSummaries.length < 2) return null;
@@ -351,7 +333,7 @@ export default function FoundationSponsorsNewLook({
         sponsorName: contract?.name ?? null,
         archetype: contract?.archetype ?? null,
         // Rarität/Kurvenform robust auflösen (Back-Compat für alte Verträge).
-        rarity: contract ? (contract.rarity ?? "magisch") : null,
+        rarity: contract ? (contract.rarity ?? "gewöhnlich") : null,
         curveShape: contract ? (contract.curveShape ?? mapArchetypeToCurveShape(contract.archetype)) : null,
         totalCash,
         // Golden Card = seltener Premium-Elite-Sponsor (Underdog-Glück). Der
@@ -701,31 +683,14 @@ export default function FoundationSponsorsNewLook({
             ) : null}
             <div className="nl-sponsor-offer-grid">
               {selectedTeamSponsorOffers.map((offer) => {
-                const negotiationProfile = sponsorChoiceProfiles[offer.offerId] ?? "balanced";
-                const adjustedComponents = applySponsorNegotiationToComponents({
-                  components: offer.components,
-                  termSeasons: 1,
-                  negotiationProfile,
-                  rarity: offer.rarity ?? "magisch",
-                });
-                const multiplier = getSponsorNegotiationMultiplier({ termSeasons: 1, negotiationProfile });
                 return (
                   <SponsorOfferCardNewLook
                     key={offer.offerId}
                     offer={offer}
                     gameState={gameState}
-                    adjustedComponents={adjustedComponents}
-                    negotiationProfile={negotiationProfile}
-                    multiplier={multiplier}
                     chooseBusy={sponsorChoiceBusy === offer.offerId}
                     canManage={selectedTeamCanManage}
                     isBestCashOffer={bestCashOfferId != null && offer.offerId === bestCashOfferId}
-                    onNegotiationProfileChange={(profile) =>
-                      setSponsorChoiceProfiles((current) => ({
-                        ...current,
-                        [offer.offerId]: profile,
-                      }))
-                    }
                     onChoose={() => void chooseTeamSponsor(offer.offerId)}
                     formatCash={formatMoney}
                   />

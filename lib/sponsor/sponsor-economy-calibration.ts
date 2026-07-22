@@ -1,6 +1,7 @@
 import prizeMoneyNormalized from "@/references/sheets/prize-money-table.normalized.json";
-import type { GameState, SponsorArchetype, SponsorCurveShape, SponsorOffer, SponsorOfferComponent, SponsorRarity } from "@/lib/data/olyDataTypes";
+import type { GameState, SponsorArchetype, SponsorCurveFamily, SponsorCurveShape, SponsorOffer, SponsorOfferComponent, SponsorRarity } from "@/lib/data/olyDataTypes";
 import {
+  SPONSOR_RARITIES,
   getSponsorCurveShapeRankMultiplier,
   getSponsorRarityEtatFactor,
   mapArchetypeToCurveShape,
@@ -337,6 +338,69 @@ function applyQualityRebalanceToPayout(input: {
 export const SPONSOR_OVERPERFORMANCE_SHARE = Number(process.env.OLY_SPONSOR_OVERPERF_SHARE ?? 0.6) || 0.6;
 
 /**
+ * P2 Sonderziel-Buff — der Sonderziel-Reward als Anteil des Titel-Etats (totalAtMaxRank), rarity-gestaffelt:
+ * `share = BASE_SHARE + RARITY_STEP × rarityOrder` (order 0..3). Default 6 % + 3 %/Stufe → 6/9/12/15 %,
+ * gedeckelt bei BASE_CAP_FRAC (30 %) der garantierten Basis. Löst den alten flachen 4 %-Anteil ab, unter dem
+ * ein volles Sonderziel nur ~5–12 % der Basis wert war (zu wenig, um dafür die Saison zu steuern). ENV-tunebar.
+ */
+export const SPONSOR_SPECIAL_BASE_SHARE = Number(process.env.OLY_SPONSOR_SPECIAL_BASE_SHARE ?? 0.06) || 0.06;
+export const SPONSOR_SPECIAL_RARITY_STEP = Number(process.env.OLY_SPONSOR_SPECIAL_RARITY_STEP ?? 0.03) || 0.03;
+export const SPONSOR_SPECIAL_BASE_CAP_FRAC = Number(process.env.OLY_SPONSOR_SPECIAL_BASE_CAP ?? 0.3) || 0.3;
+
+/**
+ * P3 — Überperformance-Modul: eine SICHTBARE, FAMILIEN-DIFFERENZIERTE Auszahlung fürs Übertreffen des
+ * Erwartungsrangs, `min(cap, rate × Plätze-über-Erwartung)`, beim Signieren eingefroren. Ersetzt (für
+ * Neuverträge) sowohl den nie ausgezahlten Feed-2-Implizit-Bonus als auch das binäre 3-C-`beat_expected_rank`-
+ * Special. Familien-Profil: Titel/Podest zahlen die dickste Überperformance (kleinste Basis als Gegengewicht),
+ * Sicherheit hat KEINS (dafür XL-Basis). `rate` und `cap` skalieren mit der Rarity (×(1 + 0.1 × order)).
+ */
+export const SPONSOR_OVERPERF_FAMILY: Record<SponsorCurveFamily, { rate: number; cap: number } | null> = {
+  titel: { rate: 1.8, cap: 14 },
+  europa: { rate: 1.2, cap: 10 },
+  stetig: { rate: 0.8, cap: 6 },
+  aufstieg: { rate: 0.6, cap: 5 },
+  sicherheit: null,
+};
+
+/**
+ * P3 — Verbesserungs-Modul als PER-PLATZ-Auszahlung statt Binärziel: `min(cap, rate × Plätze-besser-als-
+ * Startrang)`, cap = rate × max. Familien-differenziert, damit sich der Bonus je Sponsor fühlbar
+ * unterscheidet (Aufstieg/Stetig belohnen Klettern am stärksten; Titel kaum — die haben ihre Überperformance).
+ */
+export const SPONSOR_IMPROVEMENT_FAMILY: Record<SponsorCurveFamily, { rate: number; max: number }> = {
+  titel: { rate: 0.6, max: 3 },
+  europa: { rate: 1.0, max: 4 },
+  stetig: { rate: 1.2, max: 5 },
+  aufstieg: { rate: 1.5, max: 6 },
+  sicherheit: { rate: 1.0, max: 5 },
+};
+
+/** Überperformance-Rate/Cap für eine Familie + Rarity (× salaryFactor), oder null wenn die Familie keins hat. */
+export function getSponsorOverperfConfig(
+  family: SponsorCurveFamily,
+  rarityOrder: number,
+  salaryFactor = 1,
+): { ratePerUnitC: number; cap: number } | null {
+  const cfg = SPONSOR_OVERPERF_FAMILY[family];
+  if (!cfg) return null;
+  const rarityMult = 1 + 0.1 * rarityOrder;
+  return {
+    ratePerUnitC: round1(cfg.rate * rarityMult * salaryFactor),
+    cap: round1(cfg.cap * rarityMult * salaryFactor),
+  };
+}
+
+/** Per-Platz-Verbesserungs-Rate/Max für eine Familie (× salaryFactor). */
+export function getSponsorImprovementConfig(
+  family: SponsorCurveFamily,
+  salaryFactor = 1,
+): { ratePerUnitC: number; maxUnits: number; cap: number } {
+  const cfg = SPONSOR_IMPROVEMENT_FAMILY[family] ?? SPONSOR_IMPROVEMENT_FAMILY.stetig;
+  const ratePerUnitC = round1(cfg.rate * salaryFactor);
+  return { ratePerUnitC, maxUnits: cfg.max, cap: round1(ratePerUnitC * cfg.max) };
+}
+
+/**
  * Golden-Sponsor Rang-Payout-Boost (Wave-1-schonend). Ein golden markierter Vertrag hebt NUR die
  * Rang-Meilenstein-Komponente um (MULT − 1), aber absolut gedeckelt bei GOLDEN_MS_ABS_CAP_C (salaryFactor-
  * skaliert). Der Sockel (Bottom-5-Schutz) bleibt unangetastet. IDENTISCH angewandt in
@@ -538,7 +602,14 @@ export function buildOfferCashAmounts(input: {
       input.isGolden ?? false,
     ),
   );
-  const specialCash = round1(totalAtMaxRank * 0.04);
+  // P2 Sonderziel-Buff: der Sonderziel-Reward ist jetzt rarity-gestaffelt (order 0..3 → 6/9/12/15 % des
+  // Titel-Etats) statt eines flachen 4 %-Anteils — ein voll erfülltes Sonderziel lohnt sich damit spürbar
+  // (typisch ~5/8/10/13 C statt ~2–4 C). Gedeckelt bei 30 % der garantierten Basis, damit das Sonderziel eine
+  // Belohnung bleibt und nicht die Basis-Ökonomie kippt (Invariante: volles Sonderziel ≤ 30 % Basis).
+  const rarityOrder = SPONSOR_RARITIES[input.rarity].order;
+  const specialCash = round1(
+    Math.min(totalAtMaxRank * (SPONSOR_SPECIAL_BASE_SHARE + SPONSOR_SPECIAL_RARITY_STEP * rarityOrder), baseCash * SPONSOR_SPECIAL_BASE_CAP_FRAC),
+  );
   return { baseCash, rankCash, specialCash, totalAtMaxRank };
 }
 
@@ -602,7 +673,9 @@ export function estimateExpectedPayout(
       if (component.kind === "improvement") {
         expected += component.rewardCash * 0.2;
       } else if (component.kind === "special") {
-        expected += component.rewardCash * 0.12;
+        expected += component.rewardCash * 0.45;
+      } else if (component.kind === "overperformance") {
+        expected += component.rewardCash * 0.25;
       }
     }
     return round1(expected);
@@ -622,7 +695,9 @@ export function estimateExpectedPayout(
     if (component.kind === "improvement") {
       expected += component.rewardCash * 0.2;
     } else if (component.kind === "special") {
-      expected += component.rewardCash * 0.12;
+      expected += component.rewardCash * 0.45;
+    } else if (component.kind === "overperformance") {
+      expected += component.rewardCash * 0.25;
     }
   }
   return round1(expected);
@@ -642,7 +717,7 @@ export function estimateSettlementPayout(
   const rankPayout = totalMilestone > 0 ? round1(rankCash * (unlocked / totalMilestone)) : 0;
   let extra = 0;
   for (const component of offer.components) {
-    if (component.kind === "improvement" || component.kind === "special") {
+    if (component.kind === "improvement" || component.kind === "special" || component.kind === "overperformance") {
       extra += component.rewardCash * (component.kind === "special" ? 0.12 : 0.2);
     }
   }

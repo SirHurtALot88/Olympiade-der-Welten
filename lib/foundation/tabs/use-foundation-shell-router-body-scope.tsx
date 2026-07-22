@@ -213,7 +213,6 @@ import {
 } from "@/lib/scouting/scouting-watchlist-service";
 import { buildSponsorCommercialRating } from "@/lib/sponsor/sponsor-commercial-rating-service";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
-import { applySponsorNegotiationToComponents, getSponsorNegotiationMultiplier } from "@/lib/sponsor/sponsor-negotiation";
 import { buildFoundationNavAttention } from "@/lib/foundation/foundation-nav-attention";
 import { FoundationSharedProvider, useFoundationShared } from "@/lib/foundation/foundation-shared-context";
 import { FoundationStateProvider } from "@/lib/foundation/foundation-state-context";
@@ -1016,7 +1015,7 @@ export function useFoundationShellRouterBodyScope({
     setNewGamePreview, newGameBusy, setNewGameBusy, newGameError, setNewGameError, newGameSuccess, setNewGameSuccess, marketBuyPreview, setMarketBuyPreview, marketBuyPreviewContext,
     setMarketBuyPreviewContext, marketNegotiationOutcome, setMarketNegotiationOutcome, marketPreviewPlayerId, setMarketPreviewPlayerId, marketBuySubject, setMarketBuySubject, marketSellBusy, setMarketSellBusy, marketSellError,
     setMarketSellError, marketSellSuccess, setMarketSellSuccess, marketSellPreview, setMarketSellPreview, contractRenewalBusy, setContractRenewalBusy, contractRenewalMessage, setContractRenewalMessage, contractRenewalError,
-    setContractRenewalError, contractRenewalNegotiation, setContractRenewalNegotiation, sponsorChoiceBusy, setSponsorChoiceBusy, sponsorChoiceMessage, setSponsorChoiceMessage, sponsorChoiceProfiles, setSponsorChoiceProfiles, marketSellSubject,
+    setContractRenewalError, contractRenewalNegotiation, setContractRenewalNegotiation, sponsorChoiceBusy, setSponsorChoiceBusy, sponsorChoiceMessage, setSponsorChoiceMessage, marketSellSubject,
     setMarketSellSubject, marketSellRiskAcknowledged, setMarketSellRiskAcknowledged, marketContractLengthDraft, setMarketContractLengthDraft, marketContractShapeDraft, setMarketContractShapeDraft, marketOfferedSalaryDraft, setMarketOfferedSalaryDraft, marketAiTeamScope,
     setMarketAiTeamScope, marketAiPreviewBusy, setMarketAiPreviewBusy, marketAiPreviewError, setMarketAiPreviewError, marketAiPreviewFeed, setMarketAiPreviewFeed, marketAiPreviewSelectedTeamId, setMarketAiPreviewSelectedTeamId, marketAiSellTeamScope,
     setMarketAiSellTeamScope, marketAiSellPreviewBusy, setMarketAiSellPreviewBusy, marketAiSellPreviewError, setMarketAiSellPreviewError, marketAiSellPreviewFeed, setMarketAiSellPreviewFeed, marketAiSellPreviewSelectedTeamId, setMarketAiSellPreviewSelectedTeamId, marketAiPlanTeamScope,
@@ -4935,7 +4934,6 @@ export function useFoundationShellRouterBodyScope({
       showTeamManagementLockedNotice(selectedTeam.name);
       return;
     }
-    const negotiationProfile = sponsorChoiceProfiles[offerId] ?? "balanced";
     setSponsorChoiceBusy(offerId);
     setSponsorChoiceMessage(null);
     try {
@@ -4946,7 +4944,6 @@ export function useFoundationShellRouterBodyScope({
           saveId: activeSaveId,
           teamId: selectedTeam.teamId,
           offerId,
-          negotiationProfile,
           dryRun: false,
           source: readMeta.source,
         })),
@@ -10258,11 +10255,7 @@ export function useFoundationShellRouterBodyScope({
     selectedTeamSponsorOffers,
     selectedTeamCommercialRating,
     sponsorChoiceMessage,
-    sponsorChoiceProfiles,
     sponsorChoiceBusy,
-    applySponsorNegotiationToComponents,
-    getSponsorNegotiationMultiplier,
-    setSponsorChoiceProfiles,
     chooseTeamSponsor,
     renderMetricBar,
     leaguePlayerHeatPools,
@@ -10526,13 +10519,9 @@ export function useFoundationShellRouterBodyScope({
       selectedTeamSponsorContract,
       selectedTeamSponsorOffers,
       sponsorChoiceMessage,
-      sponsorChoiceProfiles,
       sponsorChoiceBusy,
       selectedTeamCanManage,
       formatMoney,
-      applySponsorNegotiationToComponents,
-      getSponsorNegotiationMultiplier,
-      setSponsorChoiceProfiles,
       chooseTeamSponsor,
       prizeFinanceTab,
     },
@@ -11293,7 +11282,6 @@ export {
   TrainingCompactClient,
   TransferHistoryV2Client,
   WarningList,
-  applySponsorNegotiationToComponents,
   buildResolvedTeamIdentities,
   buildScenarioWarning,
   buildTeamControlSettingsMap,
@@ -11353,7 +11341,6 @@ export {
   getRosterEntrySalaryDelta,
   getScoutingWishlistSlotLimit,
   getSeasonCashHeatClass,
-  getSponsorNegotiationMultiplier,
   getTeamAxisRankTooltip,
   getTeamHistoryRankToneClass,
   getTeamLogoModel,

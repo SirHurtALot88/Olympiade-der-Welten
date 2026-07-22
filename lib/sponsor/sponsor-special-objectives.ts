@@ -414,6 +414,30 @@ export function buildBeatExpectedRankSpecialComponent(input: {
   };
 }
 
+/**
+ * P3 — Überperformance-Modul (`kind: "overperformance"`): zahlt `min(cap, ratePerUnitC × Plätze-über-Erwartung)`.
+ * Der Erwartungsrang wird als `targetValue` und die Rate/der Cap in `ratePerUnitC`/`rewardCash` beim Signieren
+ * EINGEFROREN, damit Anzeige == Settlement gilt. Ersetzt (für Neuverträge) das binäre `beat_expected_rank`.
+ * Gibt null zurück, wenn kein Erwartungsrang existiert oder das Team bereits Platz 1 erwartet (keine Luft nach oben).
+ */
+export function buildOverperformanceComponent(input: {
+  expectedRank: number | null | undefined;
+  ratePerUnitC: number;
+  cap: number;
+}): SponsorOfferComponent | null {
+  if (input.expectedRank == null || !Number.isFinite(input.expectedRank)) return null;
+  const expectedRank = Math.round(input.expectedRank);
+  if (expectedRank <= 1 || input.ratePerUnitC <= 0 || input.cap <= 0) return null;
+  return {
+    componentId: "overperformance",
+    kind: "overperformance",
+    label: `+${input.ratePerUnitC} C je Platz über Erwartungsrang #${expectedRank} · max ${input.cap} C`,
+    targetValue: expectedRank,
+    rewardCash: round1(input.cap),
+    ratePerUnitC: input.ratePerUnitC,
+  };
+}
+
 // =====================================================================================================
 // TEIL B — Sponsor-Bonusziele (14 Standard + 6 Golden) + stages/spotlightBonus-Framework.
 //
