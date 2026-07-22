@@ -55,6 +55,7 @@ import {
   pickBonusObjective,
   pickGoldenObjective,
   resolveChallengeSlotIndex,
+  sponsorObjectiveFamilyForKey,
 } from "@/lib/sponsor/sponsor-special-objectives";
 import { calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 
@@ -114,6 +115,7 @@ function buildOffer(input: {
   forcePremiumElite?: boolean;
   teamQualityRank?: number | null;
   specialMode?: "standard" | "challenge";
+  usedSpecialFamilies?: Set<string>;
 }): SponsorOffer {
   const { team, identity, profile, curveShape, rarity, rankTarget, startRank, gameState, commercialRating, slotIndex, salaryFactor, leagueMinSalary, teamQualityRank, specialMode } = input;
   // Transition: der legacy archetype bleibt abgeleitet (family→archetype), damit die bestehende Marken-/
@@ -141,6 +143,7 @@ function buildOffer(input: {
     forcePremiumElite: input.forcePremiumElite,
     specialMode: specialMode ?? "standard",
     gameState,
+    usedSpecialFamilies: input.usedSpecialFamilies,
   });
   const isGolden = input.forcePremiumElite === true;
   const cashAmounts = buildOfferCashAmounts({ archetype, salaryFactor, rarity, leagueMinSalary, teamQualityRank, isGolden });
@@ -218,7 +221,14 @@ function buildOffer(input: {
       { ...bonusObjectiveInput, rewardCash: roundCash(specialCash * 1.25) },
     );
   } else if (specialMode !== "challenge") {
-    const bonusKey = pickBonusObjective(gameState.season.id, team.teamId, curveShape, slotIndex, teamQualityRank);
+    const bonusKey = pickBonusObjective(
+      gameState.season.id,
+      team.teamId,
+      curveShape,
+      slotIndex,
+      teamQualityRank,
+      input.usedSpecialFamilies,
+    );
     if (bonusKey) {
       specialComponent = buildBonusObjectiveComponent(bonusKey, bonusObjectiveInput);
     }
@@ -338,6 +348,9 @@ export function buildSponsorOffersForTeam(input: {
   const baseAnchorSalary = getSponsorRank32BaseAnchorSalary(input.gameState);
   const challengeSlotIndex = resolveChallengeSlotIndex(input.gameState.season.id, input.teamId, SLOT_COUNT);
 
+  // Slate-Anti-Wiederholung (Fable C3): über die 5 Slots hinweg möglichst nur EIN Sonderziel je Familie.
+  const usedSpecialFamilies = new Set<string>();
+
   return slate.entries.map((entry, slotIndex) => {
     const rankTarget = getSportTargetRank(startRank);
     const offer = buildOffer({
@@ -359,9 +372,15 @@ export function buildSponsorOffersForTeam(input: {
       globalParentUsage,
       teamQualityRank: qualityRank.qualityRank,
       specialMode: slotIndex === challengeSlotIndex ? "challenge" : "standard",
+      usedSpecialFamilies,
     });
     if (offer.sponsorParentBrandId) {
       usedParentBrandIds.push(offer.sponsorParentBrandId);
+    }
+    const specialKey = offer.components.find((component) => component.kind === "special")?.specialKey ?? null;
+    const family = sponsorObjectiveFamilyForKey(specialKey);
+    if (family) {
+      usedSpecialFamilies.add(family);
     }
     return offer;
   });

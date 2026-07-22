@@ -18,6 +18,7 @@ import {
 import {
   buildChallengeSpecialComponent,
   buildStandardSpecialComponent,
+  SPONSOR_OBJECTIVE_FAMILY,
 } from "@/lib/sponsor/sponsor-special-objectives";
 
 export type { SponsorBrandTemplate, SponsorSpecialTemplateId, SponsorVariantKey } from "@/lib/sponsor/sponsor-brand-variants";
@@ -182,7 +183,13 @@ function pickSpecialTemplate(input: {
   profile: TeamStrategyProfile | null;
   slotIndex: number;
   seasonId: string;
+  /** Bereits im Slate belegte Ziel-Familien (Fable C3): möglichst keine zweite aus derselben Familie. */
+  usedFamilies?: Set<string>;
 }) {
+  // Ein Template gilt als „frei", wenn seine Familie im Slate noch nicht belegt ist.
+  const familyFree = (templateId: SponsorSpecialTemplateId) =>
+    !input.usedFamilies || !input.usedFamilies.has(SPONSOR_OBJECTIVE_FAMILY[templateId] ?? templateId);
+
   const preferred: SponsorSpecialTemplateId[] = [];
   if ((input.profile?.bias?.sellForProfitAggression ?? 0) >= 8) {
     preferred.push("transfer_profit_min");
@@ -192,15 +199,19 @@ function pickSpecialTemplate(input: {
   }
   preferred.push("form_color_cover");
 
+  // Zuerst ein bevorzugtes Template AUS EINER FREIEN FAMILIE.
   for (const templateId of preferred) {
-    if (input.brand.specialTemplates.includes(templateId)) {
+    if (input.brand.specialTemplates.includes(templateId) && familyFree(templateId)) {
       return templateId;
     }
   }
+  // Fallback-Pool: bevorzugt Templates aus freien Familien, sonst alle (damit immer etwas zurückkommt).
+  const freeTemplates = input.brand.specialTemplates.filter(familyFree);
+  const pool = freeTemplates.length > 0 ? freeTemplates : input.brand.specialTemplates;
   const fallbackIndex = Math.floor(
-    getStableUnitHash(`${input.seasonId}:${input.team.teamId}:${input.slotIndex}:special`) * input.brand.specialTemplates.length,
+    getStableUnitHash(`${input.seasonId}:${input.team.teamId}:${input.slotIndex}:special`) * pool.length,
   );
-  return input.brand.specialTemplates[fallbackIndex] ?? "form_color_cover";
+  return pool[fallbackIndex] ?? (preferred.find((id) => input.brand.specialTemplates.includes(id)) ?? "form_color_cover");
 }
 
 /** Aktueller Tabellenplatz eines Teams (rank → startplatz), als Stärke-Snapshot fürs Signing. null wenn unbekannt. */
@@ -237,6 +248,8 @@ export function pickSponsorBrandForOffer(input: {
   specialMode?: "standard" | "challenge";
   gameState?: GameState;
   specialRewardCash?: number;
+  /** Bereits im Slate belegte Ziel-Familien (Slate-Anti-Wiederholung, Fable C3). */
+  usedSpecialFamilies?: Set<string>;
 }) {
   const { parent, brand } = pickBrandForSlot(input);
   const display = resolveSponsorBrandDisplay(parent, brand);
@@ -260,6 +273,7 @@ export function pickSponsorBrandForOffer(input: {
             profile: input.profile,
             slotIndex: input.slotIndex,
             seasonId: input.seasonId,
+            usedFamilies: input.usedSpecialFamilies,
           }),
           rarity: input.rarity,
           rewardCash,

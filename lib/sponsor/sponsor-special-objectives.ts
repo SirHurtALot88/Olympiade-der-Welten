@@ -698,6 +698,58 @@ export const SPONSOR_GOLDEN_OBJECTIVE_ARCHETYPE: Record<SponsorGoldenObjectiveKe
   golden_title_shock: "security",
 };
 
+/**
+ * Thematische Familie eines Sonderziels (Fable-Review C3). Dient der Slate-Anti-Wiederholung: in einem
+ * 5er-Angebot soll höchstens EIN Ziel je Familie vorkommen, damit sich die Angebote nicht anfühlen wie
+ * fünfmal dasselbe Thema. Keyed über den specialKey (für Standard-Templates identisch mit der templateId).
+ */
+export type SponsorObjectiveFamily =
+  | "axis"
+  | "table"
+  | "discipline"
+  | "player_dev"
+  | "finance"
+  | "infrastructure"
+  | "freshness"
+  | "identity";
+
+export const SPONSOR_OBJECTIVE_FAMILY: Record<string, SponsorObjectiveFamily> = {
+  axis_rank_top: "axis",
+  axis_ascension: "axis",
+  beat_expected_rank: "table",
+  underdog_story: "table",
+  rival_humiliation: "table",
+  momentum_series: "table",
+  golden_fairytale: "table",
+  golden_title_shock: "table",
+  golden_rival_deluxe: "table",
+  discipline_dominance: "discipline",
+  discipline_top3_count: "discipline",
+  golden_discipline_monopoly: "discipline",
+  fan_cult_player: "player_dev",
+  homegrown_elevation: "player_dev",
+  golden_talent_forge: "player_dev",
+  golden_crowd_favorites: "player_dev",
+  salary_pressure_max: "finance",
+  solvency_series: "finance",
+  transfer_profit_min: "finance",
+  transfer_trader: "finance",
+  fan_infrastructure: "infrastructure",
+  sustainability_architect: "infrastructure",
+  fatigue_management: "freshness",
+  form_color_cover: "identity",
+  // Bonus-KEY-Aliase (die Bonus-Keys unterscheiden sich bei diesen beiden vom specialKey der Komponente).
+  roster_diversity: "identity",
+  salary_discipline: "finance",
+};
+
+/** Familie eines Sonderziels (null, wenn unbekannt/nicht zuzuordnen). */
+export function sponsorObjectiveFamilyForKey(
+  specialKey: string | null | undefined,
+): SponsorObjectiveFamily | null {
+  return specialKey ? SPONSOR_OBJECTIVE_FAMILY[specialKey] ?? null : null;
+}
+
 function spotlightForArchetype(archetype: SponsorArchetype): number {
   return archetype === "security" ? SPONSOR_OBJ_SPOTLIGHT_SECURITY : SPONSOR_OBJ_SPOTLIGHT_STD;
 }
@@ -1165,15 +1217,22 @@ export function pickBonusObjective(
   curveShape: SponsorCurveShape,
   slotIndex: number,
   teamQualityRank?: number | null,
+  /** Bereits im Slate belegte Ziel-Familien (Slate-Anti-Wiederholung, Fable C3). */
+  usedFamilies?: Set<string>,
 ): SponsorBonusObjectiveKey | null {
   const archetype = mapCurveShapeToArchetype(curveShape);
-  const keys = filterBonusObjectivesByStrength(
+  const allKeys = filterBonusObjectivesByStrength(
     getAvailableBonusObjectiveKeys(curveShape, seasonId).filter((key) => key !== "transfer_trader"),
     teamQualityRank,
   );
-  if (keys.length === 0) {
+  if (allKeys.length === 0) {
     return null;
   }
+  // Familien meiden, die im Slate schon vorkommen; nur wenn dadurch nichts übrig bliebe, den vollen Pool.
+  const fresh = usedFamilies
+    ? allKeys.filter((key) => !usedFamilies.has(SPONSOR_OBJECTIVE_FAMILY[key] ?? ""))
+    : allKeys;
+  const keys = fresh.length > 0 ? fresh : allKeys;
   const index = Math.floor(getStableUnitHash(`${seasonId}:${teamId}:${archetype}:${slotIndex}:bonus-objective`) * keys.length);
   return keys[Math.min(keys.length - 1, index)] ?? keys[0]!;
 }
