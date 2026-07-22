@@ -1,6 +1,6 @@
 {
   "_comment": "Ratchet-Baseline fuer scripts/lint-design-tokens.ts. Key-Format: '<datei>:<zeile>:<regel>'. Regel-IDs: EUR (rohes Euro-Zeichen), LOCALE (toLocaleString/Intl.NumberFormat), HEX (hartkodierte Hex-Farbe). Neu generieren mit: npx tsx scripts/lint-design-tokens.ts --update-baseline",
-  "generatedAt": "2026-07-22T14:18:13.665Z",
+  "generatedAt": "2026-07-22T15:56:24.884Z",
   "count": 100,
   "violations": [
     "app/foundation/FoundationShellRouterBody.tsx:3040:LOCALE",
@@ -78,8 +78,8 @@
     "app/foundation/season-v2/SeasonStandingsV2Client.tsx:216:HEX",
     "app/foundation/season-v2/SeasonStandingsV2Client.tsx:217:HEX",
     "app/foundation/season-v2/SeasonStandingsV2Client.tsx:218:HEX",
-    "app/foundation/sponsors-v2/FoundationSponsorsNewLook.tsx:372:HEX",
-    "app/foundation/sponsors-v2/FoundationSponsorsNewLook.tsx:530:HEX",
+    "app/foundation/sponsors-v2/FoundationSponsorsNewLook.tsx:429:HEX",
+    "app/foundation/sponsors-v2/FoundationSponsorsNewLook.tsx:587:HEX",
     "app/foundation/team-settings/FoundationTeamSettingsNewLook.tsx:1060:LOCALE",
     "app/foundation/team-settings/FoundationTeamSettingsNewLook.tsx:775:LOCALE",
     "app/foundation/team-settings/FoundationTeamSettingsNewLook.tsx:871:LOCALE",

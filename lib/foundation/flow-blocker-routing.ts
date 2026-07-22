@@ -35,7 +35,7 @@ export const PLAYTEST_BLOCKER_ROUTES: Record<string, FlowBlockerRoute> = {
     ctaLabel: "Training setzen",
   },
   captain_not_assigned: {
-    targetView: "homeV2",
+    targetView: "teams",
     targetPanel: "captain-picker",
     ctaLabel: "Kapitän wählen",
   },

@@ -2219,9 +2219,9 @@ export default function FoundationTeamsNewLook({
       ) : null}
 
       {heroIsOwnTeam ? (
-        <div className="nl-teams-anchor">
+        <div className="nl-teams-anchor" id="foundation-teams-captain-picker" data-testid="foundation-teams-captain-picker">
           <NlCard
-            className="nl-teams-captain-card"
+            className={`nl-teams-captain-card${currentCaptain ? "" : " is-due"}`}
             eyebrow="Saison-Führung"
             title="Kapitän wählen"
             actions={

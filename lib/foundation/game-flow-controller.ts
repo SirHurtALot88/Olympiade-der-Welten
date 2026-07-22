@@ -438,7 +438,7 @@ function buildOnboardingFlowSteps(gameState: GameState, activeTeamId: string | n
       label: "Kapitän ernennen",
       cta: "Weiter: Kapitän wählen",
       status: resolveOnboardingStepStatus(flow, "appoint_captain", gameState, teamId),
-      targetView: "home",
+      targetView: "teams",
       targetPanel: "captain-picker",
       teamId,
       blockers: teamId ? [] : ["no_active_team"],

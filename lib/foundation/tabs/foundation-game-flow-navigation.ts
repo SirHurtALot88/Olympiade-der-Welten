@@ -63,9 +63,11 @@ export function createFoundationGameFlowNavigator(deps: FoundationGameFlowNaviga
       return;
     }
     if (targetPanel === "captain-picker") {
-      deps.navigateHomeTab("office");
+      // Kapitänswahl ist jetzt im Kader-Tab eingebettet (wie die AI-Teams).
+      deps.setSelectedTeamDetailTab("roster");
+      deps.setFoundationView(resolveFoundationViewTarget("teams" as FoundationView), deps.setActiveView);
       deps.setShowGameFlowPanel(false);
-      scrollToFoundationTarget("foundation-hq-captain-picker");
+      scrollToFoundationTarget("foundation-teams-captain-picker");
       return;
     }
     if (targetPanel === "sponsor-choice") {

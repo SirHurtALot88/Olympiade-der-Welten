@@ -5751,9 +5751,11 @@ export function useFoundationShellRouterBodyScope({
       return;
     }
     if (targetPanel === "captain-picker") {
-      navigateHomeTab("office");
+      // Kapitänswahl ist jetzt im Kader-Tab eingebettet (wie die AI-Teams).
+      setSelectedTeamDetailTab("roster");
+      setFoundationView(resolveFoundationViewTarget("teams"), setActiveView);
       setShowGameFlowPanel(false);
-      scrollToFoundationTarget("foundation-hq-captain-picker");
+      scrollToFoundationTarget("foundation-teams-captain-picker");
       return;
     }
     if (targetPanel === "sponsor-choice") {
@@ -5991,8 +5993,10 @@ export function useFoundationShellRouterBodyScope({
     }
 
     if (stepId === "appoint_captain") {
-      navigateHomeTab("office");
-      scrollToFoundationTarget("foundation-hq-captain-picker");
+      // Kapitänswahl ist jetzt im Kader-Tab eingebettet (wie die AI-Teams).
+      setSelectedTeamDetailTab("roster");
+      setFoundationView("teams", setActiveView);
+      scrollToFoundationTarget("foundation-teams-captain-picker");
       return;
     }
 

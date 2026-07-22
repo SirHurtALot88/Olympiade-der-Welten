@@ -300,6 +300,9 @@ export function resolveFoundationPanelScrollTarget(input: {
   if (input.panel === "board-objectives") {
     return "team-board-objectives";
   }
+  if (input.panel === "captain-picker") {
+    return "foundation-teams-captain-picker";
+  }
   if (input.panel === "contracts" || input.panel === "roster") {
     return "team-focus-roster";
   }
