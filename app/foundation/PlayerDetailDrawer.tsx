@@ -5,7 +5,9 @@ import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } 
 import type { LeagueLeaderCategoryId } from "@/lib/foundation/league-leaders-service";
 import { PLAYER_ATTRIBUTE_CHART_LABELS } from "@/lib/foundation/player-attribute-history";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
+import type { PlayerMatchdayTrainingHistory } from "@/lib/foundation/player-matchday-training-history";
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { PROGRESSION_ATTRIBUTE_ORDER } from "@/lib/training/class-progression-config";
 
 import PlayerAttributeProgressChart from "@/app/foundation/player-profile/PlayerAttributeProgressChart";
 import PlayerCareerStoryHeader from "@/app/foundation/player-profile/PlayerCareerStoryHeader";
@@ -1587,6 +1589,78 @@ type DrawerHistoryColumn = {
  * Zebra/Hover, `nl-tnum`), mit Flag AUS exakt die bisherige `team-table`-
  * Handrolled-Struktur — keine Datenänderung, nur die Tabellen-Hülle wechselt.
  */
+function formatMatchdayDelta(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value) || value === 0) {
+    return "—";
+  }
+  return `${value > 0 ? "+" : ""}${formatValue(value, 1)}`;
+}
+
+/**
+ * Intensitäts-Färbung für die Spieltag-Trainingshistorie: grün = Zuwachs, rot = Rückgang,
+ * Sättigung skaliert mit dem Betrag relativ zur größten Änderung der Tabelle. So sieht man
+ * auf einen Blick, welches Attribut sich diesen Spieltag am stärksten verbessert/verschlechtert.
+ */
+function matchdayDeltaCellStyle(value: number, maxAbs: number): { backgroundColor: string; color?: string } {
+  if (!Number.isFinite(value) || value === 0 || maxAbs <= 0) {
+    return { backgroundColor: "transparent" };
+  }
+  const intensity = Math.min(1, Math.abs(value) / maxAbs);
+  const alpha = 0.14 + 0.62 * intensity;
+  const rgb = value > 0 ? "74, 222, 128" : "248, 113, 113";
+  return {
+    backgroundColor: `rgba(${rgb}, ${alpha.toFixed(3)})`,
+    ...(intensity > 0.55 ? { color: "#0b1220" } : {}),
+  };
+}
+
+/**
+ * Spieltag-genaue Trainings-Forecast-Historie: eine Zeile pro gespieltem Spieltag, je Attribut
+ * die projizierte Änderung DIESES Spieltags (marginal), intensitäts-gefärbt. Tooltip zeigt zusätzlich
+ * die kumulierte Änderung + den projizierten Attributwert.
+ */
+function MatchdayTrainingHistoryTable({ history }: { history: PlayerMatchdayTrainingHistory }) {
+  return (
+    <div className="table-shell player-drawer-matchday-training-shell">
+      <table className="team-table player-drawer-matchday-training-table" data-testid="player-drawer-matchday-training-table">
+        <thead>
+          <tr>
+            <th title="Spieltag">MD</th>
+            <th title="Trainingsmodus dieses Spieltags">Mod.</th>
+            <th title="Summe der projizierten Attributänderung dieses Spieltags">Δ</th>
+            {PROGRESSION_ATTRIBUTE_ORDER.map((attribute) => (
+              <th key={`mdh-head-${attribute}`} title={attribute} className="is-attribute-col">
+                {formatTrainingAttributeLabel(attribute)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {history.rows.map((row) => (
+            <tr key={`mdh-${row.matchdayId}`}>
+              <td>
+                <strong>{row.matchdayLabel}</strong>
+              </td>
+              <td title={row.trainingMode ?? undefined}>{formatTrainingModeShort(row.trainingMode)}</td>
+              <td className={getDeltaToneClass(row.netMarginal)}>{formatMatchdayDelta(row.netMarginal)}</td>
+              {row.attributes.map((cell) => (
+                <td
+                  key={`mdh-${row.matchdayId}-${cell.attribute}`}
+                  className="is-attribute-col player-drawer-matchday-training-cell"
+                  style={matchdayDeltaCellStyle(cell.marginal, history.maxAbsMarginal)}
+                  title={`${cell.attribute}: Spieltag ${formatMatchdayDelta(cell.marginal)} · kumuliert ${cell.cumulative > 0 ? "+" : ""}${formatValue(cell.cumulative, 1)} · Prognose-Wert ${formatValue(cell.projectedValue, 1)}`}
+                >
+                  {formatMatchdayDelta(cell.marginal)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function PlayerDrawerLegacyHistoryTable<Row>({
   columns,
   rows,
@@ -3490,6 +3564,16 @@ export default function PlayerDetailDrawer({
 
             <div className="player-drawer-training-history-block" id="player-drawer-training-history">
               <h4>Trainingshistorie</h4>
+              {data.matchdayTrainingHistory && data.matchdayTrainingHistory.rows.length > 0 ? (
+                <div className="player-drawer-matchday-training" data-testid="player-drawer-matchday-training">
+                  <p className="player-drawer-matchday-training-caption muted">
+                    Spieltag-Verlauf (Forecast): projizierte Attributänderung je Spieltag auf Basis des
+                    bis dahin gesammelten Trainings. Grün = Zuwachs, Rot = Rückgang; kräftigere Farbe =
+                    größere Änderung. Real gebucht werden die Werte erst am Saisonende.
+                  </p>
+                  <MatchdayTrainingHistoryTable history={data.matchdayTrainingHistory} />
+                </div>
+              ) : null}
               {data.trainingHistoryRows.length > 0 ? (
                 <PlayerDrawerLegacyHistoryTable
                   newLookEnabled={true}
@@ -3562,9 +3646,10 @@ export default function PlayerDetailDrawer({
                     }
                   }}
                 />
-              ) : (
+              ) : data.matchdayTrainingHistory && data.matchdayTrainingHistory.rows.length > 0 ? null : (
                 <p className="muted">
-                  Noch keine Trainingshistorie. Nach Saisonabschluss erscheinen hier Trainingsklasse, Modus und Attributänderungen.
+                  Noch keine Trainingshistorie. Nach dem ersten Spieltag erscheint hier der Spieltag-Verlauf;
+                  die Saison-Zusammenfassung (Klasse, Modus, Attributänderungen) folgt zum Saisonabschluss.
                 </p>
               )}
             </div>

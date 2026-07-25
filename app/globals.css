@@ -16824,6 +16824,45 @@ a {
   text-align: left;
 }
 
+.player-drawer-matchday-training {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.player-drawer-matchday-training-caption {
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.player-drawer-matchday-training-table {
+  width: 100%;
+  min-width: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.player-drawer-matchday-training-table th,
+.player-drawer-matchday-training-table td {
+  padding: 5px 6px;
+  font-size: 0.68rem;
+  white-space: nowrap;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.065);
+  text-align: left;
+}
+
+.player-drawer-matchday-training-table th.is-attribute-col,
+.player-drawer-matchday-training-table td.is-attribute-col {
+  min-width: 40px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.player-drawer-matchday-training-cell {
+  border-radius: 4px;
+  font-weight: 600;
+}
+
 .player-training-controls {
   display: grid;
   gap: 14px;
