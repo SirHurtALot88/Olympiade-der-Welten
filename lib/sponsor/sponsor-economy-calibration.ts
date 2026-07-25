@@ -551,6 +551,34 @@ export function readLockedRankPayout(ladder: number[], finalRank: number | null 
   return ladder[boundedRank - 1] ?? ladder[ladder.length - 1] ?? 0;
 }
 
+/**
+ * Salary-Factor der laufenden Saison. Single Source für Offer-/Settlement-Pfad UND die Anzeige-Leiter
+ * (vorher als private `getCurrentSalaryFactor` in sponsor-offer-service + sponsor-settlement-service
+ * dupliziert).
+ */
+export function getCurrentSponsorSalaryFactor(gameState: GameState): number {
+  const factor = gameState.seasonState.seasonEconomyFactors?.[0]?.factor;
+  return typeof factor === "number" && Number.isFinite(factor) && factor > 0 ? factor : 1;
+}
+
+/**
+ * Audit #4: Vorschau der gelockten Rang-Payout-Leiter für ein noch NICHT unterschriebenes Angebot.
+ * Spiegelt die Sign-Logik in `chooseSponsorOffer` 1:1 (gleicher salaryFactor, Anker, rarity, curveShape,
+ * teamQualityRank, isGolden) — damit die in der Karte angezeigten Gewinnstufen exakt der Leiter
+ * entsprechen, aus der das Settlement später zahlt. Die Karte darf NICHT eigenständig nach generischer
+ * Meilenstein-Gewichtung splitten (das ignoriert curveShape und wich vom echten Payout ab).
+ */
+export function buildOfferRankPayoutLadderPreview(gameState: GameState, offer: SponsorOffer): number[] {
+  return buildLockedRankPayoutLadder({
+    salaryFactor: getCurrentSponsorSalaryFactor(gameState),
+    leagueMinSalary: getSponsorRank32BaseAnchorSalary(gameState),
+    rarity: offer.rarity ?? "magisch",
+    curveShape: offer.curveShape ?? mapArchetypeToCurveShape(offer.archetype),
+    teamQualityRank: offer.teamQualityRank,
+    isGolden: offer.isGolden,
+  });
+}
+
 export function buildOfferCashAmounts(input: {
   archetype: SponsorArchetype;
   salaryFactor: number;
