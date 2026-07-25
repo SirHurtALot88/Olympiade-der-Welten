@@ -6648,15 +6648,36 @@ export function useFoundationShellRouterBodyScope({
       return left.name.localeCompare(right.name, "de");
     });
   }, [gameState.disciplines]);
-  const disciplineRanksColumns = useMemo<FoundationTableColumn[]>(
-    () => [
+  const disciplineRanksColumns = useMemo<FoundationTableColumn[]>(() => {
+    // Innerhalb jedes Achsen-Blocks (POW/SPE/MEN/SOC) die Disziplinen nach Anzahl
+    // eingesetzter Spieler absteigend ordnen (z. B. bei POW zuerst Hockey mit 6,
+    // dann Gewichtheben mit 5 …). Die Block-Reihenfolge der Achsen bleibt erhalten,
+    // damit die farbige Gruppierung im Header intakt bleibt.
+    const categoryOrder: string[] = [];
+    for (const discipline of orderedDisciplines) {
+      if (!categoryOrder.includes(discipline.category)) {
+        categoryOrder.push(discipline.category);
+      }
+    }
+    const rankDisciplineOrder = [...orderedDisciplines].sort((left, right) => {
+      const categoryDelta = categoryOrder.indexOf(left.category) - categoryOrder.indexOf(right.category);
+      if (categoryDelta !== 0) {
+        return categoryDelta;
+      }
+      const countDelta = (right.playerCount ?? 0) - (left.playerCount ?? 0);
+      if (countDelta !== 0) {
+        return countDelta;
+      }
+      return (left.displayOrder ?? left.originalOrder ?? 0) - (right.displayOrder ?? right.originalOrder ?? 0);
+    });
+    return [
       { id: "team", label: "Team", dataKey: "team", defaultWidth: 178, minWidth: 150, maxWidth: 210 },
       { id: "totalRank", label: "TOT", dataKey: "totalRank", defaultWidth: 64, minWidth: 58, maxWidth: 76 },
       { id: "powRank", label: "POW", dataKey: "powRank", defaultWidth: 64, minWidth: 58, maxWidth: 76 },
       { id: "speRank", label: "SPE", dataKey: "speRank", defaultWidth: 64, minWidth: 58, maxWidth: 76 },
       { id: "menRank", label: "MEN", dataKey: "menRank", defaultWidth: 64, minWidth: 58, maxWidth: 76 },
       { id: "socRank", label: "SOC", dataKey: "socRank", defaultWidth: 64, minWidth: 58, maxWidth: 76 },
-      ...orderedDisciplines.map((discipline) => ({
+      ...rankDisciplineOrder.map((discipline) => ({
         id: discipline.id,
         label: discipline.name.replace(/\s+/g, "").slice(0, 3).toUpperCase(),
         dataKey: discipline.id,
@@ -6664,9 +6685,8 @@ export function useFoundationShellRouterBodyScope({
         minWidth: 40,
         maxWidth: 52,
       })),
-    ],
-    [orderedDisciplines],
-  );
+    ];
+  }, [orderedDisciplines]);
   const disciplineConfigTableColumns = useMemo<FoundationTableColumn[]>(
     () => [
       { id: "originalOrder", label: "Original-Reihenfolge", dataKey: "originalOrder", defaultWidth: 170, minWidth: 130 },
