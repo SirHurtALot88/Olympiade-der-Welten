@@ -86,10 +86,33 @@ describe("foundation initial compact state", () => {
     expect(compact.transferHistory).toEqual(existing.transferHistory);
   });
 
-  it("keeps attribute sheets on compact initial load while admin unlock is enabled", () => {
+  it("keeps the human roster's attribute sheets on compact initial load, strips others", () => {
+    // Own-team whole-roster forecasts (training-SP, per-intensity/-class gain,
+    // season-end preview) need the full attribute sheet up front, so the compact
+    // payload must retain the human-controlled team's sheets while still stripping
+    // opponent sheets (which hydrate on demand).
     const existing = createGameState();
+    existing.teams = [
+      { teamId: "H-R", name: "Home", humanControlled: true } as never,
+      { teamId: "A-A", name: "Away", humanControlled: false } as never,
+    ];
+    existing.seasonState.teamControlSettings = {
+      "H-R": { teamId: "H-R", controlMode: "manual" } as never,
+      "A-A": { teamId: "A-A", controlMode: "ai" } as never,
+    };
+    existing.players = [
+      { ...existing.players[0]!, id: "p-1", attributeSheetStats: { power: 70 } },
+      { ...existing.players[0]!, id: "p-2", attributeSheetStats: { power: 40 } },
+    ];
+    existing.rosters = [
+      { id: "r-1", teamId: "H-R", playerId: "p-1" } as never,
+      { id: "r-2", teamId: "A-A", playerId: "p-2" } as never,
+    ];
+
     const compact = compactFoundationInitialGameState(existing);
-    expect(compact.players[0]?.attributeSheetStats).toEqual({ power: 70 });
+    const byId = new Map(compact.players.map((player) => [player.id, player]));
+    expect(byId.get("p-1")?.attributeSheetStats).toEqual({ power: 70 });
+    expect(byId.get("p-2")?.attributeSheetStats).toBeUndefined();
   });
 
   it("strips persisted season derivations from compact payloads", () => {

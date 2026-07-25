@@ -47,7 +47,39 @@ export const SEASON_DISCIPLINE_LABELS: Record<SeasonDisciplineKey, string> = {
   showcase: "SHO",
 };
 
-export const SEASON_DISCIPLINE_AREA_GROUPS: Array<{
+/**
+ * Fixed roster size per discipline — how many players contest each discipline.
+ *
+ * Canonical source: `foundationSeedDisciplines[].playerCount` in lib/data/dataAdapter.ts
+ * (and the `Discipline.playerCount` column in prisma/schema.prisma). Mirrored here as a
+ * constant so the standings columns can be ordered by discipline size without threading
+ * the live gameState through this constants-only module. Keep in sync with the seed data.
+ */
+export const SEASON_DISCIPLINE_PLAYER_COUNT: Record<SeasonDisciplineKey, number> = {
+  tdm: 3,
+  mini_dm: 2,
+  gewichtheben: 6,
+  hockey: 5,
+  breaking: 4,
+  staffel: 3,
+  time_trial: 4,
+  spurt: 2,
+  climbing: 6,
+  fechten: 5,
+  schach: 2,
+  takeshi: 4,
+  tennis: 3,
+  i_spy: 6,
+  wettessen: 5,
+  basketball: 6,
+  football: 4,
+  battlefield: 2,
+  eiskunst: 3,
+  showcase: 5,
+};
+
+/** Axis-group membership (which disciplines belong to POW/SPE/MEN/SOC). */
+const SEASON_DISCIPLINE_AREA_GROUP_MEMBERSHIP: Array<{
   id: SeasonDisciplineAreaId;
   label: string;
   keys: SeasonDisciplineKey[];
@@ -57,6 +89,23 @@ export const SEASON_DISCIPLINE_AREA_GROUPS: Array<{
   { id: "men", label: "MEN", keys: ["schach", "takeshi", "tennis", "i_spy", "wettessen"] },
   { id: "soc", label: "SOC", keys: ["basketball", "football", "battlefield", "eiskunst", "showcase"] },
 ];
+
+/**
+ * Axis groups with each group's discipline columns ordered by roster size (most players
+ * first). This drives the standings grid column order, so e.g. the POW group reads
+ * GEW(6) · HOC(5) · BRE(4) · TDM(3) · MIN(2). Ties keep their membership order (JS sort
+ * is stable); the summing/record helpers below are order-independent.
+ */
+export const SEASON_DISCIPLINE_AREA_GROUPS: Array<{
+  id: SeasonDisciplineAreaId;
+  label: string;
+  keys: SeasonDisciplineKey[];
+}> = SEASON_DISCIPLINE_AREA_GROUP_MEMBERSHIP.map((group) => ({
+  ...group,
+  keys: [...group.keys].sort(
+    (left, right) => SEASON_DISCIPLINE_PLAYER_COUNT[right] - SEASON_DISCIPLINE_PLAYER_COUNT[left],
+  ),
+}));
 
 const SEASON_DISCIPLINE_KEY_SET = new Set<string>(Object.keys(SEASON_DISCIPLINE_LABELS));
 

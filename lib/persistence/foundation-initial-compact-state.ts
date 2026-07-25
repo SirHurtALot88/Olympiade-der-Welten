@@ -14,6 +14,43 @@ function preserveIfUnchangedFromCompact<T>(incoming: T, existing: T, compactSlic
 }
 
 /**
+ * Roster player-ids of the human-managed team(s).
+ *
+ * The compact initial payload strips every player's heavy `attributeSheetStats`
+ * (fog-of-war + payload slimming) and only re-hydrates a single player on demand
+ * when the profile drawer opens. But the whole-roster forecasts of the OWN team
+ * (training-SP prognosis, per-intensity/-class gain, season-end preview) need the
+ * full attribute sheet up front — without it `normalizePlayerAttributes` returns
+ * null and the organic progression collapses to all-zeros (Training/Performance
+ * +0, "Weitere Boni" −100%). Opponent sheets stay stripped; the own roster is
+ * small (~1 team) so keeping its sheets in the payload is negligible.
+ */
+function resolveHumanRosterPlayerIds(gameState: GameState): Set<string> {
+  const settings = gameState.seasonState.teamControlSettings;
+  const humanTeamIds = settings
+    ? new Set(
+        Object.values(settings)
+          .filter((setting) => setting?.controlMode === "manual")
+          .map((setting) => setting.teamId),
+      )
+    : new Set(gameState.teams.filter((team) => team.humanControlled).map((team) => team.teamId));
+
+  if (humanTeamIds.size === 0) {
+    // Fallback: any team flagged human-controlled, so a save without control
+    // settings still keeps its own-roster sheets rather than zeroing training.
+    for (const team of gameState.teams) {
+      if (team.humanControlled) humanTeamIds.add(team.teamId);
+    }
+  }
+
+  return new Set(
+    (gameState.rosters ?? [])
+      .filter((roster) => humanTeamIds.has(roster.teamId))
+      .map((roster) => roster.playerId),
+  );
+}
+
+/**
  * Append-only archive guard for compact-load round-trips.
  *
  * The Foundation compact load strips `seasonSnapshots`/`standingsApplyLogs` to
@@ -59,6 +96,13 @@ export function compactFoundationInitialGameState(gameState: GameState): GameSta
   );
   const activeMatchdayResultIds = new Set(activeMatchdayResults.map((result) => result.id));
 
+  // Keep the OWN team's attribute sheets in the compact payload so whole-roster
+  // forecasts (training-SP, per-intensity/-class gain, season-end preview) work
+  // immediately — opponent sheets remain stripped and hydrate on demand.
+  const keepSheetPlayerIds = FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS ? null : resolveHumanRosterPlayerIds(gameState);
+  const keepSheetsFor = (playerId: string) =>
+    FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS || (keepSheetPlayerIds?.has(playerId) ?? false);
+
   return {
     ...gameState,
     playerBaselines: undefined,
@@ -67,8 +111,8 @@ export function compactFoundationInitialGameState(gameState: GameState): GameSta
     logs: [],
     players: gameState.players.map((player) => ({
       ...player,
-      attributeSheetStats: FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS ? player.attributeSheetStats : undefined,
-      attributeSheetRatings: FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS ? player.attributeSheetRatings : undefined,
+      attributeSheetStats: keepSheetsFor(player.id) ? player.attributeSheetStats : undefined,
+      attributeSheetRatings: keepSheetsFor(player.id) ? player.attributeSheetRatings : undefined,
       flavorEn: "",
       flavorDe: "",
       previousDisciplineRatings: undefined,
