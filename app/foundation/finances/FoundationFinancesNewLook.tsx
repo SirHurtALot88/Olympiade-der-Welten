@@ -460,7 +460,7 @@ const NL_FIN_LEAGUE_COLUMNS: NlTableColumn<FinanceLeagueTableRow>[] = [
     label: "Einnahmen p.a.",
     align: "right",
     sortable: true,
-    tooltip: "Sponsor + Preisgeld (Näherungswert)",
+    tooltip: "Sponsor-Einnahmen + Gebäude-Einnahmen (Näherungswert) — ohne Preisgeld (reiner Benchmark) und Transfersaldo",
   },
   {
     key: "expensesAnnual",
