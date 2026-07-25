@@ -423,12 +423,10 @@ export function useFoundationPageState({
     if (tab === "office" || view === "hq") return "office";
     return "overview";
   });
-  const [prizeFinanceTab, setPrizeFinanceTab] = useState<"sponsors" | "prize">(() => {
-    if (typeof window === "undefined") return "sponsors";
-    const tab = parseFoundationTabFromUrl();
-    if (tab === "preisgeld" || tab === "prize") return "prize";
-    return "sponsors";
-  });
+  // LEGACY: Preisgeld ist abgeschafft (nur noch Sponsoren in Anzeige + Auszahlung).
+  // Der "prize"-Untertab existiert nicht mehr — daher immer auf "sponsors" stehen,
+  // auch bei einem alten Deep-Link `?tab=preisgeld`.
+  const [prizeFinanceTab, setPrizeFinanceTab] = useState<"sponsors" | "prize">("sponsors");
   const [playerProfileTab, setPlayerProfileTab] = useState<PlayerProfileTabId>("overview");
   const [playerProfileData, setPlayerProfileData] = useState<PlayerDetailDrawerData | null>(null);
   const [playerProfileLoading, setPlayerProfileLoading] = useState(false);

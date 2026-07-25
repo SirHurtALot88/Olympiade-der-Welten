@@ -408,7 +408,7 @@ export function ManagerOfficeClient({
 	              {
 	                key: "forecast",
 	                eyebrow: "Vor Saisonwechsel",
-	                title: "Preisgeld & Forecast",
+	                title: "Sponsoren & Forecast",
 	                detail:
 	                  selectedStandingRow?.rank != null
 	                    ? `Rang #${selectedStandingRow.rank} · ${selectedStandingRow.points != null ? formatLocalePoints(selectedStandingRow.points, 1) : "—"} Punkte`

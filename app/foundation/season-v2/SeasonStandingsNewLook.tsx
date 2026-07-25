@@ -1319,7 +1319,7 @@ export default function SeasonStandingsNewLook({
                   <StatChip label="Ränge" value="Öffnen" onClick={onOpenRanks} title="Zur Rangliste wechseln" />
                 ) : null}
                 {onOpenPrize ? (
-                  <StatChip label="Preisgeld" value="Öffnen" onClick={onOpenPrize} title="Preisgeld-Übersicht öffnen" />
+                  <StatChip label="Sponsoren" value="Öffnen" onClick={onOpenPrize} title="Sponsoren-Übersicht öffnen" />
                 ) : null}
               </StatChipRow>
             ) : null}

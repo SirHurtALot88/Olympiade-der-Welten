@@ -60,12 +60,10 @@ export type FinanceSponsorIncome = {
 };
 
 /**
- * Preisgeld (Liga-Pool, Rang-Basis + Saison-Anteil + Platzierungsbonus), siehe `buildTeamPrizeSummary`.
- *
- * WICHTIG: Preisgeld ist ausschließlich ein BENCHMARK und wird NIE als Cash ausgezahlt
- * (`CASH_PRIZE_BENCHMARK_ONLY = true` in `lib/season/cash-prize-apply-service.ts`, Team-Cash bleibt
- * unverändert). Es fließt deshalb NICHT in `totalIncome`/`guv` ein — siehe `income.prizeBenchmark`.
- * `null` wenn kein Standing vorliegt.
+ * @deprecated LEGACY — Preisgeld wird NICHT mehr ausgezahlt und NICHT mehr genutzt. Einnahmen laufen
+ * ausschließlich über Sponsoren (+ Gebäude). Dieser Typ und `prizeBenchmark` bleiben nur aus
+ * Back-Compat-Gründen bestehen (der Wert wird noch berechnet, aber NICHT mehr in der UI gezeigt).
+ * Nicht für neue Features verwenden — überall Sponsoren nutzen.
  */
 export type FinancePrizeIncome = {
   total: number;
@@ -106,8 +104,9 @@ export type TeamFinancesIncome = {
    */
   objectiveReward: number | null;
   /**
-   * Preisgeld (Liga-Pool) — reiner BENCHMARK, NIE cash-wirksam (siehe `FinancePrizeIncome`). Fließt
-   * bewusst NICHT in `totalIncome`/`guv`; rein informativ getrennt ausgewiesen. `null` ohne Standing.
+   * @deprecated LEGACY — Preisgeld ist abgeschafft (nicht ausgezahlt, nicht genutzt). Wird noch
+   * berechnet, aber in der UI NICHT mehr angezeigt. Immer Sponsoren verwenden. Wird bei einem
+   * späteren Cleanup ganz entfernt.
    */
   prizeBenchmark: FinancePrizeIncome | null;
 };
