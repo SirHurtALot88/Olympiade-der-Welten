@@ -753,6 +753,40 @@ describe("game flow controller", () => {
     expect(arena?.status).not.toBe("blocked");
   });
 
+  it("completes the preseason buy step once the minimum roster is reached (no infinite 'Spieler kaufen')", () => {
+    const roster = Array.from({ length: 7 }, (_, index) => ({
+      id: `r-${index}`,
+      teamId: "M-M",
+      playerId: `p-${index}`,
+      contractLength: 2,
+      salary: 2,
+      upkeep: 2,
+      purchasePrice: 10,
+      currentValue: 10,
+      roleTag: "starter",
+      joinedSeasonId: "season-2",
+    }));
+    const flowFull = buildGameFlowState({
+      gameState: gameState({
+        gamePhase: "preseason_management",
+        players: Array.from({ length: 7 }, (_, index) => player(`p-${index}`, "mittel")),
+        rosters: roster,
+      }),
+      activeTeamId: "M-M",
+    });
+    expect(flowFull.steps.find((step) => step.stepId === "buy_players")?.status).toBe("completed");
+
+    const flowShort = buildGameFlowState({
+      gameState: gameState({
+        gamePhase: "preseason_management",
+        players: [player("p-0", "mittel")],
+        rosters: [roster[0]!],
+      }),
+      activeTeamId: "M-M",
+    });
+    expect(flowShort.steps.find((step) => step.stepId === "buy_players")?.status).not.toBe("completed");
+  });
+
   it("never makes 'Spieler verkaufen' the guided next action in the preseason", () => {
     const flow = buildGameFlowState({
       gameState: gameState({

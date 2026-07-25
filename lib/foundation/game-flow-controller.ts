@@ -133,6 +133,12 @@ function activeTeamTrainingComplete(gameState: GameState, activeTeamId: string |
   return isTeamTrainingComplete(gameState, activeTeamId);
 }
 
+// Minimum spielfähiger Kader (entspricht dem dokumentierten Matchday-Minimum von
+// 7 aktiven Spielern). Ab hier gilt der Kauf-Schritt als erledigt, damit der Flow
+// weiterläuft und nicht ewig auf "Spieler kaufen" stehen bleibt — Zukäufe darüber
+// hinaus bleiben über den Markt jederzeit möglich.
+const PRESEASON_BUY_MINIMUM_ROSTER = 7;
+
 function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null): GameFlowStep[] {
   const seasonId = gameState.season.id;
   const gamePhase = gameState.gamePhase ?? "season_active";
@@ -233,12 +239,23 @@ function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null):
       stepId: "buy_players",
       label: "Spieler kaufen",
       cta: "Weiter: Spieler kaufen",
-      status: !hasActiveTeam ? "blocked" : buildTransferStepGate(gameState, "buy_players").allowed ? "ready" : "blocked",
+      // Ab Minimum-Kader gilt der Schritt als erledigt → Leertaste führt weiter,
+      // statt für immer auf "Spieler kaufen" zu hängen.
+      status: !hasActiveTeam
+        ? "blocked"
+        : activeRosterCount >= PRESEASON_BUY_MINIMUM_ROSTER
+          ? "completed"
+          : buildTransferStepGate(gameState, "buy_players").allowed
+            ? "ready"
+            : "blocked",
       targetView: "market",
       teamId: activeTeamId,
-      blockers: !hasActiveTeam
-        ? ["no_active_team"]
-        : buildTransferStepGate(gameState, "buy_players").blockers,
+      blockers:
+        !hasActiveTeam
+          ? ["no_active_team"]
+          : activeRosterCount >= PRESEASON_BUY_MINIMUM_ROSTER
+            ? []
+            : buildTransferStepGate(gameState, "buy_players").blockers,
       warnings: buildTransferStepGate(gameState, "buy_players").warnings,
     }),
     step({
