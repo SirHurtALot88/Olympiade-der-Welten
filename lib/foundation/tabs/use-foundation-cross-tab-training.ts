@@ -150,6 +150,8 @@ export function useFoundationCrossTabTraining(input: {
         gameState: input.gameState,
         player: trainingPlayer,
         facilities: facilitiesForForecast,
+        // Saisonale Route → Signature-Shift wirkt real (Sterne/Malus = das, was das Profil zeigt).
+        route: forecast?.developmentRoute ?? null,
       });
       const currentSchedule =
         input.gameState.seasonState.disciplineSchedule?.find(

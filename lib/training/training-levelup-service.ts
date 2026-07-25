@@ -581,6 +581,39 @@ export function buildSignatureShiftPreview(input: {
   };
 }
 
+/**
+ * Kanonische, SAISONALE Wachstums-Affinität (Basis + Signature-Shift) — die EINE Quelle, die
+ * sowohl die Gewinn-Engine (×1,15/×0,8 auf die Sterne/Malus-Attribute) als auch die Anzeigen
+ * (Profil + Trainings-Karte) nutzen, damit sie nie wieder auseinanderlaufen. Ohne `route`
+ * (z.B. Tests/Alt-Aufrufer) fällt es auf die statische Basis zurück (kein Shift, altes Verhalten).
+ */
+export function resolveSeasonalAffinityProfile(input: {
+  player: Player;
+  route?: PlayerDevelopmentRoute | null;
+  seasonId?: string | null;
+  seasonShiftAlreadyUsed?: boolean;
+}): AttributeAffinityProfile {
+  const base = deriveAttributeAffinityProfile(input.player);
+  if (input.route == null) {
+    return base;
+  }
+  const shift = buildSignatureShiftPreview({
+    player: input.player,
+    currentProfile: base,
+    route: input.route,
+    seasonId: input.seasonId ?? null,
+    seasonShiftAlreadyUsed: input.seasonShiftAlreadyUsed,
+  });
+  return shift.canShift
+    ? {
+        ...base,
+        signatureAttributes: shift.newSignatureAttributes,
+        weakAttribute: shift.newWeakAttribute,
+        reasons: [...base.reasons, shift.reason],
+      }
+    : base;
+}
+
 function getTeamStrategyAttributeBias(profile?: TeamStrategyProfile | null): PlayerGeneratorAttributeName[] {
   const result: PlayerGeneratorAttributeName[] = [];
   const axisAttributeBiasSource: Array<{
@@ -693,14 +726,14 @@ export function buildPlayerDevelopmentLevelupModel(input: {
     route: input.forecast?.developmentRoute ?? null,
     seasonId: input.gameState?.season.id ?? null,
   });
-  const affinity: AttributeAffinityProfile = signatureShift.canShift
-    ? {
-        ...baseAffinity,
-        signatureAttributes: signatureShift.newSignatureAttributes,
-        weakAttribute: signatureShift.newWeakAttribute,
-        reasons: [...baseAffinity.reasons, signatureShift.reason],
-      }
-    : baseAffinity;
+  // Gleiche kanonische Auflösung wie die Gewinn-Engine (resolveSeasonalAffinityProfile) mit
+  // identischen Eingaben (Route aus dem Forecast + seasonId) → Profil und echte SP-Rechnung
+  // zeigen/verwenden dieselben Sterne/Malus-Attribute.
+  const affinity: AttributeAffinityProfile = resolveSeasonalAffinityProfile({
+    player: input.player,
+    route: input.forecast?.developmentRoute ?? null,
+    seasonId: input.gameState?.season.id ?? null,
+  });
   const costs = playerGeneratorAttributeKeys.map((attribute) =>
     getAttributeTrainingPointCost({
       value: getPlayerAttributeValue(input.player, attribute as PlayerGeneratorAttributeName),

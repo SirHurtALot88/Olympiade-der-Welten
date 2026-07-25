@@ -84,6 +84,8 @@ export function useTrainingPanelDerivations(input: UseTrainingPanelDerivationsIn
         gameState: input.gameState,
         player: trainingPlayer,
         facilities: input.selectedTeamFacilityState,
+        // Saisonale Route → Signature-Shift wirkt real (Sterne/Malus = das, was das Profil zeigt).
+        route: forecast?.developmentRoute ?? null,
       });
       const currentSchedule =
         input.gameState.seasonState.disciplineSchedule?.find(
