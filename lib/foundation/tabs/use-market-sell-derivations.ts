@@ -190,9 +190,13 @@ export function useMarketSellDerivations(input: UseMarketSellDerivationsInput) {
         ? getRosterEntryDisplaySalary(rosterEntry, player)
         : (marketSellPreview?.activePlayer?.salary ?? null);
     const salaryDelta = player && rosterEntry ? getRosterEntrySalaryDelta(rosterEntry, player, gameState) : null;
+    // GuV Verkauf muss vom NETTO-Erlös (nach Buyout) ausgehen — genau das, was dem Team-Cash
+    // gutgeschrieben wird (transfermarkt-local-service: `cash + netProceeds`). Vorher wurde der
+    // BRUTTO-`salePrice` verrechnet, was bei laufendem Vertrag (offener Buyout) einen zu hohen
+    // Gewinn zeigte, als real ankam.
     const saleProfit =
-      marketSellPreview?.salePrice != null && purchasePrice != null
-        ? roundViewNumber(marketSellPreview.salePrice - purchasePrice, 2)
+      marketSellPreview?.netProceeds != null && purchasePrice != null
+        ? roundViewNumber(marketSellPreview.netProceeds - purchasePrice, 2)
         : (marketSellPreview?.profit ?? null);
     const areaRows = [
       { key: "POW", value: rating?.ppPow ?? performance?.pointsByArea.pow ?? null, tone: "power" },
