@@ -47318,6 +47318,55 @@ button.foundation-team-portrait-card {
   margin-top: 10px;
 }
 
+/* Kompakte Kapitän-Kachel: sobald ein Kapitän steht, klappt der Picker auf eine
+   einzeilige Zusammenfassung zusammen, damit die Kaderkarten nicht nach unten
+   geschoben werden. „Kapitän wechseln" öffnet die volle Liste wieder. */
+.is-new-look .nl-teams-captain-collapsed {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.is-new-look .nl-teams-captain-collapsed-identity {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.is-new-look .nl-teams-captain-collapsed-identity strong {
+  font-size: var(--nl-fs-md, 15px);
+}
+
+.is-new-look .nl-teams-captain-collapsed-identity small {
+  color: var(--nl-mut);
+  font-size: 12px;
+}
+
+.is-new-look .nl-teams-captain-collapsed-effects {
+  display: inline-flex;
+  gap: 12px;
+  color: var(--nl-mut);
+  font-size: 12px;
+}
+
+.is-new-look .nl-teams-captain-change {
+  margin-left: auto;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--nl-border, rgba(255, 255, 255, 0.16));
+  background: transparent;
+  color: var(--nl-txt, #fff);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.is-new-look .nl-teams-captain-change:hover {
+  background: var(--nl-surface-2, rgba(255, 255, 255, 0.06));
+}
+
 .is-new-look .nl-teams-captain-hint {
   margin: 6px 0 0;
   font-size: 11px;

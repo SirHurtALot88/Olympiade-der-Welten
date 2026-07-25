@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
@@ -726,6 +726,10 @@ export default function FoundationTeamsNewLook({
   // die Auswahl zurücksetzen, damit kein Fremdkader-Spieler „hängen bleibt".
   const [draftCaptainPlayerId, setDraftCaptainPlayerId] = useState<string | null>(null);
   const [expandedCaptainPlayerId, setExpandedCaptainPlayerId] = useState<string | null>(null);
+  // Ist ein Kapitän gewählt, klappt der Picker zu einer kompakten Kachel zusammen
+  // (nur der Kapitän sichtbar) — er soll die Kaderkarten nicht nach unten schieben.
+  // Über „wechseln" lässt sich die volle Kandidatenliste wieder aufklappen.
+  const [captainPickerExpanded, setCaptainPickerExpanded] = useState(false);
   const [captainSyncedTeamId, setCaptainSyncedTeamId] = useState<string>(selectedTeam.teamId);
   if (captainSyncedTeamId !== selectedTeam.teamId) {
     setCaptainSyncedTeamId(selectedTeam.teamId);
@@ -836,6 +840,13 @@ export default function FoundationTeamsNewLook({
   );
   const captainEffectsTooltip = getTeamCaptainEffectsTooltip();
   const canManageCaptain = heroIsOwnTeam && typeof assignTeamCaptainForSelectedTeam === "function";
+  // Kompaktansicht, sobald ein Kapitän steht — nur aufgeklappt, wenn der Nutzer
+  // aktiv „wechseln" gewählt hat (oder noch kein Kapitän gewählt ist).
+  const captainCollapsed = Boolean(currentCaptain) && !captainPickerExpanded;
+  // Nach jeder Kapitän-Änderung (Bestätigen) wieder einklappen + Team-Wechsel.
+  useEffect(() => {
+    setCaptainPickerExpanded(false);
+  }, [selectedTeamCaptainPlayerId, selectedTeam.teamId]);
 
   // CASH-Hover (alle Teams): kompakte GuV-Projektion. Cash & Gehaltsblock aus
   // der Team-Zeile, Gebäude-Unterhalt/-Einnahmen und Sponsoren-Basis aus dem
@@ -2234,14 +2245,40 @@ export default function FoundationTeamsNewLook({
               )
             }
           >
-            <p className="nl-teams-captain-intro">{captainEffectsTooltip}</p>
             {captainCandidates.length === 0 ? (
               <p className="nl-teams-action-hint is-locked">
                 <strong>Kein Kader</strong>
                 <span>Erst nach den Käufen stehen Kapitäns-Kandidaten bereit.</span>
               </p>
+            ) : captainCollapsed && currentCaptain ? (
+              <div className="nl-teams-captain-collapsed">
+                <span className="nl-teams-captain-collapsed-identity">
+                  <strong>{currentCaptain.playerName}</strong>
+                  <small>{currentCaptain.style}</small>
+                </span>
+                <span className="nl-teams-captain-collapsed-effects nl-tnum" title={captainEffectsTooltip}>
+                  <span title="Moral-Puffer">Moral +{formatNlNumber(currentCaptain.effects.moraleBuffer, 1)}</span>
+                  <span title="Team-Power-Bonus">
+                    Power +{formatNlNumber(currentCaptain.effects.teamPowerModifierPct, 1)}%
+                  </span>
+                </span>
+                {canManageCaptain ? (
+                  <button
+                    type="button"
+                    className="nl-teams-captain-change"
+                    onClick={() => {
+                      setDraftCaptainPlayerId(selectedTeamCaptainPlayerId ?? null);
+                      setCaptainPickerExpanded(true);
+                    }}
+                    title="Kandidatenliste wieder aufklappen"
+                  >
+                    Kapitän wechseln
+                  </button>
+                ) : null}
+              </div>
             ) : (
               <>
+                <p className="nl-teams-captain-intro">{captainEffectsTooltip}</p>
                 <ul className="nl-teams-captain-list" aria-label="Kapitäns-Kandidaten nach Führungswertung">
                   {captainCandidates.map((candidate, index) => {
                     const isCurrent = candidate.playerId === selectedTeamCaptainPlayerId;
@@ -2342,6 +2379,20 @@ export default function FoundationTeamsNewLook({
                     >
                       {assignTeamCaptainBusy ? "Speichert …" : "Kapitän bestätigen"}
                     </button>
+                    {currentCaptain ? (
+                      <button
+                        type="button"
+                        className="nl-teams-action"
+                        disabled={Boolean(assignTeamCaptainBusy)}
+                        onClick={() => {
+                          setDraftCaptainPlayerId(null);
+                          setCaptainPickerExpanded(false);
+                        }}
+                        title="Ohne Änderung wieder einklappen"
+                      >
+                        Abbrechen
+                      </button>
+                    ) : null}
                     <span className="nl-teams-captain-hint">
                       Führung = Charisma, Wille, Entschlossenheit, Übersicht, Klasse & Charakter-Boni. Der Kapitän puffert
                       Moral, senkt Rivalitäts-Druck und stärkt die Team-Power.
