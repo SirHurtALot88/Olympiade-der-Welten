@@ -84,7 +84,11 @@ describe("new-game-setup-service", () => {
       now: "2026-06-13T10:00:00.000Z",
     });
 
-    expect(gameState.gamePhase).toBe("preseason_management");
+    // Neue Spiele starten im offenen Spieltag 1 (Saisonstart-Setup): Kaufen/Training/
+    // Sponsor bleiben über die Early-Setup-Gates erlaubt, aber Einsatzliste + Arena
+    // sind freigeschaltet. `preseason_management` würde S1/MD1 in eine Sackgasse sperren
+    // (phase_blocked:set_lineup), da es aus dieser Phase für ein neues Spiel keinen Ausweg gibt.
+    expect(gameState.gamePhase).toBe("season_active");
     expect(gameState.season.id).toBe("season-1");
     expect(gameState.season.currentMatchday).toBe(1);
     expect(gameState.matchdayState.status).toBe("planning");
@@ -108,7 +112,7 @@ describe("new-game-setup-service", () => {
     expect(getTeamSponsorContract(gameState, "M-M")).toBeNull();
 
     const offers = getTeamSponsorOffers(gameState, "M-M");
-    expect(offers).toHaveLength(3);
+    expect(offers).toHaveLength(5);
     expect(new Set(offers.map((offer) => offer.archetype)).size).toBe(3);
     expect(offers.every((offer) => offer.seasonId === gameState.season.id)).toBe(true);
 

@@ -70,7 +70,7 @@ export type NewGameSetupPreview = {
   seasonSetup: {
     seasonId: string;
     currentMatchday: number;
-    gamePhase: "preseason_management";
+    gamePhase: "season_active";
     matchdayCount: number;
     scheduleCount: number;
     formCardsStatus: "pending_generation";
@@ -319,7 +319,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
 
   const baseGameStateBeforeSponsorOffers: GameState = {
     ...resetGameState,
-    gamePhase: "preseason_management",
+    gamePhase: "season_active",
     saveVersion: 1,
     lastAppliedEventId: null,
     appliedEventIds: [],
@@ -338,7 +338,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
       containsSeasonHistory: false,
       activeSeasonId: "season-1",
       activeMatchday: 1,
-      gamePhase: "preseason_management",
+      gamePhase: "season_active",
       humanControlledTeamCount: humanTeamIds.size,
       roomId: roomMeta.roomId,
       roomCode: roomMeta.roomCode,
@@ -468,7 +468,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
     seasonSetup: {
       seasonId: "season-1",
       currentMatchday: 1,
-      gamePhase: "preseason_management",
+      gamePhase: "season_active",
       matchdayCount: gameState.season.matchdayIds.length,
       scheduleCount: gameState.seasonState.disciplineSchedule?.length ?? gameState.season.matchdayIds.length,
       formCardsStatus: "pending_generation",
