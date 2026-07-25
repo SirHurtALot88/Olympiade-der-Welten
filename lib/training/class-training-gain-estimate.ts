@@ -38,6 +38,15 @@ export type ClassTrainingGainEstimateInput = {
    * default used elsewhere in the training views when a ceiling state hasn't been resolved yet.
    */
   ceilingStateByAttribute: Partial<Record<PlayerGeneratorAttributeName, AttributeHeadroomState>>;
+  /**
+   * Realer per-Attribut-Trainingsmultiplikator der Engine (`getCombinedAttributeTrainingMultiplier`
+   * = Decke × Achsen-Potenzialraum × Signature/Weak-Affinität), z.B. aus
+   * `row.attributeForecast[*].trainingGrowthMultiplier`. Ist er gesetzt, wird er 1:1 statt der
+   * vereinfachten `Decke × Affinität`-Näherung verwendet — so entspricht die Pro-Klasse-Schätzung
+   * exakt dem, was die Engine tatsächlich anwendet (inkl. Achsen-Potenzialraum, der vorher fehlte).
+   * Klassen-unabhängig: nur die Verteilung (`share`) ändert sich je Klasse, nicht der Attribut-Faktor.
+   */
+  engineTrainingMultiplierByAttribute?: Partial<Record<PlayerGeneratorAttributeName, number>>;
   /** Admin class-weight overrides (e.g. `row.adminBalancingConfig`). */
   adminBalancingConfig?: AdminBalancingConfigInput | null;
   /**
@@ -124,9 +133,16 @@ export function estimateClassTrainingGains(input: ClassTrainingGainEstimateInput
         const weight = Math.max(0, profile[key]);
         if (weight <= 0) return sum;
         const share = weight / positiveTotal;
-        const capacity = getAttributeGrowthMultiplier(input.ceilingStateByAttribute[key] ?? "open");
-        const affinity = getOrganicGrowthMultiplier(getAttributeAffinityKind(key, affinityProfile));
-        return sum + share * capacity * affinity;
+        // Bevorzugt den echten Engine-Multiplikator (Decke × Achsen-Potenzialraum × Affinität),
+        // damit die Schätzung nicht mehr vom tatsächlichen Ergebnis abweicht. Fallback auf die
+        // vereinfachte Decke × Affinität-Näherung, wenn kein Engine-Wert übergeben wurde.
+        const engineMultiplier = input.engineTrainingMultiplierByAttribute?.[key];
+        const attributeMultiplier =
+          engineMultiplier != null && Number.isFinite(engineMultiplier)
+            ? engineMultiplier
+            : getAttributeGrowthMultiplier(input.ceilingStateByAttribute[key] ?? "open") *
+              getOrganicGrowthMultiplier(getAttributeAffinityKind(key, affinityProfile));
+        return sum + share * attributeMultiplier;
       }, 0);
       estimatedGain = budgetBase * routeMultiplier * weightedSum;
     }

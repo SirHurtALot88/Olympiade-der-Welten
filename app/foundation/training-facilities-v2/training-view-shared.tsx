@@ -248,6 +248,14 @@ export function buildTrainingClassGainRanking(
   const ceilingStateByAttribute = Object.fromEntries(
     row.attributeForecast.map((entry) => [entry.attributeKey, entry.ceilingState ?? "open"]),
   );
+  // Realer per-Attribut-Trainingsmultiplikator der Engine (Decke × Achsen-Potenzialraum × Affinität),
+  // damit die Pro-Klasse-Schätzung exakt dem entspricht, was die Engine anwendet (statt der früheren
+  // Decke × Affinität-Näherung, die den Achsen-Potenzialraum ignorierte).
+  const engineTrainingMultiplierByAttribute = Object.fromEntries(
+    row.attributeForecast
+      .filter((entry) => entry.trainingGrowthMultiplier != null && Number.isFinite(entry.trainingGrowthMultiplier))
+      .map((entry) => [entry.attributeKey, entry.trainingGrowthMultiplier as number]),
+  );
   const trainingFocusAxis = options?.trainingFocusAxis ?? row.trainingFocusAxis ?? null;
 
   // `row.player` is the same underlying `Player` record threaded through by
@@ -260,6 +268,7 @@ export function buildTrainingClassGainRanking(
     currentClassName: row.trainingClass,
     trainingSetpoints: budget,
     ceilingStateByAttribute,
+    engineTrainingMultiplierByAttribute,
     adminBalancingConfig: row.adminBalancingConfig,
     trainingFocusAxis,
   });
@@ -319,8 +328,12 @@ export function buildTrainingBudgetBreakdown(row: TrainingPlayerRowView): Traini
   const modePresentation = getTrainingModePresentation(row.mode);
   const baseBudget = modePresentation.trainingSetpoints;
   const appliedTraining = row.attributeForecast.reduce((sum, entry) => sum + entry.training, 0);
+  const appliedSpillover = row.attributeForecast.reduce((sum, entry) => sum + (entry.spillover ?? 0), 0);
   const appliedPerformance = row.attributeForecast.reduce((sum, entry) => sum + entry.performance, 0);
   const appliedRegression = row.attributeForecast.reduce((sum, entry) => sum + entry.regression, 0);
+  // Der Teil des Budgets, den die Fokus-Stats wegen Attribut-Decke/Potenzialraum der aktuell
+  // gewählten Klasse NICHT aufnehmen konnten (transparent statt "verpufft").
+  const budgetBoundByCeiling = Math.max(0, row.organicForecast.trainingSetpoints - appliedTraining);
 
   const knownMultiplier =
     (1 + row.modifiers.traitModifierPct / 100) *
@@ -392,10 +405,25 @@ export function buildTrainingBudgetBreakdown(row: TrainingPlayerRowView): Traini
     {
       key: "applied-training",
       operator: "add",
-      label: "Angewendet auf Stats",
+      label: "Angewendet auf Fokus-Stats",
       value: `+${formatNlNumber(appliedTraining, 2)}`,
-      detail: "Nach Verteilung auf Klassenprofil, Signature/Weak-Affinität und Attribut-Decke.",
+      detail:
+        budgetBoundByCeiling >= 0.05
+          ? `Nach Verteilung auf das Klassenprofil und Signature/Weak-Affinität. Davon durch Attribut-Decken/Potenzialraum der aktuellen Klasse gebunden: −${formatNlNumber(budgetBoundByCeiling, 2)} (dieser Spieler kann diese Klasse nur teilweise ausschöpfen — eine andere Klasse holt evtl. mehr raus, siehe "Beste Klassen").`
+          : "Nach Verteilung auf das Klassenprofil und Signature/Weak-Affinität. Fokus-Stats nehmen das Budget hier nahezu voll auf.",
     },
+    ...(appliedSpillover >= 0.05
+      ? [
+          {
+            key: "spillover" as const,
+            operator: "add" as const,
+            label: "+ Spillover auf Nebenstats",
+            value: `+${formatNlNumber(appliedSpillover, 2)}`,
+            detail:
+              "30% des gebundenen Rests fließt als milde Hilfe gleichmäßig auf die nicht-fokussierten, noch nicht gecappten Attribute (bremst dort die Regression, mit kleiner Streuung).",
+          },
+        ]
+      : []),
     {
       key: "performance",
       operator: "add",

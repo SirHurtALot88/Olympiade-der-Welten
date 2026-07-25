@@ -32,6 +32,8 @@ type TrainingForecastRowInput = {
     potentialRating: number | null;
     potentialTrainingMultiplier: number;
     trainingSetpoints: number;
+    appliedTrainingSetpoints: number;
+    spilloverSetpoints: number;
     performanceSetpoints: number;
     appliedPerformanceSetpoints: number;
     netSetpoints: number;
@@ -98,6 +100,8 @@ function mapAttributeForecast(
       training: entry.training,
       performance: entry.performance,
       regression: entry.regression,
+      spillover: entry.spillover ?? 0,
+      trainingGrowthMultiplier: entry.trainingGrowthMultiplier,
       affinity: signatureSet.has(entry.attribute) ? "signature" : entry.attribute === weakAttribute ? "weak" : "neutral",
       ceilingState: headroom?.state,
       headroomLabel: headroom ? getHeadroomLabel(headroom.state, headroom.headroom) : null,
@@ -175,6 +179,8 @@ export function buildTrainingPlayerRowView(
       potentialRating: row.organicProgression.potentialRating,
       potentialTrainingMultiplier: row.organicProgression.potentialTrainingMultiplier,
       trainingSetpoints: row.organicProgression.trainingSetpoints,
+      appliedTrainingSetpoints: row.organicProgression.appliedTrainingSetpoints,
+      spilloverSetpoints: row.organicProgression.spilloverSetpoints,
       performanceSetpoints: row.organicProgression.appliedPerformanceSetpoints,
       netSetpoints: row.organicProgression.netSetpoints,
       fatigueLoad: row.organicProgression.fatigueLoad,

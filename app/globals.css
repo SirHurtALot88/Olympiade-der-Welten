@@ -51140,6 +51140,36 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut-2);
 }
 
+/* Explizite 2★ Signature + 1◆ Weak Zusammenfassung — macht unmissverständlich,
+   welche Attribute schneller/langsamer wachsen (nicht nur die kleinen Zeilen-Glyphs). */
+.is-new-look .nl-training-affinity-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s2);
+  margin-bottom: var(--nl-s2);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.is-new-look .nl-training-affinity-summary-part {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-training-affinity-summary-part.is-signature {
+  color: var(--nl-soc);
+}
+
+.is-new-look .nl-training-affinity-summary-part.is-weak {
+  color: var(--nl-mut-2);
+}
+
 .is-new-look .nl-training-forecast-track {
   position: relative;
   height: 8px;

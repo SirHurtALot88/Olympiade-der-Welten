@@ -724,6 +724,25 @@ function NlTrainingPlayerCard({
         </div>
       ) : null}
 
+      {row.modifiers.signatureAttributes.length > 0 || row.modifiers.weakAttribute ? (
+        <div
+          className="nl-training-affinity-summary"
+          data-testid="nl-training-affinity-summary"
+          title="Signature-Attribute wachsen schneller (×1,15), das Weak-Attribut langsamer (×0,8). Jeder Spieler hat 2 Signature + 1 Weak."
+        >
+          {row.modifiers.signatureAttributes.length > 0 ? (
+            <span className="nl-training-affinity-summary-part is-signature">
+              <NlTrainingGlyph kind="signature" /> {row.modifiers.signatureAttributes.join(" / ")}
+            </span>
+          ) : null}
+          {row.modifiers.weakAttribute ? (
+            <span className="nl-training-affinity-summary-part is-weak">
+              <NlTrainingGlyph kind="weak" /> {row.modifiers.weakAttribute}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="nl-training-forecast" data-testid="nl-training-forecast-bars" aria-label="Attribut-Forecast">
         {visibleForecast.map((entry) => (
           <NlTrainingForecastBar key={`${row.player.id}-${entry.attributeKey}`} entry={entry} scaleMax={scaleMax} />

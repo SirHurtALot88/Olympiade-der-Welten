@@ -63,6 +63,14 @@ export type OrganicProgressionAttributeBreakdown = {
   regression: number;
   training: number;
   performance: number;
+  /**
+   * Spillover-Trainingsanteil (Nebenstat-Hilfe): Ein Teil des Budgets, den die Fokus-Stats
+   * wegen Attribut-Decke/Potenzialraum nicht aufnehmen konnten, wird zu einem kleinen Anteil
+   * (`TRAINING_SPILLOVER_SHARE`) gleichmäßig auf die NICHT-fokussierten, noch nicht gecappten
+   * Attribute verteilt (mit deterministischem ±`TRAINING_SPILLOVER_JITTER`-Jitter). Bremst dort
+   * die Regression leicht. Getrennt von `training` ausgewiesen, damit die UI es eigenständig zeigen kann.
+   */
+  spillover: number;
   affinity: AttributeAffinityKind;
   trainingGrowthMultiplier: number;
   performanceGrowthMultiplier: number;
@@ -94,8 +102,14 @@ export type OrganicSeasonProgressionResult = {
   marketValuePressurePerAttribute: number;
   marketValueMaintenanceReliefPct: number;
   trainingSetpoints: number;
-  /** Sum of applied training deltas after class distribution and multipliers. */
+  /** Sum of applied training deltas on the focus (class-profile) attributes after distribution and multipliers. */
   appliedTrainingSetpoints: number;
+  /**
+   * Sum of the spillover training deltas redistributed onto non-focus, non-capped attributes
+   * (`TRAINING_SPILLOVER_SHARE` of the budget the focus stats could not absorb). Separate from
+   * `appliedTrainingSetpoints` so the forecast breakdown can surface it as its own line.
+   */
+  spilloverSetpoints: number;
   /** Raw performance budget before affinity multipliers. */
   performanceSetpoints: number;
   /** Sum of applied performance deltas after affinity multipliers. */
@@ -188,6 +202,29 @@ const HIGH_POTENTIAL_GAP_STARS_THRESHOLD = 1.5;
 const MID_POTENTIAL_GAP_STARS_THRESHOLD = 0.75;
 const SIGNATURE_ORGANIC_GROWTH_MULTIPLIER = 1.15;
 const WEAK_ORGANIC_GROWTH_MULTIPLIER = 0.8;
+/**
+ * Spillover-Nebenstat-Hilfe: Ein Teil des Trainingsbudgets, den die Fokus-Attribute der
+ * gewählten Klasse wegen Attribut-Decke/Potenzialraum NICHT aufnehmen konnten, wird zu diesem
+ * Anteil auf die nicht-fokussierten (und noch nicht gecappten) Attribute umverteilt — eine milde
+ * Hilfe, damit "nebenbei trainierte" Stats etwas Regression abfangen, ohne den Fokus zu ersetzen.
+ * Bewusst klein gehalten (30%), damit die Klassenwahl weiter das Wichtigste bleibt.
+ */
+const TRAINING_SPILLOVER_SHARE = 0.3;
+/** Deterministische ±-Variation je Empfänger-Attribut, damit sich die Streuung leicht unterscheidet. */
+const TRAINING_SPILLOVER_JITTER = 0.1;
+
+/**
+ * Deterministischer 0..1-Hash (FNV-1a) aus Spieler+Saison+Attribut. Ersetzt Math.random(), damit
+ * der Forecast bei jedem Rendern stabil bleibt (und in Resume-/Cron-Läufen reproduzierbar ist).
+ */
+function deterministicUnitNoise(seed: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 4294967295;
+}
 /**
  * 2026-07-04 balancing pass: shift weight from pure training towards match performance,
  * concentrated on "mittel" (the default/most-used intensity) so solid performers — not just
@@ -788,6 +825,7 @@ export function buildOrganicSeasonProgression(input: {
       marketValueMaintenanceReliefPct: 0,
       trainingSetpoints: 0,
       appliedTrainingSetpoints: 0,
+      spilloverSetpoints: 0,
       performanceSetpoints: 0,
       appliedPerformanceSetpoints: 0,
       performanceRegressionTotal: 0,
@@ -938,6 +976,10 @@ export function buildOrganicSeasonProgression(input: {
     seasonId: input.gameState.season.id,
   });
   const attributesAfter = { ...attributesBefore };
+  // Nebenspeicher für den Spillover-Nachlauf: Decke-Zustand, harte Ceiling-Obergrenze und die
+  // Klassen-Zuteilung je Attribut (letztere entscheidet, was "Fokus" vs. "Nebenstat" ist).
+  const ceilingStateByAttribute = {} as Record<PlayerGeneratorAttributeName, AttributeHeadroomState>;
+  const ceilingCapByAttribute = {} as Record<PlayerGeneratorAttributeName, number>;
   const rawAttributeBreakdown = PROGRESSION_ATTRIBUTE_ORDER.map((attribute) => {
     const affinity = getAttributeAffinityKind(attribute, affinityProfile);
     const organicAffinityMult = getOrganicGrowthMultiplier(affinity);
@@ -984,6 +1026,8 @@ export function buildOrganicSeasonProgression(input: {
     const attributeCeilingCap = isFiniteNumber(attributeHeadroom.ceiling)
       ? Math.min(99, attributeHeadroom.ceiling)
       : 99;
+    ceilingStateByAttribute[attribute] = attributeHeadroom.state;
+    ceilingCapByAttribute[attribute] = Math.max(1, attributeCeilingCap);
     const after = roundValue(clamp(before + delta, 1, Math.max(1, attributeCeilingCap)), 1);
     return {
       attribute,
@@ -993,11 +1037,47 @@ export function buildOrganicSeasonProgression(input: {
       regression: roundValue(regression, 2),
       training: roundValue(training, 2),
       performance: roundValue(performanceDelta, 2),
+      spillover: 0,
       affinity,
       trainingGrowthMultiplier,
       performanceGrowthMultiplier,
     };
   });
+  // Spillover-Nachlauf: Der Teil des Budgets, den die Fokus-Attribute nicht aufnehmen konnten
+  // (Budget − auf Fokus angewendet), wird zu TRAINING_SPILLOVER_SHARE gleichmäßig auf die
+  // NICHT-fokussierten, noch nicht gecappten Attribute verteilt (deterministischer ±Jitter).
+  // Getrennt als `spillover` geführt und in Delta/After eingerechnet.
+  const focusAppliedTraining = rawAttributeBreakdown.reduce((sum, entry) => sum + entry.training, 0);
+  // Der gebundene Rest kann das Budget nie übersteigen (bei Klassen mit negativen Nebenwirkungen
+  // auf die Fokus-Stats würde `budget − focusApplied` sonst über das Budget hinauslaufen).
+  const boundRest = Math.min(trainingSetpoints, Math.max(0, trainingSetpoints - focusAppliedTraining));
+  const spilloverPool = roundValue(boundRest * TRAINING_SPILLOVER_SHARE, 2);
+  if (spilloverPool > 0) {
+    const recipients = rawAttributeBreakdown.filter(
+      (entry) =>
+        (primaryTrainingDeltas[entry.attribute] + secondaryTrainingDeltas[entry.attribute]) <= 0.0001 &&
+        ceilingStateByAttribute[entry.attribute] !== "capped",
+    );
+    if (recipients.length > 0) {
+      const baseShare = spilloverPool / recipients.length;
+      const jittered = recipients.map(
+        (entry) =>
+          baseShare *
+          (1 + (deterministicUnitNoise(`${input.player.id}:${input.gameState.season.id}:${entry.attribute}`) * 2 - 1) * TRAINING_SPILLOVER_JITTER),
+      );
+      const jitterSum = jittered.reduce((sum, value) => sum + value, 0) || 1;
+      const scale = spilloverPool / jitterSum; // renormieren, damit die Summe exakt dem Pool entspricht
+      recipients.forEach((entry, index) => {
+        const add = roundValue(jittered[index] * scale, 2);
+        if (add <= 0) return;
+        entry.spillover = add;
+        const rawDelta = entry.regression + entry.training + entry.spillover + entry.performance;
+        const after = roundValue(clamp(entry.before + rawDelta, 1, ceilingCapByAttribute[entry.attribute]), 1);
+        entry.after = after;
+        entry.delta = roundValue(after - entry.before, 2);
+      });
+    }
+  }
   const attributeBreakdown = rawAttributeBreakdown;
   const regressionCombinedFromAttributes = roundValue(
     attributeBreakdown.reduce((sum, entry) => sum + entry.regression, 0),
@@ -1009,6 +1089,10 @@ export function buildOrganicSeasonProgression(input: {
   };
   const appliedTrainingSetpoints = roundValue(
     attributeBreakdown.reduce((sum, entry) => sum + entry.training, 0),
+    2,
+  );
+  const spilloverSetpoints = roundValue(
+    attributeBreakdown.reduce((sum, entry) => sum + entry.spillover, 0),
     2,
   );
   const appliedPerformanceSetpoints = roundValue(
@@ -1056,6 +1140,7 @@ export function buildOrganicSeasonProgression(input: {
     marketValueMaintenanceReliefPct: 0,
     trainingSetpoints,
     appliedTrainingSetpoints,
+    spilloverSetpoints,
     performanceSetpoints: performance.totalBudget,
     appliedPerformanceSetpoints,
     performanceRegressionTotal: 0,

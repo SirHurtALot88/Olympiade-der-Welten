@@ -24,6 +24,17 @@ export type TrainingAttributeForecastEntry = {
   training: number;
   performance: number;
   regression: number;
+  /**
+   * Spillover-Trainingsanteil (Nebenstat-Hilfe): separat von `training`, damit die Breakdown-Anzeige
+   * ihn eigenständig ausweisen kann. In `delta`/`after` ist er bereits enthalten.
+   */
+  spillover?: number;
+  /**
+   * Realer per-Attribut-Trainingsmultiplikator der Engine (Decke × Achsen-Potenzialraum × Affinität).
+   * Wird von `buildTrainingClassGainRanking` genutzt, um die Pro-Klasse-Schätzung exakt an die Engine
+   * anzugleichen (statt nur Decke × Affinität).
+   */
+  trainingGrowthMultiplier?: number;
   affinity: "signature" | "weak" | "neutral";
   ceilingState?: AttributeHeadroomState;
   headroomLabel?: string | null;
@@ -96,6 +107,10 @@ export type TrainingPlayerRowView = {
     potentialRating: number | null;
     potentialTrainingMultiplier: number;
     trainingSetpoints: number;
+    /** Auf die Fokus-Stats angewendeter Trainingsanteil (nach Decke/Potenzialraum/Affinität). */
+    appliedTrainingSetpoints?: number;
+    /** Auf Nebenstats umverteilter Spillover-Anteil (getrennt ausgewiesen). */
+    spilloverSetpoints?: number;
     performanceSetpoints: number;
     netSetpoints: number;
     fatigueLoad: number;
