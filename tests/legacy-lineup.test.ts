@@ -464,7 +464,9 @@ describe("legacy lineup score engine", () => {
     expect(result.entries.map((entry) => entry.score)).toEqual([10, 20]);
     expect(result.baseScore).toBe(30);
     expect(result.captainBonusTotal).toBe(0);
-    expect(result.totalScore).toBe(30);
+    // Intensität trägt jetzt eine seeded Streuung bei (Normal −2..+2/Spieler) — Basis-Summe ohne den
+    // Intensitäts-Term prüfen, damit der Test das Aufsummieren testet, nicht den Zufallswert.
+    expect(result.totalScore - (result.intensityModifier ?? 0)).toBeCloseTo(30, 5);
   });
 
   it("warns when a discipline score is missing", () => {
@@ -482,7 +484,7 @@ describe("legacy lineup score engine", () => {
     });
 
     expect(result.entries.map((entry) => entry.score)).toEqual([10, null]);
-    expect(result.totalScore).toBe(10);
+    expect(result.totalScore - (result.intensityModifier ?? 0)).toBeCloseTo(10, 5);
     expect(result.missingScores).toHaveLength(1);
     expect(result.validationWarnings.some((warning) => warning.includes("Missing discipline score"))).toBe(true);
     expect(result.modifierWarnings).toContain("Fatigue source is missing for tdm/d1.");
@@ -504,7 +506,7 @@ describe("legacy lineup score engine", () => {
 
     expect(result.baseScore).toBe(70);
     expect(result.captainBonusTotal).toBe(20);
-    expect(result.totalScore).toBe(90);
+    expect(result.totalScore - (result.intensityModifier ?? 0)).toBeCloseTo(90, 5);
     expect(result.entries[1]?.finalContribution).toBe(60);
     expect(result.validationWarnings.some((warning) => warning.includes("strongest selected player score"))).toBe(true);
   });
@@ -530,7 +532,7 @@ describe("legacy lineup score engine", () => {
 
     expect(result.fatigueModifier).toBe(-5.5);
     expect(result.captainBonusTotal).toBe(18);
-    expect(result.totalScore).toBe(82.5);
+    expect(result.totalScore - (result.intensityModifier ?? 0)).toBeCloseTo(82.5, 5);
   });
 
   it("applies mutator score to matching players and keeps mutator PPs as a separate breakdown", () => {
@@ -599,7 +601,7 @@ describe("legacy lineup score engine", () => {
     expect(result.entries[1]?.captainBonus).toBe(8);
     expect(result.entries[1]?.finalContribution).toBeCloseTo(23.9 + (result.entries[1]?.formShare ?? 0), 1);
     // totalScore = Beiträge ohne Form (50,9) + tatsächliche Form-Summe.
-    expect(result.totalScore).toBeCloseTo(50.9 + (result.formModifier ?? 0), 1);
+    expect(result.totalScore).toBeCloseTo(50.9 + (result.formModifier ?? 0) + (result.intensityModifier ?? 0), 1);
   });
 });
 

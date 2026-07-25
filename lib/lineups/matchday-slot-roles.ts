@@ -79,9 +79,12 @@ const INTENSITY_CONFIG: Record<
     strainLoadModifier: number;
   }
 > = {
-  conserve: { label: "Schonen", scoreModifier: -2, fatigueBase: 1, additionalFatigueCap: 5, rangeLowPercent: -0.02, rangeHighPercent: 0.01, strainLoadModifier: -1 },
+  // scoreModifier = ERWARTUNGSWERT (Mittelpunkt) des seeded Intensitäts-Bereichs im echten Score
+  // (INTENSITY_SCORE_RANGE: Schonen −3..−2 → −2.5, Normal −2..+2 → 0, Push +2..+6 → +4). Die
+  // Vorschau ist ein Punkt-Estimate; die Streuung selbst würfelt der Resolve pro Spieltag seeded.
+  conserve: { label: "Schonen", scoreModifier: -2.5, fatigueBase: 1, additionalFatigueCap: 5, rangeLowPercent: -0.02, rangeHighPercent: 0.01, strainLoadModifier: -1 },
   normal: { label: "Normal", scoreModifier: 0, fatigueBase: 3, additionalFatigueCap: 8, rangeLowPercent: -0.05, rangeHighPercent: 0.05, strainLoadModifier: 0 },
-  push: { label: "Push", scoreModifier: 3, fatigueBase: 4, additionalFatigueCap: 11, rangeLowPercent: -0.03, rangeHighPercent: 0.07, strainLoadModifier: 2 },
+  push: { label: "Push", scoreModifier: 4, fatigueBase: 4, additionalFatigueCap: 11, rangeLowPercent: -0.03, rangeHighPercent: 0.07, strainLoadModifier: 2 },
 };
 
 const DISCIPLINE_ROLE_THEMES: Record<OfficialDisciplineWeightId, SlotRoleTheme[]> = {

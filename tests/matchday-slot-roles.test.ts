@@ -99,7 +99,7 @@ describe("matchday slot roles", () => {
     const normal = calculateMatchdayProjectedPreview({ ...shared, intensity: "normal" });
     const push = calculateMatchdayProjectedPreview({ ...shared, intensity: "push" });
 
-    expect(push.intensityModifier).toBe(3);
+    expect(push.intensityModifier).toBe(4);
     expect(push.totalProjected ?? 0).toBeGreaterThan(normal.totalProjected ?? 0);
     expect(push.rangeHigh ?? 0).toBeGreaterThan(conserve.rangeHigh ?? 0);
     expect(push.additionalFatigue).toBeGreaterThan(conserve.additionalFatigue);
@@ -302,9 +302,9 @@ describe("matchday slot roles", () => {
   });
 
   it("exposes the three intensity stages", () => {
-    expect(getMatchdayIntensityConfig("conserve").scoreModifier).toBe(-2);
+    expect(getMatchdayIntensityConfig("conserve").scoreModifier).toBe(-2.5);
     expect(getMatchdayIntensityConfig("normal").scoreModifier).toBe(0);
-    expect(getMatchdayIntensityConfig("push").scoreModifier).toBe(3);
+    expect(getMatchdayIntensityConfig("push").scoreModifier).toBe(4);
   });
 
   it("makes push more expensive on large disciplines than on small ones", () => {

@@ -13,19 +13,13 @@ import type {
   LegacyResolveMutatorMode,
   LegacyRosterPlayerRef,
 } from "@/lib/lineups/legacy-lineup-types";
-import { distributePerPlayerFormShares } from "@/lib/lineups/legacy-lineup-modifiers";
+import { distributePerPlayerFormShares, seededIntensityShare } from "@/lib/lineups/legacy-lineup-modifiers";
 
 function roundPreviewScore(value: number) {
   return Math.round(value * 10) / 10;
 }
 
-const INTENSITY_SCORE_MODIFIER = {
-  conserve: -2,
-  normal: 0,
-  push: 3,
-} as const;
-
-function normalizeIntensity(value: unknown): keyof typeof INTENSITY_SCORE_MODIFIER {
+function normalizeIntensity(value: unknown): "conserve" | "normal" | "push" {
   return value === "conserve" || value === "push" || value === "normal" ? value : "normal";
 }
 
@@ -103,7 +97,17 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
   const formModifier = input.formModifier ?? null;
   const mutatorModifier = input.mutatorModifier ?? null;
   const intensity = normalizeIntensity(input.intensity);
-  const intensityModifier = roundPreviewScore(INTENSITY_SCORE_MODIFIER[intensity] * selectedPlayers);
+  // Intensitäts-Beitrag PRO SPIELER als seeded Streuung im charakteristischen Bereich
+  // (Schonen −3..−2, Normal −2..+2, Push +2..+6). Push zieht nach oben (Chance); sein Preis ist
+  // der höhere Ausdauerverbrauch (separat, real), nicht ein Score-Downside. Seeded pro
+  // (Spieler, Diszi, Spieltag) → reproduzierbar & replay-idempotent wie der Form-Jitter.
+  const intensityModifier = roundPreviewScore(
+    relevantEntries.reduce(
+      (sum, entry) =>
+        sum + seededIntensityShare(intensity, `intensity|${entry.playerId}|${input.disciplineId}|${input.matchdayId ?? ""}`),
+      0,
+    ),
+  );
   const captainMode = input.captainMode ?? "selected_captain";
   const captainStatus = input.captainStatus ?? (captainMode === "missing_source" ? "missing_source" : "mapped");
   if (fatigueSourceStatus !== "mapped") {
