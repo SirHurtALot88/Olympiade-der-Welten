@@ -25,6 +25,7 @@ import {
 } from "@/lib/player-formulas/market-value-apply";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildPlayerSeasonPerformance } from "@/lib/foundation/player-season-performance";
+import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import {
@@ -305,13 +306,26 @@ export function buildPreComputedSeasonXpMap(save: PersistedSaveGame): Map<string
     const facilities = facilitiesByTeamId.get(rosterEntry.teamId)!;
 
     const seasonXp = getSeasonXp({ save, player, teamId: rosterEntry.teamId, facilities, playerRating: ratings.get(player.id) ?? null });
+    const seasonPerf = buildPlayerSeasonPerformance(gameState, player.id);
+    // Saisonale Entwicklungs-Route (aus dem Forecast, mit dem TATSÄCHLICHEN Trainingsmodus des
+    // Spielers) → der Signature-Shift wirkt REAL auf die angewandten SP-Gewinne, konsistent mit
+    // dem, was Profil und Trainings-Karte anzeigen.
+    const routeForecast = buildPlayerProgressionForecast({
+      gameState,
+      player,
+      playerRating: ratings.get(player.id) ?? null,
+      seasonPerformance: seasonPerf,
+      currentXP: player.currentXP ?? 0,
+      spentXP: player.spentXP ?? 0,
+      lifetimeXP: player.lifetimeXP ?? null,
+    });
     const organicProgression = buildOrganicSeasonProgression({
       gameState,
       player,
       facilities,
       ...accumulatorProgressionOverrides(gameState, player),
+      route: routeForecast.developmentRoute,
     });
-    const seasonPerf = buildPlayerSeasonPerformance(gameState, player.id);
 
     result.set(player.id, { ...seasonXp, organicProgression, appearances: seasonPerf?.appearances ?? null });
   }
@@ -581,6 +595,16 @@ function buildPreviewPlayer(input: {
         player: input.player,
         facilities: input.facilities,
         ...accumulatorProgressionOverrides(input.save.gameState, input.player),
+        // Konsistent zum Precompute-Pfad: saisonale Route → realer Signature-Shift.
+        route: buildPlayerProgressionForecast({
+          gameState: input.save.gameState,
+          player: input.player,
+          playerRating: input.economyContext.beforeRatings.get(input.player.id) ?? null,
+          seasonPerformance: buildPlayerSeasonPerformance(input.save.gameState, input.player.id),
+          currentXP: input.player.currentXP ?? 0,
+          spentXP: input.player.spentXP ?? 0,
+          lifetimeXP: input.player.lifetimeXP ?? null,
+        }).developmentRoute,
       }))
     : null;
   const currentXPBefore = Math.max(0, Math.round(input.player.currentXP ?? 0));

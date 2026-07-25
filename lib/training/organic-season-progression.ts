@@ -15,11 +15,12 @@ import {
 } from "@/lib/facilities/facility-effects";
 import { getFacilityLevelDefinition } from "@/lib/facilities/facility-catalog";
 import {
-  deriveAttributeAffinityProfile,
   getAttributeAffinityKind,
+  resolveSeasonalAffinityProfile,
   type AttributeAffinityKind,
   type AttributeAffinityProfile,
 } from "@/lib/training/training-levelup-service";
+import type { PlayerDevelopmentRoute } from "@/lib/training/training-plan-types";
 import {
   getCombinedAttributeTrainingMultiplier,
 } from "@/lib/foundation/player-potential-display-service";
@@ -700,6 +701,12 @@ export function buildOrganicSeasonProgression(input: {
    * maximum, so averaging modes then looking up would over-reward mixed schedules — see B.2.)
    */
   performanceWeightMultiplier?: number;
+  /**
+   * Saisonale Entwicklungs-Route des Spielers (aus dem Forecast). Wenn gesetzt, verschiebt der
+   * Signature-Shift die Wachstums-Affinität auf das saisonale Route-Attribut (×1,15/×0,8 wirken
+   * dann real auf die saisonalen Sterne/Malus-Attribute). Absent → statische Basis (Alt-Verhalten).
+   */
+  route?: PlayerDevelopmentRoute | null;
 }): OrganicSeasonProgressionResult {
   const attributesBefore = normalizePlayerAttributes(input.player);
   if (!attributesBefore) {
@@ -870,7 +877,11 @@ export function buildOrganicSeasonProgression(input: {
     marktwertBase,
     marketValuePressurePerAttribute,
   });
-  const affinityProfile = deriveAttributeAffinityProfile(input.player);
+  const affinityProfile = resolveSeasonalAffinityProfile({
+    player: input.player,
+    route: input.route ?? null,
+    seasonId: input.gameState.season.id,
+  });
   const attributesAfter = { ...attributesBefore };
   const rawAttributeBreakdown = PROGRESSION_ATTRIBUTE_ORDER.map((attribute) => {
     const affinity = getAttributeAffinityKind(attribute, affinityProfile);
