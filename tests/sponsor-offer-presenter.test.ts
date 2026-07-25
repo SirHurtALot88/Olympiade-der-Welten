@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
+import {
+  buildOfferRankPayoutLadderPreview,
+  readLockedRankPayout,
+} from "@/lib/sponsor/sponsor-economy-calibration";
 import { buildSponsorOffersForTeam } from "@/lib/sponsor/sponsor-offer-service";
 import {
   buildSponsorOfferPresentation,
@@ -28,34 +32,47 @@ describe("sponsor offer presenter", () => {
     }
   }, 60000);
 
-  it("builds absolute Gewinnstufen rows that increase with better ranks", () => {
-    const rows = buildSponsorRankTierRows({ baseCash: 32, rankCash: 20.5 });
+  it("builds Gewinnstufen rows from the offer's curveShape ladder (== settlement), non-decreasing", () => {
+    const gameState = createSingleplayerGameState();
+    const teamId = gameState.teams.find((team) => team.shortCode === "W-W")?.teamId ?? gameState.teams[0]!.teamId;
+    const offer = buildSponsorOffersForTeam({ gameState, teamId })[0]!;
+    const rankLadder = buildOfferRankPayoutLadderPreview(gameState, offer);
+
+    const rows = buildSponsorRankTierRows({ baseCash: 32, rankLadder });
     expect(rows).toHaveLength(8);
     expect(rows[0]?.label).toBe("Top 28");
     expect(rows.at(-1)?.label).toBe("Meister");
 
+    // Referenzkurven haben bewusste 4er-Band-Plateaus (z.B. konsolidierung Rang 1–20 flach) →
+    // NICHT streng steigend, aber nie fallend zu besseren Rängen.
     for (let index = 1; index < rows.length; index += 1) {
-      expect(rows[index]!.absolutePayout).toBeGreaterThan(rows[index - 1]!.absolutePayout);
+      expect(rows[index]!.absolutePayout).toBeGreaterThanOrEqual(rows[index - 1]!.absolutePayout);
     }
+    // Bester Milestone (Meister) zahlt mindestens die Basis und mindestens so viel wie der schlechteste.
+    expect(rows.at(-1)!.absolutePayout).toBeGreaterThanOrEqual(32);
+    expect(rows.at(-1)!.absolutePayout).toBeGreaterThanOrEqual(rows[0]!.absolutePayout);
+  }, 60000);
 
-    const top16 = rows.find((row) => row.label === "Top 16");
-    const top24 = rows.find((row) => row.label === "Top 24");
-    expect(top16?.absolutePayout).toBeGreaterThan(top24?.absolutePayout ?? 0);
-    expect(top16?.absolutePayout).toBeGreaterThan(32);
-  });
+  it("each displayed rung equals the settlement formula baseCash + (ladder[rank] − ladder[32])", () => {
+    const gameState = createSingleplayerGameState();
+    const teamId = gameState.teams.find((team) => team.shortCode === "W-W")?.teamId ?? gameState.teams[0]!.teamId;
+    const offer = buildSponsorOffersForTeam({ gameState, teamId })[0]!;
+    const rankLadder = buildOfferRankPayoutLadderPreview(gameState, offer);
+    const baseCash = 40;
 
-  it("prepends a guaranteed floor rung (last place, base only) when opted in", () => {
-    const rows = buildSponsorRankTierRows({ baseCash: 32, rankCash: 20.5, includeFloorRung: true });
-    // Boden-Stufe zusätzlich zu den 8 Meilensteinen, ganz unten (schwierigster zuerst).
-    expect(rows).toHaveLength(9);
-    expect(rows[0]?.label).toBe("Platz 32");
+    const rows = buildSponsorRankTierRows({ baseCash, rankLadder, includeFloorRung: true });
+    // Boden-Stufe (Platz 32) = nur Basis (kein Rang-Aufschlag), genau wie das Settlement am Sockel zahlt.
     expect(rows[0]?.rankAt).toBe(32);
-    // Nur Basis — keine Gewinnstufe freigeschaltet.
-    expect(rows[0]?.absolutePayout).toBe(32);
-    expect(rows[1]?.label).toBe("Top 28");
-    // weiterhin streng monoton steigend über die gesamte Leiter.
-    for (let index = 1; index < rows.length; index += 1) {
-      expect(rows[index]!.absolutePayout).toBeGreaterThan(rows[index - 1]!.absolutePayout);
+    expect(rows[0]?.absolutePayout).toBeCloseTo(baseCash, 1);
+
+    const floor = readLockedRankPayout(rankLadder, 32);
+    for (const row of rows.slice(1)) {
+      const expected = baseCash + Math.max(0, readLockedRankPayout(rankLadder, row.rankAt) - floor);
+      expect(row.absolutePayout).toBeCloseTo(Number(expected.toFixed(2)), 1);
     }
-  });
+    // Non-decreasing über die gesamte Leiter inkl. Boden-Stufe.
+    for (let index = 1; index < rows.length; index += 1) {
+      expect(rows[index]!.absolutePayout).toBeGreaterThanOrEqual(rows[index - 1]!.absolutePayout);
+    }
+  }, 60000);
 });

@@ -1,7 +1,7 @@
 import type { GameState, SponsorOffer, SponsorOfferComponent } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import {
-  getRankMilestoneBonus,
+  readLockedRankPayout,
   SPONSOR_RANK_MILESTONES,
 } from "@/lib/sponsor/sponsor-economy-calibration";
 import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
@@ -335,20 +335,25 @@ export const SPONSOR_RANK_FLOOR_LABEL = `Platz ${SPONSOR_RANK_FLOOR_AT}`;
 /** Absolute sponsor cash (basis + unlocked rank share) at each Gewinnstufe threshold. */
 export function buildSponsorRankTierRows(input: {
   baseCash: number;
-  rankCash: number;
+  /**
+   * Audit #4: Die gelockte curveShape-Rang-Payout-Leiter (1..32) des Angebots — dieselbe, aus der das
+   * Settlement zahlt (buildOfferRankPayoutLadderPreview). Ersetzt den früheren generischen
+   * `rankCash`-Split nach Meilenstein-Gewichtung, der curveShape ignorierte und von der echten
+   * Auszahlung abwich.
+   */
+  rankLadder: number[];
   /**
    * Zeigt die garantierte Boden-Stufe (letzter Rang, nur Basis) als unterste Sprosse an.
    * Opt-in, damit der bestehende Milestone-Contract (8 Stufen ab „Top 28") stabil bleibt.
    */
   includeFloorRung?: boolean;
 }): SponsorRankTierRow[] {
-  const totalMilestoneBonus = SPONSOR_RANK_MILESTONES.reduce((sum, milestone) => sum + milestone.bonusC, 0);
+  // Sockel = Payout am schlechtesten Rang (32); jede Gewinnstufe zeigt den Rang-Aufschlag darüber —
+  // exakt `readLockedRankPayout(ladder, maxRank) − readLockedRankPayout(ladder, 32)`, wie das Settlement
+  // (sponsor-settlement-service) den rankResidual berechnet.
+  const floorPayout = readLockedRankPayout(input.rankLadder, 32);
   const milestoneRows = SPONSOR_RANK_MILESTONES.map((milestone) => {
-    const unlockedBonus = getRankMilestoneBonus(milestone.maxRank, 1);
-    const rankPortion =
-      totalMilestoneBonus > 0 && input.rankCash > 0
-        ? roundOfferCash(input.rankCash * (unlockedBonus / totalMilestoneBonus))
-        : 0;
+    const rankPortion = Math.max(0, readLockedRankPayout(input.rankLadder, milestone.maxRank) - floorPayout);
     return {
       label: milestone.label,
       rankAt: milestone.maxRank,

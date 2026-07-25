@@ -23,6 +23,7 @@ import {
   getSponsorCurveFamily,
   mapArchetypeToCurveShape,
 } from "@/lib/sponsor/sponsor-curve-shapes";
+import { buildOfferRankPayoutLadderPreview } from "@/lib/sponsor/sponsor-economy-calibration";
 import { describeSponsorOfferModules } from "@/lib/sponsor/sponsor-modules";
 import { NlDeltaChip, type NlTone } from "@/components/foundation/new-look";
 
@@ -228,6 +229,12 @@ export function SponsorOfferCardNewLook({
     (component) => component.kind !== "special" && component.kind !== "overperformance",
   );
   const baseCash = offer.components.find((component) => component.kind === "base")?.rewardCash ?? 0;
+  // Audit #4: gelockte curveShape-Rang-Leiter (== Settlement) einmal bauen und in die Gewinnstufen-Leiter
+  // reichen, damit die angezeigten Stufenbeträge der echten Auszahlung entsprechen.
+  const offerRankPayoutLadder = useMemo(
+    () => buildOfferRankPayoutLadderPreview(gameState, offer),
+    [gameState, offer],
+  );
   const totalCash = offer.components.reduce(
     (sum, component) => sum + (typeof component.rewardCash === "number" ? component.rewardCash : 0),
     0,
@@ -343,7 +350,9 @@ export function SponsorOfferCardNewLook({
           if (component.kind === "rank") {
             const tierRows = buildSponsorRankTierRows({
               baseCash,
-              rankCash: component.rewardCash,
+              // Audit #4: Gewinnstufen aus der echten curveShape-Leiter (== Settlement), nicht aus
+              // generischer Meilenstein-Gewichtung von component.rewardCash.
+              rankLadder: offerRankPayoutLadder,
               includeFloorRung: true,
             });
             // #79: höchste Stufe, deren Rang-Schwelle der aktuelle Liga-Rang

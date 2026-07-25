@@ -26,7 +26,7 @@ import {
   buildLeagueTeamQualityRanks,
 } from "@/lib/sponsor/sponsor-team-quality-rank";
 import {
-  buildLockedRankPayoutLadder,
+  buildOfferRankPayoutLadderPreview,
   buildMilestoneRankLabel,
   buildOfferCashAmounts,
   estimateExpectedPayout,
@@ -619,18 +619,10 @@ export function chooseSponsorOffer(input: {
   // Parameter wie der Angebots-/Settlement-Pfad (buildOfferCashAmounts / getSponsorPayoutForFinalRankAndTier),
   // damit Anzeige == gelockte Leiter == Settlement.
   const salaryFactorAtSign = getCurrentSalaryFactor(input.gameState);
-  const baseAnchorSalaryAtSign = getSponsorRank32BaseAnchorSalary(input.gameState);
-  const lockedRankPayoutLadder = buildLockedRankPayoutLadder({
-    salaryFactor: salaryFactorAtSign,
-    // Rarity + curveShape bauen die Leiter über die Kurven-Payout-Kurve. Defensive Fallbacks nur für den
-    // (praktisch nie erreichten) Fall eines Angebots ohne diese Felder — jedes buildSponsorOffersForTeam-
-    // Angebot setzt beide bereits.
-    rarity: offer.rarity ?? "magisch",
-    curveShape: offer.curveShape ?? mapArchetypeToCurveShape(offer.archetype),
-    leagueMinSalary: baseAnchorSalaryAtSign,
-    teamQualityRank: offer.teamQualityRank,
-    isGolden: offer.isGolden,
-  });
+  // Gelockte Leiter über den GETEILTEN Preview-Builder bauen — exakt dieselbe Funktion, die die Karte
+  // für die Anzeige nutzt (buildOfferRankPayoutLadderPreview). Damit sind Anzeige == gelockte Leiter ==
+  // Settlement per Konstruktion, ohne parallele Sign-Logik, die auseinanderdriften könnte.
+  const lockedRankPayoutLadder = buildOfferRankPayoutLadderPreview(input.gameState, offer);
   let contract: TeamSponsorContract = {
     seasonId: input.gameState.season.id,
     teamId: input.teamId,
