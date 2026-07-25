@@ -682,17 +682,54 @@ export function calculateFormModifierForSide(input: {
   };
 }
 
-// Deterministischer Form-Jitter in [-jitterMax, jitterMax] (1 Dezimale), stabil
-// pro Seed. Reiner FNV-Hash → dieselbe Paarung liefert immer denselben Wert,
-// damit Engine (Score/PP) und Anzeige exakt übereinstimmen.
-export function seededFormJitter(seed: string, jitterMax = 4): number {
+// Deterministischer Unit-Wert in [0,1) aus einem Seed-String (FNV-1a). Basis für alle
+// seeded Jitter/Streuungen — gleicher Seed → immer derselbe Wert (reproduzierbar,
+// replay-idempotent), damit Engine (Score/PP) und Anzeige exakt übereinstimmen.
+export function seededUnitInterval(seed: string): number {
   let h = 2166136261;
   for (let i = 0; i < seed.length; i += 1) {
     h ^= seed.charCodeAt(i);
     h = Math.imul(h, 16777619);
   }
-  const norm = ((h >>> 0) % 1000) / 1000; // 0..1
-  return Number(((norm * 2 - 1) * jitterMax).toFixed(1));
+  return ((h >>> 0) % 1000) / 1000; // 0..1
+}
+
+// Deterministischer Form-Jitter in [-jitterMax, jitterMax] (1 Dezimale), stabil
+// pro Seed. Reiner FNV-Hash → dieselbe Paarung liefert immer denselben Wert,
+// damit Engine (Score/PP) und Anzeige exakt übereinstimmen.
+export function seededFormJitter(seed: string, jitterMax = 4): number {
+  return Number(((seededUnitInterval(seed) * 2 - 1) * jitterMax).toFixed(1));
+}
+
+/**
+ * Charakteristischer Score-Bereich PRO SPIELER je Intensität (Schonen/Normal/Push).
+ *
+ * Design (bewusst NICHT "Push = größter Up- UND Downside"): Push zieht den Score nach OBEN
+ * (Chance), sein eigentlicher Preis ist der höhere Ausdauerverbrauch (INTENSITY_FATIGUE_MULT in
+ * fatigue-injury-service, separat & schon real) — nicht ein Score-Downside. Schonen liefert
+ * verlässlich schwach und spart Ausdauer. Die Mittelwerte liegen nah am früheren Fixmodifier
+ * (Schonen −2.5≈−2, Normal 0, Push +4≈+3), nur mit seeded Streuung statt eines starren Werts.
+ * ENV-tunebar für Balancing ohne Code-Änderung.
+ */
+export type LegacyIntensityStage = "conserve" | "normal" | "push";
+function intensityBound(envKey: string, fallback: number): number {
+  const raw = Number(process.env[envKey]);
+  return Number.isFinite(raw) ? raw : fallback;
+}
+export const INTENSITY_SCORE_RANGE: Record<LegacyIntensityStage, { min: number; max: number }> = {
+  conserve: { min: intensityBound("OLY_INTENSITY_CONSERVE_MIN", -3), max: intensityBound("OLY_INTENSITY_CONSERVE_MAX", -2) },
+  normal: { min: intensityBound("OLY_INTENSITY_NORMAL_MIN", -2), max: intensityBound("OLY_INTENSITY_NORMAL_MAX", 2) },
+  push: { min: intensityBound("OLY_INTENSITY_PUSH_MIN", 2), max: intensityBound("OLY_INTENSITY_PUSH_MAX", 6) },
+};
+
+/**
+ * Seeded Intensitäts-Beitrag PRO SPIELER: gleichverteilt im charakteristischen Bereich der
+ * gewählten Intensität. Reproduzierbar (gleicher Seed → gleicher Wert), damit Replay/forceReplace
+ * idempotent bleibt und Anzeige == Resolve. Seed z.B. `intensity|${playerId}|${disciplineId}|${matchdayId}`.
+ */
+export function seededIntensityShare(intensity: LegacyIntensityStage, seed: string): number {
+  const range = INTENSITY_SCORE_RANGE[intensity];
+  return Number((range.min + seededUnitInterval(seed) * (range.max - range.min)).toFixed(1));
 }
 
 // Verteilt die Team-Form (formModifier = Kartenwert × Anzahl) ADDITIV auf die
