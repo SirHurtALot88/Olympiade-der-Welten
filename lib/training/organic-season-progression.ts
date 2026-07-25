@@ -221,21 +221,19 @@ const TRAINING_MODES: PlayerTrainingMode[] = ["leicht", "mittel", "hart"];
  *
  * Returns null when there is no usable accumulator (→ caller falls back to mode-at-season-end).
  */
-export function resolveSeasonTrainingAccumulatorInputs(input: {
-  accumulator: Player["seasonTrainingAccumulator"] | undefined;
-  seasonId: string;
-  totalMatchdays: number;
-}): { accumulatedBaseTrainingBudget: number; performanceWeightMultiplier: number } | null {
-  const accumulator = input.accumulator;
-  if (!accumulator || accumulator.seasonId !== input.seasonId) return null;
-  const counts: Record<PlayerTrainingMode, number> = { leicht: 0, mittel: 0, hart: 0 };
-  for (const matchdayId of Object.keys(accumulator.modeByMatchday)) {
-    const mode = accumulator.modeByMatchday[matchdayId];
-    if (mode === "leicht" || mode === "mittel" || mode === "hart") counts[mode] += 1;
-  }
+/**
+ * Geteilte Kernrechnung: aus per-Modus-Zählungen die Anti-Cheese-Overrides ableiten. `budget` mittelt
+ * über ALLE Saison-Spieltage (`totalMatchdays`), `performanceWeightMultiplier` über die GEZÄHLTEN
+ * Spieltage. Single Source für den echten Accumulator (`resolveSeasonTrainingAccumulatorInputs`) und
+ * die Anzeige-Projektion (`buildProjectedSeasonTrainingAccumulatorOverrides`).
+ */
+function computeAccumulatorOverridesFromCounts(
+  counts: Record<PlayerTrainingMode, number>,
+  totalMatchdaysInput: number,
+): { accumulatedBaseTrainingBudget: number; performanceWeightMultiplier: number } | null {
   const countedMatchdays = counts.leicht + counts.mittel + counts.hart;
   if (countedMatchdays <= 0) return null;
-  const totalMatchdays = Math.max(1, Math.floor(input.totalMatchdays) || 0);
+  const totalMatchdays = Math.max(1, Math.floor(totalMatchdaysInput) || 0);
   let accumulatedBaseTrainingBudget = 0;
   let performanceWeightMultiplier = 0;
   for (const mode of TRAINING_MODES) {
@@ -244,6 +242,63 @@ export function resolveSeasonTrainingAccumulatorInputs(input: {
     performanceWeightMultiplier += PERFORMANCE_WEIGHT_MULTIPLIER_BY_MODE[mode] * (counts[mode] / countedMatchdays);
   }
   return { accumulatedBaseTrainingBudget, performanceWeightMultiplier };
+}
+
+function countAccumulatorModes(
+  accumulator: Player["seasonTrainingAccumulator"] | undefined,
+  seasonId: string,
+): Record<PlayerTrainingMode, number> {
+  const counts: Record<PlayerTrainingMode, number> = { leicht: 0, mittel: 0, hart: 0 };
+  if (!accumulator || accumulator.seasonId !== seasonId) return counts;
+  for (const matchdayId of Object.keys(accumulator.modeByMatchday)) {
+    const mode = accumulator.modeByMatchday[matchdayId];
+    if (mode === "leicht" || mode === "mittel" || mode === "hart") counts[mode] += 1;
+  }
+  return counts;
+}
+
+export function resolveSeasonTrainingAccumulatorInputs(input: {
+  accumulator: Player["seasonTrainingAccumulator"] | undefined;
+  seasonId: string;
+  totalMatchdays: number;
+}): { accumulatedBaseTrainingBudget: number; performanceWeightMultiplier: number } | null {
+  return computeAccumulatorOverridesFromCounts(
+    countAccumulatorModes(input.accumulator, input.seasonId),
+    input.totalMatchdays,
+  );
+}
+
+/** Total-Spieltag-Auflösung wie der Apply (`season-end-xp-apply-service`): deklariert → matchdayIds → 10. */
+export function resolveSeasonTotalMatchdaysForProgression(gameState: GameState): number {
+  const declared = gameState.season.totalMatchdays;
+  if (typeof declared === "number" && Number.isFinite(declared) && declared > 0) return Math.floor(declared);
+  const fromIds = gameState.season.matchdayIds?.length ?? 0;
+  return fromIds > 0 ? fromIds : 10;
+}
+
+/**
+ * Anzeige-Projektion der Accumulator-Overrides (Audit #6): die Trainings-Budget-Karte soll den real am
+ * Saisonende ANGEWENDETEN Wert vorhersagen, nicht „ganze Saison im aktuellen Modus". Dafür werden die
+ * bereits gespielten Ist-Modi (gelockt) mit dem aktuell GEDRAFTETEN Modus für die Rest-Spieltage
+ * aufgefüllt → volle Saison-Projektion. Eigenschaften:
+ *  - Leerer Accumulator (Vorsaison): alle Spieltage = Draft-Modus ⇒ numerisch identisch zum bisherigen
+ *    Legacy-Verhalten (mode-at-season-end), also KEINE Regression ohne Historie.
+ *  - Am Saisonende (Rest = 0) ⇒ projiziert == roher Accumulator ⇒ deckt sich mit dem Apply.
+ * Rückgabe direkt in `buildOrganicSeasonProgression` spreizen (`{}` = keine Overrides).
+ */
+export function buildProjectedSeasonTrainingAccumulatorOverrides(input: {
+  gameState: GameState;
+  player: Player;
+  draftMode: PlayerTrainingMode;
+}): { accumulatedBaseTrainingBudget?: number; performanceWeightMultiplier?: number } {
+  const totalMatchdays = resolveSeasonTotalMatchdaysForProgression(input.gameState);
+  const counts = countAccumulatorModes(input.player.seasonTrainingAccumulator, input.gameState.season.id);
+  const countedPast = counts.leicht + counts.mittel + counts.hart;
+  const remaining = Math.max(0, Math.floor(totalMatchdays) - countedPast);
+  if (input.draftMode === "leicht" || input.draftMode === "mittel" || input.draftMode === "hart") {
+    counts[input.draftMode] += remaining;
+  }
+  return computeAccumulatorOverridesFromCounts(counts, totalMatchdays) ?? {};
 }
 
 function roundValue(value: number, digits = 2) {
