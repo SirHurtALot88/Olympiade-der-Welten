@@ -25,7 +25,9 @@ export type MatchdayArenaScoreboardRowView = MatchdayMvpScoreboardRow & {
 };
 
 export type MatchdayArenaPhaseBreakdownItem = {
-  id: "slots" | "push" | "form" | "mutator" | "captain" | "power";
+  // "final" = Rest-Term (Fatigue/Moral/Slot-Rollen/Mutator-Team) zwischen der letzten benannten Phase
+  // (power) und dem echten Endscore — Audit #7: ohne dieses Segment summieren die Balken nicht zum Score.
+  id: "slots" | "push" | "form" | "mutator" | "captain" | "power" | "final";
   label: string;
   valueLabel: string;
   tone: "neutral" | "positive" | "negative";
@@ -47,6 +49,7 @@ export const ARENA_SCORE_TRACK_SEGMENT_LABELS: Record<ArenaScoreTrackSegmentId, 
   mutator: "Mutator",
   captain: "Captain",
   power: "Power",
+  final: "Rest",
 };
 
 function roundArenaScore(value: number | null | undefined) {
@@ -304,6 +307,21 @@ export function buildArenaScoreTrackSegments(
       value: row.teamPowerScore ?? 0,
       tone: getArenaScoreSegmentTone(row.teamPowerScore ?? 0),
     });
+  }
+  // Audit #7: Rest-Term (Fatigue/Moral/Slot-Rollen/Mutator-Team) als eigenes Segment, sobald die
+  // Enthüllung die Finale-Phase erreicht hat. Diese Effekte fließen in den echten `row.score`, sind aber
+  // in keinem der 6 benannten Segmente enthalten — ohne dieses Segment summieren die Balken nicht zum
+  // tatsächlichen Endscore. `getMatchdayArenaPhaseDelta(row, "final")` kapselt exakt diesen Residualwert.
+  if (phaseId === "final" || phaseId === "result") {
+    const residual = getMatchdayArenaPhaseDelta(row, "final");
+    if (residual != null) {
+      segments.push({
+        id: "final",
+        label: ARENA_SCORE_TRACK_SEGMENT_LABELS.final,
+        value: residual,
+        tone: getArenaScoreSegmentTone(residual),
+      });
+    }
   }
 
   return segments.filter((segment) => Math.abs(segment.value) >= 0.01 || segment.id === "slots");
