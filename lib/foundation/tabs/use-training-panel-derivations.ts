@@ -8,7 +8,10 @@ import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-sea
 import { getTeamDevelopmentTrainingBonusPct } from "@/lib/foundation/team-development-tendency";
 import { buildTrainingPlayerRowView } from "@/lib/foundation/training-player-row-view";
 import { BASE_MATCHDAY_RECOVERY } from "@/lib/fatigue/fatigue-injury-service";
-import { buildOrganicSeasonProgression } from "@/lib/training/organic-season-progression";
+import {
+  buildOrganicSeasonProgression,
+  buildProjectedSeasonTrainingAccumulatorOverrides,
+} from "@/lib/training/organic-season-progression";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import { buildTrainingModeDemand } from "@/lib/training/training-mode-demand-service";
 import { getAllTrainingModePresentations } from "@/lib/training/training-mode-presentation";
@@ -86,6 +89,13 @@ export function useTrainingPanelDerivations(input: UseTrainingPanelDerivationsIn
         facilities: input.selectedTeamFacilityState,
         // Saisonale Route → Signature-Shift wirkt real (Sterne/Malus = das, was das Profil zeigt).
         route: forecast?.developmentRoute ?? null,
+        // Anti-Cheese-Blend (Audit #6): gelockte Ist-Modi + gedrafteter Modus für die Rest-Spieltage,
+        // damit die Karte den real angewendeten Saisonende-Wert zeigt statt „ganze Saison im Modus".
+        ...buildProjectedSeasonTrainingAccumulatorOverrides({
+          gameState: input.gameState,
+          player: trainingPlayer,
+          draftMode: mode,
+        }),
       });
       const currentSchedule =
         input.gameState.seasonState.disciplineSchedule?.find(
