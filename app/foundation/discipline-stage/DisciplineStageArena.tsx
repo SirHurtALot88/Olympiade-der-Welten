@@ -675,6 +675,21 @@ export default function DisciplineStageArena({
     }
     alignedMatchdayRef.current = matchdayId;
   }, [matchdayId, matchdayPanel?.d1?.disciplineId, matchdayPanel?.d2?.disciplineId, disciplineId]);
+
+  // Auswählbar sind für normale Spieler NUR die zwei Disziplinen des aktuellen Spieltags (Diszi 1
+  // vor Diszi 2), keine anderen — freies Einwählen in beliebige Disziplinen bleibt Admin-/Dev-Modus.
+  const matchdayDisciplineOptions = useMemo<Array<{ id: string; name: string }>>(() => {
+    const pairs = [matchdayPanel?.d1, matchdayPanel?.d2].filter(
+      (entry): entry is { disciplineId: string; displayName: string } => Boolean(entry?.disciplineId),
+    );
+    const nameById = new Map(disciplines.map((d) => [d.id, d.name] as const));
+    return pairs.map((entry) => ({ id: entry.disciplineId, name: nameById.get(entry.disciplineId) ?? entry.displayName }));
+  }, [matchdayPanel, disciplines]);
+  const disciplineSelectOptions = useMemo<Array<{ id: string; name: string }>>(
+    () => (devMode || matchdayDisciplineOptions.length === 0 ? disciplines : matchdayDisciplineOptions),
+    [devMode, matchdayDisciplineOptions, disciplines],
+  );
+
   // Die 2 aktiven Mutatoren dieser Disziplin (disziplin-weit gleich) — für die
   // Anzeige „welche beiden es sind". Aus den mutatorSlots eines beliebigen Teams.
   const disciplineMutators = useMemo<string[]>(() => {
@@ -1030,15 +1045,17 @@ export default function DisciplineStageArena({
           ) : null}
         </div>
         <label style={{ fontSize: 13, display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "var(--nl-mut)", fontWeight: 700 }}>Disziplin</span>
+          <span style={{ color: "var(--nl-mut)", fontWeight: 700 }}>
+            {devMode ? "Disziplin (Admin: frei)" : "Disziplin (Spieltag)"}
+          </span>
           <select
             value={disciplineId}
             onChange={(event) => setDisciplineId(event.target.value)}
             style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--nl-line)", background: "var(--nl-panel)", color: "inherit", fontSize: 14, fontWeight: 700 }}
           >
-            {disciplines.map((discipline) => (
+            {disciplineSelectOptions.map((discipline, index) => (
               <option key={discipline.id} value={discipline.id}>
-                {discipline.name}
+                {devMode || matchdayDisciplineOptions.length === 0 ? discipline.name : `${index + 1}. ${discipline.name}`}
               </option>
             ))}
           </select>
