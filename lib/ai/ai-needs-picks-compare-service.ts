@@ -7731,19 +7731,26 @@ function toComparePrizeSignal(
     };
   }
 
+  // Preisgeld = Legacy-Benchmark, wird nie ausgezahlt. Das KI-Wirtschaftssignal muss auf der realen
+  // Season-Einnahme basieren: Sponsor-Settlement + Gebäude-Income (item.sponsorCash/facilityIncome).
+  // futureSeasons.prizeMoney trägt jetzt (Legacy-Feldname) die projizierte Sponsor-Brutto-Einnahme.
+  const currentIncome =
+    item.sponsorCash != null || item.facilityIncome != null
+      ? roundValue((item.sponsorCash ?? 0) + (item.facilityIncome ?? 0), 2)
+      : null;
   const future = item.futureSeasons.slice(0, 4);
   const futureValues = future.map((entry) => entry.prizeMoney);
   const currentGuv =
-    item.prizeMoney != null && item.salaryTotal != null ? roundValue(item.prizeMoney - item.salaryTotal, 2) : null;
+    currentIncome != null && item.salaryTotal != null ? roundValue(currentIncome - item.salaryTotal, 2) : null;
   const futureGuvValues = future.map((entry) => entry.guv);
   const guvValues = [currentGuv, ...futureGuvValues].filter((value): value is number => value != null);
   const expectedProjectedCashAfterFiveSeasons =
     item.currentCash != null && guvValues.length > 0
       ? roundValue(item.currentCash + guvValues.reduce((sum, value) => sum + value, 0), 2)
       : item.projectedCash ?? future.map((entry) => entry.projectedCash).find((value) => value != null) ?? null;
-  const firstKnown = futureValues.find((value) => value != null) ?? item.prizeMoney;
-  const lastKnown = [...futureValues].reverse().find((value) => value != null) ?? item.prizeMoney;
-  const comparableValues = [item.prizeMoney, ...futureValues].filter((value): value is number => value != null);
+  const firstKnown = futureValues.find((value) => value != null) ?? currentIncome;
+  const lastKnown = [...futureValues].reverse().find((value) => value != null) ?? currentIncome;
+  const comparableValues = [currentIncome, ...futureValues].filter((value): value is number => value != null);
   const delta = firstKnown != null && lastKnown != null ? lastKnown - firstKnown : null;
   let expectedPrizeTrend: ComparePrizeSignal["expectedPrizeTrend"] = "unknown";
   if (delta != null) {
@@ -7767,13 +7774,13 @@ function toComparePrizeSignal(
   const expectedPrizeFiveSeasonSum =
     comparableValues.length > 0 ? roundValue(comparableValues.reduce((sum, value) => sum + value, 0), 2) : null;
   const expectedGuvFiveSeasonSum = guvValues.length > 0 ? roundValue(guvValues.reduce((sum, value) => sum + value, 0), 2) : null;
-  const hasCurrent = item.prizeMoney != null;
+  const hasCurrent = currentIncome != null;
   const futureKnown = futureValues.filter((value) => value != null).length;
   const prizeSourceStatus: ComparePrizeSignal["prizeSourceStatus"] =
     hasCurrent && futureKnown >= 4 ? "ready" : hasCurrent || futureKnown > 0 ? "partial" : "missing_source";
 
   return {
-    expectedPrizeCurrentSeason: item.prizeMoney,
+    expectedPrizeCurrentSeason: currentIncome,
     expectedPrizeNextSeason1: future[0]?.prizeMoney ?? null,
     expectedPrizeNextSeason2: future[1]?.prizeMoney ?? null,
     expectedPrizeNextSeason3: future[2]?.prizeMoney ?? null,

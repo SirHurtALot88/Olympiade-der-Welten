@@ -188,13 +188,16 @@ describe("prize money preview", () => {
     expect(result.summary.totalRankChangePrize).toBe(11.9);
     expect(result.summary.currentFactor).toBe(1.09);
     expect(result.summary.futureSeasonCount).toBe(4);
+    // Sponsor-basierte Zukunft: kein Sponsor-Vertrag im Mock → future income 0, Gehalt 0 →
+    // projectedCash = currentCash (37.9). Preisgeld fließt nicht mehr ein.
     expect(result.items[0]?.futureSeasons).toContainEqual(
       expect.objectContaining({
         seasonLabel: "Season +1",
         factor: 1.21,
-        prizeMoney: 99.7,
+        prizeMoney: 0,
         salaryTotal: 0,
-        projectedCash: 137.6,
+        guv: 0,
+        projectedCash: 37.9,
       }),
     );
   });
@@ -229,7 +232,9 @@ describe("prize money preview", () => {
     // Cash danach = 37.9 − 20 (Gehalt) + 0 (kein Sponsor) + 0 (keine Gebäude) = 17.9.
     expect(row?.projectedCash).toBe(17.9);
     expect(row?.projectedCash).not.toBe(37.9);
-    expect(row?.futureSeasons.find((entry) => entry.seasonLabel === "Season +1")?.projectedCash).toBe(117.6);
+    // Sponsor-basierte Zukunft: future income 0 (kein Vertrag), Gehalt wächst mit Forecast-Faktor
+    // (20 × 1.055 = 21.1) → projectedCash Season +1 = 37.9 − 21.1 = 16.8.
+    expect(row?.futureSeasons.find((entry) => entry.seasonLabel === "Season +1")?.projectedCash).toBe(16.8);
   });
 
   it("marks missing rank without faking a zero prize", async () => {

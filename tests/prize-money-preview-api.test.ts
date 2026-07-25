@@ -56,6 +56,8 @@ describe("prize money preview api", () => {
       seasonId: "season-1",
       source: "sqlite",
       phase: "season_end",
+      // Route übergibt das Flag weiterhin; seit dem Sponsor-Default ist es ein No-op (immer sponsor-basiert).
+      includeSponsorIncome: true,
     });
     expect(body.items[0]?.projectedCash).toBe(129.3);
   });

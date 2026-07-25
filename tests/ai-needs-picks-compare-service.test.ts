@@ -635,9 +635,12 @@ describe("ai needs picks compare service", () => {
     expect(
       result.teams.find((entry) => entry.teamId === "C-C")?.warnings.some((entry) => entry.includes("harte Gameplay-Minimum bleibt 8")),
     ).toBe(true);
+    // Preisgeld = Legacy; das KI-Wirtschaftssignal ist jetzt sponsor-basiert. Ohne Sponsor-Vertrag im
+    // Mock hat C-C keine aktuelle Sponsor-Einnahme → Signal degradiert ehrlich zu "partial" (statt der
+    // früheren Phantom-Preisgeld-"ready"). Reale Sponsor-Einnahmen werden im Long-Run validiert.
     expect(result.teams.find((entry) => entry.teamId === "C-C")?.cashStrategy).toMatchObject({
       strategySource: "retool_reference",
-      sourceStatus: "ready",
+      sourceStatus: "partial",
       currentCash: 70,
       targetRoster: 10,
       minimumRoster: 8,
@@ -655,9 +658,11 @@ describe("ai needs picks compare service", () => {
       reason: expect.any(String),
     });
     expect(result.teams.find((entry) => entry.teamId === "C-C")?.cashStrategy.expectedPrizeSignal).toMatchObject({
-      expectedPrizeCurrentSeason: 24,
+      // Sponsor-basiert: kein Sponsor-Vertrag im Mock → aktuelle Sponsor-Einnahme null (nicht mehr das
+      // Legacy-Preisgeld 24), Signalstatus "partial".
+      expectedPrizeCurrentSeason: null,
       expectedPrizeFiveSeasonSum: expect.any(Number),
-      prizeSourceStatus: "ready",
+      prizeSourceStatus: "partial",
       flowPolicy: "season_end_only",
     });
     expect(result.teams.find((entry) => entry.teamId === "C-C")?.cashStrategy.maxSpendByLane.core).not.toBeNull();

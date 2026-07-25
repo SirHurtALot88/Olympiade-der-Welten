@@ -1,3 +1,4 @@
+import type { GameState } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
@@ -132,6 +133,82 @@ function projectSeasonEndCash(input: {
   }
 
   return round1(input.currentCash - input.salaryTotal + input.prizeMoney + (input.rankChangePrize ?? 0));
+}
+
+// --- Liga-weite Sponsor-/Gebäude-Einnahmen (memoisiert) ---
+// Preisgeld ist reines Legacy-Benchmark und wird nie ausgezahlt; die reale Season-End-Ökonomie ist
+// Sponsor-Settlement + Gebäude-Income − Gehalt. `projectedCash` und das KI-Wirtschaftssignal müssen
+// deshalb sponsor-basiert sein. Weil der Unified-Planner buildPrizeMoneyPreview 32× pro Übergang
+// (einmal pro Team-Plan) aufruft, wird die teure Liga-Settlement-Berechnung memoisiert — sonst
+// blockieren 32 Sponsor-Settlements pro Aufruf den Event-Loop (die frühere 502-Ursache).
+type LeagueSponsorIncome = {
+  sponsorCashByTeamId: Map<string, number>;
+  facilityIncomeByTeamId: Map<string, number>;
+};
+
+const LEAGUE_SPONSOR_INCOME_CACHE = new Map<string, LeagueSponsorIncome>();
+const LEAGUE_SPONSOR_INCOME_CACHE_LIMIT = 8;
+
+function cheapHash(input: string): string {
+  let hash = 5381;
+  for (let index = 0; index < input.length; index += 1) {
+    hash = ((hash << 5) + hash + input.charCodeAt(index)) | 0;
+  }
+  return (hash >>> 0).toString(36);
+}
+
+// Fingerprint über die einzigen Größen, von denen die Sponsor-/Gebäude-Einnahme abhängt: Rang je Team
+// (Meilenstein/Overperformance) + Sponsor-Verträge. Innerhalb eines Kauf-Planungslaufs stabil (Käufe
+// ändern Cash/Roster, nicht Rang/Vertrag), über Saisons hinweg via seasonId invalidiert.
+function buildLeagueSponsorIncomeKey(gameState: GameState, saveId: string): string {
+  const ranks = gameState.teams
+    .map((team) => `${team.teamId}:${gameState.seasonState.standings?.[team.teamId]?.rank ?? "-"}`)
+    .join(",");
+  const contracts = JSON.stringify(gameState.seasonState.sponsorContractsByTeamId ?? {});
+  return `${saveId}:${gameState.season.id}:${cheapHash(ranks)}:${cheapHash(contracts)}`;
+}
+
+function computeLeagueSponsorIncome(gameState: GameState): LeagueSponsorIncome {
+  const sponsorCashByTeamId = new Map<string, number>();
+  const facilityIncomeByTeamId = new Map<string, number>();
+  try {
+    for (const row of previewSponsorSettlement(gameState).rows) {
+      if (row.cashDelta > 0) {
+        sponsorCashByTeamId.set(row.teamId, (sponsorCashByTeamId.get(row.teamId) ?? 0) + row.cashDelta);
+      }
+    }
+  } catch {
+    // Sponsor-Vorschau ist optional — fehlt sie (z. B. ohne Verträge), bleibt die Sponsor-Einnahme leer.
+  }
+  for (const team of gameState.teams) {
+    try {
+      const facilities = getTeamFacilityState(gameState, team.teamId);
+      const arenaPopularityFactor = computeTeamBeliebtheitFromGameState(gameState, team.teamId).value;
+      const income = calculateFacilityIncome(facilities, { arenaPopularityFactor });
+      const upkeep = calculateFacilityUpkeep(facilities);
+      facilityIncomeByTeamId.set(team.teamId, round1(income - upkeep));
+    } catch {
+      // Gebäude-Einnahmen optional.
+    }
+  }
+  return { sponsorCashByTeamId, facilityIncomeByTeamId };
+}
+
+function getLeagueSponsorIncome(gameState: GameState, saveId: string): LeagueSponsorIncome {
+  const key = buildLeagueSponsorIncomeKey(gameState, saveId);
+  const cached = LEAGUE_SPONSOR_INCOME_CACHE.get(key);
+  if (cached) {
+    return cached;
+  }
+  const computed = computeLeagueSponsorIncome(gameState);
+  LEAGUE_SPONSOR_INCOME_CACHE.set(key, computed);
+  if (LEAGUE_SPONSOR_INCOME_CACHE.size > LEAGUE_SPONSOR_INCOME_CACHE_LIMIT) {
+    const oldest = LEAGUE_SPONSOR_INCOME_CACHE.keys().next().value;
+    if (oldest !== undefined) {
+      LEAGUE_SPONSOR_INCOME_CACHE.delete(oldest);
+    }
+  }
+  return computed;
 }
 
 const FORECAST_SALARY_FACTOR_PASSTHROUGH = 0.5;
@@ -451,22 +528,6 @@ export async function buildPrizeMoneyPreview(
       .filter((row) => row.rank != null)
       .map((row) => [row.rank as number, row] as const),
   );
-  const futurePrizeRowsBySeasonLabel = new Map<string, Map<number, { prizeMoney: number | null }>>();
-  if (currentFactor != null && hasDynamicSalaryBasis) {
-    for (const seasonFactor of seasonFactors.filter((row) => row.seasonLabel !== "Aktuell")) {
-      const salaryGrowthFactor = buildForecastSalaryGrowthFactor({
-        currentFactor,
-        futureFactor: seasonFactor.factor,
-      });
-      if (salaryGrowthFactor == null || seasonFactor.factor == null) continue;
-      const projectedLeagueSalaries = currentLeagueSalaries.map((salary) => round1(salary * salaryGrowthFactor));
-      const table = buildPrizeMoneyTable(projectedLeagueSalaries, seasonFactor.factor, adminBalancingConfig);
-      futurePrizeRowsBySeasonLabel.set(
-        seasonFactor.seasonLabel,
-        new Map(table.map((row) => [row.rank, { prizeMoney: row.totalPrizeMoney }] as const)),
-      );
-    }
-  }
 
   const transferBalanceByTeamId = buildTransferBalanceByTeamId(save.gameState.transferHistory);
   const seasonOneStartRankByTeamId = isSeasonOne(seasonId)
@@ -474,33 +535,11 @@ export async function buildPrizeMoneyPreview(
     : new Map<string, number>();
 
   // Sponsor-Einnahmen pro Team = Summe der positiven Cash-Komponenten aus der Settlement-Vorschau (Basis +
-  // Rang-Meilenstein beim aktuellen Rang + bereits erfüllte Sonderziele/Quests + Fan-Infrastruktur). NUR für
-  // die UI-Sponsor-Tabelle (includeSponsorIncome) — sonst zu teuer für den AI-/Season-Hotpfad (siehe Input-Doc).
-  const includeSponsorIncome = input.includeSponsorIncome === true;
-  const sponsorCashByTeamId = new Map<string, number>();
-  const facilityIncomeByTeamId = new Map<string, number>();
-  if (includeSponsorIncome) {
-    try {
-      for (const row of previewSponsorSettlement(save.gameState).rows) {
-        if (row.cashDelta > 0) {
-          sponsorCashByTeamId.set(row.teamId, (sponsorCashByTeamId.get(row.teamId) ?? 0) + row.cashDelta);
-        }
-      }
-    } catch {
-      // Sponsor-Vorschau ist optional — fehlt sie (z. B. ohne Verträge), bleibt die Sponsor-Spalte leer.
-    }
-    for (const team of save.gameState.teams) {
-      try {
-        const facilities = getTeamFacilityState(save.gameState, team.teamId);
-        const arenaPopularityFactor = computeTeamBeliebtheitFromGameState(save.gameState, team.teamId).value;
-        const income = calculateFacilityIncome(facilities, { arenaPopularityFactor });
-        const upkeep = calculateFacilityUpkeep(facilities);
-        facilityIncomeByTeamId.set(team.teamId, round1(income - upkeep));
-      } catch {
-        // Gebäude-Einnahmen optional.
-      }
-    }
-  }
+  // Rang-Meilenstein beim aktuellen Rang + bereits erfüllte Sonderziele/Quests + Fan-Infrastruktur). Immer
+  // berechnet (memoisiert), weil Preisgeld reines Legacy-Benchmark ist und die reale Ökonomie sponsor-basiert
+  // sein muss — sowohl für `projectedCash` als auch für das KI-Wirtschaftssignal. `includeSponsorIncome` wird
+  // nur noch aus Kompatibilität akzeptiert und hat keine Wirkung mehr.
+  const { sponsorCashByTeamId, facilityIncomeByTeamId } = getLeagueSponsorIncome(save.gameState, saveId);
 
   const items: PrizeMoneyPreviewItem[] = save.gameState.teams.map((team) => {
     const standing = save.gameState.seasonState.standings[team.teamId] ?? null;
@@ -541,22 +580,16 @@ export async function buildPrizeMoneyPreview(
       warnings.add(rankChangePrize.warning);
     }
 
-    const sponsorCash = includeSponsorIncome ? sponsorCashByTeamId.get(team.teamId) ?? null : null;
-    const facilityIncome = includeSponsorIncome ? facilityIncomeByTeamId.get(team.teamId) ?? null : null;
+    const sponsorCash = sponsorCashByTeamId.get(team.teamId) ?? null;
+    const facilityIncome = facilityIncomeByTeamId.get(team.teamId) ?? null;
+    // Reale Season-End-Einnahme des Teams (Sponsor-Settlement + Gebäude netto). Preisgeld fließt hier NICHT
+    // ein — es ist reines Legacy-Benchmark und wird nie ausgezahlt.
+    const seasonIncome = (sponsorCash ?? 0) + (facilityIncome ?? 0);
 
-    // UI-Sponsor-Tabelle: Cash danach = Cash vorher + Sponsor + Gebäude − Gehälter (kein Preisgeld mehr).
-    // AI-/Season-Pfad (includeSponsorIncome=false): unverändert die alte preisgeld-basierte Projektion, damit
-    // sich die AI-Budgetplanung durch den UI-Umbau NICHT ändert.
-    const projectedCash = includeSponsorIncome
-      ? currentCash == null || salaryTotal == null
-        ? null
-        : round1(currentCash - salaryTotal + (sponsorCash ?? 0) + (facilityIncome ?? 0))
-      : projectSeasonEndCash({
-          currentCash,
-          prizeMoney,
-          salaryTotal,
-          rankChangePrize: rankChangePrize.bonusMalus,
-        });
+    // Cash danach = Cash vorher + Sponsor + Gebäude − Gehälter (kein Preisgeld). Dies ist jetzt der
+    // Default für ALLE Aufrufer (UI, Season-Workflows, AI-Planung).
+    const projectedCash =
+      currentCash == null || salaryTotal == null ? null : round1(currentCash - salaryTotal + seasonIncome);
 
     const buildPlacementScenario = (direction: "better" | "worse") => {
       if (rank == null || prizeMoney == null || currentCash == null || salaryTotal == null) {
@@ -614,27 +647,22 @@ export async function buildPrizeMoneyPreview(
           };
         }
 
-        const futurePrizeFromLeagueTable =
-          rank != null
-            ? futurePrizeRowsBySeasonLabel.get(row.seasonLabel)?.get(rank)?.prizeMoney ?? null
-            : null;
-        const fallbackSeasonScaled = seasonCash != null ? round1(seasonCash * (row.factor / currentFactor)) : null;
-        const fallbackPrize = basisCash != null && fallbackSeasonScaled != null ? round1(basisCash + fallbackSeasonScaled) : null;
-        const futurePrize = futurePrizeFromLeagueTable ?? fallbackPrize;
-        const futureSalaryTotal = round1(salaryTotal);
-        const guv = futurePrize == null ? null : round1(futurePrize - futureSalaryTotal);
+        // Sponsor-basierte Zukunftsprojektion (Preisgeld = Legacy, nie ausgezahlt): die reale
+        // Season-Einnahme (Sponsor + Gebäude) skaliert mit dem Liga-Ökonomiefaktor, die Gehälter mit dem
+        // Forecast-Gehaltswachstum. Steigende Löhne bei flach kalibrierten Sponsoren erzeugen den
+        // realistischen GuV-Abwärtstrend, der das KI-Ausgabesignal antreibt.
+        const futureIncome = round1(seasonIncome * (row.factor / currentFactor));
+        const futureSalaryTotal = round1(salaryTotal * salaryGrowthFactor);
+        const guv = round1(futureIncome - futureSalaryTotal);
         return {
           seasonLabel: row.seasonLabel,
           factor: row.factor,
           salaryGrowthFactor,
-          prizeMoney: futurePrize,
+          // Legacy-Feldname; enthält jetzt die projizierte Sponsor-Brutto-Einnahme (nicht Preisgeld).
+          prizeMoney: futureIncome,
           salaryTotal: futureSalaryTotal,
           guv,
-          projectedCash: projectSeasonEndCash({
-            currentCash,
-            prizeMoney: futurePrize,
-            salaryTotal: futureSalaryTotal,
-          }),
+          projectedCash: round1(currentCash - futureSalaryTotal + futureIncome),
         };
       });
 
