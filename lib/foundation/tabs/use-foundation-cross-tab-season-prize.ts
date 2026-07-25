@@ -31,6 +31,7 @@ import {
   shouldBuildSeasonEndChampionRow as resolveShouldBuildSeasonEndChampionRow,
 } from "@/lib/foundation/tabs/season-v2-derivations";
 import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
+import { CASH_PRIZE_BENCHMARK_ONLY } from "@/lib/season/cash-prize-benchmark-flag";
 
 type SeasonSnapshotInput = NonNullable<GameState["seasonState"]["seasonSnapshots"]>[number];
 
@@ -246,9 +247,14 @@ export function useFoundationCrossTabSeasonPrize(input: {
       return { status: "open", label: "Preisgeld noch offen" };
     }
     if (currentSeasonCashPrizeApplyLogs.length > 0 || input.cashApplyFeed?.applied) {
+      // Solange CASH_PRIZE_BENCHMARK_ONLY aktiv ist, wird KEIN echter Cash-Payout gebucht
+      // (team.cash bleibt unverändert) — nur der Preisgeld/Sponsor-Benchmark + Audit-Log. Das
+      // Label muss das ehrlich sagen, sonst widerspricht die „angewendet"-Pille dem unveränderten
+      // Cash-Stand in der Finanzen-Ansicht.
+      const applied = currentSeasonCashPrizeApplyLogs.length > 1 ? "already_applied" : "Preisgeld angewendet";
       return {
         status: "applied",
-        label: currentSeasonCashPrizeApplyLogs.length > 1 ? "already_applied" : "Preisgeld angewendet",
+        label: CASH_PRIZE_BENCHMARK_ONLY ? "Benchmark protokolliert (keine Auszahlung)" : applied,
       };
     }
     if (prizePreviewHardBlocked.length > 0) {

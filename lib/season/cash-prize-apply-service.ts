@@ -2,20 +2,15 @@ import type { CashPrizeApplyLogRecord, GameState } from "@/lib/data/olyDataTypes
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { buildPrizeMoneyPreview, type PrizeMoneyPreviewResult } from "@/lib/season/prize-money-preview";
+import { CASH_PRIZE_BENCHMARK_ONLY } from "@/lib/season/cash-prize-benchmark-flag";
 import type { StandingsPreviewSource } from "@/lib/standings/standings-preview-engine";
 
 export const CASH_PRIZE_APPLY_CONFIRM_TOKEN = "APPLY_LOCAL_CASH_PRIZE";
 
-/**
- * T-032: `executeCashPrizeApply`/`previewCashPrizeApply` sind ein Debug-/Benchmark-Endpoint für die
- * Preisgeld-Berechnung — solange dieses Flag `true` ist, wird ausschließlich der Preisgeld/Sponsor-
- * Benchmark (inkl. Audit-Log `cashPrizeApplyLogs`) persistiert; Team-Cash bleibt unverändert (kein
- * echter Payout). `lib/season/economy-audit-report.ts` liest dieses Flag deshalb explizit, um einen
- * ausgeführten Benchmark-Apply NICHT als `cash_prize_apply_executed`-Verstoß zu werten. Wird dieser
- * Pfad je auf echten Cash-Payout umgestellt, muss dieses Flag auf `false` gesetzt UND der Audit-Report
- * um eine echte Payout-Prüfung erweitert werden.
- */
-export const CASH_PRIZE_BENCHMARK_ONLY = true;
+// Kanonische Definition liegt in einem client-sicheren Modul (ohne node:fs, Import oben), damit
+// UI-Hooks das Flag lesen können; hier re-exportiert, damit bestehende Server-Importe (die es aus
+// diesem Service beziehen) unverändert bleiben.
+export { CASH_PRIZE_BENCHMARK_ONLY };
 
 export type CashPrizeApplyParams = {
   saveId: string;
