@@ -71,8 +71,13 @@ export type DisciplineStageMatchdayPanelProps = {
 
 function ppText(value: number | null): string {
   if (value == null) return "–";
-  return `+${value}`;
+  if (Math.abs(value) < 0.05) return "0";
+  return `+${value.toFixed(1)}`;
 }
+
+// Rang · Team · Diszi 1 · Diszi 2 · Spieltag (Σ) · Mutator · Gesamt.
+// Header und Datenzeilen teilen sich EXAKT dieses Raster (sonst driften die Spalten).
+const PANEL_GRID_COLUMNS = "84px 1fr 78px 78px 74px 84px 88px";
 
 // Rang-Badge (klein, tabellarisch) — Gold/Silber/Bronze für die Top-3, gleiche
 // Farbsprache wie die Arena-Leiter (warn/mut/Bronze-rgb, dezent hinterlegt).
@@ -172,12 +177,12 @@ export default function DisciplineStageMatchdayPanel({
       </div>
 
       <div style={{ overflowX: "auto" }}>
-        <div style={{ minWidth: 560 }}>
+        <div style={{ minWidth: 720 }}>
           {/* Kopfzeile */}
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "88px 1fr 96px 96px 74px",
+              gridTemplateColumns: PANEL_GRID_COLUMNS,
               gap: 10,
               alignItems: "center",
               padding: "6px 10px",
@@ -192,7 +197,11 @@ export default function DisciplineStageMatchdayPanel({
             <div style={colHead} title={d2?.displayName ?? "Disziplin 2"}>
               {d2Revealed ? d2?.displayName ?? "Diszi 2" : "Diszi 2 🔒"}
             </div>
-            <div style={colHead}>Σ PP</div>
+            <div style={colHead} title="Spieltags-Punkte je Rang (Disziplin 1 + Disziplin 2)">Spieltag</div>
+            <div style={colHead} title="Mutator-Bonus-PP (0,3er) — dem Spieler gutgeschrieben, separat vom Team-PP">
+              ◆ Mutator
+            </div>
+            <div style={colHead} title="Gesamt = Spieltags-Punkte + Mutator-Bonus">Gesamt</div>
           </div>
 
           {/* Zeilen */}
@@ -209,16 +218,12 @@ export default function DisciplineStageMatchdayPanel({
             const mut = mutatorByTeam?.get(row.teamId);
             const mutPp = (d1Revealed ? mut?.d1Pp ?? 0 : 0) + (d2Revealed ? mut?.d2Pp ?? 0 : 0);
             const mutPlayers = [...(d1Revealed ? mut?.d1Players ?? [] : []), ...(d2Revealed ? mut?.d2Players ?? [] : [])];
-            const mutatorLine =
-              mutPp > 0.0001 ? (
-                <span
-                  title={mutPlayers.map((p) => `${p.name} +${p.pp.toFixed(1)} PP`).join(" · ")}
-                  style={{ fontSize: 10, fontWeight: 800, color: "var(--nl-warn)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 200 }}
-                >
-                  ◆ Mutator +{mutPp.toFixed(1)} PP
-                  {mutPlayers.length === 1 ? ` · ${mutPlayers[0]!.name}` : mutPlayers.length > 1 ? ` · ${mutPlayers.length} Spieler` : ""}
-                </span>
-              ) : null;
+            const hasMut = mutPp > 0.0001;
+            const mutatorTitle = hasMut
+              ? mutPlayers.map((p) => `${p.name} +${p.pp.toFixed(1)} PP`).join(" · ")
+              : "Kein Mutator-Bonus in den aufgedeckten Disziplinen.";
+            // Gesamt = Spieltags-Punkte + Mutator-Bonus (die „6,6 + 0,3"-Rechnung).
+            const total = sum + mutPp;
             return (
               <div
                 key={row.teamId}
@@ -233,7 +238,7 @@ export default function DisciplineStageMatchdayPanel({
                 }}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "88px 1fr 96px 96px 74px",
+                  gridTemplateColumns: PANEL_GRID_COLUMNS,
                   gap: 10,
                   alignItems: "center",
                   padding: "7px 10px",
@@ -303,9 +308,6 @@ export default function DisciplineStageMatchdayPanel({
                         </span>
                       ) : null}
                     </div>
-                    {/* Mutator-PP (0,3er) separat ausgewiesen — 1:1 dem Spieler zugeschrieben,
-                        der sie geholt hat (kein Team-Split). Nur aufgedeckte Disziplinen zählen. */}
-                    {mutatorLine}
                   </div>
                 </div>
 
@@ -319,7 +321,34 @@ export default function DisciplineStageMatchdayPanel({
                   {d2Revealed ? ppText(row.d2Pts) : lockCell}
                 </div>
 
-                {/* Spieltags-Summe */}
+                {/* Spieltags-Punkte (Σ d1 + d2, ohne Mutator) */}
+                <div
+                  style={{
+                    textAlign: "right",
+                    fontVariantNumeric: "tabular-nums",
+                    fontWeight: 800,
+                    fontSize: 13,
+                    color: sumShown ? "var(--nl-ink)" : "var(--nl-mut)",
+                  }}
+                >
+                  {sumShown ? ppText(sum) : lockCell}
+                </div>
+
+                {/* Mutator-Bonus (0,3er) — spielergenau, separat vom Team-PP. */}
+                <div
+                  title={mutatorTitle}
+                  style={{
+                    textAlign: "right",
+                    fontVariantNumeric: "tabular-nums",
+                    fontWeight: 800,
+                    fontSize: 13,
+                    color: hasMut ? "var(--nl-warn)" : "var(--nl-mut)",
+                  }}
+                >
+                  {sumShown ? (hasMut ? `◆ +${mutPp.toFixed(1)}` : "–") : lockCell}
+                </div>
+
+                {/* Gesamt = Spieltags-Punkte + Mutator-Bonus */}
                 <div
                   style={{
                     textAlign: "right",
@@ -329,7 +358,7 @@ export default function DisciplineStageMatchdayPanel({
                     color: sumShown ? "var(--nl-accent)" : "var(--nl-mut)",
                   }}
                 >
-                  {sumShown ? `+${sum}` : lockCell}
+                  {sumShown ? ppText(total) : lockCell}
                 </div>
               </div>
             );

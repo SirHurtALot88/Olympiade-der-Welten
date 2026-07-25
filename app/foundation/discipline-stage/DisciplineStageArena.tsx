@@ -16,13 +16,12 @@ import {
   type StageTeamMeta,
 } from "@/lib/foundation/discipline-stage/discipline-stage-from-preview";
 import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
-import DisciplineStageEndScreen from "@/app/foundation/discipline-stage/DisciplineStageEndScreen";
-import DisciplineStageStandingsDelta from "@/app/foundation/discipline-stage/DisciplineStageStandingsDelta";
 import DisciplineStageHighlights from "@/app/foundation/discipline-stage/DisciplineStageHighlights";
-import { type DisciplineStageTopPlayer } from "@/app/foundation/discipline-stage/DisciplineStageTopPlayers";
+import DisciplineStageTopPlayers, { type DisciplineStageTopPlayer } from "@/app/foundation/discipline-stage/DisciplineStageTopPlayers";
+import { getRankToPointsValue, resolveDisciplinePlayerCount } from "@/lib/resolve/rank-to-points";
 import DisciplineStageNativeArena, { type StagePrimitive, type StageMotif, type StageEnv, type StageLiveResultsByTeam } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
 import DisciplineStageDrawer, { type DisciplineStageDrawerTarget } from "@/app/foundation/discipline-stage/DisciplineStageDrawer";
-import DisciplineStageMatchdayPanel, { type MatchdayPanelStandingRow } from "@/app/foundation/discipline-stage/DisciplineStageMatchdayPanel";
+import DisciplineStageMatchdayPanel, { type MatchdayPanelStandingRow, type MatchdayPanelTeamResult } from "@/app/foundation/discipline-stage/DisciplineStageMatchdayPanel";
 import { getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
 import DisciplineStageHoverPreview, { type DisciplineStageHoverTarget } from "@/app/foundation/discipline-stage/DisciplineStageHoverPreview";
 import { fmt1 } from "@/app/foundation/discipline-stage/stage-format";
@@ -656,7 +655,67 @@ export default function DisciplineStageArena({
         mutatorByTeam.set(tr.teamId, cur);
       }
     }
-    return { d1, d2, standings, mutatorByTeam };
+    // Punkte je RANG (nicht flach). Bug zuvor: der Roll-up gab bei gleich-/null-
+    // bewerteten Teams jedem Rang 1 → alle bekamen den Platz-1-Wert (z. B. 6,6 in der
+    // Zweierdisziplin). Hier je Disziplin die Teams NACH ihrem echten Disziplin-Score
+    // platzieren (dieselbe Zahl, nach der die Arena animiert) und den Platz über die
+    // kanonische rank→points-Tabelle (getRankToPointsValue) in Punkte übersetzen.
+    // Teams ohne echten (positiven) Score bekommen 0 statt fälschlich den Platz-1-Wert.
+    const placementPointsForSide = (
+      discipline: { disciplineId: string; displayName: string } | null,
+      side: "d1" | "d2",
+    ): Map<string, number> => {
+      const map = new Map<string, number>();
+      if (!discipline) return map;
+      const dp = (preview.disciplinePreviews ?? []).find((entry) => entry.disciplineId === discipline.disciplineId);
+      if (!dp) return map;
+      const playerCount = resolveDisciplinePlayerCount(gameState, {
+        matchdayId: matchdayId ?? null,
+        disciplineId: discipline.disciplineId,
+        disciplineSide: side,
+      });
+      // Fallback je Team auf den bereits von der Engine berechneten teamPoints-Wert,
+      // falls die Spieleranzahl (und damit die rank→points-Suche) mal nicht auflösbar ist —
+      // besser der Engine-Wert als alles auf 0.
+      const engineTeamPoints = new Map(
+        (dp.teamResults ?? []).map((tr) => [tr.teamId, Number.isFinite(tr.teamPoints ?? NaN) ? (tr.teamPoints as number) : null] as const),
+      );
+      const scoring = (dp.teamResults ?? [])
+        .map((tr) => ({ teamId: tr.teamId, score: Number.isFinite(tr.score) ? tr.score : 0 }))
+        .filter((tr) => tr.score > 0)
+        .sort((left, right) => right.score - left.score);
+      // Standard Competition Ranking (1, 2, 2, 4) — Gleichstand teilt den besseren Rang.
+      let previousScore: number | null = null;
+      let sharedRank = 0;
+      scoring.forEach((tr, index) => {
+        const rounded = Math.round(tr.score * 10) / 10;
+        if (previousScore === null || rounded !== previousScore) {
+          sharedRank = index + 1;
+          previousScore = rounded;
+        }
+        map.set(tr.teamId, getRankToPointsValue(playerCount, sharedRank) ?? engineTeamPoints.get(tr.teamId) ?? 0);
+      });
+      // Teams ohne echten Score: keine Platzierungs-Punkte (nicht der Platz-1-Wert).
+      for (const tr of dp.teamResults ?? []) {
+        if (!map.has(tr.teamId)) map.set(tr.teamId, 0);
+      }
+      return map;
+    };
+    const d1PointsByTeam = placementPointsForSide(d1, "d1");
+    const d2PointsByTeam = placementPointsForSide(d2, "d2");
+    const teamResults: MatchdayPanelTeamResult[] = results.map((r) => {
+      const d1Points = d1 ? d1PointsByTeam.get(r.teamId) ?? 0 : null;
+      const d2Points = d2 ? d2PointsByTeam.get(r.teamId) ?? 0 : null;
+      return {
+        teamId: r.teamId,
+        d1DisciplineId: d1?.disciplineId ?? null,
+        d1Points,
+        d2DisciplineId: d2?.disciplineId ?? null,
+        d2Points,
+        totalPoints: (d1Points ?? 0) + (d2Points ?? 0),
+      };
+    });
+    return { d1, d2, standings, mutatorByTeam, teamResults };
   }, [preview, gameState, matchdayId, briefingItems, standingsItems]);
 
   // Bühne muss mit einer Disziplin DES aktuellen Spieltags starten, nicht mit dem
@@ -1161,7 +1220,7 @@ export default function DisciplineStageArena({
       {mode === "real" && preview && matchdayPanel ? (
         <div style={{ marginTop: 14 }}>
           <DisciplineStageMatchdayPanel
-            teamResults={preview.teamResults}
+            teamResults={matchdayPanel.teamResults}
             standings={matchdayPanel.standings}
             d1={matchdayPanel.d1}
             d2={matchdayPanel.d2}
@@ -1244,13 +1303,14 @@ export default function DisciplineStageArena({
 
       {mode === "real" && engineDiscipline && arenaEnded ? (
         <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
-          <DisciplineStageEndScreen
-            disciplineName={engineDiscipline.disciplineName}
-            teamResults={engineDiscipline.teamResults}
-            topPlayers={engineDiscipline.topPlayers}
-            matchdayTeams={preview?.teamResults ?? null}
-            teamMetaById={teamMetaById}
-            ownTeamId={ownTeamId}
+          {/* Konsolidiert: die Team-Wertung steht komplett in der Spieltags-Wertung oben
+              (Rang vor→nach inkl. Δ, D1/D2, Mutator, Gesamt). Statt der früheren vier
+              Einzeltabellen (Disziplin-Ergebnis, Spieltag-Gesamt, Standings-Delta) bleibt
+              hier nur die Topspieler-Tabelle + die Highlights. */}
+          <DisciplineStageTopPlayers
+            players={topPlayers.rows}
+            playerIdByRow={topPlayers.ids}
+            onOpenPlayer={(pid) => openDrawerPinned({ kind: "player", playerId: pid })}
           />
           <DisciplineStageHighlights
             candidates={engineDiscipline.highlightCandidates}
@@ -1258,9 +1318,6 @@ export default function DisciplineStageArena({
             playerNameById={playerNameById}
             ownTeamId={ownTeamId}
           />
-          {briefingItems.length > 0 ? (
-            <DisciplineStageStandingsDelta items={briefingItems} teamMetaById={teamMetaById} ownTeamId={ownTeamId} />
-          ) : null}
           {onAdvanceMatchday ? (
             <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <span style={{ fontSize: 12, color: "var(--nl-mut)" }}>
