@@ -907,6 +907,177 @@ function deriveTraitCultureSignals(player: Player, identity: TeamIdentity | null
   };
 }
 
+// --- Spieler-Wesen (Charakter/Gesinnung/Subklasse) treibt die Nachverhandlungs-Forderung ---
+// Anders als deriveTraitCultureSignals (Trait x Team-Identitaet, nur bei erfuellten Schwellen)
+// ist dies der INTRINSISCHE Verhandlungscharakter des Spielers, unabhaengig vom Team:
+// gierige/ego-getriebene Naturen fordern beim Nachverhandeln etwas mehr, bescheidene/faire weniger.
+
+// Verhandlungstemperament je Trait (nur echte Traits aus trait-salary-factors.json + Kultur-Kanon).
+// Positiv = hartnaeckiger/ego-/geldgetriebener Verhandler, negativ = bescheiden/fair/teamorientiert.
+const NATURE_TRAIT_DEMAND: Record<string, number> = {
+  egomaniac: 0.03,
+  mercenary: 0.028,
+  diva: 0.022,
+  ambitious: 0.02,
+  manipulative: 0.02,
+  fanfavorite: 0.018,
+  cheater: 0.016,
+  cruel: 0.016,
+  devious: 0.014,
+  fearless: 0.012,
+  feisty: 0.012,
+  gambler: 0.012,
+  vindictive: 0.012,
+  cool: 0.01,
+  eloquent: 0.01,
+  paranoid: 0.01,
+  renegade: 0.01,
+  scandalous: 0.01,
+  firedup: 0.008,
+  sexy: 0.008,
+  timid: -0.03,
+  fainthearted: -0.028,
+  fair: -0.026,
+  loyal: -0.024,
+  altruistic: -0.022,
+  honorable: -0.02,
+  humble: -0.02,
+  relaxed: -0.02,
+  teamplayer: -0.02,
+  flexible: -0.018,
+  caring: -0.016,
+  disciplined: -0.014,
+  diligent: -0.012,
+  lazy: -0.012,
+  motivated: -0.012,
+};
+
+// Prestige-/Status-Archetypen fordern etwas mehr, dienende/unterstuetzende weniger.
+const NATURE_SUBCLASS_DEMAND: Record<string, number> = {
+  god: 0.024,
+  royalty: 0.022,
+  "prime evil": 0.022,
+  lord: 0.02,
+  executioner: 0.018,
+  angel: 0.016,
+  behemoth: 0.016,
+  vampire: 0.014,
+  succubus: 0.012,
+  warlock: 0.012,
+  amazoness: 0.01,
+  pirate: 0.01,
+  viking: 0.01,
+  servant: -0.022,
+  monk: -0.02,
+  bot: -0.018,
+  "pet master": -0.016,
+  healer: -0.016,
+  engineer: -0.014,
+  cleric: -0.014,
+  druid: -0.012,
+  scout: -0.012,
+  shaman: -0.012,
+  creature: -0.01,
+  undead: -0.008,
+};
+
+function deriveAlignmentDemandDelta(alignment: string | null | undefined): number {
+  const raw = (alignment ?? "").trim().toUpperCase();
+  if (!raw || raw === "NEUTRAL" || raw === "N" || raw === "N-N") {
+    return 0;
+  }
+  const parts = raw.split(/[-_/]/).filter(Boolean);
+  const order = parts[0] ?? "";
+  const morality = parts[1] ?? "";
+  let delta = 0;
+  // Ordnungsachse: Rechtschaffen (R) verhandelt fairer, Chaotisch (C) haerter.
+  if (order === "R") delta -= 0.02;
+  else if (order === "C") delta += 0.02;
+  // Moralachse: Gut (G) senkt, Boese (B) erhoeht die Forderung.
+  if (morality === "G") delta -= 0.02;
+  else if (morality === "B") delta += 0.02;
+  return delta;
+}
+
+function derivePlayerNatureDemandSignals(player: Player) {
+  const demandEntries: NegotiationDemandBreakdownEntry[] = [];
+  const reasons: string[] = [];
+
+  // 1) Charakter (Traits)
+  const traitTokens = new Set(
+    [...player.traitsPositive, ...player.traitsNegative].map((trait) => normalizeTransfermarktToken(trait)),
+  );
+  let traitDelta = 0;
+  for (const [token, weight] of Object.entries(NATURE_TRAIT_DEMAND)) {
+    if (traitTokens.has(token)) {
+      traitDelta += weight;
+    }
+  }
+  traitDelta = clamp(traitDelta, -0.1, 0.12);
+
+  // 2) Subklasse (Prestige vs. dienend)
+  const subclassTokens = new Set((player.subclasses ?? []).map((sub) => normalizeTransfermarktToken(sub)));
+  let subclassDelta = 0;
+  for (const [token, weight] of Object.entries(NATURE_SUBCLASS_DEMAND)) {
+    if (subclassTokens.has(token)) {
+      subclassDelta += weight;
+    }
+  }
+  subclassDelta = clamp(subclassDelta, -0.05, 0.05);
+
+  // 3) Gesinnung (Wesen)
+  const alignmentDelta = deriveAlignmentDemandDelta(player.alignment);
+
+  const traitMultiplier = 1 + traitDelta;
+  const subclassMultiplier = 1 + subclassDelta;
+  const alignmentMultiplier = 1 + alignmentDelta;
+
+  pushDemandBreakdown(demandEntries, {
+    key: "nature_trait_demand",
+    label: "Charakter",
+    category: "personality",
+    multiplier: traitMultiplier,
+    reason:
+      traitDelta > 0
+        ? "Ego-/geldgetriebene Traits treiben die Nachverhandlungs-Forderung hoch."
+        : "Bescheidene/teamorientierte Traits daempfen die Forderung.",
+  });
+  pushDemandBreakdown(demandEntries, {
+    key: "nature_subclass_demand",
+    label: "Subklasse",
+    category: "personality",
+    multiplier: subclassMultiplier,
+    reason:
+      subclassDelta > 0
+        ? "Prestige-Archetyp erwartet ein Status-Gehalt."
+        : "Dienender Archetyp verhandelt zurueckhaltender.",
+  });
+  pushDemandBreakdown(demandEntries, {
+    key: "nature_alignment_demand",
+    label: "Wesen",
+    category: "personality",
+    multiplier: alignmentMultiplier,
+    reason:
+      alignmentDelta > 0
+        ? "Chaotisches/boeses Wesen verhandelt haerter."
+        : "Rechtschaffenes/gutes Wesen verhandelt fairer.",
+  });
+
+  // Gesamt-Wesen-Multiplikator, gebaendigt damit er nicht dominiert.
+  const salaryMultiplier = clamp(traitMultiplier * subclassMultiplier * alignmentMultiplier, 0.85, 1.18);
+  if (salaryMultiplier > 1.04) {
+    reasons.push("Das Wesen des Spielers treibt die Forderung nach oben.");
+  } else if (salaryMultiplier < 0.96) {
+    reasons.push("Das Wesen des Spielers senkt die Forderung.");
+  }
+
+  return {
+    salaryMultiplier,
+    demandEntries,
+    reasons,
+  };
+}
+
 function deriveFitDemandMultiplier(teamFit: number) {
   if (teamFit >= 0) return 1;
   return 1 + clamp(Math.abs(teamFit) / 80, 0.04, 0.2);
@@ -1334,6 +1505,7 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
 
   if (input.player && baseExpectedSalary != null && baseExpectedSalary > 0) {
     const cultureSignals = deriveTraitCultureSignals(input.player, input.teamIdentity);
+    const natureSignals = derivePlayerNatureDemandSignals(input.player);
     const moodDemand = deriveNegotiationMood(input) / 100;
     const contractLengthSignal = deriveRetoolContractSalarySignal(
       contractLength,
@@ -1364,6 +1536,7 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
     demandBreakdown.push(...contractLengthSignal.demandEntries);
     demandBreakdown.push(...contractShapeSignal.entries);
     demandBreakdown.push(...cultureSignals.demandEntries);
+    demandBreakdown.push(...natureSignals.demandEntries);
     demandBreakdown.push(...teamDemandSignals.entries);
     pushDemandBreakdown(demandBreakdown, {
       key: "prior_bad_experience",
@@ -1383,6 +1556,7 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
     const rawDemandMultiplier = clamp(
       fitDemandMultiplier *
         cultureSignals.salaryMultiplier *
+        natureSignals.salaryMultiplier *
         trustMultiplier *
         contractLengthSignal.contractFactor *
         contractLengthSignal.shortTermMultiplier *
@@ -1413,6 +1587,7 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
       warnings.push(...contractPreference.warnings);
     }
     reasons.push(...cultureSignals.reasons);
+    reasons.push(...natureSignals.reasons);
   }
 
   offeredSalary = offeredSalary ?? expectedSalary ?? baseExpectedSalary;

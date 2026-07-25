@@ -1620,6 +1620,54 @@ describe("transfermarkt local service", () => {
     expect(mercenaryPreview.scoreBreakdown.some((entry) => entry.key === "contract_length_security")).toBe(true);
   });
 
+  it("scales the re-negotiation demand with the player's nature (traits, alignment, subclass)", () => {
+    const team = persistenceState.save!.gameState.teams[0]!;
+    const negotiate = (partial: Partial<Player>) =>
+      buildContractNegotiationPreview({
+        saveId: "save-singleplayer-dev",
+        seasonId: "season-1",
+        team,
+        teamIdentity: null,
+        teamStrategyProfile: null,
+        player: createPlayer("nature-target", {
+          salaryDemand: 100,
+          displaySalary: 10,
+          alignment: "N",
+          subclasses: [],
+          traitsPositive: [],
+          traitsNegative: [],
+          ...partial,
+        }),
+        rosterPlayers: [],
+        contractLength: 3,
+        contractShape: "balanced",
+        offeredSalary: 10,
+        seasonLabelBase: "Season 1",
+      });
+
+    // 1) Charakter: nature-only Traits (nicht im Kultur-Helper) treiben die Forderung.
+    const ambitious = negotiate({ traitsPositive: ["Ambitious"] });
+    const altruistic = negotiate({ traitsPositive: ["Altruistic"] });
+    expect(ambitious.expectedSalary ?? 0).toBeGreaterThan(altruistic.expectedSalary ?? 0);
+    expect(ambitious.demandBreakdown.some((entry) => entry.key === "nature_trait_demand")).toBe(true);
+
+    // 2) Gesinnung/Wesen: Chaotisch-Boese fordert mehr als Rechtschaffen-Gut.
+    const chaoticEvil = negotiate({ alignment: "C-B" });
+    const lawfulGood = negotiate({ alignment: "R-G" });
+    expect(chaoticEvil.expectedSalary ?? 0).toBeGreaterThan(lawfulGood.expectedSalary ?? 0);
+    expect(chaoticEvil.demandBreakdown.some((entry) => entry.key === "nature_alignment_demand")).toBe(true);
+
+    // 3) Subklasse: Prestige-Archetyp fordert mehr als dienender Archetyp.
+    const royalty = negotiate({ subclasses: ["Royalty"] });
+    const servant = negotiate({ subclasses: ["Servant"] });
+    expect(royalty.expectedSalary ?? 0).toBeGreaterThan(servant.expectedSalary ?? 0);
+    expect(royalty.demandBreakdown.some((entry) => entry.key === "nature_subclass_demand")).toBe(true);
+
+    // Neutrale Natur bleibt am Basisgehalt (kein Wesen-Aufschlag/Abschlag).
+    const neutral = negotiate({});
+    expect(neutral.demandBreakdown.some((entry) => entry.key.startsWith("nature_"))).toBe(false);
+  });
+
   it("applies the Retool extra 10 percent salary discount once team fit reaches 25", () => {
     const team = persistenceState.save!.gameState.teams[0]!;
     const player = createPlayer("fit-discount-target", {
