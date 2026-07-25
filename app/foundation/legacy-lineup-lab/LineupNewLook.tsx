@@ -46,6 +46,22 @@ import type { MatchdayIntensityStage } from "@/lib/lineups/matchday-slot-roles";
 type NlCandidateEntry = LegacyLineupFocusV2BoardProps["candidateGroups"][number]["entries"][number];
 type NlBestSlotEntry = { slotKey: string; disciplineSide: "d1" | "d2"; slotIndex: number; projectedScore: number | null; projectedDelta: number | null; fitSummary: string };
 
+/**
+ * Formkarten-Direktzuweisung pro Diszi (Feature): der Client liefert je Seite die
+ * bereits gefilterten/formatierten Kartenoptionen (primär/sekundär) plus die aktuelle
+ * Auswahl. Die Einsatzliste rendert daraus zwei kompakte Dropdowns und ruft
+ * `onAssignDisciplineFormCard` — die Persistenz (Formplan + Modifier-Sync) liegt beim Client.
+ */
+type NlFormCardChoice = { id: string; label: string };
+type NlDisciplineFormCardControl = {
+  disciplineId: string | null;
+  colorLabel: string | null;
+  primarySelectedId: string | null;
+  secondarySelectedId: string | null;
+  primaryOptions: NlFormCardChoice[];
+  secondaryOptions: NlFormCardChoice[];
+};
+
 export type LineupNewLookProps = Pick<
   LegacyLineupFocusV2BoardProps,
   | "context"
@@ -112,6 +128,20 @@ export type LineupNewLookProps = Pick<
    * null/nicht-ok => Show wird gar nicht angeboten (progressive Enhancement).
    */
   resolvePreview: LegacyLineupPreviewResult | null;
+  /**
+   * Formkarten-Direktzuweisung je Diszi (optional, additiv). Ist die Prop gesetzt,
+   * zeigt jede Disziplin zwei Dropdowns (primäre/sekundäre Formkarte). Fehlt sie
+   * (z. B. Read-Only-Kontexte ohne Formkarten), bleibt die Ansicht unverändert.
+   */
+  formCardControlsBySide?: { d1: NlDisciplineFormCardControl; d2: NlDisciplineFormCardControl } | null;
+  onAssignDisciplineFormCard?: (
+    side: "d1" | "d2",
+    slot: "primary" | "secondary",
+    cardId: string | null,
+    disciplineId: string | null,
+  ) => void;
+  /** Pro Seite: läuft gerade ein Formplan-Save (Dropdowns kurz deaktivieren). */
+  formCardSavePendingSide?: { d1: boolean; d2: boolean } | null;
 };
 
 /* --- Format-Helfer (lokal, präsentational) --------------------------- */
@@ -948,6 +978,9 @@ export default function LineupNewLook({
   statusMessage,
   errors,
   resolvePreview,
+  formCardControlsBySide,
+  onAssignDisciplineFormCard,
+  formCardSavePendingSide,
 }: LineupNewLookProps) {
   const [hoveredCandidateId, setHoveredCandidateId] = useState<string | null>(null);
   // Compare-Tray (Feature 3): angehefteter Kandidat A; hovert man einen anderen
@@ -1455,6 +1488,78 @@ export default function LineupNewLook({
             </div>
           ) : null}
         </header>
+
+        {(() => {
+          // Formkarten-Direktzuweisung (Feature): zwei Dropdowns je Diszi (primär/sekundär).
+          // Nur zeigen, wenn es tatsächlich etwas auszuwählen/anzuzeigen gibt, sonst kein Clutter.
+          const control = formCardControlsBySide?.[disciplineSide] ?? null;
+          if (!control) return null;
+          const hasAnything =
+            control.primaryOptions.length > 0 ||
+            control.secondaryOptions.length > 0 ||
+            control.primarySelectedId != null ||
+            control.secondarySelectedId != null;
+          if (!hasAnything) return null;
+          const pending = formCardSavePendingSide?.[disciplineSide] ?? false;
+          const disabled = isReadOnly || isBusy || pending;
+          const renderFormCardSelect = (
+            slot: "primary" | "secondary",
+            label: string,
+            selectedId: string | null,
+            options: NlFormCardChoice[],
+          ) => (
+            <label
+              style={{ display: "flex", flexDirection: "column", gap: "3px", flex: "1 1 160px", minWidth: 0 }}
+            >
+              <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.03em", color: "var(--nl-mut)", textTransform: "uppercase" }}>
+                {label}
+              </span>
+              <select
+                className="input"
+                style={{ fontSize: "12px", padding: "4px 6px" }}
+                value={selectedId ?? ""}
+                disabled={disabled}
+                aria-label={`${disciplineSide.toUpperCase()} ${label} Formkarte`}
+                onChange={(event) =>
+                  onAssignDisciplineFormCard?.(disciplineSide, slot, event.target.value || null, control.disciplineId)
+                }
+              >
+                <option value="">— keine —</option>
+                {options.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          );
+          return (
+            <div
+              className="nl-lineup-formcards"
+              data-testid={`nl-lineup-formcards-${disciplineSide}`}
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "flex-end",
+                gap: "8px",
+                margin: "0 0 8px",
+                padding: "8px 10px",
+                borderRadius: "var(--nl-r-card, 10px)",
+                border: "1px solid var(--nl-line)",
+                background: "var(--nl-panel-2)",
+              }}
+            >
+              <span
+                style={{ fontSize: "11px", fontWeight: 800, letterSpacing: "0.02em", color: "var(--nl-ink)", flex: "1 1 100%" }}
+              >
+                Formkarten{control.colorLabel ? ` · Diszi-Farbe ${control.colorLabel}` : ""}
+                {pending ? <em style={{ fontStyle: "normal", color: "var(--nl-mut)", fontWeight: 600 }}> · speichert…</em> : null}
+              </span>
+              {renderFormCardSelect("primary", "Primär", control.primarySelectedId, control.primaryOptions)}
+              {renderFormCardSelect("secondary", "Sekundär (+)", control.secondarySelectedId, control.secondaryOptions)}
+            </div>
+          );
+        })()}
 
         <div className="nl-lineup-slot-grid">
           {sideSlots.map((slot, slotRevealIndex) => {

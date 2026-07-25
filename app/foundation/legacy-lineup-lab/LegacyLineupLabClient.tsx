@@ -6875,6 +6875,49 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     setActiveFormPickCell(null);
   }
 
+  // Formkarten-Direktzuweisung aus der Einsatzliste (statt nur über die Formplan-Seite):
+  // setzt/leert eine Slot-Karte für die AKTUELLE Spieltag-Seite. Persistiert über denselben
+  // Formplan-Save-Pfad wie das FormBoardPanel (queueFormCardPlanSave → Modifier-Sync).
+  function assignDisciplineFormCardFromLineup(
+    disciplineSide: "d1" | "d2",
+    slot: "primary" | "secondary",
+    cardId: string | null,
+    disciplineId: string | null,
+  ) {
+    if (isReadOnly) {
+      return;
+    }
+    const plan = formCardPlanByKey.get(`${params.matchdayId}:${disciplineSide}`) ?? null;
+    queueFormCardPlanSave({
+      matchdayId: params.matchdayId,
+      disciplineSide,
+      disciplineId,
+      primaryFormCardId: slot === "primary" ? cardId : plan?.primaryFormCardId ?? null,
+      secondaryFormCardId: slot === "secondary" ? cardId : plan?.secondaryFormCardId ?? null,
+    });
+  }
+
+  function buildLineupFormCardControlForSide(disciplineSide: "d1" | "d2") {
+    const discipline =
+      disciplineSide === "d1"
+        ? context?.matchdayContract?.discipline1 ?? null
+        : context?.matchdayContract?.discipline2 ?? null;
+    const color = getFormCardColorForCategory(discipline?.category ?? null);
+    const plan = formCardPlanByKey.get(`${params.matchdayId}:${disciplineSide}`) ?? null;
+    const toChoice = (card: LegacyFormCardOption) => ({
+      id: card.id,
+      label: formatFormCardOptionLabel(card, color),
+    });
+    return {
+      disciplineId: discipline?.disciplineId ?? null,
+      colorLabel: color ? formatFormCardColorLabel(color) : null,
+      primarySelectedId: plan?.primaryFormCardId ?? null,
+      secondarySelectedId: plan?.secondaryFormCardId ?? null,
+      primaryOptions: getFormBoardCardOptions(params.matchdayId, disciplineSide, "primary", color).map(toChoice),
+      secondaryOptions: getFormBoardCardOptions(params.matchdayId, disciplineSide, "secondary", color).map(toChoice),
+    };
+  }
+
   function getTeamPowerOptionsForSide(disciplineSide: "d1" | "d2") {
     const selectedPowerId = modifiers[disciplineSide].teamPowerId;
     const otherPowerId = disciplineSide === "d1" ? modifiers.d2.teamPowerId : modifiers.d1.teamPowerId;
@@ -7046,6 +7089,46 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   // Stelle bereits gelaufen (stabile Hook-Reihenfolge beim Umschalten). Der neue
   // Squad-Builder konsumiert dieselben abgeleiteten Daten und ruft dieselben
   // Handler auf wie der focusV2-Pfad; Flag aus => bestehende Ansicht unverändert.
+    //
+    // Formplan-Ansicht: Der Shell schaltet die Sub-View auf "formplan" (=> draftBoardView "formBoard").
+    // Früher rendere der Client dennoch immer die Einsatzliste (LineupNewLook), sodass der Formplan-Tab
+    // nichts anzeigte ("Seite funktioniert nicht"). Das bereits vollständig gebaute FormBoardPanel wird
+    // hier jetzt gemountet und mit den vorhandenen Handlern/Derivations versorgt.
+    if (draftBoardView === "formBoard") {
+      return (
+        <FormBoardPanel
+          modifiers={modifiers}
+          context={context}
+          draft={draft}
+          draftIntensityPreview={draftIntensityPreview}
+          formPlanOpenCells={formPlanOpenCells}
+          formDeckCards={formDeckCards}
+          formCardCounts={formCardCounts}
+          activeFormPickCell={activeFormPickCell}
+          formCardPlanByKey={formCardPlanByKey}
+          formCardPlanPendingKey={formCardPlanPendingKey}
+          usedFormCards={usedFormCards}
+          isReadOnly={isReadOnly}
+          matchdayId={params.matchdayId}
+          matchdayOptions={options.matchdays}
+          formatModifierSourceLabel={formatModifierSourceLabel}
+          formatFormPlanImpact={formatFormPlanImpact}
+          formatFormCardValueLabel={formatFormCardValueLabel}
+          formatFormCardColorLabel={formatFormCardColorLabel}
+          formatFormCardOptionLabel={formatFormCardOptionLabel}
+          formatNullableScore={formatNullableScore}
+          resolveTeamDisciplineRank={resolveTeamDisciplineRank}
+          getFormCardColorForCategory={getFormCardColorForCategory}
+          getFormBoardCardOptions={getFormBoardCardOptions}
+          renderSelectedFormCardChip={renderSelectedFormCardChip}
+          clearActiveFormPickCell={clearActiveFormPickCell}
+          assignFormCardFromDeck={assignFormCardFromDeck}
+          assignFormCardToCell={assignFormCardToCell}
+          setActiveFormPickCell={setActiveFormPickCell}
+          skipFormCardsForSide={skipFormCardsForSide}
+        />
+      );
+    }
     return (
       <LineupNewLook
         context={context}
@@ -7131,6 +7214,15 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         statusMessage={message}
         errors={errors}
         resolvePreview={preview}
+        formCardControlsBySide={{
+          d1: buildLineupFormCardControlForSide("d1"),
+          d2: buildLineupFormCardControlForSide("d2"),
+        }}
+        onAssignDisciplineFormCard={assignDisciplineFormCardFromLineup}
+        formCardSavePendingSide={{
+          d1: formCardPlanPendingKey === `${params.matchdayId}:d1`,
+          d2: formCardPlanPendingKey === `${params.matchdayId}:d2`,
+        }}
         controlsSlot={
           <>
             <label>
