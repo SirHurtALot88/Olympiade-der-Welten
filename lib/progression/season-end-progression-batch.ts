@@ -69,23 +69,29 @@ function createProgressionCapturePersistence(input: {
   };
 }
 
-export function runSeasonEndProgressionBatch(input: {
-  save: PersistedSaveGame;
-  persistence: PersistenceService;
-  /** When true (default), writes the batched final state once to the delegate persistence. */
-  persistFinalState?: boolean;
-}): SeasonEndProgressionBatchResult {
-  const materializationSave: PersistedSaveGame = {
-    ...input.save,
-    status: "active",
-  };
-  const capture = createProgressionCapturePersistence({
-    save: materializationSave,
-    delegate: input.persistence,
-    skipDelegateWrites: true,
-  });
-  const completedSeasonId = input.save.gameState.season.id;
-  const teamControlSettings = materializationSave.gameState.seasonState.teamControlSettings ?? {};
+export type SeasonEndProgressionBatchPreview = {
+  /** Per-team organic dry-run previews (the exact objects the apply consumes) — no mutations/persistence. */
+  teamApplies: SeasonEndProgressionTeamApply[];
+  teamsProcessed: number;
+  teamsApplied: number;
+  humanOrganicTeams: number;
+  aiOrganicFallbackTeams: number;
+  warnings: string[];
+  blockingReasons: string[];
+};
+
+/**
+ * Audit #5: single-source DRY-RUN of the season-end organic progression for ALL rostered teams. This is
+ * exactly the per-team `previewSeasonEndXpSpend` pass that `runSeasonEndProgressionBatch` runs before it
+ * applies mutations — extracted so BOTH the apply path AND the pre-season workflow preview consume the same
+ * computation (⇒ "Vorschau == Apply" by construction, replacing the legacy hardcoded `power +1` preview).
+ * Pure: builds the shared economy context + O(n²)-guarded pre-computed XP map ONCE and performs no writes.
+ */
+export function previewSeasonEndProgressionBatch(save: PersistedSaveGame): SeasonEndProgressionBatchPreview {
+  const materializationSave: PersistedSaveGame = { ...save, status: "active" };
+  const gameState = materializationSave.gameState;
+  const completedSeasonId = gameState.season.id;
+  const teamControlSettings = gameState.seasonState.teamControlSettings ?? {};
   const warnings: string[] = [];
   const blockingReasons: string[] = [];
   let teamsProcessed = 0;
@@ -93,26 +99,25 @@ export function runSeasonEndProgressionBatch(input: {
   let humanOrganicTeams = 0;
   let aiOrganicFallbackTeams = 0;
 
-  const sharedEconomyContext = buildEconomyPreviewContext(materializationSave.gameState);
+  // Perf: shared context + precompute map built EXACTLY once (buildPreComputedSeasonXpMap is the
+  // O(n²)-avoidance from the apply service). Both are reused across every team below.
+  const sharedEconomyContext = buildEconomyPreviewContext(gameState);
   const sharedPreComputedSeasonXp = buildPreComputedSeasonXpMap(materializationSave);
   const teamApplies: SeasonEndProgressionTeamApply[] = [];
 
-  console.error(
-    `[season-end-xp] ${completedSeasonId}: preview ${materializationSave.gameState.teams.length} teams…`,
-  );
+  console.error(`[season-end-xp] ${completedSeasonId}: preview ${gameState.teams.length} teams…`);
 
-  for (const team of materializationSave.gameState.teams) {
-    const currentSave = capture.getSave();
-    const rosterCount = currentSave.gameState.rosters.filter((entry) => entry.teamId === team.teamId).length;
+  for (const team of gameState.teams) {
+    const rosterCount = gameState.rosters.filter((entry) => entry.teamId === team.teamId).length;
     if (rosterCount === 0) continue;
     teamsProcessed += 1;
-    if (teamsProcessed === 1 || teamsProcessed % 8 === 0 || teamsProcessed === materializationSave.gameState.teams.length) {
-      console.error(`[season-end-xp] ${completedSeasonId}: preview team ${teamsProcessed}/${materializationSave.gameState.teams.length} (${team.shortCode})`);
+    if (teamsProcessed === 1 || teamsProcessed % 8 === 0 || teamsProcessed === gameState.teams.length) {
+      console.error(`[season-end-xp] ${completedSeasonId}: preview team ${teamsProcessed}/${gameState.teams.length} (${team.shortCode})`);
     }
     const controlMode = teamControlSettings[team.teamId]?.controlMode ?? (team.humanControlled === false ? "ai" : "manual");
 
     const preview = previewSeasonEndXpSpend(
-      currentSave,
+      materializationSave,
       team.teamId,
       sharedEconomyContext,
       { skipAfterEconomyAudit: true, fastDisciplineLeague: true },
@@ -130,6 +135,38 @@ export function runSeasonEndProgressionBatch(input: {
     if (controlMode === "ai") aiOrganicFallbackTeams += 1;
     else humanOrganicTeams += 1;
   }
+
+  return { teamApplies, teamsProcessed, teamsApplied, humanOrganicTeams, aiOrganicFallbackTeams, warnings, blockingReasons };
+}
+
+export function runSeasonEndProgressionBatch(input: {
+  save: PersistedSaveGame;
+  persistence: PersistenceService;
+  /** When true (default), writes the batched final state once to the delegate persistence. */
+  persistFinalState?: boolean;
+}): SeasonEndProgressionBatchResult {
+  const materializationSave: PersistedSaveGame = {
+    ...input.save,
+    status: "active",
+  };
+  const capture = createProgressionCapturePersistence({
+    save: materializationSave,
+    delegate: input.persistence,
+    skipDelegateWrites: true,
+  });
+  const completedSeasonId = input.save.gameState.season.id;
+
+  // Identical dry-run as the pre-season workflow preview (Vorschau == Apply): read the capture's save so
+  // the teamApplies are computed against the very gameState the mutations are then applied to.
+  const {
+    teamApplies,
+    teamsProcessed,
+    teamsApplied,
+    humanOrganicTeams,
+    aiOrganicFallbackTeams,
+    warnings,
+    blockingReasons,
+  } = previewSeasonEndProgressionBatch(capture.getSave());
 
   const beforeBatchSave = capture.getSave();
   let batchedGameState = beforeBatchSave.gameState;

@@ -505,6 +505,13 @@ function buildEconomyAudit(input: {
   } satisfies SeasonEndProgressionEconomyAudit;
 }
 
+/**
+ * @deprecated Audit #5: Legacy „power +1"-XP-Kosten-Vorschau, die NIE angewendet wurde. Der
+ * Pre-Season-Workflow zeigt jetzt `previewSeasonEndProgressionBatch` (identisch zum organischen Apply).
+ * Nur noch von Debug-/CSV-Scripts genutzt; nicht in neuen UI-Pfaden verwenden. Die Helfer dieses Moduls
+ * (getProgressionRatingTier / buildPreviewDisciplineRatingsFromAttributes / buildSeasonEndDisciplineDeltas
+ * / buildCoreStatsFromDisciplineRatings) bleiben aktiv — sie werden vom Apply-Service importiert.
+ */
 export function buildSeasonEndProgressionPreview(input: {
   gameState: GameState;
   teamId?: string | null;
