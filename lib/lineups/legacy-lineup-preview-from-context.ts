@@ -8,6 +8,10 @@ import {
 import { calculatePassiveTeamPowerBonus, calculateTeamPowerModifierForSide } from "@/lib/lineups/team-powers";
 import { SEASON_CAPTAIN_SLOTS } from "@/lib/lineups/lineup-discipline-contract";
 import { buildLegacyLineupAggregateScore, scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
+import {
+  applyCaptainRivalryPressureReduction,
+  calculateSideSlotRoleModifierTotal,
+} from "@/lib/lineups/matchday-slot-roles";
 import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { buildPlayerMoralePerformanceMap } from "@/lib/morale/player-morale-performance";
 import type { GameState, LineupDraft } from "@/lib/data/olyDataTypes";
@@ -177,6 +181,30 @@ export function calculateLocalLegacyLineupPreviewFromContext(
       passiveTeamPowerBonus > 0
         ? `${teamPowerResult.teamPowerLabel ? `${teamPowerResult.teamPowerLabel} ` : ""}(+${passiveTeamPowerBonus}% Identität)`
         : teamPowerResult.teamPowerLabel;
+    // Slot-Rollen-Malus + Rivalitätsdruck GENAU wie im echten Resolve (legacy-matchday-resolve-engine)
+    // nachbilden, sonst rechnet die Vorschau mit slotRoleModifier=0 (Engine-Default) und weicht vom
+    // tatsächlichen Spieltags-Score ab — dieselbe „Vorschau ≠ Ergebnis"-Klasse wie beim Form-Jitter.
+    const disciplineTop8Rivals = context.teamPowerWindows?.[disciplineId]?.top8Rivals ?? [];
+    const rivalryTopRank = Math.min(...disciplineTop8Rivals.map((rival) => rival.rank));
+    const rawRivalryPressure = Number.isFinite(rivalryTopRank) ? (rivalryTopRank <= 3 ? 1.5 : 1) : 0;
+    const rivalryPressure = applyCaptainRivalryPressureReduction(
+      rawRivalryPressure,
+      teamCaptain?.effects.rivalryPressureReductionPct ?? null,
+    );
+    const slotRoleModifier = calculateSideSlotRoleModifierTotal({
+      disciplineId,
+      disciplineSide,
+      entries: sideEntries.map((entry) => ({ playerId: entry.playerId, slotIndex: entry.slotIndex })),
+      rosterPlayers: context.rosterPlayers,
+      disciplineScores: context.disciplineScores,
+      intensity: previewModifiers[disciplineSide].intensity ?? "normal",
+      fatigueByPlayerId: fatigueMap ?? null,
+      requiredPlayers:
+        context.disciplineSidePlayerCounts?.[pair] ??
+        context.disciplinePlayerCounts[disciplineId] ??
+        null,
+      rivalryPressure,
+    });
     return {
       score: scoreLegacyLineupDisciplineSide({
         disciplineId,
@@ -194,6 +222,7 @@ export function calculateLocalLegacyLineupPreviewFromContext(
         moraleByPlayerId,
         fatigueSourceStatus: fatigueMap ? "mapped" : "missing_source",
         intensity: previewModifiers[disciplineSide].intensity,
+        slotRoleModifier,
         formCardsAvailable: formResult.formCardsAvailable,
         formCardsSelected: formResult.formCardsSelected,
         formCardLabel: formResult.formCardLabel,
