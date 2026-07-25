@@ -364,7 +364,7 @@ function NlTrainingIntensityProjection({
             aria-checked={entry.isCurrent}
             disabled={readOnly}
             onClick={() => onSelectMode(entry.mode as PlayerTrainingMode)}
-            title={`${entry.label} wählen · Fatigue-Last ${formatNlNumber(entry.fatigueLoad, 0)} · Erholungs-Tempo ${formatSignedPercent(entry.recoveryDeltaPct)} (Erholungs-Rate, nicht Fatigue-Last)`}
+            title={`${entry.label} wählen · Netto ${formatNlSignedNumber(entry.net, 1)} SP = Training +${formatNlNumber(entry.trainingGain, 1)}${entry.performanceGain ? ` + Performance +${formatNlNumber(entry.performanceGain, 1)}` : ""} − Regression ${formatNlNumber(Math.abs(entry.regression), 1)} − Potential-Decke ${formatNlNumber(entry.ceilingLoss, 1)} · Fatigue-Last ${formatNlNumber(entry.fatigueLoad, 0)} · Erholungs-Tempo ${formatSignedPercent(entry.recoveryDeltaPct)} (Erholungs-Rate, nicht Fatigue-Last)`}
           >
             <span className="nl-training-intensity-label">
               {entry.label}
@@ -397,8 +397,13 @@ function NlTrainingIntensityProjection({
         ))}
       </div>
       <small className="nl-training-intensity-foot nl-tnum">
-        Regression konstant {formatNlSignedNumber(projection[0]?.regression ?? 0, 1)} · höheres Potential ⇒ größerer
-        Trainings-Zuwachs · höhere Intensität kostet Regeneration (Verletzungsrisiko steigt)
+        Netto = Training − Regression {formatNlSignedNumber(projection[0]?.regression ?? 0, 1)} (konstant) − Potential-Decke.
+        Die Decke schneidet Zuwachs an fast vollen Attributen ab und wächst mit der Intensität — deshalb bringt mehr
+        Training nicht 1:1 mehr Netto.
+        {(() => {
+          const current = projection.find((entry) => entry.isCurrent) ?? projection[0];
+          return current ? ` Aktuell (${current.label}): Decke −${formatNlNumber(current.ceilingLoss, 1)} SP.` : "";
+        })()}
       </small>
     </div>
   );
@@ -505,6 +510,18 @@ function NlTrainingPlayerCard({
     () => buildTrainingClassSuggestion(row, trainingClassOptions),
     [row, trainingClassOptions],
   );
+  // Der Vorschlag (Signatur-Attribut-Fit) darf nur erscheinen, wenn er auch die SP-Gewinn-Rangliste
+  // ("Beste Klassen") direkt darunter anführt — sonst widerspricht der Chip der Liste und wirkt sinnlos
+  // (z. B. Vorschlag "Overseer", der in der Top-Rangliste gar nicht auftaucht). Kein Sinn ⇒ kein Chip.
+  const showClassSuggestion = useMemo(() => {
+    if (!classSuggestion) return false;
+    const ranking = buildTrainingClassGainRanking(row, trainingClassOptions, { limit: 99, includeCurrent: true });
+    const best = ranking.find((entry) => entry.rank === 1);
+    if (!best || best.isCurrent) return false;
+    if (best.className !== classSuggestion.className) return false;
+    const currentGain = ranking.find((entry) => entry.isCurrent)?.estimatedGain ?? 0;
+    return best.estimatedGain > currentGain + 0.3;
+  }, [classSuggestion, row, trainingClassOptions]);
   // Label der Klasse, die aktuell tatsächlich trainiert wird (row.trainingClass — kann von
   // row.player.className abweichen, siehe "Trainingsklasse"-Select unten). Wird explizit als
   // "Trainiert:"-Seite im Vorschlags-Chip gezeigt, damit die Klasse nicht mit der oben gezeigten
@@ -673,9 +690,9 @@ function NlTrainingPlayerCard({
         onSelectClass={(className) => onSetTrainingClass(row.player.id, className)}
       />
 
-      {showRecommendation || hasTraitBoost || hasDemand || isHighRisk || classSuggestion ? (
+      {showRecommendation || hasTraitBoost || hasDemand || isHighRisk || showClassSuggestion ? (
         <div className="nl-training-chip-row" aria-label="Trainings-Hinweise">
-          {classSuggestion ? (
+          {showClassSuggestion && classSuggestion ? (
             <span
               className="nl-training-chip is-class-suggest"
               data-testid="training-class-suggestion"
@@ -793,7 +810,10 @@ function NlTrainingWhatIf({
   disabled,
 }: {
   trainingModeOptions: TrainingCompactClientProps["trainingModeOptions"];
-  teamProjectionByMode: Map<PlayerTrainingMode, { trainingGain: number; net: number }>;
+  teamProjectionByMode: Map<
+    PlayerTrainingMode,
+    { trainingGain: number; performanceGain: number; regression: number; ceilingLoss: number; net: number }
+  >;
   squadSize: number;
   baselineNet: number;
   baselineTrainingBudget: number;
@@ -810,7 +830,13 @@ function NlTrainingWhatIf({
   const clampedIndex = Math.min(Math.max(0, modeIndex), trainingModeOptions.length - 1);
   const option = trainingModeOptions[clampedIndex];
   const projected =
-    teamProjectionByMode.get(option.value) ?? { trainingGain: option.trainingSetpoints * squadSize, net: baselineNet };
+    teamProjectionByMode.get(option.value) ?? {
+      trainingGain: option.trainingSetpoints * squadSize,
+      performanceGain: 0,
+      regression: regressionTotal,
+      ceilingLoss: 0,
+      net: baselineNet,
+    };
   const netDelta = projected.net - baselineNet;
   const trainingDelta = projected.trainingGain - baselineTrainingBudget;
   const fatigue = option.fatigueLoad * squadSize;
@@ -845,11 +871,18 @@ function NlTrainingWhatIf({
           title="Projizierter Team-Trainings-Zuwachs, wenn alle Spieler auf diesen Modus trainierten (Summe der pro-Spieler-Prognose, potentialgewichtet)."
         />
         <StatChip
+          label="Potential-Decke"
+          value={`${formatNlNumber(projected.ceilingLoss, 1)} SP`}
+          sub="Zuwachs über der Decke verpufft"
+          tone="risk"
+          title="Der Teil des Trainings, der bei diesem Modus NICHT im Netto landet, weil er auf Attribute nahe ihrer Potential-Obergrenze verteilt und dort abgeschnitten wird. Höhere Intensität ⇒ mehr Verpuffung."
+        />
+        <StatChip
           label="Netto"
           value={`${formatNlSignedNumber(projected.net, 1)} SP`}
-          sub="Performance + Training − Regression"
+          sub="Training + Performance − Regression − Decke"
           tone={projected.net >= 0 ? "good" : "risk"}
-          title="Projizierter Team-Netto-Forecast bei diesem Modus. Positiv = Kader wächst im Schnitt."
+          title="Projizierter Team-Netto-Forecast bei diesem Modus = Trainings-Zuwachs + Performance − Regression − Potential-Decke. Positiv = Kader wächst im Schnitt."
         />
         <StatChip
           label="Belastung"
@@ -862,11 +895,11 @@ function NlTrainingWhatIf({
       <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
         <NlDeltaChip
           value={netDelta}
-          format={(n) => `${formatNlSignedNumber(n, 1)} SP Netto`}
-          title="Veränderung des Team-Netto-Forecasts gegenüber der aktuellen Aufstellung."
+          format={(n) => `${formatNlSignedNumber(n, 1)} SP Netto ggü. aktuell`}
+          title="Veränderung des Team-Netto-Forecasts gegenüber der aktuellen Aufstellung (kein zweiter Netto-Wert, sondern die Differenz zum Ist-Zustand)."
         />
         <small className="nl-tnum" style={{ color: "var(--nl-mut)" }}>
-          Regression konstant {formatNlSignedNumber(regressionTotal, 1)} SP (intensitätsunabhängig)
+          Regression konstant {formatNlSignedNumber(regressionTotal, 1)} SP (intensitätsunabhängig) · Decke wächst mit der Intensität
         </small>
       </div>
     </NlWhatIfSlider>
@@ -930,15 +963,21 @@ export default function TrainingCompactNewLook({
   // Team-Vorschau je Intensität: echte, potentialgewichtete Summe der pro-Spieler-Prognose
   // (nicht der flache Konstant-Wert) — so unterscheidet sich das Team-Budget zwischen Kadern.
   const teamProjectionByMode = useMemo(() => {
-    const totals = new Map<PlayerTrainingMode, { trainingGain: number; net: number }>();
+    const totals = new Map<
+      PlayerTrainingMode,
+      { trainingGain: number; performanceGain: number; regression: number; ceilingLoss: number; net: number }
+    >();
     for (const option of trainingModeOptions) {
-      totals.set(option.value, { trainingGain: 0, net: 0 });
+      totals.set(option.value, { trainingGain: 0, performanceGain: 0, regression: 0, ceilingLoss: 0, net: 0 });
     }
     for (const row of playerRows) {
       for (const entry of buildTrainingIntensityProjection(row, trainingModeOptions)) {
         const bucket = totals.get(entry.mode);
         if (bucket) {
           bucket.trainingGain += entry.trainingGain;
+          bucket.performanceGain += entry.performanceGain;
+          bucket.regression += entry.regression;
+          bucket.ceilingLoss += entry.ceilingLoss;
           bucket.net += entry.net;
         }
       }
@@ -955,10 +994,13 @@ export default function TrainingCompactNewLook({
         right.organicForecast.netSetpoints - left.organicForecast.netSetpoints,
     )[0] ?? null;
 
-  // #48 — Team-Summe für die 4 Header-Kacheln (Performance/Trainings-Zugewinn/
-  // Regression/Netto). Aufsummiert aus den echten, bereits angewendeten
-  // Attribut-Forecast-Feldern (dieselbe Rechnung wie `buildTrainingBudgetBreakdown`
-  // pro Spieler), daher reconciled Training + Performance + Regression exakt zu Netto.
+  // #48 — Team-Summe für die Header-Kacheln (Performance/Trainings-Zugewinn/Regression/
+  // Potential-Decke/Netto). Aufsummiert aus den echten, bereits angewendeten Attribut-
+  // Forecast-Feldern; der Netto-Wert ist die Summe der pro-Spieler `netSetpoints` (jedes
+  // Attribut an seiner Potential-Decke gekappt). Weil Training/Performance/Regression VOR
+  // der Kappung summiert werden, gilt Training + Performance − Regression NICHT von selbst
+  // = Netto — die Differenz IST der Decken-Verlust. Wir weisen ihn als eigene Kachel aus,
+  // damit die Kette exakt aufgeht: Performance + Training − Regression − Decke = Netto.
   const teamKpis = useMemo(() => {
     let performance = 0;
     let training = 0;
@@ -972,7 +1014,10 @@ export default function TrainingCompactNewLook({
       }
       net += row.organicForecast.netSetpoints;
     }
-    return { performance, training, regression, net };
+    // Decken-Verlust (≥ 0): so viel Zuwachs verpufft an den Potential-Obergrenzen. Negativ
+    // dargestellt, damit performance + training + regression + ceiling === net exakt gilt.
+    const ceiling = net - (performance + training + regression);
+    return { performance, training, regression, ceiling, net };
   }, [playerRows]);
 
   // What-if-Baseline: aktuelles echtes Team-Trainingsbudget (Summe der bereits
@@ -988,6 +1033,7 @@ export default function TrainingCompactNewLook({
   const animatedTeamPerformance = useCountUp(teamKpis.performance);
   const animatedTeamTraining = useCountUp(teamKpis.training);
   const animatedTeamRegression = useCountUp(teamKpis.regression);
+  const animatedTeamCeiling = useCountUp(teamKpis.ceiling);
   const animatedTeamNet = useCountUp(teamKpis.net);
 
   return (
@@ -1016,12 +1062,11 @@ export default function TrainingCompactNewLook({
           </div>
         }
       >
-        {/* #48 — 4 klare Kacheln: Performance, Trainings-Zugewinn, Regression, Netto.
-            Jede Kachel summiert dieselben, bereits angewendeten Attribut-Forecast-Felder
-            (row.attributeForecast[].training/performance/regression) über den ganzen Kader,
-            daher gilt exakt Training + Performance + Regression = Netto — keine getrennten,
-            widersprüchlichen Zahlensysteme mehr. */}
-        <StatChipRow aria-label="Trainings-Kennzahlen: Performance, Trainings-Zugewinn, Regression, Netto">
+        {/* #48 — 5 Kacheln: Performance, Trainings-Zugewinn, Regression, Potential-Decke, Netto.
+            Performance/Training/Regression summieren die angewendeten Attribut-Forecast-Felder VOR
+            der Kappung; die Potential-Decke ist der an den Attribut-Obergrenzen verpuffte Zuwachs.
+            Damit gilt exakt: Performance + Training − Regression − Decke = Netto. */}
+        <StatChipRow aria-label="Trainings-Kennzahlen: Performance, Trainings-Zugewinn, Regression, Potential-Decke, Netto">
           <StatChip
             label="Performance"
             value={`+${formatNlNumber(animatedTeamPerformance ?? teamKpis.performance, 1)} SP`}
@@ -1044,11 +1089,18 @@ export default function TrainingCompactNewLook({
             title="SP-Verlust, den der Kader automatisch durch Alterung, Marktwert-Druck und Belastung verliert — muss durch Training + Performance ausgeglichen werden."
           />
           <StatChip
+            label="Potential-Decke"
+            value={`${formatNlNumber(animatedTeamCeiling ?? teamKpis.ceiling, 1)} SP`}
+            sub="Zuwachs über der Decke verpufft"
+            tone="risk"
+            title="Der Teil des Trainings, der NICHT im Netto landet, weil er auf Attribute nahe ihrer gescouteten Potential-Obergrenze verteilt und dort abgeschnitten wird. Höhere Intensität ⇒ mehr Verpuffung."
+          />
+          <StatChip
             label="Netto"
             value={`${formatNlSignedNumber(animatedTeamNet ?? teamKpis.net, 1)} SP`}
-            sub="Performance + Training − Regression"
+            sub="Performance + Training − Regression − Decke"
             tone={teamKpis.net >= 0 ? "good" : "risk"}
-            title="Summe aus Performance + Trainings-Zugewinn − Regression über den ganzen Kader. Positiv = Kader wächst im Schnitt, negativ = Kader baut im Schnitt ab."
+            title="Performance + Trainings-Zugewinn − Regression − Potential-Decke über den ganzen Kader. Positiv = Kader wächst im Schnitt, negativ = Kader baut im Schnitt ab."
           />
         </StatChipRow>
         <p className="nl-training-topline">
@@ -1102,7 +1154,10 @@ export default function TrainingCompactNewLook({
             return (
               <small key={`team-preview-${option.value}`} className="nl-tnum">
                 Alle {option.label}: +{formatNlNumber(team?.trainingGain ?? option.trainingSetpoints * playerRows.length, 1)}{" "}
-                durch Training · Netto {formatNlSignedNumber(team?.net ?? 0, 1)} SP · Fatigue{" "}
+                durch Training{" "}
+                {team && team.performanceGain ? `+ ${formatNlNumber(team.performanceGain, 1)} Performance ` : ""}
+                − {formatNlNumber(Math.abs(team?.regression ?? 0), 1)} Regression − {formatNlNumber(team?.ceilingLoss ?? 0, 1)}{" "}
+                Decke · Netto {formatNlSignedNumber(team?.net ?? 0, 1)} SP · Fatigue{" "}
                 {formatNlNumber(option.fatigueLoad * playerRows.length, 0)}
               </small>
             );

@@ -79,6 +79,13 @@ export type TrainingIntensityProjectionEntry = {
   performanceGain: number;
   /** Regressions-Drag (negativ), intensitätsunabhängig. */
   regression: number;
+  /**
+   * Potential-Decke: der Teil des Trainingsbudgets, der NICHT im Netto landet, weil er auf
+   * Attribute nahe ihrer Potential-Obergrenze verteilt und dort abgeschnitten wird (plus der
+   * Budget→Angewendet-Verteilungsverlust). Positiver Wert = so viel SP verpufft. Es gilt exakt:
+   * `net = trainingGain + performanceGain − |regression| − ceilingLoss`.
+   */
+  ceilingLoss: number;
   /** Projizierter Netto-Forecast, wenn diese Intensität gewählt würde. */
   net: number;
   isCurrent: boolean;
@@ -124,13 +131,21 @@ export function buildTrainingIntensityProjection(
     const perfWeight = PERFORMANCE_WEIGHT_MULTIPLIER_BY_MODE[option.value] ?? 1;
     const performanceGain = appliedPerformanceCurrent * (currentPerfWeight > 0 ? perfWeight / currentPerfWeight : 1);
     const net = currentNet + (appliedTraining - appliedTrainingCurrent) + (performanceGain - appliedPerformanceCurrent);
+    // Aus den GERUNDETEN Anzeigewerten ableiten, damit die Kette auf der Karte exakt aufgeht:
+    // trainingGain + performanceGain − |regression| − ceilingLoss === net (alle 1 Nachkommastelle).
+    const rTrainingGain = roundTo(trainingGain, 1);
+    const rPerformanceGain = roundTo(performanceGain, 1);
+    const rRegression = roundTo(regressionTotal, 1);
+    const rNet = roundTo(net, 1);
+    const ceilingLoss = roundTo(rTrainingGain + rPerformanceGain + rRegression - rNet, 1);
     return {
       mode: option.value,
       label: option.label,
-      trainingGain: roundTo(trainingGain, 1),
-      performanceGain: roundTo(performanceGain, 1),
-      regression: roundTo(regressionTotal, 1),
-      net: roundTo(net, 1),
+      trainingGain: rTrainingGain,
+      performanceGain: rPerformanceGain,
+      regression: rRegression,
+      ceilingLoss,
+      net: rNet,
       isCurrent: option.value === row.mode,
       fatigueLoad: option.fatigueLoad,
       recoveryDeltaPct: option.recoveryDeltaPct,
