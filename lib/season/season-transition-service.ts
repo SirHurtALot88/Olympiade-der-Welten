@@ -159,7 +159,7 @@ function buildStepPreviews(save: PersistedSaveGame, transition: SeasonTransition
         formCardUsageAudit.unusedCards > 0
           ? `Preview liest Preisgeld, Sponsor, Facilities; Formkarten offen: ${formCardUsageAudit.unusedCards} (${formCardUsageAudit.unusedNegativeCards} negative = ${formCardUsageAudit.negativePenaltyPoints} Strafpunkte, positive verfallen).`
           : "Preview liest Preisgeld, Sponsor, Facility-Unterhalt und Facility-Income. Alle Formkarten wurden verbraucht.",
-      player_development: `Preview berechnet XP für ${rosterCount} aktive Spieler ohne Attribut-Writes.`,
+      player_development: `Preview berechnet die organische Saisonende-Entwicklung für ${rosterCount} aktive Spieler (identisch zum Apply, ohne Attribut-Writes bis zur Bestätigung).`,
       preseason_management: `Training, Gebäude, Scouting und Board-Hinweise als Vorschau; ${formCardCount} Formkarten im Save.`,
       transfer_sell_phase: "AI-Verkäufe werden später über Sell-Service vorbereitet; Human-Teams bleiben manuell.",
       transfer_buy_phase: "AI-Käufe laufen nach Verkäufen über Buy-Service; keine Duplikate/kein negatives Cash als spätere Gate-Regeln.",

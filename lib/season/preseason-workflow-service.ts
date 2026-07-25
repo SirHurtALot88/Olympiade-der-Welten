@@ -8,14 +8,13 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { normalizePlayerBaselineRecord } from "@/lib/players/player-baseline-service";
 import {
+  previewSeasonEndProgressionBatch,
   runSeasonEndProgressionBatch,
   type SeasonEndProgressionBatchResult,
 } from "@/lib/progression/season-end-progression-batch";
 import { buildSeasonSeededDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
-import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import { buildCoreStatsFromDisciplineRatings } from "@/lib/training/season-end-progression-preview";
 import { buildLeagueDisciplineRatingsWithAttributeOverrides } from "@/lib/player-formulas/discipline-rating-engine";
-import { buildSeasonEndProgressionPreview } from "@/lib/training/season-end-progression-preview";
 import { buildPrizeMoneyPreview } from "@/lib/season/prize-money-preview";
 import { buildSeasonSnapshotDryRun, upsertSeasonSnapshotRecord } from "@/lib/season/season-snapshot-service";
 import { advanceSeasonEconomyFactorWindow, parseSalaryFactorPatternEnv } from "@/lib/season/season-economy-factors";
@@ -1002,30 +1001,12 @@ export async function buildPreSeasonWorkflowPreview(
   const prizeApplyLogs = save.gameState.seasonState.cashPrizeApplyLogs ?? [];
   const currentSeasonPrizeApplyLogs = prizeApplyLogs.filter((log) => log.seasonId === save.gameState.season.id);
   const prizeApplied = currentSeasonPrizeApplyLogs.length > 0;
-  const forecastsByPlayerId = new Map(
-    save.gameState.rosters.map((entry) => {
-      const player = save.gameState.players.find((candidate) => candidate.id === entry.playerId)!;
-      return [
-        entry.playerId,
-        buildPlayerProgressionForecast({
-          gameState: save.gameState,
-          player,
-          playerRating: null,
-          seasonPerformance: null,
-          trainingModeByPlayerId: {},
-          // XP-System abgeschafft: XP-Inputs neutralisiert (0/organisch).
-          currentXP: 0,
-          spentXP: 0,
-          lifetimeXP: null,
-        }),
-      ] as const;
-    }).filter((entry) => Boolean(entry[1])),
-  );
-  const progressionPreview = buildSeasonEndProgressionPreview({
-    gameState: save.gameState,
-    forecastsByPlayerId,
-    upgradeRequests: save.gameState.rosters.map((entry) => ({ playerId: entry.playerId, attribute: "power" })),
-  });
+  // Audit #5: die Spielerentwicklungs-Vorschau kommt jetzt aus DEMSELBEN organischen Dry-Run, den der
+  // Apply nutzt (previewSeasonEndProgressionBatch) — statt aus dem nie angewendeten Legacy-Szenario
+  // (hartkodiert „power +1" + XP-Kosten + blocked). Damit zeigt der Vorschauschritt das real
+  // angewendete Ergebnis (Vorschau == Apply), nicht ein fiktives Upgrade-Modell.
+  const seasonEndProgressionPreview = previewSeasonEndProgressionBatch(save);
+  const developmentPlayers = seasonEndProgressionPreview.teamApplies.flatMap((entry) => entry.preview.players);
   const contractPreview = previewSeasonEndContracts(save);
   const marketPreviewWarning = "market_candidate_scan_deferred_use_transfermarkt_tab_or_ai_market_apply_service";
   const nextSeasonConfirmToken = buildConfirmToken({
@@ -1088,11 +1069,21 @@ export async function buildPreSeasonWorkflowPreview(
     },
     {
       stepId: "player_development",
-      label: "XP / Spielerentwicklung",
+      label: "Spielerentwicklung (organisch)",
       status: "ready",
       productive: true,
-      summary: { players: progressionPreview.rows.length, planned: progressionPreview.rows.filter((row) => row.status === "planned").length, blocked: progressionPreview.rows.filter((row) => row.status === "blocked").length, productiveWrites: true },
-      warnings: [...progressionPreview.warnings, "applied_with_next_season_setup"],
+      summary: {
+        players: developmentPlayers.length,
+        improving: developmentPlayers.filter((player) => (player.organicProgression?.netSetpoints ?? 0) > 0).length,
+        declining: developmentPlayers.filter((player) => (player.organicProgression?.netSetpoints ?? 0) < 0).length,
+        classChanges: developmentPlayers.filter((player) => player.organicProgression?.classChanged === true).length,
+        netSetpointsTotal: roundValue(
+          developmentPlayers.reduce((sum, player) => sum + (player.organicProgression?.netSetpoints ?? 0), 0),
+        ),
+        blocked: developmentPlayers.filter((player) => player.blockers.length > 0).length,
+        productiveWrites: true,
+      },
+      warnings: [...seasonEndProgressionPreview.warnings, "applied_with_next_season_setup"],
       blockingReasons: [],
       confirmToken: "APPLIED_WITH_NEXT_SEASON_SETUP",
     },

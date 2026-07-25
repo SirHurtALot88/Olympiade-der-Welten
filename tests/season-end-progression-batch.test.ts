@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 import type { GameState, Player, PlayerGeneratorAttributes } from "@/lib/data/olyDataTypes";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { createPlayerBaselinesForPlayers } from "@/lib/players/player-baseline-service";
-import { runSeasonEndProgressionBatch } from "@/lib/progression/season-end-progression-batch";
+import {
+  previewSeasonEndProgressionBatch,
+  runSeasonEndProgressionBatch,
+} from "@/lib/progression/season-end-progression-batch";
+import { normalizePlayerAttributes } from "@/lib/training/organic-season-progression";
 
 const baseAttributes: PlayerGeneratorAttributes = {
   power: 10,
@@ -201,5 +205,28 @@ describe("runSeasonEndProgressionBatch", () => {
     expect(upgrades.length).toBeGreaterThan(0);
     expect(upgrades.every((upgrade) => upgrade.source === "organic_season_progression")).toBe(true);
     expect(upgrades.some((upgrade) => upgrade.source === "manual_xp_spend_preview")).toBe(false);
+  });
+
+  it("preview == apply: previewSeasonEndProgressionBatch matches the applied player attributes (audit #5)", () => {
+    const save = createSave();
+    const { persistence } = createPersistence();
+
+    // Standalone dry-run preview (the one the pre-season workflow shows).
+    const previewedPlayers = previewSeasonEndProgressionBatch(save).teamApplies.flatMap((entry) => entry.preview.players);
+    expect(previewedPlayers.length).toBeGreaterThan(0);
+
+    // Real apply on the same save; read back the mutated players.
+    const result = runSeasonEndProgressionBatch({ save, persistence, persistFinalState: false });
+    const appliedById = new Map(result.save.gameState.players.map((player) => [player.id, player]));
+
+    for (const previewed of previewedPlayers) {
+      const applied = appliedById.get(previewed.playerId);
+      expect(applied, previewed.playerId).toBeTruthy();
+      const appliedAttributes = normalizePlayerAttributes(applied!);
+      expect(appliedAttributes).toBeTruthy();
+      for (const [attribute, previewedValue] of Object.entries(previewed.attributeValuesAfter)) {
+        expect(appliedAttributes![attribute as keyof typeof appliedAttributes]).toBeCloseTo(previewedValue as number, 5);
+      }
+    }
   });
 });
