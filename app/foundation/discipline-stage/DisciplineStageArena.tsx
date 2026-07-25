@@ -658,6 +658,23 @@ export default function DisciplineStageArena({
     }
     return { d1, d2, standings, mutatorByTeam };
   }, [preview, gameState, matchdayId, briefingItems, standingsItems]);
+
+  // Bühne muss mit einer Disziplin DES aktuellen Spieltags starten, nicht mit dem
+  // hart kodierten Default ("staffel"). Sonst zeigt die Arena eine Disziplin ohne
+  // Preview-Daten → vereinfachtes Modell statt der bestätigten Einsatzliste, und es
+  // wirkt wie der falsche Spieltag. Einmal pro Spieltag ausrichten (respektiert
+  // manuelle Dropdown-Auswahl); beim Spieltagswechsel richtet es neu aus.
+  const alignedMatchdayRef = useRef<string | null | undefined>(null);
+  useEffect(() => {
+    const d1Id = matchdayPanel?.d1?.disciplineId ?? null;
+    const d2Id = matchdayPanel?.d2?.disciplineId ?? null;
+    if (!d1Id && !d2Id) return;
+    if (alignedMatchdayRef.current === matchdayId) return;
+    if (disciplineId !== d1Id && disciplineId !== d2Id && d1Id) {
+      setDisciplineId(d1Id);
+    }
+    alignedMatchdayRef.current = matchdayId;
+  }, [matchdayId, matchdayPanel?.d1?.disciplineId, matchdayPanel?.d2?.disciplineId, disciplineId]);
   // Die 2 aktiven Mutatoren dieser Disziplin (disziplin-weit gleich) — für die
   // Anzeige „welche beiden es sind". Aus den mutatorSlots eines beliebigen Teams.
   const disciplineMutators = useMemo<string[]>(() => {
