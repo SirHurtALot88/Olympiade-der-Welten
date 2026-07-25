@@ -2,3 +2,10 @@
 	reverse_proxy oly-app:3000
 }
 
+# Lord Enterich Cards — eigene Subdomain, getrennt von der Oly (KONZEPT §4.2).
+# Caddy holt/erneuert das HTTPS-Zertifikat automatisch. Die LEC-App bringt
+# ihren eigenen Login mit; hier keine zusaetzliche Auth noetig.
+{$LEC_DOMAIN} {
+	reverse_proxy lec-app:3000
+}
+
