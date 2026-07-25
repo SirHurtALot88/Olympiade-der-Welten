@@ -311,7 +311,9 @@ export function resolveFoundationPanelScrollTarget(input: {
     return "foundation-lineup";
   }
   if (input.panel === "training-plan") {
-    return "foundation-facilities-v2";
+    // Der Trainingsplan lebt im Training-Tab (trainingCompact), nicht im
+    // Gebäude-Tab — daher auf den Training-Compact-Anker scrollen.
+    return "foundation-training-compact";
   }
   if (input.panel === "season-end-development") {
     return "foundation-training-compact";
