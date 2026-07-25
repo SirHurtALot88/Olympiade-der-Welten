@@ -232,15 +232,21 @@ export function buildPlayerPotentialCeilingProfile(input: {
   hiddenPotentialScore?: number | null;
   existing?: PlayerPotentialRecord | null;
 }): PlayerPotentialCeilingProfile {
-  const attributeCeilings = buildHiddenAttributeCeilingsFromPotentialScore({
-    saveId: input.saveId,
-    player: input.player,
-    currentStars: input.currentStars,
-    hiddenPotentialScore:
-      input.hiddenPotentialScore ??
-      input.existing?.hiddenPotentialScore ??
-      null,
-  });
+  // Audit #8: die EINGEFRORENE Engine-Decke bevorzugen. Die Trainings-/Progression-Engine erzwingt die
+  // zum Aufnahmezeitpunkt eingefrorene `hiddenAttributeCeiling` (player-attribute-ceiling-service:273).
+  // Wird sie hier stattdessen live aus den AKTUELLEN Stats neu berechnet, driftet die im Scouting
+  // angezeigte Decke bei jedem Training nach oben — inkonsistent zur real erzwungenen Decke. Nur wenn
+  // keine (oder leere) gefrorene Decke vorliegt, frisch aus dem Potenzial-Score ableiten.
+  const frozenCeiling = input.existing?.hiddenAttributeCeiling;
+  const attributeCeilings =
+    frozenCeiling && Object.keys(frozenCeiling).length > 0
+      ? frozenCeiling
+      : buildHiddenAttributeCeilingsFromPotentialScore({
+          saveId: input.saveId,
+          player: input.player,
+          currentStars: input.currentStars,
+          hiddenPotentialScore: input.hiddenPotentialScore ?? input.existing?.hiddenPotentialScore ?? null,
+        });
   return finalizePotentialCeilingProfile(
     input.currentStars,
     derivePlayerPotentialCeilingProfileFromAttributeCeilings({
