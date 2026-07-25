@@ -2572,7 +2572,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   <div className="stack">
                     <h2>Spieltagsergebnis</h2>
                     <span className="muted">
-                      {matchdaySummary.seasonId} · Spieltag {matchdaySummary.matchdayNumber ?? "—"} · direkt aus gespeicherten Matchday-Results
+                      {matchdaySummary.seasonId} · Spieltag{" "}
+                      {homeNextMatchdayStatus.resultAvailable ? (matchdaySummary.matchdayNumber ?? "—") : (gameState.season.currentMatchday ?? "—")}
+                      {" "}· direkt aus gespeicherten Matchday-Results
                     </span>
                   </div>
                   <div className="matchday-result-actions">
@@ -2582,7 +2584,11 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                     <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("seasonV2", setActiveView)}>
                       Saisonstand ansehen
                     </button>
-                    {matchdaySummary.hasResult ? (
+                    {/* Auf den AKTUELLEN Spieltag gaten (matchdayState), nicht auf
+                        die evtl. auf einen alten Spieltag zurückgefallene Summary —
+                        sonst erscheint "Weiter" statt "Spieltag abschliessen" und der
+                        Flow dreht sich ab MD2 im Kreis. */}
+                    {homeNextMatchdayStatus.resultAvailable ? (
                       <button className="primary-button inline-button" type="button" onClick={triggerGlobalNext}>
                         Weiter
                       </button>
@@ -2600,7 +2606,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                     )}
                   </div>
                 </div>
-                {matchdaySummary.topTeams.length === 0 && matchdaySummary.bottomTeams.length === 0 ? (
+                {!homeNextMatchdayStatus.resultAvailable ||
+                (matchdaySummary.topTeams.length === 0 && matchdaySummary.bottomTeams.length === 0) ? (
                   <div className="transfer-callout is-warning arena-result-empty-state">
                     <strong>Noch kein Spieltagsergebnis vorhanden</strong>
                     <span>Nach dem finalen Reveal erscheinen hier Tageswertung, Rangänderung und Top Player.</span>

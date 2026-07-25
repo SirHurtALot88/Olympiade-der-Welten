@@ -1067,6 +1067,12 @@ export function useFoundationShellRouterBodyScope({
     return () => clearTimeout(timer);
   }, [foundationActionFeedback, setFoundationActionFeedback]);
 
+  // Manuelle Spieltags-Auswahl (Ergebnis-Dropdown) beim Spieltagswechsel zurücksetzen,
+  // damit Arena-/Ergebnis-Ansicht nicht dauerhaft einen alten Spieltag zeigen.
+  useEffect(() => {
+    setSelectedMatchdaySummaryId(null);
+  }, [gameState.matchdayState.matchdayId, setSelectedMatchdaySummaryId]);
+
   const activeTransferMarketTab = "v2" as const;
   const isTransferMarketViewActive = activeView === "marketV2";
   const activeTransferHistoryTab = "v2" as const;

@@ -34,7 +34,7 @@ export function buildLegacyLineupLabSlots(context: LegacyLineupLoadedContext): L
   const d2DisciplineId = context.contextMeta.d2DisciplineId;
 
   if (d1DisciplineId) {
-    const count = context.disciplinePlayerCounts[d1DisciplineId] ?? 0;
+    const count = resolveSideSlotCount(context, d1DisciplineId, "d1");
     for (let slotIndex = 0; slotIndex < count; slotIndex += 1) {
       result.push({
         key: `${d1DisciplineId}::d1::${slotIndex}`,
@@ -47,7 +47,7 @@ export function buildLegacyLineupLabSlots(context: LegacyLineupLoadedContext): L
   }
 
   if (d2DisciplineId) {
-    const count = context.disciplinePlayerCounts[d2DisciplineId] ?? 0;
+    const count = resolveSideSlotCount(context, d2DisciplineId, "d2");
     for (let slotIndex = 0; slotIndex < count; slotIndex += 1) {
       result.push({
         key: `${d2DisciplineId}::d2::${slotIndex}`,
@@ -60,6 +60,26 @@ export function buildLegacyLineupLabSlots(context: LegacyLineupLoadedContext): L
   }
 
   return result;
+}
+
+/**
+ * Slot-Anzahl je Disziplin-Seite: MUSS dem saisonal gewürfelten Schedule-Wert
+ * folgen (disciplineSidePlayerCounts, Key "<id>::<side>"), nicht dem statischen
+ * Basis-playerCount. Sonst rendert die Einsatzliste zu wenige/zu viele Slots
+ * gegenüber dem, was Validator, Readiness und die AI verlangen — und der User
+ * kann nicht alle Spieler einsetzen bzw. bekommt die Aufstellung nicht bestätigt.
+ * Gleiches Fallback-Muster wie die AI-Engine (ai-legacy-lineup-engine.ts).
+ */
+function resolveSideSlotCount(
+  context: LegacyLineupLoadedContext,
+  disciplineId: string,
+  side: "d1" | "d2",
+): number {
+  return (
+    context.disciplineSidePlayerCounts?.[`${disciplineId}::${side}`] ??
+    context.disciplinePlayerCounts[disciplineId] ??
+    0
+  );
 }
 
 export function buildLegacyLineupLabPlayerOptions(context: LegacyLineupLoadedContext): LegacyLineupLabPlayerOption[] {

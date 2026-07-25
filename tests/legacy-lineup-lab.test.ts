@@ -67,6 +67,26 @@ describe("legacy lineup lab helpers", () => {
     ]);
   });
 
+  it("follows the season schedule slot counts per side, not the static base playerCount", () => {
+    // Bug: die Einsatzliste baute Slots aus dem statischen Basis-playerCount
+    // (tdm:2, fechten:1), während Validator/Readiness/AI die saisonal gewürfelten
+    // Schedule-Werte nutzen — bei 3/2 fehlten/überzählten Slots.
+    const scheduleContext: LegacyLineupLoadedContext = {
+      ...context,
+      disciplineSidePlayerCounts: { "tdm::d1": 3, "fechten::d2": 2 },
+    };
+    const slots = buildLegacyLineupLabSlots(scheduleContext);
+    expect(slots.filter((slot) => slot.disciplineSide === "d1")).toHaveLength(3);
+    expect(slots.filter((slot) => slot.disciplineSide === "d2")).toHaveLength(2);
+    expect(slots.map((slot) => slot.key)).toEqual([
+      "tdm::d1::0",
+      "tdm::d1::1",
+      "tdm::d1::2",
+      "fechten::d2::0",
+      "fechten::d2::1",
+    ]);
+  });
+
   it("builds player options from active players and roster players", () => {
     const options = buildLegacyLineupLabPlayerOptions(context);
 
