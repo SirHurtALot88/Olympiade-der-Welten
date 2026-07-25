@@ -16,6 +16,7 @@ import {
   pickGoldenObjective,
   resolveChallengeSlotIndex,
   resolveRealisticAxisTargetRank,
+  filterBonusObjectivesByStrength,
   SPONSOR_BONUS_OBJECTIVE_ARCHETYPE,
   SPONSOR_GOLDEN_OBJECTIVE_ARCHETYPE,
   type SponsorGoldenObjectiveKey,
@@ -171,6 +172,9 @@ describe("sponsor bonus objectives — new targets (Fable B)", () => {
       "debt_payoff",
       "facility_condition",
       "contract_stability",
+      "budget_overachiever",
+      "cellar_escape",
+      "giant_killer",
     ] as const;
     for (const key of keys) {
       const comp = buildBonusObjectiveComponent(key, bonusInput(gs, teamId) as never);
@@ -207,6 +211,40 @@ describe("sponsor bonus objectives — new targets (Fable B)", () => {
     const res = evaluateSpecialComponentStage(gs, teamId, comp);
     expect(res.metric).toBe(expected - Math.max(1, expected - 6));
     expect(res.fraction).toBeCloseTo(0.7, 5); // +6 → mittlere Stufe
+  }, 60000);
+
+  it("underdog family: nur schwachen/Aufbau-Teams angeboten, Top-Teams nicht", () => {
+    const keys = ["budget_overachiever", "cellar_escape", "giant_killer"] as const;
+    // Starkes Team (kleine Qualitäts-Platzierung) → keines der drei angeboten.
+    expect(filterBonusObjectivesByStrength([...keys], 3)).toEqual([]);
+    // Schwaches Team (Qualitäts-Platzierung ≥ 17) → alle drei im Pool.
+    expect(filterBonusObjectivesByStrength([...keys], 28).slice().sort()).toEqual([...keys].slice().sort());
+  });
+
+  it("cellar_escape: invertierter Endrang, erste Stufe = raus aus Bottom-5", () => {
+    const gs = structuredClone(createSingleplayerGameState());
+    const teamId = gs.teams[0]!.teamId;
+    const teamCount = gs.teams.length;
+    setRank(gs, teamId, teamCount - 5); // gerade aus der Kellerzone heraus
+    const comp = buildBonusObjectiveComponent("cellar_escape", bonusInput(gs, teamId) as never);
+    const res = evaluateSpecialComponentStage(gs, teamId, comp);
+    expect(res.metric).toBe(teamCount - (teamCount - 5) + 1); // = 6 (invertierter Rang)
+    expect(res.fraction).toBeCloseTo(0.4, 5); // erste Stufe
+  }, 60000);
+
+  it("budget_overachiever: zahlt nur unter dem Kaderwert-Deckel", () => {
+    const gs = structuredClone(createSingleplayerGameState());
+    const teamId = gs.teams[0]!.teamId;
+    const teamCount = gs.teams.length;
+    setRank(gs, teamId, 8);
+    const built = buildBonusObjectiveComponent("budget_overachiever", bonusInput(gs, teamId) as never);
+    expect(String(built.targetValue)).toMatch(/^mwcap:/);
+    // Deckel sehr hoch → unter Deckel → invertierter Endrang zählt.
+    const under = { ...built, targetValue: "mwcap:9999999" } as SponsorOfferComponent;
+    expect(computeObjectiveProgressMetric(gs, teamId, under)).toBe(teamCount - 8 + 1);
+    // Deckel praktisch 0 → Kaderwert sprengt Deckel → kein Bonus.
+    const over = { ...built, targetValue: "mwcap:0.01" } as SponsorOfferComponent;
+    expect(computeObjectiveProgressMetric(gs, teamId, over)).toBe(0);
   }, 60000);
 
   it("windows transfer-trader net to the season and excludes it in season 1", () => {

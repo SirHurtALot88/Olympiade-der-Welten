@@ -615,7 +615,11 @@ export type SponsorBonusObjectiveKey =
   | "injury_prevention"
   | "debt_payoff"
   | "facility_condition"
-  | "contract_stability";
+  | "contract_stability"
+  // Underdog-Familie — nur schwachen/Aufbau-Teams angeboten, für Top-Teams unerreichbar/nicht angeboten.
+  | "budget_overachiever"
+  | "cellar_escape"
+  | "giant_killer";
 
 /** Die 6 Golden-Bonusziele (nur bei isGolden-Angeboten). */
 export type SponsorGoldenObjectiveKey =
@@ -664,6 +668,16 @@ export const SPONSOR_OBJ_UNDERDOG_MIN_QUALITY_RANK = objEnvNumber("OLY_SPONSOR_O
  */
 export const SPONSOR_OBJ_AXIS_ASCENSION_MIN_QUALITY_RANK = objEnvNumber("OLY_SPONSOR_OBJ_AXIS_ASCENSION_MIN_RANK", 3);
 
+/**
+ * Underdog-Familie (David-Bonus / Kellerkind / Giant Killer): erst ab dieser eingefrorenen Qualitäts-
+ * Platzierung (teamQualityRank; GRÖSSER = SCHWÄCHER) werden diese Ziele überhaupt angeboten. Für Top-Teams
+ * sind sie sinnlos/unerreichbar (sie können die Kellerzone nicht verlassen, ihr Kaderwert sprengt den
+ * Effizienz-Deckel, und Top-4-Teams zu schlagen ist für sie keine Sensation). ENV-tunebar.
+ */
+export const SPONSOR_OBJ_UNDERDOG_FAMILY_MIN_QUALITY_RANK = objEnvNumber("OLY_SPONSOR_OBJ_UNDERDOG_FAMILY_MIN_RANK", 17);
+/** David-Bonus: Kaderwert-Deckel = Liga-Median × dieser Faktor (beim Signing eingefroren). */
+export const SPONSOR_OBJ_BUDGET_OVERACHIEVER_CAP_FACTOR = objEnvNumber("OLY_SPONSOR_OBJ_BUDGET_CAP_FACTOR", 1.0);
+
 function stage(threshold: number, fraction: number, label: string): SponsorObjectiveStage {
   return { threshold, fraction, label };
 }
@@ -705,6 +719,10 @@ export const SPONSOR_BONUS_OBJECTIVE_ARCHETYPE: Record<SponsorBonusObjectiveKey,
   debt_payoff: "security",
   facility_condition: "security",
   contract_stability: "security",
+  // Underdog-Familie — Performance-Pool (Tabellen-/Leistungsziele).
+  budget_overachiever: "performance",
+  cellar_escape: "performance",
+  giant_killer: "performance",
 };
 
 export const SPONSOR_GOLDEN_OBJECTIVE_ARCHETYPE: Record<SponsorGoldenObjectiveKey, SponsorArchetype> = {
@@ -768,6 +786,10 @@ export const SPONSOR_OBJECTIVE_FAMILY: Record<string, SponsorObjectiveFamily> = 
   debt_payoff: "finance",
   facility_condition: "infrastructure",
   contract_stability: "player_dev",
+  // Underdog-Familie — Tabellen-Leistungsziele (Rang/Match).
+  budget_overachiever: "table",
+  cellar_escape: "table",
+  giant_killer: "table",
 };
 
 /** Familie eines Sonderziels (null, wenn unbekannt/nicht zuzuordnen). */
@@ -1152,6 +1174,58 @@ export function buildBonusObjectiveComponent(
         stages: [stage(1, 0.4, "1 verlängert"), stage(2, 0.7, "2 verlängert"), stage(3, 1.0, "3 verlängert")],
       };
     }
+    case "budget_overachiever": {
+      // David-Bonus: guter Endrang bei niedrigem Kaderwert. Freeze = Liga-Median-Kaderwert × Faktor als
+      // Deckel; die Metrik (invertierter Endrang) zählt nur, wenn der Kader unter dem Deckel bleibt. Top-
+      // Kader sprengen den Deckel strukturell → für sie wertlos (zusätzlich zum Strength-Gate).
+      const rowsMv = buildTeamSeasonOverviewRows({ gameState: input.gameState });
+      const mvs = rowsMv
+        .map((entry) => entry.marketValueTotal ?? 0)
+        .filter((value) => value > 0)
+        .sort((left, right) => left - right);
+      const median = mvs.length ? mvs[Math.floor(mvs.length / 2)]! : 0;
+      const cap = round1(median * SPONSOR_OBJ_BUDGET_OVERACHIEVER_CAP_FACTOR);
+      const teamCount = input.gameState.teams.length || 32;
+      const inv = (rank: number) => teamCount - rank + 1;
+      return {
+        ...base,
+        componentId: "special-budget-overachiever",
+        label: `Über Verhältnisse: Rang ≤20/14/8 bei Kaderwert ≤ ${cap}`,
+        targetValue: `mwcap:${cap}`,
+        specialKey: "budget_overachiever",
+        stages: [stage(inv(20), 0.4, "≤ Rang 20"), stage(inv(14), 0.7, "≤ Rang 14"), stage(inv(8), 1.0, "≤ Rang 8")],
+      };
+    }
+    case "cellar_escape": {
+      // Kellerkind-Aufstieg: die Kellerzone verlassen. Metrik = invertierter Endrang; Stufen = raus aus
+      // Bottom-5 / unteres Mittelfeld / Mittelfeld. Nur Bottom-Teams können die Kellerzone überhaupt verlassen.
+      const teamCount = input.gameState.teams.length || 32;
+      const inv = (rank: number) => teamCount - rank + 1;
+      return {
+        ...base,
+        componentId: "special-cellar-escape",
+        label: `Kellerkind-Aufstieg: raus aus Bottom-5 / ≤ Rang ${teamCount - 11} / ≤ Rang ${teamCount - 16}`,
+        targetValue: "cellar",
+        specialKey: "cellar_escape",
+        stages: [
+          stage(inv(teamCount - 5), 0.4, "raus aus Bottom-5"),
+          stage(inv(teamCount - 11), 0.7, `≤ Rang ${teamCount - 11}`),
+          stage(inv(teamCount - 16), 1.0, `≤ Rang ${teamCount - 16}`),
+        ],
+      };
+    }
+    case "giant_killer": {
+      // Giant Killer: an Spieltagen den Tagesscore eines Top-4-Teams übertreffen. Für Top-Teams ist das
+      // Erwartung (keine Sensation) und sie werden per Strength-Gate ohnehin nicht angeboten.
+      return {
+        ...base,
+        componentId: "special-giant-killer",
+        label: "Giant Killer: an Spieltagen Top-4-Teams im Tagesscore schlagen",
+        targetValue: "giant",
+        specialKey: "giant_killer",
+        stages: [stage(1, 0.4, "1 Spieltag"), stage(2, 0.7, "2 Spieltage"), stage(4, 1.0, "4 Spieltage")],
+      };
+    }
   }
 }
 
@@ -1337,6 +1411,10 @@ export function filterBonusObjectivesByStrength(
     }
     if (key === "axis_ascension") {
       return teamQualityRank >= SPONSOR_OBJ_AXIS_ASCENSION_MIN_QUALITY_RANK;
+    }
+    if (key === "budget_overachiever" || key === "cellar_escape" || key === "giant_killer") {
+      // Underdog-Familie: nur schwachen/Aufbau-Teams anbieten (Top-Teams: nicht angeboten).
+      return teamQualityRank >= SPONSOR_OBJ_UNDERDOG_FAMILY_MIN_QUALITY_RANK;
     }
     return true;
   });

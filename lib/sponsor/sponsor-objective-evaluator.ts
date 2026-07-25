@@ -539,6 +539,56 @@ export function computeObjectiveProgressMetric(
       if (final <= 3) return 1;
       return 0;
     }
+    case "budget_overachiever": {
+      // Guter Endrang, aber nur solange der Kaderwert unter dem beim Signing eingefrorenen Deckel bleibt.
+      const capRaw = taggedTargetValue(component.targetValue, "mwcap");
+      const cap = capRaw != null ? Number(capRaw) : Number.NaN;
+      const squadMv = row?.marketValueTotal ?? 0;
+      if (Number.isFinite(cap) && cap > 0 && squadMv > cap) return 0; // Deckel gesprengt → kein Bonus.
+      const final = finalRankForTeam(gameState, teamId, row);
+      if (final == null) return null;
+      const teamCount = gameState.teams.length || 32;
+      return teamCount - final + 1; // invertierter Rang: besser platziert = höher.
+    }
+    case "cellar_escape": {
+      const final = finalRankForTeam(gameState, teamId, row);
+      if (final == null) return null;
+      const teamCount = gameState.teams.length || 32;
+      return teamCount - final + 1; // invertierter Rang; Stufen prüfen "raus aus der Kellerzone".
+    }
+    case "giant_killer": {
+      // Zahl der Spieltage, an denen das Team den Tagesscore mindestens EINES Top-4-Teams (nach Endrang) übertraf.
+      const results = gameState.seasonState.disciplineResults ?? [];
+      if (results.length === 0) return null;
+      const topTeams = new Set<string>();
+      for (const team of gameState.teams) {
+        const teamRow = rows.find((entry) => entry.teamId === team.teamId) ?? null;
+        const teamRank = finalRankForTeam(gameState, team.teamId, teamRow);
+        if (teamRank != null && teamRank <= 4) topTeams.add(team.teamId);
+      }
+      if (topTeams.size === 0) return null;
+      const scoreByMatchdayTeam = new Map<string, Map<string, number>>();
+      for (const result of results) {
+        const md = result.matchdayResultId;
+        if (!scoreByMatchdayTeam.has(md)) scoreByMatchdayTeam.set(md, new Map());
+        const perTeam = scoreByMatchdayTeam.get(md)!;
+        perTeam.set(result.teamId, (perTeam.get(result.teamId) ?? 0) + (result.totalScore ?? 0));
+      }
+      let kills = 0;
+      for (const perTeam of scoreByMatchdayTeam.values()) {
+        const own = perTeam.get(teamId);
+        if (own == null) continue;
+        for (const top of topTeams) {
+          if (top === teamId) continue;
+          const topScore = perTeam.get(top);
+          if (topScore != null && own > topScore) {
+            kills += 1;
+            break;
+          }
+        }
+      }
+      return kills;
+    }
     default:
       return null;
   }
