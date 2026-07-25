@@ -352,16 +352,50 @@ function getPotentialTrainingMultiplierFromRecord(gameState: GameState, player: 
   return roundValue(gapAccel * poSteep, 3);
 }
 
+/**
+ * Jedes Feinattribut → seine Achse (pow/spe/men/soc). Fallback-Quelle, wenn das
+ * Feinattribut-Sheet (`attributeSheetStats`) fehlt oder unvollständig ist —
+ * dann wird der Achswert aus `coreStats` als Attributwert genutzt, damit die
+ * Trainings-Prognose nie stumm auf 0 kollabiert (siehe normalizePlayerAttributes).
+ */
+const ATTRIBUTE_FALLBACK_AXIS: Record<PlayerGeneratorAttributeName, "pow" | "spe" | "men" | "soc"> = {
+  power: "pow",
+  health: "pow",
+  stamina: "pow",
+  torment: "pow",
+  speed: "spe",
+  dexterity: "spe",
+  awareness: "spe",
+  intelligence: "men",
+  will: "men",
+  determination: "men",
+  charisma: "soc",
+  spirit: "soc",
+};
+
 export function normalizePlayerAttributes(player: Player): PlayerGeneratorAttributes | null {
   const stats = player.attributeSheetStats;
-  if (!stats) return null;
   const attributes = Object.fromEntries(
-    PROGRESSION_ATTRIBUTE_ORDER.map((attribute) => [attribute, stats[attribute]]),
+    PROGRESSION_ATTRIBUTE_ORDER.map((attribute) => [attribute, stats?.[attribute]]),
   ) as Partial<Record<PlayerGeneratorAttributeName, number | null>>;
-  if (!PROGRESSION_ATTRIBUTE_ORDER.every((attribute) => isFiniteNumber(attributes[attribute]))) {
-    return null;
+  if (PROGRESSION_ATTRIBUTE_ORDER.every((attribute) => isFiniteNumber(attributes[attribute]))) {
+    return attributes as PlayerGeneratorAttributes;
   }
-  return attributes as PlayerGeneratorAttributes;
+  // Fallback: fehlt das Feinattribut-Sheet (oder ist es lückenhaft), leite die
+  // fehlenden Werte aus den Achsen-Corestats ab (POW/SPE/MEN/SOC). So bekommen
+  // z. B. per New-Game-Setup erstellte Kader eine echte Trainings-Prognose statt
+  // überall 0 (attribute_source_missing → trainingSetpoints 0 → „-100 %"-Anzeige).
+  // Vorhandene Sheet-Werte bleiben unangetastet; nur Lücken werden gefüllt.
+  const core = player.coreStats;
+  if (!core) return null;
+  const filled = { ...attributes } as Record<PlayerGeneratorAttributeName, number>;
+  for (const attribute of PROGRESSION_ATTRIBUTE_ORDER) {
+    if (isFiniteNumber(filled[attribute])) continue;
+    const axisValue = core[ATTRIBUTE_FALLBACK_AXIS[attribute]];
+    if (!isFiniteNumber(axisValue)) return null;
+    filled[attribute] = axisValue;
+  }
+  return filled;
 }
 
 function normalizeWeights(weights: Partial<Record<PlayerGeneratorAttributeName, number>>) {

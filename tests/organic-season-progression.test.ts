@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { GameState, Player, PlayerGeneratorAttributes, TeamFacilityCollection } from "@/lib/data/olyDataTypes";
 import {
   buildOrganicSeasonProgression,
+  normalizePlayerAttributes,
   ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE,
   resolveOrganicRegressionCombinedTotal,
 } from "@/lib/training/organic-season-progression";
@@ -153,6 +154,21 @@ function addPoorSeasonPerformances(state: GameState, playerId: string, count = 1
 }
 
 describe("organic season progression", () => {
+  it("falls back to coreStats axes when the fine-attribute sheet is missing (no 0-forecast)", () => {
+    // Regression: Kader ohne vollständiges `attributeSheetStats` (z. B. New-Game-Setup)
+    // lieferten trainingSetpoints 0 → im FC überall „+0 SP" und ein „-100 %"-Restbonus.
+    const withoutSheet = player({ attributeSheetStats: undefined });
+    const normalized = normalizePlayerAttributes(withoutSheet);
+    expect(normalized).not.toBeNull();
+    // Achswerte werden aus coreStats abgeleitet (POW-Attribute → pow-Wert usw.).
+    expect(normalized?.power).toBe(withoutSheet.coreStats.pow);
+    expect(normalized?.charisma).toBe(withoutSheet.coreStats.soc);
+
+    const result = buildOrganicSeasonProgression({ gameState: gameState(withoutSheet), player: withoutSheet });
+    expect(result.trainingSetpoints).toBeGreaterThan(0);
+    expect(result.warnings).not.toContain(`attribute_source_missing:${withoutSheet.id}`);
+  });
+
   it("turns market value into extra attribute maintenance pressure", () => {
     const cheap = player({ marketValue: 20 });
     const star = player({ marketValue: 100 });
