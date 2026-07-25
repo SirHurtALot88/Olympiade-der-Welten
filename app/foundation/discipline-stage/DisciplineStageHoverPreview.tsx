@@ -101,7 +101,19 @@ function PlayerPreview({ gameState, target, ratingByPlayerId }: {
   const row = ratingByPlayerId.get(player.id) ?? null;
   const portraitUrl = getPlayerPortraitBrowserUrl(player.id, player.portraitUrl ?? null, player.portraitPath ?? null);
   return (
-    <AnchoredCard x={target.x} y={target.y} width={PLAYER_W}>
+    <AnchoredCard
+      x={target.x}
+      y={target.y}
+      width={PLAYER_W}
+      // Deckende Unterlage wie bei TeamPreview: die Portrait-Karte selbst ist nur ~0.9 deckend
+      // (is-full-art-Verlauf), ohne diese Fläche scheint die Rangliste/ENDSTAND dahinter durch und
+      // die Hover-Karte wirkt „transparent" (nichts lesbar). var(--nl-panel) füllt die Lücken.
+      cardStyle={{
+        borderRadius: 16,
+        background: "var(--nl-panel)",
+        boxShadow: "0 12px 32px color-mix(in srgb, var(--nl-bg) 74%, transparent)",
+      }}
+    >
       <FoundationPlayerPortraitCard
         playerId={player.id}
         name={player.name}
