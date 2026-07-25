@@ -437,9 +437,9 @@ function NlTrainingClassRanking({
     >
       <span
         className="nl-training-class-ranking-title"
-        title={`Schätzung: Trainingsbudget (${formatNlNumber(row.organicForecast.trainingSetpoints, 1)} SP) nach Klassen-Attributgewichtung verteilt, abgeschwächt an Attributen nahe der Potential-Decke, gewichtet nach Signature-/Weak-Attribut-Affinität und Development-Route-Bonus. Reale Werte hängen zusätzlich vom Performance-Anteil ab.`}
+        title={`Netto-vergleichbar: verankert am echten Netto-Forecast deiner aktuellen Klasse (${formatNlSignedNumber(row.organicForecast.netSetpoints, 1)} SP, nach Performance − Regression). Jede andere Klasse zeigt, wo dein Netto läge, wenn du sie trainierst (Delta aus Klassen-Attributgewichtung, Potential-Decke, Signature-/Weak-Affinität und Route-Bonus). Der Balken zeigt das relative Brutto-Trainingsbudget.`}
       >
-        Beste Klassen + deine aktuelle · SP-Zugewinn{" "}
+        Beste Klassen + deine aktuelle · Netto-SP{" "}
         {readOnly ? "" : <span className="nl-training-intensity-hint-inline">· tippen zum Wählen</span>}
       </span>
       <div className="nl-training-class-ranking-rows">
@@ -454,8 +454,8 @@ function NlTrainingClassRanking({
             aria-checked={entry.isCurrent}
             disabled={readOnly}
             onClick={() => onSelectClass(entry.className)}
-            title={`${entry.label} als Trainingsklasse wählen: Rang ${entry.rank} · ca. +${formatNlNumber(entry.estimatedGain, 1)} SP${
-              entry.isCurrent ? " · wird aktuell trainiert" : ""
+            title={`${entry.label} als Trainingsklasse wählen: Rang ${entry.rank} · Netto ca. ${formatNlSignedNumber(entry.netComparableGain, 1)} SP${
+              entry.isCurrent ? " · wird aktuell trainiert (= Intensitäts-Netto)" : ""
             }`}
           >
             <span className="nl-training-class-ranking-rank nl-tnum">{entry.rank}</span>
@@ -474,7 +474,7 @@ function NlTrainingClassRanking({
                 style={{ width: `${Math.min(100, (entry.estimatedGain / best) * 100)}%` }}
               />
             </span>
-            <span className="nl-training-class-ranking-value nl-tnum">≈+{formatNlNumber(entry.estimatedGain, 1)} SP</span>
+            <span className="nl-training-class-ranking-value nl-tnum">≈{formatNlSignedNumber(entry.netComparableGain, 1)} SP</span>
           </button>
         ))}
       </div>

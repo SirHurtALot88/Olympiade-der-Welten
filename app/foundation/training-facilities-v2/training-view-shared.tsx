@@ -202,8 +202,15 @@ export function buildTrainingClassSuggestion(
 export type TrainingClassGainEstimate = {
   className: ProgressionClassName;
   label: string;
-  /** Geschätzter Trainings-SP-Zugewinn für diese Klasse (siehe Doku unten) — Schätzung, keine Garantie. */
+  /** Geschätzter BRUTTO-Trainingsbudget-Zugewinn für diese Klasse (siehe Doku unten) — Schätzung, keine Garantie. Für Bar-Länge/Sortierung. */
   estimatedGain: number;
+  /**
+   * Netto-vergleichbarer SP-Zugewinn: additiv auf den echten Netto-Forecast (`organicForecast.netSetpoints`)
+   * der AKTUELLEN Klasse verankert, sodass die aktuelle Klasse exakt den Intensitäts-Netto-Wert zeigt und
+   * jede andere Klasse ihren echten Delta dazu (`+Δ` vs. aktuell). Kann negativ sein. Das ist der Wert, der
+   * in der Karte angezeigt wird — damit „Klassen-SP" und „Intensitäts-SP" dieselbe (Netto-)Einheit sprechen.
+   */
+  netComparableGain: number;
   isCurrent: boolean;
   /** 1-basierte Position in der vollständigen Gain-Rangliste (auch wenn außerhalb der Top-N gezeigt). */
   rank: number;
@@ -258,14 +265,25 @@ export function buildTrainingClassGainRanking(
   });
   const gainByClassName = new Map(gains.map((entry) => [entry.className, entry]));
 
+  // #24 — Die Klassen-Schätzung ist ein BRUTTO-Trainingsbudget; die Karte zeigt daneben den echten
+  // NETTO-Forecast (netSetpoints, nach Performance − Regression). Damit beide SP-Zahlen dieselbe
+  // Einheit sprechen, verankern wir die Rangliste additiv am echten Netto der AKTUELLEN Klasse:
+  //   netComparableGain(c) = netSetpoints + (brutto(c) − brutto(aktuelle Klasse))
+  // → die aktuelle Klasse zeigt exakt den Intensitäts-Netto-Wert, jede andere Klasse ihren echten
+  // Delta dazu. Der Bruttowert bleibt für Bar-Länge/Sortierung erhalten.
+  const currentGross = (currentClass ? gainByClassName.get(currentClass)?.estimatedGain : undefined) ?? 0;
+  const netAnchor = Number.isFinite(row.organicForecast.netSetpoints) ? row.organicForecast.netSetpoints : 0;
+
   const estimates = PROGRESSION_CLASS_ORDER.map((className) => {
     const label = trainingClassOptions.find((option) => option.value === className)?.label ?? className;
     const gain = gainByClassName.get(className);
     const developmentRoute = gain?.developmentRoute ?? "BALANCED";
+    const estimatedGain = gain?.estimatedGain ?? 0;
     return {
       className,
       label,
-      estimatedGain: gain?.estimatedGain ?? 0,
+      estimatedGain,
+      netComparableGain: roundTo(netAnchor + (estimatedGain - currentGross), 1),
       isCurrent: className === currentClass,
       developmentRoute,
       hasFocusRouteBonus: getDevelopmentRouteBonusMultiplier(developmentRoute, trainingFocusAxis) > 1,
