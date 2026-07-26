@@ -62,6 +62,34 @@ export function normalizeRoomArenaState(state: RoomArenaState): RoomArenaState {
   };
 }
 
+/**
+ * Gehört dieser Sync-State zu der Arena, die gerade angezeigt wird?
+ *
+ * Der Arena-Sync-State eines Raums überlebt den Spieltagswechsel: `room-store.ts` setzt ihn beim
+ * Anwenden eines Spieltags auf `result_applied` und NIE zurück auf `idle`, und sein `matchdayId`
+ * zeigt weiter auf den alten Spieltag. Ohne diese Prüfung steuert dieser fremde, längst
+ * abgeschlossene State ab dem zweiten Spieltag die Arena — der Host-Start-Guard sieht "nicht idle"
+ * und sendet nie wieder `startRoomArena`, sodass der Guest dauerhaft ohne Reveal dasteht.
+ *
+ * Ein leeres `seasonId`/`matchdayId` im State gilt bewusst als "passt zu allem" (Alt-States vor
+ * Einführung der Felder), ein abweichendes dagegen als Fremd-Scope.
+ */
+export function matchesArenaScope(
+  arenaSync: Pick<RoomArenaState, "saveId" | "seasonId" | "matchdayId">,
+  scope: { saveId: string | null | undefined; seasonId: string | null | undefined; matchdayId: string | null | undefined },
+) {
+  if (arenaSync.saveId !== scope.saveId) {
+    return false;
+  }
+  if (arenaSync.seasonId && arenaSync.seasonId !== scope.seasonId) {
+    return false;
+  }
+  if (arenaSync.matchdayId && arenaSync.matchdayId !== scope.matchdayId) {
+    return false;
+  }
+  return true;
+}
+
 export function createRoomArenaState(input: {
   saveId: string;
   seasonId?: string | null;

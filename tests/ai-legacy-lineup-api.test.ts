@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const buildAiLegacyLineupPreview = vi.fn();
 const loadLocalLegacyLineupContext = vi.fn();
 const loadLocalLegacyLineupContextFromGameState = vi.fn();
-const loadAllLocalLegacyLineupContexts = vi.fn();
 const loadLegacyLineupContext = vi.fn();
 const createPersistenceService = vi.fn();
 const saveLocalLegacyLineupDraft = vi.fn();
@@ -36,7 +35,6 @@ vi.mock("@/lib/ai/ai-legacy-lineup-engine", () => ({
 vi.mock("@/lib/lineups/legacy-lineup-local-service", () => ({
   loadLocalLegacyLineupContext,
   loadLocalLegacyLineupContextFromGameState,
-  loadAllLocalLegacyLineupContexts,
   saveLocalLegacyLineupDraft,
   saveLocalLegacyLineupDraftBatch,
   getLocalLegacyLineupDraft,
@@ -68,7 +66,6 @@ describe("ai legacy lineup preview api", () => {
     buildAiLegacyLineupPreview.mockReset();
     loadLocalLegacyLineupContext.mockReset();
     loadLocalLegacyLineupContextFromGameState.mockReset();
-    loadAllLocalLegacyLineupContexts.mockReset();
     loadLegacyLineupContext.mockReset();
     createPersistenceService.mockReset();
     saveLocalLegacyLineupDraft.mockReset();
@@ -86,23 +83,6 @@ describe("ai legacy lineup preview api", () => {
     loadLocalLegacyLineupContextFromGameState.mockImplementation((gameState, params) =>
       loadLocalLegacyLineupContext(params),
     );
-    // Mirrors lib/lineups/legacy-lineup-local-service.ts loadAllLocalLegacyLineupContexts: resolve
-    // the local save via the (mocked) persistence service, then delegate to
-    // loadLocalLegacyLineupContext per team so per-team mocks/call-count assertions keep working.
-    loadAllLocalLegacyLineupContexts.mockImplementation((input) => {
-      const persistence = createPersistenceService();
-      const bootstrapped = persistence.bootstrapSingleplayerSave();
-      const save = persistence.getSaveById(input.saveId) ?? persistence.getActiveSave() ?? bootstrapped.save;
-      const teamIds = input.teamIds ?? save.gameState.teams.map((team: { teamId: string }) => team.teamId);
-      return teamIds.map((teamId: string) =>
-        loadLocalLegacyLineupContext({
-          saveId: save.saveId,
-          seasonId: input.seasonId,
-          matchdayId: input.matchdayId,
-          teamId,
-        }),
-      );
-    });
     calculateLocalLegacyLineupPreviewFromContext.mockImplementation((context, entries, modifiers, fatigueByPlayerId) =>
       calculateLocalLegacyLineupPreview(context, entries, modifiers, fatigueByPlayerId),
     );
@@ -200,28 +180,21 @@ describe("ai legacy lineup preview api", () => {
   });
 
   it("builds a read-only batch preview for all local teams", async () => {
-    createPersistenceService.mockReturnValue({
-      bootstrapSingleplayerSave: () => ({
-        save: {
-          saveId: "save-local",
-          gameState: {
-            season: { id: "season-1", matchdayIds: ["matchday-1"] },
-            matchdayState: { matchdayId: "matchday-1" },
-            teams: [
-              { teamId: "A-A", shortCode: "A-A", name: "Alpha" },
-              { teamId: "B-B", shortCode: "B-B", name: "Beta" },
-            ],
-          },
-        },
-      }),
-      // Audit S4 (main): requireLocalPersistedSave löst NICHT mehr still auf den aktiven Save
-      // aus, sondern verlangt einen echten Treffer per getSaveById — sonst 404. Der Mock muss
-      // die angefragte saveId daher wirklich zurückgeben statt pauschal null.
-      getSaveById(saveId: string) {
-        return saveId === this.bootstrapSingleplayerSave().save.saveId
-          ? this.bootstrapSingleplayerSave().save
-          : null;
+    const localSave = {
+      saveId: "save-local",
+      gameState: {
+        season: { id: "season-1", matchdayIds: ["matchday-1"] },
+        matchdayState: { matchdayId: "matchday-1" },
+        teams: [
+          { teamId: "A-A", shortCode: "A-A", name: "Alpha" },
+          { teamId: "B-B", shortCode: "B-B", name: "Beta" },
+        ],
       },
+    };
+    createPersistenceService.mockReturnValue({
+      // Audit S5: the ai-batch-preview GET route resolves via `resolveLocalPersistedSave` (pure
+      // read, explicit saveId or the owner's active save) — it no longer bootstraps a save.
+      getSaveById: (saveId: string) => (saveId === localSave.saveId ? localSave : null),
       getActiveSave: () => null,
     });
 
@@ -340,14 +313,7 @@ describe("ai legacy lineup preview api", () => {
           },
         },
       }),
-      // Audit S4 (main): requireLocalPersistedSave löst NICHT mehr still auf den aktiven Save
-      // aus, sondern verlangt einen echten Treffer per getSaveById — sonst 404. Der Mock muss
-      // die angefragte saveId daher wirklich zurückgeben statt pauschal null.
-      getSaveById(saveId: string) {
-        return saveId === this.bootstrapSingleplayerSave().save.saveId
-          ? this.bootstrapSingleplayerSave().save
-          : null;
-      },
+      getSaveById: () => null,
       getActiveSave: () => null,
     });
     getLocalLegacyLineupDraft.mockReturnValue(null);
@@ -390,9 +356,7 @@ describe("ai legacy lineup preview api", () => {
     expect(body.summary.wouldSave).toBe(1);
     expect(body.summary.skippedWarning).toBe(1);
     expect(saveLocalLegacyLineupDraft).not.toHaveBeenCalled();
-    // Erster Test der Datei: trägt die Modul-Kaltstartkosten des AI-Batch-Apply-Pfads (gemessen
-    // ~5,2s, knapp über vitests 5s-Default). Kein Hänger — Folgetests im selben Lauf sind ms-schnell.
-  }, 30000);
+  });
 
   it("skips existing lineups unless overwriteExisting is explicitly enabled", async () => {
     createPersistenceService.mockReturnValue({
@@ -420,14 +384,7 @@ describe("ai legacy lineup preview api", () => {
           },
         },
       }),
-      // Audit S4 (main): requireLocalPersistedSave löst NICHT mehr still auf den aktiven Save
-      // aus, sondern verlangt einen echten Treffer per getSaveById — sonst 404. Der Mock muss
-      // die angefragte saveId daher wirklich zurückgeben statt pauschal null.
-      getSaveById(saveId: string) {
-        return saveId === this.bootstrapSingleplayerSave().save.saveId
-          ? this.bootstrapSingleplayerSave().save
-          : null;
-      },
+      getSaveById: () => null,
       getActiveSave: () => null,
     });
     getLocalLegacyLineupDraft.mockReturnValue({
@@ -439,17 +396,6 @@ describe("ai legacy lineup preview api", () => {
       context: {
         teamId: "A-A",
         team: { name: "Alpha" },
-        // contextMeta is required by isLegacyLineupDraftComplete (lib/lineups/legacy-matchday-readiness.ts)
-        // to decide whether the existing draft below already covers both discipline sides. Nulling out
-        // the discipline ids here means "no requirement", so the existing draft counts as complete.
-        contextMeta: {
-          saveId: "save-local",
-          seasonId: "season-1",
-          matchdayId: "matchday-1",
-          teamId: "A-A",
-          d1DisciplineId: null,
-          d2DisciplineId: null,
-        },
         existingDraft: {
           lineupId: "lineup-1",
           entries: [{ disciplineId: "tdm" }],
@@ -511,14 +457,7 @@ describe("ai legacy lineup preview api", () => {
           },
         },
       }),
-      // Audit S4 (main): requireLocalPersistedSave löst NICHT mehr still auf den aktiven Save
-      // aus, sondern verlangt einen echten Treffer per getSaveById — sonst 404. Der Mock muss
-      // die angefragte saveId daher wirklich zurückgeben statt pauschal null.
-      getSaveById(saveId: string) {
-        return saveId === this.bootstrapSingleplayerSave().save.saveId
-          ? this.bootstrapSingleplayerSave().save
-          : null;
-      },
+      getSaveById: () => null,
       getActiveSave: () => null,
     });
     getLocalLegacyLineupDraft.mockReturnValue({
@@ -530,16 +469,6 @@ describe("ai legacy lineup preview api", () => {
       context: {
         teamId: "A-A",
         team: { name: "Alpha" },
-        // See contextMeta comment above ("skips existing lineups..."): required by
-        // isLegacyLineupDraftComplete so the existing draft is recognized as complete.
-        contextMeta: {
-          saveId: "save-local",
-          seasonId: "season-1",
-          matchdayId: "matchday-1",
-          teamId: "A-A",
-          d1DisciplineId: null,
-          d2DisciplineId: null,
-        },
         existingDraft: {
           lineupId: "lineup-1",
           entries: [{ disciplineId: "tdm" }],
@@ -663,49 +592,11 @@ describe("ai legacy lineup preview api", () => {
           },
         },
       }),
-      // Audit S4 (main): requireLocalPersistedSave löst NICHT mehr still auf den aktiven Save
-      // aus, sondern verlangt einen echten Treffer per getSaveById — sonst 404. Der Mock muss
-      // die angefragte saveId daher wirklich zurückgeben statt pauschal null.
-      getSaveById(saveId: string) {
-        return saveId === this.bootstrapSingleplayerSave().save.saveId
-          ? this.bootstrapSingleplayerSave().save
-          : null;
-      },
+      getSaveById: () => null,
       getActiveSave: () => null,
     });
     getLocalLegacyLineupDraft.mockReturnValue(null);
-    // applyAiLegacyLineupBatchLocally (lib/ai/ai-legacy-lineup-batch-apply-service.ts) now loads the
-    // lineup context for every team up front (not just AI-eligible ones), because manual/passive teams
-    // with an incomplete lineup are auto-filled by the AI instead of being skipped outright (see the
-    // "manual_incomplete_lineup_autofilled" warning + canAutoFillIncompleteLineup gating in that file).
-    // A team is only genuinely skipped (skipped_manual / skipped_passive / skipped_disabled) when it
-    // already has a COMPLETE existing draft, so give B-B/C-C/D-D one here; A-A stays draft-less so it
-    // is planned as the eligible AI team.
-    const teamNamesByTeamId: Record<string, string> = { "A-A": "Alpha", "B-B": "Beta", "C-C": "Gamma", "D-D": "Delta" };
-    loadLocalLegacyLineupContext.mockImplementation(({ teamId }: { teamId: string }) => {
-      if (teamId === "A-A") {
-        return { ok: true, context: { teamId, team: { name: teamNamesByTeamId[teamId] } } };
-      }
-      return {
-        ok: true,
-        context: {
-          teamId,
-          team: { name: teamNamesByTeamId[teamId] },
-          contextMeta: {
-            saveId: "save-local",
-            seasonId: "season-1",
-            matchdayId: "matchday-1",
-            teamId,
-            d1DisciplineId: null,
-            d2DisciplineId: null,
-          },
-          existingDraft: {
-            lineupId: `lineup-${teamId}`,
-            entries: [{ disciplineId: "tdm" }],
-          },
-        },
-      };
-    });
+    loadLocalLegacyLineupContext.mockReturnValue({ ok: true, context: { teamId: "A-A", team: { name: "Alpha" } } });
     buildAiLegacyLineupPreview.mockReturnValue({
       teamId: "A-A",
       teamCode: "A-A",
@@ -739,7 +630,6 @@ describe("ai legacy lineup preview api", () => {
     expect(body.results.find((entry: { teamId: string }) => entry.teamId === "B-B")?.result).toBe("skipped_manual");
     expect(body.results.find((entry: { teamId: string }) => entry.teamId === "C-C")?.result).toBe("skipped_passive");
     expect(body.results.find((entry: { teamId: string }) => entry.teamId === "D-D")?.result).toBe("skipped_disabled");
-    // Context is loaded for all 4 teams up front (see comment above), not just the AI-eligible one.
-    expect(loadLocalLegacyLineupContext).toHaveBeenCalledTimes(4);
+    expect(loadLocalLegacyLineupContext).toHaveBeenCalledTimes(1);
   });
 });

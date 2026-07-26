@@ -17,6 +17,7 @@ import {
   startRoomArenaSync,
   startRoom,
 } from "@/lib/room/room-store";
+import { matchesArenaScope } from "@/lib/room/arena-sync-state";
 import { authorizeTeamWrite, buildExplicitTeamOwnership } from "@/lib/room/online-room-model";
 import { isSandboxRoomSave } from "@/lib/room/room-flow-controller";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
@@ -582,5 +583,65 @@ describe("room store", () => {
       expect(started.error).toContain("Team");
     }
     expect(persistence.counters.freshCreates).toBe(0);
+  });
+
+  it("leaves the arena sync state on the applied matchday, so the next matchday must re-scope it", () => {
+    // Regression: der Arena-Sync-State ueberlebt den Spieltagswechsel. `recordRoomGameplayWrite`
+    // setzt ihn auf "result_applied" und NIE zurueck auf "idle"; sein `matchdayId` zeigt weiter auf
+    // den abgeschlossenen Spieltag. Der Host-Start-Guard in der Arena springt aber nur bei "idle" an
+    // -- ohne Scope-Pruefung haette der Host ab Spieltag 2 nie wieder `startRoomArena` gesendet und
+    // der Guest waere dauerhaft ohne Reveal geblieben.
+    const created = createRoom("socket-arena-scope-a", { displayName: "Chris", preset: "chris_4_rest_ai", saveId: "arena-scope-save" });
+    const chris = created.room.state.roomParticipants[0];
+    expect(chris).toBeTruthy();
+    if (!chris) return;
+
+    const started = startRoomArenaSync(created.room.roomCode, created.seat.seatToken, {
+      seasonId: "season-2",
+      matchdayId: "season-2-matchday-1",
+      maxSlotRevealIndex: 5,
+    });
+    expect(started.ok).toBe(true);
+
+    const recorded = recordRoomGameplayWrite({
+      roomCode: created.room.roomCode,
+      saveId: "arena-scope-save",
+      participantId: chris.participantId,
+      action: "matchday_apply",
+      eventType: "matchday_applied",
+      affectedViews: ["arena", "standings"],
+    });
+    expect(recorded.ok).toBe(true);
+    if (!recorded.ok) return;
+
+    const staleState = recorded.room.state.arenaSyncState;
+    // Der State bleibt stehen: nicht "idle", und noch auf Spieltag 1.
+    expect(staleState.status).toBe("result_applied");
+    expect(staleState.matchdayId).toBe("season-2-matchday-1");
+
+    // Genau deshalb muss die Arena ihn fuer den NAECHSTEN Spieltag als Fremd-Scope verwerfen ...
+    expect(
+      matchesArenaScope(staleState, {
+        saveId: "arena-scope-save",
+        seasonId: "season-2",
+        matchdayId: "season-2-matchday-2",
+      }),
+    ).toBe(false);
+    // ... waehrend er fuer seinen eigenen Spieltag weiterhin gilt.
+    expect(
+      matchesArenaScope(staleState, {
+        saveId: "arena-scope-save",
+        seasonId: "season-2",
+        matchdayId: "season-2-matchday-1",
+      }),
+    ).toBe(true);
+    // Ein fremder Save gilt nie, auch bei passendem Spieltag.
+    expect(
+      matchesArenaScope(staleState, {
+        saveId: "anderer-save",
+        seasonId: "season-2",
+        matchdayId: "season-2-matchday-1",
+      }),
+    ).toBe(false);
   });
 });

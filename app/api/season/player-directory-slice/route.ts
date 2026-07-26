@@ -9,6 +9,7 @@ import {
 } from "@/lib/foundation/player-directory-slice";
 import { resolveSliceSave } from "@/lib/foundation/resolve-slice-save-context";
 import { readSaveSliceHeadProjection } from "@/lib/persistence/save-projection-read";
+import { resolveSessionOwnerId } from "@/lib/auth/session";
 
 export async function GET(request: Request) {
   try {
@@ -18,11 +19,13 @@ export async function GET(request: Request) {
     const contentSignature = searchParams.get("contentSignature")?.trim() || undefined;
     // Requesting-Team-Kontext für die Fog-of-War-Maskierung (T-022).
     const requestingTeamId = searchParams.get("teamId")?.trim() || null;
+    const ownerId = await resolveSessionOwnerId();
 
     const resolved = resolveSliceSave({
       saveId,
       contentSignature,
       allowProjectionOnly: Boolean(contentSignature),
+      ownerId,
     });
 
     if (!resolved) {

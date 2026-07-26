@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { buildTeamOverviewSlice } from "@/lib/foundation/team-overview-slice";
 import { resolveSliceSave } from "@/lib/foundation/resolve-slice-save-context";
 import { respondWithSliceEtag } from "@/lib/foundation/season-slice-http";
+import { resolveSessionOwnerId } from "@/lib/auth/session";
 
 export async function GET(request: Request) {
   try {
@@ -12,11 +13,13 @@ export async function GET(request: Request) {
     const saveId = searchParams.get("saveId")?.trim() || undefined;
     const seasonId = searchParams.get("seasonId")?.trim() || undefined;
     const contentSignature = searchParams.get("contentSignature")?.trim() || undefined;
+    const ownerId = await resolveSessionOwnerId();
 
     const resolved = resolveSliceSave({
       saveId,
       contentSignature,
       allowProjectionOnly: Boolean(contentSignature),
+      ownerId,
     });
 
     if (!resolved) {

@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 
 import { inspectSeasonManagementSheetWithFallback, mapSeasonManagementRowsToTeams } from "@/lib/foundation/season-management-sheet";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { resolveLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
+import { resolveSessionOwnerId } from "@/lib/auth/session";
 import { db } from "@/src/server/db";
 
 export async function GET(request: Request) {
@@ -12,19 +14,19 @@ export async function GET(request: Request) {
     const saveId = searchParams.get("saveId")?.trim() || undefined;
     const seasonId = searchParams.get("seasonId")?.trim() || "season-1";
     const source = searchParams.get("source")?.trim() === "prisma" ? "prisma" : "sqlite";
+    const ownerId = source === "sqlite" ? await resolveSessionOwnerId() : null;
 
     const teamStates =
       source === "sqlite"
         ? (() => {
             const persistence = createPersistenceService();
-            const save =
-              (saveId ? persistence.getSaveById(saveId) : null) ??
-              persistence.getActiveSave() ??
-              persistence.bootstrapSingleplayerSave().save;
-            return save.gameState.teams.map((team) => ({
-              teamId: team.teamId,
-              team: { name: team.name },
-            }));
+            const resolved = resolveLocalPersistedSave(persistence, saveId, ownerId);
+            return resolved
+              ? resolved.save.gameState.teams.map((team) => ({
+                  teamId: team.teamId,
+                  team: { name: team.name },
+                }))
+              : [];
           })()
         : await db.teamSeasonState.findMany({
             where: {

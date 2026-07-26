@@ -182,8 +182,11 @@ function resolveDefaultSqliteParams(input: {
   teamId: string | null;
 }): LegacyLineupKeyParams {
   const persistence = createPersistenceService();
-  const { save } = resolveLocalPersistedSave(persistence, input.saveId);
-  return resolveDefaultSqliteParamsFromSave(save, input);
+  const resolved = resolveLocalPersistedSave(persistence, input.saveId);
+  if (!resolved) {
+    throw new Error("No local save available for legacy lineup lab.");
+  }
+  return resolveDefaultSqliteParamsFromSave(resolved.save, input);
 }
 
 async function loadPrismaOptions(params: LegacyLineupKeyParams) {
@@ -505,7 +508,11 @@ export async function GET(request: Request) {
     }
 
     const persistence = createPersistenceService();
-    const { save } = resolveLocalPersistedSave(persistence, parsed.saveId);
+    const resolved = resolveLocalPersistedSave(persistence, parsed.saveId);
+    if (!resolved) {
+      return NextResponse.json({ error: "No local save available for legacy lineup lab." }, { status: 404 });
+    }
+    const { save } = resolved;
     const params = resolveDefaultSqliteParamsFromSave(save, parsed);
     const versionMeta = persistence.getSaveVersionMetadata(save.saveId);
     const cacheKey = buildLegacyLineupLabContextCacheKey({

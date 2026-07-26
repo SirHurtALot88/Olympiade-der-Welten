@@ -9,6 +9,7 @@ import {
 } from "@/lib/foundation/resolve-slice-save-context";
 import { respondWithSliceEtag } from "@/lib/foundation/season-slice-http";
 import { DEBUG_FORCE_PLAYER_VISIBILITY } from "@/lib/foundation/debug-player-visibility";
+import { resolveSessionOwnerId } from "@/lib/auth/session";
 
 export async function GET(request: Request) {
   try {
@@ -17,6 +18,7 @@ export async function GET(request: Request) {
     const seasonId = searchParams.get("seasonId")?.trim() || undefined;
     const contentSignature = searchParams.get("contentSignature")?.trim() || undefined;
     const source = searchParams.get("source")?.trim() === "prisma" ? "prisma" : "sqlite";
+    const ownerId = await resolveSessionOwnerId();
     const playerIds = (searchParams.get("playerIds") ?? "")
       .split(",")
       .map((entry) => entry.trim())
@@ -50,6 +52,7 @@ export async function GET(request: Request) {
           seasonId,
           contentSignature,
           playerIds: playerIds.length > 0 ? playerIds : undefined,
+          ownerId,
         })
       : null;
     if (persistedSlice) {
@@ -75,6 +78,7 @@ export async function GET(request: Request) {
       saveId,
       contentSignature,
       allowProjectionOnly: Boolean(contentSignature),
+      ownerId,
     });
 
     if (!resolved) {

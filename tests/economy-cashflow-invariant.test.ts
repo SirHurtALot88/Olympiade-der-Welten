@@ -253,6 +253,8 @@ type SimulationRun = {
     cashAfterPrize: Map<string, number>;
     oldCashByTeam: Map<string, number | null>;
     newCashByTeam: Map<string, number | null>;
+    prizeMoneyByTeam: Map<string, number | null>;
+    /** Aus dem geschriebenen Audit-Log (`cashPrizeApplyLogs[].payload`), NICHT aus dem Rückgabewert. */
     cashPayoutApplied: boolean;
     benchmarkOnly: boolean;
   };
@@ -514,22 +516,20 @@ beforeAll(async () => {
   }
   persistence.saveSingleplayerState(saveId, sponsorApply.gameState);
   const sponsorCashAfter = sponsorApply.gameState.teams.find((team) => team.teamId === sponsorTeamId)!.cash;
-  const newSponsorLogs = (sponsorApply.gameState.seasonState.sponsorPayoutLogs ?? []).filter(
-    (log) => log.teamId === sponsorTeamId && log.phase === "season_end",
+  // `applySponsorSettlement` läuft LIGAWEIT (`sponsor-settlement-service.ts`: `for (const team of
+  // input.gameState.teams)`) — mit `deductSalary: true` bekommt JEDES der 32 Teams einen
+  // "salary_deduct"-Eintrag, nicht nur das Team mit dem Test-Sponsorvertrag. Für das Aggregat unten
+  // müssen daher ALLE in diesem Aufruf neu entstandenen Logs gebucht werden; wer nur die Logs von
+  // `sponsorTeamId` einsammelt, hält die Gehälter der übrigen 31 Teams fälschlich für unbelegte
+  // Cash-Bewegungen.
+  const sponsorLogIdsBefore = new Set((gameStateWithContract.seasonState.sponsorPayoutLogs ?? []).map((log) => log.id));
+  const settlementLogs = (sponsorApply.gameState.seasonState.sponsorPayoutLogs ?? []).filter(
+    (log) => !sponsorLogIdsBefore.has(log.id),
   );
+  const newSponsorLogs = settlementLogs.filter((log) => log.teamId === sponsorTeamId && log.phase === "season_end");
   const sponsorLoggedDelta = Number(newSponsorLogs.reduce((sum, log) => sum + log.cashDelta, 0).toFixed(4));
   const sponsorDelta = Number((sponsorCashAfter - sponsorCashBefore).toFixed(4));
-  // WICHTIG: applySponsorSettlement mit deductSalary:true zieht Gehalt LIGA-WEIT bei ALLEN Teams ab
-  // (nicht nur bei `sponsorTeamId`, der hier zufällig einen Sponsorvertrag hat) — siehe Kommentar
-  // "Audit R2/V2" in sponsor-settlement-service.ts (~Z. 340): Gehalt wird IMMER abgezogen, unabhängig
-  // von einem Vertrag, um den KI-Paritätsbruch/Ökonomie-Skew zu vermeiden, den ein vertragsgekoppelter
-  // Abzug hätte. Für die Aggregat-Invariante (Phase 7) müssen daher ALLE `season_end`-Logs aus diesem
-  // einen Aufruf gebucht werden, nicht nur die von `sponsorTeamId` — sonst fehlt in der Buchhaltung des
-  // Tests das Gehalt der anderen 31 Teams, obwohl es real von ihrem Cash abgezogen wurde.
-  const allNewSponsorLogs = (sponsorApply.gameState.seasonState.sponsorPayoutLogs ?? []).filter(
-    (log) => log.phase === "season_end",
-  );
-  for (const log of allNewSponsorLogs) {
+  for (const log of settlementLogs) {
     bookings.push({ teamId: log.teamId, amount: log.cashDelta, system: "sponsor_salary", note: log.componentId ?? log.id });
   }
 
@@ -665,6 +665,30 @@ beforeAll(async () => {
   // Wir prüfen das hier explizit, statt es zu ignorieren — falls jemand später echten Cash-Payout
   // aktiviert, ohne diesen Test anzupassen, MUSS diese Assertion fehlschlagen (das ist beabsichtigt).
   // ---------------------------------------------------------------------------------------------
+  // Fixture-Vorbereitung: In diesem Lauf trägt KEIN Standings-Eintrag einen `rank` (siehe NEBENBEFUND
+  // in Phase 1 — `standings_apply` läuft hier nicht sauber durch). Ohne Rang blockiert
+  // `buildBlockingReasons` den Apply für alle 32 Teams mit `missing_rank`, d. h. `executeCashPrizeApply`
+  // bricht ab, BEVOR es überhaupt Cash anfassen könnte. Ein "Cash unverändert" wäre dann vakuum wahr
+  // und würde einen echten Preisgeld-Payout nicht bemerken. Wir vergeben deshalb hier deterministisch
+  // Ränge nach Punkten (bei Gleichstand nach teamId), damit der Apply real durchläuft und die
+  // Benchmark-Only-Invariante tatsächlich geprüft wird.
+  const preRankSave = persistence.getSaveById(saveId)!;
+  const rankedTeamIds = [...preRankSave.gameState.teams]
+    .map((team) => ({
+      teamId: team.teamId,
+      points: preRankSave.gameState.seasonState.standings[team.teamId]?.points ?? 0,
+    }))
+    .sort((left, right) => right.points - left.points || left.teamId.localeCompare(right.teamId));
+  const standingsWithRanks: GameState["seasonState"]["standings"] = { ...preRankSave.gameState.seasonState.standings };
+  rankedTeamIds.forEach((entry, index) => {
+    const existing = standingsWithRanks[entry.teamId] ?? { points: entry.points };
+    standingsWithRanks[entry.teamId] = { ...existing, rank: index + 1, startplatz: existing.startplatz ?? index + 1 };
+  });
+  persistence.saveSingleplayerState(saveId, {
+    ...preRankSave.gameState,
+    seasonState: { ...preRankSave.gameState.seasonState, standings: standingsWithRanks },
+  });
+
   const prizeSave = persistence.getSaveById(saveId)!;
   const cashBeforePrize = cashByTeamId(prizeSave.gameState);
   const prizePreview = await previewCashPrizeApply(
@@ -684,14 +708,29 @@ beforeAll(async () => {
     },
     persistence,
   );
-  const cashAfterPrize = cashByTeamId(persistence.getSaveById(saveId)!.gameState);
-  // `plannedChanges[].newCash` ist NICHT der maßgebliche Beweis (es kann `null` sein, wenn die
-  // Standings-Vorschau — unabhängig vom hier getesteten Cash-Payout — für ein Team unvollständig
-  // ist, siehe NEBENBEFUND in Phase 1). Der maßgebliche Beweis ist der tatsächliche `team.cash`-Wert
-  // im Save VOR/NACH dem `executeCashPrizeApply`-Aufruf — genau das, was `cashBeforePrize`/
-  // `cashAfterPrize` direkt aus dem GameState lesen.
+  const afterPrizeGameState = persistence.getSaveById(saveId)!.gameState;
+  const cashAfterPrize = cashByTeamId(afterPrizeGameState);
+  // `plannedChanges[].newCash` ist NICHT der maßgebliche Beweis und insbesondere KEIN
+  // "Cash nach Preisgeld": es ist `prize-money-preview.ts`' `projectedCash`, also die
+  // SAISONEND-PROGNOSE `Cash − Gehälter + Sponsor/Gebäude-Einnahme − Kreditrate`. Sie weicht daher
+  // auch bei komplett ausgeschaltetem Preisgeld-Payout planmäßig von `oldCash` ab — ein
+  // `newCash === oldCash` wäre nur zufällig richtig. Maßgeblich ist der tatsächliche `team.cash`-Wert
+  // im Save VOR/NACH `executeCashPrizeApply` (`cashBeforePrize`/`cashAfterPrize`), ergänzt um die
+  // Flags aus dem geschriebenen Audit-Log.
   const oldCashByTeam = new Map(prizeApply.plannedChanges.map((change) => [change.teamId, change.oldCash] as const));
   const newCashByTeam = new Map(prizeApply.plannedChanges.map((change) => [change.teamId, change.newCash] as const));
+  const prizeMoneyByTeam = new Map(prizeApply.plannedChanges.map((change) => [change.teamId, change.prizeMoney] as const));
+  // `CashPrizeApplyResult` trägt selbst KEIN `cashPayoutApplied` (siehe Typ in
+  // `cash-prize-apply-service.ts`) — ein Cast darauf liefert immer `undefined` und prüft nichts.
+  // Die Flags stehen ausschließlich im Audit-Log-Payload, das der Apply in den GameState schreibt.
+  const prizeAuditLog = (afterPrizeGameState.seasonState.cashPrizeApplyLogs ?? []).find(
+    (log) => log.id === prizeApply.auditLogId,
+  );
+  if (!prizeAuditLog) {
+    throw new Error(
+      `Kein cashPrizeApplyLogs-Eintrag für den Cash-Prize-Apply gefunden. applied=${prizeApply.applied} ok=${prizeApply.ok} canApply=${prizeApply.canApply} auditLogId=${prizeApply.auditLogId} blocking=${prizeApply.blockingReasons.slice(0, 12).join(" | ")}`,
+    );
+  }
   void prizePreview;
 
   run = {
@@ -739,8 +778,9 @@ beforeAll(async () => {
       cashAfterPrize,
       oldCashByTeam,
       newCashByTeam,
-      cashPayoutApplied: Boolean((prizeApply as unknown as { cashPayoutApplied?: boolean }).cashPayoutApplied),
-      benchmarkOnly: true,
+      prizeMoneyByTeam,
+      cashPayoutApplied: prizeAuditLog.payload.cashPayoutApplied,
+      benchmarkOnly: prizeAuditLog.payload.benchmarkOnly,
     },
   };
 }, 180_000);
@@ -813,24 +853,35 @@ describe("Geldfluss-Invariante — simulierte Mini-Saison", () => {
       expect(after, `Team ${teamId}: cash vor Cash-Prize-Apply ${before}, danach ${after}`).toBe(before);
     }
 
-    // VERALTETER KOMMENTAR KORRIGIERT: `plannedChanges[].newCash` (= `item.projectedCash` in
-    // prize-money-preview.ts) ist AUSDRÜCKLICH ein voller Wirtschafts-BENCHMARK
-    // (currentCash − Gehalt + Season-Einnahme − Kreditrate, siehe prize-money-preview.ts ~Z. 592-595),
-    // nicht "currentCash + Preisgeld". Er wird für das KI-Wirtschaftssignal gebraucht und weicht daher
-    // BEWUSST von oldCash ab, sobald Gehalt/Einnahme/Kreditrate ungleich null sind — das ist eine reine
-    // Vorschau/Prognose, kein Cash-Payout. Die frühere Annahme, `newCash` sei in dieser Fixture für
-    // alle Teams `null` (und die Schleife dadurch faktisch ein No-op), war ein Nebeneffekt eines
-    // unabhängigen, hier nicht mehr reproduzierbaren Datenzustands — keine dokumentierte Garantie.
-    // Der maßgebliche Beweis, dass KEIN echtes Cash bewegt wurde, ist ausschließlich die Schleife
-    // oben über die realen `cashBeforePrize`/`cashAfterPrize`-Werte. Hier prüfen wir nur noch, dass
-    // der Rückgabewert strukturell sinnvoll befüllt ist (keine falsche Gleichheits-Annahme mehr).
+    // Zweiter Beweis, direkt aus dem geschriebenen Audit-Log: der Apply selbst protokolliert, dass
+    // er nur Benchmark ist und kein Cash ausgezahlt hat. DAS ist die Kanarienvogel-Assertion — wird
+    // `CASH_PRIZE_BENCHMARK_ONLY` jemals auf `false` gesetzt, wird sie rot und zwingt dazu, den neuen
+    // Payout hier bewusst zu verifizieren, statt ihn stillschweigend ungeprüft zu lassen.
+    expect(run.phase6.benchmarkOnly).toBe(true);
+    expect(run.phase6.cashPayoutApplied).toBe(false);
+
+    // `plannedChanges[].oldCash` muss der real im Save stehende Cash-Wert vor dem Apply sein —
+    // sonst würde die UI eine Projektion auf einer falschen Basis anzeigen.
     expect(run.phase6.oldCashByTeam.size).toBeGreaterThan(0);
-    expect(run.phase6.newCashByTeam.size).toBeGreaterThan(0);
-    for (const [teamId, newCash] of run.phase6.newCashByTeam) {
-      if (newCash == null) continue;
-      expect(Number.isFinite(newCash), `Team ${teamId}: newCash (projectedCash) sollte eine endliche Zahl sein`).toBe(
-        true,
+    for (const [teamId, oldCash] of run.phase6.oldCashByTeam) {
+      if (oldCash == null) continue;
+      expect(oldCash, `Team ${teamId}: plannedChanges.oldCash weicht vom echten team.cash ab`).toBe(
+        run.phase6.cashBeforePrize.get(teamId),
       );
+    }
+
+    // `newCash` ist die Saisonend-Prognose (Cash − Gehälter + Sponsor/Gebäude − Kreditrate), NICHT
+    // "Cash + Preisgeld". Der hier geprüfte Punkt ist, dass Preisgeld darin nicht auftaucht: kein
+    // Team mit echtem Preisgeld-Betrag darf eine Prognose von exakt `oldCash + prizeMoney` haben.
+    const teamsWithPrizeMoney = [...run.phase6.prizeMoneyByTeam].filter(([, prize]) => (prize ?? 0) !== 0);
+    for (const [teamId, prizeMoney] of teamsWithPrizeMoney) {
+      const oldCash = run.phase6.oldCashByTeam.get(teamId) ?? null;
+      const newCash = run.phase6.newCashByTeam.get(teamId) ?? null;
+      if (oldCash == null || newCash == null) continue;
+      expect(
+        newCash,
+        `Team ${teamId}: Prognose entspricht oldCash + Preisgeld — Preisgeld fließt entgegen CASH_PRIZE_BENCHMARK_ONLY doch ein`,
+      ).not.toBe(Number((oldCash + (prizeMoney ?? 0)).toFixed(1)));
     }
   });
 
@@ -854,16 +905,16 @@ describe("Geldfluss-Invariante — simulierte Mini-Saison", () => {
       ).toBeLessThanOrEqual(AGGREGATE_TOLERANCE);
     }
 
-    // Teams, die in KEINER Buchung vorkommen, dürfen sich im Cash über den gesamten Lauf hinweg
-    // ebenfalls nicht verändert haben (Kontrollgruppe — deckt "unsichtbare" Cash-Bewegungen ab,
-    // die von keinem der oben geprüften Systeme stammen).
-    // Seit die Sponsor-/Gehalts-Buchung oben korrekt LIGA-WEIT für alle Teams mit Roster-Gehalt
-    // gebucht wird (applySponsorSettlement zieht Gehalt IMMER ab, siehe "Audit R2/V2" in
-    // sponsor-settlement-service.ts ~Z. 340), ist `touchedTeamIds` für eine volle 32-Team-Liga
-    // typischerweise bereits alle 32 Teams — eine leere Kontrollgruppe ist damit der ERWARTETE
-    // Normalfall und kein Testfehler. Die Invariante selbst bleibt aktiv, falls doch ein Team ohne
-    // jede Buchung übrig bleibt (z. B. ein Team ohne Roster/Gehalt).
+    // Kontrollgruppe: Teams, die in KEINER Buchung vorkommen, dürfen sich im Cash über den gesamten
+    // Lauf hinweg auch nicht verändert haben — das deckt "unsichtbare" Cash-Bewegungen ab, die von
+    // keinem der oben geprüften Systeme stammen.
+    //
+    // Da das ligaweite Sponsor-/Gehalts-Settlement jedem der 32 Teams eine Buchung verpasst, ist diese
+    // Gruppe inzwischen regulär LEER. Das ist keine Lücke, sondern der stärkere Fall: die
+    // Invarianten-Schleife oben deckt dann die gesamte Liga ab. Genau das wird hier festgenagelt —
+    // jedes Team muss von einer der beiden Prüfungen erfasst sein, keins darf durchrutschen.
     const untouchedTeams = run.finalGameState.teams.filter((team) => !touchedTeamIds.has(team.teamId));
+    expect(touchedTeamIds.size + untouchedTeams.length).toBe(run.finalGameState.teams.length);
     for (const team of untouchedTeams) {
       const before = run.initialCash.get(team.teamId) ?? 0;
       expect(
