@@ -891,7 +891,7 @@ function NlTrainingWhatIf({
         />
         <StatChip
           label="Potential-Decke"
-          value={`${formatNlNumber(projected.ceilingLoss, 1)} SP`}
+          value={`−${formatNlNumber(Math.abs(projected.ceilingLoss), 1)} SP`}
           sub="Zuwachs über der Decke verpufft"
           tone="risk"
           title="Der Teil des Trainings, der bei diesem Modus NICHT im Netto landet, weil er auf Attribute nahe ihrer Potential-Obergrenze verteilt und dort abgeschnitten wird. Höhere Intensität ⇒ mehr Verpuffung."
@@ -1102,14 +1102,14 @@ export default function TrainingCompactNewLook({
           />
           <StatChip
             label="Regression"
-            value={`${formatNlNumber(animatedTeamRegression ?? teamKpis.regression, 1)} SP`}
+            value={`−${formatNlNumber(Math.abs(animatedTeamRegression ?? teamKpis.regression), 1)} SP`}
             sub="Alterung & Marktwert-Druck"
             tone="risk"
             title="SP-Verlust, den der Kader automatisch durch Alterung, Marktwert-Druck und Belastung verliert — muss durch Training + Performance ausgeglichen werden."
           />
           <StatChip
             label="Potential-Decke"
-            value={`${formatNlNumber(animatedTeamCeiling ?? teamKpis.ceiling, 1)} SP`}
+            value={`−${formatNlNumber(Math.abs(animatedTeamCeiling ?? teamKpis.ceiling), 1)} SP`}
             sub="Zuwachs über der Decke verpufft"
             tone="risk"
             title="Der Teil des Trainings, der NICHT im Netto landet, weil er auf Attribute nahe ihrer gescouteten Potential-Obergrenze verteilt und dort abgeschnitten wird. Höhere Intensität ⇒ mehr Verpuffung."
