@@ -656,9 +656,7 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
         if (!loanDecision.shouldBorrow) continue;
         // Günstigstes Angebot (Bank oder Team); buildLoanOffers ist aufsteigend nach Zinssatz sortiert
         // und enthält immer die Bank, es gibt also mindestens ein Angebot.
-        const offers = buildLoanOffers(current.gameState, teamId, loanDecision.loanAmount, loanDecision.termSeasons, {
-          allowSeason1: loanDecision.allowSeason1,
-        });
+        const offers = buildLoanOffers(current.gameState, teamId, loanDecision.loanAmount, loanDecision.termSeasons);
         const bestOffer = offers[0] ?? null;
         const loanResult = originateLoan(
           current.gameState,
@@ -669,9 +667,7 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
             lenderType: bestOffer?.lenderType ?? "bank",
             lenderTeamId: bestOffer?.lenderTeamId ?? undefined,
           },
-          // allowSeason1 nur im sanktionierten S1-below-hard-min-Überlebensfall true (sonst false); lässt
-          // gezielt die S1-Kalendersperre fallen, Kapazitäts-/Distress-Gate bleiben aktiv.
-          { execute: true, allowSeason1: loanDecision.allowSeason1 },
+          { execute: true },
         );
         if (!loanResult.ok) continue;
         const persisted = persistence.saveSingleplayerState(input.saveId, loanResult.gameState);

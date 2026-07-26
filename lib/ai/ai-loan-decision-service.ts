@@ -130,17 +130,10 @@ export type AiLoanDecision = {
   loanAmount: number;
   termSeasons: number;
   reason: string;
-  /**
-   * True NUR für einen sanktionierten Season-1-Überlebenskredit (Team unter dem harten Roster-Minimum,
-   * das sich die letzten Slots aus eigener Kraft nicht leisten kann). Der Aufrufer MUSS diesen Flag an
-   * `buildLoanOffers`/`originateLoan` durchreichen (`allowSeason1`), damit die S1-Kalendersperre gezielt
-   * nur für diesen Fall fällt — Kapazitäts- und Distress-Gate bleiben aktiv. In Season 2+ immer false.
-   */
-  allowSeason1: boolean;
 };
 
 function noLoan(reason: string): AiLoanDecision {
-  return { shouldBorrow: false, loanAmount: 0, termSeasons: 0, reason, allowSeason1: false };
+  return { shouldBorrow: false, loanAmount: 0, termSeasons: 0, reason };
 }
 
 /**
@@ -239,7 +232,9 @@ export function resolveAiLoanDecision(gameState: GameState, teamId: string): AiL
   if (!team) return noLoan("team_not_found");
 
   const seasonId = gameState.season.id;
-  const seasonOne = isSeasonOne(seasonId);
+
+  // Season 1 = keine Kredite (harte Regel), siehe docs/design/kredit-system.md.
+  if (isSeasonOne(seasonId)) return noLoan("season_one_no_loans");
 
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null;
   const rosterCount = gameState.rosters.filter((entry) => entry.teamId === teamId).length;
@@ -249,17 +244,6 @@ export function resolveAiLoanDecision(gameState: GameState, teamId: string): AiL
   // finanziert es aus eigenem Cash. So bleibt Kredit die Ausnahme statt Standard-Preseason-Top-up.
   const competitiveFloor = resolveCompetitiveFloor(playerMin, playerOpt);
   const rosterGap = Math.max(0, competitiveFloor - rosterCount);
-  const belowHardMin = rosterCount < playerMin;
-
-  // Season 1: normalerweise KEINE Kredite (harte Regel) — ein Team baut seinen Startkader aus dem Draft-
-  // Budget auf, siehe docs/design/kredit-system.md. EINZIGE Ausnahme (User: „Teams nehmen zu Beginn
-  // Kredite auf, wenn sie merken, sie brauchen noch was, um die letzten Spieler aufzufüllen"): ein Team,
-  // das nicht einmal sein HARTES Roster-Minimum aus eigener Kraft stellen kann, darf einen
-  // Überlebenskredit für die letzten Slots aufnehmen — sonst hält der Saison-Preflight „teams_under_7"
-  // den ganzen Lauf an. KEIN Wettbewerbs-Floor-Kredit in S1 (nur below-hard-min): den Rest baut das Team
-  // aus dem Draft-Budget. Kapazitäts-/Distress-Gate bleiben unten voll aktiv; es fällt gezielt nur die
-  // S1-Kalendersperre (via `allowSeason1` an originateLoan/buildLoanOffers durchgereicht).
-  if (seasonOne && !belowHardMin) return noLoan("season_one_no_loans");
 
   if (rosterGap <= 0) return noLoan("no_need");
   // Reine Hort-Teams (Cash-Creator-Identität) borgen aus Charakter nicht.
@@ -270,6 +254,7 @@ export function resolveAiLoanDecision(gameState: GameState, teamId: string): AiL
   // (Verkäufe/Tilgung) statt weiter in die Spirale leihen. Das ist kein harter Mechanik-Block: below-min
   // bleibt ausgenommen (Überlebenskredit, sonst bricht der Saison-Preflight teams_under_7), und ohne
   // geplatzten Kredit greift es gar nicht. Kappt gezielt die chronischen Wiederholungs-Kreditnehmer.
+  const belowHardMin = rosterCount < playerMin;
   if (hasDefaultedLoan(gameState, teamId) && !belowHardMin) return noLoan("distress_defaulted_debt");
 
   // Kein harter Leverage-Block mehr (User: Kredite sollen möglich bleiben, "wenn begründet"): die
@@ -297,9 +282,7 @@ export function resolveAiLoanDecision(gameState: GameState, teamId: string): AiL
   const capacityPreview = originateLoan(
     gameState,
     { borrowerTeamId: teamId, principal: amountShortfall, termSeasons: DEFAULT_TERM_SEASONS },
-    // In S1 hätte die Kalendersperre den Preview früh mit capacity 0 abgebrochen (→ fälschlich
-    // „no_capacity"); für den sanktionierten below-hard-min-Überlebensfall die echte Kapazität berechnen.
-    { execute: false, allowSeason1: seasonOne },
+    { execute: false },
   );
   const capacity = capacityPreview.capacity;
   if (capacity <= 0) return noLoan("no_capacity");
@@ -314,9 +297,7 @@ export function resolveAiLoanDecision(gameState: GameState, teamId: string): AiL
   // Keine kurze Laufzeit ist zusammen mit der bestehenden Last tragbar → Kredit ablehnen statt strecken.
   if (termSeasons == null) return noLoan("debt_service_ceiling");
 
-  // allowSeason1 nur im S1-Überlebensfall true (hierher gelangt in S1 ausschließlich ein below-hard-min-
-  // Team, s. Gate oben); in Season 2+ ist seasonOne false und der Flag bleibt wirkungslos.
-  return { shouldBorrow: true, loanAmount, termSeasons, reason: "need_driven_borrow", allowSeason1: seasonOne };
+  return { shouldBorrow: true, loanAmount, termSeasons, reason: "need_driven_borrow" };
 }
 
 export type AiEarlyPayoffDecision = {
