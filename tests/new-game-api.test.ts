@@ -82,6 +82,7 @@ describe("new-game api", () => {
         seasonSetup: { seasonId: "season-1" },
         chrisTeamIds: ["M-M"],
         frankyTeamIds: [],
+        aiTeamIds: ["A-A", "Z-H"],
       },
     });
     runAiPicksExecutePreview.mockResolvedValue({
@@ -122,6 +123,11 @@ describe("new-game api", () => {
       teamScope: "all",
       allowSetupAllTeams: true,
     });
+    // Regression: the whole-league setup draft must NOT fill the player's own team. The human team
+    // (Chris's "M-M") must be excluded from the writable scope so its roster stays empty for manual
+    // drafting; only the AI teams are draftable.
+    expect(runParams.callerWritableTeamIds).toEqual(["A-A", "Z-H"]);
+    expect(runParams.callerWritableTeamIds).not.toContain("M-M");
 
     expect(saveSingleplayerState).toHaveBeenLastCalledWith(
       saveId,
@@ -136,7 +142,7 @@ describe("new-game api", () => {
       mode: "applied",
       save: { saveId, name: "Solo Save" },
       previousActiveSaveId: null,
-      preview: { seasonSetup: { seasonId: "season-1" }, chrisTeamIds: ["M-M"], frankyTeamIds: [] },
+      preview: { seasonSetup: { seasonId: "season-1" }, chrisTeamIds: ["M-M"], frankyTeamIds: [], aiTeamIds: ["A-A", "Z-H"] },
     });
     runAiPicksExecutePreview.mockRejectedValue(new Error("boom"));
 
