@@ -5,6 +5,7 @@ import type { GameState, Player, TeamFacilityCollection } from "@/lib/data/olyDa
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { createPlayerBaselineFromPlayer } from "@/lib/players/player-baseline-service";
 import { computeSeasonEndContractTick } from "@/lib/contracts/contract-renewal-service";
+import { buildPrizeMoneyPreview } from "@/lib/season/prize-money-preview";
 
 vi.mock("@/lib/season/prize-money-preview", () => ({
   buildPrizeMoneyPreview: vi.fn(async () => ({
@@ -396,6 +397,64 @@ describe("pre-season workflow service", () => {
     expect(savedState.seasonState.preSeasonWorkflowLogs?.[0]?.affectedEntities).toContain("seasonState.disciplineSchedule");
     expect(savedState.seasonState.preSeasonWorkflowLogs?.[0]?.affectedEntities).toContain("playerProgressionEvents");
     expect(savedState.seasonState.preSeasonWorkflowLogs?.[0]?.warnings).toContain("season_mutator_state_reset_lineup_modifiers_cleared");
+  });
+
+  it("does not clobber a concurrent co-op write that lands during the async prize-money read (stale-snapshot race)", async () => {
+    const sourceSave = save();
+    // `currentSave` stands in for the sqlite row: a second co-op writer (transfer / lineup /
+    // identity save) can update it independently of the stale in-memory `sourceSave` snapshot
+    // that the route already read before calling into the workflow service.
+    let currentSave: PersistedSaveGame = sourceSave;
+    const saveSingleplayerState = vi.fn((saveId: string, nextGameState: GameState) => {
+      // Mirrors the real persistence-service.saveSingleplayerState: every write bumps the stored
+      // saveVersion from whatever is currently persisted, independent of what the caller's stale
+      // in-memory snapshot thought the version was.
+      currentSave = {
+        ...currentSave,
+        saveId,
+        gameState: { ...nextGameState, saveVersion: (currentSave.gameState.saveVersion ?? 0) + 1 },
+      };
+      return currentSave;
+    });
+    const persistence = {
+      bootstrapSingleplayerSave: vi.fn(() => ({ save: currentSave, createdFromSeed: false })),
+      getActiveSave: vi.fn(() => currentSave),
+      getSaveById: vi.fn(() => currentSave),
+      saveSingleplayerState,
+    } as unknown as PersistenceService;
+
+    const preview = await buildPreSeasonWorkflowPreview(sourceSave, persistence);
+    const token = preview.steps.find((step) => step.stepId === "next_season_setup")?.confirmToken;
+
+    // Simulate the competing co-op write committing while `applyPreSeasonNextSeasonSetup` is
+    // awaiting `buildPreSeasonWorkflowPreview` -> `buildPrizeMoneyPreview` (the real
+    // implementation does a genuine `fs.readFile` here, which is the reliable event-loop yield
+    // the race depends on). This runs its own correct fresh-read-mutate-write and bumps
+    // saveVersion, exactly like a fast transfer/lineup/identity save from the other seat would.
+    const originalPrizeMoneyPreview = vi.mocked(buildPrizeMoneyPreview).getMockImplementation();
+    vi.mocked(buildPrizeMoneyPreview).mockImplementationOnce(async (...args) => {
+      const concurrentGameState: GameState = {
+        ...currentSave.gameState,
+        teams: currentSave.gameState.teams.map((team) =>
+          team.teamId === "human-1" ? { ...team, cash: team.cash + 999 } : team,
+        ),
+      };
+      saveSingleplayerState(currentSave.saveId, concurrentGameState);
+      return originalPrizeMoneyPreview!(...args);
+    });
+
+    const result = await applyPreSeasonNextSeasonSetup(sourceSave, token, persistence);
+
+    // The stale-snapshot apply must abort instead of persisting a next-season state derived from
+    // the pre-race snapshot (which would silently revert the concurrent write).
+    expect(result.applied).toBe(false);
+    expect(result.blockingReasons).toContain("concurrent_save_write_conflict");
+    // Only the concurrent writer's call actually persisted; the next-season apply never wrote.
+    expect(saveSingleplayerState).toHaveBeenCalledTimes(1);
+    // The concurrent write survives untouched.
+    expect(currentSave.gameState.teams.find((team) => team.teamId === "human-1")?.cash).toBe(
+      sourceSave.gameState.teams.find((team) => team.teamId === "human-1")!.cash + 999,
+    );
   });
 
   it("ages contracts exactly once per interactive transition: -1 decrement + salary schedule advance + expiry, idempotent, and ticks again next season", () => {

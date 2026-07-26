@@ -1219,6 +1219,11 @@ export async function applyPreSeasonNextSeasonSetup(
   confirmToken: string | null | undefined,
   persistence: PersistenceService = createPersistenceService(),
 ): Promise<PreSeasonWorkflowApplyResult> {
+  // Captured before any `await` below. Everything from here to the final persist keeps mutating
+  // this exact in-memory `save` snapshot; re-checked against the freshly stored saveVersion right
+  // before persisting so a concurrent co-op write that lands during one of those awaits (e.g. the
+  // prize-money preview's real fs.readFile) is never silently clobbered.
+  const expectedSaveVersion = save.gameState.saveVersion ?? 0;
   const preview = await buildPreSeasonWorkflowPreview(save, persistence);
   const setupStep = preview.steps.find((step) => step.stepId === "next_season_setup");
   if (!setupStep?.confirmToken || confirmToken !== setupStep.confirmToken) {
@@ -1262,6 +1267,27 @@ export async function applyPreSeasonNextSeasonSetup(
   }
 
   const { gameState, auditLog } = buildNextSeasonGameState(snapshotResult.save);
+
+  // Re-read the persisted save immediately before writing the built next-season state. If its
+  // saveVersion has moved since `expectedSaveVersion` was captured, a co-op write from the other
+  // seat committed while this request was awaiting I/O above — abort instead of overwriting it
+  // with a next-season state derived from the now-stale snapshot. The caller (route handler)
+  // surfaces this as a non-applied result with a conflict reason; the client can reload and retry.
+  const currentSave = persistence.getSaveById(save.saveId);
+  const currentSaveVersion = currentSave?.gameState.saveVersion ?? 0;
+  if (!currentSave || currentSaveVersion !== expectedSaveVersion) {
+    return {
+      ...preview,
+      dryRun: false,
+      productiveWrites: true,
+      applied: false,
+      appliedStepId: null,
+      auditLogId: null,
+      warnings: [...preview.warnings, ...penaltyResult.warnings, ...snapshotResult.warnings, ...progressionResult.warnings],
+      blockingReasons: ["concurrent_save_write_conflict"],
+    };
+  }
+
   persistence.saveSingleplayerState(save.saveId, gameState);
   const nextPreview = await buildPreSeasonWorkflowPreview({ ...progressionResult.save, gameState }, persistence);
 
