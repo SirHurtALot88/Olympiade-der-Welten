@@ -52,8 +52,58 @@ const FLOOR = 44;
  * Die Werte sind Design-Schaetzungen und muessen im Long-Run gemessen werden.
  */
 const P_MET = 0.55; // nur noch Referenzwert fuer den Stresstest
-/** Sonderziel-Spanne (schwierigkeitsabhängig) — typischer Wert für die Meister-Prüfung. */
-const SPECIAL_TYPICAL = 9;
+/**
+ * RARITY skaliert die GANZE Karte, nicht nur das Sonderziel.
+ *
+ * Frueher lief der Sonderziel-EV rarity-abhaengig NEBEN der Kalibrierung (4/12/16/30 C) — dadurch
+ * unterschieden sich zwei Angebote einer gemischten Liste um bis zu 26 C EV, eine Groessenordnung
+ * ueber dem Spread von 3.8 %. Die Rarity ueberstimmte die Risikowahl vollstaendig.
+ *
+ * Richtig ist: die Rarity ist eine QUALITAETSSTUFE der gesamten Karte. magisch = Standard (1.0),
+ * gewoehnlich schwaecher, selten besser, legendaer selten aber stark. Parität gilt damit INNERHALB
+ * einer Stufe — genau wie ursprünglich vorgegeben ("auf gleicher Stufe z. B. magisch hat jede
+ * Sponsorart ihre Staerken und Schwaechen").
+ */
+export const RARITY_MULT: Record<string, number> = {
+  "gewöhnlich": 0.85, "magisch": 1.0, "selten": 1.15, "legendär": 1.35,
+};
+
+/**
+ * OFFENER KONFLIKT (gemessen, nicht geloest): die Untergrenze 44 vertraegt sich nicht mit Rarities
+ * UNTER dem Standard.
+ *
+ * Gemessen mit Steilheit 1.7: die Rarity-Leiter selbst stimmt (Meister 78.7 / 91.3 / 103.5 / 119.7
+ * fuer gewoehnlich / magisch / selten / legendaer, monoton) und die Liga-Bilanz ist stabil
+ * (k = 1.492 unabhaengig von der gewaehlten Rarity). ABER:
+ *
+ *  - Bei gewoehnlich, magisch und selten saettigt der Kalibrier-Offset an der Bisektions-Untergrenze
+ *    (-200): das Ziel-EV der unteren Stufen liegt UNTER der garantierten 44, ist also unerreichbar.
+ *  - Folge: fuer mittlere und schwache Teams kollabiert die Karte vollstaendig in den Floor
+ *    (Letzter 44-44, sigma 0.0) — die Klausel wirkt dort ueberhaupt nicht mehr.
+ *
+ * Kern des Problems: wenn die Untergrenze jedem Team 44 garantiert, KANN ein schwacher Sponsor fuer
+ * ein schwaches Team nicht schwach sein. Die Rarity-Spanne nach unten und die Ueberlebensgarantie
+ * schliessen sich gegenseitig aus, solange beide absolut gesetzt sind.
+ *
+ * Denkbare Auflösungen (Entscheidung offen):
+ *  a) Untergrenze relativ zur Rarity (gewoehnlich garantiert weniger) — dann ist der Schutz aber
+ *     nicht mehr verlaesslich, und genau das war seine Aufgabe.
+ *  b) Rarity-Spanne nur nach OBEN (magisch = Boden, selten/legendaer besser, kein gewoehnlich)
+ *     — kollidiert mit der Vorgabe "gewoehnlich ist schwaecher".
+ *  c) Untergrenze senken und die Ueberlebenssicherung anders loesen (z. B. ueber einen
+ *     Liga-Solidaritaetsbeitrag ausserhalb der Sponsorenkarte).
+ */
+
+/**
+ * VERTEILUNG — zweite Variationsachse: WIE sich die Karte aufteilt, bei gleicher Gesamthoehe.
+ * Der Anteil, der im Sonderziel steckt, statt in Rangleiter + Klausel. Ein zielschweres Angebot
+ * haengt stark am eigenen Zutun, ein leiterschweres an der Tabelle. Beide gleich viel wert.
+ */
+export const SPLITS: Array<{ name: string; specialShare: number; note: string }> = [
+  { name: "leiterschwer", specialShare: 0.12, note: "fast alles an der Tabelle" },
+  { name: "ausgewogen",   specialShare: 0.25, note: "Standardaufteilung" },
+  { name: "zielschwer",   specialShare: 0.40, note: "viel haengt am Sonderziel" },
+];
 
 const tierOf = (rank: number) => TIERS.findIndex((t) => rank >= t.lo && rank <= t.hi);
 
@@ -215,11 +265,26 @@ const TARGET_EV_BASE = [76.0, 73.6, 71.6, 67.9, 63.8, 59.9, 56.7, 54.1, 53.0];
  * schon ab Erwartungsrang 21 statt erst 29). Aufloesung ist eine Design-Entscheidung:
  * Untergrenze senken, Sigma-Summen-Bindung bei sf 1.0 lockern, oder Spitze bei +8/+9 belassen.
  */
-const TARGET_GAMMA = Number(process.env.OLY_SPONSOR_GAMMA ?? 1);
-const TARGET_EV = (() => {
+const TARGET_GAMMA = Number(process.env.OLY_SPONSOR_GAMMA ?? 1.7);
+const TARGET_EV_SHAPE = (() => {
   const mean = TARGET_EV_BASE.reduce((a, b) => a + b, 0) / TARGET_EV_BASE.length;
   return TARGET_EV_BASE.map((v) => mean + (v - mean) * TARGET_GAMMA);
 })();
+
+/** Aktive Rarity und Verteilung des Reports (magisch/ausgewogen = Standard). */
+const RARITY = process.env.OLY_SPONSOR_RARITY ?? "magisch";
+const SPLIT = SPLITS.find((x) => x.name === (process.env.OLY_SPONSOR_SPLIT ?? "ausgewogen")) ?? SPLITS[1]!;
+
+/**
+ * Gesamtwert der Karte je Stufe = Form x Rarity. Davon geht `specialShare` ins Sonderziel, der Rest
+ * ist das Kalibrierziel fuer Rangleiter + Klausel. Dadurch ist die GESAMTHOEHE unabhaengig von der
+ * Aufteilung: eine zielschwere und eine leiterschwere Karte derselben Rarity sind gleich viel wert
+ * und unterscheiden sich nur darin, WORAN das Geld haengt.
+ */
+const cardEv = (tier: number) => TARGET_EV_SHAPE[tier]! * (RARITY_MULT[RARITY] ?? 1);
+const specialEvFor = (tier: number) => cardEv(tier) * SPLIT.specialShare;
+/** Kalibrierziel fuer Leiter 1+2+4 (ohne Sonderziel). */
+const TARGET_EV = TARGET_EV_SHAPE.map((_, i) => cardEv(i) * (1 - SPLIT.specialShare));
 
 /** EV inklusive Untergrenze und Klausel. */
 function ev(t: SponsorType, expected: number, cal: number) {
@@ -317,7 +382,7 @@ line();
 console.log("SPONSOR-MODELL VORSCHLAG — Liga-Leiter + relative Typ-Identität + Klausel + Sonderziel");
 line();
 console.log("Leiter 1 (Liga, absolut):", TIERS.map((t, i) => `${t.label}=${LIGA[i]}`).join("  "));
-console.log(`Untergrenze ${FLOOR} C · Klausel-Wahrscheinlichkeit ${P_MET} · Sonderziel typisch ${SPECIAL_TYPICAL}\n`);
+console.log(`Untergrenze ${FLOOR} C · Rarity ${RARITY} (x${RARITY_MULT[RARITY]}) · Verteilung ${SPLIT.name} (Sonderziel-Anteil ${(SPLIT.specialShare * 100).toFixed(0)} %) · Steilheit ${TARGET_GAMMA}\n`);
 console.log("  " + "Typ".padEnd(16) + "Offset E#2…E#30".padStart(12) + "   Klausel");
 for (const t of SPONSOR_TYPES) {
   console.log("  " + t.name.padEnd(16) + `${offsetFor(t.name, 2).toFixed(1)}…${offsetFor(t.name, 30).toFixed(1)}`.padStart(12) + `   +${t.clause.bonus}/−${t.clause.malus}  ${t.clause.label}`);
@@ -388,7 +453,7 @@ console.log("\nZIELPRÜFUNG (salaryFactor 1.0) — Meister typisch 90–100 · L
 let goalsOk = true;
 for (const t of SPONSOR_TYPES) {
   const c = offsetFor(t.name, 3);
-  const champ = withFloor(rankPart(t, 3, 1, c) + clauseEv(t) + SPECIAL_TYPICAL);
+  const champ = withFloor(rankPart(t, 3, 1, c) + clauseEv(t) + specialEvFor(tierOf(1)));
   const jackpot = withFloor(rankPart(t, 3, 1, c) + t.clause.bonus + 12);
   const cb = offsetFor(t.name, 30);
   const botBad = withFloor(rankPart(t, 30, 32, cb) - t.clause.malus);
@@ -464,8 +529,34 @@ const TILT_STRENGTH = Number(process.env.OLY_SPONSOR_TILT ?? 0.8);
 const tiltAt = (rank: number, sf: number) =>
   1 + Math.max(0, sf - 1) * TILT_STRENGTH * (1 - 2 * ((rank - 1) / 31));
 
+/**
+ * Liga-Bilanz rechnet mit dem LIGA-STANDARD (magisch, x1.0), NICHT mit der im Report gewaehlten
+ * Rarity. Sonst ist `k` von der Anzeige abhaengig: solveK zwingt die Summe auf die Gehaltssumme,
+ * und bei "alle 32 Teams gewoehnlich" muss k explodieren, um dieselbe Summe zu erreichen — gemessen
+ * ergab das eine INVERTIERTE Rarity-Leiter (gewoehnlich Meister 180, legendaer 91). Rarity ist eine
+ * Eigenschaft der einzelnen Karte, nicht der Liga.
+ *
+ * Vereinfachung, die noch zu schaerfen ist: hier haben alle 32 Teams den Standard. Ein realer
+ * Rarity-Mix (die Mehrheit magisch, wenige selten/legendaer) verschiebt die Summe leicht nach oben.
+ */
+const cardEvLeague = (tier: number) => TARGET_EV_SHAPE[tier]!;
+const specialEvLeague = (tier: number) => cardEvLeague(tier) * SPLIT.specialShare;
+/**
+ * Liga-Standard-Offsets EINMAL vorberechnet. Zuvor stand die Bisektion in teamPayout — das laeuft
+ * innerhalb der Bisektion von solveK und liess das Skript ins Timeout rennen.
+ */
+const LEAGUE_OFFSET = (() => {
+  const m = new Map<string, number>();
+  for (const t of SPONSOR_TYPES) for (let rank = 1; rank <= 32; rank += 1) {
+    const target = cardEvLeague(tierOf(rank)) * (1 - SPLIT.specialShare);
+    let lo = -200, hi = 200;
+    for (let i = 0; i < 90; i += 1) { const mid = (lo + hi) / 2; if (ev(t, rank, mid) < target) lo = mid; else hi = mid; }
+    m.set(`${t.name}:${rank}`, (lo + hi) / 2);
+  }
+  return m;
+})();
 function teamPayout(t: SponsorType, rank: number, k: number, fl: number, sf: number) {
-  const base = rankPart(t, rank, rank, offsetFor(t.name, rank)) + clauseEv(t) + SPECIAL_TYPICAL;
+  const base = rankPart(t, rank, rank, LEAGUE_OFFSET.get(`${t.name}:${rank}`) ?? 0) + clauseEv(t) + specialEvLeague(tierOf(rank));
   return fl + (base - FLOOR) * k * tiltAt(rank, sf);
 }
 const leagueSum = (k: number, fl: number, sf: number) =>
