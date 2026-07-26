@@ -3055,7 +3055,8 @@ export function useFoundationShellRouterBodyScope({
       setTeamProfileTeamId(state.team);
     }
     if (state.panel === "briefing" && state.view !== "playerProfile" && !shouldSuppressSeasonBriefingReopen()) {
-      openSeasonBriefingPanel({ push: false });
+      // History-Restore: der View aus dem History-Eintrag gewinnt, nicht Home.
+      openSeasonBriefingPanel({ push: false, keepView: true, view: state.view as FoundationView });
     } else {
       setSeasonBriefingOpen(false);
       if (state.panel === "briefing") {
@@ -3142,7 +3143,24 @@ export function useFoundationShellRouterBodyScope({
     }
   }
 
-  function openSeasonBriefingPanel(options?: { push?: boolean }) {
+  /**
+   * Season-Einstieg öffnen.
+   *
+   * `keepView` (Deep-Link-Fix): Der Season-Einstieg ist ein Modal
+   * (`season-briefing-backdrop`, rein an `seasonBriefingOpen` gebunden) und
+   * braucht darunter KEINEN bestimmten View. Die automatischen Öffner
+   * (Auto-Open bei offenem `season_intro`-Schritt und die `?panel=briefing`-
+   * URL-Hydration) laufen ~1s NACH dem Mount — mit dem früheren harten
+   * `setFoundationView("homeV2")` haben sie den gerade angeforderten View
+   * wieder abgeräumt. Wer also in einem frisch erstellten Spiel per Deep Link /
+   * Lesezeichen / Reload auf `?view=lineup` (o. ä.) landete, wurde stumm auf
+   * Home umgeleitet; der Ziel-View blieb im Lade-Skeleton hängen und rendert
+   * nie. Mit `keepView` bleibt der angeforderte View unter dem Modal stehen.
+   *
+   * `playerProfile` ist bewusst ausgenommen: dort wird `panel=briefing`
+   * ohnehin verworfen (siehe `applyFoundationNavigationState`).
+   */
+  function openSeasonBriefingPanel(options?: { push?: boolean; keepView?: boolean; view?: FoundationView }) {
     if (shouldSuppressSeasonBriefingReopen()) {
       setSeasonBriefingOpen(false);
       setFoundationPanel((current) => (current === "briefing" ? null : current));
@@ -3150,13 +3168,22 @@ export function useFoundationShellRouterBodyScope({
       return;
     }
 
-    if (activeView !== "homeV2" && activeView !== "home") {
+    // `options.view` überschreibt `activeView` für Aufrufer, die den Ziel-View
+    // erst nach diesem Aufruf setzen (History-Restore in
+    // `applyFoundationNavigationState`) — dort wäre `activeView` noch veraltet.
+    const targetView = options?.view ?? activeView;
+    const keepView = (options?.keepView ?? false) && targetView !== "playerProfile";
+
+    if (!keepView && activeView !== "homeV2" && activeView !== "home") {
       setFoundationView("homeV2", setActiveView);
     }
 
+    const briefingView = keepView ? targetView : "homeV2";
+    const briefingTab = briefingView === "homeV2" && homeV2Tab === "office" ? "office" : null;
+
     setSeasonBriefingOpen(true);
     setFoundationPanel("briefing");
-    syncFoundationViewInUrl("homeV2", null, null, {
+    syncFoundationViewInUrl(briefingView, briefingTab, null, {
       panel: "briefing",
       push: options?.push ?? true,
       team: selectedTeamId,
@@ -8564,7 +8591,9 @@ export function useFoundationShellRouterBodyScope({
       return;
     }
 
-    openSeasonBriefingPanel({ push: false });
+    // URL-Hydration: `panel=briefing` kam zusammen mit dem `view`-Parameter aus
+    // derselben URL — der angeforderte View bleibt also stehen.
+    openSeasonBriefingPanel({ push: false, keepView: true });
   }, [activeSaveId, gameState.season.id, isFoundationBootstrapState, seasonBriefingStepStatus]);
   useEffect(() => {
     if (!seasonBriefingOpen) {
@@ -8603,7 +8632,10 @@ export function useFoundationShellRouterBodyScope({
     }
 
     seasonBriefingAutoOpenedRef.current = autoOpenKey;
-    openSeasonBriefingPanel({ push: false });
+    // Auto-Open: läuft erst, wenn der Saison-Spielplan geladen ist (also ~1s
+    // nach dem Mount). Ohne `keepView` reißt er dem Nutzer genau dann den
+    // gerade angeforderten View wieder weg — der eigentliche Bug.
+    openSeasonBriefingPanel({ push: false, keepView: true });
   }, [
     activeSaveId,
     gameState.gamePhase,
@@ -8949,11 +8981,13 @@ export function useFoundationShellRouterBodyScope({
     seasonBriefingAutoOpenedRef.current = briefingKey;
     writeSeasonBriefingDismissedToStorage(activeSaveId, gameState.season.id);
 
-    if (activeView !== "homeV2" && activeView !== "home") {
-      setFoundationView("homeV2", setActiveView);
-    } else {
-      clearSeasonBriefingFromUrl();
-    }
+    // Kein Zwangs-Sprung mehr auf Home: Der Season-Einstieg ist ein Modal über
+    // dem laufenden View. Wurde er über einem anderen View geöffnet (Deep Link,
+    // Auto-Open mit `keepView`), muss das Schließen genau dorthin zurückfallen
+    // — sonst landet man nach dem Wegklicken doch wieder auf Home und der
+    // angeforderte View war umsonst geladen. `clearSeasonBriefingFromUrl`
+    // entfernt nur `panel=briefing` und behält `activeView` bei.
+    clearSeasonBriefingFromUrl();
 
     if (shouldPersistIntroStep) {
       queueMicrotask(() => {
