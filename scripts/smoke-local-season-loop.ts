@@ -22,6 +22,9 @@ import { ADVANCE_MATCHDAY_CONFIRM_TOKEN, executeMatchdayAdvance } from "@/lib/se
 import { buildStandingsPreview } from "@/lib/standings/standings-preview-engine";
 import { executeStandingsApply, STANDINGS_APPLY_CONFIRM_TOKEN } from "@/lib/standings/standings-apply-service";
 
+/** Team des Maskottchens Nula — siehe lib/foundation/ensure-nula-on-project-suicide.ts. */
+const NULA_MASCOT_TEAM_ID = "P-S";
+
 type SmokeCandidate = {
   teamId: string;
   teamName: string;
@@ -155,7 +158,13 @@ function validateFreshSeasonStart(saveId: string) {
         ? Number((roster.reduce((sum, entry) => sum + entry.contractLength, 0) / roster.length).toFixed(1))
         : null;
 
-    if (row.budget !== row.cash) {
+    // Sonderregel/Easter-Egg (lib/foundation/ensure-nula-on-project-suicide.ts): Nula ist das
+    // Maskottchen von Project Suicide und gehört IMMER zu P-S — aber nicht gratis. P-S KAUFT sie
+    // ganz normal zum Marktwert, direkt nach dem Neuspiel-Draft. In einem frischen Save hat P-S
+    // deshalb korrekterweise EINEN Kaderspieler und um genau diesen Kaufpreis weniger Cash als
+    // Budget. Nur P-S ist ausgenommen — bei allen anderen Teams bleibt die Gleichheit eine harte
+    // Zusicherung, damit echte Startgeld-Fehler weiterhin auffliegen.
+    if (row.budget !== row.cash && row.teamId !== NULA_MASCOT_TEAM_ID) {
       throw new Error(`Fresh save budget/cash mismatch for ${row.teamId}: budget=${row.budget}, cash=${row.cash}`);
     }
     if (row.rosterCount !== roster.length) {
