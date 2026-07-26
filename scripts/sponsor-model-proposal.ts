@@ -99,10 +99,30 @@ export const RARITY_MULT: Record<string, number> = {
  * Der Anteil, der im Sonderziel steckt, statt in Rangleiter + Klausel. Ein zielschweres Angebot
  * haengt stark am eigenen Zutun, ein leiterschweres an der Tabelle. Beide gleich viel wert.
  */
-export const SPLITS: Array<{ name: string; specialShare: number; note: string }> = [
-  { name: "leiterschwer", specialShare: 0.12, note: "fast alles an der Tabelle" },
-  { name: "ausgewogen",   specialShare: 0.25, note: "Standardaufteilung" },
-  { name: "zielschwer",   specialShare: 0.40, note: "viel haengt am Sonderziel" },
+/**
+ * VERTEILUNGSPROFIL — die Rarity liefert ein BUDGET, das Profil entscheidet, WO es landet.
+ *
+ * Falsch war eine vorige Fassung, die die Rarity als uniformen Multiplikator auf jede Zelle legte:
+ * damit hob eine hoehere Stufe stur alles proportional an (Meister 78.7/91.3/103.5/119.7) — statisch
+ * und monoton, also genau nicht gewollt. Richtig ist: die Rarity setzt nur die Groesse des Pools;
+ * seine Aufteilung ist eine freie Achse und wirkt je nach Tabellenstufe unterschiedlich.
+ *
+ * `specialShare` = Anteil des Pools, der ins Sonderziel geht.
+ * `tierWeights`  = Verteilung des Rests ueber die 9 Stufen (Meister … Platz 32), Summe 1.
+ *
+ * Bei gewoehnlich ist der Pool NEGATIV — dasselbe Profil entscheidet dann, wo gekuerzt wird.
+ */
+export const PROFILES: Array<{ name: string; specialShare: number; tierWeights: number[]; note: string }> = [
+  { name: "ausgewogen",    specialShare: 0.25, tierWeights: [.11, .11, .11, .11, .11, .11, .11, .11, .12],
+    note: "Pool gleichmaessig ueber alle Stufen" },
+  { name: "spitzenlastig", specialShare: 0.15, tierWeights: [.28, .24, .18, .12, .08, .05, .03, .02, .00],
+    note: "fast alles auf die Spitzenplaetze — ein Angebot fuer Titelambitionen" },
+  { name: "sockellastig",  specialShare: 0.15, tierWeights: [.00, .02, .03, .05, .08, .12, .18, .24, .28],
+    note: "zieht die unteren Plaetze ans Mittelfeld heran" },
+  { name: "mittelfeld",    specialShare: 0.20, tierWeights: [.02, .05, .10, .18, .25, .18, .10, .07, .05],
+    note: "belohnt das Mittelfeld, Spitze und Keller gehen leer aus" },
+  { name: "zielschwer",    specialShare: 0.70, tierWeights: [.11, .11, .11, .11, .11, .11, .11, .11, .12],
+    note: "der Pool steckt fast komplett im Sonderziel — maximaler Eigeneinfluss" },
 ];
 
 const tierOf = (rank: number) => TIERS.findIndex((t) => rank >= t.lo && rank <= t.hi);
@@ -271,20 +291,26 @@ const TARGET_EV_SHAPE = (() => {
   return TARGET_EV_BASE.map((v) => mean + (v - mean) * TARGET_GAMMA);
 })();
 
-/** Aktive Rarity und Verteilung des Reports (magisch/ausgewogen = Standard). */
+/** Aktive Rarity und aktives Verteilungsprofil des Reports (magisch/ausgewogen = Standard). */
 const RARITY = process.env.OLY_SPONSOR_RARITY ?? "magisch";
-const SPLIT = SPLITS.find((x) => x.name === (process.env.OLY_SPONSOR_SPLIT ?? "ausgewogen")) ?? SPLITS[1]!;
+const PROFILE = PROFILES.find((x) => x.name === (process.env.OLY_SPONSOR_PROFILE ?? "ausgewogen")) ?? PROFILES[0]!;
 
+/** Standard-Sonderziel-Anteil der Basiskarte (magisch), unabhaengig vom Pool. */
+const BASE_SPECIAL_SHARE = 0.25;
 /**
- * Gesamtwert der Karte je Stufe = Form x Rarity. Davon geht `specialShare` ins Sonderziel, der Rest
- * ist das Kalibrierziel fuer Rangleiter + Klausel. Dadurch ist die GESAMTHOEHE unabhaengig von der
- * Aufteilung: eine zielschwere und eine leiterschwere Karte derselben Rarity sind gleich viel wert
- * und unterscheiden sich nur darin, WORAN das Geld haengt.
+ * Der Pool, den die Rarity gegenueber dem Standard zusaetzlich vergibt (bei gewoehnlich negativ).
+ * Bezugsgroesse ist der Mittelwert der Standardleiter, damit der Pool eine Groesse in C ist und
+ * nicht selbst schon eine Form hat.
  */
-const cardEv = (tier: number) => TARGET_EV_SHAPE[tier]! * (RARITY_MULT[RARITY] ?? 1);
-const specialEvFor = (tier: number) => cardEv(tier) * SPLIT.specialShare;
-/** Kalibrierziel fuer Leiter 1+2+4 (ohne Sonderziel). */
-const TARGET_EV = TARGET_EV_SHAPE.map((_, i) => cardEv(i) * (1 - SPLIT.specialShare));
+const POOL_REF = TARGET_EV_SHAPE.reduce((x, y) => x + y, 0) / TARGET_EV_SHAPE.length;
+const POOL = ((RARITY_MULT[RARITY] ?? 1) - 1) * POOL_REF * TIERS.length;
+
+/** Sonderziel: Standardanteil der Basiskarte + der ihm zugewiesene Poolanteil. */
+const specialEvFor = (tier: number) =>
+  TARGET_EV_SHAPE[tier]! * BASE_SPECIAL_SHARE + (POOL * PROFILE.specialShare) / TIERS.length;
+/** Kalibrierziel fuer Leiter 1+2+4: Basisleiter ohne Sonderziel + der Poolanteil DIESER Stufe. */
+const TARGET_EV = TARGET_EV_SHAPE.map((v, i) =>
+  v * (1 - BASE_SPECIAL_SHARE) + POOL * (1 - PROFILE.specialShare) * PROFILE.tierWeights[i]!);
 
 /** EV inklusive Untergrenze und Klausel. */
 function ev(t: SponsorType, expected: number, cal: number) {
@@ -382,7 +408,8 @@ line();
 console.log("SPONSOR-MODELL VORSCHLAG — Liga-Leiter + relative Typ-Identität + Klausel + Sonderziel");
 line();
 console.log("Leiter 1 (Liga, absolut):", TIERS.map((t, i) => `${t.label}=${LIGA[i]}`).join("  "));
-console.log(`Untergrenze ${FLOOR} C · Rarity ${RARITY} (x${RARITY_MULT[RARITY]}) · Verteilung ${SPLIT.name} (Sonderziel-Anteil ${(SPLIT.specialShare * 100).toFixed(0)} %) · Steilheit ${TARGET_GAMMA}\n`);
+console.log(`Untergrenze ${FLOOR} C · Rarity ${RARITY} (Pool ${POOL >= 0 ? "+" : ""}${POOL.toFixed(0)} C) · Profil ${PROFILE.name} (${PROFILE.note}) · Steilheit ${TARGET_GAMMA}`);
+console.log(`Ziel-EV je Stufe: ${TARGET_EV.map((v, i) => `${TIERS[i]!.label} ${v.toFixed(0)}`).join("  ")}\n`);
 console.log("  " + "Typ".padEnd(16) + "Offset E#2…E#30".padStart(12) + "   Klausel");
 for (const t of SPONSOR_TYPES) {
   console.log("  " + t.name.padEnd(16) + `${offsetFor(t.name, 2).toFixed(1)}…${offsetFor(t.name, 30).toFixed(1)}`.padStart(12) + `   +${t.clause.bonus}/−${t.clause.malus}  ${t.clause.label}`);
@@ -540,7 +567,7 @@ const tiltAt = (rank: number, sf: number) =>
  * Rarity-Mix (die Mehrheit magisch, wenige selten/legendaer) verschiebt die Summe leicht nach oben.
  */
 const cardEvLeague = (tier: number) => TARGET_EV_SHAPE[tier]!;
-const specialEvLeague = (tier: number) => cardEvLeague(tier) * SPLIT.specialShare;
+const specialEvLeague = (tier: number) => cardEvLeague(tier) * BASE_SPECIAL_SHARE;
 /**
  * Liga-Standard-Offsets EINMAL vorberechnet. Zuvor stand die Bisektion in teamPayout — das laeuft
  * innerhalb der Bisektion von solveK und liess das Skript ins Timeout rennen.
@@ -548,7 +575,7 @@ const specialEvLeague = (tier: number) => cardEvLeague(tier) * SPLIT.specialShar
 const LEAGUE_OFFSET = (() => {
   const m = new Map<string, number>();
   for (const t of SPONSOR_TYPES) for (let rank = 1; rank <= 32; rank += 1) {
-    const target = cardEvLeague(tierOf(rank)) * (1 - SPLIT.specialShare);
+    const target = cardEvLeague(tierOf(rank)) * (1 - BASE_SPECIAL_SHARE);
     let lo = -200, hi = 200;
     for (let i = 0; i < 90; i += 1) { const mid = (lo + hi) / 2; if (ev(t, rank, mid) < target) lo = mid; else hi = mid; }
     m.set(`${t.name}:${rank}`, (lo + hi) / 2);
