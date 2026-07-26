@@ -1,8 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createFreshSeasonOneGameState } from "@/lib/game-state/singleplayer-state";
 import { runWholeSeasonDryRun } from "@/lib/season/whole-season-dryrun-service";
 import type { PersistenceService } from "@/lib/persistence/types";
+
+/**
+ * Jeder Test hier simuliert echte Spieltage (teils die halbe Saison) und braucht je nach Maschine
+ * zwischen wenigen Sekunden und ueber einer Minute. Vitests 5-s-Default passt dafuer nirgends, und
+ * die frueheren Einzelwerte (20 s / 90 s) waren geraten: unter paralleler Last -- die Datei laeuft
+ * neben anderen schweren Suiten -- kippte der 20-s-Test reproduzierbar, obwohl an ihm nichts kaputt
+ * ist. Ein grosszuegiges Timeout fuer die ganze Datei ersetzt das Nachziehen einzelner Zahlen; es
+ * verdeckt nichts, weil ein echter Haenger weiterhin auflaeuft, nur eben spaeter.
+ */
+vi.setConfig({ testTimeout: 180_000, hookTimeout: 180_000 });
 
 function createTestPersistence(gameState = createFreshSeasonOneGameState()): PersistenceService & { state: { gameState: typeof gameState } } {
   const state = {
@@ -185,7 +195,7 @@ describe("runWholeSeasonDryRun", () => {
     expect(result.missingAiLineups).toBe(0);
     expect(result.blockingReasons).toContain("ai_lineup_apply_disabled");
     expect(persistence.state.gameState).toEqual(before);
-  }, 20_000);
+  });
 
   it("supports capped simulation runs and reports the read-only dryrun contract", async () => {
     const persistence = createTestPersistence();
@@ -220,9 +230,7 @@ describe("runWholeSeasonDryRun", () => {
     expect(result.teamPPsReconciliation.totalTeamPoints).toBeGreaterThanOrEqual(0);
     expect(result.aiSeasonAudit.totals.drafts).toBeGreaterThanOrEqual(0);
     expect(result.simulatedMatchdays).toBeLessThanOrEqual(1);
-    // Eigenes Timeout wie beim Nachbartest oben: der Lauf simuliert einen echten Spieltag inkl.
-    // `advanceAfterEachMatchday` und liegt mit ~7 s zuverlaessig ueber Vitests 5-s-Default.
-  }, 30_000);
+  });
 
   it("reaches matchday 2 without captain-limit or lineup-scope regressions when AI teams are enabled and rosters cover the whole season", async () => {
     const persistence = createTestPersistence();
@@ -288,5 +296,5 @@ describe("runWholeSeasonDryRun", () => {
       expect(matchday.steps.filter((step) => step.key === "matchday_advance")).toHaveLength(1);
     }
     expect(persistence.state.gameState).toEqual(before);
-  }, 90_000);
+  });
 });
