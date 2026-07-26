@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { getInitials } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import { getPlayerPortraitModel } from "@/lib/foundation/tabs/foundation-page-module-helpers";
@@ -135,16 +136,6 @@ function NlTrainingGlyph({ kind }: { kind: NlTrainingGlyphKind }) {
   }
 }
 
-function getInitials(name: string): string {
-  return (
-    name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() ?? "")
-      .join("") || "?"
-  );
-}
 
 function getToneBadgeLabel(tone: ReturnType<typeof getDevelopmentTone>) {
   if (tone === "growth") return "steigt";

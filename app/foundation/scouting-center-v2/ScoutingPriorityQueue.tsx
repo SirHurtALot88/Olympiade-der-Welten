@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
+import { getInitials } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import { NlEmptyState, NlProgressBar } from "@/components/foundation/new-look";
@@ -69,16 +70,6 @@ const reorderButtonDisabledStyle: CSSProperties = {
   cursor: "default",
 };
 
-function getInitials(name: string) {
-  return (
-    name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() ?? "")
-      .join("") || "?"
-  );
-}
 
 export default function ScoutingPriorityQueue({
   entries,

@@ -27,22 +27,11 @@ import {
   type UseMarketSellDerivationsInput,
 } from "@/lib/foundation/tabs/use-market-sell-derivations";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
-
-function formatWholeNumber(value: number | null | undefined) {
-  return formatLocalePoints(value, 0);
-}
-
-function formatPpsValue(value: number | null | undefined) {
-  return formatLocalePoints(value, 1);
-}
-
-function formatSignedTransfermarktCurrency(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) {
-    return "—";
-  }
-  const prefix = value > 0 ? "+" : "";
-  return `${prefix}${formatTransfermarktCurrency(value)}`;
-}
+import {
+  formatPpsValue,
+  formatSignedTransfermarktCurrency,
+  formatWholeNumber,
+} from "@/lib/foundation/tabs/foundation-format-render-helpers";
 
 function getTransferTypePillClass(type: "buy" | "sell" | "contract_exit") {
   return `transfer-status-pill ${type === "buy" ? "is-ready" : "is-warning"}`;
