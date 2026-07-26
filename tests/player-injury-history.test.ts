@@ -108,20 +108,23 @@ function buildMatchdayGameState(playerId: string): GameState {
       },
     ],
     teamIdentities: [],
-    players: [buildPlayer(playerId)],
+    // Kader auf 8 auffüllen (Bank-Spieler, NICHT aufgestellt): die strukturelle Anti-Stall-
+    // Kappung erlaubt max. `Kader - 7` neue Verletzungen pro Team und Spieltag — mit nur einem
+    // Kaderspieler könnte sich hier sonst niemand mehr verletzen.
+    players: [buildPlayer(playerId), ...Array.from({ length: 7 }, (_, index) => buildPlayer(`bench-filler-${index}`))],
     disciplines: [{ id: "tdm", name: "TDM", category: "power", weight: 1 }],
-    rosters: [
-      {
-        id: "r1",
+    rosters: [playerId, ...Array.from({ length: 7 }, (_, index) => `bench-filler-${index}`)].map(
+      (rosterPlayerId, index) => ({
+        id: `r${index + 1}`,
         teamId: "T-1",
-        playerId,
+        playerId: rosterPlayerId,
         contractLength: 2,
         salary: 5,
         upkeep: 5,
-        roleTag: "starter",
+        roleTag: index === 0 ? "starter" : "bench",
         joinedSeasonId: "season-1",
-      },
-    ],
+      }),
+    ),
     contracts: [],
     transferListings: [],
     transferHistory: [],

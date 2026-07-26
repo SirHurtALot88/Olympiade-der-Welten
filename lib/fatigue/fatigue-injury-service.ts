@@ -38,6 +38,77 @@ export const FATIGUE_INJURY_REHEARSAL_SOURCE = "fatigue_injury_rehearsal_v1" as 
 export const MATCHDAY_FATIGUE_LOAD = 12;
 export const BASE_MATCHDAY_RECOVERY = 20;
 
+// ===========================================================================================
+// BALANCE-ENTSCHEIDUNG (Root-Cause-Fix des MD8/MD9-Stalls, ersetzt den Netto-Null-Ansatz aus
+// PR #199): Eingesetzte Spieler erholen sich zwischen den Spieltagen um einen ANTEIL ihrer
+// aktuellen Erschöpfung — nicht um einen flachen Betrag.
+//
+// Vorher bekam ein eingesetzter Spieler ausschließlich `+MATCHDAY_FATIGUE_LOAD` und NIE
+// Erholung: für Teams ohne Rotationsspielraum stieg Fatigue monoton bis zum Cap (100), blieb
+// dort (~40% Verletzungsrisiko/Spieltag) und produzierte korrelierte Verletzungs-Cluster bis
+// unter das 7-Spieler-Minimum -> Saison dauerhaft `incomplete_lineups`. PR #199 setzte die
+// Erholung flach == Load: der Ramp war weg, aber bei normaler Intensität war Dauereinsatz
+// damit exakt gratis (netto 0) — Rotation/Kadertiefe hätten keinerlei Wert mehr gehabt.
+//
+// Stattdessen: proportionale Erholung. Persistiert wird nach dem Einsatz
+//   fatigue_next = clamp(peak - round(peak * MATCHDAY_PLAYED_RECOVERY_RATE)),
+// wobei `peak = fatigue + intensitätsskalierter Load` unverändert der Wert des Injury-Rolls
+// bleibt (Risiko-Kurve, Event-Historie und Roll-Determinismus sind unangetastet).
+// Konsequenz (Fixpunkt-Mathematik, R = Rate): Dauereinsatz konvergiert gegen
+//   F* = Load * (1 - R) / R  — mit R = 1/3 also F* = 2 * Load.
+//   normal:   F* = 24  (Roll-Peak 36  -> ~6,0% Risiko/Spieltag, ~7,5% Score-Malus)
+//   push:     F* = 27,6 (Roll-Peak 41,4 -> ~7,8% Risiko)
+//   conserve: F* = 18  (Roll-Peak 27  -> ~4,5% Risiko)
+//   worst case (push × FaintHearted 1,06): F* ≈ 29,3, Roll-Peak ≈ 44 -> ~9% Risiko.
+// Fatigue ist damit STRUKTURELL beschränkt (Konvergenz von jedem Startwert, auch über
+// Saisons hinweg), kann also nie mehr zum Cap ramp-en — und Rotation bleibt eine echte,
+// belohnte Entscheidung: ein Bank-Spieltag bringt >= BASE_MATCHDAY_RECOVERY (20, plus
+// Facility-/Trainings-Boni) und holt einen Dauerspieler von ~24 auf ~4 zurück, während
+// Weiterspielen ihn im Gleichgewicht bei ~24 (Malus + Risiko) hält.
+// ENV-tunebar wie die Intensitäts-Multiplikatoren (OLY_FATIGUE_PLAYED_RECOVERY_RATE, in
+// (0,1) geklemmt), damit die Saison-Simulation ohne Code-Änderung retunen kann.
+// ===========================================================================================
+function envRecoveryRate(name: string, fallback: number) {
+  const parsed = Number(process.env[name]);
+  return Number.isFinite(parsed) && parsed > 0 && parsed < 1 ? parsed : fallback;
+}
+
+export const MATCHDAY_PLAYED_RECOVERY_RATE = envRecoveryRate("OLY_FATIGUE_PLAYED_RECOVERY_RATE", 1 / 3);
+
+/**
+ * Erholung eines EINGESETZTEN Spielers zwischen zwei Spieltagen: Anteil
+ * `MATCHDAY_PLAYED_RECOVERY_RATE` des Nach-Einsatz-Peaks (siehe Kommentarblock oben).
+ */
+export function getPlayedMatchdayRecovery(peakFatigue: number) {
+  return round(Math.max(0, Math.min(100, peakFatigue)) * MATCHDAY_PLAYED_RECOVERY_RATE);
+}
+
+// ===========================================================================================
+// STRUKTURELLE ANTI-STALL-GARANTIE: pro Team und Spieltag verletzen sich höchstens
+// `Kadergröße - MATCHDAY_INJURY_AVAILABLE_PLAYER_FLOOR` Spieler NEU. Da eine Verletzung exakt
+// INJURY_UNAVAILABLE_MATCHDAYS (= 1) Spieltag Sperre bedeutet, sind am Folgespieltag nur die
+// HEUTE Neuverletzten gesperrt -> jedes Team hat am nächsten Spieltag garantiert >= 7
+// einsatzfähige Spieler und der `underfilled_roster`/`incomplete_lineups`-Deadlock (Kader
+// unter LEGACY_MATCHDAY_MINIMUM_PLAYERS ohne In-Game-Rückweg) ist BY CONSTRUCTION unmöglich —
+// nicht bloß unwahrscheinlich. Der Readiness-Floor selbst bleibt unangetastet (kein Team darf
+// mit < 7 Spielern antreten), es werden keine Spieler/Verträge/Gelder erzeugt: die Kappung
+// wirkt ausschließlich auf den Verletzungs-WÜRFEL (weitere "injured"-Ergebnisse desselben
+// Spieltags werden deterministisch zu "healthy", derselbe Mechanismus wie der bestehende
+// Rehearsal-`maxInjuries`-Deckel). Fiktion: der medizinische Stab zieht Spieler raus, bevor
+// der Kader unter die Antretbarkeitsgrenze bricht.
+//
+// MUSS mit LEGACY_MATCHDAY_MINIMUM_PLAYERS (7) in lib/resolve/legacy-matchday-resolve-engine.ts
+// bzw. lib/{resolve,lineups}/legacy-matchday-readiness.ts übereinstimmen (dort modulprivat;
+// per Regressionstest gepinnt).
+// ===========================================================================================
+export const MATCHDAY_INJURY_AVAILABLE_PLAYER_FLOOR = 7;
+
+/** Max. NEUE Verletzungen eines Teams an einem Spieltag, sodass am Folgespieltag >= 7 Spieler einsatzfähig bleiben. */
+export function getMaxNewInjuriesForTeam(gameState: GameState, teamId: string) {
+  const rosterCount = gameState.rosters.reduce((sum, entry) => sum + (entry.teamId === teamId ? 1 : 0), 0);
+  return Math.max(0, rosterCount - MATCHDAY_INJURY_AVAILABLE_PLAYER_FLOOR);
+}
+
 /**
  * Discipline-side INTENSITY (Schonen/conserve, normal, Pushen/push) must scale the per-player
  * matchday fatigue load, not just the match score. Conserve saves ~25 % load (a real reason to
@@ -498,6 +569,10 @@ export function buildMatchdayInjuryRollMap(input: {
   const injuryRehearsal = input.injuryRehearsal?.enabled ? input.injuryRehearsal : null;
   const maxRehearsalInjuries = injuryRehearsal ? Math.max(0, injuryRehearsal.maxInjuries ?? 3) : Number.POSITIVE_INFINITY;
   let rehearsalInjuriesCreated = 0;
+  // Anti-Stall-Kappung (siehe MATCHDAY_INJURY_AVAILABLE_PLAYER_FLOOR): NEUE Verletzungen pro
+  // Team an diesem Spieltag deterministisch mitzählen (Roll-Reihenfolge = insertion-ordered
+  // collectMatchdayUses -> identisch bei Replay).
+  const newInjuriesByTeam = new Map<string, number>();
   const rollMap: MatchdayInjuryRollMap = new Map();
   const usedPlayers = collectMatchdayUses(gameState, input.seasonId, input.matchdayId);
 
@@ -514,7 +589,10 @@ export function buildMatchdayInjuryRollMap(input: {
     if (!player) continue;
 
     const fatigueBeforeRoll = clampFatigue(getPlayerCurrentFatigue(gameState, player, use.teamId) + getPlayerMatchdayFatigueLoad(player, use.intensity));
-    const allowInjury = !injuryRehearsal || rehearsalInjuriesCreated < maxRehearsalInjuries;
+    const teamInjuriesSoFar = newInjuriesByTeam.get(use.teamId) ?? 0;
+    const allowInjury =
+      (!injuryRehearsal || rehearsalInjuriesCreated < maxRehearsalInjuries) &&
+      teamInjuriesSoFar < getMaxNewInjuriesForTeam(gameState, use.teamId);
     const roll = resolveMatchdayInjuryRoll({
       saveId: input.saveId,
       seasonId: input.seasonId,
@@ -524,8 +602,11 @@ export function buildMatchdayInjuryRollMap(input: {
       injuryRehearsal,
       allowInjury,
     });
-    if (roll.result === "injured" && injuryRehearsal) {
-      rehearsalInjuriesCreated += 1;
+    if (roll.result === "injured") {
+      newInjuriesByTeam.set(use.teamId, teamInjuriesSoFar + 1);
+      if (injuryRehearsal) {
+        rehearsalInjuriesCreated += 1;
+      }
     }
     rollMap.set(buildMatchdayUseKey(use.teamId, use.playerId), roll);
   }
@@ -675,9 +756,19 @@ function restorePreMatchdayAvailability(input: {
     const useKey = `${entry.teamId}::${entry.playerId}`;
     const wasUsedLoop = usedIntensityByKey.has(useKey) && !view.isUnavailable;
     if (wasUsedLoop) {
-      // Einsatz-Spieler: erster Apply hat +Load (intensitätsskaliert) gerechnet -> zurücknehmen.
+      // Einsatz-Spieler: erster Apply hat clamp(F + Load) gerechnet (= Roll-Peak) und davon die
+      // proportionale Einsatz-Erholung abgezogen. Für eine EXAKTE Inversion wird der Peak nicht
+      // arithmetisch zurückgerechnet (Rundung von peak*RATE wäre nicht verlustfrei invertierbar),
+      // sondern aus dem an DIESEM Spieltag persistierten Roll gelesen: `injuryRiskLastRoll
+      // .fatigueBefore` IST der Peak des ersten Apply. Fallback (alte Saves ohne Roll-Record):
+      // arithmetische Näherung peak ~= persisted / (1 - RATE).
       const intensity = usedIntensityByKey.get(useKey) ?? "normal";
-      return { ...entry, fatigue: clampFatigue(entry.fatigue - getPlayerMatchdayFatigueLoad(player, intensity)) };
+      const storedPeak = entry.injuryRiskLastRoll?.fatigueBefore;
+      const peak =
+        typeof storedPeak === "number" && Number.isFinite(storedPeak)
+          ? clampFatigue(storedPeak)
+          : clampFatigue(round(entry.fatigue / (1 - MATCHDAY_PLAYED_RECOVERY_RATE)));
+      return { ...entry, fatigue: clampFatigue(peak - getPlayerMatchdayFatigueLoad(player, intensity)) };
     }
     // Bank oder verletzt/unavailable: erster Apply hat Recovery abgezogen -> wieder aufaddieren.
     const recovery = calculatePlayerRecovery(gameState, entry.teamId, player.trainingMode);
@@ -767,6 +858,10 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
     nextPlayers[playerIndex] = { ...player, fatigue: fatigueAfterRecovery };
   }
 
+  // Anti-Stall-Kappung auch im Apply-Pfad mitzählen: normalerweise kommt jeder Roll aus der
+  // (bereits gekappten) Roll-Map; der Inline-Fallback (Map-Miss, z. B. veraltete precomputed
+  // Map) MUSS denselben Team-Deckel respektieren, damit die Garantie lückenlos bleibt.
+  const appliedInjuriesByTeam = new Map<string, number>();
   for (const use of usedPlayers) {
     const playerIndex = playerIndexById.get(use.playerId);
     if (playerIndex == null) continue;
@@ -781,6 +876,7 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
 
     const recovery = calculatePlayerRecovery(gameState, use.teamId, player.trainingMode);
     const fatigueBeforeRoll = clampFatigue(getPlayerCurrentFatigue(gameState, player, use.teamId) + getPlayerMatchdayFatigueLoad(player, use.intensity));
+    const teamInjuriesSoFar = appliedInjuriesByTeam.get(use.teamId) ?? 0;
     const roll =
       injuryRollMap.get(buildMatchdayUseKey(use.teamId, use.playerId)) ??
       resolveMatchdayInjuryRoll({
@@ -790,7 +886,15 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
         playerId: use.playerId,
         fatigueBeforeRoll,
         injuryRehearsal: input.injuryRehearsal,
+        allowInjury: teamInjuriesSoFar < getMaxNewInjuriesForTeam(gameState, use.teamId),
       });
+    if (roll.result === "injured") {
+      appliedInjuriesByTeam.set(use.teamId, teamInjuriesSoFar + 1);
+    }
+    // Persistierter Nach-Spieltags-Wert: Roll-Peak minus proportionale Einsatz-Erholung (siehe
+    // MATCHDAY_PLAYED_RECOVERY_RATE). Der Injury-Roll selbst sieht weiterhin den unveränderten
+    // Peak `fatigueBeforeRoll` — Risiko-Kurve und Roll-Determinismus bleiben exakt wie vorher.
+    const fatigueAfterPlayedRecovery = clampFatigue(fatigueBeforeRoll - getPlayedMatchdayRecovery(fatigueBeforeRoll));
     const event: InjuryEventRecord = {
       eventId: buildInjuryEventId({
         saveId: input.saveId,
@@ -825,7 +929,7 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
     nextAvailability = updateAvailability(nextAvailability, {
       playerId: use.playerId,
       teamId: use.teamId,
-      fatigue: fatigueBeforeRoll,
+      fatigue: fatigueAfterPlayedRecovery,
       injuryStatus: roll.result === "injured" ? "injured" : availabilityView.injuryStatus === "recovering" ? "recovering" : "healthy",
       injuryUntilMatchday: roll.result === "injured" ? nextMatchdayId ?? undefined : availabilityView.injuryUntilMatchday,
       injuredAtSeasonId: roll.result === "injured" ? input.seasonId : availabilityView.injuredAtSeasonId,
@@ -833,7 +937,7 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
       injuryReason: roll.result === "injured" ? "fatigue_over_30_after_matchday_use" : availabilityView.injuryReason,
       injuryRiskLastRoll: roll,
     });
-    nextPlayers[playerIndex] = { ...nextPlayers[playerIndex], fatigue: fatigueBeforeRoll };
+    nextPlayers[playerIndex] = { ...nextPlayers[playerIndex], fatigue: fatigueAfterPlayedRecovery };
   }
 
   const injuryHighlights = newEvents

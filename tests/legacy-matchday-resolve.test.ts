@@ -548,12 +548,15 @@ describe("legacy matchday resolve preview payload", () => {
           },
         ],
       },
-      players: usedPlayerIds.map((id) => ({
+      // Kader auf 8 auffüllen (Bank, NICHT aufgestellt): die strukturelle Anti-Stall-Kappung
+      // erlaubt max. `Kader - 7` neue Verletzungen pro Team und Spieltag — mit nur 5 Kader-
+      // spielern dürfte sich der Kandidat sonst gar nicht verletzen.
+      players: [...usedPlayerIds, "A-A-bench-0", "A-A-bench-1", "A-A-bench-2"].map((id) => ({
         id,
         name: id,
         fatigue: id === victimId ? 100 : 0,
       })),
-      rosters: usedPlayerIds.map((playerId, index) => ({
+      rosters: [...usedPlayerIds, "A-A-bench-0", "A-A-bench-1", "A-A-bench-2"].map((playerId, index) => ({
         id: `r-${index}`,
         teamId: "A-A",
         playerId,
