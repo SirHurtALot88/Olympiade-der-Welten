@@ -400,12 +400,28 @@ describe("singleplayer game state", () => {
     expect(persistence.getSaveById(first.save.saveId)?.saveId).toBe(first.save.saveId);
     expect(persistence.getActiveSave()?.saveId).toBe(fresh.saveId);
     expect(fresh.gameState.transferHistory).toHaveLength(0);
-    expect(fresh.gameState.rosters).toHaveLength(0);
     expect(fresh.gameState.contracts).toHaveLength(0);
-    expect(fresh.gameState.teams.every((team) => fresh.gameState.rosters.filter((entry) => entry.teamId === team.teamId).length === 0)).toBe(true);
+    // Sonderregel/Easter-Egg (lib/foundation/ensure-nula-on-project-suicide.ts): Nula ist das
+    // Maskottchen von Project Suicide und gehört IMMER zu P-S — aber nicht gratis. Die Regel läuft
+    // direkt nach dem Neuspiel-Draft und lässt P-S sie zum Marktwert KAUFEN. Ein frischer Save hat
+    // deshalb korrekterweise GENAU diesen einen Kadereintrag, und P-S hat um genau den Kaufpreis
+    // weniger Cash als Budget. Für alle anderen 31 Teams bleiben "leerer Kader" und "Cash == Budget"
+    // harte Zusicherungen, damit echte Startgeld-/Kaderfehler weiterhin auffliegen.
+    expect(fresh.gameState.rosters).toHaveLength(1);
+    const mascotEntry = fresh.gameState.rosters[0]!;
+    expect(mascotEntry.teamId).toBe("P-S");
+    expect(mascotEntry.playerId).toBe("player-2311-nula");
+    expect(
+      fresh.gameState.teams
+        .filter((team) => team.teamId !== "P-S")
+        .every((team) => fresh.gameState.rosters.filter((entry) => entry.teamId === team.teamId).length === 0),
+    ).toBe(true);
     expect(fresh.gameState.teams).toHaveLength(32);
     expect(fresh.gameState.season.matchdayIds).toHaveLength(10);
-    expect(fresh.gameState.teams.every((team) => team.cash === team.budget)).toBe(true);
+    expect(fresh.gameState.teams.filter((team) => team.teamId !== "P-S").every((team) => team.cash === team.budget)).toBe(true);
+    // P-S hat exakt den Kaufpreis des Maskottchens weniger — kein beliebiger Fehlbetrag.
+    const projectSuicide = fresh.gameState.teams.find((team) => team.teamId === "P-S")!;
+    expect(projectSuicide.budget - projectSuicide.cash).toBeCloseTo(mascotEntry.purchasePrice ?? 0, 2);
     expect(
       Object.values(fresh.gameState.seasonState.standings).every((standing) => (standing.points ?? 0) === 0),
     ).toBe(true);
