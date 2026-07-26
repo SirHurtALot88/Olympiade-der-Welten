@@ -13,6 +13,8 @@ type SellRequestBody = {
   seasonId?: string;
   teamId?: string;
   activePlayerId?: string;
+  /** Optionaler Idempotenz-Schlüssel: verhindert Doppelbuchung bei Doppelklick/Retry. */
+  idempotencyKey?: string;
   dryRun?: boolean;
   source?: "sqlite" | "prisma";
   roomCode?: string | null;
@@ -115,7 +117,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const params = { saveId, seasonId, teamId, activePlayerId };
+    // `idempotencyKey`: Doppelklick/Retry mit demselben Schlüssel bucht den Erlös nicht
+    // erneut — siehe `executeLocalTransfermarktSell`.
+    const params = {
+      saveId,
+      seasonId,
+      teamId,
+      activePlayerId,
+      idempotencyKey: typeof body.idempotencyKey === "string" ? body.idempotencyKey : undefined,
+    };
     const summary = dryRun ? previewLocalTransfermarktSell(params) : executeLocalTransfermarktSell(params);
     notifyRoomGameplayWrite(writeAuth, {
       saveId,

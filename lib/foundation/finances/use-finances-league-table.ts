@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { estimateTeamAnnualRevenue, getTeamAnnualLoanInstallment } from "@/lib/finance/loan-service";
+import { estimateTeamAnnualRevenue, getTeamAnnualLoanInterest } from "@/lib/finance/loan-service";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { calculateFacilityIncome, calculateFacilitySeasonUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
@@ -78,10 +78,16 @@ export function buildFinancesLeagueTable(gameState: GameState): FinanceLeagueTab
     const arenaPopularityFactor = computeTeamBeliebtheitFromGameState(gameState, team.teamId).value;
     const facilityIncome = Math.max(0, calculateFacilityIncome(teamFacilities, { arenaPopularityFactor }));
 
-    const loanInstallmentTotal = getTeamAnnualLoanInstallment(gameState, team.teamId);
+    // Kredit-Ausgabe = ZINS, nicht die volle Rate: Die Tilgung ist eine
+    // Bilanz-Umbuchung (Schulden runter), keine GuV-Ausgabe — genau wie in der
+    // eigenen Übersicht (`use-finances-view-model.ts`, dort `getTeamAnnualLoanInterest`).
+    // Mit der vollen Rate wurde die Tilgung doppelt bestraft und kreditfinanzierte
+    // Teams sahen im Vergleich künstlich schlechter aus als schuldenfreie mit
+    // gleichem Cashflow.
+    const loanInterestTotal = getTeamAnnualLoanInterest(gameState, team.teamId);
 
     const incomeAnnual = round1(sponsor + facilityIncome);
-    const expensesAnnual = round1(salaryTotal + facilityUpkeepTotal + loanInstallmentTotal);
+    const expensesAnnual = round1(salaryTotal + facilityUpkeepTotal + loanInterestTotal);
 
     return {
       teamId: team.teamId,

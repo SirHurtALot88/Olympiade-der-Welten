@@ -5,6 +5,10 @@ import { useMemo } from "react";
 import type { GameState, SponsorOfferComponentKind } from "@/lib/data/olyDataTypes";
 import { estimateTeamAnnualRevenue, getTeamAnnualLoanInterest } from "@/lib/finance/loan-service";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
+import {
+  previewSponsorSettlement,
+  type SponsorSettlementRow,
+} from "@/lib/sponsor/sponsor-settlement-service";
 import { getSponsorComponentKindLabel } from "@/lib/sponsor/sponsor-offer-presenter";
 import { FACILITY_CATALOG, getFacilityLevelDefinition } from "@/lib/facilities/facility-catalog";
 import {
@@ -143,11 +147,27 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
   // den `estimateTeamAnnualRevenue`-Proxy zurück — dann `totalIsEstimate:
   // true`, siehe `FinanceSponsorIncome`-Doku.
   const sponsorContract = getTeamSponsorContract(gameState, teamId);
+  // WICHTIG: `component.rewardCash` ist laut `sponsor-offer-service` nur die
+  // OBERGRENZE des Vertragsbausteins ("Cap für Anzeige"), nicht der zu erwartende
+  // Betrag. Die tatsächlich cash-wirksame Auszahlung hängt am aktuellen Rang bzw.
+  // an erfüllten Zielen und wird von `previewSponsorSettlement` genauso berechnet
+  // wie im echten Season-End-Settlement (identische Quelle wie die Prize-v2-Ansicht).
+  // Vorher summierte diese Ansicht die Caps und zeigte dadurch ein deutlich zu
+  // hohes Sponsor-Einkommen (und damit eine zu hohe GuV) an.
+  let sponsorSettlementRows: SponsorSettlementRow[] = [];
+  try {
+    sponsorSettlementRows = previewSponsorSettlement(gameState).rows.filter((row) => row.teamId === teamId);
+  } catch {
+    // Sponsor-Vorschau ist optional — fehlt sie, greift unten der Estimate-Fallback.
+    sponsorSettlementRows = [];
+  }
   const sponsorComponents = sponsorContract
     ? SPONSOR_COMPONENT_KIND_ORDER.flatMap((kind) => {
-        const component = sponsorContract.components.find((entry) => entry.kind === kind);
-        if (!component || !Number.isFinite(component.rewardCash) || component.rewardCash <= 0) return [];
-        return [{ kind, label: getSponsorComponentKindLabel(kind), rewardCash: round1(component.rewardCash) }];
+        const rewardCash = sponsorSettlementRows
+          .filter((row) => row.kind === kind)
+          .reduce((sum, row) => sum + row.cashDelta, 0);
+        if (!Number.isFinite(rewardCash) || rewardCash <= 0) return [];
+        return [{ kind, label: getSponsorComponentKindLabel(kind), rewardCash: round1(rewardCash) }];
       })
     : [];
   const sponsorComponentsTotal = round1(sponsorComponents.reduce((sum, component) => sum + component.rewardCash, 0));

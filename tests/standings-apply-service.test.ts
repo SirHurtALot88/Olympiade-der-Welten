@@ -319,6 +319,55 @@ describe("standings apply service", () => {
     expect(save.gameState.seasonState.standingsApplyLogs?.[0]?.id).toContain("standings-apply-audit__");
   });
 
+  it("blocks a forceReplace of a matchday that is no longer the latest applied one", async () => {
+    // Regression: `StandingRecord` hält nur EINE Baseline (`matchdayBaselineId`). Wurde seit
+    // diesem Spieltag ein späterer gewertet, zeigt sie nicht mehr hierher — der Preview nähme
+    // dann den bereits fortgeschrittenen Punktestand als "Stand davor" und würde die Punkte
+    // dieses Spieltags ligaweit ein zweites Mal gutschreiben. Muss auch MIT forceReplace blocken.
+    const { save, persistence } = createPersistenceMock();
+    save.gameState.seasonState.standingsApplyLogs = [
+      {
+        id: "audit-1",
+        saveId: "save-local",
+        seasonId: "season-1",
+        matchdayId: "matchday-1",
+        action: "apply",
+        payload: {
+          idempotencyKey: "standings-apply:save-local:season-1:matchday-1",
+          totalTeams: 2,
+          appliedTeams: 2,
+          tieGroupsCount: 0,
+          previewWarningsCount: 0,
+        },
+        createdAt: "2026-06-04T00:00:00.000Z",
+      },
+    ];
+    // Seither wurde matchday-2 gewertet → die Baselines zeigen auf matchday-2.
+    save.gameState.seasonState.standings = {
+      "team-1": { points: 26.4, rank: 1, matchdayBaselinePoints: 13.2, matchdayBaselineId: "matchday-2" },
+      "team-2": { points: 24.8, rank: 2, matchdayBaselinePoints: 12.4, matchdayBaselineId: "matchday-2" },
+    } as never;
+    mockHealthyPreview();
+
+    const result = await executeStandingsApply(
+      {
+        saveId: "save-local",
+        seasonId: "season-1",
+        matchdayId: "matchday-1",
+        execute: true,
+        confirm: STANDINGS_APPLY_CONFIRM_TOKEN,
+        forceReplace: true,
+      },
+      persistence as never,
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.applied).toBe(false);
+    expect(result.blockingReasons).toContain("stale_baseline_replace_not_supported");
+    // Punktestand bleibt unangetastet — keine stille Doppelzählung.
+    expect(save.gameState.seasonState.standings["team-1"].points).toBe(26.4);
+  });
+
   it("blocks tie groups and incomplete preview rows", async () => {
     const { persistence } = createPersistenceMock();
     buildStandingsPreview.mockResolvedValue({
