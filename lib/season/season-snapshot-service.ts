@@ -889,10 +889,34 @@ export function createSeasonSnapshot(
     };
   }
 
-  const nextSnapshots = upsertSeasonSnapshotRecord(save.gameState.seasonState.seasonSnapshots, {
+  // Audit R2/Q4: Beim Ersetzen (replaceExisting) eines bereits ABGESCHLOSSENEN Snapshots die eingefrorenen
+  // Saison-Ende-Cash-Werte (cashEnd/cashTotal je Team) des Original-Snapshots bewahren. preview.snapshot
+  // berechnet cashEnd/cashTotal aus dem AKTUELLEN gameState; ist die Saison bereits abgeschlossen und der
+  // Cash inzwischen weitergezogen (Folgesaison-Transfers, Sponsor/Facility-Buchungen), würde ein Replace
+  // die historisch korrekte Saison-Ende-Ökonomie mit gedrifteten Werten überschreiben. Alle übrigen Felder
+  // (Roster/MW/Transfers/Punkte) dürfen aktualisiert werden — nur die eingefrorene Kasse bleibt erhalten.
+  let snapshotToPersist: SeasonSnapshotRecord = {
     ...preview.snapshot,
     status: preview.seasonCompleted ? "completed" : "partial",
-  });
+  };
+  if (replaceExisting && preview.existingSnapshot?.status === "completed") {
+    const frozenCashByTeamId = new Map(
+      (preview.existingSnapshot.finalStandings ?? []).map(
+        (row) => [row.teamId, { cashEnd: row.cashEnd, cashTotal: row.cashTotal }] as const,
+      ),
+    );
+    const patchedTeams = (snapshotToPersist.finalStandings ?? []).map((row) => {
+      const frozen = frozenCashByTeamId.get(row.teamId);
+      return frozen ? { ...row, cashEnd: frozen.cashEnd, cashTotal: frozen.cashTotal } : row;
+    });
+    snapshotToPersist = {
+      ...snapshotToPersist,
+      finalStandings: patchedTeams,
+      teamSnapshots: patchedTeams,
+    };
+  }
+
+  const nextSnapshots = upsertSeasonSnapshotRecord(save.gameState.seasonState.seasonSnapshots, snapshotToPersist);
 
   persistGameStateWithMaterializedDerivations(persistence, save.saveId, {
     ...save.gameState,

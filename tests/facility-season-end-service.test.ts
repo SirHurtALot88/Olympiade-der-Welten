@@ -222,6 +222,40 @@ describe("facility season-end finance service", () => {
     expect(preview.warnings).toContain("arena_income_missing");
   });
 
+  it("is idempotent — a second apply in the same season does not double-credit income (audit R2/A6)", () => {
+    const sourceSave = save({
+      cash: 10,
+      teamFacilities: {
+        "team-1": facilities({
+          training_center: { level: 1, enabled: true },
+          fan_shop: { level: 1, enabled: true },
+        }),
+      },
+    });
+    const preview = previewFacilitySeasonEndFinance(sourceSave, "team-1");
+    const { persistence, saveSingleplayerState } = persistenceMock(sourceSave);
+
+    const first = applyFacilitySeasonEndFinance(sourceSave, "team-1", preview.confirmToken, persistence);
+    expect(first.applied).toBe(true);
+    const savedState = saveSingleplayerState.mock.calls[0]?.[1];
+    if (!savedState) throw new Error("Expected first facility apply to persist state.");
+
+    // Zweiter Apply auf dem bereits abgerechneten Stand — muss ohne weitere Buchung abbrechen.
+    const alreadyAppliedSave: PersistedSaveGame = { ...sourceSave, gameState: savedState };
+    const secondPreview = previewFacilitySeasonEndFinance(alreadyAppliedSave, "team-1");
+    const second = applyFacilitySeasonEndFinance(
+      alreadyAppliedSave,
+      "team-1",
+      secondPreview.confirmToken,
+      persistence,
+    );
+
+    expect(second.applied).toBe(false);
+    expect(second.blockingReasons).toContain("facility_season_end_already_applied");
+    // Kein zweiter Persist-Aufruf → kein doppeltes Einkommen / kein doppelter Upkeep-Abzug.
+    expect(saveSingleplayerState).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps source free from Prisma write paths", async () => {
     const source = await import("node:fs/promises").then((fs) =>
       fs.readFile(

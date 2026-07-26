@@ -236,6 +236,20 @@ export function applyFacilitySeasonEndFinance(
   persistence: PersistenceService = createPersistenceService(),
 ): FacilitySeasonEndFinanceApplyResult {
   const preview = previewFacilitySeasonEndFinance(save, teamId);
+  // Audit R2/A6: interne Idempotenz-Sperre (Defense-in-Depth). Die Season-Completion-Pipeline prüft
+  // hasFacilitySeasonEndFinanceApplied bereits vor dem Aufruf, aber Direktaufrufer (Skripte, Long-Run-
+  // Sandbox, künftiger Code) täten das evtl. nicht — ohne diese Sperre würde ein zweiter Apply in
+  // derselben Saison das Fan-Shop-Einkommen erneut gutschreiben und den Upkeep erneut abbuchen. Der
+  // confirmToken allein schützt nicht, da er zustandslos/deterministisch aus dem Preview stammt.
+  if (hasFacilitySeasonEndFinanceApplied(save.gameState, save.gameState.season.id, teamId)) {
+    return {
+      ...preview,
+      dryRun: false,
+      applied: false,
+      facilityEventIds: [],
+      blockingReasons: [...preview.blockingReasons, "facility_season_end_already_applied"],
+    };
+  }
   if (!preview.ok || !preview.confirmToken || confirmToken !== preview.confirmToken) {
     return {
       ...preview,

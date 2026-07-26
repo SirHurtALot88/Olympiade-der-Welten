@@ -335,6 +335,25 @@ export type ObjectiveRewardApplyLogRecord = {
   createdAt: string;
 };
 
+/**
+ * Audit R2/V7: Audit-Eintrag für Notfall-Kasse-Aufstockungen, die die KI-Preseason-Roster-Reparatur an
+ * Teams unter dem Cash-Floor vergibt (damit sie den Pflicht-Mindestkader kaufen können). Dieses Geld
+ * entsteht aus dem Nichts — ohne diesen Ledger-Eintrag wäre die Injektion unsichtbar/unauditierbar und die
+ * Wert-Erhaltung (Cash wird nicht aus dem Nichts geschaffen) verschleiert. `cashBefore`/`cashAfter` machen
+ * den erzeugten Betrag (`amount = cashAfter - cashBefore`) nachvollziehbar.
+ */
+export type AiEmergencyCashInjectionRecord = {
+  id: string;
+  saveId: string;
+  seasonId: string;
+  teamId: string;
+  reason: "preseason_roster_repair_cash_floor";
+  cashBefore: number;
+  cashAfter: number;
+  amount: number;
+  createdAt: string;
+};
+
 export type MatchdayAdvanceLogRecord = {
   id: string;
   saveId: string;
@@ -2524,6 +2543,11 @@ export type SeasonState = {
    * Idempotenz-Marker, damit ein erneuter Abschluss-Lauf die Strafpunkte nicht doppelt abzieht.
    */
   formCardPenaltyAppliedSeasonIds?: string[];
+  /**
+   * Audit R2/V7: Ledger der Notfall-Kasse-Aufstockungen (KI-Preseason-Roster-Reparatur unter Cash-Floor).
+   * Macht das aus dem Nichts erzeugte Geld auditierbar (siehe AiEmergencyCashInjectionRecord).
+   */
+  aiEmergencyCashInjections?: AiEmergencyCashInjectionRecord[];
   cashPrizeApplyLogs?: CashPrizeApplyLogRecord[];
   matchdayAdvanceLogs?: MatchdayAdvanceLogRecord[];
   objectiveRewardApplyLogs?: ObjectiveRewardApplyLogRecord[];
