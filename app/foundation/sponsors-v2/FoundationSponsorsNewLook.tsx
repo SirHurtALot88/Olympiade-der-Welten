@@ -24,6 +24,7 @@ import {
 import { buildSponsorOfferPresentation, getSponsorComponentKindLabel } from "@/lib/sponsor/sponsor-offer-presenter";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
+import { SponsorRankLadder } from "@/components/foundation/sponsor/SponsorRankLadder";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamObjectives } from "@/lib/board/team-season-objectives-service";
 import { formatGameFlowBlocker } from "@/lib/foundation/game-flow-blocker-labels";
@@ -453,15 +454,22 @@ export default function FoundationSponsorsNewLook({
     const row = leagueSponsorRows.find((entry) => entry.teamId === leagueDetailTeamId) ?? null;
     if (!row) return null;
     const contract = getTeamSponsorContract(gameState, leagueDetailTeamId);
-    let components: { label: string; cashDelta: number; reason: string }[] = [];
+    let settlementRows: { kind: string; label: string; cashDelta: number; reason: string }[] = [];
     try {
-      components = previewSponsorSettlement(gameState)
+      settlementRows = previewSponsorSettlement(gameState)
         .rows.filter((entry) => entry.teamId === leagueDetailTeamId)
-        .map((entry) => ({ label: entry.label, cashDelta: entry.cashDelta, reason: entry.reason }));
+        .map((entry) => ({ kind: entry.kind, label: entry.label, cashDelta: entry.cashDelta, reason: entry.reason }));
     } catch {
-      components = [];
+      settlementRows = [];
     }
-    return { row, contract, components };
+    // Aufbau des Fensters spiegelt die Rechnung: Basis -> Gewinnstufen (grafisch) -> alles Weitere
+    // (Verbesserung, Sonderziele) -> Summe. Die Rang-Zeile wird durch die Leiter ersetzt, statt sie
+    // zusaetzlich als Textzeile zu wiederholen.
+    const baseRow = settlementRows.find((entry) => entry.kind === "base") ?? null;
+    const otherRows = settlementRows.filter((entry) => entry.kind !== "base" && entry.kind !== "rank");
+    const rankLadder = contract?.lockedRankPayoutLadder ?? null;
+    const baseCash = contract?.components.find((entry) => entry.kind === "base")?.rewardCash ?? 0;
+    return { row, contract, baseRow, otherRows, rankLadder, baseCash };
   }, [leagueDetailTeamId, leagueSponsorRows, gameState]);
 
   const sortedLeagueSponsorRows = useMemo(() => {
@@ -987,17 +995,58 @@ export default function FoundationSponsorsNewLook({
                 ) : null}
               </div>
 
-              {leagueDetail.components.length > 0 ? (
-                <ul className="nl-sponsor-league-detail-list">
-                  {leagueDetail.components.map((component, index) => (
-                    <li key={`${component.label}-${index}`}>
-                      <span className="nl-sponsor-league-detail-label" title={component.reason}>
-                        {component.label}
-                      </span>
-                      <span className="nl-tnum">{formatMoney(component.cashDelta)}</span>
-                    </li>
-                  ))}
-                </ul>
+              {leagueDetail.baseRow || leagueDetail.rankLadder || leagueDetail.otherRows.length > 0 ? (
+                <>
+                  {leagueDetail.baseRow ? (
+                    <ul className="nl-sponsor-league-detail-list">
+                      <li>
+                        <span className="nl-sponsor-league-detail-label" title={leagueDetail.baseRow.reason}>
+                          {leagueDetail.baseRow.label}
+                        </span>
+                        <span className="nl-tnum">{formatMoney(leagueDetail.baseRow.cashDelta)}</span>
+                      </li>
+                    </ul>
+                  ) : null}
+
+                  {/* Gewinnstufen grafisch statt als gequetschte Textzeile — dieselbe Leiter wie auf
+                      der eigenen Angebotskarte, inkl. Hervorhebung der aktuell erreichten Stufe. */}
+                  {leagueDetail.rankLadder && leagueDetail.rankLadder.length > 0 ? (
+                    <div className="nl-sponsor-league-detail-section">
+                      <div className="nl-sponsor-league-detail-section-head">
+                        <span>Gewinnstufen</span>
+                        {leagueDetail.row.rank != null ? (
+                          <small className="nl-sponsor-rank-current-hint">Aktuell #{leagueDetail.row.rank}</small>
+                        ) : null}
+                      </div>
+                      <SponsorRankLadder
+                        baseCash={leagueDetail.baseCash}
+                        rankLadder={leagueDetail.rankLadder}
+                        currentTeamRank={leagueDetail.row.rank}
+                        formatCash={formatMoney}
+                      />
+                    </div>
+                  ) : null}
+
+                  {/* Sonderziele/Verbesserung darunter: damit sichtbar wird, woraus sich die Summe
+                      unten zusammensetzt. */}
+                  {leagueDetail.otherRows.length > 0 ? (
+                    <div className="nl-sponsor-league-detail-section">
+                      <div className="nl-sponsor-league-detail-section-head">
+                        <span>Sonderziele</span>
+                      </div>
+                      <ul className="nl-sponsor-league-detail-list">
+                        {leagueDetail.otherRows.map((component, index) => (
+                          <li key={`${component.label}-${index}`}>
+                            <span className="nl-sponsor-league-detail-label" title={component.reason}>
+                              {component.label}
+                            </span>
+                            <span className="nl-tnum">{formatMoney(component.cashDelta)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </>
               ) : (
                 <p className="nl-sponsor-league-detail-empty">
                   Für diesen Vertrag liegt keine Auszahlungs-Aufschlüsselung vor.

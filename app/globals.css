@@ -60281,6 +60281,24 @@ button.is-new-look .nl-thist-season-pill,
   color: var(--nl-line-2);
 }
 
+/* Abschnitte im Sponsor-Detailfenster (Gewinnstufen / Sonderziele). */
+.is-new-look .nl-sponsor-league-detail-section {
+  margin-top: 14px;
+}
+
+.is-new-look .nl-sponsor-league-detail-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
 /* --- Sponsor-Detailfenster: Aufschluesselung des Sponsors EINES (auch fremden) Teams --- */
 .is-new-look .nl-sponsor-league-detail-backdrop {
   position: fixed;
