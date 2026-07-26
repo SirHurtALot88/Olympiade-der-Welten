@@ -12,7 +12,7 @@ import {
 } from "../lib/db/seed/mappers";
 import { createPlayerBaselineFromPlayer } from "../lib/players/player-baseline-service";
 import {
-  clearPlayerSavePatches,
+  clearPlayerSavePatchesForAllSaves,
   upsertPlayerBaselineCatalogEntries,
   upsertPlayerCatalogEntries,
 } from "../lib/persistence/save-repository";
@@ -108,7 +108,9 @@ async function main() {
   console.log("sqlite player_catalog + player_baseline_catalog upserted");
 
   if (!args.keepSavePatches) {
-    clearPlayerSavePatches(player.id);
+    // Dev-tooling catalog re-sync with no single target save: clearing across
+    // all saves is intentional here (see clearPlayerSavePatchesForAllSaves).
+    clearPlayerSavePatchesForAllSaves(player.id);
     console.log("sqlite save-specific player patches cleared");
   }
 

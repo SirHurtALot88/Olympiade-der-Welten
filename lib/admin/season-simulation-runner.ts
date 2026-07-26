@@ -1703,7 +1703,17 @@ function runXpDevelopment(run: AdminSeasonSimulationRunState, save: PersistedSav
 
     const preview = previewSeasonEndXpSpend(xpPreviewSave, teamId);
     if (preview.confirmToken) {
-      const applied = applySeasonEndXpSpend(xpPreviewSave, teamId, preview.confirmToken, persistence, { allowAiTeams: true });
+      // Perf (Audit #2 F1): den bereits berechneten Preview weiterreichen, statt ihn im Apply erneut
+      // (Slow-Path) pro Spieler durchzurechnen — halbierte die XP/Development-Phase (~5,7 s → ~0,2 s pro Team).
+      const applied = applySeasonEndXpSpend(
+        xpPreviewSave,
+        teamId,
+        preview.confirmToken,
+        persistence,
+        { allowAiTeams: true },
+        undefined,
+        preview,
+      );
       if (applied.applied) {
         appliedPlayers += applied.players.length;
         appliedUpgrades += applied.plannedUpgrades.length;

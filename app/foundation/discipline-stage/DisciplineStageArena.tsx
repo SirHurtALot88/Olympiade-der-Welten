@@ -550,6 +550,9 @@ export default function DisciplineStageArena({
   // projectedRank/projectedPoints/pointsDelta drin.
   const [standingsItems, setStandingsItems] = useState<MatchdayPanelStandingRow[]>([]);
   const [previewState, setPreviewState] = useState<"idle" | "loading" | "ready" | "unavailable">("idle");
+  // Erlaubt manuelles Neuladen der Engine-Preview (Retry-Button), falls der erste Versuch
+  // fehlschlägt/hängt — ohne den Retry säßen normale Spieler bei „unavailable" still fest.
+  const [previewReloadNonce, setPreviewReloadNonce] = useState(0);
 
   useEffect(() => {
     if (!saveId || !seasonId || !matchdayId) {
@@ -577,7 +580,7 @@ export default function DisciplineStageArena({
         }
       });
     return () => controller.abort();
-  }, [saveId, seasonId, matchdayId, ownTeamId]);
+  }, [saveId, seasonId, matchdayId, ownTeamId, previewReloadNonce]);
 
   const engineDiscipline = useMemo(
     () => preview?.disciplinePreviews.find((d) => d.disciplineId === disciplineId) ?? null,
@@ -1121,6 +1124,47 @@ export default function DisciplineStageArena({
         </label>
       </div>
 
+      {/* P1-17: Engine-Status auch AUSSERHALB des Dev-Modus sichtbar. Ohne diese Zeile bekamen
+          normale Spieler bei „loading"/„unavailable" keinerlei Rückmeldung und saßen still fest.
+          Nur eingeblendet, solange NICHT engine-echt gerendert wird (sonst wäre es Rauschen). */}
+      {!devMode && mode === "real" && !useEngine ? (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12, fontSize: 12.5 }}
+        >
+          <span
+            style={{
+              fontWeight: 800,
+              padding: "4px 10px",
+              borderRadius: 99,
+              color: "var(--nl-mut)",
+              border: "1px solid var(--nl-line)",
+            }}
+          >
+            {previewState === "loading" ? "Engine lädt …" : "Vereinfachte Ansicht (keine Engine-Aufstellung)"}
+          </span>
+          {previewState === "unavailable" ? (
+            <button
+              type="button"
+              onClick={() => setPreviewReloadNonce((nonce) => nonce + 1)}
+              style={{
+                padding: "5px 12px",
+                fontWeight: 700,
+                fontSize: 12.5,
+                border: "1px solid var(--nl-line)",
+                background: "transparent",
+                color: "inherit",
+                borderRadius: 8,
+                cursor: "pointer",
+              }}
+            >
+              Engine erneut laden
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       {devMode && (
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
         <div style={{ display: "inline-flex", borderRadius: 10, overflow: "hidden", border: "1px solid var(--nl-line)" }}>
@@ -1335,39 +1379,76 @@ export default function DisciplineStageArena({
             playerNameById={playerNameById}
             ownTeamId={ownTeamId}
           />
-          {onAdvanceMatchday ? (
-            <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 12, color: "var(--nl-mut)" }}>
-                Auswertung identisch zur Arena — schließt den Spieltag ab und schaltet weiter.
-              </span>
-              <button
-                type="button"
-                disabled={advancing}
-                onClick={async () => {
-                  if (advancing) return;
-                  setAdvancing(true);
-                  try {
-                    await onAdvanceMatchday();
-                  } finally {
-                    setAdvancing(false);
-                  }
-                }}
-                style={{
-                  padding: "11px 22px",
-                  fontWeight: 800,
-                  fontSize: 14,
-                  border: 0,
-                  borderRadius: 10,
-                  cursor: advancing ? "default" : "pointer",
-                  color: "var(--nl-ink)",
-                  background: "var(--nl-accent)",
-                  opacity: advancing ? 0.6 : 1,
-                }}
-              >
-                {advancing ? "Wird ausgewertet …" : "Spieltag auswerten & weiter →"}
-              </button>
-            </div>
-          ) : null}
+          {(() => {
+            // P1-16: Nach Disziplin 1 den Spieler AKTIV zur zweiten Disziplin des Spieltags führen,
+            // statt ihn den Spieltag vorzeitig auswerten zu lassen oder das Dropdown selbst umstellen
+            // zu müssen. `setDisciplineId` setzt `arenaEnded` (Effect auf [disciplineId]) automatisch
+            // zurück → Diszi 2 startet frisch. Der Matchday-Advance erscheint erst auf der letzten
+            // Disziplin (d2 bzw. Ein-Disziplin-Spieltag / Dev-Modus).
+            const secondDisciplineId = matchdayPanel?.d2?.disciplineId ?? null;
+            const guideToSecondDiscipline =
+              !devMode && activeDisciplineSide === "d1" && secondDisciplineId != null && secondDisciplineId !== disciplineId;
+            if (guideToSecondDiscipline) {
+              const secondName =
+                matchdayDisciplineOptions.find((option) => option.id === secondDisciplineId)?.name ?? "Disziplin 2";
+              return (
+                <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 12, color: "var(--nl-mut)" }}>
+                    Disziplin 1 abgeschlossen — weiter zur zweiten Disziplin dieses Spieltags.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setDisciplineId(secondDisciplineId)}
+                    style={{
+                      padding: "11px 22px",
+                      fontWeight: 800,
+                      fontSize: 14,
+                      border: 0,
+                      borderRadius: 10,
+                      cursor: "pointer",
+                      color: "var(--nl-ink)",
+                      background: "var(--nl-accent)",
+                    }}
+                  >
+                    Weiter zu Disziplin 2: {secondName} →
+                  </button>
+                </div>
+              );
+            }
+            return onAdvanceMatchday ? (
+              <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 12, color: "var(--nl-mut)" }}>
+                  Auswertung identisch zur Arena — schließt den Spieltag ab und schaltet weiter.
+                </span>
+                <button
+                  type="button"
+                  disabled={advancing}
+                  onClick={async () => {
+                    if (advancing) return;
+                    setAdvancing(true);
+                    try {
+                      await onAdvanceMatchday();
+                    } finally {
+                      setAdvancing(false);
+                    }
+                  }}
+                  style={{
+                    padding: "11px 22px",
+                    fontWeight: 800,
+                    fontSize: 14,
+                    border: 0,
+                    borderRadius: 10,
+                    cursor: advancing ? "default" : "pointer",
+                    color: "var(--nl-ink)",
+                    background: "var(--nl-accent)",
+                    opacity: advancing ? 0.6 : 1,
+                  }}
+                >
+                  {advancing ? "Wird ausgewertet …" : "Spieltag auswerten & weiter →"}
+                </button>
+              </div>
+            ) : null;
+          })()}
         </div>
       ) : null}
     </div>

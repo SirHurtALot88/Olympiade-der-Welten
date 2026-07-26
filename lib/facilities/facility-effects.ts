@@ -128,6 +128,26 @@ export function applyTrainingXpFacilityModifiers(
 }
 
 /**
+ * Beschreibt den Facility-Trainingseffekt für die UI, OHNE den Modifier erneut anzuwenden.
+ * `boostedTrainingXp` ist der bereits facility-geboostete Wert (Summe der organischen
+ * Trainings-Setpoints, die intern in `buildOrganicSeasonProgression` schon
+ * `× (1 + facilityModifierPct/100)` enthalten). Der Chip zeigt diesen echten Wert als `after`
+ * und rechnet `before` als facility-freie Roh-Basis zurück. Die frühere Version rief
+ * `applyTrainingXpFacilityModifiers` auf den bereits geboosteten Wert auf und zählte damit den
+ * Bonus doppelt (~1,7× bei Level-5-Center).
+ */
+export function describeTrainingXpFacilityEffect(
+  boostedTrainingXp: number,
+  facilities: TeamFacilityCollection | null | undefined,
+  options?: { developmentTrainingBonusPct?: number },
+) {
+  const { modifierPct } = applyTrainingXpFacilityModifiers(0, facilities, options);
+  const after = roundValue(boostedTrainingXp, 0);
+  const before = modifierPct > -100 ? roundValue(after / (1 + modifierPct / 100), 0) : after;
+  return { before, modifierPct, after };
+}
+
+/**
  * REHA/recovery-center = FLACHER, absoluter Recovery-Bonus (kein %-Bonus): Basis 20 →
  * L1=22, L2=24, L3=26, L4=29, L5=32 pro Spieltag bei 100% Zustand. Die Leiter ist exakt auf
  * `BASE_MATCHDAY_RECOVERY = 20` abgestimmt (L5 = 20 + 12 = 32 absolut).

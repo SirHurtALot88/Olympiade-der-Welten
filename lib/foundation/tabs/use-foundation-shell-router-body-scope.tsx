@@ -2002,33 +2002,40 @@ export function useFoundationShellRouterBodyScope({
     }
   }
 
-  async function setPlayerTrainingMode(playerId: string, mode: TrainingModeDraft) {
-    if (readMeta.readOnly) {
-      showReadOnlyNotice();
+  // Sammelt synchrone Trainingsmodus-Aufrufe (z.B. die Team-Rail "alle Spieler
+  // auf einen Modus", die pro Spieler einmal aufruft) und persistiert GENAU
+  // EINMAL mit ALLEN Änderungen. Vorher baute jeder Aufruf nextGameState aus dem
+  // stale Closure-gameState und änderte nur einen Spieler → der letzte Persist
+  // gewann und nur der letzte Spieler wurde gespeichert (Datenverlust).
+  const pendingTrainingModesRef = useRef<Map<string, TrainingModeDraft>>(new Map());
+  const trainingModeFlushRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function flushPendingTrainingModes() {
+    trainingModeFlushRef.current = null;
+    const changes = pendingTrainingModesRef.current;
+    if (changes.size === 0) {
       return;
     }
+    pendingTrainingModesRef.current = new Map();
 
-    // T-009: Kein Season-Phasen-Lock mehr für Trainingsintensität — Training
-    // bleibt für das eigene (steuerbare) Team immer einstellbar. Siehe
-    // lib/foundation/game-phase-action-policy.ts (isTrainingIntensityLockedForSeason
-    // liefert dauerhaft `false`); readMeta.readOnly oben deckt weiterhin den
-    // "fremdes Team / reine Ansicht"-Fall ab.
-
-    setTrainingModeDraft((current) => ({
-      ...current,
-      [playerId]: mode,
-    }));
-
-    const teamId = gameState.rosters.find((entry) => entry.playerId === playerId)?.teamId ?? null;
-
+    // In einem Online-Room ist der Ganz-Stand-PUT gesperrt (409
+    // room_save_generic_write_forbidden); jede gesammelte Änderung geht stattdessen
+    // einzeln über die raum-geprüfte /api/training-Route (server-autoritativ, pro
+    // Spieler). persistPlayerTrainingModeInRoom übernimmt lokales Update + Broadcast.
     if (roomContext) {
-      await persistPlayerTrainingModeInRoom(playerId, mode, teamId);
+      for (const [pendingPlayerId, pendingMode] of changes) {
+        const pendingTeamId = gameState.rosters.find((entry) => entry.playerId === pendingPlayerId)?.teamId ?? null;
+        await persistPlayerTrainingModeInRoom(pendingPlayerId, pendingMode, pendingTeamId);
+      }
       return;
     }
 
+    const teamId = gameState.rosters.find((entry) => changes.has(entry.playerId))?.teamId ?? null;
     const nextGameState: GameState = {
       ...gameState,
-      players: gameState.players.map((player) => (player.id === playerId ? { ...player, trainingMode: mode } : player)),
+      players: gameState.players.map((player) =>
+        changes.has(player.id) ? { ...player, trainingMode: changes.get(player.id)! } : player,
+      ),
       seasonState: teamId
         ? {
             ...gameState.seasonState,
@@ -2046,7 +2053,9 @@ export function useFoundationShellRouterBodyScope({
     };
 
     setGameState(nextGameState);
-    void refreshOpenPlayerProfileAfterTrainingChange(nextGameState, playerId);
+    for (const playerId of changes.keys()) {
+      void refreshOpenPlayerProfileAfterTrainingChange(nextGameState, playerId);
+    }
     try {
       await persistLocalGameStateImmediately(nextGameState);
     } catch (error) {
@@ -2056,6 +2065,32 @@ export function useFoundationShellRouterBodyScope({
         detail: error instanceof Error ? error.message : "Training konnte nicht gespeichert werden.",
       });
     }
+  }
+
+  function setPlayerTrainingMode(playerId: string, mode: TrainingModeDraft) {
+    if (readMeta.readOnly) {
+      showReadOnlyNotice();
+      return;
+    }
+
+    // T-009: Kein Season-Phasen-Lock mehr für Trainingsintensität — Training
+    // bleibt für das eigene (steuerbare) Team immer einstellbar. Siehe
+    // lib/foundation/game-phase-action-policy.ts (isTrainingIntensityLockedForSeason
+    // liefert dauerhaft `false`); readMeta.readOnly oben deckt weiterhin den
+    // "fremdes Team / reine Ansicht"-Fall ab.
+
+    setTrainingModeDraft((current) => ({
+      ...current,
+      [playerId]: mode,
+    }));
+
+    pendingTrainingModesRef.current.set(playerId, mode);
+    if (trainingModeFlushRef.current) {
+      clearTimeout(trainingModeFlushRef.current);
+    }
+    trainingModeFlushRef.current = setTimeout(() => {
+      void flushPendingTrainingModes();
+    }, 0);
   }
 
   /** Room-safe path for a single player's training-class change. See `persistPlayerTrainingModeInRoom`. */

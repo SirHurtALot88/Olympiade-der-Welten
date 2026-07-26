@@ -53,8 +53,8 @@ import {
 import type { PlayerInjuryHistoryRecord } from "@/lib/data/olyDataTypes";
 import { buildPlayerTrainingHistoryRows, type PlayerTrainingHistoryRow } from "@/lib/foundation/player-training-history";
 import {
-  buildPlayerMatchdayTrainingHistory,
-  type PlayerMatchdayTrainingHistory,
+  buildPlayerSeasonTrainingForecast,
+  type PlayerSeasonTrainingForecast,
 } from "@/lib/foundation/player-matchday-training-history";
 import {
   buildPlayerHistoryDisciplineValues,
@@ -384,8 +384,8 @@ export type PlayerDetailDrawerData = {
   }>;
   trainingHistoryRows: PlayerTrainingHistoryRow[];
   attributeHistoryRows: PlayerAttributeHistoryRow[];
-  /** Spieltag-genaue Trainings-Forecast-Historie der laufenden Saison (null wenn keine Spieltage gespielt). */
-  matchdayTrainingHistory: PlayerMatchdayTrainingHistory | null;
+  /** Kumulierte Trainings-Prognose der laufenden Saison (null wenn keine Spieltage gespielt). */
+  seasonTrainingForecast: PlayerSeasonTrainingForecast | null;
   progressionEconomyPreview: {
     marketValuePreview: number | null;
     currentContractSalary: number | null;
@@ -489,7 +489,7 @@ export type PlayerDetailDrawerData = {
     seasonName: string;
     teamName: string | null;
     teamCode: string | null;
-    appearances: number;
+    appearances: number | null;
     totalPoints: number | null;
     averageContribution: number | null;
     averageFinalScore: number | null;
@@ -1735,7 +1735,9 @@ function mergeSeasonHistoryWithTransferFallback(
       seasonName: getCanonicalSeasonLabel({ seasonId: transfer.seasonId, seasonName: transfer.seasonLabel }),
       teamName: team?.name ?? null,
       teamCode: team?.shortCode ?? null,
-      appearances: 0,
+      // Transfer-Fallback ohne Performance-Snapshot: alle Leistungswerte sind unbekannt
+      // (→ Striche, nicht Nullen), auch die Einsätze. Siehe warnings unten.
+      appearances: null,
       totalPoints: null,
       averageContribution: null,
       averageFinalScore: null,
@@ -2074,7 +2076,9 @@ function buildHistoryRows(input: {
       teamCode: entry.teamCode,
       appearances: entry.appearances,
       averageFatigue:
-        entry.appearances > 0 ? input.averageFatigueBySeasonId?.get(entry.seasonId ?? "") ?? null : null,
+        (entry.appearances ?? 0) > 0
+          ? input.averageFatigueBySeasonId?.get(entry.seasonId ?? "") ?? null
+          : null,
       totalPoints: entry.totalPoints,
       pow: resolveSeasonDisciplineAreaTotal(disciplineValues, "pow", entry.pow),
       spe: resolveSeasonDisciplineAreaTotal(disciplineValues, "spe", entry.spe),
@@ -2567,11 +2571,11 @@ export function buildPlayerDrawerDataFromGameState(input: {
     currentTrainingClass: player.trainingClass ?? player.className ?? null,
     currentTrainingMode: player.trainingMode ?? null,
   });
-  // Spieltag-genaue Forecast-Historie — nur für eigene Spieler (dieselbe Sichtbarkeitsregel wie
-  // seasonOrganicForecast), da sie die volle organische Progression pro Spieltag rekonstruiert.
-  const matchdayTrainingHistory =
+  // Kumulierte Saison-Forecast — nur für eigene Spieler (dieselbe Sichtbarkeitsregel wie
+  // seasonOrganicForecast), da sie die volle organische Progression projiziert.
+  const seasonTrainingForecast =
     team && rosterEntry && (team.humanControlled !== false || DEBUG_FORCE_PLAYER_VISIBILITY)
-      ? buildPlayerMatchdayTrainingHistory({
+      ? buildPlayerSeasonTrainingForecast({
           gameState: input.gameState,
           player,
           facilities: team ? getTeamFacilityState(input.gameState, team.teamId) : undefined,
@@ -2820,7 +2824,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
     progressionEvents,
     trainingHistoryRows,
     attributeHistoryRows,
-    matchdayTrainingHistory,
+    seasonTrainingForecast,
     seasonPerformance,
     transferContext: {
       ...buildTransferContext(input.gameState, player.id, rosterEntry),
@@ -3183,7 +3187,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     progressionEvents: [],
     trainingHistoryRows: [],
     attributeHistoryRows: [],
-    matchdayTrainingHistory: null,
+    seasonTrainingForecast: null,
     progressionEconomyPreview: null,
     seasonPerformance: null,
     transferContext: {
