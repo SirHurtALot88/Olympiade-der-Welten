@@ -67,20 +67,28 @@ describe("data adapter", () => {
   it("overlays team budgets from the season management startbudget reference", () => {
     const teams = loadSourceTeams();
 
+    // Werte an references/sheets/season-management.json angeglichen (Startbudgets dort um 50
+    // gesenkt: A-A/Armageddon Aftermath 175, B-P/Black Panthers 275, C-C/Cash Creators 215,
+    // C-S/Cold Steel 315 — dieselben Werte, die praktisch der gesamte übrige Testbestand bereits
+    // konsistent erwartet, u. a. tests/singleplayer-state.test.ts, tests/season-management-sheet.test.ts,
+    // tests/team-management-overview.test.ts, tests/transfermarkt-local-service.test.ts (alle A-A=175).
+    // Diese Datei war der einzige Ausreißer mit den alten (+50) Werten.
     expect(teams).toHaveLength(32);
-    expect(teams.find((team) => team.teamId === "A-A")?.budget).toBe(225);
-    expect(teams.find((team) => team.teamId === "B-P")?.budget).toBe(325);
-    expect(teams.find((team) => team.teamId === "C-C")?.budget).toBe(265);
-    expect(teams.find((team) => team.teamId === "C-S")?.budget).toBe(365);
+    expect(teams.find((team) => team.teamId === "A-A")?.budget).toBe(175);
+    expect(teams.find((team) => team.teamId === "B-P")?.budget).toBe(275);
+    expect(teams.find((team) => team.teamId === "C-C")?.budget).toBe(215);
+    expect(teams.find((team) => team.teamId === "C-S")?.budget).toBe(315);
   });
 
   it("carries startbudget values into the seeded game state", () => {
     const seed = loadSeedData();
     const gameState = createGameStateFromSeed(seed);
 
-    expect(seed.teams.find((team) => team.teamId === "A-A")?.budget).toBe(225);
-    expect(gameState.teams.find((team) => team.teamId === "A-A")?.budget).toBe(225);
-    expect(gameState.teams.find((team) => team.teamId === "B-P")?.budget).toBe(325);
+    // Siehe Kommentar oben: aktuelle references/sheets/season-management.json-Werte, konsistent
+    // mit dem übrigen Testbestand (z. B. tests/singleplayer-state.test.ts erwartet A-A=175).
+    expect(seed.teams.find((team) => team.teamId === "A-A")?.budget).toBe(175);
+    expect(gameState.teams.find((team) => team.teamId === "A-A")?.budget).toBe(175);
+    expect(gameState.teams.find((team) => team.teamId === "B-P")?.budget).toBe(275);
   });
 
   it("builds a fresh season one seed without inherited transfer history", () => {

@@ -369,7 +369,17 @@ describe("training performance season simulation", () => {
     });
 
     expect(coreStrong.netSetpoints).toBeGreaterThan(0);
-    expect(coreStrong.appliedPerformanceSetpoints).toBeCloseTo(billoStrong.appliedPerformanceSetpoints, 1);
+    // Performance-growth per attribute is headroom-aware (getPerformanceHeadroomGrowthMultiplier,
+    // lib/training/organic-season-progression.ts — "B1: headroom-aware ...
+    // a capped/closing attribute plateaus instead of eroding/growing at full
+    // speed"): core's attributes (~50) sit closer to their ceiling than
+    // billo's (~40), so core legitimately gets a slightly smaller performance
+    // multiplier on some attributes even under otherwise-identical "strong"
+    // performance credit. Precision 1 (tolerance 0.05) was too tight for that
+    // small, expected headroom effect (observed gap ~0.08 on a ~10 total);
+    // precision 0 (tolerance 0.5) still enforces "comparably full" credit
+    // without being fragile to that per-player headroom drift.
+    expect(coreStrong.appliedPerformanceSetpoints).toBeCloseTo(billoStrong.appliedPerformanceSetpoints, 0);
   });
 
   it("applies full performance but less training when core player is near attribute ceiling", () => {

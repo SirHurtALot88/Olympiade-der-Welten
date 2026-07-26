@@ -56,9 +56,15 @@ describe("long-run organic progression audit", () => {
   });
 
   it("computes training scale factor toward peak corridor midpoint", () => {
+    // Peak-P90-Korridor wurde von [5,8] (Midpoint 6.5) auf [8,20] (Midpoint 14) rekalibriert —
+    // siehe Kommentar an ORGANIC_PEAK_NET_MIN/MAX in long-run-organic-progression-audit.ts:
+    // "Recalibrated for the intended (buffed) training [...] The old [5,8] band was calibrated
+    // for the weaker pre-buff training and flagged the intended level as a false RED." Die alten
+    // Werte (6.5 -> 1, 10 -> <1) gehörten zum alten Korridor; unter dem neuen Korridor liegt 6.5
+    // unterhalb des Bands und wird auf den 1.25-Deckel gecappt statt exakt 1 zu ergeben.
     expect(computeOrganicTrainingScaleFactor(4.4)).toBeGreaterThan(1);
-    expect(computeOrganicTrainingScaleFactor(6.5)).toBe(1);
-    expect(computeOrganicTrainingScaleFactor(10)).toBeLessThan(1);
+    expect(computeOrganicTrainingScaleFactor(14)).toBe(1);
+    expect(computeOrganicTrainingScaleFactor(20)).toBeLessThan(1);
   });
 
   it("computes regression scale factor when league average is too high", () => {

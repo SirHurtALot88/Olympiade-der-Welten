@@ -39,6 +39,12 @@ describe("buildTransferMarketV2RosterRows", () => {
       rosters: [createRosterEntry()],
       season: { id: "season-1" },
       seasonState: { playerDisciplinePerformances: [] },
+      // buildTransferMarketV2RosterRows also builds a CA/PO star-scouting snapshot
+      // (unrelated to the pps/mvs/ovr behavior under test here), which iterates
+      // gameState.disciplines. That field is required on GameState but this fixture
+      // predates that dependency, so provide it explicitly to avoid crashing before
+      // pps/mvs/ovr are even computed.
+      disciplines: [],
     } as unknown as GameState;
 
     const playerRatingsById = new Map([
@@ -71,6 +77,9 @@ describe("buildTransferMarketV2RosterRows", () => {
       rosters: [createRosterEntry()],
       season: { id: "season-1" },
       seasonState: { playerDisciplinePerformances: [] },
+      // See comment in the test above: required for the CA/PO star-scouting
+      // snapshot path that buildTransferMarketV2RosterRows also builds.
+      disciplines: [],
     } as unknown as GameState;
 
     const playerRatingsById = new Map([

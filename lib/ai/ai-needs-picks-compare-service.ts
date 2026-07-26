@@ -2388,7 +2388,7 @@ function getAdjustedSeason1OptimumSpendTargetPct(
  */
 const GM_DRAFT_BUFFER_MIN = 0.03;
 const GM_DRAFT_BUFFER_MAX = 0.15;
-function getGmDraftBufferPct(
+export function getGmDraftBufferPct(
   profile: TeamStrategyProfile | null,
   corridorSpendTargetPct: number,
   gmArchetype?: string | null,

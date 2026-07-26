@@ -65,10 +65,15 @@ describe("potential derivation — spread and floor", () => {
   });
 
   it("weak players are not auto-lifted but keep a spread of upside", () => {
-    // The decoupled gap generator must NOT auto-lift weak players to a floor
-    // above their ability (the old `max(rawRoll, CA)` bug lifted a genuine 1★ to
-    // ~2.5★ potential). Most weak players now keep low potential; a minority
-    // carries real headroom, and a rare tail can climb toward a high ceiling.
+    // Model v6 "Star-Uniform-Potenzial" (commit 597e7bd, see doc block above
+    // deriveHiddenPotentialScore in player-potential-service.ts): the target PO
+    // star is drawn UNIFORMLY over [CA-star, 5], not as a small fixed gap on top
+    // of CA. For a weak player (~0.65★ CA here) that means the median headroom
+    // lands near the MIDPOINT of [CA, 5] (~2.8★ → score ~50), not close to their
+    // own CA score — by design, so weak/young players get real, broadly spread
+    // development reserve (commit message: 1★ players average +2.2★ headroom).
+    // This is intentional per-model design, not the old `max(rawRoll, CA)` auto-lift
+    // bug (which pinned everyone to a suspiciously stable ~2.5★ floor).
     const scores = Array.from({ length: 40 }, (_, index) =>
       buildPlayerPotentialRecord({
         saveId: "weak-upside",
@@ -81,9 +86,11 @@ describe("potential derivation — spread and floor", () => {
     );
     scores.sort((a, b) => a - b);
     const median = scores[Math.floor(0.5 * (scores.length - 1))]!;
-    // No auto-lift: the typical weak player stays low (near their own ability).
-    expect(median).toBeLessThan(45);
-    // ...but upside genuinely exists — some weak players roll meaningful headroom.
+    // Median sits around the [CA,5]-midpoint (~50), not pinned near CA (~24) and
+    // not pinned near the 5★ ceiling (~78+) — confirms it's a real uniform draw.
+    expect(median).toBeGreaterThan(40);
+    expect(median).toBeLessThan(60);
+    // ...and upside genuinely exists — some weak players roll meaningful headroom.
     expect(Math.max(...scores)).toBeGreaterThan(48);
   });
 

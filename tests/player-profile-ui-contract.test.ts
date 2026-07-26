@@ -18,7 +18,16 @@ describe("player profile ui contract", () => {
         fs.readFile(
           path.join(process.cwd(), "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx"),
           "utf8",
-        ),
+        ).then(async (scopeOnly) => {
+          // player-profile-session-cache / getCachedPlayerProfileData moved into
+          // their own hook (use-foundation-persistence-actions.ts) during the
+          // perf split; combine so `scopeText` still reflects real wiring.
+          const persistenceActionsText = await fs.readFile(
+            path.join(process.cwd(), "lib/foundation/tabs/use-foundation-persistence-actions.ts"),
+            "utf8",
+          );
+          return `${scopeOnly}\n${persistenceActionsText}`;
+        }),
         fs.readFile(path.join(process.cwd(), "lib/foundation/player-profile-service.ts"), "utf8"),
         fs.readFile(path.join(process.cwd(), "lib/foundation/projected-class-preview.ts"), "utf8"),
         fs.readFile(path.join(process.cwd(), "app/foundation/PlayerDetailDrawer.tsx"), "utf8"),
@@ -43,6 +52,14 @@ describe("player profile ui contract", () => {
     expect(profileText).toContain("trainingRow");
     expect(profileText).toContain("onSetTrainingMode");
     expect(scopeText).toContain("player-profile-session-cache");
+    // NOTE: `getCachedPlayerProfileData` / `setCachedPlayerProfileData` (the
+    // read/write side of lib/foundation/player-profile-session-cache.ts) are
+    // not imported/called anywhere in app/ or lib/ — only
+    // `invalidatePlayerProfileSessionCache` (the cache-busting side) is still
+    // wired up, in use-foundation-persistence-actions.ts. The session-cache
+    // read/write optimization itself looks disconnected — a real feature loss
+    // (see final report) — so this assertion is intentionally left
+    // unchanged/red rather than papered over.
     expect(scopeText).toContain("getCachedPlayerProfileData");
     expect(drawerText).toContain("BudgetedMediaImage");
     expect(foundationText).toContain("shouldLoadSeasonArchive");

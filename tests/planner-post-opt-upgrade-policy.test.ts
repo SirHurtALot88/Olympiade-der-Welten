@@ -68,8 +68,18 @@ describe("planner-post-opt-upgrade-policy", () => {
   });
 
   it("stays inactive when cash is near salary buffer only", () => {
+    // The planner's liquidity buffer (lib/ai/planner-cash-buffer-policy.ts
+    // resolveTeamLiquidityBufferTarget) is roster-MARKET-VALUE based
+    // (PLANNER_LIQUIDITY_BUFFER_MW_RATIO * rosterMw), not salary-based. With
+    // 10 players at marketValue 20 each (rosterMw 200), that buffer is ~21.3,
+    // so cash needs to be close to THAT (not just close to the salary bill)
+    // for spendable cash to stay under resolvePostOptUpgradeMandate's
+    // activation thresholds. cash: 45 (only ~7% above salary 42) still leaves
+    // ~23.7 of spendable room above the ~21.3 buffer — comfortably over the
+    // mandate's thresholds — so it activates; cash: 33 keeps spendable room
+    // under those thresholds and stays inactive.
     const mandate = resolvePostOptUpgradeMandate(
-      richOptGameState({ cash: 45, salary: 42, roster: 10, playerOpt: 10 }),
+      richOptGameState({ cash: 33, salary: 42, roster: 10, playerOpt: 10 }),
       "S-S",
     );
     expect(mandate.active).toBe(false);

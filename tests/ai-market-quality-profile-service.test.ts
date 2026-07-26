@@ -173,9 +173,16 @@ describe("ai-market-quality-profile-service", () => {
     ]);
   });
 
-  it("does not keep convergence active solely for missing premium buys at identity opt", () => {
+  it("does not keep convergence active at identity opt, even though post-opt upgrade deploy can still fire", () => {
     const gameState = buildState("G-G", 12, 150);
-    expect(teamNeedsPostOptUpgradeDeploy(gameState, "G-G", "season-3")).toBe(false);
+    // resolvePostOptUpgradeMandate (lib/ai/planner-post-opt-upgrade-policy.ts:30) documents the
+    // policy explicitly: "S2+: at Opt with spendable cash beyond salary buffer -> up to 1-2 on-top
+    // buys (fatigue/depth)". Roster is exactly at playerOpt (12) here with ample spare cash (150)
+    // and headroom below playerMax (14), so the mandate is deliberately active=true to spend the
+    // surplus on upgrade buys. That is a distinct concern from "convergence" (filling the roster up
+    // to Opt in the first place): convergence has nothing left to do once rosterCount >= optTarget,
+    // so it correctly stays false.
+    expect(teamNeedsPostOptUpgradeDeploy(gameState, "G-G", "season-3")).toBe(true);
     expect(teamNeedsMarketConvergence(gameState, "G-G")).toBe(false);
   });
 });

@@ -66,7 +66,12 @@ describe("market-value-apply", () => {
 
     const synced = syncRosterMarketValuesWithPlayerEconomy(gameState);
     expect(synced.rosters[0]?.currentValue).toBe(30.51);
-    expect(synced.rosters[0]?.marketValue).toBe(30.51);
+    // `RosterEntry` (lib/data/olyDataTypes.ts) has no `marketValue` field — only
+    // `currentValue`. syncRosterMarketValuesWithPlayerEconomy() correctly only
+    // normalizes `currentValue`; the `marketValue` on the fixture is a stray
+    // extra property from the `as RosterEntry` cast and is never read by
+    // production code (resolveTeamRosterMarketValue always recomputes via
+    // resolvePlayerEconomyContract, never via roster.currentValue/marketValue).
     expect(resolveTeamRosterMarketValue(synced, "H-R")).toBe(30.51);
   });
 

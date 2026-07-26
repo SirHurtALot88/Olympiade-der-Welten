@@ -78,8 +78,12 @@ function createSmallEmptySeasonOneSave(): PersistedSaveGame {
       .map((team) => ({
         ...team,
         cash: 250,
-        rosterLimit: 4,
+        rosterLimit: 14,
       })),
+    // playerMin/playerOpt hier sind bewusst nur Ausgangswerte für einzelne Tests, die sie gezielt
+    // überschreiben (siehe unten) — `deriveRosterTargets` in lib/foundation/roster-limits.ts
+    // ignoriert Sheet-/Identity-playerMin ohnehin: "Kader-Minimum ist fix 8 für alle Teams"
+    // (FIXED_ROSTER_MIN=8), und playerMax ist über DEFAULT_ROSTER_MAX ebenfalls fix bei 14.
     teamIdentities: seed.teamIdentities
       .filter((identity) => teamIds.includes(identity.teamId))
       .map((identity) => ({
@@ -87,11 +91,19 @@ function createSmallEmptySeasonOneSave(): PersistedSaveGame {
         playerMin: 2,
         playerOpt: 2,
       })),
-    players: seed.players.slice(0, 12).map((player) => ({
-      ...player,
-      marketValue: Math.min(player.marketValue ?? 20, 40),
-      salaryDemand: Math.min(player.salaryDemand ?? 5, 8),
-    })),
+    // WICHTIG: players bewusst NICHT auf eine kleine Teilmenge gekürzt (frühere Version nutzte
+    // `seed.players.slice(0, 12)`). `createGameStateFromSeed` -> `hydrateGameStateMedia` ->
+    // `repairImportedPlayerData` -> `materializeCalculatedEconomyForPlayers`
+    // (lib/player-formulas/imported-player-economy.ts) berechnet marketValue LIGA-RELATIV aus dem
+    // gesamten übergebenen `players`-Array (computeLeagueMarketValueMapFromPlayers). Eine kleine,
+    // nicht repräsentative Teilmenge (z. B. die ersten 12-50 Spieler alphabetisch) verzerrt diese
+    // Perzentil-Rechnung massiv (beobachtet: derselbe Spieler ging von realistischen ~60 MW auf
+    // ~124 MW hoch, weil er in einem winzigen Pool plötzlich zur Spitzengruppe zählte) — das ließ
+    // in den betroffenen Tests praktisch jeden Kandidaten als "nicht leistbar" durchfallen, auch
+    // mit stark erhöhtem Cash. Mit dem VOLLEN Liga-Pool bleiben die Marktwerte realistisch (~30-60
+    // für günstige Spieler), genau wie im echten 32-Team-Spiel. Nur `teams`/`teamIdentities` werden
+    // auf 2 Teams beschränkt, um den Testlauf klein/schnell zu halten.
+    players: seed.players,
     rosters: [],
     contracts: [],
     transferHistory: [],
@@ -186,10 +198,14 @@ describe("chunked redraft topup service", () => {
 
     expect(zaza).toBeDefined();
     expect(mayhemIdentity).toBeDefined();
-    expect(getPlayerAxisValue(zaza!, "pow")).toBe(52.39);
-    expect(getPlayerAxisValue(zaza!, "spe")).toBe(61.36);
-    expect(getPlayerAxisValue(zaza!, "men")).toBe(71.03);
-    expect(getPlayerAxisValue(zaza!, "soc")).toBe(87.57);
+    // Werte an data/generated/oly-player-stats.json angeglichen — der einzige, überall (Draft,
+    // Markt, Scoring) genutzte Datensatz für coreStats, Teil der "Balancing-Arbeit"-Snapshot-Daten
+    // (commit 73dfb83). getPlayerAxisValue liest coreStats hier nur direkt durch (kein
+    // Berechnungsfehler); Zaza Stardusts Charakterwerte selbst wurden neu generiert/rebalanced.
+    expect(getPlayerAxisValue(zaza!, "pow")).toBe(52.48);
+    expect(getPlayerAxisValue(zaza!, "spe")).toBe(61.42);
+    expect(getPlayerAxisValue(zaza!, "men")).toBe(76.62);
+    expect(getPlayerAxisValue(zaza!, "soc")).toBe(87.5);
     const zazaAxes = {
       quality: 100,
       pow: getPlayerAxisValue(zaza!, "pow"),
@@ -199,7 +215,7 @@ describe("chunked redraft topup service", () => {
     };
     expect(
       computePreferredAxisFit(zazaAxes, mayhemIdentity),
-    ).toBe(57.44);
+    ).toBe(57.51);
   });
 
   it("does not treat Zaza Stardust as an M-M premium identity fit", () => {
@@ -279,7 +295,10 @@ describe("chunked redraft topup service", () => {
       confirmToken: CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN,
       mode: "season1_initial_topup",
       target: "playerMin",
-      roundLimit: 3,
+      // Pace ist (dokumentiert, siehe "runs one round..."-Test) höchstens 1 Pick/Team/Runde;
+      // FIXED_ROSTER_MIN=8 (roster-limits.ts) verlangt 8 Spieler/Team, also min. 8 Runden.
+      // roundLimit mit Marge auf 10 gesetzt, damit der Lauf playerMin sicher erreicht.
+      roundLimit: 10,
       outputDir,
     });
 
@@ -465,10 +484,15 @@ describe("chunked redraft topup service", () => {
 
   it("plans playerOpt by default and enters phase B after playerMin", () => {
     const save = createSmallEmptySeasonOneSave();
+    // `deriveRosterTargets` (lib/foundation/roster-limits.ts) klemmt playerMin IMMER auf
+    // FIXED_ROSTER_MIN=8 ("Sheet-/Identity-playerMin wird ignoriert") und playerOpt auf
+    // mindestens playerMin — ein playerOpt unter 8 (wie früher hier: 2) würde also ebenfalls auf
+    // 8 hochgezogen und Phase B (playerMin -> playerOpt) könnte nie greifen. playerOpt hier bewusst
+    // > 8 (und <= playerMax=14) gesetzt, damit Phase B nach dem Erreichen von playerMin=8 sichtbar wird.
     save.gameState.teamIdentities = save.gameState.teamIdentities.map((identity) => ({
       ...identity,
       playerMin: 1,
-      playerOpt: 2,
+      playerOpt: 11,
     }));
     const persistence = createInMemoryPersistence(save);
     const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "chunked-topup-phase-b-test-"));
@@ -481,7 +505,8 @@ describe("chunked redraft topup service", () => {
       confirmToken: CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN,
       mode: "season1_initial_topup",
       target: "playerOpt",
-      roundLimit: 3,
+      // 1 Pick/Team/Runde (siehe "runs one round..."-Test) * playerOpt=11 Runden nötig, Marge auf 13.
+      roundLimit: 13,
       outputDir,
     });
 

@@ -203,6 +203,23 @@ describe("matchday MVP scoring service", () => {
     const points = updatedSave?.gameState.seasonState.standings ?? {};
 
     expect(result.executed).toBe(true);
+    // KNOWN REGRESSION (left red intentionally, do not weaken): `status` comes
+    // back "warning" instead of "applied" because standingsApply.applied is
+    // false (lib/season/matchday-mvp-scoring-service.ts ~line 862-879). Root
+    // cause: lib/resolve/legacy-matchday-readiness.ts's getRequiredCounts()
+    // resolves each discipline's required-player count only from
+    // context.disciplinePlayerCounts (the static, non-schedule-aware
+    // Discipline.playerCount from lib/data/dataAdapter.ts), while the AI
+    // lineup engine and the matchday contract itself
+    // (lib/lineups/lineup-discipline-contract.ts buildMatchdayLineupContract)
+    // correctly use the season-schedule-rolled per-matchday count
+    // (lib/season/season-discipline-schedule.ts "balanced slot buckets"). This
+    // marks correctly AI-built lineups "invalid_lineup", which cascades into
+    // standings-preview's "incomplete_result" and blocks standings apply. Same
+    // root cause documented in tests/matchday-auto-run-service.test.ts, and
+    // independently reproduced via `npm run season:smoke-matchday-auto-run`,
+    // which currently fails the same way — a genuine production regression,
+    // not a fixture issue.
     expect(result.status).toBe("applied");
     expect(result.mutatorMode).toBe("legacy_selected_traits");
     expect([...result.d1Scoreboard, ...result.d2Scoreboard].some((row) => (row.formCardModifier ?? 0) !== 0)).toBe(true);

@@ -7,11 +7,26 @@ describe("matchday summary presenter", () => {
   it("separates matchday ranking from cumulative season ranking and computes rank deltas", () => {
     const gameState = createFreshSeasonOneGameState();
     const [teamA, teamB] = gameState.teams;
-    const rosterA = gameState.rosters.filter((entry) => entry.teamId === teamA?.teamId).slice(0, 2);
-    const rosterB = gameState.rosters.filter((entry) => entry.teamId === teamB?.teamId).slice(0, 2);
 
     expect(teamA).toBeTruthy();
     expect(teamB).toBeTruthy();
+
+    // createFreshSeasonOneGameState() intentionally returns an empty pre-draft
+    // `rosters` array (see lib/game-state/singleplayer-state.ts /
+    // lib/data/dataAdapter.ts's `rosters: []`). This test only exercises the
+    // summary presenter's rank/mutator-bonus math, so top up two roster
+    // entries per team directly rather than pulling in the full lineup/AI
+    // draft machinery other tests use (topUpRostersForLineupMinimum()).
+    const freePlayers = gameState.players.slice(0, 4);
+    gameState.rosters = [
+      { id: "summary-roster-a0", teamId: teamA!.teamId, playerId: freePlayers[0]!.id, contractLength: 2, salary: 5, upkeep: 5, roleTag: "starter", joinedSeasonId: gameState.season.id },
+      { id: "summary-roster-a1", teamId: teamA!.teamId, playerId: freePlayers[1]!.id, contractLength: 2, salary: 5, upkeep: 5, roleTag: "starter", joinedSeasonId: gameState.season.id },
+      { id: "summary-roster-b0", teamId: teamB!.teamId, playerId: freePlayers[2]!.id, contractLength: 2, salary: 5, upkeep: 5, roleTag: "starter", joinedSeasonId: gameState.season.id },
+      { id: "summary-roster-b1", teamId: teamB!.teamId, playerId: freePlayers[3]!.id, contractLength: 2, salary: 5, upkeep: 5, roleTag: "starter", joinedSeasonId: gameState.season.id },
+    ];
+    const rosterA = gameState.rosters.filter((entry) => entry.teamId === teamA?.teamId).slice(0, 2);
+    const rosterB = gameState.rosters.filter((entry) => entry.teamId === teamB?.teamId).slice(0, 2);
+
     expect(rosterA).toHaveLength(2);
     expect(rosterB).toHaveLength(2);
 

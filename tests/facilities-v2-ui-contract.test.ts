@@ -6,7 +6,9 @@ import { describe, expect, it } from "vitest";
 describe("facilities v2 ui contract", () => {
   it("uses central grid layout without player lane or coach copy", async () => {
     const [clientText, gridText, foundationText, cssText] = await Promise.all([
-      fs.readFile(path.join(process.cwd(), "app/foundation/facilities-v2/FacilitiesV2Client.tsx"), "utf8"),
+      // FacilitiesV2Client.tsx is now just a thin wrapper; the actual markup
+      // lives in FacilitiesV2NewLook.tsx.
+      fs.readFile(path.join(process.cwd(), "app/foundation/facilities-v2/FacilitiesV2NewLook.tsx"), "utf8"),
       fs.readFile(path.join(process.cwd(), "app/foundation/facilities-v2/FacilityGridCard.tsx"), "utf8"),
       fs.readFile(path.join(process.cwd(), "app/foundation/FoundationShellRouterBody.tsx"), "utf8"),
       fs.readFile(path.join(process.cwd(), "app/globals.css"), "utf8"),

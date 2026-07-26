@@ -41,6 +41,12 @@ describe("velo ui rollout contract", () => {
 
     expect(lineupText).toContain("FoundationPlayerPortraitCard");
     expect(lineupText).toContain("VeloImpactStrip");
+    // NOTE: "legacy-lineup-scoreboard-impact-strip" (part of the same
+    // "legacy-lineup-scoreboard-*" family checked in
+    // tests/gameplay-flow-scan-contract.test.ts) is no longer referenced by
+    // any .tsx file — only as a dead rule in app/globals.css. Looks like the
+    // same "Daten-Ansicht" scoreboard panel removal (real feature loss, see
+    // final report), left red intentionally.
     expect(lineupText).toContain("legacy-lineup-scoreboard-impact-strip");
     expect(drawerText).toContain("player-drawer-axis-chip");
     expect(drawerText).toContain("player-drawer-scouting-disclosure");

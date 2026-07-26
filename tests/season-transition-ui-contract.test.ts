@@ -3,15 +3,27 @@ import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
-const foundationClientPath = path.join(process.cwd(), "app/foundation/FoundationPageClient.tsx");
+// FoundationPageClient.tsx is now a 25-line wrapper; this UI lives in
+// FoundationCockpitPanel.tsx, with the transition/completion fetch calls in
+// cockpit-handlers.ts, and the blocker-reason constant in
+// use-foundation-cross-tab-season-briefing.ts.
+const cockpitPanelPath = path.join(process.cwd(), "app/foundation/cockpit-v2/FoundationCockpitPanel.tsx");
+const cockpitHandlersPath = path.join(process.cwd(), "lib/foundation/tabs/cockpit-handlers.ts");
+const seasonBriefingPath = path.join(
+  process.cwd(),
+  "lib/foundation/tabs/use-foundation-cross-tab-season-briefing.ts",
+);
 const typesPath = path.join(process.cwd(), "lib/data/olyDataTypes.ts");
 
 describe("season transition ui contract", () => {
   it("exposes game phases, close-season button and preview-first wizard", async () => {
-    const [fileText, typeText] = await Promise.all([
-      fs.readFile(foundationClientPath, "utf8"),
+    const [panelText, handlersText, seasonBriefingText, typeText] = await Promise.all([
+      fs.readFile(cockpitPanelPath, "utf8"),
+      fs.readFile(cockpitHandlersPath, "utf8"),
+      fs.readFile(seasonBriefingPath, "utf8"),
       fs.readFile(typesPath, "utf8"),
     ]);
+    const fileText = `${panelText}\n${handlersText}\n${seasonBriefingText}`;
 
     expect(typeText).toContain('export type GamePhase');
     expect(typeText).toContain('"season_active"');

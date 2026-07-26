@@ -164,11 +164,16 @@ describe("legacy lineup draft service", () => {
     await service.saveLegacyLineupDraft(baseParams, entries);
     const preview = await service.calculateLegacyLineupPreview(baseParams);
 
-    expect(preview?.totalScore).toBe(105);
+    // 105 = altes Baseline-Total (Basis 100 + Captain-Bonus 5). Seit commit e04fb06 ("intensity now
+    // adds a real seeded per-player range to the matchday final score") fließt ein deterministischer
+    // Pro-Spieler-Intensitäts-Jitter ("normal" default: -2..+2 pro Spieler, seeded aus
+    // playerId/disciplineId/matchdayId, siehe seededIntensityShare in legacy-lineup-modifiers.ts) mit
+    // ein: d1 (player-1 Captain, player-2) +1.9, d2 (player-3, player-4) +0.8 → Total +2.7 = 107.7.
+    expect(preview?.totalScore).toBe(107.7);
     expect(preview?.disciplineSideScores).toHaveLength(2);
     expect(preview?.disciplineSideScores.find((entry) => entry.disciplineSide === "d1")?.captainBonusTotal).toBe(5);
-    expect(preview?.disciplineSideScores.find((entry) => entry.disciplineSide === "d1")?.totalScore).toBe(35);
-    expect(preview?.disciplineSideScores.find((entry) => entry.disciplineSide === "d2")?.totalScore).toBe(70);
+    expect(preview?.disciplineSideScores.find((entry) => entry.disciplineSide === "d1")?.totalScore).toBe(36.9);
+    expect(preview?.disciplineSideScores.find((entry) => entry.disciplineSide === "d2")?.totalScore).toBe(70.8);
   });
 
   it("keeps preview limited to base score plus captain bonus", async () => {
@@ -183,7 +188,8 @@ describe("legacy lineup draft service", () => {
     expect(preview?.scorePreview.baseScore).toBe(100);
     expect(preview?.scorePreview.fatigueModifier).toBeNull();
     expect(preview?.scorePreview.captainBonusTotal).toBe(5);
-    expect(preview?.totalScore).toBe(105);
+    // Siehe Kommentar im vorherigen Test: +2.7 Pro-Spieler-Intensitäts-Jitter (commit e04fb06).
+    expect(preview?.totalScore).toBe(107.7);
     expect(preview?.missingScores).toEqual([]);
     expect(preview?.validationWarnings).not.toContain(
       "Captain bonus for tdm/d1 follows the strongest selected player score, not a separate stored captain player identity.",

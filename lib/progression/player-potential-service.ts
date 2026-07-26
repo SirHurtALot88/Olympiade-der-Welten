@@ -352,27 +352,15 @@ function getTalentTraitPotentialModifier(player: Pick<Player, "traitsPositive" |
 }
 
 /**
- * Inverse-CDF (quantile) anchors for the hidden CA→PO *headroom* generator,
- * expressed as [cumulativeProbability, gapScorePoints]: the amount of upside a
- * player has ABOVE their current ability, in raw score points (~11–12 points ≈
- * one star on the `CA_PO_STAR_ANCHORS` curve above).
- *
- * Why a GAP curve, not an absolute-PO curve: the previous generator drew an
- * absolute score independent of CA and then floored it at CA (`max(rawRoll, CA)`).
- * Because the raw draw was right-skewed with a median (~46) well ABOVE the median
- * CA, it landed above CA for most low-CA players and pinned their PO at that
- * ~46/2.5★ floor — so a genuine 1★ was AUTOMATICALLY lifted to ~2.5★ potential,
- * the observed CA→PO gap was suspiciously stable, and headroom was negatively
- * coupled to CA. Drawing the gap directly, decoupled from CA, fixes all three:
- * a 1★ with a small draw stays ~1.5★, headroom varies freely, and it no longer
- * tracks CA.
- *
- * Shape: deliberately TIGHT and right-skewed — most players carry only a little
- * headroom (median ~0.5★), the spread is real (so the gap is no longer "stable"),
- * and the elite tail stays THIN so the top is NOT broadened (a 3★→5★ wonder kid
- * is a rare outlier, not a common outcome). Across many seeds a low-/mid-CA player
- * gets, typically: median ~0.5★ · p82 ~1.1★ · p96 ~2★ · p99 ~2.7★ of headroom.
- * Monotonic, piecewise-linear, seed-deterministic (no Math.random).
+ * OVERHOLT / VERALTET (nur zur historischen Einordnung, siehe v6-Block unten für
+ * das aktuell gültige Modell): beschrieb einen ZWISCHENSTAND, der PO als GAP über
+ * CA zog (statt eines absoluten PO-Sterns), um den `max(rawRoll, CA)`-Bug zu
+ * fixen, der schwache Spieler automatisch auf ein ~2.5★-Niveau anhob. Dieses
+ * Gap-Modell wurde seinerseits durch das Star-Uniform-Modell (v6, siehe unten)
+ * ersetzt, das die PO-Verteilung nicht mehr als engen rechtsschiefen Gap zieht,
+ * sondern gleichverteilt über [CA-Stern, 5]. Die hier früher dokumentierten
+ * Kennzahlen (Median-Headroom ~0.5★ etc.) gelten NICHT mehr für den aktuellen
+ * Generator — siehe stattdessen `deriveHiddenPotentialScore` unten.
  */
 /**
  * Star-Uniform-Potenzial (Modell v6).
