@@ -48,6 +48,10 @@ describe("transfermarkt buy api", () => {
     persistenceMocks.getSaveById.mockReturnValue(phaseSave());
   });
 
+  // Der erste `await import(...route)` zieht den kompletten Route-Abhängigkeitsgraph
+  // (Socket-/Room-/Market-/Persistence-Module) nach und braucht in einem frischen
+  // Vitest-Worker ~5,5s — knapp über dem 5000ms-Default. Kein Logik-Hänger, nur der
+  // einmalige Import-Aufwand des ersten Tests; Timeout entsprechend anheben.
   it("uses the local sqlite preview path by default and writes nothing on dry-run", async () => {
     previewLocalTransfermarktBuy.mockReturnValue({
       canBuy: true,
@@ -96,7 +100,7 @@ describe("transfermarkt buy api", () => {
       dryRun: true,
       source: "sqlite",
     });
-  });
+  }, 30000);
 
   it("passes contract shape and offered salary into the preview path", async () => {
     previewLocalTransfermarktBuy.mockReturnValue({
