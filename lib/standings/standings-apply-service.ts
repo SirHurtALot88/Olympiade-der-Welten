@@ -139,12 +139,16 @@ function buildBlockingReasons(preview: StandingsPreviewResult, duplicateDetected
     if (item.resultStatus === "tie_warning" && !forceReplace) {
       reasons.add(`tie_warning:${item.teamId}`);
     }
-    if (
-      item.currentPoints == null ||
-      item.pointsDelta == null ||
-      item.projectedPoints == null ||
-      item.projectedRank == null
-    ) {
+    if (item.currentPoints == null || item.pointsDelta == null || item.projectedPoints == null) {
+      reasons.add(`missing_preview_value:${item.teamId}`);
+    }
+    // `projectedRank == null` bedeutet bei DEFAULT_STANDINGS_TIEBREAKER_MODE = "block_on_tie" NICHT
+    // "Wert fehlt", sondern "exakter Gleichstand, Rang absichtlich offen" (standings-tiebreaker-policy:193).
+    // Dieser Fall MUSS `forceReplace` respektieren wie alle anderen Tie-Regeln oben — sonst blockiert der
+    // Apply trotz Notausgang und ein exakter Gleichstand sperrt den Saisonfortschritt dauerhaft: der
+    // Auto-Run übergibt genau dafür `forceReplace: !stopOnTie` (matchday-auto-run-service), womit der
+    // Cockpit-Schalter "bei Gleichstand nicht stoppen" faktisch wirkungslos war.
+    if (item.projectedRank == null && !forceReplace) {
       reasons.add(`missing_preview_value:${item.teamId}`);
     }
   }
