@@ -37,6 +37,29 @@ export const FATIGUE_INJURY_REHEARSAL_SOURCE = "fatigue_injury_rehearsal_v1" as 
 // die REHA-Recovery-Leiter designt war (L5 = 20 + 12 = 32 absolut, siehe RECOVERY_FLAT_BONUS_BY_LEVEL).
 export const MATCHDAY_FATIGUE_LOAD = 12;
 export const BASE_MATCHDAY_RECOVERY = 20;
+// ROOT-CAUSE FIX (Rotationsspielraum-Kollaps, siehe MD8/MD9-Stall): vorher bekam ein Spieler, der
+// an einem Spieltag EINGESETZT wurde, ausschließlich `+MATCHDAY_FATIGUE_LOAD` und NIEMALS
+// Erholung — nur Bank-Spieler erholten sich (`calculatePlayerRecovery`). Für ein Team, dessen
+// Kadergröße exakt dem kombinierten Spieltagsbedarf entspricht (kein Rotationsspielraum), spielt
+// JEDER Spieler JEDEN Spieltag: Fatigue stieg monoton bis zum Cap (100) und blieb dort für den
+// Rest der Saison hängen -> dauerhaft ~40% Verletzungsrisiko pro Spieltag -> mehrere Spieler
+// DESSELBEN Teams verletzen sich clusterweise -> Kader fällt unter LEGACY_MATCHDAY_MINIMUM_PLAYERS
+// (7) -> Saison bleibt für immer bei `resolve_status:incomplete_lineups` stecken, ohne dass es
+// einen In-Game-Erholungspfad gibt (kein Notfall-Spieler-Fix erlaubt — siehe PR-Beschreibung).
+//
+// Fix: auch EINGESETZTE Spieler erholen sich ein WENIG zwischen den Spieltagen — deutlich weniger
+// als ein Bank-Spieler (der mindestens `BASE_MATCHDAY_RECOVERY` bekommt, plus Facility-/Trainings-
+// Boni), aber genug, damit Dauereinsatz bei NORMALER Intensität zu einem stabilen Fatigue-
+// Gleichgewicht konvergiert statt zum Cap zu ramp-en.
+//
+// ACHTUNG BALANCING-AGENT: `MATCHDAY_PLAYED_RECOVERY` ist bewusst der KONSERVATIVSTE Wert, der den
+// Ramp-auf-100-Bug nachweislich verhindert — exakt gleich `MATCHDAY_FATIGUE_LOAD`, sodass ein
+// Dauereinsatz-Spieler bei normaler Intensität (Multiplier 1.0) netto GENAU NEUTRAL bleibt (0
+// Fatigue-Änderung pro Spieltag), während Pushen (INTENSITY_FATIGUE_MULT.push = 1.15) weiterhin
+// netto Fatigue aufbaut (bewusst — der bestehende Push-Tradeoff bleibt unangetastet) und Schonen
+// (0.75) weiterhin netto abbaut. Bitte gegen die Saison-Simulation retunen, falls z. B. Trait-
+// Multiplikatoren > 1.0 auch bei normaler Intensität noch einen relevanten Netto-Anstieg zulassen.
+export const MATCHDAY_PLAYED_RECOVERY = MATCHDAY_FATIGUE_LOAD;
 
 /**
  * Discipline-side INTENSITY (Schonen/conserve, normal, Pushen/push) must scale the per-player
@@ -661,7 +684,10 @@ function restorePreMatchdayAvailability(input: {
   // Pass 2: Fatigue-Delta je Spieler invertieren, basierend auf der (rekonstruierten)
   // Klassifikation des ersten Apply. Die Klemmung auf [0,100] ist unter der Inversion
   // idempotent: clamp(clamp(F + Load) - Load) == clamp(F + Load) und
-  // clamp(clamp(F - Rec) + Rec) == clamp(F - Rec).
+  // clamp(clamp(F - Rec) + Rec) == clamp(F - Rec). Für Einsatz-Spieler ist der erste Apply
+  // zweistufig (clamp(F + Load), dann clamp(... - MATCHDAY_PLAYED_RECOVERY)) — die Inversion
+  // spiegelt das exakt: zuerst die Erholung zurücknehmen (+Recovery, clamp), dann den Load
+  // zurücknehmen (-Load, clamp).
   const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
   const nextAvailability = restoredInjuryRecords.map((entry) => {
     if (!isActiveRosterPlayer(gameState, entry.playerId, entry.teamId)) {
@@ -675,9 +701,11 @@ function restorePreMatchdayAvailability(input: {
     const useKey = `${entry.teamId}::${entry.playerId}`;
     const wasUsedLoop = usedIntensityByKey.has(useKey) && !view.isUnavailable;
     if (wasUsedLoop) {
-      // Einsatz-Spieler: erster Apply hat +Load (intensitätsskaliert) gerechnet -> zurücknehmen.
+      // Einsatz-Spieler: erster Apply hat +Load (intensitätsskaliert) gerechnet, dann
+      // -MATCHDAY_PLAYED_RECOVERY -> beides in umgekehrter Reihenfolge zurücknehmen.
       const intensity = usedIntensityByKey.get(useKey) ?? "normal";
-      return { ...entry, fatigue: clampFatigue(entry.fatigue - getPlayerMatchdayFatigueLoad(player, intensity)) };
+      const restoredFatigueBeforeRoll = clampFatigue(entry.fatigue + MATCHDAY_PLAYED_RECOVERY);
+      return { ...entry, fatigue: clampFatigue(restoredFatigueBeforeRoll - getPlayerMatchdayFatigueLoad(player, intensity)) };
     }
     // Bank oder verletzt/unavailable: erster Apply hat Recovery abgezogen -> wieder aufaddieren.
     const recovery = calculatePlayerRecovery(gameState, entry.teamId, player.trainingMode);
@@ -781,6 +809,12 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
 
     const recovery = calculatePlayerRecovery(gameState, use.teamId, player.trainingMode);
     const fatigueBeforeRoll = clampFatigue(getPlayerCurrentFatigue(gameState, player, use.teamId) + getPlayerMatchdayFatigueLoad(player, use.intensity));
+    // ROOT-CAUSE FIX: der Injury-Roll bleibt auf dem PEAK-Fatigue-Wert direkt nach dem Einsatz
+    // (`fatigueBeforeRoll`, unverändert -> Risiko-Kurve/Event-Historie bleiben exakt wie vorher).
+    // Der PERSISTIERTE Zustand (was in den nächsten Spieltag übernommen wird) bekommt zusätzlich
+    // `MATCHDAY_PLAYED_RECOVERY` gutgeschrieben, damit Dauereinsatz nicht mehr monoton zum Cap
+    // ramp-t (siehe Konstanten-Kommentar oben).
+    const fatigueAfterPlayedRecovery = clampFatigue(fatigueBeforeRoll - MATCHDAY_PLAYED_RECOVERY);
     const roll =
       injuryRollMap.get(buildMatchdayUseKey(use.teamId, use.playerId)) ??
       resolveMatchdayInjuryRoll({
@@ -825,7 +859,7 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
     nextAvailability = updateAvailability(nextAvailability, {
       playerId: use.playerId,
       teamId: use.teamId,
-      fatigue: fatigueBeforeRoll,
+      fatigue: fatigueAfterPlayedRecovery,
       injuryStatus: roll.result === "injured" ? "injured" : availabilityView.injuryStatus === "recovering" ? "recovering" : "healthy",
       injuryUntilMatchday: roll.result === "injured" ? nextMatchdayId ?? undefined : availabilityView.injuryUntilMatchday,
       injuredAtSeasonId: roll.result === "injured" ? input.seasonId : availabilityView.injuredAtSeasonId,
@@ -833,7 +867,7 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
       injuryReason: roll.result === "injured" ? "fatigue_over_30_after_matchday_use" : availabilityView.injuryReason,
       injuryRiskLastRoll: roll,
     });
-    nextPlayers[playerIndex] = { ...nextPlayers[playerIndex], fatigue: fatigueBeforeRoll };
+    nextPlayers[playerIndex] = { ...nextPlayers[playerIndex], fatigue: fatigueAfterPlayedRecovery };
   }
 
   const injuryHighlights = newEvents

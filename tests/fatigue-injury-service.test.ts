@@ -11,6 +11,8 @@ import {
   getInjuryRiskPercent,
   getPlayerAvailabilityView,
   injuryRiskBands,
+  MATCHDAY_FATIGUE_LOAD,
+  MATCHDAY_PLAYED_RECOVERY,
   normalizeAvailabilityForNewSeason,
   rollInjuryRisk,
 } from "@/lib/fatigue/fatigue-injury-service";
@@ -426,7 +428,9 @@ describe("fatigue injury service", () => {
     const benchPlayer = result.gameState.players.find((player) => player.id === "bench-player");
     const benchAvailability = getPlayerAvailabilityView(result.gameState, "bench-player", "A-A", "md-2");
 
-    expect(usedPlayer?.fatigue).toBe(32);
+    // Root-cause fix: a used player now also recovers (MATCHDAY_PLAYED_RECOVERY == load at
+    // normal intensity), so net fatigue change is 0 instead of ramping by the full +load.
+    expect(usedPlayer?.fatigue).toBe(20);
     expect(benchPlayer?.fatigue).toBe(Math.max(0, Number((48 - recovery.normalRecovery).toFixed(2))));
     expect(benchAvailability.fatigue).toBe(benchPlayer?.fatigue);
     expect(benchAvailability.blocker).toBeNull();
@@ -434,7 +438,16 @@ describe("fatigue injury service", () => {
 
   it("is idempotent under a forceReplace re-apply of the same matchday for used and benched players", () => {
     // Vor-Spieltags-Stand: used-0 (Einsatz, fatigue 20), bench-0 (Bank, fatigue 60).
+    // Einsatz auf "push" gesetzt (statt "normal"): bei normaler Intensität heben sich Load und
+    // MATCHDAY_PLAYED_RECOVERY exakt auf (netto 0), wodurch ein naiver, nicht-invertierter
+    // Doppel-Apply zufällig denselben Wert wie der korrekte ergäbe und die Regression unsichtbar
+    // bliebe. Push (Load > Recovery) hält Load und Recovery unterscheidbar, damit dieser Test
+    // eine tatsächliche Doppel-Anwendung weiterhin aufdeckt.
     const gameState = createGameState("used-0", 20);
+    const usedDraft = gameState.seasonState.lineupDrafts?.[0];
+    if (usedDraft) {
+      (usedDraft as { modifiers?: unknown }).modifiers = { d1: { intensity: "push" }, d2: {} };
+    }
     gameState.players.push({
       id: "bench-0",
       name: "Bench Runner",
@@ -453,7 +466,8 @@ describe("fatigue injury service", () => {
       joinedSeasonId: "season-1",
     } as never);
     const recovery = calculateTeamRecovery(gameState, "A-A");
-    const load = 12;
+    const pushLoad = Number((MATCHDAY_FATIGUE_LOAD * 1.15).toFixed(2)); // 13.8
+    const netPerMatchday = Number((pushLoad - MATCHDAY_PLAYED_RECOVERY).toFixed(2)); // +1.8
 
     const applyParams = {
       saveId: "save-1",
@@ -468,7 +482,7 @@ describe("fatigue injury service", () => {
     const benchFirst = getPlayerAvailabilityView(first.gameState, "bench-0", "A-A", "md-1").fatigue;
     const usedEventFirst = first.injuryEvents.find((event) => event.playerId === "used-0");
 
-    expect(usedFirst).toBe(20 + load);
+    expect(usedFirst).toBe(Number((20 + netPerMatchday).toFixed(2)));
     expect(benchFirst).toBe(Math.max(0, Number((60 - recovery.normalRecovery).toFixed(2))));
 
     // forceReplace: denselben Spieltag erneut auf dem bereits fortgeschriebenen State anwenden.
@@ -481,15 +495,16 @@ describe("fatigue injury service", () => {
     const benchSecond = getPlayerAvailabilityView(second.gameState, "bench-0", "A-A", "md-1").fatigue;
     const usedEventSecond = second.injuryEvents.find((event) => event.playerId === "used-0");
 
-    // Idempotent: identisch zum ersten Apply, NICHT verdoppelt (kein F + 2*Load / doppelte Erholung).
+    // Idempotent: identisch zum ersten Apply, NICHT verdoppelt (kein F + 2*(Load-Recovery)).
     expect(usedSecond).toBe(usedFirst);
-    expect(usedSecond).not.toBe(20 + 2 * load);
+    expect(usedSecond).not.toBe(Number((20 + 2 * netPerMatchday).toFixed(2)));
     expect(benchSecond).toBe(benchFirst);
     expect(benchSecond).not.toBe(Math.max(0, Number((60 - 2 * recovery.normalRecovery).toFixed(2))));
 
-    // event.fatigueBefore / riskPercent / roll bleiben ebenfalls identisch.
+    // event.fatigueBefore / riskPercent / roll bleiben ebenfalls identisch — der Injury-Roll
+    // sieht weiterhin den PEAK-Fatigue-Wert direkt nach dem Einsatz (vor der neuen Erholungsgutschrift).
     expect(usedEventSecond?.fatigueBefore).toBe(usedEventFirst?.fatigueBefore);
-    expect(usedEventSecond?.fatigueBefore).toBe(20 + load);
+    expect(usedEventSecond?.fatigueBefore).toBe(Number((20 + pushLoad).toFixed(2)));
     expect(usedEventSecond?.riskPercent).toBe(usedEventFirst?.riskPercent);
     expect(usedEventSecond?.result).toBe(usedEventFirst?.result);
 
@@ -505,9 +520,9 @@ describe("fatigue injury service", () => {
     );
   });
 
-  it("still accumulates fatigue on a normal advance to the next distinct matchday", () => {
+  it("holds fatigue flat across repeated normal-intensity matchdays instead of accumulating without bound (root-cause regression)", () => {
     const gameState = createGameState("used-0", 20);
-    // md-2-Aufstellung: used-0 wird erneut eingesetzt.
+    // md-2-Aufstellung: used-0 wird erneut eingesetzt (normale Intensität, wie md-1).
     gameState.seasonState.lineupDrafts?.push({
       lineupId: "lineup-2",
       saveId: "save-1",
@@ -536,9 +551,12 @@ describe("fatigue injury service", () => {
       matchdayResultId: "result-md-1",
       timestamp: "2026-06-13T00:00:00.000Z",
     });
-    expect(getPlayerAvailabilityView(first.gameState, "used-0", "A-A", "md-1").fatigue).toBe(32);
+    // Root-cause fix: a played player at normal intensity also recovers MATCHDAY_PLAYED_RECOVERY
+    // (== MATCHDAY_FATIGUE_LOAD), so the net change per matchday is 0 instead of ramping by +load
+    // with zero offsetting recovery (the pre-fix behaviour was `32`).
+    expect(getPlayerAvailabilityView(first.gameState, "used-0", "A-A", "md-1").fatigue).toBe(20);
 
-    // Normales Vorrücken md-1 -> md-2 (isMatchdayReplay weggelassen -> false): akkumuliert weiter.
+    // Normales Vorrücken md-1 -> md-2 (isMatchdayReplay weggelassen -> false): bleibt stabil.
     const second = applyFatigueAndInjuryAfterMatchday({
       gameState: first.gameState,
       saveId: "save-1",
@@ -547,7 +565,78 @@ describe("fatigue injury service", () => {
       matchdayResultId: "result-md-2",
       timestamp: "2026-06-13T00:00:00.000Z",
     });
-    expect(getPlayerAvailabilityView(second.gameState, "used-0", "A-A", "md-2").fatigue).toBe(44);
+    expect(getPlayerAvailabilityView(second.gameState, "used-0", "A-A", "md-2").fatigue).toBe(20);
+  });
+
+  it("never lets a continuously-selected player's fatigue climb without bound, while a benched player still recovers at least as much as before the fix (root-cause regression)", () => {
+    // Team ohne Rotationsspielraum: EIN Spieler wird JEDEN Spieltag über eine volle Saison (10
+    // Spieltage) bei normaler Intensität eingesetzt. Vor dem Fix akkumulierte Fatigue monoton
+    // (+MATCHDAY_FATIGUE_LOAD pro Spieltag, NIE Erholung) bis zum Cap (100) und blieb dort für den
+    // Rest der Saison hängen -> dauerhaft ~40% Verletzungsrisiko/Spieltag. Dieser Test pinnt fest,
+    // dass Dauereinsatz stattdessen konvergiert und klar unterhalb der "hohes Risiko"-Zone bleibt.
+    const matchdayIds = Array.from({ length: 20 }, (_, index) => `md-${index + 1}`);
+    let gameState = createGameState("used-0", 20);
+    (gameState.season as { matchdayIds: string[] }).matchdayIds = matchdayIds;
+    const baseDraft = gameState.seasonState.lineupDrafts?.[0];
+    gameState.seasonState.lineupDrafts = matchdayIds.map((matchdayId, index) => ({
+      ...(baseDraft as NonNullable<typeof baseDraft>),
+      lineupId: `lineup-${index + 1}`,
+      matchdayId,
+    }));
+
+    const fatigueHistory: number[] = [];
+    for (const matchdayId of matchdayIds) {
+      const result = applyFatigueAndInjuryAfterMatchday({
+        gameState,
+        saveId: "save-1",
+        seasonId: "season-1",
+        matchdayId,
+        matchdayResultId: `result-${matchdayId}`,
+        timestamp: "2026-06-13T00:00:00.000Z",
+      });
+      gameState = result.gameState;
+      fatigueHistory.push(getPlayerAvailabilityView(gameState, "used-0", "A-A", matchdayId).fatigue);
+    }
+
+    // Konvergiert (bleibt nach dem ersten Spieltag konstant) statt monoton bis zum Cap zu wachsen.
+    expect(fatigueHistory[fatigueHistory.length - 1]).toBe(fatigueHistory[fatigueHistory.length - 2]);
+    expect(new Set(fatigueHistory).size).toBe(1);
+    // Bleibt klar unterhalb des Injury-Risk-Anker-Bands ab Fatigue 30 (vorher: Sättigung bei 100
+    // nach ~7 Spieltagen, siehe MD8/MD9-Stall-Report).
+    expect(Math.max(...fatigueHistory)).toBeLessThan(30);
+    expect(Math.max(...fatigueHistory)).toBe(20);
+
+    // Ein Bank-Spieler erholt sich weiterhin MINDESTENS so stark wie vor dem Fix (unverändert).
+    const benchGameState = createGameState("used-0", 20);
+    benchGameState.players.push({
+      id: "bench-only",
+      name: "Bench Only",
+      className: "Runner",
+      race: "Human",
+      marketValue: 10,
+      salary: 2,
+      fatigue: 60,
+      attributes: {},
+      disciplineRatings: {},
+    } as never);
+    benchGameState.rosters.push({
+      teamId: "A-A",
+      playerId: "bench-only",
+      role: "bench",
+      joinedSeasonId: "season-1",
+    } as never);
+    const benchRecovery = calculateTeamRecovery(benchGameState, "A-A");
+    const benchResult = applyFatigueAndInjuryAfterMatchday({
+      gameState: benchGameState,
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-1",
+      matchdayResultId: "result-md-1",
+      timestamp: "2026-06-13T00:00:00.000Z",
+    });
+    const benchPlayer = benchResult.gameState.players.find((player) => player.id === "bench-only");
+    expect(benchPlayer?.fatigue).toBe(Math.max(0, Number((60 - benchRecovery.normalRecovery).toFixed(2))));
+    expect(benchRecovery.normalRecovery).toBeGreaterThan(MATCHDAY_PLAYED_RECOVERY);
   });
 
   it("returns a recovering player to healthy once the recovery window has elapsed within the season", () => {
