@@ -121,7 +121,12 @@ export function buildFoundationActivities(input: FoundationActivityInput): Found
     });
   } else if (
     input.aiPreseasonRun &&
-    (input.aiPreseasonRun.status === "failed" || input.aiPreseasonRun.blockingReasons.length > 0)
+    (input.aiPreseasonRun.status === "failed" ||
+      // Blocker allein reichen NICHT für das rote "blockiert"-Banner: Ein Setup-Draft lässt
+      // immer erwartete Aktionen blockiert (Einsatzliste/Training laufen erst NACH dem Kader-Draft).
+      // Nur wenn der Lauf zusätzlich NICHT alle Teams abgeschlossen hat, hängt er echt fest.
+      (input.aiPreseasonRun.blockingReasons.length > 0 &&
+        input.aiPreseasonRun.aiTeamsCompleted < input.aiPreseasonRun.aiTeamsTotal))
   ) {
     // Der Lauf ist NICHT mehr aktiv, aber abgebrochen/blockiert stehengeblieben: persistente
     // rote Zeile mit den echten Gründen, damit man oben sofort sieht WARUM (Debugging).

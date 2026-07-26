@@ -344,7 +344,11 @@ function resolveOnboardingStepStatus(
     return hasTransfers ? "completed" : "ready";
   }
   if (stepId === "fill_roster") {
-    return rosterCount >= targetRosterCount ? "completed" : "ready";
+    // Ab Minimum-Kader (spielfähig) gilt der Schritt als erledigt — konsistent mit `buy_players`
+    // und der Absicht "Leertaste führt weiter". Vorher wurde der volle Optimal-Kader
+    // (`targetRosterCount`, z. B. 14) verlangt, sodass "Kader auffüllen" auch bei bereits
+    // spielfähigem Kader (z. B. 9/14) für immer als offener nächster Schritt hängen blieb.
+    return rosterCount >= Math.min(PRESEASON_BUY_MINIMUM_ROSTER, targetRosterCount) ? "completed" : "ready";
   }
   if (stepId === "training_facilities") {
     return activeTeamTrainingComplete(gameState, activeTeamId) ? "completed" : "ready";
