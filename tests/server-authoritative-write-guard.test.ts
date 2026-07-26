@@ -285,6 +285,104 @@ describe("server-authoritative room write guard", () => {
     ).toBe(true);
   });
 
+  it("S10: reconnect via rejoinRoom clears participant_offline without duplicating the participant or changing team ownership, and still rejects a bogus seat token", () => {
+    const created = createRoom("s10-socket-a", {
+      displayName: "Chris",
+      saveId: "s10-reconnect-save",
+      preset: "chris_4_rest_ai",
+    });
+    const joined = joinRoom(created.room.roomCode, "s10-socket-b", { displayName: "Franky" });
+    expect(joined.ok).toBe(true);
+    if (!joined.ok) return;
+
+    const chris = joined.room.state.roomParticipants.find((participant) => participant.displayName === "Chris");
+    expect(chris).toBeTruthy();
+    if (!chris) return;
+
+    const participantCountBefore = joined.room.state.roomParticipants.length;
+    const chrisOwnershipBefore = joined.room.state.teamOwnership.filter(
+      (entry) => entry.controllerType === "human" && entry.participantId === chris.participantId,
+    );
+    expect(chrisOwnershipBefore.length).toBeGreaterThan(0);
+
+    // Simulate a brief network hiccup (laptop sleep / wifi blip / dev-server restart): the
+    // transport disconnects and the server marks the seat + participant offline.
+    markDisconnected("s10-socket-a");
+    expect(
+      authorizeServerRoomWrite({
+        roomCode: created.room.roomCode,
+        participantId: chris.participantId,
+        userId: chris.userId,
+        saveId: "s10-reconnect-save",
+        teamId: chrisOwnershipBefore[0]?.teamId,
+        action: "buy",
+      }),
+    ).toMatchObject({ allowed: false, status: 403, reason: "participant_offline" });
+
+    // A wrong/absent seat token must still be rejected while offline - re-identifying with
+    // garbage never resurrects a participant.
+    const bogusRejoin = rejoinRoom(created.room.roomCode, "not-a-real-seat-token", "s10-socket-a-bogus");
+    expect(bogusRejoin.ok).toBe(false);
+    expect(
+      authorizeServerRoomWrite({
+        roomCode: created.room.roomCode,
+        seatToken: "not-a-real-seat-token",
+        saveId: "s10-reconnect-save",
+        teamId: chrisOwnershipBefore[0]?.teamId,
+        action: "buy",
+      }),
+    ).toMatchObject({ allowed: false, status: 401, reason: "participant_missing" });
+
+    // Client reconnects: socket.io re-fires "connect" with a NEW socket id after a successful
+    // reconnection. The Foundation shell now re-emits "rejoinRoom" on every such "connect" (see
+    // lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx), using the seatToken it
+    // still holds from the URL or the `oly-seat:<ROOMCODE>` localStorage fallback. Server-side
+    // this lands as rejoinRoom() rebinding the existing seat/participant to the new socket id.
+    const rejoined = rejoinRoom(created.room.roomCode, created.seat.seatToken, "s10-socket-a-reconnected");
+    expect(rejoined.ok).toBe(true);
+    if (!rejoined.ok) return;
+    expect(rejoined.seat.role).toBe("A");
+    expect(rejoined.seat.participantId).toBe(chris.participantId);
+
+    // No duplicate participant was minted for the reconnect.
+    expect(rejoined.room.state.roomParticipants).toHaveLength(participantCountBefore);
+    expect(
+      rejoined.room.state.roomParticipants.filter((participant) => participant.participantId === chris.participantId),
+    ).toHaveLength(1);
+
+    // Team ownership for the reconnected participant is byte-for-byte unchanged (no re-seating,
+    // no ownership reset).
+    const chrisOwnershipAfter = rejoined.room.state.teamOwnership.filter(
+      (entry) => entry.controllerType === "human" && entry.participantId === chris.participantId,
+    );
+    expect(chrisOwnershipAfter).toEqual(chrisOwnershipBefore);
+
+    // The gameplay write that 403'd while offline now succeeds.
+    expect(
+      authorizeServerRoomWrite({
+        roomCode: created.room.roomCode,
+        participantId: chris.participantId,
+        userId: chris.userId,
+        saveId: "s10-reconnect-save",
+        teamId: chrisOwnershipBefore[0]?.teamId,
+        action: "buy",
+      }).allowed,
+    ).toBe(true);
+
+    // rejoinRoom must be idempotent: e.g. the client's "connect" handler firing twice in quick
+    // succession (or the effect re-running) must never duplicate the participant or touch
+    // ownership again.
+    const rejoinedAgain = rejoinRoom(created.room.roomCode, created.seat.seatToken, "s10-socket-a-reconnected-2");
+    expect(rejoinedAgain.ok).toBe(true);
+    if (!rejoinedAgain.ok) return;
+    expect(rejoinedAgain.room.state.roomParticipants).toHaveLength(participantCountBefore);
+    expect(
+      rejoinedAgain.room.state.teamOwnership.filter(
+        (entry) => entry.controllerType === "human" && entry.participantId === chris.participantId,
+      ),
+    ).toEqual(chrisOwnershipBefore);
+  });
+
   it("scopes team-settings writes (identity/control) to the owning participant only", () => {
     const created = createRoom("guard-team-settings-a", {
       displayName: "Chris",

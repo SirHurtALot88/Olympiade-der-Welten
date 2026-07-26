@@ -1225,15 +1225,29 @@ export function useFoundationShellRouterBodyScope({
       });
     }
     socket.on("roomError", handleRoomError);
-    socket.emit("rejoinRoom", {
-      roomCode: currentRoomContext.roomCode,
-      seatToken: currentRoomContext.seatToken,
-    });
+
+    // S10: (Re-)identify this socket with the room/seat. Socket.io re-fires "connect"
+    // after every successful reconnection (transport blip, laptop sleep, dev-server
+    // restart) with a NEW socket id — without re-emitting rejoinRoom here, the server
+    // (see markDisconnected/rejoinRoom in lib/room/room-store.ts) keeps the participant
+    // "offline" forever and every gameplay write 403s with participant_offline until a
+    // full manual reload. rejoinRoom is idempotent (findSeatByToken rebinds the existing
+    // seat/participant by seatToken, it never mints a new participant), so re-emitting it
+    // on every connect - including the initial one - is safe.
+    function handleConnect() {
+      socket.emit("rejoinRoom", {
+        roomCode: currentRoomContext.roomCode,
+        seatToken: currentRoomContext.seatToken,
+      });
+    }
+    socket.on("connect", handleConnect);
+    handleConnect();
 
     return () => {
       socket.off("roomJoined", handleRoomJoined);
       socket.off("roomState", handleRoomState);
       socket.off("roomError", handleRoomError);
+      socket.off("connect", handleConnect);
     };
   }, [roomContext]);
 
