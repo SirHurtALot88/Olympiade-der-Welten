@@ -24,6 +24,7 @@ import {
   mapArchetypeToCurveShape,
 } from "@/lib/sponsor/sponsor-curve-shapes";
 import { buildOfferRankPayoutLadderPreview } from "@/lib/sponsor/sponsor-economy-calibration";
+import { SponsorRankLadder } from "@/components/foundation/sponsor/SponsorRankLadder";
 import { describeSponsorOfferModules } from "@/lib/sponsor/sponsor-modules";
 import { NlDeltaChip, type NlTone } from "@/components/foundation/new-look";
 
@@ -348,23 +349,6 @@ export function SponsorOfferCardNewLook({
       <div className="nl-sponsor-reward-tiles" aria-label="Vertragskomponenten">
         {standardComponents.map((component) => {
           if (component.kind === "rank") {
-            const tierRows = buildSponsorRankTierRows({
-              baseCash,
-              // Audit #4: Gewinnstufen aus der echten curveShape-Leiter (== Settlement), nicht aus
-              // generischer Meilenstein-Gewichtung von component.rewardCash.
-              rankLadder: offerRankPayoutLadder,
-              includeFloorRung: true,
-            });
-            // #79: höchste Stufe, deren Rang-Schwelle der aktuelle Liga-Rang
-            // erfüllt (Meilensteine sind aufsteigend schwerer sortiert).
-            let currentTierIndex = -1;
-            if (currentTeamRank != null) {
-              tierRows.forEach((row, index) => {
-                if (currentTeamRank <= row.rankAt) {
-                  currentTierIndex = index;
-                }
-              });
-            }
             return (
               <div key={component.componentId} className="nl-sponsor-reward-tile is-rank">
                 <div className="nl-sponsor-reward-tile-head">
@@ -375,35 +359,12 @@ export function SponsorOfferCardNewLook({
                     <small className="nl-sponsor-rank-current-hint">Aktuell #{currentTeamRank}</small>
                   ) : null}
                 </div>
-                <ul className="nl-sponsor-rank-ladder" data-testid="sponsor-rank-tier-list">
-                  {/* #? Meister (höchste Stufe) oben anzeigen — die Leiter wird von
-                      stark→schwach gerendert, während rankAt-Index/Balkenbreite an der
-                      Tier-Stärke (Meister = voller Balken) hängen bleiben. */}
-                  {tierRows
-                    .map((row, tierIndex) => ({ row, tierIndex }))
-                    .reverse()
-                    .map(({ row, tierIndex }) => {
-                      const isReached = currentTierIndex >= 0 && tierIndex <= currentTierIndex;
-                      const isCurrent = tierIndex === currentTierIndex;
-                      return (
-                      <li
-                        key={row.label}
-                        className={`nl-sponsor-rank-rung${isReached ? " is-reached" : ""}${isCurrent ? " is-current" : ""}`}
-                      >
-                        <span
-                          className="nl-sponsor-rank-rung-bar"
-                          aria-hidden="true"
-                          style={{ width: `${Math.round(((tierIndex + 1) / tierRows.length) * 100)}%` }}
-                        />
-                        <span className="nl-sponsor-rank-rung-label">
-                          {row.label}
-                          {isCurrent ? <span className="nl-sponsor-rank-rung-live">● aktuell</span> : null}
-                        </span>
-                        <span className="nl-sponsor-rank-rung-payout nl-tnum">{formatCash(row.absolutePayout)}</span>
-                      </li>
-                      );
-                    })}
-                </ul>
+                <SponsorRankLadder
+                  baseCash={baseCash}
+                  rankLadder={offerRankPayoutLadder}
+                  currentTeamRank={currentTeamRank}
+                  formatCash={formatCash}
+                />
                 {/* P3 — Überperformance-Modul (familien-differenziert) als konkrete, bezifferte Zeile unter der
                     Rang-Leiter: Rate je Platz über dem Erwartungsrang + Cap, exakt die beim Signieren
                     eingefrorenen Werte (Anzeige == Settlement). Sponsoren OHNE das Modul (Sicherheits-Familie

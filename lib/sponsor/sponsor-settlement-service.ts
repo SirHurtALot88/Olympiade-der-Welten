@@ -90,6 +90,10 @@ function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract)
         });
         continue;
       }
+      // Sponsorengeld flieszt ausschliesslich hier, am Saisonende — inklusive der vollen Basis.
+      // `baseFirstPaid` kann nur noch bei ALTVERTRAEGEN gesetzt sein: frueher zahlte
+      // `chooseSponsorOffer` beim Unterschreiben sofort die halbe Basisrate aus. Fuer solche
+      // Vertraege bleibt es bei der zweiten Haelfte, sonst wuerde die Basis doppelt ausgezahlt.
       const payout = contract.payouts.baseFirstPaid
         ? roundCash(component.rewardCash / 2)
         : roundCash(component.rewardCash);

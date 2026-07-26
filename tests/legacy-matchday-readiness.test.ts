@@ -10,6 +10,13 @@ function createContext(input: {
   d2Required: number;
   d1Selected?: number;
   d2Selected?: number;
+  /**
+   * Generische Disziplin-Slotzahlen, falls sie von den spielplan-aktuellen (seitenspezifischen)
+   * abweichen sollen. Default: identisch — genau deshalb konnte die Abweichung frueher nie
+   * auffallen (siehe Regressionstest unten).
+   */
+  genericD1?: number;
+  genericD2?: number;
 }): LegacyLineupLoadedContext {
   const d1Selected = input.d1Selected ?? input.d1Required;
   const d2Selected = input.d2Selected ?? input.d2Required;
@@ -37,8 +44,8 @@ function createContext(input: {
     teamId: "A-A",
     entries,
     disciplinePlayerCounts: {
-      "mini-dm": input.d1Required,
-      fechten: input.d2Required,
+      "mini-dm": input.genericD1 ?? input.d1Required,
+      fechten: input.genericD2 ?? input.d2Required,
     },
     disciplineSidePlayerCounts: {
       "mini-dm::d1": input.d1Required,
@@ -217,5 +224,37 @@ describe("legacy matchday readiness", () => {
     });
 
     expect(isLegacyLineupDraftComplete(context)).toBe(true);
+  });
+
+  it("uses the schedule's per-side slot counts, not the generic discipline counts (matchday could not be applied)", () => {
+    // Realfall aus einem echten Spielstand: der Spielplan setzt an diesem Spieltag Time Trial mit 2
+    // und Breaking mit 6 Slots an, die Disziplinen tragen generisch aber je 4. Die SUMME ist in
+    // beiden Faellen 8 -- deshalb meldete jede Gesamt-Pruefung weiterhin "8/8 bereit" und der Fehler
+    // blieb unsichtbar. Er trat nur pro Seite auf.
+    //
+    // Die Resolve-Variante las ausschliesslich die generischen Zahlen und verlangte dadurch 4/4 statt
+    // 2/6 -> "wrong_player_count" -> "invalid_lineup". Folge im Spiel: das Anwenden schrieb JEDES
+    // Team als invalid_lineup ins gespeicherte Spieltagsergebnis (teamsReady 0/32), die
+    // Standings-Vorschau leitete daraus "incomplete_result" ab und die Tabellen-Uebernahme war
+    // blockiert -- der Spieltag liess sich nicht abschliessen. Die Vorschau war nie betroffen, weil
+    // sie die lineups-Variante nutzt; diese Diskrepanz hat den Bug getarnt.
+    const context = createContext({
+      activePlayersCount: 8,
+      d1Required: 2,
+      d2Required: 6,
+      genericD1: 4,
+      genericD2: 4,
+    });
+
+    const lineupReadiness = buildLineupReadiness(context);
+    const resolveReadiness = buildResolveReadiness(context);
+
+    expect(lineupReadiness.readinessStatus).toBe("ready");
+    expect(resolveReadiness.readinessStatus).toBe("ready");
+    expect(resolveReadiness.reasonCodes).not.toContain("wrong_player_count");
+    // Beide Implementierungen muessen sich auf dieselbe Anforderung einigen, sonst driften
+    // Vorschau und Anwendung wieder auseinander.
+    expect(resolveReadiness.requiredTotalUniquePlayers).toBe(8);
+    expect(resolveReadiness.requiredTotalUniquePlayers).toBe(lineupReadiness.requiredTotalUniquePlayers);
   });
 });

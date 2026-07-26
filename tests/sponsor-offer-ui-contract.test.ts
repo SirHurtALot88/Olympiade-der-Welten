@@ -5,11 +5,12 @@ import { describe, expect, it } from "vitest";
 
 describe("sponsor offer ui contract", () => {
   it("renders challenge sponsor cards with axis chips and difficulty badges (new-look)", async () => {
-    const [foundationText, sponsorsText, newLookText, cardText, cssText, presenterText] = await Promise.all([
+    const [foundationText, sponsorsText, newLookText, cardText, ladderText, cssText, presenterText] = await Promise.all([
       fs.readFile(path.join(process.cwd(), "app/foundation/prize-v2/FoundationPrizeFinanceHost.tsx"), "utf8"),
       fs.readFile(path.join(process.cwd(), "app/foundation/sponsors-v2/FoundationSponsorsPanel.tsx"), "utf8"),
       fs.readFile(path.join(process.cwd(), "app/foundation/sponsors-v2/FoundationSponsorsNewLook.tsx"), "utf8"),
       fs.readFile(path.join(process.cwd(), "components/foundation/sponsor/SponsorOfferCardNewLook.tsx"), "utf8"),
+      fs.readFile(path.join(process.cwd(), "components/foundation/sponsor/SponsorRankLadder.tsx"), "utf8"),
       fs.readFile(path.join(process.cwd(), "app/globals.css"), "utf8"),
       fs.readFile(path.join(process.cwd(), "lib/sponsor/sponsor-offer-presenter.ts"), "utf8"),
     ]);
@@ -24,12 +25,19 @@ describe("sponsor offer ui contract", () => {
     expect(cardText).toContain("sponsor-challenge-panel");
     expect(cardText).toContain("nl-sponsor-axis-chip");
     expect(cardText).toContain("nl-sponsor-difficulty");
-    expect(cardText).toContain("sponsor-rank-tier-list");
+    // Die Gewinnstufen-Leiter liegt jetzt in der gemeinsamen `SponsorRankLadder`-Komponente, damit
+    // sie auch ausserhalb der eigenen Angebotskarte grafisch dargestellt werden kann (Liga-Detail-
+    // Fenster). Die Karte bindet sie ein, das Markup/testid steckt in der Komponente.
+    expect(cardText).toContain("SponsorRankLadder");
+    expect(ladderText).toContain("sponsor-rank-tier-list");
+    expect(ladderText).toContain("nl-sponsor-rank-rung");
+    // Auch das Liga-Detail-Fenster nutzt dieselbe Leiter statt einer Textzeile.
+    expect(newLookText).toContain("SponsorRankLadder");
     expect(cardText).toContain("Challenge wählen");
 
     // Punkt 2: Golden-Rahmen, garantierte Boden-Stufe, Staged-Bonusziel-Leiter.
     expect(cardText).toContain("is-golden");
-    expect(cardText).toContain("includeFloorRung");
+    expect(ladderText).toContain("includeFloorRung");
     expect(cardText).toContain("sponsor-stage-ladder");
 
     // Feed 2: Performance-Überperformance-Hinweis auf der Karte.
