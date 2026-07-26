@@ -705,6 +705,13 @@ function buildNextSeasonGameState(
 }
 
 function applyFormCardPenaltyToStandings(save: PersistedSaveGame): { save: PersistedSaveGame; warnings: string[] } {
+  // Audit R2/V4: Die Formkarten-Strafe wird jetzt PRIMÄR in der season-completion-Kaskade angewandt (VOR
+  // Snapshot/Rang-Payouts, mit Re-Rank). Wurde sie dort für diese Saison bereits angewandt
+  // (formCardPenaltyAppliedSeasonIds), hier NICHT erneut abziehen (sonst doppelte Strafpunkte). Dieser
+  // Legacy-Pfad bleibt nur als Fallback, falls die Completion übersprungen wurde.
+  if ((save.gameState.seasonState.formCardPenaltyAppliedSeasonIds ?? []).includes(save.gameState.season.id)) {
+    return { save, warnings: [] };
+  }
   const audit = buildFormCardSeasonUsageAudit(save.gameState, save.gameState.season.id);
   const penaltyRows = audit.rows.filter((row) => row.negativePenaltyPoints > 0);
   if (penaltyRows.length === 0) {
