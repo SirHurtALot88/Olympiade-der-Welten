@@ -1679,7 +1679,7 @@ export function createSaveRepository(): SaveRepository {
 
       return persisted;
     },
-    cloneSave({ sourceSaveId, saveId, name, status }) {
+    cloneSave({ sourceSaveId, saveId, name, status, ownerId }) {
       const source = this.getSaveById(sourceSaveId);
       if (!source) {
         throw new Error(`Source save ${sourceSaveId} could not be found.`);
@@ -1697,12 +1697,12 @@ export function createSaveRepository(): SaveRepository {
       }
 
       if (status === "active") {
-        return this.setActiveSave(saveId) ?? persisted;
+        return this.setActiveSave(saveId, ownerId) ?? persisted;
       }
 
       return persisted;
     },
-    createScenarioSnapshot({ sourceSaveId, saveId, name, status, scenarioMeta }) {
+    createScenarioSnapshot({ sourceSaveId, saveId, name, status, scenarioMeta, ownerId }) {
       const source = this.getSaveById(sourceSaveId);
       if (!source) {
         throw new Error(`Source save ${sourceSaveId} could not be found.`);
@@ -1720,7 +1720,7 @@ export function createSaveRepository(): SaveRepository {
       }
 
       if (status === "active") {
-        return this.setActiveSave(saveId) ?? persisted;
+        return this.setActiveSave(saveId, ownerId) ?? persisted;
       }
 
       return persisted;

@@ -84,7 +84,7 @@ export function createPersistenceService(): PersistenceService {
       }
       return result;
     },
-    createSave(name) {
+    createSave(name, ownerId) {
       const save = saveRepository.createSaveFromSeed({
         saveId: createSaveId(),
         name,
@@ -100,7 +100,7 @@ export function createPersistenceService(): PersistenceService {
         }),
       });
 
-      return saveRepository.setActiveSave(manualSave.saveId) ?? manualSave;
+      return saveRepository.setActiveSave(manualSave.saveId, ownerId) ?? manualSave;
     },
     createFreshSeasonOneSave(input) {
       const status = input?.status ?? "active";
@@ -124,17 +124,18 @@ export function createPersistenceService(): PersistenceService {
       });
 
       if (status === "active" && input?.activate !== false) {
-        return saveRepository.setActiveSave(taggedSave.saveId) ?? taggedSave;
+        return saveRepository.setActiveSave(taggedSave.saveId, input?.ownerId) ?? taggedSave;
       }
 
       return taggedSave;
     },
-    cloneSave(sourceSaveId, name) {
+    cloneSave(sourceSaveId, name, ownerId) {
       const clone = saveRepository.cloneSave({
         sourceSaveId,
         saveId: createSaveId(),
         name,
         status: "active",
+        ownerId,
       });
       const manualClone = saveRepository.saveGameState({
         saveId: clone.saveId,
@@ -144,7 +145,7 @@ export function createPersistenceService(): PersistenceService {
           saveCategory: "manual",
         }),
       });
-      return saveRepository.setActiveSave(manualClone.saveId) ?? manualClone;
+      return saveRepository.setActiveSave(manualClone.saveId, ownerId) ?? manualClone;
     },
     createScenarioSnapshot(input) {
       const source = saveRepository.getSaveById(input.sourceSaveId);
@@ -161,6 +162,7 @@ export function createPersistenceService(): PersistenceService {
           sourceSaveId: input.scenarioMeta.sourceSaveId ?? input.sourceSaveId,
           saveCategory: input.scenarioMeta.saveCategory ?? "manual",
         },
+        ownerId: input.ownerId,
       });
     },
     activateSave(saveId, ownerId) {

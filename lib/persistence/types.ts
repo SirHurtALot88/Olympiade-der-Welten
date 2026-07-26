@@ -66,6 +66,8 @@ export type SaveRepository = {
     saveId: string;
     name: string;
     status: SaveStatus;
+    /** See SaveRepository.setActiveSave — threaded to the internal activate-on-clone so cloning never blanket-archives another owner's active save. */
+    ownerId?: string | null;
   }): PersistedSaveGame;
   createScenarioSnapshot(input: {
     sourceSaveId: string;
@@ -73,6 +75,8 @@ export type SaveRepository = {
     name: string;
     status: SaveStatus;
     scenarioMeta: ScenarioMeta;
+    /** See SaveRepository.setActiveSave — threaded to the internal activate-on-snapshot so snapshotting never blanket-archives another owner's active save. */
+    ownerId?: string | null;
   }): PersistedSaveGame;
   saveGameState(input: {
     saveId: string;
@@ -96,14 +100,25 @@ export type PersistenceService = {
   getSaveById(saveId: string): PersistedSaveGame | null;
   getSaveVersionMetadata(saveId: string): SaveVersionMetadata | null;
   saveSingleplayerState(saveId: string, gameState: GameState, input?: { status?: SaveStatus }): PersistedSaveGame;
-  createSave(name: string): PersistedSaveGame;
-  createFreshSeasonOneSave(input?: { saveId?: string; name?: string; status?: SaveStatus; activate?: boolean }): PersistedSaveGame;
-  cloneSave(sourceSaveId: string, name: string): PersistedSaveGame;
+  /** `ownerId` (session user, auth-on only): threaded to the internal activate so creating a save moves ONLY that owner's active-save pointer, never another owner's. */
+  createSave(name: string, ownerId?: string | null): PersistedSaveGame;
+  createFreshSeasonOneSave(input?: {
+    saveId?: string;
+    name?: string;
+    status?: SaveStatus;
+    activate?: boolean;
+    /** See createSave — threaded to the internal activate-on-create. */
+    ownerId?: string | null;
+  }): PersistedSaveGame;
+  /** See createSave — threaded to the internal activate-on-clone. */
+  cloneSave(sourceSaveId: string, name: string, ownerId?: string | null): PersistedSaveGame;
   createScenarioSnapshot(input: {
     sourceSaveId: string;
     name: string;
     status?: SaveStatus;
     scenarioMeta: ScenarioMeta;
+    /** See createSave — threaded to the internal activate-on-snapshot. */
+    ownerId?: string | null;
   }): PersistedSaveGame;
   /** See SaveRepository.setActiveSave — activates per-owner (no blanket archive) or globally. */
   activateSave(saveId: string, ownerId?: string | null): PersistedSaveGame | null;

@@ -564,9 +564,14 @@ export function applyNewGameSetup(
 
   const saveId = `new-game-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const prepared = buildNewGameStateFromBaseline({ ...input, saveId });
+  // ownerId threaded here too (not just the activateSave call below): createFreshSeasonOneSave
+  // activates by default, and without ownerId that internal activate would hit the GLOBAL branch
+  // (blanket-archive every other active save) before the explicit activateSave call below ever
+  // runs — i.e. the damage would already be done.
   const created: PersistedSaveGame = persistence.createFreshSeasonOneSave({
     saveId,
     name: prepared.preview.saveName,
+    ownerId,
   });
   const saved = persistence.saveSingleplayerState(created.saveId, prepared.gameState);
   persistence.activateSave(saved.saveId, ownerId);

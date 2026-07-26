@@ -1,5 +1,6 @@
 import type Database from "better-sqlite3";
 
+import { getLiveRoomSaveIds } from "@/lib/room/live-room-save-registry";
 import type { SaveStatus } from "@/lib/persistence/types";
 
 export type SaveRetentionBucket = "singleplayer" | "multiplayer";
@@ -101,7 +102,21 @@ export function enforceRollingSaveRetention(
     )
     .all() as SaveRetentionRow[];
 
-  const protectedSaveIdSet = new Set(protectedSaveIds);
+  // A save may be "live" (in active use) without status='active' visible in this call's own
+  // protectedSaveIds argument: another owner's per-user active_saves pointer (see
+  // save-repository.ts setActiveSave), or an in-memory co-op room's bound save (created
+  // "archived" on purpose, see createRoomCoopSave). Rolling retention must never delete those —
+  // a demoted-but-still-in-use save cascading out of the rolling limit is a data-loss bug, not a
+  // cleanup. Union the explicit protect list with every current active_saves pointer and every
+  // live room save id so a write from ONE owner/context can never sweep away another's live save.
+  const activeSavesPointerRows = database.prepare("SELECT DISTINCT save_id FROM active_saves").all() as Array<{
+    save_id: string;
+  }>;
+  const protectedSaveIdSet = new Set([
+    ...protectedSaveIds,
+    ...activeSavesPointerRows.map((row) => row.save_id),
+    ...getLiveRoomSaveIds(),
+  ]);
   const rowsByRetentionKey = new Map<string, SaveRetentionRow[]>();
 
   for (const row of rows) {

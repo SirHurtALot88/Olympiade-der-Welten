@@ -22,6 +22,7 @@ import { buildRoomFlowState, getNextRoomFlowStepId, isSandboxRoomSave } from "@/
 import { findSeatByToken } from "@/lib/room/rejoin";
 import { createSeatToken } from "@/lib/room/seat-tokens";
 import { createRoomCoopSave } from "@/lib/game/new-game-setup-service";
+import { registerLiveRoomSaveId } from "@/lib/room/live-room-save-registry";
 import { applyGameModeOwnership } from "@/lib/foundation/team-control-settings";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
@@ -622,6 +623,12 @@ export function startRoom(
     } else {
       boundSaveId = createRoomCoopSave({ chrisTeamIds, frankyTeamIds, roomCode: room.roomCode }, persistence).saveId;
     }
+
+    // Register the live co-op save so rolling save retention (see save-retention.ts) never
+    // sweeps it out from under the room — it is created "archived" on purpose (see
+    // createRoomCoopSave) so getActiveSave() never returns it, which otherwise leaves it
+    // unprotected against the rolling limit for its retention bucket.
+    registerLiveRoomSaveId(room.roomCode, boundSaveId);
 
     room.state = {
       ...room.state,

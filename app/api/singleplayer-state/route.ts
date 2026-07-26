@@ -422,9 +422,14 @@ export async function POST(request: Request) {
     | null = null;
 
   if (body.action === "create") {
-    save = persistence.createSave(body.name);
+    // Per-user active-save scoping: with auth on, creating a save only moves THIS owner's
+    // pointer and never blanket-archives/repoints the other player's active save. Auth off ->
+    // ownerId null -> unchanged global behavior.
+    const ownerId = await resolveSessionOwnerId();
+    save = persistence.createSave(body.name, ownerId);
   } else if (body.action === "clone") {
-    save = persistence.cloneSave(body.sourceSaveId, body.name);
+    const ownerId = await resolveSessionOwnerId();
+    save = persistence.cloneSave(body.sourceSaveId, body.name, ownerId);
   } else if (body.action === "snapshot") {
     const source = persistence.getSaveById(body.sourceSaveId);
     if (!source) {
@@ -436,10 +441,12 @@ export async function POST(request: Request) {
       sourceSaveId: source.saveId,
       isStableTestPoint: true,
     });
+    const ownerId = await resolveSessionOwnerId();
     save = persistence.createScenarioSnapshot({
       sourceSaveId: source.saveId,
       name: body.name ?? scenarioMeta.label,
       scenarioMeta,
+      ownerId,
     });
   } else if (body.action === "activate") {
     // Per-user active-save scoping: with auth on, activating only moves THIS owner's pointer and
@@ -447,7 +454,8 @@ export async function POST(request: Request) {
     const ownerId = await resolveSessionOwnerId();
     save = persistence.activateSave(body.saveId, ownerId);
   } else if (body.action === "fresh-season-1") {
-    const created = persistence.createFreshSeasonOneSave({ name: body.name });
+    const ownerId = await resolveSessionOwnerId();
+    const created = persistence.createFreshSeasonOneSave({ name: body.name, ownerId });
     // A fresh Season 1 seeds all 32 teams with EMPTY rosters; matchdays cannot resolve until every team has a
     // roster/lineup. The whole-league AI draft (~40s) runs in the BACKGROUND (detached) on this long-lived
     // custom Node server so the "new game" request returns immediately instead of blocking ~40s (which would
