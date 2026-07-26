@@ -6,7 +6,7 @@ import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { calculateFacilityMaintenanceCost, getFacilityConditionStatus } from "@/lib/facilities/facility-condition";
 import {
   applyRecoveryFacilityModifiers,
-  applyTrainingXpFacilityModifiers,
+  describeTrainingXpFacilityEffect,
   calculateFacilityIncome,
   calculateFacilityUpkeep,
   getAnalyticsForecastQuality,
@@ -468,7 +468,7 @@ export function useFoundationCrossTabTraining(input: {
     const developmentTrainingBonusPct = input.selectedTeam
       ? getTeamDevelopmentTrainingBonusPct(input.gameState, input.selectedTeam.teamId)
       : 0;
-    const trainingXp = applyTrainingXpFacilityModifiers(
+    const trainingXp = describeTrainingXpFacilityEffect(
       trainingForecastSummary.trainingXp,
       input.selectedTeamFacilityState,
       {

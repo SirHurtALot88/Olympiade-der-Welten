@@ -212,6 +212,13 @@ function finalRankForTeam(gameState: GameState, teamId: string, row: TeamManagem
   return null;
 }
 
+/** Eingefrorener Saison-Start-Tabellenplatz eines Teams (Kellerkind-Referenz), sonst null. */
+function startRankForTeam(gameState: GameState, teamId: string): number | null {
+  const standing = (gameState.seasonState.standings ?? {})[teamId] as { startplatz?: number } | undefined;
+  if (typeof standing?.startplatz === "number" && Number.isFinite(standing.startplatz)) return standing.startplatz;
+  return null;
+}
+
 function expectedRankForTeam(rows: TeamManagementSnapshotRow[], teamId: string): number | null {
   const rowsByTeamId = new Map(rows.map((row) => [row.teamId, row] as const));
   const row = rowsByTeamId.get(teamId);
@@ -554,6 +561,13 @@ export function computeObjectiveProgressMetric(
       const final = finalRankForTeam(gameState, teamId, row);
       if (final == null) return null;
       const teamCount = gameState.teams.length || 32;
+      // Kellerkind-Bedingung: nur Teams, die tatsächlich IN der Kellerzone (Bottom-5, eingefrorener
+      // Saison-Startplatz) begonnen haben, können sie „verlassen". Ohne diese Prüfung zahlte das Ziel
+      // rein anhand des invertierten ENDrangs — ein weak-squad-Team im Mittelfeld kassierte „raus aus
+      // Bottom-5", ohne je im Keller gewesen zu sein. Fehlt der Startplatz (Alt-Save), wird nicht
+      // gegatet (lenientes Verhalten wie zuvor), statt legitime Auszahlungen fälschlich zu nullen.
+      const startRank = startRankForTeam(gameState, teamId);
+      if (startRank != null && startRank < teamCount - 4) return 0; // Start außerhalb Bottom-5 → kein Aufstieg.
       return teamCount - final + 1; // invertierter Rang; Stufen prüfen "raus aus der Kellerzone".
     }
     case "giant_killer": {

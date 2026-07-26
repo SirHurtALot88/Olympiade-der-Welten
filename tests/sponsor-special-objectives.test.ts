@@ -225,11 +225,24 @@ describe("sponsor bonus objectives — new targets (Fable B)", () => {
     const gs = structuredClone(createSingleplayerGameState());
     const teamId = gs.teams[0]!.teamId;
     const teamCount = gs.teams.length;
-    setRank(gs, teamId, teamCount - 5); // gerade aus der Kellerzone heraus
+    setRank(gs, teamId, teamCount - 5); // Endrang: gerade aus der Kellerzone heraus
+    gs.seasonState.standings![teamId]!.startplatz = teamCount; // Start im Keller (Bottom-5) → echter Aufstieg
     const comp = buildBonusObjectiveComponent("cellar_escape", bonusInput(gs, teamId) as never);
     const res = evaluateSpecialComponentStage(gs, teamId, comp);
     expect(res.metric).toBe(teamCount - (teamCount - 5) + 1); // = 6 (invertierter Rang)
     expect(res.fraction).toBeCloseTo(0.4, 5); // erste Stufe
+  }, 60000);
+
+  it("cellar_escape: kein Bonus, wenn das Team nie im Keller startete", () => {
+    const gs = structuredClone(createSingleplayerGameState());
+    const teamId = gs.teams[0]!.teamId;
+    const teamCount = gs.teams.length;
+    setRank(gs, teamId, teamCount - 5); // guter Endrang (raus aus Bottom-5) …
+    gs.seasonState.standings![teamId]!.startplatz = teamCount - 10; // … aber Start deutlich über der Kellerzone
+    const comp = buildBonusObjectiveComponent("cellar_escape", bonusInput(gs, teamId) as never);
+    const res = evaluateSpecialComponentStage(gs, teamId, comp);
+    expect(res.metric).toBe(0); // Kellerkind-Bedingung nicht erfüllt → keine Auszahlung
+    expect(res.fraction).toBeCloseTo(0, 5);
   }, 60000);
 
   it("budget_overachiever: zahlt nur unter dem Kaderwert-Deckel", () => {

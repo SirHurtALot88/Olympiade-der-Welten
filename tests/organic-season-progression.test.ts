@@ -176,15 +176,16 @@ describe("organic season progression", () => {
     const cheapResult = buildOrganicSeasonProgression({ gameState: gameState(cheap), player: cheap });
     const starResult = buildOrganicSeasonProgression({ gameState: gameState(star), player: star });
 
-    // 2026-07-04 balancing pass: ORGANIC_MARKET_VALUE_PRESSURE_RATE reduced 0.0104 -> 0.007, then
-    // auto-tuned 0.007 -> 0.0069 in the training-corridor pass. Financial-discipline B2: the market
-    // value driving regression is soft-kneed above 55, so a 100-MW star pays regression on
-    // softKnee(100)=55+(100-55)*0.35=70.75, not the full 100 — cheap players (<=55 MW) are unchanged;
-    // extreme-value stars are no longer penalized without bound.
-    expect(cheapResult.marketValuePressureTotal).toBeCloseTo(1.65, 1);
-    expect(starResult.marketValuePressureTotal).toBeCloseTo(5.86, 1);
-    expect(cheapResult.marketValuePressurePerAttribute).toBeCloseTo(0.138, 2);
-    expect(starResult.marketValuePressurePerAttribute).toBeCloseTo(0.488, 2);
+    // ORGANIC_MARKET_VALUE_PRESSURE_RATE ist auto-getunt; der letzte Balancing-Pass
+    // setzte sie auf 0.0102 (= 1,02 % vom Marktwert pro Attribut, ×12 Attribute für
+    // den Total). Financial-discipline B2: der regression-treibende Marktwert ist über
+    // 55 soft-gekniet, ein 100-MW-Star zahlt auf softKnee(100)=55+(100-55)*0.35=70.75,
+    // nicht auf volle 100 — günstige Spieler (<=55 MW) unverändert, Extrem-Stars nicht
+    // grenzenlos bestraft. Werte: cheap 20*0.0102*12=2.45, star 70.75*0.0102*12=8.66.
+    expect(cheapResult.marketValuePressureTotal).toBeCloseTo(2.45, 1);
+    expect(starResult.marketValuePressureTotal).toBeCloseTo(8.66, 1);
+    expect(cheapResult.marketValuePressurePerAttribute).toBeCloseTo(0.204, 2);
+    expect(starResult.marketValuePressurePerAttribute).toBeCloseTo(0.722, 2);
     expect(starResult.marketValuePressurePerAttribute).toBeGreaterThan(cheapResult.marketValuePressurePerAttribute);
     expect(starResult.netSetpoints).toBeLessThan(cheapResult.netSetpoints);
   });

@@ -2,7 +2,7 @@ import { useMemo } from "react";
 
 import { buildTeamPlayerTrainingLoadPlanMap, type AiPlayerTrainingLoadPlan } from "@/lib/ai/ai-player-training-load-service";
 import type { GameState, Team, TeamFacilityCollection } from "@/lib/data/olyDataTypes";
-import { applyRecoveryFacilityModifiers, applyTrainingXpFacilityModifiers } from "@/lib/facilities/facility-effects";
+import { applyRecoveryFacilityModifiers, describeTrainingXpFacilityEffect } from "@/lib/facilities/facility-effects";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
 import { getTeamDevelopmentTrainingBonusPct } from "@/lib/foundation/team-development-tendency";
@@ -256,7 +256,7 @@ export function useTrainingPanelDerivations(input: UseTrainingPanelDerivationsIn
 
   const trainingFacilityEffectPreview = useMemo(() => {
     const developmentTrainingBonusPct = getTeamDevelopmentTrainingBonusPct(input.gameState, input.selectedTeam.teamId);
-    const trainingXp = applyTrainingXpFacilityModifiers(trainingForecastSummary.trainingXp, input.selectedTeamFacilityState, {
+    const trainingXp = describeTrainingXpFacilityEffect(trainingForecastSummary.trainingXp, input.selectedTeamFacilityState, {
       developmentTrainingBonusPct,
     });
 

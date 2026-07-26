@@ -154,8 +154,11 @@ describe("prize money preview", () => {
       projectedCash: 37.9,
       basisCash: 15,
       seasonCash: 76.3,
-      payoutIfTenBetter: 91.4,
-      payoutIfTenWorse: 84.1,
+      // Szenario-Rangwechsel-Bonus wird gegen den eingefrorenen Startrang (11) gemessen, nicht gegen den
+      // Endrang: „+10" klemmt auf Rang 1 → Delta 11−1 = 10 → Bonus 12,84 → 91,4 + 12,84 = 104,2;
+      // „−10" → Rang 11 (= Start) → Delta 0 → kein Bonus → 91,4.
+      payoutIfTenBetter: 104.2,
+      payoutIfTenWorse: 91.4,
       status: "ready",
     });
     expect(result.items[1]).toMatchObject({

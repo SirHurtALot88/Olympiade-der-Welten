@@ -1079,7 +1079,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               ]}
               activeId="control"
               onSelect={(id) => {
-                const targetId = id === "forecast" ? "training-compact-forecast" : "training-compact-controls";
+                // Auf tatsächlich existierende Anker scrollen (vorher zeigten die IDs
+                // ins Leere → Klick tat nichts).
+                const targetId = id === "forecast" ? "training-development-filters" : "foundation-training-compact";
                 document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
               }}
             />

@@ -151,7 +151,7 @@ export type OrganicRegressionBreakdown = {
 // damit der gap-getriebene Beschleuniger den Liga-Ø-Netto nicht über die Zieldecke drückt — der Peak-
 // Korridor (Talente) bleibt im Band, aber der Durchschnittsspieler sinkt zurück auf ~0,25 (Ziel −0,4…0,4).
 export const ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE = 0.3;
-/** 0,7 % vom Marktwert pro Attribut (nicht MVS). Tunable via auto-tune. */
+/** 1,02 % vom Marktwert pro Attribut (nicht MVS). Tunable via auto-tune (letzter Balancing-Pass). */
 export const ORGANIC_MARKET_VALUE_PRESSURE_RATE = 0.0102;
 /**
  * Financial/value discipline (B): the market-value regression term scaled linearly and UNBOUNDED, so a
