@@ -838,6 +838,7 @@ export default function DisciplineStageArena({
         isHost: roomArenaSync.isRoomHost,
         canControl: roomArenaSync.canControlArenaReveal,
         waitingForHost: roomArenaSync.roomRevealWaitingForHost,
+        followsHost: roomArenaSync.roomRevealFollowsHost,
         syncedRound,
         onHostAdvanced: () => roomArenaSync.emitHostRoomArenaAdvance({ d1: 0, d2: 0 }),
         coopGate: {

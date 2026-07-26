@@ -65,7 +65,14 @@ export type UseArenaRoomSyncResult = {
   arenaCoopWaitingNames: string[];
   /** Reveal controls should be enabled/rendered-interactive only when this is true. */
   canControlArenaReveal: boolean;
+  /** Reiner UI-Hinweis: Guest, und der Host hat den Reveal für diese Arena noch nicht gestartet. */
   roomRevealWaitingForHost: boolean;
+  /**
+   * Steuerflag: dieser Client advanced den Reveal nie selbst, sondern folgt den Host-Schritten.
+   * Gilt für JEDEN Guest im Room, unabhängig vom Sync-Status — im Gegensatz zu
+   * `roomRevealWaitingForHost`, das nur bis zum Host-Start true ist.
+   */
+  roomRevealFollowsHost: boolean;
   emitHostRoomArenaAdvance: (maxSlotRevealCountByDiscipline: { d1: number; d2: number }) => void;
   emitArenaCoopReadyToggle: () => void;
   emitStartRoomArena: (input: {
@@ -202,6 +209,7 @@ export function useArenaRoomSync(input: UseArenaRoomSyncInput): UseArenaRoomSync
   const canControlArenaReveal = (!isRoomRevealSyncActive || isRoomHost) && !arenaCoopReadyGateActive;
   const roomRevealWaitingForHost =
     isRoomRevealSyncActive && !isRoomHost && (scopedRoomArenaSyncState?.status ?? "idle") === "idle";
+  const roomRevealFollowsHost = isRoomRevealSyncActive && !isRoomHost;
 
   // Stable identities (via useCallback) so consumers can safely list these in
   // effect dependency arrays without re-firing on every render.
@@ -279,6 +287,7 @@ export function useArenaRoomSync(input: UseArenaRoomSyncInput): UseArenaRoomSync
     arenaCoopWaitingNames,
     canControlArenaReveal,
     roomRevealWaitingForHost,
+    roomRevealFollowsHost,
     emitHostRoomArenaAdvance,
     emitArenaCoopReadyToggle,
     emitStartRoomArena,
