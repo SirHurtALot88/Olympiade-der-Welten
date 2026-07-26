@@ -190,3 +190,78 @@ for (const t of SPONSOR_TYPES) {
   );
 }
 console.log(`\nERGEBNIS: ${trapsTotal === 0 && goalsOk ? "alle Abnahmekriterien erfüllt ✓" : "Kriterien verletzt ✗"}`);
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════
+// LIGA-SUMMEN-BEDINGUNG (User-Vorgabe): salaryFactor 1.0 heisst, dass ALLE Sponsoren zusammen
+// ungefähr so viel einbringen wie die Gehälter in Summe kosten. Manche Teams gewinnen, manche
+// verlieren. 0.8 = Liga verliert deutlich (Bottom bleibt abgesichert), 1.2 = gute Gewinne möglich.
+//
+// Gemessene Referenz aus einem echten S1-Save: Σ Gehälter = 2078 (Ø 64.9 bei 32 Teams).
+//
+// Skalierung: die Überlebens-Untergrenze skaliert NICHT mit — sonst wären bei 0.8 genau die Teams
+// tot, die geschützt werden sollen. Die Stauchung kommt komplett aus dem Teil OBERHALB der
+// Untergrenze, d. h. der Verlust trifft die Spitze, nicht den Keller.
+// ══════════════════════════════════════════════════════════════════════════════════════════════════
+const SALARY_SUM_S1 = 2078;
+const clauseEv = (t: SponsorType) => P_MET * t.clause.bonus - (1 - P_MET) * t.clause.malus;
+
+/** Auszahlung eines Teams auf Rang r (Erwartung = Rang, also Δ0) für Typ t, bei Skalierung k. */
+function teamPayout(t: SponsorType, rank: number, k: number) {
+  const base = rankPart(t, rank, rank, offsetFor(t.name, rank)) + clauseEv(t) + SPECIAL_TYPICAL;
+  return FLOOR + (base - FLOOR) * k; // Untergrenze bleibt fix, nur der Teil darüber skaliert
+}
+const leagueSum = (k: number) =>
+  Array.from({ length: 32 }, (_, i) => i + 1).reduce(
+    (acc, r) => acc + SPONSOR_TYPES.reduce((a, t) => a + Math.max(FLOOR, teamPayout(t, r, k)), 0) / SPONSOR_TYPES.length,
+    0,
+  );
+
+// k so bestimmen, dass die Liga-Summe bei sf 1.0 die Gehaltssumme trifft
+let kLo = 0, kHi = 5;
+for (let i = 0; i < 200; i++) { const m = (kLo + kHi) / 2; if (leagueSum(m) < SALARY_SUM_S1) kLo = m; else kHi = m; }
+const K1 = (kLo + kHi) / 2;
+
+line();
+console.log(`LIGA-SUMMEN-PRÜFUNG — Ziel bei sf 1.0: Σ Sponsoren ≈ Σ Gehälter (${SALARY_SUM_S1})`);
+line();
+console.log(`  Skalierung k(1.0) = ${K1.toFixed(3)}  → Σ Sponsoren = ${leagueSum(K1).toFixed(0)}`);
+console.log(`  (Leiter unskaliert ergäbe Σ = ${leagueSum(1).toFixed(0)} — ${leagueSum(1) > SALARY_SUM_S1 ? "zu viel" : "zu wenig"})\n`);
+
+for (const sf of [0.8, 1.0, 1.2]) {
+  // Ziel-Summe der Liga bei diesem Faktor
+  const targetSum = SALARY_SUM_S1 * sf;
+  let a = 0, b = 5;
+  for (let i = 0; i < 200; i++) { const m = (a + b) / 2; if (leagueSum(m) < targetSum) a = m; else b = m; }
+  const k = (a + b) / 2;
+  const perRank = Array.from({ length: 32 }, (_, i) => i + 1).map((r) =>
+    SPONSOR_TYPES.reduce((acc, t) => acc + Math.max(FLOOR, teamPayout(t, r, k)), 0) / SPONSOR_TYPES.length);
+  // Gehalt je Rang: stark korreliert mit Rang. Naeherung aus dem echten Save (min 43.7 … max 87.8)
+  const salaryAt = (r: number) => 87.8 - (87.8 - 43.7) * ((r - 1) / 31);
+  const winners = perRank.filter((p, i) => p > salaryAt(i + 1)).length;
+  console.log(`  sf ${sf.toFixed(1)}  k=${k.toFixed(3)}  Σ=${leagueSum(k).toFixed(0)} (Ziel ${targetSum.toFixed(0)})` +
+    `  Meister=${perRank[0]!.toFixed(0)}  Rang16=${perRank[15]!.toFixed(0)}  Letzter=${perRank[31]!.toFixed(0)}` +
+    `  Teams im Plus: ${winners}/32`);
+  console.log(`        Letzter deckt Mindestgehalt 43.7? ${perRank[31]! >= 43.7 ? "JA ✓" : "NEIN ✗"}` +
+    `   Meister deckt Top-Gehalt 87.8? ${perRank[0]! >= 87.8 ? "JA ✓" : "NEIN ✗"}`);
+}
+
+// Die Liga-Summe oben rechnet mit ERWARTUNGSWERTEN (Klausel zu P erfüllt, Δ0, typisches Sonderziel).
+// Ein echter Meister hat aber überperformt (Δ+1), trifft seine Klausel und erfüllt sein Sonderziel —
+// sein REALISIERTER Wert liegt darum über dem Liga-Erwartungswert. Beide Zahlen sind nötig:
+// die Erwartungswert-Summe für die Liga-Bilanz, der Gutfall für "kann der Meister seine Gehälter zahlen".
+line();
+console.log("MEISTER: Liga-Erwartungswert vs. realisierter Gutfall (Titel + Klausel + Sonderziel)");
+line();
+for (const sf of [0.8, 1.0, 1.2]) {
+  const targetSum = SALARY_SUM_S1 * sf;
+  let a = 0, b = 5;
+  for (let i = 0; i < 200; i++) { const m = (a + b) / 2; if (leagueSum(m) < targetSum) a = m; else b = m; }
+  const k = (a + b) / 2;
+  const good = SPONSOR_TYPES.map((t) => {
+    // Erwartet Rang 3 (Stufe "Top 4"), wird Meister → Δ+1; Klausel erfüllt; Sonderziel voll (12)
+    const raw = rankPart(t, 3, 1, offsetFor(t.name, 3)) + t.clause.bonus + 12;
+    return FLOOR + (raw - FLOOR) * k;
+  });
+  console.log(`  sf ${sf.toFixed(1)}: Meister realisiert ${Math.min(...good).toFixed(0)}–${Math.max(...good).toFixed(0)}` +
+    `   (Top-Gehalt 87.8 gedeckt? ${Math.min(...good) >= 87.8 ? "immer ✓" : Math.max(...good) >= 87.8 ? "nur mit Risiko-Typ ~" : "nie ✗"})`);
+}
