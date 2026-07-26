@@ -1167,7 +1167,10 @@ describe("player detail drawer", () => {
     expect(data?.salary).toBe(12.75);
     expect(data?.normalSalary).not.toBeNull();
     expect(data?.normalSalary).not.toBe(data?.salary);
-    expect(data?.marketValueSource).toBe("calculated_stored");
+    // 72.57 ist der aus coreStats/disciplineRatings zurückgerechnete Marktwert (Round-Trip
+    // des displayMarketValue) → "calculated_preview". "calculated_stored" wäre der rohe
+    // gespeicherte Wert (850) und widerspräche der marketValue-Erwartung oben.
+    expect(data?.marketValueSource).toBe("calculated_preview");
     expect(data?.salarySource).toBe("active_contract");
     expect(data?.contractLength).toBe(3);
     expect(data?.contractLengthSource).toBe("active_contract");
@@ -1852,7 +1855,10 @@ describe("player detail drawer", () => {
     expect(data?.axisCards.every((entry) => entry.seasonPointsRank == null)).toBe(true);
   });
 
-  it("falls back to imported catalog flavor when compact load stripped player lore", () => {
+  it("leaves flavor empty (null) when player lore was stripped — no catalog fallback", () => {
+    // Der Katalog-Fallback (resolvePlayerFlavorDe → oly-player-stats.json) wurde bewusst
+    // aus dem Drawer entfernt, um den 6,6-MB-Seed-Chunk nicht ins Bundle zu ziehen. Ein
+    // Spieler ohne eigenes flavorDe hat daher im Drawer keine Lore mehr (null statt Katalog).
     const player = createPlayer({
       id: "player-1537-kiti",
       name: "Kiti",
@@ -1865,7 +1871,7 @@ describe("player detail drawer", () => {
       manageableTeamIds: ["team-1"],
     });
 
-    expect(data?.flavorDe).toContain("Nebelroute");
+    expect(data?.flavorDe).toBeNull();
   });
 
   it("exposes German flavor lore in drawer data when present on the player", () => {
@@ -1971,12 +1977,13 @@ describe("player detail drawer", () => {
       manageableTeamIds: ["team-1"],
     });
 
-    // Corrected ceiling math (overall-from-axis-stars weights now sum to 1.0,
-    // not 1.10, and mapNumericCeilingToAxisPoStars is the exact inverse of the
-    // forward map) yields 2.5★ here, not the old inflated 3★.
-    expect(data?.potentialOverallStars).toBe(2.5);
+    // Der angezeigte Gesamt-PO-Stern ist bewusst SCORE-basiert (potentialScoreToStars),
+    // damit Header/Kader/Scouting/Liste denselben Stern zeigen — nicht aus den Achsen-
+    // Ceilings abgeleitet. hiddenPotentialScore 80 ≥ Top-Anchor [78, 5.0] ⇒ 5.0★,
+    // Delta ggü. currentOverallStars 4.5 ⇒ +0.5.
+    expect(data?.potentialOverallStars).toBe(5);
     expect(data?.potentialOverallStars).toBeGreaterThanOrEqual(data?.currentOverallStars ?? 0);
-    expect(data?.potentialOverallDelta).toBe(-2);
+    expect(data?.potentialOverallDelta).toBe(0.5);
     expect(data?.potentialAxisStatus.some((entry) => entry.axis === "pow" && entry.routeState === "open")).toBe(true);
     expect(data?.trainingRouteImpact?.note).toContain("POW");
     expect(data?.attributeCeilingPreview.length).toBeGreaterThan(0);

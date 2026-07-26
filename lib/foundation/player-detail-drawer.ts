@@ -489,7 +489,7 @@ export type PlayerDetailDrawerData = {
     seasonName: string;
     teamName: string | null;
     teamCode: string | null;
-    appearances: number;
+    appearances: number | null;
     totalPoints: number | null;
     averageContribution: number | null;
     averageFinalScore: number | null;
@@ -1735,7 +1735,9 @@ function mergeSeasonHistoryWithTransferFallback(
       seasonName: getCanonicalSeasonLabel({ seasonId: transfer.seasonId, seasonName: transfer.seasonLabel }),
       teamName: team?.name ?? null,
       teamCode: team?.shortCode ?? null,
-      appearances: 0,
+      // Transfer-Fallback ohne Performance-Snapshot: alle Leistungswerte sind unbekannt
+      // (→ Striche, nicht Nullen), auch die Einsätze. Siehe warnings unten.
+      appearances: null,
       totalPoints: null,
       averageContribution: null,
       averageFinalScore: null,
@@ -2074,7 +2076,9 @@ function buildHistoryRows(input: {
       teamCode: entry.teamCode,
       appearances: entry.appearances,
       averageFatigue:
-        entry.appearances > 0 ? input.averageFatigueBySeasonId?.get(entry.seasonId ?? "") ?? null : null,
+        (entry.appearances ?? 0) > 0
+          ? input.averageFatigueBySeasonId?.get(entry.seasonId ?? "") ?? null
+          : null,
       totalPoints: entry.totalPoints,
       pow: resolveSeasonDisciplineAreaTotal(disciplineValues, "pow", entry.pow),
       spe: resolveSeasonDisciplineAreaTotal(disciplineValues, "spe", entry.spe),
