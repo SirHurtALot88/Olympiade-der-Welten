@@ -189,7 +189,37 @@ const EXPECTED = [1, 3, 6, 10, 14, 18, 22, 26, 30];
  * schlicht falsch. Mit explizitem Ziel je Stufe ist der Fixpunkt eindeutig, start- und
  * set-unabhaengig, und die Wirtschaftsziele haengen direkt an dieser Tabelle.
  */
-const TARGET_EV = [76.0, 73.6, 71.6, 67.9, 63.8, 59.9, 56.7, 54.1, 53.0];
+const TARGET_EV_BASE = [76.0, 73.6, 71.6, 67.9, 63.8, 59.9, 56.7, 54.1, 53.0];
+/**
+ * Steilheit der Ziel-EV-Leiter. Die Basiswerte hatten eine Schere von 76/53 = 1.43x, die
+ * Gehaltsschere liegt bei 87.8/43.7 = 2.0x — flacher als die Gehaelter heisst zwingend: die Spitze
+ * subventioniert den Keller. Gemessen ergab das bei sf 1.0 einen Ueberschuss von -2 an der Spitze
+ * und +10 im Keller. Vorgabe ist aber, dass die Spitze bei Nullsumme mindestens +10 macht.
+ * GAMMA spreizt die Leiter um ihren Mittelwert; die Hoehe renormiert solveK ohnehin auf die
+ * Gehaltssumme, es zaehlt allein die Form.
+ *
+ * GEMESSENER KONFLIKT — Default bleibt daher 1 (unveraendert), bis entschieden ist:
+ *   GAMMA  R1   R4   R8  R16  R24  R32   Letzter  Meister    Fallen (120er-Raum)
+ *   1.0    -2   -6   -5   -1   +5  +10      53    92-101     3 Paare
+ *   1.6    +8   +2   +1   +1   +1   +2      45    96-...      -
+ *   1.7    +9   +3   +2   +1   -0   +1      45    99-107      -
+ *   1.8   +11   +4   +3   +1   -1   +0      44   101-109    137 Paare
+ *   1.9   +12   +5   +4   +1   -2   +0      44   101-110      -
+ *
+ * Die Vorgabe "Spitze macht bei sf 1.0 mindestens +10" ist mit der Untergrenze 44 NICHT vereinbar:
+ * die Liga-Summe ist bei sf 1.0 auf die Gehaltssumme fixiert, mehr fuer die Spitze muss also
+ * jemandem genommen werden. Die Untergrenze verhindert, dass es der Keller ist — deshalb traegt es
+ * das untere Mittelfeld (R24 kippt auf -1 bis -11), und der Keller kollabiert vollstaendig in den
+ * Floor: ab GAMMA 1.8 ist der Letzte in BEIDEN Klausel-Zustaenden 44, die Klausel wirkt dort nicht
+ * mehr. Zugleich springt die Fallenzahl im 120er-Raum von 3 auf 137 Paare (alle gleiche Kurve, jetzt
+ * schon ab Erwartungsrang 21 statt erst 29). Aufloesung ist eine Design-Entscheidung:
+ * Untergrenze senken, Sigma-Summen-Bindung bei sf 1.0 lockern, oder Spitze bei +8/+9 belassen.
+ */
+const TARGET_GAMMA = Number(process.env.OLY_SPONSOR_GAMMA ?? 1);
+const TARGET_EV = (() => {
+  const mean = TARGET_EV_BASE.reduce((a, b) => a + b, 0) / TARGET_EV_BASE.length;
+  return TARGET_EV_BASE.map((v) => mean + (v - mean) * TARGET_GAMMA);
+})();
 
 /** EV inklusive Untergrenze und Klausel. */
 function ev(t: SponsorType, expected: number, cal: number) {
