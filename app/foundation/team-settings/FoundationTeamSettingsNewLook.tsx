@@ -37,6 +37,7 @@ import type {
   TeamStrategyDraftMap,
 } from "@/lib/foundation/tabs/foundation-page-types";
 import type { SaveSummary } from "@/lib/persistence/types";
+import { formatGermanDateTime, formatGermanSaveTimestamp } from "@/lib/utils/format-datetime";
 
 /**
  * "Neuer Look" Team-Einstellungen (flag-gated, additiv).
@@ -928,7 +929,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               <strong className="nl-teamsettings-metric-value">{activeSaveName}</strong>
               <small className="nl-teamsettings-metric-sub">
                 {activeSaveSummary
-                  ? `Update ${new Date(activeSaveSummary.updatedAt).toLocaleString("de-DE")}`
+                  ? `Update ${formatGermanDateTime(activeSaveSummary.updatedAt)}`
                   : activeSaveId}
               </small>
               <small className="nl-teamsettings-metric-sub">
@@ -1024,12 +1025,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                     : "Erstellt einen neuen lokalen Spielstand auf Basis des aktuellen Zustands."
               }
               onClick={() => {
-                const name = `Save ${new Date().toLocaleString("de-DE", {
-                  day: "2-digit",
-                  month: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}`;
+                const name = `Save ${formatGermanSaveTimestamp()}`;
                 void runSaveAction({ action: "create", name });
               }}
             >
@@ -1187,7 +1183,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                     {meta?.activeSeasonId ?? "—"} · {meta?.gamePhase ?? "—"} · MD {meta?.activeMatchday ?? "—"}
                   </span>
                   <span className="nl-teamsettings-note nl-tnum">
-                    Update {new Date(save.updatedAt).toLocaleString("de-DE")}
+                    Update {formatGermanDateTime(save.updatedAt)}
                   </span>
                   <div className="nl-teamsettings-flag-row">
                     <span className={`nl-teamsettings-status${meta?.containsFinalStandings ? " is-good" : " is-warn"}`}>

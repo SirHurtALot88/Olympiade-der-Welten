@@ -13,6 +13,7 @@ import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/s
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService, PersistedSaveGame } from "@/lib/persistence/types";
 import { DEFAULT_ACTIVE_OWNER_ID, AI_OWNER_ID, applyChrisFrankyOwnershipToTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { formatGermanDateTime } from "@/lib/utils/format-datetime";
 import {
   buildOwnershipForPreset,
   buildParticipant,
@@ -314,8 +315,8 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   const saveName =
     input.saveName?.trim() ||
     (input.presetId === "online_4v4"
-      ? `Oly Online 4v4 New Game ${new Date(now).toLocaleString("de-DE")}`
-      : `Oly New Game ${getPreset(input.presetId).label} ${new Date(now).toLocaleString("de-DE")}`);
+      ? `Oly Online 4v4 New Game ${formatGermanDateTime(now)}`
+      : `Oly New Game ${getPreset(input.presetId).label} ${formatGermanDateTime(now)}`);
 
   const baseGameStateBeforeSponsorOffers: GameState = {
     ...resetGameState,

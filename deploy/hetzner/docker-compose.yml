@@ -7,6 +7,10 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3000"
+      # Beide Spieler sitzen in Deutschland. `Europe/Berlin` (statt einer
+      # festen +1/+2-Verschiebung) wechselt automatisch zwischen MEZ/MESZ, so
+      # dass Server-Timestamps und Save-Namen in deutscher Ortszeit landen.
+      TZ: Europe/Berlin
       OLY_APP_SQLITE_PATH: /app/data/persistence/oly-app.sqlite
       # Player/team images (macOS Dropbox paths) are served from a host folder
       # mounted read-only below. Upload the Dropbox subtree to /opt/oly-media on

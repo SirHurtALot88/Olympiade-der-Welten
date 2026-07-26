@@ -43,6 +43,7 @@ import {
   type NlRadarAxis,
   type NlTone,
 } from "@/components/foundation/new-look";
+import { formatGermanDateTime } from "@/lib/utils/format-datetime";
 
 /**
  * "Neuer Look" Player Generator — flag-gated, additiv (Phase 3 der
@@ -1544,7 +1545,7 @@ export default function PlayerGeneratorPanelNewLook({
                   {draft.generated.className} · {draft.generated.race}
                 </span>
                 <span className="nl-gen-muted">
-                  Seed {draft.input.seed ?? "—"} · Update {new Date(draft.updatedAt ?? draft.createdAt).toLocaleString("de-DE")}
+                  Seed {draft.input.seed ?? "—"} · Update {formatGermanDateTime(draft.updatedAt ?? draft.createdAt)}
                 </span>
                 <div className="nl-gen-batch-actions">
                   <button type="button" className="nl-gen-inline-action" onClick={() => loadDraft(draft)}>

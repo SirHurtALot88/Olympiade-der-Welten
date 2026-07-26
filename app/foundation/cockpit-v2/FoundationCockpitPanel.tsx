@@ -79,6 +79,7 @@ import type {
 import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 import type { SaveSummary } from "@/lib/persistence/types";
 import { useFoundationShared } from "@/lib/foundation/foundation-shared-context";
+import { formatGermanSaveTimestamp } from "@/lib/utils/format-datetime";
 
 export interface FoundationCockpitPanelProps {
   activeSaveId: string;
@@ -980,12 +981,7 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                     setFreshSeasonStartMessage(null);
                     void runSaveAction({
                       action: "fresh-season-1",
-                      name: `Fresh Season 1 ${new Date().toLocaleString("de-DE", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}`,
+                      name: `Fresh Season 1 ${formatGermanSaveTimestamp()}`,
                     });
                   }}
                 >
