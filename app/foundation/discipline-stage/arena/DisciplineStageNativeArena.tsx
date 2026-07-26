@@ -68,6 +68,10 @@ export type NativeStageTeam = {
   seasonRank?: number; // echter Season-Tabellenrang → Bahn-/Turm-Reihenfolge
   teamId?: string; // für Team-Drawer
   rel?: TeamRelationshipKind | null; // Freund/Feind (mine/ally/rival) → Rahmen-Marker
+  // A2: Team hat keine Aufstellung für diese Disziplin eingereicht — die Engine liefert
+  // trotzdem ein (0-)Ergebnis. Muss sichtbar von einem echten 0-Punkte-Resultat
+  // unterschieden werden (Ladder + Detail-Ergebnistabelle).
+  missingLineup?: boolean;
 };
 export type StagePrimitive =
   | "track"
@@ -986,6 +990,7 @@ export type RT = {
   isOwn: boolean;
   teamId: string | null; // für Team-Drawer
   rel: TeamRelationshipKind | null; // Freund/Feind → Rahmen-Marker
+  missingLineup: boolean; // A2: keine Aufstellung eingereicht — 0 ist kein echtes Ergebnis
   players: NativeStagePlayer[];
   seasonRank: number;
   laneIdx: number; // dichte 0…N-1 Bahn-/Turm-Reihenfolge nach seasonRank (keine Lücken)
@@ -1144,6 +1149,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       isOwn: t.isOwn,
       teamId: t.teamId ?? null,
       rel: t.rel ?? null,
+      missingLineup: t.missingLineup ?? false,
       players: t.players,
       seasonRank: t.seasonRank ?? idx + 1,
       laneIdx: idx,
@@ -2164,7 +2170,17 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const showPodium = useCallback(() => {
     const rt = rtRef.current;
     const top3 = [...rt].sort((a, b) => b.score - a.score || a.seasonRank - b.seasonRank).slice(0, 3);
-    if (top3.length === 0) return;
+    if (top3.length === 0) {
+      // A4: keine Teams in dieser Disziplin — kein Podest zu zeigen, aber der
+      // Lauf muss trotzdem als beendet gemeldet werden (setEnded/onEnded), sonst
+      // bleibt der Spieler ohne "Weiter"-Button/"Spieltag auswerten"-Button hängen.
+      setEnded(true);
+      if (!endedFiredRef.current) {
+        endedFiredRef.current = true;
+        onEnded?.();
+      }
+      return;
+    }
     // Eigentliche Podest-Enthüllung — als innere Funktion gehalten, damit ein
     // Fotofinish (enges Rennen) sie um ~1,2 s verzögern kann (FEATURE 2). onEnded
     // feuert ausschließlich hier drin (endedFiredRef-Guard) → genau einmal je Lauf.
@@ -2516,6 +2532,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         isOwn: t.isOwn,
         teamId: t.teamId ?? null,
         total: t.score,
+        missingLineup: t.missingLineup,
         slots: Array.from({ length: slotCount }, (_, s) => {
           const p = t.players[s];
           const net = p ? playerNet(p) : 0;
@@ -3503,6 +3520,16 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                 <span style={{ flex: 1, fontSize: 11.5, color: "var(--nl-mut)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
               </>
             )}
+            {/* A2: keine Aufstellung eingereicht — 0 Punkte ist KEIN echtes Ergebnis,
+                muss sich sichtbar von einem regulären Last-Place-Ergebnis abheben. */}
+            {t.missingLineup ? (
+              <span
+                title="Team hat für diese Disziplin keine Aufstellung eingereicht — 0 ist kein echtes Ergebnis"
+                style={{ flex: "none", fontSize: 9.5, fontWeight: 800, color: "var(--nl-risk)", background: "color-mix(in srgb, var(--nl-risk) 16%, transparent)", border: "1px solid var(--nl-risk)", borderRadius: 6, padding: "1px 5px", whiteSpace: "nowrap" }}
+              >
+                keine Aufstellung
+              </span>
+            ) : null}
             {animField ? (
               <span title={`Rang-Änderung diese Etappe${behind > 0 ? ` · ${fmt1(behind)} hinter Platz 1` : ""}`} style={{ width: 42, textAlign: "right", fontSize: 11.5, fontWeight: 800, color: rankDelta > 0 ? "var(--nl-good)" : rankDelta < 0 ? "var(--nl-risk)" : "var(--nl-mut)", fontVariantNumeric: "tabular-nums" }}>
                 {rankDelta > 0 ? `▲${rankDelta}` : rankDelta < 0 ? `▼${Math.abs(rankDelta)}` : "—"}

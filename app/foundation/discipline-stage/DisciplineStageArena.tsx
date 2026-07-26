@@ -716,6 +716,7 @@ export default function DisciplineStageArena({
         d2DisciplineId: d2?.disciplineId ?? null,
         d2Points,
         totalPoints: (d1Points ?? 0) + (d2Points ?? 0),
+        missingLineup: r.missingLineup,
       };
     });
     return { d1, d2, standings, mutatorByTeam, teamResults };
@@ -941,6 +942,9 @@ export default function DisciplineStageArena({
           logoUrl: t.logoUrl,
           teamId: t.teamId,
           seasonRank: seasonRankOf(t.teamId),
+          // A2: Engine-Flag „keine Aufstellung eingereicht" 1:1 durchreichen, sonst
+          // erscheint das Team als normales 0-Punkte-Ergebnis (falscher Eindruck).
+          missingLineup: t.missingLineup,
           // Engine-Modus: Netto = val + Σmods trägt bereits die volle Engine-Zerlegung.
           players: t.players.map((p) => ({
             playerId: p.playerId,
@@ -958,6 +962,8 @@ export default function DisciplineStageArena({
           logoUrl: t.logoUrl,
           teamId: t.teamId,
           seasonRank: seasonRankOf(t.teamId),
+          // Modell-/Random-Modus rechnet ohne Engine-Preview → kein missingLineup-Konzept.
+          missingLineup: false,
           players: t.slots.map((s) => ({
             playerId: s.playerId,
             val: s.base,
@@ -1011,6 +1017,7 @@ export default function DisciplineStageArena({
         teamId: t.teamId,
         rel: t.teamId ? teamRelationshipMap.get(t.teamId) ?? null : null,
         seasonRank: t.seasonRank,
+        missingLineup: t.missingLineup,
         players: t.players.map((p) => ({
           playerId: p.playerId,
           val: p.val,
@@ -1042,6 +1049,15 @@ export default function DisciplineStageArena({
   // Spoiler-Gate (A1): der Real-Modus-Endscreen darf erst erscheinen, wenn die
   // native Arena das Podest erreicht hat. Bei Remount (Disziplin/Modus/Seed) zurück.
   const [arenaEnded, setArenaEnded] = useState(false);
+  // A3: welche Disziplinen dieses Spieltags bereits einmal zu Ende gelaufen sind —
+  // ANDERS als `arenaEnded` (das bei jedem Disziplin-Wechsel zurückgesetzt wird)
+  // bleibt dieser Satz beim Hin- und Herwechseln zwischen Disziplinen erhalten, damit
+  // eine bereits abgeschlossene Disziplin nicht wieder hinter dem 🔒 verschwindet.
+  // Nur ein Spieltagswechsel setzt ihn zurück.
+  const [endedDisciplineIds, setEndedDisciplineIds] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    setEndedDisciplineIds(new Set());
+  }, [matchdayId]);
   // Live-Ergebnisse aufgedeckter Spieler (aus der Arena gemeldet) → Team-Drawer
   // zeigt „geholt + Boni/Abzüge" für Spieler, die schon dran waren.
   const [liveResultsByTeam, setLiveResultsByTeam] = useState<StageLiveResultsByTeam>({});
@@ -1259,7 +1275,11 @@ export default function DisciplineStageArena({
         onOpenTeam={(teamId) => openDrawerPinned({ kind: "team", teamId })}
         onHoverTeam={previewTeam}
         onPreviewPlayer={previewPlayer}
-        onEnded={() => setArenaEnded(true)}
+        onEnded={() => {
+          setArenaEnded(true);
+          // A3: Disziplin dauerhaft als „schon gelaufen" merken (siehe endedDisciplineIds oben).
+          setEndedDisciplineIds((prev) => (prev.has(disciplineId) ? prev : new Set(prev).add(disciplineId)));
+        }}
         onReset={() => setArenaEnded(false)}
         onResults={setLiveResultsByTeam}
         topPlayers={topPlayers}
@@ -1285,8 +1305,16 @@ export default function DisciplineStageArena({
             standings={matchdayPanel.standings}
             d1={matchdayPanel.d1}
             d2={matchdayPanel.d2}
-            d1Revealed={matchdayPanel.d2?.disciplineId === disciplineId ? true : arenaEnded}
-            d2Revealed={matchdayPanel.d2?.disciplineId === disciplineId ? arenaEnded : false}
+            d1Revealed={
+              matchdayPanel.d2?.disciplineId === disciplineId
+                ? true
+                : Boolean(matchdayPanel.d1?.disciplineId && endedDisciplineIds.has(matchdayPanel.d1.disciplineId))
+            }
+            d2Revealed={
+              matchdayPanel.d2?.disciplineId === disciplineId
+                ? Boolean(matchdayPanel.d2?.disciplineId && endedDisciplineIds.has(matchdayPanel.d2.disciplineId))
+                : false
+            }
             teamMetaById={teamMetaById}
             ownTeamId={ownTeamId}
             onOpenTeam={(teamId) => openDrawerPinned({ kind: "team", teamId })}
