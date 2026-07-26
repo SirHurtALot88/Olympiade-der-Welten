@@ -139,7 +139,10 @@ export type TeamWriteAction =
   | "credit_early_payoff"
   | "player_generator_commit"
   | "team_identity_update"
-  | "team_control_update";
+  | "team_control_update"
+  | "team_captain_assign"
+  | "new_game_flow_step"
+  | "contract_negotiation_outcome";
 
 export type TeamWriteAuthorizationReason =
   | "ok"

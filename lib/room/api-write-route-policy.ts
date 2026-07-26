@@ -18,9 +18,13 @@ export const API_WRITE_ROUTE_ALLOWLIST: ApiWriteRoutePolicyEntry[] = [
   },
   {
     routePath: "singleplayer-state",
-    methods: ["PUT", "POST"],
+    methods: ["PUT"],
     policy: "allowlisted",
-    reason: "Save meta management (create, activate, compact put) — not a team gameplay write.",
+    reason:
+      "Whole-state PUT is save meta management (compact put) — not a team gameplay write. It is " +
+      "additionally hard-blocked with 409 room_save_generic_write_forbidden for any save bound to " +
+      "an active room (see getActiveRoomBySaveId check in the PUT handler), so it can never bypass " +
+      "per-team room ownership there either.",
   },
   {
     routePath: "singleplayer-state/season-start-reset",
@@ -138,6 +142,18 @@ export const API_WRITE_ROUTE_GUARD_REQUIRED: ApiWriteRoutePolicyEntry[] = [
     methods: ["POST"],
     policy: "require_room_write_guard",
     reason: "Player training mode/class write mutates player state for one team's roster.",
+  },
+  {
+    routePath: "singleplayer-state",
+    methods: ["POST"],
+    policy: "require_room_write_guard",
+    reason:
+      "POST is a multi-action dispatch: most branches (create/clone/snapshot/activate/delete/" +
+      "fresh-season-1) are save-meta admin without a teamId, but assign-team-captain, " +
+      "new-game-flow-step and contract-negotiation-outcome are team-scoped gameplay writes " +
+      "(captain assignment, onboarding step status, negotiation draft) and are now routed through " +
+      "authorizeServerRoomWrite. Previously this whole route was blanket-allowlisted, which let " +
+      "those three writes bypass room ownership and skip the room broadcast (S9).",
   },
 ];
 
