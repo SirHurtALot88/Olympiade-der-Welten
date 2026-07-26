@@ -8,6 +8,7 @@ import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-draw
 import type { PlayerSeasonTrainingForecast } from "@/lib/foundation/player-matchday-training-history";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { PROGRESSION_ATTRIBUTE_ORDER } from "@/lib/training/class-progression-config";
+import { formatSignedPercent } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 
 import PlayerAttributeProgressChart from "@/app/foundation/player-profile/PlayerAttributeProgressChart";
 import PlayerCareerStoryHeader from "@/app/foundation/player-profile/PlayerCareerStoryHeader";
@@ -177,15 +178,6 @@ function formatTrainingModeShort(mode: string | null | undefined) {
     return "S";
   }
   return mode;
-}
-
-function formatSignedPercent(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) {
-    return "—";
-  }
-
-  const prefix = value > 0 ? "+" : "";
-  return `${prefix}${formatValue(value, 1)}%`;
 }
 
 function formatSignedSetpoints(value: number | null | undefined, digits = 1) {

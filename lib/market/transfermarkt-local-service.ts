@@ -2541,7 +2541,26 @@ export function executeLocalTransfermarktBuy(params: TransfermarktBuyParams): Tr
     };
   }
 
-  const transferHistoryId = `history-${randomUUID()}`;
+  // Idempotenz-Guard: Mit `idempotencyKey` bekommt der History-Eintrag eine deterministische
+  // ID. Ein zweiter Aufruf mit demselben Schlüssel (Doppelklick, Retry) findet ihn vor und
+  // bucht NICHT erneut — sonst würde der Kaufpreis ein zweites Mal vom Cash abgezogen.
+  const transferHistoryId = params.idempotencyKey
+    ? `history-idem-${params.idempotencyKey}`
+    : `history-${randomUUID()}`;
+  if (params.idempotencyKey) {
+    const alreadyApplied = (save.gameState.transferHistory ?? []).some((entry) => entry.id === transferHistoryId);
+    if (alreadyApplied) {
+      return {
+        ...preview,
+        activePlayerCreated: false,
+        transferCreated: false,
+        teamSeasonStateUpdated: false,
+        activePlayerId: null,
+        transferId: transferHistoryId,
+        warnings: [...preview.warnings, "transfer_already_applied_for_idempotency_key"],
+      };
+    }
+  }
   const marketValueReference = context.marketValueReference ?? preview.currentValue ?? preview.purchasePrice;
   const nextStateBase: GameState = {
     ...save.gameState,
@@ -3015,7 +3034,23 @@ export function executeLocalTransfermarktSell(params: TransfermarktSellParams): 
     };
   }
 
-  const transferHistoryId = `history-${randomUUID()}`;
+  // Idempotenz-Guard (siehe Buy-Pfad): derselbe Schlüssel darf den Erlös nicht zweimal gutschreiben.
+  const transferHistoryId = params.idempotencyKey
+    ? `history-idem-${params.idempotencyKey}`
+    : `history-${randomUUID()}`;
+  if (params.idempotencyKey) {
+    const alreadyApplied = (save.gameState.transferHistory ?? []).some((entry) => entry.id === transferHistoryId);
+    if (alreadyApplied) {
+      return {
+        ...preview,
+        activePlayerRemoved: false,
+        transferCreated: false,
+        teamSeasonStateUpdated: false,
+        transferId: transferHistoryId,
+        warnings: [...preview.warnings, "transfer_already_applied_for_idempotency_key"],
+      };
+    }
+  }
   const netProceeds = preview.netProceeds ?? preview.salePrice ?? 0;
   const salePrice = preview.salePrice ?? 0;
   let nextState: GameState = {

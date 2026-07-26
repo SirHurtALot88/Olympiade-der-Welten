@@ -111,11 +111,23 @@ function toPlannedChanges(preview: StandingsPreviewResult): StandingsApplyPlanne
   }));
 }
 
-function buildBlockingReasons(preview: StandingsPreviewResult, duplicateDetected: boolean, forceReplace: boolean) {
+function buildBlockingReasons(
+  preview: StandingsPreviewResult,
+  duplicateDetected: boolean,
+  forceReplace: boolean,
+  staleBaselineReplace = false,
+) {
   const reasons = new Set<string>();
 
   if (duplicateDetected && !forceReplace) {
     reasons.add("duplicate_apply_for_save_season_matchday");
+  }
+
+  // Bewusst NICHT über forceReplace umgehbar — siehe `staleBaselineReplace` in
+  // `prepareStandingsApply`: die Baseline dieses Spieltags ist nicht mehr
+  // rekonstruierbar, ein Ersetzen würde die Punkte doppelt zählen.
+  if (staleBaselineReplace) {
+    reasons.add("stale_baseline_replace_not_supported");
   }
 
   for (const blockedRule of preview.blockedRules) {
@@ -194,9 +206,12 @@ async function prepareStandingsApply(
     persistence,
   );
 
+  const localSeasonState =
+    source === "sqlite" ? resolveLocalSave(persistence, scope.saveId).gameState.seasonState : null;
+
   const existingAuditLog =
-    source === "sqlite"
-      ? (resolveLocalSave(persistence, scope.saveId).gameState.seasonState.standingsApplyLogs ?? []).find(
+    localSeasonState != null
+      ? (localSeasonState.standingsApplyLogs ?? []).find(
           (log) =>
             log.saveId === scope.saveId &&
             log.seasonId === scope.seasonId &&
@@ -206,11 +221,24 @@ async function prepareStandingsApply(
       : null;
 
   const duplicateDetected = existingAuditLog != null;
+  // Schutz vor stiller Punkte-Doppelzählung: Ein `forceReplace` darf nur den ZULETZT
+  // gewerteten Spieltag ersetzen. `StandingRecord` hält genau EINE Baseline
+  // (`matchdayBaselineId`); wurde seither ein späterer Spieltag gewertet, zeigt sie nicht
+  // mehr auf diesen Spieltag, und der Preview nimmt den bereits fortgeschrittenen
+  // Punktestand als "Stand davor" — die Punkte dieses Spieltags würden ein zweites Mal
+  // gutgeschrieben (ligaweit, ohne jede Fehlermeldung). Diesen Fall blockieren wir
+  // deshalb auch MIT forceReplace, statt die Tabelle zu zerstören.
+  const staleBaselineReplace =
+    duplicateDetected &&
+    Object.values(localSeasonState?.standings ?? {}).some(
+      (record) => record?.matchdayBaselineId != null && record.matchdayBaselineId !== scope.matchdayId,
+    );
+
   const plannedChanges = toPlannedChanges(preview);
   const blockingReasons =
     source === "prisma"
       ? ["Prisma/Supabase mode is read-only. Standings Apply is only allowed in the local SQLite test save."]
-      : buildBlockingReasons(preview, duplicateDetected, params.forceReplace === true);
+      : buildBlockingReasons(preview, duplicateDetected, params.forceReplace === true, staleBaselineReplace);
   const warnings = buildWarnings(preview, duplicateDetected);
 
   return {

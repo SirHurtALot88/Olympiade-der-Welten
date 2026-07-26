@@ -21,6 +21,14 @@ export type TransfermarktBuyParams = {
   seasonId: string;
   teamId: string;
   playerId: string;
+  /**
+   * Optionaler Idempotenz-Schlüssel pro Benutzer-Aktion (z. B. ein Doppelklick oder ein
+   * Netzwerk-Retry sendet denselben Schlüssel erneut). Ist er gesetzt, bekommt der
+   * Transfer-History-Eintrag eine daraus abgeleitete, deterministische ID; ein zweiter
+   * Aufruf mit demselben Schlüssel bucht NICHT erneut (kein doppelter Kaufpreis), sondern
+   * meldet den bereits ausgeführten Transfer zurück. Ohne Schlüssel bleibt alles wie bisher.
+   */
+  idempotencyKey?: string;
   contractLength?: number;
   contractShape?: ContractShape;
   offeredSalary?: number;

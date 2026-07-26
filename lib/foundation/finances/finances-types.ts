@@ -233,10 +233,19 @@ export type FinanceLeagueTableRow = {
   cash: number;
   /** Sponsor + Preisgeld p.a. (Näherungswert, ohne Transfer-Saldo). */
   incomeAnnual: number;
-  /** Gehälter + Gebäude-Unterhalt + Kreditraten p.a. (Näherungswert, ohne Transfer-Saldo). */
+  /**
+   * Gehälter + Gebäude-Unterhalt + Kredit-ZINS p.a. (Näherungswert, ohne Transfer-Saldo).
+   * Bewusst nur der Zins: Die Tilgung ist keine GuV-Ausgabe, sondern eine Bilanz-Umbuchung
+   * (Schulden runter) — und die Kreditauszahlung wird spiegelbildlich auch nicht als
+   * Einnahme gebucht. Der reine Liquiditätsabfluss steht in `cashFlowAnnual`.
+   */
   expensesAnnual: number;
   /** `incomeAnnual - expensesAnnual`. */
   guv: number;
+  /** Tilgungsanteil der Kreditraten p.a. (cash-wirksam, aber kein GuV-Aufwand). */
+  loanPrincipalAnnual: number;
+  /** Tatsächliche Cash-Veränderung p.a.: `guv - loanPrincipalAnnual`. */
+  cashFlowAnnual: number;
   /** Kader-Marktwert-Summe (`TeamManagementSnapshotRow.marketValueTotal`) — `null` ohne Kader. */
   marketValue: number | null;
 };

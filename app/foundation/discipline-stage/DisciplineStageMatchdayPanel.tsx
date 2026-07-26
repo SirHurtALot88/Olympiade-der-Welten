@@ -27,6 +27,9 @@ export type MatchdayPanelTeamResult = {
   d2DisciplineId: string | null;
   d2Points: number | null;
   totalPoints: number | null;
+  // A2: Team hat für diesen Spieltag keine Aufstellung eingereicht — die 0 Punkte
+  // sind kein echtes Ergebnis und müssen sichtbar markiert werden.
+  missingLineup?: boolean;
 };
 
 export type MatchdayPanelStandingRow = {
@@ -138,6 +141,7 @@ export default function DisciplineStageMatchdayPanel({
       projectedPoints: s.projectedPoints,
       d1Pts,
       d2Pts,
+      missingLineup: res?.missingLineup ?? false,
     };
   });
 
@@ -295,6 +299,14 @@ export default function DisciplineStageMatchdayPanel({
                         {isOwn ? "★ " : ""}
                         {meta?.code ?? row.teamId}
                       </span>
+                      {row.missingLineup ? (
+                        <span
+                          title="Team hat keine Aufstellung eingereicht — 0 Punkte sind kein echtes Ergebnis"
+                          style={{ flex: "none", fontSize: 9.5, fontWeight: 800, color: "var(--nl-risk)", background: "color-mix(in srgb, var(--nl-risk) 16%, transparent)", border: "1px solid var(--nl-risk)", borderRadius: 6, padding: "1px 5px", whiteSpace: "nowrap" }}
+                        >
+                          keine Aufstellung
+                        </span>
+                      ) : null}
                       {rankDelta != null && rankDelta !== 0 ? (
                         <span
                           style={{

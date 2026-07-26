@@ -158,7 +158,10 @@ export type LineupNewLookProps = Pick<
 /* --- Format-Helfer (lokal, präsentational) --------------------------- */
 
 function formatScore(value: number) {
-  return Number.isInteger(value) ? String(value) : formatNlNumber(value, 1);
+  return new Intl.NumberFormat("de-DE", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(value);
 }
 
 function formatNullableScore(value: number | null | undefined) {

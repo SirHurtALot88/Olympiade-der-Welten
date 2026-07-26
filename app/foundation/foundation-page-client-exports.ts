@@ -6,7 +6,7 @@ export { default as ClassColorChip, getClassColorClassName } from "@/app/foundat
 export { default as ClassIcon } from "@/app/foundation/ClassIcon";
 export { default as DisciplineIcon } from "@/app/foundation/DisciplineIcon";
 export { default as RaceIcon } from "@/app/foundation/RaceIcon";
-export { default as PlayerGeneratorPanel } from "@/app/foundation/PlayerGeneratorPanel";
+export { default as PlayerGeneratorPanel } from "@/app/foundation/PlayerGeneratorPanelNewLook";
 export { default as FoundationPlayerPortraitPreview } from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
 export { default as FacilitiesV2Client } from "@/app/foundation/facilities-v2/FacilitiesV2Client";
 export { default as FoundationHomeV2Panel } from "@/app/foundation/home-v2/FoundationHomeV2Panel";

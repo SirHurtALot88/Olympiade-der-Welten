@@ -26,6 +26,8 @@ export type ResultTableRow = {
   teamId: string | null; // für Team-Hover/-Drawer
   total: number;
   slots: ResultSlotCell[];
+  // A2: keine Aufstellung eingereicht — 0 ist kein echtes Ergebnis, muss markiert bleiben.
+  missingLineup?: boolean;
 };
 
 export type DisciplineStageResultTableProps = {
@@ -136,6 +138,14 @@ export default function DisciplineStageResultTable({ rows, slotLabels, onOpenPla
                       {r.logoUrl ? <TeamMark src={r.logoUrl} size={26} radius={6} isOwn={r.isOwn} medal={r.rank === 1 ? "gold" : r.rank === 2 ? "silver" : r.rank === 3 ? "bronze" : null} /> : null}
                       <span style={{ fontWeight: 800, fontSize: 12.5, color: r.isOwn ? "var(--nl-accent)" : "inherit" }}>{r.isOwn ? "★ " : ""}{r.code}</span>
                       <span style={{ color: "var(--nl-mut)", fontSize: 11.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 120 }}>{r.name}</span>
+                      {r.missingLineup ? (
+                        <span
+                          title="Keine Aufstellung eingereicht — 0 ist kein echtes Ergebnis"
+                          style={{ flex: "none", fontSize: 9.5, fontWeight: 800, color: "var(--nl-risk)", background: "color-mix(in srgb, var(--nl-risk) 16%, transparent)", border: "1px solid var(--nl-risk)", borderRadius: 6, padding: "1px 5px", whiteSpace: "nowrap" }}
+                        >
+                          keine Aufstellung
+                        </span>
+                      ) : null}
                     </div>
                   </td>
                   {r.slots.map((c, ci) => {
