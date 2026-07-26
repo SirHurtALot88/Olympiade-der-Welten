@@ -59,42 +59,74 @@ type SponsorType = {
   note: string;
 };
 
-export const SPONSOR_TYPES: SponsorType[] = [
-  // ── Rang-getriebene Arten: die Kurve traegt die Identitaet, die Klausel ist Beiwerk ────────────
-  { name: "Bürgschaft", note: "hoher Sockel, kaum Upside — der sichere Hafen",
-    rel: (d) => (d <= 0 ? 6 : 6 + d),
-    clause: { label: "Stabilität: kein neuer Kredit, ≤3 Verkäufe", bonus: 5, malus: 3 } },
-  { name: "Traditionsverein", note: "belohnt exaktes Halten, bestraft Abrutschen hart",
-    rel: (d) => (d === 0 ? 12 : d > 0 ? 12 - 3 * d : 12 + 6 * d),
-    clause: { label: "Kontinuität: Vertragsstabilität + Altersschnitt", bonus: 8, malus: 7 } },
-  { name: "Allrounder", note: "linear, leichter Malus beim Abrutschen — der Standard",
-    rel: (d) => 5 + 4 * d + (d < 0 ? 2 * d : 0),
-    clause: { label: "Solvenz + moderate Fluktuation", bonus: 5, malus: 4 } },
-  { name: "Gipfelstürmer", note: "erst der Sprung ueber 2 Stufen zahlt; darunter durchgehend Malus",
-    rel: (d) => (d >= 2 ? 14 + 10 * (d - 2) : d === 1 ? 2 : -6 + 3 * d),
-    clause: { label: "Star-Power: entwickle einen Spieler +X MW", bonus: 11, malus: 9 } },
-  { name: "Vollgas", note: "steilster Verlauf in beide Richtungen — hoechstes Risiko",
-    rel: (d) => (d < 0 ? 5 * d : 10 * d),
-    clause: { label: "Einsatz: Saison-Fatigue-Schnitt ≥ X", bonus: 13, malus: 11 } },
+/**
+ * MODULAR statt fest: ein Sponsor ist eine KOMBINATION aus einer Kurvenform und einer Klausel.
+ * 6 Kurven x 14 Klauseln = 84 moegliche Sponsoren aus zwei kleinen, unabhaengig pflegbaren Listen.
+ * Die Kalibrierung laeuft ueber jede Kombination einzeln, deshalb ist jede davon automatisch
+ * EV-gleich und fallenfrei — neue Klauseln lassen sich hinzufuegen, ohne das Balancing anzufassen.
+ */
+export const CURVES: Array<{ name: string; rel: (d: number) => number; note: string }> = [
+  { name: "Sockel",   rel: (d) => (d <= 0 ? 6 : 6 + d),                                      note: "hoher Sockel, kaum Decke" },
+  { name: "Halten",   rel: (d) => (d === 0 ? 12 : d > 0 ? 12 - 3 * d : 12 + 6 * d),          note: "Maximum beim exakten Halten" },
+  { name: "Linear",   rel: (d) => 5 + 4 * d + (d < 0 ? 2 * d : 0),                            note: "gleichmaessig, milder Malus" },
+  { name: "Gipfel",   rel: (d) => (d >= 2 ? 14 + 10 * (d - 2) : d === 1 ? 2 : -6 + 3 * d),   note: "erst 2 Stufen zahlen, darunter Malus" },
+  { name: "Steil",    rel: (d) => (d < 0 ? 5 * d : 10 * d),                                   note: "steilster Verlauf beidseitig" },
+  { name: "Flach",    rel: (d) => (d <= 0 ? 2 : 2 + 2 * d),                                   note: "Rang fast egal — die Klausel entscheidet" },
+];
 
-  // ── Zustands-getriebene Arten: flache Kurve, die Klausel traegt die Identitaet ─────────────────
-  // Fuer Teams, die ihren Rang kaum bewegen koennen (Keller) oder wollen (Konsolidierung) —
-  // hier verdient man ueber Spielweise und Aufbau statt ueber die Tabelle.
-  { name: "Regenerativ", note: "Gegenstueck zu Vollgas: belohnt Schonung statt Auspowern",
-    rel: (d) => (d < -1 ? -4 + 4 * d : 7 + 2 * d),
-    clause: { label: "Schonung: Saison-Fatigue-Schnitt ≤ X (Rotation)", bonus: 9, malus: 8 } },
-  { name: "Nachwuchs", note: "Kurve fast flach — fast alles haengt an der Jugendentwicklung",
-    rel: (d) => (d <= 0 ? 3 : 3 + 1.5 * d),
-    clause: { label: "Talent: Eigengewächse entwickeln (+X MW im Kader ≤22 J.)", bonus: 16, malus: 6 } },
-  { name: "Baumeister", note: "flachste Kurve — zahlt fuer Infrastruktur statt fuer Plaetze",
-    rel: (d) => (d <= 0 ? 2 : 2 + 2 * d),
-    clause: { label: "Ausbau: Fan-Shop/Arena-Stufen erhöhen", bonus: 18, malus: 4 } },
-  { name: "Spezialist", note: "mittlere Kurve, verlangt ein scharfes Achsen-Profil",
-    rel: (d) => 4 + 3 * d,
-    clause: { label: "Profil: eine Achse (POW/SPE/MEN/SOC) in die Top-N deiner Stärkeklasse", bonus: 12, malus: 10 } },
-  { name: "Sparfuchs", note: "belohnt Halten bei niedriger Kostenbasis — die Eco-Runde",
-    rel: (d) => (d < 0 ? 9 + 3 * d : 9 + 2 * d),
-    clause: { label: "Effizienz: Gehaltssumme unter der Schwelle deiner Stärkeklasse", bonus: 10, malus: 8 } },
+/**
+ * Klauseln — alle an TATSAECHLICH vorhandenen Feldern verankert (Player.seasonTrainingAccumulator,
+ * trainingMode, classHistory, disciplineDelta, injuryHistory, coreStats, morale, popularity,
+ * Kredite, Gebaeude). KEIN Spieleralter: das Datenmodell kennt kein Alter.
+ *
+ * WICHTIG (gemessen): stark asymmetrische Klauseln (grosser Bonus, zahnloser Malus) erzeugen in
+ * Kombination mit einer flachen Kurve DOMINIERTE Sponsoren — es bleibt zu wenig Spannweite, um
+ * gegen breiter streuende Arten zu bestehen. "Ausbau" (+18/-4) und "Talentschmiede" (+16/-6)
+ * fielen deshalb als Fallen auf und wurden auf +15/-10 bzw. +14/-10 nachgezogen. Faustregel:
+ * je flacher die Kurve, desto symmetrischer muss die Klausel sein.
+ *
+ * Schwellen sind durchweg relativ zur Staerkeklasse des Teams zu setzen (wie es
+ * STRENGTH_TIER_AXIS_TARGET_RANK heute schon macht), sonst waeren sie fuer Top-Teams geschenkt
+ * und fuer schwache unmoeglich — genau der Fehler, den absolute Marktwert-Schwellen machen.
+ */
+export const CLAUSES: Array<{ name: string; label: string; bonus: number; malus: number; lever: string }> = [
+  { name: "Einsatzlast",   label: "Saison-Fatigue-Schnitt ≥ X (auspowern)",            bonus: 13, malus: 11, lever: "trainingMode + Rotation" },
+  { name: "Schonung",      label: "Saison-Fatigue-Schnitt ≤ X (rotieren)",             bonus: 9,  malus: 8,  lever: "Rotation, kostet Tabellenpunkte" },
+  { name: "Hartes Training", label: "Anteil Spieltage mit Modus 'hart' ≥ X %",         bonus: 11, malus: 9,  lever: "trainingMode je Spieltag" },
+  { name: "Talentschmiede", label: "X Spieler steigen eine Klasse auf",                bonus: 14, malus: 10, lever: "Trainingsfokus + Anlagen" },
+  { name: "Wertaufbau",    label: "Kaderwert +X % über die Saison",                    bonus: 12, malus: 8,  lever: "Training + Transfers" },
+  { name: "Achsenprofil",  label: "eine Achse (POW/SPE/MEN/SOC) in die Top-N der Klasse", bonus: 12, malus: 10, lever: "Trainingsklasse + Kaderbau" },
+  { name: "Disziplinen",   label: "X Disziplinen mit positivem Saison-Delta",          bonus: 10, malus: 9,  lever: "preferredDisciplines + Training" },
+  { name: "Schuldenfrei",  label: "kein neuer Kredit (oder einen getilgt)",            bonus: 5,  malus: 3,  lever: "Finanzplanung" },
+  { name: "Gehaltseffizienz", label: "Gehaltssumme unter der Schwelle deiner Klasse",  bonus: 10, malus: 8,  lever: "Verhandlung + Kaderschnitt" },
+  { name: "Kaderruhe",     label: "höchstens X Transfers (Zu- und Abgänge)",           bonus: 8,  malus: 7,  lever: "Transferdisziplin" },
+  { name: "Ausbau",        label: "Fan-Shop-/Arena-Stufen erhöhen",                    bonus: 15, malus: 10, lever: "Bauinvestition statt Spieler" },
+  { name: "Prophylaxe",    label: "höchstens X Verletzungen über die Saison",          bonus: 11, malus: 9,  lever: "Belastungssteuerung" },
+  { name: "Moral",         label: "Ø-Moral am Saisonende über der Schwelle",           bonus: 9,  malus: 8,  lever: "Rollen, Einsatzzeiten, Kapitän" },
+  { name: "Beliebtheit",   label: "Beliebtheit um X steigern",                         bonus: 10, malus: 7,  lever: "Erfolg + Fan-Infrastruktur" },
+];
+
+const compose = (curve: string, clause: string): SponsorType => {
+  const c = CURVES.find((x) => x.name === curve)!;
+  const k = CLAUSES.find((x) => x.name === clause)!;
+  return { name: `${curve}/${clause}`, rel: c.rel, note: `${c.note} · ${k.lever}`,
+           clause: { label: k.label, bonus: k.bonus, malus: k.malus } };
+};
+
+/** Kuratierte Auswahl fuer den Report — jede Kombination ist gueltig, das ist nur ein Querschnitt. */
+export const SPONSOR_TYPES: SponsorType[] = [
+  compose("Sockel", "Schuldenfrei"),        // sicherer Hafen, anspruchslose Klausel
+  compose("Halten", "Kaderruhe"),           // Konsolidierer: Position und Kader ruhig halten
+  compose("Linear", "Gehaltseffizienz"),    // solide, belohnt schlanke Kostenbasis
+  compose("Gipfel", "Wertaufbau"),          // Aufstiegswette plus Kaderentwicklung
+  compose("Steil", "Einsatzlast"),          // Vollgas in Tabelle UND Belastung
+  compose("Steil", "Schonung"),             // Gegenstueck: Angriff bei erzwungener Rotation
+  compose("Flach", "Talentschmiede"),       // Rang egal, Jugend zaehlt
+  compose("Flach", "Ausbau"),               // Rang egal, Infrastruktur zaehlt
+  compose("Linear", "Achsenprofil"),        // verlangt ein scharfes Spielprofil
+  compose("Halten", "Prophylaxe"),          // ruhige Saison ohne Verletzungswelle
+  compose("Linear", "Moral"),               // Kabine im Griff behalten
+  compose("Sockel", "Beliebtheit"),         // sicher, aber Fans muessen wachsen
 ];
 
 const withFloor = (v: number) => Math.max(FLOOR, v);
