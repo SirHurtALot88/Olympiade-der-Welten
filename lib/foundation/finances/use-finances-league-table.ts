@@ -13,6 +13,7 @@ import { calculateFacilityIncome, calculateFacilitySeasonUpkeep, getTeamFacility
 import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
 import { normalizeEconomyMoney, resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
+import { previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { getTeamLogoModel } from "@/lib/data/mediaAssets";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { FINANCE_SPONSOR_INCOME_COMPONENT_KINDS } from "@/lib/foundation/finances/finances-types";
@@ -54,6 +55,25 @@ export function buildFinancesLeagueTable(gameState: GameState): FinanceLeagueTab
   const overviewByTeamId = new Map(buildTeamSeasonOverviewRows({ gameState }).map((row) => [row.teamId, row] as const));
   const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
 
+  // Sponsor-Einnahme aus der ECHTEN Settlement-Vorschau — dieselbe Quelle, die auch die eigene
+  // Detail-Übersicht nutzt (`use-finances-view-model.ts`). `component.rewardCash` ist laut
+  // sponsor-offer-service nur die OBERGRENZE des Bausteins, nicht der erwartete Betrag: ein
+  // Verbesserungs-/Sonderziel zahlt 0, solange es nicht erfüllt ist, und die Rang-Komponente zahlt
+  // rangabhängig. Die Tabelle summierte bisher die Caps und zeigte dadurch auf DEMSELBEN Screen eine
+  // andere Sponsorsumme als die Detailansicht (Beispiel-Fixture: Tabelle 75 vs. Detail 69,3).
+  // Einmal für die ganze Liga vorberechnet statt pro Team — previewSponsorSettlement liefert ohnehin
+  // alle Zeilen auf einmal.
+  const sponsorSettlementByTeamId = new Map<string, number>();
+  try {
+    for (const row of previewSponsorSettlement(gameState).rows) {
+      if (!FINANCE_SPONSOR_INCOME_COMPONENT_KINDS.includes(row.kind)) continue;
+      if (!Number.isFinite(row.cashDelta) || row.cashDelta <= 0) continue;
+      sponsorSettlementByTeamId.set(row.teamId, (sponsorSettlementByTeamId.get(row.teamId) ?? 0) + row.cashDelta);
+    }
+  } catch {
+    // Sponsor-Vorschau ist optional — fehlt sie, greift unten der Estimate-Fallback (wie im Detail-Model).
+  }
+
   return gameState.teams.map((team) => {
     const overview = overviewByTeamId.get(team.teamId) ?? null;
 
@@ -78,18 +98,7 @@ export function buildFinancesLeagueTable(gameState: GameState): FinanceLeagueTab
     // Erwartungsrang), also 0 solange der Erwartungsrang nicht übertroffen wird). Würde die Tabelle den Cap
     // mitsummieren, zeigte derselbe Finanzen-Screen zwei verschiedene Sponsorsummen für dasselbe Team.
     const sponsorContract = getTeamSponsorContract(gameState, team.teamId);
-    const sponsorComponentsTotal = sponsorContract
-      ? sponsorContract.components.reduce(
-          (sum, component) =>
-            sum +
-            (FINANCE_SPONSOR_INCOME_COMPONENT_KINDS.includes(component.kind) &&
-            Number.isFinite(component.rewardCash) &&
-            component.rewardCash > 0
-              ? component.rewardCash
-              : 0),
-          0,
-        )
-      : 0;
+    const sponsorComponentsTotal = sponsorContract ? (sponsorSettlementByTeamId.get(team.teamId) ?? 0) : 0;
     const sponsor =
       sponsorComponentsTotal > 0
         ? round1(sponsorComponentsTotal)

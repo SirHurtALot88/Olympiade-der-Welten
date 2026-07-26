@@ -88,8 +88,15 @@ describe("finances: league table ↔ detail view sponsor parity", () => {
     const leagueRow = buildFinancesLeagueTable(gameState).find((row) => row.teamId === "team-1");
     if (!leagueRow) throw new Error("expected a league row for team-1");
 
-    // Basis 40 + Rang 20 + Verbesserung 10 + Sonderziel 5 = 75; der 99er Überperformance-CAP bleibt außen vor.
-    expect(detailSponsorTotal).toBe(75);
+    // Maßgeblich ist die ECHTE Settlement-Auszahlung, nicht die Summe der Vertrags-Obergrenzen:
+    // `component.rewardCash` ist laut sponsor-offer-service nur ein Cap. In dieser Fixture zahlt
+    // Basis 40 voll, die Rang-Komponente rangabhängig 29,3, und Verbesserung/Sonderziel zahlen 0,
+    // weil ihre Ziele nicht erfüllt sind → 69,3. Die frühere Erwartung 75 (= 40+20+10+5, also die
+    // Caps) stammt aus der Zeit vor der Umstellung der Detailansicht auf previewSponsorSettlement.
+    expect(detailSponsorTotal).toBeCloseTo(69.3, 1);
+    // Gegenprobe zum ursprünglichen Regressionsgrund: der 99er Überperformance-CAP darf in KEINER
+    // Ansicht mitgezählt werden (er zahlte im Settlement 84 — läge er drin, wäre die Summe > 150).
+    expect(detailSponsorTotal).toBeLessThan(100);
 
     // Die Tabelle weist Sponsor + Gebäude-Einnahmen aus; ohne Gebäude ist das exakt die Sponsorsumme.
     expect(leagueRow.incomeAnnual).toBe(detailSponsorTotal);
