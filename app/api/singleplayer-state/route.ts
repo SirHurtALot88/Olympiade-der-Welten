@@ -39,6 +39,8 @@ import { setTeamCaptain } from "@/lib/morale/team-captain-service";
 import { buildContractNegotiationDraft } from "@/lib/market/contract-negotiation-preview";
 import type { TransfermarktBuyPreview } from "@/lib/market/transfermarkt-buy-service";
 import { getActiveRoomBySaveId } from "@/lib/room/room-store";
+import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
+import { authorizeServerRoomWrite, type ServerRoomWriteAuthorization } from "@/lib/room/server-authoritative-write-guard";
 import { ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
@@ -57,6 +59,22 @@ async function resolveSessionOwnerId(): Promise<string | null> {
   return (await getSessionUser())?.ownerId ?? null;
 }
 
+/**
+ * Room-write context a caller may attach to a team-scoped gameplay action so it can be
+ * authorized via `authorizeServerRoomWrite` (mirrors the fields every dedicated guarded route —
+ * e.g. `app/api/training/route.ts` — accepts). Optional/absent in solo play, where
+ * `authorizeServerRoomWrite` falls back to the local-singleplayer ownership check unchanged.
+ */
+type RoomWriteContextFields = {
+  roomCode?: string | null;
+  participantId?: string | null;
+  seatToken?: string | null;
+  userId?: string | null;
+  activeManagerTeamId?: string | null;
+  activeOwnerId?: string | null;
+  controlMode?: "human" | "ai" | "passive" | "manual" | null;
+};
+
 type SaveActionBody =
   | { action: "create"; name: string }
   | { action: "clone"; sourceSaveId: string; name: string }
@@ -64,26 +82,26 @@ type SaveActionBody =
   | { action: "activate"; saveId: string }
   | { action: "fresh-season-1"; name?: string }
   | { action: "delete"; saveIds: string[] }
-  | {
+  | ({
       action: "assign-team-captain";
       saveId: string;
       teamId: string;
       playerId: string;
-    }
-  | {
+    } & RoomWriteContextFields)
+  | ({
       action: "new-game-flow-step";
       saveId: string;
       stepId: NewGameFlowStepId;
       status: NewGameFlowStepStatus;
       selectedTeamId?: string | null;
-    }
-  | {
+    } & RoomWriteContextFields)
+  | ({
       action: "contract-negotiation-outcome";
       saveId: string;
       summary: TransfermarktBuyPreview;
       status: ContractNegotiationDraftStatus;
       extraWarnings?: string[];
-    };
+    } & RoomWriteContextFields);
 
 const NEW_GAME_FLOW_STEP_IDS: NewGameFlowStepId[] = [
   "season_intro",
@@ -585,6 +603,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Kapitän kann nur für manuell geführte Teams gesetzt werden." }, { status: 403 });
     }
 
+    // Team-ownership guard: appointing a captain mutates this team's shared save state, so a
+    // room participant may only do it for a team they actually control. Mirrors the pattern in
+    // app/api/training/route.ts / app/api/team-settings/identity/route.ts.
+    const captainWriteAuth = authorizeServerRoomWrite({
+      roomCode: body.roomCode,
+      participantId: body.participantId,
+      seatToken: body.seatToken,
+      userId: body.userId,
+      saveId: body.saveId,
+      teamId: body.teamId,
+      action: "team_captain_assign",
+      source: "sqlite",
+      dryRun: false,
+      activeManagerTeamId: body.activeManagerTeamId,
+      activeOwnerId: body.activeOwnerId,
+      controlMode: body.controlMode,
+    });
+    if (!captainWriteAuth.allowed) {
+      return NextResponse.json({ error: captainWriteAuth.reason }, { status: captainWriteAuth.status });
+    }
+
     let nextGameState: GameState;
     try {
       nextGameState = setTeamCaptain(sourceSave.gameState, body.teamId, body.playerId);
@@ -596,6 +635,15 @@ export async function POST(request: Request) {
     }
 
     save = persistence.saveSingleplayerState(body.saveId, withNormalizedLocalTeamSettings(nextGameState));
+    notifyRoomGameplayWrite(captainWriteAuth, {
+      saveId: body.saveId,
+      teamId: body.teamId,
+      action: "team_captain_assign",
+      eventType: "save_updated",
+      affectedViews: ["home", "team"],
+      dryRun: false,
+      success: true,
+    });
   } else if (body.action === "new-game-flow-step") {
     if (!body.saveId || !NEW_GAME_FLOW_STEP_IDS.includes(body.stepId) || !NEW_GAME_FLOW_STEP_STATUSES.includes(body.status)) {
       return NextResponse.json({ error: "saveId, stepId and status are required." }, { status: 400 });
@@ -612,6 +660,35 @@ export async function POST(request: Request) {
       selectedTeamId: body.selectedTeamId ?? null,
       steps: [],
     };
+
+    // Team-ownership guard: the onboarding wizard tracks per-team steps (appoint_captain,
+    // first_transfers, ...), so once a team is known, a room participant may only flip step
+    // status for a team they actually control — otherwise a partner could mark the OTHER
+    // human's onboarding steps completed/skipped. Steps that fire before any team is selected
+    // (e.g. the very first "season_intro") have no team to authorize against yet and stay
+    // ungated, unchanged from before this fix.
+    const flowStepTeamId = body.selectedTeamId ?? previousFlow.selectedTeamId ?? null;
+    let flowStepWriteAuth: ServerRoomWriteAuthorization | null = null;
+    if (flowStepTeamId) {
+      flowStepWriteAuth = authorizeServerRoomWrite({
+        roomCode: body.roomCode,
+        participantId: body.participantId,
+        seatToken: body.seatToken,
+        userId: body.userId,
+        saveId: body.saveId,
+        teamId: flowStepTeamId,
+        action: "new_game_flow_step",
+        source: "sqlite",
+        dryRun: false,
+        activeManagerTeamId: body.activeManagerTeamId,
+        activeOwnerId: body.activeOwnerId,
+        controlMode: body.controlMode,
+      });
+      if (!flowStepWriteAuth.allowed) {
+        return NextResponse.json({ error: flowStepWriteAuth.reason }, { status: flowStepWriteAuth.status });
+      }
+    }
+
     const nextSteps = NEW_GAME_FLOW_STEP_IDS.map((stepId) => {
       const stored = previousFlow.steps?.find((step) => step.stepId === stepId);
       if (stepId !== body.stepId) {
@@ -643,6 +720,17 @@ export async function POST(request: Request) {
     });
 
     save = persistence.saveSingleplayerState(body.saveId, nextGameState);
+    if (flowStepWriteAuth) {
+      notifyRoomGameplayWrite(flowStepWriteAuth, {
+        saveId: body.saveId,
+        teamId: flowStepTeamId,
+        action: "new_game_flow_step",
+        eventType: "flow_step_changed",
+        affectedViews: ["home", "team"],
+        dryRun: false,
+        success: true,
+      });
+    }
   } else if (body.action === "contract-negotiation-outcome") {
     if (!body.saveId || !body.summary?.player?.id || !body.summary?.team?.id) {
       return NextResponse.json({ error: "saveId und summary mit Team/Spieler sind erforderlich." }, { status: 400 });
@@ -659,6 +747,33 @@ export async function POST(request: Request) {
     if (!summaryTeam || !summaryPlayer) {
       return NextResponse.json({ error: "summary team/player missing." }, { status: 400 });
     }
+
+    // The negotiation's teamId comes straight from the client-held preview (summary.team.id) —
+    // verify it actually names a team in this save before authorizing against it, so a
+    // participant can't smuggle a write onto an arbitrary teamId string.
+    const negotiationTeam = sourceSave.gameState.teams.find((entry) => entry.teamId === summaryTeam.id);
+    if (!negotiationTeam) {
+      return NextResponse.json({ error: "team_not_found" }, { status: 404 });
+    }
+
+    const negotiationWriteAuth = authorizeServerRoomWrite({
+      roomCode: body.roomCode,
+      participantId: body.participantId,
+      seatToken: body.seatToken,
+      userId: body.userId,
+      saveId: body.saveId,
+      teamId: summaryTeam.id,
+      action: "contract_negotiation_outcome",
+      source: "sqlite",
+      dryRun: false,
+      activeManagerTeamId: body.activeManagerTeamId,
+      activeOwnerId: body.activeOwnerId,
+      controlMode: body.controlMode,
+    });
+    if (!negotiationWriteAuth.allowed) {
+      return NextResponse.json({ error: negotiationWriteAuth.reason }, { status: negotiationWriteAuth.status });
+    }
+
     const draft = buildContractNegotiationDraft({
       saveId: body.saveId,
       seasonId: sourceSave.gameState.season.id,
@@ -706,6 +821,15 @@ export async function POST(request: Request) {
     });
 
     save = persistence.saveSingleplayerState(body.saveId, nextGameState);
+    notifyRoomGameplayWrite(negotiationWriteAuth, {
+      saveId: body.saveId,
+      teamId: summaryTeam.id,
+      action: "contract_negotiation_outcome",
+      eventType: "save_updated",
+      affectedViews: ["home", "team", "market"],
+      dryRun: false,
+      success: true,
+    });
   }
 
   return NextResponse.json({

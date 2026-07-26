@@ -1110,13 +1110,16 @@ export default function TransfermarktV2Client({
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            action: "contract-negotiation-outcome",
-            saveId: defaultSaveId,
-            summary,
-            status,
-            extraWarnings,
-          }),
+          body: JSON.stringify(
+            withWriteContext({
+              action: "contract-negotiation-outcome",
+              saveId: defaultSaveId,
+              teamId: summary.team.id,
+              summary,
+              status,
+              extraWarnings,
+            }),
+          ),
         },
       );
     } catch {
