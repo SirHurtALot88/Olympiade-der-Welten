@@ -17,6 +17,7 @@ import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebth
 import { buildTeamSeasonObjectiveSettlement } from "@/lib/board/team-season-objectives-service";
 import { normalizeEconomyMoney, resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
+import { FINANCE_SPONSOR_INCOME_COMPONENT_KINDS } from "@/lib/foundation/finances/finances-types";
 import type {
   FinanceFacilityIncome,
   FinanceFacilityIncomeRow,
@@ -105,8 +106,12 @@ function computeFacilitySeasonEndCash(gameState: GameState, teamId: string, cash
   };
 }
 
-/** Anzeige-Reihenfolge der Sponsor-Vertragskomponenten (mirrors `SPONSOR_STACK_SEGMENTS` in FoundationSponsorsNewLook). */
-const SPONSOR_COMPONENT_KIND_ORDER: SponsorOfferComponentKind[] = ["base", "rank", "improvement", "special"];
+/**
+ * Anzeige-Reihenfolge der Sponsor-Vertragskomponenten (mirrors `SPONSOR_STACK_SEGMENTS` in
+ * FoundationSponsorsNewLook). Kommt aus `finances-types.ts`, damit die Liga-Vergleichstabelle
+ * exakt dieselbe Komponenten-Auswahl summiert (kein Auseinanderdriften auf demselben Screen).
+ */
+const SPONSOR_COMPONENT_KIND_ORDER: SponsorOfferComponentKind[] = FINANCE_SPONSOR_INCOME_COMPONENT_KINDS;
 
 /** Wie viele vergangene (archivierte) Saisons der GuV-/Cash-Verlauf zusätzlich zur laufenden Saison zeigt (T-107). */
 const HISTORY_PAST_SEASONS = 4;

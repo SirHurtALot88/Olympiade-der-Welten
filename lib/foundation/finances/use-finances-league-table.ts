@@ -11,6 +11,7 @@ import { normalizeEconomyMoney, resolvePlayerEconomyContract } from "@/lib/found
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { getTeamLogoModel } from "@/lib/data/mediaAssets";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
+import { FINANCE_SPONSOR_INCOME_COMPONENT_KINDS } from "@/lib/foundation/finances/finances-types";
 import type { FinanceLeagueTableRow } from "@/lib/foundation/finances/finances-types";
 
 /** Gleiche Rundung wie `use-finances-view-model.ts` (1 Nachkommastelle). */
@@ -68,11 +69,20 @@ export function buildFinancesLeagueTable(gameState: GameState): FinanceLeagueTab
     // Nur wenn KEIN aktueller Vertrag existiert (keine positiven Komponenten),
     // greift der `estimateTeamAnnualRevenue`-Proxy (Payout-Log/Basis) — exakt
     // die Fallback-Logik der Detail-Übersicht.
+    // Dieselbe Komponenten-AUSWAHL wie die Detail-Übersicht (gemeinsame Konstante) — insbesondere OHNE
+    // `overperformance`, deren rewardCash nur ein Cap ist (Auszahlung = min(cap, Rate × Plätze über
+    // Erwartungsrang), also 0 solange der Erwartungsrang nicht übertroffen wird). Würde die Tabelle den Cap
+    // mitsummieren, zeigte derselbe Finanzen-Screen zwei verschiedene Sponsorsummen für dasselbe Team.
     const sponsorContract = getTeamSponsorContract(gameState, team.teamId);
     const sponsorComponentsTotal = sponsorContract
       ? sponsorContract.components.reduce(
           (sum, component) =>
-            sum + (Number.isFinite(component.rewardCash) && component.rewardCash > 0 ? component.rewardCash : 0),
+            sum +
+            (FINANCE_SPONSOR_INCOME_COMPONENT_KINDS.includes(component.kind) &&
+            Number.isFinite(component.rewardCash) &&
+            component.rewardCash > 0
+              ? component.rewardCash
+              : 0),
           0,
         )
       : 0;
