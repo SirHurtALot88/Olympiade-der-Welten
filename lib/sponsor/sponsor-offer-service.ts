@@ -308,6 +308,16 @@ function buildOffer(input: {
 export function buildSponsorOffersForTeam(input: {
   gameState: GameState;
   teamId: string;
+  /**
+   * Marken-Nutzung der GESAMTEN Liga, inklusive der Teams, die im selben Durchgang bereits erzeugt
+   * wurden. Ohne diesen Durchreicher leitet die Funktion sie aus
+   * `gameState.seasonState.sponsorOffersByTeamId` ab — also aus dem Stand VOR dem Lauf. Beim
+   * ligaweiten Erzeugen (`ensureSeasonSponsorOffers` / `regenerateSponsorOffersForSeason`) bekommen
+   * alle Teams denselben unveraenderten `gameState`, sodass sie einander nicht sehen und die
+   * Eindeutigkeitsregel aus `sponsor-brand-catalog.ts` faktisch wirkungslos blieb: mehrere Teams
+   * bekamen dieselbe Marke angeboten und am Ende unter Vertrag.
+   */
+  globalParentUsage?: Record<string, number>;
 }): SponsorOffer[] {
   const team = input.gameState.teams.find((entry) => entry.teamId === input.teamId);
   if (!team) {
@@ -344,7 +354,8 @@ export function buildSponsorOffersForTeam(input: {
   });
   const usedParentBrandIds: string[] = [];
   const recentParentBrandIds = getRecentSponsorParentIds(input.gameState, input.teamId);
-  const globalParentUsage = buildGlobalParentUsageFromOffers(input.gameState.seasonState.sponsorOffersByTeamId);
+  const globalParentUsage =
+    input.globalParentUsage ?? buildGlobalParentUsageFromOffers(input.gameState.seasonState.sponsorOffersByTeamId);
   const salaryFactor = getCurrentSalaryFactor(input.gameState);
   const baseAnchorSalary = getSponsorRank32BaseAnchorSalary(input.gameState);
   const challengeSlotIndex = resolveChallengeSlotIndex(input.gameState.season.id, input.teamId, SLOT_COUNT);
@@ -486,11 +497,31 @@ export function regenerateSponsorOffersForSeason(gameState: GameState, teamIds?:
   const targetTeamIds = teamIds ?? gameState.teams.map((team) => team.teamId);
   const nextOffers = { ...(gameState.seasonState.sponsorOffersByTeamId ?? {}) };
 
+  // Wie in `ensureSeasonSponsorOffers`: die Marken-Nutzung muss waehrend des Laufs mitwachsen,
+  // sonst erzeugen alle Ziel-Teams gegen denselben Ausgangsstand und koennen dieselbe Marke ziehen.
+  // Gestartet wird mit den Angeboten, die NICHT neu erzeugt werden (andere Teams, bestehende Vertraege).
+  const regenTargets = new Set(targetTeamIds);
+  const globalParentUsage: Record<string, number> = {};
+  const trackParentUsage = (offers: SponsorOffer[]) => {
+    for (const offer of offers) {
+      if (offer.sponsorParentBrandId) {
+        globalParentUsage[offer.sponsorParentBrandId] = (globalParentUsage[offer.sponsorParentBrandId] ?? 0) + 1;
+      }
+    }
+  };
+  for (const [teamId, offers] of Object.entries(nextOffers)) {
+    if (!regenTargets.has(teamId) || getTeamSponsorContract(gameState, teamId)) {
+      trackParentUsage(offers ?? []);
+    }
+  }
+
   for (const teamId of targetTeamIds) {
     if (getTeamSponsorContract(gameState, teamId)) {
       continue;
     }
-    nextOffers[teamId] = buildSponsorOffersForTeam({ gameState, teamId });
+    const built = buildSponsorOffersForTeam({ gameState, teamId, globalParentUsage });
+    nextOffers[teamId] = built;
+    trackParentUsage(built);
   }
 
   const normalizedOffers = normalizeLeagueSponsorOffers(gameState, nextOffers);
@@ -510,19 +541,36 @@ export function ensureSeasonSponsorOffers(gameState: GameState): GameState {
   const nextOffers: Record<string, SponsorOffer[]> = {};
   let changed = false;
 
+  // Laufende Marken-Nutzung ueber die ganze Liga: startet leer und waechst mit jedem Team, dessen
+  // Angebote hier feststehen — egal ob uebernommen oder neu erzeugt. Nur so sieht Team 20, welche
+  // Marken die Teams 1..19 in DIESEM Durchgang schon belegt haben.
+  const globalParentUsage: Record<string, number> = {};
+  const trackParentUsage = (offers: SponsorOffer[]) => {
+    for (const offer of offers) {
+      if (offer.sponsorParentBrandId) {
+        globalParentUsage[offer.sponsorParentBrandId] = (globalParentUsage[offer.sponsorParentBrandId] ?? 0) + 1;
+      }
+    }
+  };
+
   for (const team of gameState.teams) {
     if (getTeamSponsorContract(gameState, team.teamId)) {
-      nextOffers[team.teamId] = existingOffers[team.teamId] ?? [];
+      const keptOffers = existingOffers[team.teamId] ?? [];
+      nextOffers[team.teamId] = keptOffers;
+      trackParentUsage(keptOffers);
       continue;
     }
     const currentOffers = existingOffers[team.teamId] ?? [];
     const hasCurrentSeasonOffers =
       currentOffers.length === 5 && currentOffers.every((offer) => offer.seasonId === seasonId);
     if (!hasCurrentSeasonOffers) {
-      nextOffers[team.teamId] = buildSponsorOffersForTeam({ gameState, teamId: team.teamId });
+      const built = buildSponsorOffersForTeam({ gameState, teamId: team.teamId, globalParentUsage });
+      nextOffers[team.teamId] = built;
+      trackParentUsage(built);
       changed = true;
     } else {
       nextOffers[team.teamId] = currentOffers;
+      trackParentUsage(currentOffers);
     }
   }
 
