@@ -136,7 +136,11 @@ export type NativeArenaRoomSync = {
   active: boolean; // Reveal-Sync im Room aktiv (mind. 2 Teilnehmer / Sync läuft)
   isHost: boolean; // dieser Client ist der Host (Rolle A)
   canControl: boolean; // darf lokal starten/advancen (Host, oder solo-im-Room)
-  waitingForHost: boolean; // Guest: eigenes Auto-Advance gesperrt, wartet auf Host-Schritte
+  waitingForHost: boolean; // reiner UI-Hinweis: Guest, und der Host hat den Reveal noch nicht gestartet
+  // Steuerflag: dieser Client advanced nie selbst, sondern zieht `round` auf `syncedRound` nach.
+  // Bewusst NICHT `waitingForHost` — das ist nur bis zum Host-Start true und damit genau dann
+  // falsch, wenn die Host-Schritte tatsaechlich eintreffen.
+  followsHost: boolean;
   syncedRound: number; // vom Host getriebener Ziel-Reveal-Index (slotRevealIndex)
   onHostAdvanced: () => void; // Host: bei jedem eigenen Schritt an den Room melden
   coopGate: {
@@ -2426,23 +2430,29 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     if (!started || done || busy || paused) return;
     // Co-op: der GUEST advanced nie von allein — er folgt nur den Host-Schritten
     // (Effekt unten). Und solange der „beide bereit"-Gate aktiv ist, läuft nichts.
-    if (roomSync?.waitingForHost || roomSync?.coopGate.active) return;
+    if (roomSync?.followsHost || roomSync?.coopGate.active) return;
     // Kurzer Puffer nach dem Abschluss der (bereits ~10 s langen, simultan gleitenden)
     // Etappe, dann startet die nächste zügig.
     const delay = reduced.current ? 0 : 600;
     const id = window.setTimeout(() => advance(), delay);
     return () => window.clearTimeout(id);
-  }, [prim, round, busy, done, demandKg, advance, paused, started, roomSync?.waitingForHost, roomSync?.coopGate.active]);
+  }, [prim, round, busy, done, demandKg, advance, paused, started, roomSync?.followsHost, roomSync?.coopGate.active]);
 
   // Co-op GUEST: zieht `round` auf den vom Host getriebenen `syncedRound` nach —
   // spielt dieselbe Reveal-Cascade, aber host-getaktet. Pausiert der Host (Hover),
   // steigt syncedRound nicht → der Guest bleibt automatisch stehen.
+  //
+  // Gate ist `followsHost` (Guest im Room), NICHT `waitingForHost` (Guest VOR dem Host-Start):
+  // Letzteres kippt beim Start des Hosts auf false und haette diesen Effekt genau dann
+  // abgeschaltet, wenn die Host-Schritte eintreffen. Da der Guest zugleich den ▶-Button nicht
+  // klicken kann (`canControl` false → `started` bleibt false → Auto-Continue greift nie), gab es
+  // danach keinen Pfad mehr, der `round` bewegt: der Guest stand ohne Reveal und ohne Hinweis da.
   useEffect(() => {
-    if (!roomSync?.waitingForHost || busy || done) return;
+    if (!roomSync?.followsHost || busy || done) return;
     if (roomSync.syncedRound > round) {
       advance();
     }
-  }, [roomSync?.waitingForHost, roomSync?.syncedRound, round, busy, done, advance]);
+  }, [roomSync?.followsHost, roomSync?.syncedRound, round, busy, done, advance]);
 
   // Co-op HOST: meldet jeden eigenen Reveal-Schritt an den Room (nur bei Increment,
   // nicht beim initialen round=0 und nicht nach „↻ Neu"-Reset).
@@ -2817,8 +2827,14 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                     {roomSync.coopGate.waitingNames.length > 0 ? `Warte auf: ${roomSync.coopGate.waitingNames.join(", ")}` : "Alle bereit — Host kann starten."}
                   </span>
                 </>
-              ) : roomSync.waitingForHost ? (
-                <span data-testid="arena-coop-follow" style={{ fontSize: 12, color: "var(--nl-mut)", fontWeight: 700 }}>👥 Co-op · Der Host steuert den Reveal — du siehst live mit.</span>
+              ) : roomSync.followsHost ? (
+                /* `followsHost`, nicht `waitingForHost`: letzteres kippt beim Host-Start auf false,
+                   wodurch der Guest ab da in den Host-Zweig fiel und faelschlich "Du bist Host" las. */
+                <span data-testid="arena-coop-follow" style={{ fontSize: 12, color: "var(--nl-mut)", fontWeight: 700 }}>
+                  {roomSync.waitingForHost
+                    ? "👥 Co-op · Warte auf den Host — er startet den Reveal."
+                    : "👥 Co-op · Der Host steuert den Reveal — du siehst live mit."}
+                </span>
               ) : (
                 <span style={{ fontSize: 12, color: "var(--nl-accent)", fontWeight: 700 }}>👥 Co-op · Du bist Host — dein Reveal läuft synchron bei allen.</span>
               )}
