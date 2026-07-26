@@ -125,4 +125,23 @@ describe("new-game-setup-service", () => {
     const offersAgain = getTeamSponsorOffers(second.gameState, "M-M");
     expect(offersAgain.map((offer) => offer.offerId)).toEqual(offers.map((offer) => offer.offerId));
   }, 120_000);
+
+  it("auto-signs AI teams' sponsors already in Season 1 while leaving the human team to choose", () => {
+    const { gameState } = buildNewGameStateFromBaseline({
+      presetId: "solo_1",
+      now: "2026-06-13T10:00:00.000Z",
+    });
+
+    // Das menschliche Team (M-M, controlMode manual) hat weiterhin KEINEN Vertrag — es wählt selbst.
+    expect(getTeamSponsorContract(gameState, "M-M")).toBeNull();
+
+    // ALLE AI-Teams haben in S1 bereits einen unterschriebenen Sponsorvertrag (sichtbare Einnahmen +
+    // Namen im Finanz-/Sponsor-Tab). Vorher waren sie alle vertragslos bis zum S1→S2-Übergang.
+    const aiTeamIds = gameState.teams.map((team) => team.teamId).filter((teamId) => teamId !== "M-M");
+    for (const teamId of aiTeamIds) {
+      const contract = getTeamSponsorContract(gameState, teamId);
+      expect(contract, `expected AI team ${teamId} to have a signed sponsor contract in S1`).not.toBeNull();
+      expect(contract?.seasonId).toBe(gameState.season.id);
+    }
+  }, 120_000);
 });
