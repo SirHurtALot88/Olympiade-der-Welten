@@ -85,11 +85,22 @@ export function evaluateGamePhaseAction(gameState: GameState, action: GamePhaseA
   } else if (action === "sell_players") {
     allowed = isTransferSellPhaseOpen(gameState);
     reason = allowed ? null : `phase_blocked:${action}:${phase}`;
+  } else if (action === "sponsor_choice") {
+    // Sponsor ist Pflicht vor der Saison-Abrechnung (P1-5). Damit der Season-Completion-Gate
+    // (manual_sponsor_choice_pending) KEIN Soft-Lock erzeugt, ist die Wahl zusätzlich in den
+    // Abschlussphasen (season_completed/season_review — VOR dem Sponsor-Settlement) erlaubt: der
+    // Vertrag ist season-scoped und deckt damit genau die gerade abzurechnende Saison. So kann ein
+    // Spieler, der am Saisonende noch keinen Sponsor hat, ihn dort nachholen und dann abschließen.
+    allowed =
+      isPreseasonManagementOpen(gameState) ||
+      isEarlySeasonSetup(gameState) ||
+      phase === "season_completed" ||
+      phase === "season_review";
+    reason = allowed ? null : `phase_blocked:${action}:${phase}`;
   } else if (
     action === "renew_contract" ||
     action === "set_training" ||
     action === "facility_apply" ||
-    action === "sponsor_choice" ||
     action === "credit_borrow" ||
     // `credit_early_payoff` (Vorab-Ablösung) is documented as a "Verkaufsphase"
     // action (docs/design/kredit-system.md, funded from sell proceeds), but

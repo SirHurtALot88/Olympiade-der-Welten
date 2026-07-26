@@ -151,6 +151,14 @@ describe("game phase action policy", () => {
     expect(gate.allowed).toBe(true);
   });
 
+  it("keeps sponsor choice open at season end so the completion gate can never soft-lock (P1-5)", () => {
+    // Sponsor ist Pflicht vor der Abrechnung; der Season-Completion-Gate blockt vertragslose Teams.
+    // Damit das kein Soft-Lock wird, MUSS die Sponsor-Wahl in den Abschlussphasen erreichbar bleiben.
+    expect(evaluateGamePhaseAction(gameState("preseason_management"), "sponsor_choice").allowed).toBe(true);
+    expect(evaluateGamePhaseAction(gameState("season_completed"), "sponsor_choice").allowed).toBe(true);
+    expect(evaluateGamePhaseAction(gameState("season_review"), "sponsor_choice").allowed).toBe(true);
+  });
+
   it("keeps training intensity open during preseason and before the first matchday result", () => {
     expect(evaluateGamePhaseAction(gameState("preseason_management"), "set_training").allowed).toBe(true);
     expect(evaluateGamePhaseAction(gameState("season_active"), "set_training").allowed).toBe(true);

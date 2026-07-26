@@ -462,8 +462,9 @@ function buildOnboardingFlowSteps(gameState: GameState, activeTeamId: string | n
       blockers: teamId ? [] : ["no_active_team"],
     }),
     step({
-      // Sponsor ist unabhängig vom Training (wie im Folge-Season-Pfad) — kein künstlicher
-      // "blocked"-Zustand ohne Begründung mehr, nur die Reihenfolge im Flow leitet.
+      // Sponsor ist unabhängig vom Training (wie im Folge-Season-Pfad), aber PFLICHT vor Saisonabschluss
+      // (harter Gate in der Season-Completion). Hier bleibt es ein Führungs-Schritt, meldet aber
+      // `sponsor_choice_required` als Warnung, damit Gate/UI das fehlende Pflicht-Sponsoring anzeigen.
       stepId: "choose_sponsor",
       label: "Sponsor wählen",
       cta: "Weiter: Sponsor wählen",
@@ -477,6 +478,7 @@ function buildOnboardingFlowSteps(gameState: GameState, activeTeamId: string | n
       targetPanel: "sponsor-choice",
       teamId,
       blockers: teamId ? [] : ["no_active_team"],
+      warnings: teamId && !getTeamSponsorContract(gameState, teamId) ? ["sponsor_choice_required"] : [],
     }),
   ];
 }
@@ -585,12 +587,18 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       stepId: "choose_sponsor",
       label: "Sponsor wählen",
       cta: "Weiter: Sponsor wählen",
+      // Sponsor ist PFLICHT vor Saisonabschluss (der harte Gate sitzt in der Season-Completion, nicht
+      // hier — sonst würde der Schritt jeden Spieltag die Flow-Führung an sich reißen). Hier bleibt er
+      // ein optionaler Führungs-Schritt, meldet aber `sponsor_choice_required` als Warnung, damit
+      // Playability-Gate/Smoke und UI das fehlende Pflicht-Sponsoring anzeigen. Das menschliche Team muss
+      // wählen; KI/passiv signieren automatisch (chooseSponsorOfferForAiTeams).
       status: !hasActiveTeam ? "blocked" : hasSponsorContract ? "completed" : "optional",
       targetView: "prize",
       targetPanel: "sponsor-choice",
       teamId: activeTeamId,
       optional: !hasSponsorContract,
       blockers: hasActiveTeam ? [] : ["no_active_team"],
+      warnings: hasActiveTeam && !hasSponsorContract ? ["sponsor_choice_required"] : [],
     }),
     step({
       stepId: "review_last_matchday",
