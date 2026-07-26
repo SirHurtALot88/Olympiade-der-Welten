@@ -603,6 +603,13 @@ export function chooseSponsorOffer(input: {
   /** When true, skip immediate base_first payout (used for AI auto-sign / balancing sims). */
   deferBaseFirstPayout?: boolean;
 }): { gameState: GameState; contract: TeamSponsorContract | null; error?: string } {
+  // Audit R2/A2: Server-Guard gegen Re-Sign. Ohne diesen Guard konnte ein zweiter POST /api/sponsor/choose
+  // einen bestehenden Vertrag überschreiben (payouts:{} zurückgesetzt) und base_first ERNEUT auszahlen →
+  // Basis-Überzahlung (0.5·A aus dem ersten Vertrag bleibt + volle Basis des neuen). Ein Team, das für die
+  // laufende Saison bereits einen Vertrag hat, darf nicht erneut unterschreiben.
+  if (getTeamSponsorContract(input.gameState, input.teamId)) {
+    return { gameState: input.gameState, contract: null, error: "sponsor_contract_already_signed" };
+  }
   const offers = getTeamSponsorOffers(input.gameState, input.teamId);
   const offer = offers.find((entry) => entry.offerId === input.offerId) ?? null;
   if (!offer) {
