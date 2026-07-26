@@ -127,13 +127,10 @@ function buildRows(
         warning: "facility_upkeep_already_paid",
       } satisfies FacilitySeasonEndFinanceFacilityRow;
     }
-    if (cashAvailableForUpkeep != null && cashAvailableForUpkeep < row.upkeep) {
-      return {
-        ...row,
-        status: "will_disable_unpaid",
-        warning: "facility_upkeep_unpaid",
-      } satisfies FacilitySeasonEndFinanceFacilityRow;
-    }
+    // Unterhalt ist PFLICHT und kann nicht umgangen werden: immer abbuchen, auch wenn das Cash dadurch
+    // ins Minus zieht. Ein negatives Saison-Ende wird anschließend vom Zahlungsunfähigkeits-Backstop
+    // (applyInsolvencyBackstop, season-completion) in einen echten Notkredit umgewandelt — Gebäude werden
+    // NICHT mehr durch Nichtzahlung deaktiviert.
     if (cashAvailableForUpkeep != null) {
       cashAvailableForUpkeep = roundValue(cashAvailableForUpkeep - row.upkeep);
     }
@@ -156,7 +153,9 @@ export function previewFacilitySeasonEndFinance(
   // KI-Teams; fehlt der Team-/Kontext, liefert die Funktion neutral 1.0.
   const arenaPopularityFactor = computeTeamBeliebtheitFromGameState(gameState, teamId).value;
   const rows = buildRows(teamFacilities, cashBeforeFacilities, gameState.season.id, arenaPopularityFactor);
-  const disabledFacilities = rows.filter((row) => row.status === "will_disable_unpaid");
+  // Gebäude werden NICHT mehr durch Nichtzahlung deaktiviert (Unterhalt ist Pflicht) — daher immer leer.
+  // Feld bleibt für API-/Anzeige-Kompatibilität erhalten. (Verfall-bedingtes Brechen läuft separat im Apply.)
+  const disabledFacilities: FacilitySeasonEndFinanceFacilityRow[] = [];
   const paidUpkeepTotal = roundValue(rows.filter((row) => row.status === "paid").reduce((sum, row) => sum + row.upkeep, 0));
   const facilityIncomeTotal = roundValue(rows.reduce((sum, row) => sum + row.income, 0));
   const fanShopIncome = rows.find((row) => row.facilityId === "fan_shop")?.income ?? 0;
@@ -266,20 +265,22 @@ export function applyFacilitySeasonEndFinance(
     facilities: { ...teamFacilities.facilities },
   };
   for (const row of preview.rows) {
-    if (row.status !== "paid" && row.status !== "will_disable_unpaid") {
+    // Nur bezahlte Unterhalts-Zeilen erzeugen ein Event; Unterhalt ist Pflicht, es gibt kein "unbezahlt" mehr.
+    if (row.status !== "paid") {
       continue;
     }
     const eventId = `facility-event-${randomUUID()}`;
     eventIds.push(eventId);
     const previous = nextFacilities.facilities[row.facilityId];
     const previousConditionPct = getFacilityEfficiency(teamFacilities, row.facilityId).conditionPct;
-    const nextConditionPct = degradeFacilityCondition(previousConditionPct, row.status === "paid");
+    const nextConditionPct = degradeFacilityCondition(previousConditionPct, true);
     nextFacilities.facilities[row.facilityId] = {
       ...previous,
-      enabled: row.status === "paid" && nextConditionPct > 0,
-      lastPaidSeasonId: row.status === "paid" ? save.gameState.season.id : previous?.lastPaidSeasonId,
+      // Deaktivierung nur noch durch Verfall (condition <= 0), nie durch Nichtzahlung.
+      enabled: nextConditionPct > 0,
+      lastPaidSeasonId: save.gameState.season.id,
       conditionPct: nextConditionPct,
-      disabledReason: row.status === "paid" ? (nextConditionPct <= 0 ? "facility_condition_broken" : undefined) : "facility_upkeep_unpaid",
+      disabledReason: nextConditionPct <= 0 ? "facility_condition_broken" : undefined,
     };
     events.push({
       eventId,
