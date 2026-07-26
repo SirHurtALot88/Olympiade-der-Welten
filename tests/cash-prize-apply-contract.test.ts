@@ -12,7 +12,16 @@ describe("cash prize apply contract", () => {
 
     expect(route).toContain("previewCashPrizeApply");
     expect(route).toContain("executeCashPrizeApply");
-    expect(route).toContain("status: dryRun ? 200 : result.canApply ? 200 : 409");
+    // The route grew beyond the original flat `dryRun ? 200 : result.canApply ? 200 : 409`
+    // ternary into a write-authorized route (authorizeServerRoomWrite gate, per-source
+    // 409/422 split) while keeping the same "blocked skeleton" contract: it still only
+    // reports canApply/blockingReasons from previewCashPrizeApply/executeCashPrizeApply
+    // and never silently applies. See docs/CASH_PRIZE_APPLY_PLAN.md ("Aktuell weiterhin
+    // hart blockiert bei: ...") and lib/season/cash-prize-apply-service.ts, which still
+    // requires an explicit confirm token before execute and returns ok:false with
+    // blockingReasons whenever a gate fails. Assert the current blocking-status logic
+    // instead of the retired literal ternary.
+    expect(route).toContain('status: source === "prisma" ? 409 : 422');
   });
 
   it("documents allowed and forbidden tables for future apply paths", async () => {

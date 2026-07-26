@@ -229,7 +229,15 @@ describe("legacy matchday resolve preview", () => {
 
     const d1Preview = preview.disciplinePreviews.find((discipline) => discipline.disciplineId === "mini-dm");
     expect(d1Preview?.teamResults[0]?.fatigueModifier).toBe(-4);
-    expect(d1Preview?.teamResults[0]?.finalPreviewScore).toBe(59.5);
+    // 59.5 war die alte Baseline. Seit commit e04fb06 ("intensity now adds a real seeded
+    // per-player range to the matchday final score") fließt ein deterministischer Pro-Spieler-
+    // Intensitäts-Jitter (default "normal": -2..+2, seeded aus playerId/disciplineId/matchdayId,
+    // siehe seededIntensityShare in legacy-lineup-modifiers.ts) zusätzlich in finalPreviewScore
+    // ein — für A-A-d1-0/A-A-d1-1 in mini-dm/matchday-1 konstant -0.8 (derselbe Offset taucht bei
+    // denselben Spieler-IDs auch in den anderen Tests dieser Datei auf).
+    expect(d1Preview?.teamResults[0]?.finalPreviewScore).toBe(58.7);
+    // Individueller Spieler-Score/Captain-Bonus bleibt unverändert: intensityModifier wird erst
+    // NACH dem Captain-Bonus als Team-Summand addiert (siehe legacy-score-engine.ts prePowerScore).
     expect(d1Preview?.topPlayers[0]?.finalPlayerScore).toBe(40.5);
     expect(d1Preview?.topPlayers[0]?.captainBonus).toBe(13.5);
   });
@@ -266,8 +274,12 @@ describe("legacy matchday resolve preview", () => {
     const baselineD1 = baselinePreview.disciplinePreviews.find((discipline) => discipline.disciplineId === "mini-dm");
     const injuredD1 = injuredPreview.disciplinePreviews.find((discipline) => discipline.disciplineId === "mini-dm");
 
-    expect(baselineD1?.teamResults[0]?.finalPreviewScore).toBe(75);
-    expect(injuredD1?.teamResults[0]?.finalPreviewScore).toBe(56.3);
+    // 75/56.3 waren die alten Baselines. Seit commit e04fb06 kommt derselbe deterministische
+    // Pro-Spieler-Intensitäts-Jitter wie oben hinzu — für A-A-d1-0 in mini-dm/matchday-1 konstant
+    // -0.2, unabhängig von Fatigue/Injury (der Jitter ist ein separater Team-Summand nach dem
+    // Fatigue/Injury/Morale-Multiplikator-Kettenglied, siehe legacy-score-engine.ts prePowerScore).
+    expect(baselineD1?.teamResults[0]?.finalPreviewScore).toBe(74.8);
+    expect(injuredD1?.teamResults[0]?.finalPreviewScore).toBe(56.1);
   });
 
   it("computes rankInTeam correctly", () => {
@@ -410,9 +422,14 @@ describe("legacy matchday resolve preview", () => {
     expect(alphaTeam?.formModifier).toBeGreaterThanOrEqual(12 - 8);
     expect(alphaTeam?.formModifier).toBeLessThanOrEqual(12 + 8);
     expect(alphaTeam?.mutatorModifier).toBe(12);
-    // finalPreviewScore = Basis (64 inkl. Nominalform 12) − Nominalform + tatsächliche Form.
-    expect(alphaTeam?.finalPreviewScore).toBeCloseTo(64 - 12 + (alphaTeam?.formModifier ?? 0), 1);
-    expect(betaTeam?.finalPreviewScore).toBe(45); // Beta hat keine Formkarten → unverändert
+    // finalPreviewScore = Basis (64 inkl. Nominalform 12) − Nominalform + tatsächliche Form
+    // + deterministischer Pro-Spieler-Intensitäts-Jitter (commit e04fb06, "normal" default,
+    // seeded aus playerId/disciplineId/matchdayId). Für A-A-d1-0/A-A-d1-1 in mini-dm/matchday-1
+    // ist dieser Offset konstant -0.8 (siehe dieselben Spieler-IDs in den anderen Tests dieser Datei).
+    expect(alphaTeam?.finalPreviewScore).toBeCloseTo(64 - 12 + (alphaTeam?.formModifier ?? 0) - 0.8, 1);
+    // 45 war die alte Baseline (Beta hat keine Formkarten, war also sonst unverändert). Beta nutzt
+    // eigene Spieler-IDs (B-B-d1-0/B-B-d1-1) → eigener konstanter Intensitäts-Jitter-Offset (-1.1).
+    expect(betaTeam?.finalPreviewScore).toBe(43.9);
     expect(alphaTeam?.rank).toBe(1);
     expect(betaTeam?.rank).toBe(2);
     expect(alphaTeam?.teamPoints).toBe(6.6);

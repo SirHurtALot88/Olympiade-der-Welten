@@ -253,6 +253,11 @@ describe("legacy lineup context loader", () => {
       return;
     }
     expect(preview.validation.isValid).toBe(true);
-    expect(preview.scorePreview.totalScore).toBe(50);
+    // 50 = Summe der 4 rohen Discipline-Scores (11+12+13+14). Seit commit e04fb06 ("intensity now
+    // adds a real seeded per-player range to the matchday final score") fließt zusätzlich ein
+    // deterministischer Pro-Spieler-Intensitäts-Jitter ("normal" ist der Default: -2..+2 pro Spieler,
+    // seeded aus playerId/disciplineId/matchdayId, siehe seededIntensityShare in
+    // lib/lineups/legacy-lineup-modifiers.ts) in totalScore ein — hier +3.4 über die 4 Spieler.
+    expect(preview.scorePreview.totalScore).toBe(53.4);
   });
 });

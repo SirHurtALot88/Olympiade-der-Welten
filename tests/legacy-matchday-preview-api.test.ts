@@ -1,18 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const loadLocalLegacyLineupContext = vi.fn();
+// Mock-Drift: der Route-Code (app/api/resolve/legacy-matchday-preview/route.ts, loadSqliteContexts)
+// ruft für die SQLite-Quelle IMMER die gebatchte `loadAllLocalLegacyLineupContexts` (ein Aufruf für
+// alle Teams) auf, nicht die einzelne `loadLocalLegacyLineupContext` — seit dem initialen
+// Snapshot-Commit, kein späterer Commit hat das geändert. Der Test mockte bislang die falsche
+// (Einzel-Team-)Funktion, wodurch das strikte vi.mock-Modul-Replace den echten
+// `loadAllLocalLegacyLineupContexts`-Export als `undefined` maskierte und die Route real 500ete.
+const loadAllLocalLegacyLineupContexts = vi.fn();
 const buildLegacyMatchdayReadiness = vi.fn();
 const buildLegacyMatchdayResolvePreview = vi.fn();
 const buildResolveLabSummary = vi.fn();
 const buildResolveLabTeamDetails = vi.fn();
 const buildResolveLabTopPlayersBySide = vi.fn();
+const buildResolveLabPlayerCatalog = vi.fn();
 const getTopPlayerNameForTeam = vi.fn();
 const getHighlightCandidatesForTeam = vi.fn();
 const createPersistenceService = vi.fn();
 const loadLegacyLineupContext = vi.fn();
 
 vi.mock("@/lib/lineups/legacy-lineup-local-service", () => ({
-  loadLocalLegacyLineupContext,
+  loadAllLocalLegacyLineupContexts,
 }));
 
 vi.mock("@/lib/lineups/legacy-matchday-readiness", () => ({
@@ -27,6 +34,12 @@ vi.mock("@/lib/resolve/legacy-resolve-lab", () => ({
   buildResolveLabSummary,
   buildResolveLabTeamDetails,
   buildResolveLabTopPlayersBySide,
+  // Mock-Drift: buildLegacyMatchdayResolvePreviewPayload (lib/foundation/legacy-matchday-resolve-preview-service.ts)
+  // ruft auch buildResolveLabPlayerCatalog aus diesem Modul auf; ohne diesen Mock ist der Export
+  // beim vi.mock-Modul-Replace `undefined`, was die Route real mit "buildResolveLabPlayerCatalog is
+  // not a function" 500en lässt (kein Produktcode-Bug — buildResolveLabPlayerCatalog existiert seit
+  // dem initialen Snapshot-Commit, der Test-Mock war schlicht unvollständig).
+  buildResolveLabPlayerCatalog,
   getTopPlayerNameForTeam,
   getHighlightCandidatesForTeam,
 }));
@@ -102,12 +115,13 @@ function createOkContext(teamId: string, teamName: string) {
 describe("legacy matchday preview api", () => {
   beforeEach(() => {
     vi.resetModules();
-    loadLocalLegacyLineupContext.mockReset();
+    loadAllLocalLegacyLineupContexts.mockReset();
     buildLegacyMatchdayReadiness.mockReset();
     buildLegacyMatchdayResolvePreview.mockReset();
     buildResolveLabSummary.mockReset();
     buildResolveLabTeamDetails.mockReset();
     buildResolveLabTopPlayersBySide.mockReset();
+    buildResolveLabPlayerCatalog.mockReset();
     getTopPlayerNameForTeam.mockReset();
     getHighlightCandidatesForTeam.mockReset();
     createPersistenceService.mockReset();
@@ -123,6 +137,12 @@ describe("legacy matchday preview api", () => {
             season: { id: "season-1", matchdayIds: ["matchday-1"], name: "Season 1", year: 1 },
             matchdayState: { matchdayId: "matchday-1" },
             teams: [{ teamId: "A-A" }, { teamId: "B-B" }],
+            // Mock-Drift: seit commit 6934638 ("preview applies injury malus") heftet die
+            // SQLite-Vorschau die deterministische Same-Day-Injury-Rolle an (buildMatchdayInjuryRollMap
+            // in lib/fatigue/fatigue-injury-service.ts liest gameState.seasonState.lineupDrafts). Ohne
+            // `seasonState` wirft das real "Cannot read properties of undefined (reading 'lineupDrafts')".
+            seasonState: { lineupDrafts: [] },
+            players: [],
           },
         },
       }),
@@ -132,14 +152,22 @@ describe("legacy matchday preview api", () => {
           season: { id: "season-1", matchdayIds: ["matchday-1"], name: "Season 1", year: 1 },
           matchdayState: { matchdayId: "matchday-1" },
           teams: [{ teamId: "A-A" }, { teamId: "B-B" }],
+          seasonState: { lineupDrafts: [] },
+          players: [],
         },
       }),
       getSaveById: () => null,
+      // Mock-Drift: die Route liest für die SQLite-Quelle jetzt den Arena-Preview-Cache
+      // (lib/foundation/arena-preview-cache.ts), dessen Signatur aus getSaveVersionMetadata
+      // gebaut wird (siehe route.ts buildArenaPreviewCacheSignature). Ohne diesen Mock wirft
+      // `persistence.getSaveVersionMetadata(...)` "is not a function" und die Route 500et.
+      getSaveVersionMetadata: () => null,
     });
 
-    loadLocalLegacyLineupContext
-      .mockReturnValueOnce(createOkContext("A-A", "Alpha"))
-      .mockReturnValueOnce(createOkContext("B-B", "Beta"));
+    loadAllLocalLegacyLineupContexts.mockReturnValue([
+      createOkContext("A-A", "Alpha"),
+      createOkContext("B-B", "Beta"),
+    ]);
     buildLegacyMatchdayReadiness.mockImplementation((context) => ({
       teamId: context.team.id,
       teamName: context.team.name,
@@ -180,6 +208,7 @@ describe("legacy matchday preview api", () => {
     });
     buildResolveLabTeamDetails.mockReturnValue([]);
     buildResolveLabTopPlayersBySide.mockReturnValue({ d1: [], d2: [] });
+    buildResolveLabPlayerCatalog.mockReturnValue([]);
     getTopPlayerNameForTeam.mockReturnValue(null);
     getHighlightCandidatesForTeam.mockReturnValue([]);
 
@@ -189,7 +218,8 @@ describe("legacy matchday preview api", () => {
 
     expect(response.status).toBe(200);
     expect(body.source).toBe("sqlite");
-    expect(loadLocalLegacyLineupContext).toHaveBeenCalledTimes(2);
+    // Gebatchter Aufruf für alle Teams in einem Rutsch, siehe Kommentar an der Mock-Deklaration oben.
+    expect(loadAllLocalLegacyLineupContexts).toHaveBeenCalledTimes(1);
     expect(loadLegacyLineupContext).not.toHaveBeenCalled();
   });
 
@@ -243,6 +273,7 @@ describe("legacy matchday preview api", () => {
     });
     buildResolveLabTeamDetails.mockReturnValue([]);
     buildResolveLabTopPlayersBySide.mockReturnValue({ d1: [], d2: [] });
+    buildResolveLabPlayerCatalog.mockReturnValue([]);
     getTopPlayerNameForTeam.mockReturnValue(null);
     getHighlightCandidatesForTeam.mockReturnValue([]);
 
@@ -253,6 +284,6 @@ describe("legacy matchday preview api", () => {
     expect(response.status).toBe(200);
     expect(body.source).toBe("prisma");
     expect(loadLegacyLineupContext).toHaveBeenCalledTimes(2);
-    expect(loadLocalLegacyLineupContext).not.toHaveBeenCalled();
+    expect(loadAllLocalLegacyLineupContexts).not.toHaveBeenCalled();
   });
 });

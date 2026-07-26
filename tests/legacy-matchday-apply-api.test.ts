@@ -92,9 +92,17 @@ describe("legacy matchday apply api", () => {
       }),
     );
 
+    // Mock-Drift: die Route prüft `authorizeServerRoomWrite` (lib/room/server-authoritative-write-guard.ts)
+    // VOR dem Aufruf von `applyLegacyMatchdayResult` — für source=prisma lehnt der Guard IMMER sofort
+    // mit "prisma_writes_forbidden_in_local_multiplayer" ab (siehe server-authoritative-write-guard.ts
+    // ~Z. 139-146 sowie die eigene Testdatei tests/server-authoritative-write-guard.test.ts), der
+    // gemockte Service wird für diesen Pfad also NIE erreicht. Die Route liefert in diesem Guard-Zweig
+    // `{ success, error, warnings }` — kein `blockingReasons`-Feld (das kommt nur aus dem
+    // Service-Rejection-Zweig weiter unten, der hier nicht greift).
     const body = await response.json();
     expect(response.status).toBe(409);
     expect(body.success).toBe(false);
-    expect(body.blockingReasons).toHaveLength(1);
+    expect(body.error).toBe("prisma_writes_forbidden_in_local_multiplayer");
+    expect(applyLegacyMatchdayResult).not.toHaveBeenCalled();
   });
 });

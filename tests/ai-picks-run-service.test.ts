@@ -254,6 +254,117 @@ function buildGameState(): GameState {
   };
 }
 
+// Builds a minimally-realistic TransfermarktFreeAgentItem (lib/market/transfermarkt-read-service.ts)
+// from a fixture player, for tests that exercise the execute-time live free-agent pool
+// (listExecuteFreeAgentsForSlot / resolveExecuteLivePickForSlot in
+// lib/ai/market-pick-engine/execute-live-pick.ts). Only used by tests that actually complete a live
+// buy — dry-run/preflight-blocked tests don't touch this pool and are unaffected.
+function toFreeAgentItem(player: GameState["players"][number]) {
+  return {
+    playerId: player.id,
+    name: player.name,
+    className: player.className,
+    race: player.race,
+    alignment: player.alignment,
+    gender: player.gender,
+    subclasses: player.subclasses ?? [],
+    traitsPositive: player.traitsPositive ?? [],
+    traitsNegative: player.traitsNegative ?? [],
+    // Derive from the player's own top discipline rating so the execute-time need-axis scoring
+    // (resolveNeedAxisScore in lib/ai/market-pick-engine/execute-live-pick.ts) converges on the same
+    // player the frozen preview (buildAiNeedsPicksCompare mock) already planned for that team's
+    // bestNeedDisciplineId, instead of an arbitrary highest-raw-stat pick.
+    preferredDisciplineIds:
+      player.preferredDisciplineIds && player.preferredDisciplineIds.length > 0
+        ? player.preferredDisciplineIds
+        : Object.entries(player.disciplineRatings ?? {})
+            .sort((left, right) => right[1] - left[1])
+            .slice(0, 1)
+            .map(([disciplineId]) => disciplineId),
+    scoutingLevel: null,
+    scoutingDisclosure: null,
+    hiddenPositiveTraitCount: 0,
+    hiddenNegativeTraitCount: 0,
+    preferredDisciplineIdsVisible: true,
+    subclass1: null,
+    subclass2: null,
+    subclass3: null,
+    traitPos1: null,
+    traitPos2: null,
+    traitPos3: null,
+    traitNeg1: null,
+    traitNeg2: null,
+    traitNeg3: null,
+    marketValue: player.displayMarketValue ?? player.marketValue ?? null,
+    ovr: player.ovr ?? player.rating ?? null,
+    mvs: null,
+    salary: player.displaySalary ?? player.salaryDemand ?? null,
+    marketValueSalaryRatio: null,
+    bracket: null,
+    salaryStatus: "known" as const,
+    pow: player.coreStats?.pow ?? null,
+    spe: player.coreStats?.spe ?? null,
+    men: player.coreStats?.men ?? null,
+    soc: player.coreStats?.soc ?? null,
+    powTier: null,
+    speTier: null,
+    menTier: null,
+    socTier: null,
+    above20: player.disciplineTierCounts?.above20 ?? null,
+    above40: player.disciplineTierCounts?.above40 ?? null,
+    above60: player.disciplineTierCounts?.above60 ?? null,
+    above80: player.disciplineTierCounts?.above80 ?? null,
+  };
+}
+
+// Wires listLocalTransfermarktFreeAgents (see toFreeAgentItem above) so tests that run the real
+// execute loop have a live free-agent pool to resolve picks from. Used by the two tests that
+// actually complete a live buy ("executes buys...", "blocks execute drift...").
+//
+// marketValueOverrides bumps fa-value's pool-listing marketValue from its roster-record price (18,
+// from buildGameState()) up into the "core" bracket band (floor 30, see MARKET_BRACKET_DEFINITIONS
+// in lib/ai/market-pick-engine/market-brackets.ts). The frozen preview (buildCompareEntry) plans
+// fa-value as a pickLane: "core" pick, but 18 MW is actually below the real "core" floor — with the
+// unmodified fixture price, resolveExecuteLivePickForSlot's MW-band filter would silently exclude
+// fa-value from the live "core" search and hand C-C the higher-value fa-mage instead (verified by
+// running this without the override: C-C ends up with "history-fa-mage"). The actual purchase price
+// booked to transfer history stays 18 either way, since that comes from the separate
+// previewLocalTransfermarktBuy/executeLocalTransfermarktBuy mocks below, not from this pool listing.
+function mockLiveFreeAgentPool(marketValueOverrides: Record<string, number> = { "fa-value": 32 }) {
+  listLocalTransfermarktFreeAgents.mockImplementation(({ teamId }: { teamId?: string }) => {
+    const team = teamId
+      ? persistenceState.save.gameState.teams.find((entry) => entry.teamId === teamId) ?? null
+      : null;
+    const rosteredIds = new Set(persistenceState.save.gameState.rosters.map((entry) => entry.playerId));
+    const pool = persistenceState.save.gameState.players.filter((player) => !rosteredIds.has(player.id));
+    const items = pool.map((player) => {
+      const item = toFreeAgentItem(player);
+      const override = marketValueOverrides[player.id];
+      return override != null ? { ...item, marketValue: override } : item;
+    });
+    const sortedPool = [...items].sort((left, right) => (left.marketValue ?? Number.POSITIVE_INFINITY) - (right.marketValue ?? Number.POSITIVE_INFINITY));
+    return {
+      items,
+      total: items.length,
+      scope: { saveId: "save-ai-run", seasonId: "season-1", teamId: teamId ?? null },
+      saveContext: {
+        source: "sqlite",
+        requestedSaveId: "save-ai-run",
+        resolvedSaveId: "save-ai-run",
+        requestedSeasonId: "season-1",
+        resolvedSeasonId: "season-1",
+        saveName: "AI Run Test Save",
+        saveStatus: "active",
+        scopeWarning: null,
+      },
+      teamContext: team
+        ? { teamId: team.teamId, teamCode: team.shortCode, teamName: team.name, teamCash: team.cash }
+        : null,
+      poolAudit: { visiblePlayers: sortedPool.length, cheapestVisiblePlayer: sortedPool[0] ?? null },
+    };
+  });
+}
+
 function buildCompareEntry(teamId: "C-C" | "W-W", pickClassName: string, playerId: string, playerName: string) {
   const teamName = teamId === "C-C" ? "Cash Creators" : "Wicked Wizards";
   const controlMode = teamId === "C-C" ? "ai" : "manual";
@@ -1343,6 +1454,15 @@ describe("ai picks run service", () => {
   });
 
   it("executes buys through the local path and verifies transfer history", async () => {
+    // The default beforeEach stub for listLocalTransfermarktFreeAgents always returns items: [] (it
+    // only fills in poolAudit metadata) — fine for the dry-run/preflight-only tests above, but the
+    // real execute loop (lib/ai/ai-picks-run-service.ts ~L3999, "Build the team's league free-agent
+    // feed once for this execute loop") re-fetches this live pool and needs it non-empty to resolve
+    // an actual live pick (listExecuteFreeAgentsForSlot / resolveExecuteLivePickForSlot in
+    // lib/ai/market-pick-engine/execute-live-pick.ts). Populate it with the same fa-value/fa-mage
+    // free agents the frozen preview already planned for, so the live re-check matches.
+    mockLiveFreeAgentPool();
+
     const { runAiPicksExecutePreview } = await import("@/lib/ai/ai-picks-run-service");
     buildAiNeedsPicksCompare.mockClear();
     const result = await runAiPicksExecutePreview({
@@ -1375,8 +1495,14 @@ describe("ai picks run service", () => {
     });
     expect(result.traceParity.traceDifferences).toEqual([]);
     expect(buildAiNeedsPicksCompare).toHaveBeenCalledTimes(2);
+    // buildExecuteLivePick (lib/ai/ai-picks-run-service.ts:2664) always relabels primaryReason to
+    // "execute_live_lane_pick" once a live pick is resolved for the slot -- that's the whole point of
+    // the live re-check (it also appends an "execute_live_lane_pick_confirmed:<playerId>" warning
+    // when, as here, the live pick matches the frozen one). Every other field below is untouched by
+    // that relabeling (buildExecuteLivePick spreads slotTemplate and only overrides identity/lane/
+    // reason fields), so they still carry the frozen preview's original values.
     expect(result.teams.find((entry) => entry.teamId === "C-C")?.plannedPicks[0]).toMatchObject({
-      primaryReason: "Need fuellen",
+      primaryReason: "execute_live_lane_pick",
       secondaryReason: "Profil passt",
       pickLane: "core",
       rosterRole: "Core",
@@ -1390,16 +1516,72 @@ describe("ai picks run service", () => {
   });
 
   it("blocks execute drift instead of silently replanning when a frozen preview pick becomes invalid", async () => {
-    previewLocalTransfermarktBuy.mockImplementationOnce(({ playerId }: { playerId: string }) => ({
-      canBuy: false,
-      blockingReasons: playerId === "fa-value" ? ["player_not_available_anymore"] : [],
-      warnings: ["preview_pick_invalidated"],
-      contractLength: 1,
-      purchasePrice: 18,
-      salary: 3,
-      player: { id: playerId, name: playerId, className: "Mercenary", race: "Human" },
-      team: { id: "team", name: "Team", shortCode: "TEAM" },
-    }));
+    // Team-scope the live pool (unlike mockLiveFreeAgentPool's global pool used by the previous
+    // test) so C-C's live search has no leftover in-pool alternative once fa-value specifically
+    // becomes unavailable below -- otherwise it would just silently substitute W-W's fa-mage, which
+    // is a different (also real, see buildExecuteLivePick's "*_replaced_planned" vs "*_confirmed"
+    // warning) behaviour than the "genuinely nothing else available -> blocked" case this test names.
+    listLocalTransfermarktFreeAgents.mockImplementation(({ teamId }: { teamId?: string }) => {
+      const player = persistenceState.save.gameState.players.find((entry) =>
+        teamId === "W-W" ? entry.id === "fa-mage" : entry.id === "fa-value",
+      );
+      const item = player ? { ...toFreeAgentItem(player), marketValue: player.id === "fa-mage" ? 30 : 32 } : null;
+      const items = item ? [item] : [];
+      return {
+        items,
+        total: items.length,
+        scope: { saveId: "save-ai-run", seasonId: "season-1", teamId: teamId ?? null },
+        saveContext: {
+          source: "sqlite",
+          requestedSaveId: "save-ai-run",
+          resolvedSaveId: "save-ai-run",
+          requestedSeasonId: "season-1",
+          resolvedSeasonId: "season-1",
+          saveName: "AI Run Test Save",
+          saveStatus: "active",
+          scopeWarning: null,
+        },
+        teamContext: null,
+        poolAudit: { visiblePlayers: items.length, cheapestVisiblePlayer: item },
+      };
+    });
+
+    // previewLocalTransfermarktBuy is consulted more than once per pick: once inside the live-pool
+    // search itself (lib/ai/market-pick-engine/execute-live-pick.ts:417-429, confirming the
+    // top-ranked candidate is actually buyable) and again as the outer re-validation right before
+    // executing (lib/ai/ai-picks-run-service.ts:4174-4182) -- plus a season1 substitute retry if that
+    // outer check fails. Model "fa-value was available a moment ago but is gone by purchase time":
+    // its first previewLocalTransfermarktBuy call still succeeds (so the live search resolves
+    // nextPick = fa-value, matching the frozen plan -- no drift yet), every call after that for
+    // fa-value fails, including the substitute retry's own internal search, so there is genuinely no
+    // fallback left in C-C's scoped pool and the pick ends up blocked rather than silently replanned
+    // onto a different player. fa-mage (W-W) is unaffected and always succeeds.
+    const seenPlayerIds = new Set<string>();
+    previewLocalTransfermarktBuy.mockImplementation(({ playerId }: { playerId: string }) => {
+      if (playerId === "fa-value" && seenPlayerIds.has(playerId)) {
+        return {
+          canBuy: false,
+          blockingReasons: ["player_not_available_anymore"],
+          warnings: ["preview_pick_invalidated"],
+          contractLength: 1,
+          purchasePrice: 18,
+          salary: 3,
+          player: { id: playerId, name: playerId, className: "Mercenary", race: "Human" },
+          team: { id: "team", name: "Team", shortCode: "TEAM" },
+        };
+      }
+      seenPlayerIds.add(playerId);
+      return {
+        canBuy: true,
+        blockingReasons: [],
+        warnings: [],
+        contractLength: 1,
+        purchasePrice: playerId === "fa-mage" ? 30 : 18,
+        salary: playerId === "fa-mage" ? 5 : 3,
+        player: { id: playerId, name: playerId, className: playerId === "fa-mage" ? "Mage" : "Mercenary", race: playerId === "fa-mage" ? "Spirit" : "Human" },
+        team: { id: "team", name: "Team", shortCode: "TEAM" },
+      };
+    });
 
     const { runAiPicksExecutePreview } = await import("@/lib/ai/ai-picks-run-service");
     const result = await runAiPicksExecutePreview({

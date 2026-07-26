@@ -468,8 +468,15 @@ describe("ai manager apply service", () => {
       rosterBelowMin: true,
     });
 
+    // resolveMarketSpendableCashForPlanner (lib/ai/ai-manager-apply-service.ts:940-942) returns raw
+    // teamCash with no pad whenever rosterBelowMin is true, deliberately ignoring stale budget-
+    // reservation buckets. This is documented right above that early return: "Hard-min fill must not
+    // be capped by stale draft-era GM buckets ... must not be capped by ANY solvency/liquidity pad
+    // either ... below hard min, the ceiling must equal raw cash — no pad", citing a real regression
+    // (2026-07-13 S2 buy-convergence bug where teams got stuck below hardMin despite ample cash). So
+    // the expected ceiling here is exactly teamCash, not merely "some cash short of teamCash".
     expect(spendable).toBeGreaterThan(140);
-    expect(spendable).toBeLessThan(154);
+    expect(spendable).toBe(154);
   });
 
   it("falls back to salary runway reserve when no budget reservations exist and roster is at Opt", () => {

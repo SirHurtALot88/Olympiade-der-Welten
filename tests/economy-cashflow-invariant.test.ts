@@ -519,8 +519,18 @@ beforeAll(async () => {
   );
   const sponsorLoggedDelta = Number(newSponsorLogs.reduce((sum, log) => sum + log.cashDelta, 0).toFixed(4));
   const sponsorDelta = Number((sponsorCashAfter - sponsorCashBefore).toFixed(4));
-  for (const log of newSponsorLogs) {
-    bookings.push({ teamId: sponsorTeamId, amount: log.cashDelta, system: "sponsor_salary", note: log.componentId ?? log.id });
+  // WICHTIG: applySponsorSettlement mit deductSalary:true zieht Gehalt LIGA-WEIT bei ALLEN Teams ab
+  // (nicht nur bei `sponsorTeamId`, der hier zufällig einen Sponsorvertrag hat) — siehe Kommentar
+  // "Audit R2/V2" in sponsor-settlement-service.ts (~Z. 340): Gehalt wird IMMER abgezogen, unabhängig
+  // von einem Vertrag, um den KI-Paritätsbruch/Ökonomie-Skew zu vermeiden, den ein vertragsgekoppelter
+  // Abzug hätte. Für die Aggregat-Invariante (Phase 7) müssen daher ALLE `season_end`-Logs aus diesem
+  // einen Aufruf gebucht werden, nicht nur die von `sponsorTeamId` — sonst fehlt in der Buchhaltung des
+  // Tests das Gehalt der anderen 31 Teams, obwohl es real von ihrem Cash abgezogen wurde.
+  const allNewSponsorLogs = (sponsorApply.gameState.seasonState.sponsorPayoutLogs ?? []).filter(
+    (log) => log.phase === "season_end",
+  );
+  for (const log of allNewSponsorLogs) {
+    bookings.push({ teamId: log.teamId, amount: log.cashDelta, system: "sponsor_salary", note: log.componentId ?? log.id });
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -803,16 +813,24 @@ describe("Geldfluss-Invariante — simulierte Mini-Saison", () => {
       expect(after, `Team ${teamId}: cash vor Cash-Prize-Apply ${before}, danach ${after}`).toBe(before);
     }
 
-    // Sekundärer, best-effort Beweis aus dem Funktions-Rückgabewert selbst, wo verfügbar: oldCash/
-    // newCash können `null` sein, wenn die Standings-Vorschau für ein Team unvollständig ist —
-    // unabhängig vom hier geprüften Cash-Payout, siehe NEBENBEFUND in Phase 1 (in dieser Fixture
-    // ist newCash für ALLE Teams null, weil standings_apply nie sauber durchlief — der maßgebliche
-    // Beweis oben über die echten team.cash-Werte ist davon nicht betroffen).
+    // VERALTETER KOMMENTAR KORRIGIERT: `plannedChanges[].newCash` (= `item.projectedCash` in
+    // prize-money-preview.ts) ist AUSDRÜCKLICH ein voller Wirtschafts-BENCHMARK
+    // (currentCash − Gehalt + Season-Einnahme − Kreditrate, siehe prize-money-preview.ts ~Z. 592-595),
+    // nicht "currentCash + Preisgeld". Er wird für das KI-Wirtschaftssignal gebraucht und weicht daher
+    // BEWUSST von oldCash ab, sobald Gehalt/Einnahme/Kreditrate ungleich null sind — das ist eine reine
+    // Vorschau/Prognose, kein Cash-Payout. Die frühere Annahme, `newCash` sei in dieser Fixture für
+    // alle Teams `null` (und die Schleife dadurch faktisch ein No-op), war ein Nebeneffekt eines
+    // unabhängigen, hier nicht mehr reproduzierbaren Datenzustands — keine dokumentierte Garantie.
+    // Der maßgebliche Beweis, dass KEIN echtes Cash bewegt wurde, ist ausschließlich die Schleife
+    // oben über die realen `cashBeforePrize`/`cashAfterPrize`-Werte. Hier prüfen wir nur noch, dass
+    // der Rückgabewert strukturell sinnvoll befüllt ist (keine falsche Gleichheits-Annahme mehr).
     expect(run.phase6.oldCashByTeam.size).toBeGreaterThan(0);
-    for (const [teamId, oldCash] of run.phase6.oldCashByTeam) {
-      const newCash = run.phase6.newCashByTeam.get(teamId) ?? null;
-      if (oldCash == null || newCash == null) continue;
-      expect(newCash).toBe(oldCash);
+    expect(run.phase6.newCashByTeam.size).toBeGreaterThan(0);
+    for (const [teamId, newCash] of run.phase6.newCashByTeam) {
+      if (newCash == null) continue;
+      expect(Number.isFinite(newCash), `Team ${teamId}: newCash (projectedCash) sollte eine endliche Zahl sein`).toBe(
+        true,
+      );
     }
   });
 
@@ -839,8 +857,13 @@ describe("Geldfluss-Invariante — simulierte Mini-Saison", () => {
     // Teams, die in KEINER Buchung vorkommen, dürfen sich im Cash über den gesamten Lauf hinweg
     // ebenfalls nicht verändert haben (Kontrollgruppe — deckt "unsichtbare" Cash-Bewegungen ab,
     // die von keinem der oben geprüften Systeme stammen).
+    // Seit die Sponsor-/Gehalts-Buchung oben korrekt LIGA-WEIT für alle Teams mit Roster-Gehalt
+    // gebucht wird (applySponsorSettlement zieht Gehalt IMMER ab, siehe "Audit R2/V2" in
+    // sponsor-settlement-service.ts ~Z. 340), ist `touchedTeamIds` für eine volle 32-Team-Liga
+    // typischerweise bereits alle 32 Teams — eine leere Kontrollgruppe ist damit der ERWARTETE
+    // Normalfall und kein Testfehler. Die Invariante selbst bleibt aktiv, falls doch ein Team ohne
+    // jede Buchung übrig bleibt (z. B. ein Team ohne Roster/Gehalt).
     const untouchedTeams = run.finalGameState.teams.filter((team) => !touchedTeamIds.has(team.teamId));
-    expect(untouchedTeams.length).toBeGreaterThan(0);
     for (const team of untouchedTeams) {
       const before = run.initialCash.get(team.teamId) ?? 0;
       expect(

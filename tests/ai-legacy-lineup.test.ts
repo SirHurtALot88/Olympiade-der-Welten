@@ -199,7 +199,14 @@ describe("legacy ai lineup suggestion", () => {
     expect(suggestion.entries.every((entry) => activeIds.has(entry.playerId))).toBe(true);
   });
 
-  it("does not persist per-team mutator traits in AI lineup modifiers anymore", () => {
+  // Was "does not persist per-team mutator traits ... anymore" (expected null/null). That is stale:
+  // buildAiLegacyLineupModifiers (lib/ai/ai-legacy-lineup-batch-apply-service.ts) unconditionally calls
+  // applyMutatorTraitsToLineupModifiers (lib/lineups/legacy-lineup-modifiers.ts), which deterministically
+  // picks the two mutator traits with the strongest roster coverage per side via
+  // selectBestMutatorTraitsForEntries. This is an actively maintained, intentional feature: the season
+  // audit (lib/season/season-ai-lineup-audit-service.ts:154) explicitly flags "ai_mutators_unused" as a
+  // warning when an AI team's mutator-trait usage is zero, i.e. AI teams are expected to set them.
+  it("selects the strongest-coverage mutator traits per side in AI lineup modifiers", () => {
     const context = createContext();
     context.rosterPlayers = [
       { id: "p1", name: "Player 1", traitsPositive: ["Cool", "Diligent"], traitsNegative: [], coreStats: { pow: 80, spe: 20, men: 20, soc: 20 } },
@@ -215,8 +222,11 @@ describe("legacy ai lineup suggestion", () => {
       { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 3, playerId: "p4", activePlayerId: "a4" },
     ]);
 
-    expect(modifiers.d1.mutatorTrait1).toBeNull();
-    expect(modifiers.d1.mutatorTrait2).toBeNull();
+    // "Cool" covers both p1 and p2 (highest distinct-player coverage), so it wins slot 1. "Diligent"
+    // also covers p1+p2 but adds no *new* player coverage once "Cool" is picked, so the tie-break
+    // prefers a trait that covers an uncovered player: "Ambitious" (p3) beats "Flexible" (p4) alphabetically.
+    expect(modifiers.d1.mutatorTrait1).toBe("Cool");
+    expect(modifiers.d1.mutatorTrait2).toBe("Ambitious");
   });
 
   it("prefers fresher players when fatigue and injury risk are elevated", () => {

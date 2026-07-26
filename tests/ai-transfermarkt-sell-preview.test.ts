@@ -241,6 +241,32 @@ function createGameState(): GameState {
           aiSellAutoApplyEnabled: false,
         },
       },
+      // buildSeasonPointsLedger (lib/foundation/season-points-ledger.ts) only turns
+      // playerDisciplinePerformances into season points (feeding mvs AND ovrNormalized -- see
+      // buildPlayerRatingContractRows's ppsComp/mvsComp/bracketPerfComp) for performances whose
+      // matchdayResultId resolves to a matchdayResults row with status "preview_applied" for this
+      // season. Without it, every performance below is silently dropped from the ledger and mvs/ovr
+      // collapse to 0/null for the whole roster (verified: ai-core's live ovr/mvs come back 0/null
+      // without this row, even though playerDisciplinePerformances below has real data).
+      matchdayResults: [
+        {
+          id: "result-1",
+          saveId: "save-local",
+          seasonId: "season-1",
+          matchdayId: "matchday-1",
+          status: "preview_applied",
+          sourceVersion: "v1",
+          teamsTotal: 3,
+          teamsReady: 3,
+          teamsUnderfilled: 0,
+          teamsMissingLineup: 0,
+          teamsInvalidLineup: 0,
+          teamsMissingScoreCoverage: 0,
+          warningsCount: 0,
+          createdAt: "2026-06-05T10:00:00.000Z",
+          updatedAt: "2026-06-05T10:00:00.000Z",
+        },
+      ],
       playerDisciplinePerformances: [
         createPerformance({ id: "perf-1", teamId: "A-I", playerId: "ai-core", disciplineId: "d_spe", disciplineSide: "d1", scoreContribution: 12, finalPlayerScore: 30 }),
         createPerformance({ id: "perf-2", teamId: "A-I", playerId: "ai-anchor", disciplineId: "d_men", disciplineSide: "d2", scoreContribution: 48, finalPlayerScore: 70, isTop10: true }),
@@ -427,10 +453,17 @@ describe("ai transfermarkt sell preview", () => {
         ...persistenceState.save.gameState,
         seasonState: {
           ...persistenceState.save.gameState.seasonState,
+          // "underperformed" (lib/ai/ai-transfermarkt-sell-preview-service.ts:573-579) requires BOTH
+          // averageFinalScore well below the player's OVR expectation AND averageContribution < 12 --
+          // below 12 falls into the stronger "Performance blieb unter Erwartung" reason, whereas
+          // 12..25 only yields the milder "schwache lokale Score-Beitraege" (weak_contribution, see
+          // line 701). The original perf-3/perf-4 scoreContribution values (14, 16) average to 14
+          // together with perf-1's 12, i.e. exactly the milder band, so the underperformance reason
+          // never fired; lowered here to land the average under 12.
           playerDisciplinePerformances: [
             ...persistenceState.save.gameState.seasonState.playerDisciplinePerformances,
-            createPerformance({ id: "perf-3", teamId: "A-I", playerId: "ai-core", disciplineId: "d_spe", disciplineSide: "d1", scoreContribution: 14, finalPlayerScore: 28 }),
-            createPerformance({ id: "perf-4", teamId: "A-I", playerId: "ai-core", disciplineId: "d_spe", disciplineSide: "d2", scoreContribution: 16, finalPlayerScore: 29 }),
+            createPerformance({ id: "perf-3", teamId: "A-I", playerId: "ai-core", disciplineId: "d_spe", disciplineSide: "d1", scoreContribution: 8, finalPlayerScore: 28 }),
+            createPerformance({ id: "perf-4", teamId: "A-I", playerId: "ai-core", disciplineId: "d_spe", disciplineSide: "d2", scoreContribution: 9, finalPlayerScore: 29 }),
           ],
         },
       },

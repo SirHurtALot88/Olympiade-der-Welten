@@ -8,10 +8,16 @@ import {
 } from "@/lib/season/long-run-soft-blockers";
 
 describe("long-run-soft-blockers", () => {
-  it("treats S1 roster repair forbidden as soft when policy blocks repair", () => {
+  it("treats roster repair forbidden as hard now that policy always allows repair", () => {
+    // `isTransferActionAllowed` in transfer-season-policy.ts always returns `true` now (2026-07-04
+    // "course correction", siehe Kommentar dort: "All transfer actions are allowed in every season,
+    // including season 1" / "No S1 buy source is forbidden anymore"). Der
+    // `!isTransferActionAllowed(...)`-Soft-Zweig in isSoftLongRunBlocker kann dadurch nie mehr
+    // greifen — roster_hard_gate_repair_forbidden ist jetzt in JEDER Saison ein echter (harter)
+    // Blocker, nicht mehr ein erwarteter S1-Policy-Artefakt.
     const blocker = "roster_hard_gate_repair_forbidden:season-1:B-P";
-    expect(isSoftLongRunBlocker("season-1", blocker)).toBe(true);
-    expect(isSoftOpenTechnicalBug(`season-1:${blocker}`)).toBe(true);
+    expect(isSoftLongRunBlocker("season-1", blocker)).toBe(false);
+    expect(isSoftOpenTechnicalBug(`season-1:${blocker}`)).toBe(false);
   });
 
   it("keeps S2 roster repair forbidden as hard when repair is allowed", () => {
@@ -19,12 +25,14 @@ describe("long-run-soft-blockers", () => {
     expect(isSoftLongRunBlocker("season-2", blocker)).toBe(false);
   });
 
-  it("filters soft bugs from openTechnicalBugs list", () => {
+  it("keeps roster_hard_gate_repair_forbidden as a hard bug in openTechnicalBugs list", () => {
+    // Siehe Kommentar im ersten Test: seit der Transfer-Policy-Korrektur ist repair_forbidden in
+    // keiner Saison mehr ein Soft-Blocker, also filtert filterHardOpenTechnicalBugs hier nichts mehr.
     const bugs = [
       "season-1:roster_hard_gate_repair_forbidden:season-1:B-P",
       "season-2:roster_hard_gate_below_min:T-G",
     ];
-    expect(filterHardOpenTechnicalBugs(bugs)).toEqual(["season-2:roster_hard_gate_below_min:T-G"]);
+    expect(filterHardOpenTechnicalBugs(bugs)).toEqual(bugs);
   });
 
   it("treats organic-only xp phase blocks as soft", () => {
