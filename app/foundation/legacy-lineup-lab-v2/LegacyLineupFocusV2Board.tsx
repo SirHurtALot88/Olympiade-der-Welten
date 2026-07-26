@@ -293,7 +293,10 @@ export type LegacyLineupFocusV2BoardProps = {
 };
 
 function formatScore(value: number) {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+  return new Intl.NumberFormat("de-DE", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(value);
 }
 
 function formatDecimalScore(value: number | null | undefined, digits = 1) {
