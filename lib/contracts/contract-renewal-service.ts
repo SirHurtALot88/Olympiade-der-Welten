@@ -1569,11 +1569,23 @@ export function previewContractRenewalAction(input: {
     currentContractLength <= 0 ||
     rosterEntry?.contractStatus === "renewal_pending" ||
     rosterEntry?.contractStatus === "out_of_contract";
+  // Audit R2/V3: Release NUR bei ausgelaufenem Vertrag zulässig. Ein laufender Vertrag (contractLength > 0)
+  // hat einen offenen Buyout — Release würde den vollen salePrice ohne Buyout-Abzug auszahlen und damit den
+  // regulären Verkauf (netProceeds = salePrice − buyoutCost) unterbieten (Buyout-Umgehung). Unter Vertrag
+  // stehende Spieler müssen über den Transfermarkt verkauft werden; nur ausgelaufene Verträge sind releasebar
+  // (dann ist der Buyout ohnehin 0, keine Lücke).
+  const releaseEligible =
+    input.action !== "release" ||
+    currentContractLength <= 0 ||
+    rosterEntry?.contractStatus === "renewal_pending" ||
+    rosterEntry?.contractStatus === "out_of_contract" ||
+    rosterEntry?.contractStatus === "released";
   const blockingReasons = [
     !team ? "team_not_found" : null,
     !player ? "player_not_found" : null,
     !rosterEntry ? "player_not_on_team_roster" : null,
     !renewalEligible ? "renewal_only_allowed_at_lz_0" : null,
+    !releaseEligible ? "release_only_allowed_at_expired_contract" : null,
   ].filter((blocker): blocker is string => Boolean(blocker));
   const contractLength = Math.max(1, Math.min(5, normalizeLength(input.contractLength ?? rosterEntry?.contractLength ?? 2)));
   const negotiationPreview =
