@@ -215,21 +215,55 @@ const clauseEv = (t: SponsorType) => P_MET * t.clause.bonus - (1 - P_MET) * t.cl
  * steigt sie moderat. Gedaempft, damit der Keller nicht 1:1 dem Ligajahr ausgeliefert ist.
  */
 const FLOOR_DAMP = 0.8;
-const floorAt = (sf: number) => FLOOR * (1 - FLOOR_DAMP * (1 - sf));
+/**
+ * Untergrenze faellt im schlechten Jahr gedaempft mit, steigt im guten Jahr aber NICHT.
+ *
+ * Sie ist ein Schutzmechanismus, keine Belohnung: in einem miesen Ligajahr muss sie nachgeben,
+ * damit die Schere nicht flach wird (sonst Meister 59 gegen Letzter 47 = 1.26x). In einem guten
+ * Jahr mitzuwachsen hiesse dagegen, den Keller genau dann anzuheben, wenn die Spitze bevorzugt
+ * werden soll — gemessen ergab das eine U-Form im Ueberschuss (R1 +25, R16 +11, R32 +14), also
+ * ein ausgequetschtes Mittelfeld. Ohne Mitwachsen faellt der Ueberschuss sauber von oben nach unten.
+ */
+const floorAt = (sf: number) => (sf >= 1 ? FLOOR : FLOOR * (1 - FLOOR_DAMP * (1 - sf)));
 
-function teamPayout(t: SponsorType, rank: number, k: number, fl: number) {
+/**
+ * NEIGUNG im guten Ligajahr — asymmetrisch, nur nach oben.
+ *
+ * Ohne Neigung war ein 1.2er-Jahr breit geteilt und begünstigte den Keller sogar leicht
+ * (R1 +14 gegen R32 +18), während ein 0.8er-Jahr fast ausschliesslich die Spitze traf
+ * (R1 -22 gegen R32 -1). Das war unsymmetrisch zulasten der Top-Teams: sie tragen den
+ * Verlust, teilen aber den Gewinn.
+ *
+ * Deshalb kippt die Leiter bei sf > 1 zugunsten der Spitze — wer die hoechste Gehaltslast
+ * traegt und im schlechten Jahr am meisten verliert, wird im guten Jahr am staerksten
+ * beteiligt. Bei sf <= 1 bleibt die Neigung aus: die Haerte des schlechten Jahres fuer die
+ * Spitze ist gewollt und wird nicht zusaetzlich abgefedert.
+ */
+/**
+ * Voreinstellung 0.8 — bewusst moderat. Gemessene Kippstaerken bei sf 1.2 (Ueberschuss R1 … R32):
+ *   0.4 → +25 +18 +15 +13 +12 +13   Schere 1.99x   Meister 121-146
+ *   0.8 → +28 +20 +16 +12 +11 +11   Schere 2.11x   Meister 125-152
+ *   1.2 → +32 +22 +18 +12 +10 +10   Schere 2.22x   Meister 129-157
+ *   1.5 → +34 +24 +18 +11  +9  +9   Schere 2.31x   Meister 132-161
+ * 0.8 gibt der Spitze klar den groessten Anteil (+28 gegen +11), ohne den Meister ins Extreme
+ * zu ziehen. Ueber OLY_SPONSOR_TILT umstellbar.
+ */
+const TILT_STRENGTH = Number(process.env.OLY_SPONSOR_TILT ?? 0.8);
+const tiltAt = (rank: number, sf: number) =>
+  1 + Math.max(0, sf - 1) * TILT_STRENGTH * (1 - 2 * ((rank - 1) / 31));
+
+function teamPayout(t: SponsorType, rank: number, k: number, fl: number, sf: number) {
   const base = rankPart(t, rank, rank, offsetFor(t.name, rank)) + clauseEv(t) + SPECIAL_TYPICAL;
-  return fl + (base - FLOOR) * k;
+  return fl + (base - FLOOR) * k * tiltAt(rank, sf);
 }
-const leagueSum = (k: number, fl: number) =>
+const leagueSum = (k: number, fl: number, sf: number) =>
   Array.from({ length: 32 }, (_, i) => i + 1).reduce(
-    (acc, r) => acc + SPONSOR_TYPES.reduce((a, t) => a + Math.max(fl, teamPayout(t, r, k, fl)), 0) / SPONSOR_TYPES.length,
+    (acc, r) => acc + SPONSOR_TYPES.reduce((a, t) => a + Math.max(fl, teamPayout(t, r, k, fl, sf)), 0) / SPONSOR_TYPES.length,
     0,
   );
-/** k so bestimmen, dass die Liga-Summe die Zielsumme trifft. */
-function solveK(targetSum: number, fl: number) {
+function solveK(targetSum: number, fl: number, sf: number) {
   let a = 0, b = 8;
-  for (let i = 0; i < 200; i += 1) { const m = (a + b) / 2; if (leagueSum(m, fl) < targetSum) a = m; else b = m; }
+  for (let i = 0; i < 200; i += 1) { const m = (a + b) / 2; if (leagueSum(m, fl, sf) < targetSum) a = m; else b = m; }
   return (a + b) / 2;
 }
 
@@ -238,48 +272,38 @@ console.log(`LIGA-SUMMEN-PRUEFUNG — sf 1.0 heisst: Sigma Sponsoren ~ Sigma Geh
 line();
 console.log("  sf    Untergr.      k     Sigma    Meister  Rang16  Letzter   Schere  Teams im Plus");
 for (const sf of [0.8, 1.0, 1.2]) {
-  const fl = floorAt(sf);
-  const k = solveK(SALARY_SUM_S1 * sf, fl);
+  const fl = floorAt(sf), k = solveK(SALARY_SUM_S1 * sf, fl, sf);
   const perRank = Array.from({ length: 32 }, (_, i) => i + 1).map((r) =>
-    SPONSOR_TYPES.reduce((acc, t) => acc + Math.max(fl, teamPayout(t, r, k, fl)), 0) / SPONSOR_TYPES.length);
+    SPONSOR_TYPES.reduce((acc, t) => acc + Math.max(fl, teamPayout(t, r, k, fl, sf)), 0) / SPONSOR_TYPES.length);
   const salaryAt = (r: number) => 87.8 - (87.8 - 43.7) * ((r - 1) / 31);
-  const winners = perRank.filter((p, i) => p > salaryAt(i + 1)).length;
   console.log(
-    `  ${sf.toFixed(1)}   ${fl.toFixed(1).padStart(6)}  ${k.toFixed(3)}  ${leagueSum(k, fl).toFixed(0).padStart(6)}` +
+    `  ${sf.toFixed(1)}   ${fl.toFixed(1).padStart(6)}  ${k.toFixed(3)}  ${leagueSum(k, fl, sf).toFixed(0).padStart(6)}` +
     `   ${perRank[0]!.toFixed(0).padStart(6)}  ${perRank[15]!.toFixed(0).padStart(6)}  ${perRank[31]!.toFixed(0).padStart(6)}` +
-    `   ${(perRank[0]! / perRank[31]!).toFixed(2)}x   ${winners}/32`);
+    `   ${(perRank[0]! / perRank[31]!).toFixed(2)}x   ${perRank.filter((p, i) => p > salaryAt(i + 1)).length}/32`);
+}
+
+line();
+console.log("UEBERSCHUSS JE STUFE (Auszahlung minus Gehalt) — wer traegt den Verlust, wer bekommt den Gewinn?");
+line();
+const salaryAtRank = (r: number) => 87.8 - (87.8 - 43.7) * ((r - 1) / 31);
+const PROBE = [1, 4, 8, 16, 24, 32];
+console.log("  sf    " + PROBE.map((r) => `R${r}`.padStart(9)).join("") + "     Spanne");
+for (const sf of [0.8, 1.0, 1.2]) {
+  const fl = floorAt(sf), k = solveK(SALARY_SUM_S1 * sf, fl, sf);
+  const sur = PROBE.map((r) =>
+    SPONSOR_TYPES.reduce((a, t) => a + Math.max(fl, teamPayout(t, r, k, fl, sf)), 0) / SPONSOR_TYPES.length - salaryAtRank(r));
+  console.log(`  ${sf.toFixed(1)} ` + sur.map((v) => `${v >= 0 ? "+" : ""}${v.toFixed(0)}`.padStart(9)).join("") +
+    `   ${(Math.max(...sur) - Math.min(...sur)).toFixed(0)}`);
 }
 
 line();
 console.log("MEISTER realisiert (Titel + Klausel + Sonderziel) vs. Top-Gehalt 87.8");
 line();
 for (const sf of [0.8, 1.0, 1.2]) {
-  const fl = floorAt(sf);
-  const k = solveK(SALARY_SUM_S1 * sf, fl);
-  const good = SPONSOR_TYPES.map((t) => fl + (rankPart(t, 3, 1, offsetFor(t.name, 3)) + t.clause.bonus + 12 - FLOOR) * k);
-  const bottomBad = SPONSOR_TYPES.map((t) => Math.max(fl, fl + (rankPart(t, 30, 32, offsetFor(t.name, 30)) - t.clause.malus - FLOOR) * k));
+  const fl = floorAt(sf), k = solveK(SALARY_SUM_S1 * sf, fl, sf);
+  const good = SPONSOR_TYPES.map((t) => fl + (rankPart(t, 3, 1, offsetFor(t.name, 3)) + t.clause.bonus + 12 - FLOOR) * k * tiltAt(1, sf));
+  const bot = SPONSOR_TYPES.map((t) => Math.max(fl, fl + (rankPart(t, 30, 32, offsetFor(t.name, 30)) - t.clause.malus - FLOOR) * k * tiltAt(32, sf)));
   console.log(`  sf ${sf.toFixed(1)}: Meister ${Math.min(...good).toFixed(0)}-${Math.max(...good).toFixed(0)}` +
-    `   Letzter im Schlechtfall ${Math.min(...bottomBad).toFixed(0)}-${Math.max(...bottomBad).toFixed(0)}` +
-    `   Deckung Top-Gehalt: ${Math.min(...good) >= 87.8 ? "immer" : Math.max(...good) >= 87.8 ? "nur teilweise" : "nie"}`);
+    `   Letzter im Schlechtfall ${Math.min(...bot).toFixed(0)}-${Math.max(...bot).toFixed(0)}` +
+    `   Top-Gehalt gedeckt: ${Math.min(...good) >= 87.8 ? "immer" : Math.max(...good) >= 87.8 ? "teilweise" : "nie"}`);
 }
-
-// ── Wer profitiert wie stark? Auszahlung MINUS Gehalt je Tabellenstufe. ─────────────────────────
-// Beantwortet: steigen bei einem guten Ligajahr (1.2) alle Stufen gleichermassen, profitiert also
-// auch das Mittelfeld stark — oder zieht nur die Spitze davon?
-line();
-console.log("UEBERSCHUSS JE STUFE (Auszahlung minus Gehalt) — wer profitiert wie stark?");
-line();
-const salaryAtRank = (r: number) => 87.8 - (87.8 - 43.7) * ((r - 1) / 31);
-const PROBE = [1, 4, 8, 16, 24, 32];
-console.log("  sf    " + PROBE.map((r) => `R${r}`.padStart(9)).join("") + "     Spanne");
-for (const sf of [0.8, 1.0, 1.2]) {
-  const fl = floorAt(sf);
-  const k = solveK(SALARY_SUM_S1 * sf, fl);
-  const surplus = PROBE.map((r) => {
-    const payout = SPONSOR_TYPES.reduce((a, t) => a + Math.max(fl, teamPayout(t, r, k, fl)), 0) / SPONSOR_TYPES.length;
-    return payout - salaryAtRank(r);
-  });
-  console.log(`  ${sf.toFixed(1)} ` + surplus.map((v) => `${v >= 0 ? "+" : ""}${v.toFixed(0)}`.padStart(9)).join("") +
-    `   ${(Math.max(...surplus) - Math.min(...surplus)).toFixed(0)}`);
-}
-console.log("\n  Lesart: positiv = Sponsor deckt die Gehaelter und es bleibt etwas uebrig; negativ = Zuschuss noetig.");
