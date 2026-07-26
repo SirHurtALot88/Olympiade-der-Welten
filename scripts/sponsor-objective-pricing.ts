@@ -22,11 +22,11 @@
  *
  * Aufruf: npx tsx scripts/sponsor-objective-pricing.ts
  */
-type Tier = "elite" | "stark" | "mittel" | "schwach" | "aufbau";
-const TIERS: Tier[] = ["elite", "stark", "mittel", "schwach", "aufbau"];
+export type Tier = "elite" | "stark" | "mittel" | "schwach" | "aufbau";
+export const TIERS: Tier[] = ["elite", "stark", "mittel", "schwach", "aufbau"];
 
 /** Geschaetzte Erfolgswahrscheinlichkeit je Ziel und Staerkeklasse (Design-Schaetzung, zu messen). */
-const OBJECTIVES: Array<{ key: string; p: Record<Tier, number>; note: string }> = [
+export const OBJECTIVES: Array<{ key: string; p: Record<Tier, number>; note: string }> = [
   { key: "underdog_story",        p: { elite: 0.00, stark: 0.00, mittel: 0.30, schwach: 0.22, aufbau: 0.15 }, note: "Rang trotz kleinem Kaderwert" },
   { key: "cellar_escape",         p: { elite: 0.00, stark: 0.00, mittel: 0.00, schwach: 0.55, aufbau: 0.40 }, note: "Bottom-N verlassen" },
   { key: "giant_killer",          p: { elite: 0.00, stark: 0.00, mittel: 0.35, schwach: 0.28, aufbau: 0.22 }, note: "Top-4 schlagen" },
@@ -52,13 +52,14 @@ const OBJECTIVES: Array<{ key: string; p: Record<Tier, number>; note: string }> 
 ];
 
 /** Zielwert der EV je Sonderziel-Slot, nach Rarity. */
-const SLOT_EV: Record<string, number> = { "gewöhnlich": 4, "magisch": 6, "selten": 8, "legendär": 10 };
-const SLOTS: Record<string, number> = { "gewöhnlich": 1, "magisch": 2, "selten": 2, "legendär": 3 };
+export const SLOT_EV: Record<string, number> = { "gewöhnlich": 4, "magisch": 6, "selten": 8, "legendär": 10 };
+export const SLOTS: Record<string, number> = { "gewöhnlich": 1, "magisch": 2, "selten": 2, "legendär": 3 };
 /** Nur Ziele in diesem Wahrscheinlichkeitsband anbieten: darueber trivial, darunter Frust. */
-const P_MIN = 0.15, P_MAX = 0.72;
+export const P_MIN = 0.15;
+export const P_MAX = 0.72;
 /** Auszahlung = ZielEV / p, gedeckelt — sonst explodiert der Tail bei sehr kleinem p. */
-const REWARD_CAP = 4.0;
-const price = (evTarget: number, p: number) => evTarget * Math.min(REWARD_CAP, 1 / Math.max(p, P_MIN));
+export const REWARD_CAP = 4.0;
+export const price = (evTarget: number, p: number) => evTarget * Math.min(REWARD_CAP, 1 / Math.max(p, P_MIN));
 
 console.log("=".repeat(100));
 console.log("SONDERZIEL-BEPREISUNG — Auszahlung = ZielEV / Erfolgswahrscheinlichkeit (gedeckelt)");
