@@ -57,6 +57,14 @@ export type AiPicksRunParams = {
   teamScope?: "ai" | "all";
   teamIds?: string[] | null;
   allowSetupAllTeams?: boolean;
+  // Server-computed (never client-supplied) set of team ids the calling participant is actually
+  // allowed to write — AI/passive-controlled teams plus the caller's own team(s); see
+  // `resolveAiBulkTeamWriteScope`. When provided, further restricts whatever `chooseTeams` would
+  // otherwise have selected (including the `teamScope:"all" + allowSetupAllTeams` bypass, which
+  // otherwise ignores control mode entirely) so a bulk run can never mutate another human
+  // participant's team. Omitted entirely by callers outside the room-guarded routes (scripts,
+  // tests) — `null`/`undefined` means "no restriction", preserving prior behavior for them.
+  callerWritableTeamIds?: string[] | null;
   stepsPerTeam?: number | null;
   runMode?: AiNeedsPicksRunMode | null;
   draftSeed?: string | null;
@@ -549,6 +557,10 @@ export type AiPicksRunResult = {
   };
   warnings: string[];
   blockingReasons: string[];
+  /** Teams that would otherwise have been in scope but were skipped because they belong to another
+   *  human participant (see `AiPicksRunParams.callerWritableTeamIds`). Empty when the caller passed
+   *  no restriction (e.g. scripts/tests) or when nothing was skipped. */
+  skippedTeamIds: string[];
 };
 
 function roundValue(value: number, digits = 2) {
@@ -3586,9 +3598,14 @@ export async function runAiPicksExecutePreview(
     });
   }
   const localRunContext = previewRunContext;
+  const scopedTeams = chooseTeams(currentGameState, teamScope, allowSetupAllTeams, params.teamIds);
+  const callerWritableTeamIds = params.callerWritableTeamIds ? new Set(params.callerWritableTeamIds) : null;
+  const skippedTeamIds = callerWritableTeamIds
+    ? scopedTeams.filter((team) => !callerWritableTeamIds.has(team.teamId)).map((team) => team.teamId)
+    : [];
   const selectedTeams = orderTeamsForDraft(
     currentGameState,
-    chooseTeams(currentGameState, teamScope, allowSetupAllTeams, params.teamIds),
+    callerWritableTeamIds ? scopedTeams.filter((team) => callerWritableTeamIds.has(team.teamId)) : scopedTeams,
   );
   const bonusDraftSteps =
     runMode === "season1_optimum_execute"
@@ -3761,6 +3778,7 @@ export async function runAiPicksExecutePreview(
     },
     warnings,
     blockingReasons,
+    skippedTeamIds,
   };
 
   // Organic squad builder ist jetzt DEFAULT-ON (Cutover): jedes Team pickt live bei seinem Zug aus dem

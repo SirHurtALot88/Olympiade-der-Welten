@@ -29,7 +29,8 @@ export type AutoRosterFillTeamStatus =
   | "target_roster_size_missing"
   | "target_unreachable_cash"
   | "target_unreachable_no_free_agents"
-  | "buy_blocked_by_existing_rules";
+  | "buy_blocked_by_existing_rules"
+  | "skipped_not_writable";
 
 export type AutoRosterFillAcquisition = {
   playerId: string;
@@ -110,6 +111,10 @@ export type AutoRosterFillResult = {
   teams: AutoRosterFillTeamResult[];
   warnings: string[];
   blockingReasons: string[];
+  /** Teams excluded from this fill because they belong to another human participant (see
+   *  `AutoRosterFillParams.callerWritableTeamIds`). Empty when the caller passed no restriction
+   *  (e.g. scripts/tests) or when nothing was skipped. */
+  skippedTeamIds: string[];
 };
 
 export type AutoRosterFillParams = {
@@ -118,6 +123,13 @@ export type AutoRosterFillParams = {
   seasonId: string;
   dryRun?: boolean;
   confirmToken?: string | null;
+  // Server-computed (never client-supplied) set of team ids the calling participant is actually
+  // allowed to write — AI/passive-controlled teams plus the caller's own team(s); see
+  // `resolveAiBulkTeamWriteScope`. Without this the fill loop below processes EVERY team in the
+  // save unconditionally, including manually-controlled ones — that was the S6 bug for this path.
+  // `null`/`undefined` means "no restriction" (preserves prior behavior for scripts/tests outside
+  // the room-guarded route).
+  callerWritableTeamIds?: string[] | null;
 };
 
 function roundValue(value: number, digits = 2) {
@@ -684,6 +696,7 @@ export async function runAutoRosterFillForMatchdaySetup(
   // immediately and excluded from the fill passes.
   const resultByTeamId = new Map<string, AutoRosterFillTeamResult>();
   const activeAccumulators: TeamFillAccumulator[] = [];
+  const callerWritableTeamIds = input.callerWritableTeamIds ? new Set(input.callerWritableTeamIds) : null;
 
   for (const team of save.gameState.teams) {
     const beforeGameState = runContext.save.gameState;
@@ -717,6 +730,16 @@ export async function runAutoRosterFillForMatchdaySetup(
       status: "already_at_target",
     };
     resultByTeamId.set(team.teamId, teamResult);
+
+    // S6: never buy for a team the caller isn't allowed to write — another human participant's
+    // team, per `resolveAiBulkTeamWriteScope`. AI/passive-controlled teams and the caller's own
+    // team(s) stay unaffected. Checked before the target/roster-size checks below so a
+    // not-writable team is reported distinctly rather than folded into "already_at_target".
+    if (callerWritableTeamIds && !callerWritableTeamIds.has(team.teamId)) {
+      teamResult.status = "skipped_not_writable";
+      teamResult.blockingReasons = ["team_not_writable_by_caller"];
+      continue;
+    }
 
     if (targetInfo.targetRosterSize == null) {
       teamResult.status = "target_roster_size_missing";
@@ -851,5 +874,6 @@ export async function runAutoRosterFillForMatchdaySetup(
     teams: teamResults,
     warnings,
     blockingReasons,
+    skippedTeamIds: teamResults.filter((team) => team.status === "skipped_not_writable").map((team) => team.teamId),
   };
 }

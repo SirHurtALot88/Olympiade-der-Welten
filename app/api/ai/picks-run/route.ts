@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
+import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { resolveAiBulkTeamWriteScope } from "@/lib/room/ai-bulk-team-write-scope";
 import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
@@ -57,8 +59,9 @@ export async function POST(request: Request) {
     );
   }
 
+  const roomWriteContext = parseRoomWriteContextFromRequestAndBody(request, body);
   const writeAuth = authorizeServerRoomWrite({
-    ...parseRoomWriteContextFromRequestAndBody(request, body),
+    ...roomWriteContext,
     saveId,
     action: "ai_picks_run_execute",
     source: "sqlite",
@@ -68,6 +71,23 @@ export async function POST(request: Request) {
   if (!writeAuth.allowed) {
     return NextResponse.json({ error: writeAuth.reason, warnings: writeAuth.warnings }, { status: writeAuth.status });
   }
+
+  // Server-side ownership ceiling on top of the host-level `writeAuth` above: a bulk AI picks run
+  // may only ever touch AI/passive-controlled teams plus the caller's own team(s), never another
+  // human participant's team — see `resolveAiBulkTeamWriteScope`. Read fresh so nothing here trusts
+  // a client-supplied claim. When the save can't be resolved yet, omit the restriction and let the
+  // service's own save-resolution error surface as before.
+  const freshSaveForScope = createPersistenceService().getSaveById(saveId);
+  const callerWritableTeamIds = freshSaveForScope
+    ? Array.from(
+        resolveAiBulkTeamWriteScope({
+          gameState: freshSaveForScope.gameState,
+          room: writeAuth.room,
+          participant: writeAuth.participant,
+          activeOwnerId: roomWriteContext.activeOwnerId,
+        }).writableTeamIds,
+      )
+    : null;
 
   try {
     const teamIds = Array.isArray(body.teamIds) ? body.teamIds : null;
@@ -82,6 +102,7 @@ export async function POST(request: Request) {
       allowSetupAllTeams: body.allowSetupAllTeams ?? false,
       stepsPerTeam: body.stepsPerTeam ?? parseOptionalNumber(searchParams.get("stepsPerTeam")),
       runMode: body.runMode === "season1_optimum_execute" ? "season1_optimum_execute" : "default",
+      ...(callerWritableTeamIds ? { callerWritableTeamIds } : {}),
     });
 
     if (!dryRun && (result.globalExecution?.appliedPickCount ?? 0) > 0) {

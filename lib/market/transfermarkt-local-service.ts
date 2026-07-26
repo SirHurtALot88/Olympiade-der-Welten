@@ -37,7 +37,12 @@ import {
   SOLD_PLAYER_SEASON_COOLDOWN_BLOCKER,
   SOLD_PLAYER_SEASON_COOLDOWN_OVERRIDE_WARNING,
 } from "@/lib/market/transfer-sold-cooldown";
-import { isTransferSellPhaseOpen, LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
+import {
+  isTransferBuyPhaseOpen,
+  isTransferSellPhaseOpen,
+  LOCAL_TRANSFER_WINDOW_PHASE,
+  TransferWindowClosedError,
+} from "@/lib/market/transfer-window-policy";
 import { buildTransfermarktPoolAudit } from "@/lib/market/transfermarkt-pool-audit";
 import { buildTransfermarktDoubleLoadWarnings } from "@/lib/market/transfermarkt-double-load";
 import {
@@ -139,6 +144,19 @@ function isLocalTransferSellWindowOpen(gameState: GameState) {
 
 function isSystemTransferSellSource(source: string | null | undefined) {
   return typeof source === "string" && LOCAL_SYSTEM_SELL_SOURCES.has(source);
+}
+
+// S7: the buy transfer window (`isTransferBuyPhaseOpen`) was previously only checked at the route
+// layer (`app/api/transfermarkt/buy`'s `evaluateGamePhaseAction`) — any other caller of this
+// service bypassed it entirely. Every AI/system/admin buy path already labels itself with an
+// explicit `transferSource` (e.g. "ai_roster_fill", "ai_preseason_market_buy") and runs its own
+// season/phase gating upstream (these buys are frequently, and legitimately, executed outside the
+// human buy_players/transfer_buy_phase window — e.g. the season-1 preseason draft). Only a call
+// with NO transferSource — which is exactly what the human-facing buy route sends — is gated here,
+// so this closes the human-facing gap (defense in depth on top of the route's own check) without
+// re-litigating AI scheduling.
+function isHumanInitiatedTransferSource(source: string | null | undefined) {
+  return source == null || source.trim().length === 0;
 }
 
 function buildDiverseFreeAgentSlice(items: TransfermarktFreeAgentItem[], limit: number) {
@@ -1134,6 +1152,11 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
   if (!team) blockingReasons.push("team_not_found");
   if (!player) blockingReasons.push("player_not_found");
   if (playerAlreadyOwned) blockingReasons.push("player_not_free_agent_in_scope");
+  // S7: enforce the buy transfer window here too, not just at the route — see
+  // `isHumanInitiatedTransferSource`'s comment above.
+  if (isHumanInitiatedTransferSource(params.transferSource) && !isTransferBuyPhaseOpen(gameState)) {
+    blockingReasons.push(new TransferWindowClosedError("buy_players", gameState).reason);
+  }
   const soldThisSeasonCooldownHit = isPlayerTransferBuyBlocked({
     gameState,
     playerId: params.playerId,
@@ -2324,6 +2347,13 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
   if (!team) blockingReasons.push("team_not_found");
   if (!player) blockingReasons.push("player_not_found");
   if (playerAlreadyOwned) blockingReasons.push("player_not_free_agent_in_scope");
+  // S7: enforce the buy transfer window here too (fast/batch buy path) — see
+  // `isHumanInitiatedTransferSource`'s comment above. Unreachable for the human buy route (which
+  // never sets `fastLocalBatch`/`deferPersist`); kept for symmetry with the slow path above so
+  // every buy mutation site enforces the same rule.
+  if (isHumanInitiatedTransferSource(params.transferSource) && !isTransferBuyPhaseOpen(gameState)) {
+    blockingReasons.push(new TransferWindowClosedError("buy_players", gameState).reason);
+  }
   const soldThisSeasonCooldownHit = isPlayerTransferBuyBlocked({
     gameState,
     playerId: params.playerId,

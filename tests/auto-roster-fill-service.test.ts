@@ -513,4 +513,38 @@ describe("auto roster fill service", () => {
     expect(persistenceState.save.gameState.transferHistory[0]?.source).toBe("ai_roster_fill");
     expect(persistenceState.save.gameState.teams.find((team) => team.teamId === "M-M")?.cash).toBe(148);
   });
+
+  // S6 regression: a bulk AI roster-fill run must never buy for a team the caller doesn't control
+  // (e.g. another human participant's team in a room), even though this service has no controlMode
+  // filter of its own (see the two tests above — a "manual" team gets bought for by default,
+  // exactly like an AI team, when no restriction is passed). `callerWritableTeamIds` is the
+  // server-computed ceiling the route now supplies (see resolveAiBulkTeamWriteScope).
+  it("skips a team outside callerWritableTeamIds but still fills AI teams, reporting the skip", async () => {
+    const { runAutoRosterFillForMatchdaySetup } = await import("@/lib/ai/auto-roster-fill-service");
+
+    const result = await runAutoRosterFillForMatchdaySetup({
+      source: "sqlite",
+      saveId: "save-local",
+      seasonId: "season-1",
+      dryRun: false,
+      confirmToken: "FILL_ALL_TEAMS_TO_TARGET",
+      // Participant A may write A-A (AI-controlled) but not M-M (another human's team).
+      callerWritableTeamIds: ["A-A"],
+    });
+
+    expect(result.executed).toBe(true);
+    const otherHumanTeam = result.teams.find((team) => team.teamId === "M-M");
+    expect(otherHumanTeam?.status).toBe("skipped_not_writable");
+    expect(otherHumanTeam?.acquiredPlayers).toEqual([]);
+    expect(otherHumanTeam?.transferHistoryIds).toEqual([]);
+    expect(result.skippedTeamIds).toEqual(["M-M"]);
+    // No mutation at all for the skipped team: cash/roster stay exactly as seeded.
+    expect(persistenceState.save.gameState.teams.find((team) => team.teamId === "M-M")?.cash).toBe(200);
+    expect(persistenceState.save.gameState.rosters.filter((entry) => entry.teamId === "M-M")).toHaveLength(1);
+
+    // The AI team is still writable and still gets filled.
+    const aiTeam = result.teams.find((team) => team.teamId === "A-A");
+    expect(aiTeam?.status).toBe("filled");
+    expect(persistenceState.save.gameState.transferHistory.some((entry) => entry.toTeamId === "A-A")).toBe(true);
+  });
 });

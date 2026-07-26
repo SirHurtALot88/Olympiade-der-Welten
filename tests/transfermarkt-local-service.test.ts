@@ -409,13 +409,26 @@ describe("transfermarkt local service", () => {
     const { executeLocalTransfermarktBuy, listLocalTransferHistory, listLocalTransfermarktFreeAgents, previewLocalTransfermarktBuy } =
       await import("@/lib/market/transfermarkt-local-service");
 
+    // S7: buy service now enforces the buy transfer window too — this test is about the buy's
+    // side effects (roster/cash/history), not window gating, so keep the buy window explicitly
+    // open on top of the shared beforeEach fixture's default ("transfer_sell_phase"). A dedicated
+    // saveId (rather than mutating the shared "save-singleplayer-dev" fixture in place) keeps this
+    // test's `localMarketContextCache` entry (keyed by saveId + content signature — see
+    // `getLocalMarketContextKey`) from colliding with sibling tests that reuse the identically-shaped
+    // default fixture unmodified, which would otherwise leak this test's phase into theirs.
+    const buyWindowSaveId = "save-singleplayer-dev-buy-window-open";
+    persistenceState.save = {
+      saveId: buyWindowSaveId,
+      gameState: { ...persistenceState.save!.gameState, gamePhase: "transfer_buy_phase" },
+    };
+
     const beforeRow = buildTeamSeasonOverviewRows({ gameState: persistenceState.save!.gameState }).find(
       (row) => row.teamId === "A-A",
     );
     expect(beforeRow).toBeTruthy();
 
     const freeAgents = listLocalTransfermarktFreeAgents({
-      saveId: "save-singleplayer-dev",
+      saveId: buyWindowSaveId,
       seasonId: "season-1",
       teamId: "A-A",
       limit: 50,
@@ -424,7 +437,7 @@ describe("transfermarkt local service", () => {
     expect(candidate).toBeTruthy();
 
     const preview = previewLocalTransfermarktBuy({
-      saveId: "save-singleplayer-dev",
+      saveId: buyWindowSaveId,
       seasonId: "season-1",
       teamId: "A-A",
       playerId: "fa-1",
@@ -437,7 +450,7 @@ describe("transfermarkt local service", () => {
     expect(preview.promisedRole).toBe("rotation");
 
     const result = executeLocalTransfermarktBuy({
-      saveId: "save-singleplayer-dev",
+      saveId: buyWindowSaveId,
       seasonId: "season-1",
       teamId: "A-A",
       playerId: "fa-1",
@@ -458,7 +471,7 @@ describe("transfermarkt local service", () => {
     expect(afterState.rosters.find((entry) => entry.playerId === "fa-1")?.promisedRole).toBe("rotation");
 
     const afterFreeAgents = listLocalTransfermarktFreeAgents({
-      saveId: "save-singleplayer-dev",
+      saveId: buyWindowSaveId,
       seasonId: "season-1",
       teamId: "A-A",
       limit: 50,
@@ -466,7 +479,7 @@ describe("transfermarkt local service", () => {
     expect(afterFreeAgents.items.some((item) => item.playerId === "fa-1")).toBe(false);
 
     const history = listLocalTransferHistory({
-      saveId: "save-singleplayer-dev",
+      saveId: buyWindowSaveId,
       seasonId: "season-1",
       teamId: "A-A",
       limit: 10,
@@ -504,6 +517,9 @@ describe("transfermarkt local service", () => {
     persistenceState.save = {
       saveId: "save-singleplayer-dev",
       gameState: createGameState({
+        // S7: buy service now enforces the buy transfer window too — this test is about roster
+        // slots, not window gating, so keep the buy window explicitly open.
+        gamePhase: "transfer_buy_phase",
         teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 175, rosterLimit: 14 })],
         players: [...rosterPlayers, ...freeAgents],
         rosters: buildRoster(12),
@@ -521,6 +537,7 @@ describe("transfermarkt local service", () => {
     persistenceState.save = {
       saveId: "save-singleplayer-dev",
       gameState: createGameState({
+        gamePhase: "transfer_buy_phase",
         teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 175, rosterLimit: 14 })],
         players: [...rosterPlayers, ...freeAgents],
         rosters: buildRoster(13),
@@ -538,6 +555,7 @@ describe("transfermarkt local service", () => {
     persistenceState.save = {
       saveId: "save-singleplayer-dev",
       gameState: createGameState({
+        gamePhase: "transfer_buy_phase",
         teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 175, rosterLimit: 14 })],
         players: [...rosterPlayers, ...freeAgents],
         rosters: buildRoster(14),
@@ -1874,6 +1892,9 @@ describe("transfermarkt local service", () => {
     persistenceState.save = {
       saveId: "save-singleplayer-dev",
       gameState: createGameState({
+        // S7: buy service now enforces the buy transfer window too — this test is about contract
+        // negotiation, not window gating, so keep the buy window explicitly open.
+        gamePhase: "transfer_buy_phase",
         teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 175 })],
         players: [
           createPlayer("fa-negotiated", {
@@ -2115,6 +2136,9 @@ describe("transfermarkt local service", () => {
         }),
       );
       const gameState = createGameState({
+        // S7: buy service now enforces the buy transfer window too — this test is about the AI
+        // liquidity buffer, not window gating, so keep the buy window explicitly open.
+        gamePhase: "transfer_buy_phase",
         teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 10, rosterLimit: 14, humanControlled })],
         players: [...rosterPlayers, freeAgent],
         rosters,
@@ -2150,5 +2174,118 @@ describe("transfermarkt local service", () => {
     });
     expect(aiPreview.blockingReasons).toContain("insufficient_cash");
     expect(aiPreview.canBuy).toBe(false);
+  });
+
+  // S7 regression: the transfer window used to be enforced only at the route layer
+  // (`evaluateGamePhaseAction` in app/api/transfermarkt/buy and .../sell) — any other caller of
+  // the service (another route, a script, a future call path) bypassed it entirely. The service
+  // itself must now reject a human-initiated buy/sell outside the window, and still allow one
+  // inside it, even when called directly.
+  describe("S7: transfer window is enforced in the service, not just the route", () => {
+    it("rejects a buy outside the buy window and allows it once the window opens", async () => {
+      const { previewLocalTransfermarktBuy } = await import("@/lib/market/transfermarkt-local-service");
+
+      const closedGameState = createGameState({
+        teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 175 })],
+        players: [createPlayer("fa-window-buy", { marketValue: 25, displayMarketValue: 25, salaryDemand: 6, displaySalary: 6 })],
+        rosters: [],
+        // "season_active" mid-season (currentMatchday > 1, matchday resolved) is neither a buy
+        // phase nor the early-season-setup grace window — the buy window is closed.
+        gamePhase: "season_active",
+      });
+      closedGameState.season = { ...closedGameState.season, currentMatchday: 3 };
+      closedGameState.matchdayState = { ...closedGameState.matchdayState, status: "resolved" };
+      persistenceState.save = { saveId: "save-buy-window-closed", gameState: closedGameState };
+
+      const closedPreview = previewLocalTransfermarktBuy({
+        saveId: "save-buy-window-closed",
+        seasonId: "season-1",
+        teamId: "A-A",
+        playerId: "fa-window-buy",
+      });
+      expect(closedPreview.canBuy).toBe(false);
+      expect(closedPreview.blockingReasons).toContain("phase_blocked:buy_players:season_active");
+
+      const openGameState = createGameState({
+        teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 175 })],
+        players: [createPlayer("fa-window-buy", { marketValue: 25, displayMarketValue: 25, salaryDemand: 6, displaySalary: 6 })],
+        rosters: [],
+        gamePhase: "transfer_buy_phase",
+      });
+      persistenceState.save = { saveId: "save-buy-window-open", gameState: openGameState };
+
+      const openPreview = previewLocalTransfermarktBuy({
+        saveId: "save-buy-window-open",
+        seasonId: "season-1",
+        teamId: "A-A",
+        playerId: "fa-window-buy",
+      });
+      expect(openPreview.canBuy).toBe(true);
+      expect(openPreview.blockingReasons).not.toContain("phase_blocked:buy_players:season_active");
+    });
+
+    it("does not gate an AI/system-sourced buy on the window (bulk AI paths run their own scheduling)", async () => {
+      const { previewLocalTransfermarktBuy } = await import("@/lib/market/transfermarkt-local-service");
+
+      const closedGameState = createGameState({
+        teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 175 })],
+        players: [createPlayer("fa-window-buy-ai", { marketValue: 25, displayMarketValue: 25, salaryDemand: 6, displaySalary: 6 })],
+        rosters: [],
+        gamePhase: "season_active",
+      });
+      closedGameState.season = { ...closedGameState.season, currentMatchday: 3 };
+      closedGameState.matchdayState = { ...closedGameState.matchdayState, status: "resolved" };
+      persistenceState.save = { saveId: "save-buy-window-closed-ai", gameState: closedGameState };
+
+      const aiPreview = previewLocalTransfermarktBuy({
+        saveId: "save-buy-window-closed-ai",
+        seasonId: "season-1",
+        teamId: "A-A",
+        playerId: "fa-window-buy-ai",
+        transferSource: "ai_roster_fill",
+      });
+      expect(aiPreview.blockingReasons).not.toContain("phase_blocked:buy_players:season_active");
+      expect(aiPreview.canBuy).toBe(true);
+    });
+
+    it("rejects a sell outside the sell window and allows it once the window opens", async () => {
+      const { previewLocalTransfermarktSell } = await import("@/lib/market/transfermarkt-local-service");
+
+      const closedGameState = createGameState({
+        teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 175 })],
+        players: [createPlayer("p-window-sell", { marketValue: 40, displayMarketValue: 40, salaryDemand: 10, displaySalary: 10 })],
+        rosters: [createRosterEntry("r-window-sell", "p-window-sell", { salary: 10, contractLength: 3, currentValue: 40, purchasePrice: 40 })],
+        // Mid-season, matchday NOT resolved — neither a sell phase, the early-season-setup grace
+        // window, nor the local "last matchday resolved" season-end grace period.
+        gamePhase: "season_active",
+      });
+      closedGameState.season = { ...closedGameState.season, currentMatchday: 3 };
+      persistenceState.save = { saveId: "save-sell-window-closed", gameState: closedGameState };
+
+      const closedPreview = previewLocalTransfermarktSell({
+        saveId: "save-sell-window-closed",
+        seasonId: "season-1",
+        teamId: "A-A",
+        activePlayerId: "r-window-sell",
+      });
+      expect(closedPreview.canSell).toBe(false);
+      expect(closedPreview.blockingReasons).toContain("sell_only_at_season_end");
+
+      const openGameState = createGameState({
+        teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 175 })],
+        players: [createPlayer("p-window-sell", { marketValue: 40, displayMarketValue: 40, salaryDemand: 10, displaySalary: 10 })],
+        rosters: [createRosterEntry("r-window-sell", "p-window-sell", { salary: 10, contractLength: 3, currentValue: 40, purchasePrice: 40 })],
+        gamePhase: "transfer_sell_phase",
+      });
+      persistenceState.save = { saveId: "save-sell-window-open", gameState: openGameState };
+
+      const openPreview = previewLocalTransfermarktSell({
+        saveId: "save-sell-window-open",
+        seasonId: "season-1",
+        teamId: "A-A",
+        activePlayerId: "r-window-sell",
+      });
+      expect(openPreview.canSell).toBe(true);
+    });
   });
 });

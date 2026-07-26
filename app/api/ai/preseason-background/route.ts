@@ -19,6 +19,7 @@ import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-setti
 import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
+import { resolveAiBulkTeamWriteScope } from "@/lib/room/ai-bulk-team-write-scope";
 import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
@@ -71,11 +72,22 @@ function buildRunKey(saveId: string, seasonId: string) {
   return `${saveId}:${seasonId}`;
 }
 
-function getAiTeamIds(gameState: GameState) {
+// `protectManualPlayerTeams`/`getProtectedHumanTeamIds` already exclude every human-controlled team
+// (Chris's AND Franky's alike) via `seasonState.teamControlSettings`. `callerWritableTeamIds` (read
+// from `room.state.teamOwnership` when a room is active — see `resolveAiBulkTeamWriteScope`) is an
+// additional, authoritative-source intersection: defense-in-depth for the case where room ownership
+// and `teamControlSettings` briefly disagree about who owns a team (S6). In the common case the two
+// sets already agree and this intersection changes nothing.
+function getAiTeamIds(gameState: GameState, callerWritableTeamIds: Set<string> | null) {
   const control = buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings);
   const protectedHumanTeamIds = getProtectedHumanTeamIds(gameState);
   return gameState.teams
-    .filter((team) => control[team.teamId]?.controlMode === "ai" && !protectedHumanTeamIds.has(team.teamId))
+    .filter(
+      (team) =>
+        control[team.teamId]?.controlMode === "ai" &&
+        !protectedHumanTeamIds.has(team.teamId) &&
+        (!callerWritableTeamIds || callerWritableTeamIds.has(team.teamId)),
+    )
     .map((team) => team.teamId);
 }
 
@@ -320,8 +332,9 @@ export async function POST(request: Request) {
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
 
+  const roomWriteContext = parseRoomWriteContextFromRequestAndBody(request, body);
   const writeAuth = authorizeServerRoomWrite({
-    ...parseRoomWriteContextFromRequestAndBody(request, body),
+    ...roomWriteContext,
     saveId,
     action: "ai_preseason_background",
     source: "sqlite",
@@ -372,7 +385,16 @@ export async function POST(request: Request) {
       protectedGameState === freshSave.gameState
         ? freshSave
         : persistence.saveSingleplayerState(freshSave.saveId, protectedGameState, { status: freshSave.status });
-    const aiTeamIds = getAiTeamIds(protectedSave.gameState);
+    // S6 defense-in-depth: intersect with the room-ownership-authoritative writable set (see
+    // `getAiTeamIds`'s comment above) so a run can never touch a team room.state.teamOwnership
+    // says belongs to a different human, even if teamControlSettings briefly disagrees.
+    const callerWritableTeamIds = resolveAiBulkTeamWriteScope({
+      gameState: protectedSave.gameState,
+      room: writeAuth.room,
+      participant: writeAuth.participant,
+      activeOwnerId: roomWriteContext.activeOwnerId,
+    }).writableTeamIds;
+    const aiTeamIds = getAiTeamIds(protectedSave.gameState, callerWritableTeamIds);
     const startedAt = nowIso();
     const setupDraftMode = shouldRunSetupDraft(protectedSave.gameState, aiTeamIds);
     const baseRecord: AiPreseasonAutomationRunRecord = {
