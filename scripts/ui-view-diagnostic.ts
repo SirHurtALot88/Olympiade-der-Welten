@@ -20,7 +20,7 @@ const VIEWS: Array<[string, string]> = [
   ["matchdayArena", "foundation-matchday-arena"],
   ["seasonV2", "foundation-season-v2"],
   ["teams", "foundation-teams-view"],
-  ["players", "nl-players-hub"],
+  ["players", "nl-players-table"],
   ["trainingCompact", "foundation-training-compact"],
   ["trainingV2", "facilities-v2-grid"],
   ["allTimeTable", "foundation-all-time-table"],
