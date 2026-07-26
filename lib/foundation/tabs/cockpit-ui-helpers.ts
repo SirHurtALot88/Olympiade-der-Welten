@@ -101,6 +101,7 @@ export function formatCockpitReason(reason: string) {
   if (reason === "facility_upgrade_preview_stale") return "Die Upgrade-Vorschau ist veraltet. Bitte noch einmal prüfen.";
   if (reason === "facility_maintenance_preview_stale") return "Die Wartungs-Vorschau ist veraltet. Bitte noch einmal prüfen.";
   if (reason === "early_season_setup_allowed_before_first_result") return "Früher Saisonstart: Management-Aktion ist bis zum ersten echten Resultat erlaubt.";
+  if (reason === "concurrent_save_write_conflict") return "Ein anderer Mitspieler hat währenddessen gespeichert. Bitte neu laden und erneut versuchen.";
 
   return shared;
 }
