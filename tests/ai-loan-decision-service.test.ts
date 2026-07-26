@@ -279,6 +279,57 @@ describe("resolveAiLoanDecision", () => {
     expect(decision.shouldBorrow).toBe(false);
     expect(decision.reason).toBe("season_one_no_loans");
     expect(decision.loanAmount).toBe(0);
+    // Der Aufrufer würde in S1 ohnehin keine Kalendersperre umgehen: über-hard-min = kein Kredit.
+    expect(decision.allowSeason1).toBe(false);
+  });
+
+  // In S1 durchläuft der Bedarfspfad (estimateUpgradeBuyFloorMw → Objective-/Captain-Simulation) die
+  // Kapitänsauswahl, die coreStats liest — echte S1-Spieler haben die, die Test-Fixture-Spieler nicht.
+  // Minimal-coreStats injizieren, ohne die geteilte Fixture (und damit die S2-Assertions) anzufassen.
+  function withCoreStats(gameState: GameState): GameState {
+    for (const player of gameState.players as Array<{ coreStats?: Record<string, number> }>) {
+      player.coreStats = { soc: 55, men: 55, pow: 55, dex: 55, agi: 55, str: 55 };
+    }
+    return gameState;
+  }
+
+  it("Season 1 Ausnahme: unter dem harten Roster-Minimum + Cash-Lücke → Überlebenskredit mit allowSeason1", () => {
+    // Team unter playerMin (8) mit zu wenig Cash, um die letzten Slots selbst zu füllen — genau der
+    // vom User beschriebene „die letzten Spieler auffüllen"-Fall. Der Kredit muss trotz S1 möglich sein,
+    // aber gezielt: allowSeason1=true, damit der Aufrufer nur die Kalendersperre (nicht Kapazität/Distress)
+    // fallen lässt.
+    const gameState = withCoreStats(
+      buildTeamGameState({
+        cash: 5,
+        rosterCount: 6,
+        playerOpt: 12,
+        marketValuePerPlayer: 15,
+        annualRevenue: 50,
+        seasonId: "season-1",
+      }),
+    );
+    const decision = resolveAiLoanDecision(gameState, "T-1");
+    expect(decision.shouldBorrow).toBe(true);
+    expect(decision.reason).toBe("need_driven_borrow");
+    expect(decision.loanAmount).toBeGreaterThan(0);
+    expect(decision.allowSeason1).toBe(true);
+  });
+
+  it("Season 1 Ausnahme greift NICHT bei genug Cash: über-hard-min-Team baut aus dem Draft-Budget", () => {
+    // Unter playerMin, aber mit reichlich Cash: kein Kredit (cash_sufficient), kein allowSeason1-Bypass.
+    const gameState = withCoreStats(
+      buildTeamGameState({
+        cash: 400,
+        rosterCount: 6,
+        playerOpt: 12,
+        marketValuePerPlayer: 15,
+        annualRevenue: 50,
+        seasonId: "season-1",
+      }),
+    );
+    const decision = resolveAiLoanDecision(gameState, "T-1");
+    expect(decision.shouldBorrow).toBe(false);
+    expect(decision.allowSeason1).toBe(false);
   });
 });
 

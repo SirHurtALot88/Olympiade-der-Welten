@@ -3878,7 +3878,9 @@ export async function runAiPicksExecutePreview(
       // das guenstigste verfuegbare Angebot (Bank oder Team) statt immer nur bei der Bank -
       // buildLoanOffers ist bereits aufsteigend nach Zinssatz sortiert, die Bank ist immer
       // enthalten, daher gibt es hier immer mindestens ein Angebot.
-      const offers = buildLoanOffers(latestSave.gameState, latestTeam.teamId, loanDecision.loanAmount, loanDecision.termSeasons);
+      const offers = buildLoanOffers(latestSave.gameState, latestTeam.teamId, loanDecision.loanAmount, loanDecision.termSeasons, {
+        allowSeason1: loanDecision.allowSeason1,
+      });
       const bestOffer = offers[0] ?? null;
       const loanResult = originateLoan(
         latestSave.gameState,
@@ -3889,7 +3891,10 @@ export async function runAiPicksExecutePreview(
           lenderType: bestOffer?.lenderType ?? "bank",
           lenderTeamId: bestOffer?.lenderTeamId ?? undefined,
         },
-        { execute: true },
+        // allowSeason1 nur im sanktionierten S1-below-hard-min-Überlebensfall true — lässt gezielt die
+        // S1-Kalendersperre fallen, damit ein Team unter dem harten Roster-Minimum die letzten Slots
+        // finanzieren kann; Kapazitäts-/Distress-Gate bleiben aktiv.
+        { execute: true, allowSeason1: loanDecision.allowSeason1 },
       );
       if (loanResult.ok) {
         if (sharedRunContext) {
