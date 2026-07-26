@@ -10,7 +10,7 @@ import {
   CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN,
   runChunkedRedraftTopup,
 } from "@/lib/ai/chunked-redraft-topup-service";
-import type { AiSeasonStrategy, GameState } from "@/lib/data/olyDataTypes";
+import type { AiEmergencyCashInjectionRecord, AiSeasonStrategy, GameState } from "@/lib/data/olyDataTypes";
 import { deriveRosterTargets, resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
 import { isSeasonOne, isTransferActionAllowed } from "@/lib/season/transfer-season-policy";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -497,6 +497,12 @@ export function runEmergencyRosterRepairForTeams(input: {
   }
 
   let repairCashTopUps = 0;
+  // Audit R2/V7: jede Notfall-Aufstockung in einen Ledger auf seasonState schreiben. Dieses Geld entsteht
+  // aus dem Nichts (Wert-Erhaltung: sonst unsichtbar geschöpftes Cash nur für KI-Teams — auch ein KI-vs-
+  // Mensch-Paritäts-Punkt, da menschliche Teams keine solche Aufstockung erhalten). Der Eintrag hält
+  // cashBefore/cashAfter/amount fest, damit die Injektion nachvollziehbar und auditierbar ist.
+  const injectionLog: AiEmergencyCashInjectionRecord[] = [];
+  const nowIso = new Date().toISOString();
   for (const teamId of eligibleTeamIds) {
     const rosterCount = getTeamRosterCount(save.gameState, teamId);
     const hardMin = getTeamHardMinRequired(save.gameState, teamId);
@@ -506,9 +512,24 @@ export function runEmergencyRosterRepairForTeams(input: {
     const cash = team.cash ?? 0;
     if (cash + 0.01 >= PRESEASON_REPAIR_TEAM_CASH_FLOOR) continue;
     team.cash = PRESEASON_REPAIR_TEAM_CASH_FLOOR;
+    injectionLog.push({
+      id: `ai-cash-injection-${input.seasonId}-${teamId}`,
+      saveId: input.saveId,
+      seasonId: input.seasonId,
+      teamId,
+      reason: "preseason_roster_repair_cash_floor",
+      cashBefore: cash,
+      cashAfter: PRESEASON_REPAIR_TEAM_CASH_FLOOR,
+      amount: PRESEASON_REPAIR_TEAM_CASH_FLOOR - cash,
+      createdAt: nowIso,
+    });
     repairCashTopUps += 1;
   }
   if (repairCashTopUps > 0) {
+    save.gameState.seasonState.aiEmergencyCashInjections = [
+      ...injectionLog,
+      ...(save.gameState.seasonState.aiEmergencyCashInjections ?? []),
+    ];
     input.persistence.saveSingleplayerState(input.saveId, save.gameState);
     save = input.persistence.getSaveById(input.saveId);
     if (!save) throw new Error("Save missing after emergency repair cash top-up.");
