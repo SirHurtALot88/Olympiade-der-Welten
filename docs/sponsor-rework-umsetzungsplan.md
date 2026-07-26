@@ -62,14 +62,17 @@ systematisch False Positives. Der CDF-Vergleich ist zusätzlich unabhängig von 
 
 **Liga-Bilanz** (Σ Sponsoren gegen Σ Gehälter 2078) und **Überschuss je Stufe**:
 
-| sf | Σ | Meister | R16 | Letzter | R1 | R8 | R16 | R24 | R32 |
-|---|---|---|---|---|---|---|---|---|---|
-| 0,8 | 1662 | 65 | 53 | 43 | −22 | −20 | −14 | −7 | −1 |
-| 1,0 | 2078 | 84 | 66 | 52 | −4 | −4 | −0 | +4 | +9 |
-| 1,2 | 2494 | 116 | 79 | 55 | +28 | +16 | +12 | +11 | +11 |
+| sf | Σ | Meister | R16 | Letzter | Schere | R1 | R4 | R8 | R16 | R24 | R32 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 0,8 | 1662 | 67 | 52 | 44 | 1,53× | −21 | −23 | −20 | −14 | −7 | ±0 |
+| 1,0 | 2078 | 86 | 66 | 53 | 1,60× | −2 | −6 | −5 | −1 | +5 | +10 |
+| 1,2 | 2494 | 120 | 78 | 56 | 2,12× | +32 | +20 | +15 | +12 | +11 | +13 |
 
-Bei 1,2 fällt der Überschuss **monoton** von oben nach unten — wer im schlechten Jahr am meisten
-trägt, bekommt im guten Jahr am meisten.
+**Der Überschuss ist bei sf 1,2 NICHT monoton**: R32 (+13) liegt über R24 (+11), R4 (+20) unter
+R1 (+32) aber über R8 (+15). Eine frühere Fassung behauptete Monotonie — sie stammte aus der Zeit
+vor der Bonus/Malus-Ableitung, durch die der Klausel-EV exakt 0 wurde; die Ökonomietabellen wurden
+danach nicht neu gemessen. Die Nicht-Monotonie am Tabellenende ist eine direkte Folge der
+Untergrenze (siehe offener Punkt 3 unten) und noch nicht behoben.
 
 **Stresstest** (`OLY_SPONSOR_STRESS=1`), alle 120 Kombinationen gleichzeitig kalibriert:
 
@@ -97,6 +100,40 @@ noch der kleinere Bonus bleibt.
 **Regel: eine Angebotsliste darf keine zwei Sponsoren derselben Kurvenform enthalten.** Damit
 sind es über alle 32 Erwartungsränge 0 Fallen (verifiziert). Die Regel ist allerdings **nicht
 robust gegen P-Fehlschätzung** — sie trägt erst, wenn P gemessen ist.
+
+### Vier Befunde aus dem Abschluss-Audit — zwingend VOR der ersten Produktionszeile
+
+Diese vier hat keine der drei Prüfrunden vorher gesehen. Die ersten beiden sind
+**Design-Entscheidungen, die nicht der Umsetzende treffen kann.**
+
+1. **Leiter 3 bricht die Parität, die Leitern 1+2+4 herstellen.** Die Kalibrierung erzwingt
+   EV-Gleichheit nur über Liga + Typ + Klausel. Der Sonderziel-EV hängt aber an der Rarity
+   (4 / 12 / 16 / 30 C aus SLOT_EV × Slots). Enthält eine Angebotsliste **gemischte Rarities** —
+   was die heutige Angebotserzeugung tut —, unterscheiden sich zwei Angebote um bis zu **26 C EV**.
+   Das ist eine Größenordnung über dem gefeierten Spread von 3,8 % (≈ 2 C). Die Zusage „nie in der
+   Höhe, nur im Risiko" gilt damit **nur innerhalb einer Rarity**.
+   → Entscheidung: Rarity je Angebotsliste fixieren **oder** Rarity-EV in die Parität einpreisen.
+   Bestimmt die Signatur der Rechenschicht, nachträglich teuer.
+
+2. **`TARGET_EV` ist der wirtschaftliche Anker des ganzen Modells und nirgends hergeleitet.**
+   Die Werte sind eingefrorene Set-Mittel eines früheren Kalibrierlaufs. Ihre Schere (76 → 53 =
+   1,43×) ist flacher als die Gehaltsschere (87,8 → 43,7 = 2,0×) — daraus folgt zwingend das
+   Umverteilungsprofil bei sf 1,0: Spitze −2 … −6, Keller +10, nur **14 von 32 Teams im Plus**.
+   Ob das gewollt ist, hat niemand abgenommen.
+   → Entscheidung: Profil als Design-Entscheidung dokumentieren **oder** Leiter anpassen — bevor
+   die Werte in P1 als Unit-Test-Referenz eingefroren werden.
+
+3. **Die Untergrenze annulliert die eigene Begründung von Leiter 4.** Der Architektur-Gedanke war:
+   „am Tabellenende liefert nur die Klausel Risiko". Gemessen hat bei Erwartungsrang 30 aber
+   **jeder der 12 Typen den Sockel 44** — der Floor schluckt jeden Malus, die Klausel ist dort
+   reines Upside, es gibt faktisch kein Abwärtsrisiko mehr. Daraus entstehen auch die 3 Fallen und
+   die Nicht-Monotonie bei sf 1,2.
+   → Entweder akzeptieren und dokumentieren, oder das Tabellenende anders lösen.
+
+4. **Liga-Summe rechnet am Δ-0-Punkt statt über Erwartungswerte** (Jensen + Floor): `solveK` löst
+   `k` dadurch zu hoch, die reale Σ läge über dem Ziel — am stärksten bei sf 0,8. Zusätzlich ist
+   `clauseEv` seit der Bonus/Malus-Ableitung **exakt 0** (toter Code), und `SPECIAL_TYPICAL = 9`
+   passt zu keiner Rarity des Pricing-Skripts.
 
 ## 4. Betroffene Produktionsdateien
 
