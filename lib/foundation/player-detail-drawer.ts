@@ -53,8 +53,8 @@ import {
 import type { PlayerInjuryHistoryRecord } from "@/lib/data/olyDataTypes";
 import { buildPlayerTrainingHistoryRows, type PlayerTrainingHistoryRow } from "@/lib/foundation/player-training-history";
 import {
-  buildPlayerMatchdayTrainingHistory,
-  type PlayerMatchdayTrainingHistory,
+  buildPlayerSeasonTrainingForecast,
+  type PlayerSeasonTrainingForecast,
 } from "@/lib/foundation/player-matchday-training-history";
 import {
   buildPlayerHistoryDisciplineValues,
@@ -384,8 +384,8 @@ export type PlayerDetailDrawerData = {
   }>;
   trainingHistoryRows: PlayerTrainingHistoryRow[];
   attributeHistoryRows: PlayerAttributeHistoryRow[];
-  /** Spieltag-genaue Trainings-Forecast-Historie der laufenden Saison (null wenn keine Spieltage gespielt). */
-  matchdayTrainingHistory: PlayerMatchdayTrainingHistory | null;
+  /** Kumulierte Trainings-Prognose der laufenden Saison (null wenn keine Spieltage gespielt). */
+  seasonTrainingForecast: PlayerSeasonTrainingForecast | null;
   progressionEconomyPreview: {
     marketValuePreview: number | null;
     currentContractSalary: number | null;
@@ -2567,11 +2567,11 @@ export function buildPlayerDrawerDataFromGameState(input: {
     currentTrainingClass: player.trainingClass ?? player.className ?? null,
     currentTrainingMode: player.trainingMode ?? null,
   });
-  // Spieltag-genaue Forecast-Historie — nur für eigene Spieler (dieselbe Sichtbarkeitsregel wie
-  // seasonOrganicForecast), da sie die volle organische Progression pro Spieltag rekonstruiert.
-  const matchdayTrainingHistory =
+  // Kumulierte Saison-Forecast — nur für eigene Spieler (dieselbe Sichtbarkeitsregel wie
+  // seasonOrganicForecast), da sie die volle organische Progression projiziert.
+  const seasonTrainingForecast =
     team && rosterEntry && (team.humanControlled !== false || DEBUG_FORCE_PLAYER_VISIBILITY)
-      ? buildPlayerMatchdayTrainingHistory({
+      ? buildPlayerSeasonTrainingForecast({
           gameState: input.gameState,
           player,
           facilities: team ? getTeamFacilityState(input.gameState, team.teamId) : undefined,
@@ -2820,7 +2820,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
     progressionEvents,
     trainingHistoryRows,
     attributeHistoryRows,
-    matchdayTrainingHistory,
+    seasonTrainingForecast,
     seasonPerformance,
     transferContext: {
       ...buildTransferContext(input.gameState, player.id, rosterEntry),
@@ -3183,7 +3183,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     progressionEvents: [],
     trainingHistoryRows: [],
     attributeHistoryRows: [],
-    matchdayTrainingHistory: null,
+    seasonTrainingForecast: null,
     progressionEconomyPreview: null,
     seasonPerformance: null,
     transferContext: {
