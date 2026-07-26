@@ -326,6 +326,27 @@ export function applySeasonBaselineProgression(
   };
 }
 
+/**
+ * Audit R2/V5: Saison-Grenzen-Resets, die im vollen Übergang Teil von applySeasonBaselineProgression sind
+ * (trainingMode/seasonTrainingAccumulator/fatigue je Spieler + Moral-Carry) — extrahiert, damit der FAST-
+ * Pfad (OLY_TRANSFER_PIPELINE_FAST, Sims/Long-Run) sie ebenfalls anwenden kann. Ohne diesen Reset trug der
+ * FAST-Pfad die per-Matchday-Trainings-Fatigue und den Accumulator der Vorsaison in die neue Saison, wodurch
+ * Sim-Läufe mit aufgeblähter Fatigue/stale Accumulator starteten und gegenüber dem Normalpfad drifteten.
+ * Bewusst schlank: NUR die Grenz-Resets, KEINE teure Attribut-/Marktwert-Neuberechnung.
+ */
+export function applySeasonBoundaryPlayerResets(gameState: GameState): GameState {
+  return {
+    ...gameState,
+    players: gameState.players.map((player) => ({
+      ...player,
+      trainingMode: null,
+      seasonTrainingAccumulator: null,
+      fatigue: 0,
+    })),
+    playerMoraleState: advancePlayerMoraleCarryState(gameState),
+  };
+}
+
 function materializeSeasonEndProgressionBeforeNextSeason(
   save: PersistedSaveGame,
   persistence: PersistenceService,
@@ -675,7 +696,13 @@ function buildNextSeasonGameState(
       refreshTeamObjectiveState(
         advanceTeamBeliebtheitForSeasonTransition({
           completedGameState: save.gameState,
-          nextGameState: advanceSponsorContractsForNewSeason(baseGameState, nextSeasonId),
+          // Audit R2/V5: die Saison-Grenzen-Resets (trainingMode/Accumulator/Fatigue/Moral) laufen auch im
+          // FAST-Pfad — sonst startet der Sim-/Long-Run mit stale Vorsaison-Fatigue + Accumulator und driftet
+          // gegenüber dem Normalpfad, der diese Resets über applySeasonBaselineProgression erhält.
+          nextGameState: advanceSponsorContractsForNewSeason(
+            applySeasonBoundaryPlayerResets(baseGameState),
+            nextSeasonId,
+          ),
         }),
       )
     : refreshTeamObjectiveState(
