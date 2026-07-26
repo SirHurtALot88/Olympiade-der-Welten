@@ -144,7 +144,8 @@ describe("foundation player portrait card ui contract", () => {
 
     const [cardText, homeText, cssText, presetsPath] = await Promise.all([
       fs.readFile(path.join(root, "components/foundation/player-portrait-card/FoundationPlayerPortraitCard.tsx"), "utf8"),
-      fs.readFile(path.join(root, "app/foundation/home-v2/HomeV2Client.tsx"), "utf8"),
+      // HomeV2Client.tsx is now a thin wrapper; the actual markup lives in HomeV2NewLook.tsx.
+      fs.readFile(path.join(root, "app/foundation/home-v2/HomeV2NewLook.tsx"), "utf8"),
       fs.readFile(path.join(root, "app/globals.css"), "utf8"),
       fs.readFile(path.join(root, "lib/foundation/player-portrait-stat-presets.ts"), "utf8"),
     ]);
@@ -196,7 +197,24 @@ describe("foundation player portrait preview ui contract", () => {
     expect(previewText).toContain('matchMedia("(hover: none)")');
     expect(foundationText).toContain("FoundationPlayerPortraitPreview");
     expect(teamsText).toContain("FoundationPlayerPortraitPreview");
+    // NOTE: The `context="roster"` hover-preview render in FoundationTeamsDetailPanel.tsx
+    // sits inside the `selectedTeamDetailTab === "roster"` branch, which is now
+    // dead/unreachable: FoundationTeamsViewHost.tsx unconditionally routes the
+    // "roster"/"portraits" sub-tabs to FoundationTeamsNewLook instead (its
+    // "Neuer Look Gate" comment still references a flag, but the code has no
+    // such flag check anymore). FoundationTeamsNewLook.tsx renders roster
+    // players with FoundationPlayerPortraitCard directly and never uses
+    // FoundationPlayerPortraitPreview (the hover-tooltip/portal wrapper) at
+    // all, so the portal-based hover preview for team roster cards looks like
+    // a real feature loss (see final report). Left red intentionally.
     expect(teamsText).toContain('context="roster"');
+    // NOTE: TransfermarktV2Client.tsx is a thin wrapper; neither its NewLook
+    // successor (TransfermarktV2NewLook.tsx) nor FoundationMarketBuyShellHost.tsx
+    // import FoundationPlayerPortraitCard or FoundationPlayerPortraitPreview
+    // anywhere — the market screens render plain portrait <img>s via
+    // getPlayerPortraitBrowserUrl instead. The hover-preview-with-stats for
+    // market player portraits looks like a real feature loss (see final
+    // report). Left red intentionally rather than papered over.
     expect(marketText).toContain("FoundationPlayerPortraitPreview");
     expect(marketText).toContain('context="market"');
   });
@@ -208,14 +226,19 @@ describe("lineup v2 portrait hover preview ui contract", () => {
     const path = await import("node:path");
     const root = process.cwd();
 
+    // LegacyLineupFocusV2Board.tsx is no longer mounted anywhere (LegacyLineupLabClient.tsx
+    // always renders LineupNewLook.tsx for the lineup board now); LineupNewLook.tsx is the
+    // live successor and reuses the same wiring under renamed identifiers
+    // (wrapLineupV2PortraitPreview -> wrapNlPortraitPreview, context "roster" -> "lineupCandidate",
+    // see the "identische Props wie `wrapLineupV2PortraitPreview` im v2-Board" comment there).
     const boardText = await fs.readFile(
-      path.join(root, "app/foundation/legacy-lineup-lab-v2/LegacyLineupFocusV2Board.tsx"),
+      path.join(root, "app/foundation/legacy-lineup-lab/LineupNewLook.tsx"),
       "utf8",
     );
 
     expect(boardText).toContain("FoundationPlayerPortraitPreview");
-    expect(boardText).toContain("wrapLineupV2PortraitPreview");
-    expect(boardText).toContain('context="roster"');
+    expect(boardText).toContain("wrapNlPortraitPreview");
+    expect(boardText).toContain('context="lineupCandidate"');
     expect(boardText).toContain("player.coreStats.pow");
   });
 });

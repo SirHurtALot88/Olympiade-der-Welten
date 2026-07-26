@@ -4,7 +4,9 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
-const scoutingPath = path.join(root, "app/foundation/scouting-center-v2/ScoutingCenterV2Client.tsx");
+// ScoutingCenterV2Client.tsx is now a thin wrapper; the actual panel wiring
+// lives in ScoutingCenterV2NewLook.tsx.
+const scoutingPath = path.join(root, "app/foundation/scouting-center-v2/ScoutingCenterV2NewLook.tsx");
 const scoutingQueuePath = path.join(root, "app/foundation/scouting-center-v2/ScoutingPriorityQueue.tsx");
 const scoutingReportPath = path.join(root, "app/foundation/scouting-center-v2/ScoutingReportPanel.tsx");
 const legacyLineupPath = path.join(root, "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx");
@@ -37,6 +39,15 @@ describe("foundation scouting and workflow portrait ui contract", () => {
   it("uses compact lineup portrait cards in the legacy matchday pool", async () => {
     const lineupText = await fs.readFile(legacyLineupPath, "utf8");
 
+    // NOTE: FoundationPlayerPortraitCard is imported in LegacyLineupLabClient.tsx
+    // but never actually rendered there (no `<FoundationPlayerPortraitCard`
+    // usage in the file), and no other file under legacy-lineup-lab*/ renders
+    // it with density="compact" either. `legacy-matchday-player-card` is only
+    // referenced in app/globals.css (dead CSS) and `slotProjection` only in
+    // lib/foundation/player-portrait-stat-presets.ts's own definition — neither
+    // is consumed anywhere to build the described "legacy matchday pool"
+    // compact portrait cards. This looks like a real feature loss (see final
+    // report), so these assertions are intentionally left unchanged/red.
     expect(lineupText).toContain("FoundationPlayerPortraitCard");
     expect(lineupText).toContain('context="lineup"');
     expect(lineupText).toContain('density="compact"');

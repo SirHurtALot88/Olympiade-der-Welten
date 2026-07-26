@@ -11,13 +11,22 @@ const root = process.cwd();
 describe("scouting display contract", () => {
   it("renders VeloScoutMetric in scouting report and keeps recommendations tab", async () => {
     const [scoutingText, reportText, metricText, managerOfficeText] = await Promise.all([
-      fs.readFile(path.join(root, "app/foundation/scouting-center-v2/ScoutingCenterV2Client.tsx"), "utf8"),
+      // ScoutingCenterV2Client.tsx is now a thin wrapper; markup lives in ScoutingCenterV2NewLook.tsx.
+      fs.readFile(path.join(root, "app/foundation/scouting-center-v2/ScoutingCenterV2NewLook.tsx"), "utf8"),
       fs.readFile(path.join(root, "app/foundation/scouting-center-v2/ScoutingReportPanel.tsx"), "utf8"),
       fs.readFile(path.join(root, "components/foundation/velo-ui/VeloScoutMetric.tsx"), "utf8"),
       fs.readFile(path.join(root, "app/foundation/home-v2/ManagerOfficeClient.tsx"), "utf8"),
     ]);
 
     expect(scoutingText).toContain('data-testid="scouting-recommendations"');
+    // NOTE: FoundationSubNav is no longer embedded in per-panel screens — it
+    // was consolidated into a single top-level nav in FoundationShellRouterBody.tsx
+    // (app/foundation/foundation-page-client-exports.ts / .../shell/FoundationSubNav.tsx
+    // are the only other referencing files). tests/facilities-v2-ui-contract.test.ts
+    // explicitly asserts the *absence* of FoundationSubNav from its panel as
+    // the "New Look" behavior, so this looks like the same intentional
+    // consolidation here, but left red rather than silently inverted to a
+    // not.toContain (see final report).
     expect(scoutingText).toContain("FoundationSubNav");
     expect(scoutingText).not.toContain("scouting-top-disciplines");
     expect(reportText).toContain("VeloScoutMetric");
@@ -28,7 +37,7 @@ describe("scouting display contract", () => {
 
   it("renders the scouting priority queue as a drag-and-drop reorderable wishlist", async () => {
     const [scoutingText, queueText] = await Promise.all([
-      fs.readFile(path.join(root, "app/foundation/scouting-center-v2/ScoutingCenterV2Client.tsx"), "utf8"),
+      fs.readFile(path.join(root, "app/foundation/scouting-center-v2/ScoutingCenterV2NewLook.tsx"), "utf8"),
       fs.readFile(path.join(root, "app/foundation/scouting-center-v2/ScoutingPriorityQueue.tsx"), "utf8"),
     ]);
     expect(scoutingText).toContain("ScoutingPriorityQueue");

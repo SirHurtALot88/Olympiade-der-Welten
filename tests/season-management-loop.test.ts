@@ -233,10 +233,12 @@ describe("fresh season one management loop seed", () => {
       path.join(process.cwd(), "scripts/smoke-whole-season-dry-run.ts"),
       "utf8",
     );
-    const foundationText = fs.readFileSync(
-      path.join(process.cwd(), "app/foundation/FoundationPageClient.tsx"),
-      "utf8",
-    );
+    // FoundationPageClient.tsx is now a thin wrapper; this cockpit UI lives in
+    // FoundationCockpitPanel.tsx, and the fetch call lives in cockpit-handlers.ts.
+    const foundationText =
+      fs.readFileSync(path.join(process.cwd(), "app/foundation/cockpit-v2/FoundationCockpitPanel.tsx"), "utf8") +
+      "\n" +
+      fs.readFileSync(path.join(process.cwd(), "lib/foundation/tabs/cockpit-handlers.ts"), "utf8");
 
     expect(packageJson.scripts?.["season:smoke-whole-season-dry-run"]).toBe("tsx scripts/smoke-whole-season-dry-run.ts");
     expect(serviceText).toContain("simulationMode: \"in_memory_local_copy\"");

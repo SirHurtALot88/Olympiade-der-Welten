@@ -558,7 +558,11 @@ describe("foundation performance architecture helpers", () => {
     expect(foundationSurfaceText).toContain("FoundationShellRouterMarketV2");
     expect(foundationSurfaceText).toContain("FoundationShellRouterMarketSell");
     expect(foundationSurfaceText).toContain("isMarketOfferPanelOpen");
-    expect(foundationSurfaceText).toContain("FoundationShellRouterMatchdayArena");
+    // The old FoundationShellRouterMatchdayArena panel UI (matchday-arena-v2) was
+    // removed; the "matchdayArena" view now renders FoundationDisciplineStageHost
+    // directly (see the "Arena = die (ehemalige) Disziplin-Bühne" comment in
+    // FoundationShellRouterBody.tsx).
+    expect(foundationSurfaceText).toContain("FoundationDisciplineStageHost");
     expect(foundationSurfaceText).toContain("FoundationShellRouterMatchdayResult");
     expect(foundationSurfaceText).toContain("FoundationShellRouterHistoryV2");
     expect(foundationSurfaceText).toContain("FoundationShellRouterSeasonPreview");
@@ -607,10 +611,26 @@ describe("foundation performance architecture helpers", () => {
       "utf8",
     );
     expect(transfermarktV2Text).toContain("FoundationShellRouterMarketBuy");
-    const resultHostText = await fs.readFile(
+    const resultHostShellText = await fs.readFile(
       path.join(root, "app/foundation/matchday-result-v2/FoundationMatchdayResultShellHost.tsx"),
       "utf8",
     );
+    // FoundationMatchdayResultShellHost.tsx is now a thin wrapper around
+    // MatchdayResultNewLook.tsx, which owns the actual panel markup (including
+    // the id landmark). Combine both so this check still reflects real wiring.
+    const resultHostNewLookText = await fs.readFile(
+      path.join(root, "app/foundation/matchday-result-v2/MatchdayResultNewLook.tsx"),
+      "utf8",
+    );
+    const resultHostText = `${resultHostShellText}\n${resultHostNewLookText}`;
+    // NOTE: "use-matchday-result-derivations" (lib/foundation/tabs/use-matchday-result-derivations.ts)
+    // is no longer imported by either file above — it appears to be orphaned dead
+    // code. Its `matchdaySummaryTab` state was inlined directly into
+    // use-foundation-shell-router-body-scope.tsx instead, but that value is only
+    // destructured (never consumed) in FoundationShellRouterBody.tsx, and
+    // MatchdayResultNewLook.tsx has no "Spieltag/Saison" sub-tab toggle anymore.
+    // This looks like a possible real feature loss (see final report), so this
+    // assertion is intentionally left unchanged/red rather than papered over.
     expect(resultHostText).toContain("use-matchday-result-derivations");
     expect(resultHostText).toContain('id="foundation-matchday-result"');
     const historyHostText = await fs.readFile(
@@ -620,10 +640,24 @@ describe("foundation performance architecture helpers", () => {
     expect(historyHostText).toContain('id="transfer-history"');
     expect(historyHostText).toContain("use-history-v2-derivations");
     expect(historyHostText).toContain("TransferHistoryV2Client");
-    const seasonPreviewHostText = await fs.readFile(
+    const seasonPreviewHostShellText = await fs.readFile(
       path.join(root, "app/foundation/season-preview-v2/FoundationSeasonPreviewShellHost.tsx"),
       "utf8",
     );
+    // FoundationSeasonPreviewShellHost.tsx is now a thin wrapper around
+    // SeasonPreviewNewLook.tsx, which owns the actual panel markup.
+    const seasonPreviewNewLookText = await fs.readFile(
+      path.join(root, "app/foundation/season-preview-v2/SeasonPreviewNewLook.tsx"),
+      "utf8",
+    );
+    const seasonPreviewHostText = `${seasonPreviewHostShellText}\n${seasonPreviewNewLookText}`;
+    // NOTE: "use-season-preview-derivations" (lib/foundation/tabs/use-season-preview-derivations.ts,
+    // which built the sortable/resizable/pinnable standings-preview column
+    // system) is no longer imported anywhere — it appears to be orphaned dead
+    // code. SeasonPreviewNewLook.tsx sorts with its own simple
+    // `compareProjectionRows` and has no column visibility/pinning UI anymore.
+    // This looks like a possible real feature loss (see final report), so this
+    // assertion is intentionally left unchanged/red rather than papered over.
     expect(seasonPreviewHostText).toContain("use-season-preview-derivations");
     expect(seasonPreviewHostText).toContain('id="standings-preview"');
     const seasonHostText = await fs.readFile(
@@ -664,8 +698,21 @@ describe("foundation performance architecture helpers", () => {
     expect(persistenceActionsText).toContain("applyCompactSeasonArchiveSentinelIfNeeded");
     expect(persistenceActionsText).toContain("invalidatePlayerProfileSessionCache");
     expect(persistenceActionsText).toContain("invalidatePlayerAttributeSheetCache");
+    // NOTE: `homeV2OverviewHeavyReady` (the state gating
+    // `enableTopPlayerForecasts` for the HQ home-v2 overview) was present in
+    // use-foundation-shell-router-body-scope.tsx before commit fd984c8
+    // ("fix(foundation): restore shell router scope so /foundation loads
+    // again") and was dropped by that commit's large refactor along with its
+    // wiring into buildFoundationHqOfficeDerivations. It is not referenced
+    // anywhere in app/ or lib/ anymore (only in this test's own local fixture
+    // data above and in use-foundation-cross-tab-player-directory.ts's now-
+    // unused function signatures). This looks like a real accidental feature
+    // loss (see final report), so this assertion is intentionally left
+    // unchanged/red rather than papered over.
     expect(foundationText).toContain("homeV2OverviewHeavyReady");
-    expect(foundationText).toContain("player-profile-session-cache");
+    // player-profile-session-cache is imported by use-foundation-persistence-actions.ts
+    // (already read above as persistenceActionsText), not by the orchestrator directly.
+    expect(persistenceActionsText).toContain("player-profile-session-cache");
     expect(prefetchText).toContain("prefetchMatchdayArenaBase");
     expect(prefetchText).toContain("matchday-arena-session-cache");
     expect(foundationText).toContain("marketSellBusy,");

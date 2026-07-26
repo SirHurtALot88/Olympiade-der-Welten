@@ -633,6 +633,19 @@ describe("legacy lineup validator", () => {
 
 describe("legacy lineup draft ui contract", () => {
   it("keeps draft workspace as primary with captain strip, progress and quick assign", async () => {
+    // NOTE (investigated, not fixed): several of the lineupText assertions
+    // below (showExpertBackupPanels JSX, legacy-lineup-main-flow,
+    // legacy-lineup-captain-strip, legacy-lineup-progress-track,
+    // legacy-lineup-quick-assign-row, legacy-lineup-draft-flow-chip,
+    // role="tablist", legacy-lineup-team-tactics-form, "Vorschlag bewusst
+    // setzen") are gone from LegacyLineupLabClient.tsx. This is the same root
+    // cause documented in detail in tests/legacy-lineup-lab.test.ts: the
+    // component's render function now unconditionally returns either
+    // <FormBoardPanel> or <LineupNewLook> regardless of `uiVariant`, so this
+    // file's "classic" draft-workspace JSX tree is dead/unreachable, and parts
+    // of it were also edited/removed outright. Looks like a real feature loss
+    // (see final report) rather than a wrong-file-path issue, so left
+    // unchanged/red intentionally.
     const fs = await import("node:fs/promises");
     const lineupPath = path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx");
     const cssPath = path.join(process.cwd(), "app/globals.css");

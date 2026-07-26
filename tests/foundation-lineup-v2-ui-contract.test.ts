@@ -14,6 +14,18 @@ describe("foundation lineup v2 ui contract", () => {
     ]);
 
     expect(boardText).toContain('data-testid="legacy-lineup-v2-board"');
+    // NOTE (investigated): LegacyLineupFocusV2Board.tsx is imported via
+    // dynamic() in LegacyLineupLabClient.tsx but never actually rendered
+    // (`<LegacyLineupFocusV2Board` has zero matches there) — the component
+    // always renders <LineupNewLook> or <FormBoardPanel> instead. Within this
+    // now-dead file, the candidate-tab-switcher UI itself was also stripped:
+    // `onCandidateTabChange` is never called, and the mobile candidate list is
+    // hardcoded to filterLegacyLineupCandidateEntries(candidateGroups, "all", ...).
+    // LineupNewLook.tsx (the component actually rendered) has its own
+    // candidate-tabs UI, but under `className="nl-lineup-candidate-tabs"` with
+    // NO data-testid at all — so "lineup-v2-candidate-tabs" doesn't exist
+    // anywhere as a literal testid. Real feature loss (missing test hook) —
+    // see final report — left red intentionally.
     expect(boardText).toContain('data-testid="lineup-v2-candidate-tabs"');
     expect(boardText).toContain('data-testid="lineup-v2-save-button"');
     expect(boardText).toContain('data-testid="lineup-v2-clear-slot"');
@@ -54,6 +66,15 @@ describe("foundation lineup v2 ui contract", () => {
     expect(boardText).toContain("lineupCandidate");
 
     expect(clientText).toContain('uiVariant === "focusV2"');
+    // NOTE: these 5 markers are gone from LegacyLineupLabClient.tsx (and no
+    // equivalent exists in LineupNewLook.tsx either — checked directly, zero
+    // matches). "Vorschlag übernehmen" ties into the same AI-preview-adoption
+    // UI documented as likely-removed in tests/legacy-lineup-lab.test.ts and
+    // tests/legacy-lineup.test.ts; the trainer-tip/handoff-overlay/ready-panel
+    // testids and the slotRoleAttributesByKey wiring (computed via useMemo at
+    // LegacyLineupLabClient.tsx:4428 but never passed to any child) look like
+    // further pieces of the same dead/unwired feature area. Real feature loss
+    // (see final report) — left red intentionally.
     expect(clientText).toContain('data-testid="lineup-v2-trainer-tip"');
     expect(clientText).toContain("Vorschlag übernehmen");
     expect(clientText).toContain("legacy-lineup-ready-panel");
@@ -82,6 +103,8 @@ describe("foundation lineup v2 ui contract", () => {
     expect(cssText).toContain(".legacy-lineup-v2-toolbar-hero-metrics");
     expect(cssText).toContain(".legacy-lineup-v2-wizard-portraits");
     expect(cssText).toContain(".legacy-lineup-v2-form-mini-chips");
+    // Same candidate-tabs finding as above — this exact CSS rule is gone too
+    // (LineupNewLook.tsx's replacement candidate tabs use .nl-lineup-candidate-tabs).
     expect(cssText).toContain(".legacy-lineup-v2-candidate-tabs");
     expect(cssText).toContain(".legacy-lineup-v2-top-pick-chip");
     expect(cssText).toContain(".legacy-lineup-v2-slot-row.is-empty.is-next-target");
@@ -111,6 +134,7 @@ describe("foundation lineup v2 ui contract", () => {
     expect(boardText).toContain("arenaReady");
     expect(boardText).toContain("onNavigateArena");
     expect(boardText).toContain("Zur Arena");
+    // Same dead-code/candidate-tabs finding as the first "it" block above.
     expect(boardText).toContain("legacy-lineup-v2-candidate-tabs is-");
     expect(boardText).toContain("legacy-lineup-v2-toolbar-progress-chip is-");
     expect(boardText).toContain("LegacyLineupSlotMicroSteps");

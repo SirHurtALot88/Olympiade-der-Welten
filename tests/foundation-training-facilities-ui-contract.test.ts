@@ -13,8 +13,10 @@ const trainingPanelDerivationsPath =
 const facilityEffectsPath = path.join(process.cwd(), "lib/facilities/facility-effects.ts");
 const foundationPageTypesPath = path.join(process.cwd(), "lib/foundation/tabs/foundation-page-types.ts");
 const moduleHelpersPath = path.join(process.cwd(), "lib/foundation/tabs/foundation-page-module-helpers.tsx");
-const facilitiesV2Path = path.join(process.cwd(), "app/foundation/facilities-v2/FacilitiesV2Client.tsx");
-const trainingCompactPath = path.join(process.cwd(), "app/foundation/training-compact/TrainingCompactClient.tsx");
+// FacilitiesV2Client.tsx / TrainingCompactClient.tsx are now thin wrappers;
+// the actual markup lives in their *NewLook.tsx successors.
+const facilitiesV2Path = path.join(process.cwd(), "app/foundation/facilities-v2/FacilitiesV2NewLook.tsx");
+const trainingCompactPath = path.join(process.cwd(), "app/foundation/training-compact/TrainingCompactNewLook.tsx");
 const trainingViewSharedPath = path.join(process.cwd(), "app/foundation/training-facilities-v2/training-view-shared.tsx");
 const globalsPath = path.join(process.cwd(), "app/globals.css");
 
@@ -68,6 +70,11 @@ describe("foundation training and facilities ui contract", () => {
     const fileText = await fs.readFile(trainingCompactPath, "utf8");
 
     expect(fileText).toContain('data-testid="foundation-training-compact"');
+    // NOTE: `TrainingPlayerLane` (in training-view-shared.tsx) is no longer
+    // imported/rendered anywhere in the codebase — TrainingCompactNewLook.tsx
+    // builds its own player rows with FoundationPlayerPortraitPreview +
+    // VeloIntensityRail instead. This looks like orphaned dead code / a
+    // possible feature loss (see final report), left red intentionally.
     expect(fileText).toContain("TrainingPlayerLane");
     expect(fileText).toContain("organicForecast.netSetpoints");
     expect(fileText).toContain("Training");
@@ -88,7 +95,11 @@ describe("foundation training and facilities ui contract", () => {
     expect(trainingDerivationsText).toContain("buildOrganicSeasonProgression");
     expect(trainingDerivationsText).toContain("buildTrainingPlayerRowView");
     expect(scopeText).toContain("trainingModeDraft");
-    expect(scopeText).toContain("async function setPlayerTrainingMode");
+    // setPlayerTrainingMode was refactored from an immediately-awaited async
+    // call into a synchronous state update that debounces the persistence via
+    // a setTimeout -> flushPendingTrainingModes() (see pendingTrainingModesRef
+    // right above it); the capability itself is unchanged.
+    expect(scopeText).toContain("function setPlayerTrainingMode");
     expect(trainingDerivationsText).toContain("player.trainingMode ?? \"mittel\"");
     expect(scopeText).toContain("persistLocalGameStateImmediately(nextGameState)");
     expect(scopeText).toContain("getTeamFacilityState");
@@ -135,32 +146,58 @@ describe("foundation training and facilities ui contract", () => {
     const [trainingCompactText, trainingSharedText, facilitiesOverviewText, cssText] = await Promise.all([
       fs.readFile(trainingCompactPath, "utf8"),
       fs.readFile(trainingViewSharedPath, "utf8"),
+      // FacilitiesOverviewV2Client.tsx is now a thin wrapper; the actual markup
+      // lives in FacilitiesOverviewV2NewLook.tsx.
       fs.readFile(
-        path.join(process.cwd(), "app/foundation/facilities-overview-v2/FacilitiesOverviewV2Client.tsx"),
+        path.join(process.cwd(), "app/foundation/facilities-overview-v2/FacilitiesOverviewV2NewLook.tsx"),
         "utf8",
       ),
       fs.readFile(globalsPath, "utf8"),
     ]);
 
+    // NOTE: None of "training-global-mode-chips" / "Alle auf" / TrainingModeComparePanel /
+    // compareActivePlayerId are referenced anywhere in app/ or lib/ anymore.
+    // components/foundation/modern-game/TrainingModeComparePanel.tsx exists on
+    // disk but is not imported by anything, and .training-v2-global-mode-chips
+    // in globals.css has no matching JSX usage either. This looks like a real
+    // feature loss (bulk "set all players to X" training-mode control, and a
+    // mode-compare panel) — see final report. Left red intentionally.
     expect(trainingCompactText).toContain('data-testid="training-global-mode-chips"');
     expect(trainingCompactText).toContain("Alle auf");
     expect(trainingCompactText).toContain("TrainingModeComparePanel");
     expect(trainingCompactText).toContain("compareActivePlayerId");
 
     // XP-System abgeschafft: TrainingAttributeUpgradeStrip (dekorativer „+1 ~40 SP"-Streifen) entfernt.
-    expect(trainingSharedText).not.toContain("TrainingAttributeUpgradeStrip");
+    // NOTE: scoped to an actual JSX usage (`<TrainingAttributeUpgradeStrip`)
+    // rather than any substring, because the source file itself now carries a
+    // comment documenting the removal ("XP-System abgeschafft:
+    // TrainingAttributeUpgradeStrip ... entfernt") that would otherwise trip a
+    // bare .not.toContain(name) check — the intent (component not rendered) is
+    // unchanged and still fully enforced.
+    expect(trainingSharedText).not.toContain("<TrainingAttributeUpgradeStrip");
     expect(trainingSharedText).toContain("TrainingWhyDisclosure");
     expect(trainingSharedText).toContain("is-compare-active");
     expect(trainingSharedText).toContain("is-signature");
     expect(trainingSharedText).toContain("regressionRisk");
 
-    expect(facilitiesOverviewText).toContain("facilities-overview-v2-maintenance-card");
-    expect(facilitiesOverviewText).toContain("facilities-overview-v2-upgrade-preview");
+    // NOTE: class names were migrated to the "nl-facility-overview-*" prefix
+    // convention (facilities-overview-v2-maintenance-card -> nl-facility-overview-card,
+    // facilities-overview-v2-upgrade-preview -> nl-facility-overview-upgrade),
+    // consistent with the rest of the v2 redesign.
+    expect(facilitiesOverviewText).toContain("nl-facility-overview-card");
+    expect(facilitiesOverviewText).toContain("nl-facility-overview-upgrade");
 
     expect(cssText).toContain(".training-v2-global-mode-chips");
     // XP-System abgeschafft: .training-v2-upgrade-strip / -tile CSS entfernt.
-    expect(cssText).not.toContain(".training-v2-upgrade-strip");
+    // NOTE: scoped to an actual rule definition rather than any substring,
+    // because globals.css itself now carries a comment documenting the
+    // removal that would otherwise trip a bare .not.toContain(selector) check.
+    expect(cssText).not.toContain(".training-v2-upgrade-strip {");
     expect(cssText).toContain(".training-v2-rider-card.is-compare-active");
+    // NOTE: the New Look facility-overview card has no bespoke
+    // ".facilities-overview-v2-maintenance-card"-equivalent CSS rule anymore —
+    // it's styled generically via the shared NlCard component instead of a
+    // dedicated selector, so there's nothing meaningful to redirect this to.
     expect(cssText).toContain(".facilities-overview-v2-maintenance-card");
   });
 });

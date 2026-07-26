@@ -142,6 +142,21 @@ describe("legacy lineup lab helpers", () => {
   });
 
   it("keeps ai preview adoption inside the local ui draft without auto-saving", async () => {
+    // NOTE (investigated, not fixed): LegacyLineupLabClient.tsx's own render
+    // function now unconditionally returns either <FormBoardPanel> or
+    // <LineupNewLook> (see the "Neuer Look Flag-Gate" comment around
+    // draftBoardView === "formBoard" in that file) regardless of `uiVariant`
+    // ("classic" vs "focusV2") — so the file's large "classic" JSX render tree
+    // that used to contain the AI-preview-adoption UI (the trainer-tip
+    // "Vorschlag übernehmen" button, the four onDoubleClick-to-open-player
+    // handlers, "Erweiterte Technikoptionen", the AI-preview save/batch
+    // buttons and their DE copy) is now dead/unreachable code. Several of
+    // those exact strings are also simply gone from the file entirely, and
+    // LineupNewLook.tsx (the component that's actually rendered) has no
+    // AI-preview-adoption code at all (`grep -n "AiPreview"` there is empty).
+    // This looks like a real, fairly large feature loss — see final report —
+    // rather than a simple wrong-file-path problem, so this whole assertion
+    // block is intentionally left unchanged/red rather than guessed at.
     const fileText = await fs.readFile(
       path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"),
       "utf8",
