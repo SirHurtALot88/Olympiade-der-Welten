@@ -8,6 +8,19 @@ import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/ty
 import { applySeasonEndPotentialUpdates } from "@/lib/progression/player-potential-service";
 import { buildSeasonReview, type SeasonReview } from "@/lib/season/season-review-service";
 
+// Audit R2/V1: Phasen, die der Saisonübergang NICHT auf "season_review" zurücksetzen darf (der User ist im
+// Saisonende-Wizard bereits über den Review hinaus). undefined/season_active/season_completed/season_review
+// sind NICHT enthalten → dort wird korrekt auf "season_review" gesetzt.
+const SEASON_TRANSITION_POST_REVIEW_PHASES = new Set<GamePhase>([
+  "season_rewards",
+  "player_development",
+  "preseason_management",
+  "transfer_sell_phase",
+  "transfer_buy_phase",
+  "lineup_setup",
+  "next_season_ready",
+]);
+
 export const SEASON_TRANSITION_STEPS = [
   "season_check",
   "season_review",
@@ -243,7 +256,14 @@ export function startSeasonTransition(
       });
   const nextGameState: GameState = {
     ...save.gameState,
-    gamePhase: "season_review",
+    // Audit R2/V1: NICHT hart auf "season_review" zurücksetzen, wenn der User im Wizard schon WEITER ist.
+    // Der Übergang setzt "season_review" nur, solange die Phase noch nicht über den Review hinaus ist
+    // (undefined/season_active/season_completed/season_review). Ist sie bereits in einer Post-Review-Phase
+    // (season_rewards, player_development, …), bleibt sie erhalten — ein erneuter Abschluss-Trigger wirft
+    // den Fortschritt sonst zurück.
+    gamePhase: SEASON_TRANSITION_POST_REVIEW_PHASES.has(save.gameState.gamePhase as GamePhase)
+      ? save.gameState.gamePhase
+      : "season_review",
     seasonTransition: transition,
     playerPotential: updatedPlayerPotential,
   };

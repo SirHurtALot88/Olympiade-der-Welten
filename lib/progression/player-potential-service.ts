@@ -1022,6 +1022,16 @@ export function applySeasonEndPotentialUpdate(input: {
   const currentScore = input.record.hiddenPotentialScore;
   if (!isFiniteNumber(currentScore)) return input.record;
 
+  // Audit R2/V1: Idempotenz pro Saison. Der Saisonende-Drift war bislang nur über `gamePhase` abgesichert
+  // (season-transition-service). Klickte der User im Saisonende-Wizard weiter (season_review → season_rewards
+  // …) und triggerte „Saison abschließen" erneut (Doppelklick/Reload/2. Tab/Retry), driftete das Potenzial
+  // ligaweit ein ZWEITES Mal (kumulativ, da auf den bereits gedrifteten Wert addiert). `lastSeasonSnapshot`
+  // wird bei jedem Drift mit der aktuellen `seasonId` geschrieben — ist er für DIESE Saison bereits gesetzt,
+  // wurde der Drift schon angewandt → unverändert zurückgeben (harte Idempotenz, unabhängig von der Phase).
+  if (input.record.lastSeasonSnapshot?.seasonId === input.seasonId) {
+    return input.record;
+  }
+
   const outlook = input.growthOutlook ?? "stable";
   const seed = getPlayerSeedValue(`${input.saveId}:${input.player.id}:${input.seasonId}:pot-update-v2`);
   let scoreDelta = roundValue((seed - 0.5) * 4, 0);
