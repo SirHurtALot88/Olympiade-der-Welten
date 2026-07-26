@@ -104,6 +104,13 @@ export const CLAUSES: Array<{ name: string; label: string; bonus: number; malus:
   { name: "Prophylaxe",    label: "höchstens X Verletzungen über die Saison",          bonus: 11, malus: 9,  lever: "Belastungssteuerung" },
   { name: "Moral",         label: "Ø-Moral am Saisonende über der Schwelle",           bonus: 9,  malus: 8,  lever: "Rollen, Einsatzzeiten, Kapitän" },
   { name: "Beliebtheit",   label: "Beliebtheit um X steigern",                         bonus: 10, malus: 7,  lever: "Erfolg + Fan-Infrastruktur" },
+  // ── Nachtrag: Hebel aus XP-Oekonomie, Traits, Kaderkomposition, Kapitaen, Versprechen ─────────
+  { name: "XP-Disziplin",  label: "≥ X % der verdienten XP investiert statt gehortet",  bonus: 9,  malus: 8,  lever: "currentXP/spentXP steuern" },
+  { name: "Charakterarbeit", label: "X negative Traits aus dem Kader entfernen",        bonus: 11, malus: 9,  lever: "traitsNegative — Abgabe oder Entwicklung" },
+  { name: "Vielseitigkeit", label: "≥ X verschiedene Subklassen im Kader",              bonus: 8,  malus: 8,  lever: "Kaderkomposition breit halten" },
+  { name: "Fokusschule",   label: "≥ X Spieler auf derselben Trainingsklasse",          bonus: 10, malus: 9,  lever: "trainingClass buendeln — Gegenteil von Vielseitigkeit" },
+  { name: "Kapitänstreue", label: "derselbe Kapitän über die ganze Saison",             bonus: 7,  malus: 7,  lever: "appoint_captain nicht wechseln" },
+  { name: "Wortlaut",      label: "alle Spielerversprechen eingehalten",                bonus: 12, malus: 10, lever: "Rolle/Einsätze/Trainingsmodus zusagen und liefern" },
 ];
 
 const compose = (curve: string, clause: string): SponsorType => {
@@ -387,3 +394,88 @@ for (const t of SPONSOR_TYPES) {
 }
 console.log("\n  Sockel = schlechtester realistischer Ausgang, Decke = bester. Gleiche EV ueberall —");
 console.log("  die Arten unterscheiden sich AUSSCHLIESSLICH in Risiko und Form, nie in der Hoehe.");
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════
+// STRESSTEST — laeuft nur mit OLY_SPONSOR_STRESS=1, weil er den GESAMTEN Kombinationsraum
+// kalibriert. Zweck: Fallen und Ausreisser finden, BEVOR sie als Balancing-Bug im Spiel auftauchen.
+// Geprueft wird gegen die drei Annahmen, die im Modell gesetzt und nicht gemessen sind:
+// Ergebnisstreuung (sigma), Klausel-Erfuellungswahrscheinlichkeit (P_MET) und die Kurven/Klausel-Paarung.
+// ══════════════════════════════════════════════════════════════════════════════════════════════════
+if (process.env.OLY_SPONSOR_STRESS === "1") {
+  const ALL: SponsorType[] = CURVES.flatMap((c) => CLAUSES.map((k) => compose(c.name, k.name)));
+  line();
+  console.log(`STRESSTEST — ${CURVES.length} Kurven x ${CLAUSES.length} Klauseln = ${ALL.length} Kombinationen`);
+  line();
+
+  /** Kalibriert eine beliebige Typmenge unter beliebigem sigma/P und liefert Fallen + Kennzahlen. */
+  function analyse(types: SponsorType[], sigma: number, pMet: number) {
+    const dist2 = (e: number) => {
+      const w: number[] = [];
+      for (let r = 1; r <= 32; r += 1) w.push(Math.exp(-((r - e) ** 2) / (2 * sigma * sigma)));
+      const su = w.reduce((a, b) => a + b, 0);
+      return w.map((x) => x / su);
+    };
+    const ev2 = (t: SponsorType, e: number, cal: number) =>
+      dist2(e).reduce((acc, w, i) =>
+        acc + w * (pMet * withFloor(rankPart(t, e, i + 1, cal) + t.clause.bonus)
+                 + (1 - pMet) * withFloor(rankPart(t, e, i + 1, cal) - t.clause.malus)), 0);
+    const cal = new Map<string, number>();
+    for (const t of types) for (const e of EXPECTED) cal.set(`${t.name}:${tierOf(e)}`, 0);
+    for (let it = 0; it < 250; it += 1) {
+      for (const e of EXPECTED) {
+        const g = (t: SponsorType) => cal.get(`${t.name}:${tierOf(e)}`)!;
+        const tgt = types.reduce((a, t) => a + ev2(t, e, g(t)), 0) / types.length;
+        for (const t of types) cal.set(`${t.name}:${tierOf(e)}`, g(t) + (tgt - ev2(t, e, g(t))) * 0.6);
+      }
+    }
+    let traps = 0; const names = new Set<string>(); let sdLo = Infinity, sdHi = 0, spread = 0;
+    for (const e of EXPECTED) {
+      const band: number[] = [];
+      for (let r = Math.max(1, e - 8); r <= Math.min(32, e + 8); r += 1) band.push(r);
+      const rows = types.map((t) => {
+        const c = cal.get(`${t.name}:${tierOf(e)}`)!;
+        const joint = band.flatMap((r) => [withFloor(rankPart(t, e, r, c) + t.clause.bonus), withFloor(rankPart(t, e, r, c) - t.clause.malus)]);
+        const e0 = ev2(t, e, c); const d = dist2(e); let v = 0;
+        d.forEach((w, i) => {
+          v += w * pMet * (withFloor(rankPart(t, e, i + 1, c) + t.clause.bonus) - e0) ** 2
+             + w * (1 - pMet) * (withFloor(rankPart(t, e, i + 1, c) - t.clause.malus) - e0) ** 2;
+        });
+        return { name: t.name, ev: e0, sd: Math.sqrt(v), joint };
+      });
+      const evs = rows.map((r) => r.ev);
+      spread = Math.max(spread, Math.max(...evs) / Math.min(...evs) - 1);
+      sdLo = Math.min(sdLo, ...rows.map((r) => r.sd)); sdHi = Math.max(sdHi, ...rows.map((r) => r.sd));
+      // EPS: viele Klauseln teilen sich exakt dieselben Bonus/Malus-Kennzahlen (z. B. 9/8) und sind
+      // damit rechnerisch identisch — sie unterscheiden sich nur im Flavour. Ohne Toleranz wertet der
+      // Test solches Gleichstands-Rauschen als Dominanz. Erst ein echter Abstand zaehlt.
+      const EPS = 0.5;
+      for (const a of rows) {
+        // Falle = bei JEDEM Ausgang um mindestens EPS schlechter als eine Alternative. Knappe
+        // Gleichstaende (identische Klausel-Kennzahlen, nur anderes Flavour) zaehlen NICHT.
+        if (rows.some((b) => a.name !== b.name && a.joint.every((v, i) => v <= b.joint[i]! - EPS))) {
+          traps += 1; names.add(a.name);
+        }
+      }
+    }
+    return { traps, names: [...names], spread, sdLo, sdHi };
+  }
+
+  console.log("\n  A) Alle Kombinationen, Standardannahmen (sigma 4, P 0.55)");
+  const a0 = analyse(ALL, 4, 0.55);
+  console.log(`     Fallen ${a0.traps}  EV-Spread max ${(a0.spread * 100).toFixed(1)} %  sigma ${a0.sdLo.toFixed(1)}–${a0.sdHi.toFixed(1)}`);
+  if (a0.names.length) console.log(`     betroffen: ${a0.names.join(", ")}`);
+
+  console.log("\n  B) Empfindlichkeit gegen die Ergebnisstreuung (sigma) — enge vs. offene Liga");
+  for (const sg of [2, 3, 4, 6, 8]) {
+    const r = analyse(ALL, sg, 0.55);
+    console.log(`     sigma ${sg}: Fallen ${String(r.traps).padStart(3)}  Spread ${(r.spread * 100).toFixed(1).padStart(5)} %  sigma-Bereich ${r.sdLo.toFixed(1)}–${r.sdHi.toFixed(1)}` +
+      (r.names.length ? `   → ${r.names.slice(0, 4).join(", ")}${r.names.length > 4 ? " …" : ""}` : ""));
+  }
+
+  console.log("\n  C) Empfindlichkeit gegen die Klausel-Erfuellung (P) — die ungemessene Annahme");
+  for (const pm of [0.25, 0.4, 0.55, 0.7, 0.85]) {
+    const r = analyse(ALL, 4, pm);
+    console.log(`     P ${pm.toFixed(2)}: Fallen ${String(r.traps).padStart(3)}  Spread ${(r.spread * 100).toFixed(1).padStart(5)} %  sigma-Bereich ${r.sdLo.toFixed(1)}–${r.sdHi.toFixed(1)}` +
+      (r.names.length ? `   → ${r.names.slice(0, 4).join(", ")}${r.names.length > 4 ? " …" : ""}` : ""));
+  }
+}
