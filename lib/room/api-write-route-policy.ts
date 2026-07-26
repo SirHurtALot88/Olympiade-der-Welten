@@ -133,6 +133,12 @@ export const API_WRITE_ROUTE_GUARD_REQUIRED: ApiWriteRoutePolicyEntry[] = [
     policy: "require_room_write_guard",
     reason: "Team control settings write mutates seasonState.teamControlSettings for one team.",
   },
+  {
+    routePath: "training",
+    methods: ["POST"],
+    policy: "require_room_write_guard",
+    reason: "Player training mode/class write mutates player state for one team's roster.",
+  },
 ];
 
 export function isAllowlistedApiWriteRoute(routePath: string, method: string) {
