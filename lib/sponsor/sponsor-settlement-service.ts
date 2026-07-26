@@ -337,7 +337,12 @@ export function applySponsorSettlement(input: {
     const contract = getTeamSponsorContract(input.gameState, team.teamId);
     const teamRows = contract ? preview.rows.filter((row) => row.teamId === team.teamId && row.cashDelta !== 0) : [];
     let delta = roundCash(teamRows.reduce((sum, row) => sum + row.cashDelta, 0));
-    if (input.deductSalary && contract) {
+    // Audit R2/V2: Gehalt wird IMMER abgezogen — unabhängig davon, ob ein Sponsorvertrag existiert. Vorher
+    // war der (einzige) saisonale Gehaltsabzug an `contract` gekoppelt, sodass vertragslose Teams (Mensch
+    // ohne Sponsor, passive Teams, abgelaufene AI-Verträge) NIE Gehalt zahlten → systematischer Ökonomie-
+    // Skew + KI-Paritätsbruch (AI signt automatisch, Mensch konnte durch Nicht-Unterschreiben den größten
+    // Kostenblock dauerhaft vermeiden). getTeamSalaryTotal ist rosterbasiert und braucht keinen Vertrag.
+    if (input.deductSalary) {
       const salaryTotal = getTeamSalaryTotal(input.gameState, team.teamId);
       if (salaryTotal > 0) {
         delta = roundCash(delta - salaryTotal);
