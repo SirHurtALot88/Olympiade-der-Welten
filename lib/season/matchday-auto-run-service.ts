@@ -24,7 +24,6 @@ import { type ResolvePreviewStatus } from "@/lib/resolve/legacy-matchday-resolve
 import { buildStandingsPreview } from "@/lib/standings/standings-preview-engine";
 import { executeStandingsApply, STANDINGS_APPLY_CONFIRM_TOKEN } from "@/lib/standings/standings-apply-service";
 import { ADVANCE_MATCHDAY_CONFIRM_TOKEN, executeMatchdayAdvance } from "@/lib/season/matchday-progress-service";
-import { ensureMinimumActiveRosterForMatchday } from "@/lib/season/matchday-emergency-roster-service";
 
 export const MATCHDAY_AUTO_RUN_CONFIRM_TOKEN = "RUN_LOCAL_MATCHDAY_AUTO";
 
@@ -477,23 +476,13 @@ export async function runLocalMatchdayAutoRun(
     matchdayId: params.matchdayId,
   };
   const prepared = prepareGameStateForMatchdayResolve(save.gameState, scope);
-  // Self-heal a team that would otherwise be permanently stuck: if fatigue/injury accumulation has
-  // dropped a team's available roster below LEGACY_MATCHDAY_MINIMUM_PLAYERS for THIS matchday, no
-  // lineup (however built) could ever resolve for them (see matchday-emergency-roster-service.ts).
-  // Sign just enough emergency free agents to clear the floor before building/resolving lineups.
-  // No-op for every team that already meets the floor (the normal case, every matchday).
-  const emergencyReinforcement = ensureMinimumActiveRosterForMatchday(prepared.gameState, scope);
-  if ((prepared.warnings.length > 0 || emergencyReinforcement.reinforcements.length > 0) && !dryRun) {
-    persistence.saveSingleplayerState(scope.saveId, emergencyReinforcement.gameState);
+  if (prepared.warnings.length > 0 && !dryRun) {
+    persistence.saveSingleplayerState(scope.saveId, prepared.gameState);
   }
   const workingSave = {
     ...save,
-    gameState: emergencyReinforcement.gameState,
+    gameState: prepared.gameState,
   };
-  const emergencyReinforcementWarnings = emergencyReinforcement.reinforcements.map(
-    (reinforcement) =>
-      `emergency_roster_reinforcement:${reinforcement.teamId}:${reinforcement.signedPlayerIds.length}_signed_active_was_${reinforcement.activePlayersBefore}`,
-  );
   const existingMatchdayResult =
     (workingSave.gameState.seasonState.matchdayResults ?? []).find(
       (entry) => entry.saveId === scope.saveId && entry.seasonId === scope.seasonId && entry.matchdayId === scope.matchdayId,
@@ -695,7 +684,7 @@ export async function runLocalMatchdayAutoRun(
     }),
     dryRun,
     canContinue: aiBatchResult.summary.skippedBlocked === 0,
-    warnings: [...emergencyReinforcementWarnings, ...aiBatchResult.summary.warnings],
+    warnings: aiBatchResult.summary.warnings,
     blockingReasons: aiBatchResult.summary.blockingReasons,
     metrics: {
       totalTeams: aiBatchResult.summary.totalTeams,
