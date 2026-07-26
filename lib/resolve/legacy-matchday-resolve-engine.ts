@@ -109,7 +109,7 @@ function applyTeamPowerDebuffs(teamResults: DisciplineTeamResolvePreview[]) {
   );
 
   if (debuffSources.length === 0) {
-    return teamResults;
+    return { results: teamResults, factorByTeamId: new Map<string, number>() };
   }
 
   const debuffByTeamId = new Map<string, { amount: number; labels: string[] }>();
@@ -126,19 +126,29 @@ function applyTeamPowerDebuffs(teamResults: DisciplineTeamResolvePreview[]) {
     }
   }
 
-  return teamResults.map((team) => {
+  const factorByTeamId = new Map<string, number>();
+  const results = teamResults.map((team) => {
     const debuff = debuffByTeamId.get(team.teamId);
     if (!debuff) {
       return team;
     }
-    const nextScore = roundScore(Math.max(team.score - debuff.amount, 0));
+    const preDebuffScore = team.score;
+    const nextScore = roundScore(Math.max(preDebuffScore - debuff.amount, 0));
+    const factor = preDebuffScore > 0 ? nextScore / preDebuffScore : 1;
+    factorByTeamId.set(team.teamId, factor);
     return {
       ...team,
       finalPreviewScore: nextScore,
       score: nextScore,
+      entries: team.entries.map((entry) => ({
+        ...entry,
+        finalPlayerScore: entry.finalPlayerScore == null ? entry.finalPlayerScore : roundScore(entry.finalPlayerScore * factor),
+      })),
       warnings: [...team.warnings, ...debuff.labels.map((label) => `team_power_debuff:${label}`)],
     };
   });
+
+  return { results, factorByTeamId };
 }
 
 function buildPlayerNameResolver(contexts: LegacyLineupLoadedContext[]) {
@@ -569,7 +579,7 @@ export function buildLegacyMatchdayResolvePreview(
           warnings: entry.warnings ?? [],
         })),
       }));
-    const teamResultsAfterPowers = applyTeamPowerDebuffs(rawTeamResults);
+    const { results: teamResultsAfterPowers, factorByTeamId: teamPowerDebuffFactorByTeamId } = applyTeamPowerDebuffs(rawTeamResults);
     const teamResultsRanked = rankDescendingSharedTies(
       teamResultsAfterPowers,
       (result) => result.score,
@@ -585,7 +595,15 @@ export function buildLegacyMatchdayResolvePreview(
     }));
 
     const rawPlayerEntries = bucket.flatMap(({ context, score, side }) => {
-      const total = score.finalPreviewScore ?? score.totalScore;
+      // Propagate the team-power debuff (applied to the team score in
+      // applyTeamPowerDebuffs) down to the player level, proportionally, so
+      // that Σ finalPlayerScore matches the debuffed team score. `factor`
+      // stays exactly 1 for non-debuffed teams so their numbers are untouched
+      // (no new rounding introduced) — see hard invariant #3.
+      const debuffFactor = teamPowerDebuffFactorByTeamId.get(context.team.id) ?? 1;
+      const scalePlayerScore = (rawValue: number) => (debuffFactor === 1 ? rawValue : roundScore(rawValue * debuffFactor));
+      const rawTotal = score.finalPreviewScore ?? score.totalScore;
+      const total = debuffFactor === 1 ? rawTotal : roundScore(rawTotal * debuffFactor);
       const rankedWithinTeam = rankDescending(score.entries, (entry) => entry.finalContribution ?? entry.score ?? 0).map(({ item, rank }) => ({
         entry: item,
         rankInTeam: rank,
@@ -596,8 +614,8 @@ export function buildLegacyMatchdayResolvePreview(
         rank: rankedTeam?.rank ?? null,
         entries: rankedWithinTeam.map(({ entry }) => ({
           baseValue: entry.baseDisciplineScore ?? entry.score ?? 0,
-          finalPlayerScore: entry.finalContribution ?? entry.score ?? 0,
-          scoreContribution: total > 0 ? (entry.finalContribution ?? entry.score ?? 0) / total : 0,
+          finalPlayerScore: scalePlayerScore(entry.finalContribution ?? entry.score ?? 0),
+          scoreContribution: total > 0 ? scalePlayerScore(entry.finalContribution ?? entry.score ?? 0) / total : 0,
         })),
       });
 
@@ -633,15 +651,15 @@ export function buildLegacyMatchdayResolvePreview(
         mutatorBonus: entry.mutatorBonus ?? null,
         mutatorPpsBonus: entry.mutatorPpsBonus ?? null,
         formShare: entry.formShare ?? null,
-        finalPlayerScore: entry.finalContribution ?? entry.score ?? 0,
-        scoreContribution: total > 0 ? (entry.finalContribution ?? entry.score ?? 0) / total : 0,
+        finalPlayerScore: scalePlayerScore(entry.finalContribution ?? entry.score ?? 0),
+        scoreContribution: total > 0 ? scalePlayerScore(entry.finalContribution ?? entry.score ?? 0) / total : 0,
         pointsAwarded: distributedPoints.entries[index]?.points ?? null,
         pointSource: distributedPoints.pointSource,
         rankInTeam,
         rankInDiscipline: 0,
         isTop10: false,
         isMvpCandidate: false,
-        storyWeight: total > 0 ? (entry.finalContribution ?? entry.score ?? 0) / total : 0,
+        storyWeight: total > 0 ? scalePlayerScore(entry.finalContribution ?? entry.score ?? 0) / total : 0,
         disciplineSide: score.disciplineSide ?? side,
       }));
     });
