@@ -171,7 +171,12 @@ export function previewFacilityUpgrade(
   const facility = FACILITY_CATALOG_BY_ID[facilityId] ?? null;
   const teamFacilities = getTeamFacilityState(gameState, teamId);
   const storedLevel = Math.max(0, Math.min(5, Math.round(teamFacilities.facilities[facilityId]?.level ?? 0)));
-  const currentLevel = facility ? (action === "downgrade" ? storedLevel : getFacilityLevel(teamFacilities, facilityId)) : 0;
+  // WICHTIG: Für Upgrade/Downgrade IMMER den gespeicherten Level nehmen, NICHT getFacilityLevel() — das
+  // liefert bei deaktivierter/verfallener (condition<=0) Facility 0, wodurch ein "Upgrade" auf eine
+  // kaputte L5-Arena sie auf L1 zurücksetzen würde (Datenverlust). Der storedLevel erhält den echten Level;
+  // der facility_disabled-Blocker unten (currentLevel>0 + disabledReason) greift dadurch korrekt und zwingt
+  // stattdessen zur Reparatur (die den Level behält).
+  const currentLevel = facility ? storedLevel : 0;
   const nextLevel = facility
     ? action === "downgrade"
       ? Math.max(currentLevel - 1, 0)

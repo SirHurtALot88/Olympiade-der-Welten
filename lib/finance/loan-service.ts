@@ -413,7 +413,7 @@ export type OriginateLoanResult = {
 export function originateLoan(
   gameState: GameState,
   input: OriginateLoanInput,
-  options?: { execute?: boolean; allowSeason1?: boolean },
+  options?: { execute?: boolean; allowSeason1?: boolean; emergency?: boolean },
 ): OriginateLoanResult {
   const borrower = gameState.teams.find((team) => team.teamId === input.borrowerTeamId) ?? null;
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === input.borrowerTeamId) ?? null;
@@ -422,9 +422,14 @@ export function originateLoan(
     return { ok: false, loan: null, reason: "borrower_not_found", capacity: 0, terms: null, gameState };
   }
 
+  // Notkredit (Zahlungsunfähigkeits-Backstop): ein Team, das seine Verpflichtungen nicht decken kann, MUSS
+  // das Geld irgendwoher bekommen (kein Cash darf unter 0 stehen). Deshalb umgeht ein `emergency`-Kredit
+  // die S1-Sperre, das Distress-Gate und die Kapazitätsgrenze — er ist unfreiwillig, nicht strategisch.
+  const emergency = options?.emergency === true;
+
   // Season 1 = keine Kredite (harte Regel), siehe docs/design/kredit-system.md. Unabhängig von
-  // Kapazität — man kommt mit dem aus, was man hat.
-  if (!options?.allowSeason1 && isSeasonOne(gameState.season.id)) {
+  // Kapazität — man kommt mit dem aus, was man hat. (Notkredit ausgenommen.)
+  if (!options?.allowSeason1 && !emergency && isSeasonOne(gameState.season.id)) {
     return { ok: false, loan: null, reason: SEASON_ONE_NO_LOANS_REASON, capacity: 0, terms: null, gameState };
   }
 
@@ -474,11 +479,11 @@ export function originateLoan(
   // Distress-Gate (jetzt für Mensch UND KI, vorher KI-only): geplatzte Schuld → keine Neuaufnahme, es sei
   // denn das Team steht unter dem harten Roster-Minimum (Überlebenskredit). Kapazität wird trotzdem
   // zurückgegeben, damit der Aufrufer den Rahmen weiterhin anzeigen kann. Siehe `isDefaultedDebtBorrowBlocked`.
-  if (isDefaultedDebtBorrowBlocked(gameState, input.borrowerTeamId)) {
+  if (!emergency && isDefaultedDebtBorrowBlocked(gameState, input.borrowerTeamId)) {
     return { ok: false, loan: null, reason: DISTRESS_DEFAULTED_DEBT_REASON, capacity, terms: null, gameState };
   }
 
-  if (input.principal > capacity) {
+  if (!emergency && input.principal > capacity) {
     return { ok: false, loan: null, reason: "over_capacity", capacity, terms: null, gameState };
   }
 
@@ -796,15 +801,11 @@ export function applyLoanSettlement(
       const delta = cashDeltaByTeamId.get(team.teamId) ?? 0;
       if (delta === 0) return team;
       const rawNext = roundCash(team.cash + delta);
-      if (rawNext < 0) {
-        // Sollte laut Settlement-Zeilen (jede Rate ist bereits auf verfügbares Cash begrenzt)
-        // eigentlich nie passieren — der Clamp bleibt aus Robustheit, aber ein stiller Unterlauf
-        // hier deutet auf ein Leck in der Ratenberechnung hin. Sichtbar machen statt verschlucken.
-        console.warn(
-          `[loan-settlement] team=${team.teamId} season=${seasonId} cash würde negativ (${rawNext}); auf 0 geklemmt. cashVorher=${team.cash} delta=${delta}`,
-        );
-      }
-      return { ...team, cash: roundCash(Math.max(0, rawNext)) };
+      // KEIN Clamp auf 0 mehr: das würde Geld aus dem Nichts erzeugen (der frühere Bug). Ein negativer
+      // Zwischenstand (z. B. weil der Gehaltsabzug das Team schon vorher unter 0 gedrückt hat) bleibt
+      // negativ und wird am Ende der Season-Completion vom Zahlungsunfähigkeits-Backstop
+      // (applyInsolvencyBackstop) in einen echten Notkredit umgewandelt.
+      return { ...team, cash: rawNext };
     }),
     seasonState: {
       ...gameState.seasonState,
@@ -815,6 +816,50 @@ export function applyLoanSettlement(
   };
 
   return { ok: true, applied: true, duplicateDetected: false, preview, gameState: nextGameState };
+}
+
+/** Laufzeit (Saisons) des Notkredits im Zahlungsunfähigkeits-Backstop. */
+export const INSOLVENCY_BACKSTOP_TERM_SEASONS = 4;
+
+export type InsolvencyBackstopResult = {
+  gameState: GameState;
+  emergencyLoans: Array<{ teamId: string; principal: number }>;
+  warnings: string[];
+};
+
+/**
+ * Zahlungsunfähigkeits-Backstop: KEIN Team darf die Saison mit negativem Cash beenden — aber es darf auch
+ * kein Geld aus dem Nichts entstehen (der frühere `Math.max(0, …)`-Clamp). Stattdessen nimmt jedes Team mit
+ * negativem Cash automatisch einen NOTKREDIT über exakt den Fehlbetrag auf (Cash danach = 0), der über das
+ * bestehende Kreditsystem verzinst zurückgezahlt wird. Der Notkredit umgeht Kapazitäts-, Distress- und
+ * S1-Gate (er ist unfreiwillig). Läuft als letzter Cash-berührender Schritt der Season-Completion, NACHDEM
+ * Sponsor/Gehalt, Kredit-Raten, Gebäude und Ziel-Rewards verbucht sind.
+ */
+export function applyInsolvencyBackstop(input: { gameState: GameState; saveId: string }): InsolvencyBackstopResult {
+  let gameState = input.gameState;
+  const emergencyLoans: Array<{ teamId: string; principal: number }> = [];
+  const warnings: string[] = [];
+
+  for (const team of input.gameState.teams) {
+    const current = gameState.teams.find((entry) => entry.teamId === team.teamId);
+    if (!current || current.cash >= -0.01) continue;
+    const shortfall = roundCash(-current.cash);
+    if (shortfall <= 0) continue;
+
+    const result = originateLoan(
+      gameState,
+      { borrowerTeamId: team.teamId, principal: shortfall, termSeasons: INSOLVENCY_BACKSTOP_TERM_SEASONS, lenderType: "bank" },
+      { execute: true, emergency: true },
+    );
+    if (result.ok) {
+      gameState = result.gameState;
+      emergencyLoans.push({ teamId: team.teamId, principal: shortfall });
+    } else {
+      warnings.push(`insolvency_backstop_failed:${team.teamId}:${result.reason ?? "unknown"}`);
+    }
+  }
+
+  return { gameState, emergencyLoans, warnings };
 }
 
 export type EarlyPayoffQuote = {

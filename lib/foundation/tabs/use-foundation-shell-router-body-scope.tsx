@@ -761,7 +761,7 @@ const PlayerProfileClient = dynamic(() => import("@/app/foundation/player-profil
   ssr: false,
   loading: () => null,
 });
-const PlayerGeneratorPanel = dynamic(() => import("@/app/foundation/PlayerGeneratorPanel"), { ssr: false });
+const PlayerGeneratorPanel = dynamic(() => import("@/app/foundation/PlayerGeneratorPanelNewLook"), { ssr: false });
 const FoundationTransfermarktV2Panel = dynamic(
   () => import("@/app/foundation/transfermarkt-v2/FoundationTransfermarktV2Panel"),
   {
@@ -1913,13 +1913,15 @@ export function useFoundationShellRouterBodyScope({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          action: "new-game-flow-step",
-          saveId: activeSaveId,
-          stepId,
-          status,
-          selectedTeamId: selectedTeamId ?? activeManagerTeamId ?? null,
-        }),
+        body: JSON.stringify(
+          withRoomBody({
+            action: "new-game-flow-step",
+            saveId: activeSaveId,
+            stepId,
+            status,
+            selectedTeamId: selectedTeamId ?? activeManagerTeamId ?? null,
+          }),
+        ),
       },
     );
 
@@ -9003,12 +9005,14 @@ export function useFoundationShellRouterBodyScope({
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            action: "assign-team-captain",
-            saveId: activeSaveId,
-            teamId: selectedTeam.teamId,
-            playerId,
-          }),
+          body: JSON.stringify(
+            withRoomBody({
+              action: "assign-team-captain",
+              saveId: activeSaveId,
+              teamId: selectedTeam.teamId,
+              playerId,
+            }),
+          ),
         },
       );
       if (!response.ok) {

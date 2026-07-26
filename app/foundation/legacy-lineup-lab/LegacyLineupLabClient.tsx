@@ -1112,8 +1112,8 @@ function LegacyLineupSortableHeader({
 
 function formatScore(value: number) {
   return new Intl.NumberFormat("de-DE", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
   }).format(value);
 }
 

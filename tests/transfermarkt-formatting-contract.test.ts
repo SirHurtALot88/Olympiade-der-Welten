@@ -18,9 +18,11 @@ describe("transfermarkt formatting contract", () => {
   });
 
   it("formats market value and salary in the app-wide Mio convention", () => {
-    // Werte liegen in Mio-Einheit vor — konsistent zu formatNlMoney.
+    // Werte liegen in Mio-Einheit vor — konsistent zu formatNlMoney: EINHEITLICH "Mio"
+    // mit de-DE-Komma und genau einer Nachkommastelle, auch für kleine Beträge (früher
+    // wurden < 1 Mio als "750k" ausgegeben — derselbe Wert erschien so in zwei Einheiten).
     expect(formatTransfermarktCurrency(506.4)).toBe("506,4 Mio");
-    expect(formatTransfermarktCurrency(0.75)).toBe("750k");
+    expect(formatTransfermarktCurrency(0.75)).toBe("0,8 Mio");
     expect(formatTransfermarktCurrency(null)).toBe("—");
   });
 

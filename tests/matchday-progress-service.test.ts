@@ -240,4 +240,64 @@ describe("matchday progress service", () => {
     expect(result.ok).toBe(false);
     expect(result.blockingReasons[0]).toContain("read-only");
   });
+
+  // Audit S4 regression: an unresolved saveId must never silently advance "the active save"
+  // instead of the one actually requested — even though the mock's getActiveSave() below returns
+  // a real (different) save, exactly like the pre-fix code path would have picked.
+  describe("audit S4: unresolved saveId must never fall back to the active save", () => {
+    it("previewMatchdayAdvance rejects an unknown saveId instead of silently previewing the active save", async () => {
+      const { save, persistence } = createPersistenceMock();
+
+      await expect(
+        previewMatchdayAdvance({ saveId: "save-does-not-exist", seasonId: "season-1" }, persistence as never),
+      ).rejects.toThrow(/could not be resolved/i);
+
+      expect(persistence.saveSingleplayerState).not.toHaveBeenCalled();
+      expect(save.gameState.season.currentMatchday).toBe(1);
+    });
+
+    it("executeMatchdayAdvance rejects a missing saveId and writes nothing", async () => {
+      const { save, persistence } = createPersistenceMock();
+
+      await expect(
+        executeMatchdayAdvance(
+          { saveId: "", seasonId: "season-1", execute: true, confirm: ADVANCE_MATCHDAY_CONFIRM_TOKEN },
+          persistence as never,
+        ),
+      ).rejects.toThrow(/saveId is required/i);
+
+      expect(persistence.saveSingleplayerState).not.toHaveBeenCalled();
+      expect(save.gameState.season.currentMatchday).toBe(1);
+      expect(save.gameState.seasonState.matchdayAdvanceLogs).toHaveLength(0);
+    });
+
+    it("executeMatchdayAdvance rejects a stale/unknown saveId and writes nothing (not even to the active save)", async () => {
+      const { save, persistence } = createPersistenceMock();
+
+      await expect(
+        executeMatchdayAdvance(
+          { saveId: "save-belongs-to-someone-else", seasonId: "season-1", execute: true, confirm: ADVANCE_MATCHDAY_CONFIRM_TOKEN },
+          persistence as never,
+        ),
+      ).rejects.toThrow(/could not be resolved/i);
+
+      expect(persistence.saveSingleplayerState).not.toHaveBeenCalled();
+      expect(save.gameState.season.currentMatchday).toBe(1);
+      expect(save.gameState.seasonState.matchdayAdvanceLogs).toHaveLength(0);
+    });
+
+    it("a normal solo flow with a correctly threaded saveId still advances the matchday (no regression)", async () => {
+      const { save, persistence } = createPersistenceMock();
+
+      const result = await executeMatchdayAdvance(
+        { saveId: "save-local", seasonId: "season-1", execute: true, confirm: ADVANCE_MATCHDAY_CONFIRM_TOKEN },
+        persistence as never,
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.applied).toBe(true);
+      expect(persistence.saveSingleplayerState).toHaveBeenCalledWith("save-local", expect.anything());
+      expect(save.gameState.season.currentMatchday).toBe(2);
+    });
+  });
 });

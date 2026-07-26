@@ -626,4 +626,43 @@ describe("season snapshot service", () => {
     expect(teamA?.rosterEnd).toBe(1);
     expect(teamA?.salaryTotalEnd).toBe(10);
   });
+
+  // Audit S4 regression: creating a season snapshot must never silently snapshot "the active
+  // save" (here the mock's getActiveSave() below returns a real, different save — exactly what
+  // pre-fix code would have snapshotted) when the requested saveId cannot be resolved.
+  describe("audit S4: unresolved saveId must never fall back to the active save", () => {
+    it("createSeasonSnapshot rejects a missing saveId and persists nothing", () => {
+      const { save, persistence } = createPersistenceMock();
+
+      expect(() =>
+        createSeasonSnapshot(
+          { saveId: "", seasonId: "season-1", execute: true, dryRun: false, confirm: SEASON_SNAPSHOT_CONFIRM_TOKEN },
+          persistence as never,
+        ),
+      ).toThrow(/saveId is required/i);
+
+      expect(persistence.saveSingleplayerState).not.toHaveBeenCalled();
+      expect(save.gameState.seasonState.seasonSnapshots ?? []).toHaveLength(0);
+    });
+
+    it("createSeasonSnapshot rejects an unknown saveId and persists nothing (not even to the active save)", () => {
+      const { save, persistence } = createPersistenceMock();
+
+      expect(() =>
+        createSeasonSnapshot(
+          {
+            saveId: "save-belongs-to-someone-else",
+            seasonId: "season-1",
+            execute: true,
+            dryRun: false,
+            confirm: SEASON_SNAPSHOT_CONFIRM_TOKEN,
+          },
+          persistence as never,
+        ),
+      ).toThrow(/could not be resolved/i);
+
+      expect(persistence.saveSingleplayerState).not.toHaveBeenCalled();
+      expect(save.gameState.seasonState.seasonSnapshots ?? []).toHaveLength(0);
+    });
+  });
 });

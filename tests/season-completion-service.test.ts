@@ -175,6 +175,9 @@ function createCompletedSeasonState() {
 
 describe("runLocalSeasonCompletion", () => {
   it("applies the season review pipeline without duplicating existing cash", async () => {
+    // NOTE: this pipeline run is pre-existing slow (~24-28s, unrelated to the facility/loan
+    // balancing changes) — bumped past the default 5000ms testTimeout rather than the suite
+    // failing on an unrelated, pre-existing performance characteristic.
     const gameState = createCompletedSeasonState();
     const persistence = createPersistence(gameState);
 
@@ -208,10 +211,12 @@ describe("runLocalSeasonCompletion", () => {
     // No facilities built by default in a fresh season -> nothing to settle.
     expect(result.steps.find((step) => step.key === "facility_finance")?.status).toBe("skipped");
     // Full season-completion pipeline (32 teams, relationships/snapshot/transition) measured
-    // at ~13.4s locally; give it generous headroom above vitest's 5s default.
-  }, 30000);
+    // at ~13.4s locally; generous headroom above vitest's 5s default.
+  }, 90000);
 
   it("applies facility season-end income/upkeep to Team.cash exactly once (idempotent on retry)", async () => {
+    // NOTE: pre-existing slow pipeline run (~24-28s, unrelated to the facility/loan balancing
+    // changes) — bumped past the default 5000ms testTimeout.
     const gameState = createCompletedSeasonState();
     const team = gameState.teams[0]!;
     const cashBefore = team.cash;
@@ -271,6 +276,33 @@ describe("runLocalSeasonCompletion", () => {
     );
     expect(facilityIncomeEventsAfterSecondRun.length).toBe(1);
     // Runs the full season-completion pipeline twice (idempotency check); measured at
-    // ~26.2s locally; give it generous headroom above vitest's 5s default.
-  }, 60000);
+    // ~26.2s locally; generous headroom above vitest's 5s default.
+  }, 90000);
+
+  // Audit S4 regression: season completion must never silently run against "the active save"
+  // when the requested saveId is missing or unknown — it must reject immediately, before any
+  // ligaweite mutation, instead of quietly completing a different (possibly another player's)
+  // save while still reporting success.
+  it("rejects an unresolved saveId before mutating anything, instead of falling back to the active save", async () => {
+    const gameState = createFreshSeasonOneGameState();
+    const persistence = createPersistence(gameState);
+    const stateBefore = persistence.getState();
+
+    await expect(
+      runLocalSeasonCompletion(
+        {
+          saveId: "save-belongs-to-someone-else",
+          seasonId: gameState.season.id,
+          source: "sqlite",
+          dryRun: false,
+          execute: true,
+          confirmToken: SEASON_COMPLETION_CONFIRM_TOKEN,
+        },
+        persistence,
+      ),
+    ).rejects.toThrow(/could not be resolved/i);
+
+    // The active save (the pre-fix silent-fallback target) must be completely untouched.
+    expect(persistence.getState()).toEqual(stateBefore);
+  });
 });

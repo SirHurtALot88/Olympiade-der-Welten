@@ -34,6 +34,14 @@ export type TransfermarktSellParams = {
   transferSource?: string;
   localRunContext?: unknown;
   deferPersist?: boolean;
+  /**
+   * Optionaler Idempotenz-Schlüssel pro Benutzer-Aktion (z. B. ein Doppelklick oder ein
+   * Netzwerk-Retry sendet denselben Schlüssel erneut). Ist er gesetzt, bekommt der
+   * Transfer-History-Eintrag eine daraus abgeleitete, deterministische ID; ein zweiter
+   * Aufruf mit demselben Schlüssel bucht NICHT erneut, sondern meldet den bereits
+   * ausgeführten Transfer zurück. Ohne Schlüssel bleibt das Verhalten unverändert.
+   */
+  idempotencyKey?: string;
 };
 
 export type TransfermarktSellPreview = {

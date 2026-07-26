@@ -17,6 +17,8 @@ type BuyRequestBody = {
   contractLength?: number;
   contractShape?: ContractShape;
   offeredSalary?: number;
+  /** Optionaler Idempotenz-Schlüssel: verhindert Doppelbuchung bei Doppelklick/Retry. */
+  idempotencyKey?: string;
   dryRun?: boolean;
   source?: "sqlite" | "prisma";
   roomCode?: string | null;
@@ -61,6 +63,9 @@ export async function POST(request: Request) {
       contractLength: body.contractLength,
       contractShape: body.contractShape,
       offeredSalary: body.offeredSalary,
+      // Schickt der Client denselben Schlüssel erneut (Doppelklick/Retry), wird der Kauf
+      // nicht ein zweites Mal gebucht — siehe `executeLocalTransfermarktBuy`.
+      idempotencyKey: typeof body.idempotencyKey === "string" ? body.idempotencyKey : undefined,
     };
 
     if (source === "prisma") {

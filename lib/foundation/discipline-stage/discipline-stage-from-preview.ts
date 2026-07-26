@@ -28,6 +28,10 @@ export type StagePreviewTeam = {
   score: number;
   teamPoints: number | null;
   players: StagePreviewPlayer[];
+  // A2: Team hat für diese Disziplin gar keine Aufstellung eingereicht — die Engine
+  // liefert dann trotzdem einen (0-)teamResult-Eintrag. Muss in der Bühne sichtbar
+  // markiert werden, statt als normales 0-Punkte-Ergebnis durchzugehen.
+  missingLineup: boolean;
 };
 
 export type StageTeamMeta = { code: string; name: string; logoUrl: string | null };
@@ -135,6 +139,7 @@ export function buildDisciplineStageTeamsFromPreview(
       score: teamResult.score,
       teamPoints: teamResult.teamPoints,
       players,
+      missingLineup: teamResult.missingLineup,
     };
   });
 }

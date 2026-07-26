@@ -18,6 +18,7 @@ import { isLegacyLineupDraftComplete } from "@/lib/lineups/legacy-matchday-readi
 import { calculateTeamPowerModifierForSide, ensureLocalTeamPowersForSeason } from "@/lib/lineups/team-powers";
 import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import type { PersistenceService } from "@/lib/persistence/types";
 
 export type AiBatchApplyTeamStatus =
@@ -105,16 +106,10 @@ type AiBatchApplyInput = {
   dryRun?: boolean;
 };
 
+// Audit S4: AI batch lineup apply persists lineup drafts for every AI-controlled team — an
+// unresolved saveId must never silently apply to "the active save" instead of the requested one.
 function resolveLocalScope(input: AiBatchApplyInput, persistence: PersistenceService) {
-  const bootstrapped = persistence.bootstrapSingleplayerSave();
-  const save =
-    persistence.getSaveById(input.saveId) ??
-    persistence.getActiveSave() ??
-    bootstrapped.save;
-
-  if (!save) {
-    throw new Error("No local save available for AI batch apply.");
-  }
+  const { save } = requireLocalPersistedSave(persistence, input.saveId);
 
 	  return {
 	    save,

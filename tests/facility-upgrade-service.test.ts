@@ -259,6 +259,27 @@ describe("facility upgrade service", () => {
     });
   });
 
+  it("BEHAVIOR FIX: blocks upgrading a disabled/broken facility instead of resetting its level (no data loss)", () => {
+    // previewFacilityUpgrade must derive currentLevel from the STORED level, not getFacilityLevel()
+    // (which returns 0 for a disabled/broken facility) — otherwise an upgrade attempt on a broken
+    // L5 facility would silently reset it down to L1. Instead, the facility_disabled blocker fires
+    // and the caller is pointed at repair instead.
+    const sourceSave = save({
+      teamFacilities: {
+        "team-1": facilities({
+          training_center: { level: 5, enabled: false, disabledReason: "facility_condition_broken", conditionPct: 0 },
+        }),
+      },
+    });
+
+    const preview = previewFacilityUpgrade(sourceSave, "team-1", "training_center", null, "upgrade");
+
+    expect(preview.ok).toBe(false);
+    expect(preview.blockingReasons).toContain("facility_disabled");
+    expect(preview.currentLevel).toBe(5);
+    expect(preview.nextLevel).not.toBe(1);
+  });
+
   it("requires a Specialist Wing variant for the first upgrade", () => {
     const preview = previewFacilityUpgrade(save(), "team-1", "specialist_wing");
 

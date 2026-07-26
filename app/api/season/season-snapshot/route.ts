@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 
+import { SaveResolutionError } from "@/lib/persistence/resolve-local-save";
 import {
   createSeasonSnapshot,
   SEASON_SNAPSHOT_CONFIRM_TOKEN,
@@ -88,6 +89,12 @@ export async function POST(request: Request) {
       warnings: result.warnings,
     });
   } catch (error) {
+    if (error instanceof SaveResolutionError) {
+      return NextResponse.json(
+        { success: false, error: error.code, message: error.message, blockingReasons: [error.code] },
+        { status: error.status },
+      );
+    }
     return NextResponse.json(
       {
         success: false,

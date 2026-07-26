@@ -531,4 +531,45 @@ describe("legacy lineup local service", { timeout: 120_000 }, () => {
     expect(shownPlayer).toBeTruthy();
     expect(shownPlayer!.finalContribution).toBeCloseTo(withScore!.finalPlayerScore, 5);
   });
+
+  // Audit S4 regression: lineup reads/writes must never silently fall back to "the active save"
+  // (which, per co-op owner, could be a different player's save) when the requested saveId is
+  // missing or unknown. A real, different save is made active first so a pre-fix silent fallback
+  // would have a real (wrong) target to land on.
+  describe("audit S4: unresolved saveId must never fall back to the active save", () => {
+    it("loadLocalLegacyLineupContext rejects an unknown saveId instead of silently reading the active save", () => {
+      const persistence = createPersistenceService();
+      const activeSave = persistence.createFreshSeasonOneSave({ name: "Someone Else's Active Save" });
+
+      expect(() =>
+        loadLocalLegacyLineupContext({
+          saveId: "save-does-not-exist",
+          seasonId: activeSave.gameState.season.id,
+          matchdayId: activeSave.gameState.matchdayState.matchdayId,
+          teamId: activeSave.gameState.teams[0]!.teamId,
+        }),
+      ).toThrow(/could not be resolved/i);
+    });
+
+    it("saveLocalLegacyLineupDraft rejects a missing saveId and persists nothing", () => {
+      const persistence = createPersistenceService();
+      const activeSave = persistence.createFreshSeasonOneSave({ name: "Someone Else's Active Save" });
+      const beforeSaveVersion = persistence.getSaveById(activeSave.saveId)?.gameState.saveVersion;
+
+      expect(() =>
+        saveLocalLegacyLineupDraft(
+          {
+            saveId: "",
+            seasonId: activeSave.gameState.season.id,
+            matchdayId: activeSave.gameState.matchdayState.matchdayId,
+            teamId: activeSave.gameState.teams[0]!.teamId,
+          },
+          [],
+        ),
+      ).toThrow(/saveId is required/i);
+
+      // The active save (the pre-fix silent-fallback target) must be completely untouched.
+      expect(persistence.getSaveById(activeSave.saveId)?.gameState.saveVersion).toBe(beforeSaveVersion);
+    });
+  });
 });

@@ -239,14 +239,14 @@ describe("game inbox service", () => {
     // Liga-Beliebtheitswert, während die echte Season-End-Gutschrift und die
     // Finanzansicht den PERSISTIERTEN (mean-revertenden) seasonState-KPI nutzen.
     // Ab Saison 2 (persistierter Wert vorhanden) divergierte die Warnung damit
-    // vom real gutgeschriebenen Cash. Setup: Arena Level 5 (Season-Einnahme 15.6,
-    // Upkeep 5.4 bei 100% Zustand), cash = -5. Roster/Tabelle sind in beiden
-    // Szenarien identisch → der STATELESS Wert ist konstant 1.0 (Einnahme 15.6):
-    // damit würde die Warnung in BEIDEN Fällen NICHT feuern (-5 + 15.6 - 5.4 > 0).
+    // vom real gutgeschriebenen Cash. Setup: Arena Level 5 (Season-Einnahme 28.5,
+    // Upkeep 5.4 bei 100% Zustand), cash = -15. Roster/Tabelle sind in beiden
+    // Szenarien identisch → der STATELESS Wert ist konstant 1.0 (Einnahme 28.5):
+    // damit würde die Warnung in BEIDEN Fällen NICHT feuern (-15 + 28.5 - 5.4 > 0).
     // Der einzige Unterschied ist der persistierte Beliebtheitswert.
     const buildState = (persistedBeliebtheit: number) =>
       makeGameState({
-        teams: [makeTeam({ cash: -5 })],
+        teams: [makeTeam({ cash: -15 })],
         seasonState: {
           seasonId: "season-3",
           schedule: [],
@@ -276,11 +276,11 @@ describe("game inbox service", () => {
     expect(computeTeamBeliebtheitFromGameState(lowState, "M-M").value).toBe(0.5);
     expect(computeTeamBeliebtheitFromGameState(highState, "M-M").value).toBe(1.5);
 
-    // Niedrige Beliebtheit (0.5 → Arena-Einnahme 7.8): -5 + 7.8 - 5.4 = -2.6 < 0 → Warnung FEUERT.
+    // Niedrige Beliebtheit (0.5 → Arena-Einnahme 14.25): -15 + 14.25 - 5.4 = -6.15 < 0 → Warnung FEUERT.
     const lowItems = buildGameInboxItems({ gameState: lowState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
     expect(titles(lowItems)).toContain("Facility-Unterhalt gefährdet");
 
-    // Hohe Beliebtheit (1.5 → Arena-Einnahme 23.4): -5 + 23.4 - 5.4 = 13 > 0 → Warnung feuert NICHT.
+    // Hohe Beliebtheit (1.5 → Arena-Einnahme 42.75): -15 + 42.75 - 5.4 = 22.35 > 0 → Warnung feuert NICHT.
     // Hätte der Code den stateless 1.0-Wert genutzt, wäre das Ergebnis in beiden
     // Szenarien identisch (keine Warnung) — der Unterschied beweist die persistierte Quelle.
     const highItems = buildGameInboxItems({ gameState: highState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });

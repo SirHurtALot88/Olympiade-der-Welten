@@ -5,6 +5,7 @@ import {
 import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { runWithSaveRecovery } from "@/lib/persistence/atomic-save-write";
+import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { upsertTeamRelationshipEvents, type TeamRelationshipEventApplyResult } from "@/lib/rivalries/team-relationship-dynamics";
 import { buildSeasonAiLineupAudit, type SeasonAiLineupAudit } from "@/lib/season/season-ai-lineup-audit-service";
@@ -20,7 +21,7 @@ import {
   hasFacilitySeasonEndFinanceApplied,
   previewFacilitySeasonEndFinance,
 } from "@/lib/facilities/facility-season-end-service";
-import { applyLoanSettlement, previewLoanSettlement, type LoanSettlementApplyResult } from "@/lib/finance/loan-service";
+import { applyInsolvencyBackstop, applyLoanSettlement, previewLoanSettlement, type LoanSettlementApplyResult } from "@/lib/finance/loan-service";
 import { buildSeasonReview, type SeasonReview } from "@/lib/season/season-review-service";
 import {
   createSeasonSnapshot,
@@ -49,6 +50,7 @@ export type SeasonCompletionStep = {
     | "sponsor_settlement"
     | "loan_settlement"
     | "facility_finance"
+    | "insolvency_backstop"
     | "relationships"
     | "snapshot"
     | "transition"
@@ -81,26 +83,12 @@ export type SeasonCompletionResult = {
   blockingReasons: string[];
 };
 
+// Audit R2/V6 (superseded by audit S4's central strict resolver): season completion previously
+// fell back to getActiveSave()/bootstrap and only caught the mismatch after the fact. It now goes
+// straight through `requireLocalPersistedSave`, which never resolves to a different save in the
+// first place — the same protection, applied at the root instead of patched on afterward.
 function resolveLocalSave(persistence: PersistenceService, saveId: string) {
-  const bootstrapped = persistence.bootstrapSingleplayerSave();
-  const save = persistence.getSaveById(saveId) ?? persistence.getActiveSave() ?? bootstrapped.save;
-
-  if (!save) {
-    throw new Error(`Local save ${saveId} could not be loaded for season completion.`);
-  }
-
-  // Audit R2/V6: sicherstellen, dass das aufgelöste Save WIRKLICH die angeforderte saveId trägt. Ohne
-  // diese Prüfung konnte der stille Fallback auf getActiveSave()/bootstrap bei veralteter/verwaister
-  // saveId ein FREMDES Save abschließen (ligaweite Mutationen auf dem falschen Save) und die
-  // Route-Autorisierung, die gegen die angeforderte saveId prüft, unterlaufen. Lieber hart abbrechen als
-  // das falsche Save mutieren.
-  if (save.saveId !== saveId) {
-    throw new Error(
-      `Season completion refused: requested save ${saveId} not found; resolved to a different save ${save.saveId}. Refusing to mutate the wrong save.`,
-    );
-  }
-
-  return save;
+  return requireLocalPersistedSave(persistence, saveId).save;
 }
 
 function addStep(
@@ -504,7 +492,38 @@ async function runLocalSeasonCompletionUnsafe(
   );
 
   const afterObjectiveSave = objectiveRewardApply.applied ? resolveLocalSave(persistence, initialSave.saveId) : afterFacilityFinanceSave;
-  const relationshipApply = upsertTeamRelationshipEvents(afterObjectiveSave.gameState);
+
+  // Zahlungsunfähigkeits-Backstop: LETZTER Cash-Schritt. Nach Sponsor/Gehalt, Kredit-Raten, Gebäude-Unterhalt
+  // und Ziel-Rewards darf kein Team negatives Cash haben. Statt Cash auf 0 zu klemmen (Geldschöpfung) nimmt
+  // jedes negative Team einen Notkredit über den Fehlbetrag auf → Cash danach = 0, echte Restschuld im
+  // bestehenden Kreditsystem.
+  const insolvency =
+    !dryRun && blockingReasons.size === 0
+      ? applyInsolvencyBackstop({ gameState: afterObjectiveSave.gameState, saveId: afterObjectiveSave.saveId })
+      : { gameState: afterObjectiveSave.gameState, emergencyLoans: [] as Array<{ teamId: string; principal: number }>, warnings: [] as string[] };
+  let afterInsolvencySave = afterObjectiveSave;
+  if (insolvency.emergencyLoans.length > 0) {
+    persistence.saveSingleplayerState(afterObjectiveSave.saveId, insolvency.gameState);
+    afterInsolvencySave = resolveLocalSave(persistence, initialSave.saveId);
+  }
+  addStep(
+    steps,
+    {
+      key: "insolvency_backstop",
+      label: "Zahlungsunfähigkeit",
+      status: insolvency.emergencyLoans.length > 0 ? "applied" : "skipped",
+      warnings: [
+        ...insolvency.warnings,
+        ...insolvency.emergencyLoans.map((loan) => `emergency_loan:${loan.teamId}:${loan.principal}`),
+      ],
+      blockingReasons: [],
+      auditId: null,
+    },
+    warnings,
+    blockingReasons,
+  );
+
+  const relationshipApply = upsertTeamRelationshipEvents(afterInsolvencySave.gameState);
   const existingRelationshipEvents = afterCashSave.gameState.seasonState.teamRelationshipEvents ?? [];
   const existingRelationshipIds = new Set(existingRelationshipEvents.map((event) => event.eventId));
   const newRelationshipEventCount = relationshipApply.generatedEvents.filter((event) => !existingRelationshipIds.has(event.eventId)).length;
@@ -534,7 +553,7 @@ async function runLocalSeasonCompletionUnsafe(
     blockingReasons,
   );
 
-  const afterRelationshipsSave = shouldApplyRelationships ? resolveLocalSave(persistence, initialSave.saveId) : afterObjectiveSave;
+  const afterRelationshipsSave = shouldApplyRelationships ? resolveLocalSave(persistence, initialSave.saveId) : afterInsolvencySave;
   const existingSnapshot =
     (afterRelationshipsSave.gameState.seasonState.seasonSnapshots ?? []).find((snapshot) => snapshot.seasonId === seasonId) ?? null;
   const snapshot =

@@ -319,6 +319,55 @@ describe("standings apply service", () => {
     expect(save.gameState.seasonState.standingsApplyLogs?.[0]?.id).toContain("standings-apply-audit__");
   });
 
+  it("blocks a forceReplace of a matchday that is no longer the latest applied one", async () => {
+    // Regression: `StandingRecord` hält nur EINE Baseline (`matchdayBaselineId`). Wurde seit
+    // diesem Spieltag ein späterer gewertet, zeigt sie nicht mehr hierher — der Preview nähme
+    // dann den bereits fortgeschrittenen Punktestand als "Stand davor" und würde die Punkte
+    // dieses Spieltags ligaweit ein zweites Mal gutschreiben. Muss auch MIT forceReplace blocken.
+    const { save, persistence } = createPersistenceMock();
+    save.gameState.seasonState.standingsApplyLogs = [
+      {
+        id: "audit-1",
+        saveId: "save-local",
+        seasonId: "season-1",
+        matchdayId: "matchday-1",
+        action: "apply",
+        payload: {
+          idempotencyKey: "standings-apply:save-local:season-1:matchday-1",
+          totalTeams: 2,
+          appliedTeams: 2,
+          tieGroupsCount: 0,
+          previewWarningsCount: 0,
+        },
+        createdAt: "2026-06-04T00:00:00.000Z",
+      },
+    ];
+    // Seither wurde matchday-2 gewertet → die Baselines zeigen auf matchday-2.
+    save.gameState.seasonState.standings = {
+      "team-1": { points: 26.4, rank: 1, matchdayBaselinePoints: 13.2, matchdayBaselineId: "matchday-2" },
+      "team-2": { points: 24.8, rank: 2, matchdayBaselinePoints: 12.4, matchdayBaselineId: "matchday-2" },
+    } as never;
+    mockHealthyPreview();
+
+    const result = await executeStandingsApply(
+      {
+        saveId: "save-local",
+        seasonId: "season-1",
+        matchdayId: "matchday-1",
+        execute: true,
+        confirm: STANDINGS_APPLY_CONFIRM_TOKEN,
+        forceReplace: true,
+      },
+      persistence as never,
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.applied).toBe(false);
+    expect(result.blockingReasons).toContain("stale_baseline_replace_not_supported");
+    // Punktestand bleibt unangetastet — keine stille Doppelzählung.
+    expect(save.gameState.seasonState.standings["team-1"].points).toBe(26.4);
+  });
+
   it("blocks tie groups and incomplete preview rows", async () => {
     const { persistence } = createPersistenceMock();
     buildStandingsPreview.mockResolvedValue({
@@ -386,6 +435,93 @@ describe("standings apply service", () => {
     expect(result.blockingReasons).toContain("tie_groups_require_confirmed_policy");
     expect(result.blockingReasons).toContain("incomplete_result:A-A");
     expect(result.blockingReasons).toContain("missing_preview_value:A-A");
+  });
+
+  /**
+   * Reiner Gleichstand: zwei Teams mit IDENTISCHEM Spieltags-Score und identischen Projektions-Punkten.
+   * "block_on_tie" (Default) lässt `projectedRank` in diesem Fall absichtlich offen (null) — alle anderen
+   * Werte sind vollständig. Das ist NICHT "Wert fehlt", sondern "Rang bewusst offen".
+   */
+  function mockExactTiePreview() {
+    const tiedItem = (teamId: string, teamName: string, currentRank: number) => ({
+      teamId,
+      teamName,
+      currentRank,
+      // Gleichstand → Rang bewusst offen gelassen.
+      projectedRank: null,
+      currentPoints: 12,
+      projectedPoints: 18.6,
+      pointsDelta: 6.6,
+      matchdayRank: null,
+      d1Score: 55,
+      d2Score: 44,
+      matchdayScore: 99,
+      totalScore: 99,
+      cash: 100,
+      readinessStatus: "ready",
+      resultStatus: "ready",
+      warnings: [],
+      blockedRules: [],
+    });
+
+    buildStandingsPreview.mockResolvedValue({
+      items: [tiedItem("A-A", "Alpha", 1), tiedItem("B-B", "Beta", 2)],
+      summary: { totalTeams: 2, matchdayResultFound: true, readyTeams: 2, blockedTeamCount: 0 },
+      blockedRules: ["global_score_tie_breaker_missing"],
+      tieGroups: [
+        {
+          type: "totalScore",
+          value: 99,
+          affectedTeams: [
+            { teamId: "A-A", teamName: "Alpha" },
+            { teamId: "B-B", teamName: "Beta" },
+          ],
+          requiresConfirmedTieBreaker: true,
+        },
+      ],
+      source: {
+        mode: "sqlite",
+        matchdayResult: "local_saved_result",
+        currentPoints: "local_save_standings",
+        standingsRules: "global_total_score_preview",
+        fixtureCoverage: "not_required_local_results",
+      },
+      scope: { saveId: "save-local", seasonId: "season-1", matchdayId: "matchday-1" },
+    });
+  }
+
+  it("blocks an exact tie by default (rank deliberately left open)", async () => {
+    const { persistence } = createPersistenceMock();
+    mockExactTiePreview();
+
+    const result = await previewStandingsApply(
+      { saveId: "save-local", seasonId: "season-1", matchdayId: "matchday-1" },
+      persistence as never,
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.blockingReasons).toContain("tie_groups_require_confirmed_policy");
+    expect(result.blockingReasons).toContain("missing_preview_value:A-A");
+  });
+
+  it("forceReplace pushes THROUGH an exact tie — the null rank must not keep blocking", async () => {
+    // Der Auto-Run übergibt genau dafür `forceReplace: !stopOnTie` (matchday-auto-run-service), damit der
+    // Cockpit-Schalter "bei Gleichstand nicht stoppen" die Saison weiterlaufen lässt. Vorher prüfte
+    // buildBlockingReasons `projectedRank == null` OHNE forceReplace-Ausnahme, sodass `missing_preview_value`
+    // weiter blockte — der Schalter war wirkungslos und ein exakter Gleichstand sperrte den Saisonfortschritt.
+    const { persistence } = createPersistenceMock();
+    mockExactTiePreview();
+
+    const result = await previewStandingsApply(
+      { saveId: "save-local", seasonId: "season-1", matchdayId: "matchday-1", forceReplace: true },
+      persistence as never,
+    );
+
+    expect(result.blockingReasons).not.toContain("missing_preview_value:A-A");
+    expect(result.blockingReasons).not.toContain("missing_preview_value:B-B");
+    expect(result.blockingReasons).not.toContain("tie_groups_require_confirmed_policy");
+    expect(result.blockingReasons).toEqual([]);
+    expect(result.ok).toBe(true);
   });
 
   it("blocks prisma mode as read-only", async () => {

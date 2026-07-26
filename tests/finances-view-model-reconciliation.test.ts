@@ -11,7 +11,7 @@ function round1(value: number): number {
 
 /**
  * Builds a Season-2 GameState for one human team with a real cash-effective facility
- * (fan_shop L2: seasonIncome 6.5, seasonUpkeep 0.8 — flat, NOT popularity-scaled, so the
+ * (fan_shop L2: seasonIncome 7.8, seasonUpkeep 0.8 — flat, NOT popularity-scaled, so the
  * facility numbers are deterministic regardless of league-wide Beliebtheit), a roster salary,
  * an archived Season-1 snapshot (for cashSeasonStart), and a phantom benchmark `cashTotal`
  * that must be ignored in favour of the real `cashEnd`.
@@ -120,14 +120,14 @@ describe("finances view-model — cash reconciliation (T-108)", () => {
     // Plenty of cash → the fan_shop upkeep (0.8) is actually paid.
     const richModel = buildFinancesViewModel(buildGameState({ teamCash: 200, salary: 20 }), "team-1");
     if (richModel.status !== "ready") throw new Error("expected ready");
-    expect(richModel.team.income.facilityIncome?.total).toBe(6.5);
+    expect(richModel.team.income.facilityIncome?.total).toBe(7.8);
     expect(richModel.team.expenses.facilityUpkeep.total).toBe(0.8);
 
     // Effectively no cash → upkeep can no longer be paid, but the income is still collected.
     // This is the asymmetry the old model got wrong (income missing, gross upkeep charged).
     const brokeModel = buildFinancesViewModel(buildGameState({ teamCash: -50, salary: 20 }), "team-1");
     if (brokeModel.status !== "ready") throw new Error("expected ready");
-    expect(brokeModel.team.income.facilityIncome?.total).toBe(6.5);
+    expect(brokeModel.team.income.facilityIncome?.total).toBe(7.8);
     expect(brokeModel.team.expenses.facilityUpkeep.total).toBe(0);
   });
 

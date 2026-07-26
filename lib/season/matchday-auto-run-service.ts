@@ -12,6 +12,7 @@ import { ensureLocalFormCardsForSeason, normalizeLineupDraftModifiers } from "@/
 import { prepareGameStateForMatchdayResolve } from "@/lib/lineups/matchday-lineup-auto-prep";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import type { PersistenceService } from "@/lib/persistence/types";
 import {
   APPLY_CONFIRM_TOKEN,
@@ -135,18 +136,10 @@ function normalizeSource(source?: string): "sqlite" | "prisma" {
   return source === "prisma" ? "prisma" : "sqlite";
 }
 
+// Audit S4: matchday auto-run orchestrates several gameplay writes — an unresolved saveId must
+// never silently fall back to "the active save". Throw instead of retargeting the write.
 function resolveLocalSave(persistence: PersistenceService, saveId: string) {
-  const bootstrapped = persistence.bootstrapSingleplayerSave();
-  const save =
-    persistence.getSaveById(saveId) ??
-    persistence.getActiveSave() ??
-    bootstrapped.save;
-
-  if (!save) {
-    throw new Error(`Local save ${saveId} could not be loaded for matchday auto-run.`);
-  }
-
-  return save;
+  return requireLocalPersistedSave(persistence, saveId).save;
 }
 
 function getStatusFromBooleans(input: {

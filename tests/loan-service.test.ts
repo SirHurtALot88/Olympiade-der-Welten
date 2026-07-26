@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { GameState, LoanRecord, StandingRecord, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 import {
   applyEarlyPayoff,
+  applyInsolvencyBackstop,
   applyLoanSettlement,
   buildLoanOffers,
   computeBorrowingCapacity,
@@ -405,6 +406,88 @@ describe("originateLoan", () => {
     expect(result.gameState).toBe(gameState);
     expect(result.gameState.seasonState.loans ?? []).toHaveLength(0);
     expect(result.gameState.teams.find((t) => t.teamId === "A-A")?.cash).toBe(50);
+  });
+
+  describe("emergency option (Notkredit)", () => {
+    it("bypasses the Season 1 lock when emergency:true, blocked otherwise", () => {
+      const gameState = { ...gameStateWithCapacity(), season: { ...gameStateWithCapacity().season, id: "season-1" } };
+
+      const blocked = originateLoan(gameState, { borrowerTeamId: "A-A", principal: 10, termSeasons: 3 }, { execute: true });
+      expect(blocked.ok).toBe(false);
+      expect(blocked.reason).toBe("season_one_no_loans");
+
+      const emergency = originateLoan(
+        gameState,
+        { borrowerTeamId: "A-A", principal: 10, termSeasons: 3 },
+        { execute: true, emergency: true },
+      );
+      expect(emergency.ok).toBe(true);
+      expect(emergency.loan).not.toBeNull();
+      expect(emergency.gameState.teams.find((t) => t.teamId === "A-A")?.cash).toBeCloseTo(60, 1);
+    });
+
+    it("bypasses the borrowing capacity cap when emergency:true, blocked otherwise (over_capacity)", () => {
+      // capacity = 0.15*50 + 0.30*200 = 67.5 (see gameStateWithCapacity comment above); 200 is far over it.
+      const gameState = gameStateWithCapacity();
+
+      const blocked = originateLoan(gameState, { borrowerTeamId: "A-A", principal: 200, termSeasons: 3 }, { execute: true });
+      expect(blocked.ok).toBe(false);
+      expect(blocked.reason).toBe("over_capacity");
+
+      const emergency = originateLoan(
+        gameState,
+        { borrowerTeamId: "A-A", principal: 200, termSeasons: 3 },
+        { execute: true, emergency: true },
+      );
+      expect(emergency.ok).toBe(true);
+      expect(emergency.loan?.principalOriginal).toBeCloseTo(200, 1);
+      expect(emergency.gameState.teams.find((t) => t.teamId === "A-A")?.cash).toBeCloseTo(250, 1);
+    });
+  });
+});
+
+describe("applyInsolvencyBackstop", () => {
+  it("gives a team with negative cash an emergency loan instead of clamping to 0 (no money from nowhere)", () => {
+    const gameState = createGameState({
+      teams: [createTeam({ teamId: "A-A", cash: -7 }), createTeam({ teamId: "B-B", cash: 30 })],
+      teamIdentities: [createIdentity("A-A"), createIdentity("B-B")],
+    });
+
+    const result = applyInsolvencyBackstop({ gameState, saveId: "save-1" });
+
+    const teamA = result.gameState.teams.find((t) => t.teamId === "A-A");
+    const teamB = result.gameState.teams.find((t) => t.teamId === "B-B");
+
+    // Negative-cash team ends up at exactly 0, funded by a real loan (not a Math.max(0, …) clamp).
+    expect(teamA?.cash).toBe(0);
+    // Solvent team is left untouched — no loan, no cash change.
+    expect(teamB?.cash).toBe(30);
+
+    const loansForA = (result.gameState.seasonState.loans ?? []).filter((loan) => loan.borrowerTeamId === "A-A");
+    expect(loansForA).toHaveLength(1);
+    expect(loansForA[0]?.principalOriginal).toBeCloseTo(7, 1);
+    expect(loansForA[0]?.lenderType).toBe("bank");
+
+    expect(result.emergencyLoans).toEqual([{ teamId: "A-A", principal: 7 }]);
+    expect((result.gameState.seasonState.loans ?? []).filter((loan) => loan.borrowerTeamId === "B-B")).toHaveLength(0);
+
+    // Money conservation: the cash gained (0 - (-7) = 7) equals exactly the new loan's principal —
+    // nothing is created out of thin air.
+    const cashDelta = (teamA?.cash ?? 0) - -7;
+    expect(cashDelta).toBeCloseTo(loansForA[0]?.principalOriginal ?? 0, 5);
+  });
+
+  it("leaves a team with positive cash completely unchanged (no loan)", () => {
+    const gameState = createGameState({
+      teams: [createTeam({ teamId: "A-A", cash: 42 })],
+      teamIdentities: [createIdentity("A-A")],
+    });
+
+    const result = applyInsolvencyBackstop({ gameState, saveId: "save-1" });
+
+    expect(result.gameState.teams.find((t) => t.teamId === "A-A")?.cash).toBe(42);
+    expect(result.emergencyLoans).toEqual([]);
+    expect(result.gameState.seasonState.loans ?? []).toHaveLength(0);
   });
 });
 

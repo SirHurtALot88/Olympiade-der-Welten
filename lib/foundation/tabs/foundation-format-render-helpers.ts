@@ -272,6 +272,18 @@ export function formatWholeNumber(value: number | null | undefined) {
   return formatLocalePoints(value, 0);
 }
 
+/** Bis zu zwei Initialen aus einem Namen (Fallback "?"). */
+export function getInitials(name: string): string {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "?"
+  );
+}
+
 export function formatSignedDisplayMoney(value: number | null | undefined) {
   if (value == null || !Number.isFinite(value)) {
     return "—";

@@ -85,8 +85,7 @@ export type PlayerGeneratorTeamContext = {
 
 /**
  * Phase 2 — result shape for the "Als Free Agent übernehmen" commit call.
- * Shared by both generator panels (`PlayerGeneratorPanel.tsx` and
- * `PlayerGeneratorPanelNewLook.tsx`) so the host page's
+ * Used by the generator panel (`PlayerGeneratorPanelNewLook.tsx`) so the host page's
  * `commitPlayerGeneratorDraft` (see `use-foundation-shell-router-body-scope.tsx`)
  * has one type to satisfy.
  */
