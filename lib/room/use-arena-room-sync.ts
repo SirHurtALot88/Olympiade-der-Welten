@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
-import { normalizeRoomArenaState } from "@/lib/room/arena-sync-state";
+import { matchesArenaScope, normalizeRoomArenaState } from "@/lib/room/arena-sync-state";
 import { getClientSocket } from "@/lib/socket/client";
 import type { RoomJoinedPayload } from "@/types/events";
 import type { CoachRole, OlyRoomState, RoomArenaState, RoomParticipant } from "@/types/game";
@@ -47,6 +47,7 @@ export type UseArenaRoomSyncInput = {
 
 export type UseArenaRoomSyncResult = {
   roomSyncRole: CoachRole | null;
+  /** Nur der Sync-State der aktuell gezeigten Arena (Save/Season/Matchday); sonst `null`. */
   roomArenaSyncState: RoomArenaState | null;
   roomSyncParticipants: RoomParticipant[];
   isRoomHost: boolean;
@@ -96,14 +97,7 @@ export function useArenaRoomSync(input: UseArenaRoomSyncInput): UseArenaRoomSync
     if (!arenaSync || arenaSync.status === "idle") {
       return;
     }
-    const scope = scopeRef.current;
-    if (arenaSync.saveId !== scope.saveId) {
-      return;
-    }
-    if (arenaSync.seasonId && arenaSync.seasonId !== scope.seasonId) {
-      return;
-    }
-    if (arenaSync.matchdayId && arenaSync.matchdayId !== scope.matchdayId) {
+    if (!matchesArenaScope(arenaSync, scopeRef.current)) {
       return;
     }
     if (lastAppliedRoomArenaVersionRef.current === arenaSync.version) {
@@ -169,14 +163,28 @@ export function useArenaRoomSync(input: UseArenaRoomSyncInput): UseArenaRoomSync
 
   const isRoomHost = roomSyncRole === "A";
   const isRoomRevealSyncActive = Boolean(roomContext);
+  // Für die hier gezeigte Arena zählt nur ein Sync-State DIESES Spieltags. Ein State aus einem
+  // anderen Save/Spieltag bedeutet: für diese Arena läuft noch gar kein Sync — also exakt wie
+  // `null`/"idle". Ohne diese Sperre blieb der Guest ab dem zweiten Spieltag hängen: der
+  // Host-Start-Effekt springt nur bei Status "idle" an, der Raum-State stand nach dem ersten
+  // Spieltag aber dauerhaft auf "result_applied", sodass `startRoomArena` nie wieder gesendet wurde.
+  const scopedRoomArenaSyncState =
+    roomArenaSyncState && matchesArenaScope(roomArenaSyncState, { saveId, seasonId, matchdayId })
+      ? roomArenaSyncState
+      : null;
   // Co-op means the arena sync currently requires more than one connected human
   // participant (host + guest both control at least one team). A room where only the
   // host is present (solo-in-room) must keep behaving exactly like solo: no ready
   // gate, the reveal auto-starts. Only true co-op gets the "both ready" gate.
+  // `requiredParticipantIds` beschreibt die Raum-Besetzung (wird von `syncRoomArenaParticipants`
+  // spieltagsunabhängig gepflegt) und bleibt deshalb ungefiltert — sonst würde eine echte Co-op-Runde
+  // im Fenster vor dem ersten Sync des neuen Spieltags kurz als Solo gelten und das Ready-Gate
+  // umgehen. Der Ready-Zustand selbst gehört dagegen zur einzelnen Arena-Sitzung: alte Ready-Häkchen
+  // vom Vorspieltag dürfen das Gate des neuen Spieltags nicht vorab erfüllen.
   const arenaRequiredParticipantIds = roomArenaSyncState?.requiredParticipantIds ?? [];
-  const arenaReadyParticipantIds = roomArenaSyncState?.readyParticipantIds ?? [];
+  const arenaReadyParticipantIds = scopedRoomArenaSyncState?.readyParticipantIds ?? [];
   const isRoomArenaCoop = isRoomRevealSyncActive && arenaRequiredParticipantIds.length > 1;
-  const arenaCoopReadyGateActive = isRoomArenaCoop && (roomArenaSyncState?.status ?? "idle") === "ready_check";
+  const arenaCoopReadyGateActive = isRoomArenaCoop && (scopedRoomArenaSyncState?.status ?? "idle") === "ready_check";
   const selfArenaParticipantId = roomContext?.participantId ?? null;
   const isSelfArenaReady = Boolean(
     selfArenaParticipantId && arenaReadyParticipantIds.includes(selfArenaParticipantId),
@@ -193,7 +201,7 @@ export function useArenaRoomSync(input: UseArenaRoomSyncInput): UseArenaRoomSync
     .map((participant) => participant.displayName);
   const canControlArenaReveal = (!isRoomRevealSyncActive || isRoomHost) && !arenaCoopReadyGateActive;
   const roomRevealWaitingForHost =
-    isRoomRevealSyncActive && !isRoomHost && (roomArenaSyncState?.status ?? "idle") === "idle";
+    isRoomRevealSyncActive && !isRoomHost && (scopedRoomArenaSyncState?.status ?? "idle") === "idle";
 
   // Stable identities (via useCallback) so consumers can safely list these in
   // effect dependency arrays without re-firing on every render.
@@ -254,7 +262,10 @@ export function useArenaRoomSync(input: UseArenaRoomSyncInput): UseArenaRoomSync
 
   return {
     roomSyncRole,
-    roomArenaSyncState,
+    // Bewusst der scope-gefilterte State: Konsumenten fragen ihn ab, um zu entscheiden, ob für DIESE
+    // Arena schon ein Sync läuft (Host-Start-Guard). Der ungefilterte Raum-State würde dort ab dem
+    // zweiten Spieltag dauerhaft "result_applied" melden und den Start blockieren.
+    roomArenaSyncState: scopedRoomArenaSyncState,
     roomSyncParticipants,
     isRoomHost,
     isRoomRevealSyncActive,
