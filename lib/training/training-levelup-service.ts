@@ -245,82 +245,87 @@ function stableTrainingAllocationHash(value: string) {
   return hash >>> 0;
 }
 
-export function deriveAttributeAffinityProfile(player: Player): AttributeAffinityProfile {
-  const signatureCandidates: PlayerGeneratorAttributeName[] = [];
-  const weakCandidates: PlayerGeneratorAttributeName[] = [];
-  const reasons: string[] = [];
+/** Deterministischer 0..1-Wert aus einem Seed (nutzt hashString). Ersetzt Math.random. */
+function seededUnit(...parts: Array<string | null | undefined>): number {
+  return hashString(parts.map((part) => part ?? "").join(":")) / 0xffffffff;
+}
 
+/**
+ * Signature (2) + Weak (1) werden STARK ZUFÄLLIG gewürfelt — mit nur leichter Tendenz zu
+ * Klasse/Traits und den tatsächlichen Top-/Bottom-Attributen. Der Zufall ist deterministisch
+ * geseedet aus `player.id` + `seasonId` (kein Math.random), damit
+ *  - der Forecast innerhalb einer Saison stabil bleibt (bei jedem Rendern gleich), und
+ *  - sich die 2+1 JEDE SAISON neu würfeln (`seasonId` fließt in den Seed).
+ * Ohne `seasonId` (Aufrufer ohne Saisonkontext) wird ein fester Seed genutzt.
+ */
+export function deriveAttributeAffinityProfile(
+  player: Player,
+  options?: { seasonId?: string | null },
+): AttributeAffinityProfile {
+  const seasonId = options?.seasonId ?? "fixed";
+  const attributeKeys = playerGeneratorAttributeKeys as readonly PlayerGeneratorAttributeName[];
+
+  // Leichte Tendenz-Hinweise (bewusst schwach gewichtet — "stark random"): Klassen-/Trait-Rolle
+  // und die tatsächlichen Top-/Bottom-Attribute machen ein Attribut nur etwas wahrscheinlicher.
+  const sigTendency = new Set<PlayerGeneratorAttributeName>();
+  const weakTendency = new Set<PlayerGeneratorAttributeName>();
   const className = player.className.toLowerCase();
   if (className.includes("mage") || hasTrait(player, ["wizard", "scholar", "oracle"])) {
-    pushUnique(signatureCandidates, "intelligence");
-    pushUnique(signatureCandidates, "will");
-    reasons.push("mental_class_or_subclass");
+    sigTendency.add("intelligence");
+    sigTendency.add("will");
   }
   if (className.includes("tank") || hasTrait(player, ["guardian", "warrior", "brute"])) {
-    pushUnique(signatureCandidates, "health");
-    pushUnique(signatureCandidates, "stamina");
-    reasons.push("durable_role");
+    sigTendency.add("health");
+    sigTendency.add("stamina");
   }
   if (className.includes("charger") || className.includes("rogue") || hasTrait(player, ["runner", "assassin", "swift"])) {
-    pushUnique(signatureCandidates, "speed");
-    pushUnique(signatureCandidates, "dexterity");
-    reasons.push("speed_role");
+    sigTendency.add("speed");
+    sigTendency.add("dexterity");
   }
   if (className.includes("hero") || className.includes("warlord") || hasTrait(player, ["leader", "loyal", "ambitious"])) {
-    pushUnique(signatureCandidates, "determination");
-    pushUnique(signatureCandidates, "charisma");
-    reasons.push("leader_role");
+    sigTendency.add("determination");
+    sigTendency.add("charisma");
   }
   if (className.includes("badass") || hasTrait(player, ["fearless", "chaos", "demon"])) {
-    pushUnique(signatureCandidates, "power");
-    pushUnique(signatureCandidates, "torment");
-    reasons.push("high_impact_role");
-  }
-  if (hasTrait(player, ["diligent", "disciplined", "motivated"])) {
-    pushUnique(signatureCandidates, "determination");
-    pushUnique(signatureCandidates, "stamina");
-    reasons.push("positive_training_traits");
+    sigTendency.add("power");
+    sigTendency.add("torment");
   }
   if (hasTrait(player, ["diva", "lazy", "fainthearted"])) {
-    pushUnique(weakCandidates, "determination");
-    pushUnique(weakCandidates, "stamina");
-    reasons.push("negative_training_traits");
+    weakTendency.add("determination");
+    weakTendency.add("stamina");
   }
   if (hasTrait(player, ["obsessive", "paranoid"])) {
-    pushUnique(weakCandidates, "spirit");
-    reasons.push("volatile_trait_pressure");
+    weakTendency.add("spirit");
   }
-
-  const sortedAttributes = [...playerGeneratorAttributeKeys]
-    .map((attribute) => ({ attribute: attribute as PlayerGeneratorAttributeName, value: getPlayerAttributeValue(player, attribute as PlayerGeneratorAttributeName) ?? -1 }))
+  const rankedByValue = [...attributeKeys]
+    .map((attribute) => ({ attribute, value: getPlayerAttributeValue(player, attribute) ?? -1 }))
     .sort((left, right) => right.value - left.value);
-  for (const entry of sortedAttributes) {
-    pushUnique(signatureCandidates, entry.attribute);
-    if (signatureCandidates.length >= 4) break;
+  rankedByValue.slice(0, 3).forEach((entry) => sigTendency.add(entry.attribute));
+  rankedByValue.slice(-3).forEach((entry) => weakTendency.add(entry.attribute));
+
+  // "Stark random": kleiner Tendenz-Bonus auf einen Uniform[0,1)-Score. Ein Tendenz-Attribut
+  // schlägt ein neutrales nur mit ~66% — die Auswahl bleibt überwiegend zufällig.
+  const TENDENCY_BIAS = 0.15;
+  const sigScore = new Map<PlayerGeneratorAttributeName, number>();
+  const weakScore = new Map<PlayerGeneratorAttributeName, number>();
+  for (const attribute of attributeKeys) {
+    sigScore.set(attribute, seededUnit(player.id, seasonId, "sig", attribute) + (sigTendency.has(attribute) ? TENDENCY_BIAS : 0));
+    weakScore.set(attribute, seededUnit(player.id, seasonId, "weak", attribute) + (weakTendency.has(attribute) ? TENDENCY_BIAS : 0));
   }
 
-  const lowToHigh = [...sortedAttributes].sort((left, right) => left.value - right.value);
-  for (const entry of lowToHigh) {
-    pushUnique(weakCandidates, entry.attribute);
-    if (weakCandidates.length >= 3) break;
-  }
-
-  const signatureAttributes = signatureCandidates
-    .filter((attribute, index, list) => list.indexOf(attribute) === index)
+  const signatureAttributes = [...attributeKeys]
+    .sort((left, right) => (sigScore.get(right) ?? 0) - (sigScore.get(left) ?? 0))
     .slice(0, 2) as [PlayerGeneratorAttributeName, PlayerGeneratorAttributeName];
-  while (signatureAttributes.length < 2) {
-    signatureAttributes.push(playerGeneratorAttributeKeys[signatureAttributes.length] as PlayerGeneratorAttributeName);
-  }
-  const weakAttribute =
-    weakCandidates.find((attribute) => !signatureAttributes.includes(attribute)) ??
-    lowToHigh.find((entry) => !signatureAttributes.includes(entry.attribute))?.attribute ??
-    "torment";
+  const signatureSet = new Set<PlayerGeneratorAttributeName>(signatureAttributes);
+  const weakAttribute = [...attributeKeys]
+    .filter((attribute) => !signatureSet.has(attribute))
+    .sort((left, right) => (weakScore.get(right) ?? 0) - (weakScore.get(left) ?? 0))[0];
 
   return {
     playerId: player.id,
     signatureAttributes,
     weakAttribute,
-    reasons: reasons.length > 0 ? reasons : ["attribute_profile_fallback"],
+    reasons: ["seasonal_random_affinity"],
   };
 }
 
@@ -593,25 +598,11 @@ export function resolveSeasonalAffinityProfile(input: {
   seasonId?: string | null;
   seasonShiftAlreadyUsed?: boolean;
 }): AttributeAffinityProfile {
-  const base = deriveAttributeAffinityProfile(input.player);
-  if (input.route == null) {
-    return base;
-  }
-  const shift = buildSignatureShiftPreview({
-    player: input.player,
-    currentProfile: base,
-    route: input.route,
-    seasonId: input.seasonId ?? null,
-    seasonShiftAlreadyUsed: input.seasonShiftAlreadyUsed,
-  });
-  return shift.canShift
-    ? {
-        ...base,
-        signatureAttributes: shift.newSignatureAttributes,
-        weakAttribute: shift.newWeakAttribute,
-        reasons: [...base.reasons, shift.reason],
-      }
-    : base;
+  // Die Basis-Ableitung würfelt Signature/Weak bereits stark zufällig pro Saison (Seed aus
+  // player.id + seasonId). Damit ist der frühere Route-basierte "Signature-Shift" als Quelle
+  // der saisonalen Variation überflüssig — der Seasonal-Roll ersetzt ihn. `route` bleibt in der
+  // Signatur erhalten (Aufrufer-Kompatibilität), beeinflusst die Auswahl aber nicht mehr.
+  return deriveAttributeAffinityProfile(input.player, { seasonId: input.seasonId ?? null });
 }
 
 function getTeamStrategyAttributeBias(profile?: TeamStrategyProfile | null): PlayerGeneratorAttributeName[] {

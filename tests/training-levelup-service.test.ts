@@ -206,16 +206,26 @@ describe("training-levelup-service", () => {
     expect(model.costs.find((row) => row.attribute === "power")?.blocked).toBe(true);
   });
 
-  it("Signature muss nicht das aktuell hoechste Attribut sein", () => {
-    const testPlayer = player({
-      className: "Mage",
-      attributeSheetStats: attributes({ power: 95, intelligence: 40, will: 42 }),
-      traitsPositive: [],
-    });
-    const affinity = deriveAttributeAffinityProfile(testPlayer);
+  it("wuerfelt Signature/Weak stark zufaellig und pro Saison neu (deterministisch je Saison)", () => {
+    const testPlayer = player({ className: "Mage" });
 
-    expect(affinity.signatureAttributes).toContain("intelligence");
-    expect(affinity.signatureAttributes).toContain("will");
+    // Innerhalb einer Saison stabil (gleicher Seed -> gleiches Ergebnis, kein Springen beim Rendern).
+    const seasonOne = deriveAttributeAffinityProfile(testPlayer, { seasonId: "season-1" });
+    const seasonOneAgain = deriveAttributeAffinityProfile(testPlayer, { seasonId: "season-1" });
+    expect(seasonOne).toEqual(seasonOneAgain);
+
+    // Gueltiges Profil: 2 verschiedene Signature + 1 davon verschiedenes Weak.
+    expect(seasonOne.signatureAttributes).toHaveLength(2);
+    expect(new Set(seasonOne.signatureAttributes).size).toBe(2);
+    expect(seasonOne.signatureAttributes).not.toContain(seasonOne.weakAttribute);
+
+    // Wuerfelt ueber Saisons neu -> die Auswahl variiert.
+    const signaturesBySeason = new Set(
+      ["season-1", "season-2", "season-3", "season-4", "season-5"].map((seasonId) =>
+        deriveAttributeAffinityProfile(testPlayer, { seasonId }).signatureAttributes.join("|"),
+      ),
+    );
+    expect(signaturesBySeason.size).toBeGreaterThan(1);
   });
 
   it("kann einen Signature-Shift mit Zentrale-Notification previewen", () => {
@@ -253,7 +263,7 @@ describe("training-levelup-service", () => {
     expect(new Set(signaturesBySeason).size).toBeGreaterThan(1);
   });
 
-  it("nutzt den saisonal rotierten Signature-Fokus fuer echte Kosten und Badges", () => {
+  it("weist die (saisonal gewuerfelten) Signature/Weak-Attribute konsistent in den Kosten aus", () => {
     const testPlayer = player();
     const model = buildPlayerDevelopmentLevelupModel({
       gameState: gameState("season-2"),
@@ -261,9 +271,11 @@ describe("training-levelup-service", () => {
       forecast: forecast({ developmentRoute: "core_growth" }),
     });
 
-    expect(model.signatureShift.canShift).toBe(true);
-    expect(model.affinity.signatureAttributes).toEqual(model.signatureShift.newSignatureAttributes);
-    expect(model.costs.find((row) => row.attribute === model.signatureShift.newSignatureAttributes[1])?.affinity).toBe("signature");
+    expect(model.affinity.signatureAttributes).toHaveLength(2);
+    for (const attribute of model.affinity.signatureAttributes) {
+      expect(model.costs.find((row) => row.attribute === attribute)?.affinity).toBe("signature");
+    }
+    expect(model.costs.find((row) => row.attribute === model.affinity.weakAttribute)?.affinity).toBe("weak");
   });
 
   it("AI verteilt Trainingspunkte nach Route, Strategy und Affinity und meidet Weak ohne Need", () => {

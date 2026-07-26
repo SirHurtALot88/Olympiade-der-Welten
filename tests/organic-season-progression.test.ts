@@ -371,59 +371,45 @@ describe("organic season progression", () => {
     expect(openPower.after).toBeGreaterThan(cappedPower.after);
   });
 
-  it("lets signature attributes gain a little faster in organic progression", () => {
-    const signaturePlayer = player({ id: "signature", className: "Badass" });
-    const neutralPlayer = player({ id: "neutral", className: "Mage" });
-    const signatureState = gameState(signaturePlayer);
-    const neutralState = gameState(neutralPlayer);
-    addStrongPowerPerformance(signatureState, signaturePlayer.id);
-    addStrongPowerPerformance(neutralState, neutralPlayer.id);
+  it("lets signature attributes gain a little faster than neutral ones", () => {
+    // Signature/Weak sind jetzt stark zufaellig (pro Saison geseedet), also nicht mehr an eine
+    // Klasse gebunden. Flache Attribute (alle offen unter der Decke) isolieren den reinen
+    // Affinitaets-Multiplikator: Signature ~1.15 > Neutral ~1.0 > Weak ~0.8.
+    const flat: PlayerGeneratorAttributes = {
+      power: 50, health: 50, stamina: 50, intelligence: 50, awareness: 50, determination: 50,
+      speed: 50, dexterity: 50, charisma: 50, will: 50, spirit: 50, torment: 50,
+    };
+    const testPlayer = player({ id: "affinity", attributeSheetStats: flat });
+    const state = gameState(testPlayer);
+    addStrongPowerPerformance(state, testPlayer.id);
 
-    const signatureResult = buildOrganicSeasonProgression({ gameState: signatureState, player: signaturePlayer });
-    const neutralResult = buildOrganicSeasonProgression({ gameState: neutralState, player: neutralPlayer });
-    const signaturePower = signatureResult.attributeBreakdown.find((entry) => entry.attribute === "power")!;
-    const neutralPower = neutralResult.attributeBreakdown.find((entry) => entry.attribute === "power")!;
+    const result = buildOrganicSeasonProgression({ gameState: state, player: testPlayer });
+    const signature = result.attributeBreakdown.find((entry) => entry.affinity === "signature")!;
+    const neutral = result.attributeBreakdown.find((entry) => entry.affinity === "neutral")!;
 
-    expect(signaturePower.affinity).toBe("signature");
-    expect(neutralPower.affinity).toBe("neutral");
-    expect(signaturePower.trainingGrowthMultiplier).toBeGreaterThan(1);
-    expect(signaturePower.performance).toBeGreaterThan(neutralPower.performance);
-    expect(signaturePower.training).toBeGreaterThan(neutralPower.training);
+    expect(signature).toBeTruthy();
+    expect(neutral).toBeTruthy();
+    expect(signature.trainingGrowthMultiplier).toBeGreaterThan(neutral.trainingGrowthMultiplier);
+    expect(signature.trainingGrowthMultiplier).toBeGreaterThan(1);
   });
 
-  it("makes weak attributes gain slower without changing the base performance budget", () => {
-    const weakAttributes: PlayerGeneratorAttributes = {
-      power: 20,
-      health: 55,
-      stamina: 55,
-      intelligence: 90,
-      awareness: 55,
-      determination: 55,
-      speed: 55,
-      dexterity: 55,
-      charisma: 55,
-      will: 90,
-      spirit: 55,
-      torment: 55,
+  it("makes the weak attribute gain slower than neutral ones", () => {
+    const flat: PlayerGeneratorAttributes = {
+      power: 50, health: 50, stamina: 50, intelligence: 50, awareness: 50, determination: 50,
+      speed: 50, dexterity: 50, charisma: 50, will: 50, spirit: 50, torment: 50,
     };
-    const neutralAttributes: PlayerGeneratorAttributes = { ...weakAttributes, power: 55, charisma: 20 };
-    const weakPlayer = player({ id: "weak", className: "Mage", attributeSheetStats: weakAttributes });
-    const neutralPlayer = player({ id: "neutral", className: "Mage", attributeSheetStats: neutralAttributes });
-    const weakState = gameState(weakPlayer);
-    const neutralState = gameState(neutralPlayer);
-    addStrongPowerPerformance(weakState, weakPlayer.id);
-    addStrongPowerPerformance(neutralState, neutralPlayer.id);
+    const testPlayer = player({ id: "weak-affinity", attributeSheetStats: flat });
+    const state = gameState(testPlayer);
+    addStrongPowerPerformance(state, testPlayer.id);
 
-    const weakResult = buildOrganicSeasonProgression({ gameState: weakState, player: weakPlayer });
-    const neutralResult = buildOrganicSeasonProgression({ gameState: neutralState, player: neutralPlayer });
-    const weakPower = weakResult.attributeBreakdown.find((entry) => entry.attribute === "power")!;
-    const neutralPower = neutralResult.attributeBreakdown.find((entry) => entry.attribute === "power")!;
+    const result = buildOrganicSeasonProgression({ gameState: state, player: testPlayer });
+    const weak = result.attributeBreakdown.find((entry) => entry.affinity === "weak")!;
+    const neutral = result.attributeBreakdown.find((entry) => entry.affinity === "neutral")!;
 
-    expect(weakResult.performanceSetpoints).toBe(neutralResult.performanceSetpoints);
-    expect(weakPower.affinity).toBe("weak");
-    expect(neutralPower.affinity).toBe("neutral");
-    expect(weakPower.trainingGrowthMultiplier).toBeLessThan(1);
-    expect(weakPower.performance).toBeLessThan(neutralPower.performance);
+    expect(weak).toBeTruthy();
+    expect(neutral).toBeTruthy();
+    expect(weak.trainingGrowthMultiplier).toBeLessThan(neutral.trainingGrowthMultiplier);
+    expect(weak.trainingGrowthMultiplier).toBeLessThan(1);
   });
 
   it("boosts prospects with star gap and penalizes overpriced veterans", () => {
