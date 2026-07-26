@@ -8,7 +8,7 @@ import { loadImportedPlayerStats } from "@/lib/data/playerStatsAdapter";
 import { calculateImportedPlayerEconomy } from "@/lib/player-formulas/imported-player-economy";
 import { createPlayerBaselineFromPlayer } from "@/lib/players/player-baseline-service";
 import {
-  clearPlayerSavePatches,
+  clearPlayerSavePatchesForAllSaves,
   upsertPlayerBaselineCatalogEntries,
   upsertPlayerCatalogEntries,
 } from "@/lib/persistence/save-repository";
@@ -346,7 +346,10 @@ export function syncImportedCharacterPersistence(result: CharacterImportResult) 
       sourceFile: "references/character-briefs",
     }),
   ]);
-  clearPlayerSavePatches(result.player.id);
+  // This is a dev-tooling catalog re-sync (no single target save), so clearing
+  // stale per-save patches across all saves is the intended behavior here.
+  // See lib/persistence/save-repository.ts for the save-scoped default.
+  clearPlayerSavePatchesForAllSaves(result.player.id);
 
   return catalogPaths;
 }

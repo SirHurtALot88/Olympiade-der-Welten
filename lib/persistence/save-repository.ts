@@ -899,9 +899,46 @@ export function upsertPlayerBaselineCatalogEntries(
   invalidateCatalogDerivedRuntimeCaches();
 }
 
-export function clearPlayerSavePatches(playerId: string) {
+/**
+ * Löscht den Save-spezifischen Patch-/Delta-Datensatz eines Spielers für GENAU
+ * einen Save. Ein Re-Import des Katalog-Charakters darf nicht die
+ * Save-individuellen Anpassungen anderer Saves zerstören (Bug S3).
+ *
+ * Bumpt außerdem `saves.updated_at` für den betroffenen Save, damit
+ * Caches/den Version-Endpoint die Änderung bemerken.
+ */
+export function clearPlayerSavePatches(playerId: string, saveId: string, updatedAt = new Date().toISOString()) {
   const database = getDatabase();
+  const result = database
+    .prepare("DELETE FROM players WHERE save_id = ? AND player_id = ?")
+    .run(saveId, playerId);
+
+  if (result.changes > 0) {
+    database.prepare("UPDATE saves SET updated_at = ? WHERE save_id = ?").run(updatedAt, saveId);
+  }
+}
+
+/**
+ * Explizites Opt-in für den seltenen Fall, dass ein Katalog-Re-Import
+ * tatsächlich ALLE Saves betreffen soll (z.B. Dev-Tooling, das den globalen
+ * Spieler-Katalog neu synchronisiert). Nicht der Default, damit ein
+ * Re-Import nicht versehentlich Save-individuelle Anpassungen in fremden
+ * Saves löscht.
+ */
+export function clearPlayerSavePatchesForAllSaves(playerId: string, updatedAt = new Date().toISOString()) {
+  const database = getDatabase();
+  const affectedSaveIds = database
+    .prepare("SELECT DISTINCT save_id FROM players WHERE player_id = ?")
+    .all(playerId) as Array<{ save_id: string }>;
+
   database.prepare("DELETE FROM players WHERE player_id = ?").run(playerId);
+
+  if (affectedSaveIds.length > 0) {
+    const touchStatement = database.prepare("UPDATE saves SET updated_at = ? WHERE save_id = ?");
+    for (const row of affectedSaveIds) {
+      touchStatement.run(updatedAt, row.save_id);
+    }
+  }
 }
 
 function loadPlayersForSave(saveId: string) {
