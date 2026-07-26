@@ -84,6 +84,17 @@ function resolveLocalSave(persistence: PersistenceService, saveId: string) {
     throw new Error(`Local save ${saveId} could not be loaded for season completion.`);
   }
 
+  // Audit R2/V6: sicherstellen, dass das aufgelöste Save WIRKLICH die angeforderte saveId trägt. Ohne
+  // diese Prüfung konnte der stille Fallback auf getActiveSave()/bootstrap bei veralteter/verwaister
+  // saveId ein FREMDES Save abschließen (ligaweite Mutationen auf dem falschen Save) und die
+  // Route-Autorisierung, die gegen die angeforderte saveId prüft, unterlaufen. Lieber hart abbrechen als
+  // das falsche Save mutieren.
+  if (save.saveId !== saveId) {
+    throw new Error(
+      `Season completion refused: requested save ${saveId} not found; resolved to a different save ${save.saveId}. Refusing to mutate the wrong save.`,
+    );
+  }
+
   return save;
 }
 
