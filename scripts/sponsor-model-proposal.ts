@@ -60,21 +60,41 @@ type SponsorType = {
 };
 
 export const SPONSOR_TYPES: SponsorType[] = [
-  { name: "Absicherung", note: "hoher Sockel, kaum Upside, kein Rang-Malus",
+  // ── Rang-getriebene Arten: die Kurve traegt die Identitaet, die Klausel ist Beiwerk ────────────
+  { name: "Bürgschaft", note: "hoher Sockel, kaum Upside — der sichere Hafen",
     rel: (d) => (d <= 0 ? 6 : 6 + d),
     clause: { label: "Stabilität: kein neuer Kredit, ≤3 Verkäufe", bonus: 5, malus: 3 } },
-  { name: "Traditionalist", note: "belohnt exaktes Halten, bestraft Abrutschen deutlich",
+  { name: "Traditionsverein", note: "belohnt exaktes Halten, bestraft Abrutschen hart",
     rel: (d) => (d === 0 ? 12 : d > 0 ? 12 - 3 * d : 12 + 6 * d),
     clause: { label: "Kontinuität: Vertragsstabilität + Altersschnitt", bonus: 8, malus: 7 } },
-  { name: "Ausgewogen", note: "linear, leichter Malus beim Abrutschen",
+  { name: "Allrounder", note: "linear, leichter Malus beim Abrutschen — der Standard",
     rel: (d) => 5 + 4 * d + (d < 0 ? 2 * d : 0),
     clause: { label: "Solvenz + moderate Fluktuation", bonus: 5, malus: 4 } },
-  { name: "Spitzenjäger", note: "nur ein Sprung von 2 Stufen zahlt gross; darunter durchgehend Malus",
+  { name: "Gipfelstürmer", note: "erst der Sprung ueber 2 Stufen zahlt; darunter durchgehend Malus",
     rel: (d) => (d >= 2 ? 14 + 10 * (d - 2) : d === 1 ? 2 : -6 + 3 * d),
     clause: { label: "Star-Power: entwickle einen Spieler +X MW", bonus: 11, malus: 9 } },
-  { name: "Herausforderer", note: "echter Malus unten, grösste Upside",
+  { name: "Vollgas", note: "steilster Verlauf in beide Richtungen — hoechstes Risiko",
     rel: (d) => (d < 0 ? 5 * d : 10 * d),
-    clause: { label: "Vollgas: Saison-Fatigue-Schnitt ≥ X", bonus: 13, malus: 11 } },
+    clause: { label: "Einsatz: Saison-Fatigue-Schnitt ≥ X", bonus: 13, malus: 11 } },
+
+  // ── Zustands-getriebene Arten: flache Kurve, die Klausel traegt die Identitaet ─────────────────
+  // Fuer Teams, die ihren Rang kaum bewegen koennen (Keller) oder wollen (Konsolidierung) —
+  // hier verdient man ueber Spielweise und Aufbau statt ueber die Tabelle.
+  { name: "Regenerativ", note: "Gegenstueck zu Vollgas: belohnt Schonung statt Auspowern",
+    rel: (d) => (d < -1 ? -4 + 4 * d : 7 + 2 * d),
+    clause: { label: "Schonung: Saison-Fatigue-Schnitt ≤ X (Rotation)", bonus: 9, malus: 8 } },
+  { name: "Nachwuchs", note: "Kurve fast flach — fast alles haengt an der Jugendentwicklung",
+    rel: (d) => (d <= 0 ? 3 : 3 + 1.5 * d),
+    clause: { label: "Talent: Eigengewächse entwickeln (+X MW im Kader ≤22 J.)", bonus: 16, malus: 6 } },
+  { name: "Baumeister", note: "flachste Kurve — zahlt fuer Infrastruktur statt fuer Plaetze",
+    rel: (d) => (d <= 0 ? 2 : 2 + 2 * d),
+    clause: { label: "Ausbau: Fan-Shop/Arena-Stufen erhöhen", bonus: 18, malus: 4 } },
+  { name: "Spezialist", note: "mittlere Kurve, verlangt ein scharfes Achsen-Profil",
+    rel: (d) => 4 + 3 * d,
+    clause: { label: "Profil: eine Achse (POW/SPE/MEN/SOC) in die Top-N deiner Stärkeklasse", bonus: 12, malus: 10 } },
+  { name: "Sparfuchs", note: "belohnt Halten bei niedriger Kostenbasis — die Eco-Runde",
+    rel: (d) => (d < 0 ? 9 + 3 * d : 9 + 2 * d),
+    clause: { label: "Effizienz: Gehaltssumme unter der Schwelle deiner Stärkeklasse", bonus: 10, malus: 8 } },
 ];
 
 const withFloor = (v: number) => Math.max(FLOOR, v);
@@ -307,3 +327,31 @@ for (const sf of [0.8, 1.0, 1.2]) {
     `   Letzter im Schlechtfall ${Math.min(...bot).toFixed(0)}-${Math.max(...bot).toFixed(0)}` +
     `   Top-Gehalt gedeckt: ${Math.min(...good) >= 87.8 ? "immer" : Math.max(...good) >= 87.8 ? "teilweise" : "nie"}`);
 }
+
+// ── Katalog-Ansicht: wie fuehlt sich jede Art fuer ein starkes / mittleres / schwaches Team an? ──
+// Der Fallen-Test oben garantiert bereits, dass KEINE Art fuer irgendeine Ausgangslage dominiert
+// wird. Diese Tabelle zeigt, WIE sie sich unterscheiden: Sockel (schlechtester Ausgang),
+// Decke (bester Ausgang) und Risiko.
+line();
+console.log("KATALOG — jede Art aus Sicht eines starken (#2), mittleren (#18) und schwachen (#30) Teams");
+line();
+console.log("  " + "Sponsorart".padEnd(18) + "│" + "  TOP #2  Sockel–Decke  σ".padEnd(28) + "│" +
+  "  MITTEL #18 Sockel–Decke σ".padEnd(28) + "│  SCHWACH #30 Sockel–Decke σ");
+for (const t of SPONSOR_TYPES) {
+  const cells = [2, 18, 30].map((e) => {
+    const c = offsetFor(t.name, e);
+    const band: number[] = [];
+    for (let r = Math.max(1, e - 8); r <= Math.min(32, e + 8); r += 1) band.push(r);
+    const joint = band.flatMap((r) => [withFloor(rankPart(t, e, r, c) + t.clause.bonus), withFloor(rankPart(t, e, r, c) - t.clause.malus)]);
+    const e0 = ev(t, e, c); const d = distribution(e);
+    let v = 0;
+    d.forEach((w, i) => {
+      v += w * P_MET * (withFloor(rankPart(t, e, i + 1, c) + t.clause.bonus) - e0) ** 2
+         + w * (1 - P_MET) * (withFloor(rankPart(t, e, i + 1, c) - t.clause.malus) - e0) ** 2;
+    });
+    return `${Math.min(...joint).toFixed(0)}–${Math.max(...joint).toFixed(0)}`.padStart(12) + `  σ${Math.sqrt(v).toFixed(1)}`.padStart(8);
+  });
+  console.log("  " + t.name.padEnd(18) + "│" + cells.map((c) => c.padEnd(28)).join("│"));
+}
+console.log("\n  Sockel = schlechtester realistischer Ausgang, Decke = bester. Gleiche EV ueberall —");
+console.log("  die Arten unterscheiden sich AUSSCHLIESSLICH in Risiko und Form, nie in der Hoehe.");
