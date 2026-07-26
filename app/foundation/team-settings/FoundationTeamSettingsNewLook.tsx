@@ -334,7 +334,6 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
     selectedTeamStrategyProfile,
     setActiveView,
     setFoundationView,
-    setFreshSeasonStartMessage,
     setGameModeOwnershipChrisIds,
     setGameModeOwnershipFrankyIds,
     setNewGamePreview,
@@ -1032,33 +1031,12 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
             >
               Neuer Save
             </button>
-            <button
-              type="button"
-              className="nl-teamsettings-btn is-primary"
-              disabled={isSaveBusy || readMeta.readOnly}
-              title={
-                readMeta.readOnly
-                  ? getReadOnlyActionReason("ein neues Spiel")
-                  : isSaveBusy
-                    ? getBusyActionReason("Die Save-Aktion")
-                    : "Startet einen frischen Season-1-Spielstand, ohne bestehende Saves zu löschen."
-              }
-              onClick={() => {
-                const confirmed = window.confirm(
-                  "Erstellt einen neuen lokalen Testspielstand für Season 1. Bestehende Saves bleiben erhalten.",
-                );
-                if (!confirmed) {
-                  return;
-                }
-                setFreshSeasonStartMessage(null);
-                void runSaveAction({
-                  action: "fresh-season-1",
-                  name: `Fresh Season 1 ${formatGermanSaveTimestamp()}`,
-                });
-              }}
-            >
-              Neues Spiel / Season 1 starten
-            </button>
+            {/* Der frühere „Neues Spiel / Season 1 starten"-Button (action: "fresh-season-1") wurde
+                entfernt: der „Neues Spiel erstellen"-Wizard oben (renderNewGameWizard) ist jetzt der
+                EINZIGE Neues-Spiel-Einstieg — er legt ebenfalls eine frische Season 1 an UND stößt den
+                ligaweiten AI-Draft an (siehe app/api/new-game/route.ts), plus die Team-Auswahl, die der
+                alte Button nicht hatte. „Neuer Save" (Kopie des aktuellen Zustands) und „Save duplizieren"
+                bleiben als reine Save-Verwaltung erhalten. */}
             <button
               type="button"
               className="nl-teamsettings-btn"

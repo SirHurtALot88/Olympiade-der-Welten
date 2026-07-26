@@ -57,9 +57,15 @@ function baseGameState(): GameState {
 }
 
 describe("sponsor catalog v2.6", () => {
-  it("ships 100 parody parent brands", () => {
-    expect(SPONSOR_BRAND_PARENTS).toHaveLength(100);
-    expect(new Set(SPONSOR_BRAND_PARENTS.map((entry) => entry.id)).size).toBe(100);
+  it("ships 200 parody parent brands — enough for one distinct brand per offer league-wide", () => {
+    // Von 100 auf 200 erhoeht: 32 Teams x 5 Angebote = 160 Angebote pro Saison. Erst ab >=160 Marken
+    // kann jedes Angebot der Liga eine eigene Marke tragen (GLOBAL_PARENT_MAX_TEAMS = 1), sodass kein
+    // Team denselben Sponsor bekommt wie ein anderes. Die 40 daruber sind Rotationspuffer.
+    expect(SPONSOR_BRAND_PARENTS.length).toBeGreaterThanOrEqual(32 * 5);
+    expect(SPONSOR_BRAND_PARENTS).toHaveLength(200);
+    expect(new Set(SPONSOR_BRAND_PARENTS.map((entry) => entry.id)).size).toBe(200);
+    // Namen muessen ebenfalls eindeutig sein — die Uebersicht zeigt den Markennamen, nicht die id.
+    expect(new Set(SPONSOR_BRAND_PARENTS.map((entry) => entry.name)).size).toBe(200);
   });
 
   it("generates 3-5 variants per parent brand", () => {
@@ -67,21 +73,34 @@ describe("sponsor catalog v2.6", () => {
     for (const variant of SPONSOR_BRAND_VARIANTS) {
       counts.set(variant.parentBrandId, (counts.get(variant.parentBrandId) ?? 0) + 1);
     }
-    expect(counts.size).toBe(100);
+    expect(counts.size).toBe(SPONSOR_BRAND_PARENTS.length);
     for (const parent of SPONSOR_BRAND_PARENTS) {
       const count = counts.get(parent.id) ?? 0;
       expect(count).toBeGreaterThanOrEqual(3);
       expect(count).toBeLessThanOrEqual(5);
     }
-    expect(SPONSOR_BRAND_VARIANTS.length).toBeGreaterThanOrEqual(300);
+    expect(SPONSOR_BRAND_VARIANTS.length).toBeGreaterThanOrEqual(SPONSOR_BRAND_PARENTS.length * 3);
     expect(listSponsorBrandTemplates().length).toBe(SPONSOR_BRAND_VARIANTS.length);
   });
 
-  it("includes recognizable parody names", () => {
+  it("splits the catalog into 100 German and 100 international recognizable brands", () => {
     const names = SPONSOR_BRAND_PARENTS.map((entry) => entry.name);
+    // Wiedererkennungswert vor Wortspiel: stark verfremdete Namen (frueher z. B. "Teslara Motors",
+    // "AlphaSearch Global", "Golden Arches Fast") sind durch erkennbare ersetzt.
     expect(names).toContain("O.B.I. Baumarkt");
-    expect(names).toContain("Teslara Motors");
     expect(names).toContain("Siemenswerk AG");
+    expect(names).toContain("Tesla Motors");
+    expect(names).toContain("Chrysler Motors");
+    expect(names).toContain("Samsung Electronics");
+    expect(names).toContain("LG Electronics");
+    expect(names).not.toContain("Teslara Motors");
+
+    const byRegion = SPONSOR_BRAND_PARENTS.reduce<Record<string, number>>((acc, entry) => {
+      acc[entry.region] = (acc[entry.region] ?? 0) + 1;
+      return acc;
+    }, {});
+    expect(byRegion.dach).toBe(100);
+    expect(byRegion.global).toBe(100);
   });
 });
 

@@ -22,12 +22,31 @@ export type LegacyMatchdayReadiness = {
 
 const LEGACY_MATCHDAY_MINIMUM_PLAYERS = 7;
 
+/**
+ * Slot-Zahlen IMMER seitenspezifisch (`<disciplineId>::d1|d2`) mit Rückfall auf die generische
+ * Disziplin-Zahl — identisch zu `lib/lineups/legacy-matchday-readiness.ts`.
+ *
+ * Vorher las diese Variante ausschliesslich `disciplinePlayerCounts`, also den generischen Wert der
+ * Disziplin statt der fuer DIESEN Spieltag angesetzten Slot-Zahl. Folge: die Auswertung verlangte
+ * z. B. 4/4 Spieler, wo der Spielplan 2/6 vorsah. Da die SUMME in beiden Faellen gleich ist (8),
+ * meldete jede Gesamt-Pruefung weiterhin "8/8 bereit" — der Fehler trat erst pro Seite auf und
+ * setzte dort `wrong_player_count` -> `invalid_lineup`.
+ *
+ * Wirkung des Bugs: `legacy-matchday-result-apply-service` schrieb JEDES Team als
+ * `invalid_lineup` in das gespeicherte Spieltagsergebnis (`teamsReady: 0/32`), obwohl Aufstellungen
+ * gueltig waren und Scores/Raenge korrekt berechnet wurden. Die Standings-Vorschau leitete daraus
+ * `incomplete_result` fuer alle Teams ab, und `standings-apply-service` blockierte die Uebernahme —
+ * die Liga-Tabelle liess sich nicht mehr fortschreiben. Die Resolve-VORSCHAU war nie betroffen, weil
+ * sie die andere Readiness-Implementierung nutzt; genau diese Diskrepanz machte den Bug unsichtbar.
+ */
 function getRequiredCounts(context: LegacyLineupLoadedContext) {
-  const d1Required = context.contextMeta.d1DisciplineId
-    ? context.disciplinePlayerCounts[context.contextMeta.d1DisciplineId] ?? 0
+  const d1DisciplineId = context.contextMeta.d1DisciplineId;
+  const d2DisciplineId = context.contextMeta.d2DisciplineId;
+  const d1Required = d1DisciplineId
+    ? context.disciplineSidePlayerCounts?.[`${d1DisciplineId}::d1`] ?? context.disciplinePlayerCounts[d1DisciplineId] ?? 0
     : 0;
-  const d2Required = context.contextMeta.d2DisciplineId
-    ? context.disciplinePlayerCounts[context.contextMeta.d2DisciplineId] ?? 0
+  const d2Required = d2DisciplineId
+    ? context.disciplineSidePlayerCounts?.[`${d2DisciplineId}::d2`] ?? context.disciplinePlayerCounts[d2DisciplineId] ?? 0
     : 0;
 
   return {

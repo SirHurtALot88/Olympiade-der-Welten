@@ -140,9 +140,13 @@ describe("sponsor offer service", () => {
     }
   });
 
-  it("persists sponsor choice and pays first base installment", () => {
+  it("persists sponsor choice WITHOUT paying anything before season end", () => {
     const gameState = ensureSeasonSponsorOffers(createGameState());
-    const offers = buildSponsorOffersForTeam({ gameState, teamId: "M-M" });
+    // Bewusst die GESPEICHERTEN Angebote — genau die, die dem Spieler angezeigt werden und aus denen
+    // `chooseSponsorOffer` den Vertrag baut. Ein erneutes `buildSponsorOffersForTeam` liefert eine
+    // frisch gezogene Liste: die Markenwahl haengt an der ligaweiten Marken-Nutzung, die nach dem
+    // Speichern eine andere ist als davor. Der Test verglich dadurch zwei verschiedene Listen.
+    const offers = gameState.seasonState.sponsorOffersByTeamId?.["M-M"] ?? [];
     const chosen = offers[0]!;
     const result = chooseSponsorOffer({ gameState, teamId: "M-M", offerId: chosen.offerId });
     const contract = getTeamSponsorContract(result.gameState, "M-M");
@@ -151,8 +155,16 @@ describe("sponsor offer service", () => {
     expect(contract?.rarity).toBe(chosen.rarity);
     expect(contract?.curveShape).toBe(chosen.curveShape);
     expect(contract?.archetype).toBe(chosen.archetype);
-    expect(contract?.payouts.baseFirstPaid).toBe(true);
-    expect(result.gameState.teams[0]?.cash).toBeGreaterThan(50);
+    // Sponsorengeld flieszt ausschliesslich am Saisonende (sponsor-settlement-service). Frueher zahlte
+    // das Unterschreiben sofort die halbe Basisrate aus — dadurch sackte die angezeigte Saison-Summe
+    // im Moment des Abschlusses ab, und am Saisonende kam entsprechend wenig nach, obwohl genau dann
+    // Gehaelter und Transfers faellig sind.
+    expect(contract?.payouts.baseFirstPaid).toBeUndefined();
+    expect(result.gameState.teams[0]?.cash).toBe(50);
+    expect(
+      (result.gameState.seasonState.sponsorPayoutLogs ?? []).filter((log) => log.teamId === "M-M"),
+      "Unterschreiben darf keine Sponsor-Auszahlung buchen",
+    ).toHaveLength(0);
   });
 
   it("auto-selects sponsor contracts for ai teams", () => {
@@ -248,5 +260,44 @@ describe("sponsor board objectives", () => {
         (objective) => objective.teamId === "M-M" && objective.objectiveId === "sponsor-choice-pending",
       ),
     ).toBe(true);
+  });
+
+  it("gives every team a distinct sponsor brand across the whole league (no shared sponsors)", () => {
+    // 32 Teams x 5 Angebote = 160 Angebote. Der Markenpool hat 200 Eintraege, und
+    // GLOBAL_PARENT_MAX_TEAMS steht auf 1 -> jede Dachmarke darf ligaweit hoechstens einmal
+    // auftauchen. Damit ist ausgeschlossen, dass zwei Teams denselben Sponsor angeboten bekommen
+    // oder unter Vertrag nehmen.
+    //
+    // Frueher scheiterte das an zwei Stellen: der Cap stand auf 4, UND `ensureSeasonSponsorOffers`
+    // baute alle Teams gegen denselben unveraenderten gameState, sodass die Marken-Nutzung nur den
+    // Stand VOR dem Lauf kannte und Teams desselben Durchgangs einander gar nicht sahen.
+    const gameState = ensureSeasonSponsorOffers(createGameState());
+    const offersByTeam = gameState.seasonState.sponsorOffersByTeamId ?? {};
+
+    const parentIdsByTeam = new Map<string, string[]>();
+    for (const team of gameState.teams) {
+      const offers = offersByTeam[team.teamId] ?? [];
+      expect(offers.length, `Team ${team.teamId} ohne Angebote`).toBe(5);
+      parentIdsByTeam.set(
+        team.teamId,
+        offers.map((offer) => offer.sponsorParentBrandId).filter((id): id is string => Boolean(id)),
+      );
+    }
+
+    const ownerByParentId = new Map<string, string>();
+    for (const [teamId, parentIds] of parentIdsByTeam) {
+      for (const parentId of parentIds) {
+        const previousOwner = ownerByParentId.get(parentId);
+        expect(
+          previousOwner,
+          `Marke ${parentId} liegt bei Team ${teamId} UND bei Team ${previousOwner}`,
+        ).toBeUndefined();
+        ownerByParentId.set(parentId, teamId);
+      }
+    }
+
+    // Gegenprobe, dass der Lauf ueberhaupt die volle Liga abgedeckt hat und nicht bloss wenige
+    // Marken vergeben wurden (sonst waere die Eindeutigkeit oben trivial erfuellt).
+    expect(ownerByParentId.size).toBe(gameState.teams.length * 5);
   });
 });

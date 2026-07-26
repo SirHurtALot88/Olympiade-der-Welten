@@ -37,7 +37,18 @@ export {
   SPONSOR_BRAND_PARENTS,
 } from "@/lib/sponsor/sponsor-brand-parents";
 
-const GLOBAL_PARENT_SOFT_CAP = 4;
+/**
+ * Wie viele Teams dieselbe Dachmarke gleichzeitig im Angebots-Slate haben duerfen.
+ *
+ * Frueher 4 — daher tauchte z. B. "Webasto Comfort" bei vier Teams gleichzeitig auf und mehrere
+ * Teams hatten am Ende denselben Sponsor unter Vertrag. Bei 100 Marken war das auch noetig:
+ * 32 Teams x 5 Angebote = 160 Angebote passen nicht in 100 Marken.
+ *
+ * Mit 200 Marken (siehe sponsor-brand-parents.ts) geht 160 auf, also steht der Wert auf 1: jede
+ * Marke erscheint ligaweit hoechstens EINMAL. Damit ist ausgeschlossen, dass zwei Teams denselben
+ * Sponsor bekommen — schon auf Angebotsebene, nicht erst beim Abschluss.
+ */
+const GLOBAL_PARENT_MAX_TEAMS = 1;
 
 function getStableUnitHash(seed: string) {
   let hash = 2166136261;
@@ -56,7 +67,7 @@ function isParentAvailable(input: {
   if (input.usedParentBrandIds.has(input.parent.id)) {
     return false;
   }
-  if ((input.globalParentUsage[input.parent.id] ?? 0) >= GLOBAL_PARENT_SOFT_CAP) {
+  if ((input.globalParentUsage[input.parent.id] ?? 0) >= GLOBAL_PARENT_MAX_TEAMS) {
     return false;
   }
   return true;
@@ -99,7 +110,20 @@ function pickParentForSlot(input: {
     candidates = freshCandidates;
   }
 
+  // Notfall-Stufen, falls der Pool fuer diesen Archetyp leerlaeuft. Reihenfolge ist bewusst: zuerst
+  // die WEICHEN Praeferenzen fallen lassen, die ligaweite Eindeutigkeit als Letztes — sonst haetten
+  // wieder zwei Teams dieselbe Marke, und genau das soll ausgeschlossen bleiben.
   if (candidates.length === 0) {
+    // Stufe 1: "zuletzt gehabte Marken meiden" aufgeben, Eindeutigkeit bleibt.
+    candidates = SPONSOR_BRAND_PARENTS.filter(
+      (parent) => supportsSlot(parent) && isParentAvailable({ parent, usedParentBrandIds, globalParentUsage }),
+    );
+  }
+
+  if (candidates.length === 0) {
+    // Stufe 2: ligaweite Eindeutigkeit aufgeben (nur noch teamintern eindeutig). Mit 200 Marken bei
+    // 160 Angeboten wird diese Stufe nicht erreicht; sie existiert, damit ein kuenftig kleinerer
+    // Pool oder ein zusaetzlicher Archetyp-Filter nicht in "kein Kandidat" laeuft.
     candidates = SPONSOR_BRAND_PARENTS.filter(
       (parent) => supportsSlot(parent) && !usedParentBrandIds.has(parent.id),
     );
