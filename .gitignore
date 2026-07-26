@@ -59,3 +59,8 @@ scratchpad/
 
 # Claude Code agent worktrees (transient, harness-managed)
 .claude/worktrees/
+
+# Wegwerf-Diagnoseskripte (Playwright-Proben o. Ä.), muessen im Projektordner liegen
+# damit node die Pakete aufloest — gehoeren aber nie ins Repo.
+_probe*.mjs
+_probe*.ts
