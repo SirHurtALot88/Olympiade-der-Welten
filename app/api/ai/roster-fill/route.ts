@@ -7,6 +7,7 @@ import {
   runAutoRosterFillForMatchdaySetup,
 } from "@/lib/ai/auto-roster-fill-service";
 import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
+import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 export async function POST(request: Request) {
@@ -64,6 +65,18 @@ export async function POST(request: Request) {
       dryRun,
       confirmToken: body.confirmToken ?? null,
     });
+
+    if (!dryRun && result.summary.appliedBuys > 0) {
+      notifyRoomGameplayWrite(writeAuth, {
+        saveId,
+        teamId: null,
+        action: "ai_roster_fill_execute",
+        eventType: "roster_updated",
+        affectedViews: ["home", "team", "lineup"],
+        dryRun: false,
+        success: true,
+      });
+    }
 
     return NextResponse.json(result);
   } catch (error) {

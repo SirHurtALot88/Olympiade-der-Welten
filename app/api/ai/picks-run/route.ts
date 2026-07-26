@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
 import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
+import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 function parseOptionalNumber(value: string | null) {
@@ -82,6 +83,18 @@ export async function POST(request: Request) {
       stepsPerTeam: body.stepsPerTeam ?? parseOptionalNumber(searchParams.get("stepsPerTeam")),
       runMode: body.runMode === "season1_optimum_execute" ? "season1_optimum_execute" : "default",
     });
+
+    if (!dryRun && (result.globalExecution?.appliedPickCount ?? 0) > 0) {
+      notifyRoomGameplayWrite(writeAuth, {
+        saveId,
+        teamId: null,
+        action: "ai_picks_run_execute",
+        eventType: "transfer_completed",
+        affectedViews: ["home", "team", "market", "lineup"],
+        dryRun: false,
+        success: true,
+      });
+    }
 
     return NextResponse.json(result);
   } catch (error) {

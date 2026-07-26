@@ -8,6 +8,7 @@ import {
 } from "@/lib/ai/ai-market-plan-apply-service";
 import { isExplicitLocalTransferWindowPhase, LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
 import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
+import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 function parseSource(request: Request) {
@@ -97,6 +98,18 @@ export async function POST(request: Request) {
       transferPhase: body.transferPhase ?? null,
       options: body.options,
     });
+
+    if (!dryRun && result.summary.appliedBuys + result.summary.appliedSells > 0) {
+      notifyRoomGameplayWrite(writeAuth, {
+        saveId,
+        teamId,
+        action: "ai_market_plan_apply",
+        eventType: "transfer_completed",
+        affectedViews: ["home", "team", "market", "lineup"],
+        dryRun: false,
+        success: true,
+      });
+    }
 
     return NextResponse.json(result);
   } catch (error) {

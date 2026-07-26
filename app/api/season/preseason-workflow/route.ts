@@ -8,6 +8,7 @@ import {
   buildPreSeasonWorkflowPreview,
 } from "@/lib/season/preseason-workflow-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 type PreSeasonWorkflowBody = {
@@ -76,6 +77,17 @@ export async function POST(request: Request) {
     }
 
     const success = "applied" in summary ? summary.applied : summary.ok;
+    if (!dryRun && success) {
+      notifyRoomGameplayWrite(writeAuth, {
+        saveId,
+        teamId: null,
+        action: "season_transition",
+        eventType: "save_updated",
+        affectedViews: ["home", "season", "team", "contracts"],
+        dryRun: false,
+        success: true,
+      });
+    }
     return NextResponse.json(
       {
         success,
