@@ -1,8 +1,7 @@
 import FoundationPageClient from "@/app/foundation/FoundationPageClient";
 import { normalizeFoundationViewParam } from "@/lib/foundation/foundation-view-routing";
 import { loadFoundationInitialPersistenceState } from "@/lib/persistence/foundation-state-read";
-import { isAuthEnabled } from "@/lib/auth/config";
-import { getSessionUser } from "@/lib/auth/session";
+import { resolveSessionOwnerId } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -28,7 +27,7 @@ export default async function FoundationPage({ searchParams }: FoundationPagePro
   // Identitaets-Verdrahtung (Phase 1, nur bei OLY_AUTH_ENABLED=1): die echte
   // Owner-ID der eingeloggten Person seedet activeOwnerId im Client-State, statt
   // dass jeder Browser auf den hartcodierten Chris-Default zurueckfaellt.
-  const initialActiveOwnerId = isAuthEnabled() ? ((await getSessionUser())?.ownerId ?? null) : null;
+  const initialActiveOwnerId = await resolveSessionOwnerId();
 
   const initialPersistenceState =
     initialReadSource === "sqlite"

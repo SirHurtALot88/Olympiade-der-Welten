@@ -9,7 +9,7 @@ import {
   SaveResolutionError,
 } from "@/lib/persistence/resolve-local-save";
 import { createSaveRepository } from "@/lib/persistence/save-repository";
-import { resetDatabaseForTests } from "@/lib/persistence/sqlite";
+import { getDatabase, resetDatabaseForTests } from "@/lib/persistence/sqlite";
 
 beforeEach(() => {
   resetDatabaseForTests();
@@ -105,10 +105,12 @@ describe("resolveLocalPersistedSave (explicit opt-in read fallback, now per-owne
       const persistence = createPersistenceService();
 
       const chrisResolved = resolveLocalPersistedSave(persistence, null, DEFAULT_ACTIVE_OWNER_ID);
-      expect(chrisResolved.save.saveId).toBe("save-chris");
+      expect(chrisResolved).not.toBeNull();
+      expect(chrisResolved?.save.saveId).toBe("save-chris");
 
       const frankyResolved = resolveLocalPersistedSave(persistence, null, FRANKY_OWNER_ID);
-      expect(frankyResolved.save.saveId).toBe("save-franky");
+      expect(frankyResolved).not.toBeNull();
+      expect(frankyResolved?.save.saveId).toBe("save-franky");
     },
     30_000,
   );
@@ -122,7 +124,65 @@ describe("resolveLocalPersistedSave (explicit opt-in read fallback, now per-owne
 
       const persistence = createPersistenceService();
       const resolved = resolveLocalPersistedSave(persistence, null);
-      expect(resolved.save.saveId).toBe("save-a");
+      expect(resolved).not.toBeNull();
+      expect(resolved?.save.saveId).toBe("save-a");
+    },
+    30_000,
+  );
+
+  it(
+    // Audit S5 regression: Franky has never activated a save of his own, so `getActiveSave`
+    // gracefully falls through to the single globally-active save (Chris's) as a READ — that
+    // read-only fallback is pre-existing, accepted behavior (see per-user-active-save.test.ts).
+    // What must NOT happen (the actual S5 bug) is `resolveLocalPersistedSave` reaching for
+    // `activateSave`/`bootstrapSingleplayerSave` to "fix" the situation: it must never insert an
+    // active_saves pointer for Franky, and must never touch Chris's save status, purely because
+    // Franky performed a read.
+    "resolving for an owner with no active save of their own never inserts a pointer or touches the other owner's save status",
+    () => {
+      const repository = createSaveRepository();
+      createRealSave(repository, "save-chris");
+      repository.setActiveSave("save-chris", DEFAULT_ACTIVE_OWNER_ID);
+
+      const database = getDatabase();
+      const savesBefore = database.prepare("SELECT save_id, status FROM saves ORDER BY save_id").all();
+      const activeSavesBefore = database.prepare("SELECT owner_id, save_id FROM active_saves ORDER BY owner_id").all();
+      expect(activeSavesBefore).toEqual([{ owner_id: DEFAULT_ACTIVE_OWNER_ID, save_id: "save-chris" }]);
+
+      const persistence = createPersistenceService();
+      // Franky has never played -> no active_saves row for FRANKY_OWNER_ID. The read may still
+      // resolve to Chris's save via the pre-existing global-fallback read path (no ownership claim
+      // is made), but it must create/mutate nothing.
+      resolveLocalPersistedSave(persistence, null, FRANKY_OWNER_ID);
+
+      const savesAfter = database.prepare("SELECT save_id, status FROM saves ORDER BY save_id").all();
+      const activeSavesAfter = database.prepare("SELECT owner_id, save_id FROM active_saves ORDER BY owner_id").all();
+      expect(savesAfter).toEqual(savesBefore);
+      // No new pointer for Franky was created by the read.
+      expect(activeSavesAfter).toEqual(activeSavesBefore);
+
+      // Chris's own read is completely unaffected.
+      const chrisResolved = resolveLocalPersistedSave(persistence, null, DEFAULT_ACTIVE_OWNER_ID);
+      expect(chrisResolved?.save.saveId).toBe("save-chris");
+    },
+    30_000,
+  );
+
+  it(
+    // Audit S5 regression: a read with no resolvable save id at all (auth off / no active save
+    // anywhere) must create nothing and archive nothing — it answers "no save" instead of
+    // bootstrapping or guessing.
+    "creates and archives nothing when no save can be resolved at all",
+    () => {
+      const database = getDatabase();
+      const savesBefore = database.prepare("SELECT save_id, status FROM saves ORDER BY save_id").all();
+
+      const persistence = createPersistenceService();
+      const resolved = resolveLocalPersistedSave(persistence, null);
+      expect(resolved).toBeNull();
+
+      const savesAfter = database.prepare("SELECT save_id, status FROM saves ORDER BY save_id").all();
+      expect(savesAfter).toEqual(savesBefore);
     },
     30_000,
   );

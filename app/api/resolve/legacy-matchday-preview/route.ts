@@ -7,6 +7,8 @@ import { loadAllLocalLegacyLineupContexts } from "@/lib/lineups/legacy-lineup-lo
 import { LegacyLineupRepository } from "@/lib/lineups/legacy-lineup-repository";
 import type { LegacyLineupContextLoadResult, LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { resolveLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
+import { resolveSessionOwnerId } from "@/lib/auth/session";
 import { readArenaPreviewCache, writeArenaPreviewCache } from "@/lib/foundation/arena-preview-cache";
 import { buildLegacyMatchdayResolvePreviewPayload } from "@/lib/foundation/legacy-matchday-resolve-preview-service";
 import { db } from "@/src/server/db";
@@ -52,17 +54,18 @@ async function resolveDefaultPrismaParams(input: { saveId: string | null; season
   return { saveId: save.id, seasonId: season.id, matchdayId: matchday.id };
 }
 
-function resolveDefaultSqliteParams(input: { saveId: string | null; seasonId: string | null; matchdayId: string | null }) {
+function resolveDefaultSqliteParams(
+  input: { saveId: string | null; seasonId: string | null; matchdayId: string | null },
+  ownerId: string | null,
+) {
   const persistence = createPersistenceService();
-  const bootstrapped = persistence.bootstrapSingleplayerSave();
-  const save =
-    (input.saveId ? persistence.getSaveById(input.saveId) : null) ??
-    persistence.getActiveSave() ??
-    bootstrapped.save;
-
-  if (!save) {
+  // Audit S5: pure read — resolves THIS owner's active save (or the explicit saveId) but never
+  // bootstraps/activates anything. See lib/persistence/resolve-local-save.ts.
+  const resolved = resolveLocalPersistedSave(persistence, input.saveId, ownerId);
+  if (!resolved) {
     throw new Error("No local save available for legacy resolve lab.");
   }
+  const save = resolved.save;
 
   const season = save.gameState.season;
   const seasonId = input.seasonId && input.seasonId === season.id ? input.seasonId : season.id;
@@ -78,10 +81,13 @@ function resolveDefaultSqliteParams(input: { saveId: string | null; seasonId: st
   };
 }
 
-function resolveSqliteGameState(saveId: string) {
+function resolveSqliteGameState(saveId: string, ownerId: string | null) {
   const persistence = createPersistenceService();
-  const save = persistence.getSaveById(saveId) ?? persistence.getActiveSave() ?? persistence.bootstrapSingleplayerSave().save;
-  return save.gameState;
+  const resolved = resolveLocalPersistedSave(persistence, saveId, ownerId);
+  if (!resolved) {
+    throw new Error("No local save available for legacy resolve lab.");
+  }
+  return resolved.save.gameState;
 }
 
 async function loadPrismaContexts(params: LegacyLineupKeyParams[]): Promise<LegacyLineupContextLoadResult[]> {
@@ -124,17 +130,18 @@ function buildArenaPreviewCacheSignature(versionMeta: {
 export async function GET(request: Request) {
   try {
     const parsed = parseOptionalParams(request);
+    const ownerId = parsed.source === "sqlite" ? await resolveSessionOwnerId() : null;
     const params =
       parsed.source === "prisma"
         ? await resolveDefaultPrismaParams(parsed)
-        : resolveDefaultSqliteParams(parsed);
+        : resolveDefaultSqliteParams(parsed, ownerId);
 
     // Für die SQLite-Quelle den GameState einmal auflösen und weiterreichen — er
     // liefert die Team-IDs UND (im Payload-Builder) die deterministische
     // Same-Day-Injury-Rolle, exakt wie im Apply-Pfad.
-    let sqliteGameState: Awaited<ReturnType<typeof resolveSqliteGameState>> | null = null;
+    let sqliteGameState: ReturnType<typeof resolveSqliteGameState> | null = null;
     if (parsed.source === "sqlite") {
-      sqliteGameState = resolveSqliteGameState(params.saveId);
+      sqliteGameState = resolveSqliteGameState(params.saveId, ownerId);
     }
 
     const teamIds =

@@ -19,6 +19,8 @@ export function tryResolvePersistedRatingsSlice(input: {
   seasonId?: string;
   contentSignature?: string | null;
   playerIds?: string[];
+  /** Requesting session owner (auth-on only) — scopes the active-save fallback per audit S5. */
+  ownerId?: string | null;
 }): {
   saveId: string;
   seasonId: string;
@@ -26,11 +28,10 @@ export function tryResolvePersistedRatingsSlice(input: {
   ratingsByPlayerId: Record<string, SeasonRatingsSlicePlayerRow>;
 } | null {
   const persistence = createPersistenceService();
-  const resolvedSaveId =
-    input.saveId?.trim() ||
-    persistence.getActiveSave()?.saveId ||
-    persistence.bootstrapSingleplayerSave().save?.saveId ||
-    null;
+  // Audit S5: pure read — never bootstraps/creates a save. If neither an explicit saveId nor an
+  // active save can be resolved for this owner, return null so the route answers 404 instead of
+  // silently seeding a save from a GET.
+  const resolvedSaveId = input.saveId?.trim() || persistence.getActiveSave(input.ownerId)?.saveId || null;
 
   if (!resolvedSaveId) {
     return null;
@@ -68,13 +69,12 @@ export function resolveSliceSave(input: {
   saveId?: string;
   contentSignature?: string | null;
   allowProjectionOnly?: boolean;
+  /** Requesting session owner (auth-on only) — scopes the active-save fallback per audit S5. */
+  ownerId?: string | null;
 }): ResolvedSliceSave | null {
   const persistence = createPersistenceService();
-  const resolvedSaveId =
-    input.saveId?.trim() ||
-    persistence.getActiveSave()?.saveId ||
-    persistence.bootstrapSingleplayerSave().save?.saveId ||
-    null;
+  // Audit S5: pure read — never bootstraps/creates a save. See tryResolvePersistedRatingsSlice above.
+  const resolvedSaveId = input.saveId?.trim() || persistence.getActiveSave(input.ownerId)?.saveId || null;
 
   if (!resolvedSaveId) {
     return null;
