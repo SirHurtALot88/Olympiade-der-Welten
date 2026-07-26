@@ -13,6 +13,12 @@ vi.mock("@/lib/ai/ai-market-plan-apply-service", async () => {
 });
 
 describe("ai market plan apply api", () => {
+  // The route now also reads real persistence (S6 ownership-scope check via
+  // resolveAiBulkTeamWriteScope) and imports the room-gameplay-write-notifier, pulling in the real
+  // persistence/room-store module graph. That first cold import can exceed vitest's default 5s test
+  // timeout on a cold cache (see the same note in tests/ai-batch-apply-route-guard.test.ts).
+  vi.setConfig({ testTimeout: 20000 });
+
   beforeEach(() => {
     applyAiMarketPlanLocally.mockReset();
   });

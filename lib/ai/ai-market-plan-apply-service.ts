@@ -69,6 +69,7 @@ export type AiMarketPlanApplyResultStatus =
   | "skipped_passive"
   | "skipped_disabled"
   | "skipped_warning"
+  | "skipped_not_writable"
   | "blocked"
   | "failed_sell"
   | "failed_buy";
@@ -197,6 +198,10 @@ export type AiMarketPlanApplyResult = {
   appliedAudits: string[];
   buyGateRows?: Array<Record<string, unknown>>;
   auditLogId: string | null;
+  /** Teams excluded from this apply because they belong to another human participant (see
+   *  `AiMarketPlanApplyParams.callerWritableTeamIds`). Empty when the caller passed no
+   *  restriction (e.g. scripts/tests) or when nothing was skipped. */
+  skippedTeamIds: string[];
 };
 
 export type AiMarketPlanApplyParams = {
@@ -211,6 +216,12 @@ export type AiMarketPlanApplyParams = {
   transferPhase?: LocalTransferWindowPhase | string | null;
   persistence?: PersistenceService;
   localRunContext?: ReturnType<typeof createLocalTransfermarktRunContext> | null;
+  // Server-computed (never client-supplied) set of team ids the calling participant is actually
+  // allowed to write — AI/passive-controlled teams plus the caller's own team(s); see
+  // `resolveAiBulkTeamWriteScope`. `null`/`undefined` means "no restriction" (preserves prior
+  // behavior for scripts/tests and the preseason-background caller, which already restricts via
+  // `protectManualPlayerTeams`).
+  callerWritableTeamIds?: string[] | null;
   options?: {
     includeWarningTeams?: boolean;
     applySellSteps?: boolean;
@@ -1357,6 +1368,7 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       plannedWrites: [],
       appliedAudits: [],
       auditLogId: null,
+      skippedTeamIds: [],
     };
   }
   const targetedNeedTeamIds = unique([...preflightBuyNeedTeamIds, ...preflightSellNeedTeamIds]);
@@ -1457,6 +1469,7 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
   const results: AiMarketPlanApplyTeamResult[] = [];
   const plannedWrites: AiMarketPlanApplyResult["plannedWrites"] = [];
   const appliedAudits: string[] = [];
+  const callerWritableTeamIds = input.callerWritableTeamIds ? new Set(input.callerWritableTeamIds) : null;
   let abortedAfterFailure = false;
   let abortedByTeamId: string | null = null;
   const applyStartedAt = Date.now();
@@ -1470,6 +1483,31 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
 
   for (const [teamIndex, team] of preview.teams.entries()) {
     const nextResult = buildBaseTeamResult(team);
+
+    // S6: never buy/sell for a team the caller isn't allowed to write — another human
+    // participant's team, per `resolveAiBulkTeamWriteScope`. AI/passive-controlled teams and the
+    // caller's own team(s) stay unaffected. This is defense-in-depth on top of the controlMode
+    // check below: `team.controlMode` comes from `seasonState.teamControlSettings`, which can lag
+    // `room.state.teamOwnership` (the authoritative record of who actually owns a team in an
+    // online room) — `callerWritableTeamIds` is read from whichever is authoritative.
+    if (callerWritableTeamIds && !callerWritableTeamIds.has(team.teamId)) {
+      nextResult.result = "skipped_not_writable";
+      nextResult.blockingReasons = ["team_not_writable_by_caller"];
+      nextResult.warnings = [];
+      nextResult.plannedSellDetails = [];
+      nextResult.plannedBuyDetails = [];
+      nextResult.plannedSells = 0;
+      nextResult.plannedBuys = 0;
+      nextResult.projectedCash = nextResult.cashBefore;
+      nextResult.projectedRoster = nextResult.rosterBefore;
+      nextResult.cashAfter = nextResult.cashBefore;
+      nextResult.rosterAfter = nextResult.rosterBefore;
+      nextResult.salaryAfter = nextResult.salaryBefore;
+      nextResult.marketValueAfter = nextResult.marketValueBefore;
+      results.push(nextResult);
+      continue;
+    }
+
     const applyElapsedAtTeamStartMs = Date.now() - applyStartedAt;
     if (options.maxApplyMs != null && applyElapsedAtTeamStartMs > options.maxApplyMs) {
       nextResult.result = "hold";
@@ -2267,6 +2305,7 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
     "team_control_mode_passive",
     "ai_transfer_preview_disabled",
     "ai_sell_preview_disabled",
+    "team_not_writable_by_caller",
   ]);
   const blockingReasons = unique(
     results.flatMap((entry) => entry.blockingReasons).filter((reason) => !nonBlockingSkipReasons.has(reason)),
@@ -2366,5 +2405,6 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
     appliedAudits,
     auditLogId,
     buyGateRows: options.returnGateRows ? finalBuyGate.gateRows : undefined,
+    skippedTeamIds: results.filter((entry) => entry.result === "skipped_not_writable").map((entry) => entry.teamId),
   };
 }

@@ -6,6 +6,8 @@ import { AUTO_ROSTER_FILL_CONFIRM_TOKEN } from "@/lib/ai/auto-roster-fill-contra
 import {
   runAutoRosterFillForMatchdaySetup,
 } from "@/lib/ai/auto-roster-fill-service";
+import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { resolveAiBulkTeamWriteScope } from "@/lib/room/ai-bulk-team-write-scope";
 import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
@@ -45,8 +47,9 @@ export async function POST(request: Request) {
     );
   }
 
+  const roomWriteContext = parseRoomWriteContextFromRequestAndBody(request, body);
   const writeAuth = authorizeServerRoomWrite({
-    ...parseRoomWriteContextFromRequestAndBody(request, body),
+    ...roomWriteContext,
     saveId,
     action: "ai_roster_fill_execute",
     source: "sqlite",
@@ -57,6 +60,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: writeAuth.reason, warnings: writeAuth.warnings }, { status: writeAuth.status });
   }
 
+  // Server-side ownership ceiling on top of the host-level `writeAuth` above: a bulk roster-fill run
+  // may only ever buy for AI/passive-controlled teams plus the caller's own team(s), never another
+  // human participant's team — see `resolveAiBulkTeamWriteScope`. Read fresh so nothing here trusts
+  // a client-supplied claim. When the save can't be resolved yet, omit the restriction and let the
+  // service's own save-resolution error surface as before.
+  const freshSaveForScope = createPersistenceService().getSaveById(saveId);
+  const callerWritableTeamIds = freshSaveForScope
+    ? Array.from(
+        resolveAiBulkTeamWriteScope({
+          gameState: freshSaveForScope.gameState,
+          room: writeAuth.room,
+          participant: writeAuth.participant,
+          activeOwnerId: roomWriteContext.activeOwnerId,
+        }).writableTeamIds,
+      )
+    : null;
+
   try {
     const result = await runAutoRosterFillForMatchdaySetup({
       source: "sqlite",
@@ -64,6 +84,7 @@ export async function POST(request: Request) {
       seasonId,
       dryRun,
       confirmToken: body.confirmToken ?? null,
+      ...(callerWritableTeamIds ? { callerWritableTeamIds } : {}),
     });
 
     if (!dryRun && result.summary.appliedBuys > 0) {

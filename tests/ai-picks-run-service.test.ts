@@ -1515,6 +1515,55 @@ describe("ai picks run service", () => {
     });
   });
 
+  // S6 regression: the test above proves the underlying bug — `teamScope: "all" +
+  // allowSetupAllTeams: true` bypasses the controlMode filter entirely, so W-W (manual/
+  // humanControlled — i.e. another human's team) gets bought for right alongside the AI-controlled
+  // C-C. `callerWritableTeamIds` (server-computed by the route from room ownership, see
+  // resolveAiBulkTeamWriteScope) must close that gap: the same bypass call must still buy for the
+  // caller-writable AI team but skip — never silently buy for — a team outside that set, and
+  // report the skip.
+  it("restricts the teamScope:all + allowSetupAllTeams bypass to callerWritableTeamIds, skipping the excluded team", async () => {
+    const { runAiPicksExecutePreview } = await import("@/lib/ai/ai-picks-run-service");
+    buildAiNeedsPicksCompare.mockClear();
+    // dryRun: true — this is about proving the TEAM-SELECTION restriction (chooseTeams' output
+    // filtered by callerWritableTeamIds), which is identical for preview and execute (see the
+    // `selectedTeams` computation shared by both). The write-prevention half of S6 (a restricted
+    // team is never actually mutated) is covered end-to-end by the auto-roster-fill-service
+    // regression test above, which executes real (mocked) buys.
+    const result = await runAiPicksExecutePreview({
+      source: "sqlite",
+      saveId: "save-ai-run",
+      seasonId: "season-1",
+      dryRun: true,
+      teamScope: "all",
+      allowSetupAllTeams: true,
+      stepsPerTeam: 1,
+      // Simulates a caller who may only write the AI-controlled C-C — never W-W, which per this
+      // fixture's teamControlSettings is manual/humanControlled (another human's team).
+      callerWritableTeamIds: ["C-C"],
+    });
+
+    expect(result.skippedTeamIds).toEqual(["W-W"]);
+    expect(result.teams.some((entry) => entry.teamId === "W-W")).toBe(false);
+    expect(result.teams.some((entry) => entry.teamId === "C-C")).toBe(true);
+
+    // Without the restriction, the exact same bypass call plans picks for BOTH teams (this is the
+    // underlying S6 bug this fixture demonstrates: W-W is manual/humanControlled — another human's
+    // team — yet teamScope:"all" + allowSetupAllTeams ignores controlMode entirely).
+    const unrestricted = await runAiPicksExecutePreview({
+      source: "sqlite",
+      saveId: "save-ai-run",
+      seasonId: "season-1",
+      dryRun: true,
+      teamScope: "all",
+      allowSetupAllTeams: true,
+      stepsPerTeam: 1,
+    });
+    expect(unrestricted.skippedTeamIds).toEqual([]);
+    expect(unrestricted.teams.some((entry) => entry.teamId === "W-W")).toBe(true);
+    expect(unrestricted.teams.some((entry) => entry.teamId === "C-C")).toBe(true);
+  });
+
   it("blocks execute drift instead of silently replanning when a frozen preview pick becomes invalid", async () => {
     // Team-scope the live pool (unlike mockLiveFreeAgentPool's global pool used by the previous
     // test) so C-C's live search has no leftover in-pool alternative once fa-value specifically

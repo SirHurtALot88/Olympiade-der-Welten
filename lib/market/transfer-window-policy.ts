@@ -46,6 +46,35 @@ export function isTransferBuyPhaseOpen(gameState: GameState) {
   return TRANSFER_BUY_PHASES.has(phase) || isEarlySeasonTransferSetup(gameState);
 }
 
+export type TransferWindowAction = "buy_players" | "sell_players";
+
+/**
+ * Typed, serializable rejection for a buy/sell attempted outside the transfer window. Shaped to
+ * carry the exact reason string the routes (`app/api/transfermarkt/buy`,
+ * `app/api/transfermarkt/sell`) already compute via `evaluateGamePhaseAction` and return today
+ * (`phase_blocked:<action>:<phase>`, HTTP 409) — so a route mapping this error keeps the same
+ * status/message the UI has always seen, whether the route's own pre-check or this service-level
+ * check is what actually caught it (S7: defense in depth at the point of mutation).
+ */
+export class TransferWindowClosedError extends Error {
+  readonly httpStatus = 409 as const;
+  readonly action: TransferWindowAction;
+  readonly phase: GamePhase;
+  /** Matches `GamePhaseActionGate.reason` for the same action/gameState, e.g.
+   *  "phase_blocked:buy_players:season_active". */
+  readonly reason: string;
+
+  constructor(action: TransferWindowAction, gameState: GameState) {
+    const phase = gameState.gamePhase ?? "season_active";
+    const reason = `phase_blocked:${action}:${phase}`;
+    super(reason);
+    this.name = "TransferWindowClosedError";
+    this.action = action;
+    this.phase = phase;
+    this.reason = reason;
+  }
+}
+
 export function getTransferWindowStatus(gameState: GameState) {
   const phase = gameState.gamePhase ?? "season_active";
   const canSell = isTransferSellPhaseOpen(gameState);

@@ -7,6 +7,8 @@ import {
   applyAiMarketPlanLocally,
 } from "@/lib/ai/ai-market-plan-apply-service";
 import { isExplicitLocalTransferWindowPhase, LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
+import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { resolveAiBulkTeamWriteScope } from "@/lib/room/ai-bulk-team-write-scope";
 import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
@@ -72,8 +74,9 @@ export async function POST(request: Request) {
     );
   }
 
+  const roomWriteContext = parseRoomWriteContextFromRequestAndBody(request, body);
   const writeAuth = authorizeServerRoomWrite({
-    ...parseRoomWriteContextFromRequestAndBody(request, body),
+    ...roomWriteContext,
     saveId,
     teamId,
     action: "ai_market_plan_apply",
@@ -84,6 +87,25 @@ export async function POST(request: Request) {
   if (!writeAuth.allowed) {
     return NextResponse.json({ error: writeAuth.reason, warnings: writeAuth.warnings }, { status: writeAuth.status });
   }
+
+  // Server-side ownership ceiling on top of the host-level `writeAuth` above: a bulk AI market
+  // apply may only ever buy/sell for AI/passive-controlled teams plus the caller's own team(s),
+  // never another human participant's team — see `resolveAiBulkTeamWriteScope`. Read fresh so
+  // nothing here trusts a client-supplied claim (including the `teamId` query param above, which
+  // this route's host-level action does not otherwise validate ownership of). When the save can't
+  // be resolved yet, omit the restriction and let the service's own save-resolution error surface
+  // as before.
+  const freshSaveForScope = createPersistenceService().getSaveById(saveId);
+  const callerWritableTeamIds = freshSaveForScope
+    ? Array.from(
+        resolveAiBulkTeamWriteScope({
+          gameState: freshSaveForScope.gameState,
+          room: writeAuth.room,
+          participant: writeAuth.participant,
+          activeOwnerId: roomWriteContext.activeOwnerId,
+        }).writableTeamIds,
+      )
+    : null;
 
   try {
     const result = await applyAiMarketPlanLocally({
@@ -97,6 +119,7 @@ export async function POST(request: Request) {
       confirmToken: body.confirmToken ?? null,
       transferPhase: body.transferPhase ?? null,
       options: body.options,
+      ...(callerWritableTeamIds ? { callerWritableTeamIds } : {}),
     });
 
     if (!dryRun && result.summary.appliedBuys + result.summary.appliedSells > 0) {

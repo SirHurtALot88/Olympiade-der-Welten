@@ -381,11 +381,18 @@ beforeAll(async () => {
       localRunContext: runContext,
     });
     for (const item of freeAgents.items) {
+      // S7: the interactive buy-window gate is, like the sell-window gate below, expectedly closed
+      // mid-season — the local transfer service now enforces it too, not just the route. Same
+      // override mechanism as the sell side (a distinct, non-empty `transferSource`, mirroring the
+      // system batch sources) to bypass the pure window check while exercising the same production
+      // pricing/booking logic. Deliberately NOT one of `SEASON_ONE_DRAFT_BUY_SOURCES` — those get a
+      // different (no cash-buffer) affordability branch, which would change this test's numbers.
       const preview = previewLocalTransfermarktBuy({
         saveId,
         seasonId,
         teamId: team.teamId,
         playerId: item.playerId,
+        transferSource: "economy_invariant_test_buy",
         localRunContext: runContext,
       });
       if (preview.canBuy) {
@@ -406,6 +413,7 @@ beforeAll(async () => {
     seasonId,
     teamId: buyTeamId,
     playerId: buyPlayerId,
+    transferSource: "economy_invariant_test_buy",
     localRunContext: runContext,
   });
   if (!buyResult.canBuy || !buyResult.transferCreated) {
