@@ -1,8 +1,32 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
 import { buildPlayerDrawerDataFromGameState } from "@/lib/foundation/player-detail-drawer";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
+
+/**
+ * Der Fog of War ist aktuell global überbrückt: `DEBUG_FORCE_PLAYER_VISIBILITY`
+ * (aus `NEXT_PUBLIC_DEBUG_PLAYER_ATTRIBUTES`, Default AN während der Bauphase)
+ * zwingt jeden Lese-Pfad auf "exact". Die Maskierungs-Logik selbst bleibt dabei
+ * unverändert erhalten. Tests, die genau diese (nur temporär überbrückte)
+ * Maskierung prüfen, schalten den Bypass gezielt AUS: Env vor dem Modul-Load
+ * setzen und das Drawer-Modul (inkl. der Scouting-Abhängigkeiten, die denselben
+ * Modul-Load-`const` lesen) frisch laden. Das lässt das echte Spiel-Verhalten
+ * (Bauphase = kein Fog) unangetastet.
+ */
+async function buildDrawerWithFogOfWar(
+  args: Parameters<typeof buildPlayerDrawerDataFromGameState>[0],
+): Promise<ReturnType<typeof buildPlayerDrawerDataFromGameState>> {
+  vi.resetModules();
+  vi.stubEnv("NEXT_PUBLIC_DEBUG_PLAYER_ATTRIBUTES", "0");
+  try {
+    const mod = await import("@/lib/foundation/player-detail-drawer");
+    return mod.buildPlayerDrawerDataFromGameState(args);
+  } finally {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  }
+}
 
 function createPlayer(partial?: Partial<Player>): Player {
   return {
@@ -1024,7 +1048,7 @@ describe("player detail drawer", () => {
     expect(data?.salarySource).toBe("calculated_stored");
   });
 
-  it("bands own-squad potential without scouting office (L0) instead of leaking the exact score", () => {
+  it("bands own-squad potential without scouting office (L0) instead of leaking the exact score", async () => {
     const player = createPlayer({ id: "player-potential", potential: 86 });
     const gameState = createGameState({ player, withRoster: true });
     gameState.playerPotential = [
@@ -1036,7 +1060,7 @@ describe("player detail drawer", () => {
         source: "generated",
       },
     ];
-    const data = buildPlayerDrawerDataFromGameState({
+    const data = await buildDrawerWithFogOfWar({
       gameState,
       playerId: player.id,
       source: "sqlite",
@@ -1076,8 +1100,8 @@ describe("player detail drawer", () => {
     expect(data?.potential).toBe(86);
   });
 
-  it("tightens the own-squad potential band monotonically with scouting office level", () => {
-    const buildBandWidth = (level: number) => {
+  it("tightens the own-squad potential band monotonically with scouting office level", async () => {
+    const buildBandWidth = async (level: number) => {
       const player = createPlayer({ id: `player-potential-band-${level}`, potential: 70 });
       const gameState = withScoutingOffice(createGameState({ player, withRoster: true }), "team-1", level);
       gameState.playerPotential = [
@@ -1089,7 +1113,7 @@ describe("player detail drawer", () => {
           source: "generated",
         },
       ];
-      const data = buildPlayerDrawerDataFromGameState({
+      const data = await buildDrawerWithFogOfWar({
         gameState,
         playerId: player.id,
         source: "sqlite",
@@ -1102,7 +1126,7 @@ describe("player detail drawer", () => {
       return range!.max - range!.min;
     };
 
-    const widths = [0, 1, 2, 3, 4].map(buildBandWidth);
+    const widths = await Promise.all([0, 1, 2, 3, 4].map(buildBandWidth));
     for (let index = 1; index < widths.length; index += 1) {
       // Streng monoton enger werdendes Band mit steigendem Scouting-Level.
       expect(widths[index]).toBeLessThan(widths[index - 1]!);
@@ -1143,7 +1167,10 @@ describe("player detail drawer", () => {
     expect(data?.salary).toBe(12.75);
     expect(data?.normalSalary).not.toBeNull();
     expect(data?.normalSalary).not.toBe(data?.salary);
-    expect(data?.marketValueSource).toBe("calculated_stored");
+    // 72.57 ist der aus coreStats/disciplineRatings zurückgerechnete Marktwert (Round-Trip
+    // des displayMarketValue) → "calculated_preview". "calculated_stored" wäre der rohe
+    // gespeicherte Wert (850) und widerspräche der marketValue-Erwartung oben.
+    expect(data?.marketValueSource).toBe("calculated_preview");
     expect(data?.salarySource).toBe("active_contract");
     expect(data?.contractLength).toBe(3);
     expect(data?.contractLengthSource).toBe("active_contract");
@@ -1663,7 +1690,7 @@ describe("player detail drawer", () => {
     expect(data?.axisCards.find((card) => card.id === "pow")?.valueRank).not.toBeNull();
   });
 
-  it("shows rough attribute bands without exact values for non-manageable teams", () => {
+  it("shows rough attribute bands without exact values for non-manageable teams", async () => {
     const player = createPlayer({
       id: "player-scouted-attributes",
       attributeSheetStats: {
@@ -1696,7 +1723,7 @@ describe("player detail drawer", () => {
       },
     });
 
-    const data = buildPlayerDrawerDataFromGameState({
+    const data = await buildDrawerWithFogOfWar({
       gameState: createGameState({ player, withRoster: true }),
       playerId: player.id,
       source: "sqlite",
@@ -1715,7 +1742,7 @@ describe("player detail drawer", () => {
     expect(data?.axisCards.every((entry) => entry.previousSeasonPointsRank == null)).toBe(true);
   });
 
-  it("uses scouted discipline rows for non-manageable roster players", () => {
+  it("uses scouted discipline rows for non-manageable roster players", async () => {
     const player = createPlayer({
       id: "player-other-team-scouted-disciplines",
       disciplineRatings: { d1: 96, d2: 42 },
@@ -1753,7 +1780,7 @@ describe("player detail drawer", () => {
       },
     });
 
-    const data = buildPlayerDrawerDataFromGameState({
+    const data = await buildDrawerWithFogOfWar({
       gameState: createGameState({ player, withRoster: true }),
       playerId: player.id,
       source: "sqlite",
@@ -1773,7 +1800,7 @@ describe("player detail drawer", () => {
     expect(data?.axisCards.every((entry) => entry.seasonPoints == null)).toBe(true);
   });
 
-  it("uses scouted discipline rows for free agents instead of exact drawer values", () => {
+  it("uses scouted discipline rows for free agents instead of exact drawer values", async () => {
     const player = createPlayer({
       id: "player-free-agent-scouted-disciplines",
       disciplineRatings: { d1: 96, d2: 42 },
@@ -1807,7 +1834,7 @@ describe("player detail drawer", () => {
       },
     });
 
-    const data = buildPlayerDrawerDataFromGameState({
+    const data = await buildDrawerWithFogOfWar({
       gameState: createGameState({ player, withRoster: false }),
       playerId: player.id,
       source: "sqlite",
@@ -1828,7 +1855,10 @@ describe("player detail drawer", () => {
     expect(data?.axisCards.every((entry) => entry.seasonPointsRank == null)).toBe(true);
   });
 
-  it("falls back to imported catalog flavor when compact load stripped player lore", () => {
+  it("leaves flavor empty (null) when player lore was stripped — no catalog fallback", () => {
+    // Der Katalog-Fallback (resolvePlayerFlavorDe → oly-player-stats.json) wurde bewusst
+    // aus dem Drawer entfernt, um den 6,6-MB-Seed-Chunk nicht ins Bundle zu ziehen. Ein
+    // Spieler ohne eigenes flavorDe hat daher im Drawer keine Lore mehr (null statt Katalog).
     const player = createPlayer({
       id: "player-1537-kiti",
       name: "Kiti",
@@ -1841,7 +1871,7 @@ describe("player detail drawer", () => {
       manageableTeamIds: ["team-1"],
     });
 
-    expect(data?.flavorDe).toContain("Nebelroute");
+    expect(data?.flavorDe).toBeNull();
   });
 
   it("exposes German flavor lore in drawer data when present on the player", () => {
@@ -1889,7 +1919,7 @@ describe("player detail drawer", () => {
     expect(data?.seasonOrganicForecast?.trainingSetpoints).toBeGreaterThanOrEqual(0);
   });
 
-  it("exposes potential delta and route state for own roster players at scouting L5", () => {
+  it("exposes potential delta and route state for own roster players at scouting L5", async () => {
     const player = createPlayer({
       id: "own-roster-potential",
       attributeSheetStats: {
@@ -1940,19 +1970,20 @@ describe("player detail drawer", () => {
       },
     ];
 
-    const data = buildPlayerDrawerDataFromGameState({
+    const data = await buildDrawerWithFogOfWar({
       gameState,
       playerId: player.id,
       source: "sqlite",
       manageableTeamIds: ["team-1"],
     });
 
-    // Corrected ceiling math (overall-from-axis-stars weights now sum to 1.0,
-    // not 1.10, and mapNumericCeilingToAxisPoStars is the exact inverse of the
-    // forward map) yields 2.5★ here, not the old inflated 3★.
-    expect(data?.potentialOverallStars).toBe(2.5);
+    // Der angezeigte Gesamt-PO-Stern ist bewusst SCORE-basiert (potentialScoreToStars),
+    // damit Header/Kader/Scouting/Liste denselben Stern zeigen — nicht aus den Achsen-
+    // Ceilings abgeleitet. hiddenPotentialScore 80 ≥ Top-Anchor [78, 5.0] ⇒ 5.0★,
+    // Delta ggü. currentOverallStars 4.5 ⇒ +0.5.
+    expect(data?.potentialOverallStars).toBe(5);
     expect(data?.potentialOverallStars).toBeGreaterThanOrEqual(data?.currentOverallStars ?? 0);
-    expect(data?.potentialOverallDelta).toBe(-2);
+    expect(data?.potentialOverallDelta).toBe(0.5);
     expect(data?.potentialAxisStatus.some((entry) => entry.axis === "pow" && entry.routeState === "open")).toBe(true);
     expect(data?.trainingRouteImpact?.note).toContain("POW");
     expect(data?.attributeCeilingPreview.length).toBeGreaterThan(0);
