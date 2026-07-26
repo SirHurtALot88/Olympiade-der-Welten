@@ -444,7 +444,7 @@ function CashReconciliation({ team }: { team: TeamFinancesState }) {
 // `AllTimeTableNewLook`: lokaler `sortState`, Klick auf denselben Key
 // dreht die Richtung, Klick auf einen neuen Key startet absteigend.
 
-type LeagueSortKey = "cash" | "incomeAnnual" | "expensesAnnual" | "guv" | "marketValue";
+type LeagueSortKey = "cash" | "incomeAnnual" | "expensesAnnual" | "guv" | "cashFlowAnnual" | "marketValue";
 
 const NL_FIN_LEAGUE_COLUMNS: NlTableColumn<FinanceLeagueTableRow>[] = [
   { key: "rank", label: "#", align: "right", width: "36px" },
@@ -462,9 +462,24 @@ const NL_FIN_LEAGUE_COLUMNS: NlTableColumn<FinanceLeagueTableRow>[] = [
     label: "Ausgaben p.a.",
     align: "right",
     sortable: true,
-    tooltip: "Gehälter + Gebäude-Unterhalt + Kreditraten (Näherungswert)",
+    tooltip:
+      "Gehälter + Gebäude-Unterhalt + Kredit-ZINS (Näherungswert). Ohne Tilgung — die ist keine GuV-Ausgabe, sondern senkt die Schulden. Den echten Geldabfluss zeigt die Spalte „Cashflow p.a.“.",
   },
-  { key: "guv", label: "GuV p.a.", align: "right", sortable: true, tooltip: "Einnahmen p.a. minus Ausgaben p.a." },
+  {
+    key: "guv",
+    label: "GuV p.a.",
+    align: "right",
+    sortable: true,
+    tooltip: "Einnahmen p.a. minus Ausgaben p.a. (kaufmännisches Ergebnis, ohne Tilgung)",
+  },
+  {
+    key: "cashFlowAnnual",
+    label: "Cashflow p.a.",
+    align: "right",
+    sortable: true,
+    tooltip:
+      "Was tatsächlich aufs Konto kommt bzw. abfließt: GuV p.a. minus Kredit-Tilgung. Bei laufenden Krediten niedriger als die GuV.",
+  },
   { key: "marketValue", label: "MW", align: "right", sortable: true, tooltip: "Kader-Marktwert-Summe" },
 ];
 
@@ -495,6 +510,19 @@ function renderLeagueCell(
       return formatNlMoney(row.expensesAnnual);
     case "guv":
       return <span className={nlToneClass(guvTone(row.guv))}>{formatNlMoney(row.guv)}</span>;
+    case "cashFlowAnnual":
+      return (
+        <span
+          className={nlToneClass(guvTone(row.cashFlowAnnual))}
+          title={
+            row.loanPrincipalAnnual > 0
+              ? `GuV ${formatNlMoney(row.guv)} − Tilgung ${formatNlMoney(row.loanPrincipalAnnual)}`
+              : "Keine laufende Tilgung — Cashflow entspricht der GuV"
+          }
+        >
+          {formatNlMoney(row.cashFlowAnnual)}
+        </span>
+      );
     case "marketValue":
       return row.marketValue != null ? formatNlMoney(row.marketValue) : "—";
     default:

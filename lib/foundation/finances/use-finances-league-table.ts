@@ -3,7 +3,11 @@
 import { useMemo } from "react";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { estimateTeamAnnualRevenue, getTeamAnnualLoanInterest } from "@/lib/finance/loan-service";
+import {
+  estimateTeamAnnualRevenue,
+  getTeamAnnualLoanInstallment,
+  getTeamAnnualLoanInterest,
+} from "@/lib/finance/loan-service";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { calculateFacilityIncome, calculateFacilitySeasonUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
@@ -85,9 +89,16 @@ export function buildFinancesLeagueTable(gameState: GameState): FinanceLeagueTab
     // Teams sahen im Vergleich künstlich schlechter aus als schuldenfreie mit
     // gleichem Cashflow.
     const loanInterestTotal = getTeamAnnualLoanInterest(gameState, team.teamId);
+    // Tilgungsanteil = volle Rate minus Zins. Cash-wirksam (verlässt das Konto), aber
+    // kein GuV-Aufwand — deshalb getrennt ausgewiesen statt in `expensesAnnual` versteckt.
+    const loanPrincipalAnnual = Math.max(
+      0,
+      round1(getTeamAnnualLoanInstallment(gameState, team.teamId) - loanInterestTotal),
+    );
 
     const incomeAnnual = round1(sponsor + facilityIncome);
     const expensesAnnual = round1(salaryTotal + facilityUpkeepTotal + loanInterestTotal);
+    const guv = round1(incomeAnnual - expensesAnnual);
 
     return {
       teamId: team.teamId,
@@ -96,7 +107,10 @@ export function buildFinancesLeagueTable(gameState: GameState): FinanceLeagueTab
       cash: round1(team.cash),
       incomeAnnual,
       expensesAnnual,
-      guv: round1(incomeAnnual - expensesAnnual),
+      guv,
+      loanPrincipalAnnual,
+      // Was wirklich am Konto ankommt/abfließt: GuV abzüglich der Tilgung.
+      cashFlowAnnual: round1(guv - loanPrincipalAnnual),
       marketValue: overview?.marketValueTotal ?? null,
     };
   });
