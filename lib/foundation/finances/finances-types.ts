@@ -208,6 +208,10 @@ export type FinanceLeagueTableRow = {
   teamId: string;
   teamName: string;
   teamCode: string;
+  /** Team-Logo (Browser-URL) — `null` wenn kein Logo hinterlegt; dann greift `logoInitials`. */
+  logoUrl: string | null;
+  /** Initialen-Fallback (max. 2 Buchstaben) für die Crest-Anzeige ohne Logo. */
+  logoInitials: string;
   cash: number;
   /** Sponsor + Preisgeld p.a. (Näherungswert, ohne Transfer-Saldo). */
   incomeAnnual: number;

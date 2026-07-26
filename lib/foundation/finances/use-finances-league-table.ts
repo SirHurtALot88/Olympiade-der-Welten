@@ -8,6 +8,8 @@ import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { calculateFacilityIncome, calculateFacilitySeasonUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
 import { normalizeEconomyMoney, resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
+import { getTeamLogoModel } from "@/lib/data/mediaAssets";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import type { FinanceLeagueTableRow } from "@/lib/foundation/finances/finances-types";
 
@@ -50,14 +52,34 @@ export function buildFinancesLeagueTable(gameState: GameState): FinanceLeagueTab
   return gameState.teams.map((team) => {
     const overview = overviewByTeamId.get(team.teamId) ?? null;
 
-    // Einnahmen p.a. = Sponsor-Näherung + Gebäude-Einnahmen — EXAKT die
-    // laufenden (cash-wirksamen) Einnahmequellen der eigenen Finanzübersicht
+    // Einnahmen p.a. = Sponsor + Gebäude-Einnahmen — EXAKT die laufenden
+    // (cash-wirksamen) Einnahmequellen der eigenen Finanzübersicht
     // (`buildFinancesViewModel`: totalIncome = sponsor + facilityIncome + …).
     // Preisgeld wird bewusst NICHT eingerechnet: es ist ein reiner
     // platzierungs-abhängiger Benchmark (nie cash-wirksam) und war auch bei
     // Teams OHNE Sponsor > 0 — das erzeugte die falschen "Einnahmen ohne
     // Sponsor". Transfersaldo bleibt ebenfalls außen vor (Einmal-Ereignis).
-    const sponsor = Math.max(0, estimateTeamAnnualRevenue(gameState, team.teamId));
+    //
+    // Sponsor-Herleitung IDENTISCH zur eigenen Detail-Übersicht
+    // (`buildFinancesViewModel`): Summe ALLER positiven Vertragskomponenten
+    // (Basis + Leistung + Bonus), nicht nur die Basis. Vorher lief hier direkt
+    // `estimateTeamAnnualRevenue`, das in S1 (noch kein Payout-Log) auf die
+    // Basis-Komponente zurückfällt → das eigene Team zeigte z. B. 21,3 statt 74,7.
+    // Nur wenn KEIN aktueller Vertrag existiert (keine positiven Komponenten),
+    // greift der `estimateTeamAnnualRevenue`-Proxy (Payout-Log/Basis) — exakt
+    // die Fallback-Logik der Detail-Übersicht.
+    const sponsorContract = getTeamSponsorContract(gameState, team.teamId);
+    const sponsorComponentsTotal = sponsorContract
+      ? sponsorContract.components.reduce(
+          (sum, component) =>
+            sum + (Number.isFinite(component.rewardCash) && component.rewardCash > 0 ? component.rewardCash : 0),
+          0,
+        )
+      : 0;
+    const sponsor =
+      sponsorComponentsTotal > 0
+        ? round1(sponsorComponentsTotal)
+        : Math.max(0, estimateTeamAnnualRevenue(gameState, team.teamId));
 
     const salaryTotal = gameState.rosters
       .filter((entry) => entry.teamId === team.teamId)
@@ -83,10 +105,16 @@ export function buildFinancesLeagueTable(gameState: GameState): FinanceLeagueTab
     const incomeAnnual = round1(sponsor + facilityIncome);
     const expensesAnnual = round1(salaryTotal + facilityUpkeepTotal + loanInstallmentTotal);
 
+    // Logo-Modell wie in den anderen Team-Tabellen (Standings/Ränge): Browser-URL + Initialen-Fallback,
+    // damit die Vergleichstabelle Wappen statt nur Kürzel zeigt (fällt ohne hinterlegtes Logo auf Initialen).
+    const logo = getTeamLogoModel(team, { variant: "thumb" });
+
     return {
       teamId: team.teamId,
       teamName: team.name,
       teamCode: team.shortCode,
+      logoUrl: logo.src,
+      logoInitials: logo.initials,
       cash: round1(team.cash),
       incomeAnnual,
       expensesAnnual,

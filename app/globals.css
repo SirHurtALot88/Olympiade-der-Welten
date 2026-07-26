@@ -70793,6 +70793,25 @@ button.nl-players-axis:focus-visible {
   min-width: 0;
 }
 
+.is-new-look .nl-fin-league-crest {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-fin-league-crest-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
 .is-new-look .nl-fin-league-code {
   flex-shrink: 0;
   padding: 1px 6px;

@@ -22,6 +22,7 @@ function buildGameState(input: {
   salaryDemand?: number;
   snapshotCashEnd?: number | null;
   snapshotCashTotalPhantom?: number | null;
+  transferHistory?: GameState["transferHistory"];
 }): GameState {
   const team = makeTeam({ teamId: "team-1", shortCode: "T1", name: "Test United", cash: input.teamCash, budget: 100 });
   const rival = makeTeam({ teamId: "team-2", shortCode: "T2", name: "Rival City", cash: 80, budget: 100 });
@@ -67,7 +68,7 @@ function buildGameState(input: {
     players: [player],
     rosters: [roster],
     disciplines: [],
-    transferHistory: [],
+    transferHistory: input.transferHistory ?? [],
     playerProgressionEvents: [],
     seasonState: {
       seasonId: "season-2",
@@ -153,17 +154,17 @@ describe("finances view-model — cash reconciliation (T-108)", () => {
     if (model.status !== "ready") throw new Error("expected ready");
     const { team } = model;
 
+    // Transfer-Saldo ist ein Sonderposten und NICHT Teil von totalIncome/totalExpenses (siehe eigener Test
+    // unten) — er taucht hier bewusst nicht auf.
     const incomeSum = round1(
       (team.income.sponsor?.total ?? 0) +
         (team.income.facilityIncome?.total ?? 0) +
-        (team.income.transferSurplus ?? 0) +
         (team.income.objectiveReward ?? 0),
     );
     const expenseSum = round1(
       team.expenses.salaries.total +
         team.expenses.facilityUpkeep.total +
         team.expenses.loanInstallments.total +
-        (team.expenses.transferDeficit ?? 0) +
         (team.expenses.objectivePenalty ?? 0),
     );
     expect(team.totalIncome).toBe(incomeSum);
@@ -207,15 +208,58 @@ describe("finances view-model — cash reconciliation (T-108)", () => {
     expect(team.expenses.loanInstallments.loans).toHaveLength(1);
     expect(team.expenses.loanInstallments.loans[0].installment).toBe(10);
     expect(team.expenses.loanInstallments.loans[0].outstanding).toBe(100);
-    // The interest flows into totalExpenses; the principal repayment does not.
+    // The interest flows into totalExpenses; the principal repayment does not. (Transfers are a Sonderposten
+    // and also excluded — see the dedicated transfer test.)
     const expenseSum = round1(
       team.expenses.salaries.total +
         team.expenses.facilityUpkeep.total +
         team.expenses.loanInstallments.total +
-        (team.expenses.transferDeficit ?? 0) +
         (team.expenses.objectivePenalty ?? 0),
     );
     expect(team.totalExpenses).toBe(expenseSum);
+  });
+
+  it("transfer saldo is a Sonderposten: excluded from GuV/totals but exposed on team.transfer", () => {
+    // Ein großer Kaderkauf (Einmal-Ereignis) darf die laufende Betriebs-GuV NICHT verzerren.
+    const model = buildFinancesViewModel(
+      buildGameState({
+        teamCash: 200,
+        salary: 20,
+        snapshotCashEnd: 150,
+        transferHistory: [
+          {
+            id: "t1",
+            seasonId: "season-2",
+            transferType: "buy",
+            toTeamId: "team-1",
+            fromTeamId: "team-2",
+            playerId: "player-9",
+            fee: 120,
+          },
+        ] as unknown as GameState["transferHistory"],
+      }),
+      "team-1",
+    );
+    if (model.status !== "ready") throw new Error("expected ready");
+    const { team } = model;
+
+    // Der Transfer ist als eigener Sonderposten sichtbar …
+    expect(team.transfer?.buyTotal).toBe(120);
+    expect(team.transfer?.net).toBe(-120);
+    expect(team.expenses.transferDeficit).toBe(120);
+
+    // … aber NICHT in den laufenden Betriebs-Summen / der GuV enthalten.
+    const expenseSumWithoutTransfer = round1(
+      team.expenses.salaries.total +
+        team.expenses.facilityUpkeep.total +
+        team.expenses.loanInstallments.total +
+        (team.expenses.objectivePenalty ?? 0),
+    );
+    expect(team.totalExpenses).toBe(expenseSumWithoutTransfer);
+    expect(team.guv).toBe(round1(team.totalIncome - team.totalExpenses));
+
+    // Cash-Reconciliation bleibt gültig: der Transfer-Cashabfluss landet in otherCashMovements.
+    expect(round1((team.cashSeasonStart ?? 0) + team.guv + (team.otherCashMovements ?? 0))).toBe(round1(team.cash));
   });
 
   it("(d) archived history uses REAL cashEnd (not phantom cashTotal) and suppresses stale guv", () => {
