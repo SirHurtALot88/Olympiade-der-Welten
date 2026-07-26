@@ -10,8 +10,13 @@ import {
   computeTransferWindowNet,
   getAvailableBonusObjectiveKeys,
   getTeamAxisRank,
+  isFirstSeason,
   isTransferTraderAvailableForSeason,
   parseAxisTargetValue,
+  resolveMarketValueGrowthStages,
+  resolveSeasonNumber,
+  SPONSOR_OBJ_MV_GROWTH_STAGES_STRONG,
+  SPONSOR_OBJ_MV_GROWTH_STAGES_WEAK,
   pickChallengeSpecialKind,
   pickGoldenObjective,
   resolveChallengeSlotIndex,
@@ -191,6 +196,66 @@ describe("sponsor bonus objectives — new targets (Fable B)", () => {
     const metric0 = computeObjectiveProgressMetric(gs, teamId, comp);
     expect(metric0).toBeCloseTo(0, 1);
   }, 60000);
+
+  it("scales the market-value-growth ladder down in season 1, where only training can move the squad value", () => {
+    const gs = structuredClone(createSingleplayerGameState());
+    const teamId = gs.teams[0]!.teamId;
+    const stagesFor = (seasonId: string, teamQualityRank: number) =>
+      buildBonusObjectiveComponent(
+        "market_value_growth",
+        bonusInput(gs, teamId, { seasonId, teamQualityRank }) as never,
+      ).stages?.map((entry) => entry.threshold) ?? [];
+
+    // Ab S2 wirken ZWEI Hebel (Entwicklung + Zukäufe) → die ambitionierte Leiter bleibt unverändert.
+    expect(stagesFor("season-2", 1)).toEqual([...SPONSOR_OBJ_MV_GROWTH_STAGES_STRONG]);
+    expect(stagesFor("season-2", 30)).toEqual([...SPONSOR_OBJ_MV_GROWTH_STAGES_WEAK]);
+
+    // In S1 fehlt der Transfermarkt: jede Stufe muss unter der jeweiligen S2-Stufe liegen.
+    const s1Strong = stagesFor("season-1", 1);
+    const s1Weak = stagesFor("season-1", 30);
+    expect(s1Strong).toHaveLength(3);
+    for (const [index, threshold] of s1Strong.entries()) {
+      expect(threshold).toBeLessThan(SPONSOR_OBJ_MV_GROWTH_STAGES_STRONG[index]!);
+    }
+    for (const [index, threshold] of s1Weak.entries()) {
+      expect(threshold).toBeLessThan(SPONSOR_OBJ_MV_GROWTH_STAGES_WEAK[index]!);
+    }
+
+    // Kern der Regression: die UNTERSTE S1-Schwelle liegt im mit reinem Training erreichbaren Bereich.
+    // Die alte, saison-unabhängige Untergrenze von +5 % war in S1 für kein Team erreichbar.
+    expect(s1Strong[0]!).toBeLessThanOrEqual(2);
+    expect(s1Strong[0]!).toBeGreaterThan(0);
+
+    // Junge/günstige Kader wachsen relativ schneller → höhere Leiter als starke Teams, auch in S1.
+    expect(s1Weak[0]!).toBeGreaterThan(s1Strong[0]!);
+
+    // Stufen bleiben in beiden Saisons streng aufsteigend.
+    for (const ladder of [s1Strong, s1Weak]) {
+      expect(ladder[0]!).toBeLessThan(ladder[1]!);
+      expect(ladder[1]!).toBeLessThan(ladder[2]!);
+    }
+
+    // Das Label nennt die tatsächlich geforderten Prozentwerte (Anzeige == Auswertung).
+    const s1Component = buildBonusObjectiveComponent(
+      "market_value_growth",
+      bonusInput(gs, teamId, { seasonId: "season-1", teamQualityRank: 1 }) as never,
+    );
+    expect(s1Component.label).toBe(`Kaderwert-Wachstum +${s1Strong[0]}/${s1Strong[1]}/${s1Strong[2]} %`);
+  }, 60000);
+
+  it("derives the season number defensively and only treats a reliable season-1 suffix as season 1", () => {
+    expect(resolveSeasonNumber("season-1")).toBe(1);
+    expect(resolveSeasonNumber("season-12")).toBe(12);
+    expect(resolveSeasonNumber("no-suffix")).toBeNull();
+
+    expect(isFirstSeason("season-1")).toBe(true);
+    expect(isFirstSeason("season-2")).toBe(false);
+    // Ohne verlässlichen Suffix KEINE S1-Sonderregel — sonst bekämen spätere Saisons still die flache Leiter.
+    expect(isFirstSeason("no-suffix")).toBe(false);
+    expect(resolveMarketValueGrowthStages({ seasonId: "no-suffix", weak: false })).toEqual(
+      SPONSOR_OBJ_MV_GROWTH_STAGES_STRONG,
+    );
+  });
 
   it("returns null for debt_payoff / contract_stability / facility_condition when the precondition is absent", () => {
     const gs = structuredClone(createSingleplayerGameState());

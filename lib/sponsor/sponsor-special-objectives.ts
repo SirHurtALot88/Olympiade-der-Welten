@@ -678,6 +678,59 @@ export const SPONSOR_OBJ_UNDERDOG_FAMILY_MIN_QUALITY_RANK = objEnvNumber("OLY_SP
 /** David-Bonus: Kaderwert-Deckel = Liga-Median × dieser Faktor (beim Signing eingefroren). */
 export const SPONSOR_OBJ_BUDGET_OVERACHIEVER_CAP_FACTOR = objEnvNumber("OLY_SPONSOR_OBJ_BUDGET_CAP_FACTOR", 1.0);
 
+/**
+ * Kaderwert-Wachstum (market_value_growth) — Zielstufen in Prozent, getrennt nach Saison.
+ *
+ * AB S2 sind die Stufen ambitioniert, weil der Kaderwert dort über ZWEI Hebel wächst: Entwicklung der
+ * eigenen Spieler UND Zukäufe auf dem Transfermarkt.
+ *
+ * IN S1 fällt der zweite Hebel weg — die Kader stammen aus dem Draft, der Transfermarkt öffnet erst ab S2.
+ * Übrig bleibt allein die organische Entwicklung, und die ist bewusst flach balanciert: der Korridor der
+ * organischen Progression (ORGANIC_LEAGUE_NET_AVG_MIN/MAX = −0,4…+0,4 Netto-Setpoints pro Spieler und
+ * Saison, siehe lib/season/long-run-organic-progression-audit) hält den Durchschnittsspieler nahe null;
+ * spürbar zulegen können nur die Talente (Peak-Korridor P90 = 8…20 Setpoints). Die S2-Untergrenze von
+ * +5 % ist damit in S1 für kein Team seriös erreichbar — das Ziel wäre bei Ziehung sicher verloren.
+ * Die S1-Leiter setzt deshalb dort an, wo reines Training tatsächlich hinkommt.
+ *
+ * Junge/günstige Kader (schwach/aufbau) wachsen relativ schneller und bekommen in beiden Fällen die
+ * höhere Leiter. Alle vier Leitern sind ENV-tunebar, damit das Balancing ohne Codeänderung nachziehen kann.
+ */
+export const SPONSOR_OBJ_MV_GROWTH_STAGES_STRONG = [
+  objEnvNumber("OLY_SPONSOR_OBJ_MV_GROWTH_S1", 5),
+  objEnvNumber("OLY_SPONSOR_OBJ_MV_GROWTH_S2", 10),
+  objEnvNumber("OLY_SPONSOR_OBJ_MV_GROWTH_S3", 15),
+] as const;
+export const SPONSOR_OBJ_MV_GROWTH_STAGES_WEAK = [
+  objEnvNumber("OLY_SPONSOR_OBJ_MV_GROWTH_WEAK_S1", 8),
+  objEnvNumber("OLY_SPONSOR_OBJ_MV_GROWTH_WEAK_S2", 15),
+  objEnvNumber("OLY_SPONSOR_OBJ_MV_GROWTH_WEAK_S3", 25),
+] as const;
+/** Saison-1-Leitern (nur Training als Hebel — siehe Begründung oben). */
+export const SPONSOR_OBJ_MV_GROWTH_STAGES_STRONG_SEASON1 = [
+  objEnvNumber("OLY_SPONSOR_OBJ_MV_GROWTH_SEASON1_S1", 1),
+  objEnvNumber("OLY_SPONSOR_OBJ_MV_GROWTH_SEASON1_S2", 2),
+  objEnvNumber("OLY_SPONSOR_OBJ_MV_GROWTH_SEASON1_S3", 3),
+] as const;
+export const SPONSOR_OBJ_MV_GROWTH_STAGES_WEAK_SEASON1 = [
+  objEnvNumber("OLY_SPONSOR_OBJ_MV_GROWTH_WEAK_SEASON1_S1", 2),
+  objEnvNumber("OLY_SPONSOR_OBJ_MV_GROWTH_WEAK_SEASON1_S2", 4),
+  objEnvNumber("OLY_SPONSOR_OBJ_MV_GROWTH_WEAK_SEASON1_S3", 6),
+] as const;
+
+/**
+ * Die für Saison und Team-Stärke passende Kaderwert-Wachstums-Leiter. `weak` = schwach/aufbau
+ * (junger, günstiger Kader → relativ schnelleres Wachstum → höhere Stufen).
+ */
+export function resolveMarketValueGrowthStages(input: {
+  seasonId: string;
+  weak: boolean;
+}): readonly number[] {
+  if (isFirstSeason(input.seasonId)) {
+    return input.weak ? SPONSOR_OBJ_MV_GROWTH_STAGES_WEAK_SEASON1 : SPONSOR_OBJ_MV_GROWTH_STAGES_STRONG_SEASON1;
+  }
+  return input.weak ? SPONSOR_OBJ_MV_GROWTH_STAGES_WEAK : SPONSOR_OBJ_MV_GROWTH_STAGES_STRONG;
+}
+
 function stage(threshold: number, fraction: number, label: string): SponsorObjectiveStage {
   return { threshold, fraction, label };
 }
@@ -1065,7 +1118,9 @@ export function buildBonusObjectiveComponent(
       const weakMv =
         resolveSponsorStrengthTier(input.teamQualityRank, input.gameState.teams.length) === "schwach" ||
         resolveSponsorStrengthTier(input.teamQualityRank, input.gameState.teams.length) === "aufbau";
-      const g = weakMv ? [8, 15, 25] : [5, 10, 15];
+      // Saisonabhängige Leiter: in S1 gibt es keine Zukäufe (Transfermarkt erst ab S2), der Kaderwert kann
+      // also nur über Training wachsen → deutlich flachere Stufen (resolveMarketValueGrowthStages).
+      const g = resolveMarketValueGrowthStages({ seasonId: input.seasonId, weak: weakMv });
       return {
         ...base,
         componentId: "special-market-value-growth",
@@ -1366,15 +1421,28 @@ export function computeTransferWindowNet(gameState: GameState, teamId: string, s
 }
 
 /**
+ * Saison-Nummer aus der seasonId. Diese ist typischerweise "season-1", "season-2", … — der numerische
+ * Suffix ist die Saison-Nummer. Gibt null zurück, wenn kein verlässlicher Suffix existiert; Aufrufer
+ * behandeln das konservativ (= KEINE Saison-Sonderregel anwenden).
+ */
+export function resolveSeasonNumber(seasonId: string): number | null {
+  const match = /(\d+)\s*$/.exec(String(seasonId));
+  const seasonNumber = match ? Number.parseInt(match[1]!, 10) : Number.NaN;
+  return Number.isFinite(seasonNumber) ? seasonNumber : null;
+}
+
+/** Saison 1? Ohne verlässlichen Suffix konservativ `false` (keine S1-Sonderregel anwenden). */
+export function isFirstSeason(seasonId: string): boolean {
+  const seasonNumber = resolveSeasonNumber(seasonId);
+  return seasonNumber != null && seasonNumber <= 1;
+}
+
+/**
  * Season-1-Ausschluss für den Transfer-Händler: in Saison 1 gibt es keine Vorsaison-Verkäufe (Teams starten
  * bei 0, nur Draft-Käufe) → das Ziel wird gar nicht angeboten. Ab S2 verfügbar.
  */
 export function isTransferTraderAvailableForSeason(seasonId: string): boolean {
-  // seasonId ist typischerweise "season-1", "season-2", … — der numerische Suffix ist die Saison-Nummer.
-  const match = /(\d+)\s*$/.exec(String(seasonId));
-  const seasonNumber = match ? Number.parseInt(match[1]!, 10) : Number.NaN;
-  // Kein verlässlicher Suffix → konservativ NICHT ausschließen (nur S1 hart ausschließen).
-  return !(Number.isFinite(seasonNumber) && seasonNumber <= 1);
+  return !isFirstSeason(seasonId);
 }
 
 /**
