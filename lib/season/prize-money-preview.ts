@@ -9,6 +9,8 @@ import {
 import { buildPrizeMoneyTable } from "@/lib/season/prize-money";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
+import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
+import { getTeamAnnualLoanInstallment } from "@/lib/finance/loan-service";
 import { calculateFacilityIncome, calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
 import type { StandingsPreviewSource } from "@/lib/standings/standings-preview-engine";
@@ -122,18 +124,6 @@ function round3(value: number) {
   return Math.round(value * 1000) / 1000;
 }
 
-function projectSeasonEndCash(input: {
-  currentCash: number | null;
-  prizeMoney: number | null;
-  salaryTotal: number | null;
-  rankChangePrize?: number | null;
-}) {
-  if (input.currentCash == null || input.prizeMoney == null || input.salaryTotal == null) {
-    return null;
-  }
-
-  return round1(input.currentCash - input.salaryTotal + input.prizeMoney + (input.rankChangePrize ?? 0));
-}
 
 // --- Liga-weite Sponsor-/Gebäude-Einnahmen (memoisiert) ---
 // Preisgeld ist reines Legacy-Benchmark und wird nie ausgezahlt; die reale Season-End-Ökonomie ist
@@ -172,10 +162,17 @@ function computeLeagueSponsorIncome(gameState: GameState): LeagueSponsorIncome {
   const sponsorCashByTeamId = new Map<string, number>();
   const facilityIncomeByTeamId = new Map<string, number>();
   try {
+    // Exakt wie der Apply (sponsor-settlement-service): nur Teams MIT Vertrag zählen,
+    // und die Deltas werden VORZEICHENECHT summiert — negative Rank-/Ziel-Strafen
+    // gehörten vorher (if cashDelta > 0) fälschlich nicht in projectedCash/KI-Signal.
+    const contractedTeamIds = new Set(
+      gameState.teams.filter((team) => getTeamSponsorContract(gameState, team.teamId)).map((team) => team.teamId),
+    );
     for (const row of previewSponsorSettlement(gameState).rows) {
-      if (row.cashDelta > 0) {
-        sponsorCashByTeamId.set(row.teamId, (sponsorCashByTeamId.get(row.teamId) ?? 0) + row.cashDelta);
+      if (!contractedTeamIds.has(row.teamId)) {
+        continue;
       }
+      sponsorCashByTeamId.set(row.teamId, (sponsorCashByTeamId.get(row.teamId) ?? 0) + row.cashDelta);
     }
   } catch {
     // Sponsor-Vorschau ist optional — fehlt sie (z. B. ohne Verträge), bleibt die Sponsor-Einnahme leer.
@@ -585,14 +582,27 @@ export async function buildPrizeMoneyPreview(
     // Reale Season-End-Einnahme des Teams (Sponsor-Settlement + Gebäude netto). Preisgeld fließt hier NICHT
     // ein — es ist reines Legacy-Benchmark und wird nie ausgezahlt.
     const seasonIncome = (sponsorCash ?? 0) + (facilityIncome ?? 0);
+    // Kreditrate wird am Saisonende real abgebucht (season-completion-service:applyLoanSettlement)
+    // und ist im Finanz-/Prize-Panel bereits abgezogen — projectedCash muss sie ebenfalls einrechnen,
+    // sonst überschätzt es Cash (und das KI-Wirtschaftssignal) um die Jahresrate.
+    const loanInstallment = getTeamAnnualLoanInstallment(save.gameState, team.teamId);
 
-    // Cash danach = Cash vorher + Sponsor + Gebäude − Gehälter (kein Preisgeld). Dies ist jetzt der
-    // Default für ALLE Aufrufer (UI, Season-Workflows, AI-Planung).
+    // Cash danach = Cash vorher + Sponsor + Gebäude − Gehälter − Kreditrate (kein Preisgeld). Dies ist
+    // jetzt der Default für ALLE Aufrufer (UI, Season-Workflows, AI-Planung).
     const projectedCash =
-      currentCash == null || salaryTotal == null ? null : round1(currentCash - salaryTotal + seasonIncome);
+      currentCash == null || salaryTotal == null
+        ? null
+        : round1(currentCash - salaryTotal + seasonIncome - loanInstallment);
 
     const buildPlacementScenario = (direction: "better" | "worse") => {
-      if (rank == null || prizeMoney == null || currentCash == null || salaryTotal == null) {
+      const resolvedStartRank = rankChangePrize.startRank;
+      if (
+        rank == null ||
+        prizeMoney == null ||
+        currentCash == null ||
+        salaryTotal == null ||
+        !isLikelyRank(resolvedStartRank)
+      ) {
         return {
           payout: null,
           projectedCash: null,
@@ -603,25 +613,30 @@ export async function buildPrizeMoneyPreview(
         direction === "better"
           ? clampRank(rank - 10)
           : clampRank(rank + 10);
-      const rankDelta = rank - targetRank;
-      if (rankDelta === 0) {
-        return {
-          payout: prizeMoney,
-          projectedCash: projectSeasonEndCash({ currentCash, prizeMoney, salaryTotal }),
-        };
-      }
-      const placementAmount = placementByRankDelta.get(rankDelta) ?? null;
-      if (placementAmount == null) {
+      // Rangwechsel-Bonus wird gegen den EINGEFRORENEN Startrang gemessen (identisch zu
+      // buildRankChangePrize: rankDelta = startRank − finalRank), nicht gegen den aktuellen Endrang.
+      // Vorher: `rank − targetRank` ⇒ immer exakt ±10 statt „Endrang 10 Plätze besser/schlechter als
+      // tatsächlich" — falsche Zeile in der Placement-Tabelle.
+      const scenarioRankDelta = resolvedStartRank - targetRank;
+      const scenarioRankChangeBonus =
+        scenarioRankDelta === 0 ? 0 : placementByRankDelta.get(scenarioRankDelta) ?? null;
+      if (scenarioRankChangeBonus == null) {
         warnings.add(`missing_${direction}_placement_delta`);
         return {
           payout: null,
           projectedCash: null,
         };
       }
-      const payout = round1(prizeMoney + placementAmount);
+      const payout = round1(prizeMoney + scenarioRankChangeBonus);
+      // Cash danach nutzt dieselbe reale Basis wie `projectedCash` (Cash − Gehälter + Season-Einnahme
+      // − Kreditrate). Der einzige rangabhängige Term ggü. dem Ist ist der Rangwechsel-Bonus-Delta;
+      // die frühere `projectSeasonEndCash`-Formel hat stattdessen das nie ausgezahlte Preisgeld ins
+      // Cash gerechnet (Legacy-Benchmark) und Sponsor/Gebäude/Kredit ignoriert.
+      const scenarioBonusMalusDelta = scenarioRankChangeBonus - (rankChangePrize.bonusMalus ?? 0);
+      const scenarioProjectedCash = projectedCash == null ? null : round1(projectedCash + scenarioBonusMalusDelta);
       return {
         payout,
-        projectedCash: projectSeasonEndCash({ currentCash, prizeMoney: payout, salaryTotal }),
+        projectedCash: scenarioProjectedCash,
       };
     };
 
