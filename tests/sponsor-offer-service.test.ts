@@ -140,7 +140,7 @@ describe("sponsor offer service", () => {
     }
   });
 
-  it("persists sponsor choice and pays first base installment", () => {
+  it("persists sponsor choice WITHOUT paying anything before season end", () => {
     const gameState = ensureSeasonSponsorOffers(createGameState());
     // Bewusst die GESPEICHERTEN Angebote — genau die, die dem Spieler angezeigt werden und aus denen
     // `chooseSponsorOffer` den Vertrag baut. Ein erneutes `buildSponsorOffersForTeam` liefert eine
@@ -155,8 +155,16 @@ describe("sponsor offer service", () => {
     expect(contract?.rarity).toBe(chosen.rarity);
     expect(contract?.curveShape).toBe(chosen.curveShape);
     expect(contract?.archetype).toBe(chosen.archetype);
-    expect(contract?.payouts.baseFirstPaid).toBe(true);
-    expect(result.gameState.teams[0]?.cash).toBeGreaterThan(50);
+    // Sponsorengeld flieszt ausschliesslich am Saisonende (sponsor-settlement-service). Frueher zahlte
+    // das Unterschreiben sofort die halbe Basisrate aus — dadurch sackte die angezeigte Saison-Summe
+    // im Moment des Abschlusses ab, und am Saisonende kam entsprechend wenig nach, obwohl genau dann
+    // Gehaelter und Transfers faellig sind.
+    expect(contract?.payouts.baseFirstPaid).toBeUndefined();
+    expect(result.gameState.teams[0]?.cash).toBe(50);
+    expect(
+      (result.gameState.seasonState.sponsorPayoutLogs ?? []).filter((log) => log.teamId === "M-M"),
+      "Unterschreiben darf keine Sponsor-Auszahlung buchen",
+    ).toHaveLength(0);
   });
 
   it("auto-selects sponsor contracts for ai teams", () => {

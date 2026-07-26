@@ -601,46 +601,6 @@ export function ensureSeasonSponsorOffers(gameState: GameState): GameState {
 
 export { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 
-function payBaseFirstInstallment(gameState: GameState, contract: TeamSponsorContract, saveId?: string): GameState {
-  if (contract.payouts.baseFirstPaid) {
-    return gameState;
-  }
-  const baseComponent = contract.components.find((component) => component.kind === "base");
-  if (!baseComponent) {
-    return gameState;
-  }
-  const payout = roundCash(baseComponent.rewardCash / 2);
-  const teams = gameState.teams.map((team) =>
-    team.teamId === contract.teamId ? { ...team, cash: roundCash(team.cash + payout) } : team,
-  );
-  const log: NonNullable<GameState["seasonState"]["sponsorPayoutLogs"]>[number] = {
-    id: `sponsor-payout:${contract.seasonId}:${contract.teamId}:base_first:${Date.now()}`,
-    saveId: saveId ?? gameState.seasonState.seasonId,
-    seasonId: contract.seasonId,
-    teamId: contract.teamId,
-    phase: "base_first",
-    componentId: baseComponent.componentId,
-    cashDelta: payout,
-    action: "apply",
-    createdAt: new Date().toISOString(),
-  };
-
-  return {
-    ...gameState,
-    teams,
-    seasonState: {
-      ...gameState.seasonState,
-      sponsorContractsByTeamId: {
-        ...(gameState.seasonState.sponsorContractsByTeamId ?? {}),
-        [contract.teamId]: {
-          ...contract,
-          payouts: { ...contract.payouts, baseFirstPaid: true },
-        },
-      },
-      sponsorPayoutLogs: [log, ...(gameState.seasonState.sponsorPayoutLogs ?? [])],
-    },
-  };
-}
 
 export function chooseSponsorOffer(input: {
   gameState: GameState;
@@ -648,8 +608,6 @@ export function chooseSponsorOffer(input: {
   offerId: string;
   saveId?: string;
   termSeasons?: SponsorTermSeasons;
-  /** When true, skip immediate base_first payout (used for AI auto-sign / balancing sims). */
-  deferBaseFirstPayout?: boolean;
 }): { gameState: GameState; contract: TeamSponsorContract | null; error?: string } {
   // Audit R2/A2: Server-Guard gegen Re-Sign. Ohne diesen Guard konnte ein zweiter POST /api/sponsor/choose
   // einen bestehenden Vertrag überschreiben (payouts:{} zurückgesetzt) und base_first ERNEUT auszahlen →
@@ -715,10 +673,13 @@ export function chooseSponsorOffer(input: {
       },
     },
   };
+  // Sponsorengeld flieszt AUSSCHLIESZLICH am Saisonende (sponsor-settlement-service). Frueher wurde
+  // beim Unterschreiben sofort die halbe Basisrate ausgezahlt; das Settlement zahlte danach nur noch
+  // die zweite Haelfte. Das hatte zwei Nachteile: die angezeigte Saison-Summe sackte im Moment des
+  // Abschlusses ab (ohne dass der Vertrag weniger wert war), und am Saisonende kam entsprechend
+  // wenig nach — obwohl genau dann Gehaelter und Transfers zu bezahlen sind. Jetzt kommt die volle
+  // Basis mit dem Rest gemeinsam am Saisonende.
   nextGameState = appendSponsorBrandHistory(nextGameState, input.teamId, offer.sponsorParentBrandId);
-  if (!input.deferBaseFirstPayout) {
-    nextGameState = payBaseFirstInstallment(nextGameState, contract, input.saveId);
-  }
   const updatedContract = getTeamSponsorContract(nextGameState, input.teamId);
   return { gameState: nextGameState, contract: updatedContract };
 }
@@ -849,7 +810,6 @@ export function chooseSponsorOfferForAiTeams(gameState: GameState, settingsMap?:
       gameState: nextGameState,
       teamId: team.teamId,
       offerId: bestOffer.offerId,
-      deferBaseFirstPayout: true,
     });
     nextGameState = result.gameState;
   }
