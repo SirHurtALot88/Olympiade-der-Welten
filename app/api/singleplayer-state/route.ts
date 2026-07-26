@@ -536,7 +536,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "saveIds ist erforderlich und darf nicht leer sein." }, { status: 400 });
     }
 
-    const activeSave = persistence.getActiveSave();
+    // Audit S4: resolve per-OWNER, not a single global "active save" — with auth on, two players
+    // each have their own active_saves pointer, so a global lookup could fail to protect the
+    // requesting owner's own active save (or block deletion of a save that's actually the other
+    // owner's active save). Auth off -> ownerId null -> unchanged global behavior.
+    const deleteOwnerId = await resolveSessionOwnerId();
+    const activeSave = persistence.getActiveSave(deleteOwnerId);
     const blockedSaveIds: Array<{ saveId: string; reason: string }> = [];
     const deletionCandidates: string[] = [];
     for (const saveId of body.saveIds) {

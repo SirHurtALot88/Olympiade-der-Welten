@@ -314,4 +314,47 @@ describe("cash prize apply service", () => {
     expect(result.blockingReasons).toContain("missing_rank:W-W");
     expect(result.blockingReasons).toContain("missing_projected_cash:W-W");
   });
+
+  // Audit S4 regression: a cash payout must never silently land on "the active save" (here the
+  // mock's getActiveSave() below returns a real, different save — exactly what pre-fix code would
+  // have paid out instead of the requested one) when the requested saveId cannot be resolved.
+  describe("audit S4: unresolved saveId must never fall back to the active save", () => {
+    it("executeCashPrizeApply rejects a missing saveId and pays nothing out", async () => {
+      const { save, persistence } = createPersistenceMock();
+      mockHealthyPreview();
+      const cashBefore = save.gameState.teams.map((team) => team.cash);
+
+      await expect(
+        executeCashPrizeApply(
+          { saveId: "", seasonId: "season-1", matchdayId: "matchday-1", execute: true, confirm: CASH_PRIZE_APPLY_CONFIRM_TOKEN },
+          persistence as never,
+        ),
+      ).rejects.toThrow(/saveId is required/i);
+
+      expect(persistence.saveSingleplayerState).not.toHaveBeenCalled();
+      expect(save.gameState.teams.map((team) => team.cash)).toEqual(cashBefore);
+    });
+
+    it("executeCashPrizeApply rejects an unknown saveId and pays nothing out (not even to the active save)", async () => {
+      const { save, persistence } = createPersistenceMock();
+      mockHealthyPreview();
+      const cashBefore = save.gameState.teams.map((team) => team.cash);
+
+      await expect(
+        executeCashPrizeApply(
+          {
+            saveId: "save-belongs-to-someone-else",
+            seasonId: "season-1",
+            matchdayId: "matchday-1",
+            execute: true,
+            confirm: CASH_PRIZE_APPLY_CONFIRM_TOKEN,
+          },
+          persistence as never,
+        ),
+      ).rejects.toThrow(/could not be resolved/i);
+
+      expect(persistence.saveSingleplayerState).not.toHaveBeenCalled();
+      expect(save.gameState.teams.map((team) => team.cash)).toEqual(cashBefore);
+    });
+  });
 });

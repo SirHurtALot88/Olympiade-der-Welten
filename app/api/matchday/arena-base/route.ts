@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { loadMatchdayArenaBase } from "@/lib/foundation/matchday-arena-base-service";
 import { DEFAULT_ACTIVE_OWNER_ID } from "@/lib/foundation/team-control-settings";
+import { SaveResolutionError } from "@/lib/persistence/resolve-local-save";
 
 export async function GET(request: Request) {
   try {
@@ -61,6 +62,9 @@ export async function GET(request: Request) {
       ...payload,
     });
   } catch (error) {
+    if (error instanceof SaveResolutionError) {
+      return NextResponse.json({ ok: false, error: error.code, message: error.message }, { status: error.status });
+    }
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Arena base could not be loaded." },
       { status: 500 },

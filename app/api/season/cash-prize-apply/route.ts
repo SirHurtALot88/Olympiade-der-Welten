@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 
+import { SaveResolutionError } from "@/lib/persistence/resolve-local-save";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { executeCashPrizeApply, previewCashPrizeApply } from "@/lib/season/cash-prize-apply-service";
@@ -88,6 +89,12 @@ export async function POST(request: Request) {
       warnings: [...writeAuth.warnings, ...result.warnings],
     });
   } catch (error) {
+    if (error instanceof SaveResolutionError) {
+      return NextResponse.json(
+        { success: false, error: error.code, message: error.message, blockingReasons: [error.code] },
+        { status: error.status },
+      );
+    }
     const message = error instanceof Error ? error.message : "Cash prize apply preview could not be loaded.";
     return NextResponse.json(
       {

@@ -16,6 +16,7 @@ import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-s
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import { buildTeamDisciplineRankSnapshotRecords } from "@/lib/foundation/team-discipline-rank-engine";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import type { PersistenceService } from "@/lib/persistence/types";
 import {
   buildAllTimeTableFromSnapshots,
@@ -81,18 +82,10 @@ function normalizeSource(source?: string): SeasonSnapshotSource {
   return source === "prisma" ? "prisma" : "sqlite";
 }
 
+// Audit S4: creating a season snapshot persists a new save row — an unresolved saveId must never
+// silently snapshot "the active save" instead of the one actually requested. Throw instead.
 function resolveLocalSave(persistence: PersistenceService, saveId: string) {
-  const bootstrapped = persistence.bootstrapSingleplayerSave();
-  const save =
-    persistence.getSaveById(saveId) ??
-    persistence.getActiveSave() ??
-    bootstrapped.save;
-
-  if (!save) {
-    throw new Error(`Local save ${saveId} could not be loaded for season snapshots.`);
-  }
-
-  return save;
+  return requireLocalPersistedSave(persistence, saveId).save;
 }
 
 function getRosterMarketValue(

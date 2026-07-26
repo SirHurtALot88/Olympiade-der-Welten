@@ -269,4 +269,31 @@ describe("runLocalSeasonCompletion", () => {
     );
     expect(facilityIncomeEventsAfterSecondRun.length).toBe(1);
   });
+
+  // Audit S4 regression: season completion must never silently run against "the active save"
+  // when the requested saveId is missing or unknown — it must reject immediately, before any
+  // ligaweite mutation, instead of quietly completing a different (possibly another player's)
+  // save while still reporting success.
+  it("rejects an unresolved saveId before mutating anything, instead of falling back to the active save", async () => {
+    const gameState = createFreshSeasonOneGameState();
+    const persistence = createPersistence(gameState);
+    const stateBefore = persistence.getState();
+
+    await expect(
+      runLocalSeasonCompletion(
+        {
+          saveId: "save-belongs-to-someone-else",
+          seasonId: gameState.season.id,
+          source: "sqlite",
+          dryRun: false,
+          execute: true,
+          confirmToken: SEASON_COMPLETION_CONFIRM_TOKEN,
+        },
+        persistence,
+      ),
+    ).rejects.toThrow(/could not be resolved/i);
+
+    // The active save (the pre-fix silent-fallback target) must be completely untouched.
+    expect(persistence.getState()).toEqual(stateBefore);
+  });
 });

@@ -1,5 +1,5 @@
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
-import { resolveLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
+import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import {
@@ -52,8 +52,11 @@ function roundScore(value: number) {
   return Number(value.toFixed(2));
 }
 
+// Audit S4: legacy lineup drafts/form cards are gameplay writes keyed on `LegacyLineupKeyParams`,
+// whose `saveId` is always required — an unresolved id must never silently fall back to "the
+// active save" (which, per co-op owner, could be a different player's save entirely).
 function resolveLocalSave(saveId?: string, persistence: PersistenceService = createPersistenceService()) {
-  return resolveLocalPersistedSave(persistence, saveId);
+  return requireLocalPersistedSave(persistence, saveId);
 }
 
 function toLegacyDraft(draft: LineupDraft): LegacyLineupDraft {
@@ -757,7 +760,7 @@ export function loadAllLocalLegacyLineupContexts(
   },
   persistence: PersistenceService = createPersistenceService(),
 ): LegacyLineupContextLoadResult[] {
-  const { save } = resolveLocalPersistedSave(persistence, input.saveId);
+  const { save } = requireLocalPersistedSave(persistence, input.saveId);
   const teamIds = input.teamIds ?? save.gameState.teams.map((team) => team.teamId);
 
   return teamIds.map((teamId) =>
@@ -1311,7 +1314,7 @@ export function calculateLocalLegacyLineupPreview(
   if (!contextResult.ok) {
     return contextResult;
   }
-  const { save } = resolveLocalPersistedSave(persistenceService, params.saveId);
+  const { save } = requireLocalPersistedSave(persistenceService, params.saveId);
 
   return calculateLocalLegacyLineupPreviewFromContext(
     contextResult.context,

@@ -5,6 +5,7 @@ import {
 import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { runWithSaveRecovery } from "@/lib/persistence/atomic-save-write";
+import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { upsertTeamRelationshipEvents, type TeamRelationshipEventApplyResult } from "@/lib/rivalries/team-relationship-dynamics";
 import { buildSeasonAiLineupAudit, type SeasonAiLineupAudit } from "@/lib/season/season-ai-lineup-audit-service";
@@ -81,26 +82,12 @@ export type SeasonCompletionResult = {
   blockingReasons: string[];
 };
 
+// Audit R2/V6 (superseded by audit S4's central strict resolver): season completion previously
+// fell back to getActiveSave()/bootstrap and only caught the mismatch after the fact. It now goes
+// straight through `requireLocalPersistedSave`, which never resolves to a different save in the
+// first place — the same protection, applied at the root instead of patched on afterward.
 function resolveLocalSave(persistence: PersistenceService, saveId: string) {
-  const bootstrapped = persistence.bootstrapSingleplayerSave();
-  const save = persistence.getSaveById(saveId) ?? persistence.getActiveSave() ?? bootstrapped.save;
-
-  if (!save) {
-    throw new Error(`Local save ${saveId} could not be loaded for season completion.`);
-  }
-
-  // Audit R2/V6: sicherstellen, dass das aufgelöste Save WIRKLICH die angeforderte saveId trägt. Ohne
-  // diese Prüfung konnte der stille Fallback auf getActiveSave()/bootstrap bei veralteter/verwaister
-  // saveId ein FREMDES Save abschließen (ligaweite Mutationen auf dem falschen Save) und die
-  // Route-Autorisierung, die gegen die angeforderte saveId prüft, unterlaufen. Lieber hart abbrechen als
-  // das falsche Save mutieren.
-  if (save.saveId !== saveId) {
-    throw new Error(
-      `Season completion refused: requested save ${saveId} not found; resolved to a different save ${save.saveId}. Refusing to mutate the wrong save.`,
-    );
-  }
-
-  return save;
+  return requireLocalPersistedSave(persistence, saveId).save;
 }
 
 function addStep(
