@@ -47,9 +47,9 @@ export function loadFoundationInitialPersistenceState(input?: {
   saveMode?: string | null;
   /**
    * Owner of the current session (only set when auth is on). When present, the active-save
-   * fallback resolves and (re)activates THIS owner's active save instead of the shared global
-   * one, so Chris and Franky never overwrite each other's active pointer. Null/undefined ->
-   * unchanged global behavior.
+   * fallback resolves (read-only, never activates) THIS owner's active save instead of the shared
+   * global one, so Chris and Franky never see or touch each other's active pointer. Null/undefined
+   * -> unchanged global (auth-off/solo) behavior.
    */
   ownerId?: string | null;
 }): FoundationInitialPersistenceState | null {
@@ -63,30 +63,22 @@ export function loadFoundationInitialPersistenceState(input?: {
 
   const saveId = input?.saveId?.trim() || undefined;
   const ownerId = input?.ownerId?.trim() || undefined;
-  const modeSaves =
-    requestedSaveMode === "all"
-      ? allSaves
-      : allSaves.filter((summary) => matchesFoundationSaveMode(requestedSaveMode, summary));
+  // Audit S5: this is the /foundation page LOADER — a plain GET page load. It may resolve THIS
+  // owner's active save (or the explicit saveId), but it must never activate/archive anything.
+  // Falling back to "some other save in the list" and calling `activateSave` on it here is
+  // exactly the S5 bug: it would silently repoint this owner's active_saves pointer at another
+  // player's save (and flip that save's status) just because they opened the page. If neither an
+  // explicit saveId nor an active save can be resolved for this owner, return `null` ("no save")
+  // instead of guessing.
   const activeSave = persistence.getActiveSave(ownerId);
   const activeSaveSummary =
     activeSave && (requestedSaveMode === "all" || matchesFoundationSaveMode(requestedSaveMode, activeSave))
       ? activeSave
       : null;
-  const fallbackSummary = modeSaves[0] ?? allSaves[0] ?? null;
-  const save = saveId
-    ? persistence.getSaveById(saveId)
-    : activeSaveSummary
-      ? activeSaveSummary
-      : fallbackSummary
-        ? persistence.activateSave(fallbackSummary.saveId, ownerId) ?? persistence.getSaveById(fallbackSummary.saveId)
-        : null;
+  const save = saveId ? persistence.getSaveById(saveId) : activeSaveSummary;
 
   if (!save) {
     return null;
-  }
-
-  if (!saveId && fallbackSummary) {
-    allSaves = persistence.listSaves().map(enrichSaveSummary);
   }
 
   const responseModeSaves =

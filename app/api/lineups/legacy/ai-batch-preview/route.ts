@@ -8,6 +8,8 @@ import { LegacyLineupContextLoader } from "@/lib/lineups/legacy-lineup-context-l
 import { loadAllLocalLegacyLineupContexts } from "@/lib/lineups/legacy-lineup-local-service";
 import type { LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { resolveLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
+import { resolveSessionOwnerId } from "@/lib/auth/session";
 import { db } from "@/src/server/db";
 
 type PreviewSource = "sqlite" | "prisma";
@@ -48,21 +50,23 @@ function parseBaseParams(request: Request) {
   };
 }
 
-async function resolveSqliteBatchContext(input: {
-  saveId: string | null;
-  seasonId: string | null;
-  matchdayId: string | null;
-}) {
+async function resolveSqliteBatchContext(
+  input: {
+    saveId: string | null;
+    seasonId: string | null;
+    matchdayId: string | null;
+  },
+  ownerId: string | null,
+) {
   const persistence = createPersistenceService();
-  const bootstrapped = persistence.bootstrapSingleplayerSave();
-  const save =
-    (input.saveId ? persistence.getSaveById(input.saveId) : null) ??
-    persistence.getActiveSave() ??
-    bootstrapped.save;
+  // Audit S5: pure read — resolves THIS owner's active save (or the explicit saveId) but never
+  // bootstraps/activates anything.
+  const resolved = resolveLocalPersistedSave(persistence, input.saveId, ownerId);
 
-  if (!save) {
+  if (!resolved) {
     throw new Error("No local save available for AI batch preview.");
   }
+  const save = resolved.save;
 
   const season = save.gameState.season;
   const seasonId = input.seasonId && input.seasonId === season.id ? input.seasonId : season.id;
@@ -209,10 +213,11 @@ export async function GET(request: Request) {
   try {
     const source = parseSource(request);
     const baseParams = parseBaseParams(request);
+    const ownerId = source === "sqlite" ? await resolveSessionOwnerId() : null;
     const baseContext =
       source === "prisma"
         ? await resolvePrismaBatchContext(baseParams)
-        : await resolveSqliteBatchContext(baseParams);
+        : await resolveSqliteBatchContext(baseParams, ownerId);
 
     const teams =
       source === "prisma"
