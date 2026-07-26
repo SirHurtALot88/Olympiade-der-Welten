@@ -68,7 +68,7 @@ type SponsorType = {
 
 /**
  * MODULAR statt fest: ein Sponsor ist eine KOMBINATION aus einer Kurvenform und einer Klausel.
- * 6 Kurven x 14 Klauseln = 84 moegliche Sponsoren aus zwei kleinen, unabhaengig pflegbaren Listen.
+ * 6 Kurven x 20 Klauseln = 120 moegliche Sponsoren aus zwei kleinen, unabhaengig pflegbaren Listen.
  * Die Kalibrierung laeuft ueber jede Kombination einzeln, deshalb ist jede davon automatisch
  * EV-gleich und fallenfrei — neue Klauseln lassen sich hinzufuegen, ohne das Balancing anzufassen.
  */
@@ -235,6 +235,52 @@ export function calibrateOffsets(): Map<string, number> {
 const CAL_RAW = calibrateOffsets();
 /** Offset-Zugriff für ein Team mit gegebenem Erwartungsrang. */
 const offsetFor = (name: string, expectedRank: number) => CAL_RAW.get(`${name}:${tierOf(expectedRank)}`) ?? 0;
+
+/**
+ * Dominanz-Test per konditionaler FOSD (Erststufen-stochastische Dominanz).
+ *
+ * Der frueher benutzte ELEMENTWEISE Vergleich der joint-Arrays ist ungueltig, seit jede Klausel ihr
+ * eigenes p hat: er vergleicht Zellen ueber VERSCHIEDENE Wahrscheinlichkeitsmasse. Elementweise
+ * Dominanz impliziert stochastische Dominanz nur, wenn p(Dominator) >= p(Dominierter) — sonst
+ * entstehen systematisch False Positives (nachgewiesen: Flach/Ausbau wurde als von
+ * Flach/Talentschmiede dominiert gemeldet, obwohl Talentschmiede bei gleichem Schwellenwert MEHR
+ * Verlustmasse traegt). Zusaetzlicher Vorteil: der CDF-Vergleich ist unabhaengig von sigma.
+ *
+ * Je Endrang ist die Auszahlung eine Zwei-Punkt-Lotterie (Klausel erfuellt / verletzt). A dominiert
+ * B, wenn A das fuer JEDEN erreichbaren Rang tut und fuer mindestens einen strikt.
+ */
+type Lottery = { hi: number; lo: number; p: number };
+function fosdAtLeast(a: Lottery, b: Lottery): boolean {
+  for (const x of [a.lo, a.hi, b.lo, b.hi]) {
+    const ca = (a.lo <= x ? 1 - a.p : 0) + (a.hi <= x ? a.p : 0);
+    const cb = (b.lo <= x ? 1 - b.p : 0) + (b.hi <= x ? b.p : 0);
+    if (ca > cb + 1e-9) return false; // A haeuft mehr Masse unterhalb x -> nicht besser
+  }
+  return true;
+}
+function fosdStrictly(a: Lottery, b: Lottery): boolean {
+  for (const x of [a.lo, a.hi, b.lo, b.hi]) {
+    const ca = (a.lo <= x ? 1 - a.p : 0) + (a.hi <= x ? a.p : 0);
+    const cb = (b.lo <= x ? 1 - b.p : 0) + (b.hi <= x ? b.p : 0);
+    if (ca < cb - 1e-9) return true;
+  }
+  return false;
+}
+/** Lotterien eines Sponsors ueber den erreichbaren Korridor. */
+function lotteries(t: SponsorType, expected: number, cal: number, band: number[]): Lottery[] {
+  return band.map((r) => ({
+    hi: withFloor(rankPart(t, expected, r, cal) + t.clause.bonus),
+    lo: withFloor(rankPart(t, expected, r, cal) - t.clause.malus),
+    p: t.clause.p,
+  }));
+}
+/** Ist `a` eine Falle, also von irgendeinem `others`-Eintrag rang-konditional FOSD-dominiert? */
+function isTrap(a: { name: string; lot: Lottery[] }, others: Array<{ name: string; lot: Lottery[] }>): boolean {
+  return others.some((b) => b.name !== a.name
+    && a.lot.every((la, i) => fosdAtLeast(b.lot[i]!, la))
+    && a.lot.some((la, i) => fosdStrictly(b.lot[i]!, la)));
+}
+
 const line = (c = "=") => console.log(c.repeat(100));
 
 line();
@@ -254,7 +300,7 @@ for (const e of EXPECTED) {
   for (let r = Math.max(1, e - 8); r <= Math.min(32, e + 8); r += 1) band.push(r);
   const rows = SPONSOR_TYPES.map((t) => {
     const c = offsetFor(t.name, e);
-    const joint = band.flatMap((r) => [withFloor(rankPart(t, e, r, c) + t.clause.bonus), withFloor(rankPart(t, e, r, c) - t.clause.malus)]);
+    const lot = lotteries(t, e, c, band);
     const e0 = ev(t, e, c);
     const d = distribution(e);
     let v = 0;
@@ -262,9 +308,9 @@ for (const e of EXPECTED) {
       v += w * t.clause.p * (withFloor(rankPart(t, e, i + 1, c) + t.clause.bonus) - e0) ** 2
          + w * (1 - t.clause.p) * (withFloor(rankPart(t, e, i + 1, c) - t.clause.malus) - e0) ** 2;
     });
-    return { name: t.name, ev: e0, sd: Math.sqrt(v), joint };
+    return { name: t.name, ev: e0, sd: Math.sqrt(v), lot };
   });
-  const traps = rows.filter((a) => rows.some((b) => a.name !== b.name && a.joint.every((v, i) => v <= b.joint[i]!) && a.joint.some((v, i) => v < b.joint[i]!)));
+  const traps = rows.filter((a) => isTrap(a, rows));
   trapsTotal += traps.length;
   const evs = rows.map((r) => r.ev);
   console.log(
@@ -297,13 +343,12 @@ console.log(`\n  FALLEN INSGESAMT (Stuetzstellen): ${trapsTotal}${trapsTotal ===
     for (let r = Math.max(1, e - 8); r <= Math.min(32, e + 8); r += 1) band.push(r);
     const rows = SPONSOR_TYPES.map((t) => {
       const c = offsetFor(t.name, e);
-      return { name: t.name, ev: ev(t, e, c),
-        joint: band.flatMap((r) => [withFloor(rankPart(t, e, r, c) + t.clause.bonus), withFloor(rankPart(t, e, r, c) - t.clause.malus)]) };
+      return { name: t.name, ev: ev(t, e, c), lot: lotteries(t, e, c, band) };
     });
     const evs = rows.map((r) => r.ev);
     const sp = Math.max(...evs) / Math.min(...evs) - 1;
     if (sp > worstSpread) { worstSpread = sp; worstRank = e; }
-    offTraps += rows.filter((a) => rows.some((b) => a.name !== b.name && a.joint.every((v, i) => v <= b.joint[i]! - 0.5))).length;
+    offTraps += rows.filter((a) => isTrap(a, rows)).length;
   }
   console.log(`  ALLE 32 ERWARTUNGSRAENGE: Fallen ${offTraps}${offTraps === 0 ? " ✓" : " ✗"}` +
     `   groesster EV-Spread ${(worstSpread * 100).toFixed(1)} % (bei Erwartungsrang ${worstRank})`);
@@ -459,14 +504,15 @@ for (const t of SPONSOR_TYPES) {
     const c = offsetFor(t.name, e);
     const band: number[] = [];
     for (let r = Math.max(1, e - 8); r <= Math.min(32, e + 8); r += 1) band.push(r);
-    const joint = band.flatMap((r) => [withFloor(rankPart(t, e, r, c) + t.clause.bonus), withFloor(rankPart(t, e, r, c) - t.clause.malus)]);
+    const lot = lotteries(t, e, c, band);
     const e0 = ev(t, e, c); const d = distribution(e);
     let v = 0;
     d.forEach((w, i) => {
       v += w * t.clause.p * (withFloor(rankPart(t, e, i + 1, c) + t.clause.bonus) - e0) ** 2
          + w * (1 - t.clause.p) * (withFloor(rankPart(t, e, i + 1, c) - t.clause.malus) - e0) ** 2;
     });
-    return `${Math.min(...joint).toFixed(0)}–${Math.max(...joint).toFixed(0)}`.padStart(12) + `  σ${Math.sqrt(v).toFixed(1)}`.padStart(8);
+    const vals = lot.flatMap((l) => [l.hi, l.lo]);
+    return `${Math.min(...vals).toFixed(0)}–${Math.max(...vals).toFixed(0)}`.padStart(12) + `  σ${Math.sqrt(v).toFixed(1)}`.padStart(8);
   });
   console.log("  " + t.name.padEnd(18) + "│" + cells.map((c) => c.padEnd(28)).join("│"));
 }
@@ -485,110 +531,73 @@ if (process.env.OLY_SPONSOR_STRESS === "1") {
   console.log(`STRESSTEST — ${CURVES.length} Kurven x ${CLAUSES.length} Klauseln = ${ALL.length} Kombinationen`);
   line();
 
-  /** Kalibriert eine beliebige Typmenge unter beliebigem sigma/P und liefert Fallen + Kennzahlen. */
-  function analyse(types: SponsorType[], sigma: number, pMet: number) {
+  /**
+   * Kalibriert eine beliebige Typmenge mit derselben Methode wie die Produktion (Bisektion auf
+   * TARGET_EV je Stufe, klausel-individuelles p) und prueft ueber ALLE 32 Erwartungsraenge per FOSD.
+   *
+   * Der frueher hier stehende Harness war unbrauchbar: er kalibrierte aufs Set-Mittel (genau der
+   * behobene W1-Fehler), rechnete mit einem globalen pMet statt dem Klausel-p, und mass den Spread
+   * nur an den Stuetzstellen — wo er per Konstruktion 0 ist. Seine "0.0 %" waren Definition, keine
+   * Messung.
+   *
+   * `pShift` verschiebt das WAHRE p gegenueber dem kalibrierten (Fehlschaetzung), `sigma` die
+   * Ergebnisstreuung gegenueber der Kalibrierannahme.
+   */
+  function analyse(types: SponsorType[], sigma: number, pShift: number) {
     const dist2 = (e: number) => {
       const w: number[] = [];
       for (let r = 1; r <= 32; r += 1) w.push(Math.exp(-((r - e) ** 2) / (2 * sigma * sigma)));
-      const su = w.reduce((a, b) => a + b, 0);
+      const su = w.reduce((x, y) => x + y, 0);
       return w.map((x) => x / su);
     };
-    const ev2 = (t: SponsorType, e: number, cal: number) =>
-      dist2(e).reduce((acc, w, i) =>
-        acc + w * (pMet * withFloor(rankPart(t, e, i + 1, cal) + t.clause.bonus)
-                 + (1 - pMet) * withFloor(rankPart(t, e, i + 1, cal) - t.clause.malus)), 0);
+    const pTrue = (t: SponsorType) => Math.min(0.97, Math.max(0.03, t.clause.p + pShift));
+    const evTrue = (t: SponsorType, e: number, cal: number) => {
+      const pt = pTrue(t);
+      return dist2(e).reduce((acc, w, i) =>
+        acc + w * (pt * withFloor(rankPart(t, e, i + 1, cal) + t.clause.bonus)
+                 + (1 - pt) * withFloor(rankPart(t, e, i + 1, cal) - t.clause.malus)), 0);
+    };
+    // Kalibrierung EXAKT wie in der Produktion: Bisektion auf TARGET_EV, mit dem DESIGN-p.
     const cal = new Map<string, number>();
-    for (const t of types) for (const e of EXPECTED) cal.set(`${t.name}:${tierOf(e)}`, 0);
-    for (let it = 0; it < 250; it += 1) {
-      for (const e of EXPECTED) {
-        const g = (t: SponsorType) => cal.get(`${t.name}:${tierOf(e)}`)!;
-        const tgt = types.reduce((a, t) => a + ev2(t, e, g(t)), 0) / types.length;
-        for (const t of types) cal.set(`${t.name}:${tierOf(e)}`, g(t) + (tgt - ev2(t, e, g(t))) * 0.6);
-      }
+    for (const t of types) for (const e of EXPECTED) {
+      const tier = tierOf(e); let lo = -200, hi = 200;
+      for (let i = 0; i < 120; i += 1) { const m = (lo + hi) / 2; if (ev(t, e, m) < TARGET_EV[tier]!) lo = m; else hi = m; }
+      cal.set(`${t.name}:${tier}`, (lo + hi) / 2);
     }
-    let traps = 0; const names = new Set<string>(); let sdLo = Infinity, sdHi = 0, spread = 0;
-    for (const e of EXPECTED) {
+    const at = (t: SponsorType, e: number) => cal.get(`${t.name}:${tierOf(e)}`) ?? 0;
+    let traps = 0, spread = 0, sdLo = Infinity, sdHi = 0;
+    for (let e = 1; e <= 32; e += 1) {
       const band: number[] = [];
       for (let r = Math.max(1, e - 8); r <= Math.min(32, e + 8); r += 1) band.push(r);
       const rows = types.map((t) => {
-        const c = cal.get(`${t.name}:${tierOf(e)}`)!;
-        const joint = band.flatMap((r) => [withFloor(rankPart(t, e, r, c) + t.clause.bonus), withFloor(rankPart(t, e, r, c) - t.clause.malus)]);
-        const e0 = ev2(t, e, c); const d = dist2(e); let v = 0;
+        const c = at(t, e); const e0 = evTrue(t, e, c); const d = dist2(e); const pt = pTrue(t);
+        let v = 0;
         d.forEach((w, i) => {
-          v += w * pMet * (withFloor(rankPart(t, e, i + 1, c) + t.clause.bonus) - e0) ** 2
-             + w * (1 - pMet) * (withFloor(rankPart(t, e, i + 1, c) - t.clause.malus) - e0) ** 2;
+          v += w * pt * (withFloor(rankPart(t, e, i + 1, c) + t.clause.bonus) - e0) ** 2
+             + w * (1 - pt) * (withFloor(rankPart(t, e, i + 1, c) - t.clause.malus) - e0) ** 2;
         });
-        return { name: t.name, ev: e0, sd: Math.sqrt(v), joint };
+        return { name: t.name, ev: e0, sd: Math.sqrt(v), lot: lotteries(t, e, c, band) };
       });
       const evs = rows.map((r) => r.ev);
       spread = Math.max(spread, Math.max(...evs) / Math.min(...evs) - 1);
       sdLo = Math.min(sdLo, ...rows.map((r) => r.sd)); sdHi = Math.max(sdHi, ...rows.map((r) => r.sd));
-      // EPS: viele Klauseln teilen sich exakt dieselben Bonus/Malus-Kennzahlen (z. B. 9/8) und sind
-      // damit rechnerisch identisch — sie unterscheiden sich nur im Flavour. Ohne Toleranz wertet der
-      // Test solches Gleichstands-Rauschen als Dominanz. Erst ein echter Abstand zaehlt.
-      const EPS = 0.5;
-      for (const a of rows) {
-        // Falle = bei JEDEM Ausgang um mindestens EPS schlechter als eine Alternative. Knappe
-        // Gleichstaende (identische Klausel-Kennzahlen, nur anderes Flavour) zaehlen NICHT.
-        if (rows.some((b) => a.name !== b.name && a.joint.every((v, i) => v <= b.joint[i]! - EPS))) {
-          traps += 1; names.add(a.name);
-        }
-      }
+      traps += rows.filter((a2) => isTrap(a2, rows)).length;
     }
-    return { traps, names: [...names], spread, sdLo, sdHi };
+    return { traps, spread, sdLo, sdHi };
   }
 
-  console.log("\n  A) Alle Kombinationen, Standardannahmen (sigma 4, P 0.55)");
-  const a0 = analyse(ALL, 4, 0.55);
-  console.log(`     Fallen ${a0.traps}  EV-Spread max ${(a0.spread * 100).toFixed(1)} %  sigma ${a0.sdLo.toFixed(1)}–${a0.sdHi.toFixed(1)}`);
-  if (a0.names.length) console.log(`     betroffen: ${a0.names.join(", ")}`);
+  const fmt = (r: { traps: number; spread: number; sdLo: number; sdHi: number }) =>
+    `Fallen ${String(r.traps).padStart(3)}  EV-Spread ${(r.spread * 100).toFixed(1).padStart(5)} %  sigma ${r.sdLo.toFixed(1)}–${r.sdHi.toFixed(1)}`;
 
-  console.log("\n  B) Empfindlichkeit gegen die Ergebnisstreuung (sigma) — enge vs. offene Liga");
-  for (const sg of [2, 3, 4, 6, 8]) {
-    const r = analyse(ALL, sg, 0.55);
-    console.log(`     sigma ${sg}: Fallen ${String(r.traps).padStart(3)}  Spread ${(r.spread * 100).toFixed(1).padStart(5)} %  sigma-Bereich ${r.sdLo.toFixed(1)}–${r.sdHi.toFixed(1)}` +
-      (r.names.length ? `   → ${r.names.slice(0, 4).join(", ")}${r.names.length > 4 ? " …" : ""}` : ""));
-  }
+  console.log("\n  A) Alle Kombinationen, Designannahmen");
+  console.log(`     ${fmt(analyse(ALL, 4, 0))}`);
 
-  console.log("\n  C) Empfindlichkeit gegen die Klausel-Erfuellung (P) — die ungemessene Annahme");
-  for (const pm of [0.25, 0.4, 0.55, 0.7, 0.85]) {
-    const r = analyse(ALL, 4, pm);
-    console.log(`     P ${pm.toFixed(2)}: Fallen ${String(r.traps).padStart(3)}  Spread ${(r.spread * 100).toFixed(1).padStart(5)} %  sigma-Bereich ${r.sdLo.toFixed(1)}–${r.sdHi.toFixed(1)}` +
-      (r.names.length ? `   → ${r.names.slice(0, 4).join(", ")}${r.names.length > 4 ? " …" : ""}` : ""));
-  }
+  console.log("\n  B) Ergebnisstreuung weicht von der Kalibrierannahme (sigma 4) ab");
+  for (const sg of [2, 3, 4, 6, 8]) console.log(`     sigma ${sg}: ${fmt(analyse(ALL, sg, 0))}`);
 
-  // ── D) HETEROGENES P — die gefaehrlichste Annahme des Entwurfs ────────────────────────────────
-  // Test B/C variieren P global, also fuer alle Klauseln gleichzeitig. Real streuen die
-  // Erfuellungswahrscheinlichkeiten massiv: "kein neuer Kredit" ist nahezu geschenkt, "X Spieler
-  // steigen eine Klasse auf" ist teuer erkauft. Wenn die Kalibrierung ein einheitliches P
-  // unterstellt, die Realitaet aber pro Klausel abweicht, reisst die EV-Paritaet genau um diese
-  // Differenz auf — potenziell in derselben Groessenordnung wie der behobene Defekt.
-  // Hier: je Klausel ein zufaelliges wahres P aus [0.3, 0.9], kalibriert wird weiter mit 0.55.
-  console.log("\n  D) Heterogenes P — kalibriert mit 0.55, ausgewertet mit klausel-individuellem P");
-  {
-    let worstSpread = 0, totalTraps = 0, runs = 60;
-    for (let run = 0; run < runs; run += 1) {
-      const trueP = new Map(CLAUSES.map((k, i) => [k.name, 0.3 + ((Math.sin(run * 7.3 + i * 2.1) + 1) / 2) * 0.6]));
-      // Offsets stammen aus der Kalibrierung mit P_MET; ausgewertet wird mit dem wahren P.
-      for (const e of EXPECTED) {
-        const rows = ALL.map((t) => {
-          const clauseName = t.name.split("/")[1]!;
-          const pT = trueP.get(clauseName)!;
-          const c = offsetFor(t.name, e) ?? 0;
-          const d = distribution(e);
-          let e0 = 0;
-          d.forEach((w, i) => {
-            e0 += w * (pT * withFloor(rankPart(t, e, i + 1, c) + t.clause.bonus)
-                     + (1 - pT) * withFloor(rankPart(t, e, i + 1, c) - t.clause.malus));
-          });
-          return e0;
-        });
-        worstSpread = Math.max(worstSpread, Math.max(...rows) / Math.min(...rows) - 1);
-      }
-    }
-    console.log(`     ${runs} Ziehungen, P je Klausel aus [0.30, 0.90]: groesster EV-Spread ${(worstSpread * 100).toFixed(1)} %`);
-    console.log(`     Zum Vergleich: der behobene Ist-Defekt lag bei 16–30 %.`);
-    void totalTraps;
+  console.log("\n  C) Klausel-p ist fehlgeschaetzt (kalibriert mit Design-p, real verschoben)");
+  for (const sh of [-0.2, -0.15, -0.1, 0, 0.1, 0.15, 0.2]) {
+    console.log(`     p${sh >= 0 ? "+" : ""}${sh.toFixed(2)}: ${fmt(analyse(ALL, 4, sh))}`);
   }
 }
 
@@ -605,10 +614,40 @@ if (process.env.OLY_SPONSOR_SLATE === "1") {
     for (let r = Math.max(1, e - 8); r <= Math.min(32, e + 8); r += 1) band.push(r);
     const rows = oneEach.map((t) => {
       const c = offsetFor(t.name, e);
-      return { name: t.name, joint: band.flatMap((r) => [withFloor(rankPart(t, e, r, c) + t.clause.bonus), withFloor(rankPart(t, e, r, c) - t.clause.malus)]) };
+      return { name: t.name, lot: lotteries(t, e, c, band) };
     });
-    traps += rows.filter((a) => rows.some((b) => a.name !== b.name && a.joint.every((v, i) => v <= b.joint[i]! - 0.5))).length;
+    traps += rows.filter((a) => isTrap(a, rows)).length;
   }
   console.log(`\n  SLATE-TEST (je Kurve nur EINE Kombination, ${oneEach.length} Angebote, alle 32 Erwartungsränge): Fallen ${traps}${traps === 0 ? " ✓" : " ✗"}`);
   console.log(`    Angebote: ${oneEach.map((t) => t.name).join(", ")}`);
+}
+
+// Welche Paare sind es konkret? (FOSD, alle 120 Kombinationen, alle 32 Erwartungsränge)
+if (process.env.OLY_SPONSOR_TRAPS === "1") {
+  const ALL2: SponsorType[] = CURVES.flatMap((c) => CLAUSES.map((k) => compose(c.name, k.name)));
+  const cal2 = new Map<string, number>();
+  for (const t of ALL2) for (const e of EXPECTED) {
+    const tier = tierOf(e); let lo = -200, hi = 200;
+    for (let i = 0; i < 120; i += 1) { const m = (lo + hi) / 2; if (ev(t, e, m) < TARGET_EV[tier]!) lo = m; else hi = m; }
+    cal2.set(`${t.name}:${tier}`, (lo + hi) / 2);
+  }
+  const found = new Map<string, number[]>();
+  for (let e = 1; e <= 32; e += 1) {
+    const band: number[] = [];
+    for (let r = Math.max(1, e - 8); r <= Math.min(32, e + 8); r += 1) band.push(r);
+    const rows = ALL2.map((t) => ({ name: t.name, lot: lotteries(t, e, cal2.get(`${t.name}:${tierOf(e)}`) ?? 0, band) }));
+    for (const a of rows) {
+      const dom = rows.find((b) => b.name !== a.name
+        && a.lot.every((la, i) => fosdAtLeast(b.lot[i]!, la)) && a.lot.some((la, i) => fosdStrictly(b.lot[i]!, la)));
+      if (dom) {
+        const key = `${a.name}  ≪  ${dom.name}`;
+        found.set(key, [...(found.get(key) ?? []), e]);
+      }
+    }
+  }
+  console.log(`\n  ECHTE FALLEN (FOSD): ${found.size} Paare`);
+  for (const [k, ranks] of found) {
+    const sameCurve = k.split("  ≪  ")[0]!.split("/")[0] === k.split("  ≪  ")[1]!.split("/")[0];
+    console.log(`    ${k}   bei Erwartungsrang ${ranks.join(",")}   ${sameCurve ? "[gleiche Kurve]" : "[VERSCHIEDENE Kurven]"}`);
+  }
 }

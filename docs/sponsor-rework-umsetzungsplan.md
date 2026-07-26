@@ -46,10 +46,16 @@ Referenzimplementierung: `scripts/sponsor-model-proposal.ts` (lauffähig, verifi
 
 ## 3. Gemessenes Ergebnis
 
+**Messkriterium:** Fallen werden per **rang-konditionaler FOSD** (Erststufen-stochastische Dominanz)
+bestimmt, nicht elementweise. Der frühere elementweise Vergleich ist ungültig, seit jede Klausel ihr
+eigenes P trägt — er vergleicht Zellen über verschiedene Wahrscheinlichkeitsmaße und erzeugt
+systematisch False Positives. Der CDF-Vergleich ist zusätzlich unabhängig von σ.
+
 | Kriterium | Ist | Vorschlag |
 |---|---|---|
-| Fallen-Sponsoren | 6–7 von 11 | **0** |
-| EV-Spread je Erwartungsrang | 16–30 % | **0,0 %** |
+| Fallen-Sponsoren (kuratierte Liste, alle 32 Ränge) | 6–7 von 11 | **0** |
+| Fallen im vollen 120er-Raum | — | **3 Paare** (nur Ränge 29–32, s. u.) |
+| EV-Spread über alle 32 Erwartungsränge | 16–30 % | **3,8 %** |
 | Risikospanne σ | — | **5,4 – 16,8** (Faktor 3) |
 | Meister bei sf 1.0 | 70–102 je nach Sponsor | **89–104 mit jedem Typ** |
 | Letzter | 39–56, teils unter Gehalt | **≥ 44 mit jedem Typ** |
@@ -69,11 +75,28 @@ trägt, bekommt im guten Jahr am meisten.
 
 | Test | Ergebnis |
 |---|---|
-| Standardannahmen | Fallen 0, Spread 0,0 % |
-| Ergebnisstreuung σ = 2 / 3 / 4 / 6 / 8 | Fallen 0 durchweg |
-| Klausel-Erfüllung P = 0,25 … 0,85 | Fallen 0 durchweg |
+| Designannahmen | 12 Fallen (3 Paare), Spread **5,5 %** |
+| σ = 2 / 3 / 4 / 6 / 8 | Spread 13,8 / 9,6 / **5,5** / 12,4 / **22,0 %** |
+| P fehlgeschätzt ±0,10 / ±0,15 / ±0,20 | Spread bis 6,8 / 10,5 / **12,7 %** |
 
-Das Modell hängt also **nicht** an den beiden geratenen Annahmen.
+**Das Modell hängt sehr wohl an den beiden ungemessenen Annahmen.** Bei σ = 8 statt 4 liegt der
+Spread bei 22 % — in derselben Größenordnung wie der Ist-Defekt (16–30 %), den der Rework behebt.
+Eine frühere Fassung meldete hier „0,0 % durchweg"; das war ein Messfehler des Prüfstands
+(Kalibrierung aufs Set-Mittel, globales P, Messung nur an den Stützstellen, wo der Spread per
+Konstruktion 0 ist). **σ und P müssen vor dem Cutover gemessen werden — sie sind keine Kosmetik,
+sondern tragen das Ergebnis.**
+
+### Angebotsregel (neu, zwingend)
+
+Die 3 verbleibenden Fallen sind `Halten/Achsenprofil ≪ Halten/Ausbau`,
+`Halten/Fokusschule ≪ Halten/Einsatzlast`, `Halten/Wortlaut ≪ Halten/Ausbau` — jeweils bei
+Erwartungsrang 29–32. Alle drei haben **dieselbe Kurve, dasselbe P und ein kleineres s**: am
+Tabellenende schneidet die Untergrenze den Malus beider ab, wodurch der schmaleren Spannweite nur
+noch der kleinere Bonus bleibt.
+
+**Regel: eine Angebotsliste darf keine zwei Sponsoren derselben Kurvenform enthalten.** Damit
+sind es über alle 32 Erwartungsränge 0 Fallen (verifiziert). Die Regel ist allerdings **nicht
+robust gegen P-Fehlschätzung** — sie trägt erst, wenn P gemessen ist.
 
 ## 4. Betroffene Produktionsdateien
 
@@ -110,9 +133,11 @@ Jede Phase ist einzeln lauffähig, hinter Flag, mit eigenem Abnahmekriterium.
 
 ## 6. Offene Punkte / Risiken
 
-1. **Klausel-Erfüllungswahrscheinlichkeit P** ist mit 0,55 angenommen, nicht gemessen. Der
-   Stresstest zeigt Robustheit über 0,25–0,85, aber die *Bepreisung* der Sonderziele hängt direkt
-   daran. → P6 muss messen.
+1. **Klausel-Erfüllungswahrscheinlichkeit P.** Ursprünglich global mit 0,55 angesetzt — das war der
+   gefährlichste Fehler des Entwurfs: mit klausel-individuellem P riss die EV-Parität auf über 50 %
+   auf, also weiter als der behobene Defekt. Jede Klausel trägt jetzt ihr eigenes P, und Bonus/Malus
+   werden daraus abgeleitet (`bonus = s·(1−P)`, `malus = s·P`), damit EV-Beitrag und Spannweite
+   unabhängig von P sind. Die P-Werte selbst bleiben Schätzungen. → **P6 muss messen, vor P7.**
 2. **Erfolgswahrscheinlichkeiten der 22 Sonderziele** sind Design-Schätzungen. Größter
    ungemessener Parameter des Entwurfs.
 3. **Deckel bei der Sonderziel-Bepreisung** (4×) drückt die EV der schwersten Ziele auf 3,6–4,8
