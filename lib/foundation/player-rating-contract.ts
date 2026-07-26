@@ -338,6 +338,12 @@ export function buildPlayerRatingContractRows(input: {
   mvsPerformances?: PlayerDisciplinePerformanceRecord[] | null;
   normalizationPoolPlayerIds?: string[] | null;
   rankPoolPlayerIds?: string[] | null;
+  // Perf (Audit #2 F2): `players` bleibt der VOLLE Pool (Normalisierungs-Maxima, MVS-Retool),
+  // aber ausgegeben werden nur diese IDs. So kann der Saison-Ende-Progression-Audit die OVR/MVS
+  // EINES getauschten Spielers pool-relativ (byte-identisch) berechnen, ohne alle ~261 Zeilen +
+  // Rang-Maps zu bauen. Wenn gesetzt, werden die Rang-Felder NICHT befüllt (bleiben null) — der
+  // Audit liest ausschließlich ovrNormalized/mvs, keine Ränge.
+  outputPlayerIds?: string[] | null;
 }) {
   const players = input.players;
   const mvsPlayers = input.mvsPlayers ?? players;
@@ -456,7 +462,12 @@ export function buildPlayerRatingContractRows(input: {
   const poolHasSpread =
     minRawOvrScore != null && maxRawOvrScore != null && maxRawOvrScore > minRawOvrScore;
 
-  const normalizedRows = sourceRows.map((row) => {
+  // Maxima/min/max-rawOVR oben stammen aus dem VOLLEN Pool (ovrCalculationRows) — davon UNBERÜHRT.
+  // Nur die (teuren) Zeilen-Objekte + Rang-Maps werden auf die angeforderten Ausgabe-IDs beschränkt.
+  const outputIdSet = input.outputPlayerIds != null ? new Set(input.outputPlayerIds.filter(Boolean)) : null;
+  const rowsForOutput = outputIdSet ? sourceRows.filter((row) => outputIdSet.has(row.player.id)) : sourceRows;
+
+  const normalizedRows = rowsForOutput.map((row) => {
     const rawOvrScore = ovrRawByPlayerId.get(row.player.id) ?? null;
     const normalizationSpread =
       minRawOvrScore == null || maxRawOvrScore == null
@@ -512,6 +523,14 @@ export function buildPlayerRatingContractRows(input: {
 
     return result;
   });
+
+  // Rang-Berechnung ist liga-relativ und bräuchte ALLE Zeilen. Wird nur ein Teil ausgegeben
+  // (outputPlayerIds — F2-Fast-Path für den Progression-Audit), sind Ränge nicht sinnvoll berechenbar
+  // und werden bewusst weggelassen (bleiben null). Der einzige Consumer (buildEconomyAudit) liest nur
+  // ovrNormalized/mvs, keine Ränge — daher byte-identisch für die tatsächlich genutzten Felder.
+  if (outputIdSet) {
+    return normalizedRows;
+  }
 
   const rankRows = rankPoolIdSet ? normalizedRows.filter((row) => rankPoolIdSet.has(row.playerId)) : normalizedRows;
 
@@ -573,7 +592,14 @@ export function buildPlayerRatingContractRows(input: {
 export function buildPlayerRatingContractMap(
   gameState: GameState,
   seasonPointsLedger?: SeasonPointsLedger,
-  options?: { playerIds?: string[] | null; ignoreFreeze?: boolean },
+  options?: {
+    playerIds?: string[] | null;
+    ignoreFreeze?: boolean;
+    // Perf (Audit #2 F2): wie `playerIds`, ABER der Normalisierungs-/Rang-Pool bleibt die volle Liga
+    // (`playerIds` verkleinert dagegen auch den Pool → andere Maxima). Nur die ausgegebenen Zeilen werden
+    // gefiltert; Rang-Felder bleiben null. Für pool-relative Einzel-OVR/-MVS-Reads (Progression-Audit).
+    outputOnlyPlayerIds?: string[] | null;
+  },
 ) {
   // Read-Gate: sobald die Saison eingefroren ist (nach MD10), NICHT mehr pool-relativ live
   // rechnen — sonst verschieben Verkäufe/Roster-Änderungen OVR/MVS/PPs aller anderen Spieler.
@@ -606,9 +632,13 @@ export function buildPlayerRatingContractMap(
   const activePlayerIds = Array.from(new Set((gameState.rosters ?? []).map((entry) => entry.playerId).filter(Boolean)));
   const outputPlayerIdSet =
     options?.playerIds != null ? new Set(options.playerIds.filter(Boolean)) : null;
-  const rowPlayers = outputPlayerIdSet
-    ? gameState.players.filter((player) => outputPlayerIdSet.has(player.id))
-    : gameState.players;
+  // `outputOnlyPlayerIds`: voller Pool bleibt erhalten (Maxima/Ränge liga-relativ), nur die Ausgabe wird
+  // gefiltert — im Gegensatz zu `playerIds`, das den Pool selbst verkleinert.
+  const outputOnlyPlayerIds = options?.outputOnlyPlayerIds ?? null;
+  const rowPlayers =
+    outputPlayerIdSet && outputOnlyPlayerIds == null
+      ? gameState.players.filter((player) => outputPlayerIdSet.has(player.id))
+      : gameState.players;
 
   return new Map(
     buildPlayerRatingContractRows({
@@ -618,6 +648,7 @@ export function buildPlayerRatingContractMap(
       mvsPerformances: gameState.seasonState.playerDisciplinePerformances ?? [],
       normalizationPoolPlayerIds: activePlayerIds,
       rankPoolPlayerIds: activePlayerIds,
+      outputPlayerIds: outputOnlyPlayerIds,
     }).map((row) => [row.playerId, row] as const),
   );
 }

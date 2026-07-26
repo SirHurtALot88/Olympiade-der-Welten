@@ -338,4 +338,33 @@ describe("frozen valuation snapshot", () => {
     const frozenGrown = buildPlayerRatingContractMap(grownState).get(grownId)!.ovrNormalized;
     expect(frozenGrown).toBe(frozenBaseline);
   });
+
+  it("outputOnlyPlayerIds fast-path (F2) yields byte-identical ovrNormalized/mvs to the full pool map", () => {
+    // Perf-Fast-Path des Progression-Audits: EIN Spieler wird pool-relativ berechnet, ohne alle Zeilen
+    // + Rang-Maps zu bauen. Muss für die tatsächlich genutzten Felder (ovrNormalized, mvs) exakt dem
+    // vollen Map-Ergebnis entsprechen — für JEDEN Spieler, nicht nur einen.
+    const base = createGameState({ gamePhase: "season_active" });
+    const fullMap = buildPlayerRatingContractMap(base, undefined, { ignoreFreeze: true });
+
+    for (const player of base.players) {
+      const fullRow = fullMap.get(player.id);
+      const fastRow = buildPlayerRatingContractMap(base, undefined, {
+        ignoreFreeze: true,
+        outputOnlyPlayerIds: [player.id],
+      }).get(player.id);
+
+      expect(fastRow).toBeDefined();
+      expect(fastRow!.ovrNormalized).toBe(fullRow?.ovrNormalized ?? null);
+      expect(fastRow!.mvs).toBe(fullRow?.mvs ?? null);
+      expect(fastRow!.rawOvrScore).toBe(fullRow?.rawOvrScore ?? null);
+    }
+
+    // Der Fast-Path liefert genau EINE Zeile (nicht die ganze Liga) und lässt Ränge bewusst null.
+    const single = buildPlayerRatingContractMap(base, undefined, {
+      ignoreFreeze: true,
+      outputOnlyPlayerIds: ["p8"],
+    });
+    expect(single.size).toBe(1);
+    expect(single.get("p8")!.ovrRank).toBeNull();
+  });
 });
