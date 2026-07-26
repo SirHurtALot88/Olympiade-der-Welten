@@ -809,6 +809,9 @@ describe("singleplayer game state", () => {
   });
 
   it("normalizes older local saves back to a full 10-matchday season seed schedule on reload", () => {
+    // Creates a real sqlite-backed fresh Season-1 save and reloads/normalizes it;
+    // measured at ~5.3-5.5s locally (right at vitest's 5s default boundary), so give it
+    // generous headroom rather than leaving it flaky at the edge.
     const persistence = createPersistenceService();
     const fresh = persistence.createFreshSeasonOneSave({ name: "Legacy Schedule Normalize Test" });
     const mutated = structuredClone(fresh.gameState);
@@ -828,7 +831,7 @@ describe("singleplayer game state", () => {
     expect(reloaded?.gameState.seasonState.disciplineSchedule?.every((entry) => entry.sourceStatus === "season_seed")).toBe(true);
     expect(reloaded?.gameState.seasonState.disciplineSchedule?.[0]?.discipline1?.disciplineId).not.toBe("mini-dm");
     expect(reloaded?.gameState.seasonState.disciplineSchedule?.[0]?.discipline2?.disciplineId).not.toBe("fechten");
-  });
+  }, 20000);
 
   it("persists local player generator drafts inside the sqlite save", () => {
     const persistence = createPersistenceService();

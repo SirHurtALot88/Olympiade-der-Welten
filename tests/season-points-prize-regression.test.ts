@@ -1,9 +1,26 @@
+import fs from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
-import { runSeasonPointsPrizeRegressionSmoke } from "@/lib/season/season-points-prize-regression";
+import {
+  runSeasonPointsPrizeRegressionSmoke,
+  SEASON_POINTS_PRIZE_REGRESSION_OUTPUT_DIR,
+} from "@/lib/season/season-points-prize-regression";
+
+// This regression smoke reads a pre-generated Season-1 simulation artifact
+// (season1-simulation-summary.json + 2 CSVs) from the gitignored outputs/
+// directory. That artifact is produced by an ad-hoc simulation run that is
+// not part of this repo/CI and was never committed (outputs/ is in
+// .gitignore), so it is only present on a machine where someone has run
+// that simulation locally. Skip cleanly instead of failing with ENOENT when
+// it is absent.
+const hasRegressionFixture = fs.existsSync(
+  path.join(SEASON_POINTS_PRIZE_REGRESSION_OUTPUT_DIR, "season1-simulation-summary.json"),
+);
 
 describe("season points and prize regression smoke", () => {
-  it("keeps completed Season 1 points and prize rank-change plausible", async () => {
+  it.skipIf(!hasRegressionFixture)("keeps completed Season 1 points and prize rank-change plausible", async () => {
     const summary = await runSeasonPointsPrizeRegressionSmoke({ write: false });
 
     expect(summary.seasonCompleted).toBe(true);

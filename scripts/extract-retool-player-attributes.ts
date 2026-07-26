@@ -45,6 +45,15 @@ function ensureOutputDir() {
 }
 
 function findRetoolJsonCandidates() {
+  // DOWNLOADS_DIR only exists on the original author's machine. On any other
+  // machine (CI, other contributors) the directory itself is absent, which
+  // made fs.readdirSync throw ENOENT instead of falling through to the
+  // "no candidates found" path the rest of this module already handles
+  // gracefully. Treat a missing directory the same as an empty one.
+  if (!fs.existsSync(DOWNLOADS_DIR)) {
+    return [];
+  }
+
   return fs
     .readdirSync(DOWNLOADS_DIR)
     .filter((name) => RETOOL_JSON_PATTERN.test(name))

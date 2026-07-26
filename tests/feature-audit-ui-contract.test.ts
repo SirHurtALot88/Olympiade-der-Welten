@@ -3,7 +3,9 @@ import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
-const foundationClientPath = path.join(process.cwd(), "app/foundation/FoundationPageClient.tsx");
+// The Feature Audit matrix markup now lives in the cockpit panel component,
+// not in the FoundationPageClient wrapper (which is now a 25-line shim).
+const foundationClientPath = path.join(process.cwd(), "app/foundation/cockpit-v2/FoundationCockpitPanel.tsx");
 
 describe("feature audit ui contract", () => {
   it("renders the feature audit matrix in the cockpit with filters and export links", async () => {

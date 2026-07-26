@@ -95,7 +95,9 @@ describe("season start reset service", () => {
     const afterPreview = persistence.getSaveById(save.saveId);
     expect(afterPreview?.gameState.transferHistory).toHaveLength(1);
     expect(afterPreview?.gameState.rosters).toHaveLength(1);
-  });
+    // Creates a full fresh Season-1 save plus a reset preview against real persistence;
+    // measured at ~7.5s locally; give it generous headroom above vitest's 5s default.
+  }, 20000);
 
   it("replaces the current save state with a clean season-start basis on execute", async () => {
     const persistence = createPersistenceService();
@@ -160,5 +162,7 @@ describe("season start reset service", () => {
     expect(resetSave?.gameState.rosters).toHaveLength(0);
     expect(resetSave?.gameState.seasonState.matchdayResults ?? []).toHaveLength(0);
     expect(resetSave?.gameState.teams.find((entry) => entry.teamId === team.teamId)?.cash).toBe(team.cash);
-  });
+    // Creates a full fresh Season-1 save and executes a real reset against persistence;
+    // measured at ~7.7s locally; give it generous headroom above vitest's 5s default.
+  }, 20000);
 });

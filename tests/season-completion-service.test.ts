@@ -207,7 +207,9 @@ describe("runLocalSeasonCompletion", () => {
     expect(result.aiSeasonAudit.seasonId).toBe(gameState.season.id);
     // No facilities built by default in a fresh season -> nothing to settle.
     expect(result.steps.find((step) => step.key === "facility_finance")?.status).toBe("skipped");
-  });
+    // Full season-completion pipeline (32 teams, relationships/snapshot/transition) measured
+    // at ~13.4s locally; give it generous headroom above vitest's 5s default.
+  }, 30000);
 
   it("applies facility season-end income/upkeep to Team.cash exactly once (idempotent on retry)", async () => {
     const gameState = createCompletedSeasonState();
@@ -268,5 +270,7 @@ describe("runLocalSeasonCompletion", () => {
         event.teamId === team.teamId && event.seasonId === gameState.season.id && event.source === "facility_income_collected",
     );
     expect(facilityIncomeEventsAfterSecondRun.length).toBe(1);
-  });
+    // Runs the full season-completion pipeline twice (idempotency check); measured at
+    // ~26.2s locally; give it generous headroom above vitest's 5s default.
+  }, 60000);
 });

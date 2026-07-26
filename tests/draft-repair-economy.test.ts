@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveGmDraftBufferPct } from "@/lib/ai/ai-needs-picks-compare-service";
+import { getGmDraftBufferPct } from "@/lib/ai/ai-needs-picks-compare-service";
 import { resolvePreseasonRepairMarketValueCap } from "@/lib/ai/chunked-redraft-topup-service";
 
 describe("draft and repair economy helpers", () => {
   it("halves GM draft buffer corridor vs legacy max", () => {
-    const buffer = resolveGmDraftBufferPct(null, 0.93);
+    const buffer = getGmDraftBufferPct(null, 0.93);
     expect(buffer).toBeLessThanOrEqual(0.075);
     expect(buffer).toBeGreaterThanOrEqual(0.04);
   });

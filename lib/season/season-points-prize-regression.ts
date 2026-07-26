@@ -7,8 +7,14 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { buildPrizeMoneyPreview } from "@/lib/season/prize-money-preview";
 
+// Historically this pointed at a hard-coded path on the original author's
+// machine (/Users/chrisfalk/Documents/...). That directory never existed
+// anywhere else, so the regression smoke crashed with ENOENT on any other
+// machine. `outputs/` is the project-local, gitignored directory the rest of
+// the repo's tooling already writes generated artifacts to (see
+// .gitignore), so default there; an env var still allows overriding it.
 export const SEASON_POINTS_PRIZE_REGRESSION_OUTPUT_DIR =
-  "/Users/chrisfalk/Documents/Codex/2026-06-11/wir-machen-weiter-mit-dem-olympiade/outputs";
+  process.env.SEASON_POINTS_PRIZE_REGRESSION_OUTPUT_DIR ?? path.join(process.cwd(), "outputs");
 
 type RankToPointsRow = Record<string, string>;
 

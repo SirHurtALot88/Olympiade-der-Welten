@@ -10,8 +10,10 @@ describe("contract offer ui contract", () => {
         path.join(process.cwd(), "app/foundation/contract-offer/ContractOfferClient.tsx"),
         "utf8",
       ),
+      // ContractOfferClient is now wired up from FoundationMarketBuyShellHost.tsx
+      // (TransfermarktV2Client.tsx is just the outer wrapper today).
       fs.readFile(
-        path.join(process.cwd(), "app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx"),
+        path.join(process.cwd(), "app/foundation/transfermarkt-v2/FoundationMarketBuyShellHost.tsx"),
         "utf8",
       ),
     ]);

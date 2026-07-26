@@ -103,12 +103,24 @@ describe("form card plan sync", () => {
 
   it("wires game-flow form-board deep link into lineup formplan tab", async () => {
     const fs = await import("node:fs/promises");
-    const foundationText = await fs.readFile(
-      path.join(process.cwd(), "app/foundation/FoundationPageClient.tsx"),
-      "utf8",
-    );
+    // FoundationPageClient.tsx is now a thin wrapper; the deep-link wiring lives
+    // in use-foundation-shell-router-body-scope.tsx (targetPanel handling) and
+    // FoundationShellRouterBody.tsx (the actual lineup panel props).
+    const [scopeText, shellRouterBodyText] = await Promise.all([
+      fs.readFile(
+        path.join(process.cwd(), "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx"),
+        "utf8",
+      ),
+      fs.readFile(
+        path.join(process.cwd(), "app/foundation/FoundationShellRouterBody.tsx"),
+        "utf8",
+      ),
+    ]);
+    const foundationText = `${scopeText}\n${shellRouterBodyText}`;
     expect(foundationText).toContain('targetPanel === "form-board"');
     expect(foundationText).toContain("lineupDraftBoardViewRequest");
-    expect(foundationText).toContain('initialDraftBoardView={lineupDraftBoardViewRequest');
+    // Prop is now wired via the `client={{ ... }}` object literal instead of a
+    // direct JSX attribute, but it still forwards the same request value.
+    expect(foundationText).toContain("initialDraftBoardView: lineupDraftBoardViewRequest");
   });
 });
