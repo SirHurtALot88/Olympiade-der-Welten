@@ -17,6 +17,7 @@ import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebth
 import { buildTeamSeasonObjectiveSettlement } from "@/lib/board/team-season-objectives-service";
 import { normalizeEconomyMoney, resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
+import { FINANCE_SPONSOR_INCOME_COMPONENT_KINDS } from "@/lib/foundation/finances/finances-types";
 import type {
   FinanceFacilityIncome,
   FinanceFacilityIncomeRow,
@@ -105,8 +106,12 @@ function computeFacilitySeasonEndCash(gameState: GameState, teamId: string, cash
   };
 }
 
-/** Anzeige-Reihenfolge der Sponsor-Vertragskomponenten (mirrors `SPONSOR_STACK_SEGMENTS` in FoundationSponsorsNewLook). */
-const SPONSOR_COMPONENT_KIND_ORDER: SponsorOfferComponentKind[] = ["base", "rank", "improvement", "special"];
+/**
+ * Anzeige-Reihenfolge der Sponsor-Vertragskomponenten (mirrors `SPONSOR_STACK_SEGMENTS` in
+ * FoundationSponsorsNewLook). Kommt aus `finances-types.ts`, damit die Liga-Vergleichstabelle
+ * exakt dieselbe Komponenten-Auswahl summiert (kein Auseinanderdriften auf demselben Screen).
+ */
+const SPONSOR_COMPONENT_KIND_ORDER: SponsorOfferComponentKind[] = FINANCE_SPONSOR_INCOME_COMPONENT_KINDS;
 
 /** Wie viele vergangene (archivierte) Saisons der GuV-/Cash-Verlauf zusätzlich zur laufenden Saison zeigt (T-107). */
 const HISTORY_PAST_SEASONS = 4;
@@ -269,11 +274,17 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
   // Tilgung wurde doppelt bestraft.) Die Cash-Reconciliation `cashSeasonStart + guv + otherCashMovements
   // == cash` bleibt gültig: `otherCashMovements` ist eine reine Differenz und absorbiert den nun nicht
   // mehr in der GuV enthaltenen Tilgungs-Cashabfluss.
-  const totalIncome = round1(
-    (sponsor?.total ?? 0) + (facilityIncome?.total ?? 0) + (transferSurplus ?? 0) + (objectiveReward ?? 0),
-  );
+  // Transfer-Saldo ist ein Sonderposten (Einmal-Ereignis, v. a. der große Kader-Aufbau in S1), KEINE
+  // laufende Betriebs-GuV — er wird separat als Transfer-Zeile (`transfer`) ausgewiesen und über
+  // `otherCashMovements` cash-abgeglichen (analog zur Kredit-Tilgung, die ebenfalls eine reine
+  // Bilanzbewegung ist). Vorher floss `transferDeficit`/`transferSurplus` in totalIncome/totalExpenses →
+  // die GuV war in S1 durch den einmaligen Kaderkauf massiv verzerrt (z. B. -178 statt der laufenden
+  // Betriebs-GuV) und lief der bewusst transferfreien Liga-Vergleichstabelle zuwider. Die Cash-
+  // Reconciliation `cashSeasonStart + guv + otherCashMovements == cash` bleibt gültig: otherCashMovements
+  // ist eine reine Differenz und absorbiert den nun nicht mehr in der GuV enthaltenen Transfer-Cashfluss.
+  const totalIncome = round1((sponsor?.total ?? 0) + (facilityIncome?.total ?? 0) + (objectiveReward ?? 0));
   const totalExpenses = round1(
-    salaryTotal + facilityUpkeepTotal + loanInterestTotal + (transferDeficit ?? 0) + (objectivePenalty ?? 0),
+    salaryTotal + facilityUpkeepTotal + loanInterestTotal + (objectivePenalty ?? 0),
   );
   const guv = round1(totalIncome - totalExpenses);
 

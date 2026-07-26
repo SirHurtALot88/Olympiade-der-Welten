@@ -12,6 +12,24 @@
 
 import type { SponsorOfferComponentKind } from "@/lib/data/olyDataTypes";
 
+/**
+ * Sponsor-Komponenten-Arten, die als laufende "Sponsor"-Einnahme gezeigt werden — GEMEINSAME Quelle für
+ * die eigene Detail-Übersicht (`use-finances-view-model.ts`) UND die Liga-Vergleichstabelle
+ * (`use-finances-league-table.ts`), damit beide auf demselben Finanzen-Screen niemals verschiedene
+ * Sponsorsummen für dasselbe Team zeigen.
+ *
+ * `overperformance` ist bewusst NICHT enthalten: dessen `rewardCash` ist nur ein CAP, ausgezahlt wird
+ * `min(cap, ratePerUnitC × Plätze über Erwartungsrang)` (siehe sponsor-settlement-service.ts) — also
+ * 0 C, solange das Team seinen Erwartungsrang nicht übertrifft. Als sichere Einnahme ausgewiesen würde
+ * der Cap die Einnahmen systematisch aufblähen. Die Reihenfolge bestimmt zugleich die Anzeige-Sortierung.
+ */
+export const FINANCE_SPONSOR_INCOME_COMPONENT_KINDS: SponsorOfferComponentKind[] = [
+  "base",
+  "rank",
+  "improvement",
+  "special",
+];
+
 /** One sponsor-contract component contributing to the "Sponsor"-Einnahme, for the hover breakdown. */
 export type FinanceSponsorComponentRow = {
   kind: SponsorOfferComponentKind;
@@ -208,6 +226,10 @@ export type FinanceLeagueTableRow = {
   teamId: string;
   teamName: string;
   teamCode: string;
+  /** Team-Logo (Browser-URL) — `null` wenn kein Logo hinterlegt; dann greift `logoInitials`. */
+  logoUrl: string | null;
+  /** Initialen-Fallback (max. 2 Buchstaben) für die Crest-Anzeige ohne Logo. */
+  logoInitials: string;
   cash: number;
   /** Sponsor + Preisgeld p.a. (Näherungswert, ohne Transfer-Saldo). */
   incomeAnnual: number;

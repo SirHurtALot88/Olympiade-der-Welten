@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import { EmptyState } from "@/components/foundation/EmptyState";
 import {
   NL_TONE_VAR,
@@ -124,15 +125,10 @@ function buildIncomeLines(team: TeamFinancesState): FinanceLineItem[] {
       title: buildFacilityIncomeTooltip(team),
     });
   }
-  if (team.income.transferSurplus != null) {
-    lines.push({
-      key: "transfer",
-      label: "Transfer-Überschuss",
-      amount: team.income.transferSurplus,
-      tone: "spe",
-      title: buildTransferTooltip(team),
-    });
-  }
+  // Transfer-Überschuss ist ein Sonderposten (Einmal-Ereignis) und wird NICHT mehr in die laufende
+  // Betriebs-GuV/Einnahmen gerechnet — er erscheint in einem eigenen "Transfers (Sonderposten)"-Block
+  // (siehe TransferSpecialItem). So bleiben Einnahmen-Summe + Aufschlüsselung + Flow-Chart deckungsgleich
+  // mit `team.totalIncome`.
   if (team.income.objectiveReward != null) {
     lines.push({
       key: "objective",
@@ -168,15 +164,10 @@ function buildExpenseLines(team: TeamFinancesState): FinanceLineItem[] {
       title: buildLoanTooltip(team),
     });
   }
-  if (team.expenses.transferDeficit != null) {
-    lines.push({
-      key: "transfer",
-      label: "Transfer-Defizit",
-      amount: team.expenses.transferDeficit,
-      tone: "warn",
-      title: buildTransferTooltip(team),
-    });
-  }
+  // Transfer-Defizit ist ein Sonderposten (Einmal-Ereignis, v. a. der Kaderaufbau in S1) und wird NICHT
+  // mehr in die laufende Betriebs-GuV/Ausgaben gerechnet — es erscheint im eigenen "Transfers
+  // (Sonderposten)"-Block (siehe TransferSpecialItem), damit Ausgaben-Summe + Aufschlüsselung + Flow-Chart
+  // deckungsgleich mit `team.totalExpenses` bleiben.
   if (team.expenses.objectivePenalty != null) {
     lines.push({
       key: "objective",
@@ -401,6 +392,38 @@ function FinanceLine({ label, amount, share, tone, title }: { label: string; amo
   );
 }
 
+// --- Transfers (Sonderposten) -------------------------------------------
+// Der Transfersaldo der laufenden Saison ist ein Einmal-Ereignis (v. a. der große Kaderaufbau in S1) und
+// gehört bewusst NICHT in die laufende Betriebs-GuV (siehe use-finances-view-model.ts). Er wird hier als
+// eigener Sonderposten ausgewiesen, damit er sichtbar bleibt — auch in S1, wo der Cash-Abgleich (der ihn
+// sonst über "Sonstige Cash-Bewegungen" absorbiert) mangels archiviertem Saisonstart-Cash ausgeblendet ist.
+function TransferSpecialItem({ team }: { team: TeamFinancesState }) {
+  const transfer = team.transfer;
+  if (!transfer) return null;
+  return (
+    <StatChipRow className="nl-fin-kpi-hero" aria-label="Transfers (Sonderposten)">
+      <StatChip
+        label="Transfersaldo"
+        value={formatNlMoney(transfer.net)}
+        tone={transfer.net >= 0 ? "good" : "risk"}
+        title="Verkaufserlöse minus Kaufausgaben der laufenden Saison — Sonderposten, NICHT Teil der Betriebs-GuV."
+      />
+      <StatChip
+        label="Verkäufe"
+        value={formatNlMoney(transfer.sellTotal)}
+        tone="neutral"
+        title={`${transfer.sellCount} Spieler verkauft`}
+      />
+      <StatChip
+        label="Käufe"
+        value={formatNlMoney(transfer.buyTotal)}
+        tone="neutral"
+        title={`${transfer.buyCount} Spieler gekauft`}
+      />
+    </StatChipRow>
+  );
+}
+
 // --- Cash-Abgleich (T-031) -----------------------------------------------
 // Die GuV oben erklärt NICHT die tatsächliche Cash-Veränderung der Saison
 // (Kredit-Auszahlungen/Vorfälligkeitsentschädigung, Baukosten, u. Ä. fehlen).
@@ -480,6 +503,15 @@ function renderLeagueCell(
     case "team":
       return (
         <span className="nl-fin-league-team">
+          <BudgetedMediaImage
+            src={row.logoUrl}
+            alt={`${row.teamName} Logo`}
+            className="nl-fin-league-crest"
+            width={22}
+            height={22}
+            loading="lazy"
+            fallback={<span className="nl-fin-league-crest nl-fin-league-crest-fallback">{row.logoInitials}</span>}
+          />
           <span className="nl-fin-league-code">{row.teamCode}</span>
           <span className="nl-fin-league-name" title={row.teamName}>
             {row.teamName}
@@ -596,13 +628,13 @@ export default function FoundationFinancesNewLook({
               label="Einnahmen (Saison)"
               value={formatNlMoney(animatedIncome ?? team.totalIncome)}
               tone="good"
-              title="Sponsor + Gebäude-Einnahmen + Transfer-Überschuss + Vorstandsziel-Prämien der laufenden Saison"
+              title="Sponsor + Gebäude-Einnahmen + Vorstandsziel-Prämien der laufenden Saison (Transfersaldo separat als Sonderposten)"
             />
             <StatChip
               label="Ausgaben (Saison)"
               value={formatNlMoney(animatedExpenses ?? team.totalExpenses)}
               tone="risk"
-              title="Gehälter + bezahlter Gebäude-Unterhalt + Kreditraten + Transfer-Defizit + Vorstandsziel-Strafen der laufenden Saison"
+              title="Gehälter + bezahlter Gebäude-Unterhalt + Kreditraten + Vorstandsziel-Strafen der laufenden Saison (Transfersaldo separat als Sonderposten)"
             />
             <StatChip
               label="GuV"
@@ -625,6 +657,18 @@ export default function FoundationFinancesNewLook({
       {team ? (
         <NlCard className="nl-fin-flow-card" eyebrow="Cashflow" title="Einnahmen vs. Ausgaben" data-testid="nl-fin-flow-card">
           <FinanceFlowChart incomeLines={incomeLines} expenseLines={expenseLines} />
+        </NlCard>
+      ) : null}
+
+      {/* Transfersaldo als Sonderposten — außerhalb der laufenden Betriebs-GuV, aber sichtbar (auch in S1). */}
+      {team && team.transfer ? (
+        <NlCard
+          className="nl-fin-transfer-card"
+          eyebrow="Transfers"
+          title="Sonderposten (nicht in der GuV)"
+          data-testid="nl-fin-transfer-card"
+        >
+          <TransferSpecialItem team={team} />
         </NlCard>
       ) : null}
 
