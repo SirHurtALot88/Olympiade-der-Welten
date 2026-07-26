@@ -2,6 +2,7 @@ import type { Fixture, GameLogEntry, GameState, LineupDraft, MatchdayAdvanceLogR
 import { assessPlayerMorale, buildMoraleLookupIndex } from "@/lib/morale/player-morale-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import { advanceScoutIntelTick } from "@/lib/scouting/facility-scout-pipeline-service";
 import { advancePlayerPotentialRevealTick } from "@/lib/progression/player-potential-service";
 import { maybeGenerateSponsorEvents } from "@/lib/sponsor/sponsor-event-service";
@@ -73,15 +74,11 @@ function normalizeSource(source?: string) {
   return source === "prisma" ? "prisma" : "sqlite";
 }
 
+// Audit S4: gameplay writes must never silently fall back to "the active save" — an unresolved
+// saveId (missing, stale, or belonging to another player) now throws instead of quietly
+// redirecting the matchday advance to a different save while still reporting success.
 function resolveLocalSave(persistence: PersistenceService, saveId: string) {
-  const bootstrapped = persistence.bootstrapSingleplayerSave();
-  const save = persistence.getSaveById(saveId) ?? persistence.getActiveSave() ?? bootstrapped.save;
-
-  if (!save) {
-    throw new Error(`Local save ${saveId} could not be loaded for matchday progress.`);
-  }
-
-  return save;
+  return requireLocalPersistedSave(persistence, saveId).save;
 }
 
 function buildIdempotencyKey(scope: { saveId: string; seasonId: string; currentMatchdayId: string; nextMatchdayId: string | null }) {

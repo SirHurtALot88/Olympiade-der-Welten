@@ -1,5 +1,6 @@
 import type { CashPrizeApplyLogRecord, GameState } from "@/lib/data/olyDataTypes";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { buildPrizeMoneyPreview, type PrizeMoneyPreviewResult } from "@/lib/season/prize-money-preview";
 import { CASH_PRIZE_BENCHMARK_ONLY } from "@/lib/season/cash-prize-benchmark-flag";
@@ -87,15 +88,10 @@ function buildAuditLogId(scope: { saveId: string; seasonId: string; matchdayId: 
   return `cash-prize-apply-audit__${scope.saveId}__${scope.seasonId}__${scope.matchdayId}`;
 }
 
+// Audit S4: cash payouts are a gameplay write — an unresolved saveId must never silently land on
+// "the active save" (which, per-owner, isn't even a well-defined target). Throw instead.
 function resolveLocalSave(persistence: PersistenceService, saveId: string) {
-  const bootstrapped = persistence.bootstrapSingleplayerSave();
-  const save = persistence.getSaveById(saveId) ?? persistence.getActiveSave() ?? bootstrapped.save;
-
-  if (!save) {
-    throw new Error(`Local save ${saveId} could not be loaded for cash prize apply.`);
-  }
-
-  return save;
+  return requireLocalPersistedSave(persistence, saveId).save;
 }
 
 function toPlannedChanges(items: PrizeMoneyPreviewResult["items"]): CashPrizeApplyPlannedChange[] {

@@ -6,6 +6,7 @@ import {
   MATCHDAY_AUTO_RUN_CONFIRM_TOKEN,
   runLocalMatchdayAutoRun,
 } from "@/lib/season/matchday-auto-run-service";
+import { SaveResolutionError } from "@/lib/persistence/resolve-local-save";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
@@ -133,6 +134,12 @@ export async function POST(request: Request) {
       warnings: [...writeAuth.warnings, ...result.warnings],
     });
   } catch (error) {
+    if (error instanceof SaveResolutionError) {
+      return NextResponse.json(
+        { success: false, error: error.code, message: error.message, blockingReasons: [error.code] },
+        { status: error.status },
+      );
+    }
     return NextResponse.json(
       {
         success: false,

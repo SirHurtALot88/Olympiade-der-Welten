@@ -2,7 +2,7 @@ import { buildLegacyMatchdayReadiness } from "@/lib/lineups/legacy-matchday-read
 import { loadAllLocalLegacyLineupContexts } from "@/lib/lineups/legacy-lineup-local-service";
 import type { LegacyLineupContextLoadResult } from "@/lib/lineups/legacy-lineup-types";
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { resolveLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
+import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import {
   attachMatchdayInjuryPerformanceToContexts,
@@ -124,7 +124,7 @@ export function loadSqliteLegacyMatchdayResolvePreview(input: {
   // Persistenz einmal auflösen und teilen: Contexts UND GameState stammen so aus
   // demselben Save-Snapshot, wie es der Apply-Pfad tut.
   const persistence = createPersistenceService();
-  const { save } = resolveLocalPersistedSave(persistence, input.saveId);
+  const { save } = requireLocalPersistedSave(persistence, input.saveId);
   const contextResults = loadAllLocalLegacyLineupContexts(input, persistence);
   return buildLegacyMatchdayResolvePreviewPayload({
     source: "sqlite",

@@ -17,7 +17,7 @@ import {
 } from "@/lib/lineups/lineup-discipline-contract";
 import { getSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
-import { resolveLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
+import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import type { PersistedSaveGame } from "@/lib/persistence/types";
 import { buildStandingsPreview } from "@/lib/standings/standings-preview-engine";
 import { readStandingsPreviewCache, writeStandingsPreviewCache } from "@/lib/standings/standings-preview-cache";
@@ -184,8 +184,11 @@ export async function loadMatchdayArenaBase(input: {
   activeOwnerId?: string;
   includeDetails?: boolean;
 }) {
+  // Audit S4: `saveId` is always required by the caller (route 400s otherwise) — resolve strictly
+  // so a stale/unknown id never silently shows another save's (possibly another player's) arena
+  // briefing instead of failing loudly.
   const persistence = createPersistenceService();
-  const { save } = resolveLocalPersistedSave(persistence, input.saveId);
+  const { save } = requireLocalPersistedSave(persistence, input.saveId);
   const versionMeta = persistence.getSaveVersionMetadata(save.saveId);
   const contentSignature = versionMeta?.contentSignature ?? null;
   const params: LegacyLineupKeyParams = {

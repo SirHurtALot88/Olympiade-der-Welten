@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
+import { SaveResolutionError } from "@/lib/persistence/resolve-local-save";
 import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
@@ -84,6 +85,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof SaveResolutionError) {
+      return NextResponse.json({ error: error.code, message: error.message }, { status: error.status });
+    }
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "AI batch apply failed.",
