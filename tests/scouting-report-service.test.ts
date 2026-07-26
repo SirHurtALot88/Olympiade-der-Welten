@@ -1,8 +1,42 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { Discipline, GameState, Player, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
 import { buildScoutingReport } from "@/lib/scouting/scouting-report-service";
 import { refreshScoutPipeline } from "@/lib/scouting/facility-scout-pipeline-service";
+
+/**
+ * Der Fog of War ist aktuell global überbrückt: `DEBUG_FORCE_PLAYER_VISIBILITY`
+ * (aus `NEXT_PUBLIC_DEBUG_PLAYER_ATTRIBUTES`, Default AN während der Bauphase,
+ * siehe lib/foundation/debug-player-visibility.ts) zwingt jeden Lese-Pfad
+ * (inklusive buildScoutingReport) auf "exact". Die Maskierungs-Logik selbst
+ * bleibt dabei unverändert erhalten. Tests, die genau diese (nur temporär
+ * überbrückte) Maskierung prüfen, schalten den Bypass gezielt AUS: Env vor dem
+ * Modul-Load setzen und Scouting-Report + Pipeline-Modul frisch laden (gleiches
+ * Muster wie tests/player-detail-drawer.test.ts). Das lässt das echte
+ * Spiel-Verhalten (Bauphase = kein Fog) unangetastet.
+ */
+async function buildScoutingReportWithFogOfWar(
+  buildStateInput: Parameters<typeof buildGameState>[0],
+  teamId: string,
+  playerId: string,
+  certainty: number,
+): Promise<ReturnType<typeof buildScoutingReport>> {
+  vi.resetModules();
+  vi.stubEnv("NEXT_PUBLIC_DEBUG_PLAYER_ATTRIBUTES", "0");
+  try {
+    const [{ buildScoutingReport: freshBuildScoutingReport }, { refreshScoutPipeline: freshRefreshScoutPipeline }] =
+      await Promise.all([
+        import("@/lib/scouting/scouting-report-service"),
+        import("@/lib/scouting/facility-scout-pipeline-service"),
+      ]);
+    let gameState = buildGameState(buildStateInput, freshRefreshScoutPipeline);
+    gameState = setPlayerCertainty(gameState, playerId, certainty);
+    return freshBuildScoutingReport({ gameState, teamId, playerId, saveId: "save" });
+  } finally {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  }
+}
 
 function buildDiscipline(id: string, name: string): Discipline {
   return {
@@ -62,12 +96,15 @@ function buildWishlistEntry(playerId: string, priorityRank: number): TransferWis
   };
 }
 
-function buildGameState(input: {
-  player: Player;
-  rosterPlayers?: Player[];
-  facilityLevel: number;
-  wishlist?: TransferWishlistEntry[];
-}): GameState {
+function buildGameState(
+  input: {
+    player: Player;
+    rosterPlayers?: Player[];
+    facilityLevel: number;
+    wishlist?: TransferWishlistEntry[];
+  },
+  refreshScoutPipelineFn: typeof refreshScoutPipeline = refreshScoutPipeline,
+): GameState {
   const rosterPlayers = input.rosterPlayers ?? [
     buildPlayer("roster-1", { coreStats: { pow: 50, spe: 50, men: 50, soc: 50 } }),
     buildPlayer("roster-2", { coreStats: { pow: 55, spe: 52, men: 48, soc: 47 } }),
@@ -121,7 +158,7 @@ function buildGameState(input: {
     ],
   } as unknown as GameState;
 
-  gameState = refreshScoutPipeline(gameState, "M-M");
+  gameState = refreshScoutPipelineFn(gameState, "M-M");
   return gameState;
 }
 
@@ -154,16 +191,9 @@ function setPlayerCertainty(gameState: GameState, playerId: string, certainty: n
 }
 
 describe("buildScoutingReport", () => {
-  it("masks exact axis stats and impact deltas at low scouting certainty", () => {
+  it("masks exact axis stats and impact deltas at low scouting certainty", async () => {
     const player = buildPlayer("target-low");
-    let gameState = buildGameState({ player, facilityLevel: 2 });
-    gameState = setPlayerCertainty(gameState, player.id, 20);
-    const report = buildScoutingReport({
-      gameState,
-      teamId: "M-M",
-      playerId: player.id,
-      saveId: "save",
-    });
+    const report = await buildScoutingReportWithFogOfWar({ player, facilityLevel: 2 }, "M-M", player.id, 20);
 
     expect(report).not.toBeNull();
     expect(report?.axisOrbitStats).toBeNull();
@@ -194,16 +224,9 @@ describe("buildScoutingReport", () => {
     expect(report?.effectiveScoutingLevel).toBeGreaterThanOrEqual(5);
   });
 
-  it("returns per-axis star bands between level 3 and full reveal", () => {
+  it("returns per-axis star bands between level 3 and full reveal", async () => {
     const player = buildPlayer("target-mid");
-    let gameState = buildGameState({ player, facilityLevel: 1 });
-    gameState = setPlayerCertainty(gameState, player.id, 50);
-    const report = buildScoutingReport({
-      gameState,
-      teamId: "M-M",
-      playerId: player.id,
-      saveId: "save",
-    });
+    const report = await buildScoutingReportWithFogOfWar({ player, facilityLevel: 1 }, "M-M", player.id, 50);
 
     expect(report).not.toBeNull();
     expect(report?.showAxisOrbit).toBe(false);

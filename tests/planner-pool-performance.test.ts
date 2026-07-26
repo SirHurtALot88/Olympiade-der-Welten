@@ -178,6 +178,21 @@ describe("buildNeedsFingerprintActivePool", () => {
     expect(result.some((r) => r.playerId === "cheap")).toBe(true);
   });
 
+  // KNOWN REGRESSION (left red intentionally, do not weaken):
+  // buildNeedsFingerprintActivePool (lib/ai/ai-needs-picks-compare-service.ts
+  // ~line 4406) has no "always include high-OVR players" path at all. It only
+  // includes a candidate for being a cheap fill (price < AI_CHEAP_FILL_MARKET_VALUE_CAP),
+  // an axis/discipline/role match against the fingerprint, or via the
+  // identity-top safety net — and the safety net only tracks candidates that
+  // have a `staticScoreCache` entry (`if (cached) { ... identityTopQueue.push(...) }`),
+  // scored by identity fit (teamThemeFitScore + classFitScore +
+  // raceOrArchetypeFitScore + strategyFit.score), never by `ovr`. The only
+  // OVR/price-adjacent concept in this file is `isStar`/`isSuperstar`
+  // (classifyCandidateTier, ~line 816), which is PRICE-percentile based
+  // (price vs. q95Price/q85Price anchors), not an `ovr >= 72` threshold, and
+  // is not read anywhere inside buildNeedsFingerprintActivePool. A high-OVR,
+  // non-cheap, off-axis, uncached candidate is therefore never included by
+  // this function today, regardless of OVR.
   it("always includes high-OVR stars (ovr >= 72)", () => {
     const candidates = [
       rec({ playerId: "star", price: 80, ovr: 75 }),
@@ -238,7 +253,13 @@ describe("buildNeedsFingerprintActivePool", () => {
       const id = `player-${i}`;
       return rec({ playerId: id, price: 30, ovr: 60 });
     });
-    // Give the first 65 players a high identity score via cache
+    // Give the first 65 players a high identity score via cache. The safety
+    // net (lib/ai/ai-needs-picks-compare-service.ts) also caps how many
+    // players of the SAME normalizedClass it lets through
+    // (FINGERPRINT_IDENTITY_MAX_SAME_CLASS = 4, "class diversity cap to
+    // prevent the same class ... from occupying all identity slots"), so
+    // spread these 65 across enough classes (>= 10, i.e. >= 40/4) that the
+    // diversity cap doesn't itself become the bottleneck below the top-N size.
     const cache = new Map(
       Array.from({ length: 65 }, (_, i) => [
         `player-${i}`,
@@ -248,6 +269,7 @@ describe("buildNeedsFingerprintActivePool", () => {
           teamThemeFitScore: 4,
           classFitScore: 3,
           raceOrArchetypeFitScore: 2,
+          normalizedClass: `class-${i % 13}`,
         }),
       ]),
     );
@@ -259,14 +281,16 @@ describe("buildNeedsFingerprintActivePool", () => {
       staticScoreCache: cache,
     });
 
-    // Identity-top safety net ensures top-60 identity players are always included
-    const identityTopIds = new Set(Array.from({ length: 60 }, (_, i) => `player-${i}`));
+    // Identity-top safety net ensures top-N identity players are always
+    // included, where N = FINGERPRINT_IDENTITY_TOP_N = 40 (not 60) — see
+    // lib/ai/ai-needs-picks-compare-service.ts ~line 4395.
+    const identityTopIds = new Set(Array.from({ length: 65 }, (_, i) => `player-${i}`));
     const resultIds = new Set(result.map((r) => r.playerId));
     let identityTopCount = 0;
     for (const id of identityTopIds) {
       if (resultIds.has(id)) identityTopCount++;
     }
-    expect(identityTopCount).toBe(60);
+    expect(identityTopCount).toBe(40);
   });
 
   it("returns only the full pool when all candidates are already included", () => {

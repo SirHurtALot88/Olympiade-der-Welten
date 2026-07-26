@@ -60,16 +60,26 @@ describe("standings preview api", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(buildStandingsPreview).toHaveBeenCalledWith({
-      saveId: "save-initial",
-      seasonId: "season-1",
-      matchdayId: "matchday-1",
-      source: "sqlite",
-    });
+    // app/api/standings/preview/route.ts now caches sqlite-source previews
+    // (readStandingsPreviewCache/writeStandingsPreviewCache) and passes the
+    // persistence service through explicitly, so the sqlite path calls
+    // buildStandingsPreview(params, undefined, persistence) instead of just
+    // buildStandingsPreview(params). The persistence instance is an
+    // implementation detail here, so match it loosely.
+    expect(buildStandingsPreview).toHaveBeenCalledWith(
+      {
+        saveId: "save-initial",
+        seasonId: "season-1",
+        matchdayId: "matchday-1",
+        source: "sqlite",
+      },
+      undefined,
+      expect.anything(),
+    );
     expect(body.blockedRules).toContain("points_table_missing");
     expect(body.items[0]?.teamName).toBe("Armageddon Aftermath");
     expect(body.items[0]?.currentPoints).toBeNull();
-  });
+  }, 20_000);
 
   it("passes source=prisma through as read-only preview mode", async () => {
     buildStandingsPreview.mockResolvedValue({

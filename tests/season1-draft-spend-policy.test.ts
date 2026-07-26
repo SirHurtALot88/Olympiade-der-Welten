@@ -94,7 +94,15 @@ describe("season1 draft spend policy", () => {
 
   it("blocks sub-floor picks during minimum_skeleton when spend budget remains", () => {
     const team = { shortCode: "W-L", teamId: "w-l", budget: 320 };
-    expect(getSeason1BudgetTier(team)).toBe("upper");
+    // getSeason1BudgetTier's threshold is a straightforward `budget >= 300 =>
+    // "top"` (lib/ai/season1-draft-spend-policy.ts:54), consistent with the
+    // "classifies G-G with budget 310 as top tier" test above — W-L isn't in
+    // TOP_BUDGET_CODES/UPPER_BUDGET_CODES, so its tier is purely budget-driven
+    // and 320 is "top", not "upper". This doesn't change what this test
+    // actually exercises: getSeason1CheapPickPriceFloor("top") and
+    // ("upper") are both 15 (see "uses tier-adjusted price floors" above), so
+    // the shouldBlockCheapSeason1Pick behavior below is identical either way.
+    expect(getSeason1BudgetTier(team)).toBe("top");
     expect(
       shouldBlockCheapSeason1Pick({
         team,

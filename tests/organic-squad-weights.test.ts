@@ -42,8 +42,15 @@ describe("deriveUtilityWeights", () => {
   it("gives an elite-small-roster GM a lower optTarget than a depth-preference GM (both within bounds)", () => {
     const base = identity({ playerOpt: 12 });
 
-    const eliteSmall = deriveUtilityWeights(base, { eliteSmallRosterPreference: 9 });
-    const depth = deriveUtilityWeights(base, { rosterDepthPreference: 9 });
+    // lib/ai/organic-squad/weights.ts deliberately uses a small nudge constant
+    // `K = 1` for optTarget (see the doc comment there: "a large K re-inflated
+    // the sheet opt ... Keep only a GENTLE depth/elite nudge"). With K=1, a
+    // bias of 9 (normBias ≈ 0.389) only shifts the raw target by ±0.389 around
+    // 12, which rounds back to 12 on both sides and no longer produces a
+    // visible split. Use the max bias (10 ⇒ normBias = 0.5) so the ±0.5 shift
+    // actually crosses a rounding boundary (11.5 → 12 vs. 12.5 → 13).
+    const eliteSmall = deriveUtilityWeights(base, { eliteSmallRosterPreference: 10 });
+    const depth = deriveUtilityWeights(base, { rosterDepthPreference: 10 });
 
     expect(eliteSmall.optTarget).toBeLessThan(depth.optTarget);
     for (const weights of [eliteSmall, depth]) {

@@ -30,8 +30,15 @@ describe("media assets portrait mapping", () => {
   });
 
   it("appends thumb and preview variant query params for api media routes", () => {
-    expect(getTeamLogoBrowserUrl("H-R", "/Users/local/logo.png", { variant: "thumb" })).toBe(
-      "/api/media/team-logo/H-R?variant=thumb",
+    // All 32 real team codes now have an indexed static logo file under
+    // public/team-logos/ (see data/generated/team-logo-files.json, produced by
+    // `npm run team-logos:index`), and getStaticTeamLogoUrl()'s file-based path
+    // intentionally takes priority over the /api/media/team-logo route (see the
+    // comment above getStaticTeamLogoUrl in lib/data/mediaAssets.ts). Use a
+    // team id that has no indexed static file to keep exercising the
+    // variant-query-param branch of getTeamLogoBrowserUrl.
+    expect(getTeamLogoBrowserUrl("ZZ-NOFILE", "/Users/local/logo.png", { variant: "thumb" })).toBe(
+      "/api/media/team-logo/ZZ-NOFILE?variant=thumb",
     );
     expect(
       getPlayerPortraitBrowserUrl("player-0154-riley-le-rouge", null, null, { variant: "thumb" }),
@@ -50,17 +57,20 @@ describe("media assets portrait mapping", () => {
   });
 
   it("builds team logo models with optional thumb variant", () => {
+    // Same static-file-priority reasoning as above: use a team id with no
+    // indexed public/team-logos/ file so the /api/media variant-query-param
+    // path is what gets exercised here.
     expect(
       getTeamLogoModel(
         {
-          teamId: "H-R",
+          teamId: "ZZ-NOFILE",
           name: "Helsinki Rovers",
           logoPath: "/Users/local/logo.png",
         },
         { variant: "thumb" },
       ),
     ).toEqual({
-      src: "/api/media/team-logo/H-R?variant=thumb",
+      src: "/api/media/team-logo/ZZ-NOFILE?variant=thumb",
       initials: "HR",
     });
   });

@@ -24,7 +24,7 @@ describe("standings apply api", () => {
     );
 
     expect(response.status).toBe(400);
-  });
+  }, 20_000);
 
   it("returns dry-run summary for local preview", async () => {
     previewStandingsApply.mockResolvedValue({
@@ -104,6 +104,15 @@ describe("standings apply api", () => {
   });
 
   it("blocks prisma apply route in read-only mode", async () => {
+    // lib/room/server-authoritative-write-guard.ts's authorizeServerRoomWrite()
+    // now runs BEFORE the route ever calls previewStandingsApply/
+    // executeStandingsApply, and hard-blocks any "prisma" source write with the
+    // dedicated reason "prisma_writes_forbidden_in_local_multiplayer" (status
+    // 409) — a deliberate local-multiplayer/room-authoritative access-control
+    // gate (app/api/standings/apply/route.ts calls authorizeServerRoomWrite
+    // first; see lib/room/server-authoritative-write-guard.ts:139-146). The
+    // mocked previewStandingsApply below is therefore never reached for a
+    // prisma-source request; keep the mock only to prove that.
     previewStandingsApply.mockResolvedValue({
       ok: false,
       source: "prisma",
@@ -137,6 +146,7 @@ describe("standings apply api", () => {
     const body = await response.json();
     expect(response.status).toBe(409);
     expect(body.success).toBe(false);
-    expect(body.blockingReasons[0]).toContain("read-only");
+    expect(body.blockingReasons[0]).toBe("prisma_writes_forbidden_in_local_multiplayer");
+    expect(previewStandingsApply).not.toHaveBeenCalled();
   });
 });

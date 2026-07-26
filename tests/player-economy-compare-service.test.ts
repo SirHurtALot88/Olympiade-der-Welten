@@ -157,6 +157,26 @@ describe("player economy compare service", () => {
     expect(report.formulaStatus.marketValueEngine).toBe("ready");
     expect(report.players).toHaveLength(2);
     expect(report.players[0]?.legacyMarketValue).toBe(52);
+    // KNOWN REGRESSION (left red intentionally, do not weaken): `legacySalary`
+    // is sourced from resolvePlayerEconomyContract(...).salary
+    // (lib/foundation/player-economy-compare-service.ts ~line 627), whose
+    // fallback order (lib/foundation/player-economy-contract.ts ~line 310-315)
+    // is `rosterSalary ?? salaryBreakdown?.finalSalary ?? storedCalculatedSalary
+    // ?? legacyDisplaySalary`. Once a player has complete attribute data (as
+    // this fixture does), `salaryBreakdown?.finalSalary` (a fresh, independent
+    // attribute-formula computation) is non-null and wins over the raw
+    // displaySalary (12) — so `legacySalary` silently stops being "legacy" for
+    // exactly the players complete enough to also have a `calculatedSalary`.
+    // This contradicts the compare service's own stated intent
+    // (`benchmarkSource: "legacy_imported_display"`, same file ~line 148) of
+    // showing the original imported/display value side by side with a fresh
+    // recalculation. Unlike `legacyMarketValue` (whose "calculated" path
+    // re-derives FROM the display value via deriveBaseMarketValueFromFinal, so
+    // it round-trips back close to the legacy number), salary's "calculated"
+    // path is a wholly independent attribute-based formula with no such
+    // round-trip guarantee, so this can't be routed around with a different
+    // fixture without also losing calculatedSalary (which the test also needs
+    // to be non-null).
     expect(report.players[0]?.legacySalary).toBe(12);
     expect(report.players[0]?.calculatedMarketValue).not.toBeNull();
     expect(report.players[0]?.calculatedSalary).not.toBeNull();
@@ -173,7 +193,19 @@ describe("player economy compare service", () => {
         id: "p-missing",
         name: "Nightowl",
         displayMarketValue: 55,
-        displaySalary: 9,
+        // Non-finite displaySalary/salaryDemand (NOT `undefined` — createPlayer()'s
+        // `partial?.displaySalary ?? 11` / `?? 8000` defaults would silently
+        // resubstitute a real legacy value for `undefined` via `??`, which
+        // defeats this test's "missing salary source" scenario): `calculatedSalary`
+        // falls back through legacyEconomy.expectedSalary (see
+        // lib/foundation/player-economy-contract.ts's `expectedSalary:
+        // salaryBreakdown?.finalSalary ?? storedCalculatedSalary ?? legacyDisplaySalary`)
+        // before ever reaching the local (attribute-based) salaryBreakdown computed
+        // here. With a real legacy salaryDemand/displaySalary present, that fallback
+        // would resolve to a non-null value even though attribute data is
+        // incomplete.
+        displaySalary: Number.NaN,
+        salaryDemand: Number.NaN,
         attributeSheetStats: {
           power: 70,
         },
@@ -198,22 +230,37 @@ describe("player economy compare service", () => {
       createPlayer({
         id: "p-floor",
         name: "Floor Case",
-        displayMarketValue: 20,
+        // references/formulas/trait-salary-factors.json only has ~7 traits with a
+        // NEGATIVE factor at all, each within roughly [-0.07, -0.01] (e.g.
+        // "Cheater", "Paranoid", "Diva", "Egomaniac" and "Gambler" actually carry
+        // POSITIVE salary factors — a demanding/showy personality commands a
+        // higher, not lower, wage). Summing even every negative-factor trait tops
+        // out around -0.22, far short of the -1.0 (-100%) a traitPercentSum needs
+        // to flip a POSITIVE basisSalary negative on its own (salary-engine.ts:
+        // `rawFinalSalary = basisSalary * (1 + traitPercentSum)`). So to actually
+        // reach the floor, combine the strongest available negative traits with a
+        // deliberately unfavorable attribute profile (maxing out the
+        // negative-salary-modifier attributes Health/Determination/Spirit/
+        // Intelligence/Speed per references/formulas/attribute-salary-modifiers.json
+        // and minimizing the positive-modifier ones) plus a low market value, so
+        // basisSalary itself is already negative before the trait multiplier is
+        // applied.
+        displayMarketValue: 5,
         displaySalary: 6,
-        traitsNegative: ["Lazy", "Relaxed", "Cheater", "FaintHearted", "Paranoid", "Caring", "Diva"],
+        traitsNegative: ["FaintHearted", "Caring", "Relaxed", "Lazy", "Obsessive", "Renegade", "Scandalous"],
         attributeSheetStats: {
-          power: 70,
-          health: 55,
-          stamina: 60,
-          intelligence: 48,
-          awareness: 62,
-          determination: 51,
-          speed: 66,
-          dexterity: 64,
-          charisma: 58,
-          will: 72,
-          spirit: 57,
-          torment: 45,
+          power: 1,
+          health: 100,
+          stamina: 1,
+          intelligence: 100,
+          awareness: 1,
+          determination: 100,
+          speed: 100,
+          dexterity: 1,
+          charisma: 1,
+          will: 1,
+          spirit: 100,
+          torment: 1,
         },
         disciplineRatings: { d1: 1, d2: 1, d3: 1 },
       }),

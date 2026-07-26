@@ -243,6 +243,20 @@ describe("player stats adapter", () => {
       mvsPerformances: [],
     });
 
+    // KNOWN REGRESSION (left red intentionally, do not weaken):
+    // lib/foundation/player-rating-contract.ts distinguishes "no season source"
+    // (mvsPerformances == null) from "source exists" (mvsPerformances is a
+    // non-null array, even empty) at the outer `performanceRows == null ? null
+    // : (...)` check — exactly the signal this fixture provides via
+    // `mvsPerformances: []`. But the INNER ternary
+    // (`rawMvs != null && rawMvs > 0 ? roundValue(rawMvs, 2) : null`) still
+    // collapses "no MVS record found for this player" back to `null`
+    // regardless of that outer distinction, so a player with a genuinely empty
+    // season (source exists, zero placings yet) still gets `mvs: null`,
+    // `sourceStatus.mvs: "missing_source"` and the "mvs_source_missing"
+    // warning instead of `mvs: 0` / "ready". The outer null-check's own intent
+    // (treat an empty-but-present performances array differently from a
+    // missing one) is never completed for the zero case.
     expect(result[0]?.mvs).toBe(0);
     expect(result[0]?.sourceStatus.mvs).toBe("ready");
     expect(result[0]?.warnings).not.toContain("mvs_source_missing");

@@ -58,14 +58,21 @@ function createPlayer(partial: Partial<Player> = {}): Player {
   };
 }
 
-function createGameState(player: Player): GameState {
+function createGameState(player: Player, extraLeaguePlayers: Player[] = []): GameState {
   return {
     season: { id: "season-1", name: "Season 1", currentMatchday: 10, totalMatchdays: 10, isCompleted: true },
     seasonState: { seasonId: "season-1", schedule: [], standings: {}, matchdayResults: [], playerDisciplinePerformances: [], disciplineHighlights: [] },
     matchdayState: { matchdayId: "matchday-10", status: "resolved", pendingTeamIds: [], resolvedFixtureIds: [] },
     teams: [{ teamId: "team-1", name: "Team One", shortCode: "T-O", budget: 100, cash: 100, salaryTotal: 0, rosterValue: 0, humanControlled: true }],
     teamIdentities: [],
-    players: [player],
+    // Discipline ratings are league-RELATIVE (competition rank across
+    // input.gameState.players, see the "Loop-invariant league-wide discipline
+    // ranking" comment in lib/training/season-end-progression-preview.ts). A
+    // single-player league can never show a rank movement from an attribute
+    // change, since there's no one to move past — extraLeaguePlayers lets
+    // individual tests supply a real comparison pool without affecting the
+    // many other tests that use this helper with the default (empty) pool.
+    players: [player, ...extraLeaguePlayers],
     disciplines: [
       { id: "tdm", name: "TDM", category: "power", weight: 1 },
       { id: "fechten", name: "Fechten", category: "speed", weight: 1 },
@@ -159,9 +166,15 @@ function createForecast(partial: Partial<PlayerProgressionForecast> = {}): Playe
   };
 }
 
-function previewFor(player: Player, forecast: PlayerProgressionForecast, attribute = "power" as const, facilities = {}) {
+function previewFor(
+  player: Player,
+  forecast: PlayerProgressionForecast,
+  attribute = "power" as const,
+  facilities = {},
+  extraLeaguePlayers: Player[] = [],
+) {
   return buildSeasonEndProgressionPreview({
-    gameState: createGameState(player),
+    gameState: createGameState(player, extraLeaguePlayers),
     teamId: "team-1",
     forecastsByPlayerId: new Map([[player.id, forecast]]),
     upgradeRequests: [{ playerId: player.id, attribute }],
@@ -260,7 +273,38 @@ describe("season-end progression preview", () => {
   });
 
   it("shows discipline changes after an attribute preview", () => {
-    const row = previewFor(createPlayer({ attributeSheetStats: { power: 98, health: 30, stamina: 30, intelligence: 30, awareness: 30, determination: 30, speed: 30, dexterity: 30, charisma: 30, will: 30, spirit: 30, torment: 30 } }), createForecast({ seasonProjectedXP: 500 }), "power");
+    // Discipline ratings are league-RELATIVE (competition rank across
+    // gameState.players, see lib/training/season-end-progression-preview.ts).
+    // With only the target player in the league, a rank can never move — add a
+    // dense rival pool spanning the power values right around the target's
+    // 98 -> 99 preview step so the rank (and thus the discipline delta) can
+    // actually move.
+    const rivals = Array.from({ length: 10 }, (_, index) =>
+      createPlayer({
+        id: `rival-${90 + index}`,
+        attributeSheetStats: {
+          power: 90 + index,
+          health: 30,
+          stamina: 30,
+          intelligence: 30,
+          awareness: 30,
+          determination: 30,
+          speed: 30,
+          dexterity: 30,
+          charisma: 30,
+          will: 30,
+          spirit: 30,
+          torment: 30,
+        },
+      }),
+    );
+    const row = previewFor(
+      createPlayer({ attributeSheetStats: { power: 98, health: 30, stamina: 30, intelligence: 30, awareness: 30, determination: 30, speed: 30, dexterity: 30, charisma: 30, will: 30, spirit: 30, torment: 30 } }),
+      createForecast({ seasonProjectedXP: 500 }),
+      "power",
+      {},
+      rivals,
+    );
 
     expect(row.disciplineDeltas.some((entry) => (entry.disciplineDelta ?? 0) > 0)).toBe(true);
   });

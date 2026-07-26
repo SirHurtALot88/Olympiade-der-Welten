@@ -205,12 +205,86 @@ describe("matchday auto-run manual-team policy", () => {
     const aiLineupStep = result.steps.find((step) => step.key === "ai_lineups");
     const resolveStep = result.steps.find((step) => step.key === "resolve_preview");
 
-    expect(aiLineupStep?.metrics.skippedManual).toBe(1);
+    // A manual/passive team WITHOUT any existing draft is not blocked by the
+    // ai_lineups step: lib/ai/ai-legacy-lineup-batch-apply-service.ts:1164-1167
+    // sets `canAutoFillIncompleteLineup = !hasCompleteExistingDraft`, and the
+    // `skipped_manual` / `skipped_passive` results only fire when
+    // `!canAutoFillIncompleteLineup`, i.e. only when a complete draft already
+    // exists. A team with no draft at all is intentionally offered a
+    // KI-Aufstellung instead (Komfort statt Blockade) and is tagged with the
+    // `manual_incomplete_lineup_autofilled` warning (same file, ~line 1252) —
+    // see the direct `applyAiLegacyLineupBatchLocally` assertion below and the
+    // "does not overwrite a manual team's existing draft" test for the
+    // complementary, still-blocking case.
+    expect(aiLineupStep?.metrics.skippedManual).toBe(0);
     expect(Number(aiLineupStep?.metrics.skippedPassive ?? 0)).toBeGreaterThanOrEqual(0);
     expect(resolveStep?.metrics.manualMissing).toBe(1);
     expect(Number(resolveStep?.metrics.passiveMissing ?? 0)).toBeGreaterThanOrEqual(0);
     expect(resolveStep?.blockingReasons).toContain("missing_manual_lineup");
+
+    // Confirm the manual team without a draft was actually autofilled (not
+    // skipped) and carries the documented warning.
+    const directBatch = applyAiLegacyLineupBatchLocally(
+      {
+        saveId: "test-save",
+        seasonId: gameState.season.id,
+        matchdayId: gameState.matchdayState.matchdayId,
+        dryRun: true,
+        includeWarningTeams: false,
+        overwriteExisting: false,
+      },
+      persistence,
+    );
+    const manualTeamResult = directBatch.results.find((entry) => entry.teamId === "B-B");
+    expect(manualTeamResult?.result).not.toBe("skipped_manual");
+    expect(manualTeamResult?.warnings).toContain("manual_incomplete_lineup_autofilled");
   });
+
+  it("does not overwrite a manual team's existing complete draft (skipped_manual)", async () => {
+    const gameState = createFreshSeasonOneGameState();
+    topUpRostersForLineupMinimum(gameState);
+    const scope = {
+      saveId: "test-save",
+      seasonId: gameState.season.id,
+      matchdayId: gameState.matchdayState.matchdayId,
+    };
+    const persistence = createInMemoryPersistence(gameState, true);
+
+    // First pass: every team is "ai" controlled so the batch apply generates
+    // and persists a complete lineup draft for every team, including B-B.
+    applyAiLegacyLineupBatchLocally(
+      { ...scope, dryRun: false, includeWarningTeams: true, overwriteExisting: false },
+      persistence,
+    );
+    const beforeDraft = persistence
+      .getSaveById(scope.saveId)!
+      .gameState.seasonState.lineupDrafts?.find((draft) => draft.teamId === "B-B");
+    expect(beforeDraft).toBeDefined();
+
+    // Second pass: flip B-B to manual now that it holds a complete draft, and
+    // re-run with overwriteExisting so only the manual-with-draft policy (not
+    // the overwrite flag) can explain the team being left untouched.
+    const afterFirstPass = persistence.getSaveById(scope.saveId)!.gameState;
+    const existingSettings = afterFirstPass.seasonState.teamControlSettings ?? {};
+    afterFirstPass.seasonState.teamControlSettings = {
+      ...existingSettings,
+      "B-B": { ...existingSettings["B-B"], teamId: "B-B", controlMode: "manual", aiLineupApplyEnabled: false },
+    };
+    persistence.saveSingleplayerState(scope.saveId, afterFirstPass);
+
+    const secondBatch = applyAiLegacyLineupBatchLocally(
+      { ...scope, dryRun: false, includeWarningTeams: true, overwriteExisting: true },
+      persistence,
+    );
+    const manualResult = secondBatch.results.find((entry) => entry.teamId === "B-B");
+    expect(manualResult?.result).toBe("skipped_manual");
+    expect(secondBatch.summary.skippedManual).toBe(1);
+
+    const afterDraft = persistence
+      .getSaveById(scope.saveId)!
+      .gameState.seasonState.lineupDrafts?.find((draft) => draft.teamId === "B-B");
+    expect(afterDraft).toEqual(beforeDraft);
+  }, 40_000);
 
   it("uses the persisted post-AI snapshot for execute mode so resolve preview sees saved AI lineups", async () => {
     const gameState = createFreshSeasonOneGameState();
@@ -268,6 +342,28 @@ describe("matchday auto-run manual-team policy", () => {
     expect(result.summary.lineupsReady).toBe(32);
     expect(result.summary.aiReady).toBe(32);
     expect(result.summary.cashApplyAllowed).toBe(false);
+    // KNOWN REGRESSION (left red intentionally, do not weaken): this currently
+    // fails because lib/resolve/legacy-matchday-readiness.ts's getRequiredCounts()
+    // resolves required-player counts ONLY from context.disciplinePlayerCounts
+    // (the static, non-schedule-aware Discipline.playerCount, e.g. 5 for
+    // "showcase" in lib/data/dataAdapter.ts), while the AI lineup engine and the
+    // matchday contract itself (lib/lineups/lineup-discipline-contract.ts
+    // buildMatchdayLineupContract -> `scheduleSlot?.playerCount ?? discipline.
+    // requiredPlayers`) correctly use the season-schedule-rolled per-matchday
+    // count (e.g. 6 for "showcase" on this save, via
+    // lib/season/season-discipline-schedule.ts's seeded "balanced slot buckets").
+    // Every other consumer (e.g. lib/ai/ai-legacy-lineup-engine.ts:108-109,
+    // 339-340, 591-592, 914-915, 1109, 1127) prefers
+    // `disciplineSidePlayerCounts` and only falls back to
+    // `disciplinePlayerCounts`; buildLegacyMatchdayReadiness's getRequiredCounts()
+    // (lib/resolve/legacy-matchday-readiness.ts:25-38) does not, so it flags a
+    // correctly AI-built lineup as "invalid_lineup" ("Discipline showcase on d2
+    // expects 5 entries, but received 6"). This cascades into standings-preview
+    // marking every team's result "incomplete_result" and blocks standings_apply
+    // / matchday_advance. Independently reproduced outside this test suite via
+    // `npm run season:smoke-matchday-auto-run`, which currently fails with
+    // "Auto-run execute blocked: incomplete_result:<every team>" for all 32
+    // teams — this is a genuine production regression, not a fixture issue.
     expect(result.summary.advanceAllowed).toBe(true);
     expect(result.appliedAudits.cashApply).toBeNull();
     expect(result.appliedAudits.matchdayAdvance).toBeTruthy();

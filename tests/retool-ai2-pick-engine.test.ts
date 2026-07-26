@@ -470,6 +470,24 @@ describe("Retool AI2 pick engine", () => {
       sponsorSupport: 28,
     });
 
+    // KNOWN REGRESSION (left red intentionally, do not weaken): both plans
+    // collapse to reserveTarget=3 / reservePolicy="aggressive" because of the
+    // unconditional "cash hoarding" override in
+    // lib/ai/retool-ai2-pick-engine.ts (~lines 365-373): whenever
+    // `cash / rosterSalaryKnown` clears `softCashRatio + 0.05` AND the roster
+    // is below `optimum`, it force-sets `reservePolicy = "aggressive"` and
+    // scales reserveTargetMin/Base/Max down to their floor (3/4/5), with no
+    // explanatory comment. Both fixtures here (cash=180, rosterSalaryKnown=45,
+    // missingToOptimum>0) trip that override regardless of how
+    // finance/cash-priority-heavy the team identity or strategy profile is —
+    // it completely overrides the aggression01/caution01/spendPostureScore
+    // computation the rest of the function carefully derives from those
+    // signals, so a deliberately thrifty, cash-hoarding team (C-C:
+    // cashPriority 10, saveDiscipline "high", finances 10) gets force-flipped
+    // to "aggressive" exactly like a spend-happy team (M-M) once its bank
+    // balance is comfortably above its known payroll — which is precisely
+    // when a genuinely cash-conservative team should keep hoarding, not
+    // spend down to a floor.
     expect(cashCreatorPlan.reserveTarget).toBeGreaterThan(mayhemPlan.reserveTarget);
     expect(cashCreatorPlan.allowedBudgetForSearch).toBeLessThan(mayhemPlan.allowedBudgetForSearch);
     expect(cashCreatorPlan.reservePolicy).toBe("conservative");
@@ -500,6 +518,12 @@ describe("Retool AI2 pick engine", () => {
       sponsorSupport: 15,
     });
 
+    // KNOWN REGRESSION (left red intentionally, do not weaken): same root
+    // cause as the C-C/M-M budget test above — both fixtures here also trip
+    // the unconditional cash-hoarding override in
+    // lib/ai/retool-ai2-pick-engine.ts (~lines 365-373), so both safeRunway
+    // and stressedRunway collapse to reserveTarget=3 regardless of the very
+    // salary-burden/sponsor-runway pressure this test is meant to exercise.
     expect(stressedRunway.salaryBurdenRatio).toBeGreaterThan(safeRunway.salaryBurdenRatio);
     expect(stressedRunway.reserveTarget).toBeGreaterThan(safeRunway.reserveTarget);
     expect(stressedRunway.allowedBudgetForSearch).toBeLessThan(safeRunway.allowedBudgetForSearch);

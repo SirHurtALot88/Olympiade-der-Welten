@@ -65,6 +65,14 @@ describe("preseason player drift policy", () => {
 
     expect(nextRostered?.fatigue).toBe(0);
     expect(nextRostered?.attributeSheetStats?.power).toBe(44);
-    expect(nextFreeAgent?.attributeSheetStats?.power).toBeGreaterThan(40);
+    // lib/season/preseason-workflow-service.ts explicitly removed the
+    // multi-season free-agent baseline drift (see the comment there:
+    // "Multi-Season-Free-Agent-Abwertung ENTFERNT ... sowohl rostered als auch
+    // Free Agents behalten jetzt schlicht ihren aktuellen (organisch
+    // entwickelten) Wert ... Das Baseline dient nur noch als Fallback für
+    // fehlende Attributwerte"). A free agent's current attribute value (40) no
+    // longer drifts toward its baseline (55) at all; the baseline is only used
+    // as a fallback when the live value is missing.
+    expect(nextFreeAgent?.attributeSheetStats?.power).toBe(40);
   });
 });
