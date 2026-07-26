@@ -214,7 +214,7 @@ const InboxV2Client = dynamic(() => import("@/app/foundation/inbox-v2/InboxV2Cli
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Inbox wird geladen…" />,
 });
-const PlayerGeneratorPanel = dynamic(() => import("@/app/foundation/PlayerGeneratorPanel"), {
+const PlayerGeneratorPanel = dynamic(() => import("@/app/foundation/PlayerGeneratorPanelNewLook"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Player Generator wird geladen…" />,
 });

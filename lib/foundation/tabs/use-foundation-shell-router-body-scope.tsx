@@ -761,7 +761,7 @@ const PlayerProfileClient = dynamic(() => import("@/app/foundation/player-profil
   ssr: false,
   loading: () => null,
 });
-const PlayerGeneratorPanel = dynamic(() => import("@/app/foundation/PlayerGeneratorPanel"), { ssr: false });
+const PlayerGeneratorPanel = dynamic(() => import("@/app/foundation/PlayerGeneratorPanelNewLook"), { ssr: false });
 const FoundationTransfermarktV2Panel = dynamic(
   () => import("@/app/foundation/transfermarkt-v2/FoundationTransfermarktV2Panel"),
   {
