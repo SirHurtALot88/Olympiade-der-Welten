@@ -752,15 +752,45 @@ function loadSaveVersionMetadata(saveId: string): SaveVersionMetadata | null {
   return metadata;
 }
 
-let baselineSourcePlayersCache: Player[] | null = null;
+type BaselineSourcePlayersCacheEntry = {
+  signature: string;
+  players: Player[];
+};
+
+let baselineSourcePlayersCache: BaselineSourcePlayersCacheEntry | null = null;
+
+/**
+ * S13: this module is loaded as a SEPARATE instance in the socket server (tsx)
+ * and in the Next.js API route handlers (webpack bundle) — a plain module-scope
+ * cache invalidated only by an in-process call (like the old `??= null` version
+ * of this cache) can go stale forever in the *other* instance after a catalog
+ * write, and never recovers even if a completely different process (e.g. a
+ * one-off script) writes the catalog. So instead of relying purely on explicit
+ * invalidation, every read is validated against a cheap DB-derived signature
+ * (row count + max `updated_at`) — a changed catalog is detected regardless of
+ * which process wrote it, matching the pattern used by the other
+ * signature-validated caches (e.g. save-session-cache.ts).
+ */
+function computePlayerCatalogSignature(database: ReturnType<typeof getDatabase>) {
+  const row = database
+    .prepare("SELECT COUNT(*) AS count, MAX(updated_at) AS maxUpdatedAt FROM player_catalog")
+    .get() as { count: number; maxUpdatedAt: string | null };
+  return `${row.count}:${row.maxUpdatedAt ?? ""}`;
+}
 
 export function invalidateBaselineSourcePlayersCache() {
   baselineSourcePlayersCache = null;
 }
 
 function loadBaselineSourcePlayers(database = getDatabase()) {
-  baselineSourcePlayersCache ??= [...loadPlayerCatalog(database).values()];
-  return baselineSourcePlayersCache;
+  const signature = computePlayerCatalogSignature(database);
+  if (baselineSourcePlayersCache && baselineSourcePlayersCache.signature === signature) {
+    return baselineSourcePlayersCache.players;
+  }
+
+  const players = [...loadPlayerCatalog(database).values()];
+  baselineSourcePlayersCache = { signature, players };
+  return players;
 }
 
 function invalidateCatalogDerivedRuntimeCaches() {
