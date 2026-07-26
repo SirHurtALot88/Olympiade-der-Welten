@@ -1935,6 +1935,73 @@ export function useFoundationShellRouterBodyScope({
     }
   }
 
+  /**
+   * Room-safe path for a single player's training-mode change while an Online-Room is
+   * active: the generic whole-state PUT (`/api/singleplayer-state`) is blocked with 409
+   * `room_save_generic_write_forbidden` for room saves, and the 409 handler used to treat
+   * that as a save conflict and reload — silently reverting the human's training edit every
+   * matchday (AI teams keep re-evaluating training and re-persisting over it). This sends
+   * only the single player's training-mode diff through the scoped, room-guarded
+   * `/api/training` endpoint instead. Mirrors `saveTeamSettingsInRoom` (team-settings) —
+   * fresh server state in, ownership-authorized, merged, persisted, broadcast.
+   */
+  async function persistPlayerTrainingModeInRoom(playerId: string, mode: TrainingModeDraft, teamId: string | null) {
+    if (!teamId) {
+      setFoundationActionFeedback({
+        tone: "warning",
+        title: "Training nicht gespeichert",
+        detail: "Kein Team für diesen Spieler gefunden.",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/training", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({ saveId: activeSaveId, teamId, playerId, trainingMode: mode })),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (await handleStaleRoomSaveWrite(payload)) {
+        return;
+      }
+      if (!response.ok || !payload.success) {
+        setFoundationActionFeedback({
+          tone: "warning",
+          title: "Training nicht gespeichert",
+          detail: payload.error ?? "Training konnte nicht gespeichert werden.",
+        });
+        return;
+      }
+
+      const nextGameState: GameState = {
+        ...gameState,
+        players: gameState.players.map((player) => (player.id === playerId ? { ...player, trainingMode: mode } : player)),
+        seasonState: {
+          ...gameState.seasonState,
+          trainingIntensityConfirmations: {
+            ...(gameState.seasonState.trainingIntensityConfirmations ?? {}),
+            [teamId]: {
+              teamId,
+              seasonId: gameState.season.id,
+              confirmedAt: new Date().toISOString(),
+              sourcePlanId: "manual_player_training_mode",
+            },
+          },
+        },
+        saveVersion: payload.saveVersion ?? gameState.saveVersion,
+      };
+      setGameState(nextGameState);
+      void refreshOpenPlayerProfileAfterTrainingChange(nextGameState, playerId);
+    } catch (error) {
+      setFoundationActionFeedback({
+        tone: "warning",
+        title: "Training nicht gespeichert",
+        detail: error instanceof Error ? error.message : "Training konnte nicht gespeichert werden.",
+      });
+    }
+  }
+
   // Sammelt synchrone Trainingsmodus-Aufrufe (z.B. die Team-Rail "alle Spieler
   // auf einen Modus", die pro Spieler einmal aufruft) und persistiert GENAU
   // EINMAL mit ALLEN Änderungen. Vorher baute jeder Aufruf nextGameState aus dem
@@ -1950,6 +2017,18 @@ export function useFoundationShellRouterBodyScope({
       return;
     }
     pendingTrainingModesRef.current = new Map();
+
+    // In einem Online-Room ist der Ganz-Stand-PUT gesperrt (409
+    // room_save_generic_write_forbidden); jede gesammelte Änderung geht stattdessen
+    // einzeln über die raum-geprüfte /api/training-Route (server-autoritativ, pro
+    // Spieler). persistPlayerTrainingModeInRoom übernimmt lokales Update + Broadcast.
+    if (roomContext) {
+      for (const [pendingPlayerId, pendingMode] of changes) {
+        const pendingTeamId = gameState.rosters.find((entry) => entry.playerId === pendingPlayerId)?.teamId ?? null;
+        await persistPlayerTrainingModeInRoom(pendingPlayerId, pendingMode, pendingTeamId);
+      }
+      return;
+    }
 
     const teamId = gameState.rosters.find((entry) => changes.has(entry.playerId))?.teamId ?? null;
     const nextGameState: GameState = {
@@ -2014,6 +2093,52 @@ export function useFoundationShellRouterBodyScope({
     }, 0);
   }
 
+  /** Room-safe path for a single player's training-class change. See `persistPlayerTrainingModeInRoom`. */
+  async function persistPlayerTrainingClassInRoom(playerId: string, trainingClass: TrainingClassDraft, teamId: string | null) {
+    if (!teamId) {
+      setFoundationActionFeedback({
+        tone: "warning",
+        title: "Trainingsklasse nicht gespeichert",
+        detail: "Kein Team für diesen Spieler gefunden.",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/training", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({ saveId: activeSaveId, teamId, playerId, trainingClass })),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (await handleStaleRoomSaveWrite(payload)) {
+        return;
+      }
+      if (!response.ok || !payload.success) {
+        setFoundationActionFeedback({
+          tone: "warning",
+          title: "Trainingsklasse nicht gespeichert",
+          detail: payload.error ?? "Trainingsklasse konnte nicht gespeichert werden.",
+        });
+        return;
+      }
+
+      const nextGameState: GameState = {
+        ...gameState,
+        players: gameState.players.map((player) => (player.id === playerId ? { ...player, trainingClass } : player)),
+        saveVersion: payload.saveVersion ?? gameState.saveVersion,
+      };
+      setGameState(nextGameState);
+      void refreshOpenPlayerProfileAfterTrainingChange(nextGameState, playerId);
+    } catch (error) {
+      setFoundationActionFeedback({
+        tone: "warning",
+        title: "Trainingsklasse nicht gespeichert",
+        detail: error instanceof Error ? error.message : "Trainingsklasse konnte nicht gespeichert werden.",
+      });
+    }
+  }
+
   async function setPlayerTrainingClass(playerId: string, trainingClass: TrainingClassDraft) {
     if (readMeta.readOnly) {
       showReadOnlyNotice();
@@ -2024,6 +2149,13 @@ export function useFoundationShellRouterBodyScope({
       ...current,
       [playerId]: trainingClass,
     }));
+
+    const teamId = gameState.rosters.find((entry) => entry.playerId === playerId)?.teamId ?? null;
+
+    if (roomContext) {
+      await persistPlayerTrainingClassInRoom(playerId, trainingClass, teamId);
+      return;
+    }
 
     const nextGameState: GameState = {
       ...gameState,
