@@ -13,6 +13,8 @@ import {
 } from "@/lib/board/team-season-objectives-service";
 import { applyFormCardPenaltyWithRerank } from "@/lib/season/form-card-penalty-service";
 import { applySponsorSettlement, previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
+import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
+import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
 import {
   applyFacilitySeasonEndFinance,
   hasFacilitySeasonEndFinanceApplied,
@@ -39,6 +41,7 @@ export type SeasonCompletionStepStatus = "planned" | "applied" | "already_done" 
 export type SeasonCompletionStep = {
   key:
     | "season_check"
+    | "sponsor_choice_gate"
     | "form_card_penalty"
     | "season_review"
     | "objective_rewards"
@@ -210,6 +213,35 @@ async function runLocalSeasonCompletionUnsafe(
       status: completed ? "applied" : "blocked",
       warnings: [],
       blockingReasons: completed ? [] : ["season_not_completed"],
+      auditId: null,
+    },
+    warnings,
+    blockingReasons,
+  );
+
+  // Sponsor-Pflicht (P1-5): Menschliche (manuell gesteuerte) Teams MÜSSEN vor dem Saisonabschluss einen
+  // Sponsorvertrag gewählt haben, sonst rechnet die Vorschau (projectedCash) Gehalt ab, das reale
+  // Settlement aber nicht (`if (input.deductSalary && contract)`). KI/passiv signieren automatisch
+  // (chooseSponsorOfferForAiTeams); Folge-Saisons blocken bereits im Preseason-Workflow — dieser Gate
+  // erzwingt dieselbe Regel für die LAUFENDE Saison (schließt die Season-1-Lücke). Kein Soft-Lock: das
+  // Team bleibt in der Saison und der Flow führt weiterhin auf die Sponsor-Auswahl (prize:sponsor-choice).
+  const seasonEndControlSettings = buildTeamControlSettingsMap(
+    initialSave.gameState.teams,
+    initialSave.gameState.seasonState.teamControlSettings,
+  );
+  const manualTeamsWithoutSponsor = initialSave.gameState.teams.filter(
+    (team) =>
+      seasonEndControlSettings[team.teamId]?.controlMode === "manual" &&
+      getTeamSponsorContract(initialSave.gameState, team.teamId) == null,
+  );
+  addStep(
+    steps,
+    {
+      key: "sponsor_choice_gate",
+      label: "Sponsor-Pflicht",
+      status: manualTeamsWithoutSponsor.length === 0 ? "applied" : "blocked",
+      warnings: [],
+      blockingReasons: manualTeamsWithoutSponsor.length > 0 ? ["manual_sponsor_choice_pending"] : [],
       auditId: null,
     },
     warnings,

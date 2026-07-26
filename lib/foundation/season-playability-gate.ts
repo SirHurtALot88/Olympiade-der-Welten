@@ -99,6 +99,8 @@ const AUDIT_HINT_LABELS: Record<string, string> = {
     "Formkarten-Pool ist bereit — Zuweisung ist optional und blockiert den Spieltag nicht.",
   training_missing:
     "Training fehlt für mindestens einen Kaderspieler; Flow-Schritt, kein Season-Gate-Blocker.",
+  sponsor_choice_required:
+    "Sponsor noch nicht gewählt; Pflicht vor Saisonabschluss (harter Gate in der Season-Completion), mid-season nur Aktions-Hinweis.",
   transfer_window_closed:
     "Transferfenster ist geschlossen; erwarteter Phasen-Hinweis, kein technischer Season-Blocker.",
 };

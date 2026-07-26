@@ -773,7 +773,11 @@ export function chooseSponsorOfferForAiTeams(gameState: GameState, settingsMap?:
       continue;
     }
     const control = controlSettings[team.teamId];
-    if (control?.controlMode === "manual" || control?.controlMode === "passive") {
+    // Sponsor ist Pflicht → nur das MANUELL gesteuerte (menschliche) Team wählt selbst.
+    // Passive Teams werden nicht aktiv gemanagt und bekommen daher — wie echte KI-Teams —
+    // automatisch das beste Angebot signiert, damit kein Team ohne Vertrag in die
+    // Gehaltsabrechnung läuft (sonst Preview≠Apply beim Gehalt).
+    if (control?.controlMode === "manual") {
       continue;
     }
     const offers = getTeamSponsorOffers(nextGameState, team.teamId);
