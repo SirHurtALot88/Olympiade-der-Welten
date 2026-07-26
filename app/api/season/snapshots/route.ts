@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 
 import type { SeasonSnapshotRecord } from "@/lib/data/olyDataTypes";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { resolveLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
+import { resolveSessionOwnerId } from "@/lib/auth/session";
 import {
   readSeasonSnapshotsCache,
   writeSeasonSnapshotsCache,
@@ -22,10 +24,12 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const saveId = searchParams.get("saveId")?.trim() || undefined;
     const persistence = createPersistenceService();
-    const localSave =
-      (saveId ? persistence.getSaveById(saveId) : null) ??
-      persistence.getActiveSave() ??
-      persistence.bootstrapSingleplayerSave().save;
+    const ownerId = await resolveSessionOwnerId();
+    const resolved = resolveLocalPersistedSave(persistence, saveId, ownerId);
+    if (!resolved) {
+      return NextResponse.json({ ok: false, error: "Save could not be resolved." }, { status: 404 });
+    }
+    const localSave = resolved.save;
 
     const versionMeta = persistence.getSaveVersionMetadata(localSave.saveId);
     const contentSignature =

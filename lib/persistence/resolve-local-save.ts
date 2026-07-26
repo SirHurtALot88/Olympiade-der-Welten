@@ -55,10 +55,18 @@ export function requireLocalPersistedSave(
 
 /**
  * Explicit, OPT-IN "continue the current game" resolution: only for genuine read/preview entry
- * points that intentionally want to fall back to the requesting owner's active save (or bootstrap
- * one) when no `saveId` was supplied. `ownerId` (session user, auth-on only) scopes the active-save
- * fallback to THAT owner's `active_saves` pointer — mirrors `PersistenceService.getActiveSave`.
- * Omitting `ownerId` (auth off / solo) keeps the original single-global-active-save behavior.
+ * points that intentionally want to fall back to the requesting owner's active save when no
+ * `saveId` was supplied. `ownerId` (session user, auth-on only) scopes the active-save fallback to
+ * THAT owner's `active_saves` pointer — mirrors `PersistenceService.getActiveSave`. Omitting
+ * `ownerId` (auth off / solo) keeps the original single-global-active-save behavior.
+ *
+ * Audit S5: this is a PURE READ — it never bootstraps, activates, or archives anything. It tries
+ * the explicit `saveId`, then the resolved owner's active save, and returns `null` when neither
+ * exists so the caller can answer with an empty/"no save" result or a 404 instead of silently
+ * creating a save or (worse) reaching for some other owner's save. `bootstrapSingleplayerSave` is
+ * intentionally never called from here — that capability now lives only behind explicit,
+ * intentional "start/continue my game" actions (e.g. the `create`/`fresh-season-1` POST actions
+ * on `/api/singleplayer-state`), never behind a GET/read.
  *
  * Do NOT use this for gameplay/season writes — see `requireLocalPersistedSave`.
  */
@@ -66,15 +74,11 @@ export function resolveLocalPersistedSave(
   persistence: PersistenceService,
   saveId?: string | null,
   ownerId?: string | null,
-): { persistence: PersistenceService; save: PersistedSaveGame } {
-  const bootstrapped = persistence.bootstrapSingleplayerSave();
-  const save =
-    (saveId ? persistence.getSaveById(saveId) : null) ??
-    persistence.getActiveSave(ownerId) ??
-    bootstrapped.save;
+): { persistence: PersistenceService; save: PersistedSaveGame } | null {
+  const save = (saveId ? persistence.getSaveById(saveId) : null) ?? persistence.getActiveSave(ownerId) ?? null;
 
   if (!save) {
-    throw new Error("SQLite save could not be loaded.");
+    return null;
   }
 
   return { persistence, save };

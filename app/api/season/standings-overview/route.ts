@@ -6,6 +6,8 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getSeasonPointsLedger } from "@/lib/foundation/get-season-derivations";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { resolveLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
+import { resolveSessionOwnerId } from "@/lib/auth/session";
 import { readStandingsOverviewCache, writeStandingsOverviewCache } from "@/lib/season/standings-overview-cache";
 import { buildArchivedSeasonStandingsOverviewItems } from "@/lib/season/archived-standings-overview";
 import { buildTeamPrizeSummary } from "@/lib/season/prize-money";
@@ -98,18 +100,34 @@ export async function GET(request: Request) {
     const requestedSeasonId = searchParams.get("seasonId")?.trim() || undefined;
     const requestedContentSignature = searchParams.get("contentSignature")?.trim() || undefined;
     const source = searchParams.get("source")?.trim() === "prisma" ? "prisma" : "sqlite";
+    const ownerId = source === "sqlite" ? await resolveSessionOwnerId() : null;
 
     const localSave =
       source === "sqlite"
-        ? (() => {
-            const persistence = createPersistenceService();
-            return (
-              (saveId ? persistence.getSaveById(saveId) : null) ??
-              persistence.getActiveSave() ??
-              persistence.bootstrapSingleplayerSave().save
-            );
-          })()
+        ? resolveLocalPersistedSave(createPersistenceService(), saveId, ownerId)?.save ?? null
         : null;
+
+    // Audit S5: this used to fall back to `bootstrapSingleplayerSave()` (a write) when no save
+    // could be resolved. Reads must never create/activate a save — answer "no save" instead.
+    if (source === "sqlite" && !localSave) {
+      return NextResponse.json(
+        {
+          items: [],
+          missingMappings: [],
+          mappingWarnings: ["save_not_found"],
+          source: {
+            kind: "season_snapshot_missing",
+            access: "local_save",
+            detectedColumns: [],
+            disciplineColumns: SEASON_STANDINGS_DISCIPLINE_COLUMNS,
+          },
+          scope: null,
+          error: "Save could not be resolved.",
+        },
+        { status: 404 },
+      );
+    }
+
     const seasonId = requestedSeasonId ?? localSave?.gameState.season.id ?? "season-1";
     const contentSignature =
       requestedContentSignature ??

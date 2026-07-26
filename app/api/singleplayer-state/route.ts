@@ -45,19 +45,7 @@ import { ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
-import { isAuthEnabled } from "@/lib/auth/config";
-import { getSessionUser } from "@/lib/auth/session";
-
-/**
- * Owner-ID der eingeloggten Session (nur wenn OLY_AUTH_ENABLED=1). Bei deaktiviertem Login ->
- * null, damit der globale Aktiv-Save-Pfad (Auth-OFF / Solo) exakt unveraendert bleibt.
- */
-async function resolveSessionOwnerId(): Promise<string | null> {
-  if (!isAuthEnabled()) {
-    return null;
-  }
-  return (await getSessionUser())?.ownerId ?? null;
-}
+import { resolveSessionOwnerId } from "@/lib/auth/session";
 
 /**
  * Room-write context a caller may attach to a team-scoped gameplay action so it can be
@@ -250,26 +238,19 @@ function loadSqliteResponse(
     allSaves = persistence.listSaves().map(enrichSaveSummary);
   }
 
-  const modeSaves =
-    requestedSaveMode === "all"
-      ? allSaves
-      : allSaves.filter((summary) => matchesFoundationSaveMode(requestedSaveMode, summary));
+  // Audit S5: this is a READ. It may resolve THIS owner's active save (or the explicit saveId),
+  // but it must never activate/archive anything — picking some other save (e.g. the most recently
+  // updated save in the list, which could easily belong to the OTHER owner) and calling
+  // `activateSave` on it here would silently repoint this owner's active_saves pointer at another
+  // player's save and flip that save's status, as a side effect of a plain page load / GET. If
+  // neither an explicit saveId nor an active save can be resolved for this owner, fall through to
+  // the "no save" 404 below instead of guessing.
   const activeSave = persistence.getActiveSave(ownerId);
   const activeSaveSummary =
     activeSave && (requestedSaveMode === "all" || matchesFoundationSaveMode(requestedSaveMode, activeSave))
       ? activeSave
       : null;
-  const fallbackSummary = modeSaves[0] ?? allSaves[0] ?? null;
-  const save = saveId
-    ? persistence.getSaveById(saveId)
-    : activeSaveSummary
-      ? activeSaveSummary
-      : fallbackSummary
-      ? persistence.activateSave(fallbackSummary.saveId, ownerId) ?? persistence.getSaveById(fallbackSummary.saveId)
-      : null;
-  if (!saveId && fallbackSummary) {
-    allSaves = persistence.listSaves().map(enrichSaveSummary);
-  }
+  const save = saveId ? persistence.getSaveById(saveId) : activeSaveSummary;
   const responseModeSaves =
     requestedSaveMode === "all"
       ? allSaves

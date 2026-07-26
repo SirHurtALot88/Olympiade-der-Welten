@@ -180,21 +180,21 @@ describe("ai legacy lineup preview api", () => {
   });
 
   it("builds a read-only batch preview for all local teams", async () => {
+    const localSave = {
+      saveId: "save-local",
+      gameState: {
+        season: { id: "season-1", matchdayIds: ["matchday-1"] },
+        matchdayState: { matchdayId: "matchday-1" },
+        teams: [
+          { teamId: "A-A", shortCode: "A-A", name: "Alpha" },
+          { teamId: "B-B", shortCode: "B-B", name: "Beta" },
+        ],
+      },
+    };
     createPersistenceService.mockReturnValue({
-      bootstrapSingleplayerSave: () => ({
-        save: {
-          saveId: "save-local",
-          gameState: {
-            season: { id: "season-1", matchdayIds: ["matchday-1"] },
-            matchdayState: { matchdayId: "matchday-1" },
-            teams: [
-              { teamId: "A-A", shortCode: "A-A", name: "Alpha" },
-              { teamId: "B-B", shortCode: "B-B", name: "Beta" },
-            ],
-          },
-        },
-      }),
-      getSaveById: () => null,
+      // Audit S5: the ai-batch-preview GET route resolves via `resolveLocalPersistedSave` (pure
+      // read, explicit saveId or the owner's active save) — it no longer bootstraps a save.
+      getSaveById: (saveId: string) => (saveId === localSave.saveId ? localSave : null),
       getActiveSave: () => null,
     });
 

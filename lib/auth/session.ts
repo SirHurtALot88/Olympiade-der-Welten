@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 
+import { isAuthEnabled } from "@/lib/auth/config";
 import type { AuthUserConfig, AuthUsername } from "@/lib/auth/config";
 import { createSessionCookieValue, SESSION_COOKIE_NAME, sessionCookieOptions, verifySession } from "@/lib/auth/session-cookie";
 
@@ -42,4 +43,20 @@ export async function getSessionUser(): Promise<AuthUserConfig | null> {
   const cookieStore = await cookies();
   const raw = cookieStore.get(SESSION_COOKIE_NAME)?.value ?? null;
   return verifySession(raw);
+}
+
+/**
+ * Owner-ID der eingeloggten Session (nur wenn OLY_AUTH_ENABLED=1). Bei deaktiviertem Login ->
+ * null, damit der globale Aktiv-Save-Pfad (Auth-OFF / Solo) exakt unveraendert bleibt.
+ *
+ * Zentrale, geteilte Implementierung (Audit S5): jeder Read-Pfad, der "meinen aktiven Save"
+ * ohne explizite saveId aufloesen will, soll DIESE Funktion nutzen statt eine eigene Kopie zu
+ * pflegen — nur so bleibt garantiert, dass Chris und Franky nie versehentlich denselben globalen
+ * Save-Zeiger sehen.
+ */
+export async function resolveSessionOwnerId(): Promise<string | null> {
+  if (!isAuthEnabled()) {
+    return null;
+  }
+  return (await getSessionUser())?.ownerId ?? null;
 }
