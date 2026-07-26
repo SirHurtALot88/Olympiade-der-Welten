@@ -2518,6 +2518,12 @@ export type SeasonState = {
   transferWishlist?: TransferWishlistEntry[];
   transferSellMarkers?: TransferSellMarkerEntry[];
   standingsApplyLogs?: StandingsApplyAuditLogRecord[];
+  /**
+   * Audit R2/V4: Saison-IDs, für die die Formkarten-Übernutzungs-Strafe bereits auf die Endtabelle
+   * angewandt wurde (Punktabzug + Re-Rank, in der season-completion-Kaskade VOR Snapshot/Rang-Payouts).
+   * Idempotenz-Marker, damit ein erneuter Abschluss-Lauf die Strafpunkte nicht doppelt abzieht.
+   */
+  formCardPenaltyAppliedSeasonIds?: string[];
   cashPrizeApplyLogs?: CashPrizeApplyLogRecord[];
   matchdayAdvanceLogs?: MatchdayAdvanceLogRecord[];
   objectiveRewardApplyLogs?: ObjectiveRewardApplyLogRecord[];

@@ -11,6 +11,7 @@ import { buildSeasonAiLineupAudit, type SeasonAiLineupAudit } from "@/lib/season
 import {
   applyTeamSeasonObjectiveRewards,
 } from "@/lib/board/team-season-objectives-service";
+import { applyFormCardPenaltyWithRerank } from "@/lib/season/form-card-penalty-service";
 import { applySponsorSettlement, previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import {
   applyFacilitySeasonEndFinance,
@@ -38,6 +39,7 @@ export type SeasonCompletionStepStatus = "planned" | "applied" | "already_done" 
 export type SeasonCompletionStep = {
   key:
     | "season_check"
+    | "form_card_penalty"
     | "season_review"
     | "objective_rewards"
     | "cash_apply"
@@ -220,6 +222,30 @@ async function runLocalSeasonCompletionUnsafe(
       label: "Season Review",
       status: completed ? "applied" : "skipped",
       warnings: seasonReview.warnings,
+      blockingReasons: [],
+      auditId: null,
+    },
+    warnings,
+    blockingReasons,
+  );
+
+  // Audit R2/V4: Formkarten-Übernutzungs-Strafe VOR der Liga-Abrechnung anwenden — Punktabzug + Re-Rank auf
+  // der Endtabelle. Nur so sehen die rang-basierten Sponsor-Payouts UND der eingefrorene Season-Snapshot die
+  // bestrafte Tabelle (vorher lief die Strafe erst bei next_season_setup, nach Snapshot/Payouts, und war
+  // wirkungslos). Idempotent pro Saison; persistieren, damit die nachfolgenden Steps (die den Save neu lesen)
+  // die bestrafte Tabelle sehen.
+  const formCardPenalty = applyFormCardPenaltyWithRerank(initialSave.gameState, seasonId);
+  const formCardPenaltyExecuted = !dryRun && blockingReasons.size === 0 && formCardPenalty.applied;
+  if (formCardPenaltyExecuted) {
+    persistGameStateWithMaterializedDerivations(persistence, initialSave.saveId, formCardPenalty.gameState);
+  }
+  addStep(
+    steps,
+    {
+      key: "form_card_penalty",
+      label: "Formkarten-Strafe",
+      status: formCardPenalty.applied ? (formCardPenaltyExecuted ? "applied" : "planned") : "skipped",
+      warnings: formCardPenalty.warnings,
       blockingReasons: [],
       auditId: null,
     },
