@@ -205,63 +205,81 @@ console.log(`\nERGEBNIS: ${trapsTotal === 0 && goalsOk ? "alle Abnahmekriterien 
 const SALARY_SUM_S1 = 2078;
 const clauseEv = (t: SponsorType) => P_MET * t.clause.bonus - (1 - P_MET) * t.clause.malus;
 
-/** Auszahlung eines Teams auf Rang r (Erwartung = Rang, also Δ0) für Typ t, bei Skalierung k. */
-function teamPayout(t: SponsorType, rank: number, k: number) {
+/**
+ * Untergrenze ATMET mit dem Faktor mit — sie ist nicht fix.
+ *
+ * Erste Variante hielt sie starr bei 44. Ergebnis war eine zu flache Schere im schlechten Jahr:
+ * bei sf 0.8 stand Meister 59 gegen Letzter 47, also nur Faktor 1.26 — ein mieses Ligajahr fuehlte
+ * sich fuer die Spitze bestrafend und fuer den Keller fast folgenlos an. Deshalb faellt die
+ * Untergrenze bei sf < 1 gedaempft mit (Ziel bei 0.8: 35-40) und gibt der Spitze Luft; bei sf > 1
+ * steigt sie moderat. Gedaempft, damit der Keller nicht 1:1 dem Ligajahr ausgeliefert ist.
+ */
+const FLOOR_DAMP = 0.8;
+const floorAt = (sf: number) => FLOOR * (1 - FLOOR_DAMP * (1 - sf));
+
+function teamPayout(t: SponsorType, rank: number, k: number, fl: number) {
   const base = rankPart(t, rank, rank, offsetFor(t.name, rank)) + clauseEv(t) + SPECIAL_TYPICAL;
-  return FLOOR + (base - FLOOR) * k; // Untergrenze bleibt fix, nur der Teil darüber skaliert
+  return fl + (base - FLOOR) * k;
 }
-const leagueSum = (k: number) =>
+const leagueSum = (k: number, fl: number) =>
   Array.from({ length: 32 }, (_, i) => i + 1).reduce(
-    (acc, r) => acc + SPONSOR_TYPES.reduce((a, t) => a + Math.max(FLOOR, teamPayout(t, r, k)), 0) / SPONSOR_TYPES.length,
+    (acc, r) => acc + SPONSOR_TYPES.reduce((a, t) => a + Math.max(fl, teamPayout(t, r, k, fl)), 0) / SPONSOR_TYPES.length,
     0,
   );
-
-// k so bestimmen, dass die Liga-Summe bei sf 1.0 die Gehaltssumme trifft
-let kLo = 0, kHi = 5;
-for (let i = 0; i < 200; i++) { const m = (kLo + kHi) / 2; if (leagueSum(m) < SALARY_SUM_S1) kLo = m; else kHi = m; }
-const K1 = (kLo + kHi) / 2;
+/** k so bestimmen, dass die Liga-Summe die Zielsumme trifft. */
+function solveK(targetSum: number, fl: number) {
+  let a = 0, b = 8;
+  for (let i = 0; i < 200; i += 1) { const m = (a + b) / 2; if (leagueSum(m, fl) < targetSum) a = m; else b = m; }
+  return (a + b) / 2;
+}
 
 line();
-console.log(`LIGA-SUMMEN-PRÜFUNG — Ziel bei sf 1.0: Σ Sponsoren ≈ Σ Gehälter (${SALARY_SUM_S1})`);
+console.log(`LIGA-SUMMEN-PRUEFUNG — sf 1.0 heisst: Sigma Sponsoren ~ Sigma Gehaelter (${SALARY_SUM_S1})`);
 line();
-console.log(`  Skalierung k(1.0) = ${K1.toFixed(3)}  → Σ Sponsoren = ${leagueSum(K1).toFixed(0)}`);
-console.log(`  (Leiter unskaliert ergäbe Σ = ${leagueSum(1).toFixed(0)} — ${leagueSum(1) > SALARY_SUM_S1 ? "zu viel" : "zu wenig"})\n`);
-
+console.log("  sf    Untergr.      k     Sigma    Meister  Rang16  Letzter   Schere  Teams im Plus");
 for (const sf of [0.8, 1.0, 1.2]) {
-  // Ziel-Summe der Liga bei diesem Faktor
-  const targetSum = SALARY_SUM_S1 * sf;
-  let a = 0, b = 5;
-  for (let i = 0; i < 200; i++) { const m = (a + b) / 2; if (leagueSum(m) < targetSum) a = m; else b = m; }
-  const k = (a + b) / 2;
+  const fl = floorAt(sf);
+  const k = solveK(SALARY_SUM_S1 * sf, fl);
   const perRank = Array.from({ length: 32 }, (_, i) => i + 1).map((r) =>
-    SPONSOR_TYPES.reduce((acc, t) => acc + Math.max(FLOOR, teamPayout(t, r, k)), 0) / SPONSOR_TYPES.length);
-  // Gehalt je Rang: stark korreliert mit Rang. Naeherung aus dem echten Save (min 43.7 … max 87.8)
+    SPONSOR_TYPES.reduce((acc, t) => acc + Math.max(fl, teamPayout(t, r, k, fl)), 0) / SPONSOR_TYPES.length);
   const salaryAt = (r: number) => 87.8 - (87.8 - 43.7) * ((r - 1) / 31);
   const winners = perRank.filter((p, i) => p > salaryAt(i + 1)).length;
-  console.log(`  sf ${sf.toFixed(1)}  k=${k.toFixed(3)}  Σ=${leagueSum(k).toFixed(0)} (Ziel ${targetSum.toFixed(0)})` +
-    `  Meister=${perRank[0]!.toFixed(0)}  Rang16=${perRank[15]!.toFixed(0)}  Letzter=${perRank[31]!.toFixed(0)}` +
-    `  Teams im Plus: ${winners}/32`);
-  console.log(`        Letzter deckt Mindestgehalt 43.7? ${perRank[31]! >= 43.7 ? "JA ✓" : "NEIN ✗"}` +
-    `   Meister deckt Top-Gehalt 87.8? ${perRank[0]! >= 87.8 ? "JA ✓" : "NEIN ✗"}`);
+  console.log(
+    `  ${sf.toFixed(1)}   ${fl.toFixed(1).padStart(6)}  ${k.toFixed(3)}  ${leagueSum(k, fl).toFixed(0).padStart(6)}` +
+    `   ${perRank[0]!.toFixed(0).padStart(6)}  ${perRank[15]!.toFixed(0).padStart(6)}  ${perRank[31]!.toFixed(0).padStart(6)}` +
+    `   ${(perRank[0]! / perRank[31]!).toFixed(2)}x   ${winners}/32`);
 }
 
-// Die Liga-Summe oben rechnet mit ERWARTUNGSWERTEN (Klausel zu P erfüllt, Δ0, typisches Sonderziel).
-// Ein echter Meister hat aber überperformt (Δ+1), trifft seine Klausel und erfüllt sein Sonderziel —
-// sein REALISIERTER Wert liegt darum über dem Liga-Erwartungswert. Beide Zahlen sind nötig:
-// die Erwartungswert-Summe für die Liga-Bilanz, der Gutfall für "kann der Meister seine Gehälter zahlen".
 line();
-console.log("MEISTER: Liga-Erwartungswert vs. realisierter Gutfall (Titel + Klausel + Sonderziel)");
+console.log("MEISTER realisiert (Titel + Klausel + Sonderziel) vs. Top-Gehalt 87.8");
 line();
 for (const sf of [0.8, 1.0, 1.2]) {
-  const targetSum = SALARY_SUM_S1 * sf;
-  let a = 0, b = 5;
-  for (let i = 0; i < 200; i++) { const m = (a + b) / 2; if (leagueSum(m) < targetSum) a = m; else b = m; }
-  const k = (a + b) / 2;
-  const good = SPONSOR_TYPES.map((t) => {
-    // Erwartet Rang 3 (Stufe "Top 4"), wird Meister → Δ+1; Klausel erfüllt; Sonderziel voll (12)
-    const raw = rankPart(t, 3, 1, offsetFor(t.name, 3)) + t.clause.bonus + 12;
-    return FLOOR + (raw - FLOOR) * k;
-  });
-  console.log(`  sf ${sf.toFixed(1)}: Meister realisiert ${Math.min(...good).toFixed(0)}–${Math.max(...good).toFixed(0)}` +
-    `   (Top-Gehalt 87.8 gedeckt? ${Math.min(...good) >= 87.8 ? "immer ✓" : Math.max(...good) >= 87.8 ? "nur mit Risiko-Typ ~" : "nie ✗"})`);
+  const fl = floorAt(sf);
+  const k = solveK(SALARY_SUM_S1 * sf, fl);
+  const good = SPONSOR_TYPES.map((t) => fl + (rankPart(t, 3, 1, offsetFor(t.name, 3)) + t.clause.bonus + 12 - FLOOR) * k);
+  const bottomBad = SPONSOR_TYPES.map((t) => Math.max(fl, fl + (rankPart(t, 30, 32, offsetFor(t.name, 30)) - t.clause.malus - FLOOR) * k));
+  console.log(`  sf ${sf.toFixed(1)}: Meister ${Math.min(...good).toFixed(0)}-${Math.max(...good).toFixed(0)}` +
+    `   Letzter im Schlechtfall ${Math.min(...bottomBad).toFixed(0)}-${Math.max(...bottomBad).toFixed(0)}` +
+    `   Deckung Top-Gehalt: ${Math.min(...good) >= 87.8 ? "immer" : Math.max(...good) >= 87.8 ? "nur teilweise" : "nie"}`);
 }
+
+// ── Wer profitiert wie stark? Auszahlung MINUS Gehalt je Tabellenstufe. ─────────────────────────
+// Beantwortet: steigen bei einem guten Ligajahr (1.2) alle Stufen gleichermassen, profitiert also
+// auch das Mittelfeld stark — oder zieht nur die Spitze davon?
+line();
+console.log("UEBERSCHUSS JE STUFE (Auszahlung minus Gehalt) — wer profitiert wie stark?");
+line();
+const salaryAtRank = (r: number) => 87.8 - (87.8 - 43.7) * ((r - 1) / 31);
+const PROBE = [1, 4, 8, 16, 24, 32];
+console.log("  sf    " + PROBE.map((r) => `R${r}`.padStart(9)).join("") + "     Spanne");
+for (const sf of [0.8, 1.0, 1.2]) {
+  const fl = floorAt(sf);
+  const k = solveK(SALARY_SUM_S1 * sf, fl);
+  const surplus = PROBE.map((r) => {
+    const payout = SPONSOR_TYPES.reduce((a, t) => a + Math.max(fl, teamPayout(t, r, k, fl)), 0) / SPONSOR_TYPES.length;
+    return payout - salaryAtRank(r);
+  });
+  console.log(`  ${sf.toFixed(1)} ` + surplus.map((v) => `${v >= 0 ? "+" : ""}${v.toFixed(0)}`.padStart(9)).join("") +
+    `   ${(Math.max(...surplus) - Math.min(...surplus)).toFixed(0)}`);
+}
+console.log("\n  Lesart: positiv = Sponsor deckt die Gehaelter und es bleibt etwas uebrig; negativ = Zuschuss noetig.");
