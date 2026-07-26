@@ -589,22 +589,22 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
 
   const cockpitPrizePreviewStatus = useMemo(() => {
     if (!prizePreviewFeed) {
-      return { status: "open" as const, message: "Noch keine Preisgeld-Vorschau geladen." };
+      return { status: "open" as const, message: "Noch keine Sponsor-Vorschau geladen." };
     }
     if (prizePreviewHardBlocked.length > 0) {
-      return { status: "blocked" as const, message: prizePreviewHardBlocked[0] ?? "Preisgeldtabelle ist nicht verwendbar." };
+      return { status: "blocked" as const, message: prizePreviewHardBlocked[0] ?? "Sponsor-Vorschau ist nicht verwendbar." };
     }
     if ((prizePreviewFeed.summary.calculableTeams ?? 0) > 0 && (prizePreviewFeed.summary.blockedItemsCount ?? 0) === 0) {
-      return { status: "ready" as const, message: "Cash vorher, Preisgeld und Cash nachher sind für alle Teams berechenbar." };
+      return { status: "ready" as const, message: "Cash vorher, Sponsor-Einnahme und Cash nachher sind für alle Teams berechenbar." };
     }
-    return { status: "warning" as const, message: "Preisgeld-Vorschau ist nur teilweise berechenbar." };
+    return { status: "warning" as const, message: "Sponsor-Vorschau ist nur teilweise berechenbar." };
   }, [prizePreviewFeed, prizePreviewHardBlocked]);
 
   const cockpitCashApplyStatus = useMemo(() => {
     const summary = cashApplyFeed?.summary;
     const blockingReasons = cashApplyFeed?.blockingReasons ?? summary?.blockingReasons ?? [];
     if (cashApplyFeed?.applied || currentSeasonCashPrizeApplyLogs.length > 0) {
-      return { status: "applied" as const, message: currentSeasonCashPrizeApplyLogs.length > 0 ? "Preisgeld wurde für diese Season bereits angewendet." : "Cash Apply wurde lokal gespeichert." };
+      return { status: "applied" as const, message: currentSeasonCashPrizeApplyLogs.length > 0 ? "Sponsor-Auszahlung wurde für diese Season bereits angewendet." : "Cash Apply wurde lokal gespeichert." };
     }
     if (cashApplyFeed && (cashApplyFeed.canApply ?? summary?.canApply) === false) {
       return { status: "blocked" as const, message: blockingReasons[0] ?? "Cash Apply ist blockiert." };
@@ -612,7 +612,7 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
     if ((prizePreviewFeed?.summary.calculableTeams ?? 0) > 0 && (prizePreviewFeed?.summary.blockedItemsCount ?? 0) === 0) {
       return { status: "ready" as const, message: "Cash Apply kann nach Dry-Run lokal bestätigt werden." };
     }
-    return { status: "open" as const, message: "Erst Preisgeld-Vorschau vollständig berechnen." };
+    return { status: "open" as const, message: "Erst Sponsor-Vorschau vollständig berechnen." };
   }, [cashApplyFeed, currentSeasonCashPrizeApplyLogs.length, prizePreviewFeed]);
 
   const cockpitSeasonSnapshotStatus = useMemo(() => {

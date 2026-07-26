@@ -23,6 +23,8 @@ import {
 } from "@/components/foundation/sponsor/SponsorOfferCardNewLook";
 import { buildSponsorOfferPresentation, getSponsorComponentKindLabel } from "@/lib/sponsor/sponsor-offer-presenter";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
+import { previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
+import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamObjectives } from "@/lib/board/team-season-objectives-service";
 import { formatGameFlowBlocker } from "@/lib/foundation/game-flow-blocker-labels";
 import {
@@ -327,6 +329,35 @@ export default function FoundationSponsorsNewLook({
   const [ratingDetailsOpen, setRatingDetailsOpen] = useState(false);
   const [leagueSponsorSort, setLeagueSponsorSort] = useState<LeagueSponsorSort>("cash");
 
+  // Voraussichtliche Sponsor-Auszahlung je Team BEIM AKTUELLEN RANG (Basis +
+  // freigeschaltete Rang-Meilensteine + erfüllte Sonderziele) — aus der
+  // Settlement-Vorschau, also derselben rang-abhängigen Rechnung wie das echte
+  // Season-End-Settlement. Bewusst NICHT die naive Summe aller Vertrags-
+  // Komponenten (= maximal möglicher Vertragswert), die unabhängig vom
+  // erreichten Rang war und damit "was verdient das Team wirklich" nicht zeigte.
+  const sponsorProjectedByTeamId = useMemo(() => {
+    const map = new Map<string, number>();
+    try {
+      for (const row of previewSponsorSettlement(gameState).rows) {
+        if (row.cashDelta > 0) {
+          map.set(row.teamId, (map.get(row.teamId) ?? 0) + row.cashDelta);
+        }
+      }
+    } catch {
+      // Vorschau ist optional — ohne gültige Verträge bleibt die Projektion leer.
+    }
+    return map;
+  }, [gameState]);
+
+  // Aktueller Liga-Rang je Team (echte Standings) für die Auszahlungs-Erklärung.
+  const teamRankByTeamId = useMemo(() => {
+    const map = new Map<string, number | null>();
+    for (const row of buildTeamSeasonOverviewRows({ gameState })) {
+      map.set(row.teamId, row.rank ?? null);
+    }
+    return map;
+  }, [gameState]);
+
   // #76: Angebotsvergleich — echte Cash-Summe je Angebot (dieselbe Formel wie
   // in der Angebotskarte).
   const offerCashSummaries = useMemo(
@@ -381,12 +412,16 @@ export default function FoundationSponsorsNewLook({
   const leagueSponsorRows = useMemo(() => {
     return gameState.teams.map((team) => {
       const contract = getTeamSponsorContract(gameState, team.teamId);
-      const totalCash = contract
+      // Maximal möglicher Vertragswert (alle Komponenten) — nur noch als
+      // Kontext-Tooltip, nicht mehr als Hauptzahl.
+      const maxCash = contract
         ? contract.components.reduce(
             (sum, component) => sum + (typeof component.rewardCash === "number" ? component.rewardCash : 0),
             0,
           )
         : null;
+      // Hauptzahl: voraussichtliche Auszahlung beim aktuellen Rang.
+      const projectedCash = contract ? (sponsorProjectedByTeamId.get(team.teamId) ?? 0) : null;
       return {
         teamId: team.teamId,
         teamName: team.name,
@@ -396,7 +431,9 @@ export default function FoundationSponsorsNewLook({
         // Rarität/Kurvenform robust auflösen (Back-Compat für alte Verträge).
         rarity: contract ? (contract.rarity ?? "gewöhnlich") : null,
         curveShape: contract ? (contract.curveShape ?? mapArchetypeToCurveShape(contract.archetype)) : null,
-        totalCash,
+        projectedCash,
+        maxCash,
+        rank: teamRankByTeamId.get(team.teamId) ?? null,
         // Golden Card = seltener Premium-Elite-Sponsor (Underdog-Glück). Der
         // Vertrag erbt `variantKey` vom Angebot (sponsor-offer-service), daher
         // ist das der verlaessliche Golden-Indikator auf Vertragsebene.
@@ -425,7 +462,7 @@ export default function FoundationSponsorsNewLook({
         const rightOrder = right.rarity ? SPONSOR_RARITIES[right.rarity].order : -1;
         return rightOrder - leftOrder;
       }
-      return (right.totalCash ?? -1) - (left.totalCash ?? -1);
+      return (right.projectedCash ?? -1) - (left.projectedCash ?? -1);
     });
     return list;
   }, [leagueSponsorRows, leagueSponsorSort]);
@@ -487,11 +524,10 @@ export default function FoundationSponsorsNewLook({
   // bereits vorhandenen Daten (kein neuer Fetch/State).
   const activeContractCashTotal = useMemo(() => {
     if (!selectedTeamSponsorContract) return null;
-    return selectedTeamSponsorContract.components.reduce(
-      (sum, component) => sum + (typeof component.rewardCash === "number" ? component.rewardCash : 0),
-      0,
-    );
-  }, [selectedTeamSponsorContract]);
+    // Voraussichtliche Auszahlung beim aktuellen Rang (nicht der maximale
+    // Vertragswert) — konsistent mit der Liga-Sponsorenübersicht.
+    return sponsorProjectedByTeamId.get(selectedTeamSponsorContract.teamId) ?? 0;
+  }, [selectedTeamSponsorContract, sponsorProjectedByTeamId]);
   const avgOfferCashValue = useMemo(() => {
     if (offerCashSummaries.length === 0) return null;
     return offerCashSummaries.reduce((sum, entry) => sum + entry.totalCash, 0) / offerCashSummaries.length;
@@ -533,7 +569,7 @@ export default function FoundationSponsorsNewLook({
                 ? formatMoney(animatedKpiContractCash ?? activeContractCashTotal)
                 : "—"
             }
-            sub={activeContractCashTotal != null ? "aktiver Vertrag" : "kein Vertrag"}
+            sub={activeContractCashTotal != null ? "beim aktuellen Rang" : "kein Vertrag"}
             tone={activeContractCashTotal != null ? "good" : "neutral"}
           />
           <StatChip
@@ -841,8 +877,17 @@ export default function FoundationSponsorsNewLook({
                       <span className="nl-sponsor-league-sponsor is-empty">— noch keiner —</span>
                     )}
                   </div>
-                  <span className="nl-sponsor-league-cash nl-tnum">
-                    {row.totalCash != null ? formatMoney(row.totalCash) : "—"}
+                  <span
+                    className="nl-sponsor-league-cash nl-tnum"
+                    title={
+                      row.projectedCash != null
+                        ? `Voraussichtliche Auszahlung beim aktuellen Rang${
+                            row.rank != null ? ` #${row.rank}` : ""
+                          }${row.maxCash != null ? ` · max. Vertragswert ${formatMoney(row.maxCash)}` : ""}`
+                        : "Kein Sponsor unter Vertrag"
+                    }
+                  >
+                    {row.projectedCash != null ? formatMoney(row.projectedCash) : "—"}
                   </span>
                 </div>
               );

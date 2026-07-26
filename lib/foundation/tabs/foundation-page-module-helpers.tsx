@@ -162,7 +162,7 @@ export const foundationPrimaryViews: Array<{ id: FoundationView; label: string; 
   { id: "players", label: "Spieler", tooltip: "Spieler suchen, vergleichen und Profil/Training/Markt öffnen." },
   { id: "ranks", label: "Ranks", tooltip: "Team- und Disziplinranks nach Gesamtstärke und Achsen." },
   { id: "diszis", label: "Diszis", tooltip: "Disziplinen, Mutatoren und Gewichtungen prüfen." },
-  { id: "prize", label: "Preisgeld", tooltip: "Preisgeld- und Saisonende-Ausblick nach Tabellenplatz." },
+  { id: "prize", label: "Sponsoren", tooltip: "Sponsor-Vertrag wählen und Saisonfinanzen prüfen." },
   { id: "market", label: "Transfermarkt", tooltip: "Kaufen, verkaufen, Value prüfen und Budgets absichern." },
   { id: "history", label: "Transferhistorie", tooltip: "Vergangene Deals, Gewinne, Risiken und Kaderbewegungen." },
 ];
@@ -311,7 +311,9 @@ export function resolveFoundationPanelScrollTarget(input: {
     return "foundation-lineup";
   }
   if (input.panel === "training-plan") {
-    return "foundation-facilities-v2";
+    // Der Trainingsplan lebt im Training-Tab (trainingCompact), nicht im
+    // Gebäude-Tab — daher auf den Training-Compact-Anker scrollen.
+    return "foundation-training-compact";
   }
   if (input.panel === "season-end-development") {
     return "foundation-training-compact";

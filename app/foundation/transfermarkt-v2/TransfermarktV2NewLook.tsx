@@ -92,6 +92,7 @@ export type TransfermarktNewLookSortMode =
   | "value"
   | "cheap"
   | "potential"
+  | "develop"
   | "salary"
   | "pow"
   | "spe"
@@ -103,6 +104,7 @@ const NL_MARKET_SORT_LABELS: Record<TransfermarktNewLookSortMode, string> = {
   fit: "Bester Fit",
   value: "Bestes Value",
   potential: "Meistes Potenzial",
+  develop: "Beste Entwicklung",
   cheap: "Günstigste",
   salary: "Niedriges Gehalt",
   pow: "POW",
@@ -118,6 +120,8 @@ const NL_MARKET_SORT_TITLES: Record<TransfermarktNewLookSortMode, string> = {
   value: "Value = MW ÷ Gehalt. Sortiert nach dem Marktwert-pro-Gehalt-Verhältnis (hoher Wert = viel Gegenwert je Gehalts-Einheit).",
   potential:
     "Sortiert nach der markt-bepreisten Potenzial-Prämie (Aufschlag im Marktwert) plus Scouting-Konfidenz — NICHT nach dem exakten, noch verdeckten Potenzial.",
+  develop:
+    "Für die Talentschmiede: sortiert nach Trainings-Entwicklung — Forecast-Trend + Potenzial-Luft (Gap) − Regressions-Risiko. Findet Spieler, die sich am besten ausbilden lassen.",
   cheap: "Sortiert nach dem niedrigsten Marktwert (Ablöse) zuerst.",
   salary: "Sortiert nach dem niedrigsten Gehalt p.a. zuerst.",
   pow: "Sortiert nach POWER-Achswert (absteigend).",
@@ -131,6 +135,7 @@ const NL_MARKET_SORT_ORDER: TransfermarktNewLookSortMode[] = [
   "fit",
   "value",
   "potential",
+  "develop",
   "cheap",
   "salary",
   "pow",

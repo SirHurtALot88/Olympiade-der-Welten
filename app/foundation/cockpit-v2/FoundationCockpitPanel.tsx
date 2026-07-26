@@ -919,7 +919,7 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                     title={
                       cockpitBusyKey != null
                         ? getCockpitBusyReason()
-                        : "Lädt die Season-End-Preview für Preisgeld, Rangbewegung und Cash."
+                        : "Lädt die Season-End-Preview für Sponsor, Gebäude und Cash."
                     }
                     onClick={() => {
                       setCockpitBusyKey("resolve-preview");
@@ -1188,7 +1188,7 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                       }
                       onClick={() => {
                         const confirmed = window.confirm(
-                          "Jetzt den aktuellen Matchday lokal ausführen? Der Auto-Run speichert AI-Lineups, Ergebnis, Tabelle und springt danach zum nächsten Schritt. Preisgeld, Cash und Transferfenster bleiben beim Saisonende.",
+                          "Jetzt den aktuellen Matchday lokal ausführen? Der Auto-Run speichert AI-Lineups, Ergebnis, Tabelle und springt danach zum nächsten Schritt. Sponsor-Auszahlung, Cash und Transferfenster bleiben beim Saisonende.",
                         );
                         if (!confirmed) return;
                         void runCockpitMatchdayAutoRun(true);
@@ -1206,7 +1206,7 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                         <li>Matchday Advance: {String(matchdayAutoRunFeed.summary.advanceAllowed)}</li>
                         <li>Formkarten im Plan: {matchdayAutoRunFeed.summary.formCardsSelected ?? "—"}</li>
                         <li>Negative Formkarten in Slot 1: {matchdayAutoRunFeed.summary.negativeFormCardsSelected ?? "—"}</li>
-                        <li>Preisgeld/Cash: season_end_only</li>
+                        <li>Sponsor/Cash: season_end_only</li>
                         <li>Geplante Writes: {matchdayAutoRunFeed.summary.plannedWrites}</li>
                       </ul>
                       <div className="compact-table-shell" style={{ marginTop: 12 }}>
@@ -1268,7 +1268,7 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                     </>
                   ) : (
                     <p className="muted" style={{ marginTop: 10 }}>
-                      DryRun zeigt AI-Lineups, Resolve, Result Apply und Standings im lokalen Matchday-Flow. Preisgeld, Cash und Transferfenster laufen separat am Saisonende.
+                      DryRun zeigt AI-Lineups, Resolve, Result Apply und Standings im lokalen Matchday-Flow. Sponsor-Auszahlung, Cash und Transferfenster laufen separat am Saisonende.
                     </p>
                   )}
                 </div>
@@ -2403,11 +2403,12 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
 
               <article className={`panel cockpit-step ${getCockpitStepTone(prizeApplyState.status)}`}>
                 <div className="panel-header">
-                  <h3>{gameState.season.name} abgeschlossen: Preisgeld & Cash</h3>
+                  <h3>{gameState.season.name} abgeschlossen: Sponsor & Cash</h3>
                   <span className={getCockpitStatusPillClass(prizeApplyState.status)}>{prizeApplyState.label}</span>
                 </div>
                 <p className="muted cockpit-step-hint">
-                  Prominenter Season-End-Finance-Check für dein aktives Team. Preisgeld bleibt idempotent und wird nicht doppelt angewendet.
+                  Prominenter Season-End-Finance-Check für dein aktives Team. Cash-Auszahlung läuft über
+                  Sponsoren (+ Gebäude) und bleibt idempotent. Preisgeld ist nur noch Hintergrund-Benchmark.
                 </p>
                 <div className="teams-summary-grid history-summary-grid">
                   <article className="metric-card">
@@ -2419,12 +2420,12 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                     <strong>{selectedPrizePreviewRow?.rank ?? selectedStandingRow?.rank ?? "—"}</strong>
                   </article>
                   <article className="metric-card">
-                    <span>Basispreisgeld</span>
-                    <strong>{selectedPrizePreviewRow?.prizeMoney != null ? formatLocalePoints(selectedPrizePreviewRow.prizeMoney, 1) : "—"}</strong>
+                    <span>Sponsor-Einnahme</span>
+                    <strong>{selectedPrizePreviewRow?.sponsorCash != null ? formatLocalePoints(selectedPrizePreviewRow.sponsorCash, 1) : "—"}</strong>
                   </article>
                   <article className="metric-card">
-                    <span>Rank Bonus/Malus</span>
-                    <strong>{selectedPrizePreviewRow?.rankChangePrize?.bonusMalus != null ? formatLocalePoints(selectedPrizePreviewRow.rankChangePrize.bonusMalus, 1) : "—"}</strong>
+                    <span>Gebäude-Einnahme</span>
+                    <strong>{selectedPrizePreviewRow?.facilityIncome != null ? formatLocalePoints(selectedPrizePreviewRow.facilityIncome, 1) : "—"}</strong>
                   </article>
                   <article className="metric-card">
                     <span>Cash vorher</span>
@@ -2445,11 +2446,11 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
 
               <article className={`panel cockpit-step ${getCockpitStepTone(cockpitPrizePreviewStatus.status)}`}>
                 <div className="panel-header">
-                  <h3>1. Preisgeld & Finanzen Preview</h3>
+                  <h3>1. Sponsor & Finanzen Preview</h3>
                   <span className={getCockpitStatusPillClass(cockpitPrizePreviewStatus.status)}>{getCockpitStatusLabel(cockpitPrizePreviewStatus.status)}</span>
                 </div>
-                <p>Dieser Block gehört nicht zum Spieltagsflow. Preisgeld und Cash werden nur einmal am Saisonende geprüft und verrechnet.</p>
-                <p className="muted cockpit-step-hint">Season-End Reihenfolge: Season Review, Preisgeld & Finanzen, Facilities, XP, Verkaufen, Verlängern, Kaufen, Season Setup.</p>
+                <p>Dieser Block gehört nicht zum Spieltagsflow. Sponsor-Auszahlung und Cash werden nur einmal am Saisonende geprüft und verrechnet.</p>
+                <p className="muted cockpit-step-hint">Season-End Reihenfolge: Season Review, Sponsor & Finanzen, Facilities, XP, Verkaufen, Verlängern, Kaufen, Season Setup.</p>
                 <div className="cockpit-actions">
                   <button
                     className="secondary-button"
@@ -2460,14 +2461,14 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                       void reloadPrizePreviewFeed().finally(() => setCockpitBusyKey(null));
                     }}
                   >
-                    Preisgeld Preview laden
+                    Sponsor-Preview laden
                   </button>
                 </div>
                 <ul className="warning-list compact-list cockpit-detail-list">
                   <li>Berechenbar: {prizePreviewFeed?.summary.calculableTeams ?? "—"}</li>
                   <li>Blockiert: {prizePreviewFeed?.summary.blockedItemsCount ?? "—"}</li>
-                  <li>Gesamtpreisgeld: {prizePreviewFeed?.summary.totalPrizeMoney != null ? formatLocalePoints(prizePreviewFeed.summary.totalPrizeMoney, 1) : "—"}</li>
-                  <li>Total RankChange: {prizePreviewFeed?.summary.totalRankChangePrize != null ? formatLocalePoints(prizePreviewFeed.summary.totalRankChangePrize, 1) : "—"}</li>
+                  <li>Gesamt-Sponsor-Cash: {prizePreviewFeed?.items != null ? formatLocalePoints(prizePreviewFeed.items.reduce((sum, item) => sum + (item.sponsorCash ?? 0), 0), 1) : "—"}</li>
+                  <li>Gesamt-Gebäude-Einnahme: {prizePreviewFeed?.items != null ? formatLocalePoints(prizePreviewFeed.items.reduce((sum, item) => sum + (item.facilityIncome ?? 0), 0), 1) : "—"}</li>
                   <li>Missing Source Teams: {prizeAuditCompact.missingSourceTeams}</li>
                   <li>Große Rangbewegungen: {prizeAuditCompact.largeRankChanges}</li>
                   <li>Global Warnings: {prizePreviewFeed?.globalWarnings.length ?? 0}</li>
@@ -2480,7 +2481,7 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                     syncFoundationViewInUrl("prize");
                   }}
                 >
-                  Preisgeld öffnen
+                  Sponsoren öffnen
                 </button>
               </article>
 
@@ -2502,7 +2503,7 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                         : cockpitBusyKey != null
                           ? getCockpitBusyReason()
                           : !prizePreviewFeed
-                            ? "Bitte zuerst die Preisgeld-Preview laden."
+                            ? "Bitte zuerst die Sponsor-Preview laden."
                             : "Prüft den lokalen Cash-Apply einmal trocken."
                     }
                     onClick={() => {
@@ -2540,7 +2541,7 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                       : cockpitBusyKey != null
                         ? getCockpitBusyReason()
                         : !prizePreviewFeed
-                          ? "Bitte zuerst die Preisgeld-Preview laden."
+                          ? "Bitte zuerst die Sponsor-Preview laden."
                           : cockpitCashApplyStatus.message}
                   </p>
                 ) : null}
@@ -2676,7 +2677,7 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                     {seasonCompletionFeed?.status ?? seasonTransitionFeed?.transition.status ?? "idle"}
                   </span>
                 </div>
-                <p>Saison sauber schließen: Board-Ziele, Preisgeld, Beziehungen, Snapshot, neue Saison und AI-Einsatz werden zusammen geprüft.</p>
+                <p>Saison sauber schließen: Board-Ziele, Sponsor-Auszahlung, Beziehungen, Snapshot, neue Saison und AI-Einsatz werden zusammen geprüft.</p>
                 <p className="muted cockpit-step-hint">Erst Abschluss prüfen, dann ausführen. Der echte Write läuft atomar mit Recovery, damit der Save nicht halb im Saisonwechsel hängen bleibt.</p>
                 <div className="cockpit-actions">
                   <button
@@ -2700,7 +2701,7 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                     className="secondary-button"
                     type="button"
                     disabled={readMeta.readOnly || seasonTransitionBusy || !localSeasonTransitionGate.canCompleteSeason}
-                    title={localSeasonTransitionGate.disabledReason ?? "Prüft Board-Ziele, Preisgeld, Beziehungen, Snapshot, nächste Saison und AI-Audit ohne zu schreiben"}
+                    title={localSeasonTransitionGate.disabledReason ?? "Prüft Board-Ziele, Sponsor-Auszahlung, Beziehungen, Snapshot, nächste Saison und AI-Audit ohne zu schreiben"}
                     onClick={() => {
                       void runSeasonCompletion(false);
                     }}
@@ -2722,7 +2723,7 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                     className="primary-button"
                     type="button"
                     disabled={readMeta.readOnly || seasonTransitionBusy || !localSeasonTransitionGate.canCompleteSeason}
-                    title={localSeasonTransitionGate.disabledReason ?? "Preisgeld, Snapshot, Review und AI-Audit ausführen"}
+                    title={localSeasonTransitionGate.disabledReason ?? "Sponsor-Auszahlung, Snapshot, Review und AI-Audit ausführen"}
                     onClick={() => {
                       void runSeasonCompletion(true);
                     }}
@@ -2780,9 +2781,9 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                           </small>
                         </div>
                         <div className="season-completion-card">
-                          <span>Preisgeld</span>
-                          <strong>{formatSeasonCompletionStepStatus(seasonCompletionFeed.steps.find((step) => step.key === "cash_apply")?.status)}</strong>
-                          <small>{seasonCompletionFeed.cashApply?.applied ? "Cash wurde geschrieben." : "Noch Preview oder bereits vorhanden."}</small>
+                          <span>Sponsor & Cash</span>
+                          <strong>{formatSeasonCompletionStepStatus(seasonCompletionFeed.steps.find((step) => step.key === "sponsor_settlement")?.status)}</strong>
+                          <small>Sponsor-Auszahlung + Gehaltsabzug am Saisonende (echter Cash-Fluss). Preisgeld ist nur Benchmark.</small>
                         </div>
                         <div className="season-completion-card">
                           <span>Beziehungen</span>
@@ -3105,7 +3106,7 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                 <ul className="warning-list compact-list cockpit-detail-list">
                   <li>Result Apply: {resultApplyFeed?.applied ? "geschrieben" : "offen"}</li>
                   <li>Standings Apply: {standingsApplyFeed?.applied ? "geschrieben" : "offen"}</li>
-                  <li>Preisgeld/Cash: season_end_only</li>
+                  <li>Sponsor/Cash: season_end_only</li>
                   <li>Nächster Matchday: {typeof matchdayAdvanceFeed?.summary?.nextMatchdayLabel === "string" ? matchdayAdvanceFeed.summary.nextMatchdayLabel : "—"}</li>
                   <li>Lineups gesperrt: {typeof matchdayAdvanceFeed?.summary?.lockedLineups === "number" ? matchdayAdvanceFeed.summary.lockedLineups : "—"}</li>
                   <li>Prisma bleibt: read-only</li>

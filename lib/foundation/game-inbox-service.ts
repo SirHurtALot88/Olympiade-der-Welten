@@ -721,7 +721,9 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           description: trainingSet
             ? `${team.shortCode}: Alle Spieler haben einen Trainingsmodus.`
             : `${team.shortCode}: ${missingTraining} Spieler ohne Trainingsmodus.`,
-          targetView: "trainingV2",
+          // Trainingsmodus wird im Training-Tab (trainingCompact) gesetzt, nicht im
+          // Gebäude-Tab (trainingV2) — sonst öffnet "Training öffnen" die Facilities.
+          targetView: "trainingCompact",
           targetParams: { team: team.teamId, panel: "training-plan" },
           ctaLabel: "Training öffnen",
           source: "player_training_mode",

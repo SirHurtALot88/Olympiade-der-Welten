@@ -479,7 +479,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   matchdaySummaryTab,
   moveTableColumn,
   navigateHomeTab,
-  navigatePrizeFinanceTab,
   navigateToGameFlowStep,
   navigateToInboxItem,
   navigateToPrizeFinanceViewFromRouting,
@@ -532,7 +531,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   preSeasonWorkflowBusy,
   preSeasonWorkflowError,
   preSeasonWorkflowFeed,
-  prizeFinanceTab,
   rankLeaderCards,
   ranksArchiveMissing,
   isViewingArchivedRanksSeason,
@@ -1086,19 +1084,11 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               }}
             />
           ) : activeView === "prize" ? (
-            <FoundationSubNav
-              className="foundation-shell-subnav"
-              items={[
-                {
-                  id: "sponsors",
-                  label: "Sponsoren",
-                  needsAttention: foundationNavAttention.prize,
-                },
-                { id: "prize", label: "Preisgeld" },
-              ]}
-              activeId={prizeFinanceTab}
-              onSelect={(id) => navigatePrizeFinanceTab(id === "prize" ? "prize" : "sponsors")}
-            />
+            // LEGACY: Der "Preisgeld"-Untertab ist entfernt — Preisgeld wird nicht
+            // mehr ausgezahlt/genutzt. Es gibt nur noch Sponsoren, daher kein
+            // Sponsoren/Preisgeld-Umschalter mehr (die View rendert direkt die
+            // Sponsoren-Seite über den Default `prizeFinanceTab === "sponsors"`).
+            null
           ) : activeView === "teams" && selectedTeam ? (
             <FoundationSubNav
               className="foundation-shell-subnav"
@@ -1393,7 +1383,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                     value={seasonBriefingData.currentFactor}
                     format={(v) => `${formatLocalePoints(v, 2)}x`}
                   />
-                  <span className="season-briefing-kpi-sub">Basis für Gehälter, Preisgeld und Forecast</span>
+                  <span className="season-briefing-kpi-sub">Basis für Gehälter, Sponsoren und Forecast</span>
                 </article>
                 <article className={joinClassNames("season-briefing-kpi", nlToneClass("neutral"))}>
                   <span className="season-briefing-kpi-label">Matchdays</span>

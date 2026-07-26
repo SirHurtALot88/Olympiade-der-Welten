@@ -274,7 +274,7 @@ function FoundationShellRouterPrizeContent({ hostProps }: { hostProps: Foundatio
     <>
       {!hostMounted ? (
         <section className="panel" id="foundation-prize" data-testid="foundation-prize">
-          <FoundationPanelSkeleton variant="default" label="Sponsoren & Preisgeld werden geladen…" />
+          <FoundationPanelSkeleton variant="default" label="Sponsoren werden geladen…" />
         </section>
       ) : null}
       <FoundationDeferredMount onMounted={handleHostMounted}>

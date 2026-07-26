@@ -228,7 +228,7 @@ export function useFoundationCrossTabFlowCoach(input: {
           actions: [
             { label: "Arena", targetView: "matchdayArena", detail: "Spieltag", tone: "primary" },
             { label: "Office", targetView: "hq", detail: "Ursachen" },
-            { label: "Preisgeld", targetView: "prize", detail: "Ausblick" },
+            { label: "Sponsoren", targetView: "prize", detail: "Ausblick" },
           ],
         };
       case "players":

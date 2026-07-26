@@ -74,7 +74,7 @@ export const COCKPIT_QUICK_LINKS: Array<{ id: FoundationView; label: string }> =
   { id: "season", label: "Saisonstand" },
   { id: "lineup", label: "Einsatzliste" },
   { id: "marketV2", label: "Transfermarkt" },
-  { id: "prize", label: "Preisgeld" },
+  { id: "prize", label: "Sponsoren" },
 ];
 
 export const MULTI_SEASON_TEAM_BALANCE_COLUMNS: FoundationTableColumn[] = [

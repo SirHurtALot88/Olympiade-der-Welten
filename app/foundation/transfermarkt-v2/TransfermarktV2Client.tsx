@@ -95,7 +95,7 @@ type MarketBuyResponse = {
 type MarketHistoryResponse = TransferHistoryReadResult & {
   error?: string;
 };
-type MarketSortMode = "need" | "fit" | "value" | "cheap" | "potential" | "salary" | "pow" | "spe" | "men" | "soc";
+type MarketSortMode = "need" | "fit" | "value" | "cheap" | "potential" | "develop" | "salary" | "pow" | "spe" | "men" | "soc";
 type MarketAxisKey = keyof typeof AXIS_META;
 type MarketClassAxisFilter = "pow" | "spe" | "men" | "soc";
 type MarketFilterSnapshot = {
@@ -178,7 +178,25 @@ const DEFAULT_MAX_RATIO = 0;
 const MARKET_FILTER_STORAGE_VERSION = 1;
 const MARKET_FILTER_STORAGE_PREFIX = "oly.transfermarkt.v2.filters";
 const MARKET_AXIS_ORDER: MarketAxisKey[] = ["pow", "spe", "men", "soc"];
-const MARKET_SORT_MODES: MarketSortMode[] = ["need", "fit", "value", "cheap", "potential", "salary", "pow", "spe", "men", "soc"];
+const MARKET_SORT_MODES: MarketSortMode[] = ["need", "fit", "value", "cheap", "potential", "develop", "salary", "pow", "spe", "men", "soc"];
+
+// Entwicklungs-Sortierung ("Beste Entwicklung") — Hilfe für die Talentschmiede:
+// rankt Spieler nach dem Trainings-Entwicklungspotenzial. Höherer Forecast-Trend,
+// mehr Potenzial-Luft (Gap) und geringeres Regressions-Risiko = weiter oben.
+const MARKET_DEV_TREND_RANK: Record<string, number> = {
+  strong_positive: 4,
+  positive: 3,
+  neutral: 2,
+  negative: 1,
+  strong_negative: 0,
+};
+const MARKET_REGRESSION_RANK: Record<string, number> = { none: 0, low: 1, medium: 2, high: 3 };
+function marketDevTrendRank(item: TransfermarktFreeAgentItem) {
+  return item.developmentTrend ? MARKET_DEV_TREND_RANK[item.developmentTrend] ?? -1 : -1;
+}
+function marketRegressionRank(item: TransfermarktFreeAgentItem) {
+  return MARKET_REGRESSION_RANK[item.regressionRisk ?? "none"] ?? 0;
+}
 const MARKET_AXIS_SORT_MODES = new Set<MarketSortMode>(["pow", "spe", "men", "soc"]);
 const MARKET_CLASS_AXIS_FILTERS: MarketClassAxisFilter[] = ["pow", "spe", "men", "soc"];
 const HIDDEN_RACE_FILTER_VALUES = new Set(["unknown"]);
@@ -537,6 +555,18 @@ function sortCandidates(items: TransfermarktFreeAgentItem[], mode: MarketSortMod
     if (mode === "potential") {
       const premiumDelta = (right.marketValuePotentialPremiumPct ?? 0) - (left.marketValuePotentialPremiumPct ?? 0);
       if (premiumDelta !== 0) return premiumDelta;
+      const confidenceDelta = (right.scoutingConfidence ?? 0) - (left.scoutingConfidence ?? 0);
+      if (confidenceDelta !== 0) return confidenceDelta;
+    }
+    if (mode === "develop") {
+      // Trainings-Entwicklung: Forecast-Trend zuerst, dann Potenzial-Luft (Gap),
+      // dann niedrigeres Regressions-Risiko, dann Scouting-Konfidenz als Feintie.
+      const trendDelta = marketDevTrendRank(right) - marketDevTrendRank(left);
+      if (trendDelta !== 0) return trendDelta;
+      const gapDelta = (right.potentialGapStars ?? 0) - (left.potentialGapStars ?? 0);
+      if (gapDelta !== 0) return gapDelta;
+      const riskDelta = marketRegressionRank(left) - marketRegressionRank(right);
+      if (riskDelta !== 0) return riskDelta;
       const confidenceDelta = (right.scoutingConfidence ?? 0) - (left.scoutingConfidence ?? 0);
       if (confidenceDelta !== 0) return confidenceDelta;
     }

@@ -55,15 +55,10 @@ function buildSponsorTooltip(team: TeamFinancesState): string | undefined {
   return sponsor.components.map((component) => `${component.label}: ${formatNlMoney(component.rewardCash)}`).join(" · ");
 }
 
-function buildPrizeTooltip(team: TeamFinancesState): string | undefined {
-  const prize = team.income.prizeBenchmark;
-  if (!prize) return undefined;
-  return [
-    `Basis: ${formatNlMoney(prize.basis)}`,
-    `Saison-Anteil: ${formatNlMoney(prize.seasonShare)}`,
-    `Platzierungsbonus: ${formatNlMoney(prize.placementBonus)}`,
-  ].join(" · ");
-}
+// LEGACY: Preisgeld wird nicht mehr ausgezahlt und nicht mehr genutzt — Einnahmen
+// laufen ausschließlich über Sponsoren (+ Gebäude). Der frühere `buildPrizeTooltip`
+// samt Benchmark-Zeile wurde entfernt; `income.prizeBenchmark` ist nur noch ein
+// deprecated Legacy-Feld (siehe finances-types.ts) und wird in der UI nicht gezeigt.
 
 function buildFacilityIncomeTooltip(team: TeamFinancesState): string | undefined {
   const facilities = team.income.facilityIncome?.facilities ?? [];
@@ -460,7 +455,7 @@ const NL_FIN_LEAGUE_COLUMNS: NlTableColumn<FinanceLeagueTableRow>[] = [
     label: "Einnahmen p.a.",
     align: "right",
     sortable: true,
-    tooltip: "Sponsor + Preisgeld (Näherungswert)",
+    tooltip: "Sponsor-Einnahmen + Gebäude-Einnahmen (Näherungswert) — ohne Transfersaldo (Einmal-Ereignis)",
   },
   {
     key: "expensesAnnual",
@@ -567,8 +562,8 @@ function FinanceLeagueTable({
  * "Neuer Look" Finanzen — Saison-Einnahmen/Ausgaben-Übersicht des eigenen
  * Teams. Read-only: kein Formular, keine Mutation (im Unterschied zu
  * Kredite) — reine Aufschlüsselung der bereits an anderer Stelle real
- * berechneten Cashflow-Quellen (Sponsor-Vertrag, Preisgeld, Gehälter,
- * Gebäude-Unterhalt, Kreditraten, Transfer-Saldo), siehe
+ * berechneten Cashflow-Quellen (Sponsor-Vertrag, Gehälter, Gebäude-Unterhalt,
+ * Kreditraten, Transfer-Saldo — Preisgeld ist Legacy und entfällt), siehe
  * `use-finances-view-model.ts` für die Herleitung jeder Zeile.
  *
  * Unten zusätzlich die Liga-weite Finanzübersicht (`FinanceLeagueTable`,
@@ -601,7 +596,7 @@ export default function FoundationFinancesNewLook({
               label="Einnahmen (Saison)"
               value={formatNlMoney(animatedIncome ?? team.totalIncome)}
               tone="good"
-              title="Sponsor + Gebäude-Einnahmen + Transfer-Überschuss + Vorstandsziel-Prämien der laufenden Saison (Preisgeld ist reiner Benchmark, nicht enthalten)"
+              title="Sponsor + Gebäude-Einnahmen + Transfer-Überschuss + Vorstandsziel-Prämien der laufenden Saison"
             />
             <StatChip
               label="Ausgaben (Saison)"
@@ -681,16 +676,7 @@ export default function FoundationFinancesNewLook({
             ) : (
               <NlEmptyState title="Keine Einnahmen für diese Saison bekannt." />
             )}
-            {team.income.prizeBenchmark ? (
-              <p
-                className="nl-fin-league-hint muted"
-                title={buildPrizeTooltip(team)}
-                data-testid="nl-fin-prize-benchmark"
-              >
-                Benchmark (nicht ausgezahlt): Preisgeld {formatNlMoney(team.income.prizeBenchmark.total)} — reiner
-                Vergleichswert, fließt NICHT in Einnahmen/GuV.
-              </p>
-            ) : null}
+            {/* LEGACY: Preisgeld-Benchmark entfernt — es gibt nur noch Sponsor-Einnahmen. */}
           </NlCard>
 
           <NlCard

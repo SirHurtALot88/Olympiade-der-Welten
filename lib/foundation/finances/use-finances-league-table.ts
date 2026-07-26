@@ -5,7 +5,8 @@ import { useMemo } from "react";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { estimateTeamAnnualRevenue, getTeamAnnualLoanInstallment } from "@/lib/finance/loan-service";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
-import { calculateFacilitySeasonUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { calculateFacilityIncome, calculateFacilitySeasonUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
 import { normalizeEconomyMoney, resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import type { FinanceLeagueTableRow } from "@/lib/foundation/finances/finances-types";
@@ -22,9 +23,9 @@ function round1(value: number): number {
  * ID des aktiven Managers aufgerufen werden — Fog of War). Diese Funktion
  * schwächt jenen Detail-Builder nicht auf: sie ruft stattdessen dieselben
  * pro-Team-Helfer (`estimateTeamAnnualRevenue`, `getTeamAnnualLoanInstallment`,
- * `resolvePlayerEconomyContract`, `FACILITY_CATALOG`+`calculateFacilitySeasonUpkeep`,
- * `buildTeamSeasonOverviewRows` für das Preisgeld) einmal pro Team in
- * `gameState.teams` auf — genau wie die bestehende Liga-Kreditübersicht
+ * `resolvePlayerEconomyContract`, `FACILITY_CATALOG`+`calculateFacilitySeasonUpkeep`
+ * +`calculateFacilityIncome`, `buildTeamSeasonOverviewRows` für den Marktwert)
+ * einmal pro Team in `gameState.teams` auf — genau wie die bestehende Liga-Kreditübersicht
  * (#182, `FoundationCreditsNewLook`) es für Kredite tut. Auf Datenebene gibt
  * es hier keine Sperre: jeder Helfer nimmt ohnehin eine `teamId` entgegen.
  * Diese Liga-Tabelle ist bewusste Balancing-Transparenz, kein Leak.
@@ -49,8 +50,14 @@ export function buildFinancesLeagueTable(gameState: GameState): FinanceLeagueTab
   return gameState.teams.map((team) => {
     const overview = overviewByTeamId.get(team.teamId) ?? null;
 
+    // Einnahmen p.a. = Sponsor-Näherung + Gebäude-Einnahmen — EXAKT die
+    // laufenden (cash-wirksamen) Einnahmequellen der eigenen Finanzübersicht
+    // (`buildFinancesViewModel`: totalIncome = sponsor + facilityIncome + …).
+    // Preisgeld wird bewusst NICHT eingerechnet: es ist ein reiner
+    // platzierungs-abhängiger Benchmark (nie cash-wirksam) und war auch bei
+    // Teams OHNE Sponsor > 0 — das erzeugte die falschen "Einnahmen ohne
+    // Sponsor". Transfersaldo bleibt ebenfalls außen vor (Einmal-Ereignis).
     const sponsor = Math.max(0, estimateTeamAnnualRevenue(gameState, team.teamId));
-    const prize = Math.max(0, overview?.sponsorTotal ?? 0);
 
     const salaryTotal = gameState.rosters
       .filter((entry) => entry.teamId === team.teamId)
@@ -65,10 +72,15 @@ export function buildFinancesLeagueTable(gameState: GameState): FinanceLeagueTab
       (sum, entry) => sum + calculateFacilitySeasonUpkeep(entry.facilityId, teamFacilities),
       0,
     );
+    // Gebäude-Einnahmen brutto (Arena skaliert mit Team-Beliebtheit) — gleiche
+    // Herleitung wie die eigene Übersicht; der Unterhalt steht symmetrisch als
+    // Ausgabe (facilityUpkeepTotal), daher hier die Brutto-Einnahme.
+    const arenaPopularityFactor = computeTeamBeliebtheitFromGameState(gameState, team.teamId).value;
+    const facilityIncome = Math.max(0, calculateFacilityIncome(teamFacilities, { arenaPopularityFactor }));
 
     const loanInstallmentTotal = getTeamAnnualLoanInstallment(gameState, team.teamId);
 
-    const incomeAnnual = round1(sponsor + prize);
+    const incomeAnnual = round1(sponsor + facilityIncome);
     const expensesAnnual = round1(salaryTotal + facilityUpkeepTotal + loanInstallmentTotal);
 
     return {

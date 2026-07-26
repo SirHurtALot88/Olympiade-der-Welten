@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useRafThrottledScrollTop } from "@/lib/foundation/use-raf-throttled-scroll";
 
 import { calculateLocalLegacyLineupPreviewFromContext } from "@/lib/lineups/legacy-lineup-preview-from-context";
@@ -1701,6 +1701,22 @@ const formCardColorIcon: Record<LegacyFormCardOption["color"], string> = {
   blue: "●",
   yellow: "●",
 };
+
+// Bereichs-Hex der Formkarten (POW=rot, SPE=grün, MEN=blau, SOC=gelb) — identisch zu
+// `.legacy-lineup-form-card-option.is-*` in globals.css. Für die farbige, etwas größere
+// Punkte-Anzeige der Dropdown-Optionen.
+const formCardColorHex: Record<LegacyFormCardOption["color"], string> = {
+  red: "#ff8b86",
+  green: "#a8e7aa",
+  blue: "#a9ccff",
+  yellow: "#ffd987",
+};
+
+const formCardOptionStyle = (card: LegacyFormCardOption): CSSProperties => ({
+  color: formCardColorHex[card.color],
+  fontSize: "13px",
+  fontWeight: 700,
+});
 
 function getFormCardColorForCategory(category: string | null | undefined): LegacyFormCardOption["color"] | null {
   if (category === "power") return "red";
@@ -6329,7 +6345,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           >
             <option value="">Keine Karte</option>
             {getFormCardOptionsForSide(disciplineSide, "primary").map((card) => (
-              <option key={card.id} value={card.id}>
+              <option key={card.id} value={card.id} style={formCardOptionStyle(card)}>
                 {formatFormCardOptionLabel(card, disciplineColor)}
               </option>
             ))}
@@ -6348,7 +6364,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           >
             <option value="">Keine Karte</option>
             {getFormCardOptionsForSide(disciplineSide, "secondary").map((card) => (
-              <option key={card.id} value={card.id}>
+              <option key={card.id} value={card.id} style={formCardOptionStyle(card)}>
                 {formatFormCardOptionLabel(card, disciplineColor)}
               </option>
             ))}
@@ -6907,6 +6923,9 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     const toChoice = (card: LegacyFormCardOption) => ({
       id: card.id,
       label: formatFormCardOptionLabel(card, color),
+      // Bereichsfarbe der Karte (POW=rot, SPE=grün, MEN=blau, SOC=gelb) für die
+      // farbige, etwas größere Punkte-Anzeige im Einsatzlisten-Dropdown.
+      color: card.color,
     });
     return {
       disciplineId: discipline?.disciplineId ?? null,

@@ -52,7 +52,18 @@ type NlBestSlotEntry = { slotKey: string; disciplineSide: "d1" | "d2"; slotIndex
  * Auswahl. Die Einsatzliste rendert daraus zwei kompakte Dropdowns und ruft
  * `onAssignDisciplineFormCard` — die Persistenz (Formplan + Modifier-Sync) liegt beim Client.
  */
-type NlFormCardChoice = { id: string; label: string };
+type NlFormCardAreaColor = "red" | "green" | "blue" | "yellow";
+type NlFormCardChoice = { id: string; label: string; color?: NlFormCardAreaColor | null };
+
+// Bereichs-Farben der Formkarten-Optionen (POW=rot, SPE=grün, MEN=blau, SOC=gelb).
+// Gleiche Hex-Werte wie `.legacy-lineup-form-card-option.is-*` in globals.css, damit
+// die farbige Punkte-Anzeige im Dropdown und in der Legacy-Ansicht konsistent bleibt.
+const NL_FORM_CARD_AREA_HEX: Record<NlFormCardAreaColor, string> = {
+  red: "#ff8b86",
+  green: "#a8e7aa",
+  blue: "#a9ccff",
+  yellow: "#ffd987",
+};
 type NlDisciplineFormCardControl = {
   disciplineId: string | null;
   colorLabel: string | null;
@@ -1526,7 +1537,19 @@ export default function LineupNewLook({
               >
                 <option value="">— keine —</option>
                 {options.map((option) => (
-                  <option key={option.id} value={option.id}>
+                  <option
+                    key={option.id}
+                    value={option.id}
+                    // Punkte-Zeile etwas größer + in der Bereichsfarbe (MEN=blau usw.),
+                    // damit der Wert im Dropdown sofort ins Auge fällt. Native <option>
+                    // erlaubt nur ganze-Zeile-Styling — Chrome/Firefox rendern es im
+                    // Popup, Safari ignoriert es und fällt sauber auf Default zurück.
+                    style={
+                      option.color
+                        ? { color: NL_FORM_CARD_AREA_HEX[option.color], fontSize: "13px", fontWeight: 700 }
+                        : undefined
+                    }
+                  >
                     {option.label}
                   </option>
                 ))}

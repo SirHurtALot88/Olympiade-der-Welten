@@ -1,3 +1,16 @@
+/**
+ * @deprecated LEGACY — PREISGELD IST ABGESCHAFFT.
+ *
+ * Preisgeld (Liga-Pool) wird NICHT mehr ausgezahlt und NICHT mehr genutzt. Die einzige
+ * cash-wirksame Saison-Einnahme sind SPONSOREN (siehe `lib/sponsor/*` +
+ * `sponsor-settlement-service.ts`); die Cash-Prize-Apply-Kette ist reiner Benchmark
+ * (`CASH_PRIZE_BENCHMARK_ONLY = true`).
+ *
+ * Dieses Modul bleibt nur für Back-Compat bestehen (historische Standings-Felder, die
+ * historisch `sponsor*` heißen, aber Preisgeld meinen — siehe `team-management-overview.ts`).
+ * Für NEUE Features NICHT verwenden — überall Sponsoren nutzen. Ziel: bei einem späteren
+ * Cleanup ganz entfernen.
+ */
 import type { PrizeMoneyRow, SponsorPlacementRow, TeamPrizeSummaryRow } from "@/lib/season/types";
 import type { AdminBalancingConfigInput } from "@/lib/data/olyDataTypes";
 import { resolveAdminBalancingConfig } from "@/lib/admin/balancing-config";
