@@ -324,7 +324,50 @@ function mergeSeasonDisciplineValues(input: {
   return merged;
 }
 
+/**
+ * Perf (Audit #2 F4/F5): `buildTeamSeasonOverviewRows` ist eine liga-weite O(Teams×Kader)-Berechnung
+ * (Rating-Maps, Setpoint-Reduktionen, Snapshot-Historie) und wird auf dem Default-Input-Pfad dutzendfach
+ * mit DEMSELBEN `gameState` aufgerufen — Sponsor-Angebotsgenerierung (×N Teams/Ziele), Settlement-Schleifen,
+ * Objective-Evaluator, Client-Sponsors-Tab. Der Memo cached pro `gameState`-Identität (WeakMap → wird beim
+ * Klonen/Ersetzen automatisch invalidiert, passend zum immutable-GameState-Muster des Projekts). Der Cache
+ * greift NUR, wenn keine custom `standingsByTeamId`/`needScoreByTeamId`/`transferSummaryByTeamId` übergeben
+ * werden (sonst hängt das Ergebnis von nicht-identitätsstabilen Objekten ab → uncached). Rückgabe ist stets
+ * eine flache Array-Kopie, weil mehrere Aufrufer das Ergebnis in-place `.sort()`en.
+ */
+const overviewRowsCache = new WeakMap<GameState, Map<string, TeamManagementSnapshotRow[]>>();
+
 export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput): TeamManagementSnapshotRow[] {
+  const cacheable =
+    input.standingsByTeamId === undefined &&
+    input.needScoreByTeamId === undefined &&
+    input.transferSummaryByTeamId === undefined;
+  const cacheKey = cacheable
+    ? `${input.saveId ?? ""}|${input.seasonId ?? input.gameState.season.id}|${input.preferStandingDisciplineValues ? 1 : 0}`
+    : null;
+
+  if (cacheKey != null) {
+    const cached = overviewRowsCache.get(input.gameState)?.get(cacheKey);
+    if (cached) {
+      return cached.slice();
+    }
+  }
+
+  const rows = buildTeamSeasonOverviewRowsUncached(input);
+
+  if (cacheKey != null) {
+    let byKey = overviewRowsCache.get(input.gameState);
+    if (!byKey) {
+      byKey = new Map();
+      overviewRowsCache.set(input.gameState, byKey);
+    }
+    byKey.set(cacheKey, rows);
+    return rows.slice();
+  }
+
+  return rows;
+}
+
+function buildTeamSeasonOverviewRowsUncached(input: TeamManagementSnapshotInput): TeamManagementSnapshotRow[] {
   const {
     gameState,
     saveId,
