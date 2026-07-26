@@ -43,8 +43,15 @@ const TIERS = [
 const LIGA = [77, 70, 65, 61, 56, 52, 48, 44, 40];
 /** Überlebens-Untergrenze (S1-Mindestgehalt 43,7 gemessen aus einem echten Save). */
 const FLOOR = 44;
-/** Erfüllungswahrscheinlichkeit der Zustands-Klausel (Team-Entscheidung, rangunabhängig). */
-const P_MET = 0.55;
+/**
+ * Frueher eine GLOBALE Annahme (0.55) fuer alle Klauseln — nachweislich der gefaehrlichste Fehler
+ * des Entwurfs: mit klausel-individuellem P (Ziehungen aus [0.30, 0.90]) riss die EV-Paritaet auf
+ * 51.6 % auf, also WEITER als der Ist-Defekt von 16-30 %, den der Rework beheben soll. Real ist
+ * "kein neuer Kredit" nahezu geschenkt und "X Klassenaufstiege" teuer erkauft.
+ * Deshalb traegt jede Klausel ihr eigenes P und die Kalibrierung rechnet damit.
+ * Die Werte sind Design-Schaetzungen und muessen im Long-Run gemessen werden.
+ */
+const P_MET = 0.55; // nur noch Referenzwert fuer den Stresstest
 /** Sonderziel-Spanne (schwierigkeitsabhängig) — typischer Wert für die Meister-Prüfung. */
 const SPECIAL_TYPICAL = 9;
 
@@ -55,7 +62,7 @@ type SponsorType = {
   /** Leiter 2: Auszahlung nach Δ Stufen (positiv = besser als erwartet). Negativ = Malus. */
   rel: (d: number) => number;
   /** Leiter 4: rang-unabhängige Zustandsbedingung. */
-  clause: { label: string; bonus: number; malus: number };
+  clause: { label: string; bonus: number; malus: number; p: number; s: number };
   note: string;
 };
 
@@ -70,7 +77,7 @@ export const CURVES: Array<{ name: string; rel: (d: number) => number; note: str
   { name: "Halten",   rel: (d) => (d === 0 ? 12 : d > 0 ? 12 - 3 * d : 12 + 6 * d),          note: "Maximum beim exakten Halten" },
   { name: "Linear",   rel: (d) => 5 + 4 * d + (d < 0 ? 2 * d : 0),                            note: "gleichmaessig, milder Malus" },
   { name: "Gipfel",   rel: (d) => (d >= 2 ? 14 + 10 * (d - 2) : d === 1 ? 2 : -6 + 3 * d),   note: "erst 2 Stufen zahlen, darunter Malus" },
-  { name: "Steil",    rel: (d) => (d < 0 ? 5 * d : 10 * d),                                   note: "steilster Verlauf beidseitig" },
+  { name: "Steil",    rel: (d) => (d < 0 ? 5 * d : 7 * d),                                   note: "steilster Verlauf beidseitig" },
   { name: "Flach",    rel: (d) => (d <= 0 ? 2 : 2 + 2 * d),                                   note: "Rang fast egal — die Klausel entscheidet" },
 ];
 
@@ -89,35 +96,50 @@ export const CURVES: Array<{ name: string; rel: (d: number) => number; note: str
  * STRENGTH_TIER_AXIS_TARGET_RANK heute schon macht), sonst waeren sie fuer Top-Teams geschenkt
  * und fuer schwache unmoeglich — genau der Fehler, den absolute Marktwert-Schwellen machen.
  */
-export const CLAUSES: Array<{ name: string; label: string; bonus: number; malus: number; lever: string }> = [
-  { name: "Einsatzlast",   label: "Saison-Fatigue-Schnitt ≥ X (auspowern)",            bonus: 13, malus: 11, lever: "trainingMode + Rotation" },
-  { name: "Schonung",      label: "Saison-Fatigue-Schnitt ≤ X (rotieren)",             bonus: 9,  malus: 8,  lever: "Rotation, kostet Tabellenpunkte" },
-  { name: "Hartes Training", label: "Anteil Spieltage mit Modus 'hart' ≥ X %",         bonus: 11, malus: 9,  lever: "trainingMode je Spieltag" },
-  { name: "Talentschmiede", label: "X Spieler steigen eine Klasse auf",                bonus: 14, malus: 10, lever: "Trainingsfokus + Anlagen" },
-  { name: "Wertaufbau",    label: "Kaderwert +X % über die Saison",                    bonus: 12, malus: 8,  lever: "Training + Transfers" },
-  { name: "Achsenprofil",  label: "eine Achse (POW/SPE/MEN/SOC) in die Top-N der Klasse", bonus: 12, malus: 10, lever: "Trainingsklasse + Kaderbau" },
-  { name: "Disziplinen",   label: "X Disziplinen mit positivem Saison-Delta",          bonus: 10, malus: 9,  lever: "preferredDisciplines + Training" },
-  { name: "Schuldenfrei",  label: "kein neuer Kredit (oder einen getilgt)",            bonus: 5,  malus: 3,  lever: "Finanzplanung" },
-  { name: "Gehaltseffizienz", label: "Gehaltssumme unter der Schwelle deiner Klasse",  bonus: 10, malus: 8,  lever: "Verhandlung + Kaderschnitt" },
-  { name: "Kaderruhe",     label: "höchstens X Transfers (Zu- und Abgänge)",           bonus: 8,  malus: 7,  lever: "Transferdisziplin" },
-  { name: "Ausbau",        label: "Fan-Shop-/Arena-Stufen erhöhen",                    bonus: 15, malus: 10, lever: "Bauinvestition statt Spieler" },
-  { name: "Prophylaxe",    label: "höchstens X Verletzungen über die Saison",          bonus: 11, malus: 9,  lever: "Belastungssteuerung" },
-  { name: "Moral",         label: "Ø-Moral am Saisonende über der Schwelle",           bonus: 9,  malus: 8,  lever: "Rollen, Einsatzzeiten, Kapitän" },
-  { name: "Beliebtheit",   label: "Beliebtheit um X steigern",                         bonus: 10, malus: 7,  lever: "Erfolg + Fan-Infrastruktur" },
+/**
+ * Bonus und Malus werden aus (P, Spannweite s) ABGELEITET, nicht frei gewaehlt:
+ *     bonus = s * (1 - P)      malus = s * P
+ * Damit gilt fuer jede Klausel: EV-Beitrag = P*bonus - (1-P)*malus = 0, und die Spannweite
+ * bonus + malus = s. Beides unabhaengig von P.
+ *
+ * WARUM: frei gewaehlte Bonus/Malus neben einem klausel-eigenen P erzeugen Dominanz. Gemessen:
+ * Flach/Talentschmiede (P 0.40, +14/-10) schlug Flach/Ausbau (P 0.45, +15/-10) an JEDEM Punkt —
+ * gleiche Kurve, aehnliche Klausel. Ursache ist die Untergrenze: schneidet sie den Verletzt-Fall
+ * ab, fliesst die EV-Kompensation der niedrig-P-Klausel vollstaendig in die sichtbaren Zellen und
+ * hebt sie dort ueberall an. Mit abgeleiteten Werten kann das nicht mehr passieren.
+ *
+ * Nebeneffekt, thematisch stimmig: eine leichte Klausel (hohes P) zahlt wenig, bestraft aber
+ * deutlich — man wird erwartet, sie zu erfuellen. Eine schwere zahlt gross bei mildem Malus.
+ */
+export const CLAUSES: Array<{ name: string; label: string; p: number; s: number; lever: string }> = [
+  { name: "Einsatzlast",   label: "Saison-Fatigue-Schnitt ≥ X (auspowern)", p: 0.55, s: 24, lever: "trainingMode + Rotation" },
+  { name: "Schonung",      label: "Saison-Fatigue-Schnitt ≤ X (rotieren)", p: 0.5, s: 17,  lever: "Rotation, kostet Tabellenpunkte" },
+  { name: "Hartes Training", label: "Anteil Spieltage mit Modus 'hart' ≥ X %", p: 0.6, s: 20,  lever: "trainingMode je Spieltag" },
+  { name: "Talentschmiede", label: "X Spieler steigen eine Klasse auf", p: 0.4, s: 24, lever: "Trainingsfokus + Anlagen" },
+  { name: "Wertaufbau",    label: "Kaderwert +X % über die Saison", p: 0.5, s: 20,  lever: "Training + Transfers" },
+  { name: "Achsenprofil",  label: "eine Achse (POW/SPE/MEN/SOC) in die Top-N der Klasse", p: 0.45, s: 22, lever: "Trainingsklasse + Kaderbau" },
+  { name: "Disziplinen",   label: "X Disziplinen mit positivem Saison-Delta", p: 0.5, s: 19,  lever: "preferredDisciplines + Training" },
+  { name: "Schuldenfrei",  label: "kein neuer Kredit (oder einen getilgt)", p: 0.85, s: 8,  lever: "Finanzplanung" },
+  { name: "Gehaltseffizienz", label: "Gehaltssumme unter der Schwelle deiner Klasse", p: 0.5, s: 18,  lever: "Verhandlung + Kaderschnitt" },
+  { name: "Kaderruhe",     label: "höchstens X Transfers (Zu- und Abgänge)", p: 0.6, s: 15,  lever: "Transferdisziplin" },
+  { name: "Ausbau",        label: "Fan-Shop-/Arena-Stufen erhöhen", p: 0.45, s: 25, lever: "Bauinvestition statt Spieler" },
+  { name: "Prophylaxe",    label: "höchstens X Verletzungen über die Saison", p: 0.45, s: 20,  lever: "Belastungssteuerung" },
+  { name: "Moral",         label: "Ø-Moral am Saisonende über der Schwelle", p: 0.55, s: 17,  lever: "Rollen, Einsatzzeiten, Kapitän" },
+  { name: "Beliebtheit",   label: "Beliebtheit um X steigern", p: 0.45, s: 17,  lever: "Erfolg + Fan-Infrastruktur" },
   // ── Nachtrag: Hebel aus XP-Oekonomie, Traits, Kaderkomposition, Kapitaen, Versprechen ─────────
-  { name: "XP-Disziplin",  label: "≥ X % der verdienten XP investiert statt gehortet",  bonus: 9,  malus: 8,  lever: "currentXP/spentXP steuern" },
-  { name: "Charakterarbeit", label: "X negative Traits aus dem Kader entfernen",        bonus: 11, malus: 9,  lever: "traitsNegative — Abgabe oder Entwicklung" },
-  { name: "Vielseitigkeit", label: "≥ X verschiedene Subklassen im Kader",              bonus: 8,  malus: 8,  lever: "Kaderkomposition breit halten" },
-  { name: "Fokusschule",   label: "≥ X Spieler auf derselben Trainingsklasse",          bonus: 10, malus: 9,  lever: "trainingClass buendeln — Gegenteil von Vielseitigkeit" },
-  { name: "Kapitänstreue", label: "derselbe Kapitän über die ganze Saison",             bonus: 7,  malus: 7,  lever: "appoint_captain nicht wechseln" },
-  { name: "Wortlaut",      label: "alle Spielerversprechen eingehalten",                bonus: 12, malus: 10, lever: "Rolle/Einsätze/Trainingsmodus zusagen und liefern" },
+  { name: "XP-Disziplin",  label: "≥ X % der verdienten XP investiert statt gehortet", p: 0.65, s: 17,  lever: "currentXP/spentXP steuern" },
+  { name: "Charakterarbeit", label: "X negative Traits aus dem Kader entfernen", p: 0.4, s: 20,  lever: "traitsNegative — Abgabe oder Entwicklung" },
+  { name: "Vielseitigkeit", label: "≥ X verschiedene Subklassen im Kader", p: 0.6, s: 16,  lever: "Kaderkomposition breit halten" },
+  { name: "Fokusschule",   label: "≥ X Spieler auf derselben Trainingsklasse", p: 0.55, s: 19,  lever: "trainingClass buendeln — Gegenteil von Vielseitigkeit" },
+  { name: "Kapitänstreue", label: "derselbe Kapitän über die ganze Saison", p: 0.75, s: 14,  lever: "appoint_captain nicht wechseln" },
+  { name: "Wortlaut",      label: "alle Spielerversprechen eingehalten", p: 0.45, s: 22, lever: "Rolle/Einsätze/Trainingsmodus zusagen und liefern" },
 ];
 
 const compose = (curve: string, clause: string): SponsorType => {
   const c = CURVES.find((x) => x.name === curve)!;
   const k = CLAUSES.find((x) => x.name === clause)!;
   return { name: `${curve}/${clause}`, rel: c.rel, note: `${c.note} · ${k.lever}`,
-           clause: { label: k.label, bonus: k.bonus, malus: k.malus } };
+           clause: { label: k.label, p: k.p, s: k.s, bonus: k.s * (1 - k.p), malus: k.s * k.p } };
 };
 
 /** Kuratierte Auswahl fuer den Report — jede Kombination ist gueltig, das ist nur ein Querschnitt. */
@@ -136,6 +158,8 @@ export const SPONSOR_TYPES: SponsorType[] = [
   compose("Sockel", "Beliebtheit"),         // sicher, aber Fans muessen wachsen
 ];
 
+/** Erwartungswert der Klausel unter ihrem eigenen P. */
+const clauseEv = (t: SponsorType) => t.clause.p * t.clause.bonus - (1 - t.clause.p) * t.clause.malus;
 const withFloor = (v: number) => Math.max(FLOOR, v);
 const rankPart = (t: SponsorType, expected: number, final: number, cal: number) =>
   LIGA[tierOf(final)]! + t.rel(tierOf(expected) - tierOf(final)) + cal;
@@ -147,14 +171,32 @@ function distribution(expected: number, sigma = 4) {
   return w.map((x) => x / sum);
 }
 
-const EXPECTED = [2, 6, 10, 14, 18, 22, 26, 30];
+/**
+ * Ein Repraesentant je Tabellenstufe — inklusive Stufe 0 (Meister, Rang 1).
+ * Vorher begann die Liste bei 2; wegen tierOf(2)=1 wurde Stufe 0 NIE kalibriert und offsetFor fiel
+ * auf 0 zurueck. Genau der Titelverteidiger hatte damit den Defekt, den der Entwurf behebt
+ * (nachgemessen: EV-Spread 23.7 %, 7 von 12 Sponsoren Fallen).
+ */
+const EXPECTED = [1, 3, 6, 10, 14, 18, 22, 26, 30];
+
+/**
+ * EXPLIZITER Ziel-EV je Stufe statt "Mittelwert des aktuellen Sets".
+ *
+ * Die alte Kalibrierung zog alle Typen auf das Set-Mittel. Das hielt zwar die EV gleich, hatte aber
+ * zwei Fehler: (a) das NIVEAU hing am Startwert der Iteration (Init 0 → 59.9, Init 10 → 69.3 bei
+ * E#18) und war damit nicht reproduzierbar, (b) jede neu hinzugefuegte Klausel verschob das Mittel
+ * und damit die Offsets ALLER Sponsoren — die Zusage "neue Klauseln ohne Balancing-Eingriff" war
+ * schlicht falsch. Mit explizitem Ziel je Stufe ist der Fixpunkt eindeutig, start- und
+ * set-unabhaengig, und die Wirtschaftsziele haengen direkt an dieser Tabelle.
+ */
+const TARGET_EV = [76.0, 73.6, 71.6, 67.9, 63.8, 59.9, 56.7, 54.1, 53.0];
 
 /** EV inklusive Untergrenze und Klausel. */
 function ev(t: SponsorType, expected: number, cal: number) {
   return distribution(expected).reduce(
     (acc, w, i) =>
-      acc + w * (P_MET * withFloor(rankPart(t, expected, i + 1, cal) + t.clause.bonus)
-               + (1 - P_MET) * withFloor(rankPart(t, expected, i + 1, cal) - t.clause.malus)),
+      acc + w * (t.clause.p * withFloor(rankPart(t, expected, i + 1, cal) + t.clause.bonus)
+               + (1 - t.clause.p) * withFloor(rankPart(t, expected, i + 1, cal) - t.clause.malus)),
     0,
   );
 }
@@ -173,14 +215,18 @@ const meanEv = (t: SponsorType, cal: number) => EXPECTED.reduce((a, e) => a + ev
  * Ausgangslage gleichwertig sind und sich nur im Risiko unterscheiden.
  */
 export function calibrateOffsets(): Map<string, number> {
-  const key = (name: string, expectedTier: number) => `${name}:${expectedTier}`;
   const cal = new Map<string, number>();
-  for (const t of SPONSOR_TYPES) for (const e of EXPECTED) cal.set(key(t.name, tierOf(e)), 0);
-  for (let iter = 0; iter < 400; iter += 1) {
+  for (const t of SPONSOR_TYPES) {
     for (const e of EXPECTED) {
-      const at = (t: SponsorType) => cal.get(key(t.name, tierOf(e)))!;
-      const target = SPONSOR_TYPES.reduce((a, t) => a + ev(t, e, at(t)), 0) / SPONSOR_TYPES.length;
-      for (const t of SPONSOR_TYPES) cal.set(key(t.name, tierOf(e)), at(t) + (target - ev(t, e, at(t))) * 0.6);
+      const tier = tierOf(e);
+      const target = TARGET_EV[tier]!;
+      // ev(t, e, cal) ist streng monoton steigend in cal → Bisektion liefert die eindeutige Loesung.
+      let lo = -200, hi = 200;
+      for (let i = 0; i < 120; i += 1) {
+        const mid = (lo + hi) / 2;
+        if (ev(t, e, mid) < target) lo = mid; else hi = mid;
+      }
+      cal.set(`${t.name}:${tier}`, (lo + hi) / 2);
     }
   }
   return cal;
@@ -213,8 +259,8 @@ for (const e of EXPECTED) {
     const d = distribution(e);
     let v = 0;
     d.forEach((w, i) => {
-      v += w * P_MET * (withFloor(rankPart(t, e, i + 1, c) + t.clause.bonus) - e0) ** 2
-         + w * (1 - P_MET) * (withFloor(rankPart(t, e, i + 1, c) - t.clause.malus) - e0) ** 2;
+      v += w * t.clause.p * (withFloor(rankPart(t, e, i + 1, c) + t.clause.bonus) - e0) ** 2
+         + w * (1 - t.clause.p) * (withFloor(rankPart(t, e, i + 1, c) - t.clause.malus) - e0) ** 2;
     });
     return { name: t.name, ev: e0, sd: Math.sqrt(v), joint };
   });
@@ -228,13 +274,46 @@ for (const e of EXPECTED) {
     `  Fallen ${traps.length === 0 ? "0 ✓" : `${traps.length} ✗ (${traps.map((t) => t.name).join(", ")})`}`,
   );
 }
-console.log(`\n  FALLEN INSGESAMT: ${trapsTotal}${trapsTotal === 0 ? "  ✓" : "  ✗"}`);
+if (process.env.OLY_SPONSOR_DIAG === "1") {
+  const e = 18;
+  console.log("\n  DIAGNOSE bei E#18 — Profil je Typ (Klausel erfüllt / verletzt, bei Rang 10/18/26)");
+  for (const t of SPONSOR_TYPES) {
+    const c = offsetFor(t.name, e);
+    const f = (r: number, met: boolean) => withFloor(rankPart(t, e, r, c) + (met ? t.clause.bonus : -t.clause.malus)).toFixed(0);
+    console.log(`    ${t.name.padEnd(24)} P=${t.clause.p.toFixed(2)} +${t.clause.bonus}/−${t.clause.malus}` +
+      `  R10 ${f(10,true)}/${f(10,false)}  R18 ${f(18,true)}/${f(18,false)}  R26 ${f(26,true)}/${f(26,false)}`);
+  }
+}
+console.log(`\n  FALLEN INSGESAMT (Stuetzstellen): ${trapsTotal}${trapsTotal === 0 ? "  ✓" : "  ✗"}`);
+
+// Die Offsets sind je 4er-STUFE kalibriert, nicht je Rang. An den Stuetzstellen ist der Spread
+// per Konstruktion 0 — das ist keine Leistung, sondern Definition. Entscheidend ist, was ZWISCHEN
+// ihnen passiert: dort driftet die EV, weil ein Team auf Rang 16 eine andere Ergebnisverteilung
+// hat als eines auf Rang 14, aber denselben Offset benutzt. Deshalb hier ALLE 32 Raenge.
+{
+  let offTraps = 0, worstSpread = 0, worstRank = 0;
+  for (let e = 1; e <= 32; e += 1) {
+    const band: number[] = [];
+    for (let r = Math.max(1, e - 8); r <= Math.min(32, e + 8); r += 1) band.push(r);
+    const rows = SPONSOR_TYPES.map((t) => {
+      const c = offsetFor(t.name, e);
+      return { name: t.name, ev: ev(t, e, c),
+        joint: band.flatMap((r) => [withFloor(rankPart(t, e, r, c) + t.clause.bonus), withFloor(rankPart(t, e, r, c) - t.clause.malus)]) };
+    });
+    const evs = rows.map((r) => r.ev);
+    const sp = Math.max(...evs) / Math.min(...evs) - 1;
+    if (sp > worstSpread) { worstSpread = sp; worstRank = e; }
+    offTraps += rows.filter((a) => rows.some((b) => a.name !== b.name && a.joint.every((v, i) => v <= b.joint[i]! - 0.5))).length;
+  }
+  console.log(`  ALLE 32 ERWARTUNGSRAENGE: Fallen ${offTraps}${offTraps === 0 ? " ✓" : " ✗"}` +
+    `   groesster EV-Spread ${(worstSpread * 100).toFixed(1)} % (bei Erwartungsrang ${worstRank})`);
+}
 
 console.log("\nZIELPRÜFUNG (salaryFactor 1.0) — Meister typisch 90–100 · Letzter ≥ 43,7 (Mindestgehalt)");
 let goalsOk = true;
 for (const t of SPONSOR_TYPES) {
   const c = offsetFor(t.name, 3);
-  const champ = withFloor(rankPart(t, 3, 1, c) + (P_MET * t.clause.bonus - (1 - P_MET) * t.clause.malus) + SPECIAL_TYPICAL);
+  const champ = withFloor(rankPart(t, 3, 1, c) + clauseEv(t) + SPECIAL_TYPICAL);
   const jackpot = withFloor(rankPart(t, 3, 1, c) + t.clause.bonus + 12);
   const cb = offsetFor(t.name, 30);
   const botBad = withFloor(rankPart(t, 30, 32, cb) - t.clause.malus);
@@ -262,7 +341,6 @@ console.log(`\nERGEBNIS: ${trapsTotal === 0 && goalsOk ? "alle Abnahmekriterien 
 // Untergrenze, d. h. der Verlust trifft die Spitze, nicht den Keller.
 // ══════════════════════════════════════════════════════════════════════════════════════════════════
 const SALARY_SUM_S1 = 2078;
-const clauseEv = (t: SponsorType) => P_MET * t.clause.bonus - (1 - P_MET) * t.clause.malus;
 
 /**
  * Untergrenze ATMET mit dem Faktor mit — sie ist nicht fix.
@@ -385,8 +463,8 @@ for (const t of SPONSOR_TYPES) {
     const e0 = ev(t, e, c); const d = distribution(e);
     let v = 0;
     d.forEach((w, i) => {
-      v += w * P_MET * (withFloor(rankPart(t, e, i + 1, c) + t.clause.bonus) - e0) ** 2
-         + w * (1 - P_MET) * (withFloor(rankPart(t, e, i + 1, c) - t.clause.malus) - e0) ** 2;
+      v += w * t.clause.p * (withFloor(rankPart(t, e, i + 1, c) + t.clause.bonus) - e0) ** 2
+         + w * (1 - t.clause.p) * (withFloor(rankPart(t, e, i + 1, c) - t.clause.malus) - e0) ** 2;
     });
     return `${Math.min(...joint).toFixed(0)}–${Math.max(...joint).toFixed(0)}`.padStart(12) + `  σ${Math.sqrt(v).toFixed(1)}`.padStart(8);
   });
@@ -478,4 +556,59 @@ if (process.env.OLY_SPONSOR_STRESS === "1") {
     console.log(`     P ${pm.toFixed(2)}: Fallen ${String(r.traps).padStart(3)}  Spread ${(r.spread * 100).toFixed(1).padStart(5)} %  sigma-Bereich ${r.sdLo.toFixed(1)}–${r.sdHi.toFixed(1)}` +
       (r.names.length ? `   → ${r.names.slice(0, 4).join(", ")}${r.names.length > 4 ? " …" : ""}` : ""));
   }
+
+  // ── D) HETEROGENES P — die gefaehrlichste Annahme des Entwurfs ────────────────────────────────
+  // Test B/C variieren P global, also fuer alle Klauseln gleichzeitig. Real streuen die
+  // Erfuellungswahrscheinlichkeiten massiv: "kein neuer Kredit" ist nahezu geschenkt, "X Spieler
+  // steigen eine Klasse auf" ist teuer erkauft. Wenn die Kalibrierung ein einheitliches P
+  // unterstellt, die Realitaet aber pro Klausel abweicht, reisst die EV-Paritaet genau um diese
+  // Differenz auf — potenziell in derselben Groessenordnung wie der behobene Defekt.
+  // Hier: je Klausel ein zufaelliges wahres P aus [0.3, 0.9], kalibriert wird weiter mit 0.55.
+  console.log("\n  D) Heterogenes P — kalibriert mit 0.55, ausgewertet mit klausel-individuellem P");
+  {
+    let worstSpread = 0, totalTraps = 0, runs = 60;
+    for (let run = 0; run < runs; run += 1) {
+      const trueP = new Map(CLAUSES.map((k, i) => [k.name, 0.3 + ((Math.sin(run * 7.3 + i * 2.1) + 1) / 2) * 0.6]));
+      // Offsets stammen aus der Kalibrierung mit P_MET; ausgewertet wird mit dem wahren P.
+      for (const e of EXPECTED) {
+        const rows = ALL.map((t) => {
+          const clauseName = t.name.split("/")[1]!;
+          const pT = trueP.get(clauseName)!;
+          const c = offsetFor(t.name, e) ?? 0;
+          const d = distribution(e);
+          let e0 = 0;
+          d.forEach((w, i) => {
+            e0 += w * (pT * withFloor(rankPart(t, e, i + 1, c) + t.clause.bonus)
+                     + (1 - pT) * withFloor(rankPart(t, e, i + 1, c) - t.clause.malus));
+          });
+          return e0;
+        });
+        worstSpread = Math.max(worstSpread, Math.max(...rows) / Math.min(...rows) - 1);
+      }
+    }
+    console.log(`     ${runs} Ziehungen, P je Klausel aus [0.30, 0.90]: groesster EV-Spread ${(worstSpread * 100).toFixed(1)} %`);
+    console.log(`     Zum Vergleich: der behobene Ist-Defekt lag bei 16–30 %.`);
+    void totalTraps;
+  }
+}
+
+// ── Hypothese: die Fallen entstehen NUR zwischen Kombinationen mit DERSELBEN Kurve ───────────────
+// Begruendung: bei EV-Gleichheit ist die schmalere Spannweite unten besser und oben schlechter —
+// also nicht dominiert. Sobald die Untergrenze den unteren Teil abschneidet, faellt dieser Vorteil
+// weg und es bleibt nur der Nachteil oben. Das trifft aber nur Paare mit gleicher Kurvenform;
+// unterschiedliche Kurven kreuzen sich ueber den Rang und koennen sich nicht dominieren.
+if (process.env.OLY_SPONSOR_SLATE === "1") {
+  const oneEach = CURVES.map((c) => SPONSOR_TYPES.find((t) => t.name.startsWith(`${c.name}/`))).filter(Boolean) as SponsorType[];
+  let traps = 0;
+  for (let e = 1; e <= 32; e += 1) {
+    const band: number[] = [];
+    for (let r = Math.max(1, e - 8); r <= Math.min(32, e + 8); r += 1) band.push(r);
+    const rows = oneEach.map((t) => {
+      const c = offsetFor(t.name, e);
+      return { name: t.name, joint: band.flatMap((r) => [withFloor(rankPart(t, e, r, c) + t.clause.bonus), withFloor(rankPart(t, e, r, c) - t.clause.malus)]) };
+    });
+    traps += rows.filter((a) => rows.some((b) => a.name !== b.name && a.joint.every((v, i) => v <= b.joint[i]! - 0.5))).length;
+  }
+  console.log(`\n  SLATE-TEST (je Kurve nur EINE Kombination, ${oneEach.length} Angebote, alle 32 Erwartungsränge): Fallen ${traps}${traps === 0 ? " ✓" : " ✗"}`);
+  console.log(`    Angebote: ${oneEach.map((t) => t.name).join(", ")}`);
 }
