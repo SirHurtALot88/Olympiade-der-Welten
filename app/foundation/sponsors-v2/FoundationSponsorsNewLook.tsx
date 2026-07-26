@@ -409,6 +409,11 @@ export default function FoundationSponsorsNewLook({
   // Sponsor angezeigt wird (der Helfer filtert abgelaufene/Vorsaison-Verträge
   // aus `sponsorContractsByTeamId` heraus — sonst würde ein Team fälschlich mit
   // seinem alten Sponsor der Vorsaison gelistet).
+  // Detail-Fenster fuer den Sponsor EINES Teams (auch fremde Teams). Bisher war die Liga-Uebersicht
+  // reine Anzeige: man sah, WER welchen Sponsor hat, aber nicht, woraus dessen Wert besteht — das gab
+  // es nur fuer die eigenen Angebote.
+  const [leagueDetailTeamId, setLeagueDetailTeamId] = useState<string | null>(null);
+
   const leagueSponsorRows = useMemo(() => {
     return gameState.teams.map((team) => {
       const contract = getTeamSponsorContract(gameState, team.teamId);
@@ -441,6 +446,24 @@ export default function FoundationSponsorsNewLook({
       };
     });
   }, [gameState]);
+  // Komponenten-Aufschluesselung des geoeffneten Teams — dieselbe Quelle wie das echte
+  // Season-End-Settlement, damit das Fenster nicht eine andere Zahl zeigt als die Uebersicht.
+  const leagueDetail = useMemo(() => {
+    if (!leagueDetailTeamId) return null;
+    const row = leagueSponsorRows.find((entry) => entry.teamId === leagueDetailTeamId) ?? null;
+    if (!row) return null;
+    const contract = getTeamSponsorContract(gameState, leagueDetailTeamId);
+    let components: { label: string; cashDelta: number; reason: string }[] = [];
+    try {
+      components = previewSponsorSettlement(gameState)
+        .rows.filter((entry) => entry.teamId === leagueDetailTeamId)
+        .map((entry) => ({ label: entry.label, cashDelta: entry.cashDelta, reason: entry.reason }));
+    } catch {
+      components = [];
+    }
+    return { row, contract, components };
+  }, [leagueDetailTeamId, leagueSponsorRows, gameState]);
+
   const sortedLeagueSponsorRows = useMemo(() => {
     const list = [...leagueSponsorRows];
     list.sort((left, right) => {
@@ -834,7 +857,26 @@ export default function FoundationSponsorsNewLook({
                 .filter(Boolean)
                 .join(" ");
               return (
-                <div key={row.teamId} role="listitem" className={classes}>
+                <div
+                  key={row.teamId}
+                  role="listitem"
+                  className={classes}
+                  // Jede Zeile oeffnet die Sponsor-Details DIESES Teams — auch fremder Teams.
+                  onClick={row.sponsorName ? () => setLeagueDetailTeamId(row.teamId) : undefined}
+                  onKeyDown={
+                    row.sponsorName
+                      ? (event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            setLeagueDetailTeamId(row.teamId);
+                          }
+                        }
+                      : undefined
+                  }
+                  tabIndex={row.sponsorName ? 0 : undefined}
+                  title={row.sponsorName ? `${row.teamName}: Sponsor-Details oeffnen` : undefined}
+                  data-testid={row.sponsorName ? "sponsor-league-row-open" : undefined}
+                >
                   {row.isGolden ? (
                     <span className="nl-sponsor-league-golden-badge" title="Golden Card — seltener Premium-Sponsor">
                       ✦ Golden Card
@@ -894,6 +936,89 @@ export default function FoundationSponsorsNewLook({
             })}
           </div>
         </NlCard>
+
+        {/* Sponsor-Details eines beliebigen Teams — dieselbe Aufschluesselung, die es bisher nur fuer
+            die eigenen Angebote gab. Quelle ist die Settlement-Vorschau, damit die Summe hier nicht
+            von der Zahl in der Uebersicht abweichen kann. */}
+        {leagueDetail ? (
+          <div
+            className="nl-sponsor-league-detail-backdrop"
+            role="presentation"
+            onClick={() => setLeagueDetailTeamId(null)}
+          >
+            <div
+              className="nl-sponsor-league-detail"
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Sponsor-Details ${leagueDetail.row.teamName}`}
+              data-testid="sponsor-league-detail"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="nl-sponsor-league-detail-head">
+                <div>
+                  <div className="nl-sponsor-league-detail-team">
+                    <span className="nl-sponsor-league-code">{leagueDetail.row.shortCode}</span>
+                    <span>{leagueDetail.row.teamName}</span>
+                    {leagueDetail.row.rank != null ? (
+                      <span className="nl-sponsor-league-detail-rank">Platz {leagueDetail.row.rank}</span>
+                    ) : null}
+                  </div>
+                  <div className="nl-sponsor-league-detail-sponsor">{leagueDetail.row.sponsorName}</div>
+                </div>
+                <button
+                  type="button"
+                  className="nl-sponsor-league-detail-close"
+                  onClick={() => setLeagueDetailTeamId(null)}
+                  aria-label="Schliessen"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="nl-sponsor-league-detail-meta">
+                {leagueDetail.row.curveShape ? (
+                  <span className={`nl-sponsor-league-chip is-${leagueDetail.row.archetype ?? "neutral"}`}>
+                    {SPONSOR_CURVE_SHAPES[leagueDetail.row.curveShape].labelDe}
+                  </span>
+                ) : null}
+                {leagueDetail.row.rarity ? <RarityPill rarity={leagueDetail.row.rarity} /> : null}
+                {leagueDetail.row.isGolden ? (
+                  <span className="nl-sponsor-league-golden-badge">✦ Golden Card</span>
+                ) : null}
+              </div>
+
+              {leagueDetail.components.length > 0 ? (
+                <ul className="nl-sponsor-league-detail-list">
+                  {leagueDetail.components.map((component, index) => (
+                    <li key={`${component.label}-${index}`}>
+                      <span className="nl-sponsor-league-detail-label" title={component.reason}>
+                        {component.label}
+                      </span>
+                      <span className="nl-tnum">{formatMoney(component.cashDelta)}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="nl-sponsor-league-detail-empty">
+                  Für diesen Vertrag liegt keine Auszahlungs-Aufschlüsselung vor.
+                </p>
+              )}
+
+              <div className="nl-sponsor-league-detail-total">
+                <span>Auszahlung beim aktuellen Platz</span>
+                <span className="nl-tnum">
+                  {leagueDetail.row.projectedCash != null ? formatMoney(leagueDetail.row.projectedCash) : "—"}
+                </span>
+              </div>
+              {/* Bewusst KEIN "max. Vertragswert" hier: dieser Wert ist die Summe der
+                  `component.rewardCash`, die laut sponsor-offer-service nur ein Anzeige-Cap je
+                  Baustein ist. Die tatsaechliche Auszahlung an einem guten Platz liegt regelmaessig
+                  DARUEBER (beobachtet: 89,5 bei "max" 60,8) — nebeneinander gestellt widerspricht
+                  sich das sichtbar. Der Tooltip der Uebersichtszeile fuehrt den Wert weiterhin, das
+                  ist Bestandsverhalten und hier nicht Thema. */}
+            </div>
+          </div>
+        ) : null}
       </section>
     </div>
   );
