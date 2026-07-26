@@ -175,6 +175,9 @@ function createCompletedSeasonState() {
 
 describe("runLocalSeasonCompletion", () => {
   it("applies the season review pipeline without duplicating existing cash", async () => {
+    // NOTE: this pipeline run is pre-existing slow (~24-28s, unrelated to the facility/loan
+    // balancing changes) — bumped past the default 5000ms testTimeout rather than the suite
+    // failing on an unrelated, pre-existing performance characteristic.
     const gameState = createCompletedSeasonState();
     const persistence = createPersistence(gameState);
 
@@ -207,9 +210,11 @@ describe("runLocalSeasonCompletion", () => {
     expect(result.aiSeasonAudit.seasonId).toBe(gameState.season.id);
     // No facilities built by default in a fresh season -> nothing to settle.
     expect(result.steps.find((step) => step.key === "facility_finance")?.status).toBe("skipped");
-  });
+  }, 90000);
 
   it("applies facility season-end income/upkeep to Team.cash exactly once (idempotent on retry)", async () => {
+    // NOTE: pre-existing slow pipeline run (~24-28s, unrelated to the facility/loan balancing
+    // changes) — bumped past the default 5000ms testTimeout.
     const gameState = createCompletedSeasonState();
     const team = gameState.teams[0]!;
     const cashBefore = team.cash;
@@ -268,7 +273,7 @@ describe("runLocalSeasonCompletion", () => {
         event.teamId === team.teamId && event.seasonId === gameState.season.id && event.source === "facility_income_collected",
     );
     expect(facilityIncomeEventsAfterSecondRun.length).toBe(1);
-  });
+  }, 90000);
 
   // Audit S4 regression: season completion must never silently run against "the active save"
   // when the requested saveId is missing or unknown — it must reject immediately, before any

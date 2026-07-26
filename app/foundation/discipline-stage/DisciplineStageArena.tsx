@@ -164,8 +164,10 @@ const SLOT_VOCAB: Record<string, string[]> = {
   football: ["Line Power", "Route Burst", "Field Read", "Red Zone", "Locker Leader"],
   basketball: ["Tip-Off", "Fast Break", "Downtown", "And-One", "Buzzer Beater", "Overtime"],
   wettessen: ["Amuse-Bouche", "Suppe", "Hauptgang", "Wildbret", "Dessert"],
-  gewichtheben: ["Power Opener", "Safe Lift", "Pressure Lift", "Technical Lift", "Grip Anchor"],
-  climbing: ["Route Reader", "Grip Specialist", "Pace Climber", "Endurance Wall", "Summit Push"],
+  // 6 Einträge: gewichtheben/climbing/i-spy haben playerCount 6 (siehe lib/data/dataAdapter.ts) — mit nur
+  // 5 Vokabeln fiel der letzte Slot auf das generische „Etappe 6" zurück.
+  gewichtheben: ["Power Opener", "Safe Lift", "Pressure Lift", "Technical Lift", "Grip Anchor", "Maximalversuch"],
+  climbing: ["Route Reader", "Grip Specialist", "Pace Climber", "Endurance Wall", "Summit Push", "Top-Out"],
   eiskunstlauf: ["Edge Control", "Jump Setup", "Spin Grace", "Crowd Moment", "Final Pose"],
   showcase: ["Stage Lead", "Crowd Hook", "Style Tech", "Big Moment", "Finale"],
   "speed-schach": ["Opening Prep", "Pattern Read", "Clock Pressure", "Calculation Core", "Endgame Anchor"],
@@ -177,7 +179,7 @@ const SLOT_VOCAB: Record<string, string[]> = {
   // Szenen ohne definierte SLOTS — thematischer Fallback:
   battlefield: ["Ansturm", "Flanke", "Verteidigung", "Belagerung", "Sturm-Finale"],
   "mini-dm": ["Runde 1", "Runde 2", "Runde 3", "Runde 4", "Runde 5"],
-  "i-spy": ["Erster Fund", "Zweiter Fund", "Dritter Fund", "Vierter Fund", "Letzter Fund"],
+  "i-spy": ["Erster Fund", "Zweiter Fund", "Dritter Fund", "Vierter Fund", "Fünfter Fund", "Letzter Fund"],
 };
 
 // Skin je Disziplin: Akzentfarbe (Feldlinien + Wasserzeichen) + Hintergrund-
@@ -738,15 +740,47 @@ export default function DisciplineStageArena({
     alignedMatchdayRef.current = matchdayId;
   }, [matchdayId, matchdayPanel?.d1?.disciplineId, matchdayPanel?.d2?.disciplineId, disciplineId]);
 
+  // Spieltags-Disziplinen (d1/d2) DIREKT aus dem Saison-Spielplan — unabhängig von der Engine-Preview.
+  // `matchdayPanel` liefert dieselbe Info, ist aber an `preview` gekoppelt (frühes `if (!preview) return null`).
+  // Fällt die Preview aus (Netzfehler/leeres Ergebnis), wusste die Bühne vorher NICHT mehr, welche zwei
+  // Disziplinen anstehen → Dropdown zeigte alle ~20 Disziplinen und der geführte „Weiter zu Disziplin 2"-
+  // Schritt verschwand. Der Spielplan steht aber lokal im gameState und braucht die Engine gar nicht.
+  const scheduleSides = useMemo(() => {
+    if (!matchdayId) return null;
+    try {
+      const entry = getSeasonDisciplineScheduleEntry(gameState, matchdayId);
+      if (!entry) return null;
+      return {
+        d1: entry.discipline1?.disciplineId
+          ? { disciplineId: entry.discipline1.disciplineId, displayName: entry.discipline1.displayName }
+          : null,
+        d2: entry.discipline2?.disciplineId
+          ? { disciplineId: entry.discipline2.disciplineId, displayName: entry.discipline2.displayName }
+          : null,
+      };
+    } catch {
+      return null;
+    }
+  }, [gameState, matchdayId]);
+
+  // Engine-Panel bevorzugt (es kennt die real aufgelösten Disziplinen), Spielplan als Rückfallebene.
+  const matchdaySides = useMemo(
+    () => ({
+      d1: matchdayPanel?.d1 ?? scheduleSides?.d1 ?? null,
+      d2: matchdayPanel?.d2 ?? scheduleSides?.d2 ?? null,
+    }),
+    [matchdayPanel, scheduleSides],
+  );
+
   // Auswählbar sind für normale Spieler NUR die zwei Disziplinen des aktuellen Spieltags (Diszi 1
   // vor Diszi 2), keine anderen — freies Einwählen in beliebige Disziplinen bleibt Admin-/Dev-Modus.
   const matchdayDisciplineOptions = useMemo<Array<{ id: string; name: string }>>(() => {
-    const pairs = [matchdayPanel?.d1, matchdayPanel?.d2].filter(
+    const pairs = [matchdaySides.d1, matchdaySides.d2].filter(
       (entry): entry is { disciplineId: string; displayName: string } => Boolean(entry?.disciplineId),
     );
     const nameById = new Map(disciplines.map((d) => [d.id, d.name] as const));
     return pairs.map((entry) => ({ id: entry.disciplineId, name: nameById.get(entry.disciplineId) ?? entry.displayName }));
-  }, [matchdayPanel, disciplines]);
+  }, [matchdaySides, disciplines]);
   const disciplineSelectOptions = useMemo<Array<{ id: string; name: string }>>(
     () => (devMode || matchdayDisciplineOptions.length === 0 ? disciplines : matchdayDisciplineOptions),
     [devMode, matchdayDisciplineOptions, disciplines],
@@ -767,7 +801,7 @@ export default function DisciplineStageArena({
   const [syncedRound, setSyncedRound] = useState(0);
   // Welche Spieltags-Seite die aktuell gewählte Disziplin ist (für den Room-State).
   const activeDisciplineSide: "d1" | "d2" | "overall" =
-    matchdayPanel?.d1?.disciplineId === disciplineId ? "d1" : matchdayPanel?.d2?.disciplineId === disciplineId ? "d2" : "overall";
+    matchdaySides.d1?.disciplineId === disciplineId ? "d1" : matchdaySides.d2?.disciplineId === disciplineId ? "d2" : "overall";
   const roomArenaSync = useArenaRoomSync({
     roomContext,
     saveId,
@@ -1379,13 +1413,22 @@ export default function DisciplineStageArena({
             playerNameById={playerNameById}
             ownTeamId={ownTeamId}
           />
+        </div>
+      ) : null}
+
+      {/* Weiterführung NICHT an `engineDiscipline` koppeln: Topspieler/Highlights brauchen die
+          Engine-Preview, der nächste Schritt nicht. Vorher verschwand bei ausgefallener Preview der
+          komplette Block — der Spieler stand nach dem Disziplin-Ende ohne jeden Hinweis da und hätte
+          über den separaten Abschluss-Button unbeabsichtigt Disziplin 2 übersprungen. */}
+      {mode === "real" && arenaEnded ? (
+        <div style={{ marginTop: 16 }}>
           {(() => {
             // P1-16: Nach Disziplin 1 den Spieler AKTIV zur zweiten Disziplin des Spieltags führen,
             // statt ihn den Spieltag vorzeitig auswerten zu lassen oder das Dropdown selbst umstellen
             // zu müssen. `setDisciplineId` setzt `arenaEnded` (Effect auf [disciplineId]) automatisch
             // zurück → Diszi 2 startet frisch. Der Matchday-Advance erscheint erst auf der letzten
             // Disziplin (d2 bzw. Ein-Disziplin-Spieltag / Dev-Modus).
-            const secondDisciplineId = matchdayPanel?.d2?.disciplineId ?? null;
+            const secondDisciplineId = matchdaySides.d2?.disciplineId ?? null;
             const guideToSecondDiscipline =
               !devMode && activeDisciplineSide === "d1" && secondDisciplineId != null && secondDisciplineId !== disciplineId;
             if (guideToSecondDiscipline) {

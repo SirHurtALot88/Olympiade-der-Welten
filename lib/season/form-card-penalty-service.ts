@@ -48,6 +48,16 @@ export function applyFormCardPenaltyWithRerank(
 
   // 2) Re-Rank aus den bestraften Punkten — identische Tie-Policy wie der reguläre Standings-Apply, damit der
   // bestrafte Rang exakt der normalen Rangberechnung entspricht (Primär-Sort ist `projectedPoints`).
+  //
+  // Zum `null`-Rang von "block_on_tie" (standings-tiebreaker-policy:193): dieser Pfad ist hier NICHT
+  // erreichbar. Er verlangt `sameValueGroupSize > 1`, und die Gleichstands-Erkennung für `projectedPoints`
+  // (`isProjectedPointsTieAfterScoreTieBreak`, ebd. :64-71) fordert bei BEIDEN Teams `totalScore != null` —
+  // wir übergeben hier bewusst `totalScore: null` (am Saisonende gibt es keinen Spieltags-Score, der Rang
+  // folgt allein den Punkten). Bei exaktem Punkt-Gleichstand vergibt die Policy daher deterministisch
+  // aufeinanderfolgende Ränge über `sortForProjectedPoints` (matchdayRank → currentRank → teamName), niemals
+  // `null`. Der `!= null`-Guard unten bleibt als Absicherung, falls diese Annahme je bricht — er darf aber
+  // NICHT dazu führen, dass ein Vor-Strafe-Rang stehenbleibt, weshalb der Test unten genau das festnagelt
+  // (Sponsor-Settlement und Snapshot lesen `standing.rank` direkt).
   const projectedRankByTeamId = resolveProjectedRankWithTiePolicy(
     Object.entries(nextStandings).map(([teamId, standing]) => ({
       teamId,

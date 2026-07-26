@@ -9,7 +9,7 @@ import type {
 } from "@/lib/data/olyDataTypes";
 import { createNewGameFromPlayerBaseline } from "@/lib/players/player-baseline-service";
 import { buildPlayerPotentialRecordsForSave } from "@/lib/progression/player-potential-service";
-import { ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
+import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService, PersistedSaveGame } from "@/lib/persistence/types";
 import { DEFAULT_ACTIVE_OWNER_ID, AI_OWNER_ID, applyChrisFrankyOwnershipToTeamControlSettings } from "@/lib/foundation/team-control-settings";
@@ -429,7 +429,17 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   // workflow / AI autopilot / choose route) happens to generate them. Offer generation is
   // deterministic for a given (season id, teamId), so calling this here is idempotent and
   // safe to run again later (e.g. via ensureSeasonSponsorOffers elsewhere) without reshuffling.
-  const gameState: GameState = ensureSeasonSponsorOffers(baseGameStateBeforeSponsorOffers);
+  const gameStateWithSponsorOffers: GameState = ensureSeasonSponsorOffers(baseGameStateBeforeSponsorOffers);
+
+  // AI-/passive Teams signieren ihren Sponsor bereits in Season 1 (bestes Angebot), damit sie — wie das
+  // eigene Team — ab S1 einen Vertrag samt sichtbarer Sponsoreinnahmen haben (Finanz-Vergleichstabelle,
+  // Sponsor-Tab, Gehaltsabrechnung). Vorher unterschrieben AI-Teams erst beim S1→S2-Übergang, wodurch der
+  // gesamte Gegner-Pool in S1 mit 0 Sponsoreinnahmen und leeren Sponsornamen dastand. Das MANUELL
+  // gesteuerte (menschliche) Team wird bewusst übersprungen und wählt selbst über den choose_sponsor-Flow-
+  // Schritt (chooseSponsorOfferForAiTeams überspringt controlMode==="manual"). Deterministisch + idempotent
+  // (Teams mit bestehendem Vertrag werden übersprungen), deferBaseFirstPayout=true → keine sofortige
+  // Cash-Gutschrift, die Basisrate wird regulär bei der Saison-Abrechnung fällig.
+  const gameState: GameState = chooseSponsorOfferForAiTeams(gameStateWithSponsorOffers);
 
   const preview: NewGameSetupPreview = {
     mode: "preview",

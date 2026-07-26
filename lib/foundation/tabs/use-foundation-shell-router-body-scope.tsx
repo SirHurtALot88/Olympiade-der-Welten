@@ -1913,13 +1913,15 @@ export function useFoundationShellRouterBodyScope({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          action: "new-game-flow-step",
-          saveId: activeSaveId,
-          stepId,
-          status,
-          selectedTeamId: selectedTeamId ?? activeManagerTeamId ?? null,
-        }),
+        body: JSON.stringify(
+          withRoomBody({
+            action: "new-game-flow-step",
+            saveId: activeSaveId,
+            stepId,
+            status,
+            selectedTeamId: selectedTeamId ?? activeManagerTeamId ?? null,
+          }),
+        ),
       },
     );
 
@@ -9003,12 +9005,14 @@ export function useFoundationShellRouterBodyScope({
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            action: "assign-team-captain",
-            saveId: activeSaveId,
-            teamId: selectedTeam.teamId,
-            playerId,
-          }),
+          body: JSON.stringify(
+            withRoomBody({
+              action: "assign-team-captain",
+              saveId: activeSaveId,
+              teamId: selectedTeam.teamId,
+              playerId,
+            }),
+          ),
         },
       );
       if (!response.ok) {

@@ -102,20 +102,27 @@ describe("facility season-end finance service", () => {
       "team-1",
     );
 
-    // BALANCE: Fan-Shop L2 = 6.5, Arena-Basis L1 = 2.28 (jeweils +30%), effektiv Basis ×
-    // Beliebtheit. Dieses Ein-Team-Setup ohne Kader/Tabelle liefert den
-    // neutralen Faktor 1.0 → Arena L1 = 2.28 × 1.0 = 2.28.
+    // BALANCE (2026-07): Fan-Shop L2 = 7.8, Arena-Basis L1 = 2.4, effektiv Basis × Beliebtheit.
+    // Dieses Ein-Team-Setup ohne Kader/Tabelle liefert den neutralen Faktor 1.0 → Arena L1 =
+    // 2.4 × 1.0 = 2.4. Upkeep-Werte (training_center/fan_shop/arena_upgrade L1/L2/L1 je 0.8/0.8/0.8)
+    // sind vom Balancing unberührt geblieben.
     expect(preview.facilityUpkeepTotal).toBe(2.4);
-    expect(preview.fanShopIncome).toBe(6.5);
-    expect(preview.arenaIncome).toBe(2.28);
+    expect(preview.fanShopIncome).toBe(7.8);
+    expect(preview.arenaIncome).toBe(2.4);
     expect(preview.arenaPopularityFactor).toBe(1);
-    expect(preview.facilityIncomeTotal).toBe(8.78);
-    expect(preview.netFacilityResult).toBe(6.38);
+    expect(preview.facilityIncomeTotal).toBe(10.2);
+    expect(preview.netFacilityResult).toBe(7.8);
     expect(preview.cashBeforeFacilities).toBe(100);
-    expect(preview.cashAfterFacilities).toBe(106.38);
+    expect(preview.cashAfterFacilities).toBe(107.8);
   });
 
-  it("disables facilities when upkeep cannot be paid and removes their effects after apply", () => {
+  it("BEHAVIOR FIX: upkeep is mandatory — it is still charged (and cash goes negative) instead of disabling the facility", () => {
+    // Unterhalt ist Pflicht (facility-season-end-service.ts): der frühere Zustand
+    // `will_disable_unpaid` existiert nicht mehr. Der Unterhalt wird IMMER abgebucht (status
+    // "paid"), auch wenn cashAfterFacilities dadurch negativ wird — ein negatives Saison-Ende wird
+    // erst danach vom Zahlungsunfähigkeits-Backstop (applyInsolvencyBackstop) in einen Notkredit
+    // umgewandelt. Gebäude werden NICHT mehr durch Nichtzahlung deaktiviert, disabledFacilities
+    // bleibt daher immer leer.
     const sourceSave = save({
       cash: 0,
       teamFacilities: {
@@ -128,19 +135,35 @@ describe("facility season-end finance service", () => {
     const preview = previewFacilitySeasonEndFinance(sourceSave, "team-1");
     const { persistence, saveSingleplayerState } = persistenceMock(sourceSave);
 
-    expect(preview.disabledFacilities.map((row) => row.facilityId)).toEqual(["training_center", "recovery_center"]);
+    // Upkeep total: training_center L1 (0.8) + recovery_center L1 (0.7) = 1.5, no income facilities
+    // built -> cashAfterFacilities = 0 + 0 - 1.5 = -1.5 (allowed to go negative).
+    expect(preview.disabledFacilities).toEqual([]);
+    expect(preview.facilityUpkeepTotal).toBe(1.5);
+    expect(preview.cashAfterFacilities).toBe(-1.5);
+    expect(preview.rows.find((row) => row.facilityId === "training_center")?.status).toBe("paid");
+    expect(preview.rows.find((row) => row.facilityId === "recovery_center")?.status).toBe("paid");
+
     const result = applyFacilitySeasonEndFinance(sourceSave, "team-1", preview.confirmToken, persistence);
     const savedState = saveSingleplayerState.mock.calls[0]?.[1];
 
     expect(result.applied).toBe(true);
+    expect(result.disabledFacilities).toEqual([]);
     if (!savedState) throw new Error("Expected facility season-end apply to persist state.");
+    expect(savedState.teams.find((team) => team.teamId === "team-1")?.cash).toBe(-1.5);
     expect(savedState.seasonState.teamFacilities?.["team-1"].facilities.training_center).toMatchObject({
       level: 1,
-      enabled: false,
-      disabledReason: "facility_upkeep_unpaid",
+      enabled: true,
+      disabledReason: undefined,
     });
-    expect(savedState.seasonState.facilityEvents?.some((event) => event.source === "facility_upkeep_unpaid")).toBe(true);
-    expect(applyTrainingXpFacilityModifiers(100, savedState.seasonState.teamFacilities?.["team-1"]).after).toBe(100);
+    expect(savedState.seasonState.teamFacilities?.["team-1"].facilities.recovery_center).toMatchObject({
+      level: 1,
+      enabled: true,
+      disabledReason: undefined,
+    });
+    expect(savedState.seasonState.facilityEvents?.every((event) => event.source !== "facility_upkeep_unpaid")).toBe(true);
+    expect(savedState.seasonState.facilityEvents?.filter((event) => event.source === "facility_upkeep_paid")).toHaveLength(2);
+    // The facility still fully applies its effect afterwards (it was never disabled).
+    expect(applyTrainingXpFacilityModifiers(100, savedState.seasonState.teamFacilities?.["team-1"]).after).toBe(114);
   });
 
   it("sets lastPaidSeasonId and deducts paid upkeep while collecting income", () => {
@@ -160,7 +183,9 @@ describe("facility season-end finance service", () => {
     const savedState = saveSingleplayerState.mock.calls[0]?.[1];
 
     if (!savedState) throw new Error("Expected paid facility season-end apply to persist state.");
-    expect(savedState.teams.find((team) => team.teamId === "team-1")?.cash).toBe(12.05);
+    // BALANCE (2026-07): fan_shop L1 income 3.9, upkeep training_center(0.8)+fan_shop(0.4)=1.2
+    // -> cash 10 + 3.9 - 1.2 = 12.7.
+    expect(savedState.teams.find((team) => team.teamId === "team-1")?.cash).toBe(12.7);
     expect(savedState.seasonState.teamFacilities?.["team-1"].facilities.training_center.lastPaidSeasonId).toBe("season-1");
     expect(savedState.seasonState.facilityEvents?.some((event) => event.source === "facility_upkeep_paid")).toBe(true);
     expect(savedState.seasonState.facilityEvents?.some((event) => event.source === "facility_income_collected")).toBe(true);
@@ -205,8 +230,9 @@ describe("facility season-end finance service", () => {
       "team-1",
     );
 
-    expect(preview.fanShopIncome).toBe(3.25);
-    expect(preview.facilityIncomeTotal).toBe(3.25);
+    // fan_shop L2 = 7.8, condition 35% -> efficiency 50% (35/70*100) -> 7.8 * 0.5 = 3.9.
+    expect(preview.fanShopIncome).toBe(3.9);
+    expect(preview.facilityIncomeTotal).toBe(3.9);
   });
 
   it("does not invent income for missing sponsor-like sources", () => {
@@ -265,6 +291,6 @@ describe("facility season-end finance service", () => {
     );
 
     expect(source).not.toMatch(/PrismaClient|@prisma\/client|prisma\./);
-    expect(calculateFacilityIncome(facilities({ fan_shop: { level: 1, enabled: true } }))).toBe(3.25);
+    expect(calculateFacilityIncome(facilities({ fan_shop: { level: 1, enabled: true } }))).toBe(3.9);
   });
 });
