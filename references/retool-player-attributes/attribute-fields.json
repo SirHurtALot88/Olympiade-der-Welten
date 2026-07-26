@@ -40,5 +40,5 @@
     "Project reference contains only metadata for the attribute query.",
     "Query found, data not embedded."
   ],
-  "sourcePath": "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/references/retool-ai-golden-master/getPlayerAttributesForAI.state.js"
+  "sourcePath": "references/retool-ai-golden-master/getPlayerAttributesForAI.state.js"
 }

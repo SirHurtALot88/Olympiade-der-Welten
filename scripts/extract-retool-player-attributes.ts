@@ -168,8 +168,20 @@ function extractAttributeSource(): ExtractedAttributeSource {
   };
 }
 
+/**
+ * Der Quellpfad landet in committeten Referenzdateien. Absolut geschrieben würde er bei jedem
+ * Lauf auf einer anderen Maschine wechseln (früher `/Users/<autor>/…`, im Container
+ * `/home/user/…`) und die Dateien dauerhaft als geändert markieren. Liegt die Quelle im Repo,
+ * also relativ dazu ausgeben; nur externe Quellen (z. B. ein manueller Download) bleiben absolut.
+ */
+function toPortableSourcePath(sourcePath: string) {
+  const relative = path.relative(process.cwd(), sourcePath);
+  return relative && !relative.startsWith("..") && !path.isAbsolute(relative) ? relative : sourcePath;
+}
+
 function writeOutputs(source: ExtractedAttributeSource) {
   ensureOutputDir();
+  source = { ...source, sourcePath: toPortableSourcePath(source.sourcePath) };
 
   const querySqlText = source.queryBody
     ? source.queryBody

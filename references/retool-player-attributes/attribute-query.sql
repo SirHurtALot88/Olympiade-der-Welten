@@ -2,7 +2,7 @@
 -- queryName: getPlayerAttributesForAI
 -- sourceKind: SqlQueryUnified
 -- page: transfermarktPage
--- sourcePath: /Users/chrisfalk/Documents/Codex/Olympiade der Welten/references/retool-ai-golden-master/getPlayerAttributesForAI.state.js
+-- sourcePath: references/retool-ai-golden-master/getPlayerAttributesForAI.state.js
 -- spreadsheetId: unknown
 -- sheetName: unknown
 -- Query found, data not embedded.

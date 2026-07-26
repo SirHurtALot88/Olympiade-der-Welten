@@ -3,7 +3,7 @@
 - Query name: `getPlayerAttributesForAI`
 - Source kind: `SqlQueryUnified`
 - Page: `transfermarktPage`
-- Source path: `/Users/chrisfalk/Documents/Codex/Olympiade der Welten/references/retool-ai-golden-master/getPlayerAttributesForAI.state.js`
+- Source path: `references/retool-ai-golden-master/getPlayerAttributesForAI.state.js`
 - Spreadsheet: `unknown`
 - Spreadsheet ID: `unknown`
 - Sheet name: `unknown`
