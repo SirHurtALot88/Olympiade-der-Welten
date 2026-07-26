@@ -21,23 +21,30 @@ describe("ai batch apply route guard", () => {
     });
   });
 
-  it("blocks writes when room guard rejects host-only batch apply", async () => {
-    const { POST } = await import("@/app/api/lineups/legacy/ai-batch-apply/route");
-    const response = await POST(
-      new Request("http://localhost/api/lineups/legacy/ai-batch-apply?saveId=room-save&seasonId=season-1&matchdayId=md-1&roomCode=ABCD", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ dryRun: true }),
-      }),
-    );
+  it(
+    "blocks writes when room guard rejects host-only batch apply",
+    async () => {
+      const { POST } = await import("@/app/api/lineups/legacy/ai-batch-apply/route");
+      const response = await POST(
+        new Request("http://localhost/api/lineups/legacy/ai-batch-apply?saveId=room-save&seasonId=season-1&matchdayId=md-1&roomCode=ABCD", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ dryRun: true }),
+        }),
+      );
 
-    expect(response.status).toBe(403);
-    expect(authorizeServerRoomWrite).toHaveBeenCalledWith(
-      expect.objectContaining({
-        saveId: "room-save",
-        action: "lineup_ai_batch_apply",
-        dryRun: true,
-      }),
-    );
-  });
+      expect(response.status).toBe(403);
+      expect(authorizeServerRoomWrite).toHaveBeenCalledWith(
+        expect.objectContaining({
+          saveId: "room-save",
+          action: "lineup_ai_batch_apply",
+          dryRun: true,
+        }),
+      );
+    },
+    // The route now also imports the room-gameplay-write-notifier (S8 co-op broadcast fix), which
+    // transitively pulls in the real persistence/room-store module graph. That first cold import can
+    // exceed vitest's default 5s test timeout on a cold cache; the guard-rejection path itself is fast.
+    15000,
+  );
 });

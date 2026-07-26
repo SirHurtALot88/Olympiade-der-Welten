@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
+import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 function parseSource(request: Request) {
@@ -68,6 +69,18 @@ export async function POST(request: Request) {
       overwriteExisting: body.overwriteExisting ?? false,
       forceAiTeams: body.forceAiTeams ?? false,
     });
+
+    if (!dryRun && result.summary.savedTeams > 0) {
+      notifyRoomGameplayWrite(writeAuth, {
+        saveId,
+        teamId: null,
+        action: "lineup_ai_batch_apply",
+        eventType: "lineup_updated",
+        affectedViews: ["home", "lineup", "matchday", "arena"],
+        dryRun: false,
+        success: true,
+      });
+    }
 
     return NextResponse.json(result);
   } catch (error) {

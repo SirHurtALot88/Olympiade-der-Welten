@@ -20,6 +20,7 @@ import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
+import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 // Roster-abhängige Manager-Aktionen: Training/Einsatzlisten-Setup braucht Spieler im Kader. Im Setup-Draft
@@ -419,6 +420,17 @@ export async function POST(request: Request) {
     });
 
     const succeeded = finalRun.status === "completed";
+    if (succeeded) {
+      notifyRoomGameplayWrite(writeAuth, {
+        saveId,
+        teamId: null,
+        action: "ai_preseason_background",
+        eventType: "save_updated",
+        affectedViews: ["home", "team", "market", "lineup", "facilities", "training"],
+        dryRun: false,
+        success: true,
+      });
+    }
     return NextResponse.json(
       {
         ok: succeeded,
