@@ -220,7 +220,9 @@ describe("runWholeSeasonDryRun", () => {
     expect(result.teamPPsReconciliation.totalTeamPoints).toBeGreaterThanOrEqual(0);
     expect(result.aiSeasonAudit.totals.drafts).toBeGreaterThanOrEqual(0);
     expect(result.simulatedMatchdays).toBeLessThanOrEqual(1);
-  });
+    // Eigenes Timeout wie beim Nachbartest oben: der Lauf simuliert einen echten Spieltag inkl.
+    // `advanceAfterEachMatchday` und liegt mit ~7 s zuverlaessig ueber Vitests 5-s-Default.
+  }, 30_000);
 
   it("reaches matchday 2 without captain-limit or lineup-scope regressions when AI teams are enabled and rosters cover the whole season", async () => {
     const persistence = createTestPersistence();

@@ -567,6 +567,10 @@ export default function DisciplineStageArena({
     fetch(`/api/matchday/arena-base?${query.toString()}`, { cache: "no-store", signal: controller.signal })
       .then((res) => (res.ok ? res.json() : null))
       .then((payloadJson) => {
+        // Genau wie im catch-Zweig: eine Antwort, die schon eingereiht war, als der Effekt
+        // aufgeräumt wurde (Spieltags-/Team-Wechsel), darf den State nicht mehr beschreiben —
+        // sonst blitzt die Vorschau des alten Spieltags auf, bis der neue Request antwortet.
+        if (controller.signal.aborted) return;
         const enginePreview = payloadJson?.resolvePreview?.preview ?? null;
         setPreview(enginePreview);
         setBriefingItems(Array.isArray(payloadJson?.briefingStandings?.items) ? payloadJson.briefingStandings.items : []);
@@ -1101,7 +1105,12 @@ export default function DisciplineStageArena({
   }, [disciplineId, mode, seed]);
 
   // S2: Doppel-Klick-Schutz für „Spieltag auswerten & weiter".
+  // Der State allein reicht dafür nicht: zwei Klicks im selben React-Batch lesen beide das
+  // `advancing` aus derselben Render-Closure (also `false`), und `disabled` wirkt erst nach dem
+  // Re-Render — der Spieltag würde doppelt ausgewertet. Das Ref sperrt synchron beim ersten Klick;
+  // der State steuert weiterhin nur die Optik (gleiches Muster wie `busyRef` in der NativeArena).
   const [advancing, setAdvancing] = useState(false);
+  const advancingRef = useRef(false);
 
   const ownTeam = model.teams.find((t) => t.isOwn);
   const ownRank = ownTeam ? model.teams.indexOf(ownTeam) + 1 : null;
@@ -1496,11 +1505,13 @@ export default function DisciplineStageArena({
                   type="button"
                   disabled={advancing}
                   onClick={async () => {
-                    if (advancing) return;
+                    if (advancingRef.current) return;
+                    advancingRef.current = true;
                     setAdvancing(true);
                     try {
                       await onAdvanceMatchday();
                     } finally {
+                      advancingRef.current = false;
                       setAdvancing(false);
                     }
                   }}
