@@ -220,7 +220,9 @@ describe("runWholeSeasonDryRun", () => {
     expect(result.teamPPsReconciliation.totalTeamPoints).toBeGreaterThanOrEqual(0);
     expect(result.aiSeasonAudit.totals.drafts).toBeGreaterThanOrEqual(0);
     expect(result.simulatedMatchdays).toBeLessThanOrEqual(1);
-  });
+    // Simuliert real einen (gedeckelten) Spieltag inkl. Reconciliation — ~6s, also knapp über
+    // vitests 5s-Default. Der Nachbartest oben trägt aus demselben Grund bereits 20_000.
+  }, 20_000);
 
   it("reaches matchday 2 without captain-limit or lineup-scope regressions when AI teams are enabled and rosters cover the whole season", async () => {
     const persistence = createTestPersistence();

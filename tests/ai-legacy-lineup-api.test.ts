@@ -214,7 +214,14 @@ describe("ai legacy lineup preview api", () => {
           },
         },
       }),
-      getSaveById: () => null,
+      // Audit S4 (main): requireLocalPersistedSave löst NICHT mehr still auf den aktiven Save
+      // aus, sondern verlangt einen echten Treffer per getSaveById — sonst 404. Der Mock muss
+      // die angefragte saveId daher wirklich zurückgeben statt pauschal null.
+      getSaveById(saveId: string) {
+        return saveId === this.bootstrapSingleplayerSave().save.saveId
+          ? this.bootstrapSingleplayerSave().save
+          : null;
+      },
       getActiveSave: () => null,
     });
 
@@ -333,7 +340,14 @@ describe("ai legacy lineup preview api", () => {
           },
         },
       }),
-      getSaveById: () => null,
+      // Audit S4 (main): requireLocalPersistedSave löst NICHT mehr still auf den aktiven Save
+      // aus, sondern verlangt einen echten Treffer per getSaveById — sonst 404. Der Mock muss
+      // die angefragte saveId daher wirklich zurückgeben statt pauschal null.
+      getSaveById(saveId: string) {
+        return saveId === this.bootstrapSingleplayerSave().save.saveId
+          ? this.bootstrapSingleplayerSave().save
+          : null;
+      },
       getActiveSave: () => null,
     });
     getLocalLegacyLineupDraft.mockReturnValue(null);
@@ -376,7 +390,9 @@ describe("ai legacy lineup preview api", () => {
     expect(body.summary.wouldSave).toBe(1);
     expect(body.summary.skippedWarning).toBe(1);
     expect(saveLocalLegacyLineupDraft).not.toHaveBeenCalled();
-  });
+    // Erster Test der Datei: trägt die Modul-Kaltstartkosten des AI-Batch-Apply-Pfads (gemessen
+    // ~5,2s, knapp über vitests 5s-Default). Kein Hänger — Folgetests im selben Lauf sind ms-schnell.
+  }, 30000);
 
   it("skips existing lineups unless overwriteExisting is explicitly enabled", async () => {
     createPersistenceService.mockReturnValue({
@@ -404,7 +420,14 @@ describe("ai legacy lineup preview api", () => {
           },
         },
       }),
-      getSaveById: () => null,
+      // Audit S4 (main): requireLocalPersistedSave löst NICHT mehr still auf den aktiven Save
+      // aus, sondern verlangt einen echten Treffer per getSaveById — sonst 404. Der Mock muss
+      // die angefragte saveId daher wirklich zurückgeben statt pauschal null.
+      getSaveById(saveId: string) {
+        return saveId === this.bootstrapSingleplayerSave().save.saveId
+          ? this.bootstrapSingleplayerSave().save
+          : null;
+      },
       getActiveSave: () => null,
     });
     getLocalLegacyLineupDraft.mockReturnValue({
@@ -488,7 +511,14 @@ describe("ai legacy lineup preview api", () => {
           },
         },
       }),
-      getSaveById: () => null,
+      // Audit S4 (main): requireLocalPersistedSave löst NICHT mehr still auf den aktiven Save
+      // aus, sondern verlangt einen echten Treffer per getSaveById — sonst 404. Der Mock muss
+      // die angefragte saveId daher wirklich zurückgeben statt pauschal null.
+      getSaveById(saveId: string) {
+        return saveId === this.bootstrapSingleplayerSave().save.saveId
+          ? this.bootstrapSingleplayerSave().save
+          : null;
+      },
       getActiveSave: () => null,
     });
     getLocalLegacyLineupDraft.mockReturnValue({
@@ -633,7 +663,14 @@ describe("ai legacy lineup preview api", () => {
           },
         },
       }),
-      getSaveById: () => null,
+      // Audit S4 (main): requireLocalPersistedSave löst NICHT mehr still auf den aktiven Save
+      // aus, sondern verlangt einen echten Treffer per getSaveById — sonst 404. Der Mock muss
+      // die angefragte saveId daher wirklich zurückgeben statt pauschal null.
+      getSaveById(saveId: string) {
+        return saveId === this.bootstrapSingleplayerSave().save.saveId
+          ? this.bootstrapSingleplayerSave().save
+          : null;
+      },
       getActiveSave: () => null,
     });
     getLocalLegacyLineupDraft.mockReturnValue(null);
