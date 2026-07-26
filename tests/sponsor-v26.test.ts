@@ -83,11 +83,24 @@ describe("sponsor catalog v2.6", () => {
     expect(listSponsorBrandTemplates().length).toBe(SPONSOR_BRAND_VARIANTS.length);
   });
 
-  it("includes recognizable parody names", () => {
+  it("splits the catalog into 100 German and 100 international recognizable brands", () => {
     const names = SPONSOR_BRAND_PARENTS.map((entry) => entry.name);
+    // Wiedererkennungswert vor Wortspiel: stark verfremdete Namen (frueher z. B. "Teslara Motors",
+    // "AlphaSearch Global", "Golden Arches Fast") sind durch erkennbare ersetzt.
     expect(names).toContain("O.B.I. Baumarkt");
-    expect(names).toContain("Teslara Motors");
     expect(names).toContain("Siemenswerk AG");
+    expect(names).toContain("Tesla Motors");
+    expect(names).toContain("Chrysler Motors");
+    expect(names).toContain("Samsung Electronics");
+    expect(names).toContain("LG Electronics");
+    expect(names).not.toContain("Teslara Motors");
+
+    const byRegion = SPONSOR_BRAND_PARENTS.reduce<Record<string, number>>((acc, entry) => {
+      acc[entry.region] = (acc[entry.region] ?? 0) + 1;
+      return acc;
+    }, {});
+    expect(byRegion.dach).toBe(100);
+    expect(byRegion.global).toBe(100);
   });
 });
 
