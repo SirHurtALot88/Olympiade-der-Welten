@@ -912,6 +912,23 @@ const PRIM_GEO: Record<StagePrimitive, { w: number; h: number; r: number; rOwn: 
 function round1(x: number): number {
   return Math.round(x * 10) / 10;
 }
+
+/**
+ * Team-Endsumme GENAU SO aufaddieren, wie der Reveal es tut.
+ *
+ * `applyReveal` schreibt pro aufgedecktem Spieler `t.score = round1(t.score + net)` — also
+ * schrittweise gerundet. Die Ziellinie wurde dagegen als rohe Summe aller `playerNet`
+ * gebildet. Beide Wege driften auseinander (bis ~0,05 je Spieler), weshalb das beste Team
+ * mit seinem letzten Spieler NEBEN der Linie landete statt darauf.
+ *
+ * Deshalb hier dieselbe Faltung. Die Ziellinie ist damit per Konstruktion der Endstand des
+ * besten Teams — sie verschiebt sich mit den Ergebnissen, wird aber immer exakt erreicht.
+ */
+export function accumulateRevealedTeamScore(players: Array<NativeStagePlayer | null | undefined>): number {
+  let total = 0;
+  for (const player of players) total = round1(total + playerNet(player));
+  return total;
+}
 // Piecewise-lineare Interpolation entlang eines Wegpunkt-Pfads (Serpentine/
 // Parcours): f ∈ 0…1 → {x,y}. Für mountain/parcours (Token folgt dem Weg).
 function interpAlong(wp: [number, number][], f: number): { x: number; y: number } {
@@ -1540,8 +1557,9 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const finalMax = useMemo(() => {
     let mx = 0;
     for (const t of teams) {
-      let s = 0;
-      for (const p of t.players) s += playerNet(p);
+      // Identische Faltung wie im Reveal (accumulateRevealedTeamScore) — sonst landet der
+      // Fuehrende wegen der schrittweisen Rundung neben der Ziellinie statt darauf.
+      const s = accumulateRevealedTeamScore(t.players);
       if (s > mx) mx = s;
     }
     return Math.max(1, mx);
@@ -1553,8 +1571,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const finalMin = useMemo(() => {
     let mn = Infinity;
     for (const t of teams) {
-      let s = 0;
-      for (const p of t.players) s += playerNet(p);
+      const s = accumulateRevealedTeamScore(t.players);
       if (s < mn) mn = s;
     }
     return Number.isFinite(mn) ? mn : 0;
@@ -1647,13 +1664,12 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     });
   }, [barbellInfo, barbellEliminated]);
 
-  // Entstauch-Normierung (ENTKLUMPEN): Token-Positionen werden gegen den AKTUELL
-  // Führenden (posMaxRef) normiert statt gegen den theoretischen Voll-Spiel-Max
-  // (finalMax). Sonst kleben in frühen Runden alle Teams am Start, weil ihre
-  // kumulierten Scores nur ein Bruchteil des End-Totals sind. Mit dem Live-Führenden
-  // als Bezug fächert sich das Feld in JEDER Runde über den ganzen Platz auf
-  // (Führender vorn, Feld dahinter gespreizt) — so wie die Mockups es zeigen.
-  // Wird im Render-Body je Render aus displayScore gesetzt (siehe unten).
+  // Normierungsbasis der Token-Positionen. Wird im Render-Body gesetzt (s. `posMax`) und
+  // ist der FESTE Endstand des besten Teams — nicht der Live-Fuehrende. Dadurch steht die
+  // Skala die ganze Disziplin ueber still: jede Etappe setzt dort an, wo die vorige endete,
+  // und nichts rutscht beim Rundenwechsel kollektiv nach. Eine Normierung gegen den
+  // Live-Fuehrenden faechert das Feld zwar frueher auf, laesst aber die Skala je Runde
+  // springen — das wurde als Zurueckrutschen wahrgenommen.
   const posMaxRef = useRef<number>(1);
 
   const tokenPos = useCallback(
