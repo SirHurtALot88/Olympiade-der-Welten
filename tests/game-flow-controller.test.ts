@@ -802,4 +802,70 @@ describe("game flow controller", () => {
     expect(flow.currentStepId).not.toBe("sell_players");
     expect(flow.nextStepId).not.toBe("sell_players");
   });
+
+  it("does not hang on 'Kader prüfen' when the wizard save starts with an empty own roster", () => {
+    // Regression: der Setup-Draft ueberspringt Menschen-Teams, der eigene Kader
+    // ist in S1 also bewusst leer. `roster_review` verlangte aber `rosterCount > 0`
+    // — erfuellbar nur ueber die SPAETEREN Schritte (Transfermarkt / Auffuellen).
+    // Da `buildGameFlow` den ersten nicht abgeschlossenen Schritt als aktuellen
+    // waehlt, blieb der Flow dauerhaft auf "Weiter: Kader prüfen" stehen.
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        players: [],
+        rosters: [],
+        seasonState: {
+          seasonId: "season-1",
+          schedule: [],
+          standings: {},
+          newGameFlow: {
+            active: true,
+            dismissed: false,
+            selectedTeamId: "M-M",
+            // Exakt die Schrittliste, die `applyNewGameSetup` anlegt.
+            steps: [
+              { stepId: "season_intro", status: "completed", completedAt: "2026-06-20T00:00:00.000Z" },
+              { stepId: "team_confirm", status: "open" },
+              { stepId: "roster_review", status: "open" },
+              { stepId: "first_transfers", status: "open" },
+              { stepId: "fill_roster", status: "open" },
+              { stepId: "training_facilities", status: "open" },
+              { stepId: "choose_sponsor", status: "open" },
+              { stepId: "set_lineup", status: "open" },
+            ],
+          },
+        },
+        season: { id: "season-1", name: "Season 1", year: 2026, currentMatchday: 1, matchdayIds: ["season-1-md-1"] },
+      }),
+      activeTeamId: "M-M",
+    });
+
+    const rosterReview = flow.steps.find((step) => step.stepId === "roster_review");
+    expect(rosterReview?.status).toBe("completed");
+    expect(flow.currentStepId).not.toBe("roster_review");
+    expect(flow.nextStepId).not.toBe("roster_review");
+  });
+
+  it("keeps 'Kader prüfen' completed once the roster is filled", () => {
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        seasonState: {
+          seasonId: "season-1",
+          schedule: [],
+          standings: {},
+          newGameFlow: {
+            active: true,
+            dismissed: false,
+            selectedTeamId: "M-M",
+            steps: [
+              { stepId: "season_intro", status: "completed", completedAt: "2026-06-20T00:00:00.000Z" },
+              { stepId: "roster_review", status: "open" },
+            ],
+          },
+        },
+      }),
+      activeTeamId: "M-M",
+    });
+
+    expect(flow.steps.find((step) => step.stepId === "roster_review")?.status).toBe("completed");
+  });
 });
