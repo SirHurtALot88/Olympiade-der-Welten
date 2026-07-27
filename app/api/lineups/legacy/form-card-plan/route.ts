@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { saveLocalLegacyFormCardPlan } from "@/lib/lineups/legacy-lineup-local-service";
 import type { LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
+import { mapSaveResolutionErrorToResponse } from "@/lib/persistence/resolve-local-save";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { parseRoomWriteContextFromRequest } from "@/lib/room/parse-room-write-context";
@@ -54,13 +55,20 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: writeAuth.reason, warnings: writeAuth.warnings }, { status: writeAuth.status });
   }
 
-  const result = saveLocalLegacyFormCardPlan({
-    ...params,
-    disciplineSide: body.disciplineSide,
-    disciplineId: body.disciplineId ?? null,
-    primaryFormCardId: body.primaryFormCardId ?? null,
-    secondaryFormCardId: body.secondaryFormCardId ?? null,
-  });
+  let result;
+  try {
+    result = saveLocalLegacyFormCardPlan({
+      ...params,
+      disciplineSide: body.disciplineSide,
+      disciplineId: body.disciplineId ?? null,
+      primaryFormCardId: body.primaryFormCardId ?? null,
+      secondaryFormCardId: body.secondaryFormCardId ?? null,
+    });
+  } catch (error) {
+    const mapped = mapSaveResolutionErrorToResponse(error);
+    if (mapped) return mapped;
+    throw error;
+  }
   if (!result.ok) {
     return NextResponse.json({ errors: result.errors, warnings: result.warnings, plans: result.plans }, { status: 422 });
   }
