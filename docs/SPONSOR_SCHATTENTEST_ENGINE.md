@@ -22,9 +22,11 @@ laufenden Saison für die Klauseln, die nur den Momentanzustand kennen.
 
 Zwei Dinge, die diese Datenbasis **nicht** hergibt und die deshalb nirgends behauptet werden:
 
-* **Keine Seed-Streuung.** Alle Zahlen unten stammen aus *einem* Engine-Lauf. Wo „Median" und
-  „IQR" steht, laufen sie über die **Saisons** dieses Laufs, nicht über Seeds. Für die Kriterien 2
-  und 6 (Insolvenz, Teams im Minus) heißt das ausdrücklich: aus einem Lauf, Streuung ungemessen.
+* **Keine Engine-Seed-Streuung.** Alle Endstände stammen aus *einem* Engine-Lauf. Wo „Median" und
+  „IQR" über Deckungswerte steht, laufen sie über die **Saisons** dieses Laufs und über 40
+  Wiederholungen der **modelleigenen** Lotterie (Abschnitt 3), nicht über Engine-Seeds. Für die
+  Kriterien 2 und 6 heißt das: die Streuung des Modells ist gemessen (40 Würfe), die Streuung
+  zwischen Engine-Läufen nicht.
 * **Spielerzustand nur für die laufende Saison.** Fatigue-Momentanwert, `trainingMode`,
   `seasonTrainingAccumulator`, Moral, Subklassen und Trainingsklasse werden jede Preseason
   zurückgesetzt (`lib/season/preseason-workflow-service.ts`). Saison-getaggte Ledger
@@ -197,6 +199,37 @@ tatsächliche Rangverteilung ist nicht die Ursache.** Gegenprobe mit abgeschalte
 (`OLY_SPONSOR_FORM=0`): Median +8.5 Pp statt +9.0 — **auch die Formkomponente ist es nicht.**
 Es bleibt die Streuung der Lotterien selbst, die die EigenSD beziffert.
 
+### Wiederholte Lotteriewürfe — 40 Würfe, unveränderte Endränge, festes ex-ante-K
+
+Um zu trennen, was am Modell liegt und was am einzelnen Wurf, wurde die Klausel- und Ziellotterie
+40-mal neu gezogen. Endränge und K bleiben unverändert (K ist ex ante und hängt per Konstruktion
+nicht an den Würfen). Das ist **keine** Seed-Streuung der Engine — die Endstände sind dieselben —
+sondern genau die Streuung, die der Entwurf selbst erzeugt.
+
+| Größe | Median | IQR | Spanne |
+|---|---:|---|---|
+| Deckungsabweichung (160 Saison-Würfe) | **+0.7 Pp** | [−3.4, +4.5] Pp | [−10.8, +18.0] Pp |
+| Zahlungsunfähige bei sicherster Wahl | 0 | [0, 0] | max 0 |
+| Teams unter minus einem Mindestgehalt | 0 | [0, 0] | max 0 |
+| Niedrigste Kasse über alle Würfe | | | +113.8 C |
+
+**Saison-Würfe außerhalb sf ± 5 Pp: 62 von 160 = 39 %.**
+
+Das korrigiert die Lesart der Tabelle oben in einem wesentlichen Punkt: **das ex-ante-K ist nicht
+systematisch verzerrt** — der Median über 160 Würfe liegt bei +0.7 Pp, also praktisch auf dem
+Ziel. Die +9.0 Pp des einzelnen beobachteten Laufs sind ein Wurf, kein Bias. Damit ist die
+Aussage präzise:
+
+> Kriterium 1 reißt nicht, weil K falsch berechnet wäre, sondern weil die geforderte Toleranz
+> **enger ist als die Eigenstreuung des Entwurfs**. Bei einer Ausfallwahrscheinlichkeit von 39 %
+> je Saison sind 3 von 4 Saisons außerhalb ein völlig gewöhnliches Ergebnis
+> (P(≥ 3 von 4) ≈ 0.13). Die vorhergesagte Quote aus der EigenSD (±6 Pp → rund 40 %) trifft die
+> gemessenen 39 % exakt.
+
+Für die Kriterien 2 und 6 heißt derselbe Test: **in allen 40 Würfen 0 Zahlungsunfähige und 0
+Teams im Minus**, niedrigste Kasse +113.8 C. Diese beiden Kriterien stehen damit nicht mehr auf
+einem einzigen Wurf — wohl aber weiterhin auf einem einzigen **Engine-Lauf**.
+
 ### Salden
 
 Kumuliert über alle vier Saisons, Sponsor + Preisgeld (`getPrizeMoneyReference` +
@@ -216,14 +249,15 @@ Boden. Das ist hoch: dort wirken Kurve, Klausel und Sonderziel nicht mehr.
 
 | # | Kriterium | Zahl | Verdikt |
 |---|---|---|---|
-| 1 | Deckung je Saison innerhalb sf ± 5 Pp, höchstens eine von fünf Saisons außerhalb | **3 von 4 außerhalb** (+9.8, +10.6, +8.1 Pp) | **GERISSEN** |
-| 2 | 0 Zahlungsunfähige unter Teams, die die sicherste Karte wählten | **0** Fälle; Kasse-Minimum +137.7 C, Median +394.8 C | bestanden¹ |
+| 1 | Deckung je Saison innerhalb sf ± 5 Pp, höchstens eine von fünf Saisons außerhalb | **3 von 4 außerhalb** (+9.8, +10.6, +8.1 Pp); über 160 Lotteriewürfe **39 % außerhalb**, Median +0.7 Pp | **GERISSEN** |
+| 2 | 0 Zahlungsunfähige unter Teams, die die sicherste Karte wählten | **0** Fälle; über 40 Würfe Median 0, IQR [0,0], max 0; niedrigste Kasse +113.8 C | bestanden¹ |
 | 3 | sigma in [3.5, 7] **und** jedes gemessene P ≤ 0.15 neben Design-P | sigma 6.62 ✓ (aber S2/S4 einzeln 7.10/7.47 ✗); **2 Klauseln reißen** (Ausbau 0.11 vs 0.45; Wortlaut 0.00 vs 0.45) | **GERISSEN** |
 | 4 | FOSD-Test mit gemessenem sigma/P findet keine Falle in einer **echten** Angebotsliste | **0 Fallen** in 32 Listen, 96 Karten, 96 verschiedene Paare, 0 kollabiert | bestanden² |
 | 5 | Kein realisierter Fall „besserer Endrang zahlt weniger" | **6 von 128** Karten mit nicht-monotoner Auszahlungsleiter | **GERISSEN** |
-| 6 | Höchstens 8 Teams mit kumuliertem Saldo unter minus einem Mindestgehalt | **0** von 32 | bestanden¹ |
+| 6 | Höchstens 8 Teams mit kumuliertem Saldo unter minus einem Mindestgehalt | **0** von 32; über 40 Würfe Median 0, IQR [0,0], max 0 | bestanden¹ |
 
-¹ Aus **einem** Lauf. Streuung über Seeds ungemessen — nicht als belastbar zu verkaufen.
+¹ Aus **einem** Engine-Lauf. Die modelleigene Lotterie wurde 40-mal wiederholt (durchweg 0), die
+Streuung über **Engine-Seeds** bleibt ungemessen — nicht als belastbar zu verkaufen.
 Kredite sind als Rettungsleine **nicht** mitgerechnet (macht das Kriterium härter), Transfers,
 Gebäudekosten und Ablösen fehlen (macht die Kasse optimistisch).
 
@@ -268,12 +302,13 @@ wurde; im Profil steht er noch.
 
 **Das Modell besteht den Engine-Test nicht.** Drei der sechs Abbruchkriterien reißen:
 
-* **Kriterium 1 (Deckung).** 3 von 4 Saisons außerhalb sf ± 5 Pp, Median +9.0 Pp. Und die
-  Diagnose ist schwerwiegender als die Zahl: die **Eigenstreuung des Entwurfs (±5.6 bis ±6.6 Pp)
-  ist größer als die geforderte Toleranz.** Das Kriterium ist mit diesem Entwurf nicht durch
-  bessere Kalibrierung zu retten — es müsste entweder die Toleranz weiter (auf mindestens
-  ±12 Pp für 2σ) oder die Lotterie-Amplitude kleiner werden, insbesondere das Sonderziel, das mit
-  `EV / P_GOAL` (bis 4× gedeckelt) der größte einzelne Varianztreiber ist.
+* **Kriterium 1 (Deckung).** 3 von 4 Saisons außerhalb sf ± 5 Pp. Über 160 Lotteriewürfe: Median
+  **+0.7 Pp**, IQR [−3.4, +4.5] Pp, **39 % der Saisons außerhalb ±5 Pp**. Das ex-ante-K ist damit
+  **unverzerrt** — der Fehler steckt nicht in der Kalibrierung, sondern in der Vorgabe: die
+  **Eigenstreuung des Entwurfs (±5.6 bis ±6.6 Pp) ist größer als die geforderte Toleranz.** Das
+  Kriterium ist durch keine Kalibrierung zu retten. Entweder die Toleranz muss weiter (auf
+  mindestens ±12 Pp für 2σ), oder die Lotterie-Amplitude muss kleiner werden — allen voran das
+  Sonderziel, das mit `EV / P_GOAL` (bis 4× gedeckelt) der größte einzelne Varianztreiber ist.
 * **Kriterium 3 (sigma und P).** sigma 6.62 hält den Korridor nur gepoolt; einzelne Saisons liegen
   bei 7.10 und 7.47. Zwei direkt messbare P reißen deutlich: „Ausbau" 0.11 statt 0.45 und
   „Wortlaut" 0.00 statt 0.45 — letztere ist in 160 Team-Saisons **nie** erfüllt worden und wäre
@@ -286,8 +321,9 @@ wurde; im Profil steht er noch.
 
 **Was hält:** Kriterium 4 (Fallenfreiheit) hält auch mit dem gemessenen sigma 6.62 und den
 gemessenen P — und diesmal nachweislich nicht vakuum-wahr: 96 paarweise verschiedene Karten, keine
-identischen Paare, keine kollabierte Karte. Die Kriterien 2 und 6 halten deutlich (0 Insolvenzen,
-0 Teams im Minus, Kasse-Minimum +137.7 C), stehen aber auf einem einzigen Lauf.
+identischen Paare, keine kollabierte Karte. Die Kriterien 2 und 6 halten deutlich und robust:
+über 40 Lotteriewürfe durchweg 0 Insolvenzen und 0 Teams im Minus, niedrigste Kasse +113.8 C.
+Sie stehen weiterhin auf einem einzigen Engine-Lauf.
 
 **Kürzeste Zusammenfassung:** Der Entwurf ist **fallenfrei und zahlungssicher**, aber er ist
 **nicht rang-monoton**, seine **Klauseln passen teilweise nicht zu dem, was die KI im Spiel
@@ -320,6 +356,9 @@ npx tsx scripts/sponsor-shadow-ledger.ts \
   --save-id=fresh-season-1-1784196429043 \
   --measured=outputs/sponsor-shadow-run/measure-existing.json \
   --json=outputs/sponsor-shadow-run/ledger-existing.json
+
+# Wiederholte Lotteriewuerfe (Verteilung statt Einzelwert)
+npx tsx scripts/sponsor-shadow-ledger.ts … --draws=40
 
 # Gegenprobe ohne Formkomponente
 OLY_SPONSOR_FORM=0 npx tsx scripts/sponsor-shadow-ledger.ts …

@@ -52,7 +52,15 @@ const DB_PATH = argOf("db");
 const SAVE_ID = argOf("save-id");
 const MEASURED = argOf("measured");
 const JSON_OUT = argOf("json");
+/**
+ * Wiederholungen der MODELL-EIGENEN Lotterien (Klausel x Sonderziel) bei UNVERAENDERTEN,
+ * realisierten Endraengen. Das ersetzt keine Seed-Streuung der Engine — die Endstaende bleiben
+ * dieselben — aber es beziffert genau die Streuungsquelle, die Kriterium 2 und 6 treibt: die
+ * Auszahlungslotterie des Entwurfs. Ohne das stuenden beide Kriterien auf einem einzigen Wurf.
+ */
+const DRAWS = Number(argOf("draws") ?? 1);
 
+const DRAW_SALT = { value: 0 };
 const fmt = (v: number, d = 1) => (Number.isFinite(v) ? v.toFixed(d) : "—");
 const line = (c = "=") => console.log(c.repeat(104));
 
@@ -170,6 +178,8 @@ function main() {
     rows: Array<{ teamId: string; expectedRank: number; finalRank: number; paid: number; salary: number;
                   prize: number; floor: boolean; monotone: boolean; curve: string; profile: string;
                   rarity: string; worstDrop: number; dropAt: number }>;
+    /** Karten und Offsets, wie sie VOR der Saison feststanden — fuer die Wiederholungswuerfe. */
+    exAnte: ExAnteTeam[];
   };
   const seasonResults: SeasonResult[] = [];
   const decomposition = new Map<string, { clauseRate: number; clauseAssumed: number; goalRate: number; sumAtExpected: number }>();
@@ -198,7 +208,7 @@ function main() {
       const t = exAnte[idx]!;
       const p = pOf.get(t.card.clause.name)!.p;
       const params: CardParams = { sigma: SIGMA, pClause: p, pGoal: DESIGN_P_GOAL };
-      const rnd = hashRnd(`${o.teamId}:${o.seasonId}:outcome`);
+      const rnd = hashRnd(`${o.teamId}:${o.seasonId}:outcome:${DRAW_SALT.value}`);
       const clauseMet = rnd() < p;
       const goalMet = rnd() < DESIGN_P_GOAL;
       const raw = rawPayout(t.card, o.expectedRank, o.finalRank, t.cal, params, clauseMet, goalMet);
@@ -245,7 +255,7 @@ function main() {
       seasonId: snap.seasonId, sf, sfSource: factorSource.get(snap.seasonId)!, k,
       sponsorSum, salarySum, coveragePct: (100 * sponsorSum) / Math.max(1e-9, salarySum), targetPct: sf * 100,
       floorRate: rows.filter((r) => r.floor).length / rows.length,
-      prizeSum: rows.reduce((a, r) => a + r.prize, 0), rows,
+      prizeSum: rows.reduce((a, r) => a + r.prize, 0), rows, exAnte,
     });
   }
 
@@ -325,7 +335,7 @@ function main() {
         for (let r = 1; r <= 32; r += 1) {
           worst = Math.min(worst, scaleWithK(rawPayout(card, o.expectedRank, r, cal, params, false, false), card.rarity, s.sf, s.k));
         }
-        const rnd = hashRnd(`${o.teamId}:${o.seasonId}:safe:${slot}`);
+        const rnd = hashRnd(`${o.teamId}:${o.seasonId}:safe:${slot}:${DRAW_SALT.value}`);
         const clauseMet = rnd() < p, goalMet = rnd() < DESIGN_P_GOAL;
         const paid = scaleWithK(rawPayout(card, o.expectedRank, o.finalRank, cal, params, clauseMet, goalMet), card.rarity, s.sf, s.k);
         if (!best || worst > best.floorValue) best = { paid, floorValue: worst };
@@ -406,6 +416,72 @@ function main() {
   console.log(`  Kurven-Mischung (nach Abbildung): ${[...curveMix.entries()].map(([kk, v]) => `${kk} ${v}`).join(", ")}`);
   for (const d of trapDetails) console.log(`    ${d}`);
   if (slates === 0) console.log("  KEINE Angebotsliste im Save — Kriterium 4 NICHT pruefbar.");
+
+  // ── Wiederholte Lotteriewuerfe ───────────────────────────────────────────────────────────────
+  //  K bleibt fest — es ist ex ante und haengt per Konstruktion NICHT an den Wuerfen. Die
+  //  realisierten Endraenge bleiben ebenfalls fest. Variiert wird ausschliesslich die
+  //  Klausel-/Ziellotterie des Modells.
+  const drawStats = { coverageDev: [] as number[], insolvencies: [] as number[], belowSalary: [] as number[], minCash: [] as number[] };
+  if (DRAWS > 1) {
+    for (let draw = 0; draw < DRAWS; draw += 1) {
+      DRAW_SALT.value = draw;
+      const cash = new Map<string, number>(startCash);
+      const bal = new Map<string, number>();
+      let ins = 0;
+      const seen = new Set<string>();
+      for (const s of seasonResults) {
+        const seasonObs = obs.filter((o) => o.seasonId === s.seasonId);
+        let sponsorSum = 0;
+        seasonObs.forEach((o, idx) => {
+          const t = s.exAnte[idx]!;
+          const p = pOf.get(t.card.clause.name)!.p;
+          const params: CardParams = { sigma: SIGMA, pClause: p, pGoal: DESIGN_P_GOAL };
+          const rnd = hashRnd(`${o.teamId}:${o.seasonId}:outcome:${draw}`);
+          const clauseMet = rnd() < p, goalMet = rnd() < DESIGN_P_GOAL;
+          const paid = scaleWithK(rawPayout(t.card, o.expectedRank, o.finalRank, t.cal, params, clauseMet, goalMet), t.card.rarity, s.sf, s.k);
+          sponsorSum += paid;
+          const prize = getPrizeMoneyReference(o.finalRank, s.sf) + getRankMilestoneBonus(o.finalRank, s.sf);
+          bal.set(o.teamId, (bal.get(o.teamId) ?? 0) + paid + prize - (o.salaryEnd ?? 0));
+          // sicherste Karte separat
+          let bestWorst = Number.NEGATIVE_INFINITY, bestPaid = 0;
+          for (let slot = 0; slot < 5; slot += 1) {
+            const card = cardForPastSeason(o.teamId, o.seasonId, o.expectedRank, teamCount, slot);
+            const pc = pOf.get(card.clause.name)!.p;
+            const pr: CardParams = { sigma: SIGMA, pClause: pc, pGoal: DESIGN_P_GOAL };
+            const cal = calibrateCard(card, o.expectedRank, pr);
+            let worst = Number.POSITIVE_INFINITY;
+            for (let r = 1; r <= 32; r += 1) worst = Math.min(worst, scaleWithK(rawPayout(card, o.expectedRank, r, cal, pr, false, false), card.rarity, s.sf, s.k));
+            const rr = hashRnd(`${o.teamId}:${o.seasonId}:safe:${slot}:${draw}`);
+            const cm = rr() < pc, gm = rr() < DESIGN_P_GOAL;
+            if (worst > bestWorst) {
+              bestWorst = worst;
+              bestPaid = scaleWithK(rawPayout(card, o.expectedRank, o.finalRank, cal, pr, cm, gm), card.rarity, s.sf, s.k);
+            }
+          }
+          const next = (cash.get(o.teamId) ?? 0) + bestPaid + prize - (o.salaryEnd ?? 0);
+          cash.set(o.teamId, next);
+          if (next < 0 && !seen.has(o.teamId)) { ins += 1; seen.add(o.teamId); }
+        });
+        drawStats.coverageDev.push((100 * sponsorSum) / Math.max(1e-9, s.salarySum) - s.targetPct);
+      }
+      drawStats.insolvencies.push(ins);
+      drawStats.belowSalary.push([...bal.values()].filter((b) => b < -minSalary).length);
+      drawStats.minCash.push(Math.min(...cash.values()));
+    }
+    DRAW_SALT.value = 0;
+    line("-");
+    console.log(`WIEDERHOLTE LOTTERIEWUERFE — ${DRAWS} Wuerfe bei UNVERAENDERTEN Endraengen und festem ex-ante-K`);
+    line("-");
+    console.log("  Das ist NICHT Seed-Streuung der Engine (die Endstaende sind dieselben), sondern die");
+    console.log("  Streuung, die das Modell selbst durch Klausel- und Ziellotterie erzeugt.");
+    const cd = drawStats.coverageDev;
+    console.log(`  Deckungsabweichung (${cd.length} Saison-Wuerfe): Median ${fmt(median(cd))} Pp · IQR [${fmt(quantile(cd, 0.25))}, ${fmt(quantile(cd, 0.75))}] Pp` +
+      ` · Spanne [${fmt(Math.min(...cd))}, ${fmt(Math.max(...cd))}] Pp`);
+    console.log(`  Saison-Wuerfe ausserhalb sf +- 5 Pp: ${cd.filter((v) => Math.abs(v) > 5).length}/${cd.length} = ${fmt(100 * cd.filter((v) => Math.abs(v) > 5).length / cd.length, 0)} %`);
+    console.log(`  Zahlungsunfaehige bei sicherster Wahl: Median ${fmt(median(drawStats.insolvencies), 0)} · IQR [${fmt(quantile(drawStats.insolvencies, 0.25), 0)}, ${fmt(quantile(drawStats.insolvencies, 0.75), 0)}] · max ${Math.max(...drawStats.insolvencies)}`);
+    console.log(`  Teams unter minus einem Mindestgehalt: Median ${fmt(median(drawStats.belowSalary), 0)} · IQR [${fmt(quantile(drawStats.belowSalary, 0.25), 0)}, ${fmt(quantile(drawStats.belowSalary, 0.75), 0)}] · max ${Math.max(...drawStats.belowSalary)}`);
+    console.log(`  Niedrigste Kasse ueber alle Wuerfe: ${fmt(Math.min(...drawStats.minCash))} C`);
+  }
 
   // ── Kriterien-Auswertung ─────────────────────────────────────────────────────────────────────
   line();
