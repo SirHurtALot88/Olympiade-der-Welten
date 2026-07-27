@@ -1,6 +1,10 @@
 /**
- * P4/P5 — OLY_SPONSOR_V2 hinter dem Flag: Angebotserzeugung, Anzeige-Invariante, Settlement
- * und die Regression, dass BESTANDSVERTRAEGE unveraendert nach altem Recht abgerechnet werden.
+ * SPONSORSYSTEM V2 — Angebotserzeugung, Anzeige-Invariante, Settlement und die Regression, dass
+ * BESTANDSVERTRAEGE unveraendert nach altem Recht abgerechnet werden.
+ *
+ * Frueher haengte diese Datei an der Umgebungsvariable OLY_SPONSOR_V2. Die gibt es nicht mehr:
+ * welches Modell gilt, steht im SPIELSTAND (`seasonState.sponsorSystemVersion`). Die Tests
+ * schalten deshalb den Spielstand um, nicht die Umgebung — genau so, wie die App es tut.
  */
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -11,40 +15,38 @@ import { buildSponsorOffersForTeam, chooseSponsorOffer } from "@/lib/sponsor/spo
 import { buildOfferRankPayoutLadderPreview, estimateExpectedPayout } from "@/lib/sponsor/sponsor-economy-calibration";
 import { buildSponsorRankTierRows } from "@/lib/sponsor/sponsor-offer-presenter";
 import {
-  getSponsorV2Terms, isSponsorV2Enabled, resetSponsorV2KCache, sponsorV2GuaranteedLadder,
-  sponsorV2Settle, sponsorV2SettlementParts,
+  getSponsorV2Terms, resetSponsorV2KCache, resolveSponsorSystemVersion, sponsorV2GuaranteedLadder,
+  sponsorV2Settle, sponsorV2SettlementParts, stampSponsorSystemVersion,
 } from "@/lib/sponsor/sponsor-v2-offer-service";
 
-const withFlag = <T,>(value: "1" | undefined, fn: () => T): T => {
-  const before = process.env.OLY_SPONSOR_V2;
-  if (value === undefined) delete process.env.OLY_SPONSOR_V2; else process.env.OLY_SPONSOR_V2 = value;
-  try { return fn(); } finally {
-    if (before === undefined) delete process.env.OLY_SPONSOR_V2; else process.env.OLY_SPONSOR_V2 = before;
-  }
-};
+/** Ein Spielstand nach NEUEM Recht — so, wie ihn "Neues Spiel" anlegt. */
+const v2State = (): GameState => stampSponsorSystemVersion(structuredClone(createSingleplayerGameState()), 2);
+/** Ein Spielstand nach ALTEM Recht: kein Versionsvermerk, wie jeder vor der Umstellung angelegte Save. */
+const v1State = (): GameState => structuredClone(createSingleplayerGameState());
 
 afterEach(() => { resetSponsorV2KCache(); });
 
 const firstTeamId = (gs: GameState) => gs.teams[0]!.teamId;
 
-describe("sponsor v2 — Flag", () => {
-  it("ist per Default AUS", () => {
-    withFlag(undefined, () => expect(isSponsorV2Enabled()).toBe(false));
-    withFlag("1", () => expect(isSponsorV2Enabled()).toBe(true));
-  });
-
-  it("ohne Flag traegt kein Angebot V2-Konditionen", { timeout: 120_000 }, () => {
-    const gs = structuredClone(createSingleplayerGameState());
-    const offers = withFlag(undefined, () => buildSponsorOffersForTeam({ gameState: gs, teamId: firstTeamId(gs) }));
+describe("sponsor v2 — welches System gilt", () => {
+  it("ein Spielstand OHNE Vermerk ist V1 und traegt kein Angebot V2-Konditionen", { timeout: 120_000 }, () => {
+    const gs = v1State();
+    expect(resolveSponsorSystemVersion(gs)).toBe(1);
+    const offers = buildSponsorOffersForTeam({ gameState: gs, teamId: firstTeamId(gs) });
     expect(offers.length).toBeGreaterThan(0);
     expect(offers.every((o) => getSponsorV2Terms(o) === null)).toBe(true);
   });
+
+  it("der Vermerk ueberschreibt nichts: ein V1-Save bleibt V1, auch wenn erneut gestempelt wird", () => {
+    const legacy = { ...v1State(), seasonState: { ...v1State().seasonState, sponsorSystemVersion: 1 as const } };
+    expect(resolveSponsorSystemVersion(stampSponsorSystemVersion(legacy, 2))).toBe(1);
+  });
 });
 
-describe("sponsor v2 — Angebotserzeugung hinter dem Flag", () => {
+describe("sponsor v2 — Angebotserzeugung", () => {
   it("jedes Angebot traegt vollstaendige Konditionen", { timeout: 120_000 }, () => {
-    const gs = structuredClone(createSingleplayerGameState());
-    const offers = withFlag("1", () => buildSponsorOffersForTeam({ gameState: gs, teamId: firstTeamId(gs) }));
+    const gs = v2State();
+    const offers = buildSponsorOffersForTeam({ gameState: gs, teamId: firstTeamId(gs) });
     expect(offers.length).toBeGreaterThan(1);
     for (const offer of offers) {
       const terms = getSponsorV2Terms(offer);
@@ -62,19 +64,19 @@ describe("sponsor v2 — Angebotserzeugung hinter dem Flag", () => {
   });
 
   it("ANGEBOTSREGEL: keine zwei gleichen Kurvenformen in einer Liste", { timeout: 120_000 }, () => {
-    const gs = structuredClone(createSingleplayerGameState());
+    const gs = v2State();
     // Ueber mehrere Teams pruefen — die Regel muss fuer jede erzeugte Liste halten, nicht nur fuer
     // eine gluecklich gezogene. Genau bei Paaren mit DERSELBEN Kurve sind frueher Fallen entstanden.
     for (const team of gs.teams.slice(0, 8)) {
-      const offers = withFlag("1", () => buildSponsorOffersForTeam({ gameState: gs, teamId: team.teamId }));
+      const offers = buildSponsorOffersForTeam({ gameState: gs, teamId: team.teamId });
       const curves = offers.map((o) => getSponsorV2Terms(o)!.curveName);
       expect(new Set(curves).size, `${team.teamId}: ${curves.join(", ")}`).toBe(curves.length);
     }
   });
 
   it("die KI bewertet V2-Angebote mit V2-Logik statt mit V1-Heuristik", { timeout: 120_000 }, () => {
-    const gs = structuredClone(createSingleplayerGameState());
-    const offers = withFlag("1", () => buildSponsorOffersForTeam({ gameState: gs, teamId: firstTeamId(gs) }));
+    const gs = v2State();
+    const offers = buildSponsorOffersForTeam({ gameState: gs, teamId: firstTeamId(gs) });
     const evs = offers.map((o) => estimateExpectedPayout(o, 8));
     expect(evs.every((v) => Number.isFinite(v) && v > 0)).toBe(true);
     // EV-PARITAET innerhalb einer Rarity: gleiche Rarity ⇒ praktisch gleicher Erwartungswert.
@@ -94,8 +96,8 @@ describe("sponsor v2 — Angebotserzeugung hinter dem Flag", () => {
 
 describe("sponsor v2 — Anzeige == Settlement", () => {
   it("die angezeigte Gewinnstufen-Leiter ist zeichengleich die garantierte Settlement-Leiter", { timeout: 120_000 }, () => {
-    const gs = structuredClone(createSingleplayerGameState());
-    const offers = withFlag("1", () => buildSponsorOffersForTeam({ gameState: gs, teamId: firstTeamId(gs) }));
+    const gs = v2State();
+    const offers = buildSponsorOffersForTeam({ gameState: gs, teamId: firstTeamId(gs) });
     const offer = offers[0]!;
     const terms = getSponsorV2Terms(offer)!;
     // 1) Die Preview-Leiter (Karte UND Sign lesen dieselbe Funktion) ist die V2-Leiter.
@@ -112,8 +114,8 @@ describe("sponsor v2 — Anzeige == Settlement", () => {
   });
 
   it("die vier Settlement-Zeilen summieren sich exakt auf den Modellwert", { timeout: 120_000 }, () => {
-    const gs = structuredClone(createSingleplayerGameState());
-    const offers = withFlag("1", () => buildSponsorOffersForTeam({ gameState: gs, teamId: firstTeamId(gs) }));
+    const gs = v2State();
+    const offers = buildSponsorOffersForTeam({ gameState: gs, teamId: firstTeamId(gs) });
     const terms = getSponsorV2Terms(offers[0]!)!;
     for (const finalRank of [1, 4, 9, 16, 23, 28, 32]) {
       for (const clauseMet of [true, false]) {
@@ -129,8 +131,8 @@ describe("sponsor v2 — Anzeige == Settlement", () => {
   });
 
   it("die Auszahlung ist ueber alle Endraenge monoton nicht-fallend", { timeout: 120_000 }, () => {
-    const gs = structuredClone(createSingleplayerGameState());
-    const offers = withFlag("1", () => buildSponsorOffersForTeam({ gameState: gs, teamId: firstTeamId(gs) }));
+    const gs = v2State();
+    const offers = buildSponsorOffersForTeam({ gameState: gs, teamId: firstTeamId(gs) });
     for (const offer of offers) {
       const terms = getSponsorV2Terms(offer)!;
       for (const clauseMet of [true, false]) {
@@ -148,9 +150,9 @@ describe("sponsor v2 — Anzeige == Settlement", () => {
 
 describe("sponsor v2 — Settlement und Bestandsvertraege", () => {
   it("ein unterschriebener V2-Vertrag wird ueber die V2-Zeilen abgerechnet", { timeout: 180_000 }, () => {
-    const gs = structuredClone(createSingleplayerGameState());
+    const gs = v2State();
     const teamId = firstTeamId(gs);
-    const result = withFlag("1", () => {
+    const result = (() => {
       const withOffers = {
         ...gs,
         seasonState: {
@@ -164,7 +166,7 @@ describe("sponsor v2 — Settlement und Bestandsvertraege", () => {
       const offerId = withOffers.seasonState.sponsorOffersByTeamId![teamId]![0]!.offerId;
       const signed = chooseSponsorOffer({ gameState: withOffers, teamId, offerId });
       return previewSponsorSettlement(signed.gameState, "season_end").rows.filter((r) => r.teamId === teamId);
-    });
+    })();
     const ids = result.map((r) => r.componentId);
     expect(ids.some((id) => id.includes(":v2:base"))).toBe(true);
     expect(ids.some((id) => id.includes(":v2:rank"))).toBe(true);
@@ -174,7 +176,7 @@ describe("sponsor v2 — Settlement und Bestandsvertraege", () => {
     expect(result.find((r) => r.componentId.includes(":v2:base"))!.cashDelta).toBeGreaterThan(0);
   });
 
-  it("REGRESSION: ein Bestandsvertrag ohne V2-Konditionen zahlt mit Flag AN exakt wie mit Flag AUS", { timeout: 180_000 }, () => {
+  it("REGRESSION: ein Bestandsvertrag ohne V2-Konditionen zahlt im V2-Save exakt wie im V1-Save", { timeout: 180_000 }, () => {
     const teamId = firstTeamId(createSingleplayerGameState());
     const legacyComponents: SponsorOfferComponent[] = [
       { componentId: "legacy-base", kind: "base", label: "Basis", targetValue: 0, rewardCash: 40 },
@@ -182,8 +184,8 @@ describe("sponsor v2 — Settlement und Bestandsvertraege", () => {
       { componentId: "legacy-special", kind: "special", label: "Sonderziel", targetValue: 1, rewardCash: 12,
         specialKey: "fan_infrastructure" },
     ];
-    const build = (): GameState => {
-      const gs = structuredClone(createSingleplayerGameState());
+    const build = (version: 1 | 2): GameState => {
+      const gs = version === 2 ? v2State() : v1State();
       const contract: TeamSponsorContract = {
         seasonId: gs.season.id, teamId, offerId: "legacy-offer", archetype: "security",
         curveShape: "sicherheit", rarity: "magisch", name: "Bestandsvertrag",
@@ -197,8 +199,8 @@ describe("sponsor v2 — Settlement und Bestandsvertraege", () => {
       };
       return gs;
     };
-    const rowsOff = withFlag(undefined, () => previewSponsorSettlement(build(), "season_end").rows.filter((r) => r.teamId === teamId));
-    const rowsOn = withFlag("1", () => previewSponsorSettlement(build(), "season_end").rows.filter((r) => r.teamId === teamId));
+    const rowsOff = previewSponsorSettlement(build(1), "season_end").rows.filter((r) => r.teamId === teamId);
+    const rowsOn = previewSponsorSettlement(build(2), "season_end").rows.filter((r) => r.teamId === teamId);
     expect(rowsOn.length).toBe(rowsOff.length);
     expect(rowsOn.map((r) => [r.componentId, r.kind, r.status, r.cashDelta]))
       .toEqual(rowsOff.map((r) => [r.componentId, r.kind, r.status, r.cashDelta]));

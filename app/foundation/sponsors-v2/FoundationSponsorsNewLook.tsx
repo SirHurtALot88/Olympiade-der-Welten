@@ -23,6 +23,7 @@ import {
 } from "@/components/foundation/sponsor/SponsorOfferCardNewLook";
 import { buildSponsorOfferPresentation, getSponsorComponentKindLabel } from "@/lib/sponsor/sponsor-offer-presenter";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
+import { resolveSponsorSystemVersion } from "@/lib/sponsor/sponsor-v2-offer-service";
 import { previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { SponsorRankLadder } from "@/components/foundation/sponsor/SponsorRankLadder";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
@@ -564,6 +565,10 @@ export default function FoundationSponsorsNewLook({
     return offerCashSummaries.reduce((sum, entry) => sum + entry.totalCash, 0) / offerCashSummaries.length;
   }, [offerCashSummaries]);
 
+  // Aus dem SPIELSTAND gelesen, nicht aus der Umgebung: ein V1-Save bleibt V1, auch wenn der
+  // Server gerade das neue Modell fuer neue Spiele vergibt.
+  const sponsorSystemVersion = resolveSponsorSystemVersion(gameState);
+
   const animatedKpiScore = useCountUp(selectedTeamCommercialRating?.score ?? null);
   const animatedKpiContractCash = useCountUp(activeContractCashTotal);
   const animatedKpiAvgOfferCash = useCountUp(avgOfferCashValue);
@@ -626,7 +631,25 @@ export default function FoundationSponsorsNewLook({
             ) : null
           }
         >
-          <p className="nl-sponsor-header-hint">Drei Angebote pro Saison.</p>
+          <p className="nl-sponsor-header-hint">
+            Drei Angebote pro Saison.{" "}
+            {/* WELCHES REGELWERK GILT — ausgeschrieben statt an Modulnamen ablesbar. Vorher musste
+                man an der Angebotskarte erkennen, ob ein Spielstand nach altem oder neuem Recht
+                laeuft (z. B. an einer "Ueberperformance"-Zeile). Das steht jetzt hier, gelesen aus
+                dem Spielstand selbst. */}
+            <span
+              className="nl-sponsor-system-badge"
+              data-testid="sponsor-system-badge"
+              data-sponsor-system={sponsorSystemVersion}
+              title={
+                sponsorSystemVersion === 2
+                  ? "Dieser Spielstand rechnet nach dem neuen Sponsormodell: Kurvenform × Klausel (Bonus und Malus) × Sonderziel nach Schwierigkeit."
+                  : "Dieser Spielstand wurde vor der Umstellung angelegt und rechnet unveraendert nach dem alten Sponsormodell weiter."
+              }
+            >
+              {sponsorSystemVersion === 2 ? "Sponsorsystem V2 (neu)" : "Sponsorsystem V1 (alt)"}
+            </span>
+          </p>
           {selectedTeamCommercialRating ? (
             <div className="nl-sponsor-rating-drivers" aria-label="Kommerz-Rating Treiber">
               <NlProgressBar

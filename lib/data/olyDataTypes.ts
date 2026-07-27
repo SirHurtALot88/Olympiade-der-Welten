@@ -1302,7 +1302,7 @@ export type SponsorEventRecord = {
 };
 
 /**
- * OLY_SPONSOR_V2 — die vor der Saison eingefrorenen Konditionen des neuen Sponsormodells.
+ * SPONSORSYSTEM V2 — die vor der Saison eingefrorenen Konditionen des neuen Sponsormodells.
  *
  * Fehlt das Feld, ist es ein Angebot/Vertrag nach ALTEM Recht und wird unveraendert so abgerechnet.
  * Genau daran erkennt das Settlement einen Bestandsvertrag: die Migration braucht keinen Stichtag
@@ -1369,7 +1369,7 @@ export type SponsorOffer = {
    * UI/Debug; die Auszahlung läuft weiter über `components`. Optional/rückwärtskompatibel.
    */
   moduleIds?: string[];
-  /** OLY_SPONSOR_V2: eingefrorene Konditionen des neuen Modells. Fehlt = altes Recht. */
+  /** SPONSORSYSTEM V2: eingefrorene Konditionen des neuen Modells. Fehlt = altes Recht. */
   sponsorV2?: SponsorV2ContractTermsRecord;
 };
 
@@ -1438,7 +1438,7 @@ export type TeamSponsorContract = {
   /** salaryFactor zum Zeitpunkt der Unterschrift — für konsistente Meilenstein-Anzeige im Settlement. */
   salaryFactorAtSign?: number;
   /**
-   * OLY_SPONSOR_V2: beim Unterschreiben aus dem Angebot mitkopierte Konditionen des neuen Modells.
+   * SPONSORSYSTEM V2: beim Unterschreiben aus dem Angebot mitkopierte Konditionen des neuen Modells.
    * FEHLT DAS FELD, ist es ein BESTANDSVERTRAG und wird nach altem Recht abgerechnet — das ist die
    * gesamte Migrationsregel, ohne Stichtag und ohne Backfill.
    */
@@ -2592,6 +2592,25 @@ export type SeasonState = {
   cashPrizeApplyLogs?: CashPrizeApplyLogRecord[];
   matchdayAdvanceLogs?: MatchdayAdvanceLogRecord[];
   objectiveRewardApplyLogs?: ObjectiveRewardApplyLogRecord[];
+  /**
+   * WELCHES SPONSORSYSTEM DIESER SPIELSTAND BENUTZT — im Save, nicht in der Umgebung.
+   *
+   * Vorher entschied eine Umgebungsvariable (`OLY_SPONSOR_V2`) im Moment der Angebotserzeugung,
+   * welches Modell ein Spiel bekommt. Danach war sie unsichtbar wirkungslos — und das war die
+   * eigentliche Falle: startete derselbe Spielstand spaeter auf einem Server ohne die Variable,
+   * erzeugte der naechste Saisonuebergang (`ensureSeasonSponsorOffers`) fuer ein V2-Spiel
+   * stillschweigend wieder Angebote nach altem Recht. Das Regelwerk kippte, je nachdem wie der
+   * Server gestartet wurde.
+   *
+   * Deshalb steht die Version jetzt IM SPIELSTAND und wird genau einmal bei der Erzeugung gesetzt.
+   * `2` = neues Sponsormodell (Kurve x Klausel x Sonderziel, Modell in lib/sponsor/sponsor-v2-*).
+   * `1` = altes Modell.
+   *
+   * FEHLT DAS FELD, IST ES V1 UND BLEIBT V1. Das ist die harte Migrationsgrenze: jeder vor der
+   * Umstellung angelegte Spielstand hat den Vermerk nicht, laeuft unveraendert nach altem Recht
+   * weiter und wird nie nachtraeglich umgestellt. Es gibt bewusst kein Backfill.
+   */
+  sponsorSystemVersion?: 1 | 2;
   sponsorOffersByTeamId?: Record<string, SponsorOffer[]>;
   sponsorContractsByTeamId?: Record<string, TeamSponsorContract>;
   sponsorBrandHistoryByTeamId?: Record<string, string[]>;

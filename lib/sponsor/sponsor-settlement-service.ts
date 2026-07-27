@@ -71,7 +71,7 @@ function getTeamSalaryTotal(gameState: GameState, teamId: string): number {
 }
 
 /**
- * OLY_SPONSOR_V2 — Abrechnung aus den beim Unterschreiben eingefrorenen Konditionen.
+ * SPONSORSYSTEM V2 — Abrechnung aus den beim Unterschreiben eingefrorenen Konditionen.
  *
  * Die vier Zeilen sind DIFFERENZEN echter Modellwerte und addieren sich per Teleskopsumme exakt auf
  * `sponsorV2Settle(...)`. Deshalb koennen Rundung, Untergrenze und K-Skalierung die Summe nicht

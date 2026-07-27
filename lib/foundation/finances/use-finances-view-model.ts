@@ -167,7 +167,7 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
     // Sponsor-Vorschau ist optional — fehlt sie, greift unten der Estimate-Fallback.
     sponsorSettlementRows = [];
   }
-  // OLY_SPONSOR_V2: die Aufschluesselung kommt dann ZEILENWEISE aus dem Settlement statt ueber
+  // SPONSORSYSTEM V2: die Aufschluesselung kommt dann ZEILENWEISE aus dem Settlement statt ueber
   // `kind` gruppiert. Grund: V2 liefert ZWEI Zeilen mit kind "special" — die rangunabhaengige
   // Klausel und das Sonderziel. Gruppiert man sie, verschmelzen sie unter dem Etikett "Sonderziel"
   // zu einem Betrag, den es so nicht gibt. Die SUMME ist in beiden Faellen dieselbe (und damit die

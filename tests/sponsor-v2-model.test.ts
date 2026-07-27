@@ -1,5 +1,5 @@
 /**
- * P1 — die reine Rechenschicht von OLY_SPONSOR_V2 gegen die Referenz.
+ * P1 — die reine Rechenschicht des Sponsorsystems V2 gegen die Referenz.
  *
  * WOZU DIESE TESTS: `lib/sponsor/sponsor-v2-model.ts` haelt dieselben Zahlen wie
  * `scripts/sponsor-model-params.ts`, die Referenz, gegen die der Engine-Schattentest gelaufen ist.

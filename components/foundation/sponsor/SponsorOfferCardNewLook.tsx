@@ -339,11 +339,11 @@ export function SponsorOfferCardNewLook({
         </div>
       ) : null}
 
-      {/* OLY_SPONSOR_V2: die neue Kartenstruktur. Sie ersetzt nicht die Kacheln darunter, sondern
+      {/* SPONSORSYSTEM V2: die neue Kartenstruktur. Sie ersetzt nicht die Kacheln darunter, sondern
           stellt VOR sie, was das neue Modell ausmacht und was die alten Kacheln nicht ausdruecken
           koennen: die garantierte Untergrenze, die Klausel MIT Malus (man kann verlieren) und den
-          schwierigkeitsabhaengigen Sonderziel-Betrag. Ohne Flag ist presentation.v2 null und die
-          Karte sieht Zeichen fuer Zeichen aus wie vorher. */}
+          schwierigkeitsabhaengigen Sonderziel-Betrag. In einem Spielstand nach altem Recht ist
+          presentation.v2 null und die Karte sieht Zeichen fuer Zeichen aus wie vorher. */}
       {presentation.v2 ? (
         <div className="nl-sponsor-v2" data-testid="sponsor-v2-panel">
           <div className="nl-sponsor-v2-head">

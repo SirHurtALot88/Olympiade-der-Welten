@@ -1,18 +1,18 @@
 /**
- * LIVE-CHECK fuer OLY_SPONSOR_V2 — erzeugt ein NEUES Spiel und prueft, dass das neue
+ * LIVE-CHECK fuer das Sponsorsystem V2 — erzeugt ein NEUES Spiel und prueft, dass das neue
  * Sponsorsystem den ganzen Weg geht: Angebote entstehen, werden gewaehlt, und am Saisonende wird
  * korrekt abgerechnet.
  *
  * Aufruf:
- *   OLY_SPONSOR_V2=1 npx tsx scripts/sponsor-v2-live-check.ts
- *   OLY_SPONSOR_V2=1 npx tsx scripts/sponsor-v2-live-check.ts --persist --name "V2 Testspiel"
+ *   npx tsx scripts/sponsor-v2-live-check.ts
+ *   npx tsx scripts/sponsor-v2-live-check.ts --persist --name "V2 Testspiel"
  *
  * Ohne `--persist` wird NICHTS geschrieben — der Lauf baut den Spielstand im Speicher und wirft
  * ihn danach weg. Mit `--persist` landet er als Sandbox-Save in der Datenbank und kann in der App
  * weitergespielt werden.
  *
  * Was geprueft wird und warum jede Pruefung da ist:
- *  1. Angebote entstehen ueberhaupt und tragen V2-Konditionen. (Ohne Flag darf keine entstehen.)
+ *  1. Angebote entstehen ueberhaupt und tragen V2-Konditionen.
  *  2. Keine Liste enthaelt zwei gleiche Kurvenformen — die Angebotsregel, ohne die genau dort
  *     Fallen auftreten, wo die Untergrenze den Malus abschneidet.
  *  3. Jedes KI-Team hat unterschrieben und der Vertrag traegt die Konditionen des GEWAEHLTEN
@@ -38,7 +38,7 @@ import { buildSponsorRankTierRows } from "@/lib/sponsor/sponsor-offer-presenter"
 import { previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import {
-  getSponsorV2Terms, isSponsorV2Enabled, SPONSOR_V2_PRICED_GOAL_KEYS, sponsorV2GuaranteedLadder,
+  getSponsorV2Terms, resolveSponsorSystemVersion, SPONSOR_V2_PRICED_GOAL_KEYS, sponsorV2GuaranteedLadder,
   sponsorV2LeagueSalaryBasis, sponsorV2Settle,
 } from "@/lib/sponsor/sponsor-v2-offer-service";
 
@@ -60,15 +60,8 @@ function check(ok: boolean, label: string, detail = ""): void {
 
 function main(): void {
   line();
-  console.log("OLY_SPONSOR_V2 — LIVE-CHECK auf einem NEUEN Spiel");
+  console.log("SPONSORSYSTEM V2 — LIVE-CHECK auf einem NEUEN Spiel");
   line();
-  console.log(`Flag OLY_SPONSOR_V2: ${isSponsorV2Enabled() ? "AN" : "AUS"}`);
-  if (!isSponsorV2Enabled()) {
-    console.log("\nABBRUCH: ohne OLY_SPONSOR_V2=1 pruefte dieser Lauf den alten Pfad und waere wertlos.");
-    console.log("Aufruf:  OLY_SPONSOR_V2=1 npx tsx scripts/sponsor-v2-live-check.ts");
-    process.exitCode = 1;
-    return;
-  }
 
   const presetId = (PRESET ?? NEW_GAME_PRESETS[0]!.presetId) as NewGamePresetId;
   console.log(`Preset: ${presetId} · Save-Name: ${SAVE_NAME} · schreiben: ${PERSIST ? "JA (Sandbox)" : "nein"}`);
@@ -89,6 +82,8 @@ function main(): void {
     if (reloaded?.gameState) gameState = reloaded.gameState;
   }
   console.log(`Save-ID: ${saveId} · Saison ${gameState.season.id} · ${gameState.teams.length} Teams`);
+  check(resolveSponsorSystemVersion(gameState) === 2, "Spielstand traegt sponsorSystemVersion 2",
+    `gelesen: ${gameState.seasonState.sponsorSystemVersion ?? "(kein Vermerk -> V1)"}`);
 
   // ── 1/2: Angebote ────────────────────────────────────────────────────────────────────────────
   line("-");

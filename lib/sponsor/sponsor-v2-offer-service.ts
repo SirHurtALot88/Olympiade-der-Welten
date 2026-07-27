@@ -1,7 +1,7 @@
 /**
- * P4/P5 — OLY_SPONSOR_V2: Angebotserzeugung, eingefrorene Konditionen und Abrechnung.
+ * SPONSORSYSTEM V2: Angebotserzeugung, eingefrorene Konditionen und Abrechnung.
  *
- * Das Flag ist per Default AUS. Ist es an, bekommt jedes erzeugte Angebot zusaetzlich einen
+ * Jedes fuer einen V2-Spielstand erzeugte Angebot bekommt einen
  * `sponsorV2`-Block: die vollstaendigen, VOR der Saison eingefrorenen Konditionen aus
  * `lib/sponsor/sponsor-v2-model.ts`. Ab da rechnen Anzeige, Finanzprognose, KI-Bewertung und
  * Settlement ausschliesslich aus diesem Block — eine Rechenstelle, deshalb kann die harte
@@ -27,6 +27,7 @@
  */
 import type { GameState, SponsorOffer, TeamSponsorContract } from "@/lib/data/olyDataTypes";
 
+import { buildSponsorOfferModuleIds } from "@/lib/sponsor/sponsor-modules";
 import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import {
   SPONSOR_V2_CURVES, SPONSOR_V2_PROFILES, SPONSOR_V2_RARITIES,
@@ -39,13 +40,55 @@ import {
   SPONSOR_V2_EVALUABLE_CLAUSES, sponsorV2StrengthClassOf, sponsorV2ThresholdFor,
 } from "@/lib/sponsor/sponsor-v2-clause-evaluator";
 
+// ── Welches Sponsorsystem gilt? ────────────────────────────────────────────────────────────────
+export type SponsorSystemVersion = 1 | 2;
+
 /**
- * FEATURE-FLAG. Default AUS — der alte Pfad bleibt unveraendert lauffaehig, bis der Cutover
- * bewusst entschieden ist. Als Funktion statt Modulkonstante, damit Tests sie zur Laufzeit
- * umschalten koennen (Repo-Muster, vgl. lib/board/board-objectives-config.ts).
+ * DIE VERSION, DIE JEDES NEU ANGELEGTE SPIEL BEKOMMT.
+ *
+ * Frueher stand hier ein Feature-Flag (`OLY_SPONSOR_V2`), das nur im Moment der Angebotserzeugung
+ * zaehlte. Es ist ersatzlos entfallen: das neue Modell ist DAS Sponsorsystem. Wer im Browser auf
+ * "Neues Spiel" klickt, bekommt es — ohne Umgebungsvariable, ohne Skript.
+ *
+ * Der Wert wird beim Anlegen EINMAL in den Spielstand geschrieben
+ * (`seasonState.sponsorSystemVersion`) und ab da nur noch von dort gelesen. Diese Konstante ist
+ * damit die Vorgabe fuer Neugeburten, nicht der Schalter fuer laufende Spielstaende.
  */
-export function isSponsorV2Enabled(): boolean {
-  return process.env.OLY_SPONSOR_V2 === "1";
+export const SPONSOR_SYSTEM_VERSION_FOR_NEW_GAMES: SponsorSystemVersion = 2;
+
+/**
+ * Welches Sponsorsystem gilt fuer DIESEN Spielstand?
+ *
+ * Einzige Quelle ist der Spielstand selbst. Fehlt der Vermerk, ist es ein vor der Umstellung
+ * angelegter Save: der laeuft nach ALTEM Recht weiter und wird nie nachtraeglich umgestellt.
+ * Deshalb steht hier `1` und nicht `SPONSOR_SYSTEM_VERSION_FOR_NEW_GAMES` — genau diese
+ * Unterscheidung ist der Unterschied zwischen "abwaertskompatibel" und "kippt still".
+ */
+export function resolveSponsorSystemVersion(gameState: GameState): SponsorSystemVersion {
+  return gameState.seasonState?.sponsorSystemVersion === 2 ? 2 : 1;
+}
+
+/** Kurzform fuer Aufrufer, die nur wissen wollen, ob das neue Modell gilt. */
+export function usesSponsorV2(gameState: GameState): boolean {
+  return resolveSponsorSystemVersion(gameState) === 2;
+}
+
+/**
+ * Setzt den Versionsvermerk beim ANLEGEN eines Spielstands. Idempotent und nicht ueberschreibend:
+ * traegt der Save schon einen Vermerk, bleibt er stehen — ein bestehendes V1-Spiel darf durch
+ * keinen spaeteren Aufruf auf V2 rutschen.
+ */
+export function stampSponsorSystemVersion(
+  gameState: GameState,
+  version: SponsorSystemVersion = SPONSOR_SYSTEM_VERSION_FOR_NEW_GAMES,
+): GameState {
+  if (gameState.seasonState?.sponsorSystemVersion === 1 || gameState.seasonState?.sponsorSystemVersion === 2) {
+    return gameState;
+  }
+  return {
+    ...gameState,
+    seasonState: { ...gameState.seasonState, sponsorSystemVersion: version },
+  };
 }
 
 // ── Eingefrorene Konditionen ───────────────────────────────────────────────────────────────────
@@ -407,7 +450,18 @@ export function applySponsorV2ToOffers(input: {
         if (c.kind === "rank") return { ...c, rewardCash: round1(Math.max(0, topRank - floor)), targetValue: 1, penaltyCash: undefined };
         return { ...c, rewardCash: round1(terms.goalPayout) };
       });
-    return { ...offer, components, sponsorV2: terms, totalUpsideEstimate: round1(topRank + terms.clauseBonus + terms.clauseMalus + terms.goalPayout) };
+    // `moduleIds` wird in `buildSponsorOffersForTeam` aus den Komponenten abgeleitet — also BEVOR
+    // hier die Ueberperformance- und Tabellenziel-Komponenten wegfallen. Ohne Neuableitung
+    // behauptete die persistierte Liste weiter "improvement-target, overperformance" fuer Module,
+    // die dieses Angebot gar nicht mehr hat. Gemessen an einem echten Neuen Spiel: 2 von 6
+    // Eintraegen je Angebot waren Karteileichen.
+    const next: SponsorOffer = {
+      ...offer,
+      components,
+      sponsorV2: terms,
+      totalUpsideEstimate: round1(topRank + terms.clauseBonus + terms.clauseMalus + terms.goalPayout),
+    };
+    return { ...next, moduleIds: buildSponsorOfferModuleIds(next) };
   });
 }
 

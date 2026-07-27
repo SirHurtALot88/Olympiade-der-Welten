@@ -1,5 +1,5 @@
 /**
- * P3 — KLAUSEL-AUSWERTUNG fuer OLY_SPONSOR_V2.
+ * P3 — KLAUSEL-AUSWERTUNG fuer das Sponsorsystem V2.
  *
  * Bewusst KLEIN gehalten: hier stehen nur die Klauseln, die am Saison-END-ZUSTAND **trivial**
  * messbar sind — aus einem saison-getaggten Ledger oder aus dem Kader, wie er am Saisonende

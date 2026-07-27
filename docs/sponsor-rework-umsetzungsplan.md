@@ -168,11 +168,11 @@ Jede Phase ist einzeln lauffähig, hinter Flag, mit eigenem Abnahmekriterium.
 | **P1** | Reine Rechenschicht | Vier Leitern als *pure functions* in neuem Modul, keine Verdrahtung. Unit-Tests gegen die Modellzahlen | tsc grün, Tests grün, Werte identisch mit `sponsor-model-proposal.ts` |
 | **P2** | Kurven + Klauseln als Daten | 6 Kurvenformen, 20 Klauseln, Offset-Tabelle. Noch nicht aktiv | Fallen-Test als **automatisierter Test** im Repo, 0 Fallen |
 | **P3** | Evaluator | Klausel-Auswertung gegen echte Felder. Pro Klausel ein Test | jede Klausel messbar, keine auf Alter (existiert nicht) |
-| **P4** | Angebotserzeugung hinter Flag | `OLY_SPONSOR_V2` — komponiert Kurve × Klausel, Sonderziel nach Schwierigkeit | A/B: beide Pfade lauffähig, alter Pfad unverändert |
-| **P5** | Settlement hinter Flag | Auszahlung inkl. Mali; Bestandsverträge nach altem Recht | Alt-Verträge zahlen unverändert (Regressionstest) |
+| **P4** | Angebotserzeugung | komponiert Kurve × Klausel, Sonderziel nach Schwierigkeit | A/B: beide Pfade lauffähig, alter Pfad unverändert |
+| **P5** | Settlement | Auszahlung inkl. Mali; Bestandsverträge nach altem Recht | Alt-Verträge zahlen unverändert (Regressionstest) |
 | **P6** | Long-Run-Validierung | 5 Saisons, beide Arme vom selben Seed | Σ Sponsoren ≈ Σ Gehälter bei sf 1.0; kein Team zahlungsunfähig; P je Klausel **gemessen** |
 | **P7** | Nachkalibrierung | gemessene P und σ statt geschätzter in die Tabelle | Fallen 0 mit *gemessenen* Werten |
-| **P8** | Cutover | Flag default an, alter Pfad entfernt | Ökonomie-Diff dokumentiert |
+| **P8** | Cutover | Version im Save statt Flag; alter Pfad nur noch Abrechnungsseite für Bestandsverträge | Neues Spiel im Browser liefert V2 |
 
 ## 6. Offene Punkte / Risiken
 
@@ -379,46 +379,66 @@ In `sponsor-5season-model.ts` steht die geschlossene Kalibrierung noch; folgenlo
 Liga-Bilanz (K löst je Saison auf die Gehaltssumme), nicht folgenlos für die EV einer einzelnen
 Karte am Tabellenende. **Offen.**
 
-## 9. Stand der Umsetzung (2026-07-27) — was hinter OLY_SPONSOR_V2 läuft
+## 9. Stand der Umsetzung (2026-07-27) — Cutover: V2 ist DAS Sponsorsystem
 
-Das Flag ist **per Default AUS**. Ohne es läuft der alte Pfad Zeichen für Zeichen wie vorher.
+**Das Feature-Flag `OLY_SPONSOR_V2` gibt es nicht mehr.** Es war die falsche Konstruktion: es zählte
+nur im Moment der Angebotserzeugung, danach war es unsichtbar wirkungslos — und weil kein Starter der
+App (`npm run dev`, `Oly starten.bat`, `Olympiade Launcher.command`) es je gesetzt hat, erzeugte der
+"Neues Spiel"-Knopf im Browser **immer** Angebote nach altem Recht.
+
+Stattdessen steht die Version jetzt **im Spielstand**: `seasonState.sponsorSystemVersion`.
+
+* Jedes **neu angelegte** Spiel bekommt `2` — ohne Variable, ohne Skript.
+* Ein Spielstand **ohne** Vermerk ist V1 und **bleibt** V1. Kein Backfill, keine stille Umstellung.
+* Anzeige, Finanzprognose, KI-Wahl und Settlement lesen den beim Unterschreiben eingefrorenen
+  `sponsorV2`-Block des Vertrags — ein V2-Save rechnet also auch dann korrekt weiter, wenn der Server
+  neu startet, und ein V1-Save kippt nicht, wenn V2 die Vorgabe für Neugeburten ist.
+* Der alte Erzeugungspfad ist für neue Spiele tot, bleibt aber als **Abrechnungsseite** stehen, solange
+  Mehrsaison-Verträge aus V1-Spielständen laufen.
 
 | # | Phase | Stand | Beleg |
 |---|---|---|---|
 | P1 | Reine Rechenschicht | **fertig** | `lib/sponsor/sponsor-v2-model.ts`, `tests/sponsor-v2-model.test.ts` (14 Tests, Zahl-für-Zahl gegen `scripts/sponsor-model-params.ts`) |
 | P2 | Kurven + Klauseln als Daten, Fallen-Test im Repo | **fertig** | `tests/sponsor-v2-traps.test.ts` — 630 Karten, 0 Fallen, 0 kollabiert, Vakuum-Wächter aktiv |
 | P3 | Evaluator | **fertig für 10 von 15 Klauseln** | `lib/sponsor/sponsor-v2-clause-evaluator.ts`, 12 Tests. Draußen: Einsatzlast, Schonung, Achsenprofil, Disziplinen, Wortlaut — Begründung je Klausel im Modulkopf |
-| P4 | Angebotserzeugung hinter Flag | **fertig** | `lib/sponsor/sponsor-v2-offer-service.ts`, Einhängepunkt `buildSponsorOffersForTeam` |
-| P5 | Settlement hinter Flag | **fertig** | V2-Zweig in `buildSeasonEndRows`; Bestandsverträge über die **Abwesenheit** des `sponsorV2`-Blocks, Regressionstest vorhanden |
+| P4 | Angebotserzeugung | **fertig** | `lib/sponsor/sponsor-v2-offer-service.ts`, Einhängepunkt `buildSponsorOffersForTeam` |
+| P5 | Settlement | **fertig** | V2-Zweig in `buildSeasonEndRows`; Bestandsverträge über die **Abwesenheit** des `sponsorV2`-Blocks, Regressionstest vorhanden |
 | — | Anzeige (Karte, Finanzen) | **fertig** | `presentation.v2` im Presenter, V2-Block in `SponsorOfferCardNewLook`, zeilenweise Aufschlüsselung in `use-finances-view-model` |
 | — | Invariante „Anzeige == Settlement" | **verifiziert** | `tests/sponsor-v2-display-settlement-parity.test.ts` — 6 Tests, inkl. „Kasse ändert sich um exakt den angezeigten Betrag" |
 | P6 | Long-Run-Validierung | **offen** | der Schattentest deckt 4 echte Saisons ab, aber nicht den V2-Produktionspfad über mehrere Saisons |
 | P7 | Nachkalibrierung | **teilweise** | σ und die Klausel-P sind gemessen; die 32 Sonderziel-Wahrscheinlichkeiten sind weiterhin Design-Schätzungen |
-| P8 | Cutover | **offen** | Flag bleibt Default AUS |
+| P8 | Cutover | **fertig für neue Spiele** | Flag entfernt, Version im Save (`seasonState.sponsorSystemVersion`), `tests/sponsor-new-game-flow.test.ts` (9 Tests) prüft den Pfad des "Neues Spiel"-Knopfes |
 
 ### So startest du ein Spiel mit dem neuen System
 
+`npm run dev` starten, im Browser auf **Neues Spiel** klicken, Klub wählen, Spielstand anlegen.
+Auf dem **Sponsoren**-Screen steht unter dem Teamnamen `Sponsorsystem V2 (neu)`; die Angebotskarten
+zeigen eine Kurvenform (Sockel / Halten / Linear / Gipfel / Steil / Flach), eine Klausel mit Bonus
+**und** Malus und ein Sonderziel mit Erfolgswahrscheinlichkeit. Die Zeilen „Überperformance je Platz"
+und „Tabellenziel je verbessertem Platz" gibt es dort nicht mehr — sie sind die beiden Module, die V2
+entfernt.
+
+Bestehende Spielstände zeigen weiterhin `Sponsorsystem V1 (alt)` und rechnen unverändert weiter.
+
+Für einen Konsolen-Check der ganzen Kette (Angebote → Wahl → Abrechnung) ohne Browser:
+
 ```bash
-# 1. Trockenlauf ohne Schreiben — prüft die ganze Kette auf einem frisch erzeugten Spiel
-OLY_SPONSOR_V2=1 npx tsx scripts/sponsor-v2-live-check.ts
-
-# 2. Spielstand wirklich anlegen (Sandbox, wird aktiviert)
-OLY_SPONSOR_V2=1 npx tsx scripts/sponsor-v2-live-check.ts --persist --name "V2 Testspiel"
-
-# 3. App mit gesetztem Flag starten und diesen Spielstand spielen
-OLY_SPONSOR_V2=1 npm run dev
+npx tsx scripts/sponsor-v2-live-check.ts                                  # nur bauen, nichts schreiben
+npx tsx scripts/sponsor-v2-live-check.ts --persist --name "V2 Testspiel"  # Sandbox-Save anlegen
 ```
-
-**Das Flag muss bei JEDEM Start gesetzt sein.** Die Angebote frieren ihre Konditionen zwar beim
-Unterschreiben ein (ein einmal geschlossener V2-Vertrag rechnet auch ohne Flag korrekt weiter ab),
-aber neue Angebote entstehen ohne Flag wieder nach altem Recht.
 
 ### Was am neuen Pfad noch NICHT geprüft ist
 
 * **Kein Mehrsaisonlauf.** Geprüft ist Saison 1: Angebote, Wahl, Abrechnung. Der Übergang in
-  Saison 2 (Preseason-Workflow erzeugt neue Angebote, alte Verträge laufen aus) ist ungetestet.
-* **Kein Klick durch die echte UI.** Die Anzeige ist über die Presenter- und ViewModel-Funktionen
-  verifiziert, aus denen die Screens rendern — nicht durch einen Browser-Durchlauf.
+  Saison 2 (Preseason-Workflow erzeugt neue Angebote, alte Verträge laufen aus) ist nur insoweit
+  abgesichert, als ein erneuter `ensureSeasonSponsorOffers`-Lauf auf einem V2-Save wieder V2 liefert
+  (Test in `tests/sponsor-new-game-flow.test.ts`) — eine echte durchgespielte Saison 2 fehlt.
+* **Kein Klick durch die echte UI.** Verifiziert ist der Weg über die echten HTTP-Routen
+  (`POST /api/new-game` → `GET /api/singleplayer-state` → `POST /api/sponsor/choose`) auf einem
+  laufenden `npm run dev` ohne jede Umgebungsvariable: 160/160 Angebote mit V2-Konditionen, alle
+  sechs Kurvenformen vertreten, keine Überperformance-/Tabellenziel-Komponente, 31 KI-Verträge und
+  der eigene Vertrag mit eingefrorenen V2-Konditionen. Nicht verifiziert ist das Rendering selbst
+  (kein Browser-Screenshot).
 * **Golden-Sponsoren** laufen unverändert über den alten Mechanismus (steht so schon in Abschnitt 8).
 * **Die Erfolgswahrscheinlichkeiten der Sonderziele** sind Schätzungen. Alle 32 Schlüssel haben
   jetzt einen Eintrag (vorher liefen 48 von 160 Angeboten still auf den Default 0.45), aber

@@ -570,7 +570,7 @@ export function getCurrentSponsorSalaryFactor(gameState: GameState): number {
  * Meilenstein-Gewichtung splitten (das ignoriert curveShape und wich vom echten Payout ab).
  */
 export function buildOfferRankPayoutLadderPreview(gameState: GameState, offer: SponsorOffer): number[] {
-  // OLY_SPONSOR_V2: DIE Umschaltstelle. Diese eine Funktion liefert sowohl die in der Karte
+  // SPONSORSYSTEM V2: DIE Umschaltstelle der ANZEIGE. Diese eine Funktion liefert sowohl die in der Karte
   // angezeigten Gewinnstufen als auch die beim Unterschreiben eingefrorene Leiter — schaltet sie
   // um, folgen Anzeige, Sign und Settlement automatisch. Genau deshalb gibt es hier keine zweite
   // V2-Sign-Logik daneben, die auseinanderdriften koennte.
@@ -665,7 +665,7 @@ export function getTieredRankPayoutFraction(currentRank: number, target: number)
 }
 
 /**
- * OLY_SPONSOR_V2: die KI-Sponsorwahl bewertet ein V2-Angebot sonst mit V1-Logik — sie liest
+ * SPONSORSYSTEM V2: die KI-Sponsorwahl bewertet ein V2-Angebot sonst mit V1-Logik — sie liest
  * baseCash/rankCash-Heuristiken, die fuer eine V2-Karte gar nicht mehr die Auszahlung beschreiben.
  * Fuer V2 kommt der Erwartungswert direkt aus dem Modell: Erwartung ueber Endrang, Klausel und
  * Sonderziel, inklusive Untergrenze und K. Da alle Karten eines Teams per Kalibrierung denselben

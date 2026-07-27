@@ -10,6 +10,7 @@ import type {
 import { createNewGameFromPlayerBaseline } from "@/lib/players/player-baseline-service";
 import { buildPlayerPotentialRecordsForSave } from "@/lib/progression/player-potential-service";
 import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
+import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v2-offer-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService, PersistedSaveGame } from "@/lib/persistence/types";
 import { DEFAULT_ACTIVE_OWNER_ID, AI_OWNER_ID, applyChrisFrankyOwnershipToTeamControlSettings } from "@/lib/foundation/team-control-settings";
@@ -424,13 +425,21 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
     ],
   };
 
+  // SPONSORSYSTEM-VERSION ZUERST IN DEN SAVE, DANN ERST ANGEBOTE ERZEUGEN. Reihenfolge ist hier
+  // nicht kosmetisch: `ensureSeasonSponsorOffers` liest die Version aus genau diesem gameState, um
+  // zu entscheiden, welches Modell die 160 Angebote bekommen. Stuende der Vermerk erst danach im
+  // Save, waeren die Angebote nach altem Recht gebaut und der Save behauptete "V2" — Anzeige und
+  // Abrechnung liefen auseinander. Der Vermerk bleibt danach fuer die gesamte Lebensdauer des
+  // Spielstands stehen und traegt ihn auch ueber Saisonuebergaenge und Serverneustarts.
+  const baseGameStateWithSponsorSystem: GameState = stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers);
+
   // Seed sponsor offers up front so the "choose_sponsor" flow step (open by default, see
   // newGameFlow.steps above) always has real, selectable offers to show — otherwise the
   // Sponsoren tab flags red with nothing to pick from until some later flow (preseason
   // workflow / AI autopilot / choose route) happens to generate them. Offer generation is
   // deterministic for a given (season id, teamId), so calling this here is idempotent and
   // safe to run again later (e.g. via ensureSeasonSponsorOffers elsewhere) without reshuffling.
-  const gameStateWithSponsorOffers: GameState = ensureSeasonSponsorOffers(baseGameStateBeforeSponsorOffers);
+  const gameStateWithSponsorOffers: GameState = ensureSeasonSponsorOffers(baseGameStateWithSponsorSystem);
 
   // AI-/passive Teams signieren ihren Sponsor bereits in Season 1 (bestes Angebot), damit sie — wie das
   // eigene Team — ab S1 einen Vertrag samt sichtbarer Sponsoreinnahmen haben (Finanz-Vergleichstabelle,

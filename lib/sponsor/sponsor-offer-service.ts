@@ -58,7 +58,7 @@ import {
   sponsorObjectiveFamilyForKey,
 } from "@/lib/sponsor/sponsor-special-objectives";
 import { calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
-import { applySponsorV2ToOffers, isSponsorV2Enabled } from "@/lib/sponsor/sponsor-v2-offer-service";
+import { applySponsorV2ToOffers, usesSponsorV2 } from "@/lib/sponsor/sponsor-v2-offer-service";
 
 // Liga-weite Anzeige-Normalisierung der Sponsor-Angebote ist deaktiviert: der Anker basiert noch auf der
 // alten getSponsorPayoutForFinalRank-Kurve (+ Floor bei Rang 32), während das Settlement bereits die neue
@@ -398,12 +398,18 @@ export function buildSponsorOffersForTeam(input: {
     return offer;
   });
 
-  // OLY_SPONSOR_V2 (P4): das neue Modell haengt sich HINTER die bestehende Erzeugung, statt sie zu
-  // ersetzen. Marke, Name, Flavour, Rarity, Kurvenwurf und das Sonderziel bleiben unveraendert —
-  // 22 fertige, getestete Sonderziele muss niemand nachbauen. Ersetzt werden nur die BETRAEGE (aus
-  // der Modell-Rechenschicht), und die Klausel-Achse kommt dazu. Ist das Flag aus, passiert hier
-  // gar nichts und der alte Pfad laeuft Zeichen fuer Zeichen wie vorher.
-  if (!isSponsorV2Enabled()) {
+  // DIE UMSCHALTSTELLE zwischen altem und neuem Sponsormodell — und zwar anhand des SPIELSTANDS,
+  // nicht anhand der Umgebung. Neue Spiele werden mit `sponsorSystemVersion: 2` angelegt und
+  // bekommen hier das neue Modell; ein vor der Umstellung angelegter Spielstand traegt keinen
+  // Vermerk, laeuft nach altem Recht weiter und wird auch beim naechsten Saisonuebergang wieder
+  // nach altem Recht bedient. Vorher hing genau das an einer Umgebungsvariable: derselbe Save
+  // erzeugte je nach Serverstart mal V1-, mal V2-Angebote.
+  //
+  // Das neue Modell haengt sich HINTER die bestehende Erzeugung, statt sie zu ersetzen. Marke,
+  // Name, Flavour, Rarity, Kurvenwurf und das Sonderziel bleiben unveraendert — 22 fertige,
+  // getestete Sonderziele muss niemand nachbauen. Ersetzt werden nur die BETRAEGE (aus der
+  // Modell-Rechenschicht), und die Klausel-Achse kommt dazu.
+  if (!usesSponsorV2(input.gameState)) {
     return built;
   }
   return applySponsorV2ToOffers({

@@ -22,6 +22,7 @@ import type {
   TransferListing,
 } from "@/lib/data/olyDataTypes";
 import { mapArchetypeToCurveShape, mapStarTierToRarity } from "@/lib/sponsor/sponsor-curve-shapes";
+import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v2-offer-service";
 import { createGameStateFromSeed, loadSeedData } from "@/lib/data/dataAdapter";
 import { hydrateGameStateMedia } from "@/lib/data/mediaAssets";
 import { getDatabase } from "@/lib/persistence/sqlite";
@@ -1700,7 +1701,12 @@ export function createSaveRepository(): SaveRepository {
         saveId,
         name,
         status,
-        gameState,
+        // DIE EINE STELLE, AN DER EIN SPIELSTAND AUS DEM SEED GEBOREN WIRD. Hier bekommt er den
+        // Sponsorsystem-Vermerk, damit alle Wege, die einen frischen Save anlegen (Cockpit
+        // "Neues Spiel / Season 1", createSave, der Dev-Bootstrap), dasselbe Regelwerk haben —
+        // und zwar ohne einen zweiten Schreibvorgang ueber den kompletten Spielstand.
+        // Klone und Snapshots laufen ueber cloneSave und erben die Version ihrer Quelle.
+        gameState: stampSponsorSystemVersion(gameState),
       });
 
       if (!persisted) {

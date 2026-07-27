@@ -32,7 +32,7 @@ export type SponsorOfferPresentation = {
   offerBadge: string | null;
   special: SponsorSpecialPresentation | null;
   /**
-   * OLY_SPONSOR_V2: die Struktur des neuen Modells, fertig fuer die Karte. `null` = altes Angebot.
+   * SPONSORSYSTEM V2: die Struktur des neuen Modells, fertig fuer die Karte. `null` = altes Angebot.
    *
    * WARUM EIGENE FELDER statt der alten mit neuen Zahlen zu fuellen: die V2-Karte hat Achsen, die
    * es vorher nicht gab — eine Klausel mit BONUS UND MALUS, eine garantierte Untergrenze und ein

@@ -203,7 +203,7 @@ export const CLAUSE_P_REPR = 0.5;
  *                 gebrochene Versprechen"; bei X <= 7 ist P = 0.47, das Design-P 0.45 bleibt.
  *
  * `evaluable` markiert, ob die Klausel am Saison-END-ZUSTAND trivial messbar ist. Nur diese gehen
- * in den Produktions-Pool von OLY_SPONSOR_V2 (Phase P3) — lieber acht funktionierende Klauseln als
+ * in den Produktions-Pool des Sponsorsystems V2 (Phase P3) — lieber acht funktionierende Klauseln als
  * zwanzig halbe. Die uebrigen bleiben im Modellkatalog, weil sie fuer Balancing und Fallen-Test
  * zaehlen, aber ohne Evaluator nicht angeboten werden duerfen.
  */
@@ -248,7 +248,7 @@ export const CLAUSES: ClauseSpec[] = [
 ];
 export const clauseByName = (name: string): ClauseSpec =>
   CLAUSES.find((c) => c.name === name) ?? CLAUSES[0]!;
-/** Der Produktions-Pool von OLY_SPONSOR_V2: nur am Saison-End-Zustand trivial messbare Klauseln. */
+/** Der Produktions-Pool des Sponsorsystems V2: nur am Saison-End-Zustand trivial messbare Klauseln. */
 export const EVALUABLE_CLAUSES = CLAUSES.filter((c) => c.evaluable);
 
 // ── Leiter 3: Sonderziel ───────────────────────────────────────────────────────────────────────

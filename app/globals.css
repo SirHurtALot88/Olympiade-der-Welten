@@ -51902,6 +51902,27 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
+/* Welches Sponsor-Regelwerk dieser Spielstand benutzt. Bewusst eine ruhige Kennzeichnung und kein
+   Warnhinweis: beide Systeme sind gueltig, der Spieler soll nur nicht raten muessen, welches gilt. */
+.is-new-look .nl-sponsor-system-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--nl-line);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: var(--nl-mut);
+}
+.is-new-look .nl-sponsor-system-badge[data-sponsor-system="2"] {
+  border-color: color-mix(in srgb, var(--nl-acc) 45%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-acc) 12%, transparent);
+  color: var(--nl-ink);
+}
+
 /* Erfolgs-Banner nach Sponsorwahl — im Token-System (--nl-good). */
 .is-new-look .nl-sponsor-banner {
   padding: var(--nl-s2) var(--nl-s3);
@@ -52136,7 +52157,7 @@ button.foundation-team-portrait-card {
 }
 
 /* --- Challenge-Panel ---------------------------------------------- */
-/* OLY_SPONSOR_V2 — die Struktur des neuen Sponsormodells auf der Angebotskarte.
+/* SPONSORSYSTEM V2 — die Struktur des neuen Sponsormodells auf der Angebotskarte.
    Eigener Block statt neuer Zahlen in den alten Kacheln: die Klausel hat einen MALUS, und ein
    Betrag ohne die Bedingung, unter der er gilt, ist eine Falschaussage. */
 .is-new-look .nl-sponsor-v2 {
