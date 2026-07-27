@@ -35,7 +35,19 @@ export const FATIGUE_INJURY_REHEARSAL_SOURCE = "fatigue_injury_rehearsal_v1" as 
 // Spieltage tilgte und Fatigue für Rotierer wirkungslos war), aber load 15 hatte überschossen
 // (Verletzungen ~verdoppelt, 22/32 Teams rot). `BASE_MATCHDAY_RECOVERY = 20` ist die Basis, für die
 // die REHA-Recovery-Leiter designt war (L5 = 20 + 12 = 32 absolut, siehe RECOVERY_FLAT_BONUS_BY_LEVEL).
-export const MATCHDAY_FATIGUE_LOAD = 12;
+//
+// Owner-Entscheidung (2026-07): push bleibt bei 1.4 (siehe INTENSITY_FATIGUE_MULT unten) -- statt
+// push zurueckzudrehen, senkt der Owner den GENERELLEN Verbrauch, um die Saison-Verletzungszahl auf
+// ~200 (Ziel-Korridor) zu bringen. Sweep bei Push=1.4: Load 12 ergab 268/297 (Mittel ~283, klar
+// drueber); Load 10 ergab 234/184 (Mittel 209, im Korridor) -- siehe PR fuer den vollen Sweep und
+// die Multi-Season-Gegenprobe. ENV-tunable (OLY_FATIGUE_MATCHDAY_LOAD) fuer weiteres Tuning ohne
+// Code-Aenderung.
+function envNumber(name: string, fallback: number) {
+  const parsed = Number(process.env[name]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+export const MATCHDAY_FATIGUE_LOAD = envNumber("OLY_FATIGUE_MATCHDAY_LOAD", 10);
 export const BASE_MATCHDAY_RECOVERY = 20;
 
 /**
@@ -51,6 +63,7 @@ export const BASE_MATCHDAY_RECOVERY = 20;
  * zu sparen (0,67 Score/Fatigue-Punkt). Pushen war damit ~2,5x effizienter als Schonen -- die
  * Intensitaets-Wahl war keine echte Entscheidung. Bei 1.4 (Load 12 * 0.4 = 4,8 Mehr-Fatigue) liegt
  * das Verhaeltnis bei 3 / 4,8 = 0,63 Score/Fatigue-Punkt -- nah an Schonen, also ein echter Trade-off.
+ * push BLEIBT bei 1.4 (siehe MATCHDAY_FATIGUE_LOAD oben fuer den Injury-Korridor-Fix).
  */
 function envMultiplier(name: string, fallback: number) {
   const parsed = Number(process.env[name]);
