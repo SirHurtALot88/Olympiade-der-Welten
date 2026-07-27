@@ -1110,7 +1110,12 @@ export default function DisciplineStageDrawer({
   const transition = reducedMotion ? "none" : "transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease";
 
   return createPortal(
-    <div style={{ position: "fixed", inset: 0, zIndex: 60 }}>
+    // WICHTIG: `is-new-look` MUSS am Portal-Wurzelknoten hängen. Die --nl-*-Tokens sind
+    // in globals.css ausschließlich unter `.is-new-look` definiert (die Klasse sitzt auf
+    // <main>), und dieses Panel hängt in document.body — also außerhalb davon. Ohne die
+    // Klasse laufen `var(--nl-panel)` & Co. ins Leere: Karte und Backdrop wurden
+    // durchsichtig und die Arena schien durch die Spieler-Karte hindurch.
+    <div className="is-new-look" style={{ position: "fixed", inset: 0, zIndex: 60 }}>
       {/* Backdrop */}
       <div
         onClick={onClose}
