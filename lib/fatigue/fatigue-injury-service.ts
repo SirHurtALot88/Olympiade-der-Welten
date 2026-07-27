@@ -41,10 +41,16 @@ export const BASE_MATCHDAY_RECOVERY = 20;
 /**
  * Discipline-side INTENSITY (Schonen/conserve, normal, Pushen/push) must scale the per-player
  * matchday fatigue load, not just the match score. Conserve saves ~25 % load (a real reason to
- * rotate down when leverage is low), push costs ~15 % more (a deliberate, sparing gamble that
+ * rotate down when leverage is low); push costs 40 % more (a deliberate, sparing gamble that
  * trades stamina + injury risk for score). Moderate + ENV-tunable so the fatigue-validation sim
  * can retune without a code change (OLY_FATIGUE_INTENSITY_CONSERVE / OLY_FATIGUE_INTENSITY_PUSH).
  * Normal stays exactly 1.0 so the standard path is byte-identical to the pre-change behaviour.
+ *
+ * Owner-Entscheidung (2026-07): push war strikt dominant -- +3 Score fuer nur +1,8 Fatigue
+ * (Load 12 * 0.15) sind 1,67 Score/Fatigue-Punkt, waehrend Schonen -2 Score kostet, um 3 Fatigue
+ * zu sparen (0,67 Score/Fatigue-Punkt). Pushen war damit ~2,5x effizienter als Schonen -- die
+ * Intensitaets-Wahl war keine echte Entscheidung. Bei 1.4 (Load 12 * 0.4 = 4,8 Mehr-Fatigue) liegt
+ * das Verhaeltnis bei 3 / 4,8 = 0,63 Score/Fatigue-Punkt -- nah an Schonen, also ein echter Trade-off.
  */
 function envMultiplier(name: string, fallback: number) {
   const parsed = Number(process.env[name]);
@@ -54,7 +60,7 @@ function envMultiplier(name: string, fallback: number) {
 export const INTENSITY_FATIGUE_MULT: Record<MatchdayIntensityStage, number> = {
   conserve: envMultiplier("OLY_FATIGUE_INTENSITY_CONSERVE", 0.75),
   normal: 1.0,
-  push: envMultiplier("OLY_FATIGUE_INTENSITY_PUSH", 1.15),
+  push: envMultiplier("OLY_FATIGUE_INTENSITY_PUSH", 1.4),
 };
 
 /**

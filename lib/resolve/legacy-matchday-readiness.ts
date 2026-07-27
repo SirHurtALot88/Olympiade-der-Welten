@@ -1,5 +1,6 @@
 import { scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
+import { isPartialLineupComplete } from "@/lib/lineups/legacy-matchday-partial-lineup-rule";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
 
 export type LegacyMatchdayReadinessStatus =
@@ -19,8 +20,6 @@ export type LegacyMatchdayReadiness = {
   reasonCodes: string[];
   shortReason: string;
 };
-
-const LEGACY_MATCHDAY_MINIMUM_PLAYERS = 7;
 
 /**
  * Slot-Zahlen IMMER seitenspezifisch (`<disciplineId>::d1|d2`) mit Rückfall auf die generische
@@ -63,18 +62,6 @@ export function buildLegacyMatchdayReadiness(
   const activePlayersCount = context.activePlayers.length;
   const draft = context.existingDraft;
 
-  if (activePlayersCount < LEGACY_MATCHDAY_MINIMUM_PLAYERS) {
-    return {
-      teamId: context.team.id,
-      teamName: context.team.name,
-      activePlayersCount,
-      requiredTotalUniquePlayers,
-      readinessStatus: "underfilled_roster",
-      reasonCodes: ["under_minimum_matchday_players"],
-      shortReason: `Only ${activePlayersCount}/${LEGACY_MATCHDAY_MINIMUM_PLAYERS} minimum active players available.`,
-    };
-  }
-
   if (!draft) {
     return {
       teamId: context.team.id,
@@ -87,7 +74,12 @@ export function buildLegacyMatchdayReadiness(
     };
   }
 
-  const allowPartialLineup = activePlayersCount < requiredTotalUniquePlayers;
+  const selectedPlayerCount = new Set(draft.entries.map((entry) => entry.playerId)).size;
+  const allowPartialLineup = isPartialLineupComplete({
+    activePlayersCount,
+    requiredTotalUniquePlayers,
+    selectedPlayerCount,
+  });
   const validation = validateLegacyLineupContext({
     ...context,
     entries: draft.entries,
@@ -185,7 +177,7 @@ export function buildLegacyMatchdayReadiness(
     readinessStatus: "ready",
     reasonCodes: allowPartialLineup ? ["partial_lineup_allowed"] : [],
     shortReason: allowPartialLineup
-      ? `Minimum ${LEGACY_MATCHDAY_MINIMUM_PLAYERS} reached. Partial single-discipline lineup is allowed (${activePlayersCount}/${requiredTotalUniquePlayers}).`
+      ? `All ${activePlayersCount} available players are used. Partial lineup is allowed (${activePlayersCount}/${requiredTotalUniquePlayers}).`
       : `Draft is valid for ${d1Required}+${d2Required} slots.`,
   };
 }

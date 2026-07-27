@@ -154,25 +154,62 @@ function createContext(input: {
 }
 
 describe("legacy matchday readiness", () => {
-  it("blocks only when the roster drops below the minimum of 7 players", () => {
+  // Owner decision (2026-07): there is NO hard floor anymore. "wenn ein team nur 5 spieler hat
+  // kann es diese ja auch einsetzen und wenn alle Spieler eingesetzt sind die das team zur
+  // Verfügung hat ist es auch grün" — a team fielding every player it has available is ready,
+  // no matter how few that is. The old LEGACY_MATCHDAY_MINIMUM_PLAYERS=7 gate that used to block
+  // this (and could permanently stall the season) is gone.
+  it("is ready when a team with only 5 available players fields all 5 of them", () => {
     const context = createContext({
-      activePlayersCount: 6,
+      activePlayersCount: 5,
       d1Required: 2,
       d2Required: 5,
       d1Selected: 2,
-      d2Selected: 4,
+      d2Selected: 3,
     });
 
     const lineupReadiness = buildLineupReadiness(context);
     const resolveReadiness = buildResolveReadiness(context);
 
-    expect(lineupReadiness.readinessStatus).toBe("underfilled_roster");
-    expect(lineupReadiness.reasonCodes).toContain("under_minimum_matchday_players");
-    expect(resolveReadiness.readinessStatus).toBe("underfilled_roster");
-    expect(resolveReadiness.reasonCodes).toContain("under_minimum_matchday_players");
+    expect(lineupReadiness.readinessStatus).toBe("ready");
+    expect(lineupReadiness.reasonCodes).toContain("partial_lineup_allowed");
+    expect(resolveReadiness.readinessStatus).toBe("ready");
+    expect(resolveReadiness.reasonCodes).toContain("partial_lineup_allowed");
   });
 
-  it("allows partial lineups once 7 active players are available", () => {
+  it("is ready when a team with only 3 available players fields all 3 of them", () => {
+    const context = createContext({
+      activePlayersCount: 3,
+      d1Required: 2,
+      d2Required: 5,
+      d1Selected: 2,
+      d2Selected: 1,
+    });
+
+    const lineupReadiness = buildLineupReadiness(context);
+    const resolveReadiness = buildResolveReadiness(context);
+
+    expect(lineupReadiness.readinessStatus).toBe("ready");
+    expect(resolveReadiness.readinessStatus).toBe("ready");
+  });
+
+  it("is NOT ready when a team with 5 available players fields only 4 of them (rule is 'all available used', not 'anything goes')", () => {
+    const context = createContext({
+      activePlayersCount: 5,
+      d1Required: 2,
+      d2Required: 5,
+      d1Selected: 2,
+      d2Selected: 2,
+    });
+
+    const lineupReadiness = buildLineupReadiness(context);
+    const resolveReadiness = buildResolveReadiness(context);
+
+    expect(lineupReadiness.readinessStatus).not.toBe("ready");
+    expect(resolveReadiness.readinessStatus).not.toBe("ready");
+  });
+
+  it("still allows partial lineups once 7 active players are available (unchanged case, no floor involved)", () => {
     const context = createContext({
       activePlayersCount: 7,
       d1Required: 4,

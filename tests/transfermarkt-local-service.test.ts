@@ -2086,8 +2086,11 @@ describe("transfermarkt local service", () => {
       activePlayerId: "r1",
     });
 
-    // Kader faellt nach dem Verkauf von 7 auf 6 -> unter das 7er-Minimum -> echte Readiness-Stufe.
-    expect(preview.projectedReadinessAfterSell).toBe("underfilled_roster");
+    // Owner-Entscheidung (2026-07): der alte harte 7er-Floor ("underfilled_roster") ist entfernt --
+    // ein Team darf mit jeder Anzahl verfuegbarer Spieler antreten, solange es alle einsetzt. Ohne
+    // gespeicherten Lineup-Draft bleibt die echte Readiness-Stufe "missing_lineup"; wichtig ist hier,
+    // dass sie weiterhin real berechnet wird (nicht "unknown") und die Verschlechterungs-Warnung feuert.
+    expect(preview.projectedReadinessAfterSell).toBe("missing_lineup");
     expect(preview.projectedReadinessAfterSell).not.toBe("unknown");
     expect(preview.warnings).toContain("team_readiness_would_get_worse");
   }, 30000);
