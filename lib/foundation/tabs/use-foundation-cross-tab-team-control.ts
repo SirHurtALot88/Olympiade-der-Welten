@@ -111,13 +111,21 @@ export function useFoundationCrossTabTeamControl(input: {
   }, [input.activeOwnerId, teamOwners]);
   const effectiveActiveOwnerId = activeOwner?.ownerId ?? input.activeOwnerId;
   const managerTeamOptions = useMemo(() => {
-    const filteredTeams = filterTeamsByControlScope(
-      input.gameState.teams,
-      resolvedTeamControlSettings,
-      input.teamContextFilter,
-      effectiveActiveOwnerId,
-    );
-    const base = filteredTeams.length ? filteredTeams : manualTeams.length ? manualTeams : input.gameState.teams;
+    // Der Team-Picker listet BEWUSST alle Teams der Liga, nicht nur die eigenen.
+    //
+    // Frueher lief hier `filterTeamsByControlScope(..., teamContextFilter, ...)`. Der
+    // Filter steht per Default auf "my_teams" und wird bei jedem Load ueber
+    // `persistFoundationTeamFilter` wieder zurueckgeschrieben — es gibt aber gar
+    // keine Bedienung mehr, um ihn umzustellen (`teamContextFilter`/
+    // `setTeamContextFilter` werden in FoundationShellRouterBody nur noch als
+    // ungenutzte Props durchgereicht, die "Alle Teams"-Tabelle wurde entfernt).
+    // Damit war das aktive Team dauerhaft auf die eigenen 1–4 Teams eingesperrt und
+    // fremde Einsatzlisten liessen sich gar nicht mehr ansehen.
+    //
+    // Schreibaktionen bleiben unabhaengig davon gesperrt: dafuer sorgt weiterhin
+    // `selectedTeamCanManage` / `canManageTeamId` (Owner-Pruefung je Team), nicht
+    // die Sichtbarkeit im Picker. Die Sortierung unten haelt die eigenen Teams oben.
+    const base = input.gameState.teams.length ? input.gameState.teams : manualTeams;
     // Reihenfolge im Team-Picker: eigene Teams (lokaler Spieler) zuerst, dann
     // die des 2. Spielers (Franky), dann KI — so tauchen die selbst gesteuerten
     // 1–4 Teams immer ganz oben auf (auch in der "Alle Teams"-Ansicht). Rang aus
@@ -135,13 +143,7 @@ export function useFoundationCrossTabTeamControl(input: {
         ownerRank(left.teamId) - ownerRank(right.teamId) ||
         (left.shortCode ?? "").localeCompare(right.shortCode ?? ""),
     );
-  }, [
-    effectiveActiveOwnerId,
-    input.gameState.teams,
-    input.teamContextFilter,
-    manualTeams,
-    resolvedTeamControlSettings,
-  ]);
+  }, [input.gameState.teams, manualTeams, resolvedTeamControlSettings]);
   const localUserManualTeams = useMemo(() => {
     return input.gameState.teams.filter((team) => {
       const settings = resolvedTeamControlSettings[team.teamId];
