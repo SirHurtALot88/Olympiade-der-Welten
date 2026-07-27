@@ -39,6 +39,12 @@ export type DisciplineStageHoverPreviewProps = {
    * Werte (sicherer Default statt Spoiler).
    */
   liveResultsByTeam?: StageLiveResultsByTeam;
+  /**
+   * Vergebene Player-Points je Spieler-ID (mit dem Score, aus dem sie stammen). Wird erst
+   * NACH Abschluss der Disziplin gesetzt — vorher wäre die PP-Vergabe ein Spoiler. Greift
+   * nur für Spieler, die `liveResultsByTeam` ohnehin schon aufgedeckt hat.
+   */
+  ppByPlayerId?: Map<string, { pp: number | null; score: number }> | null;
 };
 
 const PLAYER_W = 184;
@@ -148,11 +154,13 @@ function PlayerPreview({ gameState, target, ratingByPlayerId }: {
   );
 }
 
-function TeamPreview({ gameState, target, fieldedPlayerIdsByTeam, liveResultsByTeam }: {
+function TeamPreview({ gameState, target, fieldedPlayerIdsByTeam, liveResultsByTeam, ppByPlayerId }: {
   gameState: GameState;
   target: { id: string; x: number; y: number };
   fieldedPlayerIdsByTeam?: Record<string, string[]>;
   liveResultsByTeam?: StageLiveResultsByTeam;
+  /** Vergebene Player-Points je Spieler — null, solange die Disziplin noch läuft. */
+  ppByPlayerId?: Map<string, { pp: number | null; score: number }> | null;
 }) {
   const team = gameState.teams?.find((t) => t.teamId === target.id) ?? null;
   if (!team) return null;
@@ -224,6 +232,7 @@ function TeamPreview({ gameState, target, fieldedPlayerIdsByTeam, liveResultsByT
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
             {fielded.map((player) => {
+              const pp = ppByPlayerId?.get(player.id) ?? null;
               const portraitUrl = getPlayerPortraitBrowserUrl(player.id, player.portraitUrl ?? null, player.portraitPath ?? null);
               const live = revealedByPlayerId.get(player.id) ?? null;
               return (
@@ -235,8 +244,23 @@ function TeamPreview({ gameState, target, fieldedPlayerIdsByTeam, liveResultsByT
                     <span aria-hidden style={{ width: 24, height: 24, borderRadius: "50%", flex: "none", background: color.primary }} />
                   )}
                   <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{player.name}</span>
+                  {/* Anti-Spoiler bleibt führend: eine Zahl gibt es NUR für aufgedeckte Spieler.
+                      Ist die Disziplin fertig gewertet, sind die vergebenen PP die eigentliche
+                      Währung — sie stehen dann vorn, der Score bleibt als Herkunft daneben. */}
                   {live ? (
-                    <span style={{ fontSize: 12, fontWeight: 800, color: "var(--nl-accent)", flex: "none" }}>{fmt1(live.net)}</span>
+                    pp?.pp != null ? (
+                      <>
+                        <span
+                          title={`${fmt1(pp.pp)} Player-Points · Score ${fmt1(pp.score)}`}
+                          style={{ fontSize: 12, fontWeight: 900, color: "var(--nl-accent)", flex: "none" }}
+                        >
+                          {fmt1(pp.pp)} PP
+                        </span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--nl-mut)", flex: "none" }}>({fmt1(live.net)})</span>
+                      </>
+                    ) : (
+                      <span style={{ fontSize: 12, fontWeight: 800, color: "var(--nl-accent)", flex: "none" }}>{fmt1(live.net)}</span>
+                    )
                   ) : (
                     <span style={{ fontSize: 10.5, fontStyle: "italic", color: "var(--nl-mut-2)", flex: "none" }}>noch offen</span>
                   )}
@@ -256,6 +280,7 @@ export default function DisciplineStageHoverPreview({
   ratingByPlayerId,
   fieldedPlayerIdsByTeam,
   liveResultsByTeam,
+  ppByPlayerId,
 }: DisciplineStageHoverPreviewProps): React.JSX.Element | null {
   // Erst nach dem Mount in document.body portalen (SSR-fest) — so kann kein
   // ancestor-`transform` die `position:fixed`-Verankerung kapern (analog zum Drawer).
@@ -271,6 +296,7 @@ export default function DisciplineStageHoverPreview({
         target={target}
         fieldedPlayerIdsByTeam={fieldedPlayerIdsByTeam}
         liveResultsByTeam={liveResultsByTeam}
+        ppByPlayerId={ppByPlayerId}
       />
     );
   // WICHTIG: `is-new-look` MUSS am Portal-Wurzelknoten hängen. Die --nl-*-Tokens sind

@@ -57986,6 +57986,53 @@ button.foundation-team-portrait-card {
   border-left: 1px solid var(--nl-line-2);
 }
 
+/*
+ * Liga-Heat der Bereichsspalten (POW/SPE/MEN/SOC) im Saisonstand.
+ *
+ * Die globalen `.heat-band-*`-Regeln sind für Spieler-Tabellen gebaut: volle Fläche,
+ * eigene Textfarbe, Inset-Rahmen. In dieser Tabelle würde das die Bereichsfarbe der Zahl
+ * (POW rot, SPE grün, MEN blau, SOC gelb) überschreiben und die Zeilen zerschneiden.
+ * Deshalb hier nur eine DEZENTE Hinterlegung aus derselben Bänder-Skala: Farbe und
+ * Rahmen der Zelle bleiben, es kommt ausschließlich ein schwacher Hintergrund dazu.
+ * Reihenfolge rot → gelb → grün entspricht heat-band-1 (schwach) … heat-band-8 (stark).
+ */
+.is-new-look .nl-standings-td-areacol.heat-band-1,
+.is-new-look .nl-standings-td-areacol.heat-band-2,
+.is-new-look .nl-standings-td-areacol.heat-band-3,
+.is-new-look .nl-standings-td-areacol.heat-band-4,
+.is-new-look .nl-standings-td-areacol.heat-band-5,
+.is-new-look .nl-standings-td-areacol.heat-band-6,
+.is-new-look .nl-standings-td-areacol.heat-band-7,
+.is-new-look .nl-standings-td-areacol.heat-band-8 {
+  color: var(--nl-tone, var(--nl-ink));
+  box-shadow: none;
+}
+
+.is-new-look .nl-standings-td-areacol.heat-band-1 {
+  background: color-mix(in srgb, var(--nl-risk) 20%, transparent);
+}
+.is-new-look .nl-standings-td-areacol.heat-band-2 {
+  background: color-mix(in srgb, var(--nl-risk) 13%, transparent);
+}
+.is-new-look .nl-standings-td-areacol.heat-band-3 {
+  background: color-mix(in srgb, var(--nl-warn) 14%, transparent);
+}
+.is-new-look .nl-standings-td-areacol.heat-band-4 {
+  background: color-mix(in srgb, var(--nl-warn) 9%, transparent);
+}
+.is-new-look .nl-standings-td-areacol.heat-band-5 {
+  background: color-mix(in srgb, var(--nl-good) 9%, transparent);
+}
+.is-new-look .nl-standings-td-areacol.heat-band-6 {
+  background: color-mix(in srgb, var(--nl-good) 14%, transparent);
+}
+.is-new-look .nl-standings-td-areacol.heat-band-7 {
+  background: color-mix(in srgb, var(--nl-good) 19%, transparent);
+}
+.is-new-look .nl-standings-td-areacol.heat-band-8 {
+  background: color-mix(in srgb, var(--nl-good) 25%, transparent);
+}
+
 .is-new-look .nl-standings-td-bonus,
 .is-new-look .nl-standings-td-mw {
   color: var(--nl-mut);

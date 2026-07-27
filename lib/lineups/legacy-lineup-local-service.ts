@@ -978,7 +978,18 @@ export function saveLocalLegacyFormCardPlan(
 } {
   const { persistence: resolvedPersistence, save } = resolveLocalSave(input.saveId, persistence);
   const effectiveSaveId = save.saveId;
-  const gameState = withNormalizedSeasonDisciplineSchedule(save.gameState, effectiveSaveId);
+  // Formkarten VOR der Prüfung selbstheilen — genau wie der Kontext-Ladepfad (getSharedLineupContextBase)
+  // und der Draft-Speicherpfad (saveLocalLegacyLineupDraft) es tun. Ohne das prüfte dieser Pfad als
+  // einziger gegen den ROHEN gespeicherten Kartenbestand, während die Auswahlliste im UI aus dem
+  // geheilten Bestand kam: Für einen Spieler, der erst NACH der ersten Kartengenerierung in den Kader
+  // kam (Draft-Reihenfolge, Transfer), bot das UI seine Karte an, das Speichern lehnte sie dann mit
+  // `form_card_plan_card_missing` ab — die Formkarten ließen sich in der Einsatzliste nicht auswählen.
+  // Die geheilten Karten landen über `nextGameState` mit in der Persistenz.
+  const gameState = ensureLocalFormCardsForSeason(
+    withNormalizedSeasonDisciplineSchedule(save.gameState, effectiveSaveId),
+    effectiveSaveId,
+    input.seasonId,
+  );
   const scheduleEntry = (gameState.seasonState.disciplineSchedule ?? []).find(
     (entry) => entry.seasonId === input.seasonId && entry.matchdayId === input.matchdayId,
   );

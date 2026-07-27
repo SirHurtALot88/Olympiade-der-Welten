@@ -34,11 +34,19 @@ export type FieldRaceLedgerEntry = {
   cumulativeRank: number | null;
   /** prevRank − thisRank: > 0 = Plätze gutgemacht, < 0 = abgerutscht, null am ersten Spieltag. */
   rankDeltaVsPrev: number | null;
+  /**
+   * Wurde dieser Spieltag ueberhaupt schon gewertet? Der Ledger laeuft bewusst ueber ALLE
+   * Spieltage der Season (auch kuenftige), damit Reihenfolge und Nummerierung stimmen.
+   * Kuenftige Spieltage tragen keine Punkte, lassen den kumulativen Rang unveraendert und
+   * ergeben damit `rankDeltaVsPrev = 0` — wer blind das Listenende liest, bekommt also
+   * "keine Bewegung" und leere Form-Felder. Dieses Flag trennt beides sauber.
+   */
+  played: boolean;
 };
 
 export type FieldRaceLedger = {
   seasonId: string;
-  matchdays: Array<{ matchdayId: string; matchdayNumber: number }>;
+  matchdays: Array<{ matchdayId: string; matchdayNumber: number; played: boolean }>;
   rowsByTeamId: Map<string, FieldRaceLedgerEntry[]>;
 };
 
@@ -113,13 +121,15 @@ export function buildFieldRaceLedger(
 
   const cumulative = new Map<string, number>();
   const prevCumulativeRank = new Map<string, number | null>();
-  const matchdays: Array<{ matchdayId: string; matchdayNumber: number }> = [];
+  const matchdays: Array<{ matchdayId: string; matchdayNumber: number; played: boolean }> = [];
 
   orderedMatchdays.forEach((option, index) => {
     const matchdayNumber = option.matchdayNumber ?? index + 1;
-    matchdays.push({ matchdayId: option.matchdayId, matchdayNumber });
-
     const dayPoints = pointsByMatchday.get(option.matchdayId) ?? new Map<string, number>();
+    // Gewertet = es gibt ueberhaupt Punkt-Eintraege fuer diesen Spieltag. Bewusst ligaweit
+    // gepruft und nicht pro Team: ein Team mit 0 Punkten hat trotzdem gespielt.
+    const played = dayPoints.size > 0;
+    matchdays.push({ matchdayId: option.matchdayId, matchdayNumber, played });
     for (const team of teams) {
       cumulative.set(team.teamId, roundValue((cumulative.get(team.teamId) ?? 0) + (dayPoints.get(team.teamId) ?? 0), 4));
     }
@@ -142,6 +152,7 @@ export function buildFieldRaceLedger(
         cumulativePoints: roundValue(cumulative.get(team.teamId) ?? 0, 1),
         cumulativeRank,
         rankDeltaVsPrev,
+        played,
       });
       prevCumulativeRank.set(team.teamId, cumulativeRank);
     }
@@ -150,12 +161,36 @@ export function buildFieldRaceLedger(
   return { seasonId, matchdays, rowsByTeamId };
 }
 
-/** Bequemer Slice der letzten `count` Spieltage eines Teams (für den Form-Strip). */
+/**
+ * Die letzten `count` GEWERTETEN Spieltage eines Teams (Form-Strip).
+ *
+ * Frueher wurde schlicht das Ende der Liste genommen. Da der Ledger auch die noch nicht
+ * gespielten Spieltage enthaelt, zeigte der Strip in laufenden Saisons die LETZTEN
+ * Spieltage der Season — alle ohne Wertung, also durchgehend "—". Jetzt zaehlen nur
+ * gewertete Spieltage.
+ */
 export function getFieldRaceRecentForm(
   ledger: FieldRaceLedger,
   teamId: string,
   count = 5,
 ): FieldRaceLedgerEntry[] {
-  const rows = ledger.rowsByTeamId.get(teamId) ?? [];
+  const rows = (ledger.rowsByTeamId.get(teamId) ?? []).filter((row) => row.played);
   return rows.slice(Math.max(0, rows.length - count));
+}
+
+/**
+ * Rang-Bewegung des Teams am zuletzt GEWERTETEN Spieltag.
+ *
+ * Der letzte Ledger-Eintrag ist in einer laufenden Season ein kuenftiger Spieltag: keine
+ * Punkte, unveraenderter Rang, `rankDeltaVsPrev = 0`. Genau deshalb stand im Cockpit "±0",
+ * obwohl das Team zehn Plaetze verloren hatte. Null, solange noch nichts gewertet wurde.
+ */
+export function getFieldRaceRankMovement(ledger: FieldRaceLedger, teamId: string): number | null {
+  const played = (ledger.rowsByTeamId.get(teamId) ?? []).filter((row) => row.played);
+  return played.length > 0 ? played[played.length - 1]!.rankDeltaVsPrev : null;
+}
+
+/** Anzahl der bereits gewerteten Spieltage — nicht die Laenge des Spielplans. */
+export function countPlayedFieldRaceMatchdays(ledger: FieldRaceLedger): number {
+  return ledger.matchdays.filter((entry) => entry.played).length;
 }
