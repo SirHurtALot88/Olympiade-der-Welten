@@ -90,7 +90,13 @@ export const poolFor = (rarity: string): number =>
  * 48/49/50/51 ueber alle vier Rarities — eine legendaere Karte war dort so viel wert wie eine
  * gewoehnliche).
  */
-export const POOL_EVEN_SHARE = Number(process.env.OLY_SPONSOR_EVEN ?? 0.5);
+/**
+ * 1.0 = VOLLE EV-Renormierung (Auflage d). 0.5 war die halbe Massnahme: sie verhinderte nur, dass
+ * Keller-Teams bei spitzenlastigem Profil voellig leer ausgehen, liess aber die halbe EV-Schieflage
+ * ueber die Profile stehen — und damit 932 FOSD-Dominanzfaelle. Ueber OLY_SPONSOR_EVEN=0.5 laesst
+ * sich der alte Zustand zum Vergleich wiederherstellen.
+ */
+export const POOL_EVEN_SHARE = Number(process.env.OLY_SPONSOR_EVEN ?? 1.0);
 /** Standard-Sonderziel-Anteil der Basiskarte, unabhaengig vom Pool. */
 export const BASE_SPECIAL = 0.25;
 
@@ -207,20 +213,52 @@ export const PROFILES: Profile[] = [
 export const profileByName = (name: string): Profile => PROFILES.find((p) => p.name === name) ?? PROFILES[0]!;
 
 /**
+ * FORMKOMPONENTE (Auflage d des Balancing-Audits).
+ *
+ * Vorher indizierten die `tierWeights` die ERWARTUNGSSTUFE des Teams. Damit war das Profil fuer ein
+ * gegebenes Team eine reine EV-VERSCHIEBUNG — und ein Profil mit mehr EV dominiert jedes andere per
+ * FOSD, trivialerweise. Gemessen: 932 Dominanzfaelle von 1920 Zellen, EV-Spread ueber die Profile
+ * bis 41.3 % bei legendaer.
+ *
+ * Jetzt indizieren die Gewichte den ENDRANG und werden um ihren erwartungsgewichteten Mittelwert
+ * zentriert. Damit ist der Beitrag der Formkomponente fuer JEDES Team exakt 0 im Erwartungswert:
+ * ein spitzenlastiges Profil zahlt mehr, WENN das Team oben landet, und weniger, wenn nicht. Zwei
+ * EV-gleiche Formen, die sich ueber den Rang kreuzen, koennen sich per Konstruktion nicht
+ * dominieren — genau das war das Ziel.
+ */
+export const FORM_AMPLITUDE = Number(process.env.OLY_SPONSOR_FORM ?? 60);
+const formMeanCache = new Map<string, number>();
+export function formShape(profile: Profile, expected: number, finalTier: number): number {
+  if (FORM_AMPLITUDE === 0) return 0;
+  const key = `${profile.name}:${Math.round(expected)}`;
+  let mean = formMeanCache.get(key);
+  if (mean === undefined) {
+    mean = dist(expected).reduce((a, w, i) => a + w * profile.tierWeights[tierOf(i + 1)]!, 0);
+    formMeanCache.set(key, mean);
+  }
+  return FORM_AMPLITUDE * (profile.tierWeights[finalTier]! - mean);
+}
+
+/**
  * Aufteilung des Pools auf Leiter (1+2+4) und Sonderziel fuer eine gegebene Stufe.
  * EINE Stelle — vorher rechneten bands.ts, 5season-model.ts und proposal.ts das jeweils selbst,
  * proposal.ts sogar ohne den Gleichanteil.
  */
 export function cardTargets(rarity: string, profile: Profile, tier: number) {
   const pool = poolFor(rarity);
-  const shaped = pool * (1 - profile.specialShare);
-  const evenPart = (shaped * POOL_EVEN_SHARE) / TIERS.length;
-  const profilePart = shaped * (1 - POOL_EVEN_SHARE) * profile.tierWeights[tier]!;
+  // EV-RENORMIERUNG: bei POOL_EVEN_SHARE = 1 bekommt jede Stufe denselben Poolanteil, unabhaengig
+  // vom Profil. Der Gesamt-EV der Karte haengt damit nur noch an Rarity und Erwartungsstufe —
+  // die Profile unterscheiden sich ausschliesslich in der FORM.
+  const evenPart = (pool * POOL_EVEN_SHARE) / TIERS.length;
+  const profilePart = pool * (1 - POOL_EVEN_SHARE) * profile.tierWeights[tier]!;
+  const total = TARGET_EV_SHAPE[tier]! + evenPart + profilePart;
   return {
     /** Kalibrierziel fuer Liga + Kurve + Klausel. */
-    ladder: TARGET_EV_SHAPE[tier]! * (1 - BASE_SPECIAL) + evenPart + profilePart,
-    /** Erwartungswert des Sonderziels. */
-    special: TARGET_EV_SHAPE[tier]! * BASE_SPECIAL + (pool * profile.specialShare) / TIERS.length,
+    ladder: total * (1 - profile.specialShare),
+    /** Erwartungswert des Sonderziels — der Anteil, den das Profil ins Ziel schiebt. */
+    special: total * profile.specialShare,
+    /** Gesamt-EV der Karte. Bei voller Renormierung fuer alle Profile identisch. */
+    total,
   };
 }
 

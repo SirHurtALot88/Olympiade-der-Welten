@@ -311,6 +311,68 @@ Rücksprung **24,0 C**. Das ist ihre erklärte Identität („Maximum beim exakt
 denselben Nerv: mit diesem Sponsor wird ein Wunderjahr bestraft. Das ist eine **Design-Entscheidung**,
 keine technische; der Prüfstand weist sie ab jetzt bei jedem Lauf aus.
 
+### (d) Profil-Dominanz — EV-Renormierung statt Angebotsregel
+
+**Befund (neu gemessen mit dem Test aus (b), 3 repräsentative Sponsoren × 5 Profile × 32
+Erwartungsränge × 4 Rarities = 1920 Zellen):**
+
+| Rarity | dominierte Fälle | EV-Spread über Profile | anbietbare Profile |
+|---|---|---|---|
+| gewöhnlich | 304 / 480 | 15,0 % | 1–4 von 5 |
+| magisch | 0 / 480 | 0,0 % | 5 von 5 — **aber vakuum** (Pool 0 ⇒ alle Profile identisch) |
+| selten | 316 / 480 | 20,3 % | 1–4 von 5 |
+| legendär | 312 / 480 | 41,3 % | 1–3 von 5 |
+| **gesamt** | **932 / 1920** | | |
+
+**Ursache:** die `tierWeights` indizierten die **Erwartungsstufe** des Teams, nicht den Endrang.
+Für ein gegebenes Team war das Profil damit eine reine **EV-Verschiebung** — und ein Profil mit
+mehr EV dominiert jedes andere per FOSD trivialerweise. Die Profile waren keine Formachse, sondern
+eine versteckte Stärkeachse.
+
+**Entscheidung: EV-Renormierung, nicht Angebotsregel.** Begründung ist gemessen, nicht ästhetisch:
+die Spalte *anbietbare Profile* zeigt, dass bei einer reinen Angebotsregel für manche
+Erwartungsränge **nur 1 von 5** Profilen übrig bleibt. Eine Regel, die Dominanz durch Filtern
+vermeidet, müsste dort ein einziges Profil anbieten — die Achse wäre für dieses Team keine Wahl
+mehr, sondern eine Vorschrift. Die Regel würde das Symptom verstecken, nicht die Ursache lösen.
+
+**Umsetzung:**
+1. `POOL_EVEN_SHARE` von 0,5 auf **1,0**: der Rarity-Pool wird gleichmäßig auf alle Stufen verteilt.
+   Der Gesamt-EV einer Karte hängt damit nur noch an Rarity und Erwartungsstufe.
+2. `specialShare` teilt jetzt die **ganze Karte** statt nur des Pools — vorher hatte das Profil
+   `zielschwer` bei `magisch` (Pool 0) **überhaupt keine Wirkung**: es war dort Zeichen für Zeichen
+   dieselbe Karte wie `ausgewogen` (96 identische Profilpaare, gemessen).
+3. Die `tierWeights` indizieren jetzt den **Endrang** und werden um ihren erwartungsgewichteten
+   Mittelwert zentriert (`formShape`, Amplitude 60 C). Der Beitrag ist damit für jedes Team exakt
+   EV-neutral: ein spitzenlastiges Profil zahlt mehr, *wenn* das Team oben landet, und weniger,
+   wenn nicht. Zwei EV-gleiche Formen, die sich über den Rang kreuzen, können sich per Konstruktion
+   nicht dominieren.
+
+**Ergebnis, verifiziert mit dem Test aus (b):**
+
+| Messung | vorher | nachher |
+|---|---|---|
+| Profil-Dominanz gesamt | 932 / 1920 | **0 / 1920** |
+| EV-Spread über Profile (legendär) | 41,3 % | **0,0 %** |
+| anbietbare Profile | 1–4 von 5 | **5 von 5, alle Rarities** |
+| größter Formunterschied zwischen Profilen | — | 54,7 – 76,1 C (die Achse lebt) |
+| Fallen im 120er-Raum (Test aus b) | 0 | **0** |
+| kollabierte Karten | 0 / 384 | **0 / 384** |
+
+**Nebenbefund, gemessen und NICHT gelöst:** bei `gewöhnlich` sind an Erwartungsrang 25–32
+**240 von 960 Profilpaaren identisch**. Grund ist die Untergrenze: der Ziel-EV der Karte liegt dort
+bei 35,6–37,5 und damit **unter der garantierten 38** — die Karte kollabiert vollständig in den
+Floor, alle Profile werden gleich. Das ist derselbe Konflikt wie in (a) und in offenem Punkt 3:
+*Untergrenze und Rarity-Spanne nach unten schließen sich aus, solange beide absolut gesetzt sind.*
+Die Bändertabelle zeigt ihn jetzt offen als `38–38 (0)`.
+
+**Folgefund:** `sponsor-rarity-bands.ts` kalibrierte in geschlossener Form (`cal = Leiterziel −
+Rohmittel`) und rechnete die Untergrenze nicht ein. Bei `zielschwer` lag der ausgewiesene Ø dadurch
+**8–9 C über dem Ziel** (Meister 93 statt 84 bei magisch) — dasselbe Profil war im Bandbild
+EV-stärker als in der Prüfmaschinerie. Jetzt bisektiert auch `bands.ts` auf den gefloorten EV.
+In `sponsor-5season-model.ts` steht die geschlossene Kalibrierung noch; folgenlos für die
+Liga-Bilanz (K löst je Saison auf die Gehaltssumme), nicht folgenlos für die EV einer einzelnen
+Karte am Tabellenende. **Offen.**
+
 ## 8. Nicht Teil dieses Plans
 
 - Golden-Sponsoren (eigene Mechanik, bleibt vorerst wie sie ist)

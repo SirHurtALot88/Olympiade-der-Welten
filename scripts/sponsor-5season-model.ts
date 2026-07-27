@@ -19,7 +19,7 @@
 import {
   TIERS, tierOf, LIGA, FLOOR_ABSOLUT, FLOOR_RARITY, floorAt, RARITY_MULT, RARITY_ORDER,
   RARITY_DRAW, POOL_EVEN_SHARE, TARGET_EV_SHAPE, rel, CLAUSE_S_REPR, CLAUSE_P_REPR,
-  clauseBonus, clauseMalus, dist, PROFILES, cardTargets, SEASON_SF, SALARY_SUM_S1, salaryAtRank,
+  clauseBonus, clauseMalus, dist, PROFILES, cardTargets, formShape, SEASON_SF, SALARY_SUM_S1, salaryAtRank,
 } from "./sponsor-model-params";
 
 export { TIERS, tierOf, LIGA, dist, rel, SEASON_SF };
@@ -70,10 +70,15 @@ for (let s = 1; s <= SEASONS; s += 1) {
     const rarName = RARITY_ORDER[rIdx]!;
     const prof = PROFILES[Math.floor(rnd() * PROFILES.length)]!;
     const { ladder: ladderTarget, special } = cardTargets(rarName, prof, expTier);
+    // OFFEN (bewusst nicht geloest): die Kalibrierung ist hier geschlossen (cal = Leiterziel -
+    // Rohmittel) und rechnet die Untergrenze NICHT ein — anders als sponsor-model-proposal.ts und
+    // sponsor-rarity-bands.ts, die per Bisektion auf den GEFLOORTEN EV kalibrieren. Fuer die
+    // Liga-Bilanz ist das folgenlos, weil K je Saison ohnehin auf die Gehaltssumme loest; fuer die
+    // EV einer EINZELNEN Karte am Tabellenende ist es das nicht. Siehe offener Punkt im Plan.
     const w = dist(t.strength);
-    const raw = w.reduce((a2, wi, i) => a2 + wi * (LIGA[tierOf(i + 1)]! + rel(expTier - tierOf(i + 1))), 0);
+    const raw = w.reduce((a2, wi, i) => a2 + wi * (LIGA[tierOf(i + 1)]! + rel(expTier - tierOf(i + 1)) + formShape(prof, t.strength, tierOf(i + 1))), 0);
     const clauseMet = rnd() < P_CLAUSE, goalMet = rnd() < P_GOAL;
-    const v = LIGA[finTier]! + rel(expTier - finTier) + (ladderTarget - raw)
+    const v = LIGA[finTier]! + rel(expTier - finTier) + formShape(prof, t.strength, finTier) + (ladderTarget - raw)
       + (clauseMet ? clauseBonus(CLAUSE_S_REPR, P_CLAUSE) : -clauseMalus(CLAUSE_S_REPR, P_CLAUSE))
       + (goalMet ? special / P_GOAL : 0);
     return { t, finalRank, expTier, v, fl: FLAT ? FLOOR_ABSOLUT : floorAt(rarName, sf) };

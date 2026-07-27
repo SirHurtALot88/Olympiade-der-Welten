@@ -37,7 +37,7 @@ import {
   TIERS, tierOf, LIGA, floorAt, FLOOR_ABSOLUT, RARITY_MULT, POOL_EVEN_SHARE, BASE_SPECIAL,
   TARGET_GAMMA, TARGET_EV_SHAPE, poolFor, rel as relRepr, clauseBonus, clauseMalus,
   SIGMA, CORRIDOR, dist as distOf, corridorOf, PROFILES, profileByName, cardTargets,
-  P_GOAL, goalPayout, relConcaveRaw, CURVE_BETA,
+  P_GOAL, goalPayout, relConcaveRaw, CURVE_BETA, RARITY_ORDER, formShape, type Profile,
   SALARY_SUM_S1, SALARY_TOP, SALARY_MIN, salaryAtRank,
 } from "./sponsor-model-params";
 
@@ -213,8 +213,15 @@ export const SPONSOR_TYPES: SponsorType[] = [
 /** Erwartungswert der Klausel unter ihrem eigenen P. */
 const clauseEv = (t: SponsorType) => t.clause.p * t.clause.bonus - (1 - t.clause.p) * t.clause.malus;
 const withFloor = (v: number) => Math.max(FLOOR, v);
+/**
+ * Rangteil MIT profilabhaengiger Formkomponente. Die Formkomponente ist je Erwartungsrang
+ * EV-neutral (siehe formShape in den Parametern) — sie verschiebt nur, WO im Korridor das Geld
+ * liegt, nicht WIE VIEL.
+ */
+const rankPartOf = (t: SponsorType, prof: Profile, expected: number, final: number, cal: number) =>
+  LIGA[tierOf(final)]! + t.rel(tierOf(expected) - tierOf(final)) + formShape(prof, expected, tierOf(final)) + cal;
 const rankPart = (t: SponsorType, expected: number, final: number, cal: number) =>
-  LIGA[tierOf(final)]! + t.rel(tierOf(expected) - tierOf(final)) + cal;
+  rankPartOf(t, PROFILE, expected, final, cal);
 
 const distribution = (expected: number, sigma: number = SIGMA) => distOf(expected, sigma);
 
@@ -721,6 +728,103 @@ for (const t of SPONSOR_TYPES) {
 }
 console.log("\n  Sockel = schlechtester realistischer Ausgang, Decke = bester. Gleiche EV ueberall —");
 console.log("  die Arten unterscheiden sich AUSSCHLIESSLICH in Risiko und Form, nie in der Hoehe.");
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════
+// PROFIL-DOMINANZ (Auflage d des Balancing-Audits).
+//
+// Der Fallen-Test oben vergleicht Kurven x Klauseln BEI FESTEM Profil. Die zweite Variationsachse —
+// das Verteilungsprofil — wurde nie gegeneinander geprueft. Hier laufen die fuenf Profile innerhalb
+// EINER Rarity gegeneinander, mit derselben 4-Punkt-Lotterie wie oben.
+// ══════════════════════════════════════════════════════════════════════════════════════════════════
+/**
+ * Eigenstaendige Mini-Engine: baut die Karte fuer eine BELIEBIGE (Rarity, Profil)-Kombination,
+ * kalibriert sie wie die Produktion und liefert EV, Sigma und die Lotterien.
+ */
+function cardOf(t: SponsorType, rarity: string, prof: Profile, expected: number) {
+  const tier = tierOf(expected);
+  const { ladder, special } = cardTargets(rarity, prof, tier);
+  const fl = floorAt(rarity, 1.0);
+  const gp = goalPayout(special, P_GOAL);
+  const target = ladder + special;
+  const wf = (v: number) => Math.max(fl, v);
+  const corners = (final: number, cal: number) => [
+    { v: wf(rankPartOf(t, prof, expected, final, cal) + t.clause.bonus + gp),  p: t.clause.p * P_GOAL },
+    { v: wf(rankPartOf(t, prof, expected, final, cal) + t.clause.bonus),       p: t.clause.p * (1 - P_GOAL) },
+    { v: wf(rankPartOf(t, prof, expected, final, cal) - t.clause.malus + gp),  p: (1 - t.clause.p) * P_GOAL },
+    { v: wf(rankPartOf(t, prof, expected, final, cal) - t.clause.malus),       p: (1 - t.clause.p) * (1 - P_GOAL) },
+  ];
+  const w = distribution(expected);
+  const evAt = (cal: number) => w.reduce((a, wi, i) => a + wi * corners(i + 1, cal).reduce((a2, c) => a2 + c.p * c.v, 0), 0);
+  let lo = -200, hi = 200;
+  for (let i = 0; i < 120; i += 1) { const m = (lo + hi) / 2; if (evAt(m) < target) lo = m; else hi = m; }
+  const cal = (lo + hi) / 2;
+  return { ev: evAt(cal), target, lot: corridorOf(expected).map((r) => ({ outcomes: corners(r, cal) })) };
+}
+
+function profileDominance(sponsors: SponsorType[]) {
+  const out: Array<{ rarity: string; dominated: number; cells: number; spread: number; twins: number;
+                     formGap: number; survMin: number; survMax: number; who: Map<string, number[]> }> = [];
+  for (const rarity of RARITY_ORDER) {
+    let dominated = 0, cells = 0, spread = 0, twins = 0, formGap = 0, survMin = 99, survMax = 0;
+    const who = new Map<string, number[]>();
+    for (const t of sponsors) {
+      for (let e = 1; e <= 32; e += 1) {
+        const rows = PROFILES.map((prof) => ({ name: prof.name, ...cardOf(t, rarity, prof, e) }));
+        cells += rows.length;
+        const evs = rows.map((r) => r.ev);
+        spread = Math.max(spread, Math.max(...evs) / Math.min(...evs) - 1);
+        // VAKUUM-WAECHTER: "0 Dominanz" ist wertlos, wenn die Profile IDENTISCHE Karten liefern.
+        // Genau das war bei magisch der Fall (Pool 0 -> alle Profile gleich).
+        for (let i = 0; i < rows.length; i += 1) for (let j = i + 1; j < rows.length; j += 1) {
+          const gap = Math.max(...rows[i]!.lot.flatMap((l, k) =>
+            l.outcomes.map((o, m) => Math.abs(o.v - rows[j]!.lot[k]!.outcomes[m]!.v))));
+          formGap = Math.max(formGap, gap);
+          if (gap < 1e-6) twins += 1;
+        }
+        // Wie viele Profile ueberleben eine reine ANGEBOTSREGEL (nur nicht-dominierte anbieten)?
+        // Das ist die Messgroesse fuer die verworfene Alternative: sinkt sie auf 1, ist die
+        // Profilachse fuer dieses Team keine Wahl mehr, sondern eine Vorschrift.
+        const surviving = rows.filter((a) => !rows.some((b) => b.name !== a.name
+          && a.lot.every((la, i) => fosdAtLeast(b.lot[i]!, la)) && a.lot.some((la, i) => fosdStrictly(b.lot[i]!, la)))).length;
+        survMin = Math.min(survMin, surviving); survMax = Math.max(survMax, surviving);
+        for (const a of rows) {
+          const dom = rows.find((b) => b.name !== a.name
+            && a.lot.every((la, i) => fosdAtLeast(b.lot[i]!, la)) && a.lot.some((la, i) => fosdStrictly(b.lot[i]!, la)));
+          if (dom) {
+            dominated += 1;
+            const key = `${a.name} ≪ ${dom.name}`;
+            const ranks = who.get(key) ?? [];
+            if (!ranks.includes(e)) ranks.push(e);
+            who.set(key, ranks);
+          }
+        }
+      }
+    }
+    out.push({ rarity, dominated, cells, spread, twins, formGap, survMin, survMax, who });
+  }
+  return out;
+}
+
+line();
+console.log("PROFIL-DOMINANZ — die fuenf Verteilungsprofile gegeneinander, innerhalb EINER Rarity");
+line();
+{
+  const repr = SPONSOR_TYPES.filter((t) => t.name.startsWith("Linear/"));
+  console.log(`  Repraesentative Sponsoren: ${repr.map((t) => t.name).join(", ")}  ·  5 Profile x 32 Erwartungsraenge`);
+  let total = 0;
+  for (const r of profileDominance(repr)) {
+    total += r.dominated;
+    console.log(`  ${r.rarity.padEnd(11)} dominierte Faelle ${String(r.dominated).padStart(4)}/${r.cells}` +
+      `   EV-Spread ueber Profile ${(r.spread * 100).toFixed(1).padStart(5)} %` +
+      `   Formunterschied ${r.formGap.toFixed(1).padStart(5)} C` +
+      `   anbietbare Profile ${r.survMin}–${r.survMax}/${PROFILES.length}` +
+      `   ${r.twins > 0 ? `⚠ ${r.twins} identische Profilpaare (Vakuum)` : r.dominated === 0 ? "✓" : "✗"}`);
+    if (process.env.OLY_SPONSOR_PROFDIAG === "1") {
+      for (const [k, ranks] of r.who) console.log(`      ${k}  bei Erwartungsrang ${ranks[0]}–${ranks[ranks.length - 1]} (${ranks.length})`);
+    }
+  }
+  console.log(`\n  PROFIL-DOMINANZ INSGESAMT: ${total}${total === 0 ? "  ✓" : "  ✗"}`);
+}
 
 // ══════════════════════════════════════════════════════════════════════════════════════════════════
 // STRESSTEST — laeuft nur mit OLY_SPONSOR_STRESS=1, weil er den GESAMTEN Kombinationsraum
