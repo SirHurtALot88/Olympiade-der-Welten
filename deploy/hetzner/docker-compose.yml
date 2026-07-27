@@ -3,6 +3,14 @@ services:
     build:
       context: ../..
       dockerfile: Dockerfile
+      # Build-Stempel fuer die Sidebar-Version-Badge (siehe lib/app-version.ts).
+      # Werte kommen aus der Shell-Umgebung, die auto-deploy.sh bzw.
+      # scripts/deploy-hetzner-with-backup.sh vor `docker compose ... --build`
+      # setzen. Ohne gesetzte Vars bleiben es leere Strings -> Dockerfile-ARG
+      # Default greift, UI zeigt den "dev"-Fallback statt eines falschen Stempels.
+      args:
+        NEXT_PUBLIC_OLY_BUILD_SHA: ${NEXT_PUBLIC_OLY_BUILD_SHA:-}
+        NEXT_PUBLIC_OLY_BUILD_DATE: ${NEXT_PUBLIC_OLY_BUILD_DATE:-}
     restart: unless-stopped
     environment:
       NODE_ENV: production

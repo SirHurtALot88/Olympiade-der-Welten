@@ -805,6 +805,32 @@ a {
   gap: 6px;
 }
 
+.foundation-sidebar-brand-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+/* Build-/Versions-Badge neben "Oly Manager" (#Version-Badge). Bewusst
+   subtil gehalten — der Name bleibt der visuelle Anker, das Badge ist nur
+   ein leiser Beleg dafür, welcher Build gerade läuft. */
+.foundation-sidebar-version-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(226, 232, 240, 0.5);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: default;
+}
+
 .foundation-sidebar-season-context {
   display: inline-flex;
   align-self: start;
@@ -61320,6 +61346,12 @@ button.is-new-look .nl-thist-season-pill,
 .is-new-look .foundation-sidebar-brand strong {
   color: var(--nl-ink);
   letter-spacing: 0.01em;
+}
+
+.is-new-look .foundation-sidebar-version-badge {
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-bg-2);
+  color: var(--nl-mut-2);
 }
 
 .is-new-look .foundation-sidebar-save-link {

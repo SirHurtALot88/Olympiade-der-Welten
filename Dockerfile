@@ -16,6 +16,16 @@ RUN npm ci
 
 FROM deps AS builder
 
+# Build-Stempel für die Sidebar-Version-Badge (app/foundation/shell/FoundationSidebar.tsx
+# via lib/app-version.ts). NEXT_PUBLIC_*-Vars müssen VOR `npm run build` als ENV gesetzt
+# sein, damit Next.js sie ins Client-Bundle inlined. Werden die ARGs beim `docker build`
+# nicht übergeben, bleiben sie leer und die UI zeigt den unmissverständlichen
+# "v<version> · dev"-Fallback statt eines erfundenen Stempels.
+ARG NEXT_PUBLIC_OLY_BUILD_SHA=""
+ARG NEXT_PUBLIC_OLY_BUILD_DATE=""
+ENV NEXT_PUBLIC_OLY_BUILD_SHA=$NEXT_PUBLIC_OLY_BUILD_SHA
+ENV NEXT_PUBLIC_OLY_BUILD_DATE=$NEXT_PUBLIC_OLY_BUILD_DATE
+
 COPY . .
 RUN npm run db:generate
 RUN npm run build

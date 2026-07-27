@@ -35,6 +35,14 @@ log "Neue Aenderungen auf '${BRANCH}' gefunden (${LOCAL:0:7} -> ${REMOTE:0:7}). 
 # 2) Sauber auf den neuen Stand ziehen (nur Vorwaerts-Merge, keine Konflikte)
 git merge --ff-only "origin/${BRANCH}"
 
+# Build-Stempel fuer die Sidebar-Version-Badge (lib/app-version.ts). Wird von
+# docker-compose.yml als build-arg an den Dockerfile-builder-Stage
+# durchgereicht und dort vor `npm run build` als NEXT_PUBLIC_*-ENV gesetzt,
+# damit Next.js die Werte ins Client-Bundle inlined.
+export NEXT_PUBLIC_OLY_BUILD_SHA="$(git rev-parse HEAD)"
+export NEXT_PUBLIC_OLY_BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+log "Build-Stempel: ${NEXT_PUBLIC_OLY_BUILD_SHA:0:7} @ ${NEXT_PUBLIC_OLY_BUILD_DATE}"
+
 # 3) Neu bauen & starten (Container wird bei Aenderung automatisch ersetzt)
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build
 
