@@ -2,6 +2,7 @@ import type { Recommendation } from "@/lib/dashboard/viewModel";
 
 /** Icon/Chip-Zuordnung je Empfehlungstyp -- wiederverwendet von /empfehlungen. */
 export const RECOMMENDATION_ICONS: Record<Recommendation["kind"], { cls: string; icon: string }> = {
+  ek_pflegen: { cls: "p-warn", icon: "⚠" },
   auslisten: { cls: "p-crit", icon: "↓" },
   preis_anpassen: { cls: "p-warn", icon: "€" },
   nachkaufen: { cls: "p-good", icon: "↑" },
@@ -9,6 +10,7 @@ export const RECOMMENDATION_ICONS: Record<Recommendation["kind"], { cls: string;
 };
 
 export const RECOMMENDATION_CHIPS: Record<Recommendation["kind"], { cls: string; label: string }> = {
+  ek_pflegen: { cls: "c-warn", label: "EK pflegen" },
   auslisten: { cls: "c-crit", label: "Auslisten" },
   preis_anpassen: { cls: "c-warn", label: "Preis anpassen" },
   nachkaufen: { cls: "c-good", label: "Nachkaufen" },
