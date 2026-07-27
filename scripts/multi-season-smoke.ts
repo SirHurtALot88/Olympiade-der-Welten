@@ -6,6 +6,7 @@ import { loadEnvConfig } from "@next/env";
 import { buildAiLegacyLineupPreview } from "@/lib/ai/ai-legacy-lineup-engine";
 import { buildAiLegacyLineupModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import { applyFacilityUpgrade, previewFacilityUpgrade } from "@/lib/facilities/facility-upgrade-service";
+import { getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 import { applyGameModeOwnership } from "@/lib/foundation/team-control-settings";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import {
@@ -283,7 +284,127 @@ type SeasonMetrics = {
     seasonId: string;
   }>;
   matchdaysCompleted: number;
+  injuryFatigue: SeasonInjuryFatigueMetrics;
 };
+
+// ---------------------------------------------------------------------------
+// Owner-requested trend instrumentation (2026-07): 200-250 injuries is the SEASON 1 target; the
+// design's promise is that the total DECLINES in later seasons as teams invest in recovery
+// facilities and squad depth. This tracker accumulates per-matchday injury/fatigue data across a
+// single season's loop (same live-run capture rationale as scripts/full-season-ui-playthrough.ts
+// -- per-matchday average fatigue is not stored as history anywhere).
+type SeasonInjuryFatigueMetrics = {
+  totalInjuries: number;
+  injuriesPerMatchday: number[];
+  injuriesManual: number;
+  injuriesAi: number;
+  maxSimultaneousInjuriesInOneTeam: number;
+  worstCaseAvailablePlayers: number | null;
+  worstCaseAvailableTeamId: string | null;
+  worstCaseAvailableMatchdayIndex: number | null;
+  avgFatigueByMd: number[];
+  peakFatigue: number;
+  rotationManualAvg: number;
+  rotationAiAvg: number;
+};
+
+class SeasonInjuryFatigueTracker {
+  private totalInjuries = 0;
+  private injuriesPerMatchday: number[] = [];
+  private injuriesManual = 0;
+  private injuriesAi = 0;
+  private maxSimultaneousInjuriesInOneTeam = 0;
+  private worstCaseAvailablePlayers = Number.POSITIVE_INFINITY;
+  private worstCaseAvailableTeamId: string | null = null;
+  private worstCaseAvailableMatchdayIndex: number | null = null;
+  private avgFatigueByMd: number[] = [];
+  private peakFatigue = 0;
+  private rotationValuesManual: number[] = [];
+  private rotationValuesAi: number[] = [];
+  private previousLineupPlayerIdsByTeam = new Map<string, Set<string>>();
+
+  constructor(
+    private readonly manualTeamId: string,
+    private readonly teamIds: string[],
+  ) {}
+
+  captureBeforeLineups(save: PersistedSaveGame, matchdayId: string) {
+    let worstActive = Number.POSITIVE_INFINITY;
+    let worstTeamId: string | null = null;
+    for (const teamId of this.teamIds) {
+      const rosterEntries = save.gameState.rosters.filter((entry) => entry.teamId === teamId);
+      let unavailable = 0;
+      for (const entry of rosterEntries) {
+        const view = getPlayerAvailabilityView(save.gameState, entry.playerId, teamId, matchdayId);
+        if (view.isUnavailable) unavailable += 1;
+      }
+      if (unavailable > this.maxSimultaneousInjuriesInOneTeam) this.maxSimultaneousInjuriesInOneTeam = unavailable;
+      const active = rosterEntries.length - unavailable;
+      if (active < worstActive) {
+        worstActive = active;
+        worstTeamId = teamId;
+      }
+    }
+    if (worstActive < this.worstCaseAvailablePlayers) {
+      this.worstCaseAvailablePlayers = worstActive;
+      this.worstCaseAvailableTeamId = worstTeamId;
+      this.worstCaseAvailableMatchdayIndex = this.injuriesPerMatchday.length + 1;
+    }
+  }
+
+  captureAfterResolve(save: PersistedSaveGame, matchdayId: string) {
+    const gameState = save.gameState;
+    const rosteredPlayerIds = new Set(gameState.rosters.map((entry) => entry.playerId));
+    const fatigueValues = gameState.players.filter((player) => rosteredPlayerIds.has(player.id)).map((player) => player.fatigue ?? 0);
+    const avgFatigue = fatigueValues.length > 0 ? fatigueValues.reduce((sum, value) => sum + value, 0) / fatigueValues.length : 0;
+    this.avgFatigueByMd.push(Number(avgFatigue.toFixed(2)));
+    const peak = fatigueValues.length > 0 ? Math.max(...fatigueValues) : 0;
+    if (peak > this.peakFatigue) this.peakFatigue = peak;
+
+    const injuryEventsThisMd = (gameState.seasonState.injuryEvents ?? []).filter(
+      (event) => event.matchdayId === matchdayId && event.result === "injured",
+    );
+    this.injuriesPerMatchday.push(injuryEventsThisMd.length);
+    this.totalInjuries += injuryEventsThisMd.length;
+    for (const event of injuryEventsThisMd) {
+      if (event.teamId === this.manualTeamId) this.injuriesManual += 1;
+      else this.injuriesAi += 1;
+    }
+
+    const lineupDraftsThisMd = (gameState.seasonState.lineupDrafts ?? []).filter((draft) => draft.matchdayId === matchdayId);
+    for (const draft of lineupDraftsThisMd) {
+      const playerIdsThisMd = new Set(draft.entries.map((entry) => entry.playerId));
+      const previousPlayerIds = this.previousLineupPlayerIdsByTeam.get(draft.teamId);
+      if (previousPlayerIds) {
+        let changed = 0;
+        for (const playerId of playerIdsThisMd) {
+          if (!previousPlayerIds.has(playerId)) changed += 1;
+        }
+        if (draft.teamId === this.manualTeamId) this.rotationValuesManual.push(changed);
+        else this.rotationValuesAi.push(changed);
+      }
+      this.previousLineupPlayerIdsByTeam.set(draft.teamId, playerIdsThisMd);
+    }
+  }
+
+  build(): SeasonInjuryFatigueMetrics {
+    const avg = (values: number[]) => (values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : 0);
+    return {
+      totalInjuries: this.totalInjuries,
+      injuriesPerMatchday: this.injuriesPerMatchday,
+      injuriesManual: this.injuriesManual,
+      injuriesAi: this.injuriesAi,
+      maxSimultaneousInjuriesInOneTeam: this.maxSimultaneousInjuriesInOneTeam,
+      worstCaseAvailablePlayers: Number.isFinite(this.worstCaseAvailablePlayers) ? this.worstCaseAvailablePlayers : null,
+      worstCaseAvailableTeamId: this.worstCaseAvailableTeamId,
+      worstCaseAvailableMatchdayIndex: this.worstCaseAvailableMatchdayIndex,
+      avgFatigueByMd: this.avgFatigueByMd,
+      peakFatigue: Number(this.peakFatigue.toFixed(2)),
+      rotationManualAvg: Number(avg(this.rotationValuesManual).toFixed(2)),
+      rotationAiAvg: Number(avg(this.rotationValuesAi).toFixed(2)),
+    };
+  }
+}
 
 function collectSeasonMetrics(
   save: PersistedSaveGame,
@@ -291,6 +412,7 @@ function collectSeasonMetrics(
   seasonId: string,
   matchdaysCompleted: number,
   seasonIndex: number,
+  injuryFatigue: SeasonInjuryFatigueMetrics,
 ): SeasonMetrics {
   const standings = save.gameState.seasonState.standings;
 
@@ -329,12 +451,13 @@ function collectSeasonMetrics(
       seasonId: t.seasonId,
     }));
 
-  return { seasonIndex, seasonId, teams, humanTeamPlayers, transferActivity, matchdaysCompleted };
+  return { seasonIndex, seasonId, teams, humanTeamPlayers, transferActivity, matchdaysCompleted, injuryFatigue };
 }
 
 async function runOneSeason(
   saveId: string,
   manualTeamId: string,
+  teamIds: string[],
   seasonId: string,
   seasonIndex: number,
   matchdaysTarget: number,
@@ -344,10 +467,12 @@ async function runOneSeason(
   const saveAtStart = requireValue(persistence.getSaveById(saveId), "Save missing at season start.");
   await applyEconomy(saveAtStart, manualTeamId, seasonId, persistence);
 
+  const tracker = new SeasonInjuryFatigueTracker(manualTeamId, teamIds);
   let matchdaysCompleted = 0;
   for (let i = 0; i < matchdaysTarget; i += 1) {
     const current = requireValue(persistence.getSaveById(saveId), "Save missing in MD loop.");
     const matchdayId = current.gameState.matchdayState.matchdayId;
+    tracker.captureBeforeLineups(current, matchdayId);
 
     prepLineup({ saveId, seasonId, matchdayId, teamId: manualTeamId });
 
@@ -374,6 +499,11 @@ async function runOneSeason(
       log(`Season ${seasonIndex + 1} MD${i + 1} auto-run blocked: ${autoRun.blockingReasons.join(" | ")}`);
       break;
     }
+
+    tracker.captureAfterResolve(
+      requireValue(persistence.getSaveById(saveId), "Save missing after auto-run resolve."),
+      matchdayId,
+    );
 
     const advance = await executeMatchdayAdvance(
       { saveId, seasonId, source: "sqlite", execute: true, confirm: ADVANCE_MATCHDAY_CONFIRM_TOKEN },
@@ -408,7 +538,7 @@ async function runOneSeason(
   }
 
   const afterCompletion = requireValue(persistence.getSaveById(saveId), "Save missing after completion.");
-  const metrics = collectSeasonMetrics(afterCompletion, manualTeamId, seasonId, matchdaysCompleted, seasonIndex);
+  const metrics = collectSeasonMetrics(afterCompletion, manualTeamId, seasonId, matchdaysCompleted, seasonIndex, tracker.build());
 
   const nextSeasonToken = buildPreSeasonNextSeasonSetupToken(afterCompletion).confirmToken;
   const nextSeason = applyPreSeasonNextSeasonSetupLightweight(afterCompletion, nextSeasonToken, persistence);
@@ -431,13 +561,14 @@ async function main() {
 
   const { save, manualTeamId, seasonId: firstSeasonId } = setupFreshSoloSave(persistence);
   log(`Fresh save created: ${save.saveId}, manual team: ${manualTeamId}`);
+  const teamIds = save.gameState.teams.map((team) => team.teamId);
 
   const allMetrics: SeasonMetrics[] = [];
   let currentSeasonId = firstSeasonId;
 
   for (let i = 0; i < args.seasons; i += 1) {
     log(`\n=== SEASON ${i + 1}/${args.seasons} (${currentSeasonId}) ===`);
-    const metrics = await runOneSeason(save.saveId, manualTeamId, currentSeasonId, i, args.matchdaysPerSeason, persistence);
+    const metrics = await runOneSeason(save.saveId, manualTeamId, teamIds, currentSeasonId, i, args.matchdaysPerSeason, persistence);
     allMetrics.push(metrics);
 
     const afterSave = requireValue(persistence.getSaveById(save.saveId), "Save missing after season.");
@@ -486,6 +617,20 @@ async function main() {
         `pts=${row.manualTeamPoints} · ` +
         `xp+${row.totalXpEarned}/-${row.totalXpSpent} · ` +
         `buys=${row.transferBuys} sells=${row.transferSells}`,
+    );
+  }
+
+  console.log("\n=== MULTI-SEASON INJURY/FATIGUE TREND (owner target: S1 in 200-250, declining after) ===");
+  for (const m of allMetrics) {
+    const f = m.injuryFatigue;
+    console.log(
+      `S${m.seasonIndex + 1} (${m.seasonId}): TOTAL INJURIES=${f.totalInjuries} · ` +
+        `manual=${f.injuriesManual} ai=${f.injuriesAi} · ` +
+        `peakFatigue=${f.peakFatigue} · ` +
+        `avgFatigueByMd=[${f.avgFatigueByMd.join(",")}] · ` +
+        `maxSimultaneousInjuriesInOneTeam=${f.maxSimultaneousInjuriesInOneTeam} · ` +
+        `worstCaseAvailablePlayers=${f.worstCaseAvailablePlayers ?? "n/a"}(team ${f.worstCaseAvailableTeamId ?? "n/a"}, MD${f.worstCaseAvailableMatchdayIndex ?? "n/a"}) · ` +
+        `rotation manual=${f.rotationManualAvg} ai=${f.rotationAiAvg}`,
     );
   }
   console.log(`\nFull report: ${outPath}`);

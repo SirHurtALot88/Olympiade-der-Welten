@@ -4,6 +4,7 @@ import type {
   LegacyLineupEntryInput,
   LegacyLineupLoadedContext,
 } from "@/lib/lineups/legacy-lineup-types";
+import { isPartialLineupComplete } from "@/lib/lineups/legacy-matchday-partial-lineup-rule";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
 
 export type LegacyMatchdayReadinessStatus =
@@ -36,8 +37,6 @@ export type LegacyMatchdayReadiness = {
   reasonCodes: string[];
   shortReason: string;
 };
-
-const LEGACY_MATCHDAY_MINIMUM_PLAYERS = 7;
 
 export function getLegacyLineupDraftSideCounts(context: LegacyLineupLoadedContext) {
   const entries = context.existingDraft?.entries ?? [];
@@ -148,18 +147,6 @@ export function buildLegacyMatchdayReadiness(context: LegacyLineupLoadedContext)
     missingPlayersToRequirement,
   };
 
-  if (activePlayersCount < LEGACY_MATCHDAY_MINIMUM_PLAYERS) {
-    return {
-      ...base,
-      matchdayReady: false,
-      readinessStatus: "underfilled_roster",
-      missingScoresCount: 0,
-      validationWarnings: draft ? [] : ["No existing legacy lineup draft was found for this team and matchday."],
-      reasonCodes: ["under_minimum_matchday_players"],
-      shortReason: `Needs at least ${LEGACY_MATCHDAY_MINIMUM_PLAYERS} active players, has ${activePlayersCount}.`,
-    };
-  }
-
   if (!draft) {
     return {
       ...base,
@@ -172,7 +159,12 @@ export function buildLegacyMatchdayReadiness(context: LegacyLineupLoadedContext)
     };
   }
 
-  const allowPartialLineup = activePlayersCount < requiredTotalUniquePlayers;
+  const selectedPlayerCount = new Set(entries.map((entry) => entry.playerId)).size;
+  const allowPartialLineup = isPartialLineupComplete({
+    activePlayersCount,
+    requiredTotalUniquePlayers,
+    selectedPlayerCount,
+  });
   const validation = validateLegacyLineupContext({
     ...context,
     entries,
@@ -230,7 +222,7 @@ export function buildLegacyMatchdayReadiness(context: LegacyLineupLoadedContext)
     validationWarnings: validation.warnings,
     reasonCodes: allowPartialLineup ? ["partial_lineup_allowed"] : [],
     shortReason: allowPartialLineup
-      ? `Minimum ${LEGACY_MATCHDAY_MINIMUM_PLAYERS} reached. Partial single-discipline lineup is allowed (${activePlayersCount}/${requiredTotalUniquePlayers}).`
+      ? `All ${activePlayersCount} available players are used. Partial lineup is allowed (${activePlayersCount}/${requiredTotalUniquePlayers}).`
       : "Draft lineup is present and preview-ready.",
   };
 }

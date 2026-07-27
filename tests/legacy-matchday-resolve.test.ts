@@ -346,6 +346,15 @@ describe("legacy matchday resolve preview", () => {
   it("marks incomplete lineups clearly", () => {
     const context = createContext({ teamId: "A-A", teamName: "Alpha", d1Scores: [30, 20], d2Scores: [10, 9, 8] });
     context.disciplinePlayerCounts = { "mini-dm": 2, fechten: 5 };
+    // Owner rule (2026-07): a short lineup only counts as "incomplete_lineups" if the team did
+    // NOT field every player it had available (see lib/lineups/legacy-matchday-partial-lineup-rule.ts).
+    // Give the team 2 unused bench players so activePlayers.length (7) exceeds the selected count
+    // (5) -- this is a genuinely avoidable shortfall, not the new "all available fielded" allowance.
+    context.activePlayers = [
+      ...context.activePlayers,
+      { id: "active-A-A-bench-0", saveId: "save-1", seasonId: "season-1", teamId: "A-A", playerId: "A-A-bench-0" },
+      { id: "active-A-A-bench-1", saveId: "save-1", seasonId: "season-1", teamId: "A-A", playerId: "A-A-bench-1" },
+    ];
     const preview = buildLegacyMatchdayResolvePreview([context]);
 
     expect(preview.status).toBe("incomplete_lineups");

@@ -10,8 +10,10 @@ const GAME_FLOW_BLOCKER_LABELS: Record<string, string> = {
   duplicate_apply_detected: "Dieser Apply wurde für Save und Matchday bereits gespeichert.",
   duplicate_apply_for_save_season_block: "Dieser Schritt wurde für Save und Matchday bereits angewendet.",
   season_end_only: "Preisgeld und Cash sind nur im Saisonabschluss erlaubt.",
+  // Dieser Reason-Code wird nicht mehr erzeugt (der 7er-Floor ist entfernt, siehe
+  // lib/lineups/legacy-matchday-partial-lineup-rule.ts) — Label bleibt fuer alte/persistierte Daten.
   under_minimum_matchday_players: "Mindestens 7 aktive Spieler sind für den Spieltag nötig.",
-  partial_lineup_allowed: "Das Team darf mit Mindestkader auch nur eine Disziplin voll besetzen.",
+  partial_lineup_allowed: "Das Team setzt alle verfügbaren Spieler ein — das zählt als vollständig, auch wenn nicht jeder Slot besetzt ist.",
   lineup_matchday_is_not_active: "Lineups lassen sich nur für den aktuell aktiven Matchday ändern.",
   preview_status_not_ready: "Die Vorschau ist noch nicht im Status bereit.",
   board_objectives_failed: "Mindestens ein Board-Ziel ist verfehlt.",
