@@ -1,4 +1,4 @@
-import { buildAiLegacyLineupPreview } from "@/lib/ai/ai-legacy-lineup-engine";
+import { buildAiLegacyLineupPreview, getMarginalRankPointSwing } from "@/lib/ai/ai-legacy-lineup-engine";
 import type { FormCardColor, GameState, LineupDraftModifiers } from "@/lib/data/olyDataTypes";
 import type { AiLegacyLineupPreviewStatus } from "@/lib/ai/ai-needs-types";
 import { buildTeamControlSettingsMap, isAiLineupBatchApplyEnabled } from "@/lib/foundation/team-control-settings";
@@ -279,6 +279,11 @@ function planNegativeDumpSidesForMatchday(input: {
   sides: Array<{ side: "d1" | "d2"; competitiveness: DisciplineSideCompetitiveness }>;
   dumpsRequiredThisMatchday: number;
   unusedNegativeCount: number;
+  // Nur bei ECHTEM Zwang (letzte Spieltage / mehr Negativkarten als Restslots) dürfen
+  // Minuskarten auch auf einer starken Seite landen. Ohne Zwang schützt die AI die Seite,
+  // die sie gewinnen will: Früher schlug die Entsorgungspflicht die Wettbewerbslogik und
+  // die AI kippte Minuskarten ausgerechnet in ihre aussichtsreichste Disziplin.
+  allowStrongSideDump: boolean;
 }) {
   const dumpSides = new Set<"d1" | "d2">();
   if (input.unusedNegativeCount <= 0 || input.dumpsRequiredThisMatchday <= 0) {
@@ -293,6 +298,11 @@ function planNegativeDumpSidesForMatchday(input: {
   for (const side of orderedSides) {
     if (dumpSides.size >= target) {
       break;
+    }
+    if (side.competitiveness === "strong" && !input.allowStrongSideDump) {
+      // Der Dump wird lieber auf einen späteren Spieltag verschoben, als die stärkste
+      // Seite dieses Spieltags zu sabotieren.
+      continue;
     }
     dumpSides.add(side.side);
   }
@@ -1002,19 +1012,51 @@ export function buildAiLegacyLineupModifiers(
       disciplineId: side.disciplineId,
       plannedEntries,
     }),
+    // Marginaler Punktwert eines Rang-Schritts (rank-to-points): Positivkarten sollen dahin,
+    // wo ein Rang-Sprung real Punkte bewegt — große Disziplinen und umkämpfte Ränge zuerst.
+    rankPointSwing: (() => {
+      if (!side.disciplineId) return null;
+      const requiredPlayers =
+        side.side === "d1"
+          ? context.matchdayContract?.discipline1?.requiredPlayers ?? null
+          : context.matchdayContract?.discipline2?.requiredPlayers ?? null;
+      if (requiredPlayers == null) return null;
+      return getMarginalRankPointSwing(
+        requiredPlayers,
+        context.teamDisciplineRanks?.[side.disciplineId]?.rank ?? null,
+      );
+    })(),
   }));
   // When negative urgency is active, also flag the weaker sides for forced dumps so all
   // negatives get assigned rather than waiting until the very last matchday.
   const effectiveDumpsRequired = negativeUrgency
     ? Math.min(2, negativeCards.length)
     : dumpsRequiredThisMatchday;
+  // "Echter Zwang" für Dumps auf starken Seiten: nur wenn die Saison fast vorbei ist oder
+  // die Negativkarten selbst die verbleibenden Primärslots übersteigen. Sonst bleibt die
+  // stärkste/aussichtsreichste Seite von Minuskarten verschont (Wettbewerbslogik vor
+  // Entsorgungspflicht).
+  const allowStrongSideDump =
+    remainingMatchdaysIncludingCurrent <= 2 || negativeCards.length >= remainingPrimarySlots;
   const negativeDumpSides = planNegativeDumpSidesForMatchday({
     sides: sidePlans,
     dumpsRequiredThisMatchday: effectiveDumpsRequired,
     unusedNegativeCount: negativeCards.length,
+    allowStrongSideDump,
   });
 
-  for (const side of sidePlans) {
+  // Kartenvergabe in Opportunitäts-Reihenfolge statt stur d1-zuerst: die Seite mit der
+  // besseren Wettbewerbslage und dem größeren Punkthebel greift zuerst in den (knappen)
+  // Positivkarten-Pool. Die Zuordnung selbst bleibt pro Seite (side.side als Key).
+  const orderedSidePlans = [...sidePlans].sort((left, right) => {
+    const competitivenessDiff = competitivenessRank(right.competitiveness) - competitivenessRank(left.competitiveness);
+    if (competitivenessDiff !== 0) return competitivenessDiff;
+    const swingDiff = (right.rankPointSwing ?? 0) - (left.rankPointSwing ?? 0);
+    if (swingDiff !== 0) return swingDiff;
+    return left.side.localeCompare(right.side);
+  });
+
+  for (const side of orderedSidePlans) {
     const primary =
       formCards.length > 0
         ? pickPrimaryFormCardForSide({

@@ -14,6 +14,7 @@ import type { AiLineupStrategy } from "@/lib/data/olyDataTypes";
 import { deriveTeamIdentityAxisWeightMap } from "@/lib/foundation/team-identity-settings";
 import { getFatiguePerformanceMultiplier, getInjuryRiskPercent } from "@/lib/fatigue/fatigue-calibration";
 import { buildLegacyLineupAggregateScore } from "@/lib/lineups/legacy-score-engine";
+import { getRankToPointsValue } from "@/lib/resolve/rank-to-points";
 import { seededFormJitter } from "@/lib/lineups/legacy-lineup-modifiers";
 import { scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
 import type { DisciplineSide, LegacyLineupEntryInput, LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
@@ -320,110 +321,398 @@ function getSelectionScore(
   return score;
 }
 
-function buildEntriesForDisciplineSide(
+// ===========================================================================================
+// Globale, opportunistische Kader-Zuteilung über BEIDE Disziplinen
+// -------------------------------------------------------------------------------------------
+// Früher wurde d1 zuerst und d2 danach befüllt ("gierig-sequenziell"): d1 schnappte sich die
+// Allrounder, selbst wenn das Team dort chancenlos war, und d2 — wo das Team womöglich Rang 1
+// wäre — bekam nur die Reste (reales Beispiel: Team D-P, Rang 1 in Eiskunst/d2, landete auf
+// Platz 9, weil die Besten in Gewichtheben/d1 verheizt wurden). Die Reihenfolge war reine
+// Aufrufreihenfolge, kein Wert-Argument.
+//
+// Jetzt wird die Zuteilung GLOBAL entschieden: Jeder Spieler hat pro Seite einen Nutzen
+// (fatigue-/health-adjustierter selectionScore, unverändert aus getSelectionScore) und die
+// Seiten haben unterschiedliche ÖKONOMISCHE Gewichte. Ein kleiner DP (Kapazitäten <= 6 pro
+// Seite) maximiert die gewichtete Gesamtsumme — wer in einer Disziplin klar mehr bringt,
+// geht dorthin; Differenz zählt, nicht Absolutwert.
+//
+// Das Seitengewicht ist bewusst KEIN Schwellen-/Bucket-System, sondern der reale marginale
+// Punktwert eines Rang-Schritts aus references/sheets/rank-to-points.json:
+//   - Große Disziplinen (mehr Spieler) haben größere Punktabstände -> mehr Gewicht.
+//   - Die Tabelle fällt konvex ab: im Keller sind die Rang-Schritte winzig -> wo das Team
+//     ohnehin chancenlos ist, lohnt kein Star; im umkämpften Bereich sind sie groß -> Invest.
+// Das Strategieprofil (resolveLineupStrategy, inkl. inferLineupStrategyFromRoster-Fallback)
+// skaliert, WIE stark ein Team dieser Opportunität folgt: risikofreudige Teams konzentrieren
+// ihre Stars aggressiv auf die wertvolle Seite, konservative/rotierende Teams verteilen
+// flacher. So verhalten sich Teams organisch unterschiedlich statt alle gleich.
+// ===========================================================================================
+
+// Die rank-to-points-Tabelle hat nur Zeilen für 2–6 Spieler und Ränge 1–32; außerhalb liefert
+// getRankToPointsValue null. Defensiv klemmen statt raten — bei komplett fehlender Tabelle
+// fällt die Zuteilung auf neutrale Gewichte (1) zurück und verhält sich wie reine Score-Summe.
+const RANK_TABLE_MIN_PLAYER_COUNT = 2;
+const RANK_TABLE_MAX_PLAYER_COUNT = 6;
+const RANK_TABLE_MAX_RANK = 32;
+// Gewichte bleiben nah um 1 gebunden, damit sie nur die VERTEILUNG steuern und die
+// Fatigue-/Health-Penalties aus getSelectionScore nicht numerisch erdrücken.
+const SIDE_WEIGHT_MIN = 0.55;
+const SIDE_WEIGHT_MAX = 1.6;
+// Zuteilungs-Bonus pro besetztem Slot: garantiert, dass der DP immer maximal viele Slots
+// füllt (Vollständigkeit schlägt Punkt-Optimierung), bevor er über die Verteilung entscheidet.
+const ALLOCATION_FILL_BONUS = 1_000_000;
+// Spieler ohne Disziplin-Score füllen nur auf, wenn sonst ein Slot leer bliebe.
+const ALLOCATION_MISSING_SCORE_PENALTY = 10_000;
+
+// Marginaler Punktwert eines Rang-Schritts rund um den aktuellen Rang des Teams.
+// Ohne bekannten Rang: mittlere Schrittweite der ganzen Zeile (neutraler Erwartungswert).
+export function getMarginalRankPointSwing(playerCount: number, rank: number | null): number | null {
+  if (!Number.isFinite(playerCount) || playerCount <= 0) {
+    return null;
+  }
+  const count = Math.min(
+    RANK_TABLE_MAX_PLAYER_COUNT,
+    Math.max(RANK_TABLE_MIN_PLAYER_COUNT, Math.round(playerCount)),
+  );
+  if (rank == null) {
+    const top = getRankToPointsValue(count, 1);
+    const bottom = getRankToPointsValue(count, RANK_TABLE_MAX_RANK);
+    if (top == null || bottom == null) {
+      return null;
+    }
+    return (top - bottom) / (RANK_TABLE_MAX_RANK - 1);
+  }
+  const clampedRank = Math.min(RANK_TABLE_MAX_RANK, Math.max(1, Math.round(rank)));
+  const upRank = Math.max(1, clampedRank - 1);
+  const downRank = Math.min(RANK_TABLE_MAX_RANK, clampedRank + 1);
+  if (upRank === downRank) {
+    return null;
+  }
+  const up = getRankToPointsValue(count, upRank);
+  const down = getRankToPointsValue(count, downRank);
+  if (up == null || down == null) {
+    return null;
+  }
+  return (up - down) / (downRank - upRank);
+}
+
+// Wie stark folgt ein Team der ökonomischen Opportunität? Kein globaler Schalter, sondern
+// abgeleitet aus der Team-Strategie (Doktrin/Kader-Zustand): risikofreudige Teams stapeln
+// ihre Stars auf die wertvolle Seite, konservative verteilen flacher (Rotation/Schonung).
+function getStrategyOpportunityConcentration(strategy: AiLineupStrategy): number {
+  switch (strategy) {
+    case "risk_high_ceiling":
+      return 1.15;
+    case "best_score_now":
+    case "captain_star":
+      return 1;
+    case "protect_stars":
+    case "captain_safe":
+      return 0.8;
+    case "develop_prospects":
+      return 0.7;
+    case "rotate_depth":
+      return 0.6;
+    case "preserve_for_later_matchday":
+      return 0.5;
+    case "avoid_injury":
+      return 0.45;
+    default:
+      return 0.85;
+  }
+}
+
+type SideAllocationPlan = {
+  side: DisciplineSide;
+  disciplineId: string | null;
+  playerCount: number;
+  focusAxes: AiNeedAxis[];
+  rank: number | null;
+  swing: number | null;
+  weight: number;
+};
+
+type SideCandidate = {
+  activePlayerId: string;
+  playerId: string;
+  score: number;
+  selectionScore: number;
+  hasScore: boolean;
+  tieBreak: number;
+  health: RosterHealthSnapshot;
+};
+
+function buildSideCandidate(
   context: LegacyLineupLoadedContext,
-  disciplineId: string | null,
-  disciplineSide: DisciplineSide,
-  usedPlayerIds: Set<string>,
+  player: LegacyLineupLoadedContext["activePlayers"][number],
+  disciplineId: string,
   focusAxes: AiNeedAxis[],
-): { entries: LegacyLineupEntryInput[]; warnings: string[]; reasoning: string[] } {
-  if (!disciplineId) {
+  lineupStrategy: AiLineupStrategy,
+): SideCandidate {
+  const disciplineScore = context.disciplineScores.find(
+    (entry) => entry.playerId === player.playerId && entry.disciplineId === disciplineId,
+  );
+  const score = disciplineScore?.score ?? Number.NEGATIVE_INFINITY;
+  const tieBreak = getIdentityTieBreakScore(context, player.playerId, focusAxes);
+  const health = getRosterHealth(context, player.playerId);
+  const baseSelectionScore = getSelectionScore(context, player.playerId, score, lineupStrategy);
+  // Gebundener taktischer Jitter (±5, deterministisch pro Spieler|Disziplin|
+  // Spieltag): die AI wählt schon nach Fatigue-adjustiertem Erwartungswert,
+  // nimmt aber nicht mehr stur die perfekt Besten — knappe Kandidaten tauschen
+  // gelegentlich (etwas Abwechslung), ohne die Team-Summe nennenswert zu
+  // verschenken. Fehlende Werte (−∞) bleiben unangetastet.
+  const selectionScore = Number.isFinite(baseSelectionScore)
+    ? baseSelectionScore + seededFormJitter(`sel|${player.playerId}|${disciplineId}|${context.matchdayId ?? ""}`, 5)
+    : baseSelectionScore;
+
+  return {
+    activePlayerId: player.id,
+    playerId: player.playerId,
+    score,
+    selectionScore,
+    hasScore: disciplineScore != null,
+    tieBreak,
+    health,
+  };
+}
+
+// DP-Nutzen eines Kandidaten auf einer Seite: Füll-Bonus (Slots immer besetzen) plus
+// GEWICHTETER selectionScore. Das Seitengewicht multipliziert den kompletten, bereits
+// fatigue-/health-adjustierten Score — die bestehende Schonlogik bleibt damit intakt und
+// wird nur relativ zwischen den Seiten skaliert.
+function getAllocationUtility(candidate: SideCandidate, weight: number): number {
+  if (!candidate.hasScore || !Number.isFinite(candidate.selectionScore)) {
+    return ALLOCATION_FILL_BONUS - ALLOCATION_MISSING_SCORE_PENALTY + candidate.tieBreak * 1e-3;
+  }
+  return ALLOCATION_FILL_BONUS + candidate.selectionScore * weight + candidate.tieBreak * 1e-6;
+}
+
+// Exakte Zuteilung über beide Seiten (kleiner DP über [Spieler x d1-Slots x d2-Slots]).
+// Kapazitäten sind <= 6 pro Seite, Kader ~20 Spieler -> trivial billig, aber im Gegensatz
+// zur alten d1-zuerst-Heuristik global optimal bezüglich des gewichteten Nutzens.
+function allocatePlayersAcrossSides(input: {
+  players: Array<{ playerId: string; d1: SideCandidate | null; d2: SideCandidate | null }>;
+  d1Capacity: number;
+  d2Capacity: number;
+  d1Weight: number;
+  d2Weight: number;
+}): { d1: string[]; d2: string[] } {
+  const { players, d1Capacity, d2Capacity } = input;
+  const n = players.length;
+  const width = d2Capacity + 1;
+  const cells = (d1Capacity + 1) * width;
+  // dp[layer][a * width + b] = bester Gesamtnutzen mit a d1- und b d2-Zuteilungen.
+  let previous = new Float64Array(cells).fill(Number.NEGATIVE_INFINITY);
+  previous[0] = 0;
+  // choice[i][cell]: 0 = skip, 1 = d1, 2 = d2 (für die Rückverfolgung).
+  const choices: Uint8Array[] = [];
+
+  for (let i = 0; i < n; i += 1) {
+    const player = players[i]!;
+    const next = new Float64Array(cells).fill(Number.NEGATIVE_INFINITY);
+    const choice = new Uint8Array(cells);
+    const utilityD1 = player.d1 ? getAllocationUtility(player.d1, input.d1Weight) : null;
+    const utilityD2 = player.d2 ? getAllocationUtility(player.d2, input.d2Weight) : null;
+
+    for (let a = 0; a <= d1Capacity; a += 1) {
+      for (let b = 0; b <= d2Capacity; b += 1) {
+        const cell = a * width + b;
+        const base = previous[cell]!;
+        if (base === Number.NEGATIVE_INFINITY) {
+          continue;
+        }
+        // Option "skip" zuerst; Zuteilungen überschreiben bei striktem Gewinn. Bei exakt
+        // gleichem Nutzen gewinnt deterministisch d1 vor d2 vor skip (stabil zur alten Ordnung).
+        if (base > next[cell]!) {
+          next[cell] = base;
+          choice[cell] = 0;
+        }
+        if (utilityD2 != null && b < d2Capacity) {
+          const target = a * width + (b + 1);
+          const value = base + utilityD2;
+          if (value > next[target]!) {
+            next[target] = value;
+            choice[target] = 2;
+          }
+        }
+        if (utilityD1 != null && a < d1Capacity) {
+          const target = (a + 1) * width + b;
+          const value = base + utilityD1;
+          if (value >= next[target]!) {
+            next[target] = value;
+            choice[target] = 1;
+          }
+        }
+      }
+    }
+
+    choices.push(choice);
+    previous = next;
+  }
+
+  // Bestes Endzustands-Ziel: maximaler Nutzen (der Füll-Bonus sorgt dafür, dass zuerst die
+  // maximal mögliche Slot-Zahl erreicht wird), Ties deterministisch Richtung volle Kapazität.
+  let bestCell = 0;
+  let bestValue = Number.NEGATIVE_INFINITY;
+  for (let a = d1Capacity; a >= 0; a -= 1) {
+    for (let b = d2Capacity; b >= 0; b -= 1) {
+      const cell = a * width + b;
+      if (previous[cell]! > bestValue) {
+        bestValue = previous[cell]!;
+        bestCell = cell;
+      }
+    }
+  }
+
+  const d1Picked: string[] = [];
+  const d2Picked: string[] = [];
+  let a = Math.floor(bestCell / width);
+  let b = bestCell % width;
+  for (let i = n - 1; i >= 0; i -= 1) {
+    const choice = choices[i]![a * width + b]!;
+    if (choice === 1) {
+      d1Picked.push(players[i]!.playerId);
+      a -= 1;
+    } else if (choice === 2) {
+      d2Picked.push(players[i]!.playerId);
+      b -= 1;
+    }
+  }
+
+  return { d1: d1Picked, d2: d2Picked };
+}
+
+// Ordnet die per DP gewählten Spieler einer Seite in Slot-Reihenfolge (bester zuerst) und
+// erzeugt Warnings/Reasoning im selben Format wie zuvor (Konsumenten filtern per "D1"/"D2").
+function buildSideResult(input: {
+  plan: SideAllocationPlan;
+  pickedCandidates: SideCandidate[];
+  lineupStrategy: AiLineupStrategy;
+}): { entries: LegacyLineupEntryInput[]; warnings: string[]; reasoning: string[] } {
+  const { plan, lineupStrategy } = input;
+  if (!plan.disciplineId) {
     return {
       entries: [],
-      warnings: [`No discipline configured for ${disciplineSide}.`],
+      warnings: [`No discipline configured for ${plan.side}.`],
       reasoning: [],
     };
   }
+  const disciplineId = plan.disciplineId;
 
-  const playerCount =
-    context.disciplineSidePlayerCounts?.[`${disciplineId}::${disciplineSide}`] ??
-    context.disciplinePlayerCounts[disciplineId] ??
-    0;
-  const lineupStrategy = resolveLineupStrategy(context);
-  const candidates = context.activePlayers
-    .filter((player) => !usedPlayerIds.has(player.playerId))
-    .map((player) => {
-      const disciplineScore = context.disciplineScores.find(
-        (entry) => entry.playerId === player.playerId && entry.disciplineId === disciplineId,
-      );
-      const score = disciplineScore?.score ?? Number.NEGATIVE_INFINITY;
-      const tieBreak = getIdentityTieBreakScore(context, player.playerId, focusAxes);
-      const health = getRosterHealth(context, player.playerId);
-      const baseSelectionScore = getSelectionScore(context, player.playerId, score, lineupStrategy);
-      // Gebundener taktischer Jitter (±5, deterministisch pro Spieler|Disziplin|
-      // Spieltag): die AI wählt schon nach Fatigue-adjustiertem Erwartungswert,
-      // nimmt aber nicht mehr stur die perfekt Besten — knappe Kandidaten tauschen
-      // gelegentlich (etwas Abwechslung), ohne die Team-Summe nennenswert zu
-      // verschenken. Fehlende Werte (−∞) bleiben unangetastet.
-      const selectionScore = Number.isFinite(baseSelectionScore)
-        ? baseSelectionScore + seededFormJitter(`sel|${player.playerId}|${disciplineId}|${context.matchdayId ?? ""}`, 5)
-        : baseSelectionScore;
-
-      return {
-        activePlayerId: player.id,
-        playerId: player.playerId,
-        score,
-        selectionScore,
-        hasScore: disciplineScore != null,
-        tieBreak,
-        health,
-      };
-    })
-    .sort((left, right) => {
-      if (left.hasScore !== right.hasScore) {
-        return left.hasScore ? -1 : 1;
-      }
-      if (right.selectionScore !== left.selectionScore) {
-        return right.selectionScore - left.selectionScore;
-      }
-      if (right.tieBreak !== left.tieBreak) {
-        return right.tieBreak - left.tieBreak;
-      }
-      return left.playerId.localeCompare(right.playerId);
-    });
-
-  const picked = candidates.slice(0, playerCount);
-  picked.forEach((player) => usedPlayerIds.add(player.playerId));
+  const picked = [...input.pickedCandidates].sort((left, right) => {
+    if (left.hasScore !== right.hasScore) {
+      return left.hasScore ? -1 : 1;
+    }
+    if (right.selectionScore !== left.selectionScore) {
+      return right.selectionScore - left.selectionScore;
+    }
+    if (right.tieBreak !== left.tieBreak) {
+      return right.tieBreak - left.tieBreak;
+    }
+    return left.playerId.localeCompare(right.playerId);
+  });
 
   return {
     entries: picked.map((player, index) => ({
       disciplineId,
-      disciplineSide,
+      disciplineSide: plan.side,
       slotIndex: index,
       playerId: player.playerId,
       activePlayerId: player.activePlayerId,
     })),
     warnings: [
-      ...(picked.length < playerCount ? [`Only ${picked.length}/${playerCount} players available for ${disciplineId} ${disciplineSide}.`] : []),
+      ...(picked.length < plan.playerCount
+        ? [`Only ${picked.length}/${plan.playerCount} players available for ${disciplineId} ${plan.side}.`]
+        : []),
       ...picked
         .filter((player) => !player.hasScore)
-        .map((player) => `Missing discipline score for player ${player.playerId} in ${disciplineId} (${disciplineSide}).`),
+        .map((player) => `Missing discipline score for player ${player.playerId} in ${disciplineId} (${plan.side}).`),
     ],
     reasoning: picked.map(
       (player, index) =>
-        `${disciplineSide.toUpperCase()} slot ${index + 1}: ${player.playerId} via selectionScore=${player.hasScore ? player.selectionScore.toFixed(2) : "missing"} disciplineScore=${player.hasScore ? player.score.toFixed(2) : "missing"} fatigue=${player.health.fatigue.toFixed(0)} injuryRisk=${player.health.injuryRiskPercent.toFixed(1)}% strategy=${lineupStrategy} tieBreak=${player.tieBreak.toFixed(2)}`,
+        `${plan.side.toUpperCase()} slot ${index + 1}: ${player.playerId} via selectionScore=${player.hasScore ? player.selectionScore.toFixed(2) : "missing"} disciplineScore=${player.hasScore ? player.score.toFixed(2) : "missing"} fatigue=${player.health.fatigue.toFixed(0)} injuryRisk=${player.health.injuryRiskPercent.toFixed(1)}% strategy=${lineupStrategy} tieBreak=${player.tieBreak.toFixed(2)}`,
     ),
   };
 }
 
 export function buildAiLegacyLineupSuggestion(context: LegacyLineupLoadedContext): AiLegacyLineupSuggestion {
   const needsSummary = evaluateLegacyAiNeeds(context);
-  const usedPlayerIds = new Set<string>();
+  const lineupStrategy = resolveLineupStrategy(context);
 
-  const d1 = buildEntriesForDisciplineSide(
-    context,
-    needsSummary.d1NeedSummary.disciplineId,
-    "d1",
-    usedPlayerIds,
-    needsSummary.d1NeedSummary.focusAxes,
-  );
-  const d2 = buildEntriesForDisciplineSide(
-    context,
-    needsSummary.d2NeedSummary.disciplineId,
-    "d2",
-    usedPlayerIds,
-    needsSummary.d2NeedSummary.focusAxes,
-  );
+  const sidePlans: SideAllocationPlan[] = (
+    [
+      { side: "d1" as const, summary: needsSummary.d1NeedSummary },
+      { side: "d2" as const, summary: needsSummary.d2NeedSummary },
+    ]
+  ).map(({ side, summary }) => {
+    const disciplineId = summary.disciplineId;
+    const playerCount = disciplineId
+      ? context.disciplineSidePlayerCounts?.[`${disciplineId}::${side}`] ??
+        context.disciplinePlayerCounts[disciplineId] ??
+        0
+      : 0;
+    const rank = disciplineId ? context.teamDisciplineRanks?.[disciplineId]?.rank ?? null : null;
+    const swing = disciplineId ? getMarginalRankPointSwing(playerCount, rank) : null;
+    return { side, disciplineId, playerCount, focusAxes: summary.focusAxes, rank, swing, weight: 1 };
+  });
+
+  // Seitengewichte: relativer marginaler Punktwert, um 1 zentriert, per Strategie gedämpft
+  // oder verstärkt. Fehlt der Punktwert (Tabelle deckt nur 2–6 Spieler ab), bleiben beide
+  // Seiten neutral gewichtet — dann entscheidet allein die Score-Differenz pro Spieler.
+  const [d1Plan, d2Plan] = sidePlans as [SideAllocationPlan, SideAllocationPlan];
+  if (d1Plan.swing != null && d2Plan.swing != null) {
+    const mean = (d1Plan.swing + d2Plan.swing) / 2;
+    if (mean > 0) {
+      const concentration = getStrategyOpportunityConcentration(lineupStrategy);
+      for (const plan of sidePlans) {
+        const relative = (plan.swing ?? mean) / mean;
+        plan.weight = Math.min(
+          SIDE_WEIGHT_MAX,
+          Math.max(SIDE_WEIGHT_MIN, 1 + (relative - 1) * concentration),
+        );
+      }
+    }
+  }
+
+  // Kandidaten für ALLE aktiven Spieler auf BEIDEN Seiten (kein usedPlayerIds-Vorfilter mehr) —
+  // die Entscheidung, wer wo spielt, fällt global im DP statt per Aufrufreihenfolge.
+  const orderedPlayers = [...context.activePlayers].sort((left, right) => left.playerId.localeCompare(right.playerId));
+  const allocationPlayers = orderedPlayers.map((player) => ({
+    playerId: player.playerId,
+    d1: d1Plan.disciplineId
+      ? buildSideCandidate(context, player, d1Plan.disciplineId, d1Plan.focusAxes, lineupStrategy)
+      : null,
+    d2: d2Plan.disciplineId
+      ? buildSideCandidate(context, player, d2Plan.disciplineId, d2Plan.focusAxes, lineupStrategy)
+      : null,
+  }));
+
+  const allocation = allocatePlayersAcrossSides({
+    players: allocationPlayers,
+    d1Capacity: d1Plan.disciplineId ? d1Plan.playerCount : 0,
+    d2Capacity: d2Plan.disciplineId ? d2Plan.playerCount : 0,
+    d1Weight: d1Plan.weight,
+    d2Weight: d2Plan.weight,
+  });
+
+  const candidateByPlayerId = new Map(allocationPlayers.map((player) => [player.playerId, player]));
+  const d1 = buildSideResult({
+    plan: d1Plan,
+    pickedCandidates: allocation.d1
+      .map((playerId) => candidateByPlayerId.get(playerId)?.d1)
+      .filter((candidate): candidate is SideCandidate => Boolean(candidate)),
+    lineupStrategy,
+  });
+  const d2 = buildSideResult({
+    plan: d2Plan,
+    pickedCandidates: allocation.d2
+      .map((playerId) => candidateByPlayerId.get(playerId)?.d2)
+      .filter((candidate): candidate is SideCandidate => Boolean(candidate)),
+    lineupStrategy,
+  });
+
+  // Audit-Zeile für die globale Zuteilung (bewusst NICHT mit "D1"/"D2" beginnend, damit die
+  // Preview-Seitenfilter sie nicht als Slot-Zeile einsammeln).
+  const allocationReasoning = `ALLOC global: d1=${d1Plan.disciplineId ?? "-"} weight=${d1Plan.weight.toFixed(3)} (rank=${d1Plan.rank ?? "n/a"}, swing=${d1Plan.swing?.toFixed(3) ?? "n/a"}) | d2=${d2Plan.disciplineId ?? "-"} weight=${d2Plan.weight.toFixed(3)} (rank=${d2Plan.rank ?? "n/a"}, swing=${d2Plan.swing?.toFixed(3) ?? "n/a"}) | strategy=${lineupStrategy}`;
 
   const entries = [...d1.entries, ...d2.entries];
   const validation = validateLegacyLineupContext({
@@ -466,7 +755,7 @@ export function buildAiLegacyLineupSuggestion(context: LegacyLineupLoadedContext
     },
     needsSummary,
     warnings: [...needsSummary.warnings, ...d1.warnings, ...d2.warnings, ...validation.errors],
-    debugReasoning: [...d1.reasoning, ...d2.reasoning],
+    debugReasoning: [allocationReasoning, ...d1.reasoning, ...d2.reasoning],
     d1SelectionReasons: [],
     d2SelectionReasons: [],
   };

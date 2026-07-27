@@ -229,6 +229,10 @@ describe("legacy ai lineup suggestion", () => {
     expect(modifiers.d1.mutatorTrait2).toBe("Ambitious");
   });
 
+  // Angepasst an die globale Zuteilung: Früher füllte die Engine d1 zuerst, also landeten die
+  // frischen p3/p4 zwangsläufig in d1. Global betrachtet gehören p3/p4 aber nach d2 (dort 89/87
+  // statt 55/52) — die Fatigue-Logik zeigt sich jetzt darin, dass der ausgelaugte Star auf der
+  // Bank bleibt (5 Spieler, 4 Slots) und der frische p5 spielt, statt eines müden Stars.
   it("prefers fresher players when fatigue and injury risk are elevated", () => {
     const context = createContext();
     context.disciplineScores = context.disciplineScores.map((score) => {
@@ -247,12 +251,16 @@ describe("legacy ai lineup suggestion", () => {
     context.lineupStrategy = "rotate_depth";
 
     const suggestion = buildAiLegacyLineupSuggestion(context);
-    const d1Players = suggestion.entries.filter((entry) => entry.disciplineSide === "d1").map((entry) => entry.playerId);
+    const fielded = suggestion.entries.map((entry) => entry.playerId);
+    const d2Players = suggestion.entries.filter((entry) => entry.disciplineSide === "d2").map((entry) => entry.playerId);
 
-    expect(d1Players).toContain("p3");
-    expect(d1Players).toContain("p4");
-    expect(d1Players).not.toContain("p1");
-    expect(d1Players).not.toContain("p2");
+    // Die frischen Leistungsträger spielen — dort, wo sie am meisten bringen (d2: 89/87).
+    expect(d2Players).toContain("p3");
+    expect(d2Players).toContain("p4");
+    // Der frische p5 wird einem müden Star vorgezogen; genau EIN erschöpfter Star pausiert.
+    expect(fielded).toContain("p5");
+    const benched = ["p1", "p2"].filter((playerId) => !fielded.includes(playerId));
+    expect(benched).toHaveLength(1);
   });
 
   it("avoids injured roster players because they are not selectable active players", () => {
@@ -519,14 +527,14 @@ describe("legacy ai lineup suggestion", () => {
     );
   });
 
+  // Angepasst an die globale Zuteilung: Fehlen nur p3/p4/p5 die mini-dm-Scores, kann die
+  // Engine inzwischen legitim ausweichen (p1/p2 nach d2, p3/p4 nach d1) und liefert ein
+  // sauberes "ready". Der missing_scores-Pfad braucht daher eine Lage OHNE Ausweichroute:
+  // nur noch p2 hat überhaupt einen d2-Score, ein zweiter d2-Slot MUSS unbewertet besetzt werden.
   it("marks missing discipline scores as missing_scores instead of faking a ready preview", () => {
     const context = createContext();
     context.disciplineScores = context.disciplineScores.filter(
-      (entry) =>
-        !(
-          entry.disciplineId === "mini-dm" &&
-          (entry.playerId === "p3" || entry.playerId === "p4" || entry.playerId === "p5")
-        ),
+      (entry) => !(entry.disciplineId === "mini-dm" && entry.playerId !== "p2"),
     );
 
     const preview = buildAiLegacyLineupPreview(context);
