@@ -60,11 +60,13 @@ const PROF = PROFILES[PROF_NAME] ?? PROFILES.ausgewogen!;
 /** Aufwaerts-Ast konkav: grosse Spruenge zahlen unterproportional. Damit sinken vor allem die
  *  Decken der SCHWACHEN Stufen, deren Korridor die groessten Delta-Werte zulaesst (Platz 32 kann
  *  +2 Stufen klettern, der Titelfavorit nur 0). */
-const rel = (d: number) => (d > 0 ? 5 + 2.5 * d - 0.9 * d * d : 5 + 2.5 * d + 2 * d);
+/** Abwaerts-Ast von 4.5 auf 2.8 pro Stufe abgeflacht: ein Titelfavorit, der 10 Plaetze faellt,
+ *  soll nicht sofort an der Untergrenze kleben. Die 35 bleibt, wird aber erst im Extremfall erreicht. */
+const rel = (d: number) => (d > 0 ? 5 + 2.5 * d - 0.9 * d * d : 5 + 2.8 * d);
 /** Repraesentative Klausel-Spannweite: von 18 auf 11 zurueckgenommen — die Decken lagen je Stufe
  *  rund 10 C zu hoch. Der Erwartungswert bleibt davon unberuehrt (Klausel-EV ist 0). */
 const CLAUSE_S = 11, CLAUSE_P = 0.5;
-export const dist = (e: number, s = 4) => {
+export const dist = (e: number, s = 5.5) => {
   const w: number[] = [];
   for (let r = 1; r <= 32; r += 1) w.push(Math.exp(-((r - e) ** 2) / (2 * s * s)));
   const t = w.reduce((a, b) => a + b, 0);
@@ -92,7 +94,7 @@ for (let ti = 0; ti < TIERS.length; ti += 1) {
     const raw = w.reduce((a, wi, i) => a + wi * (LIGA[tierOf(i + 1)]! + rel(ti - tierOf(i + 1))), 0);
     const cal = ladderTarget - raw;
     const band: number[] = [];
-    for (let r = Math.max(1, e - 8); r <= Math.min(32, e + 8); r += 1) {
+    for (let r = Math.max(1, e - 11); r <= Math.min(32, e + 11); r += 1) {
       const v = LIGA[tierOf(r)]! + rel(ti - tierOf(r)) + cal;
       band.push(Math.max(FLOOR, v + CLAUSE_S * (1 - CLAUSE_P) + special));
       band.push(Math.max(FLOOR, v - CLAUSE_S * CLAUSE_P));
