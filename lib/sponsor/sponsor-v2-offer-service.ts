@@ -119,6 +119,39 @@ export function sponsorV2GoalProbability(specialKey: string | null | undefined, 
 
 // ── Liga-K ─────────────────────────────────────────────────────────────────────────────────────
 const kCache = new Map<string, number>();
+
+/**
+ * REFERENZ-GEHALT JE TEAM, wenn die Liga noch keine echten Gehaelter fuehrt.
+ *
+ * GEMESSENER BEFUND aus dem ersten Live-Lauf, und ein echter Fehler: in einem FRISCH erzeugten
+ * Spiel ist die Gehaltssumme der Liga 0 — die Sponsorangebote entstehen beim Anlegen des Spiels,
+ * die Spielervertraege bekommen ihre Gehaelter aber erst im Draft danach. K wurde dadurch gegen
+ * eine Zielsumme von 0 geloest, fiel auf ~0, und JEDE Karte kollabierte in die Untergrenze: die
+ * Auszahlungsleiter war ueber alle 32 Raenge flach 37 C, Tabellenplatz und Sonderziel zahlten
+ * nichts. Das Spiel waere spielbar gewesen und wirtschaftlich tot.
+ *
+ * Der alte Pfad hat dieses Problem nicht, weil sein Anker `getSponsorRank32BaseAnchorSalary` mit
+ * `Math.max(SPONSOR_BASE_FLOOR_C, ...)` nach unten abgesichert ist. V2 bekommt dieselbe
+ * Absicherung: liegt die gemessene Gehaltssumme unter einem Viertel der Referenz, ist die
+ * Kader-Oekonomie noch nicht initialisiert und die Referenz wird benutzt.
+ *
+ * 64.9 C je Team ist der gemessene S1-Schnitt aus einem echten Save (Summe 2078 bei 32 Teams,
+ * `SALARY_SUM_S1` in scripts/sponsor-model-params.ts).
+ */
+export const SPONSOR_V2_REFERENCE_SALARY_PER_TEAM = 64.9;
+
+/**
+ * Gehaltssumme, gegen die K geloest wird — mit Plausibilitaetsschranke.
+ * Gibt zusaetzlich zurueck, ob die Referenz gegriffen hat, damit der Live-Check das ausweisen kann
+ * statt es zu verschlucken.
+ */
+export function sponsorV2LeagueSalaryBasis(gameState: GameState): { salarySum: number; usedReference: boolean } {
+  const measured = gameState.teams.reduce((a, t) => a + getTeamDisplaySalaryTotal(gameState, t.teamId), 0);
+  const reference = Math.max(1, gameState.teams.length) * SPONSOR_V2_REFERENCE_SALARY_PER_TEAM;
+  if (measured >= reference * 0.25) return { salarySum: measured, usedReference: false };
+  return { salarySum: reference, usedReference: true };
+}
+
 /**
  * Ex-ante geloestes K der laufenden Saison. Siehe Kopfkommentar zur Naeherung.
  * Gecacht je (Saison, Ligajahr-Faktor, gerundete Gehaltssumme) — sonst laeuft die Bisektion bei
@@ -126,7 +159,7 @@ const kCache = new Map<string, number>();
  */
 export function sponsorV2SeasonK(gameState: GameState): number {
   const salaryFactor = getSalaryFactor(gameState);
-  const salarySum = gameState.teams.reduce((a, t) => a + getTeamDisplaySalaryTotal(gameState, t.teamId), 0);
+  const { salarySum } = sponsorV2LeagueSalaryBasis(gameState);
   const key = `${gameState.season.id}:${salaryFactor.toFixed(3)}:${salarySum.toFixed(1)}`;
   const hit = kCache.get(key);
   if (hit !== undefined) return hit;

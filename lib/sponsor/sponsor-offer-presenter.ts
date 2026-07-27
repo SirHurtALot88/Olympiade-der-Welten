@@ -11,6 +11,8 @@ import {
   parseAxisTargetValue,
   type SponsorAxisKey,
 } from "@/lib/sponsor/sponsor-special-objectives";
+import { sponsorV2CurveByName, sponsorV2ProfileByName } from "@/lib/sponsor/sponsor-v2-model";
+import { getSponsorV2Terms, sponsorV2GuaranteedLadder, sponsorV2Settle } from "@/lib/sponsor/sponsor-v2-offer-service";
 
 export type SponsorChallengeDifficulty = "leicht" | "mittel" | "hart";
 
@@ -29,6 +31,49 @@ export type SponsorOfferPresentation = {
   isGolden: boolean;
   offerBadge: string | null;
   special: SponsorSpecialPresentation | null;
+  /**
+   * OLY_SPONSOR_V2: die Struktur des neuen Modells, fertig fuer die Karte. `null` = altes Angebot.
+   *
+   * WARUM EIGENE FELDER statt der alten mit neuen Zahlen zu fuellen: die V2-Karte hat Achsen, die
+   * es vorher nicht gab — eine Klausel mit BONUS UND MALUS, eine garantierte Untergrenze und ein
+   * Sonderziel, dessen Betrag von seiner Schwierigkeit abhaengt. Wer das in `rewardCash`-Kacheln
+   * presst, zeigt Zahlen ohne die Bedingung, unter der sie gelten. Genau daran erkennt der Spieler
+   * sonst nicht, dass er auch VERLIEREN kann.
+   */
+  v2: SponsorV2Presentation | null;
+};
+
+/** Anzeigefertige V2-Struktur. Alle Betraege sind die, aus denen das Settlement zahlt. */
+export type SponsorV2Presentation = {
+  curveName: string;
+  curveNote: string;
+  profileName: string;
+  profileNote: string;
+  expectedRank: number;
+  /** Garantiert auf JEDEM Endrang — die Untergrenze der Karte. */
+  guaranteedFloor: number;
+  /** Auszahlung bei Titelgewinn, ohne Klausel und Sonderziel. */
+  guaranteedTop: number;
+  clause: {
+    label: string;
+    /** "Fatigue-Schnitt ≥ 23.4" — Praedikat mit der wirklich geprueften Schwelle. */
+    thresholdText: string;
+    bonus: number;
+    malus: number;
+    /** Erfuellungswahrscheinlichkeit, aus der Bonus und Malus abgeleitet sind. */
+    probability: number;
+  };
+  goal: {
+    label: string;
+    payout: number;
+    probability: number;
+    /** "Leicht" | "Mittel" | "Hart" — abgeleitet aus der Erfolgswahrscheinlichkeit. */
+    difficultyLabel: string;
+  };
+  /** Bestwert der Karte: Titel + Klausel erfuellt + Sonderziel erreicht. */
+  maxPayout: number;
+  /** Schlechtestwert: letzter Platz, Klausel verletzt, Ziel verfehlt. */
+  minPayout: number;
 };
 
 const AXIS_LABELS: Record<SponsorAxisKey, string> = {
@@ -286,6 +331,50 @@ export function buildSponsorOfferPresentation(input: {
           teamId: input.teamId ?? input.offer.teamId,
         })
       : null,
+    v2: buildSponsorV2Presentation(input.offer),
+  };
+}
+
+/**
+ * Baut die V2-Anzeige aus den EINGEFRORENEN Konditionen des Angebots — nicht aus einer zweiten
+ * Rechnung. `sponsorV2GuaranteedLadder` und `sponsorV2Settle` sind exakt die Funktionen, aus denen
+ * auch das Settlement zahlt; die Karte kann deshalb keine anderen Zahlen zeigen als die gebuchten.
+ */
+export function buildSponsorV2Presentation(offer: SponsorOffer): SponsorV2Presentation | null {
+  const terms = getSponsorV2Terms(offer);
+  if (!terms) return null;
+  const ladder = sponsorV2GuaranteedLadder(terms);
+  const clauseP = terms.clauseBonus + terms.clauseMalus > 0
+    ? terms.clauseMalus / (terms.clauseBonus + terms.clauseMalus)
+    : 0.5;
+  const dir = terms.clauseDirection === "up" ? "≥" : "≤";
+  const curve = sponsorV2CurveByName(terms.curveName);
+  const profile = sponsorV2ProfileByName(terms.profileName);
+  return {
+    curveName: terms.curveName,
+    curveNote: curve.note,
+    profileName: terms.profileName,
+    profileNote: profile.note,
+    expectedRank: terms.expectedRank,
+    guaranteedFloor: roundOfferCash(ladder[31] ?? 0),
+    guaranteedTop: roundOfferCash(ladder[0] ?? 0),
+    clause: {
+      label: terms.clauseLabel,
+      thresholdText: terms.clauseThreshold != null
+        ? `${dir} ${Math.round(terms.clauseThreshold * 10) / 10}`
+        : "Schwelle wird am Saisonende gesetzt",
+      bonus: roundOfferCash(terms.clauseBonus),
+      malus: roundOfferCash(terms.clauseMalus),
+      probability: Math.round(clauseP * 100) / 100,
+    },
+    goal: {
+      label: terms.goalKey ?? "Sonderziel",
+      payout: roundOfferCash(terms.goalPayout),
+      probability: terms.goalProbability,
+      difficultyLabel: terms.goalProbability >= 0.55 ? "Leicht" : terms.goalProbability >= 0.35 ? "Mittel" : "Hart",
+    },
+    maxPayout: roundOfferCash(sponsorV2Settle(terms, 1, true, 1)),
+    minPayout: roundOfferCash(sponsorV2Settle(terms, 32, false, 0)),
   };
 }
 
