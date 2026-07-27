@@ -14,8 +14,21 @@ export const TIERS = [
   { label: "Top 24",   lo: 21, hi: 24 }, { label: "Top 28",  lo: 25, hi: 28 }, { label: "Platz 32", lo: 29, hi: 32 },
 ];
 export const tierOf = (r: number) => TIERS.findIndex((t) => r >= t.lo && r <= t.hi);
-export const LIGA = [77, 70, 65, 61, 56, 52, 48, 44, 40];
-export const FLOOR = 44;
+export const LIGA = [72, 67, 63, 59, 55, 51, 47, 43, 39];
+/**
+ * Untergrenze 35 statt 44 — und ausdruecklich KEIN harter Deckel.
+ * 35 ist der Ansatz fuer den gewoehnlichen Fall in einer schwachen Saison (sf 0.8). Mit 44 klemmte
+ * fast jedes Band am unteren Ende fest; im Extremfall (gewoehnlich/sockellastig/Platz 32) kollabierte
+ * die Karte auf 44-44 mit Spannweite 0 — dort wirkte weder Kurve noch Klausel noch Sonderziel.
+ */
+export const FLOOR = Number(process.env.OLY_SPONSOR_FLOOR ?? 35);
+/**
+ * Anteil des Rarity-Pools, der GLEICHMAESSIG auf alle Stufen geht, bevor das Profil den Rest formt.
+ * Ohne ihn gehen Keller-Teams bei einem spitzenlastigen Profil voellig leer aus (gemessen: Platz 32
+ * bekam 48/49/50/51 ueber alle vier Rarities — eine legendaere Karte war dort so viel wert wie eine
+ * gewoehnliche). Eine hoehere Seltenheit soll auf JEDEM Platz spuerbar sein, nur unterschiedlich stark.
+ */
+export const POOL_EVEN_SHARE = Number(process.env.OLY_SPONSOR_EVEN ?? 0.5);
 const GAMMA = Number(process.env.OLY_SPONSOR_GAMMA ?? 1.7);
 const BASE = [76.0, 73.6, 71.6, 67.9, 63.8, 59.9, 56.7, 54.1, 53.0];
 const MEAN = BASE.reduce((a, b) => a + b, 0) / BASE.length;
@@ -34,8 +47,13 @@ const PROF_NAME = argIdx >= 0 ? process.argv[argIdx + 1]! : "ausgewogen";
 const PROF = PROFILES[PROF_NAME] ?? PROFILES.ausgewogen!;
 
 /** Repraesentative Kurve (Linear) und Klausel (mittlere Spannweite) fuer die Bandbreite. */
-const rel = (d: number) => 5 + 4 * d + (d < 0 ? 2 * d : 0);
-const CLAUSE_S = 18, CLAUSE_P = 0.5;
+/** Repraesentative Kurve. Der Aufwaerts-Ast von 4 auf 2.5 zurueckgenommen: die Decken lagen je
+ *  Stufe rund 10 C zu hoch, und sie werden von der Rangleiter getragen, nicht von Klausel oder
+ *  Sonderziel (deren Reduktion nahm nur 2-3 C). Kostet Belohnung fuers Klettern — bewusst. */
+const rel = (d: number) => 5 + 2.5 * d + (d < 0 ? 2 * d : 0);
+/** Repraesentative Klausel-Spannweite: von 18 auf 11 zurueckgenommen — die Decken lagen je Stufe
+ *  rund 10 C zu hoch. Der Erwartungswert bleibt davon unberuehrt (Klausel-EV ist 0). */
+const CLAUSE_S = 11, CLAUSE_P = 0.5;
 export const dist = (e: number, s = 4) => {
   const w: number[] = [];
   for (let r = 1; r <= 32; r += 1) w.push(Math.exp(-((r - e) ** 2) / (2 * s * s)));
@@ -54,7 +72,10 @@ for (let ti = 0; ti < TIERS.length; ti += 1) {
   const e = Math.round((TIERS[ti]!.lo + TIERS[ti]!.hi) / 2);
   const cells = RARITY.map(([, mult]) => {
     const pool = (mult - 1) * MEAN * TIERS.length;
-    const ladderTarget = SHAPE[ti]! * (1 - BASE_SPECIAL) + pool * (1 - PROF.specialShare) * PROF.w[ti]!;
+    const shaped = pool * (1 - PROF.specialShare);
+    const evenPart = (shaped * POOL_EVEN_SHARE) / TIERS.length;
+    const profilePart = shaped * (1 - POOL_EVEN_SHARE) * PROF.w[ti]!;
+    const ladderTarget = SHAPE[ti]! * (1 - BASE_SPECIAL) + evenPart + profilePart;
     const special = SHAPE[ti]! * BASE_SPECIAL + (pool * PROF.specialShare) / TIERS.length;
     const w = dist(e);
     // cal so, dass der Rangteil im Mittel das Leiterziel trifft (geschlossen, wie von Fable vorgeschlagen)
