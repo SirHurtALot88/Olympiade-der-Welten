@@ -82,25 +82,11 @@ for (let s = 1; s <= SEASONS; s += 1) {
   // Endraenge: Erwartung = Staerkerang, verrauscht
   const draw = teams.map((t) => ({ t, key: t.strength + (rnd() - 0.5) * 11 }))
     .sort((a, b) => a.key - b.key);
-  // zweistufig: erst mit Probe-K die Summe messen, dann K proportional nachziehen
-  let KFOR = 1.48 * sf;
-  for (let iter = 0; iter < 40; iter += 1) {
-    let probe = 0;
-    draw.forEach(({ t }, idx) => {
-      const fr = idx + 1, eT = tierOf(t.strength), fT = tierOf(fr);
-      const lt = SHAPE[eT]! * (1 - BASE_SPECIAL);
-      const w = dist(t.strength);
-      const raw = w.reduce((a, wi, i) => a + wi * (LIGA[tierOf(i + 1)]! + rel(eT - tierOf(i + 1))), 0);
-      const v = LIGA[fT]! + rel(eT - fT) + (lt - raw) + SHAPE[eT]! * BASE_SPECIAL * 0.45;
-      const fl = floorAt("magisch", sf);
-      probe += Math.max(fl, fl + (v - fl) * KFOR);
-    });
-    KFOR *= targetSum / probe;
-  }
-  let seasonSum = 0, seasonSalary = 0;
-  draw.forEach(({ t }, idx) => {
+  // Karten EINMAL ziehen, dann K gegen genau diese Ziehung loesen. Zuvor rechnete die Probe mit
+  // einer vereinfachten Einheitskarte, waehrend die Auszahlung die echten Ziehungen nutzte — das
+  // Boomjahr schoss dadurch ueber (135 % statt 125 %).
+  const cards = draw.map(({ t }, idx) => {
     const finalRank = idx + 1, expTier = tierOf(t.strength), finTier = tierOf(finalRank);
-    // Karte ziehen
     let u = rnd(), rIdx = 0, acc = 0;
     for (let i = 0; i < RARITY.length; i += 1) { acc += RARITY[i]![2]; if (u <= acc) { rIdx = i; break; } }
     const [rarName, mult] = RARITY[rIdx]!;
@@ -110,21 +96,26 @@ for (let s = 1; s <= SEASONS; s += 1) {
     const ladderTarget = SHAPE[expTier]! * (1 - BASE_SPECIAL) + (shaped * POOL_EVEN) / 9 + shaped * (1 - POOL_EVEN) * prof.w[expTier]!;
     const special = SHAPE[expTier]! * BASE_SPECIAL + (pool * prof.sp) / 9;
     const w = dist(t.strength);
-    const raw = w.reduce((a, wi, i) => a + wi * (LIGA[tierOf(i + 1)]! + rel(expTier - tierOf(i + 1))), 0);
-    const cal = ladderTarget - raw;
+    const raw = w.reduce((a2, wi, i) => a2 + wi * (LIGA[tierOf(i + 1)]! + rel(expTier - tierOf(i + 1))), 0);
     const clauseMet = rnd() < 0.5, goalMet = rnd() < 0.45;
-    const v = LIGA[finTier]! + rel(expTier - finTier) + cal + (clauseMet ? 5.5 : -5.5) + (goalMet ? special : 0);
-    const fl = floorAt(rarName, sf);
-    const K = KFOR; // Liga-Skalierung: bindet die Summe an die Gehaltssumme
-    const paid = Math.max(fl, fl + (v - fl) * K);
-    if (paid === fl && v < fl) floorHits += 1;
+    const v = LIGA[finTier]! + rel(expTier - finTier) + (ladderTarget - raw) + (clauseMet ? 5.5 : -5.5) + (goalMet ? special : 0);
+    return { t, finalRank, expTier, v, fl: floorAt(rarName, sf) };
+  });
+  let KFOR = 1.48 * sf;
+  for (let iter = 0; iter < 60; iter += 1) {
+    const probe = cards.reduce((a2, c) => a2 + Math.max(c.fl, c.fl + (c.v - c.fl) * KFOR), 0);
+    KFOR *= targetSum / probe;
+  }
+  let seasonSum = 0, seasonSalary = 0;
+  cards.forEach((c) => {
+    const paid = Math.max(c.fl, c.fl + (c.v - c.fl) * KFOR);
+    if (paid === c.fl && c.v < c.fl) floorHits += 1;
     cells += 1;
-    const sal = salaryAt(finalRank);
-    t.cash += paid - sal; t.hist.push(finalRank);
+    const sal = salaryAt(c.finalRank);
+    c.t.cash += paid - sal; c.t.hist.push(c.finalRank);
     seasonSum += paid; seasonSalary += sal;
-    if (t.cash < -40) insolvenzen += 1;
-    // Staerke folgt dem Geld leicht nach
-    t.strength = Math.max(1, Math.min(32, Math.round(t.strength + (t.cash > 10 ? -1 : t.cash < -10 ? 1 : 0))));
+    if (c.t.cash < -40) insolvenzen += 1;
+    c.t.strength = Math.max(1, Math.min(32, Math.round(c.t.strength + (c.t.cash > 10 ? -1 : c.t.cash < -10 ? 1 : 0))));
   });
   leagueSumAll += seasonSum; salarySumAll += seasonSalary;
   console.log(`  S${s} (sf ${sf.toFixed(2)}): Σ Sponsoren ${seasonSum.toFixed(0)}  Σ Gehälter ${seasonSalary.toFixed(0)}  Deckung ${(seasonSum/seasonSalary*100).toFixed(0)} %  (Ziel ${(sf*100).toFixed(0)} %)`);
