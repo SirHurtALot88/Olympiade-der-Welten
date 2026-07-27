@@ -14,6 +14,7 @@ import {
   saveLocalLegacyLineupDraft,
 } from "@/lib/lineups/legacy-lineup-local-service";
 import type { LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
+import { applyAiInjuryDepthTopup } from "@/lib/ai/ai-injury-depth-topup-service";
 import { applyAiMarketPlanLocally } from "@/lib/ai/ai-market-plan-apply-service";
 import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-contract";
 import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
@@ -203,6 +204,22 @@ async function applyEconomy(
   });
   log("  Economy: AI transfers done.");
 
+  // Owner request: after a season with too many injuries, an AI team buys one or two cheap depth
+  // players — see lib/ai/ai-injury-depth-topup-service.ts. This mirrors the same call the real
+  // app/api/ai/preseason-background route makes right after its AI buy pass, so this harness
+  // measures the real production behaviour. Passing every team ID is safe: the service itself
+  // skips any non-AI-controlled team (defense in depth), so the manual team is never touched.
+  const injuryDepthTopup = applyAiInjuryDepthTopup({
+    saveId: save.saveId,
+    seasonId,
+    aiTeamIds: requireValue(persistence.getSaveById(save.saveId), "Save missing before injury depth topup.").gameState.teams.map(
+      (team) => team.teamId,
+    ),
+  });
+  if (injuryDepthTopup.playersBoughtTotal > 0) {
+    log(`  Economy: injury depth topup bought ${injuryDepthTopup.playersBoughtTotal} player(s) for ${injuryDepthTopup.totalSpend} cash total.`);
+  }
+
   // Manual team: sponsor, facility, training
   let current = requireValue(persistence.getSaveById(save.saveId), "Save missing after AI transfers.");
 
@@ -270,6 +287,7 @@ type SeasonMetrics = {
     standingPoints: number | null;
     standingRank: number | null;
     standingCashTotal: number | null;
+    rosterCount: number;
   }>;
   humanTeamPlayers: Array<{
     playerId: string;
@@ -427,6 +445,9 @@ function collectSeasonMetrics(
       standingPoints: standing?.points ?? null,
       standingRank: standing?.rank ?? null,
       standingCashTotal: standing?.cashTotal ?? null,
+      // Owner request (injury depth topup): track roster size so the AI-average-roster-size
+      // trend across seasons is measurable, not just cash/rank.
+      rosterCount: save.gameState.rosters.filter((entry) => entry.teamId === team.teamId).length,
     };
   });
 
@@ -597,6 +618,13 @@ async function main() {
         totalXpSpent: m.humanTeamPlayers.reduce((sum, p) => sum + p.xpSpent, 0),
         transferBuys: m.transferActivity.filter((t) => t.transferType === "buy").length,
         transferSells: m.transferActivity.filter((t) => t.transferType === "sell").length,
+        avgAiRosterSize:
+          Number(
+            (
+              m.teams.filter((t) => !t.isManual).reduce((sum, t) => sum + t.rosterCount, 0) /
+              Math.max(1, m.teams.filter((t) => !t.isManual).length)
+            ).toFixed(2),
+          ),
       };
     }),
   };
@@ -616,7 +644,8 @@ async function main() {
         `rank=${row.manualTeamRank} · ` +
         `pts=${row.manualTeamPoints} · ` +
         `xp+${row.totalXpEarned}/-${row.totalXpSpent} · ` +
-        `buys=${row.transferBuys} sells=${row.transferSells}`,
+        `buys=${row.transferBuys} sells=${row.transferSells} · ` +
+        `avgAiRosterSize=${row.avgAiRosterSize}`,
     );
   }
 

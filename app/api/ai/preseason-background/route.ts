@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-contract";
 import { applyAiMarketPlanLocally } from "@/lib/ai/ai-market-plan-apply-service";
 import { applyAiManagerPlan, type AiManagerAction, type AiManagerActionType } from "@/lib/ai/ai-manager-apply-service";
+import { applyAiInjuryDepthTopup } from "@/lib/ai/ai-injury-depth-topup-service";
 import { buildAiActionBreakdown } from "@/lib/ai/ai-action-breakdown";
 import { AI_PRESEASON_RUN_STALE_MS } from "@/lib/ai/ai-preseason-run-timing";
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
@@ -277,15 +278,20 @@ async function executeAiPreseasonBackgroundWork(input: {
     const completedTeams = market.results.filter(
       (team) => team.result !== "blocked" && team.result !== "failed_buy" && team.result !== "failed_sell",
     ).length;
+    // Owner request: after a season with too many injuries, an AI team should buy one or two
+    // cheap depth players. Runs AFTER the regular market pipeline above (so it only tops up
+    // whatever that pipeline already did) and is scoped to the same AI-only `aiTeamIds` — see
+    // lib/ai/ai-injury-depth-topup-service.ts for the injury signal / cheap-price / afford gating.
+    const injuryDepthTopup = applyAiInjuryDepthTopup({ saveId, seasonId, aiTeamIds });
     const finalRecord: AiPreseasonAutomationRunRecord = {
       ...baseRecord,
       status: market.status === "blocked" ? "failed" : "completed",
       completedAt: nowIso(),
       aiTeamsCompleted: completedTeams,
       managerActionsApplied: managerResult.actions.filter((action) => action.applied).length,
-      transferBuysApplied: market.summary.appliedBuys,
+      transferBuysApplied: market.summary.appliedBuys + injuryDepthTopup.playersBoughtTotal,
       transferSellsApplied: market.summary.appliedSells,
-      warnings: [...managerResult.warnings, ...market.warnings],
+      warnings: [...managerResult.warnings, ...market.warnings, ...injuryDepthTopup.warnings],
       blockingReasons: [...managerResult.blockers, ...market.blockingReasons],
       actionBreakdown: buildAiActionBreakdown(managerResult.actions),
     };
