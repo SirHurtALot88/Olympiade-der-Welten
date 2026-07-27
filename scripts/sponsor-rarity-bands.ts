@@ -57,7 +57,10 @@ const PROF = PROFILES[PROF_NAME] ?? PROFILES.ausgewogen!;
 /** Repraesentative Kurve. Der Aufwaerts-Ast von 4 auf 2.5 zurueckgenommen: die Decken lagen je
  *  Stufe rund 10 C zu hoch, und sie werden von der Rangleiter getragen, nicht von Klausel oder
  *  Sonderziel (deren Reduktion nahm nur 2-3 C). Kostet Belohnung fuers Klettern — bewusst. */
-const rel = (d: number) => 5 + 2.5 * d + (d < 0 ? 2 * d : 0);
+/** Aufwaerts-Ast konkav: grosse Spruenge zahlen unterproportional. Damit sinken vor allem die
+ *  Decken der SCHWACHEN Stufen, deren Korridor die groessten Delta-Werte zulaesst (Platz 32 kann
+ *  +2 Stufen klettern, der Titelfavorit nur 0). */
+const rel = (d: number) => (d > 0 ? 5 + 2.5 * d - 0.9 * d * d : 5 + 2.5 * d + 2 * d);
 /** Repraesentative Klausel-Spannweite: von 18 auf 11 zurueckgenommen — die Decken lagen je Stufe
  *  rund 10 C zu hoch. Der Erwartungswert bleibt davon unberuehrt (Klausel-EV ist 0). */
 const CLAUSE_S = 11, CLAUSE_P = 0.5;
