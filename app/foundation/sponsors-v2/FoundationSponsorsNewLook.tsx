@@ -194,9 +194,13 @@ function ActiveContractHero({
   // Rarität/Kurvenform robust auflösen (Back-Compat für alte Verträge; rarity wird bereits beim Laden aus
   // dem alten Sternrang zurückgefüllt, siehe save-repository.ts).
   const rarity = contract.rarity ?? "gewöhnlich";
+  // Siehe SponsorOfferCardNewLook: die Modellkurve gewinnt, die Legacy-Kurvenform bleibt nur fuer
+  // Vertraege aus Spielstaenden von vor der Umstellung.
   const shape = contract.curveShape ?? mapArchetypeToCurveShape(contract.archetype);
-  const shapeLabel = SPONSOR_CURVE_SHAPES[shape].labelDe;
-  const familyLabel = SPONSOR_CURVE_FAMILIES[getSponsorCurveFamily(shape)].labelDe;
+  const shapeLabel = contract.sponsorV2?.curveName ?? SPONSOR_CURVE_SHAPES[shape].labelDe;
+  const familyLabel = contract.sponsorV2
+    ? contract.sponsorV2.profileName
+    : SPONSOR_CURVE_FAMILIES[getSponsorCurveFamily(shape)].labelDe;
   const payoutTiles = buildContractPayoutTiles(contract);
   const paidCount = payoutTiles.filter((tile) => tile.paid).length;
   const termSeasons = contract.termSeasons ?? null;

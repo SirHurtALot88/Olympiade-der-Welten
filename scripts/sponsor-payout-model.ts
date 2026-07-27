@@ -1,4 +1,19 @@
 /**
+ * HISTORISCH — MISST DAS ALTE SPONSORSYSTEM (V1), DAS NICHT MEHR ERZEUGT WIRD.
+ *
+ * Dieses Skript rechnet die Auszahlung des ALTEN Angebotsmodells durch: Kurvenform-Payout-Tabellen,
+ * Modul "Überperformance", Modul "Tabellenziel" und den rarity-gestaffelten Sonderziel-Betrag. Genau
+ * diese Erzeugung ist entfernt worden — seit dem Aufräumen des Cutovers entsteht KEIN Angebot mehr
+ * nach diesen Regeln. Wer die Zahlen des laufenden Systems will, nimmt `scripts/sponsor-v2-live-check.ts`
+ * oder `lib/sponsor/sponsor-v2-model.ts`.
+ *
+ * Das Skript LÄUFT weiter und ist damit als Beleg reproduzierbar. Die beiden Modul-Konfigurationen
+ * (Überperformance / Tabellenziel) sind unten als EINGEFRORENE KOPIEN hinterlegt, weil sie aus
+ * `lib/sponsor/sponsor-economy-calibration.ts` entfernt wurden; die übrigen Funktionen (Kurven-Payout,
+ * Cash-Beträge) sind noch echte Produktionsfunktionen, weil Altverträge sie zum Abrechnen brauchen.
+ * Die frühere Zusage "kann nie von der tatsächlichen Auszahlung abdriften" gilt für dieses Skript
+ * ausdrücklich NICHT mehr — es beschreibt einen abgeschlossenen Stand.
+ *
  * Sponsor-Rechenmodell — theoretischer Durchrechner für Sponsoren-Auszahlungen.
  *
  * ZWECK (User-Vorgabe): "sauber ein Rechenmodell erstellen und in der Theorie verschiedene Positionen
@@ -24,12 +39,10 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import type { SponsorCurveShape, SponsorRarity } from "@/lib/data/olyDataTypes";
+import type { SponsorArchetype, SponsorCurveFamily, SponsorCurveShape, SponsorRarity } from "@/lib/data/olyDataTypes";
 import {
   buildOfferCashAmounts,
   getSponsorCurveShapePayout,
-  getSponsorImprovementConfig,
-  getSponsorOverperfConfig,
   SPONSOR_SPECIAL_BASE_CAP_FRAC,
   SPONSOR_SPECIAL_BASE_SHARE,
   SPONSOR_SPECIAL_RARITY_STEP,
@@ -39,7 +52,47 @@ import {
   SPONSOR_CURVE_SHAPES,
   SPONSOR_RARITIES,
 } from "@/lib/sponsor/sponsor-curve-shapes";
-import { mapCurveShapeToArchetype } from "@/lib/sponsor/sponsor-tier-pool";
+
+// ── EINGEFRORENE KOPIEN DES ENTFERNTEN V1-ERZEUGUNGSPFADS ──────────────────────────────────────────
+// Diese vier Definitionen standen bis zum Aufräumen in lib/sponsor/sponsor-economy-calibration.ts bzw.
+// lib/sponsor/sponsor-tier-pool.ts. Sie sind dort entfernt, weil kein Angebot mehr danach gebaut wird.
+// Hier stehen sie als unveränderte Kopie, damit dieser historische Report weiter läuft und reproduzierbar
+// bleibt. Sie sind KEINE Produktionswerte mehr — niemand darf sie von hier aus wieder importieren.
+const LEGACY_OVERPERF_FAMILY: Record<SponsorCurveFamily, { rate: number; cap: number } | null> = {
+  titel: { rate: 1.8, cap: 14 },
+  europa: { rate: 1.2, cap: 10 },
+  stetig: { rate: 0.8, cap: 6 },
+  aufstieg: { rate: 0.6, cap: 5 },
+  sicherheit: null,
+};
+const LEGACY_IMPROVEMENT_FAMILY: Record<SponsorCurveFamily, { rate: number; max: number }> = {
+  titel: { rate: 0.6, max: 3 },
+  europa: { rate: 1.0, max: 4 },
+  stetig: { rate: 1.2, max: 5 },
+  aufstieg: { rate: 1.5, max: 6 },
+  sicherheit: { rate: 1.0, max: 5 },
+};
+function legacyOverperfConfig(family: SponsorCurveFamily, rarityOrder: number, salaryFactor = 1) {
+  const cfg = LEGACY_OVERPERF_FAMILY[family];
+  if (!cfg) return null;
+  const rarityMult = 1 + 0.1 * rarityOrder;
+  return {
+    ratePerUnitC: Math.round(cfg.rate * rarityMult * salaryFactor * 10) / 10,
+    cap: Math.round(cfg.cap * rarityMult * salaryFactor * 10) / 10,
+  };
+}
+function legacyImprovementConfig(family: SponsorCurveFamily, salaryFactor = 1) {
+  const cfg = LEGACY_IMPROVEMENT_FAMILY[family] ?? LEGACY_IMPROVEMENT_FAMILY.stetig;
+  const ratePerUnitC = Math.round(cfg.rate * salaryFactor * 10) / 10;
+  return { ratePerUnitC, maxUnits: cfg.max, cap: Math.round(ratePerUnitC * cfg.max * 10) / 10 };
+}
+/** Legacy-Kurvenform -> Archetyp; die Abbildung ist mit dem Erzeugungspfad aus lib/ entfernt worden. */
+function legacyArchetypeOf(shape: SponsorCurveShape): SponsorArchetype {
+  const family = getSponsorCurveFamily(shape);
+  if (family === "titel") return "performance";
+  if (family === "sicherheit") return "security";
+  return "identity";
+}
 
 const SHAPES = Object.keys(SPONSOR_CURVE_SHAPES) as SponsorCurveShape[];
 const RARITIES = Object.keys(SPONSOR_RARITIES) as SponsorRarity[];
@@ -96,13 +149,13 @@ export function computeSponsorPayout(input: {
   const floor = getSponsorCurveShapePayout(32, sf, input.rarity, input.shape, lm, quality, golden);
 
   // Modul "Überperformance": misst gegen den ERWARTUNGSRANG.
-  const overperfCfg = getSponsorOverperfConfig(family, SPONSOR_RARITIES[input.rarity].order, sf);
+  const overperfCfg = legacyOverperfConfig(family, SPONSOR_RARITIES[input.rarity].order, sf);
   const overperf = overperfCfg
     ? Math.min(overperfCfg.cap, overperfCfg.ratePerUnitC * Math.max(0, input.expectedRank - input.finalRank))
     : 0;
 
   // Modul "Tabellenziel": misst gegen den STARTRANG (Vorsaison).
-  const improveCfg = getSponsorImprovementConfig(family, sf);
+  const improveCfg = legacyImprovementConfig(family, sf);
   const improve = Math.min(
     improveCfg.cap,
     improveCfg.ratePerUnitC * Math.max(0, input.startRank - input.finalRank),
@@ -110,7 +163,7 @@ export function computeSponsorPayout(input: {
 
   // Modul "Sonderziel": rang-UNABHÄNGIG, Betrag hängt nur an Rarity (nicht am gewählten Ziel!).
   const cash = buildOfferCashAmounts({
-    archetype: mapCurveShapeToArchetype(input.shape),
+    archetype: legacyArchetypeOf(input.shape),
     salaryFactor: sf,
     rarity: input.rarity,
     leagueMinSalary: lm,

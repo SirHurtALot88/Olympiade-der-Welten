@@ -97,30 +97,23 @@ function createGameState(partial?: Partial<GameState>): GameState {
 }
 
 describe("sponsor offer service", () => {
-  it("generates a distinct-curve, max-2-per-family, rarity-capped slate per team", () => {
+  it("generates a distinct-curve, rarity-varied slate per team — and no legacy curve shape", () => {
     const gameState = ensureSeasonSponsorOffers(createGameState());
     const offers = buildSponsorOffersForTeam({ gameState, teamId: "M-M" });
     expect(offers).toHaveLength(5);
 
-    // Jedes Angebot trägt den neuen Rarity+Kurvenform-Layer.
+    // Jedes Angebot trägt den Rarity-Layer …
     expect(offers.every((offer) => offer.rarity != null && SPONSOR_RARITY_KEYS.includes(offer.rarity))).toBe(true);
-    expect(offers.every((offer) => offer.curveShape != null)).toBe(true);
-
-    // Distinkte Kurvenformen …
-    const curves = offers.map((offer) => offer.curveShape!);
+    // … und die Modellkurve, aus der seine Auszahlung stammt.
+    expect(offers.every((offer) => offer.sponsorV2 != null)).toBe(true);
+    const curves = offers.map((offer) => offer.sponsorV2!.curveName);
     expect(new Set(curves).size).toBe(curves.length);
 
-    // … höchstens 2 pro Familie.
-    const familyCounts = new Map<string, number>();
-    for (const shape of curves) {
-      const family = getSponsorCurveFamily(shape);
-      familyCounts.set(family, (familyCounts.get(family) ?? 0) + 1);
-    }
-    for (const count of familyCounts.values()) {
-      expect(count).toBeLessThanOrEqual(2);
-    }
+    // KEINE Legacy-Kurvenform mehr: die elf alten Formen sind aus der Erzeugung entfernt und leben nur
+    // noch als Lese-Pfad fuer Altangebote/-vertraege weiter.
+    expect(offers.every((offer) => offer.curveShape === undefined)).toBe(true);
 
-    // Legacy-Ableitungen bleiben konsistent gefüllt (Marken-/Cash-Infrastruktur läuft weiter).
+    // Legacy-Ableitungen bleiben konsistent gefüllt (Marken-/Sonderziel-Infrastruktur läuft weiter).
     expect(offers.every((offer) => offer.demandProfile != null)).toBe(true);
   });
 
@@ -250,7 +243,10 @@ describe("sponsor board objectives", () => {
     gameState = chooseSponsorOffer({ gameState, teamId: "M-M", offerId: offer.offerId }).gameState;
     const overview = buildTeamObjectiveOverview(gameState);
     const sponsorObjectives = overview.objectives.filter((objective) => objective.teamId === "M-M" && objective.category === "sponsor");
-    expect(sponsorObjectives.length).toBeGreaterThanOrEqual(4);
+    // Drei Cash-Komponenten (Basis, Gewinnstufen, Sonderziel) ergeben drei Vertragsziele. Die
+    // Tabellenziel- und Ueberperformance-Komponenten des alten Systems gibt es nicht mehr; die Klausel
+    // des neuen Systems ist keine Komponente und taucht deshalb (unveraendert) nicht in dieser Liste auf.
+    expect(sponsorObjectives.length).toBeGreaterThanOrEqual(3);
   });
 
   it("shows sponsor choice pending objective without contract", () => {

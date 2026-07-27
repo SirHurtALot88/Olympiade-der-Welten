@@ -3,7 +3,6 @@ import { randomUUID } from "@/lib/utils/random-id";
 import type {
   GameState,
   SponsorArchetype,
-  SponsorCurveShape,
   SponsorDemandProfile,
   SponsorOffer,
   SponsorOfferComponent,
@@ -27,61 +26,25 @@ import {
 } from "@/lib/sponsor/sponsor-team-quality-rank";
 import {
   buildOfferRankPayoutLadderPreview,
-  buildMilestoneRankLabel,
-  buildOfferCashAmounts,
   estimateExpectedPayout,
-  getLeagueMinimumSalaryTotal,
-  getSponsorCurveShapePayout,
-  getSponsorRank32BaseAnchorSalary,
-  getNextMilestoneRank,
-  getPrizeMoneyReference,
-  getSponsorPayoutForFinalRank,
-  getSponsorOverperfConfig,
-  getSponsorImprovementConfig,
-  resolveSponsorEconomyAnchors,
+  getCurrentSponsorSalaryFactor,
 } from "@/lib/sponsor/sponsor-economy-calibration";
-import { SPONSOR_RARITIES, getSponsorCurveFamily, mapArchetypeToCurveShape } from "@/lib/sponsor/sponsor-curve-shapes";
+import { SPONSOR_RARITIES } from "@/lib/sponsor/sponsor-curve-shapes";
 import { applySpotlightPerkToComponents, buildSponsorOfferModuleIds } from "@/lib/sponsor/sponsor-modules";
 import {
-  getDemandMultiplierForRarity,
-  mapCurveShapeToArchetype,
+  mapSponsorCurveToArchetype,
   rollSponsorOfferSlate,
 } from "@/lib/sponsor/sponsor-tier-pool";
+import type { SponsorV2CurveName } from "@/lib/sponsor/sponsor-v2-model";
 import {
   buildBonusObjectiveComponent,
-  buildFanInfrastructureSpecialComponent,
   buildGoldenObjectiveComponent,
-  buildOverperformanceComponent,
   pickBonusObjective,
   pickGoldenObjective,
   resolveChallengeSlotIndex,
   sponsorObjectiveFamilyForKey,
 } from "@/lib/sponsor/sponsor-special-objectives";
-import { calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
-import { applySponsorV2ToOffers, usesSponsorV2 } from "@/lib/sponsor/sponsor-v2-offer-service";
-
-// Liga-weite Anzeige-Normalisierung der Sponsor-Angebote ist deaktiviert: der Anker basiert noch auf der
-// alten getSponsorPayoutForFinalRank-Kurve (+ Floor bei Rang 32), während das Settlement bereits die neue
-// getSponsorPayoutForFinalRankAndTier-Kurve nutzt. Die Normalisierung bricht dadurch die Invariante
-// Anzeige==Settlement. Erst wieder aktivieren, wenn der Anker auf die neue Kurve + effectiveBaseFloor läuft.
-const SPONSOR_LEAGUE_NORMALIZATION_ENABLED = false;
-
-function roundCash(value: number) {
-  return Number(value.toFixed(1));
-}
-
-function clampCash(value: number, min: number, max: number) {
-  return roundCash(Math.max(min, Math.min(max, value)));
-}
-
-function getCurrentSalaryFactor(gameState: GameState): number {
-  const factor = gameState.seasonState.seasonEconomyFactors?.[0]?.factor;
-  return typeof factor === "number" && Number.isFinite(factor) && factor > 0 ? factor : 1;
-}
-
-function getSportTargetRank(startRank: number | null): number {
-  return getNextMilestoneRank(startRank);
-}
+import { applySponsorV2ToOffers } from "@/lib/sponsor/sponsor-v2-offer-service";
 
 /** Demand profile derived from rarity: legendär→elite, selten→ambitious, magisch→balanced, gewöhnlich→safe. */
 function getDemandProfileForRarity(rarity: SponsorRarity): SponsorDemandProfile {
@@ -97,45 +60,48 @@ function getDemandProfileForRarity(rarity: SponsorRarity): SponsorDemandProfile 
   }
 }
 
-function buildOffer(input: {
+/**
+ * DAS GERUEST EINES ANGEBOTS — MARKE, KURVE, RARITY, SONDERZIEL. KEINE BETRAEGE.
+ *
+ * Bis zum Cutover rechnete diese Funktion die Auszahlung nach ALTEM Recht aus (Kurven-Payout-Tabellen,
+ * Meilenstein-Leiter, Überperformance-Modul, Tabellenziel-Modul) und das neue Modell überschrieb die
+ * Beträge anschließend wieder. Diese zweite Rechenstelle ist ersatzlos entfallen: hier entsteht nur noch
+ * die IDENTITÄT des Angebots — welche Marke, welche Kurve, welche Rarity, welches Sonderziel. Alle Zahlen
+ * kommen aus `applySponsorV2ToOffers` (→ sponsor-v2-model), und zwar aus genau einer Rechenstelle.
+ *
+ * Die Komponenten werden deshalb mit `rewardCash: 0` angelegt. Diese Funktion ist bewusst NICHT exportiert:
+ * ein Angebot verlässt das Modul ausschließlich durch `buildSponsorOffersForTeam`, und die Funktion setzt
+ * die Beträge immer. `tests/sponsor-v1-erzeugung-tot.test.ts` sichert genau das ab.
+ */
+function buildOfferSkeleton(input: {
   gameState: GameState;
   team: Team;
   identity: TeamIdentity | null;
   profile: TeamStrategyProfile | null;
-  curveShape: SponsorCurveShape;
+  curveName: SponsorV2CurveName;
   rarity: SponsorRarity;
-  rankTarget: number;
-  startRank: number | null;
   commercialRating: number;
   slotIndex: number;
-  salaryFactor: number;
   usedParentBrandIds?: string[];
   recentParentBrandIds?: string[];
   globalParentUsage?: Record<string, number>;
-  leagueMinSalary: number;
   forcePremiumElite?: boolean;
   teamQualityRank?: number | null;
   specialMode?: "standard" | "challenge";
   usedSpecialFamilies?: Set<string>;
 }): SponsorOffer {
-  const { team, identity, profile, curveShape, rarity, rankTarget, startRank, gameState, commercialRating, slotIndex, salaryFactor, leagueMinSalary, teamQualityRank, specialMode } = input;
-  // Transition: der legacy archetype bleibt abgeleitet (family→archetype), damit die bestehende Marken-/
-  // Sonderziel-/Cash-Infrastruktur unverändert weiterläuft, während curveShape/rarity die Payout-Kurve steuern.
-  const archetype: SponsorArchetype = mapCurveShapeToArchetype(curveShape);
-  const demandMult = getDemandMultiplierForRarity(rarity);
-  const family = getSponsorCurveFamily(curveShape);
-  const rarityOrder = SPONSOR_RARITIES[rarity].order;
-  // P3: Verbesserungs-Modul jetzt PER PLATZ (familien-differenziert) statt binär; Überperformance-Modul
-  // (familien-differenziert, rarity-skaliert) ersetzt das binäre beat_expected_rank-Special.
-  const improvementCfg = getSponsorImprovementConfig(family, salaryFactor);
-  const overperfCfg = getSponsorOverperfConfig(family, rarityOrder, salaryFactor);
+  const { team, identity, profile, curveName, rarity, gameState, commercialRating, slotIndex, teamQualityRank, specialMode } = input;
+  // Der Marken- und der Sonderziel-Katalog sind noch nach den drei alten Archetypen verschlagwortet; die
+  // Modellkurve wird dafür auf einen Eimer abgebildet (SPONSOR_CURVE_ARCHETYPE). Der Archetyp ist ab hier
+  // reines Katalog-Schlagwort — an der Auszahlung hängt er nicht mehr.
+  const archetype: SponsorArchetype = mapSponsorCurveToArchetype(curveName);
   const { brand, parent, special } = pickSponsorBrandForOffer({
     seasonId: gameState.season.id,
     teamId: team.teamId,
     team,
     identity,
     profile,
-    curveShape,
+    archetype,
     rarity,
     slotIndex,
     usedParentBrandIds: input.usedParentBrandIds,
@@ -147,85 +113,32 @@ function buildOffer(input: {
     usedSpecialFamilies: input.usedSpecialFamilies,
   });
   const isGolden = input.forcePremiumElite === true;
-  const cashAmounts = buildOfferCashAmounts({ archetype, salaryFactor, rarity, leagueMinSalary, teamQualityRank, isGolden });
-  // NEUE Kurven-Payout-Kurve steuert die Rang-Komponente: erreichbarer Upside = Kurven-Payout am Ziel-Rang
-  // MINUS Sockel (Platz 32). rarity skaliert das Etat, curveShape verteilt es über die Tabelle. base/special
-  // bleiben (Transition) über buildOfferCashAmounts (legacy stern/archetyp) berechnet.
-  const rankCash = roundCash(
-    Math.max(
-      0,
-      getSponsorCurveShapePayout(rankTarget, salaryFactor, rarity, curveShape, leagueMinSalary, teamQualityRank ?? null, isGolden) -
-        getSponsorCurveShapePayout(32, salaryFactor, rarity, curveShape, leagueMinSalary, teamQualityRank ?? null, isGolden),
-    ),
-  );
-  // P2 Sonderziel-Buff: den (jetzt rarity-gestaffelten, in buildOfferCashAmounts gedeckelten) specialCash
-  // DIREKT als Sonderziel-Reward verwenden — die frühere 0.65/0.35-Verdünnung ist entfallen, damit ein
-  // volles Sonderziel spürbar zahlt (~5/8/10/13 C je Rarity statt ~2–4 C). Challenge-Slot: Boden von 5 % auf
-  // 8 % des Titel-Etats angehoben (sein Achsen-Rang-Ziel soll ebenfalls lohnender sein).
-  const baseSpecialCash =
-    specialMode === "challenge"
-      ? roundCash(Math.max(cashAmounts.specialCash, cashAmounts.totalAtMaxRank * 0.08))
-      : cashAmounts.specialCash;
-  // Enhancement 1 (Kern): das (bereits erreichbare) Saison-Sonderziel soll den Unterhaltskosten-Teil
-  // plus etwas extra abdecken — aber über ein Ziel, nicht über den Basisbetrag. Der Reward bekommt einen
-  // an den tatsächlichen Gebäude-Unterhalt des Teams gekoppelten Floor (halber Unterhalt, gedeckelt,
-  // salaryFactor-skaliert), sodass Teams mit mehr Gebäuden auch einen größeren erreichbaren Bonus haben.
-  const teamUpkeep = calculateFacilityUpkeep(getTeamFacilityState(gameState, team.teamId));
-  const upkeepSpecialFloor = roundCash(Math.min(teamUpkeep * 0.5, 6) * salaryFactor);
-  const specialCash = roundCash(Math.max(baseSpecialCash, upkeepSpecialFloor));
 
-  // Enhancement 2 (optional) + 3 (Feinschliff): Fan-Infrastruktur-Klausel (skaliert mit Income-Gebäude-
-  // Stufe) und Überperformance-Bonus (Saison deutlich über der erwarteten Qualitäts-Platzierung). Beide
-  // konservativ, salaryFactor-skaliert, binär bzw. gedeckelt — nur ausgezahlt, wenn das jeweilige Ziel
-  // erreicht wird (siehe Settlement/Evaluator).
-  const fanInfraReward = roundCash(2.5 * salaryFactor);
-  // P3: Überperformance als eigenes, sichtbares, familien-differenziertes Modul (min(cap, rate × Plätze über
-  // Erwartung), beim Signieren eingefroren) statt des binären 3-C-beat_expected_rank. Sicherheits-Familie hat
-  // keins (overperfCfg == null → dafür XL-Basis); Teams ohne Luft nach oben ebenfalls (Builder gibt null).
-  const overperfComponent = overperfCfg
-    ? buildOverperformanceComponent({
-        expectedRank: teamQualityRank,
-        ratePerUnitC: overperfCfg.ratePerUnitC,
-        cap: overperfCfg.cap,
-      })
-    : null;
-
-  // TEIL B: das Saison-Sonderziel ist jetzt ein echtes Bonusziel aus dem 14+6-Pool (staged, anteilige
-  // Auszahlung + Spotlight-Impuls in die Beliebtheit) statt des Legacy-Templates. Golden-Angebote bekommen
-  // ein Golden-Ziel, Challenge-Angebote behalten ihr Achsen-Rang-Sonderziel (eigenes UI-Panel), Standard-
-  // Angebote ziehen deterministisch ein archetyp-passendes Bonusziel. Fällt der Pool aus (kein Ziel für den
-  // Archetyp), bleibt das Legacy-Sonderziel. `specialCash` (an den Gebäude-Unterhalt gekoppelt) bleibt der
-  // Reward-Betrag. Teil-B-Ziele sind staged (kein Malus); die Legacy-/Challenge-Variante behält ihren Malus.
-  const legacySpecialComponent: SponsorOfferComponent = {
-    ...special,
-    rewardCash: specialCash,
-    penaltyCash:
-      special.penaltyCash != null
-        ? clampCash((specialCash * 0.4) / demandMult, 0.5, specialCash * 0.5)
-        : undefined,
-  };
+  // Das Saison-Sonderziel kommt aus dem 14+6-Pool (staged, anteilige Auszahlung + Spotlight-Impuls in die
+  // Beliebtheit). Golden-Angebote bekommen ein Golden-Ziel, Challenge-Angebote behalten ihr Achsen-Rang-
+  // Sonderziel (eigenes UI-Panel), Standard-Angebote ziehen deterministisch ein passendes Bonusziel. Fällt
+  // der Pool aus, bleibt das Sonderziel der Markenvorlage stehen.
   const bonusObjectiveInput = {
     gameState,
     team,
     identity,
     profile,
-    rewardCash: specialCash,
+    rewardCash: 0,
     rarity,
     seasonId: gameState.season.id,
     teamQualityRank,
   };
-  let specialComponent: SponsorOfferComponent = legacySpecialComponent;
+  let specialComponent: SponsorOfferComponent = { ...special, rewardCash: 0, penaltyCash: undefined };
   if (isGolden) {
-    // Golden-Ziel zahlt 25 % über dem Standard-Sonderziel (das Golden-Los ist die seltene, dickste Karte).
     specialComponent = buildGoldenObjectiveComponent(
-      pickGoldenObjective(gameState.season.id, team.teamId, curveShape, teamQualityRank),
-      { ...bonusObjectiveInput, rewardCash: roundCash(specialCash * 1.25) },
+      pickGoldenObjective(gameState.season.id, team.teamId, archetype, teamQualityRank),
+      bonusObjectiveInput,
     );
   } else if (specialMode !== "challenge") {
     const bonusKey = pickBonusObjective(
       gameState.season.id,
       team.teamId,
-      curveShape,
+      archetype,
       slotIndex,
       teamQualityRank,
       input.usedSpecialFamilies,
@@ -241,44 +154,21 @@ function buildOffer(input: {
       componentId: "base-cash",
       kind: "base",
       label: "Basis-Saisonzahlung",
-      targetValue: cashAmounts.baseCash,
-      rewardCash: cashAmounts.baseCash,
+      targetValue: 0,
+      rewardCash: 0,
     },
     {
       componentId: "rank-target",
       kind: "rank",
-      label: `Gewinnstufen: ${buildMilestoneRankLabel()}`,
-      targetValue: rankTarget,
-      rewardCash: rankCash,
-      // WAVE 1 (Punkt 3): Rang-Malus 0.05→0.15, aber relativ zur Upside gedeckelt (max halber Rang-Reward),
-      // damit der Malus nie die mögliche Belohnung übersteigt. Der ambitious-penaltyMult ×2 kommt on top
-      // (applySponsorNegotiationToComponents).
-      penaltyCash: clampCash(rankCash * 0.15 * demandMult, 0.5, rankCash * 0.5),
-    },
-    {
-      componentId: "improvement-target",
-      kind: "improvement",
-      // P3: per-Platz statt binär — zahlt ratePerUnitC je verbessertem Platz ggü. Startrang, gedeckelt bei
-      // maxUnits Plätzen. rewardCash = Cap (max) für Anzeige/Total; targetValue 1 = min. 1 Platz zum Zahlen.
-      label: `+${improvementCfg.ratePerUnitC} C je verbessertem Platz · max ${improvementCfg.maxUnits}`,
+      label: "Gewinnstufen nach Endrang",
       targetValue: 1,
-      rewardCash: improvementCfg.cap,
-      ratePerUnitC: improvementCfg.ratePerUnitC,
-      maxUnits: improvementCfg.maxUnits,
+      rewardCash: 0,
     },
     specialComponent,
-    // Immer-an Fan-Infrastruktur-Klausel — ABER nur, wenn das gezogene Sonderziel (specialComponent)
-    // nicht ohnehin schon `fan_infrastructure` ist. Sonst landete die Klausel doppelt im Offer
-    // (doppelter React-Key `special-fan-infrastructure` in der Reward-Liste + doppelt gezählter
-    // rewardCash in totalUpsideEstimate).
-    ...(specialComponent.specialKey === "fan_infrastructure"
-      ? []
-      : [buildFanInfrastructureSpecialComponent({ rewardCash: fanInfraReward })]),
-    ...(overperfComponent ? [overperfComponent] : []),
   ];
 
   // P4 Baukasten: Spotlight-Perk (nur legendär/golden) verstärkt den Beliebtheits-Impuls des Sonderziels —
-  // rein Popularity-wirksam, cash-neutral, damit die P0–P3-Payout-Balance exakt erhalten bleibt.
+  // rein Popularity-wirksam, cash-neutral.
   const perkedComponents = applySpotlightPerkToComponents(components, rarity, isGolden);
 
   const offer: SponsorOffer = {
@@ -286,12 +176,11 @@ function buildOffer(input: {
     seasonId: gameState.season.id,
     teamId: team.teamId,
     archetype,
-    curveShape,
     rarity,
     name: parent.name,
     flavor: input.forcePremiumElite ? `★ Golden Card · ${brand.flavor}` : brand.flavor,
     components: perkedComponents,
-    totalUpsideEstimate: roundCash(perkedComponents.reduce((sum, component) => sum + component.rewardCash, 0)),
+    totalUpsideEstimate: 0,
     commercialRating,
     sponsorBrandId: brand.id,
     sponsorParentBrandId: brand.parentBrandId,
@@ -301,7 +190,6 @@ function buildOffer(input: {
     isChallengeOffer: specialMode === "challenge",
     isGolden,
   };
-  // P4: Baukasten-Modulliste (Cash-Komponenten + evtl. Perk) fürs UI/Debug ableiten und anhängen.
   offer.moduleIds = buildSponsorOfferModuleIds(offer);
   return offer;
 }
@@ -325,10 +213,8 @@ export function buildSponsorOffersForTeam(input: {
     return [];
   }
   const rows = buildTeamSeasonOverviewRows({ gameState: input.gameState });
-  const row = rows.find((entry) => entry.teamId === input.teamId) ?? null;
   const identity = input.gameState.teamIdentities.find((entry) => entry.teamId === input.teamId) ?? null;
   const profile = getTeamStrategyProfile(input.gameState, input.teamId);
-  const startRank = row?.startplatz ?? row?.rank ?? null;
   const commercialRating = buildSponsorCommercialRating({ gameState: input.gameState, teamId: input.teamId });
   // Feed 1 (TEIL A): fortgeschriebene Beliebtheit hebt/senkt den Stern-Deckel der Angebots-Generierung.
   const qualityRanks = buildLeagueTeamQualityRanks(rows, input.gameState.seasonState.beliebtheitByTeamId);
@@ -340,8 +226,8 @@ export function buildSponsorOffersForTeam(input: {
   const beliebtheit = input.gameState.seasonState.beliebtheitByTeamId?.[input.teamId]?.value ?? null;
   const hadGoldenLastSeason =
     input.gameState.seasonState.goldenSponsorHistoryByTeamId?.[input.teamId] === true;
-  // 5 Angebote: pro Slot eine (rarity, curveShape)-Paarung aus dem Slate-Wurf — DISTINCT Kurvenformen
-  // (≤2/Familie), rarity-gedeckelt + beliebtheits-gehoben. Jeder Slot bekommt eigenen Golden-Los, und über
+  // 5 Angebote: pro Slot eine (rarity, Modellkurve)-Paarung aus dem Slate-Wurf — DISTINCT Kurven,
+  // rarity-gedeckelt + beliebtheits-gehoben. Jeder Slot bekommt eigenen Golden-Los, und über
   // usedParentBrandIds (unten) unterschiedliche Marken.
   const SLOT_COUNT = 5;
   const slate = rollSponsorOfferSlate({
@@ -357,28 +243,21 @@ export function buildSponsorOffersForTeam(input: {
   const recentParentBrandIds = getRecentSponsorParentIds(input.gameState, input.teamId);
   const globalParentUsage =
     input.globalParentUsage ?? buildGlobalParentUsageFromOffers(input.gameState.seasonState.sponsorOffersByTeamId);
-  const salaryFactor = getCurrentSalaryFactor(input.gameState);
-  const baseAnchorSalary = getSponsorRank32BaseAnchorSalary(input.gameState);
   const challengeSlotIndex = resolveChallengeSlotIndex(input.gameState.season.id, input.teamId, SLOT_COUNT);
 
   // Slate-Anti-Wiederholung (Fable C3): über die 5 Slots hinweg möglichst nur EIN Sonderziel je Familie.
   const usedSpecialFamilies = new Set<string>();
 
   const built = slate.entries.map((entry, slotIndex) => {
-    const rankTarget = getSportTargetRank(startRank);
-    const offer = buildOffer({
+    const offer = buildOfferSkeleton({
       gameState: input.gameState,
       team,
       identity,
       profile,
-      curveShape: entry.curveShape,
+      curveName: entry.curveName,
       rarity: entry.rarity,
-      rankTarget,
-      startRank,
       commercialRating: commercialRating.score,
       slotIndex,
-      salaryFactor,
-      leagueMinSalary: baseAnchorSalary,
       forcePremiumElite: slate.goldenCardSlots.includes(slotIndex),
       usedParentBrandIds,
       recentParentBrandIds,
@@ -398,123 +277,23 @@ export function buildSponsorOffersForTeam(input: {
     return offer;
   });
 
-  // DIE UMSCHALTSTELLE zwischen altem und neuem Sponsormodell — und zwar anhand des SPIELSTANDS,
-  // nicht anhand der Umgebung. Neue Spiele werden mit `sponsorSystemVersion: 2` angelegt und
-  // bekommen hier das neue Modell; ein vor der Umstellung angelegter Spielstand traegt keinen
-  // Vermerk, laeuft nach altem Recht weiter und wird auch beim naechsten Saisonuebergang wieder
-  // nach altem Recht bedient. Vorher hing genau das an einer Umgebungsvariable: derselbe Save
-  // erzeugte je nach Serverstart mal V1-, mal V2-Angebote.
+  // DIE EINZIGE STELLE, AN DER EIN ANGEBOT BETRAEGE BEKOMMT.
   //
-  // Das neue Modell haengt sich HINTER die bestehende Erzeugung, statt sie zu ersetzen. Marke,
-  // Name, Flavour, Rarity, Kurvenwurf und das Sonderziel bleiben unveraendert — 22 fertige,
-  // getestete Sonderziele muss niemand nachbauen. Ersetzt werden nur die BETRAEGE (aus der
-  // Modell-Rechenschicht), und die Klausel-Achse kommt dazu.
-  if (!usesSponsorV2(input.gameState)) {
-    return built;
-  }
+  // Vor dem Cutover stand hier eine Weiche: ein Spielstand ohne `sponsorSystemVersion: 2` bekam die nach
+  // ALTEM Recht gerechneten Beträge zurück. Diese Weiche ist entfallen — der alte Erzeugungspfad
+  // existiert nicht mehr, es gibt also nichts mehr, wohin sie schalten könnte. Auch ein vor der
+  // Umstellung angelegter Spielstand bekommt beim nächsten Saisonübergang neue Angebote nach neuem
+  // Recht. Was er BEHÄLT, ist seine bereits unterschriebene Vertragsseite: ein Vertrag ohne
+  // `sponsorV2`-Block wird unverändert nach altem Recht abgerechnet (siehe sponsor-settlement-service).
   return applySponsorV2ToOffers({
     gameState: input.gameState,
     offers: built,
+    curveNames: slate.entries.map((entry) => entry.curveName),
     expectedRank: qualityRank.leaguePosition,
   });
 }
 
-function scaleOfferComponents(
-  offer: SponsorOffer,
-  scale: number,
-  input?: { salaryFactor: number; leagueMinSalary: number },
-): SponsorOffer {
-  if (scale === 1) {
-    return offer;
-  }
-  const components = offer.components.map((component) => {
-    let rewardCash = roundCash(component.rewardCash * scale);
-    if (component.kind === "base" && offer.archetype === "security" && input) {
-      const floor = roundCash(resolveSponsorEconomyAnchors(input.salaryFactor, input.leagueMinSalary).effectiveBaseFloor);
-      rewardCash = Math.max(rewardCash, floor);
-    }
-    return {
-      ...component,
-      targetValue:
-        component.kind === "rank" || typeof component.targetValue !== "number"
-          ? component.targetValue
-          : roundCash(component.targetValue * scale),
-      rewardCash,
-      penaltyCash: component.penaltyCash != null ? roundCash(component.penaltyCash * scale) : undefined,
-    };
-  });
-  return {
-    ...offer,
-    components,
-    totalUpsideEstimate: roundCash(components.reduce((sum, component) => sum + component.rewardCash, 0)),
-  };
-}
-
-function normalizeTeamSponsorOffers(input: {
-  offers: SponsorOffer[];
-  referenceRank: number;
-  salaryFactor: number;
-  leagueMinSalary: number;
-}): SponsorOffer[] {
-  const { offers, referenceRank, salaryFactor, leagueMinSalary } = input;
-  if (offers.length === 0) {
-    return offers;
-  }
-  // DEAKTIVIERT (Anzeige==Settlement): Diese Liga-Normalisierung skalierte die ANGEZEIGTEN Komponenten an
-  // einen Anker aus der ALTEN Payout-Kurve (getSponsorPayoutForFinalRank, statischer Floor 32), während das
-  // Settlement die NEUE Kalibrierung (getSponsorPayoutForFinalRankAndTier) unskaliert auszahlt — Ergebnis:
-  // die Karte zeigte +12–30 % andere Beträge als real gezahlt wurden (26/32 Teams). Die per-Angebot-
-  // Kalibrierung (buildOfferCashAmounts) trifft die Ziel-Bänder bereits und ist mit dem Settlement identisch;
-  // eine zusätzliche Anzeige-Skalierung bricht die Invariante nur. Reaktivieren erst, wenn der Anker auf die
-  // neue Kurve + effectiveBaseFloor umgestellt ist.
-  if (!SPONSOR_LEAGUE_NORMALIZATION_ENABLED) {
-    return offers;
-  }
-  const prizeRef = getPrizeMoneyReference(referenceRank, salaryFactor);
-  const targetTotal = getSponsorPayoutForFinalRank(referenceRank, salaryFactor);
-  const anchor = prizeRef > 0 ? (targetTotal + prizeRef) / 2 : targetTotal;
-  if (anchor <= 0) {
-    return offers;
-  }
-
-  const bestExpected = offers.reduce(
-    (max, offer) => Math.max(max, estimateExpectedPayout(offer, referenceRank, leagueMinSalary)),
-    0,
-  );
-  if (bestExpected <= 0) {
-    return offers;
-  }
-
-  const ratio = bestExpected / anchor;
-  if (ratio >= 0.9 && ratio <= 1.1) {
-    return offers;
-  }
-
-  const scale = anchor / bestExpected;
-  return offers.map((offer) => scaleOfferComponents(offer, scale, { salaryFactor, leagueMinSalary }));
-}
-
-function normalizeLeagueSponsorOffers(gameState: GameState, offersByTeamId: Record<string, SponsorOffer[]>) {
-  const salaryFactor = getCurrentSalaryFactor(gameState);
-  const baseAnchorSalary = getSponsorRank32BaseAnchorSalary(gameState);
-  const rows = buildTeamSeasonOverviewRows({ gameState });
-  const nextOffers: Record<string, SponsorOffer[]> = {};
-
-  for (const team of gameState.teams) {
-    const row = rows.find((entry) => entry.teamId === team.teamId) ?? null;
-    const referenceRank = row?.rank ?? row?.startplatz ?? 16;
-    nextOffers[team.teamId] = normalizeTeamSponsorOffers({
-      offers: offersByTeamId[team.teamId] ?? [],
-      referenceRank,
-      salaryFactor,
-      leagueMinSalary: baseAnchorSalary,
-    });
-  }
-  return nextOffers;
-}
-
 export function regenerateSponsorOffersForSeason(gameState: GameState, teamIds?: string[]): GameState {
-  const seasonId = gameState.season.id;
   const targetTeamIds = teamIds ?? gameState.teams.map((team) => team.teamId);
   const nextOffers = { ...(gameState.seasonState.sponsorOffersByTeamId ?? {}) };
 
@@ -545,13 +324,11 @@ export function regenerateSponsorOffersForSeason(gameState: GameState, teamIds?:
     trackParentUsage(built);
   }
 
-  const normalizedOffers = normalizeLeagueSponsorOffers(gameState, nextOffers);
-
   return {
     ...gameState,
     seasonState: {
       ...gameState.seasonState,
-      sponsorOffersByTeamId: normalizedOffers,
+      sponsorOffersByTeamId: nextOffers,
     },
   };
 }
@@ -595,19 +372,7 @@ export function ensureSeasonSponsorOffers(gameState: GameState): GameState {
     }
   }
 
-  const normalizedOffers = normalizeLeagueSponsorOffers(gameState, nextOffers);
-
-  if (!changed && normalizedOffers === nextOffers) {
-    return gameState;
-  }
-
-  const offersChanged =
-    changed ||
-    Object.keys(normalizedOffers).some(
-      (teamId) => normalizedOffers[teamId] !== (gameState.seasonState.sponsorOffersByTeamId ?? {})[teamId],
-    );
-
-  if (!offersChanged) {
+  if (!changed) {
     return gameState;
   }
 
@@ -615,7 +380,7 @@ export function ensureSeasonSponsorOffers(gameState: GameState): GameState {
     ...gameState,
     seasonState: {
       ...gameState.seasonState,
-      sponsorOffersByTeamId: normalizedOffers,
+      sponsorOffersByTeamId: nextOffers,
     },
   };
 }
@@ -650,9 +415,8 @@ export function chooseSponsorOffer(input: {
   // Payouts werden bei der UNTERSCHRIFT eingefroren: die volle Rang-Payout-Leiter (pro Endrang) mit dem
   // Anker + salaryFactor zum Sign-Zeitpunkt berechnen und im Vertrag speichern. Das Settlement zahlt am Ende
   // aus dieser gelockten Leiter — keine Neuableitung aus gedrifteten Season-End-Ankern mehr. Identische
-  // Parameter wie der Angebots-/Settlement-Pfad (buildOfferCashAmounts / getSponsorPayoutForFinalRankAndTier),
   // damit Anzeige == gelockte Leiter == Settlement.
-  const salaryFactorAtSign = getCurrentSalaryFactor(input.gameState);
+  const salaryFactorAtSign = getCurrentSponsorSalaryFactor(input.gameState);
   // Gelockte Leiter über den GETEILTEN Preview-Builder bauen — exakt dieselbe Funktion, die die Karte
   // für die Anzeige nutzt (buildOfferRankPayoutLadderPreview). Damit sind Anzeige == gelockte Leiter ==
   // Settlement per Konstruktion, ohne parallele Sign-Logik, die auseinanderdriften könnte.
@@ -662,7 +426,9 @@ export function chooseSponsorOffer(input: {
     teamId: input.teamId,
     offerId: offer.offerId,
     archetype: offer.archetype,
-    curveShape: offer.curveShape,
+    // Nur noch fuer Altangebote gesetzt: neue Angebote tragen keine Legacy-Kurvenform mehr. Das Feld
+    // bleibt am Vertrag, damit ein aus einem Alt-Spielstand unterschriebenes Angebot seine Form behaelt.
+    ...(offer.curveShape ? { curveShape: offer.curveShape } : {}),
     rarity: offer.rarity,
     name: offer.name,
     chosenAt: new Date().toISOString(),
@@ -682,9 +448,10 @@ export function chooseSponsorOffer(input: {
     isGolden: offer.isGolden,
     lockedRankPayoutLadder,
     salaryFactorAtSign,
-    // OLY_SPONSOR_V2 (P5): die eingefrorenen Konditionen wandern 1:1 vom Angebot in den Vertrag.
-    // Fehlt das Feld (Flag aus, oder ein vor dem Umbau unterschriebener Vertrag), rechnet das
-    // Settlement nach altem Recht — das ist die gesamte Migrationsregel.
+    // Die eingefrorenen Konditionen wandern 1:1 vom Angebot in den Vertrag. Fehlt das Feld — das ist
+    // nur noch bei einem Angebot moeglich, das VOR der Umstellung in einem Spielstand erzeugt und erst
+    // jetzt unterschrieben wurde —, rechnet das Settlement nach altem Recht. Das ist die gesamte
+    // Migrationsregel.
     ...(offer.sponsorV2 ? { sponsorV2: offer.sponsorV2 } : {}),
   };
 
@@ -764,11 +531,11 @@ function scoreOfferForAi(input: {
   // Rarity-Etat-Gewicht (order 0..3) statt Sterne — höhere Rarity ist mehr Etat wert.
   score += SPONSOR_RARITIES[offer.rarity ?? "magisch"].order * 4;
 
-  // Familien-Präferenz (neuer Pfad): die Kurvenform-Familie zur bevorzugten Ausrichtung matchen.
-  const family = offer.curveShape ? getSponsorCurveFamily(offer.curveShape) : null;
-  if (preferredArchetype === "performance" && family === "titel") {
-    score += 6;
-  } else if (preferredArchetype === "security" && family === "sicherheit") {
+  // Kurven-Präferenz: die Modellkurve des Angebots zur bevorzugten Ausrichtung matchen. Altangebote ohne
+  // V2-Block (nur noch in Spielstaenden von vor der Umstellung) haben keine Modellkurve und fallen hier
+  // schlicht durch — bewertet werden sie weiter ueber Archetyp und Erwartungswert.
+  const curveArchetype = offer.sponsorV2 ? mapSponsorCurveToArchetype(offer.sponsorV2.curveName as never) : null;
+  if (curveArchetype != null && preferredArchetype === curveArchetype && curveArchetype !== "identity") {
     score += 6;
   }
 

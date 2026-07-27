@@ -1,7 +1,6 @@
 import type {
   GameState,
   SponsorArchetype,
-  SponsorCurveShape,
   SponsorObjectiveStage,
   SponsorOfferComponent,
   SponsorRarity,
@@ -13,7 +12,6 @@ import { buildTeamSeasonOverviewRows, type TeamManagementSnapshotRow } from "@/l
 import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import type { SponsorSpecialTemplateId } from "@/lib/sponsor/sponsor-brand-variants";
 import { SPONSOR_RARITIES } from "@/lib/sponsor/sponsor-curve-shapes";
-import { mapCurveShapeToArchetype } from "@/lib/sponsor/sponsor-tier-pool";
 import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 
 /**
@@ -507,68 +505,6 @@ export const FAN_INFRASTRUCTURE_LEVEL_CAP = 6;
 export function fanInfrastructureLevelSum(gameState: GameState, teamId: string): number {
   const facilities = getTeamFacilityState(gameState, teamId);
   return getFacilityLevel(facilities, "fan_shop") + getFacilityLevel(facilities, "arena_upgrade");
-}
-
-export function buildFanInfrastructureSpecialComponent(input: { rewardCash: number }): SponsorOfferComponent {
-  return {
-    componentId: "special-fan-infrastructure",
-    kind: "special",
-    label: "Fan-Infrastruktur (Fan-Shop / Arena)",
-    targetValue: 1,
-    rewardCash: input.rewardCash,
-    specialKey: "fan_infrastructure",
-  };
-}
-
-/**
- * Überperformance-Bonus (Sponsor-Enhancement 3, Feinschliff). Immer-an-Zusatzkomponente: zahlt, wenn
- * das Team die Saison DEUTLICH über seiner erwarteten Qualitäts-Platzierung beendet. Die erwartete
- * Platzierung (teamQualityRank, beim Signing eingefroren) MINUS `margin` wird als absolute Ziel-
- * Platzierung in `targetValue` einbetoniert — die Settlement/Evaluator braucht so nur `row.rank <=
- * targetValue` zu prüfen (kein Zugriff auf den Vertrag nötig). Nicht über den Basisbetrag, sondern echte
- * Überperformance über ein Saisonziel.
- */
-export function buildBeatExpectedRankSpecialComponent(input: {
-  expectedRank: number | null | undefined;
-  margin: number;
-  rewardCash: number;
-}): SponsorOfferComponent | null {
-  if (input.expectedRank == null || !Number.isFinite(input.expectedRank)) return null;
-  // Nur Teams, die überhaupt Luft nach oben haben (nicht schon Platz 1 erwartet), bekommen die Klausel.
-  const targetRank = Math.round(input.expectedRank) - input.margin;
-  if (targetRank < 1) return null;
-  return {
-    componentId: "special-beat-expected-rank",
-    kind: "special",
-    label: `Saison auf Platz ≤ ${targetRank} beenden (Überperformance)`,
-    targetValue: targetRank,
-    rewardCash: input.rewardCash,
-    specialKey: "beat_expected_rank",
-  };
-}
-
-/**
- * P3 — Überperformance-Modul (`kind: "overperformance"`): zahlt `min(cap, ratePerUnitC × Plätze-über-Erwartung)`.
- * Der Erwartungsrang wird als `targetValue` und die Rate/der Cap in `ratePerUnitC`/`rewardCash` beim Signieren
- * EINGEFROREN, damit Anzeige == Settlement gilt. Ersetzt (für Neuverträge) das binäre `beat_expected_rank`.
- * Gibt null zurück, wenn kein Erwartungsrang existiert oder das Team bereits Platz 1 erwartet (keine Luft nach oben).
- */
-export function buildOverperformanceComponent(input: {
-  expectedRank: number | null | undefined;
-  ratePerUnitC: number;
-  cap: number;
-}): SponsorOfferComponent | null {
-  if (input.expectedRank == null || !Number.isFinite(input.expectedRank)) return null;
-  const expectedRank = Math.round(input.expectedRank);
-  if (expectedRank <= 1 || input.ratePerUnitC <= 0 || input.cap <= 0) return null;
-  return {
-    componentId: "overperformance",
-    kind: "overperformance",
-    label: `+${input.ratePerUnitC} C je Platz über Erwartungsrang #${expectedRank} · max ${input.cap} C`,
-    targetValue: expectedRank,
-    rewardCash: round1(input.cap),
-    ratePerUnitC: input.ratePerUnitC,
-  };
 }
 
 // =====================================================================================================
@@ -1374,11 +1310,9 @@ export function buildGoldenObjectiveComponent(
 export function pickGoldenObjective(
   seasonId: string,
   teamId: string,
-  curveShape: SponsorCurveShape,
+  archetype: SponsorArchetype,
   teamQualityRank?: number | null,
 ): SponsorGoldenObjectiveKey {
-  // Kurvenform → Familie → (Legacy-)Archetyp-Bucket: der Golden-Ziel-Katalog ist noch archetyp-verschlagwortet.
-  const archetype = mapCurveShapeToArchetype(curveShape);
   const all = Object.keys(SPONSOR_GOLDEN_OBJECTIVE_ARCHETYPE) as SponsorGoldenObjectiveKey[];
   const isTopStrength =
     teamQualityRank != null &&
@@ -1449,11 +1383,9 @@ export function isTransferTraderAvailableForSeason(seasonId: string): boolean {
  * Pool der Standard-Bonusziele eines Archetyps, saison-gefiltert (Transfer-Händler in S1 ausgeschlossen).
  */
 export function getAvailableBonusObjectiveKeys(
-  curveShape: SponsorCurveShape,
+  archetype: SponsorArchetype,
   seasonId: string,
 ): SponsorBonusObjectiveKey[] {
-  // Bucketing über die Kurvenform-Familie (→ Legacy-Archetyp), nicht mehr direkt über den Archetyp.
-  const archetype = mapCurveShapeToArchetype(curveShape);
   const keys = (Object.keys(SPONSOR_BONUS_OBJECTIVE_ARCHETYPE) as SponsorBonusObjectiveKey[]).filter(
     (key) => SPONSOR_BONUS_OBJECTIVE_ARCHETYPE[key] === archetype,
   );
@@ -1530,7 +1462,7 @@ function isBonusObjectiveApplicable(gameState: GameState, teamId: string, key: S
 export function pickBonusObjective(
   seasonId: string,
   teamId: string,
-  curveShape: SponsorCurveShape,
+  archetype: SponsorArchetype,
   slotIndex: number,
   teamQualityRank?: number | null,
   /** Bereits im Slate belegte Ziel-Familien (Slate-Anti-Wiederholung, Fable C3). */
@@ -1538,9 +1470,8 @@ export function pickBonusObjective(
   /** Optional: erlaubt das Applicability-Gate (Schulden/Verträge/Gebäude) für die neuen Ziele (Fable B). */
   gameState?: GameState,
 ): SponsorBonusObjectiveKey | null {
-  const archetype = mapCurveShapeToArchetype(curveShape);
   const strengthKeys = filterBonusObjectivesByStrength(
-    getAvailableBonusObjectiveKeys(curveShape, seasonId).filter((key) => key !== "transfer_trader"),
+    getAvailableBonusObjectiveKeys(archetype, seasonId).filter((key) => key !== "transfer_trader"),
     teamQualityRank,
   );
   if (strengthKeys.length === 0) {

@@ -1,4 +1,4 @@
-import type { GameState, SponsorCurveShape, SponsorRarity, Team, TeamIdentity, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
+import type { GameState, SponsorArchetype, SponsorRarity, Team, TeamIdentity, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 
 import {
   SPONSOR_BRAND_PARENTS,
@@ -7,7 +7,6 @@ import {
   scoreParentTeamAffinity,
   type SponsorBrandParent,
 } from "@/lib/sponsor/sponsor-brand-parents";
-import { mapCurveShapeToArchetype } from "@/lib/sponsor/sponsor-tier-pool";
 import {
   listVariantsForParent,
   parentSupportsArchetype,
@@ -80,13 +79,12 @@ function pickParentForSlot(input: {
   identity: TeamIdentity | null;
   profile: TeamStrategyProfile | null;
   slotIndex: number;
-  curveShape: SponsorCurveShape;
+  archetype: SponsorArchetype;
   usedParentBrandIds?: string[];
   recentParentBrandIds?: string[];
   globalParentUsage?: Record<string, number>;
 }): SponsorBrandParent {
-  // Kurvenform → Familie → (Legacy-)Archetyp-Brücke: der Marken-Katalog ist noch archetyp-verschlagwortet.
-  const archetype = mapCurveShapeToArchetype(input.curveShape);
+  const archetype = input.archetype;
   const usedParentBrandIds = new Set(input.usedParentBrandIds ?? []);
   const recentParentBrandIds = new Set(input.recentParentBrandIds ?? []);
   const globalParentUsage = input.globalParentUsage ?? {};
@@ -156,19 +154,19 @@ function pickBrandForSlot(input: {
   identity: TeamIdentity | null;
   profile: TeamStrategyProfile | null;
   slotIndex: number;
-  curveShape: SponsorCurveShape;
+  archetype: SponsorArchetype;
   rarity: SponsorRarity;
   usedParentBrandIds?: string[];
   recentParentBrandIds?: string[];
   globalParentUsage?: Record<string, number>;
   forcePremiumElite?: boolean;
 }): { parent: SponsorBrandParent; brand: SponsorBrandTemplate } {
-  const archetype = mapCurveShapeToArchetype(input.curveShape);
+  const archetype = input.archetype;
   const parent = pickParentForSlot(input);
   let brand =
     pickVariantForParent({
       parentId: parent.id,
-      curveShape: input.curveShape,
+      archetype: input.archetype,
       rarity: input.rarity,
       seasonId: input.seasonId,
       teamId: input.teamId,
@@ -176,7 +174,7 @@ function pickBrandForSlot(input: {
     }) ??
     pickVariantForParent({
       parentId: parent.id,
-      curveShape: input.curveShape,
+      archetype: input.archetype,
       // Fallback-Rarität "magisch" entspricht dem alten starTier-3-Fallback (mittleres Tier).
       rarity: "magisch",
       seasonId: input.seasonId,
@@ -262,7 +260,7 @@ export function pickSponsorBrandForOffer(input: {
   team: Team;
   identity: TeamIdentity | null;
   profile: TeamStrategyProfile | null;
-  curveShape: SponsorCurveShape;
+  archetype: SponsorArchetype;
   rarity: SponsorRarity;
   slotIndex: number;
   usedParentBrandIds?: string[];

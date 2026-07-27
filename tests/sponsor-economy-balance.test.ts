@@ -14,7 +14,6 @@ import {
   getLeagueFourthFromLowestSalaryTotal,
   getRankMilestoneBonus,
   getSponsorCurveShapePayout,
-  getSponsorPayoutForFinalRank,
   getSponsorRank32BaseAnchorSalary,
   resolveSponsorEconomyAnchors,
   SPONSOR_BASE_FLOOR_C,
@@ -403,9 +402,12 @@ describe("sponsor economy balance (preserved invariants)", () => {
     expect(getRankMilestoneBonus(28, 1)).toBe(7);
     expect(getRankMilestoneBonus(24, 1)).toBe(12);
     expect(getRankMilestoneBonus(1, 1)).toBe(63);
-    expect(getSponsorPayoutForFinalRank(32, 1)).toBe(SPONSOR_BASE_FLOOR_C);
-    expect(getSponsorPayoutForFinalRank(28, 1)).toBe(SPONSOR_BASE_FLOOR_C + 7);
-    expect(getSponsorPayoutForFinalRank(1, 1)).toBe(SPONSOR_BASE_FLOOR_C + 63);
+    // Frueher stand hier zusaetzlich `getSponsorPayoutForFinalRank` (Sockel + Meilensteine). Die Funktion
+    // war die flache Payout-Kurve VOR den Kurvenformen und hatte nach dem Entfernen der alten
+    // Anzeige-Normalisierung keinen Aufrufer mehr; sie ist geloescht. Die Invariante, die sie hier
+    // absicherte, ist die kumulative Meilenstein-Leiter — und die steht in den Zeilen darueber.
+    expect(SPONSOR_BASE_FLOOR_C + getRankMilestoneBonus(32, 1)).toBe(SPONSOR_BASE_FLOOR_C);
+    expect(SPONSOR_BASE_FLOOR_C + getRankMilestoneBonus(1, 1)).toBe(SPONSOR_BASE_FLOOR_C + 63);
   });
 
   it("supports bottom-budget teams with meaningful sponsor income in singleplayer seed", () => {
@@ -510,8 +512,10 @@ describe("sponsor economy balance (preserved invariants)", () => {
     }).gameState;
   }
 
-  // Ersetzt die im Vertrag gespeicherte gelockte Leiter durch eine kontrolliert aus (rarity, curveShape)
-  // gebaute — so sind die shape-abhängigen Assertions deterministisch (unabhängig vom Angebots-Slate-Wurf).
+  // Macht aus dem frisch unterschriebenen Vertrag einen ALTVERTRAG, wie er in einem vor der Umstellung
+  // angelegten Spielstand liegt: ohne `sponsorV2`-Konditionen, dafuer mit einer kontrolliert aus
+  // (rarity, curveShape) gebauten gelockten Leiter. Genau diese Vertraege muessen weiter abrechnen —
+  // erzeugen kann man sie nicht mehr, der alte Angebotspfad ist entfernt.
   function withLockedLadder(
     signedGs: GameState,
     teamId: string,
@@ -519,13 +523,14 @@ describe("sponsor economy balance (preserved invariants)", () => {
     salaryFactorAtSign = 1,
   ): GameState {
     const contract = getTeamSponsorContract(signedGs, teamId)!;
+    const { sponsorV2: _v2, ...legacyContract } = contract;
     return {
       ...signedGs,
       seasonState: {
         ...signedGs.seasonState,
         sponsorContractsByTeamId: {
           ...signedGs.seasonState.sponsorContractsByTeamId,
-          [teamId]: { ...contract, lockedRankPayoutLadder: ladder, salaryFactorAtSign },
+          [teamId]: { ...legacyContract, lockedRankPayoutLadder: ladder, salaryFactorAtSign },
         },
       },
     };
@@ -649,6 +654,7 @@ describe("sponsor economy balance (preserved invariants)", () => {
       salaryFactorAtSign: _dropped2,
       rarity: _dropped3,
       curveShape: _dropped4,
+      sponsorV2: _dropped5,
       ...legacyContract
     } = contract;
     const legacy: GameState = {

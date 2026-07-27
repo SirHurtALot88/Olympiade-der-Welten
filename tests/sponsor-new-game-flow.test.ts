@@ -124,14 +124,19 @@ describe("Neues Spiel — der Knopf erzeugt das neue Sponsorsystem", () => {
 });
 
 describe("Abwaertskompatibilitaet — ein bestehender Spielstand kippt nicht", () => {
-  it("ein Save OHNE Versionsvermerk erzeugt weiter Angebote nach altem Recht", { timeout: 300_000 }, () => {
+  it("ein Save OHNE Versionsvermerk bekommt NEUE Angebote — der alte Erzeugungspfad existiert nicht mehr", { timeout: 300_000 }, () => {
+    // GEAENDERT MIT DEM AUFRAEUMEN: Bis dahin bediente ein Spielstand ohne Versionsvermerk sich weiter
+    // aus der alten Erzeugung. Die ist entfernt — es gibt keinen zweiten Pfad mehr, in den ein Save
+    // zurueckfallen koennte. Was ein Altspielstand BEHAELT, ist seine Vertragsseite: ein bereits
+    // unterschriebener Vertrag ohne `sponsorV2`-Block wird unveraendert nach altem Recht abgerechnet
+    // (siehe tests/sponsor-v2-display-settlement-parity.test.ts).
     const legacy = structuredClone(createSingleplayerGameState());
     expect(legacy.seasonState.sponsorSystemVersion).toBeUndefined();
     const offers = allOffers(ensureSeasonSponsorOffers(legacy));
     expect(offers.length).toBeGreaterThan(0);
-    expect(offers.every((offer) => getSponsorV2Terms(offer) === null)).toBe(true);
-    // Und die alten Module sind dort weiterhin vorhanden — der alte Pfad ist unangetastet.
-    expect(offers.some((offer) => offer.components.some((c) => c.kind === "overperformance"))).toBe(true);
+    expect(offers.every((offer) => getSponsorV2Terms(offer) !== null)).toBe(true);
+    expect(offers.some((offer) => offer.components.some((c) => c.kind === "overperformance"))).toBe(false);
+    expect(offers.some((offer) => offer.components.some((c) => c.kind === "improvement"))).toBe(false);
   });
 
   it("ein V2-Save erzeugt auch beim naechsten Durchgang wieder V2 — ohne jede Umgebungsvariable", { timeout: 300_000 }, () => {

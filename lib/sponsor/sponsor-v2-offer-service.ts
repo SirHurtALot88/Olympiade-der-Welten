@@ -34,7 +34,7 @@ import {
   sponsorV2Calibrate, sponsorV2CardTargets, sponsorV2ClauseArms, sponsorV2ExpectedValue,
   sponsorV2FloorAt, sponsorV2GoalPayout, sponsorV2RankPart, sponsorV2ScaleWithK,
   sponsorV2SolveLeagueK, sponsorV2TierOf, sponsorV2ProfileByName,
-  type SponsorV2Card, type SponsorV2Curve, type SponsorV2Params, type SponsorV2Rarity,
+  type SponsorV2Card, type SponsorV2Curve, type SponsorV2CurveName, type SponsorV2Params, type SponsorV2Rarity,
 } from "@/lib/sponsor/sponsor-v2-model";
 import {
   SPONSOR_V2_EVALUABLE_CLAUSES, sponsorV2StrengthClassOf, sponsorV2ThresholdFor,
@@ -66,11 +66,6 @@ export const SPONSOR_SYSTEM_VERSION_FOR_NEW_GAMES: SponsorSystemVersion = 2;
  */
 export function resolveSponsorSystemVersion(gameState: GameState): SponsorSystemVersion {
   return gameState.seasonState?.sponsorSystemVersion === 2 ? 2 : 1;
-}
-
-/** Kurzform fuer Aufrufer, die nur wissen wollen, ob das neue Modell gilt. */
-export function usesSponsorV2(gameState: GameState): boolean {
-  return resolveSponsorSystemVersion(gameState) === 2;
 }
 
 /**
@@ -261,18 +256,6 @@ function paramsFor(card: SponsorV2Card, pGoal: number): SponsorV2Params {
 }
 
 // ── Angebot -> V2-Karte ────────────────────────────────────────────────────────────────────────
-/**
- * Kurvenform der Engine -> Modellkurve. Die Engine kennt 11 Formen, das Modell 6; die Abbildung
- * ist fest und offengelegt (identisch zu der im Schattentest benutzten).
- */
-const CURVE_MAP: Record<string, string> = {
-  titeljaeger: "Gipfel", meisterschale: "Gipfel",
-  koenigsklasse: "Steil", europapokal: "Steil",
-  conference: "Linear", stetig: "Linear",
-  mittelfeld: "Halten", aufsteiger: "Halten",
-  konsolidierung: "Flach",
-  sicherheit: "Sockel", klassenerhalt: "Sockel",
-};
 
 /** Deterministischer Hash-RNG — reproduzierbar, ohne Math.random. */
 function hashRnd(seed: string): () => number {
@@ -289,27 +272,6 @@ const RARITY_LABEL: Record<string, SponsorV2Rarity> = {
 };
 const rarityOf = (offer: SponsorOffer): SponsorV2Rarity => RARITY_LABEL[offer.rarity ?? "magisch"] ?? "magisch";
 
-/**
- * ANGEBOTSREGEL: keine zwei gleichen Kurvenformen in einer Liste.
- *
- * Der Wurf der Engine liefert 11 verschiedene Formen, die Abbildung faltet sie auf 6 — dabei
- * entstehen Doppel. Genau bei Paaren mit DERSELBEN Kurve sind frueher Fallen aufgetreten (gleiche
- * Kurve, gleiches P, kleineres s: am Tabellenende schneidet die Untergrenze den Malus beider ab,
- * und der schmaleren Spannweite bleibt nur der kleinere Bonus). Doppel werden deshalb
- * deterministisch auf eine noch freie Kurve umgelenkt.
- */
-function assignCurves(offers: SponsorOffer[]): SponsorV2Curve[] {
-  const used = new Set<string>();
-  return offers.map((offer) => {
-    const wanted = CURVE_MAP[offer.curveShape ?? ""] ?? "Linear";
-    if (!used.has(wanted)) { used.add(wanted); return curve(wanted); }
-    const free = SPONSOR_V2_CURVES.filter((c) => !used.has(c.name));
-    if (free.length === 0) { return curve(wanted); } // mehr Angebote als Kurven — dann eben doppelt
-    const pick = free[Math.floor(hashRnd(offer.offerId)() * free.length) % free.length]!;
-    used.add(pick.name);
-    return pick;
-  });
-}
 const curve = (name: string): SponsorV2Curve =>
   SPONSOR_V2_CURVES.find((c) => c.name === name) ?? SPONSOR_V2_CURVES[2]!;
 
@@ -432,29 +394,40 @@ function sponsorV2ExpectedValueFromLadder(terms: SponsorV2ContractTerms, params:
  * MALUS, und dafuer gibt es in der Komponentenstruktur kein Feld.
  */
 export function applySponsorV2ToOffers(input: {
-  gameState: GameState; offers: SponsorOffer[]; expectedRank: number;
+  gameState: GameState;
+  offers: SponsorOffer[];
+  /** Modellkurve je Angebot, in derselben Reihenfolge. Kommt aus dem Slate-Wurf der Erzeugung. */
+  curveNames: SponsorV2CurveName[];
+  expectedRank: number;
 }): SponsorOffer[] {
   if (input.offers.length === 0) return input.offers;
-  const curves = assignCurves(input.offers);
   return input.offers.map((offer, i) => {
     const terms = buildSponsorV2Terms({
-      gameState: input.gameState, offer, expectedRank: input.expectedRank, curve: curves[i]!,
+      gameState: input.gameState,
+      offer,
+      expectedRank: input.expectedRank,
+      curve: curve(input.curveNames[i] ?? "Linear"),
     });
     const ladder = sponsorV2GuaranteedLadder(terms);
     const floor = ladder[31]!;
     const topRank = ladder[0]!;
-    const components = offer.components
-      .filter((c) => c.kind === "base" || c.kind === "rank" || c.kind === "special")
-      .map((c) => {
-        if (c.kind === "base") return { ...c, rewardCash: round1(floor), penaltyCash: undefined };
-        if (c.kind === "rank") return { ...c, rewardCash: round1(Math.max(0, topRank - floor)), targetValue: 1, penaltyCash: undefined };
-        return { ...c, rewardCash: round1(terms.goalPayout) };
-      });
-    // `moduleIds` wird in `buildSponsorOffersForTeam` aus den Komponenten abgeleitet — also BEVOR
-    // hier die Ueberperformance- und Tabellenziel-Komponenten wegfallen. Ohne Neuableitung
-    // behauptete die persistierte Liste weiter "improvement-target, overperformance" fuer Module,
-    // die dieses Angebot gar nicht mehr hat. Gemessen an einem echten Neuen Spiel: 2 von 6
-    // Eintraegen je Angebot waren Karteileichen.
+    // Die Komponenten kommen als GERUEST ohne Betraege herein (siehe buildOfferSkeleton). Hier — und
+    // nur hier — bekommen sie ihre Zahlen. `penaltyCash` bleibt ueberall leer: den Malus traegt in V2
+    // ausschliesslich die Klausel, und ein persistierter Komponenten-Malus waere eine Anzeige, die das
+    // Settlement nie einloest.
+    const components = offer.components.map((c) => {
+      if (c.kind === "base") return { ...c, targetValue: round1(floor), rewardCash: round1(floor), penaltyCash: undefined };
+      if (c.kind === "rank") {
+        return {
+          ...c,
+          label: `Gewinnstufen nach Endrang · Kurve ${terms.curveName}`,
+          rewardCash: round1(Math.max(0, topRank - floor)),
+          targetValue: 1,
+          penaltyCash: undefined,
+        };
+      }
+      return { ...c, rewardCash: round1(terms.goalPayout), penaltyCash: undefined };
+    });
     const next: SponsorOffer = {
       ...offer,
       components,

@@ -218,9 +218,14 @@ export function SponsorOfferCardNewLook({
   // Fallback konservativ auf „gewöhnlich" (deckungsgleich mit Settlement) statt „magisch" — sonst rendert
   // jedes Angebot ohne rarity-Feld (Alt-Save vor der Rarity-Migration) fälschlich als Magisch.
   const rarity = offer.rarity ?? "gewöhnlich";
+  // Kurven-Beschriftung: neue Angebote tragen ihre Modellkurve im `sponsorV2`-Block. Nur Angebote aus
+  // Spielstaenden von VOR der Umstellung haben noch eine der elf Legacy-Kurvenformen (bzw. gar keine, dann
+  // wird sie aus dem Archetyp abgeleitet) — fuer die bleibt die alte Beschriftung stehen.
   const shape = offer.curveShape ?? mapArchetypeToCurveShape(offer.archetype);
-  const shapeLabel = SPONSOR_CURVE_SHAPES[shape].labelDe;
-  const familyLabel = SPONSOR_CURVE_FAMILIES[getSponsorCurveFamily(shape)].labelDe;
+  const shapeLabel = offer.sponsorV2?.curveName ?? SPONSOR_CURVE_SHAPES[shape].labelDe;
+  const familyLabel = offer.sponsorV2
+    ? offer.sponsorV2.profileName
+    : SPONSOR_CURVE_FAMILIES[getSponsorCurveFamily(shape)].labelDe;
   // P4 Baukasten: die Modul-Zusammensetzung des Angebots (Cash-Komponenten + evtl. Perk) fürs UI.
   const offerModules = describeSponsorOfferModules(offer);
   const offerPerk = offerModules.find((module) => module.kind === "perk") ?? null;

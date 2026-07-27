@@ -29,12 +29,15 @@ afterEach(() => { resetSponsorV2KCache(); });
 const firstTeamId = (gs: GameState) => gs.teams[0]!.teamId;
 
 describe("sponsor v2 — welches System gilt", () => {
-  it("ein Spielstand OHNE Vermerk ist V1 und traegt kein Angebot V2-Konditionen", { timeout: 120_000 }, () => {
+  it("ein Spielstand OHNE Vermerk bleibt als V1 vermerkt — bekommt aber neue Angebote nach neuem Recht", { timeout: 120_000 }, () => {
+    // Der Vermerk beschreibt weiter die HERKUNFT des Spielstands (und damit, wie seine bereits
+    // unterschriebenen Vertraege abgerechnet werden). Die ERZEUGUNG kennt kein altes Recht mehr:
+    // der alte Angebotspfad ist entfernt, es gibt nichts, wohin ein Save zurueckfallen koennte.
     const gs = v1State();
     expect(resolveSponsorSystemVersion(gs)).toBe(1);
     const offers = buildSponsorOffersForTeam({ gameState: gs, teamId: firstTeamId(gs) });
     expect(offers.length).toBeGreaterThan(0);
-    expect(offers.every((o) => getSponsorV2Terms(o) === null)).toBe(true);
+    expect(offers.every((o) => getSponsorV2Terms(o) !== null)).toBe(true);
   });
 
   it("der Vermerk ueberschreibt nichts: ein V1-Save bleibt V1, auch wenn erneut gestempelt wird", () => {

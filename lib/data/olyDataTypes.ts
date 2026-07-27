@@ -1212,13 +1212,22 @@ export type SponsorArchetype = "security" | "performance" | "identity";
  */
 export type SponsorRarity = "gewöhnlich" | "magisch" | "selten" | "legendär";
 
-/** Thematic family of a curve shape — governs the offer-slate draw ("max 2 per family"). */
+/**
+ * NUR NOCH LESEN. Thematische Familie einer alten Kurvenform. Die Angebotserzeugung wuerfelt seit dem
+ * Aufraeumen des Sponsor-Cutovers die sechs Modellkurven (siehe SPONSOR_V2_CURVES) und kennt keine
+ * Familien mehr; dieser Typ existiert fuer die Anzeige und Abrechnung von Altvertraegen.
+ */
 export type SponsorCurveFamily = "titel" | "europa" | "stetig" | "aufstieg" | "sicherheit";
 
 /**
- * A sponsor's curve shape = WHERE across the final table (Platz 1..32) its fixed Etat sits. Replaces the
- * old 3 archetypes. 11 shapes in 5 families; each has a unique win-band and a matching weak-band (no shape
- * is dominated). Data + payout profiles live in lib/sponsor/sponsor-curve-shapes.ts.
+ * NUR NOCH LESEN — KEIN ERZEUGUNGS-TYP MEHR.
+ *
+ * Die Kurvenform beschreibt, WO ueber die Endtabelle (Platz 1..32) das feste Etat eines Sponsors sitzt.
+ * Sie war die Auszahlungsachse des ALTEN Sponsorsystems (11 Formen in 5 Familien). Neue Angebote tragen
+ * sie NICHT mehr: ihre Auszahlung kommt aus dem Sponsormodell (lib/sponsor/sponsor-v2-model.ts) und
+ * steht im `sponsorV2`-Block. Typ und Payout-Tabellen (lib/sponsor/sponsor-curve-shapes.ts) bleiben
+ * ausschliesslich stehen, damit Angebote und Vertraege aus Spielstaenden von VOR der Umstellung weiter
+ * angezeigt, unterschrieben und abgerechnet werden koennen.
  */
 export type SponsorCurveShape =
   | "titeljaeger"
@@ -1233,6 +1242,13 @@ export type SponsorCurveShape =
   | "sicherheit"
   | "klassenerhalt";
 
+/**
+ * `improvement` (Tabellenziel) und `overperformance` (Ueberperformance) werden NICHT MEHR ERZEUGT — die
+ * beiden Module gehoerten zum alten Sponsorsystem und sind aus der Angebotserzeugung entfernt. Sie
+ * bleiben Teil des Typs, weil Vertraege und Angebote in bestehenden Spielstaenden sie tragen und
+ * Anzeige, Evaluator und Abrechnung sie weiter verstehen muessen. Wer sie wieder BAUT, bricht
+ * tests/sponsor-v1-erzeugung-tot.test.ts.
+ */
 export type SponsorOfferComponentKind = "base" | "rank" | "improvement" | "special" | "overperformance";
 
 /**
@@ -1268,7 +1284,7 @@ export type SponsorOfferComponent = {
    */
   spotlightBonus?: number;
   /**
-   * P3 — beim SIGNIEREN eingefrorene Rate für lineare, gedeckelte Module (Anzeige == Settlement):
+   * NUR NOCH LESEN (Altvertraege): beim SIGNIEREN eingefrorene Rate für lineare, gedeckelte Module:
    * - `kind: "overperformance"` zahlt `min(rewardCash, ratePerUnitC × max(0, targetValue − finalRank))`,
    *   wobei `targetValue` der eingefrorene Erwartungsrang und `rewardCash` der Cap ist.
    * - `kind: "improvement"` (neuer per-Platz-Modus) zahlt `min(rewardCash, ratePerUnitC × max(0, startRank − finalRank))`.
@@ -1339,7 +1355,8 @@ export type SponsorOffer = {
   seasonId: string;
   teamId: string;
   archetype: SponsorArchetype;
-  /** Curve shape = where the Etat sits across the table (transitional-optional; required after cutover). */
+  /** NUR NOCH LESEN: gesetzt an Angeboten aus Spielstaenden von vor dem Sponsor-Cutover. Neue Angebote
+   * tragen ihre Kurve im `sponsorV2`-Block. */
   curveShape?: SponsorCurveShape;
   /** Rarity = the Etat dial that replaced the legacy star tier (transitional-optional; required after cutover). */
   rarity?: SponsorRarity;
@@ -1406,7 +1423,7 @@ export type TeamSponsorContract = {
   teamId: string;
   offerId: string;
   archetype: SponsorArchetype;
-  /** Curve shape (transitional-optional; required after cutover). */
+  /** NUR NOCH LESEN: nur an Vertraegen, die aus einem Angebot von vor dem Sponsor-Cutover stammen. */
   curveShape?: SponsorCurveShape;
   /** Rarity — the Etat dial that replaced the legacy star tier (transitional-optional; required after cutover). */
   rarity?: SponsorRarity;

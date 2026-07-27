@@ -1,15 +1,6 @@
-import type {
-  SponsorArchetype,
-  SponsorCurveFamily,
-  SponsorCurveShape,
-  SponsorRarity,
-} from "@/lib/data/olyDataTypes";
-import {
-  SPONSOR_CURVE_SHAPE_KEYS,
-  SPONSOR_RARITIES,
-  SPONSOR_RARITY_KEYS,
-  getSponsorCurveFamily,
-} from "@/lib/sponsor/sponsor-curve-shapes";
+import type { SponsorArchetype, SponsorRarity } from "@/lib/data/olyDataTypes";
+import { SPONSOR_RARITIES, SPONSOR_RARITY_KEYS } from "@/lib/sponsor/sponsor-curve-shapes";
+import { SPONSOR_V2_CURVES, type SponsorV2CurveName } from "@/lib/sponsor/sponsor-v2-model";
 import type { SponsorTeamQualityRank } from "@/lib/sponsor/sponsor-team-quality-rank";
 
 /** ENV-Zahl, die EXPLIZIT 0 erlaubt (0 = Feature aus), im Gegensatz zum "0→fallback"-Muster anderswo. */
@@ -125,24 +116,46 @@ export function getDemandMultiplierForRarity(rarity: SponsorRarity): number {
   return 1.01 + SPONSOR_RARITIES[rarity].order * 0.08;
 }
 
-// ── Rarity + curve-shape slate roller (new model) ────────────────────────────────────────────────────────
+// ── Rarity + Kurven-Slate-Wurf ───────────────────────────────────────────────────────────────────────────
 
-export type SponsorSlateEntry = { curveShape: SponsorCurveShape; rarity: SponsorRarity };
+export type SponsorSlateEntry = { curveName: SponsorV2CurveName; rarity: SponsorRarity };
 export type SponsorSlateResult = { entries: SponsorSlateEntry[]; goldenCardSlots: number[] };
 
-/** Legacy curve shape → archetype (titel→performance, sicherheit→security, else→identity). */
-export function mapCurveShapeToArchetype(curveShape: SponsorCurveShape): SponsorArchetype {
-  const family = getSponsorCurveFamily(curveShape);
-  if (family === "titel") return "performance";
-  if (family === "sicherheit") return "security";
-  return "identity";
+const SPONSOR_V2_CURVE_NAMES: readonly SponsorV2CurveName[] = SPONSOR_V2_CURVES.map((c) => c.name);
+
+/**
+ * MODELLKURVE -> LEGACY-ARCHETYP-EIMER.
+ *
+ * Der Marken-Katalog und der Sonderziel-Katalog sind noch nach den drei alten Archetypen
+ * verschlagwortet (`security` / `performance` / `identity`). Diese Abbildung ist die EINZIGE Stelle,
+ * an der die Kurvenachse der Erzeugung diese Eimer noch beruehrt — sie ersetzt die frueher
+ * dazwischenliegende Doppel-Uebersetzung "Kurvenform -> Kurven-Familie -> Archetyp", die nur
+ * existierte, weil die Erzeugung noch die 11 alten Kurvenformen wuerfelte.
+ */
+const SPONSOR_CURVE_ARCHETYPE: Record<SponsorV2CurveName, SponsorArchetype> = {
+  Gipfel: "performance",
+  Steil: "performance",
+  Linear: "identity",
+  Halten: "identity",
+  Flach: "identity",
+  Sockel: "security",
+};
+
+/** Kurve -> Archetyp-Eimer fuer Marken- und Sonderziel-Auswahl. */
+export function mapSponsorCurveToArchetype(curveName: SponsorV2CurveName): SponsorArchetype {
+  return SPONSOR_CURVE_ARCHETYPE[curveName] ?? "identity";
 }
 
 /**
- * Angebots-Slate-Wurf: pro Slot eine RARITY (gedeckelt an der maxRarity des Teams, beliebtheits-gehoben
- * Richtung höherer Rarity) und dazu ein SLATE aus DISTINCT Kurvenformen (höchstens 2 pro Familie).
- * Vollständig deterministisch über getStableUnitHash (kein Math.random). Golden bleibt orthogonal und läuft
- * über denselben Golden-Los-Pfad wie zuvor.
+ * Angebots-Slate-Wurf: pro Slot eine RARITY (beliebtheits-gehoben Richtung höherer Rarity) und dazu ein
+ * SLATE aus DISTINCT Modellkurven. Vollständig deterministisch über getStableUnitHash (kein Math.random).
+ * Golden bleibt orthogonal und läuft über denselben Golden-Los-Pfad wie zuvor.
+ *
+ * Gewuerfelt werden die SECHS Kurven des Sponsormodells (Sockel/Halten/Linear/Gipfel/Steil/Flach). Die
+ * frueheren elf Kurvenformen (Koenigsklasse, Europapokal, Conference-Rang, Aufsteiger, Konsolidierung, …)
+ * sind aus der Erzeugung entfernt: sie wurden ohnehin nur auf diese sechs gefaltet, und die Faltung
+ * erzeugte Doppel, die danach wieder aufgeloest werden mussten. Ihr Typ und ihre Payout-Tabellen bleiben
+ * ausschliesslich fuer das LESEN von Altvertraegen bestehen (siehe sponsor-curve-shapes.ts).
  */
 export function rollSponsorOfferSlate(input: {
   seasonId: string;
@@ -153,12 +166,12 @@ export function rollSponsorOfferSlate(input: {
   hadGoldenLastSeason?: boolean;
   teamCount?: number;
 }): SponsorSlateResult {
-  // Guard: es gibt nur SPONSOR_CURVE_SHAPE_KEYS.length distinkte Kurvenformen. Fragt ein Aufrufer mehr Slots
-  // an, könnten wir nie so viele DISTINCT-Formen liefern und würden stillschweigend weniger Einträge zurückgeben.
-  // Deshalb den effektiven slotCount hart auf die Anzahl verfügbarer Formen deckeln. Das Spiel nutzt 5 (< 11),
+  // Guard: es gibt nur SPONSOR_V2_CURVE_NAMES.length distinkte Kurven. Fragt ein Aufrufer mehr Slots an,
+  // könnten wir nie so viele DISTINCT-Kurven liefern und würden stillschweigend weniger Einträge zurückgeben.
+  // Deshalb den effektiven slotCount hart auf die Anzahl verfügbarer Kurven deckeln. Das Spiel nutzt 5 (< 6),
   // daher ist das rein defensiv — das slotCount=5-Verhalten bleibt unverändert.
   const requestedSlotCount = input.slotCount ?? 5;
-  const slotCount = Math.min(requestedSlotCount, SPONSOR_CURVE_SHAPE_KEYS.length);
+  const slotCount = Math.min(requestedSlotCount, SPONSOR_V2_CURVE_NAMES.length);
   const teamCount = input.teamCount ?? 32;
 
   // Rebalance (2026-07): KEIN qualitäts-rang-basierter Rarity-Deckel mehr. Früher deckelte der Team-
@@ -196,38 +209,19 @@ export function rollSponsorOfferSlate(input: {
     rarities.push(picked);
   }
 
-  // Kurven-Slate: distinct Formen, höchstens 2 pro Familie. Deterministische Reihenfolge (hash-sortiert),
-  // greedy einsammeln; falls das (mit ≤2/Familie) nicht reicht, auf 3/Familie lockern.
-  const orderedShapes = [...SPONSOR_CURVE_SHAPE_KEYS].sort(
-    (a, b) =>
-      getStableUnitHash(`${input.seasonId}:${input.teamId}:sponsor-curve:${a}`) -
-      getStableUnitHash(`${input.seasonId}:${input.teamId}:sponsor-curve:${b}`),
-  );
-  const collectShapes = (maxPerFamily: number, seed: SponsorCurveShape[]): SponsorCurveShape[] => {
-    const chosen = [...seed];
-    const familyCount = new Map<SponsorCurveFamily, number>();
-    for (const shape of chosen) {
-      const fam = getSponsorCurveFamily(shape);
-      familyCount.set(fam, (familyCount.get(fam) ?? 0) + 1);
-    }
-    for (const shape of orderedShapes) {
-      if (chosen.length >= slotCount) break;
-      if (chosen.includes(shape)) continue;
-      const fam = getSponsorCurveFamily(shape);
-      if ((familyCount.get(fam) ?? 0) >= maxPerFamily) continue;
-      chosen.push(shape);
-      familyCount.set(fam, (familyCount.get(fam) ?? 0) + 1);
-    }
-    return chosen;
-  };
-  let shapes = collectShapes(2, []);
-  if (shapes.length < slotCount) {
-    shapes = collectShapes(3, shapes);
-  }
-  shapes = shapes.slice(0, slotCount);
+  // Kurven-Slate: DISTINCT Modellkurven in deterministischer (hash-sortierter) Reihenfolge. Bei 6 Kurven und
+  // 5 Slots bleibt immer genau eine uebrig — der frueher noetige Familien-Deckel (≤2 je Familie, mit Lockerung
+  // auf 3) entfaellt ersatzlos, weil die Faltung 11→6 samt ihrer Doppel weg ist.
+  const curveNames = [...SPONSOR_V2_CURVE_NAMES]
+    .sort(
+      (a, b) =>
+        getStableUnitHash(`${input.seasonId}:${input.teamId}:sponsor-curve:${a}`) -
+        getStableUnitHash(`${input.seasonId}:${input.teamId}:sponsor-curve:${b}`),
+    )
+    .slice(0, slotCount);
 
-  const entries: SponsorSlateEntry[] = shapes.map((curveShape, i) => ({
-    curveShape,
+  const entries: SponsorSlateEntry[] = curveNames.map((curveName, i) => ({
+    curveName,
     rarity: rarities[i] ?? fallbackRarity,
   }));
 
