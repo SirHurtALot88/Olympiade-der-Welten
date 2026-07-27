@@ -12,33 +12,33 @@
  *
  * Aufruf: npx tsx scripts/sponsor-5season-model.ts [--seasons 5] [--floor gestaffelt|flach]
  */
-const TIERS = [[1,1],[2,4],[5,8],[9,12],[13,16],[17,20],[21,24],[25,28],[29,32]] as const;
-const LABEL = ["Meister","Top 4","Top 8","Top 12","Top 16","Top 20","Top 24","Top 28","Platz 32"];
+export const TIERS = [[1,1],[2,4],[5,8],[9,12],[13,16],[17,20],[21,24],[25,28],[29,32]] as const;
+export const LABEL = ["Meister","Top 4","Top 8","Top 12","Top 16","Top 20","Top 24","Top 28","Platz 32"];
 /** Rang auf 1..32 klemmen und runden — gebrochene Staerkeraenge lieferten sonst tierOf = -1
  *  und damit NaN in der ganzen Bilanz ab Saison 2. */
-const tierOf = (r: number) => {
+export const tierOf = (r: number) => {
   const c = Math.max(1, Math.min(32, Math.round(r)));
   return TIERS.findIndex(([lo, hi]) => c >= lo && c <= hi);
 };
-const LIGA = [72, 67, 63, 59, 55, 51, 47, 43, 39];
+export const LIGA = [72, 67, 63, 59, 55, 51, 47, 43, 39];
 /** GESTAFFELT: steigt zum Tabellenende. Flach = alter Zustand, zum Vergleich. */
-const FLOOR_TIER = [28, 28, 28, 29, 30, 31, 32, 34, 35];
+export const FLOOR_TIER = [28, 28, 28, 29, 30, 31, 32, 34, 35];
 const FLAT = process.argv.includes("--floor") && process.argv[process.argv.indexOf("--floor") + 1] === "flach";
-const floorFor = (tier: number) => (FLAT ? 35 : FLOOR_TIER[tier]!);
+export const floorFor = (tier: number) => (FLAT ? 35 : FLOOR_TIER[tier]!);
 
-const BASE = [76.0, 73.6, 71.6, 67.9, 63.8, 59.9, 56.7, 54.1, 53.0];
-const MEAN = BASE.reduce((a, b) => a + b, 0) / BASE.length;
-const SHAPE = BASE.map((v) => MEAN + (v - MEAN) * 1.7);
-const RARITY: Array<[string, number, number]> = [["gewöhnlich",0.85,0.30],["magisch",1.0,0.47],["selten",1.15,0.18],["legendär",1.35,0.05]];
+export const BASE = [76.0, 73.6, 71.6, 67.9, 63.8, 59.9, 56.7, 54.1, 53.0];
+export const MEAN = BASE.reduce((a, b) => a + b, 0) / BASE.length;
+export const SHAPE = BASE.map((v) => MEAN + (v - MEAN) * 1.7);
+export const RARITY: Array<[string, number, number]> = [["gewöhnlich",0.85,0.30],["magisch",1.0,0.47],["selten",1.15,0.18],["legendär",1.35,0.05]];
 const BASE_SPECIAL = 0.25, POOL_EVEN = 0.5;
-const rel = (d: number) => (d > 0 ? 5 + 2.5*d - 0.9*d*d : 5 + 2.8*d);
-const PROFILES = [
+export const rel = (d: number) => (d > 0 ? 5 + 2.5*d - 0.9*d*d : 5 + 2.8*d);
+export const PROFILES = [
   { n: "ausgewogen",    sp: 0.25, w: [.11,.11,.11,.11,.11,.11,.11,.11,.12] },
   { n: "spitzenlastig", sp: 0.15, w: [.28,.24,.18,.12,.08,.05,.03,.02,.00] },
   { n: "sockellastig",  sp: 0.15, w: [.00,.02,.03,.05,.08,.12,.18,.24,.28] },
   { n: "zielschwer",    sp: 0.70, w: [.11,.11,.11,.11,.11,.11,.11,.11,.12] },
 ];
-const dist = (e: number, s = 5.5) => {
+export const dist = (e: number, s = 5.5) => {
   const w: number[] = [];
   for (let r = 1; r <= 32; r += 1) w.push(Math.exp(-((r - e) ** 2) / (2 * s * s)));
   const t = w.reduce((a, b) => a + b, 0);
