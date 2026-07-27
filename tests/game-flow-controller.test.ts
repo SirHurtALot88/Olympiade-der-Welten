@@ -687,7 +687,13 @@ describe("game flow controller", () => {
       activeTeamId: "M-M",
     });
     const training = flow.steps.find((step) => step.stepId === "training_facilities");
-    expect(training?.targetView).toBe("trainingV2");
+    // `trainingCompact` ist laut foundation-nav-config der Tab "Training"; `trainingV2`
+    // heisst dort "Gebäude" (Facilities). Der Schritt gilt erst als erledigt, wenn jeder
+    // Kaderspieler einen `trainingMode` hat (`isTeamTrainingComplete`) — das wird
+    // ausschliesslich im Training-Tab gesetzt. Frueher zeigte der CTA auf `trainingV2`
+    // und landete sichtbar bei den Gebäuden.
+    expect(training?.targetView).toBe("trainingCompact");
+    expect(training?.targetView).not.toBe("trainingV2");
     expect(training?.targetView).not.toBe("scoutingCenterV2");
   });
 
