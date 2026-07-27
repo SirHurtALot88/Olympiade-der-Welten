@@ -60,6 +60,13 @@ export const FLOOR_RARITY: Record<string, number> = {
   "gewöhnlich": 35, "magisch": 37, "selten": 39, "legendär": 42,
 };
 export const FLOOR_ABSOLUT = 35;
+/**
+ * Stellschraube fuer die Untergrenze, damit ihre Wirkung MESSBAR ist statt behauptet.
+ * Hintergrund: der Engine-Schattentest zeigt, dass die Untergrenze am Tabellenende Karten
+ * abschneidet und dadurch Fallen erzeugt (offener Punkt 3 des Umsetzungsplans). Mit dieser
+ * Schraube laesst sich die Empfindlichkeit direkt durchrechnen, statt sie zu diskutieren.
+ */
+export const FLOOR_SCALE = Number(process.env.OLY_SPONSOR_FLOORSCALE ?? 1);
 /** Daempfung, mit der die Untergrenze im schwachen Ligajahr mitfaellt. */
 export const FLOOR_DAMP = 0.8;
 /**
@@ -68,7 +75,7 @@ export const FLOOR_DAMP = 0.8;
  * anzuheben, wenn die Spitze bevorzugt werden soll (gemessen: U-Form im Ueberschuss).
  */
 export const floorAt = (rarity: string, sf: number): number =>
-  Math.max(FLOOR_ABSOLUT, (FLOOR_RARITY[rarity] ?? FLOOR_RARITY["magisch"]!) * (sf >= 1 ? 1 : 1 - FLOOR_DAMP * (1 - sf)));
+  FLOOR_SCALE * Math.max(FLOOR_ABSOLUT, (FLOOR_RARITY[rarity] ?? FLOOR_RARITY["magisch"]!) * (sf >= 1 ? 1 : 1 - FLOOR_DAMP * (1 - sf)));
 
 // ── Ziel-EV-Leiter ─────────────────────────────────────────────────────────────────────────────
 export const TARGET_EV_BASE = [76.0, 73.6, 71.6, 67.9, 63.8, 59.9, 56.7, 54.1, 53.0];
@@ -163,6 +170,87 @@ export const clauseMalus = (s: number, p: number): number => s * p;
 export const CLAUSE_S_REPR = 11;
 export const CLAUSE_P_REPR = 0.5;
 
+/**
+ * KLAUSELKATALOG — EINE Quelle der Wahrheit.
+ *
+ * Vorher stand er zweimal: als `CLAUSES` in scripts/sponsor-model-proposal.ts und als Spiegel
+ * `SHADOW_CLAUSES` in scripts/sponsor-shadow-core.ts. Genau diese Doppelhaltung hat schon einmal
+ * drei auseinandergelaufene Parametersaetze erzeugt. Jetzt steht er hier; beide Skripte importieren.
+ *
+ * ── AUFRAEUMEN NACH DEM ENGINE-SCHATTENTEST (docs/SPONSOR_SCHATTENTEST_ENGINE.md) ──────────────
+ * Der Katalog hatte 20 Eintraege. Fuenf sind RAUS, zwei sind NEU GEFASST — jede Entscheidung
+ * gegen eine Messung aus 160 Team-Saisons:
+ *
+ *   ENTFERNT, weil das Datenmodell den noetigen Vorher-Zustand nicht fuehrt (prinzipiell):
+ *     - Charakterarbeit  `traitsNegative` wird im laufenden Spiel nie mutiert und ein Kaderstand
+ *                        zum Saisonanfang existiert im Save nicht → kein Delta rekonstruierbar.
+ *     - Kapitaenstreue   `setTeamCaptain` ERSETZT den (Team, Saison)-Record; ein Wechsel
+ *                        hinterlaesst keine Spur. Zusaetzlich: 0 Eintraege in `teamCaptains`.
+ *   ENTFERNT, weil die Metrik im Lauf gar nicht entsteht (praktisch):
+ *     - Hartes Training  `seasonTrainingAccumulator` bei 0 von 2984 Spielern gesetzt.
+ *     - XP-Disziplin     `playerProgressionEvents`: 1708 Eintraege, Summe xpEarned = 0 → kein Nenner.
+ *     - Beliebtheit      `beliebtheitByTeamId` und -History leer. Nicht prinzipiell unmoeglich —
+ *                        wieder aufnehmen, sobald der Beliebtheits-Ledger fortgeschrieben wird.
+ *
+ *   NEU GEFASST:
+ *     - Ausbau    zaehlte nur fan_shop/arena_upgrade und mass P = 0.11 gegen Design 0.45. Von 148
+ *                 echten Gebaeude-Upgrades im Lauf lagen nur 17 auf diesen beiden. Die Klausel war
+ *                 nicht zu schwer, sie zeigte auf die falschen Gebaeude. Jetzt: ALLE Gebaeude,
+ *                 Schwelle frei. Gemessen bei X >= 1: P = 0.59 → Design-P von 0.45 auf 0.60.
+ *     - Wortlaut  feste Schwelle "alle Versprechen eingehalten" wurde in 160 Team-Saisons NIE
+ *                 erfuellt (min 3, Median 8, max 11 gebrochene Versprechen) — ein garantierter
+ *                 Malus von s*P = 9.9 C, den kein Spieler abwenden kann. Jetzt "hoechstens X
+ *                 gebrochene Versprechen"; bei X <= 7 ist P = 0.47, das Design-P 0.45 bleibt.
+ *
+ * `evaluable` markiert, ob die Klausel am Saison-END-ZUSTAND trivial messbar ist. Nur diese gehen
+ * in den Produktions-Pool von OLY_SPONSOR_V2 (Phase P3) — lieber acht funktionierende Klauseln als
+ * zwanzig halbe. Die uebrigen bleiben im Modellkatalog, weil sie fuer Balancing und Fallen-Test
+ * zaehlen, aber ohne Evaluator nicht angeboten werden duerfen.
+ */
+export type ClauseSpec = {
+  name: string; label: string; p: number; s: number; lever: string;
+  /** true = am Saison-End-Zustand trivial auswertbar (Produktions-Pool von V2). */
+  evaluable: boolean;
+  /** "up" = Metrik >= Schwelle erfuellt, "down" = Metrik <= Schwelle erfuellt. */
+  direction: "up" | "down";
+};
+export const CLAUSES: ClauseSpec[] = [
+  { name: "Einsatzlast", label: "Saison-Fatigue-Schnitt ≥ X (auspowern)", p: 0.55, s: 24,
+    lever: "trainingMode + Rotation", evaluable: false, direction: "up" },
+  { name: "Schonung", label: "Saison-Fatigue-Schnitt ≤ X (rotieren)", p: 0.5, s: 17,
+    lever: "Rotation, kostet Tabellenpunkte", evaluable: false, direction: "down" },
+  { name: "Talentschmiede", label: "X Spieler steigen eine Klasse auf", p: 0.4, s: 24,
+    lever: "Trainingsfokus + Anlagen", evaluable: true, direction: "up" },
+  { name: "Wertaufbau", label: "Kaderwert +X % über die Saison", p: 0.5, s: 20,
+    lever: "Training + Transfers", evaluable: true, direction: "up" },
+  { name: "Achsenprofil", label: "eine Achse (POW/SPE/MEN/SOC) in die Top-N der Klasse", p: 0.45, s: 22,
+    lever: "Trainingsklasse + Kaderbau", evaluable: false, direction: "down" },
+  { name: "Disziplinen", label: "X Disziplinen mit positivem Saison-Delta", p: 0.5, s: 19,
+    lever: "preferredDisciplines + Training", evaluable: false, direction: "up" },
+  { name: "Schuldenfrei", label: "kein neuer Kredit (oder einen getilgt)", p: 0.85, s: 8,
+    lever: "Finanzplanung", evaluable: true, direction: "down" },
+  { name: "Gehaltseffizienz", label: "Gehaltssumme unter der Schwelle deiner Klasse", p: 0.5, s: 18,
+    lever: "Verhandlung + Kaderschnitt", evaluable: true, direction: "down" },
+  { name: "Kaderruhe", label: "höchstens X Transfers (Zu- und Abgänge)", p: 0.6, s: 15,
+    lever: "Transferdisziplin", evaluable: true, direction: "down" },
+  { name: "Ausbau", label: "mindestens X Gebäudestufen ausbauen", p: 0.6, s: 25,
+    lever: "Bauinvestition statt Spieler", evaluable: true, direction: "up" },
+  { name: "Prophylaxe", label: "höchstens X Verletzungen über die Saison", p: 0.45, s: 20,
+    lever: "Belastungssteuerung", evaluable: true, direction: "down" },
+  { name: "Moral", label: "Ø-Moral am Saisonende über der Schwelle", p: 0.55, s: 17,
+    lever: "Rollen, Einsatzzeiten, Kapitän", evaluable: true, direction: "up" },
+  { name: "Vielseitigkeit", label: "≥ X verschiedene Subklassen im Kader", p: 0.6, s: 16,
+    lever: "Kaderkomposition breit halten", evaluable: true, direction: "up" },
+  { name: "Fokusschule", label: "≥ X Spieler auf derselben Trainingsklasse", p: 0.55, s: 19,
+    lever: "trainingClass buendeln — Gegenteil von Vielseitigkeit", evaluable: true, direction: "up" },
+  { name: "Wortlaut", label: "höchstens X gebrochene Spielerversprechen", p: 0.45, s: 22,
+    lever: "Rolle/Einsätze/Trainingsmodus zusagen und liefern", evaluable: false, direction: "down" },
+];
+export const clauseByName = (name: string): ClauseSpec =>
+  CLAUSES.find((c) => c.name === name) ?? CLAUSES[0]!;
+/** Der Produktions-Pool von OLY_SPONSOR_V2: nur am Saison-End-Zustand trivial messbare Klauseln. */
+export const EVALUABLE_CLAUSES = CLAUSES.filter((c) => c.evaluable);
+
 // ── Leiter 3: Sonderziel ───────────────────────────────────────────────────────────────────────
 /**
  * Das Sonderziel ist eine LOTTERIE, kein Zuschlag: mit Wahrscheinlichkeit P_GOAL zahlt es
@@ -179,13 +267,50 @@ export const goalPayout = (evTarget: number, p: number = P_GOAL): number =>
   evTarget * Math.min(GOAL_REWARD_CAP, 1 / Math.max(p, 1e-6));
 
 // ── Ergebnisstreuung und erreichbarer Korridor ─────────────────────────────────────────────────
-/** Streuung der Endraenge um den Erwartungsrang. GESETZT, nicht gemessen — traegt das Ergebnis. */
-export const SIGMA = 5.5;
+/**
+ * Streuung der Endraenge um den Erwartungsrang — GEMESSEN, nicht mehr gesetzt.
+ *
+ * Vorher 5.5 als Designannahme. Der Schattentest gegen die echte Engine
+ * (docs/SPONSOR_SCHATTENTEST_ENGINE.md, 128 echte Team-Saisons aus 4 abgeschlossenen Saisons)
+ * misst 6.62 gepoolt (je Saison 5.54 / 7.10 / 6.52 / 7.47). Gesetzt wird 6.6.
+ */
+export const SIGMA = Number(process.env.OLY_SPONSOR_SIGMA ?? 6.6);
 /** Halbe Breite des als erreichbar betrachteten Rangkorridors. */
 export const CORRIDOR = 11;
+
+/**
+ * RUECKSCHRITT ZUR MITTE — gemessen und bis zum Schattentest im Modell gar nicht abgebildet.
+ *
+ * `dist()` setzte eine um den Erwartungsrang ZENTRIERTE Normalverteilung an. Die Engine erzeugt
+ * das nicht: starke Teams (Erwartung 1-11) landen im Schnitt +3.34 Raenge SCHLECHTER, schwache
+ * (22-32) 2.11 Raenge BESSER (mittel -1.35). Fuer ein Spitzenteam war die Kalibrierung damit
+ * systematisch zu optimistisch, fuer ein Kellerteam zu pessimistisch — mit direkter Folge fuer
+ * die EV-Paritaet der jeweiligen Karten.
+ *
+ * Modelliert als EINE Zahl statt dreier Klassen-Bias, damit der Effekt stetig ueber die Raenge
+ * wirkt und keine Sprungstellen an den Klassengrenzen entstehen:
+ *     Mittelpunkt(e) = RANK_MEAN + (1 - BIAS_SHRINK) * (e - RANK_MEAN)
+ * Der Bias ist dann -BIAS_SHRINK * (e - RANK_MEAN): oben positiv, unten negativ.
+ *
+ * BIAS_SHRINK = 0.255 ist der Kleinstquadrate-Schaetzer aus denselben 128 Team-Saisons
+ * (scripts/sponsor-shadow-measure.ts, Abschnitt "RUECKSCHRITT ZUR MITTE"). Er reproduziert
+ * stark +2.68 gegen gemessen +3.34 und schwach -2.68 gegen gemessen -2.11 und erklaert 12.7 %
+ * der Rangvarianz; das Restsigma sinkt von 6.62 auf 6.18.
+ *
+ * WICHTIG fuer die Liga-Summe: die Schrumpfung ist um RANK_MEAN symmetrisch, der Mittelwert der
+ * Verteilungsmittelpunkte ueber alle 32 Teams bleibt also 16.5. Sie verschiebt Geld zwischen
+ * Spitze und Keller, nicht in die Liga hinein oder heraus.
+ */
+export const RANK_MEAN = 16.5;
+export const BIAS_SHRINK = Number(process.env.OLY_SPONSOR_SHRINK ?? 0.255);
+/** Mittelpunkt der Ergebnisverteilung eines Teams mit Erwartungsrang `expected`. */
+export const centerRank = (expected: number): number =>
+  RANK_MEAN + (1 - BIAS_SHRINK) * (expected - RANK_MEAN);
+
 export const dist = (expected: number, sigma: number = SIGMA): number[] => {
+  const c = centerRank(expected);
   const w: number[] = [];
-  for (let r = 1; r <= 32; r += 1) w.push(Math.exp(-((r - expected) ** 2) / (2 * sigma * sigma)));
+  for (let r = 1; r <= 32; r += 1) w.push(Math.exp(-((r - c) ** 2) / (2 * sigma * sigma)));
   const sum = w.reduce((a, b) => a + b, 0);
   return w.map((x) => x / sum);
 };
@@ -202,17 +327,34 @@ export const corridorOf = (expected: number, half: number = CORRIDOR): number[] 
  * `specialShare` = Anteil des Pools, der ins Sonderziel geht.
  * `tierWeights`  = Verteilung des geformten Rests ueber die 9 Stufen, Summe 1.
  */
-export type Profile = { name: string; specialShare: number; tierWeights: number[]; note: string };
+export type Profile = {
+  name: string;
+  specialShare: number;
+  tierWeights: number[];
+  /**
+   * Formgewichte je STUFENSCHRITT statt je Stufe: 8 Schritte zwischen den 9 Tabellenstufen.
+   * `stepWeights[i]` ist der Anteil des Formbudgets, der auf den Schritt von Stufe i+1 auf
+   * Stufe i entfaellt — also auf eine VERBESSERUNG um eine Stufe. Alle Eintraege >= 0, Summe 1.
+   * Siehe formShape: genau daraus folgt die Monotonie der Auszahlungsleiter.
+   */
+  stepWeights: number[];
+  note: string;
+};
 export const PROFILES: Profile[] = [
   { name: "ausgewogen",    specialShare: 0.25, tierWeights: [.11, .11, .11, .11, .11, .11, .11, .11, .12],
-    note: "Pool gleichmaessig ueber alle Stufen" },
+    stepWeights: [.125, .125, .125, .125, .125, .125, .125, .125],
+    note: "Formzuwachs gleichmaessig ueber alle Stufenschritte" },
   { name: "spitzenlastig", specialShare: 0.15, tierWeights: [.28, .24, .18, .12, .08, .05, .03, .02, .00],
-    note: "fast alles auf die Spitzenplaetze — ein Angebot fuer Titelambitionen" },
+    stepWeights: [.30, .24, .18, .12, .08, .05, .02, .01],
+    note: "der Formzuwachs sitzt ganz oben — bezahlt wird der Sprung in die Spitzenraenge" },
   { name: "sockellastig",  specialShare: 0.15, tierWeights: [.00, .02, .03, .05, .08, .12, .18, .24, .28],
-    note: "zieht die unteren Plaetze ans Mittelfeld heran" },
+    stepWeights: [.01, .02, .05, .08, .12, .18, .24, .30],
+    note: "der Formzuwachs sitzt ganz unten — schon der Sprung aus dem Keller zahlt" },
   { name: "mittelfeld",    specialShare: 0.20, tierWeights: [.02, .05, .10, .18, .25, .18, .10, .07, .05],
-    note: "belohnt das Mittelfeld, Spitze und Keller gehen leer aus" },
+    stepWeights: [.03, .07, .15, .25, .25, .15, .07, .03],
+    note: "der Formzuwachs sitzt in der Tabellenmitte — Spitze und Keller sind flach" },
   { name: "zielschwer",    specialShare: 0.70, tierWeights: [.11, .11, .11, .11, .11, .11, .11, .11, .12],
+    stepWeights: [.125, .125, .125, .125, .125, .125, .125, .125],
     note: "der Pool steckt fast komplett im Sonderziel — maximaler Eigeneinfluss" },
 ];
 export const profileByName = (name: string): Profile => PROFILES.find((p) => p.name === name) ?? PROFILES[0]!;
@@ -231,17 +373,53 @@ export const profileByName = (name: string): Profile => PROFILES.find((p) => p.n
  * EV-gleiche Formen, die sich ueber den Rang kreuzen, koennen sich per Konstruktion nicht
  * dominieren — genau das war das Ziel.
  */
-export const FORM_AMPLITUDE = Number(process.env.OLY_SPONSOR_FORM ?? 60);
+/**
+ * MONOTONIE-FIX (Riss 3 des Engine-Schattentests).
+ *
+ * GEMESSEN VORHER: 6 von 128 realisierten Karten zahlten fuer einen BESSEREN Endrang WENIGER,
+ * groesster Rueckschritt 2.8 C zwischen Rang 12 und 13. Alle sechs trugen das Profil `mittelfeld`.
+ *
+ * URSACHE: die alte Fassung las `tierWeights[finalTier]` PUNKTWEISE. Die tierWeights sind ueber die
+ * Tabellenstufen nicht monoton — bei `mittelfeld` liegt Stufe 4 (Raenge 13-16, Gewicht .25) ueber
+ * Stufe 3 (Raenge 9-12, Gewicht .18). Bei Amplitude 60 sind das 4.2 C Aufschlag fuers SCHLECHTERE
+ * Band, waehrend die LIGA-Leiter dort nur 4 C Unterschied hat. Die EV-Zentrierung haelt den
+ * Erwartungswert neutral — sie sagt nichts ueber Monotonie im Rang.
+ *
+ * FIX: die Formkomponente ist jetzt eine KUMULIERTE Summe nicht-negativer Stufenschritte statt
+ * eines punktweisen Gewichts:
+ *     formLadder(t) = Summe der stepWeights[i] fuer i >= t          (formLadder(8) = 0, formLadder(0) = 1)
+ *     formShape     = FORM_AMPLITUDE * (formLadder(finalTier) - E[formLadder])
+ * Weil alle stepWeights >= 0 sind, ist formLadder ueber die Stufen nicht-steigend, also als
+ * Funktion des RANGES nicht-fallend. Der Formbeitrag kann eine Rangverbesserung damit per
+ * Konstruktion nie verteuern. Die EV-Zentrierung (und damit die Profil-Dominanzfreiheit) bleibt
+ * unveraendert, weil nur ein rang-unabhaengiger Mittelwert abgezogen wird.
+ *
+ * VERWORFENE ALTERNATIVE — Amplitude senken, bis die Nicht-Monotonie unter die LIGA-Stufe faellt:
+ * die garantierte Stufenrendite ist LIGA-Schritt (min 4 C) plus Kurvenschritt (min -3 C bei
+ * `Halten`) = 1 C; der groesste negative Gewichtsschritt bei `mittelfeld` ist -0.07. Die Amplitude
+ * haette auf 14 gemusst — das haette die Profilachse praktisch abgeschafft, statt sie zu reparieren.
+ *
+ * AMPLITUDE 24 statt 60: die alte Zahl multiplizierte GEWICHTE (Spanne rund 0.28), die neue eine
+ * kumulierte Leiter (Spanne exakt 1.0). 60 x 0.28 = 16.8 C Formspanne vorher; 24 x 1.0 = 24 C
+ * jetzt — dieselbe Groessenordnung, gemessen an der LIGA-Leiter (74 - 39 = 35 C) etwa zwei Drittel.
+ */
+export const FORM_AMPLITUDE = Number(process.env.OLY_SPONSOR_FORM ?? 24);
+/** Kumulierte, ueber die Stufen nicht-steigende Formleiter eines Profils. Index 0..8. */
+export function formLadder(profile: Profile, tier: number): number {
+  let acc = 0;
+  for (let i = tier; i < profile.stepWeights.length; i += 1) acc += profile.stepWeights[i]!;
+  return acc;
+}
 const formMeanCache = new Map<string, number>();
 export function formShape(profile: Profile, expected: number, finalTier: number): number {
   if (FORM_AMPLITUDE === 0) return 0;
   const key = `${profile.name}:${Math.round(expected)}`;
   let mean = formMeanCache.get(key);
   if (mean === undefined) {
-    mean = dist(expected).reduce((a, w, i) => a + w * profile.tierWeights[tierOf(i + 1)]!, 0);
+    mean = dist(expected).reduce((a, w, i) => a + w * formLadder(profile, tierOf(i + 1)), 0);
     formMeanCache.set(key, mean);
   }
-  return FORM_AMPLITUDE * (profile.tierWeights[finalTier]! - mean);
+  return FORM_AMPLITUDE * (formLadder(profile, finalTier) - mean);
 }
 
 /**

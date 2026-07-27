@@ -26,6 +26,7 @@ import {
   TARGET_EV_SHAPE, rel as relRepr, CURVE_BASE, CURVE_UP, CURVE_BETA, CURVE_DOWN,
   clauseBonus, clauseMalus, dist, PROFILES, cardTargets, formShape, goalPayout,
   P_GOAL as P_GOAL_DESIGN, SIGMA as SIGMA_DESIGN, type Profile,
+  CLAUSES, clauseByName as clauseByNameParam, type ClauseSpec, BIAS_SHRINK, centerRank,
 } from "./sponsor-model-params";
 
 // ── Kurvenkatalog (identisch zu scripts/sponsor-model-proposal.ts, dort nicht separat exportiert) ──
@@ -45,36 +46,20 @@ export const curveByName = (name: string): ShadowCurve =>
 export const CURVE_CONSTANTS = { CURVE_BASE, CURVE_UP, CURVE_BETA, CURVE_DOWN };
 
 /**
- * KLAUSELKATALOG — 1:1 die 20 Klauseln aus scripts/sponsor-model-proposal.ts (dort exportiert,
- * aber das Skript ist ein Report mit Top-Level-Ausgaben; es zu importieren wuerde den ganzen
- * Report ausfuehren). Deshalb hier als reine Daten gespiegelt. `p` ist das DESIGN-P — der Wert,
- * gegen den die Messung geprueft wird.
+ * KLAUSELKATALOG — kommt jetzt aus scripts/sponsor-model-params.ts.
+ *
+ * Vorher stand hier eine HANDKOPIE der 20 Klauseln aus scripts/sponsor-model-proposal.ts, weil
+ * dieses Skript ein Report mit Top-Level-Ausgaben ist und ein Import den Report ausfuehren wuerde.
+ * Die Kopie war genau die Fehlerquelle, die im Repo schon einmal drei Parametersaetze erzeugt hat:
+ * eine Katalogaenderung musste an zwei Stellen nachgezogen werden. Der Katalog steht jetzt in der
+ * reinen Datendatei; beide Seiten lesen dieselbe Liste.
+ *
+ * Nach dem Engine-Test sind es 15 statt 20 Klauseln (fuenf gestrichen, zwei neu gefasst) —
+ * Begruendung je Eintrag im Kopfkommentar von `CLAUSES` in sponsor-model-params.ts.
  */
-export type ShadowClause = { name: string; label: string; p: number; s: number; lever: string };
-export const SHADOW_CLAUSES: ShadowClause[] = [
-  { name: "Einsatzlast", label: "Saison-Fatigue-Schnitt >= X (auspowern)", p: 0.55, s: 24, lever: "trainingMode + Rotation" },
-  { name: "Schonung", label: "Saison-Fatigue-Schnitt <= X (rotieren)", p: 0.5, s: 17, lever: "Rotation" },
-  { name: "Hartes Training", label: "Anteil Spieltage mit Modus 'hart' >= X %", p: 0.6, s: 20, lever: "trainingMode je Spieltag" },
-  { name: "Talentschmiede", label: "X Spieler steigen eine Klasse auf", p: 0.4, s: 24, lever: "Trainingsfokus" },
-  { name: "Wertaufbau", label: "Kaderwert +X % ueber die Saison", p: 0.5, s: 20, lever: "Training + Transfers" },
-  { name: "Achsenprofil", label: "eine Achse in die Top-N der Klasse", p: 0.45, s: 22, lever: "Trainingsklasse" },
-  { name: "Disziplinen", label: "X Disziplinen mit positivem Saison-Delta", p: 0.5, s: 19, lever: "preferredDisciplines" },
-  { name: "Schuldenfrei", label: "kein neuer Kredit (oder einen getilgt)", p: 0.85, s: 8, lever: "Finanzplanung" },
-  { name: "Gehaltseffizienz", label: "Gehaltssumme unter der Schwelle deiner Klasse", p: 0.5, s: 18, lever: "Verhandlung" },
-  { name: "Kaderruhe", label: "hoechstens X Transfers", p: 0.6, s: 15, lever: "Transferdisziplin" },
-  { name: "Ausbau", label: "Fan-Shop-/Arena-Stufen erhoehen", p: 0.45, s: 25, lever: "Bauinvestition" },
-  { name: "Prophylaxe", label: "hoechstens X Verletzungen ueber die Saison", p: 0.45, s: 20, lever: "Belastungssteuerung" },
-  { name: "Moral", label: "OE-Moral am Saisonende ueber der Schwelle", p: 0.55, s: 17, lever: "Rollen, Einsatzzeiten" },
-  { name: "Beliebtheit", label: "Beliebtheit um X steigern", p: 0.45, s: 17, lever: "Erfolg + Fan-Infrastruktur" },
-  { name: "XP-Disziplin", label: ">= X % der verdienten XP investiert", p: 0.65, s: 17, lever: "currentXP/spentXP" },
-  { name: "Charakterarbeit", label: "X negative Traits aus dem Kader entfernen", p: 0.4, s: 20, lever: "traitsNegative" },
-  { name: "Vielseitigkeit", label: ">= X verschiedene Subklassen im Kader", p: 0.6, s: 16, lever: "Kaderkomposition" },
-  { name: "Fokusschule", label: ">= X Spieler auf derselben Trainingsklasse", p: 0.55, s: 19, lever: "trainingClass buendeln" },
-  { name: "Kapitaenstreue", label: "derselbe Kapitaen ueber die ganze Saison", p: 0.75, s: 14, lever: "appoint_captain" },
-  { name: "Wortlaut", label: "alle Spielerversprechen eingehalten", p: 0.45, s: 22, lever: "Versprechen" },
-];
-export const clauseByName = (name: string): ShadowClause =>
-  SHADOW_CLAUSES.find((c) => c.name === name) ?? SHADOW_CLAUSES[2]!;
+export type ShadowClause = ClauseSpec;
+export const SHADOW_CLAUSES: ShadowClause[] = CLAUSES;
+export const clauseByName = (name: string): ShadowClause => clauseByNameParam(name);
 
 // ── Die Karte ──────────────────────────────────────────────────────────────────────────────────
 export type ShadowCard = {
@@ -287,4 +272,5 @@ export const sd = (xs: number[]): number => {
 
 export const DESIGN_SIGMA = SIGMA_DESIGN;
 export const DESIGN_P_GOAL = P_GOAL_DESIGN;
-export { TIERS, tierOf, TARGET_EV_SHAPE, PROFILES, floorAt };
+export const DESIGN_BIAS_SHRINK = BIAS_SHRINK;
+export { TIERS, tierOf, TARGET_EV_SHAPE, PROFILES, floorAt, centerRank };

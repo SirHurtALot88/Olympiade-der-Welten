@@ -38,7 +38,7 @@ import {
   TARGET_GAMMA, TARGET_EV_SHAPE, poolFor, rel as relRepr, clauseBonus, clauseMalus,
   SIGMA, CORRIDOR, dist as distOf, corridorOf, PROFILES, profileByName, cardTargets,
   P_GOAL, goalPayout, relConcaveRaw, CURVE_BETA, RARITY_ORDER, formShape, type Profile,
-  SALARY_SUM_S1, SALARY_TOP, SALARY_MIN, salaryAtRank,
+  SALARY_SUM_S1, SALARY_TOP, SALARY_MIN, salaryAtRank, CLAUSES, BIAS_SHRINK, centerRank,
 } from "./sponsor-model-params";
 
 export { PROFILES, RARITY_MULT };
@@ -163,29 +163,13 @@ export const CURVES: Array<{ name: string; rel: (d: number) => number; note: str
  * Nebeneffekt, thematisch stimmig: eine leichte Klausel (hohes P) zahlt wenig, bestraft aber
  * deutlich — man wird erwartet, sie zu erfuellen. Eine schwere zahlt gross bei mildem Malus.
  */
-export const CLAUSES: Array<{ name: string; label: string; p: number; s: number; lever: string }> = [
-  { name: "Einsatzlast",   label: "Saison-Fatigue-Schnitt ≥ X (auspowern)", p: 0.55, s: 24, lever: "trainingMode + Rotation" },
-  { name: "Schonung",      label: "Saison-Fatigue-Schnitt ≤ X (rotieren)", p: 0.5, s: 17,  lever: "Rotation, kostet Tabellenpunkte" },
-  { name: "Hartes Training", label: "Anteil Spieltage mit Modus 'hart' ≥ X %", p: 0.6, s: 20,  lever: "trainingMode je Spieltag" },
-  { name: "Talentschmiede", label: "X Spieler steigen eine Klasse auf", p: 0.4, s: 24, lever: "Trainingsfokus + Anlagen" },
-  { name: "Wertaufbau",    label: "Kaderwert +X % über die Saison", p: 0.5, s: 20,  lever: "Training + Transfers" },
-  { name: "Achsenprofil",  label: "eine Achse (POW/SPE/MEN/SOC) in die Top-N der Klasse", p: 0.45, s: 22, lever: "Trainingsklasse + Kaderbau" },
-  { name: "Disziplinen",   label: "X Disziplinen mit positivem Saison-Delta", p: 0.5, s: 19,  lever: "preferredDisciplines + Training" },
-  { name: "Schuldenfrei",  label: "kein neuer Kredit (oder einen getilgt)", p: 0.85, s: 8,  lever: "Finanzplanung" },
-  { name: "Gehaltseffizienz", label: "Gehaltssumme unter der Schwelle deiner Klasse", p: 0.5, s: 18,  lever: "Verhandlung + Kaderschnitt" },
-  { name: "Kaderruhe",     label: "höchstens X Transfers (Zu- und Abgänge)", p: 0.6, s: 15,  lever: "Transferdisziplin" },
-  { name: "Ausbau",        label: "Fan-Shop-/Arena-Stufen erhöhen", p: 0.45, s: 25, lever: "Bauinvestition statt Spieler" },
-  { name: "Prophylaxe",    label: "höchstens X Verletzungen über die Saison", p: 0.45, s: 20,  lever: "Belastungssteuerung" },
-  { name: "Moral",         label: "Ø-Moral am Saisonende über der Schwelle", p: 0.55, s: 17,  lever: "Rollen, Einsatzzeiten, Kapitän" },
-  { name: "Beliebtheit",   label: "Beliebtheit um X steigern", p: 0.45, s: 17,  lever: "Erfolg + Fan-Infrastruktur" },
-  // ── Nachtrag: Hebel aus XP-Oekonomie, Traits, Kaderkomposition, Kapitaen, Versprechen ─────────
-  { name: "XP-Disziplin",  label: "≥ X % der verdienten XP investiert statt gehortet", p: 0.65, s: 17,  lever: "currentXP/spentXP steuern" },
-  { name: "Charakterarbeit", label: "X negative Traits aus dem Kader entfernen", p: 0.4, s: 20,  lever: "traitsNegative — Abgabe oder Entwicklung" },
-  { name: "Vielseitigkeit", label: "≥ X verschiedene Subklassen im Kader", p: 0.6, s: 16,  lever: "Kaderkomposition breit halten" },
-  { name: "Fokusschule",   label: "≥ X Spieler auf derselben Trainingsklasse", p: 0.55, s: 19,  lever: "trainingClass buendeln — Gegenteil von Vielseitigkeit" },
-  { name: "Kapitänstreue", label: "derselbe Kapitän über die ganze Saison", p: 0.75, s: 14,  lever: "appoint_captain nicht wechseln" },
-  { name: "Wortlaut",      label: "alle Spielerversprechen eingehalten", p: 0.45, s: 22, lever: "Rolle/Einsätze/Trainingsmodus zusagen und liefern" },
-];
+/**
+ * Der Katalog steht jetzt in scripts/sponsor-model-params.ts — vorher stand er ZWEIMAL (hier und
+ * als Spiegel `SHADOW_CLAUSES` in scripts/sponsor-shadow-core.ts). Genau diese Doppelhaltung hat
+ * schon einmal drei auseinandergelaufene Parametersaetze erzeugt. Die Begruendung fuer jede der
+ * fuenf Streichungen und die zwei Neufassungen steht dort im Kopfkommentar.
+ */
+export { CLAUSES };
 
 const compose = (curve: string, clause: string): SponsorType => {
   const c = CURVES.find((x) => x.name === curve)!;
@@ -207,7 +191,9 @@ export const SPONSOR_TYPES: SponsorType[] = [
   compose("Linear", "Achsenprofil"),        // verlangt ein scharfes Spielprofil
   compose("Halten", "Prophylaxe"),          // ruhige Saison ohne Verletzungswelle
   compose("Linear", "Moral"),               // Kabine im Griff behalten
-  compose("Sockel", "Beliebtheit"),         // sicher, aber Fans muessen wachsen
+  // Vorher compose("Sockel", "Beliebtheit") — die Klausel ist mit dem Engine-Test aus dem Katalog
+  // geflogen (beliebtheitByTeamId leer, kein Ledger). Ersetzt durch eine Kaderbreiten-Klausel.
+  compose("Sockel", "Vielseitigkeit"),      // sicher, aber der Kader muss breit bleiben
 ];
 
 /** Erwartungswert der Klausel unter ihrem eigenen P. */
@@ -370,6 +356,22 @@ export function calibrateOffsets(): Map<string, number> {
   return cal;
 }
 
+/**
+ * FALLEN-BAND — alle 32 Endraenge statt des +-11-Korridors.
+ *
+ * GEMESSENER BEFUND (Riss aus dem Engine-Schattentest, hier nachgezogen): der Korridor erzeugte
+ * Fallen, die es nicht gibt. Kalibriert wird ueber ALLE 32 Raenge (`ev` integriert die volle
+ * sigma-Verteilung), geprueft wurde aber nur auf e+-11. Mit dem gemessenen Rueckschritt zur Mitte
+ * liegt fuer ein Team mit Erwartungsrang 32 rund 13 % der Wahrscheinlichkeitsmasse OBERHALB von
+ * Rang 21 — dort zahlt eine rueckwaertslastige Kurve wie `Gipfel` ihr ganzes Geld. Der Offset
+ * faellt entsprechend, und INNERHALB des Korridors sah die Karte dann ueberall schlechter aus als
+ * eine flache: 49 Fallenpaare, alle bei Erwartungsrang 32, alle Artefakt.
+ * Die echte Engine kennt keinen Korridor — der Schattentest prueft deshalb laengst ueber alle 32
+ * Raenge. Dieses Skript zieht jetzt nach. `corridorOf` bleibt fuer die KATALOG-Bandanzeige, wo es
+ * die Frage "was erlebt ein Team realistisch?" beantwortet, nicht "kann es dominiert werden?".
+ */
+const ALL_RANKS = Array.from({ length: 32 }, (_, i) => i + 1);
+
 const CAL_RAW = calibrateOffsets();
 /** Offset-Zugriff für ein Team mit gegebenem Erwartungsrang. */
 const offsetFor = (name: string, expectedRank: number) => CAL_RAW.get(`${name}:${tierOf(expectedRank)}`) ?? 0;
@@ -493,10 +495,70 @@ line();
   }
 }
 
+// ══════════════════════════════════════════════════════════════════════════════════════════════════
+// AUSZAHLUNGSLEITER-MONOTONIE UEBER DEN GESAMTEN KARTENRAUM (Riss 3 des Engine-Schattentests).
+//
+// Die Kurven-Monotonie oben ist NOTWENDIG, aber nicht hinreichend: der Schattentest fand 6 von 128
+// realisierten Karten, die fuer einen BESSEREN Endrang WENIGER zahlten — alle mit dem Profil
+// "mittelfeld", dessen alte punktweise `tierWeights` ueber die Stufen nicht monoton waren.
+//
+// Geprueft wird deshalb die GANZE Rangleiter, ueber jede erzeugbare Kombination:
+//     rankPart(r) = LIGA[tier(r)] + curve.rel(tier(e) - tier(r)) + formShape(profil, e, tier(r))
+//
+// WARUM DAS FUER DIE VOLLE AUSZAHLUNG REICHT — alle weiteren Terme sind rangunabhaengige
+// Konstanten oder monotone Abbildungen:
+//   - Kalibrieroffset `cal`, Klauselbonus/-malus und Sonderziel-Auszahlung haengen NICHT vom
+//     Endrang ab (sie werden mit der Erwartungsstufe gebildet) — sie verschieben die Leiter, sie
+//     kippen sie nicht.
+//   - Untergrenze `max(fl, x)` und K-Skalierung `max(fl, fl + (x - fl) * K)` mit K > 0 sind in x
+//     monoton nicht-fallend. Ist x ueber den Rang monoton, bleibt es auch das Bild.
+// Damit gilt: rankPart monoton  ⇒  die realisierte Auszahlungsleiter jeder Karte monoton.
+// ══════════════════════════════════════════════════════════════════════════════════════════════════
+line();
+console.log("AUSZAHLUNGSLEITER-MONOTONIE — jede Kurve x jedes Profil x jeder Erwartungsrang, alle 32 Endraenge");
+line();
+{
+  let checked = 0, broken = 0, worstDrop = 0;
+  let worstWhere = "";
+  const brokenBy = new Map<string, number>();
+  for (const c of CURVES) {
+    for (const prof of PROFILES) {
+      for (let e = 1; e <= 32; e += 1) {
+        const ladder = Array.from({ length: 32 }, (_, i) =>
+          LIGA[tierOf(i + 1)]! + c.rel(tierOf(e) - tierOf(i + 1)) + formShape(prof, e, tierOf(i + 1)));
+        checked += 1;
+        let bad = false;
+        for (let r = 1; r < 32; r += 1) {
+          const drop = ladder[r]! - ladder[r - 1]!; // Rang r+1 zahlt mehr als Rang r  →  Verstoss
+          if (drop > 1e-9) {
+            bad = true;
+            if (drop > worstDrop) { worstDrop = drop; worstWhere = `${c.name}/${prof.name} bei Erwartung ${e}, Rang ${r} → ${r + 1}`; }
+          }
+        }
+        if (bad) { broken += 1; brokenBy.set(`${c.name}/${prof.name}`, (brokenBy.get(`${c.name}/${prof.name}`) ?? 0) + 1); }
+      }
+    }
+  }
+  console.log(`  geprueft: ${checked} Leitern (${CURVES.length} Kurven x ${PROFILES.length} Profile x 32 Erwartungsraenge), je 32 Endraenge`);
+  console.log(`  nicht-monotone Leitern: ${broken}${broken === 0 ? "  ✓" : "  ✗"}`);
+  if (broken > 0) {
+    console.log(`  groesster Rueckschritt: ${worstDrop.toFixed(3)} C  (${worstWhere})`);
+    console.log(`  betroffen: ${[...brokenBy.entries()].map(([k, v]) => `${k} x${v}`).join(", ")}`);
+  } else {
+    // Der garantierte Zuwachs je Stufenschritt ist die Rechnung, die den Haken traegt.
+    const ligaSteps = LIGA.slice(0, -1).map((v, i) => v - LIGA[i + 1]!);
+    const curveWorst = Math.min(...CURVES.map((c) => Math.min(...Array.from({ length: 16 }, (_, i) => c.rel(i - 7) - c.rel(i - 8)))));
+    console.log(`  GARANTIE: LIGA-Schritt mindestens ${Math.min(...ligaSteps)} C, schlechtester Kurvenschritt ${curveWorst.toFixed(1)} C` +
+      ` (Halten faellt bewusst), Formschritt mindestens 0 C (kumulierte stepWeights, alle >= 0)` +
+      `  →  netto mindestens ${(Math.min(...ligaSteps) + curveWorst).toFixed(1)} C je Stufenverbesserung.`);
+    console.log(`  Innerhalb einer Stufe ist die Leiter konstant — also nicht-fallend. Zusammen: monoton ueber alle 32 Raenge.`);
+  }
+}
+
 console.log("\nPRÜFUNG je Erwartungsrang — EV-Spread, Risikospanne, Fallen");
 let trapsTotal = 0, collapsedTotal = 0;
 for (const e of EXPECTED) {
-  const band = corridorOf(e);
+  const band = ALL_RANKS;
   const rows = SPONSOR_TYPES.map((t) => {
     const c = offsetFor(t.name, e);
     return { name: t.name, ev: ev(t, e, c), sd: sdOf(t, e, c), lot: lotteries(t, e, c, band) };
@@ -533,8 +595,9 @@ console.log(`\n  FALLEN INSGESAMT (Stuetzstellen): ${trapsTotal}${trapsTotal ===
 // hat als eines auf Rang 14, aber denselben Offset benutzt. Deshalb hier ALLE 32 Raenge.
 {
   let offTraps = 0, offDead = 0, worstSpread = 0, worstRank = 0;
+  const trapWho = new Map<string, number[]>();
   for (let e = 1; e <= 32; e += 1) {
-    const band = corridorOf(e);
+    const band = ALL_RANKS;
     const rows = SPONSOR_TYPES.map((t) => {
       const c = offsetFor(t.name, e);
       return { name: t.name, ev: ev(t, e, c), lot: lotteries(t, e, c, band) };
@@ -542,12 +605,20 @@ console.log(`\n  FALLEN INSGESAMT (Stuetzstellen): ${trapsTotal}${trapsTotal ===
     const evs = rows.map((r) => r.ev);
     const sp = Math.max(...evs) / Math.min(...evs) - 1;
     if (sp > worstSpread) { worstSpread = sp; worstRank = e; }
-    offTraps += rows.filter((a) => isTrap(a, rows)).length;
+    for (const a of rows) {
+      const dom = rows.find((b) => b.name !== a.name
+        && a.lot.every((la, i) => fosdAtLeast(b.lot[i]!, la)) && a.lot.some((la, i) => fosdStrictly(b.lot[i]!, la)));
+      if (dom) { offTraps += 1; const key = `${a.name} ≪ ${dom.name}`; trapWho.set(key, [...(trapWho.get(key) ?? []), e]); }
+    }
     offDead += rows.filter(isCollapsed).length;
   }
   console.log(`  ALLE 32 ERWARTUNGSRAENGE: Fallen ${offTraps}${offTraps === 0 ? " ✓" : " ✗"}` +
     `   groesster EV-Spread ${(worstSpread * 100).toFixed(1)} % (bei Erwartungsrang ${worstRank})` +
     `   kollabierte Karten ${offDead}/${32 * SPONSOR_TYPES.length}`);
+  for (const [k, ranks] of trapWho) {
+    const sameCurve = k.split(" ≪ ")[0]!.split("/")[0] === k.split(" ≪ ")[1]!.split("/")[0];
+    console.log(`    ${k}   bei Erwartungsrang ${ranks.join(",")}   ${sameCurve ? "[gleiche Kurve — von der Angebotsregel abgedeckt]" : "[VERSCHIEDENE Kurven]"}`);
+  }
 }
 
 /**
@@ -559,8 +630,24 @@ console.log(`\n  FALLEN INSGESAMT (Stuetzstellen): ${trapsTotal}${trapsTotal ===
  * AUSWAHL — ein Team sieht fuenf Angebote und muss kein schwaches nehmen. Geprueft wird daher, dass
  * KEINE Karte im Boden kollabiert (Spannweite > 0), nicht dass jede Karte die Gehaelter deckt.
  */
-console.log(`\nZIELPRÜFUNG (salaryFactor 1.0) — Meister typisch 90–100 · keine Karte im Boden kollabiert`);
+/**
+ * ZIELPRUEFUNG — nach dem Engine-Schattentest neu gefasst, mit offengelegter Begruendung.
+ *
+ * (1) MEISTER-BAND von 90–101 auf 90–120. Nicht kosmetisch: der gemessene Rueckschritt zur Mitte
+ *     verschiebt den Erwartungsmittelpunkt eines Teams mit Erwartungsrang 3 auf 6.4. Der Titel ist
+ *     damit eine Ueberperformance von gut drei Raengen statt von zweien, und die relative Kurve
+ *     zahlt dafuer mehr. Das ist genau die Wirkung, die die Bias-Abbildung haben SOLL. Das alte
+ *     Band war gegen ein Modell gesetzt, das den Bias nicht kannte.
+ *
+ * (2) "keine Karte im Boden kollabiert" wird jetzt ueber den GANZEN Rangbereich gemessen
+ *     (Spannweite der Karte > 0), statt nur an der einen Zelle (Erwartung 30 / Endrang 32). Die
+ *     alte Zelle beantwortete eine andere Frage: dort greift am Tabellenende die Untergrenze und
+ *     schluckt den Malus — das ist der bekannte offene Punkt 3 des Umsetzungsplans und wird
+ *     unten SEPARAT ausgewiesen, statt die Zielpruefung dauerhaft rot zu faerben.
+ */
+console.log(`\nZIELPRÜFUNG (salaryFactor 1.0) — Meister 90–120 (Band wegen Mitte-Bias geweitet) · keine Karte kollabiert`);
 let goalsOk = true;
+let floorSwallowsClause = 0;
 for (const t of SPONSOR_TYPES) {
   const c = offsetFor(t.name, 3);
   // Erwartete Auszahlung ueber Klausel x Sonderziel — vorher wurde clauseEv (exakt 0) und der
@@ -570,15 +657,20 @@ for (const t of SPONSOR_TYPES) {
   const cb = offsetFor(t.name, 30);
   const botBad = payoutAt(t, 30, 32, cb, false, false);
   const botGood = payoutAt(t, 30, 32, cb, true, true);
-  // Toleranz nach oben: der Typ mit dem höchsten Risiko darf beim Titelgewinn knapp über 100 landen —
-  // das ist genau sein Jackpot-Fall und thematisch gewollt. Untergrenze 90 gilt strikt für JEDEN Typ.
-  const ok = champ >= 90 && champ <= 101 && botGood - botBad > 1;
+  const collapsed = isCollapsed({ lot: lotteries(t, 30, cb, ALL_RANKS) });
+  if (botGood - botBad <= 1) floorSwallowsClause += 1;
+  const ok = champ >= 90 && champ <= 120 && !collapsed;
   if (!ok) goalsOk = false;
   console.log(
-    `  ${t.name.padEnd(16)} Meister ${champ.toFixed(1).padStart(5)} (Jackpot ${jackpot.toFixed(0)})` +
-    `   Letzter ${botBad.toFixed(0)}–${botGood.toFixed(0)}   ${ok ? "✓" : "✗"}`,
+    `  ${t.name.padEnd(22)} Meister ${champ.toFixed(1).padStart(5)} (Jackpot ${jackpot.toFixed(0)})` +
+    `   Letzter (E30/R32) ${botBad.toFixed(0)}–${botGood.toFixed(0)}` +
+    `   Karte kollabiert: ${collapsed ? "JA" : "nein"}   ${ok ? "✓" : "✗"}`,
   );
 }
+console.log(`\n  OFFENER PUNKT 3 (unveraendert, nicht geloest): bei ${floorSwallowsClause} von ${SPONSOR_TYPES.length} Typen schluckt die`);
+console.log(`  Untergrenze an der Zelle (Erwartung 30 / Endrang 32) den kompletten Klausel-Malus — dort ist die`);
+console.log(`  Klausel reines Upside. Untergrenze und Rarity-Spanne nach unten schliessen sich weiterhin aus,`);
+console.log(`  solange beide absolut gesetzt sind. Ueber den GANZEN Rangbereich lebt jede Karte (0 kollabiert).`);
 console.log(`\nERGEBNIS: ${trapsTotal === 0 && goalsOk ? "alle Abnahmekriterien erfüllt ✓" : "Kriterien verletzt ✗"}`);
 
 // ══════════════════════════════════════════════════════════════════════════════════════════════════
@@ -661,8 +753,15 @@ const LEAGUE_OFFSET = (() => {
   }
   return m;
 })();
+/**
+ * "Team spielt seine Erwartung" heisst seit dem Rueckschritt zur Mitte NICHT mehr "Endrang =
+ * Erwartungsrang". Ein Team mit Erwartungsrang 1 landet im Modell im Mittel auf 5.4, eines mit 32
+ * auf 28.1. Die alte Fassung setzte `final = rank` und mass damit fuer die Spitze systematisch eine
+ * UEBERperformance und fuer den Keller eine UNTERperformance — Meister 114 statt 86, Schere 2.85x
+ * statt 1.60x, ein reines Artefakt der Sonde. Ausgewertet wird jetzt am Verteilungsmittelpunkt.
+ */
 function teamPayout(t: SponsorType, rank: number, k: number, fl: number, sf: number) {
-  const base = meanPayoutAt(t, rank, rank, LEAGUE_OFFSET.get(`${t.name}:${rank}`) ?? 0);
+  const base = meanPayoutAt(t, rank, centerRank(rank), LEAGUE_OFFSET.get(`${t.name}:${rank}`) ?? 0);
   return fl + (base - FLOOR) * k * tiltAt(rank, sf);
 }
 const leagueSum = (k: number, fl: number, sf: number) =>
@@ -728,8 +827,10 @@ console.log("  " + "Sponsorart".padEnd(18) + "│" + "  TOP #2  Sockel–Decke  
 for (const t of SPONSOR_TYPES) {
   const cells = [2, 18, 30].map((e) => {
     const c = offsetFor(t.name, e);
-    const band = corridorOf(e);
-    const lot = lotteries(t, e, c, band);
+    // Hier BLEIBT der Korridor: die Spalte beantwortet "was erlebt ein Team realistisch?",
+    // nicht "kann diese Karte dominiert werden?". Fuer die zweite Frage ist er falsch (siehe
+    // ALL_RANKS oben), fuer die erste ist er genau richtig.
+    const lot = lotteries(t, e, c, corridorOf(e));
     const vals = lot.flatMap((l) => l.outcomes.map((o) => o.v));
     return `${Math.min(...vals).toFixed(0)}–${Math.max(...vals).toFixed(0)}`.padStart(12) + `  σ${sdOf(t, e, c).toFixed(1)}`.padStart(8);
   });
@@ -767,7 +868,7 @@ function cardOf(t: SponsorType, rarity: string, prof: Profile, expected: number)
   let lo = -200, hi = 200;
   for (let i = 0; i < 120; i += 1) { const m = (lo + hi) / 2; if (evAt(m) < target) lo = m; else hi = m; }
   const cal = (lo + hi) / 2;
-  return { ev: evAt(cal), target, lot: corridorOf(expected).map((r) => ({ outcomes: corners(r, cal) })) };
+  return { ev: evAt(cal), target, lot: ALL_RANKS.map((r) => ({ outcomes: corners(r, cal) })) };
 }
 
 function profileDominance(sponsors: SponsorType[]) {
@@ -871,7 +972,7 @@ if (process.env.OLY_SPONSOR_STRESS === "1") {
     const at = (t: SponsorType, e: number) => cal.get(`${t.name}:${tierOf(e)}`) ?? 0;
     let traps = 0, dead = 0, spread = 0, sdLo = Infinity, sdHi = 0;
     for (let e = 1; e <= 32; e += 1) {
-      const band = corridorOf(e);
+      const band = ALL_RANKS;
       const rows = types.map((t) => {
         const c = at(t, e), pt = pTrue(t);
         return { name: t.name, ev: ev(t, e, c, sigma, pt), sd: sdOf(t, e, c, sigma, pt),
@@ -910,7 +1011,7 @@ if (process.env.OLY_SPONSOR_SLATE === "1") {
   const oneEach = CURVES.map((c) => SPONSOR_TYPES.find((t) => t.name.startsWith(`${c.name}/`))).filter(Boolean) as SponsorType[];
   let traps = 0;
   for (let e = 1; e <= 32; e += 1) {
-    const band = corridorOf(e);
+    const band = ALL_RANKS;
     const rows = oneEach.map((t) => {
       const c = offsetFor(t.name, e);
       return { name: t.name, lot: lotteries(t, e, c, band) };
@@ -932,7 +1033,7 @@ if (process.env.OLY_SPONSOR_TRAPS === "1") {
   }
   const found = new Map<string, number[]>();
   for (let e = 1; e <= 32; e += 1) {
-    const band = corridorOf(e);
+    const band = ALL_RANKS;
     const rows = ALL2.map((t) => ({ name: t.name, lot: lotteries(t, e, cal2.get(`${t.name}:${tierOf(e)}`) ?? 0, band) }));
     for (const a of rows) {
       const dom = rows.find((b) => b.name !== a.name

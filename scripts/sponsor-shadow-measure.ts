@@ -195,14 +195,17 @@ export const CLAUSE_METRICS: ClauseMetric[] = [
     metric: (c) => c.obs?.transferCount ?? null,
   },
   {
-    clause: "Ausbau", scope: "ledger", direction: "up", freeThreshold: false, fixedThreshold: 1,
-    unit: "Stufen-Upgrades (fan_shop + arena_upgrade)",
-    note: "facilityEvents dieser Saison mit nextLevel > previousLevel, beschraenkt auf fan_shop und "
-      + "arena_upgrade wie im Klauseltext. Feste Schwelle >= 1 Upgrade — P direkt messbar.",
+    clause: "Ausbau", scope: "ledger", direction: "up", freeThreshold: true,
+    unit: "Gebaeude-Stufenaufstiege (alle Gebaeude)",
+    note: "facilityEvents dieser Saison mit nextLevel > previousLevel, ueber ALLE Gebaeude. "
+      + "ENTSCHEIDUNG nach dem Engine-Test: die alte Fassung zaehlte nur fan_shop/arena_upgrade und "
+      + "mass P = 0.11 gegen Design 0.45 — von 148 echten Upgrades im Lauf lagen nur 17 auf diesen "
+      + "beiden Gebaeuden. Die Klausel war nicht zu schwer, sie zeigte auf die falschen Gebaeude. "
+      + "Jetzt zaehlt jeder Ausbau und die Schwelle X ist frei — damit ist der Hebel derselbe "
+      + "(Bauinvestition statt Spieler), das Praedikat aber an dem verankert, was im Spiel passiert.",
     metric: (c) => {
       const events = (c.gameState.seasonState as unknown as { facilityEvents?: Array<Record<string, unknown>> }).facilityEvents ?? [];
       return events.filter((e) => e["seasonId"] === c.seasonId && e["teamId"] === c.teamId
-        && (e["facilityId"] === "fan_shop" || e["facilityId"] === "arena_upgrade")
         && Number(e["nextLevel"] ?? 0) > Number(e["previousLevel"] ?? 0)).length;
     },
   },
@@ -276,9 +279,13 @@ export const CLAUSE_METRICS: ClauseMetric[] = [
     note: "NICHT MESSBAR: setTeamCaptain ersetzt den (Team, Saison)-Record; ein Wechsel hinterlaesst keine Spur.",
   },
   {
-    clause: "Wortlaut", scope: "ledger", direction: "down", freeThreshold: false, fixedThreshold: 0,
+    clause: "Wortlaut", scope: "ledger", direction: "down", freeThreshold: true,
     unit: "gebrochene Versprechen",
-    note: "playerRelationshipEvents mit reason 'promised_role_broken' dieser Saison. Feste Schwelle 0.",
+    note: "playerRelationshipEvents mit reason 'promised_role_broken' dieser Saison. "
+      + "ENTSCHEIDUNG nach dem Engine-Test: die feste Schwelle 0 ('alle Versprechen eingehalten') "
+      + "wurde in 160 Team-Saisons NIE erreicht (min 3, Median 8, max 11) — sie waere ein "
+      + "garantierter Malus von s*P = 22*0.45 = 9.9 C gewesen, den kein Spieler abwenden kann. "
+      + "Jetzt 'hoechstens X gebrochene Versprechen' mit freier Schwelle.",
     metric: (c) => {
       const events = (c.gameState as unknown as { playerRelationshipEvents?: Array<Record<string, unknown>> }).playerRelationshipEvents ?? [];
       return events.filter((e) => e["seasonId"] === c.seasonId && e["teamId"] === c.teamId
@@ -382,6 +389,40 @@ function main() {
     const sub = obs.filter((o) => o.seasonId === sid).map((o) => o.finalRank - o.expectedRank);
     if (sub.length === 0) continue;
     console.log(`    ${sid.padEnd(14)} N=${String(sub.length).padStart(3)}  sigma=${fmt(sd(sub))}  Bias=${fmt(mean(sub))}`);
+  }
+
+  // ── RUECKSCHRITT ZUR MITTE ────────────────────────────────────────────────────────────────────
+  /**
+   * Gemessen und im Modell bisher NICHT abgebildet: die Verteilung der Endraenge ist nicht um den
+   * Erwartungsrang zentriert. `dist()` setzt eine um `expected` zentrierte Normalverteilung an —
+   * fuer ein Spitzenteam systematisch zu optimistisch, fuer ein Kellerteam zu pessimistisch.
+   *
+   * Modellform (eine Zahl statt drei Klassen-Bias, damit sie stetig ueber die Raenge wirkt):
+   *     E[Endrang | Erwartung e] = m + (1 - shrink) * (e - m),   m = (1 + 32) / 2 = 16.5
+   * Der Bias ist dann `-shrink * (e - m)`: bei e < m positiv (schlechter als erwartet), bei e > m
+   * negativ (besser). Genau die gemessene Richtung.
+   *
+   * shrink per Kleinstquadraten aus (e - m) -> (Endrang - e). Ein Achsenabschnitt ist nicht noetig:
+   * Erwartungs- und Endraenge sind beide Permutationen von 1..32, ihr Mittel ist identisch 16.5,
+   * also ist mean(Endrang - e) exakt 0 und die Regression laeuft per Konstruktion durch den
+   * Ursprung der zentrierten Achse.
+   */
+  const RANK_MEAN_MEASURED = 16.5;
+  const sxx = obs.reduce((a, o) => a + (o.expectedRank - RANK_MEAN_MEASURED) ** 2, 0);
+  const sxy = obs.reduce((a, o) => a + (o.expectedRank - RANK_MEAN_MEASURED) * (o.finalRank - o.expectedRank), 0);
+  const shrink = sxx > 0 ? -sxy / sxx : 0;
+  /** Anteil der Rangvarianz, den die Schrumpfung erklaert — sagt, ob die eine Zahl reicht. */
+  const ssTot = obs.reduce((a, o) => a + (o.finalRank - o.expectedRank) ** 2, 0);
+  const ssRes = obs.reduce((a, o) => a + ((o.finalRank - o.expectedRank) + shrink * (o.expectedRank - RANK_MEAN_MEASURED)) ** 2, 0);
+  console.log("\n  RUECKSCHRITT ZUR MITTE (im Modell bisher nicht abgebildet):");
+  console.log(`    Schrumpfung shrink = ${fmt(shrink, 3)}  →  Mittelpunkt der Verteilung = 16.5 + ${fmt(1 - shrink, 3)} x (Erwartung − 16.5)`);
+  console.log(`    Restsigma nach Abzug des Bias: ${fmt(Math.sqrt(ssRes / Math.max(1, obs.length - 1)))} (roh ${fmt(sigmaAll)}), erklaerter Varianzanteil ${fmt(100 * (1 - ssRes / ssTot), 1)} %`);
+  for (let k = 0; k < 3; k += 1) {
+    const sub = obs.filter((o) => strengthClassOf(o.expectedRank) === k);
+    if (sub.length === 0) continue;
+    const predicted = mean(sub.map((o) => -shrink * (o.expectedRank - RANK_MEAN_MEASURED)));
+    const actual = mean(sub.map((o) => o.finalRank - o.expectedRank));
+    console.log(`      ${CLASS_LABEL[k]!.padEnd(20)} Bias gemessen ${fmt(actual)}  ·  Modell mit shrink ${fmt(predicted)}`);
   }
 
   const recon = validateReconstruction(gameState, obs);
@@ -563,7 +604,12 @@ function main() {
   if (JSON_OUT) {
     fs.writeFileSync(JSON_OUT, `${JSON.stringify({
       saveId, seasonIds, currentSeasonId, nObservations: obs.length,
-      sigma: { pooled: sigmaAll, byClass: sigmaByClass, bias: mean(devAll), design: DESIGN_SIGMA },
+      sigma: {
+        pooled: sigmaAll, byClass: sigmaByClass, bias: mean(devAll), design: DESIGN_SIGMA,
+        /** Schrumpfung zur Tabellenmitte — der bisher nicht abgebildete systematische Anteil. */
+        shrink, rankMean: RANK_MEAN_MEASURED,
+        biasByClass: [0, 1, 2].map((k) => mean(obs.filter((o) => strengthClassOf(o.expectedRank) === k).map((o) => o.finalRank - o.expectedRank))),
+      },
       clauses: results,
       observations: obs,
     }, null, 2)}\n`);
