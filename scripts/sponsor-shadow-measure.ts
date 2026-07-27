@@ -584,7 +584,8 @@ function main() {
   const upgrades = facilityEvents.filter((e) => Number(e["nextLevel"] ?? 0) > Number(e["previousLevel"] ?? 0));
   const fanArena = upgrades.filter((e) => e["facilityId"] === "fan_shop" || e["facilityId"] === "arena_upgrade");
   console.log(`  facilityEvents: ${facilityEvents.length} · davon echte Upgrades: ${upgrades.length} · davon fan_shop/arena_upgrade: ${fanArena.length}`);
-  console.log(`    → die Klausel 'Ausbau' ist auf genau diese beiden Gebaeude beschraenkt; die KI baut ueberwiegend andere.`);
+  console.log(`    → BEFUND, der die Klausel 'Ausbau' neu gefasst hat: sie zaehlte nur diese beiden Gebaeude und mass
+    damit P = 0.11 gegen Design 0.45. Sie zaehlt jetzt ALLE Gebaeude (Design-P 0.60, gemessen 0.59 bei X >= 1).`);
   const progression = (gsAny["playerProgressionEvents"] as Array<Record<string, unknown>> | undefined) ?? [];
   const earnedTotal = progression.reduce((a, e) => a + Number(e["xpEarned"] ?? 0), 0);
   const spentTotal = progression.reduce((a, e) => a + Number(e["xpSpent"] ?? 0), 0);
