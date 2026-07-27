@@ -40,7 +40,11 @@ describe("sponsor v2 — welches System gilt", () => {
     expect(offers.every((o) => getSponsorV2Terms(o) !== null)).toBe(true);
   });
 
-  it("der Vermerk ueberschreibt nichts: ein V1-Save bleibt V1, auch wenn erneut gestempelt wird", () => {
+  // Explizites Zeitlimit wie bei allen Nachbarn in dieser Datei: der Fall prueft eine reine
+  // Vorrangregel, verbringt seine Zeit aber vollstaendig im ZWEIMALIGEN Aufbau eines Spielstands
+  // (gemessen 4,6 s gegen das 5-s-Standardlimit, auch ohne jede Aenderung am Sponsorsystem). Er ist
+  // deshalb auf einer ausgelasteten Maschine an der Uhr gescheitert, nicht an seiner Behauptung.
+  it("der Vermerk ueberschreibt nichts: ein V1-Save bleibt V1, auch wenn erneut gestempelt wird", { timeout: 120_000 }, () => {
     const legacy = { ...v1State(), seasonState: { ...v1State().seasonState, sponsorSystemVersion: 1 as const } };
     expect(resolveSponsorSystemVersion(stampSponsorSystemVersion(legacy, 2))).toBe(1);
   });

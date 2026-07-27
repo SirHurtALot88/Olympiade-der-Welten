@@ -589,7 +589,13 @@ export function applySponsorV2ToOffers(input: {
     // ausschliesslich die Klausel, und ein persistierter Komponenten-Malus waere eine Anzeige, die das
     // Settlement nie einloest.
     const components = offer.components.map((c) => {
-      if (c.kind === "base") return { ...c, targetValue: round1(floor), rewardCash: round1(floor), penaltyCash: undefined };
+      // `rewardCash` der Basis BEWUSST UNGERUNDET: die Gewinnstufen-Leiter der Karte rechnet
+      // `baseCash + (Leiterwert − Leiterboden)`. Ist `baseCash` schon auf eine Nachkommastelle
+      // gerundet, der Leiterboden aber nicht, weicht die angezeigte Sprosse um bis zu 0,1 C von dem
+      // ab, was das Settlement zahlt — genau daran ist die Anzeige==Settlement-Pruefung gerissen
+      // ("Top 28": 34,2 angezeigt, 34,1 gezahlt). Gerundet wird erst bei der Ausgabe. `targetValue`
+      // ist reine Beschriftung und bleibt gerundet.
+      if (c.kind === "base") return { ...c, targetValue: round1(floor), rewardCash: floor, penaltyCash: undefined };
       if (c.kind === "rank") {
         return {
           ...c,
