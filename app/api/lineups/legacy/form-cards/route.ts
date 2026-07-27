@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { generateLocalLegacyFormCardsForSeason } from "@/lib/lineups/legacy-lineup-local-service";
 import type { LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
+import { mapSaveResolutionErrorToResponse } from "@/lib/persistence/resolve-local-save";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { parseRoomWriteContextFromRequest } from "@/lib/room/parse-room-write-context";
@@ -53,7 +54,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: writeAuth.reason, warnings: writeAuth.warnings }, { status: writeAuth.status });
   }
 
-  const result = generateLocalLegacyFormCardsForSeason(params);
+  let result;
+  try {
+    result = generateLocalLegacyFormCardsForSeason(params);
+  } catch (error) {
+    const mapped = mapSaveResolutionErrorToResponse(error);
+    if (mapped) return mapped;
+    throw error;
+  }
   if (!result.ok) {
     return NextResponse.json(
       {

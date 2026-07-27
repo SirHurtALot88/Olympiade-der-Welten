@@ -5241,6 +5241,9 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
             ? ` ${payload.summary.scrubbedSelectionCount} alte Kartenauswahlen wurden bereinigt.`
             : ""),
       );
+    } catch {
+      setErrors(["Formkarten konnten nicht erzeugt werden."]);
+      setWarnings([]);
     } finally {
       setIsBusy(false);
     }
@@ -5327,6 +5330,10 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         contentSignature: payload.contentSignature ?? null,
       });
       return true;
+    } catch {
+      setErrors(["Draft konnte nicht gespeichert werden."]);
+      setWarnings([]);
+      return false;
     } finally {
       setIsBusy(false);
     }
@@ -5548,6 +5555,12 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 	        });
 	      }
 	      return payload.preview;
+	    } catch {
+	      if (!silent) {
+	        setErrors(["AI-Vorschau konnte nicht geladen werden."]);
+	        setWarnings([]);
+	      }
+	      return null;
 	    } finally {
 	      if (!silent) {
 	        setIsBusy(false);

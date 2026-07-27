@@ -14,6 +14,7 @@ import { LegacyLineupContextLoader } from "@/lib/lineups/legacy-lineup-context-l
 import { loadLocalLegacyLineupContext } from "@/lib/lineups/legacy-lineup-local-service";
 import type { DisciplineSide, LegacyLineupKeyParams, LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import type { LineupDraftModifierSide } from "@/lib/data/olyDataTypes";
+import { mapSaveResolutionErrorToResponse } from "@/lib/persistence/resolve-local-save";
 
 function parseKeyParams(request: Request): LegacyLineupKeyParams | null {
   const { searchParams } = new URL(request.url);
@@ -155,10 +156,17 @@ export async function GET(request: Request) {
   }
 
   const source = parseSource(request);
-  const contextResult =
-    source === "prisma"
-      ? await new LegacyLineupContextLoader().loadLegacyLineupContext(params)
-      : loadLocalLegacyLineupContext(params);
+  let contextResult;
+  try {
+    contextResult =
+      source === "prisma"
+        ? await new LegacyLineupContextLoader().loadLegacyLineupContext(params)
+        : loadLocalLegacyLineupContext(params);
+  } catch (error) {
+    const mapped = mapSaveResolutionErrorToResponse(error);
+    if (mapped) return mapped;
+    throw error;
+  }
 
   if (!contextResult.ok) {
     return NextResponse.json({ errors: contextResult.errors, warnings: contextResult.warnings }, { status: 422 });
