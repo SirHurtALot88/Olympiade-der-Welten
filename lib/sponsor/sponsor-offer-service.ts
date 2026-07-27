@@ -58,6 +58,7 @@ import {
   sponsorObjectiveFamilyForKey,
 } from "@/lib/sponsor/sponsor-special-objectives";
 import { calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { applySponsorV2ToOffers, isSponsorV2Enabled } from "@/lib/sponsor/sponsor-v2-offer-service";
 
 // Liga-weite Anzeige-Normalisierung der Sponsor-Angebote ist deaktiviert: der Anker basiert noch auf der
 // alten getSponsorPayoutForFinalRank-Kurve (+ Floor bei Rang 32), während das Settlement bereits die neue
@@ -363,7 +364,7 @@ export function buildSponsorOffersForTeam(input: {
   // Slate-Anti-Wiederholung (Fable C3): über die 5 Slots hinweg möglichst nur EIN Sonderziel je Familie.
   const usedSpecialFamilies = new Set<string>();
 
-  return slate.entries.map((entry, slotIndex) => {
+  const built = slate.entries.map((entry, slotIndex) => {
     const rankTarget = getSportTargetRank(startRank);
     const offer = buildOffer({
       gameState: input.gameState,
@@ -395,6 +396,20 @@ export function buildSponsorOffersForTeam(input: {
       usedSpecialFamilies.add(family);
     }
     return offer;
+  });
+
+  // OLY_SPONSOR_V2 (P4): das neue Modell haengt sich HINTER die bestehende Erzeugung, statt sie zu
+  // ersetzen. Marke, Name, Flavour, Rarity, Kurvenwurf und das Sonderziel bleiben unveraendert —
+  // 22 fertige, getestete Sonderziele muss niemand nachbauen. Ersetzt werden nur die BETRAEGE (aus
+  // der Modell-Rechenschicht), und die Klausel-Achse kommt dazu. Ist das Flag aus, passiert hier
+  // gar nichts und der alte Pfad laeuft Zeichen fuer Zeichen wie vorher.
+  if (!isSponsorV2Enabled()) {
+    return built;
+  }
+  return applySponsorV2ToOffers({
+    gameState: input.gameState,
+    offers: built,
+    expectedRank: qualityRank.leaguePosition,
   });
 }
 
@@ -661,6 +676,10 @@ export function chooseSponsorOffer(input: {
     isGolden: offer.isGolden,
     lockedRankPayoutLadder,
     salaryFactorAtSign,
+    // OLY_SPONSOR_V2 (P5): die eingefrorenen Konditionen wandern 1:1 vom Angebot in den Vertrag.
+    // Fehlt das Feld (Flag aus, oder ein vor dem Umbau unterschriebener Vertrag), rechnet das
+    // Settlement nach altem Recht — das ist die gesamte Migrationsregel.
+    ...(offer.sponsorV2 ? { sponsorV2: offer.sponsorV2 } : {}),
   };
 
   let nextGameState: GameState = {

@@ -13,6 +13,10 @@ import {
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-service";
 import { getSponsorProfileComponentFactors } from "@/lib/sponsor/sponsor-negotiation";
 import { evaluateSpecialComponentStage } from "@/lib/sponsor/sponsor-objective-evaluator";
+import { sponsorV2EvaluateClause } from "@/lib/sponsor/sponsor-v2-clause-evaluator";
+import {
+  getSponsorV2Terms, sponsorV2SettlementParts, type SponsorV2ContractTerms,
+} from "@/lib/sponsor/sponsor-v2-offer-service";
 
 export type SponsorSettlementPhase = "season_end";
 
@@ -66,10 +70,68 @@ function getTeamSalaryTotal(gameState: GameState, teamId: string): number {
   );
 }
 
+/**
+ * OLY_SPONSOR_V2 — Abrechnung aus den beim Unterschreiben eingefrorenen Konditionen.
+ *
+ * Die vier Zeilen sind DIFFERENZEN echter Modellwerte und addieren sich per Teleskopsumme exakt auf
+ * `sponsorV2Settle(...)`. Deshalb koennen Rundung, Untergrenze und K-Skalierung die Summe nicht
+ * verfaelschen, egal an welcher Stelle sie greifen — und deshalb ist die im Angebot angezeigte
+ * garantierte Rangleiter zeichengleich die Summe der Zeilen "Saisonbasis" und "Tabellenplatz".
+ *
+ * Das SONDERZIEL wird weiterhin vom bestehenden `evaluateSpecialComponentStage` ausgewertet: V2
+ * preist es neu (nach Schwierigkeit), erfindet es aber nicht neu. Die KLAUSEL kommt aus dem neuen
+ * Evaluator, der nur Klauseln kennt, die am Saison-End-Zustand trivial messbar sind.
+ */
+function buildSponsorV2SeasonEndRows(
+  gameState: GameState, contract: TeamSponsorContract, terms: SponsorV2ContractTerms, currentRank: number | null,
+): SponsorSettlementRow[] {
+  const team = gameState.teams.find((entry) => entry.teamId === contract.teamId);
+  const clause = sponsorV2EvaluateClause({
+    gameState,
+    teamId: contract.teamId,
+    seasonId: contract.seasonId,
+    clauseName: terms.clauseName,
+    expectedRank: terms.expectedRank,
+  });
+  const goalComponent = contract.components.find((component) => component.kind === "special") ?? null;
+  const goalFraction = goalComponent
+    ? Math.max(0, Math.min(1, evaluateSpecialComponentStage(gameState, contract.teamId, goalComponent).fraction))
+    : 0;
+  const parts = sponsorV2SettlementParts({
+    terms,
+    finalRank: currentRank,
+    clauseMet: clause.met,
+    clauseAssumed: clause.assumedMet,
+    clauseMetric: clause.metric,
+    goalFraction,
+  });
+  return parts.map((part) => ({
+    teamId: contract.teamId,
+    teamName: team?.name ?? contract.teamId,
+    componentId: `${contract.offerId}:v2:${part.key}`,
+    // Die `kind`-Werte bleiben im bestehenden Vokabular, damit Finanz-Sichten und UI unveraendert
+    // weiterlaufen. Die Klausel laeuft als "special" mit — sie ist eine Zielbedingung, nur eine
+    // rangunabhaengige.
+    kind: part.key === "clause" ? "special" : part.key,
+    label: part.label,
+    status: part.cashDelta > 0 ? "paid" : part.met ? "paid" : "skipped",
+    cashDelta: part.cashDelta,
+    reason: part.reason,
+  }));
+}
+
 function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract): SponsorSettlementRow[] {
   const team = gameState.teams.find((entry) => entry.teamId === contract.teamId);
   const row = buildTeamSeasonOverviewRows({ gameState }).find((entry) => entry.teamId === contract.teamId) ?? null;
   const currentRank = row?.rank ?? null;
+  // BESTANDSVERTRAEGE: fehlt der `sponsorV2`-Block, laeuft die Abrechnung unveraendert nach altem
+  // Recht weiter. Das ist die gesamte Migrationsregel — kein Stichtag, kein Backfill. Ein Vertrag,
+  // der vor dem Umbau (oder mit ausgeschaltetem Flag) unterschrieben wurde, darf seine Auszahlung
+  // nicht nachtraeglich aendern.
+  const v2Terms = getSponsorV2Terms(contract);
+  if (v2Terms) {
+    return buildSponsorV2SeasonEndRows(gameState, contract, v2Terms, currentRank);
+  }
   const startRank = contract.startRank ?? row?.startplatz ?? currentRank;
   const salaryFactor = getCurrentSalaryFactor(gameState);
   const baseAnchorSalary = getSponsorRank32BaseAnchorSalary(gameState);

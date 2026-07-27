@@ -8,6 +8,7 @@ import {
 } from "@/lib/sponsor/sponsor-curve-shapes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamDisplaySalaryTotal, getTeamSponsorBaseReferenceTotal } from "@/lib/sponsor/sponsor-team-salary-display";
+import { getSponsorV2Terms, sponsorV2ExpectedPayout, sponsorV2GuaranteedLadder } from "@/lib/sponsor/sponsor-v2-offer-service";
 
 const PRIZE_MONEY_NORMALIZED = prizeMoneyNormalized as {
   rows: Array<{ rank: number | null; prizeMoney: number | null }>;
@@ -569,6 +570,14 @@ export function getCurrentSponsorSalaryFactor(gameState: GameState): number {
  * Meilenstein-Gewichtung splitten (das ignoriert curveShape und wich vom echten Payout ab).
  */
 export function buildOfferRankPayoutLadderPreview(gameState: GameState, offer: SponsorOffer): number[] {
+  // OLY_SPONSOR_V2: DIE Umschaltstelle. Diese eine Funktion liefert sowohl die in der Karte
+  // angezeigten Gewinnstufen als auch die beim Unterschreiben eingefrorene Leiter — schaltet sie
+  // um, folgen Anzeige, Sign und Settlement automatisch. Genau deshalb gibt es hier keine zweite
+  // V2-Sign-Logik daneben, die auseinanderdriften koennte.
+  const v2 = getSponsorV2Terms(offer);
+  if (v2) {
+    return sponsorV2GuaranteedLadder(v2);
+  }
   return buildLockedRankPayoutLadder({
     salaryFactor: getCurrentSponsorSalaryFactor(gameState),
     leagueMinSalary: getSponsorRank32BaseAnchorSalary(gameState),
@@ -655,11 +664,23 @@ export function getTieredRankPayoutFraction(currentRank: number, target: number)
   return 0;
 }
 
+/**
+ * OLY_SPONSOR_V2: die KI-Sponsorwahl bewertet ein V2-Angebot sonst mit V1-Logik — sie liest
+ * baseCash/rankCash-Heuristiken, die fuer eine V2-Karte gar nicht mehr die Auszahlung beschreiben.
+ * Fuer V2 kommt der Erwartungswert direkt aus dem Modell: Erwartung ueber Endrang, Klausel und
+ * Sonderziel, inklusive Untergrenze und K. Da alle Karten eines Teams per Kalibrierung denselben
+ * EV haben, entscheidet die KI danach ueber Rarity und ihre Praeferenzen — und nicht mehr zufaellig
+ * ueber eine Kennzahl, die nichts mehr misst.
+ */
 export function estimateExpectedPayout(
   offer: SponsorOffer,
   powerRank: number | null,
   leagueMinSalary?: number,
 ): number {
+  const v2 = getSponsorV2Terms(offer);
+  if (v2) {
+    return sponsorV2ExpectedPayout(v2);
+  }
   const baseComponent = offer.components.find((component) => component.kind === "base");
   // "gewöhnlich" ist hier das exakte Äquivalent des alten Default-Fallbacks (`offer.starTier ?? 2`).
   const rarity = offer.rarity ?? "gewöhnlich";

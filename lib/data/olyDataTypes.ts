@@ -1301,6 +1301,39 @@ export type SponsorEventRecord = {
   message: string;
 };
 
+/**
+ * OLY_SPONSOR_V2 — die vor der Saison eingefrorenen Konditionen des neuen Sponsormodells.
+ *
+ * Fehlt das Feld, ist es ein Angebot/Vertrag nach ALTEM Recht und wird unveraendert so abgerechnet.
+ * Genau daran erkennt das Settlement einen Bestandsvertrag: die Migration braucht keinen Stichtag
+ * und kein Backfill, nur diese Abwesenheit.
+ *
+ * `rankLadder[finalRank - 1]` ist der Rangteil VOR Klausel, Sonderziel, Untergrenze und
+ * K-Skalierung — die vollstaendige Auszahlung liefert `sponsorV2Settle` in
+ * lib/sponsor/sponsor-v2-offer-service.ts. Bewusst nicht die fertige Auszahlung: Klausel und
+ * Sonderziel sind Lotterien, deren Ausgang erst am Saisonende feststeht, und die Untergrenze wirkt
+ * auf die SUMME. Wer sie vorher einrechnet, floort viermal statt einmal.
+ */
+export type SponsorV2ContractTermsRecord = {
+  version: 2;
+  rankLadder: number[];
+  curveName: string;
+  profileName: string;
+  rarity: string;
+  expectedRank: number;
+  clauseName: string;
+  clauseLabel: string;
+  clauseDirection: "up" | "down";
+  clauseThreshold: number | null;
+  clauseBonus: number;
+  clauseMalus: number;
+  goalPayout: number;
+  goalProbability: number;
+  goalKey: string | null;
+  salaryFactor: number;
+  k: number;
+};
+
 export type SponsorOffer = {
   offerId: string;
   seasonId: string;
@@ -1336,6 +1369,8 @@ export type SponsorOffer = {
    * UI/Debug; die Auszahlung läuft weiter über `components`. Optional/rückwärtskompatibel.
    */
   moduleIds?: string[];
+  /** OLY_SPONSOR_V2: eingefrorene Konditionen des neuen Modells. Fehlt = altes Recht. */
+  sponsorV2?: SponsorV2ContractTermsRecord;
 };
 
 export type SponsorCommercialRating = {
@@ -1402,6 +1437,12 @@ export type TeamSponsorContract = {
   lockedRankPayoutLadder?: number[];
   /** salaryFactor zum Zeitpunkt der Unterschrift — für konsistente Meilenstein-Anzeige im Settlement. */
   salaryFactorAtSign?: number;
+  /**
+   * OLY_SPONSOR_V2: beim Unterschreiben aus dem Angebot mitkopierte Konditionen des neuen Modells.
+   * FEHLT DAS FELD, ist es ein BESTANDSVERTRAG und wird nach altem Recht abgerechnet — das ist die
+   * gesamte Migrationsregel, ohne Stichtag und ohne Backfill.
+   */
+  sponsorV2?: SponsorV2ContractTermsRecord;
 };
 
 export type ScoutIntelSource = "watchlist" | "wishlist_mirror" | "passive_need" | "roster";
