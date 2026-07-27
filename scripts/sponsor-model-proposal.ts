@@ -26,23 +26,21 @@
  * Aufruf: npx tsx scripts/sponsor-model-proposal.ts
  */
 
-const TIERS = [
-  { label: "Meister", lo: 1, hi: 1 }, { label: "Top 4", lo: 2, hi: 4 }, { label: "Top 8", lo: 5, hi: 8 },
-  { label: "Top 12", lo: 9, hi: 12 }, { label: "Top 16", lo: 13, hi: 16 }, { label: "Top 20", lo: 17, hi: 20 },
-  { label: "Top 24", lo: 21, hi: 24 }, { label: "Top 28", lo: 25, hi: 28 }, { label: "Platz 32", lo: 29, hi: 32 },
-];
 /**
- * Leiter 1, kalibriert bei salaryFactor 1.0 auf: Meister typisch 90-100 MIT JEDEM Sponsortyp,
- * Letzter ≥ Mindestgehalt 43,7 MIT JEDEM Sponsortyp.
- *
- * Die Spitze (Meister 77) ist bewusst so gesetzt, dass selbst der Typ mit der NIEDRIGSTEN Decke
- * ("Absicherung", per Design wenig Upside) als Meister noch ≥90 und damit über dem gemessenen
- * Top-Gehalt (87,8) landet — sonst wäre die sichere Sponsorwahl beim Titelgewinn wirtschaftlich
- * bestrafend, was dem Ziel "alle Gehälter zahlbar + etwas übrig" widerspricht.
+ * ALLE Parameter kommen aus scripts/sponsor-model-params.ts. Vorher trug dieses Skript einen
+ * EIGENEN, veralteten Satz (FLOOR 44 flach, LIGA-Spitze 77, Aufwaertsast 4 linear, Abwaertsast 4.5,
+ * Klausel-Spannweite 18, sigma 4, Korridor +-8, kein Pool-Gleichanteil), waehrend bands.ts und
+ * 5season-model.ts schon mit dem neuen Satz rechneten. Die Pruefmaschinerie unten hat den neuen
+ * Satz dadurch NIE gesehen.
  */
-const LIGA = [77, 70, 65, 61, 56, 52, 48, 44, 40];
-/** Überlebens-Untergrenze (S1-Mindestgehalt 43,7 gemessen aus einem echten Save). */
-const FLOOR = 44;
+import {
+  TIERS, tierOf, LIGA, floorAt, FLOOR_ABSOLUT, RARITY_MULT, POOL_EVEN_SHARE, BASE_SPECIAL,
+  TARGET_GAMMA, TARGET_EV_SHAPE, poolFor, rel as relRepr, clauseBonus, clauseMalus,
+  SIGMA, CORRIDOR, dist as distOf, corridorOf, PROFILES, profileByName, cardTargets,
+  SALARY_SUM_S1, SALARY_TOP, SALARY_MIN, salaryAtRank,
+} from "./sponsor-model-params";
+
+export { PROFILES, RARITY_MULT };
 /**
  * Frueher eine GLOBALE Annahme (0.55) fuer alle Klauseln — nachweislich der gefaehrlichste Fehler
  * des Entwurfs: mit klausel-individuellem P (Ziehungen aus [0.30, 0.90]) riss die EV-Paritaet auf
@@ -64,10 +62,6 @@ const P_MET = 0.55; // nur noch Referenzwert fuer den Stresstest
  * einer Stufe — genau wie ursprünglich vorgegeben ("auf gleicher Stufe z. B. magisch hat jede
  * Sponsorart ihre Staerken und Schwaechen").
  */
-export const RARITY_MULT: Record<string, number> = {
-  "gewöhnlich": 0.85, "magisch": 1.0, "selten": 1.15, "legendär": 1.35,
-};
-
 /**
  * OFFENER KONFLIKT (gemessen, nicht geloest): die Untergrenze 44 vertraegt sich nicht mit Rarities
  * UNTER dem Standard.
@@ -112,21 +106,6 @@ export const RARITY_MULT: Record<string, number> = {
  *
  * Bei gewoehnlich ist der Pool NEGATIV — dasselbe Profil entscheidet dann, wo gekuerzt wird.
  */
-export const PROFILES: Array<{ name: string; specialShare: number; tierWeights: number[]; note: string }> = [
-  { name: "ausgewogen",    specialShare: 0.25, tierWeights: [.11, .11, .11, .11, .11, .11, .11, .11, .12],
-    note: "Pool gleichmaessig ueber alle Stufen" },
-  { name: "spitzenlastig", specialShare: 0.15, tierWeights: [.28, .24, .18, .12, .08, .05, .03, .02, .00],
-    note: "fast alles auf die Spitzenplaetze — ein Angebot fuer Titelambitionen" },
-  { name: "sockellastig",  specialShare: 0.15, tierWeights: [.00, .02, .03, .05, .08, .12, .18, .24, .28],
-    note: "zieht die unteren Plaetze ans Mittelfeld heran" },
-  { name: "mittelfeld",    specialShare: 0.20, tierWeights: [.02, .05, .10, .18, .25, .18, .10, .07, .05],
-    note: "belohnt das Mittelfeld, Spitze und Keller gehen leer aus" },
-  { name: "zielschwer",    specialShare: 0.70, tierWeights: [.11, .11, .11, .11, .11, .11, .11, .11, .12],
-    note: "der Pool steckt fast komplett im Sonderziel — maximaler Eigeneinfluss" },
-];
-
-const tierOf = (rank: number) => TIERS.findIndex((t) => rank >= t.lo && rank <= t.hi);
-
 type SponsorType = {
   name: string;
   /** Leiter 2: Auszahlung nach Δ Stufen (positiv = besser als erwartet). Negativ = Malus. */
@@ -145,7 +124,9 @@ type SponsorType = {
 export const CURVES: Array<{ name: string; rel: (d: number) => number; note: string }> = [
   { name: "Sockel",   rel: (d) => (d <= 0 ? 6 : 6 + d),                                      note: "hoher Sockel, kaum Decke" },
   { name: "Halten",   rel: (d) => (d === 0 ? 12 : d > 0 ? 12 - 3 * d : 12 + 6 * d),          note: "Maximum beim exakten Halten" },
-  { name: "Linear",   rel: (d) => 5 + 4 * d + (d < 0 ? 2 * d : 0),                            note: "gleichmaessig, milder Malus" },
+  // "Linear" IST die repraesentative Kurve aus den Parametern — bands.ts und 5season-model.ts
+  // rechnen mit genau dieser Form. Vorher stand hier 5 + 4d (+2d abwaerts), also der alte Satz.
+  { name: "Linear",   rel: relRepr,                                                            note: "gleichmaessig, milder Malus" },
   { name: "Gipfel",   rel: (d) => (d >= 2 ? 14 + 10 * (d - 2) : d === 1 ? 2 : -6 + 3 * d),   note: "erst 2 Stufen zahlen, darunter Malus" },
   { name: "Steil",    rel: (d) => (d < 0 ? 5 * d : 7 * d),                                   note: "steilster Verlauf beidseitig" },
   { name: "Flach",    rel: (d) => (d <= 0 ? 2 : 2 + 2 * d),                                   note: "Rang fast egal — die Klausel entscheidet" },
@@ -209,7 +190,7 @@ const compose = (curve: string, clause: string): SponsorType => {
   const c = CURVES.find((x) => x.name === curve)!;
   const k = CLAUSES.find((x) => x.name === clause)!;
   return { name: `${curve}/${clause}`, rel: c.rel, note: `${c.note} · ${k.lever}`,
-           clause: { label: k.label, p: k.p, s: k.s, bonus: k.s * (1 - k.p), malus: k.s * k.p } };
+           clause: { label: k.label, p: k.p, s: k.s, bonus: clauseBonus(k.s, k.p), malus: clauseMalus(k.s, k.p) } };
 };
 
 /** Kuratierte Auswahl fuer den Report — jede Kombination ist gueltig, das ist nur ein Querschnitt. */
@@ -234,12 +215,7 @@ const withFloor = (v: number) => Math.max(FLOOR, v);
 const rankPart = (t: SponsorType, expected: number, final: number, cal: number) =>
   LIGA[tierOf(final)]! + t.rel(tierOf(expected) - tierOf(final)) + cal;
 
-function distribution(expected: number, sigma = 4) {
-  const w: number[] = [];
-  for (let r = 1; r <= 32; r += 1) w.push(Math.exp(-((r - expected) ** 2) / (2 * sigma * sigma)));
-  const sum = w.reduce((a, b) => a + b, 0);
-  return w.map((x) => x / sum);
-}
+const distribution = (expected: number, sigma: number = SIGMA) => distOf(expected, sigma);
 
 /**
  * Ein Repraesentant je Tabellenstufe — inklusive Stufe 0 (Meister, Rang 1).
@@ -259,7 +235,6 @@ const EXPECTED = [1, 3, 6, 10, 14, 18, 22, 26, 30];
  * schlicht falsch. Mit explizitem Ziel je Stufe ist der Fixpunkt eindeutig, start- und
  * set-unabhaengig, und die Wirtschaftsziele haengen direkt an dieser Tabelle.
  */
-const TARGET_EV_BASE = [76.0, 73.6, 71.6, 67.9, 63.8, 59.9, 56.7, 54.1, 53.0];
 /**
  * Steilheit der Ziel-EV-Leiter. Die Basiswerte hatten eine Schere von 76/53 = 1.43x, die
  * Gehaltsschere liegt bei 87.8/43.7 = 2.0x — flacher als die Gehaelter heisst zwingend: die Spitze
@@ -285,32 +260,24 @@ const TARGET_EV_BASE = [76.0, 73.6, 71.6, 67.9, 63.8, 59.9, 56.7, 54.1, 53.0];
  * schon ab Erwartungsrang 21 statt erst 29). Aufloesung ist eine Design-Entscheidung:
  * Untergrenze senken, Sigma-Summen-Bindung bei sf 1.0 lockern, oder Spitze bei +8/+9 belassen.
  */
-const TARGET_GAMMA = Number(process.env.OLY_SPONSOR_GAMMA ?? 1.7);
-const TARGET_EV_SHAPE = (() => {
-  const mean = TARGET_EV_BASE.reduce((a, b) => a + b, 0) / TARGET_EV_BASE.length;
-  return TARGET_EV_BASE.map((v) => mean + (v - mean) * TARGET_GAMMA);
-})();
-
 /** Aktive Rarity und aktives Verteilungsprofil des Reports (magisch/ausgewogen = Standard). */
 const RARITY = process.env.OLY_SPONSOR_RARITY ?? "magisch";
-const PROFILE = PROFILES.find((x) => x.name === (process.env.OLY_SPONSOR_PROFILE ?? "ausgewogen")) ?? PROFILES[0]!;
-
-/** Standard-Sonderziel-Anteil der Basiskarte (magisch), unabhaengig vom Pool. */
-const BASE_SPECIAL_SHARE = 0.25;
+const PROFILE = profileByName(process.env.OLY_SPONSOR_PROFILE ?? "ausgewogen");
 /**
- * Der Pool, den die Rarity gegenueber dem Standard zusaetzlich vergibt (bei gewoehnlich negativ).
- * Bezugsgroesse ist der Mittelwert der Standardleiter, damit der Pool eine Groesse in C ist und
- * nicht selbst schon eine Form hat.
+ * Untergrenze der AKTIVEN Rarity bei sf 1.0 (magisch 40). Vorher stand hier flach 44 — ein Wert,
+ * den kein anderes Skript mehr kennt.
  */
-const POOL_REF = TARGET_EV_SHAPE.reduce((x, y) => x + y, 0) / TARGET_EV_SHAPE.length;
-const POOL = ((RARITY_MULT[RARITY] ?? 1) - 1) * POOL_REF * TIERS.length;
+const FLOOR = floorAt(RARITY, 1.0);
+const POOL = poolFor(RARITY);
 
 /** Sonderziel: Standardanteil der Basiskarte + der ihm zugewiesene Poolanteil. */
-const specialEvFor = (tier: number) =>
-  TARGET_EV_SHAPE[tier]! * BASE_SPECIAL_SHARE + (POOL * PROFILE.specialShare) / TIERS.length;
-/** Kalibrierziel fuer Leiter 1+2+4: Basisleiter ohne Sonderziel + der Poolanteil DIESER Stufe. */
-const TARGET_EV = TARGET_EV_SHAPE.map((v, i) =>
-  v * (1 - BASE_SPECIAL_SHARE) + POOL * (1 - PROFILE.specialShare) * PROFILE.tierWeights[i]!);
+const specialEvFor = (tier: number) => cardTargets(RARITY, PROFILE, tier).special;
+/**
+ * Kalibrierziel fuer Leiter 1+2+4. NEU gegenueber der alten Fassung: der Pool-Gleichanteil
+ * (POOL_EVEN_SHARE) wird hier mitgerechnet — proposal.ts kannte ihn bisher gar nicht, bands.ts und
+ * 5season-model.ts rechneten schon damit.
+ */
+const TARGET_EV = TIERS.map((_, i) => cardTargets(RARITY, PROFILE, i).ladder);
 
 /** EV inklusive Untergrenze und Klausel. */
 function ev(t: SponsorType, expected: number, cal: number) {
@@ -401,6 +368,18 @@ function isTrap(a: { name: string; lot: Lottery[] }, others: Array<{ name: strin
     && a.lot.every((la, i) => fosdAtLeast(b.lot[i]!, la))
     && a.lot.some((la, i) => fosdStrictly(b.lot[i]!, la)));
 }
+/**
+ * VAKUUM-WAECHTER. "0 Fallen" ist wertlos, wenn die verglichenen Karten ueberhaupt keine
+ * Auszahlungsstreuung mehr haben: eine Karte, die ueber den gesamten Korridor in BEIDEN
+ * Klausel-Zustaenden denselben Betrag zahlt (weil die Untergrenze alles abschneidet), kann per
+ * Definition weder dominieren noch dominiert werden. Genau so entstanden die frueheren gruenen
+ * Haken bei Erwartungsrang 18-30. Deshalb wird ab jetzt MITGEZAEHLT und ausgewiesen, wie viele
+ * Karten kollabiert sind.
+ */
+const isCollapsed = (a: { lot: Lottery[] }): boolean => {
+  const vals = a.lot.flatMap((l) => [l.hi, l.lo]);
+  return Math.max(...vals) - Math.min(...vals) < 1e-6;
+};
 
 const line = (c = "=") => console.log(c.repeat(100));
 
@@ -408,7 +387,8 @@ line();
 console.log("SPONSOR-MODELL VORSCHLAG — Liga-Leiter + relative Typ-Identität + Klausel + Sonderziel");
 line();
 console.log("Leiter 1 (Liga, absolut):", TIERS.map((t, i) => `${t.label}=${LIGA[i]}`).join("  "));
-console.log(`Untergrenze ${FLOOR} C · Rarity ${RARITY} (Pool ${POOL >= 0 ? "+" : ""}${POOL.toFixed(0)} C) · Profil ${PROFILE.name} (${PROFILE.note}) · Steilheit ${TARGET_GAMMA}`);
+console.log(`Untergrenze ${FLOOR} C (Rarity-Staffel 38/40/42/45, absolut min ${FLOOR_ABSOLUT}) · Rarity ${RARITY} (Pool ${POOL >= 0 ? "+" : ""}${POOL.toFixed(0)} C, Gleichanteil ${(POOL_EVEN_SHARE * 100).toFixed(0)} %)`);
+console.log(`Profil ${PROFILE.name} (${PROFILE.note}) · Steilheit ${TARGET_GAMMA} · sigma ${SIGMA} · Korridor ±${CORRIDOR} Raenge`);
 console.log(`Ziel-EV je Stufe: ${TARGET_EV.map((v, i) => `${TIERS[i]!.label} ${v.toFixed(0)}`).join("  ")}\n`);
 console.log("  " + "Typ".padEnd(16) + "Offset E#2…E#30".padStart(12) + "   Klausel");
 for (const t of SPONSOR_TYPES) {
@@ -416,10 +396,9 @@ for (const t of SPONSOR_TYPES) {
 }
 
 console.log("\nPRÜFUNG je Erwartungsrang — EV-Spread, Risikospanne, Fallen");
-let trapsTotal = 0;
+let trapsTotal = 0, collapsedTotal = 0;
 for (const e of EXPECTED) {
-  const band: number[] = [];
-  for (let r = Math.max(1, e - 8); r <= Math.min(32, e + 8); r += 1) band.push(r);
+  const band = corridorOf(e);
   const rows = SPONSOR_TYPES.map((t) => {
     const c = offsetFor(t.name, e);
     const lot = lotteries(t, e, c, band);
@@ -433,13 +412,16 @@ for (const e of EXPECTED) {
     return { name: t.name, ev: e0, sd: Math.sqrt(v), lot };
   });
   const traps = rows.filter((a) => isTrap(a, rows));
+  const dead = rows.filter(isCollapsed);
   trapsTotal += traps.length;
+  collapsedTotal += dead.length;
   const evs = rows.map((r) => r.ev);
   console.log(
     `  E#${String(e).padEnd(2)}  EV ${Math.min(...evs).toFixed(1)}–${Math.max(...evs).toFixed(1)}` +
     ` (Spread ${((Math.max(...evs) / Math.min(...evs) - 1) * 100).toFixed(1)} %)` +
     `  σ ${Math.min(...rows.map((r) => r.sd)).toFixed(1)}–${Math.max(...rows.map((r) => r.sd)).toFixed(1)}` +
-    `  Fallen ${traps.length === 0 ? "0 ✓" : `${traps.length} ✗ (${traps.map((t) => t.name).join(", ")})`}`,
+    `  Fallen ${traps.length === 0 ? "0 ✓" : `${traps.length} ✗ (${traps.map((t) => t.name).join(", ")})`}` +
+    `${dead.length > 0 ? `  ⚠ ${dead.length}/${rows.length} Karten kollabiert (Vakuum-Haken)` : ""}`,
   );
 }
 if (process.env.OLY_SPONSOR_DIAG === "1") {
@@ -452,17 +434,17 @@ if (process.env.OLY_SPONSOR_DIAG === "1") {
       `  R10 ${f(10,true)}/${f(10,false)}  R18 ${f(18,true)}/${f(18,false)}  R26 ${f(26,true)}/${f(26,false)}`);
   }
 }
-console.log(`\n  FALLEN INSGESAMT (Stuetzstellen): ${trapsTotal}${trapsTotal === 0 ? "  ✓" : "  ✗"}`);
+console.log(`\n  FALLEN INSGESAMT (Stuetzstellen): ${trapsTotal}${trapsTotal === 0 ? "  ✓" : "  ✗"}` +
+  `${collapsedTotal > 0 ? `   —  ABER ${collapsedTotal} kollabierte Karten: dort ist der Haken VAKUUM-WAHR, nicht verdient` : ""}`);
 
 // Die Offsets sind je 4er-STUFE kalibriert, nicht je Rang. An den Stuetzstellen ist der Spread
 // per Konstruktion 0 — das ist keine Leistung, sondern Definition. Entscheidend ist, was ZWISCHEN
 // ihnen passiert: dort driftet die EV, weil ein Team auf Rang 16 eine andere Ergebnisverteilung
 // hat als eines auf Rang 14, aber denselben Offset benutzt. Deshalb hier ALLE 32 Raenge.
 {
-  let offTraps = 0, worstSpread = 0, worstRank = 0;
+  let offTraps = 0, offDead = 0, worstSpread = 0, worstRank = 0;
   for (let e = 1; e <= 32; e += 1) {
-    const band: number[] = [];
-    for (let r = Math.max(1, e - 8); r <= Math.min(32, e + 8); r += 1) band.push(r);
+    const band = corridorOf(e);
     const rows = SPONSOR_TYPES.map((t) => {
       const c = offsetFor(t.name, e);
       return { name: t.name, ev: ev(t, e, c), lot: lotteries(t, e, c, band) };
@@ -471,12 +453,14 @@ console.log(`\n  FALLEN INSGESAMT (Stuetzstellen): ${trapsTotal}${trapsTotal ===
     const sp = Math.max(...evs) / Math.min(...evs) - 1;
     if (sp > worstSpread) { worstSpread = sp; worstRank = e; }
     offTraps += rows.filter((a) => isTrap(a, rows)).length;
+    offDead += rows.filter(isCollapsed).length;
   }
   console.log(`  ALLE 32 ERWARTUNGSRAENGE: Fallen ${offTraps}${offTraps === 0 ? " ✓" : " ✗"}` +
-    `   groesster EV-Spread ${(worstSpread * 100).toFixed(1)} % (bei Erwartungsrang ${worstRank})`);
+    `   groesster EV-Spread ${(worstSpread * 100).toFixed(1)} % (bei Erwartungsrang ${worstRank})` +
+    `   kollabierte Karten ${offDead}/${32 * SPONSOR_TYPES.length}`);
 }
 
-console.log("\nZIELPRÜFUNG (salaryFactor 1.0) — Meister typisch 90–100 · Letzter ≥ 43,7 (Mindestgehalt)");
+console.log(`\nZIELPRÜFUNG (salaryFactor 1.0) — Meister typisch 90–100 · Letzter ≥ ${SALARY_MIN} (Mindestgehalt)`);
 let goalsOk = true;
 for (const t of SPONSOR_TYPES) {
   const c = offsetFor(t.name, 3);
@@ -487,7 +471,7 @@ for (const t of SPONSOR_TYPES) {
   const botGood = withFloor(rankPart(t, 30, 32, cb) + t.clause.bonus + 12);
   // Toleranz nach oben: der Typ mit dem höchsten Risiko darf beim Titelgewinn knapp über 100 landen —
   // das ist genau sein Jackpot-Fall und thematisch gewollt. Untergrenze 90 gilt strikt für JEDEN Typ.
-  const ok = champ >= 90 && champ <= 101 && botBad >= 43.7;
+  const ok = champ >= 90 && champ <= 101 && botBad >= SALARY_MIN;
   if (!ok) goalsOk = false;
   console.log(
     `  ${t.name.padEnd(16)} Meister ${champ.toFixed(1).padStart(5)} (Jackpot ${jackpot.toFixed(0)})` +
@@ -507,7 +491,6 @@ console.log(`\nERGEBNIS: ${trapsTotal === 0 && goalsOk ? "alle Abnahmekriterien 
 // tot, die geschützt werden sollen. Die Stauchung kommt komplett aus dem Teil OBERHALB der
 // Untergrenze, d. h. der Verlust trifft die Spitze, nicht den Keller.
 // ══════════════════════════════════════════════════════════════════════════════════════════════════
-const SALARY_SUM_S1 = 2078;
 
 /**
  * Untergrenze ATMET mit dem Faktor mit — sie ist nicht fix.
@@ -518,17 +501,13 @@ const SALARY_SUM_S1 = 2078;
  * Untergrenze bei sf < 1 gedaempft mit (Ziel bei 0.8: 35-40) und gibt der Spitze Luft; bei sf > 1
  * steigt sie moderat. Gedaempft, damit der Keller nicht 1:1 dem Ligajahr ausgeliefert ist.
  */
-const FLOOR_DAMP = 0.8;
 /**
  * Untergrenze faellt im schlechten Jahr gedaempft mit, steigt im guten Jahr aber NICHT.
- *
- * Sie ist ein Schutzmechanismus, keine Belohnung: in einem miesen Ligajahr muss sie nachgeben,
- * damit die Schere nicht flach wird (sonst Meister 59 gegen Letzter 47 = 1.26x). In einem guten
- * Jahr mitzuwachsen hiesse dagegen, den Keller genau dann anzuheben, wenn die Spitze bevorzugt
- * werden soll — gemessen ergab das eine U-Form im Ueberschuss (R1 +25, R16 +11, R32 +14), also
- * ein ausgequetschtes Mittelfeld. Ohne Mitwachsen faellt der Ueberschuss sauber von oben nach unten.
+ * Die Regel selbst steht jetzt in sponsor-model-params.ts (floorAt) und gilt fuer alle Skripte;
+ * hier wird sie nur noch auf die aktive Rarity angewandt. Damit atmet auch die Staffelung
+ * 38/40/42/45 korrekt mit — vorher rechnete dieses Skript mit der flachen 44.
  */
-const floorAt = (sf: number) => (sf >= 1 ? FLOOR : FLOOR * (1 - FLOOR_DAMP * (1 - sf)));
+const floorAtSf = (sf: number) => floorAt(RARITY, sf);
 
 /**
  * NEIGUNG im guten Ligajahr — asymmetrisch, nur nach oben.
@@ -567,7 +546,7 @@ const tiltAt = (rank: number, sf: number) =>
  * Rarity-Mix (die Mehrheit magisch, wenige selten/legendaer) verschiebt die Summe leicht nach oben.
  */
 const cardEvLeague = (tier: number) => TARGET_EV_SHAPE[tier]!;
-const specialEvLeague = (tier: number) => cardEvLeague(tier) * BASE_SPECIAL_SHARE;
+const specialEvLeague = (tier: number) => cardEvLeague(tier) * BASE_SPECIAL;
 /**
  * Liga-Standard-Offsets EINMAL vorberechnet. Zuvor stand die Bisektion in teamPayout — das laeuft
  * innerhalb der Bisektion von solveK und liess das Skript ins Timeout rennen.
@@ -575,7 +554,7 @@ const specialEvLeague = (tier: number) => cardEvLeague(tier) * BASE_SPECIAL_SHAR
 const LEAGUE_OFFSET = (() => {
   const m = new Map<string, number>();
   for (const t of SPONSOR_TYPES) for (let rank = 1; rank <= 32; rank += 1) {
-    const target = cardEvLeague(tierOf(rank)) * (1 - BASE_SPECIAL_SHARE);
+    const target = cardEvLeague(tierOf(rank)) * (1 - BASE_SPECIAL);
     let lo = -200, hi = 200;
     for (let i = 0; i < 90; i += 1) { const mid = (lo + hi) / 2; if (ev(t, rank, mid) < target) lo = mid; else hi = mid; }
     m.set(`${t.name}:${rank}`, (lo + hi) / 2);
@@ -602,10 +581,10 @@ console.log(`LIGA-SUMMEN-PRUEFUNG — sf 1.0 heisst: Sigma Sponsoren ~ Sigma Geh
 line();
 console.log("  sf    Untergr.      k     Sigma    Meister  Rang16  Letzter   Schere  Teams im Plus");
 for (const sf of [0.8, 1.0, 1.2]) {
-  const fl = floorAt(sf), k = solveK(SALARY_SUM_S1 * sf, fl, sf);
+  const fl = floorAtSf(sf), k = solveK(SALARY_SUM_S1 * sf, fl, sf);
   const perRank = Array.from({ length: 32 }, (_, i) => i + 1).map((r) =>
     SPONSOR_TYPES.reduce((acc, t) => acc + Math.max(fl, teamPayout(t, r, k, fl, sf)), 0) / SPONSOR_TYPES.length);
-  const salaryAt = (r: number) => 87.8 - (87.8 - 43.7) * ((r - 1) / 31);
+  const salaryAt = salaryAtRank;
   console.log(
     `  ${sf.toFixed(1)}   ${fl.toFixed(1).padStart(6)}  ${k.toFixed(3)}  ${leagueSum(k, fl, sf).toFixed(0).padStart(6)}` +
     `   ${perRank[0]!.toFixed(0).padStart(6)}  ${perRank[15]!.toFixed(0).padStart(6)}  ${perRank[31]!.toFixed(0).padStart(6)}` +
@@ -615,11 +594,10 @@ for (const sf of [0.8, 1.0, 1.2]) {
 line();
 console.log("UEBERSCHUSS JE STUFE (Auszahlung minus Gehalt) — wer traegt den Verlust, wer bekommt den Gewinn?");
 line();
-const salaryAtRank = (r: number) => 87.8 - (87.8 - 43.7) * ((r - 1) / 31);
 const PROBE = [1, 4, 8, 16, 24, 32];
 console.log("  sf    " + PROBE.map((r) => `R${r}`.padStart(9)).join("") + "     Spanne");
 for (const sf of [0.8, 1.0, 1.2]) {
-  const fl = floorAt(sf), k = solveK(SALARY_SUM_S1 * sf, fl, sf);
+  const fl = floorAtSf(sf), k = solveK(SALARY_SUM_S1 * sf, fl, sf);
   const sur = PROBE.map((r) =>
     SPONSOR_TYPES.reduce((a, t) => a + Math.max(fl, teamPayout(t, r, k, fl, sf)), 0) / SPONSOR_TYPES.length - salaryAtRank(r));
   console.log(`  ${sf.toFixed(1)} ` + sur.map((v) => `${v >= 0 ? "+" : ""}${v.toFixed(0)}`.padStart(9)).join("") +
@@ -627,15 +605,15 @@ for (const sf of [0.8, 1.0, 1.2]) {
 }
 
 line();
-console.log("MEISTER realisiert (Titel + Klausel + Sonderziel) vs. Top-Gehalt 87.8");
+console.log(`MEISTER realisiert (Titel + Klausel + Sonderziel) vs. Top-Gehalt ${SALARY_TOP}`);
 line();
 for (const sf of [0.8, 1.0, 1.2]) {
-  const fl = floorAt(sf), k = solveK(SALARY_SUM_S1 * sf, fl, sf);
+  const fl = floorAtSf(sf), k = solveK(SALARY_SUM_S1 * sf, fl, sf);
   const good = SPONSOR_TYPES.map((t) => fl + (rankPart(t, 3, 1, offsetFor(t.name, 3)) + t.clause.bonus + 12 - FLOOR) * k * tiltAt(1, sf));
   const bot = SPONSOR_TYPES.map((t) => Math.max(fl, fl + (rankPart(t, 30, 32, offsetFor(t.name, 30)) - t.clause.malus - FLOOR) * k * tiltAt(32, sf)));
   console.log(`  sf ${sf.toFixed(1)}: Meister ${Math.min(...good).toFixed(0)}-${Math.max(...good).toFixed(0)}` +
     `   Letzter im Schlechtfall ${Math.min(...bot).toFixed(0)}-${Math.max(...bot).toFixed(0)}` +
-    `   Top-Gehalt gedeckt: ${Math.min(...good) >= 87.8 ? "immer" : Math.max(...good) >= 87.8 ? "teilweise" : "nie"}`);
+    `   Top-Gehalt gedeckt: ${Math.min(...good) >= SALARY_TOP ? "immer" : Math.max(...good) >= SALARY_TOP ? "teilweise" : "nie"}`);
 }
 
 // ── Katalog-Ansicht: wie fuehlt sich jede Art fuer ein starkes / mittleres / schwaches Team an? ──
@@ -650,8 +628,7 @@ console.log("  " + "Sponsorart".padEnd(18) + "│" + "  TOP #2  Sockel–Decke  
 for (const t of SPONSOR_TYPES) {
   const cells = [2, 18, 30].map((e) => {
     const c = offsetFor(t.name, e);
-    const band: number[] = [];
-    for (let r = Math.max(1, e - 8); r <= Math.min(32, e + 8); r += 1) band.push(r);
+    const band = corridorOf(e);
     const lot = lotteries(t, e, c, band);
     const e0 = ev(t, e, c); const d = distribution(e);
     let v = 0;
@@ -715,8 +692,7 @@ if (process.env.OLY_SPONSOR_STRESS === "1") {
     const at = (t: SponsorType, e: number) => cal.get(`${t.name}:${tierOf(e)}`) ?? 0;
     let traps = 0, spread = 0, sdLo = Infinity, sdHi = 0;
     for (let e = 1; e <= 32; e += 1) {
-      const band: number[] = [];
-      for (let r = Math.max(1, e - 8); r <= Math.min(32, e + 8); r += 1) band.push(r);
+      const band = corridorOf(e);
       const rows = types.map((t) => {
         const c = at(t, e); const e0 = evTrue(t, e, c); const d = dist2(e); const pt = pTrue(t);
         let v = 0;
@@ -738,14 +714,14 @@ if (process.env.OLY_SPONSOR_STRESS === "1") {
     `Fallen ${String(r.traps).padStart(3)}  EV-Spread ${(r.spread * 100).toFixed(1).padStart(5)} %  sigma ${r.sdLo.toFixed(1)}–${r.sdHi.toFixed(1)}`;
 
   console.log("\n  A) Alle Kombinationen, Designannahmen");
-  console.log(`     ${fmt(analyse(ALL, 4, 0))}`);
+  console.log(`     ${fmt(analyse(ALL, SIGMA, 0))}`);
 
-  console.log("\n  B) Ergebnisstreuung weicht von der Kalibrierannahme (sigma 4) ab");
-  for (const sg of [2, 3, 4, 6, 8]) console.log(`     sigma ${sg}: ${fmt(analyse(ALL, sg, 0))}`);
+  console.log(`\n  B) Ergebnisstreuung weicht von der Kalibrierannahme (sigma ${SIGMA}) ab`);
+  for (const sg of [3, 4, SIGMA, 7, 9]) console.log(`     sigma ${sg}: ${fmt(analyse(ALL, sg, 0))}`);
 
   console.log("\n  C) Klausel-p ist fehlgeschaetzt (kalibriert mit Design-p, real verschoben)");
   for (const sh of [-0.2, -0.15, -0.1, 0, 0.1, 0.15, 0.2]) {
-    console.log(`     p${sh >= 0 ? "+" : ""}${sh.toFixed(2)}: ${fmt(analyse(ALL, 4, sh))}`);
+    console.log(`     p${sh >= 0 ? "+" : ""}${sh.toFixed(2)}: ${fmt(analyse(ALL, SIGMA, sh))}`);
   }
 }
 
@@ -758,8 +734,7 @@ if (process.env.OLY_SPONSOR_SLATE === "1") {
   const oneEach = CURVES.map((c) => SPONSOR_TYPES.find((t) => t.name.startsWith(`${c.name}/`))).filter(Boolean) as SponsorType[];
   let traps = 0;
   for (let e = 1; e <= 32; e += 1) {
-    const band: number[] = [];
-    for (let r = Math.max(1, e - 8); r <= Math.min(32, e + 8); r += 1) band.push(r);
+    const band = corridorOf(e);
     const rows = oneEach.map((t) => {
       const c = offsetFor(t.name, e);
       return { name: t.name, lot: lotteries(t, e, c, band) };
@@ -781,8 +756,7 @@ if (process.env.OLY_SPONSOR_TRAPS === "1") {
   }
   const found = new Map<string, number[]>();
   for (let e = 1; e <= 32; e += 1) {
-    const band: number[] = [];
-    for (let r = Math.max(1, e - 8); r <= Math.min(32, e + 8); r += 1) band.push(r);
+    const band = corridorOf(e);
     const rows = ALL2.map((t) => ({ name: t.name, lot: lotteries(t, e, cal2.get(`${t.name}:${tierOf(e)}`) ?? 0, band) }));
     for (const a of rows) {
       const dom = rows.find((b) => b.name !== a.name

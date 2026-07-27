@@ -186,7 +186,58 @@ Jede Phase ist einzeln lauffähig, hinter Flag, mit eigenem Abnahmekriterium.
 7. **σ = 4** (Ergebnisstreuung) ist gesetzt, nicht gemessen. Bei sehr enger oder sehr offener Liga
    verschiebt sich der erreichbare Korridor.
 
-## 7. Nicht Teil dieses Plans
+## 7. Vier Auflagen des Balancing-Audits (vor dem Engine-Test)
+
+### (a) Ein Parametersatz — konsolidiert, und was dabei herauskam
+
+**Befund:** die drei Modellskripte trugen **drei verschiedene Parametersätze**. Die gesamte
+Prüfmaschinerie (FOSD-Fallen-Test, EV-Parität, Kalibrierung, Stresstest) sitzt in
+`sponsor-model-proposal.ts` und lief noch mit dem **alten** Satz, während `sponsor-rarity-bands.ts`
+und `sponsor-5season-model.ts` längst mit dem neuen rechneten:
+
+| Größe | proposal.ts (alt) | bands/5season (neu) |
+|---|---|---|
+| Untergrenze | 44 flach | 38/40/42/45 je Rarity, absolut min 35 |
+| LIGA-Spitze | 77 | 72 |
+| Kurve aufwärts | `4·d` | `2,5·d − 0,9·d²` |
+| Kurve abwärts | `4,5·d` | `2,8·d` |
+| Klausel-Spannweite | 18 | 11 |
+| σ | 4 | 5,5 |
+| Korridor | ±8 Ränge | ±11 Ränge |
+| Pool-Gleichanteil | existierte nicht | 0,5 |
+
+**Der neue Satz war damit nie auf Fallenfreiheit geprüft.** Alle „0 Fallen"-Haken der Vergangenheit
+galten für Werte, die kein anderes Skript mehr benutzt.
+
+Alle Parameter liegen jetzt in `scripts/sponsor-model-params.ts`; die drei Skripte importieren
+daraus. Gemessenes Ergebnis des **neuen** Satzes auf der Prüfmaschinerie:
+
+| Messung | alter Satz (Stand vorher) | neuer Satz (konsolidiert) |
+|---|---|---|
+| Fallen, kuratierte 12er-Liste, alle 32 Ränge | 0 | 0 |
+| davon **kollabierte Karten** (Vakuum-Haken) | — (nicht gemessen) | **144 von 384** |
+| Fallen im vollen 120er-Raum | **23 Paare / 92 Instanzen** | **44 Paare / 95 Instanzen** |
+| Lage der Fallen | Erwartungsrang 29–32 | **Erwartungsrang 17–20** |
+| EV-Spread über alle 32 Ränge | 4,9 % | 4,2 % (σ-Annahme), bis 13,1 % bei σ 3 |
+| Zielprüfung „Letzter ≥ 43,7" | erfüllt (Floor 44) | **verletzt: 40 mit jedem Typ** |
+| Zielprüfung „Meister 90–100" | erfüllt | erfüllt (90,2–99,8) |
+
+**Drei Befunde, die aus der Konsolidierung fallen:**
+
+1. **Die Zielprüfung ist verletzt, strukturell.** Die Untergrenze für `magisch` ist 40, das
+   S1-Mindestgehalt 43,7. Ein Team am Tabellenende kann seine Gehälter mit einer magischen Karte
+   nicht mehr aus dem Sponsor decken. Die alte 44 war exakt auf dieses Kriterium gesetzt; die neue
+   Staffel 38/40/42/45 wurde gegen ein anderes Kriterium gewählt (Bänder nicht festklemmen) und
+   niemand hat die beiden gegeneinander gerechnet.
+2. **„0 Fallen" ist bei Erwartungsrang 22–30 vakuum-wahr.** Dort zahlen alle 12 Karten in beiden
+   Klausel-Zuständen über den gesamten Korridor exakt 40 — sie *können* sich nicht dominieren.
+   Der Prüfstand weist das ab jetzt als `⚠ n/12 Karten kollabiert` aus, statt einen Haken zu setzen.
+3. **Die Doku-Zahl „3 Paare" war schon vorher überholt.** Der Stand bei HEAD lieferte mit dem alten
+   Satz bereits 23 Paare — die Angebotsregel („keine zwei Sponsoren derselben Kurvenform") ist
+   also gegen eine Messung formuliert worden, die zum Zeitpunkt der Formulierung nicht mehr galt.
+   Der SLATE-Test (je Kurve genau ein Angebot) ist mit dem neuen Satz weiterhin bei 0 Fallen.
+
+## 8. Nicht Teil dieses Plans
 
 - Golden-Sponsoren (eigene Mechanik, bleibt vorerst wie sie ist)
 - Verhandlung (`sponsor-negotiation.ts`)
