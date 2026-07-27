@@ -47,16 +47,27 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = (await request.json()) as NewGameRequestBody;
-  const input = normalizeBody(body);
-
-  if (body.dryRun !== false) {
-    return NextResponse.json({
-      preview: previewNewGameSetup(input),
-    });
-  }
-
+  // Parse + preview live INSIDE the try below. They used to run unguarded here, so a malformed
+  // body (`request.json()` throwing) or any error inside `previewNewGameSetup` escaped as an
+  // uncaught 500 — Next then answers with an HTML error page, `response.json()` on the client
+  // throws, and the only thing the user ever saw was the opaque
+  // "New-Game-Setup konnte nicht geladen werden." catch-all. Wrapping them means the real reason
+  // reaches the UI as a proper JSON `error` string instead.
   try {
+    let body: NewGameRequestBody;
+    try {
+      body = (await request.json()) as NewGameRequestBody;
+    } catch {
+      return NextResponse.json({ error: "Ungültiger Anfrage-Body (kein JSON)." }, { status: 400 });
+    }
+    const input = normalizeBody(body);
+
+    if (body.dryRun !== false) {
+      return NextResponse.json({
+        preview: previewNewGameSetup(input),
+      });
+    }
+
     // Per-user active-save scoping: with auth on, the new game becomes active for the acting
     // user only (their pointer), leaving the other player's active save untouched. Auth off ->
     // ownerId null -> unchanged global activate.
