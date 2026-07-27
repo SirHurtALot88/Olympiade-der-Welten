@@ -51,14 +51,20 @@ bestimmt, nicht elementweise. Der frühere elementweise Vergleich ist ungültig,
 eigenes P trägt — er vergleicht Zellen über verschiedene Wahrscheinlichkeitsmaße und erzeugt
 systematisch False Positives. Der CDF-Vergleich ist zusätzlich unabhängig von σ.
 
-| Kriterium | Ist | Vorschlag |
-|---|---|---|
-| Fallen-Sponsoren (kuratierte Liste, alle 32 Ränge) | 6–7 von 11 | **0** |
-| Fallen im vollen 120er-Raum | — | **3 Paare** (nur Ränge 29–32, s. u.) |
-| EV-Spread über alle 32 Erwartungsränge | 16–30 % | **3,8 %** |
-| Risikospanne σ | — | **5,4 – 16,8** (Faktor 3) |
-| Meister bei sf 1.0 | 70–102 je nach Sponsor | **89–104 mit jedem Typ** |
-| Letzter | 39–56, teils unter Gehalt | **≥ 44 mit jedem Typ** |
+> **Achtung — die Zahlen dieser Tabelle sind der Stand VOR den vier Auflagen des Balancing-Audits.**
+> Sie wurden mit einem Parametersatz gemessen, den kein Skript mehr benutzt, und mit einem
+> Fallen-Test, der das Sonderziel nicht als Lotterie führte. Der aktuelle, nachgemessene Stand
+> steht in Abschnitt 7.
+
+| Kriterium | Ist | Vorschlag (alt) | nach (a)–(d) |
+|---|---|---|---|
+| Fallen-Sponsoren (kuratierte Liste, alle 32 Ränge) | 6–7 von 11 | 0 | **0** bei **0 kollabierten Karten** |
+| Fallen im vollen 120er-Raum | — | 3 Paare (behauptet; real 23) | **0 Paare** |
+| EV-Spread über alle 32 Erwartungsränge | 16–30 % | 3,8 % | **3,5 %** |
+| Risikospanne σ | — | 5,4 – 16,8 | **6,0 – 27,9** |
+| Meister bei sf 1.0 | 70–102 je nach Sponsor | 89–104 | **89,2–98,9 mit jedem Typ** |
+| Letzter | 39–56, teils unter Gehalt | ≥ 44 | **40 — unter dem Mindestgehalt 43,7, siehe 7 (a)** |
+| Profil-Dominanz | — | nie gemessen | **0 von 1920** |
 
 **Liga-Bilanz** (Σ Sponsoren gegen Σ Gehälter 2078) und **Überschuss je Stufe**:
 
