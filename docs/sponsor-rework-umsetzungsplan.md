@@ -268,6 +268,49 @@ Linear/…` bei Erwartungsrang 32) haben **verschiedene Kurvenformen**. Die best
 („keine zwei Sponsoren derselben Kurvenform in einer Liste") greift bei ihnen **nicht**. Ihre
 Ursache ist der Monotonie-Bug der Kurve — siehe (c).
 
+### (c) Monotonie-Bug der Kurve — behoben, mit Wertetabelle
+
+**Befund:** `rel(d) = 5 + 2,5·d − 0,9·d²` hat ihren Scheitel bei `d = 2,5/1,8 = 1,389` und **fällt
+danach**. Ab `d = 4` liegt sie unter dem Wert bei `d = 0`, ab `d = 5` unter der Ligastufe. Größter
+Rücksprung über `d ∈ [−8, +8]`: **39,3 C**.
+
+| d | −8 | −4 | −1 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| alt | −17,4 | −6,2 | 2,2 | 5,0 | **6,6** | 6,4 | 4,4 | 0,6 | −5,0 | −12,4 | −21,6 | **−32,6** |
+| neu | −17,4 | −6,2 | 2,2 | 5,0 | 6,8 | 7,9 | 8,6 | 9,1 | 9,5 | 9,7 | 10,0 | **10,2** |
+
+Rangteil eines Teams mit **Erwartungsrang 30** (ohne Offset) — der gemeldete Fall:
+
+| Endrang | 1 | 3 | 6 | 10 | 14 | 18 | 22 | 26 | 30 |
+|---|---|---|---|---|---|---|---|---|---|
+| alt | 39,4 | 45,4 | 50,6 | 54,0 | **55,6** | 55,4 | 53,4 | 49,6 | 44,0 |
+| neu | **82,2** | 77,0 | 72,7 | 68,5 | 64,1 | 59,6 | 54,9 | 49,8 | 44,0 |
+
+Der Titelgewinn zahlte **16,2 C weniger** als ein Platz 13–16. Die Prüfskripte versteckten das
+hinter dem ±11-Korridor: aus Stufe 8 liegen die Stufen 0–3 gar nicht im Korridor. **Die Engine hat
+keinen Korridor.**
+
+**Fix — Sättigung statt Quadrat:** `rel(d) = 5 + 2,5·d / (1 + 0,36·d)` für `d > 0`.
+`β = 0,9/2,5 = 0,36` reproduziert die alte Kurve bis zur **zweiten Ordnung** bei `d = 0`
+(`f'(0) = 2,5`, `f''(0) = −1,8` in beiden Fällen); die Design-Absicht „große Sprünge zahlen
+unterproportional" bleibt exakt erhalten, die Ableitung `2,5/(1+0,36d)²` ist aber überall positiv.
+Größter Rücksprung jetzt **0,000 C**.
+
+**Verworfene Alternative — konkaven Term am Scheitel klemmen** (`d² → min(d; 1,389)²`): ebenfalls
+monoton, aber danach läuft die Kurve mit voller Steigung 2,5 weiter. Gemessen bei `d = 8`:
+**geklemmt 23,26 gegen gesättigt 10,15**, für das Team mit Erwartungsrang 30 also Titelgewinn
+**95,3 statt 82,2**. Das macht genau die Deckensenkung der schwachen Stufen rückgängig, für die der
+konkave Term eingeführt wurde.
+
+**Nebenwirkung:** die 3 verbleibenden Fallen aus (b) sind damit **weg** — sie waren Symptom desselben
+Bugs. Voller 120er-Raum, alle 32 Erwartungsränge: **0 Fallen bei 0 kollabierten Karten**, also erstmals
+ein Haken, der nicht vakuum-wahr ist.
+
+**Offener Punkt:** die Kurvenform **`Halten`** (`d=0 → 12`, `d>0 → 12−3d`) fällt weiterhin, größter
+Rücksprung **24,0 C**. Das ist ihre erklärte Identität („Maximum beim exakten Halten"), trifft aber
+denselben Nerv: mit diesem Sponsor wird ein Wunderjahr bestraft. Das ist eine **Design-Entscheidung**,
+keine technische; der Prüfstand weist sie ab jetzt bei jedem Lauf aus.
+
 ## 8. Nicht Teil dieses Plans
 
 - Golden-Sponsoren (eigene Mechanik, bleibt vorerst wie sie ist)

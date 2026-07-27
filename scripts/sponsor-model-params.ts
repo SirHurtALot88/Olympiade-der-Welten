@@ -104,8 +104,41 @@ export const CURVE_BASE = 5;
 export const CURVE_UP = 2.5;
 export const CURVE_CONCAVE = 0.9;
 export const CURVE_DOWN = 2.8;
-export const rel = (d: number): number =>
+
+/**
+ * ALTE FASSUNG, nur noch fuer den Monotonie-Nachweis aufbewahrt — NICHT benutzen.
+ *
+ * MONOTONIE-BUG (gemessen): rel(d) = 5 + 2.5d - 0.9d^2 hat ihren Scheitel bei d = 2.5/1.8 = 1.389
+ * und FAELLT danach. Ab d = 4 liegt sie unter dem Wert bei d = 0, ab d = 5 sogar unter der
+ * Ligastufe. Folge fuer ein Team mit Erwartungsrang 30 (Stufe 8), Rangteil ohne Offset:
+ *
+ *   Endrang     1     3     6    10    14    18    22    26    30
+ *   roh      39.4  45.4  50.6  54.0  55.6  55.4  53.4  49.6  44.0
+ *
+ * Der TITELGEWINN zahlt 39.4, ein Platz 13-16 aber 55.6 — ein Wunderjahr wird um 16.2 C bestraft.
+ * Die Pruefskripte versteckten das hinter dem +-11-Korridor (aus Stufe 8 sind Stufe 0-3 gar nicht
+ * erreichbar); die echte Engine hat keinen Korridor.
+ */
+export const relConcaveRaw = (d: number): number =>
   (d > 0 ? CURVE_BASE + CURVE_UP * d - CURVE_CONCAVE * d * d : CURVE_BASE + CURVE_DOWN * d);
+
+/**
+ * FIX: der konkave Term wird gesaettigt statt quadratisch — a*d/(1+beta*d) statt a*d - c*d^2.
+ *
+ * beta = CURVE_CONCAVE / CURVE_UP = 0.36 ist so gewaehlt, dass die neue Kurve die alte bis zur
+ * ZWEITEN Ordnung bei d = 0 reproduziert (f'(0) = 2.5, f''(0) = -1.8 in beiden Faellen). Die
+ * Design-Absicht "grosse Spruenge zahlen unterproportional" bleibt damit exakt erhalten, die
+ * Ableitung 2.5/(1+0.36d)^2 ist aber ueber den GESAMTEN Bereich positiv.
+ *
+ * VERWORFENE ALTERNATIVE — den konkaven Term am Scheitel klemmen (d^2 -> min(d, 1.389)^2):
+ * ebenfalls monoton, aber danach laeuft die Kurve wieder mit voller Steigung 2.5 weiter. Gemessen
+ * bei d = 8: geklemmt 23.26 gegen gesaettigt 10.15, fuer das Team mit Erwartungsrang 30 also
+ * Titelgewinn 95.3 statt 82.2. Das macht genau die Deckensenkung der schwachen Stufen rueckgaengig,
+ * fuer die der konkave Term ueberhaupt eingefuehrt wurde. Die Saettigung haelt beides zusammen.
+ */
+export const CURVE_BETA = CURVE_CONCAVE / CURVE_UP;
+export const rel = (d: number): number =>
+  (d > 0 ? CURVE_BASE + (CURVE_UP * d) / (1 + CURVE_BETA * d) : CURVE_BASE + CURVE_DOWN * d);
 
 // ── Leiter 4: Klausel ──────────────────────────────────────────────────────────────────────────
 /**

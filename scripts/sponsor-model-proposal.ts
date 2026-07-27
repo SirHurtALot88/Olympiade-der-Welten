@@ -37,7 +37,7 @@ import {
   TIERS, tierOf, LIGA, floorAt, FLOOR_ABSOLUT, RARITY_MULT, POOL_EVEN_SHARE, BASE_SPECIAL,
   TARGET_GAMMA, TARGET_EV_SHAPE, poolFor, rel as relRepr, clauseBonus, clauseMalus,
   SIGMA, CORRIDOR, dist as distOf, corridorOf, PROFILES, profileByName, cardTargets,
-  P_GOAL, goalPayout,
+  P_GOAL, goalPayout, relConcaveRaw, CURVE_BETA,
   SALARY_SUM_S1, SALARY_TOP, SALARY_MIN, salaryAtRank,
 } from "./sponsor-model-params";
 
@@ -431,6 +431,59 @@ console.log(`Sonderziel als Lotterie: P ${P_GOAL} — Auszahlung ${TIERS.map((_,
 console.log("  " + "Typ".padEnd(16) + "Offset E#2…E#30".padStart(12) + "   Klausel");
 for (const t of SPONSOR_TYPES) {
   console.log("  " + t.name.padEnd(16) + `${offsetFor(t.name, 2).toFixed(1)}…${offsetFor(t.name, 30).toFixed(1)}`.padStart(12) + `   +${t.clause.bonus}/−${t.clause.malus}  ${t.clause.label}`);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════
+// KURVEN-MONOTONIE (Auflage c des Balancing-Audits).
+//
+// Die relative Kurve MUSS ueber den gesamten Bereich d in [-8, +8] nicht-fallend sein: sonst wird
+// ein Team fuer Ueberperformance bestraft. Der Korridor +-11 der Pruefskripte verdeckte das, weil
+// aus Stufe 8 die Stufen 0-3 nie im Korridor liegen — die echte Engine kennt keinen Korridor.
+// ══════════════════════════════════════════════════════════════════════════════════════════════════
+line();
+console.log("KURVEN-MONOTONIE — rel(d) ueber den GESAMTEN Bereich d ∈ [-8, +8]");
+line();
+{
+  const ds = Array.from({ length: 17 }, (_, i) => i - 8);
+  console.log("  d        " + ds.map((d) => String(d).padStart(7)).join(""));
+  console.log("  alt      " + ds.map((d) => relConcaveRaw(d).toFixed(1).padStart(7)).join(""));
+  console.log("  neu      " + ds.map((d) => relRepr(d).toFixed(1).padStart(7)).join(""));
+  /**
+   * Groesster Ruecksprung: wie weit faellt die Kurve unter ihr bis dahin erreichtes Maximum?
+   * Genau das erlebt ein Team, das sich weiter verbessert und dafuer WENIGER bekommt.
+   */
+  const mono = (f: (d: number) => number) => {
+    let peak = -Infinity, worst = 0, at = 0;
+    for (let d = -8; d <= 8; d += 0.05) {
+      peak = Math.max(peak, f(d));
+      if (peak - f(d) > worst) { worst = peak - f(d); at = d; }
+    }
+    return { worst, at };
+  };
+  const mAlt = mono(relConcaveRaw), mNeu = mono(relRepr);
+  console.log(`\n  alt: groesster Ruecksprung ${mAlt.worst.toFixed(1)} C (Maximum bei d 1.4, Tiefpunkt bei d ${mAlt.at.toFixed(1)})` +
+    `  →  ${mAlt.worst > 1e-9 ? "NICHT monoton ✗" : "monoton ✓"}`);
+  console.log(`  neu: groesster Ruecksprung ${mNeu.worst.toFixed(3)} C` +
+    `  →  ${mNeu.worst > 1e-9 ? "NICHT monoton ✗" : "monoton ✓"}   (Saettigung beta ${CURVE_BETA})`);
+
+  console.log("\n  Rangteil eines Teams mit Erwartungsrang 30 (Stufe 8), ohne Offset — der gemeldete Fall:");
+  const probes = [1, 3, 6, 10, 14, 18, 22, 26, 30];
+  const part = (f: (d: number) => number, r: number) => LIGA[tierOf(r)]! + f(8 - tierOf(r));
+  console.log("    Endrang  " + probes.map((r) => String(r).padStart(7)).join(""));
+  console.log("    alt      " + probes.map((r) => part(relConcaveRaw, r).toFixed(1).padStart(7)).join(""));
+  console.log("    neu      " + probes.map((r) => part(relRepr, r).toFixed(1).padStart(7)).join(""));
+  const bestAlt = Math.max(...probes.map((r) => part(relConcaveRaw, r)));
+  console.log(`    alt: Titelgewinn ${part(relConcaveRaw, 1).toFixed(1)}, Maximum ${bestAlt.toFixed(1)}` +
+    ` → Wunderjahr kostet ${(bestAlt - part(relConcaveRaw, 1)).toFixed(1)} C ✗`);
+  console.log(`    neu: Titelgewinn ${part(relRepr, 1).toFixed(1)} ist zugleich das Maximum ✓`);
+
+  console.log("\n  Alle sechs Kurvenformen (Sponsor-Identitaeten) auf demselben Kriterium:");
+  for (const c of CURVES) {
+    const m = mono(c.rel);
+    const intended = c.name === "Halten";
+    console.log(`    ${c.name.padEnd(8)} groesster Ruecksprung ${m.worst.toFixed(2).padStart(6)} C (bis d ≈ ${m.at.toFixed(1).padStart(5)})` +
+      `   ${m.worst > 1e-9 ? (intended ? "fallend — per Design gewollt (Maximum beim exakten Halten), OFFENER PUNKT" : "NICHT monoton ✗") : "monoton ✓"}`);
+  }
 }
 
 console.log("\nPRÜFUNG je Erwartungsrang — EV-Spread, Risikospanne, Fallen");
