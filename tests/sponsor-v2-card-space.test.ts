@@ -153,4 +153,35 @@ describe("Sponsor V2 — jede einzelne erzeugte Karte", () => {
     }
     expect(failed, `${failed.length} Karten ohne belastbare Untergrenze`).toEqual([]);
   });
+
+  /**
+   * F — JEDES ZIEL MUSS ERFUELLBAR SEIN UND SEINE SCHWELLE NENNEN.
+   *
+   * Die Angebote entstehen VOR dem Draft. Zu diesem Zeitpunkt hat kein Team Spieler, also ist jede
+   * gemessene Gehaltssumme und jeder Kaderwert 0 — und ein Ziel, das sich an einem Liga-Median
+   * orientiert, bekam die Schwelle 0. Im Browser stand dann "Gehalt <= 0 C" und "bei Kaderwert <= 0":
+   * Ziele, die niemand jemals erfuellen kann, mit ausgewiesenem Bonus daneben. Die anderen
+   * Kartenschranken haben das nicht bemerkt, weil Betrag und Struktur der Karte voellig in Ordnung
+   * waren — kaputt war allein die Zielmarke.
+   */
+  it("F — kein Sonderziel nennt eine unerfuellbare Schwelle von 0", TIMEOUT, () => {
+    const failed: string[] = [];
+    for (const [teamId, offers] of offersByTeam(newGameFromButton())) {
+      for (const offer of offers) {
+        for (const component of offer.components ?? []) {
+          if (component.kind !== "special") continue;
+          // Deckt "Gehalt <= 0 C", "bei Kaderwert <= 0" und jede kuenftige Variante ab: eine
+          // Schwelle, die als "<= 0" oder "0 C" im Text steht, ist keine Aufgabe, sondern ein Fehler.
+          if (/[≤<]=?\s*0(\s|$|\s*C\b)/.test(component.label) || /\b0\s*C\b/.test(component.label)) {
+            failed.push(`${teamId} — ${offer.name}: "${component.label}"`);
+          }
+          const numericTarget = typeof component.targetValue === "number" ? component.targetValue : null;
+          if (numericTarget !== null && numericTarget <= 0) {
+            failed.push(`${teamId} — ${offer.name}: Zielwert ${numericTarget} bei "${component.label}"`);
+          }
+        }
+      }
+    }
+    expect(failed, `${failed.length} Ziele sind nicht erfuellbar`).toEqual([]);
+  });
 });
