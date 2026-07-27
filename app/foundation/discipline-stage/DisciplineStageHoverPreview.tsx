@@ -32,6 +32,12 @@ export type DisciplineStageHoverPreviewProps = {
   fieldedPlayerIdsByTeam?: Record<string, string[]>;
   /** Aktuelle Disziplin — für den Diszi-Wert der eingesetzten Spieler. */
   disciplineId?: string;
+  /**
+   * Vergebene Player-Points je Spieler-ID (mit dem Score, aus dem sie stammen). Wird erst
+   * NACH Abschluss der Disziplin gesetzt — vorher wäre die PP-Vergabe ein Spoiler. Ist der
+   * Wert null/leer, zeigt die Karte wie bisher nur den Diszi-Wert.
+   */
+  ppByPlayerId?: Map<string, { pp: number | null; score: number }> | null;
 };
 
 const PLAYER_W = 184;
@@ -140,12 +146,14 @@ function PlayerPreview({ gameState, target, ratingByPlayerId }: {
   );
 }
 
-function TeamPreview({ gameState, target, ratingByPlayerId, fieldedPlayerIdsByTeam, disciplineId }: {
+function TeamPreview({ gameState, target, ratingByPlayerId, fieldedPlayerIdsByTeam, disciplineId, ppByPlayerId }: {
   gameState: GameState;
   target: { id: string; x: number; y: number };
   ratingByPlayerId: Map<string, PlayerRatingContractRow>;
   fieldedPlayerIdsByTeam?: Record<string, string[]>;
   disciplineId?: string;
+  /** Vergebene Player-Points je Spieler — null, solange die Disziplin noch läuft. */
+  ppByPlayerId?: Map<string, { pp: number | null; score: number }> | null;
 }) {
   const team = gameState.teams?.find((t) => t.teamId === target.id) ?? null;
   if (!team) return null;
@@ -209,6 +217,7 @@ function TeamPreview({ gameState, target, ratingByPlayerId, fieldedPlayerIdsByTe
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
             {fielded.map((player) => {
               const row = ratingByPlayerId.get(player.id) ?? null;
+              const pp = ppByPlayerId?.get(player.id) ?? null;
               const portraitUrl = getPlayerPortraitBrowserUrl(player.id, player.portraitUrl ?? null, player.portraitPath ?? null);
               const discVal = disciplineId
                 ? player.currentDisciplineValues?.[disciplineId] ?? player.disciplineRatings?.[disciplineId] ?? null
@@ -222,11 +231,30 @@ function TeamPreview({ gameState, target, ratingByPlayerId, fieldedPlayerIdsByTe
                     <span aria-hidden style={{ width: 24, height: 24, borderRadius: "50%", flex: "none", background: color.primary }} />
                   )}
                   <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{player.name}</span>
+                  {/* Nach Abschluss der Disziplin sind die PP die eigentliche Währung —
+                      sie stehen deshalb vorn, der Score bleibt als Herkunft daneben. */}
+                  {pp?.pp != null ? (
+                    <span
+                      title={`${fmt1(pp.pp)} Player-Points · Score ${fmt1(pp.score)}`}
+                      style={{ fontSize: 12, fontWeight: 900, color: "var(--nl-accent)", flex: "none" }}
+                    >
+                      {fmt1(pp.pp)} PP
+                    </span>
+                  ) : null}
                   {discVal != null ? (
-                    <span style={{ fontSize: 12, fontWeight: 800, color: "var(--nl-accent)", flex: "none" }}>{fmt1(discVal)}</span>
-                  ) : (
+                    <span
+                      style={{
+                        fontSize: pp?.pp != null ? 11 : 12,
+                        fontWeight: pp?.pp != null ? 700 : 800,
+                        color: pp?.pp != null ? "var(--nl-mut)" : "var(--nl-accent)",
+                        flex: "none",
+                      }}
+                    >
+                      {pp?.pp != null ? `(${fmt1(discVal)})` : fmt1(discVal)}
+                    </span>
+                  ) : pp?.pp == null ? (
                     <span style={{ fontSize: 11, color: "var(--nl-mut)", flex: "none" }}>OVR {row?.ovrNormalized != null ? fmt1(row.ovrNormalized) : "–"}</span>
-                  )}
+                  ) : null}
                 </div>
               );
             })}
@@ -243,6 +271,7 @@ export default function DisciplineStageHoverPreview({
   ratingByPlayerId,
   fieldedPlayerIdsByTeam,
   disciplineId,
+  ppByPlayerId,
 }: DisciplineStageHoverPreviewProps): React.JSX.Element | null {
   // Erst nach dem Mount in document.body portalen (SSR-fest) — so kann kein
   // ancestor-`transform` die `position:fixed`-Verankerung kapern (analog zum Drawer).
@@ -259,6 +288,7 @@ export default function DisciplineStageHoverPreview({
         ratingByPlayerId={ratingByPlayerId}
         fieldedPlayerIdsByTeam={fieldedPlayerIdsByTeam}
         disciplineId={disciplineId}
+        ppByPlayerId={ppByPlayerId}
       />
     );
   return createPortal(content, document.body);

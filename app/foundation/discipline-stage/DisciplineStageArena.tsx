@@ -931,6 +931,20 @@ export default function DisciplineStageArena({
     return { rows: top.map((e) => e.row), ids: top.map((e) => e.id) };
   }, [useEngine, engineDiscipline, model, teamMetaById, portraitById, ownTeamId]);
 
+  // Player-Points je Spieler für die Hover-Karte. Bewusst aus der VOLLEN Engine-Liste
+  // (nicht aus der auf 12 gekürzten Top-Spieler-Tabelle), damit der Hover auch für
+  // Spieler außerhalb der Top-12 die PP zeigt — im Hover steht sonst nur der Score,
+  // und die eigentliche Währung der Disziplin (PP) fehlte genau dort.
+  const ppByPlayerId = useMemo(() => {
+    const map = new Map<string, { pp: number | null; score: number }>();
+    if (!useEngine || !engineDiscipline) return map;
+    for (const entry of engineDiscipline.topPlayers) {
+      if (!entry.playerId) continue;
+      map.set(entry.playerId, { pp: entry.pointsAwarded ?? null, score: entry.finalPlayerScore });
+    }
+    return map;
+  }, [useEngine, engineDiscipline]);
+
   const ownShortCode = useMemo(() => {
     const own = (gameState?.teams ?? []).find((t) => t.teamId === ownTeamId);
     return own?.shortCode ?? model.teams.find((t) => t.isOwn)?.shortCode ?? null;
@@ -1558,7 +1572,15 @@ export default function DisciplineStageArena({
     {/* Hover-Vorschau — am Cursor verankert, geklammert, pointer-events:none. Als
         Geschwister NACH der Arena (kein Remount/Reset der laufenden Sim). Öffnet
         NIE den vollen Drawer; der öffnet nur per Klick. */}
-    <DisciplineStageHoverPreview target={hoverPreview} gameState={gameState} ratingByPlayerId={ratingByPlayerId} fieldedPlayerIdsByTeam={fieldedByTeam} disciplineId={disciplineId} />
+    <DisciplineStageHoverPreview
+      target={hoverPreview}
+      gameState={gameState}
+      ratingByPlayerId={ratingByPlayerId}
+      fieldedPlayerIdsByTeam={fieldedByTeam}
+      disciplineId={disciplineId}
+      // PP erst nach Abschluss der Disziplin — vorher wäre die Vergabe ein Spoiler.
+      ppByPlayerId={arenaEnded ? ppByPlayerId : null}
+    />
     </>
   );
 }

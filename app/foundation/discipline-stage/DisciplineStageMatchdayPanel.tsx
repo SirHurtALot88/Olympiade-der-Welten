@@ -110,6 +110,33 @@ function RankBadge({ rank, dim }: { rank: number | null; dim?: boolean }) {
   );
 }
 
+/**
+ * Reihenfolge der Spieltags-Wertung (in-place, wie `Array.sort`).
+ *
+ * - **d2 aufgedeckt** → nach dem projizierten Endrang; der Spieltag ist fertig gewertet.
+ * - **d2 noch verdeckt** → nach der GESAMT-Spalte dieses Spieltags, absteigend.
+ *
+ * Vorher wurde im zweiten Fall nach dem Saison-Rang VOR dem Spieltag sortiert. Am ersten
+ * Spieltag ist dieser Rang aber nur die Startreihenfolge — die Tabelle wirkte dadurch
+ * ungeordnet: das Team mit +21,1 stand unter dem mit +1,8.
+ *
+ * Nach der Gesamt-Spalte zu sortieren verrät nichts Zusätzliches: diese Zahlen stehen bereits
+ * sichtbar in der Zeile, und die verdeckte Disziplin 2 geht per Konstruktion nicht in `total`
+ * ein (nur aufgedeckte Seiten werden aufsummiert). Gleichstand fällt auf den Saison-Rang
+ * zurück, damit die Reihenfolge stabil bleibt.
+ */
+export function sortMatchdayPanelRows<T extends { total: number; currentRank: number | null; projectedRank: number | null }>(
+  rows: T[],
+  d2Revealed: boolean,
+): T[] {
+  return rows.sort((a, b) => {
+    if (d2Revealed) {
+      return ((a.projectedRank ?? 999) - (b.projectedRank ?? 999)) || ((a.currentRank ?? 999) - (b.currentRank ?? 999));
+    }
+    return (b.total - a.total) || ((a.currentRank ?? 999) - (b.currentRank ?? 999));
+  });
+}
+
 export default function DisciplineStageMatchdayPanel({
   teamResults,
   standings,
@@ -133,6 +160,12 @@ export default function DisciplineStageMatchdayPanel({
     const res = resultByTeam.get(s.teamId);
     const d1Pts = res ? (res.d1DisciplineId === d1?.disciplineId ? res.d1Points : res.d2DisciplineId === d1?.disciplineId ? res.d2Points : null) : null;
     const d2Pts = res ? (res.d1DisciplineId === d2?.disciplineId ? res.d1Points : res.d2DisciplineId === d2?.disciplineId ? res.d2Points : null) : null;
+    // Spieltags-Summe + Mutator-PP: nur die AUFGEDECKTEN Disziplinen zählen. Beides wird
+    // hier statt erst im Row-Render bestimmt, damit die Sortierung denselben Wert nutzt,
+    // der später in der Gesamt-Spalte steht (Anzeige == Sortierschlüssel).
+    const sum = (d1Revealed ? d1Pts ?? 0 : 0) + (d2Revealed ? d2Pts ?? 0 : 0);
+    const mut = mutatorByTeam?.get(s.teamId);
+    const mutPp = (d1Revealed ? mut?.d1Pp ?? 0 : 0) + (d2Revealed ? mut?.d2Pp ?? 0 : 0);
     return {
       teamId: s.teamId,
       currentRank: s.currentRank,
@@ -141,17 +174,14 @@ export default function DisciplineStageMatchdayPanel({
       projectedPoints: s.projectedPoints,
       d1Pts,
       d2Pts,
+      sum,
+      mutPp,
+      total: sum + mutPp,
       missingLineup: res?.missingLineup ?? false,
     };
   });
 
-  // Sortierung: solange d2 verdeckt ist, nach Saison-Rang VOR dem Spieltag (kein Spoiler
-  // durch die projizierte Reihenfolge). Ist d2 aufgedeckt, nach dem projizierten Endrang.
-  rows.sort((a, b) => {
-    const ra = (d2Revealed ? a.projectedRank : a.currentRank) ?? 999;
-    const rb = (d2Revealed ? b.projectedRank : b.currentRank) ?? 999;
-    return ra - rb;
-  });
+  sortMatchdayPanelRows(rows, d2Revealed);
 
   if (rows.length === 0) return null;
 
@@ -215,19 +245,16 @@ export default function DisciplineStageMatchdayPanel({
             const accent = floorTeamAccent(teamPrimaryColor(meta?.code));
             // Rang-Δ (vor → nach) nur zeigen, wenn der finale Rang aufgedeckt ist.
             const rankDelta = d2Revealed && row.currentRank != null && row.projectedRank != null ? row.currentRank - row.projectedRank : null;
-            // Spieltags-Summe: nur die bereits aufgedeckten Disziplinen aufsummieren.
-            const sum = (d1Revealed ? row.d1Pts ?? 0 : 0) + (d2Revealed ? row.d2Pts ?? 0 : 0);
+            // Spieltags-Summe, Mutator-PP und Gesamt kommen aus der Zeile (oben berechnet),
+            // damit die Gesamt-Spalte exakt der Sortierschlüssel ist.
+            const { sum, mutPp, total } = row;
             const sumShown = d1Revealed || d2Revealed;
-            // Mutator-PP (0,3er): nur aufgedeckte Seiten, spielergenau (kein Team-Split).
             const mut = mutatorByTeam?.get(row.teamId);
-            const mutPp = (d1Revealed ? mut?.d1Pp ?? 0 : 0) + (d2Revealed ? mut?.d2Pp ?? 0 : 0);
             const mutPlayers = [...(d1Revealed ? mut?.d1Players ?? [] : []), ...(d2Revealed ? mut?.d2Players ?? [] : [])];
             const hasMut = mutPp > 0.0001;
             const mutatorTitle = hasMut
               ? mutPlayers.map((p) => `${p.name} +${p.pp.toFixed(1)} PP`).join(" · ")
               : "Kein Mutator-Bonus in den aufgedeckten Disziplinen.";
-            // Gesamt = Spieltags-Punkte + Mutator-Bonus (die „6,6 + 0,3"-Rechnung).
-            const total = sum + mutPp;
             return (
               <div
                 key={row.teamId}

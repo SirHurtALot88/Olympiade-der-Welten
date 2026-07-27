@@ -3456,6 +3456,10 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             <span style={{ flex: 1 }} />
             <span style={{ width: 34, textAlign: "right" }}>Zugew.</span>
             <span style={{ minWidth: 34, textAlign: "right" }}>kg</span>
+            {/* Der Gesamtscore erst im Endstand — live wäre er ein Spoiler, weil die
+                Kraft-Turm-Darstellung die wahre Stärke bewusst erst enthüllt, wenn die
+                Latte sie testet. */}
+            {done ? <span style={{ minWidth: 44, textAlign: "right" }}>Score</span> : null}
           </div>
         ) : null}
         <div style={trackLadder ? { position: "relative", height: N * LADDER_ROW_H } : undefined}>
@@ -3557,6 +3561,16 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               </span>
             ) : null}
             <span style={{ fontWeight: 800, fontSize: 12.5, fontVariantNumeric: "tabular-nums", minWidth: 34, textAlign: "right", color: prim === "barbell" ? (bOut ? "var(--nl-mut)" : "var(--nl-warn)") : "inherit" }}>{prim === "barbell" ? bKg : fmt1(dispScore)}</span>
+            {/* Gewichtheben: der kg-Wert ist die Inszenierung, der Gesamtscore die Wertung.
+                Im Endstand stehen beide nebeneinander — vorher blieb der Score unsichtbar. */}
+            {prim === "barbell" && done ? (
+              <span
+                title="Gesamtscore des Teams in dieser Disziplin (Summe aller eingesetzten Spieler)"
+                style={{ minWidth: 44, textAlign: "right", fontSize: 12, fontWeight: 900, fontVariantNumeric: "tabular-nums", color: bOut ? "var(--nl-mut)" : "var(--nl-ink)" }}
+              >
+                {fmt1(dispScore)}
+              </span>
+            ) : null}
             {animField ? (
               <span title="Beitrag des aktuellen Spielers" style={{ width: 30, fontSize: 11, fontWeight: 800, textAlign: "left", fontVariantNumeric: "tabular-nums", color: lastGain != null ? "var(--nl-good)" : "transparent" }}>
                 {lastGain != null ? `+${fmt1(lastGain)}` : ""}
