@@ -20,6 +20,13 @@ export const LIGA = [72, 67, 63, 59, 55, 51, 47, 43, 39];
  * 35 ist der Ansatz fuer den gewoehnlichen Fall in einer schwachen Saison (sf 0.8). Mit 44 klemmte
  * fast jedes Band am unteren Ende fest; im Extremfall (gewoehnlich/sockellastig/Platz 32) kollabierte
  * die Karte auf 44-44 mit Spannweite 0 — dort wirkte weder Kurve noch Klausel noch Sonderziel.
+ *
+ * VERWORFEN: ein Vorschuss-/Tilgungsmodell (Liga zahlt auf, Team schuldet zurueck) war als Loesung
+ * fuer dieselbe Klemme vorgeschlagen. Es ist NICHT umsetzbar — im Spiel fliessen alle Sponsorzahlungen
+ * erst am Saisonende, es gibt keinen unterjaehrigen Zahlungszeitpunkt, an dem ein Vorschuss greifen
+ * koennte, und damit auch keine Tilgungsmechanik. Die Untergrenze bleibt also eine schlichte
+ * Untergrenze auf die Saisonend-Auszahlung; die Klemme wird allein durch ihre Hoehe (35 statt 44)
+ * entschaerft, nicht durch Kreditlogik.
  */
 export const FLOOR = Number(process.env.OLY_SPONSOR_FLOOR ?? 35);
 /**
