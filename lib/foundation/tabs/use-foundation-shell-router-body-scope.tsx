@@ -130,6 +130,8 @@ import { buildPlayerLeagueCareerStatsMap } from "@/lib/foundation/player-league-
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import {
   buildFieldRaceLedger,
+  countPlayedFieldRaceMatchdays,
+  getFieldRaceRankMovement,
   getFieldRaceRecentForm,
   type FieldRaceLedgerEntry,
 } from "@/lib/foundation/build-field-race-ledger";
@@ -7410,15 +7412,21 @@ export function useFoundationShellRouterBodyScope({
     [fieldRaceLedger, selectedTeam?.teamId],
   );
 
-  /** Anzahl bereits gespielter Spieltage der Season (für Frühphasen-Zustände). */
-  const fieldRacePlayedMatchdayCount = fieldRaceLedger.matchdays.length;
+  /** Anzahl bereits GEWERTETER Spieltage (nicht die Länge des Spielplans). */
+  const fieldRacePlayedMatchdayCount = countPlayedFieldRaceMatchdays(fieldRaceLedger);
   const fieldRaceTotalTeams = gameState.teams.length;
 
-  /** Rang-Movement (Δ vs. letzter Spieltag) je Team — letzter Ledger-Eintrag (D4). */
+  /**
+   * Rang-Movement (Δ vs. letztem gewerteten Spieltag) je Team (D4).
+   *
+   * Vorher wurde der LETZTE Ledger-Eintrag gelesen. In einer laufenden Season ist das ein
+   * künftiger Spieltag ohne Punkte — der Rang bleibt gleich, das Delta ist 0. Im Cockpit
+   * stand deshalb "±0", obwohl das Team Plätze verloren hatte.
+   */
   const fieldRaceRankDeltaByTeamId = useMemo(() => {
     const map = new Map<string, number | null>();
-    for (const [teamId, rows] of fieldRaceLedger.rowsByTeamId) {
-      map.set(teamId, rows.length > 0 ? rows[rows.length - 1].rankDeltaVsPrev : null);
+    for (const teamId of fieldRaceLedger.rowsByTeamId.keys()) {
+      map.set(teamId, getFieldRaceRankMovement(fieldRaceLedger, teamId));
     }
     return map;
   }, [fieldRaceLedger]);
