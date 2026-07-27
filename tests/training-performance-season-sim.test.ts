@@ -379,7 +379,22 @@ describe("training performance season simulation", () => {
     // small, expected headroom effect (observed gap ~0.08 on a ~10 total);
     // precision 0 (tolerance 0.5) still enforces "comparably full" credit
     // without being fragile to that per-player headroom drift.
-    expect(coreStrong.appliedPerformanceSetpoints).toBeCloseTo(billoStrong.appliedPerformanceSetpoints, 0);
+    //
+    // NEU: Die Performance-SPs tragen jetzt zusätzlich den (gedämpften)
+    // Potenzial-Gap-Beschleuniger (`getPerformanceGapAccelerator`) — vorher wirkte der
+    // NUR auf das Trainingsbudget. Billo sitzt mit ~40er-Attributen deutlich weiter unter
+    // seinem Potenzial als Core (~50) und bekommt darum bewusst den größeren Aufschlag.
+    // "Praktisch gleich viel Credit" ist damit keine gültige Erwartung mehr. Geprüft wird
+    // jetzt die eigentliche Aussage des Tests: Core bekommt weiterhin einen vollen,
+    // substanziellen Anteil (>= 80 % von Billo) — und die Richtung stimmt, der Spieler mit
+    // der größeren Potenzial-Lücke holt mehr heraus, nicht weniger.
+    expect(coreStrong.appliedPerformanceSetpoints).toBeGreaterThan(0);
+    expect(billoStrong.appliedPerformanceSetpoints).toBeGreaterThanOrEqual(
+      coreStrong.appliedPerformanceSetpoints,
+    );
+    expect(coreStrong.appliedPerformanceSetpoints).toBeGreaterThanOrEqual(
+      billoStrong.appliedPerformanceSetpoints * 0.8,
+    );
   });
 
   it("applies full performance but less training when core player is near attribute ceiling", () => {

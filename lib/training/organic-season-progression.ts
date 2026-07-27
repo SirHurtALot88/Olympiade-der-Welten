@@ -88,6 +88,11 @@ export type OrganicSeasonProgressionResult = {
   fatigueLoad: number;
   potentialRating: number | null;
   potentialTrainingMultiplier: number;
+  /**
+   * Gedämpfter Anteil des Potenzial-Gap-Beschleunigers, der zusätzlich auf die
+   * Performance-SPs wirkt (>= 1). Siehe `getPerformanceGapAccelerator`.
+   */
+  performanceGapAccelerator: number;
   traitTrainingMultiplier: number;
   traitModifierPct: number;
   traitBreakdown: Array<{
@@ -427,6 +432,42 @@ export const ORGANIC_GAP_ACCEL_SLOPE = Number(process.env.OLY_ORGANIC_GAP_ACCEL_
 export const ORGANIC_GAP_ACCEL_CAP = Number(process.env.OLY_ORGANIC_GAP_ACCEL_CAP ?? 2.6) || 2.6;
 export const ORGANIC_PO_STEEP_DIVISOR = Number(process.env.OLY_ORGANIC_PO_STEEP_DIVISOR ?? 110) || 110;
 
+/**
+ * Der Gap-Beschleuniger (`getPotentialTrainingMultiplierFromRecord`) hat bislang AUSSCHLIESSLICH
+ * das Trainingsbudget skaliert. Spieler weit unter ihrem Potenzial entwickelten sich also nur über
+ * das Training schneller — ihre im Wettkampf verdienten Performance-SPs liefen ohne jede
+ * Beschleunigung durch. Auf der Performance-Seite gab es lediglich UNTERGRENZEN
+ * (`*_POTENTIAL_GAP_PERFORMANCE_GROWTH_FLOOR`, max. 0,78), die nur verhindern, dass die
+ * Decken-Drossel zu stark bremst — sie können nie über 1,0 hinaus beschleunigen.
+ *
+ * Jetzt wirkt derselbe Beschleuniger auch auf die Performance-SPs, aber bewusst GEDÄMPFT:
+ * die Performance ist inzwischen der größere der beiden Kanäle (s. PERFORMANCE_WEIGHT_*),
+ * ein 1:1-Durchreichen des bis zu ~3,3-fachen Trainings-Beschleunigers würde den Liga-Median
+ * und damit die Marktwert-Ökonomie kippen. Deshalb nur der halbe Aufschlag, hart gedeckelt.
+ * Beides über ENV nachjustierbar wie die übrigen Organic-Konstanten.
+ */
+export const ORGANIC_PERFORMANCE_GAP_ACCEL_SHARE =
+  Number(process.env.OLY_ORGANIC_PERFORMANCE_GAP_ACCEL_SHARE ?? 0.5) || 0.5;
+export const ORGANIC_PERFORMANCE_GAP_ACCEL_CAP =
+  Number(process.env.OLY_ORGANIC_PERFORMANCE_GAP_ACCEL_CAP ?? 1.8) || 1.8;
+
+/**
+ * Trainings-Beschleuniger → gedämpfter Performance-Beschleuniger. Immer >= 1 (nie eine Bremse),
+ * und bei Spielern ohne Potenzial-Lücke exakt 1 — für die ändert sich also gar nichts.
+ */
+export function getPerformanceGapAccelerator(potentialTrainingMultiplier: number): number {
+  if (!isFiniteNumber(potentialTrainingMultiplier) || potentialTrainingMultiplier <= 1) {
+    return 1;
+  }
+  return roundValue(
+    Math.min(
+      ORGANIC_PERFORMANCE_GAP_ACCEL_CAP,
+      1 + (potentialTrainingMultiplier - 1) * ORGANIC_PERFORMANCE_GAP_ACCEL_SHARE,
+    ),
+    3,
+  );
+}
+
 function getPotentialTrainingMultiplierFromRecord(gameState: GameState, player: Player) {
   const record = resolvePlayerPotentialRecordFromGameState({ gameState, playerId: player.id });
   const potential =
@@ -725,6 +766,8 @@ function getOrganicPerformanceGrowthMultiplier(input: {
   affinityProfile: AttributeAffinityProfile;
   signals: SeasonPerformanceSignals;
   potentialGapStars: number;
+  /** Gedämpfter Potenzial-Gap-Beschleuniger (>= 1), s. getPerformanceGapAccelerator. */
+  gapAccelerator: number;
 }) {
   const affinity = getAttributeAffinityKind(input.attribute, input.affinityProfile);
   const headroom = getAttributeHeadroom({
@@ -732,10 +775,14 @@ function getOrganicPerformanceGrowthMultiplier(input: {
     attribute: input.attribute,
     record: input.record,
   });
-  const multiplier = getOrganicGrowthMultiplier(affinity) * getPerformanceHeadroomGrowthMultiplier(headroom.headroom);
-  if (input.signals.appearances < 4) return multiplier;
+  const base = getOrganicGrowthMultiplier(affinity) * getPerformanceHeadroomGrowthMultiplier(headroom.headroom);
   // A genuinely capped attribute never gets a bailout — the individual cap always wins.
-  if (headroom.state === "capped") return multiplier;
+  // Das gilt auch für den Gap-Beschleuniger: an der eigenen Decke wird nichts beschleunigt.
+  if (headroom.state === "capped") return base;
+  // Der Beschleuniger greift unabhängig von der Einsatzzahl: er skaliert nur tatsächlich
+  // erspielte SPs, ist also — anders als die Untergrenzen unten — nicht cheese-anfällig.
+  const multiplier = base * input.gapAccelerator;
+  if (input.signals.appearances < 4) return multiplier;
 
   const avgBudget = input.signals.avgPerformanceBudget;
   const gapStars = input.potentialGapStars;
@@ -815,6 +862,9 @@ export function buildOrganicSeasonProgression(input: {
       fatigueLoad: 0,
       potentialRating: isFiniteNumber(input.player.potential) && input.player.potential > 0 ? input.player.potential : null,
       potentialTrainingMultiplier: getPotentialTrainingMultiplierFromRecord(input.gameState, input.player),
+      performanceGapAccelerator: getPerformanceGapAccelerator(
+        getPotentialTrainingMultiplierFromRecord(input.gameState, input.player),
+      ),
       traitTrainingMultiplier: 1,
       traitModifierPct: 0,
       traitBreakdown: [],
@@ -911,8 +961,11 @@ export function buildOrganicSeasonProgression(input: {
             ? 1.06
             : 1
       : 1;
-  const potentialTrainingMultiplier =
-    getPotentialTrainingMultiplierFromRecord(input.gameState, input.player) * talentBuilderPotentialFactor;
+  const globalPotentialAccelerator = getPotentialTrainingMultiplierFromRecord(input.gameState, input.player);
+  const potentialTrainingMultiplier = globalPotentialAccelerator * talentBuilderPotentialFactor;
+  // Bewusst NUR der globale Beschleuniger: der talent_builder-Aufschlag bleibt ein reiner
+  // Trainings-Perk dieses GM-Archetyps und soll sich nicht still in einen zweiten Kanal ausweiten.
+  const performanceGapAccelerator = getPerformanceGapAccelerator(globalPotentialAccelerator);
   const baseTrainingBudget =
     input.accumulatedBaseTrainingBudget != null && Number.isFinite(input.accumulatedBaseTrainingBudget)
       ? input.accumulatedBaseTrainingBudget
@@ -1005,6 +1058,7 @@ export function buildOrganicSeasonProgression(input: {
       affinityProfile,
       signals: performanceSignals,
       potentialGapStars: starSnapshot.potentialGap,
+      gapAccelerator: performanceGapAccelerator,
     });
     // B1: headroom-aware regression — a capped/closing attribute plateaus instead of eroding at full
     // speed (mirror of the growth throttle, but gentle). Open attributes keep full regression.
@@ -1120,6 +1174,7 @@ export function buildOrganicSeasonProgression(input: {
     ),
     potentialRating,
     potentialTrainingMultiplier,
+    performanceGapAccelerator,
     traitTrainingMultiplier: traitSignal.trainingTraitMultiplier,
     traitModifierPct: roundValue((traitSignal.trainingTraitMultiplier - 1) * 100, 1),
     traitBreakdown: traitSignal.breakdown.map((entry) => ({
