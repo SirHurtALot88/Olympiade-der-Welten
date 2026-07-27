@@ -364,6 +364,17 @@ export default function SeasonStandingsNewLook({
     ? `Bereichspunkte ${datenChartMetric.label} je Team, folgt der aktiven Tabellensortierung (dein Team hervorgehoben)`
     : "Punkte je Team, in der Reihenfolge der Tabelle darunter (dein Team hervorgehoben)";
 
+  /**
+   * Trägt das Balkenchart überhaupt eine Aussage? Vor dem ersten gewerteten Spieltag steht
+   * jedes Team bei 0 — dann bleibt vom Chart nur eine Reihe Nullen über den Teamkürzeln
+   * übrig, die eine volle Bildschirmhöhe kostet, ohne etwas zu zeigen. In dem Fall wird es
+   * ausgeblendet; sobald irgendein Team einen Wert hat, erscheint es wieder.
+   */
+  const datenChartHasData = useMemo(
+    () => datenChartBars.some((bar) => Number.isFinite(bar.value) && bar.value !== 0),
+    [datenChartBars],
+  );
+
   function toggleExpanded(teamId: string) {
     setExpandedTeamId((current) => (current === teamId ? null : teamId));
   }
@@ -810,6 +821,10 @@ export default function SeasonStandingsNewLook({
    * dieser Spalte um (`datenChartMetric`/`datenChartBars`, s.o.).
    */
   function renderDatenChart() {
+    // Ohne Werte kein Chart — sonst steht nur eine Nullen-Reihe über den Teamkürzeln.
+    if (!datenChartHasData) {
+      return null;
+    }
     return (
       <div className="nl-standings-daten-chart-scroll">
         <NlBarChart
