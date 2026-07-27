@@ -16,7 +16,7 @@
 import {
   TIERS, tierOf, LIGA, FLOOR_ABSOLUT, floorAt, RARITY_MULT, RARITY_ORDER, POOL_EVEN_SHARE,
   TARGET_GAMMA, rel, CLAUSE_S_REPR, CLAUSE_P_REPR, clauseBonus, clauseMalus,
-  SIGMA, CORRIDOR, dist, PROFILES, profileByName, cardTargets,
+  SIGMA, CORRIDOR, dist, PROFILES, profileByName, cardTargets, P_GOAL, goalPayout,
 } from "./sponsor-model-params";
 
 export { TIERS, tierOf, LIGA, dist };
@@ -43,16 +43,22 @@ for (let ti = 0; ti < TIERS.length; ti += 1) {
     // cal so, dass der Rangteil im Mittel das Leiterziel trifft (geschlossene Loesung)
     const raw = w.reduce((a, wi, i) => a + wi * (LIGA[tierOf(i + 1)]! + rel(ti - tierOf(i + 1))), 0);
     const cal = ladderTarget - raw;
+    // Sonderziel als LOTTERIE, nicht als Zuschlag: es zahlt `EV / P_GOAL` oder nichts. Vorher stand
+    // hier der Erwartungswert im BESTEN Ausgang — das Band war oben zu schmal und unten zu breit.
+    const goalPay = goalPayout(special, P_GOAL);
+    const corners = (v: number) => [
+      { v: Math.max(FLOOR, v + CLAUSE_BONUS + goalPay), p: CLAUSE_P_REPR * P_GOAL },
+      { v: Math.max(FLOOR, v + CLAUSE_BONUS),           p: CLAUSE_P_REPR * (1 - P_GOAL) },
+      { v: Math.max(FLOOR, v - CLAUSE_MALUS + goalPay), p: (1 - CLAUSE_P_REPR) * P_GOAL },
+      { v: Math.max(FLOOR, v - CLAUSE_MALUS),           p: (1 - CLAUSE_P_REPR) * (1 - P_GOAL) },
+    ];
     const band: number[] = [];
     for (let r = Math.max(1, e - CORRIDOR); r <= Math.min(32, e + CORRIDOR); r += 1) {
-      const v = LIGA[tierOf(r)]! + rel(ti - tierOf(r)) + cal;
-      band.push(Math.max(FLOOR, v + CLAUSE_BONUS + special));
-      band.push(Math.max(FLOOR, v - CLAUSE_MALUS));
+      for (const c of corners(LIGA[tierOf(r)]! + rel(ti - tierOf(r)) + cal)) band.push(c.v);
     }
     const ev = w.reduce((a, wi, i) => {
       const v = LIGA[tierOf(i + 1)]! + rel(ti - tierOf(i + 1)) + cal;
-      return a + wi * (CLAUSE_P_REPR * Math.max(FLOOR, v + CLAUSE_BONUS + special)
-                     + (1 - CLAUSE_P_REPR) * Math.max(FLOOR, v - CLAUSE_MALUS));
+      return a + wi * corners(v).reduce((a2, c) => a2 + c.p * c.v, 0);
     }, 0);
     const lo = Math.min(...band), hi = Math.max(...band);
     return `${ev.toFixed(0)}   ${lo.toFixed(0)}–${hi.toFixed(0)} (${(hi - lo).toFixed(0)})`.padStart(26);

@@ -37,6 +37,7 @@ import {
   TIERS, tierOf, LIGA, floorAt, FLOOR_ABSOLUT, RARITY_MULT, POOL_EVEN_SHARE, BASE_SPECIAL,
   TARGET_GAMMA, TARGET_EV_SHAPE, poolFor, rel as relRepr, clauseBonus, clauseMalus,
   SIGMA, CORRIDOR, dist as distOf, corridorOf, PROFILES, profileByName, cardTargets,
+  P_GOAL, goalPayout,
   SALARY_SUM_S1, SALARY_TOP, SALARY_MIN, salaryAtRank,
 } from "./sponsor-model-params";
 
@@ -279,16 +280,58 @@ const specialEvFor = (tier: number) => cardTargets(RARITY, PROFILE, tier).specia
  */
 const TARGET_EV = TIERS.map((_, i) => cardTargets(RARITY, PROFILE, i).ladder);
 
-/** EV inklusive Untergrenze und Klausel. */
-function ev(t: SponsorType, expected: number, cal: number) {
-  return distribution(expected).reduce(
-    (acc, w, i) =>
-      acc + w * (t.clause.p * withFloor(rankPart(t, expected, i + 1, cal) + t.clause.bonus)
-               + (1 - t.clause.p) * withFloor(rankPart(t, expected, i + 1, cal) - t.clause.malus)),
+/**
+ * VOLLES Kalibrierziel: Leiter + Klausel + SONDERZIEL. Vorher kalibrierte dieses Skript nur die
+ * Leiter (1+2+4) und liess das Sonderziel danebenlaufen — bei einem zielschweren Profil sind das
+ * 70 % des Pools, die nie in die Pruefung eingingen.
+ */
+const TARGET_CARD_EV = TIERS.map((_, i) => TARGET_EV[i]! + specialEvFor(i));
+
+/**
+ * SONDERZIEL ALS LOTTERIE (Auflage b des Balancing-Audits).
+ *
+ * Vorher tauchte das Sonderziel im Fallen-Test nur als Erwartungswert auf. Das ist falsch, seit die
+ * Verteilungsprofile bis zu 70 % des Budgets dorthin schieben: zwei Karten mit gleichem EV, aber
+ * 15 % gegen 70 % Zielanteil, haben voellig verschiedene Auszahlungsverteilungen. Der Test sah
+ * davon nichts.
+ *
+ * Auszahlung des Ziels = EV / P_GOAL (gedeckelt, wie in sponsor-objective-pricing.ts).
+ */
+const goalPayFor = (tier: number) => goalPayout(specialEvFor(tier), P_GOAL);
+
+/** Eine der vier Auszahlungsecken: Klausel erfuellt/verletzt x Sonderziel erreicht/verfehlt. */
+const payoutAt = (t: SponsorType, expected: number, final: number, cal: number, met: boolean, goal: boolean) =>
+  withFloor(rankPart(t, expected, final, cal)
+    + (met ? t.clause.bonus : -t.clause.malus)
+    + (goal ? goalPayFor(tierOf(expected)) : 0));
+
+/** Die vier Ecken samt Wahrscheinlichkeiten fuer einen konkreten Endrang. */
+const cornersAt = (t: SponsorType, expected: number, final: number, cal: number, pClause = t.clause.p, pGoal = P_GOAL) => [
+  { v: payoutAt(t, expected, final, cal, true, true),   p: pClause * pGoal },
+  { v: payoutAt(t, expected, final, cal, true, false),  p: pClause * (1 - pGoal) },
+  { v: payoutAt(t, expected, final, cal, false, true),  p: (1 - pClause) * pGoal },
+  { v: payoutAt(t, expected, final, cal, false, false), p: (1 - pClause) * (1 - pGoal) },
+];
+
+/** EV der GANZEN Karte inklusive Untergrenze, Klausel und Sonderziel. */
+function ev(t: SponsorType, expected: number, cal: number, sigma: number = SIGMA, pClause = t.clause.p) {
+  return distribution(expected, sigma).reduce(
+    (acc, w, i) => acc + w * cornersAt(t, expected, i + 1, cal, pClause).reduce((a2, c) => a2 + c.p * c.v, 0),
     0,
   );
 }
-const meanEv = (t: SponsorType, cal: number) => EXPECTED.reduce((a, e) => a + ev(t, e, cal), 0) / EXPECTED.length;
+/** Standardabweichung der GANZEN Karte ueber Endrang x Klausel x Sonderziel. */
+function sdOf(t: SponsorType, expected: number, cal: number, sigma: number = SIGMA, pClause = t.clause.p) {
+  const m = ev(t, expected, cal, sigma, pClause);
+  const v = distribution(expected, sigma).reduce(
+    (acc, w, i) => acc + w * cornersAt(t, expected, i + 1, cal, pClause).reduce((a2, c) => a2 + c.p * (c.v - m) ** 2, 0),
+    0,
+  );
+  return Math.sqrt(v);
+}
+/** Erwartete Auszahlung bei EINEM festen Endrang (ueber Klausel x Sonderziel gemittelt). */
+const meanPayoutAt = (t: SponsorType, expected: number, final: number, cal: number) =>
+  cornersAt(t, expected, final, cal).reduce((a, c) => a + c.p * c.v, 0);
 
 /**
  * Offsets kalibrieren — PRO ERWARTUNGSSTUFE, nicht global.
@@ -307,7 +350,7 @@ export function calibrateOffsets(): Map<string, number> {
   for (const t of SPONSOR_TYPES) {
     for (const e of EXPECTED) {
       const tier = tierOf(e);
-      const target = TARGET_EV[tier]!;
+      const target = TARGET_CARD_EV[tier]!;
       // ev(t, e, cal) ist streng monoton steigend in cal → Bisektion liefert die eindeutige Loesung.
       let lo = -200, hi = 200;
       for (let i = 0; i < 120; i += 1) {
@@ -337,30 +380,24 @@ const offsetFor = (name: string, expectedRank: number) => CAL_RAW.get(`${name}:$
  * Je Endrang ist die Auszahlung eine Zwei-Punkt-Lotterie (Klausel erfuellt / verletzt). A dominiert
  * B, wenn A das fuer JEDEN erreichbaren Rang tut und fuer mindestens einen strikt.
  */
-type Lottery = { hi: number; lo: number; p: number };
+/**
+ * Eine Lotterie ist jetzt eine LISTE von Auszahlungsecken, nicht mehr ein Zwei-Punkt-Paar:
+ * Klausel (erfuellt/verletzt) x Sonderziel (erreicht/verfehlt) = 4 Ecken je Endrang.
+ */
+type Lottery = { outcomes: Array<{ v: number; p: number }> };
+const cdfAt = (l: Lottery, x: number) => l.outcomes.reduce((a, o) => a + (o.v <= x + 1e-9 ? o.p : 0), 0);
+const support = (a: Lottery, b: Lottery) => [...a.outcomes.map((o) => o.v), ...b.outcomes.map((o) => o.v)];
 function fosdAtLeast(a: Lottery, b: Lottery): boolean {
-  for (const x of [a.lo, a.hi, b.lo, b.hi]) {
-    const ca = (a.lo <= x ? 1 - a.p : 0) + (a.hi <= x ? a.p : 0);
-    const cb = (b.lo <= x ? 1 - b.p : 0) + (b.hi <= x ? b.p : 0);
-    if (ca > cb + 1e-9) return false; // A haeuft mehr Masse unterhalb x -> nicht besser
-  }
+  for (const x of support(a, b)) if (cdfAt(a, x) > cdfAt(b, x) + 1e-9) return false; // A haeuft mehr Masse unterhalb x
   return true;
 }
 function fosdStrictly(a: Lottery, b: Lottery): boolean {
-  for (const x of [a.lo, a.hi, b.lo, b.hi]) {
-    const ca = (a.lo <= x ? 1 - a.p : 0) + (a.hi <= x ? a.p : 0);
-    const cb = (b.lo <= x ? 1 - b.p : 0) + (b.hi <= x ? b.p : 0);
-    if (ca < cb - 1e-9) return true;
-  }
+  for (const x of support(a, b)) if (cdfAt(a, x) < cdfAt(b, x) - 1e-9) return true;
   return false;
 }
-/** Lotterien eines Sponsors ueber den erreichbaren Korridor. */
-function lotteries(t: SponsorType, expected: number, cal: number, band: number[]): Lottery[] {
-  return band.map((r) => ({
-    hi: withFloor(rankPart(t, expected, r, cal) + t.clause.bonus),
-    lo: withFloor(rankPart(t, expected, r, cal) - t.clause.malus),
-    p: t.clause.p,
-  }));
+/** Lotterien eines Sponsors ueber den erreichbaren Korridor — 4 Ecken je Endrang. */
+function lotteries(t: SponsorType, expected: number, cal: number, band: number[], pClause = t.clause.p): Lottery[] {
+  return band.map((r) => ({ outcomes: cornersAt(t, expected, r, cal, pClause) }));
 }
 /** Ist `a` eine Falle, also von irgendeinem `others`-Eintrag rang-konditional FOSD-dominiert? */
 function isTrap(a: { name: string; lot: Lottery[] }, others: Array<{ name: string; lot: Lottery[] }>): boolean {
@@ -377,7 +414,7 @@ function isTrap(a: { name: string; lot: Lottery[] }, others: Array<{ name: strin
  * Karten kollabiert sind.
  */
 const isCollapsed = (a: { lot: Lottery[] }): boolean => {
-  const vals = a.lot.flatMap((l) => [l.hi, l.lo]);
+  const vals = a.lot.flatMap((l) => l.outcomes.map((o) => o.v));
   return Math.max(...vals) - Math.min(...vals) < 1e-6;
 };
 
@@ -389,7 +426,8 @@ line();
 console.log("Leiter 1 (Liga, absolut):", TIERS.map((t, i) => `${t.label}=${LIGA[i]}`).join("  "));
 console.log(`Untergrenze ${FLOOR} C (Rarity-Staffel 38/40/42/45, absolut min ${FLOOR_ABSOLUT}) · Rarity ${RARITY} (Pool ${POOL >= 0 ? "+" : ""}${POOL.toFixed(0)} C, Gleichanteil ${(POOL_EVEN_SHARE * 100).toFixed(0)} %)`);
 console.log(`Profil ${PROFILE.name} (${PROFILE.note}) · Steilheit ${TARGET_GAMMA} · sigma ${SIGMA} · Korridor ±${CORRIDOR} Raenge`);
-console.log(`Ziel-EV je Stufe: ${TARGET_EV.map((v, i) => `${TIERS[i]!.label} ${v.toFixed(0)}`).join("  ")}\n`);
+console.log(`Ziel-EV je Stufe (ganze Karte inkl. Sonderziel): ${TARGET_CARD_EV.map((v, i) => `${TIERS[i]!.label} ${v.toFixed(0)}`).join("  ")}`);
+console.log(`Sonderziel als Lotterie: P ${P_GOAL} — Auszahlung ${TIERS.map((_, i) => goalPayFor(i).toFixed(0)).join("/")} statt EV ${TIERS.map((_, i) => specialEvFor(i).toFixed(0)).join("/")}\n`);
 console.log("  " + "Typ".padEnd(16) + "Offset E#2…E#30".padStart(12) + "   Klausel");
 for (const t of SPONSOR_TYPES) {
   console.log("  " + t.name.padEnd(16) + `${offsetFor(t.name, 2).toFixed(1)}…${offsetFor(t.name, 30).toFixed(1)}`.padStart(12) + `   +${t.clause.bonus}/−${t.clause.malus}  ${t.clause.label}`);
@@ -401,15 +439,7 @@ for (const e of EXPECTED) {
   const band = corridorOf(e);
   const rows = SPONSOR_TYPES.map((t) => {
     const c = offsetFor(t.name, e);
-    const lot = lotteries(t, e, c, band);
-    const e0 = ev(t, e, c);
-    const d = distribution(e);
-    let v = 0;
-    d.forEach((w, i) => {
-      v += w * t.clause.p * (withFloor(rankPart(t, e, i + 1, c) + t.clause.bonus) - e0) ** 2
-         + w * (1 - t.clause.p) * (withFloor(rankPart(t, e, i + 1, c) - t.clause.malus) - e0) ** 2;
-    });
-    return { name: t.name, ev: e0, sd: Math.sqrt(v), lot };
+    return { name: t.name, ev: ev(t, e, c), sd: sdOf(t, e, c), lot: lotteries(t, e, c, band) };
   });
   const traps = rows.filter((a) => isTrap(a, rows));
   const dead = rows.filter(isCollapsed);
@@ -464,11 +494,13 @@ console.log(`\nZIELPRÜFUNG (salaryFactor 1.0) — Meister typisch 90–100 · L
 let goalsOk = true;
 for (const t of SPONSOR_TYPES) {
   const c = offsetFor(t.name, 3);
-  const champ = withFloor(rankPart(t, 3, 1, c) + clauseEv(t) + specialEvFor(tierOf(1)));
-  const jackpot = withFloor(rankPart(t, 3, 1, c) + t.clause.bonus + 12);
+  // Erwartete Auszahlung ueber Klausel x Sonderziel — vorher wurde clauseEv (exakt 0) und der
+  // Sonderziel-EV additiv drangehaengt, was die Untergrenze umging.
+  const champ = meanPayoutAt(t, 3, 1, c);
+  const jackpot = payoutAt(t, 3, 1, c, true, true);
   const cb = offsetFor(t.name, 30);
-  const botBad = withFloor(rankPart(t, 30, 32, cb) - t.clause.malus);
-  const botGood = withFloor(rankPart(t, 30, 32, cb) + t.clause.bonus + 12);
+  const botBad = payoutAt(t, 30, 32, cb, false, false);
+  const botGood = payoutAt(t, 30, 32, cb, true, true);
   // Toleranz nach oben: der Typ mit dem höchsten Risiko darf beim Titelgewinn knapp über 100 landen —
   // das ist genau sein Jackpot-Fall und thematisch gewollt. Untergrenze 90 gilt strikt für JEDEN Typ.
   const ok = champ >= 90 && champ <= 101 && botBad >= SALARY_MIN;
@@ -546,7 +578,6 @@ const tiltAt = (rank: number, sf: number) =>
  * Rarity-Mix (die Mehrheit magisch, wenige selten/legendaer) verschiebt die Summe leicht nach oben.
  */
 const cardEvLeague = (tier: number) => TARGET_EV_SHAPE[tier]!;
-const specialEvLeague = (tier: number) => cardEvLeague(tier) * BASE_SPECIAL;
 /**
  * Liga-Standard-Offsets EINMAL vorberechnet. Zuvor stand die Bisektion in teamPayout — das laeuft
  * innerhalb der Bisektion von solveK und liess das Skript ins Timeout rennen.
@@ -554,7 +585,7 @@ const specialEvLeague = (tier: number) => cardEvLeague(tier) * BASE_SPECIAL;
 const LEAGUE_OFFSET = (() => {
   const m = new Map<string, number>();
   for (const t of SPONSOR_TYPES) for (let rank = 1; rank <= 32; rank += 1) {
-    const target = cardEvLeague(tierOf(rank)) * (1 - BASE_SPECIAL);
+    const target = cardEvLeague(tierOf(rank));
     let lo = -200, hi = 200;
     for (let i = 0; i < 90; i += 1) { const mid = (lo + hi) / 2; if (ev(t, rank, mid) < target) lo = mid; else hi = mid; }
     m.set(`${t.name}:${rank}`, (lo + hi) / 2);
@@ -562,7 +593,7 @@ const LEAGUE_OFFSET = (() => {
   return m;
 })();
 function teamPayout(t: SponsorType, rank: number, k: number, fl: number, sf: number) {
-  const base = rankPart(t, rank, rank, LEAGUE_OFFSET.get(`${t.name}:${rank}`) ?? 0) + clauseEv(t) + specialEvLeague(tierOf(rank));
+  const base = meanPayoutAt(t, rank, rank, LEAGUE_OFFSET.get(`${t.name}:${rank}`) ?? 0);
   return fl + (base - FLOOR) * k * tiltAt(rank, sf);
 }
 const leagueSum = (k: number, fl: number, sf: number) =>
@@ -630,14 +661,8 @@ for (const t of SPONSOR_TYPES) {
     const c = offsetFor(t.name, e);
     const band = corridorOf(e);
     const lot = lotteries(t, e, c, band);
-    const e0 = ev(t, e, c); const d = distribution(e);
-    let v = 0;
-    d.forEach((w, i) => {
-      v += w * t.clause.p * (withFloor(rankPart(t, e, i + 1, c) + t.clause.bonus) - e0) ** 2
-         + w * (1 - t.clause.p) * (withFloor(rankPart(t, e, i + 1, c) - t.clause.malus) - e0) ** 2;
-    });
-    const vals = lot.flatMap((l) => [l.hi, l.lo]);
-    return `${Math.min(...vals).toFixed(0)}–${Math.max(...vals).toFixed(0)}`.padStart(12) + `  σ${Math.sqrt(v).toFixed(1)}`.padStart(8);
+    const vals = lot.flatMap((l) => l.outcomes.map((o) => o.v));
+    return `${Math.min(...vals).toFixed(0)}–${Math.max(...vals).toFixed(0)}`.padStart(12) + `  σ${sdOf(t, e, c).toFixed(1)}`.padStart(8);
   });
   console.log("  " + t.name.padEnd(18) + "│" + cells.map((c) => c.padEnd(28)).join("│"));
 }
@@ -669,49 +694,34 @@ if (process.env.OLY_SPONSOR_STRESS === "1") {
    * Ergebnisstreuung gegenueber der Kalibrierannahme.
    */
   function analyse(types: SponsorType[], sigma: number, pShift: number) {
-    const dist2 = (e: number) => {
-      const w: number[] = [];
-      for (let r = 1; r <= 32; r += 1) w.push(Math.exp(-((r - e) ** 2) / (2 * sigma * sigma)));
-      const su = w.reduce((x, y) => x + y, 0);
-      return w.map((x) => x / su);
-    };
     const pTrue = (t: SponsorType) => Math.min(0.97, Math.max(0.03, t.clause.p + pShift));
-    const evTrue = (t: SponsorType, e: number, cal: number) => {
-      const pt = pTrue(t);
-      return dist2(e).reduce((acc, w, i) =>
-        acc + w * (pt * withFloor(rankPart(t, e, i + 1, cal) + t.clause.bonus)
-                 + (1 - pt) * withFloor(rankPart(t, e, i + 1, cal) - t.clause.malus)), 0);
-    };
-    // Kalibrierung EXAKT wie in der Produktion: Bisektion auf TARGET_EV, mit dem DESIGN-p.
+    // Kalibrierung EXAKT wie in der Produktion: Bisektion auf das VOLLE Kartenziel, mit dem DESIGN-p.
     const cal = new Map<string, number>();
     for (const t of types) for (const e of EXPECTED) {
       const tier = tierOf(e); let lo = -200, hi = 200;
-      for (let i = 0; i < 120; i += 1) { const m = (lo + hi) / 2; if (ev(t, e, m) < TARGET_EV[tier]!) lo = m; else hi = m; }
+      for (let i = 0; i < 120; i += 1) { const m = (lo + hi) / 2; if (ev(t, e, m) < TARGET_CARD_EV[tier]!) lo = m; else hi = m; }
       cal.set(`${t.name}:${tier}`, (lo + hi) / 2);
     }
     const at = (t: SponsorType, e: number) => cal.get(`${t.name}:${tierOf(e)}`) ?? 0;
-    let traps = 0, spread = 0, sdLo = Infinity, sdHi = 0;
+    let traps = 0, dead = 0, spread = 0, sdLo = Infinity, sdHi = 0;
     for (let e = 1; e <= 32; e += 1) {
       const band = corridorOf(e);
       const rows = types.map((t) => {
-        const c = at(t, e); const e0 = evTrue(t, e, c); const d = dist2(e); const pt = pTrue(t);
-        let v = 0;
-        d.forEach((w, i) => {
-          v += w * pt * (withFloor(rankPart(t, e, i + 1, c) + t.clause.bonus) - e0) ** 2
-             + w * (1 - pt) * (withFloor(rankPart(t, e, i + 1, c) - t.clause.malus) - e0) ** 2;
-        });
-        return { name: t.name, ev: e0, sd: Math.sqrt(v), lot: lotteries(t, e, c, band) };
+        const c = at(t, e), pt = pTrue(t);
+        return { name: t.name, ev: ev(t, e, c, sigma, pt), sd: sdOf(t, e, c, sigma, pt),
+                 lot: lotteries(t, e, c, band, pt) };
       });
       const evs = rows.map((r) => r.ev);
       spread = Math.max(spread, Math.max(...evs) / Math.min(...evs) - 1);
       sdLo = Math.min(sdLo, ...rows.map((r) => r.sd)); sdHi = Math.max(sdHi, ...rows.map((r) => r.sd));
       traps += rows.filter((a2) => isTrap(a2, rows)).length;
+      dead += rows.filter(isCollapsed).length;
     }
-    return { traps, spread, sdLo, sdHi };
+    return { traps, dead, spread, sdLo, sdHi };
   }
 
-  const fmt = (r: { traps: number; spread: number; sdLo: number; sdHi: number }) =>
-    `Fallen ${String(r.traps).padStart(3)}  EV-Spread ${(r.spread * 100).toFixed(1).padStart(5)} %  sigma ${r.sdLo.toFixed(1)}–${r.sdHi.toFixed(1)}`;
+  const fmt = (r: { traps: number; dead: number; spread: number; sdLo: number; sdHi: number }) =>
+    `Fallen ${String(r.traps).padStart(3)}  EV-Spread ${(r.spread * 100).toFixed(1).padStart(5)} %  sigma ${r.sdLo.toFixed(1)}–${r.sdHi.toFixed(1)}  kollabiert ${String(r.dead).padStart(4)}`;
 
   console.log("\n  A) Alle Kombinationen, Designannahmen");
   console.log(`     ${fmt(analyse(ALL, SIGMA, 0))}`);
@@ -751,7 +761,7 @@ if (process.env.OLY_SPONSOR_TRAPS === "1") {
   const cal2 = new Map<string, number>();
   for (const t of ALL2) for (const e of EXPECTED) {
     const tier = tierOf(e); let lo = -200, hi = 200;
-    for (let i = 0; i < 120; i += 1) { const m = (lo + hi) / 2; if (ev(t, e, m) < TARGET_EV[tier]!) lo = m; else hi = m; }
+    for (let i = 0; i < 120; i += 1) { const m = (lo + hi) / 2; if (ev(t, e, m) < TARGET_CARD_EV[tier]!) lo = m; else hi = m; }
     cal2.set(`${t.name}:${tier}`, (lo + hi) / 2);
   }
   const found = new Map<string, number[]>();

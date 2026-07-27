@@ -119,6 +119,21 @@ export const clauseMalus = (s: number, p: number): number => s * p;
 export const CLAUSE_S_REPR = 11;
 export const CLAUSE_P_REPR = 0.5;
 
+// ── Leiter 3: Sonderziel ───────────────────────────────────────────────────────────────────────
+/**
+ * Das Sonderziel ist eine LOTTERIE, kein Zuschlag: mit Wahrscheinlichkeit P_GOAL zahlt es
+ * `EV / P_GOAL`, sonst nichts. Der Fallen-Test hat es frueher nur als Erwartungswert gefuehrt —
+ * das war falsch, seit die Verteilungsprofile bis zu 70 % des Budgets dorthin schieben.
+ *
+ * P_GOAL ist eine DESIGN-SCHAETZUNG (Mitte des Bandes 0.15-0.72 aus sponsor-objective-pricing.ts)
+ * und der groesste ungemessene Parameter des Entwurfs.
+ */
+export const P_GOAL = Number(process.env.OLY_SPONSOR_PGOAL ?? 0.45);
+/** Deckel wie in sponsor-objective-pricing.ts: ohne ihn dominiert der Tail sehr schwerer Ziele. */
+export const GOAL_REWARD_CAP = 4.0;
+export const goalPayout = (evTarget: number, p: number = P_GOAL): number =>
+  evTarget * Math.min(GOAL_REWARD_CAP, 1 / Math.max(p, 1e-6));
+
 // ── Ergebnisstreuung und erreichbarer Korridor ─────────────────────────────────────────────────
 /** Streuung der Endraenge um den Erwartungsrang. GESETZT, nicht gemessen — traegt das Ergebnis. */
 export const SIGMA = 5.5;

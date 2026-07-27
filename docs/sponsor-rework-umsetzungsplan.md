@@ -237,6 +237,37 @@ daraus. Gemessenes Ergebnis des **neuen** Satzes auf der Prüfmaschinerie:
    also gegen eine Messung formuliert worden, die zum Zeitpunkt der Formulierung nicht mehr galt.
    Der SLATE-Test (je Kurve genau ein Angebot) ist mit dem neuen Satz weiterhin bei 0 Fallen.
 
+### (b) Sonderziel als Lotterie im Fallen-Test — 4-Punkt statt 2-Punkt
+
+**Befund:** `lotteries()` baute nur die Zwei-Punkt-Lotterie der Klausel (erfüllt/verletzt). Das
+Sonderziel ging ausschließlich als **Erwartungswert** ein — obwohl das Profil `zielschwer` 70 % des
+Pools dorthin schiebt. Zwei Karten mit gleichem EV, aber 15 % gegen 70 % Zielanteil, haben völlig
+verschiedene Auszahlungsverteilungen; der Test sah davon nichts.
+
+**Fix:** Das Sonderziel ist jetzt eine Bernoulli-Lotterie (`P_GOAL = 0,45`, Auszahlung `EV / P`
+mit demselben 4×-Deckel wie `sponsor-objective-pricing.ts`). Die Lotterie je Endrang hat damit
+**vier Ecken**: Klausel × Sonderziel. FOSD vergleicht jetzt allgemeine CDFs statt Zwei-Punkt-Paare.
+Kalibriert wird gegen den EV der **ganzen Karte** (Leiter + Klausel + Ziel) statt nur der Leiter.
+
+| Messung (voller 120er-Raum, alle 32 Erwartungsränge) | 2-Punkt (vorher) | 4-Punkt (jetzt) |
+|---|---|---|
+| Fallen | 44 Paare / 95 Instanzen | **3 Paare / 3 Instanzen** |
+| kollabierte Karten | 144 / 384 | **0 / 384** |
+| EV-Spread bei Designannahmen | 4,2 % | 3,8 % |
+| EV-Spread bei σ 9 | 9,4 % | 16,7 % |
+| σ-Bandbreite der Karten | 0,0 – 15,6 | 6,0 – 27,9 |
+
+**Das ist keine Verbesserung des Modells, sondern eine Korrektur der Messung.** Der alte Test
+schnitt eine Auszahlung an der Untergrenze ab, der 25–47 C Sonderzielgeld fehlten. Dadurch klemmte
+der Floor viel häufiger als in Wirklichkeit, und genau diese Klemme erzeugte die 44 Fallenpaare und
+die 144 kollabierten Karten. Die reale Karte klebt nicht am Boden — sie ist nur riskanter
+(σ bis 27,9 statt 15,6).
+
+**Neuer Befund, den erst der 4-Punkt-Test sieht:** die 3 verbleibenden Fallen (`Sockel/… ≪
+Linear/…` bei Erwartungsrang 32) haben **verschiedene Kurvenformen**. Die bestehende Angebotsregel
+(„keine zwei Sponsoren derselben Kurvenform in einer Liste") greift bei ihnen **nicht**. Ihre
+Ursache ist der Monotonie-Bug der Kurve — siehe (c).
+
 ## 8. Nicht Teil dieses Plans
 
 - Golden-Sponsoren (eigene Mechanik, bleibt vorerst wie sie ist)
