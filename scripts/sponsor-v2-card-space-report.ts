@@ -20,8 +20,9 @@ loadEnvConfig(path.resolve(__dirname, ".."));
 import type { SponsorOffer } from "@/lib/data/olyDataTypes";
 import { buildNewGameStateFromBaseline } from "@/lib/game/new-game-setup-service";
 import {
-  getSponsorV2Terms, sponsorV2CardInvariants, sponsorV2GuaranteedLadder,
+  getSponsorV2Terms, sponsorV2CardInvariants, sponsorV2GuaranteedLadder, sponsorV2Settle,
 } from "@/lib/sponsor/sponsor-v2-offer-service";
+import { SPONSOR_V2_EVALUABLE_CLAUSES } from "@/lib/sponsor/sponsor-v2-clause-evaluator";
 
 const gs = buildNewGameStateFromBaseline({ presetId: "solo_1", chrisTeamIds: ["P-S"] }).gameState;
 const offers: SponsorOffer[] = Object.values(gs.seasonState.sponsorOffersByTeamId ?? {}).flat();
@@ -61,6 +62,49 @@ console.log(`\nDie 10 Karten mit der niedrigsten Untergrenze:`);
 [...rows].sort((a, b) => Math.min(...a.ladder) - Math.min(...b.ladder)).slice(0, 10).forEach((r) => {
   console.log(`  ${Math.min(...r.ladder).toFixed(1).padStart(6)} C  …  Decke ${Math.max(...r.ladder).toFixed(1).padStart(6)} C   ${r.rarity}/${r.profile}/${r.curve} E#${r.exp}  ${r.name}`);
 });
+
+/**
+ * DIE ABNAHMEZAHL DES WIRTSCHAFTSZIELS. Die garantierte Leiter oben ist nur der Sockel; was ein Team
+ * wirklich bekommt, ist Leiter + Klausel + Sonderziel. Das Ziel lautet: der Meister landet bei
+ * Gehaltsfaktor 1.0 inklusive aller Boni zwischen 90 und 100 C. Gemessen wird deshalb ueber die
+ * Karten, die ein Spitzenteam ueberhaupt bekommt (Erwartungsrang <= 8), nicht ueber alle 160 —
+ * eine Kellerkarte auf Platz 1 sagt ueber dieses Ziel nichts aus.
+ */
+const best = (t: ReturnType<typeof getSponsorV2Terms>, rank: number) => sponsorV2Settle(t!, rank, true, 1);
+const worst = (t: ReturnType<typeof getSponsorV2Terms>, rank: number) => sponsorV2Settle(t!, rank, false, 0);
+const terms = offers.map((o) => getSponsorV2Terms(o)!);
+const topCards = terms.filter((t) => Number(t.expectedRank) <= 8);
+const botCards = terms.filter((t) => Number(t.expectedRank) >= 25);
+const stat = (a: number[]) => `min ${Math.min(...a).toFixed(1)}  median ${q(a, .5).toFixed(1)}  max ${Math.max(...a).toFixed(1)}  Mittel ${(a.reduce((x, y) => x + y, 0) / a.length).toFixed(1)}`;
+
+console.log(`\nWIRTSCHAFTSZIEL — was wirklich ausgezahlt wird (Leiter + Klausel + Sonderziel):`);
+console.log(`  Meister (Platz 1), alles erfuellt, Karten fuer Spitzenteams (E#<=8, n=${topCards.length}):`);
+console.log(`    ${stat(topCards.map((t) => best(t, 1)))}     Ziel 90–100`);
+console.log(`  Meister (Platz 1), alles erfuellt, ueber ALLE Karten (n=${terms.length}):`);
+console.log(`    ${stat(terms.map((t) => best(t, 1)))}`);
+console.log(`  Platz 32, nichts erfuellt, Karten fuer Kellerteams (E#>=25, n=${botCards.length}):`);
+console.log(`    ${stat(botCards.map((t) => worst(t, 32)))}     Ziel >= 35`);
+console.log(`  Platz 32, nichts erfuellt, ueber ALLE Karten:`);
+console.log(`    ${stat(terms.map((t) => worst(t, 32)))}`);
+console.log(`  Absturz Meisterkarte auf Platz 32 (E#<=8, nichts erfuellt) — "darf nicht gleich insolvent sein":`);
+console.log(`    ${stat(topCards.map((t) => worst(t, 32)))}`);
+
+/**
+ * REALISTISCH statt Bestfall: Klausel und Sonderziel werden nicht immer erfuellt. Der Erwartungswert
+ * auf Platz 1 gewichtet die vier Faelle mit ihren echten Wahrscheinlichkeiten. Das ist die Zahl, gegen
+ * die "90–100 als Meister" zu lesen ist — "alles erfuellt" ist die Obergrenze eines guten Jahres.
+ */
+const clauseP = (t: ReturnType<typeof getSponsorV2Terms>) =>
+  SPONSOR_V2_EVALUABLE_CLAUSES.find((c) => c.name === t!.clauseName)?.p ?? 0.5;
+const expectedAt = (t: ReturnType<typeof getSponsorV2Terms>, rank: number) => {
+  const P = clauseP(t), p = Number(t!.goalProbability);
+  return (1 - P) * (1 - p) * sponsorV2Settle(t!, rank, false, 0)
+    + P * (1 - p) * sponsorV2Settle(t!, rank, true, 0)
+    + (1 - P) * p * sponsorV2Settle(t!, rank, false, 1)
+    + P * p * sponsorV2Settle(t!, rank, true, 1);
+};
+console.log(`  Meister (Platz 1), ERWARTUNGSWERT mit echten Wahrscheinlichkeiten (E#<=8):`);
+console.log(`    ${stat(topCards.map((t) => expectedAt(t, 1)))}     Ziel 90–100`);
 
 console.log(`\nMittlere Leiter (ueber alle Karten) je Rang:`);
 const n = rows[0].ladder.length;
