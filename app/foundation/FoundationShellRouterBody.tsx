@@ -2598,13 +2598,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                     )}
                   </div>
                 </div>
+                {/* Kein Leerzustands-Kasten mehr: solange es noch kein Ergebnis gibt, bleibt der
+                    Bereich einfach leer. Der Hinweis stand als Warn-Callout unter den Buttons und
+                    las sich wie ein Fehler, obwohl "noch nicht ausgewertet" der Normalzustand vor
+                    dem Abschluss ist. */}
                 {!homeNextMatchdayStatus.resultAvailable ||
-                (matchdaySummary.topTeams.length === 0 && matchdaySummary.bottomTeams.length === 0) ? (
-                  <div className="transfer-callout is-warning arena-result-empty-state">
-                    <strong>Noch kein Spieltagsergebnis vorhanden</strong>
-                    <span>Nach dem finalen Reveal erscheinen hier Tageswertung, Rangänderung und Top Player.</span>
-                  </div>
-                ) : (
+                (matchdaySummary.topTeams.length === 0 && matchdaySummary.bottomTeams.length === 0) ? null : (
                   <div className="matchday-result-hero-grid">
                     <article className="metric-card">
                       <span>Aktives Team</span>
