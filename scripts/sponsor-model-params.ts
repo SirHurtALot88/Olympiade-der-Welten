@@ -40,7 +40,7 @@ export const tierOf = (rank: number): number => {
  * Spitze 72 statt 77: die alte 77 war gegen die flache Untergrenze 44 kalibriert. Mit der
  * gestaffelten Untergrenze (38-45) traegt die Leiter unten mehr und braucht oben weniger.
  */
-export const LIGA = [72, 67, 63, 59, 55, 51, 47, 43, 39];
+export const LIGA = [74, 68, 64, 59, 55, 51, 47, 43, 39];
 
 // ── Untergrenze — je Rarity gestaffelt, absolutes Minimum 35 ───────────────────────────────────
 /**
@@ -52,7 +52,12 @@ export const LIGA = [72, 67, 63, 59, 55, 51, 47, 43, 39];
  * wirkte weder Kurve noch Klausel noch Sonderziel.
  */
 export const FLOOR_RARITY: Record<string, number> = {
-  "gewöhnlich": 38, "magisch": 40, "selten": 42, "legendär": 45,
+  // Gesenkt, damit die Untergrenze den Kartenwert nicht mehr abschneidet: bei gewoehnlich lag das
+  // Ziel-EV der unteren Stufen (35,6-37,5) UNTER der garantierten 38, die Karte kollabierte dort in
+  // den Boden und Kurve, Klausel und Sonderziel wirkten nicht mehr. Der Schutz kommt jetzt aus der
+  // AUSWAHL — ein Team sieht fuenf Angebote und muss kein schwaches nehmen — statt aus einer
+  // Garantie, die schwache Karten daran hinderte, schwach zu sein.
+  "gewöhnlich": 35, "magisch": 37, "selten": 39, "legendär": 42,
 };
 export const FLOOR_ABSOLUT = 35;
 /** Daempfung, mit der die Untergrenze im schwachen Ligajahr mitfaellt. */

@@ -550,7 +550,16 @@ console.log(`\n  FALLEN INSGESAMT (Stuetzstellen): ${trapsTotal}${trapsTotal ===
     `   kollabierte Karten ${offDead}/${32 * SPONSOR_TYPES.length}`);
 }
 
-console.log(`\nZIELPRÜFUNG (salaryFactor 1.0) — Meister typisch 90–100 · Letzter ≥ ${SALARY_MIN} (Mindestgehalt)`);
+/**
+ * Das Kriterium "Letzter >= Mindestgehalt" ist BEWUSST aufgegeben.
+ *
+ * Es hat die Untergrenze so hoch getrieben, dass schwache Karten nicht schwach sein konnten: bei
+ * gewoehnlich lag das Ziel-EV der unteren Stufen unter der Garantie, die Karte kollabierte in den
+ * Boden, Kurve und Klausel und Sonderziel wirkten dort nicht mehr. Der Schutz kommt jetzt aus der
+ * AUSWAHL — ein Team sieht fuenf Angebote und muss kein schwaches nehmen. Geprueft wird daher, dass
+ * KEINE Karte im Boden kollabiert (Spannweite > 0), nicht dass jede Karte die Gehaelter deckt.
+ */
+console.log(`\nZIELPRÜFUNG (salaryFactor 1.0) — Meister typisch 90–100 · keine Karte im Boden kollabiert`);
 let goalsOk = true;
 for (const t of SPONSOR_TYPES) {
   const c = offsetFor(t.name, 3);
@@ -563,7 +572,7 @@ for (const t of SPONSOR_TYPES) {
   const botGood = payoutAt(t, 30, 32, cb, true, true);
   // Toleranz nach oben: der Typ mit dem höchsten Risiko darf beim Titelgewinn knapp über 100 landen —
   // das ist genau sein Jackpot-Fall und thematisch gewollt. Untergrenze 90 gilt strikt für JEDEN Typ.
-  const ok = champ >= 90 && champ <= 101 && botBad >= SALARY_MIN;
+  const ok = champ >= 90 && champ <= 101 && botGood - botBad > 1;
   if (!ok) goalsOk = false;
   console.log(
     `  ${t.name.padEnd(16)} Meister ${champ.toFixed(1).padStart(5)} (Jackpot ${jackpot.toFixed(0)})` +
