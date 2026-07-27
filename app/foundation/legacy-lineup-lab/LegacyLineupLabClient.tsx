@@ -459,6 +459,12 @@ type MatchdaySlotPreviewCard = {
   projected: ReturnType<typeof calculateMatchdayProjectedPreview>;
   selectedScore: number | null;
   selectedPlayerName: string | null;
+  /**
+   * Rohe Eingabe der Slot-Projektion OHNE Intensitaet. Damit laesst sich dieselbe
+   * Funktion (`calculateMatchdayProjectedPreview`) mit einer hypothetischen
+   * Intensitaet erneut aufrufen, statt deren Formel irgendwo nachzubauen.
+   */
+  projectionInput: Omit<Parameters<typeof calculateMatchdayProjectedPreview>[0], "intensity">;
 };
 
 type MatchdaySlotDragPreviewCard = {
@@ -3153,6 +3159,17 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         (context?.mutatorSource?.effectStatus === "ready" ? 0 : 2) +
         (context?.teamPowerSource?.effectStatus === "ready" ? 0 : 2);
 
+      const projectionInput = {
+        baseScore: selectedScore,
+        role,
+        attributeStats: selectedRosterCard?.attributeStats ?? null,
+        currentFatigueCount: selectedOption?.fatigueCount ?? null,
+        requiredPlayers: context?.disciplinePlayerCounts[slot.disciplineId] ?? null,
+        knownModifierBonus,
+        revealVariance,
+        rivalryPressure: getRivalryPressureForDiscipline(slot.disciplineId),
+      };
+
       return {
         slotKey: slot.key,
         disciplineSide: slot.disciplineSide,
@@ -3160,17 +3177,8 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         intensity,
         selectedScore,
         selectedPlayerName: selectedRosterCard?.name ?? null,
-        projected: calculateMatchdayProjectedPreview({
-          baseScore: selectedScore,
-          role,
-          attributeStats: selectedRosterCard?.attributeStats ?? null,
-          currentFatigueCount: selectedOption?.fatigueCount ?? null,
-          requiredPlayers: context?.disciplinePlayerCounts[slot.disciplineId] ?? null,
-          intensity,
-          knownModifierBonus,
-          revealVariance,
-          rivalryPressure: getRivalryPressureForDiscipline(slot.disciplineId),
-        }),
+        projectionInput,
+        projected: calculateMatchdayProjectedPreview({ ...projectionInput, intensity }),
       };
     });
 
@@ -3960,6 +3968,48 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     selections,
     slots,
   ]);
+
+  /**
+   * Bandbreite (Confidence-Band) der Disziplin-Projektion je Intensitaetsstufe.
+   *
+   * Kein neues Modell: pro Slot wird DIESELBE Projektionsfunktion
+   * `calculateMatchdayProjectedPreview` mit der jeweils hypothetischen Intensitaet
+   * erneut aufgerufen (gleiche Eingaben wie in `slotPreviewByKey`, nur `intensity`
+   * getauscht). Die Aggregation auf Disziplin-Ebene ist byte-identisch zu der,
+   * die `matchdayPreviewCards.d1RangeLow/d1RangeHigh` bereits fuer die AKTIVE
+   * Intensitaet nutzt:
+   *   low  = Σ (slot.rangeLow  ?? slot.totalProjected ?? 0) ueber alle Slots der Seite
+   *   high = Σ (slot.rangeHigh ?? slot.totalProjected ?? 0) ueber alle Slots der Seite
+   * Leere Slots liefern baseScore=null → totalProjected/rangeLow/rangeHigh = null
+   * und tragen damit 0 bei. Ist keine Seite besetzt, bleibt der Eintrag null
+   * (gleiche Null-Regel wie beim Punktwert in focusV2DisciplineTacticPreviewBySide).
+   */
+  const focusV2DisciplineTacticRangeBySide = useMemo(() => {
+    const buildForSide = (disciplineSide: "d1" | "d2") => {
+      const sidePreviews = slots
+        .filter((slot) => slot.disciplineSide === disciplineSide)
+        .map((slot) => slotPreviewByKey.get(slot.key))
+        .filter((entry): entry is MatchdaySlotPreviewCard => Boolean(entry));
+      const filledCount = sidePreviews.filter((entry) => entry.selectedScore != null).length;
+      const estimateRange = (targetIntensity: MatchdayIntensityStage) => {
+        if (filledCount === 0) return null;
+        let low = 0;
+        let high = 0;
+        for (const entry of sidePreviews) {
+          const projected = calculateMatchdayProjectedPreview({ ...entry.projectionInput, intensity: targetIntensity });
+          low += projected.rangeLow ?? projected.totalProjected ?? 0;
+          high += projected.rangeHigh ?? projected.totalProjected ?? 0;
+        }
+        return { low: Number(low.toFixed(1)), high: Number(high.toFixed(1)) };
+      };
+      return {
+        conserve: estimateRange("conserve"),
+        normal: estimateRange("normal"),
+        push: estimateRange("push"),
+      };
+    };
+    return { d1: buildForSide("d1"), d2: buildForSide("d2") };
+  }, [slotPreviewByKey, slots]);
 
   const allAvailablePlayersDeployed = useMemo(() => {
     const totalActive = context?.activePlayers?.length ?? 0;
@@ -7240,6 +7290,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
             : undefined
         }
         disciplineTacticPreviewBySide={focusV2DisciplineTacticPreviewBySide}
+        disciplineTacticRangeBySide={focusV2DisciplineTacticRangeBySide}
         recentlyAssignedSlotKey={recentlyAssignedSlotKey}
         undoInfo={lineupUndoSnapshot ? { label: lineupUndoSnapshot.label, detail: lineupUndoSnapshot.detail } : null}
         onUndo={restoreLineupUndo}
