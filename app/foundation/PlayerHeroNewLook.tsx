@@ -28,6 +28,7 @@ import {
   getPlayerDisplaySalary,
   getRosterEntryDisplaySalary,
 } from "@/app/foundation/foundation-page-client-exports";
+import { buildPlayerContractTileView } from "@/lib/foundation/player-contract-tile";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type { LeagueLeaderCategoryId } from "@/lib/foundation/league-leaders-service";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
@@ -148,6 +149,17 @@ export default function PlayerHeroNewLook({
   const heroSalary =
     data.salary ??
     (rosterEntry ? getRosterEntryDisplaySalary(rosterEntry, heroPlayer) : getPlayerDisplaySalary(heroPlayer));
+
+  // VERTRAG-Kachel: Restlaufzeit + Gehaltsverlauf. Quelle sind bewusst die
+  // Drawer-Daten und nicht der selbst gesuchte `rosterEntry` — auf der
+  // Profil-Route ist der Foundation-Kontext (und damit `rosters`) je nach
+  // Mount-Scope leer, genau daran hing frueher schon die Gehaltsanzeige.
+  // `contractLength` ist die VERBLEIBENDE Laufzeit (Saisonende-Tick zaehlt
+  // herunter), die Staffel wird synchron mitgekuerzt.
+  const contractTile = buildPlayerContractTileView({
+    contractLength: data.contractLength ?? rosterEntry?.contractLength ?? null,
+    yearlySalarySchedule: data.yearlySalarySchedule ?? rosterEntry?.yearlySalarySchedule ?? null,
+  });
 
   const radarAxes: NlRadarAxis[] = (
     [
@@ -309,7 +321,36 @@ export default function PlayerHeroNewLook({
               sub="pro Saison"
               title="Gehalt pro Saison"
             />
+            {/* Restlaufzeit. Ohne laufenden Vertrag (Free Agent) gibt es nichts
+                zu zeigen — dann entfaellt die Kachel ganz, statt "—" zu zeigen. */}
+            {contractTile.valueLabel ? (
+              <StatChip
+                label="VERTRAG"
+                value={contractTile.valueLabel}
+                tone={contractTile.isExpiring ? "accent" : "neutral"}
+                sub={contractTile.subLabel ?? undefined}
+                title={
+                  contractTile.isExpiring
+                    ? "Restlaufzeit: läuft am Saisonende aus"
+                    : "Verbleibende Vertragslaufzeit"
+                }
+              />
+            ) : null}
           </StatChipRow>
+          {/* Gehaltsverlauf nur bei mehrjaehrigen Vertraegen: bei einer Saison
+              steht der Betrag schon in der GEHALT-Kachel. */}
+          {contractTile.schedule.length > 1 ? (
+            <div className="nl-player-hero-contract-schedule" aria-label="Gehaltsverlauf je Vertragssaison">
+              <span className="nl-player-hero-contract-schedule-label">Gehaltsverlauf</span>
+              {contractTile.schedule.map((year, index) => (
+                <span key={`${year.yearIndex}-${year.label}`} className="nl-player-hero-contract-year">
+                  <span className="nl-player-hero-contract-year-label">{year.label}</span>
+                  <span className="nl-player-hero-contract-year-value nl-tnum">{formatNlMoney(year.salary)}</span>
+                  {index === 0 ? <span className="nl-player-hero-contract-year-now">laufend</span> : null}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
       </div>
       <div className="nl-player-hero-charts">

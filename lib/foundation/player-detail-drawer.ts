@@ -1,5 +1,5 @@
 import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
-import type { DisciplineCategory, GameState, Player, RosterEntry, SeasonSnapshotTransferRecord, Team, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
+import type { ContractYearSalary, DisciplineCategory, GameState, Player, RosterEntry, SeasonSnapshotTransferRecord, Team, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 import {
   assessPlayerBoardTrust,
   type PlayerBoardTrustMood,
@@ -246,6 +246,13 @@ export type PlayerDetailDrawerData = {
   contractLength: number | null;
   contractLengthSource: string;
   contractShape: "balanced" | "front_loaded" | "back_loaded" | null;
+  /**
+   * Gehalt je verbleibender Vertragssaison (Index 0 = laufende Saison). Der
+   * Saisonende-Tick kuerzt die Staffel mit (`advanceRosterContractSchedule`),
+   * sie deckt sich also immer mit `contractLength`. Hier mitgeliefert, weil die
+   * Profil-Route den Kader-Eintrag nicht zuverlaessig selbst aufloesen kann.
+   */
+  yearlySalarySchedule: ContractYearSalary[];
   isImportedEconomy: boolean;
   economyStatus: string;
   economyCompare: PlayerEconomyCompareRow | null;
@@ -2713,6 +2720,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
     contractLength: economy.contractLength,
     contractLengthSource: economy.contractLengthSource,
     contractShape: rosterEntry?.contractShape ?? "balanced",
+    yearlySalarySchedule: rosterEntry?.yearlySalarySchedule ?? [],
     isImportedEconomy: economy.isImportedEconomy,
     economyStatus: economy.economyStatus,
     economyCompare,
@@ -3125,6 +3133,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     contractLength: economy.contractLength,
     contractLengthSource: economy.contractLengthSource,
     contractShape: "balanced",
+    yearlySalarySchedule: [],
     isImportedEconomy: economy.isImportedEconomy,
     economyStatus: economy.economyStatus,
     economyCompare: null,
