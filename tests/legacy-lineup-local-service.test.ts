@@ -7,6 +7,7 @@ import {
   generateLocalLegacyFormCardsForSeason,
   getLocalLegacyLineupDraft,
   loadLocalLegacyLineupContext,
+  saveLocalLegacyFormCardPlan,
   saveLocalLegacyLineupDraft,
 } from "@/lib/lineups/legacy-lineup-local-service";
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
@@ -530,6 +531,94 @@ describe("legacy lineup local service", { timeout: 120_000 }, () => {
       : null;
     expect(shownPlayer).toBeTruthy();
     expect(shownPlayer!.finalContribution).toBeCloseTo(withScore!.finalPlayerScore, 5);
+  });
+
+  // Regression: die Formkarten-Auswahl im UI und die Prüfung beim Speichern müssen denselben
+  // Kartenbestand sehen. Der Kontext-Ladepfad heilt fehlende Formkarten selbst (ensureLocalFormCardsForSeason,
+  // additiv pro Spieler); der Plan-Speicherpfad tat das als einziger NICHT und prüfte gegen den rohen
+  // gespeicherten Bestand. Für einen Spieler, der erst nach der ersten Kartengenerierung in den Kader kam,
+  // bot das UI seine Karte an und das Speichern lehnte sie mit `form_card_plan_card_missing` ab.
+  it("accepts a form card of a player who joined the roster after the season cards were generated", () => {
+    const persistence = createPersistenceService();
+    const save = persistence.createFreshSeasonOneSave({ name: "Form Card Late Joiner" });
+    topUpRosterCoverage(save.saveId);
+    const teamId = pickEligibleTeamId(save);
+    const params = {
+      saveId: save.saveId,
+      seasonId: save.gameState.season.id,
+      matchdayId: save.gameState.matchdayState.matchdayId,
+      teamId,
+    };
+
+    // 1) Formkarten der Season erzeugen und PERSISTIEREN — das ist der Bestand, gegen den geprüft wird.
+    expect(generateLocalLegacyFormCardsForSeason(params).ok).toBe(true);
+
+    // 2) Ein Spieler kommt DANACH in den Kader (Draft-Reihenfolge, Transfer) — für ihn existiert noch
+    //    keine gespeicherte Formkarte.
+    const afterGeneration = persistence.getSaveById(save.saveId)!;
+    const usedPlayerIds = new Set(afterGeneration.gameState.rosters.map((entry) => entry.playerId));
+    // Nur Klassen mit hinterlegter Kartenfarbe (CLASS_COLOR_MAP) erzeugen überhaupt eine Formkarte. Wir
+    // wählen deshalb gezielt einen freien Spieler aus einer Klasse, die nachweislich schon Karten geliefert
+    // hat — sonst hinge der Test daran, welchen Spieler die Kadergenerierung zufällig übrig lässt.
+    const playerClassById = new Map(afterGeneration.gameState.players.map((player) => [player.id, player.className]));
+    const cardedClassNames = new Set(
+      (afterGeneration.gameState.seasonState.formCards ?? [])
+        .map((card) => playerClassById.get(card.playerId))
+        .filter((value): value is string => Boolean(value)),
+    );
+    const lateJoiner = afterGeneration.gameState.players.find(
+      (player) => !usedPlayerIds.has(player.id) && cardedClassNames.has(player.className),
+    );
+    expect(lateJoiner).toBeTruthy();
+    afterGeneration.gameState.rosters.push({
+      id: "form-card-late-joiner",
+      teamId,
+      playerId: lateJoiner!.id,
+      contractLength: 3,
+      salary: Math.round(lateJoiner!.salaryDemand),
+      upkeep: Math.round(lateJoiner!.salaryDemand),
+      purchasePrice: Math.round(lateJoiner!.marketValue),
+      currentValue: Math.round(lateJoiner!.marketValue),
+      roleTag: "bench",
+      joinedSeasonId: afterGeneration.gameState.season.id,
+    });
+    persistence.saveSingleplayerState(save.saveId, afterGeneration.gameState);
+
+    const lateJoinerCardId = `formcard:${params.seasonId}:${teamId}:${lateJoiner!.id}:positive`;
+    // Vorbedingung des Bugs: die Karte ist NICHT im gespeicherten Bestand.
+    expect(
+      (persistence.getSaveById(save.saveId)!.gameState.seasonState.formCards ?? []).some(
+        (card) => card.id === lateJoinerCardId,
+      ),
+    ).toBe(false);
+
+    // 3) Der Ladepfad heilt sie und bietet sie im UI an — genau das sieht der Spieler im Dropdown.
+    const context = loadLocalLegacyLineupContext(params);
+    expect(context.ok).toBe(true);
+    if (!context.ok) return;
+    expect((context.context.formCards ?? []).some((card) => card.id === lateJoinerCardId)).toBe(true);
+
+    // 4) Kern der Regression: Was das UI anbietet, muss das Speichern auch annehmen.
+    const scheduleEntry = getSeasonDisciplineSchedule(save.gameState).find(
+      (entry) => entry.matchdayId === params.matchdayId,
+    );
+    const saved = saveLocalLegacyFormCardPlan({
+      ...params,
+      disciplineSide: "d1",
+      disciplineId: scheduleEntry?.discipline1?.disciplineId ?? null,
+      primaryFormCardId: lateJoinerCardId,
+      secondaryFormCardId: null,
+    });
+    expect(saved.errors).toEqual([]);
+    expect(saved.ok).toBe(true);
+    expect(saved.plans.some((plan) => plan.primaryFormCardId === lateJoinerCardId)).toBe(true);
+
+    // Die geheilte Karte ist mitpersistiert — der nächste Speichervorgang prüft nicht erneut dagegen an.
+    expect(
+      (persistence.getSaveById(save.saveId)!.gameState.seasonState.formCards ?? []).some(
+        (card) => card.id === lateJoinerCardId,
+      ),
+    ).toBe(true);
   });
 
   // Audit S4 regression: lineup reads/writes must never silently fall back to "the active save"
