@@ -71,7 +71,11 @@
  * ------------------------------------------------------------------ */
 .is-new-look .nl-standings-daten-chartrow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  /* Kein 50/50: der Balkenchart braucht fuer seine 32 Balken deutlich weniger
+     Platz als die Spielerkacheln. Die Spalte wird darum bewusst schmaler
+     gehalten, damit rechts genug Breite fuer fuenf Kacheln nebeneinander
+     bleibt (= zwei Reihen fuer die Top 10). */
+  grid-template-columns: minmax(300px, 0.58fr) minmax(0, 1fr);
   gap: var(--nl-s4);
   align-items: start;
   margin-bottom: var(--nl-s3);
@@ -82,7 +86,9 @@
   margin-bottom: 0;
 }
 
-@media (max-width: 1180px) {
+/* Schmaler als das: nebeneinander wuerden die Kacheln zu eng. Dann Chart oben,
+   Spieler darunter ueber die volle Breite — dort passen die zwei Reihen locker. */
+@media (max-width: 1280px) {
   .is-new-look .nl-standings-daten-chartrow {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -110,9 +116,10 @@
   margin: 0;
   padding: 0;
   display: grid;
-  /* ~132px Mindestbreite => ab ~680px Panelbreite fünf Spalten, also
-     genau zwei Reihen für die Top 10. */
-  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  /* Fest fuenf Spalten => die Top 10 stehen IMMER in genau zwei Reihen,
+     unabhaengig von der Panelbreite. Die Kacheln stauchen sich stattdessen
+     (Namen mit Ellipse), statt in eine dritte Reihe umzubrechen. */
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: var(--nl-s1);
 }
 
