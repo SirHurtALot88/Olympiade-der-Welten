@@ -172,6 +172,58 @@ export function sponsorV2GoalPayout(evTarget: number, p: number = SPONSOR_V2_P_G
   return evTarget * Math.min(SPONSOR_V2_GOAL_REWARD_CAP, 1 / Math.max(p, 1e-6));
 }
 
+// ── Die drei harten Kartenschranken ────────────────────────────────────────────────────────────
+/**
+ * VORGABE DES AUFTRAGGEBERS, woertlich: "sonderziele duerfen maximal 15% vom gesamtwert der karte
+ * ausmachen". Gemessen wird an der Auszahlung auf dem ERWARTUNGSRANG mit erfuellter Klausel — also
+ * an genau der Zeile "Auszahlung beim aktuellen Platz", an der der Verstoss aufgefallen ist
+ * (Bosch Hausgeraete: 166,0 von 214,4 = 77 %).
+ *
+ * Der Deckel wird beim Bau der Karte durchgesetzt (`buildSponsorV2Terms`), nicht beim Anzeigen:
+ * ein Betrag, der erst in der Darstellung gekuerzt wird, waere eine Anzeige, die das Settlement
+ * nicht einloest.
+ */
+export const SPONSOR_V2_GOAL_MAX_SHARE = 0.15;
+/**
+ * Die Untergrenze ist SCHUTZ, kein Kartenanteil. Sie darf nie mehr als dieser Bruchteil dessen
+ * sein, was die Karte im Mittel ueberhaupt zahlt — sonst verschluckt sie Rangleiter, Klausel und
+ * Sonderziel und die Karte zahlt auf jedem Platz denselben Betrag. Genau das war der Kollaps.
+ */
+export const SPONSOR_V2_FLOOR_MAX_SHARE = 0.55;
+/**
+ * Mindestspreizung der garantierten Rangleiter zwischen Meister und Platz 32, NACH K. Darunter ist
+ * der Endrang wirtschaftlich bedeutungslos. 12 C sind rund ein Viertel der schwaechsten Karte.
+ */
+export const SPONSOR_V2_MIN_LADDER_SPREAD = 12;
+/** Mindestwirkung der Klausel auf dem Erwartungsrang, NACH K. Eine Klausel mit 0,0 ist ein totes Modul. */
+export const SPONSOR_V2_MIN_CLAUSE_EFFECT = 2;
+/**
+ * Groesste Spannweite (Bonus + Malus), die eine Klausel gemessen am Karten-Erwartungswert haben darf.
+ *
+ * Die Spannweiten s = 8..25 C stammen aus dem Schattentest und wurden gegen eine andere Groessen-
+ * ordnung gemessen als die heutigen Karten: eine gewoehnliche Karte fuer ein Kellerteam hat einen
+ * Erwartungswert von 35,6 C, die Klausel "Ausbau" allein eine Spannweite von 25 C. Der Malus von
+ * 15 C zwang die Untergrenze auf 7 C herunter, damit er ueberhaupt sichtbar wird — sonst waere er
+ * abgeschnitten und die Klausel wirkungslos. Eine Klausel, deren Ausschlag zwei Drittel der Karte
+ * ausmacht, ist keine Nebenbedingung mehr, sondern die Karte.
+ */
+export const SPONSOR_V2_CLAUSE_MAX_SHARE = 0.35;
+/** Die Spannweite, mit der diese Klausel auf DIESER Karte wirklich rechnet. */
+export function sponsorV2ClauseSpreadForCard(clauseSpread: number, cardTargetEv: number): number {
+  return Math.max(0, Math.min(clauseSpread, SPONSOR_V2_CLAUSE_MAX_SHARE * Math.max(0, cardTargetEv)));
+}
+/** Mindestauszahlung des Sonderziels, NACH K. Ein Sonderziel mit 0,0 ist ein totes Modul. */
+export const SPONSOR_V2_MIN_GOAL_PAYOUT = 1.5;
+
+/**
+ * Untergrenze DIESER Karte: die Rarity-Untergrenze, aber gekappt auf einen Anteil des
+ * Karten-Erwartungswerts. Fuer reiche Karten aendert sich nichts (die Rarity-Untergrenze bleibt
+ * darunter), fuer arme Karten weicht sie — und genau die waren kollabiert.
+ */
+export function sponsorV2FloorForCard(rarity: SponsorV2Rarity, salaryFactor: number, cardTargetEv: number): number {
+  return Math.min(sponsorV2FloorAt(rarity, salaryFactor), SPONSOR_V2_FLOOR_MAX_SHARE * Math.max(0, cardTargetEv));
+}
+
 // ── Ergebnisstreuung und Rueckschritt zur Mitte ────────────────────────────────────────────────
 /** GEMESSEN, nicht gesetzt: 6.62 ueber 128 echte Team-Saisons. Design war 5.5. */
 export const SPONSOR_V2_SIGMA = 6.6;
@@ -209,17 +261,29 @@ export type SponsorV2Profile = {
   stepWeights: number[];
   note: string;
 };
+/**
+ * `specialShare` ist der Anteil des KARTEN-ERWARTUNGSWERTS, der ins Sonderziel geht — nicht der
+ * Anteil der AUSZAHLUNG. Die Auszahlung folgt daraus als `specialShare * total / p` und ist
+ * zusaetzlich hart bei `SPONSOR_V2_GOAL_MAX_SHARE` der Gesamtauszahlung gedeckelt.
+ *
+ * DIE WERTE SIND GESENKT (frueher .25/.15/.15/.20/.70) — als Fehlerbehebung, nicht als Feinschliff.
+ * Bei `specialShare = 0.70` verlangte die Kalibrierung von der Rangleiter einen Erwartungswert
+ * UNTER der Untergrenze: `sponsorV2Calibrate` konnte sein Ziel nicht mehr erreichen, lief an den
+ * unteren Rand seiner Bisektion, und JEDER der 32 Raenge klemmte auf der Untergrenze. Gemessen an
+ * 160 echt erzeugten Karten: 21 vollstaendig flache Leitern, 63 Karten mit unsichtbarer Klausel,
+ * 138 mit einem Sonderziel ueber 15 % der Karte. Abgesichert in `tests/sponsor-v2-card-space.test.ts`.
+ */
 export const SPONSOR_V2_PROFILES: readonly SponsorV2Profile[] = [
-  { name: "ausgewogen", specialShare: 0.25, stepWeights: [.125, .125, .125, .125, .125, .125, .125, .125],
+  { name: "ausgewogen", specialShare: 0.06, stepWeights: [.125, .125, .125, .125, .125, .125, .125, .125],
     note: "Formzuwachs gleichmaessig ueber alle Stufenschritte" },
-  { name: "spitzenlastig", specialShare: 0.15, stepWeights: [.30, .24, .18, .12, .08, .05, .02, .01],
+  { name: "spitzenlastig", specialShare: 0.04, stepWeights: [.30, .24, .18, .12, .08, .05, .02, .01],
     note: "der Formzuwachs sitzt ganz oben — bezahlt wird der Sprung in die Spitzenraenge" },
-  { name: "sockellastig", specialShare: 0.15, stepWeights: [.01, .02, .05, .08, .12, .18, .24, .30],
+  { name: "sockellastig", specialShare: 0.04, stepWeights: [.01, .02, .05, .08, .12, .18, .24, .30],
     note: "der Formzuwachs sitzt ganz unten — schon der Sprung aus dem Keller zahlt" },
-  { name: "mittelfeld", specialShare: 0.20, stepWeights: [.03, .07, .15, .25, .25, .15, .07, .03],
+  { name: "mittelfeld", specialShare: 0.05, stepWeights: [.03, .07, .15, .25, .25, .15, .07, .03],
     note: "der Formzuwachs sitzt in der Tabellenmitte — Spitze und Keller sind flach" },
-  { name: "zielschwer", specialShare: 0.70, stepWeights: [.125, .125, .125, .125, .125, .125, .125, .125],
-    note: "der Pool steckt fast komplett im Sonderziel — maximaler Eigeneinfluss" },
+  { name: "zielbetont", specialShare: 0.10, stepWeights: [.125, .125, .125, .125, .125, .125, .125, .125],
+    note: "groesster Sonderziel-Anteil, den die 15-%-Obergrenze zulaesst — maximaler Eigeneinfluss" },
 ];
 export function sponsorV2ProfileByName(name: string): SponsorV2Profile {
   return SPONSOR_V2_PROFILES.find((p) => p.name === name) ?? SPONSOR_V2_PROFILES[0]!;
@@ -279,7 +343,22 @@ export type SponsorV2Card = {
   curve: SponsorV2Curve;
   clause: SponsorV2Clause;
 };
-export type SponsorV2Params = { sigma: number; pClause: number; pGoal: number };
+export type SponsorV2Params = {
+  sigma: number;
+  pClause: number;
+  pGoal: number;
+  /**
+   * Untergrenze DIESER Karte. Fehlt sie, gilt die reine Rarity-Untergrenze (Altverhalten der
+   * Modell-Referenz in scripts/). Die Angebotserzeugung setzt sie immer explizit, weil erst die
+   * kartenindividuelle Untergrenze den Leiterkollaps verhindert.
+   */
+  floor?: number;
+  /**
+   * Auszahlung des Sonderziels dieser Karte. Fehlt sie, wird sie aus den Kartenzielen abgeleitet.
+   * Die Angebotserzeugung setzt sie explizit, weil sie zusaetzlich bei 15 % der Karte gedeckelt ist.
+   */
+  goalPayout?: number;
+};
 export function sponsorV2ParamsOf(card: SponsorV2Card): SponsorV2Params {
   return { sigma: SPONSOR_V2_SIGMA, pClause: card.clause.p, pGoal: SPONSOR_V2_P_GOAL };
 }
@@ -310,8 +389,8 @@ export function sponsorV2RawPayout(
   params: SponsorV2Params, clauseMet: boolean, goalMet: boolean,
 ): number {
   const { bonus, malus } = sponsorV2ClauseArms(card.clause, params.pClause);
-  const gp = sponsorV2GoalPayoutOf(card, expectedRank, params.pGoal);
-  const fl = sponsorV2FloorAt(card.rarity, 1.0);
+  const gp = params.goalPayout ?? sponsorV2GoalPayoutOf(card, expectedRank, params.pGoal);
+  const fl = params.floor ?? sponsorV2FloorAt(card.rarity, 1.0);
   const v = sponsorV2RankPart(card, expectedRank, finalRank, cal)
     + (clauseMet ? bonus : -malus)
     + (goalMet ? gp : 0);
@@ -381,8 +460,10 @@ export function sponsorV2Calibrate(card: SponsorV2Card, expectedRank: number, pa
  * schlechten Jahr genau die Teams tot, die geschuetzt werden sollen. Die Stauchung kommt komplett
  * aus dem Teil OBERHALB der Untergrenze, der Verlust trifft also die Spitze, nicht den Keller.
  */
-export function sponsorV2ScaleWithK(raw: number, rarity: SponsorV2Rarity, salaryFactor: number, k: number): number {
-  const fl = sponsorV2FloorAt(rarity, salaryFactor);
+export function sponsorV2ScaleWithK(
+  raw: number, rarity: SponsorV2Rarity, salaryFactor: number, k: number, floorOverride?: number,
+): number {
+  const fl = floorOverride ?? sponsorV2FloorAt(rarity, salaryFactor);
   return Math.max(fl, fl + (raw - fl) * k);
 }
 /** Traf die Untergrenze zu? */
@@ -391,7 +472,13 @@ export function sponsorV2HitFloor(raw: number, rarity: SponsorV2Rarity, salaryFa
   return fl + (raw - fl) * k <= fl + 1e-9;
 }
 
-export type SponsorV2LeagueEntry = { card: SponsorV2Card; expectedRank: number; cal: number };
+export type SponsorV2LeagueEntry = {
+  card: SponsorV2Card;
+  expectedRank: number;
+  cal: number;
+  /** Die Parameter, mit denen die Karte kalibriert wurde — inklusive ihrer Untergrenze. */
+  params?: SponsorV2Params;
+};
 /** Erwartete Auszahlung EINER Karte vor der Saison bei gegebenem K — nur Vor-Saison-Information. */
 export function sponsorV2ExpectedPaidAtK(
   entry: SponsorV2LeagueEntry, params: SponsorV2Params, salaryFactor: number, k: number,
@@ -400,7 +487,7 @@ export function sponsorV2ExpectedPaidAtK(
   let acc = 0;
   for (let r = 1; r <= 32; r += 1) {
     for (const c of sponsorV2Corners(entry.card, entry.expectedRank, r, entry.cal, params)) {
-      acc += w[r - 1]! * c.p * sponsorV2ScaleWithK(c.v, entry.card.rarity, salaryFactor, k);
+      acc += w[r - 1]! * c.p * sponsorV2ScaleWithK(c.v, entry.card.rarity, salaryFactor, k, params.floor);
     }
   }
   return acc;
@@ -414,7 +501,7 @@ export function sponsorV2SolveLeagueK(
   entries: SponsorV2LeagueEntry[], salaryFactor: number, targetSum: number,
 ): number {
   const sumAt = (k: number) => entries.reduce(
-    (a, e) => a + sponsorV2ExpectedPaidAtK(e, sponsorV2ParamsOf(e.card), salaryFactor, k), 0);
+    (a, e) => a + sponsorV2ExpectedPaidAtK(e, e.params ?? sponsorV2ParamsOf(e.card), salaryFactor, k), 0);
   let lo = 0, hi = 12;
   if (entries.length === 0) return 1;
   if (sumAt(hi) < targetSum) return hi;

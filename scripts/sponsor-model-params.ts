@@ -340,22 +340,30 @@ export type Profile = {
   stepWeights: number[];
   note: string;
 };
+/**
+ * `specialShare` GESENKT (frueher .25/.15/.15/.20/.70) und "zielschwer" zu "zielbetont" umbenannt.
+ * Grund: bei .70 verlangte die Kalibrierung von der Rangleiter einen Erwartungswert unter der
+ * Untergrenze, die Bisektion lief an ihren Rand und die Karte klemmte auf allen 32 Raengen an der
+ * Untergrenze. Zusaetzlich deckelt lib/ das Sonderziel jetzt hart bei 15 % der Kartenauszahlung.
+ * Diese Datei ist die REFERENZ, gegen die tests/sponsor-v2-model.test.ts lib/ Zahl fuer Zahl
+ * vergleicht — sie muss deshalb mitgezogen werden.
+ */
 export const PROFILES: Profile[] = [
-  { name: "ausgewogen",    specialShare: 0.25, tierWeights: [.11, .11, .11, .11, .11, .11, .11, .11, .12],
+  { name: "ausgewogen",    specialShare: 0.06, tierWeights: [.11, .11, .11, .11, .11, .11, .11, .11, .12],
     stepWeights: [.125, .125, .125, .125, .125, .125, .125, .125],
     note: "Formzuwachs gleichmaessig ueber alle Stufenschritte" },
-  { name: "spitzenlastig", specialShare: 0.15, tierWeights: [.28, .24, .18, .12, .08, .05, .03, .02, .00],
+  { name: "spitzenlastig", specialShare: 0.04, tierWeights: [.28, .24, .18, .12, .08, .05, .03, .02, .00],
     stepWeights: [.30, .24, .18, .12, .08, .05, .02, .01],
     note: "der Formzuwachs sitzt ganz oben — bezahlt wird der Sprung in die Spitzenraenge" },
-  { name: "sockellastig",  specialShare: 0.15, tierWeights: [.00, .02, .03, .05, .08, .12, .18, .24, .28],
+  { name: "sockellastig",  specialShare: 0.04, tierWeights: [.00, .02, .03, .05, .08, .12, .18, .24, .28],
     stepWeights: [.01, .02, .05, .08, .12, .18, .24, .30],
     note: "der Formzuwachs sitzt ganz unten — schon der Sprung aus dem Keller zahlt" },
-  { name: "mittelfeld",    specialShare: 0.20, tierWeights: [.02, .05, .10, .18, .25, .18, .10, .07, .05],
+  { name: "mittelfeld",    specialShare: 0.05, tierWeights: [.02, .05, .10, .18, .25, .18, .10, .07, .05],
     stepWeights: [.03, .07, .15, .25, .25, .15, .07, .03],
     note: "der Formzuwachs sitzt in der Tabellenmitte — Spitze und Keller sind flach" },
-  { name: "zielschwer",    specialShare: 0.70, tierWeights: [.11, .11, .11, .11, .11, .11, .11, .11, .12],
+  { name: "zielbetont",    specialShare: 0.10, tierWeights: [.11, .11, .11, .11, .11, .11, .11, .11, .12],
     stepWeights: [.125, .125, .125, .125, .125, .125, .125, .125],
-    note: "der Pool steckt fast komplett im Sonderziel — maximaler Eigeneinfluss" },
+    note: "groesster Sonderziel-Anteil, den die 15-%-Obergrenze zulaesst — maximaler Eigeneinfluss" },
 ];
 export const profileByName = (name: string): Profile => PROFILES.find((p) => p.name === name) ?? PROFILES[0]!;
 

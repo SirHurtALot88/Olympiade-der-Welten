@@ -31,8 +31,11 @@ import { buildSponsorOfferModuleIds } from "@/lib/sponsor/sponsor-modules";
 import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import {
   SPONSOR_V2_CURVES, SPONSOR_V2_PROFILES, SPONSOR_V2_RARITIES,
-  sponsorV2Calibrate, sponsorV2CardTargets, sponsorV2ClauseArms, sponsorV2ExpectedValue,
-  sponsorV2FloorAt, sponsorV2GoalPayout, sponsorV2RankPart, sponsorV2ScaleWithK,
+  SPONSOR_V2_GOAL_MAX_SHARE, SPONSOR_V2_MIN_CLAUSE_EFFECT, SPONSOR_V2_MIN_GOAL_PAYOUT,
+  SPONSOR_V2_MIN_LADDER_SPREAD,
+  sponsorV2Calibrate, sponsorV2CardTargets, sponsorV2ClauseArms, sponsorV2ClauseSpreadForCard,
+  sponsorV2ExpectedValue,
+  sponsorV2FloorAt, sponsorV2FloorForCard, sponsorV2GoalPayout, sponsorV2RankPart, sponsorV2ScaleWithK,
   sponsorV2SolveLeagueK, sponsorV2TierOf, sponsorV2ProfileByName,
   type SponsorV2Card, type SponsorV2Curve, type SponsorV2CurveName, type SponsorV2Params, type SponsorV2Rarity,
 } from "@/lib/sponsor/sponsor-v2-model";
@@ -108,6 +111,16 @@ export type SponsorV2ContractTerms = {
   goalKey: string | null;
   salaryFactor: number;
   k: number;
+  /**
+   * DIE UNTERGRENZE DIESER KARTE, eingefroren wie alles andere.
+   *
+   * Frueher rechnete das Settlement sie bei jedem Aufruf neu aus `rarity` aus — eine reine
+   * Rarity-Konstante (35..42 C). Bei Karten, deren Ziel-Erwartungswert selbst nur bei 45 C lag,
+   * verschluckte diese Konstante die gesamte Rangleiter. Sie ist jetzt kartenindividuell und wird
+   * beim Bau so weit gesenkt, wie es braucht, damit Rangleiter, Klausel und Sonderziel sichtbar
+   * bleiben. Fehlt das Feld (Vertraege aus der Zeit davor), gilt die alte Rarity-Untergrenze.
+   */
+  floor?: number;
 };
 
 /**
@@ -236,7 +249,15 @@ export function sponsorV2SeasonK(gameState: GameState): number {
       clause: clause ?? { name: "—", label: "—", p: 0.5, s: 11, lever: "", evaluable: false, direction: "up" },
     };
     const expectedRank = Math.min(32, i + 1);
-    return { card, expectedRank, cal: sponsorV2Calibrate(card, expectedRank, paramsFor(card, 0.45)) };
+    // Die Referenzliga muss mit DERSELBEN Untergrenzen-Regel rechnen wie die echten Karten, sonst
+    // loest K gegen eine Liga, die es so nicht gibt.
+    const targets = sponsorV2CardTargets(card.rarity, profile, sponsorV2TierOf(expectedRank));
+    const params: SponsorV2Params = {
+      ...paramsFor(card, 0.45),
+      floor: sponsorV2FloorForCard(card.rarity, salaryFactor, targets.total),
+      goalPayout: sponsorV2GoalPayout(targets.special, 0.45),
+    };
+    return { card, expectedRank, cal: sponsorV2Calibrate(card, expectedRank, params), params };
   });
   const k = sponsorV2SolveLeagueK(entries, salaryFactor, Math.max(1, salarySum * salaryFactor));
   kCache.set(key, k);
@@ -291,18 +312,23 @@ export function buildSponsorV2Terms(input: {
   expectedRank: number;
   curve: SponsorV2Curve;
 }): SponsorV2ContractTerms {
-  const { profile, clause } = pickProfileAndClause(input.offer.offerId);
+  const { profile, clause: rawClause } = pickProfileAndClause(input.offer.offerId);
   const rarity = rarityOf(input.offer);
+  const targets = sponsorV2CardTargets(rarity, profile, sponsorV2TierOf(input.expectedRank));
+  // Die Klausel-Spannweite wird auf einen Anteil DIESER Karte gekappt, bevor irgendetwas gerechnet
+  // wird — sonst zwingt allein ihr Malus die Untergrenze in den Keller (siehe
+  // SPONSOR_V2_CLAUSE_MAX_SHARE). Die gekappte Klausel geht in Kalibrierung UND Konditionen, es gibt
+  // also keine zweite Spannweite irgendwo im System.
+  const clause = { ...rawClause, s: sponsorV2ClauseSpreadForCard(rawClause.s, targets.total) };
   const card: SponsorV2Card = { rarity, profile, curve: input.curve, clause };
   const goalKey = input.offer.components.find((c) => c.kind === "special")?.specialKey ?? null;
   const goalProbability = sponsorV2GoalProbability(goalKey, input.expectedRank);
-  const params = paramsFor(card, goalProbability);
-  const cal = sponsorV2Calibrate(card, input.expectedRank, params);
   const arms = sponsorV2ClauseArms(clause, clause.p);
-  const { special } = sponsorV2CardTargets(rarity, profile, sponsorV2TierOf(input.expectedRank));
-  return {
-    version: 2,
-    rankLadder: Array.from({ length: 32 }, (_, i) => sponsorV2RankPart(card, input.expectedRank, i + 1, cal)),
+  const salaryFactor = getSalaryFactor(input.gameState);
+  const k = sponsorV2SeasonK(input.gameState);
+
+  const base = {
+    version: 2 as const,
     curveName: input.curve.name,
     profileName: profile.name,
     rarity,
@@ -313,12 +339,154 @@ export function buildSponsorV2Terms(input: {
     clauseThreshold: sponsorV2ThresholdFor(clause.name, input.expectedRank),
     clauseBonus: arms.bonus,
     clauseMalus: arms.malus,
-    goalPayout: sponsorV2GoalPayout(special, goalProbability),
     goalProbability,
     goalKey,
-    salaryFactor: getSalaryFactor(input.gameState),
-    k: sponsorV2SeasonK(input.gameState),
+    salaryFactor,
+    k,
   };
+
+  // ── Fixpunkt ueber Untergrenze und Sonderziel ────────────────────────────────────────────────
+  // Untergrenze und Sonderziel-Betrag haengen von der fertigen Leiter ab, die Leiter haengt ueber
+  // die Kalibrierung von beiden ab. Statt das Problem wegzudefinieren wird es GELOEST: hoechstens
+  // vier Durchgaenge, in denen beide Groessen nur FALLEN duerfen. Jede Senkung entzieht dem
+  // Erwartungswert etwas, die naechste Kalibrierung hebt die Leiter entsprechend an — die
+  // Bedingungen werden dadurch lockerer, nie strenger. Der Lauf konvergiert deshalb monoton.
+  // Die Ausgangswerte, gegen die in jedem Durchgang NEU gemessen wird. Wichtig: der Fixpunkt darf
+  // nicht ratschen. Wuerde jeder Durchgang nur gegen den zuletzt gesenkten Wert kappen, liefe die
+  // Untergrenze mit jedem Durchgang weiter nach unten (gemessen: bis auf 7,4 C bei einer Karte, die
+  // 24 C haette tragen koennen), weil die Nachkalibrierung die Leiter erst danach wieder anhebt.
+  const floorStart = sponsorV2FloorForCard(rarity, salaryFactor, targets.total);
+  const goalStart = sponsorV2GoalPayout(targets.special, goalProbability);
+  let floor = floorStart;
+  let goalPayout = goalStart;
+  const kEff = Math.max(0.05, k);
+  const expIdx = Math.max(0, Math.min(31, Math.round(input.expectedRank) - 1));
+
+  const buildAt = (fl: number, gp: number): SponsorV2ContractTerms => {
+    const params: SponsorV2Params = { sigma: 6.6, pClause: clause.p, pGoal: goalProbability, floor: fl, goalPayout: gp };
+    const cal = sponsorV2Calibrate(card, input.expectedRank, params);
+    return {
+      ...base,
+      rankLadder: Array.from({ length: 32 }, (_, i) => sponsorV2RankPart(card, input.expectedRank, i + 1, cal)),
+      goalPayout: gp,
+      floor: fl,
+    };
+  };
+
+  /** Untergrenze und Ziel-Betrag, die zu einer FERTIGEN Leiter passen wuerden. */
+  const constrain = (t: SponsorV2ContractTerms) => {
+    // Wie tief muss die Untergrenze liegen, damit Klausel und Rangleiter ueberhaupt durchschlagen?
+    // Beide Bedingungen gelten NACH K, deshalb wird die Mindestwirkung durch k zurueckgerechnet.
+    const rawAtExp = t.rankLadder[expIdx] ?? 0;
+    const rawAtTop = t.rankLadder[0] ?? 0;
+    // Die Klausel muss WIRKEN, nicht in beide Richtungen frei stehen: es genuegt, dass der
+    // Bonus-Arm ueber der Untergrenze liegt. Die frueher hier stehende Forderung
+    // `Untergrenze <= Leiterwert − MALUS` war strenger als die Bedingung selbst und drueckte
+    // Karten mit spaet zahlender Kurve ("Gipfel") auf eine Untergrenze von 7,8 C, obwohl 23 C
+    // die Bedingung genauso erfuellt haetten.
+    const floorForClause = rawAtExp + t.clauseBonus - SPONSOR_V2_MIN_CLAUSE_EFFECT / kEff;
+    const floorForSpread = rawAtTop - t.clauseMalus - SPONSOR_V2_MIN_LADDER_SPREAD / kEff;
+    // 15-%-Obergrenze: gemessen an der Auszahlung auf dem Erwartungsrang MIT erfuellter Klausel —
+    // genau die Zeile "Auszahlung beim aktuellen Platz", an der der Verstoss aufgefallen ist.
+    const paidWithoutGoal = sponsorV2Settle(t, input.expectedRank, true, 0);
+    const goalCapPaid = (paidWithoutGoal * SPONSOR_V2_GOAL_MAX_SHARE) / (1 - SPONSOR_V2_GOAL_MAX_SHARE);
+    return {
+      floor: Math.max(0, Math.min(floorStart, floorForClause, floorForSpread)),
+      // Der Deckel gilt fuer die AUSGEZAHLTE Summe (nach K); der eingefrorene Betrag steht davor.
+      goalPayout: Math.max(0, Math.min(goalStart, goalCapPaid / kEff)),
+    };
+  };
+
+  let terms = buildAt(floor, goalPayout);
+  for (let pass = 0; pass < 5; pass += 1) {
+    const next = constrain(terms);
+    if (Math.abs(next.floor - floor) < 1e-6 && Math.abs(next.goalPayout - goalPayout) < 1e-6) break;
+    floor = next.floor;
+    goalPayout = next.goalPayout;
+    terms = buildAt(floor, goalPayout);
+  }
+
+  // ── Nachweis statt Hoffnung ──────────────────────────────────────────────────────────────────
+  // Der Fixpunkt oben misst gegen den AUSGANGSWERT, nicht gegen den zuletzt gesenkten — sonst
+  // ratscht die Untergrenze mit jedem Durchgang tiefer, als noetig waere. Der Preis dafuer ist,
+  // dass er theoretisch schwingen kann. Deshalb wird das Ergebnis GEPRUEFT: solange Rangleiter oder
+  // Klausel klemmen, wird die Untergrenze gesenkt. Das terminiert sicher — bei Untergrenze 0 klemmt
+  // nichts mehr und die reine Liga-Leiter spreizt sich ueber 35 C.
+  //
+  // Der Sonderziel-Anteil wird hier BEWUSST NICHT geprueft: er haengt nicht an der Untergrenze,
+  // und eine Senkung der Untergrenze deswegen war genau der Fehler, der einzelne Karten auf eine
+  // Untergrenze von 7,8 C gedrueckt hat, obwohl 22 C getragen haetten. Er wird danach exakt gekappt.
+  const laddersStuck = (t: SponsorV2ContractTerms) => {
+    const inv = sponsorV2CardInvariants(t);
+    return inv.ladderSpread < SPONSOR_V2_MIN_LADDER_SPREAD - 1e-6
+      || inv.clauseEffect < SPONSOR_V2_MIN_CLAUSE_EFFECT - 1e-6
+      || !inv.monotone;
+  };
+  for (let guard = 0; guard < 20 && laddersStuck(terms); guard += 1) {
+    floor = floor > 0.05 ? floor * 0.7 : 0;
+    terms = buildAt(floor, goalPayout);
+  }
+
+  // ── Die 15-%-Obergrenze, exakt statt geschaetzt ──────────────────────────────────────────────
+  // Der Anteil wird an der FERTIGEN Karte gemessen und der Ziel-Betrag per Bisektion auf den
+  // groessten Wert gezogen, der ihn noch einhaelt. Die Naeherung `Deckel / k` davor stimmt nur,
+  // solange beide Vergleichspunkte ueber der Untergrenze liegen — genau daran ist sie bei
+  // einzelnen Karten um Zehntel gerissen. Bisektion kennt diesen Sonderfall nicht.
+  const shareOf = (gp: number): number => {
+    const t = { ...terms, goalPayout: gp };
+    const withGoal = sponsorV2Settle(t, input.expectedRank, true, 1);
+    return withGoal > 0 ? (withGoal - sponsorV2Settle(t, input.expectedRank, true, 0)) / withGoal : 0;
+  };
+  if (shareOf(goalPayout) > SPONSOR_V2_GOAL_MAX_SHARE) {
+    let lo = 0;
+    let hi = goalPayout;
+    for (let i = 0; i < 40; i += 1) {
+      const mid = (lo + hi) / 2;
+      if (shareOf(mid) <= SPONSOR_V2_GOAL_MAX_SHARE) lo = mid; else hi = mid;
+    }
+    goalPayout = lo;
+    terms = { ...terms, goalPayout };
+  }
+  return terms;
+}
+
+/** Die vier harten Schranken einer fertigen Karte — GEMESSEN an den Betraegen, die sie auszahlt. */
+export type SponsorV2CardInvariantReport = {
+  /** Abstand Meister -> Platz 32 auf der garantierten Leiter. */
+  ladderSpread: number;
+  /** Wirkung der Klausel auf dem Erwartungsrang (Bonus + Malus, nach Untergrenze und K). */
+  clauseEffect: number;
+  /** Was das Sonderziel auf dem Erwartungsrang zusaetzlich einbringt. */
+  goalPayout: number;
+  /** Anteil des Sonderziels an der Gesamtauszahlung auf dem Erwartungsrang. */
+  goalShare: number;
+  /** Faellt die Auszahlung ueber die Raenge nirgends nach oben aus? */
+  monotone: boolean;
+  ok: boolean;
+  violations: string[];
+};
+
+/**
+ * DIE ABNAHMEBEDINGUNG, an EINER Stelle. Die Angebotserzeugung setzt sie durch, der Kartenraum-Test
+ * prueft mit derselben Funktion nach — es gibt also keine zweite Lesart davon, was "in Ordnung" heisst.
+ */
+export function sponsorV2CardInvariants(terms: SponsorV2ContractTerms): SponsorV2CardInvariantReport {
+  const ladder = sponsorV2GuaranteedLadder(terms);
+  const ladderSpread = (ladder[0] ?? 0) - (ladder[31] ?? 0);
+  const paidNoGoal = sponsorV2Settle(terms, terms.expectedRank, true, 0);
+  const paidWithGoal = sponsorV2Settle(terms, terms.expectedRank, true, 1);
+  const clauseEffect = paidNoGoal - sponsorV2Settle(terms, terms.expectedRank, false, 0);
+  const goalPayout = paidWithGoal - paidNoGoal;
+  const goalShare = paidWithGoal > 0 ? goalPayout / paidWithGoal : 0;
+  let monotone = true;
+  for (let i = 1; i < 32; i += 1) if ((ladder[i] ?? 0) > (ladder[i - 1] ?? 0) + 1e-6) monotone = false;
+  const violations: string[] = [];
+  if (ladderSpread < SPONSOR_V2_MIN_LADDER_SPREAD - 1e-6) violations.push(`Rangleiter zu flach (${ladderSpread.toFixed(1)} C)`);
+  if (clauseEffect < SPONSOR_V2_MIN_CLAUSE_EFFECT - 1e-6) violations.push(`Klausel ohne Wirkung (${clauseEffect.toFixed(1)} C)`);
+  if (goalPayout < SPONSOR_V2_MIN_GOAL_PAYOUT - 1e-6) violations.push(`Sonderziel ohne Wirkung (${goalPayout.toFixed(1)} C)`);
+  if (goalShare > SPONSOR_V2_GOAL_MAX_SHARE + 1e-6) violations.push(`Sonderziel ${(goalShare * 100).toFixed(0)} % der Karte`);
+  if (!monotone) violations.push("Auszahlung nicht monoton ueber die Raenge");
+  return { ladderSpread, clauseEffect, goalPayout, goalShare, monotone, ok: violations.length === 0, violations };
 }
 
 // ── Auszahlung aus den Konditionen — DIE eine Rechenstelle ─────────────────────────────────────
@@ -332,11 +500,16 @@ export function sponsorV2Settle(
 ): number {
   const idx = Math.max(1, Math.min(32, Math.round(Number.isFinite(Number(finalRank)) ? Number(finalRank) : 32))) - 1;
   const rarity = (RARITY_LABEL[terms.rarity] ?? "magisch") as SponsorV2Rarity;
-  const fl = sponsorV2FloorAt(rarity, 1.0);
+  // Die EINGEFRORENE Untergrenze der Karte. Vertraege aus der Zeit vor der kartenindividuellen
+  // Untergrenze tragen das Feld nicht und werden weiter nach der Rarity-Konstante abgerechnet —
+  // sie wurden unter dieser Zusage unterschrieben.
+  const fl = typeof terms.floor === "number" && Number.isFinite(terms.floor)
+    ? terms.floor
+    : sponsorV2FloorAt(rarity, 1.0);
   const raw = Math.max(fl, (terms.rankLadder[idx] ?? 0)
     + (clauseMet ? terms.clauseBonus : -terms.clauseMalus)
     + Math.max(0, Math.min(1, goalFraction)) * terms.goalPayout);
-  return sponsorV2ScaleWithK(raw, rarity, terms.salaryFactor, terms.k);
+  return sponsorV2ScaleWithK(raw, rarity, terms.salaryFactor, terms.k, fl);
 }
 
 /**
