@@ -67717,9 +67717,24 @@ button.nl-players-axis:focus-visible {
 /* Rang-Chip (#N) in der OVR-Spalte: heller `--nl-ink`-Vordergrund auf
    Akzent-getöntem, dunklem Grund — behebt den "Gold auf Gold"-Kontrast
    aus #111 unabhängig vom gewählten Akzentton. */
-.is-new-look .nl-ptable-percentile.nl-ptable-ovr-rank {
-  background: color-mix(in srgb, var(--nl-accent) 30%, var(--nl-panel-2, #0f1621) 70%);
+/* Rang-Chips der drei Kopf-Kennzahlen. Jede Spalte hat EINEN festen, klar
+   getrennten Akzent, damit PPs/OVR/MVS beim Scannen auseinanderzuhalten sind:
+   PPs blau, OVR lila, MVS gelb. Das Hell-auf-dunkel-Muster (getönter Grund +
+   `--nl-ink`) bleibt für alle drei gleich — nur der Farbton wechselt. */
+.is-new-look .nl-ptable-percentile.nl-ptable-metric-rank {
   color: var(--nl-ink);
+}
+
+.is-new-look .nl-ptable-percentile.nl-ptable-metric-rank.is-pps {
+  background: color-mix(in srgb, var(--nl-accent) 30%, var(--nl-panel-2, #0f1621) 70%);
+}
+
+.is-new-look .nl-ptable-percentile.nl-ptable-metric-rank.is-ovr {
+  background: color-mix(in srgb, #a06bff 30%, var(--nl-panel-2, #0f1621) 70%);
+}
+
+.is-new-look .nl-ptable-percentile.nl-ptable-metric-rank.is-mvs {
+  background: color-mix(in srgb, var(--nl-gold) 30%, var(--nl-panel-2, #0f1621) 70%);
 }
 
 /* Im aktiv sortierten Zustand DARF der OVR-Rang-Chip NICHT den dunklen Text
@@ -67733,9 +67748,20 @@ button.nl-players-axis:focus-visible {
    nur eine Stufe kräftiger. Vier Klassen + Element gewinnt gegenüber der
    3-Klassen-Regel aus Fix #4 und der 3-Klassen-Basisregel oben, ohne
    `!important`. */
-.is-new-look td.is-active-sort .nl-ptable-percentile.nl-ptable-ovr-rank {
-  background: color-mix(in srgb, var(--nl-accent) 55%, var(--nl-panel-2, #0f1621) 45%);
+.is-new-look td.is-active-sort .nl-ptable-percentile.nl-ptable-metric-rank {
   color: var(--nl-ink);
+}
+
+.is-new-look td.is-active-sort .nl-ptable-percentile.nl-ptable-metric-rank.is-pps {
+  background: color-mix(in srgb, var(--nl-accent) 55%, var(--nl-panel-2, #0f1621) 45%);
+}
+
+.is-new-look td.is-active-sort .nl-ptable-percentile.nl-ptable-metric-rank.is-ovr {
+  background: color-mix(in srgb, #a06bff 55%, var(--nl-panel-2, #0f1621) 45%);
+}
+
+.is-new-look td.is-active-sort .nl-ptable-percentile.nl-ptable-metric-rank.is-mvs {
+  background: color-mix(in srgb, var(--nl-gold) 55%, var(--nl-panel-2, #0f1621) 45%);
 }
 
 /* ============================================================
