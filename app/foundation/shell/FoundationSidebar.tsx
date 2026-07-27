@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
+import { getAppVersionBadge } from "@/lib/app-version";
 import { FOUNDATION_NAV_GROUPS, isFoundationNavViewActive } from "@/lib/foundation/foundation-nav-config";
 import type { FoundationNavAttentionMap } from "@/lib/foundation/foundation-nav-attention";
 import {
@@ -74,6 +75,11 @@ type SidebarDragState = {
   groupId: keyof FoundationSidebarOrderState;
   itemId: FoundationViewId;
 } | null;
+
+// Statisch pro Build (hängt nur von Version + zur Build-Zeit inlined
+// NEXT_PUBLIC_OLY_BUILD_*-Env-Vars ab) — einmal pro Modul-Load berechnen,
+// nicht bei jedem Render.
+const APP_VERSION_BADGE = getAppVersionBadge();
 
 export default function FoundationSidebar({
   activeView,
@@ -192,7 +198,16 @@ export default function FoundationSidebar({
         <Link className="foundation-sidebar-save-link" href="/">
           Spielstände
         </Link>
-        <strong>Oly Manager</strong>
+        <div className="foundation-sidebar-brand-row">
+          <strong>Oly Manager</strong>
+          <span
+            className="foundation-sidebar-version-badge"
+            data-testid="foundation-sidebar-version-badge"
+            title={APP_VERSION_BADGE.title}
+          >
+            {APP_VERSION_BADGE.compact}
+          </span>
+        </div>
         {seasonContextLabel ? (
           canSplitContext ? (
             <div
