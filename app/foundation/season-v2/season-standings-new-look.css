@@ -58,3 +58,102 @@
   max-width: 100%;
   min-width: 0;
 }
+
+/* ------------------------------------------------------------------ *
+ * Daten-Modus: Chart + Top-10-Spieler in EINER Zeile.
+ * Der Balkenchart deckt (max-width: 900px) nur die linke Hälfte der
+ * Zeile ab — rechts blieb bislang eine große leere Fläche. Die füllt
+ * jetzt das Top-Spieler-Raster: gleiche Kacheln wie im Board, nur
+ * kompakter und als Grid, sodass die Top 10 in zwei Reihen stehen.
+ * Unter 1180px klappt die Zeile in eine Spalte (Chart oben, Spieler
+ * darunter über die volle Breite) — dann passen die zwei Reihen erst
+ * recht.
+ * ------------------------------------------------------------------ */
+.is-new-look .nl-standings-daten-chartrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--nl-s4);
+  align-items: start;
+  margin-bottom: var(--nl-s3);
+}
+
+/* Der Abstand sitzt an der Zeile, nicht mehr am Chart selbst. */
+.is-new-look .nl-standings-daten-chartrow > .nl-standings-daten-chart-scroll {
+  margin-bottom: 0;
+}
+
+@media (max-width: 1180px) {
+  .is-new-look .nl-standings-daten-chartrow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.is-new-look .nl-standings-daten-players {
+  min-width: 0;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+  padding: var(--nl-s2) var(--nl-s3) var(--nl-s3);
+}
+
+.is-new-look .nl-standings-daten-players-eyebrow {
+  margin: 0 0 var(--nl-s2);
+  font-size: var(--nl-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-standings-daten-players-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  /* ~132px Mindestbreite => ab ~680px Panelbreite fünf Spalten, also
+     genau zwei Reihen für die Top 10. */
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: var(--nl-s1);
+}
+
+/* Kompakte Variante der Board-Kachel: schmaler, mit Ellipse statt
+   nowrap-Überlauf, damit fünf nebeneinander passen. */
+.is-new-look .nl-standings-daten-players-grid > li > .nl-standings-player {
+  width: 100%;
+  min-width: 0;
+  gap: var(--nl-s1);
+  padding: var(--nl-s1) var(--nl-s2);
+  border-radius: var(--nl-r-sm);
+}
+
+.is-new-look .nl-standings-daten-players-grid .nl-standings-player-rank {
+  font-size: var(--nl-fs-sm);
+  flex: 0 0 auto;
+}
+
+.is-new-look .nl-standings-daten-players-grid .nl-standings-player-portrait {
+  width: 24px;
+  height: 24px;
+}
+
+.is-new-look .nl-standings-daten-players-grid .nl-standings-player-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+.is-new-look .nl-standings-daten-players-grid .nl-standings-player-name,
+.is-new-look .nl-standings-daten-players-grid .nl-standings-player-team {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-standings-daten-players-grid .nl-standings-player-name {
+  font-size: var(--nl-fs-md);
+}
+
+.is-new-look .nl-standings-daten-players-grid .nl-standings-player-pps {
+  font-size: var(--nl-fs-lg);
+  flex: 0 0 auto;
+}

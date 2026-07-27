@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 
 import "@/app/foundation/season-v2/season-standings-new-look.css";
 
@@ -65,11 +65,56 @@ import {
 
 type NlStandingsMode = "board" | "daten" | "vereine";
 
+/**
+ * Reihenfolge = Angebotsreihenfolge: „Daten" ist der Standard-Einstieg, „Board"
+ * die erste Alternative daneben. Welche Ansicht zuletzt aktiv war, merkt sich
+ * die App pro Team (s. `readStoredStandingsMode`) — so behält jeder Manager
+ * seine eigene Präferenz, ohne dass der Standard für neue Spieler kippt.
+ */
 const NL_STANDINGS_MODE_ITEMS: Array<{ id: NlStandingsMode; label: string }> = [
-  { id: "board", label: "Board" },
   { id: "daten", label: "Daten" },
+  { id: "board", label: "Board" },
   { id: "vereine", label: "Vereine" },
 ];
+
+const NL_STANDINGS_DEFAULT_MODE: NlStandingsMode = "daten";
+
+/**
+ * Merkzettel für die zuletzt genutzte Saisonstand-Ansicht. Der Schlüssel hängt
+ * am eigenen Team, damit bei mehreren menschlichen Managern auf demselben
+ * Rechner (Solo-4 / Online) nicht einer die Präferenz des anderen überschreibt.
+ */
+function getStandingsModeStorageKey(teamId: string | null | undefined): string {
+  const scope = teamId != null && teamId.trim() !== "" ? teamId.trim() : "default";
+  return `oly.season-standings.mode:${scope}`;
+}
+
+function isStandingsMode(value: unknown): value is NlStandingsMode {
+  return value === "board" || value === "daten" || value === "vereine";
+}
+
+function readStoredStandingsMode(teamId: string | null | undefined): NlStandingsMode | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    const raw = window.localStorage.getItem(getStandingsModeStorageKey(teamId));
+    return isStandingsMode(raw) ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredStandingsMode(teamId: string | null | undefined, mode: NlStandingsMode): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(getStandingsModeStorageKey(teamId), mode);
+  } catch {
+    // Private-Mode / vollem Storage: Präferenz ist Komfort, kein Muss.
+  }
+}
 
 /** Board-Sortierung: nach Rang oder nach einem der vier Bereiche. */
 type NlBoardSortKey = "rank" | SeasonDisciplineAreaId;
@@ -199,7 +244,9 @@ export default function SeasonStandingsNewLook({
   isLoading = false,
 }: SeasonStandingsV2ClientProps) {
   const isRivalTeam = (teamId: string) => rivalTeamIds?.has(teamId) ?? false;
-  const [mode, setMode] = useState<NlStandingsMode>("board");
+  // Start bewusst deterministisch mit dem Standard (SSR/Client identisch, keine
+  // Hydration-Warnung); die gespeicherte Präferenz zieht direkt nach dem Mount nach.
+  const [mode, setMode] = useState<NlStandingsMode>(NL_STANDINGS_DEFAULT_MODE);
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
   const [boardSort, setBoardSort] = useState<NlBoardSortKey>("rank");
   const [tableSort, setTableSort] = useState<{ key: NlTableSortKey; dir: "asc" | "desc" }>({
@@ -217,6 +264,23 @@ export default function SeasonStandingsNewLook({
   // das hier schon existiert, es wird nichts neu berechnet.
   const [rankingDrawerMetric, setRankingDrawerMetric] = useState<"points" | "mw" | null>(null);
   const [rankingDrawerHighlightId, setRankingDrawerHighlightId] = useState<string | null>(null);
+
+  // Präferenz-Scope: das eigene Team. Wechselt der Manager (Solo-4/Online) das
+  // Team, zieht dessen eigene zuletzt genutzte Ansicht nach.
+  const modeScopeTeamId = selectedTeamSummary?.teamId ?? null;
+
+  useEffect(() => {
+    const stored = readStoredStandingsMode(modeScopeTeamId);
+    setMode(stored ?? NL_STANDINGS_DEFAULT_MODE);
+  }, [modeScopeTeamId]);
+
+  const handleModeChange = useCallback(
+    (next: NlStandingsMode) => {
+      setMode(next);
+      writeStoredStandingsMode(modeScopeTeamId, next);
+    },
+    [modeScopeTeamId],
+  );
 
   const boardRows = useMemo(() => [...standingsRows].sort(compareBoardRows), [standingsRows]);
 
@@ -822,11 +886,63 @@ export default function SeasonStandingsNewLook({
     );
   }
 
+  /**
+   * Top-10-Spieler direkt neben dem Balkenchart: der Chart deckt nur die linke
+   * Hälfte der Zeile ab, rechts blieb bisher eine große leere Fläche. Gleiche
+   * Kacheln wie im Board (`.nl-standings-player`), hier aber als Raster —
+   * bei genug Breite zwei Reihen à fünf Spieler statt eines Scroll-Streifens.
+   */
+  function renderDatenTopPlayers() {
+    if (topPlayersStrip.length === 0) {
+      return null;
+    }
+    return (
+      <div className="nl-standings-daten-players">
+        <p className="nl-standings-daten-players-eyebrow">Top-Spieler der Saison</p>
+        <ol className="nl-standings-daten-players-grid" aria-label="Top-Spieler der Saison">
+          {topPlayersStrip.map((player, index) => (
+            <li key={player.playerId} className="nl-reveal" style={{ "--nl-reveal-i": index } as CSSProperties}>
+              <button
+                type="button"
+                className="nl-standings-player"
+                onClick={() => onOpenPlayer(player.playerId)}
+                title={`${player.name} öffnen`}
+              >
+                <span className="nl-standings-player-rank nl-tnum">#{player.rank}</span>
+                <BudgetedMediaImage
+                  src={player.portraitUrl}
+                  alt={`${player.name} Portrait`}
+                  className="nl-standings-player-portrait"
+                  width={30}
+                  height={30}
+                  loading="lazy"
+                  fallback={
+                    <span className="nl-standings-player-portrait nl-standings-player-portrait-fallback" aria-hidden="true">
+                      {player.portraitInitials}
+                    </span>
+                  }
+                />
+                <span className="nl-standings-player-copy">
+                  <span className="nl-standings-player-name">{player.name}</span>
+                  <span className="nl-standings-player-team">{player.teamCode ?? player.teamName ?? "—"}</span>
+                </span>
+                <span className="nl-standings-player-pps nl-tnum">{formatNlNumber(player.pps, 1)}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      </div>
+    );
+  }
+
   function renderDatenMode() {
     return (
       <>
         {renderDatenKpis()}
-        {renderDatenChart()}
+        <div className="nl-standings-daten-chartrow">
+          {renderDatenChart()}
+          {renderDatenTopPlayers()}
+        </div>
         {renderDatenTable()}
       </>
     );
@@ -1340,7 +1456,7 @@ export default function SeasonStandingsNewLook({
           <NlSubTabs
             items={NL_STANDINGS_MODE_ITEMS}
             activeId={mode}
-            onSelect={(id) => setMode(id as NlStandingsMode)}
+            onSelect={(id) => handleModeChange(id as NlStandingsMode)}
             aria-label="Saisonstand Ansicht"
             className="nl-standings-subtabs"
           />
