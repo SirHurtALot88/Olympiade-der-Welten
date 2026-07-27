@@ -76,7 +76,15 @@ describe("getAppVersionBadge", () => {
 
     // Hover title carries the FULL sha and the FULL timestamp.
     expect(badge.title).toContain("a04ebb20cafef00dcafef00dcafef00dcafef00");
-    expect(badge.title).toContain("2026-07-27T12:34:56Z");
+    // The stamp is STORED as ISO-8601 UTC but DISPLAYED in German local time
+    // (MEZ/MESZ) via the shared formatter, so both players read wall-clock time
+    // instead of a UTC value that is 1-2 hours off. Derived from the helper here
+    // rather than hardcoded, so this stays true across MEZ/MESZ.
+    const { formatGermanDateTime } = await import("@/lib/utils/format-datetime");
+    expect(badge.title).toContain(formatGermanDateTime("2026-07-27T12:34:56Z"));
+    // 12:34 UTC is 14:34 in Berlin summer time — the raw UTC string must not leak.
+    expect(badge.title).not.toContain("2026-07-27T12:34:56Z");
+    expect(badge.title).toContain("14:34");
   });
 
   it("falls back to dev when the build date is unparsable", async () => {

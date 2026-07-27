@@ -18,6 +18,8 @@
  * einen unmissverständlichen "dev"-Hinweis, nie eine erfundene Zeitangabe
  * oder einen leeren/"undefined"-Wert.
  */
+import { formatGermanDate, formatGermanDateTime } from "@/lib/utils/format-datetime";
+
 export const APP_VERSION = "0.1.0";
 
 /**
@@ -43,14 +45,19 @@ export interface AppVersionBadge {
   isDev: boolean;
 }
 
-function formatCompactDate(iso: string): string | null {
+/**
+ * Der Build-Stempel wird als ISO-8601-UTC gespeichert (so setzt ihn das
+ * Deploy-Skript), aber ANGEZEIGT wird deutsche Ortszeit (MEZ/MESZ) — beide
+ * Spieler sitzen in Deutschland, und eine UTC-Anzeige hat hier schon einmal
+ * für Verwirrung gesorgt (2 Stunden Versatz zur Wirklichkeit). Wir nutzen
+ * dafür denselben gemeinsamen Formatierer wie die Spielstands-Zeitstempel,
+ * damit die Anzeige im ganzen Spiel konsistent bleibt; er setzt die Zeitzone
+ * explizit und ist damit auf Server, Browser und in CI identisch (keine
+ * Hydration-Abweichung).
+ */
+function parseBuildDate(iso: string): Date | null {
   const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-  const day = String(parsed.getUTCDate()).padStart(2, "0");
-  const month = String(parsed.getUTCMonth() + 1).padStart(2, "0");
-  return `${day}.${month}.`;
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 /**
@@ -70,16 +77,19 @@ export function getAppVersionBadge(): AppVersionBadge {
     return devFallback("lokale Entwicklung oder Build ohne Metadaten");
   }
 
-  const compactDate = formatCompactDate(APP_BUILD_DATE);
-  if (!compactDate) {
+  const parsedDate = parseBuildDate(APP_BUILD_DATE);
+  if (!parsedDate) {
     return devFallback(`Build-Datum unlesbar: ${APP_BUILD_DATE}`);
   }
 
+  const compactDate = formatGermanDate(parsedDate, { day: "2-digit", month: "2-digit" });
   const shortSha = APP_BUILD_SHA_SHORT ?? APP_BUILD_SHA;
 
   return {
     compact: `v${APP_VERSION} · ${compactDate} · ${shortSha}`,
-    title: `Oly Manager Version ${APP_VERSION} · Build ${APP_BUILD_DATE} · Commit ${APP_BUILD_SHA}`,
+    title:
+      `Oly Manager Version ${APP_VERSION} · Build ${formatGermanDateTime(parsedDate)} (deutsche Zeit)` +
+      ` · Commit ${APP_BUILD_SHA}`,
     isDev: false,
   };
 }
