@@ -62191,52 +62191,6 @@ button.is-new-look .nl-thist-season-pill,
   color: var(--nl-mut-2);
 }
 
-.is-new-look .nl-players-disc-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
-  border: 1px solid var(--nl-line-2);
-  border-radius: var(--nl-r-pill);
-  background: var(--nl-panel);
-  color: var(--nl-mut);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-transform: none;
-  cursor: pointer;
-}
-
-.is-new-look .nl-players-disc-toggle b {
-  font-size: 9px;
-  opacity: 0.75;
-}
-
-.is-new-look .nl-players-disc-toggle:hover,
-.is-new-look .nl-players-disc-toggle.is-open {
-  color: var(--nl-accent);
-  border-color: var(--nl-accent);
-}
-
-.is-new-look .nl-players-disc-toggle:focus-visible {
-  outline: var(--nl-focus-ring);
-  outline-offset: 2px;
-}
-
-.is-new-look .nl-players-disc-select {
-  width: 100%;
-  max-width: 168px;
-  padding: 3px 6px;
-  border: 1px solid var(--nl-line-2);
-  border-radius: var(--nl-r-sm);
-  background: var(--nl-panel);
-  color: var(--nl-ink);
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: normal;
-}
-
 /* --- Zeilen ---------------------------------------------------------- */
 .is-new-look .nl-players-row {
   cursor: pointer;
@@ -62372,7 +62326,7 @@ button.is-new-look .nl-thist-season-pill,
    und Wert stehen so nie horizontal neben der nächsten Achse und laufen
    nicht zusammen (z. B. "91SPE"). Jede Achse bekommt eigenen Raum. --------- */
 .is-new-look .nl-players-td-axes {
-  min-width: 172px;
+  min-width: 248px;
   padding-top: 8px;
   padding-bottom: 8px;
 }
@@ -62399,9 +62353,8 @@ button.is-new-look .nl-thist-season-pill,
   text-align: left;
 }
 
-/* Achsenwert anklicken sortiert die Tabelle danach (`onToggleSort`) — nur die
-   POW/SPE/MEN/SOC-Achsen sind echte `<button>`s, die zusätzliche
-   Disziplin-Zeile (`.nl-players-axis-discipline`) ist rein informativ. */
+/* Achsenwert anklicken sortiert die Tabelle danach (`onToggleSort`) — genau wie
+   jeder Disziplin-Chip darunter (`.nl-players-axis-disc`, `discipline:<id>`). */
 button.nl-players-axis {
   cursor: pointer;
 }
@@ -62425,20 +62378,97 @@ button.nl-players-axis:focus-visible {
   color: var(--nl-accent);
 }
 
-/* Disziplin-Zeile (Disziplinen-Picker im Achsen-Header aktiv): eigener,
-   breiterer Label-Bereich statt der 30px-Achsenspur (Disziplinnamen sind
-   länger als "POW"/"SPE"/"MEN"/"SOC"), optisch abgesetzt über der Achsenliste. */
-.is-new-look .nl-players-axis-discipline {
-  grid-template-columns: minmax(52px, auto) minmax(30px, 1fr) 26px;
-  margin-top: 2px;
-  padding-top: 5px;
-  border-top: 1px dashed var(--nl-line-2);
+/* --- Disziplinen unter der Achse -----------------------------------------
+   Jede Achse trägt dauerhaft ihre 5 Disziplinen (kein Dropdown mehr). Dichte:
+   EINE 5-spaltige Mikro-Zeile je Achse (Kürzel + Zahl + 2px-Strich) statt fünf
+   voller Balkenzeilen — die Achse bleibt die Hauptgliederung, die Disziplinen
+   sind klar untergeordnet (kleinere Schrift, gedämpfte Farbe, kein Rahmen). */
+.is-new-look .nl-players-axis-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  min-width: 0;
 }
 
-.is-new-look .nl-players-axis-discipline .nl-players-axis-label {
+.is-new-look .nl-players-axis-discs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 2px;
+  min-width: 0;
+  padding-left: 2px;
+}
+
+.is-new-look .nl-players-axis-disc {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  margin: 0;
+  padding: 0 1px 1px;
+  border: 0;
+  border-radius: var(--nl-r-sm);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.is-new-look .nl-players-axis-disc:hover {
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-players-axis-disc:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 1px;
+}
+
+.is-new-look .nl-players-axis-disc.is-active-sort {
+  background: var(--nl-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--nl-accent);
+}
+
+.is-new-look .nl-players-axis-disc-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px;
+  min-width: 0;
+}
+
+.is-new-look .nl-players-axis-disc-label {
   overflow: hidden;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.3;
+  color: var(--nl-mut);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.is-new-look .nl-players-axis-disc-value {
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: color-mix(in srgb, var(--nl-ink) 88%, transparent);
+}
+
+.is-new-look .nl-players-axis-disc.is-active-sort .nl-players-axis-disc-label,
+.is-new-look .nl-players-axis-disc.is-active-sort .nl-players-axis-disc-value {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-players-axis-disc-track {
+  height: 2px;
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel-2);
+  overflow: hidden;
+}
+
+.is-new-look .nl-players-axis-disc-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 70%, transparent);
 }
 
 .is-new-look .nl-players-axis-label {
@@ -67254,18 +67284,21 @@ button.nl-players-axis:focus-visible {
    klebend) und mehr row-gap zwischen POW/SPE/MEN/SOC. Höhere Spezifität
    als die Basisregeln, damit der Merge-Order egal ist. */
 .is-new-look td.nl-players-td-axes {
-  min-width: 208px;
+  min-width: 248px;
   padding-top: 10px;
   padding-bottom: 10px;
 }
 
 .is-new-look .nl-players-td-axes .nl-players-axes {
-  gap: 9px;
+  gap: 8px;
 }
 
-/* Label · Balken · Wert · Perzentil — breitere, klar getrennte Spalten. */
+/* Label · Balken · Wert — breite, klar getrennte Spalten. (Früher gab es eine
+   vierte Spalte für einen Perzentil-Chip; der wird in der Achsen-Zelle nicht
+   mehr gerendert, die leere Spur kostete nur Breite, die jetzt die
+   Disziplin-Chips darunter brauchen.) */
 .is-new-look .nl-players-axis.nl-ptable-axis-enhanced {
-  grid-template-columns: 34px minmax(46px, 1fr) 32px 34px;
+  grid-template-columns: 34px minmax(46px, 1fr) 32px;
   column-gap: 10px;
   min-height: 18px;
 }
