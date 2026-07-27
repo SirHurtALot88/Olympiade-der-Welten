@@ -107,13 +107,39 @@ const GOAL_PROBABILITY: Record<string, [number, number, number]> = {
   roster_diversity: [0.50, 0.50, 0.465],
   golden_title_shock: [0.16, 0.05, 0.00],
   golden_talent_forge: [0.265, 0.30, 0.31],
+  // NACHGETRAGEN nach dem ersten Live-Lauf: die Tabelle stammte aus einem Entwurfsdokument und
+  // deckte nur 22 Schluessel ab, die Engine vergibt aber 26 Bonus- und 6 Golden-Ziele. Alle nicht
+  // gelisteten liefen auf den Default 0.45 — die Zusage "Sonderziel nach Schwierigkeit" waere fuer
+  // sie stillschweigend nicht eingeloest gewesen. Die folgenden Werte sind DESIGN-SCHAETZUNGEN in
+  // derselben Groessenordnung wie die Nachbarziele derselben Familie, nicht gemessen.
+  fan_cult_player: [0.50, 0.48, 0.45],
+  rival_humiliation: [0.42, 0.40, 0.35],
+  sustainability_architect: [0.45, 0.48, 0.50],
+  discipline_specialist: [0.50, 0.48, 0.44],
+  facility_condition: [0.60, 0.52, 0.40],
+  golden_fairytale: [0.20, 0.15, 0.10],
+  golden_crowd_favorites: [0.30, 0.28, 0.25],
+  golden_discipline_monopoly: [0.22, 0.15, 0.10],
+  golden_rival_deluxe: [0.25, 0.22, 0.18],
+  // CHALLENGE-SPEZIALE (genau ein Slot je Team traegt eines davon). Im Entwurfsdokument fehlten sie
+  // ganz; der Live-Lauf hat sie sichtbar gemacht — 48 von 160 Angeboten liefen auf den Default.
+  // Geschaetzt jeweils in der Groessenordnung des thematisch naechsten Standardziels.
+  axis_rank_top: [0.49, 0.45, 0.41],
+  salary_pressure_max: [0.385, 0.52, 0.625],
+  form_color_cover: [0.50, 0.50, 0.465],
+  transfer_profit_min: [0.50, 0.48, 0.435],
+  discipline_top3_count: [0.485, 0.30, 0.15],
 };
+/** Alle Schluessel, fuer die eine Schwierigkeits-Schaetzung vorliegt — fuer die Abdeckungsmessung. */
+export const SPONSOR_V2_PRICED_GOAL_KEYS: readonly string[] = Object.keys(GOAL_PROBABILITY);
+/** Default fuer Ziele ohne Eintrag. Wer diesen Wert sieht, sieht KEINE Schwierigkeits-Bepreisung. */
+export const SPONSOR_V2_GOAL_P_DEFAULT = 0.45;
 /** Band, in dem ein Ziel ueberhaupt bepreisbar ist: darueber trivial, darunter Frust. */
 const GOAL_P_MIN = 0.15;
 const GOAL_P_MAX = 0.72;
 export function sponsorV2GoalProbability(specialKey: string | null | undefined, expectedRank: number): number {
   const row = specialKey ? GOAL_PROBABILITY[specialKey] : undefined;
-  const raw = row ? row[sponsorV2StrengthClassOf(expectedRank)]! : 0.45;
+  const raw = row ? row[sponsorV2StrengthClassOf(expectedRank)]! : SPONSOR_V2_GOAL_P_DEFAULT;
   return Math.min(GOAL_P_MAX, Math.max(GOAL_P_MIN, raw));
 }
 

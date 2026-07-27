@@ -38,8 +38,8 @@ import { buildSponsorRankTierRows } from "@/lib/sponsor/sponsor-offer-presenter"
 import { previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import {
-  getSponsorV2Terms, isSponsorV2Enabled, sponsorV2GuaranteedLadder, sponsorV2LeagueSalaryBasis,
-  sponsorV2Settle,
+  getSponsorV2Terms, isSponsorV2Enabled, SPONSOR_V2_PRICED_GOAL_KEYS, sponsorV2GuaranteedLadder,
+  sponsorV2LeagueSalaryBasis, sponsorV2Settle,
 } from "@/lib/sponsor/sponsor-v2-offer-service";
 
 const args = process.argv.slice(2);
@@ -122,6 +122,16 @@ function main(): void {
   console.log(`     Kurven:   ${[...curveMix.entries()].map(([k, v]) => `${k} ${v}`).join(", ")}`);
   console.log(`     Rarities: ${[...rarityMix.entries()].map(([k, v]) => `${k} ${v}`).join(", ")}`);
   console.log(`     Klauseln: ${[...clauseMix.entries()].map(([k, v]) => `${k} ${v}`).join(", ")}`);
+  // EHRLICHKEIT ZUR SCHWIERIGKEITS-BEPREISUNG: ein Sonderziel ohne Eintrag in der
+  // Wahrscheinlichkeitstabelle laeuft auf den Default 0.45 — fuer dieses Ziel ist "nach
+  // Schwierigkeit bepreist" dann schlicht nicht wahr. Die Quote gehoert ausgewiesen.
+  const goalKeys = allOffers.map((o) => getSponsorV2Terms(o)?.goalKey ?? null);
+  const priced = goalKeys.filter((k) => k != null && SPONSOR_V2_PRICED_GOAL_KEYS.includes(k)).length;
+  const unpricedKeys = [...new Set(goalKeys.filter((k) => k != null && !SPONSOR_V2_PRICED_GOAL_KEYS.includes(k)))];
+  check(priced === goalKeys.filter((k) => k != null).length,
+    `Sonderziele nach Schwierigkeit bepreist (statt Default 0.45)`,
+    `${priced}/${goalKeys.filter((k) => k != null).length}` +
+    (unpricedKeys.length ? ` · ohne Schaetzung: ${unpricedKeys.join(", ")}` : ""));
 
   // ── 3: Vertraege ─────────────────────────────────────────────────────────────────────────────
   line("-");

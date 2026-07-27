@@ -27,6 +27,7 @@ import { buildOfferRankPayoutLadderPreview } from "@/lib/sponsor/sponsor-economy
 import { SponsorRankLadder } from "@/components/foundation/sponsor/SponsorRankLadder";
 import { describeSponsorOfferModules } from "@/lib/sponsor/sponsor-modules";
 import { NlDeltaChip, type NlTone } from "@/components/foundation/new-look";
+import { sponsorV2ExpectedPayout } from "@/lib/sponsor/sponsor-v2-offer-service";
 
 /**
  * "Neuer Look" Sponsor-Angebotskarte — flag-gated, additiv. Wird nur von
@@ -338,10 +339,58 @@ export function SponsorOfferCardNewLook({
         </div>
       ) : null}
 
+      {/* OLY_SPONSOR_V2: die neue Kartenstruktur. Sie ersetzt nicht die Kacheln darunter, sondern
+          stellt VOR sie, was das neue Modell ausmacht und was die alten Kacheln nicht ausdruecken
+          koennen: die garantierte Untergrenze, die Klausel MIT Malus (man kann verlieren) und den
+          schwierigkeitsabhaengigen Sonderziel-Betrag. Ohne Flag ist presentation.v2 null und die
+          Karte sieht Zeichen fuer Zeichen aus wie vorher. */}
+      {presentation.v2 ? (
+        <div className="nl-sponsor-v2" data-testid="sponsor-v2-panel">
+          <div className="nl-sponsor-v2-head">
+            <span className="nl-sponsor-axis-chip is-neutral">{presentation.v2.curveName}</span>
+            <small>{presentation.v2.curveNote}</small>
+          </div>
+          <ul className="nl-sponsor-v2-list">
+            <li data-testid="sponsor-v2-floor">
+              <span>Garantiert auf jedem Platz</span>
+              <strong className="nl-tnum">{formatCash(presentation.v2.guaranteedFloor)}</strong>
+            </li>
+            <li data-testid="sponsor-v2-top">
+              <span>Bei Titelgewinn (ohne Klausel und Ziel)</span>
+              <strong className="nl-tnum">{formatCash(presentation.v2.guaranteedTop)}</strong>
+            </li>
+            <li data-testid="sponsor-v2-clause">
+              <span>
+                Klausel: {presentation.v2.clause.label} <em>({presentation.v2.clause.thresholdText})</em>
+              </span>
+              <strong className="nl-tnum">
+                +{formatCash(presentation.v2.clause.bonus)} / −{formatCash(presentation.v2.clause.malus)}
+              </strong>
+            </li>
+            <li data-testid="sponsor-v2-goal">
+              <span>
+                Sonderziel <em>({presentation.v2.goal.difficultyLabel}, {Math.round(presentation.v2.goal.probability * 100)} %)</em>
+              </span>
+              <strong className="nl-tnum">+{formatCash(presentation.v2.goal.payout)}</strong>
+            </li>
+          </ul>
+          <div className="nl-sponsor-v2-range nl-tnum" data-testid="sponsor-v2-range">
+            Spanne {formatCash(presentation.v2.minPayout)} – {formatCash(presentation.v2.maxPayout)}
+            <small>
+              {" "}schlechtester Fall: letzter Platz, Klausel verletzt, Ziel verfehlt · bester Fall: Titel, beides erfüllt
+            </small>
+          </div>
+        </div>
+      ) : null}
+
       <div className="nl-sponsor-negotiation" data-testid="nl-sponsor-negotiation">
         <div className="nl-sponsor-negotiation-live nl-tnum" aria-live="polite">
+          {/* Unter V2 ist die reine Komponentensumme irrefuehrend: sie kennt den Klausel-Malus nicht
+              und suggeriert einen Betrag, den es so nicht gibt. Angezeigt wird deshalb der
+              ERWARTUNGSWERT der Karte — also das, was sie im Mittel wirklich bringt. */}
           <span>
-            Gesamt <strong>{formatCash(totalCash)}</strong>
+            {presentation.v2 ? "Erwartungswert" : "Gesamt"}{" "}
+            <strong>{formatCash(presentation.v2 ? sponsorV2ExpectedPayout(offer.sponsorV2!) : totalCash)}</strong>
           </span>
         </div>
       </div>

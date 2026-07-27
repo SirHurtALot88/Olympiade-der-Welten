@@ -52136,6 +52136,61 @@ button.foundation-team-portrait-card {
 }
 
 /* --- Challenge-Panel ---------------------------------------------- */
+/* OLY_SPONSOR_V2 — die Struktur des neuen Sponsormodells auf der Angebotskarte.
+   Eigener Block statt neuer Zahlen in den alten Kacheln: die Klausel hat einen MALUS, und ein
+   Betrag ohne die Bedingung, unter der er gilt, ist eine Falschaussage. */
+.is-new-look .nl-sponsor-v2 {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+  padding: var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid color-mix(in srgb, var(--nl-acc) 35%, transparent);
+  background: var(--nl-panel-2);
+  font-size: 13px;
+}
+
+.is-new-look .nl-sponsor-v2-head {
+  display: flex;
+  gap: var(--nl-s2);
+  align-items: center;
+}
+
+.is-new-look .nl-sponsor-v2-head small {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-sponsor-v2-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.is-new-look .nl-sponsor-v2-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+  align-items: baseline;
+}
+
+.is-new-look .nl-sponsor-v2-list li em {
+  color: var(--nl-mut);
+  font-style: normal;
+}
+
+.is-new-look .nl-sponsor-v2-range {
+  border-top: 1px solid var(--nl-line);
+  padding-top: var(--nl-s1);
+  color: var(--nl-txt);
+}
+
+.is-new-look .nl-sponsor-v2-range small {
+  color: var(--nl-mut);
+}
+
 .is-new-look .nl-sponsor-challenge {
   display: flex;
   flex-direction: column;
