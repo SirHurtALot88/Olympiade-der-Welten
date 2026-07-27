@@ -125,6 +125,48 @@ function RankBadge({ rank, dim }: { rank: number | null; dim?: boolean }) {
  * ein (nur aufgedeckte Seiten werden aufsummiert). Gleichstand fällt auf den Saison-Rang
  * zurück, damit die Reihenfolge stabil bleibt.
  */
+/**
+ * Projizierten Rang aus den Arena-Ergebnissen ableiten, wenn die Standings-Vorschau keinen
+ * liefert.
+ *
+ * Die Vorschau liest das GESPEICHERTE Spieltagsergebnis. Solange der Spieltag nur in der
+ * Arena läuft und noch nicht übernommen wurde, gibt es keins — die Vorschau meldet dann
+ * `missing_result_for_matchday` und lässt `projectedPoints`/`projectedRank` leer. In der
+ * Tabelle stand dadurch überall „–", und weil die Sortierung bei aufgedeckter Disziplin 2
+ * genau an `projectedRank` hängt, fiel sie zusätzlich auf die Eingangsreihenfolge zurück.
+ *
+ * Die Arena kennt die Ergebnisse aber bereits. Hier wird daraus gerechnet:
+ * `currentPoints + Spieltags-Punkte` → absteigend sortiert → Rang. Bewusst OHNE Mutator-PP,
+ * denn die werden dem Spieler gutgeschrieben und nicht der Team-Tabelle (siehe Kopfzeile
+ * des Panels). Gleichstand teilt sich den Rang (beide bekommen den kleineren), damit die
+ * Rang-Differenz nicht willkürlich wird.
+ *
+ * Greift nur, wenn ein Rang fehlt — eine vorhandene Projektion aus der Vorschau bleibt
+ * unangetastet, damit die gespeicherte Wahrheit immer Vorrang hat.
+ */
+export function resolveProjectedRanksFromMatchday<
+  T extends { teamId: string; currentPoints: number | null; sum: number; projectedRank: number | null },
+>(rows: T[]): Map<string, number> {
+  const projected = rows
+    .map((row) => ({
+      teamId: row.teamId,
+      points: row.currentPoints != null && Number.isFinite(row.currentPoints) ? row.currentPoints + row.sum : null,
+    }))
+    .filter((entry): entry is { teamId: string; points: number } => entry.points != null);
+
+  const ranks = new Map<string, number>();
+  const sorted = [...projected].sort((left, right) => right.points - left.points);
+  let lastPoints: number | null = null;
+  let lastRank = 0;
+  sorted.forEach((entry, index) => {
+    const rank = lastPoints != null && entry.points === lastPoints ? lastRank : index + 1;
+    ranks.set(entry.teamId, rank);
+    lastPoints = entry.points;
+    lastRank = rank;
+  });
+  return ranks;
+}
+
 export function sortMatchdayPanelRows<T extends { total: number; currentRank: number | null; projectedRank: number | null }>(
   rows: T[],
   d2Revealed: boolean,
@@ -170,6 +212,7 @@ export default function DisciplineStageMatchdayPanel({
       teamId: s.teamId,
       currentRank: s.currentRank,
       projectedRank: s.projectedRank,
+      currentPoints: s.currentPoints,
       pointsDelta: s.pointsDelta,
       projectedPoints: s.projectedPoints,
       d1Pts,
@@ -180,6 +223,16 @@ export default function DisciplineStageMatchdayPanel({
       missingLineup: res?.missingLineup ?? false,
     };
   });
+
+  // Fehlt die gespeicherte Projektion (Spieltag noch nicht übernommen), aus den
+  // Arena-Ergebnissen ableiten — sonst stünde überall „–" und die Sortierung fiele
+  // auf die Eingangsreihenfolge zurück.
+  const derivedProjectedRanks = resolveProjectedRanksFromMatchday(rows);
+  for (const row of rows) {
+    if (row.projectedRank == null) {
+      row.projectedRank = derivedProjectedRanks.get(row.teamId) ?? null;
+    }
+  }
 
   sortMatchdayPanelRows(rows, d2Revealed);
 

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { sortMatchdayPanelRows } from "@/app/foundation/discipline-stage/DisciplineStageMatchdayPanel";
+import {
+  resolveProjectedRanksFromMatchday,
+  sortMatchdayPanelRows,
+} from "@/app/foundation/discipline-stage/DisciplineStageMatchdayPanel";
 
 type Row = { teamId: string; total: number; currentRank: number | null; projectedRank: number | null };
 
@@ -56,5 +59,63 @@ describe("Spieltags-Wertung · Reihenfolge", () => {
 
     expect(sortMatchdayPanelRows(rows, false).map((row) => row.teamId)).toEqual(["mit-rang", "ohne-rang"]);
     expect(sortMatchdayPanelRows(rows, true).map((row) => row.teamId)).toEqual(["mit-rang", "ohne-rang"]);
+  });
+});
+
+// Regression: Die Standings-Vorschau liest das GESPEICHERTE Spieltagsergebnis. Läuft der
+// Spieltag nur in der Arena und wurde noch nicht übernommen, meldet sie
+// `missing_result_for_matchday` und lässt projectedPoints/projectedRank leer — in der
+// Tabelle stand dann überall „–", und die Sortierung fiel zusätzlich auf die
+// Eingangsreihenfolge zurück, weil sie bei aufgedeckter Disziplin 2 daran hängt.
+describe("Spieltags-Wertung · projizierter Rang ohne gespeichertes Ergebnis", () => {
+  type ProjRow = { teamId: string; currentPoints: number | null; sum: number; projectedRank: number | null };
+
+  it("leitet den neuen Rang aus Saisonpunkten plus Spieltags-Punkten ab", () => {
+    const rows: ProjRow[] = [
+      { teamId: "R-L", currentPoints: 5, sum: 20.4, projectedRank: null }, // 25,4 → 1
+      { teamId: "P-S", currentPoints: 20, sum: 17.9, projectedRank: null }, // 37,9 → wäre 1
+      { teamId: "C-C", currentPoints: 12, sum: 4.2, projectedRank: null }, // 16,2 → 3
+    ];
+
+    const ranks = resolveProjectedRanksFromMatchday(rows);
+    expect(ranks.get("P-S")).toBe(1);
+    expect(ranks.get("R-L")).toBe(2);
+    expect(ranks.get("C-C")).toBe(3);
+  });
+
+  it("teilt bei Punktgleichstand denselben Rang zu", () => {
+    const rows: ProjRow[] = [
+      { teamId: "A", currentPoints: 10, sum: 5, projectedRank: null },
+      { teamId: "B", currentPoints: 12, sum: 3, projectedRank: null },
+      { teamId: "C", currentPoints: 1, sum: 1, projectedRank: null },
+    ];
+
+    const ranks = resolveProjectedRanksFromMatchday(rows);
+    expect(ranks.get("A")).toBe(1);
+    expect(ranks.get("B")).toBe(1);
+    expect(ranks.get("C")).toBe(3);
+  });
+
+  it("überspringt Teams ohne Saisonpunkte, statt sie auf Rang 1 zu setzen", () => {
+    const rows: ProjRow[] = [
+      { teamId: "ohne", currentPoints: null, sum: 99, projectedRank: null },
+      { teamId: "mit", currentPoints: 4, sum: 1, projectedRank: null },
+    ];
+
+    const ranks = resolveProjectedRanksFromMatchday(rows);
+    expect(ranks.has("ohne")).toBe(false);
+    expect(ranks.get("mit")).toBe(1);
+  });
+
+  it("macht die Tabelle bei aufgedeckter Disziplin 2 wieder sortierbar", () => {
+    // Vor dem Fix waren alle projectedRank null → alle gleich → Eingangsreihenfolge.
+    const base = [
+      { teamId: "spät", currentPoints: 1, sum: 1, projectedRank: null as number | null, total: 2, currentRank: 30 },
+      { teamId: "top", currentPoints: 20, sum: 20, projectedRank: null as number | null, total: 40, currentRank: 2 },
+    ];
+    const derived = resolveProjectedRanksFromMatchday(base);
+    for (const row of base) row.projectedRank = derived.get(row.teamId) ?? null;
+
+    expect(sortMatchdayPanelRows(base, true).map((row) => row.teamId)).toEqual(["top", "spät"]);
   });
 });
