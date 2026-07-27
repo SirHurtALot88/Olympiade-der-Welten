@@ -34,6 +34,7 @@ import {
   type SeasonStandingsV2ClientProps,
   type SeasonV2StandingsRow,
 } from "@/app/foundation/season-v2/SeasonStandingsV2Client";
+import { getPoolHeatClass } from "@/lib/foundation/player-league-heat";
 import {
   resolveSeasonDisciplineAreaTotal,
   SEASON_DISCIPLINE_AREA_GROUPS,
@@ -374,6 +375,23 @@ export default function SeasonStandingsNewLook({
     () => datenChartBars.some((bar) => Number.isFinite(bar.value) && bar.value !== 0),
     [datenChartBars],
   );
+
+  /**
+   * Liga-Vergleichspool je Bereichsspalte (POW/SPE/MEN/SOC) für die Heat-Einfärbung der
+   * Tabellenzellen. Verglichen wird immer gegen ALLE Teams der Tabelle, nicht gegen die
+   * gerade sichtbare Sortierung — die Farbe eines Wertes darf sich nicht ändern, nur weil
+   * anders sortiert wird. `getPoolHeatClass` liefert daraus `heat-band-1..8` (rot → grün),
+   * dieselbe Skala wie in den Spieler-Tabellen.
+   */
+  const areaHeatPools = useMemo(() => {
+    const pools = {} as Record<SeasonDisciplineAreaId, number[]>;
+    for (const group of SEASON_DISCIPLINE_AREA_GROUPS) {
+      pools[group.id] = standingsRows
+        .map((row) => getAreaValue(row, group.id))
+        .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+    }
+    return pools;
+  }, [standingsRows]);
 
   function toggleExpanded(teamId: string) {
     setExpandedTeamId((current) => (current === teamId ? null : teamId));
@@ -930,11 +948,18 @@ export default function SeasonStandingsNewLook({
           </td>
           <td className="nl-standings-td-points">{formatNlNumber(row.points, 1)}</td>
           <td className="nl-standings-td-bonus">{formatNlNumber(row.disciplineValues.bonuspunkte, 1)}</td>
-          {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => (
-            <td key={group.id} className={`nl-standings-td-areacol ${nlToneClass(group.id)}`}>
-              {formatNlNumber(getAreaValue(row, group.id), 1)}
-            </td>
-          ))}
+          {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => {
+            const areaValue = getAreaValue(row, group.id);
+            // Liga-Heat der Bereichsspalte: rot (schwach) → gelb (Mittelfeld) → grün (stark),
+            // dieselben Bänder wie in den Spieler-Tabellen. Die Zell-CSS zieht daraus nur eine
+            // dezente Hinterlegung, damit die Bereichsfarbe der Zahl lesbar bleibt.
+            const heatClass = getPoolHeatClass(areaValue, areaHeatPools[group.id]);
+            return (
+              <td key={group.id} className={`nl-standings-td-areacol ${nlToneClass(group.id)}${heatClass ? ` ${heatClass}` : ""}`}>
+                {formatNlNumber(areaValue, 1)}
+              </td>
+            );
+          })}
           <td className="nl-standings-td-mw">{formatNlMoney(row.marketValueTotal)}</td>
           <td className="nl-standings-td-fin">{formatNlMoney(row.cash)}</td>
           <td className={`nl-standings-td-fin${row.sponsorTotal ? " is-pos" : ""}`}>{formatNlMoney(row.sponsorTotal)}</td>
