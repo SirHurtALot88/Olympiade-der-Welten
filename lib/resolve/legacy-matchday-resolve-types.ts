@@ -27,6 +27,12 @@ export type PlayerPerformancePreview = {
   slotIndex: number;
   baseValue: number;
   fatigueAdjustedValue?: number | null;
+  // Same-day injury malus (siehe lib/fatigue/fatigue-calibration.ts INJURY_PERFORMANCE_MULTIPLIER),
+  // angewandt NACH Fatigue: injuryAdjustedValue = fatigueAdjustedValue * INJURY_PERFORMANCE_MULTIPLIER,
+  // sofern injuryApplied true ist. Für die Arena-Bühne (optisches Verletzungs-Feedback +
+  // Score-Aufschlüsselung), siehe lib/foundation/discipline-stage/discipline-stage-from-preview.ts.
+  injuryApplied?: boolean;
+  injuryAdjustedValue?: number | null;
   captainBonus?: number | null;
   mutatorBonus?: number | null;
   mutatorPpsBonus?: number | null;
@@ -102,6 +108,8 @@ export type DisciplineTeamResolvePreview = {
     slotIndex: number;
     baseValue: number | null;
     fatigueAdjustedValue: number | null;
+    injuryApplied?: boolean;
+    injuryAdjustedValue?: number | null;
     captainBonus: number | null;
     mutatorBonus?: number | null;
     mutatorPpsBonus?: number | null;
