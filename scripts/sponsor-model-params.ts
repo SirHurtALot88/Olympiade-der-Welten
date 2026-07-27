@@ -81,7 +81,11 @@ export const floorAt = (rarity: string, sf: number): number =>
 export const TARGET_EV_BASE = [76.0, 73.6, 71.6, 67.9, 63.8, 59.9, 56.7, 54.1, 53.0];
 export const TARGET_EV_MEAN = TARGET_EV_BASE.reduce((a, b) => a + b, 0) / TARGET_EV_BASE.length;
 /** Steilheit: spreizt die Leiter um ihren Mittelwert. 1.7 ist der abgenommene Wert. */
-export const TARGET_GAMMA = Number(process.env.OLY_SPONSOR_GAMMA ?? 1.7);
+// GESENKT von 1.7 auf 1.2 (identisch zu lib/, SPONSOR_V2_TARGET_GAMMA): die Ziel-EV-Leiter ist nach
+// Erwartungsstufe indiziert und die Rangleiter differenziert bereits ein zweites Mal — 1.7 zaehlte
+// den Unterschied doppelt und drueckte den Keller (gewoehnlich Stufe 8) auf 35,6 C, nur 0,6 C ueber
+// die vereinbarte Untergrenze 35. Mittelwert-erhaltend, Ligasumme unveraendert.
+export const TARGET_GAMMA = Number(process.env.OLY_SPONSOR_GAMMA ?? 1.2);
 export const TARGET_EV_SHAPE = TARGET_EV_BASE.map((v) => TARGET_EV_MEAN + (v - TARGET_EV_MEAN) * TARGET_GAMMA);
 
 // ── Rarity als BUDGET-Pool ─────────────────────────────────────────────────────────────────────

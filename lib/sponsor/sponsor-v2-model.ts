@@ -57,8 +57,17 @@ export function sponsorV2FloorAt(rarity: SponsorV2Rarity, salaryFactor: number):
 // ── Ziel-EV-Leiter und Rarity-Pool ─────────────────────────────────────────────────────────────
 const TARGET_EV_BASE = [76.0, 73.6, 71.6, 67.9, 63.8, 59.9, 56.7, 54.1, 53.0];
 const TARGET_EV_MEAN = TARGET_EV_BASE.reduce((a, b) => a + b, 0) / TARGET_EV_BASE.length;
-/** Steilheit: spreizt die Leiter um ihren Mittelwert. 1.7 ist der abgenommene Wert. */
-export const SPONSOR_V2_TARGET_GAMMA = 1.7;
+/**
+ * Steilheit: spreizt die Ziel-EV-Leiter mittelwert-erhaltend um 64,07 C. GESENKT von 1.7 auf 1.2:
+ * TARGET_EV_SHAPE ist nach ERWARTUNGSSTUFE indiziert, die Rangleiter differenziert oben/unten
+ * bereits ein zweites Mal — beide Achsen voll aufgedreht zaehlt denselben Unterschied doppelt,
+ * und der Keller lag so tief (gewoehnlich Stufe 8: 35,6 C), dass zwischen Ziel-EV und der
+ * vereinbarten Untergrenze 35 nur 0,6 C Luft blieben: Untergrenze 35, EV 35,6 und Spreizung 12
+ * sind zu dritt nicht erfuellbar, und genau daraus entstand das Absenkungs-Kappen der
+ * Untergrenze. Bei 1.2: Stufe 0 = 78,4 C, Stufe 8 = 50,8 C (gewoehnlich 41,2) — die Ligasumme
+ * bleibt identisch, es ist eine mittelwert-erhaltende Umverteilung von der Spitze zum Keller.
+ */
+export const SPONSOR_V2_TARGET_GAMMA = 1.2;
 export const SPONSOR_V2_TARGET_EV_SHAPE: readonly number[] =
   TARGET_EV_BASE.map((v) => TARGET_EV_MEAN + (v - TARGET_EV_MEAN) * SPONSOR_V2_TARGET_GAMMA);
 
@@ -185,18 +194,18 @@ export function sponsorV2GoalPayout(evTarget: number, p: number = SPONSOR_V2_P_G
  */
 export const SPONSOR_V2_GOAL_MAX_SHARE = 0.15;
 /**
- * Die Untergrenze ist SCHUTZ, kein Kartenanteil. Sie darf nie mehr als dieser Bruchteil dessen
- * sein, was die Karte im Mittel ueberhaupt zahlt — sonst verschluckt sie Rangleiter, Klausel und
- * Sonderziel und die Karte zahlt auf jedem Platz denselben Betrag. Genau das war der Kollaps.
- */
-export const SPONSOR_V2_FLOOR_MAX_SHARE = 0.55;
-/**
  * Mindestspreizung der garantierten Rangleiter zwischen Meister und Platz 32, NACH K. Darunter ist
  * der Endrang wirtschaftlich bedeutungslos. 12 C sind rund ein Viertel der schwaechsten Karte.
  */
 export const SPONSOR_V2_MIN_LADDER_SPREAD = 12;
-/** Mindestwirkung der Klausel auf dem Erwartungsrang, NACH K. Eine Klausel mit 0,0 ist ein totes Modul. */
-export const SPONSOR_V2_MIN_CLAUSE_EFFECT = 2;
+/**
+ * Mindestwirkung der Klausel auf dem Erwartungsrang, NACH K. Eine Klausel mit 0,0 ist ein totes
+ * Modul. 1 C statt 2 C: seit der Klausel-Bonus OBERHALB der Untergrenze zahlt, ist die kleinste
+ * ehrliche Wirkung der Bonus der sichersten Klausel ("Schuldenfrei", P 0.85 -> Bonus s*(1-P) =
+ * 1,2 C). 2 C waeren nur erreichbar, indem man entweder die EV-Ableitung der Arme bricht oder die
+ * vereinbarte Untergrenze der Karte senkt — beides teurer als eine sichtbare 1,3-C-Klausel.
+ */
+export const SPONSOR_V2_MIN_CLAUSE_EFFECT = 1;
 /**
  * Groesste Spannweite (Bonus + Malus), die eine Klausel gemessen am Karten-Erwartungswert haben darf.
  *
@@ -216,13 +225,54 @@ export function sponsorV2ClauseSpreadForCard(clauseSpread: number, cardTargetEv:
 export const SPONSOR_V2_MIN_GOAL_PAYOUT = 1.5;
 
 /**
- * Untergrenze DIESER Karte: die Rarity-Untergrenze, aber gekappt auf einen Anteil des
- * Karten-Erwartungswerts. Fuer reiche Karten aendert sich nichts (die Rarity-Untergrenze bleibt
- * darunter), fuer arme Karten weicht sie — und genau die waren kollabiert.
+ * MODUL-BUDGET KLEINER KARTEN. Klausel-Bonus und Sonderziel zahlen OBERHALB der Untergrenze;
+ * ihr Erwartungswert `P*Bonus + P_Ziel*Zielgeld` ist damit ein Sockel, den keine Kalibrierung
+ * unterschreiten kann: kleinster Karten-EV = Untergrenze + Modul-EV. Liegt der Ziel-EV der Karte
+ * darunter, laeuft die Bisektion an ihren Rand und die Leiter klemmt flach auf der Untergrenze
+ * (gemessen: gewoehnlich/zielbetont Stufe 8 = 41,2 C Ziel-EV gegen 35 + 7,6 C Modul-EV). Weil die
+ * Untergrenze 35 gesetzt ist ("absolute base", Auftraggeber) und die Ziel-EV-Leiter die Ligasumme
+ * traegt, gibt das MODUL-BUDGET nach — die ausdrueckliche Freigabe des Auftraggebers: "auch wenn
+ * bei kleineren sponsoren dann bonuszahlungen usw geringer ausfallen". Skaliert werden
+ * Klausel-Spannweite und Sonderziel-Anteil GEMEINSAM, sodass der Rangleiter mindestens
+ * SPONSOR_V2_LADDER_AIR Erwartungswert ueber der Untergrenze bleibt.
  */
-export function sponsorV2FloorForCard(rarity: SponsorV2Rarity, salaryFactor: number, cardTargetEv: number): number {
-  return Math.min(sponsorV2FloorAt(rarity, salaryFactor), SPONSOR_V2_FLOOR_MAX_SHARE * Math.max(0, cardTargetEv));
+export const SPONSOR_V2_LADDER_AIR = 3;
+export function sponsorV2ModuleScale(
+  rarity: SponsorV2Rarity, profile: SponsorV2Profile, tier: number, clause: SponsorV2Clause, pGoal: number,
+): number {
+  const targets = sponsorV2CardTargets(rarity, profile, tier);
+  const cappedSpread = sponsorV2ClauseSpreadForCard(clause.s, targets.total);
+  const moduleEv = clause.p * sponsorV2ClauseBonus(cappedSpread, clause.p)
+    + pGoal * sponsorV2GoalPayout(targets.special, pGoal);
+  const budget = Math.max(0, targets.total - sponsorV2FloorAt(rarity, 1.0) - SPONSOR_V2_LADDER_AIR);
+  return moduleEv > budget && moduleEv > 0 ? budget / moduleEv : 1;
 }
+/** Karte mit der Klausel-Spannweite, mit der sie nach Kappung UND Modul-Budget wirklich rechnet. */
+export function sponsorV2EffectiveCard(card: SponsorV2Card, expectedRank: number, pGoal: number): {
+  card: SponsorV2Card;
+  /** Eingefrorenes Zielgeld dieser Karte (vor dem 15-%-Deckel der Angebotserzeugung). */
+  goalPayout: number;
+  scale: number;
+} {
+  const tier = sponsorV2TierOf(expectedRank);
+  const scale = sponsorV2ModuleScale(card.rarity, card.profile, tier, card.clause, pGoal);
+  const cappedSpread = sponsorV2ClauseSpreadForCard(card.clause.s, sponsorV2CardTargets(card.rarity, card.profile, tier).total);
+  const clause: SponsorV2Clause = { ...card.clause, s: cappedSpread * scale };
+  const special = sponsorV2CardTargets(card.rarity, card.profile, tier).special * scale;
+  return { card: { ...card, clause }, goalPayout: sponsorV2GoalPayout(special, pGoal), scale };
+}
+
+/**
+ * ENTFERNT: `sponsorV2FloorForCard` (Untergrenze je Karte absenken, bis Leiter und Klausel sichtbar
+ * werden). Es loeste den Kollaps, verletzte aber die vereinbarten Untergrenzen 35/37/39/42 —
+ * gemessen ueber den echten Erzeugungspfad garantierten Karten nur noch 10,0-34,5 C (69 Verstoesse
+ * gegen die Baender, 14 Faelle "eine Karte ist das Doppelte einer anderen derselben Rarity").
+ * Der Kollaps ist stattdessen an der Wurzel behoben: der Ziel-EV haelt Mindest-Luft ueber der
+ * Untergrenze (SPONSOR_V2_TARGET_FLOOR_HEADROOM), Klausel-Bonus und Sonderziel zahlen OBERHALB
+ * der Untergrenze (sponsorV2RawPayout), zu flache Leitern werden EV-neutral aufgekippt
+ * (buildSponsorV2Terms). Bereits eingefrorene Vertraege mit gesenkter Untergrenze (`terms.floor`)
+ * werden weiter nach ihrem eingefrorenen Wert abgerechnet.
+ */
 
 // ── Ergebnisstreuung und Rueckschritt zur Mitte ────────────────────────────────────────────────
 /** GEMESSEN, nicht gesetzt: 6.62 ueber 128 echte Team-Saisons. Design war 5.5. */
@@ -286,7 +336,11 @@ export const SPONSOR_V2_PROFILES: readonly SponsorV2Profile[] = [
     note: "groesster Sonderziel-Anteil, den die 15-%-Obergrenze zulaesst — maximaler Eigeneinfluss" },
 ];
 export function sponsorV2ProfileByName(name: string): SponsorV2Profile {
-  return SPONSOR_V2_PROFILES.find((p) => p.name === name) ?? SPONSOR_V2_PROFILES[0]!;
+  // "zielschwer" ist der alte Name von "zielbetont". Vertraege, die vor der Umbenennung
+  // eingefroren wurden, tragen ihn im Save — sie muessen auf das richtige Profil aufloesen und
+  // nicht still auf "ausgewogen" zurueckfallen.
+  const wanted = name === "zielschwer" ? "zielbetont" : name;
+  return SPONSOR_V2_PROFILES.find((p) => p.name === wanted) ?? SPONSOR_V2_PROFILES[0]!;
 }
 
 /**
@@ -383,7 +437,19 @@ export function sponsorV2GoalPayoutOf(card: SponsorV2Card, expectedRank: number,
   return sponsorV2GoalPayout(special, pGoal);
 }
 
-/** Realisierte Auszahlung VOR der K-Skalierung: konkreter Endrang, konkreter Klausel-/Zielzustand. */
+/**
+ * Realisierte Auszahlung VOR der K-Skalierung: konkreter Endrang, konkreter Klausel-/Zielzustand.
+ *
+ * DIE UNTERGRENZE SCHUETZT NUR DEN RANGTEIL (und frisst den Klausel-MALUS — akzeptierter offener
+ * Punkt 3 des Umsetzungsplans: am Tabellenende gibt es kein Abwaertsrisiko mehr). Der
+ * Klausel-BONUS und das SONDERZIEL zahlen IMMER OBENDRAUF. Vorher lagen beide mit im
+ * `max(fl, …)`: sass die Rangleiter am eigenen Rang unter der Untergrenze — fuer Kellerteams mit
+ * Gipfel/Steil-Kurven der Normalfall, nicht der Randfall —, verschluckte die Untergrenze auch
+ * erfuellte Klauseln und erreichte Sonderziele ("Klausel 0,0 · Sonderziel 0,0" auf dem
+ * Settlement-Screen: verdiente Boni, die nicht ausgezahlt wurden; 113 tote Module in 480 echt
+ * erzeugten Karten). Genau diese Semantik machte auch die Untergrenzen-Absenkung je Karte
+ * noetig — mit ihr ist sie ueberfluessig und die vereinbarten Untergrenzen 35/37/39/42 bleiben.
+ */
 export function sponsorV2RawPayout(
   card: SponsorV2Card, expectedRank: number, finalRank: number, cal: number,
   params: SponsorV2Params, clauseMet: boolean, goalMet: boolean,
@@ -391,10 +457,9 @@ export function sponsorV2RawPayout(
   const { bonus, malus } = sponsorV2ClauseArms(card.clause, params.pClause);
   const gp = params.goalPayout ?? sponsorV2GoalPayoutOf(card, expectedRank, params.pGoal);
   const fl = params.floor ?? sponsorV2FloorAt(card.rarity, 1.0);
-  const v = sponsorV2RankPart(card, expectedRank, finalRank, cal)
-    + (clauseMet ? bonus : -malus)
+  return Math.max(fl, sponsorV2RankPart(card, expectedRank, finalRank, cal) - (clauseMet ? 0 : malus))
+    + (clauseMet ? bonus : 0)
     + (goalMet ? gp : 0);
-  return Math.max(fl, v);
 }
 
 /** Die vier Auszahlungsecken (Klausel x Sonderziel) bei einem festen Endrang, VOR K. */
@@ -561,9 +626,11 @@ export function sponsorV2SettleFromTerms(
 ): number {
   const idx = Math.max(1, Math.min(32, Math.round(finalRank))) - 1;
   const fl = sponsorV2FloorAt(terms.rarity, 1.0);
-  const raw = Math.max(fl, terms.rankLadder[idx]!
-    + (clauseMet ? terms.clauseBonus : -terms.clauseMalus)
-    + (goalMet ? terms.goalPayout : 0));
+  // Untergrenze schuetzt den Rangteil (und frisst den Malus); Bonus und Sonderziel zahlen
+  // obendrauf — identisch zu sponsorV2RawPayout, sonst braeche "Anzeige == Settlement".
+  const raw = Math.max(fl, terms.rankLadder[idx]! - (clauseMet ? 0 : terms.clauseMalus))
+    + (clauseMet ? terms.clauseBonus : 0)
+    + (goalMet ? terms.goalPayout : 0);
   return sponsorV2ScaleWithK(raw, terms.rarity, terms.salaryFactor, terms.k);
 }
 

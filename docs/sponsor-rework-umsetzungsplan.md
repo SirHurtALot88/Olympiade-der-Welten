@@ -449,3 +449,66 @@ npx tsx scripts/sponsor-v2-live-check.ts --persist --name "V2 Testspiel"  # Sand
 - Golden-Sponsoren (eigene Mechanik, bleibt vorerst wie sie ist)
 - Verhandlung (`sponsor-negotiation.ts`)
 - Marken-/Flavour-Katalog
+
+## 10. Kartenraum-Sanierung (2026-07-27, zweiter Schnitt) — Untergrenze 35 bleibt, Korridor-Leiter, 15-%-Sonderziel
+
+Der Auftraggeber fand im Live-Spiel Karten, die nichts tun (magisch: flach 37,0 über alle 32 Ränge,
+Klausel 0,0, Sonderziel 0,0) und Karten, deren Sonderziel 77 % der Auszahlung trug. Der erste
+Reparaturversuch (Untergrenze je Karte absenken, `sponsorV2FloorForCard`) hat die Symptome behoben,
+aber die vereinbarte Untergrenze gebrochen: gemessen garantierten 94 von 160 Karten weniger als 35 C
+(min 15,0). Der Auftraggeber hat 35 als „absolute base" bestätigt und die Korridor-Idee vorgegeben
+(„ein platz 32 team kann ja auch ne spreizung bis platz 24 oder so haben und ab da flat nach oben").
+
+**Die Wurzel waren drei Konstruktionen, nicht eine:**
+
+1. `SPONSOR_V2_TARGET_GAMMA = 1.7` drückte den Ziel-EV der Kellerkarten auf 35,6 C — 0,6 C über die
+   Untergrenze 35. Boden 35, EV 35,6 und Spreizung 12 sind zu dritt nicht erfüllbar; genau daraus
+   entstand das Untergrenzen-Kappen. Gamma ist mittelwert-erhaltend auf **1.2** gesenkt (Stufe 0:
+   84,4 → 78,4; Stufe 8: 45,3 → 50,8; Ligasumme unverändert). Die Ziel-EV-Leiter ist nach
+   Erwartungsstufe indiziert und die Rangleiter differenziert bereits ein zweites Mal — 1.7 zählte
+   denselben Unterschied doppelt.
+2. Klausel-Bonus und Sonderziel lagen MIT im `max(Untergrenze, …)` des Settlements: saß die
+   Rangleiter am eigenen Rang unter der Untergrenze (für Kellerteams mit Gipfel/Steil der
+   Normalfall), verschluckte die Untergrenze auch erfüllte Klauseln und erreichte Ziele. Jetzt
+   schützt die Untergrenze den RANGTEIL (und frisst den Malus — akzeptierter offener Punkt 3);
+   **Bonus und Sonderziel zahlen immer obendrauf**.
+3. Das Profil „zielschwer" (70 % der Karte ins Sonderziel) sprengte jede Leiter. Es heißt jetzt
+   „zielbetont" mit dem größten Anteil, den die harte 15-%-Obergrenze zulässt; alle `specialShare`
+   sind gesenkt (.06/.04/.04/.05/.10).
+
+**Korridor-Leiter** (Vorgabe des Auftraggebers, deckungsgleich mit echten Sponsorverträgen:
+Grundbetrag + Boni für die realistischen Ziele des Klubs, kein Preis je Tabellenplatz über die ganze
+Liga): oberhalb von Erwartungsrang − 8 ist die Leiter flach auf dem Korridor-Bestwert; der
+freigesetzte EV geht als Sockel auf alle Ränge zurück; reicht die Spreizung trotzdem nicht, wird
+INNERHALB des Korridors EV-neutral gekippt, bis ≥ 12 C stehen.
+
+**Modul-Budget kleiner Karten** (ausdrückliche Freigabe: „auch wenn bei kleineren sponsoren dann
+bonuszahlungen usw geringer ausfallen"): weil Bonus und Ziel oberhalb der Untergrenze zahlen, ist
+`35 + P·Bonus + P_Ziel·Zielgeld` der kleinste erreichbare Karten-EV. Wo der Ziel-EV das nicht
+hergibt (gewöhnlich Stufe 7-8: 41,2-42,5 C gegen bis 7,6 C Modul-EV), skaliert
+`sponsorV2ModuleScale` Klauselspannweite und Sonderziel gemeinsam herunter — offen im Code
+entschieden, nicht still über eine gekappte Untergrenze.
+
+**Gemessen über den echten Erzeugungspfad** (`scripts/sponsor-v2-card-audit.ts`, 5 Sätze = 800
+Karten; Bericht: `scripts/sponsor-v2-card-space-report.ts`):
+
+| Messung | Live-Defekt (vor 089c3a68) | Zwischenstand 089c3a68 | jetzt |
+|---|---|---|---|
+| flache Leitern (< 12 C Spreizung) | 104 / 480 | 0 | **0 / 800** |
+| Sonderziel > 15 % | 409 / 480 (bis 81 %) | 0 | **0 / 800** |
+| tote Module (Klausel/Ziel 0,0) | 274 / 480 | 0 | **0 / 800** |
+| Karten unter 35 C Untergrenze | 0 (Floor fraß dafür alles) | **94 / 160, min 15,0 C** | **0 / 800** |
+| Vielfache innerhalb einer Rarity (> 1,75x) | 26 / 480 (bis 5,8x) | 14 / 480 (bis 2,2x) | **0 / 800** |
+| Untergrenzen je Rarity | 35/37/39/42 | 10,0/22,6/30,2/40,7 | **35/37/39/42** |
+| σ-Band der Karten (magisch) | 6,0–27,9 (Doku-Stand) | — | 4,3–22,4 |
+
+Fallenfreiheit (FOSD, 630 Kombinationen) und EV-Parität gelten weiter — beide Tests bauen jetzt die
+EFFEKTIVE Karte (`sponsorV2EffectiveCard`), also exakt das, was die Angebotserzeugung baut. CI-Wache:
+`tests/sponsor-v2-card-space-audit.test.ts` (sechs Kriterien, 2 Sätze über den echten Pfad) neben
+`tests/sponsor-v2-card-space.test.ts` (per-Karte-Invarianten).
+
+**Offen / ehrlich:** Verträge, die im Zeitfenster von 089c3a68 unterschrieben wurden, tragen die
+abgesenkte Untergrenze eingefroren und werden danach abgerechnet (`terms.floor` wird honoriert);
+der Live-Save des Auftraggebers behält seine VOR der Sanierung erzeugten Angebote, bis
+`regenerateSponsorOffersForSeason` läuft oder die nächste Saison neue erzeugt. Die
+Erfolgswahrscheinlichkeiten der Sonderziele bleiben Design-Schätzungen (P6/P7).

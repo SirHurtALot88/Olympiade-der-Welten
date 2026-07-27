@@ -14,7 +14,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  SPONSOR_V2_CLAUSES, SPONSOR_V2_CURVES, SPONSOR_V2_LIGA, SPONSOR_V2_PROFILES,
+  SPONSOR_V2_CLAUSES, SPONSOR_V2_CURVES, SPONSOR_V2_LIGA, SPONSOR_V2_PROFILES, sponsorV2EffectiveCard,
   SPONSOR_V2_RARITIES, SPONSOR_V2_SIGMA, SPONSOR_V2_BIAS_SHRINK, SPONSOR_V2_P_GOAL,
   SPONSOR_V2_FORM_AMPLITUDE, SPONSOR_V2_TARGET_EV_SHAPE, SPONSOR_V2_TIERS,
   sponsorV2Calibrate, sponsorV2CardTargets, sponsorV2CenterRank, sponsorV2ClauseArms,
@@ -172,16 +172,21 @@ describe("sponsor v2 model — die zwei tragenden Eigenschaften", () => {
   };
 
   it("EV-PARITAET: jede Karte trifft nach der Kalibrierung ihr Ziel-EV", { timeout: 120_000 }, () => {
+    // Kalibriert wird die EFFEKTIVE Karte — mit derselben Modul-Budget-Regel, mit der auch die
+    // Angebotserzeugung rechnet (sponsorV2EffectiveCard): Klausel-Bonus und Sonderziel zahlen
+    // oberhalb der Untergrenze, ihr EV ist ein ununterschreitbarer Sockel. Ohne die Regel ist das
+    // Ziel-EV kleiner Karten schlicht UNERREICHBAR (gewoehnlich Stufe 8: Ziel 41,2 C gegen
+    // 35 + 7,6 C Modul-EV) — die Paritaet gilt fuer das, was das Spiel erzeugen kann.
     for (const rarity of SPONSOR_V2_RARITIES) {
       for (const profile of SPONSOR_V2_PROFILES) {
         for (const curve of SPONSOR_V2_CURVES) {
           for (const clause of [SPONSOR_V2_CLAUSES[0]!, SPONSOR_V2_CLAUSES[6]!, SPONSOR_V2_CLAUSES[9]!]) {
-            const card: SponsorV2Card = { rarity, profile, curve, clause };
             for (const e of [1, 9, 18, 27, 32]) {
-              const params = sponsorV2ParamsOf(card);
-              const cal = sponsorV2Calibrate(card, e, params);
+              const eff = sponsorV2EffectiveCard({ rarity, profile, curve, clause }, e, SPONSOR_V2_P_GOAL);
+              const params = { ...sponsorV2ParamsOf(eff.card), goalPayout: eff.goalPayout };
+              const cal = sponsorV2Calibrate(eff.card, e, params);
               const target = sponsorV2CardTargets(rarity, profile, sponsorV2TierOf(e)).total;
-              expect(sponsorV2ExpectedValue(card, e, cal, params)).toBeCloseTo(target, 4);
+              expect(sponsorV2ExpectedValue(eff.card, e, cal, params)).toBeCloseTo(target, 4);
             }
           }
         }

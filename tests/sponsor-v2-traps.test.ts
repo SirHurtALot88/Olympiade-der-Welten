@@ -23,7 +23,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   SPONSOR_V2_CLAUSES, SPONSOR_V2_CURVES, SPONSOR_V2_PROFILES, SPONSOR_V2_RARITIES,
-  sponsorV2Calibrate, sponsorV2IsCollapsed, sponsorV2Lotteries, sponsorV2ParamsOf,
+  sponsorV2Calibrate, sponsorV2EffectiveCard, sponsorV2IsCollapsed, sponsorV2Lotteries, sponsorV2ParamsOf,
   sponsorV2FosdAtLeast, sponsorV2FosdStrictly,
   type SponsorV2Card, type SponsorV2Lottery,
 } from "@/lib/sponsor/sponsor-v2-model";
@@ -31,11 +31,14 @@ import {
 type Built = { name: string; lot: SponsorV2Lottery[] };
 
 function build(card: SponsorV2Card, expectedRank: number): Built {
-  const params = sponsorV2ParamsOf(card);
-  const cal = sponsorV2Calibrate(card, expectedRank, params);
+  // Gebaut wird die EFFEKTIVE Karte — mit Klausel-Kappung und Modul-Budget, wie in der
+  // Angebotserzeugung. Fallenfreiheit einer Karte, die das Spiel so nie erzeugt, waere wertlos.
+  const eff = sponsorV2EffectiveCard(card, expectedRank, sponsorV2ParamsOf(card).pGoal);
+  const params = { ...sponsorV2ParamsOf(eff.card), goalPayout: eff.goalPayout };
+  const cal = sponsorV2Calibrate(eff.card, expectedRank, params);
   return {
     name: `${card.rarity}/${card.curve.name}/${card.profile.name}/${card.clause.name}`,
-    lot: sponsorV2Lotteries(card, expectedRank, cal, params),
+    lot: sponsorV2Lotteries(eff.card, expectedRank, cal, params),
   };
 }
 
