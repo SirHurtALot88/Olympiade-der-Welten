@@ -1,5 +1,6 @@
 import type { PlayerAttributeSheetStats } from "@/lib/data/olyDataTypes";
 import { getFatiguePerformancePenaltyPercent, getFatigueRiskLevel } from "@/lib/fatigue/fatigue-calibration";
+import { computeProjectedScoreBand, getIntensityMean } from "@/lib/lineups/matchday-score-band";
 import {
   officialDisciplineWeightLabels,
   officialDisciplineWeightMatrix,
@@ -74,17 +75,22 @@ const INTENSITY_CONFIG: Record<
     scoreModifier: number;
     fatigueBase: number;
     additionalFatigueCap: number;
-    rangeLowPercent: number;
-    rangeHighPercent: number;
     strainLoadModifier: number;
   }
 > = {
-  // scoreModifier = ERWARTUNGSWERT (Mittelpunkt) des seeded Intensitäts-Bereichs im echten Score
-  // (INTENSITY_SCORE_RANGE: Schonen −3..−2 → −2.5, Normal −2..+2 → 0, Push +2..+6 → +4). Die
-  // Vorschau ist ein Punkt-Estimate; die Streuung selbst würfelt der Resolve pro Spieltag seeded.
-  conserve: { label: "Schonen", scoreModifier: -2.5, fatigueBase: 1, additionalFatigueCap: 5, rangeLowPercent: -0.02, rangeHighPercent: 0.01, strainLoadModifier: -1 },
-  normal: { label: "Normal", scoreModifier: 0, fatigueBase: 3, additionalFatigueCap: 8, rangeLowPercent: -0.05, rangeHighPercent: 0.05, strainLoadModifier: 0 },
-  push: { label: "Push", scoreModifier: 4, fatigueBase: 4, additionalFatigueCap: 11, rangeLowPercent: -0.03, rangeHighPercent: 0.07, strainLoadModifier: 2 },
+  // scoreModifier = getIntensityMean(intensity), the midpoint of INTENSITY_SCORE_RANGE in
+  // legacy-lineup-modifiers.ts — the SAME range the real resolve draws from via
+  // seededIntensityShare. Derived at runtime (not hardcoded) so it can never silently drift from
+  // that range again, including under its OLY_INTENSITY_*_MIN/MAX env overrides.
+  //
+  // NOTE: this used to also carry rangeLowPercent/rangeHighPercent (a *percentage-of-score* band)
+  // that was completely independent of what the resolve actually draws (an *absolute-points*
+  // range) — the lineup UI showed a range the resolve could never produce. That percentage band
+  // has been removed; calculateMatchdayProjectedPreview below now calls computeProjectedScoreBand,
+  // which reads the real INTENSITY_SCORE_RANGE directly (see matchday-score-band.ts).
+  conserve: { label: "Schonen", scoreModifier: getIntensityMean("conserve"), fatigueBase: 1, additionalFatigueCap: 5, strainLoadModifier: -1 },
+  normal: { label: "Normal", scoreModifier: getIntensityMean("normal"), fatigueBase: 3, additionalFatigueCap: 8, strainLoadModifier: 0 },
+  push: { label: "Push", scoreModifier: getIntensityMean("push"), fatigueBase: 4, additionalFatigueCap: 11, strainLoadModifier: 2 },
 };
 
 const DISCIPLINE_ROLE_THEMES: Record<OfficialDisciplineWeightId, SlotRoleTheme[]> = {
@@ -803,24 +809,18 @@ export function calculateMatchdayProjectedPreview(input: {
   const rangeRiskSpread = fatigueRisk === "hoch" ? 2 : fatigueRisk === "mittel" ? 1 : 0;
   const rivalrySpread = input.intensity === "push" ? rivalryPressureModifier : 0;
   const baseRangeAnchor = Math.max(fatigueAdjustedScore + knownModifierBonus, 0);
-  const rangeLow = Number(
-    (
-      totalProjected +
-      baseRangeAnchor * intensityConfig.rangeLowPercent -
-      rangeRiskSpread -
-      rivalrySpread -
-      revealVariance * 0.5
-    ).toFixed(1),
-  );
-  const rangeHigh = Number(
-    (
-      totalProjected +
-      baseRangeAnchor * intensityConfig.rangeHighPercent +
-      rangeRiskSpread +
-      rivalrySpread +
-      revealVariance * 0.5
-    ).toFixed(1),
-  );
+  // computeProjectedScoreBand reads INTENSITY_SCORE_RANGE from legacy-lineup-modifiers.ts — the
+  // EXACT constant legacy-score-engine.ts draws the real intensity contribution from via
+  // seededIntensityShare. This IS the band the resolved score's intensity share is drawn from
+  // (plus the pre-existing, intensity-unrelated fatigue-risk/rivalry/reveal spread below), not a
+  // cosmetic display range with its own independent numbers.
+  const { rangeLow, rangeHigh } = computeProjectedScoreBand({
+    baseRangeAnchor,
+    intensity: input.intensity,
+    rangeRiskSpread,
+    rivalrySpread,
+    revealVariance,
+  });
 
   return {
     baseScore,
