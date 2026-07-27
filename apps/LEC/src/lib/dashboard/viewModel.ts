@@ -99,14 +99,22 @@ export interface SortimentRow {
   currentEk: number | null;
   corridor: { min: number; good: number };
   /** Ampel-Status: vergleicht den AKTUELLEN Listen-VK (Fallback: realisierter Ø-VK, wenn kein
-   * Artikelstamm-Preis vorliegt) gegen den Korridor. */
-  priceStatus: ReturnType<typeof classifyPriceStatus>;
+   * Artikelstamm-Preis vorliegt) gegen den Korridor. `"kein_ek"` (FIX 1) statt einem der drei
+   * Korridor-Status, wenn `ekMissing` true ist -- der Korridor waere sonst auf Basis EK=0
+   * winzig und wuerde "im Korridor"/"unter MIN" vortaeuschen, obwohl der EK schlicht unbekannt
+   * ist. Bewusst als Erweiterung des Rueckgabetyps (nicht `| null`), um den bestehenden
+   * Korridor-/Ampel-Code (SortimentTable, /sortiment) nicht mit Null-Checks zu durchziehen. */
+  priceStatus: ReturnType<typeof classifyPriceStatus> | "kein_ek";
   articleClass: ArticleClass;
   classLabel: string;
   /** DB I / DB II je verkauftem Stueck (Referenz-Periode, REALISIERT), DB II % gleiche Basis wie Klassifikation. */
   dbIPerUnit: number;
   dbIIPerUnit: number;
   dbIIPercent: number;
+  /** true = weder realisierter EK (Referenz-Fenster) noch aktueller Listen-EK bekannt
+   * (FIX 1, KONZEPT §7.3/§8) -- betrifft laut Chris 747 aktive Artikel. Ohne diesen Flag
+   * wuerde die App Phantom-Margen (dbI = Umsatz − 0) als echte Marge behandeln. */
+  ekMissing: boolean;
   /** Rank/Verkaeufe/Umsatz/Ø-Preis je Fenster (30/90/365/all) fuer die Dashboard-Spalten. */
   windows: Partial<Record<SaleWindowKey, SortimentWindowMetrics>>;
   /** true = im aktuellen Billbee-Artikelstamm-Katalog (nicht ausgelaufen). */
@@ -132,19 +140,26 @@ export interface RecommendationLotItem {
   articleId: string;
   nameRaw: string;
   setCode: string | null;
-  boundCapital: number;
+  /** Bestand x EK/Stk (FIX 2, siehe `boundCapitalOf`) -- NICHT der Lebenszeit-EK bereits
+   * verkaufter Stuecke. `null`, wenn fuer diesen Artikel nie ein Bestandsimport lief
+   * (`active === false`): dann ist der Bestand per Definition unbekannt, nicht 0 --
+   * eine erfundene 0 waere hier schlimmer als eine ehrliche Luecke. */
+  boundCapital: number | null;
 }
 
 export interface Recommendation {
   /** Stabile ID fuer clientseitiges "Ausblenden" (localStorage, /empfehlungen). */
   id: string;
-  kind: "auslisten" | "preis_anpassen" | "nachkaufen" | "lot_bilden";
+  kind: "ek_pflegen" | "auslisten" | "preis_anpassen" | "nachkaufen" | "lot_bilden";
   title: string;
   detail: string;
   effect: string;
-  /** Numerischer Betrag hinter `effect` -- Basis fuer "Sortierung nach €-Effekt" (PAGES_CONCEPT §4). */
+  /** Numerischer Betrag hinter `effect` -- Basis fuer "Sortierung nach €-Effekt" (PAGES_CONCEPT §4).
+   * FIX 4 (KONZEPT §7.3/§8): durchgaengig "€ gesamt", NIE €/Stk -- siehe Formel-Kommentare je
+   * Empfehlungsart in `buildRecommendations`. Ausnahme `ek_pflegen`: kein €-Betrag (der Punkt ist ja
+   * gerade, dass der EK fehlt), traegt die Anzahl betroffener Artikel und steht immer ganz oben. */
   effectValue: number;
-  /** Suchbegriff fuer den Link zu /sortiment?q=… (nicht bei kind === "lot_bilden", das verlinkt nicht 1:1). */
+  /** Suchbegriff fuer den Link zu /sortiment?q=… (nicht bei kind === "lot_bilden"/"ek_pflegen", das verlinkt nicht 1:1). */
   linkQuery?: string;
   /** Nur bei kind === "lot_bilden": aufklappbare Ladenhüter-Artikelliste (nicht 900 Einzelzeilen). */
   items?: RecommendationLotItem[];
@@ -305,6 +320,45 @@ export interface ClassifiedArticle {
   reason: string;
 }
 
+/**
+ * FIX 1 (KONZEPT §7.3/§8): true, wenn WEDER ein realisierter EK (irgendein Fenster mit
+ * qty>0 und ek>0) NOCH ein aktueller Listen-EK (Artikelstamm) bekannt ist. Ohne jeden
+ * EK-Anhaltspunkt ist dbI = Umsatz − 0 eine Phantom-Marge von ~100 % -- genau die Kette,
+ * die laut Chris Klassifikation ("Champion") und Empfehlungen ("nachkaufen") vergiftet.
+ * Zentrale Stelle, wiederverwendet von Klassifikation, Preis-Korridor-Status UND der
+ * "EK pflegen"-Empfehlung, damit alle drei denselben Begriff von "EK fehlt" nutzen.
+ */
+export function hasNoEkData(a: ArticleAggregate): boolean {
+  const hasRealizedEk = (Object.keys(a.windows) as SaleWindowKey[]).some((key) => {
+    const w = a.windows[key];
+    return !!w && w.qty > 0 && w.ek > 0;
+  });
+  const hasCurrentEk = a.currentEk !== null && a.currentEk > 0;
+  return !hasRealizedEk && !hasCurrentEk;
+}
+
+/**
+ * FIX 2 (KONZEPT §5.4/§8): gebundenes Kapital eines Artikels = Bestand (Stk) x EK/Stk --
+ * NICHT der Lebenszeit-EK bereits VERKAUFTER Stuecke (das zaehlt Wareneinsatz von Stuecken,
+ * die nicht mehr im Regal liegen, siehe Bug in topFlop.ts/viewModel.ts vor diesem Fix).
+ * EK/Stk-Basis: aktueller Listen-EK (Artikelstamm), sonst realisierter EK/Stk der
+ * Referenz-Periode. `null`, wenn fuer diesen Artikel nie ein Bestandsimport lief
+ * (`active === false` -> `stock` ist dann per Definition 0/unbekannt, nicht "0 Stk im
+ * Regal", siehe ArticleAggregate.stock) -- eine erfundene 0 waere schlimmer als eine
+ * ehrliche Luecke ("Bestand unbekannt").
+ */
+export function boundCapitalOf(a: ArticleAggregate): number | null {
+  if (!a.active) return null;
+  const referenceAgg = a.windows["365"] ?? a.windows.all;
+  const ekPerUnit =
+    a.currentEk !== null && a.currentEk > 0
+      ? a.currentEk
+      : referenceAgg && referenceAgg.qty > 0
+        ? referenceAgg.ek / referenceAgg.qty
+        : 0;
+  return a.stock * ekPerUnit;
+}
+
 /** Klassifikation je Artikel (regelbasiert, KONZEPT §8 Stufe 1) -- wiederverwendbarer Baustein. */
 export function classifyArticles(articles: ArticleAggregate[]): ClassifiedArticle[] {
   return articles.map((a) => {
@@ -314,6 +368,12 @@ export function classifyArticles(articles: ArticleAggregate[]): ClassifiedArticl
       qty365d: a.windows["365"]?.qty ?? 0,
       qtyAllTime: a.windows.all?.qty ?? 0,
       dbIIPercent: pct(a.windows.all?.dbII ?? 0, a.windows.all?.revenue ?? 1),
+      // Defensiv: `stock` ist nur bei aktiven (importierten) Artikeln ein echter Wert (siehe
+      // ArticleAggregate.stock) -- auch wenn das aktuelle Datenmodell das schon garantiert,
+      // schuetzt das FIX 3 davor, dass ein kuenftiger Importer-Bug ausgelaufene Artikel
+      // faelschlich zu Ladenhuetern macht.
+      stock: a.active ? a.stock : 0,
+      ekMissing: hasNoEkData(a),
     });
     return { article: a, ...c };
   });
@@ -352,7 +412,17 @@ export function buildSortimentRow(
     costSettings
   );
   const corridor = computePriceCorridor(hk.total, vkForCorridor || hk.total, costSettings);
-  const priceStatus = vkForCorridor > 0 ? classifyPriceStatus(vkForCorridor, corridor) : "im_korridor";
+  const ekMissing = hasNoEkData(a);
+  // FIX 1: Ohne EK ist der Korridor auf Basis EK=0 winzig (HK enthaelt praktisch nur
+  // Versand/Gebuehren) -- der reale VK liegt dann fast immer "im Korridor" oder "ueber
+  // Markt", obwohl das nichts mit einem tatsaechlich guten Preis zu tun hat. Statt dieser
+  // falschen Sicherheit: expliziter "kein_ek"-Status, der die Ampel/Preis-Korridor-UI NICHT
+  // gruen/rot lackiert, sondern als "wir wissen es nicht" kennzeichnet.
+  const priceStatus = ekMissing
+    ? "kein_ek"
+    : vkForCorridor > 0
+      ? classifyPriceStatus(vkForCorridor, corridor)
+      : "im_korridor";
 
   const dbIPerUnit = referenceAgg && referenceAgg.qty > 0 ? referenceAgg.dbI / referenceAgg.qty : 0;
   const dbIIPerUnit = referenceAgg && referenceAgg.qty > 0 ? referenceAgg.dbII / referenceAgg.qty : 0;
@@ -385,6 +455,7 @@ export function buildSortimentRow(
     dbIPerUnit,
     dbIIPerUnit,
     dbIIPercent,
+    ekMissing,
     windows: windowMetrics,
     active: a.active,
     stock: a.stock,
@@ -431,6 +502,7 @@ export const LABELS_DE: Record<ArticleClass, string> = {
 };
 
 const RECOMMENDATION_KIND_PRIORITY: Record<Recommendation["kind"], number> = {
+  ek_pflegen: -1,
   auslisten: 0,
   preis_anpassen: 1,
   nachkaufen: 2,
@@ -442,14 +514,47 @@ const RECOMMENDATION_KIND_PRIORITY: Record<Recommendation["kind"], number> = {
  * PAGES_CONCEPT §4: vollstaendige Liste fuer `/empfehlungen`, priorisiert nach
  * €-Effekt. Das Dashboard zeigt davon nur die ersten 4 (Top-4 + "Alle
  * ansehen"-Teaser, siehe DashboardShell/Recommendations).
+ *
+ * FIX 4 (KONZEPT §7.3/§8): `effectValue` ist durchgaengig "€ gesamt" normiert, damit die
+ * Sortierung ueber verschiedene Empfehlungsarten hinweg und die KPI-Summen auf
+ * /empfehlungen ueberhaupt vergleichbar sind (vorher mischte preis_anpassen €/Stk mit
+ * Lebenszeit-Summen bei nachkaufen/auslisten/lot_bilden). Formel je Art -- siehe
+ * Kommentare an den jeweiligen Schleifen unten.
  */
 export function buildRecommendations(
   classified: Array<{ article: ArticleAggregate; articleClass: ArticleClass; reason: string }>,
   sortiment: SortimentRow[]
 ): Recommendation[] {
   const recommendations: Recommendation[] = [];
+  const sortimentByArticleId = new Map(sortiment.map((s) => [s.articleId, s]));
+
+  // EK pflegen (FIX 1, KONZEPT §7.3/§8): EIN Sammel-Eintrag, ganz oben (siehe Sortierung
+  // unten) -- aktive Artikel ohne jeden EK-Anhaltspunkt vergiften Klassifikation
+  // ("Champion" trotz Phantom-Marge) UND Nachkauf-Empfehlungen. Nur AKTIVE Artikel zaehlen
+  // (ausgelaufene ohne EK sind kein akutes Problem, siehe KONZEPT §7.3), sortiert nach
+  // 90-Tage-Velocity: dort verzerrt der fehlende EK am meisten (die Karte VERKAUFT sich
+  // gerade auf Basis eines unbekannten Einkaufspreises).
+  const ekMissingActive = classified
+    .filter((c) => c.article.active && hasNoEkData(c.article))
+    .sort((a, b) => (b.article.windows["90"]?.qty ?? 0) - (a.article.windows["90"]?.qty ?? 0));
+  if (ekMissingActive.length > 0) {
+    const top = ekMissingActive[0].article;
+    const topQty90 = top.windows["90"]?.qty ?? 0;
+    recommendations.push({
+      id: "ek_pflegen",
+      kind: "ek_pflegen",
+      title: `EK pflegen (${ekMissingActive.length} Artikel).`,
+      detail:
+        `Kein Einkaufspreis hinterlegt (weder realisiert noch im Artikelstamm) -- ` +
+        `Klassifikation und Nachkauf-Empfehlung sind ohne EK nicht belastbar. ` +
+        `Staerkster Fall: ${shortName(top.nameRaw)}${topQty90 > 0 ? ` (90 T: ${topQty90} Verk.)` : ""}.`,
+      effect: `${ekMissingActive.length} aktive Artikel ohne EK`,
+      effectValue: ekMissingActive.length,
+    });
+  }
 
   // Auslisten: JEDER Low-Runner (nicht nur der schlechteste einzelne Fall).
+  // effectValue = |Lebenszeit-DB II| -- bereits eine "€ gesamt"-Groesse (Fix 4 unveraendert).
   for (const c of classified.filter((c) => c.articleClass === "low_runner")) {
     const dbIILifetime = c.article.windows.all?.dbII ?? 0;
     recommendations.push({
@@ -463,32 +568,50 @@ export function buildRecommendations(
     });
   }
 
-  // Preis anpassen: JEDER Artikel unter dem MIN-Korridor.
+  // Preis anpassen: JEDER Artikel unter dem MIN-Korridor (kein_ek-Artikel fallen hier
+  // automatisch raus, siehe SortimentRow.priceStatus/FIX 1).
+  // FIX 4: effectValue = Preis-Luecke/Stk x Hebel (max. aus Bestand ODER 90T-Velocity) --
+  // "€ gesamt", NICHT mehr €/Stk. Der Hebel ist bewusst das Maximum aus Bestand (koennte man
+  // sofort umpreisen) und 90T-Absatz (wird ohnehin in den naechsten ~3 Monaten verkauft),
+  // weil beide Wege real Geld bewegen, unabhaengig davon, welcher Wert gerade groesser ist.
   for (const s of sortiment.filter((s) => s.priceStatus === "unter_min")) {
     const alertVk = s.listingVk ?? s.avgVkRealized;
     const gap = s.corridor.min - alertVk;
+    const qty90 = s.windows["90"]?.qty ?? 0;
+    const lever = Math.max(s.stock, qty90);
+    const effectValue = gap * lever;
     recommendations.push({
       id: `preis_anpassen:${s.articleId}`,
       kind: "preis_anpassen",
       title: `${shortName(s.nameRaw)} VK anheben.`,
       detail: `Aktueller VK ${alertVk.toFixed(2)} € liegt unter dem MIN-Korridor ${s.corridor.min.toFixed(2)} €.`,
-      effect: `+ € ${gap.toFixed(2)} / Stk`,
-      effectValue: gap,
+      effect:
+        lever > 0
+          ? `+ € ${effectValue.toFixed(0)} gesamt (${lever} Stk × ${gap.toFixed(2)} €/Stk)`
+          : `+ € ${gap.toFixed(2)} / Stk (kein Bestand/Absatz zur Hochrechnung)`,
+      effectValue,
       linkQuery: s.setCode ?? s.nameRaw,
     });
   }
 
-  // Nachkaufen: JEDER Champion.
+  // Nachkaufen: JEDER Champion (Artikel mit ekMissing koennen laut Klassifikation nie
+  // Champion sein, siehe FIX 1 -- kein zusaetzlicher Filter hier noetig).
+  // FIX 4: effectValue = Erwartungswert der naechsten ~3 Monate (DB II/Stk x 90T-Velocity),
+  // NICHT mehr die Lebenszeit-DB-II-Summe -- die sagt nichts darueber aus, was ein Nachkauf
+  // heute noch bringt (siehe KONZEPT §2 Bundle-Falle: Lebenszeit-Zahlen taeuschen).
   for (const c of classified.filter((c) => c.articleClass === "champion")) {
-    const dbIILifetime = c.article.windows.all?.dbII ?? 0;
-    const dbIIPercentLifetime = pct(dbIILifetime, c.article.windows.all?.revenue ?? 1);
+    const row = sortimentByArticleId.get(c.article.articleId);
+    const dbIIPerUnit = row?.dbIIPerUnit ?? 0;
+    const dbIIPercentLifetime = row?.dbIIPercent ?? 0;
+    const qty90 = c.article.windows["90"]?.qty ?? 0;
+    const expectedDbII = dbIIPerUnit * qty90;
     recommendations.push({
       id: `nachkaufen:${c.article.articleId}`,
       kind: "nachkaufen",
       title: `${shortName(c.article.nameRaw)} nachkaufen.`,
       detail: c.reason,
-      effect: `DB II ${(dbIIPercentLifetime * 100).toFixed(0)}% · € ${dbIILifetime.toFixed(0)}`,
-      effectValue: Math.abs(dbIILifetime),
+      effect: `≈ € ${expectedDbII.toFixed(0)} / 90 T erwartet (DB II ${(dbIIPercentLifetime * 100).toFixed(0)}% · ${dbIIPerUnit.toFixed(2)} €/Stk × ${qty90} Stk)`,
+      effectValue: expectedDbII,
       linkQuery: c.article.setCode ?? c.article.nameRaw,
     });
   }
@@ -496,6 +619,9 @@ export function buildRecommendations(
   // Ladenhüter: EIN Sammel-Eintrag mit aufklappbarer Artikelliste (nicht
   // hunderte Einzelzeilen) -- Liste auf die groessten Kapitalbinder gedeckelt,
   // vollstaendige Aufschluesselung ueber /sortiment?klasse=ladenhueter.
+  // FIX 2: boundCapital = Bestand x EK/Stk (siehe `boundCapitalOf`), NICHT mehr der
+  // Lebenszeit-EK bereits verkaufter Stuecke. Artikel ohne Bestandsimport (`null`) werden
+  // NICHT als 0 mitsummiert (siehe Filter unten), sondern separat ausgewiesen.
   const ladenhueter = classified.filter((c) => c.articleClass === "ladenhueter");
   if (ladenhueter.length > 0) {
     const items: RecommendationLotItem[] = ladenhueter
@@ -503,15 +629,21 @@ export function buildRecommendations(
         articleId: c.article.articleId,
         nameRaw: c.article.nameRaw,
         setCode: c.article.setCode,
-        boundCapital: c.article.windows.all?.ek ?? 0,
+        boundCapital: boundCapitalOf(c.article),
       }))
-      .sort((a, b) => b.boundCapital - a.boundCapital);
-    const boundCapital = items.reduce((sum, i) => sum + i.boundCapital, 0);
+      .sort((a, b) => (b.boundCapital ?? -1) - (a.boundCapital ?? -1));
+    const knownItems = items.filter((i): i is RecommendationLotItem & { boundCapital: number } => i.boundCapital !== null);
+    const unknownStockCount = items.length - knownItems.length;
+    const boundCapital = knownItems.reduce((sum, i) => sum + i.boundCapital, 0);
+    const unknownNote =
+      unknownStockCount > 0
+        ? ` ${unknownStockCount} davon ohne Bestandsimport -- Bestand unbekannt, nicht mitgerechnet.`
+        : "";
     recommendations.push({
       id: "lot_bilden",
       kind: "lot_bilden",
       title: "Ladenhüter zu Lots bündeln.",
-      detail: `${ladenhueter.length} Artikel ohne Velocity (0 Verk. in 365 T trotz Historie) — als Sammlungs-Lot abverkaufen.`,
+      detail: `${ladenhueter.length} Artikel ohne Velocity (0 Verk. in 365 T trotz Historie) — als Sammlungs-Lot abverkaufen.${unknownNote}`,
       effect: `≈ € ${boundCapital.toFixed(0)} gebunden`,
       effectValue: boundCapital,
       items: items.slice(0, 50),
@@ -519,6 +651,11 @@ export function buildRecommendations(
   }
 
   recommendations.sort((a, b) => {
+    // FIX 1: "EK pflegen" ist eine Datenqualitaets-Warnung, kein €-Effekt-Ranking-Kandidat
+    // -- sie steht IMMER ganz oben, unabhaengig von effectValue.
+    const aIsEkPflegen = a.kind === "ek_pflegen";
+    const bIsEkPflegen = b.kind === "ek_pflegen";
+    if (aIsEkPflegen !== bIsEkPflegen) return aIsEkPflegen ? -1 : 1;
     const diff = Math.abs(b.effectValue) - Math.abs(a.effectValue);
     if (diff !== 0) return diff;
     return RECOMMENDATION_KIND_PRIORITY[a.kind] - RECOMMENDATION_KIND_PRIORITY[b.kind];

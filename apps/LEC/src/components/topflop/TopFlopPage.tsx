@@ -76,7 +76,11 @@ export function TopFlopPage({ articles, classByArticleId }: Props) {
           subtitle="0 Verkäufe in 365 T trotz Historie"
           accentVar="--warn"
           items={result.ladenhueter}
-          headerNote={`≈ € ${formatEuro(result.ladenhueterBoundCapital)} gebunden · ${result.ladenhueterCount} Artikel`}
+          headerNote={`≈ € ${formatEuro(result.ladenhueterBoundCapital)} gebunden · ${result.ladenhueterCount} Artikel${
+            result.ladenhueterUnknownStockCount > 0
+              ? ` (${result.ladenhueterUnknownStockCount} ohne Bestandsimport, Bestand unbekannt)`
+              : ""
+          }`}
           emptyText="Keine Ladenhüter gefunden."
         />
       </section>

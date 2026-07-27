@@ -1,6 +1,6 @@
 import type { SaleWindowKey } from "../parsing/date";
 import type { ArticleClass } from "../pricing/classification";
-import type { ArticleAggregate, ClassifiedArticle } from "./viewModel";
+import { boundCapitalOf, type ArticleAggregate, type ClassifiedArticle } from "./viewModel";
 
 /** Eine Zeile einer Top/Flop-Rangliste -- generischer Baustein fuer `RankList` (PAGES_CONCEPT §2). */
 export interface RankItem {
@@ -23,6 +23,10 @@ export interface TopFlopResult {
   ladenhueter: RankItem[];
   ladenhueterCount: number;
   ladenhueterBoundCapital: number;
+  /** FIX 2: Ladenhüter ohne Bestandsimport (`active === false`), deren gebundenes Kapital
+   * daher unbekannt (nicht 0) ist -- in `ladenhueterBoundCapital`/`ladenhueter` NICHT
+   * mitgezaehlt, hier separat ausgewiesen statt stillschweigend als 0 zu summieren. */
+  ladenhueterUnknownStockCount: number;
 }
 
 function pct(numerator: number, denominator: number): number {
@@ -105,19 +109,26 @@ export function buildTopFlop(
   });
 
   const allLadenhueter = articles.filter((a) => classByArticle.get(a.articleId) === "ladenhueter");
-  const ladenhueterBoundCapital = allLadenhueter.reduce((sum, a) => sum + (a.windows.all?.ek ?? 0), 0);
-  const ladenhueterSource = [...allLadenhueter]
-    .sort((a, b) => (b.windows.all?.ek ?? 0) - (a.windows.all?.ek ?? 0))
+  // FIX 2 (KONZEPT §5.4/§8): "gebundenes Kapital" ist Bestand x EK/Stk, NICHT der
+  // Lebenszeit-EK bereits VERKAUFTER Stuecke (`windows.all.ek`) -- das zaehlte bisher den
+  // Wareneinsatz von Karten, die laengst nicht mehr im Regal liegen. Artikel ohne
+  // Bestandsimport (`boundCapitalOf` -> null) fliessen NICHT als erfundene 0 in Summe/Ranking
+  // ein, sondern werden separat gezaehlt (`ladenhueterUnknownStockCount`).
+  const knownStockLadenhueter = allLadenhueter.filter((a) => boundCapitalOf(a) !== null);
+  const ladenhueterUnknownStockCount = allLadenhueter.length - knownStockLadenhueter.length;
+  const ladenhueterBoundCapital = knownStockLadenhueter.reduce((sum, a) => sum + (boundCapitalOf(a) ?? 0), 0);
+  const ladenhueterSource = [...knownStockLadenhueter]
+    .sort((a, b) => (boundCapitalOf(b) ?? 0) - (boundCapitalOf(a) ?? 0))
     .slice(0, 10);
   const ladenhueter: RankItem[] = ladenhueterSource.map((a) => {
-    const ek = a.windows.all?.ek ?? 0;
+    const capital = boundCapitalOf(a) ?? 0;
     return {
       articleId: a.articleId,
       nameRaw: shortName(a.nameRaw),
       setCode: a.setCode,
-      barValue: ek,
-      valueLabel: `€ ${ek.toFixed(0)} gebunden`,
-      meta: [`${a.windows.all?.qty ?? 0} Stk verkauft (Lebenszeit)`, "0 Verk. in 365 T"],
+      barValue: capital,
+      valueLabel: `€ ${capital.toFixed(0)} gebunden`,
+      meta: [`Bestand ${a.stock} Stk`, `${a.windows.all?.qty ?? 0} Stk verkauft (Lebenszeit)`, "0 Verk. in 365 T"],
     };
   });
 
@@ -129,5 +140,6 @@ export function buildTopFlop(
     ladenhueter,
     ladenhueterCount: allLadenhueter.length,
     ladenhueterBoundCapital,
+    ladenhueterUnknownStockCount,
   };
 }

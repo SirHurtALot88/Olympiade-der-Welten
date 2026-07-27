@@ -18,6 +18,9 @@ export const STATUS_PILL: Record<SortimentRow["priceStatus"], { cls: string; lab
   unter_min: { cls: "p-crit", label: "unter MIN" },
   im_korridor: { cls: "p-good", label: "im Korridor" },
   ueber_gut: { cls: "p-mkt", label: "über Markt" },
+  // FIX 1: kein Korridor-Status, sondern Kennzeichnung "wir kennen den EK nicht" --
+  // bewusst NICHT gruen/rot, damit hier keine falsche Sicherheit vorgetaeuscht wird.
+  kein_ek: { cls: "p-warn", label: "kein EK" },
 };
 
 type ColId = "artikel" | "velocity" | "umsatz" | "vk" | "korridor" | "klasse" | "status";

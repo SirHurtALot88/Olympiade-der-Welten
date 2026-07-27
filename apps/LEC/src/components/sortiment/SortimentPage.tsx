@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
 import type { ArticleClass } from "@/lib/pricing/classification";
-import type { PriceStatus } from "@/lib/pricing/costEngine";
 import type { SaleWindowKey } from "@/lib/parsing/date";
 import { LABELS_DE } from "@/lib/dashboard/viewModel";
 import { normalizedNameKey } from "@/lib/parsing/name";
@@ -22,7 +21,10 @@ const WINDOW_ORDER: { key: SaleWindowKey; label: string }[] = [
 ];
 
 const CLASS_ORDER: ArticleClass[] = ["champion", "solide", "beobachten", "faellt_ab", "low_runner", "ladenhueter"];
-const STATUS_ORDER: PriceStatus[] = ["unter_min", "im_korridor", "ueber_gut"];
+/** SortimentRow.priceStatus statt costEngine.PriceStatus (FIX 1): enthaelt zusaetzlich
+ * "kein_ek" fuer Artikel ohne jeden EK-Anhaltspunkt. */
+type RowPriceStatus = SortimentRow["priceStatus"];
+const STATUS_ORDER: RowPriceStatus[] = ["unter_min", "im_korridor", "ueber_gut", "kein_ek"];
 
 type ColId =
   | "artikel"
@@ -144,7 +146,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     const raw = searchParams.get("klasse");
     return raw ? new Set(raw.split(",").filter((c): c is ArticleClass => CLASS_ORDER.includes(c as ArticleClass))) : new Set();
   });
-  const [statusFilter, setStatusFilter] = useState<Set<PriceStatus>>(new Set());
+  const [statusFilter, setStatusFilter] = useState<Set<RowPriceStatus>>(new Set());
   const [onlyLadenhueter, setOnlyLadenhueter] = useState(false);
   // Standardmaessig nur AKTIVE Artikel zeigen (Billbee-Artikelstamm-Katalog);
   // ausgelaufene (nur in der Verkaufshistorie bekannte) Artikel sind ein
@@ -177,7 +179,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     setVisibleCount(PAGE_SIZE);
   }
 
-  function toggleStatus(status: PriceStatus) {
+  function toggleStatus(status: RowPriceStatus) {
     setStatusFilter((prev) => {
       const next = new Set(prev);
       if (next.has(status)) next.delete(status);
