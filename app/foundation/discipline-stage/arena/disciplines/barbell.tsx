@@ -20,6 +20,21 @@ type BarbellState = {
   glideT: number;
 };
 
+/**
+ * Startpunkt für einen NEUEN Glide: immer die aktuelle Position des Hebers.
+ *
+ * - Glide läuft noch (`glideT < 1`): die interpolierte Zwischenposition.
+ * - Glide ist durch (`glideT >= 1`): das erreichte Ziel `toY` — NICHT das alte `fromY`.
+ *
+ * Der zweite Fall war der Fehler: zu Beginn jeder Runde wurde `fromY` beibehalten, wodurch
+ * der Heber auf seine ursprüngliche Höhe (baseY, also 0 kg) zurücksprang und von dort erneut
+ * hochglitt, statt von der bereits gestemmten Last weiterzusteigen. Die Darstellung fing
+ * damit jede Runde sichtbar von vorn an.
+ */
+export function resolveBarbellGlideStart(state: Pick<BarbellState, "fromY" | "toY" | "glideT">): number {
+  return state.glideT < 1 ? state.fromY + (state.toY - state.fromY) * state.glideT : state.toY;
+}
+
 export default function BarbellField(props: DisciplineFieldProps): ReactNode {
   const {
     primitive: prim,
@@ -53,6 +68,12 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
   // Pro-Token Gleit-Zustand + DOM-Refs für imperatives Positioning
   const barbellRef = useRef<Map<number, BarbellState>>(new Map());
   const gRefs = useRef<Map<number, SVGGElement | null>>(new Map());
+  // Enthüllungs-Rechteck des Gewichts-Turms je Token. Der Turm wird bis zum ENDGEWICHT des
+  // Teams gezeichnet und über dieses Rechteck beschnitten: die rAF-Schleife zieht es exakt
+  // auf die animierte Token-Höhe, sodass die Platten Stück für Stück MIT dem Icon aufsteigen.
+  // Vorher hingen die Platten an der Zielhöhe und sprangen sofort auf den Endwert, während
+  // das Icon noch glitt — der Aufbau des Turms war dadurch nicht zu sehen.
+  const towerClipRefs = useRef<Map<number, SVGRectElement | null>>(new Map());
 
   // Frische Prop-Spiegel für rAF-Schleife
   const hoverRef = useRef<number | null>(props.hoverIdx);
@@ -107,7 +128,7 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
         const targetKg = barbellKgOfRef.current(t.idx);
         const targetY = barbellYRef.current(targetKg);
         if (Math.abs(targetY - st.toY) > 0.5) {
-          st.fromY = st.glideT < 1 ? st.fromY + (st.toY - st.fromY) * st.glideT : st.fromY;
+          st.fromY = resolveBarbellGlideStart(st);
           st.toY = targetY;
           st.glideT = 0;
         }
@@ -127,6 +148,13 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
           const laneIdx = barbellSortedRef.current.findIndex((bt) => bt.idx === t.idx);
           const x = axX + (laneIdx >= 0 ? laneIdx : 0) * colW + colW / 2;
           el.setAttribute("transform", `translate(${x} ${y})`);
+        }
+
+        // Turm auf dieselbe animierte Höhe beschneiden → Platten wachsen mit dem Icon.
+        const clip = towerClipRefs.current.get(t.idx);
+        if (clip) {
+          clip.setAttribute("y", String(y));
+          clip.setAttribute("height", String(Math.max(0, baseY - y)));
         }
       }
 
@@ -301,43 +329,61 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
       {barbellSorted.map((t) => {
         const laneIdx = barbellSorted.indexOf(t);
         const laneX = axX + laneIdx * colW + colW / 2;
-        const kg = barbellKgOf(t.idx);
-        const y = barbellY(kg);
         const hue = hueForIdx(t.idx);
         const bbOut = barbellEliminated(t.idx);
-        const colH = baseY - y; // Höhe der Säule
+        // Turm bis zum ENDGEWICHT zeichnen (die höchste Last, die dieses Team je stemmt) und
+        // per Clip auf die animierte Höhe beschneiden. `barbellKgOf` ist durch das Endgewicht
+        // gedeckelt, der Token verlässt diesen Bereich also nie. So bleiben die Platten stabil
+        // (kein Neuaufbau je Runde) und erscheinen rein über den Clip nach und nach.
+        const maxKg = barbellInfo.endKg[t.idx] ?? barbellInfo.axTop;
+        const maxY = barbellY(maxKg);
+        const maxColH = baseY - maxY;
 
         return (
           <g key={`tower-${t.code}`}>
-            {/* Gewichts-Turm: von baseY (unten) bis y (oben) — Stäbe + Platten.
+            {/* Gewichts-Turm: von baseY (unten) bis zur animierten Höhe — Stab + Platten.
                 Erst NACH dem ersten Versuch (thrownSlot ≥ 0) zeichnen — vorher lagen die
                 Platten von Anfang an da und überlagerten die Team-Logos. Der Turm wird VOR
                 den Token gerendert → liegt ohnehin UNTER dem Logo. */}
-            {colH > 2 && t.thrownSlot >= 0 && (
-              <g opacity={bbOut ? 0.42 : 1} style={{ transition: reducedMotion ? "none" : `transform ${TRACK_ROUND_MS}ms cubic-bezier(.45,0,.2,1)` }}>
-                {/* Dünner Haupt-Stab (the bar) */}
-                <rect x={laneX - 1.5} y={y} width={3} height={colH} fill="rgba(143,166,192,.5)" />
+            {maxColH > 2 && t.thrownSlot >= 0 && (
+              <>
+                <clipPath id={`bbtower-${t.code}`}>
+                  {/* y/height setzt die rAF-Schleife auf die animierte Token-Höhe. */}
+                  <rect
+                    ref={(node) => {
+                      towerClipRefs.current.set(t.idx, node);
+                    }}
+                    x={laneX - 20}
+                    y={baseY}
+                    width={40}
+                    height={0}
+                  />
+                </clipPath>
+                <g opacity={bbOut ? 0.42 : 1} clipPath={`url(#bbtower-${t.code})`}>
+                  {/* Dünner Haupt-Stab (the bar) */}
+                  <rect x={laneX - 1.5} y={maxY} width={3} height={maxColH} fill="rgba(143,166,192,.5)" />
 
-                {/* Gewichts-Platten als Rechtecke — mehrere Schichten je kg-Stufe */}
-                {Array.from({ length: Math.max(1, Math.ceil(colH / 12)) }).map((_, pIdx) => {
-                  const pY = baseY - (pIdx + 1) * 12;
-                  const pW = Math.min(14 + pIdx * 2, 32);
-                  return pY >= y ? (
-                    <rect
-                      key={`plate-${pIdx}`}
-                      x={laneX - pW / 2}
-                      y={pY}
-                      width={pW}
-                      height={10}
-                      rx={1}
-                      fill={`hsl(${hue} 40% ${50 + pIdx * 3}%)`}
-                      opacity={0.75}
-                      stroke="rgba(143,166,192,.3)"
-                      strokeWidth={0.5}
-                    />
-                  ) : null;
-                })}
-              </g>
+                  {/* Gewichts-Platten als Rechtecke — mehrere Schichten je kg-Stufe */}
+                  {Array.from({ length: Math.max(1, Math.ceil(maxColH / 12)) }).map((_, pIdx) => {
+                    const pY = baseY - (pIdx + 1) * 12;
+                    const pW = Math.min(14 + pIdx * 2, 32);
+                    return pY >= maxY ? (
+                      <rect
+                        key={`plate-${pIdx}`}
+                        x={laneX - pW / 2}
+                        y={pY}
+                        width={pW}
+                        height={10}
+                        rx={1}
+                        fill={`hsl(${hue} 40% ${50 + pIdx * 3}%)`}
+                        opacity={0.75}
+                        stroke="rgba(143,166,192,.3)"
+                        strokeWidth={0.5}
+                      />
+                    ) : null;
+                  })}
+                </g>
+              </>
             )}
           </g>
         );
