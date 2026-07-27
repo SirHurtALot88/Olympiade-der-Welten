@@ -71,8 +71,9 @@ describe("buildMarketComparisonRow", () => {
   it("leitet den Markt-EK aus 'ab' x Packgroesse + Einkaufs-Versand ab (KONZEPT §7.2)", () => {
     const a = article({ packQty: 3 });
     const row = buildMarketComparisonRow(a, quote({ priceFrom: 0.59 }), DEFAULT_COST_SETTINGS);
-    // Pack-Einkaufs-Versand: buyShippingFive (1.30) x Packgroesse (3) = 3.90.
-    expect(row.marketEk).toBeCloseTo(0.59 * 3 + 1.3 * 3);
+    // Pack-Einkaufs-Versand faellt EINMALIG an (3er-Pack = 1 Versandeinheit,
+    // Chris' Vorgabe) -> 1.15 (Staffel <5 Stk), NICHT x Packgroesse.
+    expect(row.marketEk).toBeCloseTo(0.59 * 3 + 1.15);
   });
 
   it("markiert einen Datensatz aelter als 30 Tage als veraltet", () => {

@@ -32,6 +32,7 @@ type ColId =
   | "avgpreis"
   | "avgvk"
   | "listingvk"
+  | "korridor"
   | "ek"
   | "dbI"
   | "dbII"
@@ -51,6 +52,9 @@ const COLS: ColumnDef<ColId>[] = [
   { id: "avgpreis", label: "Ø Preis", def: 84, min: 65, align: "r" },
   { id: "avgvk", label: "Ø-VK (real.)", def: 96, min: 70, align: "r" },
   { id: "listingvk", label: "Akt. VK (Liste)", def: 104, min: 80, align: "r" },
+  // Direkt neben dem Listen-VK: der Marker IM Korridor IST dieser VK -- nebeneinander
+  // liest man "Preis" und "wo steht er im Korridor" in einem Blick (PAGES_CONCEPT §3).
+  { id: "korridor", label: "Preis-Korridor", def: 182, min: 120 },
   { id: "ek", label: "Preis EK", def: 82, min: 65, align: "r" },
   { id: "dbI", label: "DB I/Stk", def: 84, min: 65, align: "r" },
   { id: "dbII", label: "DB II/Stk", def: 88, min: 65, align: "r" },
@@ -329,6 +333,9 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
               {visible.map((row) => {
                 const pill = STATUS_PILL[row.priceStatus];
                 const w = row.windows[selectedWindow];
+                // Gleiche Vergleichsbasis wie der Ampel-Status: aktueller Listen-VK,
+                // Fallback realisierter Ø-VK, wenn kein Artikelstamm-Preis vorliegt.
+                const vkForCorridor = row.listingVk ?? row.avgVkRealized;
                 return (
                   <tr key={row.articleId}>
                     <td>
@@ -351,6 +358,14 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
                     <td className="r num">{row.avgVkRealized > 0 ? `${formatEuroCents(row.avgVkRealized)} €` : "—"}</td>
                     <td className="r num">
                       {row.listingVk !== null ? `${formatEuroCents(row.listingVk)} €` : <span className="p-muted">—</span>}
+                    </td>
+                    <td>
+                      <Corridor
+                        min={row.corridor.min}
+                        good={row.corridor.good}
+                        vk={vkForCorridor}
+                        marketValue={row.priceTrend}
+                      />
                     </td>
                     <td className="r num">{row.ek > 0 ? `${formatEuroCents(row.ek)} €` : "—"}</td>
                     <td className="r num">{formatEuroCents(row.dbIPerUnit)} €</td>
