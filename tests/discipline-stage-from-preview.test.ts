@@ -9,6 +9,7 @@ import type {
   DisciplineResolvePreview,
   DisciplineTeamResolvePreview,
 } from "@/lib/resolve/legacy-matchday-resolve-types";
+import { INJURY_PERFORMANCE_MULTIPLIER } from "@/lib/fatigue/fatigue-calibration";
 
 // VORGEHEN (Weg 2 aus der Aufgabenstellung): Statt die echte Resolve-Engine
 // aufzuziehen, konstruieren wir von Hand mehrere GÜLTIGE DisciplineResolvePreview-
@@ -24,6 +25,8 @@ type EntryInput = {
   playerName: string;
   baseValue: number | null;
   fatigueAdjustedValue?: number | null;
+  injuryApplied?: boolean;
+  injuryAdjustedValue?: number | null;
   captainBonus?: number | null;
   mutatorBonus?: number | null;
   formShare?: number | null;
@@ -39,6 +42,8 @@ function makeEntry(input: EntryInput): DisciplineTeamResolvePreview["entries"][n
     slotIndex: 0,
     baseValue: input.baseValue,
     fatigueAdjustedValue: input.fatigueAdjustedValue ?? null,
+    injuryApplied: input.injuryApplied ?? false,
+    injuryAdjustedValue: input.injuryAdjustedValue ?? null,
     captainBonus: input.captainBonus ?? null,
     mutatorBonus: input.mutatorBonus ?? null,
     formShare: input.formShare ?? null,
@@ -253,6 +258,65 @@ describe("buildDisciplineStageTeamsFromPreview", () => {
     const teamMods = teams[2].players.flatMap((p) => p.mods.filter((m) => m.k === "Team"));
     expect(teamMods.length).toBeGreaterThan(0);
     expect(stageTeamNetTotal(teams[2])).toBeCloseTo(27.3, 1);
+  });
+});
+
+describe("Same-day-Verletzung: eigene, explizite Mod-Zeile (statt im Moral-Rest zu verschwinden)", () => {
+  const fatigueAdjusted = 60; // z.B. nach Fatigue-Malus
+  const injuryAdjusted = round1(fatigueAdjusted * INJURY_PERFORMANCE_MULTIPLIER);
+  const injuredPreview = makePreview([
+    makeTeam({
+      teamId: "ti",
+      teamName: "Iota",
+      rank: 1,
+      score: injuryAdjusted,
+      teamPoints: 1,
+      entries: [
+        {
+          playerId: "ti-p0",
+          playerName: "I0",
+          baseValue: 80,
+          fatigueAdjustedValue: fatigueAdjusted,
+          injuryApplied: true,
+          injuryAdjustedValue: injuryAdjusted,
+          finalPlayerScore: injuryAdjusted,
+        },
+      ],
+    }),
+  ]);
+  const [injuredTeam] = buildDisciplineStageTeamsFromPreview(injuredPreview, new Map(), new Map());
+  const injuredPlayer = injuredTeam.players[0];
+
+  it("erzeugt eine eigene, als injury markierte Mod-Zeile mit dem Laufzeit-Prozentwert im Label", () => {
+    const injuryMod = injuredPlayer.mods.find((m) => m.injury === true);
+    expect(injuryMod).toBeDefined();
+    const expectedPercent = Math.round((1 - INJURY_PERFORMANCE_MULTIPLIER) * 100);
+    expect(injuryMod!.k).toBe(`Verletzung −${expectedPercent} % (Basis)`);
+    expect(injuryMod!.sign).toBe(-1);
+  });
+
+  it("der Betrag der Verletzungs-Mod ist exakt fatigueAdjustedValue − injuryAdjustedValue", () => {
+    const injuryMod = injuredPlayer.mods.find((m) => m.injury === true)!;
+    expect(injuryMod.amt).toBeCloseTo(round1(fatigueAdjusted - injuryAdjusted), 1);
+  });
+
+  it("Netto trifft weiterhin exakt den Score (Invariant bleibt unter Verletzung erhalten)", () => {
+    expect(stageTeamNetTotal(injuredTeam)).toBeCloseTo(injuryAdjusted, 1);
+  });
+
+  it("erzeugt KEINE Verletzungs-Mod, wenn injuryApplied false ist", () => {
+    const healthyPreview = makePreview([
+      makeTeam({
+        teamId: "th",
+        teamName: "Theta",
+        rank: 1,
+        score: 60,
+        teamPoints: 1,
+        entries: [{ playerId: "th-p0", playerName: "H0", baseValue: 80, fatigueAdjustedValue: 60, finalPlayerScore: 60 }],
+      }),
+    ]);
+    const [healthyTeam] = buildDisciplineStageTeamsFromPreview(healthyPreview, new Map(), new Map());
+    expect(healthyTeam.players[0].mods.some((m) => m.injury === true)).toBe(false);
   });
 });
 

@@ -6,6 +6,7 @@ import { buildMatchdayMutatorTraitsBySide } from "@/lib/lineups/legacy-lineup-mo
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
 import { buildLegacyMatchdayResolvePreviewPayload } from "@/lib/foundation/legacy-matchday-resolve-preview-service";
 import { attachMatchdayInjuryPerformanceToContexts, buildMatchdayInjuryRollMap } from "@/lib/fatigue/fatigue-injury-service";
+import { INJURY_PERFORMANCE_MULTIPLIER } from "@/lib/fatigue/fatigue-calibration";
 
 function createContext(input: {
   teamId: string;
@@ -264,7 +265,7 @@ describe("legacy matchday resolve preview", () => {
       },
       fatigueSourceStatus: "mapped",
       injuryByPlayerId: {
-        "A-A-d1-0": { injuredThisMatchday: true, multiplier: 0.75 },
+        "A-A-d1-0": { injuredThisMatchday: true, multiplier: INJURY_PERFORMANCE_MULTIPLIER },
       },
       injurySourceStatus: "mapped",
     });
@@ -274,12 +275,14 @@ describe("legacy matchday resolve preview", () => {
     const baselineD1 = baselinePreview.disciplinePreviews.find((discipline) => discipline.disciplineId === "mini-dm");
     const injuredD1 = injuredPreview.disciplinePreviews.find((discipline) => discipline.disciplineId === "mini-dm");
 
-    // 75/56.3 waren die alten Baselines. Seit commit e04fb06 kommt derselbe deterministische
-    // Pro-Spieler-Intensitäts-Jitter wie oben hinzu — für A-A-d1-0 in mini-dm/matchday-1 konstant
-    // -0.2, unabhängig von Fatigue/Injury (der Jitter ist ein separater Team-Summand nach dem
-    // Fatigue/Injury/Morale-Multiplikator-Kettenglied, siehe legacy-score-engine.ts prePowerScore).
+    // Fatigue-only baseline: 100 * fatigueMult(0.75) = 75, plus the deterministic
+    // per-player intensity jitter for A-A-d1-0 in mini-dm/matchday-1 (constant -0.2,
+    // independent of fatigue/injury — the jitter is a separate team-level summand added
+    // after the fatigue/injury/morale multiplier chain, see legacy-score-engine.ts prePowerScore).
     expect(baselineD1?.teamResults[0]?.finalPreviewScore).toBe(74.8);
-    expect(injuredD1?.teamResults[0]?.finalPreviewScore).toBe(56.1);
+    // Injured: 75 * INJURY_PERFORMANCE_MULTIPLIER, then the same -0.2 jitter.
+    const expectedInjured = Number((75 * INJURY_PERFORMANCE_MULTIPLIER - 0.2).toFixed(1));
+    expect(injuredD1?.teamResults[0]?.finalPreviewScore).toBe(expectedInjured);
   });
 
   it("computes rankInTeam correctly", () => {
@@ -507,11 +510,11 @@ describe("legacy matchday resolve preview payload", () => {
     expect(payload?.warnings).not.toContain("team-load-failed");
   });
 
-  it("applies the deterministic same-day injury malus (0.75x) so preview == applied result (#9)", () => {
+  it("applies the deterministic same-day injury malus (INJURY_PERFORMANCE_MULTIPLIER) so preview == applied result (#9)", () => {
     // Bug #9: Die interaktive Resolve-VORSCHAU heftete die deterministische
     // Same-Day-Verletzungs-Performance nicht an die Contexts — der Score-Engine
     // fiel auf injuryMultiplier=1 zurück und überschätzte die Totals systematisch
-    // gegenüber dem persistierten Ergebnis (das Apply-Pfade mit 0.75x scoren).
+    // gegenüber dem persistierten Ergebnis (das Apply-Pfade mit INJURY_PERFORMANCE_MULTIPLIER scoren).
     // Die Verletzungs-Rolle ist deterministisch (stableHash-Seed), also am
     // Vorschau-Zeitpunkt bekannt. `A-A-d1-3` verletzt sich bei diesem Seed
     // (save-1/season-1/matchday-1) mit riskPercent 40 bei Fatigue 100.
@@ -591,7 +594,7 @@ describe("legacy matchday resolve preview payload", () => {
       contextResults: [{ ok: true, context: createContext({ teamId: "A-A", teamName: "Alpha", d1Scores, d2Scores }), warnings: [] }],
     });
 
-    // 2) MIT gameState (der Fix): der Payload-Builder heftet die Verletzung an → 0.75x-Malus.
+    // 2) MIT gameState (der Fix): der Payload-Builder heftet die Verletzung an → INJURY_PERFORMANCE_MULTIPLIER-Malus.
     const previewWithInjury = buildLegacyMatchdayResolvePreviewPayload({
       source: "sqlite",
       params,
@@ -612,8 +615,8 @@ describe("legacy matchday resolve preview payload", () => {
     const withMalus = victimScoreFor(previewWithInjury);
 
     expect(baseline).not.toBeNull();
-    // Der Malus senkt den Score genau um den Faktor 0.75.
-    expect(withMalus).toBeCloseTo(0.75 * baseline!, 5);
+    // Der Malus senkt den Score genau um den Faktor INJURY_PERFORMANCE_MULTIPLIER.
+    expect(withMalus).toBeCloseTo(INJURY_PERFORMANCE_MULTIPLIER * baseline!, 5);
     // Und die Vorschau matcht das angewandte Ergebnis exakt (nicht divergent).
     expect(withMalus).toBe(appliedVictimScore);
 

@@ -1,9 +1,14 @@
 export const FATIGUE_PERFORMANCE_CAP = 80;
 export const FATIGUE_PERFORMANCE_MAX_PENALTY_PERCENT = 25;
-export const INJURY_PERFORMANCE_PENALTY_PERCENT = 25;
-export const INJURY_PERFORMANCE_MULTIPLIER = 0.75;
-/** fatigueMult(0.75) × injuryMult(0.75) at max fatigue + same-day injury */
-export const MAX_COMBINED_FATIGUE_INJURY_MULTIPLIER = 0.5625;
+export const INJURY_PERFORMANCE_MULTIPLIER = 0.5;
+export const INJURY_PERFORMANCE_PENALTY_PERCENT = (1 - INJURY_PERFORMANCE_MULTIPLIER) * 100;
+/**
+ * fatigueMult at max fatigue (1 - FATIGUE_PERFORMANCE_MAX_PENALTY_PERCENT / 100) ×
+ * injuryMult (INJURY_PERFORMANCE_MULTIPLIER) at max fatigue + same-day injury.
+ */
+export const MAX_COMBINED_FATIGUE_INJURY_MULTIPLIER = Number(
+  ((1 - FATIGUE_PERFORMANCE_MAX_PENALTY_PERCENT / 100) * INJURY_PERFORMANCE_MULTIPLIER).toFixed(4),
+);
 
 export const FATIGUE_INJURY_RISK_ANCHORS = [
   { fatigue: 0, riskPercent: 0 },

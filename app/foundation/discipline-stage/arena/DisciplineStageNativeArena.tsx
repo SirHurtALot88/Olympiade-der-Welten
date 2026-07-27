@@ -39,7 +39,7 @@ function ArenaKopfStrip({ left, right }: { left: React.ReactNode; right: React.R
 // Runden-Medaillen, Ticker, Hovercard, Podest + Detail-Ergebnistabelle.
 // Position auf dem Oval = kumulierte Punkte. Reveal Slot für Slot, worst-first.
 
-export type NativeStageMod = { k: string; sign: 1 | -1; amt: number };
+export type NativeStageMod = { k: string; sign: 1 | -1; amt: number; injury?: boolean };
 export type NativeStagePlayer = {
   playerId: string | null;
   val: number;
@@ -1039,7 +1039,7 @@ type TickerHeader = { kind: "header"; id: string; text: string };
 type TickerData = TickerReveal | TickerSummary | TickerHeader;
 
 const TICKER_MAX = 40;
-type Spot = { crest: NativeStageTeam; idx: number; kick: string; name: string; sub: string; net: number; chipText: string; chipColor: string; mine: boolean; portraitUrl: string | null } | null;
+type Spot = { crest: NativeStageTeam; idx: number; kick: string; name: string; sub: string; net: number; chipText: string; chipColor: string; mine: boolean; portraitUrl: string | null; injury?: boolean } | null;
 type PodCol = { place: number; code: string; name: string; pts: number; logoUrl: string | null; isOwn: boolean; idx: number; delayMs: number; loud: boolean };
 
 // Team-Hovercard als PORTAL (document.body) mit position:fixed + Viewport-Clamping.
@@ -1924,7 +1924,9 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     const net = res.net;
     const p = res.player;
     const bonSum = p.mods.filter((m) => m.sign > 0).reduce((s, m) => s + m.amt, 0);
-    const injury = p.mods.some((m) => /verletz|injury/i.test(m.k));
+    // Bevorzugt den echten typisierten Flag (siehe discipline-stage-from-preview.ts);
+    // Regex bleibt als Fallback für Datenpfade ohne den Flag (z.B. Random/Model-Modus).
+    const injury = p.mods.some((m) => m.injury === true || /verletz|injury/i.test(m.k));
     const delta = t.roundDelta;
     const topNet = roundTopNet.current; // vorab bestimmter Etappensieger-Wert (kein prevBest)
     const slotRank = t.roundSlotRank; // vorab bestimmter Rang in dieser Etappe (1…N)
@@ -2362,18 +2364,24 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       else if (impact.cause === "best") popBanner(`🥇 Etappensieger · ${res.player.name} (${t.code})`, "gold");
       // Sounds/Highlights nach Tier
       if (impact.tier === 2) {
-        showSpotlight({
-          crest: { code: t.code, name: t.name, logoUrl: t.logoUrl, isOwn: t.isOwn, players: t.players },
-          idx: t.idx,
-          kick: causeKick(impact.cause, isMine),
-          name: (isMine ? "★ " : "") + res.player.name,
-          sub: `${t.code} · ${t.name}${slots[r] ? " · " + slots[r] : ""}`,
-          net: res.net,
-          chipText: impact.text,
-          chipColor: impact.color,
-          mine: isMine,
-          portraitUrl: res.player.portraitUrl,
-        });
+        showSpotlight(
+          {
+            crest: { code: t.code, name: t.name, logoUrl: t.logoUrl, isOwn: t.isOwn, players: t.players },
+            idx: t.idx,
+            kick: causeKick(impact.cause, isMine),
+            name: (isMine ? "★ " : "") + res.player.name,
+            sub: `${t.code} · ${t.name}${slots[r] ? " · " + slots[r] : ""}`,
+            net: res.net,
+            chipText: impact.text,
+            chipColor: impact.color,
+            mine: isMine,
+            portraitUrl: res.player.portraitUrl,
+            injury: impact.cause === "injury",
+          },
+          // Verletzung bleibt länger im Bild als andere Tier-2-Highlights (1500ms) —
+          // sichtbares, nicht-flüchtiges Feedback statt eines Blinzelns.
+          impact.cause === "injury" ? 2400 : 1500,
+        );
         fireFlash(impact.color);
         doShake(impact.cause === "injury" ? true : !isMine);
         if (impact.cause === "injury") audio.stumbleThud(isMine ? 0.5 : 0.4);
@@ -2606,10 +2614,25 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     const revealed = me.thrownSlot >= 0;
     const runnerSlotRank = revealed ? slotRankOf(me.thrownSlot, me, rtRef.current) : null;
     const runnerMedal: "gold" | "silver" | "bronze" | null = runnerSlotRank === 1 ? "gold" : runnerSlotRank === 2 ? "silver" : runnerSlotRank === 3 ? "bronze" : null;
+    // Der AKTIVE Spieler (dran, egal ob schon aufgedeckt oder noch bevorstehend
+    // diese Runde) ist verletzt → starkes, dauerhaftes optisches Feedback statt
+    // nur der einmaligen Ticker-/Flug-Zeile (siehe PlayerMark `injury`-Prop).
+    const runnerInjured = Boolean(runner && runner.mods.some((m) => m.injury === true || /verletz|injury/i.test(m.k)));
     const clickable = Boolean(onOpenPlayer && runner?.playerId);
     const deltaToLeader = me.rank === 1 ? "Führung" : "−" + fmt1((leader?.score ?? me.score) - me.score);
     return (
-      <div style={{ marginBottom: 10, borderRadius: 12, border: "1px solid var(--nl-accent)", background: "color-mix(in srgb, var(--nl-accent) 10%, transparent)", padding: "8px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
+      <div
+        style={{
+          marginBottom: 10,
+          borderRadius: 12,
+          border: runnerInjured ? "1.5px solid var(--nl-risk)" : "1px solid var(--nl-accent)",
+          background: runnerInjured ? "color-mix(in srgb, var(--nl-risk) 12%, transparent)" : "color-mix(in srgb, var(--nl-accent) 10%, transparent)",
+          padding: "8px 12px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 6,
+        }}
+      >
         {/* Kopfzeile: Wappen · Name · Rang · Punkte · Δ · Läufer-Mini (rechts) */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span aria-hidden style={{ width: 22, height: 22, borderRadius: "50%", flex: "none", overflow: "hidden", background: me.logoUrl ? "transparent" : `hsl(${hueForIdx(me.idx)} 60% 52%)`, display: "grid", placeItems: "center" }}>
@@ -2629,8 +2652,26 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             title={clickable ? "Spieler-Karte öffnen" : undefined}
             style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0, cursor: clickable ? "pointer" : "default" }}
           >
-            <PlayerMark src={runner?.portraitUrl ?? null} alt={runner?.name ?? ""} size={26} isOwn medal={runnerMedal} />
-            <span style={{ fontSize: 12.5, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>🏃 {runner?.name ?? "—"}</span>
+            <PlayerMark src={runner?.portraitUrl ?? null} alt={runner?.name ?? ""} size={26} isOwn medal={runnerMedal} injury={runnerInjured} />
+            <span style={{ fontSize: 12.5, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: runnerInjured ? "var(--nl-risk)" : undefined }}>
+              {runnerInjured ? "🤕" : "🏃"} {runner?.name ?? "—"}
+            </span>
+            {runnerInjured ? (
+              <span
+                style={{
+                  fontSize: 10.5,
+                  fontWeight: 800,
+                  padding: "2px 7px",
+                  borderRadius: 99,
+                  color: "var(--nl-bg)",
+                  background: "var(--nl-risk)",
+                  whiteSpace: "nowrap",
+                  flex: "none",
+                }}
+              >
+                Verletzt
+              </span>
+            ) : null}
           </div>
         </div>
         {/* Split-Strip: ein Chip je Etappe (Wert erst nach Auftritt; Etappen-Bester golden). */}
@@ -2973,19 +3014,36 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             MyTracker-Fallback war toter Code: animField ≡ prim !== "barbell".) */}
         {me && animField ? renderMyTeamCard() : null}
 
-        {/* Spotlight-Banner */}
+        {/* Spotlight-Banner — bei Verletzung erzwingt der Risk-Ton Rahmen/Kicker/Score,
+            unabhängig von mine/warn, damit der verletzte Spieler nie als normaler
+            Highlight-Moment durchgeht. */}
         {spotlight ? (
-          <div className="oly-anim" style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", marginBottom: 10, borderRadius: 12, border: `1.5px solid ${spotlight.mine ? "var(--nl-accent)" : "var(--nl-warn)"}`, background: `color-mix(in srgb, ${spotlight.mine ? "var(--nl-accent)" : "var(--nl-warn)"} 12%, transparent)` }}>
-            <PlayerMark src={spotlight.portraitUrl} alt={spotlight.name} size={38} spotlight={!spotlight.mine} isOwn={spotlight.mine} />
+          <div
+            className="oly-anim"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              padding: "8px 12px",
+              marginBottom: 10,
+              borderRadius: 12,
+              border: `1.5px solid ${spotlight.injury ? "var(--nl-risk)" : spotlight.mine ? "var(--nl-accent)" : "var(--nl-warn)"}`,
+              background: `color-mix(in srgb, ${spotlight.injury ? "var(--nl-risk)" : spotlight.mine ? "var(--nl-accent)" : "var(--nl-warn)"} 12%, transparent)`,
+            }}
+          >
+            <PlayerMark src={spotlight.portraitUrl} alt={spotlight.name} size={38} spotlight={!spotlight.mine} isOwn={spotlight.mine} injury={spotlight.injury} />
             <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 800, color: spotlight.mine ? "var(--nl-accent)" : "var(--nl-warn)" }}>{spotlight.kick}</div>
+              <div style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 800, color: spotlight.injury ? "var(--nl-risk)" : spotlight.mine ? "var(--nl-accent)" : "var(--nl-warn)" }}>
+                {spotlight.injury ? "🤕 " : ""}
+                {spotlight.kick}
+              </div>
               <div style={{ fontWeight: 800, fontSize: 16 }}>{spotlight.name}</div>
               <div style={{ fontSize: 12, color: "var(--nl-mut)" }}>{spotlight.sub}</div>
             </div>
             {spotlight.chipText ? (
-              <span style={{ fontSize: 11.5, fontWeight: 800, padding: "3px 10px", borderRadius: 99, color: "var(--nl-bg)", background: `rgb(${FLASH_COLOR[spotlight.chipColor] ?? FLASH_COLOR.gold})` }}>{spotlight.chipText}</span>
+              <span style={{ fontSize: 11.5, fontWeight: 800, padding: "3px 10px", borderRadius: 99, color: "var(--nl-bg)", background: spotlight.injury ? "var(--nl-risk)" : `rgb(${FLASH_COLOR[spotlight.chipColor] ?? FLASH_COLOR.gold})` }}>{spotlight.chipText}</span>
             ) : null}
-            <div style={{ fontWeight: 800, fontSize: 30, color: "var(--nl-warn)", flex: "none" }}>+{fmt1(spotlight.net)}</div>
+            <div style={{ fontWeight: 800, fontSize: 30, color: spotlight.injury ? "var(--nl-risk)" : "var(--nl-warn)", flex: "none" }}>+{fmt1(spotlight.net)}</div>
           </div>
         ) : null}
 
