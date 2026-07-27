@@ -74,9 +74,29 @@ console.log("=".repeat(104));
 let leagueSumAll = 0, salarySumAll = 0, insolvenzen = 0, floorHits = 0, cells = 0;
 for (let s = 1; s <= SEASONS; s += 1) {
   const sf = SEASON_SF[(s - 1) % SEASON_SF.length]!;
+  // K je Saison loesen, damit der Faktor VOLL in der Liga-Summe ankommt. Fest gesetzt kam er nur zu
+  // rund zwei Dritteln durch: die Untergrenze faengt schwache Jahre ab und die Decken begrenzen
+  // starke, wodurch 1.25 wie 1.09 wirkte. Die Anhebung trifft alle Stufen gleichmaessig, weil K auf
+  // den gesamten Anteil oberhalb der Untergrenze wirkt.
+  const targetSum = 2104 * sf;
   // Endraenge: Erwartung = Staerkerang, verrauscht
   const draw = teams.map((t) => ({ t, key: t.strength + (rnd() - 0.5) * 11 }))
     .sort((a, b) => a.key - b.key);
+  // zweistufig: erst mit Probe-K die Summe messen, dann K proportional nachziehen
+  let KFOR = 1.48 * sf;
+  for (let iter = 0; iter < 40; iter += 1) {
+    let probe = 0;
+    draw.forEach(({ t }, idx) => {
+      const fr = idx + 1, eT = tierOf(t.strength), fT = tierOf(fr);
+      const lt = SHAPE[eT]! * (1 - BASE_SPECIAL);
+      const w = dist(t.strength);
+      const raw = w.reduce((a, wi, i) => a + wi * (LIGA[tierOf(i + 1)]! + rel(eT - tierOf(i + 1))), 0);
+      const v = LIGA[fT]! + rel(eT - fT) + (lt - raw) + SHAPE[eT]! * BASE_SPECIAL * 0.45;
+      const fl = floorAt("magisch", sf);
+      probe += Math.max(fl, fl + (v - fl) * KFOR);
+    });
+    KFOR *= targetSum / probe;
+  }
   let seasonSum = 0, seasonSalary = 0;
   draw.forEach(({ t }, idx) => {
     const finalRank = idx + 1, expTier = tierOf(t.strength), finTier = tierOf(finalRank);
@@ -95,7 +115,7 @@ for (let s = 1; s <= SEASONS; s += 1) {
     const clauseMet = rnd() < 0.5, goalMet = rnd() < 0.45;
     const v = LIGA[finTier]! + rel(expTier - finTier) + cal + (clauseMet ? 5.5 : -5.5) + (goalMet ? special : 0);
     const fl = floorAt(rarName, sf);
-    const K = Number(process.env.OLY_K ?? 1.48) * sf; // Liga-Skalierung: bindet die Summe an die Gehaltssumme
+    const K = KFOR; // Liga-Skalierung: bindet die Summe an die Gehaltssumme
     const paid = Math.max(fl, fl + (v - fl) * K);
     if (paid === fl && v < fl) floorHits += 1;
     cells += 1;
