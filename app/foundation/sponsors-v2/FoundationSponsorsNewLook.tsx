@@ -21,7 +21,12 @@ import {
   SponsorCrest,
   SponsorOfferCardNewLook,
 } from "@/components/foundation/sponsor/SponsorOfferCardNewLook";
-import { buildSponsorOfferPresentation, getSponsorComponentKindLabel } from "@/lib/sponsor/sponsor-offer-presenter";
+import {
+  buildSponsorOfferPresentation,
+  getSponsorComponentKindLabel,
+  sortLeagueSponsorRows,
+  type LeagueSponsorSort,
+} from "@/lib/sponsor/sponsor-offer-presenter";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { resolveSponsorSystemVersion } from "@/lib/sponsor/sponsor-v2-offer-service";
 import { previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
@@ -315,7 +320,6 @@ function ActiveContractHero({
   );
 }
 
-type LeagueSponsorSort = "cash" | "sponsor" | "team" | "tier";
 
 export default function FoundationSponsorsNewLook({
   gameState,
@@ -477,31 +481,10 @@ export default function FoundationSponsorsNewLook({
     return { row, contract, baseRow, otherRows, rankLadder, baseCash };
   }, [leagueDetailTeamId, leagueSponsorRows, gameState]);
 
-  const sortedLeagueSponsorRows = useMemo(() => {
-    const list = [...leagueSponsorRows];
-    list.sort((left, right) => {
-      // Golden-Card-Sponsoren immer zuerst — unabhaengig vom Sortier-Modus.
-      if (left.isGolden !== right.isGolden) {
-        return left.isGolden ? -1 : 1;
-      }
-      if (leagueSponsorSort === "team") {
-        return left.teamName.localeCompare(right.teamName, "de", { sensitivity: "base" });
-      }
-      if (leagueSponsorSort === "sponsor") {
-        if (left.sponsorName == null && right.sponsorName == null) return 0;
-        if (left.sponsorName == null) return 1;
-        if (right.sponsorName == null) return -1;
-        return left.sponsorName.localeCompare(right.sponsorName, "de", { sensitivity: "base" });
-      }
-      if (leagueSponsorSort === "tier") {
-        const leftOrder = left.rarity ? SPONSOR_RARITIES[left.rarity].order : -1;
-        const rightOrder = right.rarity ? SPONSOR_RARITIES[right.rarity].order : -1;
-        return rightOrder - leftOrder;
-      }
-      return (right.projectedCash ?? -1) - (left.projectedCash ?? -1);
-    });
-    return list;
-  }, [leagueSponsorRows, leagueSponsorSort]);
+  const sortedLeagueSponsorRows = useMemo(
+    () => sortLeagueSponsorRows(leagueSponsorRows, leagueSponsorSort),
+    [leagueSponsorRows, leagueSponsorSort],
+  );
 
   // #D12: Schwächster Treiber des Kommerz-Ratings. Die drei Treiber
   // (Historie/Kader/Prestige) summieren sich additiv zum Score

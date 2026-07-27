@@ -947,6 +947,16 @@ export default function DisciplineStageArena({
     [gameState?.teams, gameState.seasonState?.teamControlSettings, ownTeamId],
   );
 
+  // A3: welche Disziplinen dieses Spieltags bereits einmal zu Ende gelaufen sind —
+  // ANDERS als `arenaEnded` (das bei jedem Disziplin-Wechsel zurückgesetzt wird)
+  // bleibt dieser Satz beim Hin- und Herwechseln zwischen Disziplinen erhalten, damit
+  // eine bereits abgeschlossene Disziplin nicht wieder hinter dem 🔒 verschwindet.
+  // Nur ein Spieltagswechsel setzt ihn zurück.
+  const [endedDisciplineIds, setEndedDisciplineIds] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    setEndedDisciplineIds(new Set());
+  }, [matchdayId]);
+
   const payload = useMemo(() => {
     // Echter Season-Tabellenrang je Team → Bahn-/Turm-Reihenfolge in der Arena
     // (bester Saisonstand = Slot 1 oben, schlechtester = Slot 32 unten).
@@ -967,6 +977,28 @@ export default function DisciplineStageArena({
           .forEach(([tid], i) => seasonRankByTeam.set(tid, i + 1));
       } else {
         rows.forEach(([tid, r]) => seasonRankByTeam.set(tid, r.rank as number));
+      }
+    }
+    // Nach Disziplin 1 startet Disziplin 2 in der AKTUALISIERTEN Reihenfolge: Bahn 1
+    // gehört dem Team, das an diesem Spieltag bisher am meisten geholt hat. Der
+    // Saisonstand allein reicht dafür nicht — Punkte landen erst beim Spieltags-
+    // abschluss in `standings`, an Spieltag 1 stünden also alle auf 0 und Disziplin 2
+    // liefe in derselben Reihenfolge wie Disziplin 1. Die bereits gelaufenen d1-Punkte
+    // stehen in der Preview (`matchdayPanel.teamResults`) und werden hier auf den
+    // Saisonstand addiert. Greift nur, wenn d1 wirklich durchgelaufen ist (sonst wäre
+    // es ein Spoiler) und die offene Disziplin nicht mehr d1 selbst ist.
+    const d1Id = matchdayPanel?.d1?.disciplineId ?? null;
+    const d1Done = Boolean(d1Id && endedDisciplineIds.has(d1Id) && disciplineId !== d1Id);
+    if (d1Done && matchdayPanel) {
+      const livePoints = new Map<string, number>();
+      for (const row of matchdayPanel.teamResults) {
+        const seasonPoints = standings?.[row.teamId]?.points ?? 0;
+        livePoints.set(row.teamId, seasonPoints + (row.d1Points ?? 0));
+      }
+      if (livePoints.size > 0) {
+        [...livePoints.entries()]
+          .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+          .forEach(([teamId], index) => seasonRankByTeam.set(teamId, index + 1));
       }
     }
     const seasonRankOf = (teamId?: string | null): number | undefined =>
@@ -1022,7 +1054,20 @@ export default function DisciplineStageArena({
       mineCode: ownShortCode,
       teams,
     };
-  }, [useEngine, engineTeams, model, mode, disciplineId, mutatorTraits, ownShortCode, gameState.seasonState?.standings]);
+  }, [
+    useEngine,
+    engineTeams,
+    model,
+    mode,
+    disciplineId,
+    mutatorTraits,
+    ownShortCode,
+    gameState.seasonState?.standings,
+    // Neuordnung der Bahnen nach Disziplin 1 — ohne diese Deps bliebe die
+    // Reihenfolge auf dem Stand von vor dem d1-Abschluss stehen.
+    matchdayPanel,
+    endedDisciplineIds,
+  ]);
 
   // Betroffene Spieler (≥1 Trait-Treffer) für die Player-Points-Anzeige (+0,3 PP je).
   const mutatorImpact = useMemo(() => {
@@ -1088,21 +1133,27 @@ export default function DisciplineStageArena({
   // Spoiler-Gate (A1): der Real-Modus-Endscreen darf erst erscheinen, wenn die
   // native Arena das Podest erreicht hat. Bei Remount (Disziplin/Modus/Seed) zurück.
   const [arenaEnded, setArenaEnded] = useState(false);
-  // A3: welche Disziplinen dieses Spieltags bereits einmal zu Ende gelaufen sind —
-  // ANDERS als `arenaEnded` (das bei jedem Disziplin-Wechsel zurückgesetzt wird)
-  // bleibt dieser Satz beim Hin- und Herwechseln zwischen Disziplinen erhalten, damit
-  // eine bereits abgeschlossene Disziplin nicht wieder hinter dem 🔒 verschwindet.
-  // Nur ein Spieltagswechsel setzt ihn zurück.
-  const [endedDisciplineIds, setEndedDisciplineIds] = useState<Set<string>>(() => new Set());
-  useEffect(() => {
-    setEndedDisciplineIds(new Set());
-  }, [matchdayId]);
   // Live-Ergebnisse aufgedeckter Spieler (aus der Arena gemeldet) → Team-Drawer
   // zeigt „geholt + Boni/Abzüge" für Spieler, die schon dran waren.
   const [liveResultsByTeam, setLiveResultsByTeam] = useState<StageLiveResultsByTeam>({});
+  // Ein laufendes Replay blendet den erinnerten Endscreen aus, bis der Lauf erneut
+  // endet — sonst stuende das Ergebnis schon waehrend der Wiederholung da.
+  const [replayingDisciplineId, setReplayingDisciplineId] = useState<string | null>(null);
   useEffect(() => {
     setArenaEnded(false);
+    setReplayingDisciplineId(null);
   }, [disciplineId, mode, seed]);
+
+  /**
+   * Endscreen-Sichtbarkeit. `arenaEnded` allein reichte nicht: es wird bei JEDEM
+   * Disziplin-Wechsel zurueckgesetzt, also verschwanden Topspieler, Highlights und
+   * der Weiter-Block, sobald man zu einer bereits gelaufenen Disziplin zurueckkam.
+   * `endedDisciplineIds` haelt den Abschluss ueber den Wechsel hinweg (dieselbe
+   * Quelle, aus der das Spieltags-Panel seine Reveals speist) — damit bleibt eine
+   * abgeschlossene Disziplin abgeschlossen.
+   */
+  const disciplineEnded =
+    arenaEnded || (endedDisciplineIds.has(disciplineId) && replayingDisciplineId !== disciplineId);
 
   // S2: Doppel-Klick-Schutz für „Spieltag auswerten & weiter".
   // Der State allein reicht dafür nicht: zwei Klicks im selben React-Batch lesen beide das
@@ -1321,10 +1372,14 @@ export default function DisciplineStageArena({
         onPreviewPlayer={previewPlayer}
         onEnded={() => {
           setArenaEnded(true);
+          setReplayingDisciplineId(null);
           // A3: Disziplin dauerhaft als „schon gelaufen" merken (siehe endedDisciplineIds oben).
           setEndedDisciplineIds((prev) => (prev.has(disciplineId) ? prev : new Set(prev).add(disciplineId)));
         }}
-        onReset={() => setArenaEnded(false)}
+        onReset={() => {
+          setArenaEnded(false);
+          setReplayingDisciplineId(disciplineId);
+        }}
         onResults={setLiveResultsByTeam}
         topPlayers={topPlayers}
         primitive={NATIVE_PRIMITIVE[disciplineId] ?? "track"}
@@ -1434,7 +1489,7 @@ export default function DisciplineStageArena({
         </div>
       ) : null}
 
-      {mode === "real" && engineDiscipline && arenaEnded ? (
+      {mode === "real" && engineDiscipline && disciplineEnded ? (
         <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
           {/* Konsolidiert: die Team-Wertung steht komplett in der Spieltags-Wertung oben
               (Rang vor→nach inkl. Δ, D1/D2, Mutator, Gesamt). Statt der früheren vier
@@ -1458,7 +1513,7 @@ export default function DisciplineStageArena({
           Engine-Preview, der nächste Schritt nicht. Vorher verschwand bei ausgefallener Preview der
           komplette Block — der Spieler stand nach dem Disziplin-Ende ohne jeden Hinweis da und hätte
           über den separaten Abschluss-Button unbeabsichtigt Disziplin 2 übersprungen. */}
-      {mode === "real" && arenaEnded ? (
+      {mode === "real" && disciplineEnded ? (
         <div style={{ marginTop: 16 }}>
           {(() => {
             // P1-16: Nach Disziplin 1 den Spieler AKTIV zur zweiten Disziplin des Spieltags führen,

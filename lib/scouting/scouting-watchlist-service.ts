@@ -6,10 +6,22 @@ import {
   getScoutingWishlistSlotMessage,
 } from "@/lib/scouting/scouting-wishlist-slots";
 
+/**
+ * Beobachtungsliste eines Teams für die laufende Saison.
+ *
+ * Spieler, die inzwischen in EINEM Kader stehen, fallen raus: die Watchlist ist
+ * eine Liste von Transferzielen, und ein Spieler mit Vertrag ist keins mehr.
+ * Vorher wurde nur nach Team und Saison gefiltert — ein selbst gekaufter Spieler
+ * blieb deshalb dauerhaft als „Ziel" stehen (und ein von der Konkurrenz
+ * weggeschnappter genauso). Der Eintrag wird bewusst nicht gelöscht, nur
+ * ausgeblendet: verlässt der Spieler den Kader wieder, ist er automatisch
+ * wieder ein gültiges Ziel.
+ */
 export function getScoutingWatchlistForTeam(gameState: GameState, teamId: string) {
   const seasonId = gameState.season.id;
+  const rosteredPlayerIds = new Set(gameState.rosters.map((entry) => entry.playerId));
   return (gameState.seasonState.scoutingWatchlist ?? []).filter(
-    (entry) => entry.teamId === teamId && entry.seasonId === seasonId,
+    (entry) => entry.teamId === teamId && entry.seasonId === seasonId && !rosteredPlayerIds.has(entry.playerId),
   );
 }
 

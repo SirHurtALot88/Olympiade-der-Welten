@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import { VeloImpactStrip, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
 import { isSeasonOnePreseasonNeutralBoard } from "@/lib/board/team-season-objectives-service";
+import { buildCaptainEffectExplanations } from "@/lib/morale/team-captain-service";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type { GmStoryView } from "@/lib/foundation/gm-story";
 import type { GameInboxItem, TeamControlMode } from "@/lib/data/olyDataTypes";
@@ -663,10 +664,13 @@ export function ManagerOfficeClient({
                             disabled={!selectedTeamCanManage || isReadOnlyMode}
                           >
                             <strong>{candidate.playerName}</strong>
-                            <small>
-                              Leadership {formatLocalePoints(candidate.leadershipScore, 1)} · {candidate.style} · Buffer +
-                              {formatLocalePoints(candidate.effects.moraleBuffer, 1)} · Power +
-                              {formatLocalePoints(candidate.effects.teamPowerModifierPct, 1)}%
+                            {/* Wirksame Werte statt Rohwerte: der Team-Power-Wert wird in der
+                                Auflösung geviertelt, die Vorstands-Daempfung fehlte hier ganz. */}
+                            <small title={buildCaptainEffectExplanations(candidate).map((effect) => effect.tooltip).join("\n")}>
+                              Leadership {formatLocalePoints(candidate.leadershipScore, 1)} · {candidate.style}
+                              {buildCaptainEffectExplanations(candidate).map((effect) => (
+                                <span key={effect.key}> · {effect.label} {effect.displayValue}</span>
+                              ))}
                             </small>
                             {candidate.hasCaptaincyDemand ? (
                               <span className="transfer-status-pill is-warning">{candidate.demandLabel ?? "Will Captain sein"}</span>

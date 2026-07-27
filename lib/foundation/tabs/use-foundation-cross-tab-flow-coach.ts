@@ -30,7 +30,9 @@ export function useFoundationCrossTabFlowCoach(input: {
         shortcut: "Space = nächster Preseason-Schritt",
         actions: [
           { label: "Transfermarkt", targetView: "marketV2", detail: "Kaufen/Verkaufen", tone: "primary" },
-          { label: "Training", targetView: "trainingV2", detail: "Plan setzen" },
+          // "Plan setzen" passiert im Training-Tab (`trainingCompact`); `trainingV2`
+          // ist der Gebäude-Tab und fuehrte hier auf die falsche Seite.
+          { label: "Training", targetView: "trainingCompact", detail: "Plan setzen" },
           { label: "Office", targetView: "hq", detail: "Captain & Board" },
         ],
       };

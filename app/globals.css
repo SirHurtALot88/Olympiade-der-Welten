@@ -46709,6 +46709,54 @@ button.foundation-team-portrait-card {
   height: 20px;
 }
 
+/* Gehaltsverlauf je Vertragssaison — nur bei mehrjaehrigen Vertraegen gerendert.
+   Umbricht bei schmalen Breiten, damit auch ein 5-Saison-Vertrag die Kachelzeile
+   darueber nicht auseinanderzieht. */
+.is-new-look .nl-player-hero-contract-schedule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s1) var(--nl-s2);
+  margin-top: var(--nl-s1);
+}
+
+.is-new-look .nl-player-hero-contract-schedule-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-player-hero-contract-year {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px solid var(--nl-line);
+  border-radius: 999px;
+  background: var(--nl-bg-2);
+}
+
+.is-new-look .nl-player-hero-contract-year-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-player-hero-contract-year-value {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-player-hero-contract-year-now {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--nl-accent);
+}
+
 .is-new-look .nl-player-hero-chips {
   margin-top: var(--nl-s1);
 }

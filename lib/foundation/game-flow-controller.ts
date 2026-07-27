@@ -328,7 +328,16 @@ function resolveOnboardingStepStatus(
     return activeTeamId ? "completed" : "ready";
   }
   if (stepId === "roster_review") {
-    return rosterCount > 0 ? "completed" : "ready";
+    // Reine Sichtprüfung — sie darf den Flow nie blockieren. Die Bedingung war
+    // `rosterCount > 0`, aber Spieler kommen ausschliesslich ueber die SPAETEREN
+    // Schritte (`first_transfers` / `fill_roster`) ins Team. Seit der eigene
+    // Kader beim Wizard-Start bewusst leer bleibt (der Setup-Draft ueberspringt
+    // Menschen-Teams), war die Bedingung in S1 nie erfuellbar: `buildGameFlow`
+    // waehlt den ersten nicht abgeschlossenen Schritt als aktuellen, also blieb
+    // der Flow dauerhaft auf "Weiter: Kader prüfen" stehen, statt zum
+    // Transfermarkt zu fuehren. Ein leerer Kader heisst schlicht "noch nichts zu
+    // pruefen" — der naechste sinnvolle Schritt ist der Markt.
+    return "completed";
   }
   if (stepId === "appoint_captain") {
     if (!activeTeamId) {
@@ -445,13 +454,18 @@ function buildOnboardingFlowSteps(gameState: GameState, activeTeamId: string | n
       })(),
     }),
     step({
-      // CTA muss dorthin führen, wo die Abschlussbedingung (Trainingsmodus je Spieler)
-      // erfüllt wird — also in die Trainingsansicht, nicht ins Scouting-Center.
+      // CTA muss dorthin führen, wo die Abschlussbedingung (Trainingsmodus je Spieler,
+      // s. `isTeamTrainingComplete`) erfüllt wird. Das ist der Training-Tab
+      // `trainingCompact` — NICHT `trainingV2`: diese ID heisst laut
+      // `foundation-nav-config` "Gebäude" (Facilities/Upgrades) und landete damit
+      // sichtbar auf der falschen Seite. Dieselbe Verwechslung ist in
+      // `game-inbox-service` bereits kommentiert.
       stepId: "training_facilities",
       label: "Training setzen",
       cta: "Weiter: Training setzen",
       status: resolveOnboardingStepStatus(flow, "training_facilities", gameState, teamId),
-      targetView: "trainingV2",
+      targetView: "trainingCompact",
+      targetPanel: "training-plan",
       teamId,
     }),
     // Kapitän erst NACH dem finalen Kader (Käufe) + Training ernennen.

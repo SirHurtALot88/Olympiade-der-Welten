@@ -647,6 +647,19 @@ export function describeTeamPowerDebuffEffect(input: {
   return `Debuff · trifft ${targetLabel}${bandNote}${impactNote}${spreadNote}`;
 }
 
+/**
+ * Anteil des Kapitäns-Werts `teamPowerModifierPct`, der real in die Team-Power
+ * einfliesst. Der Kapitäns-Chip zeigt den ROHWERT (max 8) — wirksam wird davon
+ * nur ein Viertel, und ausschliesslich als Aufschlag auf eine tatsaechlich
+ * gespielte Team-Power. Die Konstante ist exportiert, damit die Erklaerung im
+ * Kapitaens-Panel (`buildCaptainEffectExplanations`) denselben Faktor nutzt und
+ * Anzeige und Rechnung nicht auseinanderlaufen koennen.
+ */
+export const CAPTAIN_TEAM_POWER_EFFECT_FACTOR = 0.25;
+
+/** Obergrenze des Kapitäns-Rohwerts (identisch zum Clamp in `buildCaptainRecordForPlayer`). */
+export const CAPTAIN_TEAM_POWER_MAX_PCT = 8;
+
 export function calculateTeamPowerModifierForSide(input: {
   modifiers: LineupDraftModifiers | undefined | null;
   disciplineSide: LineupDisciplineSide;
@@ -695,7 +708,12 @@ export function calculateTeamPowerModifierForSide(input: {
     positiveAttributeTags: power.positiveAttributeTags,
     negativeAttributeTag: power.negativeAttributeTag,
   }) * categoryMultiplier).toFixed(1));
-  const captainPowerPct = Number((Math.max(0, Math.min(8, input.teamCaptainPowerModifierPct ?? 0)) * 0.25).toFixed(1));
+  const captainPowerPct = Number(
+    (
+      Math.max(0, Math.min(CAPTAIN_TEAM_POWER_MAX_PCT, input.teamCaptainPowerModifierPct ?? 0)) *
+      CAPTAIN_TEAM_POWER_EFFECT_FACTOR
+    ).toFixed(1),
+  );
   const effectiveImpact = Number((basePct + conditionalPct + attributeFitPct + captainPowerPct).toFixed(1));
   const isSelfEffect = power.effectType === "self_boost" || power.effectType === "support_boost";
   const teamPowerModifier = isSelfEffect ? effectiveImpact : 0;

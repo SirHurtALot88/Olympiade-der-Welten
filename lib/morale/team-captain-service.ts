@@ -1,5 +1,7 @@
 import type { GameState, Player, TeamCaptainRecord } from "@/lib/data/olyDataTypes";
+import { BOARD_V2_CAPTAIN } from "@/lib/board/board-objectives-config";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
+import { CAPTAIN_TEAM_POWER_EFFECT_FACTOR, CAPTAIN_TEAM_POWER_MAX_PCT } from "@/lib/lineups/team-powers";
 import { buildTeamPlayerDemandMap } from "@/lib/morale/player-demands-service";
 
 const CAPTAIN_POSITIVE_TRAITS = new Set(["eloquent", "motivated", "ambitious", "disciplined", "resourceful", "loyal"]);
@@ -21,7 +23,108 @@ function round(value: number, digits = 1) {
 }
 
 export function getTeamCaptainEffectsTooltip() {
-  return "Der Saison-Kapitän puffert Moral, reduziert Rivalitäts-Druck, stärkt Team-Power leicht und kann Konflikte abfedern.";
+  return "Der Saison-Kapitän puffert Moral, dämpft Rivalitäts-Druck im Spieltag, nimmt Druck vom Vorstand und verstärkt eine gespielte Team-Power leicht.";
+}
+
+/**
+ * Ein Kapitäns-Effekt mit vollstaendiger Herleitung fuer die UI.
+ *
+ * Hintergrund: die Chips zeigten nur Rohwerte ("Power +8%"), was zwei Dinge
+ * verschwieg — der Team-Power-Wert wird real geviertelt und wirkt nur mit einer
+ * gespielten Team-Power, und die Vorstands-Daempfung tauchte gar nicht auf,
+ * obwohl sie der wohl wichtigste Effekt ist. `formula` macht jeden Wert aus dem
+ * Fuehrungswert nachrechenbar, `caveat` nennt die Bedingung.
+ */
+export type CaptainEffectExplanation = {
+  key: "morale" | "rivalry" | "boardPressure" | "teamPower";
+  label: string;
+  /** Bereits formatierter Anzeigewert inkl. Vorzeichen/Einheit. */
+  displayValue: string;
+  /** Herleitung aus dem Führungswert, z. B. "Führung 75,6 ÷ 18 · max 6". */
+  formula: string;
+  /** Worauf der Effekt konkret wirkt. */
+  appliesTo: string;
+  /** Einschraenkung, ohne die der Wert irrefuehrend waere. */
+  caveat: string | null;
+  /** Fertige Zeile fuer ein `title`-Attribut. */
+  tooltip: string;
+};
+
+function formatDe(value: number, digits = 1) {
+  return value.toFixed(digits).replace(".", ",");
+}
+
+/**
+ * Zerlegt die Kapitäns-Effekte in nachvollziehbare Einzelposten.
+ *
+ * Bewusst NICHT enthalten ist `conflictSoftenChancePct`: das Feld wird zwar
+ * berechnet und gespeichert, aber von keiner Spiellogik gelesen (nur Typen,
+ * Test-Fixtures und ein Audit-Skript referenzieren es). Es als Effekt
+ * anzuzeigen wuerde eine Wirkung versprechen, die es nicht gibt.
+ */
+export function buildCaptainEffectExplanations(record: {
+  leadershipScore: number;
+  effects: Pick<
+    TeamCaptainRecord["effects"],
+    "moraleBuffer" | "rivalryPressureReductionPct" | "teamPowerModifierPct"
+  >;
+}): CaptainEffectExplanation[] {
+  const score = record.leadershipScore;
+  const effects = record.effects;
+  // Wirksamer Team-Power-Aufschlag — dieselbe Konstante wie in der Auflösung.
+  const effectiveTeamPowerPct =
+    Math.max(0, Math.min(CAPTAIN_TEAM_POWER_MAX_PCT, effects.teamPowerModifierPct)) * CAPTAIN_TEAM_POWER_EFFECT_FACTOR;
+  // Vorstands-Daempfung: nicht Teil von `effects`, sondern direkt aus dem
+  // Fuehrungswert (team-season-objectives-service, Board-V2).
+  const boardDamp = Math.max(0, Math.min(BOARD_V2_CAPTAIN.maxDamp, score / BOARD_V2_CAPTAIN.leadershipDivisor));
+
+  const rows: CaptainEffectExplanation[] = [
+    {
+      key: "morale",
+      label: "Moral-Puffer",
+      displayValue: `+${formatDe(effects.moraleBuffer)}`,
+      formula: `Führung ${formatDe(score)} ÷ 18 · zwischen 1 und 6`,
+      appliesTo: "Deckelt, wie viel Moral ein Spieler pro Ereignis verlieren kann.",
+      caveat: null,
+      tooltip: "",
+    },
+    {
+      key: "rivalry",
+      label: "Rivalitäts-Druck",
+      displayValue: `−${formatDe(effects.rivalryPressureReductionPct)} %`,
+      formula: `Führung ${formatDe(score)} ÷ 3,5 · zwischen 4 und 24`,
+      appliesTo: "Dämpft den Druck durch Top-Rivalen in der Disziplin beim Spieltag.",
+      caveat: "Das ist der Duell-Druck in der Arena — nicht der Vorstands-Druck.",
+      tooltip: "",
+    },
+    {
+      key: "boardPressure",
+      label: "Vorstands-Druck",
+      displayValue: `−${formatDe(boardDamp)}`,
+      formula: `Führung ${formatDe(score)} ÷ ${BOARD_V2_CAPTAIN.leadershipDivisor} · max ${formatDe(BOARD_V2_CAPTAIN.maxDamp)}`,
+      appliesTo: "Senkt den wahrgenommenen Druck des Vorstands und damit dein Rauswurf-Risiko.",
+      caveat: null,
+      tooltip: "",
+    },
+    {
+      key: "teamPower",
+      label: "Team-Power",
+      // Anzeige = WIRKSAMER Wert. Der Rohwert steht in der Formel, damit die
+      // Viertelung sichtbar ist statt zu verschwinden.
+      displayValue: `+${formatDe(effectiveTeamPowerPct)} %`,
+      formula: `Führung ${formatDe(score)} ÷ 9 = ${formatDe(effects.teamPowerModifierPct)} (max ${CAPTAIN_TEAM_POWER_MAX_PCT}), davon ×${String(CAPTAIN_TEAM_POWER_EFFECT_FACTOR).replace(".", ",")}`,
+      appliesTo: "Schlägt auf die Wirkung einer gespielten Team-Power auf.",
+      caveat: "Wirkt nur, wenn in der Disziplin eine aktive Team-Power gespielt wird — und nicht bei Debuff-Powers.",
+      tooltip: "",
+    },
+  ];
+
+  return rows.map((row) => ({
+    ...row,
+    tooltip: [`${row.label} ${row.displayValue}`, row.appliesTo, `Herleitung: ${row.formula}`, row.caveat]
+      .filter(Boolean)
+      .join(" · "),
+  }));
 }
 
 /**

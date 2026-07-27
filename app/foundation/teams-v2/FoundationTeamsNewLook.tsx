@@ -45,6 +45,7 @@ import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-disciplin
 import { SEASON_DISCIPLINE_LABELS, isSeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
 import {
   buildCaptainCandidateProfiles,
+  buildCaptainEffectExplanations,
   getTeamCaptainEffectsTooltip,
 } from "@/lib/morale/team-captain-service";
 
@@ -2256,11 +2257,17 @@ export default function FoundationTeamsNewLook({
                   <strong>{currentCaptain.playerName}</strong>
                   <small>{currentCaptain.style}</small>
                 </span>
+                {/* Alle vier realen Effekte mit ihrer Herleitung im Tooltip. Frueher standen
+                    hier nur Moral und der ROHE Team-Power-Wert (max 8) — der wird in der
+                    Auflösung geviertelt und wirkt nur mit gespielter Team-Power, und die
+                    Vorstands-Daempfung fehlte ganz. `buildCaptainEffectExplanations` liefert
+                    die wirksamen Werte aus denselben Konstanten wie die Rechnung. */}
                 <span className="nl-teams-captain-collapsed-effects nl-tnum" title={captainEffectsTooltip}>
-                  <span title="Moral-Puffer">Moral +{formatNlNumber(currentCaptain.effects.moraleBuffer, 1)}</span>
-                  <span title="Team-Power-Bonus">
-                    Power +{formatNlNumber(currentCaptain.effects.teamPowerModifierPct, 1)}%
-                  </span>
+                  {buildCaptainEffectExplanations(currentCaptain).map((effect) => (
+                    <span key={effect.key} title={effect.tooltip}>
+                      {effect.label} {effect.displayValue}
+                    </span>
+                  ))}
                 </span>
                 {canManageCaptain ? (
                   <button
@@ -2319,8 +2326,11 @@ export default function FoundationTeamsNewLook({
                             <small>Führung</small>
                           </span>
                           <span className="nl-teams-captain-effects nl-tnum">
-                            <span title="Moral-Puffer">Moral +{formatNlNumber(candidate.effects.moraleBuffer, 1)}</span>
-                            <span title="Team-Power-Bonus">Power +{formatNlNumber(candidate.effects.teamPowerModifierPct, 1)}%</span>
+                            {buildCaptainEffectExplanations(candidate).map((effect) => (
+                              <span key={effect.key} title={effect.tooltip}>
+                                {effect.label} {effect.displayValue}
+                              </span>
+                            ))}
                           </span>
                         </button>
                         <button
