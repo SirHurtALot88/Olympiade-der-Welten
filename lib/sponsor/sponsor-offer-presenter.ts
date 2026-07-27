@@ -1,4 +1,5 @@
-import type { GameState, SponsorOffer, SponsorOfferComponent } from "@/lib/data/olyDataTypes";
+import type { GameState, SponsorOffer, SponsorOfferComponent, SponsorRarity } from "@/lib/data/olyDataTypes";
+import { SPONSOR_RARITIES } from "@/lib/sponsor/sponsor-curve-shapes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import {
   readLockedRankPayout,
@@ -458,4 +459,62 @@ export function buildSponsorRankTierRows(input: {
     { label: SPONSOR_RANK_FLOOR_LABEL, rankAt: SPONSOR_RANK_FLOOR_AT, absolutePayout: roundOfferCash(input.baseCash) },
     ...milestoneRows,
   ];
+}
+
+/** Sortiermodi der Liga-Sponsorenübersicht (#78). */
+export type LeagueSponsorSort = "cash" | "sponsor" | "team" | "tier";
+
+/**
+ * Zeilenform der Liga-Sponsorenübersicht, soweit die Sortierung sie braucht.
+ * Strukturell gehalten, damit die Komponente ihre reichere Zeile direkt
+ * uebergeben kann, ohne sie hier zu duplizieren.
+ */
+export type LeagueSponsorSortRow = {
+  teamName: string;
+  sponsorName: string | null;
+  rarity: SponsorRarity | null;
+  projectedCash: number | null;
+  isGolden: boolean;
+};
+
+/**
+ * Sortiert die Liga-Sponsorenübersicht nach dem gewaehlten Modus.
+ *
+ * Der Modus bestimmt die Reihenfolge allein. Golden-Card-Sponsoren wurden
+ * frueher unabhaengig vom Modus nach ganz oben gezogen; im Cash-Modus stand
+ * dadurch ein Golden-Team mit kleinem Betrag zwischen den groessten Betraegen
+ * und die Spalte war sichtbar nicht mehr absteigend. Golden bleibt an der Karte
+ * (goldener Rahmen + Badge) erkennbar und dient nur noch als Gleichstand-
+ * Kriterium; der Teamname haelt die Reihenfolge danach stabil.
+ */
+export function sortLeagueSponsorRows<T extends LeagueSponsorSortRow>(rows: readonly T[], sort: LeagueSponsorSort): T[] {
+  const compareByMode = (left: T, right: T): number => {
+    if (sort === "team") {
+      return left.teamName.localeCompare(right.teamName, "de", { sensitivity: "base" });
+    }
+    if (sort === "sponsor") {
+      if (left.sponsorName == null && right.sponsorName == null) return 0;
+      if (left.sponsorName == null) return 1;
+      if (right.sponsorName == null) return -1;
+      return left.sponsorName.localeCompare(right.sponsorName, "de", { sensitivity: "base" });
+    }
+    if (sort === "tier") {
+      const leftOrder = left.rarity ? SPONSOR_RARITIES[left.rarity].order : -1;
+      const rightOrder = right.rarity ? SPONSOR_RARITIES[right.rarity].order : -1;
+      return rightOrder - leftOrder;
+    }
+    // "cash": voraussichtliche Auszahlung beim aktuellen Rang, absteigend.
+    // Teams ohne Vertrag (null) sortieren ans Ende.
+    return (right.projectedCash ?? -1) - (left.projectedCash ?? -1);
+  };
+  return [...rows].sort((left, right) => {
+    const byMode = compareByMode(left, right);
+    if (byMode !== 0) {
+      return byMode;
+    }
+    if (left.isGolden !== right.isGolden) {
+      return left.isGolden ? -1 : 1;
+    }
+    return left.teamName.localeCompare(right.teamName, "de", { sensitivity: "base" });
+  });
 }
