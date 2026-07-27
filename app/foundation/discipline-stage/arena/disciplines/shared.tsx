@@ -77,6 +77,7 @@ export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactN
     paused,
     highlightIdxs,
     onHoverTeam,
+    shownScore,
   } = props;
   const trioSet = new Set(highlightIdxs ?? []);
 
@@ -175,7 +176,7 @@ export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactN
                 <rect x={0} y={0} width={W} height={H} fill="url(#envSky)" />
 
                 {prim === "klassen" ? (
-                  renderKlassenBands(sorted, W, H, env, onOpenTeam, onHoverTeam)
+                  renderKlassenBands(sorted, W, H, env, onOpenTeam, onHoverTeam, shownScore)
                 ) : prim === "territory" ? (
                   renderTerritory(sorted, W, H, env)
                 ) : prim === "track" ? (

@@ -33,6 +33,7 @@ import type {
   FinancesViewModel,
   TeamFinancesState,
 } from "@/lib/foundation/finances/finances-types";
+import { getSponsorV2Terms } from "@/lib/sponsor/sponsor-v2-offer-service";
 
 /** Gleiche Rundung wie Cash-Werte im Kredit-/Sponsor-Service (1 Nachkommastelle). */
 function round1(value: number): number {
@@ -166,15 +167,26 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
     // Sponsor-Vorschau ist optional — fehlt sie, greift unten der Estimate-Fallback.
     sponsorSettlementRows = [];
   }
-  const sponsorComponents = sponsorContract
-    ? SPONSOR_COMPONENT_KIND_ORDER.flatMap((kind) => {
-        const rewardCash = sponsorSettlementRows
-          .filter((row) => row.kind === kind)
-          .reduce((sum, row) => sum + row.cashDelta, 0);
-        if (!Number.isFinite(rewardCash) || rewardCash <= 0) return [];
-        return [{ kind, label: getSponsorComponentKindLabel(kind), rewardCash: round1(rewardCash) }];
-      })
-    : [];
+  // SPONSORSYSTEM V2: die Aufschluesselung kommt dann ZEILENWEISE aus dem Settlement statt ueber
+  // `kind` gruppiert. Grund: V2 liefert ZWEI Zeilen mit kind "special" — die rangunabhaengige
+  // Klausel und das Sonderziel. Gruppiert man sie, verschmelzen sie unter dem Etikett "Sonderziel"
+  // zu einem Betrag, den es so nicht gibt. Die SUMME ist in beiden Faellen dieselbe (und damit die
+  // Invariante Anzeige == Settlement gewahrt), aber die Aufschluesselung waere gelogen.
+  const isV2Contract = getSponsorV2Terms(sponsorContract) != null;
+  const sponsorComponents = !sponsorContract
+    ? []
+    : isV2Contract
+      ? sponsorSettlementRows
+          .filter((row) => FINANCE_SPONSOR_INCOME_COMPONENT_KINDS.includes(row.kind))
+          .filter((row) => Number.isFinite(row.cashDelta) && row.cashDelta > 0)
+          .map((row) => ({ kind: row.kind, label: row.label, rewardCash: round1(row.cashDelta) }))
+      : SPONSOR_COMPONENT_KIND_ORDER.flatMap((kind) => {
+          const rewardCash = sponsorSettlementRows
+            .filter((row) => row.kind === kind)
+            .reduce((sum, row) => sum + row.cashDelta, 0);
+          if (!Number.isFinite(rewardCash) || rewardCash <= 0) return [];
+          return [{ kind, label: getSponsorComponentKindLabel(kind), rewardCash: round1(rewardCash) }];
+        });
   const sponsorComponentsTotal = round1(sponsorComponents.reduce((sum, component) => sum + component.rewardCash, 0));
   const estimatedSponsorRevenue = estimateTeamAnnualRevenue(gameState, teamId);
   const sponsorTotalIsEstimate = sponsorComponentsTotal <= 0 && estimatedSponsorRevenue > 0;

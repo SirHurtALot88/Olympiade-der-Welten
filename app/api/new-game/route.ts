@@ -47,16 +47,27 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = (await request.json()) as NewGameRequestBody;
-  const input = normalizeBody(body);
-
-  if (body.dryRun !== false) {
-    return NextResponse.json({
-      preview: previewNewGameSetup(input),
-    });
-  }
-
+  // Parse + preview live INSIDE the try below. They used to run unguarded here, so a malformed
+  // body (`request.json()` throwing) or any error inside `previewNewGameSetup` escaped as an
+  // uncaught 500 — Next then answers with an HTML error page, `response.json()` on the client
+  // throws, and the only thing the user ever saw was the opaque
+  // "New-Game-Setup konnte nicht geladen werden." catch-all. Wrapping them means the real reason
+  // reaches the UI as a proper JSON `error` string instead.
   try {
+    let body: NewGameRequestBody;
+    try {
+      body = (await request.json()) as NewGameRequestBody;
+    } catch {
+      return NextResponse.json({ error: "Ungültiger Anfrage-Body (kein JSON)." }, { status: 400 });
+    }
+    const input = normalizeBody(body);
+
+    if (body.dryRun !== false) {
+      return NextResponse.json({
+        preview: previewNewGameSetup(input),
+      });
+    }
+
     // Per-user active-save scoping: with auth on, the new game becomes active for the acting
     // user only (their pointer), leaving the other player's active save untouched. Auth off ->
     // ownerId null -> unchanged global activate.
@@ -76,6 +87,16 @@ export async function POST(request: Request) {
     // "new game" HTTP request itself still returns immediately instead of blocking ~40s+.
     const setupSaveId = result.save.saveId;
     const setupSeasonId = result.preview.seasonSetup.seasonId;
+    // Draft ONLY the AI-controlled teams. Unlike the `fresh-season-1` quick-action (which has no
+    // human team, so its whole-league `allowSetupAllTeams` draft is harmless), the "Neues Spiel"
+    // wizard hands one or more teams to Chris/Franky (controlMode "manual", humanControlled true).
+    // The `allowSetupAllTeams` bypass in `chooseTeams` ignores control mode entirely, so without a
+    // writable-scope restriction the background draft would ALSO fill the player's own roster — the
+    // player then finds their squad pre-picked instead of drafting it themselves. Passing the
+    // server-computed AI-team set as `callerWritableTeamIds` (the same guard that stops a bulk run
+    // from mutating another human participant's team) skips every human team; their rosters stay
+    // empty for manual drafting and never surface as spurious below-minimum setup warnings.
+    const aiTeamIdsForDraft = result.preview.aiTeamIds;
     const savedForDraft = persistence.getSaveById(setupSaveId);
     if (savedForDraft) {
       persistence.saveSingleplayerState(setupSaveId, {
@@ -93,6 +114,7 @@ export async function POST(request: Request) {
               confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
               teamScope: "all",
               allowSetupAllTeams: true,
+              callerWritableTeamIds: aiTeamIdsForDraft,
               draftSeed: `${setupSaveId}:${setupSeasonId}:setup`,
               yieldBetweenTeams: true,
               batchPersistence: true,

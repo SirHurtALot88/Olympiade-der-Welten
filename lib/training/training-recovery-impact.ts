@@ -10,11 +10,12 @@ export const TRAINING_RECOVERY_IMPACT: Record<
   }
 > = {
   leicht: {
-    // Balancing: Schonen darf nicht zu stark sein — Leicht-Training gibt +15% Recovery (statt +25%),
-    // damit Rotation/Schonen die Fatigue mildert, aber nicht sofort komplett wegwischt.
+    // Owner-Entscheidung (2026-07): +20% Recovery (vorher +15%) — Schonen/Leicht-Training soll
+    // spuerbar mehr Erholung geben, damit gezieltes Rotieren/Schonen ein wirksames Gegenmittel zum
+    // festen (unveraenderten) Fatigue-Druck bleibt.
     label: "Leicht",
-    recoveryMultiplier: 1.15,
-    recoveryDeltaPct: 15,
+    recoveryMultiplier: 1.2,
+    recoveryDeltaPct: 20,
     strainLabel: "schonend",
   },
   mittel: {
@@ -24,9 +25,11 @@ export const TRAINING_RECOVERY_IMPACT: Record<
     strainLabel: "normal",
   },
   hart: {
+    // Owner-Entscheidung (2026-07): -25% Recovery (vorher -32%) — Hart-Training bleibt eine
+    // bewusste Belastung, aber etwas milder als zuvor.
     label: "Hart",
-    recoveryMultiplier: 0.68,
-    recoveryDeltaPct: -32,
+    recoveryMultiplier: 0.75,
+    recoveryDeltaPct: -25,
     strainLabel: "belastend",
   },
 };

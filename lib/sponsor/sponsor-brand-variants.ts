@@ -1,9 +1,8 @@
-import type { SponsorArchetype, SponsorCurveShape, SponsorRarity } from "@/lib/data/olyDataTypes";
+import type { SponsorArchetype, SponsorRarity } from "@/lib/data/olyDataTypes";
 
 import type { SponsorBrandIndustry, SponsorBrandParent } from "@/lib/sponsor/sponsor-brand-parents";
 import { SPONSOR_BRAND_PARENTS } from "@/lib/sponsor/sponsor-brand-parents";
 import { SPONSOR_RARITIES, mapStarTierToRarity } from "@/lib/sponsor/sponsor-curve-shapes";
-import { mapCurveShapeToArchetype } from "@/lib/sponsor/sponsor-tier-pool";
 
 export type SponsorSpecialTemplateId =
   | "transfer_profit_min"
@@ -199,8 +198,8 @@ function tierRangeToRarityOrder(tierRange: [number, number]): [number, number] {
 
 export function pickVariantForParent(input: {
   parentId: string;
-  /** Kurvenform statt Archetyp — die Familie bestimmt via mapCurveShapeToArchetype den Varianten-Archetyp. */
-  curveShape: SponsorCurveShape;
+  /** Archetyp-Eimer des Slots (aus der Modellkurve abgeleitet, siehe SPONSOR_CURVE_ARCHETYPE). */
+  archetype: SponsorArchetype;
   /** Rarität statt Sternrang — SPONSOR_RARITIES[rarity].order ist die neue Tier-Achse für das Range-Filter. */
   rarity: SponsorRarity;
   seasonId: string;
@@ -208,7 +207,7 @@ export function pickVariantForParent(input: {
   slotIndex: number;
 }): SponsorBrandTemplate | null {
   const variants = listVariantsForParent(input.parentId);
-  const archetype = mapCurveShapeToArchetype(input.curveShape);
+  const archetype = input.archetype;
   const rarityOrder = SPONSOR_RARITIES[input.rarity].order;
   const matchesArchetypeAndTier = (variant: SponsorBrandTemplate) => {
     const [loOrder, hiOrder] = tierRangeToRarityOrder(variant.tierRange);

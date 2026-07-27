@@ -1,4 +1,5 @@
 import { hasResolveReadyModifierSources } from "@/lib/lineups/legacy-modifier-source-contract";
+import { isPartialLineupComplete } from "@/lib/lineups/legacy-matchday-partial-lineup-rule";
 import { applyCaptainRivalryPressureReduction, calculateSideSlotRoleModifierTotal } from "@/lib/lineups/matchday-slot-roles";
 import { scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
 import type { LegacyLineupLoadedContext, LegacyResolvePreviewOptions } from "@/lib/lineups/legacy-lineup-types";
@@ -219,8 +220,6 @@ function shouldFlagMissingSources(
   return score.fatigueStatus !== "mapped";
 }
 
-const LEGACY_MATCHDAY_MINIMUM_PLAYERS = 7;
-
 function isPartialLineupAllowed(context: LegacyLineupLoadedContext) {
   const requiredTotalUniquePlayers = getDisciplineSideMeta(context).reduce((sum, meta) => {
     return (
@@ -234,11 +233,11 @@ function isPartialLineupAllowed(context: LegacyLineupLoadedContext) {
   }, 0);
   const selectedPlayerIds = new Set((context.existingDraft?.entries ?? []).map((entry) => entry.playerId));
 
-  return (
-    context.activePlayers.length >= LEGACY_MATCHDAY_MINIMUM_PLAYERS &&
-    context.activePlayers.length < requiredTotalUniquePlayers &&
-    selectedPlayerIds.size === context.activePlayers.length
-  );
+  return isPartialLineupComplete({
+    activePlayersCount: context.activePlayers.length,
+    requiredTotalUniquePlayers,
+    selectedPlayerCount: selectedPlayerIds.size,
+  });
 }
 
 export function buildLegacyMatchdayResolvePreview(
@@ -569,6 +568,8 @@ export function buildLegacyMatchdayResolvePreview(
           slotIndex: entry.slotIndex,
           baseValue: entry.baseDisciplineScore ?? entry.score,
           fatigueAdjustedValue: entry.fatigueAdjustedScore ?? null,
+          injuryApplied: Boolean(entry.injuryStatus === "mapped" && entry.injuryMultiplier != null && entry.injuryMultiplier < 1),
+          injuryAdjustedValue: entry.injuryAdjustedScore ?? null,
           captainBonus: entry.captainBonus ?? null,
           mutatorBonus: entry.mutatorBonus ?? null,
           mutatorPpsBonus: entry.mutatorPpsBonus ?? null,
@@ -647,6 +648,8 @@ export function buildLegacyMatchdayResolvePreview(
         slotIndex: entry.slotIndex,
         baseValue: entry.baseDisciplineScore ?? entry.score ?? 0,
         fatigueAdjustedValue: entry.fatigueAdjustedScore ?? null,
+        injuryApplied: Boolean(entry.injuryStatus === "mapped" && entry.injuryMultiplier != null && entry.injuryMultiplier < 1),
+        injuryAdjustedValue: entry.injuryAdjustedScore ?? null,
         captainBonus: entry.captainBonus ?? null,
         mutatorBonus: entry.mutatorBonus ?? null,
         mutatorPpsBonus: entry.mutatorPpsBonus ?? null,

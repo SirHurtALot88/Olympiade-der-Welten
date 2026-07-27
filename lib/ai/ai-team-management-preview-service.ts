@@ -391,6 +391,23 @@ function isPrevSeasonHealthStressed(context: TeamContext) {
   );
 }
 
+/**
+ * Public wrapper around `buildPrevSeasonHealthMetrics` for callers that only need the raw
+ * previous-season injury count for a team's current roster — without building the full
+ * `TeamContext` (roster economy, morale, facilities, …) that this file needs for its own
+ * facility/training decisions. Used by `lib/ai/ai-injury-depth-topup-service.ts` so the
+ * preseason "buy a cheap depth player after a rough injury season" reaction reuses the exact
+ * same injury signal already driving the recovery-center build score/threshold here, instead
+ * of introducing a second, independent injury metric.
+ */
+export function getPrevSeasonInjuryCount(gameState: GameState, teamId: string): number {
+  const rosterEntries = gameState.rosters.filter((entry) => entry.teamId === teamId);
+  const players = rosterEntries
+    .map((entry) => gameState.players.find((player) => player.id === entry.playerId) ?? null)
+    .filter((entry): entry is Player => Boolean(entry));
+  return buildPrevSeasonHealthMetrics(gameState, teamId, players).prevSeasonInjuryCount;
+}
+
 function buildTeamContext(
   gameState: GameState,
   teamId: string,

@@ -1,5 +1,5 @@
 import prizeMoneyNormalized from "@/references/sheets/prize-money-table.normalized.json";
-import type { GameState, SponsorArchetype, SponsorCurveFamily, SponsorCurveShape, SponsorOffer, SponsorOfferComponent, SponsorRarity } from "@/lib/data/olyDataTypes";
+import type { GameState, SponsorArchetype, SponsorCurveShape, SponsorOffer, SponsorOfferComponent, SponsorRarity } from "@/lib/data/olyDataTypes";
 import {
   SPONSOR_RARITIES,
   getSponsorCurveShapeRankMultiplier,
@@ -8,6 +8,7 @@ import {
 } from "@/lib/sponsor/sponsor-curve-shapes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamDisplaySalaryTotal, getTeamSponsorBaseReferenceTotal } from "@/lib/sponsor/sponsor-team-salary-display";
+import { getSponsorV2Terms, sponsorV2ExpectedPayout, sponsorV2GuaranteedLadder } from "@/lib/sponsor/sponsor-v2-offer-service";
 
 const PRIZE_MONEY_NORMALIZED = prizeMoneyNormalized as {
   rows: Array<{ rank: number | null; prizeMoney: number | null }>;
@@ -122,13 +123,6 @@ export function getArchetypeMilestoneMultiplier(archetype: SponsorArchetype): nu
   return SPONSOR_ARCHETYPE_MILESTONE_MULT[archetype] ?? 1;
 }
 
-/** @deprecated WAVE 1: Archetyp-Split läuft jetzt über SPONSOR_ARCHETYPE_BASE_MULT / getArchetypeBaseMultiplier. */
-export function getArchetypeBaseShare(archetype: SponsorArchetype): number {
-  if (archetype === "security") return 0.65;
-  if (archetype === "identity") return 0.55;
-  return 0.35;
-}
-
 export function getTotalMilestoneBonusC(salaryFactor = 1): number {
   return round1(SPONSOR_RANK_MILESTONES.reduce((sum, milestone) => sum + milestone.bonusC, 0) * salaryFactor);
 }
@@ -153,27 +147,6 @@ export function getUnlockedMilestones(finalRank: number | null | undefined): Spo
   }
   const boundedRank = Math.min(32, Math.max(1, Math.round(finalRank)));
   return SPONSOR_RANK_MILESTONES.filter((milestone) => boundedRank <= milestone.maxRank);
-}
-
-export function getSponsorPayoutForFinalRank(finalRank: number | null | undefined, salaryFactor = 1): number {
-  const base = round1(SPONSOR_BASE_FLOOR_C * salaryFactor);
-  const milestoneBonus = getRankMilestoneBonus(finalRank, salaryFactor);
-  return round1(base + milestoneBonus);
-}
-
-export function getNextMilestoneRank(startRank: number | null | undefined): number {
-  const rank = startRank ?? 32;
-  const next = SPONSOR_RANK_MILESTONES.find((milestone) => milestone.maxRank < rank);
-  return next?.maxRank ?? 1;
-}
-
-export function buildMilestoneRankLabel(): string {
-  return SPONSOR_RANK_MILESTONES.map((milestone) => `${milestone.label} (+${milestone.bonusC} C)`).join(" · ");
-}
-
-/** @deprecated WAVE 1: Archetyp-Split läuft jetzt über SPONSOR_ARCHETYPE_MILESTONE_MULT / getArchetypeMilestoneMultiplier. */
-export function getArchetypeRankShare(archetype: SponsorArchetype): number {
-  return round1(1 - getArchetypeBaseShare(archetype));
 }
 
 /**
@@ -273,15 +246,6 @@ export function resolveSponsorEconomyAnchors(salaryFactor: number, baseAnchorSal
   return { effectiveBaseFloor, milestonePool, milestoneScale };
 }
 
-export function getScaledRankMilestoneBonus(
-  finalRank: number | null | undefined,
-  salaryFactor: number,
-  leagueMinSalary: number,
-): number {
-  const { milestoneScale } = resolveSponsorEconomyAnchors(salaryFactor, leagueMinSalary);
-  return round1(getRankMilestoneBonus(finalRank, salaryFactor) * milestoneScale);
-}
-
 /**
  * Umverteilung nach Team-Stärke (quality rank) zum SCHUTZ der schwachen Teams — hält die Top5/Bottom5-
  * Schere (MW+Cash) unter ~2×. Zwei Hebel:
@@ -346,59 +310,6 @@ export const SPONSOR_OVERPERFORMANCE_SHARE = Number(process.env.OLY_SPONSOR_OVER
 export const SPONSOR_SPECIAL_BASE_SHARE = Number(process.env.OLY_SPONSOR_SPECIAL_BASE_SHARE ?? 0.06) || 0.06;
 export const SPONSOR_SPECIAL_RARITY_STEP = Number(process.env.OLY_SPONSOR_SPECIAL_RARITY_STEP ?? 0.03) || 0.03;
 export const SPONSOR_SPECIAL_BASE_CAP_FRAC = Number(process.env.OLY_SPONSOR_SPECIAL_BASE_CAP ?? 0.3) || 0.3;
-
-/**
- * P3 — Überperformance-Modul: eine SICHTBARE, FAMILIEN-DIFFERENZIERTE Auszahlung fürs Übertreffen des
- * Erwartungsrangs, `min(cap, rate × Plätze-über-Erwartung)`, beim Signieren eingefroren. Ersetzt (für
- * Neuverträge) sowohl den nie ausgezahlten Feed-2-Implizit-Bonus als auch das binäre 3-C-`beat_expected_rank`-
- * Special. Familien-Profil: Titel/Podest zahlen die dickste Überperformance (kleinste Basis als Gegengewicht),
- * Sicherheit hat KEINS (dafür XL-Basis). `rate` und `cap` skalieren mit der Rarity (×(1 + 0.1 × order)).
- */
-export const SPONSOR_OVERPERF_FAMILY: Record<SponsorCurveFamily, { rate: number; cap: number } | null> = {
-  titel: { rate: 1.8, cap: 14 },
-  europa: { rate: 1.2, cap: 10 },
-  stetig: { rate: 0.8, cap: 6 },
-  aufstieg: { rate: 0.6, cap: 5 },
-  sicherheit: null,
-};
-
-/**
- * P3 — Verbesserungs-Modul als PER-PLATZ-Auszahlung statt Binärziel: `min(cap, rate × Plätze-besser-als-
- * Startrang)`, cap = rate × max. Familien-differenziert, damit sich der Bonus je Sponsor fühlbar
- * unterscheidet (Aufstieg/Stetig belohnen Klettern am stärksten; Titel kaum — die haben ihre Überperformance).
- */
-export const SPONSOR_IMPROVEMENT_FAMILY: Record<SponsorCurveFamily, { rate: number; max: number }> = {
-  titel: { rate: 0.6, max: 3 },
-  europa: { rate: 1.0, max: 4 },
-  stetig: { rate: 1.2, max: 5 },
-  aufstieg: { rate: 1.5, max: 6 },
-  sicherheit: { rate: 1.0, max: 5 },
-};
-
-/** Überperformance-Rate/Cap für eine Familie + Rarity (× salaryFactor), oder null wenn die Familie keins hat. */
-export function getSponsorOverperfConfig(
-  family: SponsorCurveFamily,
-  rarityOrder: number,
-  salaryFactor = 1,
-): { ratePerUnitC: number; cap: number } | null {
-  const cfg = SPONSOR_OVERPERF_FAMILY[family];
-  if (!cfg) return null;
-  const rarityMult = 1 + 0.1 * rarityOrder;
-  return {
-    ratePerUnitC: round1(cfg.rate * rarityMult * salaryFactor),
-    cap: round1(cfg.cap * rarityMult * salaryFactor),
-  };
-}
-
-/** Per-Platz-Verbesserungs-Rate/Max für eine Familie (× salaryFactor). */
-export function getSponsorImprovementConfig(
-  family: SponsorCurveFamily,
-  salaryFactor = 1,
-): { ratePerUnitC: number; maxUnits: number; cap: number } {
-  const cfg = SPONSOR_IMPROVEMENT_FAMILY[family] ?? SPONSOR_IMPROVEMENT_FAMILY.stetig;
-  const ratePerUnitC = round1(cfg.rate * salaryFactor);
-  return { ratePerUnitC, maxUnits: cfg.max, cap: round1(ratePerUnitC * cfg.max) };
-}
 
 /**
  * Golden-Sponsor Rang-Payout-Boost (Wave-1-schonend). Ein golden markierter Vertrag hebt NUR die
@@ -569,6 +480,14 @@ export function getCurrentSponsorSalaryFactor(gameState: GameState): number {
  * Meilenstein-Gewichtung splitten (das ignoriert curveShape und wich vom echten Payout ab).
  */
 export function buildOfferRankPayoutLadderPreview(gameState: GameState, offer: SponsorOffer): number[] {
+  // SPONSORSYSTEM V2: DIE Umschaltstelle der ANZEIGE. Diese eine Funktion liefert sowohl die in der Karte
+  // angezeigten Gewinnstufen als auch die beim Unterschreiben eingefrorene Leiter — schaltet sie
+  // um, folgen Anzeige, Sign und Settlement automatisch. Genau deshalb gibt es hier keine zweite
+  // V2-Sign-Logik daneben, die auseinanderdriften koennte.
+  const v2 = getSponsorV2Terms(offer);
+  if (v2) {
+    return sponsorV2GuaranteedLadder(v2);
+  }
   return buildLockedRankPayoutLadder({
     salaryFactor: getCurrentSponsorSalaryFactor(gameState),
     leagueMinSalary: getSponsorRank32BaseAnchorSalary(gameState),
@@ -641,25 +560,23 @@ export function buildOfferCashAmounts(input: {
   return { baseCash, rankCash, specialCash, totalAtMaxRank };
 }
 
-/** @deprecated Use getRankMilestoneBonus for Gewinnstufen settlement */
-export function getTieredRankPayoutFraction(currentRank: number, target: number): number {
-  if (currentRank <= target) {
-    return 1;
-  }
-  if (currentRank <= target + 3) {
-    return 0.5;
-  }
-  if (currentRank <= target + 6) {
-    return 0.25;
-  }
-  return 0;
-}
-
+/**
+ * SPONSORSYSTEM V2: die KI-Sponsorwahl bewertet ein V2-Angebot sonst mit V1-Logik — sie liest
+ * baseCash/rankCash-Heuristiken, die fuer eine V2-Karte gar nicht mehr die Auszahlung beschreiben.
+ * Fuer V2 kommt der Erwartungswert direkt aus dem Modell: Erwartung ueber Endrang, Klausel und
+ * Sonderziel, inklusive Untergrenze und K. Da alle Karten eines Teams per Kalibrierung denselben
+ * EV haben, entscheidet die KI danach ueber Rarity und ihre Praeferenzen — und nicht mehr zufaellig
+ * ueber eine Kennzahl, die nichts mehr misst.
+ */
 export function estimateExpectedPayout(
   offer: SponsorOffer,
   powerRank: number | null,
   leagueMinSalary?: number,
 ): number {
+  const v2 = getSponsorV2Terms(offer);
+  if (v2) {
+    return sponsorV2ExpectedPayout(v2);
+  }
   const baseComponent = offer.components.find((component) => component.kind === "base");
   // "gewöhnlich" ist hier das exakte Äquivalent des alten Default-Fallbacks (`offer.starTier ?? 2`).
   const rarity = offer.rarity ?? "gewöhnlich";
@@ -731,23 +648,3 @@ export function estimateExpectedPayout(
   return round1(expected);
 }
 
-export function estimateSettlementPayout(
-  offer: SponsorOffer,
-  finalRank: number | null,
-  salaryFactor = 1,
-): number {
-  const baseComponent = offer.components.find((component) => component.kind === "base");
-  const rankComponent = offer.components.find((component) => component.kind === "rank");
-  const base = baseComponent?.rewardCash ?? 0;
-  const rankCash = rankComponent?.rewardCash ?? 0;
-  const totalMilestone = getTotalMilestoneBonusC(salaryFactor);
-  const unlocked = getRankMilestoneBonus(finalRank, salaryFactor);
-  const rankPayout = totalMilestone > 0 ? round1(rankCash * (unlocked / totalMilestone)) : 0;
-  let extra = 0;
-  for (const component of offer.components) {
-    if (component.kind === "improvement" || component.kind === "special" || component.kind === "overperformance") {
-      extra += component.rewardCash * (component.kind === "special" ? 0.12 : 0.2);
-    }
-  }
-  return round1(base + rankPayout + extra);
-}

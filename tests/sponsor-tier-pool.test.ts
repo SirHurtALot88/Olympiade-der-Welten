@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { SponsorTeamQualityRank } from "@/lib/sponsor/sponsor-team-quality-rank";
 import { getDemandMultiplierForRarity, rollSponsorOfferSlate } from "@/lib/sponsor/sponsor-tier-pool";
-import { getSponsorCurveFamily } from "@/lib/sponsor/sponsor-curve-shapes";
-import type { SponsorCurveFamily } from "@/lib/data/olyDataTypes";
+import { SPONSOR_V2_CURVES } from "@/lib/sponsor/sponsor-v2-model";
 
 function createQualityRank(overrides: Partial<SponsorTeamQualityRank> & Pick<SponsorTeamQualityRank, "teamId">): SponsorTeamQualityRank {
   return {
@@ -28,27 +27,21 @@ describe("sponsor demand multiplier (rarity-keyed)", () => {
   });
 });
 
-describe("sponsor offer slate (rarity + curve shapes)", () => {
-  function familyCounts(shapes: SponsorCurveFamily[]) {
-    const counts = new Map<SponsorCurveFamily, number>();
-    for (const family of shapes) {
-      counts.set(family, (counts.get(family) ?? 0) + 1);
-    }
-    return counts;
-  }
-
-  it("rolls five DISTINCT curve shapes with at most two per family", () => {
+describe("sponsor offer slate (rarity + Modellkurven)", () => {
+  it("rolls five DISTINCT model curves out of the six the model knows", () => {
+    // Gewuerfelt werden die sechs Kurven des Sponsormodells. Die frueheren elf Legacy-Kurvenformen samt
+    // Familien-Deckel sind aus der Erzeugung entfernt — bei 6 Kurven und 5 Slots ist "distinkt" die
+    // ganze Regel, ein Deckel je Familie waere gegenstandslos.
     const slate = rollSponsorOfferSlate({
       seasonId: "season-slate",
       teamId: "M-M",
       qualityRank: createQualityRank({ teamId: "M-M", qualityRank: 5, maxRarity: "legendär", targetRarity: "selten" }),
     });
     expect(slate.entries).toHaveLength(5);
-    const curves = slate.entries.map((entry) => entry.curveShape);
+    const curves = slate.entries.map((entry) => entry.curveName);
     expect(new Set(curves).size).toBe(curves.length); // distinkt
-    const counts = familyCounts(curves.map(getSponsorCurveFamily));
-    for (const count of counts.values()) {
-      expect(count).toBeLessThanOrEqual(2);
+    for (const name of curves) {
+      expect(SPONSOR_V2_CURVES.some((c) => c.name === name)).toBe(true);
     }
   });
 

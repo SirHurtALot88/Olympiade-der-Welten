@@ -9,6 +9,7 @@ import {
 } from "@/lib/lineups/legacy-lineup-local-service";
 import { LegacyLineupService } from "@/lib/lineups/legacy-lineup-service";
 import type { LegacyLineupEntryInput, LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
+import { mapSaveResolutionErrorToResponse } from "@/lib/persistence/resolve-local-save";
 
 function parseKeyParams(request: Request): LegacyLineupKeyParams | null {
   const { searchParams } = new URL(request.url);
@@ -35,7 +36,14 @@ export async function GET(request: Request) {
   }
 
   if (parseSource(request) !== "prisma") {
-    const preview = calculateLocalLegacyLineupPreview(params);
+    let preview;
+    try {
+      preview = calculateLocalLegacyLineupPreview(params);
+    } catch (error) {
+      const mapped = mapSaveResolutionErrorToResponse(error);
+      if (mapped) return mapped;
+      throw error;
+    }
     if (!preview.ok) {
       return NextResponse.json({ errors: preview.errors, warnings: preview.warnings }, { status: 422 });
     }
@@ -64,7 +72,14 @@ export async function POST(request: Request) {
   }
 
   if (parseSource(request) !== "prisma") {
-    const preview = calculateLocalLegacyLineupPreview(params, body.entries, body.modifiers);
+    let preview;
+    try {
+      preview = calculateLocalLegacyLineupPreview(params, body.entries, body.modifiers);
+    } catch (error) {
+      const mapped = mapSaveResolutionErrorToResponse(error);
+      if (mapped) return mapped;
+      throw error;
+    }
     if (!preview.ok) {
       return NextResponse.json({ errors: preview.errors, warnings: preview.warnings }, { status: 422 });
     }

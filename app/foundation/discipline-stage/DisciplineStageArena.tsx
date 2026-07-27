@@ -1577,8 +1577,10 @@ export default function DisciplineStageArena({
       gameState={gameState}
       ratingByPlayerId={ratingByPlayerId}
       fieldedPlayerIdsByTeam={fieldedByTeam}
-      disciplineId={disciplineId}
-      // PP erst nach Abschluss der Disziplin — vorher wäre die Vergabe ein Spoiler.
+      // Anti-Spoiler: dieselbe Reveal-Quelle wie der Team-Drawer — die Hovercard darf
+      // nur Werte von Spielern zeigen, die die Arena schon aufgedeckt hat.
+      liveResultsByTeam={liveResultsByTeam}
+      // PP zusätzlich erst nach Abschluss der Disziplin — vorher wäre die Vergabe ein Spoiler.
       ppByPlayerId={arenaEnded ? ppByPlayerId : null}
     />
     </>

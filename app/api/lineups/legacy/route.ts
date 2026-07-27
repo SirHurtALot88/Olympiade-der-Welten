@@ -11,6 +11,7 @@ import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-poli
 import { LegacyLineupService } from "@/lib/lineups/legacy-lineup-service";
 import type { LegacyLineupEntryInput, LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { mapSaveResolutionErrorToResponse } from "@/lib/persistence/resolve-local-save";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
@@ -52,8 +53,14 @@ export async function GET(request: Request) {
   }
 
   if (parseSource(request) !== "prisma") {
-    const draft = getLocalLegacyLineupDraft(params);
-    return NextResponse.json({ draft, source: "sqlite", readOnly: false });
+    try {
+      const draft = getLocalLegacyLineupDraft(params);
+      return NextResponse.json({ draft, source: "sqlite", readOnly: false });
+    } catch (error) {
+      const mapped = mapSaveResolutionErrorToResponse(error);
+      if (mapped) return mapped;
+      throw error;
+    }
   }
 
   const service = new LegacyLineupService();
@@ -101,7 +108,14 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: writeAuth.reason, warnings: writeAuth.warnings }, { status: writeAuth.status });
     }
 
-    const result = saveLocalLegacyLineupDraft(params, body.entries, body.modifiers);
+    let result;
+    try {
+      result = saveLocalLegacyLineupDraft(params, body.entries, body.modifiers);
+    } catch (error) {
+      const mapped = mapSaveResolutionErrorToResponse(error);
+      if (mapped) return mapped;
+      throw error;
+    }
     if (!result.ok) {
       return NextResponse.json(
         {

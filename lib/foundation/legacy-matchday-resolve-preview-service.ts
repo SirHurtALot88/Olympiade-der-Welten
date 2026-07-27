@@ -71,7 +71,7 @@ export function buildLegacyMatchdayResolvePreviewPayload(input: {
     return null;
   }
 
-  // Deterministische Same-Day-Verletzungs-Performance (0.75x) exakt wie die
+  // Deterministische Same-Day-Verletzungs-Performance (INJURY_PERFORMANCE_MULTIPLIER) exakt wie die
   // Apply-Pfade an die Contexts heften, BEVOR die Vorschau gescored wird — so
   // zeigt die Vorschau denselben Malus, den das angewandte Ergebnis verhängt
   // (Vorschau == angewandtes Ergebnis, nicht divergent).

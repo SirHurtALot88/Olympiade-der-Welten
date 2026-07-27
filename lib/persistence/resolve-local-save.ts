@@ -1,3 +1,5 @@
+import { NextResponse } from "next/server";
+
 import type { PersistedSaveGame } from "@/lib/persistence/types";
 import type { PersistenceService } from "@/lib/persistence/types";
 
@@ -51,6 +53,21 @@ export function requireLocalPersistedSave(
   }
 
   return { persistence, save };
+}
+
+/**
+ * Maps a `SaveResolutionError` thrown by `requireLocalPersistedSave` to the JSON error response
+ * routes should return (400/404 with `{ error: code, message }`, matching the shape the
+ * `ai-batch-apply` route established first). Returns `null` for anything else so callers can fall
+ * through to their own generic 500 handling. Centralised here (next to the resolver) so the six+
+ * gameplay-write routes that call `requireLocalPersistedSave` transitively don't each hand-roll
+ * their own copy of this mapping.
+ */
+export function mapSaveResolutionErrorToResponse(error: unknown): NextResponse | null {
+  if (error instanceof SaveResolutionError) {
+    return NextResponse.json({ error: error.code, message: error.message }, { status: error.status });
+  }
+  return null;
 }
 
 /**

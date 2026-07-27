@@ -5,6 +5,7 @@ import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-co
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { calculateTransfermarktFit } from "@/lib/market/transfermarkt-fit";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { formatGermanDateTime } from "@/lib/utils/format-datetime";
 
 import {
   AI_PICK_AUDIT_RESET_CONFIRM_TOKEN,
@@ -862,7 +863,7 @@ export async function runAiPickAuditReset(params: RunAiPickAuditResetParams): Pr
       blockedCandidates.length > 0
         ? {
             action: "create_fresh_test_save",
-            suggestedName: `Fresh AI Reset Test ${new Date().toLocaleString("de-DE")}`,
+            suggestedName: `Fresh AI Reset Test ${formatGermanDateTime(new Date())}`,
             reason: "Mindestens ein AI-/Setup-Kauf ist nicht sicher ruecksetzbar. Ein frischer Test-Save vermeidet gemischte Transferspuren.",
           }
         : null,

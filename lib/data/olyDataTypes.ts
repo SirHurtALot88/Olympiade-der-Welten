@@ -1212,13 +1212,22 @@ export type SponsorArchetype = "security" | "performance" | "identity";
  */
 export type SponsorRarity = "gewöhnlich" | "magisch" | "selten" | "legendär";
 
-/** Thematic family of a curve shape — governs the offer-slate draw ("max 2 per family"). */
+/**
+ * NUR NOCH LESEN. Thematische Familie einer alten Kurvenform. Die Angebotserzeugung wuerfelt seit dem
+ * Aufraeumen des Sponsor-Cutovers die sechs Modellkurven (siehe SPONSOR_V2_CURVES) und kennt keine
+ * Familien mehr; dieser Typ existiert fuer die Anzeige und Abrechnung von Altvertraegen.
+ */
 export type SponsorCurveFamily = "titel" | "europa" | "stetig" | "aufstieg" | "sicherheit";
 
 /**
- * A sponsor's curve shape = WHERE across the final table (Platz 1..32) its fixed Etat sits. Replaces the
- * old 3 archetypes. 11 shapes in 5 families; each has a unique win-band and a matching weak-band (no shape
- * is dominated). Data + payout profiles live in lib/sponsor/sponsor-curve-shapes.ts.
+ * NUR NOCH LESEN — KEIN ERZEUGUNGS-TYP MEHR.
+ *
+ * Die Kurvenform beschreibt, WO ueber die Endtabelle (Platz 1..32) das feste Etat eines Sponsors sitzt.
+ * Sie war die Auszahlungsachse des ALTEN Sponsorsystems (11 Formen in 5 Familien). Neue Angebote tragen
+ * sie NICHT mehr: ihre Auszahlung kommt aus dem Sponsormodell (lib/sponsor/sponsor-v2-model.ts) und
+ * steht im `sponsorV2`-Block. Typ und Payout-Tabellen (lib/sponsor/sponsor-curve-shapes.ts) bleiben
+ * ausschliesslich stehen, damit Angebote und Vertraege aus Spielstaenden von VOR der Umstellung weiter
+ * angezeigt, unterschrieben und abgerechnet werden koennen.
  */
 export type SponsorCurveShape =
   | "titeljaeger"
@@ -1233,6 +1242,13 @@ export type SponsorCurveShape =
   | "sicherheit"
   | "klassenerhalt";
 
+/**
+ * `improvement` (Tabellenziel) und `overperformance` (Ueberperformance) werden NICHT MEHR ERZEUGT — die
+ * beiden Module gehoerten zum alten Sponsorsystem und sind aus der Angebotserzeugung entfernt. Sie
+ * bleiben Teil des Typs, weil Vertraege und Angebote in bestehenden Spielstaenden sie tragen und
+ * Anzeige, Evaluator und Abrechnung sie weiter verstehen muessen. Wer sie wieder BAUT, bricht
+ * tests/sponsor-v1-erzeugung-tot.test.ts.
+ */
 export type SponsorOfferComponentKind = "base" | "rank" | "improvement" | "special" | "overperformance";
 
 /**
@@ -1268,7 +1284,7 @@ export type SponsorOfferComponent = {
    */
   spotlightBonus?: number;
   /**
-   * P3 — beim SIGNIEREN eingefrorene Rate für lineare, gedeckelte Module (Anzeige == Settlement):
+   * NUR NOCH LESEN (Altvertraege): beim SIGNIEREN eingefrorene Rate für lineare, gedeckelte Module:
    * - `kind: "overperformance"` zahlt `min(rewardCash, ratePerUnitC × max(0, targetValue − finalRank))`,
    *   wobei `targetValue` der eingefrorene Erwartungsrang und `rewardCash` der Cap ist.
    * - `kind: "improvement"` (neuer per-Platz-Modus) zahlt `min(rewardCash, ratePerUnitC × max(0, startRank − finalRank))`.
@@ -1301,12 +1317,46 @@ export type SponsorEventRecord = {
   message: string;
 };
 
+/**
+ * SPONSORSYSTEM V2 — die vor der Saison eingefrorenen Konditionen des neuen Sponsormodells.
+ *
+ * Fehlt das Feld, ist es ein Angebot/Vertrag nach ALTEM Recht und wird unveraendert so abgerechnet.
+ * Genau daran erkennt das Settlement einen Bestandsvertrag: die Migration braucht keinen Stichtag
+ * und kein Backfill, nur diese Abwesenheit.
+ *
+ * `rankLadder[finalRank - 1]` ist der Rangteil VOR Klausel, Sonderziel, Untergrenze und
+ * K-Skalierung — die vollstaendige Auszahlung liefert `sponsorV2Settle` in
+ * lib/sponsor/sponsor-v2-offer-service.ts. Bewusst nicht die fertige Auszahlung: Klausel und
+ * Sonderziel sind Lotterien, deren Ausgang erst am Saisonende feststeht, und die Untergrenze wirkt
+ * auf die SUMME. Wer sie vorher einrechnet, floort viermal statt einmal.
+ */
+export type SponsorV2ContractTermsRecord = {
+  version: 2;
+  rankLadder: number[];
+  curveName: string;
+  profileName: string;
+  rarity: string;
+  expectedRank: number;
+  clauseName: string;
+  clauseLabel: string;
+  clauseDirection: "up" | "down";
+  clauseThreshold: number | null;
+  clauseBonus: number;
+  clauseMalus: number;
+  goalPayout: number;
+  goalProbability: number;
+  goalKey: string | null;
+  salaryFactor: number;
+  k: number;
+};
+
 export type SponsorOffer = {
   offerId: string;
   seasonId: string;
   teamId: string;
   archetype: SponsorArchetype;
-  /** Curve shape = where the Etat sits across the table (transitional-optional; required after cutover). */
+  /** NUR NOCH LESEN: gesetzt an Angeboten aus Spielstaenden von vor dem Sponsor-Cutover. Neue Angebote
+   * tragen ihre Kurve im `sponsorV2`-Block. */
   curveShape?: SponsorCurveShape;
   /** Rarity = the Etat dial that replaced the legacy star tier (transitional-optional; required after cutover). */
   rarity?: SponsorRarity;
@@ -1336,6 +1386,8 @@ export type SponsorOffer = {
    * UI/Debug; die Auszahlung läuft weiter über `components`. Optional/rückwärtskompatibel.
    */
   moduleIds?: string[];
+  /** SPONSORSYSTEM V2: eingefrorene Konditionen des neuen Modells. Fehlt = altes Recht. */
+  sponsorV2?: SponsorV2ContractTermsRecord;
 };
 
 export type SponsorCommercialRating = {
@@ -1371,7 +1423,7 @@ export type TeamSponsorContract = {
   teamId: string;
   offerId: string;
   archetype: SponsorArchetype;
-  /** Curve shape (transitional-optional; required after cutover). */
+  /** NUR NOCH LESEN: nur an Vertraegen, die aus einem Angebot von vor dem Sponsor-Cutover stammen. */
   curveShape?: SponsorCurveShape;
   /** Rarity — the Etat dial that replaced the legacy star tier (transitional-optional; required after cutover). */
   rarity?: SponsorRarity;
@@ -1402,6 +1454,12 @@ export type TeamSponsorContract = {
   lockedRankPayoutLadder?: number[];
   /** salaryFactor zum Zeitpunkt der Unterschrift — für konsistente Meilenstein-Anzeige im Settlement. */
   salaryFactorAtSign?: number;
+  /**
+   * SPONSORSYSTEM V2: beim Unterschreiben aus dem Angebot mitkopierte Konditionen des neuen Modells.
+   * FEHLT DAS FELD, ist es ein BESTANDSVERTRAG und wird nach altem Recht abgerechnet — das ist die
+   * gesamte Migrationsregel, ohne Stichtag und ohne Backfill.
+   */
+  sponsorV2?: SponsorV2ContractTermsRecord;
 };
 
 export type ScoutIntelSource = "watchlist" | "wishlist_mirror" | "passive_need" | "roster";
@@ -2551,6 +2609,25 @@ export type SeasonState = {
   cashPrizeApplyLogs?: CashPrizeApplyLogRecord[];
   matchdayAdvanceLogs?: MatchdayAdvanceLogRecord[];
   objectiveRewardApplyLogs?: ObjectiveRewardApplyLogRecord[];
+  /**
+   * WELCHES SPONSORSYSTEM DIESER SPIELSTAND BENUTZT — im Save, nicht in der Umgebung.
+   *
+   * Vorher entschied eine Umgebungsvariable (`OLY_SPONSOR_V2`) im Moment der Angebotserzeugung,
+   * welches Modell ein Spiel bekommt. Danach war sie unsichtbar wirkungslos — und das war die
+   * eigentliche Falle: startete derselbe Spielstand spaeter auf einem Server ohne die Variable,
+   * erzeugte der naechste Saisonuebergang (`ensureSeasonSponsorOffers`) fuer ein V2-Spiel
+   * stillschweigend wieder Angebote nach altem Recht. Das Regelwerk kippte, je nachdem wie der
+   * Server gestartet wurde.
+   *
+   * Deshalb steht die Version jetzt IM SPIELSTAND und wird genau einmal bei der Erzeugung gesetzt.
+   * `2` = neues Sponsormodell (Kurve x Klausel x Sonderziel, Modell in lib/sponsor/sponsor-v2-*).
+   * `1` = altes Modell.
+   *
+   * FEHLT DAS FELD, IST ES V1 UND BLEIBT V1. Das ist die harte Migrationsgrenze: jeder vor der
+   * Umstellung angelegte Spielstand hat den Vermerk nicht, laeuft unveraendert nach altem Recht
+   * weiter und wird nie nachtraeglich umgestellt. Es gibt bewusst kein Backfill.
+   */
+  sponsorSystemVersion?: 1 | 2;
   sponsorOffersByTeamId?: Record<string, SponsorOffer[]>;
   sponsorContractsByTeamId?: Record<string, TeamSponsorContract>;
   sponsorBrandHistoryByTeamId?: Record<string, string[]>;

@@ -153,6 +153,31 @@ export type LineupNewLookProps = Pick<
   ) => void;
   /** Pro Seite: läuft gerade ein Formplan-Save (Dropdowns kurz deaktivieren). */
   formCardSavePendingSide?: { d1: boolean; d2: boolean } | null;
+  /**
+   * Bandbreite (low/high) der Disziplin-Projektion je Intensitätsstufe — passend
+   * zu den Punktwerten aus `disciplineTacticPreviewBySide`. Quelle: dieselbe
+   * Projektionsfunktion, aufsummiert über die Slots der Seite (s. Client-Memo
+   * `focusV2DisciplineTacticRangeBySide`). Fehlt die Prop, zeigt der Header nur
+   * die Punktwerte wie bisher.
+   */
+  disciplineTacticRangeBySide?: Record<
+    "d1" | "d2",
+    Record<MatchdayIntensityStage, { low: number; high: number } | null>
+  > | null;
+  /**
+   * Zusatzfelder derselben Preview-Karte, die der Board-Typ nicht listet: die
+   * bereits im Client berechneten Disziplin-Summen (Punkt + Bandbreite). Werden
+   * per Intersection ergänzt, damit das HUD die erwarteten Punkte je Disziplin
+   * ausweisen kann, ohne den v2-Board-Vertrag zu ändern.
+   */
+  matchdayPreviewCards: {
+    d1Projected: number | null;
+    d2Projected: number | null;
+    d1RangeLow: number | null;
+    d1RangeHigh: number | null;
+    d2RangeLow: number | null;
+    d2RangeHigh: number | null;
+  };
 };
 
 /* --- Format-Helfer (lokal, präsentational) --------------------------- */
@@ -986,6 +1011,7 @@ export default function LineupNewLook({
   arenaReady = false,
   onNavigateArena,
   disciplineTacticPreviewBySide,
+  disciplineTacticRangeBySide,
   recentlyAssignedSlotKey,
   undoInfo,
   onUndo,
@@ -1365,6 +1391,7 @@ export default function LineupNewLook({
     const rank = disciplineSide === "d1" ? d1Rank : d2Rank;
     const intensity = getDisciplineIntensity(disciplineSide);
     const tacticPreview = disciplineTacticPreviewBySide?.[disciplineSide] ?? null;
+    const tacticRange = disciplineTacticRangeBySide?.[disciplineSide] ?? null;
     const progressPct = sideRequired > 0 ? Math.min(100, Math.round((sideSelected / sideRequired) * 100)) : 0;
 
     // Feature 2 „Score to beat" (spoiler-sicher): nächste Saison-Rivalen dieser
@@ -1417,26 +1444,51 @@ export default function LineupNewLook({
               title={`${sideSelected}/${sideRequired || "—"} Pflicht-Slots besetzt`}
             />
             <div className="nl-lineup-intensity" role="group" aria-label={`${disciplineSide.toUpperCase()} Intensity`}>
-              {(["conserve", "normal", "push"] as const).map((stage) => (
-                <button
-                  key={`${disciplineSide}-${stage}`}
-                  type="button"
-                  className={intensity === stage ? "is-selected" : ""}
-                  aria-pressed={intensity === stage}
-                  disabled={isReadOnly || isBusy}
-                  onClick={() => onUpdateDisciplineIntensity(disciplineSide, stage)}
-                  title={
-                    tacticPreview
-                      ? `${formatIntensityLabel(stage)} · projiziert ${formatNullableScore(tacticPreview[stage])}`
-                      : formatIntensityLabel(stage)
-                  }
-                >
-                  {formatIntensityLabel(stage)}
-                  {tacticPreview && tacticPreview[stage] != null ? (
-                    <em className="nl-tnum">{formatNullableScore(tacticPreview[stage])}</em>
-                  ) : null}
-                </button>
-              ))}
+              {(["conserve", "normal", "push"] as const).map((stage) => {
+                // Bandbreite je Stufe (dauerhaft sichtbar, nicht nur im Tooltip):
+                // low/high kommen aus derselben Projektionsfunktion wie der Punktwert,
+                // aufsummiert über die Slots dieser Seite (s. Client-Memo
+                // `focusV2DisciplineTacticRangeBySide`). Ohne Daten bleibt die Zeile weg.
+                const stageRange = tacticRange?.[stage] ?? null;
+                const rangeLabel = stageRange ? `${formatNlNumber(stageRange.low, 0)}–${formatNlNumber(stageRange.high, 0)}` : null;
+                return (
+                  <button
+                    key={`${disciplineSide}-${stage}`}
+                    type="button"
+                    className={intensity === stage ? "is-selected" : ""}
+                    aria-pressed={intensity === stage}
+                    disabled={isReadOnly || isBusy}
+                    onClick={() => onUpdateDisciplineIntensity(disciplineSide, stage)}
+                    // Spalten-Layout: Zeile 1 = Label + Punktwert (wie bisher),
+                    // Zeile 2 = kompakte Bandbreite. Inline, damit globals.css unberührt bleibt.
+                    style={{ flexDirection: "column", alignItems: "center", gap: "1px", lineHeight: 1.15 }}
+                    title={
+                      tacticPreview
+                        ? `${formatIntensityLabel(stage)} · projiziert ${formatNullableScore(tacticPreview[stage])}${
+                            stageRange
+                              ? ` · Bandbreite ${formatNullableScore(stageRange.low)} bis ${formatNullableScore(stageRange.high)}`
+                              : ""
+                          }`
+                        : formatIntensityLabel(stage)
+                    }
+                  >
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                      {formatIntensityLabel(stage)}
+                      {tacticPreview && tacticPreview[stage] != null ? (
+                        <em className="nl-tnum">{formatNullableScore(tacticPreview[stage])}</em>
+                      ) : null}
+                    </span>
+                    {rangeLabel ? (
+                      <em
+                        className="nl-tnum"
+                        style={{ fontStyle: "normal", fontSize: "9px", fontWeight: 600, color: "var(--nl-mut-2)", opacity: 1 }}
+                      >
+                        {rangeLabel}
+                      </em>
+                    ) : null}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -1778,9 +1830,29 @@ export default function LineupNewLook({
               />
             </strong>
           </div>
-          {/* HUD-Paar "D1"/"D2" entfernt: wiederholte nur die Zahl, die bereits im
-              gewählten Intensity-Button (renderSide) steht — Buttons sind die
-              Single-Source-of-Truth. */}
+          {/* Aufschlüsselung der erwarteten Punkte: zusätzlich zum Gesamtwert jede
+              Disziplin einzeln, jeweils mit Namen und derselben low–high-Bandbreite
+              (matchdayPreviewCards.dNRangeLow/High — dieselben Summen, aus denen sich
+              totalRangeLow/High zusammensetzt). Rein additiv, der Gesamtwert bleibt. */}
+          {(["d1", "d2"] as const).map((side) => {
+            const sideName = disciplineBySide[side]?.displayName ?? (side === "d1" ? "Disziplin 1" : "Disziplin 2");
+            const sideLow = side === "d1" ? matchdayPreviewCards.d1RangeLow : matchdayPreviewCards.d2RangeLow;
+            const sideHigh = side === "d1" ? matchdayPreviewCards.d1RangeHigh : matchdayPreviewCards.d2RangeHigh;
+            const sidePoint = side === "d1" ? matchdayPreviewCards.d1Projected : matchdayPreviewCards.d2Projected;
+            return (
+              <div
+                key={`nl-lineup-hud-metric-${side}`}
+                className="nl-lineup-hud-metric"
+                data-testid={`nl-lineup-hud-metric-${side}`}
+                title={`${side.toUpperCase()} ${sideName}: erwartet ${formatNullableScore(sidePoint)} Punkte · Bandbreite ${formatProjectedMetricWindow(sideLow, sideHigh)}`}
+              >
+                <small>
+                  {side.toUpperCase()} · {sideName}
+                </small>
+                <strong className="nl-tnum">{formatProjectedMetricWindow(sideLow, sideHigh)}</strong>
+              </div>
+            );
+          })}
           {/* Risiko als tonfarbener Kit-Chip (StatChip → nlToneClass): hoch=risk,
               mittel=warn, niedrig=good — statt des bloßen Kleinbuchstaben-Worts. */}
           <StatChip

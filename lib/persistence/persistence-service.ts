@@ -3,6 +3,7 @@ import { createSaveGameState, loadFreshSeasonOneSeedData, loadSeedData } from "@
 import { createSaveRepository } from "@/lib/persistence/save-repository";
 import { withScenarioMeta } from "@/lib/persistence/scenario-meta";
 import type { PersistenceService } from "@/lib/persistence/types";
+import { formatGermanDateTime } from "@/lib/utils/format-datetime";
 
 /** Every persisted write bumps from the stored version so optimistic locking stays consistent. */
 export function withNextSaveVersion(gameState: GameState, storedSaveVersion: number | null | undefined): GameState {
@@ -106,7 +107,7 @@ export function createPersistenceService(): PersistenceService {
       const status = input?.status ?? "active";
       const save = saveRepository.createSaveFromSeed({
         saveId: input?.saveId ?? createFreshSeasonOneSaveId(),
-        name: input?.name ?? `Season 1 Teststart ${new Date().toLocaleString("de-DE")}`,
+        name: input?.name ?? `Season 1 Teststart ${formatGermanDateTime(new Date())}`,
         status,
         seedData: loadFreshSeasonOneSeedData(),
       });

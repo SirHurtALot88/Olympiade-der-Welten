@@ -67,8 +67,13 @@ describe("matchday slot roles", () => {
     expect(projected.intensityModifier).toBe(0);
     expect(projected.fatiguePenaltyPercent).toBe(5);
     expect(projected.totalProjected).toBe(66.8);
-    expect(projected.rangeLow).toBe(62.5);
-    expect(projected.rangeHigh).toBe(71.1);
+    // rangeLow/rangeHigh now derive from INTENSITY_SCORE_RANGE (legacy-lineup-modifiers.ts) — the
+    // SAME absolute-points range the real resolve draws from via seededIntensityShare — instead
+    // of an unrelated percentage-of-score approximation. Normal's range is -2..+2 points; fatigue
+    // risk is "niedrig" at count 16 (spread 0) and rivalryPressure is 0 (not push), so the only
+    // extra spread here is revealVariance (2 → ±1): 66.8 + (-2) - 1 = 63.8, 66.8 + 2 + 1 = 69.8.
+    expect(projected.rangeLow).toBe(63.8);
+    expect(projected.rangeHigh).toBe(69.8);
   });
 
   it("push raises score and fatigue while conserve lowers both", () => {

@@ -1,7 +1,6 @@
 import type {
   GameState,
   SponsorArchetype,
-  SponsorCurveShape,
   SponsorObjectiveStage,
   SponsorOfferComponent,
   SponsorRarity,
@@ -13,8 +12,9 @@ import { buildTeamSeasonOverviewRows, type TeamManagementSnapshotRow } from "@/l
 import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import type { SponsorSpecialTemplateId } from "@/lib/sponsor/sponsor-brand-variants";
 import { SPONSOR_RARITIES } from "@/lib/sponsor/sponsor-curve-shapes";
-import { mapCurveShapeToArchetype } from "@/lib/sponsor/sponsor-tier-pool";
 import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { DEFAULT_ROSTER_MAX } from "@/lib/foundation/roster-limits";
+import { SPONSOR_V2_REFERENCE_SALARY_PER_TEAM } from "@/lib/sponsor/sponsor-v2-offer-service";
 
 /**
  * Rarity-Ordnung (0..3, gewöhnlich..legendär) als neue Schwierigkeits-Achse anstelle des Sternrangs. Die
@@ -317,7 +317,12 @@ export function resolveSalaryDisciplineTarget(input: {
     .map((team) => getTeamDisplaySalaryTotal(input.gameState, team.teamId))
     .filter((value) => value > 0)
     .sort((left, right) => left - right);
-  const median = leagueSalaries.length ? leagueSalaries[Math.floor(leagueSalaries.length / 2)]! : input.ownSalary;
+  // Angebote entstehen VOR dem Draft: dann ist jedes Kadergehalt 0, der Median 0 und der Anker 0 —
+  // die Karte zeigte "Gehalt <= 0 C", ein Ziel, das niemand erfuellen kann. Faellt die Messung aus,
+  // greift dieselbe Referenz, mit der auch K geloest wird (gemessener S1-Schnitt je Team).
+  const median = leagueSalaries.length
+    ? leagueSalaries[Math.floor(leagueSalaries.length / 2)]!
+    : Math.max(input.ownSalary, SPONSOR_V2_REFERENCE_SALARY_PER_TEAM);
   const basis = Math.max(input.ownSalary, 0.6 * median);
   const expensive = input.ownSalary >= median;
   const order = input.rarityOrder;
@@ -509,68 +514,6 @@ export function fanInfrastructureLevelSum(gameState: GameState, teamId: string):
   return getFacilityLevel(facilities, "fan_shop") + getFacilityLevel(facilities, "arena_upgrade");
 }
 
-export function buildFanInfrastructureSpecialComponent(input: { rewardCash: number }): SponsorOfferComponent {
-  return {
-    componentId: "special-fan-infrastructure",
-    kind: "special",
-    label: "Fan-Infrastruktur (Fan-Shop / Arena)",
-    targetValue: 1,
-    rewardCash: input.rewardCash,
-    specialKey: "fan_infrastructure",
-  };
-}
-
-/**
- * Überperformance-Bonus (Sponsor-Enhancement 3, Feinschliff). Immer-an-Zusatzkomponente: zahlt, wenn
- * das Team die Saison DEUTLICH über seiner erwarteten Qualitäts-Platzierung beendet. Die erwartete
- * Platzierung (teamQualityRank, beim Signing eingefroren) MINUS `margin` wird als absolute Ziel-
- * Platzierung in `targetValue` einbetoniert — die Settlement/Evaluator braucht so nur `row.rank <=
- * targetValue` zu prüfen (kein Zugriff auf den Vertrag nötig). Nicht über den Basisbetrag, sondern echte
- * Überperformance über ein Saisonziel.
- */
-export function buildBeatExpectedRankSpecialComponent(input: {
-  expectedRank: number | null | undefined;
-  margin: number;
-  rewardCash: number;
-}): SponsorOfferComponent | null {
-  if (input.expectedRank == null || !Number.isFinite(input.expectedRank)) return null;
-  // Nur Teams, die überhaupt Luft nach oben haben (nicht schon Platz 1 erwartet), bekommen die Klausel.
-  const targetRank = Math.round(input.expectedRank) - input.margin;
-  if (targetRank < 1) return null;
-  return {
-    componentId: "special-beat-expected-rank",
-    kind: "special",
-    label: `Saison auf Platz ≤ ${targetRank} beenden (Überperformance)`,
-    targetValue: targetRank,
-    rewardCash: input.rewardCash,
-    specialKey: "beat_expected_rank",
-  };
-}
-
-/**
- * P3 — Überperformance-Modul (`kind: "overperformance"`): zahlt `min(cap, ratePerUnitC × Plätze-über-Erwartung)`.
- * Der Erwartungsrang wird als `targetValue` und die Rate/der Cap in `ratePerUnitC`/`rewardCash` beim Signieren
- * EINGEFROREN, damit Anzeige == Settlement gilt. Ersetzt (für Neuverträge) das binäre `beat_expected_rank`.
- * Gibt null zurück, wenn kein Erwartungsrang existiert oder das Team bereits Platz 1 erwartet (keine Luft nach oben).
- */
-export function buildOverperformanceComponent(input: {
-  expectedRank: number | null | undefined;
-  ratePerUnitC: number;
-  cap: number;
-}): SponsorOfferComponent | null {
-  if (input.expectedRank == null || !Number.isFinite(input.expectedRank)) return null;
-  const expectedRank = Math.round(input.expectedRank);
-  if (expectedRank <= 1 || input.ratePerUnitC <= 0 || input.cap <= 0) return null;
-  return {
-    componentId: "overperformance",
-    kind: "overperformance",
-    label: `+${input.ratePerUnitC} C je Platz über Erwartungsrang #${expectedRank} · max ${input.cap} C`,
-    targetValue: expectedRank,
-    rewardCash: round1(input.cap),
-    ratePerUnitC: input.ratePerUnitC,
-  };
-}
-
 // =====================================================================================================
 // TEIL B — Sponsor-Bonusziele (14 Standard + 6 Golden) + stages/spotlightBonus-Framework.
 //
@@ -677,6 +620,25 @@ export const SPONSOR_OBJ_AXIS_ASCENSION_MIN_QUALITY_RANK = objEnvNumber("OLY_SPO
 export const SPONSOR_OBJ_UNDERDOG_FAMILY_MIN_QUALITY_RANK = objEnvNumber("OLY_SPONSOR_OBJ_UNDERDOG_FAMILY_MIN_RANK", 17);
 /** David-Bonus: Kaderwert-Deckel = Liga-Median × dieser Faktor (beim Signing eingefroren). */
 export const SPONSOR_OBJ_BUDGET_OVERACHIEVER_CAP_FACTOR = objEnvNumber("OLY_SPONSOR_OBJ_BUDGET_CAP_FACTOR", 1.0);
+
+/**
+ * Ersatz-Kaderwert für den Fall, dass die Liga noch keine Kader hat (Angebote entstehen vor dem
+ * Draft, dann ist jeder gemessene Kaderwert 0). Verteilt man die `teamCount x ROSTER_MAX`
+ * wertvollsten Spieler des Pools auf die Teams, ist der MITTLERE Kaderwert exakt deren Summe
+ * geteilt durch `teamCount` — egal, wer wen bekommt. Der Mittelwert steht hier fuer den Median;
+ * fuer eine grob symmetrische Verteilung ist das der genaueste Schaetzer, der zum Erzeugungs-
+ * zeitpunkt ueberhaupt aus echten Daten gebildet werden kann, und er kommt ohne gesetzte Zahl aus.
+ */
+export function referenceTeamMarketValue(gameState: GameState): number {
+  const teamCount = Math.max(1, gameState.teams.length);
+  const values = gameState.players
+    .map((player) => (Number.isFinite(player.marketValue) ? player.marketValue : 0))
+    .filter((value) => value > 0)
+    .sort((left, right) => right - left)
+    .slice(0, teamCount * DEFAULT_ROSTER_MAX);
+  if (values.length === 0) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / teamCount;
+}
 
 /**
  * Kaderwert-Wachstum (market_value_growth) — Zielstufen in Prozent, getrennt nach Saison.
@@ -1019,7 +981,10 @@ export function buildBonusObjectiveComponent(
       return {
         ...base,
         componentId: "special-fan-infrastructure",
-        label: "Fan-Infrastruktur (Fan-Shop / Arena)",
+        // Dieses Ziel zahlt STUFENLOS (Auszahlung = Gesamtstufe / Deckel), es hat deshalb bewusst keine
+        // Stufenleiter, die die Karte anzeigen koennte. Ohne die Zahlen im Titel stand dort nur
+        // "Fan-Shop / Arena" — und damit nicht, ab wann es etwas gibt und wann es voll ist.
+        label: `Fan-Infrastruktur: Fan-Shop + Arena, ab Stufe 1 anteilig, voll ab Stufe ${FAN_INFRASTRUCTURE_LEVEL_CAP}`,
         targetValue: 1,
         specialKey: "fan_infrastructure",
       };
@@ -1238,7 +1203,12 @@ export function buildBonusObjectiveComponent(
         .map((entry) => entry.marketValueTotal ?? 0)
         .filter((value) => value > 0)
         .sort((left, right) => left - right);
-      const median = mvs.length ? mvs[Math.floor(mvs.length / 2)]! : 0;
+      // Wie beim Gehaltsziel: vor dem Draft ist jeder Kaderwert 0 und der Deckel waere "Kaderwert <= 0",
+      // also unerfuellbar. Ersatzanker aus dem Spielerpool statt aus einer gesetzten Zahl: verteilt man
+      // die teamCount x ROSTER_MAX wertvollsten Spieler auf die Teams, ist der MITTLERE Kaderwert exakt
+      // deren Summe geteilt durch teamCount — unabhaengig davon, wer wen bekommt. Das ist der beste
+      // Median-Schaetzer, der zum Erzeugungszeitpunkt aus echten Daten verfuegbar ist.
+      const median = mvs.length ? mvs[Math.floor(mvs.length / 2)]! : referenceTeamMarketValue(input.gameState);
       const cap = round1(median * SPONSOR_OBJ_BUDGET_OVERACHIEVER_CAP_FACTOR);
       const teamCount = input.gameState.teams.length || 32;
       const inv = (rank: number) => teamCount - rank + 1;
@@ -1374,11 +1344,9 @@ export function buildGoldenObjectiveComponent(
 export function pickGoldenObjective(
   seasonId: string,
   teamId: string,
-  curveShape: SponsorCurveShape,
+  archetype: SponsorArchetype,
   teamQualityRank?: number | null,
 ): SponsorGoldenObjectiveKey {
-  // Kurvenform → Familie → (Legacy-)Archetyp-Bucket: der Golden-Ziel-Katalog ist noch archetyp-verschlagwortet.
-  const archetype = mapCurveShapeToArchetype(curveShape);
   const all = Object.keys(SPONSOR_GOLDEN_OBJECTIVE_ARCHETYPE) as SponsorGoldenObjectiveKey[];
   const isTopStrength =
     teamQualityRank != null &&
@@ -1449,11 +1417,9 @@ export function isTransferTraderAvailableForSeason(seasonId: string): boolean {
  * Pool der Standard-Bonusziele eines Archetyps, saison-gefiltert (Transfer-Händler in S1 ausgeschlossen).
  */
 export function getAvailableBonusObjectiveKeys(
-  curveShape: SponsorCurveShape,
+  archetype: SponsorArchetype,
   seasonId: string,
 ): SponsorBonusObjectiveKey[] {
-  // Bucketing über die Kurvenform-Familie (→ Legacy-Archetyp), nicht mehr direkt über den Archetyp.
-  const archetype = mapCurveShapeToArchetype(curveShape);
   const keys = (Object.keys(SPONSOR_BONUS_OBJECTIVE_ARCHETYPE) as SponsorBonusObjectiveKey[]).filter(
     (key) => SPONSOR_BONUS_OBJECTIVE_ARCHETYPE[key] === archetype,
   );
@@ -1530,7 +1496,7 @@ function isBonusObjectiveApplicable(gameState: GameState, teamId: string, key: S
 export function pickBonusObjective(
   seasonId: string,
   teamId: string,
-  curveShape: SponsorCurveShape,
+  archetype: SponsorArchetype,
   slotIndex: number,
   teamQualityRank?: number | null,
   /** Bereits im Slate belegte Ziel-Familien (Slate-Anti-Wiederholung, Fable C3). */
@@ -1538,9 +1504,8 @@ export function pickBonusObjective(
   /** Optional: erlaubt das Applicability-Gate (Schulden/Verträge/Gebäude) für die neuen Ziele (Fable B). */
   gameState?: GameState,
 ): SponsorBonusObjectiveKey | null {
-  const archetype = mapCurveShapeToArchetype(curveShape);
   const strengthKeys = filterBonusObjectivesByStrength(
-    getAvailableBonusObjectiveKeys(curveShape, seasonId).filter((key) => key !== "transfer_trader"),
+    getAvailableBonusObjectiveKeys(archetype, seasonId).filter((key) => key !== "transfer_trader"),
     teamQualityRank,
   );
   if (strengthKeys.length === 0) {

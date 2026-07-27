@@ -15,6 +15,7 @@ import FoundationPlayerPortraitCard from "@/components/foundation/player-portrai
 import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import TeamMark from "@/app/foundation/discipline-stage/arena/TeamMark";
+import type { StageLiveResultsByTeam } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
 import { getTeamColor, teamHasSecondary } from "@/lib/foundation/team-colors";
 import { fmt1 } from "./stage-format";
 
@@ -30,12 +31,18 @@ export type DisciplineStageHoverPreviewProps = {
   ratingByPlayerId: Map<string, PlayerRatingContractRow>;
   /** In der aktuellen Disziplin eingesetzte Spieler je Team-ID (wie im Feld). */
   fieldedPlayerIdsByTeam?: Record<string, string[]>;
-  /** Aktuelle Disziplin — für den Diszi-Wert der eingesetzten Spieler. */
-  disciplineId?: string;
+  /**
+   * ANTI-SPOILER: Live-Ergebnisse der im laufenden Reveal BEREITS aufgedeckten
+   * Spieler (aus der Arena gemeldet, exakt dieselbe Quelle wie im Team-Drawer).
+   * Nur wer hier steht, darf in der Hovercard einen Punktwert zeigen — alle
+   * anderen bleiben „noch offen". Fehlt die Prop, zeigt die Karte GAR KEINE
+   * Werte (sicherer Default statt Spoiler).
+   */
+  liveResultsByTeam?: StageLiveResultsByTeam;
   /**
    * Vergebene Player-Points je Spieler-ID (mit dem Score, aus dem sie stammen). Wird erst
-   * NACH Abschluss der Disziplin gesetzt — vorher wäre die PP-Vergabe ein Spoiler. Ist der
-   * Wert null/leer, zeigt die Karte wie bisher nur den Diszi-Wert.
+   * NACH Abschluss der Disziplin gesetzt — vorher wäre die PP-Vergabe ein Spoiler. Greift
+   * nur für Spieler, die `liveResultsByTeam` ohnehin schon aufgedeckt hat.
    */
   ppByPlayerId?: Map<string, { pp: number | null; score: number }> | null;
 };
@@ -117,6 +124,7 @@ function PlayerPreview({ gameState, target, ratingByPlayerId }: {
       cardStyle={{
         borderRadius: 16,
         background: "var(--nl-panel)",
+        color: "var(--nl-ink)",
         boxShadow: "0 12px 32px color-mix(in srgb, var(--nl-bg) 74%, transparent)",
       }}
     >
@@ -146,12 +154,11 @@ function PlayerPreview({ gameState, target, ratingByPlayerId }: {
   );
 }
 
-function TeamPreview({ gameState, target, ratingByPlayerId, fieldedPlayerIdsByTeam, disciplineId, ppByPlayerId }: {
+function TeamPreview({ gameState, target, fieldedPlayerIdsByTeam, liveResultsByTeam, ppByPlayerId }: {
   gameState: GameState;
   target: { id: string; x: number; y: number };
-  ratingByPlayerId: Map<string, PlayerRatingContractRow>;
   fieldedPlayerIdsByTeam?: Record<string, string[]>;
-  disciplineId?: string;
+  liveResultsByTeam?: StageLiveResultsByTeam;
   /** Vergebene Player-Points je Spieler — null, solange die Disziplin noch läuft. */
   ppByPlayerId?: Map<string, { pp: number | null; score: number }> | null;
 }) {
@@ -168,6 +175,14 @@ function TeamPreview({ gameState, target, ratingByPlayerId, fieldedPlayerIdsByTe
   const fielded = fieldedIds
     .map((pid) => gameState.players?.find((p) => p.id === pid) ?? null)
     .filter((p): p is NonNullable<typeof p> => Boolean(p));
+  // ANTI-SPOILER (gleiche Konvention wie Feld-Hovercard/Team-Drawer): NUR Spieler,
+  // die der Reveal schon aufgedeckt hat, dürfen eine Zahl zeigen. Die Liste kommt
+  // aus `liveResultsByTeam` — die Arena meldet dort ausschließlich Slots
+  // 0…thrownSlot. Alle übrigen Eingesetzten bleiben mit Namen sichtbar (die
+  // Aufstellung ist kein Geheimnis), aber ohne Wert → „noch offen".
+  const revealedByPlayerId = new Map(
+    (liveResultsByTeam?.[team.teamId] ?? []).map((r) => [r.playerId, r] as const),
+  );
   return (
     <AnchoredCard
       x={target.x}
@@ -178,6 +193,7 @@ function TeamPreview({ gameState, target, ratingByPlayerId, fieldedPlayerIdsByTe
         padding: 12,
         borderRadius: 12,
         background: "var(--nl-panel)",
+        color: "var(--nl-ink)",
         border: "1px solid var(--nl-line)",
         boxShadow: "0 12px 32px color-mix(in srgb, var(--nl-bg) 74%, transparent)",
       }}
@@ -216,14 +232,11 @@ function TeamPreview({ gameState, target, ratingByPlayerId, fieldedPlayerIdsByTe
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
             {fielded.map((player) => {
-              const row = ratingByPlayerId.get(player.id) ?? null;
               const pp = ppByPlayerId?.get(player.id) ?? null;
               const portraitUrl = getPlayerPortraitBrowserUrl(player.id, player.portraitUrl ?? null, player.portraitPath ?? null);
-              const discVal = disciplineId
-                ? player.currentDisciplineValues?.[disciplineId] ?? player.disciplineRatings?.[disciplineId] ?? null
-                : null;
+              const live = revealedByPlayerId.get(player.id) ?? null;
               return (
-                <div key={player.id} style={{ display: "flex", alignItems: "center", gap: 8, fontVariantNumeric: "tabular-nums" }}>
+                <div key={player.id} title={live ? `Grundwert ${fmt1(live.base)}` : "Noch nicht aufgedeckt"} style={{ display: "flex", alignItems: "center", gap: 8, fontVariantNumeric: "tabular-nums", opacity: live ? 1 : 0.72 }}>
                   {portraitUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={portraitUrl} alt="" width={24} height={24} style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", flex: "none", border: "1px solid var(--nl-line)" }} />
@@ -231,30 +244,26 @@ function TeamPreview({ gameState, target, ratingByPlayerId, fieldedPlayerIdsByTe
                     <span aria-hidden style={{ width: 24, height: 24, borderRadius: "50%", flex: "none", background: color.primary }} />
                   )}
                   <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{player.name}</span>
-                  {/* Nach Abschluss der Disziplin sind die PP die eigentliche Währung —
-                      sie stehen deshalb vorn, der Score bleibt als Herkunft daneben. */}
-                  {pp?.pp != null ? (
-                    <span
-                      title={`${fmt1(pp.pp)} Player-Points · Score ${fmt1(pp.score)}`}
-                      style={{ fontSize: 12, fontWeight: 900, color: "var(--nl-accent)", flex: "none" }}
-                    >
-                      {fmt1(pp.pp)} PP
-                    </span>
-                  ) : null}
-                  {discVal != null ? (
-                    <span
-                      style={{
-                        fontSize: pp?.pp != null ? 11 : 12,
-                        fontWeight: pp?.pp != null ? 700 : 800,
-                        color: pp?.pp != null ? "var(--nl-mut)" : "var(--nl-accent)",
-                        flex: "none",
-                      }}
-                    >
-                      {pp?.pp != null ? `(${fmt1(discVal)})` : fmt1(discVal)}
-                    </span>
-                  ) : pp?.pp == null ? (
-                    <span style={{ fontSize: 11, color: "var(--nl-mut)", flex: "none" }}>OVR {row?.ovrNormalized != null ? fmt1(row.ovrNormalized) : "–"}</span>
-                  ) : null}
+                  {/* Anti-Spoiler bleibt führend: eine Zahl gibt es NUR für aufgedeckte Spieler.
+                      Ist die Disziplin fertig gewertet, sind die vergebenen PP die eigentliche
+                      Währung — sie stehen dann vorn, der Score bleibt als Herkunft daneben. */}
+                  {live ? (
+                    pp?.pp != null ? (
+                      <>
+                        <span
+                          title={`${fmt1(pp.pp)} Player-Points · Score ${fmt1(pp.score)}`}
+                          style={{ fontSize: 12, fontWeight: 900, color: "var(--nl-accent)", flex: "none" }}
+                        >
+                          {fmt1(pp.pp)} PP
+                        </span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--nl-mut)", flex: "none" }}>({fmt1(live.net)})</span>
+                      </>
+                    ) : (
+                      <span style={{ fontSize: 12, fontWeight: 800, color: "var(--nl-accent)", flex: "none" }}>{fmt1(live.net)}</span>
+                    )
+                  ) : (
+                    <span style={{ fontSize: 10.5, fontStyle: "italic", color: "var(--nl-mut-2)", flex: "none" }}>noch offen</span>
+                  )}
                 </div>
               );
             })}
@@ -270,7 +279,7 @@ export default function DisciplineStageHoverPreview({
   gameState,
   ratingByPlayerId,
   fieldedPlayerIdsByTeam,
-  disciplineId,
+  liveResultsByTeam,
   ppByPlayerId,
 }: DisciplineStageHoverPreviewProps): React.JSX.Element | null {
   // Erst nach dem Mount in document.body portalen (SSR-fest) — so kann kein
@@ -285,11 +294,15 @@ export default function DisciplineStageHoverPreview({
       <TeamPreview
         gameState={gameState}
         target={target}
-        ratingByPlayerId={ratingByPlayerId}
         fieldedPlayerIdsByTeam={fieldedPlayerIdsByTeam}
-        disciplineId={disciplineId}
+        liveResultsByTeam={liveResultsByTeam}
         ppByPlayerId={ppByPlayerId}
       />
     );
-  return createPortal(content, document.body);
+  // WICHTIG: `is-new-look` MUSS am Portal-Wurzelknoten hängen. Die --nl-*-Tokens sind
+  // in globals.css ausschließlich unter `.is-new-look` definiert (die Klasse sitzt auf
+  // <main>), das Portal hängt aber direkt an <body> — also AUSSERHALB. Ohne die Klasse
+  // war `background: var(--nl-panel)` schlicht ungültig → die Karte blieb durchsichtig
+  // und die Rangtabelle darunter schien durch (unlesbar).
+  return createPortal(<div className="is-new-look">{content}</div>, document.body);
 }

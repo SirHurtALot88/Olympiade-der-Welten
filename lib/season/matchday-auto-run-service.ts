@@ -158,9 +158,9 @@ function getStatusFromBooleans(input: {
 // Same-day injury multipliers must be baked into the auto-run resolve preview.
 // The result-apply path uses this preview as `preloadedPreview`, so if injuries
 // are not attached before the preview is built an injured-this-matchday player
-// would be persisted at 1.0x through auto-run while scoring 0.75x through the
-// manual/sim path. Attaching here mirrors prepareLegacyMatchdayResultApply, which
-// attaches the same roll map to the contexts before it scores.
+// would be persisted at 1.0x through auto-run while scoring INJURY_PERFORMANCE_MULTIPLIER
+// through the manual/sim path. Attaching here mirrors prepareLegacyMatchdayResultApply,
+// which attaches the same roll map to the contexts before it scores.
 function attachAutoRunInjuriesToContexts(
   contexts: LegacyLineupLoadedContext[],
   gameState: GameState,

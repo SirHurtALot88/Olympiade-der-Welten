@@ -805,6 +805,32 @@ a {
   gap: 6px;
 }
 
+.foundation-sidebar-brand-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+/* Build-/Versions-Badge neben "Oly Manager" (#Version-Badge). Bewusst
+   subtil gehalten — der Name bleibt der visuelle Anker, das Badge ist nur
+   ein leiser Beleg dafür, welcher Build gerade läuft. */
+.foundation-sidebar-version-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(226, 232, 240, 0.5);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: default;
+}
+
 .foundation-sidebar-season-context {
   display: inline-flex;
   align-self: start;
@@ -51902,6 +51928,27 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
+/* Welches Sponsor-Regelwerk dieser Spielstand benutzt. Bewusst eine ruhige Kennzeichnung und kein
+   Warnhinweis: beide Systeme sind gueltig, der Spieler soll nur nicht raten muessen, welches gilt. */
+.is-new-look .nl-sponsor-system-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--nl-line);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: var(--nl-mut);
+}
+.is-new-look .nl-sponsor-system-badge[data-sponsor-system="2"] {
+  border-color: color-mix(in srgb, var(--nl-acc) 45%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-acc) 12%, transparent);
+  color: var(--nl-ink);
+}
+
 /* Erfolgs-Banner nach Sponsorwahl — im Token-System (--nl-good). */
 .is-new-look .nl-sponsor-banner {
   padding: var(--nl-s2) var(--nl-s3);
@@ -52136,6 +52183,61 @@ button.foundation-team-portrait-card {
 }
 
 /* --- Challenge-Panel ---------------------------------------------- */
+/* SPONSORSYSTEM V2 — die Struktur des neuen Sponsormodells auf der Angebotskarte.
+   Eigener Block statt neuer Zahlen in den alten Kacheln: die Klausel hat einen MALUS, und ein
+   Betrag ohne die Bedingung, unter der er gilt, ist eine Falschaussage. */
+.is-new-look .nl-sponsor-v2 {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+  padding: var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid color-mix(in srgb, var(--nl-acc) 35%, transparent);
+  background: var(--nl-panel-2);
+  font-size: 13px;
+}
+
+.is-new-look .nl-sponsor-v2-head {
+  display: flex;
+  gap: var(--nl-s2);
+  align-items: center;
+}
+
+.is-new-look .nl-sponsor-v2-head small {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-sponsor-v2-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.is-new-look .nl-sponsor-v2-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+  align-items: baseline;
+}
+
+.is-new-look .nl-sponsor-v2-list li em {
+  color: var(--nl-mut);
+  font-style: normal;
+}
+
+.is-new-look .nl-sponsor-v2-range {
+  border-top: 1px solid var(--nl-line);
+  padding-top: var(--nl-s1);
+  color: var(--nl-txt);
+}
+
+.is-new-look .nl-sponsor-v2-range small {
+  color: var(--nl-mut);
+}
+
 .is-new-look .nl-sponsor-challenge {
   display: flex;
   flex-direction: column;
@@ -61244,6 +61346,12 @@ button.is-new-look .nl-thist-season-pill,
 .is-new-look .foundation-sidebar-brand strong {
   color: var(--nl-ink);
   letter-spacing: 0.01em;
+}
+
+.is-new-look .foundation-sidebar-version-badge {
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-bg-2);
+  color: var(--nl-mut-2);
 }
 
 .is-new-look .foundation-sidebar-save-link {

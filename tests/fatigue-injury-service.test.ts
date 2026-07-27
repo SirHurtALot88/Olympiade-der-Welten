@@ -11,6 +11,7 @@ import {
   getInjuryRiskPercent,
   getPlayerAvailabilityView,
   injuryRiskBands,
+  MATCHDAY_FATIGUE_LOAD,
   normalizeAvailabilityForNewSeason,
   rollInjuryRisk,
 } from "@/lib/fatigue/fatigue-injury-service";
@@ -426,7 +427,7 @@ describe("fatigue injury service", () => {
     const benchPlayer = result.gameState.players.find((player) => player.id === "bench-player");
     const benchAvailability = getPlayerAvailabilityView(result.gameState, "bench-player", "A-A", "md-2");
 
-    expect(usedPlayer?.fatigue).toBe(32);
+    expect(usedPlayer?.fatigue).toBe(20 + MATCHDAY_FATIGUE_LOAD);
     expect(benchPlayer?.fatigue).toBe(Math.max(0, Number((48 - recovery.normalRecovery).toFixed(2))));
     expect(benchAvailability.fatigue).toBe(benchPlayer?.fatigue);
     expect(benchAvailability.blocker).toBeNull();
@@ -453,7 +454,7 @@ describe("fatigue injury service", () => {
       joinedSeasonId: "season-1",
     } as never);
     const recovery = calculateTeamRecovery(gameState, "A-A");
-    const load = 12;
+    const load = MATCHDAY_FATIGUE_LOAD;
 
     const applyParams = {
       saveId: "save-1",
@@ -536,7 +537,7 @@ describe("fatigue injury service", () => {
       matchdayResultId: "result-md-1",
       timestamp: "2026-06-13T00:00:00.000Z",
     });
-    expect(getPlayerAvailabilityView(first.gameState, "used-0", "A-A", "md-1").fatigue).toBe(32);
+    expect(getPlayerAvailabilityView(first.gameState, "used-0", "A-A", "md-1").fatigue).toBe(20 + MATCHDAY_FATIGUE_LOAD);
 
     // Normales Vorrücken md-1 -> md-2 (isMatchdayReplay weggelassen -> false): akkumuliert weiter.
     const second = applyFatigueAndInjuryAfterMatchday({
@@ -547,7 +548,7 @@ describe("fatigue injury service", () => {
       matchdayResultId: "result-md-2",
       timestamp: "2026-06-13T00:00:00.000Z",
     });
-    expect(getPlayerAvailabilityView(second.gameState, "used-0", "A-A", "md-2").fatigue).toBe(44);
+    expect(getPlayerAvailabilityView(second.gameState, "used-0", "A-A", "md-2").fatigue).toBe(20 + MATCHDAY_FATIGUE_LOAD * 2);
   });
 
   it("returns a recovering player to healthy once the recovery window has elapsed within the season", () => {

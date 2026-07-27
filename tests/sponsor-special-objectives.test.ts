@@ -26,7 +26,8 @@ import {
   SPONSOR_GOLDEN_OBJECTIVE_ARCHETYPE,
   type SponsorGoldenObjectiveKey,
 } from "@/lib/sponsor/sponsor-special-objectives";
-import { mapCurveShapeToArchetype } from "@/lib/sponsor/sponsor-tier-pool";
+import { mapSponsorCurveToArchetype } from "@/lib/sponsor/sponsor-tier-pool";
+import { SPONSOR_V2_CURVES } from "@/lib/sponsor/sponsor-v2-model";
 import type { SponsorArchetype, SponsorCurveShape } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
@@ -337,9 +338,9 @@ describe("sponsor bonus objectives — new targets (Fable B)", () => {
     expect(computeTransferWindowNet(gs, teamId, seasonId)).toBe(15);
     expect(isTransferTraderAvailableForSeason("season-1")).toBe(false);
     expect(isTransferTraderAvailableForSeason("season-2")).toBe(true);
-    // Bucketing läuft über die Kurvenform-Familie: "sicherheit" → Familie sicherheit → security-Pool.
-    expect(getAvailableBonusObjectiveKeys("sicherheit", "season-1")).not.toContain("transfer_trader");
-    expect(getAvailableBonusObjectiveKeys("sicherheit", "season-2")).toContain("transfer_trader");
+    // Bucketing läuft über den Archetyp-Eimer der Modellkurve ("Sockel" → security).
+    expect(getAvailableBonusObjectiveKeys("security", "season-1")).not.toContain("transfer_trader");
+    expect(getAvailableBonusObjectiveKeys("security", "season-2")).toContain("transfer_trader");
   }, 60000);
 
   it("keeps the objective spotlight league-centered (Σ ≈ 0)", () => {
@@ -367,20 +368,17 @@ describe("sponsor bonus objectives — new targets (Fable B)", () => {
     const goldenKeys = Object.keys(SPONSOR_GOLDEN_OBJECTIVE_ARCHETYPE) as SponsorGoldenObjectiveKey[];
     const stdKeys = Object.keys(SPONSOR_BONUS_OBJECTIVE_ARCHETYPE);
     expect(goldenKeys.some((k) => stdKeys.includes(k))).toBe(false);
-    // Repräsentative Kurvenform je (Legacy-)Archetyp-Bucket: titel→performance, aufstieg→identity, sicherheit→security.
-    const shapeByArchetype: Record<SponsorArchetype, SponsorCurveShape> = {
-      performance: "titeljaeger",
-      identity: "aufsteiger",
-      security: "sicherheit",
-    };
+    // Die Pickers nehmen den Archetyp-Eimer direkt entgegen; die Modellkurve wird in der Erzeugung ueber
+    // SPONSOR_CURVE_ARCHETYPE darauf abgebildet (frueher lag dazwischen noch die Legacy-Kurvenform).
     for (const archetype of ["performance", "identity", "security"] as const) {
-      const curveShape = shapeByArchetype[archetype];
-      expect(mapCurveShapeToArchetype(curveShape)).toBe(archetype);
-      const pick = pickGoldenObjective("season-4", "T-1", curveShape);
+      const pick = pickGoldenObjective("season-4", "T-1", archetype);
       expect(SPONSOR_GOLDEN_OBJECTIVE_ARCHETYPE[pick]).toBe(archetype);
-      expect(pickGoldenObjective("season-4", "T-1", curveShape)).toBe(pick); // deterministisch
-      expect(getAvailableBonusObjectiveKeys(curveShape, "season-4")).not.toContain(pick as never);
+      expect(pickGoldenObjective("season-4", "T-1", archetype)).toBe(pick); // deterministisch
+      expect(getAvailableBonusObjectiveKeys(archetype, "season-4")).not.toContain(pick as never);
     }
+    // Jede Modellkurve landet in genau einem Eimer, und alle drei Eimer werden bedient.
+    const buckets = new Set(SPONSOR_V2_CURVES.map((c) => mapSponsorCurveToArchetype(c.name)));
+    expect([...buckets].sort()).toEqual(["identity", "performance", "security"]);
   });
 
   it("scales standard special difficulty with rarity order and buckets bonus keys by curve family", () => {
@@ -403,11 +401,11 @@ describe("sponsor bonus objectives — new targets (Fable B)", () => {
     const discElite = buildStandardSpecialComponent({ templateId: "discipline_top3_count", rarity: "gewöhnlich", rewardCash: 5, teamQualityRank: 2 });
     expect(parseRank(discWeak.targetValue)).toBeGreaterThan(parseRank(discElite.targetValue));
 
-    // Bucketing folgt der Kurvenform-Familie: zwei Formen derselben Familie ziehen den identischen Bonus-Pool,
-    // eine Form einer anderen Familie einen disjunkten.
-    const security1 = getAvailableBonusObjectiveKeys("sicherheit", "season-4"); // Familie sicherheit
-    const security2 = getAvailableBonusObjectiveKeys("klassenerhalt", "season-4"); // gleiche Familie
-    const performance = getAvailableBonusObjectiveKeys("titeljaeger", "season-4"); // Familie titel → performance
+    // Bucketing folgt dem Archetyp-Eimer: zwei Kurven desselben Eimers ziehen den identischen Bonus-Pool,
+    // eine Kurve eines anderen Eimers einen disjunkten.
+    const security1 = getAvailableBonusObjectiveKeys(mapSponsorCurveToArchetype("Sockel"), "season-4");
+    const security2 = getAvailableBonusObjectiveKeys("security", "season-4");
+    const performance = getAvailableBonusObjectiveKeys(mapSponsorCurveToArchetype("Gipfel"), "season-4");
     expect([...security1].sort()).toEqual([...security2].sort());
     expect(security1.some((key) => performance.includes(key))).toBe(false);
     expect(performance.length).toBeGreaterThan(0);

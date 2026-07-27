@@ -1,4 +1,5 @@
 import type { DisciplineResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
+import { INJURY_PERFORMANCE_MULTIPLIER } from "@/lib/fatigue/fatigue-calibration";
 
 // Mapping der ECHTEN Resolve-Engine-Preview auf das additive Szenen-Payload der
 // Disziplin-Bühne. Ziel (Parität zur Arena): die Bühne rechnet NICHTS selbst —
@@ -8,7 +9,13 @@ import type { DisciplineResolvePreview } from "@/lib/resolve/legacy-matchday-res
 // gleichmäßig auf die Slots verteilt, damit Σ(Netto) == score gilt und die
 // Rangfolge der Szene deckungsgleich mit der Engine ist).
 
-export type StagePreviewMod = { k: string; sign: 1 | -1; amt: number };
+// Anteil, den INJURY_PERFORMANCE_MULTIPLIER vom Basis-/Fatigue-Anteil abzieht,
+// als ganzzahliger Prozentwert für die UI (z.B. 0.5 → 50). Läuft zur Laufzeit
+// aus der Konstante — NIE hartkodieren, sonst driftet die Anzeige vom echten
+// Faktor weg, sobald jemand INJURY_PERFORMANCE_MULTIPLIER anpasst.
+const INJURY_PERFORMANCE_PENALTY_UI_PERCENT = Math.round((1 - INJURY_PERFORMANCE_MULTIPLIER) * 100);
+
+export type StagePreviewMod = { k: string; sign: 1 | -1; amt: number; injury?: boolean };
 
 export type StagePreviewPlayer = {
   playerId: string | null;
@@ -61,6 +68,23 @@ export function buildDisciplineStageTeamsFromPreview(
       const fatigueDelta = round1(fatigued - (entry.baseValue ?? 0));
       if (Math.abs(fatigueDelta) >= 0.05) {
         mods.push({ k: "Fatigue", sign: fatigueDelta < 0 ? -1 : 1, amt: Math.abs(fatigueDelta) });
+      }
+      // Same-day-Verletzung: eigene, EXPLIZITE Zeile (statt im "Moral"-Rest zu
+      // verschwinden) — genau der Wunsch des Owners: sichtbar machen, dass ein
+      // verletzter Spieler nur INJURY_PERFORMANCE_MULTIPLIER seines Basis-/
+      // Fatigue-Anteils einbringt. `injury: true` markiert den Mod für die
+      // Arena (Bühnen-Feedback + Detektion), statt sich auf das Label-Regex
+      // verlassen zu müssen.
+      if (entry.injuryApplied && entry.injuryAdjustedValue != null) {
+        const injuryDelta = round1(entry.injuryAdjustedValue - fatigued);
+        if (Math.abs(injuryDelta) >= 0.05) {
+          mods.push({
+            k: `Verletzung −${INJURY_PERFORMANCE_PENALTY_UI_PERCENT} % (Basis)`,
+            sign: -1,
+            amt: Math.abs(injuryDelta),
+            injury: true,
+          });
+        }
       }
       if (entry.captainBonus) {
         mods.push({ k: "Captain", sign: entry.captainBonus < 0 ? -1 : 1, amt: round1(Math.abs(entry.captainBonus)) });

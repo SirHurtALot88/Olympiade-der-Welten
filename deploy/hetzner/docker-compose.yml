@@ -3,10 +3,22 @@ services:
     build:
       context: ../..
       dockerfile: Dockerfile
+      # Build-Stempel fuer die Sidebar-Version-Badge (siehe lib/app-version.ts).
+      # Werte kommen aus der Shell-Umgebung, die auto-deploy.sh bzw.
+      # scripts/deploy-hetzner-with-backup.sh vor `docker compose ... --build`
+      # setzen. Ohne gesetzte Vars bleiben es leere Strings -> Dockerfile-ARG
+      # Default greift, UI zeigt den "dev"-Fallback statt eines falschen Stempels.
+      args:
+        NEXT_PUBLIC_OLY_BUILD_SHA: ${NEXT_PUBLIC_OLY_BUILD_SHA:-}
+        NEXT_PUBLIC_OLY_BUILD_DATE: ${NEXT_PUBLIC_OLY_BUILD_DATE:-}
     restart: unless-stopped
     environment:
       NODE_ENV: production
       PORT: "3000"
+      # Beide Spieler sitzen in Deutschland. `Europe/Berlin` (statt einer
+      # festen +1/+2-Verschiebung) wechselt automatisch zwischen MEZ/MESZ, so
+      # dass Server-Timestamps und Save-Namen in deutscher Ortszeit landen.
+      TZ: Europe/Berlin
       OLY_APP_SQLITE_PATH: /app/data/persistence/oly-app.sqlite
       # Player/team images (macOS Dropbox paths) are served from a host folder
       # mounted read-only below. Upload the Dropbox subtree to /opt/oly-media on
