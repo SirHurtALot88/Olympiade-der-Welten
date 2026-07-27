@@ -105,6 +105,12 @@ export type DisciplineFieldProps = {
   // Abgeleitete Normierung (KDA/HP): n = (score − min)/(max − min), clamped.
   fieldNorm: (score: number) => number;
 
+  // ANZEIGE-PUNKTE eines Teams: der animierte `animScore`, solange eine Etappe rampt
+  // (bei barbell der echte score). Gegenstueck zu `t.rank`, das der Host ebenfalls aus
+  // diesem Zeitstrahl ableitet. Wer im Feld Punkte AUSGIBT oder nach Punkten gruppiert,
+  // nimmt diese Funktion — sonst weicht das Feld von der Rangliste ab.
+  shownScore: (t: RT) => number;
+
   // ---- Gewichtheben (nur `barbell`) -------------------------------------------------
   barbellInfo: BarbellInfo;
   barbellY: (kg: number) => number;
