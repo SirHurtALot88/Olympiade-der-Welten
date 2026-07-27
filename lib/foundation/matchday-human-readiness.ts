@@ -1,0 +1,61 @@
+/**
+ * Wann darf der Flow nach dem Speichern einer Einsatzliste weiter in die Arena?
+ *
+ * Solo ist die Antwort einfach: sobald das eigene Team steht. Im Multiplayer
+ * nicht — dort steuern zwei Spieler je mehrere Teams, und die Arena zeigt den
+ * Spieltag ALLER. Wer als Erster fertig ist, wuerde sonst in eine Arena
+ * geschickt, deren Aufstellungen noch gar nicht vollstaendig sind (und damit
+ * Ergebnisse sehen, bevor der Mitspieler ueberhaupt gesetzt hat).
+ *
+ * Massgeblich sind ausschliesslich die von Menschen gesteuerten Teams
+ * (`controlMode === "manual"`). KI- und passive Teams stellen sich selbst auf
+ * und duerfen nie blockieren.
+ */
+export type MatchdayReadinessTeam = {
+  id: string;
+  controlMode: string;
+  currentMatchdayReady: boolean;
+};
+
+export type MatchdayHumanReadiness = {
+  /** Alle menschlich gesteuerten Teams haben ihre Aufstellung für diesen Spieltag. */
+  allHumanTeamsReady: boolean;
+  /** Anzahl menschlich gesteuerter Teams insgesamt. */
+  humanTeamCount: number;
+  /** Teams, auf die noch gewartet wird. */
+  pendingTeamIds: string[];
+};
+
+export function evaluateMatchdayHumanReadiness(
+  teams: readonly MatchdayReadinessTeam[] | null | undefined,
+): MatchdayHumanReadiness {
+  const humanTeams = (teams ?? []).filter((team) => team.controlMode === "manual");
+  const pendingTeamIds = humanTeams.filter((team) => !team.currentMatchdayReady).map((team) => team.id);
+  return {
+    // Ohne menschliche Teams (reiner KI-Save) gibt es nichts zu blockieren.
+    allHumanTeamsReady: pendingTeamIds.length === 0,
+    humanTeamCount: humanTeams.length,
+    pendingTeamIds,
+  };
+}
+
+/**
+ * Darf der "Weiter"-Sprung von der Einsatzliste in die Arena erfolgen?
+ *
+ * `isOnlineGame` unterscheidet die beiden Faelle: solo bleibt es beim bisherigen
+ * Verhalten (eigenes Team reicht), online wird auf alle menschlichen Teams
+ * gewartet — auch auf die des Mitspielers.
+ */
+export function canJumpToArenaAfterLineupSave(input: {
+  isOnlineGame: boolean;
+  activeTeamReady: boolean;
+  teams: readonly MatchdayReadinessTeam[] | null | undefined;
+}): boolean {
+  if (!input.activeTeamReady) {
+    return false;
+  }
+  if (!input.isOnlineGame) {
+    return true;
+  }
+  return evaluateMatchdayHumanReadiness(input.teams).allHumanTeamsReady;
+}
