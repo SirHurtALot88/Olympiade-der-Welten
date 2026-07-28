@@ -2,6 +2,12 @@
 
 import { useState } from "react";
 
+import {
+  getPlayerStarTierLabel,
+  isHoloPlayerStarTier,
+  type PlayerStarTier,
+} from "@/lib/foundation/player-star-tier";
+
 // Zentrale Portrait-Marke für die Disziplin-Bühne: rundes Spielerbild mit
 // einheitlichem RING-Prioritätssystem (ein Ring, höchste Priorität gewinnt) und
 // optionaler Medaillen-BADGE (Eck-Pille, KEIN Ring). Alle Farben als
@@ -33,6 +39,19 @@ export function markMedalColor(medal: MarkMedal): string | null {
   return null;
 }
 
+// Star-Tier-Farbe (ligaweite Top-Riege, siehe lib/foundation/player-star-tier.ts).
+// Bewusst NICHT Teil der Ring-Prioritätskette: der innere Ring trägt weiterhin
+// Verletzung/Spotlight/eigenes Team/Relation — die Star-Stufe kommt als
+// ZUSÄTZLICHER Außenring dazu. Sonst müsste man sich zwischen "das ist meiner"
+// und "das ist ein Star" entscheiden, und in der Arena braucht man beides.
+export function markStarTierColor(tier: PlayerStarTier | null | undefined): string | null {
+  if (tier === "diamond") return "var(--nl-diamond)";
+  if (tier === "gold") return "var(--nl-gold)";
+  if (tier === "silver") return "var(--nl-silver)";
+  if (tier === "bronze") return "var(--nl-bronze)";
+  return null;
+}
+
 const MEDAL_SHORT: Record<NonNullable<MarkMedal>, string> = { gold: "1", silver: "2", bronze: "3" };
 
 export type PlayerMarkProps = {
@@ -49,15 +68,20 @@ export type PlayerMarkProps = {
   // pulsierenden Außenring — DAS ist das "wirklich optisch sehen"-Feedback,
   // nicht nur der einmalige Ticker-/Flug-Text.
   injury?: boolean;
+  // Ligaweite Top-Riege (Top 50/25/10/3) — rendert einen zusätzlichen
+  // Außenring in der Tier-Farbe, ohne den inneren Ring zu verdrängen.
+  starTier?: PlayerStarTier | null;
   onClick?: (() => void) | null;
   title?: string;
 };
 
-export default function PlayerMark({ src, alt = "", size = 28, isOwn = false, relation = null, spotlight = false, medal = null, injury = false, onClick, title }: PlayerMarkProps) {
+export default function PlayerMark({ src, alt = "", size = 28, isOwn = false, relation = null, spotlight = false, medal = null, injury = false, starTier = null, onClick, title }: PlayerMarkProps) {
   const [failed, setFailed] = useState(false);
   const ring = markRingColor({ injury, spotlight, isOwn, relation });
   const ringWidth = injury || spotlight || isOwn ? 2 : 1;
   const medalTone = markMedalColor(medal);
+  const starTone = markStarTierColor(starTier);
+  const starTierLabel = getPlayerStarTierLabel(starTier);
   const showImg = Boolean(src) && !failed;
   const badge = Math.max(11, Math.round(size * 0.42));
   const injuryBadge = Math.max(11, Math.round(size * 0.44));
@@ -65,7 +89,7 @@ export default function PlayerMark({ src, alt = "", size = 28, isOwn = false, re
   return (
     <span
       onClick={onClick ?? undefined}
-      title={injury ? `${title ? title + " · " : ""}Verletzt` : title}
+      title={[title, injury ? "Verletzt" : null, starTierLabel].filter(Boolean).join(" · ") || undefined}
       style={{
         position: "relative",
         width: size,
@@ -75,6 +99,23 @@ export default function PlayerMark({ src, alt = "", size = 28, isOwn = false, re
         cursor: onClick ? "pointer" : undefined,
       }}
     >
+      {starTone ? (
+        // Star-Ring außen um den regulären Ring. Bei Verletzung sitzt der
+        // pulsierende Risk-Ring auf derselben Höhe — dann rückt der Star-Ring
+        // eine Stufe weiter nach außen, damit beide sichtbar bleiben.
+        <span
+          aria-hidden
+          className={`arena-mark-star-ring is-${starTier}${isHoloPlayerStarTier(starTier) ? " is-star-holo" : ""}`}
+          style={{
+            position: "absolute",
+            inset: injury ? -7 : -3,
+            borderRadius: "50%",
+            border: `2px solid ${starTone}`,
+            boxShadow: `0 0 6px color-mix(in srgb, ${starTone} 45%, transparent)`,
+            pointerEvents: "none",
+          }}
+        />
+      ) : null}
       {injury ? (
         // Dauerhaft pulsierender Außenring — persistentes Signal, solange die
         // Marke sichtbar ist (kein Timeout, kein Ausblenden).

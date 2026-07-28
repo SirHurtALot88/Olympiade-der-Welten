@@ -123,6 +123,11 @@ import {
   type LeaguePlayerHeatPools,
 } from "@/lib/foundation/player-league-heat";
 import {
+  getPlayerStarTier,
+  getPlayerStarTierClassName,
+  getPlayerStarTierLabel,
+} from "@/lib/foundation/player-star-tier";
+import {
   buildDisciplinePpsSortKey,
   getDisciplineIdFromPpsSortKey,
   getRowDisciplinePps,
@@ -574,10 +579,17 @@ function renderMetricRankChip(
   if (rank == null) {
     return null;
   }
+  // Star-Tier DIESER Kennzahl (Top 50/25/10/3 → Bronze/Silber/Gold/Diamant).
+  // Bewusst pro Kennzahl statt einmal je Zeile: so ist am Chip ablesbar, WORIN
+  // der Spieler zur Spitze gehört. Das Portrait derselben Zeile trägt dagegen
+  // die beste der drei Stufen (siehe `FoundationPlayerPortraitCard`).
+  const starTier = getPlayerStarTier(rank);
+  const starTierLabel = getPlayerStarTierLabel(starTier);
   return (
     <span
-      className={`nl-ptable-percentile nl-ptable-metric-rank is-${metric}`}
-      title={`Liga-Rang #${rank} von ${pool.length}`}
+      className={`nl-ptable-percentile nl-ptable-metric-rank is-${metric} ${getPlayerStarTierClassName(starTier)}`.trim()}
+      data-star-tier={starTier ?? undefined}
+      title={`Liga-Rang #${rank} von ${pool.length}${starTierLabel ? ` — ${starTierLabel}` : ""}`}
     >
       #{formatNlNumber(rank, 0)}
     </span>

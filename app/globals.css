@@ -37799,6 +37799,211 @@ button.market-v2-bucket-card.is-selected {
     0 10px 24px rgba(180, 110, 60, 0.1);
 }
 
+/* --- Star-Tier: ligaweite Top-Riege --------------------------------------
+   Bronze/Silber/Gold/Diamant für Liga-Top-50/25/10/3 (Schwellen und Zuordnung:
+   `lib/foundation/player-star-tier.ts`). Gilt für JEDE Portraitkarte, also auch
+   für alle Hover-Previews, den Arena-Drawer und die Kader-Grids — die Karte ist
+   die gemeinsame Basis.
+
+   Bewusst über `outline` + ein `::after`-Overlay statt über `border-color`:
+   dieselbe Karte trägt bereits den Klassenfarb-Rahmen
+   (`player-card-class-frame-*`, setzt `border-color` und einen inset-Schatten)
+   und optional den positionsbasierten `is-rank-*`-Rahmen der Home-Kachel. Ein
+   fünfter Kandidat auf `border-color` würde je nach Merge-Reihenfolge gewinnen
+   oder verlieren; `outline` liegt daneben und kollidiert mit keinem davon. */
+.foundation-player-portrait-card.is-star-tier-bronze,
+.foundation-player-portrait-card.is-star-tier-silver,
+.foundation-player-portrait-card.is-star-tier-gold,
+.foundation-player-portrait-card.is-star-tier-diamond {
+  position: relative;
+  outline: 2px solid var(--nl-star-tone);
+  outline-offset: -2px;
+  border-radius: var(--nl-r-lg, 14px);
+}
+
+.foundation-player-portrait-card.is-star-tier-bronze {
+  --nl-star-tone: var(--nl-bronze);
+}
+
+.foundation-player-portrait-card.is-star-tier-silver {
+  --nl-star-tone: var(--nl-silver);
+}
+
+.foundation-player-portrait-card.is-star-tier-gold {
+  --nl-star-tone: var(--nl-gold);
+}
+
+.foundation-player-portrait-card.is-star-tier-diamond {
+  --nl-star-tone: var(--nl-diamond);
+}
+
+/* Der Schein nach außen wächst mit der Stufe — Bronze bleibt dezent, Diamant
+   sticht heraus, ohne dass die Karte selbst heller wird (Portraits müssen
+   lesbar bleiben). */
+.foundation-player-portrait-card.is-star-tier-bronze {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--nl-bronze) 22%, transparent);
+}
+
+.foundation-player-portrait-card.is-star-tier-silver {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--nl-silver) 26%, transparent),
+    0 8px 20px color-mix(in srgb, var(--nl-silver) 12%, transparent);
+}
+
+.foundation-player-portrait-card.is-star-tier-gold {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--nl-gold) 32%, transparent),
+    0 10px 26px color-mix(in srgb, var(--nl-gold) 18%, transparent);
+}
+
+.foundation-player-portrait-card.is-star-tier-diamond {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--nl-diamond) 38%, transparent),
+    0 12px 30px color-mix(in srgb, var(--nl-diamond) 22%, transparent);
+}
+
+/* --- Holo-Schimmer (nur Top 10 = Gold und Diamant) ------------------------
+   Der "seltene Sammelkarte"-Effekt: ein schräger, wandernder Lichtstreifen über
+   dem Portrait plus ein zweiter, langsamerer Farbverlauf. Rein dekorativ
+   (`pointer-events: none`), liegt unter den Overlay-Zahlen, damit Werte lesbar
+   bleiben. `mix-blend-mode: screen` hellt nur auf und frisst keine Details. */
+.foundation-player-portrait-card.is-star-holo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 1;
+  mix-blend-mode: screen;
+  opacity: 0.5;
+  background:
+    linear-gradient(
+      115deg,
+      transparent 0%,
+      transparent 38%,
+      color-mix(in srgb, var(--nl-star-tone) 55%, transparent) 47%,
+      color-mix(in srgb, #ffffff 70%, transparent) 50%,
+      color-mix(in srgb, var(--nl-star-tone) 55%, transparent) 53%,
+      transparent 62%,
+      transparent 100%
+    ),
+    linear-gradient(
+      210deg,
+      color-mix(in srgb, var(--nl-star-tone) 26%, transparent) 0%,
+      transparent 45%,
+      color-mix(in srgb, var(--nl-diamond) 18%, transparent) 100%
+    );
+  background-size: 260% 260%, 180% 180%;
+  background-position: 120% 0%, 0% 0%;
+  animation: nlStarHoloSweep 4.6s var(--nl-ease, ease) infinite;
+}
+
+@keyframes nlStarHoloSweep {
+  0% {
+    background-position: 130% 0%, 0% 0%;
+  }
+  55% {
+    background-position: -30% 100%, 100% 100%;
+  }
+  100% {
+    background-position: -30% 100%, 100% 100%;
+  }
+}
+
+/* Der Holo-Sweep ist Zierde, keine Information — bei reduzierter Bewegung bleibt
+   der Verlauf stehen (der Rahmen trägt die Aussage ohnehin allein). */
+@media (prefers-reduced-motion: reduce) {
+  .foundation-player-portrait-card.is-star-holo::after {
+    animation: none;
+    background-position: 50% 50%, 50% 50%;
+    opacity: 0.3;
+  }
+
+  .arena-mark-star-ring.is-star-holo {
+    animation: none;
+  }
+}
+
+/* --- Star-Tier an den Kennzahl-Kacheln (OVR/PPs/MVS) ---------------------
+   Jede Kachel trägt ihre EIGENE Stufe aus ihrem eigenen Rang — die Karte
+   drumherum zeigt die beste der drei. Nur ein Rahmen plus Tönung des Labels:
+   die Heat-Band-Hinterlegung darunter bleibt unangetastet, beide Aussagen
+   ("wie gut im Pool" und "Top N") sollen nebeneinander lesbar sein. */
+.foundation-player-portrait-stat.is-star-tier-bronze {
+  --nl-star-tone: var(--nl-bronze);
+}
+
+.foundation-player-portrait-stat.is-star-tier-silver {
+  --nl-star-tone: var(--nl-silver);
+}
+
+.foundation-player-portrait-stat.is-star-tier-gold {
+  --nl-star-tone: var(--nl-gold);
+}
+
+.foundation-player-portrait-stat.is-star-tier-diamond {
+  --nl-star-tone: var(--nl-diamond);
+}
+
+.foundation-player-portrait-stat.is-star-tier-bronze,
+.foundation-player-portrait-stat.is-star-tier-silver,
+.foundation-player-portrait-stat.is-star-tier-gold,
+.foundation-player-portrait-stat.is-star-tier-diamond {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nl-star-tone) 70%, transparent);
+}
+
+.foundation-player-portrait-stat.is-star-tier-bronze small,
+.foundation-player-portrait-stat.is-star-tier-silver small,
+.foundation-player-portrait-stat.is-star-tier-gold small,
+.foundation-player-portrait-stat.is-star-tier-diamond small {
+  color: var(--nl-star-tone);
+}
+
+/* --- Star-Tier an den Rang-Chips der Spielertabelle ---------------------- */
+.is-new-look .nl-ptable-metric-rank.is-star-tier-bronze {
+  --nl-star-tone: var(--nl-bronze);
+}
+
+.is-new-look .nl-ptable-metric-rank.is-star-tier-silver {
+  --nl-star-tone: var(--nl-silver);
+}
+
+.is-new-look .nl-ptable-metric-rank.is-star-tier-gold {
+  --nl-star-tone: var(--nl-gold);
+}
+
+.is-new-look .nl-ptable-metric-rank.is-star-tier-diamond {
+  --nl-star-tone: var(--nl-diamond);
+}
+
+.is-new-look .nl-ptable-metric-rank.is-star-tier-bronze,
+.is-new-look .nl-ptable-metric-rank.is-star-tier-silver,
+.is-new-look .nl-ptable-metric-rank.is-star-tier-gold,
+.is-new-look .nl-ptable-metric-rank.is-star-tier-diamond {
+  border-color: color-mix(in srgb, var(--nl-star-tone) 75%, transparent);
+  background: color-mix(in srgb, var(--nl-star-tone) 18%, transparent);
+  color: var(--nl-star-tone);
+  font-weight: 800;
+}
+
+/* --- Star-Ring der Arena-Marken ------------------------------------------
+   Zusätzlicher Außenring um die runde Spielermarke (`PlayerMark`). Farbe und
+   Position setzt die Komponente inline (sie kennt die Ringbreite und weicht
+   dem Verletzungs-Puls aus); hier liegt nur der Holo-Puls für Top 10. */
+.arena-mark-star-ring.is-star-holo {
+  animation: nlStarRingPulse 2.4s var(--nl-ease, ease) infinite;
+}
+
+@keyframes nlStarRingPulse {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 .home-v2-player-hero {
   position: relative;
   width: 100%;
@@ -43399,6 +43604,10 @@ button.foundation-team-portrait-card {
   --nl-gold: #f6c750;
   --nl-silver: #c7d0dc;
   --nl-bronze: #cd7f32;
+  /* Vierte, höchste Stufe der ligaweiten Top-Riege (Top 3) — es gab bisher
+     nur Gold/Silber/Bronze. Bewusst ein kühles Eis-Cyan statt eines weiteren
+     Metalltons, damit Diamant sich auf einen Blick von Gold unterscheidet. */
+  --nl-diamond: #7fe6f5;
   /* Freund/Feind-Kodierung (Arena): blau=deine, grün=verbündet, rot=Rival.
      Aliasse auf die Achsen-/Semantik-Tokens, damit Light/Dark automatisch mitzieht. */
   --nl-mine: var(--nl-men);
