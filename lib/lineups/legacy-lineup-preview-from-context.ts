@@ -227,6 +227,7 @@ export function calculateLocalLegacyLineupPreviewFromContext(
         formCardsSelected: formResult.formCardsSelected,
         formCardLabel: formResult.formCardLabel,
         formModifier: formResult.formModifier,
+        formPerPlayer: formResult.formPerPlayer,
         mutatorText: mutatorResult.mutatorText,
         mutatorModifier: effectiveMutatorModifier,
         mutatorBonusByPlayerId: effectiveMutatorBonuses,

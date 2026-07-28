@@ -413,6 +413,7 @@ export function buildLegacyMatchdayResolvePreview(
             formCardStatus: context.formCardSource?.effectStatus === "ready" ? "ready" : "missing_source",
             formCardLabel: formResult.formCardLabel,
             formModifier: formResult.formModifier,
+            formPerPlayer: formResult.formPerPlayer,
             mutatorMode: mutatorResult.mutatorMode,
             mutatorText: mutatorResult.mutatorText,
             mutatorModifier: effectiveMutatorModifier,

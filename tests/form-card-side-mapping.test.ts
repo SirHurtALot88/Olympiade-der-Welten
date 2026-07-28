@@ -88,24 +88,41 @@ describe("Formkarten — Seiten-Zuordnung d1/d2", () => {
   });
 
   /**
-   * BEKANNTER DEFEKT — bewusst als `fails` festgehalten, damit er dokumentiert ist und der Tag
-   * auffliegt, an dem jemand ihn behebt (dann wird dieser Test unerwartet gruen).
+   * DER BEHOBENE DEFEKT. Frueher wurde `formModifier` (= Kartenwert x playerCount) durch die Zahl
+   * der tatsaechlich BEWERTETEN Spieler geteilt. Liefen die beiden Zahlen auseinander —
+   * unvollstaendige Aufstellung, Spieler ohne Score — schrumpfte der flache Anteil unter den Jitter
+   * von +-4 und das VORZEICHEN kippte: eine positive Formkarte erzeugte ein "Formtief".
    *
-   * `formModifier` wird mit `playerCount` MULTIPLIZIERT (Aufrufer: die Zahl der besetzten Slots der
-   * Seite) und in der Verteilung durch die Zahl der tatsaechlich BEWERTETEN Spieler geteilt. Beide
-   * Zahlen sollen gleich sein — dann heben sich Mal und Geteilt auf und jeder Spieler bekommt genau
-   * den Kartenwert. Laufen sie auseinander (unvollstaendige Aufstellung, Spieler ohne Score),
-   * schrumpft der flache Anteil unter den Jitter von +-4 und das VORZEICHEN kippt: eine positive
-   * Karte erzeugt dann ein "Formtief" von bis zu -4.
-   *
-   * Die saubere Behebung ist, den Wert PRO SPIELER durchzureichen statt ihn zu multiplizieren und
-   * gleich wieder zu teilen. Das aendert die Form-Balance im ganzen Spiel und gehoert deshalb nicht
-   * nebenbei in einen Diagnose-Commit.
+   * Jetzt reicht `formPerPlayer` den Kartenwert direkt durch. Der flache Anteil haengt an keiner
+   * Spielerzahl mehr, also kann keine Zahlen-Kombination das Vorzeichen drehen.
    */
-  it.fails("DEFEKT: abweichende Spielerzahlen kippen das Vorzeichen der Formkarte", () => {
-    const { result } = sharesFor("d1", 1); // Modifier fuer 1 Spieler gebildet …
-    const seeds = Array.from({ length: 7 }, (_, i) => `p-${i}|d1|md-3`); // … auf 7 verteilt
-    const shares = distributePerPlayerFormShares({ formModifier: result.formModifier, seeds });
-    expect(shares.filter((share) => share < 0)).toEqual([]);
+  it("abweichende Spielerzahlen kippen das Vorzeichen NICHT mehr", () => {
+    for (const declared of [1, 2, 5, 6, 7, 14]) {
+      for (const actual of [1, 2, 5, 6, 7, 14]) {
+        const { result } = sharesFor("d1", declared);
+        const seeds = Array.from({ length: actual }, (_, i) => `p-${i}|d1|md-3`);
+        const shares = distributePerPlayerFormShares({
+          formPerPlayer: result.formPerPlayer,
+          formModifier: result.formModifier,
+          seeds,
+        });
+        expect(
+          shares.filter((share) => share < 0),
+          `declared=${declared} actual=${actual} erzeugt ein Formtief trotz positiver Karte`,
+        ).toEqual([]);
+        // Der Anteil ist jetzt UNABHAENGIG von beiden Zahlen: immer Kartenwert +- Jitter.
+        expect(Math.min(...shares)).toBeGreaterThanOrEqual(12);
+        expect(Math.max(...shares)).toBeLessThanOrEqual(20);
+      }
+    }
+  });
+
+  /** Ohne `formPerPlayer` bleibt der alte Rueckfallweg erhalten — sonst braeche jeder Altaufrufer. */
+  it("ohne den Wert je Spieler rechnet der Rueckfallweg weiter wie bisher", () => {
+    const shares = distributePerPlayerFormShares({
+      formModifier: 96,
+      seeds: Array.from({ length: 6 }, (_, i) => `p-${i}|d1|md-3`),
+    });
+    expect(Math.min(...shares)).toBeGreaterThanOrEqual(12);
   });
 });

@@ -5,7 +5,11 @@
  *
  * Zwei Stufen, per Env geschaltet:
  *   OLY_AUTO_EXPORT_SAVES   (Default "1")  – Saves periodisch nach data/online-saves/ spiegeln (nur Dateien).
- *   OLY_AUTO_EXPORT_PUSH    (Default "0")  – geänderte Saves zusätzlich nach GitHub committen + pushen.
+ *   OLY_AUTO_EXPORT_PUSH    (Default "1")  – geänderte Saves zusätzlich nach GitHub committen + pushen.
+ *                                            Stand vorher auf "0"; damit landeten gespielte Saves zwar
+ *                                            im Ordner, aber nie im Repo — sie waren in keiner Session
+ *                                            und keinem Clone verfügbar, obwohl der Ordner sie zeigte.
+ *                                            Zum Abschalten: OLY_AUTO_EXPORT_PUSH=0.
  *   OLY_AUTO_EXPORT_BRANCH  (Default "main")
  *   OLY_AUTO_EXPORT_INTERVAL_MS (Default 180000 = 3 min)
  *
@@ -90,7 +94,7 @@ export function startOnlineSaveAutoExport() {
   started = true;
 
   const intervalMs = Math.max(30_000, Number(process.env.OLY_AUTO_EXPORT_INTERVAL_MS ?? 180_000));
-  const pushEnabled = envFlag("OLY_AUTO_EXPORT_PUSH", false);
+  const pushEnabled = envFlag("OLY_AUTO_EXPORT_PUSH", true);
   const branch = process.env.OLY_AUTO_EXPORT_BRANCH ?? "main";
 
   let lastSignature: string | null = null;

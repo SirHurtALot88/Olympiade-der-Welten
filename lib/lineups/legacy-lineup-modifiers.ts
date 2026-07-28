@@ -649,6 +649,15 @@ export function calculateFormModifierForSide(input: {
   formCardsSelected: number;
   formCardLabel: string | null;
   formModifier: number;
+  /**
+   * Der Kartenwert PRO SPIELER (nach dem x2 bei Farbgleichheit) — die Groesse, die die Karte
+   * eigentlich zusagt. `formModifier` ist derselbe Wert mal `playerCount`, also die Team-Summe
+   * fuer die Anzeige. Wer den Anteil je Spieler braucht, nimmt DIESES Feld und nicht
+   * `formModifier / irgendeine Zahl`: teilt man die Team-Summe durch eine ANDERE Spielerzahl
+   * als die, mit der sie gebildet wurde, schrumpft der Anteil unter den Jitter von +-4 und das
+   * VORZEICHEN kippt — eine positive Karte wird dann zum "Formtief".
+   */
+  formPerPlayer: number;
   warnings: string[];
 } {
   const selection = getModifierSelectionForSide(input.modifiers, input.disciplineSide);
@@ -678,6 +687,7 @@ export function calculateFormModifierForSide(input: {
       disciplineColor: input.disciplineColor,
     }),
     formModifier: Number((effectiveSum * input.playerCount).toFixed(1)),
+    formPerPlayer: Number(effectiveSum.toFixed(1)),
     warnings,
   };
 }
@@ -740,19 +750,31 @@ export function seededIntensityShare(intensity: LegacyIntensityStage, seed: stri
 // (z.B. `${playerId}|${disciplineId}|${matchdayId}`) macht das Ergebnis reproduzierbar, sodass
 // Score-Engine und Bühne identische Werte zeigen.
 export function distributePerPlayerFormShares(input: {
+  /**
+   * Der Kartenwert PRO SPIELER (`calculateFormModifierForSide().formPerPlayer`). Bevorzugt
+   * angeben — dann steht der flache Anteil fest und haengt an keiner Spielerzahl.
+   */
+  formPerPlayer?: number | null;
+  /** Team-Summe. Nur noch Rueckfalloption, wenn der Wert je Spieler nicht vorliegt. */
   formModifier?: number | null;
   seeds: string[];
   jitterMax?: number;
 }): number[] {
-  const total = input.formModifier ?? 0;
   const n = input.seeds.length;
   if (n === 0) {
     return [];
   }
-  if (!Number.isFinite(total) || total === 0) {
+  // WARUM DER WERT JE SPIELER VORGEHT: die Team-Summe entsteht als `Kartenwert x playerCount`.
+  // Teilt man sie hier durch eine ANDERE Spielerzahl (unvollstaendige Aufstellung, Spieler ohne
+  // Score), schrumpft der flache Anteil — und sobald er unter den Jitter von +-4 faellt, kippt das
+  // VORZEICHEN: eine positive Formkarte erzeugt dann ein "Formtief". Gemeldet aus dem Spiel,
+  // reproduziert in tests/form-card-side-mapping.test.ts.
+  const flat = input.formPerPlayer != null && Number.isFinite(input.formPerPlayer)
+    ? input.formPerPlayer
+    : (input.formModifier ?? 0) / n;
+  if (!Number.isFinite(flat) || flat === 0) {
     return input.seeds.map(() => 0);
   }
-  const flat = total / n;
   const jitterMax = input.jitterMax ?? 4;
   return input.seeds.map((seed) => Number((flat + seededFormJitter(seed, jitterMax)).toFixed(1)));
 }

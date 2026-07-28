@@ -61,12 +61,21 @@ export function exportOnlineSaves(opts?: { ids?: string[]; activeOnly?: boolean 
   fs.mkdirSync(ONLINE_SAVES_DIR, { recursive: true });
   let changed = false;
 
-  // Verwaiste Dateien entfernen (Save gelöscht/umbenannt), damit der Ordner den aktuellen Stand zeigt.
-  const keep = new Set(summaries.map((s) => `${s.saveId}.json.gz`).concat(["manifest.json"]));
-  for (const file of fs.readdirSync(ONLINE_SAVES_DIR)) {
-    if ((file.endsWith(".json.gz") || file === "manifest.json") && !keep.has(file)) {
-      fs.rmSync(path.join(ONLINE_SAVES_DIR, file));
-      changed = true;
+  // Verwaiste Dateien entfernen (Save gelöscht/umbenannt), damit der Ordner den aktuellen Stand zeigt
+  // — ein lokal gelöschter Spielstand verschwindet so auch aus dem Repo.
+  //
+  // NUR beim VOLLSTÄNDIGEN Export. Bei `--active-only` oder `--id` enthält `summaries` absichtlich
+  // nur eine Teilmenge; würde man danach aufräumen, löschte ein gezielter Export jeden anderen
+  // Spielstand aus `data/online-saves/` — aus "exportiere diesen einen" würde "wirf alle anderen weg".
+  // Der Auto-Export-Timer ruft ohne Filter auf, der Löschabgleich läuft dort also weiterhin.
+  const isFullExport = !(opts?.ids && opts.ids.length > 0) && !opts?.activeOnly;
+  if (isFullExport) {
+    const keep = new Set(summaries.map((s) => `${s.saveId}.json.gz`).concat(["manifest.json"]));
+    for (const file of fs.readdirSync(ONLINE_SAVES_DIR)) {
+      if ((file.endsWith(".json.gz") || file === "manifest.json") && !keep.has(file)) {
+        fs.rmSync(path.join(ONLINE_SAVES_DIR, file));
+        changed = true;
+      }
     }
   }
 

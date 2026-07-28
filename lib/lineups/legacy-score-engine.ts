@@ -49,6 +49,8 @@ type ScoreSideInput = {
   formCardsAvailable?: number | null;
   formCardsSelected?: number | null;
   formModifier?: number | null;
+  /** Kartenwert PRO SPIELER — siehe distributePerPlayerFormShares: verhindert den Vorzeichen-Kipp. */
+  formPerPlayer?: number | null;
   formCardStatus?: "ready" | "missing_source";
   formCardLabel?: string | null;
   mutatorMode?: LegacyResolveMutatorMode;
@@ -95,6 +97,7 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
   const fatigueSourceStatus = input.fatigueSourceStatus ?? "missing_source";
   const moraleStatus = input.moraleByPlayerId ? "mapped" : "not_applied";
   const formModifier = input.formModifier ?? null;
+  const formPerPlayer = input.formPerPlayer ?? null;
   const mutatorModifier = input.mutatorModifier ?? null;
   const intensity = normalizeIntensity(input.intensity);
   // Intensitäts-Beitrag PRO SPIELER als seeded Streuung im charakteristischen Bereich
@@ -255,7 +258,7 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
   let appliedFormModifier = formModifier;
   if (formModifier != null && formModifier !== 0 && scoredEntries.length > 0) {
     const seeds = scoredEntries.map((entry) => `${entry.playerId}|${input.disciplineId}|${input.matchdayId ?? ""}`);
-    const shares = distributePerPlayerFormShares({ formModifier, seeds });
+    const shares = distributePerPlayerFormShares({ formPerPlayer, formModifier, seeds });
     let applied = 0;
     scoredEntries.forEach((entry, index) => {
       const share = shares[index] ?? 0;
