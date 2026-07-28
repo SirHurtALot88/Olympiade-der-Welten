@@ -7263,6 +7263,14 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           isReadOnly={isReadOnly}
           matchdayId={params.matchdayId}
           matchdayOptions={options.matchdays}
+          /* Saison-Ressourcen-Kontext für das Formplan-Cockpit: Captain-Budget kommt
+             aus den bestehenden Derivations oben (keine Neuberechnung), die
+             Team-Power-Ladungen liest das Panel direkt aus `context.teamPowers`.
+             Eine Vorausplanung pro Spieltag existiert für beide bewusst nicht. */
+          captainSeasonLimit={captainSeasonLimit}
+          captainSeasonUsedWithDraft={captainSeasonUsedWithDraft}
+          captainDraftRemaining={captainDraftRemaining}
+          getTeamPowerCategoryLabel={getTeamPowerCategoryLabel}
           formatModifierSourceLabel={formatModifierSourceLabel}
           formatFormPlanImpact={formatFormPlanImpact}
           formatFormCardValueLabel={formatFormCardValueLabel}

@@ -7,7 +7,13 @@ import DisciplineIcon from "@/app/foundation/DisciplineIcon";
 import { NlDeltaChip } from "@/components/foundation/new-look";
 import { VeloImpactStrip } from "@/components/foundation/velo-ui";
 import type { FormCardPlanRecord, LineupDraftModifiers } from "@/lib/data/olyDataTypes";
-import type { LegacyFormCardOption, LegacyLineupDraft, LegacyLineupLoadedContext, LegacyModifierSourceSummary } from "@/lib/lineups/legacy-lineup-types";
+import type {
+  LegacyFormCardOption,
+  LegacyLineupDraft,
+  LegacyLineupLoadedContext,
+  LegacyModifierSourceSummary,
+  LegacyTeamPowerOption,
+} from "@/lib/lineups/legacy-lineup-types";
 
 type FormBoardPickCell = {
   matchdayId: string;
@@ -21,6 +27,10 @@ type FormDeckCard = LegacyFormCardOption & {
   isUsed: boolean;
   isReserved: boolean;
 };
+
+// Feste Anzeige-Reihenfolge der Bereichsfarben (POW/SPE/MEN/SOC) — identisch zur
+// Sortierung im Karten-Deck des Clients, damit beide Ansichten dieselbe Ordnung zeigen.
+const FORM_CARD_COLOR_ORDER: LegacyFormCardOption["color"][] = ["red", "green", "blue", "yellow"];
 
 export type FormBoardPanelProps = {
   modifiers: LineupDraftModifiers;
@@ -40,6 +50,19 @@ export type FormBoardPanelProps = {
   isReadOnly: boolean;
   matchdayId: string;
   matchdayOptions: Array<{ id: string; matchdayIndex?: number; index?: number }>;
+  /**
+   * Captain-Saisonbudget als Planungs-Kontext (aus den bestehenden Client-Derivations
+   * `captainSeasonLimit` / `captainSeasonUsedWithDraft` / `captainDraftRemaining` —
+   * hier wird nichts neu berechnet). Eine Captain-VORAUSPLANUNG pro künftigem Spieltag
+   * existiert im Datenmodell bewusst nicht: Der Captain wird am Spieltag selbst in der
+   * Einsatzliste gesetzt. Der Formplan zeigt daher nur den Restbestand über die Saison,
+   * damit man beim Karten-Planen mitdenken kann, wo noch Captain-Einsätze übrig sind.
+   */
+  captainSeasonLimit: number;
+  captainSeasonUsedWithDraft: number;
+  captainDraftRemaining: number;
+  /** Kategorie-Kürzel (POW/SPE/MEN/SOC/FLEX) einer Team-Power — geteilter Client-Helper. */
+  getTeamPowerCategoryLabel: (category: LegacyTeamPowerOption["category"]) => string;
   formatModifierSourceLabel: (source: LegacyModifierSourceSummary | null | undefined) => string;
   formatFormPlanImpact: (
     primary: LegacyFormCardOption | null,
@@ -98,6 +121,10 @@ export default function FormBoardPanel({
   isReadOnly,
   matchdayId,
   matchdayOptions,
+  captainSeasonLimit,
+  captainSeasonUsedWithDraft,
+  captainDraftRemaining,
+  getTeamPowerCategoryLabel,
   formatModifierSourceLabel,
   formatFormPlanImpact,
   formatFormCardValueLabel,
@@ -123,6 +150,59 @@ export default function FormBoardPanel({
     ).length;
     return { filledCells, totalCells };
   }, [context?.formCardPlans, matchdayOptions.length]);
+
+  // Aktueller Spieltag-Index als Referenzpunkt der Saison-Planung: steuert die
+  // "Heute"/"Gespielt"/"Plan"-Beschriftung der Timeline und die Rest-Saison-Zählung
+  // im Ressourcen-Cockpit. Gleiche Auflösungskette wie bisher in der Timeline
+  // (matchdayOptions zuerst, Context-Fallback), nur einmal zentral statt pro Eintrag.
+  const currentMatchdayIndex = useMemo(() => {
+    const option = matchdayOptions.find((matchday) => matchday.id === matchdayId);
+    return option?.matchdayIndex ?? option?.index ?? context?.matchday.index ?? null;
+  }, [context?.matchday.index, matchdayId, matchdayOptions]);
+
+  // Wie viele Spieltage (inkl. heute) noch kommen — der Nenner der Frage
+  // "verbrenne ich meine Ressourcen zu früh?".
+  const remainingMatchdayCount = useMemo(() => {
+    const schedule = context?.seasonDisciplineSchedule ?? [];
+    if (currentMatchdayIndex == null) {
+      return schedule.length;
+    }
+    return schedule.filter((entry) => entry.matchdayIndex >= currentMatchdayIndex).length;
+  }, [context?.seasonDisciplineSchedule, currentMatchdayIndex]);
+
+  const freeDeckCards = useMemo(
+    () => formDeckCards.filter((card) => !card.isUsed && !card.isReserved),
+    [formDeckCards],
+  );
+
+  // Freie Karten pro Bereichsfarbe: die zentrale Info für den Farbmatch (x2).
+  // Wird sowohl im Ressourcen-Cockpit als auch pro Timeline-Zelle angezeigt
+  // ("wie viele passende Karten habe ich für diese Disziplin noch übrig?").
+  const freeCardCountByColor = useMemo(() => {
+    const counts: Record<LegacyFormCardOption["color"], number> = { red: 0, green: 0, blue: 0, yellow: 0 };
+    for (const card of freeDeckCards) {
+      counts[card.color] += 1;
+    }
+    return counts;
+  }, [freeDeckCards]);
+
+  // Team-Power-Saisonbudget: reine Sichtbarmachung der vorhandenen Ladungen aus
+  // `context.teamPowers` (chargesRemaining/chargesTotal/isUsedUp). Auch hier gilt:
+  // Eine Team-Power-VORAUSPLANUNG pro künftigem Spieltag existiert im Datenmodell
+  // nicht — aktiviert wird die Power am Spieltag in der Einsatzliste. Passive Powers
+  // haben kein Ladungs-Budget und werden nur gezählt, nicht aufsummiert.
+  const teamPowerBudget = useMemo(() => {
+    const powers = context?.teamPowers ?? [];
+    const activePowers = powers.filter((power) => !power.isPassive);
+    return {
+      powers: activePowers,
+      passiveCount: powers.length - activePowers.length,
+      chargesRemaining: activePowers.reduce((sum, power) => sum + power.chargesRemaining, 0),
+      chargesTotal: activePowers.reduce((sum, power) => sum + power.chargesTotal, 0),
+    };
+  }, [context?.teamPowers]);
+
+  const captainSeasonRemaining = Math.max(0, captainSeasonLimit - captainSeasonUsedWithDraft);
 
   function cellAcceptsDraggedCard(input: {
     matchdayId: string;
@@ -210,12 +290,13 @@ export default function FormBoardPanel({
     >
       <div className="legacy-lineup-form-board-head">
         <div>
-          <span>Saison-Formkarten</span>
+          <span>Saison-Planung</span>
           <strong>Formplan</strong>
         </div>
         <div className="legacy-lineup-form-board-head-stats">
-          <span className="pill">{formPlanOpenCells} offen</span>
-          <span className="pill">{formDeckCards.filter((card) => !card.isUsed && !card.isReserved).length} frei</span>
+          <span className="pill" title="Aktueller Spieltag und verbleibende Spieltage inkl. heute.">
+            Spieltag {currentMatchdayIndex ?? "—"} · {remainingMatchdayCount} übrig
+          </span>
           <span className="pill">Form {formatModifierSourceLabel(context?.formCardSource)}</span>
           <NlDeltaChip
             value={formCardCounts.positiveAvailable}
@@ -236,8 +317,103 @@ export default function FormBoardPanel({
         <span className={draft ? "is-ready" : "is-warning"}>Gespeichert {draft ? "✓" : "⚠"}</span>
       </div>
       <p className="legacy-lineup-form-board-hint">
-        Beide Slots sind optional. F1 ± · F2 nur positiv. Negative bis Saisonende abwerfen — offene Negative kosten Strafpunkte.
+        Beide Slots sind optional. F1 ± · F2 nur positiv. Farbmatch (Karte = Disziplin-Bereich) verdoppelt den Kartenwert.
+        Negative bis Saisonende abwerfen — offene Negative kosten Strafpunkte.
       </p>
+      {/*
+        Saison-Ressourcen-Cockpit: eine Zeile, drei Budgets — Formkarten, Captain,
+        Team-Power. Genau die Frage, die dieser Screen beantworten soll: "Wie viel
+        habe ich noch, und für wie viele Spieltage muss es reichen?" Formkarten sind
+        die einzige Ressource mit persistiertem Zukunfts-Plan (formCardPlans); Captain
+        und Team-Power zeigen bewusst NUR das Saison-Kontingent als Planungs-Kontext,
+        weil das Datenmodell für sie keine Vorausplanung pro Spieltag kennt.
+      */}
+      <div className="legacy-lineup-form-resources" aria-label="Saison-Ressourcen">
+        <article className="legacy-lineup-form-resource is-cards">
+          <div className="legacy-lineup-form-resource-head">
+            <span>Formkarten</span>
+            <strong>{freeDeckCards.length} frei</strong>
+          </div>
+          <div
+            className="legacy-lineup-form-resource-meter"
+            role="img"
+            aria-label={`${freeDeckCards.length} von ${Math.max(formDeckCards.length, 1)} Formkarten frei`}
+          >
+            <span style={{ width: `${Math.round((freeDeckCards.length / Math.max(formDeckCards.length, 1)) * 100)}%` }} />
+          </div>
+          <small>
+            {formPlanOpenCells} Zellen offen · {formPlanProgress.filledCells}/{formPlanProgress.totalCells} Spieltag-Seiten geplant
+          </small>
+          <div className="legacy-lineup-form-resource-colors">
+            {FORM_CARD_COLOR_ORDER.map((color) => (
+              <span
+                key={`form-resource-color-${color}`}
+                className={`legacy-lineup-form-card-chip legacy-lineup-form-resource-color is-${color}${freeCardCountByColor[color] === 0 ? " is-depleted" : ""}`}
+                title={`Freie ${formatFormCardColorLabel(color)}-Karten — zählen in ${formatFormCardColorLabel(color)}-Disziplinen doppelt (x2).`}
+              >
+                <span className="legacy-lineup-form-card-dot" aria-hidden="true" />
+                {formatFormCardColorLabel(color)} {freeCardCountByColor[color]}
+              </span>
+            ))}
+          </div>
+        </article>
+        <article className="legacy-lineup-form-resource is-captain">
+          <div className="legacy-lineup-form-resource-head">
+            <span>Captain</span>
+            <strong>{captainSeasonRemaining} von {captainSeasonLimit} übrig</strong>
+          </div>
+          <div
+            className="legacy-lineup-form-resource-meter"
+            role="img"
+            aria-label={`${captainSeasonRemaining} von ${captainSeasonLimit} Captain-Einsätzen übrig`}
+          >
+            <span style={{ width: `${Math.round((captainSeasonRemaining / Math.max(captainSeasonLimit, 1)) * 100)}%` }} />
+          </div>
+          <small>
+            {captainSeasonUsedWithDraft}/{captainSeasonLimit} Saison verplant · heute noch {captainDraftRemaining} möglich
+          </small>
+          <p className="legacy-lineup-form-resource-note">
+            Captain wird am Spieltag in der Einsatzliste gesetzt — keine Vorausplanung pro Spieltag.
+          </p>
+        </article>
+        <article className="legacy-lineup-form-resource is-power">
+          <div className="legacy-lineup-form-resource-head">
+            <span>Team-Power</span>
+            <strong>
+              {teamPowerBudget.chargesRemaining}/{teamPowerBudget.chargesTotal} Ladungen
+            </strong>
+          </div>
+          <div
+            className="legacy-lineup-form-resource-meter"
+            role="img"
+            aria-label={`${teamPowerBudget.chargesRemaining} von ${teamPowerBudget.chargesTotal} Team-Power-Ladungen übrig`}
+          >
+            <span
+              style={{ width: `${Math.round((teamPowerBudget.chargesRemaining / Math.max(teamPowerBudget.chargesTotal, 1)) * 100)}%` }}
+            />
+          </div>
+          <small>
+            Quelle {formatModifierSourceLabel(context?.teamPowerSource)}
+            {teamPowerBudget.passiveCount > 0 ? ` · ${teamPowerBudget.passiveCount} passiv` : ""}
+          </small>
+          {teamPowerBudget.powers.length > 0 ? (
+            <div className="legacy-lineup-form-resource-power-list">
+              {teamPowerBudget.powers.map((power) => (
+                <span
+                  key={`form-resource-power-${power.id}`}
+                  className={`legacy-lineup-form-resource-power${power.isUsedUp ? " is-used-up" : ""}`}
+                  title={power.description}
+                >
+                  {getTeamPowerCategoryLabel(power.category)} · {power.label} · {power.chargesRemaining}/{power.chargesTotal}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          <p className="legacy-lineup-form-resource-note">
+            Team-Power wird am Spieltag in der Einsatzliste aktiviert — keine Vorausplanung pro Spieltag.
+          </p>
+        </article>
+      </div>
       <div className="legacy-lineup-form-board-current" aria-label="Aktiver Formplan">
         {(["d1", "d2"] as const).map((disciplineSide) => {
           const discipline = disciplineSide === "d1" ? context?.matchdayContract?.discipline1 : context?.matchdayContract?.discipline2;
@@ -295,9 +471,9 @@ export default function FormBoardPanel({
         <aside className="legacy-lineup-form-deck" aria-label="Karten-Deck">
           <div className="legacy-lineup-form-deck-head">
             <span>Karten-Deck</span>
-            <strong>{activeFormPickCell ? "Karte wählen" : "Zelle links aktivieren"}</strong>
+            <strong>{activeFormPickCell ? "Karte wählen" : "Zelle rechts aktivieren"}</strong>
             <span className="legacy-lineup-form-deck-count">
-              {formDeckCards.filter((card) => !card.isUsed && !card.isReserved).length} frei · {formDeckCards.length} gesamt
+              {freeDeckCards.length} frei · {formDeckCards.length} gesamt
             </span>
             <span className="legacy-lineup-form-deck-progress" aria-label="Saison-Fortschritt Formplan">
               {formPlanProgress.filledCells}/{formPlanProgress.totalCells} Spieltage geplant
@@ -370,22 +546,21 @@ export default function FormBoardPanel({
         <div className="legacy-lineup-form-timeline" aria-label="Spieltag-Timeline">
           {(context?.seasonDisciplineSchedule ?? []).map((entry) => {
             const isCurrentMatchday = entry.matchdayId === matchdayId;
-            const currentMatchdayIndex =
-              matchdayOptions.find((matchday) => matchday.id === matchdayId)?.matchdayIndex ??
-              matchdayOptions.find((matchday) => matchday.id === matchdayId)?.index ??
-              context?.matchday.index ??
-              entry.matchdayIndex;
-            const matchdayDistance = Math.abs(entry.matchdayIndex - currentMatchdayIndex);
+            // "Gespielt"-Spieltage bleiben sichtbar (Saison-Gedächtnis: wo wurde schon
+            // investiert?), werden aber visuell zurückgenommen — dort plant niemand mehr.
+            const isPastMatchday =
+              !isCurrentMatchday && currentMatchdayIndex != null && entry.matchdayIndex < currentMatchdayIndex;
+            const matchdayDistance = Math.abs(entry.matchdayIndex - (currentMatchdayIndex ?? entry.matchdayIndex));
             const isCompactMatchday = !isCurrentMatchday && matchdayDistance > 2;
             return (
               <article
                 key={`form-board-${entry.matchdayId}`}
-                className={`legacy-lineup-form-timeline-entry${isCurrentMatchday ? " is-current" : ""}${isCompactMatchday ? " is-compact" : ""}`}
+                className={`legacy-lineup-form-timeline-entry${isCurrentMatchday ? " is-current" : ""}${isCompactMatchday ? " is-compact" : ""}${isPastMatchday ? " is-past" : ""}`}
               >
                 <div className="legacy-lineup-form-board-matchday">
                   <span>Spieltag {entry.matchdayIndex}</span>
                   <strong>{entry.matchdayLabel}</strong>
-                  <small>{isCurrentMatchday ? "Heute" : "Plan"}</small>
+                  <small>{isCurrentMatchday ? "Heute" : isPastMatchday ? "Gespielt" : "Plan"}</small>
                 </div>
                 <div className="legacy-lineup-form-board-disciplines">
                   {(["d1", "d2"] as const).map((disciplineSide) => {
@@ -399,6 +574,8 @@ export default function FormBoardPanel({
                     const planImpact = formatFormPlanImpact(selectedCard, selectedBonusCard, disciplineColor);
                     const pendingKey = `${entry.matchdayId}:${disciplineSide}`;
                     const playerCount = slot?.playerCount ?? null;
+                    const hasPlannedCards = Boolean(selectedCard || selectedBonusCard);
+                    const matchingFreeCount = disciplineColor ? freeCardCountByColor[disciplineColor] : 0;
                     const isPrimaryActive =
                       activeFormPickCell?.matchdayId === entry.matchdayId &&
                       activeFormPickCell.disciplineSide === disciplineSide &&
@@ -417,11 +594,43 @@ export default function FormBoardPanel({
                           <DisciplineIcon disciplineId={slot?.disciplineId ?? null} label={slot?.displayName ?? "—"} className="legacy-lineup-form-board-discipline-icon" />
                           <span>{disciplineSide.toUpperCase()}</span>
                         </div>
+                        {/*
+                          Chancen-Zeile: macht pro Zelle explizit, was vorher nur als
+                          Hintergrund-Tönung kodiert war — welche Kartenfarbe hier doppelt
+                          zählt und wie viele passende Karten dafür noch frei sind. Dazu der
+                          Planungs-Status (geplant/offen), damit man die Timeline scannen
+                          kann, ohne jede F1/F2-Zelle einzeln zu lesen.
+                        */}
+                        {!isCompactMatchday ? (
+                          <div className="legacy-lineup-form-board-cell-chance">
+                            {disciplineColor ? (
+                              <span
+                                className={`legacy-lineup-form-card-chip legacy-lineup-form-board-match-chip is-${disciplineColor}`}
+                                title={`Farbmatch: ${formatFormCardColorLabel(disciplineColor)}-Karten zählen in dieser Disziplin doppelt · ${matchingFreeCount} passende Karte(n) frei.`}
+                              >
+                                <span className="legacy-lineup-form-card-dot" aria-hidden="true" />
+                                x2 {formatFormCardColorLabel(disciplineColor)} · {matchingFreeCount} frei
+                              </span>
+                            ) : null}
+                            {hasPlannedCards ? (
+                              <span className="legacy-lineup-form-board-cell-flag is-planned">✓ geplant</span>
+                            ) : !isPastMatchday ? (
+                              <span className="legacy-lineup-form-board-cell-flag is-open">offen</span>
+                            ) : null}
+                          </div>
+                        ) : null}
                         {!isCompactMatchday ? (
                           <VeloImpactStrip
                             className="legacy-lineup-form-board-cell-velo-strip"
                             items={[
-                              { key: "rank", label: "Rank", value: rank != null ? `#${rank}` : "—", tone: "neutral" },
+                              {
+                                key: "rank",
+                                label: "Rank",
+                                value: rank != null ? `#${rank}` : "—",
+                                // Top-3-Disziplinen sind die aussichtsreichsten Einsätze für
+                                // knappe Ressourcen — dezent grün markiert, Rest bleibt neutral.
+                                tone: rank != null && rank <= 3 ? "positive" : "neutral",
+                              },
                               {
                                 key: "players",
                                 label: "Spieler",
@@ -432,7 +641,7 @@ export default function FormBoardPanel({
                                 key: "impact",
                                 label: "Impact",
                                 value: planImpact,
-                                tone: selectedCard || selectedBonusCard ? "positive" : "neutral",
+                                tone: hasPlannedCards ? "positive" : "neutral",
                               },
                             ]}
                           />
