@@ -2305,10 +2305,16 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       selections,
       playerOptions,
     });
-    const captainKeys = new Set(Object.entries(captains).filter(([, value]) => value).map((entry) => entry[1]));
+    // Captain ist PRO DISZIPLIN-SEITE gesetzt (`captains.d1` / `captains.d2`, Regel:
+    // perDisciplineSideMaxCaptains = 1). Vorher wurde hier nur ein flaches Set der
+    // Spieler-IDs gebildet — die Seite fiel weg. Steht derselbe Spieler auf beiden Seiten
+    // in der Aufstellung, galt er dadurch auf BEIDEN als Captain, obwohl er nur für eine
+    // gesetzt wurde: die Saison-Zählung sprang auf 2/3 und im Feld trugen zwei Slots das
+    // C-Abzeichen. Der Vergleich muss die Seite einschließen — genau so, wie es der
+    // Draft-Speicherpfad weiter oben bereits tut.
     return baseEntries.map((entry) => ({
       ...entry,
-      isCaptain: captainKeys.has(entry.activePlayerId ?? ""),
+      isCaptain: Boolean(entry.activePlayerId) && captains[entry.disciplineSide] === entry.activePlayerId,
     }));
   }, [captains, playerOptions, selections, slots]);
   const captainSeasonLimit = context?.teamStatus?.captainSlots ?? context?.captainRule?.seasonCaptainSlots ?? context?.matchdayContract?.seasonCaptainSlots ?? 3;

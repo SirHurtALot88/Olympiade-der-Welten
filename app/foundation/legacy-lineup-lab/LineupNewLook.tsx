@@ -1339,11 +1339,16 @@ export default function LineupNewLook({
     return { min: Math.min(...values) - 2, max: Math.max(...values) + 2 };
   }, [filteredCandidates]);
 
-  const activeCaptainSide = activeSlot?.disciplineSide ?? "d1";
-  const activeCaptainEntries = captainSelectEntriesBySide[activeCaptainSide] ?? [];
-  const activeCaptainInfoById = useMemo(
-    () => new Map(captainInfoBySide[activeCaptainSide].map((info) => [info.activePlayerId, info] as const)),
-    [activeCaptainSide, captainInfoBySide],
+  // Captain-Infos je Disziplin-Seite. Frueher war hier nur die AKTIVE Slot-Seite aufgeloest
+  // — der Picker sass in der Fokus-Rail und wechselte seine Bedeutung, je nachdem welcher
+  // Slot gerade fokussiert war. Jetzt bekommt jeder Disziplin-Block seinen eigenen Picker,
+  // was der Regel entspricht: ein Captain PRO Disziplin-Seite.
+  const captainInfoByIdBySide = useMemo(
+    () => ({
+      d1: new Map(captainInfoBySide.d1.map((info) => [info.activePlayerId, info] as const)),
+      d2: new Map(captainInfoBySide.d2.map((info) => [info.activePlayerId, info] as const)),
+    }),
+    [captainInfoBySide],
   );
 
   const totalRequired = lineupFlowSummary.totalRequired;
@@ -1635,6 +1640,80 @@ export default function LineupNewLook({
               </span>
               {renderFormCardSelect("primary", "Primär", control.primarySelectedId, control.primaryOptions)}
               {renderFormCardSelect("secondary", "Sekundär (+)", control.secondarySelectedId, control.secondaryOptions)}
+            </div>
+          );
+        })()}
+
+        {/* Captain DIESER Disziplin. Jede Seite hat ihren eigenen Picker — die Regel erlaubt
+            genau einen Captain je Disziplin-Seite. Vorher gab es nur EINEN Picker in der
+            Fokus-Rail, der der aktiven Slot-Seite folgte: man sah nicht, fuer welche
+            Disziplin man gerade setzt, und er wirkte wie ein globaler Schalter. */}
+        {(() => {
+          const sideCaptainEntries = captainSelectEntriesBySide[disciplineSide] ?? [];
+          if (sideCaptainEntries.length === 0) return null;
+          const infoById = captainInfoByIdBySide[disciplineSide];
+          const selectedId = captains[disciplineSide] ?? "";
+          const sideLabel = disciplineSide.toUpperCase();
+          return (
+            <div
+              className="nl-lineup-captain nl-lineup-captain-side"
+              data-testid={`nl-lineup-captain-${disciplineSide}`}
+              style={{
+                margin: "0 0 8px",
+                padding: "8px 10px",
+                borderRadius: "var(--nl-r-card, 10px)",
+                border: "1px solid var(--nl-line)",
+                background: "var(--nl-panel-2)",
+              }}
+            >
+              <span style={{ fontSize: "11px", fontWeight: 800, letterSpacing: "0.02em", color: "var(--nl-ink)" }}>
+                Captain · {sideLabel}
+                <em style={{ fontStyle: "normal", color: "var(--nl-mut)", fontWeight: 600 }}>
+                  {" "}· {captainDraftRemaining} frei heute · {captainSeasonUsedWithDraft}/{captainSeasonLimit} Saison
+                </em>
+              </span>
+              <div
+                role="group"
+                aria-label={`Captain ${sideLabel} wählen`}
+                style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px" }}
+              >
+                <button
+                  type="button"
+                  aria-pressed={!selectedId}
+                  disabled={isReadOnly || isBusy}
+                  onClick={() => onUpdateCaptain(disciplineSide, "")}
+                  style={captainChipStyle(!selectedId)}
+                >
+                  Kein Captain
+                </button>
+                {sideCaptainEntries.map((entry) => {
+                  const info = infoById.get(entry.activePlayerId);
+                  const isSelected = selectedId === entry.activePlayerId;
+                  return (
+                    <button
+                      key={entry.activePlayerId}
+                      type="button"
+                      aria-pressed={isSelected}
+                      disabled={isReadOnly || isBusy}
+                      onClick={() => onUpdateCaptain(disciplineSide, entry.activePlayerId)}
+                      title={`${entry.name} als Captain ${sideLabel} setzen`}
+                      style={captainChipStyle(isSelected)}
+                    >
+                      <strong style={{ fontWeight: isSelected ? 700 : 600 }}>{entry.name}</strong>
+                      {info?.estimatedCaptainBonus != null ? (
+                        <em style={{ fontStyle: "normal", color: "var(--nl-good)", fontWeight: 700 }} title="Geschätzter Score-Bonus">
+                          +{formatScore(info.estimatedCaptainBonus)}
+                        </em>
+                      ) : null}
+                      {info?.moraleReward != null ? (
+                        <em style={{ fontStyle: "normal", color: "var(--nl-accent)", fontWeight: 700 }} title="Moral-Reward bei Forderungserfüllung">
+                          ♥+{formatScore(info.moraleReward)}
+                        </em>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           );
         })()}
@@ -2204,67 +2283,10 @@ export default function LineupNewLook({
                 onUpdateCaptain-Handler wie zuvor auf — Selektionslogik/State bleiben
                 unverändert. Styling über Inline-Tokens (kein globals.css-Zugriff),
                 damit es kompakt in die Fokus-Rail passt. */}
-            <div className="nl-lineup-captain">
-              <span>Captain {activeCaptainSide.toUpperCase()} · {captainDraftRemaining} frei heute</span>
-              {/* Saison-Captain-Budget als Kit-NlProgressBar (invert: voll = ausgeschöpft → risk). */}
-              <NlProgressBar
-                value={captainSeasonUsedWithDraft}
-                max={captainSeasonLimit || 1}
-                label="Saisonbudget"
-                invert
-                format={(v) => `${formatNlNumber(v, 0)} / ${formatNlNumber(captainSeasonLimit, 0)}`}
-                title={`${captainSeasonUsedWithDraft} von ${captainSeasonLimit} Captain-Einsätzen dieser Saison verplant`}
-                className="nl-lineup-captain-budget"
-              />
-              <div
-                role="group"
-                aria-label={`Captain ${activeCaptainSide.toUpperCase()} wählen`}
-                style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px" }}
-              >
-                {/* "Kein Captain"-Chip (aktiv, wenn keine Auswahl gesetzt ist). */}
-                {(() => {
-                  const noneSelected = !captains[activeCaptainSide];
-                  return (
-                    <button
-                      type="button"
-                      aria-pressed={noneSelected}
-                      disabled={isReadOnly || isBusy}
-                      onClick={() => onUpdateCaptain(activeCaptainSide, "")}
-                      style={captainChipStyle(noneSelected)}
-                    >
-                      Kein Captain
-                    </button>
-                  );
-                })()}
-                {activeCaptainEntries.map((entry) => {
-                  const info = activeCaptainInfoById.get(entry.activePlayerId);
-                  const isSelected = captains[activeCaptainSide] === entry.activePlayerId;
-                  return (
-                    <button
-                      key={entry.activePlayerId}
-                      type="button"
-                      aria-pressed={isSelected}
-                      disabled={isReadOnly || isBusy}
-                      onClick={() => onUpdateCaptain(activeCaptainSide, entry.activePlayerId)}
-                      title={`${entry.name} als Captain ${activeCaptainSide.toUpperCase()} setzen`}
-                      style={captainChipStyle(isSelected)}
-                    >
-                      <strong style={{ fontWeight: isSelected ? 700 : 600 }}>{entry.name}</strong>
-                      {info?.estimatedCaptainBonus != null ? (
-                        <em style={{ fontStyle: "normal", color: "var(--nl-good)", fontWeight: 700 }} title="Geschätzter Score-Bonus">
-                          +{formatScore(info.estimatedCaptainBonus)}
-                        </em>
-                      ) : null}
-                      {info?.moraleReward != null ? (
-                        <em style={{ fontStyle: "normal", color: "var(--nl-accent)", fontWeight: 700 }} title="Moral-Reward bei Forderungserfüllung">
-                          ♥+{formatScore(info.moraleReward)}
-                        </em>
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            {/* Der Captain-Picker sitzt jetzt IN den Disziplin-Bloecken (renderCaptainPicker),
+                nicht mehr hier in der Fokus-Rail. Dort folgte er der aktiven Slot-Seite und
+                wirkte dadurch wie EIN globaler Schalter am Rand — obwohl je Disziplin ein
+                eigener Captain gesetzt werden kann (perDisciplineSideMaxCaptains = 1). */}
           </section>
 
           <section
