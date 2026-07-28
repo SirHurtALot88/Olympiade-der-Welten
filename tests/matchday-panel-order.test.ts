@@ -1,28 +1,52 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  MATCHDAY_PANEL_DEFAULT_SORT,
   resolveMatchdayRanks,
   resolveProjectedRanksFromMatchday,
   sortMatchdayPanelRows,
 } from "@/app/foundation/discipline-stage/DisciplineStageMatchdayPanel";
 
-type Row = { teamId: string; total: number; currentRank: number | null; projectedRank: number | null };
+type Row = {
+  teamId: string;
+  teamName: string;
+  total: number;
+  currentRank: number | null;
+  projectedRank: number | null;
+  d1Pts: number | null;
+  d2Pts: number | null;
+  sum: number;
+  mutPp: number;
+};
+
+function row(partial: Partial<Row> & { teamId: string; total: number }): Row {
+  return {
+    teamName: partial.teamName ?? partial.teamId,
+    currentRank: partial.currentRank ?? null,
+    projectedRank: partial.projectedRank ?? null,
+    d1Pts: partial.d1Pts ?? partial.total,
+    d2Pts: partial.d2Pts ?? null,
+    sum: partial.sum ?? partial.total,
+    mutPp: partial.mutPp ?? 0,
+    ...partial,
+  };
+}
 
 // Situation aus dem Spiel: erster Spieltag, Disziplin 2 noch verdeckt. `currentRank` ist
 // hier nur die Startreihenfolge (alphabetisch vergeben), trägt also keine Wertungsaussage.
 function firstMatchdayRows(): Row[] {
   return [
-    { teamId: "A-A", total: 1.8, currentRank: 1, projectedRank: null },
-    { teamId: "B-F", total: 16.1, currentRank: 2, projectedRank: null },
-    { teamId: "C-C", total: 3.7, currentRank: 4, projectedRank: null },
-    { teamId: "P-S", total: 21.1, currentRank: 17, projectedRank: null },
-    { teamId: "M-M", total: 17.9, currentRank: 12, projectedRank: null },
+    row({ teamId: "A-A", total: 1.8, currentRank: 1 }),
+    row({ teamId: "B-F", total: 16.1, currentRank: 2 }),
+    row({ teamId: "C-C", total: 3.7, currentRank: 4 }),
+    row({ teamId: "P-S", total: 21.1, currentRank: 17 }),
+    row({ teamId: "M-M", total: 17.9, currentRank: 12 }),
   ];
 }
 
 describe("Spieltags-Wertung · Reihenfolge", () => {
   it("ordnet bei verdeckter Disziplin 2 nach der Gesamt-Spalte, nicht nach der Startreihenfolge", () => {
-    const sorted = sortMatchdayPanelRows(firstMatchdayRows(), false);
+    const sorted = sortMatchdayPanelRows(firstMatchdayRows(), MATCHDAY_PANEL_DEFAULT_SORT);
 
     expect(sorted.map((row) => row.teamId)).toEqual(["P-S", "M-M", "B-F", "C-C", "A-A"]);
     // Regression: vorher stand A-A (+1,8) oben und P-S (+21,1) auf Platz 4 von 5.
@@ -32,34 +56,50 @@ describe("Spieltags-Wertung · Reihenfolge", () => {
     expect([...totals].sort((a, b) => b - a)).toEqual(totals);
   });
 
-  it("ordnet nach dem projizierten Endrang, sobald Disziplin 2 aufgedeckt ist", () => {
-    const rows: Row[] = [
-      { teamId: "A-A", total: 30, currentRank: 1, projectedRank: 9 },
-      { teamId: "B-F", total: 2, currentRank: 2, projectedRank: 1 },
-      { teamId: "C-C", total: 10, currentRank: 4, projectedRank: 5 },
+  it("sortiert auf Wunsch nach dem Saison-Rang statt nach dem Spieltag", () => {
+    const rows = [
+      row({ teamId: "A-A", total: 30, currentRank: 1, projectedRank: 9 }),
+      row({ teamId: "B-F", total: 2, currentRank: 2, projectedRank: 1 }),
+      row({ teamId: "C-C", total: 10, currentRank: 4, projectedRank: 5 }),
     ];
 
-    // Ist der Spieltag fertig gewertet, gilt der Endrang — nicht mehr die Tagessumme.
-    expect(sortMatchdayPanelRows(rows, true).map((row) => row.teamId)).toEqual(["B-F", "C-C", "A-A"]);
+    // Rang-Spalte aufsteigend: Rang 1 oben — unabhaengig von der Tagesleistung.
+    expect(sortMatchdayPanelRows(rows, { key: "season", dir: "asc" }).map((r) => r.teamId)).toEqual(["B-F", "C-C", "A-A"]);
   });
 
-  it("hält Gleichstände über den Saison-Rang stabil", () => {
-    const rows: Row[] = [
-      { teamId: "spät", total: 5, currentRank: 20, projectedRank: null },
-      { teamId: "früh", total: 5, currentRank: 3, projectedRank: null },
-    ];
+  it("dreht die Richtung, wenn dieselbe Spalte erneut sortiert wird", () => {
+    const rows = firstMatchdayRows();
 
-    expect(sortMatchdayPanelRows(rows, false).map((row) => row.teamId)).toEqual(["früh", "spät"]);
+    expect(sortMatchdayPanelRows(rows, { key: "total", dir: "desc" })[0]!.teamId).toBe("P-S");
+    expect(sortMatchdayPanelRows(rows, { key: "total", dir: "asc" })[0]!.teamId).toBe("A-A");
   });
 
-  it("behandelt fehlende Ränge als hinten liegend, statt sie nach vorn zu sortieren", () => {
-    const rows: Row[] = [
-      { teamId: "ohne-rang", total: 1, currentRank: null, projectedRank: null },
-      { teamId: "mit-rang", total: 1, currentRank: 8, projectedRank: 8 },
+  it("sortiert nach Teamname alphabetisch", () => {
+    const rows = [
+      row({ teamId: "z", teamName: "Zero Heroes", total: 99 }),
+      row({ teamId: "a", teamName: "Armageddon", total: 1 }),
     ];
 
-    expect(sortMatchdayPanelRows(rows, false).map((row) => row.teamId)).toEqual(["mit-rang", "ohne-rang"]);
-    expect(sortMatchdayPanelRows(rows, true).map((row) => row.teamId)).toEqual(["mit-rang", "ohne-rang"]);
+    expect(sortMatchdayPanelRows(rows, { key: "team", dir: "asc" }).map((r) => r.teamId)).toEqual(["a", "z"]);
+  });
+
+  it("haelt Gleichstaende ueber die Gesamt-Spalte und dann den Namen stabil", () => {
+    const rows = [
+      row({ teamId: "b", teamName: "Beta", total: 5, mutPp: 1 }),
+      row({ teamId: "a", teamName: "Alpha", total: 5, mutPp: 1 }),
+    ];
+
+    // Gleiche Sortierspalte, gleicher Gesamtwert → Name entscheidet, nicht die Eingangsreihenfolge.
+    expect(sortMatchdayPanelRows(rows, { key: "mutator", dir: "desc" }).map((r) => r.teamId)).toEqual(["a", "b"]);
+  });
+
+  it("sortiert fehlende Werte ans Ende, statt sie nach vorn zu ziehen", () => {
+    const rows = [
+      row({ teamId: "ohne-rang", total: 1, currentRank: null, projectedRank: null }),
+      row({ teamId: "mit-rang", total: 1, currentRank: 8, projectedRank: 8 }),
+    ];
+
+    expect(sortMatchdayPanelRows(rows, { key: "season", dir: "asc" }).map((r) => r.teamId)).toEqual(["mit-rang", "ohne-rang"]);
   });
 });
 
@@ -108,16 +148,17 @@ describe("Spieltags-Wertung · projizierter Rang ohne gespeichertes Ergebnis", (
     expect(ranks.get("mit")).toBe(1);
   });
 
-  it("macht die Tabelle bei aufgedeckter Disziplin 2 wieder sortierbar", () => {
-    // Vor dem Fix waren alle projectedRank null → alle gleich → Eingangsreihenfolge.
+  it("macht die Saison-Rang-Spalte wieder sortierbar", () => {
+    // Vor dem Fix waren alle projectedRank null → nach dieser Spalte war nichts zu ordnen.
     const base = [
-      { teamId: "spät", currentPoints: 1, sum: 1, projectedRank: null as number | null, total: 2, currentRank: 30 },
-      { teamId: "top", currentPoints: 20, sum: 20, projectedRank: null as number | null, total: 40, currentRank: 2 },
+      row({ teamId: "spät", total: 2, sum: 1, currentRank: 30 }),
+      row({ teamId: "top", total: 40, sum: 20, currentRank: 2 }),
     ];
-    const derived = resolveProjectedRanksFromMatchday(base);
-    for (const row of base) row.projectedRank = derived.get(row.teamId) ?? null;
+    const withPoints = base.map((entry) => ({ ...entry, currentPoints: entry.teamId === "top" ? 20 : 1 }));
+    const derived = resolveProjectedRanksFromMatchday(withPoints);
+    for (const entry of base) entry.projectedRank = derived.get(entry.teamId) ?? null;
 
-    expect(sortMatchdayPanelRows(base, true).map((row) => row.teamId)).toEqual(["top", "spät"]);
+    expect(sortMatchdayPanelRows(base, { key: "season", dir: "asc" }).map((entry) => entry.teamId)).toEqual(["top", "spät"]);
   });
 });
 
@@ -136,7 +177,7 @@ describe("Spieltags-Wertung · Tagesrang", () => {
   });
 
   it("laeuft parallel zur Sortierung: Tagesrang 1..n in Anzeigereihenfolge", () => {
-    const sorted = sortMatchdayPanelRows(firstMatchdayRows(), false);
+    const sorted = sortMatchdayPanelRows(firstMatchdayRows(), MATCHDAY_PANEL_DEFAULT_SORT);
     const ranks = resolveMatchdayRanks(sorted);
 
     expect(sorted.map((row) => ranks.get(row.teamId))).toEqual([1, 2, 3, 4, 5]);
