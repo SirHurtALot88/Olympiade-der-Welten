@@ -880,12 +880,24 @@ export function calculateMutatorModifierForSide(input: {
         .map((trait) => [normalizeTraitKey(trait), trait] as const),
     ).values(),
   );
-  // Vorrang: Eine vorhandene gespeicherte Spieler-/KI-Auswahl (mutatorTrait1/2) wird
-  // honoriert. Nur wenn KEINE gespeicherte Auswahl existiert, fällt die Wertung
-  // deterministisch auf die ausgewürfelten Matchday-Traits zurück (Roll bleibt Fallback).
+  // VORRANG HAT DER WURF DES SPIELTAGS, nicht eine gespeicherte Auswahl.
+  //
+  // Die Mutatoren sind eine Eigenschaft der DISZIPLIN: zwei Traits, einmal je Spieltag und Seite
+  // aus allen 36 ausgewuerfelt, fuer alle 32 Teams dieselben (so sagt es auch
+  // `getLegacyMutatorSourceSummary`). Vorher gewann eine gespeicherte Auswahl — und geschrieben
+  // wird die ausschliesslich von `applyMutatorTraitsToLineupModifiers` im KI-Aufstellungspfad,
+  // ueber `selectBestMutatorTraitsForEntries`: das waehlt die Traits danach aus, WAS DER KADER HAT.
+  //
+  // Damit bekam jedes KI-Team Mutatoren, die auf seinen eigenen Kader passten — garantierte Treffer,
+  // jeden Spieltag. Das menschliche Team hat keine gespeicherte Auswahl (die Oberflaeche bietet dafuer
+  // kein Feld) und fiel auf den blinden Wurf zurueck, traf also nur mit Glueck. Aus einem Wurf, der
+  // fuer alle gleich sein sollte, war ein Vorteil fuer die KI geworden.
+  //
+  // Gespeicherte Traits bleiben als RUECKFALL erhalten — fuer Vorschauen und Altspielstaende, in
+  // denen kein Wurf vorliegt.
   const selectedTraits = Array.from(
     new Map(
-      (storedTraits.length > 0 ? storedTraits : matchdayTraits).map(
+      (matchdayTraits.length > 0 ? matchdayTraits : storedTraits).map(
         (trait) => [normalizeTraitKey(trait), trait] as const,
       ),
     ).values(),
@@ -908,8 +920,13 @@ export function calculateMutatorModifierForSide(input: {
     const hits = countTraitHits(player, traitSet);
     totalHits += hits;
     if (hits > 0) {
+      // BEIDE Groessen skalieren mit der Trefferzahl. Der Score tat das schon (`hits * 6`), die
+      // Player-Points nicht — sie standen flach auf 0,3, egal ob ein Spieler einen oder beide
+      // ausgewuerfelten Traits hatte. Deshalb bekam nie jemand doppelte Mutator-PP, obwohl der
+      // doppelte Treffer im Score sichtbar war. Zwei Waehrungen fuer dieselbe Bedingung duerfen
+      // nicht unterschiedlich zaehlen.
       playerMutatorBonuses[playerId] = Number((hits * 6).toFixed(1));
-      playerMutatorPpsBonuses[playerId] = 0.3;
+      playerMutatorPpsBonuses[playerId] = Number((hits * 0.3).toFixed(2));
     }
     if (player) {
       const allTraits = Array.from(new Set(getPlayerMutatorTraitSlots(player).map(normalizeTraitKey).filter(Boolean)));

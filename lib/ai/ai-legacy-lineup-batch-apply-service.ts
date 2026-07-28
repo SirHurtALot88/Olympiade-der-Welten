@@ -3,7 +3,6 @@ import type { FormCardColor, GameState, LineupDraftModifiers } from "@/lib/data/
 import type { AiLegacyLineupPreviewStatus } from "@/lib/ai/ai-needs-types";
 import { buildTeamControlSettingsMap, isAiLineupBatchApplyEnabled } from "@/lib/foundation/team-control-settings";
 import {
-  applyMutatorTraitsToLineupModifiers,
   createDefaultLineupDraftModifiers,
   ensureLocalFormCardsForSeason,
   getFormCardColorForDisciplineCategory,
@@ -1108,13 +1107,12 @@ export function buildAiLegacyLineupModifiers(
 
   applyAiTeamPowers(context, modifiers, plannedEntries);
   applyAiIntensity(context, modifiers, plannedEntries);
-  const modifiersWithTraits = applyMutatorTraitsToLineupModifiers({
-    modifiers,
-    entries: plannedEntries,
-    rosterPlayers: context.rosterPlayers ?? [],
-  });
-
-  return modifiersWithTraits;
+  // KEINE kadergenaue Mutator-Auswahl mehr. `applyMutatorTraitsToLineupModifiers` waehlte ueber
+  // `selectBestMutatorTraitsForEntries` genau die Traits, die der eigene Kader BESITZT — jedes
+  // KI-Team bekam damit garantierte Treffer, waehrend das menschliche Team (das kein Auswahlfeld
+  // dafuer hat) auf den blinden Spieltags-Wurf angewiesen war. Die Mutatoren sind eine Eigenschaft
+  // der Disziplin und fuer alle 32 Teams dieselben; die Wertung nimmt jetzt den Wurf.
+  return modifiers;
 }
 
 export function applyAiLegacyLineupBatchLocally(
