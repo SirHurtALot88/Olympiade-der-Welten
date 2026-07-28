@@ -37874,6 +37874,21 @@ button.market-v2-bucket-card.is-selected {
     0 10px 24px rgba(180, 110, 60, 0.1);
 }
 
+/* Tier-Farben MUESSEN auf :root liegen, nicht nur auf `.is-new-look`.
+   Die Hover-Portraitkarte rendert per `createPortal` an `document.body` und ist
+   damit KEIN Nachfahre von `.is-new-look` — dort loeste `var(--nl-diamond)` ins
+   Leere auf, die komplette `outline`-Deklaration wurde ungueltig und es erschien
+   gar kein Rahmen. Genau das war der Grund, warum der Rahmen am kleinen Bild zu
+   sehen war, auf der aufgeklappten Karte aber nicht.
+   Die `.is-new-look`-Deklarationen bleiben bestehen und gewinnen per Spezifitaet;
+   das hier ist der Fallback fuer alles ausserhalb des App-Wrappers. */
+:root {
+  --nl-gold: #f6c750;
+  --nl-silver: #c7d0dc;
+  --nl-bronze: #cd7f32;
+  --nl-diamond: #7fe6f5;
+}
+
 /* --- Star-Tier: ligaweite Top-Riege --------------------------------------
    Bronze/Silber/Gold/Diamant für Liga-Top-50/25/10/3 (Schwellen und Zuordnung:
    `lib/foundation/player-star-tier.ts`). Gilt für JEDE Portraitkarte, also auch
@@ -37891,8 +37906,8 @@ button.market-v2-bucket-card.is-selected {
 .foundation-player-portrait-card.is-star-tier-gold,
 .foundation-player-portrait-card.is-star-tier-diamond {
   position: relative;
-  outline: 2px solid var(--nl-star-tone);
-  outline-offset: -2px;
+  outline: 3px solid var(--nl-star-tone);
+  outline-offset: -3px;
   border-radius: var(--nl-r-lg, 14px);
 }
 
@@ -37916,25 +37931,137 @@ button.market-v2-bucket-card.is-selected {
    sticht heraus, ohne dass die Karte selbst heller wird (Portraits müssen
    lesbar bleiben). */
 .foundation-player-portrait-card.is-star-tier-bronze {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--nl-bronze) 22%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--nl-bronze) 45%, transparent),
+    0 0 14px color-mix(in srgb, var(--nl-bronze) 28%, transparent);
 }
 
 .foundation-player-portrait-card.is-star-tier-silver {
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--nl-silver) 26%, transparent),
-    0 8px 20px color-mix(in srgb, var(--nl-silver) 12%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--nl-silver) 50%, transparent),
+    0 0 18px color-mix(in srgb, var(--nl-silver) 32%, transparent);
 }
 
 .foundation-player-portrait-card.is-star-tier-gold {
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--nl-gold) 32%, transparent),
-    0 10px 26px color-mix(in srgb, var(--nl-gold) 18%, transparent);
+    0 0 0 2px color-mix(in srgb, var(--nl-gold) 55%, transparent),
+    0 0 24px color-mix(in srgb, var(--nl-gold) 42%, transparent);
 }
 
 .foundation-player-portrait-card.is-star-tier-diamond {
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--nl-diamond) 38%, transparent),
-    0 12px 30px color-mix(in srgb, var(--nl-diamond) 22%, transparent);
+    0 0 0 2px color-mix(in srgb, var(--nl-diamond) 62%, transparent),
+    0 0 30px color-mix(in srgb, var(--nl-diamond) 48%, transparent);
+}
+
+/* --- Animierter Glanzrahmen (alle Stufen) --------------------------------
+   Der Rahmen ist kein flacher Strich, sondern ein umlaufender Farbverlauf mit
+   wanderndem Lichtpunkt — der "Sammelkarte"-Look, den ein statischer Rand nicht
+   hinbekommt.
+
+   Technik: ein `::before` in Rahmenstaerke, dessen Farbverlauf per `mask` nur im
+   Randbereich sichtbar bleibt (Standard-Trick fuer Gradient-Rahmen: zwei Masken,
+   die innere wird ausgestanzt). Liegt UNTER dem Inhalt (`z-index: 0` gegen den
+   Karteninhalt) und faengt keine Klicks ab.
+
+   Bewusst nur `background-position` animiert — das laeuft auf dem Compositor und
+   kostet kein Layout, anders als eine animierte `border-image`. */
+@supports not ((mask-composite: exclude) or (-webkit-mask-composite: xor)) {
+  /* Ohne Masken-Unterstuetzung wuerde der Verlauf die ganze Karte ueberdecken
+     statt nur den Rand — dann lieber gar kein Glanzring. Der farbige `outline`
+     und der Schein bleiben davon unberuehrt, die Stufe ist also weiter sichtbar. */
+  .foundation-player-portrait-card.is-star-tier-bronze::before,
+  .foundation-player-portrait-card.is-star-tier-silver::before,
+  .foundation-player-portrait-card.is-star-tier-gold::before,
+  .foundation-player-portrait-card.is-star-tier-diamond::before,
+  .is-new-look .nl-star-frame::before {
+    display: none;
+  }
+}
+
+.foundation-player-portrait-card.is-star-tier-bronze::before,
+.foundation-player-portrait-card.is-star-tier-silver::before,
+.foundation-player-portrait-card.is-star-tier-gold::before,
+.foundation-player-portrait-card.is-star-tier-diamond::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  padding: 3px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    var(--nl-star-tone) 0%,
+    color-mix(in srgb, var(--nl-star-tone) 55%, transparent) 18%,
+    #ffffff 30%,
+    var(--nl-star-tone) 42%,
+    color-mix(in srgb, var(--nl-star-tone) 65%, transparent) 70%,
+    var(--nl-star-tone) 100%
+  );
+  background-size: 280% 280%;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: nlStarRimSweep 3.8s linear infinite;
+}
+
+@keyframes nlStarRimSweep {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: 280% 50%;
+  }
+}
+
+/* Gleicher Glanz fuer die kleinen Inline-Portraits (Tabellen-Thumbnail, Podium,
+   Bestenlisten): dort traegt die Huelle den Rahmen als box-shadow, der Ring
+   kommt hier als eigener Kreis/Rahmen darueber. */
+.is-new-look .nl-star-frame::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  pointer-events: none;
+  padding: 3px;
+  background: linear-gradient(
+    115deg,
+    var(--nl-star-tone) 0%,
+    #ffffff 28%,
+    var(--nl-star-tone) 45%,
+    color-mix(in srgb, var(--nl-star-tone) 60%, transparent) 75%,
+    var(--nl-star-tone) 100%
+  );
+  background-size: 280% 280%;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: nlStarRimSweep 3.8s linear infinite;
+}
+
+.is-new-look .nl-star-frame.is-circle::before {
+  border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .foundation-player-portrait-card.is-star-tier-bronze::before,
+  .foundation-player-portrait-card.is-star-tier-silver::before,
+  .foundation-player-portrait-card.is-star-tier-gold::before,
+  .foundation-player-portrait-card.is-star-tier-diamond::before,
+  .is-new-look .nl-star-frame::before {
+    animation: none;
+  }
 }
 
 /* --- Holo-Schimmer (nur Top 10 = Gold und Diamant) ------------------------
@@ -37950,7 +38077,7 @@ button.market-v2-bucket-card.is-selected {
   pointer-events: none;
   z-index: 1;
   mix-blend-mode: screen;
-  opacity: 0.5;
+  opacity: 0.75;
   background:
     linear-gradient(
       115deg,
@@ -38088,8 +38215,8 @@ button.market-v2-bucket-card.is-selected {
   line-height: 0;
   border-radius: var(--nl-r-sm);
   box-shadow:
-    0 0 0 2px var(--nl-star-tone),
-    0 0 8px color-mix(in srgb, var(--nl-star-tone) 40%, transparent);
+    0 0 0 3px var(--nl-star-tone),
+    0 0 12px color-mix(in srgb, var(--nl-star-tone) 55%, transparent);
 }
 
 .is-new-look .nl-star-frame.is-circle {
