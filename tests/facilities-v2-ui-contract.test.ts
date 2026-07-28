@@ -9,7 +9,9 @@ describe("facilities v2 ui contract", () => {
       // FacilitiesV2Client.tsx is now just a thin wrapper; the actual markup
       // lives in FacilitiesV2NewLook.tsx.
       fs.readFile(path.join(process.cwd(), "app/foundation/facilities-v2/FacilitiesV2NewLook.tsx"), "utf8"),
-      fs.readFile(path.join(process.cwd(), "app/foundation/facilities-v2/FacilityGridCard.tsx"), "utf8"),
+      // FacilityGridCard.tsx wurde nirgends gerendert und ist entfernt — die
+      // Level-Leiste lebt in der geteilten Facility-UI, die tatsächlich benutzt wird.
+      fs.readFile(path.join(process.cwd(), "app/foundation/facilities-v2/facility-ui-shared.tsx"), "utf8"),
       fs.readFile(path.join(process.cwd(), "app/foundation/FoundationShellRouterBody.tsx"), "utf8"),
       fs.readFile(path.join(process.cwd(), "app/globals.css"), "utf8"),
     ]);

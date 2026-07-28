@@ -946,6 +946,25 @@ export function accumulateRevealedTeamScore(players: Array<NativeStagePlayer | n
   for (const player of players) total = round1(total + playerNet(player));
   return total;
 }
+
+/**
+ * Vergleichsrang für die Spalte "Rang Δ" der Ladder: der Stand VOR der gerade
+ * gezeigten Etappe.
+ *
+ * `rankHistory` bekommt am Ende JEDER gewerteten Etappe einen Eintrag mit dem
+ * dann gültigen Rang. Solange eine Etappe läuft, ist der letzte Eintrag also
+ * der Rang nach der vorigen Etappe — genau der gesuchte Vergleichswert.
+ * Im ENDSTAND ist der letzte Eintrag dagegen bereits der Endrang selbst; ein
+ * Vergleich damit ergibt immer 0, weshalb dort ausnahmslos "—" stand. Dann
+ * zählt der vorletzte Eintrag: der Rang vor der letzten Etappe.
+ *
+ * `null` heißt "kein Vergleich möglich" (noch keine abgeschlossene Vor-Etappe)
+ * — die Zelle zeigt dann bewusst nichts statt einer erfundenen 0.
+ */
+export function resolveLadderPrevRank(rankHistory: number[], done: boolean): number | null {
+  const index = rankHistory.length - (done ? 2 : 1);
+  return index >= 0 ? rankHistory[index] ?? null : null;
+}
 // Piecewise-lineare Interpolation entlang eines Wegpunkt-Pfads (Serpentine/
 // Parcours): f ∈ 0…1 → {x,y}. Für mountain/parcours (Token folgt dem Weg).
 function interpAlong(wp: [number, number][], f: number): { x: number; y: number } {
@@ -2581,10 +2600,17 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           t.thrownSlot = r;
         }
       });
+      // Rang nach JEDER Etappe festhalten — exakt wie im sequenziellen Pfad
+      // (`rt.forEach((t) => t.rankHistory.push(t.trueRank))` am Rundenende).
+      // Vorher wurde nur EINMAL am Schluss gerechnet und die Historie dann mit
+      // `slotCount` Kopien des Endrangs gefüllt: damit gab es nach einem
+      // Quick-Sim gar keinen Verlauf mehr — die Rang-Δ-Spalte zeigte überall
+      // "—" und die Bump-/Slalom-Linien liefen schnurgerade. Die Kosten sind
+      // `slotCount` Sortierungen über die Teamliste, also vernachlässigbar.
+      recomputeRanks(rt);
+      rt.forEach((t) => t.rankHistory.push(t.trueRank));
     }
-    recomputeRanks(rt);
     rt.forEach((t) => {
-      t.rankHistory = Array.from({ length: slotCount }, () => t.trueRank);
       t.displayScore = t.score; // Token-Position sofort auf Endstand (kein Nach-Gleiten)
       t.animScore = t.score; // Sync-Rampe direkt auf Endstand (Quick-Sim: kein Ramp)
     });
@@ -3672,7 +3698,14 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           // Staffel-Ladder-Politur (nur track): Rang-Änderung ggü. der letzten
           // gewerteten Etappe (rankHistory), „+N" des aktuellen Läufers (letzter
           // aufgedeckter Slot) und Rückstand absolut auf Platz 1.
-          const prevRank = t.rankHistory.length ? t.rankHistory[t.rankHistory.length - 1]! : null;
+          // Vergleichsrang = Stand VOR der gerade gezeigten Etappe.
+          // Während eine Etappe läuft, ist das der letzte Historien-Eintrag (der
+          // Rang nach der vorigen Etappe). Im ENDSTAND ist dieser letzte Eintrag
+          // aber schon der Endrang selbst — der Vergleich mit sich selbst ergab
+          // Delta 0, weshalb in der Spalte "Rang Δ" dort ausnahmslos "—" stand.
+          // Im Endstand zählt daher der vorletzte Eintrag: der Rang vor der
+          // letzten Etappe.
+          const prevRank = resolveLadderPrevRank(t.rankHistory, done);
           // track: Live-Rang/-Score aus dem geteilten 5s-Zeitstrahl (animScore) → Zeile
           // wandert synchron zur Feldbewegung. Sonst der sequenzielle rank/score.
           // Feld ↔ Tabelle: BEIDE lesen jetzt exakt dieselben Groessen (t.rank ist der

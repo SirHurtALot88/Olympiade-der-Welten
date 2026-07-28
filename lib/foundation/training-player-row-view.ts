@@ -173,6 +173,9 @@ export function buildTrainingPlayerRowView(
       }))
       .sort((left, right) => Math.abs(right.pct) - Math.abs(left.pct)),
     trainingDemand: row.trainingDemand,
+    // Wird vom Aufrufer nachgereicht (er hat GameState + vollen Player zur Hand,
+    // die `buildPlayerSeasonTrainingForecast` braucht) — hier bewusst neutral.
+    seasonSoFar: null,
     organicForecast: {
       classBefore: row.organicProgression.classBefore,
       classAfter: row.organicProgression.classAfter,

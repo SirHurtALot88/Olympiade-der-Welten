@@ -6,6 +6,7 @@ import { applyRecoveryFacilityModifiers, describeTrainingXpFacilityEffect } from
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
 import { getTeamDevelopmentTrainingBonusPct } from "@/lib/foundation/team-development-tendency";
+import { buildPlayerSeasonTrainingForecast } from "@/lib/foundation/player-matchday-training-history";
 import { buildTrainingPlayerRowView } from "@/lib/foundation/training-player-row-view";
 import { BASE_MATCHDAY_RECOVERY } from "@/lib/fatigue/fatigue-injury-service";
 import {
@@ -226,12 +227,33 @@ export function useTrainingPanelDerivations(input: UseTrainingPanelDerivationsIn
   const trainingPlayerRowViews = useMemo(() => {
     return filteredTrainingPlayerForecastRows.map((row) => {
       const view = buildTrainingPlayerRowView({ ...row, gameState: input.gameState }, TRAINING_ATTRIBUTE_LABELS);
+      // "Bisher eingebracht": derselbe Organic-Rechenweg, aber nur mit dem bis
+      // heute gesammelten Trainings-Budget + Performance-Fenster. Der Builder
+      // selbst bekommt keinen vollen `Player` — hier ist er vorhanden.
+      const fullPlayer = input.gameState.players.find((entry) => entry.id === row.player.id) ?? null;
+      const soFar = fullPlayer
+        ? buildPlayerSeasonTrainingForecast({ gameState: input.gameState, player: fullPlayer })
+        : null;
+      const viewWithSoFar = {
+        ...view,
+        seasonSoFar: soFar
+          ? {
+              matchdaysPlayed: soFar.matchdaysPlayed,
+              totalMatchdays: soFar.totalMatchdays,
+              netCumulative: soFar.netCumulative,
+              trainingTotal: soFar.trainingTotal,
+              spilloverTotal: soFar.spilloverTotal,
+              performanceTotal: soFar.performanceTotal,
+              regressionTotal: soFar.regressionTotal,
+            }
+          : null,
+      };
       const plan = trainingLoadPlanByPlayerId.get(row.player.id);
       if (!plan) {
-        return view;
+        return viewWithSoFar;
       }
       return {
-        ...view,
+        ...viewWithSoFar,
         recommendedTrainingMode: plan.selectedMode,
         recommendedTrainingDetail: plan.reasons[0] ?? null,
         recommendedTrainingMatchesCurrent: plan.selectedMode === row.mode,

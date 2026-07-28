@@ -38061,6 +38061,84 @@ button.market-v2-bucket-card.is-selected {
   font-weight: 800;
 }
 
+/* Bisher-aufgelaufen-Zeile der Trainingskarte — bewusst ruhiger als die
+   Forecast-Zeile darüber: das ist der Kontrollwert, nicht die Hauptaussage. */
+.is-new-look .nl-training-sofar {
+  display: block;
+  margin-top: 2px;
+  color: var(--nl-mut);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.is-new-look .nl-training-sofar strong {
+  color: var(--nl-ink);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+/* --- Star-Rahmen für Inline-Portraits ------------------------------------
+   Für Bilder, die NICHT über `FoundationPlayerPortraitCard` laufen (Tabellen-
+   Thumbnails, Podium). Die Hülle rendert nur, wenn eine Stufe erreicht ist —
+   ohne Stufe steht das Bild wie zuvor direkt im Fluss. `display: inline-flex`
+   statt eines Blocks, damit die Zellen-/Podiumsgeometrie unverändert bleibt. */
+.is-new-look .nl-star-frame {
+  position: relative;
+  display: inline-flex;
+  line-height: 0;
+  border-radius: var(--nl-r-sm);
+  box-shadow:
+    0 0 0 2px var(--nl-star-tone),
+    0 0 8px color-mix(in srgb, var(--nl-star-tone) 40%, transparent);
+}
+
+.is-new-look .nl-star-frame.is-circle {
+  border-radius: 50%;
+}
+
+.is-new-look .nl-star-frame.is-star-tier-bronze {
+  --nl-star-tone: var(--nl-bronze);
+}
+
+.is-new-look .nl-star-frame.is-star-tier-silver {
+  --nl-star-tone: var(--nl-silver);
+}
+
+.is-new-look .nl-star-frame.is-star-tier-gold {
+  --nl-star-tone: var(--nl-gold);
+}
+
+.is-new-look .nl-star-frame.is-star-tier-diamond {
+  --nl-star-tone: var(--nl-diamond);
+}
+
+/* Holo für Top 10 — hier als sanft pulsierender Schein statt eines
+   Lichtstreifens: die Bilder sind zu klein, als dass ein wandernder Sweep
+   darauf noch lesbar wäre. */
+.is-new-look .nl-star-frame.is-star-holo {
+  animation: nlStarFrameGlow 2.8s var(--nl-ease, ease) infinite;
+}
+
+@keyframes nlStarFrameGlow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px var(--nl-star-tone),
+      0 0 6px color-mix(in srgb, var(--nl-star-tone) 35%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px var(--nl-star-tone),
+      0 0 14px color-mix(in srgb, var(--nl-star-tone) 65%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-star-frame.is-star-holo {
+    animation: none;
+  }
+}
+
 /* --- Star-Ring der Arena-Marken ------------------------------------------
    Zusätzlicher Außenring um die runde Spielermarke (`PlayerMark`). Farbe und
    Position setzt die Komponente inline (sie kennt die Ringbreite und weicht

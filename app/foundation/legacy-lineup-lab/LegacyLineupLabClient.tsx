@@ -82,13 +82,6 @@ import { prefetchMatchdayArenaBase } from "@/lib/foundation/foundation-panel-pre
 // module scope (only inside effects/handlers), and each is reached solely via
 // client-side state after this component has already mounted, so there is no
 // SSR/hydration path to preserve.
-const LegacyLineupFocusV2Board = dynamic(
-  () => import("@/app/foundation/legacy-lineup-lab-v2/LegacyLineupFocusV2Board"),
-  {
-    ssr: false,
-    loading: () => <FoundationPanelSkeleton variant="lineup" label="Focus-Board wird geladen…" />,
-  },
-);
 const LineupNewLook = dynamic(() => import("@/app/foundation/legacy-lineup-lab/LineupNewLook"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton variant="lineup" label="Neuer Look wird geladen…" />,

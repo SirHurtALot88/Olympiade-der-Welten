@@ -187,7 +187,8 @@ describe("foundation player portrait preview ui contract", () => {
       fs.readFile(path.join(root, "components/foundation/player-portrait-card/FoundationPlayerPortraitPreview.tsx"), "utf8"),
       fs.readFile(path.join(root, "app/foundation/FoundationShellRouterBody.tsx"), "utf8"),
       fs.readFile(path.join(root, "app/foundation/teams-v2/FoundationTeamsDetailPanel.tsx"), "utf8"),
-      fs.readFile(path.join(root, "app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx"), "utf8"),
+      // TransfermarktV2Client.tsx ist ein dünner Wrapper — das Markt-Markup liegt im NewLook.
+      fs.readFile(path.join(root, "app/foundation/transfermarkt-v2/TransfermarktV2NewLook.tsx"), "utf8"),
     ]);
 
     expect(previewText).toContain('role="tooltip"');
@@ -197,24 +198,15 @@ describe("foundation player portrait preview ui contract", () => {
     expect(previewText).toContain('matchMedia("(hover: none)")');
     expect(foundationText).toContain("FoundationPlayerPortraitPreview");
     expect(teamsText).toContain("FoundationPlayerPortraitPreview");
-    // NOTE: The `context="roster"` hover-preview render in FoundationTeamsDetailPanel.tsx
-    // sits inside the `selectedTeamDetailTab === "roster"` branch, which is now
-    // dead/unreachable: FoundationTeamsViewHost.tsx unconditionally routes the
-    // "roster"/"portraits" sub-tabs to FoundationTeamsNewLook instead (its
-    // "Neuer Look Gate" comment still references a flag, but the code has no
-    // such flag check anymore). FoundationTeamsNewLook.tsx renders roster
-    // players with FoundationPlayerPortraitCard directly and never uses
-    // FoundationPlayerPortraitPreview (the hover-tooltip/portal wrapper) at
-    // all, so the portal-based hover preview for team roster cards looks like
-    // a real feature loss (see final report). Left red intentionally.
-    expect(teamsText).toContain('context="roster"');
-    // NOTE: TransfermarktV2Client.tsx is a thin wrapper; neither its NewLook
-    // successor (TransfermarktV2NewLook.tsx) nor FoundationMarketBuyShellHost.tsx
-    // import FoundationPlayerPortraitCard or FoundationPlayerPortraitPreview
-    // anywhere — the market screens render plain portrait <img>s via
-    // getPlayerPortraitBrowserUrl instead. The hover-preview-with-stats for
-    // market player portraits looks like a real feature loss (see final
-    // report). Left red intentionally rather than papered over.
+    // Das Kader-Grid rendert seit dem "Neuen Look" die VOLLE Portraitkarte inline
+    // (FoundationTeamsNewLook.tsx → FoundationPlayerPortraitCard mit OVR/PPs/MVS-
+    // Rängen). Eine Hover-Preview derselben Karte über der Karte wäre Doppelung,
+    // deshalb gibt es dort bewusst keinen `context="roster"`-Preview-Wrapper mehr.
+    // Der Vertrag hält jetzt fest, was tatsächlich gerendert wird.
+    expect(teamsText).toContain("FoundationPlayerPortraitCard");
+    // Die Markt-Kandidatenliste rendert ihre Portraits jetzt wieder mit der
+    // Hover-Vorschau samt Kernwerten — auf dem Transfermarkt entscheidet man
+    // genau danach, und vorher standen die Werte nur in der Detailspalte.
     expect(marketText).toContain("FoundationPlayerPortraitPreview");
     expect(marketText).toContain('context="market"');
   });

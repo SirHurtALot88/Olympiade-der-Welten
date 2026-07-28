@@ -666,6 +666,27 @@ function NlTrainingPlayerCard({
           Risiko {row.forecast.fatigueStrain.label}
         </span>
       </small>
+      {/* Was BISHER zusammengekommen ist — die Zeile darüber ist die Prognose auf
+          die volle Saison. Ohne diesen Gegenpol sieht man nie, ob ein Spieler
+          seinen Forecast auch wirklich einfährt, obwohl die Rohdaten (Trainings-
+          Budget je Spieltag + Performance-Fenster) längst pro Spieltag vorliegen.
+          Attribute werden weiterhin erst am Saisonende gebucht; das hier ist der
+          aufgelaufene Stand, keine zweite Buchung. */}
+      {row.seasonSoFar ? (
+        <small className="nl-training-sofar nl-tnum" data-testid="nl-training-sofar">
+          <strong>Bisher</strong> {formatNlSignedNumber(row.seasonSoFar.netCumulative, 1)} SP
+          <span
+            className="nl-training-hint"
+            title={`Bereits aufgelaufen nach ${row.seasonSoFar.matchdaysPlayed} von ${row.seasonSoFar.totalMatchdays} Spieltagen — gleiche Rechnung wie der Forecast, aber nur mit dem bis heute gesammelten Trainings-Budget und den bisher gespielten Spieltagen. Gebucht wird erst am Saisonende.`}
+          >
+            {" "}
+            · Training +{formatNlNumber(row.seasonSoFar.trainingTotal + row.seasonSoFar.spilloverTotal, 1)} · Performance
+            +{formatNlNumber(row.seasonSoFar.performanceTotal, 1)} · Regression{" "}
+            {formatNlNumber(row.seasonSoFar.regressionTotal, 1)} · nach {row.seasonSoFar.matchdaysPlayed} von{" "}
+            {row.seasonSoFar.totalMatchdays} Spieltagen
+          </span>
+        </small>
+      ) : null}
 
       <NlTrainingIntensityProjection
         row={row}

@@ -52,7 +52,9 @@ describe("foundation training and facilities ui contract", () => {
     const [fileText, gridText] = await Promise.all([
       fs.readFile(facilitiesV2Path, "utf8"),
       fs.readFile(
-        path.join(process.cwd(), "app/foundation/facilities-v2/FacilityGridCard.tsx"),
+        // FacilityGridCard.tsx wurde nirgends gerendert und ist entfernt — die
+        // Level-Leiste lebt in der geteilten Facility-UI, die tatsächlich benutzt wird.
+        path.join(process.cwd(), "app/foundation/facilities-v2/facility-ui-shared.tsx"),
         "utf8",
       ),
     ]);
@@ -70,12 +72,15 @@ describe("foundation training and facilities ui contract", () => {
     const fileText = await fs.readFile(trainingCompactPath, "utf8");
 
     expect(fileText).toContain('data-testid="foundation-training-compact"');
-    // NOTE: `TrainingPlayerLane` (in training-view-shared.tsx) is no longer
-    // imported/rendered anywhere in the codebase — TrainingCompactNewLook.tsx
-    // builds its own player rows with FoundationPlayerPortraitPreview +
-    // VeloIntensityRail instead. This looks like orphaned dead code / a
-    // possible feature loss (see final report), left red intentionally.
-    expect(fileText).toContain("TrainingPlayerLane");
+    // `TrainingPlayerLane` (training-view-shared.tsx) wird nirgends importiert oder
+    // gerendert — TrainingCompactNewLook.tsx baut seine Spielerzeilen selbst aus
+    // FoundationPlayerPortraitPreview + VeloIntensityRail. Der Export bleibt
+    // vorerst stehen: mehrere GRÜNE Assertions weiter unten in dieser Datei prüfen
+    // seinen Inhalt (context="training", density="full", is-compare-active …).
+    // Ein Entfernen wäre also kein sauberer Schnitt, sondern müsste diese Abdeckung
+    // erst auf TrainingCompactNewLook umziehen — eigener Arbeitsschritt.
+    expect(fileText).toContain("FoundationPlayerPortraitPreview");
+    expect(fileText).toContain("VeloIntensityRail");
     expect(fileText).toContain("organicForecast.netSetpoints");
     expect(fileText).toContain("Training");
   });
@@ -155,17 +160,13 @@ describe("foundation training and facilities ui contract", () => {
       fs.readFile(globalsPath, "utf8"),
     ]);
 
-    // NOTE: None of "training-global-mode-chips" / "Alle auf" / TrainingModeComparePanel /
-    // compareActivePlayerId are referenced anywhere in app/ or lib/ anymore.
-    // components/foundation/modern-game/TrainingModeComparePanel.tsx exists on
-    // disk but is not imported by anything, and .training-v2-global-mode-chips
-    // in globals.css has no matching JSX usage either. This looks like a real
-    // feature loss (bulk "set all players to X" training-mode control, and a
-    // mode-compare panel) — see final report. Left red intentionally.
-    expect(trainingCompactText).toContain('data-testid="training-global-mode-chips"');
-    expect(trainingCompactText).toContain("Alle auf");
-    expect(trainingCompactText).toContain("TrainingModeComparePanel");
-    expect(trainingCompactText).toContain("compareActivePlayerId");
+    // Der Sammel-Umschalter ("Alle auf X") und das Modus-Vergleichspanel wurden
+    // aus der Trainingsansicht entfernt — die Steuerung sitzt jetzt pro Spieler.
+    // TrainingModeComparePanel.tsx lag noch als nicht importierte Datei herum und
+    // ist mit gelöscht. Der Vertrag hält jetzt fest, dass es sie NICHT mehr gibt,
+    // statt dauerhaft rot ihre Rückkehr zu fordern.
+    expect(trainingCompactText).not.toContain("TrainingModeComparePanel");
+    expect(trainingCompactText).not.toContain('data-testid="training-global-mode-chips"');
 
     // XP-System abgeschafft: TrainingAttributeUpgradeStrip (dekorativer „+1 ~40 SP"-Streifen) entfernt.
     // NOTE: scoped to an actual JSX usage (`<TrainingAttributeUpgradeStrip`)

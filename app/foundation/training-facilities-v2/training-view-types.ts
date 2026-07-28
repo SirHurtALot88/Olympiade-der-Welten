@@ -117,6 +117,28 @@ export type TrainingPlayerRowView = {
     topGains: Array<{ attribute: string; before: number; after: number; delta: number }>;
     topLosses: Array<{ attribute: string; before: number; after: number; delta: number }>;
   };
+  /**
+   * Was der Spieler in DIESER Saison bereits eingebracht hat — im Gegensatz zu
+   * `organicForecast`, das die Projektion auf die VOLLE Saison zeigt.
+   *
+   * Quelle ist `buildPlayerSeasonTrainingForecast`: dieselbe Organic-Projektion,
+   * aber nur mit dem bis heute gesammelten Trainings-Budget und dem
+   * Performance-Fenster bis zum letzten gespielten Spieltag. Attribute werden
+   * weiterhin erst am Saisonende real gebucht — das hier ist der bis jetzt
+   * aufgelaufene Stand, nicht eine zweite Buchung.
+   *
+   * `null`, solange in dieser Saison noch kein Spieltag ins Budget eingeflossen ist.
+   */
+  seasonSoFar: {
+    matchdaysPlayed: number;
+    totalMatchdays: number;
+    /** Netto (Training + Spillover + Performance − Regression). */
+    netCumulative: number;
+    trainingTotal: number;
+    spilloverTotal: number;
+    performanceTotal: number;
+    regressionTotal: number;
+  } | null;
   forecast: {
     netDevelopmentXP: number;
     trainingFormTier: string;
