@@ -426,10 +426,12 @@ const NL_PLAYERS_COLUMNS: ReadonlyArray<{
     align: "right",
     // Bewusst NICHT nochmal der Marktwert (dafür gibt es die MW-Spalte):
     // gezeigt wird der realistisch erzielbare Netto-Erlös aus der echten
-    // Verkaufsrechnung (Sale-Factor × MW minus offener Buyout) — dieselbe
-    // Rechnung wie im Sell-Preview, nur einmalig für alle Zeilen gebatcht.
+    // Verkaufsrechnung (Sale-Factor × MW minus offener Buyout) — aus
+    // SAISONENDE-Sicht (Laufzeit −1): das laufende Vertragsjahr gilt als
+    // verbraucht, auslaufende Verträge haben keinen Buyout mehr. Deshalb
+    // weicht die Zahl bewusst von der Sofort-Verkaufs-Vorschau ab.
     tooltip:
-      "Aktueller Verkaufswert (netto): Verkaufspreis laut Transfermarkt-Sale-Factor minus offener Buyout des Restvertrags. \"—\" bei Free Agents (kein Kader, kein Verkauf).",
+      "Verkaufswert am SAISONENDE (netto): Verkaufspreis laut Transfermarkt-Sale-Factor minus Buyout des Restvertrags NACH dieser Saison (Laufzeit −1 — auslaufende Verträge ohne Buyout). Kann daher höher liegen als die Sofort-Verkaufs-Vorschau. Darunter Gewinn/Verlust gegenüber dem gezahlten Kaufpreis. \"—\" bei Free Agents (kein Kader, kein Verkauf).",
   },
   { id: "salary", label: "Gehalt", sortKey: "salary", align: "right" },
   { id: "contract", label: "Vertrag", sortKey: "contract", align: "right" },
@@ -1696,7 +1698,7 @@ export default function FoundationPlayersTableNewLook({
           className={`nl-players-td-money${sortCellClass("sellValue")}`}
           title={
             row.sellPreview
-              ? `Verkaufspreis ${formatNlMoney(row.sellPreview.grossSalePrice)} − offener Buyout ${formatNlMoney(row.sellPreview.buyoutCost)} = ${formatNlMoney(row.sellPreview.expectedSellValue)} netto`
+              ? `Saisonende-Sicht (Laufzeit −1): Verkaufspreis ${formatNlMoney(row.sellPreview.grossSalePrice)} − Rest-Buyout nach dieser Saison ${formatNlMoney(row.sellPreview.buyoutCost)} = ${formatNlMoney(row.sellPreview.expectedSellValue)} netto`
               : "Kein Verkaufswert — Free Agent oder kein belastbarer Marktwert."
           }
         >
@@ -1704,10 +1706,15 @@ export default function FoundationPlayersTableNewLook({
             {/* Netto kann bei Mehrjahresverträgen negativ sein — dann bewusst so anzeigen
                 (der Verkauf würde Cash KOSTEN), nicht auf 0 schönen. */}
             <span className="nl-tnum">{row.sellPreview ? formatNlMoney(row.sellPreview.expectedSellValue) : "—"}</span>
-            {row.sellPreview && row.sellPreview.buyoutCost > 0 ? (
-              <small className="nl-players-salary-season" title="Offener Buyout des Restvertrags (bereits abgezogen)">
-                Buyout: {formatNlMoney(row.sellPreview.buyoutCost)}
-              </small>
+            {/* G/V statt Buyout: was ein Verkauf gegenüber dem GEZAHLTEN Kaufpreis einbringt/kostet.
+                Ohne dokumentierten Kaufpreis (Eigengewächs/Startkader ohne purchasePrice) bewusst
+                kein Chip — eine G/V-Basis aus dem Marktwert wäre erfunden. */}
+            {row.sellPreview && row.sellPreview.profitVsPurchase != null ? (
+              <NlDeltaChip
+                value={row.sellPreview.profitVsPurchase}
+                format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 2)}`}
+                title={`Gewinn/Verlust bei Verkauf zum Saisonende gegenüber gezahltem Kaufpreis (${formatNlMoney(row.sellPreview.purchasePrice)})`}
+              />
             ) : null}
           </span>
         </td>
