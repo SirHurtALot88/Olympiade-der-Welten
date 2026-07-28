@@ -340,7 +340,10 @@ export default function DisciplineStageMatchdayPanel({
   modifiersByTeam,
 }: DisciplineStageMatchdayPanelProps) {
   // Ausgeklappte Disziplin-Spalte (null = keine). Hook steht vor jedem fruehen Return.
+  // `null` heisst hier "noch nichts angefasst" — dann entscheidet `autoExpandedSide` unten.
+  // Erst ein Klick auf einen Spaltenkopf macht die Wahl explizit (`expandTouched`).
   const [expandedSide, setExpandedSide] = useState<"d1" | "d2" | null>(null);
+  const [expandTouched, setExpandTouched] = useState(false);
   // Sortierung der Tabelle. Standard ist das SPIELTAGSERGEBNIS, nicht der Saison-Rang —
   // das Panel beantwortet die Frage "wer war heute gut".
   const [tableSort, setTableSort] = useState<MatchdayPanelSort>(MATCHDAY_PANEL_DEFAULT_SORT);
@@ -396,6 +399,17 @@ export default function DisciplineStageMatchdayPanel({
   // Vergleich zwischen den Teams, um den es hier geht.
   const expandable = playersByTeam != null;
   const sideRevealed: Record<"d1" | "d2", boolean> = { d1: d1Revealed, d2: d2Revealed };
+
+  /**
+   * Die eingesetzten Spieler mit ihren PP sind der interessanteste Teil der Tabelle —
+   * sie waren aber hinter einem Klick auf den Spaltenkopf versteckt und standardmaessig
+   * zugeklappt, sodass die Spalte schlicht nicht existent wirkte. Jetzt klappt die zuletzt
+   * gewertete Disziplin von selbst auf (d2, sobald aufgedeckt, sonst d1). Der Spaltenkopf
+   * bleibt der Umschalter: sobald man ihn einmal benutzt, gilt ausschliesslich die eigene
+   * Wahl — auch das bewusste Zuklappen.
+   */
+  const autoExpandedSide: "d1" | "d2" | null = d2Revealed ? "d2" : d1Revealed ? "d1" : null;
+  const openSide: "d1" | "d2" | null = expandTouched ? expandedSide : expandable ? autoExpandedSide : null;
 
   // Liga-Vergleichspool je Seite fuer die Heat-Faerbung der Spieler-PP: verglichen wird
   // gegen ALLE eingesetzten Spieler dieser Disziplin, nicht nur gegen die des eigenen
@@ -508,7 +522,7 @@ export default function DisciplineStageMatchdayPanel({
                   </div>
                 );
               }
-              const isOpen = expandedSide === side;
+              const isOpen = openSide === side;
               return (
                 <div key={side} style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
                   {sortButton(side, label, `${label} — Punkte dieser Disziplin`)}
@@ -516,7 +530,10 @@ export default function DisciplineStageMatchdayPanel({
                     <button
                       type="button"
                       aria-expanded={isOpen}
-                      onClick={() => setExpandedSide(isOpen ? null : side)}
+                      onClick={() => {
+                        setExpandTouched(true);
+                        setExpandedSide(isOpen ? null : side);
+                      }}
                       title={`Spieler mit ihren PP ${isOpen ? "einklappen" : "aufklappen"}`}
                       style={{
                         background: "none",
@@ -550,7 +567,7 @@ export default function DisciplineStageMatchdayPanel({
             // damit die Gesamt-Spalte exakt der Sortierschlüssel ist.
             const { sum, mutPp, total } = row;
             // Spieler der aufgeklappten Disziplin fuer dieses Team (leer, wenn nichts offen).
-            const sidePlayers = expandedSide ? playersByTeam?.get(row.teamId)?.[expandedSide] ?? [] : [];
+            const sidePlayers = openSide ? playersByTeam?.get(row.teamId)?.[openSide] ?? [] : [];
             const sumShown = d1Revealed || d2Revealed;
             // Tagesrang erst zeigen, wenn ueberhaupt etwas gewertet ist — sonst waere er
             // eine erfundene Reihenfolge auf lauter Nullen.
@@ -740,9 +757,9 @@ export default function DisciplineStageMatchdayPanel({
                   zuerst. Die PP-Zahl ist gegen ALLE Spieler der Disziplin heat-gefaerbt
                   (rot schwach → gelb Mittelfeld → gruen stark), dieselbe Baender-Skala wie
                   im Saisonstand. Der Score steht als Herkunft daneben. */}
-              {expandedSide && sidePlayers.length > 0 ? (
+              {openSide && sidePlayers.length > 0 ? (
                 <div
-                  data-testid={`matchday-panel-players-${row.teamId}-${expandedSide}`}
+                  data-testid={`matchday-panel-players-${row.teamId}-${openSide}`}
                   style={{
                     display: "flex",
                     flexWrap: "wrap",
@@ -753,7 +770,7 @@ export default function DisciplineStageMatchdayPanel({
                   }}
                 >
                   {sidePlayers.map((entry) => {
-                    const heat = entry.pp != null ? getPoolHeatClass(entry.pp, ppPoolBySide[expandedSide]) : "";
+                    const heat = entry.pp != null ? getPoolHeatClass(entry.pp, ppPoolBySide[openSide]) : "";
                     return (
                       <span
                         key={entry.playerId}
