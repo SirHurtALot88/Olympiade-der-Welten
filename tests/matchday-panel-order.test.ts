@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  resolveMatchdayRanks,
   resolveProjectedRanksFromMatchday,
   sortMatchdayPanelRows,
 } from "@/app/foundation/discipline-stage/DisciplineStageMatchdayPanel";
@@ -117,5 +118,40 @@ describe("Spieltags-Wertung · projizierter Rang ohne gespeichertes Ergebnis", (
     for (const row of base) row.projectedRank = derived.get(row.teamId) ?? null;
 
     expect(sortMatchdayPanelRows(base, true).map((row) => row.teamId)).toEqual(["top", "spät"]);
+  });
+});
+
+// Die Tabelle sortiert nach der Tagesleistung, zeigte aber nur den Saison-Rang — die
+// Zahlenspalte lief dadurch scheinbar wirr (4, 15, 19, 5 …). Der Tagesrang macht die
+// Reihenfolge explizit; beide Raenge stehen jetzt beschriftet nebeneinander.
+describe("Spieltags-Wertung · Tagesrang", () => {
+  it("rankt nach der Gesamt-Spalte, unabhaengig vom Saison-Rang", () => {
+    const ranks = resolveMatchdayRanks(firstMatchdayRows());
+
+    expect(ranks.get("P-S")).toBe(1); // +21,1 — Saison-Rang 17
+    expect(ranks.get("M-M")).toBe(2); // +17,9
+    expect(ranks.get("B-F")).toBe(3); // +16,1
+    expect(ranks.get("C-C")).toBe(4); // +3,7
+    expect(ranks.get("A-A")).toBe(5); // +1,8 — Saison-Rang 1
+  });
+
+  it("laeuft parallel zur Sortierung: Tagesrang 1..n in Anzeigereihenfolge", () => {
+    const sorted = sortMatchdayPanelRows(firstMatchdayRows(), false);
+    const ranks = resolveMatchdayRanks(sorted);
+
+    expect(sorted.map((row) => ranks.get(row.teamId))).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("teilt bei Gleichstand den Rang und ueberspringt danach entsprechend", () => {
+    const rows = [
+      { teamId: "A", total: 10 },
+      { teamId: "B", total: 10 },
+      { teamId: "C", total: 4 },
+    ];
+
+    const ranks = resolveMatchdayRanks(rows);
+    expect(ranks.get("A")).toBe(1);
+    expect(ranks.get("B")).toBe(1);
+    expect(ranks.get("C")).toBe(3);
   });
 });

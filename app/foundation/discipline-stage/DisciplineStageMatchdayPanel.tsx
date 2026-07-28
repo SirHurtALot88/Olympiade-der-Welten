@@ -99,9 +99,9 @@ function ppText(value: number | null): string {
   return `+${value.toFixed(1)}`;
 }
 
-// Rang · Team · Diszi 1 · Diszi 2 · Spieltag (Σ) · Mutator · Gesamt.
+// Tagesrang · Saison-Rang · Team · Diszi 1 · Diszi 2 · Spieltag (Σ) · Mutator · Gesamt.
 // Header und Datenzeilen teilen sich EXAKT dieses Raster (sonst driften die Spalten).
-const PANEL_GRID_COLUMNS = "84px 1fr 78px 78px 74px 84px 88px";
+const PANEL_GRID_COLUMNS = "58px 84px 1fr 78px 78px 74px 84px 88px";
 
 // Rang-Badge (klein, tabellarisch) — Gold/Silber/Bronze für die Top-3, gleiche
 // Farbsprache wie die Arena-Leiter (warn/mut/Bronze-rgb, dezent hinterlegt).
@@ -165,6 +165,31 @@ function RankBadge({ rank, dim }: { rank: number | null; dim?: boolean }) {
  * Greift nur, wenn ein Rang fehlt — eine vorhandene Projektion aus der Vorschau bleibt
  * unangetastet, damit die gespeicherte Wahrheit immer Vorrang hat.
  */
+/**
+ * Tagesrang: Platzierung NUR nach der Leistung dieses Spieltags (Gesamt-Spalte), unabhaengig
+ * vom Saison-Rang.
+ *
+ * Ohne ihn war die Tabelle schwer zu lesen: sortiert wird nach der Tagesleistung, angezeigt
+ * wurde aber nur der Saison-Rang — die Zahlenspalte lief also scheinbar wirr (4, 15, 19, 5 …).
+ * Beide Raenge stehen jetzt nebeneinander und sind beschriftet.
+ *
+ * Gleichstand teilt sich den Rang (beide bekommen den kleineren, der naechste ueberspringt
+ * entsprechend) — dieselbe Regel wie beim projizierten Saison-Rang.
+ */
+export function resolveMatchdayRanks<T extends { teamId: string; total: number }>(rows: T[]): Map<string, number> {
+  const ranks = new Map<string, number>();
+  const sorted = [...rows].sort((left, right) => right.total - left.total);
+  let lastTotal: number | null = null;
+  let lastRank = 0;
+  sorted.forEach((row, index) => {
+    const rank = lastTotal != null && row.total === lastTotal ? lastRank : index + 1;
+    ranks.set(row.teamId, rank);
+    lastTotal = row.total;
+    lastRank = rank;
+  });
+  return ranks;
+}
+
 export function resolveProjectedRanksFromMatchday<
   T extends { teamId: string; currentPoints: number | null; sum: number; projectedRank: number | null },
 >(rows: T[]): Map<string, number> {
@@ -251,6 +276,8 @@ export default function DisciplineStageMatchdayPanel({
   // Fehlt die gespeicherte Projektion (Spieltag noch nicht übernommen), aus den
   // Arena-Ergebnissen ableiten — sonst stünde überall „–" und die Sortierung fiele
   // auf die Eingangsreihenfolge zurück.
+  // Tagesrang aus der Gesamt-Spalte — unabhaengig von der Saison-Tabelle.
+  const matchdayRanks = resolveMatchdayRanks(rows);
   const derivedProjectedRanks = resolveProjectedRanksFromMatchday(rows);
   for (const row of rows) {
     if (row.projectedRank == null) {
@@ -320,7 +347,15 @@ export default function DisciplineStageMatchdayPanel({
               borderBottom: "1px solid var(--nl-line)",
             }}
           >
-            <div style={{ ...colHead, textAlign: "left" }}>Rang</div>
+            <div style={{ ...colHead, textAlign: "left" }} title="Platzierung NUR nach der Leistung dieses Spieltags">
+              Spieltag
+            </div>
+            <div
+              style={{ ...colHead, textAlign: "left" }}
+              title="Saison-Rang vor dem Spieltag → projizierter Rang danach"
+            >
+              Saison-Rang
+            </div>
             <div style={{ ...colHead, textAlign: "left" }}>Team</div>
             {/* Disziplin-Spaltenkoepfe sind Schalter: Klick klappt die eingesetzten Spieler
                 dieser Disziplin unter jeder Team-Zeile auf (hoechste PP zuerst). Verdeckte
@@ -384,6 +419,9 @@ export default function DisciplineStageMatchdayPanel({
             // Spieler der aufgeklappten Disziplin fuer dieses Team (leer, wenn nichts offen).
             const sidePlayers = expandedSide ? playersByTeam?.get(row.teamId)?.[expandedSide] ?? [] : [];
             const sumShown = d1Revealed || d2Revealed;
+            // Tagesrang erst zeigen, wenn ueberhaupt etwas gewertet ist — sonst waere er
+            // eine erfundene Reihenfolge auf lauter Nullen.
+            const matchdayRank = sumShown ? matchdayRanks.get(row.teamId) ?? null : null;
             const mut = mutatorByTeam?.get(row.teamId);
             const mutPlayers = [...(d1Revealed ? mut?.d1Players ?? [] : []), ...(d2Revealed ? mut?.d2Players ?? [] : [])];
             const hasMut = mutPp > 0.0001;
@@ -415,7 +453,15 @@ export default function DisciplineStageMatchdayPanel({
                   borderRadius: isOwn ? 6 : 0,
                 }}
               >
-                {/* Rang vor → nach */}
+                {/* Tagesrang — nur die Leistung DIESES Spieltags. */}
+                <div
+                  title={`Spieltags-Rang ${matchdayRank ?? "–"} — nur nach der Leistung dieses Spieltags`}
+                  style={{ display: "flex", alignItems: "center", fontVariantNumeric: "tabular-nums" }}
+                >
+                  <RankBadge rank={matchdayRank} />
+                </div>
+
+                {/* Saison-Rang vor → nach */}
                 <div style={{ display: "flex", alignItems: "center", gap: 4, fontVariantNumeric: "tabular-nums" }}>
                   <RankBadge rank={row.currentRank} dim={d2Revealed} />
                   {d2Revealed ? (
@@ -547,7 +593,7 @@ export default function DisciplineStageMatchdayPanel({
                     display: "flex",
                     flexWrap: "wrap",
                     gap: 6,
-                    padding: "6px 10px 8px 94px",
+                    padding: "6px 10px 8px 162px",
                     borderBottom: "1px solid var(--nl-line)",
                     background: "color-mix(in srgb, var(--nl-panel-2) 60%, transparent)",
                   }}
