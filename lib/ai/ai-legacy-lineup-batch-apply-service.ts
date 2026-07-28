@@ -1251,6 +1251,37 @@ export function applyAiLegacyLineupBatchLocally(
       continue;
     }
 
+    // Perf: Teams mit bereits VOLLSTÄNDIGER Aufstellung werden ohne `overwriteExisting` ohnehin
+    // übersprungen — diese Entscheidung fiel bisher aber erst NACH `buildAiLegacyLineupPreview` +
+    // `calculateLocalLegacyLineupPreviewFromContext`. Gemessen an 32 Teams: ein Lauf, in dem alle
+    // Aufstellungen schon existierten, verbrannte trotzdem ~3,5 s Generierung + ~2,5 s Validierung
+    // für Ergebnisse, die anschließend verworfen wurden (~6 s von ~8 s Gesamtdauer des Batches).
+    // Die Bedingung hängt nur an `hasCompleteExistingDraft`/`overwriteExisting`, ist hier also
+    // bereits vollständig entscheidbar. `previewStatus`/Captain-Felder bleiben leer, weil für ein
+    // NICHT angefasstes Team keine KI-Aufstellung berechnet wurde — das ist ehrlicher als der
+    // frühere Status einer sofort weggeworfenen Vorschau.
+    if (hasCompleteExistingDraft && !overwriteExisting) {
+      results.push({
+        teamId: team.teamId,
+        teamCode: team.teamCode,
+        teamName: team.teamName,
+        controlMode: team.controlMode,
+        aiEligible: team.aiEligible,
+        previewStatus: "blocked",
+        captainSlotsUsed: null,
+        captainSlotsRemaining: null,
+        d1CaptainSelectionStatus: null,
+        d2CaptainSelectionStatus: null,
+        captainDecisions: [],
+        result: "skipped_existing",
+        overwriteExisting: true,
+        warnings: [],
+        blockingReasons: ["existing_lineup_requires_overwrite_confirm"],
+        saved: false,
+      });
+      continue;
+    }
+
     if (!team.aiEligible && team.controlMode === "ai" && !canAutoFillIncompleteLineup) {
       results.push({
         teamId: team.teamId,
