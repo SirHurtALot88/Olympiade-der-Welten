@@ -164,3 +164,34 @@
   font-size: var(--nl-fs-lg);
   flex: 0 0 auto;
 }
+
+/*
+ * Rang-Bänder der Bereichsspalten (POW/SPE/MEN/SOC) in der Daten-Tabelle.
+ *
+ * Bewusst absolute Liga-Ränge statt Perzentil-Heat: Top 3 grün, 4–6 gelb, 7–10 rot,
+ * ab Rang 11 keine Hinterlegung. Dadurch fallen starke und schwache Teams je Achse
+ * sofort auf, auch wenn die Liga eng beieinander liegt. Gerankt wird gegen ALLE Teams,
+ * nicht gegen die sichtbare Sortierung — die Farbe eines Wertes ist sortierstabil.
+ *
+ * Es kommt ausschliesslich ein Hintergrund dazu: Schriftfarbe bleibt die Achsenfarbe
+ * (POW rot, SPE gruen, MEN blau, SOC gelb) und die Zellrahmen bleiben unangetastet,
+ * damit die Zeilen nicht zerschnitten wirken.
+ */
+.is-new-look .nl-standings-td-areacol.nl-rankband-good,
+.is-new-look .nl-standings-td-areacol.nl-rankband-warn,
+.is-new-look .nl-standings-td-areacol.nl-rankband-risk {
+  color: var(--nl-tone, var(--nl-ink));
+  box-shadow: none;
+}
+
+.is-new-look .nl-standings-td-areacol.nl-rankband-good {
+  background: color-mix(in srgb, var(--nl-good) 24%, transparent);
+}
+
+.is-new-look .nl-standings-td-areacol.nl-rankband-warn {
+  background: color-mix(in srgb, var(--nl-warn) 20%, transparent);
+}
+
+.is-new-look .nl-standings-td-areacol.nl-rankband-risk {
+  background: color-mix(in srgb, var(--nl-risk) 20%, transparent);
+}

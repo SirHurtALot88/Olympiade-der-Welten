@@ -44,7 +44,6 @@ import {
   type SeasonStandingsV2ClientProps,
   type SeasonV2StandingsRow,
 } from "@/app/foundation/season-v2/SeasonStandingsV2Client";
-import { getPoolHeatClass } from "@/lib/foundation/player-league-heat";
 import type { SeasonStandingsTopPlayerEntry } from "@/lib/foundation/season-standings-top-players";
 import {
   resolveSeasonDisciplineAreaTotal,
@@ -204,6 +203,28 @@ function formatArchivedAt(value: string | null): string | null {
   }
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString("de-DE");
+}
+
+/**
+ * Rang-Bänder der Bereichsspalten im Saisonstand: Top 3 grün, 4–6 gelb, 7–10 rot,
+ * ab 11 keine Hinterlegung. Bewusst absolute Ränge statt Perzentilen — so sieht man
+ * auf einen Blick, wer in einer Achse wirklich vorne bzw. hinten dran ist, unabhängig
+ * davon wie eng die Liga beieinander liegt. Die Schriftfarbe bleibt die Achsenfarbe.
+ */
+function getAreaRankBandClass(rank: number | undefined): string {
+  if (!rank || !Number.isFinite(rank)) {
+    return "";
+  }
+  if (rank <= 3) {
+    return "nl-rankband-good";
+  }
+  if (rank <= 6) {
+    return "nl-rankband-warn";
+  }
+  if (rank <= 10) {
+    return "nl-rankband-risk";
+  }
+  return "";
 }
 
 function getAreaValue(row: SeasonV2StandingsRow, areaId: SeasonDisciplineAreaId): number | null {
@@ -535,20 +556,43 @@ export default function SeasonStandingsNewLook({
   );
 
   /**
-   * Liga-Vergleichspool je Bereichsspalte (POW/SPE/MEN/SOC) für die Heat-Einfärbung der
-   * Tabellenzellen. Verglichen wird immer gegen ALLE Teams der Tabelle, nicht gegen die
-   * gerade sichtbare Sortierung — die Farbe eines Wertes darf sich nicht ändern, nur weil
-   * anders sortiert wird. `getPoolHeatClass` liefert daraus `heat-band-1..8` (rot → grün),
-   * dieselbe Skala wie in den Spieler-Tabellen.
+   * Liga-Rang je Bereichsspalte (POW/SPE/MEN/SOC) für die Einfärbung der Tabellenzellen.
+   * Gerankt wird immer gegen ALLE Teams der Tabelle, nicht gegen die gerade sichtbare
+   * Sortierung — die Farbe eines Wertes darf sich nicht ändern, nur weil anders sortiert
+   * wird.
+   *
+   * Bei Gleichstand bekommt die ganze Gruppe den SCHLECHTESTEN Rang der Gruppe (1,3,3,4 …).
+   * Grund: zu Saisonbeginn stehen ganze Achsen noch auf 0. Mit dem üblichen "bester Rang für
+   * alle" (1,2,2,4) würde eine komplett unbespielte Spalte grün leuchten, obwohl niemand
+   * etwas geholt hat. Mit dem schlechtesten Rang rutscht so eine Gruppe automatisch aus den
+   * Bändern heraus und die Spalte bleibt neutral.
    */
-  const areaHeatPools = useMemo(() => {
-    const pools = {} as Record<SeasonDisciplineAreaId, number[]>;
+  const areaRanksByTeam = useMemo(() => {
+    const ranks = {} as Record<SeasonDisciplineAreaId, Map<string, number>>;
     for (const group of SEASON_DISCIPLINE_AREA_GROUPS) {
-      pools[group.id] = standingsRows
-        .map((row) => getAreaValue(row, group.id))
-        .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+      const ranked = new Map<string, number>();
+      const scored = standingsRows
+        .map((row) => ({ teamId: row.teamId, value: getAreaValue(row, group.id) }))
+        .filter(
+          (entry): entry is { teamId: string; value: number } =>
+            typeof entry.value === "number" && Number.isFinite(entry.value),
+        )
+        .sort((a, b) => b.value - a.value);
+      let groupStart = 0;
+      while (groupStart < scored.length) {
+        let groupEnd = groupStart;
+        while (groupEnd + 1 < scored.length && scored[groupEnd + 1].value === scored[groupStart].value) {
+          groupEnd += 1;
+        }
+        const worstRank = groupEnd + 1;
+        for (let index = groupStart; index <= groupEnd; index += 1) {
+          ranked.set(scored[index].teamId, worstRank);
+        }
+        groupStart = groupEnd + 1;
+      }
+      ranks[group.id] = ranked;
     }
-    return pools;
+    return ranks;
   }, [standingsRows]);
 
   function toggleExpanded(teamId: string) {
@@ -1176,12 +1220,14 @@ export default function SeasonStandingsNewLook({
           <td className="nl-standings-td-bonus">{formatNlNumber(row.disciplineValues.bonuspunkte, 1)}</td>
           {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => {
             const areaValue = getAreaValue(row, group.id);
-            // Liga-Heat der Bereichsspalte: rot (schwach) → gelb (Mittelfeld) → grün (stark),
-            // dieselben Bänder wie in den Spieler-Tabellen. Die Zell-CSS zieht daraus nur eine
-            // dezente Hinterlegung, damit die Bereichsfarbe der Zahl lesbar bleibt.
-            const heatClass = getPoolHeatClass(areaValue, areaHeatPools[group.id]);
+            // Liga-Rang der Bereichsspalte: Top 3 grün, 4–6 gelb, 7–10 rot, Rest neutral.
+            // Nur eine Hinterlegung — die Zahl behält ihre Achsenfarbe (POW rot, SPE grün …).
+            const bandClass = getAreaRankBandClass(areaRanksByTeam[group.id]?.get(row.teamId));
             return (
-              <td key={group.id} className={`nl-standings-td-areacol ${nlToneClass(group.id)}${heatClass ? ` ${heatClass}` : ""}`}>
+              <td
+                key={group.id}
+                className={`nl-standings-td-areacol ${nlToneClass(group.id)}${bandClass ? ` ${bandClass}` : ""}`}
+              >
                 {/* Hover auf die Bereichsspalte: Top-3-Spieler des Teams nach PPs in dieser Achse. */}
                 <StandingsTopPlayersHover
                   panelId={`nl-standings-top3-table-${row.teamId}-${group.id}`}
