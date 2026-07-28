@@ -3008,7 +3008,11 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             />
           ) : null}
 
-          {activeView === "finances" ? <FoundationFinancesHost gameState={gameState} teamId={activeManagerTeamId} /> : null}
+          {/* saveId: Seed fürs Season-Ökonomie-Fenster (Salary-Factor-Chip) — muss die echte
+              activeSaveId sein, damit Finanzen dieselben Faktoren zeigen wie Briefing + KI. */}
+          {activeView === "finances" ? (
+            <FoundationFinancesHost gameState={gameState} teamId={activeManagerTeamId} saveId={activeSaveId} />
+          ) : null}
 
           <div className={`foundation-warning-grid${getViewClass("debug")}`}>
             <WarningList title="Spieler ohne Team" warnings={gameState.mappingReport.unmappedPlayers} />

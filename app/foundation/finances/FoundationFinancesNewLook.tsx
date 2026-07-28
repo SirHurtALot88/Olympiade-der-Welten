@@ -24,6 +24,8 @@ import type {
   FinancesViewModel,
   TeamFinancesState,
 } from "@/lib/foundation/finances/finances-types";
+import type { SalaryFactorOutlook } from "@/lib/foundation/finances/salary-factor-outlook";
+import { formatLocalePoints } from "@/lib/foundation/tabs/home-v2-ui-helpers";
 
 export type FoundationFinancesNewLookProps = {
   teamName: string;
@@ -32,12 +34,46 @@ export type FoundationFinancesNewLookProps = {
   leagueTable: FinanceLeagueTableRow[];
   /** Active manager's own team id — hebt "Dein Team" in der Liga-Tabelle hervor. */
   activeManagerTeamId: string | null;
+  /** Salary Factor der laufenden Season + Richtung zur nächsten — siehe `salary-factor-outlook.ts`. */
+  salaryFactorOutlook: SalaryFactorOutlook;
 };
 
 /** Grün bei GuV ≥ 0, sonst Rot — gleiche binäre Ton-Regel wie andere GuV-Chips im neuen Look. */
 function guvTone(value: number): NlTone {
   return value >= 0 ? "good" : "risk";
 }
+
+// --- Salary Factor (Saison-Ökonomie) -------------------------------------
+// Ton-Wahl bewusst nach Nutzen für den Spieler, nicht mechanisch nach Vorzeichen:
+// Ein STEIGENDER Salary Factor ist für den Manager GUT — der Faktor skaliert die
+// Einnahmenseite der Liga (Sponsor-Topf ≈ Liga-Gehaltssumme × Faktor, dazu Preis-/
+// Meilenstein-Leitern; siehe sponsor-v2-offer-service / prize-money), NICHT die
+// Gehälter selbst (die kommen aus den Marktwert-Formeln). Auch die KI spart bei
+// Faktor < 1 Cash an (retool-ai2-pick-engine, contract-renewal-service) — unter 1.0
+// sind magere Zeiten. Daher: steigt → good, fällt → risk, stabil → neutral.
+function salaryFactorDirectionTone(direction: SalaryFactorOutlook["direction"]): NlTone {
+  if (direction === "up") return "good";
+  if (direction === "down") return "risk";
+  return "neutral";
+}
+
+function formatSalaryFactor(value: number): string {
+  return `${formatLocalePoints(value, 2)}×`;
+}
+
+/** Untertitel des Chips: ehrlich nur dann eine Richtung, wenn die nächste Season vorliegt. */
+function buildSalaryFactorSub(outlook: SalaryFactorOutlook): string | undefined {
+  if (outlook.nextFactor == null || outlook.direction == null) return undefined;
+  const arrow = outlook.direction === "up" ? "▲" : outlook.direction === "down" ? "▼" : "±";
+  const word = outlook.direction === "up" ? "steigt" : outlook.direction === "down" ? "fällt" : "stabil";
+  return `${arrow} ${word} → ${formatSalaryFactor(outlook.nextFactor)} nächste Season`;
+}
+
+const SALARY_FACTOR_TOOLTIP =
+  "Liga-Ökonomiefaktor der laufenden Season: skaliert die Einnahmenseite — der Sponsor-Topf der Liga " +
+  "entspricht ungefähr Liga-Gehaltssumme × Faktor, Meilenstein-/Preisleitern skalieren mit. Über 1,0 fließt " +
+  "mehr Geld in die Liga als Gehälter kosten (gute Zeiten), unter 1,0 weniger (sparen!). Die nächste Season " +
+  "ist bereits ausgewürfelt (siehe Season-Briefing) — der Pfeil zeigt, wohin sich die Ökonomie entwickelt.";
 
 // --- Hover-Tooltips: was steckt hinter der jeweiligen Zeile ------------
 // Reine `title`-Strings statt Hover-Cards (siehe Auftrag) — niedrigrisiko
@@ -636,6 +672,7 @@ export default function FoundationFinancesNewLook({
   model,
   leagueTable,
   activeManagerTeamId,
+  salaryFactorOutlook,
 }: FoundationFinancesNewLookProps) {
   const team = model.status === "ready" ? model.team : null;
   const incomeLines = team ? buildIncomeLines(team) : [];
@@ -670,6 +707,19 @@ export default function FoundationFinancesNewLook({
               tone={guvTone(team.guv)}
               title="Einnahmen minus Ausgaben der laufenden Saison"
             />
+            {/* Salary Factor: Wert der laufenden Season + Richtung zur (bereits ausgewürfelten)
+                nächsten Season — Tonwahl siehe salaryFactorDirectionTone. Ohne validen Wert
+                bewusst gar kein Chip statt "1,00×"-Fake. */}
+            {salaryFactorOutlook.currentFactor != null ? (
+              <StatChip
+                label="Salary Factor"
+                value={formatSalaryFactor(salaryFactorOutlook.currentFactor)}
+                tone={salaryFactorDirectionTone(salaryFactorOutlook.direction)}
+                sub={buildSalaryFactorSub(salaryFactorOutlook)}
+                title={SALARY_FACTOR_TOOLTIP}
+                className="nl-fin-salary-factor-chip"
+              />
+            ) : null}
           </StatChipRow>
         ) : null}
       </NlCard>
