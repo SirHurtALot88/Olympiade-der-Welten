@@ -4,6 +4,11 @@ import type { Discipline, GameState, Team } from "@/lib/data/olyDataTypes";
 import type { SortState } from "@/lib/foundation/foundation-table-ui-types";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 import { sortTableRows as sortRows } from "@/components/foundation/FoundationTableUi";
+import {
+  buildSpielplanMutatorSummaries,
+  type SpielplanDisciplineMutatorSummary,
+  type SpielplanMutatorSlotSummary,
+} from "@/lib/foundation/spielplan-mutator-summary";
 import { getSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import {
   shouldBuildDisciplineConfigDerivations as resolveShouldBuildDisciplineConfigDerivations,
@@ -44,12 +49,30 @@ export type FoundationDisciplineLeaderEntry = {
   row: FoundationDisciplineRankRow | null;
 };
 
+/** Mutator-Spalteninhalt fürs Spielplan-UI: Trait-Label + Treffer + Hover-Spieler. */
+export type FoundationDisciplineMutatorInfo = SpielplanMutatorSlotSummary & {
+  /** true = Spieltag ist applied — Trefferzahl ist echte Vergangenheit, kein Ausblick. */
+  resolved: boolean;
+};
+
 export type FoundationDisciplineConfigRow = Discipline & {
   originalOrder: number;
   displayOrder: number;
   playerCount: number;
   mutator1: string;
   mutator2: string;
+  /**
+   * Gewürfelte Spieltag-Mutatoren (deterministischer Engine-Seed) samt Treffern.
+   * `mutator1`/`mutator2` blieben bisher leer, weil dort nur die STATISCHEN
+   * Disziplin-Textfelder (`discipline.mutator1/2`) gelesen wurden — die echten
+   * Mutatoren werden aber pro Spieltag+Seite gewürfelt und standen dem Spielplan
+   * schlicht nicht zur Verfügung. `null`, wenn die Disziplin in keinem
+   * Spieltag-Slot der Saison steht.
+   */
+  mutatorInfo1: FoundationDisciplineMutatorInfo | null;
+  mutatorInfo2: FoundationDisciplineMutatorInfo | null;
+  /** Gespeicherte Treffer, die zu keinem der beiden Spieltag-Traits passen (Team-Override). */
+  mutatorUnattributedHits: number;
 };
 
 type SeasonSnapshotInput = NonNullable<GameState["seasonState"]["seasonSnapshots"]>[number];
@@ -204,22 +227,57 @@ export function useFoundationCrossTabDisciplineRanks(input: {
     return slotMeta;
   }, [seasonDisciplineScheduleRows, shouldBuildDisciplineConfigDerivations]);
 
+  /**
+   * Gewürfelte Spieltag-Mutatoren + gespeicherte Treffer je Disziplin. Einmal
+   * memoisiert (statt pro Zeile/Hover), weil der Aufbau über alle applied
+   * Performance-Zeilen der Saison iteriert.
+   */
+  const spielplanMutatorSummaries = useMemo(() => {
+    if (!shouldBuildDisciplineConfigDerivations) {
+      return new Map<string, SpielplanDisciplineMutatorSummary>();
+    }
+    return buildSpielplanMutatorSummaries({
+      gameState: input.gameState,
+      // Gleiche saveId-Quelle wie `seasonDisciplineScheduleRows` oben — der Roll-Seed
+      // (saveId/seasonId/matchdayId/Seite/disciplineId) muss exakt dem der Resolve-Engine
+      // entsprechen, sonst zeigen wir andere Traits als gewertet wurden.
+      saveId: input.activeSaveId || "normalized-local-save",
+      scheduleRows: seasonDisciplineScheduleRows,
+    });
+  }, [input.activeSaveId, input.gameState, seasonDisciplineScheduleRows, shouldBuildDisciplineConfigDerivations]);
+
   const disciplineConfigRows = useMemo(() => {
     if (!shouldBuildDisciplineConfigDerivations) {
       return [] as FoundationDisciplineConfigRow[];
     }
     return [...input.gameState.disciplines].map((discipline) => {
       const seasonalMeta = seasonDisciplineConfigMap.get(discipline.id);
+      const mutatorSummary = spielplanMutatorSummaries.get(discipline.id) ?? null;
       return {
         ...discipline,
         originalOrder: discipline.originalOrder ?? 0,
         displayOrder: seasonalMeta?.displayOrder ?? discipline.displayOrder ?? 0,
         playerCount: seasonalMeta?.playerCount ?? discipline.playerCount ?? 0,
-        mutator1: discipline.mutator1 ?? "",
-        mutator2: discipline.mutator2 ?? "",
+        // Vorrang wie in der Engine: ein gepflegtes statisches Disziplin-Textfeld
+        // gewinnt; sonst das gewürfelte Spieltag-Trait-Label — damit Sortierung
+        // und "Ohne Mutator"-Zähler dieselben Labels sehen wie die Zelle.
+        mutator1: discipline.mutator1?.trim() || mutatorSummary?.slots[0]?.label || "",
+        mutator2: discipline.mutator2?.trim() || mutatorSummary?.slots[1]?.label || "",
+        mutatorInfo1: mutatorSummary
+          ? { ...mutatorSummary.slots[0], resolved: mutatorSummary.resolved }
+          : null,
+        mutatorInfo2: mutatorSummary
+          ? { ...mutatorSummary.slots[1], resolved: mutatorSummary.resolved }
+          : null,
+        mutatorUnattributedHits: mutatorSummary?.unattributedHitCount ?? 0,
       };
     });
-  }, [input.gameState.disciplines, seasonDisciplineConfigMap, shouldBuildDisciplineConfigDerivations]);
+  }, [
+    input.gameState.disciplines,
+    seasonDisciplineConfigMap,
+    shouldBuildDisciplineConfigDerivations,
+    spielplanMutatorSummaries,
+  ]);
 
   const currentMatchdayDisciplineSchedule = useMemo(
     () =>
