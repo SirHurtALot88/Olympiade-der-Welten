@@ -25,7 +25,15 @@ export const NL_PLAYERS_HIDEABLE_COLUMN_IDS: ReadonlyArray<string> = [
   "class",
   "race",
   "abilityStars",
-  "axes",
+  // Je Achse eine eigene Spalte (POW/SPE/MEN/SOC) — jede einzeln abschaltbar und
+  // nach rechts aufklappbar auf ihre 5 Disziplinen (PPs). Ersetzt die frühere
+  // gebündelte "axes"-Sammelspalte; alte gespeicherte Präferenzen mit "axes"
+  // werden von `readColumnPreferences` schlicht ignoriert (unbekannte ID) und
+  // die vier neuen Spalten starten sichtbar.
+  "axisPow",
+  "axisSpe",
+  "axisMen",
+  "axisSoc",
   "pps",
   "ovr",
   "mvs",
@@ -65,7 +73,20 @@ export const NL_PLAYERS_COLUMN_PRESETS: ReadonlyArray<NlPlayersColumnPreset> = [
   {
     id: "scouting",
     label: "Scouting",
-    visible: ["class", "race", "abilityStars", "axes", "pps", "ovr", "mvs", "bestDiscipline", "traits"],
+    visible: [
+      "class",
+      "race",
+      "abilityStars",
+      "axisPow",
+      "axisSpe",
+      "axisMen",
+      "axisSoc",
+      "pps",
+      "ovr",
+      "mvs",
+      "bestDiscipline",
+      "traits",
+    ],
   },
   {
     id: "finanzen",

@@ -15,6 +15,10 @@ import {
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
 import type { SeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
+import {
+  buildRosterDisciplinePpsByAxis,
+  type RosterAxisDisciplinePps,
+} from "@/lib/foundation/tabs/use-foundation-cross-tab-teams-roster";
 import type { PlayerTableScope } from "@/lib/foundation/tabs/foundation-page-types";
 import {
   getPlayerDisplayMarketValue,
@@ -37,6 +41,12 @@ export type FoundationPlayerScopeRow = {
   playerOvr: number | null;
   playerMvs: number | null;
   playerPps: number | null;
+  /**
+   * PP je Achse und Disziplin aus dem Saison-Punkte-Ledger — Grundlage der aufklappbaren
+   * Achsen-Spalten. Dieselbe Quelle und derselbe Builder wie in der Teams-Detailansicht,
+   * damit beide Ansichten nicht auseinanderlaufen.
+   */
+  disciplinePpsByAxis: RosterAxisDisciplinePps[];
   seasonPoints: number | null;
   appearances: number | null;
   bestDiscipline: string | null;
@@ -68,6 +78,47 @@ export function getDisciplineIdFromSortKey(sortKey: string | null | undefined): 
     return null;
   }
   return sortKey.slice(DISCIPLINE_SORT_KEY_PREFIX.length);
+}
+
+/**
+ * Sortier-Schlüssel für "nach den in einer Disziplin GEHOLTEN PPs sortieren"
+ * (aufklappbare Achsen-Spalten im Spieler-Verzeichnis). Bewusst ein eigener
+ * Präfix neben `discipline:` — dort steht die Disziplin-WERTUNG (0–100,
+ * `player.disciplineRatings`), hier die tatsächlich erzielten
+ * Performance-Punkte aus dem Saison-Ledger (`row.disciplinePpsByAxis`).
+ * Die beiden Präfixe kollidieren nicht: `disciplinePps:` beginnt nicht mit
+ * `discipline:` (Zeichen 11 ist `P` statt `:`).
+ */
+const DISCIPLINE_PPS_SORT_KEY_PREFIX = "disciplinePps:";
+
+export function buildDisciplinePpsSortKey(disciplineId: string): string {
+  return `${DISCIPLINE_PPS_SORT_KEY_PREFIX}${disciplineId}`;
+}
+
+export function getDisciplineIdFromPpsSortKey(sortKey: string | null | undefined): string | null {
+  if (!sortKey || !sortKey.startsWith(DISCIPLINE_PPS_SORT_KEY_PREFIX)) {
+    return null;
+  }
+  return sortKey.slice(DISCIPLINE_PPS_SORT_KEY_PREFIX.length);
+}
+
+/**
+ * In einer Disziplin erzielte PPs einer Verzeichniszeile (`null`, wenn die
+ * Disziplin nicht im Katalog der Zeile steckt). Liest ausschließlich die
+ * bereits gebaute `disciplinePpsByAxis`-Struktur — rechnet nichts neu.
+ */
+export function getRowDisciplinePps(
+  row: Pick<FoundationPlayerScopeRow, "disciplinePpsByAxis">,
+  disciplineId: string,
+): number | null {
+  for (const axis of row.disciplinePpsByAxis) {
+    for (const discipline of axis.disciplines) {
+      if (discipline.id === disciplineId) {
+        return discipline.pps;
+      }
+    }
+  }
+  return null;
 }
 
 export function shouldBuildFoundationLeagueHeatPools(input: {
@@ -270,6 +321,20 @@ export function useFoundationCrossTabPlayerDirectory(input: {
           playerOvr: playerRating?.ovrNormalized ?? null,
           playerMvs: playerRating?.mvs ?? null,
           playerPps: playerRating?.ppsSeason ?? null,
+          disciplinePpsByAxis: (() => {
+            const ledgerSummary = input.seasonPointsLedger?.playerSummariesByPlayerId?.get(player.id) ?? null;
+            return buildRosterDisciplinePpsByAxis({
+              disciplines: input.gameState.disciplines,
+              pointsByDiscipline: ledgerSummary?.pointsByDiscipline ?? null,
+              pointsByArea: ledgerSummary?.pointsByArea ?? null,
+              axisTotals: {
+                pow: playerRating?.ppPow ?? null,
+                spe: playerRating?.ppSpe ?? null,
+                men: playerRating?.ppMen ?? null,
+                soc: playerRating?.ppSoc ?? null,
+              },
+            });
+          })(),
           seasonPoints: seasonPerformance?.totalPoints ?? null,
           appearances: seasonPerformance?.appearances ?? null,
           bestDiscipline: seasonPerformance?.bestDisciplineLabel ?? null,
@@ -357,6 +422,10 @@ export function useFoundationCrossTabPlayerDirectory(input: {
       if (disciplineId && sortState) {
         accessors[sortState.key] = (row) => row.player.disciplineRatings[disciplineId] ?? Number.NEGATIVE_INFINITY;
       }
+      const disciplinePpsId = getDisciplineIdFromPpsSortKey(sortState?.key);
+      if (disciplinePpsId && sortState) {
+        accessors[sortState.key] = (row) => getRowDisciplinePps(row, disciplinePpsId) ?? Number.NEGATIVE_INFINITY;
+      }
       return sortRows(playersTableRows, sortState, accessors);
     },
     [input.shouldBuildPlayerDirectory, input.tableSorts.playersTable, playersTableRows],
@@ -390,6 +459,10 @@ export function useFoundationCrossTabPlayerDirectory(input: {
     const disciplineId = getDisciplineIdFromSortKey(sortState.key);
     if (disciplineId) {
       accessors[sortState.key] = (row) => row.player.disciplineRatings[disciplineId] ?? Number.NEGATIVE_INFINITY;
+    }
+    const disciplinePpsId = getDisciplineIdFromPpsSortKey(sortState.key);
+    if (disciplinePpsId) {
+      accessors[sortState.key] = (row) => getRowDisciplinePps(row, disciplinePpsId) ?? Number.NEGATIVE_INFINITY;
     }
     const accessor = accessors[sortState.key];
     if (!accessor) {
