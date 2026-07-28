@@ -412,7 +412,21 @@ export function normalizeAvailabilityForNewSeason(
   });
 }
 
-function collectMatchdayUses(gameState: GameState, seasonId: string, matchdayId: string): MatchdayUse[] {
+function collectMatchdayUses(
+  gameState: GameState,
+  seasonId: string,
+  matchdayId: string,
+  /**
+   * Bis zu welcher Disziplin-Seite gebucht wurde. Die Arena wertet pro Disziplin, und
+   * die Ermuedung soll dem folgen: Nach D1 traegt nur, wer in D1 gelaufen ist. Ohne
+   * Angabe zaehlt der ganze Spieltag — das Verhalten aller bisherigen Aufrufer.
+   *
+   * Der Endzustand bleibt davon unberuehrt: Der D2-Commit setzt zuerst auf den
+   * Vor-Spieltags-Stand zurueck und wendet dann beide Seiten an, kommt also auf
+   * denselben Wert wie ein Voll-Apply in einem Rutsch (kein F + 2*Load).
+   */
+  commitThroughSide: "d1" | "d2" = "d2",
+): MatchdayUse[] {
   // Insertion-ordered map so the returned order matches the previous Set-based dedup exactly
   // (determinism for the injury roll loop). A player selected on BOTH discipline sides is deduped
   // to a single use whose intensity is the HIGHER-load side (push > normal > conserve).
@@ -422,6 +436,7 @@ function collectMatchdayUses(gameState: GameState, seasonId: string, matchdayId:
   );
   for (const draft of drafts) {
     for (const entry of draft.entries) {
+      if (commitThroughSide === "d1" && entry.disciplineSide !== "d1") continue;
       if (!isActiveRosterPlayer(gameState, entry.playerId, draft.teamId)) continue;
       const key = `${draft.teamId}::${entry.playerId}`;
       // Each entry carries its discipline side; the side's intensity lives in the draft modifiers.
@@ -725,6 +740,12 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
    * (distinct matchdays) lässt dieses Flag weg -> unverändertes Verhalten.
    */
   isMatchdayReplay?: boolean;
+  /**
+   * Bis zu welcher Disziplin-Seite gebucht wurde (siehe `collectMatchdayUses`). Nach
+   * einem D1-Commit traegt nur die D1-Belastung; der D2-Commit setzt zurueck und wendet
+   * beide Seiten an. Ohne Angabe: ganzer Spieltag wie bisher.
+   */
+  commitThroughSide?: "d1" | "d2";
 }): { gameState: GameState; injuryEvents: InjuryEventRecord[] } {
   const gameState = restorePreMatchdayAvailability({
     gameState: input.gameState,
@@ -732,7 +753,12 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
     matchdayId: input.matchdayId,
     isMatchdayReplay: Boolean(input.isMatchdayReplay),
   });
-  const usedPlayers = collectMatchdayUses(gameState, input.seasonId, input.matchdayId);
+  const usedPlayers = collectMatchdayUses(
+    gameState,
+    input.seasonId,
+    input.matchdayId,
+    input.commitThroughSide ?? "d2",
+  );
   const usedPlayerKeys = new Set(usedPlayers.map((use) => `${use.teamId}::${use.playerId}`));
   const nextMatchdayId = getNextMatchdayId(gameState, input.matchdayId);
   const injuryRollMap =
