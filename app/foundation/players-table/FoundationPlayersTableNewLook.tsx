@@ -1189,15 +1189,16 @@ export default function FoundationPlayersTableNewLook({
   }
 
   /**
-   * Aufgeklappte PPs-Detailzeile. Echte Pro-Areal-PPs-Punkte (wie viele
-   * Performance-Punkte je Bereich POW/SPE/MEN/SOC erzielt wurden) liegen in
-   * `FoundationPlayerScopeRow` nicht vor — nur der Gesamtwert `playerPps`.
-   * Sie existieren an anderer Stelle im Code (z. B. `ppPow`/`ppSpe`/`ppMen`/
-   * `ppSoc` in `lib/foundation/player-rating-contract.ts`), aber nur als
-   * Ergebnis einer ligaweiten Neuberechnung, die hier nicht verfügbar ist.
-   * Statt das zu erfinden, zeigen wir ehrlich die vorhandenen Kernwerte
-   * (POW/SPE/MEN/SOC, 0–100) als Aufschlüsselungs-Näherung mit klarer
-   * Kennzeichnung, dass es keine echten Areal-PPs-Punkte sind.
+   * Aufgeklappte PPs-Detailzeile — zeigt die ECHTEN Performance-Punkte je Achse.
+   *
+   * Vorher standen hier `player.coreStats` (POW/SPE/MEN/SOC, 0-100) als
+   * "Naeherung": die Aufschluesselung eines PPs-Werts zeigte also Attribute
+   * statt Punkte, und die vier Balken summierten sich nie auf den Gesamtwert
+   * in der Kopfzeile (73+52+59+76 gegen 9,8). Die echten Achsen-PPs
+   * (`ppPow`/`ppSpe`/`ppMen`/`ppSoc`) stehen in derselben
+   * `playerRatingsById`-Karte, aus der die Zeile schon OVR/MVS/PPs zieht — sie
+   * waren nur nicht durchgereicht. Die Balken skalieren jetzt relativ zum
+   * groessten Achsenwert der Zeile, weil PPs keine 0-100-Skala haben.
    */
   function renderPpsDetail(row: FoundationPlayerScopeRow) {
     return (
@@ -1210,23 +1211,37 @@ export default function FoundationPlayersTableNewLook({
           </span>
         </div>
         <div className="nl-players-pps-detail-grid">
-          {NL_PLAYERS_AXES.map(({ key, label }) => {
-            const value = row.player.coreStats[key] ?? null;
-            const percent =
-              value != null && Number.isFinite(value) ? Math.max(2, Math.min(100, value)) : 0;
-            return (
-              <div key={key} className={`nl-players-pps-detail-axis ${nlToneClass(key)}`}>
-                <span className="nl-players-pps-detail-axis-label">{label}</span>
-                <span className="nl-players-pps-detail-axis-track" aria-hidden="true">
-                  <span className="nl-players-pps-detail-axis-fill" style={{ width: `${percent}%` }} />
-                </span>
-                <span className="nl-players-pps-detail-axis-value nl-tnum">{formatNlNumber(value, 0)}</span>
-              </div>
+          {(() => {
+            // Bezugsgroesse fuer die Balkenbreite: der groesste Achsenwert dieser
+            // Zeile. PPs sind nicht auf 0-100 normiert, eine feste Skala waere
+            // also willkuerlich.
+            const axisMax = Math.max(
+              0,
+              ...NL_PLAYERS_AXES.map(({ key }) => {
+                const raw = row.axisPps[key];
+                return raw != null && Number.isFinite(raw) ? raw : 0;
+              }),
             );
-          })}
+            return NL_PLAYERS_AXES.map(({ key, label }) => {
+              const value = row.axisPps[key];
+              const safeValue = value != null && Number.isFinite(value) ? value : null;
+              const percent = safeValue != null && axisMax > 0 ? Math.max(2, (safeValue / axisMax) * 100) : 0;
+              return (
+                <div key={key} className={`nl-players-pps-detail-axis ${nlToneClass(key)}`}>
+                  <span className="nl-players-pps-detail-axis-label">{label}</span>
+                  <span className="nl-players-pps-detail-axis-track" aria-hidden="true">
+                    <span className="nl-players-pps-detail-axis-fill" style={{ width: `${percent}%` }} />
+                  </span>
+                  <span className="nl-players-pps-detail-axis-value nl-tnum">
+                    {safeValue != null ? formatPpsValue(safeValue) : "—"}
+                  </span>
+                </div>
+              );
+            });
+          })()}
         </div>
         <p className="nl-players-pps-detail-note">
-          Zeigt die Kernwerte POW/SPE/MEN/SOC (0–100) als Näherung.
+          Performance-Punkte je Achse — Summe entspricht den Gesamt-PPs.
         </p>
       </div>
     );

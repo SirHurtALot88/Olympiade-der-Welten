@@ -37,6 +37,14 @@ export type FoundationPlayerScopeRow = {
   playerOvr: number | null;
   playerMvs: number | null;
   playerPps: number | null;
+  /**
+   * ECHTE Performance-Punkte je Achse (nicht die Kernwerte 0–100). Die
+   * PPs-Aufschlüsselung in der Spielerliste zeigte bisher `player.coreStats`
+   * als „Näherung", weil diese Werte hier nicht durchgereicht waren — die vier
+   * Balken summierten sich also nie auf den Gesamt-PPs-Wert darüber. Sie liegen
+   * in derselben `playerRatingsById`-Karte, aus der schon OVR/MVS/PPs kommen.
+   */
+  axisPps: { pow: number | null; spe: number | null; men: number | null; soc: number | null };
   seasonPoints: number | null;
   appearances: number | null;
   bestDiscipline: string | null;
@@ -270,6 +278,12 @@ export function useFoundationCrossTabPlayerDirectory(input: {
           playerOvr: playerRating?.ovrNormalized ?? null,
           playerMvs: playerRating?.mvs ?? null,
           playerPps: playerRating?.ppsSeason ?? null,
+          axisPps: {
+            pow: playerRating?.ppPow ?? null,
+            spe: playerRating?.ppSpe ?? null,
+            men: playerRating?.ppMen ?? null,
+            soc: playerRating?.ppSoc ?? null,
+          },
           seasonPoints: seasonPerformance?.totalPoints ?? null,
           appearances: seasonPerformance?.appearances ?? null,
           bestDiscipline: seasonPerformance?.bestDisciplineLabel ?? null,
