@@ -44,7 +44,7 @@ export type DisciplineStageHoverPreviewProps = {
    * NACH Abschluss der Disziplin gesetzt — vorher wäre die PP-Vergabe ein Spoiler. Greift
    * nur für Spieler, die `liveResultsByTeam` ohnehin schon aufgedeckt hat.
    */
-  ppByPlayerId?: Map<string, { pp: number | null; score: number }> | null;
+  ppByPlayerId?: Map<string, { pp: number | null; score: number; mutatorPp?: number | null }> | null;
 };
 
 const PLAYER_W = 184;
@@ -160,7 +160,7 @@ function TeamPreview({ gameState, target, fieldedPlayerIdsByTeam, liveResultsByT
   fieldedPlayerIdsByTeam?: Record<string, string[]>;
   liveResultsByTeam?: StageLiveResultsByTeam;
   /** Vergebene Player-Points je Spieler — null, solange die Disziplin noch läuft. */
-  ppByPlayerId?: Map<string, { pp: number | null; score: number }> | null;
+  ppByPlayerId?: Map<string, { pp: number | null; score: number; mutatorPp?: number | null }> | null;
 }) {
   const team = gameState.teams?.find((t) => t.teamId === target.id) ?? null;
   if (!team) return null;
@@ -250,13 +250,29 @@ function TeamPreview({ gameState, target, fieldedPlayerIdsByTeam, liveResultsByT
                   {live ? (
                     pp?.pp != null ? (
                       <>
+                        {/* Gesamtscore ZUERST — er erklaert die Reihenfolge. Dahinter die PP als
+                            eigentliche Waehrung, und in Klammern der Anteil, den die
+                            Disziplin-Mutatoren beigesteuert haben: ohne ihn bleibt unerklaerlich,
+                            warum zwei Spieler mit aehnlichem Score verschieden viele PP bekommen. */}
+                        <span style={{ fontSize: 11.5, fontWeight: 800, color: "var(--nl-mut)", flex: "none" }}>{fmt1(live.net)}</span>
                         <span
-                          title={`${fmt1(pp.pp)} Player-Points · Score ${fmt1(pp.score)}`}
+                          title={
+                            pp.mutatorPp != null && Math.abs(pp.mutatorPp) >= 0.05
+                              ? `${fmt1(pp.pp)} Player-Points · davon ${fmt1(pp.mutatorPp)} aus Disziplin-Mutatoren · Score ${fmt1(pp.score)}`
+                              : `${fmt1(pp.pp)} Player-Points · kein Mutator-Anteil · Score ${fmt1(pp.score)}`
+                          }
                           style={{ fontSize: 12, fontWeight: 900, color: "var(--nl-accent)", flex: "none" }}
                         >
                           {fmt1(pp.pp)} PP
                         </span>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--nl-mut)", flex: "none" }}>({fmt1(live.net)})</span>
+                        {pp.mutatorPp != null && Math.abs(pp.mutatorPp) >= 0.05 ? (
+                          <span
+                            title="Anteil an den Player-Points, der aus den Mutatoren dieser Disziplin stammt"
+                            style={{ fontSize: 10.5, fontWeight: 700, color: "var(--nl-good)", flex: "none" }}
+                          >
+                            ({pp.mutatorPp > 0 ? "+" : "−"}{fmt1(Math.abs(pp.mutatorPp))} Mut)
+                          </span>
+                        ) : null}
                       </>
                     ) : (
                       <span style={{ fontSize: 12, fontWeight: 800, color: "var(--nl-accent)", flex: "none" }}>{fmt1(live.net)}</span>

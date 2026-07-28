@@ -6,6 +6,7 @@ import type { LegacyLineupLoadedContext, LegacyResolvePreviewOptions } from "@/l
 import {
   calculateMvpForcedMutatorModifierForSide,
   calculateFormModifierForSide,
+  resolveEffectiveLineupModifiers,
   calculateMutatorModifierForSide,
   buildMatchdayMutatorTraitsBySide,
   getFormCardColorForDisciplineCategory,
@@ -350,7 +351,14 @@ export function buildLegacyMatchdayResolvePreview(
             slotRoleModifier,
             ...(() => {
           const formResult = calculateFormModifierForSide({
-            modifiers: draft?.modifiers,
+            // Plan schlaegt Entwurf: was im Auswahlfeld steht, wird auch gerechnet.
+            modifiers: resolveEffectiveLineupModifiers({
+              modifiers: draft?.modifiers,
+              formCardPlans: context.formCardPlans,
+              seasonId: context.contextMeta.seasonId,
+              teamId: context.contextMeta.teamId,
+              matchdayId: context.contextMeta.matchdayId,
+            }),
             disciplineSide: meta.disciplineSide,
             disciplineColor: getFormCardColorForDisciplineCategory(
               context.disciplines.find((discipline) => discipline.id === meta.disciplineId)?.category,

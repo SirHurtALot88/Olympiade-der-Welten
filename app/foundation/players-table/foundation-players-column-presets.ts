@@ -38,6 +38,9 @@ export const NL_PLAYERS_HIDEABLE_COLUMN_IDS: ReadonlyArray<string> = [
   "ovr",
   "mvs",
   "mw",
+  // Netto-Verkaufswert (nicht der MW): eigene Datenspalte, damit sie über
+  // dieselbe Sichtbarkeits-/Preset-Mechanik läuft wie MW/GEHALT.
+  "sellValue",
   "salary",
   "contract",
   "appearances",
@@ -94,7 +97,10 @@ export const NL_PLAYERS_COLUMN_PRESETS: ReadonlyArray<NlPlayersColumnPreset> = [
     // `team` bewusst dabei (T-037): bei Scope "Alle"/"Aktive" mischt die Zeilenliste
     // Spieler mehrerer Teams — ohne Team-Spalte ist die Gehalts-/Vertragsansicht
     // nicht mehr einem Team zuordenbar.
-    visible: ["team", "ovr", "mvs", "mw", "salary", "contract", "careerLeague"],
+    // `sellValue` gehört fachlich hierher: die Finanzen-Sicht beantwortet
+    // "was ist der Kader wert / was kostet er" — der realistische Verkaufserlös
+    // ist genau diese Frage aus Verkäufersicht.
+    visible: ["team", "ovr", "mvs", "mw", "sellValue", "salary", "contract", "careerLeague"],
   },
   {
     id: "alles",

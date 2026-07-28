@@ -74,9 +74,28 @@ const CAPTAIN_WORTHWHILE_BASE_THRESHOLD = 44;
 const CAPTAIN_THRESHOLD_MIN_FRACTION = 0.15;
 // Faktor des Captain-Boosts laut Score-Engine: +0.5 x finalContribution.
 const CAPTAIN_RAW_BOOST_FACTOR = 0.5;
-// Ab dieser Spielerzahl gilt eine Diszi als "groß" -> Boost bringt spürbar mehr Rohpunkte.
+// Ab dieser Spielerzahl gilt eine Diszi als "groß" -> mehr Punkte am Tisch (rank_to_points
+// haengt an der Spielerzahl), darum bleibt dieser Aufschlag bestehen.
 const CAPTAIN_LARGE_DISCIPLINE_PLAYER_COUNT = 5;
 const CAPTAIN_LARGE_DISCIPLINE_MULTIPLIER = 1.18;
+// ---------------------------------------------------------------------------------------
+// Gegenkraft dazu: in KLEINEN Diszis waehlt derselbe absolute Boost mehr Raenge, weil die
+// Team-Gesamtwerte dort insgesamt niedriger liegen. Statt das ueber die Spielerzahl zu raten,
+// wird der ANTEIL des Boosts am eigenen Seiten-Gesamtscore gemessen:
+//
+//   boostShare = rawBoost / Seiten-Gesamtscore
+//
+// Bei gleichmaessigem Kader ist das ~ CAPTAIN_RAW_BOOST_FACTOR / Spielerzahl (3 Spieler ->
+// 0,167; 6 Spieler -> 0,083). Der Clou: hat man einen echten SPEZIALISTEN, liegt sein Beitrag
+// deutlich ueber dem der Mitspieler — dann steigt der Anteil zusaetzlich, und genau dort ist
+// der Captain am wertvollsten. Referenzwert entspricht einer 4er-Diszi mit gleichmaessigem
+// Kader; der Multiplikator ist damit um 1 zentriert und bewusst gedeckelt (kein Hebel, nur
+// eine Neigung).
+const CAPTAIN_REFERENCE_BOOST_SHARE = CAPTAIN_RAW_BOOST_FACTOR / 4;
+const CAPTAIN_SHARE_MULTIPLIER_MIN = 0.8;
+const CAPTAIN_SHARE_MULTIPLIER_MAX = 1.35;
+/** Untergrenze fuer den Nenner, damit fast leere Seiten den Anteil nicht explodieren lassen. */
+const CAPTAIN_SHARE_MIN_SIDE_SCORE = 30;
 // Fallback-Teamzahl für die Rang-Normierung, falls allTeamIdentities fehlt.
 const CAPTAIN_DEFAULT_TOTAL_TEAMS = 32;
 // Ein bester Seiten-Score darunter gilt als "schwache Seite" (Konzession möglich).
@@ -122,6 +141,29 @@ function getCaptainRequiredPlayers(
 }
 
 // Stärkster Disziplin-Score der aktuell für diese Seite geplanten Spieler.
+/**
+ * Summe der Diszi-Scores aller auf dieser Seite aufgestellten Spieler. Nenner fuer den
+ * Boost-Anteil (s. CAPTAIN_REFERENCE_BOOST_SHARE): je kleiner die Seite bzw. je dominanter
+ * ein Spezialist, desto groesser der Anteil des Captain-Boosts am Gesamtergebnis.
+ */
+function getCaptainSideTotalScore(
+  context: LegacyLineupLoadedContext,
+  entries: Array<LegacyLineupEntryInput & { isCaptain: boolean }>,
+  disciplineId: string,
+  disciplineSide: DisciplineSide,
+): number {
+  return entries
+    .filter((entry) => entry.disciplineId === disciplineId && entry.disciplineSide === disciplineSide)
+    .reduce(
+      (sum, entry) =>
+        sum +
+        (context.disciplineScores.find(
+          (score) => score.playerId === entry.playerId && score.disciplineId === disciplineId,
+        )?.score ?? 0),
+      0,
+    );
+}
+
 function getCaptainSideStrongestScore(
   context: LegacyLineupLoadedContext,
   entries: Array<LegacyLineupEntryInput & { isCaptain: boolean }>,
@@ -163,6 +205,18 @@ type CaptainOpportunity = {
   leverage: number;
   rank: number | null;
   strongestScore: number;
+  /** Anteil des Boosts am Seiten-Gesamtscore (kleine Diszi / Spezialist => hoeher). */
+  boostShare: number;
+  /** Aus boostShare abgeleitete Neigung, um 1 zentriert und gedeckelt. */
+  shareMultiplier: number;
+  /**
+   * NUR fuer den Vergleich der beiden Seiten: opportunityScore x shareMultiplier.
+   * Bewusst NICHT fuer die Lohnt-sich-Huerde — sonst wuerde der Anteil-Effekt die Huerde
+   * global senken und die Slots wanderten wieder an den Saisonanfang (gemessen: Verteilung
+   * [1,1,0,...] statt gleichmaessig). Der Anteil entscheidet WOHIN der Captain geht, nicht OB
+   * ein Slot ausgegeben wird.
+   */
+  selectionScore: number;
   isLargeDiscipline: boolean;
   isConceding: boolean;
   worthwhile: boolean;
@@ -187,8 +241,18 @@ function evaluateCaptainOpportunity(input: {
   const rawBoost = Math.max(0, contribution) * CAPTAIN_RAW_BOOST_FACTOR;
   const leverage = getCaptainRankLeverage(rank, totalTeams);
   const isLargeDiscipline = requiredPlayers >= CAPTAIN_LARGE_DISCIPLINE_PLAYER_COUNT;
+  // Punkte am Tisch: grosse Diszis bringen laut rank_to_points mehr.
   const sizeMultiplier = isLargeDiscipline ? CAPTAIN_LARGE_DISCIPLINE_MULTIPLIER : 1;
+  // Rang-Hebelwirkung des Boosts: sein Anteil am eigenen Seiten-Ergebnis. Klein/Spezialist
+  // => groesserer Anteil => derselbe absolute Boost waehlt mehr Raenge.
+  const sideTotalScore = getCaptainSideTotalScore(context, entries, candidate.disciplineId, candidate.disciplineSide);
+  const boostShare = rawBoost / Math.max(CAPTAIN_SHARE_MIN_SIDE_SCORE, sideTotalScore);
+  const shareMultiplier = Math.min(
+    CAPTAIN_SHARE_MULTIPLIER_MAX,
+    Math.max(CAPTAIN_SHARE_MULTIPLIER_MIN, boostShare / CAPTAIN_REFERENCE_BOOST_SHARE),
+  );
   const opportunityScore = rawBoost * leverage * sizeMultiplier;
+  const selectionScore = opportunityScore * shareMultiplier;
 
   // Konzession: schwache Seite UND (konservative Aufstellung ODER Tabellenkeller). Genau der
   // Fall des Users: "wenn man eh schwach ist und negative Form reinschmeißt, warum Captain?"
@@ -206,6 +270,9 @@ function evaluateCaptainOpportunity(input: {
     leverage,
     rank,
     strongestScore,
+    boostShare,
+    shareMultiplier,
+    selectionScore,
     isLargeDiscipline,
     isConceding,
     worthwhile,
@@ -1045,8 +1112,10 @@ function buildCaptainDecisions(
   // --- Auswahl: höchstens EIN neuer Captain pro Spieltag, an der lohnendsten Seite. ---
   // Deterministische Reihenfolge: bester Opportunity-Score zuerst, dann stabile Schlüssel.
   const rankedOpportunities = [...opportunityBySide.values()].sort((left, right) => {
-    if (right.opportunityScore !== left.opportunityScore) {
-      return right.opportunityScore - left.opportunityScore;
+    // Hier zaehlt der anteilsgewichtete Wert: bei gleichem Rohertrag gewinnt die Seite, an der
+    // der Boost mehr bewegt (kleine Diszi / Spezialist).
+    if (right.selectionScore !== left.selectionScore) {
+      return right.selectionScore - left.selectionScore;
     }
     if (left.candidate.disciplineId !== right.candidate.disciplineId) {
       return left.candidate.disciplineId.localeCompare(right.candidate.disciplineId);
@@ -1138,12 +1207,17 @@ function buildCaptainDecisions(
 
     if (selectedNewSides.has(side)) {
       // Grund/Reasoning sichtbar machen (Audit/Preview): großer Weg vs. opportunistisch.
+      const shareLabel = `${Math.round(opportunity.boostShare * 100)}% der Seite, Gewicht ${opportunity.shareMultiplier.toFixed(2)}`;
       const reason =
-        opportunity.isLargeDiscipline && opportunity.rank != null && opportunity.rank <= Math.ceil(totalTeams * 0.5)
-          ? `Captain auf große Diszi absichern: ${captainLabel} (Rang ${rankLabel}, +${formatBoost(opportunity.rawBoost)} Rohpunkte, Hebel ${opportunity.leverage.toFixed(2)})`
-          : forced
-            ? `Captain gesetzt (Saisonende, Slot sonst verfallen): ${captainLabel} (+${formatBoost(opportunity.rawBoost)} Rohpunkte)`
-            : `Captain opportunistisch gesetzt: ${captainLabel} (Wert ${formatBoost(opportunity.opportunityScore)} >= Hürde ${formatBoost(effectiveThreshold)}, Rang ${rankLabel})`;
+        // Ein hoher Boost-Anteil heisst: kleine Diszi und/oder echter Spezialist — dort waehlt
+        // derselbe absolute Boost am meisten Raenge. Das ist der interessanteste Fall, darum zuerst.
+        opportunity.shareMultiplier >= 1.15
+          ? `Captain auf Spezialisten/kleine Diszi: ${captainLabel} (${shareLabel}, Rang ${rankLabel}, +${formatBoost(opportunity.rawBoost)} Rohpunkte)`
+          : opportunity.isLargeDiscipline && opportunity.rank != null && opportunity.rank <= Math.ceil(totalTeams * 0.5)
+            ? `Captain auf große Diszi absichern: ${captainLabel} (Rang ${rankLabel}, +${formatBoost(opportunity.rawBoost)} Rohpunkte, Hebel ${opportunity.leverage.toFixed(2)})`
+            : forced
+              ? `Captain gesetzt (Saisonende, Slot sonst verfallen): ${captainLabel} (+${formatBoost(opportunity.rawBoost)} Rohpunkte)`
+              : `Captain opportunistisch gesetzt: ${captainLabel} (Wert ${formatBoost(opportunity.opportunityScore)} >= Hürde ${formatBoost(effectiveThreshold)}, Rang ${rankLabel}, ${shareLabel})`;
       decisionsBySide.set(side, {
         candidate,
         status: "selected",

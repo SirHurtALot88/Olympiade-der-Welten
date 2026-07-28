@@ -20,6 +20,7 @@ import {
   type NlTone,
 } from "@/components/foundation/new-look";
 import type { DisciplineCategoryFilter, FoundationDiszisPanelProps } from "@/app/foundation/ranks-v2/FoundationDiszisPanel";
+import type { FoundationDisciplineMutatorInfo } from "@/lib/foundation/tabs/use-foundation-cross-tab-discipline-ranks";
 
 /**
  * "Neuer Look" Spielplan — bildet den Diszis-Reiter (jetzt "Spielplan")
@@ -212,6 +213,33 @@ export default function FoundationDiszisNewLook({
       }
       case "mutator1":
       case "mutator2": {
+        // Gewürfelte Spieltag-Mutatoren (deterministischer Engine-Seed) + Treffer
+        // aus den applied Ergebnissen; Hover (title) listet die getroffenen
+        // Spieler. Quelle: `mutatorInfo1/2` aus dem Cross-Tab-Hook — die alten
+        // statischen `discipline.mutator1/2`-Textfelder sind in den Saves leer,
+        // deshalb stand hier vorher pauschal "kein Mutator".
+        const info = (column.key === "mutator1" ? row.mutatorInfo1 : row.mutatorInfo2) as
+          | FoundationDisciplineMutatorInfo
+          | null
+          | undefined;
+        if (info?.label) {
+          const hitTitle = info.resolved
+            ? info.hitPlayers.length > 0
+              ? `Getroffen: ${info.hitPlayers
+                  .map((player) => `${player.playerName}${player.teamCode ? ` (${player.teamCode})` : ""}`)
+                  .join(", ")}`
+              : "Keine Treffer bei den aufgestellten Spielern."
+            : "Spieltag noch nicht gewertet — Treffer stehen erst nach dem Ergebnis fest.";
+          return (
+            <span className="nl-diszis-mutator" title={`${info.label} — ${hitTitle}`}>
+              {info.label}
+              <br />
+              <small className={info.resolved && info.hitCount > 0 ? undefined : "muted"}>
+                {info.resolved ? `${formatNlNumber(info.hitCount, 0)} Treffer` : "ausstehend"}
+              </small>
+            </span>
+          );
+        }
         const value = (row[column.key] as string) || "";
         return value ? <>{value}</> : <span className="muted">kein Mutator</span>;
       }
@@ -338,9 +366,10 @@ export default function FoundationDiszisNewLook({
         )}
 
         <p className="muted">
-          Mutatoren sind pro Disziplin (noch) nicht im Saison-Spielplan hinterlegt — die Spalten zeigen daher
-          „kein Mutator&#8220;. Der vollständige Spieltag-Ablauf steht im{" "}
-          <a href="#foundation-diszis-schedule">Saison-Spielplan</a> oben.
+          Mutatoren werden pro Spieltag und Disziplin-Seite deterministisch ausgewürfelt (gleicher Seed wie die
+          Spieltag-Wertung) — die Spalten zeigen die beiden Spieltag-Mutatoren der Disziplin samt Trefferzahl aus dem
+          gewerteten Ergebnis; Hover über die Zelle listet die getroffenen Spieler. Der vollständige Spieltag-Ablauf
+          steht im <a href="#foundation-diszis-schedule">Saison-Spielplan</a> oben.
         </p>
       </NlCard>
     </section>

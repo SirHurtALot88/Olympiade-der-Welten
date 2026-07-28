@@ -446,8 +446,12 @@ describe("legacy matchday resolve preview", () => {
     expect(betaTeam?.rank).toBe(2);
     expect(alphaTeam?.teamPoints).toBe(6.6);
     expect(betaTeam?.teamPoints).toBe(6.2);
+    // Dieser Spieler trifft BEIDE ausgewuerfelten Traits — daher 2 x 6 = 12 Score.
+    // Die PP standen hier frueher auf 0,3 und schrieben damit einen Fehler fest: derselbe doppelte
+    // Treffer zaehlte im Score doppelt und in den Player-Points einfach. Seit beide Waehrungen mit
+    // der Trefferzahl skalieren, sind es 2 x 0,3 = 0,6. Siehe tests/mutator-fairness.test.ts.
     expect(alphaPlayer?.mutatorBonus).toBe(12);
-    expect(alphaPlayer?.mutatorPpsBonus).toBe(0.3);
+    expect(alphaPlayer?.mutatorPpsBonus).toBe(0.6);
     // finalPlayerScore enthält jetzt den Pro-Spieler-Form-Anteil (war 32 OHNE Form,
     // jetzt 32 + Formanteil ≈ 6 ± 4).
     expect(alphaPlayer?.finalPlayerScore).toBeGreaterThan(32);

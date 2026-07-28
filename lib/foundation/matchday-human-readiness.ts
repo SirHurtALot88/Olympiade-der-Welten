@@ -46,6 +46,48 @@ export function evaluateMatchdayHumanReadiness(
  * Verhalten (eigenes Team reicht), online wird auf alle menschlichen Teams
  * gewartet — auch auf die des Mitspielers.
  */
+/**
+ * Leitet die Bereitschaftsliste direkt aus dem Spielstand ab.
+ *
+ * Bewusst NICHT über den Arena-Base-Service: der laedt asynchron und steht an
+ * der Sprungstelle im Shell-Scope nicht zur Verfuegung — genau deshalb blieb
+ * die Regel zunaechst unverdrahtet. Die Kriterien sind dieselben wie dort
+ * (`countMatchdayLineupDisciplineSides(...) >= 2`, also beide Disziplin-Seiten
+ * des Spieltags gesetzt), nur lokal aus `lineupDrafts` gerechnet.
+ */
+export function buildMatchdayReadinessTeamsFromState(input: {
+  teams: ReadonlyArray<{ teamId: string }>;
+  controlModeByTeamId: Readonly<Record<string, { controlMode: string } | undefined>>;
+  lineupDrafts:
+    | ReadonlyArray<{
+        teamId: string;
+        seasonId: string;
+        matchdayId: string;
+        entries?: ReadonlyArray<{ disciplineId: string; disciplineSide: "d1" | "d2" }> | null;
+      }>
+    | null
+    | undefined;
+  seasonId: string;
+  matchdayId: string | null;
+}): MatchdayReadinessTeam[] {
+  const sidesByTeam = new Map<string, Set<string>>();
+  for (const draft of input.lineupDrafts ?? []) {
+    if (draft.seasonId !== input.seasonId || draft.matchdayId !== input.matchdayId) {
+      continue;
+    }
+    const sides = sidesByTeam.get(draft.teamId) ?? new Set<string>();
+    for (const entry of draft.entries ?? []) {
+      sides.add(`${entry.disciplineId}::${entry.disciplineSide}`);
+    }
+    sidesByTeam.set(draft.teamId, sides);
+  }
+  return input.teams.map((team) => ({
+    id: team.teamId,
+    controlMode: input.controlModeByTeamId[team.teamId]?.controlMode ?? "manual",
+    currentMatchdayReady: (sidesByTeam.get(team.teamId)?.size ?? 0) >= 2,
+  }));
+}
+
 export function canJumpToArenaAfterLineupSave(input: {
   isOnlineGame: boolean;
   activeTeamReady: boolean;

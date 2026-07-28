@@ -1,4 +1,4 @@
-import type { FormCardColor, FormCardRecord, GameState, LineupDraftModifiers, LineupDisciplineSide, Player } from "@/lib/data/olyDataTypes";
+import type { FormCardColor, FormCardPlanRecord, FormCardRecord, GameState, LineupDraftModifiers, LineupDisciplineSide, Player } from "@/lib/data/olyDataTypes";
 import type {
   LegacyFormCardOption,
   LegacyMutatorSlotEffect,
@@ -112,6 +112,53 @@ export function normalizeLineupDraftModifiers(modifiers?: Partial<LineupDraftMod
       ...(modifiers?.d2 ?? {}),
     },
   };
+}
+
+/**
+ * DIE MASSGEBLICHE KARTENAUSWAHL EINES SPIELTAGS — Plan schlägt Entwurf.
+ *
+ * Formkarten lagen an ZWEI Stellen, und Anzeige und Abrechnung lasen verschiedene:
+ *  - `seasonState.formCardPlans` — was das Auswahlfeld beim Klicken persistiert (je Spieltag+Seite)
+ *    und was die Karte in der Oberflaeche anzeigt.
+ *  - `draft.modifiers` — woraus die Score-Engine rechnete. Der Entwurf bekommt seinen Inhalt nur
+ *    beim SPEICHERN, mit dem Stand von genau diesem Moment.
+ * Wer danach eine Karte tauschte, aenderte damit die Anzeige, aber nicht die Rechnung. Gemeldet aus
+ * dem Spiel: auf d1 stand "+8,0 MEN x2" (also +16 je Spieler), gerechnet wurde mit -4 — dem Wert der
+ * d2-Karte. Die betroffenen Spieler zeigten -6,9 / -6,9 / -2,0, also flacher Anteil -4 plus Jitter,
+ * statt der zugesagten +12 bis +20.
+ *
+ * Der Plan gewinnt, weil er die je Spieltag festgehaltene ABSICHT ist; der Entwurf ist ein
+ * Nebenprodukt des Speicherzeitpunkts. Fehlt fuer eine Seite ein Plan, bleibt der Entwurf gueltig —
+ * Altspielstaende ohne Plaene rechnen damit unveraendert weiter.
+ */
+export function resolveEffectiveLineupModifiers(input: {
+  modifiers?: Partial<LineupDraftModifiers> | null;
+  formCardPlans?: readonly FormCardPlanRecord[] | null;
+  seasonId?: string | null;
+  teamId?: string | null;
+  matchdayId?: string | null;
+}): LineupDraftModifiers {
+  const normalized = normalizeLineupDraftModifiers(input.modifiers);
+  const plans = input.formCardPlans ?? [];
+  if (plans.length === 0) return normalized;
+  for (const side of ["d1", "d2"] as const) {
+    const plan = plans.find(
+      (entry) =>
+        entry.disciplineSide === side &&
+        (input.matchdayId == null || entry.matchdayId === input.matchdayId) &&
+        (input.seasonId == null || entry.seasonId === input.seasonId) &&
+        (input.teamId == null || entry.teamId === input.teamId),
+    );
+    // Ein Plan OHNE Karten ist eine Aussage ("hier liegt nichts"), kein fehlender Plan — er setzt
+    // den Entwurf ebenso zurueck. Sonst ueberlebte eine entfernte Karte in der Abrechnung.
+    if (!plan) continue;
+    normalized[side] = {
+      ...normalized[side],
+      primaryFormCardId: plan.primaryFormCardId ?? null,
+      secondaryFormCardId: plan.secondaryFormCardId ?? null,
+    };
+  }
+  return normalized;
 }
 
 export function lineupModifiersHaveFormCardSelections(modifiers?: Partial<LineupDraftModifiers> | null) {
@@ -833,12 +880,24 @@ export function calculateMutatorModifierForSide(input: {
         .map((trait) => [normalizeTraitKey(trait), trait] as const),
     ).values(),
   );
-  // Vorrang: Eine vorhandene gespeicherte Spieler-/KI-Auswahl (mutatorTrait1/2) wird
-  // honoriert. Nur wenn KEINE gespeicherte Auswahl existiert, fällt die Wertung
-  // deterministisch auf die ausgewürfelten Matchday-Traits zurück (Roll bleibt Fallback).
+  // VORRANG HAT DER WURF DES SPIELTAGS, nicht eine gespeicherte Auswahl.
+  //
+  // Die Mutatoren sind eine Eigenschaft der DISZIPLIN: zwei Traits, einmal je Spieltag und Seite
+  // aus allen 36 ausgewuerfelt, fuer alle 32 Teams dieselben (so sagt es auch
+  // `getLegacyMutatorSourceSummary`). Vorher gewann eine gespeicherte Auswahl — und geschrieben
+  // wird die ausschliesslich von `applyMutatorTraitsToLineupModifiers` im KI-Aufstellungspfad,
+  // ueber `selectBestMutatorTraitsForEntries`: das waehlt die Traits danach aus, WAS DER KADER HAT.
+  //
+  // Damit bekam jedes KI-Team Mutatoren, die auf seinen eigenen Kader passten — garantierte Treffer,
+  // jeden Spieltag. Das menschliche Team hat keine gespeicherte Auswahl (die Oberflaeche bietet dafuer
+  // kein Feld) und fiel auf den blinden Wurf zurueck, traf also nur mit Glueck. Aus einem Wurf, der
+  // fuer alle gleich sein sollte, war ein Vorteil fuer die KI geworden.
+  //
+  // Gespeicherte Traits bleiben als RUECKFALL erhalten — fuer Vorschauen und Altspielstaende, in
+  // denen kein Wurf vorliegt.
   const selectedTraits = Array.from(
     new Map(
-      (storedTraits.length > 0 ? storedTraits : matchdayTraits).map(
+      (matchdayTraits.length > 0 ? matchdayTraits : storedTraits).map(
         (trait) => [normalizeTraitKey(trait), trait] as const,
       ),
     ).values(),
@@ -861,12 +920,16 @@ export function calculateMutatorModifierForSide(input: {
     const hits = countTraitHits(player, traitSet);
     totalHits += hits;
     if (hits > 0) {
+      // BEIDE Groessen skalieren mit der Trefferzahl. Der Score tat das schon (`hits * 6`), die
+      // Player-Points nicht — sie standen flach auf 0,3, egal ob ein Spieler einen oder beide
+      // ausgewuerfelten Traits hatte. Deshalb bekam nie jemand doppelte Mutator-PP, obwohl der
+      // doppelte Treffer im Score sichtbar war. Zwei Waehrungen fuer dieselbe Bedingung duerfen
+      // nicht unterschiedlich zaehlen.
       playerMutatorBonuses[playerId] = Number((hits * 6).toFixed(1));
-      playerMutatorPpsBonuses[playerId] = 0.3;
+      playerMutatorPpsBonuses[playerId] = Number((hits * 0.3).toFixed(2));
     }
     if (player) {
       const allTraits = Array.from(new Set(getPlayerMutatorTraitSlots(player).map(normalizeTraitKey).filter(Boolean)));
-      let assignedPpsTrait = false;
       for (const trait of selectedTraits) {
         const normalizedTrait = normalizeTraitKey(trait);
         const traitHits = allTraits.reduce((count, playerTrait) => count + (playerTrait === normalizedTrait ? 1 : 0), 0);
@@ -875,12 +938,13 @@ export function calculateMutatorModifierForSide(input: {
           const affectedPlayerIds = affectedPlayerIdsByTrait.get(normalizedTrait) ?? new Set<string>();
           affectedPlayerIds.add(playerId);
           affectedPlayerIdsByTrait.set(normalizedTrait, affectedPlayerIds);
-          if (!assignedPpsTrait) {
-            const ppsPlayerIds = ppsPlayerIdsByTrait.get(normalizedTrait) ?? new Set<string>();
-            ppsPlayerIds.add(playerId);
-            ppsPlayerIdsByTrait.set(normalizedTrait, ppsPlayerIds);
-            assignedPpsTrait = true;
-          }
+          // Ein Spieler zaehlt bei JEDEM getroffenen Trait mit. Vorher wurde er nur dem ERSTEN
+          // zugeschlagen ("assignedPpsTrait") — ein Rest der alten flachen 0,3. Seit die Auszahlung
+          // mit der Trefferzahl skaliert, wich der Slot-Ausweis von der Auszahlung ab: ein Spieler
+          // mit beiden Traits bekam 0,6, die Slots wiesen zusammen aber nur 0,3 aus.
+          const ppsPlayerIds = ppsPlayerIdsByTrait.get(normalizedTrait) ?? new Set<string>();
+          ppsPlayerIds.add(playerId);
+          ppsPlayerIdsByTrait.set(normalizedTrait, ppsPlayerIds);
         }
       }
     }

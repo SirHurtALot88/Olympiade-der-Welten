@@ -2701,6 +2701,19 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const posMax = finalMax;
   posMaxRef.current = posMax;
 
+  /**
+   * Etappen-Label fuer den Chip kuerzen: mit Spielername + Wert + Rang in derselben Zeile
+   * waere "Runde 1" zu breit. "Runde 3" -> "R3", "Etappe 2" -> "E2"; alles andere bleibt wie
+   * es ist (Diszis mit sprechenden Etappennamen sollen die behalten), notfalls gekuerzt.
+   */
+  const shortSlotLabel = (label: string, index: number): string => {
+    const numbered = /^(Runde|Etappe|Versuch|Durchgang)\s+(\d+)$/i.exec(label.trim());
+    if (numbered) {
+      return `${numbered[1]![0]!.toUpperCase()}${numbered[2]}`;
+    }
+    return label.length > 10 ? `${label.slice(0, 9)}…` : label || `E${index + 1}`;
+  };
+
   // ---- Konsolidierte „Dein Team"-Karte (nur track) (FEATURE 3) ----
   // Ersetzt den früheren MyTracker-Streifen UND die separate „Dein Läufer"-Karte durch
   // eine kompakte 2-Zeilen-Karte: Kopf (Wappen · Name · Rang · Punkte · Δ zur Spitze ·
@@ -2777,16 +2790,41 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             ) : null}
           </div>
         </div>
-        {/* Split-Strip: ein Chip je Etappe (Wert erst nach Auftritt; Etappen-Bester golden). */}
+        {/* Split-Strip: ein Chip je Etappe — "R1 · Name +49 #3". Der Rang ist die Platzierung
+            DES SPIELERS in dieser Etappe (slotRankOf), nicht der Teamrang; der Teamrang nach der
+            Etappe steckt weiter im Punkt darunter. Wert + Rang erst nach dem Auftritt; der
+            Name darf vorher stehen, es ist der eigene Kader (kein Spoiler). */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 5, fontSize: 11, fontVariantNumeric: "tabular-nums" }}>
           {Array.from({ length: slotCount }, (_, s) => {
             const thrown = me.thrownSlot >= 0 && s <= me.thrownSlot;
-            const best = thrown && slotRankOf(s, me, rtRef.current) === 1;
+            const slotRank = thrown ? slotRankOf(s, me, rtRef.current) : null;
+            const best = slotRank === 1;
             const histRank = me.rankHistory[s];
+            const slotPlayer = me.players[s] ?? null;
+            const slotLabel = shortSlotLabel(slots[s] ?? "E" + (s + 1), s);
+            const valueLabel = thrown ? "+" + fmt1(playerNet(slotPlayer)) : "—";
+            const title = [
+              slots[s] ?? "Etappe " + (s + 1),
+              slotPlayer?.name ?? null,
+              thrown ? `${valueLabel} Punkte` : "noch nicht dran",
+              slotRank != null ? `Etappen-Rang #${slotRank}` : null,
+              histRank != null ? `Teamrang danach #${histRank}` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ");
             return (
-              <div key={s} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, minWidth: 32, opacity: thrown ? 1 : 0.45 }}>
-                <span style={{ padding: "2px 6px", borderRadius: 6, fontWeight: 800, whiteSpace: "nowrap", border: `1px solid ${best ? "var(--nl-warn)" : "var(--nl-line)"}`, color: best ? "var(--nl-warn)" : "inherit", background: best ? "color-mix(in srgb, var(--nl-warn) 14%, transparent)" : "transparent" }}>
-                  {best ? "🥇 " : ""}{slots[s] ?? "E" + (s + 1)} {thrown ? "+" + fmt1(playerNet(me.players[s])) : "—"}
+              <div key={s} title={title} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, minWidth: 32, maxWidth: 190, opacity: thrown ? 1 : 0.45 }}>
+                <span style={{ display: "inline-flex", alignItems: "baseline", gap: 4, maxWidth: "100%", padding: "2px 6px", borderRadius: 6, fontWeight: 800, whiteSpace: "nowrap", border: `1px solid ${best ? "var(--nl-warn)" : "var(--nl-line)"}`, color: best ? "var(--nl-warn)" : "inherit", background: best ? "color-mix(in srgb, var(--nl-warn) 14%, transparent)" : "transparent" }}>
+                  <span style={{ flex: "none" }}>{best ? "🥇 " : ""}{slotLabel}</span>
+                  {slotPlayer?.name ? (
+                    <span style={{ fontWeight: 700, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", color: best ? undefined : "var(--nl-mut)" }}>
+                      {slotPlayer.name}
+                    </span>
+                  ) : null}
+                  <span style={{ flex: "none" }}>{valueLabel}</span>
+                  {slotRank != null ? (
+                    <span style={{ flex: "none", fontWeight: 800, color: best ? "var(--nl-warn)" : ampel(slotRank) }}>#{slotRank}</span>
+                  ) : null}
                 </span>
                 <span aria-hidden style={{ width: 6, height: 6, borderRadius: "50%", background: histRank != null ? ampel(histRank) : "var(--nl-line)" }} />
               </div>

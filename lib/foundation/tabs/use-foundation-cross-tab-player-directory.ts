@@ -24,6 +24,10 @@ import {
   getPlayerDisplayMarketValue,
   getRosterEntrySalarySortValue,
 } from "@/lib/foundation/tabs/season-stand-render-helpers";
+import {
+  buildExpectedSellValueByPlayerId,
+  type ExpectedSellValueEntry,
+} from "@/lib/market/transfermarkt-expected-sell-value";
 import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
 import { resolvePlayerPotentialRecordFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 
@@ -42,9 +46,28 @@ export type FoundationPlayerScopeRow = {
   playerMvs: number | null;
   playerPps: number | null;
   /**
-   * PP je Achse und Disziplin aus dem Saison-Punkte-Ledger — Grundlage der aufklappbaren
-   * Achsen-Spalten. Dieselbe Quelle und derselbe Builder wie in der Teams-Detailansicht,
-   * damit beide Ansichten nicht auseinanderlaufen.
+   * ECHTE Performance-Punkte je Achse (nicht die Kernwerte 0–100). Die
+   * PPs-Aufschlüsselung in der Spielerliste zeigte bisher `player.coreStats`
+   * als „Näherung", weil diese Werte hier nicht durchgereicht waren — die vier
+   * Balken summierten sich also nie auf den Gesamt-PPs-Wert darüber. Sie liegen
+   * in derselben `playerRatingsById`-Karte, aus der schon OVR/MVS/PPs kommen.
+   */
+  axisPps: { pow: number | null; spe: number | null; men: number | null; soc: number | null };
+  /**
+   * Erwarteter Verkaufserlös (Brutto laut Sale-Factor, offener Buyout, Netto) —
+   * bewusst NICHT nochmal der Marktwert (den zeigt die MW-Spalte schon), sondern
+   * das, was ein Verkauf JETZT wirklich einbrächte. Einmalig für alle Zeilen
+   * batch-berechnet (`buildExpectedSellValueByPlayerId`) statt eines Server-
+   * Previews pro Zeile. `null` für Free Agents (kein Kader → kein Verkauf) und
+   * ohne belastbaren Marktwert — dort zeigt die Spalte "—" statt einer Schätzung.
+   */
+  sellPreview: ExpectedSellValueEntry | null;
+  /**
+   * Dieselben PP eine Ebene tiefer: je Achse zusätzlich die zugehörigen
+   * Disziplinen aus dem Saison-Punkte-Ledger — Grundlage der aufklappbaren
+   * Achsen-Spalten. Gleiche Quelle und gleicher Builder wie in der
+   * Teams-Detailansicht, damit beide Ansichten nicht auseinanderlaufen; die
+   * Achsentotals darin stammen aus denselben `ppPow`/`ppSpe`/… wie `axisPps`.
    */
   disciplinePpsByAxis: RosterAxisDisciplinePps[];
   seasonPoints: number | null;
@@ -289,6 +312,9 @@ export function useFoundationCrossTabPlayerDirectory(input: {
 
     const teamById = new Map(input.gameState.teams.map((team) => [team.teamId, team] as const));
     const rosterByPlayerId = new Map(input.gameState.rosters.map((roster) => [roster.playerId, roster] as const));
+    // EIN Batch-Lauf für alle Kaderspieler (der Sale-Factor-Rank-Kontext ist pro
+    // GameState gecacht) — ein Preview-Aufruf pro Zeile wäre bei ~330 Zeilen zu teuer.
+    const sellValueByPlayerId = buildExpectedSellValueByPlayerId(input.gameState);
 
     return input.gameState.players
       .map((player) => {
@@ -321,6 +347,15 @@ export function useFoundationCrossTabPlayerDirectory(input: {
           playerOvr: playerRating?.ovrNormalized ?? null,
           playerMvs: playerRating?.mvs ?? null,
           playerPps: playerRating?.ppsSeason ?? null,
+          axisPps: {
+            pow: playerRating?.ppPow ?? null,
+            spe: playerRating?.ppSpe ?? null,
+            men: playerRating?.ppMen ?? null,
+            soc: playerRating?.ppSoc ?? null,
+          },
+          // Achsentotals bewusst aus denselben `ppPow`/`ppSpe`/… wie `axisPps`
+          // oben — Achsen-Spalte und aufgeklappte Disziplin-Spalten dürfen nicht
+          // aus zwei verschiedenen Quellen stammen.
           disciplinePpsByAxis: (() => {
             const ledgerSummary = input.seasonPointsLedger?.playerSummariesByPlayerId?.get(player.id) ?? null;
             return buildRosterDisciplinePpsByAxis({
@@ -335,6 +370,7 @@ export function useFoundationCrossTabPlayerDirectory(input: {
               },
             });
           })(),
+          sellPreview: sellValueByPlayerId.get(player.id) ?? null,
           seasonPoints: seasonPerformance?.totalPoints ?? null,
           appearances: seasonPerformance?.appearances ?? null,
           bestDiscipline: seasonPerformance?.bestDisciplineLabel ?? null,
@@ -356,6 +392,10 @@ export function useFoundationCrossTabPlayerDirectory(input: {
         return true;
       });
   }, [
+    // Ganzer GameState als Dependency: `buildExpectedSellValueByPlayerId` und
+    // `resolvePlayerPotentialRecordFromGameState` lesen mehr als players/rosters/teams
+    // (Matchday-Results, Freeze-Snapshot, Verträge) — Teil-Deps würden veralten.
+    input.gameState,
     input.gameState.players,
     input.gameState.rosters,
     input.gameState.teams,
@@ -407,6 +447,7 @@ export function useFoundationCrossTabPlayerDirectory(input: {
         ovr: (row) => row.playerOvr ?? Number.NEGATIVE_INFINITY,
         mvs: (row) => row.playerMvs ?? Number.NEGATIVE_INFINITY,
         mw: (row) => getPlayerDisplayMarketValue(row.player) ?? Number.NEGATIVE_INFINITY,
+        sellValue: (row) => row.sellPreview?.expectedSellValue ?? Number.NEGATIVE_INFINITY,
         salary: (row) => (row.roster ? getRosterEntrySalarySortValue(row.roster, row.player) : Number.NEGATIVE_INFINITY),
         contract: (row) => row.roster?.contractLength ?? 0,
         appearances: (row) => row.appearances ?? Number.NEGATIVE_INFINITY,
@@ -445,6 +486,7 @@ export function useFoundationCrossTabPlayerDirectory(input: {
       ovr: (row) => row.playerOvr ?? Number.NEGATIVE_INFINITY,
       mvs: (row) => row.playerMvs ?? Number.NEGATIVE_INFINITY,
       mw: (row) => getPlayerDisplayMarketValue(row.player) ?? Number.NEGATIVE_INFINITY,
+      sellValue: (row) => row.sellPreview?.expectedSellValue ?? Number.NEGATIVE_INFINITY,
       salary: (row) => (row.roster ? getRosterEntrySalarySortValue(row.roster, row.player) : Number.NEGATIVE_INFINITY),
       contract: (row) => row.roster?.contractLength ?? 0,
       appearances: (row) => row.appearances ?? Number.NEGATIVE_INFINITY,

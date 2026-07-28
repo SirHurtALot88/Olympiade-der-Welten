@@ -501,6 +501,57 @@ describe("legacy ai lineup suggestion", () => {
     expect(preview.captainDecisions.some((decision) => decision.includes("große Diszi absichern"))).toBe(true);
   });
 
+  it("prefers the small discipline with a specialist over the larger one for the captain slot", () => {
+    // Gleiches Rohpotenzial, unterschiedlicher HEBEL: In der grossen Diszi (d1, 5 Spieler)
+    // geht der Boost im Gesamtergebnis unter, in der kleinen (d2, 2 Spieler) mit einem klaren
+    // Spezialisten ist er ein grosser Anteil am Seitenergebnis — und waehlt darum mehr Raenge.
+    // Ohne die Anteils-Gewichtung haette d1 wegen CAPTAIN_LARGE_DISCIPLINE_MULTIPLIER gewonnen.
+    const context = createContext();
+    context.disciplinePlayerCounts = { tdm: 5, "mini-dm": 2 };
+    context.disciplineSidePlayerCounts = { "tdm::d1": 5, "mini-dm::d2": 2 };
+    context.teamDisciplineRanks = {
+      // Gleicher Rang auf beiden Seiten -> gleicher Rang-Hebel, der Unterschied kommt allein
+      // aus dem Boost-Anteil.
+      tdm: { rank: 8, score: 390, sourceStatus: "mapped" },
+      "mini-dm": { rank: 8, score: 150, sourceStatus: "mapped" },
+    };
+    context.activePlayers = [
+      ...context.activePlayers,
+      { id: "a6", saveId: "save-1", seasonId: "season-1", teamId: "A-A", playerId: "p6", upkeep: 10 },
+      { id: "a7", saveId: "save-1", seasonId: "season-1", teamId: "A-A", playerId: "p7", upkeep: 10 },
+    ];
+    context.rosterPlayers = [
+      ...context.rosterPlayers,
+      { id: "p6", name: "Player 6", coreStats: { pow: 70, spe: 20, men: 20, soc: 20 } },
+      { id: "p7", name: "Player 7", coreStats: { pow: 70, spe: 20, men: 20, soc: 20 } },
+    ];
+    context.disciplineScores = [
+      // Grosse Diszi: breite, gleichmaessige Bank — der beste Spieler ist minimal staerker als
+      // der Spezialist drueben, sein Boost ist aber nur ein kleiner Teil von ~5 x 80.
+      { playerId: "p1", disciplineId: "tdm", score: 84 },
+      { playerId: "p2", disciplineId: "tdm", score: 82 },
+      { playerId: "p6", disciplineId: "tdm", score: 80 },
+      { playerId: "p7", disciplineId: "tdm", score: 80 },
+      { playerId: "p4", disciplineId: "tdm", score: 78 },
+      { playerId: "p5", disciplineId: "tdm", score: 76 },
+      { playerId: "p3", disciplineId: "tdm", score: 20 },
+      // Kleine Diszi: EIN klarer Spezialist plus ein schwacher Partner.
+      { playerId: "p3", disciplineId: "mini-dm", score: 80 },
+      { playerId: "p5", disciplineId: "mini-dm", score: 24 },
+      { playerId: "p1", disciplineId: "mini-dm", score: 12 },
+      { playerId: "p2", disciplineId: "mini-dm", score: 10 },
+      { playerId: "p4", disciplineId: "mini-dm", score: 10 },
+      { playerId: "p6", disciplineId: "mini-dm", score: 10 },
+      { playerId: "p7", disciplineId: "mini-dm", score: 10 },
+    ];
+
+    const preview = buildAiLegacyLineupPreview(context);
+
+    expect(preview.d2.captainSelectionStatus).toBe("selected");
+    expect(preview.d1.captainSelectionStatus).not.toBe("selected");
+    expect(preview.captainDecisions.some((decision) => decision.includes("Spezialisten/kleine Diszi"))).toBe(true);
+  });
+
   it("skips captain suggestions entirely once the season captain limit is already reached", () => {
     const context = createContext();
     context.teamStatus = {

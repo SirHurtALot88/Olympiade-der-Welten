@@ -125,6 +125,10 @@ import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-draw
 import { getPlayerDisplayMarketValueDelta as resolvePlayerDisplayMarketValueDelta } from "@/lib/foundation/player-display-market-value";
 import { getPlayerBaselineEconomyReference } from "@/lib/players/player-baseline-service";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
+import {
+  buildMatchdayReadinessTeamsFromState,
+  canJumpToArenaAfterLineupSave,
+} from "@/lib/foundation/matchday-human-readiness";
 import { buildPlayerSeasonPerformanceMap } from "@/lib/foundation/player-season-performance";
 import { buildPlayerLeagueCareerStatsMap } from "@/lib/foundation/player-league-career-stats";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
@@ -6362,7 +6366,22 @@ export function useFoundationShellRouterBodyScope({
     }
     if (
       activeView === "lineup" &&
-      activeManagerMatchdayReady &&
+      canJumpToArenaAfterLineupSave({
+        // Im Online-Spiel steuern beide Spieler mehrere Teams und die Arena zeigt
+        // den Spieltag ALLER. Wer als Erster speicherte, landete sonst in einer
+        // Arena, deren Aufstellungen noch unvollstaendig sind — und saehe
+        // Ergebnisse, bevor der Mitspieler gesetzt hat. Solo bleibt es beim
+        // eigenen Team.
+        isOnlineGame: activeSaveGameMode === "online_4v4",
+        activeTeamReady: activeManagerMatchdayReady,
+        teams: buildMatchdayReadinessTeamsFromState({
+          teams: gameState.teams,
+          controlModeByTeamId: resolvedTeamControlSettings,
+          lineupDrafts: gameState.seasonState.lineupDrafts,
+          seasonId: gameState.season.id,
+          matchdayId: gameState.matchdayState.matchdayId,
+        }),
+      }) &&
       !homeNextMatchdayStatus.resultAvailable &&
       primaryInboxItem?.itemId.startsWith("lineup_missing:")
     ) {
