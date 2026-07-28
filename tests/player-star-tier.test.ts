@@ -125,6 +125,28 @@ describe("Star-Tier: Renderpfade", () => {
     expect(markText).toContain("const ring = markRingColor({ injury, spotlight, isOwn, relation });");
   });
 
+  it("nutzt in den Bestenlisten den eigenen Ranglistenrang, statt Raenge durchzureichen", () => {
+    const leadersText = read("app/foundation/league-leaders-v2/LeagueLeadersNewLook.tsx");
+    // Nur die drei Kategorien, deren Rangfolge WIRKLICH die einer Star-Kennzahl
+    // ist — bei "PP Pow" oder "Training" misst die Liste etwas anderes.
+    expect(leadersText).toContain('new Set(["pps", "mvs", "ovr"])');
+    expect(leadersText).toContain("getLeaderStarTier(category.id, leader.rank)");
+    expect(leadersText).toContain("getLeaderStarTier(category.id, entry.rank)");
+  });
+
+  it("rahmt die Top-Spieler-Strips des Saisonstands ueber deren PPs-Rang ein", () => {
+    const standingsText = read("app/foundation/season-v2/SeasonStandingsNewLook.tsx");
+    expect(standingsText).toContain("PlayerStarFrame tier={getPlayerStarTier(player.rank)}");
+  });
+
+  it("laesst die Scouting-Portraits bewusst ohne Rahmen (Fog-of-War)", () => {
+    const scoutText = read("app/foundation/scouting-center-v2/ScoutingCenterV2NewLook.tsx");
+    // Ein Star-Rahmen an einem ungescouteten Spieler wuerde genau die
+    // Einordnung verraten, die der Fog verdeckt — deshalb steht dort keiner.
+    expect(scoutText).not.toContain("PlayerStarFrame");
+    expect(scoutText).not.toContain("getPlayerStarTier");
+  });
+
   it("bringt Tier-Farben und Holo-Regeln als Design-Tokens mit", () => {
     const cssText = read("app/globals.css");
     expect(cssText).toContain("--nl-diamond:");
