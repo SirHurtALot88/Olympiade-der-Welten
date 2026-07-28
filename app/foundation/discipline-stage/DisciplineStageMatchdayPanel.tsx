@@ -18,6 +18,9 @@
 // Rein visuell/lesend — keine Engine-Logik. Werte kommen 1:1 aus der Resolve-Preview
 // (teamResults) und der Standings-Preview (items).
 
+import { Fragment, useState } from "react";
+
+import { getPoolHeatClass } from "@/lib/foundation/player-league-heat";
 import { teamPrimaryColor, floorTeamAccent } from "@/lib/foundation/team-colors";
 
 export type MatchdayPanelTeamResult = {
@@ -55,6 +58,18 @@ export type MatchdayPanelMutatorEntry = {
 
 export type MatchdayPanelTeamMeta = { code: string; name: string; logoUrl: string | null };
 
+/** Ein eingesetzter Spieler einer Disziplin — Basis der ausklappbaren Spalten. */
+export type MatchdayPanelPlayerRow = {
+  playerId: string;
+  name: string;
+  /** Dem Spieler gutgeschriebene Player-Points (null, solange nicht gewertet). */
+  pp: number | null;
+  /** Beitrag zum Team-Score — die Zahl, nach der die Arena animiert. */
+  score: number | null;
+  /** Mutator-Anteil an den PP (separat ausgewiesen, weil er dem Spieler gehoert). */
+  mutatorPp: number | null;
+};
+
 export type DisciplineStageMatchdayPanelProps = {
   teamResults: MatchdayPanelTeamResult[];
   standings: MatchdayPanelStandingRow[];
@@ -70,6 +85,12 @@ export type DisciplineStageMatchdayPanelProps = {
   onHoverTeam?: ((teamId: string | null) => void) | null;
   /** Mutator-PP (0,3er) je Team, spielergenau — separat vom Team-PP ausgewiesen. */
   mutatorByTeam?: Map<string, MatchdayPanelMutatorEntry> | null;
+  /**
+   * Eingesetzte Spieler je Team und Disziplin-Seite, nach PP absteigend. Speist die
+   * ausklappbaren Disziplin-Spalten. Fehlt die Prop, bleiben die Spaltenköpfe reine
+   * Beschriftung (kein Aufklappen).
+   */
+  playersByTeam?: Map<string, { d1: MatchdayPanelPlayerRow[]; d2: MatchdayPanelPlayerRow[] }> | null;
 };
 
 function ppText(value: number | null): string {
@@ -191,7 +212,10 @@ export default function DisciplineStageMatchdayPanel({
   onOpenTeam,
   onHoverTeam,
   mutatorByTeam,
+  playersByTeam,
 }: DisciplineStageMatchdayPanelProps) {
+  // Ausgeklappte Disziplin-Spalte (null = keine). Hook steht vor jedem fruehen Return.
+  const [expandedSide, setExpandedSide] = useState<"d1" | "d2" | null>(null);
   const resultByTeam = new Map(teamResults.map((r) => [r.teamId, r]));
 
   // Zeilen aus den Standings ableiten (haben current/projected Rank + Punkte). PPs je
@@ -236,6 +260,26 @@ export default function DisciplineStageMatchdayPanel({
 
   sortMatchdayPanelRows(rows, d2Revealed);
 
+  // Ausgeklappte Disziplin-Spalte (null = keine). Bewusst nur EINE zur Zeit: zwei
+  // gleichzeitig aufgeklappte Spalten verdoppeln die Zeilenhoehe und man verliert den
+  // Vergleich zwischen den Teams, um den es hier geht.
+  const expandable = playersByTeam != null;
+  const sideRevealed: Record<"d1" | "d2", boolean> = { d1: d1Revealed, d2: d2Revealed };
+
+  // Liga-Vergleichspool je Seite fuer die Heat-Faerbung der Spieler-PP: verglichen wird
+  // gegen ALLE eingesetzten Spieler dieser Disziplin, nicht nur gegen die des eigenen
+  // Teams — sonst waere der beste Spieler jedes Teams automatisch gruen.
+  const ppPoolBySide: Record<"d1" | "d2", number[]> = { d1: [], d2: [] };
+  if (playersByTeam) {
+    for (const sides of playersByTeam.values()) {
+      for (const key of ["d1", "d2"] as const) {
+        for (const entry of sides[key]) {
+          if (entry.pp != null && Number.isFinite(entry.pp)) ppPoolBySide[key].push(entry.pp);
+        }
+      }
+    }
+  }
+
   if (rows.length === 0) return null;
 
   const colHead: React.CSSProperties = {
@@ -278,12 +322,48 @@ export default function DisciplineStageMatchdayPanel({
           >
             <div style={{ ...colHead, textAlign: "left" }}>Rang</div>
             <div style={{ ...colHead, textAlign: "left" }}>Team</div>
-            <div style={colHead} title={d1?.displayName ?? "Disziplin 1"}>
-              {d1?.displayName ?? "Diszi 1"}
-            </div>
-            <div style={colHead} title={d2?.displayName ?? "Disziplin 2"}>
-              {d2Revealed ? d2?.displayName ?? "Diszi 2" : "Diszi 2 🔒"}
-            </div>
+            {/* Disziplin-Spaltenkoepfe sind Schalter: Klick klappt die eingesetzten Spieler
+                dieser Disziplin unter jeder Team-Zeile auf (hoechste PP zuerst). Verdeckte
+                Disziplinen bleiben reine Beschriftung — sonst waere die Aufklappung ein
+                Spoiler. */}
+            {(["d1", "d2"] as const).map((side) => {
+              const disc = side === "d1" ? d1 : d2;
+              const label = disc?.displayName ?? (side === "d1" ? "Diszi 1" : "Diszi 2");
+              const revealed = sideRevealed[side];
+              const canExpand = expandable && revealed;
+              const isOpen = expandedSide === side;
+              if (!canExpand) {
+                return (
+                  <div key={side} style={colHead} title={disc?.displayName ?? (side === "d1" ? "Disziplin 1" : "Disziplin 2")}>
+                    {revealed ? label : `${label} 🔒`}
+                  </div>
+                );
+              }
+              return (
+                <button
+                  key={side}
+                  type="button"
+                  aria-expanded={isOpen}
+                  onClick={() => setExpandedSide(isOpen ? null : side)}
+                  title={`${label} — Spieler mit ihren PP ${isOpen ? "einklappen" : "aufklappen"}`}
+                  style={{
+                    ...colHead,
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    cursor: "pointer",
+                    font: "inherit",
+                    fontSize: 10.5,
+                    fontWeight: 800,
+                    letterSpacing: "0.04em",
+                    textTransform: "uppercase",
+                    color: isOpen ? "var(--nl-accent)" : "var(--nl-mut)",
+                  }}
+                >
+                  {label} {isOpen ? "▾" : "▸"}
+                </button>
+              );
+            })}
             <div style={colHead} title="Spieltags-Punkte je Rang (Disziplin 1 + Disziplin 2)">Spieltag</div>
             <div style={colHead} title="Mutator-Bonus-PP (0,3er) — dem Spieler gutgeschrieben, separat vom Team-PP">
               ◆ Mutator
@@ -301,6 +381,8 @@ export default function DisciplineStageMatchdayPanel({
             // Spieltags-Summe, Mutator-PP und Gesamt kommen aus der Zeile (oben berechnet),
             // damit die Gesamt-Spalte exakt der Sortierschlüssel ist.
             const { sum, mutPp, total } = row;
+            // Spieler der aufgeklappten Disziplin fuer dieses Team (leer, wenn nichts offen).
+            const sidePlayers = expandedSide ? playersByTeam?.get(row.teamId)?.[expandedSide] ?? [] : [];
             const sumShown = d1Revealed || d2Revealed;
             const mut = mutatorByTeam?.get(row.teamId);
             const mutPlayers = [...(d1Revealed ? mut?.d1Players ?? [] : []), ...(d2Revealed ? mut?.d2Players ?? [] : [])];
@@ -309,8 +391,8 @@ export default function DisciplineStageMatchdayPanel({
               ? mutPlayers.map((p) => `${p.name} +${p.pp.toFixed(1)} PP`).join(" · ")
               : "Kein Mutator-Bonus in den aufgedeckten Disziplinen.";
             return (
+              <Fragment key={row.teamId}>
               <div
-                key={row.teamId}
                 onClick={() => {
                   if (onOpenTeam && row.teamId) onOpenTeam(row.teamId);
                 }}
@@ -453,6 +535,59 @@ export default function DisciplineStageMatchdayPanel({
                   {sumShown ? ppText(total) : lockCell}
                 </div>
               </div>
+
+              {/* Aufgeklappte Disziplin: die eingesetzten Spieler dieses Teams, hoechste PP
+                  zuerst. Die PP-Zahl ist gegen ALLE Spieler der Disziplin heat-gefaerbt
+                  (rot schwach → gelb Mittelfeld → gruen stark), dieselbe Baender-Skala wie
+                  im Saisonstand. Der Score steht als Herkunft daneben. */}
+              {expandedSide && sidePlayers.length > 0 ? (
+                <div
+                  data-testid={`matchday-panel-players-${row.teamId}-${expandedSide}`}
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 6,
+                    padding: "6px 10px 8px 94px",
+                    borderBottom: "1px solid var(--nl-line)",
+                    background: "color-mix(in srgb, var(--nl-panel-2) 60%, transparent)",
+                  }}
+                >
+                  {sidePlayers.map((entry) => {
+                    const heat = entry.pp != null ? getPoolHeatClass(entry.pp, ppPoolBySide[expandedSide]) : "";
+                    return (
+                      <span
+                        key={entry.playerId}
+                        className={heat ? `matchday-panel-player ${heat}` : "matchday-panel-player"}
+                        title={`${entry.name} · ${entry.pp != null ? `${entry.pp.toFixed(1)} PP` : "keine PP"}${
+                          entry.score != null ? ` · Score ${entry.score.toFixed(1)}` : ""
+                        }${entry.mutatorPp ? ` · davon ◆ ${entry.mutatorPp.toFixed(1)} Mutator` : ""}`}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "baseline",
+                          gap: 5,
+                          padding: "2px 7px",
+                          borderRadius: 6,
+                          border: "1px solid var(--nl-line)",
+                          fontSize: 11.5,
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        <strong style={{ fontWeight: 700 }}>{entry.name}</strong>
+                        <em style={{ fontStyle: "normal", fontWeight: 900, color: "var(--nl-accent)" }}>
+                          {entry.pp != null ? `${entry.pp.toFixed(1)} PP` : "–"}
+                        </em>
+                        {entry.score != null ? (
+                          <em style={{ fontStyle: "normal", color: "var(--nl-mut)" }}>({entry.score.toFixed(1)})</em>
+                        ) : null}
+                        {entry.mutatorPp ? (
+                          <em style={{ fontStyle: "normal", color: "var(--nl-warn)", fontWeight: 700 }}>◆</em>
+                        ) : null}
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </Fragment>
             );
           })}
         </div>

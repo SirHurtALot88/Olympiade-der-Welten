@@ -58033,6 +58033,49 @@ button.foundation-team-portrait-card {
   background: color-mix(in srgb, var(--nl-good) 25%, transparent);
 }
 
+/*
+ * PP-Chips der aufgeklappten Disziplin-Spalten in der Spieltags-Wertung. Gleiche
+ * Baender-Skala wie die Bereichsspalten im Saisonstand (rot schwach → gruen stark),
+ * ebenfalls nur als dezente Hinterlegung: der Chip behaelt Rahmen und Textfarben,
+ * damit PP-Wert, Score und Mutator-Marker lesbar bleiben.
+ */
+.matchday-panel-player.heat-band-1,
+.matchday-panel-player.heat-band-2,
+.matchday-panel-player.heat-band-3,
+.matchday-panel-player.heat-band-4,
+.matchday-panel-player.heat-band-5,
+.matchday-panel-player.heat-band-6,
+.matchday-panel-player.heat-band-7,
+.matchday-panel-player.heat-band-8 {
+  color: inherit;
+  box-shadow: none;
+}
+
+.matchday-panel-player.heat-band-1 {
+  background: color-mix(in srgb, var(--nl-risk) 20%, transparent);
+}
+.matchday-panel-player.heat-band-2 {
+  background: color-mix(in srgb, var(--nl-risk) 13%, transparent);
+}
+.matchday-panel-player.heat-band-3 {
+  background: color-mix(in srgb, var(--nl-warn) 14%, transparent);
+}
+.matchday-panel-player.heat-band-4 {
+  background: color-mix(in srgb, var(--nl-warn) 9%, transparent);
+}
+.matchday-panel-player.heat-band-5 {
+  background: color-mix(in srgb, var(--nl-good) 9%, transparent);
+}
+.matchday-panel-player.heat-band-6 {
+  background: color-mix(in srgb, var(--nl-good) 14%, transparent);
+}
+.matchday-panel-player.heat-band-7 {
+  background: color-mix(in srgb, var(--nl-good) 19%, transparent);
+}
+.matchday-panel-player.heat-band-8 {
+  background: color-mix(in srgb, var(--nl-good) 25%, transparent);
+}
+
 .is-new-look .nl-standings-td-bonus,
 .is-new-look .nl-standings-td-mw {
   color: var(--nl-mut);
