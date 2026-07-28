@@ -19,6 +19,7 @@ import {
   LegacyMatchdayResultApplyService,
   type LegacyMatchdayCommitThroughSide,
 } from "@/lib/resolve/legacy-matchday-result-apply-service";
+import { readMatchdayResolveSnapshot } from "@/lib/foundation/matchday-resolve-snapshot";
 import { buildResolveLabSummary } from "@/lib/resolve/legacy-resolve-lab";
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
 import { type ResolvePreviewStatus } from "@/lib/resolve/legacy-matchday-resolve-types";
@@ -786,7 +787,20 @@ export async function runLocalMatchdayAutoRun(
     return contextResult.context;
   });
   attachAutoRunInjuriesToContexts(currentContexts, postAiSave.gameState, scope);
-  const currentResolve = buildResolvePreviewEnvelopeFromContexts(currentContexts);
+  const liveResolve = buildResolvePreviewEnvelopeFromContexts(currentContexts);
+
+  // Die EINE Rechnung des Spieltags, entstanden beim Speichern der Aufstellungen und
+  // von der Arena bereits gezeigt. Sie ersetzt hier das frisch gerechnete Ergebnis —
+  // sonst buchte der Commit andere Zahlen als die, die der Spieler gerade gesehen hat.
+  // Genau daran scheiterte die Gleichheit vorher: Der erste Commit schreibt die
+  // Nach-Spieltags-Fatigue, deren Rekonstruktion beim naechsten Resolve traf den
+  // Ausgangsstand nicht exakt, und dieselbe Disziplin kam zweimal anders heraus.
+  // Fehlt der Snapshot (Feld war unvollstaendig, Aufstellungen nachtraeglich
+  // geaendert), bleibt es beim bisherigen Live-Ergebnis.
+  const resolveSnapshot = readMatchdayResolveSnapshot(postAiSave.gameState, scope);
+  const currentResolve: ResolvePreviewEnvelope = resolveSnapshot
+    ? { ...liveResolve, preview: resolveSnapshot.payload.preview }
+    : liveResolve;
   let activeResolve = currentResolve;
   let lineupSummary = buildDryRunLineupSummary({
     gameState: postAiSave.gameState,

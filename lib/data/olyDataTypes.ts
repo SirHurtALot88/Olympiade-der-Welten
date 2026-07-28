@@ -2083,6 +2083,37 @@ export type DisciplineHighlightRecord = {
   createdAt: string;
 };
 
+/**
+ * Vorberechneter Spieltag: das Resolve-Ergebnis, einmal gerechnet und abgelegt.
+ *
+ * `payload` ist die Resolve-Vorschau (`LegacyMatchdayResolvePreviewPayload`) — hier
+ * bewusst als `unknown` typisiert, damit die Datentypen nicht gegen die Resolve-Schicht
+ * ziehen; `lib/foundation/matchday-resolve-snapshot.ts` liest ihn typisiert.
+ *
+ * `signature` bindet den Snapshot an die Eingaben, aus denen er entstand (Aufstellungen,
+ * Kapitaene, Verfuegbarkeit). Aendert sich davon etwas, ist er ungueltig und wird neu
+ * gerechnet — ein Snapshot darf niemals ein Ergebnis zu einer Aufstellung liefern, die
+ * so gar nicht mehr antritt.
+ */
+export type MatchdayResolveSnapshotRecord = {
+  id: string;
+  saveId: string;
+  seasonId: string;
+  matchdayId: string;
+  signature: string;
+  previewStatus: string;
+  readinessByTeamId: Record<
+    string,
+    {
+      readinessStatus: string;
+      reasonCodes: string[];
+      shortReason: string;
+    }
+  >;
+  payload: unknown;
+  createdAt: string;
+};
+
 export type ResultAuditLogRecord = {
   id: string;
   saveId: string;
@@ -2663,6 +2694,17 @@ export type SeasonState = {
   playerDisciplinePerformances?: PlayerDisciplinePerformanceRecord[];
   disciplineHighlights?: DisciplineHighlightRecord[];
   resultAuditLogs?: ResultAuditLogRecord[];
+  /**
+   * Die EINE Rechnung des laufenden Spieltags. Entsteht, sobald alle Aufstellungen
+   * stehen (also auf dem Weg zur Arena), und ist danach die gemeinsame Quelle fuer
+   * die Arena-Buehne und beide Disziplin-Buchungen. Vorher rechneten Vorschau,
+   * D1-Commit und D2-Commit jeweils neu — und kamen wegen der zwischenzeitlich
+   * geschriebenen Fatigue nicht auf dieselben Zahlen.
+   *
+   * Immer hoechstens ein Eintrag: der des aktuell offenen Spieltags. Aeltere werden
+   * beim Schreiben ersetzt, damit der Save nicht mit Vorschauen zulaeuft.
+   */
+  matchdayResolveSnapshots?: MatchdayResolveSnapshotRecord[];
   seasonSnapshots?: SeasonSnapshotRecord[];
   aiManagerBudgetReservations?: Record<string, AiManagerBudgetReservationRecord>;
   aiCashBufferDipLedger?: Record<string, AiCashBufferDipLedgerEntry>;

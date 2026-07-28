@@ -671,11 +671,14 @@ export class LegacyMatchdayResultApplyService {
       existingResult,
     );
 
-    // Bereits gebuchte Disziplin-Seiten sind eingefroren. Der Resolve ist ueber zwei
-    // Laeufe NICHT bitgleich — der erste Apply schreibt die Nach-Spieltags-Fatigue, und
-    // deren Rekonstruktion beim Replay trifft den Vor-Spieltags-Stand nicht exakt. Ohne
-    // dieses Einfrieren haette der D2-Commit die D1-Raenge nachtraeglich verschoben,
-    // obwohl der Spieler sie laengst als Ergebnis gesehen und im Saisonstand hatte.
+    // Sicherheitsnetz fuer den Fall OHNE vorberechneten Spieltag: Bereits gebuchte
+    // Disziplin-Seiten sind eingefroren. Der Resolve ist ueber zwei Laeufe NICHT
+    // bitgleich — der erste Apply schreibt die Nach-Spieltags-Fatigue, und deren
+    // Rekonstruktion beim Replay trifft den Vor-Spieltags-Stand nicht exakt; ohne das
+    // Einfrieren verschoebe der D2-Commit die D1-Raenge nachtraeglich.
+    // Im Normalfall greift das nicht mehr: Liegt der Snapshot vor, lesen beide Commits
+    // ohnehin aus derselben Rechnung, und es gibt nichts zu korrigieren. Verifiziert —
+    // die Gleichheit von Buehne und Buchung haelt auch mit abgeschaltetem Einfrieren.
     // Nur die gestaffelte Buchung friert ein: Ein normaler Voll-Re-Apply (alle Seiten
     // liegen bereits vor) soll wie bisher alles neu rechnen.
     const existingSides = new Set(
