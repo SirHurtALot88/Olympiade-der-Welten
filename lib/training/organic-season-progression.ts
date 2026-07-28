@@ -176,6 +176,15 @@ const ORGANIC_REGRESSION_HEADROOM_MULTIPLIER: Record<"open" | "closing" | "cappe
   closing: 0.7,
   capped: 0.45,
 };
+/**
+ * Normiert den optionalen Regression-Spieltag-Anteil auf [0,1]. Ungültige Werte (NaN, ∞, null)
+ * fallen auf 1 zurück — d. h. volle Saison-Regression, exakt das bisherige Verhalten.
+ */
+function normalizeRegressionScale(value: number | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 1;
+  return clamp(value, 0, 1);
+}
+
 function softKneeMarketValueForRegression(marktwertBase: number): number {
   if (marktwertBase <= ORGANIC_MARKET_VALUE_REGRESSION_SOFT_KNEE) return marktwertBase;
   return (
@@ -711,10 +720,13 @@ function buildPerformanceDeltas(gameState: GameState, playerId: string) {
 function buildOrganicRegressionBreakdown(input: {
   marktwertBase: number;
   marketValuePressurePerAttribute: number;
+  /** Anteilige Spieltag-Skalierung der Regression (0..1, Default 1 = volle Saison). */
+  regressionScale?: number;
 }): OrganicRegressionBreakdown {
   const attributeCount = PROGRESSION_ATTRIBUTE_ORDER.length;
-  const baseFlatTotal = roundValue(-ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE * attributeCount, 2);
-  const marketValueTotal = roundValue(-input.marketValuePressurePerAttribute * attributeCount, 2);
+  const scale = normalizeRegressionScale(input.regressionScale);
+  const baseFlatTotal = roundValue(-ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE * attributeCount * scale, 2);
+  const marketValueTotal = roundValue(-input.marketValuePressurePerAttribute * attributeCount * scale, 2);
   return {
     baseFlatTotal,
     marketValueTotal,
@@ -846,6 +858,21 @@ export function buildOrganicSeasonProgression(input: {
    * dann real auf die saisonalen Sterne/Malus-Attribute). Absent → statische Basis (Alt-Verhalten).
    */
   route?: PlayerDevelopmentRoute | null;
+  /**
+   * NUR für Zwischenstands-PROGNOSEN (Saison-Forecast in der Trainingshistorie): anteilige
+   * Spieltag-Skalierung der Regression (gespielte Spieltage / Saison-Spieltage, 0..1).
+   *
+   * Ursache: Der kumulierte Saison-Forecast skaliert Training (Budget = Σ Modus-Anteile über
+   * gespielte Spieltage / GESAMT-Spieltage) und Performance (nur Records bis heute) bereits
+   * anteilig — die Regression wurde aber immer als VOLLER Saisonbetrag abgezogen. Nach 3 von
+   * 10 Spieltagen stand damit 3/10 Wachstum gegen 10/10 Regression → die Prognose sah
+   * unrealistisch negativ aus. Mit dieser Skala zieht die Regression im gleichen Takt mit.
+   *
+   * Absent/1 = volle Saison-Regression — das ist der Pflichtwert für den Saisonende-Apply
+   * (`season-end-xp-apply-service`), der diesen Parameter bewusst NICHT setzt: die real
+   * gebuchte Entwicklung bleibt unverändert.
+   */
+  regressionMatchdayScale?: number;
 }): OrganicSeasonProgressionResult {
   const attributesBefore = normalizePlayerAttributes(input.player);
   if (!attributesBefore) {
@@ -1019,9 +1046,12 @@ export function buildOrganicSeasonProgression(input: {
     marketValuePressurePerAttribute * PROGRESSION_ATTRIBUTE_ORDER.length,
     2,
   );
+  // Prognose-Skalierung der Regression (s. Doku am Input-Parameter). Default 1 = Apply-Verhalten.
+  const regressionScale = normalizeRegressionScale(input.regressionMatchdayScale);
   const regressionBreakdown = buildOrganicRegressionBreakdown({
     marktwertBase,
     marketValuePressurePerAttribute,
+    regressionScale,
   });
   const affinityProfile = resolveSeasonalAffinityProfile({
     player: input.player,
@@ -1063,8 +1093,12 @@ export function buildOrganicSeasonProgression(input: {
     // B1: headroom-aware regression — a capped/closing attribute plateaus instead of eroding at full
     // speed (mirror of the growth throttle, but gentle). Open attributes keep full regression.
     const regressionHeadroomMultiplier = ORGANIC_REGRESSION_HEADROOM_MULTIPLIER[attributeHeadroom.state] ?? 1;
+    // regressionScale: bei Zwischenstands-Prognosen anteilig zu den gespielten Spieltagen (s. o.);
+    // im Saisonende-Apply immer 1 → identische Rechnung wie bisher.
     const regression =
-      -(ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE + marketValuePressurePerAttribute) * regressionHeadroomMultiplier;
+      -(ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE + marketValuePressurePerAttribute) *
+      regressionHeadroomMultiplier *
+      regressionScale;
     const training = applyTrainingGrowthMultiplier(primaryTrainingDeltas[attribute] + secondaryTrainingDeltas[attribute], trainingMultiplier);
     const performanceDelta =
       applyPositiveGrowthMultiplier(performance.deltas[attribute], performanceGrowthMultiplier) *
