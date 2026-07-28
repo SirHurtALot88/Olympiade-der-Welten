@@ -821,6 +821,9 @@ export class LegacyMatchdayResultApplyService {
           timestamp: now,
           precomputedInjuryRolls: injuryRollMap,
           isMatchdayReplay,
+          // Die Ermuedung folgt der Wertung: Nach D1 traegt nur, wer in D1 gelaufen ist.
+          // Vorher stand nach dem halben Spieltag bereits die Last des ganzen im Kader.
+          commitThroughSide,
         });
 
     // Anti-cheese Teil B (B.4): record this matchday's per-player training mode and advance the

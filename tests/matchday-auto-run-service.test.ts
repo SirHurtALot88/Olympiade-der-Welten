@@ -760,3 +760,130 @@ describe("matchday resolve snapshot equality", () => {
     }
   }, 180_000);
 });
+describe("matchday fatigue follows the discipline commit", () => {
+  function makeAllAiGameState() {
+    const gameState = createFreshSeasonOneGameState();
+    topUpRostersForLineupMinimum(gameState);
+    const existingSettings = gameState.seasonState.teamControlSettings ?? {};
+    gameState.seasonState.teamControlSettings = Object.fromEntries(
+      gameState.teams.map((team) => [
+        team.teamId,
+        {
+          ...existingSettings[team.teamId],
+          teamId: team.teamId,
+          controlMode: "ai" as const,
+          aiLineupPreviewEnabled: true,
+          aiLineupApplyEnabled: true,
+          aiLineupAutoApplyEnabled: false,
+          aiTransferPreviewEnabled: false,
+          aiTransferAutoApplyEnabled: false,
+          aiSellPreviewEnabled: false,
+          aiSellAutoApplyEnabled: false,
+          notes: null,
+          strategyLock: null,
+        },
+      ]),
+    );
+    return gameState;
+  }
+
+  function runCommit(
+    persistence: PersistenceService,
+    scope: { saveId: string; seasonId: string; matchdayId: string },
+    commitThroughSide: "d1" | "d2",
+  ) {
+    return runLocalMatchdayAutoRun(
+      {
+        ...scope,
+        source: "sqlite",
+        execute: true,
+        dryRun: false,
+        confirmToken: MATCHDAY_AUTO_RUN_CONFIRM_TOKEN,
+        options: {
+          includeWarningLineups: true,
+          overwriteExistingLineups: false,
+          stopOnTie: false,
+          advanceAfterCashApply: true,
+          commitThroughSide,
+        },
+      },
+      persistence,
+    );
+  }
+
+  function fatigueByPlayer(persistence: PersistenceService) {
+    const state = persistence.getSaveById("test-save")!.gameState.seasonState;
+    return new Map(
+      (state.playerAvailabilityState ?? []).map((entry) => [
+        `${entry.teamId}::${entry.playerId}`,
+        entry.fatigue ?? 0,
+      ]),
+    );
+  }
+
+  it("loads only the d1 players after a half matchday, and lands on the full-matchday state after d2", async () => {
+    const gameState = makeAllAiGameState();
+    const scope = {
+      saveId: "test-save",
+      seasonId: gameState.season.id,
+      matchdayId: gameState.matchdayState.matchdayId,
+    };
+
+    // Referenz: derselbe Spieltag in EINEM Rutsch gebucht.
+    const referencePersistence = createInMemoryPersistence(gameState, true);
+    applyAiLegacyLineupBatchLocally(
+      { ...scope, dryRun: false, includeWarningTeams: true, overwriteExisting: false },
+      referencePersistence,
+    );
+    ensureMatchdayResolveSnapshot(scope, referencePersistence);
+    await runCommit(referencePersistence, scope, "d2");
+    const referenceFatigue = fatigueByPlayer(referencePersistence);
+
+    // Gestaffelt: erst D1, dann D2.
+    const stagedPersistence = createInMemoryPersistence(gameState, true);
+    applyAiLegacyLineupBatchLocally(
+      { ...scope, dryRun: false, includeWarningTeams: true, overwriteExisting: false },
+      stagedPersistence,
+    );
+    const snapshot = ensureMatchdayResolveSnapshot(scope, stagedPersistence);
+    expect(snapshot).not.toBeNull();
+
+    // Wer NUR in D2 antritt, darf nach dem D1-Commit noch keine Spieltagslast tragen.
+    const drafts = (stagedPersistence.getSaveById("test-save")!.gameState.seasonState.lineupDrafts ?? []).filter(
+      (draft) => draft.seasonId === scope.seasonId && draft.matchdayId === scope.matchdayId,
+    );
+    const d1Keys = new Set<string>();
+    const d2OnlyKeys = new Set<string>();
+    for (const draft of drafts) {
+      for (const entry of draft.entries) {
+        if (entry.disciplineSide === "d1") d1Keys.add(`${draft.teamId}::${entry.playerId}`);
+      }
+    }
+    for (const draft of drafts) {
+      for (const entry of draft.entries) {
+        const key = `${draft.teamId}::${entry.playerId}`;
+        if (entry.disciplineSide === "d2" && !d1Keys.has(key)) d2OnlyKeys.add(key);
+      }
+    }
+    expect(d2OnlyKeys.size).toBeGreaterThan(0);
+
+    const beforeAny = fatigueByPlayer(stagedPersistence);
+    await runCommit(stagedPersistence, scope, "d1");
+    const afterD1 = fatigueByPlayer(stagedPersistence);
+
+    for (const key of d2OnlyKeys) {
+      // Reine D2-Starter sind nach dem halben Spieltag unbelastet (Erholung kann sie
+      // sogar frischer machen — belastet werden duerfen sie jedenfalls nicht).
+      expect(afterD1.get(key) ?? 0).toBeLessThanOrEqual(beforeAny.get(key) ?? 0);
+    }
+
+    await runCommit(stagedPersistence, scope, "d2");
+    const afterD2 = fatigueByPlayer(stagedPersistence);
+
+    // Und am Ende steht exakt der Zustand, den eine Buchung in einem Rutsch erzeugt.
+    expect(afterD2.size).toBe(referenceFatigue.size);
+    for (const [key, value] of referenceFatigue) {
+      expect(afterD2.get(key)).toBeCloseTo(value, 5);
+    }
+  }, 240_000);
+});
