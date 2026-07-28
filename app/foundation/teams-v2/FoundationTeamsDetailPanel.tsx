@@ -24,6 +24,7 @@ import {
   StatChip,
   StatChipRow,
   formatNlMoney,
+  formatNlNumber,
 } from "@/components/foundation/new-look";
 
 const TEAM_ROSTER_PORTRAIT_LOADING = {
@@ -549,20 +550,52 @@ function FoundationTeamsDetailPanel({
   );
 
   // Kompakte "at a glance"-Achsen-PPs (POW/SPE/MEN/SOC) für eine Zelle.
-  const renderPpsAxisStrip = (axisValues, ariaName) => (
+  // Optional (`sort`) machen die vier Achsen-Chips anklickbar und sortieren
+  // die Tabelle nach genau dieser Achse (Vorbild: die Achsen-Header in
+  // FoundationPlayersTableNewLook.tsx, `nl-players-axis`/`onToggleSort`).
+  // Ohne `sort`-Option (z. B. der Kader-Tab) bleibt der Chip ein reiner
+  // `<span>` wie bisher — additiv, kein Verhalten für bestehende Aufrufer.
+  const renderPpsAxisStrip = (axisValues, ariaName, sort) => (
     <div className="selected-roster-pps-axes" aria-label={`PPs nach Bereich für ${ariaName}`}>
-      {axisValues.map((axisItem) => (
-        <span
-          key={axisItem.axis}
-          className={`selected-roster-pps-axis nl-tone-${axisItem.axis}`}
-          title={`${axisItem.label}-PPs (Saison)`}
-        >
-          <span className="selected-roster-pps-axis-label">{axisItem.label}</span>
-          <span className="selected-roster-pps-axis-value nl-tnum">
-            {axisItem.value != null && Number.isFinite(axisItem.value) ? formatPpsValue(axisItem.value) : "—"}
-          </span>
-        </span>
-      ))}
+      {axisValues.map((axisItem) => {
+        const label = `${axisItem.label}-PPs (Saison)`;
+        const value =
+          axisItem.value != null && Number.isFinite(axisItem.value) ? formatPpsValue(axisItem.value) : "—";
+        if (!sort) {
+          return (
+            <span
+              key={axisItem.axis}
+              className={`selected-roster-pps-axis nl-tone-${axisItem.axis}`}
+              title={label}
+            >
+              <span className="selected-roster-pps-axis-label">{axisItem.label}</span>
+              <span className="selected-roster-pps-axis-value nl-tnum">{value}</span>
+            </span>
+          );
+        }
+        const isActiveSort = sort.activeAxis === axisItem.axis;
+        return (
+          <button
+            key={axisItem.axis}
+            type="button"
+            className={`selected-roster-pps-axis selected-roster-pps-axis-sortable nl-tone-${axisItem.axis}${
+              isActiveSort ? " is-active-sort" : ""
+            }`}
+            title={`Nach ${label} sortieren`}
+            aria-pressed={isActiveSort}
+            onClick={(event) => {
+              // Nicht an den Zeilen-/Drawer-Klick durchreichen — ein
+              // Achsenklick soll ausschließlich sortieren (gleiches Muster
+              // wie der bestehende PPs-Zellen-Wrapper weiter unten).
+              event.stopPropagation();
+              sort.onSort(axisItem.axis);
+            }}
+          >
+            <span className="selected-roster-pps-axis-label">{axisItem.label}</span>
+            <span className="selected-roster-pps-axis-value nl-tnum">{value}</span>
+          </button>
+        );
+      })}
     </div>
   );
 
@@ -1698,14 +1731,47 @@ function FoundationTeamsDetailPanel({
                             switch (nlContractSort.key) {
                               case "player":
                                 return row.playerName;
+                              case "status":
+                                return row.status;
+                              case "shape":
+                                return formatContractShapeLabel(row.contractShape);
                               case "lz":
                                 return row.contractLength;
                               case "morale":
                                 return row.morale;
+                              case "intent":
+                                return row.moraleContractIntent
+                                  ? formatMoraleContractIntentLabel(row.moraleContractIntent)
+                                  : null;
                               case "buyout":
                                 return row.buyoutCost;
                               case "exit":
                                 return row.exitValue;
+                              // "Akt. MW" — aktueller Marktwert VOR Sale-Factor (siehe
+                              // TeamContractSeasonRow: marketValueAtExit ist trotz des
+                              // Namens die Basis, exitValue = marketValueAtExit * saleFactor
+                              // und steht schon in der VK-Spalte — hier also keine Dublette).
+                              case "marketValueNow":
+                                return row.marketValueAtExit;
+                              // Gehaltsverlauf sortiert nach dem Gesamtgehalt über die
+                              // Vertragslaufzeit (nicht nur die letzte aktive Saison, die
+                              // die Zelle als Zahl zeigt) — konsistent mit dem Rest der Zeile.
+                              case "salary":
+                                return row.totalSalary;
+                              case "ovr":
+                                return rosterRowByPlayerId.get(row.playerId)?.playerOvr ?? null;
+                              case "mvs":
+                                return rosterRowByPlayerId.get(row.playerId)?.playerMvs ?? null;
+                              // Achsen-PPs (POW/SPE/MEN/SOC) — je Achse einzeln sortierbar
+                              // über den Klick auf den jeweiligen Chip in der PPs-Zelle.
+                              case "pps:pow":
+                                return rosterRowByPlayerId.get(row.playerId)?.ppPow ?? null;
+                              case "pps:spe":
+                                return rosterRowByPlayerId.get(row.playerId)?.ppSpe ?? null;
+                              case "pps:men":
+                                return rosterRowByPlayerId.get(row.playerId)?.ppMen ?? null;
+                              case "pps:soc":
+                                return rosterRowByPlayerId.get(row.playerId)?.ppSoc ?? null;
                               default:
                                 return null;
                             }
@@ -1726,19 +1792,51 @@ function FoundationTeamsDetailPanel({
                           setNlContractSort((prev) =>
                             prev?.key === key
                               ? { key, direction: prev.direction === "asc" ? "desc" : "asc" }
-                              : { key, direction: "asc" },
+                              : // Erster Klick auf eine Spalte sortiert IMMER absteigend zuerst
+                                // (höchster/"bester" Wert zuerst, Z→A bei Text) — das ist die
+                                // natürliche Erwartung ("wer verdient am meisten?", "wer läuft
+                                // zuerst aus?") und erspart einen sonst nötigen zweiten Klick.
+                                // Erst der zweite Klick auf dieselbe Spalte schaltet auf "asc".
+                                { key, direction: "desc" },
                           );
                         const nlContractColumns = [
                           { key: "player", label: "Spieler", sortable: true },
-                          { key: "status", label: "Status" },
-                          { key: "shape", label: "Form" },
+                          { key: "status", label: "Status", sortable: true },
+                          { key: "shape", label: "Form", sortable: true },
                           { key: "lz", label: "LZ", align: "center", sortable: true },
                           { key: "morale", label: "Moral", align: "center", sortable: true },
-                          { key: "intent", label: "Intent" },
+                          { key: "intent", label: "Intent", sortable: true },
                           { key: "buyout", label: "Buyout", align: "right", sortable: true },
                           { key: "exit", label: "VK", align: "right", sortable: true },
-                          { key: "pps", label: "PPs", tooltip: "Season-Performance-Punkte nach Bereich (POW/SPE/MEN/SOC) — ausklappbar für die Disziplin-PPs.", width: 168 },
-                          { key: "salary", label: "Gehaltsverlauf" },
+                          {
+                            key: "marketValueNow",
+                            label: "Akt. MW",
+                            align: "right",
+                            sortable: true,
+                            tooltip: "Aktueller Marktwert inkl. Transfermarkt-Sale-Factor (der Faktor ×… steht klein daneben). Nicht zu verwechseln mit VK — das ist der Preis NACH Anwendung des Faktors.",
+                          },
+                          {
+                            key: "ovr",
+                            label: "OVR",
+                            align: "right",
+                            sortable: true,
+                            tooltip: "Gesamtstärke (Overall).",
+                          },
+                          {
+                            key: "mvs",
+                            label: "MVS",
+                            align: "right",
+                            sortable: true,
+                            tooltip: "Marktwert-Score.",
+                          },
+                          {
+                            key: "pps",
+                            label: "PPs",
+                            tooltip:
+                              "Season-Performance-Punkte nach Bereich (POW/SPE/MEN/SOC) — jede Achse einzeln anklickbar zum Sortieren, ausklappbar für die Disziplin-PPs.",
+                            width: 168,
+                          },
+                          { key: "salary", label: "Gehaltsverlauf", sortable: true, tooltip: "Sortiert nach Gesamtgehalt über die Vertragslaufzeit." },
                           { key: "actions", label: "Aktionen", align: "right" },
                         ];
                         const renderNlContractCell = (row, column) => {
@@ -1818,6 +1916,32 @@ function FoundationTeamsDetailPanel({
                               return row.buyoutCost != null ? formatNlMoney(row.buyoutCost) : "—";
                             case "exit":
                               return row.exitValue != null ? formatNlMoney(row.exitValue) : "—";
+                            case "marketValueNow":
+                              // marketValueAtExit ist im Row-Modell trotz des Namens die
+                              // Basis VOR dem Sale-Factor (siehe contract-negotiation-preview.ts /
+                              // transfermarkt-sale-factor.ts: exitValue = marketValueAtExit ×
+                              // saleFactor) — also der AKTUELLE Marktwert, keine Dublette der
+                              // VK-Spalte. Faktor klein daneben, Betrag groß.
+                              return row.marketValueAtExit != null ? (
+                                <span className="team-contract-mv-cell nl-tnum">
+                                  <strong>{formatNlMoney(row.marketValueAtExit)}</strong>
+                                  {row.saleFactor != null ? (
+                                    <span className="team-contract-mv-cell-factor">
+                                      · ×{formatNlNumber(row.saleFactor, 2)}
+                                    </span>
+                                  ) : null}
+                                </span>
+                              ) : (
+                                "—"
+                              );
+                            case "ovr": {
+                              const value = rosterRowByPlayerId.get(row.playerId)?.playerOvr ?? null;
+                              return value != null ? formatWholeNumber(value) : "—";
+                            }
+                            case "mvs": {
+                              const value = rosterRowByPlayerId.get(row.playerId)?.playerMvs ?? null;
+                              return value != null ? formatPpsValue(value) : "—";
+                            }
                             case "pps": {
                               const rosterRow = rosterRowByPlayerId.get(row.playerId) ?? null;
                               const contractPpsAxes = [
@@ -1827,9 +1951,15 @@ function FoundationTeamsDetailPanel({
                                 { axis: "soc", label: "SOC", value: rosterRow?.ppSoc ?? null },
                               ];
                               const isContractPpsExpanded = expandedContractPpsPlayerId === row.playerId;
+                              const activeAxis = nlContractSort?.key?.startsWith("pps:")
+                                ? nlContractSort.key.slice("pps:".length)
+                                : null;
                               return (
                                 <div className="selected-roster-pps-cell" onClick={(event) => event.stopPropagation()}>
-                                  {renderPpsAxisStrip(contractPpsAxes, row.playerName)}
+                                  {renderPpsAxisStrip(contractPpsAxes, row.playerName, {
+                                    activeAxis,
+                                    onSort: (axis) => handleNlContractSort(`pps:${axis}`),
+                                  })}
                                   <button
                                     className={`selected-roster-pps-diszi-toggle${isContractPpsExpanded ? " is-open" : ""}`}
                                     type="button"

@@ -6733,6 +6733,30 @@ a {
   color: rgba(241, 245, 249, 0.96);
 }
 
+/* Sortierbare Variante (nur Verträge-Tabelle, siehe `renderPpsAxisStrip`'s
+   `sort`-Option) — echter Button statt <span>, aktiver Sortier-Zustand im
+   selben Muster wie `.nl-players-axis.is-active-sort` (Achsen-Sort der
+   Spielerliste): Akzent-Rahmen + Akzent-Textfarbe statt der Ton-Farbe. */
+button.selected-roster-pps-axis-sortable {
+  cursor: pointer;
+  font: inherit;
+}
+button.selected-roster-pps-axis-sortable:hover {
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 20%, transparent);
+}
+button.selected-roster-pps-axis-sortable:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 1px;
+}
+.is-new-look .selected-roster-pps-axis-sortable.is-active-sort {
+  border-color: var(--nl-accent);
+  background: var(--nl-accent-soft);
+}
+.is-new-look .selected-roster-pps-axis-sortable.is-active-sort .selected-roster-pps-axis-label,
+.is-new-look .selected-roster-pps-axis-sortable.is-active-sort .selected-roster-pps-axis-value {
+  color: var(--nl-accent);
+}
+
 .is-new-look .selected-roster-pps-diszi-toggle {
   display: inline-flex;
   align-items: center;
@@ -10461,8 +10485,29 @@ a {
   box-shadow: inset 3px 0 0 rgba(251, 191, 36, 0.45);
 }
 
+/* "Akt. MW"-Spalte: Betrag groß, Sale-Factor klein/gedämpft daneben — derselbe
+   Groß/Klein-Kontrast wie der Moral-Salary-Modifier weiter oben in der Zeile. */
+.is-new-look .team-contract-mv-cell {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.is-new-look .team-contract-mv-cell-factor {
+  font-size: var(--nl-fs-xs);
+  color: var(--nl-mut);
+}
+
 .team-contracts-layout {
   display: grid;
+  /* Explizite Spurgröße statt der impliziten "auto"-Spur: ohne die kann ein
+     intrinsisch breiter Grid-Item-Inhalt (die Verträge-Tabelle, jetzt mit 3
+     weiteren Spalten noch breiter) den GANZEN Grid-Container über die
+     Panel-Breite hinaus aufblähen ("Grid Blowout") — die Tabelle scrollt
+     zwar selbst (`.nl-table-shell { overflow-x: auto }`), aber ohne
+     `minmax(0, 1fr)` hier wird stattdessen die ganze Seite horizontal breiter.
+     `minmax(0, 1fr)` deckelt die Spur auf die verfügbare Breite, sodass die
+     Tabelle intern scrollt statt den Body zu verbreitern. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
 }
 
@@ -62511,31 +62556,32 @@ button.is-new-look .nl-thist-season-pill,
   text-align: center;
 }
 
-/* --- Primäre/sekundäre Spalten-Betonung (PPs > OVR) ------------------
-   PPs ist die wichtigste Kennzahl (wichtiger als OVR/MVS) und bekommt die
-   stärkste Betonung; OVR bleibt sekundär hervorgehoben, aber schwächer.
-   Nutzt Ränder statt Hintergrund, damit die liga-relative Heat-Färbung
-   (getPoolHeatClass) je Zelle weiterhin sichtbar bleibt. ---------------- */
-.is-new-look .nl-players-th.is-highlight-primary {
+/* --- Kennzahl-Spalten-Kopfzeile: eigene Farbe je Spalte (PPs/OVR/MVS) --
+   Grund (Lesbarkeit beim Querlesen): die drei Kennzahl-Spalten standen
+   vorher alle im selben liga-relativen Blau-Heat-Vokabular (siehe unten,
+   `.nl-players-td-pps` / `.nl-ptable-ovr-cell` / `.nl-ptable-mvs-cell`)
+   und verschwammen in einer Zeile zu einem Block. Jede Kopfzelle bekommt
+   jetzt denselben Farbton wie ihre Körperzellen darunter (Blau/Gold/
+   Bronze) — Kopf und Zellen bilden so eine klar zuordenbare Einheit.
+   Der "aktive Sortierspalte"-Zustand (`.is-active-sort`, s.u.) bleibt
+   optisch klar davon abgesetzt: er nutzt ein anderes, kräftiges
+   Blau-Wasch unabhängig vom Spalten-Akzent (auch auf Gold/Bronze). ---- */
+.is-new-look .nl-players-th.is-highlight-pps {
   background: var(--nl-accent-soft);
   color: var(--nl-accent);
   box-shadow: inset 0 -2px 0 var(--nl-accent);
 }
 
-.is-new-look .nl-players-th.is-highlight-secondary {
-  box-shadow: inset 0 -2px 0 var(--nl-line-2);
+.is-new-look .nl-players-th.is-highlight-ovr {
+  background: color-mix(in srgb, var(--nl-gold) 16%, transparent);
+  color: var(--nl-gold);
+  box-shadow: inset 0 -2px 0 var(--nl-gold);
 }
 
-.is-new-look .nl-players-td-metric.is-highlight-primary {
-  box-shadow:
-    inset 2px 0 0 var(--nl-accent),
-    inset -2px 0 0 var(--nl-accent);
-}
-
-.is-new-look .nl-players-td-metric.is-highlight-secondary {
-  box-shadow:
-    inset 1px 0 0 var(--nl-line-2),
-    inset -1px 0 0 var(--nl-line-2);
+.is-new-look .nl-players-th.is-highlight-mvs {
+  background: color-mix(in srgb, var(--nl-bronze) 18%, transparent);
+  color: var(--nl-bronze);
+  box-shadow: inset 0 -2px 0 var(--nl-bronze);
 }
 
 /* --- PPs: aufklappbarer Zellen-Button + Detailzeile ------------------- */
@@ -68096,66 +68142,103 @@ button.is-new-look .nl-thist-season-pill,
 }
 
 /* ============================================================
-   FIX 2 (#111, überarbeitet) — OVR-Spalte: zurück ins Marken-
-   Farbschema statt festem Gold/Amber-Akzent + "Gold-auf-Gold"-Chip.
+   FIX 2 (überarbeitet) — PPs/OVR/MVS: je eine EIGENE, unterscheidbare
+   Farbfamilie statt geteiltem Blau.
 
    Scope of the TSX this CSS supports:
      - app/foundation/players-table/FoundationPlayersTableNewLook.tsx
-       (OVR column body cell + `renderMetricRankChip`)
+       (PPs/OVR/MVS Körperzellen + `renderMetricRankChip`)
 
-   Der vorherige Ansatz gab der OVR-Zelle einen festen `--nl-warn`
-   (Amber/Gold) Akzent, um sie von PPs/MVS abzusetzen. Zwei Probleme
-   (Produkt-Feedback #111):
-     (a) Amber/Gold ist kein Teil des Blau-zentrierten "Neuer Look"-
-         Markenschemas (Accent = `--nl-accent`, wie bei PPs) — die
-         Spalte wirkte wie eine off-brand "goldene Bande".
-     (b) Der Rang-Chip (`#N`) setzte Amber-Text auf einen ebenfalls
-         Amber-getönten Hintergrund ("Gold auf Gold") — dadurch kaum
-         lesbar.
+   Vorher (Fix #111): OVR bekam einen festen `--nl-accent`-Akzent, PPs/MVS
+   behielten die wertabhängige `getPoolHeatClass`-Hintergrundfarbe
+   (`.heat-band-1`..`8`, rot→grün→blau nach Liga-Perzentil). Problem: bei
+   Spitzenwerten (`heat-band-7`/`8`) landen PPs UND MVS im selben hellen/
+   dunklen Blau wie die OVR-Zelle — beim Querlesen einer Zeile verschwimmen
+   alle drei Kennzahl-Spalten zu einem Block (Produkt-Feedback).
 
-   PPs/MVS behalten ihre Value-Heat-Hintergrundfarbe UNVERÄNDERT (dieselben
-   `.heat-band-*`-Klassen über `getPoolHeatClass`, hier nicht angefasst).
+   Diese Version gibt jeder der drei Spalten EINE feste, spaltenweit
+   gleichbleibende Farbfamilie (Zellhintergrund + Rand + Rang-Chip + Kopf-
+   zeile, siehe `.is-highlight-pps/ovr/mvs` oben) statt der wertabhängigen
+   Heat-Skala:
+     PPs → `--nl-accent` (Blau) — bereits die App-weite "Hero"-Akzentfarbe.
+     OVR → `--nl-gold` (Gold) — Kopf-Kennzahl, hebt sich klar vom Blau ab.
+     MVS → `--nl-bronze` (Bronze) — dritte, warme Farbe, mit Gold noch klar
+       unterscheidbar (unterschiedlicher Farbton, nicht nur Helligkeit).
+   Absichtlich NICHT aus den Achsen-Tokens (`--nl-pow/spe/men/soc`), die in
+   der direkt danebenliegenden "Achsen"-Spalte bereits POW/SPE/MEN/SOC
+   bedeuten — sonst kollidiert die Kennzahl-Farbe mit der Achsen-Farbe in
+   derselben Zeile.
 
-   Diese Version bringt OVR zurück in dasselbe Blau-Vokabular wie die
-   PPs-Spalte (`is-highlight-primary`, `--nl-accent`), aber eine Stufe
-   leiser/sekundär (nur linker Akzent-Rand statt beidseitig, dezentere
-   8%-Tönung statt Volltönung) — dieselbe Betonungs-Sprache wie PPs, damit
-   OVR weiterhin als zweite Kopf-Kennzahl ("Hero"-Metrik) erkennbar bleibt,
-   ohne mit PPs zu konkurrieren oder wie ein Fremdkörper zu wirken.
+   `getPoolHeatClass` wird in der TSX weiterhin für PPs/MVS berechnet
+   (Klasse bleibt am Element, ungenutzt) — nur diese CSS-Regeln hier
+   gewinnen über Selektor-Spezifität (3 Klassen + Element gegenüber der
+   1-Klassen-`.heat-band-N`-Regel), ohne `!important`. Der ligaweite Rang
+   bleibt weiterhin exakt sichtbar, nur eben im `#N`-Chip statt im
+   Zellhintergrund.
 
-   Der Rang-Chip bekommt einen FESTEN, hellen Vordergrund (`--nl-ink`) auf
-   einem dezent Akzent-getönten, dunklen Hintergrund statt Ton-auf-Ton —
-   dasselbe Muster wie überall sonst im "Neuer Look" (helle Schrift auf
-   getöntem Grund, siehe z. B. `.nl-ptable-percentile` Basis-Regel oben),
-   das unabhängig vom Akzentton ausreichenden Kontrast liefert (heller
-   Text auf dunklem, nur leicht getöntem Grund statt gesättigter Ton-Text
-   auf gesättigtem Ton-Hintergrund).
+   Rang-Chip: fester, heller `--nl-ink`-Vordergrund auf spaltentyp-
+   getöntem, dunklem Hintergrund statt Ton-auf-Ton — dasselbe Muster wie
+   überall sonst im "Neuer Look" (helle Schrift auf getöntem Grund), das
+   unabhängig vom Farbton ausreichenden Kontrast liefert.
    ------------------------------------------------------------ */
 
+.is-new-look td.nl-players-td-metric.nl-players-td-pps {
+  background: color-mix(in srgb, var(--nl-accent) 10%, transparent);
+  box-shadow:
+    inset 2px 0 0 var(--nl-accent),
+    inset -2px 0 0 var(--nl-accent);
+}
+
 .is-new-look td.nl-players-td-metric.nl-ptable-ovr-cell {
-  background: color-mix(in srgb, var(--nl-accent) 8%, transparent);
+  background: color-mix(in srgb, var(--nl-gold) 10%, transparent);
   box-shadow:
-    inset 2px 0 0 var(--nl-accent),
+    inset 2px 0 0 var(--nl-gold),
     inset -1px 0 0 var(--nl-line-2);
 }
 
-/* Aktive Sortierspalte: Hintergrund/Text kommen weiterhin von der
-   bestehenden generischen `.is-active-sort`-Regel weiter oben (helles
-   Blau + dunkler Text `#0b1220`) — hier bleibt nur der linke Akzent-Rand
-   der Spalten-Identität erhalten. */
+.is-new-look td.nl-players-td-metric.nl-ptable-mvs-cell {
+  background: color-mix(in srgb, var(--nl-bronze) 10%, transparent);
+  box-shadow:
+    inset 2px 0 0 var(--nl-bronze),
+    inset -1px 0 0 var(--nl-line-2);
+}
+
+/* Aktive Sortierspalte: Hintergrund/Text kommen bewusst NICHT von der
+   spaltentyp-eigenen Farbe, sondern von einem eigenen, kräftigeren
+   Blau-Wasch (dieselben Werte wie die generische `.is-active-sort`-Regel
+   aus Fix #4) — so bleibt "aktiv sortiert" ein einziges, wiedererkennbares
+   Signal über ALLE Spalten hinweg und wird nicht mit der Spalten-Farbe
+   (Gold/Bronze) verwechselt. Muss hier explizit wiederholt werden, weil
+   die obigen 3-Klassen-Regeln sonst über der generischen `.is-active-sort`-
+   Regel (2 Klassen) gewinnen würden. Der farbige Rand bleibt als
+   Spalten-Identität erhalten. */
+.is-new-look td.nl-players-td-metric.nl-players-td-pps.is-active-sort {
+  background: color-mix(in srgb, var(--heat-blue-light, #7fa2d1) 45%, var(--nl-panel) 55%);
+  color: #0b1220;
+  box-shadow:
+    inset 2px 0 0 var(--nl-accent),
+    inset -2px 0 0 var(--nl-accent);
+}
+
 .is-new-look td.nl-players-td-metric.nl-ptable-ovr-cell.is-active-sort {
+  background: color-mix(in srgb, var(--heat-blue-light, #7fa2d1) 45%, var(--nl-panel) 55%);
+  color: #0b1220;
   box-shadow:
-    inset 2px 0 0 var(--nl-accent),
+    inset 2px 0 0 var(--nl-gold),
     inset -1px 0 0 var(--nl-line-2);
 }
 
-/* Rang-Chip (#N) in der OVR-Spalte: heller `--nl-ink`-Vordergrund auf
-   Akzent-getöntem, dunklem Grund — behebt den "Gold auf Gold"-Kontrast
-   aus #111 unabhängig vom gewählten Akzentton. */
-/* Rang-Chips der drei Kopf-Kennzahlen. Jede Spalte hat EINEN festen, klar
-   getrennten Akzent, damit PPs/OVR/MVS beim Scannen auseinanderzuhalten sind:
-   PPs blau, OVR lila, MVS gelb. Das Hell-auf-dunkel-Muster (getönter Grund +
-   `--nl-ink`) bleibt für alle drei gleich — nur der Farbton wechselt. */
+.is-new-look td.nl-players-td-metric.nl-ptable-mvs-cell.is-active-sort {
+  background: color-mix(in srgb, var(--heat-blue-light, #7fa2d1) 45%, var(--nl-panel) 55%);
+  color: #0b1220;
+  box-shadow:
+    inset 2px 0 0 var(--nl-bronze),
+    inset -1px 0 0 var(--nl-line-2);
+}
+
+/* Rang-Chips der drei Kennzahl-Spalten — derselbe Farbton wie Kopfzeile/
+   Zellhintergrund der jeweiligen Spalte, damit Rang-Chip und Zelle als
+   Einheit erkennbar sind. */
 .is-new-look .nl-ptable-percentile.nl-ptable-metric-rank {
   color: var(--nl-ink);
 }
@@ -68165,20 +68248,20 @@ button.is-new-look .nl-thist-season-pill,
 }
 
 .is-new-look .nl-ptable-percentile.nl-ptable-metric-rank.is-ovr {
-  background: color-mix(in srgb, #a06bff 30%, var(--nl-panel-2, #0f1621) 70%);
-}
-
-.is-new-look .nl-ptable-percentile.nl-ptable-metric-rank.is-mvs {
   background: color-mix(in srgb, var(--nl-gold) 30%, var(--nl-panel-2, #0f1621) 70%);
 }
 
-/* Im aktiv sortierten Zustand DARF der OVR-Rang-Chip NICHT den dunklen Text
+.is-new-look .nl-ptable-percentile.nl-ptable-metric-rank.is-mvs {
+  background: color-mix(in srgb, var(--nl-bronze) 30%, var(--nl-panel-2, #0f1621) 70%);
+}
+
+/* Im aktiv sortierten Zustand DARF der Rang-Chip NICHT den dunklen Text
    (#0b1220) der generischen `.is-active-sort .nl-ptable-percentile`-Regel
-   (Fix #4) erben: der Chip behält seinen eigenen dunklen, akzent-getönten
-   Grund (NICHT `transparent` — sonst scheint die helle Sortier-Wäsche durch
-   und der dunkle Text landet auf hellem Grund → „dunkel auf dunkel"/„dunkel
-   auf hell", beides unlesbar, Feedback „OVR ist in dunkel kaum lesbar!").
-   Stattdessen: kräftiger, deckender Akzent-auf-Panel-Grund + heller
+   (Fix #4) erben: der Chip behält seinen eigenen dunklen, spaltentyp-
+   getönten Grund (NICHT `transparent` — sonst scheint die helle Sortier-
+   Wäsche durch und der dunkle Text landet auf hellem Grund → „dunkel auf
+   dunkel"/„dunkel auf hell", beides unlesbar).
+   Stattdessen: kräftiger, deckender Farb-auf-Panel-Grund + heller
    `--nl-ink`-Text — dasselbe Hell-auf-dunkel-Muster wie im Basis-Zustand,
    nur eine Stufe kräftiger. Vier Klassen + Element gewinnt gegenüber der
    3-Klassen-Regel aus Fix #4 und der 3-Klassen-Basisregel oben, ohne
@@ -68192,11 +68275,11 @@ button.is-new-look .nl-thist-season-pill,
 }
 
 .is-new-look td.is-active-sort .nl-ptable-percentile.nl-ptable-metric-rank.is-ovr {
-  background: color-mix(in srgb, #a06bff 55%, var(--nl-panel-2, #0f1621) 45%);
+  background: color-mix(in srgb, var(--nl-gold) 55%, var(--nl-panel-2, #0f1621) 45%);
 }
 
 .is-new-look td.is-active-sort .nl-ptable-percentile.nl-ptable-metric-rank.is-mvs {
-  background: color-mix(in srgb, var(--nl-gold) 55%, var(--nl-panel-2, #0f1621) 45%);
+  background: color-mix(in srgb, var(--nl-bronze) 55%, var(--nl-panel-2, #0f1621) 45%);
 }
 
 /* ============================================================

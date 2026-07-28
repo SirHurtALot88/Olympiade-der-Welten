@@ -364,11 +364,14 @@ const NL_PLAYERS_COLUMNS: ReadonlyArray<{
   align?: "left" | "right" | "center";
   tooltip?: string;
   /**
-   * Primäre/sekundäre Spalten-Betonung (Akzent-Rahmen auf Kopf + Zellen).
-   * PPs ist laut Produkt die wichtigste Kennzahl (wichtiger als OVR/MVS)
-   * und bekommt die stärkste Betonung; OVR bleibt sekundär hervorgehoben.
+   * Spalten-EIGENE Kennzahlen-Farbe (Kopf-Tönung + Unterstrich) für die drei
+   * Kennzahl-Spalten PPs/OVR/MVS. Grund: alle drei standen vorher im selben
+   * (liga-relativen) Blau-Heat-Vokabular und verschwammen beim Querlesen
+   * einer Zeile zu einem Block — jede Spalte bekommt jetzt EINE feste,
+   * unterscheidbare Farbfamilie (siehe `.nl-players-td-pps` /
+   * `.nl-ptable-ovr-cell` / `.nl-ptable-mvs-cell` in `app/globals.css`).
    */
-  highlight?: "primary" | "secondary";
+  highlight?: "pps" | "ovr" | "mvs";
 }> = [
   {
     id: "compare",
@@ -400,23 +403,24 @@ const NL_PLAYERS_COLUMNS: ReadonlyArray<{
     sortKey: "pps",
     align: "right",
     tooltip:
-      "Performance-Punkte der Saison — wichtigste Leistungskennzahl (Zeile aufklappbar für die Aufschlüsselung). Farben sind liga-relativ (Achtel des Liga-Pools).",
-    highlight: "primary",
+      "Performance-Punkte der Saison — wichtigste Leistungskennzahl (Zeile aufklappbar für die Aufschlüsselung). Blaue Spaltenfarbe; der Rang-Chip zeigt den ligaweiten Platz.",
+    highlight: "pps",
   },
   {
     id: "ovr",
     label: "OVR",
     sortKey: "ovr",
     align: "right",
-    tooltip: "Gesamtstärke (Overall) — Farben sind liga-relativ (Achtel des Liga-Pools).",
-    highlight: "secondary",
+    tooltip: "Gesamtstärke (Overall). Goldene Spaltenfarbe; der Rang-Chip zeigt den ligaweiten Platz.",
+    highlight: "ovr",
   },
   {
     id: "mvs",
     label: "MVS",
     sortKey: "mvs",
     align: "right",
-    tooltip: "Marktwert-Score — Farben sind liga-relativ (Achtel des Liga-Pools).",
+    tooltip: "Marktwert-Score. Bronzene Spaltenfarbe; der Rang-Chip zeigt den ligaweiten Platz.",
+    highlight: "mvs",
   },
   { id: "mw", label: "MW", sortKey: "mw", align: "right", tooltip: "Marktwert" },
   {
@@ -571,22 +575,29 @@ function renderMetricPercentileChip(value: number | null | undefined, pool: numb
  * `null`, wenn kein valider Rang/Pool vorliegt (keine Erfindung).
  *
  * Ton ist bewusst FEST (`.nl-ptable-metric-rank.is-<metric>`), NICHT die
- * wertabhängige `getPoolHeatTone`-Ton-Klasse: OVR ist die Kopf-Kennzahl der
- * Tabelle und bekommt EINEN eigenen, von PPs/MVS abgesetzten Akzent statt
- * einer dritten überlagerten Farb-Ebene (Value-Heat-Zellenhintergrund +
+ * wertabhängige `getPoolHeatTone`-Ton-Klasse — sonst würde eine dritte,
+ * überlagerte Farb-Ebene entstehen (Value-Heat-Zellenhintergrund +
  * Sortier-Highlight + ton-gefärbter Chip sahen zusammen wie zufälliger
- * Regenbogen aus). Seit #111 nutzt dieser feste Akzent `--nl-accent`
- * (dasselbe Blau-Vokabular wie PPs, nur schwächer) statt Amber/Gold — der
- * Chip-Text ist ein fester heller `--nl-ink`-Vordergrund statt Ton-auf-Ton,
- * damit er lesbar bleibt. Siehe die OVR-`<td>`-Zelle unten und die CSS
- * `.nl-ptable-ovr-cell` / `.nl-ptable-metric-rank`.
+ * Regenbogen aus).
+ *
+ * Farbfamilie je Kennzahl-Spalte (PPs/OVR/MVS standen vorher alle im
+ * selben liga-relativen Blau-Heat-Vokabular und verschwammen beim
+ * Querlesen einer Zeile zu einem Block):
+ *   PPs → `--nl-accent` (Blau, bereits die "Hero"-Kennzahl der App),
+ *   OVR → `--nl-gold` (Gold),
+ *   MVS → `--nl-bronze` (Bronze).
+ * Alle drei bewusst NICHT aus den Achsen-Tokens (`--nl-pow/spe/men/soc`),
+ * die direkt daneben in der "Achsen"-Spalte stehen — sonst würde eine
+ * Kennzahl-Spalte wie eine der vier Achsen-Balken aussehen. Der
+ * Chip-Text ist ein fester heller `--nl-ink`-Vordergrund statt Ton-auf-
+ * Ton, damit er lesbar bleibt. Dieselbe Farbe grundiert außerdem den
+ * kompletten Zellenhintergrund + Rand der jeweiligen Spalte (siehe CSS
+ * `.nl-players-td-pps` / `.nl-ptable-ovr-cell` / `.nl-ptable-mvs-cell` /
+ * `.nl-ptable-metric-rank`).
  */
 function renderMetricRankChip(
   value: number | null | undefined,
   pool: number[],
-  // Eigener Akzent je Kennzahl: PPs blau, OVR lila, MVS gelb. Die drei Spalten
-  // standen vorher farblich nebeneinander und waren im Scannen nicht zu
-  // unterscheiden — jede bekommt jetzt EINE feste, klar getrennte Farbe.
   metric: "pps" | "ovr" | "mvs" = "ovr",
 ) {
   const rank = getLeagueRank(value, pool);
@@ -1632,7 +1643,14 @@ export default function FoundationPlayersTableNewLook({
         })}
         {isColumnVisible("pps") ? (
         <td
-          className={`nl-players-td-metric nl-players-td-pps is-highlight-primary${sortCellClass("pps")} ${
+          // `nl-players-td-pps` trägt die feste blaue Spalten-Identität (CSS,
+          // `app/globals.css`) — überschreibt bewusst den wertabhängigen
+          // Heat-Hintergrund (`getPoolHeatClass`), der PPs sonst optisch mit
+          // MVS verschmelzen ließ (beide teilten sich dieselbe liga-relative
+          // Blau-Stufe bei Spitzenwerten). Die Heat-Klasse bleibt unten am
+          // Element (harmlos, überschrieben) — der ligaweite Rang steht
+          // stattdessen weiterhin explizit im `#N`-Chip.
+          className={`nl-players-td-metric nl-players-td-pps${sortCellClass("pps")} ${
             row.playerPps != null ? getPoolHeatClass(row.playerPps, leaguePlayerHeatPools.pps) : ""
           }`}
         >
@@ -1660,6 +1678,7 @@ export default function FoundationPlayersTableNewLook({
         </td>
         ) : null}
         {isColumnVisible("ovr") ? (
+        // `nl-ptable-ovr-cell` trägt die feste goldene Spalten-Identität (CSS).
         <td className={`nl-players-td-metric nl-ptable-ovr-cell${sortCellClass("ovr")}`}>
           <span className="nl-ptable-metric-cell">
             <span className="nl-tnum">{formatWholeNumber(row.playerOvr)}</span>
@@ -1669,7 +1688,10 @@ export default function FoundationPlayersTableNewLook({
         ) : null}
         {isColumnVisible("mvs") ? (
         <td
-          className={`nl-players-td-metric${sortCellClass("mvs")} ${
+          // `nl-ptable-mvs-cell` trägt die feste bronzene Spalten-Identität
+          // (CSS) — überschreibt den wertabhängigen Heat-Hintergrund aus
+          // demselben Grund wie bei PPs oben (Verwechslungsgefahr mit PPs).
+          className={`nl-players-td-metric nl-ptable-mvs-cell${sortCellClass("mvs")} ${
             row.playerMvs != null ? getPoolHeatClass(row.playerMvs, leaguePlayerHeatPools.mvs) : ""
           }`}
         >
@@ -2083,7 +2105,7 @@ export default function FoundationPlayersTableNewLook({
                       title={`Ansicht "${preset.label}" anwenden`}
                       style={
                         isActive
-                          ? { background: "var(--nl-accent)", borderColor: "var(--nl-accent)", color: "#fff" }
+                          ? { background: "var(--nl-accent)", borderColor: "var(--nl-accent)", color: "var(--nl-ink)" }
                           : undefined
                       }
                     >
