@@ -8,6 +8,7 @@ import DisciplineIcon from "@/app/foundation/DisciplineIcon";
 import RaceIcon from "@/app/foundation/RaceIcon";
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
+import PlayerStarFrame from "@/components/foundation/player-portrait-card/PlayerStarFrame";
 import type { ContractShape, GameState, Player, RosterEntry, Team } from "@/lib/data/olyDataTypes";
 import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 
@@ -237,6 +238,11 @@ export default function FoundationPlayersTableBody({
                           playerClassName={row.player.className}
                         >
                           {portrait.src ? (
+                            <PlayerStarFrame
+                              metrics={{ ovr: row.playerOvr, pps: row.playerPps, mvs: row.playerMvs }}
+                              leagueHeatPools={leaguePlayerHeatPools}
+                              shape="rounded"
+                            >
                             <BudgetedMediaImage
                               className="transfermarkt-portrait"
                               src={portrait.src}
@@ -253,6 +259,7 @@ export default function FoundationPlayersTableBody({
                                 </div>
                               }
                             />
+                            </PlayerStarFrame>
                           ) : (
                             <div
                               className="transfermarkt-portrait transfermarkt-portrait-placeholder"

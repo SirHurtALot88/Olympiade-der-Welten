@@ -39,6 +39,7 @@ import {
   type NlTone,
 } from "@/components/foundation/new-look";
 import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
+import PlayerStarFrame from "@/components/foundation/player-portrait-card/PlayerStarFrame";
 import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import type { FoundationPlayerScopeRow } from "@/lib/foundation/tabs/use-foundation-cross-tab-player-directory";
 
@@ -174,6 +175,11 @@ export default function FoundationPlayersLeaderPodium({
                       : { poScoreRange: getFoggedPoScoreRange(row.potentialScore ?? row.player.potential ?? null) })}
                   >
                     {portrait.src ? (
+                      <PlayerStarFrame
+                        metrics={{ ovr: row.playerOvr, pps: row.playerPps, mvs: row.playerMvs }}
+                        leagueHeatPools={leaguePlayerHeatPools}
+                        shape="circle"
+                      >
                       <BudgetedMediaImage
                         className="nl-podium-portrait"
                         src={portrait.src}
@@ -193,6 +199,7 @@ export default function FoundationPlayersLeaderPodium({
                           </span>
                         }
                       />
+                      </PlayerStarFrame>
                     ) : (
                       <span className="nl-podium-portrait nl-podium-portrait-fallback" aria-hidden="true">
                         {portrait.initials}

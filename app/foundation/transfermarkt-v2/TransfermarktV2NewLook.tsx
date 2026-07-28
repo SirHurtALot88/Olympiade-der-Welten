@@ -3,6 +3,7 @@
 import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { NlAbilityStars } from "@/components/foundation/velo-ui";
+import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import type { TransfermarktV2RosterRow } from "@/app/foundation/transfermarkt-v2/TransfermarktV2Client";
 import {
@@ -24,6 +25,7 @@ import {
 import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import type { ContractYearSalary, Discipline, DisciplineCategory, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
 import { formatGameFlowBlocker } from "@/lib/foundation/game-flow-blocker-labels";
+import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import { formatNullablePps } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 import { getGameTermShort } from "@/lib/ui/game-encyclopedia";
 import {
@@ -1442,13 +1444,37 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                   onKeyDown={(event) => handleNlSelectKeyDown(event, () => onSelectCandidate(item.playerId))}
                 >
                   <div className="nl-market-candidate-head">
-                    <span className="nl-market-candidate-portrait" aria-hidden="true">
-                      {portraitSrc ? (
-                        <OptimizedMediaImage src={portraitSrc} alt="" width={48} height={48} className="nl-market-portrait-img" />
-                      ) : (
-                        <span className="nl-market-portrait-initials">{portrait.initials}</span>
-                      )}
-                    </span>
+                    {/* Hover-Vorschau mit Werten — auf dem Markt entscheidet man anhand
+                        der Kernwerte, und die standen bisher nur in der Detailspalte
+                        rechts. `aria-hidden` ist entfallen: die Vorschau ist eine echte
+                        Tooltip-Affordanz, kein reines Dekorbild. Heat-Pools liegen in
+                        dieser Ansicht nicht vor, daher der leere Pool (gleiche Konvention
+                        wie in der Trainingsansicht) — die Werte zeigt sie trotzdem. */}
+                    <FoundationPlayerPortraitPreview
+                      playerId={item.playerId}
+                      name={item.name}
+                      portraitUrl={portraitSrc ?? null}
+                      portraitInitials={portrait.initials}
+                      playerOvr={item.ovr}
+                      playerMvs={item.mvs}
+                      playerPps={null}
+                      pow={item.pow}
+                      spe={item.spe}
+                      men={item.men}
+                      soc={item.soc}
+                      leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+                      variant="team"
+                      context="market"
+                      playerClassName={item.className}
+                    >
+                      <span className="nl-market-candidate-portrait">
+                        {portraitSrc ? (
+                          <OptimizedMediaImage src={portraitSrc} alt="" width={48} height={48} className="nl-market-portrait-img" />
+                        ) : (
+                          <span className="nl-market-portrait-initials">{portrait.initials}</span>
+                        )}
+                      </span>
+                    </FoundationPlayerPortraitPreview>
                     <span className="nl-market-candidate-copy">
                       {onOpenPlayerDetails ? (
                         <button

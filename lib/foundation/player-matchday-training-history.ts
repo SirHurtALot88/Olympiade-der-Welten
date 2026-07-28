@@ -38,8 +38,25 @@ export type PlayerSeasonTrainingForecast = {
   seasonId: string;
   /** Anzahl bereits ins Trainings-Budget eingeflossener Spieltage. */
   matchdaysPlayed: number;
+  /** Volle Saisonlänge — Bezugsgröße für „nach N von M Spieltagen". */
+  totalMatchdays: number;
   /** Summe der kumulierten Attributänderungen (das „kumulierte Plus" der Saison). */
   netCumulative: number;
+  /**
+   * Aufteilung des kumulierten Plus nach HERKUNFT, aufsummiert über alle
+   * Attribute: was aus dem Trainings-Budget kommt (inkl. Spillover auf
+   * Nebenstats) und was aus der Spieltags-Leistung. `regression` ist der
+   * Gegenposten, der beides wieder abträgt.
+   *
+   * Die drei Zahlen stammen unverändert aus `attributeBreakdown` der
+   * Organic-Projektion — dieselbe Quelle wie `netCumulative`, nur nicht
+   * saldiert. So ist ablesbar, ob ein Spieler durch TRAINING wächst oder
+   * weil er spielt.
+   */
+  trainingTotal: number;
+  spilloverTotal: number;
+  performanceTotal: number;
+  regressionTotal: number;
   attributes: PlayerSeasonTrainingForecastCell[];
 };
 
@@ -136,5 +153,28 @@ export function buildPlayerSeasonTrainingForecast(input: {
   });
   const netCumulative = round1(attributes.reduce((sum, cell) => sum + cell.cumulative, 0));
 
-  return { seasonId, matchdaysPlayed: playedMatchdayIds.length, netCumulative, attributes };
+  // Herkunft des kumulierten Plus, aufsummiert über alle Attribute. Rein additiv
+  // aus derselben Projektion — es wird nichts zusätzlich gerechnet.
+  let trainingTotal = 0;
+  let spilloverTotal = 0;
+  let performanceTotal = 0;
+  let regressionTotal = 0;
+  for (const entry of projection.attributeBreakdown) {
+    trainingTotal += entry.training ?? 0;
+    spilloverTotal += entry.spillover ?? 0;
+    performanceTotal += entry.performance ?? 0;
+    regressionTotal += entry.regression ?? 0;
+  }
+
+  return {
+    seasonId,
+    matchdaysPlayed: playedMatchdayIds.length,
+    totalMatchdays,
+    netCumulative,
+    trainingTotal: round1(trainingTotal),
+    spilloverTotal: round1(spilloverTotal),
+    performanceTotal: round1(performanceTotal),
+    regressionTotal: round1(regressionTotal),
+    attributes,
+  };
 }
