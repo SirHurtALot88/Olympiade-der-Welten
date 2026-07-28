@@ -304,9 +304,21 @@ export function buildLegacyMatchdayResolvePreview(
     const teamCaptain = context.gameState ? selectTeamCaptain(context.gameState, context.teamId) : null;
 
     for (const meta of getDisciplineSideMeta(context)) {
-      const sideEntries = (draft?.entries ?? []).filter(
-        (entry) => entry.disciplineId === meta.disciplineId && entry.disciplineSide === meta.disciplineSide,
-      );
+      const sideRequiredPlayers =
+        context.disciplineSidePlayerCounts?.[`${meta.disciplineId}::${meta.disciplineSide}`] ??
+        context.disciplinePlayerCounts[meta.disciplineId] ??
+        null;
+      // Ueberzaehlige Draft-Eintraege auch fuer die Nebenkanaele (Slot-Rollen, Form-
+      // playerCount, Mutator-Slots) kappen — dieselbe Regel wie in der Score-Engine:
+      // es werten nur die ersten requiredPlayers Slots (slotIndex-sortiert). Sonst
+      // rechnen die Modifier mit 5 Spielern, waehrend die Wertung nur 3 kennt.
+      const allSideEntries = (draft?.entries ?? [])
+        .filter((entry) => entry.disciplineId === meta.disciplineId && entry.disciplineSide === meta.disciplineSide)
+        .sort((left, right) => left.slotIndex - right.slotIndex);
+      const sideEntries =
+        sideRequiredPlayers != null && sideRequiredPlayers > 0 && allSideEntries.length > sideRequiredPlayers
+          ? allSideEntries.slice(0, sideRequiredPlayers)
+          : allSideEntries;
       // "Ruhepol"-Captain-Effekt jetzt auch im echten Resolve (vorher nur Lab-UI): Rivalitaetsdruck aus
       // Top-Rivalen der Diszi wird wie im Lab berechnet und durch rivalryPressureReductionPct gedaempft.
       const disciplineTop8Rivals = context.teamPowerWindows?.[meta.disciplineId]?.top8Rivals ?? [];
@@ -324,10 +336,7 @@ export function buildLegacyMatchdayResolvePreview(
         disciplineScores: context.disciplineScores,
         intensity: draft?.modifiers?.[meta.disciplineSide]?.intensity ?? "normal",
         fatigueByPlayerId: context.fatigueByPlayerId ?? null,
-        requiredPlayers:
-          context.disciplineSidePlayerCounts?.[`${meta.disciplineId}::${meta.disciplineSide}`] ??
-          context.disciplinePlayerCounts[meta.disciplineId] ??
-          null,
+        requiredPlayers: sideRequiredPlayers,
         rivalryPressure,
       });
       const score = scoreLegacyLineupDisciplineSide({
@@ -338,10 +347,7 @@ export function buildLegacyMatchdayResolvePreview(
         disciplineScores: context.disciplineScores,
         activePlayers: context.activePlayers,
         rosterPlayers: context.rosterPlayers,
-        requiredPlayers:
-          context.disciplineSidePlayerCounts?.[`${meta.disciplineId}::${meta.disciplineSide}`] ??
-          context.disciplinePlayerCounts[meta.disciplineId] ??
-          null,
+        requiredPlayers: sideRequiredPlayers,
             fatigueByPlayerId: context.fatigueByPlayerId ?? null,
             injuryByPlayerId: context.injuryByPlayerId ?? null,
             moraleByPlayerId,
