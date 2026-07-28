@@ -42,6 +42,33 @@ export const PLAYER_STAR_TIERS: ReadonlyArray<{
 const HOLO_MAX_RANK = 10;
 
 /**
+ * Ligaweiter Rang eines Werts innerhalb seines Heat-Pools (1 = bester).
+ *
+ * Dieselbe Zaehlweise wie in der Spielertabelle (`getLeagueRank`): wie viele
+ * Eintraege des Pools liegen ueber dem Wert. `null`, wenn Wert oder Pool
+ * fehlen — dann gibt es schlicht keine Einordnung.
+ *
+ * Wird gebraucht, weil laengst nicht jede Ansicht fertige Raenge durchreicht,
+ * die Liga-Pools aber fast ueberall vorliegen. So bekommen auch Portraits ohne
+ * explizite Rang-Props ihre Stufe, statt still ohne Rahmen zu bleiben.
+ */
+export function resolveLeagueRankFromPool(
+  value: number | null | undefined,
+  pool: ReadonlyArray<number> | null | undefined,
+): number | null {
+  if (value == null || !Number.isFinite(value) || !pool || pool.length === 0) {
+    return null;
+  }
+  let higher = 0;
+  for (const entry of pool) {
+    if (entry > value) {
+      higher += 1;
+    }
+  }
+  return higher + 1;
+}
+
+/**
  * Stufe eines einzelnen Rangs. `null` für alles außerhalb der Top 50, für
  * fehlende Ränge (z. B. Spieler ohne Roster-Eintrag, siehe
  * `outputOnlyPlayerIds` im Rating-Contract) und für unplausible Werte —

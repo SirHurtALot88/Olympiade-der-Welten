@@ -19,6 +19,7 @@ import {
   getBestPlayerStarTier,
   getPlayerStarTierClassName,
   isHoloPlayerStarTier,
+  resolveLeagueRankFromPool,
 } from "@/lib/foundation/player-star-tier";
 
 export type FoundationPlayerPortraitEconomyStat = {
@@ -157,6 +158,15 @@ export default function FoundationPlayerPortraitCard({
   portraitFetchPriority = "auto",
 }: FoundationPlayerPortraitCardProps) {
   const resolvedHeatPools = leagueHeatPools ?? createEmptyLeaguePlayerHeatPools();
+  // Ligaraenge: bevorzugt die explizit uebergebenen, sonst aus den Heat-Pools
+  // abgeleitet. Die meisten Aufrufer (Hover-Vorschau der Spielertabelle, Training,
+  // Arena-Drawer) reichen zwar die Pools durch, aber keine fertigen Raenge — die
+  // Karte blieb dadurch ohne Rang-Angabe UND ohne Star-Rahmen, obwohl die
+  // Einordnung aus den Pools eindeutig ableitbar ist. Gleiche Zaehlweise wie in
+  // der Spielertabelle, also derselbe Rang wie dort.
+  const effectiveOvrRank = ovrRank ?? resolveLeagueRankFromPool(playerOvr, resolvedHeatPools.ovr);
+  const effectivePpsRank = ppsRank ?? resolveLeagueRankFromPool(playerPps ?? null, resolvedHeatPools.pps);
+  const effectiveMvsRank = mvsRank ?? resolveLeagueRankFromPool(playerMvs, resolvedHeatPools.mvs);
   // Team-Varianten dürfen die alte String-CA/PO-Zeile nur im "Neuen Look" zeigen (Tier-3
   // Rosterkarten) — Flag-aus bleibt unverändert, weil `newLook` dort nie gesetzt wird.
   const showCaPo =
@@ -189,15 +199,18 @@ export default function FoundationPlayerPortraitCard({
     playerOvr,
     playerMvs,
     playerPps,
-    ovrRank,
-    mvsRank,
-    ppsRank,
+    ovrRank: effectiveOvrRank,
+    mvsRank: effectiveMvsRank,
+    ppsRank: effectivePpsRank,
     caRating,
     poRangeMin,
     poRangeMax,
     showCaPo,
     leagueHeatPools: resolvedHeatPools,
-    rankStyle: ovrRank != null || ppsRank != null || mvsRank != null || variant === "team" ? "inline" : "label",
+    rankStyle:
+      effectiveOvrRank != null || effectivePpsRank != null || effectiveMvsRank != null || variant === "team"
+        ? "inline"
+        : "label",
   });
 
   const abilityStarsRow =
@@ -338,8 +351,12 @@ export default function FoundationPlayerPortraitCard({
    * egal worüber er stark ist. Die einzelnen OVR/PPs/MVS-Chips tragen davon
    * unabhängig ihre eigene Stufe (siehe `buildRosterOverlayStats`).
    */
-  const starTier = getBestPlayerStarTier(ovrRank, ppsRank, mvsRank);
-  const starTierDescription = describePlayerStarTier({ ovrRank, ppsRank, mvsRank });
+  const starTier = getBestPlayerStarTier(effectiveOvrRank, effectivePpsRank, effectiveMvsRank);
+  const starTierDescription = describePlayerStarTier({
+    ovrRank: effectiveOvrRank,
+    ppsRank: effectivePpsRank,
+    mvsRank: effectiveMvsRank,
+  });
 
   const cardClassName = [
     "foundation-player-portrait-card",
