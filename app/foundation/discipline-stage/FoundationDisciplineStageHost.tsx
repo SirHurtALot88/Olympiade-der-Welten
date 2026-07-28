@@ -20,6 +20,8 @@ export type FoundationDisciplineStageHostProps = {
   matchdayId?: string | null;
   // Kanonische „Weiter"-Aktion (identisch zur Arena) — wertet den Spieltag aus.
   onAdvanceMatchday?: (() => void | Promise<void>) | null;
+  // Bucht die zu Ende gespielte Disziplin (siehe DisciplineStageArenaProps).
+  onCommitDiscipline?: ((side: "d1" | "d2") => Promise<unknown>) | null;
   /** Multiplayer-Room-Kontext — aktiviert Co-op-Ready-Gate + host-getriebenen Lockstep-Reveal. */
   roomContext?: FoundationRoomContext | null;
   // Öffnet die normale Spieler-Karte (PlayerDetailDrawer), wie im Rest der App.

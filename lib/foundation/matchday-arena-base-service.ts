@@ -189,6 +189,7 @@ export async function loadMatchdayArenaBase(input: {
   // briefing instead of failing loudly.
   const persistence = createPersistenceService();
   const { save } = requireLocalPersistedSave(persistence, input.saveId);
+
   const versionMeta = persistence.getSaveVersionMetadata(save.saveId);
   const contentSignature = versionMeta?.contentSignature ?? null;
   const params: LegacyLineupKeyParams = {

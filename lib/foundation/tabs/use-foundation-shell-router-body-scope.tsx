@@ -4280,39 +4280,55 @@ export function useFoundationShellRouterBodyScope({
     }
   }
 
-  async function runFinishMatchdaySimple() {
+  /**
+   * Buchung einer in der Arena zu Ende gespielten Disziplin. Ersetzt den frueheren
+   * „Spieltag abschliessen"-Knopf: Was die Buehne gezeigt hat, wandert direkt danach in
+   * den Saisonstand — nach D1 als halber Spieltag, nach D2 vollstaendig samt Preisgeld
+   * und Spieltagswechsel. Die KI-Aufstellungen stehen zu diesem Zeitpunkt bereits (die
+   * Arena-Basis erzeugt sie beim Laden), der Lauf rechnet also genau das Gezeigte nach.
+   */
+  async function commitArenaDiscipline(side: "d1" | "d2") {
     if (readMeta.readOnly) {
       showReadOnlyNotice();
-      return;
+      return null;
     }
-    // Force solo-safe options: keep existing lineups, no tie-stop, advance after cash
     const savedInclude = matchdayAutoRunIncludeWarningLineups;
     const savedOverwrite = matchdayAutoRunOverwriteExistingLineups;
     const savedStop = matchdayAutoRunStopOnTie;
     setMatchdayAutoRunIncludeWarningLineups(false);
+    // Vorhandene Aufstellungen NIE ueberschreiben — sonst wuerde der Lauf andere
+    // Aufstellungen erzeugen als die, gegen die die Arena gerade gespielt hat.
     setMatchdayAutoRunOverwriteExistingLineups(false);
     setMatchdayAutoRunStopOnTie(false);
     try {
       const runCockpitMatchdayAutoRun = matchdayArenaApplyHandlers?.runCockpitMatchdayAutoRun;
       if (!runCockpitMatchdayAutoRun) {
-        return;
+        return null;
       }
-      const result = await runCockpitMatchdayAutoRun(true);
-      const advanced = result?.summary?.advanceAllowed ?? false;
-      if (advanced) {
-        setFoundationView("homeV2", setActiveView);
+      const result = await runCockpitMatchdayAutoRun(true, side);
+      const booked = result?.summary?.standingsApplyAllowed ?? false;
+      if (!booked) {
+        setFoundationActionFeedback({
+          tone: "warning",
+          title: "Punkte nicht gebucht",
+          detail: "Die Wertung dieser Disziplin ist blockiert — bitte Cockpit pruefen.",
+        });
+        return result;
+      }
+      if (side === "d2") {
         setFoundationActionFeedback({
           tone: "success",
           title: "Spieltag abgeschlossen",
-          detail: "Ergebnisse gesichert. Der nächste Spieltag ist bereit.",
+          detail: "Beide Disziplinen sind gewertet. Der naechste Spieltag ist bereit.",
         });
       } else {
         setFoundationActionFeedback({
-          tone: "warning",
-          title: "Spieltag nicht vollständig abgeschlossen",
-          detail: "Bitte Cockpit prüfen — ein Schritt ist möglicherweise blockiert.",
+          tone: "success",
+          title: "Disziplin 1 gewertet",
+          detail: "Die Platzierungspunkte stehen im Saisonstand. Weiter mit Disziplin 2.",
         });
       }
+      return result;
     } finally {
       setMatchdayAutoRunIncludeWarningLineups(savedInclude);
       setMatchdayAutoRunOverwriteExistingLineups(savedOverwrite);
@@ -11271,7 +11287,7 @@ export function useFoundationShellRouterBodyScope({
     runCockpitMatchdayAutoRun,
     runFacilityMaintenancePreview,
     runFacilityUpgradePreview,
-    runFinishMatchdaySimple,
+    commitArenaDiscipline,
     runFoundationCommand,
     runNewGameSetup,
     runSaveAction,

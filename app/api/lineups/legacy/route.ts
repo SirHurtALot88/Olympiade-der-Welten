@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 
+import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import {
   getLocalLegacyLineupDraft,
   saveLocalLegacyLineupDraft,
@@ -125,6 +126,28 @@ export async function PUT(request: Request) {
         { status: 422 },
       );
     }
+    // Sobald der Spieler seine Aufstellung abgibt, geben die KI-Teams ihre auch ab.
+    // Das muss VOR der Arena passieren: Die Buehne ist nicht mehr nur Vorschau, sie
+    // zeigt genau das, was am Ende jeder Disziplin gebucht wird — und dafuer muessen
+    // die Gegner-Aufstellungen feststehen. Frueher entstanden sie erst beim Abschluss,
+    // die Vorschau eines frischen Spieltags rechnete also gegen ein halb leeres Feld.
+    // `overwriteExisting: false` laesst bereits vorhandene Aufstellungen unangetastet;
+    // der Aufruf ist damit idempotent und bei vollstaendigem Feld praktisch kostenlos.
+    // Ein Fehlschlag darf das Speichern der eigenen Aufstellung nicht kippen — die
+    // fehlenden KI-Aufstellungen holt der Ergebnis-Commit dann wie bisher nach.
+    try {
+      applyAiLegacyLineupBatchLocally({
+        saveId: params.saveId,
+        seasonId: params.seasonId,
+        matchdayId: params.matchdayId,
+        dryRun: false,
+        includeWarningTeams: false,
+        overwriteExisting: false,
+      });
+    } catch {
+      // bewusst geschluckt, siehe oben
+    }
+
     notifyRoomGameplayWrite(writeAuth, {
       saveId: params.saveId,
       teamId: params.teamId,

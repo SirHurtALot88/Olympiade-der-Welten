@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
@@ -78,6 +78,13 @@ export type DisciplineStageArenaProps = {
   seasonId?: string | null;
   matchdayId?: string | null;
   onAdvanceMatchday?: (() => void | Promise<void>) | null;
+  /**
+   * Bucht die gerade zu Ende gespielte Disziplin. Wird direkt beim Zieleinlauf gerufen —
+   * die Platzierungspunkte stehen damit im Saisonstand, sobald der Endscreen erscheint.
+   * `"d1"` schreibt einen halben Spieltag, `"d2"` schliesst ihn ab. Ohne diesen Callback
+   * bleibt die Buehne reine Vorschau (z. B. `dev-arena`).
+   */
+  onCommitDiscipline?: ((side: "d1" | "d2") => Promise<unknown>) | null;
   onOpenPlayer?: ((playerId: string) => void) | null;
   onOpenTeam?: ((teamId: string) => void) | null;
   /** Multiplayer-Room-Kontext — aktiviert Co-op-Ready-Gate + host-getriebenen Lockstep-Reveal. */
@@ -432,6 +439,7 @@ export default function DisciplineStageArena({
   seasonId,
   matchdayId,
   onAdvanceMatchday,
+  onCommitDiscipline,
   onOpenPlayer,
   onOpenTeam,
   roomContext,
@@ -1274,6 +1282,47 @@ export default function DisciplineStageArena({
   const disciplineEnded =
     arenaEnded || (endedDisciplineIds.has(disciplineId) && replayingDisciplineId !== disciplineId);
 
+  /**
+   * Buchungszustand je Disziplin. Der Zieleinlauf loest die Wertung aus; bis sie durch
+   * ist, steht im Endscreen „wird gewertet", danach „im Saisonstand". Ein Replay derselben
+   * Disziplin bucht NICHT erneut — gebucht wird der erste, verbindliche Durchlauf.
+   */
+  const [commitStateByDiscipline, setCommitStateByDiscipline] = useState<
+    Record<string, "pending" | "booked" | "failed">
+  >({});
+  const commitInFlightRef = useRef<Set<string>>(new Set());
+  const commitState = commitStateByDiscipline[disciplineId] ?? null;
+
+  const commitFinishedDiscipline = useCallback(
+    (finishedDisciplineId: string) => {
+      if (!onCommitDiscipline) return;
+      const side =
+        matchdayPanel?.d1?.disciplineId === finishedDisciplineId
+          ? "d1"
+          : matchdayPanel?.d2?.disciplineId === finishedDisciplineId
+            ? "d2"
+            : null;
+      // Nur die beiden Spieltags-Disziplinen werden gewertet. Ein freies Nachspielen
+      // ausserhalb des Spieltags-Paars bleibt folgenlos.
+      if (!side) return;
+      if (commitInFlightRef.current.has(finishedDisciplineId)) return;
+      if (commitStateByDiscipline[finishedDisciplineId] === "booked") return;
+      commitInFlightRef.current.add(finishedDisciplineId);
+      setCommitStateByDiscipline((prev) => ({ ...prev, [finishedDisciplineId]: "pending" }));
+      void onCommitDiscipline(side)
+        .then(() => {
+          setCommitStateByDiscipline((prev) => ({ ...prev, [finishedDisciplineId]: "booked" }));
+        })
+        .catch(() => {
+          setCommitStateByDiscipline((prev) => ({ ...prev, [finishedDisciplineId]: "failed" }));
+        })
+        .finally(() => {
+          commitInFlightRef.current.delete(finishedDisciplineId);
+        });
+    },
+    [commitStateByDiscipline, matchdayPanel?.d1?.disciplineId, matchdayPanel?.d2?.disciplineId, onCommitDiscipline],
+  );
+
   // S2: Doppel-Klick-Schutz für „Spieltag auswerten & weiter".
   // Der State allein reicht dafür nicht: zwei Klicks im selben React-Batch lesen beide das
   // `advancing` aus derselben Render-Closure (also `false`), und `disabled` wirkt erst nach dem
@@ -1529,6 +1578,9 @@ export default function DisciplineStageArena({
           setReplayingDisciplineId(null);
           // A3: Disziplin dauerhaft als „schon gelaufen" merken (siehe endedDisciplineIds oben).
           setEndedDisciplineIds((prev) => (prev.has(disciplineId) ? prev : new Set(prev).add(disciplineId)));
+          // Zieleinlauf = Wertung. Was die Buehne gezeigt hat, wandert jetzt in den
+          // Saisonstand; nach D2 wird der Spieltag zusaetzlich abgeschlossen.
+          commitFinishedDiscipline(disciplineId);
         }}
         onReset={() => {
           setArenaEnded(false);
@@ -1551,6 +1603,37 @@ export default function DisciplineStageArena({
           schrittweise enthüllt (d1 nach Disziplin-1-Ende, d2 + finaler Saison-Rang nach
           Disziplin-2-Ende); sonst zeigt es den Spieltags-Fahrplan + Saisonstand (PP gesperrt,
           kein Spoiler). Beide Disziplinen des Spieltags werden zusammengefasst. */}
+      {/* Wertungsstatus der gerade beendeten Disziplin. Ersetzt den frueheren Abschluss-Knopf:
+          der Spieler klickt nichts mehr, er sieht nur, dass die Punkte stehen. */}
+      {mode === "real" && disciplineEnded && commitState ? (
+        <div
+          role="status"
+          data-testid="arena-discipline-commit-status"
+          data-commit-state={commitState}
+          style={{
+            marginTop: 14,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 13,
+            fontWeight: 700,
+            padding: "9px 12px",
+            borderRadius: 12,
+            border: `1px solid ${commitState === "failed" ? "var(--nl-risk)" : "var(--nl-line)"}`,
+            color: commitState === "failed" ? "var(--nl-risk)" : "var(--nl-good)",
+            background: "var(--nl-panel)",
+          }}
+        >
+          {commitState === "pending"
+            ? "Wertung läuft — die Platzierungspunkte werden gebucht …"
+            : commitState === "booked"
+              ? matchdayPanel?.d2?.disciplineId === disciplineId
+                ? "Spieltag gewertet — beide Disziplinen stehen im Saisonstand."
+                : "Gewertet — die Platzierungspunkte stehen im Saisonstand."
+              : "Die Wertung ist fehlgeschlagen. Die Punkte wurden nicht gebucht."}
+        </div>
+      ) : null}
+
       {mode === "real" && preview && matchdayPanel ? (
         <div style={{ marginTop: 14 }}>
           <DisciplineStageMatchdayPanel
