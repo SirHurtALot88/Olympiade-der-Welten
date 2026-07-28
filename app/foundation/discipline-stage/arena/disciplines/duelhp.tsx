@@ -6,9 +6,11 @@
 // Abprall am Ellipsen-Rand. Score bleibt Wahrheit: sobald die Reveal-Engine den
 // kumulierten Score eines Teams erhöht, stürmt sein Logo auf den nächsten Gegner zu
 // (Lunge/Aufprall), eine aufsteigende SCHADENS-Zahl (dmg, aus dem Score abgeleitet)
-// erscheint — der größte Move einer Runde als gelbe Crit-Zahl mit ✦-Funken. Rang = 1
-// ist das größte, goldene Logo (Krone), Top-3 tragen Medaillen-Ringe, Freund/Feind
-// als Rahmen. reduced-motion → statischer Endstand mit Sample-Treffern.
+// erscheint — der größte Move einer Runde als gelbe Crit-Zahl mit ✦-Funken. Die
+// LOGO-GRÖSSE folgt den Punkten (Durchmesser ∝ score/maxScore, siehe
+// lib/minidm-token-size.ts), der Führende trägt zusätzlich Krone + Gold-Puls, Top-3
+// Medaillen-Ringe, Freund/Feind als Rahmen. reduced-motion → statischer Endstand
+// mit Sample-Treffern.
 //
 // Das geteilte Chrome liefert automatisch: MyTracker/Kopf-Strip, 32er-Ladder (Rang =
 // Score, Ampel, Medaillen), Feed-Ticker, Hover-Steckbrief, Podest, Endstand.
@@ -18,6 +20,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import type { DisciplineFieldProps, RT } from "./types";
 import { TokenChrome } from "./benchmark";
+import { MINI_DM_ATTACK_INTERVAL_MS, miniDmTokenDiameter } from "@/lib/minidm-token-size";
 
 const SVGNS = "http://www.w3.org/2000/svg";
 
@@ -51,6 +54,7 @@ export default function DuelhpField(props: DisciplineFieldProps): ReactNode {
     reducedMotion,
     geo,
     fieldNorm,
+    shownScore,
     rt,
     sorted,
     now,
@@ -70,8 +74,7 @@ export default function DuelhpField(props: DisciplineFieldProps): ReactNode {
   const cy = H * 0.52;
   const rx = W * 0.47;
   const ry = H * 0.44;
-  const D = Math.round(H * 0.062); // Basis-Token-Durchmesser
-  const DL = Math.round(D * 1.24); // Führender
+  const D = Math.round(H * 0.062); // Basis-Token-Durchmesser (Bezugsgröße der Punkte-Skalierung)
 
   // Aus dem einen Score abgeleiteter „Gesamt-Schaden" (Deko fürs Gefühl, monoton,
   // Bereich wie im Mockup: 800 … 7800). Der Score bleibt die Wahrheit.
@@ -79,6 +82,9 @@ export default function DuelhpField(props: DisciplineFieldProps): ReactNode {
 
   // Imperative Refs (Bewegung + FX ohne React-Re-Render pro Frame — wie track.tsx).
   const nodesRef = useRef<Map<number, Node>>(new Map());
+  // Aktueller Anzeige-Durchmesser je Team (im Render aus den Punkten berechnet) —
+  // die rAF-Schleife liest ihn für Kollisionsgrößen, ohne selbst zu rechnen.
+  const diaRef = useRef<Map<number, number>>(new Map());
   const gRefs = useRef<Map<number, SVGGElement | null>>(new Map());
   const fxLayerRef = useRef<SVGGElement | null>(null);
   const lastDmgRef = useRef<Map<number, number>>(new Map());
@@ -109,7 +115,7 @@ export default function DuelhpField(props: DisciplineFieldProps): ReactNode {
         y: cy + Math.sin(ang) * rad * ry,
         vx: Math.cos(va) * sp,
         vy: Math.sin(va) * sp,
-        sz: t.rank === 1 ? DL : D,
+        sz: diaRef.current.get(t.idx) ?? D,
         rally: false,
         lungeT: 0,
       };
@@ -237,7 +243,9 @@ export default function DuelhpField(props: DisciplineFieldProps): ReactNode {
         if (el) el.setAttribute("transform", `translate(${n.x} ${n.y})`);
       }
       const arr = rtRef.current;
-      for (let k = 0; k < 5; k += 1) {
+      // 6 statt 5 Sample-Treffer (~+20 %, im Gleichschritt mit dem dichteren
+      // Live-Rhythmus) — weiterhin rein statisch, keine Bewegung.
+      for (let k = 0; k < 6; k += 1) {
         const t = arr[k * 3];
         if (!t) continue;
         const n = nodesRef.current.get(t.idx);
@@ -260,10 +268,11 @@ export default function DuelhpField(props: DisciplineFieldProps): ReactNode {
       const frozen = hoverRef.current != null || pausedRef.current;
       const nodes = Array.from(nodesRef.current.values());
 
-      // Führenden-Größe live nachführen.
+      // Kollisions-Größe live an die punktebasierte Anzeige-Größe koppeln (diaRef
+      // wird bei jedem Render aus shownScore neu befüllt → wächst im Reveal mit).
       const rankByIdx = new Map<number, number>();
       for (const t of rtRef.current) rankByIdx.set(t.idx, t.rank);
-      for (const n of nodes) n.sz = rankByIdx.get(n.idx) === 1 ? DL : D;
+      for (const n of nodes) n.sz = diaRef.current.get(n.idx) ?? D;
 
       if (!frozen && nodes.length > 0) {
         // Rally-Puls an/aus: mal bildet sich ein Grüppchen, dann löst es sich.
@@ -292,7 +301,11 @@ export default function DuelhpField(props: DisciplineFieldProps): ReactNode {
         // Schadenszahlen im leeren Pit poppen.
         if (nodes.length > 1 && rtRef.current.some((t) => t.thrownSlot >= 0)) {
           atkAcc += dt;
-          if (atkAcc > 400) {
+          // Rhythmus aus lib/minidm-token-size.ts (310 ms statt 400 ms ≈ +29 % Treffer):
+          // NUR die Frequenz der kosmetischen Chip-Treffer steigt — Rundendauer taktet
+          // der Host, und der Schaden hier fließt in KEINE Wertung (Score kommt read-only
+          // aus den Props, siehe Contract in types.ts: Feld ist rein visuell).
+          if (atkAcc > MINI_DM_ATTACK_INTERVAL_MS) {
             atkAcc = 0;
             const N = nodes.length;
             // Gewicht ∝ (N − Rang + 1): Führer am häufigsten, Schlusslicht am seltensten.
@@ -426,8 +439,15 @@ export default function DuelhpField(props: DisciplineFieldProps): ReactNode {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reducedMotion]);
 
-  // Token-Radius (Halb-Durchmesser) — Führender/eigenes Team etwas größer.
-  const tokenR = (t: RT): number => (t.rank === 1 ? DL / 2 : t.isOwn ? D / 2 + 1 : D / 2);
+  // Token-Radius aus den ANZEIGE-Punkten (shownScore → wächst während des Reveals
+  // mit): Durchmesser ∝ score/maxScore, Details/Begründung in lib/minidm-token-size.ts.
+  // Kein Rang-1-Sonderfall mehr — der Führende ist per Definition maxScore und damit
+  // ohnehin der Größte; Krone + Gold-Puls markieren ihn zusätzlich.
+  const maxShown = rt.reduce((m, t) => Math.max(m, shownScore(t)), 0);
+  const tokenR = (t: RT): number =>
+    miniDmTokenDiameter({ score: shownScore(t), maxScore: maxShown, baseD: D, isOwn: t.isOwn }) / 2;
+  // Durchmesser-Spiegel für die rAF-Schleife (Kollisionen) aktualisieren.
+  for (const t of rt) diaRef.current.set(t.idx, tokenR(t) * 2);
 
   return (
     <>
