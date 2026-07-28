@@ -82,15 +82,32 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
   const activePlayerById = new Map((input.activePlayers ?? []).map((player) => [player.id, player]));
   const rosterPlayerById = new Map((input.rosterPlayers ?? []).map((player) => [player.id, player]));
 
-  const relevantEntries = input.entries
+  const allSideEntries = input.entries
     .filter((entry) => entry.disciplineId === input.disciplineId && entry.disciplineSide === input.disciplineSide)
     .sort((left, right) => left.slotIndex - right.slotIndex);
 
   const missingScores: string[] = [];
   const validationWarnings: string[] = [];
   const modifierWarnings: string[] = [];
-  const selectedPlayers = relevantEntries.length;
   const requiredPlayers = input.requiredPlayers ?? null;
+  // Ueberzaehlige Eintraege NICHT werten (Ursache des Staffel-Bugs "5 Etappen
+  // angekuendigt, nach der 3. ist Schluss"): ein Draft kann mehr Eintraege tragen,
+  // als die Disziplin an diesem Spieltag erlaubt (z. B. stale Draft, nachdem der
+  // Season-Schedule den playerCount gesenkt hat). Frueher zaehlten ALLE Eintraege
+  // in den Team-Score — das verzerrte die Wertung (5 statt 3 Spieler) und blies
+  // die Buehnen-Etappenzahl auf (slotCount = max Eintraege je Team), waehrend die
+  // regulaeren 3er-Teams nach Etappe 3 fertig waren. Es werten die ersten
+  // requiredPlayers Slots (slotIndex-sortiert = die aufgestellte Reihenfolge).
+  const relevantEntries =
+    requiredPlayers != null && requiredPlayers > 0 && allSideEntries.length > requiredPlayers
+      ? allSideEntries.slice(0, requiredPlayers)
+      : allSideEntries;
+  if (relevantEntries.length < allSideEntries.length) {
+    validationWarnings.push(
+      `Discipline ${input.disciplineId} on ${input.disciplineSide} has ${allSideEntries.length} lineup entries but only ${requiredPlayers} count; surplus entries are ignored.`,
+    );
+  }
+  const selectedPlayers = relevantEntries.length;
   const missingPlayers = requiredPlayers == null ? 0 : Math.max(0, requiredPlayers - selectedPlayers);
   const isComplete = requiredPlayers == null ? true : missingPlayers === 0;
 
