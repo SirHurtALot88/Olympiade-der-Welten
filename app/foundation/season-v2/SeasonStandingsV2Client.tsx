@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 
 import SeasonStandingsNewLook from "@/app/foundation/season-v2/SeasonStandingsNewLook";
+import type { SeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
 import type { SeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
 
 type SeasonV2DisciplineKey = SeasonDisciplineKey | "bonuspunkte";
@@ -173,6 +174,12 @@ export type SeasonStandingsV2ClientProps = {
   disciplineLeaders: SeasonV2DisciplineLeader[];
   /** Team-IDs der Rivalen des aktiven Teams (additive Hervorhebung, optional/graceful). */
   rivalTeamIds?: ReadonlySet<string>;
+  /**
+   * Top-3-Spieler je Team und Spalte (POW/SPE/MEN/SOC + 20 Disziplinen) fürs
+   * Hover-Panel im Saisonstand — im Host EINMAL memoisiert. Optional/`null`
+   * (z. B. Archiv-Saison: Live-Werte wären dort gelogen) → kein Hover-Panel.
+   */
+  teamTopPlayersByColumn?: SeasonStandingsTopPlayersByTeam | null;
   onChangeSeason: (seasonId: string) => void;
   onOpenTeam: (teamId: string) => void;
   onOpenPlayer: (playerId: string) => void;

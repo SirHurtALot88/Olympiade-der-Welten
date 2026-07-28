@@ -62,6 +62,13 @@ export interface UseSeasonV2DataInput {
       {
         totalPoints?: number | null;
         pointsByArea: { power?: number | null; speed?: number | null; mental?: number | null; social?: number | null };
+        /**
+         * PPs je Disziplin — vom Season-V2-Host für die Top-3-Hover des
+         * Saisonstands konsumiert (`buildSeasonStandingsTopPlayersByTeam`).
+         * Optional deklariert, weil dieser Struktur-Typ nur die gelesenen
+         * Felder des echten `SeasonPointsLedger` abbildet.
+         */
+        pointsByDiscipline?: Record<string, number>;
       }
     >;
   } | null;

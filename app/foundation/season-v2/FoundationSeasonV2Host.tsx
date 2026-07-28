@@ -1,8 +1,11 @@
 "use client";
 
+import { useMemo } from "react";
+
 import FoundationSeasonV2Panel, {
   type FoundationSeasonV2PanelProps,
 } from "@/app/foundation/season-v2/FoundationSeasonV2Panel";
+import { buildSeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
 import {
   useSeasonV2PanelModel,
   type UseSeasonV2PanelModelInput,
@@ -91,6 +94,25 @@ export default function FoundationSeasonV2Host({
     seasonTopPlayersSort,
   });
 
+  /**
+   * Top-3-Spieler je Team für alle 24 Saisonstand-Spalten (4 Achsen + 20
+   * Disziplinen) — EINMAL memoisiert statt pro Hover (32 Teams × 24 Spalten).
+   * Für archivierte Saisons bewusst `null`: Ratings/Ledger tragen immer die
+   * LIVE-Saison — ein "Top 3" aus aktuellen Werten wäre im Archiv gelogen,
+   * dort zeigt der Saisonstand deshalb gar kein Hover-Panel.
+   */
+  const teamTopPlayersByColumn = useMemo(
+    () =>
+      isViewingArchivedSeason
+        ? null
+        : buildSeasonStandingsTopPlayersByTeam({
+            gameState,
+            playerRatingsById,
+            seasonPointsLedger,
+          }),
+    [gameState, isViewingArchivedSeason, playerRatingsById, seasonPointsLedger],
+  );
+
   const model = useSeasonV2PanelModel({
     gameState,
     selectedTeamId,
@@ -119,6 +141,7 @@ export default function FoundationSeasonV2Host({
       standingsRows={model.standingsRows}
       topPlayers={model.topPlayers}
       playerRows={model.playerRows}
+      teamTopPlayersByColumn={teamTopPlayersByColumn}
       gmRows={model.gmRows}
       archiveRows={model.archiveRows}
       disciplineLeaders={model.disciplineLeaders}

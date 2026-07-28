@@ -1,6 +1,16 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 
 import "@/app/foundation/season-v2/season-standings-new-look.css";
 
@@ -35,6 +45,7 @@ import {
   type SeasonV2StandingsRow,
 } from "@/app/foundation/season-v2/SeasonStandingsV2Client";
 import { getPoolHeatClass } from "@/lib/foundation/player-league-heat";
+import type { SeasonStandingsTopPlayerEntry } from "@/lib/foundation/season-standings-top-players";
 import {
   resolveSeasonDisciplineAreaTotal,
   SEASON_DISCIPLINE_AREA_GROUPS,
@@ -220,6 +231,88 @@ function compareBoardRows(left: SeasonV2StandingsRow, right: SeasonV2StandingsRo
   return left.teamName.localeCompare(right.teamName, "de-DE");
 }
 
+type StandingsTopPlayersHoverProps = {
+  panelId: string;
+  /** Spaltenname fürs Panel ("POW", "GEW", …). */
+  columnLabel: string;
+  teamName: string;
+  entries: SeasonStandingsTopPlayerEntry[] | null | undefined;
+  /** Der eigentliche Zellenwert — bleibt unverändert gerendert. */
+  children: ReactNode;
+};
+
+/**
+ * Hover-/Fokus-Panel "Top-3-Spieler des Teams in dieser Spalte" — dasselbe
+ * Hover-Portal-Vokabular wie `TeamsKpiHoverPortal` in `FoundationTeamsNewLook`
+ * (`.nl-teams-rank-portal`/`.nl-teams-rank-preview`, Sichtbarkeit über das
+ * `hidden`-Attribut aus React-State statt CSS-`:hover`), damit kein zweites
+ * Popover-System entsteht und die bestehenden globals.css-Regeln greifen.
+ * Ohne Einträge (z. B. vor dem ersten gewerteten Spieltag oder in einer
+ * Archiv-Saison, wo Live-Werte gelogen wären) wird NUR der Wert gerendert —
+ * kein leerer Dialog im Accessibility-Tree, keine erfundene Rangfolge.
+ */
+function StandingsTopPlayersHover({ panelId, columnLabel, teamName, entries, children }: StandingsTopPlayersHoverProps) {
+  const [open, setOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  if (!entries || entries.length === 0) {
+    return <>{children}</>;
+  }
+
+  function cancelClose() {
+    if (closeTimer.current != null) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  }
+
+  function openNow() {
+    cancelClose();
+    setOpen(true);
+  }
+
+  function closeSoon() {
+    cancelClose();
+    // kleine Verzögerung, damit der Zeiger die Lücke zum Panel überbrücken kann
+    closeTimer.current = setTimeout(() => setOpen(false), 90);
+  }
+
+  return (
+    <span
+      className="nl-teams-rank-portal"
+      onMouseEnter={openNow}
+      onMouseLeave={closeSoon}
+      onFocus={openNow}
+      onBlur={() => {
+        cancelClose();
+        setOpen(false);
+      }}
+    >
+      {children}
+      <div
+        id={panelId}
+        role="dialog"
+        aria-label={`Top-3-Spieler ${teamName} — ${columnLabel}`}
+        className="nl-teams-rank-preview"
+        hidden={!open}
+      >
+        <span className="nl-teams-rank-preview-title">
+          Top 3 · {columnLabel} — {teamName}
+        </span>
+        <ol className="nl-teams-rank-preview-list">
+          {entries.map((entry, index) => (
+            <li key={entry.playerId} className="nl-teams-rank-preview-row">
+              <span className="nl-teams-rank-preview-rank nl-tnum">#{index + 1}</span>
+              <span className="nl-teams-rank-preview-team">{entry.playerName}</span>
+              <span className="nl-teams-rank-preview-points nl-tnum">{formatNlNumber(entry.value, 1)} PPs</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </span>
+  );
+}
+
 export default function SeasonStandingsNewLook({
   selectedSeasonId,
   selectedSeasonLabel,
@@ -237,6 +330,7 @@ export default function SeasonStandingsNewLook({
   archiveRows,
   disciplineLeaders,
   rivalTeamIds,
+  teamTopPlayersByColumn,
   onChangeSeason,
   onOpenTeam,
   onOpenPlayer,
@@ -615,7 +709,15 @@ export default function SeasonStandingsNewLook({
                 tone={group.id}
                 showValue={false}
               />
-              <span className="nl-standings-area-value nl-tnum">{formatNlNumber(value, 0)}</span>
+              {/* Hover auf den Bereichswert: Top-3-Spieler des Teams nach PPs in genau dieser Achse. */}
+              <StandingsTopPlayersHover
+                panelId={`nl-standings-top3-board-${row.teamId}-${group.id}`}
+                columnLabel={group.label}
+                teamName={row.teamName}
+                entries={teamTopPlayersByColumn?.get(row.teamId)?.[group.id]}
+              >
+                <span className="nl-standings-area-value nl-tnum">{formatNlNumber(value, 0)}</span>
+              </StandingsTopPlayersHover>
             </span>
           );
         })}
@@ -657,7 +759,15 @@ export default function SeasonStandingsNewLook({
                         tone={group.id}
                         showValue={false}
                       />
-                      <span className="nl-standings-disc-value nl-tnum">{formatNlNumber(value, 1)}</span>
+                      {/* Hover auf den Disziplinwert: Top-3-Spieler des Teams nach PPs in genau dieser Disziplin. */}
+                      <StandingsTopPlayersHover
+                        panelId={`nl-standings-top3-disc-${row.teamId}-${key}`}
+                        columnLabel={SEASON_DISCIPLINE_LABELS[key]}
+                        teamName={row.teamName}
+                        entries={teamTopPlayersByColumn?.get(row.teamId)?.[key]}
+                      >
+                        <span className="nl-standings-disc-value nl-tnum">{formatNlNumber(value, 1)}</span>
+                      </StandingsTopPlayersHover>
                     </li>
                   );
                 })}
@@ -1072,7 +1182,15 @@ export default function SeasonStandingsNewLook({
             const heatClass = getPoolHeatClass(areaValue, areaHeatPools[group.id]);
             return (
               <td key={group.id} className={`nl-standings-td-areacol ${nlToneClass(group.id)}${heatClass ? ` ${heatClass}` : ""}`}>
-                {formatNlNumber(areaValue, 1)}
+                {/* Hover auf die Bereichsspalte: Top-3-Spieler des Teams nach PPs in dieser Achse. */}
+                <StandingsTopPlayersHover
+                  panelId={`nl-standings-top3-table-${row.teamId}-${group.id}`}
+                  columnLabel={group.label}
+                  teamName={row.teamName}
+                  entries={teamTopPlayersByColumn?.get(row.teamId)?.[group.id]}
+                >
+                  {formatNlNumber(areaValue, 1)}
+                </StandingsTopPlayersHover>
               </td>
             );
           })}

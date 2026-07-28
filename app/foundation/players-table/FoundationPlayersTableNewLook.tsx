@@ -402,6 +402,18 @@ const NL_PLAYERS_COLUMNS: ReadonlyArray<{
     tooltip: "Marktwert-Score — Farben sind liga-relativ (Achtel des Liga-Pools).",
   },
   { id: "mw", label: "MW", sortKey: "mw", align: "right", tooltip: "Marktwert" },
+  {
+    id: "sellValue",
+    label: "VK-Wert",
+    sortKey: "sellValue",
+    align: "right",
+    // Bewusst NICHT nochmal der Marktwert (dafür gibt es die MW-Spalte):
+    // gezeigt wird der realistisch erzielbare Netto-Erlös aus der echten
+    // Verkaufsrechnung (Sale-Factor × MW minus offener Buyout) — dieselbe
+    // Rechnung wie im Sell-Preview, nur einmalig für alle Zeilen gebatcht.
+    tooltip:
+      "Aktueller Verkaufswert (netto): Verkaufspreis laut Transfermarkt-Sale-Factor minus offener Buyout des Restvertrags. \"—\" bei Free Agents (kein Kader, kein Verkauf).",
+  },
   { id: "salary", label: "Gehalt", sortKey: "salary", align: "right" },
   { id: "contract", label: "Vertrag", sortKey: "contract", align: "right" },
   { id: "appearances", label: "Einsätze", sortKey: "appearances", align: "right" },
@@ -1189,15 +1201,16 @@ export default function FoundationPlayersTableNewLook({
   }
 
   /**
-   * Aufgeklappte PPs-Detailzeile. Echte Pro-Areal-PPs-Punkte (wie viele
-   * Performance-Punkte je Bereich POW/SPE/MEN/SOC erzielt wurden) liegen in
-   * `FoundationPlayerScopeRow` nicht vor — nur der Gesamtwert `playerPps`.
-   * Sie existieren an anderer Stelle im Code (z. B. `ppPow`/`ppSpe`/`ppMen`/
-   * `ppSoc` in `lib/foundation/player-rating-contract.ts`), aber nur als
-   * Ergebnis einer ligaweiten Neuberechnung, die hier nicht verfügbar ist.
-   * Statt das zu erfinden, zeigen wir ehrlich die vorhandenen Kernwerte
-   * (POW/SPE/MEN/SOC, 0–100) als Aufschlüsselungs-Näherung mit klarer
-   * Kennzeichnung, dass es keine echten Areal-PPs-Punkte sind.
+   * Aufgeklappte PPs-Detailzeile — zeigt die ECHTEN Performance-Punkte je Achse.
+   *
+   * Vorher standen hier `player.coreStats` (POW/SPE/MEN/SOC, 0-100) als
+   * "Naeherung": die Aufschluesselung eines PPs-Werts zeigte also Attribute
+   * statt Punkte, und die vier Balken summierten sich nie auf den Gesamtwert
+   * in der Kopfzeile (73+52+59+76 gegen 9,8). Die echten Achsen-PPs
+   * (`ppPow`/`ppSpe`/`ppMen`/`ppSoc`) stehen in derselben
+   * `playerRatingsById`-Karte, aus der die Zeile schon OVR/MVS/PPs zieht — sie
+   * waren nur nicht durchgereicht. Die Balken skalieren jetzt relativ zum
+   * groessten Achsenwert der Zeile, weil PPs keine 0-100-Skala haben.
    */
   function renderPpsDetail(row: FoundationPlayerScopeRow) {
     return (
@@ -1210,23 +1223,37 @@ export default function FoundationPlayersTableNewLook({
           </span>
         </div>
         <div className="nl-players-pps-detail-grid">
-          {NL_PLAYERS_AXES.map(({ key, label }) => {
-            const value = row.player.coreStats[key] ?? null;
-            const percent =
-              value != null && Number.isFinite(value) ? Math.max(2, Math.min(100, value)) : 0;
-            return (
-              <div key={key} className={`nl-players-pps-detail-axis ${nlToneClass(key)}`}>
-                <span className="nl-players-pps-detail-axis-label">{label}</span>
-                <span className="nl-players-pps-detail-axis-track" aria-hidden="true">
-                  <span className="nl-players-pps-detail-axis-fill" style={{ width: `${percent}%` }} />
-                </span>
-                <span className="nl-players-pps-detail-axis-value nl-tnum">{formatNlNumber(value, 0)}</span>
-              </div>
+          {(() => {
+            // Bezugsgroesse fuer die Balkenbreite: der groesste Achsenwert dieser
+            // Zeile. PPs sind nicht auf 0-100 normiert, eine feste Skala waere
+            // also willkuerlich.
+            const axisMax = Math.max(
+              0,
+              ...NL_PLAYERS_AXES.map(({ key }) => {
+                const raw = row.axisPps[key];
+                return raw != null && Number.isFinite(raw) ? raw : 0;
+              }),
             );
-          })}
+            return NL_PLAYERS_AXES.map(({ key, label }) => {
+              const value = row.axisPps[key];
+              const safeValue = value != null && Number.isFinite(value) ? value : null;
+              const percent = safeValue != null && axisMax > 0 ? Math.max(2, (safeValue / axisMax) * 100) : 0;
+              return (
+                <div key={key} className={`nl-players-pps-detail-axis ${nlToneClass(key)}`}>
+                  <span className="nl-players-pps-detail-axis-label">{label}</span>
+                  <span className="nl-players-pps-detail-axis-track" aria-hidden="true">
+                    <span className="nl-players-pps-detail-axis-fill" style={{ width: `${percent}%` }} />
+                  </span>
+                  <span className="nl-players-pps-detail-axis-value nl-tnum">
+                    {safeValue != null ? formatPpsValue(safeValue) : "—"}
+                  </span>
+                </div>
+              );
+            });
+          })()}
         </div>
         <p className="nl-players-pps-detail-note">
-          Zeigt die Kernwerte POW/SPE/MEN/SOC (0–100) als Näherung.
+          Performance-Punkte je Achse — Summe entspricht den Gesamt-PPs.
         </p>
       </div>
     );
@@ -1524,6 +1551,27 @@ export default function FoundationPlayersTableNewLook({
           </span>
         </td>
         ) : null}
+        {isColumnVisible("sellValue") ? (
+        <td
+          className={`nl-players-td-money${sortCellClass("sellValue")}`}
+          title={
+            row.sellPreview
+              ? `Verkaufspreis ${formatNlMoney(row.sellPreview.grossSalePrice)} − offener Buyout ${formatNlMoney(row.sellPreview.buyoutCost)} = ${formatNlMoney(row.sellPreview.expectedSellValue)} netto`
+              : "Kein Verkaufswert — Free Agent oder kein belastbarer Marktwert."
+          }
+        >
+          <span className="nl-players-money">
+            {/* Netto kann bei Mehrjahresverträgen negativ sein — dann bewusst so anzeigen
+                (der Verkauf würde Cash KOSTEN), nicht auf 0 schönen. */}
+            <span className="nl-tnum">{row.sellPreview ? formatNlMoney(row.sellPreview.expectedSellValue) : "—"}</span>
+            {row.sellPreview && row.sellPreview.buyoutCost > 0 ? (
+              <small className="nl-players-salary-season" title="Offener Buyout des Restvertrags (bereits abgezogen)">
+                Buyout: {formatNlMoney(row.sellPreview.buyoutCost)}
+              </small>
+            ) : null}
+          </span>
+        </td>
+        ) : null}
         {isColumnVisible("salary") ? (
         <td className={`nl-players-td-money${sortCellClass("salary")}`}>
           <span className="nl-players-money">
@@ -1690,6 +1738,9 @@ export default function FoundationPlayersTableNewLook({
         return row.playerMvs != null ? formatPpsValue(row.playerMvs) : "—";
       case "mw":
         return formatNlMoney(getPlayerDisplayMarketValue(row.player));
+      case "sellValue":
+        // Netto-Verkaufswert wie in der Zelle — "—" statt Schätzung, wenn kein Kader/MW.
+        return row.sellPreview ? formatNlMoney(row.sellPreview.expectedSellValue) : "—";
       case "salary": {
         const annualSalary = row.roster
           ? getRosterEntryDisplaySalary(row.roster, row.player)
