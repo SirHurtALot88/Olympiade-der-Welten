@@ -1257,6 +1257,38 @@ export default function DisciplineStageArena({
     [payload],
   );
 
+  /**
+   * Gefeldete Spieler „kleben" bis zum Disziplinwechsel.
+   *
+   * Am Ende einer Disziplin lief die Quelle oben leer (der Spieltags-Draft wird beim
+   * Anwenden des Ergebnisses konsumiert, und die Preview liefert für die abgeschlossene
+   * Disziplin keine Aufstellung mehr). Ergebnis: die Team-Karte zeigte die gerade
+   * angetretenen Spieler NICHT mehr unter „In dieser Disziplin", sondern warf den
+   * kompletten Kader auf die Ersatzbank — genau in dem Moment, in dem man nachschauen
+   * will, wer da eigentlich gelaufen ist.
+   *
+   * Deshalb merken wir uns je Disziplin die zuletzt bekannte, nicht-leere Besetzung und
+   * liefern sie weiter aus. Der Cache wird beim Wechsel auf eine andere Disziplin
+   * verworfen, sodass nie die Aufstellung der Vor-Disziplin durchschlägt.
+   */
+  const stickyFieldedRef = useRef<{ disciplineId: string; byTeam: Record<string, string[]> }>({
+    disciplineId,
+    byTeam: {},
+  });
+  const stickyFieldedByTeam = useMemo(() => {
+    const previous = stickyFieldedRef.current.disciplineId === disciplineId ? stickyFieldedRef.current.byTeam : {};
+    const merged: Record<string, string[]> = { ...previous };
+    for (const [entryTeamId, ids] of Object.entries(fieldedByTeam)) {
+      // Nur nicht-leere Besetzungen überschreiben den Merkzettel — eine leer gewordene
+      // Quelle darf den gemerkten Stand nicht loeschen.
+      if (ids.length > 0) {
+        merged[entryTeamId] = ids;
+      }
+    }
+    stickyFieldedRef.current = { disciplineId, byTeam: merged };
+    return merged;
+  }, [fieldedByTeam, disciplineId]);
+
   // Spoiler-Gate (A1): der Real-Modus-Endscreen darf erst erscheinen, wenn die
   // native Arena das Podest erreicht hat. Bei Remount (Disziplin/Modus/Seed) zurück.
   const [arenaEnded, setArenaEnded] = useState(false);
@@ -1836,7 +1868,7 @@ export default function DisciplineStageArena({
       target={drawerTarget}
       gameState={gameState}
       disciplineId={disciplineId}
-      fieldedPlayerIdsByTeam={fieldedByTeam}
+      fieldedPlayerIdsByTeam={stickyFieldedByTeam}
       liveResultsByTeam={liveResultsByTeam}
       disciplineMutators={shownMutators}
       onClose={() => {
@@ -1856,7 +1888,7 @@ export default function DisciplineStageArena({
       target={hoverPreview}
       gameState={gameState}
       ratingByPlayerId={ratingByPlayerId}
-      fieldedPlayerIdsByTeam={fieldedByTeam}
+      fieldedPlayerIdsByTeam={stickyFieldedByTeam}
       // Anti-Spoiler: dieselbe Reveal-Quelle wie der Team-Drawer — die Hovercard darf
       // nur Werte von Spielern zeigen, die die Arena schon aufgedeckt hat.
       liveResultsByTeam={liveResultsByTeam}

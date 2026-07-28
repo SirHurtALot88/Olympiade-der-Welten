@@ -811,11 +811,15 @@ function TeamBody({
   // Arena-Payload übergebenen Spieler-IDs (sonst fielen alle auf die Ersatzbank).
   const fieldedIds = (fieldedPlayerIdsByTeam?.[teamId] ?? []).filter(Boolean);
 
-  // Gefeldete Menge = entweder die Draft-eingesetzten IDs (echtes Spiel) oder die
-  // übergebenen Arena-IDs (Test/Vorschau). Ersatzbank = Roster ohne diese Menge.
-  const deployedIds = hasDraft
-    ? new Set(entries.map((e) => e.activePlayerId ?? e.playerId))
-    : new Set(fieldedIds);
+  // Gefeldete Menge = Draft-eingesetzte IDs (echtes Spiel) VEREINIGT mit den vom Arena-
+  // Payload übergebenen IDs (Test/Vorschau und abgeschlossene Disziplin). Bewusst eine
+  // Vereinigung statt eines Entweder-oder: sonst landet ein Spieler, der oben unter
+  // „In dieser Disziplin" steht, gleichzeitig auf der Ersatzbank, sobald nur eine der
+  // beiden Quellen ihn kennt.
+  const deployedIds = new Set<string>([
+    ...(hasDraft ? entries.map((e) => e.activePlayerId ?? e.playerId) : []),
+    ...fieldedIds,
+  ]);
   const benchIds = rosterIds.filter((id) => !deployedIds.has(id));
 
   const matchdayId = gameState.matchdayState?.matchdayId ?? "";
