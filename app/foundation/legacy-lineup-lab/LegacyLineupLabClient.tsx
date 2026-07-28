@@ -2033,12 +2033,6 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   const [errors, setErrors] = useState<string[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [message, setMessage] = useState<string>("");
-  const [lineupHandoffOverlay, setLineupHandoffOverlay] = useState<{
-    teamName: string;
-    d1Label: string;
-    d2Label: string;
-    scoreLabel: string;
-  } | null>(null);
   const [sourceReadOnly, setSourceReadOnly] = useState<boolean>(source === "prisma");
   const [roomContext, setRoomContext] = useState<FoundationRoomContext | null>(null);
   const [playerFilter, setPlayerFilter] = useState("");
@@ -5215,12 +5209,18 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       { skipContextReload: source === "sqlite" },
     );
     if (saved) {
-      // Die Arena lädt beim Öffnen ihr Engine-Bundle (Resolve-Preview über 32 Teams, der teuerste
-      // Teil des Übergangs). Bisher startete dieser Request ERST nach der 2-Sekunden-Übergabe-
-      // Animation — die Wartezeit war also doppelt: erst Animation, dann Laden. Jetzt läuft der
-      // Abruf SOFORT nach dem Speichern parallel zur Animation und landet im Session-Cache, aus
-      // dem die Arena beim Mount liest. `includeDetails` liefert genau das Bundle, das sie braucht.
-      const arenaPrefetch = prefetchMatchdayArenaBase({
+      // Speichern heisst "ich bin bereit" — NICHT "los geht's". Frueher sprang die
+      // Einsatzliste direkt (nach dem Handoff-Overlay) in die Arena; damit war der
+      // Spieltag angestossen, sobald man nur zwischenspeichern wollte, und im
+      // Mehrspieler-Betrieb konnte man den anderen die Arena vor die Nase setzen.
+      // Der Wechsel passiert jetzt ausschliesslich ueber den "Zur Arena"-Knopf.
+      //
+      // Der Arena-Prefetch bleibt aber genau hier: Die Arena laedt beim Oeffnen ihr
+      // Engine-Bundle (Resolve-Preview ueber 32 Teams, der teuerste Teil des Uebergangs).
+      // Wir warmen den Session-Cache jetzt schon beim Speichern, sodass der spaetere
+      // Klick auf "Zur Arena" die Daten fertig vorfindet — dieselbe Ersparnis wie zuvor,
+      // nur ohne den ungewollten Sprung.
+      prefetchMatchdayArenaBase({
         saveId: params.saveId,
         seasonId: params.seasonId,
         matchdayId: params.matchdayId,
@@ -5229,55 +5229,8 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         includeDetails: true,
         immediate: true,
       });
-      const d1Label = context?.matchdayContract?.discipline1?.displayName ?? "D1";
-      const d2Label = context?.matchdayContract?.discipline2?.displayName ?? "D2";
       const scoreLabel = formatProjectedMetricWindow(matchdayPreviewCards.totalRangeLow, matchdayPreviewCards.totalRangeHigh);
-      const prefersReducedMotion =
-        typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      if (typeof window !== "undefined") {
-        window.sessionStorage.setItem("lineup-v2-arena-handoff", "1");
-      }
-      if (prefersReducedMotion || !props.onOpenArena) {
-        setMessage("Einsatzliste gespeichert — Wechsel zur Arena …");
-        props.onOpenArena?.({
-          saveId: params.saveId,
-          seasonId: params.seasonId,
-          matchdayId: params.matchdayId,
-          teamId: params.teamId,
-        });
-        return;
-      }
-      setLineupHandoffOverlay({
-        teamName: context?.team.name ?? "Team",
-        d1Label,
-        d2Label,
-        scoreLabel,
-      });
-      // Übergabe adaptiv statt starr: Die Animation lief bisher IMMER volle 2 s, danach begann erst
-      // das Laden der Arena — in Summe spürbar lang. Jetzt läuft der Abruf parallel (oben gestartet),
-      // und wir wechseln, sobald BEIDES fertig ist: die Mindest-Anzeigedauer (damit die Animation
-      // nicht nur aufblitzt) UND die Daten. Die 2 s bleiben die Obergrenze, damit ein hängender
-      // Request den Wechsel niemals blockiert.
-      const HANDOFF_MIN_MS = 900;
-      const HANDOFF_MAX_MS = 2000;
-      const openArena = () => {
-        setLineupHandoffOverlay(null);
-        props.onOpenArena?.({
-          saveId: params.saveId,
-          seasonId: params.seasonId,
-          matchdayId: params.matchdayId,
-          teamId: params.teamId,
-        });
-      };
-      let handedOff = false;
-      const handOffOnce = () => {
-        if (handedOff) return;
-        handedOff = true;
-        openArena();
-      };
-      const minDelay = new Promise<void>((resolve) => window.setTimeout(resolve, HANDOFF_MIN_MS));
-      window.setTimeout(handOffOnce, HANDOFF_MAX_MS);
-      void Promise.all([minDelay, arenaPrefetch ?? Promise.resolve()]).then(handOffOnce);
+      setMessage(`Einsatzliste gespeichert — bereit (${scoreLabel} Pkt. projiziert). Weiter mit „Zur Arena“.`);
     }
   }
 
