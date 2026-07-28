@@ -924,6 +924,23 @@ function round1(x: number): number {
  * Deshalb hier dieselbe Faltung. Die Ziellinie ist damit per Konstruktion der Endstand des
  * besten Teams — sie verschiebt sich mit den Ergebnissen, wird aber immer exakt erreicht.
  */
+/**
+ * Startwert der Glide-Rampe einer neuen Etappe.
+ *
+ * Ist die vorige Etappe ausgeglitten, sind `animScore` und `score` identisch — dann ist die
+ * Wahl egal. Wurde dagegen weitergeschaltet, waehrend das Token noch lief (manuelles
+ * Weiterklicken, Host-Takt im Co-op, oder weil die virtuelle Etappen-Uhr durch Zeitlupe/
+ * Hover hinter der Reveal-Cascade zurueckliegt), steht `score` bereits auf dem vollen
+ * Etappen-Endstand, das Token aber noch davor. Dann ist die SICHTBARE Position der richtige
+ * Start — sonst springt das Token beim Etappenwechsel vorwaerts.
+ *
+ * `Math.min` schuetzt gegen einen `animScore`, der (durch Rundung) minimal ueber dem
+ * Endstand liegt: rueckwaerts darf eine Etappe nie starten.
+ */
+export function resolveStageGlideStart(input: { animScore: number; score: number; glideWasRunning: boolean }): number {
+  return input.glideWasRunning ? Math.min(input.animScore, input.score) : input.score;
+}
+
 export function accumulateRevealedTeamScore(players: Array<NativeStagePlayer | null | undefined>): number {
   let total = 0;
   for (const player of players) total = round1(total + playerNet(player));
@@ -2277,9 +2294,17 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setBusy(true);
     const r = round;
     const rt = rtRef.current;
+    // Lief die vorige Etappe noch (Glide nicht durch, z. B. weil manuell weitergeklickt oder
+    // vom Host getaktet wurde), ist `t.score` bereits der volle Etappen-Endstand, das Token
+    // steht aber noch davor. Dann startet die neue Rampe an der SICHTBAREN Position
+    // (`animScore`) statt am Endstand — sonst springt das Token beim Etappenwechsel vorwaerts.
+    // Der Zielwert bleibt unberuehrt (`displayScore` kommt aus `t.score`), das ERGEBNIS
+    // aendert sich also nicht: das Token holt den Rueckstand innerhalb der neuen Etappe auf.
+    const glideWasRunning = prim !== "barbell" && roundAnimStartRef.current !== 0;
     rt.forEach((t) => {
       t.roundStartRank = t.rank;
-      t.roundStartScore = t.score; // Basis der 5s-animScore-Rampe (Feld↔Tabelle-Sync)
+      // Basis der 5s-animScore-Rampe (Feld↔Tabelle-Sync).
+      t.roundStartScore = resolveStageGlideStart({ animScore: t.animScore, score: t.score, glideWasRunning });
       // roundMedal NICHT mehr zurücksetzen: die Gesamt-Top-3-Medaille bleibt stabil und
       // wird in recomputeRanks bei jedem Reveal frisch gesetzt (kein Blinken am Etappenstart).
     });
@@ -2477,10 +2502,37 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     // Co-op: der GUEST advanced nie von allein — er folgt nur den Host-Schritten
     // (Effekt unten). Und solange der „beide bereit"-Gate aktiv ist, läuft nichts.
     if (roomSync?.followsHost || roomSync?.coopGate.active) return;
-    // Kurzer Puffer nach dem Abschluss der (bereits ~10 s langen, simultan gleitenden)
-    // Etappe, dann startet die nächste zügig.
-    const delay = reduced.current ? 0 : 600;
-    const id = window.setTimeout(() => advance(), delay);
+    // Die Etappe hat ZWEI voneinander unabhaengige Uhren:
+    //   1. die Reveal-Cascade (echte Timer, ~TRACK_ROUND_MS / Teamzahl je Team) — sie gibt
+    //      `busy` frei und loest diesen Effekt aus;
+    //   2. die VIRTUELLE Etappen-Uhr `animClockRef`, an der die Token-Bewegung haengt. Die
+    //      laeuft bei Hover/Leertaste mit Speed 0 und waehrend der Highlight-Zeitlupe mit
+    //      0,2× — sie braucht also real laenger als TRACK_ROUND_MS.
+    //
+    // Wechselte die Etappe allein nach (1), stand die Bewegung noch mitten im Gleiten. Der
+    // naechste `advance()` setzt `roundStartScore = t.score` (der VOLLE Etappen-Endstand)
+    // und startet die Uhr neu — das Token sprang damit vorwaerts auf das Etappenende,
+    // statt dort weiterzulaufen, wo es gerade war. Genau das war als „die Folgeetappe
+    // faengt nicht dort an, wo die vorherige aufhoert" sichtbar, und nur „teils", weil es
+    // davon abhing, ob Zeitlupe oder Hover die virtuelle Uhr zurueckgeworfen hatten.
+    //
+    // Deshalb wird jetzt zusaetzlich auf (2) gewartet: erst wenn die virtuelle Uhr das
+    // Etappenende erreicht hat, laeuft der Puffer und die naechste Etappe beginnt — dort,
+    // wo die vorige tatsaechlich geendet hat.
+    if (reduced.current) {
+      const id = window.setTimeout(() => advance(), 0);
+      return () => window.clearTimeout(id);
+    }
+    let id = 0;
+    const waitForGlide = () => {
+      const glideDone = roundAnimStartRef.current === 0 || animClockRef.current >= TRACK_ROUND_MS;
+      if (!glideDone) {
+        id = window.setTimeout(waitForGlide, 80);
+        return;
+      }
+      id = window.setTimeout(() => advance(), 600);
+    };
+    waitForGlide();
     return () => window.clearTimeout(id);
   }, [prim, round, busy, done, demandKg, advance, paused, started, roomSync?.followsHost, roomSync?.coopGate.active]);
 
