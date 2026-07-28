@@ -80,7 +80,32 @@ function hasRatingsMapEntries(
   return map != null && map.size > 0;
 }
 
+/**
+ * Memo für `hasCurrentSeasonSaleFactorRanking` pro GameState-Identität: Die Spielerliste
+ * ("Verkaufswert"-Spalte) ruft den Sale-Factor-Breakdown für JEDEN Kaderspieler auf (bis zu
+ * ~330 Zeilen), und dieser Check iteriert jedes Mal über sämtliche Matchday-Results und
+ * Performance-Zeilen (bzw. baut ohne Applied-Results sogar den kompletten Season-Points-Ledger).
+ * Das ist eine reine Ableitung aus dem GameState — dieselbe Identitäts-Annahme, auf der auch
+ * `saleFactorRankContextCache` (s. u.) schon beruht. Innere Map, weil das Ergebnis über den
+ * Ledger-Pfad von der `saveId` abhängen kann.
+ */
+const saleFactorRankingFlagCache = new WeakMap<GameState, Map<string, boolean>>();
+
 export function hasCurrentSeasonSaleFactorRanking(gameState: GameState, saveId?: string | null): boolean {
+  const cacheKey = saveId ?? "";
+  const cachedBySaveId = saleFactorRankingFlagCache.get(gameState);
+  const cached = cachedBySaveId?.get(cacheKey);
+  if (cached != null) {
+    return cached;
+  }
+  const result = computeHasCurrentSeasonSaleFactorRanking(gameState, saveId);
+  const bucket = cachedBySaveId ?? new Map<string, boolean>();
+  bucket.set(cacheKey, result);
+  saleFactorRankingFlagCache.set(gameState, bucket);
+  return result;
+}
+
+function computeHasCurrentSeasonSaleFactorRanking(gameState: GameState, saveId?: string | null): boolean {
   const appliedResultIds = new Set(
     (gameState.seasonState.matchdayResults ?? [])
       .filter((result) => result.seasonId === gameState.season.id && result.status === "preview_applied")
