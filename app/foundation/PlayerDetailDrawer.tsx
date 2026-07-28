@@ -54,6 +54,7 @@ import {
   NlSubTabs,
   NlTable,
   formatNlNumber, formatNlMoney,
+  nlToneClass,
   type NlRadarAxis,
   type NlTableColumn,
 } from "@/components/foundation/new-look";
@@ -3319,10 +3320,13 @@ export default function PlayerDetailDrawer({
                       { key: "pps", label: "PPs" },
                       { key: "ovr", label: "OVR" },
                       { key: "mvs", label: "MVS" },
-                      { key: "pow", label: "POW" },
-                      { key: "spe", label: "SPE" },
-                      { key: "men", label: "MEN" },
-                      { key: "soc", label: "SOC" },
+                      // Achsen-Spalten in den festen Achsfarben des Spiels (nl-tone-pow/…, wie
+                      // Spielerliste/Radar) — Kopf voll eingefärbt, Werte dezent getönt (CSS:
+                      // .player-drawer-history-axis-col in globals.css).
+                      { key: "pow", label: "POW", className: `player-drawer-history-axis-col ${nlToneClass("pow")}` },
+                      { key: "spe", label: "SPE", className: `player-drawer-history-axis-col ${nlToneClass("spe")}` },
+                      { key: "men", label: "MEN", className: `player-drawer-history-axis-col ${nlToneClass("men")}` },
+                      { key: "soc", label: "SOC", className: `player-drawer-history-axis-col ${nlToneClass("soc")}` },
                     ]}
                     renderCell={(row, columnKey) => {
                       switch (columnKey) {

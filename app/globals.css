@@ -16889,6 +16889,36 @@ a {
   font-weight: 600;
 }
 
+/* Trainingshistorie/Saison-Forecast: Die Legende verspricht "Grün = Zuwachs, Rot = Rückgang",
+   aber die von getDeltaToneClass gesetzten is-positive/is-negative-Klassen hatten in diesen
+   Tabellen KEINE Farbregel (nur spezifische Selektoren wie .player-drawer-delta.is-positive
+   existierten) — alle Deltas blieben einfarbig. Farben aus dem bestehenden Ton-Vokabular
+   (--nl-good/--nl-risk/--nl-mut, wie NlDeltaChip), mit Fallback-Hex für Render-Kontexte
+   ohne .is-new-look-Vorfahren. Helle Töne auf dunklem Grund → Kontrast bleibt erhalten. */
+.player-drawer-matchday-training-table td.is-positive,
+.player-drawer-training-history-table .is-positive {
+  color: var(--nl-good, #4cc56b);
+}
+.player-drawer-matchday-training-table td.is-negative,
+.player-drawer-training-history-table .is-negative {
+  color: var(--nl-risk, #e5615a);
+}
+.player-drawer-matchday-training-table td.is-neutral,
+.player-drawer-training-history-table .is-neutral {
+  color: var(--nl-mut, #93a3bd);
+}
+
+/* Sportliche Historie: POW/SPE/MEN/SOC-Spalten tragen die festen Achsfarben des Spiels
+   (nl-tone-pow/… setzt --nl-tone, s. Ton-Klassen unter .is-new-look). Kopf voll im
+   Achston, Werte nur dezent Richtung Achston getönt (color-mix mit heller Tinte),
+   damit die Zahlen auf dem dunklen Grund gut lesbar bleiben — kein dunkel-auf-dunkel. */
+.is-new-look .player-drawer-dashboard th.player-drawer-history-axis-col {
+  color: var(--nl-tone, var(--nl-mut, #93a3bd));
+}
+.is-new-look .player-drawer-dashboard td.player-drawer-history-axis-col {
+  color: color-mix(in srgb, var(--nl-tone, var(--nl-ink, #e8eefc)) 45%, var(--nl-ink, #e8eefc));
+}
+
 .player-training-controls {
   display: grid;
   gap: 14px;

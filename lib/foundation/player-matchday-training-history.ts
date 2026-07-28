@@ -112,6 +112,12 @@ export function buildPlayerSeasonTrainingForecast(input: {
     facilities: input.facilities ?? undefined,
     accumulatedBaseTrainingBudget: accInputs?.accumulatedBaseTrainingBudget,
     performanceWeightMultiplier: accInputs?.performanceWeightMultiplier,
+    // Ursache des früheren Schiefstands: Training (anteiliges Budget) und Performance (nur
+    // Records bis heute) waren bereits auf die gespielten Spieltage beschnitten, die Regression
+    // wurde aber als VOLLER Saisonbetrag abgezogen — nach 3 von N Spieltagen wirkte die Prognose
+    // dadurch unrealistisch negativ. Die Regression skaliert jetzt im selben Spieltag-Takt
+    // (gespielt / gesamt); am Saisonende ist der Faktor 1 und deckt sich exakt mit dem Apply.
+    regressionMatchdayScale: totalMatchdays > 0 ? playedMatchdayIds.length / totalMatchdays : 1,
   });
 
   const cumulativeByAttr = Object.fromEntries(
