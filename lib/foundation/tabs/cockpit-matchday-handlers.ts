@@ -70,7 +70,10 @@ export type CockpitMatchdayApplyHandlers = {
   runCockpitStandingsApply: (execute: boolean) => Promise<FoundationApplySummary | null>;
   runCockpitCashApply: (execute: boolean) => Promise<FoundationApplySummary | null>;
   runCockpitMatchdayAdvance: (execute: boolean) => Promise<FoundationApplySummary | null>;
-  runCockpitMatchdayAutoRun: (execute: boolean) => Promise<FoundationMatchdayAutoRunSummary | null>;
+  runCockpitMatchdayAutoRun: (
+    execute: boolean,
+    commitThroughSide?: "d1" | "d2",
+  ) => Promise<FoundationMatchdayAutoRunSummary | null>;
 };
 
 /**
@@ -337,7 +340,13 @@ export function createCockpitMatchdayApplyHandlers(
     }
   }
 
-  async function runCockpitMatchdayAutoRun(execute: boolean) {
+  async function runCockpitMatchdayAutoRun(
+    execute: boolean,
+    // Die Arena bucht pro Disziplin: nach D1 mit `"d1"` (nur D1 landet im Saisonstand,
+    // kein Spieltagswechsel), nach D2 mit `"d2"` (Spieltag komplett). Ohne Angabe bleibt
+    // es beim vollstaendigen Durchlauf, wie ihn das Cockpit ausloest.
+    commitThroughSide: "d1" | "d2" = "d2",
+  ) {
     if (readMetaSource === "prisma") {
       showReadOnlyNotice();
       return null;
@@ -362,6 +371,7 @@ export function createCockpitMatchdayApplyHandlers(
               overwriteExistingLineups: matchdayAutoRunOverwriteExistingLineups,
               stopOnTie: matchdayAutoRunStopOnTie,
               advanceAfterCashApply: true,
+              commitThroughSide,
             },
           }),
         ),

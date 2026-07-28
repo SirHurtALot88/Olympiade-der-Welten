@@ -27,6 +27,7 @@ type MatchdayAutoRunBody = {
     overwriteExistingLineups?: boolean;
     stopOnTie?: boolean;
     advanceAfterCashApply?: boolean;
+    commitThroughSide?: "d1" | "d2";
   };
 };
 
@@ -102,6 +103,7 @@ export async function POST(request: Request) {
         overwriteExistingLineups: body.options?.overwriteExistingLineups ?? false,
         stopOnTie: body.options?.stopOnTie ?? true,
         advanceAfterCashApply: body.options?.advanceAfterCashApply ?? true,
+        commitThroughSide: body.options?.commitThroughSide === "d1" ? "d1" : "d2",
       },
     });
 

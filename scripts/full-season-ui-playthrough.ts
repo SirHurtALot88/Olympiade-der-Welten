@@ -734,6 +734,7 @@ async function runUiMatchdayLoop(input: {
   saveId: string;
   manualTeamId: string;
   matchdayIndex: number;
+  seasonId: string;
   matchdayId: string;
   timeoutMs: number;
 }) {
@@ -753,20 +754,46 @@ async function runUiMatchdayLoop(input: {
 
   await gotoFoundation(input.page, input.baseUrl, "matchdayArena", input.manualTeamId, input.saveId, input.timeoutMs);
   await input.page.locator("#foundation-matchday-arena:not(.foundation-section-hidden)").waitFor({ state: "attached", timeout: 20_000 });
-  const finishButton = input.page.getByTestId("arena-finish-matchday-button");
-  await finishButton.waitFor({ state: "visible", timeout: input.timeoutMs });
-  let autoRunPromise: ReturnType<typeof input.page.waitForResponse> | null = null;
-  autoRunPromise = input.page.waitForResponse(
-    (response) => response.url().includes("/api/season/matchday-auto-run") && response.request().method() === "POST",
-    { timeout: Math.max(input.timeoutMs, 180_000) },
-  );
-  // Silence the hanging promise rejection on browser close
-  autoRunPromise.catch(() => undefined);
-  await finishButton.click({ force: true });
-  const autoRunResponse = await autoRunPromise;
-  const autoRunBody = (await autoRunResponse.json().catch(() => ({}))) as { ok?: boolean; success?: boolean; blockingReasons?: string[] };
-  if (!autoRunResponse.ok() || (autoRunBody.ok === false && autoRunBody.success === false)) {
-    throw new Error(`Matchday auto-run failed: ${autoRunBody.blockingReasons?.join(" | ") ?? autoRunResponse.status()}`);
+  // Seit der Arena-Umstellung gibt es keinen „Spieltag abschliessen"-Knopf mehr: Jede zu
+  // Ende gespielte Disziplin bucht sich selbst. Ein UI-Playthrough kann die beiden
+  // Enthuellungen nicht verlaesslich in vertretbarer Zeit durchspielen, darum treibt der
+  // Lauf hier genau die Buchungen an, die die Arena ausloest — erst D1 (halber Spieltag),
+  // dann D2 (Abschluss inkl. Spieltagswechsel).
+  await input.page.locator("[data-testid='arena-primary-step'], [data-testid='arena-result-summary']").first()
+    .waitFor({ state: "visible", timeout: input.timeoutMs })
+    .catch(() => undefined);
+
+  for (const commitThroughSide of ["d1", "d2"] as const) {
+    const response = await fetch(`${input.baseUrl}/api/season/matchday-auto-run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        saveId: input.saveId,
+        seasonId: input.seasonId,
+        matchdayId: input.matchdayId,
+        source: "sqlite",
+        execute: true,
+        dryRun: false,
+        confirmToken: MATCHDAY_AUTO_RUN_CONFIRM_TOKEN,
+        options: {
+          includeWarningLineups: false,
+          overwriteExistingLineups: false,
+          stopOnTie: false,
+          advanceAfterCashApply: true,
+          commitThroughSide,
+        },
+      }),
+    });
+    const body = (await response.json().catch(() => ({}))) as {
+      ok?: boolean;
+      success?: boolean;
+      blockingReasons?: string[];
+    };
+    if (!response.ok || (body.ok === false && body.success === false)) {
+      throw new Error(
+        `Matchday commit (${commitThroughSide}) failed: ${body.blockingReasons?.join(" | ") ?? response.status}`,
+      );
+    }
   }
 
   const nextMatchdayId = await waitForMatchdayAdvance(input.baseUrl, input.saveId, input.matchdayId, Math.max(input.timeoutMs, 180_000));
@@ -965,6 +992,7 @@ async function main() {
           saveId: save.saveId,
           manualTeamId,
           matchdayIndex: index,
+          seasonId,
           matchdayId,
           timeoutMs: args.timeoutMs,
         });

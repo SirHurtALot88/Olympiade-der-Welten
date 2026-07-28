@@ -1,5 +1,6 @@
 import type { MatchdayMvpScoringResult } from "@/lib/season/matchday-mvp-scoring-service";
 import { runMatchdayMvpScoring } from "@/lib/season/matchday-mvp-scoring-service";
+import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import { loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-lineup-local-service";
 import type { LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
 import { DEFAULT_ACTIVE_OWNER_ID, buildTeamControlSettingsMap, canLocalUserManageTeam } from "@/lib/foundation/team-control-settings";
@@ -188,7 +189,31 @@ export async function loadMatchdayArenaBase(input: {
   // so a stale/unknown id never silently shows another save's (possibly another player's) arena
   // briefing instead of failing loudly.
   const persistence = createPersistenceService();
-  const { save } = requireLocalPersistedSave(persistence, input.saveId);
+  let { save } = requireLocalPersistedSave(persistence, input.saveId);
+
+  // Die Arena ist nicht mehr nur Schaufenster: Was sie zeigt, wird am Ende jeder Disziplin
+  // genau so gebucht. Dafuer muessen die KI-Aufstellungen VOR der Vorschau feststehen —
+  // frueher entstanden sie erst beim Abschluss, weshalb die Vorschau eines frischen
+  // Spieltags gegen fehlende Gegner-Aufstellungen rechnete und nicht dem Endstand entsprach.
+  // `overwriteExisting: false` laesst bereits vorhandene Aufstellungen unangetastet, der
+  // Aufruf ist damit idempotent und bei vollstaendigem Feld praktisch kostenlos.
+  if (input.includeDetails === true) {
+    const aiBatch = applyAiLegacyLineupBatchLocally(
+      {
+        saveId: save.saveId,
+        seasonId: input.seasonId,
+        matchdayId: input.matchdayId,
+        dryRun: false,
+        includeWarningTeams: false,
+        overwriteExisting: false,
+      },
+      persistence,
+    );
+    if (aiBatch.summary.savedTeams > 0) {
+      save = requireLocalPersistedSave(persistence, input.saveId).save;
+    }
+  }
+
   const versionMeta = persistence.getSaveVersionMetadata(save.saveId);
   const contentSignature = versionMeta?.contentSignature ?? null;
   const params: LegacyLineupKeyParams = {

@@ -37,6 +37,20 @@ export type LegacyMatchdayScopeParams = {
   matchdayId: string;
 };
 
+/**
+ * Bis zu welcher Disziplin-Seite das Ergebnis geschrieben wird. Die Arena bucht pro
+ * Disziplin: nach D1 steht `"d1"` (nur die D1-Zeilen landen im Save, der Saisonstand
+ * zeigt einen halben Spieltag), nach D2 steht `"d2"` und der Spieltag ist vollstaendig.
+ * `"d2"` ist der Vollumfang und damit das Verhalten aller Aufrufer von vorher.
+ */
+export type LegacyMatchdayCommitThroughSide = "d1" | "d2";
+
+const COMMIT_SIDE_ORDER: Record<LegacyMatchdayCommitThroughSide, number> = { d1: 0, d2: 1 };
+
+function isSideIncluded(side: "d1" | "d2", commitThroughSide: LegacyMatchdayCommitThroughSide) {
+  return COMMIT_SIDE_ORDER[side] <= COMMIT_SIDE_ORDER[commitThroughSide];
+}
+
 export type ApplyLegacyMatchdayResultParams = LegacyMatchdayScopeParams & {
   source?: LegacyMatchdayApplySource;
   dryRun?: boolean;
@@ -44,6 +58,7 @@ export type ApplyLegacyMatchdayResultParams = LegacyMatchdayScopeParams & {
   confirm?: string;
   forceReplace?: boolean;
   allowIncompleteOverride?: boolean;
+  commitThroughSide?: LegacyMatchdayCommitThroughSide;
   resolveOptions?: LegacyResolvePreviewOptions;
   preloadedContexts?: LegacyLineupLoadedContext[];
   preloadedPreview?: ReturnType<typeof buildLegacyMatchdayResolvePreview>;
@@ -551,11 +566,40 @@ export class LegacyMatchdayResultApplyService {
     }
 
     const targetResultId = buildResultId(params.saveId, params.seasonId, params.matchdayId);
+
+    // Teil-Buchung der Arena: Nach D1 duerfen NUR die D1-Zeilen in den Save. Der
+    // Standings-Preview leitet die Punkte aus genau diesen Zeilen ab, ein halber
+    // Spieltag ergibt damit von selbst einen halben Punktestand — und D2 bleibt
+    // ungespoilert. Der D2-Commit schreibt spaeter beide Seiten (replace_apply).
+    const commitThroughSide: LegacyMatchdayCommitThroughSide = params.commitThroughSide ?? "d2";
+    const isPartialCommit = commitThroughSide !== "d2";
+    const committedDisciplineIds = new Set(
+      prepared.writePayload.disciplineResultPayloads
+        .filter((payload) => isSideIncluded(payload.disciplineSide, commitThroughSide))
+        .map((payload) => payload.disciplineId),
+    );
+    const writePayload = isPartialCommit
+      ? {
+          ...prepared.writePayload,
+          disciplineResultPayloads: prepared.writePayload.disciplineResultPayloads.filter((payload) =>
+            isSideIncluded(payload.disciplineSide, commitThroughSide),
+          ),
+          playerPerformancePayloads: prepared.writePayload.playerPerformancePayloads.filter((payload) =>
+            isSideIncluded(payload.disciplineSide, commitThroughSide),
+          ),
+          // Highlights ohne Disziplin-Bezug (z. B. spieltagsweite Storylines) sind erst
+          // mit dem vollstaendigen Spieltag aussagekraeftig und warten auf den D2-Commit.
+          highlightPayloads: prepared.writePayload.highlightPayloads.filter((payload) =>
+            payload.disciplineId ? committedDisciplineIds.has(payload.disciplineId) : false,
+          ),
+        }
+      : prepared.writePayload;
+
     const counts: ApplyCounts = {
       matchdayResults: 1,
-      disciplineResults: prepared.writePayload.disciplineResultPayloads.length,
-      playerPerformances: prepared.writePayload.playerPerformancePayloads.length,
-      highlights: prepared.writePayload.highlightPayloads.length,
+      disciplineResults: writePayload.disciplineResultPayloads.length,
+      playerPerformances: writePayload.playerPerformancePayloads.length,
+      highlights: writePayload.highlightPayloads.length,
       auditLogs: 1,
     };
     const dryRunSummary = {
@@ -627,33 +671,83 @@ export class LegacyMatchdayResultApplyService {
       existingResult,
     );
 
-    const nextDisciplineResults = prepared.writePayload.disciplineResultPayloads.map((payload) =>
-      mapDisciplineResultRecord(
-        {
-          ...payload,
-          matchdayResultId,
-        },
-        now,
-      ),
+    // Bereits gebuchte Disziplin-Seiten sind eingefroren. Der Resolve ist ueber zwei
+    // Laeufe NICHT bitgleich — der erste Apply schreibt die Nach-Spieltags-Fatigue, und
+    // deren Rekonstruktion beim Replay trifft den Vor-Spieltags-Stand nicht exakt. Ohne
+    // dieses Einfrieren haette der D2-Commit die D1-Raenge nachtraeglich verschoben,
+    // obwohl der Spieler sie laengst als Ergebnis gesehen und im Saisonstand hatte.
+    // Nur die gestaffelte Buchung friert ein: Ein normaler Voll-Re-Apply (alle Seiten
+    // liegen bereits vor) soll wie bisher alles neu rechnen.
+    const existingSides = new Set(
+      (save.gameState.seasonState.disciplineResults ?? [])
+        .filter((entry) => entry.matchdayResultId === matchdayResultId)
+        .map((entry) => entry.disciplineSide),
     );
-    const nextPlayerPerformances = prepared.writePayload.playerPerformancePayloads.map((payload) =>
-      mapPlayerPerformanceRecord(
-        {
-          ...payload,
-          matchdayResultId,
-        },
-        now,
-      ),
-    );
-    const nextHighlights = prepared.writePayload.highlightPayloads.map((payload) =>
-      mapHighlightRecord(
-        {
-          ...payload,
-          matchdayResultId,
-        },
-        now,
-      ),
-    );
+    const incomingSides = new Set(writePayload.disciplineResultPayloads.map((payload) => payload.disciplineSide));
+    const isStagedContinuation =
+      existingSides.size > 0 && [...incomingSides].some((side) => !existingSides.has(side));
+    const frozenSides = isStagedContinuation ? existingSides : new Set<"d1" | "d2">();
+    const frozenDisciplineResults = isStagedContinuation
+      ? (save.gameState.seasonState.disciplineResults ?? []).filter(
+          (entry) => entry.matchdayResultId === matchdayResultId && frozenSides.has(entry.disciplineSide),
+        )
+      : [];
+    const nextDisciplineResults = [
+      ...frozenDisciplineResults,
+      ...writePayload.disciplineResultPayloads
+        .filter((payload) => !frozenSides.has(payload.disciplineSide))
+        .map((payload) =>
+          mapDisciplineResultRecord(
+            {
+              ...payload,
+              matchdayResultId,
+            },
+            now,
+          ),
+        ),
+    ];
+    const nextPlayerPerformances = [
+      ...(isStagedContinuation
+        ? (save.gameState.seasonState.playerDisciplinePerformances ?? []).filter(
+            (entry) => entry.matchdayResultId === matchdayResultId && frozenSides.has(entry.disciplineSide),
+          )
+        : []),
+      ...writePayload.playerPerformancePayloads
+        .filter((payload) => !frozenSides.has(payload.disciplineSide))
+        .map((payload) =>
+          mapPlayerPerformanceRecord(
+            {
+              ...payload,
+              matchdayResultId,
+            },
+            now,
+          ),
+        ),
+    ];
+    // Highlights haengen an der Disziplin, nicht an der Seite — die eingefrorenen
+    // Disziplinen kommen aus den eingefrorenen Ergebniszeilen.
+    const frozenDisciplineIds = new Set(frozenDisciplineResults.map((entry) => entry.disciplineId));
+    const nextHighlights = [
+      ...(isStagedContinuation
+        ? (save.gameState.seasonState.disciplineHighlights ?? []).filter(
+            (entry) =>
+              entry.matchdayResultId === matchdayResultId &&
+              entry.disciplineId != null &&
+              frozenDisciplineIds.has(entry.disciplineId),
+          )
+        : []),
+      ...writePayload.highlightPayloads
+        .filter((payload) => !(payload.disciplineId != null && frozenDisciplineIds.has(payload.disciplineId)))
+        .map((payload) =>
+          mapHighlightRecord(
+            {
+              ...payload,
+              matchdayResultId,
+            },
+            now,
+          ),
+        ),
+    ];
     const nextAuditLog = mapAuditRecord(
       {
         ...prepared.writePayload.auditPayload,

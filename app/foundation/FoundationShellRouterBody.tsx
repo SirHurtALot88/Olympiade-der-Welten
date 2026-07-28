@@ -556,7 +556,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   rosterPlayers,
   runFacilityMaintenancePreview,
   runFacilityUpgradePreview,
-  runFinishMatchdaySimple,
+  commitArenaDiscipline,
   runFoundationCommand,
   runNewGameSetup,
   runSaveAction,
@@ -2543,9 +2543,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               (überall im Season-Flow verdrahtet), rendert aber jetzt die native Bühne.
               Die Landmark-ID `foundation-matchday-arena` bleibt am Container (Scroll-Target
               via getFoundationViewScrollTarget + Gameplay-Smoke-Locator).
-              Der eigene Advance-Button der Bühne ist unterdrückt (onAdvanceMatchday=null) —
-              der flow-kritische Abschluss läuft weiter über die „Spieltagsergebnis"-Sektion
-              unten (runFinishMatchdaySimple / triggerGlobalNext). Die alte Arena-Panel-UI
+              Es gibt keinen Abschluss-Knopf mehr: Jede zu Ende gespielte Disziplin bucht
+              sich selbst (onCommitDiscipline) — nach D1 als halber Spieltag, nach D2 samt
+              Preisgeld und Spieltagswechsel. Der eigene Advance-Button der Bühne bleibt
+              damit unnötig (onAdvanceMatchday=null). Die alte Arena-Panel-UI
               (matchday-arena-v2) wurde entfernt. */}
           <FoundationDisciplineStageHost
             gameState={gameState}
@@ -2555,6 +2556,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             seasonId={gameState.season.id}
             matchdayId={gameState.matchdayState.matchdayId}
             onAdvanceMatchday={null}
+            onCommitDiscipline={commitArenaDiscipline}
             onOpenPlayer={(playerId) => openPlayerDrawerById(playerId)}
             onOpenTeam={(teamId) => openTeamDrawerById(teamId)}
             roomContext={roomContext}
@@ -2576,26 +2578,17 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                     <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("seasonV2", setActiveView)}>
                       Saisonstand ansehen
                     </button>
-                    {/* Auf den AKTUELLEN Spieltag gaten (matchdayState), nicht auf
-                        die evtl. auf einen alten Spieltag zurückgefallene Summary —
-                        sonst erscheint "Weiter" statt "Spieltag abschliessen" und der
-                        Flow dreht sich ab MD2 im Kreis. */}
+                    {/* Kein „Spieltag abschliessen" mehr: Die Wertung passiert am Ende jeder
+                        Disziplin in der Arena. Solange der Spieltag laeuft, steht hier nichts
+                        Primaeres — es gibt schlicht nichts zu druecken. Erst wenn das Ergebnis
+                        vollstaendig ist, fuehrt „Weiter" den Saison-Flow fort. Gegatet wird auf
+                        den AKTUELLEN Spieltag (matchdayState), nicht auf die evtl. auf einen
+                        alten Spieltag zurueckgefallene Summary. */}
                     {homeNextMatchdayStatus.resultAvailable ? (
                       <button className="primary-button inline-button" type="button" onClick={triggerGlobalNext}>
                         Weiter
                       </button>
-                    ) : (
-                      <button
-                        className="primary-button inline-button"
-                        type="button"
-                        data-testid="arena-finish-matchday-button"
-                        disabled={readMeta.readOnly || cockpitBusyKey != null}
-                        onClick={() => void runFinishMatchdaySimple()}
-                        title="Berechnet alle Ergebnisse, schreibt Wertung und wechselt zum nächsten Spieltag."
-                      >
-                        {cockpitBusyKey === "matchday-auto-run-execute" ? "Läuft..." : "Spieltag abschliessen"}
-                      </button>
-                    )}
+                    ) : null}
                   </div>
                 </div>
                 {/* Kein Leerzustands-Kasten mehr: solange es noch kein Ergebnis gibt, bleibt der

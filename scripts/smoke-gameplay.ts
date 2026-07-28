@@ -914,7 +914,7 @@ async function main() {
         // Vor den (instant) Button-Checks unten warten, bis die Controls tatsächlich gerendert
         // sind — sonst racet der arena-reset-/step-Check gegen den Bühnen-Render.
         await page
-          .locator("[data-testid='arena-primary-step'], [data-testid='arena-reset'], [data-testid='arena-lineup-blocker'], [data-testid='arena-finish-matchday-button']")
+          .locator("[data-testid='arena-primary-step'], [data-testid='arena-reset'], [data-testid='arena-lineup-blocker'], [data-testid='arena-discipline-commit-status']")
           .first()
           .waitFor({ state: "visible", timeout: viewTimeoutMs })
           .catch(() => {});
@@ -941,10 +941,11 @@ async function main() {
           .isVisible()
           .catch(() => false);
         const stepButtonVisible =
-          // Neue Arena (Disziplin-Bühne): primärer ▶ Start/Etappe-Button bzw. der
-          // „Spieltag abschliessen"-Button der Ergebnis-Sektion. Fallbacks: Alt-Labels.
+          // Neue Arena (Disziplin-Bühne): primärer ▶ Start/Etappe-Button. Einen
+          // „Spieltag abschliessen"-Button gibt es nicht mehr — eine fertig gespielte
+          // Disziplin bucht sich selbst und meldet das über den Wertungsstatus.
           (await page.getByTestId("arena-primary-step").isVisible().catch(() => false)) ||
-          (await page.getByTestId("arena-finish-matchday-button").isVisible().catch(() => false)) ||
+          (await page.getByTestId("arena-discipline-commit-status").isVisible().catch(() => false)) ||
           (await page.getByRole("button", { name: /^Step$/ }).isVisible().catch(() => false)) ||
           (await page.getByRole("button", { name: /^Weiter$/ }).first().isVisible().catch(() => false)) ||
           (await page.getByRole("button", { name: /^Play$/ }).isVisible().catch(() => false));

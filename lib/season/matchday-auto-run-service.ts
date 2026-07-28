@@ -17,6 +17,7 @@ import type { PersistenceService } from "@/lib/persistence/types";
 import {
   APPLY_CONFIRM_TOKEN,
   LegacyMatchdayResultApplyService,
+  type LegacyMatchdayCommitThroughSide,
 } from "@/lib/resolve/legacy-matchday-result-apply-service";
 import { buildResolveLabSummary } from "@/lib/resolve/legacy-resolve-lab";
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
@@ -80,6 +81,13 @@ export type MatchdayAutoRunParams = {
     overwriteExistingLineups?: boolean;
     stopOnTie?: boolean;
     advanceAfterCashApply?: boolean;
+    /**
+     * Bis zu welcher Disziplin-Seite gebucht wird. Die Arena ruft nach D1 mit `"d1"` und
+     * nach D2 mit `"d2"`. Bei `"d1"` landen nur die D1-Zeilen im Save, der Saisonstand
+     * zeigt einen halben Spieltag, und Cash-Apply/Advance bleiben aus — der Spieltag ist
+     * ja noch nicht vorbei. Default `"d2"` = vollstaendiger Spieltag wie bisher.
+     */
+    commitThroughSide?: LegacyMatchdayCommitThroughSide;
   };
 };
 
@@ -480,7 +488,11 @@ export async function runLocalMatchdayAutoRun(
   const includeWarningLineups = params.options?.includeWarningLineups ?? false;
   const overwriteExistingLineups = params.options?.overwriteExistingLineups ?? false;
   const stopOnTie = params.options?.stopOnTie ?? true;
-  const advanceAfterCashApply = params.options?.advanceAfterCashApply ?? true;
+  const commitThroughSide: LegacyMatchdayCommitThroughSide = params.options?.commitThroughSide ?? "d2";
+  const isPartialCommit = commitThroughSide !== "d2";
+  // Ein halber Spieltag wird nicht weitergeschaltet: Preisgeld und Spieltagswechsel
+  // gehoeren an das Ende von D2, nicht an das von D1.
+  const advanceAfterCashApply = isPartialCommit ? false : params.options?.advanceAfterCashApply ?? true;
   const result = createBaseResult({
     source,
     dryRun,
@@ -522,7 +534,18 @@ export async function runLocalMatchdayAutoRun(
       (entry) => entry.saveId === scope.saveId && entry.seasonId === scope.seasonId && entry.matchdayId === scope.matchdayId,
     ) ?? null;
 
-  if (existingMatchdayResult) {
+  // Ein Ergebnis aus einem D1-Teil-Commit traegt nur die d1-Zeilen. Der Wiederaufnahme-
+  // Kurzschluss darf davon NICHT ausgeloest werden — sonst wuerde der spaetere D2-Commit
+  // Resolve und Ergebnis-Schreiben ueberspringen und D2 nie im Save landen.
+  const existingCommittedSides = new Set(
+    (workingSave.gameState.seasonState.disciplineResults ?? [])
+      .filter((entry) => existingMatchdayResult != null && entry.matchdayResultId === existingMatchdayResult.id)
+      .map((entry) => entry.disciplineSide),
+  );
+  const existingMatchdayResultIsComplete =
+    existingMatchdayResult != null && existingCommittedSides.has("d1") && existingCommittedSides.has("d2");
+
+  if (existingMatchdayResult && existingMatchdayResultIsComplete) {
     addStep(result, {
       key: "ai_lineups",
       label: "AI Lineups",
@@ -700,7 +723,10 @@ export async function runLocalMatchdayAutoRun(
   // BEVOR die AI-Aufstellung gebaut wird — so self-managen AI-Teams ihre Fatigue auch im echten
   // Spiel. Nur beim echten Ausfuehren (execute); ein Dry-Run-Preview veraendert den Spielstand nicht.
   // Nur AI-Teams; menschlich gesteuerte Teams bleiben unangetastet.
-  if (!dryRun) {
+  // Beim D2-Commit liegt bereits ein Teil-Ergebnis vor — die Neubewertung lief dann schon
+  // beim D1-Commit und darf nicht ein zweites Mal auf die inzwischen veraenderte Fatigue
+  // schauen, sonst haengt der Trainingsmodus davon ab, in wie vielen Schritten gebucht wurde.
+  if (!dryRun && existingMatchdayResult == null) {
     reevaluateAiTrainingModesForMatchday({ saveId: scope.saveId, persistence });
   }
 
@@ -870,6 +896,10 @@ export async function runLocalMatchdayAutoRun(
     execute: true,
     dryRun: false,
     confirm: APPLY_CONFIRM_TOKEN,
+    commitThroughSide,
+    // Der D2-Commit trifft auf das Teil-Ergebnis, das der D1-Commit hinterlassen hat,
+    // und muss es ersetzen duerfen. Ohne Teil-Commit bleibt es beim alten Verhalten.
+    forceReplace: existingMatchdayResult != null,
     preloadedContexts: currentContexts,
     preloadedPreview: activeResolve.preview,
   });

@@ -544,3 +544,121 @@ describe("matchday auto-run manual-team policy", () => {
     expect(persistedInjured!.finalPlayerScore).not.toBe(noInjuryFinal);
   }, 40_000);
 });
+
+describe("matchday auto-run per-discipline commit", () => {
+  function makeAllAiGameState() {
+    const gameState = createFreshSeasonOneGameState();
+    topUpRostersForLineupMinimum(gameState);
+    const existingSettings = gameState.seasonState.teamControlSettings ?? {};
+    gameState.seasonState.teamControlSettings = Object.fromEntries(
+      gameState.teams.map((team) => [
+        team.teamId,
+        {
+          ...existingSettings[team.teamId],
+          teamId: team.teamId,
+          controlMode: "ai" as const,
+          aiLineupPreviewEnabled: true,
+          aiLineupApplyEnabled: true,
+          aiLineupAutoApplyEnabled: false,
+          aiTransferPreviewEnabled: false,
+          aiTransferAutoApplyEnabled: false,
+          aiSellPreviewEnabled: false,
+          aiSellAutoApplyEnabled: false,
+          notes: null,
+          strategyLock: null,
+        },
+      ]),
+    );
+    return gameState;
+  }
+
+  function runCommit(persistence: PersistenceService, gameState: GameState, commitThroughSide: "d1" | "d2") {
+    return runLocalMatchdayAutoRun(
+      {
+        saveId: "test-save",
+        seasonId: gameState.season.id,
+        matchdayId: gameState.matchdayState.matchdayId,
+        source: "sqlite",
+        execute: true,
+        dryRun: false,
+        confirmToken: MATCHDAY_AUTO_RUN_CONFIRM_TOKEN,
+        options: {
+          includeWarningLineups: true,
+          overwriteExistingLineups: false,
+          stopOnTie: false,
+          advanceAfterCashApply: true,
+          commitThroughSide,
+        },
+      },
+      persistence,
+    );
+  }
+
+  it("books only d1 on a half matchday and completes the matchday on the d2 commit", async () => {
+    const gameState = makeAllAiGameState();
+    const persistence = createInMemoryPersistence(gameState, true);
+    const matchdayId = gameState.matchdayState.matchdayId;
+
+    const d1 = await runCommit(persistence, gameState, "d1");
+    expect(d1.summary.resultApplyAllowed).toBe(true);
+    expect(d1.summary.standingsApplyAllowed).toBe(true);
+    // Ein halber Spieltag wird NICHT weitergeschaltet.
+    expect(d1.summary.advanceAllowed).toBe(false);
+
+    const afterD1 = persistence.getSaveById("test-save")!.gameState.seasonState;
+    const resultId = afterD1.matchdayResults!.find((entry) => entry.matchdayId === matchdayId)!.id;
+    const sidesAfterD1 = new Set(
+      (afterD1.disciplineResults ?? [])
+        .filter((entry) => entry.matchdayResultId === resultId)
+        .map((entry) => entry.disciplineSide),
+    );
+    expect([...sidesAfterD1]).toEqual(["d1"]);
+    const d1RowsAfterD1 = (afterD1.disciplineResults ?? [])
+      .filter((entry) => entry.matchdayResultId === resultId && entry.disciplineSide === "d1")
+      .map((entry) => `${entry.teamId}:${entry.rank}:${entry.totalScore}`)
+      .sort();
+    expect(persistence.getSaveById("test-save")!.gameState.matchdayState.matchdayId).toBe(matchdayId);
+
+    const pointsAfterD1 = Object.fromEntries(
+      Object.entries(afterD1.standings ?? {}).map(([teamId, row]) => [teamId, row.points ?? 0]),
+    );
+
+    const d2 = await runCommit(persistence, gameState, "d2");
+    expect(d2.summary.resultApplyAllowed).toBe(true);
+    expect(d2.summary.standingsApplyAllowed).toBe(true);
+
+    const afterD2 = persistence.getSaveById("test-save")!.gameState.seasonState;
+    const sidesAfterD2 = new Set(
+      (afterD2.disciplineResults ?? [])
+        .filter((entry) => entry.matchdayResultId === resultId)
+        .map((entry) => entry.disciplineSide),
+    );
+    expect([...sidesAfterD2].sort()).toEqual(["d1", "d2"]);
+
+    // Eine bereits gewertete Disziplin ist eingefroren: Der D2-Commit rechnet D1 NICHT
+    // neu. Ohne das Einfrieren verschob die nicht bitgleiche Replay-Rekonstruktion die
+    // D1-Raenge nachtraeglich, obwohl der Spieler sie laengst als Ergebnis gesehen hatte.
+    const d1RowsAfterD2 = (afterD2.disciplineResults ?? [])
+      .filter((entry) => entry.matchdayResultId === resultId && entry.disciplineSide === "d1")
+      .map((entry) => `${entry.teamId}:${entry.rank}:${entry.totalScore}`)
+      .sort();
+    expect(d1RowsAfterD2).toEqual(d1RowsAfterD1);
+
+    // Kein Doppelzaehlen: der zweite Apply rechnet von derselben Vor-Spieltags-Basis,
+    // die Gesamtpunkte sind also nicht die Summe zweier voller Spieltage.
+    const pointsAfterD2 = Object.fromEntries(
+      Object.entries(afterD2.standings ?? {}).map(([teamId, row]) => [teamId, row.points ?? 0]),
+    );
+    const baselineIds = new Set(
+      Object.values(afterD2.standings ?? {}).map((row) => row.matchdayBaselineId),
+    );
+    expect([...baselineIds]).toEqual([matchdayId]);
+    for (const [teamId, points] of Object.entries(pointsAfterD2)) {
+      const baseline = afterD2.standings![teamId]!.matchdayBaselinePoints ?? 0;
+      const afterD1Points = pointsAfterD1[teamId] ?? 0;
+      // D1-Punkte bleiben enthalten, D2 kommt oben drauf — nie weniger als nach D1.
+      expect(points).toBeGreaterThanOrEqual(Number((afterD1Points - 0.001).toFixed(3)));
+      expect(points).toBeGreaterThanOrEqual(baseline);
+    }
+  }, 120_000);
+});
