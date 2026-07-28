@@ -23,6 +23,11 @@ import DisciplineStageNativeArena, { type StagePrimitive, type StageMotif, type 
 import DisciplineStageDrawer, { type DisciplineStageDrawerTarget } from "@/app/foundation/discipline-stage/DisciplineStageDrawer";
 import DisciplineStageMatchdayPanel, { type MatchdayPanelStandingRow, type MatchdayPanelTeamResult } from "@/app/foundation/discipline-stage/DisciplineStageMatchdayPanel";
 import { getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
+import {
+  buildMatchdayArenaBaseSessionKey,
+  getMatchdayArenaBaseBundle,
+  setMatchdayArenaBaseBundle,
+} from "@/lib/foundation/matchday-arena-session-cache";
 import DisciplineStageHoverPreview, { type DisciplineStageHoverTarget } from "@/app/foundation/discipline-stage/DisciplineStageHoverPreview";
 import { fmt1 } from "@/app/foundation/discipline-stage/stage-format";
 import { buildTeamRelationshipMap } from "@/lib/foundation/team-relationship";
@@ -562,6 +567,40 @@ export default function DisciplineStageArena({
       return;
     }
     const controller = new AbortController();
+
+    // Session-Cache zuerst: Der Lineup→Arena-Übergang füllt ihn während der Übergabe-Animation
+    // vor (prefetchMatchdayArenaBase mit includeDetails), und beim Zurückwechseln in die Arena
+    // liegt das Bundle ohnehin noch. Vorher lud die Arena bei JEDEM Mount neu — der teuerste
+    // Teil des Öffnens (Resolve-Preview für 32 Teams, ~1 s Serverzeit) lief also immer wieder.
+    // Der Schlüssel trägt `includeDetails`, ein Light-Prefetch kann hier also nicht treffen.
+    const sessionKey = buildMatchdayArenaBaseSessionKey({
+      saveId,
+      seasonId,
+      matchdayId,
+      teamId: ownTeamId ?? "",
+      source: "sqlite",
+      includeDetails: true,
+    });
+    // Beim manuellen Retry (previewReloadNonce > 0) den Cache bewusst ÜBERSPRINGEN: Wer auf
+    // „Engine erneut laden" drückt, will einen echten neuen Versuch — ein Cache-Treffer würde
+    // sonst immer dasselbe (womöglich leere) Ergebnis zurückgeben und der Button wäre wirkungslos.
+    const cached =
+      previewReloadNonce > 0
+        ? null
+        : getMatchdayArenaBaseBundle<{
+            resolvePreview?: { preview?: unknown } | null;
+            briefingStandings?: { items?: unknown } | null;
+            standingsPreview?: { items?: unknown } | null;
+          }>(sessionKey);
+    if (cached) {
+      const cachedPreview = (cached.resolvePreview?.preview ?? null) as typeof preview;
+      setPreview(cachedPreview);
+      setBriefingItems(Array.isArray(cached.briefingStandings?.items) ? (cached.briefingStandings.items as MatchdayPanelStandingRow[]) : []);
+      setStandingsItems(Array.isArray(cached.standingsPreview?.items) ? (cached.standingsPreview.items as MatchdayPanelStandingRow[]) : []);
+      setPreviewState(cachedPreview ? "ready" : "unavailable");
+      return;
+    }
+
     setPreviewState("loading");
     const query = new URLSearchParams({ saveId, seasonId, matchdayId, teamId: ownTeamId ?? "", source: "sqlite", includeDetails: "1" });
     fetch(`/api/matchday/arena-base?${query.toString()}`, { cache: "no-store", signal: controller.signal })
@@ -571,6 +610,11 @@ export default function DisciplineStageArena({
         // aufgeräumt wurde (Spieltags-/Team-Wechsel), darf den State nicht mehr beschreiben —
         // sonst blitzt die Vorschau des alten Spieltags auf, bis der neue Request antwortet.
         if (controller.signal.aborted) return;
+        // Für den nächsten Besuch (Tab-Wechsel, Rückkehr aus dem Spielerprofil) mitschreiben —
+        // dieselbe Ablage, aus der der Lineup→Arena-Übergang vorbefüllt.
+        if (payloadJson?.context) {
+          setMatchdayArenaBaseBundle(sessionKey, payloadJson);
+        }
         const enginePreview = payloadJson?.resolvePreview?.preview ?? null;
         setPreview(enginePreview);
         setBriefingItems(Array.isArray(payloadJson?.briefingStandings?.items) ? payloadJson.briefingStandings.items : []);
