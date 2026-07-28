@@ -4,6 +4,7 @@ import { loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-
 import type { LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
 import { DEFAULT_ACTIVE_OWNER_ID, buildTeamControlSettingsMap, canLocalUserManageTeam } from "@/lib/foundation/team-control-settings";
 import { readArenaPreviewCache, writeArenaPreviewCache } from "@/lib/foundation/arena-preview-cache";
+import { readMatchdayResolveSnapshot } from "@/lib/foundation/matchday-resolve-snapshot";
 import {
   loadSqliteLegacyMatchdayResolvePreview,
   type LegacyMatchdayResolvePreviewPayload,
@@ -214,14 +215,25 @@ export async function loadMatchdayArenaBase(input: {
   if (input.includeDetails === true) {
     const resolveCacheKey = `${save.saveId}:${params.seasonId}:${params.matchdayId}`;
     const cacheSignature = contentSignature ?? `${versionMeta?.updatedAt ?? save.updatedAt}`;
+    // Zuerst die EINE Rechnung des Spieltags, die beim Speichern der Aufstellungen
+    // entstanden ist. Sie ist dieselbe Quelle, aus der auch gebucht wird — die Buehne
+    // zeigt damit exakt das, was am Ende jeder Disziplin in den Saisonstand wandert.
+    // Fehlt sie (Feld noch unvollstaendig, Snapshot durch geaenderte Aufstellungen
+    // verfallen), wird wie bisher live gerechnet; dann ist es eben nur eine Vorschau.
+    const snapshot = readMatchdayResolveSnapshot(save.gameState, {
+      saveId: save.saveId,
+      seasonId: params.seasonId,
+      matchdayId: params.matchdayId,
+    });
     resolvePreview =
+      snapshot?.payload ??
       readArenaPreviewCache<LegacyMatchdayResolvePreviewPayload>(resolveCacheKey, cacheSignature) ??
       loadSqliteLegacyMatchdayResolvePreview({
         saveId: save.saveId,
         seasonId: params.seasonId,
         matchdayId: params.matchdayId,
       });
-    if (resolvePreview) {
+    if (resolvePreview && !snapshot) {
       writeArenaPreviewCache(resolveCacheKey, cacheSignature, resolvePreview);
     }
 

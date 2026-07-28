@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
+import { ensureMatchdayResolveSnapshot } from "@/lib/foundation/matchday-resolve-snapshot";
 import {
   getLocalLegacyLineupDraft,
   saveLocalLegacyLineupDraft,
@@ -143,6 +144,23 @@ export async function PUT(request: Request) {
         dryRun: false,
         includeWarningTeams: false,
         overwriteExisting: false,
+      });
+    } catch {
+      // bewusst geschluckt, siehe oben
+    }
+
+    // Steht das Feld, wird der Spieltag hier EINMAL gerechnet und abgelegt. Ab da
+    // lesen die Arena-Buehne und beide Disziplin-Buchungen aus demselben Ergebnis,
+    // statt jeweils neu zu rechnen — nur so zeigt die Buehne exakt das, was gebucht
+    // wird. Der Weg zur Arena fuehrt ohnehin ueber diesen Aufruf, die Rechnung laeuft
+    // also dann, wenn der Spieler ohnehin gerade den Reiter wechselt.
+    // Auch hier gilt: ein Fehlschlag kippt das Speichern nicht, es wird nur spaeter
+    // live gerechnet wie vorher.
+    try {
+      ensureMatchdayResolveSnapshot({
+        saveId: params.saveId,
+        seasonId: params.seasonId,
+        matchdayId: params.matchdayId,
       });
     } catch {
       // bewusst geschluckt, siehe oben

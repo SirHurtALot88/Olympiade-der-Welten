@@ -7,6 +7,7 @@ import {
   loadLocalLegacyLineupContextFromGameState,
 } from "@/lib/lineups/legacy-lineup-local-service";
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
+import { ensureMatchdayResolveSnapshot } from "@/lib/foundation/matchday-resolve-snapshot";
 import { prepareGameStateForMatchdayResolve } from "@/lib/lineups/matchday-lineup-auto-prep";
 import {
   attachMatchdayInjuryPerformanceToContexts,
@@ -661,4 +662,101 @@ describe("matchday auto-run per-discipline commit", () => {
       expect(points).toBeGreaterThanOrEqual(baseline);
     }
   }, 120_000);
+});
+
+describe("matchday resolve snapshot equality", () => {
+  function makeAllAiGameState() {
+    const gameState = createFreshSeasonOneGameState();
+    topUpRostersForLineupMinimum(gameState);
+    const existingSettings = gameState.seasonState.teamControlSettings ?? {};
+    gameState.seasonState.teamControlSettings = Object.fromEntries(
+      gameState.teams.map((team) => [
+        team.teamId,
+        {
+          ...existingSettings[team.teamId],
+          teamId: team.teamId,
+          controlMode: "ai" as const,
+          aiLineupPreviewEnabled: true,
+          aiLineupApplyEnabled: true,
+          aiLineupAutoApplyEnabled: false,
+          aiTransferPreviewEnabled: false,
+          aiTransferAutoApplyEnabled: false,
+          aiSellPreviewEnabled: false,
+          aiSellAutoApplyEnabled: false,
+          notes: null,
+          strategyLock: null,
+        },
+      ]),
+    );
+    return gameState;
+  }
+
+  it("books exactly what the arena showed, for both disciplines", async () => {
+    const gameState = makeAllAiGameState();
+    const persistence = createInMemoryPersistence(gameState, true);
+    const scope = {
+      saveId: "test-save",
+      seasonId: gameState.season.id,
+      matchdayId: gameState.matchdayState.matchdayId,
+    };
+
+    // Feld herstellen (die KI-Aufstellungen entstehen sonst erst im Commit) und
+    // danach genau das tun, was der Weg zur Arena tut: einmal rechnen und ablegen.
+    applyAiLegacyLineupBatchLocally(
+      { ...scope, dryRun: false, includeWarningTeams: true, overwriteExisting: false },
+      persistence,
+    );
+    const snapshot = ensureMatchdayResolveSnapshot(scope, persistence);
+    expect(snapshot).not.toBeNull();
+
+    // Das ist, was die Arena-Buehne zeigt.
+    const shown = new Map<string, string>();
+    for (const disciplinePreview of snapshot!.payload.preview.disciplinePreviews) {
+      for (const row of disciplinePreview.teamResults) {
+        shown.set(
+          `${disciplinePreview.disciplineSide}:${row.teamId}`,
+          `${row.rank}:${row.finalPreviewScore}`,
+        );
+      }
+    }
+    expect(shown.size).toBeGreaterThan(0);
+
+    const runCommit = (commitThroughSide: "d1" | "d2") =>
+      runLocalMatchdayAutoRun(
+        {
+          ...scope,
+          source: "sqlite",
+          execute: true,
+          dryRun: false,
+          confirmToken: MATCHDAY_AUTO_RUN_CONFIRM_TOKEN,
+          options: {
+            includeWarningLineups: true,
+            overwriteExistingLineups: false,
+            stopOnTie: false,
+            advanceAfterCashApply: true,
+            commitThroughSide,
+          },
+        },
+        persistence,
+      );
+
+    await runCommit("d1");
+    await runCommit("d2");
+
+    const seasonState = persistence.getSaveById("test-save")!.gameState.seasonState;
+    const resultId = seasonState.matchdayResults!.find((entry) => entry.matchdayId === scope.matchdayId)!.id;
+    const booked = new Map<string, string>();
+    for (const row of (seasonState.disciplineResults ?? []).filter(
+      (entry) => entry.matchdayResultId === resultId,
+    )) {
+      booked.set(`${row.disciplineSide}:${row.teamId}`, `${row.rank}:${row.totalScore}`);
+    }
+
+    // Kern der Umstellung: Gebucht wird exakt das Gezeigte — in BEIDEN Disziplinen,
+    // ueber zwei getrennte Buchungen hinweg.
+    expect(booked.size).toBe(shown.size);
+    for (const [key, value] of shown) {
+      expect(booked.get(key)).toBe(value);
+    }
+  }, 180_000);
 });
