@@ -47195,13 +47195,21 @@ button.foundation-team-portrait-card {
   display: flex;
   align-items: center;
   gap: var(--nl-s4);
-  flex: 1 1 340px;
-  min-width: 260px;
+  /* Breiter als vorher (war 340/260px), damit das größere Portrait (#) neben
+     Name/Chips nicht sofort in den Wrap-Umbruch drängt. */
+  flex: 1 1 420px;
+  min-width: 320px;
 }
 
+/* Portrait deutlich größer (war 140px, #) — jetzt auf Augenhöhe mit dem
+   Achsen-Radar daneben (`.nl-player-hero-radar`, 216px breit), damit der
+   Header nicht mehr kopflastig auf Text wirkt. `nl-star-frame` +
+   `is-star-tier-*`/`is-star-holo` (siehe unten) tragen hier denselben
+   ligaweiten Top-Riege-Rahmen wie Kader-Karten, Arena-Marken und die
+   Spielertabelle — bewusst dieselbe Klasse, kein eigenes Hero-only-System. */
 .is-new-look .nl-player-hero-portrait {
-  width: 140px;
-  height: 140px;
+  width: 212px;
+  height: 212px;
   flex: 0 0 auto;
   border-radius: var(--nl-r-md);
   border: 1px solid var(--nl-line);
@@ -47214,9 +47222,43 @@ button.foundation-team-portrait-card {
   place-items: center;
   background: var(--nl-accent-soft);
   color: var(--nl-accent);
-  font-size: 40px;
+  font-size: 60px;
   font-weight: 700;
   letter-spacing: 0.04em;
+}
+
+/* Der generische Inline-Rahmen (`nl-star-frame`, sonst 2px/dezenter Glow für
+   kleine Tabellen-/Podium-Bilder, siehe weiter oben) wirkt am 212px-Hero-
+   Portrait zu dünn — Rand und Glow-Radius skalieren hier mit der Größe hoch,
+   ohne die Basisregel (und damit die kleinen Konsumenten) anzufassen. */
+.is-new-look .nl-player-hero-portrait.nl-star-frame {
+  box-shadow:
+    0 0 0 3px var(--nl-star-tone),
+    0 0 16px color-mix(in srgb, var(--nl-star-tone) 45%, transparent);
+}
+
+.is-new-look .nl-player-hero-portrait.nl-star-frame.is-star-holo {
+  animation: nlStarFrameGlowLg 2.8s var(--nl-ease, ease) infinite;
+}
+
+@keyframes nlStarFrameGlowLg {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px var(--nl-star-tone),
+      0 0 14px color-mix(in srgb, var(--nl-star-tone) 40%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px var(--nl-star-tone),
+      0 0 26px color-mix(in srgb, var(--nl-star-tone) 70%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-player-hero-portrait.nl-star-frame.is-star-holo {
+    animation: none;
+  }
 }
 
 .is-new-look .nl-player-hero-copy {

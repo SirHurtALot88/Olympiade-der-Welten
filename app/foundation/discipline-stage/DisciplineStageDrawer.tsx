@@ -34,6 +34,7 @@ import {
 import { buildPlayerRatingContractMap, type PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
+import { getBestPlayerStarTier } from "@/lib/foundation/player-star-tier";
 import { getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 import { getTeamColor, teamHasSecondary, floorTeamAccent } from "@/lib/foundation/team-colors";
 import { fmt1 } from "./stage-format";
@@ -327,6 +328,9 @@ function PlayerBody({
   const ppsRank = data?.ppsRank ?? null;
   const mvs = data?.mvs ?? player.economyAfterUpgradePreview?.mvsUnchanged ?? null;
   const mvsRank = data?.mvsRank ?? null;
+  // Ligaweite Top-Riege fürs große Kopf-Portrait (Blickfang) — dieselbe
+  // "beste der drei Kennzahlen"-Regel wie im Spielerprofil-Hero.
+  const headStarTier = getBestPlayerStarTier(ovrRank, ppsRank, mvsRank);
 
   // Aktuelle Disziplin.
   const discEntry = (data?.disciplineValues ?? []).find((d) => d.id === disciplineId) ?? null;
@@ -358,7 +362,14 @@ function PlayerBody({
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         {/* --nl-accent lokal auf die Team-Farbe biegen → Portrait-Ring wird team-akzentuiert */}
         <span style={withVars({ "--nl-accent": "var(--accent)" }, { display: "inline-flex", flex: "none" })}>
-          <PlayerMark src={portraitUrl} alt={player.name} size={84} spotlight title={player.name} />
+          <PlayerMark
+            src={portraitUrl}
+            alt={player.name}
+            size={84}
+            spotlight
+            starTier={headStarTier}
+            title={player.name}
+          />
         </span>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

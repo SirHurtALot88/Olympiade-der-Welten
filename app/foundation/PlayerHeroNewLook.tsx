@@ -33,6 +33,12 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import type { LeagueLeaderCategoryId } from "@/lib/foundation/league-leaders-service";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
 import { formatLeaguePercentile } from "@/lib/foundation/player-league-heat";
+import {
+  getBestPlayerStarTier,
+  getPlayerStarTierClassName,
+  getPlayerStarTierLabel,
+  isHoloPlayerStarTier,
+} from "@/lib/foundation/player-star-tier";
 import { useFoundationStateOptional } from "@/lib/foundation/foundation-state-context";
 
 import ClassIcon from "./ClassIcon";
@@ -117,8 +123,8 @@ export default function PlayerHeroNewLook({
   // Perzentil-Nenner MUSS zum Rang-Pool passen: OVR/PPs/MVS-Ränge werden in
   // `buildPlayerRatingContractMap` gegen die AKTIVEN (rostierten) Spieler
   // gebildet (`rankPoolPlayerIds: activePlayerIds`), NICHT gegen alle Spieler
-  // inkl. Free Agents. Nähmen wir `players.length` (~alle Spieler), käme Rang
-  // #156 fälschlich als „Top 5 %" heraus, obwohl es unter den aktiven Spielern
+  // inkl. Free Agents. Nähmen wir `players.length` (~alle Spieler), käme
+  // Rang 156 fälschlich als „Top 5 %" heraus, obwohl es unter den aktiven Spielern
   // eher Mittelfeld ist. Daher: eindeutige Roster-Spielerzahl.
   const activePlayerPoolSize = resolvedGameState
     ? new Set(resolvedGameState.rosters.map((entry) => entry.playerId).filter(Boolean)).size
@@ -218,22 +224,43 @@ export default function PlayerHeroNewLook({
           onOpenLeagueLeaders(axisKey, { playerId: data.playerId, playerName: data.name })
       : undefined;
 
+  // Star-Tier fürs Hero-Portrait (#): dieselbe ligaweite Top-Riege wie im Kader,
+  // in der Spielertabelle und an der Arena-Marke — die BESTE der drei Kennzahlen
+  // (siehe `getBestPlayerStarTier`), nicht nur OVR. Ein Free Agent/Spieler ohne
+  // Ränge (`ovrRank`/`ppsRank`/`mvsRank` alle `null`) bekommt automatisch keine
+  // Stufe zurück, also auch keinen Rahmen — kein Sonderfall nötig.
+  const heroStarTier = getBestPlayerStarTier(data.ovrRank, data.ppsRank, data.mvsRank);
+  const heroStarTierLabel = getPlayerStarTierLabel(heroStarTier);
+  const heroPortraitClassName = [
+    "nl-player-hero-portrait",
+    "nl-star-frame",
+    getPlayerStarTierClassName(heroStarTier),
+    isHoloPlayerStarTier(heroStarTier) ? "is-star-holo" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <section className="is-new-look nl-player-hero" data-testid="player-hero-new-look" data-new-look="true">
       <div className="nl-player-hero-identity">
         {data.portraitUrl ? (
           <BudgetedMediaImage
-            className="nl-player-hero-portrait"
+            className={heroPortraitClassName}
             src={data.portraitUrl}
             alt={data.name}
-            width={160}
-            height={160}
+            title={heroStarTierLabel ?? undefined}
+            width={220}
+            height={220}
             loading="eager"
             fetchPriority="high"
             eager
           />
         ) : (
-          <div className="nl-player-hero-portrait nl-player-hero-portrait-fallback" aria-hidden="true">
+          <div
+            className={`${heroPortraitClassName} nl-player-hero-portrait-fallback`}
+            title={heroStarTierLabel ?? undefined}
+            aria-hidden="true"
+          >
             {buildHeroInitials(data.name)}
           </div>
         )}

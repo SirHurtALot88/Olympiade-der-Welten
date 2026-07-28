@@ -10,6 +10,8 @@ type OptimizedMediaImageProps = {
   width?: number;
   height?: number;
   style?: CSSProperties;
+  /** Optionaler Tooltip (z. B. Star-Tier-Label). Ohne Wert kein `title`-Attribut. */
+  title?: string;
   loading?: "eager" | "lazy";
   fetchPriority?: "high" | "low" | "auto";
   fallback?: ReactNode;
@@ -60,6 +62,7 @@ export default function OptimizedMediaImage({
   width,
   height,
   style,
+  title,
   loading = "lazy",
   fetchPriority = "low",
   fallback = null,
@@ -115,6 +118,7 @@ export default function OptimizedMediaImage({
       <span
         className={`${onErrorClassName ?? className} optimized-media-image-fallback`}
         style={style}
+        title={title}
         aria-label={alt.trim() ? alt : undefined}
       >
         {initials}
@@ -130,6 +134,7 @@ export default function OptimizedMediaImage({
       <span
         className={`optimized-media-image is-progressive${loaded ? " is-loaded" : ""}`}
         style={style}
+        title={title}
       >
         <img
           className={`${className} is-placeholder-layer`}
@@ -174,6 +179,7 @@ export default function OptimizedMediaImage({
       width={width}
       height={height}
       style={style}
+      title={title}
       loading={loading}
       decoding="async"
       fetchPriority={fetchPriority}
