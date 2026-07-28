@@ -137,6 +137,7 @@ import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
 import { potentialScoreToStars } from "@/lib/progression/player-potential-service";
 import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
 
+import PlayerStarFrame from "@/components/foundation/player-portrait-card/PlayerStarFrame";
 import FoundationPlayersCompareOverlay from "@/app/foundation/players-table/FoundationPlayersCompareOverlay";
 import { getFoggedPoScoreRange } from "@/app/foundation/players-table/foundation-players-fog-of-war";
 import { DEBUG_FORCE_PLAYER_VISIBILITY } from "@/lib/foundation/debug-player-visibility";
@@ -1476,26 +1477,32 @@ export default function FoundationPlayersTableNewLook({
         </td>
         <td className="nl-players-td-image">
           <FoundationPlayerPortraitPreview {...portraitPreviewProps}>
-            {portrait.src ? (
-              <BudgetedMediaImage
-                className="nl-players-portrait"
-                src={portrait.src}
-                alt={row.player.name}
-                width={44}
-                height={44}
-                loading="lazy"
-                fetchPriority="low"
-                fallback={
-                  <span className="nl-players-portrait nl-players-portrait-fallback" aria-hidden="true">
-                    {portrait.initials}
-                  </span>
-                }
-              />
-            ) : (
-              <span className="nl-players-portrait nl-players-portrait-fallback" aria-hidden="true">
-                {portrait.initials}
-              </span>
-            )}
+            <PlayerStarFrame
+              metrics={{ ovr: row.playerOvr, pps: row.playerPps, mvs: row.playerMvs }}
+              leagueHeatPools={leaguePlayerHeatPools}
+              shape="rounded"
+            >
+              {portrait.src ? (
+                <BudgetedMediaImage
+                  className="nl-players-portrait"
+                  src={portrait.src}
+                  alt={row.player.name}
+                  width={44}
+                  height={44}
+                  loading="lazy"
+                  fetchPriority="low"
+                  fallback={
+                    <span className="nl-players-portrait nl-players-portrait-fallback" aria-hidden="true">
+                      {portrait.initials}
+                    </span>
+                  }
+                />
+              ) : (
+                <span className="nl-players-portrait nl-players-portrait-fallback" aria-hidden="true">
+                  {portrait.initials}
+                </span>
+              )}
+            </PlayerStarFrame>
           </FoundationPlayerPortraitPreview>
         </td>
         <td className={`nl-players-td-name${sortCellClass("name")}`}>

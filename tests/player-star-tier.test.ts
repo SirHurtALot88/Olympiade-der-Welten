@@ -153,6 +153,36 @@ describe("Star-Tier: Renderpfade", () => {
     expect(scoutText).not.toContain("getPlayerStarTier");
   });
 
+  it("deklariert die Tier-Farben auch auf :root, sonst bleiben Portale farblos", () => {
+    const cssText = read("app/globals.css");
+    // Die Hover-Portraitkarte rendert per createPortal an document.body und ist
+    // damit KEIN Nachfahre von `.is-new-look`. Lagen die Farben nur dort, loeste
+    // `var(--nl-diamond)` ins Leere auf, die `outline`-Deklaration wurde
+    // ungueltig und es erschien ueberhaupt kein Rahmen.
+    const rootBlock = cssText.match(/:root \{[^}]*--nl-diamond[^}]*\}/s);
+    expect(rootBlock).not.toBeNull();
+    expect(rootBlock?.[0]).toContain("--nl-gold");
+    expect(rootBlock?.[0]).toContain("--nl-silver");
+    expect(rootBlock?.[0]).toContain("--nl-bronze");
+  });
+
+  it("traegt den animierten Glanzring — mit Rueckfallebene ohne Masken-Support", () => {
+    const cssText = read("app/globals.css");
+    expect(cssText).toContain("@keyframes nlStarRimSweep");
+    expect(cssText).toContain("mask-composite: exclude");
+    // Ohne Masken wuerde der Verlauf die ganze Karte ueberdecken statt nur den Rand.
+    expect(cssText).toContain("@supports not ((mask-composite: exclude) or (-webkit-mask-composite: xor))");
+  });
+
+  it("rahmt das Portrait in der tatsaechlich gerenderten Spielertabelle ein", () => {
+    // Es gibt zwei Tabellen-Dateien; gerendert wird FoundationPlayersTableNewLook
+    // (dynamisch aus FoundationShellRouterBody). Die andere zu bearbeiten aendert
+    // sichtbar nichts.
+    const tableText = read("app/foundation/players-table/FoundationPlayersTableNewLook.tsx");
+    expect(tableText).toContain("<PlayerStarFrame");
+    expect(tableText).toContain("leagueHeatPools={leaguePlayerHeatPools}");
+  });
+
   it("bringt Tier-Farben und Holo-Regeln als Design-Tokens mit", () => {
     const cssText = read("app/globals.css");
     expect(cssText).toContain("--nl-diamond:");
