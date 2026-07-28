@@ -42455,6 +42455,200 @@ button.foundation-team-portrait-card {
   opacity: 0.55;
 }
 
+/* ============================================================
+   Formplan-Rework: Saison-Planungs-Cockpit
+   ------------------------------------------------------------
+   Der Formplan ist die Saison-Planungs-Ansicht für knappe Ressourcen
+   (Formkarten, Captain, Team-Power). Das Ressourcen-Cockpit zeigt pro
+   Ressource "übrig vs. Saisonrest" als Meter; die Timeline-Zellen
+   bekommen eine Chancen-Zeile (Farbmatch x2 + passende freie Karten +
+   Planungs-Status), damit man die Saison scannen kann statt jede
+   F1/F2-Zelle zu lesen. Farben kommen aus den `--nl-*`-Tokens mit
+   rgba-Fallback, weil das Panel auch außerhalb von `.is-new-look`
+   gerendert werden kann.
+   ============================================================ */
+
+.legacy-lineup-form-resources {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.legacy-lineup-form-resource {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(14, 20, 32, 0.78), rgba(9, 13, 22, 0.66));
+}
+
+.legacy-lineup-form-resource-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.legacy-lineup-form-resource-head > span {
+  color: rgba(235, 238, 245, 0.64);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.legacy-lineup-form-resource-head > strong {
+  color: var(--nl-ink, rgba(247, 247, 244, 0.98));
+  font-size: 0.86rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+/* Restbestands-Meter: gefüllter Anteil = noch übrig. Läuft die Saison der
+   Ressource davon, sieht man das hier zuerst. */
+.legacy-lineup-form-resource-meter {
+  position: relative;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.legacy-lineup-form-resource-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--nl-good, rgba(76, 197, 107, 0.85));
+  transition: width 260ms ease;
+}
+
+.legacy-lineup-form-resource.is-captain .legacy-lineup-form-resource-meter > span {
+  background: var(--nl-soc, rgba(230, 180, 85, 0.9));
+}
+
+.legacy-lineup-form-resource.is-power .legacy-lineup-form-resource-meter > span {
+  background: var(--nl-men, rgba(91, 155, 255, 0.9));
+}
+
+.legacy-lineup-form-resource > small {
+  color: rgba(211, 224, 243, 0.74);
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+
+.legacy-lineup-form-resource-note {
+  margin: 0;
+  color: rgba(211, 224, 243, 0.56);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.legacy-lineup-form-resource-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.legacy-lineup-form-resource-color {
+  padding: 3px 8px;
+  font-size: 0.72rem;
+}
+
+.legacy-lineup-form-resource-color.is-depleted {
+  opacity: 0.42;
+}
+
+.legacy-lineup-form-resource-power-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.legacy-lineup-form-resource-power {
+  min-width: 0;
+  overflow: hidden;
+  padding: 3px 8px;
+  border: 1px solid color-mix(in srgb, var(--nl-men, rgba(91, 155, 255, 1)) 28%, transparent);
+  border-radius: 999px;
+  color: rgba(214, 230, 255, 0.92);
+  background: color-mix(in srgb, var(--nl-men, rgba(91, 155, 255, 1)) 14%, transparent);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legacy-lineup-form-resource-power.is-used-up {
+  opacity: 0.45;
+}
+
+/* Timeline-Einträge als Karten: Heute leuchtet, Gespielt tritt zurück. */
+.legacy-lineup-form-timeline-entry {
+  display: grid;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(16, 22, 34, 0.6), rgba(9, 13, 22, 0.45));
+}
+
+.legacy-lineup-form-timeline-entry.is-current {
+  border-color: color-mix(in srgb, var(--nl-accent, rgba(102, 160, 238, 1)) 52%, transparent);
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--nl-accent, rgba(102, 160, 238, 1)) 18%, transparent), transparent 46%),
+    linear-gradient(180deg, rgba(24, 36, 58, 0.68), rgba(10, 15, 25, 0.55));
+}
+
+.legacy-lineup-form-timeline-entry.is-past {
+  opacity: 0.55;
+  filter: saturate(0.72);
+}
+
+/* Chancen-Zeile pro Disziplin-Zelle (Farbmatch + Status). */
+.legacy-lineup-form-board-cell-chance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.legacy-lineup-form-board-match-chip {
+  padding: 3px 8px;
+  font-size: 0.72rem;
+}
+
+.legacy-lineup-form-board-cell-flag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.legacy-lineup-form-board-cell-flag.is-planned {
+  color: var(--nl-good, rgba(167, 243, 208, 0.95));
+  border: 1px solid color-mix(in srgb, var(--nl-good, rgba(76, 197, 107, 1)) 34%, transparent);
+  background: color-mix(in srgb, var(--nl-good, rgba(76, 197, 107, 1)) 14%, transparent);
+}
+
+.legacy-lineup-form-board-cell-flag.is-open {
+  color: rgba(235, 238, 245, 0.6);
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+@media (max-width: 1080px) {
+  .legacy-lineup-form-resources {
+    grid-template-columns: 1fr;
+  }
+}
+
 .legacy-lineup-v2-handoff-overlay {
   position: fixed;
   inset: 0;
