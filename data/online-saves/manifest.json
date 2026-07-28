@@ -1,6 +1,6 @@
 {
   "schemaVersion": "oly-online-saves-v1",
-  "exportedAt": "2026-07-28T14:50:05.988Z",
+  "exportedAt": "2026-07-28T15:17:56.063Z",
   "activeSaveId": "fresh-season-1-1785220152367",
   "saves": [
     {
@@ -16,8 +16,8 @@
       "name": "UI-Check Neues Spiel",
       "status": "archived",
       "file": "new-game-1785067203149-82cbka.json.gz",
-      "uncompressedBytes": 13702113,
-      "gzipBytes": 1906632
+      "uncompressedBytes": 13702115,
+      "gzipBytes": 1906637
     },
     {
       "saveId": "fresh-season-1-1785215034359",
