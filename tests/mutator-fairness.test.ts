@@ -118,3 +118,56 @@ describe("Mutatoren — Score und Player-Points zaehlen dieselbe Bedingung gleic
     expect(result.playerMutatorPpsBonuses["p-none"]).toBeUndefined();
   });
 });
+
+/**
+ * ANGEZEIGT == GEWERTET. Die Arena zeigt oben zwei Trait-Chips ("MUTATOREN: ColdBlooded,
+ * FaintHearted"). Sie stammen aus `mutatorSlots` der Engine — es muessen exakt die Traits sein,
+ * nach denen auch gerechnet wird, und sie muessen fuer JEDES Team dieselben sein. Genau Letzteres
+ * galt vorher nicht: die Chips kommen aus `teamResults[0]`, waehrend jedes KI-Team eigene,
+ * kadergenaue Traits mitbrachte — der Kopf der Arena zeigte also die Mutatoren EINES Teams als
+ * waeren sie disziplinweit.
+ */
+describe("Mutatoren — die angezeigten zwei sind die gewerteten zwei", () => {
+  it("die Slot-Beschriftungen sind genau die ausgewuerfelten Traits", () => {
+    const result = evaluate();
+    expect(result.mutatorSlots.map((slot) => slot.label)).toEqual([...ROLLED]);
+    expect(result.mutatorText).toBe(ROLLED.join(", "));
+  });
+
+  it("jedes Team bekommt dieselben zwei — auch mit eigener gespeicherter Auswahl", () => {
+    const teamA = createDefaultLineupDraftModifiers();
+    const teamB = createDefaultLineupDraftModifiers();
+    teamB.d1.mutatorTrait1 = "Sexy"; // ein Team bringt eine eigene Auswahl mit …
+    teamB.d1.mutatorTrait2 = "Cool";
+    const labels = (mods: ReturnType<typeof createDefaultLineupDraftModifiers>) =>
+      evaluate(mods).mutatorSlots.map((slot) => slot.label);
+    // … sie darf den Kopf der Arena nicht auseinanderlaufen lassen.
+    expect(labels(teamA)).toEqual(labels(teamB));
+    expect(labels(teamB)).toEqual([...ROLLED]);
+  });
+
+  it("die je Slot ausgewiesenen PP ergeben zusammen genau das, was ausgezahlt wird", () => {
+    const result = evaluate();
+    const slotSum = result.mutatorSlots.reduce((sum, slot) => sum + slot.playerPpsModifier, 0);
+    const paidSum = Object.values(result.playerMutatorPpsBonuses).reduce((sum, value) => sum + value, 0);
+    // p-double 0,6 + p-single 0,3 = 0,9 — der Ausweis je Slot muss dieselbe Summe ergeben.
+    expect(paidSum).toBeCloseTo(0.9, 6);
+    expect(slotSum).toBeCloseTo(paidSum, 6);
+  });
+
+  it("die je Slot ausgewiesenen Score-Punkte ergeben zusammen den Team-Modifikator", () => {
+    const result = evaluate();
+    const slotSum = result.mutatorSlots.reduce((sum, slot) => sum + slot.scoreModifier, 0);
+    expect(slotSum).toBeCloseTo(result.mutatorModifier, 6);
+    // 2 Treffer (p-double) + 1 Treffer (p-single) = 3 x 6 = 18
+    expect(result.mutatorModifier).toBe(18);
+  });
+
+  it("ein Spieler mit beiden Traits taucht in BEIDEN Slots auf", () => {
+    const result = evaluate();
+    for (const slot of result.mutatorSlots) {
+      expect(slot.affectedPlayerIds, `Slot ${slot.label}`).toContain("p-double");
+    }
+    expect(result.mutatorSlots.find((slot) => slot.label === "Fearless")!.affectedPlayerIds).not.toContain("p-single");
+  });
+});

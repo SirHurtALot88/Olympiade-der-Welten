@@ -930,7 +930,6 @@ export function calculateMutatorModifierForSide(input: {
     }
     if (player) {
       const allTraits = Array.from(new Set(getPlayerMutatorTraitSlots(player).map(normalizeTraitKey).filter(Boolean)));
-      let assignedPpsTrait = false;
       for (const trait of selectedTraits) {
         const normalizedTrait = normalizeTraitKey(trait);
         const traitHits = allTraits.reduce((count, playerTrait) => count + (playerTrait === normalizedTrait ? 1 : 0), 0);
@@ -939,12 +938,13 @@ export function calculateMutatorModifierForSide(input: {
           const affectedPlayerIds = affectedPlayerIdsByTrait.get(normalizedTrait) ?? new Set<string>();
           affectedPlayerIds.add(playerId);
           affectedPlayerIdsByTrait.set(normalizedTrait, affectedPlayerIds);
-          if (!assignedPpsTrait) {
-            const ppsPlayerIds = ppsPlayerIdsByTrait.get(normalizedTrait) ?? new Set<string>();
-            ppsPlayerIds.add(playerId);
-            ppsPlayerIdsByTrait.set(normalizedTrait, ppsPlayerIds);
-            assignedPpsTrait = true;
-          }
+          // Ein Spieler zaehlt bei JEDEM getroffenen Trait mit. Vorher wurde er nur dem ERSTEN
+          // zugeschlagen ("assignedPpsTrait") — ein Rest der alten flachen 0,3. Seit die Auszahlung
+          // mit der Trefferzahl skaliert, wich der Slot-Ausweis von der Auszahlung ab: ein Spieler
+          // mit beiden Traits bekam 0,6, die Slots wiesen zusammen aber nur 0,3 aus.
+          const ppsPlayerIds = ppsPlayerIdsByTrait.get(normalizedTrait) ?? new Set<string>();
+          ppsPlayerIds.add(playerId);
+          ppsPlayerIdsByTrait.set(normalizedTrait, ppsPlayerIds);
         }
       }
     }
