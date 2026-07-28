@@ -1686,6 +1686,11 @@ export function useFoundationShellRouterBodyScope({
     setSeasonOverviewSeasonId,
     roomContext,
     roomLiveState,
+    // Host hat die Arena dieses Spieltags gestartet (was erst geht, wenn alle Teams bereit
+    // sind) → dieser Client wird mitgenommen und sieht ab da, was der Host macht.
+    onHostStartedArena: () => {
+      setActiveView("matchdayArena");
+    },
     setRoomActivityNotice,
     setSaveSyncError,
     setFoundationActionFeedback,

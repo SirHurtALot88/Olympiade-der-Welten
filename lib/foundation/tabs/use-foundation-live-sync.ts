@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
@@ -39,6 +39,12 @@ export type UseFoundationLiveSyncInput = {
   setSeasonOverviewSeasonId: Dispatch<SetStateAction<string>>;
   roomContext: unknown;
   roomLiveState: OlyRoomState | null;
+  /**
+   * Wird genau einmal je Arena-Sitzung aufgerufen, wenn der HOST die Arena dieses Spieltags
+   * gestartet hat und dieser Client noch woanders steht. Der Consumer navigiert damit in die
+   * Arena, sodass die Clients dem Host folgen und sehen, was er macht.
+   */
+  onHostStartedArena?: (() => void) | null;
   setRoomActivityNotice: Dispatch<
     SetStateAction<{ title: string; detail: string } | null>
   >;
@@ -68,6 +74,8 @@ export type UseFoundationLiveSyncInput = {
 
 export function useFoundationLiveSync(input: UseFoundationLiveSyncInput) {
   const [liveSyncStatus, setLiveSyncStatus] = useState<"connected" | "syncing" | "reconnecting" | "disconnected" | "idle">("idle");
+  // Merkt sich, für welche Arena-Sitzung dieser Client dem Host schon gefolgt ist.
+  const followedArenaSessionKeyRef = useRef<string | null>(null);
   const {
     gameState,
     setGameState,
@@ -79,6 +87,7 @@ export function useFoundationLiveSync(input: UseFoundationLiveSyncInput) {
     setSeasonOverviewSeasonId,
     roomContext,
     roomLiveState,
+    onHostStartedArena,
     setRoomActivityNotice,
     setSaveSyncError,
     setFoundationActionFeedback,
@@ -249,6 +258,43 @@ export function useFoundationLiveSync(input: UseFoundationLiveSyncInput) {
       socket.off("roomGameplayEvent", handleRoomGameplayEvent);
     };
   }, [activeSaveId, roomContext, roomLiveState, readMeta.source]);
+
+  /**
+   * "Der Host geht in die Arena → die Clients kommen mit."
+   *
+   * Der Host startet die Arena erst, wenn alle Teams bereit sind (Gate in
+   * `DisciplineStageArena`). Sein `startRoomArena` schreibt den Raum-Arena-State auf einen
+   * Nicht-idle-Status — genau dieses Signal ziehen wir hier ab und schicken jeden Client, der
+   * noch woanders steht, in die Arena. Bewusst KEIN eigenes Socket-Event: der Arena-State ist
+   * bereits die Wahrheit darüber, ob der Reveal für diesen Spieltag läuft.
+   *
+   * Nur einmal je Arena-Sitzung (`saveId|seasonId|matchdayId`), damit ein Client, der bewusst
+   * aus der Arena heraus navigiert, nicht dauerhaft zurückgezogen wird.
+   */
+  const arenaSync = roomLiveState?.arenaSyncState ?? null;
+  const arenaSessionKey =
+    arenaSync && arenaSync.status !== "idle"
+      ? `${arenaSync.saveId}|${arenaSync.seasonId ?? ""}|${arenaSync.matchdayId ?? ""}`
+      : null;
+  useEffect(() => {
+    if (!roomContext || !onHostStartedArena || !arenaSessionKey) {
+      return;
+    }
+    if (arenaSync && arenaSync.saveId !== activeSaveId) {
+      return;
+    }
+    if (followedArenaSessionKeyRef.current === arenaSessionKey) {
+      return;
+    }
+    followedArenaSessionKeyRef.current = arenaSessionKey;
+    if (activeView === "matchdayArena") {
+      return;
+    }
+    onHostStartedArena();
+    // `activeView` bewusst NICHT in den Deps: sonst würde ein späterer View-Wechsel den Effekt
+    // erneut auslösen. Der Ref-Guard oben ist die eigentliche Einmal-Semantik.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomContext, onHostStartedArena, arenaSessionKey, activeSaveId]);
 
   useEffect(() => {
     if (readMeta.source !== "sqlite" || !activeSaveId || !hasLoadedPersistentState.current) {

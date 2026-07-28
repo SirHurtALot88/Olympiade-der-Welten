@@ -85,6 +85,57 @@ export function getMatchdayArenaReadiness(gameState: GameState, activeTeamId: st
   };
 }
 
+export type MatchdayTeamLineupReadiness = {
+  teamId: string;
+  teamName: string;
+  teamCode: string;
+  isReady: boolean;
+  blocker: MatchdayArenaBlockerReason;
+};
+
+export type MatchdayLeagueLineupReadiness = {
+  /** Alle Teams der Liga mit ihrem Bereit-Status für den aktuellen Spieltag. */
+  teams: MatchdayTeamLineupReadiness[];
+  /** Teams, die noch NICHT bereit sind (Aufstellung fehlt/unvollständig/nicht abgeschickt/Formkarten offen). */
+  pendingTeams: MatchdayTeamLineupReadiness[];
+  readyCount: number;
+  totalCount: number;
+  /** True, sobald jedes Team der Liga bereit ist — das Gate für den Arena-START. */
+  allReady: boolean;
+};
+
+/**
+ * Bereit-Status ALLER Teams für den aktuellen Spieltag.
+ *
+ * "Bereit" heisst hier exakt dasselbe wie für das eigene Team: Aufstellung operativ
+ * vollständig, abgeschickt (= gespeichert) und Formkarten geklärt. Damit sind KI-Teams
+ * automatisch bereit, sobald ihre Aufstellung generiert und ihre Formkarten gesetzt sind —
+ * es braucht keinen separaten KI-Sonderweg.
+ *
+ * Verwendet vom Arena-Start-Gate: der Host darf jederzeit IN die Arena wechseln, den Reveal
+ * aber erst starten, wenn `allReady` true ist.
+ */
+export function getMatchdayLeagueLineupReadiness(gameState: GameState): MatchdayLeagueLineupReadiness {
+  const teams = gameState.teams.map((team) => {
+    const readiness = getMatchdayArenaReadiness(gameState, team.teamId);
+    return {
+      teamId: team.teamId,
+      teamName: team.name,
+      teamCode: team.shortCode || team.teamId,
+      isReady: readiness.isReady,
+      blocker: readiness.blocker,
+    } satisfies MatchdayTeamLineupReadiness;
+  });
+  const pendingTeams = teams.filter((team) => !team.isReady);
+  return {
+    teams,
+    pendingTeams,
+    readyCount: teams.length - pendingTeams.length,
+    totalCount: teams.length,
+    allReady: teams.length > 0 && pendingTeams.length === 0,
+  };
+}
+
 export function formatLineupOperationalGapDetail(
   readiness: Pick<
     ReturnType<typeof getMatchdayArenaReadiness>,

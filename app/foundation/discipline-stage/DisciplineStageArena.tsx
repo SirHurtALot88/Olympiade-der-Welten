@@ -36,6 +36,7 @@ import DisciplineStageHoverPreview, { type DisciplineStageHoverTarget } from "@/
 import { fmt1 } from "@/app/foundation/discipline-stage/stage-format";
 import { buildTeamRelationshipMap } from "@/lib/foundation/team-relationship";
 import { buildPlayerRatingContractMap, type PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
+import { getMatchdayLeagueLineupReadiness } from "@/lib/foundation/matchday-arena-readiness";
 
 // Disziplinen mit fertigem nativem Renderer (löst schrittweise das iframe ab).
 // Nativer Renderer je Disziplin. Engine, FX, Sounds, Ticker, Podest, Detail-
@@ -901,17 +902,29 @@ export default function DisciplineStageArena({
       setSyncedRound(normalized.slotRevealIndex);
     },
   });
+  /**
+   * Start-Gate: In die Arena darf der Host jederzeit wechseln — losgehen darf es aber erst,
+   * wenn JEDES Team der Liga bereit ist (Aufstellung gespeichert + Formkarten geklärt).
+   * KI-Teams erfüllen das automatisch, sobald ihre Aufstellung generiert ist; es braucht
+   * dafür keinen Sonderweg, `getMatchdayLeagueLineupReadiness` prüft alle Teams gleich.
+   */
+  const leagueLineupReadiness = useMemo(() => getMatchdayLeagueLineupReadiness(gameState), [gameState]);
+  const arenaStartBlockedByLineups = !leagueLineupReadiness.allReady;
+
   // Host meldet den Sync einmalig an, sobald die Preview steht (idle → running).
   useEffect(() => {
     if (!roomContext || !roomArenaSync.isRoomHost || !preview) return;
     if ((roomArenaSync.roomArenaSyncState?.status ?? "idle") !== "idle") return;
+    // Solange noch Teams offen sind, wird der Reveal NICHT gestartet. Der Effekt läuft
+    // erneut, sobald ein Team fertig meldet (gameState → leagueLineupReadiness ändert sich).
+    if (arenaStartBlockedByLineups) return;
     roomArenaSync.emitStartRoomArena({
       seasonId: seasonId ?? null,
       matchdayId: matchdayId ?? null,
       disciplineSide: activeDisciplineSide,
       maxSlotRevealCountByDiscipline: { d1: 0, d2: 0 },
     });
-  }, [roomContext, roomArenaSync, preview, seasonId, matchdayId, activeDisciplineSide]);
+  }, [roomContext, roomArenaSync, preview, seasonId, matchdayId, activeDisciplineSide, arenaStartBlockedByLineups]);
   // Prop-Bündel für die NativeArena (nur im Room aktiv; solo bleibt alles inert).
   const nativeRoomSync = roomContext
     ? {
@@ -1278,6 +1291,41 @@ export default function DisciplineStageArena({
   return (
     <>
     <div style={{ width: "100%", margin: "0 auto", padding: "20px 24px", color: "inherit" }}>
+      {/*
+        Warte-Banner des Start-Gates. In der Arena zu stehen ist erlaubt, losgehen erst,
+        wenn alle Teams ihre Einsatzliste gespeichert haben. Das Banner nennt die offenen
+        Teams namentlich, damit sofort klar ist, auf wen gewartet wird.
+      */}
+      {arenaStartBlockedByLineups ? (
+        <div
+          role="status"
+          style={{
+            display: "flex",
+            alignItems: "baseline",
+            flexWrap: "wrap",
+            gap: 8,
+            marginBottom: 14,
+            padding: "10px 14px",
+            borderRadius: 12,
+            background: "color-mix(in srgb, var(--nl-warn) 12%, var(--nl-panel))",
+            border: "1px solid color-mix(in srgb, var(--nl-warn) 45%, var(--nl-line))",
+          }}
+        >
+          <strong style={{ fontSize: 13, fontWeight: 800, color: "var(--nl-warn)" }}>
+            Noch nicht startklar — {leagueLineupReadiness.readyCount}/{leagueLineupReadiness.totalCount} Teams bereit
+          </strong>
+          <span style={{ fontSize: 12, color: "var(--nl-mut)" }}>
+            Es fehlt noch:{" "}
+            {leagueLineupReadiness.pendingTeams
+              .slice(0, 6)
+              .map((team) => team.teamName)
+              .join(" · ")}
+            {leagueLineupReadiness.pendingTeams.length > 6
+              ? ` · +${leagueLineupReadiness.pendingTeams.length - 6} weitere`
+              : ""}
+          </span>
+        </div>
+      ) : null}
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 14 }}>
         <div>
           <div style={{ fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800 }}>
