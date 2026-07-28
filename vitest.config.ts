@@ -25,6 +25,13 @@ export default defineConfig({
       // Dev-Server treibt. Es enthaelt 0 vitest-Tests, wird vom Default-Glob aber eingesammelt und
       // scheitert beim Collect ("Playwright Test did not expect test() to be called here").
       "**/tests/*.spec.js",
+      // `.claude/worktrees/*` sind Scratch-Checkouts von Subagenten. Sie enthalten
+      // vollstaendige Kopien von `tests/`, teils auf altem Stand. Die Root-Suite sammelt
+      // sie sonst mit ein und faehrt VERALTETE Tests gegen den AKTUELLEN Quellstand --
+      // die Fehlschlaege sehen aus wie echte Regressionen, gehoeren aber einem laengst
+      // beendeten Agentenlauf. In der CI faellt das nicht auf (frischer Checkout), lokal
+      // verfaelscht es jeden vollen Lauf.
+      "**/.claude/worktrees/**",
     ],
     env: {
       // Der Online-Save-Auto-Export (lib/persistence/online-save-auto-export.ts) läuft per Default

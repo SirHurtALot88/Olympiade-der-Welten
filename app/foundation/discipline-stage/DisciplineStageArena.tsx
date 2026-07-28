@@ -26,6 +26,7 @@ import DisciplineStageMatchdayPanel, {
   type MatchdayPanelStandingRow,
   type MatchdayPanelTeamResult,
 } from "@/app/foundation/discipline-stage/DisciplineStageMatchdayPanel";
+import { buildMatchdayTeamModifiers } from "@/lib/foundation/matchday-team-modifiers";
 import { getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
 import {
   buildMatchdayArenaBaseSessionKey,
@@ -803,7 +804,14 @@ export default function DisciplineStageArena({
         missingLineup: r.missingLineup,
       };
     });
-    return { d1, d2, standings, mutatorByTeam, playersByTeam, teamResults };
+    // Captain-/Formkarten-Einsatz je Team — 1:1 aus derselben Preview, damit die
+    // Wertung zeigt, WOMIT ein Team in den Spieltag gegangen ist (kein Recompute).
+    const modifiersByTeam = buildMatchdayTeamModifiers({
+      disciplinePreviews: preview.disciplinePreviews ?? [],
+      d1DisciplineId: d1?.disciplineId ?? null,
+      d2DisciplineId: d2?.disciplineId ?? null,
+    });
+    return { d1, d2, standings, mutatorByTeam, playersByTeam, modifiersByTeam, teamResults };
   }, [preview, gameState, matchdayId, briefingItems, standingsItems]);
 
   // Bühne muss mit einer Disziplin DES aktuellen Spieltags starten, nicht mit dem
@@ -1566,6 +1574,7 @@ export default function DisciplineStageArena({
             onHoverTeam={previewTeam}
             mutatorByTeam={matchdayPanel.mutatorByTeam}
             playersByTeam={matchdayPanel.playersByTeam}
+            modifiersByTeam={matchdayPanel.modifiersByTeam}
           />
         </div>
       ) : null}

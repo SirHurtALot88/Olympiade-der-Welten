@@ -21,6 +21,12 @@
 import { Fragment, useState } from "react";
 
 import { getPoolHeatClass } from "@/lib/foundation/player-league-heat";
+import {
+  describeMatchdaySideModifiers,
+  type MatchdayFormTone,
+  type MatchdayTeamModifiers,
+  type MatchdayTeamSideModifiers,
+} from "@/lib/foundation/matchday-team-modifiers";
 import { teamPrimaryColor, floorTeamAccent } from "@/lib/foundation/team-colors";
 
 export type MatchdayPanelTeamResult = {
@@ -91,7 +97,67 @@ export type DisciplineStageMatchdayPanelProps = {
    * Beschriftung (kein Aufklappen).
    */
   playersByTeam?: Map<string, { d1: MatchdayPanelPlayerRow[]; d2: MatchdayPanelPlayerRow[] }> | null;
+  /**
+   * Womit ein Team in den Spieltag gegangen ist: Captain gesetzt (ja/nein) und die
+   * eingesetzten Formkarten je Disziplin-Seite. Werte stammen 1:1 aus der Resolve-
+   * Preview — die Wertung zeigt also das, was tatsaechlich angewandt wurde.
+   */
+  modifiersByTeam?: Map<string, MatchdayTeamModifiers> | null;
 };
+
+// Farbe der Form-Chips nach Richtung: positiv gruen, negativ rot, sonst neutral. Genau
+// diese Richtung ist die Aussage — z. B. "Team ging mit negativer Form in eine Diszi,
+// in der es eigentlich fuehrt".
+const FORM_TONE_COLOR: Record<MatchdayFormTone, string> = {
+  positive: "var(--nl-good)",
+  negative: "var(--nl-risk)",
+  neutral: "var(--nl-mut)",
+  none: "var(--nl-mut)",
+};
+
+/** Captain- und Form-Chips einer Disziplin-Seite (nur was gesetzt war wird gezeigt). */
+function SideModifierChips({ side, label }: { side: MatchdayTeamSideModifiers | null; label: string }) {
+  if (side == null || (!side.captainUsed && side.formCardLabel == null)) return null;
+  const title = `${label} — ${describeMatchdaySideModifiers(side)}`;
+  const chip = {
+    flex: "none" as const,
+    fontSize: 9,
+    fontWeight: 800,
+    borderRadius: 5,
+    padding: "0 4px",
+    whiteSpace: "nowrap" as const,
+    lineHeight: "14px",
+  };
+  return (
+    <span title={title} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+      <span style={{ ...chip, fontSize: 8.5, color: "var(--nl-mut)" }}>{label}</span>
+      {side.captainUsed ? (
+        <span
+          style={{
+            ...chip,
+            color: "var(--nl-gold)",
+            background: "color-mix(in srgb, var(--nl-gold) 14%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--nl-gold) 45%, transparent)",
+          }}
+        >
+          © {side.captainName ?? "Captain"}
+        </span>
+      ) : null}
+      {side.formCardLabel != null ? (
+        <span
+          style={{
+            ...chip,
+            color: FORM_TONE_COLOR[side.formTone],
+            background: `color-mix(in srgb, ${FORM_TONE_COLOR[side.formTone]} 12%, transparent)`,
+            border: `1px solid color-mix(in srgb, ${FORM_TONE_COLOR[side.formTone]} 40%, transparent)`,
+          }}
+        >
+          {side.formCardLabel}
+        </span>
+      ) : null}
+    </span>
+  );
+}
 
 function ppText(value: number | null): string {
   if (value == null) return "–";
@@ -271,6 +337,7 @@ export default function DisciplineStageMatchdayPanel({
   onHoverTeam,
   mutatorByTeam,
   playersByTeam,
+  modifiersByTeam,
 }: DisciplineStageMatchdayPanelProps) {
   // Ausgeklappte Disziplin-Spalte (null = keine). Hook steht vor jedem fruehen Return.
   const [expandedSide, setExpandedSide] = useState<"d1" | "d2" | null>(null);
@@ -600,6 +667,21 @@ export default function DisciplineStageMatchdayPanel({
                         </span>
                       ) : null}
                     </div>
+                    {/* Captain + Formkarten je Seite. d2 bleibt bis zur Aufdeckung
+                        verborgen — die Aufstellung ist selbst ein Spoiler. */}
+                    {(() => {
+                      const mods = modifiersByTeam?.get(row.teamId);
+                      if (!mods) return null;
+                      const showD1 = d1Revealed && mods.d1 != null;
+                      const showD2 = d2Revealed && mods.d2 != null;
+                      if (!showD1 && !showD2) return null;
+                      return (
+                        <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+                          {showD1 ? <SideModifierChips side={mods.d1} label={d1?.displayName ?? "D1"} /> : null}
+                          {showD2 ? <SideModifierChips side={mods.d2} label={d2?.displayName ?? "D2"} /> : null}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
