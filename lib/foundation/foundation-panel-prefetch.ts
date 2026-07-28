@@ -237,7 +237,18 @@ export function prefetchMatchdayArenaBase(input: {
   matchdayId: string;
   teamId: string;
   source?: "sqlite" | "prisma";
-}) {
+  /**
+   * `true` holt das VOLLE Bundle inkl. `resolvePreview`/`standingsPreview` — genau das, was die Arena
+   * beim Öffnen braucht. Für den beiläufigen Hintergrund-Prefetch bleibt es aus (Light-Bundle, billiger).
+   * Der Session-Key unterscheidet beide Varianten, ein Light-Treffer kann die Arena also nicht belegen.
+   */
+  includeDetails?: boolean;
+  /**
+   * Sofort statt im Idle-Slot laden — für den Lineup→Arena-Übergang, wo die Zeit knapp ist.
+   * Nur dann wird ein Promise zurückgegeben, auf das der Aufrufer warten kann.
+   */
+  immediate?: boolean;
+}): Promise<void> | undefined {
   if (!input.saveId || !input.seasonId || !input.matchdayId || !input.teamId) {
     return;
   }
@@ -246,30 +257,35 @@ export function prefetchMatchdayArenaBase(input: {
   }
 
   const source = input.source ?? "sqlite";
+  const includeDetails = input.includeDetails === true;
   const sessionKey = buildMatchdayArenaBaseSessionKey({
     saveId: input.saveId,
     seasonId: input.seasonId,
     matchdayId: input.matchdayId,
     teamId: input.teamId,
     source,
+    includeDetails,
   });
   if (prefetchedMatchdayArenaBaseKeys.has(sessionKey) || getMatchdayArenaBaseBundle(sessionKey)) {
     return;
   }
   prefetchedMatchdayArenaBaseKeys.add(sessionKey);
 
-  scheduleIdleTask(() => {
+  const run = (): Promise<void> => {
     const params = new URLSearchParams({
       saveId: input.saveId,
       seasonId: input.seasonId,
       matchdayId: input.matchdayId,
       teamId: input.teamId,
       source,
-      includeDetails: "0",
+      includeDetails: includeDetails ? "1" : "0",
     });
-    void fetch(`/api/matchday/arena-base?${params.toString()}`, { cache: "no-store" })
+    return fetch(`/api/matchday/arena-base?${params.toString()}`, { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) {
+          // Fehlgeschlagenen Versuch nicht als "erledigt" stehen lassen, sonst blockiert der
+          // Merker jeden weiteren Prefetch für diesen Schlüssel in dieser Session.
+          prefetchedMatchdayArenaBaseKeys.delete(sessionKey);
           return;
         }
         const payload = await response.json();
@@ -277,8 +293,16 @@ export function prefetchMatchdayArenaBase(input: {
           setMatchdayArenaBaseBundle(sessionKey, payload);
         }
       })
-      .catch(() => undefined);
-  });
+      .catch(() => {
+        prefetchedMatchdayArenaBaseKeys.delete(sessionKey);
+      });
+  };
+
+  if (input.immediate) {
+    return run();
+  }
+  scheduleIdleTask(run);
+  return undefined;
 }
 
 export function prefetchFoundationDefaultPanels(saveId?: string) {

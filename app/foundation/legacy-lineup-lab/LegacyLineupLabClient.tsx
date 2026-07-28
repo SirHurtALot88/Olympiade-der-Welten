@@ -72,6 +72,7 @@ import type {
 import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
 import { describeTeamPowerDebuffEffect, isTeamPowerDebuffEffect } from "@/lib/lineups/team-powers";
 import type { AiLegacyLineupPreview } from "@/lib/ai/ai-needs-types";
+import { prefetchMatchdayArenaBase } from "@/lib/foundation/foundation-panel-prefetch";
 
 // Perf/DX (#57): these three sub-views are each only rendered behind a single
 // runtime condition (newLook flag, formBoard tab, focusV2 variant) — never all
@@ -5158,6 +5159,20 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       { skipContextReload: source === "sqlite" },
     );
     if (saved) {
+      // Die Arena lädt beim Öffnen ihr Engine-Bundle (Resolve-Preview über 32 Teams, der teuerste
+      // Teil des Übergangs). Bisher startete dieser Request ERST nach der 2-Sekunden-Übergabe-
+      // Animation — die Wartezeit war also doppelt: erst Animation, dann Laden. Jetzt läuft der
+      // Abruf SOFORT nach dem Speichern parallel zur Animation und landet im Session-Cache, aus
+      // dem die Arena beim Mount liest. `includeDetails` liefert genau das Bundle, das sie braucht.
+      const arenaPrefetch = prefetchMatchdayArenaBase({
+        saveId: params.saveId,
+        seasonId: params.seasonId,
+        matchdayId: params.matchdayId,
+        teamId: params.teamId,
+        source: "sqlite",
+        includeDetails: true,
+        immediate: true,
+      });
       const d1Label = context?.matchdayContract?.discipline1?.displayName ?? "D1";
       const d2Label = context?.matchdayContract?.discipline2?.displayName ?? "D2";
       const scoreLabel = formatProjectedMetricWindow(matchdayPreviewCards.totalRangeLow, matchdayPreviewCards.totalRangeHigh);
@@ -5182,7 +5197,14 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         d2Label,
         scoreLabel,
       });
-      window.setTimeout(() => {
+      // Übergabe adaptiv statt starr: Die Animation lief bisher IMMER volle 2 s, danach begann erst
+      // das Laden der Arena — in Summe spürbar lang. Jetzt läuft der Abruf parallel (oben gestartet),
+      // und wir wechseln, sobald BEIDES fertig ist: die Mindest-Anzeigedauer (damit die Animation
+      // nicht nur aufblitzt) UND die Daten. Die 2 s bleiben die Obergrenze, damit ein hängender
+      // Request den Wechsel niemals blockiert.
+      const HANDOFF_MIN_MS = 900;
+      const HANDOFF_MAX_MS = 2000;
+      const openArena = () => {
         setLineupHandoffOverlay(null);
         props.onOpenArena?.({
           saveId: params.saveId,
@@ -5190,7 +5212,16 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           matchdayId: params.matchdayId,
           teamId: params.teamId,
         });
-      }, 2000);
+      };
+      let handedOff = false;
+      const handOffOnce = () => {
+        if (handedOff) return;
+        handedOff = true;
+        openArena();
+      };
+      const minDelay = new Promise<void>((resolve) => window.setTimeout(resolve, HANDOFF_MIN_MS));
+      window.setTimeout(handOffOnce, HANDOFF_MAX_MS);
+      void Promise.all([minDelay, arenaPrefetch ?? Promise.resolve()]).then(handOffOnce);
     }
   }
 

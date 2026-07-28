@@ -9,6 +9,13 @@ export type MatchdayArenaSessionParams = {
   matchdayId: string;
   teamId: string;
   source: "sqlite" | "prisma";
+  /**
+   * MUSS Teil des Schlüssels sein: `includeDetails=1` liefert zusätzlich `resolvePreview` und
+   * `standingsPreview` (siehe matchday-arena-base-service). Die Arena braucht genau diese Details;
+   * der Hintergrund-Prefetch holt bewusst nur das Light-Bundle. Ohne diese Unterscheidung würde ein
+   * Light-Treffer die Arena mit fehlender Engine-Preview beliefern.
+   */
+  includeDetails: boolean;
 };
 
 export type MatchdayArenaBaseBundleCacheEntry = {
@@ -28,7 +35,9 @@ const arenaBaseBundleByKey = new Map<string, MatchdayArenaBaseBundleCacheEntry>(
 const arenaResolvePreviewByKey = new Map<string, MatchdayArenaResolveCacheEntry>();
 
 export function buildMatchdayArenaBaseSessionKey(params: MatchdayArenaSessionParams) {
-  return `${params.saveId}:${params.seasonId}:${params.matchdayId}:${params.teamId}:${params.source}:base`;
+  return `${params.saveId}:${params.seasonId}:${params.matchdayId}:${params.teamId}:${params.source}:${
+    params.includeDetails ? "full" : "light"
+  }:base`;
 }
 
 export function buildMatchdayArenaResolveSessionKey(
