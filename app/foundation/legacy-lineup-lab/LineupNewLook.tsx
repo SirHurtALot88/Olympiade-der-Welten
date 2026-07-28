@@ -73,6 +73,29 @@ type NlDisciplineFormCardControl = {
   secondaryOptions: NlFormCardChoice[];
 };
 
+/**
+ * Team-Power-Auswahl je Disziplin. Der Client liefert die bereits gefilterte,
+ * sortierte und beschriftete Optionsliste (Effekt · Bereich · Prozent · Fit ·
+ * Ladungen · Quelle) sowie eine Kurzfassung der aktuellen Auswahl — die
+ * Einsatzliste rendert daraus nur noch das Dropdown und meldet die Wahl über
+ * `onAssignTeamPower` zurück. Eine Power kann pro Spieltag nur EINMAL gesetzt
+ * werden; die Sperre der bereits in der anderen Diszi belegten Power steckt
+ * schon in der gelieferten Optionsliste.
+ */
+type NlTeamPowerChoice = { id: string; label: string; isDebuff: boolean; isOffFit: boolean };
+type NlDisciplineTeamPowerControl = {
+  disciplineId: string | null;
+  selectedId: string | null;
+  options: NlTeamPowerChoice[];
+  /** Beschriftung der Leer-Option — nennt bei leerer Liste auch den Grund. */
+  emptyLabel: string;
+  /** Tooltip des Selects (Quelle + Grund, bei Read-Only zusätzlich die Sperre). */
+  title: string;
+  /** Kurzfassung der gewählten Power (Wirkung · Fit · Ladungen), sonst `null`. */
+  selectedSummary: string | null;
+  sourceLabel: string | null;
+};
+
 export type LineupNewLookProps = Pick<
   LegacyLineupFocusV2BoardProps,
   | "context"
@@ -153,6 +176,12 @@ export type LineupNewLookProps = Pick<
   ) => void;
   /** Pro Seite: läuft gerade ein Formplan-Save (Dropdowns kurz deaktivieren). */
   formCardSavePendingSide?: { d1: boolean; d2: boolean } | null;
+  /**
+   * Team-Power-Auswahl je Diszi (optional, additiv). Fehlt die Prop, bleibt die
+   * Ansicht unverändert — dieselbe Konvention wie bei den Formkarten.
+   */
+  teamPowerControlsBySide?: { d1: NlDisciplineTeamPowerControl; d2: NlDisciplineTeamPowerControl } | null;
+  onAssignTeamPower?: (side: "d1" | "d2", powerId: string | null) => void;
   /**
    * Bandbreite (low/high) der Disziplin-Projektion je Intensitätsstufe — passend
    * zu den Punktwerten aus `disciplineTacticPreviewBySide`. Quelle: dieselbe
@@ -1021,6 +1050,8 @@ export default function LineupNewLook({
   formCardControlsBySide,
   onAssignDisciplineFormCard,
   formCardSavePendingSide,
+  teamPowerControlsBySide,
+  onAssignTeamPower,
 }: LineupNewLookProps) {
   const [hoveredCandidateId, setHoveredCandidateId] = useState<string | null>(null);
   // Compare-Tray (Feature 3): angehefteter Kandidat A; hovert man einen anderen
@@ -1640,6 +1671,85 @@ export default function LineupNewLook({
               </span>
               {renderFormCardSelect("primary", "Primär", control.primarySelectedId, control.primaryOptions)}
               {renderFormCardSelect("secondary", "Sekundär (+)", control.secondarySelectedId, control.secondaryOptions)}
+            </div>
+          );
+        })()}
+
+        {(() => {
+          // Team-Power DIESER Disziplin. Fehlte in der Einsatzliste komplett — die
+          // Optionen wurden im Client zwar weiter abgeleitet, aber von keiner Ansicht
+          // gerendert, sodass man pro Spieltag gar keine Power mehr setzen konnte.
+          // Bewusst direkt unter den Formkarten und über dem Captain: alle drei
+          // Spieltag-Ressourcen einer Disziplin stehen damit als Block beieinander.
+          const control = teamPowerControlsBySide?.[disciplineSide] ?? null;
+          if (!control) return null;
+          // Nichts zu wählen UND nichts gesetzt → kein leerer Kasten. Der Grund
+          // ("alle verbraucht", "Quelle fehlt", …) steckt in `emptyLabel` und wird
+          // nur gezeigt, solange es überhaupt Powers geben könnte.
+          if (control.options.length === 0 && !control.selectedId) return null;
+          const disabled = isReadOnly || isBusy;
+          const sideLabel = disciplineSide.toUpperCase();
+          return (
+            <div
+              className="nl-lineup-teampower"
+              data-testid={`nl-lineup-teampower-${disciplineSide}`}
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "flex-end",
+                gap: "8px",
+                margin: "0 0 8px",
+                padding: "8px 10px",
+                borderRadius: "var(--nl-r-card, 10px)",
+                border: "1px solid var(--nl-line)",
+                background: "var(--nl-panel-2)",
+              }}
+            >
+              <span
+                style={{ fontSize: "11px", fontWeight: 800, letterSpacing: "0.02em", color: "var(--nl-ink)", flex: "1 1 100%" }}
+              >
+                Team-Power · {sideLabel}
+                {control.sourceLabel ? (
+                  <em style={{ fontStyle: "normal", color: "var(--nl-mut)", fontWeight: 600 }}> · {control.sourceLabel}</em>
+                ) : null}
+              </span>
+              <label style={{ display: "flex", flexDirection: "column", gap: "3px", flex: "1 1 100%", minWidth: 0 }}>
+                <span
+                  style={{
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    letterSpacing: "0.03em",
+                    color: "var(--nl-mut)",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Power einsetzen
+                </span>
+                <select
+                  className="input"
+                  style={{ fontSize: "12px", padding: "4px 6px" }}
+                  value={control.selectedId ?? ""}
+                  disabled={disabled}
+                  title={control.title}
+                  aria-label={`${sideLabel} Team-Power wählen`}
+                  onChange={(event) => onAssignTeamPower?.(disciplineSide, event.target.value || null)}
+                >
+                  <option value="">— {control.emptyLabel} —</option>
+                  {control.options.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {control.selectedSummary ? (
+                <span
+                  style={{ fontSize: "11px", fontWeight: 600, color: "var(--nl-mut)", flex: "1 1 100%" }}
+                  title="Projizierte Wirkung der gewählten Power auf diese Disziplin."
+                >
+                  {control.selectedSummary}
+                </span>
+              ) : null}
             </div>
           );
         })()}

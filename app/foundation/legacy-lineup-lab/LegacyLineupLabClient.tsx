@@ -7067,6 +7067,70 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     ].filter(Boolean).join("\n");
   }
 
+  /**
+   * Team-Power-Auswahl für die Einsatzliste ("Neuer Look"). Die Auswahl-Logik
+   * (welche Power für welche Seite wählbar ist, Sortierung nach Fit/Quelle,
+   * Beschriftung mit Effekt/Fit/Ladungen) existiert bereits für die alte
+   * Ansicht — hier wird sie nur in ein reines Datenmodell für `LineupNewLook`
+   * überführt. Es wird nichts neu berechnet: `getTeamPowerOptionsForSide`,
+   * `formatTeamPowerOptionLabel`, `getTeamPowerConditionalInfo` und
+   * `getTeamPowerProjectedBreakdown` sind dieselben Funktionen wie zuvor.
+   *
+   * Ohne diesen Durchreicher konnte man in der Einsatzliste GAR KEINE
+   * Team-Power mehr setzen: die Optionen wurden zwar weiterhin abgeleitet,
+   * aber von keiner Ansicht mehr gerendert.
+   */
+  function buildLineupTeamPowerControlForSide(disciplineSide: "d1" | "d2") {
+    const discipline =
+      disciplineSide === "d1"
+        ? context?.matchdayContract?.discipline1 ?? null
+        : context?.matchdayContract?.discipline2 ?? null;
+    const disciplineId = discipline?.disciplineId ?? null;
+    const disciplineCategory = discipline?.category ?? null;
+    const selectedId = modifiers[disciplineSide].teamPowerId ?? null;
+    const options = getTeamPowerOptionsForSide(disciplineSide).map((power) => {
+      const conditional = getTeamPowerConditionalInfo(power, disciplineId);
+      return {
+        id: power.id,
+        label: formatTeamPowerOptionLabel(
+          power,
+          disciplineCategory,
+          conditional.active,
+          disciplineId,
+          context?.disciplineWeights,
+        ),
+        isDebuff: isTeamPowerDebuffEffect(power.effectType),
+        isOffFit: !(power.category === "flex" || power.category === getTeamPowerCategoryForDiscipline(disciplineCategory)),
+      };
+    });
+
+    const selectedPower = getSelectedTeamPowerOption(selectedId);
+    let selectedSummary: string | null = null;
+    if (selectedPower) {
+      const breakdown = getTeamPowerProjectedBreakdown(selectedPower, disciplineSide, disciplineId, disciplineCategory);
+      const isDebuffEffect = isTeamPowerDebuffEffect(selectedPower.effectType);
+      const totalPct = Number((breakdown.basePct + breakdown.extraPct + breakdown.attributeFitPct).toFixed(1));
+      selectedSummary = [
+        `${isDebuffEffect ? "−" : "+"}${formatDecimalScore(Math.abs(totalPct), 1)}%`,
+        isDebuffEffect ? "gegen Gegner" : breakdown.isFit ? "Fit" : "Off-Fit",
+        breakdown.conditional.active ? `Zusatz aktiv (${breakdown.conditional.label})` : null,
+        `${selectedPower.chargesRemaining}/${selectedPower.chargesTotal} Ladungen`,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+    }
+
+    return {
+      disciplineId,
+      selectedId,
+      options,
+      emptyLabel: getTeamPowerEmptyOptionLabel(disciplineSide),
+      title: getTeamPowerSelectTitle(disciplineSide),
+      selectedSummary,
+      sourceLabel: context?.teamPowerSource?.sourceLabel ?? null,
+    };
+  }
+
   function openPlayerDetails(playerId: string, activePlayerId?: string | null) {
     props.onOpenPlayerDetails?.({ playerId, activePlayerId });
   }
@@ -7312,6 +7376,11 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           d1: formCardPlanPendingKey === `${params.matchdayId}:d1`,
           d2: formCardPlanPendingKey === `${params.matchdayId}:d2`,
         }}
+        teamPowerControlsBySide={{
+          d1: buildLineupTeamPowerControlForSide("d1"),
+          d2: buildLineupTeamPowerControlForSide("d2"),
+        }}
+        onAssignTeamPower={(disciplineSide, powerId) => updateModifier(disciplineSide, "teamPowerId", powerId ?? "")}
         controlsSlot={
           <>
             <label>
