@@ -18,11 +18,15 @@ import type { LegacyFormCardOption } from "@/lib/lineups/legacy-lineup-types";
 import {
   calculateFormModifierForSide,
   distributePerPlayerFormShares,
+  resolveEffectiveLineupModifiers,
 } from "@/lib/lineups/legacy-lineup-modifiers";
+import type { FormCardPlanRecord } from "@/lib/data/olyDataTypes";
 
 const CARDS: LegacyFormCardOption[] = [
   { id: "card-plus", playerId: "p1", playerName: "p1", color: "blue", value: 8, isUsed: false, usedByLineupId: null },
   { id: "card-minus", playerId: "p2", playerName: "p2", color: "blue", value: -4, isUsed: false, usedByLineupId: null },
+  // Die gemeldete d2-Karte: -4,0 POW auf einer MEN-Disziplin — Farbe passt NICHT, also kein x2.
+  { id: "card-minus-fremd", playerId: "p3", playerName: "p3", color: "red", value: -4, isUsed: false, usedByLineupId: null },
 ];
 
 /** d1 traegt die positive Karte, d2 die negative — exakt die gemeldete Aufstellung. */
@@ -124,5 +128,88 @@ describe("Formkarten — Seiten-Zuordnung d1/d2", () => {
       seeds: Array.from({ length: 6 }, (_, i) => `p-${i}|d1|md-3`),
     });
     expect(Math.min(...shares)).toBeGreaterThanOrEqual(12);
+  });
+});
+
+/**
+ * DER GEMELDETE FALL, EINS ZU EINS. Im Auswahlfeld stand auf d1 "+8,0 MEN x2" und auf d2
+ * "-4,0 POW". Gerechnet wurde auf d1 mit -4 — dem Wert der d2-Karte: die Spieler zeigten
+ * -6,9 / -6,9 / -2,0, also flacher Anteil -4 plus Jitter, statt der zugesagten +12 bis +20.
+ *
+ * Ursache: die Auswahl liegt an zwei Stellen. Das Auswahlfeld persistiert nach
+ * `seasonState.formCardPlans` (und zeigt von dort an), die Score-Engine las `draft.modifiers` —
+ * die nur beim SPEICHERN des Entwurfs gefuellt werden. Wer danach eine Karte tauschte, aenderte
+ * die Anzeige, nicht die Rechnung.
+ */
+describe("Formkarten — der Plan ist massgeblich, nicht der Entwurf", () => {
+  const plan = (side: "d1" | "d2", cardId: string | null): FormCardPlanRecord => ({
+    id: `plan:${side}`, saveId: "s", seasonId: "season-1", teamId: "C-C", matchdayId: "md-3",
+    disciplineSide: side, disciplineId: null, primaryFormCardId: cardId, secondaryFormCardId: null,
+    updatedAt: "2026-07-28T00:00:00.000Z",
+  });
+  const scope = { seasonId: "season-1", teamId: "C-C", matchdayId: "md-3" };
+  /** Der Entwurf traegt die VERTAUSCHTE Belegung — genau der gemeldete Zustand. */
+  const STALE_DRAFT = {
+    d1: { ...MODIFIERS.d1, primaryFormCardId: "card-minus-fremd" },
+    d2: { ...MODIFIERS.d2, primaryFormCardId: "card-plus" },
+  };
+
+  it("der Plan setzt sich gegen einen veralteten Entwurf durch", () => {
+    const effective = resolveEffectiveLineupModifiers({
+      modifiers: STALE_DRAFT,
+      formCardPlans: [plan("d1", "card-plus"), plan("d2", "card-minus-fremd")],
+      ...scope,
+    });
+    expect(effective.d1.primaryFormCardId).toBe("card-plus");
+    expect(effective.d2.primaryFormCardId).toBe("card-minus-fremd");
+  });
+
+  it("und damit rechnet d1 wieder positiv statt mit der d2-Karte", () => {
+    const effective = resolveEffectiveLineupModifiers({
+      modifiers: STALE_DRAFT,
+      formCardPlans: [plan("d1", "card-plus"), plan("d2", "card-minus-fremd")],
+      ...scope,
+    });
+    const result = calculateFormModifierForSide({
+      modifiers: effective, disciplineSide: "d1", disciplineColor: "blue", playerCount: 6, formCards: CARDS,
+    });
+    expect(result.formPerPlayer).toBe(16);
+    const shares = distributePerPlayerFormShares({
+      formPerPlayer: result.formPerPlayer,
+      seeds: Array.from({ length: 6 }, (_, i) => `p-${i}|d1|md-3`),
+    });
+    expect(shares.filter((share) => share < 0), `gerechnet: ${shares.join(", ")}`).toEqual([]);
+  });
+
+  it("ohne den Fix haette der Entwurf gewonnen — die Gegenprobe", () => {
+    const result = calculateFormModifierForSide({
+      modifiers: STALE_DRAFT, disciplineSide: "d1", disciplineColor: "blue", playerCount: 6, formCards: CARDS,
+    });
+    // -4 POW auf einer blauen Disziplin: keine Farbgleichheit, also kein x2 → -4 je Spieler.
+    expect(result.formPerPlayer).toBe(-4);
+    const shares = distributePerPlayerFormShares({
+      formPerPlayer: result.formPerPlayer,
+      seeds: Array.from({ length: 6 }, (_, i) => `p-${i}|d1|md-3`),
+    });
+    // Genau das Fenster, in dem die gemeldeten -6,9 / -6,9 / -2,0 liegen.
+    expect(Math.min(...shares)).toBeGreaterThanOrEqual(-8);
+    expect(Math.max(...shares)).toBeLessThanOrEqual(0);
+  });
+
+  it("eine geleerte Auswahl im Plan loescht die Karte auch in der Rechnung", () => {
+    const effective = resolveEffectiveLineupModifiers({
+      modifiers: STALE_DRAFT,
+      formCardPlans: [plan("d1", null)],
+      ...scope,
+    });
+    expect(effective.d1.primaryFormCardId).toBeNull();
+    // Ohne Plan fuer d2 bleibt der Entwurf gueltig — Altspielstaende rechnen unveraendert weiter.
+    expect(effective.d2.primaryFormCardId).toBe("card-plus");
+  });
+
+  it("ein Plan eines ANDEREN Spieltags greift nicht", () => {
+    const foreign = { ...plan("d1", "card-plus"), matchdayId: "md-9" };
+    const effective = resolveEffectiveLineupModifiers({ modifiers: STALE_DRAFT, formCardPlans: [foreign], ...scope });
+    expect(effective.d1.primaryFormCardId).toBe("card-minus-fremd");
   });
 });

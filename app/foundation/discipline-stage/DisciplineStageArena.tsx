@@ -936,11 +936,18 @@ export default function DisciplineStageArena({
   // Spieler außerhalb der Top-12 die PP zeigt — im Hover steht sonst nur der Score,
   // und die eigentliche Währung der Disziplin (PP) fehlte genau dort.
   const ppByPlayerId = useMemo(() => {
-    const map = new Map<string, { pp: number | null; score: number }>();
+    // `mutatorPp` kommt mit: ohne ihn steht in der Karte eine PP-Zahl, deren Zustandekommen
+    // niemand nachvollziehen kann — zwei Spieler mit aehnlichem Score koennen sehr
+    // unterschiedliche PP haben, wenn einer die Disziplin-Mutatoren traf und der andere nicht.
+    const map = new Map<string, { pp: number | null; score: number; mutatorPp: number | null }>();
     if (!useEngine || !engineDiscipline) return map;
     for (const entry of engineDiscipline.topPlayers) {
       if (!entry.playerId) continue;
-      map.set(entry.playerId, { pp: entry.pointsAwarded ?? null, score: entry.finalPlayerScore });
+      map.set(entry.playerId, {
+        pp: entry.pointsAwarded ?? null,
+        score: entry.finalPlayerScore,
+        mutatorPp: entry.mutatorPpsBonus ?? null,
+      });
     }
     return map;
   }, [useEngine, engineDiscipline]);

@@ -1,5 +1,6 @@
 import {
   calculateFormModifierForSide,
+  resolveEffectiveLineupModifiers,
   calculateMutatorModifierForSide,
   getFormCardColorForDisciplineCategory,
   normalizeLineupDraftModifiers,
@@ -95,7 +96,18 @@ export function calculateLocalLegacyLineupPreviewFromContext(
           null,
       })
     : {};
-  const previewModifiers = normalizeLineupDraftModifiers(modifiers ?? context.existingDraft?.modifiers);
+  // Uebergibt der Aufrufer eigene Modifikatoren (die Oberflaeche reicht ihren Live-Stand durch),
+  // gewinnen die — sie sind die juengste Absicht. Ohne sie gilt: Plan schlaegt Entwurf, genau wie
+  // in der Abrechnung, damit Vorschau und Ergebnis dieselbe Karte benutzen.
+  const previewModifiers = modifiers
+    ? normalizeLineupDraftModifiers(modifiers)
+    : resolveEffectiveLineupModifiers({
+        modifiers: context.existingDraft?.modifiers,
+        formCardPlans: context.formCardPlans,
+        seasonId: context.contextMeta.seasonId,
+        teamId: context.contextMeta.teamId,
+        matchdayId: context.contextMeta.matchdayId,
+      });
   const matchdayMutatorTraitsBySide = buildMatchdayMutatorTraitsBySide({
     saveId: context.saveId,
     seasonId: context.seasonId,

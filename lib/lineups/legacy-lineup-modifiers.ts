@@ -1,4 +1,4 @@
-import type { FormCardColor, FormCardRecord, GameState, LineupDraftModifiers, LineupDisciplineSide, Player } from "@/lib/data/olyDataTypes";
+import type { FormCardColor, FormCardPlanRecord, FormCardRecord, GameState, LineupDraftModifiers, LineupDisciplineSide, Player } from "@/lib/data/olyDataTypes";
 import type {
   LegacyFormCardOption,
   LegacyMutatorSlotEffect,
@@ -112,6 +112,53 @@ export function normalizeLineupDraftModifiers(modifiers?: Partial<LineupDraftMod
       ...(modifiers?.d2 ?? {}),
     },
   };
+}
+
+/**
+ * DIE MASSGEBLICHE KARTENAUSWAHL EINES SPIELTAGS — Plan schlägt Entwurf.
+ *
+ * Formkarten lagen an ZWEI Stellen, und Anzeige und Abrechnung lasen verschiedene:
+ *  - `seasonState.formCardPlans` — was das Auswahlfeld beim Klicken persistiert (je Spieltag+Seite)
+ *    und was die Karte in der Oberflaeche anzeigt.
+ *  - `draft.modifiers` — woraus die Score-Engine rechnete. Der Entwurf bekommt seinen Inhalt nur
+ *    beim SPEICHERN, mit dem Stand von genau diesem Moment.
+ * Wer danach eine Karte tauschte, aenderte damit die Anzeige, aber nicht die Rechnung. Gemeldet aus
+ * dem Spiel: auf d1 stand "+8,0 MEN x2" (also +16 je Spieler), gerechnet wurde mit -4 — dem Wert der
+ * d2-Karte. Die betroffenen Spieler zeigten -6,9 / -6,9 / -2,0, also flacher Anteil -4 plus Jitter,
+ * statt der zugesagten +12 bis +20.
+ *
+ * Der Plan gewinnt, weil er die je Spieltag festgehaltene ABSICHT ist; der Entwurf ist ein
+ * Nebenprodukt des Speicherzeitpunkts. Fehlt fuer eine Seite ein Plan, bleibt der Entwurf gueltig —
+ * Altspielstaende ohne Plaene rechnen damit unveraendert weiter.
+ */
+export function resolveEffectiveLineupModifiers(input: {
+  modifiers?: Partial<LineupDraftModifiers> | null;
+  formCardPlans?: readonly FormCardPlanRecord[] | null;
+  seasonId?: string | null;
+  teamId?: string | null;
+  matchdayId?: string | null;
+}): LineupDraftModifiers {
+  const normalized = normalizeLineupDraftModifiers(input.modifiers);
+  const plans = input.formCardPlans ?? [];
+  if (plans.length === 0) return normalized;
+  for (const side of ["d1", "d2"] as const) {
+    const plan = plans.find(
+      (entry) =>
+        entry.disciplineSide === side &&
+        (input.matchdayId == null || entry.matchdayId === input.matchdayId) &&
+        (input.seasonId == null || entry.seasonId === input.seasonId) &&
+        (input.teamId == null || entry.teamId === input.teamId),
+    );
+    // Ein Plan OHNE Karten ist eine Aussage ("hier liegt nichts"), kein fehlender Plan — er setzt
+    // den Entwurf ebenso zurueck. Sonst ueberlebte eine entfernte Karte in der Abrechnung.
+    if (!plan) continue;
+    normalized[side] = {
+      ...normalized[side],
+      primaryFormCardId: plan.primaryFormCardId ?? null,
+      secondaryFormCardId: plan.secondaryFormCardId ?? null,
+    };
+  }
+  return normalized;
 }
 
 export function lineupModifiersHaveFormCardSelections(modifiers?: Partial<LineupDraftModifiers> | null) {
