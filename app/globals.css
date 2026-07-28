@@ -37829,6 +37829,211 @@ button.market-v2-bucket-card.is-selected {
     0 10px 24px rgba(180, 110, 60, 0.1);
 }
 
+/* --- Star-Tier: ligaweite Top-Riege --------------------------------------
+   Bronze/Silber/Gold/Diamant für Liga-Top-50/25/10/3 (Schwellen und Zuordnung:
+   `lib/foundation/player-star-tier.ts`). Gilt für JEDE Portraitkarte, also auch
+   für alle Hover-Previews, den Arena-Drawer und die Kader-Grids — die Karte ist
+   die gemeinsame Basis.
+
+   Bewusst über `outline` + ein `::after`-Overlay statt über `border-color`:
+   dieselbe Karte trägt bereits den Klassenfarb-Rahmen
+   (`player-card-class-frame-*`, setzt `border-color` und einen inset-Schatten)
+   und optional den positionsbasierten `is-rank-*`-Rahmen der Home-Kachel. Ein
+   fünfter Kandidat auf `border-color` würde je nach Merge-Reihenfolge gewinnen
+   oder verlieren; `outline` liegt daneben und kollidiert mit keinem davon. */
+.foundation-player-portrait-card.is-star-tier-bronze,
+.foundation-player-portrait-card.is-star-tier-silver,
+.foundation-player-portrait-card.is-star-tier-gold,
+.foundation-player-portrait-card.is-star-tier-diamond {
+  position: relative;
+  outline: 2px solid var(--nl-star-tone);
+  outline-offset: -2px;
+  border-radius: var(--nl-r-lg, 14px);
+}
+
+.foundation-player-portrait-card.is-star-tier-bronze {
+  --nl-star-tone: var(--nl-bronze);
+}
+
+.foundation-player-portrait-card.is-star-tier-silver {
+  --nl-star-tone: var(--nl-silver);
+}
+
+.foundation-player-portrait-card.is-star-tier-gold {
+  --nl-star-tone: var(--nl-gold);
+}
+
+.foundation-player-portrait-card.is-star-tier-diamond {
+  --nl-star-tone: var(--nl-diamond);
+}
+
+/* Der Schein nach außen wächst mit der Stufe — Bronze bleibt dezent, Diamant
+   sticht heraus, ohne dass die Karte selbst heller wird (Portraits müssen
+   lesbar bleiben). */
+.foundation-player-portrait-card.is-star-tier-bronze {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--nl-bronze) 22%, transparent);
+}
+
+.foundation-player-portrait-card.is-star-tier-silver {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--nl-silver) 26%, transparent),
+    0 8px 20px color-mix(in srgb, var(--nl-silver) 12%, transparent);
+}
+
+.foundation-player-portrait-card.is-star-tier-gold {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--nl-gold) 32%, transparent),
+    0 10px 26px color-mix(in srgb, var(--nl-gold) 18%, transparent);
+}
+
+.foundation-player-portrait-card.is-star-tier-diamond {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--nl-diamond) 38%, transparent),
+    0 12px 30px color-mix(in srgb, var(--nl-diamond) 22%, transparent);
+}
+
+/* --- Holo-Schimmer (nur Top 10 = Gold und Diamant) ------------------------
+   Der "seltene Sammelkarte"-Effekt: ein schräger, wandernder Lichtstreifen über
+   dem Portrait plus ein zweiter, langsamerer Farbverlauf. Rein dekorativ
+   (`pointer-events: none`), liegt unter den Overlay-Zahlen, damit Werte lesbar
+   bleiben. `mix-blend-mode: screen` hellt nur auf und frisst keine Details. */
+.foundation-player-portrait-card.is-star-holo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 1;
+  mix-blend-mode: screen;
+  opacity: 0.5;
+  background:
+    linear-gradient(
+      115deg,
+      transparent 0%,
+      transparent 38%,
+      color-mix(in srgb, var(--nl-star-tone) 55%, transparent) 47%,
+      color-mix(in srgb, #ffffff 70%, transparent) 50%,
+      color-mix(in srgb, var(--nl-star-tone) 55%, transparent) 53%,
+      transparent 62%,
+      transparent 100%
+    ),
+    linear-gradient(
+      210deg,
+      color-mix(in srgb, var(--nl-star-tone) 26%, transparent) 0%,
+      transparent 45%,
+      color-mix(in srgb, var(--nl-diamond) 18%, transparent) 100%
+    );
+  background-size: 260% 260%, 180% 180%;
+  background-position: 120% 0%, 0% 0%;
+  animation: nlStarHoloSweep 4.6s var(--nl-ease, ease) infinite;
+}
+
+@keyframes nlStarHoloSweep {
+  0% {
+    background-position: 130% 0%, 0% 0%;
+  }
+  55% {
+    background-position: -30% 100%, 100% 100%;
+  }
+  100% {
+    background-position: -30% 100%, 100% 100%;
+  }
+}
+
+/* Der Holo-Sweep ist Zierde, keine Information — bei reduzierter Bewegung bleibt
+   der Verlauf stehen (der Rahmen trägt die Aussage ohnehin allein). */
+@media (prefers-reduced-motion: reduce) {
+  .foundation-player-portrait-card.is-star-holo::after {
+    animation: none;
+    background-position: 50% 50%, 50% 50%;
+    opacity: 0.3;
+  }
+
+  .arena-mark-star-ring.is-star-holo {
+    animation: none;
+  }
+}
+
+/* --- Star-Tier an den Kennzahl-Kacheln (OVR/PPs/MVS) ---------------------
+   Jede Kachel trägt ihre EIGENE Stufe aus ihrem eigenen Rang — die Karte
+   drumherum zeigt die beste der drei. Nur ein Rahmen plus Tönung des Labels:
+   die Heat-Band-Hinterlegung darunter bleibt unangetastet, beide Aussagen
+   ("wie gut im Pool" und "Top N") sollen nebeneinander lesbar sein. */
+.foundation-player-portrait-stat.is-star-tier-bronze {
+  --nl-star-tone: var(--nl-bronze);
+}
+
+.foundation-player-portrait-stat.is-star-tier-silver {
+  --nl-star-tone: var(--nl-silver);
+}
+
+.foundation-player-portrait-stat.is-star-tier-gold {
+  --nl-star-tone: var(--nl-gold);
+}
+
+.foundation-player-portrait-stat.is-star-tier-diamond {
+  --nl-star-tone: var(--nl-diamond);
+}
+
+.foundation-player-portrait-stat.is-star-tier-bronze,
+.foundation-player-portrait-stat.is-star-tier-silver,
+.foundation-player-portrait-stat.is-star-tier-gold,
+.foundation-player-portrait-stat.is-star-tier-diamond {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nl-star-tone) 70%, transparent);
+}
+
+.foundation-player-portrait-stat.is-star-tier-bronze small,
+.foundation-player-portrait-stat.is-star-tier-silver small,
+.foundation-player-portrait-stat.is-star-tier-gold small,
+.foundation-player-portrait-stat.is-star-tier-diamond small {
+  color: var(--nl-star-tone);
+}
+
+/* --- Star-Tier an den Rang-Chips der Spielertabelle ---------------------- */
+.is-new-look .nl-ptable-metric-rank.is-star-tier-bronze {
+  --nl-star-tone: var(--nl-bronze);
+}
+
+.is-new-look .nl-ptable-metric-rank.is-star-tier-silver {
+  --nl-star-tone: var(--nl-silver);
+}
+
+.is-new-look .nl-ptable-metric-rank.is-star-tier-gold {
+  --nl-star-tone: var(--nl-gold);
+}
+
+.is-new-look .nl-ptable-metric-rank.is-star-tier-diamond {
+  --nl-star-tone: var(--nl-diamond);
+}
+
+.is-new-look .nl-ptable-metric-rank.is-star-tier-bronze,
+.is-new-look .nl-ptable-metric-rank.is-star-tier-silver,
+.is-new-look .nl-ptable-metric-rank.is-star-tier-gold,
+.is-new-look .nl-ptable-metric-rank.is-star-tier-diamond {
+  border-color: color-mix(in srgb, var(--nl-star-tone) 75%, transparent);
+  background: color-mix(in srgb, var(--nl-star-tone) 18%, transparent);
+  color: var(--nl-star-tone);
+  font-weight: 800;
+}
+
+/* --- Star-Ring der Arena-Marken ------------------------------------------
+   Zusätzlicher Außenring um die runde Spielermarke (`PlayerMark`). Farbe und
+   Position setzt die Komponente inline (sie kennt die Ringbreite und weicht
+   dem Verletzungs-Puls aus); hier liegt nur der Holo-Puls für Top 10. */
+.arena-mark-star-ring.is-star-holo {
+  animation: nlStarRingPulse 2.4s var(--nl-ease, ease) infinite;
+}
+
+@keyframes nlStarRingPulse {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 .home-v2-player-hero {
   position: relative;
   width: 100%;
@@ -42485,6 +42690,200 @@ button.foundation-team-portrait-card {
   opacity: 0.55;
 }
 
+/* ============================================================
+   Formplan-Rework: Saison-Planungs-Cockpit
+   ------------------------------------------------------------
+   Der Formplan ist die Saison-Planungs-Ansicht für knappe Ressourcen
+   (Formkarten, Captain, Team-Power). Das Ressourcen-Cockpit zeigt pro
+   Ressource "übrig vs. Saisonrest" als Meter; die Timeline-Zellen
+   bekommen eine Chancen-Zeile (Farbmatch x2 + passende freie Karten +
+   Planungs-Status), damit man die Saison scannen kann statt jede
+   F1/F2-Zelle zu lesen. Farben kommen aus den `--nl-*`-Tokens mit
+   rgba-Fallback, weil das Panel auch außerhalb von `.is-new-look`
+   gerendert werden kann.
+   ============================================================ */
+
+.legacy-lineup-form-resources {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.legacy-lineup-form-resource {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(14, 20, 32, 0.78), rgba(9, 13, 22, 0.66));
+}
+
+.legacy-lineup-form-resource-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.legacy-lineup-form-resource-head > span {
+  color: rgba(235, 238, 245, 0.64);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.legacy-lineup-form-resource-head > strong {
+  color: var(--nl-ink, rgba(247, 247, 244, 0.98));
+  font-size: 0.86rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+/* Restbestands-Meter: gefüllter Anteil = noch übrig. Läuft die Saison der
+   Ressource davon, sieht man das hier zuerst. */
+.legacy-lineup-form-resource-meter {
+  position: relative;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.legacy-lineup-form-resource-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--nl-good, rgba(76, 197, 107, 0.85));
+  transition: width 260ms ease;
+}
+
+.legacy-lineup-form-resource.is-captain .legacy-lineup-form-resource-meter > span {
+  background: var(--nl-soc, rgba(230, 180, 85, 0.9));
+}
+
+.legacy-lineup-form-resource.is-power .legacy-lineup-form-resource-meter > span {
+  background: var(--nl-men, rgba(91, 155, 255, 0.9));
+}
+
+.legacy-lineup-form-resource > small {
+  color: rgba(211, 224, 243, 0.74);
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+
+.legacy-lineup-form-resource-note {
+  margin: 0;
+  color: rgba(211, 224, 243, 0.56);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.legacy-lineup-form-resource-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.legacy-lineup-form-resource-color {
+  padding: 3px 8px;
+  font-size: 0.72rem;
+}
+
+.legacy-lineup-form-resource-color.is-depleted {
+  opacity: 0.42;
+}
+
+.legacy-lineup-form-resource-power-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.legacy-lineup-form-resource-power {
+  min-width: 0;
+  overflow: hidden;
+  padding: 3px 8px;
+  border: 1px solid color-mix(in srgb, var(--nl-men, rgba(91, 155, 255, 1)) 28%, transparent);
+  border-radius: 999px;
+  color: rgba(214, 230, 255, 0.92);
+  background: color-mix(in srgb, var(--nl-men, rgba(91, 155, 255, 1)) 14%, transparent);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legacy-lineup-form-resource-power.is-used-up {
+  opacity: 0.45;
+}
+
+/* Timeline-Einträge als Karten: Heute leuchtet, Gespielt tritt zurück. */
+.legacy-lineup-form-timeline-entry {
+  display: grid;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(16, 22, 34, 0.6), rgba(9, 13, 22, 0.45));
+}
+
+.legacy-lineup-form-timeline-entry.is-current {
+  border-color: color-mix(in srgb, var(--nl-accent, rgba(102, 160, 238, 1)) 52%, transparent);
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--nl-accent, rgba(102, 160, 238, 1)) 18%, transparent), transparent 46%),
+    linear-gradient(180deg, rgba(24, 36, 58, 0.68), rgba(10, 15, 25, 0.55));
+}
+
+.legacy-lineup-form-timeline-entry.is-past {
+  opacity: 0.55;
+  filter: saturate(0.72);
+}
+
+/* Chancen-Zeile pro Disziplin-Zelle (Farbmatch + Status). */
+.legacy-lineup-form-board-cell-chance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.legacy-lineup-form-board-match-chip {
+  padding: 3px 8px;
+  font-size: 0.72rem;
+}
+
+.legacy-lineup-form-board-cell-flag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.legacy-lineup-form-board-cell-flag.is-planned {
+  color: var(--nl-good, rgba(167, 243, 208, 0.95));
+  border: 1px solid color-mix(in srgb, var(--nl-good, rgba(76, 197, 107, 1)) 34%, transparent);
+  background: color-mix(in srgb, var(--nl-good, rgba(76, 197, 107, 1)) 14%, transparent);
+}
+
+.legacy-lineup-form-board-cell-flag.is-open {
+  color: rgba(235, 238, 245, 0.6);
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+@media (max-width: 1080px) {
+  .legacy-lineup-form-resources {
+    grid-template-columns: 1fr;
+  }
+}
+
 .legacy-lineup-v2-handoff-overlay {
   position: fixed;
   inset: 0;
@@ -43235,6 +43634,10 @@ button.foundation-team-portrait-card {
   --nl-gold: #f6c750;
   --nl-silver: #c7d0dc;
   --nl-bronze: #cd7f32;
+  /* Vierte, höchste Stufe der ligaweiten Top-Riege (Top 3) — es gab bisher
+     nur Gold/Silber/Bronze. Bewusst ein kühles Eis-Cyan statt eines weiteren
+     Metalltons, damit Diamant sich auf einen Blick von Gold unterscheidet. */
+  --nl-diamond: #7fe6f5;
   /* Freund/Feind-Kodierung (Arena): blau=deine, grün=verbündet, rot=Rival.
      Aliasse auf die Achsen-/Semantik-Tokens, damit Light/Dark automatisch mitzieht. */
   --nl-mine: var(--nl-men);
@@ -58063,6 +58466,49 @@ button.foundation-team-portrait-card {
   background: color-mix(in srgb, var(--nl-good) 25%, transparent);
 }
 
+/*
+ * PP-Chips der aufgeklappten Disziplin-Spalten in der Spieltags-Wertung. Gleiche
+ * Baender-Skala wie die Bereichsspalten im Saisonstand (rot schwach → gruen stark),
+ * ebenfalls nur als dezente Hinterlegung: der Chip behaelt Rahmen und Textfarben,
+ * damit PP-Wert, Score und Mutator-Marker lesbar bleiben.
+ */
+.matchday-panel-player.heat-band-1,
+.matchday-panel-player.heat-band-2,
+.matchday-panel-player.heat-band-3,
+.matchday-panel-player.heat-band-4,
+.matchday-panel-player.heat-band-5,
+.matchday-panel-player.heat-band-6,
+.matchday-panel-player.heat-band-7,
+.matchday-panel-player.heat-band-8 {
+  color: inherit;
+  box-shadow: none;
+}
+
+.matchday-panel-player.heat-band-1 {
+  background: color-mix(in srgb, var(--nl-risk) 20%, transparent);
+}
+.matchday-panel-player.heat-band-2 {
+  background: color-mix(in srgb, var(--nl-risk) 13%, transparent);
+}
+.matchday-panel-player.heat-band-3 {
+  background: color-mix(in srgb, var(--nl-warn) 14%, transparent);
+}
+.matchday-panel-player.heat-band-4 {
+  background: color-mix(in srgb, var(--nl-warn) 9%, transparent);
+}
+.matchday-panel-player.heat-band-5 {
+  background: color-mix(in srgb, var(--nl-good) 9%, transparent);
+}
+.matchday-panel-player.heat-band-6 {
+  background: color-mix(in srgb, var(--nl-good) 14%, transparent);
+}
+.matchday-panel-player.heat-band-7 {
+  background: color-mix(in srgb, var(--nl-good) 19%, transparent);
+}
+.matchday-panel-player.heat-band-8 {
+  background: color-mix(in srgb, var(--nl-good) 25%, transparent);
+}
+
 .is-new-look .nl-standings-td-bonus,
 .is-new-look .nl-standings-td-mw {
   color: var(--nl-mut);
@@ -62243,31 +62689,6 @@ button.is-new-look .nl-thist-season-pill,
   border-radius: var(--nl-r-sm);
 }
 
-/* --- Achsen-Spaltenkopf: kein einzelner Sortier-Button (die Spalte bündelt
-   POW/SPE/MEN/SOC + optional eine Disziplin, siehe `renderAxisBars`), statt
-   dessen ein Sortier-Hinweis + Disziplinen-Umschalter/-Picker. Braucht mehr
-   vertikalen Raum als die sonst einzeiligen Köpfe, daher `white-space: normal`
-   nur für diese eine Kopfzelle. --------------------------------------------- */
-.is-new-look .nl-players-th:has(.nl-players-axes-th) {
-  white-space: normal;
-  vertical-align: top;
-}
-
-.is-new-look .nl-players-axes-th {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-}
-
-.is-new-look .nl-players-axes-th-hint {
-  font-size: 9px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  text-transform: none;
-  color: var(--nl-mut-2);
-}
-
 /* --- Zeilen ---------------------------------------------------------- */
 .is-new-look .nl-players-row {
   cursor: pointer;
@@ -62398,26 +62819,20 @@ button.is-new-look .nl-thist-season-pill,
   white-space: nowrap;
 }
 
-/* --- Achsen-Mini-Bars (POW/SPE/MEN/SOC, 0-100) ---------------------------
-   Eine Zeile je Achse (1×4) statt eines engen 2×2-Clusters: Label, Balken
-   und Wert stehen so nie horizontal neben der nächsten Achse und laufen
-   nicht zusammen (z. B. "91SPE"). Jede Achse bekommt eigenen Raum. --------- */
-.is-new-look .nl-players-td-axes {
-  min-width: 248px;
+/* --- Achsen-Spalten (POW/SPE/MEN/SOC, 0-100) -----------------------------
+   Jede Achse ist eine EIGENE, farblich getönte Spalte. Der Achsenname steht
+   im Spaltenkopf (dort sitzt auch der Sortier-Button), die Zelle trägt nur
+   noch Balken + Wert — daher zwei statt drei Rasterspalten. Der Pfeil im Kopf
+   klappt die Achse nach rechts auf ihre 5 Disziplin-PPs-Spalten auf. -------- */
+.is-new-look .nl-players-td-axis {
+  min-width: 72px;
   padding-top: 8px;
   padding-bottom: 8px;
 }
 
-.is-new-look .nl-players-axes {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 5px;
-  min-width: 0;
-}
-
 .is-new-look .nl-players-axis {
   display: grid;
-  grid-template-columns: 30px minmax(48px, 1fr) 28px;
+  grid-template-columns: minmax(28px, 1fr) 26px;
   align-items: center;
   gap: var(--nl-s2);
   width: 100%;
@@ -62430,129 +62845,90 @@ button.is-new-look .nl-thist-season-pill,
   text-align: left;
 }
 
-/* Achsenwert anklicken sortiert die Tabelle danach (`onToggleSort`) — genau wie
-   jeder Disziplin-Chip darunter (`.nl-players-axis-disc`, `discipline:<id>`). */
-button.nl-players-axis {
-  cursor: pointer;
-}
-
-button.nl-players-axis:hover {
-  background: var(--nl-panel-2);
-}
-
-button.nl-players-axis:focus-visible {
-  outline: var(--nl-focus-ring);
-  outline-offset: 1px;
-}
-
-.is-new-look .nl-players-axis.is-active-sort {
-  background: var(--nl-accent-soft);
-  box-shadow: inset 0 0 0 1px var(--nl-accent);
-}
-
-.is-new-look .nl-players-axis.is-active-sort .nl-players-axis-label,
-.is-new-look .nl-players-axis.is-active-sort .nl-players-axis-value {
-  color: var(--nl-accent);
-}
-
-/* --- Disziplinen unter der Achse -----------------------------------------
-   Jede Achse trägt dauerhaft ihre 5 Disziplinen (kein Dropdown mehr). Dichte:
-   EINE 5-spaltige Mikro-Zeile je Achse (Kürzel + Zahl + 2px-Strich) statt fünf
-   voller Balkenzeilen — die Achse bleibt die Hauptgliederung, die Disziplinen
-   sind klar untergeordnet (kleinere Schrift, gedämpfte Farbe, kein Rahmen). */
-.is-new-look .nl-players-axis-group {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+/* Spaltenkopf einer Achse: Sortier-Button + Aufklapp-Pfeil nebeneinander,
+   damit Sortieren und Ausklappen sich nicht gegenseitig auslösen. */
+.is-new-look .nl-players-axis-th {
+  display: flex;
+  align-items: center;
   gap: 2px;
   min-width: 0;
 }
 
-.is-new-look .nl-players-axis-discs {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 2px;
-  min-width: 0;
-  padding-left: 2px;
+.is-new-look .nl-players-axis-th .nl-players-sort-th {
+  color: var(--nl-tone, inherit);
 }
 
-.is-new-look .nl-players-axis-disc {
-  display: grid;
-  gap: 1px;
-  min-width: 0;
-  margin: 0;
-  padding: 0 1px 1px;
+.is-new-look .nl-players-axis-expand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
   border: 0;
   border-radius: var(--nl-r-sm);
   background: transparent;
-  font: inherit;
-  text-align: left;
+  color: var(--nl-mut);
+  font-size: 11px;
+  line-height: 1;
   cursor: pointer;
+  transition: background-color var(--nl-t-fast) var(--nl-ease), color var(--nl-t-fast) var(--nl-ease);
 }
 
-.is-new-look .nl-players-axis-disc:hover {
+.is-new-look .nl-players-axis-expand:hover {
   background: var(--nl-panel-2);
+  color: var(--nl-tone, var(--nl-ink));
 }
 
-.is-new-look .nl-players-axis-disc:focus-visible {
+.is-new-look .nl-players-axis-expand:focus-visible {
   outline: var(--nl-focus-ring);
   outline-offset: 1px;
 }
 
-.is-new-look .nl-players-axis-disc.is-active-sort {
+/* Aufgeklappt zeigt der Chevron nach links (= "wieder einklappen"). */
+.is-new-look .nl-players-axis-expand.is-expanded {
   background: var(--nl-accent-soft);
-  box-shadow: inset 0 0 0 1px var(--nl-accent);
-}
-
-.is-new-look .nl-players-axis-disc-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 2px;
-  min-width: 0;
-}
-
-.is-new-look .nl-players-axis-disc-label {
-  overflow: hidden;
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0;
-  line-height: 1.3;
-  color: var(--nl-mut);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.is-new-look .nl-players-axis-disc-value {
-  font-size: 9px;
-  font-weight: 600;
-  line-height: 1.3;
-  color: color-mix(in srgb, var(--nl-ink) 88%, transparent);
-}
-
-.is-new-look .nl-players-axis-disc.is-active-sort .nl-players-axis-disc-label,
-.is-new-look .nl-players-axis-disc.is-active-sort .nl-players-axis-disc-value {
   color: var(--nl-accent);
 }
 
-.is-new-look .nl-players-axis-disc-track {
-  height: 2px;
-  border-radius: var(--nl-r-pill);
-  background: var(--nl-panel-2);
-  overflow: hidden;
+.is-new-look .nl-players-axis-expand.is-expanded svg {
+  transform: rotate(180deg);
+  transform-origin: center;
 }
 
-.is-new-look .nl-players-axis-disc-fill {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 70%, transparent);
+/* --- Aufgeklappte Disziplin-Spalten (geholte PPs) -------------------------
+   Schmale Zahlenspalten rechts der jeweiligen Achse. Inhalt sind die in der
+   Disziplin tatsächlich erzielten Performance-Punkte der Saison (nicht die
+   Disziplin-Wertung); die Einfärbung ist liga-relativ über denselben
+   Achtel-Heat wie PPs/OVR/MVS. Kopf trägt das 3-Buchstaben-Kürzel, der volle
+   Name steht im `title`. */
+.is-new-look .nl-players-th-disc-pps {
+  min-width: 46px;
 }
 
-.is-new-look .nl-players-axis-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--nl-tone, var(--nl-mut));
+.is-new-look .nl-players-disc-th {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.is-new-look .nl-players-disc-th .nl-players-sort-th {
+  color: var(--nl-tone, inherit);
+  font-size: 9.5px;
+  letter-spacing: 0.02em;
+}
+
+.is-new-look .nl-players-td-disc-pps {
+  min-width: 46px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-players-disc-pps {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--nl-ink);
 }
 
 .is-new-look .nl-players-axis-track {
@@ -65559,11 +65935,13 @@ button.nl-players-axis:focus-visible {
   white-space: nowrap;
 }
 
-/* --- 1) Achsen-Zeile: Label + Balken + Wert (kein #Rang mehr in der
-   Zelle — Excel-Redundanz zu den PPS/OVR/MVS-Rang-Chips entfernt, siehe
-   `renderAxisBars`; der Rang steckt weiterhin im `title`-Tooltip). --- */
+/* --- 1) Achsen-Zelle: Balken + Wert (Label und Sortierung sitzen im
+   Spaltenkopf, siehe `renderAxisColumnHeader`; der Liga-Rang steckt
+   weiterhin im `title`-Tooltip der Zelle). --- */
 .is-new-look .nl-players-axis.nl-ptable-axis-enhanced {
-  grid-template-columns: 28px minmax(40px, 1fr) 26px;
+  grid-template-columns: minmax(26px, 1fr) 24px;
+  column-gap: 6px;
+  min-height: 18px;
 }
 
 /* --- 2) Disziplin-Eignungs-Strip (nächster Spieltag) ----------------- */
@@ -67360,16 +67738,6 @@ button.nl-players-axis:focus-visible {
    aneinander. Mehr Spaltenbreite, größerer column-gap (Wert nie am Label
    klebend) und mehr row-gap zwischen POW/SPE/MEN/SOC. Höhere Spezifität
    als die Basisregeln, damit der Merge-Order egal ist. */
-.is-new-look td.nl-players-td-axes {
-  min-width: 248px;
-  padding-top: 10px;
-  padding-bottom: 10px;
-}
-
-.is-new-look .nl-players-td-axes .nl-players-axes {
-  gap: 8px;
-}
-
 /* Label · Balken · Wert — breite, klar getrennte Spalten. (Früher gab es eine
    vierte Spalte für einen Perzentil-Chip; der wird in der Achsen-Zelle nicht
    mehr gerendert, die leere Spur kostete nur Breite, die jetzt die
@@ -67381,16 +67749,6 @@ button.nl-players-axis:focus-visible {
 }
 
 /* Wert nie am Label/Balken kleben — eigener Innenabstand + eigene Spalte. */
-.is-new-look .nl-players-td-axes .nl-players-axis-value {
-  padding-left: 4px;
-  font-size: 11.5px;
-}
-
-.is-new-look .nl-players-td-axes .nl-players-axis-label {
-  font-size: 10.5px;
-  letter-spacing: 0.05em;
-}
-
 /* Wave 5 — Home-Politur (#40): Radar-Prominenz + reichhaltigere
    Aufsteiger/Risiken-Zeilen. Nur NEUE `.nl-home-*` Klassen; alle
    Selektoren sind bewusst spezifischer als die bestehenden Regeln in

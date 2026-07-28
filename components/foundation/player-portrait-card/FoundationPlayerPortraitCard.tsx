@@ -14,6 +14,12 @@ import {
   type PortraitOverlayStat,
 } from "@/lib/foundation/player-portrait-stat-presets";
 import { createEmptyLeaguePlayerHeatPools, type LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
+import {
+  describePlayerStarTier,
+  getBestPlayerStarTier,
+  getPlayerStarTierClassName,
+  isHoloPlayerStarTier,
+} from "@/lib/foundation/player-star-tier";
 
 export type FoundationPlayerPortraitEconomyStat = {
   label: string;
@@ -86,7 +92,11 @@ function renderOverlayStat(stat: PortraitOverlayStat) {
   return (
     <span
       key={`${stat.label}-${stat.value}`}
-      className={`home-v2-player-stat foundation-player-portrait-stat ${stat.heatClass ?? ""}`.trim()}
+      className={`home-v2-player-stat foundation-player-portrait-stat ${stat.heatClass ?? ""} ${
+        stat.starTierClass ?? ""
+      }`
+        .replace(/\s+/g, " ")
+        .trim()}
       title={stat.title}
     >
       <small>{stat.label}</small>
@@ -316,6 +326,21 @@ export default function FoundationPlayerPortraitCard({
     </div>
   );
 
+  /**
+   * Star-Tier der Karte (Bronze/Silber/Gold/Diamant für Liga-Top-50/25/10/3).
+   * Wird bewusst HIER aus den bereits vorhandenen Rang-Props abgeleitet statt
+   * als eigene Prop durchgereicht: die Karte ist die gemeinsame Basis aller
+   * Portrait-Darstellungen (inkl. `FoundationPlayerPortraitPreview` und damit
+   * sämtlicher Hover-Previews), also bekommt jeder Aufrufer, der ohnehin
+   * Ränge liefert, den Rahmen ohne eigenes Zutun.
+   *
+   * Für das Portrait zählt der BESTE der drei Ränge — ein Star ist ein Star,
+   * egal worüber er stark ist. Die einzelnen OVR/PPs/MVS-Chips tragen davon
+   * unabhängig ihre eigene Stufe (siehe `buildRosterOverlayStats`).
+   */
+  const starTier = getBestPlayerStarTier(ovrRank, ppsRank, mvsRank);
+  const starTierDescription = describePlayerStarTier({ ovrRank, ppsRank, mvsRank });
+
   const cardClassName = [
     "foundation-player-portrait-card",
     "home-v2-player-card",
@@ -325,14 +350,26 @@ export default function FoundationPlayerPortraitCard({
     portraitLayout === "rail" ? "is-portrait-rail" : "",
     selected ? "is-selected" : "",
     rankFrameClass,
+    getPlayerStarTierClassName(starTier),
+    isHoloPlayerStarTier(starTier) ? "is-star-holo" : "",
     className,
   ]
     .filter(Boolean)
     .join(" ");
 
+  // Der Rahmen soll nicht raten lassen, WARUM die Karte leuchtet — die Stufe
+  // samt auslösendem Rang hängt daher am Titel der Karte.
+  const cardTitle = [title ?? `${name} öffnen`, starTierDescription].filter(Boolean).join(" · ");
+
   if (!interactive) {
     return (
-      <div className={cardClassName} style={style} data-testid={testId ?? (variant === "team" ? "foundation-team-portrait-card" : undefined)}>
+      <div
+        className={cardClassName}
+        style={style}
+        title={starTierDescription ?? undefined}
+        data-star-tier={starTier ?? undefined}
+        data-testid={testId ?? (variant === "team" ? "foundation-team-portrait-card" : undefined)}
+      >
         {cardBody}
       </div>
     );
@@ -344,7 +381,8 @@ export default function FoundationPlayerPortraitCard({
       className={cardClassName}
       style={style}
       onClick={() => onOpen?.()}
-      title={title ?? `${name} öffnen`}
+      title={cardTitle}
+      data-star-tier={starTier ?? undefined}
       data-testid={testId ?? (variant === "team" ? "foundation-team-portrait-card" : undefined)}
     >
       {cardBody}

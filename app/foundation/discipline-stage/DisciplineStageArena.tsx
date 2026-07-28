@@ -21,7 +21,11 @@ import DisciplineStageTopPlayers, { type DisciplineStageTopPlayer } from "@/app/
 import { getRankToPointsValue, resolveDisciplinePlayerCount } from "@/lib/resolve/rank-to-points";
 import DisciplineStageNativeArena, { type StagePrimitive, type StageMotif, type StageEnv, type StageLiveResultsByTeam } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
 import DisciplineStageDrawer, { type DisciplineStageDrawerTarget } from "@/app/foundation/discipline-stage/DisciplineStageDrawer";
-import DisciplineStageMatchdayPanel, { type MatchdayPanelStandingRow, type MatchdayPanelTeamResult } from "@/app/foundation/discipline-stage/DisciplineStageMatchdayPanel";
+import DisciplineStageMatchdayPanel, {
+  type MatchdayPanelPlayerRow,
+  type MatchdayPanelStandingRow,
+  type MatchdayPanelTeamResult,
+} from "@/app/foundation/discipline-stage/DisciplineStageMatchdayPanel";
 import { getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
 import {
   buildMatchdayArenaBaseSessionKey,
@@ -708,6 +712,35 @@ export default function DisciplineStageArena({
         mutatorByTeam.set(tr.teamId, cur);
       }
     }
+    // Spieler je Team und Disziplin-Seite für die ausklappbaren Spalten der Spieltags-
+    // Wertung. Quelle sind dieselben Resolve-Entries wie oben — kein zweiter Rechenweg.
+    // `pp` ist der dem Spieler gutgeschriebene Player-Point-Anteil, `score` sein
+    // Beitrag zum Team-Score (die Zahl, nach der die Arena animiert).
+    const playersByTeam = new Map<string, { d1: MatchdayPanelPlayerRow[]; d2: MatchdayPanelPlayerRow[] }>();
+    for (const dp of preview.disciplinePreviews ?? []) {
+      const side = dp.disciplineId === d1?.disciplineId ? "d1" : dp.disciplineId === d2?.disciplineId ? "d2" : null;
+      if (!side) continue;
+      for (const tr of dp.teamResults ?? []) {
+        const cur = playersByTeam.get(tr.teamId) ?? { d1: [], d2: [] };
+        for (const e of tr.entries ?? []) {
+          if (!e.playerId) continue;
+          cur[side].push({
+            playerId: e.playerId,
+            name: e.playerName ?? e.playerId,
+            pp: e.pointsAwarded ?? null,
+            score: e.finalPlayerScore ?? null,
+            mutatorPp: e.mutatorPpsBonus ?? null,
+          });
+        }
+        playersByTeam.set(tr.teamId, cur);
+      }
+    }
+    // Höchste PP zuerst — die Reihenfolge ist die Aussage der Aufklappung.
+    for (const sides of playersByTeam.values()) {
+      for (const key of ["d1", "d2"] as const) {
+        sides[key].sort((left, right) => (right.pp ?? -1) - (left.pp ?? -1) || (right.score ?? 0) - (left.score ?? 0));
+      }
+    }
     // Punkte je RANG (nicht flach). Bug zuvor: der Roll-up gab bei gleich-/null-
     // bewerteten Teams jedem Rang 1 → alle bekamen den Platz-1-Wert (z. B. 6,6 in der
     // Zweierdisziplin). Hier je Disziplin die Teams NACH ihrem echten Disziplin-Score
@@ -769,7 +802,7 @@ export default function DisciplineStageArena({
         missingLineup: r.missingLineup,
       };
     });
-    return { d1, d2, standings, mutatorByTeam, teamResults };
+    return { d1, d2, standings, mutatorByTeam, playersByTeam, teamResults };
   }, [preview, gameState, matchdayId, briefingItems, standingsItems]);
 
   // Bühne muss mit einer Disziplin DES aktuellen Spieltags starten, nicht mit dem
@@ -1484,6 +1517,7 @@ export default function DisciplineStageArena({
             onOpenTeam={(teamId) => openDrawerPinned({ kind: "team", teamId })}
             onHoverTeam={previewTeam}
             mutatorByTeam={matchdayPanel.mutatorByTeam}
+            playersByTeam={matchdayPanel.playersByTeam}
           />
         </div>
       ) : null}

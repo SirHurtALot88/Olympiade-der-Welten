@@ -185,7 +185,7 @@ const ROSTER_PPS_AXES: Array<{ axis: SeasonDisciplineAreaId; label: string; cate
  * `pointsByDiscipline`. Es wird nichts neu erfunden: fehlt ein Ledger-Eintrag,
  * steht die Disziplin mit 0 PPs (der Katalog kommt aus `gameState.disciplines`).
  */
-function buildRosterDisciplinePpsByAxis(input: {
+export function buildRosterDisciplinePpsByAxis(input: {
   disciplines: GameState["disciplines"];
   pointsByDiscipline: Record<string, number> | null | undefined;
   pointsByArea: Record<string, number | null | undefined> | null | undefined;

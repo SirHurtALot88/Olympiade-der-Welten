@@ -1,4 +1,9 @@
 import { getPoolHeatClass, type LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
+import {
+  getPlayerStarTier,
+  getPlayerStarTierClassName,
+  getPlayerStarTierLabel,
+} from "@/lib/foundation/player-star-tier";
 
 export type PlayerPortraitContext =
   | "roster"
@@ -20,6 +25,14 @@ export type PortraitOverlayStat = {
   heatClass?: string;
   title?: string;
   valueClass?: string;
+  /**
+   * Star-Tier DIESER Kennzahl (`is-star-tier-*`, siehe
+   * `lib/foundation/player-star-tier.ts`) — steht bewusst neben `heatClass`
+   * statt darin: die Heat-Bänder sagen "wie gut im Ligavergleich" (Achtel des
+   * Pools), das Star-Tier sagt "Top 50/25/10/3". Beides gleichzeitig ist
+   * gewollt, die Tier-Regel legt nur einen Rahmen darüber.
+   */
+  starTierClass?: string;
 };
 
 export type PlayerPortraitTrainingContextData = {
@@ -126,6 +139,23 @@ function stat(label: string, value: string, extra?: Partial<PortraitOverlayStat>
   return { label, value, ...extra };
 }
 
+/**
+ * Star-Tier-Zusatz für eine Kennzahl-Kachel: Klasse plus Tooltip-Zeile, damit
+ * am Chip ablesbar ist, WELCHE Stufe der Rahmen meint. Jede Kennzahl bekommt
+ * ihre EIGENE Stufe aus ihrem eigenen Rang (das Portrait selbst nimmt dagegen
+ * die beste der drei, siehe `FoundationPlayerPortraitCard`).
+ */
+function starTierStatExtra(metricLabel: string, rank: number | null | undefined): Partial<PortraitOverlayStat> {
+  const tier = getPlayerStarTier(rank);
+  if (!tier) {
+    return {};
+  }
+  return {
+    starTierClass: getPlayerStarTierClassName(tier),
+    title: `${getPlayerStarTierLabel(tier)} — ${metricLabel} #${rank}`,
+  };
+}
+
 export function buildRosterOverlayStats(input: BuildRosterOverlayInput): PortraitOverlayStat[] {
   const rankInline = input.rankStyle === "inline";
   const stats: PortraitOverlayStat[] = [
@@ -134,6 +164,7 @@ export function buildRosterOverlayStats(input: BuildRosterOverlayInput): Portrai
       rankInline ? formatMetricWithRank(input.playerOvr, input.ovrRank, 1) : formatNumber(input.playerOvr, 1),
       {
         heatClass: getPoolHeatClass(input.playerOvr, input.leagueHeatPools.ovr),
+        ...starTierStatExtra("OVR", input.ovrRank),
       },
     ),
     stat(
@@ -144,8 +175,11 @@ export function buildRosterOverlayStats(input: BuildRosterOverlayInput): Portrai
           ? formatNumber(input.playerPps, 1)
           : "—",
       input.playerPps != null
-        ? { heatClass: getPoolHeatClass(input.playerPps, input.leagueHeatPools.pps) }
-        : undefined,
+        ? {
+            heatClass: getPoolHeatClass(input.playerPps, input.leagueHeatPools.pps),
+            ...starTierStatExtra("PPs", input.ppsRank),
+          }
+        : starTierStatExtra("PPs", input.ppsRank),
     ),
   ];
   stats.push(
@@ -154,6 +188,7 @@ export function buildRosterOverlayStats(input: BuildRosterOverlayInput): Portrai
       rankInline ? formatMetricWithRank(input.playerMvs, input.mvsRank, 1) : formatNumber(input.playerMvs, 1),
       {
         heatClass: getPoolHeatClass(input.playerMvs, input.leagueHeatPools.mvs),
+        ...starTierStatExtra("MVS", input.mvsRank),
       },
     ),
   );

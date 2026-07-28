@@ -123,8 +123,14 @@ import {
   type LeaguePlayerHeatPools,
 } from "@/lib/foundation/player-league-heat";
 import {
-  buildDisciplineSortKey,
-  getDisciplineIdFromSortKey,
+  getPlayerStarTier,
+  getPlayerStarTierClassName,
+  getPlayerStarTierLabel,
+} from "@/lib/foundation/player-star-tier";
+import {
+  buildDisciplinePpsSortKey,
+  getDisciplineIdFromPpsSortKey,
+  getRowDisciplinePps,
   type FoundationPlayerScopeRow,
 } from "@/lib/foundation/tabs/use-foundation-cross-tab-player-directory";
 import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
@@ -319,12 +325,23 @@ function getContractExpiryBucket(row: FoundationPlayerScopeRow): NlContractExpir
  * (`discipline.category`, aus `gameState.disciplines`) — es wird nichts neu
  * zugeordnet, nur gruppiert.
  */
-const NL_PLAYERS_AXES: ReadonlyArray<{ key: NlAxisKey; label: string; category: DisciplineCategory }> = [
-  { key: "pow", label: "POW", category: "power" },
-  { key: "spe", label: "SPE", category: "speed" },
-  { key: "men", label: "MEN", category: "mental" },
-  { key: "soc", label: "SOC", category: "social" },
+const NL_PLAYERS_AXES: ReadonlyArray<{
+  key: NlAxisKey;
+  label: string;
+  category: DisciplineCategory;
+  /** Spalten-ID im Spaltenkatalog/Sichtbarkeitsmenü — je Achse eine eigene Spalte. */
+  columnId: string;
+}> = [
+  { key: "pow", label: "POW", category: "power", columnId: "axisPow" },
+  { key: "spe", label: "SPE", category: "speed", columnId: "axisSpe" },
+  { key: "men", label: "MEN", category: "mental", columnId: "axisMen" },
+  { key: "soc", label: "SOC", category: "social", columnId: "axisSoc" },
 ];
+
+/** Achsen-Definition zu einer Spalten-ID (`axisPow` → POW), sonst `null`. */
+function getAxisByColumnId(columnId: string): (typeof NL_PLAYERS_AXES)[number] | null {
+  return NL_PLAYERS_AXES.find((axis) => axis.columnId === columnId) ?? null;
+}
 
 /**
  * Kurzkürzel einer Disziplin für die dichte Achsen-Zelle (5 Disziplinen je
@@ -370,13 +387,13 @@ const NL_PLAYERS_COLUMNS: ReadonlyArray<{
     align: "left",
     tooltip: "Fähigkeit (CA) und Potenzial (PO) als Sterne — Bereich, solange nicht vollständig bekannt.",
   },
-  {
-    id: "axes",
-    label: "Achsen",
-    align: "left",
-    tooltip:
-      "POW/SPE/MEN/SOC — liga-relative Achsenwerte (0–100), anklickbar zum Sortieren. Unter jeder Achse stehen ihre 5 Disziplinen (Kürzel + Wertung); auch jede Disziplin ist anklickbar und sortiert die Liste nach dieser Wertung.",
-  },
+  ...NL_PLAYERS_AXES.map(({ key, label, columnId }) => ({
+    id: columnId,
+    label,
+    sortKey: key,
+    align: "left" as const,
+    tooltip: `${label} — Achsenwert (0–100), Spaltenkopf anklicken sortiert. Der Pfeil im Kopf klappt die Spalte nach rechts auf und zeigt die 5 ${label}-Disziplinen mit den PPs, die der Spieler dort in dieser Saison geholt hat.`,
+  })),
   {
     id: "pps",
     label: "PPs",
@@ -574,10 +591,17 @@ function renderMetricRankChip(
   if (rank == null) {
     return null;
   }
+  // Star-Tier DIESER Kennzahl (Top 50/25/10/3 → Bronze/Silber/Gold/Diamant).
+  // Bewusst pro Kennzahl statt einmal je Zeile: so ist am Chip ablesbar, WORIN
+  // der Spieler zur Spitze gehört. Das Portrait derselben Zeile trägt dagegen
+  // die beste der drei Stufen (siehe `FoundationPlayerPortraitCard`).
+  const starTier = getPlayerStarTier(rank);
+  const starTierLabel = getPlayerStarTierLabel(starTier);
   return (
     <span
-      className={`nl-ptable-percentile nl-ptable-metric-rank is-${metric}`}
-      title={`Liga-Rang #${rank} von ${pool.length}`}
+      className={`nl-ptable-percentile nl-ptable-metric-rank is-${metric} ${getPlayerStarTierClassName(starTier)}`.trim()}
+      data-star-tier={starTier ?? undefined}
+      title={`Liga-Rang #${rank} von ${pool.length}${starTierLabel ? ` — ${starTierLabel}` : ""}`}
     >
       #{formatNlNumber(rank, 0)}
     </span>
@@ -757,9 +781,6 @@ export default function FoundationPlayersTableNewLook({
     [columnVisibility],
   );
 
-  /** Aktuell sortierte Disziplin (`discipline:<id>`-Sortierschlüssel), falls aktiv. */
-  const activeDisciplineSortId = useMemo(() => getDisciplineIdFromSortKey(sortState?.key), [sortState?.key]);
-
   /**
    * Disziplinen je Achse (POW/SPE/MEN/SOC → je 5 Disziplinen), gruppiert aus
    * `gameState.disciplines` über `discipline.category` — der offiziellen
@@ -779,6 +800,92 @@ export default function FoundationPlayersTableNewLook({
     }
     return byAxis;
   }, [gameState.disciplines]);
+
+  /**
+   * Aufgeklappte Achsen-Spalten: je Achse (POW/SPE/MEN/SOC) klappt der Pfeil im
+   * Spaltenkopf die 5 zugehörigen Disziplinen als eigene Spalten NACH RECHTS
+   * auf. In den Disziplin-Spalten stehen die tatsächlich erzielten PPs der
+   * Saison (`row.disciplinePpsByAxis`), nicht die Disziplin-Wertung.
+   */
+  const [expandedAxes, setExpandedAxes] = useState<Record<NlAxisKey, boolean>>({
+    pow: false,
+    spe: false,
+    men: false,
+    soc: false,
+  });
+
+  function toggleAxisExpanded(axisKey: NlAxisKey) {
+    setExpandedAxes((current) => ({ ...current, [axisKey]: !current[axisKey] }));
+  }
+
+  /** Aktuell nach PPs sortierte Disziplin (`disciplinePps:<id>`), falls aktiv. */
+  const activeDisciplinePpsSortId = useMemo(
+    () => getDisciplineIdFromPpsSortKey(sortState?.key),
+    [sortState?.key],
+  );
+
+  /**
+   * Ligaweite Heat-Pools der DISZIPLIN-PPs (je Disziplin alle PPs-Werte des
+   * aktuellen Scopes). Die vorhandenen `leaguePlayerHeatPools.disciplines`
+   * tragen die Disziplin-WERTUNG (0–100) und taugen als Maßstab für erzielte
+   * Punkte nicht — daher ein eigener Pool aus genau den Zeilen, die die
+   * Tabelle auch kennt. Gleiche Achtel-Einfärbung (grün→rot) wie überall
+   * sonst (`getPoolHeatClass`).
+   */
+  const leagueDisciplinePpsPools = useMemo(() => {
+    const pools = new Map<string, number[]>();
+    for (const row of rows) {
+      for (const axis of row.disciplinePpsByAxis) {
+        for (const discipline of axis.disciplines) {
+          const pool = pools.get(discipline.id);
+          if (pool) {
+            pool.push(discipline.pps);
+          } else {
+            pools.set(discipline.id, [discipline.pps]);
+          }
+        }
+      }
+    }
+    return pools;
+  }, [rows]);
+
+  /**
+   * Tatsächlich gerenderte Kopf-/Zellenfolge: die sichtbaren Katalogspalten,
+   * wobei jede AUFGEKLAPPTE Achsen-Spalte direkt rechts von sich ihre
+   * Disziplin-Spalten einschiebt. Kopf, Zeilen, Export und der `colSpan` der
+   * Detailzeile leiten sich alle aus dieser einen Liste ab — sonst laufen
+   * Kopf und Zellen bei einer neuen Spalte auseinander.
+   */
+  type RenderedPlayersColumn =
+    | { kind: "column"; key: string; column: (typeof NL_PLAYERS_COLUMNS)[number] }
+    | {
+        kind: "disciplinePps";
+        key: string;
+        axisKey: NlAxisKey;
+        axisLabel: string;
+        discipline: Discipline;
+      };
+
+  const renderedColumns = useMemo<RenderedPlayersColumn[]>(() => {
+    const out: RenderedPlayersColumn[] = [];
+    for (const column of visibleColumns) {
+      out.push({ kind: "column", key: column.id, column });
+      const axis = getAxisByColumnId(column.id);
+      if (!axis || !expandedAxes[axis.key]) {
+        continue;
+      }
+      for (const discipline of disciplinesByAxis[axis.key] ?? []) {
+        out.push({
+          kind: "disciplinePps",
+          key: `${column.id}:${discipline.id}`,
+          axisKey: axis.key,
+          axisLabel: axis.label,
+          discipline,
+        });
+      }
+    }
+    return out;
+  }, [visibleColumns, expandedAxes, disciplinesByAxis]);
 
   // Bei Filterwechsel wieder auf die erste "Seite" zurück.
   useEffect(() => {
@@ -1027,136 +1134,137 @@ export default function FoundationPlayersTableNewLook({
   }
 
   /**
-   * Kopfzelle der Achsen-Spalte: kein einzelner `sortKey` (die Spalte bündelt
-   * POW/SPE/MEN/SOC plus die je 5 zugehörigen Disziplinen, siehe
-   * `renderAxisBars`) — statt eines Sortier-Buttons steht hier nur der Hinweis,
-   * dass jeder Wert der Zelle anklickbar sortiert. Der frühere
-   * "Disziplinen"-Umschalter mit Dropdown ist entfallen: die Disziplinen stehen
-   * jetzt dauerhaft in jeder Zeile und sind dort direkt sortierbar (jeder
-   * Disziplin-Chip setzt `discipline:<id>` über denselben `onToggleSort`-Callback
-   * wie jede andere Spalte).
+   * Kopfzelle EINER Achsen-Spalte (POW/SPE/MEN/SOC). Zwei getrennte
+   * Affordanzen im selben Kopf, damit Sortieren und Aufklappen sich nicht
+   * gegenseitig auslösen:
+   *  - Das Label ist der Sortier-Button (`onToggleSort(axis.key)`, gleicher
+   *    Pfad wie jede andere Spalte).
+   *  - Der Pfeil rechts klappt die Spalte NACH RECHTS auf und zeigt die 5
+   *    Disziplinen dieser Achse als eigene Spalten mit den dort geholten PPs.
    */
-  function renderAxesColumnHeader(tooltip?: string) {
+  function renderAxisColumnHeader(
+    axis: (typeof NL_PLAYERS_AXES)[number],
+    column: (typeof NL_PLAYERS_COLUMNS)[number],
+  ) {
+    const isExpanded = expandedAxes[axis.key];
+    const isActive = sortState?.key === axis.key;
+    const direction: "none" | "asc" | "desc" = !isActive ? "none" : sortState?.direction === "asc" ? "asc" : "desc";
+    const disciplineCount = (disciplinesByAxis[axis.key] ?? []).length;
     return (
-      <div className="nl-players-axes-th">
-        <span className="nl-players-axes-th-label" title={tooltip}>
-          {NL_PLAYERS_COLUMNS.find((column) => column.id === "axes")?.label ?? "Achsen"}
-        </span>
-        <span className="nl-players-axes-th-hint">Achse oder Disziplin anklicken sortiert</span>
+      <div className={`nl-players-axis-th ${nlToneClass(axis.key)}`}>
+        <button
+          type="button"
+          className={`nl-players-sort-th${isActive ? " is-active" : ""}`}
+          onClick={() => onToggleSort(axis.key)}
+          title={column.tooltip ?? `Nach ${axis.label} sortieren`}
+          aria-label={`Nach ${axis.label} sortieren`}
+        >
+          <span>{axis.label}</span>
+          <b aria-hidden="true">
+            <NlSortGlyph direction={direction} />
+          </b>
+        </button>
+        {disciplineCount > 0 ? (
+          <button
+            type="button"
+            className={`nl-players-axis-expand${isExpanded ? " is-expanded" : ""}`}
+            onClick={() => toggleAxisExpanded(axis.key)}
+            aria-expanded={isExpanded}
+            title={
+              isExpanded
+                ? `${axis.label}-Disziplinen einklappen`
+                : `${disciplineCount} ${axis.label}-Disziplinen mit geholten PPs ausklappen`
+            }
+            aria-label={
+              isExpanded ? `${axis.label}-Disziplinen einklappen` : `${axis.label}-Disziplinen ausklappen`
+            }
+          >
+            {/* Horizontale Aufklapp-Richtung: ▸ zu, ◂ auf — die 180°-Drehung
+                macht die `.is-expanded`-Regel im Stylesheet, damit derselbe
+                Chevron wie überall sonst verwendet wird. */}
+            <NlChevronGlyph open={false} />
+          </button>
+        ) : null}
       </div>
     );
   }
 
   /**
-   * Achsen-Zellinhalt: eine Zeile je Achse (POW/SPE/MEN/SOC) statt eines
-   * engen 2×2-Clusters — Label, Balken und Wert stehen so nie horizontal
-   * nebeneinander benachbarter Achsen und laufen nicht zusammen
-   * ("91SPE" statt "91 · SPE"). Jede Achse ist einzeln lesbar.
-   *
-   * Bewusst NUR Balken + Wert (kein inline "#Rang" mehr) — PPs/OVR/MVS
-   * tragen bereits eigene Top-%/Rang-Chips, ein zusätzlicher #Rang je
-   * Achse war reine Excel-Redundanz ("ein GAME, keine Excel-Tabelle").
-   * Der ligaweite Rang bleibt trotzdem einen Hover entfernt: er steckt im
-   * `title`-Tooltip der Achse statt fest sichtbar in der Zelle zu stehen.
-   *
-   * Unter JEDER Achse stehen dauerhaft deren 5 Disziplinen (kein Dropdown mehr,
-   * `disciplinesByAxis`). Dichte-Entscheidung: die Disziplinen sind bewusst
-   * KEINE zweite Balken-Ebene, sondern eine einzelne 5-spaltige Mikro-Zeile aus
-   * Kürzel + Zahl (`getDisciplineShortLabel`, voller Name im `title`) mit einem
-   * 2px-Fortschrittsstrich. So kostet eine Achse nur ~14px extra statt 5 voller
-   * Balkenzeilen, die Achse bleibt visuell die Hauptgliederung und die Zeile
-   * bleibt trotz 4 Achsen + 20 Disziplinen vertretbar hoch. Jeder Chip ist ein
-   * eigener Sortier-Button (`discipline:<id>`, gleicher `onToggleSort`-Pfad wie
-   * die Achsen) — alle 20 Disziplinwerte sind damit direkt sortierbar.
+   * Kopfzelle einer aufgeklappten Disziplin-Spalte: Kürzel (voller Name im
+   * `title`) als Sortier-Button über `disciplinePps:<id>` — sortiert also nach
+   * den in dieser Disziplin GEHOLTEN PPs, nicht nach der Disziplin-Wertung.
    */
-  function renderAxisBars(row: FoundationPlayerScopeRow) {
+  function renderDisciplinePpsColumnHeader(entry: {
+    axisKey: NlAxisKey;
+    axisLabel: string;
+    discipline: Discipline;
+  }) {
+    const sortKey = buildDisciplinePpsSortKey(entry.discipline.id);
+    const isActive = sortState?.key === sortKey;
+    const direction: "none" | "asc" | "desc" = !isActive ? "none" : sortState?.direction === "asc" ? "asc" : "desc";
     return (
-      <div className="nl-players-axes" role="group" aria-label={`Achsenwerte ${row.player.name}`}>
-        {NL_PLAYERS_AXES.map(({ key, label }) => {
-          const value = row.player.coreStats[key] ?? null;
-          const percent =
-            value != null && Number.isFinite(value) ? Math.max(2, Math.min(100, value)) : 0;
-          const pool = leaguePlayerHeatPools[key];
-          const rank = getLeagueRank(value, pool);
-          const isAxisSort = sortState?.key === key;
-          const disciplines = disciplinesByAxis[key] ?? [];
-          return (
-            <div key={key} className={`nl-players-axis-group ${nlToneClass(key)}`}>
-              <button
-                type="button"
-                className={`nl-players-axis nl-ptable-axis-enhanced ${nlToneClass(key)}${isAxisSort ? " is-active-sort" : ""}`}
-                onClick={(event) => {
-                  // Nicht zum Zeilenklick (öffnet den Spieler-Drawer) durchreichen —
-                  // ein Achsenwert-Klick soll ausschließlich sortieren.
-                  event.stopPropagation();
-                  onToggleSort(key);
-                }}
-                aria-pressed={isAxisSort}
-                title={`Nach ${label} sortieren — ${label}: ${formatNlNumber(value, 0)} von 100${
-                  rank != null ? ` — Liga-Rang #${rank} von ${pool.length}` : ""
-                }`}
-              >
-                <span className="nl-players-axis-label">{label}</span>
-                <span className="nl-players-axis-track" aria-hidden="true">
-                  <span className="nl-players-axis-fill" style={{ width: `${percent}%` }} />
-                </span>
-                <span className="nl-players-axis-value nl-tnum">{formatNlNumber(value, 0)}</span>
-              </button>
-              {disciplines.length > 0 ? (
-                <div className="nl-players-axis-discs" role="group" aria-label={`Disziplinen ${label}`}>
-                  {disciplines.map((discipline) => {
-                    const disciplineValue = row.player.disciplineRatings[discipline.id] ?? null;
-                    const disciplinePool = leaguePlayerHeatPools.disciplines[discipline.id] ?? [];
-                    // Gleiche ABSOLUTE 0–100-Skala wie der Achsenbalken direkt darüber
-                    // (Disziplin-Wertungen liegen wie die Kernwerte auf 0–100). Bewusst
-                    // nicht pool-relativ: zwei verschiedene Maßstäbe direkt untereinander
-                    // wären irreführend, und bei einem dünn besetzten Liga-Pool (kleiner
-                    // Umfang) stünden sonst alle 5 Balken auf Anschlag. Der ligaweite
-                    // Rang bleibt im `title` erhalten.
-                    const disciplinePercent =
-                      disciplineValue != null && Number.isFinite(disciplineValue)
-                        ? Math.max(2, Math.min(100, disciplineValue))
-                        : 0;
-                    const disciplineRank = getLeagueRank(disciplineValue, disciplinePool);
-                    const sortKey = buildDisciplineSortKey(discipline.id);
-                    const isDisciplineSort = activeDisciplineSortId === discipline.id;
-                    return (
-                      <button
-                        key={discipline.id}
-                        type="button"
-                        className={`nl-players-axis-disc${isDisciplineSort ? " is-active-sort" : ""}`}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onToggleSort(sortKey);
-                        }}
-                        aria-pressed={isDisciplineSort}
-                        aria-label={`Nach ${discipline.name} sortieren`}
-                        title={`Nach ${discipline.name} sortieren — ${discipline.name}: ${formatNlNumber(
-                          disciplineValue,
-                          0,
-                        )}${disciplineRank != null ? ` — Liga-Rang #${disciplineRank} von ${disciplinePool.length}` : ""}`}
-                      >
-                        <span className="nl-players-axis-disc-head">
-                          <span className="nl-players-axis-disc-label">{getDisciplineShortLabel(discipline.name)}</span>
-                          <span className="nl-players-axis-disc-value nl-tnum">
-                            {formatNlNumber(disciplineValue, 0)}
-                          </span>
-                        </span>
-                        <span className="nl-players-axis-disc-track" aria-hidden="true">
-                          <span
-                            className="nl-players-axis-disc-fill"
-                            style={{ width: `${disciplinePercent}%` }}
-                          />
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
+      <div className={`nl-players-disc-th ${nlToneClass(entry.axisKey)}`}>
+        <button
+          type="button"
+          className={`nl-players-sort-th${isActive ? " is-active" : ""}`}
+          onClick={() => onToggleSort(sortKey)}
+          title={`Nach PPs in ${entry.discipline.name} sortieren (${entry.axisLabel})`}
+          aria-label={`Nach PPs in ${entry.discipline.name} sortieren`}
+        >
+          <span>{getDisciplineShortLabel(entry.discipline.name)}</span>
+          <b aria-hidden="true">
+            <NlSortGlyph direction={direction} />
+          </b>
+        </button>
       </div>
+    );
+  }
+
+  /**
+   * Zellinhalt EINER Achsen-Spalte: Balken + Wert des Achsen-Kernwerts
+   * (0–100). Bewusst kein inline "#Rang" — PPs/OVR/MVS tragen bereits eigene
+   * Top-%/Rang-Chips; der ligaweite Rang bleibt einen Hover entfernt im
+   * `title`. Zusätzlich nennt der Tooltip die auf dieser Achse geholten PPs
+   * (`row.disciplinePpsByAxis`), damit Achsenstärke und tatsächliche Ausbeute
+   * ohne Aufklappen vergleichbar sind.
+   */
+  function renderAxisCell(row: FoundationPlayerScopeRow, axis: (typeof NL_PLAYERS_AXES)[number]) {
+    const value = row.player.coreStats[axis.key] ?? null;
+    const percent = value != null && Number.isFinite(value) ? Math.max(2, Math.min(100, value)) : 0;
+    const pool = leaguePlayerHeatPools[axis.key];
+    const rank = getLeagueRank(value, pool);
+    const axisPps = row.disciplinePpsByAxis.find((entry) => entry.axis === axis.key)?.axisPps ?? null;
+    return (
+      <div
+        className={`nl-players-axis nl-ptable-axis-enhanced ${nlToneClass(axis.key)}`}
+        title={`${axis.label}: ${formatNlNumber(value, 0)} von 100${
+          rank != null ? ` — Liga-Rang #${rank} von ${pool.length}` : ""
+        }${axisPps != null ? ` — ${formatPpsValue(axisPps)} PPs auf dieser Achse` : ""}`}
+      >
+        <span className="nl-players-axis-track" aria-hidden="true">
+          <span className="nl-players-axis-fill" style={{ width: `${percent}%` }} />
+        </span>
+        <span className="nl-players-axis-value nl-tnum">{formatNlNumber(value, 0)}</span>
+      </div>
+    );
+  }
+
+  /**
+   * Zellinhalt einer aufgeklappten Disziplin-Spalte: die in dieser Disziplin
+   * GEHOLTEN PPs der laufenden Saison (aus dem Saison-Ledger über
+   * `row.disciplinePpsByAxis`) — nicht die Disziplin-Wertung. Einfärbung
+   * liga-relativ über den eigenen PPs-Pool (`leagueDisciplinePpsPools`,
+   * gleiche Achtel-Skala grün→rot wie PPs/OVR/MVS).
+   */
+  function renderDisciplinePpsCell(row: FoundationPlayerScopeRow, discipline: Discipline) {
+    const value = getRowDisciplinePps(row, discipline.id);
+    return (
+      <span
+        className="nl-players-disc-pps nl-tnum"
+        title={`${discipline.name}: ${value != null ? `${formatPpsValue(value)} PPs` : "keine PPs"} (${row.player.name})`}
+      >
+        {value != null && value > 0 ? formatPpsValue(value) : "—"}
+      </span>
     );
   }
 
@@ -1485,9 +1593,41 @@ export default function FoundationPlayersTableNewLook({
         {isColumnVisible("abilityStars") ? (
         <td className="nl-ptable-td-ability nl-ptable-td-ability-stacked">{renderAbilityStars(row)}</td>
         ) : null}
-        {isColumnVisible("axes") ? (
-        <td className="nl-players-td-axes">{renderAxisBars(row)}</td>
-        ) : null}
+        {/* Je Achse eine Spalte; ist sie aufgeklappt, folgen direkt rechts ihre
+            Disziplin-Spalten. Reihenfolge und Sichtbarkeit sind identisch zu
+            `renderedColumns` (Tabellenkopf) — beide leiten aus `visibleColumns`
+            + `expandedAxes` ab. */}
+        {NL_PLAYERS_AXES.flatMap((axis) => {
+          if (!isColumnVisible(axis.columnId)) {
+            return [];
+          }
+          const cells = [
+            <td key={axis.columnId} className={`nl-players-td-axis${sortCellClass(axis.key)}`}>
+              {renderAxisCell(row, axis)}
+            </td>,
+          ];
+          if (!expandedAxes[axis.key]) {
+            return cells;
+          }
+          for (const discipline of disciplinesByAxis[axis.key] ?? []) {
+            const disciplinePps = getRowDisciplinePps(row, discipline.id);
+            const heatClass =
+              disciplinePps != null
+                ? getPoolHeatClass(disciplinePps, leagueDisciplinePpsPools.get(discipline.id) ?? [])
+                : "";
+            cells.push(
+              <td
+                key={`${axis.columnId}:${discipline.id}`}
+                className={`nl-players-td-disc-pps ${heatClass}${sortCellClass(
+                  buildDisciplinePpsSortKey(discipline.id),
+                )}`}
+              >
+                {renderDisciplinePpsCell(row, discipline)}
+              </td>,
+            );
+          }
+          return cells;
+        })}
         {isColumnVisible("pps") ? (
         <td
           className={`nl-players-td-metric nl-players-td-pps is-highlight-primary${sortCellClass("pps")} ${
@@ -1655,7 +1795,7 @@ export default function FoundationPlayersTableNewLook({
     return [
       rowElement,
       <tr key={`${row.player.id}-pps-detail`} id={ppsDetailId} className="nl-players-detail-row">
-        <td className="nl-players-detail-cell" colSpan={visibleColumns.length}>
+        <td className="nl-players-detail-cell" colSpan={renderedColumns.length}>
           {renderPpsDetail(row)}
         </td>
       </tr>,
@@ -1678,13 +1818,35 @@ export default function FoundationPlayersTableNewLook({
    * einen Bruchteil der gefilterten Treffer erfassen.
    */
   const exportColumns = useMemo(
-    () => visibleColumns.filter((column) => column.id !== "compare" && column.id !== "image"),
-    [visibleColumns],
+    () =>
+      renderedColumns
+        .filter(
+          (entry) => entry.kind === "disciplinePps" || (entry.column.id !== "compare" && entry.column.id !== "image"),
+        )
+        .map((entry) =>
+          entry.kind === "disciplinePps"
+            ? // Aufgeklappte Disziplin-Spalten exportieren mit vollem Namen statt
+              // dem Kürzel der Kopfzeile — im CSV ist kein `title`-Tooltip da.
+              { id: entry.key, label: `${entry.axisLabel} ${entry.discipline.name} PPs`, disciplineId: entry.discipline.id }
+            : { id: entry.column.id, label: entry.column.label, disciplineId: null as string | null },
+        ),
+    [renderedColumns],
   );
 
   /** Klartext-Zellwert einer Export-Spalte für eine Zeile — spiegelt `renderRow` je Spalten-ID. */
-  function getExportCellText(columnId: string, row: FoundationPlayerScopeRow): string {
-    switch (columnId) {
+  function getExportCellText(
+    column: { id: string; disciplineId: string | null },
+    row: FoundationPlayerScopeRow,
+  ): string {
+    if (column.disciplineId) {
+      const pps = getRowDisciplinePps(row, column.disciplineId);
+      return pps != null && pps > 0 ? formatPpsValue(pps) : "—";
+    }
+    const axis = getAxisByColumnId(column.id);
+    if (axis) {
+      return formatNlNumber(row.player.coreStats[axis.key] ?? null, 0);
+    }
+    switch (column.id) {
       case "name":
         return row.player.name;
       case "team":
@@ -1726,10 +1888,6 @@ export default function FoundationPlayersTableNewLook({
         }
         return `CA ${caStars != null ? `${formatNlNumber(caStars, 2)}★` : "—"} / PO ${poText}`;
       }
-      case "axes":
-        return NL_PLAYERS_AXES.map(
-          ({ key, label }) => `${label} ${formatNlNumber(row.player.coreStats[key] ?? null, 0)}`,
-        ).join(" ");
       case "pps":
         return row.playerPps != null ? formatPpsValue(row.playerPps) : "—";
       case "ovr":
@@ -1779,7 +1937,7 @@ export default function FoundationPlayersTableNewLook({
     const rows = queryChipFilteredRows.map((row) =>
       // Whitespace normalisieren (z. B. der Zeilenumbruch in der "Saison: …"-Gehaltszeile
       // gibt es hier nicht, aber Achsen-/CA-PO-Text kombiniert mehrere Werte mit Leerzeichen).
-      exportColumns.map((column) => getExportCellText(column.id, row).replace(/\s+/g, " ").trim()),
+      exportColumns.map((column) => getExportCellText(column, row).replace(/\s+/g, " ").trim()),
     );
     return { headers, rows };
   }
@@ -2261,24 +2419,41 @@ export default function FoundationPlayersTableNewLook({
             <table className="nl-players-table nl-tnum">
               <thead>
                 <tr>
-                  {visibleColumns.map((column) => (
-                    <th
-                      key={column.id}
-                      scope="col"
-                      className={`nl-players-th is-${column.align ?? "left"}${
-                        column.highlight ? ` is-highlight-${column.highlight}` : ""
-                      }${sortCellClass(column.sortKey)}`}
-                      aria-sort={ariaSortFor(column.sortKey)}
-                    >
-                      {column.sortKey ? (
-                        renderSortHeader(column.sortKey, column.label, column.tooltip)
-                      ) : column.id === "axes" ? (
-                        renderAxesColumnHeader(column.tooltip)
-                      ) : (
-                        <span title={column.tooltip}>{column.label}</span>
-                      )}
-                    </th>
-                  ))}
+                  {renderedColumns.map((entry) => {
+                    if (entry.kind === "disciplinePps") {
+                      const sortKey = buildDisciplinePpsSortKey(entry.discipline.id);
+                      return (
+                        <th
+                          key={entry.key}
+                          scope="col"
+                          className={`nl-players-th is-right nl-players-th-disc-pps${sortCellClass(sortKey)}`}
+                          aria-sort={ariaSortFor(sortKey)}
+                        >
+                          {renderDisciplinePpsColumnHeader(entry)}
+                        </th>
+                      );
+                    }
+                    const { column } = entry;
+                    const axis = getAxisByColumnId(column.id);
+                    return (
+                      <th
+                        key={entry.key}
+                        scope="col"
+                        className={`nl-players-th is-${column.align ?? "left"}${
+                          column.highlight ? ` is-highlight-${column.highlight}` : ""
+                        }${axis ? " nl-players-th-axis" : ""}${sortCellClass(column.sortKey)}`}
+                        aria-sort={ariaSortFor(column.sortKey)}
+                      >
+                        {axis ? (
+                          renderAxisColumnHeader(axis, column)
+                        ) : column.sortKey ? (
+                          renderSortHeader(column.sortKey, column.label, column.tooltip)
+                        ) : (
+                          <span title={column.tooltip}>{column.label}</span>
+                        )}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>{visibleRows.flatMap((row) => renderRow(row))}</tbody>
