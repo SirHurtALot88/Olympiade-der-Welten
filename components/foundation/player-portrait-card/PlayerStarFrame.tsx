@@ -8,6 +8,7 @@ import {
   getPlayerStarTierClassName,
   getPlayerStarTierLabel,
   isHoloPlayerStarTier,
+  resolveLeagueRankFromPool,
   type PlayerStarTier,
 } from "@/lib/foundation/player-star-tier";
 
@@ -27,20 +28,6 @@ import {
  * Ohne Stufe rendert die Hülle NUR die Kinder — kein zusätzliches Element,
  * kein veränderter Layoutfluss für die große Mehrheit der Spieler.
  */
-
-/** Ligaweiter Rang eines Werts in seinem Pool (1 = bester); `null` ohne Pool/Wert. */
-function resolveLeagueRank(value: number | null | undefined, pool: ReadonlyArray<number> | undefined): number | null {
-  if (value == null || !Number.isFinite(value) || !pool || pool.length === 0) {
-    return null;
-  }
-  let higher = 0;
-  for (const entry of pool) {
-    if (entry > value) {
-      higher += 1;
-    }
-  }
-  return higher + 1;
-}
 
 export type PlayerStarFrameProps = {
   children: ReactNode;
@@ -67,9 +54,9 @@ export default function PlayerStarFrame({
     tier ??
     (metrics && leagueHeatPools
       ? getBestPlayerStarTier(
-          resolveLeagueRank(metrics.ovr, leagueHeatPools.ovr),
-          resolveLeagueRank(metrics.pps, leagueHeatPools.pps),
-          resolveLeagueRank(metrics.mvs, leagueHeatPools.mvs),
+          resolveLeagueRankFromPool(metrics.ovr, leagueHeatPools.ovr),
+          resolveLeagueRankFromPool(metrics.pps, leagueHeatPools.pps),
+          resolveLeagueRankFromPool(metrics.mvs, leagueHeatPools.mvs),
         )
       : null);
 

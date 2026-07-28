@@ -1309,6 +1309,20 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+  // Kopfbereich der Ladder (Titelzeile + Spaltenkoepfe) — wird gemessen, weil die
+  // Zeilenhoehe aus dem Rest der Hoehe folgt. Ohne diese Messung muesste man den
+  // Kopf hart schaetzen und die Liste endete je nach Disziplin zu frueh oder zu spaet.
+  const ladderHeadRef = useRef<HTMLDivElement | null>(null);
+  const [ladderHeadH, setLadderHeadH] = useState(0);
+  useLayoutEffect(() => {
+    const el = ladderHeadRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const measure = () => setLadderHeadH(Math.round(el.getBoundingClientRect().height));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   // Gewichtheben · Kraft-Turm (barbell): die geforderte Last (goldene Latte) steigt
   // je Runde. demandKg = aktuelle Last (null = Wettkampf noch nicht gestartet). Alle
   // noch nicht gerissenen Heber sitzen auf der Latte; wer sie nicht mehr packt (endKg
@@ -2873,7 +2887,28 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   // (Key/DOM bleibt fix) und per transform:translateY(Rang) mit CSS-Transition an ihre
   // Platzierung geschoben → kontinuierliches Mitlaufen statt Reflow-Sprünge.
   const trackLadder = animField;
-  const LADDER_ROW_H = 25;
+  /**
+   * Zeilenhoehe der Ladder — abgeleitet aus der Hoehe der Arena-Hauptspalte, damit
+   * die Tabelle rechts in JEDER Disziplin exakt so hoch ist wie die Arena links:
+   * gleicher Anfang, gleiches Ende, alle Teams sichtbar, kein Innen-Scroll.
+   *
+   * Vorher war die Hoehe fix 25px. Damit endete die Liste je nach Disziplin
+   * deutlich vor der Arena (kurze Liste, Loch darunter) oder lief darueber hinaus
+   * und musste scrollen — beides sah aus wie ein Layoutfehler.
+   *
+   * Die Grenzen sind bewusst gesetzt: unter ~17px werden Teamkuerzel und Punkte
+   * unlesbar, ueber ~34px zerfaellt die Liste optisch. Passt die Zeilenzahl auch
+   * bei Minimalhoehe nicht, bleibt der Innen-Scroll als ehrlicher Notnagel.
+   */
+  const LADDER_ROW_MIN_H = 17;
+  const LADDER_ROW_MAX_H = 34;
+  const LADDER_PAD_Y = 10; // padding des Ladder-Containers, oben + unten je 10px
+  const LADDER_ROW_H = useMemo(() => {
+    if (ladderMaxH == null || ladderHeadH <= 0) return 25;
+    const available = ladderMaxH - ladderHeadH - LADDER_PAD_Y * 2;
+    if (available <= 0) return LADDER_ROW_MIN_H;
+    return Math.max(LADDER_ROW_MIN_H, Math.min(LADDER_ROW_MAX_H, available / N));
+  }, [ladderMaxH, ladderHeadH, N]);
   const ladderRows = trackLadder ? [...rtRef.current].sort((a, b) => a.seasonRank - b.seasonRank) : ladderList;
 
   // Basketball-Court: Treffer/Fehlwurf-Schwelle = Feld-Median der bereits geworfenen
@@ -3007,7 +3042,11 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   };
 
   return (
-    <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
+    // `alignItems: stretch` (statt flex-start): die Ladder-Spalte rechts bekommt
+    // dieselbe Hoehe wie die Arena-Hauptspalte links, statt nur so hoch zu sein wie
+    // ihr Inhalt. Zusammen mit der abgeleiteten Zeilenhoehe (LADDER_ROW_H) endet die
+    // Tabelle damit in jeder Disziplin buendig mit der Arena.
+    <div style={{ display: "flex", gap: 14, alignItems: "stretch", flexWrap: "wrap" }}>
       <style>{`
         @keyframes olyFlash{0%{opacity:0}18%{opacity:1}100%{opacity:0}}
         @keyframes olyShakeHard{0%,100%{transform:translate(0,0)}15%{transform:translate(-5px,3px)}30%{transform:translate(4px,-4px)}45%{transform:translate(-4px,2px)}60%{transform:translate(3px,-2px)}80%{transform:translate(-2px,1px)}}
@@ -3666,7 +3705,15 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       </div>
 
       {/* Live-Ladder rechts */}
-      <div ref={ladderRef} data-testid="arena-ladder" style={{ flex: "0 0 340px", minWidth: 300, maxHeight: ladderMaxH ?? (done ? undefined : "calc(100vh - 130px)"), overflowY: "auto", overscrollBehavior: "contain", background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 10, position: done ? "static" : "sticky", top: done ? undefined : 12, order: 2 }}>
+      {/* `height` statt `maxHeight` und kein `sticky` mehr: die Tabelle soll exakt
+          mit der Arena anfangen und aufhoeren. Sticky liess sie beim Scrollen
+          gegenueber der Arena wandern, `maxHeight` deckelte nur nach oben und liess
+          kurze Listen ein Loch darunter. `overflowY: auto` bleibt als Notnagel fuer
+          den Fall, dass selbst die Minimal-Zeilenhoehe nicht reicht. */}
+      <div ref={ladderRef} data-testid="arena-ladder" style={{ flex: "0 0 340px", minWidth: 300, height: ladderMaxH ?? undefined, overflowY: "auto", overscrollBehavior: "contain", background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: LADDER_PAD_Y, order: 2, display: "flex", flexDirection: "column" }}>
+        {/* Kopfblock (Titel + Spaltenkoepfe) in einem gemessenen Wrapper: aus seiner
+            Hoehe folgt, wie viel Platz den Zeilen bleibt (siehe LADDER_ROW_H). */}
+        <div ref={ladderHeadRef} style={{ flex: "none" }}>
         <div style={{ fontSize: 11, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
           <span>{prim === "barbell" ? (done ? "Endstand" : "Rangliste · live") : done ? "Endstand" : "Rundenstand — live"}</span>
           {prim === "barbell" && !done ? <span style={{ marginLeft: "auto", fontFamily: "ui-monospace, monospace", fontSize: 9, color: "var(--nl-mut)", fontWeight: 700 }}>{barbellLive} im Wettkampf</span> : null}
@@ -3690,7 +3737,20 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             {done ? <span style={{ minWidth: 44, textAlign: "right" }}>Score</span> : null}
           </div>
         ) : null}
-        <div style={trackLadder ? { position: "relative", height: N * LADDER_ROW_H } : undefined}>
+        </div>
+        {/* Zeilenliste fuellt den Rest exakt aus — bei animiertem Feld absolut
+            positioniert (fuer die Rang-Wechsel-Animation), sonst im Fluss. */}
+        <div
+          style={
+            trackLadder
+              ? { position: "relative", height: N * LADDER_ROW_H, flex: "none" }
+              : // Ohne animiertes Feld (z. B. Gewichtheben) stehen die Zeilen im Fluss.
+                // Damit die Liste die gestreckte Hoehe trotzdem buendig ausfuellt, werden
+                // sie ueber die verbleibende Hoehe verteilt, statt oben zu kleben und
+                // darunter ein Loch zu lassen.
+                { flex: "1 1 auto", minHeight: 0, display: "flex", flexDirection: "column", justifyContent: "space-between" }
+          }
+        >
         {ladderRows.map((t) => {
           const teamClickable = Boolean(onOpenTeam && t.teamId);
           const teamHoverable = Boolean(onHoverTeam && t.teamId);
@@ -3746,7 +3806,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               }
             }}
             title={teamClickable ? "Team-Karte öffnen" : undefined}
-            style={{ display: "flex", alignItems: "center", gap: 7, padding: "1.5px 6px", borderRadius: 8, fontVariantNumeric: "tabular-nums", cursor: teamClickable ? "pointer" : "default", opacity: bOut ? 0.55 : 1, background: t.isOwn ? "color-mix(in srgb, var(--nl-accent) 14%, transparent)" : bChamp ? "color-mix(in srgb, var(--nl-warn) 16%, transparent)" : rc ? `color-mix(in srgb, ${rc} 9%, transparent)` : "transparent", boxShadow: rc ? `inset 3px 0 0 ${rc}` : undefined, ...(trackLadder ? { position: "absolute" as const, left: 0, right: 0, height: LADDER_ROW_H, transform: `translateY(${(dispRank - 1) * LADDER_ROW_H}px)`, transition: reduced.current ? "none" : "transform .35s cubic-bezier(.45,0,.2,1)" } : null) }}>
+            style={{ display: "flex", alignItems: "center", gap: 7, padding: "1.5px 6px", borderRadius: 8, fontVariantNumeric: "tabular-nums", cursor: teamClickable ? "pointer" : "default", opacity: bOut ? 0.55 : 1, background: t.isOwn ? "color-mix(in srgb, var(--nl-accent) 14%, transparent)" : bChamp ? "color-mix(in srgb, var(--nl-warn) 16%, transparent)" : rc ? `color-mix(in srgb, ${rc} 9%, transparent)` : "transparent", boxShadow: rc ? `inset 3px 0 0 ${rc}` : undefined, ...(trackLadder ? { position: "absolute" as const, left: 0, right: 0, height: LADDER_ROW_H, overflow: "hidden" as const, transform: `translateY(${(dispRank - 1) * LADDER_ROW_H}px)`, transition: reduced.current ? "none" : "transform .35s cubic-bezier(.45,0,.2,1)" } : null) }}>
             <span style={{ width: 26, textAlign: "right", fontWeight: 800, color: prim === "barbell" ? (bChamp ? "var(--nl-warn)" : ampel(bRank)) : ampel(dispRank), fontSize: 12.5 }}>{bChamp ? "🏆" : `#${prim === "barbell" ? bRank : dispRank}`}</span>
             {prim === "barbell" ? (
               <span aria-hidden title="Rang-Änderung seit letzter Runde" style={{ width: 14, fontSize: 10, fontWeight: 800, textAlign: "left", color: bArrow > 0 ? "var(--nl-good)" : bArrow < 0 ? "var(--nl-risk)" : "var(--nl-mut)" }}>

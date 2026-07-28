@@ -90,7 +90,13 @@ describe("Star-Tier: Renderpfade", () => {
 
   it("leitet das Tier in der gemeinsamen Portraitkarte ab (deckt alle Hover-Previews mit ab)", () => {
     const cardText = read("components/foundation/player-portrait-card/FoundationPlayerPortraitCard.tsx");
-    expect(cardText).toContain("getBestPlayerStarTier(ovrRank, ppsRank, mvsRank)");
+    // Die Karte leitet fehlende Raenge aus den Liga-Heat-Pools ab — sonst blieben
+    // alle Hover-Vorschauen ohne Rahmen, weil ihre Aufrufer zwar die Pools, aber
+    // keine fertigen Raenge durchreichen.
+    expect(cardText).toContain("getBestPlayerStarTier(effectiveOvrRank, effectivePpsRank, effectiveMvsRank)");
+    expect(cardText).toContain("resolveLeagueRankFromPool(playerOvr, resolvedHeatPools.ovr)");
+    expect(cardText).toContain("resolveLeagueRankFromPool(playerPps ?? null, resolvedHeatPools.pps)");
+    expect(cardText).toContain("resolveLeagueRankFromPool(playerMvs, resolvedHeatPools.mvs)");
     expect(cardText).toContain("getPlayerStarTierClassName(starTier)");
     expect(cardText).toContain('isHoloPlayerStarTier(starTier) ? "is-star-holo" : ""');
     expect(cardText).toContain("data-star-tier={starTier ?? undefined}");

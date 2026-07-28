@@ -1674,9 +1674,19 @@ export default function DisciplineStageArena({
             d1={matchdayPanel.d1}
             d2={matchdayPanel.d2}
             d1Revealed={
-              matchdayPanel.d2?.disciplineId === disciplineId
-                ? true
-                : Boolean(matchdayPanel.d1?.disciplineId && endedDisciplineIds.has(matchdayPanel.d1.disciplineId))
+              // Disziplin 1 gilt als aufgedeckt, sobald sie in DIESER Sitzung
+              // durchgelaufen ist — dann stehen Punkte, Form und Captain sofort
+              // in der Wertung, ohne dass man erst auf Disziplin 2 wechseln muss.
+              //
+              // Der Zweig ueber `d2 === disciplineId` bleibt als Faellback fuer den
+              // Wiedereinstieg (Arena neu geoeffnet, `endedDisciplineIds` leer,
+              // Disziplin 1 laengst gewertet). Er greift jetzt aber nur noch, wenn
+              // Disziplin 1 auch wirklich ein Ergebnis hat: vorher genuegte das
+              // blosse Anwaehlen von Disziplin 2 im Dropdown, um Aufstellung und
+              // Karten von Disziplin 1 zu zeigen, bevor sie gelaufen war.
+              Boolean(matchdayPanel.d1?.disciplineId && endedDisciplineIds.has(matchdayPanel.d1.disciplineId)) ||
+              (matchdayPanel.d2?.disciplineId === disciplineId &&
+                matchdayPanel.teamResults.some((row) => row.d1Points != null))
             }
             d2Revealed={
               matchdayPanel.d2?.disciplineId === disciplineId

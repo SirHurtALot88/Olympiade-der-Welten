@@ -165,9 +165,9 @@ function ppText(value: number | null): string {
   return `+${value.toFixed(1)}`;
 }
 
-// Tagesrang · Saison-Rang · Team · Diszi 1 · Diszi 2 · Spieltag (Σ) · Mutator · Gesamt.
+// Tagesrang · Saison-Rang · Team · Diszi 1 · Diszi 2 · Spieltag (Σ) · Form · Mutator · Gesamt.
 // Header und Datenzeilen teilen sich EXAKT dieses Raster (sonst driften die Spalten).
-const PANEL_GRID_COLUMNS = "58px 128px 1fr 78px 78px 74px 84px 88px";
+const PANEL_GRID_COLUMNS = "58px 122px 1fr 74px 74px 70px 76px 80px 84px";
 
 // Rang-Badge (klein, tabellarisch) — Gold/Silber/Bronze für die Top-3, gleiche
 // Farbsprache wie die Arena-Leiter (warn/mut/Bronze-rgb, dezent hinterlegt).
@@ -205,6 +205,7 @@ export type MatchdayPanelSortKey =
   | "d1"
   | "d2"
   | "sum"
+  | "form"
   | "mutator"
   | "total";
 
@@ -228,6 +229,14 @@ type SortableRow = {
   d2Pts: number | null;
   sum: number;
   mutPp: number;
+  /**
+   * Formkarten-Beitrag der AUFGEDECKTEN Disziplinen, summiert. Bewusst eine eigene
+   * Spalte statt nur der Chips am Teamnamen: nur so laesst sich die Tabelle danach
+   * ordnen und die Frage beantworten, ob der Kartensatz an diesem Spieltag gepasst
+   * hat. Der Wert ist bereits in den Disziplin-Punkten enthalten — er wird hier
+   * nicht addiert, sondern nur ausgewiesen.
+   */
+  formPp: number;
   total: number;
 };
 
@@ -246,6 +255,8 @@ function sortValue(row: SortableRow, key: MatchdayPanelSortKey): number | string
       return row.sum;
     case "mutator":
       return row.mutPp;
+    case "form":
+      return row.formPp;
     case "matchday":
     case "total":
     default:
@@ -363,6 +374,11 @@ export default function DisciplineStageMatchdayPanel({
     const sum = (d1Revealed ? d1Pts ?? 0 : 0) + (d2Revealed ? d2Pts ?? 0 : 0);
     const mut = mutatorByTeam?.get(s.teamId);
     const mutPp = (d1Revealed ? mut?.d1Pp ?? 0 : 0) + (d2Revealed ? mut?.d2Pp ?? 0 : 0);
+    // Formkarten-Beitrag der aufgedeckten Seiten. Gleiche Aufdeck-Regel wie bei
+    // Punkten und Mutator — eine verdeckte Disziplin darf hier nichts verraten.
+    const mods = modifiersByTeam?.get(s.teamId);
+    const formPp =
+      (d1Revealed ? mods?.d1?.formModifier ?? 0 : 0) + (d2Revealed ? mods?.d2?.formModifier ?? 0 : 0);
     return {
       teamId: s.teamId,
       teamName: teamMetaById.get(s.teamId)?.name ?? teamMetaById.get(s.teamId)?.code ?? s.teamId,
@@ -375,6 +391,7 @@ export default function DisciplineStageMatchdayPanel({
       d2Pts,
       sum,
       mutPp,
+      formPp,
       total: sum + mutPp,
       missingLineup: res?.missingLineup ?? false,
     };
@@ -552,6 +569,11 @@ export default function DisciplineStageMatchdayPanel({
               );
             })}
             {sortButton("sum", "Punkte", "Spieltags-Punkte je Rang (Disziplin 1 + Disziplin 2)")}
+            {sortButton(
+              "form",
+              "Form",
+              "Beitrag der eingesetzten Formkarten in den aufgedeckten Disziplinen. Bereits in den Disziplin-Punkten enthalten — hier nur ausgewiesen, damit sichtbar ist, ob der Kartensatz gepasst hat. Die gespielten Karten stehen als Chips am Teamnamen.",
+            )}
             {sortButton("mutator", "◆ Mutator", "Mutator-Bonus-PP (0,3er) — dem Spieler gutgeschrieben, separat vom Team-PP")}
             {sortButton("total", "Gesamt", "Gesamt = Spieltags-Punkte + Mutator-Bonus")}
           </div>
@@ -723,6 +745,31 @@ export default function DisciplineStageMatchdayPanel({
                   }}
                 >
                   {sumShown ? ppText(sum) : lockCell}
+                </div>
+
+                {/* Formkarten-Beitrag der aufgedeckten Seiten. Grau bei 0, damit die
+                    Spalte nicht mit Nullen zuschreit; Ton nach Richtung, weil eine
+                    negative Karte genauso eine Aussage ist wie eine positive. */}
+                <div
+                  title={
+                    row.formPp === 0
+                      ? "Keine Formkarte in den aufgedeckten Disziplinen"
+                      : `Formkarten-Beitrag: ${row.formPp > 0 ? "+" : ""}${row.formPp.toFixed(1)} — bereits in den Disziplin-Punkten enthalten`
+                  }
+                  style={{
+                    textAlign: "right",
+                    fontVariantNumeric: "tabular-nums",
+                    fontWeight: 800,
+                    fontSize: 13,
+                    color:
+                      row.formPp > 0.05
+                        ? "var(--nl-good)"
+                        : row.formPp < -0.05
+                          ? "var(--nl-risk)"
+                          : "var(--nl-mut)",
+                  }}
+                >
+                  {sumShown ? (Math.abs(row.formPp) < 0.05 ? "0" : `${row.formPp > 0 ? "+" : ""}${row.formPp.toFixed(1)}`) : lockCell}
                 </div>
 
                 {/* Mutator-Bonus (0,3er) — spielergenau, separat vom Team-PP. */}
