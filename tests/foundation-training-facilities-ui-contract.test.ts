@@ -130,20 +130,27 @@ describe("foundation training and facilities ui contract", () => {
     expect(cssText).toContain(".facilities-v2-action-bar");
   });
 
-  it("uses full-art portrait cards with training context presets in the player lane", async () => {
+  // Frueher prueften diese Assertions `TrainingPlayerLane` in
+  // training-view-shared.tsx — eine Spielerbahn, die nirgends importiert oder
+  // gerendert wurde. Der `context="training"`-Preset lebt tatsaechlich in
+  // TrainingCompactNewLook.tsx, das seine Spielerkarten selbst baut und den
+  // Preset ueber `FoundationPlayerPortraitPreview` fuettert. Die Abdeckung ist
+  // dorthin umgezogen, nicht entfallen.
+  it("uses the training context preset on the rendered player cards", async () => {
     const [trainingText, cssText] = await Promise.all([
-      fs.readFile(trainingViewSharedPath, "utf8"),
+      fs.readFile(trainingCompactPath, "utf8"),
       fs.readFile(globalsPath, "utf8"),
     ]);
 
-    expect(trainingText).toContain("FoundationPlayerPortraitCard");
-    expect(trainingText).toContain('context="training"');
-    expect(trainingText).toContain('density="full"');
+    expect(trainingText).toContain("FoundationPlayerPortraitPreview");
+    expect(trainingText).toContain('context: "training"');
+    // Der Preset wird auch wirklich gefuettert (sonst zeigt das Popup dieselben
+    // Zahlen doppelt, die die Karte schon als Sterne/Chips traegt).
+    expect(trainingText).toContain("contextData: {");
+    expect(trainingText).toContain("training: {");
     expect(trainingText).toContain("organicForecast.netSetpoints");
     expect(trainingText).toContain("forecast.regressionRisk");
     expect(trainingText).toContain("trainingModeLabel");
-    expect(trainingText).toContain("footerSlot");
-    expect(trainingText).toContain("team-portraits-grid");
     expect(cssText).toContain(".foundation-player-portrait-card.is-density-compact");
   });
 
@@ -177,9 +184,14 @@ describe("foundation training and facilities ui contract", () => {
     // unchanged and still fully enforced.
     expect(trainingSharedText).not.toContain("<TrainingAttributeUpgradeStrip");
     expect(trainingSharedText).toContain("TrainingWhyDisclosure");
-    expect(trainingSharedText).toContain("is-compare-active");
     expect(trainingSharedText).toContain("is-signature");
     expect(trainingSharedText).toContain("regressionRisk");
+    // `is-compare-active` sass ausschliesslich in der nie gerenderten
+    // `TrainingPlayerLane`. Ein Compare-Panel gibt es im Neuen Look bewusst
+    // nicht mehr (siehe Dateikommentar in TrainingCompactNewLook.tsx) — der
+    // Vertrag haelt das jetzt fest, statt seine Rueckkehr zu fordern.
+    expect(trainingSharedText).not.toContain("is-compare-active");
+    expect(trainingCompactText).not.toContain("is-compare-active");
 
     // NOTE: class names were migrated to the "nl-facility-overview-*" prefix
     // convention (facilities-overview-v2-maintenance-card -> nl-facility-overview-card,

@@ -21,9 +21,11 @@ import {
 } from "@/components/foundation/new-look";
 import type { LeagueLeadersClientProps } from "@/app/foundation/league-leaders-v2/LeagueLeadersClient";
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
+import PlayerStarFrame from "@/components/foundation/player-portrait-card/PlayerStarFrame";
 import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import type { LeagueLeaderCategory, LeagueLeaderEntry, LeagueLeaderTone } from "@/lib/foundation/league-leaders-service";
 import { useFoundationStateOptional } from "@/lib/foundation/foundation-state-context";
+import { getPlayerStarTier, type PlayerStarTier } from "@/lib/foundation/player-star-tier";
 import {
   buildLeagueRecordsHallOfFame,
   type LeagueRecordsHallOfFame,
@@ -97,26 +99,58 @@ function getLeaderInitials(name: string): string {
  * Initialen-Fallback (`BudgetedMediaImage`/`OptimizedMediaImage`s eigener
  * `fallback`-Mechanismus).
  */
-function LeaderAvatar({ playerId, name, className }: { playerId: string; name: string; className: string }) {
+/**
+ * Kategorien, deren Bestenliste EXAKT die ligaweite Rangfolge einer
+ * Star-Tier-Kennzahl ist. Nur dort ist `entry.rank` gleichbedeutend mit dem
+ * Ligarang, den `getPlayerStarTier` erwartet — bei "PP Pow" oder "Training"
+ * misst die Liste etwas anderes, und ein Rahmen wäre dort schlicht falsch.
+ */
+const STAR_TIER_LEADER_CATEGORIES = new Set(["pps", "mvs", "ovr"]);
+
+/**
+ * Star-Tier aus einem Bestenlisten-Eintrag — `null`, wenn die Kategorie keine
+ * der drei Kennzahlen ist. Die Liste wird ligaweit über alle Saisonzeilen
+ * gebaut (`buildCategory` in `league-leaders-service.ts`), der Rang ist also
+ * derselbe Begriff wie überall sonst. Einziger Unterschied: `buildCategory`
+ * vergibt bei Gleichstand fortlaufende statt geteilter Ränge — an der Spitze,
+ * wo die Stufen liegen, fällt das nicht ins Gewicht.
+ */
+function getLeaderStarTier(categoryId: string, rank: number | null | undefined) {
+  return STAR_TIER_LEADER_CATEGORIES.has(categoryId) ? getPlayerStarTier(rank) : null;
+}
+
+function LeaderAvatar({
+  playerId,
+  name,
+  className,
+  starTier = null,
+}: {
+  playerId: string;
+  name: string;
+  className: string;
+  starTier?: PlayerStarTier | null;
+}) {
   const portraitSrc = getPlayerPortraitBrowserUrl(playerId, null, null, { variant: "thumb" });
   const initials = getLeaderInitials(name);
   return (
-    <span className={className} aria-hidden="true">
-      {portraitSrc ? (
-        <BudgetedMediaImage
-          className="nl-leaders-avatar-img"
-          src={portraitSrc}
-          alt={name}
-          width={44}
-          height={44}
-          loading="lazy"
-          fetchPriority="low"
-          fallback={initials}
-        />
-      ) : (
-        initials
-      )}
-    </span>
+    <PlayerStarFrame tier={starTier} shape="circle">
+      <span className={className} aria-hidden={starTier ? undefined : true}>
+        {portraitSrc ? (
+          <BudgetedMediaImage
+            className="nl-leaders-avatar-img"
+            src={portraitSrc}
+            alt={name}
+            width={44}
+            height={44}
+            loading="lazy"
+            fetchPriority="low"
+            fallback={initials}
+          />
+        ) : (
+          initials
+        )}
+      </span>
+    </PlayerStarFrame>
   );
 }
 
@@ -311,7 +345,12 @@ export default function LeagueLeadersNewLook({
                   onClick={() => onOpenPlayer(leader.playerId)}
                   title={`${leader.name} · ${leader.teamName} · Profil öffnen`}
                 >
-                  <LeaderAvatar playerId={leader.playerId} name={leader.name} className="nl-leaders-hero-avatar" />
+                  <LeaderAvatar
+                    playerId={leader.playerId}
+                    name={leader.name}
+                    className="nl-leaders-hero-avatar"
+                    starTier={getLeaderStarTier(category.id, leader.rank)}
+                  />
                   <span className="nl-leaders-hero-copy">
                     <span className="nl-leaders-hero-rankline">
                       <NlMedalBadge kind="gold" title={`Rang 1 · ${category.label}`} />
@@ -341,7 +380,12 @@ export default function LeagueLeadersNewLook({
                         style={{ width: `${getLeaderBarPercent(entry, topValue)}%` }}
                       />
                       <span className="nl-leaders-row-rank nl-tnum">{entry.rank}</span>
-                      <LeaderAvatar playerId={entry.playerId} name={entry.name} className="nl-leaders-row-avatar" />
+                      <LeaderAvatar
+                        playerId={entry.playerId}
+                        name={entry.name}
+                        className="nl-leaders-row-avatar"
+                        starTier={getLeaderStarTier(category.id, entry.rank)}
+                      />
                       <span className="nl-leaders-row-player">
                         <strong>{entry.name}</strong>
                         <small>{entry.teamCode ?? entry.teamName}</small>
