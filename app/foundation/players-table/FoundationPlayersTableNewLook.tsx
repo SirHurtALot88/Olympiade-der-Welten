@@ -534,11 +534,12 @@ function renderMetricPercentileChip(value: number | null | undefined, pool: numb
 }
 
 /**
- * Absoluter Liga-Rang-Chip ("#N") — ersetzt den Perzentil-Chip in der
- * OVR-Spalte (Produkt-Feedback: absoluter Rang ist griffiger als "Top X%").
+ * Absoluter Liga-Rang-Chip ("#N") — ersetzt den Perzentil-Chip in ALLEN drei
+ * Kennzahl-Spalten PPs/OVR/MVS (Produkt-Feedback: absoluter Rang ist griffiger
+ * als "Top X%", und "Top 1%" stand in allen drei Spalten gleich da).
  * `null`, wenn kein valider Rang/Pool vorliegt (keine Erfindung).
  *
- * Ton ist bewusst FEST (`.nl-ptable-ovr-rank`), NICHT mehr die
+ * Ton ist bewusst FEST (`.nl-ptable-metric-rank.is-<metric>`), NICHT die
  * wertabhängige `getPoolHeatTone`-Ton-Klasse: OVR ist die Kopf-Kennzahl der
  * Tabelle und bekommt EINEN eigenen, von PPs/MVS abgesetzten Akzent statt
  * einer dritten überlagerten Farb-Ebene (Value-Heat-Zellenhintergrund +
@@ -547,15 +548,25 @@ function renderMetricPercentileChip(value: number | null | undefined, pool: numb
  * (dasselbe Blau-Vokabular wie PPs, nur schwächer) statt Amber/Gold — der
  * Chip-Text ist ein fester heller `--nl-ink`-Vordergrund statt Ton-auf-Ton,
  * damit er lesbar bleibt. Siehe die OVR-`<td>`-Zelle unten und die CSS
- * `.nl-ptable-ovr-cell` / `.nl-ptable-ovr-rank`.
+ * `.nl-ptable-ovr-cell` / `.nl-ptable-metric-rank`.
  */
-function renderMetricRankChip(value: number | null | undefined, pool: number[]) {
+function renderMetricRankChip(
+  value: number | null | undefined,
+  pool: number[],
+  // Eigener Akzent je Kennzahl: PPs blau, OVR lila, MVS gelb. Die drei Spalten
+  // standen vorher farblich nebeneinander und waren im Scannen nicht zu
+  // unterscheiden — jede bekommt jetzt EINE feste, klar getrennte Farbe.
+  metric: "pps" | "ovr" | "mvs" = "ovr",
+) {
   const rank = getLeagueRank(value, pool);
   if (rank == null) {
     return null;
   }
   return (
-    <span className="nl-ptable-percentile nl-ptable-ovr-rank" title={`Liga-Rang #${rank} von ${pool.length}`}>
+    <span
+      className={`nl-ptable-percentile nl-ptable-metric-rank is-${metric}`}
+      title={`Liga-Rang #${rank} von ${pool.length}`}
+    >
       #{formatNlNumber(rank, 0)}
     </span>
   );
@@ -1475,7 +1486,7 @@ export default function FoundationPlayersTableNewLook({
                 <NlChevronGlyph open={isPpsExpanded} />
               </b>
             </button>
-            {renderMetricPercentileChip(row.playerPps, leaguePlayerHeatPools.pps)}
+            {renderMetricRankChip(row.playerPps, leaguePlayerHeatPools.pps, "pps")}
           </span>
         </td>
         ) : null}
@@ -1483,7 +1494,7 @@ export default function FoundationPlayersTableNewLook({
         <td className={`nl-players-td-metric nl-ptable-ovr-cell${sortCellClass("ovr")}`}>
           <span className="nl-ptable-metric-cell">
             <span className="nl-tnum">{formatWholeNumber(row.playerOvr)}</span>
-            {renderMetricRankChip(row.playerOvr, leaguePlayerHeatPools.ovr)}
+            {renderMetricRankChip(row.playerOvr, leaguePlayerHeatPools.ovr, "ovr")}
           </span>
         </td>
         ) : null}
@@ -1495,7 +1506,7 @@ export default function FoundationPlayersTableNewLook({
         >
           <span className="nl-ptable-metric-cell">
             <span className="nl-tnum">{row.playerMvs != null ? formatPpsValue(row.playerMvs) : "—"}</span>
-            {renderMetricPercentileChip(row.playerMvs, leaguePlayerHeatPools.mvs)}
+            {renderMetricRankChip(row.playerMvs, leaguePlayerHeatPools.mvs, "mvs")}
           </span>
         </td>
         ) : null}
