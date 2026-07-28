@@ -52,6 +52,14 @@ export type MatchdayAutoRunStep = {
   dryRun: boolean;
   canContinue: boolean;
   warnings: string[];
+  /**
+   * Nachvollziehbarkeits-Protokoll (z. B. Begruendungen der Captain-KI). Bewusst getrennt
+   * von `warnings`: diese Zeilen faerben KEINEN Status ein. Vorher liefen sie ueber den
+   * Warnungskanal und haben den Auto-Run dauerhaft auf `warning` gezogen, obwohl nichts
+   * zu tun war — 64 Log-Zeilen gegen 4 echte Signale pro Spieltag.
+   * Optional: die meisten Schritte protokollieren nichts.
+   */
+  decisions?: string[];
   blockingReasons: string[];
   metrics: Record<string, number | string | boolean | null>;
   plannedWrites: number;
@@ -105,6 +113,8 @@ export type MatchdayAutoRunResult = {
   };
   steps: MatchdayAutoRunStep[];
   warnings: string[];
+  /** Gesammelte Entscheidungsprotokolle aller Schritte (faerben keinen Status ein). */
+  decisions: string[];
   blockingReasons: string[];
   plannedWrites: Array<{
     step: MatchdayAutoRunStepKey;
@@ -401,6 +411,7 @@ function createBaseResult(
     },
     steps: [],
     warnings: [],
+    decisions: [],
     blockingReasons: [],
     plannedWrites: [],
     appliedAudits: {
@@ -413,10 +424,33 @@ function createBaseResult(
   };
 }
 
+/**
+ * Nicht-handlungsrelevante Standings-Hinweise. `team_power_debuff:...` protokolliert nur, dass
+ * ein Team-Power-Debuff gegriffen hat — das ist die Mechanik bei der Arbeit, kein Problem
+ * (so steht es auch schon im Playability-Gate: "nur Balance-/Audit-Hinweis, kein Flow-Blocker").
+ * Ueber den Warnungskanal hat es den Standings-Preview-Schritt dauerhaft gelb gefaerbt.
+ */
+function isNonActionableStandingsNotice(warning: string) {
+  return warning.startsWith("team_power_debuff:");
+}
+
+/** Teilt Standings-Hinweise in echte Warnungen und reines Protokoll. */
+function splitStandingsNotices(notices: string[]) {
+  const warnings: string[] = [];
+  const decisions: string[] = [];
+  for (const notice of notices) {
+    (isNonActionableStandingsNotice(notice) ? decisions : warnings).push(notice);
+  }
+  return { warnings, decisions };
+}
+
 function addStep(result: MatchdayAutoRunResult, step: MatchdayAutoRunStep) {
   result.steps.push(step);
   if (step.warnings.length > 0) {
     result.warnings.push(...step.warnings);
+  }
+  if (step.decisions != null && step.decisions.length > 0) {
+    result.decisions.push(...step.decisions);
   }
   if (step.blockingReasons.length > 0) {
     if (!step.canContinue) {
@@ -547,6 +581,7 @@ export async function runLocalMatchdayAutoRun(
     }
 
     const standingsPreview = await buildStandingsPreview({ ...scope, source }, undefined, persistence);
+    const standingsNotices = splitStandingsNotices(standingsPreview.items.flatMap((item) => item.warnings));
     const standingsPreviewBlockers =
       stopOnTie && (standingsPreview.tieGroups?.length ?? 0) > 0
         ? [...standingsPreview.blockedRules, "tie_groups_require_confirmed_policy"]
@@ -556,11 +591,12 @@ export async function runLocalMatchdayAutoRun(
       label: "Standings Preview",
       status: getStatusFromBooleans({
         blockingReasons: standingsPreviewBlockers,
-        warnings: standingsPreview.items.flatMap((item) => item.warnings),
+        warnings: standingsNotices.warnings,
       }),
       dryRun: false,
       canContinue: standingsPreviewBlockers.length === 0,
-      warnings: standingsPreview.items.flatMap((item) => item.warnings),
+      warnings: standingsNotices.warnings,
+      decisions: standingsNotices.decisions,
       blockingReasons: standingsPreviewBlockers,
       metrics: {
         readyTeams: standingsPreview.summary.readyTeams,
@@ -685,6 +721,8 @@ export async function runLocalMatchdayAutoRun(
     dryRun,
     canContinue: aiBatchResult.summary.skippedBlocked === 0,
     warnings: aiBatchResult.summary.warnings,
+    // Captain-Begruendungen laufen ueber den Protokollkanal und faerben den Status nicht.
+    decisions: aiBatchResult.summary.captainDecisions,
     blockingReasons: aiBatchResult.summary.blockingReasons,
     metrics: {
       totalTeams: aiBatchResult.summary.totalTeams,
@@ -871,6 +909,7 @@ export async function runLocalMatchdayAutoRun(
   result.appliedAudits.resultApply = resultApply.matchdayResultId;
 
   const standingsPreview = await buildStandingsPreview({ ...scope, source }, undefined, persistence);
+  const standingsNotices = splitStandingsNotices(standingsPreview.items.flatMap((item) => item.warnings));
   const standingsPreviewBlockers =
     stopOnTie && (standingsPreview.tieGroups?.length ?? 0) > 0
       ? [...standingsPreview.blockedRules, "tie_groups_require_confirmed_policy"]
@@ -880,11 +919,12 @@ export async function runLocalMatchdayAutoRun(
     label: "Standings Preview",
     status: getStatusFromBooleans({
       blockingReasons: standingsPreviewBlockers,
-      warnings: standingsPreview.items.flatMap((item) => item.warnings),
+      warnings: standingsNotices.warnings,
     }),
     dryRun: false,
     canContinue: standingsPreviewBlockers.length === 0,
-    warnings: standingsPreview.items.flatMap((item) => item.warnings),
+    warnings: standingsNotices.warnings,
+    decisions: standingsNotices.decisions,
     blockingReasons: standingsPreviewBlockers,
     metrics: {
       readyTeams: standingsPreview.summary.readyTeams,

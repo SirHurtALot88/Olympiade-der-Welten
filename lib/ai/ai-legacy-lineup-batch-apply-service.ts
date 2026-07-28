@@ -45,6 +45,8 @@ export type AiBatchApplyTeamResult = {
   result: AiBatchApplyTeamStatus;
   overwriteExisting: boolean;
   warnings: string[];
+  /** Begruendungen der Captain-KI — Protokoll, kein Problem (s. AiLegacyLineupPreview). */
+  captainDecisions: string[];
   blockingReasons: string[];
   saved: boolean;
   formCardsSelected?: number;
@@ -83,6 +85,8 @@ export type AiBatchApplySummary = {
     totalMs: number;
   };
   warnings: string[];
+  /** Gesammelte Captain-Begruendungen aller Teams (dedupliziert). */
+  captainDecisions: string[];
   blockingReasons: string[];
 };
 
@@ -157,6 +161,7 @@ function buildCaptainPreviewMeta(
   preview: Partial<{
     captainSlotsUsed: number;
     captainSlotsRemaining: number;
+    captainDecisions: string[];
     d1: { captainSelectionStatus?: string | null } | null;
     d2: { captainSelectionStatus?: string | null } | null;
   }>,
@@ -164,6 +169,8 @@ function buildCaptainPreviewMeta(
   return {
     captainSlotsUsed: preview.captainSlotsUsed ?? null,
     captainSlotsRemaining: preview.captainSlotsRemaining ?? null,
+    // Reicht das Entscheidungsprotokoll der Captain-KI durch — getrennt vom Warnungskanal.
+    captainDecisions: preview.captainDecisions ?? [],
     d1CaptainSelectionStatus: preview.d1?.captainSelectionStatus ?? null,
     d2CaptainSelectionStatus: preview.d2?.captainSelectionStatus ?? null,
   };
@@ -1189,6 +1196,7 @@ export function applyAiLegacyLineupBatchLocally(
         captainSlotsRemaining: null,
         d1CaptainSelectionStatus: null,
         d2CaptainSelectionStatus: null,
+        captainDecisions: [],
         result: "skipped_blocked",
         overwriteExisting: false,
         warnings: contextResult.warnings,
@@ -1213,6 +1221,7 @@ export function applyAiLegacyLineupBatchLocally(
         captainSlotsRemaining: null,
         d1CaptainSelectionStatus: null,
         d2CaptainSelectionStatus: null,
+        captainDecisions: [],
         result: "skipped_manual",
         overwriteExisting: false,
         warnings: [],
@@ -1234,6 +1243,7 @@ export function applyAiLegacyLineupBatchLocally(
         captainSlotsRemaining: null,
         d1CaptainSelectionStatus: null,
         d2CaptainSelectionStatus: null,
+        captainDecisions: [],
         result: "skipped_passive",
         overwriteExisting: false,
         warnings: [],
@@ -1255,6 +1265,7 @@ export function applyAiLegacyLineupBatchLocally(
         captainSlotsRemaining: null,
         d1CaptainSelectionStatus: null,
         d2CaptainSelectionStatus: null,
+        captainDecisions: [],
         result: "skipped_disabled",
         overwriteExisting: false,
         warnings: [],
@@ -1478,6 +1489,7 @@ export function applyAiLegacyLineupBatchLocally(
       totalMs: elapsedSince(totalStartedAt),
     },
     warnings: Array.from(new Set(results.flatMap((entry) => entry.warnings))),
+    captainDecisions: Array.from(new Set(results.flatMap((entry) => entry.captainDecisions ?? []))),
     blockingReasons: Array.from(new Set(results.flatMap((entry) => entry.blockingReasons))),
   };
 

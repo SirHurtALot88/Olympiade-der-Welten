@@ -147,6 +147,14 @@ export type AiLegacyLineupPreview = {
   totalExpectedScore: number;
   expectedScore: number;
   warnings: string[];
+  /**
+   * Begruendungen der Captain-KI ("Captain gespart: Ertrag zu gering ...", "Captain
+   * opportunistisch gesetzt ..."). Bewusst NICHT in `warnings`: das sind
+   * Entscheidungsprotokolle, keine Probleme. Vorher landeten sie im Warnungskanal und
+   * haben ihn zugeschuettet — 64 Log-Zeilen gegen 4 echte Signale pro Spieltag, wodurch
+   * der Matchday-Auto-Run dauerhaft auf `warning` stand.
+   */
+  captainDecisions: string[];
   explanation: string;
   debugReasoning: string[];
   modifierPlan?: {

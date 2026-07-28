@@ -399,7 +399,14 @@ describe("legacy ai lineup suggestion", () => {
     expect(preview.captainSlotsRemaining).toBe(0);
     expect(captainEntries).toHaveLength(1);
     expect(preview.d1.captainSelectionStatus === "selected" || preview.d2.captainSelectionStatus === "selected").toBe(true);
-    expect(preview.warnings.some((warning) => warning.includes("Captain gespart") || warning === "captain_limit_reached")).toBe(true);
+    // Begruendungen der Captain-KI laufen ueber `captainDecisions`, nicht mehr ueber `warnings`
+    // (sie sind Protokoll, kein Problem, und haben den Warnungskanal zugeschuettet).
+    expect(
+      preview.captainDecisions.some(
+        (decision) => decision.includes("Captain gespart") || decision === "captain_limit_reached",
+      ),
+    ).toBe(true);
+    expect(preview.warnings.some((warning) => warning.includes("Captain gespart"))).toBe(false);
   });
 
   it("uses a captain in midseason top-six windows for large disciplines", () => {
@@ -491,7 +498,7 @@ describe("legacy ai lineup suggestion", () => {
 
     expect(preview.d1.captainSelectionStatus).toBe("selected");
     expect(preview.entries.some((entry) => entry.disciplineId === "tdm" && entry.isCaptain)).toBe(true);
-    expect(preview.warnings.some((warning) => warning.includes("große Diszi absichern"))).toBe(true);
+    expect(preview.captainDecisions.some((decision) => decision.includes("große Diszi absichern"))).toBe(true);
   });
 
   it("skips captain suggestions entirely once the season captain limit is already reached", () => {
@@ -508,7 +515,9 @@ describe("legacy ai lineup suggestion", () => {
     expect(preview.d2.captainSelectionStatus).toBe("skipped_limit_reached");
     expect(preview.d1.captainName).toBeNull();
     expect(preview.d2.captainName).toBeNull();
-    expect(preview.warnings).toContain("captain_limit_reached");
+    // Protokollkanal statt Warnungskanal (s.o.).
+    expect(preview.captainDecisions).toContain("captain_limit_reached");
+    expect(preview.warnings).not.toContain("captain_limit_reached");
   });
 
   it("does not double-count captain sides that were already consumed earlier in the season", () => {
@@ -594,7 +603,8 @@ describe("legacy ai lineup suggestion", () => {
     expect(preview.captainSlotsRemaining).toBe(3);
     expect([preview.d1.captainSelectionStatus, preview.d2.captainSelectionStatus]).not.toContain("selected");
     expect(preview.d1.captainSelectionStatus).toBe("skipped_not_worthwhile");
-    expect(preview.warnings.some((warning) => warning.includes("Captain gespart"))).toBe(true);
+    expect(preview.captainDecisions.some((decision) => decision.includes("Captain gespart"))).toBe(true);
+    expect(preview.warnings.some((warning) => warning.includes("Captain gespart"))).toBe(false);
   });
 
   it("is deterministic: the same context yields the same captain decisions twice", () => {

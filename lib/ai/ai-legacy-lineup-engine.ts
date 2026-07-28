@@ -33,7 +33,16 @@ type CaptainSuggestionCandidate = {
 type CaptainDecision = {
   candidate: CaptainSuggestionCandidate | null;
   status: AiCaptainSelectionStatus;
+  /**
+   * Echte Warnungen zum Kandidaten (Erschoepfung, fehlende Werte ...). Landet im
+   * Warnungskanal der Vorschau.
+   */
   warnings: string[];
+  /**
+   * Begruendung, WARUM der Slot gesetzt oder gespart wurde. Reines Protokoll, kein
+   * Problem — laeuft ueber `captainDecisions` und faerbt keinen Status mehr ein.
+   */
+  decisions: string[];
 };
 
 // ===========================================================================================
@@ -1083,6 +1092,7 @@ function buildCaptainDecisions(
         candidate: null,
         status: "skipped_not_needed",
         warnings: [],
+        decisions: [],
       });
       continue;
     }
@@ -1091,7 +1101,9 @@ function buildCaptainDecisions(
       decisionsBySide.set(side, {
         candidate,
         status: "blocked_policy",
+        // Echtes Problem (fehlende Policy-Quelle), bleibt im Warnungskanal.
         warnings: ["captain_policy_source_missing"],
+        decisions: [],
       });
       continue;
     }
@@ -1108,6 +1120,7 @@ function buildCaptainDecisions(
         candidate,
         status: "selected",
         warnings: candidate.warnings,
+        decisions: [],
       });
       continue;
     }
@@ -1117,7 +1130,8 @@ function buildCaptainDecisions(
       decisionsBySide.set(side, {
         candidate,
         status: "skipped_limit_reached",
-        warnings: ["captain_limit_reached"],
+        warnings: [],
+        decisions: ["captain_limit_reached"],
       });
       continue;
     }
@@ -1133,7 +1147,8 @@ function buildCaptainDecisions(
       decisionsBySide.set(side, {
         candidate,
         status: "selected",
-        warnings: [reason, ...candidate.warnings],
+        warnings: candidate.warnings,
+        decisions: [reason],
       });
       continue;
     }
@@ -1143,9 +1158,9 @@ function buildCaptainDecisions(
       decisionsBySide.set(side, {
         candidate,
         status: "skipped_not_worthwhile",
-        warnings: [
+        warnings: candidate.warnings,
+        decisions: [
           `Captain gespart: schwache/konservative Diszi, Slot für später aufgehoben (Rang ${rankLabel}, bester Score ${formatBoost(opportunity.strongestScore)})`,
-          ...candidate.warnings,
         ],
       });
       continue;
@@ -1155,9 +1170,9 @@ function buildCaptainDecisions(
       decisionsBySide.set(side, {
         candidate,
         status: "skipped_not_worthwhile",
-        warnings: [
+        warnings: candidate.warnings,
+        decisions: [
           `Captain gespart: Ertrag zu gering (Wert ${formatBoost(opportunity.opportunityScore)} < Hürde ${formatBoost(effectiveThreshold)}, Rang ${rankLabel})`,
-          ...candidate.warnings,
         ],
       });
       continue;
@@ -1167,9 +1182,9 @@ function buildCaptainDecisions(
     decisionsBySide.set(side, {
       candidate,
       status: "skipped_saving_for_later",
-      warnings: [
+      warnings: candidate.warnings,
+      decisions: [
         `Captain gespart: stärkere Seite/späterer Spieltag bevorzugt (Wert ${formatBoost(opportunity.opportunityScore)}, max ${CAPTAIN_MAX_NEW_PER_MATCHDAY}/Spieltag)`,
-        ...candidate.warnings,
       ],
     });
   }
@@ -1433,6 +1448,8 @@ export function buildAiLegacyLineupPreview(
     ...validation.errors,
     ...validation.warnings,
   ];
+  // Getrennt vom Warnungskanal: reines Entscheidungsprotokoll der Captain-KI.
+  const captainDecisions = [...captainPlan.d1.decisions, ...captainPlan.d2.decisions];
   const status = getPreviewStatus(d1, d2, warnings);
   const strategyExplanation = buildStrategyProfileExplanation(context);
   const explanation = [
@@ -1457,6 +1474,7 @@ export function buildAiLegacyLineupPreview(
     totalExpectedScore: fullScorePreview.totalScore,
     expectedScore: fullScorePreview.totalScore,
     warnings,
+    captainDecisions,
     explanation,
     debugReasoning: [...(strategyExplanation ? [`Strategy: ${strategyExplanation}`] : []), ...suggestion.debugReasoning],
     d1,
