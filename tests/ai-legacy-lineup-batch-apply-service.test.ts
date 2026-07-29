@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { buildAiLegacyLineupModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
+import { __setTeamPowersEnabledForTests } from "@/lib/lineups/team-powers";
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 
 function createContext(
@@ -51,6 +52,13 @@ function createContext(
     },
   } as unknown as LegacyLineupLoadedContext;
 }
+
+// Team-Powers sind im Spiel abgeschaltet (TEAM_POWERS_ENABLED). Die beiden
+// Power-Faelle dieser Suite pruefen die Auswahl-Mechanik selbst und schalten sie
+// dafuer gezielt ein — dieselbe Loesung wie in den team-powers-Suiten, damit die
+// Abdeckung erhalten bleibt, bis das System zurueckkehrt.
+beforeAll(() => __setTeamPowersEnabledForTests(true));
+afterAll(() => __setTeamPowersEnabledForTests(false));
 
 describe("AI legacy lineup form-card planning", () => {
   it("does not place a negative form card on a matching-color discipline when the side is competitive", () => {
