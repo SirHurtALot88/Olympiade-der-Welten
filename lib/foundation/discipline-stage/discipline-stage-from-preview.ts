@@ -39,6 +39,14 @@ export type StagePreviewTeam = {
   // liefert dann trotzdem einen (0-)teamResult-Eintrag. Muss in der Bühne sichtbar
   // markiert werden, statt als normales 0-Punkte-Ergebnis durchzugehen.
   missingLineup: boolean;
+  /**
+   * In der Einsatzliste dieser Disziplin gesetzter Kapitän (Name/ID) — oder `null`,
+   * wenn das Team keinen benannt hat. Die Bühne setzt daraufhin einen kleinen Stern
+   * ans Team-Wappen. Bewusst aus `entry.isCaptain` und nicht aus `captainBonus`:
+   * ein Kapitän ist gesetzt, auch wenn sein Bonus in dieser Disziplin 0 ergibt.
+   */
+  captainPlayerId: string | null;
+  captainName: string | null;
 };
 
 export type StageTeamMeta = { code: string; name: string; logoUrl: string | null };
@@ -154,6 +162,8 @@ export function buildDisciplineStageTeamsFromPreview(
       last.mods.push({ k: "Team", sign: residual < 0 ? -1 : 1, amt: Math.abs(residual) });
     }
 
+    const captainEntry = teamResult.entries.find((entry) => entry.isCaptain) ?? null;
+
     return {
       teamId: teamResult.teamId,
       code: meta?.code ?? teamResult.teamId,
@@ -164,6 +174,8 @@ export function buildDisciplineStageTeamsFromPreview(
       teamPoints: teamResult.teamPoints,
       players,
       missingLineup: teamResult.missingLineup,
+      captainPlayerId: captainEntry?.playerId ?? null,
+      captainName: captainEntry?.playerName ?? null,
     };
   });
 }

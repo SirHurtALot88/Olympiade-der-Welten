@@ -1142,6 +1142,8 @@ export default function DisciplineStageArena({
           // A2: Engine-Flag „keine Aufstellung eingereicht" 1:1 durchreichen, sonst
           // erscheint das Team als normales 0-Punkte-Ergebnis (falscher Eindruck).
           missingLineup: t.missingLineup,
+          // Kapitän dieser Einsatzliste (falls gesetzt) → Stern am Wappen in der Arena.
+          captainName: t.captainName,
           // Engine-Modus: Netto = val + Σmods trägt bereits die volle Engine-Zerlegung.
           players: t.players.map((p) => ({
             playerId: p.playerId,
@@ -1162,6 +1164,8 @@ export default function DisciplineStageArena({
           seasonRank: seasonRankOf(t.teamId),
           // Modell-/Random-Modus rechnet ohne Engine-Preview → kein missingLineup-Konzept.
           missingLineup: false,
+          // Ohne Engine-Preview gibt es auch keine Einsatzliste → kein Kapitän.
+          captainName: null as string | null,
           players: t.slots.map((s) => ({
             playerId: s.playerId,
             val: s.base,
@@ -1253,6 +1257,7 @@ export default function DisciplineStageArena({
         rel: t.teamId ? teamRelationshipMap.get(t.teamId) ?? null : null,
         seasonRank: t.seasonRank,
         missingLineup: t.missingLineup,
+        captainName: t.captainName,
         players: t.players.map((p) => ({
           playerId: p.playerId,
           val: p.val,

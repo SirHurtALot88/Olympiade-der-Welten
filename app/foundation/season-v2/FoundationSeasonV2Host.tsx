@@ -6,6 +6,7 @@ import FoundationSeasonV2Panel, {
   type FoundationSeasonV2PanelProps,
 } from "@/app/foundation/season-v2/FoundationSeasonV2Panel";
 import { buildSeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
+import { buildSeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
 import {
   useSeasonV2PanelModel,
   type UseSeasonV2PanelModelInput,
@@ -113,6 +114,18 @@ export default function FoundationSeasonV2Host({
     [gameState, isViewingArchivedSeason, playerRatingsById, seasonPointsLedger],
   );
 
+  /**
+   * Formkarten-Bilanz je Team für die Saisonstand-Spalte „Formkarten": Summe der
+   * NENNWERTE aller in dieser Saison ausgespielten Karten (+8 → 8, −4 → −4).
+   * Läuft über `formCards`/`lineupDrafts`, die beide nach `seasonId` gefiltert
+   * sind — eine Archiv-Saison ohne erhaltene Aufstellungen liefert deshalb
+   * schlicht eine leere Karte (Spalte zeigt „—") statt geratener Werte.
+   */
+  const teamFormCardBonusByTeamId = useMemo(
+    () => buildSeasonFormCardBonusByTeamId(gameState, seasonOverviewSeasonId),
+    [gameState, seasonOverviewSeasonId],
+  );
+
   const model = useSeasonV2PanelModel({
     gameState,
     selectedTeamId,
@@ -142,6 +155,7 @@ export default function FoundationSeasonV2Host({
       topPlayers={model.topPlayers}
       playerRows={model.playerRows}
       teamTopPlayersByColumn={teamTopPlayersByColumn}
+      teamFormCardBonusByTeamId={teamFormCardBonusByTeamId}
       gmRows={model.gmRows}
       archiveRows={model.archiveRows}
       disciplineLeaders={model.disciplineLeaders}
