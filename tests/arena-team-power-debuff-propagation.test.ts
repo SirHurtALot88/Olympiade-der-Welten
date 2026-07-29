@@ -1,8 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import type { LegacyTeamPowerOption } from "@/lib/lineups/team-powers";
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
+
+import { __setTeamPowersEnabledForTests } from "@/lib/lineups/team-powers";
+
+// Team-Powers sind im Spiel derzeit abgeschaltet (siehe TEAM_POWERS_ENABLED).
+// Diese Suite prueft die Mechanik selbst und schaltet sie dafuer gezielt ein,
+// damit die Abdeckung erhalten bleibt, bis das System zurueckkehrt.
+beforeAll(() => __setTeamPowersEnabledForTests(true));
+afterAll(() => __setTeamPowersEnabledForTests(false));
 
 // Fixture style mirrors tests/legacy-matchday-resolve.test.ts createContext().
 // Per-team suffix appended to d1 player IDs. The score engine adds a small

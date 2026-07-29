@@ -550,12 +550,61 @@ function buildTeamPowerUsageMap(gameState: GameState, seasonId: string, excludeL
   return usage;
 }
 
+/**
+ * Zentraler Schalter fuer das gesamte Team-Power-System.
+ *
+ * Auf Wunsch von Chris vorerst AUS: die Powers wirkten sich auf die Arena-Scores aus,
+ * sollen aber erst wieder mitspielen, wenn das Ability-Design steht (siehe
+ * `docs/team-abilities-redesign.md`). Bewusst ein Schalter statt Code-Entfernung —
+ * das System ist vollstaendig getestet und soll unbeschaedigt zurueckkehren koennen.
+ *
+ * Der Schalter greift an genau drei Stellen und deckt damit alles ab:
+ *   1. `getTeamPowerOptions` liefert nichts -> keine Auswahl in der Einsatzliste, keine
+ *      Anzeige, und die AI findet nichts zum Waehlen.
+ *   2. `calculatePassiveTeamPowerBonus` gibt 0 -> der Dauerbonus verschwindet.
+ *   3. `calculateTeamPowerModifierForSide` gibt das neutrale Ergebnis -> kein Score-
+ *      Beitrag und `teamPowerImpact` bleibt 0. Damit laufen auch die Debuffs leer, denn
+ *      `applyTeamPowerDebuffs` sammelt nur Quellen mit `teamPowerImpact > 0`.
+ *
+ * Bereits gespeicherte `teamPowerId`-Eintraege in Drafts bleiben unangetastet und wirken
+ * wieder, sobald der Schalter zurueckgeht — es gibt nichts zu migrieren.
+ */
+export const TEAM_POWERS_ENABLED = false;
+
+// Laufzeit-Zustand des Schalters. Getrennt von der Konstante, damit die bestehenden
+// Mechanik-Tests die Rechenwege weiter abdecken koennen — sonst waere die gesamte
+// Abdeckung weg, sobald das System wieder eingeschaltet wird.
+let teamPowersEnabled = TEAM_POWERS_ENABLED;
+
+export function areTeamPowersEnabled(): boolean {
+  return teamPowersEnabled;
+}
+
+/** NUR fuer Tests: schaltet die Mechanik voruebergehend ein/aus. */
+export function __setTeamPowersEnabledForTests(enabled: boolean): void {
+  teamPowersEnabled = enabled;
+}
+
+/** Neutrales Ergebnis von `calculateTeamPowerModifierForSide` (keine Power im Spiel). */
+const NEUTRAL_TEAM_POWER_RESULT = {
+  teamPowerSelected: 0,
+  teamPowerModifier: 0,
+  teamPowerImpact: 0,
+  teamPowerBasePct: 0,
+  teamPowerConditionalPct: 0,
+  teamPowerAttributeFitPct: 0,
+  teamPowerLabel: null as string | null,
+} as const;
+
 export function getTeamPowerOptions(input: {
   gameState: GameState;
   seasonId: string;
   teamId: string;
   lineupId?: string | null;
 }): LegacyTeamPowerOption[] {
+  if (!teamPowersEnabled) {
+    return [];
+  }
   const usage = buildTeamPowerUsageMap(input.gameState, input.seasonId, input.lineupId ?? null);
   const powers = (input.gameState.seasonState.teamPowers ?? []).filter(
     (power) => power.seasonId === input.seasonId && power.teamId === input.teamId && power.selectedForSeason,
@@ -599,6 +648,9 @@ export function calculatePassiveTeamPowerBonus(
   teamPowers: LegacyTeamPowerOption[],
   disciplineCategory: DisciplineCategory | string | null | undefined,
 ): number {
+  if (!teamPowersEnabled) {
+    return 0;
+  }
   const passivePower = teamPowers.find((power) => power.isPassive);
   if (!passivePower) {
     return 0;
@@ -678,8 +730,13 @@ export function calculateTeamPowerModifierForSide(input: {
   teamPowerLabel: string | null;
   warnings: string[];
 } {
-  const powerId = input.modifiers?.[input.disciplineSide]?.teamPowerId ?? null;
   const warnings: string[] = [];
+  if (!teamPowersEnabled) {
+    // Keine Warnung: eine deaktivierte Mechanik ist kein Fehlerfall. Gespeicherte
+    // teamPowerIds bleiben liegen und wirken wieder, sobald der Schalter zurueckgeht.
+    return { ...NEUTRAL_TEAM_POWER_RESULT, warnings };
+  }
+  const powerId = input.modifiers?.[input.disciplineSide]?.teamPowerId ?? null;
   if (!powerId) {
     return { teamPowerSelected: 0, teamPowerModifier: 0, teamPowerImpact: 0, teamPowerBasePct: 0, teamPowerConditionalPct: 0, teamPowerAttributeFitPct: 0, teamPowerLabel: null, warnings };
   }

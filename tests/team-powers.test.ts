@@ -1,6 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { calculateTeamPowerModifierForSide, type LegacyTeamPowerOption } from "@/lib/lineups/team-powers";
+
+import { __setTeamPowersEnabledForTests } from "@/lib/lineups/team-powers";
+
+// Team-Powers sind im Spiel derzeit abgeschaltet (siehe TEAM_POWERS_ENABLED).
+// Diese Suite prueft die Mechanik selbst und schaltet sie dafuer gezielt ein,
+// damit die Abdeckung erhalten bleibt, bis das System zurueckkehrt.
+beforeAll(() => __setTeamPowersEnabledForTests(true));
+afterAll(() => __setTeamPowersEnabledForTests(false));
 
 function createPower(partial?: Partial<LegacyTeamPowerOption>): LegacyTeamPowerOption {
   return {
