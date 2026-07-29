@@ -1,5 +1,6 @@
 import { buildAiLegacyLineupPreview, getMarginalRankPointSwing } from "@/lib/ai/ai-legacy-lineup-engine";
-import type { FormCardColor, GameState, LineupDraftModifiers } from "@/lib/data/olyDataTypes";
+import type { FormCardColor, GameState, LineupDraft, LineupDraftModifiers } from "@/lib/data/olyDataTypes";
+import { isTeamMatchdayLineupOperationallyReady } from "@/lib/foundation/matchday-lineup-readiness";
 import type { AiLegacyLineupPreviewStatus } from "@/lib/ai/ai-needs-types";
 import { buildTeamControlSettingsMap, isAiLineupBatchApplyEnabled } from "@/lib/foundation/team-control-settings";
 import {
@@ -1569,24 +1570,49 @@ export function applyAiLegacyLineupBatchLocally(
     }
 
     if (statusKind === "warning" && !includeWarningTeams) {
-      const captainMeta = buildCaptainPreviewMeta(preview);
-      results.push({
-        teamId: preview.teamId,
-        teamCode: preview.teamCode,
-        teamName: preview.teamName,
-        controlMode: team.controlMode,
-        aiEligible: team.aiEligible,
-        previewStatus: preview.status,
-        ...captainMeta,
-        result: "skipped_warning",
-        overwriteExisting: hasExistingDraft,
-        warnings: baseWarnings,
-        blockingReasons: [],
-        saved: false,
-        formCardsSelected,
-        negativeFormCardsSelected,
-      });
-      continue;
+      // Teilbesetzter Kader ist kein Grund, GAR NICHT anzutreten: Früher wurden diese Teams
+      // als `skipped_warning` übersprungen und gingen mit NULL Aufstellung (0 Punkte) in den
+      // Spieltag. Eine Teilaufstellung mit allen verfügbaren Spielern ist strikt besser —
+      // genau das prüft `isTeamMatchdayLineupOperationallyReady` (alle einsatzbereiten
+      // Spieler aufgestellt, offene Slots erlaubt). Andere Warnungsarten (missing_scores etc.)
+      // werden weiterhin übersprungen, dort deutet die Warnung auf ein echtes Datenproblem.
+      const partialLineupSaveable =
+        preview.status === "incomplete_roster" &&
+        preview.entries.length > 0 &&
+        isTeamMatchdayLineupOperationallyReady(preparedGameState, team.teamId, {
+          lineupId: `${params.saveId}:${params.seasonId}:${params.matchdayId}:${params.teamId}`,
+          saveId: params.saveId,
+          seasonId: params.seasonId,
+          matchdayId: params.matchdayId,
+          teamId: params.teamId,
+          status: "draft",
+          entries: preview.entries as LineupDraft["entries"],
+          modifiers,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      if (!partialLineupSaveable) {
+        const captainMeta = buildCaptainPreviewMeta(preview);
+        results.push({
+          teamId: preview.teamId,
+          teamCode: preview.teamCode,
+          teamName: preview.teamName,
+          controlMode: team.controlMode,
+          aiEligible: team.aiEligible,
+          previewStatus: preview.status,
+          ...captainMeta,
+          result: "skipped_warning",
+          overwriteExisting: hasExistingDraft,
+          warnings: baseWarnings,
+          blockingReasons: [],
+          saved: false,
+          formCardsSelected,
+          negativeFormCardsSelected,
+        });
+        continue;
+      }
+      // Nachvollziehbarkeit im Batch-Protokoll: das Team tritt bewusst teilbesetzt an.
+      baseWarnings.push("partial_lineup_saved_max_available_players");
     }
 
     if (hasCompleteExistingDraft && !overwriteExisting) {
