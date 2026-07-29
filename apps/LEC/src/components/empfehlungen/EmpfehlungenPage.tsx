@@ -7,7 +7,7 @@ import { AppShell } from "@/components/shell/AppShell";
 import { RECOMMENDATION_ICONS, RECOMMENDATION_CHIPS } from "@/components/dashboard/Recommendations";
 
 type Kind = Recommendation["kind"];
-const KIND_ORDER: Kind[] = ["auslisten", "preis_anpassen", "nachkaufen", "lot_bilden"];
+const KIND_ORDER: Kind[] = ["ek_pflegen", "auslisten", "preis_anpassen", "nachkaufen", "lot_bilden"];
 const DISMISSED_KEY = "lec.empfehlungen.dismissed.v1";
 const PAGE_SIZE = 100;
 
@@ -136,7 +136,7 @@ export function EmpfehlungenPage({ recommendations, kpis }: Props) {
             Verschenkte Marge <span>· VK &lt; MIN</span>
           </div>
           <div className="val" style={{ color: "var(--warn)" }}>
-            € <span className="num">{kpis.givenAwayMargin.toFixed(2)}</span> <small>/ Stk (Summe)</small>
+            € <span className="num">{kpis.givenAwayMargin.toFixed(0)}</span> <small>gesamt</small>
           </div>
         </div>
         <div className="card kpi" style={{ borderColor: "var(--good)" }}>
@@ -229,7 +229,7 @@ export function EmpfehlungenPage({ recommendations, kpis }: Props) {
                           {item.setCode && <span className="code" style={{ marginLeft: 8 }}>{item.setCode}</span>}
                         </span>
                         <span className="num" style={{ flex: "none", color: "var(--faint)" }}>
-                          € {item.boundCapital.toFixed(0)}
+                          {item.boundCapital !== null ? `€ ${item.boundCapital.toFixed(0)}` : "Bestand unbekannt"}
                         </span>
                       </div>
                     ))}
