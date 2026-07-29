@@ -4,7 +4,7 @@ import { loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-
 import type { LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
 import { DEFAULT_ACTIVE_OWNER_ID, buildTeamControlSettingsMap, canLocalUserManageTeam } from "@/lib/foundation/team-control-settings";
 import { readArenaPreviewCache, writeArenaPreviewCache } from "@/lib/foundation/arena-preview-cache";
-import { readMatchdayResolveSnapshot } from "@/lib/foundation/matchday-resolve-snapshot";
+import { buildMatchdayResolveSignature, readMatchdayResolveSnapshot } from "@/lib/foundation/matchday-resolve-snapshot";
 import {
   loadSqliteLegacyMatchdayResolvePreview,
   type LegacyMatchdayResolvePreviewPayload,
@@ -214,7 +214,21 @@ export async function loadMatchdayArenaBase(input: {
 
   if (input.includeDetails === true) {
     const resolveCacheKey = `${save.saveId}:${params.seasonId}:${params.matchdayId}`;
-    const cacheSignature = contentSignature ?? `${versionMeta?.updatedAt ?? save.updatedAt}`;
+    // Die Save-Content-Signatur allein reicht hier NICHT: sie kennt von den Aufstellungen
+    // nur die ANZAHL (`lineupDraftCount`). Wird eine Aufstellung geaendert statt neu
+    // angelegt — die eigene Elf umgestellt, ein bestehender Draft vom AI-Batch
+    // ueberschrieben — bleibt sie gleich, und die Arena beantwortet die Anfrage aus dem
+    // Cache: sie zeigt dann eine andere Aufstellung als die tatsaechlich gespeicherte.
+    // Deshalb zusaetzlich die Matchday-Resolve-Signatur, die Slots, Reihenfolge, Kapitaen,
+    // Formkarten und den Verfuegbarkeitsstand der eingesetzten Spieler abdeckt.
+    const cacheSignature = [
+      contentSignature ?? `${versionMeta?.updatedAt ?? save.updatedAt}`,
+      buildMatchdayResolveSignature(save.gameState, {
+        saveId: save.saveId,
+        seasonId: params.seasonId,
+        matchdayId: params.matchdayId,
+      }),
+    ].join("|");
     // Zuerst die EINE Rechnung des Spieltags, die beim Speichern der Aufstellungen
     // entstanden ist. Sie ist dieselbe Quelle, aus der auch gebucht wird — die Buehne
     // zeigt damit exakt das, was am Ende jeder Disziplin in den Saisonstand wandert.

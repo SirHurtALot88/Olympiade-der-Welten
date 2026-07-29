@@ -965,6 +965,17 @@ export type SaveLocalLegacyFormCardPlanInput = LegacyLineupKeyParams & {
   disciplineId?: string | null;
   primaryFormCardId?: string | null;
   secondaryFormCardId?: string | null;
+  /**
+   * Vorgeplante Intensitaet der Seite (Formplan-Push-Ziele).
+   *
+   * Dreiwertig und das mit Absicht:
+   *  - `undefined` → unveraendert lassen. Das Kartenfeld und das Intensitaets-Feld
+   *    schreiben denselben Datensatz; ohne diese Unterscheidung wuerde jedes
+   *    Kartenklicken den Push-Plan derselben Seite mitloeschen.
+   *  - `null`      → Plan bewusst entfernen ("kein Plan").
+   *  - Stufe       → Plan setzen.
+   */
+  plannedIntensity?: "conserve" | "normal" | "push" | null;
 };
 
 export function saveLocalLegacyFormCardPlan(
@@ -1040,32 +1051,54 @@ export function saveLocalLegacyFormCardPlan(
   const now = new Date().toISOString();
   const planId = `form-card-plan:${effectiveSaveId}:${input.seasonId}:${input.matchdayId}:${input.teamId}:${input.disciplineSide}`;
   const allPlans = gameState.seasonState.formCardPlans ?? [];
-  const nextPlan: FormCardPlanRecord | null =
-    requestedCardIds.length > 0
-      ? {
-          id: planId,
-          saveId: effectiveSaveId,
-          seasonId: input.seasonId,
-          teamId: input.teamId,
-          matchdayId: input.matchdayId,
-          disciplineSide: input.disciplineSide,
-          disciplineId,
-          primaryFormCardId: input.primaryFormCardId ?? null,
-          secondaryFormCardId: input.secondaryFormCardId ?? null,
-          updatedAt: now,
-        }
-      : null;
+  // Der Datensatz traegt zwei unabhaengige Planungen: Formkarten UND Push-Ziel.
+  // `plannedIntensity: undefined` heisst "nicht angefasst" — sonst wuerde ein
+  // Kartenklick den Push-Plan derselben Seite mitloeschen (und umgekehrt).
+  const existingPlan = allPlans.find((plan) => plan.id === planId) ?? null;
+  const nextPlannedIntensity =
+    input.plannedIntensity === undefined ? existingPlan?.plannedIntensity ?? null : input.plannedIntensity;
+  // Ein Datensatz ohne Karten UND ohne Push-Ziel ist leer und wird geloescht —
+  // sonst sammelt der Save leere Plaene an.
+  const hasPlanContent = requestedCardIds.length > 0 || nextPlannedIntensity != null;
+  const nextPlan: FormCardPlanRecord | null = hasPlanContent
+    ? {
+        id: planId,
+        saveId: effectiveSaveId,
+        seasonId: input.seasonId,
+        teamId: input.teamId,
+        matchdayId: input.matchdayId,
+        disciplineSide: input.disciplineSide,
+        disciplineId,
+        primaryFormCardId: input.primaryFormCardId ?? null,
+        secondaryFormCardId: input.secondaryFormCardId ?? null,
+        plannedIntensity: nextPlannedIntensity,
+        updatedAt: now,
+      }
+    : null;
   const reservedCardIds = new Set(requestedCardIds);
+  // Dieselbe Karte darf nur an EINEM Spieltag liegen. Frueher flog der fremde Plan
+  // dabei komplett raus; seit er auch ein Push-Ziel tragen kann, wird ihm nur noch
+  // die Karte entzogen — das Push-Ziel dieser Seite bleibt bestehen. Erst wenn
+  // danach weder Karte noch Push-Ziel uebrig ist, verschwindet der Datensatz.
+  const releaseReservedCards = (plan: FormCardPlanRecord): FormCardPlanRecord | null => {
+    const primary = plan.primaryFormCardId && reservedCardIds.has(plan.primaryFormCardId) ? null : plan.primaryFormCardId;
+    const secondary =
+      plan.secondaryFormCardId && reservedCardIds.has(plan.secondaryFormCardId) ? null : plan.secondaryFormCardId;
+    if (primary === plan.primaryFormCardId && secondary === plan.secondaryFormCardId) {
+      return plan;
+    }
+    if (!primary && !secondary && plan.plannedIntensity == null) {
+      return null;
+    }
+    return { ...plan, primaryFormCardId: primary, secondaryFormCardId: secondary, updatedAt: now };
+  };
   const nextPlans = [
-    ...allPlans.filter((plan) => {
-      if (plan.id === planId) {
-        return false;
-      }
-      if (plan.seasonId !== input.seasonId || plan.teamId !== input.teamId) {
-        return true;
-      }
-      return ![plan.primaryFormCardId, plan.secondaryFormCardId].some((cardId) => cardId && reservedCardIds.has(cardId));
-    }),
+    ...allPlans
+      .filter((plan) => plan.id !== planId)
+      .map((plan) =>
+        plan.seasonId !== input.seasonId || plan.teamId !== input.teamId ? plan : releaseReservedCards(plan),
+      )
+      .filter((plan): plan is FormCardPlanRecord => plan != null),
     ...(nextPlan ? [nextPlan] : []),
   ].sort(
     (left, right) =>

@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -63,6 +66,28 @@ describe("Spieler-Verzeichnis: Achsen-Spalten + Disziplin-PPs", () => {
     } finally {
       (globalThis as { window?: unknown }).window = originalWindow;
     }
+  });
+
+  it("faerbt die Disziplin-Spalten im Ton ihrer Achse, nicht im Heat-Regenbogen", () => {
+    const tableText = readFileSync(
+      join(process.cwd(), "app/foundation/players-table/FoundationPlayersTableNewLook.tsx"),
+      "utf8",
+    );
+    // Zelle UND Kopf tragen den Achsenton — sonst ist bei zwei aufgeklappten
+    // Achsen nebeneinander nicht erkennbar, welcher Block wozu gehoert.
+    expect(tableText).toContain("nl-players-td-disc-pps ${nlToneClass(axis.key)}");
+    expect(tableText).toContain("nl-players-th-disc-pps ${nlToneClass(entry.axisKey)}");
+    // Gruppenklammer: Achse offen -> linke Kante, letzte Disziplin -> rechte Kante.
+    expect(tableText).toContain("is-group-start");
+    expect(tableText).toContain("is-group-end");
+    expect(tableText).toContain("is-group-open");
+
+    const cssText = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
+    // Die Heat-Stufe steuert jetzt die Deckkraft des Achsentons statt eine
+    // eigene Farbe zu setzen — Zugehoerigkeit ueber Farbe, Leistung ueber Staerke.
+    expect(cssText).toContain(".is-new-look .nl-players-td-disc-pps.heat-band-8 {");
+    expect(cssText).toContain("color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 48%, transparent)");
+    expect(cssText).toContain(".is-new-look .nl-players-td-disc-pps.is-group-end");
   });
 
   it("hält Wertungs- und PPs-Sortierschlüssel einer Disziplin auseinander", () => {

@@ -293,7 +293,19 @@ describe("runWholeSeasonDryRun", () => {
     expect(result.simulatedMatchdays).toBe(2);
     expect(result.aiSeasonAudit.totals.aiDrafts).toBeGreaterThan(0);
     expect(result.aiSeasonAudit.totals.formCardUses).toBeGreaterThan(0);
-    expect(result.aiSeasonAudit.totals.mutatorTraits).toBeGreaterThan(0);
+    // KI-Aufstellungen tragen bewusst KEINE kadergenauen Mutator-Traits mehr.
+    // `applyMutatorTraitsToLineupModifiers` waehlte frueher genau die Traits aus,
+    // die der eigene Kader BESITZT — jedes KI-Team bekam damit garantierte Treffer,
+    // waehrend das menschliche Team dafuer gar kein Auswahlfeld hat und auf den
+    // blinden Spieltags-Wurf angewiesen war. Der Aufruf wurde deshalb aus
+    // `ai-legacy-lineup-batch-apply-service.ts` entfernt (dort ausfuehrlich
+    // begruendet); die Mutatoren sind eine Eigenschaft der DISZIPLIN und fuer alle
+    // 32 Teams dieselben, die Wertung nimmt den Wurf.
+    //
+    // Die Assertion stand noch auf dem alten Verhalten und war dadurch dauerhaft
+    // rot. Sie haelt jetzt die tatsaechliche Regel fest — ein Wiederauftauchen
+    // waere die Rueckkehr des Ungleichgewichts, nicht ein Fortschritt.
+    expect(result.aiSeasonAudit.totals.mutatorTraits).toBe(0);
     for (const matchday of result.matchdays) {
       expect(matchday.steps.filter((step) => step.key === "matchday_advance")).toHaveLength(1);
     }
