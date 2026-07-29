@@ -58156,25 +58156,14 @@ button.foundation-team-portrait-card {
   box-shadow: var(--nl-e1);
 }
 
+/* Die Kopfzeile traegt seit dem Entfernen des Titelblocks nur noch die Bedienelemente —
+   `flex-end` haelt sie rechts, wo sie vorher schon standen. */
 .is-new-look .nl-lineup-show-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: var(--nl-s3);
-}
-
-.is-new-look .nl-lineup-show-title {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.is-new-look .nl-lineup-show-title strong {
-  font-family: var(--nl-display);
-  font-size: 16px;
-  color: var(--nl-ink);
 }
 
 .is-new-look .nl-lineup-show-controls {
