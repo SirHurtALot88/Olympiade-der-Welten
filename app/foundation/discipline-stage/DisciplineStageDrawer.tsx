@@ -95,6 +95,34 @@ function rankLabel(rank: number | null | undefined): string | null {
   return rank != null && Number.isFinite(rank) ? `#${rank}` : null;
 }
 
+/**
+ * Mindestgröße des Liga-Rang-Pools, ab der ein „#N" überhaupt etwas aussagt.
+ *
+ * Sämtliche Ränge der Karte (OVR, PP, MVS, Achsen) werden gegen die Spieler auf ALLEN
+ * Kadern der Liga gerechnet — bei 32 Teams sind das rund 256. Ist dieser Pool degeneriert,
+ * weil die Kader im geladenen Stand (noch) fast leer sind, ist jeder Spieler automatisch
+ * Erster: dann stand auf der Karte „#1" quer durch alle Werte, und OVR normalisierte sich
+ * auf glatte 100 — beides eine Aussage über nichts. Unter dieser Schwelle wird der Rang
+ * deshalb weggelassen statt erfunden. 20 ≈ zwei bis drei Kader: weniger als das ist kein
+ * Ligavergleich mehr.
+ */
+const MIN_LEAGUE_RANK_POOL = 20;
+
+/**
+ * Größe des Pools, gegen den gerankt wird: jeder Spieler, der auf irgendeinem Kader der Liga
+ * steht — exakt das `activePlayerIds` aus `buildPlayerDrawerDataFromGameState` und
+ * `buildPlayerRatingContractMap`. Nicht das eigene Team, nicht die Teilnehmer der laufenden
+ * Disziplin.
+ */
+function getLeagueRankPoolSize(gameState: GameState): number {
+  return new Set((gameState.rosters ?? []).map((entry) => entry.playerId).filter(Boolean)).size;
+}
+
+/** Trägt der Pool einen Ligavergleich? Siehe MIN_LEAGUE_RANK_POOL. */
+function isLeagueRankUsable(gameState: GameState): boolean {
+  return getLeagueRankPoolSize(gameState) >= MIN_LEAGUE_RANK_POOL;
+}
+
 // CSS-Custom-Properties in ein Style-Objekt gießen (TS-freundlicher Cast).
 function withVars(vars: Record<string, string>, rest?: React.CSSProperties): React.CSSProperties {
   return { ...(vars as unknown as React.CSSProperties), ...(rest ?? {}) };
@@ -186,7 +214,9 @@ function TraitChip({ text, tone }: { text: string; tone: "good" | "risk" }) {
 }
 
 /** Achsen-Balken mit FESTEM Ton (nie team-eingefärbt) + Wert und optionalem Rang. */
-function AxisBar({ meta, value, rank }: { meta: AxisMeta; value: number | null; rank: number | null }) {
+// `rankText` statt einer rohen Zahl: der Aufrufer entscheidet über das Liga-Gate
+// (MIN_LEAGUE_RANK_POOL) und übergibt null, wenn kein belastbarer Rang existiert.
+function AxisBar({ meta, value, rankText }: { meta: AxisMeta; value: number | null; rankText: string | null }) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6, marginBottom: 3 }}>
@@ -195,7 +225,7 @@ function AxisBar({ meta, value, rank }: { meta: AxisMeta; value: number | null; 
         </span>
         <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6, fontVariantNumeric: "tabular-nums" }}>
           <span style={{ fontSize: 13, fontWeight: 800 }}>{typeof value === "number" ? fmt1(value) : "–"}</span>
-          {rankLabel(rank) ? <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--nl-mut)" }}>{rankLabel(rank)}</span> : null}
+          {rankText ? <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--nl-mut)" }}>{rankText}</span> : null}
         </span>
       </div>
       <NlProgressBar value={typeof value === "number" ? value : 0} max={100} tone={meta.tone} showValue={false} />
@@ -294,6 +324,11 @@ function PlayerBody({
       return null;
     }
   }, [gameState, playerId]);
+
+  const leagueRankUsable = useMemo(() => isLeagueRankUsable(gameState), [gameState]);
+  /** Rang nur zeigen, wenn er aus einem echten Ligavergleich stammt (siehe MIN_LEAGUE_RANK_POOL). */
+  const leagueRankLabel = (rank: number | null | undefined): string | null =>
+    leagueRankUsable ? rankLabel(rank) : null;
 
   if (!player) {
     return <div style={{ fontSize: 13, color: "var(--nl-mut)", fontStyle: "italic" }}>Spieler nicht gefunden.</div>;
@@ -471,8 +506,8 @@ function PlayerBody({
             <span style={{ fontSize: 26, fontWeight: 800, color: "var(--accent)", fontVariantNumeric: "tabular-nums" }}>
               {typeof currentDiscValue === "number" ? fmt1(currentDiscValue) : "–"}
             </span>
-            {rankLabel(currentDiscRank) ? (
-              <span style={{ fontSize: 12, fontWeight: 800, color: "var(--nl-mut)" }}>{rankLabel(currentDiscRank)}</span>
+            {leagueRankLabel(currentDiscRank) ? (
+              <span style={{ fontSize: 12, fontWeight: 800, color: "var(--nl-mut)" }}>{leagueRankLabel(currentDiscRank)}</span>
             ) : null}
           </span>
         </div>
@@ -480,9 +515,9 @@ function PlayerBody({
 
       {/* Kopfzahlen: OVR (groß, --accent), PP, MVS */}
       <div style={{ display: "flex", gap: 6 }}>
-        <HeadlineTile label="OVR" value={ovr != null ? fmt1(ovr) : "–"} rank={rankLabel(ovrRank)} role="primary" big />
-        <HeadlineTile label="PP" value={pps != null ? fmt1(pps) : "–"} rank={rankLabel(ppsRank)} />
-        <HeadlineTile label="MVS" value={mvs != null ? fmt1(mvs) : "–"} rank={mvs != null ? rankLabel(mvsRank) : null} />
+        <HeadlineTile label="OVR" value={ovr != null ? fmt1(ovr) : "–"} rank={leagueRankLabel(ovrRank)} role="primary" big />
+        <HeadlineTile label="PP" value={pps != null ? fmt1(pps) : "–"} rank={leagueRankLabel(ppsRank)} />
+        <HeadlineTile label="MVS" value={mvs != null ? fmt1(mvs) : "–"} rank={mvs != null ? leagueRankLabel(mvsRank) : null} />
       </div>
 
       {/* Achsen (feste Töne, nie team-eingefärbt) */}
@@ -491,9 +526,12 @@ function PlayerBody({
           {AXES.map((meta) => {
             const card = axisById.get(meta.id);
             const value = (card?.value ?? player.coreStats?.[meta.coreKey]) ?? null;
-            // Rang = Saison-Punkte-Rang der Achse (nicht Attribut-Rang).
-            const rank = card?.seasonPointsRank ?? null;
-            return <AxisBar key={meta.id} meta={meta} value={value} rank={rank} />;
+            // Zahl und Rang müssen dieselbe Größe beschreiben. Hier steht der ATTRIBUTWERT
+            // (POW 65,9) — dazu gehört `valueRank`, der Rang genau dieses Attributs in der
+            // Liga. Vorher hing daneben `seasonPointsRank`, also der Rang der in POW-Diszis
+            // gesammelten Saison-PPs: ein Rang, der zur angezeigten Zahl nicht passte.
+            const rank = card?.valueRank ?? null;
+            return <AxisBar key={meta.id} meta={meta} value={value} rankText={leagueRankLabel(rank)} />;
           })}
         </div>
       </Section>
@@ -508,7 +546,7 @@ function PlayerBody({
                   <span style={{ fontSize: 12.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.label}</span>
                   <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6, flex: "none", fontVariantNumeric: "tabular-nums" }}>
                     <span style={{ fontSize: 13, fontWeight: 800, color: "var(--accent)" }}>{fmt1(d.value)}</span>
-                    {rankLabel(d.rank) ? <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--nl-mut)" }}>{rankLabel(d.rank)}</span> : null}
+                    {leagueRankLabel(d.rank) ? <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--nl-mut)" }}>{leagueRankLabel(d.rank)}</span> : null}
                   </span>
                 </div>
                 <AccentMiniBar value={d.value} />
@@ -778,11 +816,14 @@ function TeamBody({
     }
     try {
       const ratingMap = buildPlayerRatingContractMap(gameState);
+      // Bei degeneriertem Pool (fast leere Kader) wäre jeder Spieler „#1" — dann gar kein
+      // Rang statt eines erfundenen. Gleiches Gate wie in der Spieler-Ansicht.
+      const rankUsable = isLeagueRankUsable(gameState);
       for (const pid of rosterIds) {
         const r = ratingMap.get(pid);
         if (r) rows.set(pid, r);
         ovr.set(pid, r?.ovrNormalized ?? null);
-        ovrRank.set(pid, r?.ovrRank ?? null);
+        ovrRank.set(pid, rankUsable ? r?.ovrRank ?? null : null);
         pps.set(pid, r?.ppsSeason ?? null);
       }
     } catch {
