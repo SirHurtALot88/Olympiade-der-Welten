@@ -17,6 +17,8 @@ import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-con
 import TeamMark from "@/app/foundation/discipline-stage/arena/TeamMark";
 import type { StageLiveResultsByTeam } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
 import { getTeamColor, teamHasSecondary } from "@/lib/foundation/team-colors";
+import PlayerStarFrame from "@/components/foundation/player-portrait-card/PlayerStarFrame";
+import { getPlayerStarTier, getPlayerStarTierLabel } from "@/lib/foundation/player-star-tier";
 import { fmt1 } from "./stage-format";
 
 export type DisciplineStageHoverTarget =
@@ -154,9 +156,11 @@ function PlayerPreview({ gameState, target, ratingByPlayerId }: {
   );
 }
 
-function TeamPreview({ gameState, target, fieldedPlayerIdsByTeam, liveResultsByTeam, ppByPlayerId }: {
+function TeamPreview({ gameState, target, ratingByPlayerId, fieldedPlayerIdsByTeam, liveResultsByTeam, ppByPlayerId }: {
   gameState: GameState;
   target: { id: string; x: number; y: number };
+  /** Kanonische Ratings — liefert OVR und Liga-Rang fuer die Top-3-Zeile. */
+  ratingByPlayerId: Map<string, PlayerRatingContractRow>;
   fieldedPlayerIdsByTeam?: Record<string, string[]>;
   liveResultsByTeam?: StageLiveResultsByTeam;
   /** Vergebene Player-Points je Spieler — null, solange die Disziplin noch läuft. */
@@ -183,6 +187,31 @@ function TeamPreview({ gameState, target, fieldedPlayerIdsByTeam, liveResultsByT
   const revealedByPlayerId = new Map(
     (liveResultsByTeam?.[team.teamId] ?? []).map((r) => [r.playerId, r] as const),
   );
+  /**
+   * Die drei staerksten Spieler des Teams nach OVR — unabhaengig davon, wer in
+   * DIESER Disziplin aufgestellt ist. Beantwortet beim Ueberfliegen der Liste
+   * die Frage "wer sind hier eigentlich die Stars?", die die Eingesetzt-Liste
+   * nicht beantwortet (dort steht nur, wer heute laeuft).
+   *
+   * Kein Spoiler: OVR ist eine Saison-Kennzahl und steht ohnehin in Kader,
+   * Tabelle und Drawer — anders als die Disziplin-Ergebnisse, die der Reveal
+   * schuetzt. Deshalb ist die Zeile auch nicht an `liveResultsByTeam` gebunden.
+   */
+  const topByOvr = (gameState.rosters ?? [])
+    .filter((entry) => entry.teamId === team.teamId)
+    .map((entry) => {
+      const player = gameState.players?.find((candidate) => candidate.id === entry.playerId) ?? null;
+      if (!player) return null;
+      const rating = ratingByPlayerId.get(player.id) ?? null;
+      const ovr = rating?.ovrNormalized ?? null;
+      if (ovr == null || !Number.isFinite(ovr)) return null;
+      return { player, ovr, ovrRank: rating?.ovrRank ?? null };
+    })
+    .filter((entry): entry is { player: NonNullable<typeof entry>["player"]; ovr: number; ovrRank: number | null } =>
+      Boolean(entry),
+    )
+    .sort((left, right) => right.ovr - left.ovr || left.player.name.localeCompare(right.player.name, "de"))
+    .slice(0, 3);
   return (
     <AnchoredCard
       x={target.x}
@@ -225,6 +254,63 @@ function TeamPreview({ gameState, target, fieldedPlayerIdsByTeam, liveResultsByT
           </div>
         </div>
       </div>
+      {topByOvr.length > 0 ? (
+        <div style={{ marginTop: 10, borderTop: "1px solid var(--nl-line)", paddingTop: 8 }}>
+          <div style={{ fontSize: 9.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 6 }}>
+            Top 3 · OVR
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {topByOvr.map((entry) => {
+              const portraitUrl = getPlayerPortraitBrowserUrl(
+                entry.player.id,
+                entry.player.portraitUrl ?? null,
+                entry.player.portraitPath ?? null,
+              );
+              const tier = getPlayerStarTier(entry.ovrRank);
+              const tierLabel = getPlayerStarTierLabel(tier);
+              return (
+                <div
+                  key={entry.player.id}
+                  title={`${entry.player.name} — OVR ${fmt1(entry.ovr)}${
+                    entry.ovrRank != null ? ` · Liga-Rang #${entry.ovrRank}` : ""
+                  }${tierLabel ? ` · ${tierLabel}` : ""}`}
+                  style={{ flex: "1 1 0", minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}
+                >
+                  <PlayerStarFrame tier={tier} shape="circle">
+                    {portraitUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={portraitUrl}
+                        alt=""
+                        width={38}
+                        height={38}
+                        style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", display: "block", border: "1px solid var(--nl-line)" }}
+                      />
+                    ) : (
+                      <span aria-hidden style={{ width: 38, height: 38, borderRadius: "50%", display: "block", background: color.primary }} />
+                    )}
+                  </PlayerStarFrame>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 800,
+                      maxWidth: "100%",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {entry.player.name}
+                  </span>
+                  <span style={{ fontSize: 10.5, fontWeight: 900, color: "var(--nl-accent)", fontVariantNumeric: "tabular-nums" }}>
+                    {fmt1(entry.ovr)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
       {fielded.length > 0 ? (
         <div style={{ marginTop: 10, borderTop: "1px solid var(--nl-line)", paddingTop: 8 }}>
           <div style={{ fontSize: 9.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 6 }}>
@@ -310,6 +396,7 @@ export default function DisciplineStageHoverPreview({
       <TeamPreview
         gameState={gameState}
         target={target}
+        ratingByPlayerId={ratingByPlayerId}
         fieldedPlayerIdsByTeam={fieldedPlayerIdsByTeam}
         liveResultsByTeam={liveResultsByTeam}
         ppByPlayerId={ppByPlayerId}
