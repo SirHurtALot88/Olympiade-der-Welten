@@ -5,9 +5,10 @@
 // oben, WAAGERECHT wie die Staffel lesbar. Links = Aufschlag-Linie (Start), rechts =
 // Championship-Netz (Ziel). x-Position = kumulierte Punkte (score/finalMax) → die Teams
 // rücken über die vollen Runden nach rechts zum Netz. y = feste Team-Bahn (laneIdx),
-// damit man jedes Team über die Runden verfolgen kann (kein Rang-Springen). Setzköpfe
-// (Top-8) nummeriert, Führer mit 🏆 + goldenem Puls, Ballwechsel zwischen den Führenden,
-// ✦-Ass-Funke bei Punktgewinn.
+// damit man jedes Team über die Runden verfolgen kann (kein Rang-Springen). Führer mit
+// 🏆 + goldenem Puls, Ballwechsel zwischen den Führenden, ✦-Ass-Funke bei Punktgewinn.
+// Die Setzkopf-Nummern (①…⑧) über den Wappen sind ENTFALLEN — der Rang steht schon im
+// Rang-Badge unter dem Token und im Team-Hover.
 //
 // Host bleibt WAHRHEIT: Score/Reveal/Ladder/Ticker/Hover/Pops kommen vom Host; die lokale
 // tokenPos (waagerecht) speist die Benchmark-Glide-Schleife (useTokenGlide) → Ghost +
@@ -381,8 +382,6 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
         .map((t) => {
           const r = t.isOwn ? geo.rOwn : geo.r;
           const glowing = t.glowUntil > now;
-          const isSeed = t.rank <= 8 ? t.rank : 0;
-          const seedMark = "①②③④⑤⑥⑦⑧"[isSeed - 1] ?? "";
 
           return (
             <g
@@ -410,12 +409,10 @@ export default function TennisField(props: DisciplineFieldProps): ReactNode {
                   🏆
                 </text>
               ) : null}
-              {/* Setzkopf-Nummer (Top-8, golden) */}
-              {isSeed > 0 && t.rank !== 1 ? (
-                <text y={-(r + 5)} textAnchor="middle" fontSize={9} fontWeight={900} fill="var(--nl-warn)">
-                  {seedMark}
-                </text>
-              ) : null}
+              {/* Kein Setzkopf-Kringel mehr über dem Token: der Rang steht bereits im
+                  Rang-Badge unter dem Wappen (TokenChrome) und im Hover — eine zweite
+                  Rangzahl direkt daneben war reine Doppelung und hat im Gedränge des
+                  Feldes zudem am NACHBAR-Token geklebt. */}
             </g>
           );
         })}

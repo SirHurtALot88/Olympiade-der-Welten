@@ -1983,6 +1983,14 @@ export type FormCardPlanRecord = {
   disciplineId: string | null;
   primaryFormCardId: string | null;
   secondaryFormCardId: string | null;
+  /**
+   * Vorgeplante Intensitaet dieser Spieltag-Seite (Formplan). Rein planerisch:
+   * die Wertung liest weiterhin ausschliesslich `LineupDraftModifiers.intensity`
+   * des am Spieltag gespeicherten Entwurfs. Der Plan sagt "hier will ich pushen"
+   * und wird beim Oeffnen des Spieltags in den Entwurf uebernommen — er ersetzt
+   * ihn nicht. `null`/fehlend = kein Plan (die Einsatzliste startet auf "normal").
+   */
+  plannedIntensity?: "conserve" | "normal" | "push" | null;
   updatedAt: string;
 };
 

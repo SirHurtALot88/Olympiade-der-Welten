@@ -12,8 +12,25 @@ import type {
   LegacyLineupDraft,
   LegacyLineupLoadedContext,
   LegacyModifierSourceSummary,
-  LegacyTeamPowerOption,
 } from "@/lib/lineups/legacy-lineup-types";
+import type { MatchdayIntensityStage } from "@/lib/lineups/matchday-slot-roles";
+
+/**
+ * Push-Ziele im Formplan: die drei Intensitätsstufen in fester Reihenfolge
+ * (Schonen → Normal → Push), inklusive Kurzlabel für die enge Timeline-Zelle.
+ * Die Stufen selbst kommen aus `matchday-slot-roles` (INTENSITY_CONFIG) — hier
+ * steht nur die Anzeige, keine zweite Wahrheit über ihre Wirkung.
+ */
+const FORM_PLAN_INTENSITY_STAGES: Array<{
+  id: MatchdayIntensityStage;
+  label: string;
+  short: string;
+  hint: string;
+}> = [
+  { id: "conserve", label: "Schonen", short: "S", hint: "Schonen — weniger Score, deutlich weniger Fatigue." },
+  { id: "normal", label: "Normal", short: "N", hint: "Normal — Standard-Belastung." },
+  { id: "push", label: "Push", short: "P", hint: "Push — mehr Score, dafür die höchste Fatigue- und Strain-Last." },
+];
 
 type FormBoardPickCell = {
   matchdayId: string;
@@ -61,8 +78,18 @@ export type FormBoardPanelProps = {
   captainSeasonLimit: number;
   captainSeasonUsedWithDraft: number;
   captainDraftRemaining: number;
-  /** Kategorie-Kürzel (POW/SPE/MEN/SOC/FLEX) einer Team-Power — geteilter Client-Helper. */
-  getTeamPowerCategoryLabel: (category: LegacyTeamPowerOption["category"]) => string;
+  /**
+   * Push-Ziel einer Spieltag-Seite setzen (`null` = Plan löschen). Anders als
+   * Captain und Team-Power ist die Intensität pro Spieltag planbar — sie hängt am
+   * Formkarten-Plan-Datensatz (`plannedIntensity`) und ist damit die zweite echte
+   * Vorausplanung dieses Screens.
+   */
+  setFormPlanIntensity: (input: {
+    matchdayId: string;
+    disciplineSide: "d1" | "d2";
+    disciplineId: string | null;
+    intensity: MatchdayIntensityStage | null;
+  }) => void;
   formatModifierSourceLabel: (source: LegacyModifierSourceSummary | null | undefined) => string;
   formatFormPlanImpact: (
     primary: LegacyFormCardOption | null,
@@ -124,7 +151,7 @@ export default function FormBoardPanel({
   captainSeasonLimit,
   captainSeasonUsedWithDraft,
   captainDraftRemaining,
-  getTeamPowerCategoryLabel,
+  setFormPlanIntensity,
   formatModifierSourceLabel,
   formatFormPlanImpact,
   formatFormCardValueLabel,
@@ -186,21 +213,29 @@ export default function FormBoardPanel({
     return counts;
   }, [freeDeckCards]);
 
-  // Team-Power-Saisonbudget: reine Sichtbarmachung der vorhandenen Ladungen aus
-  // `context.teamPowers` (chargesRemaining/chargesTotal/isUsedUp). Auch hier gilt:
-  // Eine Team-Power-VORAUSPLANUNG pro künftigem Spieltag existiert im Datenmodell
-  // nicht — aktiviert wird die Power am Spieltag in der Einsatzliste. Passive Powers
-  // haben kein Ladungs-Budget und werden nur gezählt, nicht aufsummiert.
-  const teamPowerBudget = useMemo(() => {
-    const powers = context?.teamPowers ?? [];
-    const activePowers = powers.filter((power) => !power.isPassive);
-    return {
-      powers: activePowers,
-      passiveCount: powers.length - activePowers.length,
-      chargesRemaining: activePowers.reduce((sum, power) => sum + power.chargesRemaining, 0),
-      chargesTotal: activePowers.reduce((sum, power) => sum + power.chargesTotal, 0),
-    };
-  }, [context?.teamPowers]);
+  // Push-Plan der Rest-Saison: wie viele NOCH KOMMENDE Spieltag-Seiten stehen auf
+  // Schonen / Normal / Push, und wie viele sind noch ungeplant? Genau die Bilanz,
+  // die "wo setze ich meine Push-Spieltage?" beantwortet — Push kostet Fatigue und
+  // Strain, es kann also nicht jeder Spieltag ein Push-Spieltag sein.
+  // Gespielte Spieltage zählen bewusst nicht mit: dort ist nichts mehr zu planen.
+  const intensityPlanBudget = useMemo(() => {
+    const counts: Record<MatchdayIntensityStage, number> = { conserve: 0, normal: 0, push: 0 };
+    let openSides = 0;
+    for (const entry of context?.seasonDisciplineSchedule ?? []) {
+      if (currentMatchdayIndex != null && entry.matchdayIndex < currentMatchdayIndex) {
+        continue;
+      }
+      for (const disciplineSide of ["d1", "d2"] as const) {
+        const planned = formCardPlanByKey.get(`${entry.matchdayId}:${disciplineSide}`)?.plannedIntensity ?? null;
+        if (planned) {
+          counts[planned] += 1;
+        } else {
+          openSides += 1;
+        }
+      }
+    }
+    return { counts, openSides, plannedSides: counts.conserve + counts.normal + counts.push };
+  }, [context?.seasonDisciplineSchedule, currentMatchdayIndex, formCardPlanByKey]);
 
   const captainSeasonRemaining = Math.max(0, captainSeasonLimit - captainSeasonUsedWithDraft);
 
@@ -322,11 +357,16 @@ export default function FormBoardPanel({
       </p>
       {/*
         Saison-Ressourcen-Cockpit: eine Zeile, drei Budgets — Formkarten, Captain,
-        Team-Power. Genau die Frage, die dieser Screen beantworten soll: "Wie viel
-        habe ich noch, und für wie viele Spieltage muss es reichen?" Formkarten sind
-        die einzige Ressource mit persistiertem Zukunfts-Plan (formCardPlans); Captain
-        und Team-Power zeigen bewusst NUR das Saison-Kontingent als Planungs-Kontext,
-        weil das Datenmodell für sie keine Vorausplanung pro Spieltag kennt.
+        Push-Ziele. Genau die Frage, die dieser Screen beantworten soll: "Wie viel
+        habe ich noch, und für wie viele Spieltage muss es reichen?"
+
+        Die Team-Power-Kachel stand hier bis zuletzt daneben, konnte aber gar nichts
+        planen: Powers werden am Spieltag in der Einsatzliste aktiviert, ein
+        Zukunfts-Plan existiert für sie im Datenmodell nicht. Sie ist ersetzt durch
+        die Intensität — die IST pro Spieltag planbar (`plannedIntensity` am
+        Formkarten-Plan) und ist die eigentliche Vorausplanungs-Entscheidung neben
+        den Karten: Push kostet Fatigue und Strain, also muss man sich aussuchen, wo
+        man pusht. Captain bleibt reiner Kontext (Saison-Kontingent).
       */}
       <div className="legacy-lineup-form-resources" aria-label="Saison-Ressourcen">
         <article className="legacy-lineup-form-resource is-cards">
@@ -376,41 +416,46 @@ export default function FormBoardPanel({
             Captain wird am Spieltag in der Einsatzliste gesetzt — keine Vorausplanung pro Spieltag.
           </p>
         </article>
-        <article className="legacy-lineup-form-resource is-power">
+        <article className="legacy-lineup-form-resource is-intensity">
           <div className="legacy-lineup-form-resource-head">
-            <span>Team-Power</span>
-            <strong>
-              {teamPowerBudget.chargesRemaining}/{teamPowerBudget.chargesTotal} Ladungen
-            </strong>
+            <span>Push-Ziele</span>
+            <strong>{intensityPlanBudget.counts.push} Push geplant</strong>
           </div>
           <div
             className="legacy-lineup-form-resource-meter"
             role="img"
-            aria-label={`${teamPowerBudget.chargesRemaining} von ${teamPowerBudget.chargesTotal} Team-Power-Ladungen übrig`}
+            aria-label={`${intensityPlanBudget.plannedSides} von ${intensityPlanBudget.plannedSides + intensityPlanBudget.openSides} kommenden Spieltag-Seiten mit Intensität geplant`}
           >
             <span
-              style={{ width: `${Math.round((teamPowerBudget.chargesRemaining / Math.max(teamPowerBudget.chargesTotal, 1)) * 100)}%` }}
+              style={{
+                width: `${Math.round(
+                  (intensityPlanBudget.plannedSides /
+                    Math.max(intensityPlanBudget.plannedSides + intensityPlanBudget.openSides, 1)) *
+                    100,
+                )}%`,
+              }}
             />
           </div>
           <small>
-            Quelle {formatModifierSourceLabel(context?.teamPowerSource)}
-            {teamPowerBudget.passiveCount > 0 ? ` · ${teamPowerBudget.passiveCount} passiv` : ""}
+            {intensityPlanBudget.plannedSides}/{intensityPlanBudget.plannedSides + intensityPlanBudget.openSides}{" "}
+            Rest-Saison-Seiten geplant · {intensityPlanBudget.openSides} offen
           </small>
-          {teamPowerBudget.powers.length > 0 ? (
-            <div className="legacy-lineup-form-resource-power-list">
-              {teamPowerBudget.powers.map((power) => (
-                <span
-                  key={`form-resource-power-${power.id}`}
-                  className={`legacy-lineup-form-resource-power${power.isUsedUp ? " is-used-up" : ""}`}
-                  title={power.description}
-                >
-                  {getTeamPowerCategoryLabel(power.category)} · {power.label} · {power.chargesRemaining}/{power.chargesTotal}
-                </span>
-              ))}
-            </div>
-          ) : null}
+          <div className="legacy-lineup-form-resource-intensities">
+            {FORM_PLAN_INTENSITY_STAGES.map((stage) => (
+              <span
+                key={`form-resource-intensity-${stage.id}`}
+                className={`legacy-lineup-form-intensity-chip is-${stage.id}${
+                  intensityPlanBudget.counts[stage.id] === 0 ? " is-depleted" : ""
+                }`}
+                title={stage.hint}
+              >
+                {stage.label} {intensityPlanBudget.counts[stage.id]}
+              </span>
+            ))}
+          </div>
           <p className="legacy-lineup-form-resource-note">
-            Team-Power wird am Spieltag in der Einsatzliste aktiviert — keine Vorausplanung pro Spieltag.
+            Push kostet Fatigue und Strain — grob vorplanen, wo es sich lohnt. Am Spieltag selbst bleibt die
+            Einsatzliste die letzte Instanz.
           </p>
         </article>
       </div>
@@ -573,6 +618,7 @@ export default function FormBoardPanel({
                     const disciplineColor = getFormCardColorForCategory(slot?.category ?? null);
                     const planImpact = formatFormPlanImpact(selectedCard, selectedBonusCard, disciplineColor);
                     const pendingKey = `${entry.matchdayId}:${disciplineSide}`;
+                    const plannedIntensity = plan?.plannedIntensity ?? null;
                     const playerCount = slot?.playerCount ?? null;
                     const hasPlannedCards = Boolean(selectedCard || selectedBonusCard);
                     const matchingFreeCount = disciplineColor ? freeCardCountByColor[disciplineColor] : 0;
@@ -732,6 +778,54 @@ export default function FormBoardPanel({
                             {selectedBonusCard ? renderSelectedFormCardChip(selectedBonusCard.id, disciplineColor) : <em>wählen</em>}
                           </button>
                         </div>
+                        {/*
+                          Push-Ziel der Seite. Gespielte Spieltage bekommen keinen
+                          Schalter mehr — dort ist nichts mehr zu planen; der
+                          gewählte Stand bleibt aber als Chip lesbar (Saison-
+                          Gedächtnis, gleiche Logik wie bei den Karten).
+                        */}
+                        {isPastMatchday ? (
+                          plannedIntensity ? (
+                            <div className="legacy-lineup-form-board-cell-intensity is-past">
+                              <span className={`legacy-lineup-form-intensity-chip is-${plannedIntensity}`}>
+                                {FORM_PLAN_INTENSITY_STAGES.find((stage) => stage.id === plannedIntensity)?.label}
+                              </span>
+                            </div>
+                          ) : null
+                        ) : (
+                          <div
+                            className="legacy-lineup-form-board-cell-intensity"
+                            role="group"
+                            aria-label={`Push-Ziel ${entry.matchdayLabel} ${disciplineSide.toUpperCase()}`}
+                          >
+                            {FORM_PLAN_INTENSITY_STAGES.map((stage) => {
+                              const isActive = plannedIntensity === stage.id;
+                              return (
+                                <button
+                                  key={`${entry.matchdayId}-${disciplineSide}-intensity-${stage.id}`}
+                                  type="button"
+                                  data-form-board-intensity-id={`${entry.matchdayId}:${disciplineSide}:${stage.id}`}
+                                  aria-pressed={isActive}
+                                  className={`legacy-lineup-form-intensity-button is-${stage.id}${isActive ? " is-active" : ""}`}
+                                  disabled={isReadOnly || formCardPlanPendingKey === pendingKey || !slot}
+                                  title={`${stage.hint}${isActive ? " · Nochmal klicken entfernt den Plan." : ""}`}
+                                  onClick={() =>
+                                    setFormPlanIntensity({
+                                      matchdayId: entry.matchdayId,
+                                      disciplineSide,
+                                      disciplineId: slot?.disciplineId ?? null,
+                                      // Nochmal auf die aktive Stufe = Plan wieder offen.
+                                      intensity: isActive ? null : stage.id,
+                                    })
+                                  }
+                                >
+                                  <span aria-hidden="true">{isCompactMatchday ? stage.short : stage.label}</span>
+                                  <span className="sr-only">{stage.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </section>
                     );
                   })}

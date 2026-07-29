@@ -6779,6 +6779,12 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     disciplineId: string | null;
     primaryFormCardId: string | null;
     secondaryFormCardId: string | null;
+    /**
+     * Push-Ziel der Seite. Bewusst dreiwertig: fehlt das Feld, laesst der Server
+     * das gespeicherte Push-Ziel unangetastet — sonst wuerde jeder Kartenklick
+     * die Intensitaets-Planung derselben Seite mitloeschen.
+     */
+    plannedIntensity?: MatchdayIntensityStage | null;
   }) {
     if (!context || isReadOnly) {
       return;
@@ -6803,6 +6809,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           disciplineId: input.disciplineId,
           primaryFormCardId: input.primaryFormCardId,
           secondaryFormCardId: input.secondaryFormCardId,
+          ...("plannedIntensity" in input ? { plannedIntensity: input.plannedIntensity ?? null } : {}),
         }),
       });
       const payload = (await response.json()) as FormCardPlanResponse;
@@ -6832,13 +6839,17 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       }
       setWarnings(payload.warnings ?? []);
       setMessage(
-        input.primaryFormCardId || input.secondaryFormCardId
-          ? input.matchdayId === params.matchdayId
-            ? "Formplan synchronisiert — Entwurf übernimmt die Karten automatisch."
-            : "Formplan gespeichert."
-          : input.matchdayId === params.matchdayId
-            ? "Formkarten entfernt — Entwurf wurde angepasst."
-            : "Formplan-Eintrag entfernt.",
+        "plannedIntensity" in input
+          ? input.plannedIntensity == null
+            ? "Push-Ziel entfernt."
+            : `Push-Ziel gespeichert: ${formatIntensityStageLabel(input.plannedIntensity)}.`
+          : input.primaryFormCardId || input.secondaryFormCardId
+            ? input.matchdayId === params.matchdayId
+              ? "Formplan synchronisiert — Entwurf übernimmt die Karten automatisch."
+              : "Formplan gespeichert."
+            : input.matchdayId === params.matchdayId
+              ? "Formkarten entfernt — Entwurf wurde angepasst."
+              : "Formplan-Eintrag entfernt.",
       );
     } catch {
       setErrors(["Formkarten-Plan konnte gerade nicht gespeichert werden."]);
@@ -6865,6 +6876,38 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         void handleSaveFormCardPlan(pending);
       }
     }, 300);
+  }
+
+  /**
+   * Push-Ziel einer Spieltag-Seite im Formplan setzen bzw. wieder loeschen
+   * (nochmal auf die aktive Stufe klicken = "kein Plan").
+   *
+   * Rein planerisch: die Wertung liest weiterhin nur die Intensitaet des am
+   * Spieltag gespeicherten Entwurfs. Faellt der Plan auf den AKTIVEN Spieltag,
+   * wird er zusaetzlich sofort in den Entwurf uebernommen — sonst muesste man
+   * dieselbe Entscheidung zweimal treffen.
+   */
+  function setFormPlanIntensity(input: {
+    matchdayId: string;
+    disciplineSide: "d1" | "d2";
+    disciplineId: string | null;
+    intensity: MatchdayIntensityStage | null;
+  }) {
+    if (isReadOnly) {
+      return;
+    }
+    const plan = formCardPlanByKey.get(`${input.matchdayId}:${input.disciplineSide}`) ?? null;
+    if (input.matchdayId === params.matchdayId && input.intensity) {
+      updateDisciplineIntensityStage(input.disciplineSide, input.intensity);
+    }
+    void handleSaveFormCardPlan({
+      matchdayId: input.matchdayId,
+      disciplineSide: input.disciplineSide,
+      disciplineId: input.disciplineId,
+      primaryFormCardId: plan?.primaryFormCardId ?? null,
+      secondaryFormCardId: plan?.secondaryFormCardId ?? null,
+      plannedIntensity: input.intensity,
+    });
   }
 
   function assignFormCardToCell(input: {
@@ -7241,13 +7284,13 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           matchdayId={params.matchdayId}
           matchdayOptions={options.matchdays}
           /* Saison-Ressourcen-Kontext für das Formplan-Cockpit: Captain-Budget kommt
-             aus den bestehenden Derivations oben (keine Neuberechnung), die
-             Team-Power-Ladungen liest das Panel direkt aus `context.teamPowers`.
-             Eine Vorausplanung pro Spieltag existiert für beide bewusst nicht. */
+             aus den bestehenden Derivations oben (keine Neuberechnung). Eine
+             Captain-Vorausplanung pro Spieltag existiert bewusst nicht. Das
+             Push-Ziel dagegen schon — es liegt im Formkarten-Plan-Datensatz. */
           captainSeasonLimit={captainSeasonLimit}
           captainSeasonUsedWithDraft={captainSeasonUsedWithDraft}
           captainDraftRemaining={captainDraftRemaining}
-          getTeamPowerCategoryLabel={getTeamPowerCategoryLabel}
+          setFormPlanIntensity={setFormPlanIntensity}
           formatModifierSourceLabel={formatModifierSourceLabel}
           formatFormPlanImpact={formatFormPlanImpact}
           formatFormCardValueLabel={formatFormCardValueLabel}
