@@ -35150,6 +35150,26 @@ button.market-v2-bucket-card.is-selected {
   margin: 8px 0;
 }
 
+/* Weit entfernte Spieltage: Rank/Spieler/Impact bleiben sichtbar (dort wird ja
+   vorausgeplant), laufen aber enger, damit die Timeline kompakt bleibt. */
+.legacy-lineup-form-board-cell-velo-strip.is-compact {
+  margin: 4px 0;
+  gap: 4px;
+  padding: 0 8px;
+}
+
+.legacy-lineup-form-board-cell-velo-strip.is-compact .velo-impact-card {
+  padding: 4px 6px;
+}
+
+.legacy-lineup-form-board-cell-velo-strip.is-compact .velo-impact-card span {
+  font-size: 0.62rem;
+}
+
+.legacy-lineup-form-board-cell-velo-strip.is-compact .velo-impact-card strong {
+  font-size: 0.82rem;
+}
+
 .legacy-lineup-team-tactics-form-readonly {
   display: flex;
   flex-wrap: wrap;

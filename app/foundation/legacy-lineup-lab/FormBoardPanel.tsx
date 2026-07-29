@@ -619,33 +619,39 @@ export default function FormBoardPanel({
                             ) : null}
                           </div>
                         ) : null}
-                        {!isCompactMatchday ? (
-                          <VeloImpactStrip
-                            className="legacy-lineup-form-board-cell-velo-strip"
-                            items={[
-                              {
-                                key: "rank",
-                                label: "Rank",
-                                value: rank != null ? `#${rank}` : "—",
-                                // Top-3-Disziplinen sind die aussichtsreichsten Einsätze für
-                                // knappe Ressourcen — dezent grün markiert, Rest bleibt neutral.
-                                tone: rank != null && rank <= 3 ? "positive" : "neutral",
-                              },
-                              {
-                                key: "players",
-                                label: "Spieler",
-                                value: playerCount != null ? String(playerCount) : "—",
-                                tone: "neutral",
-                              },
-                              {
-                                key: "impact",
-                                label: "Impact",
-                                value: planImpact,
-                                tone: hasPlannedCards ? "positive" : "neutral",
-                              },
-                            ]}
-                          />
-                        ) : null}
+                        {/*
+                          Rank/Spieler/Impact stehen in JEDER Zelle — auch bei weit
+                          entfernten Spieltagen. Genau dort plant man ja voraus, und
+                          ohne den Disziplin-Rang fehlt die einzige Information, an der
+                          man entscheidet, wo eine knappe Karte hingehört. Die
+                          Kompakt-Ansicht spart weiter Platz (Chancen-Zeile bleibt aus,
+                          der Streifen läuft mit engeren Abständen).
+                        */}
+                        <VeloImpactStrip
+                          className={`legacy-lineup-form-board-cell-velo-strip${isCompactMatchday ? " is-compact" : ""}`}
+                          items={[
+                            {
+                              key: "rank",
+                              label: "Rank",
+                              value: rank != null ? `#${rank}` : "—",
+                              // Top-3-Disziplinen sind die aussichtsreichsten Einsätze für
+                              // knappe Ressourcen — dezent grün markiert, Rest bleibt neutral.
+                              tone: rank != null && rank <= 3 ? "positive" : "neutral",
+                            },
+                            {
+                              key: "players",
+                              label: "Spieler",
+                              value: playerCount != null ? String(playerCount) : "—",
+                              tone: "neutral",
+                            },
+                            {
+                              key: "impact",
+                              label: "Impact",
+                              value: planImpact,
+                              tone: hasPlannedCards ? "positive" : "neutral",
+                            },
+                          ]}
+                        />
                         <div className="legacy-lineup-form-board-chip-picks">
                           <button
                             type="button"
