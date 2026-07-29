@@ -58,9 +58,10 @@ export const GAME_ENCYCLOPEDIA_ENTRIES: GameEncyclopediaEntry[] = [
   {
     id: "mvs",
     term: "MVS",
-    aliases: ["matchday value score", "value score", "matchday value"],
+    // Alte Schreibweisen bleiben als Alias stehen, damit die Suche sie weiter findet.
+    aliases: ["market value score", "matchday value score", "value score", "matchday value"],
     category: "Kennzahl",
-    short: "Matchday Value Score fuer praktischen Spieltagsnutzen.",
+    short: "Market Value Score — was ein Spieler auf dem Platz wert ist.",
     meaning:
       "MVS bewertet, wie nuetzlich ein Spieler im Saison- und Spieltagskontext war. Er schaut nicht nur auf reine Staerke, sondern auf verwertbaren Impact.",
     factors: [

@@ -60,7 +60,7 @@ function buildStatForecastTooltip(row: TrainingPlayerRowView) {
 function buildMatchdayRealityNote(row: TrainingPlayerRowView) {
   const pps = row.playerPps != null ? formatNlNumber(row.playerPps, 1) : "—";
   const mvs = row.playerMvs != null ? formatNlNumber(row.playerMvs, 1) : "—";
-  return `Saison-PPs ${pps} (echter Punktebeitrag) · MVS ${mvs} (Matchday Value Score). Der Performance-Anteil oben wird separat aus den einzelnen Matchday-Ergebnissen berechnet, zeigt also dieselbe Spielpraxis wie PPs/MVS, nur auf die Stat-Skala übersetzt.`;
+  return `Saison-PPs ${pps} (echter Punktebeitrag) · MVS ${mvs} (Market Value Score). Der Performance-Anteil oben wird separat aus den einzelnen Matchday-Ergebnissen berechnet, zeigt also dieselbe Spielpraxis wie PPs/MVS, nur auf die Stat-Skala übersetzt.`;
 }
 
 function TrainingModeDemandBanner({ row }: { row: TrainingPlayerRowView }) {
