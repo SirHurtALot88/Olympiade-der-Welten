@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { GameState, Player, Team } from "@/lib/data/olyDataTypes";
 import { buildGameFlowState, shouldAutoOpenSeasonBriefing } from "@/lib/foundation/game-flow-controller";
+import { createFreshSeasonOneGameState } from "@/lib/game-state/singleplayer-state";
 
 function team(partial?: Partial<Team>): Team {
   return {
@@ -873,5 +874,69 @@ describe("game flow controller", () => {
     });
 
     expect(flow.steps.find((step) => step.stepId === "roster_review")?.status).toBe("completed");
+  });
+});
+
+describe("game flow does not restart the new-game onboarding mid-season", () => {
+  function midSeasonStateWithStuckOnboarding() {
+    const gameState = createFreshSeasonOneGameState();
+    const teamId = gameState.teams[0]!.teamId;
+    // Spieltag 5 laeuft, ein Spieltag ist gewertet — die Saison ist eindeutig unterwegs.
+    gameState.matchdayState = {
+      ...gameState.matchdayState,
+      matchdayId: gameState.season.matchdayIds[4]!,
+      status: "planning",
+    };
+    gameState.season = { ...gameState.season, currentMatchday: 5 };
+    gameState.seasonState.matchdayResults = [
+      {
+        id: "result-md1",
+        saveId: "test-save",
+        seasonId: gameState.season.id,
+        matchdayId: gameState.season.matchdayIds[0]!,
+      } as never,
+    ];
+    // Der Zustand aus dem Bug-Report: newGameFlow steht dauerhaft auf aktiv, der
+    // season_intro-Schritt wurde nie abgehakt (Wegklicken landet nur in der lokalen
+    // Dismiss-Ablage).
+    gameState.seasonState.newGameFlow = {
+      active: true,
+      dismissed: false,
+      selectedTeamId: teamId,
+      steps: [{ stepId: "season_intro", status: "open" }],
+    } as never;
+    return { gameState, teamId };
+  }
+
+  it("keeps the season briefing done once the season is underway", () => {
+    const { gameState, teamId } = midSeasonStateWithStuckOnboarding();
+    const flow = buildGameFlowState({ gameState, activeTeamId: teamId });
+
+    const seasonIntro = flow.steps.find((entry) => entry.stepId === "season_intro");
+    expect(seasonIntro?.status).toBe("completed");
+    expect(flow.currentStep.stepId).not.toBe("season_intro");
+  });
+
+  it("does not prepend the new-game onboarding chain to a running season", () => {
+    const { gameState, teamId } = midSeasonStateWithStuckOnboarding();
+    const flow = buildGameFlowState({ gameState, activeTeamId: teamId });
+
+    // team_confirm & Co gehoeren vor den ersten Spieltag. Standen sie mitten in der
+    // Saison vorne, verdraengten sie die echten Spieltags-Schritte aus der Fuehrung.
+    const onboardingIds = ["team_confirm", "roster_review", "first_transfers", "fill_roster"];
+    for (const stepId of onboardingIds) {
+      expect(flow.steps.some((entry) => entry.stepId === stepId)).toBe(false);
+    }
+  });
+
+  it("never points at the arena while the lineup is still missing", () => {
+    const { gameState, teamId } = midSeasonStateWithStuckOnboarding();
+    const flow = buildGameFlowState({ gameState, activeTeamId: teamId });
+
+    const openArena = flow.steps.find((entry) => entry.stepId === "open_arena");
+    expect(openArena?.status).toBe("blocked");
+    expect(openArena?.blockers ?? []).toContain("missing_lineup");
+    expect(flow.currentStep.stepId).not.toBe("open_arena");
+    expect(flow.nextStep?.stepId).not.toBe("open_arena");
   });
 });

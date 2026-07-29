@@ -398,9 +398,31 @@ function teamHasAffordableFacilityUpgrade(gameState: GameState, teamId: string |
   });
 }
 
+/**
+ * Laeuft die Saison schon? Sobald ein Spieltag gewertet ist, Punkte in der Tabelle
+ * stehen oder der Spielplan ueber Spieltag 1 hinaus ist, ist die Einstiegsphase
+ * vorbei — egal was `newGameFlow` behauptet.
+ */
+function isSeasonUnderway(gameState: GameState) {
+  const seasonId = gameState.season.id;
+  if ((gameState.season.currentMatchday ?? 1) > 1) return true;
+  if ((gameState.seasonState.matchdayResults ?? []).some((result) => result.seasonId === seasonId)) return true;
+  if (Object.values(gameState.seasonState.standings ?? {}).some((entry) => (entry.points ?? 0) > 0)) return true;
+  return false;
+}
+
 function buildOnboardingFlowSteps(gameState: GameState, activeTeamId: string | null): GameFlowStep[] {
   const flow = gameState.seasonState.newGameFlow;
   if (!flow?.active || flow.dismissed) {
+    return [];
+  }
+  // Der Neues-Spiel-Einstieg gehoert vor den ersten Spieltag. `newGameFlow.active`
+  // allein reicht als Bedingung nicht: Der Schreiber im Shell-Scope setzt bei JEDEM
+  // Schritt wieder `active: true, dismissed: false`, das Flag geht also nie aus. Ohne
+  // diese Klammer bekam der Spieler die komplette Einstiegskette noch in Spieltag 5
+  // vorgesetzt — inklusive „Season-Briefing lesen", das nie abgehakt wurde und den
+  // Flow damit jeden Spieltag von vorn beginnen liess.
+  if (isSeasonUnderway(gameState)) {
     return [];
   }
 
@@ -552,7 +574,17 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
   const seasonIntroStep = storedNewGameFlow?.steps?.find((entry) => entry.stepId === "season_intro");
   const trainingFacilitiesStep = storedNewGameFlow?.steps?.find((entry) => entry.stepId === "training_facilities");
   const seasonIntroHandled = seasonIntroStep?.status === "completed" || seasonIntroStep?.status === "skipped";
-  const seasonIntroOpen = Boolean(storedNewGameFlow?.active && !storedNewGameFlow.dismissed && !seasonIntroHandled);
+  // Das Season-Briefing gehoert an den Saisonstart. Sobald die Saison laeuft, ist es
+  // erledigt — auch wenn `newGameFlow` noch aktiv steht und der Schritt nie abgehakt
+  // wurde. Genau das liess den Flow bis Spieltag 5 jedes Mal mit „Season-Briefing
+  // lesen" beginnen: Das Wegklicken des Briefings landet in der lokalen
+  // Dismiss-Ablage, nicht im Schritt-Status, der Schritt blieb also ewig offen.
+  const seasonIntroOpen = Boolean(
+    storedNewGameFlow?.active &&
+      !storedNewGameFlow.dismissed &&
+      !seasonIntroHandled &&
+      !isSeasonUnderway(gameState),
+  );
   const trainingFacilitiesHandled = trainingFacilitiesStep?.status === "completed" || trainingFacilitiesStep?.status === "skipped";
   const hasSponsorContract = activeTeamId ? getTeamSponsorContract(gameState, activeTeamId) != null : true;
   const boardSignals = getTeamBoardFlowSignals(gameState, activeTeamId);
