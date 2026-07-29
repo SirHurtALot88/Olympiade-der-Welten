@@ -26753,6 +26753,25 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   background: rgba(255, 255, 255, 0.04);
 }
 
+/* Die `.heat-band-N`-Grundregeln setzen Hintergrund UND eine DUNKLE Textfarbe —
+   sie sind für die hellen Heat-Flächen gemacht (helles Band, dunkle Schrift).
+   Die Buckets hier übernehmen davon nur die FARBE als Rahmen/Verlauf auf
+   dunklem Panel und überschrieben bisher ausschliesslich `background` und
+   `border-color`. Die dunkle Schriftfarbe blieb stehen und vererbte sich auf
+   Überschrift, Anzahl und Spieler-Chips: praktisch schwarz auf dunkelgrün bzw.
+   dunkelrot, kaum lesbar. Deshalb hier die Textfarbe explizit zurück auf den
+   normalen hellen Ink des Panels. */
+.team-contracts-expiry-bucket.heat-band-1,
+.team-contracts-expiry-bucket.heat-band-3,
+.team-contracts-expiry-bucket.heat-band-5,
+.team-contracts-expiry-bucket.heat-band-6,
+.team-contracts-expiry-bucket.heat-band-8 {
+  color: var(--nl-ink, rgba(233, 241, 255, 0.94));
+  /* Der Inset-Schatten der Heat-Grundregel zeichnet helle Kanten für die helle
+     Fläche — auf dem dunklen Verlauf sieht das aus wie ein Fehldruck. */
+  box-shadow: none;
+}
+
 .team-contracts-expiry-bucket.heat-band-1 {
   border-color: var(--heat-danger-bg);
   background: linear-gradient(180deg, rgba(124, 52, 52, 0.22), rgba(255, 255, 255, 0.03));
