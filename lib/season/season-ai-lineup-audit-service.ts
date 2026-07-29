@@ -151,7 +151,11 @@ export function buildSeasonAiLineupAudit(gameState: GameState, seasonId = gameSt
       warnings.push("ai_form_cards_unused");
     }
     if (controlMode === "ai" && teamDrafts.length > 0 && summary.pushSides === 0) warnings.push("ai_push_unused");
-    if (controlMode === "ai" && teamDrafts.length > 0 && summary.mutatorTraits === 0) warnings.push("ai_mutators_unused");
+    // KEIN "ai_mutators_unused" mehr: Mutatoren sind eine Eigenschaft der DISZIPLIN, die einmal je
+    // Spieltag und Seite fuer alle 32 Teams ausgewuerfelt wird — kein Werkzeug, das ein Team
+    // "nutzt". Frueher setzte der KI-Pfad kadergenaue Traits (garantierte Treffer, waehrend das
+    // menschliche Team den blinden Wurf bekam); seit das entfernt ist, steht bei jedem KI-Team
+    // planmaessig 0, und die Warnung waere dauerhaft und ausnahmslos rot.
 
     return {
       teamId: team.teamId,
