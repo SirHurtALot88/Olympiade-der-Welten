@@ -1132,9 +1132,6 @@ export default function DisciplineStageArena({
     }
     const seasonRankOf = (teamId?: string | null): number | undefined =>
       teamId != null ? seasonRankByTeam.get(teamId) : undefined;
-    const slotCount = useEngine
-      ? engineTeams!.reduce((max, t) => Math.max(max, t.players.length), 0) || model.slotCount
-      : model.slotCount;
     const teams = useEngine
       ? engineTeams!.map((t) => ({
           code: t.code,
@@ -1180,6 +1177,28 @@ export default function DisciplineStageArena({
             ovrRank: s.playerId ? ratingByPlayerId.get(s.playerId)?.ovrRank ?? null : null,
           })),
         }));
+    /**
+     * Etappenzahl = die tatsaechlich aufgestellte Spielerzahl (Maximum ueber die
+     * Teams), NICHT die von der Disziplin geforderte.
+     *
+     * Vorher stand hier im Modell-Modus schlicht `model.slotCount`, und das ist
+     * `discipline.playerCount` — also die ANFORDERUNG. Stellt ein Spieltag in
+     * dieser Disziplin weniger Spieler als gefordert (kommt bei Staffel und
+     * Takeshi vor), liefen trotzdem so viele Etappen wie gefordert: in den
+     * ueberzaehligen Etappen ist `players[r]` schlicht `undefined`, es wird
+     * nichts addiert und im Feld bewegt sich nichts. Gleichzeitig ist die
+     * Ziellinie der Endstand des besten Teams ueber DESSEN Spieler — der war
+     * nach der letzten echten Etappe erreicht. Ergebnis: "Ziel nach 3 von 5
+     * Etappen erreicht, danach passiert nichts mehr".
+     *
+     * Das Maximum (statt Minimum) ist richtig, weil Teams unterschiedlich viele
+     * Spieler haben duerfen — ein Team mit mehr Spielern muss seine auch alle
+     * zeigen duerfen. Der Fallback greift nur, wenn gar keine Spieler vorliegen.
+     */
+    const slotCount = Math.max(
+      1,
+      teams.reduce((max, team) => Math.max(max, team.players.length), 0) || model.slotCount,
+    );
     return {
       slots: Array.from({ length: slotCount }, (_, i) => slotLabel(disciplineId, i, slotCount)),
       mineCode: ownShortCode,

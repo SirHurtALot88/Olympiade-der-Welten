@@ -165,9 +165,9 @@ function ppText(value: number | null): string {
   return `+${value.toFixed(1)}`;
 }
 
-// Tagesrang · Saison-Rang · Team · Diszi 1 · Diszi 2 · Spieltag (Σ) · Form · Mutator · Gesamt.
+// Rang (Spieltag) · S-Rang (Saison) · Team · Diszi 1 · Diszi 2 · Punkte (Σ) · Form · Mutator · Gesamt.
 // Header und Datenzeilen teilen sich EXAKT dieses Raster (sonst driften die Spalten).
-const PANEL_GRID_COLUMNS = "58px 122px 1fr 74px 74px 70px 76px 80px 84px";
+const PANEL_GRID_COLUMNS = "56px 104px 1fr 74px 74px 70px 76px 80px 84px";
 
 // Rang-Badge (klein, tabellarisch) — Gold/Silber/Bronze für die Top-3, gleiche
 // Farbsprache wie die Arena-Leiter (warn/mut/Bronze-rgb, dezent hinterlegt).
@@ -521,8 +521,10 @@ export default function DisciplineStageMatchdayPanel({
               borderBottom: "1px solid var(--nl-line)",
             }}
           >
-            {sortButton("matchday", "Spieltag", "Platzierung nur nach der Leistung dieses Spieltags", "left")}
-            {sortButton("season", "Saison-Rang", "Saison-Rang vor dem Spieltag → projizierter Rang danach", "left")}
+            {/* Kurze Beschriftungen: "Spieltag"/"Saison-Rang" waren fuer die
+                Spaltenbreiten zu lang und ueberlappten sich im Kopf. */}
+            {sortButton("matchday", "Rang", "Platzierung nur nach der Leistung dieses Spieltags", "left")}
+            {sortButton("season", "S-Rang", "Saison-Rang vor dem Spieltag → projizierter Rang danach", "left")}
             {sortButton("team", "Team", "Teamname", "left")}
             {/* Disziplin-Spalten: das Label sortiert nach dieser Disziplin, das Chevron daneben
                 klappt die eingesetzten Spieler mit ihren PP auf. Zwei getrennte Schalter, damit
