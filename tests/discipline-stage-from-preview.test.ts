@@ -32,6 +32,7 @@ type EntryInput = {
   formShare?: number | null;
   finalPlayerScore?: number | null;
   pointsAwarded?: number | null;
+  isCaptain?: boolean;
 };
 
 function makeEntry(input: EntryInput): DisciplineTeamResolvePreview["entries"][number] {
@@ -49,7 +50,7 @@ function makeEntry(input: EntryInput): DisciplineTeamResolvePreview["entries"][n
     formShare: input.formShare ?? null,
     finalPlayerScore: input.finalPlayerScore ?? null,
     pointsAwarded: input.pointsAwarded ?? null,
-    isCaptain: false,
+    isCaptain: input.isCaptain ?? false,
     warnings: [],
   };
 }
@@ -396,5 +397,42 @@ describe("saubere Verteilung: jeder Spieler traegt seine volle finalPlayerScore,
 
   it("Gesamt-Netto trifft exakt den Engine-Score (nichts liegt neben den Spielern)", () => {
     expect(stageTeamNetTotal(mapped)).toBeCloseTo(70, 1);
+  });
+});
+
+describe("Kapitän der Einsatzliste", () => {
+  it("reicht den gesetzten Kapitän durch (Name + playerId)", () => {
+    const preview = makePreview([
+      makeTeam({
+        teamId: "cap",
+        teamName: "Mit Kapitän",
+        rank: 1,
+        score: 30,
+        teamPoints: 10,
+        entries: [
+          makeEntry({ playerId: "cap-p0", playerName: "Kapitänin", baseValue: 10, finalPlayerScore: 10, isCaptain: true }),
+          makeEntry({ playerId: "cap-p1", playerName: "Andere", baseValue: 20, finalPlayerScore: 20 }),
+        ],
+      }),
+    ]);
+    const [team] = buildDisciplineStageTeamsFromPreview(preview, new Map(), new Map());
+    expect(team.captainPlayerId).toBe("cap-p0");
+    expect(team.captainName).toBe("Kapitänin");
+  });
+
+  it("liefert null, wenn kein Kapitän gesetzt wurde (Bonus allein reicht nicht)", () => {
+    const preview = makePreview([
+      makeTeam({
+        teamId: "nocap",
+        teamName: "Ohne Kapitän",
+        rank: 1,
+        score: 13,
+        teamPoints: null,
+        entries: [makeEntry({ playerId: "nocap-p0", playerName: "Solo", baseValue: 10, captainBonus: 3, finalPlayerScore: 13 })],
+      }),
+    ]);
+    const [team] = buildDisciplineStageTeamsFromPreview(preview, new Map(), new Map());
+    expect(team.captainPlayerId).toBeNull();
+    expect(team.captainName).toBeNull();
   });
 });

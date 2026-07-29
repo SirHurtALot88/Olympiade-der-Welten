@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { TEAM_POWERS_ENABLED } from "@/lib/lineups/team-powers";
+
 const REPO_ROOT = process.cwd();
 
 function readSource(relativePath: string): string {
@@ -10,38 +12,48 @@ function readSource(relativePath: string): string {
 }
 
 /**
- * Die Team-Power ist neben Formkarten und Captain die dritte Spieltag-Ressource
- * einer Disziplin. Die Auswahl-Ableitungen (`getTeamPowerOptionsForSide`,
- * `getTeamPowerEmptyOptionLabel`, `getTeamPowerSelectTitle`) existierten im
- * Client weiter, wurden aber von KEINER gerenderten Ansicht mehr konsumiert —
- * in der Einsatzliste konnte man deshalb gar keine Power mehr setzen.
- * Dieser Vertrag hält den Renderpfad fest.
+ * Team-Powers sind abgeschaltet (`TEAM_POWERS_ENABLED = false`). Die Mechanik lieferte danach
+ * zwar keine Optionen mehr, das Dropdown blieb aber trotzdem stehen: die Einsatzliste blendet
+ * den Kasten nur aus, wenn WEDER Optionen DA sind NOCH etwas ausgewaehlt ist — und in
+ * gewachsenen Spielstaenden steht in `modifiers.dX.teamPowerId` noch eine alte Power.
+ * Ergebnis war ein Auswahlfeld mit genau einem Eintrag, den man nicht mehr wechseln konnte.
+ *
+ * Dieser Vertrag haelt fest, dass bei abgeschalteter Mechanik gar keine Controls mehr
+ * durchgereicht werden. Der Renderpfad selbst bleibt vollstaendig erhalten, damit das
+ * Wiedereinschalten eine Zeile ist — die letzten beiden Faelle bewachen genau das.
  */
-describe("Einsatzliste: Team-Power-Auswahl je Disziplin", () => {
+describe("Einsatzliste: Team-Power-Auswahl", () => {
   const lineupText = readSource("app/foundation/legacy-lineup-lab/LineupNewLook.tsx");
   const clientText = readSource("app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx");
 
-  it("rendert je Disziplin-Seite ein Team-Power-Select", () => {
-    expect(lineupText).toContain("teamPowerControlsBySide");
-    expect(lineupText).toContain("onAssignTeamPower");
+  it("reicht bei abgeschalteter Mechanik keine Controls durch", () => {
+    expect(TEAM_POWERS_ENABLED).toBe(false);
+    // Die Controls haengen am Schalter statt an der Options-Laenge — eine gespeicherte
+    // `teamPowerId` kann den Block damit nicht mehr am Leben halten.
+    expect(clientText).toMatch(/teamPowerControlsBySide=\{\s*areTeamPowersEnabled\(\)/);
+    expect(clientText).toContain('import { areTeamPowersEnabled, describeTeamPowerDebuffEffect');
+  });
+
+  it("blendet den Block ohne Controls komplett aus", () => {
+    expect(lineupText).toContain("const control = teamPowerControlsBySide?.[disciplineSide] ?? null;");
+    expect(lineupText).toContain("if (!control) return null;");
+  });
+
+  it("meldet beim Speichern keine Power mehr", () => {
+    // Sonst quittierte das Speichern "1 Power" fuer eine Auswahl, die es nicht mehr gibt.
+    expect(clientText).toMatch(/selectedPowerCount = areTeamPowersEnabled\(\)/);
+    expect(clientText).toContain("selectedPowerCount == null ? null : `${selectedPowerCount} Power`");
+  });
+
+  it("haelt den Renderpfad fuer das Wiedereinschalten vollstaendig vor", () => {
     expect(lineupText).toContain('data-testid={`nl-lineup-teampower-${disciplineSide}`}');
-    // Der Select meldet die Wahl (leerer Wert = keine Power) an den Client zurück.
     expect(lineupText).toContain("onAssignTeamPower?.(disciplineSide, event.target.value || null)");
-  });
-
-  it("versorgt die Einsatzliste aus den vorhandenen Client-Ableitungen", () => {
     expect(clientText).toContain("function buildLineupTeamPowerControlForSide");
-    // Keine neue Auswahl-/Sortierlogik: es werden exakt die bestehenden Helfer genutzt.
     expect(clientText).toContain("getTeamPowerOptionsForSide(disciplineSide)");
-    expect(clientText).toContain("getTeamPowerEmptyOptionLabel(disciplineSide)");
-    expect(clientText).toContain("getTeamPowerSelectTitle(disciplineSide)");
-    // Persistenz läuft über denselben Modifier-Pfad wie zuvor.
     expect(clientText).toContain('updateModifier(disciplineSide, "teamPowerId", powerId ?? "")');
-    expect(clientText).toContain('d1: buildLineupTeamPowerControlForSide("d1")');
-    expect(clientText).toContain('d2: buildLineupTeamPowerControlForSide("d2")');
   });
 
-  it("hält den Ressourcen-Block je Disziplin zusammen (Formkarten · Team-Power · Captain)", () => {
+  it("haelt den Ressourcen-Block je Disziplin zusammen (Formkarten · Team-Power · Captain)", () => {
     const formCardsIndex = lineupText.indexOf('data-testid={`nl-lineup-formcards-${disciplineSide}`}');
     const teamPowerIndex = lineupText.indexOf('data-testid={`nl-lineup-teampower-${disciplineSide}`}');
     const captainIndex = lineupText.indexOf('data-testid={`nl-lineup-captain-${disciplineSide}`}');

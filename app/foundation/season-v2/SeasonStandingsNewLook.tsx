@@ -149,6 +149,7 @@ type NlTableSortKey =
   | "points"
   | "bonus"
   | SeasonDisciplineAreaId
+  | "formCards"
   | "mw"
   | "cash"
   | "sponsor"
@@ -163,7 +164,11 @@ function nlMoneySignClass(value: number | null | undefined): string {
   return value > 0 ? " is-pos" : " is-neg";
 }
 
-function getTableSortValue(row: SeasonV2StandingsRow, key: NlTableSortKey): number | string {
+function getTableSortValue(
+  row: SeasonV2StandingsRow,
+  key: NlTableSortKey,
+  formCardTotalByTeamId?: Map<string, number> | null,
+): number | string {
   switch (key) {
     case "rank":
       return row.rank != null && Number.isFinite(row.rank) ? row.rank : Number.POSITIVE_INFINITY;
@@ -174,6 +179,12 @@ function getTableSortValue(row: SeasonV2StandingsRow, key: NlTableSortKey): numb
     case "bonus": {
       const bonus = row.disciplineValues.bonuspunkte;
       return bonus != null && Number.isFinite(bonus) ? bonus : Number.NEGATIVE_INFINITY;
+    }
+    case "formCards": {
+      // Teams ohne gespielte Karte sortieren ans Ende der Absteigend-Sicht (kein
+      // stiller 0-Wert, der eine gespielte ±0-Bilanz vortäuschen würde).
+      const total = formCardTotalByTeamId?.get(row.teamId);
+      return total != null && Number.isFinite(total) ? total : Number.NEGATIVE_INFINITY;
     }
     case "mw":
       return row.marketValueTotal != null && Number.isFinite(row.marketValueTotal)
@@ -234,6 +245,42 @@ function getAreaRankBandClass(rank: number | undefined): string {
   return "";
 }
 
+/**
+ * Liga-Rang je Team für eine Kennzahl, immer über ALLE Zeilen (nicht über die
+ * gerade sichtbare Sortierung) — größter Wert = #1.
+ *
+ * Bei Gleichstand bekommt die ganze Gruppe den SCHLECHTESTEN Rang (1,3,3,4 …)
+ * statt des besten. Grund: zu Saisonbeginn stehen ganze Spalten auf 0; mit
+ * "bester Rang für alle" würde eine komplett unbespielte Spalte lauter #1
+ * ausweisen, obwohl niemand etwas geholt hat.
+ */
+function buildValueRanks(
+  rows: SeasonV2StandingsRow[],
+  getValue: (row: SeasonV2StandingsRow) => number | null | undefined,
+): Map<string, number> {
+  const ranked = new Map<string, number>();
+  const scored = rows
+    .map((row) => ({ teamId: row.teamId, value: getValue(row) }))
+    .filter(
+      (entry): entry is { teamId: string; value: number } =>
+        typeof entry.value === "number" && Number.isFinite(entry.value),
+    )
+    .sort((a, b) => b.value - a.value);
+  let groupStart = 0;
+  while (groupStart < scored.length) {
+    let groupEnd = groupStart;
+    while (groupEnd + 1 < scored.length && scored[groupEnd + 1].value === scored[groupStart].value) {
+      groupEnd += 1;
+    }
+    const worstRank = groupEnd + 1;
+    for (let index = groupStart; index <= groupEnd; index += 1) {
+      ranked.set(scored[index].teamId, worstRank);
+    }
+    groupStart = groupEnd + 1;
+  }
+  return ranked;
+}
+
 function getAreaValue(row: SeasonV2StandingsRow, areaId: SeasonDisciplineAreaId): number | null {
   const ledgerValue = areaId === "pow" ? row.pow : areaId === "spe" ? row.spe : areaId === "men" ? row.men : row.soc;
   return resolveSeasonDisciplineAreaTotal(row.disciplineValues, areaId, ledgerValue);
@@ -267,6 +314,17 @@ type StandingsTopPlayersHoverProps = {
   entries: SeasonStandingsTopPlayerEntry[] | null | undefined;
   /** Der eigentliche Zellenwert — bleibt unverändert gerendert. */
   children: ReactNode;
+  /**
+   * Wrapper-Element. Standard `span` (sitzt inline um den Zellwert). Mit `"li"`
+   * wird die GANZE Listenzeile zur Hoverfläche — so genutzt bei den Disziplinen
+   * im Aufklapp-Detail, wo man über Name/Balken/Wert gleichermaßen hovern
+   * können soll und nicht nur über die schmale Zahl.
+   */
+  as?: "span" | "li";
+  className?: string;
+  /** Überschrift des Panels — "Top 3" (Achsen) bzw. "Teilnehmer" (Disziplinen). */
+  headline?: string;
+  title?: string;
 };
 
 /**
@@ -279,12 +337,32 @@ type StandingsTopPlayersHoverProps = {
  * Archiv-Saison, wo Live-Werte gelogen wären) wird NUR der Wert gerendert —
  * kein leerer Dialog im Accessibility-Tree, keine erfundene Rangfolge.
  */
-function StandingsTopPlayersHover({ panelId, columnLabel, teamName, entries, children }: StandingsTopPlayersHoverProps) {
+function StandingsTopPlayersHover({
+  panelId,
+  columnLabel,
+  teamName,
+  entries,
+  children,
+  as = "span",
+  className,
+  headline = "Top 3",
+  title,
+}: StandingsTopPlayersHoverProps) {
   const [open, setOpen] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const Wrapper = as;
 
   if (!entries || entries.length === 0) {
-    return <>{children}</>;
+    // Ohne Einträge kein Panel — der Wrapper bleibt trotzdem stehen, sobald er
+    // (wie bei der Disziplin-Zeile) das tragende Layout-Element ist. Der reine
+    // Tooltip bleibt erhalten, damit die Zeile nicht stumm wird.
+    return as === "span" && !className ? (
+      <>{children}</>
+    ) : (
+      <Wrapper className={className} title={title}>
+        {children}
+      </Wrapper>
+    );
   }
 
   function cancelClose() {
@@ -306,8 +384,9 @@ function StandingsTopPlayersHover({ panelId, columnLabel, teamName, entries, chi
   }
 
   return (
-    <span
-      className="nl-teams-rank-portal"
+    <Wrapper
+      className={className ? `${className} nl-teams-rank-portal` : "nl-teams-rank-portal"}
+      title={title}
       onMouseEnter={openNow}
       onMouseLeave={closeSoon}
       onFocus={openNow}
@@ -320,12 +399,12 @@ function StandingsTopPlayersHover({ panelId, columnLabel, teamName, entries, chi
       <div
         id={panelId}
         role="dialog"
-        aria-label={`Top-3-Spieler ${teamName} — ${columnLabel}`}
+        aria-label={`${headline} ${teamName} — ${columnLabel}`}
         className="nl-teams-rank-preview"
         hidden={!open}
       >
         <span className="nl-teams-rank-preview-title">
-          Top 3 · {columnLabel} — {teamName}
+          {headline} · {columnLabel} — {teamName}
         </span>
         <ol className="nl-teams-rank-preview-list">
           {entries.map((entry, index) => (
@@ -337,7 +416,7 @@ function StandingsTopPlayersHover({ panelId, columnLabel, teamName, entries, chi
           ))}
         </ol>
       </div>
-    </span>
+    </Wrapper>
   );
 }
 
@@ -359,6 +438,7 @@ export default function SeasonStandingsNewLook({
   disciplineLeaders,
   rivalTeamIds,
   teamTopPlayersByColumn,
+  teamFormCardBonusByTeamId,
   onChangeSeason,
   onOpenTeam,
   onOpenPlayer,
@@ -424,11 +504,27 @@ export default function SeasonStandingsNewLook({
     });
   }, [boardRows, boardSort]);
 
+  /**
+   * Formkarten-Nennwert-Summe je Team (nur Teams, die überhaupt Karten gespielt
+   * haben). Muss VOR `sortedTableRows` stehen — die Sortierung nach der
+   * Formkarten-Spalte liest diese Karte bereits im Render.
+   */
+  const formCardTotalByTeamId = useMemo(() => {
+    const totals = new Map<string, number>();
+    if (!teamFormCardBonusByTeamId) {
+      return totals;
+    }
+    for (const [teamId, entry] of teamFormCardBonusByTeamId) {
+      totals.set(teamId, entry.total);
+    }
+    return totals;
+  }, [teamFormCardBonusByTeamId]);
+
   const sortedTableRows = useMemo(() => {
     const direction = tableSort.dir === "asc" ? 1 : -1;
     return [...boardRows].sort((left, right) => {
-      const leftValue = getTableSortValue(left, tableSort.key);
-      const rightValue = getTableSortValue(right, tableSort.key);
+      const leftValue = getTableSortValue(left, tableSort.key, formCardTotalByTeamId);
+      const rightValue = getTableSortValue(right, tableSort.key, formCardTotalByTeamId);
       let result =
         typeof leftValue === "string" || typeof rightValue === "string"
           ? String(leftValue).localeCompare(String(rightValue), "de-DE")
@@ -577,30 +673,20 @@ export default function SeasonStandingsNewLook({
   const areaRanksByTeam = useMemo(() => {
     const ranks = {} as Record<SeasonDisciplineAreaId, Map<string, number>>;
     for (const group of SEASON_DISCIPLINE_AREA_GROUPS) {
-      const ranked = new Map<string, number>();
-      const scored = standingsRows
-        .map((row) => ({ teamId: row.teamId, value: getAreaValue(row, group.id) }))
-        .filter(
-          (entry): entry is { teamId: string; value: number } =>
-            typeof entry.value === "number" && Number.isFinite(entry.value),
-        )
-        .sort((a, b) => b.value - a.value);
-      let groupStart = 0;
-      while (groupStart < scored.length) {
-        let groupEnd = groupStart;
-        while (groupEnd + 1 < scored.length && scored[groupEnd + 1].value === scored[groupStart].value) {
-          groupEnd += 1;
-        }
-        const worstRank = groupEnd + 1;
-        for (let index = groupStart; index <= groupEnd; index += 1) {
-          ranked.set(scored[index].teamId, worstRank);
-        }
-        groupStart = groupEnd + 1;
-      }
-      ranks[group.id] = ranked;
+      ranks[group.id] = buildValueRanks(standingsRows, (row) => getAreaValue(row, group.id));
     }
     return ranks;
   }, [standingsRows]);
+
+  /**
+   * Liga-Rang für Marktwert und Gehaltssumme — als kompaktes „#N" direkt hinter
+   * dem Geldwert in DERSELBEN Spalte. Beide Male absteigend gerankt: der höchste
+   * Marktwert ist #1, ebenso die höchste Gehaltssumme (teuerster Kader). Gerankt
+   * wird gegen alle Teams, nicht gegen die aktive Sortierung — der Rang darf sich
+   * nicht ändern, nur weil die Tabelle anders sortiert wird.
+   */
+  const marketValueRanks = useMemo(() => buildValueRanks(standingsRows, (row) => row.marketValueTotal), [standingsRows]);
+  const salaryRanks = useMemo(() => buildValueRanks(standingsRows, (row) => row.salaryTotal), [standingsRows]);
 
   function toggleExpanded(teamId: string) {
     setExpandedTeamId((current) => (current === teamId ? null : teamId));
@@ -833,12 +919,26 @@ export default function SeasonStandingsNewLook({
               <ul className="nl-standings-disc-list">
                 {group.keys.map((key) => {
                   const value = row.disciplineValues[key];
+                  const participants = teamTopPlayersByColumn?.get(row.teamId)?.[key];
                   return (
-                    <li
+                    /* Hover auf die GANZE Disziplin-Zeile (Kürzel · Balken · Wert):
+                       zeigt die Spieler, die in dieser Disziplin für das Team PPs
+                       geholt haben, mit ihren PPs. Ohne Teilnehmer bleibt es beim
+                       reinen Tooltip — kein leeres Panel. */
+                    <StandingsTopPlayersHover
                       key={key}
+                      as="li"
                       className="nl-standings-disc"
-                      title={`${SEASON_DISCIPLINE_LABELS[key]}: ${formatNlNumber(value, 1)}`}
-                      aria-label={`${SEASON_DISCIPLINE_LABELS[key]}: ${formatNlNumber(value, 1)}`}
+                      panelId={`nl-standings-players-disc-${row.teamId}-${key}`}
+                      columnLabel={SEASON_DISCIPLINE_LABELS[key]}
+                      teamName={row.teamName}
+                      headline="Teilnehmer"
+                      entries={participants}
+                      title={
+                        participants && participants.length > 0
+                          ? `${SEASON_DISCIPLINE_LABELS[key]}: ${formatNlNumber(value, 1)} — ${participants.length} Teilnehmer (Hover zeigt die Spieler)`
+                          : `${SEASON_DISCIPLINE_LABELS[key]}: ${formatNlNumber(value, 1)}`
+                      }
                     >
                       <span className="nl-standings-disc-label">{SEASON_DISCIPLINE_LABELS[key]}</span>
                       <NlProgressBar
@@ -848,16 +948,8 @@ export default function SeasonStandingsNewLook({
                         tone={group.id}
                         showValue={false}
                       />
-                      {/* Hover auf den Disziplinwert: Top-3-Spieler des Teams nach PPs in genau dieser Disziplin. */}
-                      <StandingsTopPlayersHover
-                        panelId={`nl-standings-top3-disc-${row.teamId}-${key}`}
-                        columnLabel={SEASON_DISCIPLINE_LABELS[key]}
-                        teamName={row.teamName}
-                        entries={teamTopPlayersByColumn?.get(row.teamId)?.[key]}
-                      >
-                        <span className="nl-standings-disc-value nl-tnum">{formatNlNumber(value, 1)}</span>
-                      </StandingsTopPlayersHover>
-                    </li>
+                      <span className="nl-standings-disc-value nl-tnum">{formatNlNumber(value, 1)}</span>
+                    </StandingsTopPlayersHover>
                   );
                 })}
               </ul>
@@ -1197,6 +1289,7 @@ export default function SeasonStandingsNewLook({
               <th className="nl-standings-th-team">{renderTableSortHeader("team", "Team")}</th>
               <th>{renderTableSortHeader("points", "Punkte")}</th>
               <th>{renderTableSortHeader("bonus", "Bonus")}</th>
+              <th className="nl-standings-th-formcards">{renderTableSortHeader("formCards", "Formkarten")}</th>
               {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => (
                 <th key={group.id} className={`nl-standings-th-areacol ${nlToneClass(group.id)}`}>
                   {renderTableSortHeader(group.id, group.label)}
@@ -1214,6 +1307,52 @@ export default function SeasonStandingsNewLook({
           <tbody>{sortedTableRows.map((row) => renderTableRow(row))}</tbody>
         </table>
       </div>
+    );
+  }
+
+  /**
+   * Kompakter Liga-Rang direkt hinter einem Geldwert, in DERSELBEN Spalte
+   * (kein eigener Tabellenplatz). Ohne Rang (kein Wert vorhanden) bleibt die
+   * Zelle unverändert — lieber nichts als ein erfundenes "#—".
+   */
+  function renderRankSuffix(rank: number | undefined, metricLabel: string, teamName: string) {
+    if (rank == null || !Number.isFinite(rank)) {
+      return null;
+    }
+    return (
+      <span
+        className={`nl-standings-rank-suffix nl-tnum${rank === 1 ? " is-top" : ""}`}
+        title={`${metricLabel}: Rang ${rank} von ${standingsRows.length} — ${teamName}`}
+      >
+        #{rank}
+      </span>
+    );
+  }
+
+  /**
+   * Spalte „Formkarten": Summe der NENNWERTE aller in dieser Saison
+   * ausgespielten Formkarten (+8 zählt 8, −4 zählt −4, einfach aufsummiert).
+   * Teams ohne gespielte Karte zeigen „—" statt einer 0 — das ist ein
+   * Unterschied: keine Karte gespielt ≠ Karten mit Bilanz ±0.
+   */
+  function renderFormCardCell(row: SeasonV2StandingsRow) {
+    const entry = teamFormCardBonusByTeamId?.get(row.teamId) ?? null;
+    if (!entry || entry.cards === 0) {
+      return (
+        <td className="nl-standings-td-formcards" title={`Keine Formkarte gespielt — ${row.teamName}`}>
+          —
+        </td>
+      );
+    }
+    const total = entry.total;
+    const sign = total > 0 ? " is-pos" : total < 0 ? " is-neg" : "";
+    return (
+      <td
+        className={`nl-standings-td-formcards${sign}`}
+        title={`${row.teamName}: ${entry.cards} gespielte Formkarten · positiv ${formatNlNumber(entry.positive, 0)} · negativ ${formatNlNumber(entry.negative, 0)} · Summe ${formatNlNumber(total, 0)}`}
+      >
+        {`${total > 0 ? "+" : total === 0 ? "±" : ""}${formatNlNumber(total, 0)}`}
+      </td>
     );
   }
 
@@ -1263,6 +1402,7 @@ export default function SeasonStandingsNewLook({
           </td>
           <td className="nl-standings-td-points">{formatNlNumber(row.points, 1)}</td>
           <td className="nl-standings-td-bonus">{formatNlNumber(row.disciplineValues.bonuspunkte, 1)}</td>
+          {renderFormCardCell(row)}
           {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => {
             const areaValue = getAreaValue(row, group.id);
             // Liga-Rang der Bereichsspalte: Top 3 grün, 4–6 gelb, 7–10 rot, Rest neutral.
@@ -1285,17 +1425,23 @@ export default function SeasonStandingsNewLook({
               </td>
             );
           })}
-          <td className="nl-standings-td-mw">{formatNlMoney(row.marketValueTotal)}</td>
+          <td className="nl-standings-td-mw">
+            {formatNlMoney(row.marketValueTotal)}
+            {renderRankSuffix(marketValueRanks.get(row.teamId), "Marktwert", row.teamName)}
+          </td>
           <td className="nl-standings-td-fin">{formatNlMoney(row.cash)}</td>
           <td className={`nl-standings-td-fin${row.sponsorTotal ? " is-pos" : ""}`}>{formatNlMoney(row.sponsorTotal)}</td>
-          <td className="nl-standings-td-fin">{formatNlMoney(row.salaryTotal)}</td>
+          <td className="nl-standings-td-fin">
+            {formatNlMoney(row.salaryTotal)}
+            {renderRankSuffix(salaryRanks.get(row.teamId), "Gehaltssumme", row.teamName)}
+          </td>
           <td className="nl-standings-td-fin">{formatNlMoney(row.buildingCost)}</td>
           <td className={`nl-standings-td-fin${nlMoneySignClass(row.transferNet)}`}>{formatNlMoney(row.transferNet)}</td>
           <td className={`nl-standings-td-fin${nlMoneySignClass(row.guv)}`}>{formatNlMoney(row.guv)}</td>
         </tr>
         {isExpanded ? (
           <tr className="nl-standings-table-detailrow">
-            <td className="nl-standings-table-detailcell" colSpan={16} id={`nl-standings-tdetails-${row.teamId}`}>
+            <td className="nl-standings-table-detailcell" colSpan={17} id={`nl-standings-tdetails-${row.teamId}`}>
               <span className="nl-standings-table-detailtitle">Disziplinen nach Bereich</span>
               {renderDisciplineGroups(row)}
             </td>

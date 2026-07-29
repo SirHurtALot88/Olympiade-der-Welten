@@ -61,7 +61,8 @@ export type RosterAxisDisciplinePps = {
   axis: SeasonDisciplineAreaId;
   label: string;
   axisPps: number | null;
-  disciplines: Array<{ id: string; name: string; pps: number }>;
+  /** `playerCount` = Kadergröße der Disziplin (wie viele Spieler pro Team antreten). */
+  disciplines: Array<{ id: string; name: string; pps: number; playerCount: number | null }>;
 };
 
 export type FoundationRosterTableRow = {
@@ -191,9 +192,13 @@ export function buildRosterDisciplinePpsByAxis(input: {
   pointsByArea: Record<string, number | null | undefined> | null | undefined;
   axisTotals: Record<SeasonDisciplineAreaId, number | null>;
 }): RosterAxisDisciplinePps[] {
+  // Katalog-Reihenfolge (`originalOrder`): TDM · Mini DM · Gewichtheben · Hockey · Breaking.
+  // Vorher stand `displayOrder` vorn — das ist die SPIELPLAN-Reihenfolge (TDM hat dort 13 und
+  // rutschte damit ans Ende der POW-Liste). In einer Nachschlage-Liste soll die Ordnung aber
+  // dieselbe und wiedererkennbare sein, egal wie der Spielplan der Saison gerade liegt.
   const orderedDisciplines = [...input.disciplines].sort(
     (left, right) =>
-      (left.displayOrder ?? left.originalOrder ?? 0) - (right.displayOrder ?? right.originalOrder ?? 0),
+      (left.originalOrder ?? left.displayOrder ?? 0) - (right.originalOrder ?? right.displayOrder ?? 0),
   );
   return ROSTER_PPS_AXES.map(({ axis, label, category }) => {
     // Achsen-Gesamtwert bevorzugt aus derselben Ledger-Quelle wie die Disziplinen
@@ -216,6 +221,13 @@ export function buildRosterDisciplinePpsByAxis(input: {
             id: discipline.id,
             name: discipline.name,
             pps: Number.isFinite(raw) ? roundViewNumber(raw as number, 1) : 0,
+            // Kadergröße der Disziplin — steht in der Liste als "(6)" hinter dem Namen und
+            // sagt, wie viele Spieler pro Team hier antreten. Fehlt der Katalogwert, bleibt
+            // die Klammer weg statt eine Zahl zu erfinden.
+            playerCount:
+              typeof discipline.playerCount === "number" && Number.isFinite(discipline.playerCount)
+                ? discipline.playerCount
+                : null,
           };
         }),
     };

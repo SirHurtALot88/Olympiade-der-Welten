@@ -141,6 +141,53 @@ export function GhostLayer(props: {
   );
 }
 
+// ---- Team-Rahmen + Kapitäns-Stern (geteilt) -----------------------------------------
+/**
+ * Der Ring um das Wappen — und, falls die Einsatzliste einen Kapitän ausweist,
+ * dessen kleiner Stern. EINE Quelle für alle Felder: `TokenChrome` nutzt sie, und
+ * die drei Felder mit eigener Token-Zeichnung (shared/track/lamps) rufen sie direkt
+ * auf, damit Rahmenstärke und Stern nicht an vier Stellen auseinanderlaufen.
+ *
+ * BEWUSST SCHMAL (Owner-Wunsch): der normale Rahmen war mit 2,4 px so breit, dass er
+ * bei kleinen Token einen guten Teil des Wappens überdeckte. Jetzt liegt er dünn und
+ * eng am Logo — die frei gewordene Fläche geht an das Wappen (die Radien in PRIM_GEO
+ * sind im Gegenzug ~20 % größer). Das EIGENE Team behält seinen kräftigeren
+ * Doppelring als Anker, nur leicht verschlankt.
+ */
+export function TeamFrame(props: { t: RT; r: number }): React.ReactNode {
+  const { t, r } = props;
+  return (
+    <>
+      {t.isOwn ? (
+        <>
+          <circle r={r + 1.2} fill="none" stroke="var(--nl-accent)" strokeWidth={2.2} />
+          <circle r={r + 0.1} fill="none" stroke="var(--nl-ink)" strokeWidth={1} opacity={0.9} />
+        </>
+      ) : (
+        <circle r={r + 0.7} fill="none" stroke={floorTeamAccent(teamPrimaryColor(t.code))} strokeWidth={1.4} opacity={1} />
+      )}
+      {/* Kapitäns-Stern: in der Einsatzliste dieser Disziplin wurde ein Kapitän gesetzt.
+          Sitzt oben LINKS versetzt, damit er weder mit Pokal/Medaille (oben mittig) noch
+          mit dem Rang-Badge (unten) kollidiert. */}
+      {t.captainName ? (
+        <text
+          x={-(r + 1)}
+          y={-(r + 1)}
+          textAnchor="middle"
+          fontSize={Math.max(8, Math.round(r * 0.85))}
+          fill="var(--nl-gold)"
+          stroke="var(--nl-bg)"
+          strokeWidth={0.6}
+          paintOrder="stroke"
+          style={{ pointerEvents: "none" }}
+        >
+          ★
+        </text>
+      ) : null}
+    </>
+  );
+}
+
 // ---- Verständnis-Chrome (Benchmark) -------------------------------------------------
 // Die Ringe/Logo/Rahmen/Badge, die in JEDER Disziplin identisch sind. Die Feld-Datei
 // wickelt das in ihr Token-<g> (mit data-token-code + tokenRef) und ergänzt ihre eigenen
@@ -167,9 +214,9 @@ export function TokenChrome(props: {
   const showBadge = badge && (t.isOwn || t.rank <= 3 || hoverIdx === t.idx);
   return (
     <>
-      {/* Highlight-Trio (Aufholjagd): grüner Aufhol-Puls an den 3 größten Aufsteigern (Zoom).
-          Bewusst GRÜN (--nl-good) statt Gold — sonst kollidiert der Ring mit der Gold-Medaille
-          und dem Glow (alles war --nl-warn → „Gold-Overload"). */}
+      {/* Highlight-Puls (Zoom-Momente: Verletzung bzw. Aufstieg aufs Podest — der Host
+          entscheidet, wann das feuert). Bewusst GRÜN (--nl-good) statt Gold — sonst
+          kollidiert der Ring mit der Gold-Medaille und dem Glow („Gold-Overload"). */}
       {trioSet.has(t.idx) ? <circle r={r + 10} fill="none" stroke="var(--nl-good)" strokeWidth={3.5} opacity={0.95} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 0.85s ease-in-out infinite" }} /> : null}
       {/* Eigen-Team-Anker: dauerhafter, weicher Akzent-Puls. */}
       {t.isOwn ? <circle r={r + 6} fill="none" stroke="var(--nl-accent)" strokeWidth={2} opacity={0.9} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.6s ease-in-out infinite" }} /> : null}
@@ -183,15 +230,7 @@ export function TokenChrome(props: {
       ) : (
         <circle r={r} fill={`hsl(${hue} 60% 52%)`} />
       )}
-      {/* Team-Farb-Rahmen — JEDES Team; eigenes Team Akzent + Ink-Doppelring. */}
-      {t.isOwn ? (
-        <>
-          <circle r={r + 1.6} fill="none" stroke="var(--nl-accent)" strokeWidth={3} />
-          <circle r={r + 0.2} fill="none" stroke="var(--nl-ink)" strokeWidth={1.4} opacity={0.9} />
-        </>
-      ) : (
-        <circle r={r + 1.4} fill="none" stroke={floorTeamAccent(teamPrimaryColor(t.code))} strokeWidth={2.4} opacity={1} />
-      )}
+      <TeamFrame t={t} r={r} />
       {/* Pokal auf Rang 1 (Felder mit eigener Krone setzen trophy={false}). */}
       {trophy && t.rank === 1 ? <text y={-(r + 9)} textAnchor="middle" fontSize={14}>🏆</text> : null}
       {/* Szene-Beziehungs-Label (nur SCENE_PRIMS, fremde Anker). */}

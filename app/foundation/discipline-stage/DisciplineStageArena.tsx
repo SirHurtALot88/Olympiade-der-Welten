@@ -735,17 +735,25 @@ export default function DisciplineStageArena({
         const cur = playersByTeam.get(tr.teamId) ?? { d1: [], d2: [] };
         for (const e of tr.entries ?? []) {
           if (!e.playerId) continue;
+          // PP INKLUSIVE Mutator-Bonus — dieselbe Definition wie im Saison-Ledger
+          // (`points = basePoints + mutatorPpsBonus`, season-points-ledger.ts).
+          // `pointsAwarded` ist nur der verteilte Basis-Anteil, `mutatorPpsBonus`
+          // liegt in der Resolve-Engine als eigenes Feld daneben. Vorher stand hier
+          // allein `pointsAwarded`: die Summe der Spieler-Chips ergab damit die
+          // Basis-PP des Teams statt des Gesamtwerts, obwohl der Chip-Tooltip
+          // "davon ◆ X Mutator" behauptete, der Bonus stecke schon drin.
+          const basePp = e.pointsAwarded ?? null;
+          const mutatorPp = e.mutatorPpsBonus ?? null;
           cur[side].push({
             playerId: e.playerId,
             name: e.playerName ?? e.playerId,
-            // Gesamte Gutschrift (Anteil + Mutator), nicht nur der Anteil — sonst zeigt
-            // die Wertung eine andere Zahl als der Saison-Ledger bucht.
-            pp: resolveAwardedPlayerPoints({
-              pointsAwarded: e.pointsAwarded,
-              mutatorPpsBonus: e.mutatorPpsBonus,
-            }),
+            // Ueber den geteilten Helfer statt inline: dieselbe Summe zieht auch der
+            // Ledger, der Team-Hover und die Top-Spieler-Zeile. Zwei Stellen, die
+            // "Anteil + Mutator" jeweils selbst ausrechnen, laufen frueher oder
+            // spaeter auseinander — genau so ist dieser Fehler entstanden.
+            pp: resolveAwardedPlayerPoints({ pointsAwarded: basePp, mutatorPpsBonus: mutatorPp }),
             score: e.finalPlayerScore ?? null,
-            mutatorPp: e.mutatorPpsBonus ?? null,
+            mutatorPp,
           });
         }
         playersByTeam.set(tr.teamId, cur);
@@ -1155,6 +1163,8 @@ export default function DisciplineStageArena({
           // A2: Engine-Flag „keine Aufstellung eingereicht" 1:1 durchreichen, sonst
           // erscheint das Team als normales 0-Punkte-Ergebnis (falscher Eindruck).
           missingLineup: t.missingLineup,
+          // Kapitän dieser Einsatzliste (falls gesetzt) → Stern am Wappen in der Arena.
+          captainName: t.captainName,
           // Engine-Modus: Netto = val + Σmods trägt bereits die volle Engine-Zerlegung.
           players: t.players.map((p) => ({
             playerId: p.playerId,
@@ -1175,6 +1185,8 @@ export default function DisciplineStageArena({
           seasonRank: seasonRankOf(t.teamId),
           // Modell-/Random-Modus rechnet ohne Engine-Preview → kein missingLineup-Konzept.
           missingLineup: false,
+          // Ohne Engine-Preview gibt es auch keine Einsatzliste → kein Kapitän.
+          captainName: null as string | null,
           players: t.slots.map((s) => ({
             playerId: s.playerId,
             val: s.base,
@@ -1266,6 +1278,7 @@ export default function DisciplineStageArena({
         rel: t.teamId ? teamRelationshipMap.get(t.teamId) ?? null : null,
         seasonRank: t.seasonRank,
         missingLineup: t.missingLineup,
+        captainName: t.captainName,
         players: t.players.map((p) => ({
           playerId: p.playerId,
           val: p.val,

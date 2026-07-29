@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
 import type { ArticleClass } from "@/lib/pricing/classification";
-import type { PriceStatus } from "@/lib/pricing/costEngine";
 import type { SaleWindowKey } from "@/lib/parsing/date";
 import { LABELS_DE } from "@/lib/dashboard/viewModel";
 import { normalizedNameKey } from "@/lib/parsing/name";
@@ -22,7 +21,10 @@ const WINDOW_ORDER: { key: SaleWindowKey; label: string }[] = [
 ];
 
 const CLASS_ORDER: ArticleClass[] = ["champion", "solide", "beobachten", "faellt_ab", "low_runner", "ladenhueter"];
-const STATUS_ORDER: PriceStatus[] = ["unter_min", "im_korridor", "ueber_gut"];
+/** SortimentRow.priceStatus statt costEngine.PriceStatus (FIX 1): enthaelt zusaetzlich
+ * "kein_ek" fuer Artikel ohne jeden EK-Anhaltspunkt. */
+type RowPriceStatus = SortimentRow["priceStatus"];
+const STATUS_ORDER: RowPriceStatus[] = ["unter_min", "im_korridor", "ueber_gut", "kein_ek"];
 
 type ColId =
   | "artikel"
@@ -32,6 +34,7 @@ type ColId =
   | "avgpreis"
   | "avgvk"
   | "listingvk"
+  | "korridor"
   | "ek"
   | "dbI"
   | "dbII"
@@ -51,6 +54,9 @@ const COLS: ColumnDef<ColId>[] = [
   { id: "avgpreis", label: "Ø Preis", def: 84, min: 65, align: "r" },
   { id: "avgvk", label: "Ø-VK (real.)", def: 96, min: 70, align: "r" },
   { id: "listingvk", label: "Akt. VK (Liste)", def: 104, min: 80, align: "r" },
+  // Direkt neben dem Listen-VK: der Marker IM Korridor IST dieser VK -- nebeneinander
+  // liest man "Preis" und "wo steht er im Korridor" in einem Blick (PAGES_CONCEPT §3).
+  { id: "korridor", label: "Preis-Korridor", def: 182, min: 120 },
   { id: "ek", label: "Preis EK", def: 82, min: 65, align: "r" },
   { id: "dbI", label: "DB I/Stk", def: 84, min: 65, align: "r" },
   { id: "dbII", label: "DB II/Stk", def: 88, min: 65, align: "r" },
@@ -140,7 +146,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     const raw = searchParams.get("klasse");
     return raw ? new Set(raw.split(",").filter((c): c is ArticleClass => CLASS_ORDER.includes(c as ArticleClass))) : new Set();
   });
-  const [statusFilter, setStatusFilter] = useState<Set<PriceStatus>>(new Set());
+  const [statusFilter, setStatusFilter] = useState<Set<RowPriceStatus>>(new Set());
   const [onlyLadenhueter, setOnlyLadenhueter] = useState(false);
   // Standardmaessig nur AKTIVE Artikel zeigen (Billbee-Artikelstamm-Katalog);
   // ausgelaufene (nur in der Verkaufshistorie bekannte) Artikel sind ein
@@ -173,7 +179,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     setVisibleCount(PAGE_SIZE);
   }
 
-  function toggleStatus(status: PriceStatus) {
+  function toggleStatus(status: RowPriceStatus) {
     setStatusFilter((prev) => {
       const next = new Set(prev);
       if (next.has(status)) next.delete(status);
@@ -329,6 +335,9 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
               {visible.map((row) => {
                 const pill = STATUS_PILL[row.priceStatus];
                 const w = row.windows[selectedWindow];
+                // Gleiche Vergleichsbasis wie der Ampel-Status: aktueller Listen-VK,
+                // Fallback realisierter Ø-VK, wenn kein Artikelstamm-Preis vorliegt.
+                const vkForCorridor = row.listingVk ?? row.avgVkRealized;
                 return (
                   <tr key={row.articleId}>
                     <td>
@@ -351,6 +360,14 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
                     <td className="r num">{row.avgVkRealized > 0 ? `${formatEuroCents(row.avgVkRealized)} €` : "—"}</td>
                     <td className="r num">
                       {row.listingVk !== null ? `${formatEuroCents(row.listingVk)} €` : <span className="p-muted">—</span>}
+                    </td>
+                    <td>
+                      <Corridor
+                        min={row.corridor.min}
+                        good={row.corridor.good}
+                        vk={vkForCorridor}
+                        marketValue={row.priceTrend}
+                      />
                     </td>
                     <td className="r num">{row.ek > 0 ? `${formatEuroCents(row.ek)} €` : "—"}</td>
                     <td className="r num">{formatEuroCents(row.dbIPerUnit)} €</td>

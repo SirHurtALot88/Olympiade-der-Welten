@@ -6887,6 +6887,14 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   color: rgba(203, 213, 225, 0.88);
 }
 
+/* Kadergröße hinter dem Disziplin-Namen: gedämpft und leicht kleiner, damit sie den
+   Namen ergänzt und nicht mit dem PPs-Wert am rechten Rand um Aufmerksamkeit ringt. */
+.is-new-look .selected-roster-pps-diszi-item-count {
+  font-size: 0.92em;
+  font-weight: 600;
+  color: rgba(148, 163, 184, 0.72);
+}
+
 .is-new-look .selected-roster-pps-diszi-item-value {
   flex: 0 0 auto;
   font-weight: 700;
@@ -35169,6 +35177,26 @@ button.market-v2-bucket-card.is-selected {
   margin: 8px 0;
 }
 
+/* Weit entfernte Spieltage: Rank/Spieler/Impact bleiben sichtbar (dort wird ja
+   vorausgeplant), laufen aber enger, damit die Timeline kompakt bleibt. */
+.legacy-lineup-form-board-cell-velo-strip.is-compact {
+  margin: 4px 0;
+  gap: 4px;
+  padding: 0 8px;
+}
+
+.legacy-lineup-form-board-cell-velo-strip.is-compact .velo-impact-card {
+  padding: 4px 6px;
+}
+
+.legacy-lineup-form-board-cell-velo-strip.is-compact .velo-impact-card span {
+  font-size: 0.62rem;
+}
+
+.legacy-lineup-form-board-cell-velo-strip.is-compact .velo-impact-card strong {
+  font-size: 0.82rem;
+}
+
 .legacy-lineup-team-tactics-form-readonly {
   display: flex;
   flex-wrap: wrap;
@@ -45922,6 +45950,28 @@ button.foundation-team-portrait-card {
   grid-template-columns: 34px minmax(0, 1fr) 38px;
   align-items: center;
   gap: 6px;
+}
+
+/* Die Disziplin-Zeile IST die Hoverfläche fürs Teilnehmer-Panel (`.nl-teams-rank-portal`).
+   Dessen `display: inline-flex` würde das Grid oben kippen — hier bleibt das Raster,
+   nur `position: relative` (fürs absolut gesetzte Panel) kommt vom Portal dazu. */
+.is-new-look .nl-standings-disc.nl-teams-rank-portal {
+  display: grid;
+}
+
+.is-new-look .nl-standings-disc.nl-teams-rank-portal:hover,
+.is-new-look .nl-standings-disc.nl-teams-rank-portal:focus-within {
+  background: var(--nl-panel-2);
+  border-radius: var(--nl-r-sm);
+}
+
+/* Teilnehmerliste einer Disziplin kann länger werden als die Top-3-Panels der
+   Achsen — deckeln und scrollbar machen (dafür braucht das Panel hier, anders als
+   sonst, eigene Pointer-Events). */
+.is-new-look .nl-standings-disc .nl-teams-rank-preview {
+  max-height: 250px;
+  overflow-y: auto;
+  pointer-events: auto;
 }
 
 .is-new-look .nl-standings-disc-label {
@@ -58133,25 +58183,14 @@ button.foundation-team-portrait-card {
   box-shadow: var(--nl-e1);
 }
 
+/* Die Kopfzeile traegt seit dem Entfernen des Titelblocks nur noch die Bedienelemente —
+   `flex-end` haelt sie rechts, wo sie vorher schon standen. */
 .is-new-look .nl-lineup-show-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: var(--nl-s3);
-}
-
-.is-new-look .nl-lineup-show-title {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.is-new-look .nl-lineup-show-title strong {
-  font-family: var(--nl-display);
-  font-size: 16px;
-  color: var(--nl-ink);
 }
 
 .is-new-look .nl-lineup-show-controls {
@@ -58919,6 +58958,45 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-standings-td-mw {
   color: var(--nl-mut);
   font-variant-numeric: tabular-nums;
+}
+
+/* Kompakter Liga-Rang direkt hinter MW/Gehälter — gleiche Spalte, keine eigene.
+   Bewusst klein & gedämpft: der Geldwert bleibt die Hauptzahl, der Rang ist die
+   Einordnung dahinter. #1 bekommt den Akzent. */
+.is-new-look .nl-standings-rank-suffix {
+  margin-left: 5px;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--nl-mut);
+  opacity: 0.8;
+  vertical-align: baseline;
+}
+
+.is-new-look .nl-standings-rank-suffix.is-top {
+  color: var(--nl-gold, #f0c04a);
+  opacity: 1;
+}
+
+/* Spalte „Formkarten": Summe der gespielten Kartenwerte (+8 → 8, −4 → −4). */
+.is-new-look .nl-standings-th-formcards {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-standings-td-formcards {
+  text-align: right;
+  color: var(--nl-mut);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-standings-td-formcards.is-pos {
+  color: var(--nl-good, #6ec97e);
+}
+
+.is-new-look .nl-standings-td-formcards.is-neg {
+  color: var(--nl-bad, #dc6357);
 }
 
 /* Finanz-Spalten im Daten-Modus: Cash · Gehälter · Gebäude · GuV */
@@ -72849,4 +72927,66 @@ button.is-new-look .nl-thist-season-pill,
 @keyframes foundation-action-feedback-in {
   from { opacity: 0; transform: translate(-50%, 14px); }
   to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* --- Spieler-Tabelle: Achsen-Zelle (POW/SPE/MEN/SOC) ------------------
+   Ein Balken, die Zahl steht darin.
+
+   Vorher war die Zelle ein 2- bzw. 3-Spalten-Raster (zuletzt
+   `34px minmax(46px, 1fr) 32px`): ein 6px hoher Strich plus der Wert in
+   einer eigenen Spalte daneben. Das kostete Breite, und bei 6px Hoehe war
+   der Laengenunterschied zwischen einem 80er und einem 60er kaum zu sehen —
+   man musste die Zahlen lesen, statt die Balken zu vergleichen.
+
+   Jetzt traegt ein einziger, hoeherer Balken den optischen Vergleich, und die
+   Zahl liegt mittig darin. Die Regeln stehen bewusst am Dateiende: sie muessen
+   die frueheren `.nl-ptable-axis-enhanced`-Bloecke ueberschreiben, und bei
+   gleicher Spezifitaet gewinnt die spaetere Regel. */
+.is-new-look .nl-players-axis,
+.is-new-look .nl-players-axis.nl-ptable-axis-enhanced {
+  display: block;
+  grid-template-columns: none;
+  column-gap: 0;
+  gap: 0;
+  min-height: 0;
+  padding: 1px 0;
+}
+
+.is-new-look .nl-players-axis .nl-players-axis-track {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 15px;
+  border-radius: var(--nl-r-sm, 5px);
+}
+
+/* Der Fuellbalken bleibt der eigentliche Messwert — nur er skaliert mit dem Wert. */
+.is-new-look .nl-players-axis .nl-players-axis-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+}
+
+/* Die Zahl liegt ueber der GANZEN Spur, nicht ueber der Fuellung: sonst wandert
+   sie bei kleinen Werten aus der Zelle. Der Schatten haelt sie sowohl auf dem
+   getoenten Balken als auch auf der leeren Spur lesbar. */
+.is-new-look .nl-players-axis .nl-players-axis-value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--nl-ink);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+/* Schmalere Achsen-Spalte: ohne die zweite Rasterspalte fuer den Wert braucht
+   der Kopf keine Breite mehr fuer eine Zahl, die jetzt im Balken sitzt. */
+.is-new-look .nl-players-th-axis {
+  width: 62px;
+  min-width: 62px;
 }

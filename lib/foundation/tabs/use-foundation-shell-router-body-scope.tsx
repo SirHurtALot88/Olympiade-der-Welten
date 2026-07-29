@@ -6078,8 +6078,11 @@ export function useFoundationShellRouterBodyScope({
           ...current.seasonState,
           newGameFlow: {
             ...previous,
-            active: true,
-            dismissed: false,
+            // Sind alle Einstiegsschritte erledigt, ist der Einstieg vorbei. Vorher stand
+            // hier hart `active: true` — das Flag ging nie aus, und der Flow bot die
+            // Neues-Spiel-Kette noch mitten in der Saison an.
+            active: !isHandled,
+            dismissed: isHandled ? true : false,
             selectedTeamId: selectedTeamId ?? previous.selectedTeamId ?? null,
             steps: nextSteps,
             updatedAt: now,
