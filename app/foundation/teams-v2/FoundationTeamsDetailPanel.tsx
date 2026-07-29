@@ -222,16 +222,22 @@ function buildContractSalarySteps(row, seasonLabels) {
       lastActiveIndex = index;
     }
   });
+  // Erste Saison MIT Gehalt = die laufende Saison (`yearlySalarySchedule[0]`, siehe
+  // `resolvePlayerEconomySalary`). Das ist der Betrag, den das Team JETZT zahlt — und
+  // damit die Zahl, die neben der Treppe steht und nach der die Spalte sortiert.
+  const currentIndex = values.findIndex((entry) => entry.salary != null);
   const steps = values.map((entry, index) => ({
     label: entry.label,
     salary: entry.salary,
     heightPct: entry.salary != null ? Math.max(12, Math.round((entry.salary / maxSalary) * 100)) : 8,
     isEmpty: entry.salary == null,
     isLast: index === lastActiveIndex,
+    isCurrent: index === currentIndex,
   }));
   return {
     steps,
     lastActiveSalary: lastActiveIndex >= 0 ? values[lastActiveIndex].salary : null,
+    currentSalary: currentIndex >= 0 ? values[currentIndex].salary : null,
   };
 }
 
@@ -1742,6 +1748,14 @@ function FoundationTeamsDetailPanel({
                             return base;
                           }
                           const dir = nlContractSort.direction === "asc" ? 1 : -1;
+                          // Einmal je Zeile statt einmal je Vergleich — die Treppe wird
+                          // beim Rendern ohnehin gebaut, hier nur der aktuelle Betrag.
+                          const currentSalaryByRowId = new Map(
+                            base.map((row) => [
+                              row.rowId,
+                              buildContractSalarySteps(row, selectedTeamContractTable?.seasonLabels).currentSalary,
+                            ]),
+                          );
                           const readSortValue = (row) => {
                             switch (nlContractSort.key) {
                               case "player":
@@ -1768,11 +1782,16 @@ function FoundationTeamsDetailPanel({
                               // und steht schon in der VK-Spalte — hier also keine Dublette).
                               case "marketValueNow":
                                 return row.marketValueAtExit;
-                              // Gehaltsverlauf sortiert nach dem Gesamtgehalt über die
-                              // Vertragslaufzeit (nicht nur die letzte aktive Saison, die
-                              // die Zelle als Zahl zeigt) — konsistent mit dem Rest der Zeile.
+                              // Gehaltsverlauf sortiert nach dem AKTUELLEN Saisongehalt —
+                              // also nach genau der Zahl, die die Zelle neben der Treppe
+                              // zeigt. Vorher lief die Sortierung über `totalSalary` (Summe
+                              // über die ganze Laufzeit), die Zelle zeigte aber die letzte
+                              // Vertragssaison: drei verschiedene Größen, und der oberste
+                              // Spieler war weder der teuerste von heute noch der mit der
+                              // größten angezeigten Zahl. Die Laufzeit-Summe steht weiter im
+                              // Tooltip der Spalte und in der Fußzeile.
                               case "salary":
-                                return row.totalSalary;
+                                return currentSalaryByRowId.get(row.rowId) ?? null;
                               case "ovr":
                                 return rosterRowByPlayerId.get(row.playerId)?.playerOvr ?? null;
                               case "mvs":
@@ -1851,7 +1870,7 @@ function FoundationTeamsDetailPanel({
                               "Season-Performance-Punkte nach Bereich (POW/SPE/MEN/SOC) — jede Achse einzeln anklickbar zum Sortieren, ausklappbar für die Disziplin-PPs.",
                             width: 168,
                           },
-                          { key: "salary", label: "Gehaltsverlauf", sortable: true, tooltip: "Sortiert nach Gesamtgehalt über die Vertragslaufzeit." },
+                          { key: "salary", label: "Gehaltsverlauf", sortable: true, tooltip: "Treppe = Gehalt je Vertragssaison. Die Zahl daneben ist das AKTUELLE Saisongehalt — danach wird auch sortiert." },
                           { key: "actions", label: "Aktionen", align: "right" },
                         ];
                         const renderNlContractCell = (row, column) => {
@@ -2017,8 +2036,22 @@ function FoundationTeamsDetailPanel({
                                       />
                                     ))}
                                   </div>
-                                  <span className="team-contract-salary-cell-value nl-tnum">
-                                    {staircase.lastActiveSalary != null ? formatDisplayMoney(staircase.lastActiveSalary) : "—"}
+                                  {/* AKTUELLES Saisongehalt — was das Team heute zahlt, und
+                                      die Größe, nach der die Spalte sortiert. Vorher stand
+                                      hier die LETZTE Vertragssaison: bei front-/back-loaded
+                                      Verträgen eine ganz andere Zahl als die aktuelle Last,
+                                      und sortiert wurde nach einer dritten (Laufzeit-Summe).
+                                      Der komplette Verlauf steckt weiter in der Treppe
+                                      daneben, jeder Balken mit eigenem Tooltip. */}
+                                  <span
+                                    className="team-contract-salary-cell-value nl-tnum"
+                                    title={
+                                      staircase.lastActiveSalary != null && staircase.currentSalary != null
+                                        ? `Aktuelle Saison ${formatDisplayMoney(staircase.currentSalary)} · letzte Vertragssaison ${formatDisplayMoney(staircase.lastActiveSalary)}`
+                                        : "Aktuelles Saisongehalt"
+                                    }
+                                  >
+                                    {staircase.currentSalary != null ? formatDisplayMoney(staircase.currentSalary) : "—"}
                                   </span>
                                 </div>
                               );

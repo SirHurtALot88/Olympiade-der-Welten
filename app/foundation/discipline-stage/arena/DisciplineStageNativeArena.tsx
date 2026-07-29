@@ -6,6 +6,7 @@ import { teamPrimaryColor, floorTeamAccent } from "@/lib/foundation/team-colors"
 import { useStageAudio } from "./useStageAudio";
 import DisciplineStageResultTable, { type ResultTableRow } from "./DisciplineStageResultTable";
 import DisciplineStageTopPlayersRow from "../DisciplineStageTopPlayersRow";
+import DisciplineStageInjuryRow, { type DisciplineStageInjuredPlayer } from "../DisciplineStageInjuryRow";
 import PlayerMark from "./PlayerMark";
 import type { DisciplineStageTopPlayer } from "../DisciplineStageTopPlayers";
 import { fmt1, ampel } from "../stage-format";
@@ -3019,6 +3020,36 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       if (pid) revealedPlayerIds.add(pid);
     }
   }
+  // Verletzte unter den bereits aufgedeckten Spielern — Quelle sind dieselben Slots
+  // wie oben, damit die Zeile keinen Reveal vorwegnimmt. Erkennung wie im Ticker:
+  // bevorzugt der typisierte `injury`-Flag, Regex als Fallback fuer Datenpfade ohne ihn
+  // (Random-/Modell-Modus). Der Malus ist die Summe der Verletzungs-Mods, NICHT aller
+  // negativen Mods — sonst stuende Fatigue und Intensitaet mit in der Zahl.
+  const revealedInjuredPlayers: DisciplineStageInjuredPlayer[] = [];
+  for (const t of rtRef.current) {
+    for (let s = 0; s <= t.thrownSlot; s += 1) {
+      const p = t.players[s];
+      if (!p) continue;
+      const injuryMods = p.mods.filter((m) => m.injury === true || /verletz|injury/i.test(m.k));
+      if (injuryMods.length === 0) continue;
+      revealedInjuredPlayers.push({
+        playerId: p.playerId,
+        name: p.name,
+        teamCode: t.code,
+        logoUrl: t.logoUrl,
+        portraitUrl: p.portraitUrl,
+        isOwn: t.isOwn,
+        malus: round1(injuryMods.filter((m) => m.sign < 0).reduce((sum, m) => sum + m.amt, 0)),
+        ovrRank: p.ovrRank ?? null,
+      });
+    }
+  }
+  // Eigenes Team zuerst, danach der groesste Abzug — die zwei Fragen, die man an
+  // dieser Zeile stellt ("bin ich betroffen?" / "wen hat es hart erwischt?").
+  revealedInjuredPlayers.sort(
+    (left, right) => Number(right.isOwn) - Number(left.isOwn) || right.malus - left.malus || left.name.localeCompare(right.name, "de"),
+  );
+
   const revealedTopPlayers = topPlayers
     ? (() => {
         const rows: DisciplineStageTopPlayer[] = [];
@@ -3708,6 +3739,14 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             limit={10}
           />
         ) : null}
+
+        {/* Verletzungs-Zeile: nur wenn es Verletzte unter den aufgedeckten Spielern gibt.
+            Rendert sich selbst weg, wenn die Liste leer ist. */}
+        <DisciplineStageInjuryRow
+          players={revealedInjuredPlayers}
+          onOpenPlayer={onOpenPlayer}
+          onPreviewPlayer={onPreviewPlayer}
+        />
 
         {/* Ticker */}
         <div style={{ marginTop: 12, background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 10 }}>

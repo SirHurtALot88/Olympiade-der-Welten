@@ -6,6 +6,7 @@ import { fmt1 } from "./stage-format";
 import PlayerMark from "./arena/PlayerMark";
 import TeamMark from "./arena/TeamMark";
 import { getPlayerStarTier } from "@/lib/foundation/player-star-tier";
+import { hasVisibleMutatorPoints } from "@/lib/foundation/player-points-total";
 
 // Horizontale Top-Spieler-Zeile unter der Arena (statt linker Spalte), damit die
 // Arena die volle Breite bekommt. Sortiert nach Player-Points (kommt bereits
@@ -92,8 +93,15 @@ export default function DisciplineStageTopPlayersRow({ players, onOpenPlayer, on
                 <div style={{ textAlign: "right", flex: "none", paddingLeft: 4 }}>
                   {p.points != null ? (
                     <>
+                      {/* `p.points` ist die GESAMTE Gutschrift inkl. Mutator-Aufschlag. */}
                       <div style={{ fontSize: 13, fontWeight: 800, color: "var(--nl-accent)" }}>{fmt1(p.points)} PP</div>
-                      <div style={{ fontSize: 10.5, color: "var(--nl-mut)" }}>(Score {fmt1(p.score)})</div>
+                      <div style={{ fontSize: 10.5, color: "var(--nl-mut)" }}>
+                        (Score {fmt1(p.score)}
+                        {hasVisibleMutatorPoints(p.mutatorPoints)
+                          ? ` · inkl. ${p.mutatorPoints! > 0 ? "+" : "−"}${fmt1(Math.abs(p.mutatorPoints!))} Mut`
+                          : ""}
+                        )
+                      </div>
                     </>
                   ) : (
                     <div style={{ fontSize: 13, fontWeight: 800, color: "var(--nl-accent)" }}>{fmt1(p.score)}</div>
