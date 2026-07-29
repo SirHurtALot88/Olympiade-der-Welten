@@ -43,7 +43,18 @@ export type SeasonStandingsTopPlayersByTeam = Map<
   Partial<Record<SeasonStandingsTopPlayersColumnKey, SeasonStandingsTopPlayerEntry[]>>
 >;
 
-const TOP_PLAYERS_PER_COLUMN = 3;
+/**
+ * Achsen-Spalten (POW/SPE/MEN/SOC) sammeln den ganzen Kader — dort ist nur die
+ * Spitze interessant, deshalb Top 3.
+ */
+const TOP_PLAYERS_PER_AREA_COLUMN = 3;
+/**
+ * Disziplin-Spalten beantworten eine ANDERE Frage: "wer war in dieser Disziplin
+ * überhaupt dabei und was hat er geholt". Da wäre ein Top-3-Schnitt irreführend —
+ * es sind ohnehin nur die Spieler mit PPs > 0, also die tatsächlichen Teilnehmer.
+ * Die Kappung ist reiner Panel-Schutz für Disziplinen mit sehr vielen Startern.
+ */
+const TOP_PLAYERS_PER_DISCIPLINE_COLUMN = 12;
 
 /**
  * Bewusst strukturell-minimal statt `PlayerRatingContractRow`/`SeasonPointsLedger`:
@@ -119,13 +130,15 @@ export function buildSeasonStandingsTopPlayersByTeam(input: {
     }
   }
 
-  // Je Spalte absteigend sortieren und auf Top 3 kappen; Gleichstand stabil
-  // über den Namen auflösen, damit das Panel nicht bei jedem Render flackert.
+  // Je Spalte absteigend sortieren und kappen (Achse: Top 3, Disziplin: alle
+  // Teilnehmer bis zum Panel-Limit); Gleichstand stabil über den Namen auflösen,
+  // damit das Panel nicht bei jedem Render flackert.
   for (const columns of result.values()) {
     for (const key of Object.keys(columns) as SeasonStandingsTopPlayersColumnKey[]) {
+      const limit = isSeasonDisciplineKey(key) ? TOP_PLAYERS_PER_DISCIPLINE_COLUMN : TOP_PLAYERS_PER_AREA_COLUMN;
       columns[key] = [...(columns[key] ?? [])]
         .sort((left, right) => right.value - left.value || left.playerName.localeCompare(right.playerName, "de"))
-        .slice(0, TOP_PLAYERS_PER_COLUMN);
+        .slice(0, limit);
     }
   }
 

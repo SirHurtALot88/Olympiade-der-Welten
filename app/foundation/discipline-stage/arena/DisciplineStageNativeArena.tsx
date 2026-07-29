@@ -75,6 +75,11 @@ export type NativeStageTeam = {
   // trotzdem ein (0-)Ergebnis. Muss sichtbar von einem echten 0-Punkte-Resultat
   // unterschieden werden (Ladder + Detail-Ergebnistabelle).
   missingLineup?: boolean;
+  /**
+   * Name des in der Einsatzliste gesetzten Kapitäns (oder null/undefined, wenn das
+   * Team keinen benannt hat) → kleiner Stern am Wappen (`TokenChrome`).
+   */
+  captainName?: string | null;
 };
 export type StagePrimitive =
   | "track"
@@ -884,32 +889,38 @@ export const STAR_MIN = 80;
 export const TRACK_ROUND_MS = 10000;
 // viewBox + Token-Radien je Primitive. Der Rest (Engine/FX/Ticker/Podest/Tabelle)
 // ist geometrieunabhängig; nur Feld-Layout + tokenPos unterscheiden sich.
+//
+// LESBARKEIT DER WAPPEN (Owner-Wunsch): die Logo-Radien sind gegenüber der
+// Erstfassung durchgehend ~20 % größer — dafür sitzt der normale Team-Rahmen in
+// `TokenChrome` jetzt DÜNNER und ENGER am Logo. Netto bleibt das Token damit fast
+// gleich groß (Feld-Layouts/Bahnabstände kippen nicht), aber die Fläche, die auf
+// das Wappen entfällt, wächst spürbar — genau das, was man erkennen will.
 const PRIM_GEO: Record<StagePrimitive, { w: number; h: number; r: number; rOwn: number }> = {
-  track: { w: 1180, h: 620, r: 13, rOwn: 20 },
+  track: { w: 1180, h: 620, r: 15.5, rOwn: 23 },
   // Kompakt: 32 Bahnen passen in einen normalen Viewport (~640px hoch bei voller Breite).
-  lanes: { w: 1180, h: 640, r: 8, rOwn: 11 },
-  towers: { w: 1180, h: 600, r: 10, rOwn: 14 },
+  lanes: { w: 1180, h: 640, r: 9.5, rOwn: 13 },
+  towers: { w: 1180, h: 600, r: 12, rOwn: 16.5 },
   // stage — Showcase-Bühne mit Tiefe: perspektivische Ruhm-Treppe zum Podest.
-  stage: { w: 1180, h: 640, r: 10, rOwn: 15 },
+  stage: { w: 1180, h: 640, r: 12, rOwn: 18 },
   // Row-Familie (wie lanes)
-  platter: { w: 1180, h: 640, r: 8, rOwn: 11 },
-  lamps: { w: 1180, h: 640, r: 8, rOwn: 11 },
-  spybar: { w: 1180, h: 640, r: 8, rOwn: 11 },
-  kda: { w: 1180, h: 640, r: 8, rOwn: 11 },
-  duelhp: { w: 1180, h: 640, r: 8, rOwn: 11 },
+  platter: { w: 1180, h: 640, r: 9.5, rOwn: 13 },
+  lamps: { w: 1180, h: 640, r: 9.5, rOwn: 13 },
+  spybar: { w: 1180, h: 640, r: 9.5, rOwn: 13 },
+  kda: { w: 1180, h: 640, r: 9.5, rOwn: 13 },
+  duelhp: { w: 1180, h: 640, r: 9.5, rOwn: 13 },
   // Turm-Familie (wie towers)
-  barbell: { w: 1180, h: 600, r: 10, rOwn: 14 },
-  sparkbar: { w: 1180, h: 600, r: 9, rOwn: 13 },
-  thermometer: { w: 1180, h: 600, r: 9, rOwn: 13 },
+  barbell: { w: 1180, h: 600, r: 12, rOwn: 16.5 },
+  sparkbar: { w: 1180, h: 600, r: 10.5, rOwn: 15.5 },
+  thermometer: { w: 1180, h: 600, r: 10.5, rOwn: 15.5 },
   // Szenen
-  peloton: { w: 1180, h: 460, r: 11, rOwn: 16 },
-  parcours: { w: 1180, h: 560, r: 12, rOwn: 17 },
-  bump: { w: 1180, h: 560, r: 7, rOwn: 10 },
-  mountain: { w: 1180, h: 620, r: 11, rOwn: 16 },
-  court: { w: 1180, h: 620, r: 11, rOwn: 16 },
-  rink: { w: 1180, h: 560, r: 11, rOwn: 15 },
-  klassen: { w: 1180, h: 640, r: 8, rOwn: 11 },
-  territory: { w: 1180, h: 640, r: 8, rOwn: 11 },
+  peloton: { w: 1180, h: 460, r: 13, rOwn: 19 },
+  parcours: { w: 1180, h: 560, r: 14, rOwn: 20 },
+  bump: { w: 1180, h: 560, r: 8.5, rOwn: 12 },
+  mountain: { w: 1180, h: 620, r: 13, rOwn: 19 },
+  court: { w: 1180, h: 620, r: 13, rOwn: 19 },
+  rink: { w: 1180, h: 560, r: 13, rOwn: 18 },
+  klassen: { w: 1180, h: 640, r: 9.5, rOwn: 13 },
+  territory: { w: 1180, h: 640, r: 9.5, rOwn: 13 },
 };
 
 function round1(x: number): number {
@@ -1054,6 +1065,7 @@ export type RT = {
   teamId: string | null; // für Team-Drawer
   rel: TeamRelationshipKind | null; // Freund/Feind → Rahmen-Marker
   missingLineup: boolean; // A2: keine Aufstellung eingereicht — 0 ist kein echtes Ergebnis
+  captainName: string | null; // in der Einsatzliste gesetzter Kapitän → Stern am Wappen
   players: NativeStagePlayer[];
   seasonRank: number;
   laneIdx: number; // dichte 0…N-1 Bahn-/Turm-Reihenfolge nach seasonRank (keine Lücken)
@@ -1241,6 +1253,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       teamId: t.teamId ?? null,
       rel: t.rel ?? null,
       missingLineup: t.missingLineup ?? false,
+      captainName: t.captainName ?? null,
       players: t.players,
       seasonRank: t.seasonRank ?? idx + 1,
       laneIdx: idx,
@@ -1288,6 +1301,12 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const [zoom, setZoom] = useState<{ ox: number; oy: number; scale: number } | null>(null);
   const roundAnimStartRef = useRef<number>(0);
   const zoomFiredRef = useRef<boolean>(false);
+  /**
+   * idx der Teams, deren Spieler in DIESER Etappe eine Verletzung abbekommen —
+   * beim Rundenstart aus den Slot-Mods gelesen (siehe `advance`). Einer von zwei
+   * Gründen, aus denen der Highlight-Zoom überhaupt noch feuern darf.
+   */
+  const roundInjuryIdxsRef = useRef<number[]>([]);
   const svgRef = useRef<SVGSVGElement | null>(null); // für korrekte Zoom-Origin (getScreenCTM)
   // Highlight-Slow-Motion: die 3 größten Aufsteiger einer Etappe werden kurz
   // hervorgehoben (Ring am Token) und der geteilte Zeitstrahl läuft für ~1,5 s in
@@ -1889,12 +1908,19 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           changed = true;
         }
       }
-      // Highlight-Zeitlupe (nicht blockierend): die 3 GRÖSSTEN RANG-AUFSTEIGER dieser
-      // Etappe (die „Aufhol"-Teams) — falls keiner klettert, die 3 größten Netto-
-      // Zugewinne. Einmalig pro Etappe: Ring an ihren Token + geteilter Zeitstrahl
-      // ~1,5 s in Zeitlupe (0,2×) + enger Zoom auf ihren Schwerpunkt, damit man ihre
-      // Aufholjagd in Ruhe beobachten kann. Origin exakt über getScreenCTM (sonst landet
+      // Highlight-Zeitlupe (nicht blockierend). Einmalig pro Etappe: Ring an den
+      // hervorgehobenen Token + geteilter Zeitstrahl ~1,5 s in Zeitlupe (0,2×) +
+      // enger Zoom auf ihren Schwerpunkt. Origin exakt über getScreenCTM (sonst landet
       // der Zoom daneben, weil die SVG skaliert/geletterboxed ist).
+      //
+      // ANLASS-GATE (Owner-Wunsch): der Zoom feuerte früher in JEDER Etappe auf die 3
+      // größten Aufsteiger — bei 20+ Etappen war das Dauerzustand statt Höhepunkt.
+      // Jetzt gibt es genau zwei Anlässe:
+      //   1. VERLETZUNG in dieser Etappe → Zoom auf die betroffenen Teams.
+      //   2. Die Bewegung berührt das PODEST der kommenden Runde, d. h. mindestens
+      //      einer der Aufsteiger steht nach dieser Etappe auf Rang 1–3.
+      // Trifft keins von beidem zu, bleibt die Etappe im normalen Fluss: kein Zoom,
+      // keine Zeitlupe, kein Puls-Ring.
       if (start && !zoomFiredRef.current && tRaw > 0.42 && tRaw < 0.72 && !reduced.current) {
         zoomFiredRef.current = true;
         const finalOrder = [...rt].sort((a, b) => b.displayScore - a.displayScore || a.seasonRank - b.seasonRank);
@@ -1912,6 +1938,17 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         // Zugewinne als Fallback). Trio = die spannendsten Bewegungen dieser Etappe.
         let trio = climbers.filter((c) => c.climb > 0).slice(0, 3);
         if (trio.length === 0) trio = climbers.filter((c) => c.gain > 0.5).slice(0, 3);
+        // Anlass 1 schlägt Anlass 2: bei einer Verletzung zeigt der Zoom die
+        // betroffenen Teams, nicht irgendwelche Aufsteiger.
+        const injuredIdxs = roundInjuryIdxsRef.current;
+        if (injuredIdxs.length > 0) {
+          trio = rt
+            .filter((t) => injuredIdxs.includes(t.idx))
+            .slice(0, 3)
+            .map((t) => ({ t, climb: 0, gain: t.displayScore - t.roundStartScore }));
+        } else {
+          trio = trio.filter((c) => (finalRank.get(c.t.idx) ?? Number.POSITIVE_INFINITY) <= 3);
+        }
         if (trio.length) {
           setHighlightTrio(trio.map((c) => c.t.idx));
           const HOLD_MS = 1500;
@@ -2390,6 +2427,12 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     // (Feld ↔ Rangliste synchron). Zoom-Highlight für diese Runde neu scharf schalten.
     roundAnimStartRef.current = Date.now();
     zoomFiredRef.current = false;
+    // Verletzungen dieser Etappe vorab bestimmen (aus den Slot-Mods, gleiche
+    // Erkennung wie in `noteReveal`): sie sind der eine Anlass, der den
+    // Highlight-Zoom auch abseits des Podiums rechtfertigt.
+    roundInjuryIdxsRef.current = rt
+      .filter((t) => (t.players[r]?.mods ?? []).some((m) => m.injury === true || /verletz|injury/i.test(m.k)))
+      .map((t) => t.idx);
     if (prim === "track") {
       // Staffelstab-Übergabe (FEATURE 1): bei jedem Etappenwechsel (ab Etappe 2 — Etappe 1
       // hat keinen abgebenden Läufer) reicht jedes Token seinen Stab nach vorn. Ein einziger

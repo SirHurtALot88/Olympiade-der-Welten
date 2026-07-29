@@ -62,9 +62,11 @@ export type DisciplineFieldProps = {
   // Der Host berechnet es (now < handoffTs + 600); das Track-Feld zeigt dann den Stab-Funken.
   handoffActive?: boolean;
 
-  // Highlight-Trio: idx der 3 größten Aufsteiger der laufenden Etappe (während der ~1,5 s
-  // Zeitlupe gesetzt, sonst leer). Felder heben diese Token mit einem Puls-Ring hervor,
-  // damit man ihre Aufholjagd im Zoom verfolgen kann.
+  // Highlight-Token: idx der hervorgehobenen Teams der laufenden Etappe (während der
+  // ~1,5 s Zeitlupe gesetzt, sonst leer). Felder heben diese Token mit einem Puls-Ring
+  // hervor, damit man sie im Zoom verfolgen kann. Der Host feuert das NUR bei einem
+  // echten Anlass: Verletzung in dieser Etappe, oder ein Aufsteiger, der danach auf dem
+  // Podest (Rang 1–3) steht — sonst bleibt die Etappe im normalen Fluss.
   highlightIdxs?: number[];
 
   // Start-Gate: true, sobald der erste ▶-Etappe-Klick erfolgt ist. Felder können vorher

@@ -21,6 +21,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { hueForIdx, relColor } from "../DisciplineStageNativeArena";
 import { teamPrimaryColor, floorTeamAccent } from "@/lib/foundation/team-colors";
+import { TeamFrame } from "./benchmark";
 import type { DisciplineFieldProps, RT } from "./types";
 
 // Deterministischer 0…1-Hash (FNV-1a) — Treffer-Seite (rot/grün) + vertikale Streuung.
@@ -523,15 +524,8 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
               ) : (
                 <circle r={r} fill={`hsl(${hue} 60% 52%)`} />
               )}
-              {/* Team-Farb-Rahmen (getTeamColor) — jedes Team sichtbar; eigenes hervorgehoben. */}
-              {t.isOwn ? (
-                <>
-                  <circle r={r + 1.6} fill="none" stroke="var(--nl-accent)" strokeWidth={3} />
-                  <circle r={r + 0.2} fill="none" stroke="var(--nl-ink)" strokeWidth={1.4} opacity={0.9} />
-                </>
-              ) : (
-                <circle r={r + 1.4} fill="none" stroke={floorTeamAccent(teamPrimaryColor(t.code))} strokeWidth={2.4} />
-              )}
+              {/* Team-Farb-Rahmen + Kapitäns-Stern — geteilt mit `TokenChrome`. */}
+              <TeamFrame t={t} r={r} />
               {t.rank === 1 ? (
                 <text y={-(r + 9)} textAnchor="middle" fontSize={14}>
                   🏆

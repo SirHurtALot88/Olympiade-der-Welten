@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 
 import SeasonStandingsNewLook from "@/app/foundation/season-v2/SeasonStandingsNewLook";
 import type { SeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
+import type { SeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
 import type { SeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
 
 type SeasonV2DisciplineKey = SeasonDisciplineKey | "bonuspunkte";
@@ -182,6 +183,12 @@ export type SeasonStandingsV2ClientProps = {
    * (z. B. Archiv-Saison: Live-Werte wären dort gelogen) → kein Hover-Panel.
    */
   teamTopPlayersByColumn?: SeasonStandingsTopPlayersByTeam | null;
+  /**
+   * Summe der gespielten Formkarten-Nennwerte je Team (+8 zählt 8, −4 zählt −4) —
+   * speist die Saisonstand-Spalte „Formkarten". Optional/`null`, wenn für die
+   * gewählte Saison keine Aufstellungen mehr vorliegen (dann zeigt die Spalte „—").
+   */
+  teamFormCardBonusByTeamId?: SeasonFormCardBonusByTeamId | null;
   onChangeSeason: (seasonId: string) => void;
   onOpenTeam: (teamId: string) => void;
   onOpenPlayer: (playerId: string) => void;
