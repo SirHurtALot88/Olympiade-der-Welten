@@ -71,9 +71,14 @@ import {
  * gebauten Feld-Rennen-Ledger (`build-field-race-ledger.ts`,
  * `rankDeltaVsPrev`). Das ist die eigentliche "wer bewegt sich"-Kennzahl des
  * Feldrennens — der Board-Zeilen-Chip liest dieses Feld (▲ Plätze gut / ▼ ab /
- * — am ersten Spieltag). Der Rang-Cell-Chip `row.rankDiff` bleibt die
- * saisonübergreifende Bewegung (aus `historicalPointsBySeason`) und ist davon
- * bewusst getrennt.
+ * — am ersten Spieltag).
+ *
+ * Die Rang-Spalte der Daten-Tabelle liest jetzt dieselbe Größe
+ * (`renderRankMovementChip`). Vorher hing sie allein an `row.rankDiff`, der
+ * saisonübergreifenden Bewegung — die wird aber erst beim Saisonabschluss
+ * geschrieben und stand deshalb die ganze laufende Saison über auf 0/leer.
+ * `rankDiff` bleibt als Rückfallebene erhalten (eigener Tooltip), damit die
+ * beiden Größen unterscheidbar bleiben.
  */
 
 type NlStandingsMode = "board" | "daten" | "vereine";
@@ -735,6 +740,44 @@ export default function SeasonStandingsNewLook({
     );
   }
 
+  /**
+   * Rang-Bewegung in der Rang-Spalte der Daten-Tabelle.
+   *
+   * Vorher hing hier ausschliesslich `row.rankDiff` — und das ist die Bewegung
+   * seit SAISONSTART. Die wird erst beim Saisonabschluss geschrieben
+   * (`cash-prize-apply-service`), in der laufenden Saison steht sie auf 0 bzw.
+   * fehlt. Ergebnis: die Spalte blieb ueber die komplette Saison leer, obwohl
+   * genau hier "wer hat sich seit dem letzten Spieltag bewegt?" hingehoert.
+   *
+   * Jetzt fuehrt das Spieltags-Delta aus dem Feld-Rennen-Ledger
+   * (`fieldRaceRankDelta`, dieselbe Quelle wie der Board-Chip). Nur wenn es das
+   * nicht gibt (erster Spieltag, Archiv-Snapshot) faellt die Zelle auf die
+   * Saisonstart-Bewegung zurueck — mit eigenem Tooltip, damit die beiden
+   * Groessen nie verwechselt werden.
+   */
+  function renderRankMovementChip(row: SeasonV2StandingsRow) {
+    const matchdayDelta = row.fieldRaceRankDelta;
+    if (matchdayDelta != null && Number.isFinite(matchdayDelta)) {
+      return (
+        <NlDeltaChip
+          value={matchdayDelta}
+          format={(n) => (n === 0 ? "±0" : `${n > 0 ? "+" : ""}${formatNlNumber(n, 0)}`)}
+          title="Rang-Bewegung gegenüber dem letzten Spieltag"
+        />
+      );
+    }
+    if (row.rankDiff != null && Number.isFinite(row.rankDiff) && row.rankDiff !== 0) {
+      return (
+        <NlDeltaChip
+          value={row.rankDiff}
+          format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 0)}`}
+          title="Rang-Bewegung seit Saisonstart"
+        />
+      );
+    }
+    return null;
+  }
+
   function renderAreaMiniBars(row: SeasonV2StandingsRow) {
     return (
       <div className="nl-standings-areas" role="group" aria-label={`Bereichspunkte ${row.teamName}`}>
@@ -1199,13 +1242,7 @@ export default function SeasonStandingsNewLook({
           </td>
           <td className="nl-standings-td-rank">
             <span className="nl-tnum">{row.rank ?? "—"}</span>
-            {row.rankDiff != null && Number.isFinite(row.rankDiff) && row.rankDiff !== 0 ? (
-              <NlDeltaChip
-                value={row.rankDiff}
-                format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 0)}`}
-                title="Rang-Bewegung seit Saisonstart"
-              />
-            ) : null}
+            {renderRankMovementChip(row)}
           </td>
           <td className="nl-standings-td-team">
             <button

@@ -85,6 +85,15 @@ export function applyPlannedFormCardsToModifiers(
       };
       usedPlannedCards.add(secondaryCardId);
     }
+    // Push-Ziel des Formplans in den Entwurf uebernehmen — aber nur als SAAT.
+    // Steht auf der Seite bereits eine bewusst abweichende Intensitaet, gewinnt
+    // die: der Plan ist die Vorabsicht, die Einsatzliste am Spieltag die letzte
+    // Instanz. `"normal"` ist der Startwert eines frischen Entwurfs und damit
+    // "noch nichts entschieden" — nur den ueberschreibt der Plan.
+    const plannedIntensity = plan?.plannedIntensity ?? null;
+    if (plannedIntensity && next[side].intensity === "normal") {
+      next[side] = { ...next[side], intensity: plannedIntensity };
+    }
   }
   return next;
 }

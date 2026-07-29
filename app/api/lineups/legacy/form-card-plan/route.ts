@@ -38,9 +38,21 @@ export async function PUT(request: Request) {
     disciplineId?: string | null;
     primaryFormCardId?: string | null;
     secondaryFormCardId?: string | null;
+    plannedIntensity?: "conserve" | "normal" | "push" | null;
   };
   if (body.disciplineSide !== "d1" && body.disciplineSide !== "d2") {
     return NextResponse.json({ error: "disciplineSide must be d1 or d2." }, { status: 400 });
+  }
+  // Dreiwertig: fehlendes Feld = "nicht anfassen", `null` = Push-Ziel loeschen.
+  // Deshalb `"plannedIntensity" in body` statt eines `?? null`-Fallbacks — sonst
+  // wuerde jeder Kartenklick das Push-Ziel derselben Seite mitloeschen.
+  const hasPlannedIntensity = Object.prototype.hasOwnProperty.call(body, "plannedIntensity");
+  if (
+    hasPlannedIntensity &&
+    body.plannedIntensity != null &&
+    !["conserve", "normal", "push"].includes(body.plannedIntensity)
+  ) {
+    return NextResponse.json({ error: "plannedIntensity must be conserve, normal, push or null." }, { status: 400 });
   }
 
   const writeAuth = authorizeServerRoomWrite({
@@ -63,6 +75,7 @@ export async function PUT(request: Request) {
       disciplineId: body.disciplineId ?? null,
       primaryFormCardId: body.primaryFormCardId ?? null,
       secondaryFormCardId: body.secondaryFormCardId ?? null,
+      ...(hasPlannedIntensity ? { plannedIntensity: body.plannedIntensity ?? null } : {}),
     });
   } catch (error) {
     const mapped = mapSaveResolutionErrorToResponse(error);
