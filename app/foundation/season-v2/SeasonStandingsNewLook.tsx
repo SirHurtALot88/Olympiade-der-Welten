@@ -1098,11 +1098,11 @@ export default function SeasonStandingsNewLook({
                 title={`${player.name} öffnen`}
               >
                 <span className="nl-standings-player-rank nl-tnum">#{player.rank}</span>
-                {/* `player.rank` ist der ligaweite PPs-Rang der Saison-Spielerliste
-                    (sortiert nach PPs, siehe `use-season-v2-data.ts`) — also
-                    derselbe Rangbegriff, aus dem sich die Star-Stufe speist.
-                    Kein zusätzliches Durchreichen nötig. */}
-                <PlayerStarFrame tier={getPlayerStarTier(player.rank)} shape="circle">
+                {/* `player.rank` ist der ligaweite PPs-Rang dieser Liste (sortiert
+                    nach PPs) — für den Star-Rahmen zählt aber ausschliesslich der
+                    OVR-Rang (`player.ovrRank`, separat durchgereicht), NICHT dieser
+                    Listen-Rang. Siehe `lib/foundation/player-star-tier.ts`. */}
+                <PlayerStarFrame tier={getPlayerStarTier(player.ovrRank)} shape="circle" size="sm">
                   <BudgetedMediaImage
                     src={player.portraitUrl}
                     alt={`${player.name} Portrait`}
@@ -1336,11 +1336,11 @@ export default function SeasonStandingsNewLook({
                 title={`${player.name} öffnen`}
               >
                 <span className="nl-standings-player-rank nl-tnum">#{player.rank}</span>
-                {/* `player.rank` ist der ligaweite PPs-Rang der Saison-Spielerliste
-                    (sortiert nach PPs, siehe `use-season-v2-data.ts`) — also
-                    derselbe Rangbegriff, aus dem sich die Star-Stufe speist.
-                    Kein zusätzliches Durchreichen nötig. */}
-                <PlayerStarFrame tier={getPlayerStarTier(player.rank)} shape="circle">
+                {/* `player.rank` ist der ligaweite PPs-Rang dieser Liste (sortiert
+                    nach PPs) — für den Star-Rahmen zählt aber ausschliesslich der
+                    OVR-Rang (`player.ovrRank`, separat durchgereicht), NICHT dieser
+                    Listen-Rang. Siehe `lib/foundation/player-star-tier.ts`. */}
+                <PlayerStarFrame tier={getPlayerStarTier(player.ovrRank)} shape="circle" size="sm">
                   <BudgetedMediaImage
                     src={player.portraitUrl}
                     alt={`${player.name} Portrait`}

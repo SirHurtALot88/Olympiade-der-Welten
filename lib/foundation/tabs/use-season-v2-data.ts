@@ -42,6 +42,8 @@ export interface UseSeasonV2DataInput {
       ppsSeason?: number | null;
       ppsSeasonRank?: number | null;
       ovrNormalized?: number | null;
+      /** Ligaweiter OVR-Rang — Grundlage des Star-Tier-Rahmens (siehe `player-star-tier.ts`). */
+      ovrRank?: number | null;
       mvs?: number | null;
       ppPow?: number | null;
       ppSpe?: number | null;
@@ -148,6 +150,7 @@ export function useSeasonV2Data(input: UseSeasonV2DataInput) {
             pps: totalPoints,
             ppsRank: player.ppsRank ?? null,
             ovr: player.ovr ?? null,
+            ovrRank: player.ovrRank ?? null,
             mvs: player.mvs ?? null,
             marketValue: player.marketValue ?? null,
             bracket: getTransfermarktBracket(player.marketValue ?? null),
@@ -194,6 +197,7 @@ export function useSeasonV2Data(input: UseSeasonV2DataInput) {
           pps: resolvedPps != null ? roundViewNumber(resolvedPps, 1) : null,
           ppsRank: rating?.ppsSeasonRank ?? null,
           ovr: rating?.ovrNormalized ?? null,
+          ovrRank: rating?.ovrRank ?? null,
           mvs: rating?.mvs ?? null,
           marketValue,
           bracket: getTransfermarktBracket(marketValue),

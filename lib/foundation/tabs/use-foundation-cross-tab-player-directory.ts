@@ -43,6 +43,8 @@ export type FoundationPlayerScopeRow = {
   /** Echter Potenzial-Score (hiddenPotentialScore) für den kanonischen PO-Stern. */
   potentialScore: number | null;
   playerOvr: number | null;
+  /** Ligaweiter OVR-Rang — einzige Grundlage des Star-Tier-Rahmens am Portrait (siehe `player-star-tier.ts`). */
+  ovrRank: number | null;
   playerMvs: number | null;
   playerPps: number | null;
   /**
@@ -345,6 +347,7 @@ export function useFoundationCrossTabPlayerDirectory(input: {
           seasonPerformance,
           potentialScore: potentialRecord?.hiddenPotentialScore ?? player.potential ?? null,
           playerOvr: playerRating?.ovrNormalized ?? null,
+          ovrRank: playerRating?.ovrRank ?? null,
           playerMvs: playerRating?.mvs ?? null,
           playerPps: playerRating?.ppsSeason ?? null,
           axisPps: {

@@ -34,7 +34,7 @@ import type { LeagueLeaderCategoryId } from "@/lib/foundation/league-leaders-ser
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
 import { formatLeaguePercentile } from "@/lib/foundation/player-league-heat";
 import {
-  getBestPlayerStarTier,
+  getPlayerStarTier,
   getPlayerStarTierClassName,
   getPlayerStarTierLabel,
   isHoloPlayerStarTier,
@@ -225,11 +225,12 @@ export default function PlayerHeroNewLook({
       : undefined;
 
   // Star-Tier fürs Hero-Portrait (#): dieselbe ligaweite Top-Riege wie im Kader,
-  // in der Spielertabelle und an der Arena-Marke — die BESTE der drei Kennzahlen
-  // (siehe `getBestPlayerStarTier`), nicht nur OVR. Ein Free Agent/Spieler ohne
-  // Ränge (`ovrRank`/`ppsRank`/`mvsRank` alle `null`) bekommt automatisch keine
-  // Stufe zurück, also auch keinen Rahmen — kein Sonderfall nötig.
-  const heroStarTier = getBestPlayerStarTier(data.ovrRank, data.ppsRank, data.mvsRank);
+  // in der Spielertabelle und an der Arena-Marke — ausschliesslich über den
+  // OVR-Rang (siehe `getPlayerStarTier`), nicht mehr über die beste der drei
+  // Kennzahlen. Ein Free Agent/Spieler ohne OVR-Rang (`ovrRank` `null`)
+  // bekommt automatisch keine Stufe zurück, also auch keinen Rahmen — kein
+  // Sonderfall nötig.
+  const heroStarTier = getPlayerStarTier(data.ovrRank);
   const heroStarTierLabel = getPlayerStarTierLabel(heroStarTier);
   const heroPortraitClassName = [
     "nl-player-hero-portrait",

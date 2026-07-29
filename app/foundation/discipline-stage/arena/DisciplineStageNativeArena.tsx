@@ -12,6 +12,7 @@ import { fmt1, ampel } from "../stage-format";
 import type { TeamRelationshipKind } from "@/lib/foundation/team-relationship";
 import { getDisciplineField } from "./disciplines/registry";
 import type { DisciplineFieldProps } from "./disciplines/types";
+import { getPlayerStarTier } from "@/lib/foundation/player-star-tier";
 
 // Freund/Feind-Rahmenfarbe (mine=blau, ally=grün, rival=rot) über die globalen
 // --nl-* Tokens (Light/Dark ziehen automatisch mit). Marker = Rahmen, nie Füllung.
@@ -47,6 +48,8 @@ export type NativeStagePlayer = {
   portraitUrl: string | null;
   mods: NativeStageMod[];
   pointsAwarded: number | null;
+  /** Ligaweiter OVR-Rang — einzige Grundlage des Star-Tier-Rings am `PlayerMark` (siehe `player-star-tier.ts`). */
+  ovrRank?: number | null;
 };
 // Live-Ergebnis eines bereits AUFGEDECKTEN Spielers (für den Team-Drawer: „was hat
 // der Spieler in dieser Disziplin geholt + Boni/Abzüge"). Nur enthüllte Slots.
@@ -1103,7 +1106,21 @@ type TickerHeader = { kind: "header"; id: string; text: string };
 type TickerData = TickerReveal | TickerSummary | TickerHeader;
 
 const TICKER_MAX = 40;
-type Spot = { crest: NativeStageTeam; idx: number; kick: string; name: string; sub: string; net: number; chipText: string; chipColor: string; mine: boolean; portraitUrl: string | null; injury?: boolean } | null;
+type Spot = {
+  crest: NativeStageTeam;
+  idx: number;
+  kick: string;
+  name: string;
+  sub: string;
+  net: number;
+  chipText: string;
+  chipColor: string;
+  mine: boolean;
+  portraitUrl: string | null;
+  injury?: boolean;
+  /** Ligaweiter OVR-Rang — Grundlage des Star-Tier-Rings am Spotlight-Portrait. */
+  ovrRank?: number | null;
+} | null;
 type PodCol = { place: number; code: string; name: string; pts: number; logoUrl: string | null; isOwn: boolean; idx: number; delayMs: number; loud: boolean };
 
 // Team-Hovercard als PORTAL (document.body) mit position:fixed + Viewport-Clamping.
@@ -2473,6 +2490,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             mine: isMine,
             portraitUrl: res.player.portraitUrl,
             injury: impact.cause === "injury",
+            ovrRank: res.player.ovrRank ?? null,
           },
           // Verletzung bleibt länger im Bild als andere Tier-2-Highlights (1500ms) —
           // sichtbares, nicht-flüchtiges Feedback statt eines Blinzelns.
@@ -2508,6 +2526,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             chipColor: "gold",
             mine: true,
             portraitUrl: res.player.portraitUrl,
+            ovrRank: res.player.ovrRank ?? null,
           },
           900,
         );
@@ -2808,7 +2827,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             title={clickable ? "Spieler-Karte öffnen" : undefined}
             style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0, cursor: clickable ? "pointer" : "default" }}
           >
-            <PlayerMark src={runner?.portraitUrl ?? null} alt={runner?.name ?? ""} size={26} isOwn medal={runnerMedal} injury={runnerInjured} />
+            <PlayerMark src={runner?.portraitUrl ?? null} alt={runner?.name ?? ""} size={26} isOwn medal={runnerMedal} injury={runnerInjured} starTier={getPlayerStarTier(runner?.ovrRank)} />
             <span style={{ fontSize: 12.5, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: runnerInjured ? "var(--nl-risk)" : undefined }}>
               {runnerInjured ? "🤕" : "🏃"} {runner?.name ?? "—"}
             </span>
@@ -3175,7 +3194,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                         title={clickable ? "Spieler-Karte öffnen" : undefined}
                         style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px 8px 8px", borderRadius: 12, border: "1px solid var(--nl-accent)", background: "color-mix(in srgb, var(--nl-bg) 84%, var(--nl-accent))", cursor: clickable ? "pointer" : "default" }}
                       >
-                        <PlayerMark src={lifter?.portraitUrl ?? null} alt={lifter?.name ?? ""} size={46} isOwn medal={null} />
+                        <PlayerMark src={lifter?.portraitUrl ?? null} alt={lifter?.name ?? ""} size={46} isOwn medal={null} starTier={getPlayerStarTier(lifter?.ovrRank)} />
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 800, color: "var(--nl-accent)" }}>🏋 Dein Heber · {me.code}</div>
                           <div style={{ fontSize: 15, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{lifter?.name ?? "—"}</div>
@@ -3241,7 +3260,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               background: `color-mix(in srgb, ${spotlight.injury ? "var(--nl-risk)" : spotlight.mine ? "var(--nl-accent)" : "var(--nl-warn)"} 12%, transparent)`,
             }}
           >
-            <PlayerMark src={spotlight.portraitUrl} alt={spotlight.name} size={38} spotlight={!spotlight.mine} isOwn={spotlight.mine} injury={spotlight.injury} />
+            <PlayerMark src={spotlight.portraitUrl} alt={spotlight.name} size={38} spotlight={!spotlight.mine} isOwn={spotlight.mine} injury={spotlight.injury} starTier={getPlayerStarTier(spotlight.ovrRank)} />
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 800, color: spotlight.injury ? "var(--nl-risk)" : spotlight.mine ? "var(--nl-accent)" : "var(--nl-warn)" }}>
                 {spotlight.injury ? "🤕 " : ""}

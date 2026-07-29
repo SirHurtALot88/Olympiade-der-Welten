@@ -82,6 +82,12 @@ export default function PlayerMark({ src, alt = "", size = 28, isOwn = false, re
   const medalTone = markMedalColor(medal);
   const starTone = markStarTierColor(starTier);
   const starTierLabel = getPlayerStarTierLabel(starTier);
+  // Bei kleinen Marken (Einsatzlisten, Top-Spieler-Chips, 24–32px) frisst der
+  // sonst 2px breite Star-Ring zu viel vom Portrait — dort dünner und näher
+  // am Bild. Mittlere/große Marken (Kopf-Portrait im Drawer, Spotlight)
+  // bleiben unverändert.
+  const starRingWidth = size < 36 ? 1 : 2;
+  const starRingInset = injury ? -(starRingWidth * 3 + 1) : -(starRingWidth + 1);
   const showImg = Boolean(src) && !failed;
   const badge = Math.max(11, Math.round(size * 0.42));
   const injuryBadge = Math.max(11, Math.round(size * 0.44));
@@ -108,10 +114,10 @@ export default function PlayerMark({ src, alt = "", size = 28, isOwn = false, re
           className={`arena-mark-star-ring is-${starTier}${isHoloPlayerStarTier(starTier) ? " is-star-holo" : ""}`}
           style={{
             position: "absolute",
-            inset: injury ? -7 : -3,
+            inset: starRingInset,
             borderRadius: "50%",
-            border: `2px solid ${starTone}`,
-            boxShadow: `0 0 6px color-mix(in srgb, ${starTone} 45%, transparent)`,
+            border: `${starRingWidth}px solid ${starTone}`,
+            boxShadow: `0 0 ${starRingWidth === 1 ? 4 : 6}px color-mix(in srgb, ${starTone} 45%, transparent)`,
             pointerEvents: "none",
           }}
         />

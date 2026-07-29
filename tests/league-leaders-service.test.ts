@@ -19,6 +19,7 @@ const seasonRows: LeagueLeaderSourceRow[] = [
     ppMen: 18,
     ppSoc: 17,
     ovr: 72,
+    ovrRank: 5,
     mvs: 68,
   },
   {
@@ -33,6 +34,7 @@ const seasonRows: LeagueLeaderSourceRow[] = [
     ppMen: 19,
     ppSoc: 21,
     ovr: 75,
+    ovrRank: 2,
     mvs: 70,
   },
   {
@@ -47,6 +49,7 @@ const seasonRows: LeagueLeaderSourceRow[] = [
     ppMen: 12,
     ppSoc: 13,
     ovr: 69,
+    ovrRank: 9,
     mvs: 66,
   },
 ];
@@ -59,6 +62,7 @@ const trainingRows: LeagueTrainingLeaderSourceRow[] = [
     teamCode: "ALP",
     teamName: "Alpha Team",
     trainingForecast: 1.2,
+    ovrRank: 5,
   },
   {
     playerId: "p2",
@@ -67,6 +71,7 @@ const trainingRows: LeagueTrainingLeaderSourceRow[] = [
     teamCode: "BET",
     teamName: "Beta Team",
     trainingForecast: 2.8,
+    ovrRank: 2,
   },
   {
     playerId: "p3",
@@ -75,6 +80,7 @@ const trainingRows: LeagueTrainingLeaderSourceRow[] = [
     teamCode: "GAM",
     teamName: "Gamma Team",
     trainingForecast: 0.4,
+    ovrRank: 9,
   },
 ];
 

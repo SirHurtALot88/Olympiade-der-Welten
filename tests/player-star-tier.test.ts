@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   describePlayerStarTier,
-  getBestPlayerStarTier,
   getPlayerStarTier,
   getPlayerStarTierClassName,
   getPlayerStarTierLabel,
@@ -44,21 +43,6 @@ describe("Star-Tier: Schwellen", () => {
   });
 });
 
-describe("Star-Tier: bester Rang fürs Portrait", () => {
-  it("nimmt den besten der drei Ränge", () => {
-    // Nur in MVS top, sonst mittelmäßig → das Portrait zeigt trotzdem Diamant.
-    expect(getBestPlayerStarTier(120, 340, 2)).toBe("diamond");
-    expect(getBestPlayerStarTier(12, 40, 60)).toBe("silver");
-    expect(getBestPlayerStarTier(80, 90, 100)).toBeNull();
-  });
-
-  it("ignoriert fehlende und unplausible Ränge statt sie als 'gut' zu werten", () => {
-    expect(getBestPlayerStarTier(null, undefined, 8)).toBe("gold");
-    expect(getBestPlayerStarTier(null, undefined, null)).toBeNull();
-    expect(getBestPlayerStarTier(0, -5, 30)).toBe("bronze");
-  });
-});
-
 describe("Star-Tier: Holo und Beschriftung", () => {
   it("gibt den Holo-Schimmer nur der Top 10", () => {
     expect(isHoloPlayerStarTier("diamond")).toBe(true);
@@ -75,35 +59,42 @@ describe("Star-Tier: Holo und Beschriftung", () => {
     expect(getPlayerStarTierLabel(null)).toBeNull();
   });
 
-  it("nennt im Tooltip die Kennzahl, die die Stufe ausgelöst hat", () => {
-    expect(describePlayerStarTier({ ovrRank: 40, ppsRank: 2, mvsRank: 90 })).toBe(
-      "Diamant · Liga-Top-3 — PPs #2",
-    );
-    expect(describePlayerStarTier({ ovrRank: 9 })).toBe("Gold · Liga-Top-10 — OVR #9");
-    expect(describePlayerStarTier({ ovrRank: 200, ppsRank: 300 })).toBeNull();
-    expect(describePlayerStarTier({})).toBeNull();
+  it("nennt im Tooltip AUSSCHLIESSLICH den OVR-Rang, der die Stufe ausgelöst hat", () => {
+    // Für den Rahmen zählt nur OVR — ein starker PPs-/MVS-Rang taucht im
+    // Tooltip bewusst nicht mehr auf (siehe Modul-Kommentar).
+    expect(describePlayerStarTier(2)).toBe("Diamant · Liga-Top-3 — OVR #2");
+    expect(describePlayerStarTier(9)).toBe("Gold · Liga-Top-10 — OVR #9");
+    expect(describePlayerStarTier(200)).toBeNull();
+    expect(describePlayerStarTier(null)).toBeNull();
+    expect(describePlayerStarTier(undefined)).toBeNull();
   });
 });
 
 describe("Star-Tier: Renderpfade", () => {
   const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
-  it("leitet das Tier in der gemeinsamen Portraitkarte ab (deckt alle Hover-Previews mit ab)", () => {
+  it("leitet das Tier in der gemeinsamen Portraitkarte AUSSCHLIESSLICH aus dem OVR-Rang ab (deckt alle Hover-Previews mit ab)", () => {
     const cardText = read("components/foundation/player-portrait-card/FoundationPlayerPortraitCard.tsx");
-    // Die Karte leitet fehlende Raenge aus den Liga-Heat-Pools ab — sonst blieben
-    // alle Hover-Vorschauen ohne Rahmen, weil ihre Aufrufer zwar die Pools, aber
-    // keine fertigen Raenge durchreichen.
-    expect(cardText).toContain("getBestPlayerStarTier(effectiveOvrRank, effectivePpsRank, effectiveMvsRank)");
+    // Die Karte leitet fehlende Raenge weiterhin aus den Liga-Heat-Pools ab (#232),
+    // wertet davon aber nur noch den OVR-Rang aus — PPs/MVS entscheiden nicht mehr
+    // ueber den Rahmen.
+    expect(cardText).toContain("const starTier = getPlayerStarTier(effectiveOvrRank);");
     expect(cardText).toContain("resolveLeagueRankFromPool(playerOvr, resolvedHeatPools.ovr)");
-    expect(cardText).toContain("resolveLeagueRankFromPool(playerPps ?? null, resolvedHeatPools.pps)");
-    expect(cardText).toContain("resolveLeagueRankFromPool(playerMvs, resolvedHeatPools.mvs)");
     expect(cardText).toContain("getPlayerStarTierClassName(starTier)");
     expect(cardText).toContain('isHoloPlayerStarTier(starTier) ? "is-star-holo" : ""');
     expect(cardText).toContain("data-star-tier={starTier ?? undefined}");
+    // Die alte "beste der drei Kennzahlen"-Funktion ist komplett weg, nicht nur
+    // hier unbenutzt — sonst könnte sie versehentlich wieder aufgerufen werden.
+    expect(cardText).not.toContain("getBestPlayerStarTier");
 
     // Die Preview rendert dieselbe Karte — daher kein zweiter Renderpfad nötig.
     const previewText = read("components/foundation/player-portrait-card/FoundationPlayerPortraitPreview.tsx");
     expect(previewText).toContain("FoundationPlayerPortraitCard");
+  });
+
+  it("getBestPlayerStarTier gibt es nicht mehr", () => {
+    const tierLibText = read("lib/foundation/player-star-tier.ts");
+    expect(tierLibText).not.toContain("getBestPlayerStarTier");
   });
 
   it("gibt jeder Kennzahl-Kachel ihre eigene Stufe", () => {
@@ -131,18 +122,19 @@ describe("Star-Tier: Renderpfade", () => {
     expect(markText).toContain("const ring = markRingColor({ injury, spotlight, isOwn, relation });");
   });
 
-  it("nutzt in den Bestenlisten den eigenen Ranglistenrang, statt Raenge durchzureichen", () => {
+  it("nutzt in den Bestenlisten den mitgeführten OVR-Rang, NICHT den Listen-Rang der jeweiligen Kategorie", () => {
     const leadersText = read("app/foundation/league-leaders-v2/LeagueLeadersNewLook.tsx");
-    // Nur die drei Kategorien, deren Rangfolge WIRKLICH die einer Star-Kennzahl
-    // ist — bei "PP Pow" oder "Training" misst die Liste etwas anderes.
-    expect(leadersText).toContain('new Set(["pps", "mvs", "ovr"])');
-    expect(leadersText).toContain("getLeaderStarTier(category.id, leader.rank)");
-    expect(leadersText).toContain("getLeaderStarTier(category.id, entry.rank)");
+    // Gilt jetzt für JEDE Kategorie (auch PP Pow/Training), weil `entry.ovrRank`
+    // immer der echte ligaweite OVR-Rang ist — unabhängig davon, wonach die
+    // Liste selbst sortiert.
+    expect(leadersText).toContain("function getLeaderStarTier(ovrRank: number | null | undefined) {");
+    expect(leadersText).toContain("getLeaderStarTier(leader.ovrRank)");
+    expect(leadersText).toContain("getLeaderStarTier(entry.ovrRank)");
   });
 
-  it("rahmt die Top-Spieler-Strips des Saisonstands ueber deren PPs-Rang ein", () => {
+  it("rahmt die Top-Spieler-Strips des Saisonstands über deren OVR-Rang ein, NICHT über den PPs-Listen-Rang", () => {
     const standingsText = read("app/foundation/season-v2/SeasonStandingsNewLook.tsx");
-    expect(standingsText).toContain("PlayerStarFrame tier={getPlayerStarTier(player.rank)}");
+    expect(standingsText).toContain("PlayerStarFrame tier={getPlayerStarTier(player.ovrRank)}");
   });
 
   it("laesst die Scouting-Portraits bewusst ohne Rahmen (Fog-of-War)", () => {
@@ -180,7 +172,9 @@ describe("Star-Tier: Renderpfade", () => {
     // sichtbar nichts.
     const tableText = read("app/foundation/players-table/FoundationPlayersTableNewLook.tsx");
     expect(tableText).toContain("<PlayerStarFrame");
-    expect(tableText).toContain("leagueHeatPools={leaguePlayerHeatPools}");
+    // Die Tabelle kennt den echten OVR-Rang und uebergibt die Stufe direkt, statt sie
+    // aus dem Liga-Heat-Pool zu naehern (die Naeherung lieferte hier dauerhaft null).
+    expect(tableText).toContain("tier={getPlayerStarTier(row.ovrRank)}");
   });
 
   it("bringt Tier-Farben und Holo-Regeln als Design-Tokens mit", () => {
@@ -191,5 +185,8 @@ describe("Star-Tier: Renderpfade", () => {
     expect(cssText).toContain("@keyframes nlStarHoloSweep");
     // Bewegung ist Zierde, keine Information.
     expect(cssText).toContain("@media (prefers-reduced-motion: reduce)");
+    // 24–32px-Thumbnails bekommen einen dünneren Ring, sonst frisst der
+    // Standard-2px-Ring das kleine Portrait.
+    expect(cssText).toContain(".is-new-look .nl-star-frame.is-size-sm");
   });
 });

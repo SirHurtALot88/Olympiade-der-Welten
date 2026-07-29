@@ -1,5 +1,8 @@
 "use client";
 
+import PlayerStarFrame from "@/components/foundation/player-portrait-card/PlayerStarFrame";
+import { getPlayerStarTier } from "@/lib/foundation/player-star-tier";
+
 import { fmt1 } from "./stage-format";
 
 export type DisciplineStageTopPlayer = {
@@ -12,6 +15,8 @@ export type DisciplineStageTopPlayer = {
   points: number | null;
   isMvp: boolean;
   isOwn: boolean;
+  /** Ligaweiter OVR-Rang — einzige Grundlage des Star-Tier-Rahmens, NICHT `rank` (der PP-Rang dieser Liste). */
+  ovrRank: number | null;
 };
 
 export type DisciplineStageTopPlayersProps = {
@@ -51,12 +56,14 @@ export default function DisciplineStageTopPlayers({ players, onOpenPlayer, playe
                 }}
               >
                 <span style={{ width: 20, textAlign: "right", fontWeight: 800, color: "var(--nl-mut)", fontSize: 12.5 }}>{p.rank}</span>
-                {p.portraitUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={p.portraitUrl} alt="" width={24} height={24} style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", flex: "none", border: "1px solid var(--nl-line)" }} />
-                ) : (
-                  <span aria-hidden style={{ width: 24, height: 24, borderRadius: "50%", flex: "none", background: "var(--nl-bg)", border: "1px solid var(--nl-line)" }} />
-                )}
+                <PlayerStarFrame tier={getPlayerStarTier(p.ovrRank)} shape="circle" size="sm">
+                  {p.portraitUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={p.portraitUrl} alt="" width={24} height={24} style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", flex: "none", border: "1px solid var(--nl-line)" }} />
+                  ) : (
+                    <span aria-hidden style={{ width: 24, height: 24, borderRadius: "50%", flex: "none", background: "var(--nl-bg)", border: "1px solid var(--nl-line)" }} />
+                  )}
+                </PlayerStarFrame>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {p.isMvp ? "⭐ " : ""}

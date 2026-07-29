@@ -9,6 +9,13 @@
  * (`getPlayerRankFrameClass`, Top 3 der eigenen Top-6) — also gerade KEINE
  * ligaweite Aussage.
  *
+ * Für das PORTRAIT (den Rahmen) zählt AUSSCHLIESSLICH der OVR-Rang — nicht
+ * mehr die beste der drei Kennzahlen. Ein Spieler mit starkem PPs- oder
+ * MVS-Rang, der ausserhalb der OVR-Top-50 liegt, bekommt also keinen Rahmen.
+ * Die einzelnen OVR/PPs/MVS-Rang-Chips auf der Karte bleiben davon
+ * unberührt: sie leiten ihre eigene Stufe weiterhin je Kennzahl über
+ * `getPlayerStarTier` ab (siehe `player-portrait-stat-presets.ts`).
+ *
  * Es wird hier NICHTS neu gerechnet. Die Ränge stammen unverändert aus
  * `lib/foundation/player-rating-contract.ts` (`buildSharedRankMap` →
  * `ovrRank` / `ppsSeasonRank` / `mvsRank`); dieses Modul bildet sie nur auf
@@ -83,26 +90,6 @@ export function getPlayerStarTier(rank: number | null | undefined): PlayerStarTi
 }
 
 /**
- * Beste Stufe über mehrere Ränge (OVR/PPs/MVS). Für das PORTRAIT gedacht:
- * ein Star ist ein Star, egal worüber er stark ist — wer in einer der drei
- * Kennzahlen Top 3 ist, trägt den Diamant-Rahmen, auch wenn er in den anderen
- * beiden mittelmäßig steht. Die einzelnen Kennzahl-Chips bekommen dagegen
- * jeweils ihre EIGENE Stufe (siehe `getPlayerStarTier`), damit auf der Karte
- * ablesbar bleibt, WORIN er top ist.
- */
-export function getBestPlayerStarTier(
-  ...ranks: Array<number | null | undefined>
-): PlayerStarTier | null {
-  const best = ranks.reduce<number | null>((lowest, rank) => {
-    if (rank == null || !Number.isFinite(rank) || rank < 1) {
-      return lowest;
-    }
-    return lowest == null || rank < lowest ? rank : lowest;
-  }, null);
-  return getPlayerStarTier(best);
-}
-
-/**
  * CSS-Klasse einer Stufe (leerer String ohne Stufe, damit Aufrufer die Klasse
  * bedingungslos in ein Template hängen können). Die Regeln liegen in
  * `app/globals.css` unter `.is-star-tier-*`.
@@ -136,32 +123,16 @@ export function getPlayerStarTierShortLabel(tier: PlayerStarTier | null | undefi
 }
 
 /**
- * Tooltip-Zeile für ein Portrait: nennt die Stufe und den Rang, der sie
+ * Tooltip-Zeile für ein Portrait: nennt die Stufe und den OVR-Rang, der sie
  * ausgelöst hat — sonst rät man, warum die Karte leuchtet. `null`, wenn keine
- * Stufe erreicht ist.
+ * Stufe erreicht ist. Nennt bewusst NUR den OVR-Rang (nicht PPs/MVS) — der
+ * Rahmen entscheidet sich für das Portrait ausschliesslich über OVR (siehe
+ * Modul-Kommentar oben).
  */
-export function describePlayerStarTier(input: {
-  ovrRank?: number | null;
-  ppsRank?: number | null;
-  mvsRank?: number | null;
-}): string | null {
-  const entries: Array<{ metric: string; rank: number }> = [];
-  for (const [metric, rank] of [
-    ["OVR", input.ovrRank],
-    ["PPs", input.ppsRank],
-    ["MVS", input.mvsRank],
-  ] as const) {
-    if (rank != null && Number.isFinite(rank) && rank >= 1) {
-      entries.push({ metric, rank });
-    }
-  }
-  const best = entries.reduce<{ metric: string; rank: number } | null>(
-    (lowest, entry) => (lowest == null || entry.rank < lowest.rank ? entry : lowest),
-    null,
-  );
-  const tier = getPlayerStarTier(best?.rank ?? null);
-  if (!tier || !best) {
+export function describePlayerStarTier(ovrRank: number | null | undefined): string | null {
+  const tier = getPlayerStarTier(ovrRank);
+  if (!tier || ovrRank == null || !Number.isFinite(ovrRank)) {
     return null;
   }
-  return `${getPlayerStarTierLabel(tier)} — ${best.metric} #${best.rank}`;
+  return `${getPlayerStarTierLabel(tier)} — OVR #${ovrRank}`;
 }

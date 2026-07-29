@@ -91,6 +91,8 @@ type SeasonV2TopPlayerRow = {
   rank: number;
   pps: number | null;
   ovr: number | null;
+  /** Ligaweiter OVR-Rang — Grundlage des Star-Tier-Rahmens (siehe `player-star-tier.ts`), NICHT `rank` (der PPs-Rang dieser Liste). */
+  ovrRank: number | null;
   mvs: number | null;
   ppPow: number | null;
   ppSpe: number | null;

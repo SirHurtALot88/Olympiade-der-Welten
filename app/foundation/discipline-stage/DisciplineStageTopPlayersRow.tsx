@@ -5,6 +5,7 @@ import type { DisciplineStageTopPlayer } from "./DisciplineStageTopPlayers";
 import { fmt1 } from "./stage-format";
 import PlayerMark from "./arena/PlayerMark";
 import TeamMark from "./arena/TeamMark";
+import { getPlayerStarTier } from "@/lib/foundation/player-star-tier";
 
 // Horizontale Top-Spieler-Zeile unter der Arena (statt linker Spalte), damit die
 // Arena die volle Breite bekommt. Sortiert nach Player-Points (kommt bereits
@@ -77,7 +78,7 @@ export default function DisciplineStageTopPlayersRow({ players, onOpenPlayer, on
                 }}
               >
                 <span style={{ fontWeight: 800, color: "var(--nl-mut)", fontSize: 12.5, width: 18, textAlign: "right" }}>{p.rank}</span>
-                <PlayerMark src={p.portraitUrl} size={28} isOwn={p.isOwn} />
+                <PlayerMark src={p.portraitUrl} size={28} isOwn={p.isOwn} starTier={getPlayerStarTier(p.ovrRank)} />
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 12.5, fontWeight: 700, whiteSpace: "nowrap", maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis" }}>
                     {p.isMvp ? "⭐ " : ""}

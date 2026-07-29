@@ -42,6 +42,8 @@ export interface SeasonV2TopPlayerInputRow {
   rank: number;
   pps?: number | null;
   ovr?: number | null;
+  /** Ligaweiter OVR-Rang — Grundlage des Star-Tier-Rahmens, NICHT `rank` (der PPs-Rang dieser Liste). */
+  ovrRank?: number | null;
   mvs?: number | null;
   ppPow?: number | null;
   ppSpe?: number | null;
@@ -173,6 +175,7 @@ export function useSeasonV2PanelModel({
         rank: row.rank,
         pps: row.pps ?? null,
         ovr: row.ovr ?? null,
+        ovrRank: row.ovrRank ?? null,
         mvs: row.mvs ?? null,
         ppPow: row.ppPow ?? null,
         ppSpe: row.ppSpe ?? null,
@@ -199,6 +202,7 @@ export function useSeasonV2PanelModel({
         rank: row.rank,
         pps: row.pps ?? null,
         ovr: row.ovr ?? null,
+        ovrRank: row.ovrRank ?? null,
         mvs: row.mvs ?? null,
         ppPow: row.ppPow ?? null,
         ppSpe: row.ppSpe ?? null,

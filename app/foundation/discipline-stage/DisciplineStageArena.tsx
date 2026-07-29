@@ -1006,6 +1006,7 @@ export default function DisciplineStageArena({
             points: pp.pointsAwarded,
             isMvp: Boolean(pp.isMvpCandidate),
             isOwn: pp.teamId === ownTeamId,
+            ovrRank: ratingByPlayerId.get(pp.playerId)?.ovrRank ?? null,
           },
         });
       });
@@ -1024,6 +1025,7 @@ export default function DisciplineStageArena({
               points: null,
               isMvp: s.base >= 80,
               isOwn: t.isOwn,
+              ovrRank: s.playerId ? ratingByPlayerId.get(s.playerId)?.ovrRank ?? null : null,
             },
           });
         });
@@ -1035,7 +1037,7 @@ export default function DisciplineStageArena({
       e.row.rank = i + 1;
     });
     return { rows: top.map((e) => e.row), ids: top.map((e) => e.id) };
-  }, [useEngine, engineDiscipline, model, teamMetaById, portraitById, ownTeamId]);
+  }, [useEngine, engineDiscipline, model, teamMetaById, portraitById, ownTeamId, ratingByPlayerId]);
 
   // Player-Points je Spieler für die Hover-Karte. Bewusst aus der VOLLEN Engine-Liste
   // (nicht aus der auf 12 gekürzten Top-Spieler-Tabelle), damit der Hover auch für
@@ -1152,6 +1154,7 @@ export default function DisciplineStageArena({
             traits: [] as string[],
             mods: p.mods,
             pointsAwarded: p.pointsAwarded,
+            ovrRank: p.playerId ? ratingByPlayerId.get(p.playerId)?.ovrRank ?? null : null,
           })),
         }))
       : model.teams.map((t) => ({
@@ -1174,6 +1177,7 @@ export default function DisciplineStageArena({
             // nativeTeams liest ausschließlich p.mods (SHOULD-1, Variante a).
             mods: mode === "real" ? realMods(s) : [...realMods(s), ...traitMutatorMods(s.traits, mutatorTraits)],
             pointsAwarded: null as number | null,
+            ovrRank: s.playerId ? ratingByPlayerId.get(s.playerId)?.ovrRank ?? null : null,
           })),
         }));
     return {
@@ -1194,6 +1198,7 @@ export default function DisciplineStageArena({
     // Reihenfolge auf dem Stand von vor dem d1-Abschluss stehen.
     matchdayPanel,
     endedDisciplineIds,
+    ratingByPlayerId,
   ]);
 
   // Betroffene Spieler (≥1 Trait-Treffer) für die Player-Points-Anzeige (+0,3 PP je).

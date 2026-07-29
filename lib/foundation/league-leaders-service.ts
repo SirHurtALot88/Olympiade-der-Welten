@@ -15,6 +15,12 @@ export type LeagueLeaderSourceRow = {
   ppMen: number | null;
   ppSoc: number | null;
   ovr: number | null;
+  /**
+   * Ligaweiter OVR-Rang des Spielers (nicht der Rang IN dieser Kategorie) —
+   * einzige Grundlage für den Star-Tier-Rahmen im Portrait, siehe
+   * `lib/foundation/player-star-tier.ts`.
+   */
+  ovrRank: number | null;
   mvs: number | null;
 };
 
@@ -25,6 +31,8 @@ export type LeagueTrainingLeaderSourceRow = {
   teamCode: string | null;
   teamName: string;
   trainingForecast: number;
+  /** Ligaweiter OVR-Rang — siehe `LeagueLeaderSourceRow.ovrRank`. */
+  ovrRank: number | null;
 };
 
 export type LeagueLeaderTone = "total" | "pow" | "spe" | "men" | "soc" | "mvs" | "ovr" | "training";
@@ -40,6 +48,8 @@ export type LeagueLeaderEntry = {
   teamName: string;
   value: number;
   displayValue: string;
+  /** Ligaweiter OVR-Rang — siehe `LeagueLeaderSourceRow.ovrRank`. */
+  ovrRank: number | null;
 };
 
 export type LeagueLeaderCategory = {
@@ -58,6 +68,7 @@ type LeaderCandidateRow = {
   teamCode: string | null;
   teamName: string;
   value: number | null;
+  ovrRank: number | null;
 };
 
 function formatLeaderValue(categoryId: string, value: number): string {
@@ -99,6 +110,7 @@ function buildCategory(
       teamName: row.teamName,
       value: row.value as number,
       displayValue: formatLeaderValue(id, row.value as number),
+      ovrRank: row.ovrRank,
     }));
 
   return { id, label, tone, entries };
@@ -119,6 +131,7 @@ export function buildLeagueLeaderBoards(input: {
       teamCode: row.teamCode,
       teamName: row.teamName,
       value: picker(row),
+      ovrRank: row.ovrRank,
     }));
 
   const categories: LeagueLeaderCategory[] = [
@@ -144,6 +157,7 @@ export function buildLeagueLeaderBoards(input: {
           teamCode: row.teamCode,
           teamName: row.teamName,
           value: row.trainingForecast,
+          ovrRank: row.ovrRank,
         })),
         limit,
       ),
@@ -153,7 +167,16 @@ export function buildLeagueLeaderBoards(input: {
   return categories;
 }
 
-export function buildLeagueTrainingLeaderRows(gameState: GameState): LeagueTrainingLeaderSourceRow[] {
+/**
+ * `ovrRankByPlayerId` ist bewusst ein schmaler `{ ovrRank }`-Lookup statt des
+ * vollen `PlayerRatingContractRow` — dieser Service bleibt so von der
+ * Rating-Contract-Form entkoppelt (strukturelle Zuweisbarkeit reicht, siehe
+ * `SeasonStandingsRatingsInput` für dasselbe Muster).
+ */
+export function buildLeagueTrainingLeaderRows(
+  gameState: GameState,
+  ovrRankByPlayerId?: ReadonlyMap<string, { ovrRank: number | null } | null | undefined>,
+): LeagueTrainingLeaderSourceRow[] {
   const rosterByPlayerId = new Map(gameState.rosters.map((entry) => [entry.playerId, entry] as const));
   const teamById = new Map(gameState.teams.map((team) => [team.teamId, team] as const));
 
@@ -179,6 +202,7 @@ export function buildLeagueTrainingLeaderRows(gameState: GameState): LeagueTrain
         teamCode: team?.shortCode ?? null,
         teamName: team?.name ?? "—",
         trainingForecast: progression.netSetpoints,
+        ovrRank: ovrRankByPlayerId?.get(player.id)?.ovrRank ?? null,
       };
     })
     .filter((row): row is LeagueTrainingLeaderSourceRow => Boolean(row));

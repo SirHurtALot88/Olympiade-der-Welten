@@ -9548,6 +9548,7 @@ export function useFoundationShellRouterBodyScope({
             pps: totalPoints,
             ppsRank: player.ppsRank ?? null,
             ovr: player.ovr ?? null,
+            ovrRank: player.ovrRank ?? null,
             mvs: player.mvs ?? null,
             marketValue: player.marketValue ?? null,
             bracket: getTransfermarktBracket(player.marketValue ?? null),
@@ -9597,6 +9598,7 @@ export function useFoundationShellRouterBodyScope({
           pps: resolvedPps != null ? roundViewNumber(resolvedPps, 1) : null,
           ppsRank: rating?.ppsSeasonRank ?? null,
           ovr: rating?.ovrNormalized ?? null,
+          ovrRank: rating?.ovrRank ?? null,
           mvs: rating?.mvs ?? null,
           marketValue,
           bracket: getTransfermarktBracket(marketValue),
@@ -9669,8 +9671,8 @@ export function useFoundationShellRouterBodyScope({
       return [];
     }
 
-    return buildLeagueTrainingLeaderRows(gameState);
-  }, [activeView, gameState]);
+    return buildLeagueTrainingLeaderRows(gameState, playerRatingsById);
+  }, [activeView, gameState, playerRatingsById]);
 
   const leagueLeaderBoards = useMemo(() => {
     if (!shouldBuildLeagueLeaderBoards || seasonTopPlayerRows.length === 0) {
@@ -9838,6 +9840,7 @@ export function useFoundationShellRouterBodyScope({
         rank: row.rank,
         pps: row.pps ?? null,
         ovr: row.ovr ?? null,
+        ovrRank: row.ovrRank ?? null,
         mvs: row.mvs ?? null,
         ppPow: row.ppPow ?? null,
         ppSpe: row.ppSpe ?? null,
@@ -9862,6 +9865,7 @@ export function useFoundationShellRouterBodyScope({
         rank: row.rank,
         pps: row.pps ?? null,
         ovr: row.ovr ?? null,
+        ovrRank: row.ovrRank ?? null,
         mvs: row.mvs ?? null,
         ppPow: row.ppPow ?? null,
         ppSpe: row.ppSpe ?? null,

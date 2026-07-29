@@ -34,7 +34,7 @@ import {
 import { buildPlayerRatingContractMap, type PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
-import { getBestPlayerStarTier } from "@/lib/foundation/player-star-tier";
+import { getPlayerStarTier } from "@/lib/foundation/player-star-tier";
 import { getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 import { getTeamColor, teamHasSecondary, floorTeamAccent } from "@/lib/foundation/team-colors";
 import { fmt1 } from "./stage-format";
@@ -328,9 +328,9 @@ function PlayerBody({
   const ppsRank = data?.ppsRank ?? null;
   const mvs = data?.mvs ?? player.economyAfterUpgradePreview?.mvsUnchanged ?? null;
   const mvsRank = data?.mvsRank ?? null;
-  // Ligaweite Top-Riege fürs große Kopf-Portrait (Blickfang) — dieselbe
-  // "beste der drei Kennzahlen"-Regel wie im Spielerprofil-Hero.
-  const headStarTier = getBestPlayerStarTier(ovrRank, ppsRank, mvsRank);
+  // Ligaweite Top-Riege fürs große Kopf-Portrait (Blickfang) — ausschliesslich
+  // über den OVR-Rang, wie im Spielerprofil-Hero.
+  const headStarTier = getPlayerStarTier(ovrRank);
 
   // Aktuelle Disziplin.
   const discEntry = (data?.disciplineValues ?? []).find((d) => d.id === disciplineId) ?? null;
@@ -557,6 +557,7 @@ function LineupRow({
   slotLabel?: string | null;
   /** Kanonischer OVR (ovrNormalized) aus dem Rating-Contract; kein roher player.ovr. */
   ovr: number | null;
+  /** Ligaweiter OVR-Rang (`ovrRankById`) — Anzeige-Rang UND Grundlage des Star-Tier-Rahmens am Portrait. */
   rank: number | null;
   /** Farbe des 2px-Rails links (Sektions-Marker). */
   railColor?: string | null;
@@ -588,7 +589,7 @@ function LineupRow({
         opacity: unavailable ? 0.62 : 1,
       }}
     >
-      <PlayerMark src={portraitUrl} alt={player.name} size={52} title={player.name} />
+      <PlayerMark src={portraitUrl} alt={player.name} size={52} title={player.name} starTier={getPlayerStarTier(rank)} />
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>

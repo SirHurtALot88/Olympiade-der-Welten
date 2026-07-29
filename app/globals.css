@@ -38128,9 +38128,10 @@ button.market-v2-bucket-card.is-selected {
 
 /* --- Star-Tier an den Kennzahl-Kacheln (OVR/PPs/MVS) ---------------------
    Jede Kachel trägt ihre EIGENE Stufe aus ihrem eigenen Rang — die Karte
-   drumherum zeigt die beste der drei. Nur ein Rahmen plus Tönung des Labels:
-   die Heat-Band-Hinterlegung darunter bleibt unangetastet, beide Aussagen
-   ("wie gut im Pool" und "Top N") sollen nebeneinander lesbar sein. */
+   drumherum entscheidet sich dagegen AUSSCHLIESSLICH über den OVR-Rang (siehe
+   `lib/foundation/player-star-tier.ts`). Nur ein Rahmen plus Tönung des
+   Labels: die Heat-Band-Hinterlegung darunter bleibt unangetastet, beide
+   Aussagen ("wie gut im Pool" und "Top N") sollen nebeneinander lesbar sein. */
 .foundation-player-portrait-stat.is-star-tier-bronze {
   --nl-star-tone: var(--nl-bronze);
 }
@@ -38223,6 +38224,14 @@ button.market-v2-bucket-card.is-selected {
   border-radius: 50%;
 }
 
+/* 24–32px-Thumbnails (Chips, Einsatzlisten): dünnerer Ring/Glow, sonst frisst
+   der Standard-2px-Ring bei so kleinen Bildern zu viel vom Portrait. */
+.is-new-look .nl-star-frame.is-size-sm {
+  box-shadow:
+    0 0 0 1px var(--nl-star-tone),
+    0 0 4px color-mix(in srgb, var(--nl-star-tone) 35%, transparent);
+}
+
 .is-new-look .nl-star-frame.is-star-tier-bronze {
   --nl-star-tone: var(--nl-bronze);
 }
@@ -38246,6 +38255,10 @@ button.market-v2-bucket-card.is-selected {
   animation: nlStarFrameGlow 2.8s var(--nl-ease, ease) infinite;
 }
 
+.is-new-look .nl-star-frame.is-size-sm.is-star-holo {
+  animation: nlStarFrameGlowSm 2.8s var(--nl-ease, ease) infinite;
+}
+
 @keyframes nlStarFrameGlow {
   0%,
   100% {
@@ -38260,8 +38273,24 @@ button.market-v2-bucket-card.is-selected {
   }
 }
 
+/* Dieselbe Holo-Pulsation, nur mit dem dünneren 1px-Ring der `is-size-sm`-Thumbnails. */
+@keyframes nlStarFrameGlowSm {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px var(--nl-star-tone),
+      0 0 4px color-mix(in srgb, var(--nl-star-tone) 30%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px var(--nl-star-tone),
+      0 0 9px color-mix(in srgb, var(--nl-star-tone) 55%, transparent);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .is-new-look .nl-star-frame.is-star-holo {
+  .is-new-look .nl-star-frame.is-star-holo,
+  .is-new-look .nl-star-frame.is-size-sm.is-star-holo {
     animation: none;
   }
 }

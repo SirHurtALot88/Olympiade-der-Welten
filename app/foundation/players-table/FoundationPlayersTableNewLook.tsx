@@ -115,6 +115,7 @@ import { NlAbilityStars } from "@/components/foundation/velo-ui/NlAbilityStars";
 import FoundationPlayerPortraitPreview, {
   type FoundationPlayerPortraitPreviewProps,
 } from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
+import PlayerStarFrame from "@/components/foundation/player-portrait-card/PlayerStarFrame";
 import type { Discipline, DisciplineCategory, GameState, Team } from "@/lib/data/olyDataTypes";
 import type { SortState } from "@/lib/foundation/foundation-table-ui-types";
 import {
@@ -137,7 +138,6 @@ import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
 import { potentialScoreToStars } from "@/lib/progression/player-potential-service";
 import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
 
-import PlayerStarFrame from "@/components/foundation/player-portrait-card/PlayerStarFrame";
 import FoundationPlayersCompareOverlay from "@/app/foundation/players-table/FoundationPlayersCompareOverlay";
 import { getFoggedPoScoreRange } from "@/app/foundation/players-table/foundation-players-fog-of-war";
 import { DEBUG_FORCE_PLAYER_VISIBILITY } from "@/lib/foundation/debug-player-visibility";
@@ -1477,11 +1477,7 @@ export default function FoundationPlayersTableNewLook({
         </td>
         <td className="nl-players-td-image">
           <FoundationPlayerPortraitPreview {...portraitPreviewProps}>
-            <PlayerStarFrame
-              metrics={{ ovr: row.playerOvr, pps: row.playerPps, mvs: row.playerMvs }}
-              leagueHeatPools={leaguePlayerHeatPools}
-              shape="rounded"
-            >
+            <PlayerStarFrame tier={getPlayerStarTier(row.ovrRank)} shape="rounded">
               {portrait.src ? (
                 <BudgetedMediaImage
                   className="nl-players-portrait"

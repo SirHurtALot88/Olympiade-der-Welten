@@ -2,9 +2,7 @@
 
 import type { ReactNode } from "react";
 
-import { type LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import {
-  getBestPlayerStarTier,
   getPlayerStarTierClassName,
   getPlayerStarTierLabel,
   isHoloPlayerStarTier,
@@ -16,14 +14,12 @@ import {
  * Star-Tier-Rahmen für Portraits, die NICHT über `FoundationPlayerPortraitCard`
  * laufen — also die kleinen Inline-Bilder in Tabellen, Podien und Strips.
  *
- * Die große Portraitkarte leitet ihre Stufe selbst aus den Rang-Props ab; wo
- * das Bild dagegen als nacktes `<img>` gerendert wird, fehlt dieser Weg. Diese
- * Hülle schließt die Lücke, ohne dass jede Fundstelle die Tier-Logik kopiert.
- *
- * Zwei Wege, die Stufe zu bestimmen — je nachdem, was die Ansicht zur Hand hat:
- *  - `tier` direkt, wenn die Ränge schon aufgelöst vorliegen
- *  - `metrics` + `leagueHeatPools`, wenn nur Werte und Pools da sind (dann wird
- *    der ligaweite Rang genauso abgeleitet wie in der Spielertabelle)
+ * Die große Portraitkarte leitet ihre Stufe selbst aus dem `ovrRank`-Prop ab;
+ * wo das Bild dagegen als nacktes `<img>` gerendert wird, fehlt dieser Weg.
+ * Diese Hülle schließt die Lücke, ohne dass jede Fundstelle die Tier-Logik
+ * kopiert — der Aufrufer übergibt die fertig aufgelöste Stufe direkt als
+ * `tier={getPlayerStarTier(ovrRank)}`. Für das Portrait zählt AUSSCHLIESSLICH
+ * OVR (siehe `lib/foundation/player-star-tier.ts`).
  *
  * Ohne Stufe rendert die Hülle NUR die Kinder — kein zusätzliches Element,
  * kein veränderter Layoutfluss für die große Mehrheit der Spieler.
@@ -31,48 +27,41 @@ import {
 
 export type PlayerStarFrameProps = {
   children: ReactNode;
-  /** Fertige Stufe — hat Vorrang vor `metrics`. */
+  /** Fertige Stufe (`getPlayerStarTier(ovrRank)`), `null`/`undefined` ohne Rahmen. */
   tier?: PlayerStarTier | null;
-  /** Kennzahlen des Spielers; zusammen mit `leagueHeatPools` wird daraus die Stufe abgeleitet. */
-  metrics?: { ovr?: number | null; pps?: number | null; mvs?: number | null };
-  leagueHeatPools?: LeaguePlayerHeatPools;
   /** Zusätzliche Klasse für die Hülle (z. B. Form-/Größenanpassung der Fundstelle). */
   className?: string;
   /** Runde Portraits (Podium, Arena-Marken) statt der Standard-Kartenrundung. */
   shape?: "rounded" | "circle";
+  /**
+   * `"sm"` für 24–32px-Thumbnails: dünnerer Ring/Glow, sonst frisst der
+   * Standard-2px-Ring bei so kleinen Bildern zu viel vom Portrait. Nur die
+   * CSS-Stärke ändert sich, die Stufen-Logik bleibt identisch. Default
+   * `"md"` (unverändert für alle bestehenden mittleren/großen Aufrufer).
+   */
+  size?: "sm" | "md";
 };
 
 export default function PlayerStarFrame({
   children,
   tier,
-  metrics,
-  leagueHeatPools,
   className = "",
   shape = "rounded",
+  size = "md",
 }: PlayerStarFrameProps) {
-  const resolvedTier =
-    tier ??
-    (metrics && leagueHeatPools
-      ? getBestPlayerStarTier(
-          resolveLeagueRankFromPool(metrics.ovr, leagueHeatPools.ovr),
-          resolveLeagueRankFromPool(metrics.pps, leagueHeatPools.pps),
-          resolveLeagueRankFromPool(metrics.mvs, leagueHeatPools.mvs),
-        )
-      : null);
-
-  if (!resolvedTier) {
+  if (!tier) {
     return <>{children}</>;
   }
 
-  const label = getPlayerStarTierLabel(resolvedTier);
+  const label = getPlayerStarTierLabel(tier);
   return (
     <span
-      className={`nl-star-frame is-${shape} ${getPlayerStarTierClassName(resolvedTier)}${
-        isHoloPlayerStarTier(resolvedTier) ? " is-star-holo" : ""
+      className={`nl-star-frame is-${shape}${size === "sm" ? " is-size-sm" : ""} ${getPlayerStarTierClassName(tier)}${
+        isHoloPlayerStarTier(tier) ? " is-star-holo" : ""
       } ${className}`
         .replace(/\s+/g, " ")
         .trim()}
-      data-star-tier={resolvedTier}
+      data-star-tier={tier}
       title={label ?? undefined}
     >
       {children}

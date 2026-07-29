@@ -11,6 +11,7 @@ import FoundationPlayerPortraitPreview from "@/components/foundation/player-port
 import PlayerStarFrame from "@/components/foundation/player-portrait-card/PlayerStarFrame";
 import type { ContractShape, GameState, Player, RosterEntry, Team } from "@/lib/data/olyDataTypes";
 import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
+import { getPlayerStarTier } from "@/lib/foundation/player-star-tier";
 
 export type PlayersTableColumn = {
   id: string;
@@ -30,6 +31,8 @@ export type PlayersTableRow = {
     sourceLabel?: string;
   } | null;
   playerOvr: number | null;
+  /** Ligaweiter OVR-Rang — einzige Grundlage des Star-Tier-Rahmens am Portrait (siehe `player-star-tier.ts`). */
+  ovrRank: number | null;
   playerMvs: number | null;
   playerPps: number | null;
   bestDiscipline: string | null;
@@ -238,11 +241,7 @@ export default function FoundationPlayersTableBody({
                           playerClassName={row.player.className}
                         >
                           {portrait.src ? (
-                            <PlayerStarFrame
-                              metrics={{ ovr: row.playerOvr, pps: row.playerPps, mvs: row.playerMvs }}
-                              leagueHeatPools={leaguePlayerHeatPools}
-                              shape="rounded"
-                            >
+                            <PlayerStarFrame tier={getPlayerStarTier(row.ovrRank)} shape="rounded">
                             <BudgetedMediaImage
                               className="transfermarkt-portrait"
                               src={portrait.src}

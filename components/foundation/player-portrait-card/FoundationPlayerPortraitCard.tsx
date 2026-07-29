@@ -16,7 +16,7 @@ import {
 import { createEmptyLeaguePlayerHeatPools, type LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import {
   describePlayerStarTier,
-  getBestPlayerStarTier,
+  getPlayerStarTier,
   getPlayerStarTierClassName,
   isHoloPlayerStarTier,
   resolveLeagueRankFromPool,
@@ -341,22 +341,22 @@ export default function FoundationPlayerPortraitCard({
 
   /**
    * Star-Tier der Karte (Bronze/Silber/Gold/Diamant für Liga-Top-50/25/10/3).
-   * Wird bewusst HIER aus den bereits vorhandenen Rang-Props abgeleitet statt
-   * als eigene Prop durchgereicht: die Karte ist die gemeinsame Basis aller
-   * Portrait-Darstellungen (inkl. `FoundationPlayerPortraitPreview` und damit
-   * sämtlicher Hover-Previews), also bekommt jeder Aufrufer, der ohnehin
-   * Ränge liefert, den Rahmen ohne eigenes Zutun.
+   * Wird bewusst HIER aus dem bereits vorhandenen `ovrRank`-Prop abgeleitet
+   * statt als eigene Prop durchgereicht: die Karte ist die gemeinsame Basis
+   * aller Portrait-Darstellungen (inkl. `FoundationPlayerPortraitPreview` und
+   * damit sämtlicher Hover-Previews), also bekommt jeder Aufrufer, der
+   * ohnehin `ovrRank` liefert, den Rahmen ohne eigenes Zutun.
    *
-   * Für das Portrait zählt der BESTE der drei Ränge — ein Star ist ein Star,
-   * egal worüber er stark ist. Die einzelnen OVR/PPs/MVS-Chips tragen davon
-   * unabhängig ihre eigene Stufe (siehe `buildRosterOverlayStats`).
+   * Für das Portrait zählt AUSSCHLIESSLICH der OVR-Rang — nicht mehr der beste
+   * der drei Ränge. Ein starker PPs- oder MVS-Rang allein löst keinen Rahmen
+   * mehr aus. Die einzelnen OVR/PPs/MVS-Chips tragen davon unabhängig ihre
+   * eigene Stufe (siehe `buildRosterOverlayStats`).
    */
-  const starTier = getBestPlayerStarTier(effectiveOvrRank, effectivePpsRank, effectiveMvsRank);
-  const starTierDescription = describePlayerStarTier({
-    ovrRank: effectiveOvrRank,
-    ppsRank: effectivePpsRank,
-    mvsRank: effectiveMvsRank,
-  });
+  // Upstream (#232) leitet fehlende Raenge aus den Liga-Heat-Pools ab — das behalten
+  // wir, weil die Hover-Karte sonst gar keinen Rang kennt. Ausgewertet wird davon aber
+  // AUSSCHLIESSLICH der OVR-Rang.
+  const starTier = getPlayerStarTier(effectiveOvrRank);
+  const starTierDescription = describePlayerStarTier(effectiveOvrRank);
 
   const cardClassName = [
     "foundation-player-portrait-card",

@@ -100,23 +100,16 @@ function getLeaderInitials(name: string): string {
  * `fallback`-Mechanismus).
  */
 /**
- * Kategorien, deren Bestenliste EXAKT die ligaweite Rangfolge einer
- * Star-Tier-Kennzahl ist. Nur dort ist `entry.rank` gleichbedeutend mit dem
- * Ligarang, den `getPlayerStarTier` erwartet — bei "PP Pow" oder "Training"
- * misst die Liste etwas anderes, und ein Rahmen wäre dort schlicht falsch.
+ * Star-Tier aus einem Bestenlisten-Eintrag — ausschliesslich über den
+ * mitgeführten OVR-Rang (`entry.ovrRank`, siehe `LeagueLeaderSourceRow` in
+ * `league-leaders-service.ts`), NICHT über `entry.rank` (den Rang INNERHALB
+ * dieser Kategorie, z. B. den PPs-Rang in der PPs-Liste). Ein Spieler mit
+ * starkem PPs-/MVS-/Training-Rang, der ausserhalb der OVR-Top-50 liegt,
+ * bekommt also bewusst keinen Rahmen — gilt gleichermassen für jede
+ * Kategorie, nicht nur PPs/MVS/OVR.
  */
-const STAR_TIER_LEADER_CATEGORIES = new Set(["pps", "mvs", "ovr"]);
-
-/**
- * Star-Tier aus einem Bestenlisten-Eintrag — `null`, wenn die Kategorie keine
- * der drei Kennzahlen ist. Die Liste wird ligaweit über alle Saisonzeilen
- * gebaut (`buildCategory` in `league-leaders-service.ts`), der Rang ist also
- * derselbe Begriff wie überall sonst. Einziger Unterschied: `buildCategory`
- * vergibt bei Gleichstand fortlaufende statt geteilter Ränge — an der Spitze,
- * wo die Stufen liegen, fällt das nicht ins Gewicht.
- */
-function getLeaderStarTier(categoryId: string, rank: number | null | undefined) {
-  return STAR_TIER_LEADER_CATEGORIES.has(categoryId) ? getPlayerStarTier(rank) : null;
+function getLeaderStarTier(ovrRank: number | null | undefined) {
+  return getPlayerStarTier(ovrRank);
 }
 
 function LeaderAvatar({
@@ -349,7 +342,7 @@ export default function LeagueLeadersNewLook({
                     playerId={leader.playerId}
                     name={leader.name}
                     className="nl-leaders-hero-avatar"
-                    starTier={getLeaderStarTier(category.id, leader.rank)}
+                    starTier={getLeaderStarTier(leader.ovrRank)}
                   />
                   <span className="nl-leaders-hero-copy">
                     <span className="nl-leaders-hero-rankline">
@@ -384,7 +377,7 @@ export default function LeagueLeadersNewLook({
                         playerId={entry.playerId}
                         name={entry.name}
                         className="nl-leaders-row-avatar"
-                        starTier={getLeaderStarTier(category.id, entry.rank)}
+                        starTier={getLeaderStarTier(entry.ovrRank)}
                       />
                       <span className="nl-leaders-row-player">
                         <strong>{entry.name}</strong>
