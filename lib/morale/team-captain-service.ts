@@ -1,7 +1,11 @@
 import type { GameState, Player, TeamCaptainRecord } from "@/lib/data/olyDataTypes";
 import { BOARD_V2_CAPTAIN } from "@/lib/board/board-objectives-config";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
-import { CAPTAIN_TEAM_POWER_EFFECT_FACTOR, CAPTAIN_TEAM_POWER_MAX_PCT } from "@/lib/lineups/team-powers";
+import {
+  CAPTAIN_TEAM_POWER_EFFECT_FACTOR,
+  CAPTAIN_TEAM_POWER_MAX_PCT,
+  areTeamPowersEnabled,
+} from "@/lib/lineups/team-powers";
 import { buildTeamPlayerDemandMap } from "@/lib/morale/player-demands-service";
 
 const CAPTAIN_POSITIVE_TRAITS = new Set(["eloquent", "motivated", "ambitious", "disciplined", "resourceful", "loyal"]);
@@ -119,7 +123,13 @@ export function buildCaptainEffectExplanations(record: {
     },
   ];
 
-  return rows.map((row) => ({
+  // Der Kapitaen verstaerkt eine gespielte Team-Power. Ist die Mechanik abgeschaltet, ist der
+  // Aufschlag garantiert wirkungslos — dann darf er auch nicht als Effekt ausgewiesen werden,
+  // sonst verspricht der Chip einen Nutzen, den es nicht gibt. Die uebrigen drei Effekte
+  // (Moral, Rivalitaet, Vorstand) sind davon unberuehrt.
+  const visibleRows = areTeamPowersEnabled() ? rows : rows.filter((row) => row.key !== "teamPower");
+
+  return visibleRows.map((row) => ({
     ...row,
     tooltip: [`${row.label} ${row.displayValue}`, row.appliesTo, `Herleitung: ${row.formula}`, row.caveat]
       .filter(Boolean)

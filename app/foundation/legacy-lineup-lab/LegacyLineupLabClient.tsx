@@ -70,7 +70,7 @@ import type {
   LegacyLineupPreviewResult,
 } from "@/lib/lineups/legacy-lineup-types";
 import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
-import { describeTeamPowerDebuffEffect, isTeamPowerDebuffEffect } from "@/lib/lineups/team-powers";
+import { areTeamPowersEnabled, describeTeamPowerDebuffEffect, isTeamPowerDebuffEffect } from "@/lib/lineups/team-powers";
 import type { AiLegacyLineupPreview } from "@/lib/ai/ai-needs-types";
 import { prefetchMatchdayArenaBase } from "@/lib/foundation/foundation-panel-prefetch";
 
@@ -5289,7 +5289,12 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         .filter((entry) => entry.isCaptain)
         .map((entry) => `${entry.disciplineId}::${entry.disciplineSide}`),
     );
-    const selectedPowerCount = [modifiers.d1.teamPowerId, modifiers.d2.teamPowerId].filter(Boolean).length;
+    // Bei abgeschalteten Team-Powers taucht der Teil gar nicht mehr in der Meldung auf.
+    // Alte Drafts tragen ihre `teamPowerId` weiter mit sich — ohne diese Klammer meldete
+    // das Speichern also "1 Power" fuer etwas, das nirgends mehr waehlbar ist und nicht wirkt.
+    const selectedPowerCount = areTeamPowersEnabled()
+      ? [modifiers.d1.teamPowerId, modifiers.d2.teamPowerId].filter(Boolean).length
+      : null;
     const selectedFormCount = [
       modifiers.d1.primaryFormCardId,
       modifiers.d1.secondaryFormCardId,
@@ -5301,7 +5306,15 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       .join("/");
     const captainBudgetAfterSave = Math.min(captainSeasonLimit, captainUsedBeforeCurrentDraft + captainSides.size);
 
-    return `${baseMessage} ${filledSlots}/${slots.length} Slots · Captain ${captainBudgetAfterSave}/${captainSeasonLimit} · Einsatz ${intensityLabels} · ${selectedFormCount} Form · ${selectedPowerCount} Power.`;
+    const parts = [
+      `${filledSlots}/${slots.length} Slots`,
+      `Captain ${captainBudgetAfterSave}/${captainSeasonLimit}`,
+      `Einsatz ${intensityLabels}`,
+      `${selectedFormCount} Form`,
+      selectedPowerCount == null ? null : `${selectedPowerCount} Power`,
+    ].filter(Boolean);
+
+    return `${baseMessage} ${parts.join(" · ")}.`;
   }
 
   async function saveEntries(
@@ -7404,10 +7417,18 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           d1: formCardPlanPendingKey === `${params.matchdayId}:d1`,
           d2: formCardPlanPendingKey === `${params.matchdayId}:d2`,
         }}
-        teamPowerControlsBySide={{
-          d1: buildLineupTeamPowerControlForSide("d1"),
-          d2: buildLineupTeamPowerControlForSide("d2"),
-        }}
+        // Abgeschaltete Team-Powers reichen gar keine Controls durch. Die Ansicht blendet
+        // den Block bei `null` komplett aus — auch dann, wenn ein alter Draft noch eine
+        // `teamPowerId` gespeichert hat. Genau daran hing das Dropdown zuletzt noch: die
+        // Optionsliste war leer, die gespeicherte Auswahl hielt den Kasten aber am Leben.
+        teamPowerControlsBySide={
+          areTeamPowersEnabled()
+            ? {
+                d1: buildLineupTeamPowerControlForSide("d1"),
+                d2: buildLineupTeamPowerControlForSide("d2"),
+              }
+            : null
+        }
         onAssignTeamPower={(disciplineSide, powerId) => updateModifier(disciplineSide, "teamPowerId", powerId ?? "")}
         controlsSlot={
           <>
