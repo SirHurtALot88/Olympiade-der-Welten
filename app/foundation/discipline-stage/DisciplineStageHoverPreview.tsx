@@ -340,7 +340,25 @@ function TeamPreview({ gameState, target, ratingByPlayerId, fieldedPlayerIdsByTe
                             eigentliche Waehrung, und in Klammern der Anteil, den die
                             Disziplin-Mutatoren beigesteuert haben: ohne ihn bleibt unerklaerlich,
                             warum zwei Spieler mit aehnlichem Score verschieden viele PP bekommen. */}
-                        <span style={{ fontSize: 11.5, fontWeight: 800, color: "var(--nl-mut)", flex: "none" }}>{fmt1(live.net)}</span>
+                        {/* FINALER Score (`pp.score` = `finalPlayerScore` der Engine), nicht
+                            `live.net` aus der Arena-Simulation. Genau daraus werden die PP
+                            innerhalb des Teams anteilig verteilt
+                            (`distributeRankPointsToPlayers`, pointSource
+                            `rank_to_points_final_score_share`) — sie sind also monoton in
+                            diesem Wert. Stand hier die Arena-Zahl, sah die Reihenfolge
+                            widerspruechlich aus: ein Spieler mit sichtbar hoeherem Wert
+                            konnte weniger PP haben, weil der PP-Wert von einer anderen
+                            Groesse kam als die angezeigte. */}
+                        <span
+                          title={`Finaler Score ${fmt1(pp.score)} — daraus werden die Team-PP anteilig verteilt${
+                            Math.abs(pp.score - live.net) >= 0.05
+                              ? ` · Arena-Zwischenstand war ${fmt1(live.net)}`
+                              : ""
+                          }`}
+                          style={{ fontSize: 11.5, fontWeight: 800, color: "var(--nl-mut)", flex: "none" }}
+                        >
+                          {fmt1(pp.score)}
+                        </span>
                         <span
                           title={
                             pp.mutatorPp != null && Math.abs(pp.mutatorPp) >= 0.05

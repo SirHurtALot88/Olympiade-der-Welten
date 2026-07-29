@@ -70,3 +70,44 @@ describe("Arena-Team-Hover: Top 3 nach OVR", () => {
     expect(topBlock).not.toContain("liveResultsByTeam");
   });
 });
+
+/**
+ * Im Team-Hover stand neben den PP der Arena-Zwischenstand (`live.net`), waehrend
+ * die PP aus dem FINALEN Score der Engine (`finalPlayerScore`) kommen. Zwei
+ * verschiedene Groessen nebeneinander — dadurch sah die Reihenfolge
+ * widerspruechlich aus: ein Spieler mit sichtbar hoeherem Wert konnte weniger PP
+ * haben.
+ */
+describe("Arena-Team-Hover: PP stehen neben dem Score, aus dem sie stammen", () => {
+  const preview = read("app/foundation/discipline-stage/DisciplineStageHoverPreview.tsx");
+
+  it("zeigt den finalen Score der Engine, nicht den Arena-Zwischenstand", () => {
+    expect(preview).toContain("{fmt1(pp.score)}");
+    expect(preview).toContain("Finaler Score ${fmt1(pp.score)}");
+  });
+
+  it("nennt den Arena-Zwischenstand nur, wenn er wirklich abweicht", () => {
+    expect(preview).toContain("Math.abs(pp.score - live.net) >= 0.05");
+  });
+});
+
+/**
+ * Begruendung fuer die Anzeige: die PP werden ANTEILIG am finalen Score innerhalb
+ * des Teams verteilt. Sie sind darin also monoton — waere das nicht so, waere die
+ * vom Playtest gemeldete Reihenfolge tatsaechlich ein Verteilungsfehler gewesen.
+ */
+describe("PP-Verteilung: anteilig am finalen Score innerhalb des Teams", () => {
+  const rankToPoints = read("lib/resolve/rank-to-points.ts");
+
+  it("verteilt primaer nach finalPlayerScore", () => {
+    expect(rankToPoints).toContain(
+      "const finalScoreDistribution = distributeByValues(input.entries, teamPoints, (entry) => entry.finalPlayerScore);",
+    );
+    expect(rankToPoints).toContain('pointSource: "rank_to_points_final_score_share"');
+  });
+
+  it("faellt erst danach auf baseValue bzw. scoreContribution zurueck, mit Warnung", () => {
+    expect(rankToPoints).toContain('warnings.push("rank_to_points_used_base_share_fallback")');
+    expect(rankToPoints).toContain('warnings.push("rank_to_points_used_score_share_fallback")');
+  });
+});
