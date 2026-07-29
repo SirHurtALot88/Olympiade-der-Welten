@@ -1,4 +1,5 @@
 import type { Fixture, GameLogEntry, GameState, LineupDraft, MatchdayAdvanceLogRecord, PlayerMoraleState } from "@/lib/data/olyDataTypes";
+import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import { assessPlayerMorale, buildMoraleLookupIndex } from "@/lib/morale/player-morale-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -340,6 +341,36 @@ function writeLocalMatchdayAdvance(prepared: PreparedMatchdayProgress, persisten
       };
 
   persistence.saveSingleplayerState(save.saveId, finalGameState);
+
+  // Die KI-Teams stellen fuer den NEUEN Spieltag sofort auf — nicht erst, wenn der
+  // Spieler seine eigene Aufstellung speichert oder die Arena oeffnet. Sie brauchen
+  // keinen dieser Ausloeser: sobald der vorige Spieltag durch ist, stehen Kader,
+  // Formkarten und Training fest.
+  //
+  // Das nimmt zugleich die Wartezeit aus dem Speichern der eigenen Aufstellung
+  // (dort lief der Batch bisher synchron) und sorgt dafuer, dass die Arena von
+  // Anfang an ein vollstaendiges Feld sieht statt eines halb leeren.
+  //
+  // `overwriteExisting: false` macht den Aufruf idempotent — die spaeteren Aufrufe
+  // beim Speichern und beim Ergebnis-Commit bleiben als Sicherheitsnetz bestehen und
+  // finden dann nichts mehr zu tun. Ein Fehlschlag darf den Spieltagswechsel niemals
+  // kippen: der Wechsel ist bereits persistiert, die Aufstellungen holt der naechste
+  // Aufruf nach.
+  if (prepared.nextMatchdayId) {
+    try {
+      applyAiLegacyLineupBatchLocally({
+        saveId: save.saveId,
+        seasonId: prepared.seasonId,
+        matchdayId: prepared.nextMatchdayId,
+        dryRun: false,
+        includeWarningTeams: false,
+        overwriteExisting: false,
+      });
+    } catch {
+      // bewusst geschluckt, siehe oben
+    }
+  }
+
   return finalGameState.seasonState.matchdayAdvanceLogs?.[(finalGameState.seasonState.matchdayAdvanceLogs?.length ?? 0) - 1] ?? null;
 }
 
