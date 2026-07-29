@@ -1625,30 +1625,46 @@ export default function FoundationPlayersTableNewLook({
             return [];
           }
           const cells = [
-            <td key={axis.columnId} className={`nl-players-td-axis${sortCellClass(axis.key)}`}>
+            <td
+              key={axis.columnId}
+              className={`nl-players-td-axis ${nlToneClass(axis.key)}${
+                expandedAxes[axis.key] ? " is-group-open" : ""
+              }${sortCellClass(axis.key)}`}
+            >
               {renderAxisCell(row, axis)}
             </td>,
           ];
           if (!expandedAxes[axis.key]) {
             return cells;
           }
-          for (const discipline of disciplinesByAxis[axis.key] ?? []) {
+          const axisDisciplines = disciplinesByAxis[axis.key] ?? [];
+          axisDisciplines.forEach((discipline, index) => {
             const disciplinePps = getRowDisciplinePps(row, discipline.id);
             const heatClass =
               disciplinePps != null
                 ? getPoolHeatClass(disciplinePps, leagueDisciplinePpsPools.get(discipline.id) ?? [])
                 : "";
+            // Achsen-Ton auf die Zelle: die Disziplinen einer Achse tragen deren
+            // Farbe (POW rot, SPE gruen, MEN blau, SOC gelb), damit auf einen Blick
+            // klar ist, welcher Block zu welcher Achse gehoert. Vorher trugen sie nur
+            // die generischen Heat-Farben — bei zwei aufgeklappten Achsen nebeneinander
+            // war die Zuordnung dadurch nicht mehr erkennbar.
+            // Die Heat-Stufe bleibt erhalten, sie steuert jetzt die STAERKE des
+            // Achsen-Tons statt eine eigene Farbe zu setzen (siehe globals.css).
+            // `is-group-start`/`is-group-end` klammern den Block sichtbar ein.
             cells.push(
               <td
                 key={`${axis.columnId}:${discipline.id}`}
-                className={`nl-players-td-disc-pps ${heatClass}${sortCellClass(
+                className={`nl-players-td-disc-pps ${nlToneClass(axis.key)} ${heatClass}${
+                  index === 0 ? " is-group-start" : ""
+                }${index === axisDisciplines.length - 1 ? " is-group-end" : ""}${sortCellClass(
                   buildDisciplinePpsSortKey(discipline.id),
                 )}`}
               >
                 {renderDisciplinePpsCell(row, discipline)}
               </td>,
             );
-          }
+          });
           return cells;
         })}
         {isColumnVisible("pps") ? (
@@ -2467,11 +2483,15 @@ export default function FoundationPlayersTableNewLook({
                   {renderedColumns.map((entry) => {
                     if (entry.kind === "disciplinePps") {
                       const sortKey = buildDisciplinePpsSortKey(entry.discipline.id);
+                      const groupDisciplines = disciplinesByAxis[entry.axisKey] ?? [];
+                      const groupIndex = groupDisciplines.findIndex((item) => item.id === entry.discipline.id);
                       return (
                         <th
                           key={entry.key}
                           scope="col"
-                          className={`nl-players-th is-right nl-players-th-disc-pps${sortCellClass(sortKey)}`}
+                          className={`nl-players-th is-right nl-players-th-disc-pps ${nlToneClass(entry.axisKey)}${
+                            groupIndex === 0 ? " is-group-start" : ""
+                          }${groupIndex === groupDisciplines.length - 1 ? " is-group-end" : ""}${sortCellClass(sortKey)}`}
                           aria-sort={ariaSortFor(sortKey)}
                         >
                           {renderDisciplinePpsColumnHeader(entry)}
@@ -2486,7 +2506,7 @@ export default function FoundationPlayersTableNewLook({
                         scope="col"
                         className={`nl-players-th is-${column.align ?? "left"}${
                           column.highlight ? ` is-highlight-${column.highlight}` : ""
-                        }${axis ? " nl-players-th-axis" : ""}${sortCellClass(column.sortKey)}`}
+                        }${axis ? ` nl-players-th-axis${expandedAxes[axis.key] ? " is-group-open" : ""}` : ""}${sortCellClass(column.sortKey)}`}
                         aria-sort={ariaSortFor(column.sortKey)}
                       >
                         {axis ? (

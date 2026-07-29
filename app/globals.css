@@ -63218,6 +63218,82 @@ button.is-new-look .nl-thist-season-pill,
   white-space: nowrap;
 }
 
+/* --- Achsenfarbe statt Regenbogen ----------------------------------------
+   Die Disziplin-Spalten tragen den TON ihrer Achse (POW rot, SPE gruen,
+   MEN blau, SOC gelb, via `nlToneClass` als `--nl-tone`). Vorher setzten die
+   generischen Heat-Baender jede Zelle in ihre eigene Farbe — bei zwei
+   aufgeklappten Achsen nebeneinander war dadurch nicht mehr erkennbar, welcher
+   Block zu welcher Achse gehoert.
+
+   Die Heat-Stufe geht nicht verloren, sie steuert jetzt die DECKKRAFT des
+   Achsentons: schwach = wenig geholt, kraeftig = viel. Eine Farbe fuer die
+   Zugehoerigkeit, die Intensitaet fuer die Leistung. Die Regeln sind
+   spezifischer als `.heat-band-*`, damit sie dort gewinnen. */
+.is-new-look .nl-players-td-disc-pps.heat-band-1,
+.is-new-look .nl-players-td-disc-pps.heat-band-2,
+.is-new-look .nl-players-td-disc-pps.heat-band-3,
+.is-new-look .nl-players-td-disc-pps.heat-band-4,
+.is-new-look .nl-players-td-disc-pps.heat-band-5,
+.is-new-look .nl-players-td-disc-pps.heat-band-6,
+.is-new-look .nl-players-td-disc-pps.heat-band-7,
+.is-new-look .nl-players-td-disc-pps.heat-band-8 {
+  color: var(--nl-ink);
+  box-shadow: none;
+}
+
+.is-new-look .nl-players-td-disc-pps.heat-band-1 {
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 5%, transparent);
+}
+
+.is-new-look .nl-players-td-disc-pps.heat-band-2 {
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 9%, transparent);
+}
+
+.is-new-look .nl-players-td-disc-pps.heat-band-3 {
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 13%, transparent);
+}
+
+.is-new-look .nl-players-td-disc-pps.heat-band-4 {
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 18%, transparent);
+}
+
+.is-new-look .nl-players-td-disc-pps.heat-band-5 {
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 24%, transparent);
+}
+
+.is-new-look .nl-players-td-disc-pps.heat-band-6 {
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 31%, transparent);
+}
+
+.is-new-look .nl-players-td-disc-pps.heat-band-7 {
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 39%, transparent);
+}
+
+.is-new-look .nl-players-td-disc-pps.heat-band-8 {
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 48%, transparent);
+}
+
+/* --- Gruppenklammer: Achse + ihre Disziplinen gehoeren sichtbar zusammen ---
+   Ohne die Klammer standen die aufgeklappten Spalten optisch lose neben der
+   Achse, obwohl sie in der Spaltenfolge direkt dahinter liegen. */
+.is-new-look .nl-players-td-axis.is-group-open,
+.is-new-look .nl-players-th-axis.is-group-open {
+  border-left: 2px solid color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 55%, transparent);
+}
+
+.is-new-look .nl-players-td-disc-pps.is-group-end,
+.is-new-look .nl-players-th-disc-pps.is-group-end {
+  border-right: 2px solid color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 55%, transparent);
+}
+
+/* Der Achsen-Kopf soll ueber seiner GANZEN Spalte sitzen (Balken UND Wert),
+   sonst klafft zwischen Achsenwert und erster Disziplin eine kopflose Luecke —
+   genau der Eindruck von "nicht sauber direkt dahinter". */
+.is-new-look .nl-players-th-axis .nl-players-axis-th {
+  width: 100%;
+  justify-content: space-between;
+}
+
 .is-new-look .nl-players-disc-pps {
   font-size: 11px;
   font-weight: 600;
