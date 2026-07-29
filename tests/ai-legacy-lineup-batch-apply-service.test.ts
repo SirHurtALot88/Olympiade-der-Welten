@@ -725,4 +725,172 @@ describe("AI legacy lineup form-card planning", () => {
     ].filter(Boolean).length;
     expect(usedCount).toBeGreaterThanOrEqual(2);
   });
+
+  // --- Formkarten-Haushalt: Disziplingröße & Saisonplan ------------------------------------
+  // Der Punktwert eines Einsatzes ist Kartenwert × (Farbtreffer ? 2 : 1) × Spielerzahl —
+  // dieselbe Karte ist in einer 6er-Disziplin doppelt so viel wert wie in einer 3er.
+
+  function scheduleEntry(
+    matchdayIndex: number,
+    d1: { playerCount: number; category: string },
+    d2: { playerCount: number; category: string },
+  ) {
+    return {
+      seasonId: "season-1",
+      matchdayId: `matchday-${matchdayIndex}`,
+      matchdayIndex,
+      matchdayLabel: `MD${matchdayIndex}`,
+      discipline1: { disciplineId: `disc-${matchdayIndex}-1`, displayName: "D1", order: 1, playerCount: d1.playerCount, category: d1.category },
+      discipline2: { disciplineId: `disc-${matchdayIndex}-2`, displayName: "D2", order: 2, playerCount: d2.playerCount, category: d2.category },
+      sourceStatus: "season_seed",
+      sourceNote: null,
+    } as NonNullable<LegacyLineupLoadedContext["seasonDisciplineSchedule"]>[number];
+  }
+
+  it("reserves a big color-matched card in a small discipline when a big color-matched slot comes soon", () => {
+    const context = createContext([
+      { id: "positive-red-8", playerId: "p1", playerName: "P1", color: "red", value: 8, isUsed: false, usedByLineupId: null },
+    ]);
+    // d1: 3er-Power-Disziplin (rot), Seite ist stark — aber am MD3 wartet eine 6er-Power-Disziplin:
+    // dort bringt dieselbe Karte die doppelten Teampunkte, also wird sie aufgespart.
+    context.matchdayContract = {
+      ...context.matchdayContract!,
+      discipline1: { ...context.matchdayContract!.discipline1!, requiredPlayers: 3 },
+    };
+    context.seasonDisciplineSchedule = [
+      scheduleEntry(1, { playerCount: 3, category: "power" }, { playerCount: 2, category: "speed" }),
+      scheduleEntry(2, { playerCount: 2, category: "speed" }, { playerCount: 3, category: "mental" }),
+      scheduleEntry(3, { playerCount: 6, category: "power" }, { playerCount: 2, category: "speed" }),
+    ];
+    context.teamDisciplineRanks = {
+      tdm: { rank: 5, score: 500, sourceStatus: "mapped" },
+      spurt: { rank: 20, score: 300, sourceStatus: "mapped" },
+    };
+    context.disciplineScores = [
+      { playerId: "p1", disciplineId: "tdm", score: 80 },
+    ];
+
+    const modifiers = buildAiLegacyLineupModifiers(context, [
+      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p1", activePlayerId: "a1" },
+    ]);
+
+    expect(modifiers.d1.primaryFormCardId).toBeNull();
+    expect(modifiers.d1.secondaryFormCardId).toBeNull();
+  });
+
+  it("plays the big color-matched card when no better slot remains in the season plan", () => {
+    const context = createContext([
+      { id: "positive-red-8", playerId: "p1", playerName: "P1", color: "red", value: 8, isUsed: false, usedByLineupId: null },
+    ]);
+    // Gleiche Lage wie oben, aber der Restplan hat nur kleine, farbfremde Disziplinen:
+    // ein besserer Slot kommt nicht mehr — die Karte fällt JETZT.
+    context.matchdayContract = {
+      ...context.matchdayContract!,
+      discipline1: { ...context.matchdayContract!.discipline1!, requiredPlayers: 3 },
+    };
+    context.seasonDisciplineSchedule = [
+      scheduleEntry(1, { playerCount: 3, category: "power" }, { playerCount: 2, category: "speed" }),
+      scheduleEntry(2, { playerCount: 2, category: "speed" }, { playerCount: 3, category: "mental" }),
+      scheduleEntry(3, { playerCount: 3, category: "speed" }, { playerCount: 2, category: "mental" }),
+    ];
+    context.teamDisciplineRanks = {
+      tdm: { rank: 5, score: 500, sourceStatus: "mapped" },
+      spurt: { rank: 20, score: 300, sourceStatus: "mapped" },
+    };
+    context.disciplineScores = [
+      { playerId: "p1", disciplineId: "tdm", score: 80 },
+    ];
+
+    const modifiers = buildAiLegacyLineupModifiers(context, [
+      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p1", activePlayerId: "a1" },
+    ]);
+
+    expect(modifiers.d1.primaryFormCardId).toBe("positive-red-8");
+  });
+
+  it("skips the second big card when the side already dominates the discipline", () => {
+    // Chris' W-L-Fall: 2×8er farbverdoppelt in einer Disziplin, die das Team ohnehin anführt —
+    // eine Karte reicht, die zweite fehlt später in der Saison.
+    const buildDominanceContext = (rank: number) => {
+      const context = createContext([
+        { id: "positive-red-8", playerId: "p1", playerName: "P1", color: "red", value: 8, isUsed: false, usedByLineupId: null },
+        { id: "positive-red-7", playerId: "p2", playerName: "P2", color: "red", value: 7, isUsed: false, usedByLineupId: null },
+        { id: "positive-blue-2a", playerId: "p3", playerName: "P3", color: "blue", value: 2, isUsed: false, usedByLineupId: null },
+        { id: "positive-blue-2b", playerId: "p4", playerName: "P4", color: "blue", value: 2, isUsed: false, usedByLineupId: null },
+        { id: "positive-blue-2c", playerId: "p5", playerName: "P5", color: "blue", value: 2, isUsed: false, usedByLineupId: null },
+        { id: "positive-blue-2d", playerId: "p6", playerName: "P6", color: "blue", value: 2, isUsed: false, usedByLineupId: null },
+        // Bereits verbrauchte Positivkarten halten den Ausgaben-Pace im Soll (kein Zwangs-Spend).
+        { id: "used-a", playerId: "p7", playerName: "P7", color: "green", value: 3, isUsed: true, usedByLineupId: "lineup-x" },
+        { id: "used-b", playerId: "p8", playerName: "P8", color: "green", value: 3, isUsed: true, usedByLineupId: "lineup-x" },
+        { id: "used-c", playerId: "p9", playerName: "P9", color: "green", value: 3, isUsed: true, usedByLineupId: "lineup-x" },
+      ]);
+      context.matchday = { index: 6 } as typeof context.matchday;
+      context.season = { currentMatchday: 6 } as typeof context.season;
+      context.matchdayContract = {
+        ...context.matchdayContract!,
+        matchdayIndex: 6,
+        discipline1: { ...context.matchdayContract!.discipline1!, requiredPlayers: 6 },
+      };
+      context.seasonDisciplineSchedule = [
+        scheduleEntry(6, { playerCount: 6, category: "power" }, { playerCount: 2, category: "speed" }),
+        scheduleEntry(7, { playerCount: 2, category: "speed" }, { playerCount: 3, category: "mental" }),
+        scheduleEntry(8, { playerCount: 3, category: "mental" }, { playerCount: 2, category: "speed" }),
+        scheduleEntry(9, { playerCount: 2, category: "speed" }, { playerCount: 2, category: "mental" }),
+        scheduleEntry(10, { playerCount: 3, category: "mental" }, { playerCount: 2, category: "speed" }),
+      ];
+      context.teamDisciplineRanks = {
+        tdm: { rank, score: 700, sourceStatus: "mapped" },
+        spurt: { rank: 20, score: 300, sourceStatus: "mapped" },
+      };
+      context.disciplineScores = [
+        { playerId: "p1", disciplineId: "tdm", score: 84 },
+      ];
+      return context;
+    };
+
+    const dominantModifiers = buildAiLegacyLineupModifiers(buildDominanceContext(1), [
+      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p1", activePlayerId: "a1" },
+    ]);
+    expect(dominantModifiers.d1.primaryFormCardId).toBe("positive-red-8");
+    expect(dominantModifiers.d1.secondaryFormCardId).toBeNull();
+
+    // Ohne klare Dominanz (Rang 5) ist die Doppel-Investition in der großen Disziplin legitim.
+    const contestedModifiers = buildAiLegacyLineupModifiers(buildDominanceContext(5), [
+      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p1", activePlayerId: "a1" },
+    ]);
+    expect(contestedModifiers.d1.primaryFormCardId).toBe("positive-red-8");
+    expect(contestedModifiers.d1.secondaryFormCardId).toBe("positive-red-7");
+  });
+
+  it("dumps a negative card into the smaller of two weak disciplines", () => {
+    const context = createContext(
+      [
+        { id: "negative-green-8", playerId: "p1", playerName: "P1", color: "green", value: -8, isUsed: false, usedByLineupId: null },
+      ],
+      { d2Category: "mental", d2DisciplineId: "puzzle" },
+    );
+    // d1 (tdm) ist eine 6er-, d2 (puzzle) eine 2er-Disziplin — beide Seiten schwach:
+    // der Malus wirkt × Spielerzahl, also gehört die Minuskarte in die kleine Disziplin.
+    context.matchdayContract = {
+      ...context.matchdayContract!,
+      discipline1: { ...context.matchdayContract!.discipline1!, requiredPlayers: 6 },
+      discipline2: { ...context.matchdayContract!.discipline2!, disciplineId: "puzzle", category: "mental", requiredPlayers: 2 },
+    };
+    context.teamDisciplineRanks = {
+      tdm: { rank: 29, score: 150, sourceStatus: "mapped" },
+      puzzle: { rank: 30, score: 140, sourceStatus: "mapped" },
+    };
+    context.disciplineScores = [
+      { playerId: "p1", disciplineId: "tdm", score: 60 },
+      { playerId: "p2", disciplineId: "puzzle", score: 58 },
+    ];
+
+    const modifiers = buildAiLegacyLineupModifiers(context, [
+      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p1", activePlayerId: "a1" },
+      { disciplineId: "puzzle", disciplineSide: "d2", slotIndex: 0, playerId: "p2", activePlayerId: "a2" },
+    ]);
+
+    expect(modifiers.d2.primaryFormCardId).toBe("negative-green-8");
+    expect(modifiers.d1.primaryFormCardId).toBeNull();
+  });
 });
