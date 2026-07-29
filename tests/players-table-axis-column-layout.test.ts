@@ -58,6 +58,29 @@ describe("Spieler-Tabelle: Achsen- und Disziplin-Spalten", () => {
     expect(TABLE).not.toContain('<span className="nl-players-axis-track" aria-hidden="true">');
   });
 
+  it("behält in den Aufklapp-Listen die Katalog-Reihenfolge und nennt die Kadergröße", () => {
+    const roster = readFileSync(join(REPO_ROOT, "lib/foundation/tabs/use-foundation-cross-tab-teams-roster.ts"), "utf8");
+    const panel = readFileSync(join(REPO_ROOT, "app/foundation/teams-v2/FoundationTeamsDetailPanel.tsx"), "utf8");
+
+    // `originalOrder` zuerst — NICHT `displayOrder`. Letzteres ist die Spielplan-Reihenfolge
+    // und schob TDM (displayOrder 13) ans Ende der POW-Liste.
+    expect(roster).toContain("(left.originalOrder ?? left.displayOrder ?? 0) - (right.originalOrder ?? right.displayOrder ?? 0)");
+    expect(roster).not.toContain("(left.displayOrder ?? left.originalOrder ?? 0) - (right.displayOrder ?? right.originalOrder ?? 0)");
+
+    // Katalog-Reihenfolge fuer POW ist TDM · Mini DM · Gewichtheben · Hockey · Breaking.
+    const powByCatalog = [...(foundationSeedDisciplines as unknown as Discipline[])]
+      .filter((discipline) => discipline.category === "power")
+      .sort((left, right) => (left.originalOrder ?? left.displayOrder ?? 0) - (right.originalOrder ?? right.displayOrder ?? 0))
+      .map((discipline) => discipline.name);
+    expect(powByCatalog[0]).toBe("TDM");
+
+    // Kadergröße wird durchgereicht und in Klammern hinter dem Namen gezeigt.
+    expect(roster).toContain("playerCount:");
+    expect(panel).toContain('<span className="selected-roster-pps-diszi-item-count"> ({discipline.playerCount})</span>');
+    // Ohne Katalogwert bleibt die Klammer weg statt eine Zahl zu erfinden.
+    expect(panel).toContain("discipline.playerCount != null ? (");
+  });
+
   it("macht die Achsen-Spalte schmaler und die Spur hoch genug für die Zahl", () => {
     expect(CSS).toContain(".is-new-look .nl-players-axis .nl-players-axis-value");
     // Zahl mittig über der ganzen Spur, damit sie bei kleinen Werten nicht ausbricht.

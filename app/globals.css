@@ -6887,6 +6887,14 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   color: rgba(203, 213, 225, 0.88);
 }
 
+/* Kadergröße hinter dem Disziplin-Namen: gedämpft und leicht kleiner, damit sie den
+   Namen ergänzt und nicht mit dem PPs-Wert am rechten Rand um Aufmerksamkeit ringt. */
+.is-new-look .selected-roster-pps-diszi-item-count {
+  font-size: 0.92em;
+  font-weight: 600;
+  color: rgba(148, 163, 184, 0.72);
+}
+
 .is-new-look .selected-roster-pps-diszi-item-value {
   flex: 0 0 auto;
   font-weight: 700;
