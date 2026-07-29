@@ -72866,3 +72866,65 @@ button.is-new-look .nl-thist-season-pill,
   from { opacity: 0; transform: translate(-50%, 14px); }
   to { opacity: 1; transform: translate(-50%, 0); }
 }
+
+/* --- Spieler-Tabelle: Achsen-Zelle (POW/SPE/MEN/SOC) ------------------
+   Ein Balken, die Zahl steht darin.
+
+   Vorher war die Zelle ein 2- bzw. 3-Spalten-Raster (zuletzt
+   `34px minmax(46px, 1fr) 32px`): ein 6px hoher Strich plus der Wert in
+   einer eigenen Spalte daneben. Das kostete Breite, und bei 6px Hoehe war
+   der Laengenunterschied zwischen einem 80er und einem 60er kaum zu sehen —
+   man musste die Zahlen lesen, statt die Balken zu vergleichen.
+
+   Jetzt traegt ein einziger, hoeherer Balken den optischen Vergleich, und die
+   Zahl liegt mittig darin. Die Regeln stehen bewusst am Dateiende: sie muessen
+   die frueheren `.nl-ptable-axis-enhanced`-Bloecke ueberschreiben, und bei
+   gleicher Spezifitaet gewinnt die spaetere Regel. */
+.is-new-look .nl-players-axis,
+.is-new-look .nl-players-axis.nl-ptable-axis-enhanced {
+  display: block;
+  grid-template-columns: none;
+  column-gap: 0;
+  gap: 0;
+  min-height: 0;
+  padding: 1px 0;
+}
+
+.is-new-look .nl-players-axis .nl-players-axis-track {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 15px;
+  border-radius: var(--nl-r-sm, 5px);
+}
+
+/* Der Fuellbalken bleibt der eigentliche Messwert — nur er skaliert mit dem Wert. */
+.is-new-look .nl-players-axis .nl-players-axis-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+}
+
+/* Die Zahl liegt ueber der GANZEN Spur, nicht ueber der Fuellung: sonst wandert
+   sie bei kleinen Werten aus der Zelle. Der Schatten haelt sie sowohl auf dem
+   getoenten Balken als auch auf der leeren Spur lesbar. */
+.is-new-look .nl-players-axis .nl-players-axis-value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--nl-ink);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+/* Schmalere Achsen-Spalte: ohne die zweite Rasterspalte fuer den Wert braucht
+   der Kopf keine Breite mehr fuer eine Zahl, die jetzt im Balken sitzt. */
+.is-new-look .nl-players-th-axis {
+  width: 62px;
+  min-width: 62px;
+}
