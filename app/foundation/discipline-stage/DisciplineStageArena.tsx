@@ -16,6 +16,7 @@ import {
   type StageTeamMeta,
 } from "@/lib/foundation/discipline-stage/discipline-stage-from-preview";
 import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
+import { resolveAwardedPlayerPoints } from "@/lib/foundation/player-points-total";
 import DisciplineStageHighlights from "@/app/foundation/discipline-stage/DisciplineStageHighlights";
 import DisciplineStageTopPlayers, { type DisciplineStageTopPlayer } from "@/app/foundation/discipline-stage/DisciplineStageTopPlayers";
 import { getRankToPointsValue, resolveDisciplinePlayerCount } from "@/lib/resolve/rank-to-points";
@@ -737,7 +738,12 @@ export default function DisciplineStageArena({
           cur[side].push({
             playerId: e.playerId,
             name: e.playerName ?? e.playerId,
-            pp: e.pointsAwarded ?? null,
+            // Gesamte Gutschrift (Anteil + Mutator), nicht nur der Anteil — sonst zeigt
+            // die Wertung eine andere Zahl als der Saison-Ledger bucht.
+            pp: resolveAwardedPlayerPoints({
+              pointsAwarded: e.pointsAwarded,
+              mutatorPpsBonus: e.mutatorPpsBonus,
+            }),
             score: e.finalPlayerScore ?? null,
             mutatorPp: e.mutatorPpsBonus ?? null,
           });
@@ -1003,7 +1009,13 @@ export default function DisciplineStageArena({
             logoUrl: meta?.logoUrl ?? null,
             portraitUrl: portraitById.get(pp.playerId) ?? null,
             score: pp.finalPlayerScore,
-            points: pp.pointsAwarded,
+            // Gutgeschriebene PP = Team-Anteil + Mutator-Aufschlag (die Zahl, die der
+            // Saison-Ledger bucht). `pointsAwarded` allein unterschlaegt den Aufschlag.
+            points: resolveAwardedPlayerPoints({
+              pointsAwarded: pp.pointsAwarded,
+              mutatorPpsBonus: pp.mutatorPpsBonus,
+            }),
+            mutatorPoints: pp.mutatorPpsBonus ?? null,
             isMvp: Boolean(pp.isMvpCandidate),
             isOwn: pp.teamId === ownTeamId,
             ovrRank: ratingByPlayerId.get(pp.playerId)?.ovrRank ?? null,
@@ -1023,6 +1035,7 @@ export default function DisciplineStageArena({
               portraitUrl: s.portraitUrl,
               score: s.net,
               points: null,
+              mutatorPoints: null,
               isMvp: s.base >= 80,
               isOwn: t.isOwn,
               ovrRank: s.playerId ? ratingByPlayerId.get(s.playerId)?.ovrRank ?? null : null,

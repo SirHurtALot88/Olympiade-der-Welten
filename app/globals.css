@@ -68523,11 +68523,46 @@ button.is-new-look .nl-thist-season-pill,
   color: #0b1220;
 }
 
-/* Delta-Chips (MW-/Gehalts-Entwicklung ▲/▼) behalten ihre grün/rot
-   Bedeutung im Pfeil, aber der Zahlentext wird auf denselben dunklen Ton
-   gesetzt, damit er auf dem hellen Blau lesbar bleibt. */
+/* Delta-Chips (MW-/VK-/Gehalts-Entwicklung ▲/▼) in der AKTIVEN Sortierspalte.
+
+   Der Normalzustand des Chips ist eine 14-%-Tönung plus farbiger Text auf
+   dunklem Panel — das trägt dort. Auf dem hellen Blau der aktiven Spalte
+   verschwand beides: die Tönung ging im Hintergrund unter, und die Regel
+   darüber überschrieb zusätzlich den grün/roten Text mit Dunkel. Übrig blieb
+   ein fast unsichtbarer Pfeil mit Zahl — gemeldet für die VK-Wert-Spalte,
+   betrifft aber jede Spalte, die man als Sortierung markiert.
+
+   Deshalb hier ein VOLL deckender Chip statt einer Tönung: kräftige Fläche in
+   der jeweiligen Bedeutungsfarbe, dunkler Text darauf, dazu eine Kante gegen
+   das Blau. Die Aussage (grün = besser, rot = schlechter) bleibt damit
+   erhalten und wird sogar deutlicher als in den inaktiven Spalten — was
+   richtig ist, denn genau nach dieser Spalte sortiert man ja gerade. */
 .is-new-look td.is-active-sort .nl-delta-chip {
-  color: #0b1220;
+  color: var(--heat-elite-text, #0b1220);
+  /* Neutral („± 0"): keine Bedeutungsfarbe, aber genug Fläche, um als Chip
+     erkennbar zu bleiben statt als loser Text im Blau zu schwimmen. */
+  background: color-mix(in srgb, var(--heat-elite-text, #0b1220) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--heat-elite-text, #0b1220) 26%, transparent);
+  font-weight: 800;
+}
+
+.is-new-look td.is-active-sort .nl-delta-chip.is-good {
+  background: color-mix(in srgb, var(--nl-good) 82%, #ffffff 18%);
+  border-color: color-mix(in srgb, var(--nl-good) 92%, var(--heat-elite-text, #0b1220) 8%);
+  color: var(--heat-elite-text, #0b1220);
+}
+
+.is-new-look td.is-active-sort .nl-delta-chip.is-risk {
+  background: color-mix(in srgb, var(--nl-risk) 82%, #ffffff 18%);
+  border-color: color-mix(in srgb, var(--nl-risk) 92%, var(--heat-elite-text, #0b1220) 8%);
+  color: var(--heat-elite-text, #0b1220);
+}
+
+/* Der Pfeil trägt die Richtung — auf der deckenden Fläche darf er kräftiger
+   sein als die 9px des Normalzustands, sonst geht er neben der Zahl unter. */
+.is-new-look td.is-active-sort .nl-delta-chip .nl-delta-chip-arrow {
+  font-size: 10px;
+  font-weight: 900;
 }
 
 /* ------------------------------------------------------------

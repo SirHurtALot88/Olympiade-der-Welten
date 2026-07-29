@@ -557,6 +557,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   runFacilityMaintenancePreview,
   runFacilityUpgradePreview,
   commitArenaDiscipline,
+  runCockpitMatchdayAdvance,
   runFoundationCommand,
   runNewGameSetup,
   runSaveAction,
@@ -2578,13 +2579,32 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                     <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("seasonV2", setActiveView)}>
                       Saisonstand ansehen
                     </button>
-                    {/* Kein „Spieltag abschliessen" mehr: Die Wertung passiert am Ende jeder
-                        Disziplin in der Arena. Solange der Spieltag laeuft, steht hier nichts
-                        Primaeres — es gibt schlicht nichts zu druecken. Erst wenn das Ergebnis
-                        vollstaendig ist, fuehrt „Weiter" den Saison-Flow fort. Gegatet wird auf
-                        den AKTUELLEN Spieltag (matchdayState), nicht auf die evtl. auf einen
-                        alten Spieltag zurueckgefallene Summary. */}
-                    {homeNextMatchdayStatus.resultAvailable ? (
+                    {/* „Spieltag abschliessen" ist zurueck — und zwar als bewusste
+                        Entscheidung des Managers.
+
+                        Die Wertung passiert weiterhin am Ende jeder Disziplin in der Arena;
+                        neu ist nur, dass der Spieltagswechsel NICHT mehr automatisch an D2
+                        haengt (`commitArenaDiscipline` ruft den Auto-Run mit
+                        `advanceAfterCashApply: false`). Vorher sprang die Ansicht direkt nach
+                        D2 auf den naechsten Spieltag und die gerade gespielte Tabelle war weg,
+                        bevor man sie lesen konnte. Jetzt bleibt der Stand stehen, bis hier
+                        gedrueckt wird.
+
+                        Gegatet auf den Flow-Schritt, nicht auf die Summary: „ready" heisst
+                        genau, dass beide Disziplinen gewertet sind und der Wechsel sauber
+                        moeglich ist. */}
+                    {gameFlowActionStep.stepId === "advance_to_next_matchday" && gameFlowActionStep.status === "ready" ? (
+                      <button
+                        className="primary-button inline-button"
+                        type="button"
+                        data-testid="arena-finish-matchday"
+                        disabled={cockpitBusyKey === "matchday-advance"}
+                        title="Beide Disziplinen sind gewertet. Schaltet auf den nächsten Spieltag weiter — die Tabelle bleibt bis dahin stehen."
+                        onClick={() => void runCockpitMatchdayAdvance?.(true)}
+                      >
+                        {cockpitBusyKey === "matchday-advance" ? "schaltet weiter…" : "Spieltag abschließen"}
+                      </button>
+                    ) : homeNextMatchdayStatus.resultAvailable ? (
                       <button className="primary-button inline-button" type="button" onClick={triggerGlobalNext}>
                         Weiter
                       </button>

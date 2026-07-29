@@ -19,6 +19,7 @@ import type { StageLiveResultsByTeam } from "@/app/foundation/discipline-stage/a
 import { getTeamColor, teamHasSecondary } from "@/lib/foundation/team-colors";
 import PlayerStarFrame from "@/components/foundation/player-portrait-card/PlayerStarFrame";
 import { getPlayerStarTier, getPlayerStarTierLabel } from "@/lib/foundation/player-star-tier";
+import { hasVisibleMutatorPoints, resolveAwardedPlayerPoints } from "@/lib/foundation/player-points-total";
 import { fmt1 } from "./stage-format";
 
 export type DisciplineStageHoverTarget =
@@ -319,6 +320,9 @@ function TeamPreview({ gameState, target, ratingByPlayerId, fieldedPlayerIdsByTe
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
             {fielded.map((player) => {
               const pp = ppByPlayerId?.get(player.id) ?? null;
+              const awardedPp = pp
+                ? resolveAwardedPlayerPoints({ pointsAwarded: pp.pp, mutatorPpsBonus: pp.mutatorPp })
+                : null;
               const portraitUrl = getPlayerPortraitBrowserUrl(player.id, player.portraitUrl ?? null, player.portraitPath ?? null);
               const live = revealedByPlayerId.get(player.id) ?? null;
               return (
@@ -359,22 +363,28 @@ function TeamPreview({ gameState, target, ratingByPlayerId, fieldedPlayerIdsByTe
                         >
                           {fmt1(pp.score)}
                         </span>
+                        {/* GESAMTE gutgeschriebene PP — Anteil an den Team-Punkten PLUS
+                            Mutator-Aufschlag, genau die Zahl, die der Saison-Ledger bucht
+                            (`season-points-ledger.ts`). Vorher stand hier nur der Anteil und
+                            der Aufschlag daneben in Klammern: aus "0,2 PP (+0,6 Mut)" musste
+                            man sich die tatsaechlichen 0,8 selbst zusammenrechnen. Die
+                            Klammer bleibt als AUFSCHLUESSELUNG stehen, nicht als Zusatzposten. */}
                         <span
                           title={
-                            pp.mutatorPp != null && Math.abs(pp.mutatorPp) >= 0.05
-                              ? `${fmt1(pp.pp)} Player-Points · davon ${fmt1(pp.mutatorPp)} aus Disziplin-Mutatoren · Score ${fmt1(pp.score)}`
-                              : `${fmt1(pp.pp)} Player-Points · kein Mutator-Anteil · Score ${fmt1(pp.score)}`
+                            hasVisibleMutatorPoints(pp.mutatorPp)
+                              ? `${fmt1(awardedPp)} Player-Points · ${fmt1(pp.pp)} Anteil an den Team-Punkten + ${fmt1(pp.mutatorPp!)} aus Disziplin-Mutatoren · Score ${fmt1(pp.score)}`
+                              : `${fmt1(awardedPp)} Player-Points · kein Mutator-Anteil · Score ${fmt1(pp.score)}`
                           }
                           style={{ fontSize: 12, fontWeight: 900, color: "var(--nl-accent)", flex: "none" }}
                         >
-                          {fmt1(pp.pp)} PP
+                          {fmt1(awardedPp)} PP
                         </span>
-                        {pp.mutatorPp != null && Math.abs(pp.mutatorPp) >= 0.05 ? (
+                        {hasVisibleMutatorPoints(pp.mutatorPp) ? (
                           <span
-                            title="Anteil an den Player-Points, der aus den Mutatoren dieser Disziplin stammt"
+                            title="Darin enthalten: der Aufschlag aus den Mutatoren dieser Disziplin"
                             style={{ fontSize: 10.5, fontWeight: 700, color: "var(--nl-good)", flex: "none" }}
                           >
-                            ({pp.mutatorPp > 0 ? "+" : "−"}{fmt1(Math.abs(pp.mutatorPp))} Mut)
+                            (inkl. {pp.mutatorPp! > 0 ? "+" : "−"}{fmt1(Math.abs(pp.mutatorPp!))} Mut)
                           </span>
                         ) : null}
                       </>

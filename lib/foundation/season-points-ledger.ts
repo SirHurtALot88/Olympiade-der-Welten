@@ -5,6 +5,7 @@ import type {
   MatchdayResultRecord,
   PlayerDisciplinePerformanceRecord,
 } from "@/lib/data/olyDataTypes";
+import { resolveAwardedPlayerPoints } from "@/lib/foundation/player-points-total";
 import { distributeRankPointsToPlayers, resolveDisciplinePlayerCount } from "@/lib/resolve/rank-to-points";
 
 type LedgerPointSource =
@@ -283,6 +284,10 @@ export function buildSeasonPointsLedger(
         );
       }
       const mutatorPpsBonus = isFiniteNumber(performance.mutatorPpsBonus) ? performance.mutatorPpsBonus : 0;
+      // Gebuchte PP = Anteil + Mutator-Aufschlag. Ueber den geteilten Helfer, damit
+      // die Buehne exakt dieselbe Zahl zeigen kann, die hier gutgeschrieben wird —
+      // vorher rechnete die Arena eigenstaendig nur mit dem Anteil.
+      const awardedPoints = resolveAwardedPlayerPoints({ pointsAwarded: derivedPoints, mutatorPpsBonus }) ?? 0;
       return {
         performanceId: performance.id,
         matchdayResultId: performance.matchdayResultId,
@@ -294,7 +299,7 @@ export function buildSeasonPointsLedger(
         disciplineSide: performance.disciplineSide,
         basePoints: derivedPoints,
         mutatorPpsBonus,
-        points: roundValue(derivedPoints + mutatorPpsBonus, 4),
+        points: roundValue(awardedPoints, 4),
         pointSource,
         baseValue: performance.baseValue,
         finalPlayerScore: performance.finalPlayerScore,

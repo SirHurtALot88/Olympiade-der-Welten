@@ -824,6 +824,8 @@ export default function DisciplineStageMatchdayPanel({
                       <span
                         key={entry.playerId}
                         className={heat ? `matchday-panel-player ${heat}` : "matchday-panel-player"}
+                        // `entry.pp` ist die GESAMTE Gutschrift inkl. Mutator-Aufschlag —
+                        // "davon" ist hier also korrekt, seit die Summe angezeigt wird.
                         title={`${entry.name} · ${entry.pp != null ? `${entry.pp.toFixed(1)} PP` : "keine PP"}${
                           entry.score != null ? ` · Score ${entry.score.toFixed(1)}` : ""
                         }${entry.mutatorPp ? ` · davon ◆ ${entry.mutatorPp.toFixed(1)} Mutator` : ""}`}

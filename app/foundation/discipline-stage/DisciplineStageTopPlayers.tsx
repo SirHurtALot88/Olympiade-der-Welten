@@ -12,7 +12,14 @@ export type DisciplineStageTopPlayer = {
   logoUrl: string | null;
   portraitUrl: string | null;
   score: number;
+  /**
+   * GESAMTE gutgeschriebene Player-Points: Anteil an den Team-Punkten PLUS
+   * Mutator-Aufschlag — dieselbe Zahl, die der Saison-Ledger bucht (siehe
+   * `resolveAwardedPlayerPoints`). Nicht `pointsAwarded` allein.
+   */
   points: number | null;
+  /** Darin ENTHALTENER Mutator-Aufschlag, nur zur Aufschluesselung. */
+  mutatorPoints: number | null;
   isMvp: boolean;
   isOwn: boolean;
   /** Ligaweiter OVR-Rang — einzige Grundlage des Star-Tier-Rahmens, NICHT `rank` (der PP-Rang dieser Liste). */
