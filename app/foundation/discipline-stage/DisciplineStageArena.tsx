@@ -734,12 +734,24 @@ export default function DisciplineStageArena({
         const cur = playersByTeam.get(tr.teamId) ?? { d1: [], d2: [] };
         for (const e of tr.entries ?? []) {
           if (!e.playerId) continue;
+          // PP INKLUSIVE Mutator-Bonus — dieselbe Definition wie im Saison-Ledger
+          // (`points = basePoints + mutatorPpsBonus`, season-points-ledger.ts).
+          // `pointsAwarded` ist nur der verteilte Basis-Anteil, `mutatorPpsBonus`
+          // liegt in der Resolve-Engine als eigenes Feld daneben. Vorher stand hier
+          // allein `pointsAwarded`: die Summe der Spieler-Chips ergab damit die
+          // Basis-PP des Teams statt des Gesamtwerts, obwohl der Chip-Tooltip
+          // "davon ◆ X Mutator" behauptete, der Bonus stecke schon drin.
+          const basePp = e.pointsAwarded ?? null;
+          const mutatorPp = e.mutatorPpsBonus ?? null;
           cur[side].push({
             playerId: e.playerId,
             name: e.playerName ?? e.playerId,
-            pp: e.pointsAwarded ?? null,
+            pp:
+              basePp == null && mutatorPp == null
+                ? null
+                : Number(((basePp ?? 0) + (mutatorPp ?? 0)).toFixed(4)),
             score: e.finalPlayerScore ?? null,
-            mutatorPp: e.mutatorPpsBonus ?? null,
+            mutatorPp,
           });
         }
         playersByTeam.set(tr.teamId, cur);
