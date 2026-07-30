@@ -16,6 +16,7 @@ import { hydrateSeasonRatingsSliceMap } from "@/lib/foundation/season-ratings-sl
 const EMPTY_RATINGS_MAP = new Map<string, PlayerRatingContractRow>();
 const EMPTY_PERFORMANCE_BY_PLAYER_ID: PlayerDirectorySliceResponse["performanceByPlayerId"] = {};
 const EMPTY_CAREER_STATS_BY_PLAYER_ID: PlayerDirectorySliceResponse["careerStatsByPlayerId"] = {};
+const EMPTY_DISCIPLINE_POINTS_BY_PLAYER_ID: PlayerDirectorySliceResponse["disciplinePointsByPlayerId"] = {};
 
 function buildPlayerDirectorySliceRequestKey(input: {
   saveId: string;
@@ -121,12 +122,17 @@ export function usePlayerDirectorySlice(input: {
   );
   const performanceByPlayerId = payload?.performanceByPlayerId ?? EMPTY_PERFORMANCE_BY_PLAYER_ID;
   const careerStatsByPlayerId = payload?.careerStatsByPlayerId ?? EMPTY_CAREER_STATS_BY_PLAYER_ID;
+  // Aeltere gecachte Payloads (vor dem Feld) haben das Objekt nicht — dann
+  // greift der stabile Leer-Fallback statt `undefined` durch die Deps zu tragen.
+  const disciplinePointsByPlayerId =
+    payload?.disciplinePointsByPlayerId ?? EMPTY_DISCIPLINE_POINTS_BY_PLAYER_ID;
 
   return {
     payload,
     ratingsById,
     performanceByPlayerId,
     careerStatsByPlayerId,
+    disciplinePointsByPlayerId,
     loading,
     error,
   };
