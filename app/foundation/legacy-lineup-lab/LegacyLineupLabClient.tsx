@@ -3492,7 +3492,11 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         } else if (activeSlotCandidate?.blockReason) {
           groupKey = "blocked";
           detail = formatLegacyLineupDragBlockReason(activeSlotCandidate.blockReason) ?? "Gerade nicht legal einsetzbar.";
-          shortReason = "blockiert";
+          // "Verletzt" statt "blockiert": In der Auswahlliste stand fuer JEDEN Sperrgrund dasselbe
+          // Wort. Warum ein Spieler nicht geht, sah man erst im Hovertext — eine Verletzung war
+          // damit vor dem Setzen nicht erkennbar, obwohl sie der haeufigste und wichtigste Grund
+          // ist. Genau so gemeldet: "verletzungen muessen im ui direkt erkennbar sein".
+          shortReason = activeSlotCandidate.blockReason === "player_injured_unavailable" ? "Verletzt" : "blockiert";
         } else if (isElevatedFatigue(player.fatigueCount)) {
           groupKey = "fatigue";
           detail = `${formatFatigueImpactDetail(player.fatigueCount)} macht den Pick spürbar riskanter.`;
