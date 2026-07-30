@@ -454,6 +454,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   leagueSetupRetryBusy,
   leagueSetupRetryError,
   retryLeagueSetup,
+  retryMarketSellPreview,
   lineupDraftBoardView,
   lineupDraftBoardViewRequest,
   lineupFocusRequestKey,
@@ -2992,6 +2993,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               },
               closeMarketSellModal,
               confirmTransfermarktSell,
+              retryMarketSellPreview,
             }}
           />
 
