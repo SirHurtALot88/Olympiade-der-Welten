@@ -48,9 +48,21 @@ import {
   aggregatePlayerInjuryHistoryBySeason,
   buildPlayerInjuryHistoryFromEvents,
   buildPlayerInjurySummary,
+  resolveInjuryMatchdayDisciplines,
+  type PlayerInjuryDiscipline,
   type PlayerInjurySummary,
 } from "@/lib/foundation/player-injury-history";
 import type { PlayerInjuryHistoryRecord } from "@/lib/data/olyDataTypes";
+
+/**
+ * Verletzungs-Zeile der Anzeige: der persistierte Datensatz plus die Disziplinen, in denen
+ * der Spieler am Spieltag der Verletzung aufgestellt war. Bewusst NICHT in
+ * `PlayerInjuryHistoryRecord` (persistierte Form) ergaenzt — der Einsatz wird beim Lesen aus
+ * der Einsatzliste aufgeloest, nicht mitgespeichert.
+ */
+export type PlayerDrawerInjuryHistoryRow = PlayerInjuryHistoryRecord & {
+  disciplines: PlayerInjuryDiscipline[];
+};
 import { buildPlayerTrainingHistoryRows, type PlayerTrainingHistoryRow } from "@/lib/foundation/player-training-history";
 import {
   buildPlayerSeasonTrainingForecast,
@@ -318,7 +330,7 @@ export type PlayerDetailDrawerData = {
     injuryHistory: PlayerInjuryHistoryRecord[];
   };
   injurySummary: PlayerInjurySummary;
-  injuryHistoryRows: PlayerInjuryHistoryRecord[];
+  injuryHistoryRows: PlayerDrawerInjuryHistoryRow[];
   form: number | null;
   potential: number | null;
   scoutPotential: PlayerScoutPotential | null;
@@ -2454,11 +2466,22 @@ export function buildPlayerDrawerDataFromGameState(input: {
     buildSeasonHistory(input.gameState, player.id, player),
   );
   const latestArchivedPerformance = findLatestArchivedPlayerPerformance(input.gameState, player.id);
-  const injuryHistoryRows = buildPlayerInjuryHistoryFromEvents({
+  const injuryHistoryRows: PlayerDrawerInjuryHistoryRow[] = buildPlayerInjuryHistoryFromEvents({
     playerId: player.id,
     gameState: input.gameState,
     persistedHistory: player.injuryHistory,
-  });
+  }).map((row) => ({
+    ...row,
+    // Der Verletzungswurf haengt am Spieltag, nicht an einer Disziplin. Den tatsaechlichen
+    // Einsatz liefert die Einsatzliste desselben Spieltags — beim Lesen aufgeloest, damit
+    // alte Spielstaende ohne Migration mitkommen.
+    disciplines: resolveInjuryMatchdayDisciplines({
+      gameState: input.gameState,
+      teamId: row.teamId,
+      playerId: player.id,
+      matchdayId: row.matchdayId,
+    }),
+  }));
   const injurySummary = buildPlayerInjurySummary(injuryHistoryRows);
   const injuryBySeasonId = new Map(
     aggregatePlayerInjuryHistoryBySeason(injuryHistoryRows).map((entry) => [entry.seasonId, entry] as const),

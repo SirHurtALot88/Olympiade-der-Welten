@@ -96,6 +96,61 @@ export function buildPlayerInjuryHistoryFromEvents(input: {
   return [...merged.values()].sort((left, right) => right.timestamp.localeCompare(left.timestamp, "de"));
 }
 
+/** Disziplin, in der ein Spieler am Spieltag der Verletzung eingesetzt war. */
+export type PlayerInjuryDiscipline = {
+  disciplineId: string;
+  name: string;
+  /** Kadergröße der Disziplin — wie viele Spieler pro Team dort antreten. */
+  playerCount: number | null;
+};
+
+/**
+ * Loest auf, in welchen Disziplinen ein Spieler am Spieltag seiner Verletzung aufgestellt war.
+ *
+ * WICHTIG zur Semantik: Der Verletzungswurf haengt am SPIELTAG und an der Fatigue, nicht an
+ * einer einzelnen Disziplin — `InjuryEventRecord` traegt deshalb gar keine `disciplineId`.
+ * Was hier ermittelt wird, ist der tatsaechliche Einsatz laut Einsatzliste desselben
+ * Spieltags. Ein Spieler kann in BEIDEN Disziplinen eines Spieltags gestanden haben; dann
+ * liefert die Funktion beide, statt sich willkuerlich fuer eine zu entscheiden.
+ *
+ * Ohne Einsatzliste (alter Spielstand, Draft geloescht) bleibt das Ergebnis leer — es wird
+ * keine Disziplin geraten.
+ */
+export function resolveInjuryMatchdayDisciplines(input: {
+  gameState: GameState;
+  teamId: string;
+  playerId: string;
+  matchdayId: string;
+}): PlayerInjuryDiscipline[] {
+  const drafts = (input.gameState.seasonState.lineupDrafts ?? []).filter(
+    (draft) => draft.teamId === input.teamId && draft.matchdayId === input.matchdayId,
+  );
+
+  const disciplineIds: string[] = [];
+  for (const draft of drafts) {
+    for (const entry of draft.entries ?? []) {
+      if (entry.playerId !== input.playerId || !entry.disciplineId) {
+        continue;
+      }
+      if (!disciplineIds.includes(entry.disciplineId)) {
+        disciplineIds.push(entry.disciplineId);
+      }
+    }
+  }
+
+  return disciplineIds.map((disciplineId) => {
+    const discipline = input.gameState.disciplines?.find((entry) => entry.id === disciplineId) ?? null;
+    return {
+      disciplineId,
+      name: discipline?.name ?? disciplineId,
+      playerCount:
+        typeof discipline?.playerCount === "number" && Number.isFinite(discipline.playerCount)
+          ? discipline.playerCount
+          : null,
+    };
+  });
+}
+
 export function buildPlayerInjurySummary(history: PlayerInjuryHistoryRecord[]): PlayerInjurySummary {
   const seasons = new Set(history.map((entry) => entry.seasonId));
   return {
