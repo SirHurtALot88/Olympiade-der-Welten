@@ -39,6 +39,14 @@ export function markMedalColor(medal: MarkMedal): string | null {
   return null;
 }
 
+// Numerische Medaille (RT.stageMedal/roundMedal: 1/2/3) → MarkMedal. EINE Quelle für
+// alles, was aus der Zahl eine Farbe/Badge macht (Kür-Karten via medal-Prop, Feld-Ringe
+// via markMedalColor(numericMedalOf(m))) — sonst entstünde neben markMedalColor eine
+// zweite Gold/Silber/Bronze-Liste.
+export function numericMedalOf(m: 0 | 1 | 2 | 3): MarkMedal {
+  return m === 1 ? "gold" : m === 2 ? "silver" : m === 3 ? "bronze" : null;
+}
+
 // Star-Tier-Farbe (ligaweite Top-Riege, siehe lib/foundation/player-star-tier.ts).
 // Bewusst NICHT Teil der Ring-Prioritätskette: der innere Ring trägt weiterhin
 // Verletzung/Spotlight/eigenes Team/Relation — die Star-Stufe kommt als
