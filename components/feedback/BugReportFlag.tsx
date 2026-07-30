@@ -7,9 +7,9 @@ import { useState } from "react";
  *
  * Warum ein Freitextfeld dazwischen und nicht sofort senden: eine Meldung ohne einen Satz dazu ist
  * schwer zu deuten, und ein Fehlklick soll nicht als Meldung durchgehen. Der Satz ist aber optional —
- * das Wertvolle sammelt der Server selbst (Spielstand, Saison, Spieltag, aktives Team; siehe
- * lib/bug-report/bug-report-service.ts). Genau dieser Zustand hat in diesem Projekt bei mehreren
- * Fehlern gefehlt und die Diagnose auf Screenshots zurueckgeworfen.
+ * das Wertvolle sammelt der Server selbst (Spielstand, Saison, Spieltag, aktives Team, Seite und
+ * Melder; siehe lib/bug-report/bug-report-service.ts). Genau dieser Zustand hat in diesem Projekt bei
+ * mehreren Fehlern gefehlt und die Diagnose auf Screenshots zurueckgeworfen.
  *
  * Absichtlich NICHT an den Login gebunden (anders als AuthStatusBadge): melden koennen soll man
  * immer, auch ohne Session und auch auf einer Seite, die gerade halb kaputt ist.
@@ -31,13 +31,25 @@ export function BugReportFlag() {
           url: typeof window === "undefined" ? null : window.location.href,
           // Die Ansicht steht als Query-Parameter in der URL — praeziser als der Pfad allein.
           view: typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("view"),
+          // Der Pfad zusaetzlich, weil die Seiten ausserhalb von /foundation (Login, Startseite,
+          // Online-Raum) gar keinen `?view=`-Parameter haben — dort war die Ansicht bisher leer.
+          path: typeof window === "undefined" ? null : window.location.pathname,
+          tab: typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab"),
           viewport:
             typeof window === "undefined" ? null : { width: window.innerWidth, height: window.innerHeight },
           clientTime: new Date().toISOString(),
+          // WER meldet, setzt der Server aus dem Session-Cookie — ein hier mitgeschickter Name waere
+          // frei behauptbar und damit wertlos.
         }),
       });
       const payload = (await response.json().catch(() => null)) as
-        | { ok?: boolean; reportId?: string; game?: { saveName?: string | null; currentMatchday?: number | null } | null }
+        | {
+            ok?: boolean;
+            reportId?: string;
+            game?: { saveName?: string | null; currentMatchday?: number | null } | null;
+            page?: { label?: string | null; path?: string | null } | null;
+            reporter?: { displayName?: string | null } | null;
+          }
         | null;
       if (!response.ok || !payload?.ok) {
         setState("failed");
@@ -45,11 +57,14 @@ export function BugReportFlag() {
       }
       // Zeigen, WAS mitgegangen ist — sonst weiss niemand, ob die Meldung brauchbar war.
       const game = payload.game;
-      setSentInfo(
+      const parts = [
         game?.saveName
           ? `${game.saveName}${game.currentMatchday != null ? ` · Spieltag ${game.currentMatchday}` : ""}`
           : "ohne Spielkontext",
-      );
+        payload.page?.label ?? payload.page?.path ?? null,
+        payload.reporter?.displayName ?? null,
+      ];
+      setSentInfo(parts.filter(Boolean).join(" · "));
       setState("sent");
       setNote("");
     } catch {
@@ -94,7 +109,7 @@ export function BugReportFlag() {
                 id="oly-bug-report-note"
                 rows={3}
                 value={note}
-                placeholder="Optional — Saison, Spieltag und Ansicht gehen automatisch mit."
+                placeholder="Optional — Saison, Spieltag, Seite und dein Name gehen automatisch mit."
                 onChange={(event) => setNote(event.target.value)}
               />
               {state === "failed" ? (

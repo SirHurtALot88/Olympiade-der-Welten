@@ -31,6 +31,11 @@ services:
       OLY_USER_FRANKY_PASSWORD: ${OLY_USER_FRANKY_PASSWORD:-}
     volumes:
       - oly-data:/app/data/persistence
+      # Bug-Meldungen MUESSEN ein eigenes Volume haben. Ohne dieses Mount schreibt die Flagge nach
+      # /app/data/bug-reports INNERHALB des Containers — und der Auto-Deploy baut bei jedem Push auf
+      # main einen neuen Container. Jede auf dem Live-Server gemeldete Sache war damit beim naechsten
+      # Deploy geloescht, ohne Spur und ohne Fehlermeldung.
+      - oly-bug-reports:/app/data/bug-reports
       - /opt/oly-media:/app/media/dropbox:ro
     expose:
       - "3000"
@@ -77,6 +82,7 @@ services:
 
 volumes:
   oly-data:
+  oly-bug-reports:
   lec-data:
   caddy-data:
   caddy-config:

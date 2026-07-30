@@ -13,6 +13,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { getFoundationBreadcrumb } from "@/lib/foundation/foundation-breadcrumb";
+import { normalizeFoundationViewParam, type FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 
 export const BUG_REPORTS_DIR = path.join(process.cwd(), "data", "bug-reports");
@@ -22,16 +24,55 @@ export type BugReportInput = {
   note?: string | null;
   /** Seite/Ansicht, auf der die Flagge geklickt wurde (Client kennt das genauer als der Server). */
   view?: string | null;
+  /** Pfad ohne Query, z. B. "/foundation". Traegt die Ansichten, die KEIN `?view=` haben. */
+  path?: string | null;
+  /** Unter-Reiter innerhalb einer Ansicht (`?tab=`) — sonst landet man beim Nachstellen daneben. */
+  tab?: string | null;
   url?: string | null;
   userAgent?: string | null;
   viewport?: { width: number; height: number } | null;
   /** Zeitpunkt beim Klick. Ohne Angabe stempelt der Server. */
   clientTime?: string | null;
+  /** Wer gemeldet hat. Kommt aus dem Session-Cookie und wird NUR von der Route gesetzt. */
+  reporter?: BugReportReporter | null;
+};
+
+/**
+ * Wer die Meldung abgesetzt hat.
+ *
+ * `source` ist kein Beiwerk: ohne sie ist ein leerer Name nicht deutbar. "Login ist aus" (Solo am
+ * eigenen Rechner — es GIBT keinen Benutzer) und "niemand angemeldet" (Login an, Meldung von der
+ * Login-Seite) sehen im Feld `username` identisch aus, verlangen beim Nachstellen aber Verschiedenes.
+ */
+export type BugReportReporter = {
+  username: string | null;
+  displayName: string | null;
+  /** Owner-Id aus dem Team-Control-System — damit laesst sich "sein" Team im Save finden. */
+  ownerId: string | null;
+  source: "session" | "auth_disabled" | "not_logged_in";
+};
+
+/** Die Seite, auf der geklickt wurde — maschinenlesbar UND als Klartext. */
+export type BugReportPage = {
+  path: string | null;
+  view: string | null;
+  tab: string | null;
+  /**
+   * Lesbarer Name, z. B. "Spieltag · Arena". Kommt aus der Navigations-Konfiguration
+   * (`getFoundationBreadcrumb`) statt aus einer zweiten, handgepflegten Liste — sonst driftet die
+   * Beschriftung in der Meldung von der im Spiel weg, und die Meldung zeigt auf eine Ansicht, die so
+   * gar nicht mehr heisst.
+   */
+  label: string | null;
 };
 
 export type BugReportRecord = BugReportInput & {
   reportId: string;
   createdAt: string;
+  /** Immer gesetzt — auch wenn niemand angemeldet ist (dann mit Begruendung in `source`). */
+  reporter: BugReportReporter;
+  /** Immer gesetzt — die Seite ist neben dem Spielstand die zweite Haelfte der Nachstellbarkeit. */
+  page: BugReportPage;
   /** Aus dem aktiven Spielstand ergaenzt — das ist der Teil, der die Meldung nachstellbar macht. */
   game: {
     saveId: string | null;
@@ -49,6 +90,37 @@ export type BugReportRecord = BugReportInput & {
 function buildReportId(now: Date) {
   const stamp = now.toISOString().replace(/[:.]/g, "-");
   return `bug-${stamp}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** Ohne Angabe der Route: nicht raten, sondern als unbekannt stehen lassen. */
+const UNKNOWN_REPORTER: BugReportReporter = {
+  username: null,
+  displayName: null,
+  ownerId: null,
+  source: "not_logged_in",
+};
+
+/**
+ * Baut aus Pfad und Query die Seite, auf der geklickt wurde.
+ *
+ * `view` allein reicht nicht: die Ansichten ausserhalb von `/foundation` (Login, Startseite, der
+ * Online-Raum) haben gar keinen `?view=`-Parameter — dort war das Feld bisher schlicht `null`, und
+ * die Meldung sagte nicht mehr, als dass irgendwo etwas kaputt ist. Der Pfad schliesst diese Luecke.
+ *
+ * Der Alias-Schritt ueber `normalizeFoundationViewParam` ist noetig, weil dieselbe Ansicht unter
+ * mehreren Schreibweisen in der URL steht (`season`, `season-v2`, `seasonV2`). Ohne ihn faende die
+ * Nav-Suche das Label nur bei der kanonischen Variante.
+ */
+function resolvePage(input: BugReportInput): BugReportPage {
+  const view = input.view?.trim() || null;
+  const normalized = normalizeFoundationViewParam(view);
+  const breadcrumb = normalized ? getFoundationBreadcrumb(normalized as FoundationViewId) : null;
+  return {
+    path: input.path?.trim() || null,
+    view,
+    tab: input.tab?.trim() || null,
+    label: breadcrumb ? `${breadcrumb.group} · ${breadcrumb.view}` : null,
+  };
 }
 
 /**
@@ -92,6 +164,8 @@ export function saveBugReport(input: BugReportInput): { reportId: string; file: 
     note: (input.note ?? "").trim() || null,
     reportId: buildReportId(now),
     createdAt: now.toISOString(),
+    reporter: input.reporter ?? UNKNOWN_REPORTER,
+    page: resolvePage(input),
     game: collectGameContext(),
   };
   fs.mkdirSync(BUG_REPORTS_DIR, { recursive: true });
