@@ -52,6 +52,7 @@ export function BugReportFlag() {
             game?: { saveName?: string | null; currentMatchday?: number | null } | null;
             page?: { label?: string | null; path?: string | null } | null;
             reporter?: { displayName?: string | null } | null;
+            git?: { pushed?: boolean; unpushed?: number | null } | null;
           }
         | null;
       if (!response.ok || !payload?.ok) {
@@ -66,6 +67,13 @@ export function BugReportFlag() {
           : "ohne Spielkontext",
         payload.page?.label ?? payload.page?.path ?? null,
         payload.reporter?.displayName ?? null,
+        // Ohne diesen Hinweis sieht eine Meldung, die nur lokal liegt, exakt aus wie eine, die
+        // rausgegangen ist — und genau so ist die erste verlorengegangen.
+        payload.git?.pushed
+          ? "→ Git"
+          : payload.git?.unpushed
+            ? `⚠ nur lokal (${payload.git.unpushed} offen)`
+            : "⚠ nur lokal",
       ];
       setSentInfo(parts.filter(Boolean).join(" · "));
       setState("sent");
