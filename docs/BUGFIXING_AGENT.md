@@ -47,11 +47,22 @@ ohne Spur, ohne Fehlermeldung. Behoben mit dem eigenen Volume `oly-bug-reports`
 (`deploy/hetzner/docker-compose.yml`).
 
 Damit die Meldungen den Server auch verlassen, gibt es `deploy/hetzner/push-bug-reports.sh` — dieselbe
-Mechanik wie `push-live-save.sh`: eigener Branch, `main` bleibt unberührt, kein Neu-Deploy. Der
-Cron-Installer richtet beides zusammen ein:
+Mechanik wie `push-live-save.sh`: eigener Branch, `main` bleibt unberührt, kein Neu-Deploy.
+
+**Der Cron richtet sich selbst ein.** `auto-deploy.sh` ruft bei jedem Deploy
+`install-live-save-cron.sh --ensure-only` auf — idempotent, still, und ein Fehler dabei wirft den
+Deploy nicht um. Auf dem Server ist dafür nichts zu tun.
+
+Das ist die Lehre aus dem zweiten Fehler in dieser Kette: die Cron-Zeile für die Bug-Meldungen wurde
+dem Installer hinzugefügt — aber niemand führte den Installer auf dem Server erneut aus. Dort lief
+weiter die alte Crontab mit nur dem Live-Save. Nichts schlug fehl, es passierte nur schlicht nichts,
+und die Meldungen erreichten GitHub nie. Eine neue Zeile in einem Skript, das niemand mehr aufruft,
+ist keine Änderung.
+
+Von Hand (mit sofortigem ersten Push, z. B. beim Aufsetzen eines neuen Servers):
 
 ```bash
-bash deploy/hetzner/install-live-save-cron.sh    # einmalig auf dem Server
+bash deploy/hetzner/install-live-save-cron.sh
 ```
 
 ### Lokal gespielte Runden — und warum beide Quellen sich nicht überschreiben
