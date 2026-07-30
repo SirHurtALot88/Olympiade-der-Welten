@@ -209,6 +209,7 @@ import {
   setTeamCaptain,
 } from "@/lib/morale/team-captain-service";
 import { buildPlayerMoraleAudit } from "@/lib/morale/player-morale-service";
+import type { ContractDissolutionOffer } from "@/lib/morale/contract-dissolution-service";
 import { buildTeamRivalryLedger } from "@/lib/rivalries/team-rivalries";
 import { buildTeamRelationshipCards } from "@/lib/rivalries/team-relationship-dynamics";
 import {
@@ -10518,10 +10519,110 @@ export function useFoundationShellRouterBodyScope({
   ]);
 
 
+  // --- Vertragsauflösung auf Spielerwunsch ---------------------------------
+  // Unzufriedene Spieler bieten am Season-End an, ihren Vertrag aufzulösen. Die Angebote
+  // rechnet der SERVER (Preis + wer überhaupt fragen darf), damit die Ansicht keinen
+  // veralteten Preis buchen kann.
+  const [contractDissolutionOffers, setContractDissolutionOffers] = useState<ContractDissolutionOffer[]>([]);
+  const [contractDissolutionBusyPlayerId, setContractDissolutionBusyPlayerId] = useState<string | null>(null);
+
+  const reloadContractDissolutionOffers = useCallback(async () => {
+    // Nur im Season-End-Fenster und nur fürs eigene Team — sonst gibt es nichts zu entscheiden.
+    if (!selectedTeamRosterActionsAvailable || !selectedTeam?.teamId || !activeSaveId) {
+      setContractDissolutionOffers([]);
+      return;
+    }
+    try {
+      const query = new URLSearchParams({
+        saveId: activeSaveId,
+        seasonId: gameState.season.id,
+        teamId: selectedTeam.teamId,
+      });
+      const response = await fetch(`/api/contracts/dissolution?${query.toString()}`);
+      const payload = (await response.json()) as { offers?: ContractDissolutionOffer[] };
+      setContractDissolutionOffers(payload.offers ?? []);
+    } catch {
+      // Keine Angebote statt einer halben Liste — lieber nichts anbieten als etwas Falsches.
+      setContractDissolutionOffers([]);
+    }
+  }, [activeSaveId, gameState.season.id, selectedTeam?.teamId, selectedTeamRosterActionsAvailable]);
+
+  useEffect(() => {
+    void reloadContractDissolutionOffers();
+  }, [reloadContractDissolutionOffers]);
+
+  async function decideContractDissolution(playerId: string, decision: "accepted" | "declined") {
+    if (!selectedTeam?.teamId || !activeSaveId || contractDissolutionBusyPlayerId) {
+      return;
+    }
+    setContractDissolutionBusyPlayerId(playerId);
+    try {
+      const response = await fetch("/api/contracts/dissolution", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          saveId: activeSaveId,
+          seasonId: gameState.season.id,
+          teamId: selectedTeam.teamId,
+          playerId,
+          decision,
+          source: readMeta.source,
+        }),
+      });
+      const payload = (await response.json()) as {
+        success?: boolean;
+        error?: string;
+        offers?: ContractDissolutionOffer[];
+        applied?: { playerName: string; decision: string; salePrice: number; waivedBuyout: number } | null;
+      };
+
+      setContractDissolutionOffers(payload.offers ?? []);
+
+      if (!response.ok || !payload.success || !payload.applied) {
+        setFoundationActionFeedback({
+          tone: "warning",
+          title: "Vertragsauflösung nicht möglich",
+          detail:
+            payload.error === "offer_not_available"
+              ? "Das Angebot steht nicht mehr offen — in dieser Saison wurde bereits entschieden."
+              : payload.error ?? "Die Entscheidung konnte nicht gespeichert werden.",
+        });
+        return;
+      }
+
+      const applied = payload.applied;
+      setFoundationActionFeedback({
+        tone: "success",
+        title: applied.decision === "accepted" ? "Vertrag aufgelöst" : "Auflösung abgelehnt",
+        detail:
+          applied.decision === "accepted"
+            ? `${applied.playerName} geht. Erlös ${formatTransfermarktCurrency(applied.salePrice)}${
+                applied.waivedBuyout > 0
+                  ? ` · Buyout von ${formatTransfermarktCurrency(applied.waivedBuyout)} entfällt`
+                  : ""
+              }.`
+            : `${applied.playerName} erfüllt seinen Vertrag weiter — das kostet ihn Moral. Nächste Saison darf er erneut fragen.`,
+      });
+
+      await loadSave(activeSaveId);
+    } catch {
+      setFoundationActionFeedback({
+        tone: "warning",
+        title: "Vertragsauflösung nicht möglich",
+        detail: "Die Entscheidung konnte nicht gespeichert werden.",
+      });
+    } finally {
+      setContractDissolutionBusyPlayerId(null);
+    }
+  }
+
   const foundationTeamsViewHostProps: Omit<FoundationTeamsViewHostProps, "selectedTeam"> = {
     activeView,
     selectedTeamId,
     gameState,
+    contractDissolutionOffers,
+    contractDissolutionBusyPlayerId,
+    onDecideContractDissolution: decideContractDissolution,
     tableSorts,
     seasonStandRows,
     shouldBuildDisciplineRanks,

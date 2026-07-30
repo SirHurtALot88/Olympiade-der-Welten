@@ -15,6 +15,7 @@ import { formatContractShapeShortLabel, rosterSalariesDifferForDisplay } from "@
 import { formatPlayerIdentitySubMeta } from "@/lib/foundation/player-identity-meta";
 import TeamDrawerHistoryTable from "@/components/foundation/team-drawer/TeamDrawerHistoryTable";
 import { isSeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
+import type { ContractDissolutionOffer } from "@/lib/morale/contract-dissolution-service";
 import { TEAM_BOARD_PRESSURE_TOOLTIP, TEAM_BOARD_RATING_TOOLTIP } from "@/lib/foundation/team-board-tooltips";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import {
@@ -327,6 +328,11 @@ export type FoundationTeamsDetailPanelProps = {
   setShowTeamContractPreviewRows: unknown;
   contractRenewalBusy: unknown;
   marketSellBusy?: boolean;
+  /** Spieler, die dem Team gerade anbieten, ihren Vertrag aufzulösen (Season-End). */
+  contractDissolutionOffers?: ContractDissolutionOffer[];
+  /** Spieler, dessen Entscheidung gerade geschrieben wird — sperrt nur dessen Knöpfe. */
+  contractDissolutionBusyPlayerId?: string | null;
+  onDecideContractDissolution?: (playerId: string, decision: "accepted" | "declined") => void | Promise<void>;
   openContractRenewalNegotiation: unknown;
   openMarketSellModal: unknown;
   openPlayerDrawerById: unknown;
@@ -456,6 +462,9 @@ function FoundationTeamsDetailPanel({
   setShowTeamContractPreviewRows,
   contractRenewalBusy,
   marketSellBusy = false,
+  contractDissolutionOffers = [],
+  contractDissolutionBusyPlayerId = null,
+  onDecideContractDissolution,
   openContractRenewalNegotiation,
   openMarketSellModal,
   openPlayerDrawerById,
@@ -708,6 +717,83 @@ function FoundationTeamsDetailPanel({
   return (
     <div className="foundation-teams-view-panel" data-testid="foundation-teams-view" data-team-tab={selectedTeamDetailTab}>
             <>
+              {/* Vertragsauflösung auf Spielerwunsch. Steht ÜBER dem Kader, weil sie eine
+                  Frist hat: wer nicht entscheidet, behält den Spieler samt seiner Unzufriedenheit.
+                  Die Liste kommt vom Server — Preis und Anspruch werden dort gerechnet, damit die
+                  Ansicht keinen veralteten Preis buchen kann. */}
+              {rosterActionsEnabled && contractDissolutionOffers.length > 0 ? (
+                <section
+                  className="panel team-focus-panel"
+                  id="team-focus-dissolution"
+                  data-testid="teams-contract-dissolution"
+                >
+                  <div className="panel-header">
+                    <div>
+                      <h3>Vertragsauflösung auf Spielerwunsch</h3>
+                      <p className="muted">
+                        Diese Spieler bieten an, ihren Vertrag aufzulösen. Nimmst du an, kassierst du den vollen
+                        Verkaufspreis und der Rest-Buyout entfällt — den Zeitpunkt suchst du dir aber nicht aus.
+                        Lehnst du ab, erfüllt der Spieler seinen Vertrag und verliert weiter Moral.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="teams-dissolution-list">
+                    {contractDissolutionOffers.map((offer) => {
+                      const busy = contractDissolutionBusyPlayerId === offer.playerId;
+                      const anyBusy = contractDissolutionBusyPlayerId != null;
+                      return (
+                        <li key={offer.playerId} className="teams-dissolution-item">
+                          <div className="teams-dissolution-identity">
+                            <button
+                              type="button"
+                              className="nl-teams-playerlink is-inline"
+                              onClick={() => void openPlayerDrawerById(offer.playerId)}
+                              title={`${offer.playerName} öffnen`}
+                            >
+                              {offer.playerName}
+                            </button>
+                            <small className="muted">
+                              Moral {formatNlNumber(offer.morale, 1)} · Restlaufzeit {offer.remainingContractLength}{" "}
+                              {offer.remainingContractLength === 1 ? "Saison" : "Saisons"}
+                              {offer.previouslyDeclined ? " · hat schon einmal gefragt" : ""}
+                            </small>
+                          </div>
+                          <div className="teams-dissolution-money nl-tnum">
+                            <span title="Was das Team bei Annahme bekommt.">
+                              Erlös <strong>{formatNlMoney(offer.salePrice)}</strong>
+                            </span>
+                            {offer.waivedBuyout > 0 ? (
+                              <small className="muted" title="Rest-Buyout, der bei Annahme entfällt.">
+                                Buyout {formatNlMoney(offer.waivedBuyout)} entfällt
+                              </small>
+                            ) : null}
+                          </div>
+                          <div className="teams-dissolution-actions">
+                            <button
+                              type="button"
+                              className="nl-teams-action"
+                              disabled={busy || anyBusy}
+                              onClick={() => void onDecideContractDissolution?.(offer.playerId, "accepted")}
+                              title="Der Spieler geht, das Team kassiert den Verkaufspreis."
+                            >
+                              {busy ? "…" : "Auflösen"}
+                            </button>
+                            <button
+                              type="button"
+                              className="nl-teams-action nl-teams-action-danger"
+                              disabled={busy || anyBusy}
+                              onClick={() => void onDecideContractDissolution?.(offer.playerId, "declined")}
+                              title="Der Spieler bleibt und erfüllt seinen Vertrag — kostet ihn Moral."
+                            >
+                              {busy ? "…" : "Ablehnen"}
+                            </button>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              ) : null}
               <section className="panel team-focus-panel teams-primary-roster-panel" id="team-focus-roster">
                 <div className="panel-header team-focus-header">
                   <div className="team-focus-title-wrap">
