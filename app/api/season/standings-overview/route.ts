@@ -9,6 +9,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import { resolveLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import { resolveSessionOwnerId } from "@/lib/auth/session";
 import { readStandingsOverviewCache, writeStandingsOverviewCache } from "@/lib/season/standings-overview-cache";
+import { getLeagueSponsorIncome } from "@/lib/season/prize-money-preview";
 import { buildArchivedSeasonStandingsOverviewItems } from "@/lib/season/archived-standings-overview";
 import { buildTeamPrizeSummary } from "@/lib/season/prize-money";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
@@ -308,6 +309,29 @@ export async function GET(request: Request) {
           })()
         : null;
 
+    // Echte Saisonende-Einnahmen je Team (Sponsoren beim aktuellen Rang + Gebaeude netto) —
+    // dieselbe Quelle, aus der auch gebucht wird.
+    const localSponsorIncome =
+      source === "sqlite" ? getLeagueSponsorIncome(localSave!.gameState, localSave!.saveId) : null;
+    const localSalaryTotalByTeamId =
+      source === "sqlite"
+        ? (() => {
+            const playerById = new Map(localSave!.gameState.players.map((player) => [player.id, player] as const));
+            return new Map(
+              localSave!.gameState.teams.map((team) => [
+                team.teamId,
+                localSave!.gameState.rosters
+                  .filter((entry) => entry.teamId === team.teamId)
+                  .reduce(
+                    (sum, entry) =>
+                      sum + (resolvePlayerEconomyContract({ player: playerById.get(entry.playerId), rosterEntry: entry }).salary ?? 0),
+                    0,
+                  ),
+              ] as const),
+            );
+          })()
+        : null;
+
     const localPrizeSummaryByTeamId =
       source === "sqlite"
         ? (() => {
@@ -379,6 +403,9 @@ export async function GET(request: Request) {
               const startRank = hasCurrentPoints ? standing?.startplatz ?? budgetStartRank : budgetStartRank;
               const displayRank = hasCurrentPoints ? standing?.rank ?? startRank : budgetStartRank;
               const prizeSummary = localPrizeSummaryByTeamId?.get(team.teamId) ?? null;
+              const liveSponsorCash = localSponsorIncome?.sponsorCashByTeamId.get(team.teamId) ?? null;
+              const liveFacilityIncome = localSponsorIncome?.facilityIncomeByTeamId.get(team.teamId) ?? null;
+              const teamSalaryTotal = localSalaryTotalByTeamId?.get(team.teamId) ?? 0;
               return {
                 teamId: team.teamId,
                 teamName: team.name,
@@ -391,8 +418,29 @@ export async function GET(request: Request) {
                 rankDiff: standing?.rankDiff ?? prizeSummary?.rankDiff ?? null,
                 sponsorBasis: standing?.sponsorBasis ?? prizeSummary?.basis ?? null,
                 sponsorRank: standing?.sponsorRank ?? prizeSummary?.placementBonus ?? null,
-                sponsorTotal: standing?.sponsorTotal ?? prizeSummary?.sponsorTotal ?? null,
-                guv: standing?.guv ?? prizeSummary?.profitLoss ?? null,
+                /**
+                 * SPONSOREN UND GUV KOMMEN AUS DER ECHTEN ABRECHNUNG, nicht aus dem
+                 * Preisgeld.
+                 *
+                 * Beide Vorgaenger-Quellen rechneten mit dem Preisgeld-Benchmark, der
+                 * nie ausgezahlt wird: der persistierte `standing` (geschrieben vom
+                 * Saisonende-Schritt in seiner alten Fassung) und `prizeSummary`
+                 * (`buildTeamPrizeSummary` ueber `buildPrizeMoneyTable`). Fuer C-C
+                 * standen dort 70,1 Sponsoren und +27,6 GuV, waehrend die Abrechnung
+                 * 48,1 gegen 42,5 Gehaelter buchte.
+                 *
+                 * `getLeagueSponsorIncome` liefert dieselbe Sponsor-Abrechnung beim
+                 * aktuellen Rang, die auch `applySponsorSettlement` gutschreibt, plus
+                 * die Gebaeude netto. Sie hat Vorrang vor dem gespeicherten Stand —
+                 * sonst zeigte ein Spielstand, der den Schritt frueher ausgefuehrt hat,
+                 * fuer immer die alten Zahlen.
+                 */
+                sponsorTotal:
+                  liveSponsorCash ?? standing?.sponsorTotal ?? prizeSummary?.sponsorTotal ?? null,
+                guv:
+                  liveSponsorCash != null
+                    ? Number((liveSponsorCash + (liveFacilityIncome ?? 0) - teamSalaryTotal).toFixed(2))
+                    : standing?.guv ?? prizeSummary?.profitLoss ?? null,
                 cashTotal: standing?.cashTotal ?? prizeSummary?.cashTotal ?? null,
                 form: null,
                 transfers: prizeSummary?.transfers ?? null,
