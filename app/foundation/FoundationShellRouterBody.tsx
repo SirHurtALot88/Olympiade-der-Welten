@@ -390,6 +390,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   foundationWarningInboxItems,
   freshSeasonStartMessage,
   gameFlowActionStep,
+  matchdayAdvanceStep,
   gameModeOwnershipChrisIds,
   gameModeOwnershipLimits,
   gameState,
@@ -2598,7 +2599,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                         verschwand der Knopf dadurch komplett, und der Spieltag liess sich aus dem
                         normalen Spielverlauf nicht mehr abschliessen. `canAdvanceMatchdayFromStep`
                         deckt beide Zustaende ab und wird auch vom globalen "Weiter" benutzt. */}
-                    {canAdvanceMatchdayFromStep(gameFlowActionStep) ? (
+                    {canAdvanceMatchdayFromStep(matchdayAdvanceStep) ? (
                       <button
                         className="primary-button inline-button"
                         type="button"

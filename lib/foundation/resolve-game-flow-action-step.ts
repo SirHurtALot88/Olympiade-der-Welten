@@ -23,7 +23,8 @@ function isReadyLike(step: GameFlowStep) {
  *
  * Beide benutzen jetzt diese Funktion, damit die Bedingung nicht wieder auseinanderlaeuft.
  */
-export function canAdvanceMatchdayFromStep(step: Pick<GameFlowStep, "stepId" | "status">) {
+export function canAdvanceMatchdayFromStep(step: Pick<GameFlowStep, "stepId" | "status"> | null | undefined) {
+  if (!step) return false;
   return step.stepId === "advance_to_next_matchday" && (step.status === "ready" || step.status === "warning");
 }
 
@@ -45,14 +46,34 @@ export function resolveGameFlowActionStep(
   }
 
   const advanceStep = readyLike.find((step) => step.stepId === "advance_to_next_matchday");
-  const nonAdvanceReady = readyLike.filter((step) => step.stepId !== "advance_to_next_matchday");
+  const nonAdvance = readyLike.filter((step) => step.stepId !== "advance_to_next_matchday");
 
-  if (nonAdvanceReady.length > 0) {
-    return nonAdvanceReady[0]!;
+  /**
+   * EIN BLOCKIERTER SCHRITT DARF DEN SPIELTAGSWECHSEL NICHT VERDRAENGEN.
+   *
+   * `isReadyLike` fasst ready, warning UND blocked zusammen — als "steht noch offen". Fuer die
+   * Reihenfolge ist das zu grob: vorher gewann JEDER Nicht-Advance-Schritt aus dieser Menge, auch
+   * ein blockierter. Nach einem Spieltag ist aber regelmaessig etwas blockiert, das erst der naechste
+   * Spieltag freigibt (Aufstellung, Spieltagsvorschau). Damit wurde "Zum naechsten Spieltag" nie zum
+   * Aktionsschritt — und der "Spieltag abschliessen"-Knopf, der daran haengt, erschien nie. Aus dem
+   * normalen Spielverlauf gab es keinen Weg mehr weiter.
+   *
+   * Auf einen blockierten Schritt kann man ohnehin nicht handeln. Er darf einen handlungsfaehigen
+   * Wechsel deshalb nicht schlagen. Die dokumentierte Absicht ("prefers non-advance READY steps
+   * before advance") bleibt unveraendert — nur "blocked" zaehlt hier nicht mehr mit.
+   */
+  const nonAdvanceActionable = nonAdvance.filter((step) => step.status !== "blocked");
+
+  if (nonAdvanceActionable.length > 0) {
+    return nonAdvanceActionable[0]!;
   }
 
   if (advanceStep) {
     return advanceStep;
+  }
+
+  if (nonAdvance.length > 0) {
+    return nonAdvance[0]!;
   }
 
   if (optional.length > 0) {

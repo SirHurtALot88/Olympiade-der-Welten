@@ -224,6 +224,19 @@ export function useFoundationCrossTabGameFlow(input: {
     return resolveGameFlowActionStep(actionableSteps, fallbackStep, acknowledgedFlowStepIds);
   }, [acknowledgedFlowStepIds, gameFlowState]);
 
+  /**
+   * Der Spieltagswechsel-Schritt SELBST — unabhaengig davon, was der Flow-Coach gerade empfiehlt.
+   *
+   * Der "Spieltag abschliessen"-Knopf im Spieltagsergebnis hing am Aktionsschritt. Das ist die
+   * falsche Frage: der Knopf soll erscheinen, wenn der Wechsel MOEGLICH ist, nicht wenn er gerade
+   * empfohlen wird. Empfiehlt der Coach etwas anderes (optionale Gebaeude, offene Quittierung),
+   * verschwand der Knopf, obwohl beide Disziplinen gewertet waren.
+   */
+  const matchdayAdvanceStep = useMemo(
+    () => gameFlowState.steps.find((entry) => entry.stepId === "advance_to_next_matchday") ?? null,
+    [gameFlowState],
+  );
+
   const matchdayArenaReadiness = useMemo(
     () => getMatchdayArenaReadiness(input.gameState, input.activeManagerTeamId),
     [input.activeManagerTeamId, input.gameState],
@@ -425,6 +438,7 @@ export function useFoundationCrossTabGameFlow(input: {
     focusMatchdayLoop,
     inboxPrimaryTeamItem,
     gameFlowActionStep,
+    matchdayAdvanceStep,
     matchdayArenaReadiness,
     matchdayArenaBlockerSummary,
     transferWindowHint,

@@ -64,6 +64,47 @@ describe("Spieltagswechsel — das Gate laesst niemanden mehr haengen", () => {
    * Wenn das Gate ihn dann ablehnt, zeigt die Oberflaeche einen Aktionsschritt an, den niemand
    * ausloesen kann — exakt die gemeldete Blockade.
    */
+  it("null/undefined sperrt (der Schritt kann fehlen)", () => {
+    expect(canAdvanceMatchdayFromStep(null)).toBe(false);
+    expect(canAdvanceMatchdayFromStep(undefined)).toBe(false);
+  });
+
+  /**
+   * DIE ZWEITE, EIGENTLICHE URSACHE. `isReadyLike` fasst ready, warning UND blocked als "steht noch
+   * offen" zusammen. Fuer die Reihenfolge war das zu grob: JEDER Nicht-Advance-Schritt aus dieser
+   * Menge gewann, auch ein blockierter. Nach einem Spieltag ist aber regelmaessig etwas blockiert,
+   * das erst der naechste Spieltag freigibt — "Zum naechsten Spieltag" wurde damit nie zum
+   * Aktionsschritt, und der Knopf daran erschien nie.
+   */
+  it("ein BLOCKIERTER anderer Schritt verdraengt den Wechsel nicht mehr", () => {
+    const advance = step({ status: "ready" });
+    const blockedOther = step({ stepId: "set_lineup", status: "blocked", blockers: ["missing_lineup"] });
+    const resolved = resolveGameFlowActionStep([blockedOther, advance], blockedOther, new Set());
+    expect(resolved.stepId).toBe("advance_to_next_matchday");
+    expect(canAdvanceMatchdayFromStep(resolved)).toBe(true);
+  });
+
+  it("ein HANDLUNGSFAEHIGER anderer Schritt geht weiterhin vor (unveraenderte Absicht)", () => {
+    const advance = step({ status: "ready" });
+    const readyOther = step({ stepId: "open_season_standings", status: "ready" });
+    expect(resolveGameFlowActionStep([advance, readyOther], advance, new Set()).stepId).toBe("open_season_standings");
+  });
+
+  /**
+   * Und der Knopf selbst haengt nicht mehr am Aktionsschritt: er soll erscheinen, wenn der Wechsel
+   * MOEGLICH ist, nicht wenn der Flow-Coach ihn gerade empfiehlt. Deshalb wird er ueber den
+   * Wechsel-Schritt gegatet (matchdayAdvanceStep), nicht ueber gameFlowActionStep.
+   */
+  it("der Wechsel bleibt moeglich, auch wenn der Coach etwas anderes empfiehlt", () => {
+    const advance = step({ status: "ready" });
+    const readyOther = step({ stepId: "open_season_standings", status: "ready" });
+    const actionStep = resolveGameFlowActionStep([advance, readyOther], advance, new Set());
+    // Der Coach empfiehlt den Saisonstand …
+    expect(canAdvanceMatchdayFromStep(actionStep)).toBe(false);
+    // … der Knopf richtet sich aber nach dem Wechsel-Schritt selbst.
+    expect(canAdvanceMatchdayFromStep(advance)).toBe(true);
+  });
+
   it("was der Resolver zum Aktionsschritt macht, muss das Gate auch zulassen", () => {
     for (const status of ["ready", "warning"] as const) {
       const advance = step({ status });
