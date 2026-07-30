@@ -633,13 +633,26 @@ export function calculateFormModifierForSide(input: {
 } {
   const selection = getModifierSelectionForSide(input.modifiers, input.disciplineSide);
   const selectedIds = [selection.primaryFormCardId, selection.secondaryFormCardId].filter((value): value is string => Boolean(value));
-  const selectedCards = selectedIds
+  const foundCards = selectedIds
     .map((cardId) => input.formCards.find((card) => card.id === cardId) ?? null)
     .filter((card): card is LegacyFormCardOption => Boolean(card));
 
+  // `isUsed` heisst: diese Karte ist bereits in einer ANDEREN Aufstellung verbraucht
+  // (`getTeamFormCardOptions` schliesst die eigene Lineup-ID aus). Eine dort gespielte
+  // Karte darf hier weder Punkte bringen noch als Chip erscheinen — sonst zaehlt
+  // dieselbe Karte zweimal, und die Wertung weist einen Formkarten-Einsatz aus, den es
+  // an diesem Spieltag gar nicht gab. Bleibt eine solche ID im Draft liegen, wird sie
+  // hier still ignoriert statt nachtraeglich gebucht.
+  const selectedCards = foundCards.filter((card) => !card.isUsed);
+
   const warnings: string[] = [];
-  if (selectedIds.length !== selectedCards.length) {
+  if (selectedIds.length !== foundCards.length) {
     warnings.push(`Eine ausgewählte Formkarte für ${input.disciplineSide.toUpperCase()} konnte nicht geladen werden.`);
+  }
+  if (foundCards.length !== selectedCards.length) {
+    warnings.push(
+      `Eine Formkarte für ${input.disciplineSide.toUpperCase()} ist bereits an einem anderen Spieltag gespielt worden und zählt hier nicht.`,
+    );
   }
   if (selectedCards.length > 1 && selectedCards[1] && selectedCards[1].value < 0) {
     warnings.push(`Die zweite Formkarte auf ${input.disciplineSide.toUpperCase()} darf nicht negativ sein.`);
