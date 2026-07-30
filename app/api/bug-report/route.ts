@@ -48,6 +48,9 @@ export async function POST(request: Request) {
       // Gedeckelt, weil der Titel aus dem Browser kommt und beliebig lang sein kann.
       pageTitle: typeof body.pageTitle === "string" ? body.pageTitle.slice(0, 300) : null,
       url: typeof body.url === "string" ? body.url : null,
+      // Der Spielstand, auf den der Browser schaut. Verlaesslicher als der globale Aktiv-Zeiger,
+      // der bei zwei Spielern regelmaessig dem jeweils anderen gehoert.
+      saveId: typeof body.saveId === "string" ? body.saveId : null,
       // Der Client schickt seinen User-Agent nicht mit; der Header ist die verlaessliche Quelle.
       userAgent: request.headers.get("user-agent"),
       viewport,

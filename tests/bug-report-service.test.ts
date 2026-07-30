@@ -18,6 +18,8 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const activeSave = { saveId: "save-1", name: "Testspiel" };
+/** Der Save des ANDEREN Spielers — auf den zeigt der globale Aktiv-Zeiger genauso oft. */
+const fremderSave = { saveId: "save-franky", name: "Frankys Spiel" };
 const gameState = {
   season: { id: "season-3", year: 3, currentMatchday: 7 },
   matchdayState: { matchdayId: "matchday-7", status: "resolved" },
@@ -31,12 +33,20 @@ const gameState = {
   },
 };
 
+/**
+ * Der Mock bildet die Lage auf dem echten Server nach: Es gibt einen GLOBALEN Aktiv-Zeiger, der auf
+ * Frankys Save zeigt, und daneben einen besitzerbezogenen. Wer den globalen nimmt, bekommt den
+ * falschen — genau das ist in Produktion passiert.
+ */
 vi.mock("@/lib/persistence/persistence-service", () => ({
   createPersistenceService: () => ({
-    getActiveSave: () => activeSave,
-    getSaveById: () => ({ gameState }),
+    getActiveSave: (ownerId?: string) => (ownerId === "user_local" ? activeSave : fremderSave),
+    getSaveById: (saveId: string) =>
+      saveId === "save-1" || saveId === "save-franky" ? { saveId, gameState } : null,
   }),
 }));
+
+const CHRIS = { username: "chris", displayName: "Chris", ownerId: "user_local", source: "session" } as const;
 
 let workdir = "";
 let cwdSpy: ReturnType<typeof vi.spyOn> | null = null;
@@ -68,7 +78,7 @@ describe("Bug-Meldung — der Zustand wird mitgeschrieben", () => {
   /** DER KERN: ohne diese Felder ist die Meldung nicht nachstellbar. */
   it("reichert Saison, Spieltag und Spielstand aus dem aktiven Save an", async () => {
     const { saveBugReport } = await importService();
-    const { record } = saveBugReport({ note: "x" });
+    const { record } = saveBugReport({ note: "x", reporter: CHRIS });
     expect(record.game).toMatchObject({
       saveId: "save-1",
       saveName: "Testspiel",
@@ -86,7 +96,7 @@ describe("Bug-Meldung — der Zustand wird mitgeschrieben", () => {
    */
   it("findet das gefuehrte Team ueber teamControlSettings, nicht ueber team.controlMode", async () => {
     const { saveBugReport } = await importService();
-    const { record } = saveBugReport({});
+    const { record } = saveBugReport({ reporter: CHRIS });
     expect(record.game?.activeTeamIds).toEqual(["C-C"]);
     // Gegenprobe zur Abgrenzung: ai und passive gehoeren NICHT dazu.
     expect(record.game?.activeTeamIds).not.toContain("A-A");
@@ -220,6 +230,53 @@ describe("Bug-Meldung — wer gemeldet hat", () => {
     const { record } = saveBugReport({ note: "x" });
     expect(record.reporter).not.toBeUndefined();
     expect(record.reporter.username).toBeNull();
+  });
+});
+
+/**
+ * DER TEUERSTE FEHLER DIESER DATEI — er ist in Produktion aufgetreten und hat Diagnosen verdorben.
+ *
+ * Der erste Entwurf nahm den GLOBALEN Aktiv-Zeiger (`getActiveSave()` ohne Besitzer). Auf einem
+ * Server mit zwei Spielern in getrennten Saves ist das der zuletzt gesetzte Zeiger — also mit
+ * gleicher Wahrscheinlichkeit der des anderen. Zwei echte Meldungen von Chris (Save ...8d7mdx,
+ * Team C-C) trugen dadurch Frankys Save und dessen Team T-G. Die darauf gestuetzte Untersuchung kam
+ * bei beiden Meldungen zu einem falschen Ergebnis, und zwar zu einem plausibel klingenden.
+ *
+ * Ein falscher Zustand ist schlimmer als gar keiner: fehlt er, sieht man es und fragt nach.
+ */
+describe("Bug-Meldung — der Spielstand gehoert dem Melder, nicht dem Server", () => {
+  it("nimmt die saveId aus der URL, wenn der Client sie mitschickt", async () => {
+    const { saveBugReport } = await importService();
+    const { record } = saveBugReport({ saveId: "save-1", reporter: CHRIS });
+    expect(record.game?.saveId).toBe("save-1");
+  });
+
+  /** Ohne saveId: der aktive Save DES MELDERS, nicht der globale Zeiger. */
+  it("faellt auf den besitzerbezogenen Aktiv-Save zurueck, nicht auf den globalen", async () => {
+    const { saveBugReport } = await importService();
+    const { record } = saveBugReport({ reporter: CHRIS });
+    expect(record.game?.saveId).toBe("save-1");
+    // Die Gegenprobe ist der eigentliche Test: der globale Zeiger zeigt hier auf Frankys Save.
+    expect(record.game?.saveId).not.toBe("save-franky");
+  });
+
+  /**
+   * Die mitgeschickte saveId schlaegt den Aktiv-Zeiger — auch wenn beide gesetzt sind. Wer auf
+   * einen aelteren Spielstand schaut, meldet einen Fehler in DIESEM, nicht im zuletzt geoeffneten.
+   */
+  it("die mitgeschickte saveId gewinnt gegen den Aktiv-Zeiger", async () => {
+    const { saveBugReport } = await importService();
+    const { record } = saveBugReport({ saveId: "save-franky", reporter: CHRIS });
+    expect(record.game?.saveId).toBe("save-franky");
+  });
+
+  /** Ohne Login gibt es nur einen Spieler — dann ist der globale Zeiger richtig und muss greifen. */
+  it("ohne Login bleibt der globale Zeiger die Quelle", async () => {
+    const { saveBugReport } = await importService();
+    const { record } = saveBugReport({
+      reporter: { username: null, displayName: null, ownerId: null, source: "auth_disabled" },
+    });
+    expect(record.game?.saveId).toBe("save-franky");
   });
 
   it("listet die neuesten Meldungen zuerst", async () => {

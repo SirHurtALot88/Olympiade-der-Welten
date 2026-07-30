@@ -40,6 +40,12 @@ export type BugReportInput = {
   clientTime?: string | null;
   /** Wer gemeldet hat. Kommt aus dem Session-Cookie und wird NUR von der Route gesetzt. */
   reporter?: BugReportReporter | null;
+  /**
+   * Der Spielstand, auf den der Browser gerade schaut (aus der URL). Die verlaesslichste Quelle —
+   * siehe `collectGameContext`: der globale Aktiv-Zeiger gehoert bei zwei Spielern regelmaessig
+   * dem jeweils anderen.
+   */
+  saveId?: string | null;
 };
 
 /**
@@ -133,14 +139,29 @@ function resolvePage(input: BugReportInput): BugReportPage {
 }
 
 /**
- * Zustand des aktiven Spielstands. Bewusst tolerant: laeuft die Meldung ausserhalb eines Spiels
- * (Login-Seite, kein Save aktiv), bleibt `game` null — eine Meldung ohne Spielkontext ist immer noch
- * besser als keine.
+ * Zustand des Spielstands, in dem der MELDER gerade steckte. Bewusst tolerant: laeuft die Meldung
+ * ausserhalb eines Spiels (Login-Seite, kein Save aktiv), bleibt `game` null — eine Meldung ohne
+ * Spielkontext ist immer noch besser als keine.
+ *
+ * DIE REIHENFOLGE IST DER GANZE PUNKT. Der erste Entwurf nahm ohne Umschweife
+ * `getActiveSave()` — den GLOBALEN Zeiger, ohne Besitzer. Auf einem Server mit zwei Spielern in
+ * getrennten Saves ist das schlicht der zuletzt gesetzte Zeiger, also mit gleicher
+ * Wahrscheinlichkeit der des ANDEREN. Der Schaden war nicht theoretisch: zwei Meldungen von Chris
+ * (Save ...8d7mdx, Team C-C) trugen Frankys Save ...h0z7cl und dessen Team T-G — und die darauf
+ * gestuetzte Diagnose lag bei beiden Meldungen falsch, in eine plausibel klingende Richtung. Ein
+ * falscher Zustand ist schlimmer als gar keiner: fehlt er, sieht man es und fragt nach.
+ *
+ * Deshalb:
+ *   1. Die vom Client mitgeschickte `saveId` — der Browser weiss am genauesten, worauf er schaut.
+ *   2. Sonst der aktive Save DES MELDERS (`getActiveSave(ownerId)`, besitzerbezogen).
+ *   3. Nur ohne Login der globale Zeiger — dann gibt es genau einen Spieler und keine Verwechslung.
  */
-function collectGameContext(): BugReportRecord["game"] {
+function collectGameContext(input: BugReportInput): BugReportRecord["game"] {
   try {
     const persistence = createPersistenceService();
-    const active = persistence.getActiveSave();
+    const ownerId = input.reporter?.ownerId ?? null;
+    const explicit = input.saveId?.trim() || null;
+    const active = explicit ? persistence.getSaveById(explicit) : persistence.getActiveSave(ownerId ?? undefined);
     if (!active) return null;
     const full = persistence.getSaveById(active.saveId);
     const gameState = full?.gameState ?? null;
@@ -175,7 +196,7 @@ export function saveBugReport(input: BugReportInput): { reportId: string; file: 
     createdAt: now.toISOString(),
     reporter: input.reporter ?? UNKNOWN_REPORTER,
     page: resolvePage(input),
-    game: collectGameContext(),
+    game: collectGameContext(input),
   };
   fs.mkdirSync(BUG_REPORTS_DIR, { recursive: true });
   const file = path.join(BUG_REPORTS_DIR, `${record.reportId}.json`);

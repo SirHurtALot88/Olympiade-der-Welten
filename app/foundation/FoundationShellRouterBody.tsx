@@ -2640,7 +2640,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               viewMode={seasonStandingsMode}
               onViewModeChange={setSeasonStandingsMode}
               onOpenRanks={() => setFoundationView("ranks", setActiveView)}
-              onOpenPrize={() => openPrizeFinanceView({ tab: "prize" })}
+              // Der Knopf heisst "Sponsoren" (SeasonStandingsNewLook.tsx) — er muss auch dorthin
+              // fuehren. Bis hierher zwang er die Preisgeld-Ansicht auf, die weder Namen noch
+              // Seltenheit zeigt, und aus der es seit dem Wegfall des Umschalters keinen Rueckweg gab.
+              onOpenPrize={() => openPrizeFinanceView()}
             />
           ) : null}
 

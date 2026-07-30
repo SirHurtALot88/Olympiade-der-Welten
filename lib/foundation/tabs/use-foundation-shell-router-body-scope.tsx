@@ -2939,33 +2939,27 @@ export function useFoundationShellRouterBodyScope({
     scrollToFoundationTarget(tab === "prize" ? "prize-money" : "sponsor-choice");
   }
 
-  function resolvePrizeFinanceTabFromPanel(panel?: string | null): "sponsors" | "prize" {
-    if (panel === "sponsor-choice" || panel === "sponsors" || panel === "sponsor") {
-      return "sponsors";
-    }
-    return "prize";
+  function navigateToPrizeFinanceViewFromRouting(_panel?: string | null, push = false) {
+    openPrizeFinanceView({ push });
   }
 
-  function navigateToPrizeFinanceViewFromRouting(panel?: string | null, push = false) {
-    openPrizeFinanceView({ tab: resolvePrizeFinanceTabFromPanel(panel), push });
-  }
-
-  function openPrizeFinanceView(options?: { tab?: "sponsors" | "prize"; push?: boolean }) {
-    const urlTab = typeof window !== "undefined" ? parseFoundationTabFromUrl() : null;
-    const needsSponsorChoice = Boolean(selectedTeam && selectedTeamCanManage && !selectedTeamSponsorContract);
-    const nextTab =
-      options?.tab ??
-      (urlTab === "preisgeld" || urlTab === "prize"
-        ? "prize"
-        : urlTab === "sponsors" || urlTab === "sponsor"
-          ? "sponsors"
-          : needsSponsorChoice
-            ? "sponsors"
-            : "prize");
-    setPrizeFinanceTab(nextTab);
+  /**
+   * Fuehrt IMMER auf die Sponsorenuebersicht — es gibt keine zweite Unteransicht mehr.
+   *
+   * Vorher nahm diese Funktion ein `tab` entgegen und liess ausserdem ein "preisgeld" aus der URL
+   * gewinnen. Beides zusammen war eine Falle: die Zahlen-Ansicht zeigt weder Sponsorennamen noch
+   * Seltenheit, und seit der Umschalter zwischen den Unteransichten entfernt wurde, gab es von dort
+   * keinen Rueckweg. Der Knopf "Sponsoren" im Saisonstand fuehrte genau dorthin — gemeldet als
+   * "ich sehe hier nicht mehr die sponsoren die die anderen teams haben".
+   *
+   * Der Parameter ist bewusst ganz entfernt und nicht nur ignoriert: sonst baut ihn irgendwann
+   * jemand mit `tab: "prize"` wieder ein, und die Falle ist zurueck.
+   */
+  function openPrizeFinanceView(options?: { push?: boolean }) {
+    setPrizeFinanceTab("sponsors");
     setFoundationView("prize", setActiveView, { push: options?.push ?? true });
-    syncFoundationViewInUrl("prize", nextTab === "prize" ? "preisgeld" : "sponsors");
-    scrollToFoundationTarget(nextTab === "prize" ? "prize-money" : "sponsor-choice");
+    syncFoundationViewInUrl("prize", "sponsors");
+    scrollToFoundationTarget("sponsor-choice");
   }
 
   function openTrainingPlayerTarget(playerId: string, target: "training" | "upgrade" = "training") {
@@ -6064,7 +6058,7 @@ export function useFoundationShellRouterBodyScope({
       return;
     }
     if (targetPanel === "sponsor-choice") {
-      openPrizeFinanceView({ tab: "sponsors", push: false });
+      openPrizeFinanceView({ push: false });
       setShowGameFlowPanel(false);
       return;
     }
@@ -6342,7 +6336,7 @@ export function useFoundationShellRouterBodyScope({
     }
 
     if (stepId === "choose_sponsor") {
-      openPrizeFinanceView({ tab: "sponsors" });
+      openPrizeFinanceView();
       return;
     }
 
@@ -6560,7 +6554,11 @@ export function useFoundationShellRouterBodyScope({
     }
     const targetView = resolveFoundationViewTarget(view);
     if (targetView === "prize") {
-      openPrizeFinanceView({ tab: "prize" });
+      // "sponsors", nicht "prize": Preisgeld wird nicht mehr ausgezahlt, und der Umschalter
+      // zwischen beiden Unteransichten ist entfernt (FoundationShellRouterBody.tsx, activeView
+      // === "prize"). Wer hier auf der Zahlen-Ansicht landete, kam nicht mehr zur
+      // Sponsorenuebersicht zurueck — genau das wurde gemeldet.
+      openPrizeFinanceView();
       return;
     }
     if (targetView === "homeV2") {
