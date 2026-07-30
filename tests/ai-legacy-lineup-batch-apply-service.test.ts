@@ -298,8 +298,15 @@ describe("AI legacy lineup form-card planning", () => {
       { disciplineId: "spurt", disciplineSide: "d2", slotIndex: 0, playerId: "p-red-b", activePlayerId: "a2" },
     ]);
 
-    expect(modifiers.d1.primaryFormCardId).toBe("negative-red-a");
-    expect(modifiers.d2.primaryFormCardId).toBe("negative-red-b");
+    // Beide Minuskarten fallen — darum geht es hier. WELCHE auf welche Seite geht, hat der
+    // Saisonplan gedreht, und zwar zugunsten des Teams: d1 ist TDM (rot, 2 Spieler), d2 ist
+    // Spurt (grün, 2 Spieler), beide Karten sind ROT. Früher landete die dicke `-8` auf der
+    // farbgleichen roten Seite und verdoppelte dort ihren Malus: −8×2×2 = −32 plus −4×1×2 = −8,
+    // zusammen −40. Der Plan versteckt die `-8` stattdessen auf der farbfremden grünen Seite
+    // (−8×1×2 = −16) und nimmt die Farbverdopplung nur für die kleine `-4` in Kauf
+    // (−4×2×2 = −16) — zusammen −32 statt −40.
+    expect(modifiers.d1.primaryFormCardId).toBe("negative-red-b");
+    expect(modifiers.d2.primaryFormCardId).toBe("negative-red-a");
     expect(modifiers.d1.secondaryFormCardId).toBeNull();
     expect(modifiers.d2.secondaryFormCardId).toBeNull();
   });
