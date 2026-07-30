@@ -244,6 +244,11 @@ export function prefetchMatchdayArenaBase(input: {
    */
   includeDetails?: boolean;
   /**
+   * Stand der Aufstellungen (siehe `buildMatchdayLineupRevision`). Geht in den Session-Key ein,
+   * damit ein vorgeholtes Bundle eine spaetere Aenderung an den Aufstellungen nicht ueberlebt.
+   */
+  lineupRevision?: string;
+  /**
    * Sofort statt im Idle-Slot laden — für den Lineup→Arena-Übergang, wo die Zeit knapp ist.
    * Nur dann wird ein Promise zurückgegeben, auf das der Aufrufer warten kann.
    */
@@ -265,6 +270,7 @@ export function prefetchMatchdayArenaBase(input: {
     teamId: input.teamId,
     source,
     includeDetails,
+    lineupRevision: input.lineupRevision,
   });
   if (prefetchedMatchdayArenaBaseKeys.has(sessionKey) || getMatchdayArenaBaseBundle(sessionKey)) {
     return;

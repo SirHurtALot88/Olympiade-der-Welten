@@ -62,6 +62,7 @@ import { NlAbilityStars } from "@/components/foundation/velo-ui";
 import PlayerHeroNewLook from "./PlayerHeroNewLook";
 import { buildPlayerCareerSeries } from "@/lib/foundation/career-series";
 import { useFoundationStateOptional } from "@/lib/foundation/foundation-state-context";
+import { selectMovedDisciplines } from "@/lib/foundation/player-discipline-training-forecast";
 
 function formatValue(value: number | null | undefined, digits = 0) {
   if (value == null || !Number.isFinite(value)) {
@@ -1983,6 +1984,31 @@ export default function PlayerDetailDrawer({
   const isActivePlayer = !isFreeAgent && !isScoutedProfile;
   const abilitiesKnown = isActivePlayer || data.teamHumanControlled === true;
   const disciplineStatFogged = isScoutedProfile || !abilitiesKnown;
+  /**
+   * Projizierte Auswirkung des Saison-Trainings je Disziplin, als Nachschlagetabelle für die
+   * Diszi-Zeilen. Nur Werte ≠ 0 landen darin — eine „(+0)"-Marke wäre Rauschen an jeder Zeile.
+   */
+  const disciplineTrainingDeltaById = useMemo<Record<string, number>>(() => {
+    const rows = data.disciplineTrainingForecast?.rowsByDisciplineId;
+    if (!rows) {
+      return {};
+    }
+    const byId: Record<string, number> = {};
+    for (const row of Object.values(rows)) {
+      if (row.delta !== 0) {
+        byId[row.disciplineId] = row.delta;
+      }
+    }
+    return byId;
+  }, [data.disciplineTrainingForecast]);
+  const movedTrainingDisciplines = useMemo(
+    () => selectMovedDisciplines(data.disciplineTrainingForecast),
+    [data.disciplineTrainingForecast],
+  );
+  const disciplineLabelById = useMemo(
+    () => new Map(data.disciplineValues.map((entry) => [entry.id, entry.label] as const)),
+    [data.disciplineValues],
+  );
   const scoutingLevel = data.scoutingLevel ?? 0;
   const showScoutedPotentialSummary = !isScoutedProfile || scoutingLevel >= 2;
   const showScoutedPotentialStars = !isScoutedProfile || scoutingLevel >= 4;
@@ -2455,6 +2481,22 @@ export default function PlayerDetailDrawer({
                                       className={`player-drawer-axis-discipline-value${foggedBand ? " is-fogged" : ""}`}
                                     >
                                       {foggedBand ?? formatValue(entry.value, 0)}
+                                      {/* Projizierte Auswirkung des Saison-Trainings auf DIESE Diszi.
+                                          Nie bei verdeckten Spielern: eine exakte Veraenderung wuerde
+                                          das Klassen-Band aushebeln, das daneben absichtlich unscharf ist. */}
+                                      {!foggedBand && disciplineTrainingDeltaById[entry.id] ? (
+                                        <em
+                                          className={`player-drawer-axis-discipline-forecast ${getDeltaToneClass(
+                                            disciplineTrainingDeltaById[entry.id],
+                                          )}`}
+                                          title={`Saison-Forecast: ${
+                                            disciplineTrainingDeltaById[entry.id] > 0 ? "+" : ""
+                                          }${disciplineTrainingDeltaById[entry.id]} aus dem bisher gesammelten Training — gebucht wird erst am Saisonende, und nur wenn sich bei den anderen Spielern nichts verschiebt.`}
+                                        >
+                                          {disciplineTrainingDeltaById[entry.id] > 0 ? "+" : ""}
+                                          {disciplineTrainingDeltaById[entry.id]}
+                                        </em>
+                                      ) : null}
                                     </span>
                                   </div>
                                   <NlProgressBar
@@ -3586,6 +3628,41 @@ export default function PlayerDetailDrawer({
                     erst am Saisonende.
                   </p>
                   <SeasonTrainingForecastSummary forecast={data.seasonTrainingForecast} />
+                  {/* Der Forecast darüber steht in ATTRIBUTEN. Was ein Manager davon wissen will,
+                      steht eine Ebene weiter: in welchen Disziplinen wird der Spieler dadurch besser?
+                      Die Übersetzung ist nicht offensichtlich — ein Diszi-Wert ist der ligaweite Rang
+                      der gewichteten Attributsumme, nicht die Summe selbst. Deshalb steht sie hier. */}
+                  {!disciplineStatFogged && movedTrainingDisciplines.length > 0 ? (
+                    <div
+                      className="player-drawer-discipline-forecast"
+                      data-testid="player-drawer-discipline-training-forecast"
+                    >
+                      <p className="player-drawer-matchday-training-caption muted">
+                        Auswirkung auf die Disziplinen — projizierte Änderung des Diszi-Werts, wenn
+                        sich bei den anderen Spielern nichts verschiebt. Ein Diszi-Wert ist ein
+                        Ligarang: dasselbe Attribut-Plus kann je nach Dichte des Felds 0 oder mehrere
+                        Punkte bedeuten.
+                      </p>
+                      <ul className="player-drawer-discipline-forecast-list">
+                        {movedTrainingDisciplines.map((row) => (
+                          <li key={`discipline-forecast-${row.disciplineId}`}>
+                            <DisciplineIcon
+                              disciplineId={row.disciplineId}
+                              label={disciplineLabelById.get(row.disciplineId) ?? row.disciplineId}
+                              className="discipline-icon-chip-inline"
+                            />
+                            <span className="player-drawer-discipline-forecast-label">
+                              {disciplineLabelById.get(row.disciplineId) ?? row.disciplineId}
+                            </span>
+                            <span className={`player-drawer-discipline-forecast-delta ${getDeltaToneClass(row.delta)}`}>
+                              {row.delta > 0 ? "+" : ""}
+                              {row.delta}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
               {data.trainingHistoryRows.length > 0 ? (

@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from "react";
 import type { FoundationSaveMode } from "@/lib/persistence/foundation-save-mode";
 import { invalidateMatchdayArenaSessionCache } from "@/lib/foundation/matchday-arena-session-cache";
 import { clearPrefetchedMatchdayArenaBaseKeys } from "@/lib/foundation/foundation-panel-prefetch";
+import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
 import type {
   FoundationApplySummary,
   FoundationMatchdayAutoRunSummary,
@@ -76,6 +77,8 @@ export type CockpitMatchdayApplyHandlers = {
     /** Default `true` (Cockpit). Die Arena uebergibt `false` — sie schaltet ueber
      *  „Spieltag abschliessen" weiter, damit die Spieltagstabelle stehen bleibt. */
     advanceAfterCashApply?: boolean,
+    /** Die Preview, die die Arena gezeigt hat — sie wird gebucht statt neu gerechnet. */
+    submittedPreview?: LegacyMatchdayResolvePreview | null,
   ) => Promise<FoundationMatchdayAutoRunSummary | null>;
 };
 
@@ -359,6 +362,15 @@ export function createCockpitMatchdayApplyHandlers(
      * dort ueber den expliziten "Spieltag abschliessen"-Knopf.
      */
     advanceAfterCashApply = true,
+    /**
+     * Die Preview, die die Arena dem Spieler gerade gezeigt hat.
+     *
+     * Ohne sie rechnet der Server ein zweites Mal — und weil die Engine zwar deterministisch ist,
+     * aber ueber den Zustand rechnet, den sie IM MOMENT DES BUCHENS vorfindet, wich das gebuchte
+     * Ergebnis von dem ab, das gerade ueber den Schirm gelaufen war. Das Cockpit hat keine Buehne
+     * vor sich und laesst das Feld leer.
+     */
+    submittedPreview: LegacyMatchdayResolvePreview | null = null,
   ) {
     if (readMetaSource === "prisma") {
       showReadOnlyNotice();
@@ -385,6 +397,7 @@ export function createCockpitMatchdayApplyHandlers(
               stopOnTie: matchdayAutoRunStopOnTie,
               advanceAfterCashApply,
               commitThroughSide,
+              submittedPreview,
             },
           }),
         ),

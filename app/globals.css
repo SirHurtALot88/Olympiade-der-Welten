@@ -14972,6 +14972,66 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+/* Projizierte Auswirkung des Saison-Trainings, als kleine Marke hinter dem Diszi-Wert.
+   Bewusst leiser als der Wert selbst: gebucht ist sie noch nicht. */
+.player-drawer-axis-discipline-forecast {
+  margin-left: 4px;
+  font-size: 0.78em;
+  font-style: normal;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: rgba(214, 223, 241, 0.62);
+}
+
+.player-drawer-axis-discipline-forecast.is-positive {
+  color: #6ee7a8;
+}
+
+.player-drawer-axis-discipline-forecast.is-negative {
+  color: #f98a8a;
+}
+
+.player-drawer-discipline-forecast {
+  margin-top: 10px;
+}
+
+.player-drawer-discipline-forecast-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.player-drawer-discipline-forecast-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.player-drawer-discipline-forecast-label {
+  font-weight: 700;
+  color: rgba(214, 223, 241, 0.86);
+}
+
+.player-drawer-discipline-forecast-delta {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: rgba(214, 223, 241, 0.62);
+}
+
+.player-drawer-discipline-forecast-delta.is-positive {
+  color: #6ee7a8;
+}
+
+.player-drawer-discipline-forecast-delta.is-negative {
+  color: #f98a8a;
+}
+
 .player-drawer-axis-discipline-meter {
   position: relative;
   height: 4px;

@@ -65,6 +65,10 @@ export type PlayerDrawerInjuryHistoryRow = PlayerInjuryHistoryRecord & {
 };
 import { buildPlayerTrainingHistoryRows, type PlayerTrainingHistoryRow } from "@/lib/foundation/player-training-history";
 import {
+  buildPlayerDisciplineTrainingForecast,
+  type PlayerDisciplineTrainingForecast,
+} from "@/lib/foundation/player-discipline-training-forecast";
+import {
   buildPlayerSeasonTrainingForecast,
   type PlayerSeasonTrainingForecast,
 } from "@/lib/foundation/player-matchday-training-history";
@@ -405,6 +409,8 @@ export type PlayerDetailDrawerData = {
   attributeHistoryRows: PlayerAttributeHistoryRow[];
   /** Kumulierte Trainings-Prognose der laufenden Saison (null wenn keine Spieltage gespielt). */
   seasonTrainingForecast: PlayerSeasonTrainingForecast | null;
+  /** Uebersetzung des Attribut-Forecasts in Diszi-Werte (siehe player-discipline-training-forecast). */
+  disciplineTrainingForecast: PlayerDisciplineTrainingForecast | null;
   progressionEconomyPreview: {
     marketValuePreview: number | null;
     currentContractSalary: number | null;
@@ -2611,6 +2617,13 @@ export function buildPlayerDrawerDataFromGameState(input: {
           facilities: team ? getTeamFacilityState(input.gameState, team.teamId) : undefined,
         })
       : null;
+  // Was der Attribut-Forecast in den DISZIPLINEN bedeutet. Haengt am selben Sichtbarkeitsgatter
+  // wie `seasonTrainingForecast` — ohne Forecast gibt es hier nichts zu uebersetzen.
+  const disciplineTrainingForecast = buildPlayerDisciplineTrainingForecast({
+    gameState: input.gameState,
+    player,
+    forecast: seasonTrainingForecast,
+  });
   const playerTeamId = rosterEntry?.teamId ?? team?.teamId ?? "";
   const availability = getPlayerAvailabilityView(
     input.gameState,
@@ -2856,6 +2869,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
     trainingHistoryRows,
     attributeHistoryRows,
     seasonTrainingForecast,
+    disciplineTrainingForecast,
     seasonPerformance,
     transferContext: {
       ...buildTransferContext(input.gameState, player.id, rosterEntry),
@@ -3220,6 +3234,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     trainingHistoryRows: [],
     attributeHistoryRows: [],
     seasonTrainingForecast: null,
+    disciplineTrainingForecast: null,
     progressionEconomyPreview: null,
     seasonPerformance: null,
     transferContext: {

@@ -32,6 +32,7 @@ import { buildMatchdayTeamModifiers } from "@/lib/foundation/matchday-team-modif
 import { getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
 import {
   buildMatchdayArenaBaseSessionKey,
+  buildMatchdayLineupRevision,
   getMatchdayArenaBaseBundle,
   setMatchdayArenaBaseBundle,
 } from "@/lib/foundation/matchday-arena-session-cache";
@@ -86,7 +87,9 @@ export type DisciplineStageArenaProps = {
    * `"d1"` schreibt einen halben Spieltag, `"d2"` schliesst ihn ab. Ohne diesen Callback
    * bleibt die Buehne reine Vorschau (z. B. `dev-arena`).
    */
-  onCommitDiscipline?: ((side: "d1" | "d2") => Promise<unknown>) | null;
+  onCommitDiscipline?:
+    | ((side: "d1" | "d2", shownPreview: LegacyMatchdayResolvePreview | null) => Promise<unknown>)
+    | null;
   onOpenPlayer?: ((playerId: string) => void) | null;
   onOpenTeam?: ((teamId: string) => void) | null;
   /** Multiplayer-Room-Kontext — aktiviert Co-op-Ready-Gate + host-getriebenen Lockstep-Reveal. */
@@ -595,6 +598,21 @@ export default function DisciplineStageArena({
   // fehlschlägt/hängt — ohne den Retry säßen normale Spieler bei „unavailable" still fest.
   const [previewReloadNonce, setPreviewReloadNonce] = useState(0);
 
+  /**
+   * Stand der Aufstellungen dieses Spieltags. Teil des Cache-Schluessels UND Ausloeser des Effekts
+   * darunter: ziehen die KI-Aufstellungen nach, waehrend die Buehne offen steht, muss die Preview
+   * neu geholt werden. Vorher blieb die alte stehen — und gebucht wurde spaeter etwas anderes,
+   * als ueber den Schirm gelaufen war.
+   */
+  const lineupRevision = useMemo(
+    () =>
+      buildMatchdayLineupRevision(gameState?.seasonState?.lineupDrafts, {
+        seasonId: seasonId ?? "",
+        matchdayId: matchdayId ?? "",
+      }),
+    [gameState?.seasonState?.lineupDrafts, seasonId, matchdayId],
+  );
+
   useEffect(() => {
     if (!saveId || !seasonId || !matchdayId) {
       setPreviewState("unavailable");
@@ -614,6 +632,7 @@ export default function DisciplineStageArena({
       teamId: ownTeamId ?? "",
       source: "sqlite",
       includeDetails: true,
+      lineupRevision,
     });
     // Beim manuellen Retry (previewReloadNonce > 0) den Cache bewusst ÜBERSPRINGEN: Wer auf
     // „Engine erneut laden" drückt, will einen echten neuen Versuch — ein Cache-Treffer würde
@@ -664,7 +683,7 @@ export default function DisciplineStageArena({
         }
       });
     return () => controller.abort();
-  }, [saveId, seasonId, matchdayId, ownTeamId, previewReloadNonce]);
+  }, [saveId, seasonId, matchdayId, ownTeamId, previewReloadNonce, lineupRevision]);
 
   const engineDiscipline = useMemo(
     () => preview?.disciplinePreviews.find((d) => d.disciplineId === disciplineId) ?? null,
@@ -1428,7 +1447,11 @@ export default function DisciplineStageArena({
       if (commitStateByDiscipline[finishedDisciplineId] === "booked") return;
       commitInFlightRef.current.add(finishedDisciplineId);
       setCommitStateByDiscipline((prev) => ({ ...prev, [finishedDisciplineId]: "pending" }));
-      void onCommitDiscipline(side)
+      // Die gerade abgespielte Preview geht MIT — sie wird gebucht, statt dass der Server ein
+      // zweites Mal aufloest. Ohne sie rechnete der Commit ueber den Zustand, den er im Moment des
+      // Buchens vorfindet; bewegte sich dazwischen etwas an den Aufstellungen, landete im
+      // Saisonstand etwas anderes als das, was ueber den Schirm gelaufen war.
+      void onCommitDiscipline(side, preview)
         .then(() => {
           setCommitStateByDiscipline((prev) => ({ ...prev, [finishedDisciplineId]: "booked" }));
         })
