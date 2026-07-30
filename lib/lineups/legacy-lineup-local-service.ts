@@ -1129,6 +1129,19 @@ export function saveLocalLegacyLineupDraft(
   entries: LegacyLineupEntryInput[],
   modifiers = createDefaultLineupDraftModifiers(),
   persistence?: PersistenceService,
+  /**
+   * `lockMatchday` nagelt die Abgabe fest: der Draft geht als `locked` in den Save und kann
+   * danach nicht mehr ueberschrieben werden (die Pruefung dafuer steht weiter unten und gab es
+   * laengst — sie wurde nur nie ausgeloest, weil jedes Speichern `submitted` schrieb).
+   *
+   * Gesetzt wird das NUR von der Spieler-Route, und dort erst nach ausdruecklicher Bestaetigung.
+   * Skripte und Simulationen speichern weiterhin ohne Sperre, sonst koennte ein Lauf seinen
+   * eigenen zweiten Spieltag nicht mehr schreiben.
+   *
+   * Warum ueberhaupt: `lib/lineups/matchday-lineup-lock.ts` erklaert den Missbrauch, gegen den
+   * das gerichtet ist.
+   */
+  options?: { lockMatchday?: boolean },
 ): LegacyLineupSaveResult {
   const { persistence: resolvedPersistence, save } = resolveLocalSave(params.saveId, persistence);
   const effectiveParams = { ...params, saveId: save.saveId };
@@ -1192,7 +1205,7 @@ export function saveLocalLegacyLineupDraft(
     seasonId: effectiveParams.seasonId,
     matchdayId: effectiveParams.matchdayId,
     teamId: effectiveParams.teamId,
-    status: "submitted",
+    status: options?.lockMatchday ? "locked" : "submitted",
     entries: normalizedEntries,
     modifiers: normalizeLineupDraftModifiers(resolvedModifiers),
     createdAt: existing?.createdAt ?? now,

@@ -138,7 +138,7 @@ import {
   buildFieldRaceLedger,
   countPlayedFieldRaceMatchdays,
   getFieldRaceRankMovement,
-  getFieldRaceRecentForm,
+  getFieldRaceSeasonForm,
   type FieldRaceLedgerEntry,
 } from "@/lib/foundation/build-field-race-ledger";
 import {
@@ -309,6 +309,8 @@ import {
 import { useFoundationKeyboardNavigation } from "@/lib/foundation/use-foundation-keyboard-navigation";
 import { buildFoundationActivities } from "@/lib/foundation/foundation-activity-registry";
 import type { FoundationStateContextValue } from "@/lib/foundation/foundation-state-context";
+import { resolveDisciplinePointsLedgerView } from "@/lib/foundation/discipline-points-source";
+import { buildSeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
 import { usePlayerDirectorySlice } from "@/lib/foundation/use-player-directory-slice";
 import { useSeasonRatingsSlice } from "@/lib/foundation/use-season-ratings-slice";
 import { usePlayerDirectorySortWorker } from "@/lib/foundation/use-player-directory-sort-worker";
@@ -1370,7 +1372,7 @@ export function useFoundationShellRouterBodyScope({
   // Der Slice ist modulweit nach saveId/seasonId/contentSignature gecacht —
   // wer vorher in der Spielerliste war, holt hier nichts neu.
   const playerDirectorySlice = usePlayerDirectorySlice({
-    enabled: shouldBuildPlayerDirectory || shouldBuildTeamsView,
+    enabled: shouldBuildPlayerDirectory || shouldBuildTeamsView || activeView === "seasonV2",
     saveId: activeSaveId,
     seasonId: gameState.season.id,
     contentSignature: seasonContentSignature,
@@ -7727,7 +7729,7 @@ export function useFoundationShellRouterBodyScope({
 
   /** Letzte bis zu 5 Spieltage des aktiven Teams (D1 Feld-Form-Strip). */
   const selectedTeamFieldRaceForm: FieldRaceLedgerEntry[] = useMemo(
-    () => (selectedTeam ? getFieldRaceRecentForm(fieldRaceLedger, selectedTeam.teamId, 5) : []),
+    () => (selectedTeam ? getFieldRaceSeasonForm(fieldRaceLedger, selectedTeam.teamId) : []),
     [fieldRaceLedger, selectedTeam?.teamId],
   );
 
@@ -10104,6 +10106,38 @@ export function useFoundationShellRouterBodyScope({
     () => new Map(gameState.players.map((player) => [player.id, player] as const)),
     [gameState.players],
   );
+  /**
+   * Teilnehmer je Team und Spalte für die Aufklappung im Saisonstand: die Zahl
+   * in Klammern hinter jedem Disziplin-Kürzel und das Hover-Panel dahinter.
+   *
+   * Das wurde bislang nur im (nirgends gerenderten) `FoundationSeasonV2Host`
+   * gebaut — auf dem tatsächlich gerenderten Pfad kam der Prop nie an, weshalb
+   * jede Disziplin "(0)" trug und das Hover-Panel leer blieb. Der Prop ist am
+   * `SeasonStandingsV2Client` optional, deshalb fiel das nie als Typfehler auf.
+   *
+   * Quelle ist der SERVER-Slice, nicht der clientseitige Ledger: der Client hält
+   * den kompakten Payload und kennt nur den aktiven Spieltag — am echten
+   * Spielstand (Spieltag 10) lieferte er statt 19 nur 2 besetzte Disziplinen.
+   * Die Entscheidung selbst trifft `resolveDisciplinePointsLedgerView`.
+   *
+   * Für archivierte Saisons bewusst `null`: Ratings und Slice tragen immer die
+   * LIVE-Saison — eine Teilnehmerliste aus aktuellen Werten wäre im Archiv
+   * schlicht gelogen; dort zeigt der Saisonstand deshalb gar kein Panel.
+   */
+  const seasonV2TeamTopPlayersByColumn = useMemo(
+    () =>
+      isViewingArchivedSeason
+        ? null
+        : buildSeasonStandingsTopPlayersByTeam({
+            gameState,
+            playerRatingsById,
+            seasonPointsLedger: resolveDisciplinePointsLedgerView({
+              playerDirectorySlice,
+              seasonPointsLedger,
+            }),
+          }),
+    [gameState, isViewingArchivedSeason, playerDirectorySlice, playerRatingsById, seasonPointsLedger],
+  );
   const seasonV2TopPlayers = useMemo(() => {
     return sortedSeasonTopPlayerRows.slice(0, SEASON_V2_TOP_PLAYER_LIMIT).map((row) => {
       const player = seasonV2PlayerById.get(row.playerId) ?? null;
@@ -11732,6 +11766,7 @@ export function useFoundationShellRouterBodyScope({
     seasonV2PressureTeam,
     seasonV2SelectedTeamSummary,
     seasonV2StandingsRows,
+    seasonV2TeamTopPlayersByColumn,
     seasonV2TopPlayers,
     selectTeamSettingsTeam,
     selectedBoardConfidence,

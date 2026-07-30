@@ -5357,21 +5357,57 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       const query = new URLSearchParams(params);
       query.set("source", source);
       withRoomQuery(query);
-      const response = await fetch(`/api/lineups/legacy?${query.toString()}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ entries: entriesToSave, modifiers }),
-      });
-      const payload = (await response.json()) as {
+      const putLineup = (confirmLock: boolean) =>
+        fetch(`/api/lineups/legacy?${query.toString()}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ entries: entriesToSave, modifiers, confirmLock }),
+        });
+      let response = await putLineup(false);
+      let payload = (await response.json()) as {
         draft?: LegacyLineupDraft;
         saveVersion?: number | null;
         contentSignature?: string | null;
         warnings?: string[];
         errors?: string[];
         error?: string;
+        commitment?: { hasFormCards: boolean; hasCaptain: boolean; isEmptyCommitment: boolean };
       };
+
+      /**
+       * Das Speichern nagelt den Spieltag fest — danach sind Formkarten, Kapitaen und
+       * Aufstellung nicht mehr aenderbar. Die Route speichert deshalb erst auf Bestaetigung
+       * und meldet im ersten Anlauf zurueck, WAS eingesetzt wird.
+       *
+       * Ohne Formkarte UND ohne Kapitaen wird deutlicher gefragt: das ist fast nie Absicht
+       * und danach nicht mehr zu korrigieren.
+       */
+      if (response.status === 409 && payload.error === "lineup_lock_confirmation_required") {
+        const commitment = payload.commitment;
+        const einsatz = commitment?.isEmptyCommitment
+          ? "Du setzt WEDER eine Formkarte NOCH einen Kapitän ein."
+          : [
+              commitment?.hasFormCards ? "Formkarte(n) gesetzt" : "keine Formkarte",
+              commitment?.hasCaptain ? "Kapitän gesetzt" : "kein Kapitän",
+            ].join(" · ");
+        const confirmed =
+          typeof window === "undefined"
+            ? false
+            : window.confirm(
+                `Aufstellung abgeben und für diesen Spieltag festlegen?\n\n${einsatz}\n\n` +
+                  "Danach lassen sich Aufstellung, Kapitän und Formkarten für diesen Spieltag " +
+                  "nicht mehr ändern.",
+              );
+        if (!confirmed) {
+          setMessage("");
+          setWarnings([]);
+          return false;
+        }
+        response = await putLineup(true);
+        payload = (await response.json()) as typeof payload;
+      }
 
       if (!response.ok) {
         setErrors(payload.errors ?? [payload.error ?? "Draft konnte nicht gespeichert werden."]);

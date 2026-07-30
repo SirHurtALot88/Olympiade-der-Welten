@@ -6,7 +6,7 @@ import { formatNlNumber } from "@/components/foundation/new-look/nl-tones";
 import type { FieldRaceLedgerEntry } from "@/lib/foundation/build-field-race-ledger";
 
 export type NlFieldRaceFormStripProps = {
-  /** Letzte bis zu 5 Spieltage eines Teams — chronologisch (ältester zuerst). */
+  /** Alle bereits gewerteten Spieltage eines Teams — chronologisch (ältester zuerst). */
   entries: FieldRaceLedgerEntry[];
   /** Insgesamt bereits gespielte Spieltage der Season (für die Frühphasen-Notiz). */
   playedMatchdayCount?: number;
@@ -59,8 +59,10 @@ export function NlFieldRaceFormStrip({
     .map((rank) => -rank);
 
   return (
-    <div className={classes} data-testid="nl-form-strip" aria-label={`Form der letzten ${entries.length} Spieltage`}>
-      <span className="nl-form-strip-label">Form · letzte {formatNlNumber(entries.length, 0)}</span>
+    <div className={classes} data-testid="nl-form-strip" aria-label={`Form über ${entries.length} gewertete Spieltage`}>
+      {/* Der Strip zeigt die GANZE Saison, nicht mehr die letzten fünf — die
+          Beschriftung darf deshalb keine Fensterbreite mehr nennen. */}
+      <span className="nl-form-strip-label">Form · Saison</span>
       <ol className="nl-form-strip-days">
         {entries.map((entry) => (
           <li
@@ -76,7 +78,16 @@ export function NlFieldRaceFormStrip({
             }
           >
             <span className="nl-form-strip-md nl-tnum">S{formatNlNumber(entry.matchdayNumber, 0)}</span>
-            <span className="nl-form-strip-pts nl-tnum">{formatNlNumber(entry.tagespunkte, 1)}</span>
+            {/* Tagespunkte und Tagesrang in EINER Zeile: „8,7 #6". Die Punkte
+                allein sagen nicht, ob das ein guter Spieltag war — erst der Rang
+                stellt sie ins Feld. Der Rang steht nur da, wenn er wirklich
+                vorliegt; sonst bleibt es bei den Punkten. */}
+            <span className="nl-form-strip-value">
+              <span className="nl-form-strip-pts nl-tnum">{formatNlNumber(entry.tagespunkte, 1)}</span>
+              {entry.tagesrang != null ? (
+                <span className="nl-form-strip-rank nl-tnum">#{formatNlNumber(entry.tagesrang, 0)}</span>
+              ) : null}
+            </span>
             {entry.rankDeltaVsPrev != null ? (
               <NlDeltaChip
                 value={entry.rankDeltaVsPrev}
