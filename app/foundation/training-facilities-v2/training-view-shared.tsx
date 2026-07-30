@@ -110,12 +110,31 @@ export type TrainingIntensityProjectionEntry = {
  * modusunabhängig), daher wird der Netto-Wert exakt gegenüber dem echten aktuellen
  * `netSetpoints` verschoben: Δtraining (angewendet) + Δperformance (Modus-Gewicht
  * PERFORMANCE_WEIGHT_MULTIPLIER_BY_MODE).
+ *
+ * MITTEN IN DER SAISON zählt aber nur noch der REST. Die Engine friert die bereits
+ * gespielten Spieltage auf ihrem damals gewählten Modus ein und legt den neu
+ * gewählten Modus nur auf die verbleibenden Spieltage
+ * (`buildProjectedSeasonTrainingAccumulatorOverrides`, Anti-Cheese). Wer an
+ * Spieltag 7 von 10 auf „Hart" umstellt, ändert also nur 3/10 der Saison.
+ *
+ * Die Projektion skalierte trotzdem mit dem ROHEN Modus-Setpoint, also so, als
+ * liefe die ganze Saison im gewählten Modus. Zwei Folgen, beide aus dem Playtest
+ * gemeldet: die Spreizung zwischen Leicht/Mittel/Hart war viel zu groß, und weil
+ * der Anker (`trainingSetpoints`) selbst schon der geblendete Ist-Wert ist,
+ * verschob sich die GANZE Leiter, je nachdem welcher Modus gerade aktiv war —
+ * derselbe Spieler zeigte für „Leicht" +10,6 (mit Leicht aktiv) bzw. +6,8 (mit
+ * Hart aktiv).
+ *
+ * Deshalb skaliert die Prognose jetzt über das geblendete Basisbudget:
+ *   base(M) = bereits aufgelaufen + Rest-Spieltage × Setpoint(M) / Spieltage gesamt
+ * — exakt dieselbe Rechnung wie `computeAccumulatorOverridesFromCounts`. Ohne
+ * Accumulator (vor dem ersten Spieltag) ist Rest = alle Spieltage, und das
+ * Ergebnis fällt mit der alten reinen Setpoint-Skalierung zusammen.
  */
 export function buildTrainingIntensityProjection(
   row: TrainingPlayerRowView,
   trainingModeOptions: TrainingModeOption[],
 ): TrainingIntensityProjectionEntry[] {
-  const currentBudgetBase = TRAINING_SETPOINTS_BY_MODE[row.mode] ?? TRAINING_SETPOINTS_BY_MODE.mittel;
   const currentTrainingBudget = row.organicForecast.trainingSetpoints;
   const appliedTrainingCurrent = row.attributeForecast.reduce((sum, entry) => sum + entry.training, 0);
   const appliedPerformanceCurrent = row.organicForecast.performanceSetpoints;
@@ -123,12 +142,27 @@ export function buildTrainingIntensityProjection(
   const currentNet = row.organicForecast.netSetpoints;
   const currentPerfWeight = PERFORMANCE_WEIGHT_MULTIPLIER_BY_MODE[row.mode] ?? 1;
 
+  // Anteil der Saison, den eine Modus-Änderung ueberhaupt noch bewegen kann.
+  const accumulator = row.trainingAccumulatorForecast;
+  const totalMatchdays = accumulator ? Math.max(1, accumulator.totalMatchdays) : 0;
+  const remainingMatchdays = accumulator ? Math.max(0, totalMatchdays - accumulator.matchdaysCounted) : 0;
+  const remainingShare = accumulator ? remainingMatchdays / totalMatchdays : 1;
+  /** Geblendetes Basisbudget fuer einen Modus: Vergangenheit bleibt, nur der Rest wechselt. */
+  const blendedBase = (mode: PlayerTrainingMode) => {
+    const setpoint = TRAINING_SETPOINTS_BY_MODE[mode] ?? TRAINING_SETPOINTS_BY_MODE.mittel;
+    if (!accumulator) return setpoint;
+    return accumulator.accumulatedBudget + (remainingMatchdays * setpoint) / totalMatchdays;
+  };
+  const currentBlendedBase = blendedBase(row.mode);
+
   return trainingModeOptions.map((option) => {
-    const budgetBase = TRAINING_SETPOINTS_BY_MODE[option.value] ?? option.trainingSetpoints;
-    const budgetScale = currentBudgetBase > 0 ? budgetBase / currentBudgetBase : 1;
+    const budgetScale = currentBlendedBase > 0 ? blendedBase(option.value) / currentBlendedBase : 1;
     const trainingGain = currentTrainingBudget * budgetScale;
     const appliedTraining = appliedTrainingCurrent * budgetScale;
-    const perfWeight = PERFORMANCE_WEIGHT_MULTIPLIER_BY_MODE[option.value] ?? 1;
+    // Das Performance-Gewicht blendet genauso: nur die Rest-Spieltage wechseln den
+    // Modus, also verschiebt sich das Gewicht auch nur um deren Anteil.
+    const perfWeightRaw = PERFORMANCE_WEIGHT_MULTIPLIER_BY_MODE[option.value] ?? 1;
+    const perfWeight = currentPerfWeight + (perfWeightRaw - currentPerfWeight) * remainingShare;
     const performanceGain = appliedPerformanceCurrent * (currentPerfWeight > 0 ? perfWeight / currentPerfWeight : 1);
     const net = currentNet + (appliedTraining - appliedTrainingCurrent) + (performanceGain - appliedPerformanceCurrent);
     // Aus den GERUNDETEN Anzeigewerten ableiten, damit die Kette auf der Karte exakt aufgeht:
