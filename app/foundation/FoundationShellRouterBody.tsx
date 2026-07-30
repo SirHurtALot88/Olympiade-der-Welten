@@ -173,6 +173,7 @@ import type { FoundationTableColumn } from "@/lib/foundation/foundation-table-ui
 import type { GameEncyclopediaEntry } from "@/lib/ui/game-encyclopedia";
 import type { InboxV2Item } from "@/app/foundation/inbox-v2/inbox-v2-types";
 import type { Discipline, GameInboxItem, MappingWarning, Player, PlayerScoutIntelRecord, Team } from "@/lib/data/olyDataTypes";
+import { canAdvanceMatchdayFromStep } from "@/lib/foundation/resolve-game-flow-action-step";
 
 // Perf/DX (#57): these view panels used to come in eagerly through the
 // `foundation-page-client-exports` barrel (or, for the last five, a direct
@@ -2590,10 +2591,14 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                         bevor man sie lesen konnte. Jetzt bleibt der Stand stehen, bis hier
                         gedrueckt wird.
 
-                        Gegatet auf den Flow-Schritt, nicht auf die Summary: „ready" heisst
-                        genau, dass beide Disziplinen gewertet sind und der Wechsel sauber
-                        moeglich ist. */}
-                    {gameFlowActionStep.stepId === "advance_to_next_matchday" && gameFlowActionStep.status === "ready" ? (
+                        Gegatet auf den Flow-Schritt, nicht auf die Summary. WICHTIG: "ready" allein
+                        genuegt dafuer NICHT — der Schritt steht auf "warning", sobald das Board
+                        `board_objectives_failed` meldet (Saisonziele gerissen). Das ist eine
+                        Mitteilung, kein Hindernis: gewertet ist der Spieltag genauso. Vorher
+                        verschwand der Knopf dadurch komplett, und der Spieltag liess sich aus dem
+                        normalen Spielverlauf nicht mehr abschliessen. `canAdvanceMatchdayFromStep`
+                        deckt beide Zustaende ab und wird auch vom globalen "Weiter" benutzt. */}
+                    {canAdvanceMatchdayFromStep(gameFlowActionStep) ? (
                       <button
                         className="primary-button inline-button"
                         type="button"
