@@ -759,7 +759,7 @@ async function runUiMatchdayLoop(input: {
   // Enthuellungen nicht verlaesslich in vertretbarer Zeit durchspielen, darum treibt der
   // Lauf hier genau die Buchungen an, die die Arena ausloest — erst D1 (halber Spieltag),
   // dann D2 (Abschluss inkl. Spieltagswechsel).
-  await input.page.locator("[data-testid='arena-primary-step'], [data-testid='arena-finish-matchday']").first()
+  await input.page.locator("[data-testid='arena-primary-step'], [data-testid='arena-finish-matchday'], [data-testid='arena-stage']").first()
     .waitFor({ state: "visible", timeout: input.timeoutMs })
     .catch(() => undefined);
 

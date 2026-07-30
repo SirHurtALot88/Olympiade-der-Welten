@@ -1447,7 +1447,11 @@ export default function DisciplineStageArena({
 
   return (
     <>
-    <div style={{ width: "100%", margin: "0 auto", padding: "20px 24px", color: "inherit" }}>
+    {/* Stabiler Anker fuer die Browser-Smokes: belegt, dass die Buehne wirklich gerendert
+        hat. Vorher zeigten die Smokes auf die "Spieltagsergebnis"-Sektion, die es nicht mehr
+        gibt. Der Abschluss-Knopf taugt NICHT als Ersatz — er erscheint erst bei fertigem
+        Spieltag, im Smoke also nie. */}
+    <div data-testid="arena-stage" style={{ width: "100%", margin: "0 auto", padding: "20px 24px", color: "inherit" }}>
       {/*
         Warte-Banner des Start-Gates. In der Arena zu stehen ist erlaubt, losgehen erst,
         wenn alle Teams ihre Einsatzliste gespeichert haben. Das Banner nennt die offenen
