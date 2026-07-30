@@ -60,13 +60,15 @@ describe("Spieltags-Wertung: Form als eigene Spalte", () => {
     );
   });
 
-  it("haelt Kopf und Datenzeile im selben Raster", () => {
+  it("haelt Kopf, Team-Zeile und Disziplin-Zeile im selben Raster", () => {
     const panel = read("app/foundation/discipline-stage/DisciplineStageMatchdayPanel.tsx");
     const columnCount = (panel.match(/const PANEL_GRID_COLUMNS = "([^"]+)"/)?.[1] ?? "").split(/\s+/).length;
-    // Tagesrang · Saison-Rang · Team · D1 · D2 · Punkte · Form · Mutator · Gesamt
-    expect(columnCount).toBe(9);
-    // Beide Renderpfade teilen sich dieselbe Konstante.
-    expect(panel.match(/gridTemplateColumns: PANEL_GRID_COLUMNS/g)?.length).toBe(2);
+    // Tagesrang · Saison-Rang · Team · Punkte · Form · Mutator · Gesamt.
+    // Die beiden Disziplin-SPALTEN sind entfallen: ihre Werte stehen jetzt in eigenen
+    // Zeilen unter dem Team, dort samt Form, Mutator und Gesamt.
+    expect(columnCount).toBe(7);
+    // Alle drei Renderpfade teilen sich dieselbe Konstante — sonst driften die Spalten.
+    expect(panel.match(/gridTemplateColumns: PANEL_GRID_COLUMNS/g)?.length).toBe(3);
   });
 });
 
