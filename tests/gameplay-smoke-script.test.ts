@@ -43,7 +43,14 @@ describe("gameplay smoke script contract", () => {
     expect(scriptText).toContain("foundation-lineup");
     expect(scriptText).toContain("foundation-cockpit");
     expect(scriptText).toContain("matchdayArena");
-    expect(scriptText).toContain(".matchday-arena-lane, .matchday-arena-empty-card, #foundation-matchday-arena .warning-list");
+    // Der Arena-Nachweis haengt am Buehnen-Wurzelelement. Vorher stand hier ein Ausschnitt
+    // der Locator-Liste der entfernten Arena-v2-Panel-UI (.matchday-arena-lane,
+    // .matchday-arena-empty-card ...) — die traf im App-Code nichts mehr und hielt den
+    // toten Rest im Skript fest.
+    // Bewusst keine `not.toContain`-Waechter auf die alten Klassennamen: die Kommentare im
+    // Skript nennen sie, um zu erklaeren, warum sie weg sind — ein Waechter wuerde genau
+    // diese Erklaerung verbieten.
+    expect(scriptText).toContain("[data-testid='arena-stage'], #foundation-matchday-arena .warning-list");
     expect(scriptText).toContain('page.getByRole("button", { name: /^Step$/ })');
     expect(scriptText).toContain('page.getByRole("button", { name: /^Reset$/ })');
     expect(scriptText).toContain("DestructiveSignature");
