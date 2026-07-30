@@ -123,6 +123,25 @@ export function getTeamControlSettings(gameState: GameState, teamId: string) {
   return team ? createDefaultTeamControlSettings(team) : null;
 }
 
+/**
+ * Klarname zu einer Owner-ID — fuer Anzeigen, die eine Person benennen (z. B. wer einen
+ * Spielstand angelegt hat).
+ *
+ * Gibt `null` zurueck, wenn keine ID vorliegt. Das ist ein echter Zustand, kein Fehler:
+ * Spielstaende aus der Zeit vor der `created_by`-Spalte und alles, was ohne aktivierten
+ * Login entstanden ist, haben schlicht keinen Urheber-Vermerk. Die Anzeigestelle
+ * entscheidet, wie sie das benennt — hier wird nichts geraten.
+ *
+ * Unbekannte IDs kommen unveraendert zurueck statt als "Unbekannt": eine rohe ID ist beim
+ * Nachsehen brauchbarer als ein Platzhalter.
+ */
+export function resolveOwnerDisplayLabel(ownerId: string | null | undefined): string | null {
+  if (!ownerId) {
+    return null;
+  }
+  return DEFAULT_TEAM_OWNERS.find((owner) => owner.ownerId === ownerId)?.label ?? ownerId;
+}
+
 export function isChrisOwnedTeamSettings(settings: TeamControlSettings | null | undefined) {
   if (!settings || settings.controlMode !== "manual") {
     return false;

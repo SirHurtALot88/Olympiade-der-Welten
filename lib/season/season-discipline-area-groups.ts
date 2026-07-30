@@ -107,6 +107,24 @@ export const SEASON_DISCIPLINE_AREA_GROUPS: Array<{
   ),
 }));
 
+/**
+ * Dieselben Gruppen in der KANONISCHEN Disziplin-Reihenfolge (POW liest damit
+ * TDM · Mini DM · Gewichtheben · Hockey · Breaking).
+ *
+ * `SEASON_DISCIPLINE_AREA_GROUPS` sortiert bewusst nach Kadergrösse — das war
+ * eine Anforderung an die RANG-Tabelle, wo die Spaltenbreite mit der Spielerzahl
+ * korrespondiert. Über den gemeinsamen Export ist diese Sortierung aber auch im
+ * Saisonstand gelandet, wo sie niemand bestellt hat: dort erwartet man die
+ * Reihenfolge, in der die Disziplinen überall sonst stehen. Deshalb hier ein
+ * eigener Export statt einer Umsortierung an der Anzeigestelle — die Reihenfolge
+ * bleibt so an EINER Stelle definiert.
+ */
+export const SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER: Array<{
+  id: SeasonDisciplineAreaId;
+  label: string;
+  keys: SeasonDisciplineKey[];
+}> = SEASON_DISCIPLINE_AREA_GROUP_MEMBERSHIP.map((group) => ({ ...group, keys: [...group.keys] }));
+
 const SEASON_DISCIPLINE_KEY_SET = new Set<string>(Object.keys(SEASON_DISCIPLINE_LABELS));
 
 export type PlayerHistoryDisciplineValues = Partial<Record<SeasonDisciplineKey, number | null>>;

@@ -50,6 +50,7 @@ import type { SeasonStandingsTopPlayerEntry } from "@/lib/foundation/season-stan
 import {
   resolveSeasonDisciplineAreaTotal,
   SEASON_DISCIPLINE_AREA_GROUPS,
+  SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER,
   SEASON_DISCIPLINE_LABELS,
   type SeasonDisciplineAreaId,
   type SeasonDisciplineKey,
@@ -905,6 +906,18 @@ export default function SeasonStandingsNewLook({
    * Name + Punkte aus `row.disciplineValues` mit dünnem Balken relativ zu
    * `disciplineMaxByKey`. Geteilt zwischen Board-Expand und Daten-Tabelle.
    */
+  /**
+   * Disziplin-Reihenfolge der Aufklapp-Gruppen: KANONISCH (TDM · Mini DM ·
+   * Gewichtheben · …), nicht nach Kadergroesse. `SEASON_DISCIPLINE_AREA_GROUPS`
+   * sortiert nach Spielerzahl — das war eine Anforderung an die RANG-Tabelle und
+   * ist ueber den gemeinsamen Export hier mitgelaufen, wo man die uebliche
+   * Reihenfolge erwartet.
+   */
+  const standardOrderKeysByArea = useMemo(
+    () => new Map(SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER.map((group) => [group.id, group.keys])),
+    [],
+  );
+
   function renderDisciplineGroups(row: SeasonV2StandingsRow) {
     return (
       <div className="nl-standings-groups">
@@ -917,9 +930,13 @@ export default function SeasonStandingsNewLook({
                 <span className="nl-standings-group-total nl-tnum">{formatNlNumber(areaValue, 1)}</span>
               </div>
               <ul className="nl-standings-disc-list">
-                {group.keys.map((key) => {
+                {standardOrderKeysByArea.get(group.id)?.map((key) => {
                   const value = row.disciplineValues[key];
                   const participants = teamTopPlayersByColumn?.get(row.teamId)?.[key];
+                  // Teilnehmerzahl dieses TEAMS in dieser Disziplin über die Saison.
+                  // Quelle ist der Saison-Ledger (wer hier PPs geholt hat) — dieselbe
+                  // Liste, die der Hover zeigt, nur als Zahl davor.
+                  const participantCount = participants?.length ?? 0;
                   return (
                     /* Hover auf die GANZE Disziplin-Zeile (Kürzel · Balken · Wert):
                        zeigt die Spieler, die in dieser Disziplin für das Team PPs
@@ -935,12 +952,17 @@ export default function SeasonStandingsNewLook({
                       headline="Teilnehmer"
                       entries={participants}
                       title={
-                        participants && participants.length > 0
-                          ? `${SEASON_DISCIPLINE_LABELS[key]}: ${formatNlNumber(value, 1)} — ${participants.length} Teilnehmer (Hover zeigt die Spieler)`
-                          : `${SEASON_DISCIPLINE_LABELS[key]}: ${formatNlNumber(value, 1)}`
+                        participantCount > 0
+                          ? `${SEASON_DISCIPLINE_LABELS[key]}: ${formatNlNumber(value, 1)} — ${participantCount} Spieler dieses Teams waren diese Saison hier im Einsatz (Hover zeigt sie)`
+                          : `${SEASON_DISCIPLINE_LABELS[key]}: ${formatNlNumber(value, 1)} — noch kein Einsatz dieses Teams`
                       }
                     >
-                      <span className="nl-standings-disc-label">{SEASON_DISCIPLINE_LABELS[key]}</span>
+                      <span className="nl-standings-disc-label">
+                        {SEASON_DISCIPLINE_LABELS[key]}
+                        {/* Teilnehmerzahl direkt am Kürzel: beantwortet „auf wie vielen
+                            Schultern steht dieser Wert?" ohne Hover. */}
+                        <small className="nl-standings-disc-count nl-tnum">({participantCount})</small>
+                      </span>
                       <NlProgressBar
                         className="nl-standings-disc-bar"
                         value={getBarPercent(value, disciplineMaxByKey.get(key) ?? 0)}

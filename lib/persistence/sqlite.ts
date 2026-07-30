@@ -210,6 +210,11 @@ function ensureSaveVersionColumns(database: Database.Database) {
     ["matchday_id", "TEXT NOT NULL DEFAULT ''"],
     ["lineup_draft_count", "INTEGER NOT NULL DEFAULT 0"],
     ["transfer_history_count", "INTEGER NOT NULL DEFAULT 0"],
+    // Wer den Spielstand ANGELEGT hat. Wird nur beim INSERT gesetzt und danach nie mehr
+    // angefasst — sonst waere es "wer zuletzt gespeichert hat", und das steht schon in
+    // `updated_at`. Leer bei allem, was vor dieser Spalte entstanden ist; die UI zeigt
+    // dafuer "unbekannt" statt zu raten.
+    ["created_by", "TEXT NOT NULL DEFAULT ''"],
   ] as const;
 
   for (const [name, definition] of additions) {

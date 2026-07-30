@@ -111,6 +111,51 @@ describe("Bug-Meldung — der Zustand wird mitgeschrieben", () => {
     expect(record.viewport).toEqual({ width: 1512, height: 963 });
   });
 
+  /**
+   * "Die Seite, auf der der Bug gemeldet wird, und der User sollten auch mit drin stehen."
+   *
+   * `view` allein reicht dafuer nicht: der Parameter existiert nur innerhalb der
+   * Foundation-Shell. Auf Login, Cockpit und Startseite war die Seite bisher nur aus der
+   * rohen URL zu erraten.
+   */
+  it("benennt die Seite auch ohne ?view= — ueber Pfad und Titel", async () => {
+    const { saveBugReport, formatBugReportPage } = await importService();
+    const { record } = saveBugReport({ path: "/cockpit", pageTitle: "Cockpit · Oly" });
+    expect(record.path).toBe("/cockpit");
+    expect(record.pageTitle).toBe("Cockpit · Oly");
+    expect(formatBugReportPage(record)).toContain("Cockpit");
+
+    // Mit Ansicht gewinnt die Ansicht — sie ist praeziser als der Pfad.
+    expect(formatBugReportPage({ view: "matchdayArena", path: "/foundation", pageTitle: "Oly" })).toContain(
+      "matchdayArena",
+    );
+    // Und wenn wirklich nichts da ist, wird das benannt statt leer gelassen.
+    expect(formatBugReportPage({ view: null, path: null, pageTitle: null })).toBe("unbekannte Seite");
+  });
+
+  it("haelt fest, WER gemeldet hat", async () => {
+    const { saveBugReport } = await importService();
+    const withSession = saveBugReport({ sessionOwnerId: "franky_remote_placeholder" }).record;
+    expect(withSession.reporter).toEqual({
+      ownerId: "franky_remote_placeholder",
+      label: "Franky",
+      fromSession: true,
+    });
+  });
+
+  /**
+   * Ohne Login gibt es keine Session — es sitzt aber trotzdem einer an der Tastatur. Der
+   * Fallback benennt den lokalen Benutzer und markiert, dass das erschlossen ist. Ohne die
+   * Markierung laese sich eine Annahme wie eine Feststellung, und bei zwei Spielern auf
+   * einer Instanz waere sie still falsch.
+   */
+  it("unterscheidet belegte von erschlossener Identitaet", async () => {
+    const { saveBugReport } = await importService();
+    const withoutSession = saveBugReport({}).record;
+    expect(withoutSession.reporter.label).toBe("Chris");
+    expect(withoutSession.reporter.fromSession).toBe(false);
+  });
+
   it("listet die neuesten Meldungen zuerst", async () => {
     const { saveBugReport, listBugReports } = await importService();
     const first = saveBugReport({ note: "erste" });
