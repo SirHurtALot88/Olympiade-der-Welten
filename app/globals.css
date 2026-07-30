@@ -59077,6 +59077,45 @@ button.foundation-team-portrait-card {
   background: color-mix(in srgb, var(--nl-good) 25%, transparent);
 }
 
+/* --- Star-Tier an den Spieler-Chips der Spieltags-Wertung -----------------
+   Die ligaweite Top-Riege (Diamant/Gold/Silber/Bronze fuer Top 3/10/25/50)
+   traegt jedes Portrait in Kader, Arena und Drawer laengst; hier waren die
+   Chips die letzte Stelle, an der die besten Spieler nicht zu erkennen waren.
+   Schwellen und Zuordnung kommen unveraendert aus
+   `lib/foundation/player-star-tier.ts` — hier steht nur die Farbe.
+
+   Als RING per `box-shadow`, nicht ueber `border-color`: der Rahmen des Chips
+   ist eine Inline-Angabe der Komponente (`1px solid var(--nl-line)`) und liesse
+   sich aus dem Stylesheet gar nicht ueberschreiben. Der Ring liegt genau auf
+   dem Rahmen und faerbt ihn dadurch ein, ohne die Chip-Geometrie zu aendern.
+
+   Die Regel steht bewusst NACH den Heat-Baendern: die setzen bei gleicher
+   Spezifitaet `box-shadow: none`, und die Heat-Faerbung (Hintergrund) soll
+   erhalten bleiben — beide Aussagen ("wie stark heute" und "Top N der Liga")
+   stehen nebeneinander. Kein Holo-Puls wie an den Portraits: bei 11,5 px
+   Chip-Hoehe waere eine Daueranimation in einer Tabelle nur Unruhe. */
+.matchday-panel-player.is-star-tier-bronze {
+  --nl-star-tone: var(--nl-bronze);
+}
+.matchday-panel-player.is-star-tier-silver {
+  --nl-star-tone: var(--nl-silver);
+}
+.matchday-panel-player.is-star-tier-gold {
+  --nl-star-tone: var(--nl-gold);
+}
+.matchday-panel-player.is-star-tier-diamond {
+  --nl-star-tone: var(--nl-diamond);
+}
+
+.matchday-panel-player.is-star-tier-bronze,
+.matchday-panel-player.is-star-tier-silver,
+.matchday-panel-player.is-star-tier-gold,
+.matchday-panel-player.is-star-tier-diamond {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--nl-star-tone) 85%, transparent),
+    0 0 5px color-mix(in srgb, var(--nl-star-tone) 28%, transparent);
+}
+
 .is-new-look .nl-standings-td-bonus,
 .is-new-look .nl-standings-td-mw {
   color: var(--nl-mut);

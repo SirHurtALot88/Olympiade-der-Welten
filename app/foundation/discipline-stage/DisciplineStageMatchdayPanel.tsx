@@ -27,6 +27,11 @@ import {
   type MatchdayTeamModifiers,
   type MatchdayTeamSideModifiers,
 } from "@/lib/foundation/matchday-team-modifiers";
+import {
+  describePlayerStarTier,
+  getPlayerStarTier,
+  getPlayerStarTierClassName,
+} from "@/lib/foundation/player-star-tier";
 import { teamPrimaryColor, floorTeamAccent } from "@/lib/foundation/team-colors";
 
 export type MatchdayPanelTeamResult = {
@@ -74,6 +79,15 @@ export type MatchdayPanelPlayerRow = {
   score: number | null;
   /** Mutator-Anteil an den PP (separat ausgewiesen, weil er dem Spieler gehoert). */
   mutatorPp: number | null;
+  /**
+   * Ligaweiter OVR-Rang — Grundlage des Star-Tier-Rahmens am Chip (Diamant/Gold/
+   * Silber/Bronze fuer die Top 3/10/25/50, `lib/foundation/player-star-tier.ts`).
+   *
+   * Bewusst der RANG und nicht die fertige Stufe: die Schwellen gehoeren in den
+   * gemeinsamen Begriff, nicht in jede Ansicht, die ihn zeigt. `null` fuer Spieler
+   * ohne Rang — die bleiben rahmenlos, statt auf "Bronze" zu fallen.
+   */
+  ovrRank?: number | null;
 };
 
 export type DisciplineStageMatchdayPanelProps = {
@@ -428,18 +442,26 @@ export default function DisciplineStageMatchdayPanel({
       // Zeilen unter dem Team. Die Team-Zeile bleibt die Summe, die Disziplin-Zeilen
       // zeigen, woher sie kommt. Verdeckte Seiten liefern null statt 0: "noch nicht
       // aufgedeckt" ist etwas anderes als "null Punkte".
+      //
+      // Bei den PUNKTEN steht bewusst KEIN `?? 0` mehr. Findet die Zuordnung ueber
+      // d1DisciplineId/d2DisciplineId kein Ergebnis, ist der Wert UNBEKANNT — und
+      // eine erfundene 0 in der Zeile war genau der Bug: die Disziplin-Zeile behauptete
+      // "0 Punkte, 0 Form, kein Mutator, 0 gesamt", waehrend die Spieler-Chips derselben
+      // Zeile echte PP zeigten. Jetzt steht dort "–", der Widerspruch ist damit sichtbar
+      // statt stillschweigend als Null verbucht. Form und Mutator behalten ihr `?? 0`:
+      // "keine Formkarte gespielt" bzw. "kein Mutator-Bonus" IST der Wert 0.
       bySide: {
         d1: {
-          points: d1Revealed ? d1Pts ?? 0 : null,
+          points: d1Revealed ? d1Pts : null,
           form: d1Revealed ? mods?.d1?.formModifier ?? 0 : null,
           mutator: d1Revealed ? mut?.d1Pp ?? 0 : null,
-          total: d1Revealed ? (d1Pts ?? 0) + (mut?.d1Pp ?? 0) : null,
+          total: d1Revealed && d1Pts != null ? d1Pts + (mut?.d1Pp ?? 0) : null,
         },
         d2: {
-          points: d2Revealed ? d2Pts ?? 0 : null,
+          points: d2Revealed ? d2Pts : null,
           form: d2Revealed ? mods?.d2?.formModifier ?? 0 : null,
           mutator: d2Revealed ? mut?.d2Pp ?? 0 : null,
-          total: d2Revealed ? (d2Pts ?? 0) + (mut?.d2Pp ?? 0) : null,
+          total: d2Revealed && d2Pts != null ? d2Pts + (mut?.d2Pp ?? 0) : null,
         },
       },
       missingLineup: res?.missingLineup ?? false,
@@ -937,12 +959,17 @@ export default function DisciplineStageMatchdayPanel({
                   return (
                     <Fragment key={`${row.teamId}-side-${side}`}>
                       {/* Toenung als eigene, ueber alle Spalten gelegte Flaeche — sonst
-                          blitzten die Spaltenabstaende durch den Zeilenhintergrund. */}
+                          blitzten die Spaltenabstaende durch den Zeilenhintergrund.
+                          `alignSelf: stretch` ist Pflicht: das Raster steht auf
+                          `alignItems: center`, und ein LEERES div erbt daraus die
+                          Inhaltshoehe 0 — die Flaeche war damit nie zu sehen und die
+                          Disziplin-Zeilen lasen sich als Fortsetzung der Teamzeile. */}
                       <div
                         aria-hidden
                         style={{
                           gridColumn: "1 / -1",
                           gridRow,
+                          alignSelf: "stretch",
                           background: "color-mix(in srgb, var(--nl-panel-2) 50%, transparent)",
                           borderRadius: 6,
                         }}
@@ -981,15 +1008,25 @@ export default function DisciplineStageMatchdayPanel({
                         >
                           {sidePlayers.map((entry) => {
                             const heat = entry.pp != null ? getPoolHeatClass(entry.pp, ppPoolBySide[side]) : "";
+                            // Star-Tier des Chips: dieselbe ligaweite Top-Riege wie an den
+                            // Portraits (Kader, Arena, Drawer) — Diamant/Gold/Silber/Bronze
+                            // ueber den OVR-Rang. Ohne Stufe bleibt die Klasse leer und der
+                            // Chip sieht aus wie bisher; ein Spieler ausserhalb der Top 50
+                            // bekommt also KEINEN Rahmen.
+                            const starTier = getPlayerStarTier(entry.ovrRank);
+                            const starClass = getPlayerStarTierClassName(starTier);
+                            const starTitle = describePlayerStarTier(entry.ovrRank);
                             return (
                               <span
                                 key={entry.playerId}
-                                className={heat ? `matchday-panel-player ${heat}` : "matchday-panel-player"}
+                                className={["matchday-panel-player", heat, starClass].filter(Boolean).join(" ")}
                                 // `entry.pp` ist die GESAMTE Gutschrift inkl. Mutator-Aufschlag —
                                 // "davon" ist hier also korrekt, seit die Summe angezeigt wird.
                                 title={`${entry.name} · ${entry.pp != null ? `${entry.pp.toFixed(1)} PP` : "keine PP"}${
                                   entry.score != null ? ` · Score ${entry.score.toFixed(1)}` : ""
-                                }${entry.mutatorPp ? ` · davon ◆ ${entry.mutatorPp.toFixed(1)} Mutator` : ""}`}
+                                }${entry.mutatorPp ? ` · davon ◆ ${entry.mutatorPp.toFixed(1)} Mutator` : ""}${
+                                  starTitle ? ` · ${starTitle}` : ""
+                                }`}
                                 style={{
                                   display: "inline-flex",
                                   alignItems: "baseline",
