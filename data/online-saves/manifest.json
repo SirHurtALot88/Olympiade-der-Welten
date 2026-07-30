@@ -1,63 +1,23 @@
 {
   "schemaVersion": "oly-online-saves-v1",
-  "exportedAt": "2026-07-28T15:17:56.063Z",
-  "activeSaveId": "fresh-season-1-1785220152367",
+  "exportedAt": "2026-07-30T08:09:36.319Z",
+  "activeSaveId": "fresh-season-1-1785071357332",
   "saves": [
     {
-      "saveId": "fresh-season-1-1785220152367",
-      "name": "Auto Run Smoke 2026-07-28T06:29:12.366Z",
+      "saveId": "fresh-season-1-1785071357332",
+      "name": "Auto Run Smoke 2026-07-26T13:09:17.332Z",
       "status": "active",
-      "file": "fresh-season-1-1785220152367.json.gz",
-      "uncompressedBytes": 16603058,
-      "gzipBytes": 2283074
+      "file": "fresh-season-1-1785071357332.json.gz",
+      "uncompressedBytes": 16229433,
+      "gzipBytes": 2200124
     },
     {
-      "saveId": "new-game-1785067203149-82cbka",
-      "name": "UI-Check Neues Spiel",
+      "saveId": "fresh-season-1-1785071405237",
+      "name": "Whole Season DryRun Smoke 2026-07-26T13:10:05.237Z",
       "status": "archived",
-      "file": "new-game-1785067203149-82cbka.json.gz",
-      "uncompressedBytes": 13702115,
-      "gzipBytes": 1906637
-    },
-    {
-      "saveId": "fresh-season-1-1785215034359",
-      "name": "Auto Run Smoke 2026-07-28T05:03:54.359Z",
-      "status": "archived",
-      "file": "fresh-season-1-1785215034359.json.gz",
-      "uncompressedBytes": 16433343,
-      "gzipBytes": 2272914
-    },
-    {
-      "saveId": "fresh-season-1-1785214876544",
-      "name": "Auto Run Smoke 2026-07-28T05:01:16.544Z",
-      "status": "archived",
-      "file": "fresh-season-1-1785214876544.json.gz",
-      "uncompressedBytes": 16092364,
-      "gzipBytes": 2254893
-    },
-    {
-      "saveId": "fresh-season-1-1785213135232",
-      "name": "Auto Run Smoke 2026-07-28T04:32:15.231Z",
-      "status": "archived",
-      "file": "fresh-season-1-1785213135232.json.gz",
-      "uncompressedBytes": 16273678,
-      "gzipBytes": 2263314
-    },
-    {
-      "saveId": "fresh-season-1-1785061991768",
-      "name": "S1 market apply regression 1785061991768",
-      "status": "archived",
-      "file": "fresh-season-1-1785061991768.json.gz",
-      "uncompressedBytes": 12052220,
-      "gzipBytes": 1823973
-    },
-    {
-      "saveId": "save-singleplayer-dev",
-      "name": "Singleplayer Foundation",
-      "status": "archived",
-      "file": "save-singleplayer-dev.json.gz",
-      "uncompressedBytes": 11849061,
-      "gzipBytes": 1757464
+      "file": "fresh-season-1-1785071405237.json.gz",
+      "uncompressedBytes": 12118043,
+      "gzipBytes": 1828297
     }
   ]
 }
