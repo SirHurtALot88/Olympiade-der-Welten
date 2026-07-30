@@ -17,7 +17,7 @@
 
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import type { DisciplineFieldProps, RT } from "./types";
-import { GhostLayer, TokenChrome } from "./benchmark";
+import { GhostLayer, TokenChrome, tokenRadius } from "./benchmark";
 
 // Deterministischer 0…1-Hash (FNV-1a) — Feld-Deko/Fahrer-Phasen ohne Hydration-Mismatch.
 function h01(s: string): number {
@@ -108,7 +108,7 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
   const streakRefs = useRef<Map<number, SVGLineElement | null>>(new Map());
   const packRefs = useRef<Map<number, SVGCircleElement | null>>(new Map());
 
-  const rOf = (t: RT): number => (t.isOwn ? geo.rOwn : geo.r);
+  const rOf = (t: RT): number => (tokenRadius(t, geo));
 
   // ---- Straßen-Deko (Publikum, Wimpel, Absperrgitter, km-Marken) — einmalig ----------
   const roadArt = useMemo(() => {
@@ -372,7 +372,7 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
         {rt.map((t) =>
           t.logoUrl ? (
             <clipPath key={`clip-${t.code}`} id={`natclip-${t.code}`}>
-              <circle cx={0} cy={0} r={t.isOwn ? geo.rOwn : geo.r} />
+              <circle cx={0} cy={0} r={tokenRadius(t, geo)} />
             </clipPath>
           ) : null,
         )}

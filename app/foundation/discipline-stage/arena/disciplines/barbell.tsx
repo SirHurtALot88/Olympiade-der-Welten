@@ -12,7 +12,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { hueForIdx, TRACK_ROUND_MS } from "../DisciplineStageNativeArena";
 import type { DisciplineFieldProps, RT } from "./types";
-import { TokenChrome } from "./benchmark";
+import { TokenChrome, tokenRadius } from "./benchmark";
 
 type BarbellState = {
   fromY: number;
@@ -195,7 +195,7 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
         {rt.map((t) =>
           t.logoUrl ? (
             <clipPath key={`clip-${t.code}`} id={`natclip-${t.code}`}>
-              <circle cx={0} cy={0} r={t.isOwn ? geo.rOwn : geo.r} />
+              <circle cx={0} cy={0} r={tokenRadius(t, geo)} />
             </clipPath>
           ) : null,
         )}
@@ -394,7 +394,7 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
         .slice()
         .reverse()
         .map((t) => {
-          const r = t.isOwn ? geo.rOwn : geo.r;
+          const r = tokenRadius(t, geo);
           const bbOut = barbellEliminated(t.idx);
           const bbChamp = done && (barbellRankMap[t.code] ?? 99) === 1;
           const glowing = t.glowUntil > now;
