@@ -2558,105 +2558,30 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             saveId={activeSaveId}
             seasonId={gameState.season.id}
             matchdayId={gameState.matchdayState.matchdayId}
-            onAdvanceMatchday={null}
+            // Der Spieltagswechsel gehoert in die Arena, nicht in einen Kasten darunter.
+            // Vorher stand er in der "Spieltagsergebnis"-Sektion — die ist entfernt, und
+            // damit waere der Spieltag aus dem normalen Spielverlauf nicht mehr
+            // abschliessbar gewesen (man landete im Cockpit und hing dort fest).
+            //
+            // Gate wie zuvor ueber `canAdvanceMatchdayFromStep`: "ready" allein genuegt
+            // NICHT — der Schritt steht auf "warning", sobald das Board gerissene
+            // Saisonziele meldet. Das ist eine Mitteilung, kein Hindernis. Ist der
+            // Spieltag noch nicht gewertet, gibt es keinen Knopf (null), und die Buehne
+            // zeigt stattdessen ihren Hinweis.
+            onAdvanceMatchday={
+              canAdvanceMatchdayFromStep(matchdayAdvanceStep)
+                ? () => runCockpitMatchdayAdvance?.(true)
+                : null
+            }
             onCommitDiscipline={commitArenaDiscipline}
             onOpenPlayer={(playerId) => openPlayerDrawerById(playerId)}
             onOpenTeam={(teamId) => openTeamDrawerById(teamId)}
             roomContext={roomContext}
           />
-              <section className="panel arena-result-summary" id="arena-result-summary" data-testid="arena-result-summary">
-                <div className="panel-header">
-                  <div className="stack">
-                    <h2>Spieltagsergebnis</h2>
-                    <span className="muted">
-                      {matchdaySummary.seasonId} · Spieltag{" "}
-                      {homeNextMatchdayStatus.resultAvailable ? (matchdaySummary.matchdayNumber ?? "—") : (gameState.season.currentMatchday ?? "—")}
-                      {" "}· direkt aus gespeicherten Matchday-Results
-                    </span>
-                  </div>
-                  <div className="matchday-result-actions">
-                    <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("matchdayArena", setActiveView)}>
-                      Zur Arena
-                    </button>
-                    <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("seasonV2", setActiveView)}>
-                      Saisonstand ansehen
-                    </button>
-                    {/* „Spieltag abschliessen" ist zurueck — und zwar als bewusste
-                        Entscheidung des Managers.
-
-                        Die Wertung passiert weiterhin am Ende jeder Disziplin in der Arena;
-                        neu ist nur, dass der Spieltagswechsel NICHT mehr automatisch an D2
-                        haengt (`commitArenaDiscipline` ruft den Auto-Run mit
-                        `advanceAfterCashApply: false`). Vorher sprang die Ansicht direkt nach
-                        D2 auf den naechsten Spieltag und die gerade gespielte Tabelle war weg,
-                        bevor man sie lesen konnte. Jetzt bleibt der Stand stehen, bis hier
-                        gedrueckt wird.
-
-                        Gegatet auf den Flow-Schritt, nicht auf die Summary. WICHTIG: "ready" allein
-                        genuegt dafuer NICHT — der Schritt steht auf "warning", sobald das Board
-                        `board_objectives_failed` meldet (Saisonziele gerissen). Das ist eine
-                        Mitteilung, kein Hindernis: gewertet ist der Spieltag genauso. Vorher
-                        verschwand der Knopf dadurch komplett, und der Spieltag liess sich aus dem
-                        normalen Spielverlauf nicht mehr abschliessen. `canAdvanceMatchdayFromStep`
-                        deckt beide Zustaende ab und wird auch vom globalen "Weiter" benutzt. */}
-                    {canAdvanceMatchdayFromStep(matchdayAdvanceStep) ? (
-                      <button
-                        className="primary-button inline-button"
-                        type="button"
-                        data-testid="arena-finish-matchday"
-                        disabled={cockpitBusyKey === "matchday-advance"}
-                        title="Beide Disziplinen sind gewertet. Schaltet auf den nächsten Spieltag weiter — die Tabelle bleibt bis dahin stehen."
-                        onClick={() => void runCockpitMatchdayAdvance?.(true)}
-                      >
-                        {cockpitBusyKey === "matchday-advance" ? "schaltet weiter…" : "Spieltag abschließen"}
-                      </button>
-                    ) : homeNextMatchdayStatus.resultAvailable ? (
-                      <button className="primary-button inline-button" type="button" onClick={triggerGlobalNext}>
-                        Weiter
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-                {/* Kein Leerzustands-Kasten mehr: solange es noch kein Ergebnis gibt, bleibt der
-                    Bereich einfach leer. Der Hinweis stand als Warn-Callout unter den Buttons und
-                    las sich wie ein Fehler, obwohl "noch nicht ausgewertet" der Normalzustand vor
-                    dem Abschluss ist. */}
-                {!homeNextMatchdayStatus.resultAvailable ||
-                (matchdaySummary.topTeams.length === 0 && matchdaySummary.bottomTeams.length === 0) ? null : (
-                  <div className="matchday-result-hero-grid">
-                    <article className="metric-card">
-                      <span>Aktives Team</span>
-                      <strong>{activeTeamMatchdaySummaryRow?.teamShortCode ?? selectedTeam?.shortCode ?? "—"}</strong>
-                      <small>
-                        Tagesrang {activeTeamMatchdaySummaryRow?.matchdayRank ?? "—"} · {activeTeamMatchdaySummaryRow?.matchdayPoints != null ? formatNlNumber(activeTeamMatchdaySummaryRow.matchdayPoints, 1) : "—"} Pkt
-                      </small>
-                    </article>
-                    <article className="metric-card">
-                      <span>Rangänderung</span>
-                      <strong className={activeTeamMatchdaySummaryRow?.rankDirection === "up" ? "text-positive" : activeTeamMatchdaySummaryRow?.rankDirection === "down" ? "text-negative" : undefined}>
-                        {activeTeamMatchdaySummaryRow?.rankDelta != null
-                          ? activeTeamMatchdaySummaryRow.rankDelta > 0
-                            ? `↑ +${activeTeamMatchdaySummaryRow.rankDelta}`
-                            : activeTeamMatchdaySummaryRow.rankDelta < 0
-                              ? `↓ ${activeTeamMatchdaySummaryRow.rankDelta}`
-                              : "0"
-                          : "—"}
-                      </strong>
-                      <small>{activeTeamMatchdaySummaryRow?.seasonRankBeforeMatchday ?? "—"} → {activeTeamMatchdaySummaryRow?.seasonRankAfterMatchday ?? "—"}</small>
-                    </article>
-                    <article className="metric-card">
-                      <span>D1</span>
-                      <strong>{matchdaySummary.d1.disciplineName ?? "—"}</strong>
-                      <small>{matchdaySummary.d1.disciplineId ?? "missing_source"}</small>
-                    </article>
-                    <article className="metric-card">
-                      <span>D2</span>
-                      <strong>{matchdaySummary.d2.disciplineName ?? "—"}</strong>
-                      <small>{matchdaySummary.d2.disciplineId ?? "missing_source"}</small>
-                    </article>
-                  </div>
-                )}
-              </section>
+              {/* Die "Spieltagsergebnis"-Sektion ist entfernt: sie wiederholte, was die
+                  Arena und der Saisonstand ohnehin zeigen, und war der Grund, warum der
+                  Spieltagswechsel unterhalb der Buehne versteckt lag. Der Knopf sitzt
+                  jetzt in der Arena (onAdvanceMatchday oben). */}
           </div>
           ) : null}
 

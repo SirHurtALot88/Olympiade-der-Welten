@@ -111,6 +111,24 @@ const ALL_MUTATOR_TRAITS = [...POSITIVE_MUTATOR_TRAITS, ...NEGATIVE_MUTATOR_TRAI
 const POSITIVE_TRAIT_SET = new Set(POSITIVE_MUTATOR_TRAITS.map((t) => t.toLowerCase()));
 
 // 2 Traits deterministisch aus dem Pool wählen (seed = Wurf).
+/**
+ * Zurueck an den Anfang der Buehne.
+ *
+ * Der "Weiter zu Disziplin 2"-Knopf sitzt UNTER der Arena. Ohne diesen Sprung stand man
+ * nach dem Wechsel mitten in der Spieltags-Wertung und musste die neue Disziplin erst
+ * wieder hochsuchen. Ziel ist der Arena-Container aus dem Shell (`foundation-matchday-arena`);
+ * fehlt er, wird auf den Seitenanfang zurueckgefallen.
+ */
+function scrollArenaIntoView() {
+  if (typeof document === "undefined") return;
+  const container = document.getElementById("foundation-matchday-arena");
+  if (container) {
+    container.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 function pickMutatorTraits(seed: number): string[] {
   const rng = mulberry32(seed);
   const pool = [...ALL_MUTATOR_TRAITS];
@@ -1865,7 +1883,13 @@ export default function DisciplineStageArena({
                   </span>
                   <button
                     type="button"
-                    onClick={() => setDisciplineId(secondDisciplineId)}
+                    onClick={() => {
+                      setDisciplineId(secondDisciplineId);
+                      // Nach oben scrollen: der Knopf sitzt UNTER der Buehne, nach dem
+                      // Wechsel stand man also mitten in der Spieltags-Wertung und musste
+                      // sich die neue Disziplin erst wieder hochsuchen.
+                      scrollArenaIntoView();
+                    }}
                     style={{
                       padding: "11px 22px",
                       fontWeight: 800,
@@ -1885,10 +1909,13 @@ export default function DisciplineStageArena({
             return onAdvanceMatchday ? (
               <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 12, color: "var(--nl-mut)" }}>
-                  Auswertung identisch zur Arena — schließt den Spieltag ab und schaltet weiter.
+                  Beide Disziplinen sind gewertet — schaltet auf den nächsten Spieltag weiter.
                 </span>
                 <button
                   type="button"
+                  // Anker fuer Tests und die Browser-Smokes. Lag vorher am Knopf in der
+                  // entfernten "Spieltagsergebnis"-Sektion und wandert mit ihm hierher.
+                  data-testid="arena-finish-matchday"
                   disabled={advancing}
                   onClick={async () => {
                     if (advancingRef.current) return;
@@ -1913,7 +1940,7 @@ export default function DisciplineStageArena({
                     opacity: advancing ? 0.6 : 1,
                   }}
                 >
-                  {advancing ? "Wird ausgewertet …" : "Spieltag auswerten & weiter →"}
+                  {advancing ? "schaltet weiter…" : "Spieltag abschließen"}
                 </button>
               </div>
             ) : null;

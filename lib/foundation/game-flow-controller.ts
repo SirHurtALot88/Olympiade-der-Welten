@@ -783,7 +783,10 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       cta: "Weiter: Ergebnis anschauen",
       status: hasResults ? "ready" : "blocked",
       targetView: "matchdayArena",
-      targetPanel: "arena-result-summary",
+      // Die "Spieltagsergebnis"-Sektion ist entfernt — sie wiederholte, was Arena und
+      // Saisonstand ohnehin zeigen. Das Ergebnis steht jetzt in der Arena selbst
+      // (Spieltags-Wertung unter der Buehne), also fuehrt der Schritt dorthin.
+      targetPanel: "foundation-matchday-arena",
       teamId: activeTeamId,
       blockers: hasResults ? [] : ["missing_results"],
     }),
