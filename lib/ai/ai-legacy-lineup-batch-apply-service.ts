@@ -1,11 +1,13 @@
 import { buildAiLegacyLineupPreview, getMarginalRankPointSwing } from "@/lib/ai/ai-legacy-lineup-engine";
-import type { FormCardColor, GameState, LineupDraftModifiers } from "@/lib/data/olyDataTypes";
+import type { FormCardColor, GameState, LineupDraft, LineupDraftModifiers } from "@/lib/data/olyDataTypes";
+import { isTeamMatchdayLineupOperationallyReady } from "@/lib/foundation/matchday-lineup-readiness";
 import type { AiLegacyLineupPreviewStatus } from "@/lib/ai/ai-needs-types";
 import { buildTeamControlSettingsMap, isAiLineupBatchApplyEnabled } from "@/lib/foundation/team-control-settings";
 import {
   createDefaultLineupDraftModifiers,
   ensureLocalFormCardsForSeason,
   getFormCardColorForDisciplineCategory,
+  seededUnitInterval,
 } from "@/lib/lineups/legacy-lineup-modifiers";
 import type { LegacyFormCardOption, LegacyLineupEntryInput, LegacyLineupKeyParams, LegacyLineupLoadedContext, LegacyMutatorTraitOption, LegacyRosterPlayerRef, LegacyTeamPowerOption } from "@/lib/lineups/legacy-lineup-types";
 import {
@@ -250,26 +252,6 @@ function takeBestFormCard(input: {
   return picked;
 }
 
-function findBestMatchingPositiveFormCard(input: {
-  cards: LegacyFormCardOption[];
-  usedIds: Set<string>;
-  color: FormCardColor | null;
-  fallbackAnyColor?: boolean;
-}) {
-  const candidates = input.cards.filter((card) => !input.usedIds.has(card.id) && card.value > 0);
-  if (candidates.length === 0) return null;
-
-  const colorMatchCandidates = input.color ? candidates.filter((card) => card.color === input.color) : [];
-  if (colorMatchCandidates.length > 0) {
-    return sortFormCardsForSlot(colorMatchCandidates, input.color, "positive")[0] ?? null;
-  }
-
-  if (input.fallbackAnyColor) {
-    return sortFormCardsForSlot(candidates, null, "positive")[0] ?? null;
-  }
-  return null;
-}
-
 function competitivenessRank(value: DisciplineSideCompetitiveness) {
   switch (value) {
     case "weak":
@@ -281,8 +263,162 @@ function competitivenessRank(value: DisciplineSideCompetitiveness) {
   }
 }
 
+// --- Formkarten-Haushalt -------------------------------------------------------------------
+// Der Punktwert eines Karteneinsatzes ist `Kartenwert × (Farbtreffer ? 2 : 1) × Spielerzahl`
+// (s. calculateFormModifierForSide): dieselbe Karte bringt in einer 6er-Disziplin doppelt so
+// viele Teampunkte wie in einer 3er. Statt Karten stur nach Wettbewerbslage zu verbrennen,
+// bewertet die KI jeden Einsatz gegen die besten noch KOMMENDEN Slots im Saisonplan und
+// spart dicke Karten für große (idealerweise farbgleiche) Disziplinen auf.
+
+type FormCardFutureSlot = {
+  /** Spieltage Abstand zum Slot (>= 1). */
+  distance: number;
+  playerCount: number;
+  color: FormCardColor | null;
+};
+
+// Abzinsung pro Spieltag Abstand: ferne Traum-Slots zählen weniger — die Zukunft ist unsicher
+// (Formkrisen, Verletzungen) und die eigenen Karten konkurrieren um dieselben großen Slots.
+const FORM_CARD_FUTURE_DISCOUNT = 0.93;
+
+// Ohne echten Saisonplan (synthetische Test-Kontexte) wird mit neutralen 4er-Slots geplant:
+// konservativ genug, dass dicke Karten nicht am ersten Spieltag in Mini-Disziplinen landen.
+const FORM_CARD_FALLBACK_SLOT_PLAYER_COUNT = 4;
+
+function collectFutureFormCardSlots(
+  context: LegacyLineupLoadedContext,
+  currentMatchdayIndex: number,
+  remainingMatchdaysIncludingCurrent: number,
+): FormCardFutureSlot[] {
+  const schedule = (context.seasonDisciplineSchedule ?? []).filter(
+    (entry) => entry.matchdayIndex > currentMatchdayIndex,
+  );
+  if (schedule.length > 0) {
+    const slots: FormCardFutureSlot[] = [];
+    for (const entry of schedule) {
+      for (const slot of [entry.discipline1, entry.discipline2]) {
+        if (!slot) continue;
+        slots.push({
+          distance: Math.max(1, entry.matchdayIndex - currentMatchdayIndex),
+          playerCount: slot.playerCount ?? FORM_CARD_FALLBACK_SLOT_PLAYER_COUNT,
+          color: getFormCardColorForDisciplineCategory(slot.category),
+        });
+      }
+    }
+    return slots;
+  }
+
+  // Fallback ohne Plan: verbleibende Spieltage als farb-neutrale Durchschnitts-Slots.
+  const slots: FormCardFutureSlot[] = [];
+  for (let distance = 1; distance < remainingMatchdaysIncludingCurrent; distance += 1) {
+    slots.push(
+      { distance, playerCount: FORM_CARD_FALLBACK_SLOT_PLAYER_COUNT, color: null },
+      { distance, playerCount: FORM_CARD_FALLBACK_SLOT_PLAYER_COUNT, color: null },
+    );
+  }
+  return slots;
+}
+
+function formCardDeploymentValue(card: LegacyFormCardOption, color: FormCardColor | null, playerCount: number) {
+  const multiplier = color != null && card.color === color ? 2 : 1;
+  return card.value * multiplier * Math.max(1, playerCount);
+}
+
+function estimateBestFutureFormCardValue(card: LegacyFormCardOption, futureSlots: FormCardFutureSlot[]) {
+  let best = 0;
+  for (const slot of futureSlots) {
+    const value = formCardDeploymentValue(card, slot.color, slot.playerCount) * FORM_CARD_FUTURE_DISCOUNT ** slot.distance;
+    if (value > best) {
+      best = value;
+    }
+  }
+  return best;
+}
+
+// Team-Charakter statt Einheits-KI (Vorbild: Doktrinen in team-powers): mentale Teams
+// haushalten geduldiger, Power-Teams hauen eher raus. Dazu ein deterministischer Jitter
+// pro Team, damit auch gleichgelagerte Identitäten nicht identisch spielen.
+type FormCardDoctrineProfile = {
+  /** ~0.85..1.2 — je höher, desto eher wird eine Karte für bessere zukünftige Slots reserviert. */
+  patience: number;
+  /** 0..1 — Overkill-Bremse: wie konsequent auf die zweite Karte verzichtet wird, wenn die Seite ohnehin dominiert. */
+  restraint: number;
+};
+
+function getFormCardDoctrineProfile(context: LegacyLineupLoadedContext): FormCardDoctrineProfile {
+  const identity = context.teamIdentity ?? null;
+  const pow = identity?.pow ?? 0;
+  const spe = identity?.spe ?? 0;
+  const men = identity?.men ?? 0;
+  const soc = identity?.soc ?? 0;
+  const mentalLean = identity != null && men >= Math.max(pow, spe, soc);
+  const powerLean = identity != null && pow >= Math.max(spe, men, soc);
+  const patienceJitter = (seededUnitInterval(`formcard-patience|${context.teamId}`) - 0.5) * 0.16;
+  const restraintJitter = (seededUnitInterval(`formcard-restraint|${context.teamId}`) - 0.5) * 0.3;
+  const patience = Math.min(
+    1.2,
+    Math.max(0.85, 1 + (mentalLean ? 0.08 : 0) - (powerLean ? 0.08 : 0) + patienceJitter),
+  );
+  const restraint = Math.min(
+    1,
+    Math.max(0, 0.55 + (mentalLean ? 0.2 : 0) - (powerLean ? 0.2 : 0) + restraintJitter),
+  );
+  return { patience, restraint };
+}
+
+function selectPositiveFormCardForSlot(input: {
+  positiveCards: LegacyFormCardOption[];
+  usedIds: Set<string>;
+  color: FormCardColor | null;
+  playerCount: number;
+  futureSlots: FormCardFutureSlot[];
+  patience: number;
+  /** Ausgabedruck (Urgency/Pace/Restsaison): dann darf auch die "am wenigsten bereute" reservierte Karte fallen. */
+  mustSpend: boolean;
+}): LegacyFormCardOption | null {
+  const candidates = input.positiveCards.filter((card) => !input.usedIds.has(card.id) && card.value > 0);
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  // Reserve-Schwelle: geduldige Teams reservieren schon bei kleinem Zukunftsvorteil,
+  // ungeduldige erst bei deutlichem. (patience 0.85..1.2 → Faktor 1.35..1.0)
+  const reserveFactor = Math.max(1, 2.2 - input.patience);
+  const scored = candidates.map((card) => {
+    const nowValue = formCardDeploymentValue(card, input.color, input.playerCount);
+    const futureValue = estimateBestFutureFormCardValue(card, input.futureSlots);
+    return {
+      card,
+      colorHit: input.color != null && card.color === input.color,
+      nowValue,
+      regret: futureValue - nowValue,
+      reserved: futureValue > nowValue * reserveFactor,
+    };
+  });
+
+  const playable = scored.filter((entry) => !entry.reserved);
+  const pool =
+    playable.length > 0
+      ? playable
+      : input.mustSpend
+        ? // Zwangsausgabe: die Karte opfern, die durch den Einsatz JETZT am wenigsten verliert.
+          [[...scored].sort((left, right) => left.regret - right.regret || left.card.id.localeCompare(right.card.id))[0]!]
+        : [];
+  if (pool.length === 0) {
+    return null;
+  }
+
+  const picked = [...pool].sort((left, right) => {
+    if (left.nowValue !== right.nowValue) return right.nowValue - left.nowValue;
+    if (left.colorHit !== right.colorHit) return (right.colorHit ? 1 : 0) - (left.colorHit ? 1 : 0);
+    return left.card.id.localeCompare(right.card.id);
+  })[0]!.card;
+  input.usedIds.add(picked.id);
+  return picked;
+}
+
 function planNegativeDumpSidesForMatchday(input: {
-  sides: Array<{ side: "d1" | "d2"; competitiveness: DisciplineSideCompetitiveness }>;
+  sides: Array<{ side: "d1" | "d2"; competitiveness: DisciplineSideCompetitiveness; playerCount?: number }>;
   dumpsRequiredThisMatchday: number;
   unusedNegativeCount: number;
   // Nur bei ECHTEM Zwang (letzte Spieltage / mehr Negativkarten als Restslots) dürfen
@@ -297,8 +433,13 @@ function planNegativeDumpSidesForMatchday(input: {
   }
 
   const target = Math.min(input.dumpsRequiredThisMatchday, input.unusedNegativeCount, 2);
+  // Bei gleicher Wettbewerbslage in die KLEINERE Disziplin entsorgen: der Malus einer
+  // Minuskarte skaliert wie der Bonus mit der Spielerzahl — ein Dump in der 2er kostet
+  // ein Drittel dessen, was er in der 6er kosten würde.
   const orderedSides = [...input.sides].sort(
-    (left, right) => competitivenessRank(left.competitiveness) - competitivenessRank(right.competitiveness),
+    (left, right) =>
+      competitivenessRank(left.competitiveness) - competitivenessRank(right.competitiveness) ||
+      (left.playerCount ?? 0) - (right.playerCount ?? 0),
   );
 
   for (const side of orderedSides) {
@@ -784,9 +925,12 @@ function pickPrimaryFormCardForSide(input: {
   positiveCards: LegacyFormCardOption[];
   usedIds: Set<string>;
   color: FormCardColor | null;
+  playerCount: number;
+  futureSlots: FormCardFutureSlot[];
+  doctrine: FormCardDoctrineProfile;
   positiveSelected: number;
   desiredPositiveThisMatchday: number;
-  positiveUrgency: boolean;
+  mustSpendPositives: boolean;
 }) {
   if (input.competitiveness === "weak") {
     return takeDumpNegativeFormCard({
@@ -813,33 +957,24 @@ function pickPrimaryFormCardForSide(input: {
     });
   }
 
-  if (input.competitiveness === "strong" && input.positiveSelected < input.desiredPositiveThisMatchday) {
-    const positive = findBestMatchingPositiveFormCard({
-      cards: input.positiveCards,
-      usedIds: input.usedIds,
-      color: input.color,
-      fallbackAnyColor: input.positiveUrgency,
-    });
-    if (positive) {
-      input.usedIds.add(positive.id);
-      return positive;
-    }
+  if (input.positiveSelected >= input.desiredPositiveThisMatchday) {
+    return null;
+  }
+  // Neutrale Seiten investieren nur unter Ausgabedruck (Karten stauen sich / Saisonende naht) —
+  // sonst gehören die knappen Positivkarten den Seiten, auf denen das Team wirklich mitspielt.
+  if (input.competitiveness === "neutral" && !input.mustSpendPositives) {
+    return null;
   }
 
-  if (input.competitiveness === "neutral" && input.positiveUrgency && input.positiveSelected < input.desiredPositiveThisMatchday) {
-    const positive = findBestMatchingPositiveFormCard({
-      cards: input.positiveCards,
-      usedIds: input.usedIds,
-      color: input.color,
-      fallbackAnyColor: true,
-    });
-    if (positive) {
-      input.usedIds.add(positive.id);
-      return positive;
-    }
-  }
-
-  return null;
+  return selectPositiveFormCardForSlot({
+    positiveCards: input.positiveCards,
+    usedIds: input.usedIds,
+    color: input.color,
+    playerCount: input.playerCount,
+    futureSlots: input.futureSlots,
+    patience: input.doctrine.patience,
+    mustSpend: input.mustSpendPositives,
+  });
 }
 
 function pickSecondaryFormCardForSide(input: {
@@ -848,28 +983,39 @@ function pickSecondaryFormCardForSide(input: {
   positiveCards: LegacyFormCardOption[];
   usedIds: Set<string>;
   color: FormCardColor | null;
+  playerCount: number;
+  futureSlots: FormCardFutureSlot[];
+  doctrine: FormCardDoctrineProfile;
+  /** Seite führt die Disziplin ohnehin klar an — die zweite dicke Karte wäre Overkill. */
+  dominant: boolean;
   positiveSelected: number;
   desiredPositiveThisMatchday: number;
-  positiveUrgency: boolean;
+  mustSpendPositives: boolean;
 }) {
   // Weak sides never get secondary cards.
   if (input.competitiveness === "weak") return null;
   // Neutral sides only get a secondary when positives are piling up.
-  if (input.competitiveness === "neutral" && !input.positiveUrgency) return null;
+  if (input.competitiveness === "neutral" && !input.mustSpendPositives) return null;
   // Never put a negative in the secondary slot.
   if (input.primaryCard && input.primaryCard.value < 0) return null;
   if (input.positiveSelected >= input.desiredPositiveThisMatchday) return null;
+  // Overkill-Bremse: Wer die Disziplin ohnehin klar anführt, gewinnt auch mit EINER Karte —
+  // die zweite fehlt später (Chris: "selbst mit nur 1 8x2 Karte wären sie immer noch 1.").
+  // Wie konsequent verzichtet wird, ist Team-Charakter (restraint), kein Einheitsschalter.
+  if (input.dominant && !input.mustSpendPositives && input.doctrine.restraint >= 0.35) return null;
+  // Kleine Disziplinen rechtfertigen keine Doppel-Investition: der zweite Karteneinsatz
+  // wirkt dort nur mit halber Kraft einer großen Disziplin.
+  if (input.playerCount <= 3 && !input.mustSpendPositives) return null;
 
-  const positive = findBestMatchingPositiveFormCard({
-    cards: input.positiveCards,
+  return selectPositiveFormCardForSlot({
+    positiveCards: input.positiveCards,
     usedIds: input.usedIds,
     color: input.color,
-    fallbackAnyColor: input.positiveUrgency,
+    playerCount: input.playerCount,
+    futureSlots: input.futureSlots,
+    patience: input.doctrine.patience,
+    mustSpend: input.mustSpendPositives,
   });
-  if (positive) {
-    input.usedIds.add(positive.id);
-  }
-  return positive;
 }
 
 function getAiIntensityForSide(input: {
@@ -987,15 +1133,27 @@ export function buildAiLegacyLineupModifiers(
     2,
     Math.max(0, negativeCards.length - Math.max(0, remainingPrimarySlots - 2)),
   );
-  const desiredPositiveThisMatchday = Math.min(
-    4,
-    Math.ceil(positiveCards.length / remainingMatchdaysIncludingCurrent),
-  );
   // Urgency flags: true when cards are accumulating faster than available slots can absorb them.
   // Negative urgency: more negatives than remaining primary slots (can't all be used without color-override).
   // Positive urgency: more than 2 positives needed per matchday to exhaust the pool.
   const negativeUrgency = negativeCards.length > remainingPrimarySlots;
   const positiveUrgency = positiveCards.length > remainingMatchdaysIncludingCurrent * 2;
+  // Ausgaben-Pace über die Saison: ~85% der Positivkarten sollen bis zum Saisonende fallen,
+  // leicht backloaded (Exponent > 1), damit früh gespart und hinten raus ausgegeben wird.
+  // Hinkt das Team dem Pace hinterher, entsteht Ausgabedruck — Karten sollen nicht verrotten.
+  const positiveSpentSoFar = (context.formCards ?? []).filter((card) => card.isUsed && card.value > 0).length;
+  const totalPositiveSeason = positiveSpentSoFar + positiveCards.length;
+  const paceProgress = Math.pow(Math.max(0, currentMatchdayIndex - 1) / totalMatchdays, 1.15);
+  const paceTarget = Math.floor(totalPositiveSeason * 0.85 * paceProgress);
+  const paceDeficit = Math.max(0, paceTarget - positiveSpentSoFar);
+  const mustSpendPositives =
+    positiveUrgency || paceDeficit >= 1 || remainingMatchdaysIncludingCurrent <= 2;
+  const desiredPositiveThisMatchday = Math.min(
+    4,
+    Math.max(Math.ceil(positiveCards.length / remainingMatchdaysIncludingCurrent), Math.min(3, paceDeficit)),
+  );
+  const doctrine = getFormCardDoctrineProfile(context);
+  const futureSlots = collectFutureFormCardSlots(context, currentMatchdayIndex, remainingMatchdaysIncludingCurrent);
   const usedIds = new Set<string>();
   let positiveSelected = 0;
   const sides = [
@@ -1003,36 +1161,58 @@ export function buildAiLegacyLineupModifiers(
       side: "d1" as const,
       disciplineId: context.matchdayContract?.discipline1?.disciplineId ?? null,
       color: getFormCardColorForDisciplineCategory(context.matchdayContract?.discipline1?.category),
+      requiredPlayers: context.matchdayContract?.discipline1?.requiredPlayers ?? null,
     },
     {
       side: "d2" as const,
       disciplineId: context.matchdayContract?.discipline2?.disciplineId ?? null,
       color: getFormCardColorForDisciplineCategory(context.matchdayContract?.discipline2?.category),
+      requiredPlayers: context.matchdayContract?.discipline2?.requiredPlayers ?? null,
     },
   ];
-  const sidePlans = sides.map((side) => ({
-    ...side,
-    competitiveness: estimateDisciplineSideCompetitiveness({
+  const sidePlans = sides.map((side) => {
+    const rank = side.disciplineId ? context.teamDisciplineRanks?.[side.disciplineId]?.rank ?? null : null;
+    const strongestScore = getSideStrongestScore({
       context,
       side: side.side,
       disciplineId: side.disciplineId,
       plannedEntries,
-    }),
-    // Marginaler Punktwert eines Rang-Schritts (rank-to-points): Positivkarten sollen dahin,
-    // wo ein Rang-Sprung real Punkte bewegt — große Disziplinen und umkämpfte Ränge zuerst.
-    rankPointSwing: (() => {
-      if (!side.disciplineId) return null;
-      const requiredPlayers =
-        side.side === "d1"
-          ? context.matchdayContract?.discipline1?.requiredPlayers ?? null
-          : context.matchdayContract?.discipline2?.requiredPlayers ?? null;
-      if (requiredPlayers == null) return null;
-      return getMarginalRankPointSwing(
-        requiredPlayers,
-        context.teamDisciplineRanks?.[side.disciplineId]?.rank ?? null,
-      );
-    })(),
-  }));
+    });
+    const competitiveness = estimateDisciplineSideCompetitiveness({
+      context,
+      side: side.side,
+      disciplineId: side.disciplineId,
+      plannedEntries,
+    });
+    const contractPlayerCount =
+      side.requiredPlayers ??
+      (side.disciplineId
+        ? context.disciplineSidePlayerCounts?.[`${side.disciplineId}::${side.side}`] ??
+          context.disciplinePlayerCounts[side.disciplineId] ??
+          null
+        : null);
+    const playerCount = Math.max(
+      1,
+      contractPlayerCount ??
+        (plannedEntries.filter((entry) => entry.disciplineSide === side.side).length ||
+          FORM_CARD_FALLBACK_SLOT_PLAYER_COUNT),
+    );
+
+    return {
+      ...side,
+      competitiveness,
+      playerCount,
+      // Klare Dominanz: Die Seite führt die Disziplin an UND bringt Top-Personal — hier reicht
+      // eine Karte, die zweite wäre verschenkter Saisonvorrat (Overkill-Bremse im Secondary-Pick).
+      dominant: competitiveness === "strong" && rank != null && rank <= 2 && strongestScore >= 80,
+      // Marginaler Punktwert eines Rang-Schritts (rank-to-points): Positivkarten sollen dahin,
+      // wo ein Rang-Sprung real Punkte bewegt — große Disziplinen und umkämpfte Ränge zuerst.
+      rankPointSwing: (() => {
+        if (!side.disciplineId || side.requiredPlayers == null) return null;
+        return getMarginalRankPointSwing(side.requiredPlayers, rank);
+      })(),
+    };
+  });
   // When negative urgency is active, also flag the weaker sides for forced dumps so all
   // negatives get assigned rather than waiting until the very last matchday.
   const effectiveDumpsRequired = negativeUrgency
@@ -1057,8 +1237,17 @@ export function buildAiLegacyLineupModifiers(
   const orderedSidePlans = [...sidePlans].sort((left, right) => {
     const competitivenessDiff = competitivenessRank(right.competitiveness) - competitivenessRank(left.competitiveness);
     if (competitivenessDiff !== 0) return competitivenessDiff;
+    // Zwei schwache Seiten sind reine Müllkippen: die KLEINERE Disziplin zuerst — dort
+    // kostet die Minuskarte am wenigsten Teampunkte (Malus × Spielerzahl).
+    if (left.competitiveness === "weak" && right.competitiveness === "weak") {
+      const dumpCostDiff = left.playerCount - right.playerCount;
+      if (dumpCostDiff !== 0) return dumpCostDiff;
+      return left.side.localeCompare(right.side);
+    }
     const swingDiff = (right.rankPointSwing ?? 0) - (left.rankPointSwing ?? 0);
     if (swingDiff !== 0) return swingDiff;
+    const playerCountDiff = right.playerCount - left.playerCount;
+    if (playerCountDiff !== 0) return playerCountDiff;
     return left.side.localeCompare(right.side);
   });
 
@@ -1072,9 +1261,12 @@ export function buildAiLegacyLineupModifiers(
             positiveCards,
             usedIds,
             color: side.color,
+            playerCount: side.playerCount,
+            futureSlots,
+            doctrine,
             positiveSelected,
             desiredPositiveThisMatchday,
-            positiveUrgency,
+            mustSpendPositives,
           })
         : null;
 
@@ -1093,9 +1285,13 @@ export function buildAiLegacyLineupModifiers(
             positiveCards,
             usedIds,
             color: side.color,
+            playerCount: side.playerCount,
+            futureSlots,
+            doctrine,
+            dominant: side.dominant,
             positiveSelected,
             desiredPositiveThisMatchday,
-            positiveUrgency,
+            mustSpendPositives,
           })
         : null;
 
@@ -1374,24 +1570,49 @@ export function applyAiLegacyLineupBatchLocally(
     }
 
     if (statusKind === "warning" && !includeWarningTeams) {
-      const captainMeta = buildCaptainPreviewMeta(preview);
-      results.push({
-        teamId: preview.teamId,
-        teamCode: preview.teamCode,
-        teamName: preview.teamName,
-        controlMode: team.controlMode,
-        aiEligible: team.aiEligible,
-        previewStatus: preview.status,
-        ...captainMeta,
-        result: "skipped_warning",
-        overwriteExisting: hasExistingDraft,
-        warnings: baseWarnings,
-        blockingReasons: [],
-        saved: false,
-        formCardsSelected,
-        negativeFormCardsSelected,
-      });
-      continue;
+      // Teilbesetzter Kader ist kein Grund, GAR NICHT anzutreten: Früher wurden diese Teams
+      // als `skipped_warning` übersprungen und gingen mit NULL Aufstellung (0 Punkte) in den
+      // Spieltag. Eine Teilaufstellung mit allen verfügbaren Spielern ist strikt besser —
+      // genau das prüft `isTeamMatchdayLineupOperationallyReady` (alle einsatzbereiten
+      // Spieler aufgestellt, offene Slots erlaubt). Andere Warnungsarten (missing_scores etc.)
+      // werden weiterhin übersprungen, dort deutet die Warnung auf ein echtes Datenproblem.
+      const partialLineupSaveable =
+        preview.status === "incomplete_roster" &&
+        preview.entries.length > 0 &&
+        isTeamMatchdayLineupOperationallyReady(preparedGameState, team.teamId, {
+          lineupId: `${params.saveId}:${params.seasonId}:${params.matchdayId}:${params.teamId}`,
+          saveId: params.saveId,
+          seasonId: params.seasonId,
+          matchdayId: params.matchdayId,
+          teamId: params.teamId,
+          status: "draft",
+          entries: preview.entries as LineupDraft["entries"],
+          modifiers,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      if (!partialLineupSaveable) {
+        const captainMeta = buildCaptainPreviewMeta(preview);
+        results.push({
+          teamId: preview.teamId,
+          teamCode: preview.teamCode,
+          teamName: preview.teamName,
+          controlMode: team.controlMode,
+          aiEligible: team.aiEligible,
+          previewStatus: preview.status,
+          ...captainMeta,
+          result: "skipped_warning",
+          overwriteExisting: hasExistingDraft,
+          warnings: baseWarnings,
+          blockingReasons: [],
+          saved: false,
+          formCardsSelected,
+          negativeFormCardsSelected,
+        });
+        continue;
+      }
+      // Nachvollziehbarkeit im Batch-Protokoll: das Team tritt bewusst teilbesetzt an.
+      baseWarnings.push("partial_lineup_saved_max_available_players");
     }
 
     if (hasCompleteExistingDraft && !overwriteExisting) {

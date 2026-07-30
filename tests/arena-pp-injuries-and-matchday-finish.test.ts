@@ -129,15 +129,20 @@ describe("Spieltag: Abschluss ist wieder eine Entscheidung", () => {
     expect(route).toContain("advanceAfterCashApply: body.options?.advanceAfterCashApply ?? true");
   });
 
-  it("bietet im Spieltagsergebnis den expliziten Abschluss-Knopf", () => {
-    // Die konkrete Verdrahtung (Sichtbarkeit am Spieltag statt am Flow-Schritt,
-    // Aufruf ohne Optional-Chaining, Start-/Erfolgs-/Ablehnungs-Meldung) haelt
-    // `matchday-finish-button-wiring.test.ts` fest — der erste Wurf hier war
-    // gegen genau die Fassung geschrieben, die sich im Playtest als stumm
-    // herausgestellt hat.
+  it("bietet den expliziten Abschluss-Knopf in der Arena", () => {
+    // Der Knopf lag in der "Spieltagsergebnis"-Sektion unter der Buehne. Die Sektion ist
+    // entfernt (sie wiederholte Arena und Saisonstand), der Knopf wanderte in die Arena —
+    // sonst waere der Spieltag aus dem normalen Spielverlauf nicht mehr abschliessbar.
+    const arena = read("app/foundation/discipline-stage/DisciplineStageArena.tsx");
+    expect(arena).toContain('data-testid="arena-finish-matchday"');
+    expect(arena).toContain("Spieltag abschließen");
+
     const body = read("app/foundation/FoundationShellRouterBody.tsx");
-    expect(body).toContain('data-testid="arena-finish-matchday"');
-    expect(body).toContain("Spieltag abschließen");
+    // Gegatet auf den Flow-Schritt: erst wenn beide Disziplinen gewertet sind.
+    expect(body).toContain("canAdvanceMatchdayFromStep(matchdayAdvanceStep)");
+    // Die Rueckmeldung (Start/Erfolg/Ablehnung) haelt `matchday-finish-button-wiring.test.ts`
+    // fest — hier nur, dass der Knopf ueberhaupt am meldenden Wrapper haengt.
+    expect(body).toContain("finishMatchdayAndAdvance()");
   });
 });
 

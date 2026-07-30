@@ -319,7 +319,12 @@ export function resolveFoundationPanelScrollTarget(input: {
     return "foundation-training-compact";
   }
   if (input.panel === "arena-result-summary") {
-    return "arena-result-summary";
+    // Die "Spieltagsergebnis"-Sektion ist entfernt (sie wiederholte Arena und
+    // Saisonstand). Bestehende Postfach-Links tragen den alten Panel-Namen weiter —
+    // die Zuordnung leitet sie in die Arena um, wo das Ergebnis jetzt steht. So
+    // muessen die Link-Erzeuger in game-inbox-service nicht angefasst werden und
+    // aeltere Spielstaende mit gespeicherten Links laufen nicht ins Leere.
+    return "foundation-matchday-arena";
   }
   return input.panel ?? getFoundationViewScrollTarget(input.targetView) ?? "foundation-home";
 }

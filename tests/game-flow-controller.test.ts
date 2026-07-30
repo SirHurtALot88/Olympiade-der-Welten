@@ -424,7 +424,7 @@ describe("game flow controller", () => {
     });
     expect(flow.currentStepId).toBe("review_matchday_results");
     expect(flow.currentStep.targetView).toBe("matchdayArena");
-    expect(flow.currentStep.targetPanel).toBe("arena-result-summary");
+    expect(flow.currentStep.targetPanel).toBe("foundation-matchday-arena");
   });
 
   it("offers the next result-flow step after the current result panel instead of jumping backwards", () => {

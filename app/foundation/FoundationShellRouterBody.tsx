@@ -173,6 +173,7 @@ import type { FoundationTableColumn } from "@/lib/foundation/foundation-table-ui
 import type { GameEncyclopediaEntry } from "@/lib/ui/game-encyclopedia";
 import type { InboxV2Item } from "@/app/foundation/inbox-v2/inbox-v2-types";
 import type { Discipline, GameInboxItem, MappingWarning, Player, PlayerScoutIntelRecord, Team } from "@/lib/data/olyDataTypes";
+import { canAdvanceMatchdayFromStep } from "@/lib/foundation/resolve-game-flow-action-step";
 
 // Perf/DX (#57): these view panels used to come in eagerly through the
 // `foundation-page-client-exports` barrel (or, for the last five, a direct
@@ -389,6 +390,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   foundationWarningInboxItems,
   freshSeasonStartMessage,
   gameFlowActionStep,
+  matchdayAdvanceStep,
   gameModeOwnershipChrisIds,
   gameModeOwnershipLimits,
   gameState,
@@ -2556,58 +2558,38 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             saveId={activeSaveId}
             seasonId={gameState.season.id}
             matchdayId={gameState.matchdayState.matchdayId}
-            onAdvanceMatchday={null}
+            // Der Spieltagswechsel gehoert in die Arena, nicht in einen Kasten darunter.
+            // Vorher stand er in der "Spieltagsergebnis"-Sektion — die ist entfernt, und
+            // damit waere der Spieltag aus dem normalen Spielverlauf nicht mehr
+            // abschliessbar gewesen (man landete im Cockpit und hing dort fest).
+            //
+            // Gate wie zuvor ueber `canAdvanceMatchdayFromStep`: "ready" allein genuegt
+            // NICHT — der Schritt steht auf "warning", sobald das Board gerissene
+            // Saisonziele meldet. Das ist eine Mitteilung, kein Hindernis. Ist der
+            // Spieltag noch nicht gewertet, gibt es keinen Knopf (null), und die Buehne
+            // zeigt stattdessen ihren Hinweis.
+            //
+            // Aufruf ueber `finishMatchdayAndAdvance` statt direkt ueber
+            // `runCockpitMatchdayAdvance`: der reine Aufruf verschluckte eine Ablehnung
+            // (422 mit `blockingReasons`) vollstaendig. Der Knopf wurde kurz grau und
+            // danach war der Spieltag trotzdem derselbe — von aussen nicht von "Knopf tut
+            // nichts" zu unterscheiden. Der Wrapper meldet Start, Erfolg und Ablehnung
+            // mit Begruendung zurueck. Bewusst OHNE `?.`: ein fehlender Handler ist ein
+            // Fehler und soll knallen, nicht still nichts tun.
+            onAdvanceMatchday={
+              canAdvanceMatchdayFromStep(matchdayAdvanceStep)
+                ? () => finishMatchdayAndAdvance()
+                : null
+            }
             onCommitDiscipline={commitArenaDiscipline}
             onOpenPlayer={(playerId) => openPlayerDrawerById(playerId)}
             onOpenTeam={(teamId) => openTeamDrawerById(teamId)}
             roomContext={roomContext}
           />
-              {/*
-                Spieltagsergebnis-Panel auf das reduziert, was hier tatsaechlich
-                gebraucht wird: den Abschluss des Spieltags.
-
-                Die Kacheln (Aktives Team, Rangaenderung, D1, D2) wiederholten nur,
-                was die Spieltags-Wertung in der Arena ohnehin vollstaendig und
-                besser zeigt, und die beiden Navigationsknoepfe doppelten die
-                Seitennavigation. Uebrig bleibt der eine Knopf, der von hier aus
-                etwas bewegt.
-
-                Sichtbar, sobald fuer den AKTUELLEN Spieltag ein Ergebnis
-                gebucht ist — nicht mehr am globalen Flow-Schritt gegatet. Der
-                haengt auch an Posteingang und Transfers, wodurch derselbe
-                Zustand mal den Knopf und mal ein generisches „Weiter" zeigte.
-                Ob der Wechsel wirklich erlaubt ist, entscheidet der Server; eine
-                Ablehnung kommt jetzt als Meldung zurueck statt als Stille.
-              */}
-              {homeNextMatchdayStatus.resultAvailable ? (
-                <section className="panel arena-result-summary" id="arena-result-summary" data-testid="arena-result-summary">
-                  <div className="panel-header">
-                    <div className="stack">
-                      <h2>Spieltag abschließen</h2>
-                      <span className="muted">
-                        {matchdaySummary.seasonId} · Spieltag {matchdaySummary.matchdayNumber ?? gameState.season.currentMatchday ?? "—"} ist
-                        gewertet — die Tabelle bleibt stehen, bis du weiterschaltest.
-                      </span>
-                    </div>
-                    <div className="matchday-result-actions">
-                      <button
-                        className="primary-button inline-button"
-                        type="button"
-                        data-testid="arena-finish-matchday"
-                        disabled={cockpitBusyKey === "matchday-advance"}
-                        title="Schaltet auf den nächsten Spieltag weiter."
-                        /* Bewusst OHNE `?.`: ein fehlender Handler ist ein Fehler und muss
-                           knallen. Mit Optional-Chaining sah ein nicht durchgereichter
-                           Handler exakt aus wie „Knopf tut nichts" — genau die Stille,
-                           die hier gemeldet wurde. */
-                        onClick={() => void finishMatchdayAndAdvance()}
-                      >
-                        {cockpitBusyKey === "matchday-advance" ? "schaltet weiter…" : "Spieltag abschließen"}
-                      </button>
-                    </div>
-                  </div>
-                </section>
-              ) : null}
+              {/* Die "Spieltagsergebnis"-Sektion ist entfernt: sie wiederholte, was die
+                  Arena und der Saisonstand ohnehin zeigen, und war der Grund, warum der
+                  Spieltagswechsel unterhalb der Buehne versteckt lag. Der Knopf sitzt
+                  jetzt in der Arena (onAdvanceMatchday oben). */}
           </div>
           ) : null}
 

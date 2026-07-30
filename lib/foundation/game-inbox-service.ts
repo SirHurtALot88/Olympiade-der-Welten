@@ -387,7 +387,9 @@ function buildPlayerHealthInboxTasks(input: {
           severity: fatigue >= 80 || riskPercent >= 25 ? "critical" : "warning",
           title: fatigue >= 80 || riskPercent >= 25 ? "Hohes Verletzungsrisiko" : "Ermüdung beobachten",
           description: `${getPlayerName(input.gameState, entry.playerId)}: Fatigue ${Math.round(fatigue)}, Verletzungsrisiko ${riskPercent}%.`,
-          targetView: "training",
+          // Trainingslast/Ermuedung steuert man im Training-Tab (trainingCompact).
+          // "training" ist ein Alt-Bezeichner OHNE Navigationseintrag — das Ziel war unerreichbar.
+          targetView: "trainingCompact",
           targetParams: { team: input.team.teamId, player: entry.playerId },
           ctaLabel: "Training prüfen",
           source: "player_health_fatigue_risk",
@@ -437,7 +439,9 @@ function buildPlayerHealthInboxTasks(input: {
           severity: plan.projectedInjuryRiskPercent >= 20 ? "warning" : "info",
           title: "Hard-Training vs. Erholung",
           description: `${plan.playerName}: Hard-Demand unter Belastung (Fatigue ${Math.round(plan.currentFatigue)}, Modus ${plan.selectedMode}).`,
-          targetView: "training",
+          // Trainingslast/Ermuedung steuert man im Training-Tab (trainingCompact).
+          // "training" ist ein Alt-Bezeichner OHNE Navigationseintrag — das Ziel war unerreichbar.
+          targetView: "trainingCompact",
           targetParams: { team: input.team.teamId, player: plan.playerId },
           ctaLabel: "Training steuern",
           source: "player_health_training_load",
@@ -1320,7 +1324,9 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
           severity: "info",
           title: "Story Card: Entwicklung zeigt Wirkung",
           description: `${getPlayerName(input.gameState, event.playerId)} verbessert ${improvedCount} Diszis durch Training.`,
-          targetView: "trainingV2",
+          // "season-end-development" loest auf den Anker foundation-training-compact auf, das Panel
+          // lebt also im Training-Tab (trainingCompact) — NICHT im Gebaeude-Tab (trainingV2).
+          targetView: "trainingCompact",
           targetParams: { team: event.teamId, player: event.playerId, panel: "season-end-development" },
           source: "story:player_progression_discipline_delta",
           createdAt: event.timestamp ?? createdAt,
@@ -1461,7 +1467,8 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
         severity: "info",
         title: "Story Card: Durchbruch-Spieler",
         description: `${getPlayerName(input.gameState, event.playerId)} legt in einer Saison um +${attributeDelta.toFixed(0)} Attributpunkte zu.`,
-        targetView: "trainingV2",
+        // Siehe oben: das Panel lebt im Training-Tab, nicht im Gebaeude-Tab.
+        targetView: "trainingCompact",
         targetParams: { team: event.teamId, player: event.playerId, panel: "season-end-development" },
         source: "story:player_breakout_attribute_delta",
         createdAt: event.timestamp ?? createdAt,
