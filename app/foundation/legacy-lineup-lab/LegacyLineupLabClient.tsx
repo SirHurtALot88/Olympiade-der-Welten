@@ -3281,7 +3281,26 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           }),
           slot.disciplineId,
         )
-          .slice(0, 3)
+          // GEMELDET: „bester fit wird nich immer korrekt angezeigt".
+          //
+          // Hier stand `.slice(0, 3)` VOR dem `.map(...)`. Die Auswahl fiel damit nach
+          // `sortOptionsByDisciplineSkill` — dem rohen Disziplin-Skill —, waehrend die
+          // angezeigte Zahl (und der Tooltip, und der Gewinn beim "Optimieren") der
+          // PROJIZIERTE Score ist: Rolle, Attribute, Fatigue, Intensitaet, Rivalitaet.
+          //
+          // Zwei verschiedene Massstaebe fuer dieselbe Aussage. Ein Spieler mit etwas
+          // weniger Grund-Skill, aber besserer Rollen-Passung oder frischer, projiziert
+          // regelmaessig hoeher — er stand dann hinter dem "Best Fit" oder war durch den
+          // Schnitt schon raus. Der Knopf zeigte also einen Vorschlag, dessen eigene Zahl
+          // eine andere Reihenfolge behauptete.
+          //
+          // Jetzt wird erst projiziert, dann nach der projizierten Zahl sortiert und
+          // zuletzt geschnitten. Die Vorsortierung nach Skill bleibt als stabile
+          // Ausgangsreihenfolge (Gleichstand faellt auf sie zurueck).
+          //
+          // Kosten: die Projektion laeuft jetzt fuer alle zulaessigen Optionen statt fuer
+          // drei. Das ist dieselbe Groessenordnung, die `playerBestSlotSummaryByActivePlayerId`
+          // direkt darunter ohnehin schon rechnet (jeder Spieler × jeder Slot).
           .map((option) => {
             const rosterCard = rosterCardByActivePlayerId.get(option.activePlayerId) ?? null;
             const projected = calculateMatchdayProjectedPreview({
@@ -3313,7 +3332,12 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               rangeHigh: projected.rangeHigh,
               warnings: projected.warnings,
             };
-          });
+          })
+          // Nach der PROJIZIERTEN Zahl ordnen — das ist die, die am Knopf steht. Ohne
+          // Projektion (kein Basis-Score fuer diese Diszi) nach hinten: ein Vorschlag ohne
+          // Zahl ist kein Vorschlag.
+          .sort((left, right) => (right.projectedScore ?? Number.NEGATIVE_INFINITY) - (left.projectedScore ?? Number.NEGATIVE_INFINITY))
+          .slice(0, 3);
 
         return [slot.key, { topCandidates, currentProjected }] as const;
       }),
