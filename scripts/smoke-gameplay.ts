@@ -927,7 +927,10 @@ async function main() {
             "Zur Arena",
             "Arena noch nicht bereit",
             "Arena-Kontext fehlt",
-            "Spieltagsergebnis",
+            // Vorher stand hier "Spieltagsergebnis" — die Ueberschrift der entfernten
+            // Sektion. Der Disziplin-Waehler im Buehnen-Kopf ist immer da; das Praefix
+            // deckt beide Beschriftungen ab ("Disziplin (Spieltag)" bzw. Admin-Variante).
+            "Disziplin (",
             "Lineup bestätigen",
           ]),
           "Arena öffnet.",
