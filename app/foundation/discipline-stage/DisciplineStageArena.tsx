@@ -15,6 +15,7 @@ import {
   buildDisciplineStageTeamsFromPreview,
   type StageTeamMeta,
 } from "@/lib/foundation/discipline-stage/discipline-stage-from-preview";
+import { orderStageTeamsBySeasonRank } from "@/lib/foundation/discipline-stage/discipline-stage-team-order";
 import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
 import { resolveAwardedPlayerPoints } from "@/lib/foundation/player-points-total";
 import DisciplineStageHighlights from "@/app/foundation/discipline-stage/DisciplineStageHighlights";
@@ -1245,7 +1246,11 @@ export default function DisciplineStageArena({
     return {
       slots: Array.from({ length: slotCount }, (_, i) => slotLabel(disciplineId, i, slotCount)),
       mineCode: ownShortCode,
-      teams,
+      // ANTI-SPOILER: beide Quellen oben liefern nach ERGEBNIS sortiert (Engine:
+      // rankDescendingSharedTies nach score, Modell: b.total - a.total). Ohne diese
+      // Umsortierung stünde der Sieger oben, bevor die erste Etappe läuft — Begründung
+      // und Randfälle stehen im Helfer.
+      teams: orderStageTeamsBySeasonRank(teams),
     };
   }, [
     useEngine,
