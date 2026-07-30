@@ -13,6 +13,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { markMedalColor, numericMedalOf } from "../PlayerMark";
 import type { DisciplineFieldProps, RT } from "./types";
 
 const BASE = 60;
@@ -499,6 +500,9 @@ export default function TerritoryField(props: DisciplineFieldProps): ReactNode {
         const isLead = sorted[0]?.code === t.code;
         const idx = sorted.findIndex((x) => x.code === t.code);
         const inTrio = trioSet.has(t.idx);
+        // Highlight-/Kür-Farbe wie der HighlightRing der Token-Felder (Verletzung rot,
+        // Etappen-Kür in Medaillenfarbe) — Treemap-Zellen tragen sie als Sektor-Rahmen.
+        const trioCol = t.stageInjured ? "var(--nl-risk)" : markMedalColor(numericMedalOf(t.stageMedal)) ?? "var(--nl-warn)";
 
         // Banner-Größe ∝ Punkte (weiter Bereich), aber in den Sektor eingepasst.
         const bannerR = Math.min(Math.min(rw, rh) * 0.42, 8 + (score / maxScore) * 37);
@@ -513,7 +517,7 @@ export default function TerritoryField(props: DisciplineFieldProps): ReactNode {
         return (
           <g key={t.code} data-token-code={t.code}>
             {/* Terrain */}
-            <rect x={rx} y={ry} width={rw} height={rh} fill={`url(#bg-${t.code})`} stroke={inTrio ? "var(--nl-warn)" : isLead ? COLORS.lead : relBorder} strokeWidth={inTrio ? 2.5 : isLead ? 2 : relStroke} rx={4} />
+            <rect x={rx} y={ry} width={rw} height={rh} fill={`url(#bg-${t.code})`} stroke={inTrio ? trioCol : isLead ? COLORS.lead : relBorder} strokeWidth={inTrio ? 2.5 : isLead ? 2 : relStroke} rx={4} />
 
             {/* Krater (Vollgas: mehr bei stärkeren Reichen) */}
             {rw > 34 && rh > 30

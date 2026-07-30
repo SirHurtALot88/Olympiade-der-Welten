@@ -64,9 +64,10 @@ export type DisciplineFieldProps = {
 
   // Highlight-Token: idx der hervorgehobenen Teams der laufenden Etappe (während der
   // ~1,5 s Zeitlupe gesetzt, sonst leer). Felder heben diese Token mit einem Puls-Ring
-  // hervor, damit man sie im Zoom verfolgen kann. Der Host feuert das NUR bei einem
-  // echten Anlass: Verletzung in dieser Etappe, oder ein Aufsteiger, der danach auf dem
-  // Podest (Rang 1–3) steht — sonst bleibt die Etappe im normalen Fluss.
+  // hervor (siehe `HighlightRing` in benchmark.tsx), damit man sie im Zoom verfolgen
+  // kann. Anlässe des Hosts: VERLETZUNG in dieser Etappe (Ring rot, Zoom auf die
+  // Betroffenen) — sonst die ETAPPEN-KÜR: die Top 3 der Etappe pulsieren in ihren
+  // Medaillenfarben (RT.stageMedal), der Zoom fährt auf den Etappenbesten.
   highlightIdxs?: number[];
 
   // Start-Gate: true, sobald der erste ▶-Etappe-Klick erfolgt ist. Felder können vorher

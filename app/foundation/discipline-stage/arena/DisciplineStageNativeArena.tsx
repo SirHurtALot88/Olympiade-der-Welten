@@ -7,7 +7,8 @@ import { useStageAudio } from "./useStageAudio";
 import DisciplineStageResultTable, { type ResultTableRow } from "./DisciplineStageResultTable";
 import DisciplineStageTopPlayersRow from "../DisciplineStageTopPlayersRow";
 import DisciplineStageInjuryRow, { type DisciplineStageInjuredPlayer } from "../DisciplineStageInjuryRow";
-import PlayerMark from "./PlayerMark";
+import PlayerMark, { markMedalColor, numericMedalOf } from "./PlayerMark";
+import TeamMark from "./TeamMark";
 import type { DisciplineStageTopPlayer } from "../DisciplineStageTopPlayers";
 import { fmt1, ampel } from "../stage-format";
 import type { TeamRelationshipKind } from "@/lib/foundation/team-relationship";
@@ -1007,6 +1008,13 @@ function interpAlong(wp: [number, number][], f: number): { x: number; y: number 
 function modSum(mods: NativeStageMod[]): number {
   return mods.reduce((s, m) => s + m.sign * m.amt, 0);
 }
+// Verletzungs-Erkennung an einem Slot-Mod: bevorzugt der typisierte `injury`-Flag
+// (siehe discipline-stage-from-preview.ts), Regex bleibt als Fallback für Datenpfade
+// ohne ihn (Random-/Modell-Modus). EINE Quelle — vorher stand dieselbe Regex an vier
+// Stellen (noteReveal, Etappen-Vorablauf, Läufer-Karte, Verletzten-Zeile).
+export function isInjuryMod(m: NativeStageMod): boolean {
+  return m.injury === true || /verletz|injury/i.test(m.k);
+}
 export function playerNet(p: NativeStagePlayer | null | undefined): number {
   if (!p) return 0;
   // UNGECLAMPT: kann bei schwachem/verletztem Slot + negativen Team-Debuffs auch
@@ -1014,6 +1022,99 @@ export function playerNet(p: NativeStagePlayer | null | undefined): number {
   // Team-Total nach oben verzerren würde). Token-Position clampt separat (tokenPos).
   return round1(p.val + modSum(p.mods));
 }
+// ---- Etappen-Kür (Owner-Wunsch: Highlights = Verletzungen + bester Spieler) ---------
+// Minimaler Team-Ausschnitt, den die Kür braucht — bewusst strukturell (kein RT),
+// damit die Helfer pur und ohne Arena-Mount testbar bleiben.
+export type StageSlotTeam = {
+  idx: number;
+  code: string;
+  name: string;
+  logoUrl: string | null;
+  isOwn: boolean;
+  seasonRank: number;
+  players: NativeStagePlayer[];
+};
+// Reihenfolge einer Etappe: alle Teams nach Netto ihres Slot-Spielers absteigend,
+// Tiebreak Season-Rang. DIE eine Quelle für Runden-Slot-Ränge, Etappensieger-Netto
+// UND die Kür der Etappen-Top-3 — advance() leitet alle drei hieraus ab.
+export function computeSlotOrder<T extends Pick<StageSlotTeam, "seasonRank" | "players">>(
+  teams: T[],
+  slot: number,
+): { t: T; net: number; has: boolean }[] {
+  return teams
+    .map((t) => ({ t, net: playerNet(t.players[slot]), has: !!t.players[slot] }))
+    .sort((a, b) => b.net - a.net || a.t.seasonRank - b.t.seasonRank);
+}
+// Ein Kür-Kandidat: Spielerkarte + Team-Kontext eines Etappen-Podest-Platzes.
+export type StageCrownEntry = {
+  idx: number; // Team-Index (RT.idx) — Träger des Kür-Rahmens am Token
+  medal: 1 | 2 | 3;
+  playerId: string | null;
+  name: string;
+  portraitUrl: string | null;
+  ovrRank: number | null;
+  injured: boolean;
+  teamCode: string;
+  teamName: string;
+  logoUrl: string | null;
+  isOwn: boolean;
+  net: number;
+};
+// Etappen-Kür: die (bis zu) 3 besten ECHTEN Auftritte der Etappe. Teams ohne Spieler
+// in diesem Slot (has=false) werden nicht gekürt — sonst stünde eine leere Karte mit
+// einer erfundenen 0 auf dem Podest (Regel: fehlender Wert ≠ 0).
+export function computeStageCrown<T extends StageSlotTeam>(
+  order: { t: T; net: number; has: boolean }[],
+  slot: number,
+): StageCrownEntry[] {
+  return order
+    .filter((o) => o.has)
+    .slice(0, 3)
+    .map((o, i) => {
+      const p = o.t.players[slot]!;
+      return {
+        idx: o.t.idx,
+        medal: (i + 1) as 1 | 2 | 3,
+        playerId: p.playerId,
+        name: p.name,
+        portraitUrl: p.portraitUrl,
+        ovrRank: p.ovrRank ?? null,
+        injured: p.mods.some(isInjuryMod),
+        teamCode: o.t.code,
+        teamName: o.t.name,
+        logoUrl: o.t.logoUrl,
+        isOwn: o.t.isOwn,
+        net: o.net,
+      };
+    });
+}
+// Anlass-Entscheid des Highlight-Moments einer Etappe (Owner-Wunsch v2):
+//   1. VERLETZUNG in dieser Etappe → Zoom/Puls auf die betroffenen Teams; die
+//      Kür-Karten treten zurück (das Spotlight-Banner trägt den Verletzungs-Moment,
+//      zwei konkurrierende Overlays wären Lärm).
+//   2. Sonst ETAPPEN-KÜR: die Top 3 pulsieren in ihren Medaillenfarben, der Zoom
+//      fährt NUR auf den besten Spieler der Etappe, dazu die drei Spielerkarten.
+// Früher gab es statt (2) den „berührt das Podest der Gesamtwertung"-Anlass — der
+// Owner will den Moment jetzt in JEDER Etappe, als Kür ihrer Top 3.
+export function resolveStageHighlight(args: { injuredIdxs: number[]; crown: StageCrownEntry[] }): {
+  cause: "injury" | "kuer" | null;
+  trioIdxs: number[];
+  zoomIdxs: number[];
+  showCards: boolean;
+} {
+  if (args.injuredIdxs.length > 0) {
+    const idxs = args.injuredIdxs.slice(0, 3);
+    return { cause: "injury", trioIdxs: idxs, zoomIdxs: idxs, showCards: false };
+  }
+  if (args.crown.length > 0) {
+    return { cause: "kuer", trioIdxs: args.crown.map((c) => c.idx), zoomIdxs: [args.crown[0]!.idx], showCards: true };
+  }
+  return { cause: null, trioIdxs: [], zoomIdxs: [], showCards: false };
+}
+// Wie lange die Kür-Karten im Bild bleiben — länger als die 1,5-s-Zeitlupe, damit
+// man nach dem Rauszoomen noch lesen kann, wer gekürt wurde.
+export const STAGE_CROWN_MS = 2600;
+
 // Golden-Angle-Farbverteilung nach fester Team-Position → maximale Spreizung,
 // keine Hash-Kollisionen (früher hueFor über den Code → viele fast gleiche Grüns).
 export function hueForIdx(idx: number): number {
@@ -1090,6 +1191,14 @@ export type RT = {
   roundDelta: number;
   roundMedal: 0 | 1 | 2 | 3;
   roundSlotRank: number; // vorab bestimmter Rang im aktuellen Slot (1…N) — kein Spoiler
+  // ETAPPEN-KÜR (bewusst getrennt von roundMedal = finale Gesamt-Top-3): Gold/Silber/
+  // Bronze der Top 3 der LAUFENDEN Etappe. Gesetzt im Highlight-Moment (~Mitte des
+  // Glides), bleibt als Rahmen am Token, bis die nächste Etappe neu kürt — „die Top 3
+  // bewegen sich mit dem passenden Rahmen voran" (Owner-Wunsch).
+  stageMedal: 0 | 1 | 2 | 3;
+  // Verletzung im Slot der laufenden Etappe (vorab aus den Mods gelesen): Anlass des
+  // Highlight-Zooms und Farbgeber des Puls-Rings (rot statt Medaillenfarbe).
+  stageInjured: boolean;
   glowUntil: number;
 };
 
@@ -1271,6 +1380,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       roundDelta: 0,
       roundMedal: 0 as 0 | 1 | 2 | 3,
       roundSlotRank: 0,
+      stageMedal: 0 as 0 | 1 | 2 | 3,
+      stageInjured: false,
       glowUntil: 0,
     }));
     // Bahn-/Turm-Reihenfolge nach echtem Season-Rang, aber DICHT durchnummeriert
@@ -1303,11 +1414,14 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const roundAnimStartRef = useRef<number>(0);
   const zoomFiredRef = useRef<boolean>(false);
   /**
-   * idx der Teams, deren Spieler in DIESER Etappe eine Verletzung abbekommen —
-   * beim Rundenstart aus den Slot-Mods gelesen (siehe `advance`). Einer von zwei
-   * Gründen, aus denen der Highlight-Zoom überhaupt noch feuern darf.
+   * Etappen-Kür: die vorab bestimmten Top 3 der laufenden Etappe (Karten- und
+   * Rahmen-Daten). Beim Rundenstart in `advance` eingefroren, weil die rAF-Schleife
+   * zum Feuer-Zeitpunkt weder den Slot-Index noch die Slot-Reihenfolge kennt.
    */
-  const roundInjuryIdxsRef = useRef<number[]>([]);
+  const stageCrownRef = useRef<{ list: StageCrownEntry[]; stage: number; label: string | null }>({ list: [], stage: 0, label: null });
+  // Kür-Overlay (die 3 Spielerkarten mit Team-Logo) — gesetzt im Highlight-Moment,
+  // blendet nach STAGE_CROWN_MS wieder aus.
+  const [stageCrown, setStageCrown] = useState<{ list: StageCrownEntry[]; stage: number; label: string | null } | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null); // für korrekte Zoom-Origin (getScreenCTM)
   // Highlight-Slow-Motion: die 3 größten Aufsteiger einer Etappe werden kurz
   // hervorgehoben (Ring am Token) und der geteilte Zeitstrahl läuft für ~1,5 s in
@@ -1460,6 +1574,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setBanner(null);
     setHandoffTs(0);
     setPhotoFinish(false);
+    setStageCrown(null);
+    stageCrownRef.current = { list: [], stage: 0, label: null };
     setDemandKg(null);
     setBarbellMsg(null);
     barbellDemandRef.current = null;
@@ -1911,61 +2027,50 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       }
       // Highlight-Zeitlupe (nicht blockierend). Einmalig pro Etappe: Ring an den
       // hervorgehobenen Token + geteilter Zeitstrahl ~1,5 s in Zeitlupe (0,2×) +
-      // enger Zoom auf ihren Schwerpunkt. Origin exakt über getScreenCTM (sonst landet
-      // der Zoom daneben, weil die SVG skaliert/geletterboxed ist).
+      // enger Zoom. Origin über die echt gerenderte Token-Lage (sonst landet der
+      // Zoom daneben, weil die SVG skaliert/geletterboxed ist).
       //
-      // ANLASS-GATE (Owner-Wunsch): der Zoom feuerte früher in JEDER Etappe auf die 3
-      // größten Aufsteiger — bei 20+ Etappen war das Dauerzustand statt Höhepunkt.
-      // Jetzt gibt es genau zwei Anlässe:
-      //   1. VERLETZUNG in dieser Etappe → Zoom auf die betroffenen Teams.
-      //   2. Die Bewegung berührt das PODEST der kommenden Runde, d. h. mindestens
-      //      einer der Aufsteiger steht nach dieser Etappe auf Rang 1–3.
-      // Trifft keins von beidem zu, bleibt die Etappe im normalen Fluss: kein Zoom,
-      // keine Zeitlupe, kein Puls-Ring.
+      // ANLASS (Owner-Wunsch v2): Highlights sind Verletzungen UND der beste Spieler
+      // jeder Etappe. Die frühere Bedingung „Bewegung berührt das Podest der kommenden
+      // Runde" ist ersetzt durch die ETAPPEN-KÜR: die Top 3 der Etappe werden mit
+      // Gold/Silber/Bronze gekürt (Rahmen bleibt bis zur nächsten Kür am Token), der
+      // Zoom fährt auf den Etappenbesten, dazu die drei Spielerkarten als Overlay.
+      // Verletzungen behalten Vorrang: dann zeigt der Zoom die betroffenen Teams und
+      // die Karten treten zurück (das Verletzungs-Spotlight trägt diesen Moment).
       if (start && !zoomFiredRef.current && tRaw > 0.42 && tRaw < 0.72 && !reduced.current) {
         zoomFiredRef.current = true;
-        const finalOrder = [...rt].sort((a, b) => b.displayScore - a.displayScore || a.seasonRank - b.seasonRank);
-        const finalRank = new Map<number, number>();
-        finalOrder.forEach((t, i) => finalRank.set(t.idx, i + 1));
-        // Ranking der Kandidaten: Rang-Aufstieg zuerst, dann Netto-Zugewinn.
-        const climbers = rt
-          .map((t) => ({
-            t,
-            climb: t.roundStartRank - (finalRank.get(t.idx) ?? t.roundStartRank),
-            gain: t.displayScore - t.roundStartScore,
-          }))
-          .sort((a, b) => b.climb - a.climb || b.gain - a.gain);
-        // Nur echte Aufsteiger/Zugewinne (früh in der Etappe legt evtl. jeder zu → Top-3
-        // Zugewinne als Fallback). Trio = die spannendsten Bewegungen dieser Etappe.
-        let trio = climbers.filter((c) => c.climb > 0).slice(0, 3);
-        if (trio.length === 0) trio = climbers.filter((c) => c.gain > 0.5).slice(0, 3);
-        // Anlass 1 schlägt Anlass 2: bei einer Verletzung zeigt der Zoom die
-        // betroffenen Teams, nicht irgendwelche Aufsteiger.
-        const injuredIdxs = roundInjuryIdxsRef.current;
-        if (injuredIdxs.length > 0) {
-          trio = rt
-            .filter((t) => injuredIdxs.includes(t.idx))
-            .slice(0, 3)
-            .map((t) => ({ t, climb: 0, gain: t.displayScore - t.roundStartScore }));
-        } else {
-          trio = trio.filter((c) => (finalRank.get(c.t.idx) ?? Number.POSITIVE_INFINITY) <= 3);
+        const crownData = stageCrownRef.current;
+        const focus = resolveStageHighlight({
+          injuredIdxs: rt.filter((t) => t.stageInjured).map((t) => t.idx),
+          crown: crownData.list,
+        });
+        // Kür-Rahmen IMMER neu setzen (auch in Verletzungs-Etappen): erst alle
+        // löschen, dann die aktuellen Top 3 — so wandert der Rahmen jede Etappe
+        // zum neuen Podest statt zu verwaisen.
+        for (const t of rt) t.stageMedal = 0;
+        for (const c of crownData.list) {
+          const ct = rt.find((t) => t.idx === c.idx);
+          if (ct) ct.stageMedal = c.medal;
         }
-        if (trio.length) {
-          setHighlightTrio(trio.map((c) => c.t.idx));
+        if (focus.trioIdxs.length) {
+          setHighlightTrio(focus.trioIdxs);
           const HOLD_MS = 1500;
           highlightHoldRef.current = now + HOLD_MS;
-          // Zoom-Zentrum = Schwerpunkt der ECHT gerenderten Trio-Token. Wir lesen die
-          // Bildschirmposition direkt aus dem DOM (data-token-code → getBoundingClientRect),
-          // nicht aus host.tokenPos — denn die Felder platzieren die Token selbst (Oval,
-          // Streuung …); host.tokenPos traf die reale Position nicht und der Zoom landete
-          // daneben (z.B. unten rechts). Jetzt trifft er die Tokens zum Feuer-Zeitpunkt.
+          // Zoom-Zentrum = Schwerpunkt der ECHT gerenderten Zoom-Ziel-Token (bei der
+          // Kür genau EIN Token: der Etappenbeste). Wir lesen die Bildschirmposition
+          // direkt aus dem DOM (data-token-code → getBoundingClientRect), nicht aus
+          // host.tokenPos — denn die Felder platzieren die Token selbst (Oval,
+          // Streuung …); host.tokenPos traf die reale Position nicht und der Zoom
+          // landete daneben (z.B. unten rechts).
           const svg = svgRef.current;
           let origin = { ox: 50, oy: 50, scale: 1.65 };
           if (svg) {
             const rect = svg.getBoundingClientRect();
             const centers: { x: number; y: number }[] = [];
-            for (const c of trio) {
-              const el = svg.querySelector(`[data-token-code="${c.t.code}"]`) as SVGGraphicsElement | null;
+            for (const zi of focus.zoomIdxs) {
+              const zt = rt.find((t) => t.idx === zi);
+              if (!zt) continue;
+              const el = svg.querySelector(`[data-token-code="${zt.code}"]`) as SVGGraphicsElement | null;
               if (el) {
                 const b = el.getBoundingClientRect();
                 if (b.width > 0 || b.height > 0) centers.push({ x: b.left + b.width / 2, y: b.top + b.height / 2 });
@@ -1982,6 +2087,10 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             }
           }
           setZoom(origin);
+          if (focus.showCards) {
+            setStageCrown(crownData);
+            window.setTimeout(() => setStageCrown((cur) => (cur === crownData ? null : cur)), STAGE_CROWN_MS + 250);
+          }
           window.setTimeout(() => {
             setZoom(null);
             setHighlightTrio([]);
@@ -2067,9 +2176,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     const net = res.net;
     const p = res.player;
     const bonSum = p.mods.filter((m) => m.sign > 0).reduce((s, m) => s + m.amt, 0);
-    // Bevorzugt den echten typisierten Flag (siehe discipline-stage-from-preview.ts);
-    // Regex bleibt als Fallback für Datenpfade ohne den Flag (z.B. Random/Model-Modus).
-    const injury = p.mods.some((m) => m.injury === true || /verletz|injury/i.test(m.k));
+    const injury = p.mods.some(isInjuryMod);
     const delta = t.roundDelta;
     const topNet = roundTopNet.current; // vorab bestimmter Etappensieger-Wert (kein prevBest)
     const slotRank = t.roundSlotRank; // vorab bestimmter Rang in dieser Etappe (1…N)
@@ -2395,18 +2502,23 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       t.roundStartScore = resolveStageGlideStart({ animScore: t.animScore, score: t.score, glideWasRunning });
       // roundMedal NICHT mehr zurücksetzen: die Gesamt-Top-3-Medaille bleibt stabil und
       // wird in recomputeRanks bei jedem Reveal frisch gesetzt (kein Blinken am Etappenstart).
+      // Verletzungen dieser Etappe vorab am Team markieren (gleiche Erkennung wie in
+      // `noteReveal`): sie sind der Anlass, der den Highlight-Zoom von der Kür wegzieht,
+      // und färben den Puls-Ring am Token rot.
+      t.stageInjured = (t.players[r]?.mods ?? []).some(isInjuryMod);
     });
     // Runden-Slot-Ränge VORAB bestimmen (kein Spoiler: nur gespeichert, erscheint
     // erst mit dem Auftritt): alle Teams nach playerNet(players[r]) absteigend,
     // Tiebreak seasonRank. Liefert echte Top-Performer für Medaillen/Highlights.
-    const slotOrder = rt
-      .map((t) => ({ t, net: playerNet(t.players[r]), has: !!t.players[r] }))
-      .sort((a, b) => b.net - a.net || a.t.seasonRank - b.t.seasonRank);
+    const slotOrder = computeSlotOrder(rt, r);
     slotOrder.forEach((o, i) => {
       o.t.roundSlotRank = i + 1;
     });
     // Etappensieger-Netto = bester Wert eines Teams, das in diesem Slot antritt.
     roundTopNet.current = slotOrder.find((o) => o.has)?.net ?? 0;
+    // Etappen-Kür vorbereiten (Karten + Rahmen der Etappen-Top-3): hier eingefroren,
+    // weil die rAF-Schleife zum Feuer-Zeitpunkt weder `r` noch die Slot-Reihenfolge kennt.
+    stageCrownRef.current = { list: computeStageCrown(slotOrder, r), stage: r + 1, label: slots[r] ?? null };
     tier2Budget.current = 2;
     tier1Budget.current = 4;
     if (r === 0) audio.gun(0.6);
@@ -2428,12 +2540,6 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     // (Feld ↔ Rangliste synchron). Zoom-Highlight für diese Runde neu scharf schalten.
     roundAnimStartRef.current = Date.now();
     zoomFiredRef.current = false;
-    // Verletzungen dieser Etappe vorab bestimmen (aus den Slot-Mods, gleiche
-    // Erkennung wie in `noteReveal`): sie sind der eine Anlass, der den
-    // Highlight-Zoom auch abseits des Podiums rechtfertigt.
-    roundInjuryIdxsRef.current = rt
-      .filter((t) => (t.players[r]?.mods ?? []).some((m) => m.injury === true || /verletz|injury/i.test(m.k)))
-      .map((t) => t.idx);
     if (prim === "track") {
       // Staffelstab-Übergabe (FEATURE 1): bei jedem Etappenwechsel (ab Etappe 2 — Etappe 1
       // hat keinen abgebenden Läufer) reicht jedes Token seinen Stab nach vorn. Ein einziger
@@ -2702,6 +2808,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setBanner(null);
     setHandoffTs(0);
     setPhotoFinish(false);
+    setStageCrown(null);
     force();
     later(showPodium, 200);
   }, [slotCount, clearTimers, buildRT, later, showPodium]);
@@ -2832,7 +2939,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     // Der AKTIVE Spieler (dran, egal ob schon aufgedeckt oder noch bevorstehend
     // diese Runde) ist verletzt → starkes, dauerhaftes optisches Feedback statt
     // nur der einmaligen Ticker-/Flug-Zeile (siehe PlayerMark `injury`-Prop).
-    const runnerInjured = Boolean(runner && runner.mods.some((m) => m.injury === true || /verletz|injury/i.test(m.k)));
+    const runnerInjured = Boolean(runner && runner.mods.some(isInjuryMod));
     const clickable = Boolean(onOpenPlayer && runner?.playerId);
     // Rang UND Punkte aus derselben Anzeige-Wahrheit wie Feld + Rangliste (shownScore /
     // me.rank), sonst zeigte diese Karte den Cascade-Sprungwert und lief der Icon-
@@ -3021,16 +3128,15 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     }
   }
   // Verletzte unter den bereits aufgedeckten Spielern — Quelle sind dieselben Slots
-  // wie oben, damit die Zeile keinen Reveal vorwegnimmt. Erkennung wie im Ticker:
-  // bevorzugt der typisierte `injury`-Flag, Regex als Fallback fuer Datenpfade ohne ihn
-  // (Random-/Modell-Modus). Der Malus ist die Summe der Verletzungs-Mods, NICHT aller
+  // wie oben, damit die Zeile keinen Reveal vorwegnimmt. Erkennung wie im Ticker
+  // (`isInjuryMod`). Der Malus ist die Summe der Verletzungs-Mods, NICHT aller
   // negativen Mods — sonst stuende Fatigue und Intensitaet mit in der Zahl.
   const revealedInjuredPlayers: DisciplineStageInjuredPlayer[] = [];
   for (const t of rtRef.current) {
     for (let s = 0; s <= t.thrownSlot; s += 1) {
       const p = t.players[s];
       if (!p) continue;
-      const injuryMods = p.mods.filter((m) => m.injury === true || /verletz|injury/i.test(m.k));
+      const injuryMods = p.mods.filter(isInjuryMod);
       if (injuryMods.length === 0) continue;
       revealedInjuredPlayers.push({
         playerId: p.playerId,
@@ -3152,6 +3258,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         @keyframes olyBanner{0%{opacity:0;transform:translate(-50%,-14px) scale(.92)}12%{opacity:1;transform:translate(-50%,0) scale(1)}85%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-8px) scale(1)}}
         @keyframes olyHandoff{0%{opacity:0}22%{opacity:1}100%{opacity:0}}
         @keyframes olyScan{from{top:0}to{top:100%}}
+        @keyframes olyCrownIn{0%{opacity:0;transform:translateY(26px) scale(.7)}12%{opacity:1;transform:translateY(-3px) scale(1.05)}18%{transform:translateY(0) scale(1)}88%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-8px) scale(.96)}}
+        @keyframes olyCrownShine{0%{transform:translateX(-160%) skewX(-18deg)}100%{transform:translateX(320%) skewX(-18deg)}}
         @media (prefers-reduced-motion: reduce){.oly-anim{animation:none!important;opacity:1!important}}
       `}</style>
 
@@ -3423,6 +3531,72 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 5 }}>
               <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 26% 11%, transparent 0%, transparent 18%, color-mix(in srgb, var(--nl-bg) 60%, transparent) 46%, color-mix(in srgb, var(--nl-bg) 88%, transparent) 100%)" }} />
               <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 2, background: "var(--nl-warn)", boxShadow: "0 0 10px var(--nl-warn)", animation: "olyScan 1.1s linear" }} />
+            </div>
+          ) : null}
+
+          {/* ETAPPEN-KÜR (Owner-Wunsch): während des Highlight-Zooms werden nicht nur die
+              Team-Token markiert, sondern die Top 3 der Etappe als SPIELERKARTEN gekürt —
+              Portrait + Team-Logo + Netto, gerahmt in Gold/Silber/Bronze, Podest-Anordnung
+              (Silber · Gold erhöht · Bronze), gestaffelter Einflug, Glanz-Sweep auf Gold.
+              pointerEvents:none → Token-Hover/Klick unterm Overlay bleiben bedienbar. */}
+          {stageCrown ? (
+            <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 6, display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 12, padding: "0 12px 16px" }}>
+              <div className="oly-anim" style={{ position: "absolute", top: 10, left: 0, right: 0, display: "flex", justifyContent: "center", animation: reduced.current ? "none" : `olyCrownIn ${STAGE_CROWN_MS}ms cubic-bezier(.22,.9,.32,1) both` }}>
+                <span style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", fontWeight: 900, color: "var(--nl-gold)", background: "color-mix(in srgb, var(--nl-bg) 82%, var(--nl-gold))", border: "1px solid var(--nl-gold)", borderRadius: 999, padding: "5px 14px", boxShadow: "0 8px 24px -10px rgba(0,0,0,.8)" }}>
+                  ⭐ Kür der Etappe {stageCrown.stage}
+                  {stageCrown.label ? ` · ${stageCrown.label}` : ""}
+                </span>
+              </div>
+              {[2, 1, 3]
+                .map((m) => stageCrown.list.find((c) => c.medal === m))
+                .filter((c): c is StageCrownEntry => Boolean(c))
+                .map((c, orderIdx) => {
+                  const gold = c.medal === 1;
+                  const tone = markMedalColor(numericMedalOf(c.medal)) ?? "var(--nl-gold)";
+                  return (
+                    <div
+                      key={c.medal}
+                      className="oly-anim"
+                      style={{
+                        position: "relative",
+                        overflow: "hidden",
+                        width: gold ? 188 : 160,
+                        marginBottom: gold ? 24 : 0,
+                        padding: "9px 12px 11px",
+                        borderRadius: 14,
+                        border: `2px solid ${tone}`,
+                        background: `linear-gradient(180deg, color-mix(in srgb, ${tone} 22%, var(--nl-panel)) 0%, var(--nl-panel) 64%)`,
+                        boxShadow: `0 16px 36px -14px rgba(0,0,0,.85), 0 0 ${gold ? 26 : 16}px color-mix(in srgb, ${tone} ${gold ? 45 : 28}%, transparent)`,
+                        textAlign: "center",
+                        animation: reduced.current ? "none" : `olyCrownIn ${STAGE_CROWN_MS}ms cubic-bezier(.22,.9,.32,1) both`,
+                        // Gold zuletzt (Steigerung): Silber → Bronze → Gold.
+                        animationDelay: `${gold ? 260 : orderIdx * 110}ms`,
+                      }}
+                    >
+                      {/* Glanz-Sweep — nur auf der Gold-Karte, einmalig. */}
+                      {gold && !reduced.current ? (
+                        <div aria-hidden style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: "38%", background: "linear-gradient(90deg, transparent, color-mix(in srgb, var(--nl-gold) 35%, transparent), transparent)", animation: "olyCrownShine 1.4s ease-out .55s both" }} />
+                      ) : null}
+                      <div style={{ fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", fontWeight: 900, color: tone, marginBottom: 6 }}>
+                        {KLASSEN_MEDALS[c.medal - 1]} {c.medal === 1 ? "Etappen-Gold" : c.medal === 2 ? "Etappen-Silber" : "Etappen-Bronze"}
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "center" }}>
+                        <PlayerMark src={c.portraitUrl} alt={c.name} size={gold ? 62 : 52} isOwn={c.isOwn} medal={numericMedalOf(c.medal)} injury={c.injured} starTier={getPlayerStarTier(c.ovrRank)} />
+                      </div>
+                      <div style={{ marginTop: 7, fontWeight: 800, fontSize: gold ? 14.5 : 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: c.isOwn ? "var(--nl-accent)" : "var(--nl-ink)" }}>
+                        {c.isOwn ? "★ " : ""}
+                        {c.name}
+                      </div>
+                      <div style={{ marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 11, color: "var(--nl-mut)", fontWeight: 700, minWidth: 0 }}>
+                        <TeamMark src={c.logoUrl} alt={c.teamName} size={17} radius={5} isOwn={c.isOwn} placeholderColor={teamPrimaryColor(c.teamCode)} placeholderLabel={c.teamCode} />
+                        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.teamCode} · {c.teamName}</span>
+                      </div>
+                      <div style={{ marginTop: 5, fontWeight: 900, fontSize: gold ? 24 : 19, lineHeight: 1, color: tone, fontVariantNumeric: "tabular-nums" }}>
+                        {c.net < 0 ? fmt1(c.net) : `+${fmt1(c.net)}`}
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           ) : null}
 
