@@ -22,7 +22,11 @@ import {
 import { readMatchdayResolveSnapshot } from "@/lib/foundation/matchday-resolve-snapshot";
 import { buildResolveLabSummary } from "@/lib/resolve/legacy-resolve-lab";
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
-import { type ResolvePreviewStatus } from "@/lib/resolve/legacy-matchday-resolve-types";
+import {
+  type LegacyMatchdayResolvePreview,
+  type ResolvePreviewStatus,
+} from "@/lib/resolve/legacy-matchday-resolve-types";
+import { decideResolvePreviewToBook } from "@/lib/resolve/resolve-preview-submission";
 import { buildStandingsPreview } from "@/lib/standings/standings-preview-engine";
 import { executeStandingsApply, STANDINGS_APPLY_CONFIRM_TOKEN } from "@/lib/standings/standings-apply-service";
 import { ADVANCE_MATCHDAY_CONFIRM_TOKEN, executeMatchdayAdvance } from "@/lib/season/matchday-progress-service";
@@ -89,6 +93,13 @@ export type MatchdayAutoRunParams = {
      * ja noch nicht vorbei. Default `"d2"` = vollstaendiger Spieltag wie bisher.
      */
     commitThroughSide?: LegacyMatchdayCommitThroughSide;
+    /**
+     * Die Preview, die die Arena dem Spieler gezeigt hat. Ist sie gesetzt und passt sie zu den
+     * Aufstellungen, die jetzt in der Ablage stehen, wird SIE gebucht — statt einer zweiten
+     * Auflösung, die bei bewegtem Zustand andere Zahlen liefert als die, die gerade über den
+     * Schirm gelaufen sind. Ohne Angabe (Cockpit) bleibt es beim frisch gerechneten Ergebnis.
+     */
+    submittedPreview?: LegacyMatchdayResolvePreview | null;
   };
 };
 
@@ -924,6 +935,19 @@ export async function runLocalMatchdayAutoRun(
     return result;
   }
 
+  // „Was du siehst, wird gebucht": hat die Arena ihre Preview mitgeschickt und beschreibt sie
+  // dieselben Aufstellungen, die jetzt in der Ablage stehen, wird SIE festgeschrieben — nicht das
+  // Ergebnis einer zweiten Auflösung. Passt sie nicht mehr, bleibt es beim frisch gerechneten
+  // Ergebnis, und der Grund steht als Warnung in der Rückmeldung statt still zu verschwinden.
+  const previewDecision = decideResolvePreviewToBook({
+    submitted: params.options?.submittedPreview,
+    serverPreview: activeResolve.preview,
+    scope,
+  });
+  if (previewDecision.rejectedReason) {
+    result.warnings.push(previewDecision.rejectedReason);
+  }
+
   const resultApplyService = new LegacyMatchdayResultApplyService(undefined, undefined, persistence);
   const resultApply = await resultApplyService.applyLegacyMatchdayResult({
     ...scope,
@@ -936,7 +960,7 @@ export async function runLocalMatchdayAutoRun(
     // und muss es ersetzen duerfen. Ohne Teil-Commit bleibt es beim alten Verhalten.
     forceReplace: existingMatchdayResult != null,
     preloadedContexts: currentContexts,
-    preloadedPreview: activeResolve.preview,
+    preloadedPreview: previewDecision.preview,
   });
   addStep(result, {
     key: "result_apply",

@@ -40,6 +40,7 @@ import { buildTeamObjectiveOverview, refreshTeamObjectiveState } from "@/lib/boa
 import { getMetricBarPercent, getPoolHeatClass } from "@/lib/foundation/player-league-heat";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { canAdvanceMatchdayFromStep } from "@/lib/foundation/resolve-game-flow-action-step";
+import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
 import {
   FACILITY_CATALOG,
   getFacilityLevelDefinition,
@@ -4453,7 +4454,15 @@ export function useFoundationShellRouterBodyScope({
    * und Spieltagswechsel. Die KI-Aufstellungen stehen zu diesem Zeitpunkt bereits (die
    * Arena-Basis erzeugt sie beim Laden), der Lauf rechnet also genau das Gezeigte nach.
    */
-  async function commitArenaDiscipline(side: "d1" | "d2") {
+  /**
+   * @param shownPreview Die Resolve-Preview, die die Buehne gerade abgespielt hat. Sie geht mit an
+   *   den Server und wird dort gebucht, statt ein zweites Mal aufgeloest zu werden — sonst weicht
+   *   das, was im Saisonstand landet, von dem ab, was der Spieler gesehen hat.
+   */
+  async function commitArenaDiscipline(
+    side: "d1" | "d2",
+    shownPreview: LegacyMatchdayResolvePreview | null = null,
+  ) {
     if (readMeta.readOnly) {
       showReadOnlyNotice();
       return null;
@@ -4476,7 +4485,7 @@ export function useFoundationShellRouterBodyScope({
       // gerade gespielte Spieltagstabelle war weg, bevor man sie lesen konnte. Der
       // Wechsel passiert jetzt ueber den "Spieltag abschliessen"-Knopf im
       // Spieltagsergebnis — also dann, wenn der Manager fertig geschaut hat.
-      const result = await runCockpitMatchdayAutoRun(true, side, false);
+      const result = await runCockpitMatchdayAutoRun(true, side, false, shownPreview);
       const booked = result?.summary?.standingsApplyAllowed ?? false;
       if (!booked) {
         setFoundationActionFeedback({

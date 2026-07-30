@@ -7,6 +7,7 @@ import {
   runLocalMatchdayAutoRun,
 } from "@/lib/season/matchday-auto-run-service";
 import { SaveResolutionError } from "@/lib/persistence/resolve-local-save";
+import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
@@ -28,6 +29,8 @@ type MatchdayAutoRunBody = {
     stopOnTie?: boolean;
     advanceAfterCashApply?: boolean;
     commitThroughSide?: "d1" | "d2";
+    /** Die Preview, die die Arena gezeigt hat — sie wird gebucht statt neu gerechnet. */
+    submittedPreview?: LegacyMatchdayResolvePreview | null;
   };
 };
 
@@ -104,6 +107,7 @@ export async function POST(request: Request) {
         stopOnTie: body.options?.stopOnTie ?? true,
         advanceAfterCashApply: body.options?.advanceAfterCashApply ?? true,
         commitThroughSide: body.options?.commitThroughSide === "d1" ? "d1" : "d2",
+        submittedPreview: body.options?.submittedPreview ?? null,
       },
     });
 

@@ -16,6 +16,18 @@ export type MatchdayArenaSessionParams = {
    * Light-Treffer die Arena mit fehlender Engine-Preview beliefern.
    */
   includeDetails: boolean;
+  /**
+   * Stand der Aufstellungen dieses Spieltags (siehe `buildMatchdayLineupRevision`).
+   *
+   * MUSS Teil des Schlüssels sein. Das teuerste Stück des Bundles ist die Resolve-Preview — genau
+   * das Ergebnis, das die Arena abspielt. Ohne die Aufstellungen im Schlüssel überlebte ein
+   * Treffer jede Änderung an ihnen: typischer Ablauf war, dass die KI-Aufstellungen erst nach dem
+   * ersten Laden nachgezogen wurden und die Bühne danach weiter die Preview von VOR dem Nachziehen
+   * zeigte. Gebucht wurde anschliessend etwas anderes als das Gesehene.
+   *
+   * Leer lassen ist erlaubt (Aufrufer ohne GameState) — dann verhält sich der Schlüssel wie zuvor.
+   */
+  lineupRevision?: string;
 };
 
 export type MatchdayArenaBaseBundleCacheEntry = {
@@ -34,10 +46,32 @@ const MAX_ARENA_RESOLVE_ENTRIES = 12;
 const arenaBaseBundleByKey = new Map<string, MatchdayArenaBaseBundleCacheEntry>();
 const arenaResolvePreviewByKey = new Map<string, MatchdayArenaResolveCacheEntry>();
 
+/**
+ * Kurzfassung des Aufstellungsstands eines Spieltags — Eingang in den Cache-Schlüssel.
+ *
+ * Bewusst über `updatedAt` statt über die Einträge selbst: jede Schreiboperation an einem Entwurf
+ * bewegt den Zeitstempel, auch eine, die nur Modifikatoren (Formkarte, Intensität, Kapitän)
+ * ändert — und die gehen genauso in das Ergebnis ein wie die Spielerauswahl. Die Anzahl steht
+ * mit davor, damit auch das Verschwinden eines Entwurfs den Schlüssel bewegt.
+ */
+export function buildMatchdayLineupRevision(
+  drafts: Array<{ seasonId: string; matchdayId: string; teamId: string; updatedAt: string }> | null | undefined,
+  scope: { seasonId: string; matchdayId: string },
+): string {
+  const relevant = (drafts ?? []).filter(
+    (draft) => draft.seasonId === scope.seasonId && draft.matchdayId === scope.matchdayId,
+  );
+  const stamped = relevant
+    .map((draft) => `${draft.teamId}@${draft.updatedAt}`)
+    .sort()
+    .join(",");
+  return `${relevant.length}|${stamped}`;
+}
+
 export function buildMatchdayArenaBaseSessionKey(params: MatchdayArenaSessionParams) {
   return `${params.saveId}:${params.seasonId}:${params.matchdayId}:${params.teamId}:${params.source}:${
     params.includeDetails ? "full" : "light"
-  }:base`;
+  }:${params.lineupRevision ?? ""}:base`;
 }
 
 export function buildMatchdayArenaResolveSessionKey(

@@ -4,6 +4,7 @@ import { Component, type ReactNode } from "react";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
+import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
 import DisciplineStageArena from "@/app/foundation/discipline-stage/DisciplineStageArena";
 
 // Die Disziplin-Bühne wird — wie Spieler-Detail und Team-Profil — AUSSERHALB
@@ -21,7 +22,9 @@ export type FoundationDisciplineStageHostProps = {
   // Kanonische „Weiter"-Aktion (identisch zur Arena) — wertet den Spieltag aus.
   onAdvanceMatchday?: (() => void | Promise<void>) | null;
   // Bucht die zu Ende gespielte Disziplin (siehe DisciplineStageArenaProps).
-  onCommitDiscipline?: ((side: "d1" | "d2") => Promise<unknown>) | null;
+  onCommitDiscipline?:
+    | ((side: "d1" | "d2", shownPreview: LegacyMatchdayResolvePreview | null) => Promise<unknown>)
+    | null;
   /** Multiplayer-Room-Kontext — aktiviert Co-op-Ready-Gate + host-getriebenen Lockstep-Reveal. */
   roomContext?: FoundationRoomContext | null;
   // Öffnet die normale Spieler-Karte (PlayerDetailDrawer), wie im Rest der App.
