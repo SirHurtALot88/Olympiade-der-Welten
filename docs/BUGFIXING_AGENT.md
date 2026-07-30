@@ -8,11 +8,15 @@ wieder (siehe „Das Leck" weiter unten). Eine Meldung abzuschicken fühlte sich
 aber keiner.
 
 **Ab jetzt: ein Agent.** Er sieht regelmäßig nach, ob neue Meldungen da sind, stellt jede nach,
-schreibt Befund und Lösungsvorschlag daneben — und legt sie **dir** zur Entscheidung vor. Gebaut wird
-erst nach deiner Freigabe.
+schreibt Befund und Lösungsvorschlag daneben — und **baut den Fix selbst, bis er auf `main` liegt**.
 
-Die Arbeitsteilung in einem Satz: **der Agent prüft und schlägt vor, du entscheidest, der Agent
-baut.**
+Die Arbeitsteilung in einem Satz: **der Agent erledigt, was eindeutig ist, und legt dir vor, was eine
+Entscheidung braucht.**
+
+Das war nicht immer so. Anfangs wartete jeder Fix auf eine Freigabe — bei sechs Meldungen an einem
+Nachmittag ist das der Engpass, nicht die Arbeit. Wo genau die Grenze verläuft, steht unter
+[„Selbst mergen — und wo die Grenze liegt"](#selbst-mergen--und-wo-die-grenze-liegt). Dieser
+Abschnitt ist der wichtigste im ganzen Dokument.
 
 ---
 
@@ -261,19 +265,54 @@ aussehen, wenn er Ihnen vorgelegt wird. Und **„schon erledigt?" wird zuerst ge
 teuerste Art, Zeit zu verbrennen, einen Fehler zu untersuchen, den ein Commit von gestern längst
 behoben hat.
 
-Die Untersuchungs-Agenten **ändern keinen Code**. Sie lesen, belegen, berichten. Gebaut wird erst
-nach Ihrer Freigabe, und dann gezielt.
+Die Untersuchungs-Agenten **ändern keinen Code**. Sie lesen, belegen, berichten. Gebaut wird davon
+getrennt, und dann gezielt.
+
+---
+
+## Selbst mergen — und wo die Grenze liegt
+
+Der Agent **mergt seine eigenen Fixes selbst**, per Auto-Merge, sobald die CI grün ist. Von dort holt
+der Auto-Deploy sie binnen Minuten auf den Live-Server. Eine Meldung kann damit gemeldet, untersucht,
+gebaut und ausgeliefert werden, ohne dass jemand dazwischen etwas anklickt.
+
+**Was das kostet, offen gesagt:** Jeder Merge löst einen Neustart der laufenden Instanz aus — wer
+gerade spielt, merkt das. Und ein falscher Fix ist live, bevor ihn jemand gesehen hat; die
+Rückfahrkarte ist ein Revert, kein „nochmal drüber schauen".
+
+Deshalb gilt die Grenze schärfer als vorher.
+
+### Was der Agent nicht selbst entscheidet
+
+Diese Fälle werden **weder gebaut noch gemergt**. Sie bleiben auf `vorgeprueft`, werden Chris
+vorgelegt, und der Lauf macht mit den anderen Meldungen weiter — eine Rückfrage hält nie den ganzen
+Durchgang an:
+
+- **Es steckt eine Produkt- oder Designentscheidung darin.** „Soll X ganz verschwinden?", „Wie lange
+  soll eine Verletzung wehtun?" — das sind keine Fehler, das sind Festlegungen.
+- **Bestehende Spielstände würden verändert oder migriert.** Ein Datenverlust lässt sich nicht
+  reverten.
+- **Der Fix baut ein zentrales System um** — Persistenz, Auth, Save-Auflösung, Scoring. Auch wenn er
+  richtig ist: die Folgen reichen weiter als die Meldung.
+- **Die Ursache ist nicht belegt** (`SICHERHEIT: niedrig`, oder „nicht reproduzierbar"). Ein Fix
+  gegen eine Vermutung ist eine zweite Vermutung.
+
+Die Faustregel dahinter: **ein zurückgestellter Fehler kostet Wartezeit, ein falsch gebauter kostet
+einen Spielstand.** Im Zweifel zurückstellen.
 
 ---
 
 ## Was der Agent nicht tut
 
-- **Nicht ungefragt bauen.** Zwischen Befund und Fix steht immer deine Freigabe. Einzige Ausnahme, und
-  auch nur wenn du sie vorher erteilst: offensichtliche Ein-Zeilen-Fixes.
+- **Nichts bauen, das eine Entscheidung enthält.** Siehe oben — im Zweifel zurückstellen.
 - **Nichts erfinden.** Kein Fehler wird nachgestellt „vermutlich so" — entweder nachgestellt oder als
   nicht nachstellbar gemeldet.
 - **Keine Rohmeldung anfassen.** `data/bug-reports/*.json` ist unveränderlich.
-- **Nicht nach `main` pushen.** Fixes laufen über einen Branch und einen PR.
+- **Nicht direkt auf `main` pushen.** Jeder Fix läuft über Branch und PR — auch der, den der Agent
+  gleich darauf selbst mergt. Der PR ist der Prüfpunkt (CI) und die Rückfahrkarte (ein Revert statt
+  eines Reparatur-Commits).
+- **Nicht am grünen Tor vorbei mergen.** Auto-Merge, nie mit der Brechstange. Ist die CI rot, bleibt
+  der PR offen — auch wenn der Fix „offensichtlich" richtig ist.
 - **Nicht stumm bleiben.** Auch „keine neuen Meldungen" ist ein Ergebnis — dann meldet er sich
   allerdings gar nicht, statt dich mit Leermeldungen zuzuschütten.
 
@@ -299,12 +338,23 @@ Du bist der Bugfixing-Agent für „Olympiade der Welten". Arbeite nach docs/BUG
    - data/bug-reports/triage/<reportId>.md schreiben, Format siehe docs/BUGFIXING_AGENT.md,
      status: vorgeprueft. Abschnitt "Was dagegen spricht" ist Pflicht.
    - Nicht nachstellbar? Genauso dokumentieren, mit dem, was du versucht hast und was fehlt.
-5. Triage-Notizen committen, auf den Arbeitsbranch pushen, Draft-PR öffnen.
-6. Chris die Vorlage geben: pro Meldung ein Absatz — was ist kaputt, woran liegt es,
-   was schlägst du vor, was kostet es. Danach auf seine Freigabe warten.
-7. Erst nach Freigabe bauen: Fix, Test der den Fehler festhält, PR. Danach status: erledigt.
+5. Bauen, was eindeutig ist — ohne Rückfrage: Fix + ein Test, der ohne den Fix ROT ist
+   (das gegenprüfen, nicht behaupten). Branch, PR (kein Draft), dann Auto-Merge aktivieren.
+   Die grüne CI ist das Tor; steht Auto-Merge nicht zur Verfügung, nach dem grünen Lauf
+   selbst per Squash mergen. Nie an einer roten CI vorbei.
+6. Triage-Notiz auf status: gebaut, mit pr und commit. NICHT auf erledigt — das setzt
+   erst Chris' bestaetigt-Zeile, wenn die Wirkung im Spiel gesehen wurde.
+7. npm run bugs:tabelle laufen lassen, damit TICKETS.md den neuen Stand zeigt.
+8. Zurückstellen statt bauen, wenn eines davon zutrifft — Notiz bleibt auf vorgeprueft,
+   der Lauf macht mit den anderen Meldungen weiter, eine Rückfrage hält nie alles an:
+   - es steckt eine Produkt- oder Designentscheidung darin
+   - bestehende Spielstände würden verändert oder migriert
+   - der Fix baut ein zentrales System um (Persistenz, Auth, Save-Auflösung, Scoring)
+   - die Ursache ist nicht belegt
+9. Chris am Ende kurz berichten: was gebaut und gemergt wurde, was auf ihn wartet und warum.
 
-Nie nach main pushen. Rohmeldungen nie verändern.
+Nie direkt nach main pushen — jeder Fix läuft über Branch und PR. Rohmeldungen nie verändern.
+"Schon erledigt?" immer gegen origin/main prüfen, nie gegen den lokalen Stand.
 ```
 
 ---
@@ -318,6 +368,8 @@ Nie nach main pushen. Rohmeldungen nie verändern.
 | Vorprüfung und Status | `lib/bug-report/bug-report-triage.ts` |
 | API (`POST`/`GET /api/bug-report`) | `app/api/bug-report/route.ts` |
 | Entscheidungsvorlage | `scripts/bug-reports-review.ts` → `npm run bugs:review` |
+| Ticketnummern (fortlaufend) | `lib/bug-report/bug-report-tickets.ts` → `data/bug-reports/tickets.json` |
+| Ticket-Tabelle | `scripts/bug-reports-table.ts` → `npm run bugs:tabelle` → `data/bug-reports/TICKETS.md` |
 | Meldungen vom Live-Server holen | `deploy/hetzner/push-bug-reports.sh` |
 | Volume gegen Datenverlust | `deploy/hetzner/docker-compose.yml` |
 | Tests | `tests/bug-report-service.test.ts`, `tests/bug-report-triage.test.ts` |
