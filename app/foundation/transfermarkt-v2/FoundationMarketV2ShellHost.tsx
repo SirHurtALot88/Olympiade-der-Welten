@@ -92,6 +92,11 @@ export type FoundationMarketV2ShellHostProps = {
     portraitUrl: string | null;
   }) => void;
   loadSave: (saveId: string) => Promise<void>;
+  /**
+   * Stoesst den Markt-Feed neu an. Der Feed haengt NICHT am Spielstand, sondern an einem
+   * eigenen Zaehler — ohne diesen Anstoss bleibt er nach einem Kauf auf dem alten Stand.
+   */
+  bumpMarketReloadToken: () => void;
 };
 
 /**
@@ -136,6 +141,7 @@ export default function FoundationMarketV2ShellHost({
   closeFoundationDrilldownPanel,
   openMarketSellModal,
   loadSave,
+  bumpMarketReloadToken,
 }: FoundationMarketV2ShellHostProps) {
   const {
     transferWindowStatus,
@@ -226,6 +232,19 @@ export default function FoundationMarketV2ShellHost({
         onOpenOfferPanel: openMarketOfferPanel,
         onCloseOfferPanel: closeFoundationDrilldownPanel,
         roomContext,
+        /**
+         * GEMELDET: „cash anzeige updated sich nicht nach kauf eines spielers".
+         *
+         * Der Kauf lud nur den SPIELSTAND neu (`loadSave`). Die Cash-Zahl im Transfermarkt
+         * kommt aber aus `marketFeed.teamContext.teamCash`, und der Markt-Feed haengt an
+         * einem eigenen Zaehler (`marketReloadToken`) — nicht am Spielstand. Nach einem
+         * Kauf aendert sich keine seiner uebrigen Abhaengigkeiten (gleicher Save, gleiche
+         * Ansicht, gleiche Saison, gleiches Team), also lief der Effekt nicht noch einmal
+         * und die Zahl blieb auf dem Stand VOR dem Kauf stehen.
+         *
+         * Die Erfolgsmeldung behauptete dabei ausdruecklich, der Marktfeed sei neu geladen.
+         * Das war die einzige Stelle, an der der Widerspruch ueberhaupt sichtbar wurde.
+         */
         onBuyCompleted: async (teamId) => {
           setActiveManagerTeam(teamId, "manual_select");
           setFoundationActionFeedback({
@@ -234,6 +253,7 @@ export default function FoundationMarketV2ShellHost({
             detail: `${getTeamLockedName(teamId)} wurde aktualisiert. Cash, Gehalt, Kader und Marktfeed sind neu geladen.`,
           });
           await loadSave(activeSaveId);
+          bumpMarketReloadToken();
         },
         onSell: (payload) => {
           void openMarketSellModal({
