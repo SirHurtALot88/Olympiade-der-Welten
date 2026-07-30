@@ -452,7 +452,35 @@ export function ensureLocalFormCardsForSeason(gameState: GameState, saveId: stri
   const missing = buildGeneratedFormCardRecordsForSeason(gameState, saveId, seasonId).filter(
     (card) => !existingSeasonCardIds.has(card.id),
   );
-  if (missing.length === 0) {
+
+  // Gegenstueck zum additiven Heilen: Karten, zu denen es KEINE Kaderzeile (Team, Spieler) mehr gibt,
+  // fliegen wieder raus. Formkarten gehoeren laut Generator oben ausschliesslich einer bestehenden
+  // Kaderzugehoerigkeit — der Transfermarkt aendert aber nur `rosters` (executeLocalTransfermarktSell
+  // entfernt die Zeile, executeLocalTransfermarktBuy legt eine neue an) und fasst `formCards` nie an.
+  // Ohne dieses Aufraeumen behielt der VERKAEUFER die beiden Karten des abgegebenen Spielers: er konnte
+  // sie weiter ausspielen, und eine ungespielte NEGATIVE Karte kostete ihn am Saisonende trotzdem Punkte
+  // (`buildFormCardSeasonUsageAudit` → `applyFormCardPenaltyWithRerank`). Beim Wechsel innerhalb der
+  // Saison lag dieselbe Spielerform sogar doppelt im Spiel — beim alten und beim neuen Team.
+  //
+  // BEREITS GESPIELTE Karten bleiben bewusst liegen: sie stecken in einem `lineupDraft` und damit in der
+  // Wertung eines Spieltags, der schon gelaufen ist. Verworfen wurde deshalb der einfachere Weg, hier wie
+  // `generateLocalLegacyFormCardsForSeason` den kompletten Season-Bestand durch die Neugenerierung zu
+  // ERSETZEN: das haette auch gespielte Karten geloescht und die Formmodifikatoren vergangener Spieltage
+  // nachtraeglich veraendert.
+  const rosterMemberships = new Set(gameState.rosters.map((entry) => `${entry.teamId}|${entry.playerId}`));
+  const playedCardIds = buildFormCardUsageMap(gameState, seasonId);
+  const staleCardIds = new Set(
+    existing
+      .filter(
+        (card) =>
+          card.seasonId === seasonId &&
+          !rosterMemberships.has(`${card.teamId}|${card.playerId}`) &&
+          !playedCardIds.has(card.id),
+      )
+      .map((card) => card.id),
+  );
+
+  if (missing.length === 0 && staleCardIds.size === 0) {
     return gameState;
   }
 
@@ -460,7 +488,7 @@ export function ensureLocalFormCardsForSeason(gameState: GameState, saveId: stri
     ...gameState,
     seasonState: {
       ...gameState.seasonState,
-      formCards: [...existing, ...missing],
+      formCards: [...existing.filter((card) => !staleCardIds.has(card.id)), ...missing],
     },
   };
 }
