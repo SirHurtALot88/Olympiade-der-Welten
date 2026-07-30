@@ -204,7 +204,11 @@ describe("fatigue injury service", () => {
     expect(laterAvailability.injuryStatus).toBe("recovering");
   });
 
-  it("keeps injured players available on the injury matchday but blocks the next matchday", () => {
+  it("sperrt den Verletzten fuer die Folgedisziplin desselben Spieltags", () => {
+    // Ein Spieltag hat zwei Disziplinen. Verletzt sich der Spieler in D1, war er bisher
+    // in D2 weiter aufstellbar: die Sperre begann erst am NAECHSTEN Spieltag. Der Fixture
+    // hat kein gebuchtes Ergebnis, der Spieltag laeuft also noch — genau die Lage
+    // zwischen D1-Commit und D2.
     const playerId = findInjuredPlayerId({ saveId: "save-1", seasonId: "season-1", matchdayId: "md-1" });
     const gameState = createGameState(playerId, 83);
     const result = applyFatigueAndInjuryAfterMatchday({
@@ -217,8 +221,68 @@ describe("fatigue injury service", () => {
     });
 
     const injuryDayAvailability = getPlayerAvailabilityView(result.gameState, playerId, "A-A", "md-1");
-    expect(injuryDayAvailability.isUnavailable).toBe(false);
+    expect(injuryDayAvailability.isUnavailable).toBe(true);
+    expect(injuryDayAvailability.blocker).toBe("player_injured_unavailable");
     expect(injuryDayAvailability.injuryStatus).toBe("injured");
+  });
+
+  it("zaehlt den Verletzten fuer die Fatigue-Verrechnung weiter als Einsatz an seinem Spieltag", () => {
+    // Gegenprobe zur Sperre: Wer sich an Spieltag N verletzt, ist an N GELAUFEN. Die
+    // Buchhaltungssicht muss ihm deshalb Belastung statt Erholung zuschreiben — sonst
+    // rechnet ein forceReplace-Re-Apply desselben Spieltags einen anderen Ausgangsstand.
+    const playerId = findInjuredPlayerId({ saveId: "save-1", seasonId: "season-1", matchdayId: "md-1" });
+    const gameState = createGameState(playerId, 83);
+    const result = applyFatigueAndInjuryAfterMatchday({
+      gameState,
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-1",
+      matchdayResultId: "result-1",
+      timestamp: "2026-06-13T00:00:00.000Z",
+    });
+
+    const bookkeeping = getPlayerAvailabilityView(result.gameState, playerId, "A-A", "md-1", {
+      matchdayBookkeeping: true,
+    });
+    expect(bookkeeping.isUnavailable).toBe(false);
+    expect(bookkeeping.injuryStatus).toBe("injured");
+    // Einsatz-Zweig: +Load. Waere er als "nicht verfuegbar" eingestuft worden, stuende
+    // hier stattdessen der abgezogene Erholungswert.
+    expect(bookkeeping.fatigue).toBe(83 + MATCHDAY_FATIGUE_LOAD);
+  });
+
+  it("nimmt die Sperre zurueck, sobald beide Disziplinen des Spieltags gebucht sind", () => {
+    // Die Sperre gilt der noch OFFENEN Disziplin. Ist der Spieltag komplett gewertet,
+    // gibt es keine mehr — ein Rueckblick auf denselben Spieltag (Arena-Tabelle,
+    // Bereitschaft) soll nicht nachtraeglich behaupten, er haette nicht antreten duerfen.
+    const playerId = findInjuredPlayerId({ saveId: "save-1", seasonId: "season-1", matchdayId: "md-1" });
+    const gameState = createGameState(playerId, 83);
+    const result = applyFatigueAndInjuryAfterMatchday({
+      gameState,
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-1",
+      matchdayResultId: "result-1",
+      timestamp: "2026-06-13T00:00:00.000Z",
+    });
+
+    const bookedState: GameState = {
+      ...result.gameState,
+      seasonState: {
+        ...result.gameState.seasonState,
+        matchdayResults: [
+          { id: "result-1", saveId: "save-1", seasonId: "season-1", matchdayId: "md-1", status: "preview_applied" },
+        ] as GameState["seasonState"]["matchdayResults"],
+        disciplineResults: [
+          { id: "dr-d1", matchdayResultId: "result-1", teamId: "A-A", disciplineId: "tdm", disciplineSide: "d1" },
+          { id: "dr-d2", matchdayResultId: "result-1", teamId: "A-A", disciplineId: "spurt", disciplineSide: "d2" },
+        ] as GameState["seasonState"]["disciplineResults"],
+      },
+    };
+
+    expect(getPlayerAvailabilityView(bookedState, playerId, "A-A", "md-1").isUnavailable).toBe(false);
+    // Der naechste Spieltag bleibt gesperrt — daran aendert die Buchung nichts.
+    expect(getPlayerAvailabilityView(bookedState, playerId, "A-A", "md-2").isUnavailable).toBe(true);
   });
 
   it("uses the same deterministic injury rolls for pre-match scoring and post-match state", () => {

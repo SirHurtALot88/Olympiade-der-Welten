@@ -215,25 +215,18 @@ describe("matchday auto-run manual-team policy", () => {
     const aiLineupStep = result.steps.find((step) => step.key === "ai_lineups");
     const resolveStep = result.steps.find((step) => step.key === "resolve_preview");
 
-    // A manual/passive team WITHOUT any existing draft is not blocked by the
-    // ai_lineups step: lib/ai/ai-legacy-lineup-batch-apply-service.ts:1164-1167
-    // sets `canAutoFillIncompleteLineup = !hasCompleteExistingDraft`, and the
-    // `skipped_manual` / `skipped_passive` results only fire when
-    // `!canAutoFillIncompleteLineup`, i.e. only when a complete draft already
-    // exists. A team with no draft at all is intentionally offered a
-    // KI-Aufstellung instead (Komfort statt Blockade) and is tagged with the
-    // `manual_incomplete_lineup_autofilled` warning (same file, ~line 1252) —
-    // see the direct `applyAiLegacyLineupBatchLocally` assertion below and the
-    // "does not overwrite a manual team's existing draft" test for the
-    // complementary, still-blocking case.
-    expect(aiLineupStep?.metrics.skippedManual).toBe(0);
+    // Ein `manual`-Team OHNE Aufstellung wird von der KI nicht mehr gefuellt. Frueher
+    // galt die leere Einsatzliste als "unvollstaendig" und die KI stellte ersatzweise auf
+    // (Komfort statt Blockade) — der Spieler fand seinen Spieltag damit fertig
+    // aufgestellt vor. Die fehlende Aufstellung ist jetzt genau das, was sie ist: ein
+    // offener Punkt, den der Resolve-Schritt als `missing_manual_lineup` meldet.
+    // `passive`-Teams behalten den Autofill, sonst traeten sie mit leerem Feld an.
+    expect(aiLineupStep?.metrics.skippedManual).toBe(1);
     expect(Number(aiLineupStep?.metrics.skippedPassive ?? 0)).toBeGreaterThanOrEqual(0);
     expect(resolveStep?.metrics.manualMissing).toBe(1);
     expect(Number(resolveStep?.metrics.passiveMissing ?? 0)).toBeGreaterThanOrEqual(0);
     expect(resolveStep?.blockingReasons).toContain("missing_manual_lineup");
 
-    // Confirm the manual team without a draft was actually autofilled (not
-    // skipped) and carries the documented warning.
     const directBatch = applyAiLegacyLineupBatchLocally(
       {
         saveId: "test-save",
@@ -246,9 +239,11 @@ describe("matchday auto-run manual-team policy", () => {
       persistence,
     );
     const manualTeamResult = directBatch.results.find((entry) => entry.teamId === "B-B");
-    expect(manualTeamResult?.result).not.toBe("skipped_manual");
-    expect(manualTeamResult?.warnings).toContain("manual_incomplete_lineup_autofilled");
-  });
+    expect(manualTeamResult?.result).toBe("skipped_manual");
+    expect(manualTeamResult?.saved).toBe(false);
+    // Fixture-schwer (voller Spieltags-Durchlauf ueber 32 Teams) — wie die uebrigen
+    // Faelle dieser Suite mit eigener Frist, statt an den 5-Sekunden-Default zu stossen.
+  }, 40_000);
 
   it("does not overwrite a manual team's existing complete draft (skipped_manual)", async () => {
     const gameState = createFreshSeasonOneGameState();
@@ -294,6 +289,38 @@ describe("matchday auto-run manual-team policy", () => {
       .getSaveById(scope.saveId)!
       .gameState.seasonState.lineupDrafts?.find((draft) => draft.teamId === "B-B");
     expect(afterDraft).toEqual(beforeDraft);
+  }, 40_000);
+
+  it("schreibt fuer ein manuelles Team ohne Aufstellung gar keinen Draft — auch keine Formkarten", async () => {
+    // Gemeldeter Fehler: "immer wenn ich einen neuen spieltag berechne sind auch die
+    // Human teams schon mit spielern in der einsatzliste gefüllt". Der Batch lief nach
+    // jedem Spieltagswechsel fuer den naechsten Spieltag und behandelte die LEERE
+    // Einsatzliste des Spielers als "unvollstaendig" — also als Einladung, sie zu
+    // fuellen, samt der von der KI-Doktrin gewaehlten Formkarten.
+    const gameState = createFreshSeasonOneGameState();
+    topUpRostersForLineupMinimum(gameState);
+    const scope = {
+      saveId: "test-save",
+      seasonId: gameState.season.id,
+      matchdayId: gameState.matchdayState.matchdayId,
+    };
+    const existingSettings = gameState.seasonState.teamControlSettings ?? {};
+    gameState.seasonState.teamControlSettings = {
+      ...existingSettings,
+      "B-B": { ...existingSettings["B-B"], teamId: "B-B", controlMode: "manual", aiLineupApplyEnabled: false },
+    };
+    const persistence = createInMemoryPersistence(gameState, true);
+
+    const batch = applyAiLegacyLineupBatchLocally(
+      { ...scope, dryRun: false, includeWarningTeams: true, overwriteExisting: false },
+      persistence,
+    );
+
+    expect(batch.results.find((entry) => entry.teamId === "B-B")?.result).toBe("skipped_manual");
+    const drafts = persistence.getSaveById(scope.saveId)!.gameState.seasonState.lineupDrafts ?? [];
+    expect(drafts.find((draft) => draft.teamId === "B-B")).toBeUndefined();
+    // Gegenprobe: KI-Teams stellen weiter auf, die Sperre trifft nur das Spieler-Team.
+    expect(drafts.some((draft) => draft.teamId !== "B-B" && draft.entries.length > 0)).toBe(true);
   }, 40_000);
 
   it("uses the persisted post-AI snapshot for execute mode so resolve preview sees saved AI lineups", async () => {

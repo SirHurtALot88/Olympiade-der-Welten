@@ -1,6 +1,7 @@
 import { buildAiLegacyLineupModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { isFormCardFlowReadyForMatchday } from "@/lib/foundation/form-card-flow";
+import { getManualControlTeamIds } from "@/lib/foundation/team-control-settings";
 import { isTeamMatchdayLineupSubmitted } from "@/lib/foundation/matchday-lineup-readiness";
 import {
   autoFillFormCardModifiers,
@@ -19,10 +20,20 @@ export function prepareGameStateForMatchdayResolve(
   const warnings: string[] = [];
   const drafts = [...(next.seasonState.lineupDrafts ?? [])];
   let changed = next !== gameState;
+  // Menschlich gesteuerte Teams sind hier tabu. Die Vorbereitung fuellt fehlende
+  // Modifikatoren aus der KI-Doktrin nach (`buildAiLegacyLineupModifiers` waehlt dabei
+  // auch FORMKARTEN) — auf einer selbst gebauten Einsatzliste waere das ein fremder
+  // Griff in die Karten des Spielers. Dass die Bedingung darunter faktisch nur bei
+  // fehlendem Kartenvorrat greift, ist kein Schutz, sondern Zufall: sie prueft den
+  // VORRAT, nicht die Entscheidung.
+  const manualTeamIds = getManualControlTeamIds(next);
 
   for (let index = 0; index < drafts.length; index += 1) {
     const draft = drafts[index]!;
     if (draft.seasonId !== scope.seasonId || draft.matchdayId !== scope.matchdayId || draft.entries.length === 0) {
+      continue;
+    }
+    if (manualTeamIds.has(draft.teamId)) {
       continue;
     }
 
