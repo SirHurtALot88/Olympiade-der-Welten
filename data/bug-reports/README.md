@@ -6,16 +6,18 @@ Meldung, benannt nach ihrem Zeitstempel (`bug-<ISO>-<random>.json`), also chrono
 Der Ordner wird **ins Repo committet** (wie `data/online-saves/`), damit die Meldungen überall lesbar
 sind, nicht nur auf dem Rechner, auf dem gespielt wurde.
 
+**Wer sich um die Meldungen kümmert, steht in [`docs/BUGFIXING_AGENT.md`](../../docs/BUGFIXING_AGENT.md).**
+
 ## Was in einer Meldung steht
 
 | Feld | Woher |
 |---|---|
 | `note` | Freitext des Melders — optional |
-| `view` | `?view=`-Parameter — nur innerhalb der Foundation-Shell vorhanden |
-| `path`, `pageTitle` | Browser — benennen die Seite auch dort, wo `view` fehlt (Login, Cockpit, Startseite) |
-| `url`, `viewport`, `clientTime` | vom Browser beim Klick |
-| `reporter.ownerId`, `reporter.label` | Session-Benutzer; ohne Login der lokale Benutzer |
-| `reporter.fromSession` | `false` = die Identität ist erschlossen, nicht belegt |
+| `reporter` | wer gemeldet hat: `displayName`, `username`, `ownerId` — vom Server aus dem Session-Cookie |
+| `reporter.source` | `session` \| `auth_disabled` (Login aus) \| `not_logged_in` |
+| `page.path`, `page.view`, `page.tab` | die Seite, auf der geklickt wurde |
+| `page.label` | ihr Name aus der Navigation, z. B. „Spieltag · Arena" |
+| `view`, `url`, `viewport`, `clientTime` | vom Browser beim Klick |
 | `userAgent` | aus dem Request-Header |
 | `game.saveId`, `game.saveName` | aktiver Spielstand |
 | `game.seasonId`, `game.seasonYear`, `game.currentMatchday` | Saison und Spieltag |
@@ -26,15 +28,20 @@ sind, nicht nur auf dem Rechner, auf dem gespielt wurde.
 Eine Meldung ohne Spielkontext ist weniger wert, aber besser als keine — deshalb wird sie trotzdem
 geschrieben.
 
+`reporter` ist **immer** gesetzt, notfalls mit leeren Namen und einer Begründung in `source`. Ein
+fehlendes Feld wäre nicht deutbar: „niemand angemeldet" und „Meldung stammt aus der Zeit vor diesem
+Feld" sähen identisch aus.
+
 ## Nachschauen
 
-- Dateien direkt lesen, oder
-- `GET /api/bug-report` — liefert die letzten 50 Meldungen als JSON.
+- `npm run bugs:review` — die Entscheidungsvorlage: was offen ist, mit Zustand, Seite, Melder,
+  Befund und Lösungsvorschlag (`-- --alle` zeigt auch Erledigtes, `-- --json` ist maschinenlesbar)
+- `GET /api/bug-report` — die letzten 50 Meldungen als JSON
+- Dateien direkt lesen
 
-## Wer sich darum kümmert
+## `triage/`
 
-Aktuell: **niemand automatisch**. Die Datei liegt auf dem Rechner, auf dem der Server lief, und
-erreicht das Repo erst, wenn sie committet und gepusht wird. Solange das nicht passiert, sieht sie
-ausser dem Melder niemand.
-
-Der Weg von hier zu einer Vorlage mit Vorpruefung steht in `docs/bug-triage-konzept.md`.
+Die Vorprüfung zu einer Meldung liegt als `triage/<reportId>.md` **daneben**, nicht darin: die
+Rohmeldung ist ein Protokoll und wird nie wieder verändert. Was der Melder gesehen hat, ist
+nachträglich nicht mehr feststellbar — stünde die Bewertung in derselben Datei, wäre das Protokoll
+beim ersten Schreibfehler mit weg.

@@ -110,50 +110,116 @@ describe("Bug-Meldung — der Zustand wird mitgeschrieben", () => {
     expect(record.url).toContain("view=matchdayArena");
     expect(record.viewport).toEqual({ width: 1512, height: 963 });
   });
+});
 
-  /**
-   * "Die Seite, auf der der Bug gemeldet wird, und der User sollten auch mit drin stehen."
-   *
-   * `view` allein reicht dafuer nicht: der Parameter existiert nur innerhalb der
-   * Foundation-Shell. Auf Login, Cockpit und Startseite war die Seite bisher nur aus der
-   * rohen URL zu erraten.
-   */
-  it("benennt die Seite auch ohne ?view= — ueber Pfad und Titel", async () => {
-    const { saveBugReport, formatBugReportPage } = await importService();
-    const { record } = saveBugReport({ path: "/cockpit", pageTitle: "Cockpit · Oly" });
-    expect(record.path).toBe("/cockpit");
-    expect(record.pageTitle).toBe("Cockpit · Oly");
-    expect(formatBugReportPage(record)).toContain("Cockpit");
-
-    // Mit Ansicht gewinnt die Ansicht — sie ist praeziser als der Pfad.
-    expect(formatBugReportPage({ view: "matchdayArena", path: "/foundation", pageTitle: "Oly" })).toContain(
-      "matchdayArena",
-    );
-    // Und wenn wirklich nichts da ist, wird das benannt statt leer gelassen.
-    expect(formatBugReportPage({ view: null, path: null, pageTitle: null })).toBe("unbekannte Seite");
+/**
+ * DIE SEITE. Vorher stand dort nur der `?view=`-Parameter. Auf jeder Seite ausserhalb von
+ * /foundation — Login, Startseite, Online-Raum — gibt es den gar nicht; die Meldung sagte dann nicht
+ * einmal mehr, WO geklickt wurde. Genau danach war gefragt.
+ */
+describe("Bug-Meldung — die Seite", () => {
+  it("haelt Pfad, Ansicht und Reiter fest", async () => {
+    const { saveBugReport } = await importService();
+    const { record } = saveBugReport({ view: "matchdayArena", path: "/foundation", tab: "disziplinen" });
+    expect(record.page).toMatchObject({ path: "/foundation", view: "matchdayArena", tab: "disziplinen" });
   });
 
-  it("haelt fest, WER gemeldet hat", async () => {
+  /** Der Klartext kommt aus der Navigations-Konfiguration — keine zweite, driftende Label-Liste. */
+  it("uebersetzt die Ansicht in den Namen, der im Spiel an der Navigation steht", async () => {
     const { saveBugReport } = await importService();
-    const withSession = saveBugReport({ sessionOwnerId: "franky_remote_placeholder" }).record;
-    expect(withSession.reporter).toEqual({
-      ownerId: "franky_remote_placeholder",
-      label: "Franky",
-      fromSession: true,
+    expect(saveBugReport({ view: "matchdayArena" }).record.page.label).toBe("Spieltag · Arena");
+    expect(saveBugReport({ view: "trainingCompact" }).record.page.label).toBe("Team · Training");
+  });
+
+  /**
+   * Dieselbe Ansicht steht unter mehreren Schreibweisen in der URL (`season`, `season-v2`,
+   * `seasonV2`). Ohne die Alias-Aufloesung faende die Nav-Suche das Label nur bei der kanonischen
+   * Variante — und die Meldung von genau derselben Seite haette mal einen Namen und mal keinen.
+   */
+  it("findet das Label auch bei Alias-Schreibweisen der Ansicht", async () => {
+    const { saveBugReport } = await importService();
+    const canonical = saveBugReport({ view: "seasonV2" }).record.page.label;
+    expect(canonical).toBe("Spieltag · Saisonstand");
+    expect(saveBugReport({ view: "season-v2" }).record.page.label).toBe(canonical);
+    expect(saveBugReport({ view: "season" }).record.page.label).toBe(canonical);
+  });
+
+  /** Seite ohne `?view=`: der Pfad traegt die Meldung — er darf nicht mit verloren gehen. */
+  it("haelt den Pfad fest, wenn es gar keine Ansicht gibt", async () => {
+    const { saveBugReport } = await importService();
+    const { record } = saveBugReport({ path: "/login" });
+    expect(record.page.path).toBe("/login");
+    expect(record.page.view).toBeNull();
+    // Fuer Seiten ausserhalb der Navigation gibt es kein Label — lieber keines als ein erfundenes.
+    expect(record.page.label).toBeNull();
+  });
+
+  it("eine unbekannte Ansicht erfindet kein Label", async () => {
+    const { saveBugReport } = await importService();
+    expect(saveBugReport({ view: "gibtesnicht" }).record.page.label).toBeNull();
+  });
+
+  /**
+   * Die Nav-Konfiguration kennt nur die Foundation-Ansichten. Auf Login, Startseite und Online-Raum
+   * fehlt der `?view=`-Parameter UND der Nav-Eintrag — dort blieb das Label leer und die Meldung sagte
+   * nur noch "irgendwo unter /login". Der Dokumenttitel tritt genau in diese Luecke.
+   */
+  it("nimmt den Dokumenttitel als Label, wo die Navigation die Seite nicht kennt", async () => {
+    const { saveBugReport } = await importService();
+    const { record } = saveBugReport({ path: "/login", pageTitle: "Anmelden · Oly" });
+    expect(record.page.label).toBe("Anmelden · Oly");
+    expect(record.page.path).toBe("/login");
+  });
+
+  /** Die Navigation bleibt die bessere Quelle: sie driftet nicht, der Browsertitel schon. */
+  it("die Navigation gewinnt gegen den Dokumenttitel", async () => {
+    const { saveBugReport } = await importService();
+    const { record } = saveBugReport({ view: "matchdayArena", pageTitle: "irgendwas aus dem Browser" });
+    expect(record.page.label).toBe("Spieltag · Arena");
+  });
+});
+
+/**
+ * DER MELDER. Bei zwei Spielern am selben Save ist "wer hat das gesehen" die Frage, an der die
+ * Nachstellung haengt: Chris und Franky fuehren verschiedene Teams und sehen verschiedene Ansichten.
+ */
+describe("Bug-Meldung — wer gemeldet hat", () => {
+  it("uebernimmt den Melder, den die Route aus der Session aufgeloest hat", async () => {
+    const { saveBugReport } = await importService();
+    const { record } = saveBugReport({
+      reporter: { username: "franky", displayName: "Franky", ownerId: "owner-franky", source: "session" },
+    });
+    expect(record.reporter).toEqual({
+      username: "franky",
+      displayName: "Franky",
+      ownerId: "owner-franky",
+      source: "session",
     });
   });
 
   /**
-   * Ohne Login gibt es keine Session — es sitzt aber trotzdem einer an der Tastatur. Der
-   * Fallback benennt den lokalen Benutzer und markiert, dass das erschlossen ist. Ohne die
-   * Markierung laese sich eine Annahme wie eine Feststellung, und bei zwei Spielern auf
-   * einer Instanz waere sie still falsch.
+   * `source` traegt die Bedeutung, nicht der leere Name: "Login ist aus" (Solo — es GIBT keinen
+   * Benutzer) und "niemand angemeldet" sehen im Feld `username` identisch aus, verlangen beim
+   * Nachstellen aber Verschiedenes. Wuerden beide nur als leer gefuehrt, waere die Unterscheidung weg.
    */
-  it("unterscheidet belegte von erschlossener Identitaet", async () => {
+  it("unterscheidet abgeschalteten Login von niemand-angemeldet", async () => {
     const { saveBugReport } = await importService();
-    const withoutSession = saveBugReport({}).record;
-    expect(withoutSession.reporter.label).toBe("Chris");
-    expect(withoutSession.reporter.fromSession).toBe(false);
+    const off = saveBugReport({
+      reporter: { username: null, displayName: null, ownerId: null, source: "auth_disabled" },
+    });
+    const out = saveBugReport({
+      reporter: { username: null, displayName: null, ownerId: null, source: "not_logged_in" },
+    });
+    expect(off.record.reporter.source).toBe("auth_disabled");
+    expect(out.record.reporter.source).toBe("not_logged_in");
+  });
+
+  /** Das Feld darf nie fehlen — sonst muss jede Auswertung raten, ob "kein Melder" oder "alt". */
+  it("ist auch dann gesetzt, wenn die Route keinen Melder mitgibt", async () => {
+    const { saveBugReport } = await importService();
+    const { record } = saveBugReport({ note: "x" });
+    expect(record.reporter).not.toBeUndefined();
+    expect(record.reporter.username).toBeNull();
   });
 
   it("listet die neuesten Meldungen zuerst", async () => {
