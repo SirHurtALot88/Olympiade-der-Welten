@@ -72982,6 +72982,76 @@ button.is-new-look .nl-thist-season-pill,
   }
 }
 
+/* --- Verkaufs-Modal, Zustandsschicht (Redesign in Kaufmodal-Qualität) ---
+   Genau EIN tragender Zustand pro Render: lädt / Fenster zu (Info, kein
+   Fehler) / Fehler mit Retry / blockiert mit großem Grund. Nur Tokens. */
+
+.is-new-look .transfer-sell-state-callout {
+  display: grid;
+  gap: var(--nl-s2);
+  padding: var(--nl-s4);
+}
+
+.is-new-look .transfer-sell-state-kicker {
+  font-size: var(--nl-fs-sm);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .transfer-sell-state-headline {
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--nl-ink);
+}
+
+.is-new-look .transfer-sell-state-hint {
+  font-size: var(--nl-fs-md);
+  line-height: 1.4;
+  color: var(--nl-mut);
+}
+
+.is-new-look .transfer-sell-state-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: var(--nl-s1);
+}
+
+/* Risiko-Bestätigung: eigene, deutlich abgesetzte Zeile — der bequeme Weg
+   durch den Dialog führt NICHT über diese Checkbox hinweg. */
+.is-new-look .transfer-sell-risk-ack {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nl-s2);
+  padding: var(--nl-s2) var(--nl-s3);
+  border: 1px solid color-mix(in srgb, var(--nl-warn) 55%, var(--nl-line));
+  border-radius: var(--nl-r-md);
+  background: color-mix(in srgb, var(--nl-warn) 10%, var(--nl-panel));
+  font-size: var(--nl-fs-lg);
+  color: var(--nl-ink);
+  cursor: pointer;
+}
+
+.is-new-look .transfer-sell-risk-ack input {
+  margin-top: 2px;
+  accent-color: var(--nl-warn);
+}
+
+/* Endgültigkeits-Hinweis direkt über den Aktionen. */
+.is-new-look .transfer-sell-final-note {
+  margin: 0;
+  max-width: 62ch;
+  font-size: var(--nl-fs-md);
+  line-height: 1.4;
+  text-align: right;
+  color: color-mix(in srgb, var(--nl-warn) 70%, var(--nl-mut));
+}
+
+.is-new-look .transfer-sell-impact-stats {
+  margin-top: var(--nl-s2);
+}
+
 /* Disziplin-Bühne · Drawer-Sektion "In dieser Disziplin": größere Portrait-Karten
    als Rail-Tiles (1:1 Full-Art, 108er-Raster). Farben ausschließlich rgba/rgb —
    kein Hex (Design-Token-Lint bleibt sauber). Reuse der Rail-Tile-Optik aus

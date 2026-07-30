@@ -205,3 +205,81 @@ export function formatMatchdayShortLabel(matchdayId: string): string {
   const numeric = matchdayId.match(/matchday-(\d+)/i)?.[1] ?? matchdayId.match(/md-?(\d+)/i)?.[1] ?? null;
   return numeric != null ? `MD ${numeric}` : humanizeToken(matchdayId);
 }
+
+/**
+ * Einordnung eines Preview-Fehlers aus `/api/transfermarkt/sell`.
+ *
+ * Die Route lehnt Anfragen außerhalb des Verkaufsfensters mit
+ * `phase_blocked:sell_players:<phase>` und `summary: null` ab — das ist KEIN
+ * Defekt, sondern ein regulärer Spielzustand (Verkauft wird im Verkaufsfenster
+ * am Saisonende). Das Modal rendert diesen Fall deshalb als ruhigen
+ * Info-Bildschirm, nicht als Fehlermeldung. Alles andere bleibt ein Fehler
+ * mit genau EINER Meldung und einem konkreten nächsten Schritt.
+ */
+export type SellPreviewIssue = {
+  kind: "window_closed" | "error";
+  title: string;
+  message: string;
+  /** Konkrete Handlungsempfehlung für den Spieler (oder null). */
+  hint: string | null;
+};
+
+const SELL_WINDOW_CLOSED_BY_PHASE: Record<string, { message: string; hint: string }> = {
+  season_active: {
+    message: "Die Saison läuft noch — verkauft wird im Verkaufsfenster am Saisonende, nach Spieltag 10.",
+    hint: "Bis dahin kannst du hier alles prüfen: Marktwert und Verkaufspreis siehst du im Kader und auf dem Transfermarkt.",
+  },
+  season_completed: {
+    message: "Die Saison ist gespielt — schließe zuerst die Saisonauswertung ab, direkt danach öffnet das Verkaufsfenster.",
+    hint: "Weiter über den Saisonabschluss im Spielfluss — dann kannst du hier verkaufen.",
+  },
+  season_review: {
+    message: "Die Saisonauswertung läuft — direkt danach öffnet das Verkaufsfenster.",
+    hint: "Schließe die Auswertung ab, dann kannst du hier verkaufen.",
+  },
+  season_rewards: {
+    message: "Die Saison-Abrechnung läuft — direkt danach öffnet das Verkaufsfenster.",
+    hint: "Schließe die Abrechnung ab, dann kannst du hier verkaufen.",
+  },
+  player_development: {
+    message: "Die Spielerentwicklung läuft — direkt danach öffnet das Verkaufsfenster.",
+    hint: "Schließe die Entwicklung ab, dann kannst du hier verkaufen.",
+  },
+  transfer_buy_phase: {
+    message: "Gerade läuft die Kaufphase — die Verkaufsphase dieser Saisonwende ist bereits vorbei.",
+    hint: "Das nächste Verkaufsfenster öffnet am Ende der kommenden Saison.",
+  },
+  lineup_setup: {
+    message: "Die neue Saison wird gerade vorbereitet — das Verkaufsfenster öffnet wieder am Saisonende.",
+    hint: "Stell zuerst deine Aufstellung, verkauft wird am Ende der Saison.",
+  },
+  next_season_ready: {
+    message: "Die neue Saison steht bereit — das Verkaufsfenster öffnet wieder am Saisonende.",
+    hint: "Starte die Saison, verkauft wird an ihrem Ende.",
+  },
+};
+
+export function describeSellPreviewIssue(error: string): SellPreviewIssue {
+  if (error.startsWith("phase_blocked:sell_players:")) {
+    const phase = error.slice("phase_blocked:sell_players:".length);
+    const copy = SELL_WINDOW_CLOSED_BY_PHASE[phase] ?? {
+      message: "Das Verkaufsfenster ist gerade geschlossen — verkauft wird am Saisonende.",
+      hint: "Du kannst die Vorschau später im Verkaufsfenster erneut öffnen.",
+    };
+    return { kind: "window_closed", title: "Transferfenster geschlossen", ...copy };
+  }
+  if (error.startsWith("phase_blocked:")) {
+    return {
+      kind: "window_closed",
+      title: "In dieser Phase nicht möglich",
+      message: "Diese Aktion ist in der aktuellen Spielphase gesperrt.",
+      hint: "Folge dem Spielfluss — die Aktion wird wieder frei, sobald ihre Phase dran ist.",
+    };
+  }
+  return {
+    kind: "error",
+    title: "Verkaufsvorschau nicht verfügbar",
+    message: looksLikeSentence(error) ? error : translateSellBlockingReason(error),
+    hint: "Lade die Vorschau neu — bleibt der Fehler, schließe den Dialog und öffne den Verkauf erneut.",
+  };
+}

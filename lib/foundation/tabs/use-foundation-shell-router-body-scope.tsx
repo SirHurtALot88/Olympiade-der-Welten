@@ -3651,6 +3651,14 @@ export function useFoundationShellRouterBodyScope({
     closeFoundationDrilldownPanel();
   }
 
+  /** Fehlerzustand im Verkaufs-Modal: Vorschau für das aktuelle Subjekt neu laden. */
+  function retryMarketSellPreview() {
+    if (!marketSellSubject) {
+      return;
+    }
+    void requestTransfermarktSellPreview(marketSellSubject, marketSellPreview?.team?.id);
+  }
+
   async function confirmTransfermarktSell() {
     if (readMeta.source === "prisma") {
       setMarketSellError("Prisma-Referenz ist read-only. Für Verkäufe bitte lokalen Testspielstand nutzen.");
@@ -11613,6 +11621,7 @@ export function useFoundationShellRouterBodyScope({
     leagueSetupRetryBusy,
     leagueSetupRetryError,
     retryLeagueSetup,
+    retryMarketSellPreview,
     lineupDraftBoardView,
     lineupDraftBoardViewRequest,
     lineupFocusRequestKey,
