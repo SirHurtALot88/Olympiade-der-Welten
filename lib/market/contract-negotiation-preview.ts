@@ -1982,7 +1982,32 @@ export function buildTeamContractSeasonTable(input: {
         contractShape: entry.contractShape ?? "balanced",
         contractLength: entry.contractLength,
         totalSalary: roundMoney(yearlySalarySchedule.reduce((sum, row) => sum + row.salary, 0), 2),
-        buyoutCost: calculateOpenBuyoutCost(yearlySalarySchedule, 0),
+        /**
+         * GEMELDET: „ich bin gerade MD10 im Saisonende, aber hier stehen immer noch Werte bei
+         * Buyout trotz auslaufender Vertraege — der Buyout muesste zu dem Zeitpunkt bei allen
+         * schon um 1 Vertragsjahr geringer sein."
+         *
+         * Stimmt, und zwar nicht nur am Saisonende: ein Verkauf (und damit der Buyout) ist
+         * ueberhaupt nur moeglich, wenn das Verkaufsfenster offen ist —
+         * `isLocalTransferSellWindowOpen` in `transfermarkt-local-service`, sonst lehnt der
+         * Server mit `sell_only_at_season_end` ab. Zu diesem Zeitpunkt ist das laufende
+         * Vertragsjahr aber gespielt und bezahlt; es gehoert nicht mehr in die Abloese.
+         *
+         * Mit `seasonsElapsed: 0` stand hier die volle Restlaufzeit INKLUSIVE des laufenden
+         * Jahres. Ein auslaufender Vertrag (Restlaufzeit 1) zeigte damit noch ein volles
+         * Jahresgehalt als Buyout, obwohl der Spieler ohnehin geht — er hat richtigerweise
+         * gar keinen mehr.
+         *
+         * Dieselbe Rechnung macht die Spalte „VK" der Spielerliste seit jeher
+         * (`transfermarkt-expected-sell-value.ts`, dort ausfuehrlich begruendet). Zwei
+         * Tabellen zeigten also verschiedene Buyouts fuer denselben Spieler. Jetzt eine Regel.
+         *
+         * UNBERUEHRT bleibt der echte Verkaufs-Flow (`previewLocalTransfermarktSell` /
+         * `executeLocalTransfermarktSell`): der rechnet weiter mit der vollen Restlaufzeit.
+         * Was am Ende abgebucht wird, aendert dieser Commit nicht — nur was die Uebersicht
+         * dazu behauptet.
+         */
+        buyoutCost: calculateOpenBuyoutCost(yearlySalarySchedule, 1),
         exitValue,
         saleFactor: saleFactorBreakdown.saleFactor,
         marketValueAtExit,

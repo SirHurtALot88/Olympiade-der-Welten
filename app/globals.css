@@ -59077,6 +59077,45 @@ button.foundation-team-portrait-card {
   background: color-mix(in srgb, var(--nl-good) 25%, transparent);
 }
 
+/* --- Star-Tier an den Spieler-Chips der Spieltags-Wertung -----------------
+   Die ligaweite Top-Riege (Diamant/Gold/Silber/Bronze fuer Top 3/10/25/50)
+   traegt jedes Portrait in Kader, Arena und Drawer laengst; hier waren die
+   Chips die letzte Stelle, an der die besten Spieler nicht zu erkennen waren.
+   Schwellen und Zuordnung kommen unveraendert aus
+   `lib/foundation/player-star-tier.ts` — hier steht nur die Farbe.
+
+   Als RING per `box-shadow`, nicht ueber `border-color`: der Rahmen des Chips
+   ist eine Inline-Angabe der Komponente (`1px solid var(--nl-line)`) und liesse
+   sich aus dem Stylesheet gar nicht ueberschreiben. Der Ring liegt genau auf
+   dem Rahmen und faerbt ihn dadurch ein, ohne die Chip-Geometrie zu aendern.
+
+   Die Regel steht bewusst NACH den Heat-Baendern: die setzen bei gleicher
+   Spezifitaet `box-shadow: none`, und die Heat-Faerbung (Hintergrund) soll
+   erhalten bleiben — beide Aussagen ("wie stark heute" und "Top N der Liga")
+   stehen nebeneinander. Kein Holo-Puls wie an den Portraits: bei 11,5 px
+   Chip-Hoehe waere eine Daueranimation in einer Tabelle nur Unruhe. */
+.matchday-panel-player.is-star-tier-bronze {
+  --nl-star-tone: var(--nl-bronze);
+}
+.matchday-panel-player.is-star-tier-silver {
+  --nl-star-tone: var(--nl-silver);
+}
+.matchday-panel-player.is-star-tier-gold {
+  --nl-star-tone: var(--nl-gold);
+}
+.matchday-panel-player.is-star-tier-diamond {
+  --nl-star-tone: var(--nl-diamond);
+}
+
+.matchday-panel-player.is-star-tier-bronze,
+.matchday-panel-player.is-star-tier-silver,
+.matchday-panel-player.is-star-tier-gold,
+.matchday-panel-player.is-star-tier-diamond {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--nl-star-tone) 85%, transparent),
+    0 0 5px color-mix(in srgb, var(--nl-star-tone) 28%, transparent);
+}
+
 .is-new-look .nl-standings-td-bonus,
 .is-new-look .nl-standings-td-mw {
   color: var(--nl-mut);
@@ -70417,14 +70456,17 @@ button.is-new-look .nl-thist-season-pill,
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  min-width: 40px;
+  /* Breiter als frueher: der Strip zeigt die ganze Saison, und Punkte teilen
+     sich die Zeile jetzt mit dem Tagesrang. Umbrechen duerfen die Kacheln
+     ohnehin (`flex-wrap` an `.nl-form-strip-days`). */
+  min-width: 52px;
   padding: var(--nl-s1) var(--nl-s2);
   border-radius: var(--nl-r-sm);
   background: color-mix(in srgb, var(--nl-ink) 5%, transparent);
 }
 
 .is-new-look .nl-form-strip.is-compact .nl-form-strip-day {
-  min-width: 36px;
+  min-width: 48px;
   padding: 2px var(--nl-s1);
 }
 
@@ -70434,11 +70476,27 @@ button.is-new-look .nl-thist-season-pill,
   letter-spacing: 0.02em;
 }
 
+/* Punkte und Tagesrang auf einer Grundlinie: „8,7 #6". Der Rang tritt dabei
+   bewusst zurueck — er ordnet die Punkte ein, ersetzt sie aber nicht. */
+.is-new-look .nl-form-strip-value {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  white-space: nowrap;
+}
+
 .is-new-look .nl-form-strip-pts {
   font-size: var(--nl-fs-md);
   font-weight: 600;
   color: var(--nl-ink);
 }
+
+.is-new-look .nl-form-strip-rank {
+  font-size: var(--nl-fs-xs);
+  font-weight: 600;
+  color: var(--nl-mut);
+}
+
 
 .is-new-look .nl-form-strip-delta {
   font-size: var(--nl-fs-xs);
@@ -73170,4 +73228,174 @@ button.is-new-look .nl-thist-season-pill,
   align-items: center;
   gap: 6px;
   flex: 0 0 auto;
+}
+
+/* ==========================================================================
+   SAISONABSCHLUSS (season-finale)
+
+   Die Bühne für das Saisonende. Vorher schickte der Flow den Spieler ins Cockpit —
+   dort steht "salary_explosion" neben "S3 Readiness", und der Abschluss einer Saison
+   ging darin unter. Diese Ansicht hat deshalb bewusst KEINE Cockpit-Optik: großer
+   Kopf, ruhige Blöcke, eine Handlung je Zeile.
+   ========================================================================== */
+.nl-season-finale {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.nl-season-finale-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nl-season-finale-eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.nl-season-finale-hero h2 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.15;
+}
+
+.nl-season-finale-sub {
+  margin: 0;
+  color: var(--nl-mut);
+  font-size: 13px;
+}
+
+.nl-season-finale h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.nl-season-finale-awards ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  /* Auto-fit statt fester Spaltenzahl: die Zahl der Auszeichnungen schwankt
+     (Best Transfer entfällt ohne Transfers), und Löcher im Raster sähen aus, als
+     fehlte etwas. */
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.nl-season-finale-award {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--nl-line);
+  border-radius: 10px;
+  background: var(--nl-panel-2);
+}
+
+.nl-season-finale-award-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-accent);
+}
+
+.nl-season-finale-award.is-team .nl-season-finale-award-label {
+  color: var(--nl-gold);
+}
+
+.nl-season-finale-award strong {
+  font-size: 14px;
+}
+
+.nl-season-finale-award small {
+  color: var(--nl-mut);
+  font-size: 11.5px;
+}
+
+.nl-season-finale-board ul,
+.nl-season-finale-steps ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nl-season-finale-board li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: var(--nl-panel-2);
+  font-size: 13px;
+}
+
+.nl-season-finale-board li.is-completed small {
+  color: var(--nl-good);
+  font-weight: 700;
+}
+
+.nl-season-finale-board li.is-failed small {
+  color: var(--nl-risk);
+  font-weight: 700;
+}
+
+.nl-season-finale-step {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--nl-line);
+  border-radius: 10px;
+  background: var(--nl-panel-2);
+}
+
+/* Erledigtes bleibt lesbar, tritt aber zurück — sonst konkurriert die Vergangenheit
+   optisch mit dem, was jetzt ansteht. */
+.nl-season-finale-step.is-done {
+  opacity: 0.62;
+}
+
+.nl-season-finale-step-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.nl-season-finale-step-text strong {
+  font-size: 14px;
+}
+
+.nl-season-finale-step-text small {
+  color: var(--nl-mut);
+  font-size: 12px;
+}
+
+.nl-season-finale-step-done {
+  flex: none;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--nl-good);
+}
+
+@media (max-width: 720px) {
+  .nl-season-finale-step {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }

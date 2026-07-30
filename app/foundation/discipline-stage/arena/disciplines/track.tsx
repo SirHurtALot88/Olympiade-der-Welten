@@ -15,7 +15,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { hueForIdx, relColor } from "../DisciplineStageNativeArena";
-import { TeamFrame, HighlightRing } from "./benchmark";
+import { TeamFrame, HighlightRing, tokenRadius } from "./benchmark";
 import type { DisciplineFieldProps, RT } from "./types";
 
 export default function TrackField(props: DisciplineFieldProps): ReactNode {
@@ -135,7 +135,7 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
         {rt.map((t) =>
           t.logoUrl ? (
             <clipPath key={`clip-${t.code}`} id={`natclip-${t.code}`}>
-              <circle cx={0} cy={0} r={t.isOwn ? geo.rOwn : geo.r} />
+              <circle cx={0} cy={0} r={tokenRadius(t, geo)} />
             </clipPath>
           ) : null,
         )}
@@ -225,7 +225,7 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
       {/* Ghost-Schicht (VOR den Token): wo jedes Team letzte Runde stand. Position +
           Opazität setzt die rAF-Schleife; die Lücke zum Token zeigt den Zugewinn. */}
       {sorted.map((t) => {
-        const r = t.isOwn ? geo.rOwn : geo.r;
+        const r = tokenRadius(t, geo);
         const hue = hueForIdx(t.idx);
         return (
           <g
@@ -250,7 +250,7 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
           // Nur der Rang am Token (klar & aufgeräumt); die Rang-Änderung (▲/▼) steht in der
           // Rangliste rechts, nicht zusätzlich im Feld (sonst Unübersicht).
           const showBadge = t.isOwn || t.rank <= 3 || hoverIdx === t.idx;
-          const r = t.isOwn ? geo.rOwn : geo.r;
+          const r = tokenRadius(t, geo);
           const hue = hueForIdx(t.idx);
           const medal = t.roundMedal === 1 ? "var(--nl-gold)" : t.roundMedal === 2 ? "var(--nl-silver)" : t.roundMedal === 3 ? "var(--nl-bronze)" : null;
           const glowing = t.glowUntil > now;

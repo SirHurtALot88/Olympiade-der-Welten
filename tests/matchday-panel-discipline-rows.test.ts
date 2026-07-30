@@ -32,8 +32,11 @@ describe("Spieltags-Wertung: Disziplin-Zeilen unter dem Team", () => {
 
   it("verrät über eine verdeckte Disziplin nichts", () => {
     // null statt 0 — "noch nicht aufgedeckt" ist etwas anderes als "null Punkte".
-    expect(PANEL).toContain("points: d1Revealed ? d1Pts ?? 0 : null,");
-    expect(PANEL).toContain("points: d2Revealed ? d2Pts ?? 0 : null,");
+    // Das `?? 0` ist zusätzlich gefallen: auch "aufgedeckt, aber kein Ergebnis
+    // zugeordnet" ist unbekannt und nicht 0 (siehe
+    // tests/matchday-panel-discipline-row-values.test.ts).
+    expect(PANEL).toContain("points: d1Revealed ? d1Pts : null,");
+    expect(PANEL).toContain("points: d2Revealed ? d2Pts : null,");
   });
 
   it("hängt die Disziplin-Zeilen nicht ans Aufklappen", () => {

@@ -4,6 +4,7 @@ import type { TeamDetailDrawerData, TeamDetailDrawerHistoryRow } from "@/lib/fou
 import type { TeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
 import type { GameState, Player, RosterEntry } from "@/lib/data/olyDataTypes";
 import { getTeamLogoModel } from "@/lib/data/mediaAssets";
+import { resolvePlayerDisciplinePoints } from "@/lib/foundation/discipline-points-source";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
@@ -170,37 +171,11 @@ type SeasonPointsLedger = {
 /**
  * Entscheidet, WOHER die Disziplin-PPs einer Rosterzeile kommen.
  *
- * Der Directory-Slice rechnet SERVERSEITIG auf dem vollständigen Save. Der
- * Foundation-Client hält dagegen den kompakten Payload
- * (`compactFoundationInitialGameState`): dort sind `matchdayResults` /
- * `disciplineResults` auf den AKTIVEN Spieltag beschnitten und
- * `persistedSeasonDerivations` entfernt. Ein clientseitig gebauter
- * `buildSeasonPointsLedger` kennt daher nur diesen einen Spieltag und ist,
- * solange er nicht ausgewertet ist, leer — genau das ließ im aufgeklappten
- * PPs-Panel der Kader-/Verträge-Rostertabelle überall "—" stehen, während die
- * PPS-Spalte derselben Zeile (Server-Ratings-Slice) echte Saisonwerte zeigte.
- *
- * Sobald der Slice da ist, ist er deshalb die alleinige Quelle: fehlt ein
- * Spieler dort, hat er in dieser Saison keine PPs geholt — dann bleibt es leer,
- * statt auf den beschnittenen Ledger zurückzufallen. Der Ledger bleibt nur
- * Fallback für Pfade ohne Slice (Home-V2-/Markt-Kacheln, oder Slice-Fehler).
+ * Die Regel selbst steht in `lib/foundation/discipline-points-source.ts` — sie
+ * gilt wortgleich auch für die Spielerliste und die Saisonstand-Aufklappung.
+ * Hier bleibt nur der Name stehen, unter dem der Teams-Tab sie aufruft.
  */
-export function resolveRosterDisciplinePointsSource(input: {
-  playerId: string;
-  playerDirectorySlice: {
-    payload: unknown;
-    error: string | null;
-    disciplinePointsByPlayerId: Record<string, Record<string, number>>;
-  };
-  ledgerPointsByDiscipline: Record<string, number> | null | undefined;
-}): Record<string, number> | null {
-  const sliceIsUsable =
-    Boolean(input.playerDirectorySlice.payload) && !input.playerDirectorySlice.error;
-  if (sliceIsUsable) {
-    return input.playerDirectorySlice.disciplinePointsByPlayerId[input.playerId] ?? null;
-  }
-  return input.ledgerPointsByDiscipline ?? null;
-}
+export const resolveRosterDisciplinePointsSource = resolvePlayerDisciplinePoints;
 
 /**
  * Reihenfolge + Achse↔Kategorie-Zuordnung für die Disziplin-PPs-Aufschlüsselung.

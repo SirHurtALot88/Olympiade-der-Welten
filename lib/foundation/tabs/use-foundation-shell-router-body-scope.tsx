@@ -137,7 +137,7 @@ import {
   buildFieldRaceLedger,
   countPlayedFieldRaceMatchdays,
   getFieldRaceRankMovement,
-  getFieldRaceRecentForm,
+  getFieldRaceSeasonForm,
   type FieldRaceLedgerEntry,
 } from "@/lib/foundation/build-field-race-ledger";
 import {
@@ -308,6 +308,8 @@ import {
 import { useFoundationKeyboardNavigation } from "@/lib/foundation/use-foundation-keyboard-navigation";
 import { buildFoundationActivities } from "@/lib/foundation/foundation-activity-registry";
 import type { FoundationStateContextValue } from "@/lib/foundation/foundation-state-context";
+import { resolveDisciplinePointsLedgerView } from "@/lib/foundation/discipline-points-source";
+import { buildSeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
 import { usePlayerDirectorySlice } from "@/lib/foundation/use-player-directory-slice";
 import { useSeasonRatingsSlice } from "@/lib/foundation/use-season-ratings-slice";
 import { usePlayerDirectorySortWorker } from "@/lib/foundation/use-player-directory-sort-worker";
@@ -710,6 +712,10 @@ import {
   getGameFlowStatusLabel,
 } from "@/lib/foundation/tabs/cockpit-ui-helpers";
 import { createCockpitMatchdayApplyHandlers } from "@/lib/foundation/tabs/cockpit-matchday-handlers";
+import {
+  createCockpitPreseasonHandlers,
+  createCockpitSeasonTransitionHandlers,
+} from "@/lib/foundation/tabs/cockpit-handlers";
 import {
   formatFitDisplay,
   formatMarketDevelopmentRoute,
@@ -1365,7 +1371,7 @@ export function useFoundationShellRouterBodyScope({
   // Der Slice ist modulweit nach saveId/seasonId/contentSignature gecacht —
   // wer vorher in der Spielerliste war, holt hier nichts neu.
   const playerDirectorySlice = usePlayerDirectorySlice({
-    enabled: shouldBuildPlayerDirectory || shouldBuildTeamsView,
+    enabled: shouldBuildPlayerDirectory || shouldBuildTeamsView || activeView === "seasonV2",
     saveId: activeSaveId,
     seasonId: gameState.season.id,
     contentSignature: seasonContentSignature,
@@ -3922,6 +3928,128 @@ export function useFoundationShellRouterBodyScope({
     runCockpitMatchdayAdvance,
     runCockpitMatchdayAutoRun,
   } = matchdayArenaApplyHandlers;
+
+  /**
+   * DIESELBEN SAISONENDE-AKTIONEN, ABER AUSSERHALB DES COCKPITS.
+   *
+   * Preisgeld buchen, Entwicklung anwenden, naechste Saison starten — das gab es bisher
+   * nur im Cockpit, einem Werkzeugkasten mit Vokabeln wie "Preview laden" und
+   * "Blocker pruefen". Der Flow schickte den Spieler am Saisonende genau dorthin.
+   *
+   * Die Handler sind Factory-Funktionen, keine Hooks: sie lassen sich ueberall erzeugen,
+   * wo die Deps liegen. Der Praezedenzfall steht direkt darueber — die Arena benutzt
+   * `createCockpitMatchdayApplyHandlers` seit jeher auf demselben Weg. `runCockpitCashApply`
+   * kommt sogar geschenkt, es steckt bereits in `matchdayArenaApplyHandlers`.
+   */
+  const { runCockpitCashApply } = matchdayArenaApplyHandlers;
+
+  const seasonEndPreseasonHandlers = useMemo(
+    () =>
+      createCockpitPreseasonHandlers({
+        readMetaSource: readMeta.source,
+        setCockpitBusyKey,
+        preSeasonWorkflowFeed,
+        showReadOnlyNotice,
+        withRoomBody,
+        activeSaveId,
+        setPreSeasonWorkflowBusy,
+        setPreSeasonWorkflowError,
+        setPreSeasonWorkflowFeed,
+        loadSave,
+        reloadSeasonStandingsOverview,
+        reloadSeasonManagementOverview,
+        reloadHistoryFeed,
+        reloadTransferRecapFeed,
+        bumpMarketReloadToken: () => setMarketReloadToken((current) => current + 1),
+        setActiveView,
+        syncFoundationViewInUrl,
+      }),
+    [
+      activeSaveId,
+      loadSave,
+      preSeasonWorkflowFeed,
+      readMeta.source,
+      reloadHistoryFeed,
+      reloadSeasonManagementOverview,
+      reloadSeasonStandingsOverview,
+      reloadTransferRecapFeed,
+      setActiveView,
+      setCockpitBusyKey,
+      setMarketReloadToken,
+      setPreSeasonWorkflowBusy,
+      setPreSeasonWorkflowError,
+      setPreSeasonWorkflowFeed,
+      showReadOnlyNotice,
+      syncFoundationViewInUrl,
+      withRoomBody,
+    ],
+  );
+
+  const seasonEndTransitionHandlers = useMemo(
+    () =>
+      createCockpitSeasonTransitionHandlers({
+        readMetaSource: readMeta.source,
+        setCockpitBusyKey,
+        seasonId: gameState.season.id,
+        wholeSeasonMaxMatchdays,
+        wholeSeasonIncludeWarningLineups,
+        wholeSeasonOverwriteExistingLineups,
+        wholeSeasonStopOnTie,
+        showReadOnlyNotice,
+        withRoomBody,
+        activeSaveId,
+        setSeasonTransitionBusy,
+        setSeasonTransitionError,
+        setSeasonTransitionFeed,
+        setSeasonCompletionFeed,
+        setCashApplyFeed,
+        setSeasonSnapshotFeed,
+        setWholeSeasonDryRunFeed,
+        setFoundationActionFeedback,
+        loadSave,
+        reloadResolvePreview,
+        reloadStandingsPreviewFeed,
+        reloadPrizePreviewFeed,
+        reloadSeasonStandingsOverview,
+        reloadSeasonManagementOverview,
+        reloadHistoryFeed,
+        reloadTransferRecapFeed,
+        setActiveView,
+        syncFoundationViewInUrl,
+      }),
+    [
+      activeSaveId,
+      gameState.season.id,
+      loadSave,
+      readMeta.source,
+      reloadHistoryFeed,
+      reloadPrizePreviewFeed,
+      reloadResolvePreview,
+      reloadSeasonManagementOverview,
+      reloadSeasonStandingsOverview,
+      reloadStandingsPreviewFeed,
+      reloadTransferRecapFeed,
+      setActiveView,
+      setCashApplyFeed,
+      setCockpitBusyKey,
+      setFoundationActionFeedback,
+      setSeasonCompletionFeed,
+      setSeasonSnapshotFeed,
+      setSeasonTransitionBusy,
+      setSeasonTransitionError,
+      setSeasonTransitionFeed,
+      setWholeSeasonDryRunFeed,
+      showReadOnlyNotice,
+      syncFoundationViewInUrl,
+      wholeSeasonIncludeWarningLineups,
+      wholeSeasonMaxMatchdays,
+      wholeSeasonOverwriteExistingLineups,
+      wholeSeasonStopOnTie,
+    ],
+  );
+
+  const { runPreSeasonWorkflowPreview, runPreSeasonNextSeasonSetup } = seasonEndPreseasonHandlers;
+  const { runSeasonCompletion } = seasonEndTransitionHandlers;
 
   async function runAiPreseasonBackground() {
     if (readMeta.source === "prisma") {
@@ -7590,7 +7718,7 @@ export function useFoundationShellRouterBodyScope({
 
   /** Letzte bis zu 5 Spieltage des aktiven Teams (D1 Feld-Form-Strip). */
   const selectedTeamFieldRaceForm: FieldRaceLedgerEntry[] = useMemo(
-    () => (selectedTeam ? getFieldRaceRecentForm(fieldRaceLedger, selectedTeam.teamId, 5) : []),
+    () => (selectedTeam ? getFieldRaceSeasonForm(fieldRaceLedger, selectedTeam.teamId) : []),
     [fieldRaceLedger, selectedTeam?.teamId],
   );
 
@@ -9967,6 +10095,38 @@ export function useFoundationShellRouterBodyScope({
     () => new Map(gameState.players.map((player) => [player.id, player] as const)),
     [gameState.players],
   );
+  /**
+   * Teilnehmer je Team und Spalte für die Aufklappung im Saisonstand: die Zahl
+   * in Klammern hinter jedem Disziplin-Kürzel und das Hover-Panel dahinter.
+   *
+   * Das wurde bislang nur im (nirgends gerenderten) `FoundationSeasonV2Host`
+   * gebaut — auf dem tatsächlich gerenderten Pfad kam der Prop nie an, weshalb
+   * jede Disziplin "(0)" trug und das Hover-Panel leer blieb. Der Prop ist am
+   * `SeasonStandingsV2Client` optional, deshalb fiel das nie als Typfehler auf.
+   *
+   * Quelle ist der SERVER-Slice, nicht der clientseitige Ledger: der Client hält
+   * den kompakten Payload und kennt nur den aktiven Spieltag — am echten
+   * Spielstand (Spieltag 10) lieferte er statt 19 nur 2 besetzte Disziplinen.
+   * Die Entscheidung selbst trifft `resolveDisciplinePointsLedgerView`.
+   *
+   * Für archivierte Saisons bewusst `null`: Ratings und Slice tragen immer die
+   * LIVE-Saison — eine Teilnehmerliste aus aktuellen Werten wäre im Archiv
+   * schlicht gelogen; dort zeigt der Saisonstand deshalb gar kein Panel.
+   */
+  const seasonV2TeamTopPlayersByColumn = useMemo(
+    () =>
+      isViewingArchivedSeason
+        ? null
+        : buildSeasonStandingsTopPlayersByTeam({
+            gameState,
+            playerRatingsById,
+            seasonPointsLedger: resolveDisciplinePointsLedgerView({
+              playerDirectorySlice,
+              seasonPointsLedger,
+            }),
+          }),
+    [gameState, isViewingArchivedSeason, playerDirectorySlice, playerRatingsById, seasonPointsLedger],
+  );
   const seasonV2TopPlayers = useMemo(() => {
     return sortedSeasonTopPlayerRows.slice(0, SEASON_V2_TOP_PLAYER_LIMIT).map((row) => {
       const player = seasonV2PlayerById.get(row.playerId) ?? null;
@@ -11540,6 +11700,12 @@ export function useFoundationShellRouterBodyScope({
     runFacilityUpgradePreview,
     commitArenaDiscipline,
     finishMatchdayAndAdvance,
+    // Saisonabschluss-Ansicht (season-finale): dieselben Aktionen wie im Cockpit,
+    // nur an einer Stelle, an die man einen Spieler schicken kann.
+    runCockpitCashApply,
+    runPreSeasonWorkflowPreview,
+    runPreSeasonNextSeasonSetup,
+    runSeasonCompletion,
     runFoundationCommand,
     runNewGameSetup,
     runSaveAction,
@@ -11589,6 +11755,7 @@ export function useFoundationShellRouterBodyScope({
     seasonV2PressureTeam,
     seasonV2SelectedTeamSummary,
     seasonV2StandingsRows,
+    seasonV2TeamTopPlayersByColumn,
     seasonV2TopPlayers,
     selectTeamSettingsTeam,
     selectedBoardConfidence,

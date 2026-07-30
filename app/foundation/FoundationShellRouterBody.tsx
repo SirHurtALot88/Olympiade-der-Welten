@@ -223,6 +223,10 @@ const FoundationLineupPanel = dynamic(() => import("@/app/foundation/legacy-line
   ssr: false,
   loading: () => <FoundationPanelSkeleton variant="lineup" label="Einsatzliste wird geladen…" />,
 });
+const FoundationSeasonFinalePanel = dynamic(
+  () => import("@/app/foundation/season-v2/FoundationSeasonFinalePanel"),
+  { ssr: false },
+);
 const FoundationSeasonV2Panel = dynamic(() => import("@/app/foundation/season-v2/FoundationSeasonV2Panel"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton variant="seasonV2" label="Saisonstand wird geladen…" />,
@@ -560,6 +564,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   runFacilityUpgradePreview,
   commitArenaDiscipline,
   finishMatchdayAndAdvance,
+  runCockpitCashApply,
+  runPreSeasonWorkflowPreview,
+  runPreSeasonNextSeasonSetup,
   runFoundationCommand,
   runNewGameSetup,
   runSaveAction,
@@ -608,6 +615,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   seasonV2PressureTeam,
   seasonV2SelectedTeamSummary,
   seasonV2StandingsRows,
+  seasonV2TeamTopPlayersByColumn,
   seasonV2TopPlayers,
   selectTeamSettingsTeam,
   selectedBoardConfidence,
@@ -2609,6 +2617,35 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             hostProps={foundationMatchdayResultHostProps}
           />
 
+          {/* SAISONABSCHLUSS. Sichtbar, sobald die Saison durch ist — genau dann, wenn der
+              Flow bisher ins Cockpit zeigte. Steht UEBER der Tabelle, weil am Saisonende
+              nicht der Tabellenstand die Frage ist, sondern "was jetzt". */}
+          {activeView === "seasonV2" && (gameState.gamePhase === "season_completed" || gameState.gamePhase === "season_review") ? (
+            <FoundationSeasonFinalePanel
+              gameState={gameState}
+              activeTeamId={activeManagerTeamId}
+              prizeApplied={(gameState.seasonState.cashPrizeApplyLogs ?? []).some(
+                (log: { seasonId: string }) => log.seasonId === gameState.season.id,
+              )}
+              developmentApplied={(gameState.playerProgressionEvents ?? []).some(
+                (event: { seasonId: string }) => event.seasonId === gameState.season.id,
+              )}
+              nextSeasonReady={Boolean(preSeasonWorkflowFeed?.ok)}
+              busy={Boolean(preSeasonWorkflowBusy) || cockpitBusyKey != null}
+              readOnly={readMeta.readOnly}
+              onApplyPrize={() => void runCockpitCashApply(true)}
+              onLoadNextSeasonPreview={() => void runPreSeasonWorkflowPreview()}
+              onStartNextSeason={() => {
+                // Der Saisonstart schreibt Snapshot, Entwicklung, Spielplan und Formkarten —
+                // das ist nichts, was man aus Versehen ausloest.
+                if (!window.confirm("Neue Saison starten? Das schreibt Entwicklung, neuen Spielplan und Formkarten.")) return;
+                void runPreSeasonNextSeasonSetup();
+              }}
+              onOpenDevelopment={() => setFoundationView("trainingCompact", setActiveView, { push: true })}
+              onOpenRoster={() => setFoundationView("teams", setActiveView, { push: true })}
+            />
+          ) : null}
+
           {(activeView === "seasonV2") ? (
             <FoundationSeasonV2Panel
               active={activeView === "seasonV2"}
@@ -2625,6 +2662,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               topPlayer={seasonV2TopPlayers[0] ?? null}
               standingsRows={seasonV2StandingsRows}
               topPlayers={seasonV2TopPlayers}
+              teamTopPlayersByColumn={seasonV2TeamTopPlayersByColumn}
               playerRows={seasonV2PlayerRows}
               gmRows={seasonV2GmRows}
               archiveRows={seasonV2ArchiveRows}

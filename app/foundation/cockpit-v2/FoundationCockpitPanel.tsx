@@ -2548,7 +2548,15 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                 </ul>
               </article>
 
-              <article className={`panel cockpit-step ${getCockpitStepTone(preSeasonWorkflowFeed?.ok ? "ready" : preSeasonWorkflowFeed ? "warning" : "open")}`}>
+              {/* `id` ist der SPRUNGANKER, auf den die Saison-Checkliste zeigt
+                  (`season-readiness-checklist.ts`, Eintrag "Neue Saison vorbereiten",
+                  targetPanel: "preseason-workflow"). Ohne ihn lief `scrollToFoundationTarget`
+                  in ein `getElementById` → null und brach still ab: der Knopf navigierte
+                  ins Cockpit und tat sonst nichts. */}
+              <article
+                id="preseason-workflow"
+                className={`panel cockpit-step ${getCockpitStepTone(preSeasonWorkflowFeed?.ok ? "ready" : preSeasonWorkflowFeed ? "warning" : "open")}`}
+              >
                 <div className="panel-header">
                   <h3>Pre-Season Workflow</h3>
                   <span className={getCockpitStatusPillClass(preSeasonWorkflowFeed?.ok ? "ready" : preSeasonWorkflowFeed ? "warning" : "open")}>
@@ -2865,7 +2873,10 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                       </div>
                       <p className="muted">{step.preview}</p>
                       {step.stepId === "season_review" && seasonTransitionFeed?.seasonReview ? (
-                        <div className="season-review-preview" data-testid="season-review-preview">
+                        // `id` zusaetzlich zum Testid: die Saison-Checkliste springt hierher
+                        // ("Spielerentwicklung", "Saisonrückblick"), und `getElementById`
+                        // findet ein `data-testid` nicht.
+                        <div className="season-review-preview" data-testid="season-review-preview" id="season-review-preview">
                           <div className="season-review-hero">
                             {(() => {
                               const champion = seasonTransitionFeed.seasonReview.championTeam;

@@ -3281,7 +3281,26 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           }),
           slot.disciplineId,
         )
-          .slice(0, 3)
+          // GEMELDET: „bester fit wird nich immer korrekt angezeigt".
+          //
+          // Hier stand `.slice(0, 3)` VOR dem `.map(...)`. Die Auswahl fiel damit nach
+          // `sortOptionsByDisciplineSkill` — dem rohen Disziplin-Skill —, waehrend die
+          // angezeigte Zahl (und der Tooltip, und der Gewinn beim "Optimieren") der
+          // PROJIZIERTE Score ist: Rolle, Attribute, Fatigue, Intensitaet, Rivalitaet.
+          //
+          // Zwei verschiedene Massstaebe fuer dieselbe Aussage. Ein Spieler mit etwas
+          // weniger Grund-Skill, aber besserer Rollen-Passung oder frischer, projiziert
+          // regelmaessig hoeher — er stand dann hinter dem "Best Fit" oder war durch den
+          // Schnitt schon raus. Der Knopf zeigte also einen Vorschlag, dessen eigene Zahl
+          // eine andere Reihenfolge behauptete.
+          //
+          // Jetzt wird erst projiziert, dann nach der projizierten Zahl sortiert und
+          // zuletzt geschnitten. Die Vorsortierung nach Skill bleibt als stabile
+          // Ausgangsreihenfolge (Gleichstand faellt auf sie zurueck).
+          //
+          // Kosten: die Projektion laeuft jetzt fuer alle zulaessigen Optionen statt fuer
+          // drei. Das ist dieselbe Groessenordnung, die `playerBestSlotSummaryByActivePlayerId`
+          // direkt darunter ohnehin schon rechnet (jeder Spieler × jeder Slot).
           .map((option) => {
             const rosterCard = rosterCardByActivePlayerId.get(option.activePlayerId) ?? null;
             const projected = calculateMatchdayProjectedPreview({
@@ -3313,7 +3332,12 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               rangeHigh: projected.rangeHigh,
               warnings: projected.warnings,
             };
-          });
+          })
+          // Nach der PROJIZIERTEN Zahl ordnen — das ist die, die am Knopf steht. Ohne
+          // Projektion (kein Basis-Score fuer diese Diszi) nach hinten: ein Vorschlag ohne
+          // Zahl ist kein Vorschlag.
+          .sort((left, right) => (right.projectedScore ?? Number.NEGATIVE_INFINITY) - (left.projectedScore ?? Number.NEGATIVE_INFINITY))
+          .slice(0, 3);
 
         return [slot.key, { topCandidates, currentProjected }] as const;
       }),
@@ -5337,21 +5361,57 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       const query = new URLSearchParams(params);
       query.set("source", source);
       withRoomQuery(query);
-      const response = await fetch(`/api/lineups/legacy?${query.toString()}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ entries: entriesToSave, modifiers }),
-      });
-      const payload = (await response.json()) as {
+      const putLineup = (confirmLock: boolean) =>
+        fetch(`/api/lineups/legacy?${query.toString()}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ entries: entriesToSave, modifiers, confirmLock }),
+        });
+      let response = await putLineup(false);
+      let payload = (await response.json()) as {
         draft?: LegacyLineupDraft;
         saveVersion?: number | null;
         contentSignature?: string | null;
         warnings?: string[];
         errors?: string[];
         error?: string;
+        commitment?: { hasFormCards: boolean; hasCaptain: boolean; isEmptyCommitment: boolean };
       };
+
+      /**
+       * Das Speichern nagelt den Spieltag fest — danach sind Formkarten, Kapitaen und
+       * Aufstellung nicht mehr aenderbar. Die Route speichert deshalb erst auf Bestaetigung
+       * und meldet im ersten Anlauf zurueck, WAS eingesetzt wird.
+       *
+       * Ohne Formkarte UND ohne Kapitaen wird deutlicher gefragt: das ist fast nie Absicht
+       * und danach nicht mehr zu korrigieren.
+       */
+      if (response.status === 409 && payload.error === "lineup_lock_confirmation_required") {
+        const commitment = payload.commitment;
+        const einsatz = commitment?.isEmptyCommitment
+          ? "Du setzt WEDER eine Formkarte NOCH einen Kapitän ein."
+          : [
+              commitment?.hasFormCards ? "Formkarte(n) gesetzt" : "keine Formkarte",
+              commitment?.hasCaptain ? "Kapitän gesetzt" : "kein Kapitän",
+            ].join(" · ");
+        const confirmed =
+          typeof window === "undefined"
+            ? false
+            : window.confirm(
+                `Aufstellung abgeben und für diesen Spieltag festlegen?\n\n${einsatz}\n\n` +
+                  "Danach lassen sich Aufstellung, Kapitän und Formkarten für diesen Spieltag " +
+                  "nicht mehr ändern.",
+              );
+        if (!confirmed) {
+          setMessage("");
+          setWarnings([]);
+          return false;
+        }
+        response = await putLineup(true);
+        payload = (await response.json()) as typeof payload;
+      }
 
       if (!response.ok) {
         setErrors(payload.errors ?? [payload.error ?? "Draft konnte nicht gespeichert werden."]);

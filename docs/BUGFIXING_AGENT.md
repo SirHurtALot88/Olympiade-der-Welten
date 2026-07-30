@@ -24,8 +24,8 @@ baut.**
             ▼
    data/bug-reports/bug-<Zeitstempel>-<zufall>.json      ← Rohmeldung, wird NIE wieder angefasst
             │
-            ├── lokal gespielt  →  committen und pushen
-            └── Live-Server     →  Cron pusht auf Branch "bug-reports"  (alle 15 Min)
+            ├── lokal gespielt  →  Server pusht selbst auf Branch "bug-reports"  (sofort)
+            └── Live-Server     →  Cron pusht auf Branch "bug-reports"      (alle 15 Min)
             │
             ▼
    Der Agent liest sie, stellt sie nach, schreibt
@@ -54,10 +54,34 @@ Cron-Installer richtet beides zusammen ein:
 bash deploy/hetzner/install-live-save-cron.sh    # einmalig auf dem Server
 ```
 
-> **Wichtig für lokal gespielte Runden:** Meldungen, die auf deinem Rechner entstehen, liegen in
-> deinem lokalen `data/bug-reports/`. Der Agent läuft in einer frischen Umgebung und sieht **nur, was
-> im Repo liegt**. Also: `git add data/bug-reports && git commit && git push`. Sonst kennt der Agent
-> die Meldung nicht — sie ist nicht verloren, aber unsichtbar.
+### Lokal gespielte Runden — und warum beide Quellen sich nicht überschreiben
+
+Früher stand hier die Handanweisung „also: `git add data/bug-reports && git commit && git push`".
+Die wird vergessen: die allererste Meldung ist genau daran verlorengegangen — die Datei lag da,
+gesehen hat sie nie jemand. Der lokale Server erledigt das jetzt selbst
+(`lib/bug-report/bug-report-git.ts`), direkt beim Absetzen der Meldung.
+
+Dabei war eine Kollision zu lösen. `push-bug-reports.sh` baut einen **elternlosen** Commit und macht
+einen **Force-Push** — so bleibt der Branch immer genau ein Commit groß, statt bei jedem Cron-Lauf zu
+wachsen. Schriebe der lokale Server normal auf denselben Branch, wäre alles lokal Gemeldete beim
+nächsten Cron-Lauf spurlos weg, alle 15 Minuten, ohne Fehlermeldung.
+
+Beide Seiten bilden deshalb dieselbe Form: **Baum = Vereinigung aus bestehendem Branch-Inhalt und
+eigenen Dateien**, dann elternloser Commit und Force-Push. Damit ist jeder Push idempotent, keine
+Quelle löscht die andere, und der Branch bleibt ein Commit groß. `tests/bug-report-git.test.ts` stellt
+einen Cron-Lauf nach und prüft beide Richtungen.
+
+Zwei weitere Eigenschaften des lokalen Wegs:
+
+- **Der Arbeitsstand des Spielers wird nicht angefasst.** Der Server läuft im Arbeits-Repo; ein
+  beiläufiges `git add`/`git commit` wäre auf dem gerade ausgecheckten Branch gelandet, womöglich
+  mitten in halbfertiger Arbeit. Deshalb ausschließlich Plumbing mit eigenem `GIT_INDEX_FILE` —
+  dieselbe Mechanik wie im Server-Skript.
+- **Ein gescheiterter Push verliert nichts.** Der Baum wird aus *allen* lokalen Meldungen gebildet,
+  nicht nur der neuen; was diesmal nicht rausging, geht beim nächsten Mal mit. An der Flagge steht
+  dann `⚠ nur lokal (n offen)` statt `→ Git`.
+
+Abschalten mit `OLY_BUG_REPORT_GIT=0` (in Tests ohnehin aus).
 
 ---
 

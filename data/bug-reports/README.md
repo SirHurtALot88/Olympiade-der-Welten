@@ -3,8 +3,12 @@
 Hier landet jede Meldung, die über die rote Flagge oben rechts abgeschickt wird — eine JSON-Datei je
 Meldung, benannt nach ihrem Zeitstempel (`bug-<ISO>-<random>.json`), also chronologisch sortiert.
 
-Der Ordner wird **ins Repo committet** (wie `data/online-saves/`), damit die Meldungen überall lesbar
-sind, nicht nur auf dem Rechner, auf dem gespielt wurde.
+Jede Meldung wird **automatisch auf den Branch `bug-reports` gepusht**, sofort beim Absetzen — lokal
+vom Server selbst, auf dem Live-Server per Cron. Erst dadurch ist sie überall lesbar und nicht nur auf
+dem Rechner, auf dem gespielt wurde. Lesen mit `git fetch origin bug-reports`.
+
+Beide Quellen schreiben denselben Branch als *Vereinigung*, damit keine die andere überschreibt; das
+Warum steht in `docs/BUGFIXING_AGENT.md`.
 
 **Wer sich um die Meldungen kümmert, steht in [`docs/BUGFIXING_AGENT.md`](../../docs/BUGFIXING_AGENT.md).**
 

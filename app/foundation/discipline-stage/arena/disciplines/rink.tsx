@@ -11,7 +11,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import type { DisciplineFieldProps, RT } from "./types";
-import { useTokenGlide, tokenRef, GhostLayer, TokenChrome } from "./benchmark";
+import { useTokenGlide, tokenRef, GhostLayer, TokenChrome, tokenRadius } from "./benchmark";
 
 export default function RinkField(props: DisciplineFieldProps): ReactNode {
   const {
@@ -113,7 +113,7 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
       g.appendChild(p);
       if (fxRef.current) fxRef.current.appendChild(g);
       shots.push({
-        x: fracX(t.animScore) + (t.isOwn ? geo.rOwn : geo.r) + 6,
+        x: fracX(t.animScore) + (tokenRadius(t, geo)) + 6,
         y: laneY(t.idx),
         // Save → der Puck landet knapp VOR dem Torraum (Goalie pariert); Tor → in den Kasten.
         tx: outcome === "goal" ? GR + 6 : GR - 10,
@@ -136,7 +136,7 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
       // Puck beim Führenden (Nose + 5).
       const el = puckRef.current;
       if (el && lead && !frozen) {
-        el.setAttribute("cx", String(fracX(lead.animScore) + (lead.isOwn ? geo.rOwn : geo.r) + 5));
+        el.setAttribute("cx", String(fracX(lead.animScore) + tokenRadius(lead, geo) + 5));
         el.setAttribute("cy", String(laneY(lead.idx)));
       }
 
@@ -246,7 +246,7 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
         {rt.map((t) =>
           t.logoUrl ? (
             <clipPath key={`clip-${t.code}`} id={`natclip-${t.code}`}>
-              <circle cx={0} cy={0} r={t.isOwn ? geo.rOwn : geo.r} />
+              <circle cx={0} cy={0} r={tokenRadius(t, geo)} />
             </clipPath>
           ) : null,
         )}
@@ -342,7 +342,7 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
         .slice()
         .reverse()
         .map((t) => {
-          const r = t.isOwn ? geo.rOwn : geo.r;
+          const r = tokenRadius(t, geo);
           const glowing = t.glowUntil > now;
 
           return (
@@ -388,7 +388,7 @@ export default function RinkField(props: DisciplineFieldProps): ReactNode {
           neben ihm platziert; Position via rAF (animScore), friert bei Hover/Pause ein. */}
       <ellipse
         ref={puckRef}
-        cx={leader ? fracX(leader.animScore) + (leader.isOwn ? geo.rOwn : geo.r) + 5 : CX}
+        cx={leader ? fracX(leader.animScore) + tokenRadius(leader, geo) + 5 : CX}
         cy={leader ? laneY(leader.idx) : CY}
         rx="5.5"
         ry="3.5"
