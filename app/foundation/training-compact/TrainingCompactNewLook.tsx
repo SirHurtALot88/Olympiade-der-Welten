@@ -12,6 +12,7 @@ import {
   NlCard,
   NlDeltaChip,
   NlEmptyState,
+  NlFatigueGauge,
   NlWhatIfSlider,
   StatChip,
   StatChipRow,
@@ -324,6 +325,21 @@ function NlTrainingIntensityProjection({
   const potentialMultiplier = row.modifiers.potentialTrainingMultiplier;
   const potentialTone = getPotentialTone(potentialMultiplier);
   const best = projection.reduce((max, entry) => Math.max(max, entry.trainingGain), 0.01);
+  /**
+   * Die Netto-Formel stand bis zuletzt als dreizeiliger Fliesstext UNTER jeder
+   * Intensitaets-Karte — bei mehreren Spielern nebeneinander also x-mal derselbe
+   * Absatz, der die Karten deutlich in die Hoehe zog. Die Herleitung gibt es
+   * ohnehin ausfuehrlich hinter „Wie kommt das zustande?"
+   * (`training-view-shared.tsx`); hier reicht sie als Tooltip an der
+   * Ueberschrift. Der Text selbst bleibt unveraendert erhalten.
+   */
+  const currentProjection = projection.find((entry) => entry.isCurrent) ?? projection[0];
+  const netFormulaHint = `Netto = Training − Regression ${formatNlSignedNumber(
+    projection[0]?.regression ?? 0,
+    1,
+  )} (konstant) − Potential-Decke. Die Decke schneidet Zuwachs an fast vollen Attributen ab und wächst mit der Intensität — deshalb bringt mehr Training nicht 1:1 mehr Netto.${
+    currentProjection ? ` Aktuell (${currentProjection.label}): Decke −${formatNlNumber(currentProjection.ceilingLoss, 1)} SP.` : ""
+  } Schritt für Schritt unter „Wie kommt das zustande?".`;
 
   return (
     <div
@@ -333,7 +349,7 @@ function NlTrainingIntensityProjection({
       aria-label="Trainingsintensität wählen"
     >
       <div className="nl-training-intensity-head">
-        <span className="nl-training-intensity-title">
+        <span className="nl-training-intensity-title" title={netFormulaHint}>
           Intensität {readOnly ? "" : <span className="nl-training-intensity-hint-inline">· tippen zum Wählen</span>}
         </span>
         <span
@@ -387,15 +403,6 @@ function NlTrainingIntensityProjection({
           </button>
         ))}
       </div>
-      <small className="nl-training-intensity-foot nl-tnum">
-        Netto = Training − Regression {formatNlSignedNumber(projection[0]?.regression ?? 0, 1)} (konstant) − Potential-Decke.
-        Die Decke schneidet Zuwachs an fast vollen Attributen ab und wächst mit der Intensität — deshalb bringt mehr
-        Training nicht 1:1 mehr Netto.
-        {(() => {
-          const current = projection.find((entry) => entry.isCurrent) ?? projection[0];
-          return current ? ` Aktuell (${current.label}): Decke −${formatNlNumber(current.ceilingLoss, 1)} SP.` : "";
-        })()}
-      </small>
     </div>
   );
 }
@@ -641,8 +648,21 @@ function NlTrainingPlayerCard({
             />
           ) : null}
         </div>
-        <span className={`nl-training-player-badge is-${tone} nl-training-hint`} title={getToneBadgeTooltip(tone)}>
-          {getToneBadgeLabel(tone)}
+        {/* Fatigue-Gauge im Karten-Kopf. Auf dieser Seite entscheidet man ueber die
+            Trainings-INTENSITAET, und genau die kostet Regeneration — der aktuelle
+            Erschoepfungsstand gehoert damit neben die Entscheidung, statt nur im
+            Spieler-Drawer und in der Einsatzliste zu stehen. Dasselbe geteilte
+            `NlFatigueGauge` wie dort (gleiche Schwellen, gleicher Ton-Verlauf),
+            damit ein Spieler nicht auf zwei Seiten unterschiedlich „muede" aussieht. */}
+        <span className="nl-training-player-head-meta">
+          <NlFatigueGauge
+            value={row.player.fatigue}
+            className="nl-training-player-fatigue"
+            title={`Fatigue ${formatNlNumber(row.player.fatigue, 0)}/100 · Verletzungsrisiko bei ${row.modeConfig.label}: ${row.modeConfig.fatigueRisk}. ${row.fatigueWarning}`}
+          />
+          <span className={`nl-training-player-badge is-${tone} nl-training-hint`} title={getToneBadgeTooltip(tone)}>
+            {getToneBadgeLabel(tone)}
+          </span>
         </span>
       </header>
 
@@ -702,8 +722,19 @@ function NlTrainingPlayerCard({
         onSelectClass={(className) => onSetTrainingClass(row.player.id, className)}
       />
 
-      {showRecommendation || hasTraitBoost || hasDemand || isHighRisk || showClassSuggestion ? (
-        <div className="nl-training-chip-row" aria-label="Trainings-Hinweise">
+      {/* EINE Chip-Zeile fuer Hinweise UND Affinitaeten. Vorher waren das zwei
+          Container untereinander, wodurch schon bei einem einzelnen Trait-Chip
+          („★ 0%") eine fast leere Zeile ueber den Affinitaeten stand. Beides sind
+          kurze Pillen derselben Art — sie fliessen jetzt gemeinsam um, und die
+          Karte spart je nach Fuellung eine ganze Zeile. */}
+      {showRecommendation ||
+      hasTraitBoost ||
+      hasDemand ||
+      isHighRisk ||
+      showClassSuggestion ||
+      row.modifiers.signatureAttributes.length > 0 ||
+      row.modifiers.weakAttribute ? (
+        <div className="nl-training-chip-row" aria-label="Trainings-Hinweise und Affinitäten">
           {showClassSuggestion && classSuggestion ? (
             <span
               className="nl-training-chip is-class-suggest"
@@ -750,23 +781,22 @@ function NlTrainingPlayerCard({
               <NlTrainingGlyph kind="risk" /> Rückschritt-Risiko
             </span>
           ) : null}
-        </div>
-      ) : null}
-
-      {row.modifiers.signatureAttributes.length > 0 || row.modifiers.weakAttribute ? (
-        <div
-          className="nl-training-affinity-summary"
-          data-testid="nl-training-affinity-summary"
-          title="Signature-Attribute wachsen schneller (×1,15), das Weak-Attribut langsamer (×0,8). Jeder Spieler hat 2 Signature + 1 Weak."
-        >
-          {row.modifiers.signatureAttributes.length > 0 ? (
-            <span className="nl-training-affinity-summary-part is-signature">
-              <NlTrainingGlyph kind="signature" /> {row.modifiers.signatureAttributes.join(" / ")}
-            </span>
-          ) : null}
-          {row.modifiers.weakAttribute ? (
-            <span className="nl-training-affinity-summary-part is-weak">
-              <NlTrainingGlyph kind="weak" /> {row.modifiers.weakAttribute}
+          {row.modifiers.signatureAttributes.length > 0 || row.modifiers.weakAttribute ? (
+            <span
+              className="nl-training-affinity-summary"
+              data-testid="nl-training-affinity-summary"
+              title="Signature-Attribute wachsen schneller (×1,15), das Weak-Attribut langsamer (×0,8). Jeder Spieler hat 2 Signature + 1 Weak."
+            >
+              {row.modifiers.signatureAttributes.length > 0 ? (
+                <span className="nl-training-affinity-summary-part is-signature">
+                  <NlTrainingGlyph kind="signature" /> {row.modifiers.signatureAttributes.join(" / ")}
+                </span>
+              ) : null}
+              {row.modifiers.weakAttribute ? (
+                <span className="nl-training-affinity-summary-part is-weak">
+                  <NlTrainingGlyph kind="weak" /> {row.modifiers.weakAttribute}
+                </span>
+              ) : null}
             </span>
           ) : null}
         </div>
