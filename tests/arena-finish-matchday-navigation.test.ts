@@ -30,13 +30,19 @@ const HANDLER = SCOPE.slice(
  *     mehrere Sekunden; in dieser Zeit ist ein stummer Knopf von einem kaputten nicht zu
  *     unterscheiden — genau so ist der Bug gemeldet worden.
  *
- * Punkt 2 und 3 liegen in `finishMatchdayAndAdvance` (EIN Ort fuer die Rueckmeldung),
- * Punkt 1 an der Aufrufstelle: welche Ansicht danach dran ist, ist Sache des Shell-Bodys
- * und nicht der Spieltags-Logik.
+ * Alle drei Punkte liegen inzwischen in `finishMatchdayAndAdvance` — EIN Ort.
+ *
+ * Der Sprung stand urspruenglich an der Aufrufstelle, mit der Begruendung, welche Ansicht danach
+ * dran ist sei Sache des Shell-Bodys und nicht der Spieltags-Logik. Die Begruendung stimmt, das Ziel
+ * war nur zu eng gefasst: `finishMatchdayAndAdvance` IST der Shell-Body-Scope (die Spieltags-Logik
+ * liegt in `cockpit-matchday-handlers.ts`, die auch das Cockpit benutzt). Am Aufrufort war es eine
+ * Kopie pro Knopf — und das globale "Weiter" hatte sie nicht. Derselbe Spieltagsabschluss liess
+ * einen also je nach geklicktem Knopf woanders stehen. Deshalb pruefen die Tests hier jetzt den
+ * Wrapper und zusaetzlich, dass KEINE Aufrufstelle den Sprung noch einmal selbst macht.
  */
 describe("Arena: Spieltag abschliessen", () => {
   it("wartet das Ergebnis ab, statt es wegzuwerfen", () => {
-    expect(BODY).toContain("const summary = await finishMatchdayAndAdvance();");
+    expect(BODY).toContain("finishMatchdayAndAdvance()");
     // Der alte Fire-and-forget-Aufruf darf nicht zurueckkommen.
     expect(BODY).not.toContain("? () => runCockpitMatchdayAdvance?.(true)");
     // Und der Body ruft die Auswertung nicht an der Rueckmeldung vorbei direkt auf.
@@ -45,9 +51,51 @@ describe("Arena: Spieltag abschliessen", () => {
   });
 
   it("springt nach erfolgreichem Wechsel in den Saisonstand", () => {
-    expect(BODY).toMatch(
-      /if \(summary\?\.applied\) \{[\s\S]{0,200}setFoundationView\("seasonV2", setActiveView, \{ push: true \}\)/,
+    expect(HANDLER).toMatch(
+      /if \(result\?\.applied\) \{[\s\S]{0,900}setFoundationView\("seasonV2", setActiveView, \{ push: true \}\)/,
     );
+  });
+
+  /**
+   * Der Sprung darf NICHT im Ablehnungszweig stehen. Eine Ablehnung legt ihre Begruendung als
+   * `foundationActionFeedback` in der Ansicht ab, auf der man steht — wer dabei in den Saisonstand
+   * geschoben wird, sieht sie nie und haelt den Knopf wieder fuer tot. Genau das war die Meldung.
+   */
+  it("wechselt NICHT, wenn der Abschluss abgelehnt wurde", () => {
+    const rejection = HANDLER.slice(HANDLER.indexOf("const reasons = ["));
+    expect(rejection).not.toContain('setFoundationView("seasonV2"');
+  });
+
+  /**
+   * Zwei Kopien des Sprungs waeren zwei Stellen, an denen er wieder fehlen kann.
+   *
+   * Bewusst NICHT als Zaehlung ueber die ganze Datei: es gibt legitime andere Wege in den
+   * Saisonstand (`onOpenSeason` in der Navigation). Ein Verbot des Aufrufs an sich haette die mit
+   * erschlagen. Geprueft werden deshalb genau die beiden Aufrufstellen des Spieltagsabschlusses.
+   */
+  it("keine Aufrufstelle wiederholt den Sprung", () => {
+    const arenaCall = BODY.slice(BODY.indexOf("onAdvanceMatchday={"), BODY.indexOf("onCommitDiscipline="));
+    expect(arenaCall).toContain("finishMatchdayAndAdvance()");
+    expect(arenaCall).not.toContain('setFoundationView("seasonV2"');
+
+    const globalNext = SCOPE.slice(SCOPE.indexOf("if (canAdvanceMatchdayFromStep(gameFlowActionStep)) {"));
+    const globalNextBranch = globalNext.slice(0, globalNext.indexOf("return;"));
+    expect(globalNextBranch).toContain("finishMatchdayAndAdvance()");
+    expect(globalNextBranch).not.toContain('setFoundationView("seasonV2"');
+  });
+
+  /**
+   * Das globale "Weiter" schliesst denselben Spieltag ab. Es lief an diesem Wrapper vorbei: rohe
+   * Abfrage auf `status === "ready"` (bei gerissenen Saisonzielen steht der Schritt auf "warning" —
+   * eine Mitteilung, kein Hindernis), direkter Aufruf ohne Lebenszeichen und Ablehnungsgrund, und
+   * kein Sprung. Drei Unterschiede beim selben Vorgang.
+   */
+  it("das globale Weiter nimmt denselben Weg wie der Arena-Knopf", () => {
+    expect(SCOPE).toContain("if (canAdvanceMatchdayFromStep(gameFlowActionStep)) {");
+    expect(SCOPE).not.toContain(
+      'gameFlowActionStep.stepId === "advance_to_next_matchday" && gameFlowActionStep.status === "ready"',
+    );
+    expect(SCOPE).not.toContain("await matchdayArenaApplyHandlers?.runCockpitMatchdayAdvance(true)");
   });
 
   it("nennt bei Ablehnung den Grund, statt still zu bleiben", () => {

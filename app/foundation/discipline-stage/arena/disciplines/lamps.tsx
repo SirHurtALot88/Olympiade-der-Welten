@@ -21,7 +21,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { hueForIdx, relColor } from "../DisciplineStageNativeArena";
 import { teamPrimaryColor, floorTeamAccent } from "@/lib/foundation/team-colors";
-import { TeamFrame } from "./benchmark";
+import { TeamFrame, HighlightRing } from "./benchmark";
 import type { DisciplineFieldProps, RT } from "./types";
 
 // Deterministischer 0…1-Hash (FNV-1a) — Treffer-Seite (rot/grün) + vertikale Streuung.
@@ -511,8 +511,9 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
               <rect className="f-blade" x={r - 1} y={-1.1} width={12} height={2.2} rx={1} fill="url(#lampBlade)" />
 
               {glowing ? <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={4} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.1s ease-in-out infinite" }} /> : null}
-              {/* Highlight-Trio (Aufholjagd): pulsierender Ring an den 3 größten Aufsteigern. */}
-              {trioSet.has(t.idx) ? <circle r={r + 10} fill="none" stroke="var(--nl-warn)" strokeWidth={3.5} opacity={0.95} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 0.85s ease-in-out infinite" }} /> : null}
+              {/* Highlight-/Kür-Ring: pulsiert im Zoom-Moment (Verletzung rot, Kür in
+                  Medaillenfarbe), bleibt danach als ruhiger Kür-Rahmen (siehe benchmark). */}
+              <HighlightRing t={t} r={r} inTrio={trioSet.has(t.idx)} reducedMotion={reducedMotion} />
               {/* Eigen-Team-Anker: dauerhafter, weicher Akzent-Puls. */}
               {t.isOwn ? <circle r={r + 6} fill="none" stroke="var(--nl-accent)" strokeWidth={2} opacity={0.9} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.6s ease-in-out infinite" }} /> : null}
               {t.rank === 1 && done ? <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={2.5} opacity={0.6} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.6s ease-in-out infinite" }} /> : null}

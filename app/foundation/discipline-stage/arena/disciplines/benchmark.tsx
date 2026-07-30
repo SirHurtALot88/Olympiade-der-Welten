@@ -32,6 +32,7 @@
 
 import React, { useEffect, useRef, type RefObject } from "react";
 import { hueForIdx, relColor, SCENE_PRIMS } from "../DisciplineStageNativeArena";
+import { markMedalColor, numericMedalOf } from "../PlayerMark";
 import { teamPrimaryColor, floorTeamAccent } from "@/lib/foundation/team-colors";
 import type { DisciplineFieldProps, RT, StagePrimitive, FieldGeo, Vec2 } from "./types";
 
@@ -188,6 +189,31 @@ export function TeamFrame(props: { t: RT; r: number }): React.ReactNode {
   );
 }
 
+// ---- Highlight-/Kür-Ring (Benchmark) ------------------------------------------------
+/**
+ * Der äußere r+10-Ring — EINE Quelle für alle Felder (`TokenChrome` nutzt ihn, die
+ * Felder mit eigener Token-Zeichnung — shared/track/lamps — rufen ihn direkt auf):
+ *
+ *   • Im Highlight-Moment (inTrio) PULSIERT er: Verletzung rot (--nl-risk), sonst in
+ *     der Kür-Medaillenfarbe (Gold/Silber/Bronze der Etappen-Top-3). Das frühere
+ *     einheitliche Grün bleibt nur als Fallback (z. B. verletztes Team ohne
+ *     Kür-Medaille wäre rot; ein Trio-Token ganz ohne beides grün).
+ *   • NACH der Kür bleibt er als ruhiger, dünnerer Rahmen stehen (t.stageMedal), bis
+ *     die nächste Etappe neu kürt — „die Top 3 bewegen sich mit dem passenden Rahmen
+ *     auch voran" (Owner-Wunsch). Bewusst bei r+10 (außerhalb von Eigen-Anker r+6 und
+ *     roundMedal-Ring r+4.6), damit Kür-Rahmen und Gesamt-Medaille koexistieren.
+ */
+export function HighlightRing(props: { t: RT; r: number; inTrio: boolean; reducedMotion: boolean }): React.ReactNode {
+  const { t, r, inTrio, reducedMotion } = props;
+  const tone = markMedalColor(numericMedalOf(t.stageMedal));
+  if (inTrio) {
+    const col = t.stageInjured ? "var(--nl-risk)" : tone ?? "var(--nl-good)";
+    return <circle r={r + 10} fill="none" stroke={col} strokeWidth={3.5} opacity={0.95} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 0.85s ease-in-out infinite" }} />;
+  }
+  if (tone) return <circle r={r + 10} fill="none" stroke={tone} strokeWidth={2.4} opacity={0.85} />;
+  return null;
+}
+
 // ---- Token-Größe nach Rang ------------------------------------------------------------
 // „Können wir in jeder Diszi einführen, dass Teams die weiter vorne sind größere Logos in
 // der Arena erhalten? Dann werden die starken Teams weiter hervorgehoben."
@@ -226,8 +252,7 @@ export function tokenRankScale(rank: number | null | undefined): number {
  */
 export function tokenRadius(t: RT, geo: FieldGeo, override?: number): number {
   const base = (override ?? geo.r) * tokenRankScale(t.rank);
-  return t.isOwn ? Math.max(base, override ?? geo.rOwn) : base;
-}
+  return t.isOwn ? Math.max(base, override ?? geo.rOwn) : base;}
 
 // ---- Verständnis-Chrome (Benchmark) -------------------------------------------------
 // Die Ringe/Logo/Rahmen/Badge, die in JEDER Disziplin identisch sind. Die Feld-Datei
@@ -255,10 +280,9 @@ export function TokenChrome(props: {
   const showBadge = badge && (t.isOwn || t.rank <= 3 || hoverIdx === t.idx);
   return (
     <>
-      {/* Highlight-Puls (Zoom-Momente: Verletzung bzw. Aufstieg aufs Podest — der Host
-          entscheidet, wann das feuert). Bewusst GRÜN (--nl-good) statt Gold — sonst
-          kollidiert der Ring mit der Gold-Medaille und dem Glow („Gold-Overload"). */}
-      {trioSet.has(t.idx) ? <circle r={r + 10} fill="none" stroke="var(--nl-good)" strokeWidth={3.5} opacity={0.95} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 0.85s ease-in-out infinite" }} /> : null}
+      {/* Highlight-/Kür-Ring (Zoom-Momente: Verletzung rot, Etappen-Kür in Medaillen-
+          farbe; danach ruhiger Kür-Rahmen bis zur nächsten Etappe — siehe HighlightRing). */}
+      <HighlightRing t={t} r={r} inTrio={trioSet.has(t.idx)} reducedMotion={reducedMotion} />
       {/* Eigen-Team-Anker: dauerhafter, weicher Akzent-Puls. */}
       {t.isOwn ? <circle r={r + 6} fill="none" stroke="var(--nl-accent)" strokeWidth={2} opacity={0.9} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.6s ease-in-out infinite" }} /> : null}
       {/* Relations-Ring (Rivalen rot / Verbündete) — eng am Rahmen. */}

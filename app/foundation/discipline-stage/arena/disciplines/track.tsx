@@ -15,7 +15,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { hueForIdx, relColor } from "../DisciplineStageNativeArena";
-import { TeamFrame, tokenRadius } from "./benchmark";
+import { TeamFrame, HighlightRing, tokenRadius } from "./benchmark";
 import type { DisciplineFieldProps, RT } from "./types";
 
 export default function TrackField(props: DisciplineFieldProps): ReactNode {
@@ -270,10 +270,10 @@ export default function TrackField(props: DisciplineFieldProps): ReactNode {
               }}
             >
               {glowing ? <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={4} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.1s ease-in-out infinite" }} /> : null}
-              {/* Highlight-Trio (Aufholjagd): kräftiger, pulsierender goldener Ring an den 3
-                  größten Aufsteigern der Etappe — während der Zeitlupe/des Zooms leuchtet er,
-                  damit man diese Token im Feld sofort findet und ihre Jagd verfolgt. */}
-              {trioSet.has(t.idx) ? <circle r={r + 10} fill="none" stroke="var(--nl-good)" strokeWidth={3.5} opacity={0.95} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 0.85s ease-in-out infinite" }} /> : null}
+              {/* Highlight-/Kür-Ring: pulsiert während der Zeitlupe/des Zooms (Verletzung rot,
+                  Etappen-Kür in Medaillenfarbe), bleibt danach als ruhiger Kür-Rahmen am Token —
+                  so findet man die Gekürten im Feld und verfolgt sie beim Vorrücken. */}
+              <HighlightRing t={t} r={r} inTrio={trioSet.has(t.idx)} reducedMotion={reducedMotion} />
               {/* Eigen-Team-Anker: dauerhafter, weicher Akzent-Puls — man findet sich immer. */}
               {t.isOwn ? (
                 <circle r={r + 6} fill="none" stroke="var(--nl-accent)" strokeWidth={2} opacity={0.9} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.6s ease-in-out infinite" }} />
