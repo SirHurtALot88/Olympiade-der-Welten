@@ -3453,6 +3453,8 @@ export default function PlayerDetailDrawer({
                   matchdaysMissed: number;
                   worstRisk: number | null;
                   avgFatigue: number | null;
+                  /** Einsaetze am Spieltag der Verletzung, mit Kadergroesse der Disziplin. */
+                  disciplines: { name: string; playerCount: number | null }[];
                 };
                 const injurySeasonSummaries: InjurySeasonSummaryRow[] = (() => {
                   const bySeason = new Map<
@@ -3468,9 +3470,17 @@ export default function PlayerDetailDrawer({
                         matchdaysMissed: 0,
                         worstRisk: null,
                         avgFatigue: null,
+                        disciplines: [],
                         fatigueSum: 0,
                         fatigueCount: 0,
                       };
+                    // Jede Disziplin nur einmal je Saison — zwei Verletzungen in derselben
+                    // Disziplin sollen sie nicht doppelt in die Zelle schreiben.
+                    for (const discipline of row.disciplines ?? []) {
+                      if (!bucket.disciplines.some((entry) => entry.name === discipline.name)) {
+                        bucket.disciplines.push({ name: discipline.name, playerCount: discipline.playerCount });
+                      }
+                    }
                     bucket.injuriesCount += 1;
                     bucket.matchdaysMissed += row.matchdaysMissed;
                     if (Number.isFinite(row.riskPercent)) {
@@ -3499,6 +3509,7 @@ export default function PlayerDetailDrawer({
                     columns={[
                       { key: "season", label: "Saison" },
                       { key: "summary", label: "Verletzungen" },
+                      { key: "disciplines", label: "Im Einsatz bei" },
                       { key: "worstRisk", label: "Max. Risiko" },
                       { key: "avgFatigue", label: "Ø Fatigue" },
                     ]}
@@ -3508,6 +3519,36 @@ export default function PlayerDetailDrawer({
                           return row.seasonName ?? row.seasonId;
                         case "summary":
                           return `${row.injuriesCount} Verletzung${row.injuriesCount === 1 ? "" : "en"} · ${row.matchdaysMissed} Spieltag${row.matchdaysMissed === 1 ? "" : "e"} ausgefallen`;
+                        case "disciplines":
+                          // Der Verletzungswurf haengt am Spieltag und an der Fatigue, nicht an
+                          // einer Disziplin. Gezeigt wird deshalb der tatsaechliche EINSATZ des
+                          // Spieltags, in Klammern die Kadergroesse der Disziplin. Ohne
+                          // Einsatzliste (alter Stand) bleibt die Zelle leer statt zu raten.
+                          return row.disciplines.length === 0 ? (
+                            "—"
+                          ) : (
+                            <span
+                              title={row.disciplines
+                                .map(
+                                  (discipline) =>
+                                    `${discipline.name}${
+                                      discipline.playerCount != null
+                                        ? ` — ${discipline.playerCount} Spieler pro Team`
+                                        : ""
+                                    }`,
+                                )
+                                .join(" · ")}
+                            >
+                              {row.disciplines
+                                .map(
+                                  (discipline) =>
+                                    `${discipline.name}${
+                                      discipline.playerCount != null ? ` (${discipline.playerCount})` : ""
+                                    }`,
+                                )
+                                .join(" · ")}
+                            </span>
+                          );
                         case "worstRisk":
                           return row.worstRisk == null ? "—" : `${formatValue(row.worstRisk, 0)}%`;
                         case "avgFatigue":
