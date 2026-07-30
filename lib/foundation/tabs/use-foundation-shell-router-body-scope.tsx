@@ -4342,6 +4342,58 @@ export function useFoundationShellRouterBodyScope({
     }
   }
 
+  /**
+   * „Spieltag abschliessen" aus dem Spieltagsergebnis: schaltet auf den naechsten
+   * Spieltag weiter.
+   *
+   * Seit die Arena nach D2 nicht mehr automatisch weiterschaltet (damit die
+   * Spieltagstabelle stehen bleibt) ist DAS der Weg nach vorn — er darf deshalb
+   * niemals stumm scheitern. Genau das ist beim ersten Wurf passiert: der Knopf
+   * rief `runCockpitMatchdayAdvance` direkt auf, und ein blockierter Wechsel
+   * (422 mit `blockingReasons`) fuehrte zu exakt gar nichts auf dem Schirm —
+   * gemeldet als „der macht aktuell noch nichts", waehrend der Spieler auf
+   * seinem Spieltag festhing.
+   *
+   * Der Server bleibt die Instanz, die entscheidet, ob gewechselt werden darf
+   * (`prepareMatchdayProgress`: Ergebnis gebucht? Tabelle gebucht? schon
+   * weitergeschaltet?). Diese Funktion reicht seine Begruendung nur nach vorn.
+   */
+  async function finishMatchdayAndAdvance() {
+    if (readMeta.readOnly) {
+      showReadOnlyNotice();
+      return null;
+    }
+    // Sofort ein Lebenszeichen: der Wechsel kann je nach Last mehrere Sekunden
+    // dauern, und ohne Rueckmeldung wirkt der Knopf in dieser Zeit tot. Genau so
+    // ist der Bug wahrgenommen worden ("der macht aktuell noch nichts").
+    setFoundationActionFeedback({
+      tone: "info",
+      title: "Spieltag wird abgeschlossen …",
+      detail: "Tabelle, Preisgeld-Vorschau und naechster Spieltag werden aktualisiert.",
+    });
+    const result = await matchdayArenaApplyHandlers.runCockpitMatchdayAdvance(true);
+    if (result?.applied) {
+      // Der Flow zeigt danach die naechsten offenen Schritte — alte Haken weg.
+      setAcknowledgedFlowStepIds(new Set());
+      setFoundationActionFeedback({
+        tone: "success",
+        title: "Spieltag abgeschlossen",
+        detail: "Der naechste Spieltag ist bereit.",
+      });
+      return result;
+    }
+    const reasons = result?.blockingReasons ?? [];
+    setFoundationActionFeedback({
+      tone: "warning",
+      title: "Spieltag konnte nicht abgeschlossen werden",
+      detail:
+        reasons.length > 0
+          ? reasons.map((reason) => formatCockpitReason(reason)).join(" · ")
+          : "Der Wechsel wurde abgelehnt — Details stehen im Cockpit unter Matchday Advance.",
+    });
+    return result;
+  }
+
   async function postAdminSeasonSimulation(action: "start" | "tick" | "pause" | "resume" | "cancel" | "status") {
     if (readMeta.source === "prisma") {
       showReadOnlyNotice();
@@ -11301,6 +11353,7 @@ export function useFoundationShellRouterBodyScope({
     runFacilityMaintenancePreview,
     runFacilityUpgradePreview,
     commitArenaDiscipline,
+    finishMatchdayAndAdvance,
     runFoundationCommand,
     runNewGameSetup,
     runSaveAction,

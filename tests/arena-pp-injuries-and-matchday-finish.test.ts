@@ -130,12 +130,14 @@ describe("Spieltag: Abschluss ist wieder eine Entscheidung", () => {
   });
 
   it("bietet im Spieltagsergebnis den expliziten Abschluss-Knopf", () => {
+    // Die konkrete Verdrahtung (Sichtbarkeit am Spieltag statt am Flow-Schritt,
+    // Aufruf ohne Optional-Chaining, Start-/Erfolgs-/Ablehnungs-Meldung) haelt
+    // `matchday-finish-button-wiring.test.ts` fest — der erste Wurf hier war
+    // gegen genau die Fassung geschrieben, die sich im Playtest als stumm
+    // herausgestellt hat.
     const body = read("app/foundation/FoundationShellRouterBody.tsx");
     expect(body).toContain('data-testid="arena-finish-matchday"');
     expect(body).toContain("Spieltag abschließen");
-    expect(body).toContain("runCockpitMatchdayAdvance?.(true)");
-    // Gegatet auf den Flow-Schritt: erst wenn beide Disziplinen gewertet sind.
-    expect(body).toContain('gameFlowActionStep.stepId === "advance_to_next_matchday" && gameFlowActionStep.status === "ready"');
   });
 });
 

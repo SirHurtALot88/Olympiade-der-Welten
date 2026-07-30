@@ -59050,6 +59050,16 @@ button.foundation-team-portrait-card {
   color: var(--nl-bad, #dc6357);
 }
 
+/* Teilnehmerzahl direkt hinter dem Disziplin-Kürzel: bewusst kleiner und
+   gedämpft, damit sie das Kürzel nicht überstimmt — sie ist Kontext, nicht die
+   Aussage der Zeile. */
+.is-new-look .nl-standings-disc-count {
+  margin-left: 4px;
+  color: var(--nl-mut-2, rgba(148, 163, 184, 0.7));
+  font-size: 0.85em;
+  font-weight: 600;
+}
+
 /* Aufklapp-Zeile: Disziplinen nach Bereich gruppiert */
 .is-new-look .nl-standings-table-detailrow > .nl-standings-table-detailcell {
   padding: var(--nl-s2) var(--nl-s3) var(--nl-s3);
