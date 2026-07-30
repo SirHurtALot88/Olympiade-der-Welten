@@ -73020,3 +73020,51 @@ button.is-new-look .nl-thist-season-pill,
   width: 62px;
   min-width: 62px;
 }
+
+/* --- Vertragsauflösung auf Spielerwunsch (Kader, Season-End) -------------
+   Drei Spalten je Angebot: wer fragt, was es einbringt, und die Entscheidung.
+   Die Geldspalte steht mittig, damit der Blick von links (Name) nach rechts
+   (Knöpfe) über die Zahl läuft, die die Entscheidung trägt. */
+.teams-dissolution-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.teams-dissolution-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--nl-line, rgba(148, 163, 184, 0.28));
+  border-radius: 10px;
+  background: var(--nl-panel-2, rgba(15, 23, 42, 0.55));
+}
+
+.teams-dissolution-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.teams-dissolution-money {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  flex: 0 0 auto;
+}
+
+.teams-dissolution-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}

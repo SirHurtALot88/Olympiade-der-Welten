@@ -147,4 +147,38 @@ describe("Ablehnung", () => {
     // Nie unter null, sonst kippt die Moral-Skala.
     expect(applyDeclinePenalty(3)).toBe(0);
   });
+
+  it("senkt die GESPEICHERTE Moral des Spielers", () => {
+    // Der Abzug muss auf `playerMoraleState` landen — daraus leitet assessPlayerMorale den
+    // angezeigten Wert und den contractIntent ab. Nur ein Log-Eintrag waere folgenlos.
+    const before = gameState({
+      playerMoraleState: [
+        { playerId: "p-star", teamId: "C-C", morale: 20 },
+        { playerId: "p-happy", teamId: "C-C", morale: 70 },
+      ],
+    });
+    const after = declineContractDissolution({
+      gameState: before,
+      offer: offersFor(before)[0],
+      seasonId: "season-1",
+      saveId: "save-1",
+      decidedAt: "2027-01-01T00:00:00.000Z",
+    }) as unknown as { playerMoraleState: Array<{ playerId: string; morale: number }> };
+
+    expect(after.playerMoraleState.find((entry) => entry.playerId === "p-star")?.morale).toBe(14);
+    // Mitspieler bleiben unberuehrt.
+    expect(after.playerMoraleState.find((entry) => entry.playerId === "p-happy")?.morale).toBe(70);
+  });
+
+  it("erfindet keine Moral-Zeile, wenn der Spieler noch keine hat", () => {
+    const after = declineContractDissolution({
+      gameState: gameState(),
+      offer: offersFor()[0],
+      seasonId: "season-1",
+      saveId: "save-1",
+      decidedAt: "2027-01-01T00:00:00.000Z",
+    }) as unknown as { playerMoraleState?: unknown[] };
+
+    expect(after.playerMoraleState).toEqual([]);
+  });
 });
