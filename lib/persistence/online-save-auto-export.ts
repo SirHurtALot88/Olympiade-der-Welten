@@ -21,12 +21,30 @@
 import { exec as execCb } from "node:child_process";
 import { promisify } from "node:util";
 
+import { computeBugReportSignature } from "@/lib/bug-report/bug-report-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { exportOnlineSaves, ONLINE_SAVES_DIR } from "@/lib/persistence/online-save-export";
 
 const exec = promisify(execCb);
 
 const ONLINE_SAVES_PATHSPEC = "data/online-saves";
+
+/**
+ * Bug-Meldungen fahren auf demselben Weg mit.
+ *
+ * Auf dem Hetzner-Server holt `deploy/hetzner/push-bug-reports.sh` sie per Cron aus dem Container.
+ * Fuer einen LOKAL gestarteten Server gab es diesen Weg nicht: die Meldung landete in
+ * `data/bug-reports/` auf der eigenen Platte und blieb dort liegen — niemand ausser dem Rechner
+ * selbst hat sie je gesehen. Genau derselbe Defekt wie bei den Saves vor dem Auto-Push.
+ *
+ * Bewusst nach `main` und nicht auf den Branch `bug-reports`: das Server-Skript spiegelt dorthin
+ * mit einem elternlosen Force-Push seines kompletten Volume-Inhalts. Wuerde der lokale Rechner auf
+ * denselben Branch pushen, ueberschrieben sich beide Seiten gegenseitig. Zwei Quellen, zwei
+ * Ablagen — dafuer geht keine Meldung verloren.
+ */
+const BUG_REPORTS_PATHSPEC = "data/bug-reports";
+
+const DATA_PATHSPECS = [ONLINE_SAVES_PATHSPEC, BUG_REPORTS_PATHSPEC];
 
 function envFlag(name: string, fallback: boolean) {
   const value = process.env[name];
@@ -45,31 +63,44 @@ async function git(args: string, opts?: { allowFail?: boolean }) {
 }
 
 /**
- * Prüft, ob ALLE Commits zwischen origin/<branch> und HEAD ausschließlich data/online-saves/
- * berühren. Nur dann darf der Timer pushen (sonst lägen unfertige Code-Commits vor → nicht anfassen).
+ * Prüft, ob ALLE Commits zwischen origin/<branch> und HEAD ausschließlich Datenordner
+ * (data/online-saves/, data/bug-reports/) berühren. Nur dann darf der Timer pushen (sonst lägen
+ * unfertige Code-Commits vor → nicht anfassen).
  */
-async function pendingCommitsAreOnlySaves(branch: string) {
+async function pendingCommitsAreOnlyData(branch: string) {
   const range = `origin/${branch}..HEAD`;
   const commits = await git(`rev-list ${range}`, { allowFail: true });
   if (commits == null) return false; // origin/<branch> unbekannt → lieber nicht pushen
   if (commits.length === 0) return true;
   for (const sha of commits.split("\n").filter(Boolean)) {
     const files = (await git(`diff-tree --no-commit-id --name-only -r ${sha}`, { allowFail: true })) ?? "";
-    const nonSave = files.split("\n").filter((f) => f.trim() && !f.startsWith(`${ONLINE_SAVES_PATHSPEC}/`));
-    if (nonSave.length > 0) return false;
+    const nonData = files
+      .split("\n")
+      .filter((f) => f.trim() && !DATA_PATHSPECS.some((pathspec) => f.startsWith(`${pathspec}/`)));
+    if (nonData.length > 0) return false;
   }
   return true;
 }
 
 async function publishToGitHub(branch: string) {
-  // Nur data/online-saves stagen → der Timer-Commit ist immer reine Save-Daten.
-  await git(`add -- ${ONLINE_SAVES_PATHSPEC}`);
-  const staged = await git(`diff --cached --name-only -- ${ONLINE_SAVES_PATHSPEC}`, { allowFail: true });
+  // Nur die Datenordner stagen → der Timer-Commit enthält niemals Code.
+  const pathspecs = DATA_PATHSPECS.join(" ");
+  await git(`add -- ${pathspecs}`);
+  const staged = await git(`diff --cached --name-only -- ${pathspecs}`, { allowFail: true });
   if (!staged) return { pushed: false, reason: "nichts-zu-committen" };
 
-  await git(`commit -m "chore(saves): auto-export online saves [skip ci]" -- ${ONLINE_SAVES_PATHSPEC}`);
+  // Die Nachricht nennt, was wirklich drin ist: eine Meldung, die als "auto-export online saves"
+  // durchläuft, findet später niemand wieder.
+  const stagedFiles = staged.split("\n").filter(Boolean);
+  const reportCount = stagedFiles.filter((f) => f.startsWith(`${BUG_REPORTS_PATHSPEC}/`)).length;
+  const saveCount = stagedFiles.length - reportCount;
+  const parts = [
+    saveCount > 0 ? `${saveCount} Save(s)` : null,
+    reportCount > 0 ? `${reportCount} Bug-Meldung(en)` : null,
+  ].filter(Boolean);
+  await git(`commit -m "chore(daten): auto-export ${parts.join(" + ")} [skip ci]" -- ${pathspecs}`);
 
-  if (!(await pendingCommitsAreOnlySaves(branch))) {
+  if (!(await pendingCommitsAreOnlyData(branch))) {
     return { pushed: false, reason: "offene-code-commits-vorhanden-push-uebersprungen" };
   }
   const pushed = await git(`push origin HEAD:${branch}`, { allowFail: true });
@@ -86,6 +117,7 @@ function computeSignature() {
     .join("|");
 }
 
+
 let started = false;
 
 export function startOnlineSaveAutoExport() {
@@ -98,6 +130,7 @@ export function startOnlineSaveAutoExport() {
   const branch = process.env.OLY_AUTO_EXPORT_BRANCH ?? "main";
 
   let lastSignature: string | null = null;
+  let lastBugReportSignature: string | null = null;
   let running = false;
 
   const tick = async () => {
@@ -105,11 +138,29 @@ export function startOnlineSaveAutoExport() {
     running = true;
     try {
       const signature = computeSignature();
-      if (signature === lastSignature) return; // nichts geändert → nichts tun (Idle-Kosten ~0)
-      const result = exportOnlineSaves();
-      lastSignature = signature;
-      if (!result.changed) return;
-      console.log(`[online-saves] exportiert: ${result.saves.length} Save(s) → ${ONLINE_SAVES_DIR}`);
+      const bugReportSignature = computeBugReportSignature();
+      // Nichts geändert → nichts tun (Idle-Kosten ~0). Beide Quellen zählen: eine neue Meldung
+      // allein muss reichen, sonst bliebe sie bis zum nächsten Spielzug liegen.
+      if (signature === lastSignature && bugReportSignature === lastBugReportSignature) return;
+
+      let publish = false;
+      if (signature !== lastSignature) {
+        const result = exportOnlineSaves();
+        lastSignature = signature;
+        if (result.changed) {
+          console.log(`[online-saves] exportiert: ${result.saves.length} Save(s) → ${ONLINE_SAVES_DIR}`);
+          publish = true;
+        }
+      }
+      if (bugReportSignature !== lastBugReportSignature) {
+        // Beim ersten Zyklus ist der Vergleichswert null — dann steht hier nur, was ohnehin schon
+        // im Repo liegt, und `publishToGitHub` findet nichts zu committen. Kostet einen Leerlauf,
+        // spart eine Sonderbehandlung.
+        lastBugReportSignature = bugReportSignature;
+        publish = true;
+      }
+      if (!publish) return;
+
       if (pushEnabled) {
         const outcome = await publishToGitHub(branch);
         console.log(`[online-saves] GitHub-Push: ${outcome.pushed ? "OK" : `übersprungen (${outcome.reason})`}`);

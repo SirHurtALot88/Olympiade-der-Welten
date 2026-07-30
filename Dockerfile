@@ -52,7 +52,14 @@ RUN apt-get update \
 
 COPY --from=builder --chown=oly:nodejs /app ./
 
-RUN mkdir -p /app/data/persistence \
+# `bug-reports` MUSS hier stehen, obwohl der Ordner ueber `data/bug-reports/README.md` ohnehin aus
+# dem Repo mitkaeme. Docker legt ein neues Named Volume aus dem Image-Pfad an und uebernimmt dabei
+# dessen Eigentuemer — gibt es den Pfad im Image NICHT, gehoert das Volume root, und die App laeuft
+# als `oly` (uid 1001). Schreiben scheitert dann mit EACCES: die Flagge meldet "Senden
+# fehlgeschlagen", der Server hat nichts, und nichts im Log sagt warum. Die Existenz des Ordners
+# haenge damit an einer einzelnen README-Datei — wer die aufraeumt, kippt still den ganzen
+# Melde-Weg. Hier steht sie explizit.
+RUN mkdir -p /app/data/persistence /app/data/bug-reports \
   && chmod +x /app/scripts/start-hosted.sh \
   && chown -R oly:nodejs /app/data /app/.next /app/deploy
 
