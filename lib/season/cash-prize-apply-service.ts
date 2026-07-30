@@ -5,6 +5,7 @@ import type { PersistenceService } from "@/lib/persistence/types";
 import { buildPrizeMoneyPreview, type PrizeMoneyPreviewResult } from "@/lib/season/prize-money-preview";
 import { CASH_PRIZE_BENCHMARK_ONLY } from "@/lib/season/cash-prize-benchmark-flag";
 import type { StandingsPreviewSource } from "@/lib/standings/standings-preview-engine";
+import { applySponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 
 export const CASH_PRIZE_APPLY_CONFIRM_TOKEN = "APPLY_LOCAL_CASH_PRIZE";
 
@@ -252,6 +253,7 @@ function writeLocalCashPrizeApply(input: {
       preview: PrizeMoneyPreviewResult;
       idempotencyKey: string;
       matchdayId: string;
+      phase: "season_end" | "matchday";
 }) {
   const save = resolveLocalSave(input.persistence, input.saveId);
   const now = new Date().toISOString();
@@ -321,7 +323,50 @@ function writeLocalCashPrizeApply(input: {
     },
   };
 
-  input.persistence.saveSingleplayerState(save.saveId, nextGameState);
+  /**
+   * GEMELDET: „Preisgeld und Sponsoren buchen ist gelaufen, aber der GuV-Betrag wurde nicht auf das
+   * aktuelle Cash drauf gerechnet — bei allen Teams." Bestaetigt.
+   *
+   * Dieser Schritt schrieb bisher AUSSCHLIESSLICH die Tabellen-Spalten (`sponsorTotal`, `guv`,
+   * `cashTotal`, `cashFc`) und ein Audit-Log; `nextTeams` ging unveraendert durch. Die Oberflaeche
+   * meldete danach „Ist gebucht — das Geld steht auf dem Konto", und in der Tabelle stand eine GuV
+   * — bewegt wurde aber nichts.
+   *
+   * Das Geld floss nur in `applySponsorSettlement`, und die wird an genau EINER Stelle gerufen:
+   * `season-completion-service`. Der Saisonabschluss haengt aber nur im Cockpit
+   * (`runSeasonCompletion`); im Saisonende-Panel, das im normalen Spielverlauf benutzt wird, gibt
+   * es ihn nicht. „Neue Saison starten" geht ueber den Preseason-Workflow, der die Abrechnung nur
+   * VORSCHAUT (`previewSponsorSettlement`) und keinen Riegel gegen einen Wechsel ohne Buchung hat.
+   *
+   * Damit war es moeglich — und ist genau passiert —, mit unveraendertem Cash in die neue Saison zu
+   * gehen: kein Sponsorgeld, keine Gehaelter, bei allen 32 Teams.
+   *
+   * Der Schritt tut jetzt, was auf ihm steht. NUR am Saisonende: bei `phase === "matchday"` gibt es
+   * keine Sponsor-Abrechnung, die Spalten bleiben wie bisher reine Zwischenstands-Anzeige.
+   *
+   * Doppelbuchung ist beidseitig abgesichert: `applySponsorSettlement` prueft ueber
+   * `previewSponsorSettlement` bereits gezahlte Zeilen, und `season-completion-service` ueberspringt
+   * seinerseits, sobald ein `season_end`-Eintrag in `sponsorPayoutLogs` steht. Wer zuerst kommt,
+   * bucht; der andere laesst es. `deductSalary: true` ist dieselbe Einstellung, die der
+   * Saisonabschluss benutzt — sonst kaeme Sponsorgeld ohne die zugehoerigen Gehaelter an, und die
+   * gebuchte Summe waere nicht die GuV, die daneben steht.
+   *
+   * Die Standings-Spalten oben werden bewusst VOR der Abrechnung aus der Vorschau gebildet: sie
+   * beantworten „was hat die Saison gebracht", nicht „wie viel liegt jetzt auf dem Konto". Rechnete
+   * man sie auf dem Nach-Buchungs-Stand, waere `cashFc` doppelt um die Gehaelter gekuerzt.
+   */
+  const settlement =
+    input.phase === "season_end"
+      ? applySponsorSettlement({
+          gameState: nextGameState,
+          saveId: save.saveId,
+          phase: "season_end",
+          execute: true,
+          deductSalary: true,
+        })
+      : null;
+
+  input.persistence.saveSingleplayerState(save.saveId, settlement?.applied ? settlement.gameState : nextGameState);
   return auditLog;
 }
 
@@ -369,6 +414,7 @@ export async function executeCashPrizeApply(
     preview: prepared.preview,
     idempotencyKey: prepared.idempotencyKey,
     matchdayId: params.matchdayId ?? resolveLocalSave(persistence, params.saveId).gameState.matchdayState.matchdayId,
+    phase: params.phase === "matchday" ? "matchday" : "season_end",
   });
 
   return {
