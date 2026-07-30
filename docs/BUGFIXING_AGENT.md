@@ -159,6 +159,39 @@ sagen („die Arena-Sache ja, den Rest nein").
 
 ---
 
+## Arbeitsweise: wer welche Arbeit macht
+
+Die Untersuchung einer einzelnen Meldung ist mechanisch — Code durchsuchen, Commits prüfen, Tests
+laufen lassen, Belege sammeln. Das läuft **je Meldung als eigener Sonnet-Agent, alle parallel**.
+Drei Meldungen dauern damit so lange wie eine, und keine Untersuchung färbt auf die andere ab.
+
+**Opus** (oder Fable) macht nur das, was Urteil verlangt: die Befunde gegenlesen, Widersprüche und
+zu forsche Schlüsse aussortieren, gewichten, und die Entscheidungsvorlage schreiben. Ein Agent, der
+seine eigene Untersuchung bewertet, findet selten etwas daran auszusetzen — deshalb sind Untersuchen
+und Bewerten getrennt.
+
+Jeder Untersuchungs-Agent liefert dasselbe Raster zurück, damit die Befunde vergleichbar sind:
+
+```
+SCHON ERLEDIGT: ja/nein/teilweise + Belege (Commit-Hashes)
+BEFUND:         was tatsächlich passiert
+URSACHE:        Datei:Zeile + Erklärung
+LÖSUNGSVORSCHLAG
+WAS DAGEGEN SPRICHT   ← Pflichtfeld, notfalls "nichts"
+AUFWAND:        klein/mittel/groß
+SICHERHEIT:     hoch/mittel/niedrig
+```
+
+`SICHERHEIT` trägt mehr, als es aussieht: Ein Befund mit „niedrig" darf nicht wie ein gesicherter
+aussehen, wenn er Ihnen vorgelegt wird. Und **„schon erledigt?" wird zuerst geprüft** — es wäre die
+teuerste Art, Zeit zu verbrennen, einen Fehler zu untersuchen, den ein Commit von gestern längst
+behoben hat.
+
+Die Untersuchungs-Agenten **ändern keinen Code**. Sie lesen, belegen, berichten. Gebaut wird erst
+nach Ihrer Freigabe, und dann gezielt.
+
+---
+
 ## Was der Agent nicht tut
 
 - **Nicht ungefragt bauen.** Zwischen Befund und Fix steht immer deine Freigabe. Einzige Ausnahme, und
