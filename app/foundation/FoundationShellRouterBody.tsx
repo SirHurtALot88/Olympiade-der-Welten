@@ -4,6 +4,7 @@
 // Contains the real Foundation shell UI (previously the monolith return block).
 import dynamic from "next/dynamic";
 import { FoundationDeferredMount } from "@/lib/foundation/FoundationDeferredMount";
+import { getSeasonEndPayoutStatus } from "@/lib/season/season-end-sponsor-payout-status";
 import { FoundationSharedProvider } from "@/lib/foundation/foundation-shared-context";
 import { FoundationShellRouterCockpit, FoundationShellRouterHistoryV2, FoundationShellRouterMarketSell, FoundationShellRouterMarketV2, FoundationShellRouterMatchdayResult, FoundationShellRouterPrize, FoundationShellRouterSeasonPreview, FoundationShellRouterTeams, FoundationShellRouterTraining } from "@/app/foundation/FoundationShellRouter";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
@@ -2650,9 +2651,11 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             <FoundationSeasonFinalePanel
               gameState={gameState}
               activeTeamId={activeManagerTeamId}
-              prizeApplied={(gameState.seasonState.cashPrizeApplyLogs ?? []).some(
-                (log: { seasonId: string }) => log.seasonId === gameState.season.id,
-              )}
+              /* „Erledigt" heisst: das Sponsorgeld ist auf dem Konto — nicht bloss,
+                 dass der Schritt schon einmal ausgeloest wurde. Ein Spielstand, in dem
+                 der Schritt vor der Buchungs-Reparatur lief, traegt ein Audit-Log ohne
+                 Zahlung; dort muss der Knopf wieder anfassbar sein. */
+              seasonEndPayoutStatus={getSeasonEndPayoutStatus(gameState, gameState.season.id)}
               developmentApplied={(gameState.playerProgressionEvents ?? []).some(
                 (event: { seasonId: string }) => event.seasonId === gameState.season.id,
               )}

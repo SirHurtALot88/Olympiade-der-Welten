@@ -84,6 +84,9 @@ describe("Saisonabschluss: eine Bühne statt des Cockpits", () => {
 
   it("schaltet schreibende Knöpfe im Nur-Lesen-Modus ab", () => {
     expect(PANEL).toContain("disabled={busy || readOnly}");
-    expect(PANEL).toContain("prizeApplied || readOnly ? null");
+    // `prizeApplied` hiess frueher so und beantwortete die falsche Frage (gibt es ein
+    // Audit-Log?). Der Riegel haengt jetzt an der tatsaechlichen Zahlung — der
+    // Nur-Lesen-Teil der Bedingung ist unveraendert.
+    expect(PANEL.replace(/\s+/g, " ")).toContain('seasonEndPayoutStatus === "paid" || readOnly ? null');
   });
 });
