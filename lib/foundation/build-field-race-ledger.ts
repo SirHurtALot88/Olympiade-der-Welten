@@ -179,6 +179,19 @@ export function getFieldRaceRecentForm(
 }
 
 /**
+ * ALLE bereits gewerteten Spieltage der Saison — der Form-Strip zeigt seit
+ * dieser Aenderung den ganzen Verlauf statt eines Fensters der letzten fuenf.
+ *
+ * Bewusst eine eigene Funktion statt `getFieldRaceRecentForm(ledger, teamId,
+ * 999)`: eine Zahl, die "alle" bedeuten soll, muss man beim Lesen erst als
+ * solche erkennen — und sie waere still falsch, sollte eine Saison je mehr
+ * Spieltage bekommen.
+ */
+export function getFieldRaceSeasonForm(ledger: FieldRaceLedger, teamId: string): FieldRaceLedgerEntry[] {
+  return (ledger.rowsByTeamId.get(teamId) ?? []).filter((row) => row.played);
+}
+
+/**
  * Rang-Bewegung des Teams am zuletzt GEWERTETEN Spieltag.
  *
  * Der letzte Ledger-Eintrag ist in einer laufenden Season ein kuenftiger Spieltag: keine

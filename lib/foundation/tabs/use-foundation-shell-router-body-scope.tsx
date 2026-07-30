@@ -137,7 +137,7 @@ import {
   buildFieldRaceLedger,
   countPlayedFieldRaceMatchdays,
   getFieldRaceRankMovement,
-  getFieldRaceRecentForm,
+  getFieldRaceSeasonForm,
   type FieldRaceLedgerEntry,
 } from "@/lib/foundation/build-field-race-ledger";
 import {
@@ -7720,7 +7720,7 @@ export function useFoundationShellRouterBodyScope({
 
   /** Letzte bis zu 5 Spieltage des aktiven Teams (D1 Feld-Form-Strip). */
   const selectedTeamFieldRaceForm: FieldRaceLedgerEntry[] = useMemo(
-    () => (selectedTeam ? getFieldRaceRecentForm(fieldRaceLedger, selectedTeam.teamId, 5) : []),
+    () => (selectedTeam ? getFieldRaceSeasonForm(fieldRaceLedger, selectedTeam.teamId) : []),
     [fieldRaceLedger, selectedTeam?.teamId],
   );
 

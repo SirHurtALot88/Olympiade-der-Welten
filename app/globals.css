@@ -70456,14 +70456,17 @@ button.is-new-look .nl-thist-season-pill,
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  min-width: 40px;
+  /* Breiter als frueher: der Strip zeigt die ganze Saison, und Punkte teilen
+     sich die Zeile jetzt mit dem Tagesrang. Umbrechen duerfen die Kacheln
+     ohnehin (`flex-wrap` an `.nl-form-strip-days`). */
+  min-width: 52px;
   padding: var(--nl-s1) var(--nl-s2);
   border-radius: var(--nl-r-sm);
   background: color-mix(in srgb, var(--nl-ink) 5%, transparent);
 }
 
 .is-new-look .nl-form-strip.is-compact .nl-form-strip-day {
-  min-width: 36px;
+  min-width: 48px;
   padding: 2px var(--nl-s1);
 }
 
@@ -70473,11 +70476,27 @@ button.is-new-look .nl-thist-season-pill,
   letter-spacing: 0.02em;
 }
 
+/* Punkte und Tagesrang auf einer Grundlinie: „8,7 #6". Der Rang tritt dabei
+   bewusst zurueck — er ordnet die Punkte ein, ersetzt sie aber nicht. */
+.is-new-look .nl-form-strip-value {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  white-space: nowrap;
+}
+
 .is-new-look .nl-form-strip-pts {
   font-size: var(--nl-fs-md);
   font-weight: 600;
   color: var(--nl-ink);
 }
+
+.is-new-look .nl-form-strip-rank {
+  font-size: var(--nl-fs-xs);
+  font-weight: 600;
+  color: var(--nl-mut);
+}
+
 
 .is-new-look .nl-form-strip-delta {
   font-size: var(--nl-fs-xs);
