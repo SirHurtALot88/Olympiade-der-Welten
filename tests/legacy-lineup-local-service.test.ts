@@ -372,6 +372,45 @@ describe("legacy lineup local service", { timeout: 120_000 }, () => {
     }
   });
 
+  it("traegt beim Speichern keine Formkarte ein, die der Spieler nicht gewaehlt hat", () => {
+    // Gemeldeter Fehler: In der Wertung standen Formkarten (+19,0 Form), die nie gespielt
+    // wurden. Quelle war der Autofill in diesem Schreibpfad — wer keine Karte waehlte,
+    // bekam automatisch die staerkste Positivkarte je Disziplin-Seite eingetragen.
+    const persistence = createPersistenceService();
+    const save = persistence.createFreshSeasonOneSave({ name: "Lineup Form Card Autofill Test" });
+    topUpRosterCoverage(save.saveId);
+    const params = {
+      saveId: save.saveId,
+      seasonId: save.gameState.season.id,
+      matchdayId: save.gameState.matchdayState.matchdayId,
+      teamId: pickEligibleTeamId(save),
+    };
+
+    const context = loadLocalLegacyLineupContext(params);
+    const entries = buildEntriesFromContext(context, { d1Captain: false, d2Captain: false });
+    // Der Kartenvorrat ist da — nur gewaehlt hat der Spieler nichts.
+    expect(context.ok && (context.context.formCards ?? []).some((card) => card.value > 0)).toBe(true);
+
+    const saveResult = saveLocalLegacyLineupDraft(params, entries);
+    expect(saveResult.ok).toBe(true);
+
+    const loaded = getLocalLegacyLineupDraft(params);
+    expect(loaded?.modifiers.d1.primaryFormCardId).toBeNull();
+    expect(loaded?.modifiers.d1.secondaryFormCardId).toBeNull();
+    expect(loaded?.modifiers.d2.primaryFormCardId).toBeNull();
+    expect(loaded?.modifiers.d2.secondaryFormCardId).toBeNull();
+
+    // Gegenprobe: gewaehlte Karten landen unveraendert im Draft.
+    const chosenCardId = context.ok ? context.context.formCards?.find((card) => card.value > 0)?.id ?? null : null;
+    expect(chosenCardId).not.toBeNull();
+    const withChoice = saveLocalLegacyLineupDraft(params, entries, {
+      d1: { primaryFormCardId: chosenCardId, secondaryFormCardId: null, mutatorTrait1: null, mutatorTrait2: null },
+      d2: { primaryFormCardId: null, secondaryFormCardId: null, mutatorTrait1: null, mutatorTrait2: null },
+    });
+    expect(withChoice.ok).toBe(true);
+    expect(getLocalLegacyLineupDraft(params)?.modifiers.d1.primaryFormCardId).toBe(chosenCardId);
+  });
+
   it("blocks overwriting lineups for a non-active matchday", () => {
     const persistence = createPersistenceService();
     const save = persistence.createFreshSeasonOneSave({ name: "Lineup Lock Test" });

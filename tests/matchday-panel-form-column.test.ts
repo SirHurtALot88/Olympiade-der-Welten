@@ -63,17 +63,53 @@ describe("Spieltags-Wertung: Form als eigene Spalte", () => {
   it("haelt Kopf und Team-Block im selben Raster", () => {
     const panel = read("app/foundation/discipline-stage/DisciplineStageMatchdayPanel.tsx");
     const columnCount = (panel.match(/const PANEL_GRID_COLUMNS = "([^"]+)"/)?.[1] ?? "").split(/\s+/).length;
-    // Tagesrang · Saison-Rang · Wappen · Team · Punkte · Form · Mutator · Gesamt.
+    // Tagesrang · Saison-Rang · Wappen · Team · Punkte · Form · Captain · Mutator · Gesamt.
     // Die beiden Disziplin-SPALTEN sind entfallen: ihre Werte stehen jetzt in den
-    // Disziplin-Zeilen unter dem Team, dort samt Form, Mutator und Gesamt. Das Wappen
-    // hat eine eigene Spalte bekommen, weil es ueber den ganzen Team-Block laeuft.
-    expect(columnCount).toBe(8);
+    // Disziplin-Zeilen unter dem Team. Das Wappen hat eine eigene Spalte, weil es ueber
+    // den ganzen Team-Block laeuft. Captain kam hinzu — er stand vorher nur als Chip am
+    // Teamnamen, man sah also DASS einer gesetzt war, aber nicht, was er gebracht hat.
+    expect(columnCount).toBe(9);
     // Nur noch ZWEI Renderpfade: der Kopf und der Team-Block. Die Disziplin-Zeilen sind
     // keine eigenen Raster mehr, sondern Zeilen im Raster des Team-Blocks — genau
     // deshalb koennen sie mit dem Wappen ueberhaupt eine gemeinsame Spalte teilen.
     expect(panel.match(/gridTemplateColumns: PANEL_GRID_COLUMNS/g)?.length).toBe(2);
-    // Und die Spaltenindizes kommen aus einer Quelle, statt an jeder Zelle zu stehen.
-    expect(panel).toContain("const COL = { rank: 1, seasonRank: 2, crest: 3, team: 4,");
+    // Und die Spaltenindizes kommen aus EINER Quelle, statt an jeder Zelle zu stehen.
+    // Bewusst feldweise geprueft statt als ein Literal-String: die Schreibweise (ein-
+    // oder mehrzeilig) ist Formatierung, die Reihenfolge ist die Aussage.
+    for (const [name, index] of [
+      ["rank", 1],
+      ["seasonRank", 2],
+      ["crest", 3],
+      ["team", 4],
+      ["points", 5],
+      ["form", 6],
+      ["captain", 7],
+      ["mutator", 8],
+      ["total", 9],
+    ] as const) {
+      expect(panel, `COL.${name} soll ${index} sein`).toMatch(new RegExp(`${name}:\\s*${index}\\b`));
+    }
+  });
+
+  /**
+   * Die Spaltenkoepfe standen nicht auf einer Linie: "◆ MUTATOR ▼" ist in Versalien mit
+   * Sperrung das laengste Label und brach in seiner Spalte um — die Raute landete auf einer
+   * eigenen Zeile und schob das Wort nach unten. Beides zusammen haelt das ab: die Koepfe
+   * brechen nie um, und die Spalte ist breit genug.
+   */
+  it("die Spaltenkoepfe brechen nicht um", () => {
+    const panel = read("app/foundation/discipline-stage/DisciplineStageMatchdayPanel.tsx");
+    // Endmarke AB der Startposition suchen: `{label}` steht auch in den Chips weiter oben,
+    // ein blankes indexOf lieferte sonst eine Endmarke VOR dem Anfang und damit einen
+    // leeren Ausschnitt — der Test waere gruen geblieben, ohne irgendetwas zu pruefen.
+    const buttonStart = panel.indexOf("const sortButton =");
+    const button = panel.slice(buttonStart, panel.indexOf("{label}", buttonStart));
+    expect(buttonStart, "sortButton nicht gefunden").toBeGreaterThan(-1);
+    expect(button.length, "leerer Ausschnitt — die Marken passen nicht mehr").toBeGreaterThan(100);
+    expect(button).toContain('whiteSpace: "nowrap"');
+    const widths = (panel.match(/const PANEL_GRID_COLUMNS = "([^"]+)"/)?.[1] ?? "").split(/\s+/);
+    // Mutator-Spalte (Index 7, 0-basiert) traegt das laengste Label.
+    expect(Number.parseInt(widths[7] ?? "0", 10)).toBeGreaterThanOrEqual(88);
   });
 });
 

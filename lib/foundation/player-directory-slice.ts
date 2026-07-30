@@ -38,8 +38,57 @@ export type PlayerDirectorySliceResponse = {
       seasonsPlayed: number;
     }
   >;
+  /**
+   * In der laufenden Saison je Disziplin geholte PPs (Disziplin-ID → PPs) aus
+   * dem Saison-Ledger — die aufklappbaren Achsen-Spalten der Spielerliste.
+   *
+   * Warum ueberhaupt im Slice und nicht clientseitig aus dem Ledger? Der
+   * Foundation-Client haelt per Default den KOMPAKTEN Payload
+   * (`compactFoundationInitialGameState`): dort sind `matchdayResults` /
+   * `disciplineResults` auf den AKTIVEN Spieltag beschnitten und
+   * `persistedSeasonDerivations` entfernt. Ein clientseitig gebauter
+   * `buildSeasonPointsLedger` kennt damit nur den aktiven Spieltag — und ist,
+   * solange dieser noch nicht ausgewertet ist, komplett leer. Genau dieselben
+   * Werte, die hier als `ppsSeason`/`ppPow`… aus dem SERVER-Ledger kommen,
+   * muessen deshalb auch pro Disziplin von hier kommen, sonst stehen in den
+   * aufgeklappten Spalten Nullen neben einer gefuellten PPS-Spalte.
+   *
+   * Bewusst DUENN besetzt: nur Disziplinen mit Punkten stehen drin. Fehlt ein
+   * Eintrag, sind es 0 PPs — dieselbe Lesart wie in
+   * `buildRosterDisciplinePpsByAxis`. Ein Spieler ohne Punkte fehlt ganz.
+   */
+  disciplinePointsByPlayerId: Record<string, Record<string, number>>;
   count: number;
 };
+
+/** Nur Disziplinen mit tatsaechlichen Punkten — 0/NaN fliegen raus (siehe Feldkommentar). */
+function toDisciplinePointsRow(pointsByDiscipline: Record<string, number>): Record<string, number> {
+  const row: Record<string, number> = {};
+  for (const [disciplineId, points] of Object.entries(pointsByDiscipline)) {
+    if (typeof points === "number" && Number.isFinite(points) && points !== 0) {
+      row[disciplineId] = points;
+    }
+  }
+  return row;
+}
+
+/**
+ * Disziplin-PPs aller Spieler aus den Ledger-Summaries. Spieler ohne Punkte
+ * tauchen nicht auf (statt mit einem leeren Objekt) — das haelt den Payload
+ * klein und aendert die Bedeutung nicht.
+ */
+function buildDisciplinePointsByPlayerId(
+  playerSummariesByPlayerId: Map<string, { pointsByDiscipline: Record<string, number> }>,
+): Record<string, Record<string, number>> {
+  const result: Record<string, Record<string, number>> = {};
+  for (const [playerId, summary] of playerSummariesByPlayerId) {
+    const row = toDisciplinePointsRow(summary.pointsByDiscipline ?? {});
+    if (Object.keys(row).length > 0) {
+      result[playerId] = row;
+    }
+  }
+  return result;
+}
 
 function toPerformanceRow(summary: PlayerSeasonPerformanceSummary): PlayerDirectoryPerformanceRow {
   return {
@@ -114,12 +163,21 @@ export function maskPlayerDirectorySliceForRequestingTeam(input: {
       resolveVisibility(playerId) === "exact" ? row : maskCareerStatsRow(),
     ]),
   );
+  // Disziplin-PPs sind exakte Saison-Leistung — dieselbe Fog-Regel wie
+  // `performanceByPlayerId`/`ppsSeason`: nicht sichtbar ⇒ Eintrag faellt weg
+  // (die Zelle zeigt dann "—", statt eine Zahl zu verraten).
+  const disciplinePointsByPlayerId = Object.fromEntries(
+    Object.entries(input.payload.disciplinePointsByPlayerId).filter(
+      ([playerId]) => resolveVisibility(playerId) === "exact",
+    ),
+  );
 
   return {
     ...input.payload,
     ratingsByPlayerId,
     performanceByPlayerId,
     careerStatsByPlayerId,
+    disciplinePointsByPlayerId,
   };
 }
 
@@ -159,6 +217,7 @@ export function buildPlayerDirectorySliceFromPersisted(input: {
     ratingsByPlayerId,
     performanceByPlayerId,
     careerStatsByPlayerId,
+    disciplinePointsByPlayerId: buildDisciplinePointsByPlayerId(derivations.ledger.playerSummariesByPlayerId),
     count: Object.keys(ratingsByPlayerId).length,
   };
 }
@@ -205,6 +264,7 @@ export function buildPlayerDirectorySlice(input: {
     ratingsByPlayerId: ratingsSlice.ratingsByPlayerId,
     performanceByPlayerId,
     careerStatsByPlayerId,
+    disciplinePointsByPlayerId: buildDisciplinePointsByPlayerId(derivations.ledger.playerSummariesByPlayerId),
     count: Object.keys(ratingsSlice.ratingsByPlayerId).length,
   };
 }

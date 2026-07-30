@@ -199,6 +199,8 @@ export function useFoundationCrossTabPlayerDirectory(input: {
       }
     >;
     careerStatsByPlayerId: Record<string, PlayerLeagueCareerStats>;
+    /** Disziplin-ID → in dieser Saison geholte PPs, je Spieler (Server-Ledger). */
+    disciplinePointsByPlayerId: Record<string, Record<string, number>>;
   };
   playerScope: PlayerTableScope;
   playerSeasonPerformanceMap: Map<string, PlayerSeasonPerformanceSummary>;
@@ -317,6 +319,16 @@ export function useFoundationCrossTabPlayerDirectory(input: {
     // EIN Batch-Lauf für alle Kaderspieler (der Sale-Factor-Rank-Kontext ist pro
     // GameState gecacht) — ein Preview-Aufruf pro Zeile wäre bei ~330 Zeilen zu teuer.
     const sellValueByPlayerId = buildExpectedSellValueByPlayerId(input.gameState);
+    // Sobald der Directory-Slice da ist, ist ER die Quelle der Disziplin-PPs:
+    // Der Slice rechnet SERVERSEITIG auf dem vollständigen Save, der Client hält
+    // dagegen den kompakten Payload (`compactFoundationInitialGameState`), in dem
+    // `matchdayResults`/`disciplineResults` auf den AKTIVEN Spieltag beschnitten
+    // sind. Ein clientseitiger `seasonPointsLedger` kennt daher nur diesen einen
+    // Spieltag und ist, solange er nicht ausgewertet ist, leer — genau das ließ
+    // in den aufgeklappten Achsen-Spalten überall "—" stehen, während PPS/OVR
+    // (aus demselben Slice) längst echte Saisonwerte zeigten.
+    const useSliceDisciplinePoints =
+      Boolean(input.playerDirectorySlice.payload) && !input.playerDirectorySlice.error;
 
     return input.gameState.players
       .map((player) => {
@@ -361,9 +373,16 @@ export function useFoundationCrossTabPlayerDirectory(input: {
           // aus zwei verschiedenen Quellen stammen.
           disciplinePpsByAxis: (() => {
             const ledgerSummary = input.seasonPointsLedger?.playerSummariesByPlayerId?.get(player.id) ?? null;
+            // Slice zuerst (siehe Kommentar oben), Ledger nur als Fallback für
+            // Pfade ohne Slice (z. B. Vollzustand nach Slice-Fehler). Fehlt der
+            // Spieler im Slice, hat er in dieser Saison keine PPs geholt — das
+            // bleibt bewusst leer statt auf den beschnittenen Ledger zurückzufallen.
+            const pointsByDiscipline = useSliceDisciplinePoints
+              ? input.playerDirectorySlice.disciplinePointsByPlayerId[player.id] ?? null
+              : ledgerSummary?.pointsByDiscipline ?? null;
             return buildRosterDisciplinePpsByAxis({
               disciplines: input.gameState.disciplines,
-              pointsByDiscipline: ledgerSummary?.pointsByDiscipline ?? null,
+              pointsByDiscipline,
               pointsByArea: ledgerSummary?.pointsByArea ?? null,
               axisTotals: {
                 pow: playerRating?.ppPow ?? null,
@@ -402,10 +421,17 @@ export function useFoundationCrossTabPlayerDirectory(input: {
     input.gameState.players,
     input.gameState.rosters,
     input.gameState.teams,
+    // Die Disziplin-PPs-Quellen gehören ZWINGEND in die Deps: sie werden im
+    // Memo gelesen (`disciplinePpsByAxis`), trafen aber erst nach der ersten
+    // Zeilenberechnung ein — ohne Dep wären die Zeilen mit leeren PPs eingefroren.
+    input.playerDirectorySlice.disciplinePointsByPlayerId,
+    input.playerDirectorySlice.error,
+    input.playerDirectorySlice.payload,
     input.playerDirectorySlice.performanceByPlayerId,
     input.playerRatingsById,
     input.playerScope,
     input.playerSeasonPerformanceMap,
+    input.seasonPointsLedger,
     input.shouldBuildPlayerDirectory,
     playerLeagueCareerStatsMap,
   ]);

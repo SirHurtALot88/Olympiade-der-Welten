@@ -168,21 +168,42 @@ function ppText(value: number | null): string {
 // Header, Team-Zeilen UND Disziplin-Zeilen teilen sich EXAKT dieses Raster (sonst driften
 // die Spalten gegeneinander).
 /**
- * Acht Spalten: Rang · S-Rang · Wappen · Team · Punkte · Form · Mutator · Gesamt.
+ * Neun Spalten: Rang · S-Rang · Wappen · Team · Punkte · Form · Captain · Mutator · Gesamt.
  *
  * Die beiden Disziplin-Spalten sind entfallen. Sie zeigten dieselbe Aufteilung, die
  * darunter ohnehin als Spieler-Gruppen je Seite stand — zwei parallele Achsen fuer
  * denselben Sachverhalt. Jetzt traegt die Team-Zeile die Summe und darunter steht je
- * Disziplin eine eigene Zeile mit denselben vier Groessen.
+ * Disziplin eine eigene Zeile mit denselben Groessen.
+ *
+ * Captain steht direkt hinter Form, weil beides dieselbe Frage beantwortet: was hat das
+ * Team an eigenen Entscheidungen in diese Disziplin gelegt. Genau das war sonst nur als
+ * Chip am Teamnamen zu sehen — man sah DASS ein Captain gesetzt war, aber nicht, was er
+ * gebracht hat. Bei einem Team mit Captain UND negativer Formkarte liest sich das ohne
+ * Zahlen widerspruechlich.
+ *
+ * Die Breiten sind so gewaehlt, dass die Kopf-Beschriftung samt Sortierpfeil in EINE
+ * Zeile passt: "◆ MUTATOR ▼" ist in Versalien mit Sperrung das laengste Label und ist an
+ * 80 px umgebrochen — die Raute rutschte auf eine eigene Zeile und schob das Wort nach
+ * unten, wodurch die vier Koepfe nicht mehr auf einer Linie standen.
  *
  * Das Wappen hat eine EIGENE Spalte, weil es ueber den ganzen Team-Block laeuft
  * (Team-Zeile + Disziplin-Zeilen). Steckte es wie vorher in der Team-Spalte, koennte es
  * nur so hoch werden wie die erste Zeile.
  */
-const PANEL_GRID_COLUMNS = "56px 112px 56px 1fr 70px 76px 80px 84px";
+const PANEL_GRID_COLUMNS = "56px 112px 56px 1fr 70px 76px 78px 92px 84px";
 
 /** Spaltenindizes (1-basiert) — die Zellen des Team-Blocks werden explizit gesetzt. */
-const COL = { rank: 1, seasonRank: 2, crest: 3, team: 4, points: 5, form: 6, mutator: 7, total: 8 } as const;
+const COL = {
+  rank: 1,
+  seasonRank: 2,
+  crest: 3,
+  team: 4,
+  points: 5,
+  form: 6,
+  captain: 7,
+  mutator: 8,
+  total: 9,
+} as const;
 
 /**
  * Das Wappen fuellt die Hoehe des Team-Blocks — gedeckelt.
@@ -237,6 +258,7 @@ export type MatchdayPanelSortKey =
   | "d2"
   | "sum"
   | "form"
+  | "captain"
   | "mutator"
   | "total";
 
@@ -268,6 +290,7 @@ type SortableRow = {
    * nicht addiert, sondern nur ausgewiesen.
    */
   formPp: number;
+  captainPp: number;
   total: number;
 };
 
@@ -288,6 +311,8 @@ function sortValue(row: SortableRow, key: MatchdayPanelSortKey): number | string
       return row.mutPp;
     case "form":
       return row.formPp;
+    case "captain":
+      return row.captainPp;
     case "matchday":
     case "total":
     default:
@@ -410,6 +435,10 @@ export default function DisciplineStageMatchdayPanel({
     const mods = modifiersByTeam?.get(s.teamId);
     const formPp =
       (d1Revealed ? mods?.d1?.formModifier ?? 0 : 0) + (d2Revealed ? mods?.d2?.formModifier ?? 0 : 0);
+    // Captain-Beitrag der aufgedeckten Seiten — dieselbe Aufdeck-Regel wie bei Punkten,
+    // Form und Mutator. `captainBonus` ist null, wenn kein Captain in dieser Diszi stand.
+    const captainPp =
+      (d1Revealed ? mods?.d1?.captainBonus ?? 0 : 0) + (d2Revealed ? mods?.d2?.captainBonus ?? 0 : 0);
     return {
       teamId: s.teamId,
       teamName: teamMetaById.get(s.teamId)?.name ?? teamMetaById.get(s.teamId)?.code ?? s.teamId,
@@ -423,6 +452,7 @@ export default function DisciplineStageMatchdayPanel({
       sum,
       mutPp,
       formPp,
+      captainPp,
       total: sum + mutPp,
       // Dieselben vier Groessen NOCH EINMAL je Disziplin — daraus baut die Ansicht die
       // Zeilen unter dem Team. Die Team-Zeile bleibt die Summe, die Disziplin-Zeilen
@@ -432,12 +462,14 @@ export default function DisciplineStageMatchdayPanel({
         d1: {
           points: d1Revealed ? d1Pts ?? 0 : null,
           form: d1Revealed ? mods?.d1?.formModifier ?? 0 : null,
+          captain: d1Revealed ? mods?.d1?.captainBonus ?? 0 : null,
           mutator: d1Revealed ? mut?.d1Pp ?? 0 : null,
           total: d1Revealed ? (d1Pts ?? 0) + (mut?.d1Pp ?? 0) : null,
         },
         d2: {
           points: d2Revealed ? d2Pts ?? 0 : null,
           form: d2Revealed ? mods?.d2?.formModifier ?? 0 : null,
+          captain: d2Revealed ? mods?.d2?.captainBonus ?? 0 : null,
           mutator: d2Revealed ? mut?.d2Pp ?? 0 : null,
           total: d2Revealed ? (d2Pts ?? 0) + (mut?.d2Pp ?? 0) : null,
         },
@@ -557,6 +589,10 @@ export default function DisciplineStageMatchdayPanel({
           fontWeight: 800,
           letterSpacing: "0.04em",
           textTransform: "uppercase",
+          // Ohne `nowrap` bricht die laengste Beschriftung ("◆ MUTATOR ▼") in ihrer Spalte
+          // um: die Raute landet auf einer eigenen Zeile und schiebt das Wort nach unten —
+          // die Zahlenspalten-Koepfe standen dadurch nicht mehr auf einer Linie.
+          whiteSpace: "nowrap",
           color: active ? "var(--nl-accent)" : "var(--nl-mut)",
         }}
       >
@@ -581,7 +617,7 @@ export default function DisciplineStageMatchdayPanel({
         {/* Untergrenze angehoben (720 → 880): die Spieler-Chips teilen sich die
             Team-Spalte jetzt mit dem Disziplin-Label. Darunter blieben davon keine 100 px
             uebrig und jeder Chip stand auf einer eigenen Zeile. */}
-        <div style={{ minWidth: 880 }}>
+        <div style={{ minWidth: 960 }}>
           {/* Kopfzeile */}
           <div
             style={{
@@ -656,6 +692,11 @@ export default function DisciplineStageMatchdayPanel({
               "form",
               "Form",
               "Beitrag der eingesetzten Formkarten in den aufgedeckten Disziplinen. Bereits in den Disziplin-Punkten enthalten — hier nur ausgewiesen, damit sichtbar ist, ob der Kartensatz gepasst hat. Die gespielten Karten stehen als Chips am Teamnamen.",
+            )}
+            {sortButton(
+              "captain",
+              "Captain",
+              "Beitrag des eingesetzten Captains in den aufgedeckten Disziplinen. Wie die Form bereits in den Disziplin-Punkten enthalten — hier ausgewiesen, damit sichtbar ist, was die Captain-Entscheidung gebracht hat. Steht kein Captain in der Diszi, bleibt die Zelle leer.",
             )}
             {sortButton("mutator", "◆ Mutator", "Mutator-Bonus-PP (0,3er) — dem Spieler gutgeschrieben, separat vom Team-PP")}
             {sortButton("total", "Gesamt", "Gesamt = Spieltags-Punkte + Mutator-Bonus")}
@@ -882,6 +923,33 @@ export default function DisciplineStageMatchdayPanel({
                   {sumShown ? (Math.abs(row.formPp) < 0.05 ? "0" : `${row.formPp > 0 ? "+" : ""}${row.formPp.toFixed(1)}`) : lockCell}
                 </div>
 
+                {/* Captain-Beitrag der aufgedeckten Seiten. Gold wie der Captain-Chip am
+                    Teamnamen, damit beides als dieselbe Sache lesbar ist. Ohne gesetzten
+                    Captain steht ein Strich statt einer 0 — "nicht gesetzt" ist etwas
+                    anderes als "hat nichts gebracht". */}
+                <div
+                  title={
+                    row.captainPp === 0
+                      ? "Kein Captain in den aufgedeckten Disziplinen"
+                      : `Captain-Beitrag: ${row.captainPp > 0 ? "+" : ""}${row.captainPp.toFixed(1)} — bereits in den Disziplin-Punkten enthalten`
+                  }
+                  style={{
+                    gridColumn: COL.captain,
+                    gridRow: 1,
+                    textAlign: "right",
+                    fontVariantNumeric: "tabular-nums",
+                    fontWeight: 800,
+                    fontSize: 13,
+                    color: Math.abs(row.captainPp) > 0.05 ? "var(--nl-gold)" : "var(--nl-mut)",
+                  }}
+                >
+                  {sumShown
+                    ? Math.abs(row.captainPp) < 0.05
+                      ? "–"
+                      : `${row.captainPp > 0 ? "+" : ""}${row.captainPp.toFixed(1)}`
+                    : lockCell}
+                </div>
+
                 {/* Mutator-Bonus (0,3er) — spielergenau, separat vom Team-PP. */}
                 <div
                   title={mutatorTitle}
@@ -1030,6 +1098,15 @@ export default function DisciplineStageMatchdayPanel({
                         }}
                       >
                         {values.form == null ? "–" : Math.abs(values.form) < 0.05 ? "0" : ppText(values.form)}
+                      </div>
+                      <div
+                        style={{
+                          ...cell,
+                          gridColumn: COL.captain,
+                          color: Math.abs(values.captain ?? 0) > 0.05 ? "var(--nl-gold)" : "var(--nl-mut)",
+                        }}
+                      >
+                        {values.captain == null || Math.abs(values.captain) < 0.05 ? "–" : ppText(values.captain)}
                       </div>
                       <div
                         style={{

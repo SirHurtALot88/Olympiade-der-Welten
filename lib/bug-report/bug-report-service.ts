@@ -40,12 +40,6 @@ export type BugReportInput = {
   clientTime?: string | null;
   /** Wer gemeldet hat. Kommt aus dem Session-Cookie und wird NUR von der Route gesetzt. */
   reporter?: BugReportReporter | null;
-  /**
-   * Der Spielstand, auf den der Browser gerade schaut (aus der URL). Die verlaesslichste Quelle —
-   * siehe `collectGameContext`: der globale Aktiv-Zeiger gehoert bei zwei Spielern regelmaessig
-   * dem jeweils anderen.
-   */
-  saveId?: string | null;
 };
 
 /**
@@ -88,6 +82,13 @@ export type BugReportRecord = BugReportInput & {
   game: {
     saveId: string | null;
     saveName: string | null;
+    /**
+     * Woher der Spielstand kam: `"url"` = der, den der Melder offen hatte (belegt);
+     * `"active"` = Notnagel ueber den global aktiven Spielstand, weil die URL keinen bekannten
+     * `saveId` trug. Ohne diese Angabe laesst sich ein irrefuehrender Kontext nicht von einem
+     * belegten unterscheiden.
+     */
+    saveSource: "url" | "active";
     seasonId: string | null;
     seasonYear: number | null;
     currentMatchday: number | null;
@@ -138,36 +139,51 @@ function resolvePage(input: BugReportInput): BugReportPage {
   };
 }
 
+/** Der `saveId`-Parameter aus der URL, die der Melder offen hatte. */
+function readSaveIdFromUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).searchParams.get("saveId")?.trim() || null;
+  } catch {
+    // Auch ein relativer Pfad soll noch etwas hergeben.
+    const match = /[?&]saveId=([^&#]+)/.exec(url);
+    return match ? decodeURIComponent(match[1]!) : null;
+  }
+}
+
 /**
- * Zustand des Spielstands, in dem der MELDER gerade steckte. Bewusst tolerant: laeuft die Meldung
+ * Zustand des Spielstands, den der MELDER vor sich hatte. Bewusst tolerant: laeuft die Meldung
  * ausserhalb eines Spiels (Login-Seite, kein Save aktiv), bleibt `game` null — eine Meldung ohne
  * Spielkontext ist immer noch besser als keine.
  *
- * DIE REIHENFOLGE IST DER GANZE PUNKT. Der erste Entwurf nahm ohne Umschweife
- * `getActiveSave()` — den GLOBALEN Zeiger, ohne Besitzer. Auf einem Server mit zwei Spielern in
- * getrennten Saves ist das schlicht der zuletzt gesetzte Zeiger, also mit gleicher
- * Wahrscheinlichkeit der des ANDEREN. Der Schaden war nicht theoretisch: zwei Meldungen von Chris
- * (Save ...8d7mdx, Team C-C) trugen Frankys Save ...h0z7cl und dessen Team T-G — und die darauf
- * gestuetzte Diagnose lag bei beiden Meldungen falsch, in eine plausibel klingende Richtung. Ein
- * falscher Zustand ist schlimmer als gar keiner: fehlt er, sieht man es und fragt nach.
+ * Warum die URL Vorrang hat: die erste Fassung nahm `getActiveSave()`, also den GLOBAL aktiven
+ * Spielstand. Das ist bei zwei Spielern auf einer Instanz regelmaessig ein anderer als der, in dem
+ * gemeldet wurde. Genau das ist passiert — in zwei der ersten drei echten Meldungen trug die URL
+ * `saveId=…8d7mdx`, waehrend der Bericht den Zustand von `…h0z7cl` beschrieb (ein Spielstand, den
+ * ein anderer Spieler 10 Minuten zuvor angelegt hatte). Der Bericht beschrieb damit eine andere
+ * Partie als die gemeldete: falsche Saison, falscher Spieltag, falsches gefuehrtes Team. Das ist
+ * schlimmer als gar kein Kontext, weil es glaubwuerdig aussieht.
  *
- * Deshalb:
- *   1. Die vom Client mitgeschickte `saveId` — der Browser weiss am genauesten, worauf er schaut.
- *   2. Sonst der aktive Save DES MELDERS (`getActiveSave(ownerId)`, besitzerbezogen).
- *   3. Nur ohne Login der globale Zeiger — dann gibt es genau einen Spieler und keine Verwechslung.
+ * `saveSource` haelt fest, woher die Zuordnung kam — sonst laesst sich spaeter nicht mehr sagen, ob
+ * der Kontext belegt oder nur der beste verfuegbare Notnagel war.
  */
-function collectGameContext(input: BugReportInput): BugReportRecord["game"] {
+function collectGameContext(url: string | null | undefined): BugReportRecord["game"] {
   try {
     const persistence = createPersistenceService();
-    const ownerId = input.reporter?.ownerId ?? null;
-    const explicit = input.saveId?.trim() || null;
-    const active = explicit ? persistence.getSaveById(explicit) : persistence.getActiveSave(ownerId ?? undefined);
-    if (!active) return null;
-    const full = persistence.getSaveById(active.saveId);
+    const urlSaveId = readSaveIdFromUrl(url);
+    const fromUrl = urlSaveId ? persistence.getSaveById(urlSaveId) : null;
+    const active = fromUrl ? null : persistence.getActiveSave();
+    if (!fromUrl && !active) return null;
+
+    const saveId = fromUrl ? urlSaveId! : active!.saveId;
+    const full = fromUrl ?? persistence.getSaveById(saveId);
     const gameState = full?.gameState ?? null;
     return {
-      saveId: active.saveId,
-      saveName: active.name ?? null,
+      saveId,
+      saveName: (fromUrl ? (full?.name ?? null) : (active!.name ?? null)) ?? null,
+      // "url" = der Spielstand, den der Melder offen hatte (belegt).
+      // "active" = Notnagel: die URL trug keinen (oder keinen bekannten) saveId.
+      saveSource: fromUrl ? "url" : "active",
       seasonId: gameState?.season?.id ?? null,
       seasonYear: gameState?.season?.year ?? null,
       currentMatchday: gameState?.season?.currentMatchday ?? null,
@@ -196,12 +212,40 @@ export function saveBugReport(input: BugReportInput): { reportId: string; file: 
     createdAt: now.toISOString(),
     reporter: input.reporter ?? UNKNOWN_REPORTER,
     page: resolvePage(input),
-    game: collectGameContext(input),
+    game: collectGameContext(input.url),
   };
   fs.mkdirSync(BUG_REPORTS_DIR, { recursive: true });
   const file = path.join(BUG_REPORTS_DIR, `${record.reportId}.json`);
   fs.writeFileSync(file, `${JSON.stringify(record, null, 2)}\n`, "utf8");
   return { reportId: record.reportId, file, record };
+}
+
+/**
+ * Signatur ueber die abgelegten Meldungen — die Aenderungserkennung fuer den Auto-Export
+ * (`lib/persistence/online-save-auto-export.ts`), der die Meldungen ins Repo mitnimmt.
+ *
+ * Warum die Meldungen eine EIGENE Signatur brauchen und nicht an der Save-Signatur mitlaufen: der
+ * Export-Zyklus bricht ab, wenn sich kein Save bewegt hat, und danach ein zweites Mal, wenn der
+ * Save-Export nichts geaendert hat. Eine Meldung von einer Seite, auf der man nicht spielt (Login,
+ * Startseite, Online-Raum), haette den Rechner damit nie verlassen — und das ist genau die Lage,
+ * in der man meldet.
+ *
+ * Dateinamen genuegen: eine Meldung wird geschrieben und nie wieder veraendert. Die Vorpruefungen
+ * liegen als `.md` im Unterordner `triage/` und zaehlen bewusst NICHT mit — sonst schoebe jede
+ * Statusaenderung einen Commit an, ohne dass eine neue Meldung vorliegt.
+ */
+export function computeBugReportSignature(): string {
+  try {
+    if (!fs.existsSync(BUG_REPORTS_DIR)) return "";
+    return fs
+      .readdirSync(BUG_REPORTS_DIR)
+      .filter((name) => name.endsWith(".json"))
+      .sort()
+      .join("|");
+  } catch {
+    // Eine unlesbare Ablage darf den Auto-Export nicht zum Absturz bringen — er laeuft im Timer.
+    return "";
+  }
 }
 
 export function listBugReports(limit = 50): BugReportRecord[] {

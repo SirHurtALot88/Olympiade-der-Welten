@@ -8,7 +8,6 @@ import {
   calculateMutatorModifierForSide,
   createDefaultLineupDraftModifiers,
   ensureLocalFormCardsForSeason,
-  autoFillFormCardModifiers,
   getFormCardColorForDisciplineCategory,
   getTeamFormCardOptions,
   buildLegacyMutatorTraitOptionsForRoster,
@@ -1176,13 +1175,17 @@ export function saveLocalLegacyLineupDraft(
       warnings: ["This lineup is already locked/resolved and can no longer be overwritten."],
     };
   }
-  const resolvedModifiers = autoFillFormCardModifiers({
-    gameState: gameStateWithFormCards,
-    seasonId: effectiveParams.seasonId,
-    teamId: effectiveParams.teamId,
-    lineupId,
-    modifiers,
-  });
+  // Formkarten spielt nur, wer sie spielt. Hier lief bisher `autoFillFormCardModifiers`:
+  // Wer beim Speichern KEINE Karte gewaehlt hatte, bekam automatisch die staerkste
+  // Positivkarte je Disziplin-Seite eingetragen. Das ist der einzige Schreibpfad der
+  // menschlichen Einsatzliste — der Spieler sah anschliessend in der Wertung einen
+  // Formbonus aus Karten, die er nie ausgespielt hatte, und der Kartenvorrat leerte sich
+  // ohne sein Zutun. Verworfen wurde die kleinere Variante, den Autofill nur fuer
+  // `controlMode === "manual"` abzuschalten: die KI setzt ihre Karten ohnehin explizit
+  // ueber `buildAiLegacyLineupModifiers` und speichert ueber
+  // `saveLocalLegacyLineupDraftBatch`, das nie automatisch gefuellt hat. Ein zweiter
+  // Auswahlweg neben der Doktrin waere nur eine zweite Quelle fuer dieselbe Groesse.
+  const resolvedModifiers = normalizeLineupDraftModifiers(modifiers);
   const nextDraft: LineupDraft = {
     lineupId,
     saveId: effectiveParams.saveId,

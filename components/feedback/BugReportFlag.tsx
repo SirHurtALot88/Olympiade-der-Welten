@@ -35,10 +35,6 @@ export function BugReportFlag() {
           // Online-Raum) gar keinen `?view=`-Parameter haben — dort war die Ansicht bisher leer.
           path: typeof window === "undefined" ? null : window.location.pathname,
           tab: typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab"),
-          // Der Spielstand aus der URL. Ohne ihn muesste der Server den globalen Aktiv-Zeiger
-          // nehmen — der bei zwei Spielern in getrennten Saves regelmaessig dem anderen gehoert
-          // und schon zwei Meldungen mit fremdem Spielstand und fremdem Team versehen hat.
-          saveId: typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("saveId"),
           // Der Dokumenttitel als Rueckfallebene fuer die Seiten, die die Nav-Konfiguration nicht
           // kennt (Login, Startseite, Online-Raum) — dort waere der Klartextname sonst leer.
           pageTitle: typeof document === "undefined" ? null : document.title,

@@ -18,8 +18,6 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const activeSave = { saveId: "save-1", name: "Testspiel" };
-/** Der Save des ANDEREN Spielers — auf den zeigt der globale Aktiv-Zeiger genauso oft. */
-const fremderSave = { saveId: "save-franky", name: "Frankys Spiel" };
 const gameState = {
   season: { id: "season-3", year: 3, currentMatchday: 7 },
   matchdayState: { matchdayId: "matchday-7", status: "resolved" },
@@ -34,19 +32,26 @@ const gameState = {
 };
 
 /**
- * Der Mock bildet die Lage auf dem echten Server nach: Es gibt einen GLOBALEN Aktiv-Zeiger, der auf
- * Frankys Save zeigt, und daneben einen besitzerbezogenen. Wer den globalen nimmt, bekommt den
- * falschen — genau das ist in Produktion passiert.
+ * Ein ZWEITER Spielstand, den nur die URL kennt. Er bildet die Lage nach, in der die erste Fassung
+ * daneben lag: zwei Spieler auf einer Instanz, der global aktive Spielstand ist ein anderer als der,
+ * in dem gemeldet wurde.
  */
+const urlSave = {
+  name: "Anderes Spiel",
+  gameState: {
+    season: { id: "season-9", year: 9, currentMatchday: 3 },
+    matchdayState: { matchdayId: "matchday-3", status: "planning" },
+    teams: [{ teamId: "X-X" }],
+    seasonState: { teamControlSettings: { "X-X": { teamId: "X-X", controlMode: "manual" } } },
+  },
+};
+
 vi.mock("@/lib/persistence/persistence-service", () => ({
   createPersistenceService: () => ({
-    getActiveSave: (ownerId?: string) => (ownerId === "user_local" ? activeSave : fremderSave),
-    getSaveById: (saveId: string) =>
-      saveId === "save-1" || saveId === "save-franky" ? { saveId, gameState } : null,
+    getActiveSave: () => activeSave,
+    getSaveById: (saveId: string) => (saveId === "save-aus-url" ? urlSave : { gameState }),
   }),
 }));
-
-const CHRIS = { username: "chris", displayName: "Chris", ownerId: "user_local", source: "session" } as const;
 
 let workdir = "";
 let cwdSpy: ReturnType<typeof vi.spyOn> | null = null;
@@ -78,7 +83,7 @@ describe("Bug-Meldung — der Zustand wird mitgeschrieben", () => {
   /** DER KERN: ohne diese Felder ist die Meldung nicht nachstellbar. */
   it("reichert Saison, Spieltag und Spielstand aus dem aktiven Save an", async () => {
     const { saveBugReport } = await importService();
-    const { record } = saveBugReport({ note: "x", reporter: CHRIS });
+    const { record } = saveBugReport({ note: "x" });
     expect(record.game).toMatchObject({
       saveId: "save-1",
       saveName: "Testspiel",
@@ -96,11 +101,48 @@ describe("Bug-Meldung — der Zustand wird mitgeschrieben", () => {
    */
   it("findet das gefuehrte Team ueber teamControlSettings, nicht ueber team.controlMode", async () => {
     const { saveBugReport } = await importService();
-    const { record } = saveBugReport({ reporter: CHRIS });
+    const { record } = saveBugReport({});
     expect(record.game?.activeTeamIds).toEqual(["C-C"]);
     // Gegenprobe zur Abgrenzung: ai und passive gehoeren NICHT dazu.
     expect(record.game?.activeTeamIds).not.toContain("A-A");
     expect(record.game?.activeTeamIds).not.toContain("B-B");
+  });
+
+  /**
+   * DER FEHLER, DEN DIE ERSTEN ECHTEN MELDUNGEN AUFGEDECKT HABEN.
+   *
+   * Die Anreicherung nahm `getActiveSave()`, also den GLOBAL aktiven Spielstand. Bei zwei Spielern
+   * auf einer Instanz ist das regelmaessig ein anderer als der gemeldete: in zwei von drei echten
+   * Meldungen trug die URL `saveId=…8d7mdx`, waehrend der Bericht den Zustand von `…h0z7cl`
+   * beschrieb — eine andere Partie, mit anderer Saison, anderem Spieltag und anderem gefuehrten
+   * Team. Das ist schlimmer als gar kein Kontext, weil es glaubwuerdig aussieht.
+   */
+  it("nimmt den Spielstand aus der URL des Melders, nicht den global aktiven", async () => {
+    const { saveBugReport } = await importService();
+    const { record } = saveBugReport({
+      url: "https://olympiade.duckdns.org/foundation?view=lineup&team=C-C&saveId=save-aus-url",
+    });
+    expect(record.game?.saveId).toBe("save-aus-url");
+    expect(record.game?.saveName).toBe("Anderes Spiel");
+    expect(record.game?.seasonYear).toBe(9);
+    expect(record.game?.currentMatchday).toBe(3);
+    expect(record.game?.activeTeamIds).toEqual(["X-X"]);
+    // Und die Herkunft steht dabei — sonst ist belegt von geraten nicht zu unterscheiden.
+    expect(record.game?.saveSource).toBe("url");
+  });
+
+  it("faellt auf den aktiven Spielstand zurueck, wenn die URL keinen traegt", async () => {
+    const { saveBugReport } = await importService();
+    const { record } = saveBugReport({ url: "https://olympiade.duckdns.org/login" });
+    expect(record.game?.saveId).toBe("save-1");
+    expect(record.game?.saveSource).toBe("active");
+  });
+
+  /** Eine kaputte URL darf die Meldung nicht verschlucken — sie ist dann eben der Notnagel. */
+  it("kommt mit einer unbrauchbaren URL zurecht", async () => {
+    const { saveBugReport } = await importService();
+    expect(saveBugReport({ url: "nicht-wirklich-eine-url" }).record.game?.saveSource).toBe("active");
+    expect(saveBugReport({ url: null }).record.game?.saveSource).toBe("active");
   });
 
   it("ein leerer Freitext ist erlaubt — der Zustand ist der Inhalt", async () => {
@@ -230,53 +272,6 @@ describe("Bug-Meldung — wer gemeldet hat", () => {
     const { record } = saveBugReport({ note: "x" });
     expect(record.reporter).not.toBeUndefined();
     expect(record.reporter.username).toBeNull();
-  });
-});
-
-/**
- * DER TEUERSTE FEHLER DIESER DATEI — er ist in Produktion aufgetreten und hat Diagnosen verdorben.
- *
- * Der erste Entwurf nahm den GLOBALEN Aktiv-Zeiger (`getActiveSave()` ohne Besitzer). Auf einem
- * Server mit zwei Spielern in getrennten Saves ist das der zuletzt gesetzte Zeiger — also mit
- * gleicher Wahrscheinlichkeit der des anderen. Zwei echte Meldungen von Chris (Save ...8d7mdx,
- * Team C-C) trugen dadurch Frankys Save und dessen Team T-G. Die darauf gestuetzte Untersuchung kam
- * bei beiden Meldungen zu einem falschen Ergebnis, und zwar zu einem plausibel klingenden.
- *
- * Ein falscher Zustand ist schlimmer als gar keiner: fehlt er, sieht man es und fragt nach.
- */
-describe("Bug-Meldung — der Spielstand gehoert dem Melder, nicht dem Server", () => {
-  it("nimmt die saveId aus der URL, wenn der Client sie mitschickt", async () => {
-    const { saveBugReport } = await importService();
-    const { record } = saveBugReport({ saveId: "save-1", reporter: CHRIS });
-    expect(record.game?.saveId).toBe("save-1");
-  });
-
-  /** Ohne saveId: der aktive Save DES MELDERS, nicht der globale Zeiger. */
-  it("faellt auf den besitzerbezogenen Aktiv-Save zurueck, nicht auf den globalen", async () => {
-    const { saveBugReport } = await importService();
-    const { record } = saveBugReport({ reporter: CHRIS });
-    expect(record.game?.saveId).toBe("save-1");
-    // Die Gegenprobe ist der eigentliche Test: der globale Zeiger zeigt hier auf Frankys Save.
-    expect(record.game?.saveId).not.toBe("save-franky");
-  });
-
-  /**
-   * Die mitgeschickte saveId schlaegt den Aktiv-Zeiger — auch wenn beide gesetzt sind. Wer auf
-   * einen aelteren Spielstand schaut, meldet einen Fehler in DIESEM, nicht im zuletzt geoeffneten.
-   */
-  it("die mitgeschickte saveId gewinnt gegen den Aktiv-Zeiger", async () => {
-    const { saveBugReport } = await importService();
-    const { record } = saveBugReport({ saveId: "save-franky", reporter: CHRIS });
-    expect(record.game?.saveId).toBe("save-franky");
-  });
-
-  /** Ohne Login gibt es nur einen Spieler — dann ist der globale Zeiger richtig und muss greifen. */
-  it("ohne Login bleibt der globale Zeiger die Quelle", async () => {
-    const { saveBugReport } = await importService();
-    const { record } = saveBugReport({
-      reporter: { username: null, displayName: null, ownerId: null, source: "auth_disabled" },
-    });
-    expect(record.game?.saveId).toBe("save-franky");
   });
 
   it("listet die neuesten Meldungen zuerst", async () => {

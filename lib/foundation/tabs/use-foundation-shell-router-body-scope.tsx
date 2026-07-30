@@ -39,6 +39,7 @@ import { runAiTurn } from "@/lib/ai/aiTurnEngine";
 import { buildTeamObjectiveOverview, refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
 import { getMetricBarPercent, getPoolHeatClass } from "@/lib/foundation/player-league-heat";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
+import { canAdvanceMatchdayFromStep } from "@/lib/foundation/resolve-game-flow-action-step";
 import {
   FACILITY_CATALOG,
   getFacilityLevelDefinition,
@@ -1357,8 +1358,14 @@ export function useFoundationShellRouterBodyScope({
   const shouldLoadSeasonRatings = shouldBuildPlayerRatings || shouldBuildTrainingView;
   const shouldFetchSeasonRatingsFromApi = shouldLoadSeasonRatings && !shouldLoadSeasonLedger;
   const seasonContentSignature = useMemo(() => buildGameStateContentSignature(gameState), [gameState]);
+  // Auch der Teams-Tab braucht den Directory-Slice: seine Kader-/Verträge-
+  // Rostertabelle zeigt pro Spieler ausklappbare Disziplin-PPs, und die stehen
+  // nur im SERVER-gerechneten Slice richtig drin (der Client hält den kompakten
+  // Payload, siehe `disciplinePointsByPlayerId` in player-directory-slice.ts).
+  // Der Slice ist modulweit nach saveId/seasonId/contentSignature gecacht —
+  // wer vorher in der Spielerliste war, holt hier nichts neu.
   const playerDirectorySlice = usePlayerDirectorySlice({
-    enabled: shouldBuildPlayerDirectory,
+    enabled: shouldBuildPlayerDirectory || shouldBuildTeamsView,
     saveId: activeSaveId,
     seasonId: gameState.season.id,
     contentSignature: seasonContentSignature,
@@ -1391,11 +1398,14 @@ export function useFoundationShellRouterBodyScope({
     teamOverviewSlice,
   });
   // Teams-Detail (Verträge/Kader) zeigt pro Spieler ausklappbare Disziplin-PPs.
-  // Die dafür nötigen echten Pro-Disziplin-Punkte liegen NUR im Season-Ledger
-  // (aggregierte Achsen-PPs kommen aus dem Ratings-Slice) — daher wird das
-  // (gecachte) `useSeasonDerivations` hier zusätzlich aktiviert, sobald die
-  // Teams-Ansicht offen ist. Andere Ledger-Konsumenten bleiben über ihre
-  // eigenen `shouldLoad*`-Gates unberührt (Ratings kommen weiter aus dem Slice).
+  // Die Pro-Disziplin-Punkte kommen inzwischen aus dem Directory-Slice (oben) —
+  // der clientseitige Ledger konnte sie nie liefern, weil der Foundation-Client
+  // nur den kompakten Payload hält (`matchdayResults` auf den aktiven Spieltag
+  // beschnitten). Das (gecachte) `useSeasonDerivations` bleibt hier trotzdem
+  // aktiv: der Ledger liefert die Team-Summaries des Team-Drawers und den
+  // Achsen-Fallback (`pointsByArea`) und dient den Disziplin-PPs weiterhin als
+  // Fallback, falls der Slice ausfällt. Andere Ledger-Konsumenten bleiben über
+  // ihre eigenen `shouldLoad*`-Gates unberührt.
   const shouldLoadTeamsRosterDisciplineLedger = shouldBuildTeamsView;
   const shouldLoadSeasonDerivations =
     shouldLoadTeamsRosterDisciplineLedger ||
@@ -2652,7 +2662,28 @@ export function useFoundationShellRouterBodyScope({
     }));
   }
 
-  function saveTransferWishlist(nextEntries: TransferWishlistEntry[]) {
+  /**
+   * GEMELDET: „,Wishlist & Scouting' fuellt sich immer wieder mit Spielern, die ich schon entfernt
+   * habe."
+   *
+   * Die Ursache steckte in der Kombination aus zwei an sich harmlosen Zeilen: die Aufrufer haben die
+   * neue Liste aus `gameState.seasonState.transferWishlist` der RENDER-CLOSURE berechnet, und diese
+   * Funktion hat das Ergebnis dann ABSOLUT in den Updater geschrieben — `current` wurde gar nicht
+   * gelesen. Solange zwischen zwei Klicks kein Rerender liegt (und dieser Shell ist gross und
+   * rendert traege), rechnen beide Klicks auf demselben alten Stand. Der zweite Schreibvorgang
+   * enthaelt den vom ersten entfernten Spieler wieder — er "kommt zurueck", ohne dass irgendwo
+   * etwas nachfuellt.
+   *
+   * Deshalb nimmt die Funktion jetzt eine FUNKTION der aktuellen Liste entgegen und wendet sie
+   * innerhalb des Updaters auf `current` an. Damit sieht jeder Klick, was der vorherige getan hat.
+   *
+   * Das gilt auch fuer den Spiegel in die Beobachtungsliste: `syncWishlistToScoutingWatchlist`
+   * leitet die Mirror-Eintraege aus der Wishlist ab. Lief er auf dem veralteten Stand, kam der
+   * entfernte Spieler dort ebenfalls zurueck.
+   */
+  function saveTransferWishlist(
+    update: TransferWishlistEntry[] | ((currentEntries: TransferWishlistEntry[]) => TransferWishlistEntry[]),
+  ) {
     if (readMeta.readOnly) {
       showReadOnlyNotice();
       return;
@@ -2660,6 +2691,8 @@ export function useFoundationShellRouterBodyScope({
 
     const teamId = marketTeamId || selectedTeam?.teamId || null;
     setGameState((current) => {
+      const currentEntries = current.seasonState.transferWishlist ?? [];
+      const nextEntries = typeof update === "function" ? update(currentEntries) : update;
       let next: GameState = {
         ...current,
         seasonState: {
@@ -2731,10 +2764,14 @@ export function useFoundationShellRouterBodyScope({
 
   function toggleTransferWishlist(item: TransfermarktFreeAgentItem) {
     const teamId = marketTeamId || selectedTeam?.teamId || null;
-    const currentEntries = gameState.seasonState.transferWishlist ?? [];
-    const existing = currentEntries.find((entry) => entry.playerId === item.playerId);
+    // Die ENTSCHEIDUNG (hinzufuegen oder entfernen) faellt aus der Closure — sie braucht ohnehin
+    // Nebenwirkungen (Slot-Pruefung, Hinweis), die nicht in einen State-Updater gehoeren. Die
+    // AENDERUNG der Liste laeuft danach funktional, also auf dem wirklich aktuellen Stand.
+    const existing = (gameState.seasonState.transferWishlist ?? []).some(
+      (entry) => entry.playerId === item.playerId,
+    );
     if (existing) {
-      saveTransferWishlist(currentEntries.filter((entry) => entry.playerId !== item.playerId));
+      saveTransferWishlist((entries) => entries.filter((entry) => entry.playerId !== item.playerId));
       return;
     }
     if (!teamId) {
@@ -2746,11 +2783,15 @@ export function useFoundationShellRouterBodyScope({
       return;
     }
 
-    saveTransferWishlist([buildWishlistEntry(item), ...currentEntries]);
+    // Der `some`-Riegel schuetzt gegen den umgekehrten Fall: zwei Klicks auf denselben Spieler vor
+    // dem Rerender haetten ihn sonst doppelt in die Liste gelegt.
+    saveTransferWishlist((entries) =>
+      entries.some((entry) => entry.playerId === item.playerId) ? entries : [buildWishlistEntry(item), ...entries],
+    );
   }
 
   function removeTransferWishlistEntry(playerId: string) {
-    saveTransferWishlist((gameState.seasonState.transferWishlist ?? []).filter((entry) => entry.playerId !== playerId));
+    saveTransferWishlist((entries) => entries.filter((entry) => entry.playerId !== playerId));
   }
 
   function reorderTransferWishlist(playerId: string, targetIndex: number) {
@@ -2758,9 +2799,7 @@ export function useFoundationShellRouterBodyScope({
     if (!teamId) {
       return;
     }
-    saveTransferWishlist(
-      reorderTeamTransferWishlist(gameState.seasonState.transferWishlist ?? [], teamId, playerId, targetIndex),
-    );
+    saveTransferWishlist((entries) => reorderTeamTransferWishlist(entries, teamId, playerId, targetIndex));
   }
 
   function toggleScoutingWatch(item: TransfermarktFreeAgentItem) {
@@ -4352,6 +4391,18 @@ export function useFoundationShellRouterBodyScope({
    * Der Server bleibt die Instanz, die entscheidet, ob gewechselt werden darf
    * (`prepareMatchdayProgress`: Ergebnis gebucht? Tabelle gebucht? schon
    * weitergeschaltet?). Diese Funktion reicht seine Begruendung nur nach vorn.
+   *
+   * Der Sprung in den Saisonstand liegt HIER und nicht an den Aufrufstellen. Er stand vorher am
+   * Arena-Knopf, mit der Begruendung, welche Ansicht danach dran ist sei Sache des Shell-Bodys —
+   * was stimmt, aber genau das ist diese Funktion auch, sie liegt im Shell-Body-Scope und nicht in
+   * der Spieltags-Logik (`cockpit-matchday-handlers.ts`, die auch das Cockpit benutzt). Am
+   * Aufrufort war es eine Kopie pro Knopf: das globale "Weiter" hatte sie nicht, und derselbe
+   * Abschluss liess einen je nach geklicktem Knopf woanders stehen.
+   *
+   * Gewechselt wird NUR bei `applied`. Eine Ablehnung legt ihre Begruendung als
+   * `foundationActionFeedback` in der Ansicht ab, auf der man steht — wer dabei weggeschoben wird,
+   * sieht sie nie und haelt den Knopf fuer tot. Genau diese Verwechslung war schon einmal die
+   * Meldung ("der macht aktuell noch nichts").
    */
   async function finishMatchdayAndAdvance() {
     if (readMeta.readOnly) {
@@ -4375,6 +4426,10 @@ export function useFoundationShellRouterBodyScope({
         title: "Spieltag abgeschlossen",
         detail: "Der naechste Spieltag ist bereit.",
       });
+      // In den Saisonstand: dort steht, was der gerade abgeschlossene Spieltag bewirkt hat. Ohne
+      // den Wechsel bleibt man in der Arena des SCHON ABGESCHLOSSENEN Spieltags stehen und sieht
+      // weder die neue Tabelle noch den neuen Spieltag.
+      setFoundationView("seasonV2", setActiveView, { push: true });
       return result;
     }
     // Die Route legt Ablehnungsgruende an ZWEI Stellen ab (oben und noch einmal in
@@ -6482,11 +6537,29 @@ export function useFoundationShellRouterBodyScope({
       setShowGameFlowPanel(true);
       return;
     }
-    if (gameFlowActionStep.stepId === "advance_to_next_matchday" && gameFlowActionStep.status === "ready") {
-      const result = await matchdayArenaApplyHandlers?.runCockpitMatchdayAdvance(true);
-      if (result?.applied) {
-        setAcknowledgedFlowStepIds(new Set());
-      } else {
+    /**
+     * Das globale "Weiter" schliesst denselben Spieltag ab wie der Knopf in der Arena — es lief
+     * aber an dem Weg vorbei, den die Arena nimmt. Drei Unterschiede, alle drei sichtbar:
+     *
+     * 1. Es fragte roh `status === "ready"` ab. Der Schritt steht auf "warning", sobald das Board
+     *    gerissene Saisonziele meldet — eine Mitteilung, kein Hindernis, der Spieltag ist in beiden
+     *    Faellen identisch gewertet. Der Arena-Knopf ist laengst auf `canAdvanceMatchdayFromStep`
+     *    umgestellt; hier stand die alte Abfrage noch, und ein Team mit gerissenen Zielen kam ueber
+     *    diesen Weg nicht weiter.
+     * 2. Es rief `runCockpitMatchdayAdvance` direkt auf, also OHNE das Lebenszeichen beim Klick und
+     *    ohne die Ablehnungsgruende, die `finishMatchdayAndAdvance` aus beiden Ablagen der Route
+     *    zusammentraegt. Es blieb das Flow-Panel — das zeigt, DASS etwas offen ist, nicht warum der
+     *    Wechsel abgelehnt wurde.
+     * 3. Es wechselte danach nicht in den Saisonstand, der Arena-Knopf schon. Derselbe Abschluss
+     *    liess einen also je nach angeklicktem Knopf woanders stehen.
+     *
+     * (Ein zweites `canAdvanceMatchdayFromStep` liegt in `foundation-global-next-actions.ts` — das
+     * Modul importiert allerdings niemand, es wird nur als Text von einem Contract-Test gelesen.)
+     */
+    if (canAdvanceMatchdayFromStep(gameFlowActionStep)) {
+      // Haken raeumen, Rueckmeldung und Sprung in den Saisonstand macht der Wrapper.
+      const result = await finishMatchdayAndAdvance();
+      if (!result?.applied) {
         setShowGameFlowPanel(true);
       }
       return;
@@ -7809,6 +7882,7 @@ export function useFoundationShellRouterBodyScope({
     activeSaveId,
     currentAreaRanksByTeamId,
     seasonPointsLedger,
+    playerDirectorySlice,
     teamObjectiveOverview,
     currentMatchdayDisciplineSchedule,
     manageableTeamIds: foundationManageableTeamIds,
@@ -11189,6 +11263,9 @@ export function useFoundationShellRouterBodyScope({
     closeFoundationDrilldownPanel,
     openMarketSellModal,
     loadSave: loadSave as unknown as FoundationMarketV2ShellHostProps["loadSave"],
+    // Der Markt-Feed haengt an diesem Zaehler, nicht am Spielstand — siehe Begruendung
+    // beim Kauf-Abschluss im Host.
+    bumpMarketReloadToken: () => setMarketReloadToken((current) => current + 1),
   };
 
   const foundationShellRouterBodyProps = {

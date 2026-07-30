@@ -115,6 +115,46 @@ export type PlayerAvailabilityView = PlayerAvailabilityStateRecord & {
   blocker: "player_injured_unavailable" | null;
 };
 
+export type PlayerAvailabilityViewOptions = {
+  /**
+   * Buchhaltungssicht der Fatigue-Verrechnung: nur die Spieltags-FENSTER zaehlen, die
+   * Sperre fuer die noch offene Disziplin desselben Spieltags bleibt aussen vor.
+   *
+   * Wer an Spieltag N verletzt wird, ist an N GELAUFEN — die Verrechnung muss ihm dort
+   * Belastung statt Erholung zuschreiben, und ein forceReplace-Re-Apply desselben
+   * Spieltags muss genau dieselbe Klassifikation treffen, sonst kippt die Idempotenz
+   * (siehe `restorePreMatchdayAvailability`). Nur die vier Aufrufer INNERHALB dieser
+   * Datei setzen das Flag; alles, was ueber die AUFSTELLBARKEIT entscheidet, nimmt den
+   * Normalfall.
+   */
+  matchdayBookkeeping?: boolean;
+};
+
+/**
+ * Welche Disziplin-Seiten des Spieltags sind bereits gebucht?
+ *
+ * Die Arena wertet pro Disziplin und bucht nach D1 ein Teil-Ergebnis (siehe
+ * `commitThroughSide` in lib/resolve/legacy-matchday-result-apply-service.ts). Solange
+ * nicht beide Seiten geschrieben sind, laeuft der Spieltag noch — und genau dann darf ein
+ * in D1 verletzter Spieler in der Folgedisziplin nicht mehr auflaufen.
+ */
+function isMatchdayFullyCommitted(gameState: GameState, matchdayId: string) {
+  const matchdayResultIds = new Set(
+    (gameState.seasonState.matchdayResults ?? [])
+      .filter((entry) => entry.matchdayId === matchdayId && entry.status !== "voided")
+      .map((entry) => entry.id),
+  );
+  if (matchdayResultIds.size === 0) {
+    return false;
+  }
+  const committedSides = new Set(
+    (gameState.seasonState.disciplineResults ?? [])
+      .filter((entry) => matchdayResultIds.has(entry.matchdayResultId))
+      .map((entry) => entry.disciplineSide),
+  );
+  return committedSides.has("d1") && committedSides.has("d2");
+}
+
 export type InjuryRehearsalOptions = {
   enabled: boolean;
   seed?: string;
@@ -286,6 +326,7 @@ export function getPlayerAvailabilityView(
   playerId: string,
   teamId: string,
   matchdayId: string,
+  options?: PlayerAvailabilityViewOptions,
 ): PlayerAvailabilityView {
   const player = gameState.players.find((entry) => entry.id === playerId) ?? null;
   const activeTeamId = getRosterTeamForPlayer(gameState, playerId);
@@ -328,13 +369,30 @@ export function getPlayerAvailabilityView(
   const hasActiveInjury = stored?.injuryStatus === "injured" || stored?.injuryStatus === "recovering";
 
   // Gesperrt: ab dem Spieltag NACH der Verletzung bis einschließlich Ende der Ausfallzeit.
-  const isUnavailable =
+  const isUnavailableInLaterMatchday =
     stored?.injuryStatus === "injured" &&
     currentIndex >= 0 &&
     injuredAtIndex >= 0 &&
     unavailableUntilIndex >= 0 &&
     currentIndex > injuredAtIndex &&
     currentIndex <= unavailableUntilIndex;
+  // Gesperrt AUCH in der Folgedisziplin desselben Spieltags. Ein Spieltag hat zwei
+  // Disziplinen; verletzt sich der Spieler in D1, stand er in D2 bisher weiter zur
+  // Auswahl, weil die Sperre erst ab `currentIndex > injuredAtIndex` galt — also erst am
+  // naechsten Spieltag. Der Eintrag entsteht mit dem D1-Commit, ab da ist die Verletzung
+  // Tatsache und die noch offene Seite fuer ihn zu.
+  //
+  // Die Klammer `!isMatchdayFullyCommitted` haelt das auf die LAUFENDE Wertung begrenzt:
+  // Ist der Spieltag komplett gebucht, gibt es keine Folgedisziplin mehr, und ein
+  // Rueckblick auf denselben Spieltag (Arena-Tabelle, Bereitschaft, Historie) soll nicht
+  // nachtraeglich behaupten, der Spieler haette nicht antreten duerfen.
+  const isBlockedForRemainingDisciplineSide =
+    !options?.matchdayBookkeeping &&
+    stored?.injuryStatus === "injured" &&
+    currentIndex >= 0 &&
+    injuredAtIndex === currentIndex &&
+    !isMatchdayFullyCommitted(gameState, matchdayId);
+  const isUnavailable = isUnavailableInLaterMatchday || isBlockedForRemainingDisciplineSide;
   // Ausfallzeit vorbei, aber Erholungsfenster noch offen -> "recovering" (einsatzfähig).
   const inRecoveryWindow =
     hasActiveInjury &&
@@ -541,6 +599,7 @@ export function buildMatchdayInjuryRollMap(input: {
       use.playerId,
       use.teamId,
       input.matchdayId,
+      { matchdayBookkeeping: true },
     );
     if (availabilityView.isUnavailable) continue;
 
@@ -705,7 +764,9 @@ function restorePreMatchdayAvailability(input: {
     if (!player) {
       return entry;
     }
-    const view = getPlayerAvailabilityView(restoredGameState, entry.playerId, entry.teamId, matchdayId);
+    const view = getPlayerAvailabilityView(restoredGameState, entry.playerId, entry.teamId, matchdayId, {
+      matchdayBookkeeping: true,
+    });
     const useKey = `${entry.teamId}::${entry.playerId}`;
     const wasUsedLoop = usedIntensityByKey.has(useKey) && !view.isUnavailable;
     if (wasUsedLoop) {
@@ -788,6 +849,7 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
       roster.playerId,
       roster.teamId,
       input.matchdayId,
+      { matchdayBookkeeping: true },
     );
     if (usedPlayerKeys.has(usedKey) && !view.isUnavailable) continue;
     const recovery = calculatePlayerRecovery(gameState, roster.teamId, player.trainingMode);
@@ -821,6 +883,7 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
       use.playerId,
       use.teamId,
       input.matchdayId,
+      { matchdayBookkeeping: true },
     );
     if (availabilityView.isUnavailable) continue;
 

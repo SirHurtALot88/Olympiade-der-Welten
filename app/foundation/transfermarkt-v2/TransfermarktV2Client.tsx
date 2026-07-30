@@ -656,6 +656,8 @@ export default function TransfermarktV2Client({
       }
     >(),
   );
+  /** Zaehlerstand, unter dem die Eintraege in `marketCacheRef` entstanden sind — siehe Kauf-Effekt. */
+  const marketCacheTokenRef = useRef(0);
   const marketAbortRef = useRef<AbortController | null>(null);
   const historyAbortRef = useRef<AbortController | null>(null);
   const previewAbortRef = useRef<AbortController | null>(null);
@@ -1496,6 +1498,23 @@ export default function TransfermarktV2Client({
     const controller = new AbortController();
     marketAbortRef.current?.abort();
     marketAbortRef.current = controller;
+
+    // Ein Anstoss ueber `reloadToken` muss den Cache MIT entwerten, sonst verpufft er.
+    //
+    // GEMELDET: „cash anzeige updated sich nicht nach kauf eines spielers". #273 hat den Anstoss
+    // ergaenzt (`bumpMarketReloadToken` nach dem Kauf) — der Effekt lief danach wirklich erneut.
+    // Nur endete er zwei Zeilen weiter unten im Cache-Treffer und kehrte mit dem Stand VOR dem Kauf
+    // zurueck: `reloadToken` steht in den Abhaengigkeiten, aber NICHT im Cache-Schluessel, die
+    // Cache-Pruefung liegt vor jedem Netzwerkaufruf, und geleert wurde diese Map nirgends.
+    //
+    // Deshalb hier statt im Schluessel: waere der Zaehler Teil des Schluessels, blieben bei jedem
+    // Kauf alle alten Eintraege als Muell liegen. So bleibt das Zwischenspeichern fuer Suche und
+    // Teamwechsel innerhalb einer Generation erhalten, und ein Kauf verwirft genau einmal alles.
+    if (marketCacheTokenRef.current !== reloadToken) {
+      marketCacheTokenRef.current = reloadToken;
+      marketCacheRef.current.clear();
+    }
+
     const marketCacheKey = `${defaultSaveId}:${defaultSeasonId}:${selectedTeamId}:${deferredSearch.trim()}`;
     const cachedMarket = marketCacheRef.current.get(marketCacheKey);
     if (cachedMarket) {

@@ -2578,17 +2578,17 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             // raeumt die alten Flow-Haken weg. Bewusst OHNE `?.`: ein fehlender Handler
             // ist ein Fehler und soll knallen, nicht still nichts tun.
             //
-            // Die NAVIGATION bleibt hier statt im Handler: welche Ansicht danach dran ist,
-            // ist Sache des Shell-Bodys, nicht der Spieltags-Logik. Ohne sie stand man
-            // nach dem Wechsel weiter in der Arena des GERADE ABGESCHLOSSENEN Spieltags
-            // und sah weder die neue Tabelle noch den neuen Spieltag.
+            // Die NAVIGATION in den Saisonstand stand frueher hier. Sie ist in
+            // `finishMatchdayAndAdvance` gewandert — nicht in die Spieltags-Logik, sondern
+            // nur eine Ebene hoch in denselben Shell-Body-Scope. Grund: das globale
+            // "Weiter" schliesst denselben Spieltag ab und hatte die Kopie nicht, also
+            // stand man je nach geklicktem Knopf woanders. Ein Ziel, eine Stelle.
+            // Bewusst `await` und bewusst OHNE `?.`: die Buehne haelt ihren Knopf so lange auf
+            // "schaltet weiter…", und ein fehlender Handler soll knallen statt still nichts zu tun.
             onAdvanceMatchday={
               canAdvanceMatchdayFromStep(matchdayAdvanceStep)
                 ? async () => {
-                    const summary = await finishMatchdayAndAdvance();
-                    if (summary?.applied) {
-                      setFoundationView("seasonV2", setActiveView, { push: true });
-                    }
+                    await finishMatchdayAndAdvance();
                   }
                 : null
             }
