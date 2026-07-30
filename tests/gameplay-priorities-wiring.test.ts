@@ -102,6 +102,13 @@ describe("gameplay priorities wiring", () => {
   it("auto-completes onboarding roster steps from live milestones", () => {
     const flow = buildGameFlowState({
       gameState: gameState({
+        // Die Einstiegskette gehoert VOR den ersten Spieltag: seit dem Riegel in
+        // `isSeasonUnderway` wird sie einer laufenden Saison nicht mehr vorangestellt.
+        // Das Fixture stand auf `currentMatchday: 2` und pruefte damit einen Zustand,
+        // den es nicht mehr gibt. Das eigentliche Anliegen des Tests — Einstiegsschritte
+        // aus echten Meilensteinen (Transfer, Kader) automatisch abhaken — gilt
+        // unveraendert und wird hier weiter geprueft, nur eben vor dem Saisonstart.
+        season: { id: "season-2", name: "Season 2", year: 2027, currentMatchday: 1, matchdayIds: ["season-2-md-1", "season-2-md-2"] },
         seasonState: {
           seasonId: "season-2",
           schedule: [],
@@ -141,6 +148,37 @@ describe("gameplay priorities wiring", () => {
     expect(flow.steps.find((entry) => entry.stepId === "roster_review")?.status).toBe("completed");
     expect(flow.steps.find((entry) => entry.stepId === "first_transfers")?.status).toBe("completed");
     expect(flow.currentStepId).not.toBe("roster_review");
+  });
+
+  it("stellt einer laufenden Saison keine Einstiegskette mehr voran", () => {
+    // Gegenstueck zum Test darueber: derselbe Einstiegs-Zustand, aber der erste
+    // Spieltag ist durch. Frueher bekam der Spieler die komplette Kette noch in
+    // Spieltag 5 vorgesetzt, weil `newGameFlow.active` nie ausging.
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        seasonState: {
+          seasonId: "season-2",
+          schedule: [],
+          standings: {},
+          newGameFlow: {
+            active: true,
+            selectedTeamId: "M-M",
+            dismissed: false,
+            steps: [
+              { stepId: "team_confirm", status: "open" },
+              { stepId: "roster_review", status: "open" },
+              { stepId: "season_intro", status: "open" },
+            ],
+          },
+        },
+      }),
+      activeTeamId: "M-M",
+    });
+
+    expect(flow.steps.find((entry) => entry.stepId === "roster_review")).toBeUndefined();
+    expect(flow.steps.find((entry) => entry.stepId === "team_confirm")).toBeUndefined();
+    // Und das Briefing gilt als erledigt, statt den Flow jeden Spieltag neu zu starten.
+    expect(flow.steps.find((entry) => entry.stepId === "season_intro")?.status).not.toBe("open");
   });
 
   it("blocks transfer steps when buy window is closed mid-season", () => {
