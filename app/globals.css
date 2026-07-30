@@ -17583,33 +17583,61 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   font-size: 0.8rem;
 }
 
-.team-drawer-history-area {
+/* Die PP-Tabelle im Spielerprofil teilt sich die Bereichsfarben mit der Team-Historie:
+   dieselben vier Werte, eine Definition. Ohne das Anhaengen der Spieler-Selektoren
+   haetten beide Tabellen zwei Farbquellen, die auseinanderdriften koennen. */
+.team-drawer-history-area,
+.player-drawer-history-area {
   color: #f7f9fc;
   font-weight: 900;
 }
 
-.team-drawer-history-table td.team-drawer-history-area.is-power {
+.team-drawer-history-table td.team-drawer-history-area.is-power,
+.player-attribute-progress-table td.player-drawer-history-area.is-power {
   background: rgba(141, 52, 54, 0.58);
 }
 
-.team-drawer-history-table td.team-drawer-history-area.is-speed {
+.team-drawer-history-table td.team-drawer-history-area.is-speed,
+.player-attribute-progress-table td.player-drawer-history-area.is-speed {
   background: rgba(79, 142, 73, 0.58);
 }
 
-.team-drawer-history-table td.team-drawer-history-area.is-mental {
+.team-drawer-history-table td.team-drawer-history-area.is-mental,
+.player-attribute-progress-table td.player-drawer-history-area.is-mental {
   background: rgba(36, 79, 159, 0.58);
 }
 
-.team-drawer-history-table td.team-drawer-history-area.is-social {
+.team-drawer-history-table td.team-drawer-history-area.is-social,
+.player-attribute-progress-table td.player-drawer-history-area.is-social {
   background: rgba(203, 169, 93, 0.58);
   color: #14120f;
 }
 
 .team-drawer-history-table .team-drawer-history-area.is-discipline-child,
-.teams-v2-history-table .teams-v2-area-cell.is-discipline-child {
+.teams-v2-history-table .teams-v2-area-cell.is-discipline-child,
+.player-attribute-progress-table .player-drawer-history-area.is-discipline-child {
   font-size: 0.78rem;
   font-weight: 700;
   opacity: 0.92;
+}
+
+/* Aufklapp-Knopf im Spaltenkopf: erbt Farbe und Gewicht der Kopfzeile, damit er wie
+   Text aussieht und nicht wie ein Formular-Button. */
+.player-attribute-progress-table .player-drawer-history-expand {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.player-attribute-progress-table .player-drawer-history-expand:hover,
+.player-attribute-progress-table .player-drawer-history-expand:focus-visible {
+  text-decoration: underline;
 }
 
 .team-drawer-history-expand-header {
