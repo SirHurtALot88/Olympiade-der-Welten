@@ -165,9 +165,17 @@ function ppText(value: number | null): string {
   return `+${value.toFixed(1)}`;
 }
 
-// Rang (Spieltag) · S-Rang (Saison) · Team · Diszi 1 · Diszi 2 · Punkte (Σ) · Form · Mutator · Gesamt.
-// Header und Datenzeilen teilen sich EXAKT dieses Raster (sonst driften die Spalten).
-const PANEL_GRID_COLUMNS = "56px 104px 1fr 74px 74px 70px 76px 80px 84px";
+// Header, Team-Zeilen UND Disziplin-Zeilen teilen sich EXAKT dieses Raster (sonst driften
+// die Spalten gegeneinander).
+/**
+ * Sieben Spalten: Rang · S-Rang · Team · Punkte · Form · Mutator · Gesamt.
+ *
+ * Die beiden Disziplin-Spalten sind entfallen. Sie zeigten dieselbe Aufteilung, die
+ * darunter ohnehin als Spieler-Gruppen je Seite stand — zwei parallele Achsen fuer
+ * denselben Sachverhalt. Jetzt traegt die Team-Zeile die Summe und darunter steht je
+ * Disziplin eine eigene Zeile mit denselben vier Groessen.
+ */
+const PANEL_GRID_COLUMNS = "56px 104px 1fr 70px 76px 80px 84px";
 
 // Rang-Badge (klein, tabellarisch) — Gold/Silber/Bronze für die Top-3, gleiche
 // Farbsprache wie die Arena-Leiter (warn/mut/Bronze-rgb, dezent hinterlegt).
@@ -393,6 +401,24 @@ export default function DisciplineStageMatchdayPanel({
       mutPp,
       formPp,
       total: sum + mutPp,
+      // Dieselben vier Groessen NOCH EINMAL je Disziplin — daraus baut die Ansicht die
+      // Zeilen unter dem Team. Die Team-Zeile bleibt die Summe, die Disziplin-Zeilen
+      // zeigen, woher sie kommt. Verdeckte Seiten liefern null statt 0: "noch nicht
+      // aufgedeckt" ist etwas anderes als "null Punkte".
+      bySide: {
+        d1: {
+          points: d1Revealed ? d1Pts ?? 0 : null,
+          form: d1Revealed ? mods?.d1?.formModifier ?? 0 : null,
+          mutator: d1Revealed ? mut?.d1Pp ?? 0 : null,
+          total: d1Revealed ? (d1Pts ?? 0) + (mut?.d1Pp ?? 0) : null,
+        },
+        d2: {
+          points: d2Revealed ? d2Pts ?? 0 : null,
+          form: d2Revealed ? mods?.d2?.formModifier ?? 0 : null,
+          mutator: d2Revealed ? mut?.d2Pp ?? 0 : null,
+          total: d2Revealed ? (d2Pts ?? 0) + (mut?.d2Pp ?? 0) : null,
+        },
+      },
       missingLineup: res?.missingLineup ?? false,
     };
   });
@@ -545,59 +571,58 @@ export default function DisciplineStageMatchdayPanel({
                 Spaltenbreiten zu lang und ueberlappten sich im Kopf. */}
             {sortButton("matchday", "Rang", "Platzierung nur nach der Leistung dieses Spieltags", "left")}
             {sortButton("season", "S-Rang", "Saison-Rang vor dem Spieltag → projizierter Rang danach", "left")}
-            {sortButton("team", "Team", "Teamname", "left")}
-            {/* Disziplin-Spalten: das Label sortiert nach dieser Disziplin, das Chevron daneben
-                klappt die eingesetzten Spieler mit ihren PP auf. Zwei getrennte Schalter, damit
-                Sortieren und Aufklappen sich nicht denselben Klick teilen. Verdeckte Disziplinen
-                bleiben reine Beschriftung — beides waere dort ein Spoiler. */}
-            {(["d1", "d2"] as const).map((side) => {
-              const disc = side === "d1" ? d1 : d2;
-              const label = disc?.displayName ?? (side === "d1" ? "Diszi 1" : "Diszi 2");
-              const revealed = sideRevealed[side];
-              if (!revealed) {
+            {/* Team-Spalte traegt jetzt auch die Disziplin-Schalter: die eigenen
+                Disziplin-SPALTEN sind entfallen, das Sortieren nach einer einzelnen
+                Disziplin soll aber bleiben. Der Pfeil klappt die Spieler der Seite auf. */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flexWrap: "wrap" }}>
+              {sortButton("team", "Team", "Teamname", "left")}
+              {(["d1", "d2"] as const).map((side) => {
+                const disc = side === "d1" ? d1 : d2;
+                const label = disc?.displayName ?? (side === "d1" ? "Diszi 1" : "Diszi 2");
+                if (!sideRevealed[side]) {
+                  return (
+                    <span key={side} style={{ fontSize: 10.5, color: "var(--nl-mut-2)" }} title={label}>
+                      {label} 🔒
+                    </span>
+                  );
+                }
+                const isOpen = openSides.includes(side);
+                const otherSide = side === "d1" ? "d2" : "d1";
                 return (
-                  <div key={side} style={colHead} title={disc?.displayName ?? (side === "d1" ? "Disziplin 1" : "Disziplin 2")}>
-                    {label} 🔒
-                  </div>
+                  <span key={side} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                    {sortButton(side, label, `${label} — nach den Punkten dieser Disziplin sortieren`, "left")}
+                    {expandable ? (
+                      <button
+                        type="button"
+                        aria-expanded={isOpen}
+                        onClick={() => {
+                          setExpandTouched(true);
+                          // Stehen BEIDE Seiten offen (Default), nimmt ein Klick nur diese
+                          // eine weg und laesst die andere stehen.
+                          if (isOpen) {
+                            setExpandedSide(openSides.length > 1 && sideRevealed[otherSide] ? otherSide : null);
+                            return;
+                          }
+                          setExpandedSide(side);
+                        }}
+                        title={`Spieler mit ihren PP ${isOpen ? "einklappen" : "aufklappen"}`}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          padding: 0,
+                          cursor: "pointer",
+                          fontSize: 10,
+                          lineHeight: 1,
+                          color: isOpen ? "var(--nl-accent)" : "var(--nl-mut-2)",
+                        }}
+                      >
+                        {isOpen ? "▾" : "▸"}
+                      </button>
+                    ) : null}
+                  </span>
                 );
-              }
-              const isOpen = openSides.includes(side);
-              const otherSide = side === "d1" ? "d2" : "d1";
-              return (
-                <div key={side} style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
-                  {sortButton(side, label, `${label} — Punkte dieser Disziplin`)}
-                  {expandable ? (
-                    <button
-                      type="button"
-                      aria-expanded={isOpen}
-                      onClick={() => {
-                        setExpandTouched(true);
-                        // Stehen gerade BEIDE Seiten offen (Default), klappt ein Klick nur
-                        // diese eine zu und laesst die andere stehen — sonst raeumte der
-                        // Klick beide weg, obwohl man nur eine wegnehmen wollte.
-                        if (isOpen) {
-                          setExpandedSide(openSides.length > 1 && sideRevealed[otherSide] ? otherSide : null);
-                          return;
-                        }
-                        setExpandedSide(side);
-                      }}
-                      title={`Spieler mit ihren PP ${isOpen ? "einklappen" : "aufklappen"}`}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        padding: 0,
-                        cursor: "pointer",
-                        fontSize: 10,
-                        lineHeight: 1,
-                        color: isOpen ? "var(--nl-accent)" : "var(--nl-mut-2)",
-                      }}
-                    >
-                      {isOpen ? "▾" : "▸"}
-                    </button>
-                  ) : null}
-                </div>
-              );
-            })}
+              })}
+            </div>
             {sortButton("sum", "Punkte", "Spieltags-Punkte je Rang (Disziplin 1 + Disziplin 2)")}
             {sortButton(
               "form",
@@ -757,15 +782,8 @@ export default function DisciplineStageMatchdayPanel({
                   </div>
                 </div>
 
-                {/* d1 PP */}
-                <div style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 800, fontSize: 13, color: "var(--nl-ink)" }}>
-                  {d1Revealed ? ppText(row.d1Pts) : lockCell}
-                </div>
-
-                {/* d2 PP */}
-                <div style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 800, fontSize: 13, color: "var(--nl-ink)" }}>
-                  {d2Revealed ? ppText(row.d2Pts) : lockCell}
-                </div>
+                {/* Die beiden Disziplin-Spalten sind entfallen — ihre Werte stehen jetzt in
+                    den Disziplin-Zeilen unter dem Team, dort samt Form, Mutator und Gesamt. */}
 
                 {/* Spieltags-Punkte (Σ d1 + d2, ohne Mutator) */}
                 <div
@@ -837,6 +855,83 @@ export default function DisciplineStageMatchdayPanel({
                   zuerst. Die PP-Zahl ist gegen ALLE Spieler der Disziplin heat-gefaerbt
                   (rot schwach → gelb Mittelfeld → gruen stark), dieselbe Baender-Skala wie
                   im Saisonstand. Der Score steht als Herkunft daneben. */}
+              {/* Je aufgedeckter Disziplin eine eigene Zeile mit DENSELBEN vier Groessen wie
+                  oben (Punkte · Form · Mutator · Gesamt). Die Team-Zeile bleibt die Summe,
+                  diese Zeilen zeigen, woher sie kommt. Sie haengen NICHT am Aufklappen — der
+                  Pfeil steuert nur die Spieler-Chips. */}
+              {(["d1", "d2"] as const)
+                .filter((side) => sideRevealed[side])
+                .map((side) => {
+                  const disc = side === "d1" ? d1 : d2;
+                  const values = row.bySide[side];
+                  const cell = {
+                    textAlign: "right" as const,
+                    fontVariantNumeric: "tabular-nums" as const,
+                    fontSize: 12,
+                    fontWeight: 700,
+                  };
+                  return (
+                    <div
+                      key={`${row.teamId}-side-${side}`}
+                      data-testid={`matchday-panel-side-${row.teamId}-${side}`}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: PANEL_GRID_COLUMNS,
+                        gap: 10,
+                        alignItems: "center",
+                        padding: "4px 10px",
+                        borderBottom: "1px solid var(--nl-line)",
+                        background: "color-mix(in srgb, var(--nl-panel-2) 45%, transparent)",
+                      }}
+                    >
+                      <div />
+                      <div />
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          paddingLeft: 8,
+                          minWidth: 0,
+                          fontSize: 11.5,
+                          color: "var(--nl-mut)",
+                        }}
+                      >
+                        <span style={{ fontWeight: 900, letterSpacing: "0.06em" }}>{side.toUpperCase()}</span>
+                        <span
+                          style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                          title={disc?.displayName ?? undefined}
+                        >
+                          {disc?.displayName ?? (side === "d1" ? "Disziplin 1" : "Disziplin 2")}
+                        </span>
+                      </div>
+                      <div style={{ ...cell, color: "var(--nl-ink)" }}>{ppText(values.points)}</div>
+                      <div
+                        style={{
+                          ...cell,
+                          color:
+                            (values.form ?? 0) > 0.05
+                              ? "var(--nl-good)"
+                              : (values.form ?? 0) < -0.05
+                                ? "var(--nl-risk)"
+                                : "var(--nl-mut)",
+                        }}
+                      >
+                        {values.form == null ? "–" : Math.abs(values.form) < 0.05 ? "0" : ppText(values.form)}
+                      </div>
+                      <div
+                        style={{
+                          ...cell,
+                          color: (values.mutator ?? 0) > 0.0001 ? "var(--nl-warn)" : "var(--nl-mut)",
+                        }}
+                      >
+                        {values.mutator == null ? "–" : values.mutator > 0.0001 ? `◆ ${ppText(values.mutator)}` : "–"}
+                      </div>
+                      <div style={{ ...cell, fontWeight: 900, color: "var(--nl-accent)" }}>{ppText(values.total)}</div>
+                    </div>
+                  );
+                })}
+
               {openSideRows.map(({ side, players: sidePlayers }) => (
                 <div
                   key={`${row.teamId}-players-${side}`}

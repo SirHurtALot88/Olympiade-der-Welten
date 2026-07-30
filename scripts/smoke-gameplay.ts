@@ -904,17 +904,23 @@ async function main() {
       run: async (step) => {
         await gotoFoundation(page, args.baseUrl, "matchdayArena", expectedTeamId, expectedSaveId, viewTimeoutMs, "#foundation-matchday-arena");
         await page.locator("#foundation-matchday-arena").waitFor({ state: "attached", timeout: viewTimeoutMs });
+        // Nur noch die Locator, die im App-Code tatsaechlich vergeben werden: das
+        // Buehnen-Wurzelelement und die Warnliste. Die uebrigen Einträge dieser Liste
+        // (.arena-v2-shell, .arena-v2-board-row, .matchday-arena-lane,
+        // .matchday-arena-empty-card, .foundation-matchday-arena-panel,
+        // arena-lineup-blocker) gehoerten zur entfernten Arena-v2-Panel-UI — vier davon
+        // existieren nur noch als CSS-Regel in globals.css, die kein Element mehr traegt,
+        // die anderen zwei gar nicht. Sie konnten also nie treffen und liessen die Liste
+        // breiter aussehen, als sie war.
         await page
-          .locator(
-            ".arena-v2-shell, .arena-v2-board-row, .matchday-arena-lane, .matchday-arena-empty-card, #foundation-matchday-arena .warning-list, [data-testid='arena-lineup-blocker'], [data-testid='arena-stage'], .foundation-matchday-arena-panel",
-          )
+          .locator("[data-testid='arena-stage'], #foundation-matchday-arena .warning-list")
           .first()
           .waitFor({ state: "visible", timeout: viewTimeoutMs });
         // Die Arena (Disziplin-Bühne) lädt ihre Steuerung asynchron aus /api/matchday/arena-base.
         // Vor den (instant) Button-Checks unten warten, bis die Controls tatsächlich gerendert
         // sind — sonst racet der arena-reset-/step-Check gegen den Bühnen-Render.
         await page
-          .locator("[data-testid='arena-primary-step'], [data-testid='arena-reset'], [data-testid='arena-lineup-blocker'], [data-testid='arena-discipline-commit-status']")
+          .locator("[data-testid='arena-primary-step'], [data-testid='arena-reset'], [data-testid='arena-discipline-commit-status']")
           .first()
           .waitFor({ state: "visible", timeout: viewTimeoutMs })
           .catch(() => {});
@@ -923,7 +929,8 @@ async function main() {
           step,
           hasAny(text, [
             "Matchday Arena",
-            "Arena v2",
+            // "Arena v2" ist raus: der Text kommt im App-Code nicht mehr vor (nur noch in
+            // einem Kommentar in matchday-arena-session-cache.ts, also nie auf der Seite).
             "Zur Arena",
             "Arena noch nicht bereit",
             "Arena-Kontext fehlt",
@@ -935,18 +942,21 @@ async function main() {
           ]),
           "Arena öffnet.",
         );
-        const blockerVisible = await page.getByTestId("arena-lineup-blocker").isVisible().catch(() => false);
+        // `blockerVisible` ist ersatzlos weg: `arena-lineup-blocker` wird im App-Code nicht
+        // mehr vergeben, der Wert war also immer `false`. Er stand unten in zwei Zusagen als
+        // Alternative (`stepButtonVisible || blockerVisible`) und liess sie toleranter
+        // aussehen, als sie sind — an der Auswertung aendert das Entfernen nichts.
         const laneOrEmptyVisible = await page
-          .locator(
-            ".arena-v2-board-row, .arena-v2-shell, .matchday-arena-lane, .matchday-arena-empty-card, #foundation-matchday-arena .warning-list, [data-testid='arena-lineup-blocker'], [data-testid='arena-stage']",
-          )
+          .locator("[data-testid='arena-stage'], #foundation-matchday-arena .warning-list")
           .first()
           .isVisible()
           .catch(() => false);
         const stepButtonVisible =
-          // Neue Arena (Disziplin-Bühne): primärer ▶ Start/Etappe-Button. Einen
-          // „Spieltag abschliessen"-Button gibt es nicht mehr — eine fertig gespielte
-          // Disziplin bucht sich selbst und meldet das über den Wertungsstatus.
+          // Neue Arena (Disziplin-Bühne): primärer ▶ Start/Etappe-Button. Gewertet wird pro
+          // Disziplin — eine fertig gespielte Disziplin bucht sich selbst und meldet das
+          // über den Wertungsstatus. „Spieltag abschliessen" sitzt seit #247 ebenfalls in
+          // der Bühne, erscheint aber erst nach beiden Disziplinen und ist hier nicht der
+          // erwartete Zustand.
           (await page.getByTestId("arena-primary-step").isVisible().catch(() => false)) ||
           (await page.getByTestId("arena-discipline-commit-status").isVisible().catch(() => false)) ||
           (await page.getByRole("button", { name: /^Step$/ }).isVisible().catch(() => false)) ||
@@ -958,11 +968,13 @@ async function main() {
         assertStep(
           step,
           laneOrEmptyVisible ||
-            hasAny(text, ["Team-Lanes", "Noch keine", "Arena-Kontext", "Scoreboard", "Fokus-Team", "Teams", "Reveal", "Einsatzliste", "Spieltagsergebnis"]),
+            // "Spieltagsergebnis" ist raus — die Ueberschrift der mit #247 entfernten
+            // Sektion. Die uebrigen Alternativen bleiben unangetastet.
+            hasAny(text, ["Team-Lanes", "Noch keine", "Arena-Kontext", "Scoreboard", "Fokus-Team", "Teams", "Reveal", "Einsatzliste"]),
           "Lanes oder sauberer Empty-State sichtbar.",
         );
-        assertStep(step, stepButtonVisible || blockerVisible, "Step-/Weiter-Button sichtbar.");
-        assertStep(step, resetButtonVisible || blockerVisible, "Reset-Button sichtbar.");
+        assertStep(step, stepButtonVisible, "Step-/Weiter-Button sichtbar.");
+        assertStep(step, resetButtonVisible, "Reset-Button sichtbar.");
       },
     }));
 
