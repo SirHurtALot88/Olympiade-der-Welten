@@ -428,6 +428,26 @@ export default function DisciplineStageMatchdayPanel({
   const autoExpandedSide: "d1" | "d2" | null = d2Revealed ? "d2" : d1Revealed ? "d1" : null;
   const openSide: "d1" | "d2" | null = expandTouched ? expandedSide : expandable ? autoExpandedSide : null;
 
+  /**
+   * WELCHE Disziplinen unter der Teamzeile stehen.
+   *
+   * Der Kopf-Chevron bleibt der Umschalter: hat man ihn einmal benutzt, gilt
+   * ausschliesslich die eigene Wahl (genau eine Seite, oder bewusst zugeklappt).
+   *
+   * Ohne eigene Wahl standen bisher nur die Spieler der ZULETZT gewerteten
+   * Disziplin da — nach D2 war D1 damit unsichtbar, obwohl beide Disziplinen in
+   * dieselbe Spieltags-Summe eingehen. Im Default zeigt die Tabelle deshalb jetzt
+   * ALLE aufgedeckten Seiten, D1 oben, D2 darunter, jede mit ihrem
+   * Disziplin-Namen davor. Verdeckte Seiten bleiben weg — das waere ein Spoiler.
+   */
+  const openSides: Array<"d1" | "d2"> = expandTouched
+    ? openSide
+      ? [openSide]
+      : []
+    : expandable
+      ? (["d1", "d2"] as const).filter((side) => sideRevealed[side])
+      : [];
+
   // Liga-Vergleichspool je Seite fuer die Heat-Faerbung der Spieler-PP: verglichen wird
   // gegen ALLE eingesetzten Spieler dieser Disziplin, nicht nur gegen die des eigenen
   // Teams — sonst waere der beste Spieler jedes Teams automatisch gruen.
@@ -541,7 +561,8 @@ export default function DisciplineStageMatchdayPanel({
                   </div>
                 );
               }
-              const isOpen = openSide === side;
+              const isOpen = openSides.includes(side);
+              const otherSide = side === "d1" ? "d2" : "d1";
               return (
                 <div key={side} style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
                   {sortButton(side, label, `${label} — Punkte dieser Disziplin`)}
@@ -551,7 +572,14 @@ export default function DisciplineStageMatchdayPanel({
                       aria-expanded={isOpen}
                       onClick={() => {
                         setExpandTouched(true);
-                        setExpandedSide(isOpen ? null : side);
+                        // Stehen gerade BEIDE Seiten offen (Default), klappt ein Klick nur
+                        // diese eine zu und laesst die andere stehen — sonst raeumte der
+                        // Klick beide weg, obwohl man nur eine wegnehmen wollte.
+                        if (isOpen) {
+                          setExpandedSide(openSides.length > 1 && sideRevealed[otherSide] ? otherSide : null);
+                          return;
+                        }
+                        setExpandedSide(side);
                       }}
                       title={`Spieler mit ihren PP ${isOpen ? "einklappen" : "aufklappen"}`}
                       style={{
@@ -590,8 +618,11 @@ export default function DisciplineStageMatchdayPanel({
             // Spieltags-Summe, Mutator-PP und Gesamt kommen aus der Zeile (oben berechnet),
             // damit die Gesamt-Spalte exakt der Sortierschlüssel ist.
             const { sum, mutPp, total } = row;
-            // Spieler der aufgeklappten Disziplin fuer dieses Team (leer, wenn nichts offen).
-            const sidePlayers = openSide ? playersByTeam?.get(row.teamId)?.[openSide] ?? [] : [];
+            // Spieler der aufgeklappten Disziplinen fuer dieses Team, in fester
+            // Reihenfolge D1 → D2 (leer, wenn nichts offen).
+            const openSideRows = openSides
+              .map((side) => ({ side, players: playersByTeam?.get(row.teamId)?.[side] ?? [] }))
+              .filter((entry) => entry.players.length > 0);
             const sumShown = d1Revealed || d2Revealed;
             // Tagesrang erst zeigen, wenn ueberhaupt etwas gewertet ist — sonst waere er
             // eine erfundene Reihenfolge auf lauter Nullen.
@@ -806,24 +837,45 @@ export default function DisciplineStageMatchdayPanel({
                   zuerst. Die PP-Zahl ist gegen ALLE Spieler der Disziplin heat-gefaerbt
                   (rot schwach → gelb Mittelfeld → gruen stark), dieselbe Baender-Skala wie
                   im Saisonstand. Der Score steht als Herkunft daneben. */}
-              {openSide && sidePlayers.length > 0 ? (
+              {openSideRows.map(({ side, players: sidePlayers }) => (
                 <div
-                  data-testid={`matchday-panel-players-${row.teamId}-${openSide}`}
+                  key={`${row.teamId}-players-${side}`}
+                  data-testid={`matchday-panel-players-${row.teamId}-${side}`}
                   style={{
                     display: "flex",
                     flexWrap: "wrap",
+                    alignItems: "center",
                     gap: 6,
                     padding: "6px 10px 8px 206px",
                     borderBottom: "1px solid var(--nl-line)",
                     background: "color-mix(in srgb, var(--nl-panel-2) 60%, transparent)",
                   }}
                 >
+                  {/* Disziplin-Marke vor der Zeile: sobald beide Seiten untereinander
+                      stehen, waeren zwei gleich aussehende Chip-Reihen sonst nicht
+                      auseinanderzuhalten. */}
+                  <span
+                    title={(side === "d1" ? d1 : d2)?.displayName ?? (side === "d1" ? "Disziplin 1" : "Disziplin 2")}
+                    style={{
+                      flex: "none",
+                      fontSize: 10,
+                      fontWeight: 900,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      color: "var(--nl-mut)",
+                      minWidth: 26,
+                    }}
+                  >
+                    {side.toUpperCase()}
+                  </span>
                   {sidePlayers.map((entry) => {
-                    const heat = entry.pp != null ? getPoolHeatClass(entry.pp, ppPoolBySide[openSide]) : "";
+                    const heat = entry.pp != null ? getPoolHeatClass(entry.pp, ppPoolBySide[side]) : "";
                     return (
                       <span
                         key={entry.playerId}
                         className={heat ? `matchday-panel-player ${heat}` : "matchday-panel-player"}
+                        // `entry.pp` ist die GESAMTE Gutschrift inkl. Mutator-Aufschlag —
+                        // "davon" ist hier also korrekt, seit die Summe angezeigt wird.
                         title={`${entry.name} · ${entry.pp != null ? `${entry.pp.toFixed(1)} PP` : "keine PP"}${
                           entry.score != null ? ` · Score ${entry.score.toFixed(1)}` : ""
                         }${entry.mutatorPp ? ` · davon ◆ ${entry.mutatorPp.toFixed(1)} Mutator` : ""}`}
@@ -852,7 +904,7 @@ export default function DisciplineStageMatchdayPanel({
                     );
                   })}
                 </div>
-              ) : null}
+              ))}
             </Fragment>
             );
           })}

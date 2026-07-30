@@ -236,94 +236,18 @@ export function getPlayerMutatorTraitSlots(player: Pick<LegacyRosterPlayerRef, "
     .filter(Boolean);
 }
 
-export function selectBestMutatorTraitsForEntries(
-  entries: Array<{ playerId: string }>,
-  rosterPlayers: LegacyRosterPlayerRef[],
-  traitOptions: LegacyMutatorTraitOption[] = getLegacyMutatorTraitOptions(),
-): [string | null, string | null] {
-  const rosterPlayerById = new Map((rosterPlayers ?? []).map((player) => [player.id, player]));
-  const traitCounts = new Map<string, { label: string; hits: number; players: Set<string> }>();
-
-  for (const entry of entries) {
-    const player = rosterPlayerById.get(entry.playerId) ?? null;
-    const hitKeysForPlayer = new Set<string>();
-    for (const trait of getPlayerMutatorTraitSlots(player)) {
-      const key = normalizeTraitKey(trait);
-      const current = traitCounts.get(key) ?? { label: trait, hits: 0, players: new Set<string>() };
-      current.hits += 1;
-      if (!hitKeysForPlayer.has(key)) {
-        current.players.add(entry.playerId);
-        hitKeysForPlayer.add(key);
-      }
-      traitCounts.set(key, current);
-    }
-  }
-
-  const candidates = [...traitCounts.values()]
-    .filter((entry) => entry.hits > 0)
-    .sort((left, right) => {
-      if (left.players.size !== right.players.size) return right.players.size - left.players.size;
-      if (left.hits !== right.hits) return right.hits - left.hits;
-      return left.label.localeCompare(right.label);
-    });
-
-  const first = candidates[0] ?? null;
-  const coveredPlayers = new Set(first?.players ?? []);
-  const second =
-    candidates
-      .filter((entry) => entry !== first)
-      .sort((left, right) => {
-        const leftNewPlayers = [...left.players].filter((playerId) => !coveredPlayers.has(playerId)).length;
-        const rightNewPlayers = [...right.players].filter((playerId) => !coveredPlayers.has(playerId)).length;
-        if (leftNewPlayers !== rightNewPlayers) return rightNewPlayers - leftNewPlayers;
-        if (left.players.size !== right.players.size) return right.players.size - left.players.size;
-        if (left.hits !== right.hits) return right.hits - left.hits;
-        return left.label.localeCompare(right.label);
-      })[0] ?? null;
-
-  const selectedLabels = [first?.label ?? null, second?.label ?? null];
-  if (selectedLabels.every(Boolean)) {
-    return selectedLabels as [string, string];
-  }
-
-  const usedKeys = new Set(selectedLabels.filter(Boolean).map((label) => normalizeTraitKey(label!)));
-  for (const option of traitOptions.length > 0 ? traitOptions : getLegacyMutatorTraitOptions()) {
-    const label = String(option.label || option.value || "").trim();
-    if (!label) continue;
-    const key = normalizeTraitKey(label);
-    if (usedKeys.has(key)) continue;
-    const emptyIndex = selectedLabels.findIndex((entry) => !entry);
-    if (emptyIndex === -1) break;
-    selectedLabels[emptyIndex] = label;
-    usedKeys.add(key);
-  }
-
-  return [selectedLabels[0] ?? null, selectedLabels[1] ?? null];
-}
-
-export function applyMutatorTraitsToLineupModifiers(input: {
-  modifiers: LineupDraftModifiers;
-  entries: Array<{ playerId: string; disciplineSide: "d1" | "d2" }>;
-  rosterPlayers: LegacyRosterPlayerRef[];
-  traitOptions?: LegacyMutatorTraitOption[];
-  onlyFillMissing?: boolean;
-}): LineupDraftModifiers {
-  const modifiers = normalizeLineupDraftModifiers(input.modifiers);
-  const traitOptions = input.traitOptions ?? getLegacyMutatorTraitOptions();
-
-  for (const side of ["d1", "d2"] as const) {
-    const sideEntries = input.entries.filter((entry) => entry.disciplineSide === side);
-    const [trait1, trait2] = selectBestMutatorTraitsForEntries(sideEntries, input.rosterPlayers, traitOptions);
-    if (!input.onlyFillMissing || !modifiers[side].mutatorTrait1?.trim()) {
-      modifiers[side].mutatorTrait1 = trait1;
-    }
-    if (!input.onlyFillMissing || !modifiers[side].mutatorTrait2?.trim()) {
-      modifiers[side].mutatorTrait2 = trait2;
-    }
-  }
-
-  return modifiers;
-}
+/**
+ * ENTFERNT: `selectBestMutatorTraitsForEntries` und `applyMutatorTraitsToLineupModifiers`.
+ *
+ * Beide waehlten die zwei Mutator-Traits nach der staerksten KADER-Abdeckung aus und schrieben sie
+ * in `draft.modifiers`. Aufgerufen wurden sie nur aus dem KI-Aufstellungspfad — jedes KI-Team spielte
+ * damit mit Mutatoren, die auf seinen eigenen Kader passten (garantierte Treffer), waehrend das
+ * menschliche Team kein Auswahlfeld dafuer hat und den blinden Spieltags-Wurf bekam.
+ *
+ * Mutatoren sind eine Eigenschaft der DISZIPLIN: zwei Traits, einmal je Spieltag und Seite aus allen
+ * 36 ausgewuerfelt, fuer alle 32 Teams dieselben. Seit die Wertung den Wurf nimmt, war beides tot.
+ * Siehe tests/mutator-fairness.test.ts.
+ */
 
 export function buildLegacyMutatorTraitOptionsForRoster(rosterPlayers: LegacyRosterPlayerRef[]): LegacyMutatorTraitOption[] {
   const byKey = new Map<string, LegacyMutatorTraitOption>();

@@ -29,6 +29,7 @@ import { getClassColorClassName } from "@/app/foundation/classVisuals";
 import { getTeamLogoModel } from "@/lib/data/mediaAssets";
 import type { Discipline, DisciplineCategory, GameState, Team } from "@/lib/data/olyDataTypes";
 import { formatContractShapeShortLabel } from "@/lib/foundation/player-economy-contract";
+import { areTeamPowersEnabled } from "@/lib/lineups/team-powers";
 import { formatPlayerIdentitySubMeta } from "@/lib/foundation/player-identity-meta";
 import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import type { FieldRaceLedgerEntry } from "@/lib/foundation/build-field-race-ledger";
@@ -2405,7 +2406,7 @@ export default function FoundationTeamsNewLook({
                     ) : null}
                     <span className="nl-teams-captain-hint">
                       Führung = Charisma, Wille, Entschlossenheit, Übersicht, Klasse & Charakter-Boni. Der Kapitän puffert
-                      Moral, senkt Rivalitäts-Druck und stärkt die Team-Power.
+                      Moral{areTeamPowersEnabled() ? ", senkt Rivalitäts-Druck und stärkt die Team-Power." : " und senkt Rivalitäts-Druck."}
                     </span>
                   </div>
                 ) : (

@@ -4305,7 +4305,12 @@ export function useFoundationShellRouterBodyScope({
       if (!runCockpitMatchdayAutoRun) {
         return null;
       }
-      const result = await runCockpitMatchdayAutoRun(true, side);
+      // `advanceAfterCashApply: false` — die Arena schaltet NICHT selbst weiter.
+      // Vorher sprang die Ansicht direkt nach D2 auf den naechsten Spieltag, und die
+      // gerade gespielte Spieltagstabelle war weg, bevor man sie lesen konnte. Der
+      // Wechsel passiert jetzt ueber den "Spieltag abschliessen"-Knopf im
+      // Spieltagsergebnis — also dann, wenn der Manager fertig geschaut hat.
+      const result = await runCockpitMatchdayAutoRun(true, side, false);
       const booked = result?.summary?.standingsApplyAllowed ?? false;
       if (!booked) {
         setFoundationActionFeedback({
@@ -4318,8 +4323,9 @@ export function useFoundationShellRouterBodyScope({
       if (side === "d2") {
         setFoundationActionFeedback({
           tone: "success",
-          title: "Spieltag abgeschlossen",
-          detail: "Beide Disziplinen sind gewertet. Der naechste Spieltag ist bereit.",
+          title: "Beide Disziplinen gewertet",
+          detail:
+            "Die Spieltagstabelle bleibt stehen, solange du sie ansiehst. Weiter geht es ueber „Spieltag abschliessen“.",
         });
       } else {
         setFoundationActionFeedback({
@@ -5927,6 +5933,7 @@ export function useFoundationShellRouterBodyScope({
     focusMatchdayLoop,
     inboxPrimaryTeamItem,
     gameFlowActionStep,
+    matchdayAdvanceStep,
     matchdayArenaReadiness,
     matchdayArenaBlockerSummary,
     transferWindowHint,
@@ -11118,6 +11125,7 @@ export function useFoundationShellRouterBodyScope({
     foundationWarningInboxItems,
     freshSeasonStartMessage,
     gameFlowActionStep,
+    matchdayAdvanceStep,
     gameModeOwnershipChrisIds,
     gameModeOwnershipLimits,
     gameState,

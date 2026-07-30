@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+
+import { TEAM_POWERS_ENABLED, __setTeamPowersEnabledForTests } from "@/lib/lineups/team-powers";
 
 import {
   buildArenaPlayerRankLookup,
@@ -82,6 +84,10 @@ const rows: MatchdayMvpScoreboardRow[] = [
 ];
 
 describe("matchday arena presenter", () => {
+  afterEach(() => {
+    __setTeamPowersEnabledForTests(TEAM_POWERS_ENABLED);
+  });
+
   it("builds phase-aware scoreboard rows with base ranks and deltas", () => {
     const result = buildMatchdayArenaScoreboardView(rows);
     const alpha = result.find((entry) => entry.teamId === "A-A");
@@ -186,6 +192,9 @@ describe("matchday arena presenter", () => {
     expect(mutatorSegments.map((segment) => segment.id)).toEqual(["slots", "push", "form", "mutator"]);
     expect(mutatorSegments.find((segment) => segment.id === "mutator")?.value).toBe(12);
 
+    // Das Power-Segment gibt es nur mit laufender Mechanik — hier bewusst eingeschaltet,
+    // damit die Segment-Rechnung abgedeckt bleibt, waehrend der Schalter im Spiel aus ist.
+    __setTeamPowersEnabledForTests(true);
     const powerSegments = buildArenaScoreTrackSegments(alpha, "power", { slotsScore: 100 });
     expect(powerSegments.map((segment) => segment.id)).toEqual(["slots", "push", "form", "mutator", "captain", "power"]);
     expect(powerSegments.find((segment) => segment.id === "power")?.value).toBe(8.5);
@@ -194,6 +203,22 @@ describe("matchday arena presenter", () => {
     expect(breakdown.find((item) => item.id === "mutator")?.valueLabel).toContain("Mut 1 · Mut 2");
     expect(breakdown.find((item) => item.id === "mutator")?.valueLabel).toContain("3 Treffer");
     expect(getMatchdayArenaPhaseBreakdown(alpha, "power")[5]?.id).toBe("power");
+  });
+
+  it("zeigt bei abgeschalteten Team-Powers weder Segment noch Breakdown-Zeile", () => {
+    // `teamPowerStatus` meldet nur, ob die Datenquelle geladen ist — sie steht auch bei
+    // abgeschalteter Mechanik auf "ready". Ohne die Schalter-Pruefung zeichnete die Arena
+    // deshalb weiter ein Team-Power-Segment mit Wert 0 und eine "Pow"-Zeile daneben.
+    __setTeamPowersEnabledForTests(false);
+    const [alpha] = buildMatchdayArenaScoreboardView(rows);
+
+    expect(alpha.teamPowerStatus).toBe("ready");
+
+    const segments = buildArenaScoreTrackSegments(alpha, "power", { slotsScore: 100 });
+    expect(segments.map((segment) => segment.id)).toEqual(["slots", "push", "form", "mutator", "captain"]);
+
+    const breakdown = getMatchdayArenaPhaseBreakdown(alpha, "power");
+    expect(breakdown.map((item) => item.id)).not.toContain("power");
   });
 
   it("counts mutator hits per team for the active discipline side", () => {

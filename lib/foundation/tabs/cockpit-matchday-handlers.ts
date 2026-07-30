@@ -73,6 +73,9 @@ export type CockpitMatchdayApplyHandlers = {
   runCockpitMatchdayAutoRun: (
     execute: boolean,
     commitThroughSide?: "d1" | "d2",
+    /** Default `true` (Cockpit). Die Arena uebergibt `false` — sie schaltet ueber
+     *  „Spieltag abschliessen" weiter, damit die Spieltagstabelle stehen bleibt. */
+    advanceAfterCashApply?: boolean,
   ) => Promise<FoundationMatchdayAutoRunSummary | null>;
 };
 
@@ -346,6 +349,16 @@ export function createCockpitMatchdayApplyHandlers(
     // kein Spieltagswechsel), nach D2 mit `"d2"` (Spieltag komplett). Ohne Angabe bleibt
     // es beim vollstaendigen Durchlauf, wie ihn das Cockpit ausloest.
     commitThroughSide: "d1" | "d2" = "d2",
+    /**
+     * Direkt nach der Wertung auf den naechsten Spieltag weiterschalten.
+     *
+     * Fuer das Cockpit weiter der Default (`true`) — dort ist der Auto-Run genau
+     * "Spieltag durchziehen". Die ARENA gibt `false` mit: sonst sprang die Ansicht
+     * unmittelbar nach D2 auf den naechsten Spieltag, und die gerade gespielte
+     * Spieltagstabelle war weg, bevor man sie ansehen konnte. Weitergeschaltet wird
+     * dort ueber den expliziten "Spieltag abschliessen"-Knopf.
+     */
+    advanceAfterCashApply = true,
   ) {
     if (readMetaSource === "prisma") {
       showReadOnlyNotice();
@@ -370,7 +383,7 @@ export function createCockpitMatchdayApplyHandlers(
               includeWarningLineups: matchdayAutoRunIncludeWarningLineups,
               overwriteExistingLineups: matchdayAutoRunOverwriteExistingLineups,
               stopOnTie: matchdayAutoRunStopOnTie,
-              advanceAfterCashApply: true,
+              advanceAfterCashApply,
               commitThroughSide,
             },
           }),

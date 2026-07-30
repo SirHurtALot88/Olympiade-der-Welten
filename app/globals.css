@@ -6887,6 +6887,14 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   color: rgba(203, 213, 225, 0.88);
 }
 
+/* Kadergröße hinter dem Disziplin-Namen: gedämpft und leicht kleiner, damit sie den
+   Namen ergänzt und nicht mit dem PPs-Wert am rechten Rand um Aufmerksamkeit ringt. */
+.is-new-look .selected-roster-pps-diszi-item-count {
+  font-size: 0.92em;
+  font-weight: 600;
+  color: rgba(148, 163, 184, 0.72);
+}
+
 .is-new-look .selected-roster-pps-diszi-item-value {
   flex: 0 0 auto;
   font-weight: 700;
@@ -17575,33 +17583,61 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   font-size: 0.8rem;
 }
 
-.team-drawer-history-area {
+/* Die PP-Tabelle im Spielerprofil teilt sich die Bereichsfarben mit der Team-Historie:
+   dieselben vier Werte, eine Definition. Ohne das Anhaengen der Spieler-Selektoren
+   haetten beide Tabellen zwei Farbquellen, die auseinanderdriften koennen. */
+.team-drawer-history-area,
+.player-drawer-history-area {
   color: #f7f9fc;
   font-weight: 900;
 }
 
-.team-drawer-history-table td.team-drawer-history-area.is-power {
+.team-drawer-history-table td.team-drawer-history-area.is-power,
+.player-attribute-progress-table td.player-drawer-history-area.is-power {
   background: rgba(141, 52, 54, 0.58);
 }
 
-.team-drawer-history-table td.team-drawer-history-area.is-speed {
+.team-drawer-history-table td.team-drawer-history-area.is-speed,
+.player-attribute-progress-table td.player-drawer-history-area.is-speed {
   background: rgba(79, 142, 73, 0.58);
 }
 
-.team-drawer-history-table td.team-drawer-history-area.is-mental {
+.team-drawer-history-table td.team-drawer-history-area.is-mental,
+.player-attribute-progress-table td.player-drawer-history-area.is-mental {
   background: rgba(36, 79, 159, 0.58);
 }
 
-.team-drawer-history-table td.team-drawer-history-area.is-social {
+.team-drawer-history-table td.team-drawer-history-area.is-social,
+.player-attribute-progress-table td.player-drawer-history-area.is-social {
   background: rgba(203, 169, 93, 0.58);
   color: #14120f;
 }
 
 .team-drawer-history-table .team-drawer-history-area.is-discipline-child,
-.teams-v2-history-table .teams-v2-area-cell.is-discipline-child {
+.teams-v2-history-table .teams-v2-area-cell.is-discipline-child,
+.player-attribute-progress-table .player-drawer-history-area.is-discipline-child {
   font-size: 0.78rem;
   font-weight: 700;
   opacity: 0.92;
+}
+
+/* Aufklapp-Knopf im Spaltenkopf: erbt Farbe und Gewicht der Kopfzeile, damit er wie
+   Text aussieht und nicht wie ein Formular-Button. */
+.player-attribute-progress-table .player-drawer-history-expand {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.player-attribute-progress-table .player-drawer-history-expand:hover,
+.player-attribute-progress-table .player-drawer-history-expand:focus-visible {
+  text-decoration: underline;
 }
 
 .team-drawer-history-expand-header {
@@ -26751,6 +26787,25 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
+}
+
+/* Die `.heat-band-N`-Grundregeln setzen Hintergrund UND eine DUNKLE Textfarbe —
+   sie sind für die hellen Heat-Flächen gemacht (helles Band, dunkle Schrift).
+   Die Buckets hier übernehmen davon nur die FARBE als Rahmen/Verlauf auf
+   dunklem Panel und überschrieben bisher ausschliesslich `background` und
+   `border-color`. Die dunkle Schriftfarbe blieb stehen und vererbte sich auf
+   Überschrift, Anzahl und Spieler-Chips: praktisch schwarz auf dunkelgrün bzw.
+   dunkelrot, kaum lesbar. Deshalb hier die Textfarbe explizit zurück auf den
+   normalen hellen Ink des Panels. */
+.team-contracts-expiry-bucket.heat-band-1,
+.team-contracts-expiry-bucket.heat-band-3,
+.team-contracts-expiry-bucket.heat-band-5,
+.team-contracts-expiry-bucket.heat-band-6,
+.team-contracts-expiry-bucket.heat-band-8 {
+  color: var(--nl-ink, rgba(233, 241, 255, 0.94));
+  /* Der Inset-Schatten der Heat-Grundregel zeichnet helle Kanten für die helle
+     Fläche — auf dem dunklen Verlauf sieht das aus wie ein Fehldruck. */
+  box-shadow: none;
 }
 
 .team-contracts-expiry-bucket.heat-band-1 {
@@ -52116,13 +52171,15 @@ button.foundation-team-portrait-card {
 }
 
 /* Explizite 2★ Signature + 1◆ Weak Zusammenfassung — macht unmissverständlich,
-   welche Attribute schneller/langsamer wachsen (nicht nur die kleinen Zeilen-Glyphs). */
+   welche Attribute schneller/langsamer wachsen (nicht nur die kleinen Zeilen-Glyphs).
+   Sitzt seit der Kompaktierung IN der Hinweis-Chip-Zeile (`nl-training-chip-row`)
+   statt als eigener Block darunter: `inline-flex` statt `flex`, und kein
+   `margin-bottom` mehr — den Abstand macht jetzt das `gap` der Zeile. */
 .is-new-look .nl-training-affinity-summary {
-  display: flex;
+  display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--nl-s2);
-  margin-bottom: var(--nl-s2);
+  gap: var(--nl-s1);
   font-size: 11px;
   font-weight: 600;
 }
@@ -58156,25 +58213,14 @@ button.foundation-team-portrait-card {
   box-shadow: var(--nl-e1);
 }
 
+/* Die Kopfzeile traegt seit dem Entfernen des Titelblocks nur noch die Bedienelemente —
+   `flex-end` haelt sie rechts, wo sie vorher schon standen. */
 .is-new-look .nl-lineup-show-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: var(--nl-s3);
-}
-
-.is-new-look .nl-lineup-show-title {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.is-new-look .nl-lineup-show-title strong {
-  font-family: var(--nl-display);
-  font-size: 16px;
-  color: var(--nl-ink);
 }
 
 .is-new-look .nl-lineup-show-controls {
@@ -68604,11 +68650,46 @@ button.is-new-look .nl-thist-season-pill,
   color: #0b1220;
 }
 
-/* Delta-Chips (MW-/Gehalts-Entwicklung ▲/▼) behalten ihre grün/rot
-   Bedeutung im Pfeil, aber der Zahlentext wird auf denselben dunklen Ton
-   gesetzt, damit er auf dem hellen Blau lesbar bleibt. */
+/* Delta-Chips (MW-/VK-/Gehalts-Entwicklung ▲/▼) in der AKTIVEN Sortierspalte.
+
+   Der Normalzustand des Chips ist eine 14-%-Tönung plus farbiger Text auf
+   dunklem Panel — das trägt dort. Auf dem hellen Blau der aktiven Spalte
+   verschwand beides: die Tönung ging im Hintergrund unter, und die Regel
+   darüber überschrieb zusätzlich den grün/roten Text mit Dunkel. Übrig blieb
+   ein fast unsichtbarer Pfeil mit Zahl — gemeldet für die VK-Wert-Spalte,
+   betrifft aber jede Spalte, die man als Sortierung markiert.
+
+   Deshalb hier ein VOLL deckender Chip statt einer Tönung: kräftige Fläche in
+   der jeweiligen Bedeutungsfarbe, dunkler Text darauf, dazu eine Kante gegen
+   das Blau. Die Aussage (grün = besser, rot = schlechter) bleibt damit
+   erhalten und wird sogar deutlicher als in den inaktiven Spalten — was
+   richtig ist, denn genau nach dieser Spalte sortiert man ja gerade. */
 .is-new-look td.is-active-sort .nl-delta-chip {
-  color: #0b1220;
+  color: var(--heat-elite-text, #0b1220);
+  /* Neutral („± 0"): keine Bedeutungsfarbe, aber genug Fläche, um als Chip
+     erkennbar zu bleiben statt als loser Text im Blau zu schwimmen. */
+  background: color-mix(in srgb, var(--heat-elite-text, #0b1220) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--heat-elite-text, #0b1220) 26%, transparent);
+  font-weight: 800;
+}
+
+.is-new-look td.is-active-sort .nl-delta-chip.is-good {
+  background: color-mix(in srgb, var(--nl-good) 82%, #ffffff 18%);
+  border-color: color-mix(in srgb, var(--nl-good) 92%, var(--heat-elite-text, #0b1220) 8%);
+  color: var(--heat-elite-text, #0b1220);
+}
+
+.is-new-look td.is-active-sort .nl-delta-chip.is-risk {
+  background: color-mix(in srgb, var(--nl-risk) 82%, #ffffff 18%);
+  border-color: color-mix(in srgb, var(--nl-risk) 92%, var(--heat-elite-text, #0b1220) 8%);
+  color: var(--heat-elite-text, #0b1220);
+}
+
+/* Der Pfeil trägt die Richtung — auf der deckenden Fläche darf er kräftiger
+   sein als die 9px des Normalzustands, sonst geht er neben der Zahl unter. */
+.is-new-look td.is-active-sort .nl-delta-chip .nl-delta-chip-arrow {
+  font-size: 10px;
+  font-weight: 900;
 }
 
 /* ------------------------------------------------------------
@@ -72876,4 +72957,66 @@ button.is-new-look .nl-thist-season-pill,
 @keyframes foundation-action-feedback-in {
   from { opacity: 0; transform: translate(-50%, 14px); }
   to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* --- Spieler-Tabelle: Achsen-Zelle (POW/SPE/MEN/SOC) ------------------
+   Ein Balken, die Zahl steht darin.
+
+   Vorher war die Zelle ein 2- bzw. 3-Spalten-Raster (zuletzt
+   `34px minmax(46px, 1fr) 32px`): ein 6px hoher Strich plus der Wert in
+   einer eigenen Spalte daneben. Das kostete Breite, und bei 6px Hoehe war
+   der Laengenunterschied zwischen einem 80er und einem 60er kaum zu sehen —
+   man musste die Zahlen lesen, statt die Balken zu vergleichen.
+
+   Jetzt traegt ein einziger, hoeherer Balken den optischen Vergleich, und die
+   Zahl liegt mittig darin. Die Regeln stehen bewusst am Dateiende: sie muessen
+   die frueheren `.nl-ptable-axis-enhanced`-Bloecke ueberschreiben, und bei
+   gleicher Spezifitaet gewinnt die spaetere Regel. */
+.is-new-look .nl-players-axis,
+.is-new-look .nl-players-axis.nl-ptable-axis-enhanced {
+  display: block;
+  grid-template-columns: none;
+  column-gap: 0;
+  gap: 0;
+  min-height: 0;
+  padding: 1px 0;
+}
+
+.is-new-look .nl-players-axis .nl-players-axis-track {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 15px;
+  border-radius: var(--nl-r-sm, 5px);
+}
+
+/* Der Fuellbalken bleibt der eigentliche Messwert — nur er skaliert mit dem Wert. */
+.is-new-look .nl-players-axis .nl-players-axis-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+}
+
+/* Die Zahl liegt ueber der GANZEN Spur, nicht ueber der Fuellung: sonst wandert
+   sie bei kleinen Werten aus der Zelle. Der Schatten haelt sie sowohl auf dem
+   getoenten Balken als auch auf der leeren Spur lesbar. */
+.is-new-look .nl-players-axis .nl-players-axis-value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--nl-ink);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+/* Schmalere Achsen-Spalte: ohne die zweite Rasterspalte fuer den Wert braucht
+   der Kopf keine Breite mehr fuer eine Zahl, die jetzt im Balken sitzt. */
+.is-new-look .nl-players-th-axis {
+  width: 62px;
+  min-width: 62px;
 }

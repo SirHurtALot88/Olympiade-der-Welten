@@ -1,8 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { TeamCaptainRecord } from "@/lib/data/olyDataTypes";
 import { BOARD_V2_CAPTAIN } from "@/lib/board/board-objectives-config";
-import { CAPTAIN_TEAM_POWER_EFFECT_FACTOR } from "@/lib/lineups/team-powers";
+import {
+  CAPTAIN_TEAM_POWER_EFFECT_FACTOR,
+  TEAM_POWERS_ENABLED,
+  __setTeamPowersEnabledForTests,
+} from "@/lib/lineups/team-powers";
 import { buildCaptainEffectExplanations } from "@/lib/morale/team-captain-service";
 
 /** Dreamscape aus dem echten Save: Führung ~75,6 → Power-Rohwert am Cap (8). */
@@ -27,6 +31,18 @@ function captain(partial?: Partial<TeamCaptainRecord>): TeamCaptainRecord {
 }
 
 describe("captain effect explanations", () => {
+  // Die Team-Power-Zeile gibt es nur, solange die Mechanik laeuft. Diese Suite beschreibt die
+  // Herleitung der Werte — sie schaltet das System deshalb bewusst ein, damit die Rechenwege
+  // abgedeckt bleiben, auch waehrend der Schalter im Spiel auf aus steht. Der Aus-Zustand hat
+  // seinen eigenen Test am Ende.
+  beforeEach(() => {
+    __setTeamPowersEnabledForTests(true);
+  });
+
+  afterEach(() => {
+    __setTeamPowersEnabledForTests(TEAM_POWERS_ENABLED);
+  });
+
   it("shows the EFFECTIVE team power bonus, not the raw chip value", () => {
     // Der Chip zeigte "+8 %", real fliessen davon nur 25 % in die Team-Power.
     const teamPower = buildCaptainEffectExplanations(captain()).find((row) => row.key === "teamPower");
@@ -89,5 +105,16 @@ describe("captain effect explanations", () => {
     );
     expect(weak.find((row) => row.key === "teamPower")?.displayValue).toBe("+0,5 %");
     expect(weak.find((row) => row.key === "boardPressure")?.displayValue).toBe("−0,5");
+  });
+
+  it("verschweigt den Team-Power-Aufschlag, solange die Mechanik abgeschaltet ist", () => {
+    // Der Aufschlag wirkt ausschliesslich auf eine GESPIELTE Team-Power. Ohne das System ist
+    // er garantiert wirkungslos — der Chip darf ihn dann nicht als Kapitaens-Nutzen ausweisen.
+    __setTeamPowersEnabledForTests(false);
+
+    const rows = buildCaptainEffectExplanations(captain());
+
+    expect(rows.map((row) => row.key)).toEqual(["morale", "rivalry", "boardPressure"]);
+    expect(JSON.stringify(rows)).not.toMatch(/team-power/i);
   });
 });

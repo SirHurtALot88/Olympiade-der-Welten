@@ -1,3 +1,4 @@
+import { areTeamPowersEnabled } from "@/lib/lineups/team-powers";
 import type { MatchdayMvpScoreboardRow } from "@/lib/season/matchday-mvp-scoring-service";
 
 export const MATCHDAY_ARENA_PHASES = [
@@ -300,7 +301,10 @@ export function buildArenaScoreTrackSegments(
       tone: getArenaScoreSegmentTone(row.captainScore ?? 0),
     });
   }
-  if (maxPhaseIndex >= 5 && row.teamPowerStatus === "ready") {
+  // `teamPowerStatus` sagt nur, ob die DATENQUELLE geladen ist — sie steht auch dann auf
+  // "ready", wenn die Mechanik abgeschaltet ist. Ohne die zweite Bedingung zeichnete die
+  // Arena also weiter ein Team-Power-Segment mit Wert 0.
+  if (maxPhaseIndex >= 5 && areTeamPowersEnabled() && row.teamPowerStatus === "ready") {
     segments.push({
       id: "power",
       label: ARENA_SCORE_TRACK_SEGMENT_LABELS.power,
@@ -457,7 +461,12 @@ export function getMatchdayArenaPhaseBreakdown(
     },
   ];
 
-  return items.filter((item) => phaseOrder.indexOf(item.id) <= maxPhaseIndex);
+  // Die "Pow"-Zeile faellt bei abgeschalteter Mechanik ganz weg statt "—" anzuzeigen: eine
+  // leere Spalte fuer ein totes System ist keine Information. Die Reveal-Phase "power" selbst
+  // bleibt bestehen — sie ist Teil der Choreografie und traegt jetzt einfach keinen Inhalt.
+  return items.filter(
+    (item) => phaseOrder.indexOf(item.id) <= maxPhaseIndex && (item.id !== "power" || areTeamPowersEnabled()),
+  );
 }
 
 export type ArenaRevealStep = {

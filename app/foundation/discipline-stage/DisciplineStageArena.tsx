@@ -16,6 +16,7 @@ import {
   type StageTeamMeta,
 } from "@/lib/foundation/discipline-stage/discipline-stage-from-preview";
 import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
+import { resolveAwardedPlayerPoints } from "@/lib/foundation/player-points-total";
 import DisciplineStageHighlights from "@/app/foundation/discipline-stage/DisciplineStageHighlights";
 import DisciplineStageTopPlayers, { type DisciplineStageTopPlayer } from "@/app/foundation/discipline-stage/DisciplineStageTopPlayers";
 import { getRankToPointsValue, resolveDisciplinePlayerCount } from "@/lib/resolve/rank-to-points";
@@ -734,12 +735,25 @@ export default function DisciplineStageArena({
         const cur = playersByTeam.get(tr.teamId) ?? { d1: [], d2: [] };
         for (const e of tr.entries ?? []) {
           if (!e.playerId) continue;
+          // PP INKLUSIVE Mutator-Bonus — dieselbe Definition wie im Saison-Ledger
+          // (`points = basePoints + mutatorPpsBonus`, season-points-ledger.ts).
+          // `pointsAwarded` ist nur der verteilte Basis-Anteil, `mutatorPpsBonus`
+          // liegt in der Resolve-Engine als eigenes Feld daneben. Vorher stand hier
+          // allein `pointsAwarded`: die Summe der Spieler-Chips ergab damit die
+          // Basis-PP des Teams statt des Gesamtwerts, obwohl der Chip-Tooltip
+          // "davon ◆ X Mutator" behauptete, der Bonus stecke schon drin.
+          const basePp = e.pointsAwarded ?? null;
+          const mutatorPp = e.mutatorPpsBonus ?? null;
           cur[side].push({
             playerId: e.playerId,
             name: e.playerName ?? e.playerId,
-            pp: e.pointsAwarded ?? null,
+            // Ueber den geteilten Helfer statt inline: dieselbe Summe zieht auch der
+            // Ledger, der Team-Hover und die Top-Spieler-Zeile. Zwei Stellen, die
+            // "Anteil + Mutator" jeweils selbst ausrechnen, laufen frueher oder
+            // spaeter auseinander — genau so ist dieser Fehler entstanden.
+            pp: resolveAwardedPlayerPoints({ pointsAwarded: basePp, mutatorPpsBonus: mutatorPp }),
             score: e.finalPlayerScore ?? null,
-            mutatorPp: e.mutatorPpsBonus ?? null,
+            mutatorPp,
           });
         }
         playersByTeam.set(tr.teamId, cur);
@@ -1003,7 +1017,13 @@ export default function DisciplineStageArena({
             logoUrl: meta?.logoUrl ?? null,
             portraitUrl: portraitById.get(pp.playerId) ?? null,
             score: pp.finalPlayerScore,
-            points: pp.pointsAwarded,
+            // Gutgeschriebene PP = Team-Anteil + Mutator-Aufschlag (die Zahl, die der
+            // Saison-Ledger bucht). `pointsAwarded` allein unterschlaegt den Aufschlag.
+            points: resolveAwardedPlayerPoints({
+              pointsAwarded: pp.pointsAwarded,
+              mutatorPpsBonus: pp.mutatorPpsBonus,
+            }),
+            mutatorPoints: pp.mutatorPpsBonus ?? null,
             isMvp: Boolean(pp.isMvpCandidate),
             isOwn: pp.teamId === ownTeamId,
             ovrRank: ratingByPlayerId.get(pp.playerId)?.ovrRank ?? null,
@@ -1023,6 +1043,7 @@ export default function DisciplineStageArena({
               portraitUrl: s.portraitUrl,
               score: s.net,
               points: null,
+              mutatorPoints: null,
               isMvp: s.base >= 80,
               isOwn: t.isOwn,
               ovrRank: s.playerId ? ratingByPlayerId.get(s.playerId)?.ovrRank ?? null : null,

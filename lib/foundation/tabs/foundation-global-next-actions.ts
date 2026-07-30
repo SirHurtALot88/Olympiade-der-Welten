@@ -5,6 +5,7 @@ import type { GameFlowStepStatus, GameFlowView } from "@/lib/foundation/game-flo
 import { formatGameFlowBlockerList } from "@/lib/foundation/game-flow-blocker-labels";
 import type { FoundationReadMeta, FoundationView } from "@/lib/foundation/tabs/foundation-page-types";
 import { getGameFlowStatusClass } from "@/lib/foundation/tabs/cockpit-ui-helpers";
+import { canAdvanceMatchdayFromStep } from "@/lib/foundation/resolve-game-flow-action-step";
 
 export type FoundationGlobalNextUiInput = {
   primaryInboxItem: GameInboxItem | null;
@@ -163,7 +164,7 @@ export function createTriggerGlobalNext(deps: TriggerGlobalNextDeps) {
       deps.setShowGameFlowPanel(true);
       return;
     }
-    if (deps.gameFlowActionStep.stepId === "advance_to_next_matchday" && deps.gameFlowActionStep.status === "ready") {
+    if (canAdvanceMatchdayFromStep(deps.gameFlowActionStep)) {
       const result = await deps.matchdayArenaApplyHandlers?.runCockpitMatchdayAdvance?.(true);
       if (result?.applied) {
         deps.setAcknowledgedFlowStepIds(new Set());

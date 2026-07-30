@@ -173,6 +173,7 @@ import type { FoundationTableColumn } from "@/lib/foundation/foundation-table-ui
 import type { GameEncyclopediaEntry } from "@/lib/ui/game-encyclopedia";
 import type { InboxV2Item } from "@/app/foundation/inbox-v2/inbox-v2-types";
 import type { Discipline, GameInboxItem, MappingWarning, Player, PlayerScoutIntelRecord, Team } from "@/lib/data/olyDataTypes";
+import { canAdvanceMatchdayFromStep } from "@/lib/foundation/resolve-game-flow-action-step";
 
 // Perf/DX (#57): these view panels used to come in eagerly through the
 // `foundation-page-client-exports` barrel (or, for the last five, a direct
@@ -389,6 +390,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   foundationWarningInboxItems,
   freshSeasonStartMessage,
   gameFlowActionStep,
+  matchdayAdvanceStep,
   gameModeOwnershipChrisIds,
   gameModeOwnershipLimits,
   gameState,
@@ -557,6 +559,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   runFacilityMaintenancePreview,
   runFacilityUpgradePreview,
   commitArenaDiscipline,
+  runCockpitMatchdayAdvance,
   runFoundationCommand,
   runNewGameSetup,
   runSaveAction,
@@ -2578,13 +2581,36 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                     <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("seasonV2", setActiveView)}>
                       Saisonstand ansehen
                     </button>
-                    {/* Kein „Spieltag abschliessen" mehr: Die Wertung passiert am Ende jeder
-                        Disziplin in der Arena. Solange der Spieltag laeuft, steht hier nichts
-                        Primaeres — es gibt schlicht nichts zu druecken. Erst wenn das Ergebnis
-                        vollstaendig ist, fuehrt „Weiter" den Saison-Flow fort. Gegatet wird auf
-                        den AKTUELLEN Spieltag (matchdayState), nicht auf die evtl. auf einen
-                        alten Spieltag zurueckgefallene Summary. */}
-                    {homeNextMatchdayStatus.resultAvailable ? (
+                    {/* „Spieltag abschliessen" ist zurueck — und zwar als bewusste
+                        Entscheidung des Managers.
+
+                        Die Wertung passiert weiterhin am Ende jeder Disziplin in der Arena;
+                        neu ist nur, dass der Spieltagswechsel NICHT mehr automatisch an D2
+                        haengt (`commitArenaDiscipline` ruft den Auto-Run mit
+                        `advanceAfterCashApply: false`). Vorher sprang die Ansicht direkt nach
+                        D2 auf den naechsten Spieltag und die gerade gespielte Tabelle war weg,
+                        bevor man sie lesen konnte. Jetzt bleibt der Stand stehen, bis hier
+                        gedrueckt wird.
+
+                        Gegatet auf den Flow-Schritt, nicht auf die Summary. WICHTIG: "ready" allein
+                        genuegt dafuer NICHT — der Schritt steht auf "warning", sobald das Board
+                        `board_objectives_failed` meldet (Saisonziele gerissen). Das ist eine
+                        Mitteilung, kein Hindernis: gewertet ist der Spieltag genauso. Vorher
+                        verschwand der Knopf dadurch komplett, und der Spieltag liess sich aus dem
+                        normalen Spielverlauf nicht mehr abschliessen. `canAdvanceMatchdayFromStep`
+                        deckt beide Zustaende ab und wird auch vom globalen "Weiter" benutzt. */}
+                    {canAdvanceMatchdayFromStep(matchdayAdvanceStep) ? (
+                      <button
+                        className="primary-button inline-button"
+                        type="button"
+                        data-testid="arena-finish-matchday"
+                        disabled={cockpitBusyKey === "matchday-advance"}
+                        title="Beide Disziplinen sind gewertet. Schaltet auf den nächsten Spieltag weiter — die Tabelle bleibt bis dahin stehen."
+                        onClick={() => void runCockpitMatchdayAdvance?.(true)}
+                      >
+                        {cockpitBusyKey === "matchday-advance" ? "schaltet weiter…" : "Spieltag abschließen"}
+                      </button>
+                    ) : homeNextMatchdayStatus.resultAvailable ? (
                       <button className="primary-button inline-button" type="button" onClick={triggerGlobalNext}>
                         Weiter
                       </button>

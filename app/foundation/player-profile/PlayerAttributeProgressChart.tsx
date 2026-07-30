@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 
 import {
   buildAttributeHistoryDelta,
@@ -16,6 +16,11 @@ import {
   formatProgressDelta,
   sortPlayerProgressHistoryRows,
 } from "@/lib/foundation/player-progress-summary";
+import {
+  SEASON_DISCIPLINE_AREA_GROUPS,
+  SEASON_DISCIPLINE_LABELS,
+  type SeasonDisciplineAreaId,
+} from "@/lib/season/season-discipline-area-groups";
 import { NL_TONE_VAR, NlDeltaChip } from "@/components/foundation/new-look";
 
 type PlayerAttributeProgressChartProps = {
@@ -31,6 +36,16 @@ const PP_METRICS = [
   { id: "men" as const, label: "MEN", className: "is-mental", rankKey: "menRank" as const },
   { id: "soc" as const, label: "SOC", className: "is-social", rankKey: "socRank" as const },
 ];
+
+/**
+ * Achsen-Metrik je Bereich. Die IDs von `PP_METRICS` und `SeasonDisciplineAreaId` sind
+ * dieselben vier Schlüssel — der Lookup verbindet die Bereichsgruppen (die die Disziplin-
+ * Spalten liefern) mit Label, Tonklasse und Rang-Feld der Achse.
+ */
+const PP_METRIC_BY_AREA = Object.fromEntries(PP_METRICS.map((metric) => [metric.id, metric])) as Record<
+  SeasonDisciplineAreaId,
+  (typeof PP_METRICS)[number]
+>;
 
 // `power`/`speed` reuse the shared `NL_TONE_VAR.pow`/`.spe` axis tokens (single
 // source of truth, no independent hex drift vs. the rest of the New-Look UI).
@@ -342,6 +357,15 @@ export default function PlayerAttributeProgressChart({
   classHistory = [],
 }: PlayerAttributeProgressChartProps) {
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
+  // Aufklappbare Bereichsspalten der PP-Tabelle — dieselbe Bedienung wie in der
+  // Team-Historie: ein Klick auf POW/SPE/MEN/SOC blendet die Disziplinen dieses
+  // Bereichs als eigene Spalten dahinter ein.
+  const [expandedPpAreas, setExpandedPpAreas] = useState<Record<SeasonDisciplineAreaId, boolean>>({
+    pow: false,
+    spe: false,
+    men: false,
+    soc: false,
+  });
 
   const sortedRows = useMemo(() => sortPlayerProgressHistoryRows(historyRows), [historyRows]);
   const summary = useMemo(() => buildPlayerProgressSummary(sortedRows), [sortedRows]);
@@ -772,11 +796,41 @@ export default function PlayerAttributeProgressChart({
               <th>Saison</th>
               <th className="player-drawer-history-axis is-neutral">PPs</th>
               <th className="player-drawer-history-axis is-neutral">OVR</th>
-              {PP_METRICS.map((option) => (
-                <th key={option.id} className={`player-drawer-history-axis ${option.className}`}>
-                  {option.label}
-                </th>
-              ))}
+              {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => {
+                const metric = PP_METRIC_BY_AREA[group.id];
+                const isExpanded = expandedPpAreas[group.id];
+                return (
+                  <Fragment key={group.id}>
+                    <th className={`player-drawer-history-area ${metric.className}`}>
+                      <button
+                        type="button"
+                        className="player-drawer-history-expand"
+                        aria-expanded={isExpanded}
+                        title={
+                          isExpanded
+                            ? `${metric.label}-Disziplinen ausblenden`
+                            : `${metric.label}-Disziplinen einblenden`
+                        }
+                        onClick={() =>
+                          setExpandedPpAreas((current) => ({ ...current, [group.id]: !current[group.id] }))
+                        }
+                      >
+                        {metric.label} <span aria-hidden="true">{isExpanded ? "−" : "+"}</span>
+                      </button>
+                    </th>
+                    {isExpanded
+                      ? group.keys.map((key) => (
+                          <th
+                            key={key}
+                            className={`player-drawer-history-area ${metric.className} is-discipline-child`}
+                          >
+                            {SEASON_DISCIPLINE_LABELS[key]}
+                          </th>
+                        ))
+                      : null}
+                  </Fragment>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -790,11 +844,31 @@ export default function PlayerAttributeProgressChart({
                   {formatPpTableMetric(resolveHistoryPps(row), row.ppsRank)}
                 </td>
                 <td className="player-drawer-history-axis is-neutral">{formatPpTableMetric(row.ovr, row.ovrRank)}</td>
-                {PP_METRICS.map((option) => (
-                  <td key={`${row.seasonName}-${option.id}`} className={`player-drawer-history-axis ${option.className}`}>
-                    {formatPpTableMetric(row[option.id], row[option.rankKey])}
-                  </td>
-                ))}
+                {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => {
+                  const metric = PP_METRIC_BY_AREA[group.id];
+                  return (
+                    <Fragment key={`${row.seasonName}-${group.id}`}>
+                      <td className={`player-drawer-history-area ${metric.className}`}>
+                        {formatPpTableMetric(row[metric.id], row[metric.rankKey])}
+                      </td>
+                      {expandedPpAreas[group.id]
+                        ? group.keys.map((key) => {
+                            // Disziplin-PPs der Saison. Kein Rang je Disziplin in dieser Zeile —
+                            // `disciplineValues` traegt nur den Wert, und es wird nichts erfunden.
+                            const value = row.disciplineValues?.[key];
+                            return (
+                              <td
+                                key={`${row.seasonName}-${key}`}
+                                className={`player-drawer-history-area ${metric.className} is-discipline-child`}
+                              >
+                                {value != null && Number.isFinite(value) ? formatPpTableMetric(value, null) : "—"}
+                              </td>
+                            );
+                          })
+                        : null}
+                    </Fragment>
+                  );
+                })}
               </tr>
             ))}
           </tbody>

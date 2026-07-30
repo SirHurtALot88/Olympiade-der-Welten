@@ -801,10 +801,20 @@ export default function FoundationPlayersTableNewLook({
   /**
    * Disziplinen je Achse (POW/SPE/MEN/SOC → je 5 Disziplinen), gruppiert aus
    * `gameState.disciplines` über `discipline.category` — der offiziellen
-   * Zuordnung des Datenmodells (siehe `NL_PLAYERS_AXES`). Reihenfolge wie
-   * überall sonst in der App: `displayOrder`, sonst `originalOrder`.
-   * Es wird nichts erfunden: hat der Katalog für eine Achse weniger/mehr
-   * Disziplinen, rendert die Zelle genau das, was da ist.
+   * Zuordnung des Datenmodells (siehe `NL_PLAYERS_AXES`).
+   *
+   * Reihenfolge INNERHALB einer Achse: absteigend nach Kadergröße
+   * (`discipline.playerCount`) — die Disziplin mit den meisten Teilnehmern steht
+   * ganz links. Sie ist die, in der ein Team die meisten Spieler unterbringt und
+   * die damit am schwersten wiegt; sie soll beim Aufklappen zuerst ins Auge
+   * fallen. POW liest sich damit GEW(6) · HOC(5) · BRE(4) · TDM(3) · MIN(2)
+   * statt in der Katalog-Reihenfolge — dieselbe Regel wie in den
+   * Saisonstand-Gruppen (`SEASON_DISCIPLINE_AREA_GROUPS`).
+   *
+   * Bei gleicher Kadergröße bleibt die bisherige Reihenfolge erhalten
+   * (`displayOrder`, sonst `originalOrder`): vorsortiert und stabil sortiert.
+   * Fehlt `playerCount` im Katalog, zählt die Disziplin als 0 und rutscht ans
+   * Ende der Achse — es wird nichts erfunden.
    */
   const disciplinesByAxis = useMemo(() => {
     const ordered = [...gameState.disciplines].sort(
@@ -813,7 +823,9 @@ export default function FoundationPlayersTableNewLook({
     );
     const byAxis = {} as Record<NlAxisKey, Discipline[]>;
     for (const { key, category } of NL_PLAYERS_AXES) {
-      byAxis[key] = ordered.filter((discipline) => discipline.category === category);
+      byAxis[key] = ordered
+        .filter((discipline) => discipline.category === category)
+        .sort((left, right) => (right.playerCount ?? 0) - (left.playerCount ?? 0));
     }
     return byAxis;
   }, [gameState.disciplines]);
@@ -1258,10 +1270,14 @@ export default function FoundationPlayersTableNewLook({
           rank != null ? ` — Liga-Rang #${rank} von ${pool.length}` : ""
         }${axisPps != null ? ` — ${formatPpsValue(axisPps)} PPs auf dieser Achse` : ""}`}
       >
-        <span className="nl-players-axis-track" aria-hidden="true">
-          <span className="nl-players-axis-fill" style={{ width: `${percent}%` }} />
+        {/* Ein Balken, die Zahl steht DARIN. Vorher lag der Wert in einer eigenen
+            Rasterspalte neben einem 6px-Strich: die Spalte war breit, und weil der
+            Strich so dünn war, sah ein 80er fast aus wie ein 60er. Jetzt trägt die
+            Balkenlänge den Vergleich und die Zahl kostet keine eigene Spalte mehr. */}
+        <span className="nl-players-axis-track">
+          <span className="nl-players-axis-fill" style={{ width: `${percent}%` }} aria-hidden="true" />
+          <span className="nl-players-axis-value nl-tnum">{formatNlNumber(value, 0)}</span>
         </span>
-        <span className="nl-players-axis-value nl-tnum">{formatNlNumber(value, 0)}</span>
       </div>
     );
   }

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import { VeloImpactStrip, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
 import { isSeasonOnePreseasonNeutralBoard } from "@/lib/board/team-season-objectives-service";
+import { areTeamPowersEnabled } from "@/lib/lineups/team-powers";
 import { buildCaptainEffectExplanations } from "@/lib/morale/team-captain-service";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type { GmStoryView } from "@/lib/foundation/gm-story";
@@ -344,14 +345,27 @@ export function ManagerOfficeClient({
 	              {
 	                key: "powers",
 	                eyebrow: "Diese Season",
-	                title: selectedTeamCaptainProfile?.playerName ?? "Captain & Team Powers",
+	                title: selectedTeamCaptainProfile?.playerName ?? (areTeamPowersEnabled() ? "Captain & Team Powers" : "Captain"),
 	                detail:
 	                  selectedTeamCaptainProfile
 	                    ? `${selectedTeamCaptainProfile.style} · Buffer +${formatLocalePoints(selectedTeamCaptainProfile.effects.moraleBuffer, 1)}`
 	                    : "Noch kein klares Captain-Signal sichtbar.",
-	                meta: selectedTeamPowers.length > 0 ? `${selectedTeamPowers.length} Powers aktiv` : "Captain-Synergien offen",
-                  priority: selectedTeamPowers.length > 0 ? 54 : 46,
-	                tone: selectedTeamPowers.length > 0 ? "ready" : "warning",
+	                // Ohne Team-Powers haengt die Kachel allein am Captain. Sonst stuende hier
+	                // dauerhaft die Warnung "Captain-Synergien offen" — ein Handlungsappell fuer
+	                // ein System, das der Spieler gar nicht mehr bedienen kann.
+	                meta: areTeamPowersEnabled()
+	                  ? selectedTeamPowers.length > 0
+	                    ? `${selectedTeamPowers.length} Powers aktiv`
+	                    : "Captain-Synergien offen"
+	                  : selectedTeamCaptainProfile
+	                    ? "Captain gesetzt"
+	                    : "Captain offen",
+                  priority: (areTeamPowersEnabled() ? selectedTeamPowers.length > 0 : Boolean(selectedTeamCaptainProfile))
+                    ? 54
+                    : 46,
+	                tone: (areTeamPowersEnabled() ? selectedTeamPowers.length > 0 : Boolean(selectedTeamCaptainProfile))
+	                  ? "ready"
+	                  : "warning",
 	                onClick: () => {
                     onNavigate("homeV2");
                     window.setTimeout(() => {

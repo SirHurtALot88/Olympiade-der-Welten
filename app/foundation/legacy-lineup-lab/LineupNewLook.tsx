@@ -821,11 +821,11 @@ function NlLineupResolveShow({
 
   return (
     <section className="nl-lineup-show" aria-label="Resolve-Show" data-testid="nl-lineup-resolve-show">
+      {/* Ohne Titelzeile: "Resolve-Show · Projektion deiner Einsatzliste / So löst dein
+          Spieltag auf — Slot für Slot" beschrieb nur, was die Show darunter ohnehin zeigt,
+          und kostete eine ganze Zeile. Die Bedienelemente bleiben — ohne sie waere die Show
+          nicht mehr abspielbar. `aria-label` der Section traegt den Namen weiterhin. */}
       <header className="nl-lineup-show-head">
-        <div className="nl-lineup-show-title">
-          <span className="nl-lineup-eyebrow">Resolve-Show · Projektion deiner Einsatzliste</span>
-          <strong>So löst dein Spieltag auf — Slot für Slot</strong>
-        </div>
         <div className="nl-lineup-show-controls">
           {!isOpen ? (
             <>
