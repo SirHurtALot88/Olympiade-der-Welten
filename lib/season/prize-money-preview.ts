@@ -131,7 +131,7 @@ function round3(value: number) {
 // deshalb sponsor-basiert sein. Weil der Unified-Planner buildPrizeMoneyPreview 32× pro Übergang
 // (einmal pro Team-Plan) aufruft, wird die teure Liga-Settlement-Berechnung memoisiert — sonst
 // blockieren 32 Sponsor-Settlements pro Aufruf den Event-Loop (die frühere 502-Ursache).
-type LeagueSponsorIncome = {
+export type LeagueSponsorIncome = {
   sponsorCashByTeamId: Map<string, number>;
   facilityIncomeByTeamId: Map<string, number>;
 };
@@ -191,7 +191,17 @@ function computeLeagueSponsorIncome(gameState: GameState): LeagueSponsorIncome {
   return { sponsorCashByTeamId, facilityIncomeByTeamId };
 }
 
-function getLeagueSponsorIncome(gameState: GameState, saveId: string): LeagueSponsorIncome {
+/**
+ * Sponsor-Abrechnung beim AKTUELLEN Rang plus Gebaeude netto, je Team.
+ *
+ * Exportiert, weil die Saisonstand-Uebersicht dieselbe Groesse braucht: ihre Spalten
+ * SPONSOREN und GUV wurden aus dem Preisgeld-Benchmark gebildet (`buildTeamPrizeSummary`
+ * ueber `buildPrizeMoneyTable`) und wichen dadurch von dem ab, was tatsaechlich gebucht
+ * wird. Eine Groesse, eine Quelle — sonst driften Tabelle und Konto wieder auseinander.
+ *
+ * Ergebnis ist nach Spielstand/Saison/Raengen/Vertraegen gecacht.
+ */
+export function getLeagueSponsorIncome(gameState: GameState, saveId: string): LeagueSponsorIncome {
   const key = buildLeagueSponsorIncomeKey(gameState, saveId);
   const cached = LEAGUE_SPONSOR_INCOME_CACHE.get(key);
   if (cached) {
