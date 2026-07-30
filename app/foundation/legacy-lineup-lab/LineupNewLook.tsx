@@ -1596,12 +1596,18 @@ export default function LineupNewLook({
           // Nur zeigen, wenn es tatsächlich etwas auszuwählen/anzuzeigen gibt, sonst kein Clutter.
           const control = formCardControlsBySide?.[disciplineSide] ?? null;
           if (!control) return null;
+          // Frueher verschwand der ganze Block, sobald es nichts mehr auszuwaehlen gab
+          // ("sonst kein Clutter"). Am Saisonende — wenn alle Karten verbraucht sind — sah
+          // das aus, als sei das Formkarten-Feature kaputt: die Slots waren einfach nicht
+          // mehr da, ohne jede Erklaerung. Genau so ist es gemeldet worden.
+          //
+          // Der Block bleibt jetzt stehen und sagt, WARUM nichts zu waehlen ist. Ein leeres
+          // Feld mit Begruendung ist eine Information; ein fehlendes Feld ist ein Raetsel.
           const hasAnything =
             control.primaryOptions.length > 0 ||
             control.secondaryOptions.length > 0 ||
             control.primarySelectedId != null ||
             control.secondarySelectedId != null;
-          if (!hasAnything) return null;
           const pending = formCardSavePendingSide?.[disciplineSide] ?? false;
           const disabled = isReadOnly || isBusy || pending;
           const renderFormCardSelect = (
@@ -1669,8 +1675,19 @@ export default function LineupNewLook({
                 Formkarten{control.colorLabel ? ` · Diszi-Farbe ${control.colorLabel}` : ""}
                 {pending ? <em style={{ fontStyle: "normal", color: "var(--nl-mut)", fontWeight: 600 }}> · speichert…</em> : null}
               </span>
-              {renderFormCardSelect("primary", "Primär", control.primarySelectedId, control.primaryOptions)}
-              {renderFormCardSelect("secondary", "Sekundär (+)", control.secondarySelectedId, control.secondaryOptions)}
+              {hasAnything ? (
+                <>
+                  {renderFormCardSelect("primary", "Primär", control.primarySelectedId, control.primaryOptions)}
+                  {renderFormCardSelect("secondary", "Sekundär (+)", control.secondarySelectedId, control.secondaryOptions)}
+                </>
+              ) : (
+                <span
+                  style={{ fontSize: "11.5px", color: "var(--nl-mut)", flex: "1 1 100%" }}
+                  title="Formkarten werden pro Saison vergeben und sind mit dem Ausspielen verbraucht."
+                >
+                  Keine Formkarte mehr verfügbar — alle Karten dieser Saison sind gespielt.
+                </span>
+              )}
             </div>
           );
         })()}
