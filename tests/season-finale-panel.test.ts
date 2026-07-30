@@ -84,6 +84,9 @@ describe("Saisonabschluss: eine Bühne statt des Cockpits", () => {
 
   it("schaltet schreibende Knöpfe im Nur-Lesen-Modus ab", () => {
     expect(PANEL).toContain("disabled={busy || readOnly}");
-    expect(PANEL).toContain("prizeApplied || readOnly ? null");
+    // Ohne Ruecksicht auf Zeilenumbrueche: die Bedingung ist die Aussage, ihre
+    // Formatierung nicht. Der frueher hier verankerte Einzeiler zerbrach, als der
+    // Preisgeld-Schritt mehrzeilig wurde — ohne dass sich am Verhalten etwas aenderte.
+    expect(PANEL.replace(/\s+/g, " ")).toContain("prizeApplied || readOnly ? null");
   });
 });

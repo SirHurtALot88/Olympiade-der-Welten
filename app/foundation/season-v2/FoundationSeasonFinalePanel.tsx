@@ -20,6 +20,8 @@
 import { useMemo } from "react";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
+// Client-sicheres Modul ohne Persistence-/node:fs-Import — genau dafür liegt das Flag dort.
+import { CASH_PRIZE_BENCHMARK_ONLY } from "@/lib/season/cash-prize-benchmark-flag";
 import { buildSeasonReview } from "@/lib/season/season-review-service";
 
 export type SeasonFinaleStepState = "done" | "ready" | "blocked" | "busy";
@@ -92,14 +94,41 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
     state: SeasonFinaleStepState;
     action: { label: string; onClick: () => void } | null;
   }> = [
+    /**
+     * DIESER SCHRITT BUCHT KEIN GELD — und behauptete es trotzdem.
+     *
+     * Gemeldet: „ich habe den button gedrückt vom saisonübergang! Aber er hat nicht
+     * funktioniert" — daneben unveränderte Cash-Zahlen. Der Knopf hatte funktioniert;
+     * nur sein Text war falsch.
+     *
+     * `executeCashPrizeApply` ist laut `cash-prize-benchmark-flag.ts` ein Benchmark-
+     * Endpunkt: solange `CASH_PRIZE_BENCHMARK_ONLY` gilt, wird ausschliesslich der
+     * Preisgeld-/Sponsor-Benchmark samt Audit-Log persistiert, Team-Cash bleibt
+     * unangetastet. Im Spielstand des Melders steht genau das im eigenen Log:
+     * `totalPrizeMoney: 2365.1`, `benchmarkOnly: true`, `cashPayoutApplied: false`.
+     *
+     * Der Zustand kam obendrein aus der falschen Frage: `prizeApplied` prüft nur, OB
+     * ein Log existiert — nicht, ob Geld geflossen ist. „Erledigt · das Geld steht auf
+     * dem Konto" stand deshalb über einem Log, das das Gegenteil aussagt.
+     *
+     * Das echte Geld bewegt `runLocalSeasonCompletion` beim Saisonwechsel: Sponsor-
+     * Settlement, Gebäude-Abrechnung, Kreditrate. Genau dorthin zeigt der Text jetzt.
+     */
     {
       key: "prize",
-      title: "Preisgeld & Sponsoren buchen",
-      detail: prizeApplied
-        ? "Ist gebucht — das Geld steht auf dem Konto."
-        : "Platzierung und Sponsoren werden in Cash umgerechnet und gutgeschrieben.",
+      title: CASH_PRIZE_BENCHMARK_ONLY ? "Preisgeld & Sponsoren berechnen" : "Preisgeld & Sponsoren buchen",
+      detail: CASH_PRIZE_BENCHMARK_ONLY
+        ? prizeApplied
+          ? "Berechnet — hier fliesst noch kein Geld. Gutgeschrieben wird beim Saisonwechsel: Sponsoren und Gebäude, abzüglich Gehälter und Kreditrate."
+          : "Rechnet Platzierung und Sponsoren durch. Das Geld selbst kommt erst mit dem Saisonwechsel aufs Konto."
+        : prizeApplied
+          ? "Ist gebucht — das Geld steht auf dem Konto."
+          : "Platzierung und Sponsoren werden in Cash umgerechnet und gutgeschrieben.",
       state: prizeApplied ? "done" : busy ? "busy" : "ready",
-      action: prizeApplied || readOnly ? null : { label: "Preisgeld buchen", onClick: onApplyPrize },
+      action:
+        prizeApplied || readOnly
+          ? null
+          : { label: CASH_PRIZE_BENCHMARK_ONLY ? "Durchrechnen" : "Preisgeld buchen", onClick: onApplyPrize },
     },
     {
       key: "development",
@@ -126,9 +155,12 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
     {
       key: "next-season",
       title: "Neue Saison starten",
+      // Hier landet das Geld — `runLocalSeasonCompletion` bucht Sponsor-Settlement,
+      // Gebäude-Abrechnung und Kreditrate. Das gehört in den Text, sonst sucht man
+      // es beim Schritt darüber (und findet es nicht).
       detail: nextSeasonReady
-        ? "Alles geprüft. Der Start schreibt Entwicklung, neuen Spielplan und Formkarten."
-        : "Erst prüfen lassen, was der Saisonwechsel verändert — dann starten.",
+        ? "Alles geprüft. Der Start bucht Sponsoren, Gebäude und Kreditrate aufs Konto und schreibt Entwicklung, neuen Spielplan und Formkarten."
+        : "Erst prüfen lassen, was der Saisonwechsel verändert — dann starten. Hier wird auch das Geld gutgeschrieben.",
       state: readOnly ? "blocked" : busy ? "busy" : "ready",
       action: readOnly
         ? null

@@ -2,6 +2,7 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { getTeamBoardFlowSignals } from "@/lib/board/team-season-objectives-service";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
+import { CASH_PRIZE_BENCHMARK_ONLY } from "@/lib/season/cash-prize-benchmark-flag";
 import { isTeamMatchdayLineupComplete, isTeamMatchdayLineupSubmitted } from "@/lib/foundation/matchday-lineup-readiness";
 import { isTeamTrainingComplete } from "@/lib/foundation/team-training-status";
 
@@ -106,8 +107,15 @@ function buildSeasonEndItems(gameState: GameState): SeasonReadinessItem[] {
   return [
     {
       id: "prize",
-      label: "Preisgeld gebucht",
-      detail: prizeApplied ? "Saison-Preisgeld angewendet." : "Preisgeld noch offen.",
+      // "gebucht" war hier genauso falsch wie im Saisonabschluss-Panel: solange
+      // `CASH_PRIZE_BENCHMARK_ONLY` gilt, bewegt dieser Schritt kein Team-Cash.
+      // Gutgeschrieben wird beim Saisonwechsel (`runLocalSeasonCompletion`).
+      label: CASH_PRIZE_BENCHMARK_ONLY ? "Preisgeld berechnet" : "Preisgeld gebucht",
+      detail: prizeApplied
+        ? CASH_PRIZE_BENCHMARK_ONLY
+          ? "Durchgerechnet — gutgeschrieben wird beim Saisonwechsel."
+          : "Saison-Preisgeld angewendet."
+        : "Preisgeld noch offen.",
       status: prizeApplied ? "ready" : "open",
       targetView: "prize",
     },
