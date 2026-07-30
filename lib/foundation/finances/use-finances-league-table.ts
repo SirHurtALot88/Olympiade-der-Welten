@@ -109,7 +109,30 @@ export function buildFinancesLeagueTable(gameState: GameState): FinanceLeagueTab
       .reduce((sum, entry) => {
         const player = playerById.get(entry.playerId) ?? null;
         const contract = resolvePlayerEconomyContract({ player, rosterEntry: entry });
-        return sum + (contract.expectedSalary ?? normalizeEconomyMoney(contract.salary) ?? 0);
+        /**
+         * `contract.salary` — der ECHTE Vertragswert dieser Saison, nicht der geglaettete.
+         *
+         * Gemeldet: „in der finanzansicht hat Z-H weniger gehaelter als in dieser ansicht???
+         * was stimmt denn nun bitte den aktuellen wert aus den vertraegen ziehen inkl. FL oder
+         * BL nicht den durchschnitts gehalt wert."
+         *
+         * FL/BL sind `front_loaded` / `back_loaded`: bei diesen Vertragsformen weicht die
+         * aktuelle Rate bewusst vom Mittelwert ab. `expectedSalary` ist der Formelwert
+         * (Mittelwert), `salary` die Rate, die tatsaechlich faellig wird. Bei Z-H trennt das
+         * 97,7 von 83,3 — Sunken Crown zahlt aktuell 13,34 statt der berechneten 9,74.
+         *
+         * Der Saisonstand zeigte laengst `salary`, diese Tabelle `expectedSalary`: derselbe
+         * Spielstand, zwei Gehaltssummen. Massgeblich ist `salary`, denn genau dieses Feld
+         * bucht die Saisonende-Abrechnung ab (`sponsor-settlement-service`:
+         * `resolvePlayerEconomyContract(...).salary ?? 0`) — dieselbe Quelle nutzt auch
+         * `buildFinancesViewModel` fuer die eigene Detail-Uebersicht.
+         *
+         * NICHT angefasst: `getTeamDisplaySalaryTotal`. Daran haengt ueber
+         * `getTeamSponsorBaseReferenceTotal` der Sponsor-Anker; eine Aenderung dort
+         * verschoebe die Sponsoren-Kalibrierung und gehoert in die laufende Balance-
+         * Entscheidung, nicht in einen Anzeige-Fix.
+         */
+        return sum + (normalizeEconomyMoney(contract.salary) ?? contract.salary ?? 0);
       }, 0);
 
     const teamFacilities = getTeamFacilityState(gameState, team.teamId);
