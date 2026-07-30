@@ -168,6 +168,41 @@ type SeasonPointsLedger = {
 } | null;
 
 /**
+ * Entscheidet, WOHER die Disziplin-PPs einer Rosterzeile kommen.
+ *
+ * Der Directory-Slice rechnet SERVERSEITIG auf dem vollständigen Save. Der
+ * Foundation-Client hält dagegen den kompakten Payload
+ * (`compactFoundationInitialGameState`): dort sind `matchdayResults` /
+ * `disciplineResults` auf den AKTIVEN Spieltag beschnitten und
+ * `persistedSeasonDerivations` entfernt. Ein clientseitig gebauter
+ * `buildSeasonPointsLedger` kennt daher nur diesen einen Spieltag und ist,
+ * solange er nicht ausgewertet ist, leer — genau das ließ im aufgeklappten
+ * PPs-Panel der Kader-/Verträge-Rostertabelle überall "—" stehen, während die
+ * PPS-Spalte derselben Zeile (Server-Ratings-Slice) echte Saisonwerte zeigte.
+ *
+ * Sobald der Slice da ist, ist er deshalb die alleinige Quelle: fehlt ein
+ * Spieler dort, hat er in dieser Saison keine PPs geholt — dann bleibt es leer,
+ * statt auf den beschnittenen Ledger zurückzufallen. Der Ledger bleibt nur
+ * Fallback für Pfade ohne Slice (Home-V2-/Markt-Kacheln, oder Slice-Fehler).
+ */
+export function resolveRosterDisciplinePointsSource(input: {
+  playerId: string;
+  playerDirectorySlice: {
+    payload: unknown;
+    error: string | null;
+    disciplinePointsByPlayerId: Record<string, Record<string, number>>;
+  };
+  ledgerPointsByDiscipline: Record<string, number> | null | undefined;
+}): Record<string, number> | null {
+  const sliceIsUsable =
+    Boolean(input.playerDirectorySlice.payload) && !input.playerDirectorySlice.error;
+  if (sliceIsUsable) {
+    return input.playerDirectorySlice.disciplinePointsByPlayerId[input.playerId] ?? null;
+  }
+  return input.ledgerPointsByDiscipline ?? null;
+}
+
+/**
  * Reihenfolge + Achse↔Kategorie-Zuordnung für die Disziplin-PPs-Aufschlüsselung.
  * `category` ist die `DisciplineCategory` (power/speed/mental/social) am
  * `Discipline`-Objekt, `axis` die kurze POW/SPE/MEN/SOC-Kennung (Ton-Tokens).
@@ -285,6 +320,18 @@ export function useFoundationCrossTabTeamsRoster(input: {
   activeSaveId?: string | null;
   currentAreaRanksByTeamId: Map<string, TeamsAreaRank>;
   seasonPointsLedger: SeasonPointsLedger;
+  /**
+   * Serverseitig gerechneter Spieler-Slice — Quelle der Disziplin-PPs (das
+   * Warum steht an `resolveRosterDisciplinePointsSource`). Bewusst nur die drei
+   * Felder, die hier gebraucht werden, damit der Hook nicht am ganzen
+   * Slice-Vertrag hängt.
+   */
+  playerDirectorySlice: {
+    payload: unknown;
+    error: string | null;
+    /** Disziplin-ID → in dieser Saison geholte PPs, je Spieler (Server-Ledger). */
+    disciplinePointsByPlayerId: Record<string, Record<string, number>>;
+  };
   teamObjectiveOverview: TeamObjectiveOverview;
   currentMatchdayDisciplineSchedule: CurrentMatchdayDisciplineSchedule;
   /** Steuerbare Teams des aktiven Owners — bestimmt `known` für CA/PO-Sterne (Tier-3 Rosterkarten). */
@@ -348,9 +395,19 @@ export function useFoundationCrossTabTeamsRoster(input: {
           disciplinePpsByAxis: (() => {
             const ledgerSummary =
               input.seasonPointsLedger?.playerSummariesByPlayerId?.get(player.id) ?? null;
+            // Quellenwahl liegt in `resolveRosterDisciplinePointsSource` —
+            // dort steht auch das Warum (kompakter Client-Payload).
+            const pointsByDiscipline = resolveRosterDisciplinePointsSource({
+              playerId: player.id,
+              playerDirectorySlice: input.playerDirectorySlice,
+              ledgerPointsByDiscipline: ledgerSummary?.pointsByDiscipline,
+            });
             return buildRosterDisciplinePpsByAxis({
               disciplines: input.gameState.disciplines,
-              pointsByDiscipline: ledgerSummary?.pointsByDiscipline ?? null,
+              pointsByDiscipline,
+              // Achsen-Gesamtwert bleibt am Ledger: ist der leer, fällt
+              // `buildRosterDisciplinePpsByAxis` auf `ppPow`/`ppSpe`… zurück —
+              // und die stammen aus demselben Server-Ledger wie die Slice-Werte.
               pointsByArea: ledgerSummary?.pointsByArea ?? null,
               axisTotals: {
                 pow: playerRating?.ppPow ?? null,
@@ -384,6 +441,13 @@ export function useFoundationCrossTabTeamsRoster(input: {
     input.activeSaveId,
     input.gameState,
     input.manageableTeamIds,
+    // Die Disziplin-PPs-Quelle gehört ZWINGEND in die Deps: sie wird im Memo
+    // gelesen (`disciplinePpsByAxis`), trifft aber erst nach der ersten
+    // Zeilenberechnung ein — ohne Dep blieben die Zeilen auf dem Stand vor dem
+    // Slice-Eintreffen (also mit leeren PPs) eingefroren.
+    input.playerDirectorySlice.disciplinePointsByPlayerId,
+    input.playerDirectorySlice.error,
+    input.playerDirectorySlice.payload,
     input.playerRatingsById,
     input.rosterPlayers,
     input.seasonPointsLedger,

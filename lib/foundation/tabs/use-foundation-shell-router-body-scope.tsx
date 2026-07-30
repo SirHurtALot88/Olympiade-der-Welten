@@ -1358,8 +1358,14 @@ export function useFoundationShellRouterBodyScope({
   const shouldLoadSeasonRatings = shouldBuildPlayerRatings || shouldBuildTrainingView;
   const shouldFetchSeasonRatingsFromApi = shouldLoadSeasonRatings && !shouldLoadSeasonLedger;
   const seasonContentSignature = useMemo(() => buildGameStateContentSignature(gameState), [gameState]);
+  // Auch der Teams-Tab braucht den Directory-Slice: seine Kader-/Verträge-
+  // Rostertabelle zeigt pro Spieler ausklappbare Disziplin-PPs, und die stehen
+  // nur im SERVER-gerechneten Slice richtig drin (der Client hält den kompakten
+  // Payload, siehe `disciplinePointsByPlayerId` in player-directory-slice.ts).
+  // Der Slice ist modulweit nach saveId/seasonId/contentSignature gecacht —
+  // wer vorher in der Spielerliste war, holt hier nichts neu.
   const playerDirectorySlice = usePlayerDirectorySlice({
-    enabled: shouldBuildPlayerDirectory,
+    enabled: shouldBuildPlayerDirectory || shouldBuildTeamsView,
     saveId: activeSaveId,
     seasonId: gameState.season.id,
     contentSignature: seasonContentSignature,
@@ -1392,11 +1398,14 @@ export function useFoundationShellRouterBodyScope({
     teamOverviewSlice,
   });
   // Teams-Detail (Verträge/Kader) zeigt pro Spieler ausklappbare Disziplin-PPs.
-  // Die dafür nötigen echten Pro-Disziplin-Punkte liegen NUR im Season-Ledger
-  // (aggregierte Achsen-PPs kommen aus dem Ratings-Slice) — daher wird das
-  // (gecachte) `useSeasonDerivations` hier zusätzlich aktiviert, sobald die
-  // Teams-Ansicht offen ist. Andere Ledger-Konsumenten bleiben über ihre
-  // eigenen `shouldLoad*`-Gates unberührt (Ratings kommen weiter aus dem Slice).
+  // Die Pro-Disziplin-Punkte kommen inzwischen aus dem Directory-Slice (oben) —
+  // der clientseitige Ledger konnte sie nie liefern, weil der Foundation-Client
+  // nur den kompakten Payload hält (`matchdayResults` auf den aktiven Spieltag
+  // beschnitten). Das (gecachte) `useSeasonDerivations` bleibt hier trotzdem
+  // aktiv: der Ledger liefert die Team-Summaries des Team-Drawers und den
+  // Achsen-Fallback (`pointsByArea`) und dient den Disziplin-PPs weiterhin als
+  // Fallback, falls der Slice ausfällt. Andere Ledger-Konsumenten bleiben über
+  // ihre eigenen `shouldLoad*`-Gates unberührt.
   const shouldLoadTeamsRosterDisciplineLedger = shouldBuildTeamsView;
   const shouldLoadSeasonDerivations =
     shouldLoadTeamsRosterDisciplineLedger ||
@@ -7875,6 +7884,7 @@ export function useFoundationShellRouterBodyScope({
     activeSaveId,
     currentAreaRanksByTeamId,
     seasonPointsLedger,
+    playerDirectorySlice,
     teamObjectiveOverview,
     currentMatchdayDisciplineSchedule,
     manageableTeamIds: foundationManageableTeamIds,
