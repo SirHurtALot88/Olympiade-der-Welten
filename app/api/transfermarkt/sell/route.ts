@@ -76,8 +76,25 @@ export async function POST(request: Request) {
       );
     }
 
+    /**
+     * Die Phasensperre gilt fuer den VERKAUF, nicht fuer das Nachschlagen.
+     *
+     * Vorher lief auch die reine Vorschau (`dryRun`) dagegen: ausserhalb des
+     * Verkaufsfensters kam 409 mit `summary: null`, und der Spieler sah statt
+     * Preis, Erloes und GuV nur Striche — genau in dem Moment, in dem er
+     * entscheiden will, wen er am Saisonende abgibt.
+     *
+     * Die Vorschau darf hier durch, weil sie den Verkauf NICHT ermoeglicht:
+     * `previewLocalTransfermarktSell` traegt denselben Sachverhalt selbst als
+     * `blockingReasons: ["sell_only_at_season_end"]` mit `canSell: false`
+     * (am echten Spielstand in `season_completed` nachgemessen). Die Sperre
+     * verschwindet also nicht, sie wird nur nicht mehr zur leeren Antwort.
+     *
+     * Der ausfuehrende Pfad (`dryRun: false`) laeuft unveraendert in die
+     * Sperre — zwei unabhaengige Riegel, nicht einer.
+     */
     const phaseGate = evaluateGamePhaseAction(save.gameState, "sell_players");
-    if (!phaseGate.allowed) {
+    if (!phaseGate.allowed && !dryRun) {
       return NextResponse.json(
         {
           success: false,
