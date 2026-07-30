@@ -2653,7 +2653,28 @@ export function useFoundationShellRouterBodyScope({
     }));
   }
 
-  function saveTransferWishlist(nextEntries: TransferWishlistEntry[]) {
+  /**
+   * GEMELDET: „,Wishlist & Scouting' fuellt sich immer wieder mit Spielern, die ich schon entfernt
+   * habe."
+   *
+   * Die Ursache steckte in der Kombination aus zwei an sich harmlosen Zeilen: die Aufrufer haben die
+   * neue Liste aus `gameState.seasonState.transferWishlist` der RENDER-CLOSURE berechnet, und diese
+   * Funktion hat das Ergebnis dann ABSOLUT in den Updater geschrieben — `current` wurde gar nicht
+   * gelesen. Solange zwischen zwei Klicks kein Rerender liegt (und dieser Shell ist gross und
+   * rendert traege), rechnen beide Klicks auf demselben alten Stand. Der zweite Schreibvorgang
+   * enthaelt den vom ersten entfernten Spieler wieder — er "kommt zurueck", ohne dass irgendwo
+   * etwas nachfuellt.
+   *
+   * Deshalb nimmt die Funktion jetzt eine FUNKTION der aktuellen Liste entgegen und wendet sie
+   * innerhalb des Updaters auf `current` an. Damit sieht jeder Klick, was der vorherige getan hat.
+   *
+   * Das gilt auch fuer den Spiegel in die Beobachtungsliste: `syncWishlistToScoutingWatchlist`
+   * leitet die Mirror-Eintraege aus der Wishlist ab. Lief er auf dem veralteten Stand, kam der
+   * entfernte Spieler dort ebenfalls zurueck.
+   */
+  function saveTransferWishlist(
+    update: TransferWishlistEntry[] | ((currentEntries: TransferWishlistEntry[]) => TransferWishlistEntry[]),
+  ) {
     if (readMeta.readOnly) {
       showReadOnlyNotice();
       return;
@@ -2661,6 +2682,8 @@ export function useFoundationShellRouterBodyScope({
 
     const teamId = marketTeamId || selectedTeam?.teamId || null;
     setGameState((current) => {
+      const currentEntries = current.seasonState.transferWishlist ?? [];
+      const nextEntries = typeof update === "function" ? update(currentEntries) : update;
       let next: GameState = {
         ...current,
         seasonState: {
@@ -2732,10 +2755,14 @@ export function useFoundationShellRouterBodyScope({
 
   function toggleTransferWishlist(item: TransfermarktFreeAgentItem) {
     const teamId = marketTeamId || selectedTeam?.teamId || null;
-    const currentEntries = gameState.seasonState.transferWishlist ?? [];
-    const existing = currentEntries.find((entry) => entry.playerId === item.playerId);
+    // Die ENTSCHEIDUNG (hinzufuegen oder entfernen) faellt aus der Closure — sie braucht ohnehin
+    // Nebenwirkungen (Slot-Pruefung, Hinweis), die nicht in einen State-Updater gehoeren. Die
+    // AENDERUNG der Liste laeuft danach funktional, also auf dem wirklich aktuellen Stand.
+    const existing = (gameState.seasonState.transferWishlist ?? []).some(
+      (entry) => entry.playerId === item.playerId,
+    );
     if (existing) {
-      saveTransferWishlist(currentEntries.filter((entry) => entry.playerId !== item.playerId));
+      saveTransferWishlist((entries) => entries.filter((entry) => entry.playerId !== item.playerId));
       return;
     }
     if (!teamId) {
@@ -2747,11 +2774,15 @@ export function useFoundationShellRouterBodyScope({
       return;
     }
 
-    saveTransferWishlist([buildWishlistEntry(item), ...currentEntries]);
+    // Der `some`-Riegel schuetzt gegen den umgekehrten Fall: zwei Klicks auf denselben Spieler vor
+    // dem Rerender haetten ihn sonst doppelt in die Liste gelegt.
+    saveTransferWishlist((entries) =>
+      entries.some((entry) => entry.playerId === item.playerId) ? entries : [buildWishlistEntry(item), ...entries],
+    );
   }
 
   function removeTransferWishlistEntry(playerId: string) {
-    saveTransferWishlist((gameState.seasonState.transferWishlist ?? []).filter((entry) => entry.playerId !== playerId));
+    saveTransferWishlist((entries) => entries.filter((entry) => entry.playerId !== playerId));
   }
 
   function reorderTransferWishlist(playerId: string, targetIndex: number) {
@@ -2759,9 +2790,7 @@ export function useFoundationShellRouterBodyScope({
     if (!teamId) {
       return;
     }
-    saveTransferWishlist(
-      reorderTeamTransferWishlist(gameState.seasonState.transferWishlist ?? [], teamId, playerId, targetIndex),
-    );
+    saveTransferWishlist((entries) => reorderTeamTransferWishlist(entries, teamId, playerId, targetIndex));
   }
 
   function toggleScoutingWatch(item: TransfermarktFreeAgentItem) {

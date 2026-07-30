@@ -43,10 +43,17 @@ Zwei Stellen, an denen das früher schon still gescheitert ist und die deshalb n
 | `page.label` | ihr Name aus der Navigation, z. B. „Spieltag · Arena" |
 | `view`, `url`, `viewport`, `clientTime` | vom Browser beim Klick |
 | `userAgent` | aus dem Request-Header |
-| `game.saveId`, `game.saveName` | aktiver Spielstand |
+| `game.saveId`, `game.saveName` | der Spielstand aus der URL des Melders (`?saveId=`) |
+| `game.saveSource` | `url` (belegt) \| `active` (Notnagel: URL trug keinen bekannten `saveId`) |
 | `game.seasonId`, `game.seasonYear`, `game.currentMatchday` | Saison und Spieltag |
 | `game.matchdayId`, `game.matchdayStatus` | Zustand des Spieltags |
 | `game.activeTeamIds` | die vom Menschen geführten Teams (`teamControlSettings.controlMode === "manual"`) |
+
+Der Spielstand kommt aus der **URL des Melders**, nicht aus dem global aktiven. Bei zwei Spielern auf
+einer Instanz ist der aktive regelmäßig ein anderer als der gemeldete — in zwei der ersten drei
+echten Meldungen wäre der Bericht so einer fremden Partie zugeordnet worden, mit falscher Saison,
+falschem Spieltag und falschem geführten Team. Das ist schlimmer als gar kein Kontext, weil es
+glaubwürdig aussieht. `saveSource` hält fest, welcher Weg gegriffen hat.
 
 `game` ist `null`, wenn beim Melden kein Spielstand aktiv war (Login-Seite, frische Installation).
 Eine Meldung ohne Spielkontext ist weniger wert, aber besser als keine — deshalb wird sie trotzdem

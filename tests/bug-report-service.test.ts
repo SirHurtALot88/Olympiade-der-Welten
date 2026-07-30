@@ -31,10 +31,25 @@ const gameState = {
   },
 };
 
+/**
+ * Ein ZWEITER Spielstand, den nur die URL kennt. Er bildet die Lage nach, in der die erste Fassung
+ * daneben lag: zwei Spieler auf einer Instanz, der global aktive Spielstand ist ein anderer als der,
+ * in dem gemeldet wurde.
+ */
+const urlSave = {
+  name: "Anderes Spiel",
+  gameState: {
+    season: { id: "season-9", year: 9, currentMatchday: 3 },
+    matchdayState: { matchdayId: "matchday-3", status: "planning" },
+    teams: [{ teamId: "X-X" }],
+    seasonState: { teamControlSettings: { "X-X": { teamId: "X-X", controlMode: "manual" } } },
+  },
+};
+
 vi.mock("@/lib/persistence/persistence-service", () => ({
   createPersistenceService: () => ({
     getActiveSave: () => activeSave,
-    getSaveById: () => ({ gameState }),
+    getSaveById: (saveId: string) => (saveId === "save-aus-url" ? urlSave : { gameState }),
   }),
 }));
 
@@ -91,6 +106,43 @@ describe("Bug-Meldung — der Zustand wird mitgeschrieben", () => {
     // Gegenprobe zur Abgrenzung: ai und passive gehoeren NICHT dazu.
     expect(record.game?.activeTeamIds).not.toContain("A-A");
     expect(record.game?.activeTeamIds).not.toContain("B-B");
+  });
+
+  /**
+   * DER FEHLER, DEN DIE ERSTEN ECHTEN MELDUNGEN AUFGEDECKT HABEN.
+   *
+   * Die Anreicherung nahm `getActiveSave()`, also den GLOBAL aktiven Spielstand. Bei zwei Spielern
+   * auf einer Instanz ist das regelmaessig ein anderer als der gemeldete: in zwei von drei echten
+   * Meldungen trug die URL `saveId=…8d7mdx`, waehrend der Bericht den Zustand von `…h0z7cl`
+   * beschrieb — eine andere Partie, mit anderer Saison, anderem Spieltag und anderem gefuehrten
+   * Team. Das ist schlimmer als gar kein Kontext, weil es glaubwuerdig aussieht.
+   */
+  it("nimmt den Spielstand aus der URL des Melders, nicht den global aktiven", async () => {
+    const { saveBugReport } = await importService();
+    const { record } = saveBugReport({
+      url: "https://olympiade.duckdns.org/foundation?view=lineup&team=C-C&saveId=save-aus-url",
+    });
+    expect(record.game?.saveId).toBe("save-aus-url");
+    expect(record.game?.saveName).toBe("Anderes Spiel");
+    expect(record.game?.seasonYear).toBe(9);
+    expect(record.game?.currentMatchday).toBe(3);
+    expect(record.game?.activeTeamIds).toEqual(["X-X"]);
+    // Und die Herkunft steht dabei — sonst ist belegt von geraten nicht zu unterscheiden.
+    expect(record.game?.saveSource).toBe("url");
+  });
+
+  it("faellt auf den aktiven Spielstand zurueck, wenn die URL keinen traegt", async () => {
+    const { saveBugReport } = await importService();
+    const { record } = saveBugReport({ url: "https://olympiade.duckdns.org/login" });
+    expect(record.game?.saveId).toBe("save-1");
+    expect(record.game?.saveSource).toBe("active");
+  });
+
+  /** Eine kaputte URL darf die Meldung nicht verschlucken — sie ist dann eben der Notnagel. */
+  it("kommt mit einer unbrauchbaren URL zurecht", async () => {
+    const { saveBugReport } = await importService();
+    expect(saveBugReport({ url: "nicht-wirklich-eine-url" }).record.game?.saveSource).toBe("active");
+    expect(saveBugReport({ url: null }).record.game?.saveSource).toBe("active");
   });
 
   it("ein leerer Freitext ist erlaubt — der Zustand ist der Inhalt", async () => {
