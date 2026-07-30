@@ -52171,13 +52171,15 @@ button.foundation-team-portrait-card {
 }
 
 /* Explizite 2★ Signature + 1◆ Weak Zusammenfassung — macht unmissverständlich,
-   welche Attribute schneller/langsamer wachsen (nicht nur die kleinen Zeilen-Glyphs). */
+   welche Attribute schneller/langsamer wachsen (nicht nur die kleinen Zeilen-Glyphs).
+   Sitzt seit der Kompaktierung IN der Hinweis-Chip-Zeile (`nl-training-chip-row`)
+   statt als eigener Block darunter: `inline-flex` statt `flex`, und kein
+   `margin-bottom` mehr — den Abstand macht jetzt das `gap` der Zeile. */
 .is-new-look .nl-training-affinity-summary {
-  display: flex;
+  display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--nl-s2);
-  margin-bottom: var(--nl-s2);
+  gap: var(--nl-s1);
   font-size: 11px;
   font-weight: 600;
 }
