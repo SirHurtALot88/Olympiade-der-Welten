@@ -29,26 +29,44 @@ export function BugReportFlag() {
         body: JSON.stringify({
           note,
           url: typeof window === "undefined" ? null : window.location.href,
-          // Die Ansicht steht als Query-Parameter in der URL — praeziser als der Pfad allein.
+          // Die Ansicht steht als Query-Parameter in der URL — praeziser als der Pfad allein,
+          // aber NUR innerhalb der Foundation-Shell vorhanden. Auf Login, Cockpit und
+          // Startseite ist sie null, und dann waere die Seite ohne die beiden Felder
+          // darunter nicht mehr zu benennen.
           view: typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("view"),
+          path: typeof window === "undefined" ? null : window.location.pathname,
+          pageTitle: typeof document === "undefined" ? null : document.title,
           viewport:
             typeof window === "undefined" ? null : { width: window.innerWidth, height: window.innerHeight },
           clientTime: new Date().toISOString(),
         }),
       });
       const payload = (await response.json().catch(() => null)) as
-        | { ok?: boolean; reportId?: string; game?: { saveName?: string | null; currentMatchday?: number | null } | null }
+        | {
+            ok?: boolean;
+            reportId?: string;
+            game?: { saveName?: string | null; currentMatchday?: number | null } | null;
+            reporter?: { label?: string | null } | null;
+            page?: string | null;
+          }
         | null;
       if (!response.ok || !payload?.ok) {
         setState("failed");
         return;
       }
       // Zeigen, WAS mitgegangen ist — sonst weiss niemand, ob die Meldung brauchbar war.
+      // Seite und Melder gehoeren dazu: unter welchem Namen etwas rausgeht, will man sehen.
       const game = payload.game;
       setSentInfo(
-        game?.saveName
-          ? `${game.saveName}${game.currentMatchday != null ? ` · Spieltag ${game.currentMatchday}` : ""}`
-          : "ohne Spielkontext",
+        [
+          payload.page,
+          game?.saveName
+            ? `${game.saveName}${game.currentMatchday != null ? ` · Spieltag ${game.currentMatchday}` : ""}`
+            : "ohne Spielkontext",
+          payload.reporter?.label ? `als ${payload.reporter.label}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
       );
       setState("sent");
       setNote("");
