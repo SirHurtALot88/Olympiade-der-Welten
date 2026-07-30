@@ -251,6 +251,7 @@ type SimulationRun = {
   phase6: {
     cashBeforePrize: Map<string, number>;
     cashAfterPrize: Map<string, number>;
+    bookingByTeam: Map<string, number>;
     oldCashByTeam: Map<string, number | null>;
     newCashByTeam: Map<string, number | null>;
     prizeMoneyByTeam: Map<string, number | null>;
@@ -718,6 +719,32 @@ beforeAll(async () => {
   );
   const afterPrizeGameState = persistence.getSaveById(saveId)!.gameState;
   const cashAfterPrize = cashByTeamId(afterPrizeGameState);
+  // Der Saisonende-Schritt bucht inzwischen WIRKLICH: Sponsor-Settlement (inkl.
+  // Gehaltsabzug) und Gebaeude-Abrechnung. Beide protokollieren, was sie tun —
+  // `sponsorPayoutLogs` je Posten, `facilityEvents` als Einnahme/Unterhalt. Genau
+  // diese Protokolle sind der Massstab: die Cash-Aenderung muss ihrer Summe
+  // entsprechen, sonst ist Geld aus dem Nichts entstanden oder verschwunden.
+  const prizePhaseBookingByTeam = new Map<string, number>();
+  const addPrizePhaseBooking = (teamId: string, amount: number, system: string, note: string) => {
+    prizePhaseBookingByTeam.set(teamId, (prizePhaseBookingByTeam.get(teamId) ?? 0) + amount);
+    // Auch in die Gesamtliste, sonst rechnet die Aggregat-Zusicherung am Ende ohne sie.
+    bookings.push({ teamId, amount, system, note });
+  };
+  const sponsorLogsBefore = new Set((prizeSave.gameState.seasonState.sponsorPayoutLogs ?? []).map((log) => log.id));
+  for (const log of afterPrizeGameState.seasonState.sponsorPayoutLogs ?? []) {
+    if (!sponsorLogsBefore.has(log.id)) {
+      addPrizePhaseBooking(log.teamId, log.cashDelta, "season_end:sponsor", log.componentId ?? log.id);
+    }
+  }
+  const facilityEventsBefore = new Set((prizeSave.gameState.seasonState.facilityEvents ?? []).map((event) => event.eventId));
+  for (const event of afterPrizeGameState.seasonState.facilityEvents ?? []) {
+    if (!facilityEventsBefore.has(event.eventId)) {
+      // `cost` ist positiv fuer Ausgaben; Einnahmen stehen als negative Kosten bzw.
+      // in `income`. Beides zusammen ergibt die Cash-Wirkung des Ereignisses.
+      const income = (event as { income?: number }).income ?? 0;
+      addPrizePhaseBooking(event.teamId, income - (event.cost ?? 0), "season_end:facility", event.eventId);
+    }
+  }
   // `plannedChanges[].newCash` ist NICHT der maßgebliche Beweis und insbesondere KEIN
   // "Cash nach Preisgeld": es ist `prize-money-preview.ts`' `projectedCash`, also die
   // SAISONEND-PROGNOSE `Cash − Gehälter + Sponsor/Gebäude-Einnahme − Kreditrate`. Sie weicht daher
@@ -789,6 +816,7 @@ beforeAll(async () => {
       prizeMoneyByTeam,
       cashPayoutApplied: prizeAuditLog.payload.cashPayoutApplied,
       benchmarkOnly: prizeAuditLog.payload.benchmarkOnly,
+      bookingByTeam: prizePhaseBookingByTeam,
     },
   };
 }, 180_000);
@@ -849,17 +877,36 @@ describe("Geldfluss-Invariante — simulierte Mini-Saison", () => {
     expect(Math.abs(run.phase5.delta - -run.phase5.loggedCost)).toBeLessThanOrEqual(SINGLE_BOOKING_TOLERANCE);
   });
 
-  it("Phase 6 (Preisgeld): DOKUMENTIERTE LÜCKE — Cash-Prize-Apply bewegt aktuell KEIN echtes Cash (CASH_PRIZE_BENCHMARK_ONLY=true)", () => {
+  it("Phase 6 (Saisonende): Cash-Änderung entspricht exakt den protokollierten Sponsor- und Gebäude-Buchungen — Preisgeld bleibt draußen", () => {
     expect(run.phase6.cashBeforePrize.size).toBe(32);
-    // Maßgeblicher Beweis: der tatsächliche team.cash-Wert im Save, unmittelbar vor/nach
-    // executeCashPrizeApply, für JEDES der 32 Teams unverändert. Falls dieser Test irgendwann rot
-    // wird: das ist GEWOLLT — es bedeutet, dass Preisgeld-Payout inzwischen echtes Cash bewegt und
-    // dieser Test (inkl. der Doku oben) bewusst aktualisiert werden muss, statt den neuen Payout
-    // stillschweigend ungeprüft zu lassen.
+    /**
+     * DIESER TEST WURDE BEWUSST UMGESCHRIEBEN — der alte Wortlaut verlangte, dass
+     * `executeCashPrizeApply` das Cash JEDES Teams unverändert lässt, und trug den Hinweis:
+     * „Falls dieser Test irgendwann rot wird: das ist GEWOLLT."
+     *
+     * Genau das ist eingetreten. Der Saisonende-Schritt bucht inzwischen wirklich:
+     * Sponsor-Settlement inklusive Gehaltsabzug, dazu die Gebäude-Abrechnung. Vorher war
+     * beides nur über den Saisonabschluss im Cockpit erreichbar — im normalen Spielverlauf
+     * ging man mit unverändertem Cash in die neue Saison.
+     *
+     * „Unverändert" wäre jetzt die falsche Frage. Die richtige ist strenger: die Änderung
+     * muss der Summe der PROTOKOLLIERTEN Buchungen entsprechen. Damit bleibt der Test
+     * genau das, was er sein soll — eine Wache gegen Geld aus dem Nichts, nicht gegen
+     * Geldbewegung an sich.
+     *
+     * Das Preisgeld bleibt draußen: die beiden Kanarienvogel-Zusicherungen darunter
+     * (`benchmarkOnly` / `cashPayoutApplied`) sind unverändert.
+     */
     for (const [teamId, before] of run.phase6.cashBeforePrize) {
-      const after = run.phase6.cashAfterPrize.get(teamId);
-      expect(after, `Team ${teamId}: cash vor Cash-Prize-Apply ${before}, danach ${after}`).toBe(before);
+      const after = run.phase6.cashAfterPrize.get(teamId) ?? before;
+      const booked = run.phase6.bookingByTeam.get(teamId) ?? 0;
+      expect(
+        Math.abs(after - (before + booked)),
+        `Team ${teamId}: cash ${before} + protokollierte Buchungen ${booked.toFixed(2)} = ${(before + booked).toFixed(2)}, tatsächlich ${after}`,
+      ).toBeLessThanOrEqual(SINGLE_BOOKING_TOLERANCE);
     }
+    // Und es hat sich wirklich etwas bewegt — sonst prüfte die Schleife oben nur Nullen.
+    expect([...run.phase6.bookingByTeam.values()].some((amount) => amount !== 0)).toBe(true);
 
     // Zweiter Beweis, direkt aus dem geschriebenen Audit-Log: der Apply selbst protokolliert, dass
     // er nur Benchmark ist und kein Cash ausgezahlt hat. DAS ist die Kanarienvogel-Assertion — wird
