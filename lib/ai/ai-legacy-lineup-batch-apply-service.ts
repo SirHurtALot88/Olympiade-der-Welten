@@ -344,6 +344,36 @@ function collectFormCardPlanSlots(input: {
   return { slots, hasRealSchedule: false };
 }
 
+/**
+ * Wie viele Spieler auf dieser Seite wirklich antreten — und damit, wie viel eine Formkarte hier
+ * ueberhaupt bringen kann.
+ *
+ * Der Wert einer Karte ist `Kartenwert x Spielerzahl` (`calculateFormModifierForSide`), und die
+ * Score-Engine setzt dort `sideEntries.length` ein, also die TATSAECHLICH aufgestellten Spieler.
+ * Die KI hat stattdessen die SOLL-Kadergroesse der Disziplin gerechnet. Wer eine 5er-Disziplin nur
+ * mit 4 Spielern besetzt, bekam eine Karte damit 25 % zu hoch bewertet — gemeldet als „M-M setzen
+ * 2 Boostkarten ein, obwohl sie nur 4 statt 5 Spieler haben, das kostet auch Effizienz".
+ *
+ * Karten sind Einwegware: was hier verpufft, fehlt fuer den Rest der Saison. Es braucht dafuer
+ * KEINE neue Regel — `selectPositiveFormCardForSlot` vergleicht den Jetzt-Wert ohnehin mit dem
+ * Anspruch besserer Slots. Sie muss nur die ehrliche Zahl bekommen, dann bleibt die Karte von
+ * allein liegen, wenn ein voller Kader mehr aus ihr macht.
+ */
+export function resolveFormCardSidePlayerCount(input: {
+  /** Eintraege der Aufstellung fuer GENAU diese Seite. */
+  filledPlayers: number;
+  /** Soll-Kadergroesse der Disziplin — Rueckfall, solange keine Aufstellung vorliegt. */
+  contractPlayerCount: number | null;
+}): number {
+  const { filledPlayers, contractPlayerCount } = input;
+  if (filledPlayers > 0) {
+    // Mehr als die Soll-Groesse zaehlt nicht: ueberzaehlige Eintraege werden vor der Wertung
+    // gekappt (s. lineup-surplus-entries-cap), sie wuerden die Karte sonst zu hoch bewerten.
+    return Math.max(1, Math.min(filledPlayers, contractPlayerCount ?? filledPlayers));
+  }
+  return Math.max(1, contractPlayerCount ?? FORM_CARD_FALLBACK_SLOT_PLAYER_COUNT);
+}
+
 function formCardDeploymentValue(card: LegacyFormCardOption, color: FormCardColor | null, playerCount: number) {
   const multiplier = color != null && card.color === color ? 2 : 1;
   return card.value * multiplier * Math.max(1, playerCount);
@@ -1364,12 +1394,10 @@ export function buildAiLegacyLineupModifiers(
           context.disciplinePlayerCounts[side.disciplineId] ??
           null
         : null);
-    const playerCount = Math.max(
-      1,
-      contractPlayerCount ??
-        (plannedEntries.filter((entry) => entry.disciplineSide === side.side).length ||
-          FORM_CARD_FALLBACK_SLOT_PLAYER_COUNT),
-    );
+    const playerCount = resolveFormCardSidePlayerCount({
+      filledPlayers: plannedEntries.filter((entry) => entry.disciplineSide === side.side).length,
+      contractPlayerCount,
+    });
 
     return {
       ...side,

@@ -1,6 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { buildAiLegacyLineupModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
+import {
+  buildAiLegacyLineupModifiers,
+  resolveFormCardSidePlayerCount,
+} from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import { __setTeamPowersEnabledForTests } from "@/lib/lineups/team-powers";
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 
@@ -53,12 +56,83 @@ function createContext(
   } as unknown as LegacyLineupLoadedContext;
 }
 
+/**
+ * Eine Aufstellung in der GROESSE, die die Disziplin verlangt.
+ *
+ * Die Faelle hier modellieren Disziplin-Groessen ueber `requiredPlayers` (2er, 3er, 6er) und gaben
+ * dazu lange nur EINEN Eintrag als Platzhalter mit. Das ging gut, solange die KI den Kartenwert an
+ * `requiredPlayers` gehaengt hat. Sie rechnet ihn jetzt an den TATSAECHLICH aufgestellten Spielern
+ * — so wie die Score-Engine, die `sideEntries.length` einsetzt. Mit einem einzelnen Eintrag waere
+ * eine 6er-Disziplin also so viel wert wie eine 2er, und genau die Unterscheidung ist der
+ * Gegenstand dieser Tests. Der echte Aufrufer uebergibt ohnehin `preview.entries`, also die volle
+ * Aufstellung; ein Ein-Mann-Kader in einer 6er-Disziplin ist ein Zustand, den es dort nicht gibt.
+ *
+ * Der erste Spieler heisst weiterhin `p1` (bzw. der uebergebene Praefix + "1"), damit die
+ * `disciplineScores` der Faelle unveraendert greifen.
+ */
+function fillSide(
+  disciplineId: string,
+  disciplineSide: "d1" | "d2",
+  count: number,
+  playerPrefix = "p",
+) {
+  return Array.from({ length: count }, (_, index) => ({
+    disciplineId,
+    disciplineSide,
+    slotIndex: index,
+    playerId: `${playerPrefix}${index + 1}`,
+    activePlayerId: `a-${disciplineSide}-${index + 1}`,
+  }));
+}
+
 // Team-Powers sind im Spiel abgeschaltet (TEAM_POWERS_ENABLED). Die beiden
 // Power-Faelle dieser Suite pruefen die Auswahl-Mechanik selbst und schalten sie
 // dafuer gezielt ein — dieselbe Loesung wie in den team-powers-Suiten, damit die
 // Abdeckung erhalten bleibt, bis das System zurueckkehrt.
 beforeAll(() => __setTeamPowersEnabledForTests(true));
 afterAll(() => __setTeamPowersEnabledForTests(false));
+
+/**
+ * Gemeldet: „M-M setzen 2 Boostkarten ein, obwohl sie nur 4 statt 5 Spieler haben, das kostet auch
+ * Effizienz."
+ *
+ * Eine Formkarte bringt `Kartenwert x Spielerzahl`, und die Score-Engine setzt dort
+ * `sideEntries.length` ein — die TATSAECHLICH aufgestellten Spieler. Die KI hat stattdessen die
+ * SOLL-Kadergroesse gerechnet und eine Karte damit zu hoch bewertet, sobald die Seite nicht voll
+ * besetzt war. Karten sind Einwegware: was dabei verpufft, fehlt den Rest der Saison.
+ *
+ * Geprueft wird hier die URSACHE, nicht eine Folge. Ein Test auf „die KI spielt jetzt weniger
+ * Karten" waere wertlos: ob eine Karte faellt, haengt zusaetzlich am Restspielplan, und ein solcher
+ * Test haelt auch dann, wenn sich gar nichts geaendert hat (ausprobiert — er tat es).
+ */
+describe("Spielerzahl, an der ein Formkarten-Einsatz gemessen wird", () => {
+  it("nimmt die aufgestellten Spieler, nicht die Soll-Groesse", () => {
+    // Der gemeldete Fall: 5er-Disziplin, 4 Spieler da. Vorher kam hier 5 heraus.
+    expect(resolveFormCardSidePlayerCount({ filledPlayers: 4, contractPlayerCount: 5 })).toBe(4);
+  });
+
+  it("bewertet einen vollen Kader unveraendert", () => {
+    expect(resolveFormCardSidePlayerCount({ filledPlayers: 5, contractPlayerCount: 5 })).toBe(5);
+  });
+
+  it("zaehlt ueberzaehlige Eintraege nicht mit", () => {
+    // Ueber die Soll-Groesse hinausgehende Eintraege werden vor der Wertung gekappt
+    // (lineup-surplus-entries-cap) — sie duerfen die Karte nicht aufwerten.
+    expect(resolveFormCardSidePlayerCount({ filledPlayers: 7, contractPlayerCount: 5 })).toBe(5);
+  });
+
+  it("faellt ohne Aufstellung auf die Soll-Groesse zurueck", () => {
+    // Beim Planen kuenftiger Spieltage gibt es noch keine Aufstellung; dort ist die Soll-Groesse
+    // die beste verfuegbare Schaetzung.
+    expect(resolveFormCardSidePlayerCount({ filledPlayers: 0, contractPlayerCount: 6 })).toBe(6);
+  });
+
+  it("erfindet ohne jede Angabe keine Null", () => {
+    // Eine 0 wuerde jede Karte wertlos rechnen und sie in einen beliebigen anderen Slot spuelen.
+    expect(resolveFormCardSidePlayerCount({ filledPlayers: 0, contractPlayerCount: null })).toBeGreaterThan(0);
+    expect(resolveFormCardSidePlayerCount({ filledPlayers: 3, contractPlayerCount: null })).toBe(3);
+  });
+});
 
 describe("AI legacy lineup form-card planning", () => {
   it("does not place a negative form card on a matching-color discipline when the side is competitive", () => {
@@ -102,7 +176,9 @@ describe("AI legacy lineup form-card planning", () => {
 
     const modifiers = buildAiLegacyLineupModifiers(context, [
       { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p-red", activePlayerId: "a1" },
+      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 1, playerId: "p-red-2", activePlayerId: "a3" },
       { disciplineId: "spurt", disciplineSide: "d2", slotIndex: 0, playerId: "p-green", activePlayerId: "a2" },
+      { disciplineId: "spurt", disciplineSide: "d2", slotIndex: 1, playerId: "p-green-2", activePlayerId: "a4" },
     ]);
 
     expect(modifiers.d1.primaryFormCardId).toBe("positive-red");
@@ -785,9 +861,7 @@ describe("AI legacy lineup form-card planning", () => {
       { playerId: "p1", disciplineId: "tdm", score: 80 },
     ];
 
-    const modifiers = buildAiLegacyLineupModifiers(context, [
-      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p1", activePlayerId: "a1" },
-    ]);
+    const modifiers = buildAiLegacyLineupModifiers(context, fillSide("tdm", "d1", 3));
 
     expect(modifiers.d1.primaryFormCardId).toBeNull();
     expect(modifiers.d1.secondaryFormCardId).toBeNull();
@@ -816,9 +890,7 @@ describe("AI legacy lineup form-card planning", () => {
       { playerId: "p1", disciplineId: "tdm", score: 80 },
     ];
 
-    const modifiers = buildAiLegacyLineupModifiers(context, [
-      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p1", activePlayerId: "a1" },
-    ]);
+    const modifiers = buildAiLegacyLineupModifiers(context, fillSide("tdm", "d1", 3));
 
     expect(modifiers.d1.primaryFormCardId).toBe("positive-red-8");
   });
@@ -863,16 +935,12 @@ describe("AI legacy lineup form-card planning", () => {
       return context;
     };
 
-    const dominantModifiers = buildAiLegacyLineupModifiers(buildDominanceContext(1), [
-      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p1", activePlayerId: "a1" },
-    ]);
+    const dominantModifiers = buildAiLegacyLineupModifiers(buildDominanceContext(1), fillSide("tdm", "d1", 6));
     expect(dominantModifiers.d1.primaryFormCardId).toBe("positive-red-8");
     expect(dominantModifiers.d1.secondaryFormCardId).toBeNull();
 
     // Ohne klare Dominanz (Rang 5) ist die Doppel-Investition in der großen Disziplin legitim.
-    const contestedModifiers = buildAiLegacyLineupModifiers(buildDominanceContext(5), [
-      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p1", activePlayerId: "a1" },
-    ]);
+    const contestedModifiers = buildAiLegacyLineupModifiers(buildDominanceContext(5), fillSide("tdm", "d1", 6));
     expect(contestedModifiers.d1.primaryFormCardId).toBe("positive-red-8");
     expect(contestedModifiers.d1.secondaryFormCardId).toBe("positive-red-7");
   });
@@ -901,8 +969,12 @@ describe("AI legacy lineup form-card planning", () => {
     ];
 
     const modifiers = buildAiLegacyLineupModifiers(context, [
-      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p1", activePlayerId: "a1" },
-      { disciplineId: "puzzle", disciplineSide: "d2", slotIndex: 0, playerId: "p2", activePlayerId: "a2" },
+      ...fillSide("tdm", "d1", 6),
+      // d2 behaelt bewusst `p2` auf Slot 0 — an diesem Spieler haengt der `disciplineScores`-
+      // Eintrag fuer puzzle, ueber den die Seite ihre Staerke bestimmt. Ein anderer Praefix haette
+      // die Wertung der Seite still entkoppelt und den Fall entschaerft.
+      { disciplineId: "puzzle", disciplineSide: "d2" as const, slotIndex: 0, playerId: "p2", activePlayerId: "a2" },
+      { disciplineId: "puzzle", disciplineSide: "d2" as const, slotIndex: 1, playerId: "p2b", activePlayerId: "a2b" },
     ]);
 
     expect(modifiers.d2.primaryFormCardId).toBe("negative-green-8");
