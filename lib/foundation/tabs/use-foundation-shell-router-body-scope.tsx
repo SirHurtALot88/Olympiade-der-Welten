@@ -4383,13 +4383,21 @@ export function useFoundationShellRouterBodyScope({
       });
       return result;
     }
-    const reasons = result?.blockingReasons ?? [];
+    // Die Route legt Ablehnungsgruende an ZWEI Stellen ab (oben und noch einmal in
+    // `summary`), und manche Ablehnung kommt nur als Warnung. Wer nur die obere Ablage
+    // liest, bekommt in genau diesen Faellen eine leere Begruendung und meldet
+    // "abgelehnt, kein Grund" — was von "der Knopf tut nichts" kaum zu unterscheiden ist.
+    const reasons = [
+      ...(result?.blockingReasons ?? []),
+      ...(result?.summary?.blockingReasons ?? []),
+      ...(result?.warnings ?? []),
+    ];
     setFoundationActionFeedback({
       tone: "warning",
       title: "Spieltag konnte nicht abgeschlossen werden",
       detail:
         reasons.length > 0
-          ? reasons.map((reason) => formatCockpitReason(reason)).join(" · ")
+          ? [...new Set(reasons.map((reason) => formatCockpitReason(reason)))].join(" · ")
           : "Der Wechsel wurde abgelehnt — Details stehen im Cockpit unter Matchday Advance.",
     });
     return result;

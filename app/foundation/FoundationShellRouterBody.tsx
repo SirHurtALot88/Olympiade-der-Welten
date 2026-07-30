@@ -2574,11 +2574,22 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             // (422 mit `blockingReasons`) vollstaendig. Der Knopf wurde kurz grau und
             // danach war der Spieltag trotzdem derselbe — von aussen nicht von "Knopf tut
             // nichts" zu unterscheiden. Der Wrapper meldet Start, Erfolg und Ablehnung
-            // mit Begruendung zurueck. Bewusst OHNE `?.`: ein fehlender Handler ist ein
-            // Fehler und soll knallen, nicht still nichts tun.
+            // mit Begruendung zurueck (aus beiden Ablagen der Route plus Warnungen) und
+            // raeumt die alten Flow-Haken weg. Bewusst OHNE `?.`: ein fehlender Handler
+            // ist ein Fehler und soll knallen, nicht still nichts tun.
+            //
+            // Die NAVIGATION bleibt hier statt im Handler: welche Ansicht danach dran ist,
+            // ist Sache des Shell-Bodys, nicht der Spieltags-Logik. Ohne sie stand man
+            // nach dem Wechsel weiter in der Arena des GERADE ABGESCHLOSSENEN Spieltags
+            // und sah weder die neue Tabelle noch den neuen Spieltag.
             onAdvanceMatchday={
               canAdvanceMatchdayFromStep(matchdayAdvanceStep)
-                ? () => finishMatchdayAndAdvance()
+                ? async () => {
+                    const summary = await finishMatchdayAndAdvance();
+                    if (summary?.applied) {
+                      setFoundationView("seasonV2", setActiveView, { push: true });
+                    }
+                  }
                 : null
             }
             onCommitDiscipline={commitArenaDiscipline}

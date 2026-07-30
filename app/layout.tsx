@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import "./globals.css";
 import { AuthStatusBadge } from "@/components/auth/AuthStatusBadge";
+import { BugReportFlag } from "@/components/feedback/BugReportFlag";
 import { isAuthEnabled } from "@/lib/auth/config";
 
 export const metadata: Metadata = {
@@ -14,6 +15,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="de">
       <body>
         <AuthStatusBadge authEnabled={isAuthEnabled()} />
+        {/* Immer erreichbar, unabhaengig vom Login: melden koennen soll man auch auf einer
+            Seite, die gerade halb kaputt ist. */}
+        <BugReportFlag />
         {children}
       </body>
     </html>

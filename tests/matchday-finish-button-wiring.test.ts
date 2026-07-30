@@ -50,10 +50,10 @@ describe("Spieltagsabschluss: Knopf in der Buehne, Sektion darunter entfernt", (
 
   it("ruft den meldenden Wrapper OHNE Optional-Chaining auf", () => {
     // Mit `?.` sah ein fehlender Handler exakt aus wie "Knopf tut nichts".
-    expect(body).toContain("? () => finishMatchdayAndAdvance()");
+    expect(body).toContain("await finishMatchdayAndAdvance();");
     expect(body).not.toContain("finishMatchdayAndAdvance?.()");
     // Und nicht mehr direkt am rohen Handler vorbei — der verschluckte die Ablehnung.
-    expect(body).not.toContain("() => runCockpitMatchdayAdvance?.(true)");
+    expect(body).not.toContain("runCockpitMatchdayAdvance?.(true)");
   });
 
   it("meldet Start, Erfolg UND Ablehnung zurueck", () => {
