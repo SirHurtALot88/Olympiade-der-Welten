@@ -183,6 +183,34 @@ export function saveBugReport(input: BugReportInput): { reportId: string; file: 
   return { reportId: record.reportId, file, record };
 }
 
+/**
+ * Signatur ueber die abgelegten Meldungen — die Aenderungserkennung fuer den Auto-Export
+ * (`lib/persistence/online-save-auto-export.ts`), der die Meldungen ins Repo mitnimmt.
+ *
+ * Warum die Meldungen eine EIGENE Signatur brauchen und nicht an der Save-Signatur mitlaufen: der
+ * Export-Zyklus bricht ab, wenn sich kein Save bewegt hat, und danach ein zweites Mal, wenn der
+ * Save-Export nichts geaendert hat. Eine Meldung von einer Seite, auf der man nicht spielt (Login,
+ * Startseite, Online-Raum), haette den Rechner damit nie verlassen — und das ist genau die Lage,
+ * in der man meldet.
+ *
+ * Dateinamen genuegen: eine Meldung wird geschrieben und nie wieder veraendert. Die Vorpruefungen
+ * liegen als `.md` im Unterordner `triage/` und zaehlen bewusst NICHT mit — sonst schoebe jede
+ * Statusaenderung einen Commit an, ohne dass eine neue Meldung vorliegt.
+ */
+export function computeBugReportSignature(): string {
+  try {
+    if (!fs.existsSync(BUG_REPORTS_DIR)) return "";
+    return fs
+      .readdirSync(BUG_REPORTS_DIR)
+      .filter((name) => name.endsWith(".json"))
+      .sort()
+      .join("|");
+  } catch {
+    // Eine unlesbare Ablage darf den Auto-Export nicht zum Absturz bringen — er laeuft im Timer.
+    return "";
+  }
+}
+
 export function listBugReports(limit = 50): BugReportRecord[] {
   if (!fs.existsSync(BUG_REPORTS_DIR)) return [];
   return fs
