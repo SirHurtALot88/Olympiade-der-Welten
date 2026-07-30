@@ -207,6 +207,8 @@ describe("transfermarkt sell api", () => {
           seasonId: "season-1",
           teamId: "M-M",
           activePlayerId: "active-1",
+          // Der AUSFUEHRENDE Pfad — nur der laeuft in die Phasensperre.
+          dryRun: false,
         }),
       }),
     );
@@ -214,6 +216,55 @@ describe("transfermarkt sell api", () => {
 
     expect(response.status).toBe(409);
     expect(body.error).toBe("phase_blocked:sell_players:season_completed");
-    expect(previewLocalTransfermarktSell).not.toHaveBeenCalled();
+    expect(executeLocalTransfermarktSell).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Vertragsaenderung, bewusst: die Phasensperre gilt fuer den VERKAUF, nicht
+   * fuer das Nachschlagen. Vorher lief auch die reine Vorschau dagegen und
+   * antwortete mit 409 und `summary: null` — der Spieler sah ausserhalb des
+   * Fensters statt Preis, Erloes und GuV nur Striche, genau wenn er entscheiden
+   * will, wen er am Saisonende abgibt.
+   *
+   * Gefahrlos ist das, weil die Vorschau den Verkauf nicht ermoeglicht: sie
+   * traegt den Sachverhalt selbst als `blockingReasons` mit `canSell: false`.
+   * Am echten Spielstand in `season_completed` nachgemessen.
+   */
+  it("liefert die Vorschau auch ausserhalb des Verkaufsfensters — samt Blockgrund", async () => {
+    persistenceMocks.getSaveById.mockReturnValue(phaseSave("season_completed"));
+    previewLocalTransfermarktSell.mockReturnValue({
+      canSell: false,
+      blockingReasons: ["sell_only_at_season_end"],
+      warnings: [],
+      salePrice: 28.37,
+      netProceeds: 23.13,
+    });
+
+    const { POST } = await import("@/app/api/transfermarkt/sell/route");
+    const response = await POST(
+      new Request("http://localhost/api/transfermarkt/sell", {
+        method: "POST",
+        body: JSON.stringify({
+          saveId: "save-singleplayer-dev",
+          seasonId: "season-1",
+          teamId: "M-M",
+          activePlayerId: "active-1",
+        }),
+      }),
+    );
+    const body = await response.json();
+
+    expect(previewLocalTransfermarktSell).toHaveBeenCalled();
+    // Die Zahlen sind da …
+    expect(body.summary.salePrice).toBe(28.37);
+    expect(body.summary.netProceeds).toBe(23.13);
+    // … und die Sperre auch.
+    expect(body.summary.canSell).toBe(false);
+    expect(body.summary.blockingReasons).toContain("sell_only_at_season_end");
+    // Kein `error`: das ist ein regulaerer Zustand, kein Fehlschlag. Sonst zeigte
+    // das Modal denselben Sachverhalt zweimal.
+    expect(body.error).toBeUndefined();
+    // Und verkauft wurde ganz sicher nichts.
+    expect(executeLocalTransfermarktSell).not.toHaveBeenCalled();
   });
 });
