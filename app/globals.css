@@ -73171,3 +73171,173 @@ button.is-new-look .nl-thist-season-pill,
   gap: 6px;
   flex: 0 0 auto;
 }
+
+/* ==========================================================================
+   SAISONABSCHLUSS (season-finale)
+
+   Die Bühne für das Saisonende. Vorher schickte der Flow den Spieler ins Cockpit —
+   dort steht "salary_explosion" neben "S3 Readiness", und der Abschluss einer Saison
+   ging darin unter. Diese Ansicht hat deshalb bewusst KEINE Cockpit-Optik: großer
+   Kopf, ruhige Blöcke, eine Handlung je Zeile.
+   ========================================================================== */
+.nl-season-finale {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.nl-season-finale-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nl-season-finale-eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.nl-season-finale-hero h2 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.15;
+}
+
+.nl-season-finale-sub {
+  margin: 0;
+  color: var(--nl-mut);
+  font-size: 13px;
+}
+
+.nl-season-finale h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.nl-season-finale-awards ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  /* Auto-fit statt fester Spaltenzahl: die Zahl der Auszeichnungen schwankt
+     (Best Transfer entfällt ohne Transfers), und Löcher im Raster sähen aus, als
+     fehlte etwas. */
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.nl-season-finale-award {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--nl-line);
+  border-radius: 10px;
+  background: var(--nl-panel-2);
+}
+
+.nl-season-finale-award-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-accent);
+}
+
+.nl-season-finale-award.is-team .nl-season-finale-award-label {
+  color: var(--nl-gold);
+}
+
+.nl-season-finale-award strong {
+  font-size: 14px;
+}
+
+.nl-season-finale-award small {
+  color: var(--nl-mut);
+  font-size: 11.5px;
+}
+
+.nl-season-finale-board ul,
+.nl-season-finale-steps ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nl-season-finale-board li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: var(--nl-panel-2);
+  font-size: 13px;
+}
+
+.nl-season-finale-board li.is-completed small {
+  color: var(--nl-good);
+  font-weight: 700;
+}
+
+.nl-season-finale-board li.is-failed small {
+  color: var(--nl-risk);
+  font-weight: 700;
+}
+
+.nl-season-finale-step {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--nl-line);
+  border-radius: 10px;
+  background: var(--nl-panel-2);
+}
+
+/* Erledigtes bleibt lesbar, tritt aber zurück — sonst konkurriert die Vergangenheit
+   optisch mit dem, was jetzt ansteht. */
+.nl-season-finale-step.is-done {
+  opacity: 0.62;
+}
+
+.nl-season-finale-step-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.nl-season-finale-step-text strong {
+  font-size: 14px;
+}
+
+.nl-season-finale-step-text small {
+  color: var(--nl-mut);
+  font-size: 12px;
+}
+
+.nl-season-finale-step-done {
+  flex: none;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--nl-good);
+}
+
+@media (max-width: 720px) {
+  .nl-season-finale-step {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

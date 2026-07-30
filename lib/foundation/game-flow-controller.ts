@@ -37,6 +37,7 @@ export type GameFlowView =
   | "home"
   | "hq"
   | "season"
+  | "seasonV2"
   | "cockpit"
   | "lineup"
   | "matchdayArena"
@@ -176,7 +177,11 @@ function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null):
       label: "Saisonrückblick prüfen",
       cta: "Weiter: Saisonrückblick",
       status: gamePhase === "season_completed" || gamePhase === "season_review" || hasSeasonHistory ? "ready" : "completed",
-      targetView: "cockpit",
+      // Der Rueckblick lebt jetzt im Saisonstand als eigene Abschluss-Ansicht. Vorher
+      // zeigte er auf das Cockpit — einen Werkzeugkasten mit "Blocker pruefen" und
+      // "salary_explosion", in dem ein Spieler nichts verloren hat.
+      targetView: "seasonV2",
+      targetPanel: "season-finale",
       teamId: activeTeamId,
       warnings: hasSeasonHistory ? [] : ["season_source_missing"],
     }),
@@ -270,7 +275,10 @@ function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null):
       label: "Season vorbereiten",
       cta: "Weiter: Season Setup",
       status: gamePhase === "next_season_ready" || gamePhase === "season_active" ? "completed" : preseasonManagementReady ? "warning" : "ready",
-      targetView: "cockpit",
+      // Ziel ist die Saisonabschluss-Ansicht, nicht das Cockpit: dort steht der Schritt
+      // "Neue Saison starten" mit demselben Handler, aber in Spielersprache.
+      targetView: "seasonV2",
+      targetPanel: "season-finale",
       teamId: activeTeamId,
       /**
        * NUR NOCH DAS, WAS MAN AUCH ERLEDIGEN KANN.
