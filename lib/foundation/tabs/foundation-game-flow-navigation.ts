@@ -22,7 +22,7 @@ export type FoundationGameFlowNavigationDeps = {
   setSelectedTeamDetailTab: (tab: "roster" | "contracts") => void;
   setMarketFocusPlayerId: (playerId: string | null) => void;
   navigateToPrizeFinanceViewFromRouting: (panel: string | null | undefined, push: boolean) => void;
-  openPrizeFinanceView: (options?: { tab?: "sponsors" | "prize"; push?: boolean }) => void;
+  openPrizeFinanceView: (options?: { push?: boolean }) => void;
 };
 
 export type FoundationGameFlowNavigator = {
@@ -71,7 +71,7 @@ export function createFoundationGameFlowNavigator(deps: FoundationGameFlowNaviga
       return;
     }
     if (targetPanel === "sponsor-choice") {
-      deps.openPrizeFinanceView({ tab: "sponsors", push: false });
+      deps.openPrizeFinanceView({ push: false });
       deps.setShowGameFlowPanel(false);
       return;
     }

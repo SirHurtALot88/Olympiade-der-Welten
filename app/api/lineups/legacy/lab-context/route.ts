@@ -2,6 +2,8 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 
+import { isAuthEnabled } from "@/lib/auth/config";
+import { resolveSessionOwnerId } from "@/lib/auth/session";
 import { LegacyLineupContextLoader } from "@/lib/lineups/legacy-lineup-context-loader";
 import { loadLocalLegacyLineupContext, loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-lineup-local-service";
 import { LegacyLineupRepository } from "@/lib/lineups/legacy-lineup-repository";
@@ -58,8 +60,34 @@ function parseOptionalParams(request: Request) {
     seasonId: searchParams.get("seasonId")?.trim() ?? null,
     matchdayId: searchParams.get("matchdayId")?.trim() ?? null,
     teamId: searchParams.get("teamId")?.trim() ?? null,
-    activeOwnerId: searchParams.get("activeOwnerId")?.trim() || DEFAULT_ACTIVE_OWNER_ID,
+    // NUR ein Vorschlag des Browsers — verbindlich ist die Sitzung. Siehe `resolveRequestOwnerId`.
+    requestedActiveOwnerId: searchParams.get("activeOwnerId")?.trim() || null,
   };
+}
+
+/**
+ * WER FRAGT — und zwar so, dass der Browser es nicht bestimmen kann.
+ *
+ * Diese Route entscheidet ueber `isSqliteLineupReadOnly`, ob eine Einsatzliste bedienbar ist. Bis
+ * hierher nahm sie die Identitaet aus dem Query-String und fiel sonst auf DEFAULT_ACTIVE_OWNER_ID
+ * zurueck. Zwei Folgen, beide schlecht:
+ *
+ *   1. Ein umgeschriebener Link konnte behaupten, jemand anderes zu sein — die Aufstellung eines
+ *      fremden Teams waere damit als eigene bedienbar gewesen.
+ *   2. Fehlte der Parameter, galt bei jedem der beiden Spieler stillschweigend derselbe Default.
+ *      Fuer den anderen war das schlicht die falsche Person, und seine eigene Aufstellung erschien
+ *      gesperrt. Genau so gemeldet: "ich habe ploetzlich nicht mehr die moeglichkeit formkarten
+ *      einzusetzen" — auf dem EIGENEN Team.
+ *
+ * `lib/auth/session.ts` schreibt die Regel vor: jeder Pfad, der "meins" aufloest, nimmt
+ * `resolveSessionOwnerId()`. Bei abgeschaltetem Login gibt es keine Sitzung und genau einen Spieler
+ * — dann bleibt der bisherige Weg (Query-Parameter, sonst Default) richtig.
+ */
+async function resolveRequestOwnerId(requested: string | null): Promise<string> {
+  if (isAuthEnabled()) {
+    return (await resolveSessionOwnerId()) ?? DEFAULT_ACTIVE_OWNER_ID;
+  }
+  return requested || DEFAULT_ACTIVE_OWNER_ID;
 }
 
 async function resolveDefaultPrismaParams(input: {
@@ -507,8 +535,13 @@ export async function GET(request: Request) {
       });
     }
 
+    const activeOwnerId = await resolveRequestOwnerId(parsed.requestedActiveOwnerId);
+
     const persistence = createPersistenceService();
-    const resolved = resolveLocalPersistedSave(persistence, parsed.saveId);
+    // Der Besitzer MUSS mit: fehlt die saveId, greift sonst der global zuletzt aktive Save — bei zwei
+    // angemeldeten Spielern regelmaessig der des ANDEREN. Die Einsatzliste haette dann gegen einen
+    // fremden Spielstand geprueft, in dem das eigene Team nicht steuerbar ist, und sich gesperrt.
+    const resolved = resolveLocalPersistedSave(persistence, parsed.saveId, activeOwnerId);
     if (!resolved) {
       return NextResponse.json({ error: "No local save available for legacy lineup lab." }, { status: 404 });
     }
@@ -520,7 +553,7 @@ export async function GET(request: Request) {
       seasonId: params.seasonId,
       matchdayId: params.matchdayId,
       teamId: params.teamId,
-      activeOwnerId: parsed.activeOwnerId,
+      activeOwnerId,
     });
     const cacheSignature = versionMeta?.contentSignature ?? `${save.saveId}:${versionMeta?.saveVersion ?? 0}`;
     const cachedPayload = readLegacyLineupLabContextCache<Record<string, unknown>>(cacheKey, cacheSignature);
@@ -538,7 +571,7 @@ export async function GET(request: Request) {
     const payload = {
       params,
       source: "sqlite",
-      readOnly: isSqliteLineupReadOnly(save, params, parsed.activeOwnerId),
+      readOnly: isSqliteLineupReadOnly(save, params, activeOwnerId),
       context: contextResult.ok ? contextResult.context : null,
       contextWarnings: contextResult.ok ? contextResult.warnings : contextResult.warnings,
       contextErrors: contextResult.ok ? [] : contextResult.errors,
