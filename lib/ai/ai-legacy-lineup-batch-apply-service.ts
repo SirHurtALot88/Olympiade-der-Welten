@@ -1401,9 +1401,21 @@ export function applyAiLegacyLineupBatchLocally(
     }
 
     const hasCompleteExistingDraft = isLegacyLineupDraftComplete(contextResult.context);
+    // Nur fuer Teams OHNE Manager am Tisch: ein `passive`-Team wuerde sonst mit leerer
+    // Einsatzliste antreten, weil niemand sie fuellt. Menschlich gesteuerte Teams sind
+    // hier bewusst NICHT dabei — siehe die Sperre direkt darunter.
     const canAutoFillIncompleteLineup = !hasCompleteExistingDraft;
 
-    if (team.controlMode === "manual" && !canAutoFillIncompleteLineup) {
+    // Ein `manual`-Team stellt der Spieler auf. Punkt. Frueher stand hier
+    // `manual && !canAutoFillIncompleteLineup`, die Sperre griff also NUR bei bereits
+    // vollstaendiger Aufstellung — genau umgekehrt zum Bedarf: Die leere Einsatzliste
+    // eines neuen Spieltags galt als "unvollstaendig" und wurde von der KI gefuellt
+    // (Komfort statt Blockade). Der Spieler fand seinen naechsten Spieltag damit fertig
+    // aufgestellt vor, samt der von `buildAiLegacyLineupModifiers` gewaehlten FORMKARTEN,
+    // die er nie gespielt hatte. Die Aufstellung ist die Kernentscheidung des Spielers;
+    // fehlt sie, meldet der Resolve-Schritt `missing_manual_lineup` — das ist der richtige
+    // Weg, nicht ein stiller KI-Griff in fremde Karten.
+    if (team.controlMode === "manual") {
       results.push({
         teamId: team.teamId,
         teamCode: team.teamCode,
@@ -1500,7 +1512,6 @@ export function applyAiLegacyLineupBatchLocally(
       continue;
     }
 
-    const effectiveAiEligible = team.aiEligible || canAutoFillIncompleteLineup;
     const previewStartedAt = performance.now();
     const preview = buildAiLegacyLineupPreview(contextResult.context, "sqlite");
     performanceBreakdown.aiLineupGenerationMs += elapsedSince(previewStartedAt);
@@ -1522,7 +1533,6 @@ export function applyAiLegacyLineupBatchLocally(
       ...(preview.warnings ?? []),
       ...(validationPreview.ok ? validationPreview.validation.warnings : validationPreview.warnings),
       ...(!formCardEnsure.ok ? formCardEnsure.warnings : formCardEnsure.warnings),
-      ...(canAutoFillIncompleteLineup && team.controlMode === "manual" ? ["manual_incomplete_lineup_autofilled"] : []),
     ]);
     const formCardsSelected = countSelectedFormCards(modifiers);
     const negativeFormCardsSelected = countSelectedNegativeFormCards(modifiers, contextResult.context.formCards ?? []);
