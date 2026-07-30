@@ -711,6 +711,10 @@ import {
 } from "@/lib/foundation/tabs/cockpit-ui-helpers";
 import { createCockpitMatchdayApplyHandlers } from "@/lib/foundation/tabs/cockpit-matchday-handlers";
 import {
+  createCockpitPreseasonHandlers,
+  createCockpitSeasonTransitionHandlers,
+} from "@/lib/foundation/tabs/cockpit-handlers";
+import {
   formatFitDisplay,
   formatMarketDevelopmentRoute,
   formatMarketDevelopmentTrend,
@@ -3928,6 +3932,128 @@ export function useFoundationShellRouterBodyScope({
     runCockpitMatchdayAdvance,
     runCockpitMatchdayAutoRun,
   } = matchdayArenaApplyHandlers;
+
+  /**
+   * DIESELBEN SAISONENDE-AKTIONEN, ABER AUSSERHALB DES COCKPITS.
+   *
+   * Preisgeld buchen, Entwicklung anwenden, naechste Saison starten — das gab es bisher
+   * nur im Cockpit, einem Werkzeugkasten mit Vokabeln wie "Preview laden" und
+   * "Blocker pruefen". Der Flow schickte den Spieler am Saisonende genau dorthin.
+   *
+   * Die Handler sind Factory-Funktionen, keine Hooks: sie lassen sich ueberall erzeugen,
+   * wo die Deps liegen. Der Praezedenzfall steht direkt darueber — die Arena benutzt
+   * `createCockpitMatchdayApplyHandlers` seit jeher auf demselben Weg. `runCockpitCashApply`
+   * kommt sogar geschenkt, es steckt bereits in `matchdayArenaApplyHandlers`.
+   */
+  const { runCockpitCashApply } = matchdayArenaApplyHandlers;
+
+  const seasonEndPreseasonHandlers = useMemo(
+    () =>
+      createCockpitPreseasonHandlers({
+        readMetaSource: readMeta.source,
+        setCockpitBusyKey,
+        preSeasonWorkflowFeed,
+        showReadOnlyNotice,
+        withRoomBody,
+        activeSaveId,
+        setPreSeasonWorkflowBusy,
+        setPreSeasonWorkflowError,
+        setPreSeasonWorkflowFeed,
+        loadSave,
+        reloadSeasonStandingsOverview,
+        reloadSeasonManagementOverview,
+        reloadHistoryFeed,
+        reloadTransferRecapFeed,
+        bumpMarketReloadToken: () => setMarketReloadToken((current) => current + 1),
+        setActiveView,
+        syncFoundationViewInUrl,
+      }),
+    [
+      activeSaveId,
+      loadSave,
+      preSeasonWorkflowFeed,
+      readMeta.source,
+      reloadHistoryFeed,
+      reloadSeasonManagementOverview,
+      reloadSeasonStandingsOverview,
+      reloadTransferRecapFeed,
+      setActiveView,
+      setCockpitBusyKey,
+      setMarketReloadToken,
+      setPreSeasonWorkflowBusy,
+      setPreSeasonWorkflowError,
+      setPreSeasonWorkflowFeed,
+      showReadOnlyNotice,
+      syncFoundationViewInUrl,
+      withRoomBody,
+    ],
+  );
+
+  const seasonEndTransitionHandlers = useMemo(
+    () =>
+      createCockpitSeasonTransitionHandlers({
+        readMetaSource: readMeta.source,
+        setCockpitBusyKey,
+        seasonId: gameState.season.id,
+        wholeSeasonMaxMatchdays,
+        wholeSeasonIncludeWarningLineups,
+        wholeSeasonOverwriteExistingLineups,
+        wholeSeasonStopOnTie,
+        showReadOnlyNotice,
+        withRoomBody,
+        activeSaveId,
+        setSeasonTransitionBusy,
+        setSeasonTransitionError,
+        setSeasonTransitionFeed,
+        setSeasonCompletionFeed,
+        setCashApplyFeed,
+        setSeasonSnapshotFeed,
+        setWholeSeasonDryRunFeed,
+        setFoundationActionFeedback,
+        loadSave,
+        reloadResolvePreview,
+        reloadStandingsPreviewFeed,
+        reloadPrizePreviewFeed,
+        reloadSeasonStandingsOverview,
+        reloadSeasonManagementOverview,
+        reloadHistoryFeed,
+        reloadTransferRecapFeed,
+        setActiveView,
+        syncFoundationViewInUrl,
+      }),
+    [
+      activeSaveId,
+      gameState.season.id,
+      loadSave,
+      readMeta.source,
+      reloadHistoryFeed,
+      reloadPrizePreviewFeed,
+      reloadResolvePreview,
+      reloadSeasonManagementOverview,
+      reloadSeasonStandingsOverview,
+      reloadStandingsPreviewFeed,
+      reloadTransferRecapFeed,
+      setActiveView,
+      setCashApplyFeed,
+      setCockpitBusyKey,
+      setFoundationActionFeedback,
+      setSeasonCompletionFeed,
+      setSeasonSnapshotFeed,
+      setSeasonTransitionBusy,
+      setSeasonTransitionError,
+      setSeasonTransitionFeed,
+      setWholeSeasonDryRunFeed,
+      showReadOnlyNotice,
+      syncFoundationViewInUrl,
+      wholeSeasonIncludeWarningLineups,
+      wholeSeasonMaxMatchdays,
+      wholeSeasonOverwriteExistingLineups,
+      wholeSeasonStopOnTie,
+    ],
+  );
+
+  const { runPreSeasonWorkflowPreview, runPreSeasonNextSeasonSetup } = seasonEndPreseasonHandlers;
+  const { runSeasonCompletion } = seasonEndTransitionHandlers;
 
   async function runAiPreseasonBackground() {
     if (readMeta.source === "prisma") {
@@ -11542,6 +11668,12 @@ export function useFoundationShellRouterBodyScope({
     runFacilityUpgradePreview,
     commitArenaDiscipline,
     finishMatchdayAndAdvance,
+    // Saisonabschluss-Ansicht (season-finale): dieselben Aktionen wie im Cockpit,
+    // nur an einer Stelle, an die man einen Spieler schicken kann.
+    runCockpitCashApply,
+    runPreSeasonWorkflowPreview,
+    runPreSeasonNextSeasonSetup,
+    runSeasonCompletion,
     runFoundationCommand,
     runNewGameSetup,
     runSaveAction,

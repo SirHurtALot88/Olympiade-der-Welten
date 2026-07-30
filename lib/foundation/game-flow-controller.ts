@@ -37,6 +37,7 @@ export type GameFlowView =
   | "home"
   | "hq"
   | "season"
+  | "seasonV2"
   | "cockpit"
   | "lineup"
   | "matchdayArena"
@@ -156,8 +157,6 @@ function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null):
     seasonIntroStep?.status !== "skipped";
   const isFirstSeason = /season[-_\s]*1\b/i.test(`${gameState.season.id} ${gameState.season.name}`);
   const isSeasonReviewPhase = gamePhase === "season_completed" || gamePhase === "season_review";
-  const boardSignals = getTeamBoardFlowSignals(gameState, activeTeamId);
-  const boardFlowWarnings = uniq([...boardSignals.blockers, ...boardSignals.warnings]);
   const playerDevelopmentDone = completedTransitionSteps.has("player_development");
   const preseasonManagementReady =
     gamePhase === "next_season_ready" ||
@@ -178,7 +177,11 @@ function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null):
       label: "Saisonrückblick prüfen",
       cta: "Weiter: Saisonrückblick",
       status: gamePhase === "season_completed" || gamePhase === "season_review" || hasSeasonHistory ? "ready" : "completed",
-      targetView: "cockpit",
+      // Der Rueckblick lebt jetzt im Saisonstand als eigene Abschluss-Ansicht. Vorher
+      // zeigte er auf das Cockpit — einen Werkzeugkasten mit "Blocker pruefen" und
+      // "salary_explosion", in dem ein Spieler nichts verloren hat.
+      targetView: "seasonV2",
+      targetPanel: "season-finale",
       teamId: activeTeamId,
       warnings: hasSeasonHistory ? [] : ["season_source_missing"],
     }),
@@ -272,10 +275,28 @@ function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null):
       label: "Season vorbereiten",
       cta: "Weiter: Season Setup",
       status: gamePhase === "next_season_ready" || gamePhase === "season_active" ? "completed" : preseasonManagementReady ? "warning" : "ready",
-      targetView: "cockpit",
+      // Ziel ist die Saisonabschluss-Ansicht, nicht das Cockpit: dort steht der Schritt
+      // "Neue Saison starten" mit demselben Handler, aber in Spielersprache.
+      targetView: "seasonV2",
+      targetPanel: "season-finale",
       teamId: activeTeamId,
+      /**
+       * NUR NOCH DAS, WAS MAN AUCH ERLEDIGEN KANN.
+       *
+       * Der Knopf beschriftet sich aus `warnings[0]` (FoundationShellRouterBody:1885).
+       * Hier standen vorher auch die Board-Signale — darunter `board_objectives_failed`.
+       * Ein verfehltes Saisonziel ist aber eine Tatsache ueber eine ABGESCHLOSSENE Saison:
+       * es kann nie wieder erfuellt werden, verschwindet also nie. Der Weiter-Knopf hiess
+       * dadurch dauerhaft "Board-Ziel verfehlt", ohne dass es etwas zu tun gab — der
+       * Spieler haengt sichtbar fest, obwohl der Schritt bereit ist.
+       *
+       * Der Board-Zustand bleibt sichtbar, nur eben dort, wo er hingehoert: als
+       * Board-Ziele auf der Startseite und als eigener Posteingang-Eintrag
+       * (game-inbox-service: "Board-Ziel verfehlt"). Gefaehrdete Ziele (`at_risk`,
+       * `high_board_pressure`) sind laufende Saison und ebenfalls kein Grund, den
+       * Saisonwechsel zu beschriften.
+       */
       warnings: uniq([
-        ...boardFlowWarnings,
         hasSeasonHistory && !cashApplied ? "prize_money_not_applied" : null,
         hasSeasonHistory && !playerDevelopmentDone ? "player_development_pending" : null,
       ]),

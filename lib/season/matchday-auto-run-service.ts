@@ -106,6 +106,7 @@ export type MatchdayAutoRunResult = {
   summary: {
     lineupsReady: number;
     aiReady: number;
+    aiMissing: number;
     manualReady: number;
     missingManualTeams: number;
     manualMissing: number;
@@ -332,6 +333,16 @@ function buildDryRunLineupSummary(input: {
       .map((draft) => draft.teamId),
   );
   let aiReady = 0;
+  /**
+   * FEHLENDE KI-AUFSTELLUNGEN WURDEN NICHT GEZAEHLT.
+   *
+   * Der Zweig fuer `ai` hatte nur ein `if (isReady) aiReady += 1` und danach ein `continue`
+   * — kein Gegenstueck. `manual` und `passive` zaehlen ihre Fehlenden seit jeher. Damit gab
+   * es keine Zahl, an der ein Blocker haette haengen koennen, und ein Spieltag ohne EINE
+   * einzige Aufstellung lief sauber durch: Podest aus drei Teams mit 0 Punkten, Spieltag
+   * verbraucht, Ergebnis wertlos.
+   */
+  let aiMissing = 0;
   let manualReady = 0;
   let manualMissing = 0;
   let passiveReady = 0;
@@ -347,6 +358,8 @@ function buildDryRunLineupSummary(input: {
     if (controlMode === "ai") {
       if (isReady) {
         aiReady += 1;
+      } else if (isMissingLineup) {
+        aiMissing += 1;
       }
       continue;
     }
@@ -370,6 +383,7 @@ function buildDryRunLineupSummary(input: {
   return {
     lineupsReady: input.resolve.summary.teamsReady,
     aiReady,
+    aiMissing,
     manualReady,
     missingManualTeams: manualMissing,
     manualMissing,
@@ -404,6 +418,7 @@ function createBaseResult(
     summary: {
       lineupsReady: 0,
       aiReady: 0,
+      aiMissing: 0,
       manualReady: 0,
       missingManualTeams: 0,
       manualMissing: 0,
@@ -833,6 +848,7 @@ export async function runLocalMatchdayAutoRun(
 
   result.summary.lineupsReady = lineupSummary.lineupsReady;
   result.summary.aiReady = lineupSummary.aiReady;
+  result.summary.aiMissing = lineupSummary.aiMissing;
   result.summary.manualReady = lineupSummary.manualReady;
   result.summary.missingManualTeams = lineupSummary.missingManualTeams;
   result.summary.manualMissing = lineupSummary.manualMissing;
@@ -844,6 +860,11 @@ export async function runLocalMatchdayAutoRun(
   const resolveBlockingReasons = [
     ...(lineupSummary.manualMissing > 0 ? ["missing_manual_lineup"] : []),
     ...(lineupSummary.passiveMissing > 0 ? ["passive_missing_lineup"] : []),
+    // Fehlende KI-Aufstellungen blockieren genauso wie fehlende menschliche. Ohne diesen
+    // Eintrag konnte ein Spieltag gewertet werden, an dem KEIN einziges Team antritt —
+    // gemeldet aus einem frischen Spielstand, in dem der KI-Kaderaufbau nicht durchgelaufen
+    // war: 32 Teams "keine Aufstellung", alle 0 Punkte, Spieltag trotzdem verbraucht.
+    ...(lineupSummary.aiMissing > 0 ? ["missing_ai_lineup"] : []),
     ...(activeResolve.preview.status === "ready" ? [] : [`resolve_status:${activeResolve.preview.status}`]),
   ];
   addStep(result, {

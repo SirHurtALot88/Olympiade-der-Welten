@@ -63,6 +63,9 @@ export async function POST(request: Request) {
       game: result.record.game,
       page: result.record.page,
       reporter: result.record.reporter,
+      // Ob die Meldung den Rechner VERLASSEN hat. Genau daran ist die erste gescheitert: die
+      // Datei lag da, gesehen hat sie nie jemand. Wer meldet, soll das sofort sehen.
+      git: { pushed: result.git.pushed, unpushed: result.git.unpushed, error: result.git.error },
     });
   } catch (error) {
     return NextResponse.json(

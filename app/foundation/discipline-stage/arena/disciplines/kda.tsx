@@ -13,7 +13,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import type { DisciplineFieldProps, RT } from "./types";
-import { useTokenGlide, tokenRef, GhostLayer, TokenChrome } from "./benchmark";
+import { useTokenGlide, tokenRef, GhostLayer, TokenChrome, tokenRadius } from "./benchmark";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -278,7 +278,7 @@ export default function KdaField(props: DisciplineFieldProps): ReactNode {
         {rt.map((t) =>
           t.logoUrl ? (
             <clipPath key={`clip-${t.code}`} id={`natclip-${t.code}`}>
-              <circle cx={0} cy={0} r={t.isOwn ? geo.rOwn : geo.r} />
+              <circle cx={0} cy={0} r={tokenRadius(t, geo)} />
             </clipPath>
           ) : null,
         )}
@@ -348,7 +348,7 @@ export default function KdaField(props: DisciplineFieldProps): ReactNode {
         .slice()
         .reverse()
         .map((t) => {
-          const r = t.isOwn ? geo.rOwn : geo.r;
+          const r = tokenRadius(t, geo);
           const glowing = t.glowUntil > now;
           const isLead = t.rank === 1;
           return (

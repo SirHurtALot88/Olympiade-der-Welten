@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import type { DisciplineFieldProps, RT } from "./types";
-import { GhostLayer, TokenChrome } from "./benchmark";
+import { GhostLayer, TokenChrome, tokenRadius } from "./benchmark";
 
 export default function SchachField(props: DisciplineFieldProps): ReactNode {
   const {
@@ -410,7 +410,7 @@ export default function SchachField(props: DisciplineFieldProps): ReactNode {
           .sort((a, b) => b.animScore - a.animScore || a.seasonRank - b.seasonRank)
           .findIndex((o) => o.idx === t.idx);
         const i = liveIdx >= 0 ? liveIdx : sorted.indexOf(t);
-        const r = t.isOwn ? geo.rOwn : geo.r;
+        const r = tokenRadius(t, geo);
         // Bezug für die relative Elo-Höhe (Render-Snapshot): Führer nach anim/displayScore.
         const leadAnimR = rt.reduce((m, o) => Math.max(m, o.animScore), 0);
         const leadDispR = rt.reduce((m, o) => Math.max(m, o.displayScore), 0);
@@ -450,7 +450,7 @@ export default function SchachField(props: DisciplineFieldProps): ReactNode {
         {rt.map((t) =>
           t.logoUrl ? (
             <clipPath key={`clip-${t.code}`} id={`natclip-${t.code}`}>
-              <circle cx={0} cy={0} r={t.isOwn ? geo.rOwn : geo.r} />
+              <circle cx={0} cy={0} r={tokenRadius(t, geo)} />
             </clipPath>
           ) : null,
         )}

@@ -15,6 +15,7 @@ import path from "node:path";
 
 import { getFoundationBreadcrumb } from "@/lib/foundation/foundation-breadcrumb";
 import { normalizeFoundationViewParam, type FoundationViewId } from "@/lib/foundation/foundation-view-routing";
+import { commitAndPushBugReport, type BugReportGitResult } from "@/lib/bug-report/bug-report-git";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 
 export const BUG_REPORTS_DIR = path.join(process.cwd(), "data", "bug-reports");
@@ -203,7 +204,9 @@ function collectGameContext(url: string | null | undefined): BugReportRecord["ga
   }
 }
 
-export function saveBugReport(input: BugReportInput): { reportId: string; file: string; record: BugReportRecord } {
+export function saveBugReport(
+  input: BugReportInput,
+): { reportId: string; file: string; record: BugReportRecord; git: BugReportGitResult } {
   const now = new Date();
   const record: BugReportRecord = {
     ...input,
@@ -217,7 +220,25 @@ export function saveBugReport(input: BugReportInput): { reportId: string; file: 
   fs.mkdirSync(BUG_REPORTS_DIR, { recursive: true });
   const file = path.join(BUG_REPORTS_DIR, `${record.reportId}.json`);
   fs.writeFileSync(file, `${JSON.stringify(record, null, 2)}\n`, "utf8");
-  return { reportId: record.reportId, file, record };
+
+  // ERST schreiben, DANN versionieren. Ohne diesen Schritt liegt die Meldung auf genau einer
+  // Platte und erreicht niemanden — daran ist die erste verlorengegangen: die Datei war da,
+  // gesehen hat sie nie jemand. Scheitert Git, bleibt die Datei trotzdem bestehen; die
+  // Meldung geht nie verloren, nur ihre Reichweite ist dann geringer.
+  const git = commitAndPushBugReport({
+    absoluteFile: file,
+    reportId: record.reportId,
+    reporterLabel: record.reporter.displayName ?? "Unbekannt",
+    summary: [
+      record.page.label ?? record.page.path ?? "unbekannte Seite",
+      record.game?.saveName
+        ? `${record.game.saveName} · Spieltag ${record.game.currentMatchday ?? "?"}`
+        : "ohne Spielkontext",
+      record.note ?? "(ohne Beschreibung)",
+    ].join("\n"),
+  });
+
+  return { reportId: record.reportId, file, record, git };
 }
 
 /**

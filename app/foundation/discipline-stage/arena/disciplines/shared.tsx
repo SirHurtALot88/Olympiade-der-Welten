@@ -33,7 +33,7 @@ import {
   hueForIdx,
   TRACK_ROUND_MS,
 } from "../DisciplineStageNativeArena";
-import { TeamFrame, HighlightRing } from "./benchmark";
+import { TeamFrame, HighlightRing, tokenRadius } from "./benchmark";
 import type { DisciplineFieldProps, RT } from "./types";
 
 export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactNode {
@@ -139,7 +139,7 @@ export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactN
               {rt.map((t) =>
                 t.logoUrl ? (
                   <clipPath key={`clip-${t.code}`} id={`natclip-${t.code}`}>
-                    <circle cx={0} cy={0} r={t.isOwn ? geo.rOwn : geo.r} />
+                    <circle cx={0} cy={0} r={tokenRadius(t, geo)} />
                   </clipPath>
                 ) : null,
               )}
@@ -480,7 +480,7 @@ export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactN
             {/* Ghost-Schicht (Benchmark, VOR den Token): wo jedes Team letzte Runde stand.
                 Position + Opazität setzt die rAF-Schleife; die Lücke zum Token = Zugewinn. */}
             {FIELD_CUSTOM.has(prim) ? null : sorted.map((t) => {
-              const gr = t.isOwn ? geo.rOwn : geo.r;
+              const gr = tokenRadius(t, geo);
               const ghue = hueForIdx(t.idx);
               return (
                 <g
@@ -506,7 +506,7 @@ export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactN
                 // sequenziellen score (Wahrheit) — nur die Bewegung folgt dem Ziel.
                 const posScore = t.displayScore;
                 const pos = tokenPos(t, posScore);
-                const r = t.isOwn ? geo.rOwn : geo.r;
+                const r = tokenRadius(t, geo);
                 const hue = hueForIdx(t.idx);
                 const medal = t.roundMedal === 1 ? "var(--nl-gold)" : t.roundMedal === 2 ? "var(--nl-silver)" : t.roundMedal === 3 ? "var(--nl-bronze)" : null;
                 // Gewichtheben: Heber gerissen (auf Endgewicht) bzw. Champion an der Krone.

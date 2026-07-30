@@ -480,7 +480,12 @@ describe("game flow controller", () => {
 
     expect(flow.phase).toBe("season_review");
     expect(flow.currentStepId).toBe("review_previous_season");
-    expect(flow.currentStep.targetView).toBe("cockpit");
+    // Zielte frueher aufs Cockpit — das ist der Entwickler-Werkzeugkasten
+    // ("Multi-Season Balance", "salary_explosion", "Blocker pruefen"). Der Spieler landete
+    // dort am Saisonende und kam nicht weiter. Jetzt fuehrt der Schritt in die
+    // Saisonabschluss-Ansicht im Saisonstand.
+    expect(flow.currentStep.targetView).toBe("seasonV2");
+    expect(flow.currentStep.targetPanel).toBe("season-finale");
   });
 
   it("surfaces blockers when no active team exists", () => {

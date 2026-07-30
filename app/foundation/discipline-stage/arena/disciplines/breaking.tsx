@@ -12,7 +12,7 @@
 
 import { type ReactNode } from "react";
 import type { DisciplineFieldProps, RT } from "./types";
-import { useTokenGlide, tokenRef, GhostLayer, TokenChrome } from "./benchmark";
+import { useTokenGlide, tokenRef, GhostLayer, TokenChrome, tokenRadius } from "./benchmark";
 
 function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
@@ -75,7 +75,7 @@ export default function BreakingField(props: DisciplineFieldProps): ReactNode {
         {rt.map((t) =>
           t.logoUrl ? (
             <clipPath key={`clip-${t.code}`} id={`natclip-${t.code}`}>
-              <circle cx={0} cy={0} r={t.isOwn ? geo.rOwn : geo.r} />
+              <circle cx={0} cy={0} r={tokenRadius(t, geo)} />
             </clipPath>
           ) : null,
         )}
@@ -156,7 +156,7 @@ export default function BreakingField(props: DisciplineFieldProps): ReactNode {
         .slice()
         .reverse()
         .map((t) => {
-          const r = t.isOwn ? geo.rOwn : geo.r;
+          const r = tokenRadius(t, geo);
           const glowing = t.glowUntil > now;
           const isLead = t.rank === 1;
           return (

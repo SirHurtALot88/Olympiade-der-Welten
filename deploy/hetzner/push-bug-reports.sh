@@ -45,7 +45,22 @@ echo "      $REPORT_COUNT Meldung(en) gefunden."
 echo "[2/3] Commit bauen (main + Arbeitsbaum bleiben unberuehrt) ..."
 export GIT_INDEX_FILE=/tmp/oly-bug-reports-index
 rm -f "$GIT_INDEX_FILE"
-git read-tree --empty
+
+# Auf dem BESTEHENDEN Branch-Inhalt aufsetzen statt bei leer anzufangen.
+#
+# Der Live-Server ist nicht mehr die einzige Quelle: lokal gespielte Runden schieben ihre
+# Meldungen ebenfalls hierher (lib/bug-report/bug-report-git.ts). Baute dieser Lauf den Baum
+# aus dem leeren Verzeichnis auf, wuerde der Force-Push unten alles loeschen, was nicht aus
+# dem Container kommt — alle 15 Minuten, lautlos.
+#
+# Beide Seiten bilden deshalb die VEREINIGUNG: bestehender Branch + eigene Dateien. Der Branch
+# bleibt dabei ein einziger elternloser Commit, wie bisher.
+git fetch -q origin "$BRANCH" 2>/dev/null || true
+if git rev-parse --verify -q "refs/remotes/origin/$BRANCH" >/dev/null 2>&1; then
+  git read-tree "refs/remotes/origin/$BRANCH"
+else
+  git read-tree --empty
+fi
 while IFS= read -r FILE; do
   BLOB="$(git hash-object -w "$FILE")"
   git update-index --add --cacheinfo 100644 "$BLOB" "data/bug-reports/$(basename "$FILE")"

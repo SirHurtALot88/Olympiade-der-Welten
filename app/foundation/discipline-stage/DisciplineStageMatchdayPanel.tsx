@@ -159,10 +159,18 @@ function SideModifierChips({ side, label }: { side: MatchdayTeamSideModifiers | 
   );
 }
 
+/**
+ * Punktwert mit Vorzeichen.
+ *
+ * Das Plus kommt aus dem WERT, nicht fest davor. Vorher stand hier `+${value.toFixed(1)}` —
+ * bei einem negativen Beitrag (rote Formkarte, Mutator-Abzug) ergab das "+-18,4". Betrifft
+ * jede Spalte, die durch diese Funktion laeuft: Punkte, Form, Mutator und Gesamt, in
+ * Team- wie in Disziplin-Zeilen.
+ */
 function ppText(value: number | null): string {
   if (value == null) return "–";
   if (Math.abs(value) < 0.05) return "0";
-  return `+${value.toFixed(1)}`;
+  return `${value > 0 ? "+" : ""}${value.toFixed(1)}`;
 }
 
 // Header, Team-Zeilen UND Disziplin-Zeilen teilen sich EXAKT dieses Raster (sonst driften
@@ -903,7 +911,7 @@ export default function DisciplineStageMatchdayPanel({
                   title={
                     row.formPp === 0
                       ? "Keine Formkarte in den aufgedeckten Disziplinen"
-                      : `Formkarten-Beitrag: ${row.formPp > 0 ? "+" : ""}${row.formPp.toFixed(1)} — bereits in den Disziplin-Punkten enthalten`
+                      : `Formkarten-Beitrag: ${ppText(row.formPp)} — bereits in den Disziplin-Punkten enthalten`
                   }
                   style={{
                     gridColumn: COL.form,
@@ -920,7 +928,7 @@ export default function DisciplineStageMatchdayPanel({
                           : "var(--nl-mut)",
                   }}
                 >
-                  {sumShown ? (Math.abs(row.formPp) < 0.05 ? "0" : `${row.formPp > 0 ? "+" : ""}${row.formPp.toFixed(1)}`) : lockCell}
+                  {sumShown ? ppText(row.formPp) : lockCell}
                 </div>
 
                 {/* Captain-Beitrag der aufgedeckten Seiten. Gold wie der Captain-Chip am
@@ -1097,7 +1105,7 @@ export default function DisciplineStageMatchdayPanel({
                                 : "var(--nl-mut)",
                         }}
                       >
-                        {values.form == null ? "–" : Math.abs(values.form) < 0.05 ? "0" : ppText(values.form)}
+                        {ppText(values.form)}
                       </div>
                       <div
                         style={{

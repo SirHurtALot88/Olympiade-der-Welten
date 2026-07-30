@@ -123,7 +123,7 @@ export function GhostLayer(props: {
   return (
     <>
       {sorted.map((t) => {
-        const gr = t.isOwn ? geo.rOwn : geo.r;
+        const gr = tokenRadius(t, geo);
         const ghue = hueForIdx(t.idx);
         return (
           <g
@@ -214,6 +214,46 @@ export function HighlightRing(props: { t: RT; r: number; inTrio: boolean; reduce
   return null;
 }
 
+// ---- Token-Größe nach Rang ------------------------------------------------------------
+// „Können wir in jeder Diszi einführen, dass Teams die weiter vorne sind größere Logos in
+// der Arena erhalten? Dann werden die starken Teams weiter hervorgehoben."
+//
+// Maßstab ist der ANZEIGE-Rang `t.rank` — derselbe animierte Zeitstrahl, an dem auch die
+// Rangliste hängt. Dadurch wächst das Logo genau in dem Moment, in dem das Team in der
+// Tabelle nach oben geht, statt einen Frame früher oder später.
+//
+// WARUM 1,5× UND NICHT MEHR: Das eigene Team bekommt seit jeher `geo.rOwn`, und das ist je
+// Feld 1,4–1,5× `geo.r` (track 15,5→23, stage 12→18, lanes 9,5→13). Der Spitzenreiter wird
+// damit so groß, wie ein Token im Feld ohnehin schon ist — es entsteht keine neue
+// Überlappungsklasse. In den engen Reihen-Feldern (lanes: laneH = 604/N, bei 32 Teams also
+// 18,9 px) liegt der eigene Token heute bereits über der Bahnhöhe; die Darstellung verträgt
+// das erkennbar.
+const TOKEN_RANK_SCALE_TOP = 1.5;
+/** Ab diesem Rang ist die Größe wieder einheitlich — sonst hätte jedes Team eine eigene. */
+const TOKEN_RANK_SCALE_SPAN = 12;
+
+/**
+ * Größenfaktor 1,0 … 1,5 aus dem Rang. Quadratisch, damit sich die Spitze deutlich abhebt
+ * und das Mittelfeld nicht in 12 kaum unterscheidbare Abstufungen zerfällt:
+ * Rang 1 → 1,50 · 2 → 1,42 · 3 → 1,35 · 5 → 1,22 · 9 → 1,06 · ab 13 → 1,00.
+ */
+export function tokenRankScale(rank: number | null | undefined): number {
+  if (!Number.isFinite(rank) || (rank as number) < 1) return 1;
+  const closeness = Math.max(0, 1 - ((rank as number) - 1) / TOKEN_RANK_SCALE_SPAN);
+  return 1 + (TOKEN_RANK_SCALE_TOP - 1) * closeness * closeness;
+}
+
+/**
+ * DIE Token-Größe. Muss überall dieselbe sein — insbesondere im Clip-Pfad jeder Feld-Datei:
+ * skaliert man nur das Bild und nicht den Clip, wird das Logo am alten Kreis abgeschnitten.
+ *
+ * Das eigene Team fällt nie unter `geo.rOwn` (man muss sich weiter wiederfinden), wächst
+ * aber mit, wenn es vorne liegt.
+ */
+export function tokenRadius(t: RT, geo: FieldGeo, override?: number): number {
+  const base = (override ?? geo.r) * tokenRankScale(t.rank);
+  return t.isOwn ? Math.max(base, override ?? geo.rOwn) : base;}
+
 // ---- Verständnis-Chrome (Benchmark) -------------------------------------------------
 // Die Ringe/Logo/Rahmen/Badge, die in JEDER Disziplin identisch sind. Die Feld-Datei
 // wickelt das in ihr Token-<g> (mit data-token-code + tokenRef) und ergänzt ihre eigenen
@@ -233,7 +273,7 @@ export function TokenChrome(props: {
   radius?: number;
 }): React.ReactNode {
   const { t, prim, geo, trioSet, hoverIdx, reducedMotion, trophy = true, badge = true, radius } = props;
-  const r = radius ?? (t.isOwn ? geo.rOwn : geo.r);
+  const r = tokenRadius(t, geo, radius);
   const hue = hueForIdx(t.idx);
   const medal = t.roundMedal === 1 ? "var(--nl-gold)" : t.roundMedal === 2 ? "var(--nl-silver)" : t.roundMedal === 3 ? "var(--nl-bronze)" : null;
   const rc = relColor(t.rel);

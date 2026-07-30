@@ -318,6 +318,30 @@ export function resolveFoundationPanelScrollTarget(input: {
   if (input.panel === "season-end-development") {
     return "foundation-training-compact";
   }
+  /**
+   * DIE SPRUENGE DER SAISON-CHECKLISTE.
+   *
+   * `scrollToFoundationTarget` macht ein `getElementById` und bricht bei `null` STILL ab —
+   * die Ansicht wechselt, sonst passiert nichts. Von aussen nicht von einem kaputten Knopf
+   * zu unterscheiden ("der Button bringt gar nichts und bringt mich auch nicht weiter").
+   *
+   * Von den sieben Zielen der Checkliste trafen nur zwei ein Element. Die uebrigen hatten
+   * ihren Namen zwar als `data-testid` oder Klasse, aber nicht als `id` — oder das Element
+   * hiess schlicht anders. `tests/season-checklist-jump-targets.test.ts` prueft jetzt jedes
+   * Ziel gegen die tatsaechlich vergebenen `id`s.
+   */
+  if (input.panel === "season-review") {
+    // Cockpit-Block heisst `season-review-preview`.
+    return "season-review-preview";
+  }
+  if (input.panel === "team-sponsor-choice") {
+    // Die Sponsoren-Sektion traegt `id="sponsor-choice"`; der Testid-Name ist laenger.
+    return "sponsor-choice";
+  }
+  if (input.panel === "facilities") {
+    // Es gibt kein Element namens "facilities" — gemeint ist die Gebaeude-Ansicht.
+    return "foundation-facilities-v2";
+  }
   if (input.panel === "arena-result-summary") {
     // Die "Spieltagsergebnis"-Sektion ist entfernt (sie wiederholte Arena und
     // Saisonstand). Bestehende Postfach-Links tragen den alten Panel-Namen weiter —

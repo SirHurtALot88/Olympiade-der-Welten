@@ -29,6 +29,9 @@ import {
 } from "@/lib/room/foundation-room-context-client";
 import type { FoundationSaveMode } from "@/lib/persistence/foundation-save-mode";
 
+/** Wiederholungen pro Spieltag+Team-Satz, bevor das automatische Nachziehen aufgibt. */
+export const AI_LINEUP_ENSURE_MAX_ATTEMPTS = 3;
+
 export function shouldBuildFoundationMatchdaySummaryDerivations(activeView: string): boolean {
   return (
     activeView === "matchdayArena" ||
@@ -159,7 +162,14 @@ export function useFoundationCrossTabMatchdayLineup(input: {
   const shouldBuildMatchdayDerivations = shouldBuildFoundationMatchdayFlowDerivations(input.activeView);
   const shouldBuildMatchdaySummary = shouldBuildFoundationMatchdaySummaryDerivations(input.activeView);
 
+  /**
+   * Merkt sich NUR erfolgreich durchgelaufene Laeufe. Der Schluessel wurde frueher schon vor dem
+   * Absenden gesetzt und nie wieder entfernt — ein einziger Fehlschlag (Netz weg, Route lehnt ab,
+   * Abbruch beim Ansichtswechsel) hat den Spieltag damit dauerhaft als "erledigt" markiert. Ergebnis:
+   * die KI-Teams standen ohne Aufstellung da, ohne Meldung, bis zum Neuladen der Seite.
+   */
   const aiLineupEnsureRunStartedRef = useRef<Set<string>>(new Set());
+  const aiLineupEnsureAttemptsRef = useRef<Map<string, number>>(new Map());
   const aiLineupEnsureAbortRef = useRef<AbortController | null>(null);
 
   const homeCurrentLineupDraft = useMemo(() => {
@@ -347,8 +357,18 @@ export function useFoundationCrossTabMatchdayLineup(input: {
       if (trigger !== "manual" && aiLineupEnsureRunStartedRef.current.has(runKey)) {
         return null;
       }
+      // Ein Fehlschlag darf wiederholt werden, aber nicht endlos: der Effect haengt an der Identitaet
+      // dieser Funktion, ein dauerhaft ablehnender Server wuerde sonst in einer Dauerschleife
+      // angefragt. Nach `AI_LINEUP_ENSURE_MAX_ATTEMPTS` bleibt es beim Zustand — den meldet
+      // inzwischen der Spieltagsabschluss als `missing_ai_lineup`, statt still zu werten.
+      const attempts = aiLineupEnsureAttemptsRef.current.get(runKey) ?? 0;
+      if (trigger !== "manual" && attempts >= AI_LINEUP_ENSURE_MAX_ATTEMPTS) {
+        return null;
+      }
+      // Ein Anstoss von Hand setzt das Budget zurueck: wer den Knopf drueckt, hat den Grund
+      // (Netz wieder da, Server wieder oben) meist gerade beseitigt.
+      aiLineupEnsureAttemptsRef.current.set(runKey, trigger === "manual" ? 1 : attempts + 1);
 
-      aiLineupEnsureRunStartedRef.current.add(runKey);
       input.setAiLineupEnsureBusy(true);
       aiLineupEnsureAbortRef.current?.abort();
       const controller = new AbortController();
@@ -381,19 +401,32 @@ export function useFoundationCrossTabMatchdayLineup(input: {
           ),
         });
         if (controller.signal.aborted) {
+          // Abgebrochen wurde von aussen (Ansichtswechsel, neuer Lauf) — das ist kein Fehlversuch
+          // und darf das Wiederholungsbudget nicht aufbrauchen.
+          aiLineupEnsureAttemptsRef.current.set(runKey, attempts);
           return null;
         }
         const payload = (await response.json()) as FoundationAiLineupBatchApplyResponse;
         input.setAiLineupEnsureFeed(payload);
         if (response.ok && !payload.error) {
+          // Erst jetzt gilt der Lauf als erledigt. Eine Ablehnung bleibt offen und wird beim
+          // naechsten Betreten der Arena erneut versucht.
+          aiLineupEnsureRunStartedRef.current.add(runKey);
           await input.loadSave(input.activeSaveId, input.foundationSaveMode, { compactInitial: true });
         }
         return payload;
       } catch (error) {
         if (controller.signal.aborted) {
+          aiLineupEnsureAttemptsRef.current.set(runKey, attempts);
           return null;
         }
-        throw error;
+        // Nicht weiterwerfen: der Aufrufer ist ein Effect (`void ensure…`), dort landet der Fehler
+        // als unbehandelte Promise-Ablehnung im Nichts. Der Lauf bleibt unmarkiert und damit
+        // wiederholbar; die Meldung geht in denselben Feed wie eine Ablehnung der Route.
+        input.setAiLineupEnsureFeed({
+          error: error instanceof Error ? error.message : "ai_lineup_ensure_failed",
+        } as FoundationAiLineupBatchApplyResponse);
+        return null;
       } finally {
         if (aiLineupEnsureAbortRef.current === controller) {
           aiLineupEnsureAbortRef.current = null;
