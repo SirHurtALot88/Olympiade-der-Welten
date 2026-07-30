@@ -906,7 +906,7 @@ async function main() {
         await page.locator("#foundation-matchday-arena").waitFor({ state: "attached", timeout: viewTimeoutMs });
         await page
           .locator(
-            ".arena-v2-shell, .arena-v2-board-row, .matchday-arena-lane, .matchday-arena-empty-card, #foundation-matchday-arena .warning-list, [data-testid='arena-lineup-blocker'], [data-testid='arena-result-summary'], .foundation-matchday-arena-panel",
+            ".arena-v2-shell, .arena-v2-board-row, .matchday-arena-lane, .matchday-arena-empty-card, #foundation-matchday-arena .warning-list, [data-testid='arena-lineup-blocker'], [data-testid='arena-stage'], .foundation-matchday-arena-panel",
           )
           .first()
           .waitFor({ state: "visible", timeout: viewTimeoutMs });
@@ -927,7 +927,10 @@ async function main() {
             "Zur Arena",
             "Arena noch nicht bereit",
             "Arena-Kontext fehlt",
-            "Spieltagsergebnis",
+            // Vorher stand hier "Spieltagsergebnis" — die Ueberschrift der entfernten
+            // Sektion. Der Disziplin-Waehler im Buehnen-Kopf ist immer da; das Praefix
+            // deckt beide Beschriftungen ab ("Disziplin (Spieltag)" bzw. Admin-Variante).
+            "Disziplin (",
             "Lineup bestätigen",
           ]),
           "Arena öffnet.",
@@ -935,7 +938,7 @@ async function main() {
         const blockerVisible = await page.getByTestId("arena-lineup-blocker").isVisible().catch(() => false);
         const laneOrEmptyVisible = await page
           .locator(
-            ".arena-v2-board-row, .arena-v2-shell, .matchday-arena-lane, .matchday-arena-empty-card, #foundation-matchday-arena .warning-list, [data-testid='arena-lineup-blocker'], [data-testid='arena-result-summary']",
+            ".arena-v2-board-row, .arena-v2-shell, .matchday-arena-lane, .matchday-arena-empty-card, #foundation-matchday-arena .warning-list, [data-testid='arena-lineup-blocker'], [data-testid='arena-stage']",
           )
           .first()
           .isVisible()
