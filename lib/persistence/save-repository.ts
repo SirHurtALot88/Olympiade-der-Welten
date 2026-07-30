@@ -48,6 +48,7 @@ import {
   readSaveSessionCache,
   writeSaveSessionCache,
 } from "@/lib/persistence/save-session-cache";
+import { DEFAULT_ACTIVE_OWNER_ID } from "@/lib/foundation/team-control-settings";
 import { ensurePlayerBaselines, guardPlayerBaselineWrite } from "@/lib/players/player-baseline-service";
 import { ensurePlayerInjuryHistoryForGameState } from "@/lib/foundation/player-injury-history";
 import { ensureNulaOnProjectSuicide } from "@/lib/foundation/ensure-nula-on-project-suicide";
@@ -112,6 +113,7 @@ type SaveRow = {
   matchday_id?: string;
   lineup_draft_count?: number;
   transfer_history_count?: number;
+  created_by?: string;
 };
 
 type GameMetadata = {
@@ -1381,12 +1383,30 @@ export function readPersistPerfStats(): PersistPerfStats | null {
   return globalScope.__olyPersistPerf ?? null;
 }
 
+/**
+ * Owner-ID, die als Urheber eines NEU angelegten Spielstands festgeschrieben wird.
+ *
+ * `ownerId` ist nur bei aktiviertem Login gesetzt (resolveSessionOwnerId gibt sonst null
+ * zurueck). Ohne Login gibt es aber trotzdem genau einen Menschen an der Tastatur, und den
+ * kennt das Team-Control-System laengst als `DEFAULT_ACTIVE_OWNER_ID` ("Chris") — dieselbe
+ * Annahme, auf der dort die gesamte Zuordnung "meine Teams" beruht. Der Fallback erfindet
+ * also niemanden, er benennt den bereits vorhandenen lokalen Benutzer.
+ *
+ * Leer bleibt das Feld nur fuer Spielstaende, die vor dieser Spalte entstanden sind — dort
+ * ist der Urheber wirklich nicht mehr feststellbar, und die UI sagt das auch so.
+ */
+function resolveCreatingOwnerId(ownerId: string | null | undefined): string {
+  return ownerId ?? DEFAULT_ACTIVE_OWNER_ID;
+}
+
 function createPersistedSaveRecord(input: {
   saveId: string;
   name: string;
   status: SaveStatus;
   createdAt?: string;
   updatedAt?: string;
+  /** Owner-ID des Anlegenden — greift nur beim INSERT (siehe Upsert unten). */
+  createdBy?: string | null;
   gameState: GameState;
 }) {
   const perfStats = getPersistPerfStats();
@@ -1448,7 +1468,8 @@ function createPersistedSaveRecord(input: {
       season_id,
       matchday_id,
       lineup_draft_count,
-      transfer_history_count
+      transfer_history_count,
+      created_by
     )
     VALUES (
       @saveId,
@@ -1461,8 +1482,12 @@ function createPersistedSaveRecord(input: {
       @seasonId,
       @matchdayId,
       @lineupDraftCount,
-      @transferHistoryCount
+      @transferHistoryCount,
+      @createdBy
     )
+    -- created_by steht bewusst NICHT im UPDATE-Zweig: es ist die Urheberschaft, nicht
+    -- "wer zuletzt gespeichert hat". Jeder weitere Schreibvorgang laeuft durch genau
+    -- diesen Upsert, ein Mitschreiben wuerde den Wert bei jedem Spielzug ueberschreiben.
     ON CONFLICT(save_id) DO UPDATE SET
       name = excluded.name,
       status = excluded.status,
@@ -1494,6 +1519,7 @@ function createPersistedSaveRecord(input: {
       saveVersion: versionMetadata.saveVersion ?? 0,
       seasonId: versionMetadata.seasonId,
       matchdayId: versionMetadata.matchdayId,
+      createdBy: input.createdBy ?? "",
       lineupDraftCount: versionMetadata.lineupDraftCount,
       transferHistoryCount: versionMetadata.transferHistoryCount,
     });
@@ -1637,7 +1663,7 @@ export function createSaveRepository(): SaveRepository {
     listSaves() {
       const database = getDatabase();
       const rows = database
-        .prepare("SELECT save_id, name, status, created_at, updated_at FROM saves ORDER BY updated_at DESC")
+        .prepare("SELECT save_id, name, status, created_at, updated_at, created_by FROM saves ORDER BY updated_at DESC")
         .all() as SaveRow[];
 
       return rows.map<SaveSummary>((row) => ({
@@ -1646,6 +1672,7 @@ export function createSaveRepository(): SaveRepository {
           status: row.status,
           createdAt: row.created_at,
           updatedAt: row.updated_at,
+          createdBy: row.created_by ? row.created_by : null,
           scenarioMeta: loadScenarioMetaForSummary(row.save_id, row.created_at),
       })).map((summary) => ({
         ...summary,
@@ -1692,7 +1719,7 @@ export function createSaveRepository(): SaveRepository {
 
       return this.getSaveById(saveId);
     },
-    createSaveFromSeed({ saveId, name, status, seedData }) {
+    createSaveFromSeed({ saveId, name, status, seedData, ownerId }) {
       // scheduleSeedId ties the initial season discipline schedule to this save's unique
       // saveId so every new save/season gets its own pairing + player-count rolls instead of
       // reusing the default "local-game-state" seed for every save (see season-discipline-schedule.ts).
@@ -1701,6 +1728,7 @@ export function createSaveRepository(): SaveRepository {
         saveId,
         name,
         status,
+        createdBy: resolveCreatingOwnerId(ownerId),
         // DIE EINE STELLE, AN DER EIN SPIELSTAND AUS DEM SEED GEBOREN WIRD. Hier bekommt er den
         // Sponsorsystem-Vermerk, damit alle Wege, die einen frischen Save anlegen (Cockpit
         // "Neues Spiel / Season 1", createSave, der Dev-Bootstrap), dasselbe Regelwerk haben —
@@ -1725,6 +1753,9 @@ export function createSaveRepository(): SaveRepository {
         saveId,
         name,
         status,
+        // Ein Klon ist ein NEUER Spielstand — Urheber ist, wer geklont hat, nicht der
+        // Urheber der Quelle.
+        createdBy: resolveCreatingOwnerId(ownerId),
         gameState: source.gameState,
       });
 
@@ -1748,6 +1779,7 @@ export function createSaveRepository(): SaveRepository {
         saveId,
         name,
         status,
+        createdBy: resolveCreatingOwnerId(ownerId),
         gameState: withScenarioMeta(source.gameState, scenarioMeta),
       });
 

@@ -168,14 +168,37 @@ function ppText(value: number | null): string {
 // Header, Team-Zeilen UND Disziplin-Zeilen teilen sich EXAKT dieses Raster (sonst driften
 // die Spalten gegeneinander).
 /**
- * Sieben Spalten: Rang · S-Rang · Team · Punkte · Form · Mutator · Gesamt.
+ * Acht Spalten: Rang · S-Rang · Wappen · Team · Punkte · Form · Mutator · Gesamt.
  *
  * Die beiden Disziplin-Spalten sind entfallen. Sie zeigten dieselbe Aufteilung, die
  * darunter ohnehin als Spieler-Gruppen je Seite stand — zwei parallele Achsen fuer
  * denselben Sachverhalt. Jetzt traegt die Team-Zeile die Summe und darunter steht je
  * Disziplin eine eigene Zeile mit denselben vier Groessen.
+ *
+ * Das Wappen hat eine EIGENE Spalte, weil es ueber den ganzen Team-Block laeuft
+ * (Team-Zeile + Disziplin-Zeilen). Steckte es wie vorher in der Team-Spalte, koennte es
+ * nur so hoch werden wie die erste Zeile.
  */
-const PANEL_GRID_COLUMNS = "56px 104px 1fr 70px 76px 80px 84px";
+const PANEL_GRID_COLUMNS = "56px 112px 56px 1fr 70px 76px 80px 84px";
+
+/** Spaltenindizes (1-basiert) — die Zellen des Team-Blocks werden explizit gesetzt. */
+const COL = { rank: 1, seasonRank: 2, crest: 3, team: 4, points: 5, form: 6, mutator: 7, total: 8 } as const;
+
+/**
+ * Das Wappen fuellt die Hoehe des Team-Blocks — gedeckelt.
+ *
+ * Ohne `maxHeight` waechst es mit: sobald die Spieler-Chips umbrechen (schmales Fenster,
+ * grosser Kader), wird aus dem Wappen ein meterhoher Balken. `contain` statt `cover`,
+ * damit ein quadratisches Wappen nicht oben und unten abgeschnitten wird.
+ */
+const CREST_STYLE = {
+  width: "100%",
+  height: "100%",
+  minHeight: 22,
+  maxHeight: 66,
+  borderRadius: 6,
+  background: "var(--nl-bg)",
+} as const;
 
 // Rang-Badge (klein, tabellarisch) — Gold/Silber/Bronze für die Top-3, gleiche
 // Farbsprache wie die Arena-Leiter (warn/mut/Bronze-rgb, dezent hinterlegt).
@@ -555,7 +578,10 @@ export default function DisciplineStageMatchdayPanel({
       </div>
 
       <div style={{ overflowX: "auto" }}>
-        <div style={{ minWidth: 720 }}>
+        {/* Untergrenze angehoben (720 → 880): die Spieler-Chips teilen sich die
+            Team-Spalte jetzt mit dem Disziplin-Label. Darunter blieben davon keine 100 px
+            uebrig und jeder Chip stand auf einer eigenen Zeile. */}
+        <div style={{ minWidth: 880 }}>
           {/* Kopfzeile */}
           <div
             style={{
@@ -571,6 +597,8 @@ export default function DisciplineStageMatchdayPanel({
                 Spaltenbreiten zu lang und ueberlappten sich im Kopf. */}
             {sortButton("matchday", "Rang", "Platzierung nur nach der Leistung dieses Spieltags", "left")}
             {sortButton("season", "S-Rang", "Saison-Rang vor dem Spieltag → projizierter Rang danach", "left")}
+            {/* Wappen-Spalte — im Kopf ohne Beschriftung. */}
+            <div />
             {/* Team-Spalte traegt jetzt auch die Disziplin-Schalter: die eigenen
                 Disziplin-SPALTEN sind entfallen, das Sortieren nach einer einzelnen
                 Disziplin soll aber bleiben. Der Pfeil klappt die Spieler der Seite auf. */}
@@ -643,11 +671,19 @@ export default function DisciplineStageMatchdayPanel({
             // Spieltags-Summe, Mutator-PP und Gesamt kommen aus der Zeile (oben berechnet),
             // damit die Gesamt-Spalte exakt der Sortierschlüssel ist.
             const { sum, mutPp, total } = row;
-            // Spieler der aufgeklappten Disziplinen fuer dieses Team, in fester
-            // Reihenfolge D1 → D2 (leer, wenn nichts offen).
-            const openSideRows = openSides
-              .map((side) => ({ side, players: playersByTeam?.get(row.teamId)?.[side] ?? [] }))
-              .filter((entry) => entry.players.length > 0);
+            // Eine Zeile je AUFGEDECKTER Disziplin — sie traegt links die eingesetzten
+            // Spieler und rechts die Aufschluesselung der Punkte. Vorher waren das zwei
+            // getrennte Zeilen uebereinander: eine mit den Zahlen, eine mit den Chips.
+            // Dieselbe Disziplin zweimal untereinander zu lesen war die Doppelung.
+            //
+            // Die Zahlen haengen NICHT am Aufklappen (der Pfeil steuert nur die Chips),
+            // die Zeile steht also auch eingeklappt.
+            const openSideRows = (["d1", "d2"] as const)
+              .filter((side) => sideRevealed[side])
+              .map((side) => ({
+                side,
+                players: openSides.includes(side) ? playersByTeam?.get(row.teamId)?.[side] ?? [] : [],
+              }));
             const sumShown = d1Revealed || d2Revealed;
             // Tagesrang erst zeigen, wenn ueberhaupt etwas gewertet ist — sonst waere er
             // eine erfundene Reihenfolge auf lauter Nullen.
@@ -658,9 +694,11 @@ export default function DisciplineStageMatchdayPanel({
             const mutatorTitle = hasMut
               ? mutPlayers.map((p) => `${p.name} +${p.pp.toFixed(1)} PP`).join(" · ")
               : "Kein Mutator-Bonus in den aufgedeckten Disziplinen.";
+            // Zeile 1 ist das Team, danach je Disziplin eine — das Wappen laeuft ueber alle.
+            const blockRowCount = 1 + openSideRows.length;
             return (
-              <Fragment key={row.teamId}>
               <div
+                key={row.teamId}
                 onClick={() => {
                   if (onOpenTeam && row.teamId) onOpenTeam(row.teamId);
                 }}
@@ -673,7 +711,10 @@ export default function DisciplineStageMatchdayPanel({
                 style={{
                   display: "grid",
                   gridTemplateColumns: PANEL_GRID_COLUMNS,
-                  gap: 10,
+                  columnGap: 10,
+                  // Kein Zeilenabstand: die Disziplin-Zeilen sollen als Fortsetzung des
+                  // Teams lesen, nicht als eigene Eintraege.
+                  rowGap: 0,
                   alignItems: "center",
                   padding: "7px 10px",
                   borderBottom: "1px solid var(--nl-line)",
@@ -686,13 +727,13 @@ export default function DisciplineStageMatchdayPanel({
                 {/* Tagesrang — nur die Leistung DIESES Spieltags. */}
                 <div
                   title={`Spieltags-Rang ${matchdayRank ?? "–"} — nur nach der Leistung dieses Spieltags`}
-                  style={{ display: "flex", alignItems: "center", fontVariantNumeric: "tabular-nums" }}
+                  style={{ gridColumn: COL.rank, gridRow: 1, display: "flex", alignItems: "center", fontVariantNumeric: "tabular-nums" }}
                 >
                   <RankBadge rank={matchdayRank} />
                 </div>
 
                 {/* Saison-Rang vor → nach */}
-                <div style={{ display: "flex", alignItems: "center", gap: 4, fontVariantNumeric: "tabular-nums" }}>
+                <div style={{ gridColumn: COL.seasonRank, gridRow: 1, display: "flex", alignItems: "center", gap: 4, fontVariantNumeric: "tabular-nums" }}>
                   <RankBadge rank={row.currentRank} dim={d2Revealed} />
                   {d2Revealed ? (
                     <>
@@ -717,26 +758,40 @@ export default function DisciplineStageMatchdayPanel({
                   ) : null}
                 </div>
 
-                {/* Team */}
-                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                {/* Wappen — laeuft ueber den GANZEN Team-Block (Team-Zeile + Disziplin-
+                    Zeilen). `contain` statt `cover`: bei dieser Hoehe wuerde `cover` einem
+                    quadratischen Wappen oben und unten die Haelfte abschneiden. */}
+                <div
+                  style={{
+                    gridColumn: COL.crest,
+                    gridRow: `1 / span ${blockRowCount}`,
+                    alignSelf: "stretch",
+                    display: "flex",
+                    alignItems: "center",
+                    padding: "1px 0",
+                    // Ueber der Toenung der Disziplin-Zeilen, nicht darunter: die liegt
+                    // spaeter im DOM und wuerde dem Wappen sonst die unteren zwei Drittel
+                    // einfaerben.
+                    zIndex: 1,
+                  }}
+                >
                   {meta?.logoUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={meta.logoUrl}
                       alt=""
-                      width={22}
-                      height={22}
                       onError={(e) => {
                         (e.currentTarget as HTMLImageElement).style.display = "none";
                       }}
-                      style={{ width: 22, height: 22, borderRadius: 5, objectFit: "cover", flex: "none", border: `1.5px solid ${accent}` }}
+                      style={{ ...CREST_STYLE, objectFit: "contain", border: `1.5px solid ${accent}` }}
                     />
                   ) : (
-                    <span
-                      aria-hidden
-                      style={{ width: 22, height: 22, borderRadius: 5, flex: "none", background: "var(--nl-bg)", border: `1.5px solid ${accent}` }}
-                    />
+                    <span aria-hidden style={{ ...CREST_STYLE, border: `1.5px solid ${accent}` }} />
                   )}
+                </div>
+
+                {/* Team */}
+                <div style={{ gridColumn: COL.team, gridRow: 1, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                   <div style={{ display: "flex", flexDirection: "column", minWidth: 0, gap: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                       <span
@@ -788,6 +843,8 @@ export default function DisciplineStageMatchdayPanel({
                 {/* Spieltags-Punkte (Σ d1 + d2, ohne Mutator) */}
                 <div
                   style={{
+                    gridColumn: COL.points,
+                    gridRow: 1,
                     textAlign: "right",
                     fontVariantNumeric: "tabular-nums",
                     fontWeight: 800,
@@ -808,6 +865,8 @@ export default function DisciplineStageMatchdayPanel({
                       : `Formkarten-Beitrag: ${row.formPp > 0 ? "+" : ""}${row.formPp.toFixed(1)} — bereits in den Disziplin-Punkten enthalten`
                   }
                   style={{
+                    gridColumn: COL.form,
+                    gridRow: 1,
                     textAlign: "right",
                     fontVariantNumeric: "tabular-nums",
                     fontWeight: 800,
@@ -827,6 +886,8 @@ export default function DisciplineStageMatchdayPanel({
                 <div
                   title={mutatorTitle}
                   style={{
+                    gridColumn: COL.mutator,
+                    gridRow: 1,
                     textAlign: "right",
                     fontVariantNumeric: "tabular-nums",
                     fontWeight: 800,
@@ -840,6 +901,8 @@ export default function DisciplineStageMatchdayPanel({
                 {/* Gesamt = Spieltags-Punkte + Mutator-Bonus */}
                 <div
                   style={{
+                    gridColumn: COL.total,
+                    gridRow: 1,
                     textAlign: "right",
                     fontVariantNumeric: "tabular-nums",
                     fontWeight: 900,
@@ -849,66 +912,115 @@ export default function DisciplineStageMatchdayPanel({
                 >
                   {sumShown ? ppText(total) : lockCell}
                 </div>
-              </div>
 
-              {/* Aufgeklappte Disziplin: die eingesetzten Spieler dieses Teams, hoechste PP
-                  zuerst. Die PP-Zahl ist gegen ALLE Spieler der Disziplin heat-gefaerbt
-                  (rot schwach → gelb Mittelfeld → gruen stark), dieselbe Baender-Skala wie
-                  im Saisonstand. Der Score steht als Herkunft daneben. */}
-              {/* Je aufgedeckter Disziplin eine eigene Zeile mit DENSELBEN vier Groessen wie
-                  oben (Punkte · Form · Mutator · Gesamt). Die Team-Zeile bleibt die Summe,
-                  diese Zeilen zeigen, woher sie kommt. Sie haengen NICHT am Aufklappen — der
-                  Pfeil steuert nur die Spieler-Chips. */}
-              {(["d1", "d2"] as const)
-                .filter((side) => sideRevealed[side])
-                .map((side) => {
+                {/* EINE Zeile je aufgedeckter Disziplin: links die eingesetzten Spieler,
+                    rechts die Aufschluesselung derselben vier Groessen wie oben
+                    (Punkte · Form · Mutator · Gesamt). Vorher standen beide untereinander —
+                    dieselbe Disziplin zweimal zu lesen war die Doppelung.
+
+                    Die Zahlen stehen immer; der Chevron im Kopf schaltet nur die
+                    Spieler-Chips zu. Die PP-Zahl der Chips ist gegen ALLE Spieler der
+                    Disziplin heat-gefaerbt (rot schwach → gelb Mittelfeld → gruen stark),
+                    dieselbe Baender-Skala wie im Saisonstand; der Score steht daneben. */}
+                {openSideRows.map(({ side, players: sidePlayers }, sideIndex) => {
                   const disc = side === "d1" ? d1 : d2;
+                  const gridRow = 2 + sideIndex;
                   const values = row.bySide[side];
                   const cell = {
+                    gridRow,
                     textAlign: "right" as const,
                     fontVariantNumeric: "tabular-nums" as const,
                     fontSize: 12,
                     fontWeight: 700,
+                    zIndex: 1,
                   };
                   return (
-                    <div
-                      key={`${row.teamId}-side-${side}`}
-                      data-testid={`matchday-panel-side-${row.teamId}-${side}`}
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: PANEL_GRID_COLUMNS,
-                        gap: 10,
-                        alignItems: "center",
-                        padding: "4px 10px",
-                        borderBottom: "1px solid var(--nl-line)",
-                        background: "color-mix(in srgb, var(--nl-panel-2) 45%, transparent)",
-                      }}
-                    >
-                      <div />
-                      <div />
+                    <Fragment key={`${row.teamId}-side-${side}`}>
+                      {/* Toenung als eigene, ueber alle Spalten gelegte Flaeche — sonst
+                          blitzten die Spaltenabstaende durch den Zeilenhintergrund. */}
                       <div
+                        aria-hidden
                         style={{
+                          gridColumn: "1 / -1",
+                          gridRow,
+                          background: "color-mix(in srgb, var(--nl-panel-2) 50%, transparent)",
+                          borderRadius: 6,
+                        }}
+                      />
+                      <div
+                        data-testid={`matchday-panel-side-${row.teamId}-${side}`}
+                        style={{
+                          gridColumn: COL.team,
+                          gridRow,
+                          zIndex: 1,
                           display: "flex",
+                          flexWrap: "wrap",
                           alignItems: "center",
                           gap: 6,
-                          paddingLeft: 8,
                           minWidth: 0,
-                          fontSize: 11.5,
-                          color: "var(--nl-mut)",
+                          padding: "3px 0",
                         }}
                       >
-                        <span style={{ fontWeight: 900, letterSpacing: "0.06em" }}>{side.toUpperCase()}</span>
                         <span
-                          style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                          title={disc?.displayName ?? undefined}
+                          title={disc?.displayName ?? (side === "d1" ? "Disziplin 1" : "Disziplin 2")}
+                          style={{
+                            flex: "none",
+                            display: "inline-flex",
+                            alignItems: "baseline",
+                            gap: 5,
+                            fontSize: 11,
+                            color: "var(--nl-mut)",
+                          }}
                         >
-                          {disc?.displayName ?? (side === "d1" ? "Disziplin 1" : "Disziplin 2")}
+                          <span style={{ fontWeight: 900, letterSpacing: "0.06em" }}>{side.toUpperCase()}</span>
+                          <span>{disc?.displayName ?? (side === "d1" ? "Disziplin 1" : "Disziplin 2")}</span>
+                        </span>
+                        <span
+                          data-testid={`matchday-panel-players-${row.teamId}-${side}`}
+                          style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, minWidth: 0 }}
+                        >
+                          {sidePlayers.map((entry) => {
+                            const heat = entry.pp != null ? getPoolHeatClass(entry.pp, ppPoolBySide[side]) : "";
+                            return (
+                              <span
+                                key={entry.playerId}
+                                className={heat ? `matchday-panel-player ${heat}` : "matchday-panel-player"}
+                                // `entry.pp` ist die GESAMTE Gutschrift inkl. Mutator-Aufschlag —
+                                // "davon" ist hier also korrekt, seit die Summe angezeigt wird.
+                                title={`${entry.name} · ${entry.pp != null ? `${entry.pp.toFixed(1)} PP` : "keine PP"}${
+                                  entry.score != null ? ` · Score ${entry.score.toFixed(1)}` : ""
+                                }${entry.mutatorPp ? ` · davon ◆ ${entry.mutatorPp.toFixed(1)} Mutator` : ""}`}
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "baseline",
+                                  gap: 5,
+                                  padding: "2px 7px",
+                                  borderRadius: 6,
+                                  border: "1px solid var(--nl-line)",
+                                  fontSize: 11.5,
+                                  fontVariantNumeric: "tabular-nums",
+                                }}
+                              >
+                                <strong style={{ fontWeight: 700 }}>{entry.name}</strong>
+                                <em style={{ fontStyle: "normal", fontWeight: 900, color: "var(--nl-accent)" }}>
+                                  {entry.pp != null ? `${entry.pp.toFixed(1)} PP` : "–"}
+                                </em>
+                                {entry.score != null ? (
+                                  <em style={{ fontStyle: "normal", color: "var(--nl-mut)" }}>({entry.score.toFixed(1)})</em>
+                                ) : null}
+                                {entry.mutatorPp ? (
+                                  <em style={{ fontStyle: "normal", color: "var(--nl-warn)", fontWeight: 700 }}>◆</em>
+                                ) : null}
+                              </span>
+                            );
+                          })}
                         </span>
                       </div>
-                      <div style={{ ...cell, color: "var(--nl-ink)" }}>{ppText(values.points)}</div>
+                      <div style={{ ...cell, gridColumn: COL.points, color: "var(--nl-ink)" }}>{ppText(values.points)}</div>
                       <div
                         style={{
                           ...cell,
+                          gridColumn: COL.form,
                           color:
                             (values.form ?? 0) > 0.05
                               ? "var(--nl-good)"
@@ -922,85 +1034,19 @@ export default function DisciplineStageMatchdayPanel({
                       <div
                         style={{
                           ...cell,
+                          gridColumn: COL.mutator,
                           color: (values.mutator ?? 0) > 0.0001 ? "var(--nl-warn)" : "var(--nl-mut)",
                         }}
                       >
                         {values.mutator == null ? "–" : values.mutator > 0.0001 ? `◆ ${ppText(values.mutator)}` : "–"}
                       </div>
-                      <div style={{ ...cell, fontWeight: 900, color: "var(--nl-accent)" }}>{ppText(values.total)}</div>
-                    </div>
+                      <div style={{ ...cell, gridColumn: COL.total, fontWeight: 900, color: "var(--nl-accent)" }}>
+                        {ppText(values.total)}
+                      </div>
+                    </Fragment>
                   );
                 })}
-
-              {openSideRows.map(({ side, players: sidePlayers }) => (
-                <div
-                  key={`${row.teamId}-players-${side}`}
-                  data-testid={`matchday-panel-players-${row.teamId}-${side}`}
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "6px 10px 8px 206px",
-                    borderBottom: "1px solid var(--nl-line)",
-                    background: "color-mix(in srgb, var(--nl-panel-2) 60%, transparent)",
-                  }}
-                >
-                  {/* Disziplin-Marke vor der Zeile: sobald beide Seiten untereinander
-                      stehen, waeren zwei gleich aussehende Chip-Reihen sonst nicht
-                      auseinanderzuhalten. */}
-                  <span
-                    title={(side === "d1" ? d1 : d2)?.displayName ?? (side === "d1" ? "Disziplin 1" : "Disziplin 2")}
-                    style={{
-                      flex: "none",
-                      fontSize: 10,
-                      fontWeight: 900,
-                      letterSpacing: "0.06em",
-                      textTransform: "uppercase",
-                      color: "var(--nl-mut)",
-                      minWidth: 26,
-                    }}
-                  >
-                    {side.toUpperCase()}
-                  </span>
-                  {sidePlayers.map((entry) => {
-                    const heat = entry.pp != null ? getPoolHeatClass(entry.pp, ppPoolBySide[side]) : "";
-                    return (
-                      <span
-                        key={entry.playerId}
-                        className={heat ? `matchday-panel-player ${heat}` : "matchday-panel-player"}
-                        // `entry.pp` ist die GESAMTE Gutschrift inkl. Mutator-Aufschlag —
-                        // "davon" ist hier also korrekt, seit die Summe angezeigt wird.
-                        title={`${entry.name} · ${entry.pp != null ? `${entry.pp.toFixed(1)} PP` : "keine PP"}${
-                          entry.score != null ? ` · Score ${entry.score.toFixed(1)}` : ""
-                        }${entry.mutatorPp ? ` · davon ◆ ${entry.mutatorPp.toFixed(1)} Mutator` : ""}`}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "baseline",
-                          gap: 5,
-                          padding: "2px 7px",
-                          borderRadius: 6,
-                          border: "1px solid var(--nl-line)",
-                          fontSize: 11.5,
-                          fontVariantNumeric: "tabular-nums",
-                        }}
-                      >
-                        <strong style={{ fontWeight: 700 }}>{entry.name}</strong>
-                        <em style={{ fontStyle: "normal", fontWeight: 900, color: "var(--nl-accent)" }}>
-                          {entry.pp != null ? `${entry.pp.toFixed(1)} PP` : "–"}
-                        </em>
-                        {entry.score != null ? (
-                          <em style={{ fontStyle: "normal", color: "var(--nl-mut)" }}>({entry.score.toFixed(1)})</em>
-                        ) : null}
-                        {entry.mutatorPp ? (
-                          <em style={{ fontStyle: "normal", color: "var(--nl-warn)", fontWeight: 700 }}>◆</em>
-                        ) : null}
-                      </span>
-                    );
-                  })}
-                </div>
-              ))}
-            </Fragment>
+              </div>
             );
           })}
         </div>

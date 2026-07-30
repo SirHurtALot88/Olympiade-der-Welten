@@ -35,6 +35,9 @@ export function BugReportFlag() {
           // Online-Raum) gar keinen `?view=`-Parameter haben — dort war die Ansicht bisher leer.
           path: typeof window === "undefined" ? null : window.location.pathname,
           tab: typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab"),
+          // Der Dokumenttitel als Rueckfallebene fuer die Seiten, die die Nav-Konfiguration nicht
+          // kennt (Login, Startseite, Online-Raum) — dort waere der Klartextname sonst leer.
+          pageTitle: typeof document === "undefined" ? null : document.title,
           viewport:
             typeof window === "undefined" ? null : { width: window.innerWidth, height: window.innerHeight },
           clientTime: new Date().toISOString(),

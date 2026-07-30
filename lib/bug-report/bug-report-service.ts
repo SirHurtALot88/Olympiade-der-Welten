@@ -28,6 +28,11 @@ export type BugReportInput = {
   path?: string | null;
   /** Unter-Reiter innerhalb einer Ansicht (`?tab=`) — sonst landet man beim Nachstellen daneben. */
   tab?: string | null;
+  /**
+   * Dokumenttitel beim Klick. Die Nav-Konfiguration kennt nur die Foundation-Ansichten; auf Login,
+   * Startseite und Online-Raum bleibt `label` sonst leer und es steht nur der nackte Pfad da.
+   */
+  pageTitle?: string | null;
   url?: string | null;
   userAgent?: string | null;
   viewport?: { width: number; height: number } | null;
@@ -110,6 +115,10 @@ const UNKNOWN_REPORTER: BugReportReporter = {
  * Der Alias-Schritt ueber `normalizeFoundationViewParam` ist noetig, weil dieselbe Ansicht unter
  * mehreren Schreibweisen in der URL steht (`season`, `season-v2`, `seasonV2`). Ohne ihn faende die
  * Nav-Suche das Label nur bei der kanonischen Variante.
+ *
+ * Fehlt die Ansicht in der Nav-Konfiguration — auf Login, Startseite und Online-Raum gibt es sie dort
+ * gar nicht —, tritt der Dokumenttitel ein. Sonst bliebe das Label auf genau den Seiten leer, auf
+ * denen der `?view=`-Parameter ebenfalls fehlt, und die Meldung sagte nur noch "irgendwo unter /login".
  */
 function resolvePage(input: BugReportInput): BugReportPage {
   const view = input.view?.trim() || null;
@@ -119,7 +128,7 @@ function resolvePage(input: BugReportInput): BugReportPage {
     path: input.path?.trim() || null,
     view,
     tab: input.tab?.trim() || null,
-    label: breadcrumb ? `${breadcrumb.group} · ${breadcrumb.view}` : null,
+    label: breadcrumb ? `${breadcrumb.group} · ${breadcrumb.view}` : input.pageTitle?.trim() || null,
   };
 }
 

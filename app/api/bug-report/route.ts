@@ -45,6 +45,8 @@ export async function POST(request: Request) {
       view: typeof body.view === "string" ? body.view : null,
       path: typeof body.path === "string" ? body.path : null,
       tab: typeof body.tab === "string" ? body.tab : null,
+      // Gedeckelt, weil der Titel aus dem Browser kommt und beliebig lang sein kann.
+      pageTitle: typeof body.pageTitle === "string" ? body.pageTitle.slice(0, 300) : null,
       url: typeof body.url === "string" ? body.url : null,
       // Der Client schickt seinen User-Agent nicht mit; der Header ist die verlaessliche Quelle.
       userAgent: request.headers.get("user-agent"),

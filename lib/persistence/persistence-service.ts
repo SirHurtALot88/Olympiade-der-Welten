@@ -91,6 +91,7 @@ export function createPersistenceService(): PersistenceService {
         name,
         status: "active",
         seedData: loadSeedData(),
+        ownerId,
       });
       const manualSave = saveRepository.saveGameState({
         saveId: save.saveId,
@@ -110,6 +111,7 @@ export function createPersistenceService(): PersistenceService {
         name: input?.name ?? `Season 1 Teststart ${formatGermanDateTime(new Date())}`,
         status,
         seedData: loadFreshSeasonOneSeedData(),
+        ownerId: input?.ownerId,
       });
       const taggedSave = saveRepository.saveGameState({
         saveId: save.saveId,

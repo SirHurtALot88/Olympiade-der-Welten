@@ -138,9 +138,11 @@ describe("Spieltag: Abschluss ist wieder eine Entscheidung", () => {
     expect(arena).toContain("Spieltag abschließen");
 
     const body = read("app/foundation/FoundationShellRouterBody.tsx");
-    expect(body).toContain("runCockpitMatchdayAdvance?.(true)");
     // Gegatet auf den Flow-Schritt: erst wenn beide Disziplinen gewertet sind.
     expect(body).toContain("canAdvanceMatchdayFromStep(matchdayAdvanceStep)");
+    // Die Rueckmeldung (Start/Erfolg/Ablehnung) haelt `matchday-finish-button-wiring.test.ts`
+    // fest — hier nur, dass der Knopf ueberhaupt am meldenden Wrapper haengt.
+    expect(body).toContain("finishMatchdayAndAdvance()");
   });
 });
 

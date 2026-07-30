@@ -559,7 +559,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   runFacilityMaintenancePreview,
   runFacilityUpgradePreview,
   commitArenaDiscipline,
-  runCockpitMatchdayAdvance,
+  finishMatchdayAndAdvance,
   runFoundationCommand,
   runNewGameSetup,
   runSaveAction,
@@ -2568,35 +2568,27 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             // Saisonziele meldet. Das ist eine Mitteilung, kein Hindernis. Ist der
             // Spieltag noch nicht gewertet, gibt es keinen Knopf (null), und die Buehne
             // zeigt stattdessen ihren Hinweis.
+            //
+            // Aufruf ueber `finishMatchdayAndAdvance` statt direkt ueber
+            // `runCockpitMatchdayAdvance`: der reine Aufruf verschluckte eine Ablehnung
+            // (422 mit `blockingReasons`) vollstaendig. Der Knopf wurde kurz grau und
+            // danach war der Spieltag trotzdem derselbe — von aussen nicht von "Knopf tut
+            // nichts" zu unterscheiden. Der Wrapper meldet Start, Erfolg und Ablehnung
+            // mit Begruendung zurueck (aus beiden Ablagen der Route plus Warnungen) und
+            // raeumt die alten Flow-Haken weg. Bewusst OHNE `?.`: ein fehlender Handler
+            // ist ein Fehler und soll knallen, nicht still nichts tun.
+            //
+            // Die NAVIGATION bleibt hier statt im Handler: welche Ansicht danach dran ist,
+            // ist Sache des Shell-Bodys, nicht der Spieltags-Logik. Ohne sie stand man
+            // nach dem Wechsel weiter in der Arena des GERADE ABGESCHLOSSENEN Spieltags
+            // und sah weder die neue Tabelle noch den neuen Spieltag.
             onAdvanceMatchday={
               canAdvanceMatchdayFromStep(matchdayAdvanceStep)
                 ? async () => {
-                    // Zwei Dinge, die hier vorher fehlten:
-                    //
-                    // 1. NAVIGATION. Der Knopf schaltete den Spieltag zwar weiter, liess den
-                    //    Spieler aber in der Arena des GERADE ABGESCHLOSSENEN Spieltags
-                    //    stehen. Von dort sah man weder die neue Tabelle noch den neuen
-                    //    Spieltag — der Knopf wirkte wie ein Blindgaenger.
-                    // 2. FEHLERMELDUNG. Lehnt die API ab (`applied: false`), landete die
-                    //    Antwort nur in einem Feed, den die Arena gar nicht rendert. Fuer den
-                    //    Spieler passierte schlicht nichts, ohne Grund.
-                    const summary = await runCockpitMatchdayAdvance?.(true);
+                    const summary = await finishMatchdayAndAdvance();
                     if (summary?.applied) {
                       setFoundationView("seasonV2", setActiveView, { push: true });
-                      return;
                     }
-                    const reason =
-                      summary?.blockingReasons?.[0] ??
-                      summary?.summary?.blockingReasons?.[0] ??
-                      summary?.warnings?.[0] ??
-                      null;
-                    setFoundationActionFeedback({
-                      tone: "warning",
-                      title: "Spieltag nicht weitergeschaltet",
-                      detail: reason
-                        ? `Der Spieltagswechsel wurde abgelehnt: ${reason}`
-                        : "Der Spieltagswechsel wurde abgelehnt. Im Cockpit steht die vollständige Antwort der Auswertung.",
-                    });
                   }
                 : null
             }

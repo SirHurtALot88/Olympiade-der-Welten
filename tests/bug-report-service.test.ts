@@ -158,6 +158,25 @@ describe("Bug-Meldung — die Seite", () => {
     const { saveBugReport } = await importService();
     expect(saveBugReport({ view: "gibtesnicht" }).record.page.label).toBeNull();
   });
+
+  /**
+   * Die Nav-Konfiguration kennt nur die Foundation-Ansichten. Auf Login, Startseite und Online-Raum
+   * fehlt der `?view=`-Parameter UND der Nav-Eintrag — dort blieb das Label leer und die Meldung sagte
+   * nur noch "irgendwo unter /login". Der Dokumenttitel tritt genau in diese Luecke.
+   */
+  it("nimmt den Dokumenttitel als Label, wo die Navigation die Seite nicht kennt", async () => {
+    const { saveBugReport } = await importService();
+    const { record } = saveBugReport({ path: "/login", pageTitle: "Anmelden · Oly" });
+    expect(record.page.label).toBe("Anmelden · Oly");
+    expect(record.page.path).toBe("/login");
+  });
+
+  /** Die Navigation bleibt die bessere Quelle: sie driftet nicht, der Browsertitel schon. */
+  it("die Navigation gewinnt gegen den Dokumenttitel", async () => {
+    const { saveBugReport } = await importService();
+    const { record } = saveBugReport({ view: "matchdayArena", pageTitle: "irgendwas aus dem Browser" });
+    expect(record.page.label).toBe("Spieltag · Arena");
+  });
 });
 
 /**

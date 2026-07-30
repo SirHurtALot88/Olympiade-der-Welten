@@ -5,6 +5,7 @@ import type { GameInboxItem, GameState, Team } from "@/lib/data/olyDataTypes";
 import { formatCockpitReason } from "@/lib/foundation/tabs/cockpit-ui-helpers";
 import type { FoundationReadMeta, FoundationScreenPrimaryAction, FoundationView } from "@/lib/foundation/tabs/foundation-page-types";
 import { isTransferBuyPhaseOpen } from "@/lib/market/transfer-window-policy";
+import { isSeasonEndRosterPhase } from "@/lib/season/season-end-roster-window";
 
 type SeasonTransitionGateSnapshot = {
   canCompleteSeason: boolean;
@@ -41,16 +42,13 @@ export function useFoundationCrossTabScreenPrimaryAction(input: {
 
   const seasonEndRosterActionsActive = useMemo(() => {
     const phase = input.gameState.gamePhase ?? "season_active";
-    const sellWindowPhases = new Set([
-      "season_completed",
-      "season_review",
-      "season_rewards",
-      "player_development",
-      "preseason_management",
-      "transfer_sell_phase",
-    ]);
-    return sellWindowPhases.has(phase) || (phase === "season_active" && input.localSeasonTransitionGate.canCompleteSeason);
-  }, [input.gameState.gamePhase, input.localSeasonTransitionGate.canCompleteSeason]);
+    // Phasenliste liegt geteilt in `season-end-roster-window` — die Inbox braucht dieselbe,
+    // sonst meldet sie Angebote, die der Kader gar nicht freigibt (oder umgekehrt).
+    return (
+      isSeasonEndRosterPhase(input.gameState) ||
+      (phase === "season_active" && input.localSeasonTransitionGate.canCompleteSeason)
+    );
+  }, [input.gameState, input.localSeasonTransitionGate.canCompleteSeason]);
 
   const marketTransferWindowOpen = useMemo(
     () => isTransferBuyPhaseOpen(input.gameState),
