@@ -773,6 +773,12 @@ export default function DisciplineStageArena({
             pp: resolveAwardedPlayerPoints({ pointsAwarded: basePp, mutatorPpsBonus: mutatorPp }),
             score: e.finalPlayerScore ?? null,
             mutatorPp,
+            // Ligaweiter OVR-Rang fuer den Star-Tier-Rahmen des Chips. Quelle ist die
+            // bereits vorhandene `ratingByPlayerId` — `buildPlayerRatingContractMap`
+            // OHNE `playerIds`, sonst schrumpfte der Normalisierungs-/Rang-Pool auf die
+            // eingesetzten Spieler und die Raenge waeren falsch (Top 50 der Liga, nicht
+            // Top 50 dieses Spieltags).
+            ovrRank: ratingByPlayerId.get(e.playerId)?.ovrRank ?? null,
           });
         }
         playersByTeam.set(tr.teamId, cur);
@@ -833,8 +839,16 @@ export default function DisciplineStageArena({
     const d1PointsByTeam = placementPointsForSide(d1, "d1");
     const d2PointsByTeam = placementPointsForSide(d2, "d2");
     const teamResults: MatchdayPanelTeamResult[] = results.map((r) => {
-      const d1Points = d1 ? d1PointsByTeam.get(r.teamId) ?? 0 : null;
-      const d2Points = d2 ? d2PointsByTeam.get(r.teamId) ?? 0 : null;
+      // `?? null` statt `?? 0`: liefert die Disziplin ueberhaupt kein Team-Ergebnis
+      // (kein `disciplinePreview` zu dieser Disziplin — z. B. weil d1/d2 nur aus dem
+      // Spielplan stammen), ist der Wert UNBEKANNT und nicht "null Punkte". Die 0 war
+      // hier doppelt schaedlich: die Spieltags-Wertung zeigte eine erfundene 0, und die
+      // Aufdeck-Regel der Arena (`teamResults.some((row) => row.d1Points != null)`)
+      // konnte nie greifen, weil `d1Points` damit NIE null war. Teams, die in der
+      // Disziplin gewertet wurden, aber keinen Score haben, stehen weiterhin auf 0 —
+      // die setzt `placementPointsForSide` selbst.
+      const d1Points = d1 ? d1PointsByTeam.get(r.teamId) ?? null : null;
+      const d2Points = d2 ? d2PointsByTeam.get(r.teamId) ?? null : null;
       return {
         teamId: r.teamId,
         d1DisciplineId: d1?.disciplineId ?? null,
@@ -853,7 +867,7 @@ export default function DisciplineStageArena({
       d2DisciplineId: d2?.disciplineId ?? null,
     });
     return { d1, d2, standings, mutatorByTeam, playersByTeam, modifiersByTeam, teamResults };
-  }, [preview, gameState, matchdayId, briefingItems, standingsItems]);
+  }, [preview, gameState, matchdayId, briefingItems, standingsItems, ratingByPlayerId]);
 
   // Bühne muss mit einer Disziplin DES aktuellen Spieltags starten, nicht mit dem
   // hart kodierten Default ("staffel"). Sonst zeigt die Arena eine Disziplin ohne
