@@ -9138,11 +9138,39 @@ export function useFoundationShellRouterBodyScope({
     }
 
     let cancelled = false;
+    /**
+     * DIESER POLLER WILL EIN EINZIGES FELD WISSEN — und hat dafuer bis hierher den KOMPLETTEN
+     * Spielstand ueberschrieben, alle 5 Sekunden.
+     *
+     * GEMELDET: „'wishlist & scouting' fuellt sich immer wieder mit spielern die ich schon entfernt
+     * habe". Das Entfernen aendert zunaechst nur den lokalen Zustand und wird erst nach 2500 ms
+     * geschrieben (use-foundation-persistence-actions.ts). Faellt ein Poller-Tick in dieses Fenster,
+     * ersetzt `setGameState(nextGameState)` den lokalen Stand durch den noch alten Serverstand — der
+     * entfernte Spieler ist zurueck. Schlimmer noch: `loadSave` setzt dabei die
+     * Autosave-Signatur auf den geladenen Stand, die verlorene Aenderung gilt also als gespeichert
+     * und wird nie nachgeholt. Bei 2,5 Stunden Spielzeit sind das ~1800 Gelegenheiten.
+     *
+     * Zwei Faelle, und nur der erste war das Problem:
+     *
+     *   - Der Draft laeuft NOCH  → an den Kadern hat sich nichts geaendert, also nur das Statusfeld
+     *     uebernehmen und den lokalen Zustand ansonsten in Ruhe lassen.
+     *   - Der Draft ist FERTIG   → jetzt sind die Kader der ganzen Liga neu, und genau darauf
+     *     wartet der Spieler. Hier ist die vollstaendige Uebernahme richtig, und sie geschieht
+     *     genau einmal statt im Sekundentakt.
+     */
     const pollLeagueSetupStatus = async () => {
       const nextGameState = await loadSave(activeSaveId, foundationSaveMode, { compactInitial: true });
-      if (!cancelled && nextGameState) {
-        setGameState(nextGameState);
+      if (cancelled || !nextGameState) return;
+      const nextStatus = nextGameState.seasonState.leagueSetupStatus;
+      if (nextStatus === "in_progress") {
+        setGameState((current) =>
+          current.seasonState.leagueSetupStatus === nextStatus
+            ? current
+            : { ...current, seasonState: { ...current.seasonState, leagueSetupStatus: nextStatus } },
+        );
+        return;
       }
+      setGameState(nextGameState);
     };
 
     const intervalId = window.setInterval(() => {
