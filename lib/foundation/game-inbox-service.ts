@@ -26,6 +26,9 @@ import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { listOpenSponsorEvents } from "@/lib/sponsor/sponsor-event-service";
 import { getTransferWindowStatus } from "@/lib/market/transfer-window-policy";
 import { buildCaptainCandidateProfiles, hasPersistedTeamCaptain } from "@/lib/morale/team-captain-service";
+import { buildContractDissolutionOffers } from "@/lib/morale/contract-dissolution-service";
+import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
+import { isSeasonEndRosterPhase } from "@/lib/season/season-end-roster-window";
 
 export type GameInboxTargetView =
   | "home"
@@ -312,6 +315,81 @@ function resolveTeamTrainingBaselineIntensity(gameState: GameState, teamId: stri
   if (settings?.trainingIntensity === "light") return "light";
   if (settings?.trainingIntensity === "hard") return "hard";
   return "normal";
+}
+
+/**
+ * Spieler, die dem Team anbieten, ihren Vertrag aufzuloesen.
+ *
+ * Ohne diesen Hinweis sah man die Angebote nur, wenn man am Saisonende zufaellig in den
+ * Kader schaute — bei einer Entscheidung mit Frist (wer nichts tut, behaelt den Spieler
+ * samt seiner Unzufriedenheit) zu wenig.
+ *
+ * EIN Eintrag je Team, nicht einer je Spieler: die Entscheidungen stehen ohnehin
+ * gesammelt im Kader, und drei unzufriedene Spieler sollen die Inbox nicht fluten.
+ */
+function buildContractDissolutionInboxTasks(input: {
+  saveId: string;
+  gameState: GameState;
+  team: Team;
+  roster: RosterEntry[];
+  controlMode: string;
+  createdAt: string;
+}): GameInboxItem[] {
+  // Nur fuer gesteuerte Teams und nur im Saisonende-Fenster — davor gibt es keine
+  // Angebote, und die AI entscheidet ohne Inbox.
+  if (input.controlMode !== "manual" || !isSeasonEndRosterPhase(input.gameState)) {
+    return [];
+  }
+
+  const seasonId = input.gameState.season.id;
+  // Moral aus derselben Quelle wie Profil und Kader-Ansicht — `buildContractDissolutionOffers`
+  // leitet sie bewusst nicht selbst ab, damit die Zahlen nicht auseinanderlaufen.
+  const moraleByPlayerId: Record<string, number> = {};
+  for (const entry of input.roster) {
+    const assessment = assessPlayerMorale({
+      gameState: input.gameState,
+      playerId: entry.playerId,
+      teamId: input.team.teamId,
+    });
+    if (assessment?.morale != null && Number.isFinite(assessment.morale)) {
+      moraleByPlayerId[entry.playerId] = assessment.morale;
+    }
+  }
+
+  const offers = buildContractDissolutionOffers({
+    gameState: input.gameState,
+    teamId: input.team.teamId,
+    seasonId,
+    saveId: input.saveId,
+    moraleByPlayerId,
+  });
+  if (offers.length === 0) {
+    return [];
+  }
+
+  const names = offers.map((offer) => offer.playerName);
+  const shown = names.slice(0, 3).join(", ");
+  const rest = names.length > 3 ? ` und ${names.length - 3} weitere` : "";
+
+  return [
+    createItem({
+      itemId: `contract_dissolution_offer:${input.saveId}:${seasonId}:${input.team.teamId}`,
+      saveId: input.saveId,
+      seasonId,
+      teamId: input.team.teamId,
+      // Nur bei genau einem Angebot laesst sich der Eintrag einem Spieler zuordnen.
+      playerId: offers.length === 1 ? offers[0].playerId : null,
+      category: "warning",
+      severity: "warning",
+      title: offers.length === 1 ? "Spieler will seinen Vertrag auflösen" : `${offers.length} Spieler wollen ihren Vertrag auflösen`,
+      description: `${shown}${rest}. Annehmen bringt den vollen Verkaufspreis und spart den Buyout; ablehnen kostet den Spieler weiter Moral.`,
+      targetView: "teams",
+      targetParams: { team: input.team.teamId },
+      ctaLabel: "Im Kader entscheiden",
+      source: "contract_dissolution_offer",
+      createdAt: input.createdAt,
+    }),
+  ];
 }
 
 function buildPlayerHealthInboxTasks(input: {
@@ -910,6 +988,14 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
         team,
         roster,
         playerById,
+        controlMode,
+        createdAt,
+      }),
+      ...buildContractDissolutionInboxTasks({
+        saveId: input.saveId,
+        gameState: input.gameState,
+        team,
+        roster,
         controlMode,
         createdAt,
       }),
