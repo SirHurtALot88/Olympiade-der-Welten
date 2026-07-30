@@ -201,8 +201,21 @@ export function acceptContractDissolution(input: DecisionInput): GameState {
 export function declineContractDissolution(input: DecisionInput): GameState {
   const { gameState, offer } = input;
 
+  // Der Abzug landet auf der GESPEICHERTEN Moral (`playerMoraleState`) — das ist die
+  // Groesse, aus der `assessPlayerMorale` den angezeigten Wert und damit auch
+  // `contractIntent` ableitet. Ohne diesen Schritt waere eine Ablehnung folgenlos: der
+  // Spieler bliebe, ohne dass es ihn etwas kostet, und genau das ist der Kern der Regel.
+  // Hat der Spieler noch keine gespeicherte Zeile, gibt es nichts zu senken — dann bleibt
+  // es beim Log-Eintrag, statt eine Moral-Zeile aus dem Nichts zu erfinden.
+  const playerMoraleState = (gameState.playerMoraleState ?? []).map((entry) =>
+    entry.playerId === offer.playerId && entry.teamId === offer.teamId
+      ? { ...entry, morale: applyDeclinePenalty(entry.morale) }
+      : entry,
+  );
+
   return {
     ...gameState,
+    playerMoraleState,
     seasonState: {
       ...gameState.seasonState,
       contractDissolutions: [
