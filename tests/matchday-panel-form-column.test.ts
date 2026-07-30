@@ -60,15 +60,20 @@ describe("Spieltags-Wertung: Form als eigene Spalte", () => {
     );
   });
 
-  it("haelt Kopf, Team-Zeile und Disziplin-Zeile im selben Raster", () => {
+  it("haelt Kopf und Team-Block im selben Raster", () => {
     const panel = read("app/foundation/discipline-stage/DisciplineStageMatchdayPanel.tsx");
     const columnCount = (panel.match(/const PANEL_GRID_COLUMNS = "([^"]+)"/)?.[1] ?? "").split(/\s+/).length;
-    // Tagesrang · Saison-Rang · Team · Punkte · Form · Mutator · Gesamt.
-    // Die beiden Disziplin-SPALTEN sind entfallen: ihre Werte stehen jetzt in eigenen
-    // Zeilen unter dem Team, dort samt Form, Mutator und Gesamt.
-    expect(columnCount).toBe(7);
-    // Alle drei Renderpfade teilen sich dieselbe Konstante — sonst driften die Spalten.
-    expect(panel.match(/gridTemplateColumns: PANEL_GRID_COLUMNS/g)?.length).toBe(3);
+    // Tagesrang · Saison-Rang · Wappen · Team · Punkte · Form · Mutator · Gesamt.
+    // Die beiden Disziplin-SPALTEN sind entfallen: ihre Werte stehen jetzt in den
+    // Disziplin-Zeilen unter dem Team, dort samt Form, Mutator und Gesamt. Das Wappen
+    // hat eine eigene Spalte bekommen, weil es ueber den ganzen Team-Block laeuft.
+    expect(columnCount).toBe(8);
+    // Nur noch ZWEI Renderpfade: der Kopf und der Team-Block. Die Disziplin-Zeilen sind
+    // keine eigenen Raster mehr, sondern Zeilen im Raster des Team-Blocks — genau
+    // deshalb koennen sie mit dem Wappen ueberhaupt eine gemeinsame Spalte teilen.
+    expect(panel.match(/gridTemplateColumns: PANEL_GRID_COLUMNS/g)?.length).toBe(2);
+    // Und die Spaltenindizes kommen aus einer Quelle, statt an jeder Zelle zu stehen.
+    expect(panel).toContain("const COL = { rank: 1, seasonRank: 2, crest: 3, team: 4,");
   });
 });
 

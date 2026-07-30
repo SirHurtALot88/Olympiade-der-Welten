@@ -8,6 +8,12 @@ export type SaveSummary = {
   status: SaveStatus;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Owner-ID dessen, der den Spielstand ANGELEGT hat — nicht dessen, der zuletzt
+   * gespeichert hat (das steht in `updatedAt`). `null` fuer Spielstaende aus der Zeit
+   * vor dieser Spalte und fuer alles, was ohne Login entstanden ist.
+   */
+  createdBy?: string | null;
   scenarioMeta?: ScenarioMeta;
   saveMode?: "solo_1" | "solo_2" | "solo_4" | "online_4v4" | "custom";
 };
@@ -60,13 +66,19 @@ export type SaveRepository = {
     name: string;
     status: SaveStatus;
     seedData: OlySeedData;
+    /** Owner-ID des Anlegenden — wird als Urheberschaft festgeschrieben (SaveSummary.createdBy). */
+    ownerId?: string | null;
   }): PersistedSaveGame;
   cloneSave(input: {
     sourceSaveId: string;
     saveId: string;
     name: string;
     status: SaveStatus;
-    /** See SaveRepository.setActiveSave — threaded to the internal activate-on-clone so cloning never blanket-archives another owner's active save. */
+    /**
+     * See SaveRepository.setActiveSave — threaded to the internal activate-on-clone so cloning
+     * never blanket-archives another owner's active save. Doubles as the Urheberschaft of the
+     * CLONE (SaveSummary.createdBy): wer klont, legt einen neuen Spielstand an.
+     */
     ownerId?: string | null;
   }): PersistedSaveGame;
   createScenarioSnapshot(input: {

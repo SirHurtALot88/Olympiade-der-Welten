@@ -37,6 +37,7 @@ import type {
   TeamStrategyDraftMap,
 } from "@/lib/foundation/tabs/foundation-page-types";
 import type { SaveSummary } from "@/lib/persistence/types";
+import { resolveOwnerDisplayLabel } from "@/lib/foundation/team-control-settings";
 import { formatGermanDateTime, formatGermanSaveTimestamp } from "@/lib/utils/format-datetime";
 
 /**
@@ -1149,6 +1150,10 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               const meta = save.scenarioMeta;
               const warning = buildScenarioWarning(meta);
               const resolvedSaveMode = save.saveMode ?? resolveFoundationSaveMode(save);
+              // Wer den Spielstand ANGELEGT hat. Fehlt bei allem, was vor der
+              // `created_by`-Spalte entstanden ist und bei allem ohne aktivierten Login —
+              // das wird benannt statt geraten.
+              const createdByLabel = resolveOwnerDisplayLabel(save.createdBy);
               return (
                 <article
                   key={save.saveId}
@@ -1184,6 +1189,16 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                   </span>
                   <span className="nl-teamsettings-note nl-tnum">
                     Update {formatGermanDateTime(save.updatedAt)}
+                  </span>
+                  <span
+                    className="nl-teamsettings-note nl-tnum"
+                    title={
+                      createdByLabel
+                        ? `Angelegt am ${formatGermanDateTime(save.createdAt)} von ${createdByLabel}. Das ist die Urheberschaft — wer zuletzt gespeichert hat, steht in „Update".`
+                        : "Für diesen Spielstand ist kein Urheber hinterlegt: er stammt aus der Zeit vor dem Urheber-Vermerk oder wurde ohne aktivierten Login angelegt."
+                    }
+                  >
+                    Angelegt {formatGermanDateTime(save.createdAt)} · {createdByLabel ?? "Urheber unbekannt"}
                   </span>
                   <div className="nl-teamsettings-flag-row">
                     <span className={`nl-teamsettings-status${meta?.containsFinalStandings ? " is-good" : " is-warn"}`}>

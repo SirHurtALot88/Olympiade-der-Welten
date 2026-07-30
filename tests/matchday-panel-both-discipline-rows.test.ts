@@ -26,7 +26,12 @@ describe("Spieltags-Wertung: beide Disziplinen untereinander", () => {
     // Die Filterreihenfolge ist die Renderreihenfolge — D1 zuerst.
     const openSidesBlock = panel.slice(panel.indexOf("const openSides"), panel.indexOf("const openSides") + 400);
     expect(openSidesBlock.indexOf('"d1"')).toBeLessThan(openSidesBlock.indexOf('"d2"'));
-    expect(panel).toContain("const openSideRows = openSides");
+    // Die Zeilen selbst haengen an `sideRevealed`, nicht mehr an `openSides`: seit
+    // Spieler und Punkt-Aufschluesselung EINE Zeile sind, muss die Zeile auch dann
+    // stehen, wenn die Spieler eingeklappt sind. `openSides` entscheidet nur noch
+    // darueber, ob die Chips darin auftauchen.
+    expect(panel).toContain('const openSideRows = (["d1", "d2"] as const)');
+    expect(panel).toContain("players: openSides.includes(side) ? playersByTeam?.get(row.teamId)?.[side] ?? [] : [],");
   });
 
   it("laesst verdeckte Disziplinen weg (Anti-Spoiler)", () => {
@@ -38,7 +43,8 @@ describe("Spieltags-Wertung: beide Disziplinen untereinander", () => {
     // Zwei gleich aussehende Chip-Reihen untereinander waeren sonst nicht
     // auseinanderzuhalten.
     expect(panel).toContain("{side.toUpperCase()}");
-    expect(panel).toContain('(side === "d1" ? d1 : d2)?.displayName');
+    expect(panel).toContain('const disc = side === "d1" ? d1 : d2;');
+    expect(panel).toContain('{disc?.displayName ?? (side === "d1" ? "Disziplin 1" : "Disziplin 2")}');
   });
 
   it("faerbt die PP weiter gegen den Pool DIESER Disziplin", () => {

@@ -38,11 +38,43 @@ describe("Spieltags-Wertung: Disziplin-Zeilen unter dem Team", () => {
 
   it("hängt die Disziplin-Zeilen nicht ans Aufklappen", () => {
     // Der Pfeil steuert nur die Spieler-Chips; die Aufschlüsselung steht immer.
-    const sideRowIndex = PANEL.indexOf("matchday-panel-side-");
-    const playerRowIndex = PANEL.indexOf("matchday-panel-players-");
-    expect(sideRowIndex).toBeGreaterThan(-1);
-    // Die Disziplin-Zeile wird VOR den Spieler-Chips gerendert.
-    expect(sideRowIndex).toBeLessThan(playerRowIndex);
+    // Deshalb filtert die Zeilenliste über `sideRevealed`, und erst die Chips darin
+    // fragen `openSides`.
+    expect(PANEL).toContain("players: openSides.includes(side) ? playersByTeam?.get(row.teamId)?.[side] ?? [] : [],");
+  });
+
+  /**
+   * "Die Splittung der Punkte soll auf der gleichen Höhe sein wie die Spieler — also
+   * keine extra Zeile, sondern dieselbe Zeile. Gesamt oben und darunter zwei Zeilen mit
+   * erst die Spieler und rechts die Aufschlüsselung der Punkte."
+   *
+   * Vorher standen je Disziplin ZWEI Zeilen untereinander: eine mit den vier Zahlen und
+   * darunter eine mit den Spieler-Chips. Vier Zeilen pro Team für zwei Disziplinen.
+   */
+  it("legt Spieler und Zahlen in EINE Zeile", () => {
+    const rowStart = PANEL.indexOf("data-testid={`matchday-panel-side-${row.teamId}-${side}`}");
+    const rowEnd = PANEL.indexOf("gridColumn: COL.points", rowStart);
+    expect(rowStart).toBeGreaterThan(-1);
+    expect(rowEnd).toBeGreaterThan(rowStart);
+    // Die Chips sitzen innerhalb derselben Zeile, VOR den Zahlenspalten.
+    const between = PANEL.slice(rowStart, rowEnd);
+    expect(between).toContain("data-testid={`matchday-panel-players-${row.teamId}-${side}`}");
+    // Und zwar in der Team-Spalte, damit die Zahlen rechts in ihren Spalten bleiben.
+    expect(between).toContain("gridColumn: COL.team");
+  });
+
+  /**
+   * "Und das Team-Logo kannst du dann so groß wie alle 3 Zeilen machen."
+   */
+  it("lässt das Wappen über den ganzen Team-Block laufen", () => {
+    expect(PANEL).toContain("const blockRowCount = 1 + openSideRows.length;");
+    expect(PANEL).toContain("gridRow: `1 / span ${blockRowCount}`");
+    // Über der Tönung der Disziplin-Zeilen — die liegt später im DOM und würde dem
+    // Wappen sonst die unteren zwei Drittel einfärben.
+    const crestStart = PANEL.indexOf("gridColumn: COL.crest");
+    expect(PANEL.slice(crestStart, crestStart + 700)).toContain("zIndex: 1");
+    // Gedeckelt: ohne `maxHeight` wird das Wappen bei umbrechenden Chips zum Balken.
+    expect(PANEL).toContain("maxHeight: 66,");
   });
 
   it("behält das Sortieren nach einer einzelnen Disziplin", () => {
