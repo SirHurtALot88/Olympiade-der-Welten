@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import { ensureMatchdayResolveSnapshot } from "@/lib/foundation/matchday-resolve-snapshot";
+import { describeLineupCommitment } from "@/lib/lineups/matchday-lineup-lock";
 import {
   getLocalLegacyLineupDraft,
   saveLocalLegacyLineupDraft,
@@ -76,7 +77,16 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "saveId, seasonId, matchdayId and teamId are required." }, { status: 400 });
   }
 
-  const body = (await request.json()) as { entries?: LegacyLineupEntryInput[]; modifiers?: LineupDraftModifiers };
+  const body = (await request.json()) as {
+    entries?: LegacyLineupEntryInput[];
+    modifiers?: LineupDraftModifiers;
+    /**
+     * Bestaetigung des Managers, dass die Abgabe festgenagelt werden darf. Ohne sie speichert
+     * die Route NICHT — sie meldet zurueck, was eingesetzt wird, damit die Oberflaeche danach
+     * fragen kann. Siehe `lib/lineups/matchday-lineup-lock.ts` fuer den Missbrauch dahinter.
+     */
+    confirmLock?: boolean;
+  };
   if (!Array.isArray(body.entries)) {
     return NextResponse.json({ error: "entries array is required." }, { status: 400 });
   }
@@ -110,9 +120,31 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: writeAuth.reason, warnings: writeAuth.warnings }, { status: writeAuth.status });
     }
 
+    /**
+     * Der Riegel gegen das Nachbessern zwischen zwei Arena-Blicken: die Abgabe wird beim
+     * Speichern festgenagelt. Weil das unwiderruflich ist, speichert die Route erst nach
+     * ausdruecklicher Bestaetigung — vorher meldet sie nur zurueck, WAS eingesetzt wird.
+     *
+     * Der 409 ist kein Fehlerfall, sondern der Normalweg beim ersten Klick. `commitment` sagt
+     * der Oberflaeche, wie sie zu fragen hat: ohne Formkarte UND ohne Kapitaen ist die Abgabe
+     * fast nie Absicht und braucht eine deutlichere Rueckfrage.
+     */
+    const commitment = describeLineupCommitment(body.entries, body.modifiers);
+    if (!body.confirmLock) {
+      return NextResponse.json(
+        {
+          error: "lineup_lock_confirmation_required",
+          commitment,
+          warnings: [],
+          blockingReasons: [],
+        },
+        { status: 409 },
+      );
+    }
+
     let result;
     try {
-      result = saveLocalLegacyLineupDraft(params, body.entries, body.modifiers);
+      result = saveLocalLegacyLineupDraft(params, body.entries, body.modifiers, undefined, { lockMatchday: true });
     } catch (error) {
       const mapped = mapSaveResolutionErrorToResponse(error);
       if (mapped) return mapped;
