@@ -2570,7 +2570,34 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             // zeigt stattdessen ihren Hinweis.
             onAdvanceMatchday={
               canAdvanceMatchdayFromStep(matchdayAdvanceStep)
-                ? () => runCockpitMatchdayAdvance?.(true)
+                ? async () => {
+                    // Zwei Dinge, die hier vorher fehlten:
+                    //
+                    // 1. NAVIGATION. Der Knopf schaltete den Spieltag zwar weiter, liess den
+                    //    Spieler aber in der Arena des GERADE ABGESCHLOSSENEN Spieltags
+                    //    stehen. Von dort sah man weder die neue Tabelle noch den neuen
+                    //    Spieltag — der Knopf wirkte wie ein Blindgaenger.
+                    // 2. FEHLERMELDUNG. Lehnt die API ab (`applied: false`), landete die
+                    //    Antwort nur in einem Feed, den die Arena gar nicht rendert. Fuer den
+                    //    Spieler passierte schlicht nichts, ohne Grund.
+                    const summary = await runCockpitMatchdayAdvance?.(true);
+                    if (summary?.applied) {
+                      setFoundationView("seasonV2", setActiveView, { push: true });
+                      return;
+                    }
+                    const reason =
+                      summary?.blockingReasons?.[0] ??
+                      summary?.summary?.blockingReasons?.[0] ??
+                      summary?.warnings?.[0] ??
+                      null;
+                    setFoundationActionFeedback({
+                      tone: "warning",
+                      title: "Spieltag nicht weitergeschaltet",
+                      detail: reason
+                        ? `Der Spieltagswechsel wurde abgelehnt: ${reason}`
+                        : "Der Spieltagswechsel wurde abgelehnt. Im Cockpit steht die vollständige Antwort der Auswertung.",
+                    });
+                  }
                 : null
             }
             onCommitDiscipline={commitArenaDiscipline}
