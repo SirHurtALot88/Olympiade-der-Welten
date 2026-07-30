@@ -276,6 +276,16 @@ Der Agent **mergt seine eigenen Fixes selbst**, per Auto-Merge, sobald die CI gr
 der Auto-Deploy sie binnen Minuten auf den Live-Server. Eine Meldung kann damit gemeldet, untersucht,
 gebaut und ausgeliefert werden, ohne dass jemand dazwischen etwas anklickt.
 
+**Auto-Merge wird gesetzt und dann losgelassen.** Der CI-Lauf dauert rund zwanzig Minuten; sie
+abzuwarten heißt, zwanzig Minuten lang nichts zu tun und dabei Wecker zu stellen. Der Agent aktiviert
+Auto-Merge direkt beim Öffnen des PRs, hängt sich per `subscribe_pr_activity` an ihn und beendet die
+Sitzung. Wird die CI grün, mergt GitHub ohne Zutun; wird sie rot, weckt der PR den Agenten von
+selbst — und dann gilt: Logs holen, Ursache beheben, pushen, bis grün. Ein roter PR bleibt nicht
+liegen.
+
+Das ist der Unterschied zwischen *warten* und *abwarten*: Abpollen hat hier noch nie etwas
+beschleunigt, es hat nur den Lauf verlängert.
+
 **Was das kostet, offen gesagt:** Jeder Merge löst einen Neustart der laufenden Instanz aus — wer
 gerade spielt, merkt das. Und ein falscher Fix ist live, bevor ihn jemand gesehen hat; die
 Rückfahrkarte ist ein Revert, kein „nochmal drüber schauen".
@@ -339,9 +349,11 @@ Du bist der Bugfixing-Agent für „Olympiade der Welten". Arbeite nach docs/BUG
      status: vorgeprueft. Abschnitt "Was dagegen spricht" ist Pflicht.
    - Nicht nachstellbar? Genauso dokumentieren, mit dem, was du versucht hast und was fehlt.
 5. Bauen, was eindeutig ist — ohne Rückfrage: Fix + ein Test, der ohne den Fix ROT ist
-   (das gegenprüfen, nicht behaupten). Branch, PR (kein Draft), dann Auto-Merge aktivieren.
-   Die grüne CI ist das Tor; steht Auto-Merge nicht zur Verfügung, nach dem grünen Lauf
-   selbst per Squash mergen. Nie an einer roten CI vorbei.
+   (das gegenprüfen, nicht behaupten). Branch, PR (kein Draft), dann SOFORT Auto-Merge
+   (Squash) aktivieren. Die grüne CI ist das Tor — GitHub mergt von selbst.
+   NICHT auf den CI-Lauf warten (~20 Minuten). Stattdessen subscribe_pr_activity auf den
+   PR: eine rote CI weckt dich von allein, dann Logs holen, fixen, pushen, bis grün.
+   Nie an einer roten oder laufenden CI vorbei von Hand mergen.
 6. Triage-Notiz auf status: gebaut, mit pr und commit. NICHT auf erledigt — das setzt
    erst Chris' bestaetigt-Zeile, wenn die Wirkung im Spiel gesehen wurde.
 7. npm run bugs:tabelle laufen lassen, damit TICKETS.md den neuen Stand zeigt.
