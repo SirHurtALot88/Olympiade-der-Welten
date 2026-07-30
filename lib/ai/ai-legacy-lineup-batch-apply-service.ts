@@ -1,3 +1,10 @@
+import {
+  buildAiFormCardSeasonPlan,
+  getPlannedCardIdsForSlot,
+  getPlannedClaimValue,
+  type FormCardSeasonPlan,
+  type FormCardSeasonPlanSlot,
+} from "@/lib/ai/ai-form-card-season-plan";
 import { buildAiLegacyLineupPreview, getMarginalRankPointSwing } from "@/lib/ai/ai-legacy-lineup-engine";
 import type { FormCardColor, GameState, LineupDraft, LineupDraftModifiers } from "@/lib/data/olyDataTypes";
 import { isTeamMatchdayLineupOperationallyReady } from "@/lib/foundation/matchday-lineup-readiness";
@@ -266,73 +273,80 @@ function competitivenessRank(value: DisciplineSideCompetitiveness) {
 // --- Formkarten-Haushalt -------------------------------------------------------------------
 // Der Punktwert eines Karteneinsatzes ist `Kartenwert × (Farbtreffer ? 2 : 1) × Spielerzahl`
 // (s. calculateFormModifierForSide): dieselbe Karte bringt in einer 6er-Disziplin doppelt so
-// viele Teampunkte wie in einer 3er. Statt Karten stur nach Wettbewerbslage zu verbrennen,
-// bewertet die KI jeden Einsatz gegen die besten noch KOMMENDEN Slots im Saisonplan und
-// spart dicke Karten für große (idealerweise farbgleiche) Disziplinen auf.
-
-type FormCardFutureSlot = {
-  /** Spieltage Abstand zum Slot (>= 1). */
-  distance: number;
-  playerCount: number;
-  color: FormCardColor | null;
-};
-
-// Abzinsung pro Spieltag Abstand: ferne Traum-Slots zählen weniger — die Zukunft ist unsicher
-// (Formkrisen, Verletzungen) und die eigenen Karten konkurrieren um dieselben großen Slots.
-const FORM_CARD_FUTURE_DISCOUNT = 0.93;
-
-// Ohne echten Saisonplan (synthetische Test-Kontexte) wird mit neutralen 4er-Slots geplant:
-// konservativ genug, dass dicke Karten nicht am ersten Spieltag in Mini-Disziplinen landen.
+// viele Teampunkte wie in einer 3er.
+//
+// FRÜHER stand hier `estimateBestFutureFormCardValue`: JEDE Karte einzeln gegen den besten noch
+// kommenden Slot. Das war kein Haushalt, sondern n unabhängige Tagträume — alle Karten
+// reklamierten denselben 6er-Farbtreffer-Slot, weil keine der anderen den Slot je wegnahm.
+// Beobachtbare Folge (Simulation über 10 Spieltage, alle 20 Disziplinen): an Spieltag 4 landeten
+// `grün+8` UND `rot+2` beide auf Gewichtheben (6er, ROT), während Climbing (6er, GRÜN) desselben
+// Spieltags leer blieb — 48 statt 96 Punkte für die grüne Acht, und die zweite Karte verpuffte
+// als Doppelbelegung. Ersetzt durch eine echte SAISONZUORDNUNG (ai-form-card-season-plan): dort
+// ist ein vergebener Slot vergeben, und die nächste Karte muss sich mit dem zweitbesten begnügen.
 const FORM_CARD_FALLBACK_SLOT_PLAYER_COUNT = 4;
 
-function collectFutureFormCardSlots(
-  context: LegacyLineupLoadedContext,
-  currentMatchdayIndex: number,
-  remainingMatchdaysIncludingCurrent: number,
-): FormCardFutureSlot[] {
-  const schedule = (context.seasonDisciplineSchedule ?? []).filter(
-    (entry) => entry.matchdayIndex > currentMatchdayIndex,
-  );
-  if (schedule.length > 0) {
-    const slots: FormCardFutureSlot[] = [];
+/**
+ * Die Slots, über die geplant wird: der AKTUELLE Spieltag (mit den echten Seiten aus dem
+ * Spieltags-Contract) plus alle folgenden aus dem Saison-Spielplan. Der aktuelle Spieltag gehört
+ * bewusst dazu — nur so kann der Plan sagen „diese Karte gehört HEUTE auf d2 und nicht auf d1".
+ *
+ * Ohne echten Spielplan (synthetische Test-Kontexte, alte Saves) bleiben für die Zukunft
+ * farb-neutrale 4er-Platzhalter: konservativ genug, dass dicke Karten nicht am ersten Spieltag
+ * in Mini-Disziplinen landen, aber ohne eine Disziplin-Zuordnung zu erfinden, die es nicht gibt.
+ */
+function collectFormCardPlanSlots(input: {
+  context: LegacyLineupLoadedContext;
+  currentMatchdayIndex: number;
+  remainingMatchdaysIncludingCurrent: number;
+  currentSides: Array<{ side: "d1" | "d2"; disciplineId: string | null; color: FormCardColor | null; playerCount: number }>;
+}): { slots: FormCardSeasonPlanSlot[]; hasRealSchedule: boolean } {
+  const slots: FormCardSeasonPlanSlot[] = input.currentSides.map((side) => ({
+    matchdayIndex: input.currentMatchdayIndex,
+    matchdayId: input.context.matchdayId ?? null,
+    disciplineSide: side.side,
+    disciplineId: side.disciplineId,
+    color: side.color,
+    playerCount: side.playerCount,
+  }));
+
+  // „Echter Spielplan" heißt: die Saison kennt für den aktuellen Spieltag ODER später eine
+  // Disziplin-Zuordnung. Bewusst nicht „es gibt noch SPÄTERE Einträge" — sonst gälte der Plan
+  // ausgerechnet am letzten Spieltag als unecht, obwohl die Zuordnung dort am sichersten ist.
+  const allEntries = input.context.seasonDisciplineSchedule ?? [];
+  const hasRealSchedule = allEntries.some((entry) => entry.matchdayIndex >= input.currentMatchdayIndex);
+  const schedule = allEntries.filter((entry) => entry.matchdayIndex > input.currentMatchdayIndex);
+  if (hasRealSchedule) {
     for (const entry of schedule) {
-      for (const slot of [entry.discipline1, entry.discipline2]) {
+      for (const [side, slot] of [["d1", entry.discipline1], ["d2", entry.discipline2]] as const) {
         if (!slot) continue;
         slots.push({
-          distance: Math.max(1, entry.matchdayIndex - currentMatchdayIndex),
-          playerCount: slot.playerCount ?? FORM_CARD_FALLBACK_SLOT_PLAYER_COUNT,
+          matchdayIndex: entry.matchdayIndex,
+          matchdayId: entry.matchdayId,
+          disciplineSide: side,
+          disciplineId: slot.disciplineId,
           color: getFormCardColorForDisciplineCategory(slot.category),
+          playerCount: slot.playerCount,
         });
       }
     }
-    return slots;
+    return { slots, hasRealSchedule: true };
   }
 
-  // Fallback ohne Plan: verbleibende Spieltage als farb-neutrale Durchschnitts-Slots.
-  const slots: FormCardFutureSlot[] = [];
-  for (let distance = 1; distance < remainingMatchdaysIncludingCurrent; distance += 1) {
+  for (let distance = 1; distance < input.remainingMatchdaysIncludingCurrent; distance += 1) {
+    const matchdayIndex = input.currentMatchdayIndex + distance;
+    // `disciplineSide: null` ist hier ehrlich: welche Seite das wird, steht ohne Spielplan nicht
+    // fest. Die Platzhalter tragen deshalb nur Kapazität bei, nie eine Seiten-Zuordnung.
     slots.push(
-      { distance, playerCount: FORM_CARD_FALLBACK_SLOT_PLAYER_COUNT, color: null },
-      { distance, playerCount: FORM_CARD_FALLBACK_SLOT_PLAYER_COUNT, color: null },
+      { matchdayIndex, matchdayId: null, disciplineSide: null, disciplineId: null, color: null, playerCount: FORM_CARD_FALLBACK_SLOT_PLAYER_COUNT },
+      { matchdayIndex, matchdayId: null, disciplineSide: null, disciplineId: null, color: null, playerCount: FORM_CARD_FALLBACK_SLOT_PLAYER_COUNT },
     );
   }
-  return slots;
+  return { slots, hasRealSchedule: false };
 }
 
 function formCardDeploymentValue(card: LegacyFormCardOption, color: FormCardColor | null, playerCount: number) {
   const multiplier = color != null && card.color === color ? 2 : 1;
   return card.value * multiplier * Math.max(1, playerCount);
-}
-
-function estimateBestFutureFormCardValue(card: LegacyFormCardOption, futureSlots: FormCardFutureSlot[]) {
-  let best = 0;
-  for (const slot of futureSlots) {
-    const value = formCardDeploymentValue(card, slot.color, slot.playerCount) * FORM_CARD_FUTURE_DISCOUNT ** slot.distance;
-    if (value > best) {
-      best = value;
-    }
-  }
-  return best;
 }
 
 // Team-Charakter statt Einheits-KI (Vorbild: Doktrinen in team-powers): mentale Teams
@@ -371,7 +385,11 @@ function selectPositiveFormCardForSlot(input: {
   usedIds: Set<string>;
   color: FormCardColor | null;
   playerCount: number;
-  futureSlots: FormCardFutureSlot[];
+  /** Saisonplan + aktueller Spieltag: woran der Einsatz HIER gemessen wird. */
+  plan: FormCardSeasonPlan;
+  currentMatchdayIndex: number;
+  /** Karten, die der Plan für GENAU diese Seite vorgesehen hat. */
+  plannedCardIds: Set<string>;
   patience: number;
   /** Ausgabedruck (Urgency/Pace/Restsaison): dann darf auch die "am wenigsten bereute" reservierte Karte fallen. */
   mustSpend: boolean;
@@ -386,13 +404,19 @@ function selectPositiveFormCardForSlot(input: {
   const reserveFactor = Math.max(1, 2.2 - input.patience);
   const scored = candidates.map((card) => {
     const nowValue = formCardDeploymentValue(card, input.color, input.playerCount);
-    const futureValue = estimateBestFutureFormCardValue(card, input.futureSlots);
+    // Der ANSPRUCH der Karte auf ihren Planplatz, abgezinst auf heute. Drei Fälle fallen daraus
+    // ohne Sonderbehandlung heraus (s. getPlannedClaimValue): Plan will sie hier → Anspruch ==
+    // Jetzt-Wert, sie fällt. Plan will sie heute NEBENAN → Anspruch ist der dortige, bessere Wert,
+    // sie bleibt liegen. Plan will sie später → abgezinster Anspruch. Kein Plan-Platz (`null`) →
+    // kein Anspruch, sie darf sofort fallen, statt bis zum Saisonende zu verrotten.
+    const claimValue = getPlannedClaimValue({ plan: input.plan, cardId: card.id, currentMatchdayIndex: input.currentMatchdayIndex }) ?? 0;
     return {
       card,
       colorHit: input.color != null && card.color === input.color,
+      planned: input.plannedCardIds.has(card.id),
       nowValue,
-      regret: futureValue - nowValue,
-      reserved: futureValue > nowValue * reserveFactor,
+      regret: claimValue - nowValue,
+      reserved: claimValue > nowValue * reserveFactor,
     };
   });
 
@@ -409,6 +433,10 @@ function selectPositiveFormCardForSlot(input: {
   }
 
   const picked = [...pool].sort((left, right) => {
+    // Die Vorabsicht des Plans schlägt den Tageswert: der Plan hat diese Karte für DIESE Seite
+    // vorgesehen, weil sie über die ganze Saison gerechnet hierher gehört. Erst wenn der Plan
+    // nichts sagt, entscheidet wieder der Jetzt-Wert.
+    if (left.planned !== right.planned) return (right.planned ? 1 : 0) - (left.planned ? 1 : 0);
     if (left.nowValue !== right.nowValue) return right.nowValue - left.nowValue;
     if (left.colorHit !== right.colorHit) return (right.colorHit ? 1 : 0) - (left.colorHit ? 1 : 0);
     return left.card.id.localeCompare(right.card.id);
@@ -835,6 +863,57 @@ function applyAiTeamPowers(
   }
 }
 
+/**
+ * Die Minuskarte, die der SAISONPLAN für genau diese Seite vorgesehen hat.
+ *
+ * Ohne Plan griff die Entsorgung zur jeweils KLEINSTEN Minuskarte (`takeDumpNegativeFormCard`),
+ * weil das den Schaden dieses einen Spieltags minimiert. Über die Saison ist das genau falsch
+ * herum: die kleinen Minuskarten sind billig genug für jede Disziplin, die dicke `-8` braucht
+ * die 2er-Disziplin. In der Simulation blieben so alle `-8` bis zum Saisonende liegen und
+ * landeten dann im Rückstau auf i_spy und Basketball (je 6 Spieler) — zweimal −48 statt zweimal
+ * −16 in einer 2er. Der Plan dreht die Reihenfolge um: größter Betrag zuerst ins billigste Loch.
+ */
+function takePlannedNegativeFormCard(input: {
+  cards: LegacyFormCardOption[];
+  usedIds: Set<string>;
+  plannedCardIds: Set<string>;
+}) {
+  const picked =
+    input.cards
+      .filter((card) => !input.usedIds.has(card.id) && input.plannedCardIds.has(card.id))
+      .sort((left, right) => left.value - right.value || left.id.localeCompare(right.id))[0] ?? null;
+  if (picked) {
+    input.usedIds.add(picked.id);
+  }
+  return picked;
+}
+
+/**
+ * Die Minuskarte, die auf DIESER Seite am wenigsten kostet — dieselbe Kostenrechnung wie im
+ * Saisonplan, nur ohne die (hier konstante) Kadergröße: `|Wert| × (Farbtreffer ? 2 : 1)`.
+ *
+ * `takeBestFormCard` taugt dafür nicht: es SIEBT farbgleiche Minuskarten komplett aus und
+ * liefert `null`, wenn alle verbliebenen Karten die Farbe der Disziplin haben — der Aufrufer
+ * fiel dann auf `takeDumpNegativeFormCard` zurück, das ausgerechnet die GRÖSSTE Karte nimmt.
+ * Hier wird die Farbe stattdessen eingepreist statt als Ausschlusskriterium benutzt.
+ */
+function takeCheapestNegativeFormCard(input: {
+  cards: LegacyFormCardOption[];
+  usedIds: Set<string>;
+  color: FormCardColor | null;
+}) {
+  const damage = (card: LegacyFormCardOption) =>
+    Math.abs(card.value) * (input.color != null && card.color === input.color ? 2 : 1);
+  const picked =
+    input.cards
+      .filter((card) => !input.usedIds.has(card.id))
+      .sort((left, right) => damage(left) - damage(right) || left.id.localeCompare(right.id))[0] ?? null;
+  if (picked) {
+    input.usedIds.add(picked.id);
+  }
+  return picked;
+}
+
 function takeDumpNegativeFormCard(input: {
   cards: LegacyFormCardOption[];
   usedIds: Set<string>;
@@ -926,13 +1005,44 @@ function pickPrimaryFormCardForSide(input: {
   usedIds: Set<string>;
   color: FormCardColor | null;
   playerCount: number;
-  futureSlots: FormCardFutureSlot[];
+  plan: FormCardSeasonPlan;
+  currentMatchdayIndex: number;
+  plannedCardIds: Set<string>;
   doctrine: FormCardDoctrineProfile;
   positiveSelected: number;
   desiredPositiveThisMatchday: number;
   mustSpendPositives: boolean;
+  /** Der Saisonplan trägt eine echte Disziplin-Zuordnung (kein Platzhalter-Spielplan). */
+  planActive: boolean;
+  /** Karten, die der Plan für GENAU diese Seite auf den PRIMÄRplatz gelegt hat. */
+  plannedPrimaryCardIds: Set<string>;
 }) {
   if (input.competitiveness === "weak") {
+    const planned = takePlannedNegativeFormCard({
+      cards: input.negativeCards,
+      usedIds: input.usedIds,
+      plannedCardIds: input.plannedCardIds,
+    });
+    if (planned) return planned;
+    // Schwache Seite, für die der Plan HEUTE keine Minuskarte vorsieht — trotzdem wird entsorgt:
+    // Jede früh abgeladene Minuskarte macht einen späteren Primärplatz für eine PLUSkarte frei,
+    // und dieser Kapazitätsgewinn wiegt in der Simulation schwerer als der Verlust auf dieser
+    // einen Seite (den Dump hier ganz zu unterlassen kostete unterm Strich 264 → 150).
+    //
+    // Geändert hat sich nur, WELCHE Karte fällt: `takeDumpNegativeFormCard` sortiert aufsteigend
+    // über den (negativen) Wert und greift damit zur GRÖSSTEN Minuskarte — sinnvoll unter echtem
+    // Entsorgungszwang, fatal bei einer Gelegenheit. Auf einer schwachen 6er-Disziplin kostete
+    // das −48, während der Plan für dieselbe −8 längst eine 2er-Disziplin vorgesehen hatte
+    // (−16). `takeCheapestNegativeFormCard` nimmt stattdessen die hier BILLIGSTE Karte und
+    // lässt die dicken für ihre geplanten Verstecke liegen.
+    if (input.planActive && !input.preferNegativeDump) {
+      const cheapest = takeCheapestNegativeFormCard({
+        cards: input.negativeCards,
+        usedIds: input.usedIds,
+        color: input.color,
+      });
+      if (cheapest) return cheapest;
+    }
     return takeDumpNegativeFormCard({
       cards: input.negativeCards,
       usedIds: input.usedIds,
@@ -941,6 +1051,12 @@ function pickPrimaryFormCardForSide(input: {
   }
 
   if (input.preferNegativeDump) {
+    const planned = takePlannedNegativeFormCard({
+      cards: input.negativeCards,
+      usedIds: input.usedIds,
+      plannedCardIds: input.plannedCardIds,
+    });
+    if (planned) return planned;
     // For both strong and neutral dump sides: prefer non-color-matched but always fall back
     // to any negative (including color-matched) so forced dumps never silently skip.
     const nonMatching = takeBestFormCard({
@@ -957,11 +1073,24 @@ function pickPrimaryFormCardForSide(input: {
     });
   }
 
-  if (input.positiveSelected >= input.desiredPositiveThisMatchday) {
+  // Hat der Plan für DIESE Seite eine Pluskarte auf den Primärplatz gelegt, die noch frei ist?
+  const hasPlannedPositive =
+    input.planActive &&
+    input.positiveCards.some((card) => !input.usedIds.has(card.id) && input.plannedPrimaryCardIds.has(card.id));
+
+  // `desiredPositiveThisMatchday` verteilt die Pluskarten grob über die Restsaison
+  // (Karten ÷ Restspieltage). Die Näherung wird bei vielen Restspieltagen zu 1 und deckelte
+  // damit den ganzen Spieltag auf EINE Karte: an einem Spieltag mit zwei farbgleichen
+  // 6er-Disziplinen nahm d1 die passende Karte und d2 ging leer aus, obwohl dort eine zweite
+  // Karte derselben Farbe bereitlag. Der Plan ist die exakte Fassung derselben Absicht — er hat
+  // die Karte bewusst HIER hingelegt — und hebt deshalb den Deckel auf.
+  if (input.positiveSelected >= input.desiredPositiveThisMatchday && !hasPlannedPositive) {
     return null;
   }
   // Neutrale Seiten investieren nur unter Ausgabedruck (Karten stauen sich / Saisonende naht) —
   // sonst gehören die knappen Positivkarten den Seiten, auf denen das Team wirklich mitspielt.
+  // Diese Sperre bleibt AUCH mit Plan: der Plan rechnet in Formmodifier und weiß nichts über
+  // Ränge — ob Punkte hier überhaupt etwas bewegen, entscheidet weiter die Wettbewerbslogik.
   if (input.competitiveness === "neutral" && !input.mustSpendPositives) {
     return null;
   }
@@ -971,7 +1100,9 @@ function pickPrimaryFormCardForSide(input: {
     usedIds: input.usedIds,
     color: input.color,
     playerCount: input.playerCount,
-    futureSlots: input.futureSlots,
+    plan: input.plan,
+    currentMatchdayIndex: input.currentMatchdayIndex,
+    plannedCardIds: input.plannedCardIds,
     patience: input.doctrine.patience,
     mustSpend: input.mustSpendPositives,
   });
@@ -984,25 +1115,66 @@ function pickSecondaryFormCardForSide(input: {
   usedIds: Set<string>;
   color: FormCardColor | null;
   playerCount: number;
-  futureSlots: FormCardFutureSlot[];
+  plan: FormCardSeasonPlan;
+  currentMatchdayIndex: number;
+  plannedCardIds: Set<string>;
   doctrine: FormCardDoctrineProfile;
   /** Seite führt die Disziplin ohnehin klar an — die zweite dicke Karte wäre Overkill. */
   dominant: boolean;
   positiveSelected: number;
   desiredPositiveThisMatchday: number;
   mustSpendPositives: boolean;
+  /** Der Saisonplan trägt eine echte Disziplin-Zuordnung (kein Platzhalter-Spielplan). */
+  planActive: boolean;
+  /** Karten, die der Plan für GENAU diese Seite auf den SEKUNDÄRplatz gelegt hat. */
+  plannedSecondaryCardIds: Set<string>;
 }) {
   // Weak sides never get secondary cards.
   if (input.competitiveness === "weak") return null;
+  // Overkill-Bremse: Wer die Disziplin ohnehin klar anführt, gewinnt auch mit EINER Karte —
+  // die zweite fehlt später (Chris: "selbst mit nur 1 8x2 Karte wären sie immer noch 1.").
+  // Wie konsequent verzichtet wird, ist Team-Charakter (restraint), kein Einheitsschalter.
+  // Steht VOR dem Plan: der Plan rechnet in Formmodifier und weiß nichts über Ränge — die
+  // Wettbewerbslogik behält das Vetorecht über die Vorabsicht.
+  if (input.dominant && !input.mustSpendPositives && input.doctrine.restraint >= 0.35) return null;
+
+  if (input.planActive) {
+    // OB eine Seite überhaupt doppelt belegt wird, entscheidet ab hier allein der Saisonplan.
+    //
+    // Vorher entschied das der Tageswert, und das kostete doppelt: an Spieltag 1 nahm Hockey
+    // (5er, rot) Primär- UND Sekundärplatz (`rot+8` und `rot+2`), womit das Spieltags-Budget
+    // `desiredPositiveThisMatchday` erschöpft war und Fechten (5er, GRÜN) derselben Runde leer
+    // ausging — die kleine Zweitkarte verdrängte eine ganze Disziplinseite.
+    //
+    // Zwei bisherige Sperren fallen im Planpfad bewusst weg:
+    //   - `primaryCard.value < 0 → kein Sekundär` war ein KAPAZITÄTS-Artefakt, keine Spielregel:
+    //     `calculateFormModifierForSide` summiert beide Karten und verbietet nur eine NEGATIVE
+    //     zweite Karte. Weil jeder Spieler eine Plus- UND eine Minuskarte erzeugt und alle
+    //     Minuskarten gespielt werden müssen (sonst Punktabzug, s. form-card-penalty-service),
+    //     belegen die Minuskarten den Großteil der Primärplätze. Mit der Sperre verrotteten in
+    //     der Simulation 6 von 12 Pluskarten ungespielt.
+    //   - `desiredPositiveThisMatchday` und die 3er-Grenze sind Näherungen für „nicht alles auf
+    //     einmal". Der Plan ist die exakte Fassung derselben Absicht und ersetzt sie hier.
+    if (input.plannedSecondaryCardIds.size === 0) return null;
+    return selectPositiveFormCardForSlot({
+      positiveCards: input.positiveCards.filter((card) => input.plannedSecondaryCardIds.has(card.id)),
+      usedIds: input.usedIds,
+      color: input.color,
+      playerCount: input.playerCount,
+      plan: input.plan,
+      currentMatchdayIndex: input.currentMatchdayIndex,
+      plannedCardIds: input.plannedSecondaryCardIds,
+      patience: input.doctrine.patience,
+      mustSpend: input.mustSpendPositives,
+    });
+  }
+
+  // Ohne echten Spielplan (synthetische Kontexte, alte Saves) bleibt der bisherige Weg.
   // Neutral sides only get a secondary when positives are piling up.
   if (input.competitiveness === "neutral" && !input.mustSpendPositives) return null;
   // Never put a negative in the secondary slot.
   if (input.primaryCard && input.primaryCard.value < 0) return null;
   if (input.positiveSelected >= input.desiredPositiveThisMatchday) return null;
-  // Overkill-Bremse: Wer die Disziplin ohnehin klar anführt, gewinnt auch mit EINER Karte —
-  // die zweite fehlt später (Chris: "selbst mit nur 1 8x2 Karte wären sie immer noch 1.").
-  // Wie konsequent verzichtet wird, ist Team-Charakter (restraint), kein Einheitsschalter.
-  if (input.dominant && !input.mustSpendPositives && input.doctrine.restraint >= 0.35) return null;
   // Kleine Disziplinen rechtfertigen keine Doppel-Investition: der zweite Karteneinsatz
   // wirkt dort nur mit halber Kraft einer großen Disziplin.
   if (input.playerCount <= 3 && !input.mustSpendPositives) return null;
@@ -1012,7 +1184,9 @@ function pickSecondaryFormCardForSide(input: {
     usedIds: input.usedIds,
     color: input.color,
     playerCount: input.playerCount,
-    futureSlots: input.futureSlots,
+    plan: input.plan,
+    currentMatchdayIndex: input.currentMatchdayIndex,
+    plannedCardIds: input.plannedCardIds,
     patience: input.doctrine.patience,
     mustSpend: input.mustSpendPositives,
   });
@@ -1153,7 +1327,6 @@ export function buildAiLegacyLineupModifiers(
     Math.max(Math.ceil(positiveCards.length / remainingMatchdaysIncludingCurrent), Math.min(3, paceDeficit)),
   );
   const doctrine = getFormCardDoctrineProfile(context);
-  const futureSlots = collectFutureFormCardSlots(context, currentMatchdayIndex, remainingMatchdaysIncludingCurrent);
   const usedIds = new Set<string>();
   let positiveSelected = 0;
   const sides = [
@@ -1213,11 +1386,58 @@ export function buildAiLegacyLineupModifiers(
       })(),
     };
   });
+  // --- Saisonplan der Formkarten ---------------------------------------------------------
+  // EINMAL pro Aufstellungslauf: welche Karte gehört über die Restsaison auf welchen Slot?
+  // Die Zuordnung ist die Vorabsicht; alles darunter (Wettbewerbslage, Ausgabedruck,
+  // Overkill-Bremse) bleibt die kurzfristige Korrektur am Spieltag — das vom Nutzer gewünschte
+  // „umbuchen". Neu abgeleitet statt gespeichert: fällt ein Spieler aus oder ist eine Karte
+  // anders verbraucht, ändert sich die Eingabe und der nächste Plan ordnet die Restkarten neu zu.
+  const { slots: planSlots, hasRealSchedule } = collectFormCardPlanSlots({
+    context,
+    currentMatchdayIndex,
+    remainingMatchdaysIncludingCurrent,
+    currentSides: sidePlans.map((side) => ({
+      side: side.side,
+      disciplineId: side.disciplineId,
+      color: side.color,
+      playerCount: side.playerCount,
+    })),
+  });
+  const formCardSeasonPlan = buildAiFormCardSeasonPlan({
+    cards: formCards.map((card) => ({ id: card.id, value: card.value, color: card.color })),
+    slots: planSlots,
+  });
+  const plannedCardIdsBySide: Record<"d1" | "d2", Set<string>> = {
+    d1: getPlannedCardIdsForSlot(formCardSeasonPlan, currentMatchdayIndex, "d1"),
+    d2: getPlannedCardIdsForSlot(formCardSeasonPlan, currentMatchdayIndex, "d2"),
+  };
+  const plannedPrimaryCardIdsBySide: Record<"d1" | "d2", Set<string>> = {
+    d1: getPlannedCardIdsForSlot(formCardSeasonPlan, currentMatchdayIndex, "d1", "primary"),
+    d2: getPlannedCardIdsForSlot(formCardSeasonPlan, currentMatchdayIndex, "d2", "primary"),
+  };
+  const plannedSecondaryCardIdsBySide: Record<"d1" | "d2", Set<string>> = {
+    d1: getPlannedCardIdsForSlot(formCardSeasonPlan, currentMatchdayIndex, "d1", "secondary"),
+    d2: getPlannedCardIdsForSlot(formCardSeasonPlan, currentMatchdayIndex, "d2", "secondary"),
+  };
+  const negativeCardIds = new Set(negativeCards.map((card) => card.id));
+  // Seiten, für die der Plan HEUTE eine Minuskarte vorsieht. Das ersetzt das bisherige
+  // „entsorgen, wenn der Rückstau zwingt" durch „entsorgen, wenn es billig ist": ohne Plan
+  // sammelten sich die Minuskarten bis zum Saisonende und fielen dann zwangsweise in die
+  // Disziplinen, die gerade dran waren — in der Simulation zweimal −48 in 6er-Disziplinen.
+  //
+  // NUR mit echtem Spielplan: ohne ihn weiß niemand, ob heute wirklich der billigste Tag ist,
+  // und die alte Rückstau-Logik bleibt die ehrlichere Antwort.
+  const plannedNegativeSideCount = hasRealSchedule
+    ? (["d1", "d2"] as const).filter((side) =>
+        [...plannedCardIdsBySide[side]].some((cardId) => negativeCardIds.has(cardId)),
+      ).length
+    : 0;
   // When negative urgency is active, also flag the weaker sides for forced dumps so all
   // negatives get assigned rather than waiting until the very last matchday.
-  const effectiveDumpsRequired = negativeUrgency
-    ? Math.min(2, negativeCards.length)
-    : dumpsRequiredThisMatchday;
+  const effectiveDumpsRequired = Math.max(
+    plannedNegativeSideCount,
+    negativeUrgency ? Math.min(2, negativeCards.length) : dumpsRequiredThisMatchday,
+  );
   // "Echter Zwang" für Dumps auf starken Seiten: nur wenn die Saison fast vorbei ist oder
   // die Negativkarten selbst die verbleibenden Primärslots übersteigen. Sonst bleibt die
   // stärkste/aussichtsreichste Seite von Minuskarten verschont (Wettbewerbslogik vor
@@ -1262,8 +1482,12 @@ export function buildAiLegacyLineupModifiers(
             usedIds,
             color: side.color,
             playerCount: side.playerCount,
-            futureSlots,
+            plan: formCardSeasonPlan,
+            currentMatchdayIndex,
+            plannedCardIds: plannedCardIdsBySide[side.side],
             doctrine,
+            planActive: hasRealSchedule,
+            plannedPrimaryCardIds: plannedPrimaryCardIdsBySide[side.side],
             positiveSelected,
             desiredPositiveThisMatchday,
             mustSpendPositives,
@@ -1286,9 +1510,13 @@ export function buildAiLegacyLineupModifiers(
             usedIds,
             color: side.color,
             playerCount: side.playerCount,
-            futureSlots,
+            plan: formCardSeasonPlan,
+            currentMatchdayIndex,
+            plannedCardIds: plannedCardIdsBySide[side.side],
             doctrine,
             dominant: side.dominant,
+            planActive: hasRealSchedule,
+            plannedSecondaryCardIds: plannedSecondaryCardIdsBySide[side.side],
             positiveSelected,
             desiredPositiveThisMatchday,
             mustSpendPositives,
