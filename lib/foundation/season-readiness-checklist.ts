@@ -2,6 +2,7 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { getTeamBoardFlowSignals } from "@/lib/board/team-season-objectives-service";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
+import { getSeasonEndPayoutStatus } from "@/lib/season/season-end-sponsor-payout-status";
 import { isTeamMatchdayLineupComplete, isTeamMatchdayLineupSubmitted } from "@/lib/foundation/matchday-lineup-readiness";
 import { isTeamTrainingComplete } from "@/lib/foundation/team-training-status";
 
@@ -99,16 +100,23 @@ function buildSeasonActiveItems(gameState: GameState, teamId: string): SeasonRea
 
 function buildSeasonEndItems(gameState: GameState): SeasonReadinessItem[] {
   const seasonId = gameState.season.id;
-  const prizeApplied = (gameState.seasonState.cashPrizeApplyLogs ?? []).some((log) => log.seasonId === seasonId);
+  const payoutStatus = getSeasonEndPayoutStatus(gameState, seasonId);
   const developmentApplied = (gameState.playerProgressionEvents ?? []).some((event) => event.seasonId === seasonId);
   const seasonReviewReady = gameState.gamePhase === "season_completed" || gameState.gamePhase === "season_review";
 
   return [
     {
       id: "prize",
-      label: "Preisgeld gebucht",
-      detail: prizeApplied ? "Saison-Preisgeld angewendet." : "Preisgeld noch offen.",
-      status: prizeApplied ? "ready" : "open",
+      // Dieselbe Unterscheidung wie im Saisonabschluss-Panel: ein Audit-Log ohne Zahlung
+      // ist nicht erledigt, sondern nachzuholen.
+      label: "Sponsoren gebucht",
+      detail:
+        payoutStatus === "paid"
+          ? "Sponsorgeld abzüglich Gehälter ist gutgeschrieben."
+          : payoutStatus === "pending_payout"
+            ? "Angestoßen, aber nicht gebucht — bitte nachbuchen."
+            : "Sponsoren-Abrechnung noch offen.",
+      status: payoutStatus === "paid" ? "ready" : "open",
       targetView: "prize",
     },
     {

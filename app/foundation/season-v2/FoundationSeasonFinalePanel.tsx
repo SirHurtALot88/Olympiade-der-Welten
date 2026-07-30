@@ -21,14 +21,24 @@ import { useMemo } from "react";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { buildSeasonReview } from "@/lib/season/season-review-service";
+import type { SeasonEndPayoutStatus } from "@/lib/season/season-end-sponsor-payout-status";
 
 export type SeasonFinaleStepState = "done" | "ready" | "blocked" | "busy";
 
 export type FoundationSeasonFinalePanelProps = {
   gameState: GameState;
   activeTeamId: string | null;
-  /** Preisgeld ist für diese Saison bereits gebucht. */
-  prizeApplied: boolean;
+  /**
+   * Steht das Sponsorgeld dieser Saison auf dem Konto?
+   *
+   * Frueher hiess dieser Prop `prizeApplied` und beantwortete eine andere Frage: ob ein
+   * Audit-Log existiert. Das ist nicht dasselbe — ein Spielstand, in dem der Schritt vor
+   * der Buchungs-Reparatur lief, traegt ein Log OHNE Zahlung. Dort stand „erledigt · das
+   * Geld steht auf dem Konto" ueber unveraendertem Cash, und der Knopf war weg.
+   *
+   * `pending_payout` ist genau dieser Fall: angestossen, aber nicht gebucht — nachholbar.
+   */
+  seasonEndPayoutStatus: SeasonEndPayoutStatus;
   /** Spielerentwicklung der Saison ist bereits angewendet. */
   developmentApplied: boolean;
   /** Vorschau des Saisonwechsels liegt vor und ist ohne Blocker. */
@@ -60,7 +70,7 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
   const {
     gameState,
     activeTeamId,
-    prizeApplied,
+    seasonEndPayoutStatus,
     developmentApplied,
     nextSeasonReady,
     busy,
@@ -92,14 +102,29 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
     state: SeasonFinaleStepState;
     action: { label: string; onClick: () => void } | null;
   }> = [
+    /**
+     * Drei Zustaende, nicht zwei. „Angestossen" und „bezahlt" sind verschiedene Dinge —
+     * sie gleichzusetzen war der Fehler, an dem ein Spielstand mit unveraendertem Cash
+     * als „erledigt" dastand und der Knopf nicht mehr anfassbar war.
+     */
     {
       key: "prize",
-      title: "Preisgeld & Sponsoren buchen",
-      detail: prizeApplied
-        ? "Ist gebucht — das Geld steht auf dem Konto."
-        : "Platzierung und Sponsoren werden in Cash umgerechnet und gutgeschrieben.",
-      state: prizeApplied ? "done" : busy ? "busy" : "ready",
-      action: prizeApplied || readOnly ? null : { label: "Preisgeld buchen", onClick: onApplyPrize },
+      title: "Sponsoren & Preisgeld buchen",
+      detail:
+        seasonEndPayoutStatus === "paid"
+          ? "Ist gebucht — Sponsorgeld abzüglich Gehälter steht auf dem Konto."
+          : seasonEndPayoutStatus === "pending_payout"
+            ? "Der Schritt lief, aber das Geld ist nie geflossen — das war ein Fehler und ist behoben. Jetzt nachbuchen."
+            : "Sponsorgeld wird abzüglich Gehälter gutgeschrieben.",
+      state:
+        seasonEndPayoutStatus === "paid" ? "done" : busy ? "busy" : "ready",
+      action:
+        seasonEndPayoutStatus === "paid" || readOnly
+          ? null
+          : {
+              label: seasonEndPayoutStatus === "pending_payout" ? "Jetzt nachbuchen" : "Sponsoren buchen",
+              onClick: onApplyPrize,
+            },
     },
     {
       key: "development",

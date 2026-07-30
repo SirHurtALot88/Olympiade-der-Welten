@@ -4,6 +4,7 @@ import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save"
 import type { PersistenceService } from "@/lib/persistence/types";
 import { buildPrizeMoneyPreview, type PrizeMoneyPreviewResult } from "@/lib/season/prize-money-preview";
 import { CASH_PRIZE_BENCHMARK_ONLY } from "@/lib/season/cash-prize-benchmark-flag";
+import { hasSeasonEndSponsorPayout } from "@/lib/season/season-end-sponsor-payout-status";
 import type { StandingsPreviewSource } from "@/lib/standings/standings-preview-engine";
 import { applySponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 
@@ -205,13 +206,36 @@ async function prepareCashPrizeApply(
             log.payload.idempotencyKey === idempotencyKey,
         ) ?? null
       : null;
-  const duplicateDetected = existingAuditLog != null;
+  /**
+   * Ein vorhandenes Audit-Log heisst NICHT, dass Geld geflossen ist.
+   *
+   * Solange dieser Schritt nur Tabellen-Spalten und das Log schrieb, konnte er als
+   * "erledigt" dastehen, ohne einen Cent bewegt zu haben — genau so ist ein Spielstand
+   * entstanden, in dem alle 32 Teams unveraendertes Cash hatten. Der Duplikat-Riegel
+   * sperrte den Knopf danach dauerhaft: der Spieler konnte die Buchung nie nachholen.
+   *
+   * Der Riegel greift deshalb nur noch, wenn das Sponsorgeld dieser Saison tatsaechlich
+   * ausgezahlt ist. Ist es das nicht, ist ein zweiter Druck kein Duplikat, sondern die
+   * ERSTE Buchung. Gegen echte Doppelbuchung schuetzt weiterhin `applySponsorSettlement`
+   * selbst (Idempotenz je Team ueber `sponsorPayoutLogs`) — der Riegel hier war immer nur
+   * die zweite Linie, nie die eigentliche Wache.
+   */
+  const sponsorPayoutSettled =
+    source === "prisma"
+      ? false
+      : hasSeasonEndSponsorPayout(resolveLocalSave(persistence, scope.saveId).gameState, scope.seasonId);
+  const duplicateDetected = existingAuditLog != null && (phase === "matchday" || sponsorPayoutSettled);
+  const staleApplyLogWithoutPayout = existingAuditLog != null && !duplicateDetected;
   const plannedChanges = toPlannedChanges(preview.items);
   const blockingReasons =
     source === "prisma"
       ? ["Prisma/Supabase mode is read-only. Cash Apply is only allowed in the local SQLite test save."]
       : buildBlockingReasons(preview, duplicateDetected, phase);
   const warnings = buildWarnings(preview, duplicateDetected, phase);
+  if (staleApplyLogWithoutPayout) {
+    // Sichtbar machen, dass hier ein alter Lauf nachgeholt wird, statt es still zu tun.
+    warnings.push("apply_log_without_sponsor_payout_retry");
+  }
 
   return {
     source,
