@@ -47,11 +47,22 @@ ohne Spur, ohne Fehlermeldung. Behoben mit dem eigenen Volume `oly-bug-reports`
 (`deploy/hetzner/docker-compose.yml`).
 
 Damit die Meldungen den Server auch verlassen, gibt es `deploy/hetzner/push-bug-reports.sh` — dieselbe
-Mechanik wie `push-live-save.sh`: eigener Branch, `main` bleibt unberührt, kein Neu-Deploy. Der
-Cron-Installer richtet beides zusammen ein:
+Mechanik wie `push-live-save.sh`: eigener Branch, `main` bleibt unberührt, kein Neu-Deploy.
+
+**Der Cron richtet sich selbst ein.** `auto-deploy.sh` ruft bei jedem Deploy
+`install-live-save-cron.sh --ensure-only` auf — idempotent, still, und ein Fehler dabei wirft den
+Deploy nicht um. Auf dem Server ist dafür nichts zu tun.
+
+Das ist die Lehre aus dem zweiten Fehler in dieser Kette: die Cron-Zeile für die Bug-Meldungen wurde
+dem Installer hinzugefügt — aber niemand führte den Installer auf dem Server erneut aus. Dort lief
+weiter die alte Crontab mit nur dem Live-Save. Nichts schlug fehl, es passierte nur schlicht nichts,
+und die Meldungen erreichten GitHub nie. Eine neue Zeile in einem Skript, das niemand mehr aufruft,
+ist keine Änderung.
+
+Von Hand (mit sofortigem ersten Push, z. B. beim Aufsetzen eines neuen Servers):
 
 ```bash
-bash deploy/hetzner/install-live-save-cron.sh    # einmalig auf dem Server
+bash deploy/hetzner/install-live-save-cron.sh
 ```
 
 ### Lokal gespielte Runden — und warum beide Quellen sich nicht überschreiben
@@ -131,6 +142,11 @@ Format — Kopf maschinenlesbar, Rest für dich:
 status: vorgeprueft
 titel: Arena zählt die Punkte der zweiten Disziplin doppelt
 schwere: hoch
+ergebnis: <ab `gebaut`/`abgelehnt` Pflicht — ein Satz, was dabei herauskam>
+pr: <ab `gebaut` Pflicht>
+commit: <Merge-Commit auf main>
+gemergt: <Datum>
+bestaetigt: <ab `erledigt` PFLICHT — WIE die Wirkung belegt wurde>
 
 **Befund.** Nachgestellt im gemeldeten Save (Saison 1, Spieltag 1): nach dem Wechsel auf
 Disziplin 2 steht die Gesamtwertung 214 statt 107. Reproduzierbar in 3 von 3 Versuchen.
@@ -158,11 +174,38 @@ brauchbar; ein erratener Befund ist es nicht.
 
 ## Vorlegen und entscheiden
 
+**Die Übersicht: [`data/bug-reports/TICKETS.md`](../data/bug-reports/TICKETS.md)** — alle Meldungen
+mit Nummer, Melder, Seite, Stand und Ergebnis auf einer Seite.
+
 ```bash
-npm run bugs:review              # was offen ist — der Normalfall
+npm run bugs:tabelle             # TICKETS.md neu erzeugen, fehlende Nummern vergeben
+npm run bugs:tabelle -- --check  # schreibt nichts, Exit 1 bei Abweichung
+npm run bugs:review              # Volltext: was offen ist — der Normalfall
+npm run bugs:review -- --nr 3    # ein einzelnes Ticket
 npm run bugs:review -- --alle    # auch Abgelehntes und Erledigtes
 npm run bugs:review -- --json    # maschinenlesbar
 ```
+
+### Warum die Tabelle erzeugt und nicht gepflegt wird
+
+Die beiden Fehlerarten sind nicht gleich schlimm. Einer **erzeugten** Tabelle, deren Quelle jemand
+nicht nachgezogen hat, sieht man die Lücke an — sie schreibt „Wirkung nicht bestätigt" in die Zelle
+und mahnt sie beim Erzeugen an. Eine **gepflegte** Tabelle, die ein Lauf vergisst, behauptet
+stattdessen etwas Plausibles und Falsches.
+
+Das ist keine Theorie. Nach einem einzigen Tag Betrieb lagen für die Sponsoren-Meldung bereits **zwei
+unabhängige Fixes** im Repo (#268 aus einer anderen Sitzung und einer aus dieser), weil niemand sehen
+konnte, dass die Sache schon bearbeitet wurde. Genau diese Doppelarbeit soll die Tabelle verhindern —
+und das kann sie nur, wenn man ihr trauen kann.
+
+Deshalb: **`TICKETS.md` wird nie von Hand editiert.** Der Stand einer Meldung wird in ihrer
+Triage-Notiz gepflegt, die Tabelle liest ihn dort ab. Zwei gleichzeitige Läufe fassen so verschiedene
+Dateien an und können sich nicht gegenseitig überschreiben.
+
+**Ticket-Nummern** stehen in `data/bug-reports/tickets.json` und werden nur **angehängt**, nie
+geändert. Ein Nachzügler bekommt die nächste freie Nummer, auch wenn das die Chronologie bricht —
+„Nr. 3" muss nächste Woche noch dieselbe Meldung sein. Nach Datum durchzunummerieren würde bei jedem
+Nachzügler alle späteren Nummern verschieben.
 
 Die Ausgabe ist eine **Entscheidungsvorlage**: pro Meldung stehen Zustand, Seite, Melder, Befund und
 Vorschlag beieinander, sodass genau eine Frage beantwortbar ist — *soll das gefixt werden?*
@@ -175,11 +218,51 @@ wer am Zug ist):
 | `offen` | noch nicht angesehen | Agent |
 | `vorgeprueft` | Befund und Vorschlag liegen vor | **du** |
 | `angenommen` | freigegeben, Fix ist zu bauen | Agent |
+| `gebaut` | Fix gemergt, **Wirkung noch nicht belegt** | wer bestätigt |
 | `abgelehnt` | soll nicht gefixt werden | — |
-| `erledigt` | Fix gebaut und gemergt | — |
+| `erledigt` | Fix gemergt **und** Wirkung belegt | — |
+
+`gebaut` gibt es, weil die Unterscheidung schon einmal Schaden angerichtet hat: Die Cash-Meldung galt
+nach einem Merge als behoben — der Fix stieß einen Reload an, der zwei Zeilen weiter von einem
+Zwischenspeicher verschluckt wurde. Ein „erledigt", während der Fehler weiterläuft, nimmt die Meldung
+aus dem Blick. **`erledigt` gibt es deshalb nur mit gefülltem `bestaetigt:`** — sonst stuft der Parser
+selbsttätig auf `gebaut` zurück.
 
 Entscheiden kannst du auf zwei Wegen: im Beileger den Status ändern — oder es dem Agenten einfach
 sagen („die Arena-Sache ja, den Rest nein").
+
+---
+
+## Arbeitsweise: wer welche Arbeit macht
+
+Die Untersuchung einer einzelnen Meldung ist mechanisch — Code durchsuchen, Commits prüfen, Tests
+laufen lassen, Belege sammeln. Das läuft **je Meldung als eigener Sonnet-Agent, alle parallel**.
+Drei Meldungen dauern damit so lange wie eine, und keine Untersuchung färbt auf die andere ab.
+
+**Opus** (oder Fable) macht nur das, was Urteil verlangt: die Befunde gegenlesen, Widersprüche und
+zu forsche Schlüsse aussortieren, gewichten, und die Entscheidungsvorlage schreiben. Ein Agent, der
+seine eigene Untersuchung bewertet, findet selten etwas daran auszusetzen — deshalb sind Untersuchen
+und Bewerten getrennt.
+
+Jeder Untersuchungs-Agent liefert dasselbe Raster zurück, damit die Befunde vergleichbar sind:
+
+```
+SCHON ERLEDIGT: ja/nein/teilweise + Belege (Commit-Hashes)
+BEFUND:         was tatsächlich passiert
+URSACHE:        Datei:Zeile + Erklärung
+LÖSUNGSVORSCHLAG
+WAS DAGEGEN SPRICHT   ← Pflichtfeld, notfalls "nichts"
+AUFWAND:        klein/mittel/groß
+SICHERHEIT:     hoch/mittel/niedrig
+```
+
+`SICHERHEIT` trägt mehr, als es aussieht: Ein Befund mit „niedrig" darf nicht wie ein gesicherter
+aussehen, wenn er Ihnen vorgelegt wird. Und **„schon erledigt?" wird zuerst geprüft** — es wäre die
+teuerste Art, Zeit zu verbrennen, einen Fehler zu untersuchen, den ein Commit von gestern längst
+behoben hat.
+
+Die Untersuchungs-Agenten **ändern keinen Code**. Sie lesen, belegen, berichten. Gebaut wird erst
+nach Ihrer Freigabe, und dann gezielt.
 
 ---
 

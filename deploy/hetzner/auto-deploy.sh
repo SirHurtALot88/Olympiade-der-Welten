@@ -46,4 +46,19 @@ log "Build-Stempel: ${NEXT_PUBLIC_OLY_BUILD_SHA:0:7} @ ${NEXT_PUBLIC_OLY_BUILD_D
 # 3) Neu bauen & starten (Container wird bei Aenderung automatisch ersetzt)
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build
 
+# 4) Push-Crons nachziehen (Live-Save, Bug-Meldungen).
+#
+# WARUM HIER: eine neue Cron-Zeile im Installer nuetzt nichts, solange niemand den Installer auf dem
+# Server erneut ausfuehrt. Genau daran ist die Bug-Melde-Kette gescheitert — die Zeile fuer
+# push-bug-reports.sh kam dazu, auf dem Server lief aber weiter die alte Crontab mit nur dem
+# Live-Save, und keine einzige Meldung erreichte GitHub. Niemandem faellt das auf, weil nichts
+# fehlschlaegt; es passiert nur schlicht nichts. Seitdem richtet sich jede neue Zeile beim naechsten
+# Deploy selbst ein.
+#
+# Idempotent und still: aendert sich nichts, gibt es keine Ausgabe. Ein Fehler beim Crontab-Schreiben
+# darf den Deploy NICHT umwerfen — das Spiel laeuft dann trotzdem, nur die Spiegelung haengt.
+if ! bash deploy/hetzner/install-live-save-cron.sh --ensure-only; then
+  log "WARNUNG: Push-Crons konnten nicht eingerichtet werden — Deploy ist trotzdem durch."
+fi
+
 log "Deploy fertig — jetzt auf Stand ${REMOTE:0:7}."

@@ -2222,12 +2222,37 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 onIncludeDoneChange={setInboxIncludeDone}
                 includeDismissed={inboxIncludeDismissed}
                 onIncludeDismissedChange={setInboxIncludeDismissed}
-                onRunChoice={(_itemId, choiceId) => {
+                /**
+                 * GEMELDET: „ich wollte zu training über die inbox message und wurde zur team
+                 * ansicht weitergeleitet".
+                 *
+                 * Der Handler bekam die `itemId` der angeklickten Karte — und warf sie weg
+                 * (`_itemId`). Stattdessen schlug er den gerade AUSGEWAEHLTEN Eintrag nach, und
+                 * ohne Auswahl schlicht den ERSTEN der Liste. Die CTA-Knoepfe rufen aber
+                 * `stopPropagation()`, setzen die Auswahl also gar nicht auf ihre eigene Karte:
+                 * Beim ersten Oeffnen der Inbox landete jeder Klick deterministisch beim ersten
+                 * Eintrag. Und diese Liste ist NICHT nach Dringlichkeit sortiert — Kapitaen,
+                 * Sponsor und Vertragsaufloesung (alle mit Ziel `teams`) stehen dort oft vor den
+                 * Trainings-Eintraegen. Wer „Training öffnen" klickte, landete im Kader.
+                 *
+                 * Der frühere Fix e574215 konnte das nicht heilen: Er hat die ZIELE in
+                 * `game-inbox-service.ts` berichtigt. Die sind seitdem korrekt — sie wurden hier
+                 * nur nie gelesen.
+                 *
+                 * Richtig verdrahtet gibt es das laengst, in `FoundationInboxV2Host.tsx:96-104`.
+                 * Nur wird die Komponente, die diesen Host rendert, nirgends verwendet.
+                 */
+                onOpenItem={(itemId) => {
+                  const sourceItem = visibleInboxItems.find((item: GameInboxItem) => item.itemId === itemId);
+                  if (sourceItem) {
+                    navigateToInboxItem(sourceItem);
+                  }
+                }}
+                onRunChoice={(itemId, choiceId) => {
                   if (choiceId !== "open-target") {
                     return;
                   }
-                  const selected = inboxV2Items.find((item: InboxV2Item) => item.id === (inboxV2SelectedItemId ?? inboxV2Items[0]?.id));
-                  const sourceItem = visibleInboxItems.find((item: GameInboxItem) => item.itemId === selected?.id);
+                  const sourceItem = visibleInboxItems.find((item: GameInboxItem) => item.itemId === itemId);
                   if (sourceItem) {
                     navigateToInboxItem(sourceItem);
                   }
@@ -2678,7 +2703,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               viewMode={seasonStandingsMode}
               onViewModeChange={setSeasonStandingsMode}
               onOpenRanks={() => setFoundationView("ranks", setActiveView)}
-              onOpenPrize={() => openPrizeFinanceView({ tab: "prize" })}
+              // Der Knopf heisst "Sponsoren" (SeasonStandingsNewLook.tsx) — er muss auch dorthin
+              // fuehren. Bis hierher zwang er die Preisgeld-Ansicht auf, die weder Namen noch
+              // Seltenheit zeigt, und aus der es seit dem Wegfall des Umschalters keinen Rueckweg gab.
+              onOpenPrize={() => openPrizeFinanceView()}
             />
           ) : null}
 

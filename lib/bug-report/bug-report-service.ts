@@ -255,12 +255,23 @@ export function saveBugReport(
  * liegen als `.md` im Unterordner `triage/` und zaehlen bewusst NICHT mit — sonst schoebe jede
  * Statusaenderung einen Commit an, ohne dass eine neue Meldung vorliegt.
  */
+/**
+ * Nur die Meldungen selbst — nicht jede JSON-Datei im Ordner.
+ *
+ * Das Nummern-Register `tickets.json` liegt danebenan. Ein Filter allein auf `.json` las es als
+ * Meldung mit, und der Tabellen-Generator vergab prompt eine Ticket-Nummer an `undefined`. Der
+ * Namensprefix ist die eigentliche Regel (siehe `buildReportId`), also wird auch danach gefiltert.
+ */
+function isBugReportFileName(name: string): boolean {
+  return name.startsWith("bug-") && name.endsWith(".json");
+}
+
 export function computeBugReportSignature(): string {
   try {
     if (!fs.existsSync(BUG_REPORTS_DIR)) return "";
     return fs
       .readdirSync(BUG_REPORTS_DIR)
-      .filter((name) => name.endsWith(".json"))
+      .filter(isBugReportFileName)
       .sort()
       .join("|");
   } catch {
@@ -273,7 +284,7 @@ export function listBugReports(limit = 50): BugReportRecord[] {
   if (!fs.existsSync(BUG_REPORTS_DIR)) return [];
   return fs
     .readdirSync(BUG_REPORTS_DIR)
-    .filter((name) => name.endsWith(".json"))
+    .filter(isBugReportFileName)
     .sort()
     .reverse()
     .slice(0, limit)

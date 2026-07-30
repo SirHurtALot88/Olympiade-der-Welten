@@ -62,3 +62,38 @@ describe("Transfermarkt — Cash steht nach dem Kauf richtig", () => {
     expect(SCOPE).toContain("bumpMarketReloadToken: () => setMarketReloadToken((current) => current + 1),");
   });
 });
+
+/**
+ * DER ANSTOSS ALLEIN GENUEGTE NICHT — er wurde vom Zwischenspeicher verschluckt.
+ *
+ * Nach #273 lief der Feed-Effekt nach einem Kauf wirklich erneut. Zwei Zeilen weiter kehrte er
+ * jedoch mit einem Cache-Treffer zurueck, und zwar mit dem Stand VOR dem Kauf: `reloadToken` steht
+ * in den Abhaengigkeiten des Effekts, aber NICHT im Cache-Schluessel; die Cache-Pruefung liegt vor
+ * jedem Netzwerkaufruf; und geleert wurde diese Map nirgends im ganzen File.
+ *
+ * Diese Datei prueft am Quelltext, nicht im Browser (Begruendung oben) — genau deshalb braucht es
+ * die Zusicherung hier: sie haelt fest, dass die Entwertung existiert und nicht wieder verschwindet.
+ */
+describe("Transfermarkt — der Kauf entwertet auch den Markt-Zwischenspeicher", () => {
+  it("der Zaehler wird gegen den Stand des Zwischenspeichers gehalten", () => {
+    expect(CLIENT).toContain("marketCacheTokenRef");
+    expect(CLIENT).toContain("marketCacheTokenRef.current !== reloadToken");
+  });
+
+  /** Ohne dieses `clear()` liefert der naechste Lauf denselben veralteten Feed zurueck. */
+  it("bei neuem Zaehlerstand wird der Zwischenspeicher geleert", () => {
+    expect(CLIENT).toContain("marketCacheRef.current.clear()");
+  });
+
+  /**
+   * Die Entwertung muss VOR der Cache-Abfrage stehen. Danach waere sie wirkungslos — der Effekt
+   * haette laengst mit dem alten Feed zurueckgegeben.
+   */
+  it("die Entwertung steht vor der Cache-Abfrage", () => {
+    const clearIndex = CLIENT.indexOf("marketCacheRef.current.clear()");
+    const readIndex = CLIENT.indexOf("marketCacheRef.current.get(marketCacheKey)");
+    expect(clearIndex).toBeGreaterThan(-1);
+    expect(readIndex).toBeGreaterThan(-1);
+    expect(clearIndex).toBeLessThan(readIndex);
+  });
+});

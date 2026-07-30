@@ -68,8 +68,12 @@ export function getLegacyLineupDragFitTier(input: {
 
 export function formatLegacyLineupDragBlockReason(reason: LegacyLineupDragBlockReason | null) {
   switch (reason) {
+    // Hier stand der rohe Code-String. Er ging unuebersetzt bis in die Oberflaeche durch: als
+    // Hinweistext an der Kandidatenliste und als Meldung nach einem verhinderten Zug las der
+    // Spieler woertlich "player_injured_unavailable". Jeder andere Sperrgrund daneben hatte
+    // deutschen Text — dieser eine war schlicht vergessen worden.
     case "player_injured_unavailable":
-      return "player_injured_unavailable";
+      return "Verletzt — kann diesen Spieltag nicht antreten";
     case "already_assigned_other_discipline":
       return "bereits in anderer Diszi eingesetzt";
     case "captain_not_allowed":
