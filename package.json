@@ -126,6 +126,7 @@
     "retool:extract-transfermarkt-columns": "tsx scripts/extract-retool-transfermarkt-columns.ts",
     "retool:extract-standings-economy": "tsx scripts/extract-retool-standings-economy.ts",
     "bugs:review": "tsx scripts/bug-reports-review.ts",
+    "bugs:tabelle": "tsx scripts/bug-reports-table.ts",
     "saves:export": "tsx scripts/save-export.ts",
     "saves:import": "tsx scripts/save-import.ts"
   },

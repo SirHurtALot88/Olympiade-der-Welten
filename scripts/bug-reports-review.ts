@@ -18,20 +18,29 @@ import {
   listBugReports,
   type BugReportRecord,
 } from "@/lib/bug-report/bug-report-service";
+import { buildNumberByReportId, readTicketRegistry } from "@/lib/bug-report/bug-report-tickets";
 import {
   OPEN_TRIAGE_STATUSES,
+  findTriageGaps,
   readTriage,
   type BugTriage,
   type BugTriageStatus,
 } from "@/lib/bug-report/bug-report-triage";
 
-type Entry = { report: BugReportRecord; triage: BugTriage | null; status: BugTriageStatus };
+type Entry = {
+  report: BugReportRecord;
+  triage: BugTriage | null;
+  status: BugTriageStatus;
+  /** Ticket-Nummer — damit man im Gespraech "Nr. 3" sagen kann statt der langen Id. */
+  nummer: number | null;
+};
 
 /** Reihenfolge der Statusgruppen in der Ausgabe — wer am Zug ist, steht oben. */
-const STATUS_ORDER: BugTriageStatus[] = ["vorgeprueft", "offen", "angenommen", "erledigt", "abgelehnt"];
+const STATUS_ORDER: BugTriageStatus[] = ["vorgeprueft", "offen", "angenommen", "gebaut", "erledigt", "abgelehnt"];
 
 const STATUS_HINT: Record<BugTriageStatus, string> = {
   vorgeprueft: "wartet auf DEINE Entscheidung",
+  gebaut: "gemergt — Wirkung im Spiel noch nicht belegt",
   offen: "noch nicht geprueft — der Agent ist am Zug",
   angenommen: "freigegeben — der Fix ist zu bauen",
   erledigt: "gefixt",
@@ -39,9 +48,11 @@ const STATUS_HINT: Record<BugTriageStatus, string> = {
 };
 
 function parseArgs(argv: string[]) {
+  const nrIndex = argv.indexOf("--nr");
   return {
     alle: argv.includes("--alle") || argv.includes("--all"),
     json: argv.includes("--json"),
+    nr: nrIndex >= 0 ? Number(argv[nrIndex + 1]) : null,
   };
 }
 
@@ -86,16 +97,26 @@ function formatLocalTime(iso: string): string {
 
 function collect(): Entry[] {
   // Grosszuegiges Limit: eine uebersehene Meldung ist teurer als eine lange Liste.
+  const numberByReportId = buildNumberByReportId(readTicketRegistry());
   return listBugReports(500).map((report) => {
     const triage = readTriage(report.reportId);
-    return { report, triage, status: triage?.status ?? "offen" };
+    return {
+      report,
+      triage,
+      status: triage?.status ?? "offen",
+      nummer: numberByReportId.get(report.reportId) ?? null,
+    };
   });
 }
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const all = collect();
-  const entries = args.alle ? all : all.filter((entry) => OPEN_TRIAGE_STATUSES.includes(entry.status));
+  const entries = args.nr
+    ? all.filter((entry) => entry.nummer === args.nr)
+    : args.alle
+      ? all
+      : all.filter((entry) => OPEN_TRIAGE_STATUSES.includes(entry.status));
 
   if (args.json) {
     console.log(JSON.stringify({ total: all.length, shown: entries.length, entries }, null, 2));
@@ -137,7 +158,7 @@ function main() {
     }
     const { report, triage } = entry;
     console.log("");
-    console.log(`  ${triage?.titel ?? report.note ?? "(ohne Beschreibung)"}`);
+    console.log(`  ${entry.nummer != null ? `Nr ${entry.nummer} — ` : ""}${triage?.titel ?? report.note ?? "(ohne Beschreibung)"}`);
     console.log(`    Id       ${report.reportId}`);
     console.log(`    Wann     ${formatLocalTime(report.createdAt)}`);
     console.log(`    Wer      ${formatReporter(report)}`);
@@ -145,6 +166,11 @@ function main() {
     console.log(`    Stand    ${formatGame(report)}`);
     if (triage?.schwere) console.log(`    Schwere  ${triage.schwere}`);
     if (report.note && triage?.titel) console.log(`    Gemeldet "${report.note}"`);
+    if (triage?.ergebnis) console.log(`    Ergebnis ${triage.ergebnis}`);
+    if (triage?.pr) console.log(`    PR       ${triage.pr}${triage.commit ? ` (${triage.commit})` : ""}`);
+    if (triage?.bestaetigt) console.log(`    Belegt   ${triage.bestaetigt}`);
+    const gaps = triage ? findTriageGaps(triage) : [];
+    if (gaps.length > 0) console.log(`    OFFEN    ${gaps.join(", ")}`);
     if (triage?.body) {
       console.log("");
       for (const line of triage.body.split("\n")) console.log(`    ${line}`);
