@@ -7,6 +7,11 @@ import { CASH_PRIZE_BENCHMARK_ONLY } from "@/lib/season/cash-prize-benchmark-fla
 import { hasSeasonEndSponsorPayout } from "@/lib/season/season-end-sponsor-payout-status";
 import type { StandingsPreviewSource } from "@/lib/standings/standings-preview-engine";
 import { applySponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
+import {
+  applyFacilitySeasonEndFinance,
+  hasFacilitySeasonEndFinanceApplied,
+  previewFacilitySeasonEndFinance,
+} from "@/lib/facilities/facility-season-end-service";
 
 export const CASH_PRIZE_APPLY_CONFIRM_TOKEN = "APPLY_LOCAL_CASH_PRIZE";
 
@@ -287,16 +292,33 @@ function writeLocalCashPrizeApply(input: {
     Object.entries(save.gameState.seasonState.standings ?? {}).map(([teamId, standing]) => {
       const row = previewByTeamId.get(teamId) ?? null;
       if (!row) return [teamId, standing] as const;
+      /**
+       * SPONSOREN STATT PREISGELD.
+       *
+       * `sponsorTotal` und `guv` wurden aus `row.prizeMoney` gebildet — dem
+       * Preisgeld-BENCHMARK, der nie ausgezahlt wird (`CASH_PRIZE_BENCHMARK_ONLY`).
+       * Die Tabelle zeigte damit eine GuV, die niemand je aufs Konto bekommt: fuer
+       * C-C standen dort 67,5 Sponsoren und +25,0 GuV, waehrend die Abrechnung
+       * 48,1 Sponsorgeld gegen 42,5 Gehaelter buchte — real +5,6.
+       *
+       * Quelle ist jetzt `row.sponsorCash`: die Sponsor-Abrechnung beim AKTUELLEN
+       * Rang (`previewSponsorSettlement`), also exakt das, was `applySponsorSettlement`
+       * gutschreibt. Dazu die Gebaeude netto, die ebenfalls real gebucht werden.
+       * Eine Groesse, eine Quelle — die Spalte beantwortet endlich dieselbe Frage
+       * wie das Konto.
+       */
       const sponsorBasis = row.basisCash;
       const sponsorRank = row.rankChangePrize.bonusMalus;
       const sponsorSeason =
-        row.prizeMoney != null && sponsorBasis != null ? Number((row.prizeMoney - sponsorBasis).toFixed(2)) : null;
-      const sponsorTotal =
-        row.prizeMoney != null ? Number((row.prizeMoney + (sponsorRank ?? 0)).toFixed(2)) : null;
+        row.sponsorCash != null && sponsorBasis != null ? Number((row.sponsorCash - sponsorBasis).toFixed(2)) : null;
+      const sponsorTotal = row.sponsorCash != null ? Number(row.sponsorCash.toFixed(2)) : null;
       const cashFc =
         row.currentCash != null && row.salaryTotal != null ? Number((row.currentCash - row.salaryTotal).toFixed(2)) : null;
+      // GuV = was die Saison real einbringt: Sponsoren + Gebaeude (netto) − Gehaelter.
       const guv =
-        sponsorTotal != null && row.salaryTotal != null ? Number((sponsorTotal - row.salaryTotal).toFixed(2)) : null;
+        sponsorTotal != null && row.salaryTotal != null
+          ? Number((sponsorTotal + (row.facilityIncome ?? 0) - row.salaryTotal).toFixed(2))
+          : null;
       return [
         teamId,
         {
@@ -391,6 +413,48 @@ function writeLocalCashPrizeApply(input: {
       : null;
 
   input.persistence.saveSingleplayerState(save.saveId, settlement?.applied ? settlement.gameState : nextGameState);
+
+  /**
+   * GEBAEUDE GEHOEREN ZUR SAISONABRECHNUNG.
+   *
+   * Die GuV-Spalte weist Sponsoren + Gebaeude − Gehaelter aus. Buchte dieser Schritt nur
+   * die Sponsoren, versprach die Spalte wieder mehr, als ankommt — genau der Fehler, der
+   * hier gerade behoben wird, nur an einer neuen Stelle.
+   *
+   * Die Fan-Shop-/Arena-Abrechnung lief bisher ausschliesslich in
+   * `season-completion-service`, und der haengt nur im Cockpit. Im normalen Spielverlauf
+   * war sie damit unerreichbar.
+   *
+   * Uebernommen ist das Muster von dort, nicht nachgebaut — inklusive des Grundes, warum
+   * der Spielstand in JEDEM Durchlauf neu aufgeloest wird: `applyFacilitySeasonEndFinance`
+   * persistiert einen vollstaendigen GameState aus dem ihm gegebenen Stand. Aus einem
+   * veralteten Schnappschuss gebaut, ueberschriebe ein spaeteres Team die Buchung eines
+   * frueheren.
+   *
+   * Doppelbuchung ist durch `hasFacilitySeasonEndFinanceApplied` je Team und Saison
+   * ausgeschlossen — dieselbe Sperre, die auch den Saisonabschluss schuetzt. Wer zuerst
+   * kommt, bucht.
+   */
+  if (input.phase === "season_end") {
+    for (const team of resolveLocalSave(input.persistence, save.saveId).gameState.teams) {
+      const latestSave = resolveLocalSave(input.persistence, save.saveId);
+      if (hasFacilitySeasonEndFinanceApplied(latestSave.gameState, latestSave.gameState.season.id, team.teamId)) {
+        continue;
+      }
+      const facilityPreview = previewFacilitySeasonEndFinance(latestSave, team.teamId);
+      if (!facilityPreview.ok || !facilityPreview.confirmToken) {
+        continue;
+      }
+      const hasFacilityAction =
+        facilityPreview.facilityIncomeTotal > 0 ||
+        facilityPreview.rows.some((row) => row.status === "paid" || row.status === "will_disable_unpaid");
+      if (!hasFacilityAction) {
+        continue;
+      }
+      applyFacilitySeasonEndFinance(latestSave, team.teamId, facilityPreview.confirmToken, input.persistence);
+    }
+  }
+
   return auditLog;
 }
 

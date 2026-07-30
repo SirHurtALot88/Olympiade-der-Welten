@@ -29,7 +29,8 @@ export interface FoundationPrizeV2PanelProps {
   prizeForecastRows: Array<{
     label: string;
     factor: number | null;
-    prizeMoney: number | null;
+    // Preisgeld ist raus: es wird nicht ausgezahlt und darf deshalb in keiner
+    // Vorschau stehen, mit der jemand plant.
     sponsorCash: number | null;
     facilityIncome: number | null;
     salaryTotal: number | null;

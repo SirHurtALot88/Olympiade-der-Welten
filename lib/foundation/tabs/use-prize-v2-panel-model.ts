@@ -74,7 +74,6 @@ export interface PrizeV2Row {
   basisCash: number | null;
   seasonCash: number | null;
   currentFactor: number | null;
-  prizeMoney: number | null;
   sponsorCash: number | null;
   facilityIncome: number | null;
   bonusMalus: number | null;
@@ -189,7 +188,6 @@ export function usePrizeV2PanelModel({
       return {
         label,
         factor: null as number | null,
-        prizeMoney: null as number | null,
         sponsorCash: roundViewNumber(sponsorCash, 1),
         facilityIncome: roundViewNumber(facilityIncome, 1),
         salaryGrowthFactor: 1,
@@ -217,7 +215,8 @@ export function usePrizeV2PanelModel({
         currentCash: (row) => row.currentCash ?? Number.NEGATIVE_INFINITY,
         basisCash: (row) => row.basisCash ?? Number.NEGATIVE_INFINITY,
         seasonCash: (row) => row.seasonCash ?? Number.NEGATIVE_INFINITY,
-        prizeMoney: (row) => row.prizeMoney ?? Number.NEGATIVE_INFINITY,
+        sponsorCash: (row) => row.sponsorCash ?? Number.NEGATIVE_INFINITY,
+        facilityIncome: (row) => row.facilityIncome ?? Number.NEGATIVE_INFINITY,
         startRank: (row) => row.rankChangePrize?.startRank ?? Number.POSITIVE_INFINITY,
         rankDelta: (row) => row.rankChangePrize?.rankDelta ?? Number.NEGATIVE_INFINITY,
         rankChangePrize: (row) => row.rankChangePrize?.bonusMalus ?? Number.NEGATIVE_INFINITY,
@@ -256,10 +255,13 @@ export function usePrizeV2PanelModel({
       { id: "basisCash", label: "Basis Cash", dataKey: "basisCash", defaultWidth: 118, minWidth: 96 },
       { id: "seasonCash", label: "Season-Anteil", dataKey: "seasonCash", defaultWidth: 128, minWidth: 100 },
       { id: "currentFactor", label: "Faktor", dataKey: "currentFactor", defaultWidth: 88, minWidth: 74 },
-      { id: "prizeMoney", label: "Preisgeld", dataKey: "prizeMoney", defaultWidth: 116, minWidth: 92 },
+      // PREISGELD RAUS. Es wird nicht ausgezahlt (`CASH_PRIZE_BENCHMARK_ONLY`), also
+      // gehoert es in keine Tabelle, mit der jemand plant. An seiner Stelle steht die
+      // Groesse, die wirklich aufs Konto kommt: die Sponsor-Abrechnung beim aktuellen
+      // Rang — dieselbe Zahl, die `applySponsorSettlement` gutschreibt.
+      { id: "sponsorCash", label: "Sponsoren", dataKey: "sponsorCash", defaultWidth: 116, minWidth: 92 },
+      { id: "facilityIncome", label: "Gebäude", dataKey: "facilityIncome", defaultWidth: 110, minWidth: 90 },
       { id: "rankChangePrize", label: "Rank Bonus", dataKey: "rankChangePrize", defaultWidth: 118, minWidth: 96 },
-      { id: "payoutIfTenBetter", label: "+10 Plätze", dataKey: "payoutIfTenBetter", defaultWidth: 116, minWidth: 92 },
-      { id: "payoutIfTenWorse", label: "-10 Plätze", dataKey: "payoutIfTenWorse", defaultWidth: 116, minWidth: 92 },
       { id: "projectedCash", label: "Cash nachher", dataKey: "projectedCash", defaultWidth: 126, minWidth: 100 },
       ...prizeFutureSeasonLabels.map((entry) => ({
         id: `future-${entry.seasonLabel}`,
@@ -321,7 +323,6 @@ export function usePrizeV2PanelModel({
           basisCash: row.basisCash ?? null,
           seasonCash: row.seasonCash ?? null,
           currentFactor: prizePreviewFeed?.summary.currentFactor ?? null,
-          prizeMoney: row.prizeMoney ?? null,
           sponsorCash: row.sponsorCash ?? null,
           facilityIncome: row.facilityIncome ?? null,
           bonusMalus: row.rankChangePrize?.bonusMalus ?? null,
@@ -350,7 +351,8 @@ export function usePrizeV2PanelModel({
       currentCash: selectedPrizePreviewRow.currentCash ?? null,
       basisCash: selectedPrizePreviewRow.basisCash ?? null,
       seasonCash: selectedPrizePreviewRow.seasonCash ?? null,
-      prizeMoney: selectedPrizePreviewRow.prizeMoney ?? null,
+      sponsorCash: selectedPrizePreviewRow.sponsorCash ?? null,
+      facilityIncome: selectedPrizePreviewRow.facilityIncome ?? null,
       bonusMalus: selectedPrizePreviewRow.rankChangePrize?.bonusMalus ?? null,
       projectedCash: selectedPrizePreviewRow.projectedCash ?? null,
       salaryTotal: selectedPrizePreviewRow.salaryTotal ?? null,
