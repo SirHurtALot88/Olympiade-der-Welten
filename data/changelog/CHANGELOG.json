@@ -155,6 +155,15 @@
       "version": "0.3"
     },
     {
+      "datum": "2026-08-01",
+      "seite": "Cockpit · Saisonende",
+      "pr": "#329",
+      "text": "Der Saisonende-Assistent hat jetzt einen Knopf zum Weiterschalten. Vorher endete er nach dem ersten Klick beim Rueckblick — die uebrigen Stationen wurden zwar angezeigt, waren aber nicht anklickbar, und weil das Verkaufsfenster erst drei Stationen spaeter oeffnet, blieben Verkaeufe am Saisonende gesperrt.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": null
+    },
+    {
       "datum": "2026-07-30",
       "seite": "Spieltag · Einsatzliste",
       "pr": "#264",
