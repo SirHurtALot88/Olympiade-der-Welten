@@ -5,12 +5,21 @@ import { NextResponse } from "next/server";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
-import { buildSeasonTransitionPreview, startSeasonTransition } from "@/lib/season/season-transition-service";
+import {
+  advanceSeasonTransitionStep,
+  buildSeasonTransitionPreview,
+  startSeasonTransition,
+} from "@/lib/season/season-transition-service";
 
 type SeasonTransitionBody = {
   saveId?: string;
   dryRun?: boolean;
-  action?: "start_transition" | "preview";
+  /**
+   * `advance_step` schaltet den Assistenten eine Station weiter. Ohne diese Aktion endete die
+   * Kette bei `season_review` — und weil Verkaufen erst in `preseason_management` /
+   * `transfer_sell_phase` oeffnet, war es nach dem ersten Spieltag dauerhaft zu.
+   */
+  action?: "start_transition" | "advance_step" | "preview";
   source?: "sqlite" | "prisma";
   roomCode?: string | null;
   participantId?: string | null;
@@ -55,9 +64,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const summary = dryRun || body.action !== "start_transition"
+    const summary = dryRun
       ? buildSeasonTransitionPreview(save)
-      : startSeasonTransition(save, persistence);
+      : body.action === "start_transition"
+        ? startSeasonTransition(save, persistence)
+        : body.action === "advance_step"
+          ? advanceSeasonTransitionStep(save, persistence)
+          : buildSeasonTransitionPreview(save);
     const success = "applied" in summary ? Boolean(summary.applied) : summary.ok;
     notifyRoomGameplayWrite(writeAuth, {
       saveId,
