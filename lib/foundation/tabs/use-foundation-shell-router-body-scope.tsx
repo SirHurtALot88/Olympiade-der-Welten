@@ -1,4 +1,5 @@
 "use client";
+import { applyTeamCashPatch } from "@/lib/foundation/apply-team-cash-patch";
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
 import {
   FoundationShellRouterCockpit,
@@ -3726,15 +3727,28 @@ export function useFoundationShellRouterBodyScope({
       setMarketSellSubject(null);
     setMarketSellRiskAcknowledged(false);
       setFoundationPanel(null);
-      await Promise.all([
-        loadSave(activeSaveId),
-        reloadMarketFeed(marketTeamId),
+
+      // Wie beim Kauf: Der neue Kontostand steht bereits in der Antwort und wird oben schon im
+      // Erfolgstext angezeigt. Ihn sofort zu übernehmen macht die Zahl richtig, bevor der Nachlauf
+      // überhaupt anläuft — siehe `applyTeamCashPatch`.
+      setGameState((current) => {
+        const teams = applyTeamCashPatch(current.teams, {
+          teamId: payload.summary?.team?.id ?? marketTeamId,
+          cash: payload.summary?.cashAfter,
+        });
+        return teams === current.teams ? current : { ...current, teams };
+      });
+
+      // Dieselbe Aufteilung wie beim Kauf: vorn nur das Sichtbare, der Rest läuft nach.
+      await Promise.all([loadSave(activeSaveId), reloadMarketFeed(marketTeamId)]);
+      setMarketReloadToken((current) => current + 1);
+
+      void Promise.all([
         reloadHistoryFeed(),
         reloadTransferRecapFeed(),
         reloadSeasonStandingsOverview(),
         reloadSeasonManagementOverview(),
-      ]);
-      setMarketReloadToken((current) => current + 1);
+      ]).catch(() => {});
     } catch {
       setMarketSellError("Verkauf konnte nicht bestätigt werden.");
     } finally {
@@ -5262,9 +5276,44 @@ export function useFoundationShellRouterBodyScope({
       syncFoundationViewInUrl("marketV2", null, null, { team: selectedTeamId });
       setMarketBuySubject(null);
       setMarketBuyPreviewContext(null);
+
+      // Der neue Kontostand steht bereits in der Antwort — `cashAfter` wird oben schon für den
+      // Erfolgstext benutzt. Ihn hier sofort in den Spielstand zu schreiben, macht die Anzeige in
+      // dem Moment richtig, in dem der Kauf bestätigt ist.
+      //
+      // Vorher hing die Zahl an `loadSave()` weiter unten, und das holt den GESAMTEN Spielstand neu
+      // über das Netz und baut ihn neu auf (Normalisierung, Zielzustände, Sponsor-Vergleich) — für
+      // eine einzige geänderte Zahl. Genau das war als „die Seite lädt nach jedem Kauf nochmal"
+      // sichtbar.
+      //
+      // Der Wert ist nicht geraten: Er stammt aus dem ausgeführten Kauf, ist also derselbe, den der
+      // Nachlauf gleich darauf bestätigt. Bleibt der Nachlauf aus (Netz weg), steht trotzdem der
+      // richtige Betrag da statt des alten — strikt besser als vorher.
+      setGameState((current) => {
+        const teams = applyTeamCashPatch(current.teams, {
+          teamId: payload.summary?.team?.id ?? marketBuyPreview.team?.id,
+          cash: payload.summary?.cashAfter,
+        });
+        return teams === current.teams ? current : { ...current, teams };
+      });
+
+      // VORDERGRUND: nur, was der Spieler in diesem Moment vor sich hat. Der Spielstand (Kader,
+      // Gehalt) und die Marktliste, aus der der gekaufte Spieler verschwinden muss.
       await Promise.all([
         loadSave(buyContext.saveId),
-        reloadMarketFeed(payload.summary.team?.id ?? marketBuyPreview.team.id),
+        reloadMarketFeed(payload.summary.team?.id ?? marketBuyPreview.team?.id),
+      ]);
+      setMarketReloadToken((current) => current + 1);
+
+      // HINTERGRUND: Ansichten, die der Spieler gerade nicht ansieht — Saison-Übersichten,
+      // Transferhistorie, KI-Vorschauen. Sie waren bisher mit im `await` und hielten damit das
+      // Kauf-Fenster offen, obwohl keine von ihnen im Transfermarkt sichtbar ist. Wer nach dem Kauf
+      // in den Saisonstand wechselt, findet ihn dann längst aktualisiert vor.
+      //
+      // Fehler werden hier bewusst verschluckt: Ein fehlgeschlagener Nachlauf einer nicht
+      // sichtbaren Ansicht darf keine Fehlermeldung über einen GELUNGENEN Kauf legen. Beim
+      // nächsten Öffnen lädt die Ansicht ohnehin neu.
+      void Promise.all([
         marketAiPreviewFeed ? reloadAiTransferPreview(marketAiPreviewSelectedTeamId) : Promise.resolve(null),
         marketAiSellPreviewFeed ? reloadAiSellPreview(marketAiSellPreviewSelectedTeamId) : Promise.resolve(null),
         marketAiPlanPreviewFeed ? reloadAiMarketPlanPreview(marketAiPlanPreviewSelectedTeamId) : Promise.resolve(null),
@@ -5272,8 +5321,7 @@ export function useFoundationShellRouterBodyScope({
         reloadHistoryFeed(),
         reloadSeasonStandingsOverview(),
         reloadSeasonManagementOverview(),
-      ]);
-      setMarketReloadToken((current) => current + 1);
+      ]).catch(() => {});
     } catch {
       setMarketBuyError("Kauf konnte nicht bestätigt werden.");
     } finally {
