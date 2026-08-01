@@ -1,11 +1,12 @@
 {
-  "hinweis": "Von Hand gepflegt — Changelog-Eintraege fuer Aenderungen OHNE Bug-Meldung (neues Feature, umgebaute Ansicht). Gefixte Bugs bekommen ihre changelog:-Zeile stattdessen in der Triage-Notiz. Ein Eintrag braucht: datum (JJJJ-MM-TT, der Merge-Tag), text (ein Satz Alltagssprache: was war vorher, was ist jetzt anders), optional seite (\"Markt · Transfermarkt\"), pr (\"#291\") und version (\"0.3.0\", der package.json-Stand zum Merge-Zeitpunkt — nur setzen, wenn wirklich bekannt, sonst leer lassen statt zu raten). Gepflegt wird beim Mergen, nicht spaeter — und erst dann: was nicht gemergt ist, gehoert nicht hinein. Danach npm run changelog:bauen.",
+  "hinweis": "Von Hand gepflegt — Changelog-Eintraege fuer Aenderungen OHNE Bug-Meldung (neues Feature, umgebaute Ansicht). Gefixte Bugs bekommen ihre changelog:-Zeile stattdessen in der Triage-Notiz. Ein Eintrag braucht: datum (JJJJ-MM-TT, der Merge-Tag), text (ein Satz Alltagssprache: was war vorher, was ist jetzt anders), gewicht (grundlegend | spielblockierend | behebung | feinschliff — fehlt es, erscheint der Eintrag als 'Ohne Einstufung' und der Generator mahnt), optional seite (\"Markt · Transfermarkt\"), pr (\"#291\") und version (\"0.3.0\", der package.json-Stand zum Merge-Zeitpunkt — nur setzen, wenn wirklich bekannt, sonst leer lassen statt zu raten). Gepflegt wird beim Mergen, nicht spaeter — und erst dann: was nicht gemergt ist, gehoert nicht hinein. Danach npm run changelog:bauen.",
   "eintraege": [
     {
       "datum": "2026-08-01",
       "seite": "Cockpit · Saisonende",
       "text": "Das Saisonende laeuft jetzt wirklich durch: nach dem letzten Spieltag fuehrt der Assistent Schritt fuer Schritt ueber Rueckblick, Finanzen und Spielerentwicklung bis zu Verkaufs- und Kaufphase. Vorher blieb er nach dem Rueckblick stehen — Verkaeufe waren dadurch ab dem ersten Spieltag einer Saison dauerhaft gesperrt.",
       "pr": "#298",
+      "gewicht": "spielblockierend",
       "version": "0.2"
     },
     {
@@ -13,7 +14,22 @@
       "seite": "Team · Einsatzliste",
       "text": "Jede Slot-Karte zeigt jetzt einen Risiko-Balken mit exakter Prozentzahl: das Verletzungsrisiko, mit dem der Spieltag wirklich wuerfelt (inklusive Einsatz-Last — deshalb nie 0 %, auch ausgeruht bleiben ~2 % Restrisiko). Vorher war das Risiko vor dem Spieltag unsichtbar und eine Verletzung wirkte wie ein Fehler; die Posteingangs-Meldung erklaert sie jetzt auch im Nachhinein (Fatigue beim Wurf + Prozent).",
       "pr": "#302",
+      "gewicht": "grundlegend",
       "version": "0.3"
+    },
+    {
+      "datum": "2026-08-01",
+      "seite": "Welt · Sponsoren",
+      "text": "Das Sponsorsystem ist grundlegend umgebaut: Die Auszahlung eines Vertrags richtet sich jetzt nach Preisgeld und Platzierung deines Teams, und keine Angebotskarte ist im Schnitt mehr wert als eine andere — vorher konnte die gezogene Karte mehr entscheiden als die eigene Leistung. Die Karten unterscheiden sich jetzt nur noch darin, wie viel Risiko du nimmst.",
+      "pr": "#294",
+      "gewicht": "grundlegend"
+    },
+    {
+      "datum": "2026-08-01",
+      "seite": "Changelog",
+      "text": "Neu: dieser Reiter. Der Changelog zeigt, was sich im Spiel geaendert hat — gefixte Fehler und Neuerungen in Alltagssprache, mit der PR-Nummer als Beleg.",
+      "pr": "#295",
+      "gewicht": "grundlegend"
     }
   ]
 }

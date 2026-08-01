@@ -73647,3 +73647,51 @@ button.is-new-look .nl-thist-season-pill,
   color: var(--nl-ink);
   line-height: 1.55;
 }
+
+/* Die Gewichtungs-Abschnitte: das Grosse zuerst, deutlich abgesetzt. Jede Stufe traegt eine
+   eigene Kantenfarbe, damit man beim Scrollen SIEHT, in welcher Liga man sich bewegt —
+   Semantik-Tokens statt Accent, wie bei den uebrigen Statusfarben. */
+.is-new-look .nl-changelog-abschnitt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-changelog-abschnitt-kopf {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: var(--nl-s3);
+  border-left: 3px solid var(--nl-gewicht-farbe, var(--nl-mut-2));
+  margin-top: var(--nl-s2);
+}
+
+.is-new-look .nl-changelog-abschnitt-titel {
+  margin: 0;
+  font-size: var(--nl-fs-md, 1rem);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-changelog-abschnitt-erklaerung {
+  margin: 0;
+  font-size: var(--nl-fs-xs);
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-changelog-abschnitt[data-gewicht="grundlegend"] {
+  --nl-gewicht-farbe: var(--nl-accent);
+}
+
+.is-new-look .nl-changelog-abschnitt[data-gewicht="spielblockierend"] {
+  --nl-gewicht-farbe: var(--nl-risk);
+}
+
+.is-new-look .nl-changelog-abschnitt[data-gewicht="behebung"] {
+  --nl-gewicht-farbe: var(--nl-good);
+}
+
+.is-new-look .nl-changelog-abschnitt[data-gewicht="feinschliff"] {
+  --nl-gewicht-farbe: var(--nl-mut-2);
+}

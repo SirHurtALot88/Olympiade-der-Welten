@@ -55,6 +55,15 @@ export type BugTriage = {
   titel: string | null;
   /** Wie schwer es wiegt. Frei gelassen, wenn der Pruefer sich nicht festlegen will. */
   schwere: "hoch" | "mittel" | "niedrig" | null;
+  /**
+   * Die Gewichtung fuer den Changelog-Reiter (`grundlegend`, `spielblockierend`, `behebung`,
+   * `feinschliff` — siehe `CHANGELOG_GEWICHTE` in `lib/changelog/changelog.ts`). Getrennt von
+   * `schwere`, weil die beiden Verschiedenes messen: `schwere` sagt, wie dringend der Fehler WAR,
+   * die Gewichtung sagt, was die Aenderung fuer den Spieler BEDEUTET. Bewusst als roher String —
+   * ein Tippfehler soll die Notiz nicht unlesbar machen; die Pruefung gegen die erlaubten Werte
+   * liegt auf der Changelog-Seite, wo eine unlesbare Angabe als Luecke angemahnt wird.
+   */
+  gewicht: string | null;
   /** Ein Satz Klartext: was am Ende dabei herausgekommen ist. Pflicht ab `gebaut`/`abgelehnt`. */
   ergebnis: string | null;
   /** PR des Fixes. Pflicht ab `gebaut`. */
@@ -98,6 +107,7 @@ const HEAD_KEYS = [
   "status",
   "titel",
   "schwere",
+  "gewicht",
   "ergebnis",
   "pr",
   "commit",
@@ -150,6 +160,7 @@ export function parseTriage(reportId: string, raw: string, file: string): BugTri
     status: parsedStatus === "erledigt" && !bestaetigt ? "gebaut" : parsedStatus,
     titel: value("titel"),
     schwere: schwereValue === "hoch" || schwereValue === "mittel" || schwereValue === "niedrig" ? schwereValue : null,
+    gewicht: value("gewicht"),
     ergebnis: value("ergebnis"),
     pr: value("pr"),
     commit: value("commit"),
@@ -179,6 +190,7 @@ export function writeTriage(input: {
   status: BugTriageStatus;
   titel: string;
   schwere?: BugTriage["schwere"];
+  gewicht?: string | null;
   ergebnis?: string | null;
   pr?: string | null;
   commit?: string | null;
@@ -196,6 +208,7 @@ export function writeTriage(input: {
     `status: ${input.status}`,
     `titel: ${input.titel}`,
     ...optional("schwere", input.schwere),
+    ...optional("gewicht", input.gewicht),
     ...optional("ergebnis", input.ergebnis),
     ...optional("pr", input.pr),
     ...optional("commit", input.commit),
