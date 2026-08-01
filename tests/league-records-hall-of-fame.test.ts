@@ -8,6 +8,13 @@ function buildGameState(partial: Partial<GameState>): GameState {
     season: { id: "season-3", name: "Season 3" },
     seasonState: { seasonSnapshots: [] },
     teams: [],
+    // Seit die Hall of Fame die LAUFENDE Saison mitliest (sonst waere sie in Saison 1 leer),
+    // gehoeren diese Listen zum Mindestzustand. Leer heisst hier: keine Live-Daten — die
+    // Erwartungen dieser Datei bleiben damit reine Archiv-Aussagen.
+    players: [],
+    rosters: [],
+    disciplines: [],
+    transferHistory: [],
     ...partial,
   } as GameState;
 }

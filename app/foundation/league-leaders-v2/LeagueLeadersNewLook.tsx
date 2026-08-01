@@ -38,6 +38,19 @@ import {
   type OwnTeamLeaderboardFootprint,
 } from "@/lib/foundation/league-season-bests";
 import {
+  buildLeagueSeasonAwards,
+  type LeagueSeasonAward,
+  type LeagueSeasonAwards,
+} from "@/lib/foundation/league-season-awards";
+import {
+  buildEternalPlayerTable,
+  type EternalPlayerScope,
+  type EternalPlayerStatus,
+} from "@/lib/foundation/eternal-player-table";
+import { buildLeagueLegends } from "@/lib/foundation/league-legend-criteria";
+import { buildLeagueRecordBook } from "@/lib/foundation/league-record-book";
+import type { GameState } from "@/lib/data/olyDataTypes";
+import {
   buildLeagueAchievements,
   getLeagueAchievementGroupLabel,
   type LeagueAchievement,
@@ -63,9 +76,12 @@ import {
  * Ladefehler) fällt jeder Avatar ehrlich auf die Initialen zurück.
  *
  * Bewusst weggelassen, weil es dafür keine echten Daten gibt:
- * - keine Rang-Bewegung/Trends (nicht in den Props vorhanden),
- * - kein erfundener Rang außerhalb der gelisteten Einträge: ist kein eigener
- *   Spieler in `entries`, zeigt "Dein Bester" ehrlich "außerhalb Top N".
+ * - keine Rang-Bewegung/Trends (nicht in den Props vorhanden).
+ *
+ * "Dein Bester" nannte hier frueher keinen Rang, sondern nur "außerhalb Top N" — damals lagen
+ * wirklich nur fünf Plätze vor, und ein geratener Rang wäre eine Falschaussage gewesen. Seit
+ * die Kategorie ihre vollständige Rangliste mitliefert (`fullEntries`), ist der echte Rang
+ * bekannt und steht dort: "#87 · Name".
  */
 
 const NL_LEADER_TONE_MAP: Record<LeagueLeaderTone, NlTone> = {
@@ -205,6 +221,7 @@ export default function LeagueLeadersNewLook({
   function openCategoryRankingDrawer(categoryId: string, highlightPlayerId?: string | null) {
     setRankingDrawerCategoryId(categoryId);
     setRankingDrawerHighlightId(highlightPlayerId ?? null);
+    setRankingDrawerVisibleCount(NL_RANKING_DRAWER_STEP);
   }
 
   function closeCategoryRankingDrawer() {
@@ -217,12 +234,29 @@ export default function LeagueLeadersNewLook({
     [categories, rankingDrawerCategoryId],
   );
 
+  /**
+   * Wie viele Plaetze der Drawer gerade zeigt.
+   *
+   * GEWUENSCHT: „…dann die tabelle aufgeht wo man z.B. dann ne top 50 oder so sehen kann oder
+   * sogar alle."
+   *
+   * Die Staffelung ist reine RENDER-Kappung: `fullEntries` liegt vollstaendig vor, hier wird nur
+   * entschieden, wie viel davon gezeichnet wird. Beim Oeffnen startet es wieder bei 50, damit
+   * eine zuvor aufgeklappte Liste nicht die naechste Kategorie mit 332 Zeilen aufreisst.
+   */
+  const NL_RANKING_DRAWER_STEP = 50;
+  const [rankingDrawerVisibleCount, setRankingDrawerVisibleCount] = useState(NL_RANKING_DRAWER_STEP);
+
   const rankingDrawerRows = useMemo<NlRankingDrawerRow[]>(() => {
     if (!rankingDrawerCategory) {
       return [];
     }
     const tone = NL_LEADER_TONE_MAP[rankingDrawerCategory.tone] ?? "accent";
-    return rankingDrawerCategory.entries.map((entry) => ({
+    // `fullEntries` statt `entries`: die Kachel zeigt weiter die Top 5, der Drawer die ganze
+    // Rangliste. Beide stammen aus derselben Sortierung — `entries` IST der Anfang von
+    // `fullEntries`, die Raenge koennen also nicht auseinanderlaufen.
+    const alle = rankingDrawerCategory.fullEntries ?? rankingDrawerCategory.entries;
+    return alle.slice(0, rankingDrawerVisibleCount).map((entry) => ({
       id: entry.playerId,
       rank: entry.rank,
       name: entry.name,
@@ -232,6 +266,22 @@ export default function LeagueLeadersNewLook({
       tone,
       isOwn: entry.teamId != null && entry.teamId === selectedTeamId,
     }));
+  }, [rankingDrawerCategory, rankingDrawerVisibleCount, selectedTeamId]);
+
+  /** Wie viele Plaetze die Kategorie insgesamt hat — fuer „Alle 332 anzeigen". */
+  const rankingDrawerTotal = (rankingDrawerCategory?.fullEntries ?? rankingDrawerCategory?.entries ?? []).length;
+
+  /**
+   * Der beste eigene Spieler in dieser Kategorie — jetzt IMMER mit Rang.
+   *
+   * Vorher stand auf der Kachel „außerhalb Top 5", weil nur fuenf Plaetze bekannt waren. Das
+   * war keine Information. Mit der vollen Liste ist „#87" moeglich, und der Drawer kann
+   * dorthin springen.
+   */
+  const rankingDrawerOwnBest = useMemo(() => {
+    if (!rankingDrawerCategory || !selectedTeamId) return null;
+    const alle = rankingDrawerCategory.fullEntries ?? rankingDrawerCategory.entries;
+    return alle.find((entry) => entry.teamId === selectedTeamId) ?? null;
   }, [rankingDrawerCategory, selectedTeamId]);
 
   // Optionaler Foundation-State: Rekorde/Hall-of-Fame brauchen den vollen
@@ -257,6 +307,19 @@ export default function LeagueLeadersNewLook({
 
   // D11 — Own-Team-Leaderboard-Footprint: Top-5-Slots + beste Platzierung des
   // Manager-Teams, rein aus den öffentlichen Ranglisten-Einträgen (fog-safe).
+  /**
+   * Saison-Awards — die Frage, die die Kategorie-Kacheln NICHT beantworten.
+   *
+   * Die Kacheln zeigen achtmal „wer hat am meisten". Diese Karten zeigen, WIE jemand zu seinen
+   * Punkten kam: Spezialist gegen Allrounder, Konstanz gegen Ausreißer, Schnäppchen gegen
+   * Rekordkauf. Read-time aus dem Punkte-Ledger — nichts davon wird gespeichert, damit es keine
+   * zweite Wahrheit neben den Daten gibt, aus denen es entstand.
+   */
+  const seasonAwards = useMemo<LeagueSeasonAwards>(
+    () => (foundationGameState ? buildLeagueSeasonAwards(foundationGameState) : { matchdaysPlayed: 0, awards: [] }),
+    [foundationGameState],
+  );
+
   const footprint = useMemo<OwnTeamLeaderboardFootprint>(
     () => buildOwnTeamLeaderboardFootprint({ categories, selectedTeamId }),
     [categories, selectedTeamId],
@@ -299,9 +362,19 @@ export default function LeagueLeadersNewLook({
       </NlCard>
 
       {subTab === "records" ? (
-        <LeagueRecordsPanel records={records} seasonBests={seasonBests} onOpenPlayer={onOpenPlayer} />
+        <LeagueRecordsPanel
+          records={records}
+          seasonBests={seasonBests}
+          gameState={foundationGameState}
+          onOpenPlayer={onOpenPlayer}
+        />
       ) : subTab === "legends" ? (
-        <LegendaryPlayersPanel records={records} onOpenPlayer={onOpenPlayer} />
+        <LegendaryPlayersPanel
+          records={records}
+          gameState={foundationGameState}
+          ownTeamId={selectedTeamId}
+          onOpenPlayer={onOpenPlayer}
+        />
       ) : subTab === "achievements" ? (
         <LeagueAchievementsPanel achievements={achievements} onOpenPlayer={onOpenPlayer} />
       ) : (
@@ -317,10 +390,17 @@ export default function LeagueLeadersNewLook({
           const chasers = category.entries.slice(1);
           const median = getCategoryMedian(category);
           const statDecimals = getCategoryStatDecimals(category.id);
-          // Bester eigener Spieler: erster Eintrag (nach Rang sortiert) des eigenen Teams.
+          /**
+           * Bester eigener Spieler — gesucht in der GANZEN Rangliste, nicht nur in den Top 5.
+           *
+           * Vorher stand hier meistens „außerhalb Top 5", weil nur fuenf Plaetze bekannt waren.
+           * Das war keine Information: es sagte nicht, ob der eigene Beste Sechster ist oder
+           * Dreihundertster. Mit `fullEntries` steht dort jetzt „#87 · Name".
+           */
+          const alleEintraege = category.fullEntries ?? category.entries;
           const ownBest =
             selectedTeamId != null
-              ? category.entries.find((entry) => entry.teamId != null && entry.teamId === selectedTeamId) ?? null
+              ? alleEintraege.find((entry) => entry.teamId != null && entry.teamId === selectedTeamId) ?? null
               : null;
 
           return (
@@ -428,19 +508,38 @@ export default function LeagueLeadersNewLook({
                       <StatChip
                         label="Dein Bester"
                         value="—"
-                        sub={`außerhalb Top ${formatNlNumber(category.entries.length, 0)}`}
+                        sub="kein Spieler gewertet"
                         onClick={() => openCategoryRankingDrawer(category.id)}
-                        title={`Rangliste ${category.label} — kein eigener Spieler unter den gelisteten Top ${formatNlNumber(category.entries.length, 0)}`}
+                        title={`Rangliste ${category.label} — kein eigener Spieler in dieser Wertung`}
                       />
                     )
                   ) : null}
                 </StatChipRow>
+              ) : null}
+
+              {hasData ? (
+                // Der Knopf, den es vorher nicht gab: die Chips oeffneten den Drawer nur als
+                // Nebeneffekt („Leader", „Median"). Gewuenscht war ein sichtbarer Weg in die
+                // ganze Rangliste.
+                <button
+                  type="button"
+                  className="nl-leaders-openall"
+                  data-testid="leaders-open-full-ranking"
+                  onClick={() => openCategoryRankingDrawer(category.id, ownBest?.playerId ?? null)}
+                  title={`Ganze Rangliste ${category.label} — ${formatNlNumber(alleEintraege.length, 0)} Spieler`}
+                >
+                  Ganze Rangliste · {formatNlNumber(alleEintraege.length, 0)} Spieler
+                </button>
               ) : null}
             </article>
           );
         })}
       </div>
       )}
+
+      {subTab === "leaders" && seasonAwards.awards.length > 0 ? (
+        <SeasonAwardsPanel awards={seasonAwards} selectedTeamId={selectedTeamId} onOpenPlayer={onOpenPlayer} />
+      ) : null}
 
       <NlRankingDrawer
         open={rankingDrawerCategory != null}
@@ -451,6 +550,35 @@ export default function LeagueLeadersNewLook({
         rows={rankingDrawerRows}
         highlightId={rankingDrawerHighlightId}
         onSelectRow={(row) => onOpenPlayer(row.id)}
+        footer={
+          <>
+            {rankingDrawerTotal > rankingDrawerRows.length ? (
+              <button
+                type="button"
+                className="nl-rankdrawer-more"
+                data-testid="ranking-drawer-show-all"
+                onClick={() => setRankingDrawerVisibleCount(rankingDrawerTotal)}
+              >
+                Alle {rankingDrawerTotal} anzeigen
+              </button>
+            ) : null}
+            {rankingDrawerOwnBest ? (
+              <button
+                type="button"
+                className="nl-rankdrawer-more"
+                data-testid="ranking-drawer-own-best"
+                onClick={() => {
+                  // Erst so weit aufklappen, dass der eigene Spieler ueberhaupt gezeichnet ist —
+                  // sonst springt der Drawer auf eine Zeile, die es im DOM noch nicht gibt.
+                  setRankingDrawerVisibleCount((sichtbar) => Math.max(sichtbar, rankingDrawerOwnBest.rank));
+                  setRankingDrawerHighlightId(rankingDrawerOwnBest.playerId);
+                }}
+              >
+                Zu meinem Besten · #{rankingDrawerOwnBest.rank} {rankingDrawerOwnBest.name}
+              </button>
+            ) : null}
+          </>
+        }
       />
     </section>
   );
@@ -464,13 +592,21 @@ export default function LeagueLeadersNewLook({
 function LeagueRecordsPanel({
   records,
   seasonBests,
+  gameState,
   onOpenPlayer,
 }: {
   records: LeagueRecordsHallOfFame | null;
   seasonBests: LeagueSeasonBests;
+  /** Fuer das Rekordbuch — es liest Spieltagsergebnisse direkt, nicht ueber Snapshots. */
+  gameState: GameState | null;
   onOpenPlayer: (playerId: string) => void;
 }) {
-  const seasonBestsSection = <SeasonBestsSection seasonBests={seasonBests} onOpenPlayer={onOpenPlayer} />;
+  const seasonBestsSection = (
+    <>
+      <SeasonBestsSection seasonBests={seasonBests} onOpenPlayer={onOpenPlayer} />
+      {gameState ? <RecordBookSection gameState={gameState} onOpenPlayer={onOpenPlayer} /> : null}
+    </>
+  );
 
   // D7: Season-Bestwerte werden immer gezeigt (ab S1/MD1 lebendig). Der
   // All-Time-Teil erscheint erst, wenn mindestens eine Saison archiviert ist —
@@ -688,6 +824,148 @@ const LEGENDS_TABLE_COLUMNS: Array<NlTableColumn<PlayerCareerLeaderRow>> = [
 ];
 
 /**
+ * "Rekordbuch" — Superlative, die ab dem ersten Spieltag entstehen.
+ *
+ * GEMELDET: „der rekorde tab ist noch tot da passiert fast gar nichts, keine interessanten
+ * infos."
+ *
+ * Der Reiter hing komplett an archivierten Saisons. Diese Sektion liest stattdessen, was jeder
+ * Spieltag ohnehin schreibt — und weil der Snapshot dieselben Listen 1:1 archiviert, gilt jeder
+ * Rekord später unverändert weiter. In Saison 1 stammt jeder Halter zwangsläufig aus Saison 1;
+ * das ist kein Leerzustand, sondern die Geburt des Rekordbuchs.
+ */
+function RecordBookSection({
+  gameState,
+  onOpenPlayer,
+}: {
+  gameState: GameState;
+  onOpenPlayer: (playerId: string) => void;
+}) {
+  const buch = useMemo(() => buildLeagueRecordBook(gameState), [gameState]);
+  const alle = [...buch.spieltagsSuperlative, ...buch.serien];
+
+  if (alle.length === 0) {
+    return null;
+  }
+
+  return (
+    <NlCard
+      className="nl-recordbook-card"
+      eyebrow={`aus ${formatNlNumber(buch.matchdaysPlayed, 0)} gespielten Spieltagen`}
+      title="Rekordbuch"
+    >
+      <p className="nl-leaders-hint">
+        Bestmarken aus jedem einzelnen Spieltag. Sie gelten weiter, wenn die Saison ins Archiv wandert — spätere Saisons
+        müssen sie brechen.
+      </p>
+      <div className="nl-recordbook" data-testid="record-book">
+        {alle.map((eintrag) => {
+          const klickbar = eintrag.playerId != null;
+          const inhalt = (
+            <>
+              <span className="nl-recordbook-label">{eintrag.label}</span>
+              <strong className="nl-recordbook-value nl-tnum">{eintrag.displayValue}</strong>
+              <span className="nl-recordbook-holder">{eintrag.halter}</span>
+              {eintrag.kontext ? (
+                <span className={`nl-recordbook-kontext${eintrag.laeuftNoch ? " is-running" : ""}`}>{eintrag.kontext}</span>
+              ) : null}
+            </>
+          );
+          return klickbar ? (
+            <button
+              key={eintrag.id}
+              type="button"
+              className="nl-recordbook-entry"
+              onClick={() => onOpenPlayer(eintrag.playerId as string)}
+              title={`${eintrag.beschreibung} — Profil von ${eintrag.halter} öffnen`}
+              data-record-id={eintrag.id}
+            >
+              {inhalt}
+            </button>
+          ) : (
+            <div key={eintrag.id} className="nl-recordbook-entry" title={eintrag.beschreibung} data-record-id={eintrag.id}>
+              {inhalt}
+            </div>
+          );
+        })}
+      </div>
+    </NlCard>
+  );
+}
+
+/**
+ * "Saison-Awards" — Auszeichnungen, die eine ROLLE erzählen.
+ *
+ * GEWÜNSCHT: „ob wir hier noch mehr awards vergeben könnten für spieler basierend auf ihren
+ * achievements".
+ *
+ * Sitzt bewusst UNTER dem Kategorien-Grid im selben Reiter, nicht in einem eigenen: Awards sind
+ * die zweite Lesart derselben Saison, keine andere Ansicht. Jede Karte nennt ihre Bedingung —
+ * ein Award, den man nicht nachvollziehen kann, ist nur eine Zahl mit Schleife.
+ *
+ * Nicht vergebene Awards erscheinen GAR NICHT (der Selector liefert sie erst gar nicht):
+ * „Neuzugang der Saison — niemand" wäre eine leere Behauptung.
+ */
+function SeasonAwardsPanel({
+  awards,
+  selectedTeamId,
+  onOpenPlayer,
+}: {
+  awards: LeagueSeasonAwards;
+  selectedTeamId: string | null;
+  onOpenPlayer: (playerId: string) => void;
+}) {
+  return (
+    <NlCard
+      eyebrow={
+        awards.matchdaysPlayed > 0
+          ? `Stand Spieltag ${formatNlNumber(awards.matchdaysPlayed, 0)} · wird laufend neu vergeben`
+          : "wird laufend neu vergeben"
+      }
+      title="Saison-Awards"
+      className="nl-leaders-awards-card"
+    >
+      <div className="nl-leaders-awards" data-testid="season-awards">
+        {awards.awards.map((award) => (
+          <SeasonAwardCard
+            key={award.id}
+            award={award}
+            isOwn={award.teamId != null && award.teamId === selectedTeamId}
+            onOpenPlayer={onOpenPlayer}
+          />
+        ))}
+      </div>
+    </NlCard>
+  );
+}
+
+function SeasonAwardCard({
+  award,
+  isOwn,
+  onOpenPlayer,
+}: {
+  award: LeagueSeasonAward;
+  isOwn: boolean;
+  onOpenPlayer: (playerId: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`nl-leaders-award${isOwn ? " is-own-team" : ""}`}
+      onClick={() => onOpenPlayer(award.playerId)}
+      title={`${award.bedingung} — Profil von ${award.playerName} öffnen`}
+      data-award-id={award.id}
+    >
+      <span className="nl-leaders-award-label">{award.label}</span>
+      <strong className="nl-leaders-award-holder">{award.playerName}</strong>
+      <span className="nl-leaders-award-team">{award.teamCode ?? award.teamName ?? "—"}</span>
+      <span className="nl-leaders-award-value nl-tnum">{award.displayValue}</span>
+      {award.kontext ? <span className="nl-leaders-award-kontext">{award.kontext}</span> : null}
+    </button>
+  );
+}
+
+/**
  * "Legendäre Spieler" — eigenständiger Hall-of-Fame-Sub-Tab (statt einer
  * bisher versteckten 8-Zeilen-Tabelle unter "Rekorde"): Podium der Top-3
  * Karriere-PPs-Rekordhalter als Hero-Karten, darunter eine sortierbare
@@ -697,9 +975,14 @@ const LEGENDS_TABLE_COLUMNS: Array<NlTableColumn<PlayerCareerLeaderRow>> = [
  */
 function LegendaryPlayersPanel({
   records,
+  gameState,
+  ownTeamId,
   onOpenPlayer,
 }: {
   records: LeagueRecordsHallOfFame | null;
+  /** Fuer die Ewige Tabelle darunter — sie liest Kader und Transferhistorie direkt. */
+  gameState: GameState | null;
+  ownTeamId: string | null;
   onOpenPlayer: (playerId: string) => void;
 }) {
   const [sort, setSort] = useState<{ key: LegendsSortKey; direction: NlTableSortDirection }>({
@@ -723,13 +1006,23 @@ function LegendaryPlayersPanel({
     });
   }
 
-  if (!records || !records.hasHistory || legends.length === 0) {
+  /**
+   * Die zweite Sperre.
+   *
+   * Hier stand `!records.hasHistory` — also „es gibt kein Saison-ARCHIV". Damit blieb der Reiter
+   * in Saison 1 leer, selbst nachdem die Karrieredaten die laufende Saison mitzählen. Der Grund
+   * war eine falsche Gleichsetzung: „kein Archiv" hiess nicht „keine Karrieredaten".
+   *
+   * Gefragt wird jetzt, was wirklich zählt: liegen Zeilen vor? Fehlen sie, ist der Leerzustand
+   * ehrlich — vor dem ersten Spieltag hat noch niemand gepunktet.
+   */
+  if (!records || legends.length === 0) {
     return (
       <div className="nl-legends" data-testid="nl-league-legends">
         <NlCard className="nl-records-empty-card" title="🏆 Legendäre Spieler">
           <p className="nl-records-empty-text">
-            Noch keine legendären Spieler — sobald die erste Saison archiviert ist, erscheinen hier die Karriere-Bestenlisten
-            über alle Saisons (Punkte, Einsätze, MVP-Awards).
+            Noch keine Karrieredaten — sobald der erste Spieltag gerechnet ist, entsteht hier die Bestenliste über
+            Punkte, Einsätze und MVP-Auftritte.
           </p>
         </NlCard>
       </div>
@@ -742,11 +1035,18 @@ function LegendaryPlayersPanel({
     <div className="nl-legends" data-testid="nl-league-legends">
       <NlCard
         className="nl-legends-podium-card"
-        eyebrow={`${formatNlNumber(records.seasonCount, 0)} Saison${records.seasonCount === 1 ? "" : "en"} Karrieredaten`}
+        eyebrow={
+          // Herkunfts-Etikett statt einer Zahl, die in Saison 1 „0 Saisonen" sagen wuerde:
+          // die laufende Saison ZAEHLT, sie ist nur noch nicht archiviert.
+          records.hasHistory
+            ? `${formatNlNumber(records.seasonCount, 0)} Saison${records.seasonCount === 1 ? "" : "en"} im Archiv · plus laufende`
+            : "laufende Saison · noch nichts archiviert"
+        }
         title="🏆 Legendäre Spieler"
       >
         <p className="nl-leaders-hint">
-          Ligaweite Karriere-Bestenliste über alle archivierten Saisons — Punkte, Einsätze und MVP-Awards.
+          Ligaweite Karriere-Bestenliste — Punkte, Einsätze und MVP-Auftritte. Die laufende Saison zählt mit und wandert
+          beim Saisonabschluss ins Archiv.
         </p>
         <div className="nl-legends-podium">
           {podium.map((row, index) => (
@@ -846,9 +1146,237 @@ function LegendaryPlayersPanel({
           }}
         />
       </NlCard>
+
+      {gameState ? <LegendCriteriaPanel gameState={gameState} legends={legends} onOpenPlayer={onOpenPlayer} /> : null}
+      {gameState ? <EternalPlayerTablePanel gameState={gameState} ownTeamId={ownTeamId} onOpenPlayer={onOpenPlayer} /> : null}
     </div>
   );
 }
+
+/**
+ * "Wer wird unsterblich?" — die Legenden-Definition als sichtbares Langzeitziel.
+ *
+ * GEWÜNSCHT: „Legendäre spieler definieren."
+ *
+ * Vorher hieß „legendär" schlicht: steht in den Top 25 der Karriere-PPs. Das ist eine
+ * Sortierung, keine Definition — in einer Liste der besten 25 sind immer 25 Spieler, auch am
+ * ersten Spieltag. Ein Status, den man weder verfehlen noch verlieren kann, ist keiner.
+ *
+ * In Saison 1 kann es per Definition keine Legenden geben (Kriterium „Dauer" verlangt drei
+ * Saisons). Statt eines Leerzustands zeigt der Reiter deshalb die KRITERIEN selbst und die
+ * Anwärter mit Fortschritt — dieselben Resolver, die später den Status verleihen. Die Anzeige
+ * graduiert, es entsteht keine zweite Ansicht.
+ */
+function LegendCriteriaPanel({
+  gameState,
+  legends,
+  onOpenPlayer,
+}: {
+  gameState: GameState;
+  legends: PlayerCareerLeaderRow[];
+  onOpenPlayer: (playerId: string) => void;
+}) {
+  const bewertung = useMemo(() => buildLeagueLegends(gameState, legends), [gameState, legends]);
+  const zeigeLegenden = bewertung.legends.length > 0;
+  const liste = zeigeLegenden ? bewertung.legends : bewertung.anwaerter;
+
+  return (
+    <NlCard
+      className="nl-legend-criteria-card"
+      eyebrow={
+        zeigeLegenden
+          ? `${formatNlNumber(bewertung.legends.length, 0)} Legende${bewertung.legends.length === 1 ? "" : "n"}`
+          : `frühestens ab Saison ${formatNlNumber(bewertung.moeglichAbSaison, 0)} · aktuell Saison ${formatNlNumber(bewertung.aktuelleSaison, 0)}`
+      }
+      title={zeigeLegenden ? "Legenden" : "Auf dem Weg zur Legende"}
+    >
+      <p className="nl-leaders-hint">
+        Legende wird, wer <strong>mindestens {formatNlNumber(bewertung.moeglichAbSaison, 0)} Saisons</strong> gespielt hat
+        und dazu <strong>zwei weitere Kriterien</strong> erfüllt. Die Dauer ist Pflicht — sonst wäre jeder Saison-1-Leader
+        sofort Legende.
+      </p>
+
+      <ol className="nl-legend-candidates" data-testid="legend-candidates">
+        {liste.map((kandidat) => (
+          <li key={kandidat.playerId} className="nl-legend-candidate">
+            <button type="button" className="nl-legend-candidate-head" onClick={() => onOpenPlayer(kandidat.playerId)}>
+              <strong>{kandidat.playerName}</strong>
+              <small>{kandidat.teamName ?? "—"}</small>
+              <span className="nl-legend-score nl-tnum">
+                {formatNlNumber(kandidat.erfuellteAnzahl, 0)}/5
+              </span>
+            </button>
+            <ul className="nl-legend-criterialist">
+              {kandidat.criteria.map((kriterium) => (
+                <li
+                  key={kriterium.id}
+                  className={`nl-legend-criterion${kriterium.erfuellt ? " is-met" : ""}`}
+                  title={kriterium.erklaerung}
+                >
+                  <span aria-hidden="true">{kriterium.erfuellt ? "✓" : "○"}</span>
+                  <span className="nl-legend-criterion-label">{kriterium.label}</span>
+                  <span className="nl-legend-criterion-stand">{kriterium.stand}</span>
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ol>
+    </NlCard>
+  );
+}
+
+/**
+ * "Ewige Tabelle" — das Vereinsgedächtnis.
+ *
+ * GEWÜNSCHT: „…so ne ewige tabelle ALLER spieler aus dem team … alle spieler die das team je
+ * hatte mit allen PPs usw. Aber dass man auch wechseln kann auf ALLE spieler und sehen kann wer
+ * ist all time best."
+ *
+ * Der Umschalter beantwortet zwei verschiedene Fragen mit einer Tabelle: „was hat uns dieser
+ * Spieler gebracht" (Team-Sicht, nur die für DIESES Team erspielten PPs) und „wer ist der Beste,
+ * den die Liga je gesehen hat" (Liga-Sicht, Karrieresumme).
+ *
+ * Die Team-Sicht ist für jedes Team wählbar — Kader und PPs sind öffentliche Daten, die
+ * Leader-Kacheln zeigen sie ohnehin für alle 32 Teams.
+ */
+function EternalPlayerTablePanel({
+  gameState,
+  ownTeamId,
+  onOpenPlayer,
+}: {
+  gameState: GameState;
+  ownTeamId: string | null;
+  onOpenPlayer: (playerId: string) => void;
+}) {
+  const [scopeTeamId, setScopeTeamId] = useState<string | null>(ownTeamId);
+  const [sichtbar, setSichtbar] = useState(ETERNAL_TABLE_STEP);
+
+  const scope = useMemo<EternalPlayerScope>(
+    () => (scopeTeamId ? { kind: "team", teamId: scopeTeamId } : { kind: "league" }),
+    [scopeTeamId],
+  );
+  const tabelle = useMemo(() => buildEternalPlayerTable(gameState, scope), [gameState, scope]);
+  const istTeamSicht = tabelle.scope.kind === "team";
+
+  const teamsAlphabetisch = useMemo(
+    () => [...(gameState.teams ?? [])].sort((links, rechts) => links.name.localeCompare(rechts.name, "de")),
+    [gameState.teams],
+  );
+
+  function wechsle(naechsterTeamId: string | null) {
+    setScopeTeamId(naechsterTeamId);
+    // Beim Wechsel wieder einklappen — sonst reisst ein zuvor aufgeklapptes Team die 330 Zeilen
+    // der Liga-Sicht ungefragt auf.
+    setSichtbar(ETERNAL_TABLE_STEP);
+  }
+
+  return (
+    <NlCard
+      className="nl-eternal-card"
+      eyebrow={
+        tabelle.onlyCurrentSeason
+          ? "bisher 1 Saison · wächst mit jedem Saisonabschluss"
+          : `${formatNlNumber(tabelle.seasonCount, 0)} Saisons`
+      }
+      title="Ewige Tabelle"
+    >
+      <div className="nl-eternal-switch" role="group" aria-label="Auswahl der Ewigen Tabelle">
+        {ownTeamId ? (
+          <button
+            type="button"
+            className={`nl-eternal-pill${scopeTeamId === ownTeamId ? " is-active" : ""}`}
+            onClick={() => wechsle(ownTeamId)}
+            data-testid="eternal-scope-own"
+          >
+            Mein Team
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className={`nl-eternal-pill${scopeTeamId == null ? " is-active" : ""}`}
+          onClick={() => wechsle(null)}
+          data-testid="eternal-scope-league"
+        >
+          Ganze Liga
+        </button>
+        <label className="nl-eternal-teamselect">
+          <span className="nl-eternal-teamselect-label">Team wählen</span>
+          <select
+            value={scopeTeamId ?? ""}
+            onChange={(event) => wechsle(event.target.value === "" ? null : event.target.value)}
+          >
+            <option value="">— ganze Liga —</option>
+            {teamsAlphabetisch.map((team) => (
+              <option key={team.teamId} value={team.teamId}>
+                {team.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <p className="nl-leaders-hint">
+        {istTeamSicht
+          ? "Alle Spieler, die je für dieses Team gespielt haben — gewertet werden nur die PPs, die sie FÜR DIESES TEAM geholt haben. Verkaufte Spieler bleiben mit ihrer Bilanz stehen."
+          : "Alle Spieler mit Karrieredaten, sortiert nach Karriere-PPs — das ist die All-Time-Bestenliste."}
+      </p>
+
+      {tabelle.rows.length === 0 ? (
+        <p className="nl-records-empty-text">Noch keine Einträge — sobald ein Spieltag gerechnet ist, füllt sich die Tabelle.</p>
+      ) : (
+        <>
+          <ol className="nl-eternal-list" data-testid="eternal-player-table">
+            {tabelle.rows.slice(0, sichtbar).map((row, index) => (
+              <li key={row.playerId} className="nl-eternal-row">
+                <button type="button" className="nl-eternal-rowbtn" onClick={() => onOpenPlayer(row.playerId)}>
+                  <span className="nl-eternal-rank nl-tnum">#{index + 1}</span>
+                  <span className="nl-eternal-name">
+                    <strong>{row.playerName}</strong>
+                    <small>
+                      {istTeamSicht
+                        ? `${row.zeitraum} · ${formatNlNumber(row.appearances, 0)} Einsätze · ${ETERNAL_STATUS_LABEL[row.status]}${
+                            row.verkauftAn ? ` an ${row.verkauftAn}` : ""
+                          }`
+                        : `${row.zeitraum} · ${formatNlNumber(row.appearances, 0)} Einsätze · ${
+                            row.teams.length > 0 ? row.teams.join(", ") : row.teamName ?? "—"
+                          }`}
+                    </small>
+                  </span>
+                  <span className="nl-eternal-points nl-tnum">{formatNlNumber(row.points, 1)}</span>
+                  {istTeamSicht && row.careerPoints !== row.points ? (
+                    <span className="nl-eternal-career nl-tnum" title="PPs über die ganze Karriere">
+                      {formatNlNumber(row.careerPoints, 1)} ges.
+                    </span>
+                  ) : null}
+                </button>
+              </li>
+            ))}
+          </ol>
+          {tabelle.rows.length > sichtbar ? (
+            <button
+              type="button"
+              className="nl-rankdrawer-more"
+              data-testid="eternal-show-all"
+              onClick={() => setSichtbar(tabelle.rows.length)}
+            >
+              Alle {formatNlNumber(tabelle.rows.length, 0)} anzeigen
+            </button>
+          ) : null}
+        </>
+      )}
+    </NlCard>
+  );
+}
+
+/** Wie viele Zeilen die Ewige Tabelle zunächst zeigt — reine Render-Kappung, wie im Drawer. */
+const ETERNAL_TABLE_STEP = 25;
+
+const ETERNAL_STATUS_LABEL: Record<EternalPlayerStatus, string> = {
+  im_kader: "im Kader",
+  verkauft: "verkauft",
+  weg: "nicht mehr im Team",
+};
 
 /**
  * D11 — Own-Team-Leaderboard-Footprint: kompakte Zusammenfassung im Header,
