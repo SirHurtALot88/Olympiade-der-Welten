@@ -4,7 +4,7 @@
 > `data/bug-reports/triage/*.md` und `tickets.json`. Wer hier etwas ändert, verliert es beim
 > nächsten `npm run bugs:tabelle`. Der Stand einer Meldung wird in ihrer Triage-Notiz gepflegt.
 
-19 Meldungen — offen: 0 · vorgeprüft: 3 · angenommen: 0 · gebaut: 16 · abgelehnt: 0 · erledigt: 0
+19 Meldungen — offen: 0 · vorgeprüft: 2 · angenommen: 0 · gebaut: 17 · abgelehnt: 0 · erledigt: 0
 
 | Nr | Eingang | Von | Wo | Titel | Status | Ergebnis |
 |---:|---|---|---|---|---|---|
@@ -14,7 +14,7 @@
 | [4](triage/bug-2026-07-30T14-37-11-903Z-imx650.md) | 30.07., 16:37 | Franky | Markt · Transfermarkt | Cash-Anzeige bleibt nach dem Kauf stehen — der Anstoß wird vom Markt-Zwischenspeicher verschluckt | gebaut ⚠ | Zwei Anläufe. #273 stieß den Feed neu an, der Anstoß wurde aber vom Ref-Cache verschluckt; erst die Entwertung des Zwischenspeichers schließt die Kette. · PR #273 + #264 · `ea89b21e + 4bf73875` · **Wirkung nicht bestaetigt** |
 | [5](triage/bug-2026-07-30T14-42-43-320Z-sq84lk.md) | 30.07., 16:42 | Franky | Spieltag · Inbox | Inbox-Klick benutzte nicht die angeklickte Karte — „Training öffnen" landete in der Team-Ansicht | gebaut ⚠ | Der Klick-Handler warf die Id der angeklickten Karte weg und nahm den ersten Eintrag der unsortierten Liste. Behoben — der angeklickte Eintrag entscheidet. · PR #264 · **Wirkung nicht bestaetigt** |
 | [6](triage/bug-2026-07-30T15-01-02-061Z-vi7fg4.md) | 30.07., 17:01 | Franky | Spieltag · Einsatzliste | „Bester Fit" wählt nach dem rohen Score, zeigt aber den angepassten — beide Zahlen sind verschieden | gebaut ⚠ | Auf main bereits behoben (#274) — Auswahl und angezeigte Zahl benutzen denselben Maßstab. Nicht von mir gebaut, nur zugeordnet. · PR #274 · `fb6299e2` · **Wirkung nicht bestaetigt** |
-| [7](triage/bug-2026-07-30T19-45-25-841Z-zzd5f2.md) | 30.07., 21:45 | Franky | Spieltag · Einsatzliste | Spieler lassen sich nicht mehr in Disziplinen einsetzen (Franky, S1/MD4) | vorgeprüft | — |
+| [7](triage/bug-2026-07-30T19-45-25-841Z-zzd5f2.md) | 30.07., 21:45 | Franky | Spieltag · Einsatzliste | Spieler lassen sich nicht mehr in Disziplinen einsetzen (Franky, S1/MD4) | gebaut ⚠ | Am Save nachgestellt. Keine der drei vorgemerkten Spuren trifft — der Kader ist zu klein für den Spieltag, und niemand sagte es. Erklärung an die Einsatzliste gebaut, dazu den Arena-Weg entriegelt, der für so ein Team unerreichbar war. · PR #323 · **Wirkung nicht bestaetigt** |
 | [8](triage/bug-2026-07-31T06-52-47-563Z-ntw1fx.md) | 31.07., 08:52 | Chris | Markt · Transfermarkt | Wishlist soll im Draft bis zu 15 Plätze haben und danach auf das Scouting-Niveau zurückfallen | gebaut ⚠ | Die Wunschliste war im Draft nicht zu klein, sondern unbegrenzt — Chris sah trotzdem eine sehr niedrige Grenze, weil die Draft-Phasen-Erkennung seinen Spielstand (Kader schon über dem Minimum, Einstiegs-Flow aber noch offen) fälschlich als „Draft vorbei" wertete und darum schon die niedrige Scouting-Grenze anwandte. Jetzt gilt im Draft eine feste 15er-Grenze, und die Phasenerkennung folgt dem Einstiegs-Flow statt allein dem Kaderstand. · PR #306 · **Wirkung nicht bestaetigt** |
 | [9](triage/bug-2026-07-31T07-53-56-901Z-o366jv.md) | 31.07., 09:53 | Chris | Spieltag · Arena | Arena-Teamkarte zeigt bei mScoring niemanden unter „in dieser Disziplin" | gebaut ⚠ | Es war ein Fehler — aber ein anderer als vermutet. Die Karte suchte die aufgestellten Spieler unter der Id ihres KADER-EINTRAGS statt unter ihrer Spieler-Id; gefunden wurde damit nie jemand. Behoben, mit Test auf der Aufbereitung. · PR #312 · **Wirkung nicht bestaetigt** |
 | [10](triage/bug-2026-07-31T07-59-10-609Z-xqz47b.md) | 31.07., 09:59 | Chris | Spieltag · Arena | Endrang des Spieltags und Rang im Saisonstand widersprechen sich — Rang 1 mit 22 Punkten steht auf 14 | gebaut ⚠ | Ursache lag im ausgelassenen Standings-Apply (#297), die Rangbildung selbst war korrekt; die Invariante ist jetzt als Test festgehalten. · PR #297 + #305 · **Wirkung nicht bestaetigt** |
@@ -35,4 +35,4 @@ von einem Zwischenspeicher verschluckt.
 
 Details je Ticket: die Nummer verlinkt auf die Triage-Notiz. Volltext: `npm run bugs:review`.
 
-_Erzeugt: 1.8.2026, 20:34:17_
+_Erzeugt: 1.8.2026, 21:49:03_
