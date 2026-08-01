@@ -439,6 +439,11 @@ export function useFoundationCrossTabTeamsRoster(input: {
         return null;
       }
 
+      const team = input.gameState.teams.find((entry) => entry.teamId === resolvedTeamId) ?? null;
+      if (!team) {
+        return null;
+      }
+
       const saveId = input.activeSaveId ?? "default";
       const contentSignature = buildTeamProfileContentSignature({
         saveId,
@@ -447,20 +452,6 @@ export function useFoundationCrossTabTeamsRoster(input: {
         playerRatingsById: input.playerRatingsById,
       });
       const cacheKey = buildTeamProfileSessionKey(saveId, input.gameState.season.id, resolvedTeamId);
-      if (scope === "full") {
-        const cached = getCachedTeamProfileData(cacheKey, contentSignature);
-        if (cached) {
-          return cached;
-        }
-      }
-
-      const team = input.gameState.teams.find((entry) => entry.teamId === resolvedTeamId) ?? null;
-      if (!team) {
-        return null;
-      }
-
-      const teamControl = getTeamControlSettings(input.gameState, team.teamId);
-      const logo = getTeamLogoModel(team, { variant: "preview" });
       const liveSeasonOverviewRow =
         liveSeasonStandRows.find((entry) => entry.teamId === team.teamId) ?? null;
       const currentAreaRanks = areaRanksByTeamId.get(team.teamId) ?? null;
@@ -661,6 +652,24 @@ export function useFoundationCrossTabTeamsRoster(input: {
         }
         history = rows;
       }
+
+      // Der Session-Cache (nur `scope: "full"`) darf niemals die Live-Zeile
+      // ausliefern: `contentSignature` kennt weder Spieltag noch Ligastand, also
+      // hätte ein Cache-Treffer sonst die Live-Saison mit dem Stand vom ERSTEN
+      // Aufruf eingefroren — für die eigene Team-Ansicht, die als einzige diesen
+      // Cache benutzt (die Teams-Detailansicht baut `history-summary` immer
+      // frisch). `history` ist oben bereits neu gebaut und wird hier vor jedem
+      // Cache-Rückgabepfad übergestülpt, damit beide Ansichten dieselbe frische
+      // Live-Zeile zeigen (#298).
+      if (scope === "full") {
+        const cached = getCachedTeamProfileData(cacheKey, contentSignature);
+        if (cached) {
+          return { ...cached, history };
+        }
+      }
+
+      const teamControl = getTeamControlSettings(input.gameState, team.teamId);
+      const logo = getTeamLogoModel(team, { variant: "preview" });
 
       if (scope === "history-summary") {
         return {
