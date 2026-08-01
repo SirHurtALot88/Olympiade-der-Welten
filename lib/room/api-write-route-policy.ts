@@ -33,6 +33,17 @@ export const API_WRITE_ROUTE_ALLOWLIST: ApiWriteRoutePolicyEntry[] = [
     reason: "Dev-only season start reset tooling.",
   },
   {
+    routePath: "bug-report",
+    methods: ["POST"],
+    policy: "allowlisted",
+    reason:
+      "Bug reports are written as standalone JSON files under data/bug-reports/ — the handler " +
+      "READS the save to enrich the report (season, matchday, active teams) but never persists " +
+      "game state, so there is no team-owned write to authorize. Gating it behind the room guard " +
+      "would be actively harmful: reporting must stay possible from the login page, without a " +
+      "session, and on a half-broken screen (see components/feedback/BugReportFlag.tsx).",
+  },
+  {
     routePath: "new-game",
     methods: ["POST"],
     policy: "allowlisted",

@@ -142,7 +142,16 @@ export type TeamWriteAction =
   | "team_control_update"
   | "team_captain_assign"
   | "new_game_flow_step"
-  | "contract_negotiation_outcome";
+  | "contract_negotiation_outcome"
+  /**
+   * Vertragsaufloesung annehmen/ablehnen. Eigene Aktion statt
+   * `contract_negotiation_outcome`: eine Aufloesung beendet einen Vertrag und kostet eine
+   * Abfindung, eine Verhandlung verlaengert ihn — im Raum-Protokoll dieselbe Marke zu
+   * verwenden hiesse, dem Mitspieler das Falsche zu melden.
+   *
+   * Team-Ebene, NICHT host-level: die Entscheidung gehoert dem Team, dessen Spieler geht.
+   */
+  | "contract_dissolution";
 
 export type TeamWriteAuthorizationReason =
   | "ok"
