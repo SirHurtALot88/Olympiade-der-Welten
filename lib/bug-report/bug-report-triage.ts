@@ -91,6 +91,12 @@ export type BugTriage = {
    * dasteht.
    */
   seite: string | null;
+  /**
+   * App-Version ("0.3.0"), in der der Fix steckt — optional, analog zur `changelog:`-Zeile. Nur
+   * setzen, wenn die Version zum Merge-Zeitpunkt wirklich bekannt ist (siehe `package.json`);
+   * sonst leer lassen statt zu raten.
+   */
+  version: string | null;
   /** Der ganze Text unterhalb des Kopfes: Befund, Ursache, Vorschlag. */
   body: string;
   file: string;
@@ -109,6 +115,7 @@ const HEAD_KEYS = [
   "bestaetigt",
   "changelog",
   "seite",
+  "version",
 ] as const;
 
 function isTriageStatus(value: string): value is BugTriageStatus {
@@ -161,6 +168,7 @@ export function parseTriage(reportId: string, raw: string, file: string): BugTri
     bestaetigt,
     changelog: value("changelog"),
     seite: value("seite"),
+    version: value("version"),
     body: lines.slice(bodyStart).join("\n").trim(),
     file,
   };
@@ -190,6 +198,7 @@ export function writeTriage(input: {
   bestaetigt?: string | null;
   changelog?: string | null;
   seite?: string | null;
+  version?: string | null;
   body: string;
 }): string {
   fs.mkdirSync(BUG_TRIAGE_DIR, { recursive: true });
@@ -207,6 +216,7 @@ export function writeTriage(input: {
     ...optional("bestaetigt", input.bestaetigt),
     ...optional("changelog", input.changelog),
     ...optional("seite", input.seite),
+    ...optional("version", input.version),
   ].join("\n");
   fs.writeFileSync(file, `${head}\n\n${input.body.trim()}\n`, "utf8");
   return file;

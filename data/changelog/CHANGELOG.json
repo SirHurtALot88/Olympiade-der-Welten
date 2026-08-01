@@ -7,7 +7,8 @@
       "pr": "#297 + #305",
       "text": "Der Rang im Saisonstand konnte veraltet stehen bleiben, wenn ein Spieltag noch nicht abgeschlossen war — das ist jetzt behoben, und eine feste Prüfung stellt sicher, dass das Team mit den meisten Punkten immer Rang 1 hat.",
       "quelle": "triage",
-      "gewicht": "behebung"
+      "gewicht": "behebung",
+      "version": null
     },
     {
       "datum": "2026-08-01",
@@ -15,7 +16,8 @@
       "pr": "#297",
       "text": "Ein verletzter Spieler in der Aufstellung eines Computer-Teams konnte den ganzen Spieltag blockieren — er liess sich nicht mehr abschliessen. Die Computer-Teams pruefen ihre Aufstellung jetzt noch einmal, sobald du deine speicherst, und tauschen verletzte oder ausgelaugte Spieler aus.",
       "quelle": "triage",
-      "gewicht": "spielblockierend"
+      "gewicht": "spielblockierend",
+      "version": null
     },
     {
       "datum": "2026-08-01",
@@ -23,7 +25,8 @@
       "pr": "#298",
       "text": "Das Saisonende laeuft jetzt wirklich durch: nach dem letzten Spieltag fuehrt der Assistent Schritt fuer Schritt ueber Rueckblick, Finanzen und Spielerentwicklung bis zu Verkaufs- und Kaufphase. Vorher blieb er nach dem Rueckblick stehen — Verkaeufe waren dadurch ab dem ersten Spieltag einer Saison dauerhaft gesperrt.",
       "quelle": "gepflegt",
-      "gewicht": "spielblockierend"
+      "gewicht": "spielblockierend",
+      "version": "0.2"
     },
     {
       "datum": "2026-08-01",
@@ -31,7 +34,8 @@
       "pr": "#302",
       "text": "Jede Slot-Karte zeigt jetzt einen Risiko-Balken mit exakter Prozentzahl: das Verletzungsrisiko, mit dem der Spieltag wirklich wuerfelt (inklusive Einsatz-Last — deshalb nie 0 %, auch ausgeruht bleiben ~2 % Restrisiko). Vorher war das Risiko vor dem Spieltag unsichtbar und eine Verletzung wirkte wie ein Fehler; die Posteingangs-Meldung erklaert sie jetzt auch im Nachhinein (Fatigue beim Wurf + Prozent).",
       "quelle": "gepflegt",
-      "gewicht": "grundlegend"
+      "gewicht": "grundlegend",
+      "version": "0.3"
     },
     {
       "datum": "2026-08-01",
@@ -39,7 +43,8 @@
       "pr": "#294",
       "text": "Das Sponsorsystem ist grundlegend umgebaut: Die Auszahlung eines Vertrags richtet sich jetzt nach Preisgeld und Platzierung deines Teams, und keine Angebotskarte ist im Schnitt mehr wert als eine andere — vorher konnte die gezogene Karte mehr entscheiden als die eigene Leistung. Die Karten unterscheiden sich jetzt nur noch darin, wie viel Risiko du nimmst.",
       "quelle": "gepflegt",
-      "gewicht": "grundlegend"
+      "gewicht": "grundlegend",
+      "version": null
     },
     {
       "datum": "2026-08-01",
@@ -47,7 +52,8 @@
       "pr": "#295",
       "text": "Neu: dieser Reiter. Der Changelog zeigt, was sich im Spiel geaendert hat — gefixte Fehler und Neuerungen in Alltagssprache, mit der PR-Nummer als Beleg.",
       "quelle": "gepflegt",
-      "gewicht": "grundlegend"
+      "gewicht": "grundlegend",
+      "version": null
     },
     {
       "datum": "2026-07-30",
@@ -55,7 +61,8 @@
       "pr": "#264",
       "text": "Warum ein Spieler nicht aufgestellt werden konnte, war nicht zu erkennen — statt eines Grundes stand nur „blockiert\" oder ein kryptischer Code da. Jetzt steht „Verletzt\" direkt am Spieler.",
       "quelle": "triage",
-      "gewicht": "behebung"
+      "gewicht": "behebung",
+      "version": null
     },
     {
       "datum": "2026-07-30",
@@ -63,7 +70,8 @@
       "pr": "#264",
       "text": "Die Formkarten in der Einsatzliste waren manchmal am eigenen Team gesperrt, weil das Spiel den falschen Spielstand ansah. Jetzt erkennt es zuverlässig, wer gerade spielt — die eigenen Formkarten bleiben bedienbar.",
       "quelle": "triage",
-      "gewicht": "behebung"
+      "gewicht": "behebung",
+      "version": null
     },
     {
       "datum": "2026-07-30",
@@ -71,7 +79,8 @@
       "pr": "#268 + #264",
       "text": "Der Knopf „Sponsoren\" im Saisonstand landete in der Preisgeld-Ansicht, aus der kein Weg zurückführte. Jetzt öffnet er wieder die Sponsorenübersicht mit den Sponsoren aller Teams.",
       "quelle": "triage",
-      "gewicht": "behebung"
+      "gewicht": "behebung",
+      "version": null
     },
     {
       "datum": "2026-07-30",
@@ -79,7 +88,8 @@
       "pr": "#264",
       "text": "Aus der Wunschliste entfernte Spieler tauchten nach wenigen Sekunden von selbst wieder auf. Jetzt bleiben Änderungen an der Wunschliste während des Drafts erhalten.",
       "quelle": "triage",
-      "gewicht": "behebung"
+      "gewicht": "behebung",
+      "version": null
     },
     {
       "datum": "2026-07-30",
@@ -87,7 +97,8 @@
       "pr": "#273 + #264",
       "text": "Nach einem Kauf blieb der alte Kontostand stehen, bis man die Seite neu geladen hat. Jetzt aktualisiert er sich sofort.",
       "quelle": "triage",
-      "gewicht": "behebung"
+      "gewicht": "behebung",
+      "version": null
     },
     {
       "datum": "2026-07-30",
@@ -95,7 +106,8 @@
       "pr": "#264",
       "text": "Ein Klick in der Inbox öffnete manchmal das Ziel einer anderen Karte — „Training öffnen\" landete in der Team-Ansicht. Jetzt zählt genau die Karte, die man angeklickt hat.",
       "quelle": "triage",
-      "gewicht": "behebung"
+      "gewicht": "behebung",
+      "version": null
     },
     {
       "datum": "2026-07-30",
@@ -103,7 +115,8 @@
       "pr": "#274",
       "text": "„Bester Fit\" schlug in der Einsatzliste Spieler nach einer anderen Zahl vor, als daneben angezeigt wurde. Jetzt richten sich Vorschlag und Anzeige nach demselben Wert.",
       "quelle": "triage",
-      "gewicht": "behebung"
+      "gewicht": "behebung",
+      "version": null
     }
   ]
 }

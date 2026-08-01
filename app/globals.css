@@ -73575,6 +73575,24 @@ button.is-new-look .nl-thist-season-pill,
   max-width: 860px;
 }
 
+/* Aeussere Gliederung nach Version, sobald Eintraege eine Versionsangabe tragen. Eintraege ohne
+   Version bekommen dieselbe Struktur unter einer neutralen Sammelueberschrift — sie verschwinden
+   nicht, sie werden nur ehrlich als "nicht zugeordnet" markiert. */
+.is-new-look .nl-changelog-version {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-changelog-version-heading {
+  margin: 0;
+  font-size: var(--nl-fs-sm);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut-2);
+}
+
 .is-new-look .nl-changelog-intro {
   margin: 0;
   color: var(--nl-mut);
