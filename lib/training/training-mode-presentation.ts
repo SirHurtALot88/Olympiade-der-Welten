@@ -3,11 +3,22 @@ import { TRAINING_RECOVERY_IMPACT } from "@/lib/training/training-recovery-impac
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
 /** Base training budget per mode (season-end organic progression).
- *  Calibrated for peak P90 ~5–8 and league Ø Δ within ±0.4. */
+ *  Calibrated for peak P90 ~5–8 and league Ø Δ within ±0.4.
+ *
+ *  2026-08-01: um Faktor 0,76 gesenkt (3,6/4,56/6,47 → 2,74/3,47/4,92). Chris' Zielvorgabe ist ein
+ *  Ø-Performance-Anteil von 50 % am Bruttozuwachs; gemessen waren es 34,3 %
+ *  (`npm run training:source-share-audit`, Save new-game-1785174792968-8d7mdx, 332 Spieler).
+ *
+ *  Warum SENKEN statt die Performance allein anheben: der Anteil allein ueber Performance zu
+ *  erreichen haette Performance × 1,92 gebraucht und den Liga-Ø-Netto von +0,73 auf ≈ +2,9
+ *  getrieben — weit aus dem Korridor [-0,4; +0,4]. Das Paar (Performance × 1,46, Training × 0,76)
+ *  verschiebt das VERHAELTNIS und laesst die Bruttosumme, und damit den Netto-Haushalt, stehen.
+ *
+ *  Der Spillover stammt aus demselben Budget und skaliert deshalb automatisch mit. */
 export const TRAINING_SETPOINTS_BY_MODE: Record<PlayerTrainingMode, number> = {
-  leicht: 3.6,
-  mittel: 4.56,
-  hart: 6.47,
+  leicht: 2.74,
+  mittel: 3.47,
+  hart: 4.92,
 };
 
 export const FATIGUE_LOAD_BY_MODE: Record<PlayerTrainingMode, number> = {
