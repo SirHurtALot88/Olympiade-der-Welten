@@ -19,6 +19,7 @@ import { describe, expect, it } from "vitest";
 import {
   getPrizePlacementBonus,
   getPrizePlacementRows,
+  PRIZE_PLACEMENT_EFFECTIVE_CAP,
   PRIZE_PLACEMENT_SHEET_TABLE,
 } from "@/lib/season/prize-placement-table";
 
@@ -50,19 +51,35 @@ describe("Platzierungsbonus — eine Tabelle, aus dem Sheet", () => {
     expect(PRIZE_PLACEMENT_SHEET_TABLE.size).toBe(sheetRows.length);
   });
 
-  it("ist asymmetrisch: aufwaerts +1,28 je Platz, abwaerts −0,96 — und flacht oberhalb ±10 ab", () => {
+  it("ist asymmetrisch: aufwaerts +1,28 je Platz, abwaerts −0,96", () => {
     expect(getPrizePlacementBonus(1)).toBeCloseTo(1.28, 2);
     expect(getPrizePlacementBonus(-1)).toBeCloseTo(-0.96, 2);
-    expect(getPrizePlacementBonus(10)).toBeCloseTo(12.84, 2);
-    // Ab +11 flacher: +0,64 statt +1,28 je Platz.
-    expect(getPrizePlacementBonus(11) - getPrizePlacementBonus(10)).toBeCloseTo(0.65, 2);
     expect(getPrizePlacementBonus(0)).toBe(0);
+    // Innerhalb der Kappung laeuft die Tabelle unveraendert weiter.
+    expect(getPrizePlacementBonus(6)).toBeCloseTo(7.71, 2);
+    expect(getPrizePlacementBonus(-6)).toBeCloseTo(-5.78, 2);
   });
 
-  it("klammert ausserhalb der Tabelle auf den Rand statt auf 0 zu fallen", () => {
-    expect(getPrizePlacementBonus(99)).toBeCloseTo(26.33, 2);
-    expect(getPrizePlacementBonus(-99)).toBeCloseTo(-12.84, 2);
+  /**
+   * DIE KAPPUNG BEI SECHS PLAETZEN. Ungekappt honorierte die Tabelle einen Sprung von Rang 32 auf 1
+   * mit +26,33 C — mehr als ein Drittel dessen, was ein Mittelfeldteam eine ganze Saison lang
+   * bekommt, entstanden in einer einzigen Saison. Weil die Tabelle asymmetrisch ist, leckte die
+   * Ligasumme in den Extremen zusaetzlich nach oben. Ab sechs Plaetzen zahlt kein weiterer mehr;
+   * die Belohnung fuer den besseren Endrang steckt ohnehin schon in der Rangkurve selbst.
+   */
+  it("kappt den Rangsprung bei sechs Plaetzen — in beide Richtungen", () => {
+    expect(PRIZE_PLACEMENT_EFFECTIVE_CAP).toBe(6);
+    for (const delta of [7, 10, 20, 31, 99]) {
+      expect(getPrizePlacementBonus(delta), `+${delta}`).toBeCloseTo(getPrizePlacementBonus(6), 6);
+    }
+    for (const delta of [-7, -10, -20, -31, -99]) {
+      expect(getPrizePlacementBonus(delta), `${delta}`).toBeCloseTo(getPrizePlacementBonus(-6), 6);
+    }
     expect(getPrizePlacementBonus(Number.NaN)).toBe(0);
+    // Bis zur Grenze bleibt sie streng monoton — sonst waere ein Platz mehr plotzlich weniger wert.
+    for (let delta = -5; delta <= 6; delta += 1) {
+      expect(getPrizePlacementBonus(delta), `${delta}`).toBeGreaterThan(getPrizePlacementBonus(delta - 1));
+    }
   });
 
   it("liefert die Anzeigeform absteigend nach rankDelta", () => {
