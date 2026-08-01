@@ -21,46 +21,67 @@ const SPONSOR_SEASON_PERCENTS = [
   2.61, 2.38, 2.15, 1.92, 1.76, 1.61, 1.46, 1.3, 1.15, 1, 0.84, 0.69, 0.54, 0.38, 0.23, 0.08,
 ] as const;
 
-const BASIS_DIFFS = [
-  0, 0.4, 0.8, 1.2, 1.6, 2, 2.4, 2.8, 3.2, 3.6, 4, 4.4, 4.8, 5.2, 5.6, 6, 6, 6.3, 6.6, 6.9,
-  7.2, 7.5, 7.8, 8.1, 8.4, 8.7, 9, 9.3, 9.6, 9.9, 10.2, 10.5,
-] as const;
+/**
+ * ANTEIL DES TOPFES, DER FLACH AUF ALLE 32 PLAETZE VERTEILT WIRD (V4).
+ *
+ * Der Rest laeuft ueber `SPONSOR_SEASON_PERCENTS`. Der Wert ist auf den Eigentuemer-Benchmark
+ * kalibriert: bei der echten Liga-Gehaltssumme des Live-Saves (2056,6 C) und Gehaltsfaktor 1,0
+ * bekommt der Meister 90,9 C — bei einem Meister-Gehalt von 95,7 C also ein netto etwa stabiles
+ * Jahr. Die Schere Rang 1 zu Rang 32 liegt damit bei 1,96x und bleibt unter dem Balancingziel 2x.
+ *
+ * Kleinerer Anteil = steilere Kurve (mehr fuer die Spitze), groesserer = flachere.
+ */
+export const SPONSOR_SOCKEL_SHARE = 0.715;
 
 function round2(value: number) {
   return Math.round(value * 100) / 100;
 }
 
+/**
+ * DIE AUSZAHLUNGSKURVE DER SAISON — `Kurve(r) = f*S*s/32 + f*S*(1-s)*p_r/Sum(p)`.
+ *
+ * `S` ist die echte Liga-Gehaltssumme, `f` der Gehaltsfaktor, `s` der flache Sockelanteil. Der Topf
+ * ist damit exakt `S*f`, wie zuvor — geaendert hat sich, WIE er verteilt wird.
+ *
+ * FRUEHER hing an jedem Rang ein eigener Sockel (`BASIS_DIFFS`, viertniedrigstes Gehalt plus einen
+ * mit dem Rang WACHSENDEN Aufschlag), und der verteilbare Rest war `max(0, S*f - Sockelsumme)`.
+ * Beide Groessen liefen gegeneinander: der Sockel war faktor-fix, der Rest schrumpfte mit dem
+ * Faktor. Unterhalb Faktor 0,8722 ueberholte die Sockelsteigung die Prozentkurve und die Tabelle
+ * KIPPTE — bei 0,82, dem echten Boden des Saison-Wurfs, verdiente der Tabellenletzte mehr als der
+ * Meister. Da die Sponsorleiter diese Kurve woertlich einfriert, erbte sie die Inversion; ~12 % aller
+ * Saisons lagen im gekippten Bereich.
+ *
+ * Der flache Sockel behebt das STRUKTURELL statt kalibriert: er ist rangneutral und skaliert mit dem
+ * Faktor, also ist die Kurve fuer jedes `f > 0` streng fallend im Rang. Ein schlechtes Jahr trifft
+ * damit alle proportional, statt die Spitze allein zahlen zu lassen.
+ */
 export function buildPrizeMoneyTable(teamSalaries: number[], salaryFactor = 1, adminConfig?: AdminBalancingConfigInput | null): PrizeMoneyRow[] {
-  const sortedSalaries = [...teamSalaries].filter((value) => Number.isFinite(value)).sort((left, right) => left - right);
-  const basisBase = sortedSalaries.length >= 4 ? sortedSalaries[3] : 0;
   const sponsorSeasonPercents = adminConfig ? resolveAdminBalancingConfig(adminConfig).prizeMoneyPercents : [...SPONSOR_SEASON_PERCENTS];
   const sumPercent = sponsorSeasonPercents.reduce((sum, value) => sum + value, 0);
+  const salaries = teamSalaries.filter((value) => Number.isFinite(value));
+  const totalSalaries = salaries.reduce((sum, value) => sum + value, 0);
 
-  const rows = sponsorSeasonPercents.map((percent, index) => {
-    const rank = index + 1;
-    const diff = BASIS_DIFFS[index] ?? 0;
-    const basis = basisBase + diff;
+  // DER TOPF GEHOERT ZUR TABELLE, NICHT ZUR TEAMLISTE. Die Kurve hat feste 32 Raenge; kaemen weniger
+  // Gehaelter herein (Testzustaende, Teil-Ligen), waere der Topf auf denselben Bruchteil geschrumpft
+  // und die Kurve liefe unter die Sponsor-Untergrenze — dort klammert sie, und das Klammern zerstoert
+  // die Erwartungswert-Gleichheit der Karten. Ueber das MITTLERE Gehalt hochgerechnet ist der Topf
+  // fuer die echte 32er-Liga rechnerisch identisch zur Gehaltssumme und bleibt sonst massstabstreu.
+  const meanSalary = salaries.length > 0 ? totalSalaries / salaries.length : 0;
+  const pot = Math.max(0, meanSalary * sponsorSeasonPercents.length * salaryFactor);
+  const flatBasis = (pot * SPONSOR_SOCKEL_SHARE) / sponsorSeasonPercents.length;
+  const seasonTotal = pot - flatBasis * sponsorSeasonPercents.length;
+
+  return sponsorSeasonPercents.map((percent, index) => {
+    const seasonShare = round2(sumPercent > 0 ? seasonTotal * (percent / sumPercent) : 0);
+    const basis = round2(flatBasis);
     return {
-      rank,
+      rank: index + 1,
       basis,
       percent,
-      diff,
-      seasonShare: 0,
-      totalPrizeMoney: 0,
-    };
-  });
-
-  const sumBasis = rows.reduce((sum, row) => sum + row.basis, 0);
-  const totalSalaries = sortedSalaries.reduce((sum, value) => sum + value, 0);
-  const seasonTotal = Math.max(0, totalSalaries * salaryFactor - sumBasis);
-
-  return rows.map((row) => {
-    const seasonShare = round2(seasonTotal * (row.percent / sumPercent));
-    return {
-      ...row,
-      basis: round2(row.basis),
+      // Der rangabhaengige Sockelaufschlag ist entfallen; das Feld bleibt fuer die Zeilenform.
+      diff: 0,
       seasonShare,
-      totalPrizeMoney: round2(row.basis + seasonShare),
+      totalPrizeMoney: round2(basis + seasonShare),
     };
   });
 }
