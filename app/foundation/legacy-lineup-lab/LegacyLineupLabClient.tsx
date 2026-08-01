@@ -47,6 +47,7 @@ import {
   type MatchdaySlotRoleDefinition,
 } from "@/lib/lineups/matchday-slot-roles";
 import { calculatePerPlayerFormModifier } from "@/lib/lineups/legacy-lineup-modifiers";
+import { describeLineupRosterShortfall, isLineupArenaReady } from "@/lib/lineups/lineup-roster-shortfall";
 import { applyPlannedFormCardsToModifiers } from "@/lib/foundation/form-board-plan-service";
 import {
   formatLegacyLineupDragBlockReason,
@@ -4040,6 +4041,30 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     return assignedIds.size >= totalActive;
   }, [context?.activePlayers?.length, entries]);
 
+  /**
+   * Reicht der Kader ueberhaupt fuer die Plaetze dieses Spieltags? Ist er zu klein, laeuft die
+   * Kandidatenliste irgendwann leer — und sagte bisher nur "Keine Kandidaten in dieser Gruppe".
+   * Gemeldet als "spieler können nichtmehr in disziplinen eingesetzt werden". Der Hinweis nennt
+   * die Zahlen und sagt, dass so anzutreten erlaubt ist.
+   */
+  const lineupRosterShortfall = useMemo(() => {
+    const assignedPlayerCount = new Set(entries.map((entry) => entry.activePlayerId).filter(Boolean)).size;
+    return describeLineupRosterShortfall({
+      requiredSlots:
+        (context?.matchdayContract?.discipline1?.requiredPlayers ?? 0) +
+        (context?.matchdayContract?.discipline2?.requiredPlayers ?? 0),
+      availablePlayerCount: context?.activePlayers?.length ?? 0,
+      rosterPlayerCount: context?.rosterPlayers?.length ?? 0,
+      assignedPlayerCount,
+    });
+  }, [
+    context?.activePlayers?.length,
+    context?.matchdayContract?.discipline1?.requiredPlayers,
+    context?.matchdayContract?.discipline2?.requiredPlayers,
+    context?.rosterPlayers?.length,
+    entries,
+  ]);
+
   const lineupReadyToSave = useMemo(() => {
     return (
       (matchdayPreviewCards.openSlots === 0 || allAvailablePlayersDeployed) &&
@@ -4682,9 +4707,18 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     };
   }, [allAvailablePlayersDeployed, captainBudgetExceeded, captainDraftUsedCount, captainSeasonLimit, captainUsedBeforeCurrentDraft, captains.d1, captains.d2, draft, duplicateSelections.length, lineupReadyToSave, matchdayPreviewCards.openSlots]);
   const lineupFinishItems = useMemo(() => lineupMiniAudit.items.slice(0, 6), [lineupMiniAudit]);
+  // Der Weg in die Arena darf nicht strenger sein als die Bereitschaftspruefung des Spieltags:
+  // ein Kader, der die Plaetze gar nicht besetzen KANN, erreicht "0 offene Slots" nie und waere
+  // hier fuer immer haengengeblieben. Siehe `lineup-roster-shortfall`.
   const focusV2ArenaReady = useMemo(
-    () => Boolean(draft) && lineupMiniAudit.blockingItems.length === 0 && matchdayPreviewCards.openSlots === 0,
-    [draft, lineupMiniAudit.blockingItems.length, matchdayPreviewCards.openSlots],
+    () =>
+      isLineupArenaReady({
+        hasSavedDraft: Boolean(draft),
+        hasBlockingIssues: lineupMiniAudit.blockingItems.length > 0,
+        openSlots: matchdayPreviewCards.openSlots,
+        allAvailablePlayersDeployed,
+      }),
+    [allAvailablePlayersDeployed, draft, lineupMiniAudit.blockingItems.length, matchdayPreviewCards.openSlots],
   );
   const activeSlotIssues = activeSlot ? slotIssuesByKey.get(activeSlot.key) ?? [] : [];
   const teamdeckSortInsight = useMemo(() => {
@@ -7448,6 +7482,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         onUpdateDisciplineIntensity={updateDisciplineIntensityStage}
         playerFilter={playerFilter}
         onPlayerFilterChange={setPlayerFilter}
+        rosterShortfall={lineupRosterShortfall}
         arenaReady={focusV2ArenaReady}
         onNavigateArena={
           props.onOpenArena

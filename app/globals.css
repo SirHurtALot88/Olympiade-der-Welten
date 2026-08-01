@@ -57537,6 +57537,17 @@ button.foundation-team-portrait-card {
   color: var(--nl-risk);
 }
 
+/* Kader-Unterdeckung: eine Nachricht, kein Fehler — deshalb warnfarben statt rot. */
+.is-new-look .nl-lineup-status.is-warn {
+  border-color: color-mix(in srgb, var(--nl-warn) 50%, transparent);
+  background: color-mix(in srgb, var(--nl-warn) 8%, var(--nl-panel-2));
+  color: var(--nl-fg);
+}
+
+.is-new-look .nl-lineup-status.is-warn strong {
+  color: var(--nl-warn);
+}
+
 /* --- Layout ------------------------------------------------------------ */
 
 .is-new-look .nl-lineup-layout {
