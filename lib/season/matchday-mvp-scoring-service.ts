@@ -1,6 +1,5 @@
 import type { GameState, LineupDraft, Team, TeamControlMode } from "@/lib/data/olyDataTypes";
-import { buildAiLegacyLineupPreview } from "@/lib/ai/ai-legacy-lineup-engine";
-import { buildAiLegacyLineupModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
+import { buildAiLegacyLineupPreviewWithModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import { ensureLocalFormCardsForSeason, normalizeLineupDraftModifiers } from "@/lib/lineups/legacy-lineup-modifiers";
 import { ensureLocalTeamPowersForSeason } from "@/lib/lineups/team-powers";
 import { getManualControlTeamIds } from "@/lib/foundation/team-control-settings";
@@ -557,8 +556,8 @@ export async function runMatchdayMvpScoring(
     }
 
     const replacingIncompleteDraft = Boolean(contextResult.context.existingDraft?.entries.length) && !existingDraftComplete;
-    const preview = buildAiLegacyLineupPreview(contextResult.context, "sqlite");
-    const modifiers = buildAiLegacyLineupModifiers(contextResult.context, preview.entries);
+    // Formkarten VOR der Kapitaenswahl — beides kommt deshalb aus einem Aufruf.
+    const { preview, modifiers } = buildAiLegacyLineupPreviewWithModifiers(contextResult.context, "sqlite");
     if (preview.status === "blocked" || preview.status === "missing_scores") {
       lineupTeams.push({
         teamId: team.teamId,

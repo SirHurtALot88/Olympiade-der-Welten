@@ -2,8 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 
-import { buildAiLegacyLineupModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
-import { buildAiLegacyLineupPreview } from "@/lib/ai/ai-legacy-lineup-engine";
+import { buildAiLegacyLineupPreviewWithModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import type {
   AiLegacyLineupAuditSummary,
   AiLegacyLineupModifierSidePlan,
@@ -13,7 +12,7 @@ import type {
 import { LegacyLineupContextLoader } from "@/lib/lineups/legacy-lineup-context-loader";
 import { loadLocalLegacyLineupContext } from "@/lib/lineups/legacy-lineup-local-service";
 import type { DisciplineSide, LegacyLineupKeyParams, LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
-import type { LineupDraftModifierSide } from "@/lib/data/olyDataTypes";
+import type { LineupDraftModifiers, LineupDraftModifierSide } from "@/lib/data/olyDataTypes";
 import { mapSaveResolutionErrorToResponse } from "@/lib/persistence/resolve-local-save";
 
 function parseKeyParams(request: Request): LegacyLineupKeyParams | null {
@@ -137,8 +136,11 @@ function buildAiAuditSummary(
   };
 }
 
-function enrichAiPreview(context: LegacyLineupLoadedContext, preview: AiLegacyLineupPreview): AiLegacyLineupPreview {
-  const modifiers = buildAiLegacyLineupModifiers(context, preview.entries);
+function enrichAiPreview(
+  context: LegacyLineupLoadedContext,
+  preview: AiLegacyLineupPreview,
+  modifiers: LineupDraftModifiers,
+): AiLegacyLineupPreview {
   return {
     ...preview,
     modifierPlan: {
@@ -172,7 +174,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ errors: contextResult.errors, warnings: contextResult.warnings }, { status: 422 });
   }
 
-  const preview = enrichAiPreview(contextResult.context, buildAiLegacyLineupPreview(contextResult.context, source));
+  // Formkarten VOR der Kapitaenswahl — die Vorschau zeigt damit dieselbe Kopplung wie der Apply.
+  const planned = buildAiLegacyLineupPreviewWithModifiers(contextResult.context, source);
+  const preview = enrichAiPreview(contextResult.context, planned.preview, planned.modifiers);
 
   return NextResponse.json({
     preview,

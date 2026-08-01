@@ -14,8 +14,7 @@ import path from "node:path";
 
 import { loadEnvConfig } from "@next/env";
 
-import { buildAiLegacyLineupPreview } from "@/lib/ai/ai-legacy-lineup-engine";
-import { buildAiLegacyLineupModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
+import { buildAiLegacyLineupPreviewWithModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import { applyFacilityUpgrade, previewFacilityUpgrade } from "@/lib/facilities/facility-upgrade-service";
 import { calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { applyGameModeOwnership } from "@/lib/foundation/team-control-settings";
@@ -161,11 +160,12 @@ function setupFreshSoloSave(persistence = createPersistenceService()) {
 function prepManualLineup(params: LegacyLineupKeyParams) {
   const ctx = loadLocalLegacyLineupContext(params);
   if (!ctx.ok) throw new Error(`Lineup context failed: ${ctx.errors.join(" | ")}`);
-  const preview = buildAiLegacyLineupPreview(ctx.context, "sqlite");
+  // Formkarten VOR der Kapitaenswahl — ein Aufruf, damit das Skript dieselbe Kopplung misst
+  // wie das Spiel (keine Kapitaene in Disziplinen mit negativer Formbilanz).
+  const { preview, modifiers } = buildAiLegacyLineupPreviewWithModifiers(ctx.context, "sqlite");
   if (preview.status === "blocked" || preview.entries.length === 0) {
     throw new Error(`Lineup preview blocked: ${preview.warnings.join(" | ") || preview.status}`);
   }
-  const modifiers = buildAiLegacyLineupModifiers(ctx.context, preview.entries);
   const result = saveLocalLegacyLineupDraft(params, preview.entries, modifiers);
   if (!result.ok) throw new Error(`Lineup save failed: ${result.errors.join(" | ")}`);
   return result;

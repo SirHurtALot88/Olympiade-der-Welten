@@ -134,7 +134,8 @@ describe("ai legacy lineup preview api", () => {
     expect(response.status).toBe(200);
     expect(loadLocalLegacyLineupContext).toHaveBeenCalledTimes(1);
     expect(loadLegacyLineupContext).not.toHaveBeenCalled();
-    expect(buildAiLegacyLineupPreview).toHaveBeenCalledWith(expect.any(Object), "sqlite");
+    // Dritter Parameter: der Formkarten-Zug, den die Kapitaenswahl VOR ihrer Entscheidung liest.
+    expect(buildAiLegacyLineupPreview).toHaveBeenCalledWith(expect.any(Object), "sqlite", expect.any(Object));
     expect(body.readOnly).toBe(true);
     expect(body.source).toBe("sqlite");
   }, 20000);
@@ -174,7 +175,7 @@ describe("ai legacy lineup preview api", () => {
     expect(response.status).toBe(200);
     expect(loadLegacyLineupContext).toHaveBeenCalledTimes(1);
     expect(loadLocalLegacyLineupContext).not.toHaveBeenCalled();
-    expect(buildAiLegacyLineupPreview).toHaveBeenCalledWith(expect.any(Object), "prisma");
+    expect(buildAiLegacyLineupPreview).toHaveBeenCalledWith(expect.any(Object), "prisma", expect.any(Object));
     expect(body.readOnly).toBe(true);
     expect(body.source).toBe("prisma");
   });

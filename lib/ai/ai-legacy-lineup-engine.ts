@@ -103,6 +103,40 @@ const CAPTAIN_WEAK_SIDE_STRONGEST_SCORE = 66;
 // Fallback-Hebel, wenn kein Rang bekannt ist: Magnitude entscheidet allein.
 const CAPTAIN_LEVERAGE_UNKNOWN_RANK = 0.85;
 
+// ===========================================================================================
+// Konzession per HARTEM Signal: die selbst gespielte negative Formkarte
+// -------------------------------------------------------------------------------------------
+// Die Konzessions-Erkennung darunter hing bisher an einem GERATENEN Signal ("schwache Seite +
+// konservative Strategie/Tabellenkeller"). Gemeint war immer der Fall, den Chris meldet: das
+// Team wirft in eine Disziplin eine Minuskarte UND setzt dort trotzdem den Kapitän — beide
+// Entscheidungen einzeln richtig, zusammen heben sie sich auf. Im Live-Save (MD1, Saison 1)
+// hat das Raten den Fall nicht getroffen: 9 der 22 Teams mit Kapitän hatten ihn auf genau der
+// Seite, deren Formbilanz sie im selben Zug ins Minus gedrückt haben.
+//
+// Deshalb bekommt die Konzession jetzt das harte Signal: WELCHE Seiten heute unterm Strich
+// eine negative Formbilanz haben, liefert der Aufsteller (`buildAiLegacyLineupModifiers`) —
+// derselbe Rechenweg, den auch die Wertung nimmt. Der Kapitän-Slot ist knapp (3 pro Saison,
+// ~20 Disziplin-Seiten): eine Seite, die das Team gerade selbst schlechter stellt, ist nie der
+// beste Platz dafür.
+//
+// GRENZFALL, bewusst offen gelassen (Triage: "Kapitän kann in einer abgeschriebenen Diszi
+// trotzdem sinnvoll sein, um einen knappen Rangverlust abzuwenden"):
+//   1. Es zählt die NETTO-Formbilanz der Seite, nicht das blosse Vorhandensein einer
+//      Minuskarte. Der Saisonplan darf neben eine Minuskarte eine grössere Pluskarte legen
+//      (`ai-form-card-season-plan`); im Live-Save war das bei einem der 9 Teams so — die
+//      Seite stand am Ende bei +42.8 Formpunkten. Wer unterm Strich AUFWERTET, gibt nichts
+//      auf und darf den Kapitän behalten.
+//   2. Der bestehende "use it or lose it"-Zwang (`forced`) sticht die Konzession weiterhin.
+//      Genau dort — und nur dort — kostet das Sparen wirklich etwas, weil der Slot sonst
+//      verfällt. Solange noch Spieltage übrig sind, ist "nicht hier" kein Verzicht, sondern
+//      eine Verschiebung: derselbe Slot steht an einem Spieltag ohne selbst gewählten Malus
+//      erneut zur Verfügung.
+// Eine dritte Ausnahme über Beträge ("Boost grösser als Malus, also doch setzen") wurde
+// verworfen: der Boost ist +0.5 x EIN Spielerbeitrag (~30 Punkte im Save), der Malus wirkt mit
+// Kartenwert x Farbfaktor x Kadergrösse. Beide sind gleicher Grössenordnung, ein Betragsver-
+// gleich hätte 8 der 9 Fälle unverändert gelassen und damit die Meldung nicht beantwortet.
+// ===========================================================================================
+
 // Hebel-Multiplikator aus dem Disziplin-Rang (rank 1 = stärkstes Team der Liga in der Diszi).
 // Deterministisch, rein aus Rangposition; dokumentiert und beschränkt (0.28..1.15).
 function getCaptainRankLeverage(rank: number | null, totalTeams: number): number {
@@ -219,11 +253,14 @@ type CaptainOpportunity = {
   selectionScore: number;
   isLargeDiscipline: boolean;
   isConceding: boolean;
+  /** Konzession per hartem Signal: Das Team drückt diese Seite heute selbst ins Formminus. */
+  concedesByNegativeFormCard: boolean;
   worthwhile: boolean;
 };
 
 // Bewertet einen Captain-Kandidaten: erwarteter effektiver Ertrag = Rohboost x Hebel x Größe,
-// plus Konzessions-Erkennung (schwach + konservativ/Tabellenkeller => Slot sparen).
+// plus Konzessions-Erkennung (negative Formbilanz ODER schwach + konservativ/Tabellenkeller
+// => Slot sparen).
 function evaluateCaptainOpportunity(input: {
   context: LegacyLineupLoadedContext;
   entries: Array<LegacyLineupEntryInput & { isCaptain: boolean }>;
@@ -232,6 +269,8 @@ function evaluateCaptainOpportunity(input: {
   strategyConservative: boolean;
   bottomTier: boolean;
   totalTeams: number;
+  /** Seiten mit negativer Netto-Formbilanz aus dem heutigen Formkarten-Zug. */
+  negativeFormCardSides: ReadonlySet<DisciplineSide>;
 }): CaptainOpportunity {
   const { context, entries, candidate, totalTeams } = input;
   const rank = context.teamDisciplineRanks?.[candidate.disciplineId]?.rank ?? null;
@@ -254,11 +293,14 @@ function evaluateCaptainOpportunity(input: {
   const opportunityScore = rawBoost * leverage * sizeMultiplier;
   const selectionScore = opportunityScore * shareMultiplier;
 
-  // Konzession: schwache Seite UND (konservative Aufstellung ODER Tabellenkeller). Genau der
-  // Fall des Users: "wenn man eh schwach ist und negative Form reinschmeißt, warum Captain?"
+  // Konzession, harter Weg: Das Team spielt auf dieser Seite heute selbst eine negative
+  // Formbilanz — dort ist der knappe Captain-Slot verschwendet (s. Block oben).
+  const concedesByNegativeFormCard = input.negativeFormCardSides.has(candidate.disciplineSide);
+  // Konzession, weicher Weg (unverändert): schwache Seite UND (konservative Aufstellung ODER
+  // Tabellenkeller). Bleibt als Ergänzung stehen — sie greift auch ohne Formkarten-Zug.
   const isWeakSide =
     (rank != null && rank >= Math.ceil(totalTeams * 0.72)) || strongestScore < CAPTAIN_WEAK_SIDE_STRONGEST_SCORE;
-  const isConceding = isWeakSide && (input.strategyConservative || input.bottomTier);
+  const isConceding = concedesByNegativeFormCard || (isWeakSide && (input.strategyConservative || input.bottomTier));
 
   const worthwhile = !isConceding && opportunityScore >= input.effectiveThreshold;
 
@@ -275,6 +317,7 @@ function evaluateCaptainOpportunity(input: {
     selectionScore,
     isLargeDiscipline,
     isConceding,
+    concedesByNegativeFormCard,
     worthwhile,
   };
 }
@@ -1055,6 +1098,8 @@ function buildCaptainDecisions(
   input: {
     d1DisciplineId: string | null;
     d2DisciplineId: string | null;
+    /** Seiten mit negativer Netto-Formbilanz aus dem heutigen Formkarten-Zug. */
+    negativeFormCardSides: ReadonlySet<DisciplineSide>;
   },
 ) {
   const captainUsage = getCaptainUsageBeforeCurrentDraft(context);
@@ -1105,6 +1150,7 @@ function buildCaptainDecisions(
         strategyConservative,
         bottomTier,
         totalTeams,
+        negativeFormCardSides: input.negativeFormCardSides,
       }),
     );
   }
@@ -1228,6 +1274,18 @@ function buildCaptainDecisions(
     }
 
     // Nicht gewählt: Slot wird bewusst gespart. Grund je nach Ursache.
+    if (opportunity.concedesByNegativeFormCard) {
+      decisionsBySide.set(side, {
+        candidate,
+        status: "skipped_not_worthwhile",
+        warnings: candidate.warnings,
+        decisions: [
+          `Captain gespart: negative Formkarte auf dieser Diszi — der Bonus wäre dort verschenkt (Rang ${rankLabel}, ${captainLabel} +${formatBoost(opportunity.rawBoost)} Rohpunkte)`,
+        ],
+      });
+      continue;
+    }
+
     if (opportunity.isConceding) {
       decisionsBySide.set(side, {
         candidate,
@@ -1418,9 +1476,25 @@ function buildPreviewSide(
   };
 }
 
+/**
+ * Der Formkarten-Zug wird NICHT hier gerechnet: er hängt an `buildAiLegacyLineupModifiers`
+ * (Aufsteller-Schicht), und die importiert diese Engine — umgekehrt gäbe es einen Zyklus.
+ * Deshalb reicht der Aufrufer die Antwort herein. Die Kopplung liegt damit in der
+ * REIHENFOLGE: erst Formkarten, dann Kapitän. Der Aufstellungs-Teil davor
+ * (`buildAiLegacyLineupSuggestion`) bleibt unberührt — er entscheidet weiterhin ohne
+ * Formkarten- und ohne Kapitänswissen, und die Entries, die der Resolver bekommt, sind exakt
+ * die, die auch gespeichert werden.
+ *
+ * Ohne Resolver (Aufrufer ohne Formkarten-Schicht) verhält sich die Kapitänswahl wie vorher.
+ */
+export type AiLegacyLineupPreviewOptions = {
+  resolveNegativeFormCardSides?: (entries: LegacyLineupEntryInput[]) => Iterable<DisciplineSide>;
+};
+
 export function buildAiLegacyLineupPreview(
   context: LegacyLineupLoadedContext,
   source: "sqlite" | "prisma" = "sqlite",
+  options: AiLegacyLineupPreviewOptions = {},
 ): AiLegacyLineupPreview {
   const suggestion = buildAiLegacyLineupSuggestion(context);
   const captainRuleStatus = context.captainRule?.sourceStatus ?? "missing_source";
@@ -1434,9 +1508,17 @@ export function buildAiLegacyLineupPreview(
   const d1DisciplineId = context.contextMeta.d1DisciplineId;
   const d2DisciplineId = context.contextMeta.d2DisciplineId;
 
+  // Formkarten-Entscheidung ZUERST: sie geht als hartes Konzessionssignal in die Kapitänswahl
+  // ein. Der Resolver bekommt die fertige Aufstellung (ohne Kapitäns-Flags — die Formkartenwahl
+  // liest sie nicht), damit er dieselben Karten sieht, die später gespeichert werden.
+  const negativeFormCardSides = new Set<DisciplineSide>(
+    options.resolveNegativeFormCardSides?.(suggestion.entries) ?? [],
+  );
+
   const captainPlan = buildCaptainDecisions(context, entries, {
     d1DisciplineId,
     d2DisciplineId,
+    negativeFormCardSides,
   });
   entries = captainPlan.entries;
 

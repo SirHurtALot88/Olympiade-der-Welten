@@ -42,7 +42,10 @@ describe("Spieltagswertung — die KI stellt keine Spieler-Teams auf", () => {
    */
   it("die Sperre greift, bevor eine KI-Aufstellung gebaut wird", () => {
     const guard = LOOP.indexOf("if (manualTeamIds.has(team.teamId)) {");
-    const build = SOURCE.indexOf("buildAiLegacyLineupModifiers(contextResult.context");
+    // Aufstellung, Formkarten und Kapitaen kommen seit der Kopplung „keine Kapitaene in
+    // Disziplinen mit Minuskarte" aus EINEM Aufruf — das ist die Stelle, hinter der die
+    // Sperre niemals stehen darf.
+    const build = SOURCE.indexOf("buildAiLegacyLineupPreviewWithModifiers(contextResult.context");
     const write = SOURCE.indexOf("upsertDraftInGameState(");
     expect(guard).toBeGreaterThan(-1);
     expect(guard, "die Sperre steht hinter dem Modifier-Bau").toBeLessThan(build);
@@ -60,7 +63,7 @@ describe("Spieltagswertung — die KI stellt keine Spieler-Teams auf", () => {
 
   /** Für KI-Teams bleibt alles wie es war — die Sperre darf nicht den ganzen Lauf lahmlegen. */
   it("KI-Teams werden weiterhin aufgestellt", () => {
-    expect(SOURCE).toContain("buildAiLegacyLineupModifiers(contextResult.context, preview.entries)");
+    expect(SOURCE).toContain('buildAiLegacyLineupPreviewWithModifiers(contextResult.context, "sqlite")');
     expect(SOURCE).toContain('status: "auto_lineup_source"');
   });
 });
