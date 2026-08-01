@@ -43,6 +43,12 @@ import {
   type LeagueSeasonAwards,
 } from "@/lib/foundation/league-season-awards";
 import {
+  buildEternalPlayerTable,
+  type EternalPlayerScope,
+  type EternalPlayerStatus,
+} from "@/lib/foundation/eternal-player-table";
+import type { GameState } from "@/lib/data/olyDataTypes";
+import {
   buildLeagueAchievements,
   getLeagueAchievementGroupLabel,
   type LeagueAchievement,
@@ -356,7 +362,12 @@ export default function LeagueLeadersNewLook({
       {subTab === "records" ? (
         <LeagueRecordsPanel records={records} seasonBests={seasonBests} onOpenPlayer={onOpenPlayer} />
       ) : subTab === "legends" ? (
-        <LegendaryPlayersPanel records={records} onOpenPlayer={onOpenPlayer} />
+        <LegendaryPlayersPanel
+          records={records}
+          gameState={foundationGameState}
+          ownTeamId={selectedTeamId}
+          onOpenPlayer={onOpenPlayer}
+        />
       ) : subTab === "achievements" ? (
         <LeagueAchievementsPanel achievements={achievements} onOpenPlayer={onOpenPlayer} />
       ) : (
@@ -879,9 +890,14 @@ function SeasonAwardCard({
  */
 function LegendaryPlayersPanel({
   records,
+  gameState,
+  ownTeamId,
   onOpenPlayer,
 }: {
   records: LeagueRecordsHallOfFame | null;
+  /** Fuer die Ewige Tabelle darunter — sie liest Kader und Transferhistorie direkt. */
+  gameState: GameState | null;
+  ownTeamId: string | null;
   onOpenPlayer: (playerId: string) => void;
 }) {
   const [sort, setSort] = useState<{ key: LegendsSortKey; direction: NlTableSortDirection }>({
@@ -905,13 +921,23 @@ function LegendaryPlayersPanel({
     });
   }
 
-  if (!records || !records.hasHistory || legends.length === 0) {
+  /**
+   * Die zweite Sperre.
+   *
+   * Hier stand `!records.hasHistory` — also „es gibt kein Saison-ARCHIV". Damit blieb der Reiter
+   * in Saison 1 leer, selbst nachdem die Karrieredaten die laufende Saison mitzählen. Der Grund
+   * war eine falsche Gleichsetzung: „kein Archiv" hiess nicht „keine Karrieredaten".
+   *
+   * Gefragt wird jetzt, was wirklich zählt: liegen Zeilen vor? Fehlen sie, ist der Leerzustand
+   * ehrlich — vor dem ersten Spieltag hat noch niemand gepunktet.
+   */
+  if (!records || legends.length === 0) {
     return (
       <div className="nl-legends" data-testid="nl-league-legends">
         <NlCard className="nl-records-empty-card" title="🏆 Legendäre Spieler">
           <p className="nl-records-empty-text">
-            Noch keine legendären Spieler — sobald die erste Saison archiviert ist, erscheinen hier die Karriere-Bestenlisten
-            über alle Saisons (Punkte, Einsätze, MVP-Awards).
+            Noch keine Karrieredaten — sobald der erste Spieltag gerechnet ist, entsteht hier die Bestenliste über
+            Punkte, Einsätze und MVP-Auftritte.
           </p>
         </NlCard>
       </div>
@@ -924,11 +950,18 @@ function LegendaryPlayersPanel({
     <div className="nl-legends" data-testid="nl-league-legends">
       <NlCard
         className="nl-legends-podium-card"
-        eyebrow={`${formatNlNumber(records.seasonCount, 0)} Saison${records.seasonCount === 1 ? "" : "en"} Karrieredaten`}
+        eyebrow={
+          // Herkunfts-Etikett statt einer Zahl, die in Saison 1 „0 Saisonen" sagen wuerde:
+          // die laufende Saison ZAEHLT, sie ist nur noch nicht archiviert.
+          records.hasHistory
+            ? `${formatNlNumber(records.seasonCount, 0)} Saison${records.seasonCount === 1 ? "" : "en"} im Archiv · plus laufende`
+            : "laufende Saison · noch nichts archiviert"
+        }
         title="🏆 Legendäre Spieler"
       >
         <p className="nl-leaders-hint">
-          Ligaweite Karriere-Bestenliste über alle archivierten Saisons — Punkte, Einsätze und MVP-Awards.
+          Ligaweite Karriere-Bestenliste — Punkte, Einsätze und MVP-Auftritte. Die laufende Saison zählt mit und wandert
+          beim Saisonabschluss ins Archiv.
         </p>
         <div className="nl-legends-podium">
           {podium.map((row, index) => (
@@ -1028,9 +1061,163 @@ function LegendaryPlayersPanel({
           }}
         />
       </NlCard>
+
+      {gameState ? <EternalPlayerTablePanel gameState={gameState} ownTeamId={ownTeamId} onOpenPlayer={onOpenPlayer} /> : null}
     </div>
   );
 }
+
+/**
+ * "Ewige Tabelle" — das Vereinsgedächtnis.
+ *
+ * GEWÜNSCHT: „…so ne ewige tabelle ALLER spieler aus dem team … alle spieler die das team je
+ * hatte mit allen PPs usw. Aber dass man auch wechseln kann auf ALLE spieler und sehen kann wer
+ * ist all time best."
+ *
+ * Der Umschalter beantwortet zwei verschiedene Fragen mit einer Tabelle: „was hat uns dieser
+ * Spieler gebracht" (Team-Sicht, nur die für DIESES Team erspielten PPs) und „wer ist der Beste,
+ * den die Liga je gesehen hat" (Liga-Sicht, Karrieresumme).
+ *
+ * Die Team-Sicht ist für jedes Team wählbar — Kader und PPs sind öffentliche Daten, die
+ * Leader-Kacheln zeigen sie ohnehin für alle 32 Teams.
+ */
+function EternalPlayerTablePanel({
+  gameState,
+  ownTeamId,
+  onOpenPlayer,
+}: {
+  gameState: GameState;
+  ownTeamId: string | null;
+  onOpenPlayer: (playerId: string) => void;
+}) {
+  const [scopeTeamId, setScopeTeamId] = useState<string | null>(ownTeamId);
+  const [sichtbar, setSichtbar] = useState(ETERNAL_TABLE_STEP);
+
+  const scope = useMemo<EternalPlayerScope>(
+    () => (scopeTeamId ? { kind: "team", teamId: scopeTeamId } : { kind: "league" }),
+    [scopeTeamId],
+  );
+  const tabelle = useMemo(() => buildEternalPlayerTable(gameState, scope), [gameState, scope]);
+  const istTeamSicht = tabelle.scope.kind === "team";
+
+  const teamsAlphabetisch = useMemo(
+    () => [...(gameState.teams ?? [])].sort((links, rechts) => links.name.localeCompare(rechts.name, "de")),
+    [gameState.teams],
+  );
+
+  function wechsle(naechsterTeamId: string | null) {
+    setScopeTeamId(naechsterTeamId);
+    // Beim Wechsel wieder einklappen — sonst reisst ein zuvor aufgeklapptes Team die 330 Zeilen
+    // der Liga-Sicht ungefragt auf.
+    setSichtbar(ETERNAL_TABLE_STEP);
+  }
+
+  return (
+    <NlCard
+      className="nl-eternal-card"
+      eyebrow={
+        tabelle.onlyCurrentSeason
+          ? "bisher 1 Saison · wächst mit jedem Saisonabschluss"
+          : `${formatNlNumber(tabelle.seasonCount, 0)} Saisons`
+      }
+      title="Ewige Tabelle"
+    >
+      <div className="nl-eternal-switch" role="group" aria-label="Auswahl der Ewigen Tabelle">
+        {ownTeamId ? (
+          <button
+            type="button"
+            className={`nl-eternal-pill${scopeTeamId === ownTeamId ? " is-active" : ""}`}
+            onClick={() => wechsle(ownTeamId)}
+            data-testid="eternal-scope-own"
+          >
+            Mein Team
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className={`nl-eternal-pill${scopeTeamId == null ? " is-active" : ""}`}
+          onClick={() => wechsle(null)}
+          data-testid="eternal-scope-league"
+        >
+          Ganze Liga
+        </button>
+        <label className="nl-eternal-teamselect">
+          <span className="nl-eternal-teamselect-label">Team wählen</span>
+          <select
+            value={scopeTeamId ?? ""}
+            onChange={(event) => wechsle(event.target.value === "" ? null : event.target.value)}
+          >
+            <option value="">— ganze Liga —</option>
+            {teamsAlphabetisch.map((team) => (
+              <option key={team.teamId} value={team.teamId}>
+                {team.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <p className="nl-leaders-hint">
+        {istTeamSicht
+          ? "Alle Spieler, die je für dieses Team gespielt haben — gewertet werden nur die PPs, die sie FÜR DIESES TEAM geholt haben. Verkaufte Spieler bleiben mit ihrer Bilanz stehen."
+          : "Alle Spieler mit Karrieredaten, sortiert nach Karriere-PPs — das ist die All-Time-Bestenliste."}
+      </p>
+
+      {tabelle.rows.length === 0 ? (
+        <p className="nl-records-empty-text">Noch keine Einträge — sobald ein Spieltag gerechnet ist, füllt sich die Tabelle.</p>
+      ) : (
+        <>
+          <ol className="nl-eternal-list" data-testid="eternal-player-table">
+            {tabelle.rows.slice(0, sichtbar).map((row, index) => (
+              <li key={row.playerId} className="nl-eternal-row">
+                <button type="button" className="nl-eternal-rowbtn" onClick={() => onOpenPlayer(row.playerId)}>
+                  <span className="nl-eternal-rank nl-tnum">#{index + 1}</span>
+                  <span className="nl-eternal-name">
+                    <strong>{row.playerName}</strong>
+                    <small>
+                      {istTeamSicht
+                        ? `${row.zeitraum} · ${formatNlNumber(row.appearances, 0)} Einsätze · ${ETERNAL_STATUS_LABEL[row.status]}${
+                            row.verkauftAn ? ` an ${row.verkauftAn}` : ""
+                          }`
+                        : `${row.zeitraum} · ${formatNlNumber(row.appearances, 0)} Einsätze · ${
+                            row.teams.length > 0 ? row.teams.join(", ") : row.teamName ?? "—"
+                          }`}
+                    </small>
+                  </span>
+                  <span className="nl-eternal-points nl-tnum">{formatNlNumber(row.points, 1)}</span>
+                  {istTeamSicht && row.careerPoints !== row.points ? (
+                    <span className="nl-eternal-career nl-tnum" title="PPs über die ganze Karriere">
+                      {formatNlNumber(row.careerPoints, 1)} ges.
+                    </span>
+                  ) : null}
+                </button>
+              </li>
+            ))}
+          </ol>
+          {tabelle.rows.length > sichtbar ? (
+            <button
+              type="button"
+              className="nl-rankdrawer-more"
+              data-testid="eternal-show-all"
+              onClick={() => setSichtbar(tabelle.rows.length)}
+            >
+              Alle {formatNlNumber(tabelle.rows.length, 0)} anzeigen
+            </button>
+          ) : null}
+        </>
+      )}
+    </NlCard>
+  );
+}
+
+/** Wie viele Zeilen die Ewige Tabelle zunächst zeigt — reine Render-Kappung, wie im Drawer. */
+const ETERNAL_TABLE_STEP = 25;
+
+const ETERNAL_STATUS_LABEL: Record<EternalPlayerStatus, string> = {
+  im_kader: "im Kader",
+  verkauft: "verkauft",
+  weg: "nicht mehr im Team",
+};
 
 /**
  * D11 — Own-Team-Leaderboard-Footprint: kompakte Zusammenfassung im Header,

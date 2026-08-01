@@ -47067,6 +47067,113 @@ button.foundation-team-portrait-card {
   border-top: 1px solid var(--nl-line);
 }
 
+/* Ewige Tabelle: Umschalter zwischen Team- und Liga-Sicht, darunter die Liste. Bewusst als
+   Liste und nicht als NlTable — die Zeile trägt zwei Zahlen (für uns / Karriere) und eine
+   Statuszeile, das wird in einer Spaltentabelle schnell eng. */
+.is-new-look .nl-eternal-switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s1, 6px);
+  margin-bottom: var(--nl-s2, 10px);
+}
+
+.is-new-look .nl-eternal-pill {
+  border: 1px solid var(--nl-line);
+  background: transparent;
+  color: var(--nl-mut, #93a3bd);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.is-new-look .nl-eternal-pill.is-active {
+  border-color: var(--nl-accent, #5b9bff);
+  background: rgba(91, 155, 255, 0.12);
+  color: inherit;
+}
+
+.is-new-look .nl-eternal-pill:focus-visible,
+.is-new-look .nl-eternal-teamselect select:focus-visible {
+  outline: 2px solid var(--nl-accent, #5b9bff);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-eternal-teamselect {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.is-new-look .nl-eternal-teamselect-label {
+  font-size: 0.72rem;
+  color: var(--nl-mut, #93a3bd);
+}
+
+.is-new-look .nl-eternal-teamselect select {
+  border: 1px solid var(--nl-line);
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+}
+
+.is-new-look .nl-eternal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.is-new-look .nl-eternal-rowbtn {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 44px 1fr auto auto;
+  align-items: center;
+  gap: var(--nl-s2, 10px);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  padding: 7px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.is-new-look .nl-eternal-rowbtn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.is-new-look .nl-eternal-rank {
+  color: var(--nl-mut, #93a3bd);
+  font-size: 0.82rem;
+}
+
+.is-new-look .nl-eternal-name {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.is-new-look .nl-eternal-name small {
+  color: var(--nl-mut, #93a3bd);
+  font-size: 0.72rem;
+}
+
+.is-new-look .nl-eternal-points {
+  font-weight: 600;
+}
+
+/* Der Karriere-Wert daneben, sichtbar zurückgenommen: in der Team-Sicht zählt die linke Zahl. */
+.is-new-look .nl-eternal-career {
+  color: var(--nl-mut, #93a3bd);
+  font-size: 0.75rem;
+}
+
 /* Saison-Awards: eine Karte je Auszeichnung, unter dem Kategorien-Grid. Bewusst schmaler als
    die Leader-Kacheln — es sind viele, und jede trägt nur einen Halter. */
 .is-new-look .nl-leaders-awards {
