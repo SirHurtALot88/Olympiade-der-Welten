@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
 import { applyCompactSeasonArchiveSentinelIfNeeded } from "@/lib/foundation/apply-compact-season-archive-sentinel";
 import { invalidatePlayerAttributeSheetCache } from "@/lib/foundation/hydrate-player-attribute-sheet";
 import { invalidatePlayerProfileSessionCache } from "@/lib/foundation/player-profile-session-cache";
@@ -29,6 +28,7 @@ import type {
 import { TRANSFER_MARKET_INITIAL_RENDER_LIMIT } from "@/lib/foundation/tabs/foundation-page-types";
 import type { ActiveManagerTeamSource } from "@/lib/foundation/tabs/foundation-page-types";
 import {
+  normalizeLoadedFoundationGameState,
   persistFoundationManagerTeamId,
   persistFoundationSaveMode,
   resolveFoundationTeamId,
@@ -358,6 +358,45 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
     }, 0);
   }
 
+  /**
+   * Übernimmt einen bereits AUFBEREITETEN Spielstand (siehe `normalizeLoadedFoundationGameState`) in
+   * den React-State — der zweite gemeinsame Baustein neben der Aufbereitung selbst. `loadSave` und
+   * `applyGameStateFromGameplayResponse` rufen beide genau diese Funktion auf, statt Refs/Flags
+   * jeweils selbst zu pflegen; sonst laufen sie bei der nächsten Änderung auseinander.
+   */
+  function commitFreshlyLoadedGameState(nextGameState: GameState, options: { compactInitial?: boolean }) {
+    hasPersistedInitialState.current = false;
+    hasLoadedPersistentState.current = true;
+    loadedWithCompactInitialRef.current = options.compactInitial ?? true;
+    autoPersistContentSignatureRef.current = buildAutoPersistContentSignature(nextGameState);
+    setGameState(nextGameState);
+    noteKnownSaveVersion(nextGameState.saveVersion);
+    setPersistenceError(null);
+    // Ein erfolgreicher Load räumt AUCH einen evtl. hängengebliebenen
+    // Bootstrap-Fehler weg (beide Pfade setzen sonst nur ihren eigenen
+    // State → sonst blieb "konnte nicht geladen werden" stehen, obwohl der
+    // Spielstand längst geladen ist).
+    setBootstrapError(null);
+    onFetchSlowClear?.();
+  }
+
+  /**
+   * Antwort-Weg: Ein Gameplay-Endpunkt (aktuell nur der Transfermarkt-Kauf) hat den resultierenden
+   * Spielstand schon berechnet und in seiner Antwort mitgeschickt (kompakt, wie `compactInitial`).
+   * Statt ihn wegzuwerfen und danach den GESAMTEN Spielstand nochmal über `loadSave` zu holen, läuft
+   * er hier durch dieselbe Aufbereitung wie der Fetch-Weg und landet direkt im React-State.
+   *
+   * `noteKnownSaveVersion`/`autoPersistContentSignatureRef` werden dabei mit übernommen — der
+   * mitgelieferte Zustand trägt bereits die vom Server nach dem Schreiben vergebene `saveVersion`,
+   * genau wie ein frischer Load. Ohne das würde der nächste Auto-Save mit einer veralteten Version
+   * antreten und sich einen unnötigen 409-Konflikt einhandeln.
+   */
+  function applyGameStateFromGameplayResponse(rawGameState: GameState): GameState {
+    const nextGameState = normalizeLoadedFoundationGameState(rawGameState, { compactInitial: true });
+    commitFreshlyLoadedGameState(nextGameState, { compactInitial: true });
+    return nextGameState;
+  }
+
   async function loadSave(
     saveId?: string,
     saveMode: FoundationSaveMode = foundationSaveMode,
@@ -405,29 +444,24 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
           return null;
         }
 
-        const normalizedGameState =
-          payload._meta?.source === "prisma" ? payload.save.gameState : withNormalizedLocalTeamSettings(payload.save.gameState);
-        const sponsorOffersBefore = JSON.stringify(normalizedGameState.seasonState.sponsorOffersByTeamId ?? {});
-        const nextGameState = applyCompactSeasonArchiveSentinelIfNeeded(refreshTeamObjectiveState(normalizedGameState), options);
+        // Normalisierung + Board-Zielzustände + Kompakt-Sentinel: dieselbe Aufbereitung, die auch der
+        // Antwort-Weg nach einem Kauf durchläuft (siehe `applyGameStateFromGameplayResponse` weiter
+        // unten) — eine Funktion für beide, damit sie nicht auseinanderlaufen.
+        // sponsorOffersBefore VOR der Normalisierung nehmen: Team-Settings-Normalisierung rührt
+        // `sponsorOffersByTeamId` nicht an, das Ergebnis ist identisch — aber so bleibt der Vergleich
+        // unabhängig davon, was `normalizeLoadedFoundationGameState` intern tut.
+        const sponsorOffersBefore = JSON.stringify(payload.save.gameState.seasonState.sponsorOffersByTeamId ?? {});
+        const nextGameState = normalizeLoadedFoundationGameState(payload.save.gameState, {
+          compactInitial: options.compactInitial ?? true,
+          isPrismaSource: payload._meta?.source === "prisma",
+        });
         const sponsorOffersHydrated = sponsorOffersBefore !== JSON.stringify(nextGameState.seasonState.sponsorOffersByTeamId ?? {});
 
         if (requestVersion !== loadSaveRequestVersion.current) {
           return null;
         }
 
-        hasPersistedInitialState.current = false;
-        hasLoadedPersistentState.current = true;
-        loadedWithCompactInitialRef.current = options.compactInitial ?? true;
-        autoPersistContentSignatureRef.current = buildAutoPersistContentSignature(nextGameState);
-        setGameState(nextGameState);
-        noteKnownSaveVersion(nextGameState.saveVersion);
-        setPersistenceError(null);
-        // Ein erfolgreicher Load räumt AUCH einen evtl. hängengebliebenen
-        // Bootstrap-Fehler weg (beide Pfade setzen sonst nur ihren eigenen
-        // State → sonst blieb "konnte nicht geladen werden" stehen, obwohl der
-        // Spielstand längst geladen ist).
-        setBootstrapError(null);
-        onFetchSlowClear?.();
+        commitFreshlyLoadedGameState(nextGameState, options);
         if (
           sponsorOffersHydrated &&
           payload._meta?.source !== "prisma" &&
@@ -938,6 +972,7 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
 
   return {
     loadSave,
+    applyGameStateFromGameplayResponse,
     persistLocalGameStateImmediately,
     handleStaleRoomSaveWrite,
     runSaveAction,

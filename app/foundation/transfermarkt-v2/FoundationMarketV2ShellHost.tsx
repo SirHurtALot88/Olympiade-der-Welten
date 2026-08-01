@@ -93,6 +93,14 @@ export type FoundationMarketV2ShellHostProps = {
   }) => void;
   loadSave: (saveId: string) => Promise<void>;
   /**
+   * Übernimmt einen bereits vom Server aufbereiteten Spielstand (z. B. `gameStateAfter` aus der
+   * Kauf-Antwort) direkt in den React-State — ohne ihn nochmal per `loadSave` über das Netz zu
+   * holen. Dieselbe Aufbereitung (Normalisierung, Board-Zielzustände, Kompakt-Sentinel) wie
+   * `loadSave`, siehe `normalizeLoadedFoundationGameState` / `commitFreshlyLoadedGameState` in
+   * `use-foundation-persistence-actions.ts`.
+   */
+  applyGameStateFromGameplayResponse: (rawGameState: GameState) => GameState;
+  /**
    * Stoesst den Markt-Feed neu an. Der Feed haengt NICHT am Spielstand, sondern an einem
    * eigenen Zaehler — ohne diesen Anstoss bleibt er nach einem Kauf auf dem alten Stand.
    */
@@ -141,6 +149,7 @@ export default function FoundationMarketV2ShellHost({
   closeFoundationDrilldownPanel,
   openMarketSellModal,
   loadSave,
+  applyGameStateFromGameplayResponse,
   bumpMarketReloadToken,
 }: FoundationMarketV2ShellHostProps) {
   const {
@@ -243,16 +252,34 @@ export default function FoundationMarketV2ShellHost({
          * und die Zahl blieb auf dem Stand VOR dem Kauf stehen.
          *
          * Die Erfolgsmeldung behauptete dabei ausdruecklich, der Marktfeed sei neu geladen.
-         * Das war die einzige Stelle, an der der Widerspruch ueberhaupt sichtbar wurde.
+         * Das war die einzige Stelle, an der der Widerspruch ueberhaupt sichtbar wurde — Grund
+         * genug, hier unten genau zu sagen was jeweils WIRKLICH passiert, statt eine pauschale
+         * Behauptung stehen zu lassen (siehe `stateAppliedFromResponse` unten).
+         *
+         * `bumpMarketReloadToken()` laeuft in JEDEM Fall — der Marktfeed haengt wie oben
+         * beschrieben an seinem eigenen Zaehler, nicht am Spielstand, und muss deshalb immer
+         * separat angestossen werden, egal ob der Spielstand selbst per Antwort uebernommen
+         * oder per `loadSave` neu geholt wurde.
          */
-        onBuyCompleted: async (teamId) => {
+        onBuyCompleted: async ({ teamId, gameStateAfter }) => {
           setActiveManagerTeam(teamId, "manual_select");
+          // Der Kauf-Endpunkt hat den Folgezustand oft schon fertig berechnet mitgeschickt
+          // (`gameStateAfter`) — dann wird er direkt uebernommen, statt den ganzen Spielstand
+          // nochmal ueber `loadSave` zu holen. Fehlt er (alter Server, Fehler), greift
+          // unveraendert der volle Reload.
+          const stateAppliedFromResponse = gameStateAfter != null;
           setFoundationActionFeedback({
             tone: "success",
             title: "Kauf abgeschlossen",
-            detail: `${getTeamLockedName(teamId)} wurde aktualisiert. Cash, Gehalt, Kader und Marktfeed sind neu geladen.`,
+            detail: stateAppliedFromResponse
+              ? `${getTeamLockedName(teamId)} wurde aktualisiert. Cash, Gehalt und Kader stammen direkt aus der Kauf-Antwort, der Marktfeed lädt neu.`
+              : `${getTeamLockedName(teamId)} wurde aktualisiert. Cash, Gehalt, Kader und Marktfeed sind neu geladen.`,
           });
-          await loadSave(activeSaveId);
+          if (gameStateAfter) {
+            applyGameStateFromGameplayResponse(gameStateAfter);
+          } else {
+            await loadSave(activeSaveId);
+          }
           bumpMarketReloadToken();
         },
         onSell: (payload) => {

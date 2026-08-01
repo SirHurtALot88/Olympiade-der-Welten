@@ -1507,6 +1507,7 @@ export function useFoundationShellRouterBodyScope({
 
   const {
     loadSave,
+    applyGameStateFromGameplayResponse,
     persistLocalGameStateImmediately,
     handleStaleRoomSaveWrite,
     runSaveAction,
@@ -5299,8 +5300,15 @@ export function useFoundationShellRouterBodyScope({
 
       // VORDERGRUND: nur, was der Spieler in diesem Moment vor sich hat. Der Spielstand (Kader,
       // Gehalt) und die Marktliste, aus der der gekaufte Spieler verschwinden muss.
+      //
+      // Der Kauf-Endpunkt hat den resultierenden Spielstand nach dem Kauf bereits fertig berechnet
+      // und schickt ihn kompakt mit (`payload.gameStateAfter`) — den übernehmen wir direkt, statt
+      // ihn über `loadSave` ein zweites Mal komplett über das Netz zu holen. Fehlt er (alter Server,
+      // Fehler), greift unverändert der bisherige volle Reload.
       await Promise.all([
-        loadSave(buyContext.saveId),
+        payload.gameStateAfter
+          ? Promise.resolve(applyGameStateFromGameplayResponse(payload.gameStateAfter))
+          : loadSave(buyContext.saveId),
         reloadMarketFeed(payload.summary.team?.id ?? marketBuyPreview.team?.id),
       ]);
       setMarketReloadToken((current) => current + 1);
@@ -11516,6 +11524,7 @@ export function useFoundationShellRouterBodyScope({
     closeFoundationDrilldownPanel,
     openMarketSellModal,
     loadSave: loadSave as unknown as FoundationMarketV2ShellHostProps["loadSave"],
+    applyGameStateFromGameplayResponse,
     // Der Markt-Feed haengt an diesem Zaehler, nicht am Spielstand — siehe Begruendung
     // beim Kauf-Abschluss im Host.
     bumpMarketReloadToken: () => setMarketReloadToken((current) => current + 1),

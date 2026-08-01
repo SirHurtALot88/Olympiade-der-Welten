@@ -197,6 +197,9 @@ describe("transfermarkt buy api", () => {
     expect(executeLocalTransfermarktBuy).toHaveBeenCalledTimes(1);
     expect(previewLocalTransfermarktBuy).not.toHaveBeenCalled();
     expect(body.summary.activePlayerCreated).toBe(true);
+    // Alte/abweichende Summary-Form ohne `gameStateAfter`: kein Zustand da, der Client faellt auf
+    // seinen bisherigen vollen Reload zurueck.
+    expect(body.gameStateAfter).toBeNull();
     expect(body.scope).toMatchObject({
       saveId: "save-singleplayer-dev",
       seasonId: "season-1",
@@ -205,6 +208,78 @@ describe("transfermarkt buy api", () => {
       dryRun: false,
       source: "sqlite",
     });
+  });
+
+  it("returns the resulting game state after a real buy, compacted in the same shape the state endpoint uses", async () => {
+    const heavyGameStateAfter = {
+      ...phaseSave().gameState,
+      teams: [{ teamId: "M-M", shortCode: "M-M", name: "Mayhem Mavericks", budget: 500, cash: 200, identityId: "M-M", humanControlled: true, rosterLimit: 12 }],
+      rosters: [{ id: "roster-1", teamId: "M-M", playerId: "player-1", contractLength: 1, salary: 10000, upkeep: 10000, purchasePrice: 100000, currentValue: 100000, roleTag: "prospect", joinedSeasonId: "season-1" }],
+      logs: ["some heavy debug log entry"],
+      saveVersion: 7,
+      seasonState: {
+        seasonId: "season-1",
+        schedule: [],
+        standings: {},
+        // Das Saisonarchiv ist genau das, was NICHT in jeder Kauf-Antwort mitwandern darf —
+        // `compactFoundationInitialGameState` muss es hier auf `undefined` kappen.
+        seasonSnapshots: [{ seasonId: "season-0", champion: "A-A" }],
+        standingsApplyLogs: [{ id: "log-1", seasonId: "season-0" }],
+      },
+    };
+
+    executeLocalTransfermarktBuy.mockReturnValue({
+      canBuy: true,
+      blockingReasons: [],
+      warnings: [],
+      player: { id: "player-1", name: "Citrine Miri", className: "Warlord", race: "Demon" },
+      team: { id: "M-M", name: "Mayhem Mavericks", shortCode: "M-M" },
+      cashBefore: 300,
+      cashAfter: 200,
+      salaryBefore: 24000,
+      salaryAfter: 34000,
+      marketValueBefore: 40000,
+      marketValueAfter: 140000,
+      rosterBefore: 0,
+      rosterAfter: 1,
+      purchasePrice: 100,
+      salary: 10000,
+      contractLength: 1,
+      currentValue: 100000,
+      joinedSeasonId: "season-1",
+      activePlayerCreated: true,
+      transferCreated: true,
+      teamSeasonStateUpdated: true,
+      activePlayerId: "local-roster:save-singleplayer-dev:player-1",
+      transferId: "local-transfer:save-singleplayer-dev:player-1",
+      gameStateAfter: heavyGameStateAfter,
+    });
+
+    const { POST } = await import("@/app/api/transfermarkt/buy/route");
+    const response = await POST(
+      new Request("http://localhost/api/transfermarkt/buy", {
+        method: "POST",
+        body: JSON.stringify({
+          saveId: "save-singleplayer-dev",
+          seasonId: "season-1",
+          teamId: "M-M",
+          playerId: "player-1",
+          dryRun: false,
+        }),
+      }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    // Der mitgekaufte Roster-Eintrag steht drin — es ist wirklich der neue Zustand.
+    expect(body.gameStateAfter.rosters).toHaveLength(1);
+    expect(body.gameStateAfter.rosters[0].playerId).toBe("player-1");
+    expect(body.gameStateAfter.saveVersion).toBe(7);
+    // Kompaktiert wie der State-Endpunkt: Saisonarchiv gekappt, nicht einfach durchgereicht.
+    expect(body.gameStateAfter.seasonState.seasonSnapshots).toBeUndefined();
+    expect(body.gameStateAfter.seasonState.standingsApplyLogs).toBeUndefined();
+    // Nicht doppelt: der volle Zustand haengt NICHT auch noch an `summary`.
+    expect(body.summary.gameStateAfter).toBeUndefined();
   });
 
   it("blocks buys in prisma read-only mode", async () => {

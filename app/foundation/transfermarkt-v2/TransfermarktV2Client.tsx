@@ -5,7 +5,7 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEv
 import { getClassColorToken } from "@/app/foundation/ClassColorChip";
 import { FoundationShellRouterMarketBuy } from "@/app/foundation/FoundationShellRouter";
 import TransfermarktV2NewLook from "@/app/foundation/transfermarkt-v2/TransfermarktV2NewLook";
-import type { ContractShape, Discipline, Team, TeamControlMode, TeamSeasonObjectiveRecord, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
+import type { ContractShape, Discipline, GameState, Team, TeamControlMode, TeamSeasonObjectiveRecord, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 import { getTransfermarktPortraitModel } from "@/lib/market/transfermarkt-lab";
 import type { TransferHistoryReadResult } from "@/lib/market/transfer-history-read-service";
@@ -64,7 +64,13 @@ export type TransfermarktV2ClientProps = {
   scoutingPipelineCapacity?: { occupied: number; max: number | null; draftSuspended?: boolean } | null;
   scoutingActiveWishlistPlayerIds?: string[];
   onToggleScoutingWatch?: ((item: TransfermarktFreeAgentItem) => void) | null;
-  onBuyCompleted?: ((teamId: string) => Promise<void> | void) | null;
+  /**
+   * `gameStateAfter` ist der bereits vom Kauf-Endpunkt berechnete Folgezustand (kompakt, siehe
+   * `app/api/transfermarkt/buy/route.ts`) — nur bei einem echten Kauf gesetzt, sonst `null`. Der
+   * Aufrufer entscheidet, was er damit macht (übernehmen statt neu laden); dieser Client kennt nur
+   * die Team-Id und reicht den Zustand unverändert durch, statt selbst Aufbereitungslogik zu bauen.
+   */
+  onBuyCompleted?: ((payload: { teamId: string; gameStateAfter: GameState | null }) => Promise<void> | void) | null;
   initialPlayerId?: string | null;
   onInitialPlayerFocusConsumed?: (() => void) | null;
   offerPanelActive?: boolean;
@@ -88,6 +94,8 @@ type MarketFeedResponse = TransfermarktReadResult & {
 type MarketBuyResponse = {
   success: boolean;
   summary: TransfermarktBuyPreview | null;
+  /** Kompakter Folgezustand direkt aus dem Kauf-Endpunkt — siehe `onBuyCompleted` oben. */
+  gameStateAfter?: GameState | null;
   warnings: string[];
   error?: string;
 };
@@ -1835,7 +1843,7 @@ export default function TransfermarktV2Client({
       );
       deactivateOfferPanel();
       setBuyNegotiationOutcome(null);
-      await onBuyCompleted?.(selectedTeamId);
+      await onBuyCompleted?.({ teamId: selectedTeamId, gameStateAfter: payload.gameStateAfter ?? null });
       setOfferedSalary(null);
       setSalaryEditedManually(false);
       setMarketHasMore(false);

@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { buildActivePlayerId } from "@/lib/db/seed/mappers";
 import { db } from "@/src/server/db";
 import { resolveSeasonOneMarketBuyBlocker } from "@/lib/season/transfer-season-policy";
-import type { ContractShape, ContractYearSalary, RosterPromisedRole } from "@/lib/data/olyDataTypes";
+import type { ContractShape, ContractYearSalary, GameState, RosterPromisedRole } from "@/lib/data/olyDataTypes";
 import type {
   NegotiationDemandBreakdownEntry,
   NegotiationScoreBreakdownEntry,
@@ -124,6 +124,16 @@ export type TransfermarktBuyExecuteResult = TransfermarktBuyPreview & {
   teamSeasonStateUpdated: boolean;
   activePlayerId: string | null;
   transferId: string | null;
+  /**
+   * Nur beim erfolgreichen LOKALEN Kauf (nicht Prisma, nicht der Fast-Batch-Pfad für AI-Massenkäufe)
+   * gesetzt: der volle, bereits persistierte Spielstand direkt nach dem Kauf — inkl. der vom
+   * Persistenz-Layer vergebenen neuen `saveVersion` und materialisierten Ableitungen (siehe
+   * `persistTransfermarktGameState` in transfermarkt-local-service.ts). Der Buy-Endpunkt kompaktiert
+   * ihn (dieselbe `compactFoundationInitialGameState`-Funktion wie der State-Endpunkt) und hängt ihn
+   * der Antwort an, damit der Client danach nicht den gesamten Spielstand neu über das Netz holen muss.
+   * Bleibt es undefined, fällt der Client auf den bisherigen vollen Reload zurück.
+   */
+  gameStateAfter?: GameState;
 };
 
 type ResolvedBuyContext = {

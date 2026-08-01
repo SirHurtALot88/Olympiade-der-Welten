@@ -41,25 +41,71 @@ describe("Transfermarkt — Cash steht nach dem Kauf richtig", () => {
     expect(FEED).toContain("marketReloadToken");
   });
 
-  it("der Kauf-Abschluss stoesst den Feed an", () => {
+  it("der Kauf-Abschluss stoesst den Feed an — mit oder ohne mitgelieferten Folgezustand", () => {
     const handler = HOST.slice(HOST.indexOf("onBuyCompleted:"), HOST.indexOf("onSell:"));
     expect(handler.length, "leerer Ausschnitt — die Marken passen nicht mehr").toBeGreaterThan(100);
+    // Fallback bleibt bestehen: fehlt der mitgelieferte Zustand (alter Server, Fehler), lädt der
+    // Host weiterhin den ganzen Spielstand neu.
     expect(handler).toContain("await loadSave(activeSaveId);");
+    // Der Marktfeed haengt an seinem eigenen Zaehler, nicht am Spielstand — er muss also IMMER
+    // angestossen werden, unabhaengig davon, welcher der beiden Zweige oben lief.
     expect(handler).toContain("bumpMarketReloadToken();");
   });
 
   /**
-   * Reihenfolge ist hier Absicht: erst den Spielstand holen, dann den Feed anstossen. Andersherum
-   * koennte der Feed noch mit dem alten Save-Zustand antworten und die Zahl bliebe wieder stehen.
+   * Reihenfolge ist hier Absicht: erst den Spielstand verarbeiten (übernehmen ODER neu laden),
+   * dann den Feed anstossen. Andersherum koennte der Feed noch mit dem alten Save-Zustand
+   * antworten und die Zahl bliebe wieder stehen.
    */
-  it("erst der Spielstand, dann der Feed", () => {
+  it("erst der Spielstand, dann der Feed — auf beiden Zweigen", () => {
     const handler = HOST.slice(HOST.indexOf("onBuyCompleted:"), HOST.indexOf("onSell:"));
-    expect(handler.indexOf("await loadSave(activeSaveId);")).toBeLessThan(handler.indexOf("bumpMarketReloadToken();"));
+    const bumpIndex = handler.indexOf("bumpMarketReloadToken();");
+    expect(handler.indexOf("await loadSave(activeSaveId);")).toBeLessThan(bumpIndex);
+    expect(handler.indexOf("applyGameStateFromGameplayResponse(gameStateAfter)")).toBeLessThan(bumpIndex);
   });
 
   it("der Host bekommt den Anstoss von der Shell durchgereicht", () => {
     expect(HOST).toContain("bumpMarketReloadToken: () => void;");
     expect(SCOPE).toContain("bumpMarketReloadToken: () => setMarketReloadToken((current) => current + 1),");
+  });
+
+  /**
+   * GENAU DIESE ART FEHLER passierte schon einmal in diesem Repo, an anderer Stelle im selben
+   * Transfermarkt-Feature: eine Funktion existierte und tat das Richtige, wurde aber vom Hook nie
+   * zurückgegeben und war dadurch über keine UI erreichbar (siehe Session-Report von
+   * claude/transfermarkt-kauf-zustand). Diese Zusicherung haelt fest, dass die Übernahme-Funktion
+   * hier wirklich bis zum Host durchgereicht wird — nicht nur im Hook definiert ist.
+   */
+  it("der Antwort-Weg (gameStateAfter uebernehmen statt neu laden) ist bis zum Host durchverdrahtet", () => {
+    expect(HOST).toContain("applyGameStateFromGameplayResponse: (rawGameState: GameState) => GameState;");
+    expect(SCOPE).toContain("applyGameStateFromGameplayResponse,");
+    const handler = HOST.slice(HOST.indexOf("onBuyCompleted:"), HOST.indexOf("onSell:"));
+    expect(handler).toContain("applyGameStateFromGameplayResponse(gameStateAfter)");
+  });
+
+  /**
+   * Der Client (`TransfermarktV2Client.tsx`) muss den mitgelieferten Folgezustand tatsächlich an
+   * `onBuyCompleted` weiterreichen — reicht er nur die Team-Id durch (wie vor dieser Änderung),
+   * kommt beim Host nie ein Zustand an und der Fallback-Reload läuft immer, egal was der
+   * Kauf-Endpunkt mitschickt.
+   */
+  it("der Client reicht den mitgelieferten Folgezustand an onBuyCompleted weiter", () => {
+    expect(CLIENT).toContain(
+      "await onBuyCompleted?.({ teamId: selectedTeamId, gameStateAfter: payload.gameStateAfter ?? null });",
+    );
+  });
+
+  /**
+   * Die Erfolgsmeldung behauptete vorher UNBEDINGT „Cash, Gehalt, Kader und Marktfeed sind neu
+   * geladen" — das war schon einmal falsch (siehe Kommentar oben im Host) und wird es wieder, wenn
+   * der Zustand nur noch übernommen statt neu geladen wird. Die Meldung muss also zwischen beiden
+   * Fällen unterscheiden.
+   */
+  it("die Erfolgsmeldung behauptet nicht mehr pauschal 'neu geladen'", () => {
+    const handler = HOST.slice(HOST.indexOf("onBuyCompleted:"), HOST.indexOf("onSell:"));
+    expect(handler).toContain("stateAppliedFromResponse");
+    expect(handler).toContain("stammen direkt aus der Kauf-Antwort");
+    expect(handler).toContain("Cash, Gehalt, Kader und Marktfeed sind neu geladen.");
   });
 });
 
