@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent as ReactDragEvent, type ReactNode } from "react";
 
 import type { LegacyLineupFocusV2BoardProps } from "@/lib/lineups/legacy-lineup-board-props";
+import type { LineupRosterShortfall } from "@/lib/lineups/lineup-roster-shortfall";
 import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
 import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import {
@@ -157,6 +158,12 @@ export type LineupNewLookProps = Pick<
   /** Letzte Statusmeldung des Clients (Save-Feedback etc.). */
   statusMessage: string;
   errors: string[];
+  /**
+   * Kader kleiner als die Plätze dieses Spieltags (null = alles deckbar). Ohne diesen
+   * Hinweis lief die Kandidatenliste irgendwann leer und sagte nur "Keine Kandidaten" —
+   * gemeldet als "spieler können nichtmehr in disziplinen eingesetzt werden".
+   */
+  rosterShortfall?: LineupRosterShortfall | null;
   /**
    * Letztes Preview-Ergebnis des Clients (derselbe Feed, den die klassische
    * Einsatzliste für ihren Scoreboard-Reveal nutzt). Treibt die Resolve-Show —
@@ -1067,6 +1074,7 @@ export default function LineupNewLook({
   onUndo,
   statusMessage,
   errors,
+  rosterShortfall = null,
   resolvePreview,
   formCardControlsBySide,
   onAssignDisciplineFormCard,
@@ -2235,6 +2243,15 @@ export default function LineupNewLook({
         </div>
       ) : null}
 
+      {/* Kader kleiner als der Spieltag: der Hinweis MUSS oben stehen, bevor der Manager sich
+          wundert, warum ab dem x-ten Slot niemand mehr auswählbar ist. Vorher stand dort nur
+          "Keine Kandidaten in dieser Gruppe" — richtig, aber unerklärt. */}
+      {rosterShortfall ? (
+        <div className="nl-lineup-status is-warn" role="status" data-testid="nl-lineup-roster-shortfall">
+          <strong>{rosterShortfall.headline}</strong> {rosterShortfall.detail} {rosterShortfall.hint}
+        </div>
+      ) : null}
+
       {/* --- Optimieren (Feature 1): Upgrade-Hinweise für belegte Slots ------- */}
       {optimizeOpen ? (
         <NlCard
@@ -2528,7 +2545,16 @@ export default function LineupNewLook({
                 />
               ) : null}
               {filteredCandidates.length === 0 ? (
-                <NlEmptyState title="Keine Kandidaten" message="Keine Kandidaten in dieser Gruppe." />
+                /* Leer heisst nicht kaputt. Ist der Kader zu klein fuer den Spieltag, ist genau
+                   DAS der Grund — und der gehoert hierhin, nicht nur in den Hinweis oben. */
+                <NlEmptyState
+                  title={rosterShortfall ? rosterShortfall.headline : "Keine Kandidaten"}
+                  message={
+                    rosterShortfall
+                      ? `${rosterShortfall.detail} ${rosterShortfall.hint}`
+                      : "Keine Kandidaten in dieser Gruppe."
+                  }
+                />
               ) : (
                 filteredCandidates.map((entry: NlCandidateEntry, index: number) => {
                   const candidate = entry.player;
