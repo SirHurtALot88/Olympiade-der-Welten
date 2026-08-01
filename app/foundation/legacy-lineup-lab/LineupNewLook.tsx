@@ -400,6 +400,19 @@ function getNlSlotReadiness(projected: number | null, topPickScore: number | nul
   return { label: "Notfall", tone: "risk" };
 }
 
+/**
+ * Ton fuer das Einsatz-Verletzungsrisiko eines aufgestellten Spielers, abgeleitet aus dem
+ * Band des ECHTEN Modells (`bandLabel` aus projectMatchdayInjuryRisk) statt aus eigenen
+ * Prozent-Schwellen — sonst haette die Anzeige eine zweite, driftende Risikoskala.
+ * none/minimal bleiben ohne Farbton: das Risiko wird trotzdem IMMER angezeigt (nie 0 %,
+ * Feature-Request "Ruhetag davor und trotzdem verletzt"), soll unauffaellig aber sichtbar sein.
+ */
+function getNlInjuryProjectionTone(bandLabel: string): NlTone {
+  if (bandLabel === "sehr_stark" || bandLabel === "stark") return "risk";
+  if (bandLabel === "mittel") return "warn";
+  return "neutral";
+}
+
 /** Risiko-Wort → semantischer Ton für den Kit-Chip: hoch=risk, mittel=warn, niedrig=good. */
 function getNlRiskTone(riskLevel: string): NlTone {
   if (riskLevel === "hoch") return "risk";
@@ -1866,11 +1879,19 @@ export default function LineupNewLook({
             const isNextTarget = !player && nextOpenSlotKey === slot.key;
             const isJustAssigned = recentlyAssignedSlotKey === slot.key;
             const isCaptain = Boolean(selectedId) && captains[slot.disciplineSide] === selectedId;
-            const fatigue = selectedId ? getSelectedOptionMeta(selectedId)?.fatigueCount ?? null : null;
+            const selectedMeta = selectedId ? getSelectedOptionMeta(selectedId) : null;
+            const fatigue = selectedMeta?.fatigueCount ?? null;
             // Nach-Spieltag-Belastung (Feature 2): aktuelle Fatigue + projizierte
             // Zusatz-Ermüdung dieses Slots. >= FATIGUE_HIGH ⇒ Warn-Affordanz.
             const aftermathFatigue = fatigue != null ? fatigue + (preview?.projected.additionalFatigue ?? 0) : null;
             const aftermathHigh = aftermathFatigue != null && aftermathFatigue >= FATIGUE_HIGH;
+            // Einsatz-Verletzungsrisiko (Feature-Request "man sieht nicht, wer Verletzungs-
+            // potential hat — in der Arena isses zu spaet"): vorberechnet aus dem ECHTEN
+            // Wurf-Modell (Fatigue + Spieltags-Last, traits- und intensitaetsskaliert),
+            // hier nur noch per aktueller Seiten-Intensitaet nachgeschlagen. Wird fuer JEDEN
+            // aufgestellten Spieler gezeigt, auch ausgeruht (~2 %): das Restrisiko ist Teil
+            // des Modells und soll nicht mehr wie ein Bug wirken, wenn es zuschlaegt.
+            const injuryProjection = selectedMeta?.injuryRiskProjection?.[getDisciplineIntensity(slot.disciplineSide)] ?? null;
 
             return (
               <article
@@ -1947,6 +1968,19 @@ export default function LineupNewLook({
                     {issue ? (
                       <span className="nl-lineup-chip is-risk" title={issue.detail}>
                         {issue.label}
+                      </span>
+                    ) : null}
+                    {/* Einsatz-Verletzungsrisiko: immer sichtbar, sobald ein Spieler im
+                        Slot steht — auch die ~2 % Restrisiko eines Ausgeruhten. Der Wert
+                        ist exakt die Wahrscheinlichkeit, gegen die der Spieltag würfelt
+                        (aktuelle Fatigue + Einsatz-Last), nicht das Risiko der aktuellen
+                        Fatigue — das unterschlug die Last und zeigte Ausgeruhten 0 %. */}
+                    {player && injuryProjection ? (
+                      <span
+                        className={`nl-lineup-chip is-${getNlInjuryProjectionTone(injuryProjection.bandLabel)}`}
+                        title={`Verletzungsrisiko dieses Einsatzes: ${formatNlNumber(injuryProjection.riskPercent, 1)} % — gewürfelt bei Fatigue ${formatNlNumber(injuryProjection.fatigueBeforeRoll, 0)} (aktuell ${formatNlNumber(fatigue ?? 0, 0)} + Einsatz-Last ${formatNlNumber(injuryProjection.matchdayLoad, 0)}). Ein Restrisiko besteht bei jedem Einsatz, 0 % gibt es nicht. Verletzungen entstehen nur so — nicht durch Gegner.`}
+                      >
+                        Verl. {formatNlNumber(injuryProjection.riskPercent, 1)} %
                       </span>
                     ) : null}
                     {/* Fatigue-Aftermath-Warnung (Feature 2): Spieler ist nach diesem

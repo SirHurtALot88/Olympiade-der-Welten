@@ -38,6 +38,25 @@ export type LegacyActivePlayerRef = {
   marketValue?: number | null;
 };
 
+/**
+ * Vorberechnetes Einsatz-Verletzungsrisiko je Intensitaetsstufe (Schonen/Normal/Pushen).
+ *
+ * Alle drei Stufen werden serverseitig aus dem ECHTEN Modell berechnet
+ * (`projectMatchdayInjuryRisk` in lib/fatigue/fatigue-injury-service.ts), damit die
+ * Einsatzliste beim Umschalten der Intensitaet nur noch nachschlagen muss, statt die
+ * Formel clientseitig nachzubauen — Nachbau war der Weg, auf dem Anzeige und Wurf
+ * bisher auseinanderliefen (Anzeige auf aktueller Fatigue, Wurf auf Fatigue + Last).
+ */
+export type LegacyInjuryRiskProjectionRef = Record<
+  "conserve" | "normal" | "push",
+  {
+    fatigueBeforeRoll: number;
+    matchdayLoad: number;
+    riskPercent: number;
+    bandLabel: string;
+  }
+>;
+
 export type LegacyRosterPlayerRef = {
   id: string;
   name: string;
@@ -55,6 +74,7 @@ export type LegacyRosterPlayerRef = {
   injuryRiskPercent?: number | null;
   injuryRiskBand?: string | null;
   injuryRiskLabel?: string | null;
+  injuryRiskProjection?: LegacyInjuryRiskProjectionRef | null;
   availabilityBlocker?: "player_injured_unavailable" | null;
   form?: number | null;
   traitsPositive?: string[];

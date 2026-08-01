@@ -19,7 +19,7 @@ import type { ReactNode } from "react";
 import type { LegacyLineupCandidateTab } from "@/lib/lineups/legacy-lineup-candidate-tabs";
 import type { LegacyLineupDragFitTier } from "@/lib/lineups/legacy-lineup-drag-drop";
 import type { LegacyLineupLabSlot } from "@/lib/lineups/legacy-lineup-lab";
-import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
+import type { LegacyInjuryRiskProjectionRef, LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import type { MatchdayIntensityStage, MatchdaySlotRoleDefinition } from "@/lib/lineups/matchday-slot-roles";
 
 export type LineupBoardRosterCard = {
@@ -190,7 +190,16 @@ export type LegacyLineupFocusV2BoardProps = {
   lineupMeta: { d1Selected: number; d2Selected: number };
   d1Rank: number | null;
   d2Rank: number | null;
-  getSelectedOptionMeta: (activePlayerId: string) => { name: string; fatigueCount?: number | null } | null;
+  getSelectedOptionMeta: (activePlayerId: string) => {
+    name: string;
+    fatigueCount?: number | null;
+    /**
+     * Einsatz-Verletzungsrisiko je Intensitaet (aus dem echten Wurf-Modell vorberechnet).
+     * Die Einsatzliste zeigt es pro aufgestelltem Spieler an — Feature-Request: man sah
+     * vor dem Spieltag nicht, wer Verletzungspotential traegt, "in der Arena isses zu spaet".
+     */
+    injuryRiskProjection?: LegacyInjuryRiskProjectionRef | null;
+  } | null;
   onAssignPlayer: (slotKey: string, activePlayerId: string) => void;
   /** Increments on every real assignment (click, digit-key, Enter top-pick) — see LegacyLineupLabClient. */
   assignPulse?: number;

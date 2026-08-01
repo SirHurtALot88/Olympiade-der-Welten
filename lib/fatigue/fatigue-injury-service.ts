@@ -199,10 +199,56 @@ function round(value: number, digits = 2) {
  * so the forceReplace/replay path stays idempotent (same intensity -> same load ->
  * same fatigueBeforeRoll). Defaults to "normal" (multiplier 1.0) when unspecified.
  */
-function getPlayerMatchdayFatigueLoad(player: Player, intensity: MatchdayIntensityStage = "normal") {
+function getPlayerMatchdayFatigueLoad(
+  player: Pick<Player, "traitsPositive" | "traitsNegative">,
+  intensity: MatchdayIntensityStage = "normal",
+) {
   return round(
     MATCHDAY_FATIGUE_LOAD * getPlayerFatigueLoadMultiplier(player) * INTENSITY_FATIGUE_MULT[intensity],
   );
+}
+
+export type MatchdayInjuryRiskProjection = {
+  /** Fatigue, bei der der Wurf tatsaechlich stattfaende: aktuelle Fatigue + Spieltags-Last. */
+  fatigueBeforeRoll: number;
+  /** Spieltags-Last, die VOR dem Wurf aufgeschlagen wird (trait- und intensitaetsskaliert). */
+  matchdayLoad: number;
+  riskPercent: number;
+  bandLabel: InjuryRiskBand["label"];
+};
+
+/**
+ * Projiziert das Verletzungsrisiko eines EINSATZES — also genau die Zahl, gegen die der
+ * Spieltags-Wurf in `buildMatchdayInjuryRollMap` spaeter wirklich wuerfelt.
+ *
+ * Warum eine eigene Funktion statt `getInjuryRiskPercent(aktuelleFatigue)` in der Anzeige:
+ * Der echte Wurf passiert NICHT auf der aktuellen Fatigue, sondern auf
+ * `fatigueBeforeRoll = aktuelleFatigue + Spieltags-Last` (siehe die identische Rechnung im
+ * Roll-Loop). Eine Anzeige auf der aktuellen Fatigue unterschlaegt die Last systematisch —
+ * gemessen am echten Spielstand ~2,5 % angezeigt vs. ~4,5 % gewuerfelt im Mittel — und zeigt
+ * fuer ausgeruhte Spieler faelschlich 0 %, obwohl jeder Einsatz ein Restrisiko traegt
+ * (Minimum bei Fatigue 0, normaler Intensitaet: Wurf bei Fatigue ~10 => ~1,7 %). Genau diese
+ * unsichtbare Restwahrscheinlichkeit wurde als "Bug" gemeldet ("Ruhetag davor und trotzdem
+ * verletzt").
+ *
+ * Die Einsatzliste (und jede andere Anzeige) MUSS hierueber gehen, damit Anzeige und
+ * Wurf nie auseinanderdriften: gleiche Last-Funktion, gleiche Klemmung, gleiche Kurve.
+ */
+export function projectMatchdayInjuryRisk(input: {
+  player: Pick<Player, "traitsPositive" | "traitsNegative">;
+  currentFatigue: number | null | undefined;
+  intensity?: MatchdayIntensityStage;
+}): MatchdayInjuryRiskProjection {
+  const matchdayLoad = getPlayerMatchdayFatigueLoad(input.player, input.intensity ?? "normal");
+  // Gleiche Rechnung wie im Roll-Loop: getPlayerCurrentFatigue klemmt die aktuelle Fatigue,
+  // danach klemmt die Summe erneut — beides hier gespiegelt, damit Randfaelle (>100) identisch fallen.
+  const fatigueBeforeRoll = clampFatigue(clampFatigue(input.currentFatigue) + matchdayLoad);
+  return {
+    fatigueBeforeRoll,
+    matchdayLoad,
+    riskPercent: getInjuryRiskPercent(fatigueBeforeRoll),
+    bandLabel: getInjuryRiskBand(fatigueBeforeRoll).label,
+  };
 }
 
 function stableHash(input: string) {

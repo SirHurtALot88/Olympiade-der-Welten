@@ -57885,6 +57885,14 @@ button.foundation-team-portrait-card {
   border-color: color-mix(in srgb, var(--nl-risk) 45%, transparent);
 }
 
+/* Mittlere Stufe fuer Chips, die einen Ton aus fatigueTone()/Risiko-Baendern bekommen
+   (z. B. Einsatz-Verletzungsrisiko, Aftermath-Fatigue). Ohne diese Regel fiel "warn"
+   stumm auf das neutrale Grau zurueck — die Eskalationsstufe war unsichtbar. */
+.is-new-look .nl-lineup-chip.is-warn {
+  color: var(--nl-warn);
+  border-color: color-mix(in srgb, var(--nl-warn) 45%, transparent);
+}
+
 .is-new-look .nl-lineup-bestfit {
   display: flex;
   align-items: baseline;
