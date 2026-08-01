@@ -53,6 +53,23 @@ export function getPhaseAfterStep(stepId: SeasonTransitionStepId): GamePhase | n
   return STEP_TO_NEXT_PHASE[stepId];
 }
 
+/**
+ * Alle Phasen, in denen die Saison zu Ende ist und der Assistent laeuft — der Einstieg
+ * (`season_completed`) und jede Station, auf die ein Schritt schaltet.
+ *
+ * ABGELEITET statt aufgezaehlt: eine zweite Liste derselben Phasen driftet, sobald die Kette
+ * eine Station bekommt. Genau so verschwand der Saisonabschluss-Bildschirm bisher hinter
+ * `season_review` — er zaehlte zwei Phasen von Hand auf, waehrend die Kette neun kannte.
+ */
+const SEASON_END_PHASES = new Set<GamePhase>([
+  "season_completed",
+  ...SEASON_TRANSITION_STEPS.map(getPhaseAfterStep).filter((phase): phase is GamePhase => phase !== null),
+]);
+
+export function isSeasonEndPhase(phase: GamePhase | null | undefined): boolean {
+  return phase != null && SEASON_END_PHASES.has(phase);
+}
+
 /** Der Schritt, der auf diese Phase folgt — oder `null`, wenn die Kette zu Ende ist. */
 export function getNextStepAfter(stepId: SeasonTransitionStepId): SeasonTransitionStepId | null {
   const index = SEASON_TRANSITION_STEPS.indexOf(stepId);

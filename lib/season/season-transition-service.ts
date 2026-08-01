@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import type { GamePhase, GameState, SeasonTransitionState } from "@/lib/data/olyDataTypes";
 import { buildFormCardSeasonUsageAudit } from "@/lib/lineups/legacy-lineup-modifiers";
+import { isTransferMarketPhaseOpen } from "@/lib/market/transfer-window-policy";
 import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
@@ -360,5 +361,60 @@ export function advanceSeasonTransitionStep(
     dryRun: false,
     applied: true,
     transition,
+  };
+}
+
+/**
+ * Bis zum Transferfenster durchschalten — so weit, dass Verkaufen und Verlaengern offen sind.
+ *
+ * GEMELDET: "wenn hier gesagt wird sponsoren + preisgeld dann training und dann kader, wuerde
+ * ich erwarten dass wenn ich da drauf gehe auch meine vertraege verlaengern und spieler
+ * verkaufen kann! sonst ist das n fehler im system"
+ *
+ * Der Saisonabschluss-Bildschirm nannte vier Schritte und schickte zum Kader ("Im Kader kannst
+ * du verhandeln"). Am echten Spielstand war in Phase `season_completed` aber JEDE dieser
+ * Handlungen gesperrt — `renew_contract`, `sell_players`, `buy_players`, `set_training`
+ * (`game-phase-action-policy`). Die Checkliste beschrieb einen Ablauf, den die Phase nicht
+ * zuliess.
+ *
+ * Warum eine Schleife und kein einzelner Schritt: zwischen `season_completed` und der ersten
+ * Phase mit offenem Transferfenster liegen VIER Stationen. Sie einzeln anklicken zu lassen ist
+ * der Wizard-Weg (Cockpit); die Checkliste stellt eine andere Frage — "ich will jetzt meine
+ * Vertraege machen" — und beantwortet sie in einem Zug.
+ *
+ * Die Schleife erfindet dabei nichts: sie ruft denselben `advanceSeasonTransitionStep` auf, der
+ * auch am Einzelschritt haengt. Welche Station auf welche folgt, entscheidet weiterhin allein
+ * die Kette — hier steht nur, WANN aufgehoert wird.
+ *
+ * `applied: true` heisst hier "das Fenster ist jetzt offen", nicht "es wurde etwas geschrieben".
+ * War es schon offen, ist das Ergebnis dasselbe und der Aufrufer soll es nicht als Fehler
+ * anzeigen — ein zweiter Klick auf denselben Knopf ist kein Fehlschlag. Geschrieben wird dann
+ * nichts; die Phase rutscht insbesondere NICHT weiter Richtung neuer Saison.
+ */
+export function advanceSeasonTransitionToTransferWindow(
+  save: PersistedSaveGame,
+  persistence: PersistenceService = createPersistenceService(),
+): SeasonTransitionPreview {
+  let current = save;
+  let result = buildSeasonTransitionPreview(current);
+
+  // Obergrenze = Laenge der Kette. Kein Sicherheitsnetz gegen Fehler, sondern gegen eine
+  // Endlosschleife, falls ein Schritt je aufhoert weiterzuschalten (`applied: false`) — dann
+  // bricht die Schleife ohnehin unten ab; die Grenze ist der Guertel dazu.
+  for (let hop = 0; hop < SEASON_TRANSITION_STEPS.length; hop += 1) {
+    if (isTransferMarketPhaseOpen(current.gameState)) break;
+    const step = advanceSeasonTransitionStep(current, persistence);
+    if (!("applied" in step) || !step.applied) return step;
+    const reloaded = persistence.getSaveById(current.saveId);
+    if (!reloaded) return step;
+    current = reloaded;
+    result = step;
+  }
+
+  return {
+    ...buildSeasonTransitionPreview(current),
+    dryRun: false,
+    applied: true,
+    transition: result.transition,
   };
 }

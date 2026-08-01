@@ -7,6 +7,7 @@ import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import {
   advanceSeasonTransitionStep,
+  advanceSeasonTransitionToTransferWindow,
   buildSeasonTransitionPreview,
   startSeasonTransition,
 } from "@/lib/season/season-transition-service";
@@ -19,7 +20,12 @@ type SeasonTransitionBody = {
    * Kette bei `season_review` — und weil Verkaufen erst in `preseason_management` /
    * `transfer_sell_phase` oeffnet, war es nach dem ersten Spieltag dauerhaft zu.
    */
-  action?: "start_transition" | "advance_step" | "preview";
+  /**
+   * `open_transfer_window` schaltet in einem Zug bis zur ersten Phase mit offenem
+   * Transferfenster durch. Der Saisonabschluss-Bildschirm schickt zum Kader ("Im Kader kannst
+   * du verhandeln") — ohne diesen Weg war dort jede Handlung gesperrt.
+   */
+  action?: "start_transition" | "advance_step" | "open_transfer_window" | "preview";
   source?: "sqlite" | "prisma";
   roomCode?: string | null;
   participantId?: string | null;
@@ -70,7 +76,9 @@ export async function POST(request: Request) {
         ? startSeasonTransition(save, persistence)
         : body.action === "advance_step"
           ? advanceSeasonTransitionStep(save, persistence)
-          : buildSeasonTransitionPreview(save);
+          : body.action === "open_transfer_window"
+            ? advanceSeasonTransitionToTransferWindow(save, persistence)
+            : buildSeasonTransitionPreview(save);
     const success = "applied" in summary ? Boolean(summary.applied) : summary.ok;
     notifyRoomGameplayWrite(writeAuth, {
       saveId,

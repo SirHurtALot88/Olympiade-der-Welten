@@ -20,6 +20,7 @@
 import { useMemo } from "react";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
 import { buildSeasonReview } from "@/lib/season/season-review-service";
 import type { SeasonEndPayoutStatus } from "@/lib/season/season-end-sponsor-payout-status";
 
@@ -52,6 +53,19 @@ export type FoundationSeasonFinalePanelProps = {
   onStartNextSeason: () => void;
   onOpenDevelopment: () => void;
   onOpenRoster: () => void;
+  /**
+   * Schaltet bis zur ersten Phase mit offenem Transferfenster durch.
+   *
+   * GEMELDET: "wenn hier gesagt wird sponsoren + preisgeld dann training und dann kader,
+   * wuerde ich erwarten dass wenn ich da drauf gehe auch meine vertraege verlaengern und
+   * spieler verkaufen kann! sonst ist das n fehler im system"
+   *
+   * Genau das war es. Diese Liste nannte vier Schritte und schickte zum Kader — waehrend in
+   * Phase `season_completed` `renew_contract`, `sell_players`, `buy_players` und `set_training`
+   * allesamt gesperrt sind (`game-phase-action-policy`). Die Liste beschrieb einen Ablauf, den
+   * die Phase nicht zuliess.
+   */
+  onOpenTransferWindow: () => void;
 };
 
 function formatValue(value: number | string | null): string {
@@ -80,7 +94,19 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
     onStartNextSeason,
     onOpenDevelopment,
     onOpenRoster,
+    onOpenTransferWindow,
   } = props;
+
+  /**
+   * Ist das Transferfenster offen — dieselbe Frage, die auch der Server stellt, bevor er einen
+   * Verkauf oder eine Verlaengerung durchlaesst. Bewusst `evaluateGamePhaseAction` und nicht
+   * ein eigener Phasenvergleich: sonst gaebe es zwei Vorstellungen davon, was gerade erlaubt
+   * ist, und die Liste koennte erneut etwas versprechen, das die Regel verbietet.
+   */
+  const transferWindowOpen = useMemo(
+    () => evaluateGamePhaseAction(gameState, "renew_contract").allowed,
+    [gameState],
+  );
 
   // `buildSeasonReview` ist rein und liest nur den GameState — es gibt hier nichts zu
   // laden. Memoisiert, weil es die komplette Saison durchrechnet.
@@ -135,6 +161,24 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
       state: developmentApplied ? "done" : "ready",
       action: { label: "Zum Training", onClick: onOpenDevelopment },
     },
+    /**
+     * Der Schritt, der vorher fehlte.
+     *
+     * Zwischen dem Saisonende und der ersten Phase, in der man verhandeln, verkaufen und
+     * kaufen darf, liegen vier Stationen der Saisonende-Kette. Sie liefen bisher nur im
+     * Cockpit-Assistenten — einer Ansicht, in die dieser Bildschirm bewusst NICHT schickt.
+     * Also stand hier "Im Kader kannst du verhandeln", und im Kader ging nichts.
+     */
+    {
+      key: "transfer-window",
+      title: "Transferfenster öffnen",
+      detail: transferWindowOpen
+        ? "Offen — Verträge verlängern, verkaufen und kaufen sind freigeschaltet."
+        : "Verlängern, verkaufen und kaufen sind bis dahin gesperrt. Ein Klick schaltet den Saisonwechsel bis dorthin durch.",
+      state: transferWindowOpen ? "done" : readOnly ? "blocked" : busy ? "busy" : "ready",
+      action:
+        transferWindowOpen || readOnly ? null : { label: "Transferfenster öffnen", onClick: onOpenTransferWindow },
+    },
     {
       key: "contracts",
       title:
@@ -142,11 +186,15 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
           ? `Auslaufende Verträge (${expiringContracts})`
           : "Verträge — nichts läuft aus",
       detail:
-        expiringContracts > 0
-          ? "Diese Spieler verlassen dich, wenn du nicht verlängerst. Im Kader kannst du verhandeln."
-          : "Kein Vertrag läuft zum Saisonende aus.",
-      state: expiringContracts > 0 ? "ready" : "done",
-      action: expiringContracts > 0 ? { label: "Zum Kader", onClick: onOpenRoster } : null,
+        expiringContracts === 0
+          ? "Kein Vertrag läuft zum Saisonende aus."
+          : transferWindowOpen
+            ? "Diese Spieler verlassen dich, wenn du nicht verlängerst. Im Kader kannst du verhandeln."
+            : "Diese Spieler verlassen dich, wenn du nicht verlängerst. Verhandeln geht erst, wenn das Transferfenster offen ist.",
+      state: expiringContracts === 0 ? "done" : transferWindowOpen ? "ready" : "blocked",
+      // Kein Knopf ins Leere: solange gesperrt ist, was dort zu tun waere, schickt diese Zeile
+      // auch niemanden hin. Der Schritt darueber ist dann der einzige, der weiterfuehrt.
+      action: expiringContracts > 0 && transferWindowOpen ? { label: "Zum Kader", onClick: onOpenRoster } : null,
     },
     {
       key: "next-season",
