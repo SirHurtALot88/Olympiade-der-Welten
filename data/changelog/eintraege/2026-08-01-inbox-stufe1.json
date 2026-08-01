@@ -4,41 +4,47 @@
     "seite": "Spieltag · Inbox",
     "text": "Die Inbox nennt ihre Sprungziele jetzt so, wie die Reiter heißen: statt „Springe zu trainingV2.\" steht dort „Öffnet: Gebäude\".",
     "gewicht": "behebung",
-    "version": "0.3"
+    "version": "0.3",
+    "pr": "#339"
   },
   {
     "datum": "2026-08-01",
     "seite": "Spieltag · Inbox",
     "text": "Gebäude-Meldungen ohne Stufenwechsel („fan_shop: Level 1 → 1\") entfallen, und ein echter Ausbau nennt das Gebäude beim Namen.",
     "gewicht": "behebung",
-    "version": "0.3"
+    "version": "0.3",
+    "pr": "#339"
   },
   {
     "datum": "2026-08-01",
     "seite": "Spieltag · Inbox",
     "text": "Spieltage stehen im Nachrichtentext als „Spieltag 10\" statt als „matchday-10\" — auch bei Verletzungen („fällt bis Spieltag 9 aus\") und beim Preisgeld.",
     "gewicht": "behebung",
-    "version": "0.3"
+    "version": "0.3",
+    "pr": "#339"
   },
   {
     "datum": "2026-08-01",
     "seite": "Spieltag · Inbox",
     "text": "Derselbe Spieltag wird nur noch einmal gemeldet: „Spieltagsergebnis verfügbar\" ist weg, der Recap sagt ohnehin, was passiert ist.",
     "gewicht": "feinschliff",
-    "version": "0.3"
+    "version": "0.3",
+    "pr": "#339"
   },
   {
     "datum": "2026-08-01",
     "seite": "Spieltag · Inbox",
     "text": "Board-Ziele tragen ihr Ziel im Titel — mehrere Karten heißen nicht mehr alle „Board-Ziel gefährdet\".",
     "gewicht": "feinschliff",
-    "version": "0.3"
+    "version": "0.3",
+    "pr": "#339"
   },
   {
     "datum": "2026-08-01",
     "seite": "Spieltag · Inbox",
     "text": "Preisgeld-Karten ohne Zahlen („— Teams, — Preisgeld\") entstehen gar nicht mehr, und die Pre-Season-Karte nennt die Phase im Klartext statt „preseason_management\".",
     "gewicht": "feinschliff",
-    "version": "0.3"
+    "version": "0.3",
+    "pr": "#339"
   }
 ]
