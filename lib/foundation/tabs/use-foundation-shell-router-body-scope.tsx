@@ -10953,14 +10953,22 @@ export function useFoundationShellRouterBodyScope({
       const response = await fetch("/api/contracts/dissolution", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          saveId: activeSaveId,
-          seasonId: gameState.season.id,
-          teamId: selectedTeam.teamId,
-          playerId,
-          decision,
-          source: readMeta.source,
-        }),
+        // Der Raum-Kontext MUSS mit: ohne ihn haelt `authorizeServerRoomWrite` den Aufruf fuer
+        // Solo und laesst ihn durch — die Besitzpruefung auf der Route waere dann nur Zierde.
+        // Genau so war es hier bis zur Coop-Absicherung: die Route schrieb ungeprueft.
+        body: JSON.stringify(
+          withRoomContextBody(
+            {
+              saveId: activeSaveId,
+              seasonId: gameState.season.id,
+              teamId: selectedTeam.teamId,
+              playerId,
+              decision,
+              source: readMeta.source,
+            },
+            roomContext,
+          ),
+        ),
       });
       const payload = (await response.json()) as {
         success?: boolean;
