@@ -6,6 +6,7 @@ import changelogDatei from "@/data/changelog/CHANGELOG.json";
 import { NlCard, NlEmptyState } from "@/components/foundation/new-look";
 import {
   gruppiereChangelogNachDatum,
+  gruppiereChangelogNachVersion,
   parseChangelogDatei,
   sortiereChangelog,
   type ChangelogEintrag,
@@ -34,6 +35,15 @@ function formatChangelogDatum(datum: string): string {
   });
 }
 
+/**
+ * Ueberschrift der aeusseren Versionsgruppe. `null` heisst: fuer diese Eintraege ist die Version
+ * nicht bekannt (aeltere Eintraege, bevor das Feld eingefuehrt wurde) — eine ehrliche Sammel-
+ * ueberschrift statt eine geratene Versionsnummer.
+ */
+function formatVersionsTitel(version: string | null): string {
+  return version ? `Version ${version}` : "Ohne Versionsangabe";
+}
+
 function ChangelogEintragZeile({ eintrag }: { eintrag: ChangelogEintrag }) {
   return (
     <li className="nl-changelog-item">
@@ -48,8 +58,8 @@ function ChangelogEintragZeile({ eintrag }: { eintrag: ChangelogEintrag }) {
 
 export default function FoundationChangelogHost() {
   // Die Datei ist zur Build-Zeit eingebacken — einmal parsen und gruppieren reicht.
-  const gruppen = useMemo(
-    () => gruppiereChangelogNachDatum(sortiereChangelog(parseChangelogDatei(changelogDatei))),
+  const versionsGruppen = useMemo(
+    () => gruppiereChangelogNachVersion(sortiereChangelog(parseChangelogDatei(changelogDatei))),
     [],
   );
 
@@ -62,19 +72,32 @@ export default function FoundationChangelogHost() {
         </p>
       </NlCard>
 
-      {gruppen.length === 0 ? (
+      {versionsGruppen.length === 0 ? (
         <NlCard>
           <NlEmptyState title="Noch keine Einträge." />
         </NlCard>
       ) : (
-        gruppen.map((gruppe) => (
-          <NlCard key={gruppe.datum} className="nl-changelog-day" title={formatChangelogDatum(gruppe.datum)}>
-            <ul className="nl-changelog-list">
-              {gruppe.eintraege.map((eintrag, index) => (
-                <ChangelogEintragZeile key={`${gruppe.datum}-${index}`} eintrag={eintrag} />
-              ))}
-            </ul>
-          </NlCard>
+        versionsGruppen.map((versionsGruppe) => (
+          <section
+            key={versionsGruppe.version ?? "ohne-version"}
+            className="nl-changelog-version"
+            data-testid={`foundation-changelog-version-${versionsGruppe.version ?? "ohne-version"}`}
+          >
+            <h3 className="nl-changelog-version-heading">{formatVersionsTitel(versionsGruppe.version)}</h3>
+            {gruppiereChangelogNachDatum(versionsGruppe.eintraege).map((gruppe) => (
+              <NlCard
+                key={`${versionsGruppe.version ?? "ohne-version"}-${gruppe.datum}`}
+                className="nl-changelog-day"
+                title={formatChangelogDatum(gruppe.datum)}
+              >
+                <ul className="nl-changelog-list">
+                  {gruppe.eintraege.map((eintrag, index) => (
+                    <ChangelogEintragZeile key={`${gruppe.datum}-${index}`} eintrag={eintrag} />
+                  ))}
+                </ul>
+              </NlCard>
+            ))}
+          </section>
         ))
       )}
     </div>

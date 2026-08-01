@@ -29,6 +29,14 @@ export type ChangelogEintrag = {
   text: string;
   /** Woher der Eintrag stammt — nur fuer Nachvollziehbarkeit, die Oberflaeche zeigt es nicht. */
   quelle: "triage" | "gepflegt";
+  /**
+   * Optionale App-Version ("0.3.0"), in der die Aenderung steckt. Freitext statt strengem Semver,
+   * weil die Quellen es nicht anders liefern (eine `version:`-Zeile in der Triage-Notiz oder das
+   * Feld in `eintraege.json`). Faelt bei aelteren Eintraegen bewusst fehlen: welche Version sie
+   * enthielt, ist nachtraeglich nicht mehr zuverlaessig feststellbar — eine geratene Zuordnung waere
+   * eine Falschaussage. Fehlt sie, landet der Eintrag im Reiter unter "Ohne Versionsangabe".
+   */
+  version: string | null;
 };
 
 /**
@@ -85,6 +93,7 @@ export function changelogAusTriage(triage: BugTriage, seiteAusMeldung: string | 
       pr: triage.pr,
       text: triage.changelog,
       quelle: "triage",
+      version: triage.version,
     },
   };
 }
@@ -106,6 +115,7 @@ export function parseChangelogEintrag(roh: unknown): ChangelogEintrag | null {
     pr: typeof wert.pr === "string" && wert.pr.trim() ? wert.pr.trim() : null,
     text,
     quelle: wert.quelle === "triage" ? "triage" : "gepflegt",
+    version: typeof wert.version === "string" && wert.version.trim() ? wert.version.trim() : null,
   };
 }
 
@@ -144,5 +154,51 @@ export function gruppiereChangelogNachDatum(eintraege: ChangelogEintrag[]): Chan
       gruppen.push({ datum: eintrag.datum, eintraege: [eintrag] });
     }
   }
+  return gruppen;
+}
+
+export type ChangelogVersionsgruppe = { version: string | null; eintraege: ChangelogEintrag[] };
+
+/**
+ * Vergleicht zwei Versionsangaben absteigend, numerisches Segment fuer Segment ("0.10" vor "0.3").
+ * Freitext-tolerant: alles, was kein Ziffernblock ist (z.B. ein "v"-Praefix), wird uebersprungen;
+ * fehlende Segmente zaehlen als 0, damit "0.3" und "0.3.0" gleichrangig sind.
+ */
+function vergleicheVersionenAbsteigend(a: string, b: string): number {
+  const segmente = (wert: string) => wert.split(/[^0-9]+/).filter((teil) => teil !== "").map(Number);
+  const segA = segmente(a);
+  const segB = segmente(b);
+  const laenge = Math.max(segA.length, segB.length);
+  for (let index = 0; index < laenge; index += 1) {
+    const x = segA[index] ?? 0;
+    const y = segB[index] ?? 0;
+    if (x !== y) return y - x;
+  }
+  return 0;
+}
+
+/**
+ * Gruppiert bereits sortierte (neueste zuerst) Eintraege nach Version — die aeussere Gliederung
+ * des Reiters, sobald Versionsangaben vorhanden sind. Eintraege ohne `version` verschwinden nicht:
+ * sie landen gesammelt in einer eigenen Gruppe mit `version: null` (Oberflaeche zeigt dafuer eine
+ * ehrliche Sammelueberschrift, "Ohne Versionsangabe"), immer als letzte Gruppe — sie ist der
+ * Auffangkorb, keine echte Versionsangabe, die um einen Sortierplatz mitspielt.
+ */
+export function gruppiereChangelogNachVersion(eintraege: ChangelogEintrag[]): ChangelogVersionsgruppe[] {
+  const nachVersion = new Map<string, ChangelogEintrag[]>();
+  const ohneVersion: ChangelogEintrag[] = [];
+  for (const eintrag of eintraege) {
+    if (eintrag.version) {
+      const liste = nachVersion.get(eintrag.version) ?? [];
+      liste.push(eintrag);
+      nachVersion.set(eintrag.version, liste);
+    } else {
+      ohneVersion.push(eintrag);
+    }
+  }
+  const gruppen: ChangelogVersionsgruppe[] = [...nachVersion.entries()]
+    .sort((links, rechts) => vergleicheVersionenAbsteigend(links[0], rechts[0]))
+    .map(([version, eintraege]) => ({ version, eintraege }));
+  if (ohneVersion.length > 0) gruppen.push({ version: null, eintraege: ohneVersion });
   return gruppen;
 }

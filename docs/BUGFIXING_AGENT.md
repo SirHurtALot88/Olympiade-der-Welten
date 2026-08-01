@@ -418,6 +418,10 @@ nichts — das ist der Normalfall, kein Fehler.
    ein Satz Alltagssprache (was war kaputt, was ist jetzt anders), Datum, PR-Nummer und die
    betroffene Seite. Kein Entwicklerjargon, keine Dateinamen. Der Changelog ist im Spiel
    sichtbar — unterster Reiter. Wer spielt, soll ohne Nachfragen sehen, was gefixt wurde.
+   Optional dazu eine `version:`-Zeile im Triage-Kopf ("0.3.0") — nur setzen, wenn der
+   `package.json`-Stand zum Merge-Zeitpunkt wirklich bekannt ist, sonst leer lassen statt zu
+   raten. Der Reiter gruppiert Eintraege mit Version danach; ohne Version landen sie unter
+   einer neutralen Sammelueberschrift statt zu verschwinden.
 
 9. npm run bugs:tabelle laufen lassen, damit TICKETS.md den neuen Stand zeigt.
 

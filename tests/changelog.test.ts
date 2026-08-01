@@ -16,8 +16,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   changelogAusTriage,
   gruppiereChangelogNachDatum,
+  gruppiereChangelogNachVersion,
   normalisiereChangelogDatum,
   parseChangelogDatei,
+  parseChangelogEintrag,
   sortiereChangelog,
   type ChangelogEintrag,
 } from "@/lib/changelog/changelog";
@@ -28,7 +30,7 @@ vi.mock("@/lib/persistence/persistence-service", () => ({
 }));
 
 function eintrag(teil: Partial<ChangelogEintrag>): ChangelogEintrag {
-  return { datum: "2026-07-30", seite: null, pr: null, text: "x", quelle: "triage", ...teil };
+  return { datum: "2026-07-30", seite: null, pr: null, text: "x", quelle: "triage", version: null, ...teil };
 }
 
 describe("changelog:-Zeile im Triage-Kopf", () => {
@@ -69,8 +71,24 @@ describe("changelogAusTriage — nur Gemergtes erscheint", () => {
         pr: "#273",
         text: "Jetzt anders.",
         quelle: "triage",
+        version: null,
       },
     });
+  });
+
+  it("liest die version-Zeile analog zur changelog-Zeile durch", () => {
+    const mitVersion = parseTriage(
+      "bug-3v",
+      "status: gebaut\ntitel: T\npr: #273\ngemergt: 2026-07-30\nchangelog: Jetzt anders.\nversion: 0.3.0\n\nBefund.",
+      "bug-3v.md",
+    );
+    const ergebnis = changelogAusTriage(mitVersion, null);
+    expect(ergebnis.art).toBe("eintrag");
+    if (ergebnis.art === "eintrag") expect(ergebnis.eintrag.version).toBe("0.3.0");
+  });
+
+  it("ohne version-Zeile bleibt das Feld null, kein geratener Wert", () => {
+    expect(basis.version).toBeNull();
   });
 
   /** DER KERN: was nicht gemergt ist, hat im Changelog nichts verloren. */
@@ -136,6 +154,41 @@ describe("Datum, Sortierung, Gruppierung", () => {
   });
 });
 
+describe("gruppiereChangelogNachVersion — Version optional, verschwindet nichts", () => {
+  it("gruppiert absteigend nach Version, numerisch statt alphabetisch", () => {
+    const gruppen = gruppiereChangelogNachVersion([
+      eintrag({ text: "a", version: "0.3.0" }),
+      eintrag({ text: "b", version: "0.10.0" }),
+      eintrag({ text: "c", version: "0.3.0" }),
+      eintrag({ text: "d", version: "0.2.0" }),
+    ]);
+    // Alphabetisch waere "0.10.0" vor "0.2.0" und "0.3.0" — numerisch gehoert es ans Ende.
+    expect(gruppen.map((g) => g.version)).toEqual(["0.10.0", "0.3.0", "0.2.0"]);
+    expect(gruppen[1].eintraege.map((e) => e.text)).toEqual(["a", "c"]);
+  });
+
+  it("Eintraege ohne Version verschwinden nicht — eigene Gruppe mit version: null, immer zuletzt", () => {
+    const gruppen = gruppiereChangelogNachVersion([
+      eintrag({ text: "ohne-alt", version: null }),
+      eintrag({ text: "mit", version: "0.3.0" }),
+      eintrag({ text: "ohne-neu", version: null }),
+    ]);
+    expect(gruppen).toHaveLength(2);
+    expect(gruppen[0]).toEqual({ version: "0.3.0", eintraege: [expect.objectContaining({ text: "mit" })] });
+    expect(gruppen[1].version).toBeNull();
+    expect(gruppen[1].eintraege.map((e) => e.text)).toEqual(["ohne-alt", "ohne-neu"]);
+  });
+
+  it("faellt bei komplett unversionierten Eintraegen auf eine einzige Gruppe zurueck", () => {
+    const gruppen = gruppiereChangelogNachVersion([eintrag({ text: "a" }), eintrag({ text: "b" })]);
+    expect(gruppen).toEqual([{ version: null, eintraege: [expect.objectContaining({ text: "a" }), expect.objectContaining({ text: "b" })] }]);
+  });
+
+  it("leere Liste ergibt keine Gruppen", () => {
+    expect(gruppiereChangelogNachVersion([])).toEqual([]);
+  });
+});
+
 describe("parseChangelogDatei — der Reiter darf an Datenmuell nicht scheitern", () => {
   it("laesst kaputte Eintraege herausfallen statt zu crashen", () => {
     const eintraege = parseChangelogDatei({
@@ -156,6 +209,22 @@ describe("parseChangelogDatei — der Reiter darf an Datenmuell nicht scheitern"
     expect(parseChangelogDatei(null)).toEqual([]);
     expect(parseChangelogDatei("quatsch")).toEqual([]);
     expect(parseChangelogDatei({ eintraege: "keine liste" })).toEqual([]);
+  });
+
+  it("reicht ein vorhandenes version-Feld durch", () => {
+    const geparst = parseChangelogEintrag({ datum: "2026-08-01", text: "x", version: "0.3.0" });
+    expect(geparst?.version).toBe("0.3.0");
+  });
+
+  it("fehlendes version-Feld bricht nichts — Eintrag bleibt gueltig, version ist null", () => {
+    const geparst = parseChangelogEintrag({ datum: "2026-08-01", text: "x" });
+    expect(geparst).not.toBeNull();
+    expect(geparst?.version).toBeNull();
+  });
+
+  it("ein leerer version-String zaehlt wie kein Feld", () => {
+    const geparst = parseChangelogEintrag({ datum: "2026-08-01", text: "x", version: "   " });
+    expect(geparst?.version).toBeNull();
   });
 });
 
@@ -218,7 +287,13 @@ describe("sammleChangelog — beide Quellen, ein Ergebnis", () => {
       CHANGELOG_EINTRAEGE_FILE,
       JSON.stringify({
         eintraege: [
-          { datum: "2026-08-01", seite: "Welt · Lexikon", pr: "#300", text: "Neues Kapitel im Lexikon." },
+          {
+            datum: "2026-08-01",
+            seite: "Welt · Lexikon",
+            pr: "#300",
+            text: "Neues Kapitel im Lexikon.",
+            version: "0.3.0",
+          },
           { datum: "ohne datum", text: "kaputt" },
         ],
       }),
@@ -231,10 +306,32 @@ describe("sammleChangelog — beide Quellen, ein Ergebnis", () => {
       "Der Kontostand aktualisiert sich jetzt sofort.",
     ]);
     expect(sammlung.eintraege[0].quelle).toBe("gepflegt");
+    expect(sammlung.eintraege[0].version).toBe("0.3.0");
     expect(sammlung.eintraege[1].seite).toBe("Markt · Transfermarkt");
+    // Die Triage-Notiz oben hat keine version:-Zeile — kein geratener Wert, sondern null.
+    expect(sammlung.eintraege[1].version).toBeNull();
     expect(sammlung.verworfeneGepflegte).toBe(1);
     // Die vorgepruefte Meldung ist weder Eintrag noch Luecke — an ihr fehlt nichts.
     expect(sammlung.luecken).toEqual([]);
+  });
+
+  it("reicht eine version:-Zeile aus der Triage-Notiz durch", async () => {
+    const { saveBugReport, writeTriage, sammleChangelog } = await importModules();
+    const gemeldet = saveBugReport({ note: "mit Version", view: "marketV2" });
+    writeTriage({
+      reportId: gemeldet.reportId,
+      status: "gebaut",
+      titel: "Mit Version",
+      pr: "#310",
+      gemergt: "2026-08-01",
+      changelog: "Etwas ist jetzt anders.",
+      version: "0.3.0",
+      body: "Befund.",
+    });
+
+    const sammlung = sammleChangelog();
+    expect(sammlung.eintraege).toHaveLength(1);
+    expect(sammlung.eintraege[0].version).toBe("0.3.0");
   });
 
   it("meldet einen gemergten Fix ohne changelog-Zeile als Luecke", async () => {
