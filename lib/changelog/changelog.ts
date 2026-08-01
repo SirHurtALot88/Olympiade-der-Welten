@@ -187,6 +187,24 @@ export function parseChangelogDatei(roh: unknown): ChangelogEintrag[] {
 }
 
 /**
+ * Wirft woertliche Doppel heraus: gleicher Tag, gleicher Satz = EIN Eintrag fuer den Spieler.
+ * Der Fall ist real — zwei Meldungen derselben Sache (Arena- und Saisonstand-Sicht des
+ * Rang-Fehlers) bekommen je eine Triage-Notiz, der Fix ist aber einer, und der Changelog
+ * beantwortet "was hat sich geaendert", nicht "welche Tickets gab es". Der erste Eintrag
+ * gewinnt; absichtlich NUR bei woertlich gleichem Text — aehnliche Saetze zusammenzulegen
+ * waere Raten, und geraten wird hier nirgends.
+ */
+export function dedupliziereChangelog(eintraege: ChangelogEintrag[]): ChangelogEintrag[] {
+  const gesehen = new Set<string>();
+  return eintraege.filter((eintrag) => {
+    const schluessel = `${eintrag.datum} ${eintrag.text}`;
+    if (gesehen.has(schluessel)) return false;
+    gesehen.add(schluessel);
+    return true;
+  });
+}
+
+/**
  * Neueste zuerst. Innerhalb eines Tages bleibt die Eingangsreihenfolge stehen (stabil) — die
  * Quellen liefern Triage-Eintraege vor gepflegten, und diese Ordnung soll kein Sortierlauf
  * stillschweigend umwerfen.

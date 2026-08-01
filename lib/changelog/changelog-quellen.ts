@@ -13,6 +13,7 @@ import { listBugReports } from "@/lib/bug-report/bug-report-service";
 import { BUG_TRIAGE_DIR, parseTriage } from "@/lib/bug-report/bug-report-triage";
 import {
   changelogAusTriage,
+  dedupliziereChangelog,
   parseChangelogEintrag,
   sortiereChangelog,
   type ChangelogEintrag,
@@ -129,7 +130,9 @@ export function sammleChangelog(): ChangelogSammlung {
   }
 
   return {
-    eintraege: sortiereChangelog(eintraege),
+    // Erst sortieren, dann dedupe: bei gleichem Tag und Satz gewinnt so der zuerst gelistete
+    // (Triage vor gepflegt, Dateinamens-Reihenfolge) — deterministisch statt zufaellig.
+    eintraege: dedupliziereChangelog(sortiereChangelog(eintraege)),
     luecken,
     verworfeneGepflegte: gepflegte.verworfen,
     ohneGewicht,

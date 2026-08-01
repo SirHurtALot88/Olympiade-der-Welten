@@ -4,6 +4,14 @@
     {
       "datum": "2026-08-01",
       "seite": "Spieltag · Arena",
+      "pr": "#297 + #305",
+      "text": "Der Rang im Saisonstand konnte veraltet stehen bleiben, wenn ein Spieltag noch nicht abgeschlossen war — das ist jetzt behoben, und eine feste Prüfung stellt sicher, dass das Team mit den meisten Punkten immer Rang 1 hat.",
+      "quelle": "triage",
+      "gewicht": "behebung"
+    },
+    {
+      "datum": "2026-08-01",
+      "seite": "Spieltag · Arena",
       "pr": "#297",
       "text": "Ein verletzter Spieler in der Aufstellung eines Computer-Teams konnte den ganzen Spieltag blockieren — er liess sich nicht mehr abschliessen. Die Computer-Teams pruefen ihre Aufstellung jetzt noch einmal, sobald du deine speicherst, und tauschen verletzte oder ausgelaugte Spieler aus.",
       "quelle": "triage",

@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   changelogAusTriage,
+  dedupliziereChangelog,
   gewichtAusTriage,
   gruppiereChangelogNachDatum,
   gruppiereChangelogNachGewicht,
@@ -200,6 +201,18 @@ describe("Datum, Sortierung, Gruppierung", () => {
       eintrag({ datum: "2026-07-30", text: "c" }),
     ]);
     expect(sortiert.map((e) => e.text)).toEqual(["b", "a", "c"]);
+  });
+
+  it("wirft nur WOERTLICHE Doppel desselben Tages heraus — ein Fix, ein Satz, ein Eintrag", () => {
+    const doppelt = dedupliziereChangelog([
+      eintrag({ datum: "2026-08-01", text: "Der Rang stimmt wieder.", seite: "Spieltag · Arena" }),
+      eintrag({ datum: "2026-08-01", text: "Der Rang stimmt wieder.", seite: "Welt · Saisonstand" }),
+      eintrag({ datum: "2026-07-30", text: "Der Rang stimmt wieder." }), // anderer Tag → bleibt
+      eintrag({ datum: "2026-08-01", text: "Der Rang stimmt jetzt." }), // aehnlich ≠ gleich → bleibt
+    ]);
+    expect(doppelt).toHaveLength(3);
+    // Der erste gewinnt — mitsamt seiner Seite.
+    expect(doppelt[0].seite).toBe("Spieltag · Arena");
   });
 
   it("gruppiert sortierte Eintraege nach Tag", () => {
