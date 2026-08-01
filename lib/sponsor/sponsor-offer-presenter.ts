@@ -10,6 +10,7 @@ import {
   type SponsorAxisKey,
 } from "@/lib/sponsor/sponsor-special-objectives";
 import { sponsorV3CardByKey } from "@/lib/sponsor/sponsor-v3-model";
+import { sponsorV4AxisDefinition, sponsorV4AxisKeyFromSpecialKey } from "@/lib/sponsor/sponsor-v4-axes";
 import {
   getSponsorV3Terms, sponsorV3GuaranteedLadder, sponsorV3Settle, sponsorV3StandardDeviation,
 } from "@/lib/sponsor/sponsor-v3-offer-service";
@@ -69,6 +70,13 @@ export type SponsorV3Presentation = {
     probability: number;
     difficultyLabel: string;
   } | null;
+  /**
+   * Vorschuss-Konditionen, falls die Karte einen zahlt: `amount` kommt bei Unterschrift, `fee` wird
+   * am Saisonende zusammen mit dem Vorschuss verrechnet. Ohne diese Felder waere die zweite
+   * Wahldimension nur fuer die KI sichtbar — der Mensch saehe die Karte nicht, die ihm Liquiditaet
+   * im Transferfenster verschafft.
+   */
+  advance: { amount: number; fee: number } | null;
   /** Bestwert der Karte: Titel plus erreichtes Sonderziel. */
   maxPayout: number;
   /** Schlechtestwert: letzter Platz, Ziel verfehlt. */
@@ -191,6 +199,38 @@ function buildSpecialPresentation(input: {
     difficulty: "mittel" as SponsorChallengeDifficulty,
     difficultyLabel: DIFFICULTY_LABELS.mittel,
   };
+
+  // V4-ZIELACHSE. Ohne diesen Zweig fiele sie in den generischen Fallback ganz unten und stuende
+  // dort als "Saison-Bonusziel — siehe Stufen" mit erfundener Schwierigkeit "mittel". Beides waere
+  // falsch: eine Achse hat keine Stufen (sie ist stufenlos), und ihre Schwierigkeit ist per
+  // Konstruktion fuer jedes Team dieselbe — sie misst den eigenen Zuwachs gegen die eigene
+  // Ausgangslage. Genau das muss auf der Karte stehen, sonst waehlt der Mensch schlechter
+  // informiert als die KI.
+  const v4AxisKey = sponsorV4AxisKeyFromSpecialKey(specialKey);
+  if (v4AxisKey) {
+    const definition = sponsorV4AxisDefinition(v4AxisKey);
+    const read = (tag: string): number | null => {
+      const raw = typeof input.component.targetValue === "string"
+        ? new RegExp(`(?:^|;)${tag}:([^;]*)`).exec(input.component.targetValue)?.[1]
+        : null;
+      const parsed = raw != null ? Number(raw) : NaN;
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+    const scale = read("axisscale") ?? definition.scale;
+    const offset = read("axisoffset") ?? definition.offset;
+    const baseline = read("axisbase");
+    const ziel = Math.round((scale - offset) * 10) / 10;
+    return {
+      ...base,
+      headline: `Zielachse · ${definition.label}`,
+      difficulty: "mittel",
+      difficultyLabel: DIFFICULTY_LABELS.mittel,
+      detail:
+        `${definition.label}: ${ziel}${definition.unit} Zuwachs gegenueber dem eigenen Saisonstart` +
+        (baseline != null && baseline !== 0 ? ` (Ausgangswert ${baseline}${definition.unit})` : "") +
+        " · anteilige Auszahlung",
+    };
+  }
 
   if (specialKey === "axis_rank_top") {
     const parsed = parseAxisTargetValue(input.component.targetValue);
@@ -363,6 +403,9 @@ export function buildSponsorV3Presentation(offer: SponsorOffer): SponsorV3Presen
           probability: Math.round(terms.goalP * 100) / 100,
           difficultyLabel: terms.goalP >= 0.55 ? "Leicht" : terms.goalP >= 0.35 ? "Mittel" : "Hart",
         }
+      : null,
+    advance: terms.advance
+      ? { amount: roundOfferCash(terms.advance.amount), fee: roundOfferCash(terms.advance.fee) }
       : null,
     maxPayout: roundOfferCash(sponsorV3Settle(terms, 1, 1)),
     minPayout: roundOfferCash(sponsorV3Settle(terms, 32, 0)),

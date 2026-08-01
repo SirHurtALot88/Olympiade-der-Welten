@@ -10,6 +10,7 @@ import {
   sponsorV3Settle,
 } from "@/lib/sponsor/sponsor-v3-model";
 import { getSponsorV3Terms, sponsorV3SettlementParts } from "@/lib/sponsor/sponsor-v3-offer-service";
+import { getSeasonSponsorCashTotal, previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 
 function qualityRank(teamId: string, position: number): SponsorTeamQualityRank {
   return {
@@ -112,5 +113,39 @@ describe("Sponsor-Vorschuss: das Slate garantiert beide Seiten", () => {
       qualityRank: qualityRank("M-M", 1),
     });
     expect(slate.entries[0]!.advance).toBeUndefined();
+  });
+});
+
+describe("Sponsor-Vorschuss: die Saisonsumme zaehlt ihn nicht doppelt", () => {
+  it("weist ueber beide Zeitpunkte genau `settle − Gebuehr` aus", () => {
+    // DER FEHLER, DEN DIESER TEST ABDECKT: die Saisonsumme addierte das Vorschuss-Log als Einnahme
+    // UND klammerte gleichzeitig die negative Verrechnungszeile auf 0. Derselbe Betrag wurde damit
+    // zweimal gutgeschrieben; gemessen waren es 24,4 C zu viel bei einem einzigen Vertrag. Solange
+    // jede Settlement-Zeile positiv war, fiel das Klammern nicht auf — Achsen und Vorschuss haben
+    // erstmals negative Zeilen, und damit wurde aus einer Unsauberkeit ein echter Anzeigefehler.
+    const gameState = createSingleplayerGameState();
+    const teamId = gameState.teams[0]!.teamId;
+    const offers = buildSponsorOffersForTeam({ gameState, teamId });
+    const withAdvance = offers.find((offer) => getSponsorV3Terms(offer)?.advance != null)!;
+    const terms = getSponsorV3Terms(withAdvance)!;
+
+    const stateWithOffers = {
+      ...gameState,
+      seasonState: {
+        ...gameState.seasonState,
+        sponsorOffersByTeamId: { ...(gameState.seasonState.sponsorOffersByTeamId ?? {}), [teamId]: offers },
+      },
+    };
+    const signed = chooseSponsorOffer({ gameState: stateWithOffers, teamId, offerId: withAdvance.offerId }).gameState;
+
+    // Nur dieses eine Team hat einen Vertrag — die Liga-Summe ist damit seine Summe.
+    const angezeigt = getSeasonSponsorCashTotal(signed);
+    const rows = previewSponsorSettlement(signed).rows.filter((row) => row.teamId === teamId);
+    const echteSaisonende = rows.reduce((sum, row) => sum + row.cashDelta, 0);
+    const echt = terms.advance!.amount + echteSaisonende;
+
+    expect(angezeigt).toBeCloseTo(echt, 1);
+    // Und der Vorschuss selbst darf die Summe nicht heben: er ist vorgezogenes eigenes Geld.
+    expect(angezeigt).toBeLessThan(terms.advance!.amount + Math.max(...terms.rankLadder) + terms.goalSize);
   });
 });

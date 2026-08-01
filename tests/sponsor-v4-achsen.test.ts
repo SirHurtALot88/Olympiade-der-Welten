@@ -198,3 +198,36 @@ describe("Sponsor-Achsen: unerfuellbare Achsen werden gefiltert, nicht geklammer
     expect(sponsorV4OfferableAxes(maxed, teamId)).not.toContain("ausbau");
   });
 });
+
+describe("Sponsor-Achsen: der Vorschuss zahlt die Soliditaets-Achse nicht selbst", () => {
+  it("zaehlt den Vorschuss als Verbindlichkeit, nicht als Zuwachs", () => {
+    // DER EXPLOIT, DEN DAS ABDECKT: die Soliditaets-Achse misst `Kasse − Schulden` gegen die vor
+    // der Unterschrift eingefrorene Ausgangslage. Der Vorschuss erhoeht die Kasse — zaehlte er
+    // nicht auch als Schuld, haette das blosse UNTERSCHREIBEN die Achse zu einem guten Teil
+    // erfuellt. Gemessen waren das 5,2 C fuer 0,7 C Gebuehr, risikofrei. Ein Kredit ist korrekt
+    // neutral (Cash und Schuld wachsen zusammen); der Vorschuss muss es genauso sein.
+    const gameState = baseState();
+    const teamId = gameState.teams[0]!.teamId;
+    const terms = buildSponsorV4AxisTerms(gameState, teamId, "soliditaet");
+
+    const vorschuss = { amount: 16, fee: 0.8 };
+    const nachUnterschrift: GameState = {
+      ...gameState,
+      teams: gameState.teams.map((team) =>
+        team.teamId === teamId ? { ...team, cash: team.cash + vorschuss.amount } : team,
+      ),
+      seasonState: {
+        ...gameState.seasonState,
+        sponsorContractsByTeamId: {
+          ...(gameState.seasonState.sponsorContractsByTeamId ?? {}),
+          [teamId]: { sponsorV3: { advance: vorschuss } },
+        },
+      } as GameState["seasonState"],
+    };
+
+    const vorher = evaluateSponsorV4Axis(gameState, teamId, terms).fraction;
+    const nachher = evaluateSponsorV4Axis(nachUnterschrift, teamId, terms).fraction;
+    // Die Gebuehr macht die Position sogar minimal schlechter — auf keinen Fall besser.
+    expect(nachher).toBeLessThanOrEqual(vorher);
+  });
+});

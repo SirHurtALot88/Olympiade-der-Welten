@@ -318,7 +318,12 @@ function buildCashEconomyAudit(gameState: GameState) {
   if (cashPrizeLogs.some((log) => log.action === "apply")) {
     violations.push("cash_prize_apply_executed");
   }
-  const baseFirstLogs = sponsorLogs.filter((log) => log.phase === "base_first");
+  // Der V4-Vorschuss benutzt dieselbe Log-Phase, ist aber KEIN vorgezogener Basis-Auszahlungspfad,
+  // sondern eine bewusst gewaehlte Kartenoption — er wird am Saisonende samt Gebuehr verrechnet.
+  // Ohne diese Ausnahme meldete jeder Langlauf mit Vorschussvertraegen Scheinverstoesse.
+  const baseFirstLogs = sponsorLogs.filter(
+    (log) => log.phase === "base_first" && log.componentId !== "v4_advance",
+  );
   if (baseFirstLogs.length > 0) {
     violations.push(`sponsor_base_first_executed:${baseFirstLogs.length}`);
   }

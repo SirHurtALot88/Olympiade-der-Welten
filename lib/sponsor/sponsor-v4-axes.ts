@@ -83,13 +83,23 @@ function facilityLevelHeadroom(gameState: GameState, teamId: string): number {
   );
 }
 
-/** Nettofinanzposition: Kasse minus offene Restschulden. */
+/**
+ * Nettofinanzposition: Kasse minus alles, was noch zurueckzuzahlen ist.
+ *
+ * DER SPONSOR-VORSCHUSS GEHOERT ZWINGEND DAZU. Er erhoeht bei Unterschrift die Kasse, wird aber am
+ * Saisonende samt Gebuehr wieder verrechnet — er ist eine Verbindlichkeit wie ein Kredit. Zaehlte
+ * man ihn nicht mit, waere die Kombination "Solidität + Vorschuss" ein Selbstlaeufer: das blosse
+ * Unterschreiben haette die Nettoposition gegen die vorher eingefrorene Ausgangslage gehoben und die
+ * Achse zu einem guten Teil ohne jede Leistung bezahlt. Gemessen waren das 5,2 C fuer 0,7 C Gebuehr.
+ */
 function netFinancialPosition(gameState: GameState, teamId: string): number {
   const cash = gameState.teams.find((team) => team.teamId === teamId)?.cash ?? 0;
   const debt = (gameState.seasonState.loans ?? [])
     .filter((loan) => loan.borrowerTeamId === teamId && loan.status === "active")
     .reduce((sum, loan) => sum + (loan.principalOutstanding ?? 0), 0);
-  return cash - debt;
+  const advance = gameState.seasonState.sponsorContractsByTeamId?.[teamId]?.sponsorV3?.advance ?? null;
+  const advanceDebt = advance ? advance.amount + advance.fee : 0;
+  return cash - debt - advanceDebt;
 }
 
 /** Marktwert-Sprung, ab dem ein Spieler als entwickelt zaehlt — dieselbe Schwelle wie golden_talent_forge. */

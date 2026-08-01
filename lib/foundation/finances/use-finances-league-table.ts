@@ -67,7 +67,9 @@ export function buildFinancesLeagueTable(gameState: GameState): FinanceLeagueTab
   try {
     for (const row of previewSponsorSettlement(gameState).rows) {
       if (!FINANCE_SPONSOR_INCOME_COMPONENT_KINDS.includes(row.kind)) continue;
-      if (!Number.isFinite(row.cashDelta) || row.cashDelta <= 0) continue;
+      // Negative Zeilen saldieren mit, sonst weicht die Tabelle wieder von der Detailansicht ab —
+      // diesmal um die Vorschuss-Verrechnung und um verfehlte Achsen.
+      if (!Number.isFinite(row.cashDelta)) continue;
       sponsorSettlementByTeamId.set(row.teamId, (sponsorSettlementByTeamId.get(row.teamId) ?? 0) + row.cashDelta);
     }
   } catch {

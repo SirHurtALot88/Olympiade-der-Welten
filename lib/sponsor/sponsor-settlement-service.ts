@@ -255,13 +255,18 @@ export function getSeasonSponsorCashTotal(gameState: GameState): number {
   const allLogs = gameState.seasonState.sponsorPayoutLogs ?? [];
 
   // Sum every sponsor payout log already applied this season (base_first + any season_end partials).
+  // Der Gehaltsabzug faehrt in derselben Logliste mit, gehoert aber nicht zur Sponsoreinnahme.
   const alreadyPaid = allLogs
-    .filter((log) => log.seasonId === seasonId && log.cashDelta > 0)
+    .filter((log) => log.seasonId === seasonId && log.componentId !== "salary_deduct" && log.cashDelta > 0)
     .reduce((sum, log) => sum + log.cashDelta, 0);
 
-  // Add the projected remaining payouts that have not yet been applied (season_end preview).
+  // NEGATIVE ZEILEN GEHOEREN DAZU. Frueher wurde hier auf 0 geklammert — solange jede Zeile positiv
+  // war, fiel das nicht auf. Seit es Achsen und Vorschuesse gibt, ist es ein echter Fehler: eine
+  // verfehlte Achse traegt −G/2, und die Vorschuss-Verrechnung ist immer negativ. Zusammen mit dem
+  // Vorschuss-Log, das oben als Einnahme zaehlt, wurde derselbe Betrag zweimal gutgeschrieben und
+  // die Saisonsumme um Vorschuss plus Gebuehr plus verfehlte Achse zu hoch ausgewiesen.
   const preview = previewSponsorSettlement(gameState, "season_end");
-  const projectedRemaining = preview.rows.reduce((sum, row) => sum + Math.max(0, row.cashDelta), 0);
+  const projectedRemaining = preview.rows.reduce((sum, row) => sum + row.cashDelta, 0);
 
   return roundCash(alreadyPaid + projectedRemaining);
 }

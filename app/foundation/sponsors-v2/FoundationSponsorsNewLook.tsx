@@ -358,9 +358,9 @@ export default function FoundationSponsorsNewLook({
     const map = new Map<string, number>();
     try {
       for (const row of previewSponsorSettlement(gameState).rows) {
-        if (row.cashDelta > 0) {
-          map.set(row.teamId, (map.get(row.teamId) ?? 0) + row.cashDelta);
-        }
+        // Saldiert, nicht geklammert: die Vorschuss-Verrechnung ist negativ und die Achse kann
+        // es sein. Wer nur die positiven Zeilen zaehlt, zeigt eine Projektion, die es nicht gibt.
+        map.set(row.teamId, (map.get(row.teamId) ?? 0) + row.cashDelta);
       }
     } catch {
       // Vorschau ist optional — ohne gültige Verträge bleibt die Projektion leer.
