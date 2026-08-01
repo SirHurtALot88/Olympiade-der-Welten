@@ -758,8 +758,11 @@ describe("team season objectives service", () => {
     const giantsBias = getTeamObjectiveAiBias(gameState, "T-G");
     const teachersBias = getTeamObjectiveAiBias(gameState, "T-T");
 
-    expect(giantsGoal?.label).toBe("Power Top 5");
-    expect(wizardsGoal?.label).toBe("Mental Top 5");
+    // Ein Achsen-Rangziel ist im Slate immer das ZWEITE Rang-Ziel (Slot 1 hält die Rang-Erwartung),
+    // wird also als optionales Zusatzziel vergeben — daran hängt der Labelzusatz.
+    expect(giantsGoal?.label).toBe("Power Top 5 (optional)");
+    expect(giantsGoal?.optional).toBe(true);
+    expect(wizardsGoal?.label).toBe("Mental Top 5 (optional)");
     expect(teachersGoal?.targetValue).toContain("4/4 Achsen");
     expect(giantsBias?.axisPriorities.pow).toBeGreaterThan(0);
     expect(teachersBias?.axisPriorities.pow).toBeGreaterThan(0);
@@ -1687,5 +1690,71 @@ describe("Rang-Erwartungen: angezeigte Zielmarke und Auswertung dürfen nicht au
     expect(markInTarget(goal?.targetValue ?? null)).toBe(20);
     expect(markInLabel(goal?.label ?? "")).toBe(20);
     expect(goal?.status).not.toBe("completed");
+  });
+});
+
+describe("Vergabe: höchstens ein verbindliches Rang-Ziel je Saison", () => {
+  // Chris' Regel: "man kann ja nicht 2 Rank Targets haben". Der Slot-1-Sportauftrag (die
+  // Rang-Erwartung) bleibt verbindlich; jedes weitere Rang-Ziel im Slate wird zum optionalen
+  // Zusatzziel — es kann Bonus bringen, kostet aber nichts, wenn es verfehlt wird.
+  const buildTeamWithSecondRankGoal = () => {
+    // Klares Achsenprofil (kein Allrounder), aber Bias/Ambition unter der Schwelle für ein eigenes
+    // Achsen-Rangziel — damit rutscht der Spieler-Durchbruch ("Top-20-Durchbruch schaffen") in den
+    // Slate und ist dort das zweite Rang-Ziel.
+    const team = createTeam({ teamId: "C-C", shortCode: "C-C", identityId: "C-C" });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity("C-C", { pow: 7, spe: 2, men: 2, soc: 2, ambition: 6 })],
+    });
+    // Saison durchgespielt, ohne dass ein Spieler je Top 20 war -> der Durchbruch ist verfehlt.
+    gameState.seasonState.matchdayResults = [createMatchdayResult("md-result-1", "md-1")];
+    return gameState;
+  };
+
+  it("stuft das zweite Rang-Ziel zum optionalen Zusatzziel herab", () => {
+    const objectives = buildTeamObjectiveOverview(buildTeamWithSecondRankGoal()).objectives.filter(
+      (objective) => objective.teamId === "C-C",
+    );
+
+    const expectationGoal = objectives.find((objective) => objective.objectiveId === "expectation-rank");
+    const breakthroughGoal = objectives.find((objective) => objective.objectiveId === "player-top20-breakthrough");
+
+    // Das Rang-Ziel des Vorstands bleibt verbindlich.
+    expect(expectationGoal).toBeDefined();
+    expect(expectationGoal?.optional).toBeFalsy();
+
+    // Das zweite Rang-Ziel wird als Zusatzziel vergeben: erkennbar im Label, ohne Strafe.
+    expect(breakthroughGoal).toBeDefined();
+    expect(breakthroughGoal?.optional).toBe(true);
+    expect(breakthroughGoal?.label).toContain("(optional)");
+    expect(breakthroughGoal?.status).toBe("failed");
+    expect(breakthroughGoal?.penaltyCash).toBeUndefined();
+    expect(breakthroughGoal?.boardConfidenceDelta ?? 0).toBeGreaterThanOrEqual(0);
+  });
+
+  it("führt genau ein verbindliches Rang-Ziel im Board-Slate", () => {
+    const objectives = buildTeamObjectiveOverview(buildTeamWithSecondRankGoal()).objectives.filter(
+      (objective) => objective.teamId === "C-C" && objective.category !== "sponsor",
+    );
+    // Ziele, deren Marke ein Rang ist (Liga-, Achsen- oder Disziplin-Rang).
+    const rankGoals = objectives.filter((objective) => /Top\s+\d+|Rang/i.test(String(objective.targetValue ?? "")));
+
+    expect(rankGoals.length).toBeGreaterThan(1);
+    expect(rankGoals.filter((objective) => !objective.optional)).toHaveLength(1);
+  });
+
+  it("ein verfehltes Zusatzziel kostet weder Cash noch Vorstandsvertrauen", () => {
+    const gameState = buildTeamWithSecondRankGoal();
+    const overview = buildTeamObjectiveOverview(gameState);
+    const settlement = buildTeamSeasonObjectiveSettlement(gameState);
+    const breakthroughRow = settlement.rows.find(
+      (row) => row.teamId === "C-C" && row.objectiveId === "player-top20-breakthrough",
+    );
+
+    expect(breakthroughRow?.status).toBe("failed");
+    expect(breakthroughRow?.cashDelta).toBe(0);
+    expect(breakthroughRow?.boardConfidenceDelta).toBeGreaterThanOrEqual(0);
+    // Und es taucht nicht als Vorstands-Warnung auf, solange die verbindlichen Ziele stehen.
+    expect(overview.boardConfidence["C-C"]).toBeDefined();
   });
 });

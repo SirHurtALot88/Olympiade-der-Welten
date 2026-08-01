@@ -105,6 +105,15 @@ type ObjectiveDraft = {
   penaltyCash?: number;
   boardConfidenceDelta?: number;
   source?: string;
+  /**
+   * Das Ziel wird gegen eine Rangmarke gewertet (Liga-Rang, Achsen-Rang, Disziplin-Rang eines
+   * Spielers). Der Vorstand stellt pro Saison nur EIN verbindliches Rang-Ziel — jedes weitere im
+   * Slate wird in der Vergabe zum optionalen Zusatzziel herabgestuft (siehe
+   * `demoteExtraRankTargets`).
+   */
+  rankTarget?: boolean;
+  /** In der Vergabe zum Zusatzziel herabgestuft: bringt Bonus, kostet aber nichts. */
+  optional?: boolean;
 };
 
 type AxisKey = "pow" | "spe" | "men" | "soc";
@@ -504,6 +513,7 @@ export function getExpectationRankObjective(input: {
     rewardCash,
     penaltyCash,
     boardConfidenceDelta,
+    rankTarget: true,
     source: "team_expectation_rank_model",
   };
 }
@@ -990,6 +1000,7 @@ function getAxisRankObjective(input: {
     rewardCash: targetRank <= 5 ? 6 : 4,
     penaltyCash: status === "failed" ? 2 : undefined,
     boardConfidenceDelta: status === "completed" ? 0.55 : status === "at_risk" ? -0.15 : -0.45,
+    rankTarget: true,
     source: explicitPowerChase || explicitMentalChase ? "team_signature_axis_rank_goal" : "team_profile_axis_rank_goal",
   };
 }
@@ -1035,6 +1046,7 @@ function getAllRoundAxisObjective(input: {
     rewardCash: 5,
     penaltyCash: status === "failed" ? 2 : undefined,
     boardConfidenceDelta: status === "completed" ? 0.5 : status === "at_risk" ? -0.1 : -0.45,
+    rankTarget: true,
     source: "team_profile_allround_axis_goal",
   };
 }
@@ -1132,6 +1144,7 @@ function getNextMatchdayTop10Objective(gameState: GameState, team: Team): Object
     status: bestRank == null ? "open" : bestRank <= 10 ? "completed" : bestRank <= 14 ? "at_risk" : "failed",
     rewardCash: 2,
     boardConfidenceDelta: bestRank != null && bestRank <= 10 ? 0.25 : bestRank != null && bestRank > 14 ? -0.25 : 0,
+    rankTarget: true,
     source: result ? "discipline_results_current_matchday" : "season_discipline_schedule",
   };
 }
@@ -1207,6 +1220,7 @@ function getTopPlayerObjective(input: {
     status,
     rewardCash: status === "completed" ? 4 : undefined,
     boardConfidenceDelta: status === "completed" ? 0.55 : status === "failed" ? -0.35 : status === "at_risk" ? 0.1 : 0,
+    rankTarget: true,
     source: ranks.length ? "player_discipline_performance_rank" : "player_performance_pending",
   };
 }
@@ -1282,6 +1296,7 @@ function getPlayerTop50Objective(input: {
     rewardCash: status === "completed" ? 2 : undefined,
     penaltyCash: status === "failed" ? 1 : undefined,
     boardConfidenceDelta: status === "completed" ? 0.35 : status === "failed" ? -0.3 : status === "at_risk" ? -0.1 : 0,
+    rankTarget: true,
     source: summary.bestRank == null ? "player_performance_pending" : "player_discipline_performance_rank",
   };
 }
@@ -1325,6 +1340,7 @@ function getPlayerTop20Objective(input: {
     rewardCash: status === "completed" ? (wantsRepeatPeak ? 5 : 3) : undefined,
     penaltyCash: status === "failed" ? (wantsRepeatPeak ? 2 : 1) : undefined,
     boardConfidenceDelta: status === "completed" ? (wantsRepeatPeak ? 0.55 : 0.35) : status === "failed" ? -0.5 : status === "at_risk" ? -0.15 : 0,
+    rankTarget: true,
     source: summary.bestRank == null ? "player_performance_pending" : "player_discipline_performance_rank",
   };
 }
@@ -1426,6 +1442,7 @@ function getRivalryObjective(input: {
     rewardCash: status === "completed" ? 5 : undefined,
     penaltyCash: status === "failed" ? 2 : undefined,
     boardConfidenceDelta: status === "completed" ? 0.5 : status === "at_risk" ? -0.1 : -0.5,
+    rankTarget: true,
     source: `team_rivalry_matrix:${rivalry.rivalryId}`,
   };
 }
@@ -1468,6 +1485,34 @@ function pickUrgentObjective(objectives: ObjectiveDraft[], category: TeamSeasonO
     objectives.find((objective) => objective.category === category) ??
     null
   );
+}
+
+/**
+ * Regel über das Spiel (Chris): Der Vorstand kann pro Saison nicht zwei Rang-Ziele gleichzeitig
+ * verlangen. Das erste vergebene Rang-Ziel bleibt verbindlich — es ist der Slot-1-Sportauftrag, an
+ * dem die Saison gemessen wird. Jedes weitere Rang-Ziel im Slate wird zum optionalen Zusatzziel:
+ * Es kann Bonus bringen, kostet aber weder Cash noch Vorstandsvertrauen, wenn es verfehlt wird.
+ *
+ * Das ist eine Entscheidung der VERGABE. Wie ein einzelnes Ziel gegen seine Marke gewertet wird,
+ * bleibt unverändert — ein herabgestuftes Ziel zeigt weiter seinen echten Stand, nur ohne Strafe.
+ */
+function demoteExtraRankTargets(picked: ObjectiveDraft[]): ObjectiveDraft[] {
+  let bindingRankTargetTaken = false;
+  return picked.map((objective) => {
+    if (!objective.rankTarget) return objective;
+    if (!bindingRankTargetTaken) {
+      bindingRankTargetTaken = true;
+      return objective;
+    }
+    return {
+      ...objective,
+      optional: true,
+      label: `${objective.label} (optional)`,
+      penaltyCash: undefined,
+      // Bonus bleibt, Abzug entfällt: ein Zusatzziel darf das Vertrauen nur heben.
+      boardConfidenceDelta: Math.max(0, objective.boardConfidenceDelta ?? 0),
+    };
+  });
 }
 
 export function selectBoardObjectiveDrafts(input: {
@@ -1541,7 +1586,7 @@ export function selectBoardObjectiveDrafts(input: {
     add(objective);
   }
 
-  return picked;
+  return demoteExtraRankTargets(picked);
 }
 
 function buildSponsorObjectiveDrafts(input: {
@@ -1691,6 +1736,7 @@ function buildTeamObjectives(input: {
         rewardCash: sportTarget.rank <= 4 ? 12 : 6,
         penaltyCash: sportTarget.rank <= 4 ? 4 : 1,
         boardConfidenceDelta: statusForRank(row.rank, sportTarget.rank) === "completed" ? 0.8 : -0.6,
+        rankTarget: true,
         source: "team_identity_ambition_current_rank",
       },
       getPreferredAxisObjective({ team, identity, profile, row }),
@@ -1772,12 +1818,16 @@ function buildTeamObjectives(input: {
     };
   })();
 
-  return [...objectiveDrafts, ...(boardConfidencePenaltyDraft ? [boardConfidencePenaltyDraft] : []), ...sponsorDrafts].map((objective) => ({
-    seasonId: gameState.season.id,
-    teamId: team.teamId,
-    source: objective.source ?? "board_objective_generator_v1",
-    ...objective,
-  }));
+  // `rankTarget` ist reine Vergabe-Information (welche Ziele um das eine verbindliche Rang-Ziel
+  // konkurrieren) und wandert nicht in den Spielstand — dort zählt nur noch `optional`.
+  return [...objectiveDrafts, ...(boardConfidencePenaltyDraft ? [boardConfidencePenaltyDraft] : []), ...sponsorDrafts].map(
+    ({ rankTarget: _rankTarget, ...objective }) => ({
+      seasonId: gameState.season.id,
+      teamId: team.teamId,
+      source: objective.source ?? "board_objective_generator_v1",
+      ...objective,
+    }),
+  );
 }
 
 function mergeStoredTeamObjectives(input: {
@@ -1831,6 +1881,9 @@ function mergeStoredTeamObjectives(input: {
       currentValue: generatedObjective.currentValue,
       status: generatedObjective.status,
       boardConfidenceDelta: generatedObjective.boardConfidenceDelta,
+      // Ob ein Ziel verbindlich oder nur ein Zusatzziel ist, entscheidet die Vergabe bei jedem
+      // Refresh neu — der gespeicherte Stand darf das nicht einfrieren.
+      optional: generatedObjective.optional,
       source: appendObjectiveSource(storedObjective.source, "status_refresh"),
     });
   }
@@ -1883,8 +1936,11 @@ export function calculateBoardConfidence(input: {
     base = identitySeed;
   }
   const delta = input.objectives.reduce((sum, objective) => sum + (objective.boardConfidenceDelta ?? 0), 0);
-  const failed = input.objectives.filter((objective) => objective.status === "failed").length;
-  const atRisk = input.objectives.filter((objective) => objective.status === "at_risk").length;
+  // Optionale Zusatzziele (herabgestufte Rang-Ziele) erzeugen keinen Druck: Der Vorstand hat sie
+  // nicht verlangt, also darf ihr Verfehlen weder Vertrauen kosten noch die Pressure hochtreiben.
+  const bindingObjectives = input.objectives.filter((objective) => !objective.optional);
+  const failed = bindingObjectives.filter((objective) => objective.status === "failed").length;
+  const atRisk = bindingObjectives.filter((objective) => objective.status === "at_risk").length;
   const value = roundValue(clamp(base + delta, 1, 10), 1);
   const pressure = roundValue(clamp(11 - value + failed * 0.8 + atRisk * 0.35, 1, 10), 1);
 
