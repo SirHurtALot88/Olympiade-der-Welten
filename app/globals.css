@@ -44247,7 +44247,16 @@ button.foundation-team-portrait-card {
   --nl-fs-lg: 13px;
   --nl-fs-xl: 17px;
 
-  /* Sanfte, sichere Basis — kein Restyling bestehender Markup-Elemente. */
+  /* Sanfte, sichere Basis — kein Restyling bestehender Markup-Elemente.
+     `color` ist bewusst dabei (anders als die restlichen Zeilen hier, die nur
+     Restyling vermeiden wollen): `.is-new-look` sitzt auf dunklem Grund
+     (`--nl-bg`), `body { color: var(--ink) }` (fast schwarz, für den hellen
+     Seiten-Body gedacht) vererbt aber sonst bis zu jedem Element ohne eigene
+     Farbe durch — dunkler Text auf dunklem Grund. Diese eine Zeile ist die
+     Vorgabe „auf dunklem Grund ist Weiß der Standard": Elemente mit eigener
+     `color` (z.B. helle Flächen wie `.is-active-sort`) sind unberührt, nur
+     wer gar keine Farbe setzt, erbt jetzt hell statt schwarz. */
+  color: var(--nl-ink);
   accent-color: var(--nl-accent);
   scrollbar-color: var(--nl-line-2) transparent;
 }
