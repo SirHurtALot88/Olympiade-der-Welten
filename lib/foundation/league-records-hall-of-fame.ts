@@ -1,6 +1,7 @@
 import type { GameState, SeasonSnapshotRecord } from "@/lib/data/olyDataTypes";
 import { buildAllTimeTableFromSnapshots, resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
 import { buildPlayerLeagueCareerStatsMap } from "@/lib/foundation/player-league-career-stats";
+import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 
 /**
@@ -133,6 +134,38 @@ function seasonLabelOf(snapshot: SeasonSnapshotRecord): string {
   return getCanonicalSeasonLabel({ seasonId: snapshot.seasonId, seasonName: snapshot.seasonName });
 }
 
+/**
+ * Die hoechste je gezahlte Abloese — aus `gameState.transferHistory`.
+ *
+ * `contract_exit` bleibt aussen vor: ein auslaufender Vertrag ist kein Transfer mit Abloese,
+ * er stuende sonst mit 0 in einer Rekordliste. Ebenso `fee <= 0` — ein abloesefreier Wechsel
+ * ist kein Ablose-Rekord.
+ */
+function buildRecordTransferFee(gameState: GameState): RecordTransferFeeEntry | null {
+  // `?? []` statt direktem Zugriff: aeltere Spielstaende und Import-Fixtures tragen diese Listen
+  // nicht zwingend. Fehlt die Historie, gibt es schlicht keinen Rekord — das ist die ehrliche
+  // Antwort, ein Absturz waere keine.
+  const playerNameById = new Map((gameState.players ?? []).map((player) => [player.id, player.name] as const));
+  const teamNameById = new Map((gameState.teams ?? []).map((team) => [team.teamId, team.name] as const));
+
+  let best: RecordTransferFeeEntry | null = null;
+  for (const transfer of gameState.transferHistory ?? []) {
+    if (transfer.transferType === "contract_exit") continue;
+    if (!isFiniteNumber(transfer.fee) || transfer.fee <= 0) continue;
+    if (best != null && transfer.fee <= best.amount) continue;
+    best = {
+      playerId: transfer.playerId,
+      playerName: playerNameById.get(transfer.playerId) ?? transfer.playerId,
+      fromTeamName: transfer.fromTeamId ? teamNameById.get(transfer.fromTeamId) ?? null : null,
+      toTeamName: transfer.toTeamId ? teamNameById.get(transfer.toTeamId) ?? null : null,
+      seasonLabel: transfer.seasonLabel ?? getCanonicalSeasonLabel({ seasonId: transfer.seasonId, seasonName: null }),
+      amount: Number(transfer.fee.toFixed(2)),
+      type: transfer.transferType === "sell" ? "sell" : "buy",
+    };
+  }
+  return best;
+}
+
 export function buildLeagueRecordsHallOfFame(gameState: GameState): LeagueRecordsHallOfFame {
   const snapshots = sortSnapshotsAsc(
     (gameState.seasonState.seasonSnapshots ?? []).filter((snapshot) => (snapshot.finalStandings?.length ?? 0) > 0),
@@ -193,24 +226,16 @@ export function buildLeagueRecordsHallOfFame(gameState: GameState): LeagueRecord
   }
 
   // --- Rekord-Transferablöse -------------------------------------------
-  let recordTransferFee: RecordTransferFeeEntry | null = null;
-  for (const snapshot of snapshots) {
-    for (const transfer of snapshot.transferSnapshots ?? []) {
-      if (transfer.type === "contract_exit") continue;
-      if (!isFiniteNumber(transfer.amount) || transfer.amount <= 0) continue;
-      if (recordTransferFee == null || transfer.amount > recordTransferFee.amount) {
-        recordTransferFee = {
-          playerId: transfer.playerId,
-          playerName: transfer.playerName,
-          fromTeamName: transfer.fromTeamName,
-          toTeamName: transfer.toTeamName,
-          seasonLabel: seasonLabelOf(snapshot),
-          amount: transfer.amount,
-          type: transfer.type,
-        };
-      }
-    }
-  }
+  /**
+   * Quelle ist `gameState.transferHistory` — save-weit, ueberlebt den Saisonwechsel und traegt
+   * in Saison 1 bereits jeden Transfer.
+   *
+   * Vorher las diese Stelle die Transferliste AUS DEM SNAPSHOT, also eine zweite Fassung
+   * derselben Transfers, die erst mit dem ersten Saisonarchiv entsteht. Beide zu haben hiesse:
+   * zwei Quellen fuer dieselbe Groesse, von denen eine die halbe Spielzeit lang leer ist. Die
+   * Snapshot-Fassung wird hier deshalb nicht mehr gelesen.
+   */
+  const recordTransferFee = buildRecordTransferFee(gameState);
 
   // --- Höchstes Board-Vertrauen -----------------------------------------
   let highestBoardConfidence: HighestBoardConfidenceEntry | null = null;
@@ -270,7 +295,22 @@ export function buildLeagueRecordsHallOfFame(gameState: GameState): LeagueRecord
   }
 
   // --- Karriere-Leaderboard (Auftritte / PPs / MVP) ----------------------
-  const careerStatsMap = buildPlayerLeagueCareerStatsMap(gameState);
+  /**
+   * GEMELDET: „der rekorde tab ist noch tot da passiert fast gar nichts" — und der Reiter
+   * „Legendäre Spieler" war leer.
+   *
+   * Der Grund war NICHT, dass die Daten fehlen: `buildPlayerLeagueCareerStatsMap` fuehrt Archiv
+   * und laufende Saison schon immer zusammen (`currentSeasonLedger` /
+   * `currentSeasonPerformanceByPlayerId`, dedupliziert ueber `seasonId`). Hier wurde sie nur
+   * OHNE diese Optionen aufgerufen — also sah sie ausschliesslich Snapshots, und die sind in
+   * Saison 1 leer. Zwei von vier Reitern waren dadurch waehrend der gesamten ersten Saison tot.
+   *
+   * Die laufende Saison faellt automatisch wieder heraus, sobald sie als Snapshot existiert —
+   * die Funktion prueft `snapshotSeasonIds.has(currentSeasonId)`. Doppelzaehlung ist damit
+   * ausgeschlossen, ohne dass hier etwas zu tun waere.
+   */
+  const currentSeasonLedger = buildSeasonPointsLedger(gameState);
+  const careerStatsMap = buildPlayerLeagueCareerStatsMap(gameState, { currentSeasonLedger });
   const latestIdentityByPlayerId = new Map<string, { playerName: string; teamName: string | null }>();
   const mvpTotalByPlayerId = new Map<string, number>();
   const teamsByPlayerId = new Map<string, string[]>();
@@ -289,6 +329,39 @@ export function buildLeagueRecordsHallOfFame(gameState: GameState): LeagueRecord
         }
         teamsByPlayerId.set(performance.playerId, teams);
       }
+    }
+  }
+
+  /**
+   * Namen und Teams der LAUFENDEN Saison — ohne sie stuenden in Saison 1 lauter Spieler-IDs in
+   * der Liste, weil die Identitaet bisher nur aus Snapshots kam. Bewusst NACH den Snapshots
+   * gesetzt: `latestIdentity` soll der juengste Stand sein, und der aktuelle Kader ist juenger
+   * als jedes Archiv.
+   */
+  const teamNameById = new Map((gameState.teams ?? []).map((team) => [team.teamId, team.name] as const));
+  const currentTeamNameByPlayerId = new Map(
+    (gameState.rosters ?? [])
+      .map((entry) => [entry.playerId, teamNameById.get(entry.teamId) ?? null] as const)
+      .filter((entry): entry is readonly [string, string] => entry[1] != null),
+  );
+  for (const player of gameState.players ?? []) {
+    if (!careerStatsMap.has(player.id)) continue;
+    const teamName = currentTeamNameByPlayerId.get(player.id) ?? null;
+    latestIdentityByPlayerId.set(player.id, { playerName: player.name, teamName });
+    if (teamName) {
+      const teams = teamsByPlayerId.get(player.id) ?? [];
+      if (!teams.includes(teamName)) {
+        teams.push(teamName);
+      }
+      teamsByPlayerId.set(player.id, teams);
+    }
+  }
+
+  // MVP-Auftritte der laufenden Saison — dieselbe Quelle, aus der auch der Spieltag sie liest.
+  if (!snapshots.some((snapshot) => snapshot.seasonId === gameState.season.id)) {
+    for (const performance of gameState.seasonState.playerDisciplinePerformances ?? []) {
+      if (!performance.isMvpCandidate) continue;
+      mvpTotalByPlayerId.set(performance.playerId, (mvpTotalByPlayerId.get(performance.playerId) ?? 0) + 1);
     }
   }
 
