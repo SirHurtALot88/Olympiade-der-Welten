@@ -3,6 +3,15 @@
   "eintraege": [
     {
       "datum": "2026-08-01",
+      "seite": "Spieltag · Einsatzliste",
+      "pr": "#323",
+      "text": "Hat dein Kader weniger Spieler, als der Spieltag Plätze hat, sagt die Einsatzliste jetzt, warum niemand mehr auswählbar ist — und lässt dich trotzdem speichern und in die Arena.",
+      "quelle": "triage",
+      "gewicht": "spielblockierend",
+      "version": null
+    },
+    {
+      "datum": "2026-08-01",
       "seite": "Markt · Transfermarkt",
       "pr": "#306",
       "text": "Im Draft könnt ihr jetzt bis zu 15 Spieler auf die Wunschliste setzen; danach gilt wieder die gewohnte Scouting-Grenze.",
