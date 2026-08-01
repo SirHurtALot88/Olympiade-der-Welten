@@ -25,6 +25,7 @@ import {
 import { isLegacyLineupDraftComplete } from "@/lib/lineups/legacy-matchday-readiness";
 import { calculateTeamPowerModifierForSide, ensureLocalTeamPowersForSeason } from "@/lib/lineups/team-powers";
 import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
+import { findStaleAiLineupEntries, shouldSkipExistingAiDraft } from "@/lib/ai/ai-lineup-freshness";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import type { PersistenceService } from "@/lib/persistence/types";
@@ -1724,7 +1725,27 @@ export function applyAiLegacyLineupBatchLocally(
     // bereits vollständig entscheidbar. `previewStatus`/Captain-Felder bleiben leer, weil für ein
     // NICHT angefasstes Team keine KI-Aufstellung berechnet wurde — das ist ehrlicher als der
     // frühere Status einer sofort weggeworfenen Vorschau.
-    if (hasCompleteExistingDraft && !overwriteExisting) {
+    // Die KI plant vorab und reagiert nicht dynamisch — zwischen Plan und Spieltag verletzt sich
+    // ein Spieler oder laeuft in die Fatigue. Bevor ein vorhandener Entwurf uebersprungen wird,
+    // muss er deshalb gegen den AKTUELLEN Kaderzustand geprueft werden. Ohne diese Pruefung blieb
+    // ein Verletzter in der abgegebenen Aufstellung stehen, riss beim Aufloesen ein Loch, und der
+    // Standings-Apply verweigerte danach den GANZEN Spieltag (Meldung 32k3rk: zwei KI-Teams
+    // blockierten die ganze Liga). Passt der Entwurf nicht mehr, faellt er hier NICHT in den
+    // Uebersprung, sondern wird unten reguler neu gerechnet.
+    const staleDraftFindings = hasCompleteExistingDraft
+      ? findStaleAiLineupEntries({
+          entryPlayerIds: (contextResult.context.existingDraft?.entries ?? []).map((entry) => entry.playerId),
+          rosterPlayers: contextResult.context.rosterPlayers ?? [],
+        })
+      : [];
+
+    if (
+      shouldSkipExistingAiDraft({
+        hasCompleteExistingDraft,
+        overwriteExisting,
+        staleFindingCount: staleDraftFindings.length,
+      })
+    ) {
       results.push({
         teamId: team.teamId,
         teamCode: team.teamCode,
@@ -1881,7 +1902,16 @@ export function applyAiLegacyLineupBatchLocally(
       baseWarnings.push("partial_lineup_saved_max_available_players");
     }
 
-    if (hasCompleteExistingDraft && !overwriteExisting) {
+    // Zweites Tor, dieselbe Bedingung wie oben — und deshalb dieselbe Ausnahme. Ohne sie faellt ein
+    // veralteter Entwurf zwar in die Neuberechnung, wird aber hier doch wieder verworfen und nie
+    // gespeichert: der Fehler bliebe bestehen, nur teurer.
+    if (
+      shouldSkipExistingAiDraft({
+        hasCompleteExistingDraft,
+        overwriteExisting,
+        staleFindingCount: staleDraftFindings.length,
+      })
+    ) {
       const captainMeta = buildCaptainPreviewMeta(preview);
       results.push({
         teamId: preview.teamId,
