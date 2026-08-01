@@ -364,6 +364,7 @@ import {
   buildLeagueTrainingLeaderRows,
   type LeagueLeaderCategoryId,
 } from "@/lib/foundation/league-leaders-service";
+import { buildMostImprovedRows, formatMostImprovedValue } from "@/lib/foundation/most-improved-service";
 import { resolveShouldBuildTeamsScopedRatings, shouldBuildTeamsView as resolveShouldBuildTeamsView } from "@/lib/foundation/tabs/teams-view-derivations";
 import type { FoundationMatchdayResultShellHostProps } from "@/app/foundation/matchday-result-v2/FoundationMatchdayResultShellHost";
 import type { FoundationHistoryV2ShellHostProps } from "@/app/foundation/transfer-history-v2/FoundationHistoryV2ShellHost";
@@ -10051,11 +10052,26 @@ export function useFoundationShellRouterBodyScope({
       return [];
     }
 
+    // Reihenfolge kommt fertig aus dem Most-Improved-Service — `buildLeagueLeaderBoards`
+    // uebernimmt sie unveraendert, damit Platz 1 der Liste derselbe Spieler ist wie der
+    // Saisonende-Award (siehe `most-improved-service.ts`).
+    const mostImprovedRows = buildMostImprovedRows(gameState, playerRatingsById).map((row) => ({
+      playerId: row.playerId,
+      name: row.name,
+      teamId: row.teamId,
+      teamCode: row.teamCode,
+      teamName: row.teamName,
+      delta: row.delta,
+      displayValue: formatMostImprovedValue(row.delta),
+      ovrRank: row.ovrRank,
+    }));
+
     return buildLeagueLeaderBoards({
       seasonRows: seasonTopPlayerRows,
       trainingRows: leagueTrainingLeaderRows,
+      mostImprovedRows,
     });
-  }, [leagueTrainingLeaderRows, seasonTopPlayerRows, shouldBuildLeagueLeaderBoards]);
+  }, [gameState, leagueTrainingLeaderRows, playerRatingsById, seasonTopPlayerRows, shouldBuildLeagueLeaderBoards]);
 
   // Ewige Tabelle — Live-Stand der laufenden Saison je Team, direkt aus dem
   // Season-Standings-Feed (siehe `shouldLoadSeasonOverviewFeed`, das den

@@ -35,9 +35,37 @@ export type LeagueTrainingLeaderSourceRow = {
   ovrRank: number | null;
 };
 
-export type LeagueLeaderTone = "total" | "pow" | "spe" | "men" | "soc" | "mvs" | "ovr" | "training";
+/**
+ * Bereits fertig sortierte Most-Improved-Zeilen aus `most-improved-service`.
+ *
+ * Bewusst strukturell und ohne Import aus jenem Service — dieselbe Entkopplung wie bei
+ * `ovrRankByPlayerId` weiter unten, und sie vermeidet einen Zyklus: der Most-Improved-Service
+ * kennt den Kategorie-Typ von hier, hier ist von dort nichts noetig.
+ */
+export type LeagueMostImprovedSourceRow = {
+  playerId: string;
+  name: string;
+  teamId: string | null;
+  teamCode: string | null;
+  teamName: string;
+  delta: number;
+  displayValue: string;
+  /** Ligaweiter OVR-Rang — siehe `LeagueLeaderSourceRow.ovrRank`. */
+  ovrRank: number | null;
+};
 
-export type LeagueLeaderCategoryId = "pps" | "pow" | "spe" | "men" | "soc" | "ovr" | "mvs" | "training";
+export type LeagueLeaderTone = "total" | "pow" | "spe" | "men" | "soc" | "mvs" | "ovr" | "training" | "improved";
+
+export type LeagueLeaderCategoryId =
+  | "pps"
+  | "pow"
+  | "spe"
+  | "men"
+  | "soc"
+  | "ovr"
+  | "mvs"
+  | "training"
+  | "mostImproved";
 
 export type LeagueLeaderEntry = {
   rank: number;
@@ -116,9 +144,43 @@ function buildCategory(
   return { id, label, tone, entries };
 }
 
+/**
+ * Kategorie aus einer Liste, die ihre Reihenfolge SCHON mitbringt.
+ *
+ * `buildCategory` sortiert selbst (Wert, dann Name) — fuer Most Improved waere das falsch: dort
+ * loest `compareMostImprovedRows` den Gleichstand feiner auf, und genau diese Reihenfolge muss
+ * die Bestenliste uebernehmen, sonst kuert die Liste einen anderen Ersten als die
+ * Saisonende-Auszeichnung.
+ */
+function buildPreSortedCategory(
+  id: string,
+  label: string,
+  tone: LeagueLeaderTone,
+  rows: Array<LeaderCandidateRow & { displayValue: string }>,
+  limit: number,
+): LeagueLeaderCategory {
+  const entries = rows
+    .filter((row) => row.value != null && Number.isFinite(row.value))
+    .slice(0, limit)
+    .map((row, index) => ({
+      rank: index + 1,
+      playerId: row.playerId,
+      name: row.name,
+      teamId: row.teamId,
+      teamCode: row.teamCode,
+      teamName: row.teamName,
+      value: row.value as number,
+      displayValue: row.displayValue,
+      ovrRank: row.ovrRank,
+    }));
+
+  return { id, label, tone, entries };
+}
+
 export function buildLeagueLeaderBoards(input: {
   seasonRows: LeagueLeaderSourceRow[];
   trainingRows?: LeagueTrainingLeaderSourceRow[];
+  mostImprovedRows?: LeagueMostImprovedSourceRow[];
   limit?: number;
 }): LeagueLeaderCategory[] {
   const limit = input.limit ?? LEAGUE_LEADER_DEFAULT_LIMIT;
@@ -157,6 +219,27 @@ export function buildLeagueLeaderBoards(input: {
           teamCode: row.teamCode,
           teamName: row.teamName,
           value: row.trainingForecast,
+          ovrRank: row.ovrRank,
+        })),
+        limit,
+      ),
+    );
+  }
+
+  if (input.mostImprovedRows && input.mostImprovedRows.length > 0) {
+    categories.push(
+      buildPreSortedCategory(
+        "mostImproved",
+        "Most Improved",
+        "improved",
+        input.mostImprovedRows.map((row) => ({
+          playerId: row.playerId,
+          name: row.name,
+          teamId: row.teamId,
+          teamCode: row.teamCode,
+          teamName: row.teamName,
+          value: row.delta,
+          displayValue: row.displayValue,
           ovrRank: row.ovrRank,
         })),
         limit,

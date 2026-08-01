@@ -14,6 +14,11 @@ import {
 } from "@/lib/board/team-season-objectives-service";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildPlayerSeasonPerformanceMap } from "@/lib/foundation/player-season-performance";
+import {
+  buildMostImprovedRows,
+  formatMostImprovedValue,
+  resolveMostImprovedWinner,
+} from "@/lib/foundation/most-improved-service";
 
 export type SeasonReviewAward = {
   awardId: string;
@@ -506,12 +511,46 @@ export function buildSeasonReview(gameState: GameState): SeasonReview {
     }));
   }
 
+  /**
+   * Most Improved Player — der Aufsteiger der Saison.
+   *
+   * NICHT zu verwechseln mit `xpDevelopmentRankings.topImproved` weiter oben: das ist ein
+   * Diagnose-Report ueber die XP-Ausgaben und misst, wer beim Saisonende-Ausbau die meisten
+   * Attributpunkte GEKAUFT hat. Der zaehlt hier bewusst nicht — er speist sich aus
+   * `playerProgressionEvents`, die erst im Schritt `player_development` entstehen, also NACH
+   * `season_rewards`, wo diese Auszeichnung faellt. Zum Zeitpunkt der Ehrung ist er leer.
+   *
+   * Der Award misst stattdessen die Verbesserung, die in der Saison sichtbar war — siehe die
+   * ausfuehrliche Begruendung in `most-improved-service.ts`. Dieselbe Rechnung traegt die
+   * Bestenliste-Kategorie "Most Improved"; beide nehmen den Sieger aus
+   * `resolveMostImprovedWinner`, damit Platz 1 der Liste und der Award-Sieger nicht
+   * auseinanderlaufen koennen.
+   */
+  const mostImprovedRows = buildMostImprovedRows(gameState);
+  const mostImproved = resolveMostImprovedWinner(mostImprovedRows);
+  if (mostImproved) {
+    awards.push(makeAward({
+      awardId: "most_improved_player",
+      label: "Most Improved Player",
+      category: "player",
+      winnerType: "player",
+      winnerId: mostImproved.playerId,
+      winnerName: mostImproved.name,
+      value: mostImproved.delta,
+      reason: `Feldposition ${mostImproved.earlyFieldPosition} → ${mostImproved.lateFieldPosition} (${formatMostImprovedValue(mostImproved.delta)})`,
+      source: "most-improved-service.fieldPositionTrend",
+    }));
+  } else {
+    warnings.push("most_improved_source_missing");
+  }
+
   const storylines = [
     championTeam ? { storylineId: "champion-run", text: `${championTeam.name} beendet die Saison als Champion mit ${championTeam.value} Punkten.`, source: championTeam.source } : null,
     topPlayers[0] ? { storylineId: "player-season-leader", text: `${topPlayers[0].name} war der prägendste Spieler der Saison (${topPlayers[0].label}).`, source: topPlayers[0].source } : null,
     dominantDisciplineWin ? { storylineId: "dominant-discipline-win", text: `${dominantDisciplineWin.name} lieferte den dominantesten Diszi-Sieg: ${dominantDisciplineWin.label}.`, source: dominantDisciplineWin.source } : null,
     transferHighlights[0] ? { storylineId: "transfer-headline", text: `${transferHighlights[0].playerName} war der Transfer-Aufmacher: ${transferHighlights[0].label}.`, source: transferHighlights[0].source } : null,
     promisedRoleSignals[0] ? { storylineId: "promised-role-gap", text: `${promisedRoleSignals[0].playerName} bekam als ${promisedRoleSignals[0].promisedRole} nur ${promisedRoleSignals[0].appearances}/${promisedRoleSignals[0].expectedAppearances} Einsätze.`, source: promisedRoleSignals[0].source } : null,
+    mostImproved ? { storylineId: "most-improved-player", text: `${mostImproved.name} ist der Aufsteiger der Saison: von Feldposition ${mostImproved.earlyFieldPosition} in der Hinrunde auf ${mostImproved.lateFieldPosition} in der Rückrunde.`, source: "most-improved-service.fieldPositionTrend" } : null,
     xpDevelopmentRankings.topImproved[0] ? { storylineId: "xp-development-leader", text: `${xpDevelopmentRankings.topImproved[0].playerName} führt die XP-Entwicklung an (${xpDevelopmentRankings.topImproved[0].label}).`, source: xpDevelopmentRankings.topImproved[0].source } : null,
   ].filter((entry): entry is { storylineId: string; text: string; source: string } => Boolean(entry));
 
