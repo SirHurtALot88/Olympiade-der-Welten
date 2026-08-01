@@ -47067,6 +47067,75 @@ button.foundation-team-portrait-card {
   border-top: 1px solid var(--nl-line);
 }
 
+/* Legenden-Kriterien: je Anwärter eine Checkliste. Die Häkchen sind die eigentliche Aussage —
+   sie zeigen, WAS noch fehlt, nicht nur dass etwas fehlt. */
+.is-new-look .nl-legend-candidates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--nl-s2, 10px);
+}
+
+.is-new-look .nl-legend-candidate {
+  border: 1px solid var(--nl-line);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.is-new-look .nl-legend-candidate-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  padding: 0 0 6px;
+  cursor: pointer;
+}
+
+.is-new-look .nl-legend-candidate-head small {
+  color: var(--nl-mut, #93a3bd);
+  font-size: 0.74rem;
+}
+
+.is-new-look .nl-legend-score {
+  margin-left: auto;
+  font-weight: 600;
+}
+
+.is-new-look .nl-legend-criterialist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 3px 10px;
+}
+
+.is-new-look .nl-legend-criterion {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 0.74rem;
+  color: var(--nl-mut, #93a3bd);
+}
+
+.is-new-look .nl-legend-criterion.is-met {
+  color: var(--nl-good, #59c88a);
+}
+
+.is-new-look .nl-legend-criterion-label {
+  font-weight: 600;
+}
+
+.is-new-look .nl-legend-criterion-stand {
+  margin-left: auto;
+  opacity: 0.85;
+}
+
 /* Ewige Tabelle: Umschalter zwischen Team- und Liga-Sicht, darunter die Liste. Bewusst als
    Liste und nicht als NlTable — die Zeile trägt zwei Zahlen (für uns / Karriere) und eine
    Statuszeile, das wird in einer Spaltentabelle schnell eng. */

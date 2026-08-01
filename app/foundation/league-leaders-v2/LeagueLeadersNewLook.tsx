@@ -47,6 +47,7 @@ import {
   type EternalPlayerScope,
   type EternalPlayerStatus,
 } from "@/lib/foundation/eternal-player-table";
+import { buildLeagueLegends } from "@/lib/foundation/league-legend-criteria";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import {
   buildLeagueAchievements,
@@ -1062,8 +1063,82 @@ function LegendaryPlayersPanel({
         />
       </NlCard>
 
+      {gameState ? <LegendCriteriaPanel gameState={gameState} legends={legends} onOpenPlayer={onOpenPlayer} /> : null}
       {gameState ? <EternalPlayerTablePanel gameState={gameState} ownTeamId={ownTeamId} onOpenPlayer={onOpenPlayer} /> : null}
     </div>
+  );
+}
+
+/**
+ * "Wer wird unsterblich?" — die Legenden-Definition als sichtbares Langzeitziel.
+ *
+ * GEWÜNSCHT: „Legendäre spieler definieren."
+ *
+ * Vorher hieß „legendär" schlicht: steht in den Top 25 der Karriere-PPs. Das ist eine
+ * Sortierung, keine Definition — in einer Liste der besten 25 sind immer 25 Spieler, auch am
+ * ersten Spieltag. Ein Status, den man weder verfehlen noch verlieren kann, ist keiner.
+ *
+ * In Saison 1 kann es per Definition keine Legenden geben (Kriterium „Dauer" verlangt drei
+ * Saisons). Statt eines Leerzustands zeigt der Reiter deshalb die KRITERIEN selbst und die
+ * Anwärter mit Fortschritt — dieselben Resolver, die später den Status verleihen. Die Anzeige
+ * graduiert, es entsteht keine zweite Ansicht.
+ */
+function LegendCriteriaPanel({
+  gameState,
+  legends,
+  onOpenPlayer,
+}: {
+  gameState: GameState;
+  legends: PlayerCareerLeaderRow[];
+  onOpenPlayer: (playerId: string) => void;
+}) {
+  const bewertung = useMemo(() => buildLeagueLegends(gameState, legends), [gameState, legends]);
+  const zeigeLegenden = bewertung.legends.length > 0;
+  const liste = zeigeLegenden ? bewertung.legends : bewertung.anwaerter;
+
+  return (
+    <NlCard
+      className="nl-legend-criteria-card"
+      eyebrow={
+        zeigeLegenden
+          ? `${formatNlNumber(bewertung.legends.length, 0)} Legende${bewertung.legends.length === 1 ? "" : "n"}`
+          : `frühestens ab Saison ${formatNlNumber(bewertung.moeglichAbSaison, 0)} · aktuell Saison ${formatNlNumber(bewertung.aktuelleSaison, 0)}`
+      }
+      title={zeigeLegenden ? "Legenden" : "Auf dem Weg zur Legende"}
+    >
+      <p className="nl-leaders-hint">
+        Legende wird, wer <strong>mindestens {formatNlNumber(bewertung.moeglichAbSaison, 0)} Saisons</strong> gespielt hat
+        und dazu <strong>zwei weitere Kriterien</strong> erfüllt. Die Dauer ist Pflicht — sonst wäre jeder Saison-1-Leader
+        sofort Legende.
+      </p>
+
+      <ol className="nl-legend-candidates" data-testid="legend-candidates">
+        {liste.map((kandidat) => (
+          <li key={kandidat.playerId} className="nl-legend-candidate">
+            <button type="button" className="nl-legend-candidate-head" onClick={() => onOpenPlayer(kandidat.playerId)}>
+              <strong>{kandidat.playerName}</strong>
+              <small>{kandidat.teamName ?? "—"}</small>
+              <span className="nl-legend-score nl-tnum">
+                {formatNlNumber(kandidat.erfuellteAnzahl, 0)}/5
+              </span>
+            </button>
+            <ul className="nl-legend-criterialist">
+              {kandidat.criteria.map((kriterium) => (
+                <li
+                  key={kriterium.id}
+                  className={`nl-legend-criterion${kriterium.erfuellt ? " is-met" : ""}`}
+                  title={kriterium.erklaerung}
+                >
+                  <span aria-hidden="true">{kriterium.erfuellt ? "✓" : "○"}</span>
+                  <span className="nl-legend-criterion-label">{kriterium.label}</span>
+                  <span className="nl-legend-criterion-stand">{kriterium.stand}</span>
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ol>
+    </NlCard>
   );
 }
 
