@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { findStaleAiLineupEntries, isAiLineupDraftStale } from "@/lib/ai/ai-lineup-freshness";
+import { findStaleAiLineupEntries, isAiLineupDraftStale, shouldSkipExistingAiDraft } from "@/lib/ai/ai-lineup-freshness";
 import { FATIGUE_REST_FLOOR, resolveFatigueRestFloor } from "@/lib/fatigue/fatigue-rest-propensity";
 
 /**
@@ -131,5 +131,53 @@ describe("Frischepruefung vorgeplanter KI-Aufstellungen", () => {
 
   it("gilt eine leere Aufstellung nicht als veraltet", () => {
     expect(isAiLineupDraftStale({ entryPlayerIds: [], rosterPlayers: roster(HEALTHY) })).toBe(false);
+  });
+});
+
+/**
+ * Die Torbedingung selbst. Sie steht im Batch an ZWEI Stellen (vor der Generierung und nach der
+ * Validierung) und muss beide Male dasselbe sagen — sonst wird entweder umsonst gerechnet oder das
+ * Ergebnis nach der Neuberechnung wieder verworfen. Beim ersten Anlauf dieses Fixes war genau das
+ * die Falle: Nur das erste Tor war angepasst, der veraltete Entwurf waere trotzdem verworfen worden.
+ */
+describe("Uebersprung-Entscheidung fuer vorhandene KI-Entwuerfe", () => {
+  it("ueberspringt einen gueltigen vollstaendigen Entwurf — das ist die Ersparnis, wegen der es das Tor gibt", () => {
+    expect(
+      shouldSkipExistingAiDraft({ hasCompleteExistingDraft: true, overwriteExisting: false, staleFindingCount: 0 }),
+    ).toBe(true);
+  });
+
+  it("ueberspringt NICHT, wenn der Entwurf veraltet ist — der gemeldete Fehler", () => {
+    expect(
+      shouldSkipExistingAiDraft({ hasCompleteExistingDraft: true, overwriteExisting: false, staleFindingCount: 1 }),
+    ).toBe(false);
+  });
+
+  it("ueberspringt NICHT bei ausdruecklichem Ueberschreiben", () => {
+    expect(
+      shouldSkipExistingAiDraft({ hasCompleteExistingDraft: true, overwriteExisting: true, staleFindingCount: 0 }),
+    ).toBe(false);
+  });
+
+  it("ueberspringt NICHT, wenn gar kein vollstaendiger Entwurf da ist", () => {
+    expect(
+      shouldSkipExistingAiDraft({ hasCompleteExistingDraft: false, overwriteExisting: false, staleFindingCount: 0 }),
+    ).toBe(false);
+  });
+
+  it("verbindet Frischepruefung und Tor: verletzter Spieler im Entwurf => nicht ueberspringen", () => {
+    // Der Weg, den der Batch geht — beide Bausteine hintereinander, nicht nur einer davon.
+    const findings = findStaleAiLineupEntries({
+      entryPlayerIds: ["p-healthy", "player-2891-hellraiser"],
+      rosterPlayers: roster(HEALTHY, { id: "player-2891-hellraiser", injuryStatus: "injured" }),
+    });
+
+    expect(
+      shouldSkipExistingAiDraft({
+        hasCompleteExistingDraft: true,
+        overwriteExisting: false,
+        staleFindingCount: findings.length,
+      }),
+    ).toBe(false);
   });
 });

@@ -25,7 +25,7 @@ import {
 import { isLegacyLineupDraftComplete } from "@/lib/lineups/legacy-matchday-readiness";
 import { calculateTeamPowerModifierForSide, ensureLocalTeamPowersForSeason } from "@/lib/lineups/team-powers";
 import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
-import { findStaleAiLineupEntries } from "@/lib/ai/ai-lineup-freshness";
+import { findStaleAiLineupEntries, shouldSkipExistingAiDraft } from "@/lib/ai/ai-lineup-freshness";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import type { PersistenceService } from "@/lib/persistence/types";
@@ -1739,7 +1739,13 @@ export function applyAiLegacyLineupBatchLocally(
         })
       : [];
 
-    if (hasCompleteExistingDraft && !overwriteExisting && staleDraftFindings.length === 0) {
+    if (
+      shouldSkipExistingAiDraft({
+        hasCompleteExistingDraft,
+        overwriteExisting,
+        staleFindingCount: staleDraftFindings.length,
+      })
+    ) {
       results.push({
         teamId: team.teamId,
         teamCode: team.teamCode,
@@ -1899,7 +1905,13 @@ export function applyAiLegacyLineupBatchLocally(
     // Zweites Tor, dieselbe Bedingung wie oben — und deshalb dieselbe Ausnahme. Ohne sie faellt ein
     // veralteter Entwurf zwar in die Neuberechnung, wird aber hier doch wieder verworfen und nie
     // gespeichert: der Fehler bliebe bestehen, nur teurer.
-    if (hasCompleteExistingDraft && !overwriteExisting && staleDraftFindings.length === 0) {
+    if (
+      shouldSkipExistingAiDraft({
+        hasCompleteExistingDraft,
+        overwriteExisting,
+        staleFindingCount: staleDraftFindings.length,
+      })
+    ) {
       const captainMeta = buildCaptainPreviewMeta(preview);
       results.push({
         teamId: preview.teamId,

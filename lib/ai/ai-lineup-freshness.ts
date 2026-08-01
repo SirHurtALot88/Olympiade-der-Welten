@@ -120,3 +120,24 @@ export function findStaleAiLineupEntries(input: {
 export function isAiLineupDraftStale(input: Parameters<typeof findStaleAiLineupEntries>[0]): boolean {
   return findStaleAiLineupEntries(input).length > 0;
 }
+
+/**
+ * DARF EIN VORHANDENER ENTWURF UEBERSPRUNGEN WERDEN?
+ *
+ * Diese Bedingung steht im Batch an ZWEI Stellen — einmal vor der Generierung (billig, spart die
+ * Rechenzeit) und einmal nach der Validierung (verwirft das Ergebnis). Sie muessen dieselbe Antwort
+ * geben: Wird nur das erste Tor geoeffnet, rechnet der Batch die Aufstellung zwar neu, verwirft sie
+ * am zweiten aber wieder — der Fehler bliebe bestehen, nur teurer. Wird nur das zweite geoeffnet,
+ * wird jedes Mal umsonst gerechnet.
+ *
+ * Deshalb liegt die Regel hier als EINE Funktion und nicht zweimal als Ausdruck. Genau diese
+ * Verdopplung war der Grund, warum die Frischepruefung beim ersten Anlauf wirkungslos geblieben
+ * waere.
+ */
+export function shouldSkipExistingAiDraft(input: {
+  hasCompleteExistingDraft: boolean;
+  overwriteExisting: boolean;
+  staleFindingCount: number;
+}): boolean {
+  return input.hasCompleteExistingDraft && !input.overwriteExisting && input.staleFindingCount === 0;
+}
