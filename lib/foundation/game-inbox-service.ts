@@ -29,21 +29,20 @@ import { buildCaptainCandidateProfiles, hasPersistedTeamCaptain } from "@/lib/mo
 import { buildContractDissolutionOffers } from "@/lib/morale/contract-dissolution-service";
 import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
 import { isSeasonEndRosterPhase } from "@/lib/season/season-end-roster-window";
+import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
+import { FACILITY_CATALOG_BY_ID } from "@/lib/facilities/facility-catalog";
+import { formatGamePhaseLabel } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 
-export type GameInboxTargetView =
-  | "home"
-  | "season"
-  | "cockpit"
-  | "lineup"
-  | "matchdayArena"
-  | "matchdayResult"
-  | "teams"
-  | "training"
-  | "prize"
-  | "market"
-  | "history"
-  | "teamSettings"
-  | "admin";
+/**
+ * Fruehere Fassung war eine EIGENE, handgepflegte Liste — und darum falsch: sie enthielt den
+ * Alt-Bezeichner `training` (kein Reiter, kein Render-Zweig, Ziel fuehrte ins Leere) und kannte
+ * `trainingCompact`/`trainingV2` gar nicht. Weil `GameInboxItem.targetView` als `string`
+ * deklariert ist, hat der Compiler dazu nie etwas gesagt.
+ *
+ * Jetzt gilt die Liste der wirklich existierenden Views. Durchgesetzt wird sie in `createItem`
+ * (s.u.) — dort meckert der Compiler bei jedem Ziel, das es nicht gibt.
+ */
+export type GameInboxTargetView = FoundationViewId;
 
 export type BuildGameInboxInput = {
   gameState: GameState;
@@ -88,7 +87,9 @@ function formatInboxDetail(value: string | null | undefined) {
 const INBOX_CHRONICLE_ONLY_SOURCES = new Set([
   "facility_events",
   "cash_prize_apply_logs",
-  "matchday_results",
+  // "matchday_results" ist hier bewusst NICHT mehr aufgefuehrt: die Quelle erzeugt seit dem
+  // Streichen von `matchday_result_available` keine Eintraege mehr (s. buildGlobalTasks). Der
+  // Spieltag steht jetzt einmal als Recap in der Chronik, nicht zweimal.
   "season_snapshots",
   "transfer_history",
 ]);
@@ -243,12 +244,34 @@ function resolvePlayerDisplayName(gameState: GameState, playerId: string) {
   return gameState.players.find((player) => player.id === playerId)?.name ?? playerId;
 }
 
+/**
+ * GEMELDET: „matchday-10: +3 Plätze" — der rohe Bezeichner stand im Nachrichtentext.
+ *
+ * Der Spieler kennt „Spieltag 10". Die Nummer ist die Position im Saison-Spielplan, dieselbe
+ * Rechnung wie in `player-injury-history.ts`. Ist der Spieltag nicht im Plan (Altstand, fremde
+ * Saison), bleibt der Bezeichner stehen — falsch nummerieren waere schlimmer als gar nicht.
+ */
+function resolveMatchdayDisplayLabel(gameState: GameState, matchdayId: string | null | undefined) {
+  if (!matchdayId) return null;
+  const index = gameState.season.matchdayIds?.findIndex((entry) => entry === matchdayId) ?? -1;
+  return index >= 0 ? `Spieltag ${index + 1}` : matchdayId;
+}
+
+/** Anzeigename eines Gebaeudes; ohne ihn stand „fan_shop" in der Nachricht. */
+function resolveFacilityDisplayName(facilityId: string) {
+  return FACILITY_CATALOG_BY_ID[facilityId as keyof typeof FACILITY_CATALOG_BY_ID]?.label ?? facilityId;
+}
+
 function createItem(
   input: Omit<GameInboxItem, "saveId" | "seasonId" | "createdAt" | "status"> & {
     saveId: string;
     seasonId: string;
     createdAt: string;
     status?: GameInboxStatus;
+    // Engt das `string`-Feld aus `GameInboxItem` auf existierende Views ein. Der Typ am Datensatz
+    // bleibt `string` (dort haengt zu viel dran); die Einengung wirkt genau an der Stelle, an der
+    // Ziele entstehen — und nur hier sind sie je falsch gewesen.
+    targetView: GameInboxTargetView;
   },
 ): GameInboxItem {
   return {
@@ -448,7 +471,12 @@ function buildPlayerHealthInboxTasks(input: {
           category: "warning",
           severity: "critical",
           title: "Verletzter Spieler",
-          description: `${getPlayerName(input.gameState, entry.playerId)} fehlt${availability.injuryUntilMatchday ? ` bis ${availability.injuryUntilMatchday}` : ""}.${causeDetail}`,
+          // `injuryUntilMatchday` ist ein Bezeichner („matchday-9"), kein Text fuer Menschen.
+          description: `${getPlayerName(input.gameState, entry.playerId)} fehlt${
+            availability.injuryUntilMatchday
+              ? ` bis ${resolveMatchdayDisplayLabel(input.gameState, availability.injuryUntilMatchday)}`
+              : ""
+          }.${causeDetail}`,
           targetView: "lineup",
           targetParams: { team: input.team.teamId, player: entry.playerId },
           ctaLabel: "Lineup prüfen",
@@ -1023,8 +1051,13 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
         teamId: objective.teamId,
         category: "task",
         severity: objective.status === "failed" ? "critical" : "warning",
-        title: objective.status === "failed" ? "Board-Ziel verfehlt" : "Board-Ziel gefährdet",
-        description: `${objective.label}: ${objective.currentValue ?? "—"} / Ziel ${objective.targetValue ?? "—"}`,
+        // Das Ziel gehoert in den Titel: bei mehreren Board-Zielen entstanden sonst mehrere Karten
+        // mit WORTGLEICHEM Titel, und was gemeint war, stand nur in der Kleinzeile.
+        title:
+          objective.status === "failed"
+            ? `Board-Ziel verfehlt: ${objective.label}`
+            : `Board-Ziel gefährdet: ${objective.label}`,
+        description: `Aktuell ${objective.currentValue ?? "—"} · Ziel ${objective.targetValue ?? "—"}`,
         targetView: "teams",
         targetParams: { team: objective.teamId, panel: "board-objectives" },
         source: "team_season_objectives",
@@ -1067,29 +1100,16 @@ function buildGlobalTasks(input: BuildGameInboxInput, createdAt: string) {
   const items: GameInboxItem[] = [];
   const seasonId = input.gameState.season.id;
   const matchdayId = input.gameState.matchdayState.matchdayId;
-  const matchdayResult = (input.gameState.seasonState.matchdayResults ?? []).find(
-    (result) => result.seasonId === seasonId && result.matchdayId === matchdayId,
-  );
 
-  if (matchdayResult) {
-    items.push(
-      createItem({
-        itemId: `matchday_result_available:${input.saveId}:${seasonId}:${matchdayId}`,
-        saveId: input.saveId,
-        seasonId,
-        matchday: matchdayId,
-        category: "result",
-        severity: "info",
-        title: "Spieltagsergebnis verfügbar",
-        description: `${matchdayId}: Ergebnis kann angesehen werden.`,
-        targetView: "matchdayArena",
-        targetParams: { matchday: matchdayId, panel: "arena-result-summary" },
-        source: "matchday_results",
-        createdAt,
-      }),
-    );
-  }
-
+  /**
+   * HIER STAND `matchday_result_available` („Spieltagsergebnis verfügbar") — samt der Suche nach
+   * dem passenden `matchdayResult`, die nur diese eine Karte gefuettert hat.
+   *
+   * Ersatzlos gestrichen: derselbe Spieltag wurde ZWEIMAL gemeldet — einmal hier als „kann
+   * angesehen werden" und einmal weiter unten als `matchday_recap`, der dasselbe Ziel oeffnet und
+   * zusaetzlich sagt, WAS passiert ist (Rang, MVP, Verletzungen). Eine Karte, die nur ankuendigt,
+   * dass es eine andere Karte gibt, ist kein Inhalt.
+   */
   if (input.gameState.gamePhase === "season_completed" || input.gameState.gamePhase === "season_review") {
     items.push(
       createItem({
@@ -1117,7 +1137,9 @@ function buildGlobalTasks(input: BuildGameInboxInput, createdAt: string) {
         category: "task",
         severity: "warning",
         title: "Pre-Season Schritt offen",
-        description: `Aktuelle Phase: ${input.gameState.gamePhase}.`,
+        // GEMELDET: „Aktuelle Phase: preseason_management." — der rohe Phasen-Bezeichner. Den
+        // Klartextnamen gibt es laengst (`formatGamePhaseLabel`), er wurde hier nur nicht benutzt.
+        description: `Aktuelle Phase: ${formatGamePhaseLabel(input.gameState.gamePhase)}.`,
         targetView: "cockpit",
         targetParams: { phase: input.gameState.gamePhase },
         source: "game_phase",
@@ -1203,6 +1225,10 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
 
   for (const event of input.gameState.seasonState.facilityEvents ?? []) {
     if (!teamVisible(event.teamId)) continue;
+    // GEMELDET: „fan_shop: Level 1 → 1." Ein Ereignis ohne Stufenwechsel ist kein Ereignis —
+    // es wurde bisher trotzdem gemeldet, weil hier nie geprueft wurde, ob sich etwas aendert.
+    if (event.previousLevel === event.nextLevel) continue;
+    const facilityName = resolveFacilityDisplayName(event.facilityId);
     items.push(
       createItem({
         itemId: `facility_news:${input.saveId}:${event.eventId}`,
@@ -1211,8 +1237,8 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
         teamId: event.teamId,
         category: "facility",
         severity: "info",
-        title: "Facility Event",
-        description: `${event.facilityId}: Level ${event.previousLevel} → ${event.nextLevel}.`,
+        title: `${facilityName} ${event.nextLevel > event.previousLevel ? "ausgebaut" : "zurückgestuft"}`,
+        description: `${facilityName}: Stufe ${event.previousLevel} → ${event.nextLevel}.`,
         targetView: "trainingV2",
         targetParams: { team: event.teamId, panel: "facilities" },
         source: "facility_events",
@@ -1245,6 +1271,12 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
   }
 
   for (const log of input.gameState.seasonState.cashPrizeApplyLogs ?? []) {
+    // GEMELDET: „Preisgeld angewendet: — Teams, — Preisgeld." Ohne Payload hat die Karte nichts zu
+    // sagen; sie zeigte nur ihre eigenen Platzhalter. Dann lieber gar keine Nachricht.
+    const appliedTeams = log.payload?.appliedTeams;
+    const totalPrizeMoney = log.payload?.totalPrizeMoney;
+    if (appliedTeams == null && totalPrizeMoney == null) continue;
+    const prizeMatchdayLabel = resolveMatchdayDisplayLabel(input.gameState, log.matchdayId);
     items.push(
       createItem({
         itemId: `prize_news:${input.saveId}:${log.id}`,
@@ -1253,8 +1285,13 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
         matchday: log.matchdayId ?? null,
         category: "finance",
         severity: "info",
-        title: "Preisgeld angewendet",
-        description: `${log.payload?.appliedTeams ?? "—"} Teams, ${log.payload?.totalPrizeMoney ?? "—"} Preisgeld.`,
+        title: prizeMatchdayLabel ? `Preisgeld ausgezahlt — ${prizeMatchdayLabel}` : "Preisgeld ausgezahlt",
+        description: [
+          totalPrizeMoney != null ? `${totalPrizeMoney} Preisgeld` : null,
+          appliedTeams != null ? `${appliedTeams} Teams` : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
         targetView: "prize",
         targetParams: { season: log.seasonId },
         source: "cash_prize_apply_logs",
@@ -1268,6 +1305,8 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
     .find((result) => result.status === "preview_applied" && result.seasonId === seasonId);
   if (latestResult) {
     const summary = buildMatchdaySummary(input.gameState, { seasonId, matchdayId: latestResult.matchdayId });
+    const recapMatchdayLabel =
+      resolveMatchdayDisplayLabel(input.gameState, latestResult.matchdayId) ?? "Spieltag-Recap";
     const injuryEvents = (input.gameState.seasonState.injuryEvents ?? []).filter(
       (event) => event.seasonId === seasonId && event.matchdayId === latestResult.matchdayId && event.result === "injured",
     );
@@ -1294,8 +1333,9 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
           teamId: teamRow.teamId,
           category: "result",
           severity: teamInjuries.length > 0 ? "warning" : "info",
-          title: `Spieltag-Recap: ${teamRow.teamShortCode}`,
-          description: `${latestResult.matchdayId}: ${rankDetail} · ${mvpDetail} · ${injuryDetail}.`,
+          // GEMELDET: „matchday-10: +3 Plätze" — der Bezeichner gehoert nicht in den Text.
+          title: `${recapMatchdayLabel} — ${teamRow.teamShortCode}`,
+          description: `${rankDetail} · ${mvpDetail} · ${injuryDetail}.`,
           targetView: "matchdayArena",
           targetParams: { team: teamRow.teamId, matchday: latestResult.matchdayId, panel: "arena-result-summary" },
           source: "story:matchday_recap",
@@ -1722,7 +1762,7 @@ export function isGameInboxChronicleItem(item: GameInboxItem) {
   if (item.source === "facility_events") {
     return true;
   }
-  if (item.source === "cash_prize_apply_logs" || item.source === "matchday_results") {
+  if (item.source === "cash_prize_apply_logs") {
     return true;
   }
   if (item.category === "finance" && item.source === "cash_prize_apply_logs") {

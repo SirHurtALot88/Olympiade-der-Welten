@@ -1,4 +1,5 @@
 import type { GameInboxItem, GameState } from "@/lib/data/olyDataTypes";
+import { describeInboxTargetDestination } from "@/lib/foundation/inbox-target-labels";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
 export type InboxQuickActionKind = "apply" | "navigate" | "dismiss";
@@ -87,7 +88,9 @@ export function getInboxQuickActions(item: GameInboxItem): InboxQuickAction[] {
     actions.push({
       id: "open-target",
       label: item.ctaLabel,
-      detail: `Springe zu ${item.targetView}.`,
+      // Hier stand einmal der rohe `targetView` in einem Satz — im Spiel las sich das als
+      // „Springe zu trainingV2.". Der Name kommt jetzt aus den Nav-Gruppen.
+      detail: describeInboxTargetDestination(item),
       kind: "navigate",
     });
   }
