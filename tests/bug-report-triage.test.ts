@@ -111,3 +111,78 @@ describe("Triage — Vorpruefung und Entscheidung", () => {
     expect(fs.readdirSync(BUG_TRIAGE_DIR)).toEqual(["bug-4.md"]);
   });
 });
+
+/**
+ * MEHRZEILIGE KOPF-WERTE — ein Wert, der von Hand oder vom Editor umgebrochen wird, darf nicht
+ * still verschwinden. Vorlage ist die echte Notiz `bug-2026-07-31T07-53-56-901Z-o366jv.md`: ihre
+ * `changelog:`-Zeile ging ueber zwei Zeilen und wurde vom Generator als komplett FEHLEND gemeldet,
+ * obwohl sie dastand — siehe Recherche zu diesem Fix.
+ */
+describe("Triage — mehrzeilige Kopf-Werte", () => {
+  it("fuegt eine eingerueckte Fortsetzungszeile mit einem Leerzeichen an den Wert an", async () => {
+    const { parseTriage } = await importModules();
+    const raw = [
+      "status: gebaut",
+      "titel: Arena-Teamkarte zeigt bei mScoring niemanden unter „in dieser Disziplin\"",
+      "schwere: mittel",
+      "ergebnis: Es war ein Fehler — aber ein anderer als vermutet. Behoben, mit Test auf der Aufbereitung.",
+      "pr: #312",
+      "gemergt: 2026-08-01",
+      "changelog: Auf der Team-Karte in der Arena stehen die aufgestellten Spieler wieder unter „In dieser",
+      '  Disziplin", statt dass die Sektion leer bleibt.',
+      "",
+      "**Die Meldung.** Fliesstext hier.",
+    ].join("\n");
+    const parsed = parseTriage("bug-mehrzeilig", raw, "bug-mehrzeilig.md");
+    // Die Kopfzeilen VOR dem mehrzeiligen Wert bleiben unberuehrt.
+    expect(parsed.pr).toBe("#312");
+    expect(parsed.gemergt).toBe("2026-08-01");
+    // Der eigentliche Fix: der Wert ist vollstaendig und zu einem Leerzeichen normalisiert.
+    expect(parsed.changelog).toBe(
+      'Auf der Team-Karte in der Arena stehen die aufgestellten Spieler wieder unter „In dieser Disziplin", statt dass die Sektion leer bleibt.',
+    );
+  });
+
+  it("zieht den Fliesstext nach dem Kopf nicht in den letzten Wert hinein", async () => {
+    const { parseTriage } = await importModules();
+    const raw = [
+      "status: gebaut",
+      "titel: Kurzer Titel",
+      "changelog: Ein kurzer Changelog-Satz.",
+      "",
+      "**Die Meldung.** Das ist Fliesstext und darf nicht an changelog haengen.",
+      "Zweite Zeile Fliesstext, unindentiert.",
+    ].join("\n");
+    const parsed = parseTriage("bug-body-grenze", raw, "x.md");
+    expect(parsed.changelog).toBe("Ein kurzer Changelog-Satz.");
+    expect(parsed.body).toBe(
+      "**Die Meldung.** Das ist Fliesstext und darf nicht an changelog haengen.\nZweite Zeile Fliesstext, unindentiert.",
+    );
+  });
+
+  it("liest einzeilige Werte unveraendert wie zuvor", async () => {
+    const { parseTriage } = await importModules();
+    const raw = "status: gebaut\ntitel: Einzeiler\nchangelog: Alles auf einer Zeile.\n\nBefund.";
+    const parsed = parseTriage("bug-einzeilig", raw, "x.md");
+    expect(parsed.changelog).toBe("Alles auf einer Zeile.");
+    expect(parsed.body).toBe("Befund.");
+  });
+
+  it("ein Doppelpunkt im Wert wird nicht als neuer Kopf-Schluessel missverstanden", async () => {
+    const { parseTriage } = await importModules();
+    const raw = [
+      "status: gebaut",
+      "titel: Test",
+      "ergebnis: Fehler: nichts ging mehr, aber jetzt wieder.",
+      "  Zweite Zeile mit einem Doppelpunkt mittendrin: so wie hier.",
+      "pr: #1",
+      "",
+      "Befund.",
+    ].join("\n");
+    const parsed = parseTriage("bug-doppelpunkt", raw, "x.md");
+    expect(parsed.ergebnis).toBe(
+      "Fehler: nichts ging mehr, aber jetzt wieder. Zweite Zeile mit einem Doppelpunkt mittendrin: so wie hier.",
+    );
+    expect(parsed.pr).toBe("#1");
+  });
+});
