@@ -7,6 +7,8 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { applySeasonEndPotentialUpdates } from "@/lib/progression/player-potential-service";
 import { buildSeasonReview, type SeasonReview } from "@/lib/season/season-review-service";
+import { getNextStepAfter, getPhaseAfterStep, isStepBehind } from "@/lib/season/season-transition-chain";
+import { SEASON_TRANSITION_STEPS, type SeasonTransitionStepId } from "@/lib/season/season-transition-steps";
 
 // Audit R2/V1: Phasen, die der Saisonübergang NICHT auf "season_review" zurücksetzen darf (der User ist im
 // Saisonende-Wizard bereits über den Review hinaus). undefined/season_active/season_completed/season_review
@@ -21,19 +23,11 @@ const SEASON_TRANSITION_POST_REVIEW_PHASES = new Set<GamePhase>([
   "next_season_ready",
 ]);
 
-export const SEASON_TRANSITION_STEPS = [
-  "season_check",
-  "season_review",
-  "season_rewards",
-  "player_development",
-  "preseason_management",
-  "transfer_sell_phase",
-  "transfer_buy_phase",
-  "lineup_setup",
-  "next_season_ready",
-] as const;
-
-export type SeasonTransitionStepId = (typeof SEASON_TRANSITION_STEPS)[number];
+// Die Liste ist nach `season-transition-steps.ts` gewandert, damit die Kette sie nutzen kann,
+// ohne einen Zyklus ueber diesen Service zu bauen. Re-Export, damit die bestehenden Importeure
+// dieses Moduls unveraendert weiterlaufen.
+export { SEASON_TRANSITION_STEPS };
+export type { SeasonTransitionStepId };
 
 export type SeasonTransitionStepPreview = {
   stepId: SeasonTransitionStepId;
@@ -179,14 +173,30 @@ function buildStepPreviews(save: PersistedSaveGame, transition: SeasonTransition
       lineup_setup: `${lineupCount} gespeicherte Lineups würden für neue Season geprüft/resetet.`,
       next_season_ready: "Neue Saison startet ueber den bestaetigten Pre-Season Workflow.",
     };
+    // Ein Schritt ist erledigt, sobald die PHASE ueber ihn hinaus ist — nicht erst, wenn er in
+    // `completedSteps` steht. Die Phase liegt im Save und steuert alle Gates; `completedSteps` ist
+    // nur die Beschriftung und fehlt z. B. bei Saves aus dem Admin-Runner oder aus einem Import.
+    const behind = isStepBehind(stepId, currentStep);
+    // HIER stand `canApply: false` — fest verdrahtet fuer JEDEN Schritt. Das war die Sackgasse:
+    // der Assistent zeigte die komplette Kette an, aber kein Schritt war je anwendbar, also blieb
+    // die Phase auf `season_review` stehen. Verkaufen (nur in `preseason_management` und
+    // `transfer_sell_phase` offen) und die Awards (`season_rewards`) waren damit unerreichbar.
+    const canApply = blockingReasons.length === 0 && index === currentIndex && getPhaseAfterStep(stepId) !== null;
     return {
       stepId,
       label: STEP_LABELS[stepId],
-      status: blockingReasons.length > 0 ? "blocked" : completed.has(stepId) ? "applied" : index === currentIndex ? "ready" : "open",
+      status:
+        blockingReasons.length > 0
+          ? "blocked"
+          : behind || completed.has(stepId)
+            ? "applied"
+            : index === currentIndex
+              ? "ready"
+              : "open",
       preview: previewByStep[stepId],
       warnings,
       blockingReasons,
-      canApply: false,
+      canApply,
     } satisfies SeasonTransitionStepPreview;
   });
 }
@@ -266,6 +276,82 @@ export function startSeasonTransition(
       : "season_review",
     seasonTransition: transition,
     playerPotential: updatedPlayerPotential,
+  };
+  persistGameStateWithMaterializedDerivations(persistence, save.saveId, nextGameState);
+
+  return {
+    ...buildSeasonTransitionPreview({ ...save, gameState: nextGameState }),
+    dryRun: false,
+    applied: true,
+    transition,
+  };
+}
+
+/**
+ * Einen Schritt des Saisonende-Assistenten anwenden und die Phase auf die naechste Station
+ * schalten.
+ *
+ * DAS WAR DIE LUECKE. Die Kette existierte als Liste, die Zuordnung Phase→Schritt existierte,
+ * nur schaltete nichts je weiter — `canApply` stand fest auf `false`, und die einzige schreibende
+ * Funktion (`startSeasonTransition`) kam nie ueber `season_review` hinaus. Dadurch waren
+ * `preseason_management` und `transfer_sell_phase` unerreichbar, und weil VERKAUFEN genau an
+ * diesen beiden Phasen haengt, war es nach dem ersten Spieltag einer Saison dauerhaft zu.
+ *
+ * Der erste Schritt (`season_check`) laeuft bewusst weiter ueber `startSeasonTransition`: dort
+ * haengt der Idempotenz-Guard fuer die Potenzial-Drift, den ein zweiter Weg sonst umgehen wuerde.
+ *
+ * KEIN Schritt fuehrt hier wirtschaftliche Effekte aus (Preisgeld, XP). Die haben eigene, jeweils
+ * bestaetigte Wege (`cash-prize-apply-service`, `season-end-xp-apply-service`); sie hier
+ * mitlaufen zu lassen hiesse, dieselbe Buchung an zwei Stellen ausloesen zu koennen. Das
+ * Weiterschalten ist deshalb absichtlich NICHT an sie gekoppelt — es oeffnet die Phase, in der
+ * sie stattfinden.
+ */
+export function advanceSeasonTransitionStep(
+  save: PersistedSaveGame,
+  persistence: PersistenceService = createPersistenceService(),
+): SeasonTransitionPreview {
+  const preview = buildSeasonTransitionPreview(save);
+  const currentStep = preview.transition.currentStep as SeasonTransitionStepId;
+
+  // Solange der letzte Spieltag nicht durch ist, faengt die Kette gar nicht erst an.
+  if (!preview.canCompleteSeason) {
+    return {
+      ...preview,
+      ok: false,
+      dryRun: false,
+      applied: false,
+      blockingReasons: [...new Set([...preview.blockingReasons, "last_matchday_not_completed"])],
+    };
+  }
+
+  // Der Einstieg behaelt seinen eigenen Weg — wegen des Drift-Guards, siehe oben.
+  if (currentStep === "season_check") {
+    return startSeasonTransition(save, persistence);
+  }
+
+  const nextPhase = getPhaseAfterStep(currentStep);
+  if (!nextPhase) {
+    // Ende der Kette: ab hier legt der Pre-Season-Workflow die neue Saison an, nicht dieser Weg.
+    return {
+      ...preview,
+      ok: false,
+      dryRun: false,
+      applied: false,
+      blockingReasons: [...new Set([...preview.blockingReasons, "season_transition_chain_complete"])],
+    };
+  }
+
+  const nextStep = getNextStepAfter(currentStep) ?? currentStep;
+  const transition: SeasonTransitionState = {
+    ...preview.transition,
+    status: "preview",
+    currentStep: nextStep,
+    completedSteps: [...new Set([...preview.transition.completedSteps, currentStep])],
+  };
+  const nextGameState: GameState = {
+    ...save.gameState,
+    gamePhase: nextPhase,
+    seasonTransition: transition,
   };
   persistGameStateWithMaterializedDerivations(persistence, save.saveId, nextGameState);
 
