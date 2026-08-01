@@ -31,6 +31,7 @@ import {
   getCurrentMatchdayDisciplineSchedule,
   getTeamMatchdayLineupDraft,
 } from "@/lib/foundation/matchday-lineup-readiness";
+import { buildTeamLineupSections } from "@/lib/foundation/discipline-stage/discipline-stage-team-lineup";
 import { buildPlayerRatingContractMap, type PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
@@ -853,27 +854,31 @@ function TeamBody({
   const d2Id = schedule?.discipline2?.disciplineId;
   const onSchedule = d1Id === disciplineId || d2Id === disciplineId;
   const currentSide: "d1" | "d2" = d1Id === disciplineId ? "d1" : "d2";
-  const otherSide: "d1" | "d2" = currentSide === "d1" ? "d2" : "d1";
   const otherDisciplineId = (currentSide === "d1" ? d2Id : d1Id) ?? null;
 
   const hasDraft = (draft?.entries?.length ?? 0) > 0;
-  const section1 = entries.filter((e) => e.disciplineSide === currentSide);
-  const section2 = entries.filter((e) => e.disciplineSide === otherSide);
 
   // Im Test/Vorschau-Modus sind die Drafts leer; dann feldern wir aus den vom
   // Arena-Payload übergebenen Spieler-IDs (sonst fielen alle auf die Ersatzbank).
   const fieldedIds = (fieldedPlayerIdsByTeam?.[teamId] ?? []).filter(Boolean);
 
-  // Gefeldete Menge = Draft-eingesetzte IDs (echtes Spiel) VEREINIGT mit den vom Arena-
-  // Payload übergebenen IDs (Test/Vorschau und abgeschlossene Disziplin). Bewusst eine
-  // Vereinigung statt eines Entweder-oder: sonst landet ein Spieler, der oben unter
-  // „In dieser Disziplin" steht, gleichzeitig auf der Ersatzbank, sobald nur eine der
-  // beiden Quellen ihn kennt.
-  const deployedIds = new Set<string>([
-    ...(hasDraft ? entries.map((e) => e.activePlayerId ?? e.playerId) : []),
-    ...fieldedIds,
-  ]);
-  const benchIds = rosterIds.filter((id) => !deployedIds.has(id));
+  // Aufstellung → Katalog-Spieler-IDs. Die Auflösung liegt bewusst in einer eigenen,
+  // testbaren Aufbereitung: `entry.activePlayerId` ist die Id des KADER-EINTRAGS, nicht
+  // die des Spielers — direkt in `gameState.players` gesucht fand sie nie jemanden, und
+  // die Sektion „In dieser Disziplin" blieb leer, obwohl aufgestellt war. Sektionen und
+  // Ersatzbank kommen aus derselben Quelle, damit niemand gleichzeitig oben in der
+  // Disziplin und unten auf der Bank steht. Der Arena-Payload bleibt zweite Quelle für
+  // die eingesetzte Menge (Test/Vorschau und abgeschlossene Disziplin).
+  const lineupSections = buildTeamLineupSections({
+    entries: hasDraft ? entries : [],
+    rosters: gameState.rosters ?? [],
+    teamId,
+    currentSide,
+    fieldedPlayerIds: fieldedIds,
+  });
+  const section1 = lineupSections.currentSide;
+  const section2 = lineupSections.otherSide;
+  const benchIds = lineupSections.benchPlayerIds;
 
   const matchdayId = gameState.matchdayState?.matchdayId ?? "";
   const isUnavailable = (pid: string): boolean => {
@@ -980,10 +985,8 @@ function TeamBody({
         {hasDraft && onSchedule && section1.length > 0 ? (
           <div className="dstage-portrait-rail-grid">
             {section1
-              .slice()
-              .sort((a, b) => a.slotIndex - b.slotIndex)
               .map((e) => {
-                const pid = e.activePlayerId ?? e.playerId;
+                const pid = e.playerId;
                 return (
                   <DisciplinePortraitCard
                     key={`${e.disciplineSide}-${e.slotIndex}-${pid}`}
@@ -1033,10 +1036,8 @@ function TeamBody({
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {section2
-              .slice()
-              .sort((a, b) => a.slotIndex - b.slotIndex)
               .map((e) => {
-                const pid = e.activePlayerId ?? e.playerId;
+                const pid = e.playerId;
                 return (
                   <LineupRow
                     key={`${e.disciplineSide}-${e.slotIndex}-${pid}`}
