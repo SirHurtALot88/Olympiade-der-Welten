@@ -369,8 +369,19 @@ export type CockpitSeasonTransitionHandlersDeps = {
   syncFoundationViewInUrl: (view: FoundationView, tab?: string | null, playerId?: string | null) => void;
 };
 
+/**
+ * Die Aktionen des Saisonende-Assistenten.
+ *
+ * `advance_step` fehlte hier — und nur hier. Der Weiterschalt-Weg war ab #298 vollstaendig
+ * vorhanden (Kette, `canApply`, Route, Handler), aber diese Signatur liess die Aktion nicht
+ * durch, also gab es im Cockpit keinen Knopf dafuer. Der Assistent zeigte die ganze Kette an,
+ * weiter kam man trotzdem nur bis `season_review` — und weil Verkaufen erst in
+ * `preseason_management` oeffnet, blieb es gesperrt.
+ */
+export type CockpitSeasonTransitionAction = "preview" | "start_transition" | "advance_step";
+
 export type CockpitSeasonTransitionHandlers = {
-  runSeasonTransition: (action: "preview" | "start_transition") => Promise<SeasonTransitionApiResponse | null>;
+  runSeasonTransition: (action: CockpitSeasonTransitionAction) => Promise<SeasonTransitionApiResponse | null>;
   runSeasonCompletion: (execute: boolean) => Promise<SeasonCompletionApiResponse | null>;
   runCockpitWholeSeasonDryRun: () => Promise<FoundationWholeSeasonDryRunSummary | null>;
   runSeasonSnapshotAction: (

@@ -15,6 +15,7 @@ import type {
   SeasonSnapshotRecord,
   Team,
 } from "@/lib/data/olyDataTypes";
+import type { CockpitSeasonTransitionAction } from "@/lib/foundation/tabs/cockpit-handlers";
 import type { CockpitMatchdayMvpScoringFeed } from "@/lib/foundation/tabs/cockpit-matchday-handlers";
 import { featureAuditFilters, getFeatureAuditFlags } from "@/lib/foundation/feature-audit-matrix";
 import type {
@@ -185,7 +186,7 @@ export interface FoundationCockpitPanelProps {
   runSaveAction: (body: SaveActionRequest) => Promise<void>;
   runSeasonCompletion: (execute: boolean) => Promise<SeasonCompletionApiResponse | null>;
   runSeasonSnapshotAction: (execute: boolean, options?: { forceCreate?: boolean; replaceExisting?: boolean; }) => Promise<FoundationSeasonSnapshotSummary | null>;
-  runSeasonTransition: (action: "preview" | "start_transition") => Promise<SeasonTransitionApiResponse | null>;
+  runSeasonTransition: (action: CockpitSeasonTransitionAction) => Promise<SeasonTransitionApiResponse | null>;
   seasonCompletionFeed: SeasonCompletionSummaryResponse | null;
   seasonEndChampionRow: TeamManagementSnapshotRow | null;
   seasonHistorySnapshots: SeasonSnapshotRecord[];
@@ -419,6 +420,23 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
     ),
     [seasonCompletionFeed],
   );
+
+  /**
+   * Wohin der naechste Klick fuehrt — die Station HINTER der gerade anwendbaren.
+   *
+   * Bewusst das Ziel und nicht der aktuelle Schritt: „Weiter zu Vorbereitung“ sagt, was danach
+   * offen ist; „Saison prüfen abschließen“ sagt nur, was man gerade verlaesst. Und bewusst aus
+   * `canApply` statt aus `transition.currentStep` — welcher Schritt dran ist, entscheidet der
+   * Service; die Oberflaeche soll dieselbe Frage nicht ein zweites Mal beantworten.
+   *
+   * Ohne geladenen Feed bleibt es `null`, der Knopf heisst dann schlicht „Nächster Schritt“ —
+   * er funktioniert trotzdem, weil der Server die Station aus der Phase im Save liest.
+   */
+  const seasonTransitionNextStepLabel = useMemo(() => {
+    const steps = seasonTransitionFeed?.steps ?? [];
+    const readyIndex = steps.findIndex((step) => step.canApply);
+    return readyIndex < 0 ? null : steps[readyIndex + 1]?.label ?? null;
+  }, [seasonTransitionFeed]);
 
   return (
     <section className="panel" id="foundation-cockpit" data-testid="foundation-cockpit">
@@ -2722,6 +2740,33 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                     }}
                   >
                     Saison abschließen
+                  </button>
+                  {/*
+                    HIER fehlte der Weg. Ab #298 war die Kette vollstaendig — Schrittfolge,
+                    `canApply`, Route-Aktion `advance_step`, Handler — nur hatte NICHTS in der
+                    Oberflaeche sie je aufgerufen. Der Assistent zeigte alle neun Stationen an,
+                    weiter kam man trotzdem nur bis `season_review`, weil "Saison abschließen" den
+                    ersten Schritt macht und danach kein zweiter Knopf existierte. Verkaufen
+                    oeffnet erst in `preseason_management` — vier Stationen spaeter.
+
+                    Welche Station als naechstes kommt, entscheidet der Server aus der Phase im
+                    Save; der Knopf braucht dafuer keinen geladenen Feed und funktioniert deshalb
+                    auch direkt nach dem Aufklappen.
+                  */}
+                  <button
+                    className="primary-button"
+                    type="button"
+                    data-testid="season-transition-advance"
+                    disabled={readMeta.readOnly || seasonTransitionBusy || !localSeasonTransitionGate.canCompleteSeason}
+                    title={
+                      localSeasonTransitionGate.disabledReason ??
+                      "Schaltet den Assistenten eine Station weiter und gibt die Phase dahinter frei (Verkaufsfenster ab „Vorbereitung“)."
+                    }
+                    onClick={() => {
+                      void runSeasonTransition("advance_step");
+                    }}
+                  >
+                    {seasonTransitionNextStepLabel ? `Weiter zu „${seasonTransitionNextStepLabel}“` : "Nächster Schritt"}
                   </button>
                   <button
                     className="primary-button"
