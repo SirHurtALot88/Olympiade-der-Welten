@@ -1,0 +1,4 @@
+{
+  "hinweis": "Von Hand gepflegt — Changelog-Eintraege fuer Aenderungen OHNE Bug-Meldung (neues Feature, umgebaute Ansicht). Gefixte Bugs bekommen ihre changelog:-Zeile stattdessen in der Triage-Notiz. Ein Eintrag braucht: datum (JJJJ-MM-TT, der Merge-Tag), text (ein Satz Alltagssprache: was war vorher, was ist jetzt anders), optional seite (\"Markt · Transfermarkt\") und pr (\"#291\"). Gepflegt wird beim Mergen, nicht spaeter — und erst dann: was nicht gemergt ist, gehoert nicht hinein. Danach npm run changelog:bauen.",
+  "eintraege": []
+}

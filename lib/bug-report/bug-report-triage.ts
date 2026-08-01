@@ -68,13 +68,38 @@ export type BugTriage = {
    * Ein Beleg, der nicht sagt WIE geprueft wurde, ist keiner.
    */
   bestaetigt: string | null;
+  /**
+   * Ein Satz Alltagssprache fuer den Changelog-Reiter im Spiel: was war kaputt, was ist jetzt
+   * anders. Er beschreibt die WIRKUNG, nicht den Eingriff — "der Kontostand aktualisiert sich
+   * sofort", nicht "Ref-Cache entwertet". Nur Notizen ab `gebaut` landen im Changelog; die Zeile
+   * hier zu pflegen gehoert in denselben Lauf wie der Merge (siehe docs/BUGFIXING_AGENT.md).
+   */
+  changelog: string | null;
+  /**
+   * Betroffene Seite in den Worten der Navigation ("Spieltag · Einsatzliste"). Normalerweise
+   * kommt sie aus der Rohmeldung (`page.label`) — diese Zeile gibt es fuer Notizen OHNE
+   * Rohmeldung (Zuruf im Gespraech statt Flagge), damit deren Changelog-Eintrag nicht ohne Ort
+   * dasteht.
+   */
+  seite: string | null;
   /** Der ganze Text unterhalb des Kopfes: Befund, Ursache, Vorschlag. */
   body: string;
   file: string;
 };
 
 /** Kopfzeilen, die der Parser kennt. Alles andere beginnt den Fliesstext. */
-const HEAD_KEYS = ["status", "titel", "schwere", "ergebnis", "pr", "commit", "gemergt", "bestaetigt"] as const;
+const HEAD_KEYS = [
+  "status",
+  "titel",
+  "schwere",
+  "ergebnis",
+  "pr",
+  "commit",
+  "gemergt",
+  "bestaetigt",
+  "changelog",
+  "seite",
+] as const;
 
 function isTriageStatus(value: string): value is BugTriageStatus {
   return (BUG_TRIAGE_STATUSES as readonly string[]).includes(value);
@@ -123,6 +148,8 @@ export function parseTriage(reportId: string, raw: string, file: string): BugTri
     commit: value("commit"),
     gemergt: value("gemergt"),
     bestaetigt,
+    changelog: value("changelog"),
+    seite: value("seite"),
     body: lines.slice(bodyStart).join("\n").trim(),
     file,
   };
@@ -149,6 +176,8 @@ export function writeTriage(input: {
   commit?: string | null;
   gemergt?: string | null;
   bestaetigt?: string | null;
+  changelog?: string | null;
+  seite?: string | null;
   body: string;
 }): string {
   fs.mkdirSync(BUG_TRIAGE_DIR, { recursive: true });
@@ -163,6 +192,8 @@ export function writeTriage(input: {
     ...optional("commit", input.commit),
     ...optional("gemergt", input.gemergt),
     ...optional("bestaetigt", input.bestaetigt),
+    ...optional("changelog", input.changelog),
+    ...optional("seite", input.seite),
   ].join("\n");
   fs.writeFileSync(file, `${head}\n\n${input.body.trim()}\n`, "utf8");
   return file;
@@ -180,5 +211,10 @@ export function findTriageGaps(triage: BugTriage): string[] {
     gaps.push("kein Ergebnis angegeben");
   }
   if (triage.status === "gebaut" && !triage.bestaetigt) gaps.push("Wirkung nicht bestaetigt");
+  // Ein gemergter Fix ohne Changelog-Zeile ist fuer den Spieler von einem ungefixten nicht zu
+  // unterscheiden — deshalb zaehlt die fehlende Zeile als Luecke, nicht als Geschmacksfrage.
+  if ((triage.status === "gebaut" || triage.status === "erledigt") && !triage.changelog) {
+    gaps.push("keine changelog:-Zeile");
+  }
   return gaps;
 }
