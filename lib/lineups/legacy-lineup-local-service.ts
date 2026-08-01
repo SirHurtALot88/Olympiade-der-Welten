@@ -28,6 +28,7 @@ import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { buildPlayerMoralePerformanceMap } from "@/lib/morale/player-morale-performance";
 import type { FormCardPlanRecord, GameState, LineupDraft, Player, RosterEntry } from "@/lib/data/olyDataTypes";
 import type {
+  LegacyInjuryRiskProjectionRef,
   LegacyLineupContextLoadResult,
   LegacyLineupDraft,
   LegacyLineupEntryInput,
@@ -39,7 +40,7 @@ import type {
 } from "@/lib/lineups/legacy-lineup-types";
 import { getImportedPlayerDisplayMarketValue, getImportedPlayerDisplaySalary } from "@/lib/data/player-economy-display";
 import { getFatiguePerformanceMultiplier } from "@/lib/fatigue/fatigue-calibration";
-import { getInjuryRiskBand, getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
+import { getInjuryRiskBand, getPlayerAvailabilityView, projectMatchdayInjuryRisk } from "@/lib/fatigue/fatigue-injury-service";
 import { resolveLineupStrategyForTeam } from "@/lib/ai/ai-manager-doctrine-service";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
 import { calculateLocalLegacyLineupPreviewFromContext } from "@/lib/lineups/legacy-lineup-preview-from-context";
@@ -517,6 +518,15 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
     const availability = availabilityByPlayerId.get(player.id) ?? getPlayerAvailabilityView(normalizedGameState, player.id, params.teamId, params.matchdayId);
     const fatigue = availability.fatigue ?? player.fatigue ?? null;
     const injuryRiskBand = getInjuryRiskBand(fatigue ?? 0);
+    // Einsatz-Risiko je Intensitaet VORberechnen (alle drei Stufen), damit die Einsatzliste
+    // beim Intensitaets-Umschalten nur nachschlaegt. Bewusst hier im Server-Kontextbau statt
+    // im Client: so gelten dieselben ENV-Tunables (OLY_FATIGUE_*) wie beim echten Wurf.
+    const injuryRiskProjection = Object.fromEntries(
+      (["conserve", "normal", "push"] as const).map((intensity) => [
+        intensity,
+        projectMatchdayInjuryRisk({ player, currentFatigue: fatigue ?? 0, intensity }),
+      ]),
+    ) as LegacyInjuryRiskProjectionRef;
     return {
       id: player.id,
       name: player.name,
@@ -534,6 +544,7 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
       injuryRiskPercent: fatigue != null ? injuryRiskBand.riskPercent : null,
       injuryRiskBand: fatigue != null ? injuryRiskBand.label : null,
       injuryRiskLabel: fatigue != null ? injuryRiskBand.uiLabel : null,
+      injuryRiskProjection,
       availabilityBlocker: availability.blocker,
       form: player.form ?? null,
       traitsPositive: player.traitsPositive ?? [],

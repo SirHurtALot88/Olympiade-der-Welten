@@ -428,6 +428,15 @@ function buildPlayerHealthInboxTasks(input: {
     );
 
     if (availability.isUnavailable && availability.injuryStatus === "injured") {
+      // Ursache der Verletzung mitliefern (Feature-Request "man kann nicht sehn von wem man
+      // verletzt wurde"): Es gibt keinen Verursacher — der persistierte Wurf (Fatigue beim
+      // Wurf + Risikoprozent) IST die ganze Erklaerung. Ohne diesen Zusatz wirkte gerade der
+      // Niedrig-Risiko-Fall (~2 %, Ruhetag davor) wie ein Fehler statt wie Pech.
+      const lastRoll = availability.injuryRiskLastRoll;
+      const causeDetail =
+        lastRoll && lastRoll.result === "injured"
+          ? ` Überlastung ohne Fremdeinwirkung: Der Einsatz würfelte bei Fatigue ${Math.round(lastRoll.fatigueBefore)} mit ${lastRoll.riskPercent} % Verletzungsrisiko.`
+          : "";
       items.push(
         createItem({
           itemId: `player_injured:${input.saveId}:${seasonId}:${matchdayId}:${input.team.teamId}:${entry.playerId}`,
@@ -439,7 +448,7 @@ function buildPlayerHealthInboxTasks(input: {
           category: "warning",
           severity: "critical",
           title: "Verletzter Spieler",
-          description: `${getPlayerName(input.gameState, entry.playerId)} fehlt${availability.injuryUntilMatchday ? ` bis ${availability.injuryUntilMatchday}` : ""}.`,
+          description: `${getPlayerName(input.gameState, entry.playerId)} fehlt${availability.injuryUntilMatchday ? ` bis ${availability.injuryUntilMatchday}` : ""}.${causeDetail}`,
           targetView: "lineup",
           targetParams: { team: input.team.teamId, player: entry.playerId },
           ctaLabel: "Lineup prüfen",

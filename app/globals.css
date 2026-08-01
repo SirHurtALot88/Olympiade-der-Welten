@@ -57885,6 +57885,40 @@ button.foundation-team-portrait-card {
   border-color: color-mix(in srgb, var(--nl-risk) 45%, transparent);
 }
 
+/* Mittlere Stufe fuer Chips, die einen Ton aus fatigueTone()/Risiko-Baendern bekommen
+   (z. B. Aftermath-Fatigue). Ohne diese Regel fiel "warn" stumm auf das neutrale
+   Grau zurueck — die Eskalationsstufe war unsichtbar. */
+.is-new-look .nl-lineup-chip.is-warn {
+  color: var(--nl-warn);
+  border-color: color-mix(in srgb, var(--nl-warn) 45%, transparent);
+}
+
+/* Einsatz-Verletzungsrisiko-Meter in der Slot-Karte: kompakte NlProgressBar-Instanz
+   (gleiches Muster wie die player-drawer-*-progress-Verkleinerungen). Sitzt an fester
+   Position am Kartenfuss, damit die Fuell-Laengen ueber die Slot-Karten hinweg direkt
+   vergleichbar sind — der Blick findet den riskantesten Spieler ohne Zahlenlesen. */
+.is-new-look .nl-lineup-injury-meter {
+  width: calc(100% - var(--nl-s3) * 2);
+  margin: 0 var(--nl-s3) var(--nl-s3);
+  gap: 2px;
+}
+.is-new-look .nl-lineup-injury-meter .nl-progress-track {
+  height: 4px;
+}
+.is-new-look .nl-lineup-injury-meter .nl-progress-label {
+  font-size: 9px;
+}
+.is-new-look .nl-lineup-injury-meter .nl-progress-value {
+  font-size: 10px;
+  font-weight: 700;
+}
+/* Restrisiko nie unsichtbar: selbst die ~2 % eines Ausgeruhten muessen als Anschnitt
+   erkennbar bleiben, sonst kehrt genau die alte Undurchsichtigkeit zurueck ("wusste
+   nicht, dass ueberhaupt ein Risiko bestand"). */
+.is-new-look .nl-lineup-injury-meter .nl-progress-fill {
+  min-width: 6px;
+}
+
 .is-new-look .nl-lineup-bestfit {
   display: flex;
   align-items: baseline;

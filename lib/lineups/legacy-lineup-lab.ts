@@ -1,5 +1,6 @@
 import type {
   LegacyActivePlayerRef,
+  LegacyInjuryRiskProjectionRef,
   LegacyLineupEntryInput,
   LegacyLineupLoadedContext,
   LegacyRosterPlayerRef,
@@ -24,6 +25,8 @@ export type LegacyLineupLabPlayerOption = {
   injuryRiskPercent: number | null;
   injuryRiskBand: string | null;
   injuryRiskLabel: string | null;
+  /** Einsatz-Risiko je Intensitaet — vorberechnet aus dem echten Wurf-Modell, siehe LegacyInjuryRiskProjectionRef. */
+  injuryRiskProjection: LegacyInjuryRiskProjectionRef | null;
 };
 
 export function buildLegacyLineupLabSlots(context: LegacyLineupLoadedContext): LegacyLineupLabSlot[] {
@@ -106,6 +109,7 @@ export function buildLegacyLineupLabPlayerOptions(context: LegacyLineupLoadedCon
       injuryRiskPercent: player?.injuryRiskPercent ?? null,
       injuryRiskBand: player?.injuryRiskBand ?? null,
       injuryRiskLabel: player?.injuryRiskLabel ?? null,
+      injuryRiskProjection: player?.injuryRiskProjection ?? null,
     };
   });
 }
