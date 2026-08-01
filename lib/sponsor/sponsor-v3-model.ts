@@ -89,6 +89,35 @@ export const SPONSOR_V4_AXIS_PBAR = 0.5;
 /** Golden-Los: mehr Hebel, unveraenderter Erwartungswert. */
 export const SPONSOR_V4_GOLDEN_AXIS_MULT = 1.25;
 
+/**
+ * DIE ZWEITE WAHLDIMENSION: Vorschuss statt Saisonende.
+ *
+ * Warum es sie braucht: die Achse allein macht die Wahl inhaltlich, aber alle Angebote zahlen zum
+ * selben Zeitpunkt. Liquiditaet ist fuer ein klammes Team real wertvoll — die Alternative ist ein
+ * Kredit zu 7 bis 20 Prozent Zins — und fuer ein reiches wertlos. Damit haengt die richtige Wahl an
+ * der eigenen Lage statt an einer Rangfolge, die fuer alle gleich waere.
+ *
+ * Der Vorschuss ist ein VORGEZOGENER TEIL der eigenen Auszahlung, kein Geschenk: er wird am
+ * Saisonende samt Gebuehr wieder verrechnet. Die Gebuehr liegt bewusst unter dem Kreditzins — der
+ * Sponsor ist der guenstigste Kredit im Spiel, aber eben nicht gratis.
+ */
+export type SponsorV4AdvanceTerms = {
+  /** Bei Unterschrift ausgezahlt. */
+  amount: number;
+  /** Gebuehr, am Saisonende zusammen mit dem Vorschuss verrechnet. */
+  fee: number;
+};
+
+/** Anteil des Leiterbodens, der als Vorschuss ausgezahlt wird. */
+export const SPONSOR_V4_ADVANCE_SHARE = 0.35;
+/**
+ * Gebuehr auf den Vorschuss. Sie MUSS unter dem guenstigsten Bankkredit liegen (MIN_INTEREST_RATE =
+ * 0,07 je Saison, lib/finance/loan-service.ts) — sonst waere die Vorschusskarte strikt schlechter
+ * als ein Kredit und damit keine Option, sondern eine Falle. 5 Prozent lassen genug Abstand, ohne
+ * den Vorschuss zum Selbstlaeufer zu machen.
+ */
+export const SPONSOR_V4_ADVANCE_FEE_RATE = 0.05;
+
 export function sponsorV4AxisSizeFor(rarity: string, golden = false): number {
   const base = SPONSOR_V4_AXIS_SIZE_BY_RARITY[rarity as SponsorV3Rarity] ?? SPONSOR_V4_AXIS_SIZE_BY_RARITY.magisch;
   return golden ? Math.round(base * SPONSOR_V4_GOLDEN_AXIS_MULT * 10) / 10 : base;
@@ -395,6 +424,11 @@ export type SponsorV3ContractTerms = {
    * die Auszahlung ueber `goalKey`/`goalP` wie zuvor.
    */
   axis?: SponsorV4AxisTerms;
+  /**
+   * Vorschuss-Konditionen (V4). Fehlt beim Standard-Profil und bei Altvertraegen — dann kommt die
+   * ganze Auszahlung am Saisonende.
+   */
+  advance?: SponsorV4AdvanceTerms;
 };
 
 /**
@@ -414,6 +448,8 @@ export function buildSponsorV3TermsCore(input: {
   axis?: SponsorV4AxisTerms | null;
   /** Hebelgroesse der Achse (Rarity, ggf. Golden). Nur wirksam mit `axis`. */
   axisSize?: number;
+  /** Zahlt diese Karte einen Vorschuss bei Unterschrift? */
+  withAdvance?: boolean;
   /** Nur fuer Sensitivitaets-Laeufe: skaliert die Rarity-Tilts global. Default 1. */
   tiltScale?: number;
   anchorSigma?: number;
@@ -431,6 +467,15 @@ export function buildSponsorV3TermsCore(input: {
   // Erfolgswahrscheinlichkeit. Beides landet in denselben zwei Feldern, damit das Settlement genau
   // eine Rechnung kennt: `Auszahlung = Leiter + Erfuellung*G − p*G`.
   const axis = input.axis ?? null;
+  // Der Vorschuss haengt am LEITERBODEN, nicht am Erwartungswert: er ist der Teil der Auszahlung,
+  // der auf jedem Endrang sicher kommt. Auf mehr darf kein Vorschuss laufen, sonst koennte ein
+  // Absturz den Vertrag ins Minus drehen.
+  const ladderFloor = Math.max(input.floor, Math.min(...rankLadder));
+  const advanceAmount = input.withAdvance === true ? Math.round(ladderFloor * SPONSOR_V4_ADVANCE_SHARE * 10) / 10 : 0;
+  const advance: SponsorV4AdvanceTerms | null =
+    advanceAmount > 0
+      ? { amount: advanceAmount, fee: Math.round(advanceAmount * SPONSOR_V4_ADVANCE_FEE_RATE * 10) / 10 }
+      : null;
   const hasGoal = axis == null && input.card.goal && input.goalKey != null;
   const goalP = axis != null ? SPONSOR_V4_AXIS_PBAR : hasGoal ? sponsorV3GoalProbability(input.goalKey, input.startRank) : 0;
   const goalSize =
@@ -457,6 +502,7 @@ export function buildSponsorV3TermsCore(input: {
     salaryFactor: input.salaryFactor,
     floor: input.floor,
     ...(axis != null ? { axis } : {}),
+    ...(advance != null ? { advance } : {}),
   };
 }
 

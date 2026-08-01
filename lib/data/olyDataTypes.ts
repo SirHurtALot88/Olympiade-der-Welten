@@ -1343,6 +1343,16 @@ export type SponsorV3ContractTermsRecord = {
   goalSize: number;
   salaryFactor: number;
   floor: number;
+  /**
+   * V4-Zielachse: wofuer dieser Sponsor zahlt, gemessen gegen die bei Angebotserzeugung
+   * eingefrorene eigene Ausgangslage. Fehlt bei der Basis-Karte und bei Altvertraegen.
+   */
+  axis?: { key: string; baseline: number; scale: number; offset: number };
+  /**
+   * V4-Vorschuss: bei Unterschrift ausgezahlter Teil, am Saisonende samt Gebuehr verrechnet.
+   * Fehlt beim Standard-Profil und bei Altvertraegen.
+   */
+  advance?: { amount: number; fee: number };
 };
 
 /**

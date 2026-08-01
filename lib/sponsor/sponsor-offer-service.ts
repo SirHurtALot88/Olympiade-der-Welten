@@ -361,6 +361,7 @@ export function buildSponsorOffersForTeam(input: {
     cardKeys: slate.entries.map((entry) => entry.cardKey),
     axisKeys: slate.entries.map((entry) => entry.axisKey ?? null),
     goldenSlots: slate.goldenCardSlots,
+    advanceSlots: slate.entries.map((entry) => entry.advance === true),
     teamId: input.teamId,
     startRank,
   });
@@ -541,12 +542,43 @@ export function chooseSponsorOffer(input: {
       },
     },
   };
-  // Sponsorengeld flieszt AUSSCHLIESZLICH am Saisonende (sponsor-settlement-service). Frueher wurde
-  // beim Unterschreiben sofort die halbe Basisrate ausgezahlt; das Settlement zahlte danach nur noch
+  // Sponsorengeld flieszt grundsaetzlich am Saisonende (sponsor-settlement-service). Frueher wurde
+  // beim Unterschreiben IMMER die halbe Basisrate ausgezahlt; das Settlement zahlte danach nur noch
   // die zweite Haelfte. Das hatte zwei Nachteile: die angezeigte Saison-Summe sackte im Moment des
   // Abschlusses ab (ohne dass der Vertrag weniger wert war), und am Saisonende kam entsprechend
-  // wenig nach — obwohl genau dann Gehaelter und Transfers zu bezahlen sind. Jetzt kommt die volle
-  // Basis mit dem Rest gemeinsam am Saisonende.
+  // wenig nach — obwohl genau dann Gehaelter und Transfers zu bezahlen sind.
+  //
+  // VORSCHUSS-KARTEN sind die bewusste Ausnahme und genau deshalb eine Entscheidung: wer sie waehlt,
+  // holt sich Liquiditaet fuers Transferfenster und zahlt dafuer eine Gebuehr. Der Vorschuss wird am
+  // Saisonende samt Gebuehr wieder verrechnet — er ist vorgezogenes eigenes Geld, kein Zuschuss.
+  const advance = offer.sponsorV3?.advance ?? null;
+  if (advance && advance.amount > 0) {
+    nextGameState = {
+      ...nextGameState,
+      teams: nextGameState.teams.map((team) =>
+        team.teamId === input.teamId
+          ? { ...team, cash: Math.round((team.cash + advance.amount) * 10) / 10 }
+          : team,
+      ),
+      seasonState: {
+        ...nextGameState.seasonState,
+        sponsorPayoutLogs: [
+          {
+            id: `sponsor-payout:${nextGameState.season.id}:${input.teamId}:advance:${randomUUID()}`,
+            saveId: input.saveId ?? "",
+            seasonId: nextGameState.season.id,
+            teamId: input.teamId,
+            phase: "base_first" as const,
+            componentId: "v4_advance",
+            cashDelta: advance.amount,
+            action: "apply" as const,
+            createdAt: new Date().toISOString(),
+          },
+          ...(nextGameState.seasonState.sponsorPayoutLogs ?? []),
+        ],
+      },
+    };
+  }
   nextGameState = appendSponsorBrandHistory(nextGameState, input.teamId, offer.sponsorParentBrandId);
   const updatedContract = getTeamSponsorContract(nextGameState, input.teamId);
   return { gameState: nextGameState, contract: updatedContract };

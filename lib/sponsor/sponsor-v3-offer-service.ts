@@ -181,6 +181,8 @@ export function buildSponsorV3Terms(input: {
   axisKey?: SponsorV4AxisKey | null;
   teamId?: string;
   golden?: boolean;
+  /** Zahlt diese Karte einen Vorschuss bei Unterschrift? */
+  withAdvance?: boolean;
 }): SponsorV3ContractTerms {
   const card = sponsorV3CardByKey(input.cardKey);
   const goalKey = card.goal
@@ -200,6 +202,7 @@ export function buildSponsorV3Terms(input: {
     goalKey,
     axis,
     axisSize: axis ? sponsorV4AxisSizeFor(rarity, input.golden === true) : undefined,
+    withAdvance: input.withAdvance === true,
     salaryFactor: getSponsorV3SalaryFactor(input.gameState),
     floor: SPONSOR_V3_FLOOR_C,
   });
@@ -225,6 +228,8 @@ export function applySponsorV3ToOffers(input: {
   axisKeys?: (SponsorV4AxisKey | null)[];
   /** Slots, die das Golden-Los gezogen haben — dort ist der Achsenhebel groesser. */
   goldenSlots?: number[];
+  /** Slots, die einen Vorschuss zahlen. */
+  advanceSlots?: boolean[];
   teamId?: string;
   startRank: number;
 }): SponsorOffer[] {
@@ -239,6 +244,7 @@ export function applySponsorV3ToOffers(input: {
       axisKey: input.axisKeys?.[index] ?? null,
       teamId: input.teamId,
       golden: input.goldenSlots?.includes(index) === true,
+      withAdvance: input.advanceSlots?.[index] === true,
     });
     const ladder = sponsorV3GuaranteedLadder(terms);
     const floor = ladder[31]!;
@@ -324,6 +330,20 @@ export function sponsorV3SettlementParts(input: {
         (terms.tilt === 0 ? "" : ` · ${tiltLabel} ${terms.tilt > 0 ? "+" : ""}${Math.round(terms.tilt * 100)} %`),
     },
   ];
+  if (terms.advance && terms.advance.amount > 0) {
+    // Der Vorschuss wurde bei Unterschrift ausgezahlt und wird hier zurueckgerechnet — er ist
+    // vorgezogenes eigenes Geld. Nur die Gebuehr bleibt als echter Abzug stehen. Ohne diese Zeile
+    // wuerde derselbe Betrag zweimal gutgeschrieben.
+    parts.push({
+      key: "base",
+      label: "Vorschuss-Verrechnung",
+      cashDelta: round1(-(terms.advance.amount + terms.advance.fee)),
+      met: true,
+      reason:
+        `bei Unterschrift ausgezahlt: ${round1(terms.advance.amount)} C · ` +
+        `Gebuehr ${round1(terms.advance.fee)} C`,
+    });
+  }
   if (terms.goalSize > 0) {
     parts.push({
       key: "special",
