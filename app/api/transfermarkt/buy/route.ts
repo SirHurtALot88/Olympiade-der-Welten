@@ -3,8 +3,10 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 
 import { executeLocalTransfermarktBuy, previewLocalTransfermarktBuy } from "@/lib/market/transfermarkt-local-service";
-import type { ContractShape } from "@/lib/data/olyDataTypes";
+import type { TransfermarktBuyExecuteResult, TransfermarktBuyPreview } from "@/lib/market/transfermarkt-buy-service";
+import type { ContractShape, GameState } from "@/lib/data/olyDataTypes";
 import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
+import { compactFoundationInitialGameState } from "@/lib/persistence/foundation-initial-compact-state";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
@@ -139,9 +141,27 @@ export async function POST(request: Request) {
       );
     }
 
-    const summary = dryRun
-      ? previewLocalTransfermarktBuy(params)
-      : executeLocalTransfermarktBuy(params);
+    // `executeLocalTransfermarktBuy` hat den resultierenden, bereits persistierten Spielstand schon
+    // in der Hand (`gameStateAfter`) — nur bei einem echten, erfolgreichen lokalen Kauf gesetzt. Vor
+    // dem Rausschicken aus `summary` herausziehen (der ungekürzte Zustand würde bei jedem Kauf das
+    // ganze Saisonarchiv mitschicken) und stattdessen kompakt daneben mitgeben — in genau derselben
+    // Form (`compactFoundationInitialGameState`), die auch der State-Endpunkt mit `compactInitial`
+    // liefert. Der Client übernimmt ihn dann direkt, statt den ganzen Spielstand neu zu holen. Fehlt
+    // er (alte Summary-Form, Preview, Batch-Pfad), bleibt es bei `null` — der Client fällt dann auf
+    // den bisherigen vollständigen Reload zurück.
+    let gameStateAfter: GameState | null = null;
+    let summary: TransfermarktBuyPreview | TransfermarktBuyExecuteResult;
+    if (dryRun) {
+      summary = previewLocalTransfermarktBuy(params);
+    } else {
+      const executed = executeLocalTransfermarktBuy(params);
+      if (executed.gameStateAfter) {
+        gameStateAfter = compactFoundationInitialGameState(executed.gameStateAfter);
+      }
+      const { gameStateAfter: _executedGameStateAfter, ...summaryWithoutState } = executed;
+      summary = summaryWithoutState;
+    }
+
     notifyRoomGameplayWrite(writeAuth, {
       saveId,
       teamId,
@@ -156,6 +176,7 @@ export async function POST(request: Request) {
       {
         success: summary.canBuy,
         summary,
+        gameStateAfter,
         warnings: [...phaseGate.warnings, ...writeAuth.warnings, ...summary.warnings],
         scope: { saveId, seasonId, teamId, playerId, dryRun, source },
       },

@@ -474,6 +474,12 @@ describe("transfermarkt local service", () => {
     expect(afterState.rosters.find((entry) => entry.playerId === "fa-1")?.roleTag).toBe("prospect");
     expect(afterState.rosters.find((entry) => entry.playerId === "fa-1")?.promisedRole).toBe("rotation");
 
+    // Der Kauf-Endpunkt soll den bereits berechneten Folgezustand nicht neu vom Server holen
+    // müssen — `executeLocalTransfermarktBuy` liefert ihn also selbst mit zurück, identisch mit dem,
+    // was tatsächlich persistiert wurde (inkl. der vom Persistenz-Layer vergebenen saveVersion).
+    expect(result.gameStateAfter).toBe(afterState);
+    expect(result.gameStateAfter?.rosters.find((entry) => entry.playerId === "fa-1")).toBeTruthy();
+
     const afterFreeAgents = listLocalTransfermarktFreeAgents({
       saveId: buyWindowSaveId,
       seasonId: "season-1",
