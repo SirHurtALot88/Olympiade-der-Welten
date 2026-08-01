@@ -3,9 +3,36 @@
   "eintraege": [
     {
       "datum": "2026-08-01",
+      "seite": "Markt · Transfermarkt",
+      "pr": "#306",
+      "text": "Im Draft könnt ihr jetzt bis zu 15 Spieler auf die Wunschliste setzen; danach gilt wieder die gewohnte Scouting-Grenze.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-01",
+      "seite": "Spieltag · Arena",
+      "pr": "#312",
+      "text": "Auf der Team-Karte in der Arena stehen die aufgestellten Spieler wieder unter „In dieser Disziplin\", statt dass die Sektion leer bleibt.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-01",
       "seite": "Spieltag · Arena",
       "pr": "#297 + #305",
       "text": "Der Rang im Saisonstand konnte veraltet stehen bleiben, wenn ein Spieltag noch nicht abgeschlossen war — das ist jetzt behoben, und eine feste Prüfung stellt sicher, dass das Team mit den meisten Punkten immer Rang 1 hat.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-01",
+      "seite": "Spieltag · Arena",
+      "pr": "#315",
+      "text": "KI-Teams verschenken ihren Kapitän nicht mehr an eine Disziplin, in die sie am selben Spieltag eine Formkarte mit Minus werfen — der Kapitän geht dorthin, wo er noch etwas bewegt.",
       "quelle": "triage",
       "gewicht": "behebung",
       "version": null
@@ -17,6 +44,42 @@
       "text": "Ein verletzter Spieler in der Aufstellung eines Computer-Teams konnte den ganzen Spieltag blockieren — er liess sich nicht mehr abschliessen. Die Computer-Teams pruefen ihre Aufstellung jetzt noch einmal, sobald du deine speicherst, und tauschen verletzte oder ausgelaugte Spieler aus.",
       "quelle": "triage",
       "gewicht": "spielblockierend",
+      "version": null
+    },
+    {
+      "datum": "2026-08-01",
+      "seite": "Team · Teams",
+      "pr": "#298",
+      "text": "Verkaufen war nach dem ersten Spieltag dauerhaft gesperrt — auch am Saisonende. Jetzt schaltet das Saisonende weiter, und Verkaeufe sind dort wieder moeglich.",
+      "quelle": "triage",
+      "gewicht": "spielblockierend",
+      "version": null
+    },
+    {
+      "datum": "2026-08-01",
+      "seite": "Team · Teams",
+      "pr": "#298",
+      "text": "Vertragsverlaengerungen liessen sich nach dem letzten Spieltag nicht mehr abschliessen. Das Saisonende schaltet jetzt weiter, damit sie wieder moeglich sind.",
+      "quelle": "triage",
+      "gewicht": "spielblockierend",
+      "version": null
+    },
+    {
+      "datum": "2026-08-01",
+      "seite": "Team · Teams",
+      "pr": "#310",
+      "text": "Die Team-Historie der eigenen Mannschaft zeigte manchmal veraltete Werte aus einem früheren Spieltag an, statt den aktuellen Ligastand. Sie ist jetzt immer auf dem neuesten Stand.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-01",
+      "seite": "Spieltag · Saisonstand",
+      "pr": "#313",
+      "text": "Bei den Saisonzielen konnte eine Rang-Erwartung eine andere Marke anzeigen, als sie tatsächlich gewertet wurde — ein Ziel stand auf verfehlt, obwohl die genannte Marke erreicht war. Anzeige und Wertung nennen jetzt dieselbe Marke. Ausserdem verlangt der Vorstand pro Saison nur noch ein Rang-Ziel; weitere Rangziele sind optionale Zusatzziele, die Bonus bringen, aber nichts kosten.",
+      "quelle": "triage",
+      "gewicht": "behebung",
       "version": null
     },
     {
@@ -53,6 +116,15 @@
       "text": "Neu: dieser Reiter. Der Changelog zeigt, was sich im Spiel geaendert hat — gefixte Fehler und Neuerungen in Alltagssprache, mit der PR-Nummer als Beleg.",
       "quelle": "gepflegt",
       "gewicht": "grundlegend",
+      "version": null
+    },
+    {
+      "datum": "2026-08-01",
+      "seite": "Markt · Transfermarkt",
+      "pr": "#300",
+      "text": "Nach einem Kauf oder Verkauf im Transfermarkt lud die ganze Seite neu, nur damit der Kontostand stimmt. Jetzt steht der neue Betrag sofort da, und die uebrigen Ansichten aktualisieren sich im Hintergrund.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
       "version": null
     },
     {
