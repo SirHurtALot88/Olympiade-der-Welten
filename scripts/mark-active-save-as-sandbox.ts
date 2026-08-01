@@ -13,9 +13,8 @@ const SNAPSHOT_DESCRIPTION =
   "Archivierter Ruecksprungpunkt vor groesseren Sandbox-Multi-Season-Tests.";
 
 function ensureOutputDir() {
-  const outputDir =
-    process.env.OLY_OUTPUT_DIR ??
-    "/Users/chrisfalk/Documents/Codex/2026-06-11/wir-machen-weiter-mit-dem-olympiade/outputs";
+  // Standardablage im Repo, damit das Skript auch ohne den Rechner des Autors laeuft.
+  const outputDir = process.env.OLY_OUTPUT_DIR ?? path.join(process.cwd(), "outputs");
   fs.mkdirSync(outputDir, { recursive: true });
   return outputDir;
 }

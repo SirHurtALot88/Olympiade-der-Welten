@@ -6,7 +6,8 @@ import { getDisciplineColor, getSeasonDisciplineSchedule } from "@/lib/season/se
 
 const OUTPUT_DIR =
   process.env.OLY_OUTPUT_DIR ??
-  "/Users/chrisfalk/Documents/Codex/2026-06-11/wir-machen-weiter-mit-dem-olympiade/outputs";
+  // Standardablage im Repo, damit das Audit auch ohne den Rechner des Autors laeuft.
+  path.join(process.cwd(), "outputs");
 
 function csvEscape(value: unknown) {
   if (value == null) return "";

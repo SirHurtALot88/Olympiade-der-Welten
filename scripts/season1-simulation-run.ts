@@ -17,7 +17,8 @@ import { buildStandingsPreview } from "@/lib/standings/standings-preview-engine"
 import { executeStandingsApply, STANDINGS_APPLY_CONFIRM_TOKEN } from "@/lib/standings/standings-apply-service";
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
-const OUTPUT_DIR = "/Users/chrisfalk/Documents/Codex/2026-06-11/wir-machen-weiter-mit-dem-olympiade/outputs";
+// Standardablage im Repo, damit der Lauf auch ohne den Rechner des Autors funktioniert.
+const OUTPUT_DIR = process.env.OLY_OUTPUT_DIR ?? path.join(PROJECT_ROOT, "outputs");
 const EXPECTED_TEAM_COUNT = 32;
 const EXPECTED_MATCHDAY_COUNT = 10;
 const TARGET_SEASON_ID = process.env.OLY_TARGET_SEASON_ID ?? "season-1";

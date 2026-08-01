@@ -1,7 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const WORKSPACE_ROOT = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten";
+// Repo-relativ wie lib/standings/season-standings-sheet.ts und lib/season/prize-money-sheet.ts,
+// damit die Referenzdateien auch abseits des Rechners des Autors gefunden werden.
+const WORKSPACE_ROOT = process.cwd();
 
 export const TEAM_START_CASH_CSV_PATH = path.join(
   WORKSPACE_ROOT,

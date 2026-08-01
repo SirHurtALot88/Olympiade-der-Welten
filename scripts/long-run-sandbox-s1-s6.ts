@@ -108,7 +108,8 @@ import { ensureIsolatedLongRunDatabase } from "@/lib/season/long-run-db-isolatio
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 const OUTPUT_DIR =
   process.env.OLY_LONG_RUN_OUTPUT_DIR ??
-  "/Users/chrisfalk/Documents/Codex/2026-06-11/wir-machen-weiter-mit-dem-olympiade/outputs";
+  // Standardablage im Repo, damit der Long-Run auch ohne den Rechner des Autors laeuft.
+  path.join(PROJECT_ROOT, "outputs");
 const TARGET_FINAL_SEASON = Number(process.env.OLY_LONG_RUN_FINAL_SEASON ?? 6);
 const RUN_LABEL = process.env.OLY_LONG_RUN_LABEL ?? `Long Run Sandbox S1-S${TARGET_FINAL_SEASON}`;
 const RESUME_SAVE_ID = process.env.OLY_LONG_RUN_SAVE_ID ?? null;

@@ -1,19 +1,22 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const projectRoot = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten";
+const projectRoot = path.resolve(__dirname, "..");
 const referencesDir = path.join(projectRoot, "references", "retool-ai-golden-master");
 const docsDir = path.join(projectRoot, "docs");
 const outputDir = path.join(projectRoot, "references", "retool-standings-economy");
-const retoolAppExportCandidates = [
-  "/Users/chrisfalk/Downloads/Olympiade%20der%20Welten%20Draftboard (7).json",
-  "/Users/chrisfalk/Downloads/Olympiade%20der%20Welten%20Draftboard (6).json",
-  "/Users/chrisfalk/Downloads/Olympiade%20der%20Welten%20Draftboard (5).json",
-  "/Users/chrisfalk/Downloads/Olympiade%20der%20Welten%20Draftboard (4).json",
-  "/Users/chrisfalk/Downloads/Olympiade%20der%20Welten%20Draftboard (3).json",
-  "/Users/chrisfalk/Downloads/Olympiade%20der%20Welten%20Draftboard (2).json",
-  "/Users/chrisfalk/Downloads/Olympiade%20der%20Welten%20Draftboard (1).json",
-  "/Users/chrisfalk/Downloads/Olympiade%20der%20Welten%20Draftboard.json",
+// Der Retool-Export liegt nicht im Repo — nur lokal beim Autor. OLY_RETOOL_DOWNLOADS_DIR
+// erlaubt, den Downloads-Ordner zu benennen; die Dateinamen folgen Retools Auto-Nummerierung
+// bei Mehrfach-Downloads.
+const retoolAppExportFileNames = [
+  "Olympiade%20der%20Welten%20Draftboard (7).json",
+  "Olympiade%20der%20Welten%20Draftboard (6).json",
+  "Olympiade%20der%20Welten%20Draftboard (5).json",
+  "Olympiade%20der%20Welten%20Draftboard (4).json",
+  "Olympiade%20der%20Welten%20Draftboard (3).json",
+  "Olympiade%20der%20Welten%20Draftboard (2).json",
+  "Olympiade%20der%20Welten%20Draftboard (1).json",
+  "Olympiade%20der%20Welten%20Draftboard.json",
 ] as const;
 
 const groups = {
@@ -258,9 +261,22 @@ function buildManifest(summary: Record<GroupName, ExtractedReference[]>) {
 }
 
 function getRetoolAppExportPath() {
-  const found = retoolAppExportCandidates.find((candidate) => fs.existsSync(candidate));
+  const explicitSource = process.env.OLY_RETOOL_SOURCE ?? null;
+  if (explicitSource) {
+    if (!fs.existsSync(explicitSource)) {
+      throw new Error(`OLY_RETOOL_SOURCE zeigt auf eine nicht existierende Datei: ${explicitSource}`);
+    }
+    return explicitSource;
+  }
+
+  const downloadsDir = process.env.OLY_RETOOL_DOWNLOADS_DIR ?? null;
+  const found = downloadsDir
+    ? retoolAppExportFileNames.map((name) => path.join(downloadsDir, name)).find((candidate) => fs.existsSync(candidate))
+    : null;
   if (!found) {
-    throw new Error("No Retool Draftboard export found in Downloads.");
+    throw new Error(
+      "Kein Retool-Draftboard-Export gefunden. Datei angeben mit OLY_RETOOL_SOURCE=<pfad-zur-json> oder Downloads-Ordner mit OLY_RETOOL_DOWNLOADS_DIR=<verzeichnis> setzen.",
+    );
   }
   return found;
 }

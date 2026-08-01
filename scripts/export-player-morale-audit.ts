@@ -7,7 +7,8 @@ import { assertOlyProjectRoot } from "@/lib/persistence/project-root-guard";
 
 const OUTPUT_DIR =
   process.env.OLY_OUTPUT_DIR ??
-  "/Users/chrisfalk/Documents/Codex/2026-06-11/wir-machen-weiter-mit-dem-olympiade/outputs";
+  // Standardablage im Repo, damit das Audit auch ohne den Rechner des Autors laeuft.
+  path.join(process.cwd(), "outputs");
 
 function escapeCsv(value: string | number | null | undefined) {
   const text = value == null ? "—" : String(value);

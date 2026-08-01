@@ -5,7 +5,8 @@ import type { AiPicksRunResult, AiPicksRunTeamResult } from "@/lib/ai/ai-picks-r
 import { buildRedraftRunAudit, buildRedraftTeamSpendAudit } from "@/lib/ai/redraft-mode-audit";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 
-const OUTPUT_DIR = "/Users/chrisfalk/Documents/Codex/2026-06-11/wir-machen-weiter-mit-dem-olympiade/outputs";
+// Standardablage im Repo, damit das Audit auch ohne den Rechner des Autors laeuft.
+const OUTPUT_DIR = process.env.OLY_OUTPUT_DIR ?? path.join(process.cwd(), "outputs");
 const EXECUTE_JSON_PATH = path.join(OUTPUT_DIR, "clean-redraft-execute.json");
 
 function csvCell(value: unknown) {
