@@ -77,6 +77,9 @@ const NL_LEADER_TONE_MAP: Record<LeagueLeaderTone, NlTone> = {
   mvs: "warn",
   ovr: "accent",
   training: "good",
+  // Der Aufsteiger sticht bewusst mit dem Akzent heraus und nicht mit "good" wie Training:
+  // Training ist eine Prognose, Most Improved ist bereits geliefert.
+  improved: "accent",
 };
 
 function getLeaderInitials(name: string): string {
