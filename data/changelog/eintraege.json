@@ -30,6 +30,13 @@
       "text": "Neu: dieser Reiter. Der Changelog zeigt, was sich im Spiel geaendert hat — gefixte Fehler und Neuerungen in Alltagssprache, mit der PR-Nummer als Beleg.",
       "pr": "#295",
       "gewicht": "grundlegend"
+    },
+    {
+      "datum": "2026-08-01",
+      "gewicht": "behebung",
+      "text": "Nach einem Kauf oder Verkauf im Transfermarkt lud die ganze Seite neu, nur damit der Kontostand stimmt. Jetzt steht der neue Betrag sofort da, und die uebrigen Ansichten aktualisieren sich im Hintergrund.",
+      "seite": "Markt · Transfermarkt",
+      "pr": "#300"
     }
   ]
 }
