@@ -310,6 +310,12 @@ export type TransfermarktBuySummary = {
 export type TransfermarktBuyApiResponse = {
   success: boolean;
   summary: TransfermarktBuySummary | null;
+  /**
+   * Der resultierende Spielstand direkt nach einem echten Kauf, bereits in der abgespeckten
+   * `compactFoundationInitialGameState`-Form — siehe `app/api/transfermarkt/buy/route.ts`. Nur bei
+   * `dryRun: false` und erfolgreichem Kauf gesetzt; sonst `null` (Preview, Fehlkauf, alter Server).
+   */
+  gameStateAfter?: GameState | null;
   warnings: string[];
   error?: string;
   scope?: Omit<TransfermarktBuyRequestContext, "view"> & { view?: FoundationView };

@@ -2646,6 +2646,11 @@ export function executeLocalTransfermarktBuy(params: TransfermarktBuyParams): Tr
   };
   const nextState = applyTransferBudgetSpend(nextStateBase, params.teamId, preview.purchasePrice!);
 
+  // Nur der direkte (nicht-Batch) Pfad liefert `gameStateAfter` zurück: der Fast-Batch-Pfad
+  // (AI-Massenkäufe, `runContext` gesetzt) deferriert das Persistieren über mehrere Käufe hinweg,
+  // sodass hier noch kein final gespeicherter Zustand existiert — für ihn bleibt das Feld undefined
+  // und Aufrufer fallen auf ihren bisherigen Reload-Weg zurück (siehe Kommentar am Typ).
+  let gameStateAfter: GameState | undefined;
   if (runContext) {
     runContext.save = {
       ...runContext.save,
@@ -2657,7 +2662,8 @@ export function executeLocalTransfermarktBuy(params: TransfermarktBuyParams): Tr
       flushLocalTransfermarktRunContext(runContext);
     }
   } else {
-    persistTransfermarktGameState(persistence, save.saveId, nextState, [params.playerId]);
+    const persisted = persistTransfermarktGameState(persistence, save.saveId, nextState, [params.playerId]);
+    gameStateAfter = persisted.gameState;
   }
 
   return {
@@ -2667,6 +2673,7 @@ export function executeLocalTransfermarktBuy(params: TransfermarktBuyParams): Tr
     teamSeasonStateUpdated: true,
     activePlayerId: `local-roster:${save.saveId}:${params.playerId}`,
     transferId: transferHistoryId,
+    gameStateAfter,
   };
 }
 

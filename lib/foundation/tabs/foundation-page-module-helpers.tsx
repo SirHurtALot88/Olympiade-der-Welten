@@ -24,6 +24,8 @@ import {
 import { withNormalizedTeamGeneralManagers } from "@/lib/foundation/team-general-managers";
 import { withNormalizedTeamIdentityOverrides } from "@/lib/foundation/team-identity-settings";
 import { withNormalizedTeamStrategyProfiles } from "@/lib/foundation/team-strategy-profiles";
+import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
+import { applyCompactSeasonArchiveSentinelIfNeeded } from "@/lib/foundation/apply-compact-season-archive-sentinel";
 import type { FoundationSaveMode } from "@/lib/persistence/foundation-save-mode";
 import { normalizeFoundationSaveMode } from "@/lib/persistence/foundation-save-mode";
 import type { FoundationTableColumn } from "@/lib/foundation/foundation-table-ui-types";
@@ -1066,6 +1068,31 @@ export function withNormalizedLocalTeamSettings(gameState: GameState): GameState
       withNormalizedTeamGeneralManagers(withNormalizedTeamIdentityOverrides(gameState)),
     ),
   );
+}
+
+/**
+ * Die Aufbereitung, die jeder frisch von SERVER erhaltene Foundation-Spielstand durchläuft, bevor er
+ * in `setGameState` landet — egal ob er über einen vollen State-Fetch (`loadSave`) oder als
+ * mitgelieferter `gameStateAfter` einer Gameplay-Antwort (z. B. Transfermarkt-Kauf) hereinkommt. Eine
+ * Kopie dieser drei Schritte an einer zweiten Stelle war schon mehrfach die Ursache für auseinander-
+ * laufendes Verhalten zwischen den beiden Wegen — deshalb genau eine Funktion für beide.
+ *
+ * - `withNormalizedLocalTeamSettings`: Team-Identität/GM/Steuerung/Strategie-Profile auf ihre
+ *   normalisierte Form bringen (Prisma-Quelle liefert das schon serverseitig normalisiert, siehe
+ *   `isPrismaSource`).
+ * - `refreshTeamObjectiveState`: Board-Zielzustände für die aktuelle Season neu ableiten.
+ * - `applyCompactSeasonArchiveSentinelIfNeeded`: bei einem kompakten Payload das serverseitig
+ *   gestrippte Saisonarchiv durch ein leeres Sentinel-Array ersetzen, statt `undefined` stehen zu
+ *   lassen (siehe `apply-compact-season-archive-sentinel.ts`).
+ */
+export function normalizeLoadedFoundationGameState(
+  gameState: GameState,
+  options: { compactInitial?: boolean; isPrismaSource?: boolean } = {},
+): GameState {
+  const normalizedGameState = options.isPrismaSource ? gameState : withNormalizedLocalTeamSettings(gameState);
+  return applyCompactSeasonArchiveSentinelIfNeeded(refreshTeamObjectiveState(normalizedGameState), {
+    compactInitial: options.compactInitial ?? true,
+  });
 }
 
 export function buildTeamIdentityDraftMap(teams: Team[], teamIdentities: TeamIdentity[]) {
