@@ -5,6 +5,18 @@ export const SCOUTING_WISHLIST_BASE_SLOTS = 4;
 export const SCOUTING_WISHLIST_SLOTS_PER_LEVEL = 3;
 export const SCOUTING_DRAFT_WISHLIST_SLOT_LIMIT = 999;
 
+/**
+ * Obergrenze der Wunschliste selbst während der Draft-Phase (Season 1, bis
+ * der Einstiegs-Flow abgeschlossen ist). Bug 2026-07-31: Chris meldete eine
+ * zu kleine Grenze im Draft — tatsächlich war sie `null` (unbegrenzt), aber
+ * `isTeamSetupDraftWishlistPhase` erkannte den Draft in seinem Spielstand gar
+ * nicht mehr als solchen (siehe dort), sodass schon die reguläre, sehr
+ * niedrige Scouting-Grenze griff. Getrennt von `SCOUTING_DRAFT_WISHLIST_SLOT_LIMIT`
+ * oben, das die Kapazität der manuellen Scouting-Pipeline (nicht die
+ * Wunschliste) im Draft begrenzt.
+ */
+export const DRAFT_TRANSFER_WISHLIST_SLOT_LIMIT = 15;
+
 export type ScoutingWishlistSlotCheck = {
   ok: boolean;
   limit: number | null;
@@ -43,7 +55,22 @@ function getSetupRosterTarget(gameState: GameState, teamId: string) {
 export function isTeamSetupDraftWishlistPhase(gameState: GameState, teamId: string) {
   if (gameState.season.id !== "season-1") return false;
   if (gameState.gamePhase && gameState.gamePhase !== "preseason_management") return false;
-  if (gameState.seasonState.newGameFlow?.active === false) return false;
+  const flow = gameState.seasonState.newGameFlow;
+  if (flow) {
+    // `newGameFlow.active` wird erst false, sobald ALLE Einstiegsschritte
+    // abgeschlossen oder übersprungen sind (siehe `updateNewGameFlowStepStatus`
+    // in use-foundation-shell-router-body-scope.tsx) — das ist das verlässliche
+    // Draft-Ende. Der Kaderstand allein reicht nicht: `fill_roster` gilt schon
+    // ab Mindestkader (`playerMin`) als erledigt, obwohl z. B. Sponsor-Wahl
+    // oder Aufstellung noch offen sind und der Spieler sich weiter im Draft
+    // sieht. Genau das hat Chris' zu kleine Wunschliste ausgelöst (Bug
+    // 2026-07-31): Kader 9/8 (schon über `playerMin`) ließ die alte,
+    // rosterbasierte Prüfung die Draft-Phase vorzeitig verlassen, obwohl der
+    // Einstiegs-Flow noch aktiv war.
+    return flow.active;
+  }
+  // Fallback für Spielstände ohne `newGameFlow` (z. B. ältere Saves): Draft
+  // gilt, solange der Kader das Soll noch nicht erreicht hat.
   const rosterCount = gameState.rosters.filter((entry) => entry.teamId === teamId).length;
   return rosterCount < getSetupRosterTarget(gameState, teamId);
 }
@@ -52,9 +79,9 @@ export function getScoutingFacilityLevel(gameState: GameState, teamId: string) {
   return getFacilityLevel(getTeamFacilityState(gameState, teamId), "scouting_office");
 }
 
-export function getScoutingWishlistSlotLimit(gameState: GameState, teamId: string): number | null {
+export function getScoutingWishlistSlotLimit(gameState: GameState, teamId: string): number {
   if (isTeamSetupDraftWishlistPhase(gameState, teamId)) {
-    return null;
+    return DRAFT_TRANSFER_WISHLIST_SLOT_LIMIT;
   }
   return getScoutingWishlistSlotsForLevel(getScoutingFacilityLevel(gameState, teamId));
 }
@@ -73,9 +100,9 @@ export function getTeamTransferWishlistEntries(gameState: GameState, teamId: str
 export function getActiveScoutingWishlistEntries(gameState: GameState, teamId: string) {
   const entries = sortByPriorityRank(getTeamTransferWishlistEntries(gameState, teamId));
   const limit = getScoutingWishlistSlotLimit(gameState, teamId);
-  if (limit == null) {
-    return entries;
-  }
+  // Nur die Anzeige/Aktivierung wird gekappt (slice) — gespeicherte Einträge
+  // oberhalb der Grenze bleiben im Save erhalten, siehe trimTransferWishlistToSlotLimit
+  // für die einzige Stelle, die Einträge tatsächlich entfernt.
   return entries.slice(0, limit);
 }
 
@@ -125,27 +152,28 @@ export function canAddPlayerToTransferWishlist(
   const entries = getTeamTransferWishlistEntries(gameState, teamId);
   const used = entries.length;
   const draftSuspended = isTeamSetupDraftWishlistPhase(gameState, teamId);
+  // Seit `getScoutingWishlistSlotLimit` im Draft die feste 15er-Grenze statt
+  // `null` liefert, greift dieselbe Prüfung einheitlich in beiden Phasen —
+  // `draftSuspended` bleibt nur noch als Info fürs UI erhalten (andere
+  // Meldung, siehe getScoutingWishlistSlotMessage).
+  const limit = getScoutingWishlistSlotLimit(gameState, teamId);
   if (playerId && entries.some((entry) => entry.playerId === playerId)) {
-    return { ok: true, limit: getScoutingWishlistSlotLimit(gameState, teamId), used, draftSuspended };
+    return { ok: true, limit, used, draftSuspended };
   }
-  if (draftSuspended) {
-    return { ok: true, limit: null, used, draftSuspended: true };
-  }
-  const limit = getScoutingWishlistSlotLimit(gameState, teamId) ?? 0;
   if (used >= limit) {
-    return { ok: false, limit, used, draftSuspended: false, reason: "wishlist_full" };
+    return { ok: false, limit, used, draftSuspended, reason: "wishlist_full" };
   }
-  return { ok: true, limit, used, draftSuspended: false };
+  return { ok: true, limit, used, draftSuspended };
 }
 
 export function getScoutingWishlistSlotMessage(check: ScoutingWishlistSlotCheck) {
-  if (check.draftSuspended) {
+  if (check.reason !== "wishlist_full") {
     return null;
   }
-  if (check.reason === "wishlist_full") {
-    return `Wishlist voll (${check.used}/${check.limit} Scouting-Slots). Erst einen Spieler entfernen oder Scouting Office upgraden.`;
+  if (check.draftSuspended) {
+    return `Wunschliste im Draft voll (${check.used}/${check.limit} Plätzen). Erst einen Spieler entfernen, um einen neuen zu setzen.`;
   }
-  return null;
+  return `Wishlist voll (${check.used}/${check.limit} Scouting-Slots). Erst einen Spieler entfernen oder Scouting Office upgraden.`;
 }
 
 export function countManualScoutingWatchSlots(gameState: GameState, teamId: string) {
