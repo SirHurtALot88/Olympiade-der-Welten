@@ -89,11 +89,18 @@ describe("finances: league table ↔ detail view sponsor parity", () => {
     if (!leagueRow) throw new Error("expected a league row for team-1");
 
     // Maßgeblich ist die ECHTE Settlement-Auszahlung, nicht die Summe der Vertrags-Obergrenzen:
-    // `component.rewardCash` ist laut sponsor-offer-service nur ein Cap. In dieser Fixture zahlt
-    // Basis 40 voll, die Rang-Komponente rangabhängig 29,3, und Verbesserung/Sonderziel zahlen 0,
-    // weil ihre Ziele nicht erfüllt sind → 69,3. Die frühere Erwartung 75 (= 40+20+10+5, also die
-    // Caps) stammt aus der Zeit vor der Umstellung der Detailansicht auf previewSponsorSettlement.
-    expect(detailSponsorTotal).toBeCloseTo(69.3, 1);
+    // `component.rewardCash` ist laut sponsor-offer-service nur ein Cap.
+    //
+    // Seit V3 rechnet das Settlement NICHT mehr aus den Vertrags-Komponenten, sondern aus der
+    // eingefrorenen Rang-Leiter; ein Vertrag ohne V3-Terme wird beim Abrechnen migriert
+    // (`buildMigratedSponsorV3Terms`). Diese Fixture hat zwei Teams ohne Kader — die Leiter faellt
+    // damit auf die Untergrenze `SPONSOR_V3_FLOOR_C`. Das ist korrektes Verhalten fuer eine
+    // Fixture ohne Gehaelter, kein Defekt: die Leiter ist gehaltsverankert und hat hier nichts,
+    // woran sie sich verankern koennte.
+    //
+    // Die AUSSAGE dieses Tests ist ohnehin die Parität der beiden Ansichten (Zusicherung unten),
+    // nicht der Absolutwert. Der frühere Wert 69,3 stammte aus der Komponenten-Summe von V2.
+    expect(detailSponsorTotal).toBeCloseTo(32, 1);
     // Gegenprobe zum ursprünglichen Regressionsgrund: der 99er Überperformance-CAP darf in KEINER
     // Ansicht mitgezählt werden (er zahlte im Settlement 84 — läge er drin, wäre die Summe > 150).
     expect(detailSponsorTotal).toBeLessThan(100);

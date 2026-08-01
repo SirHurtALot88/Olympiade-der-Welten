@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { SponsorTeamQualityRank } from "@/lib/sponsor/sponsor-team-quality-rank";
 import { getDemandMultiplierForRarity, rollSponsorOfferSlate } from "@/lib/sponsor/sponsor-tier-pool";
-import { SPONSOR_V2_CURVES } from "@/lib/sponsor/sponsor-v2-model";
+import { SPONSOR_V3_CARDS } from "@/lib/sponsor/sponsor-v3-model";
 
 function createQualityRank(overrides: Partial<SponsorTeamQualityRank> & Pick<SponsorTeamQualityRank, "teamId">): SponsorTeamQualityRank {
   return {
@@ -38,10 +38,12 @@ describe("sponsor offer slate (rarity + Modellkurven)", () => {
       qualityRank: createQualityRank({ teamId: "M-M", qualityRank: 5, maxRarity: "legendär", targetRarity: "selten" }),
     });
     expect(slate.entries).toHaveLength(5);
-    const curves = slate.entries.map((entry) => entry.curveName);
-    expect(new Set(curves).size).toBe(curves.length); // distinkt
-    for (const name of curves) {
-      expect(SPONSOR_V2_CURVES.some((c) => c.name === name)).toBe(true);
+    // V3: die Auswahl besteht aus KARTEN (`cardKey`), nicht mehr aus Kurvennamen —
+    // fuenf Risikoprofile mit identischem Erwartungswert.
+    const cards = slate.entries.map((entry) => entry.cardKey);
+    expect(new Set(cards).size).toBe(cards.length); // distinkt
+    for (const key of cards) {
+      expect(SPONSOR_V3_CARDS.some((card) => card.key === key)).toBe(true);
     }
   });
 

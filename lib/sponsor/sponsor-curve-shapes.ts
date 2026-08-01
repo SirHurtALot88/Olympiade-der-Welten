@@ -127,8 +127,6 @@ export const SPONSOR_CURVE_FAMILIES: Record<SponsorCurveFamily, SponsorCurveFami
 
 export type SponsorRarityDef = {
   labelDe: string;
-  /** Etat multiplier vs magisch (the ×1.0 reference). Bounded 0.90..1.15 (owner-set), salary-anchored. */
-  etatFactor: number;
   /** Diablo-style loot color (grey/blue/yellow/orange) for the sponsor list. */
   colorHex: string;
   /** Relative draw weight (higher = more common). Modulated at draw time by commercial rating / beliebtheit. */
@@ -144,32 +142,24 @@ const RARITY_WEIGHT = {
   legendär: Number(process.env.OLY_SPONSOR_RARITY_W_LEGENDARY ?? 6) || 6,
 };
 
+/**
+ * RARITY IST KEIN ETAT-HEBEL MEHR. Die frueheren `etatFactor`-Multiplikatoren (0,92 bis 1,15) sind
+ * mit dem V3-Umbau ERSATZLOS ENTFALLEN: sie waren genau der Mechanismus, ueber den "welchen Vertrag
+ * du zufaellig unterschrieben hast" mehr zaehlte als die Leistung. In V3 skaliert Rarity nur noch
+ * die GROESSE des Hebels (Tilt-Staerke und Zielpraemie, siehe sponsor-v3-model.ts), nie den
+ * Erwartungswert. Geblieben sind Beschriftung, Loot-Farbe, Ziehgewicht und Ordnung.
+ */
 export const SPONSOR_RARITIES: Record<SponsorRarity, SponsorRarityDef> = {
-  gewöhnlich: { labelDe: "Gewöhnlich", etatFactor: Number(process.env.OLY_SPONSOR_RARITY_F_COMMON ?? 0.92) || 0.92, colorHex: "#98a2ab", drawWeight: RARITY_WEIGHT.gewöhnlich, order: 0 },
-  magisch: { labelDe: "Magisch", etatFactor: Number(process.env.OLY_SPONSOR_RARITY_F_MAGIC ?? 1.0) || 1.0, colorHex: "#4f9be0", drawWeight: RARITY_WEIGHT.magisch, order: 1 },
-  selten: { labelDe: "Selten", etatFactor: Number(process.env.OLY_SPONSOR_RARITY_F_RARE ?? 1.08) || 1.08, colorHex: "#e0b83a", drawWeight: RARITY_WEIGHT.selten, order: 2 },
-  legendär: { labelDe: "Legendär", etatFactor: Number(process.env.OLY_SPONSOR_RARITY_F_LEGENDARY ?? 1.15) || 1.15, colorHex: "#e07f2e", drawWeight: RARITY_WEIGHT.legendär, order: 3 },
+  gewöhnlich: { labelDe: "Gewöhnlich", colorHex: "#98a2ab", drawWeight: RARITY_WEIGHT.gewöhnlich, order: 0 },
+  magisch: { labelDe: "Magisch", colorHex: "#4f9be0", drawWeight: RARITY_WEIGHT.magisch, order: 1 },
+  selten: { labelDe: "Selten", colorHex: "#e0b83a", drawWeight: RARITY_WEIGHT.selten, order: 2 },
+  legendär: { labelDe: "Legendär", colorHex: "#e07f2e", drawWeight: RARITY_WEIGHT.legendär, order: 3 },
 };
 
 export const SPONSOR_RARITY_KEYS = Object.keys(SPONSOR_RARITIES) as SponsorRarity[];
 
-export function getSponsorRarityEtatFactor(rarity: SponsorRarity): number {
-  return SPONSOR_RARITIES[rarity]?.etatFactor ?? 1;
-}
-
 export function getSponsorCurveFamily(shape: SponsorCurveShape): SponsorCurveFamily {
   return SPONSOR_CURVE_SHAPES[shape]?.family ?? "stetig";
-}
-
-/**
- * Per-rank payout multiplier of a shape relative to the reference base floor, i.e. `reference[rank]/36`.
- * `getSponsorCurveShapePayout` (in calibration) multiplies this by the live salary-anchored effectiveBaseFloor
- * and the rarity Etat factor. Rank is clamped to 1..32.
- */
-export function getSponsorCurveShapeRankMultiplier(shape: SponsorCurveShape, finalRank: number): number {
-  const def = SPONSOR_CURVE_SHAPES[shape] ?? SPONSOR_CURVE_SHAPES.sicherheit;
-  const boundedRank = Math.min(32, Math.max(1, Math.round(finalRank)));
-  return def.reference[boundedRank - 1]! / SPONSOR_REFERENCE_BASE_FLOOR;
 }
 
 // ── Migration mappers (old star tier / archetype → rarity / curve shape) ────────────────────────────────

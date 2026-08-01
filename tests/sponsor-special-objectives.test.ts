@@ -26,8 +26,8 @@ import {
   SPONSOR_GOLDEN_OBJECTIVE_ARCHETYPE,
   type SponsorGoldenObjectiveKey,
 } from "@/lib/sponsor/sponsor-special-objectives";
-import { mapSponsorCurveToArchetype } from "@/lib/sponsor/sponsor-tier-pool";
-import { SPONSOR_V2_CURVES } from "@/lib/sponsor/sponsor-v2-model";
+import { mapSponsorCardToArchetype } from "@/lib/sponsor/sponsor-tier-pool";
+import { SPONSOR_V3_CARDS } from "@/lib/sponsor/sponsor-v3-model";
 import type { SponsorArchetype, SponsorCurveShape } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
@@ -376,8 +376,9 @@ describe("sponsor bonus objectives — new targets (Fable B)", () => {
       expect(pickGoldenObjective("season-4", "T-1", archetype)).toBe(pick); // deterministisch
       expect(getAvailableBonusObjectiveKeys(archetype, "season-4")).not.toContain(pick as never);
     }
-    // Jede Modellkurve landet in genau einem Eimer, und alle drei Eimer werden bedient.
-    const buckets = new Set(SPONSOR_V2_CURVES.map((c) => mapSponsorCurveToArchetype(c.name)));
+    // Jede KARTE landet in genau einem Eimer, und alle drei Eimer werden bedient.
+    // (V3: aus den Kurvennamen sind die fuenf Risikokarten geworden.)
+    const buckets = new Set(SPONSOR_V3_CARDS.map((card) => mapSponsorCardToArchetype(card.key)));
     expect([...buckets].sort()).toEqual(["identity", "performance", "security"]);
   });
 
@@ -401,11 +402,11 @@ describe("sponsor bonus objectives — new targets (Fable B)", () => {
     const discElite = buildStandardSpecialComponent({ templateId: "discipline_top3_count", rarity: "gewöhnlich", rewardCash: 5, teamQualityRank: 2 });
     expect(parseRank(discWeak.targetValue)).toBeGreaterThan(parseRank(discElite.targetValue));
 
-    // Bucketing folgt dem Archetyp-Eimer: zwei Kurven desselben Eimers ziehen den identischen Bonus-Pool,
-    // eine Kurve eines anderen Eimers einen disjunkten.
-    const security1 = getAvailableBonusObjectiveKeys(mapSponsorCurveToArchetype("Sockel"), "season-4");
+    // Bucketing folgt dem Archetyp-Eimer: zwei Karten desselben Eimers ziehen den identischen
+    // Bonus-Pool, eine Karte eines anderen Eimers einen disjunkten.
+    const security1 = getAvailableBonusObjectiveKeys(mapSponsorCardToArchetype("sicherheit"), "season-4");
     const security2 = getAvailableBonusObjectiveKeys("security", "season-4");
-    const performance = getAvailableBonusObjectiveKeys(mapSponsorCurveToArchetype("Gipfel"), "season-4");
+    const performance = getAvailableBonusObjectiveKeys(mapSponsorCardToArchetype("ambition"), "season-4");
     expect([...security1].sort()).toEqual([...security2].sort());
     expect(security1.some((key) => performance.includes(key))).toBe(false);
     expect(performance.length).toBeGreaterThan(0);

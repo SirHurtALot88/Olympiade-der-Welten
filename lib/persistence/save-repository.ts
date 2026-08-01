@@ -22,7 +22,8 @@ import type {
   TransferListing,
 } from "@/lib/data/olyDataTypes";
 import { mapArchetypeToCurveShape, mapStarTierToRarity } from "@/lib/sponsor/sponsor-curve-shapes";
-import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v2-offer-service";
+import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
+import { withMigratedSponsorLadders } from "@/lib/sponsor/sponsor-v3-migration";
 import { createGameStateFromSeed, loadSeedData } from "@/lib/data/dataAdapter";
 import { hydrateGameStateMedia } from "@/lib/data/mediaAssets";
 import { getDatabase } from "@/lib/persistence/sqlite";
@@ -1246,7 +1247,13 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     mappingReport,
   });
   mark("hydrateGameStateMedia done");
+  // MIGRATION M1 (docs/SPONSOR_PREISGELD_SOCKEL_ENTWURF.md, Abschnitt 5): einmalige, versionierte
+  // Neuberechnung der noch NICHT abgerechneten Sponsorleitern auf die V3-Basisleiter. Sie laeuft
+  // beim Laden, damit die anstehende Saisonabrechnung nicht noch einmal die Ausreisser der alten
+  // Leiter auszahlt (gemessen am Live-Save: +34,2 C / −26,7 C gegen den Benchmark). Der Stempel im
+  // Save (`seasonState.sponsorLadderMigrationVersion`) sorgt dafuer, dass sie GENAU EINMAL laeuft.
   const gameStateWithoutBaseline = withNormalizedSeasonDisciplineSchedule(
+    withMigratedSponsorLadders(
     normalizeLegacySponsors(
     normalizeLegacyRosterTargets(
       normalizeLegacyFinanceScale(
@@ -1254,6 +1261,7 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
           saveId,
         }),
       ),
+    ),
     ),
     ),
     saveId,
