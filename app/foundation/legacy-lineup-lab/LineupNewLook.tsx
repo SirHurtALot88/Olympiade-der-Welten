@@ -22,6 +22,7 @@ import {
   type NlTone,
 } from "@/components/foundation/new-look";
 import { VeloRangeBar } from "@/components/foundation/velo-ui/VeloRangeBar";
+import { getInjuryRiskPercent } from "@/lib/fatigue/fatigue-calibration";
 import { filterLegacyLineupCandidateEntries } from "@/lib/lineups/legacy-lineup-candidate-tabs";
 import type { LegacyLineupPreviewResult, LegacyLineupScoreResult } from "@/lib/lineups/legacy-lineup-types";
 import type { MatchdayIntensityStage } from "@/lib/lineups/matchday-slot-roles";
@@ -399,6 +400,13 @@ function getNlSlotReadiness(projected: number | null, topPickScore: number | nul
   if (topPickScore != null && projected >= topPickScore - 8) return { label: "Solide", tone: "neutral" };
   return { label: "Notfall", tone: "risk" };
 }
+
+/**
+ * Obergrenze der Risiko-Meter-Skala: das Maximum, das das Modell ueberhaupt hergibt
+ * (Risiko bei Fatigue 100). Aus der ECHTEN Kurve abgeleitet statt hart codiert, damit
+ * eine Rebalancierung der Anker die Skala automatisch mitzieht.
+ */
+const MAX_MATCHDAY_INJURY_RISK_PERCENT = getInjuryRiskPercent(100);
 
 /**
  * Ton fuer das Einsatz-Verletzungsrisiko eines aufgestellten Spielers, abgeleitet aus dem
@@ -1970,19 +1978,6 @@ export default function LineupNewLook({
                         {issue.label}
                       </span>
                     ) : null}
-                    {/* Einsatz-Verletzungsrisiko: immer sichtbar, sobald ein Spieler im
-                        Slot steht — auch die ~2 % Restrisiko eines Ausgeruhten. Der Wert
-                        ist exakt die Wahrscheinlichkeit, gegen die der Spieltag würfelt
-                        (aktuelle Fatigue + Einsatz-Last), nicht das Risiko der aktuellen
-                        Fatigue — das unterschlug die Last und zeigte Ausgeruhten 0 %. */}
-                    {player && injuryProjection ? (
-                      <span
-                        className={`nl-lineup-chip is-${getNlInjuryProjectionTone(injuryProjection.bandLabel)}`}
-                        title={`Verletzungsrisiko dieses Einsatzes: ${formatNlNumber(injuryProjection.riskPercent, 1)} % — gewürfelt bei Fatigue ${formatNlNumber(injuryProjection.fatigueBeforeRoll, 0)} (aktuell ${formatNlNumber(fatigue ?? 0, 0)} + Einsatz-Last ${formatNlNumber(injuryProjection.matchdayLoad, 0)}). Ein Restrisiko besteht bei jedem Einsatz, 0 % gibt es nicht. Verletzungen entstehen nur so — nicht durch Gegner.`}
-                      >
-                        Verl. {formatNlNumber(injuryProjection.riskPercent, 1)} %
-                      </span>
-                    ) : null}
                     {/* Fatigue-Aftermath-Warnung (Feature 2): Spieler ist nach diesem
                         Spieltag hoch belastet. Ton über fatigueTone (⇒ is-risk). */}
                     {aftermathHigh ? (
@@ -1995,6 +1990,33 @@ export default function LineupNewLook({
                     ) : null}
                   </span>
                 </button>
+
+                {/* Einsatz-Verletzungsrisiko als METER, nicht als blosser Text: das Risiko
+                    ist eine kontinuierliche Groesse pro Spieler — die Fuell-LAENGE macht die
+                    Slots auf einen Blick vergleichbar (der riskanteste faellt sofort auf),
+                    ohne Zahlen lesen zu muessen; Farbton allein waere fuer Farbfehlsichtige
+                    unbrauchbar. Der exakte Prozentwert steht rechts daneben — es ist genau
+                    die Zahl, gegen die der Spieltag wuerfelt (aktuelle Fatigue + Einsatz-Last),
+                    nicht das Risiko der aktuellen Fatigue (das unterschlug die Last und
+                    zeigte Ausgeruhten 0 %). Gleiches Kit-Primitive wie ueberall im Neuen
+                    Look (NlProgressBar), Ton aus den Risiko-Baendern des Modells. Die Skala
+                    endet beim Modell-Maximum (Risiko bei Fatigue 100), damit die volle
+                    Track-Laenge "schlimmster moeglicher Fall" bedeutet — auf einer
+                    0-100-%-Skala waere selbst Hoechstrisiko ein unlesbarer Splitter.
+                    Immer sichtbar, sobald ein Spieler im Slot steht: auch die ~2 %
+                    Restrisiko eines Ausgeruhten sind Teil des Modells und sollen nicht
+                    mehr wie ein Bug wirken, wenn sie zuschlagen. */}
+                {player && injuryProjection ? (
+                  <NlProgressBar
+                    className="nl-lineup-injury-meter"
+                    label="Verl.-Risiko"
+                    value={injuryProjection.riskPercent}
+                    max={MAX_MATCHDAY_INJURY_RISK_PERCENT}
+                    tone={getNlInjuryProjectionTone(injuryProjection.bandLabel)}
+                    format={(current) => `${formatNlNumber(current, 1)} %`}
+                    title={`Verletzungsrisiko dieses Einsatzes: ${formatNlNumber(injuryProjection.riskPercent, 1)} % — gewürfelt bei Fatigue ${formatNlNumber(injuryProjection.fatigueBeforeRoll, 0)} (aktuell ${formatNlNumber(fatigue ?? 0, 0)} + Einsatz-Last ${formatNlNumber(injuryProjection.matchdayLoad, 0)}). Skala bis ${formatNlNumber(MAX_MATCHDAY_INJURY_RISK_PERCENT, 0)} % (Modell-Maximum bei Fatigue 100). Ein Restrisiko besteht bei jedem Einsatz, 0 % gibt es nicht. Verletzungen entstehen nur so — nicht durch Gegner.`}
+                  />
+                ) : null}
 
                 {!player && topCandidate ? (
                   <button

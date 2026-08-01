@@ -239,6 +239,32 @@ describe("Datenpfad in die Einsatzliste", () => {
   });
 });
 
+/**
+ * Geprueft am Quelltext (gleiche Begruendung wie tests/lineup-injury-visibility.test.ts:
+ * die Einsatzliste laesst sich ohne halbe Foundation-Shell nicht rendern). Das belegt
+ * nicht das Bild im Browser, haelt aber fest, DASS die Darstellung ein Meter mit
+ * Laengen-Kodierung ist (NlProgressBar, Skala bis zum Modell-Maximum) und nicht wieder
+ * zu blossem Text schrumpft — und dass der Wert aus der Projektion des echten Modells
+ * kommt, nicht aus einer Neuberechnung.
+ */
+describe("Einsatzliste — Darstellung als Meter, gespeist aus der Projektion", () => {
+  it("die Slot-Karte rendert das Risiko als NlProgressBar-Meter aus injuryRiskProjection", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const view = readFileSync(
+      join(process.cwd(), "app/foundation/legacy-lineup-lab/LineupNewLook.tsx"),
+      "utf8",
+    );
+    expect(view).toContain('className="nl-lineup-injury-meter"');
+    expect(view).toContain("value={injuryProjection.riskPercent}");
+    expect(view).toContain("max={MAX_MATCHDAY_INJURY_RISK_PERCENT}");
+    // Skalen-Obergrenze kommt aus der echten Kurve, nicht aus einer Hauszahl.
+    expect(view).toContain("getInjuryRiskPercent(100)");
+    // Die Projektion wird per Seiten-Intensitaet nachgeschlagen, nicht clientseitig nachgerechnet.
+    expect(view).toContain("injuryRiskProjection?.[getDisciplineIntensity(slot.disciplineSide)]");
+  });
+});
+
 describe("Nachvollziehbarkeit im Nachhinein (Inbox)", () => {
   it("die Verletzungs-Meldung nennt Fatigue beim Wurf und Risikoprozent", () => {
     const gameState = createGameState([{ id: "p-injured", fatigue: 20 }], "normal");

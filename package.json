@@ -1,6 +1,6 @@
 {
   "name": "baue-einen-lokalen-web-app-prototyp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "next:clean": "tsx scripts/clean-next-runtime.ts",
