@@ -1,8 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { buildAiLegacyLineupModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
-import { buildAiLegacyLineupPreview } from "@/lib/ai/ai-legacy-lineup-engine";
+import { buildAiLegacyLineupPreviewWithModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import type { LineupDraftModifiers, TeamPowerEffectType, TeamPowerTargetMode } from "@/lib/data/olyDataTypes";
 import { createDefaultLineupDraftModifiers } from "@/lib/lineups/legacy-lineup-modifiers";
 import { loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-lineup-local-service";
@@ -231,8 +230,9 @@ function auditAiPowerUsage(input: {
       teamsWithAvailablePowers += 1;
     }
 
-    const preview = buildAiLegacyLineupPreview(context, "sqlite");
-    const modifiers = buildAiLegacyLineupModifiers(context, preview.entries);
+    // Formkarten VOR der Kapitaenswahl — ein Aufruf, damit der Audit dieselbe Kopplung misst
+    // wie das Spiel (keine Kapitaene in Disziplinen mit negativer Formbilanz).
+    const { preview, modifiers } = buildAiLegacyLineupPreviewWithModifiers(context, "sqlite");
     let selectedForTeam = 0;
 
     for (const side of ["d1", "d2"] as const) {

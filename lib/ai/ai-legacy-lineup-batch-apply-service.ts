@@ -8,9 +8,10 @@ import {
 import { buildAiLegacyLineupPreview, getMarginalRankPointSwing } from "@/lib/ai/ai-legacy-lineup-engine";
 import type { FormCardColor, GameState, LineupDraft, LineupDraftModifiers } from "@/lib/data/olyDataTypes";
 import { isTeamMatchdayLineupOperationallyReady } from "@/lib/foundation/matchday-lineup-readiness";
-import type { AiLegacyLineupPreviewStatus } from "@/lib/ai/ai-needs-types";
+import type { AiLegacyLineupPreview, AiLegacyLineupPreviewStatus } from "@/lib/ai/ai-needs-types";
 import { buildTeamControlSettingsMap, isAiLineupBatchApplyEnabled } from "@/lib/foundation/team-control-settings";
 import {
+  calculateFormModifierForSide,
   createDefaultLineupDraftModifiers,
   ensureLocalFormCardsForSeason,
   getFormCardColorForDisciplineCategory,
@@ -1568,6 +1569,96 @@ export function buildAiLegacyLineupModifiers(
   return modifiers;
 }
 
+/**
+ * Welche Disziplin-Seiten stellt der heutige Formkarten-Zug unterm Strich SCHLECHTER?
+ *
+ * Gerechnet wird mit `calculateFormModifierForSide` — derselben Funktion, die auch die Wertung
+ * benutzt. Bewusst die NETTO-Bilanz und nicht "liegt hier eine Minuskarte": der Saisonplan darf
+ * neben eine Minuskarte eine groessere Pluskarte legen (s. `ai-form-card-season-plan`), und eine
+ * Seite, die dadurch unterm Strich AUFWERTET, hat das Team nicht abgeschrieben. Im Live-Save
+ * (MD1) war genau ein Team so gelagert: Minuskarte plus staerkere Pluskarte, Seite am Ende bei
+ * +42.8 Formpunkten — dort waere eine Sperre falsch gewesen.
+ */
+export function resolveNegativeFormCardSides(
+  context: LegacyLineupLoadedContext,
+  modifiers: LineupDraftModifiers,
+): Set<"d1" | "d2"> {
+  const negativeSides = new Set<"d1" | "d2">();
+  const contractBySide = {
+    d1: context.matchdayContract?.discipline1 ?? null,
+    d2: context.matchdayContract?.discipline2 ?? null,
+  } as const;
+
+  for (const side of ["d1", "d2"] as const) {
+    const contract = contractBySide[side];
+    const disciplineId = contract?.disciplineId ?? null;
+    // Die Spielerzahl skaliert den Betrag, nicht das Vorzeichen — fuer die Frage "Minus oder
+    // nicht" reicht deshalb jeder positive Wert; 1 ist der ehrliche Notnagel ohne Vertrag.
+    const playerCount =
+      contract?.requiredPlayers ??
+      (disciplineId
+        ? context.disciplineSidePlayerCounts?.[`${disciplineId}::${side}`] ??
+          context.disciplinePlayerCounts[disciplineId] ??
+          1
+        : 1);
+    const { formModifier } = calculateFormModifierForSide({
+      modifiers,
+      disciplineSide: side,
+      disciplineColor: getFormCardColorForDisciplineCategory(contract?.category),
+      playerCount: Math.max(1, playerCount),
+      formCards: context.formCards ?? [],
+    });
+    if (formModifier < 0) {
+      negativeSides.add(side);
+    }
+  }
+
+  return negativeSides;
+}
+
+/**
+ * Aufstellung, Formkarten und Kapitaen in EINEM Zug — und in dieser Reihenfolge.
+ *
+ * Anlass (Chris): Teams warfen korrekt eine Minuskarte in die schwaechere Disziplin und setzten
+ * dort trotzdem den Kapitaen. Beide Entscheidungen fielen bisher UNABHAENGIG voneinander und in
+ * genau der falschen Folge: erst `buildAiLegacyLineupPreview` (Kapitaen), danach
+ * `buildAiLegacyLineupModifiers` (Formkarten). Die Kapitaenswahl konnte den Formkarten-Zug also
+ * gar nicht kennen. Diese Funktion dreht die Folge um und ist ab jetzt der einzige Weg, beides
+ * zu erzeugen — sonst faellt die Kopplung an einem Aufrufer still wieder aus.
+ *
+ * Die AUFSTELLUNG selbst bleibt unveraendert vorn: sie entscheidet weiter ohne Formkarten- und
+ * ohne Kapitaenswissen, und der Formkarten-Zug bekommt exakt die Entries, die gespeichert werden.
+ */
+export function buildAiLegacyLineupPreviewWithModifiers(
+  context: LegacyLineupLoadedContext,
+  source: "sqlite" | "prisma" = "sqlite",
+): { preview: AiLegacyLineupPreview; modifiers: LineupDraftModifiers; modifierPlanningMs: number } {
+  const planned: { modifiers: LineupDraftModifiers | null; ms: number } = { modifiers: null, ms: 0 };
+
+  const preview = buildAiLegacyLineupPreview(context, source, {
+    resolveNegativeFormCardSides: (entries) => {
+      const startedAt = performance.now();
+      const modifiers = buildAiLegacyLineupModifiers(context, entries);
+      planned.modifiers = modifiers;
+      planned.ms += performance.now() - startedAt;
+      return resolveNegativeFormCardSides(context, modifiers);
+    },
+  });
+
+  const modifiers = planned.modifiers ?? buildAiLegacyLineupModifiers(context, preview.entries);
+  // Die Intensitaet ist die EINZIGE Modifier-Groesse, die den Kapitaen liest (`hasCaptain` ->
+  // "push"). Sie wird deshalb nach der Kapitaenswahl nachgezogen. Formkarten und Team-Power
+  // haengen nur an der Aufstellung und bleiben so, wie der Formkarten-Zug sie gesetzt hat —
+  // sonst wuerde die Kapitaenswahl gegen andere Karten entschieden haben als die gespeicherten.
+  // Ohne Kapitaen aendert der Nachzug nichts (der Formkarten-Zug rechnete bereits ohne einen)
+  // und entfaellt — der Regelfall bei den meisten Teams eines Spieltags.
+  if (preview.entries.some((entry) => entry.isCaptain)) {
+    applyAiIntensity(context, modifiers, preview.entries);
+  }
+
+  return { preview, modifiers, modifierPlanningMs: planned.ms };
+}
+
 export function applyAiLegacyLineupBatchLocally(
   input: AiBatchApplyInput,
   persistence: PersistenceService = createPersistenceService(),
@@ -1790,11 +1881,15 @@ export function applyAiLegacyLineupBatchLocally(
     }
 
     const previewStartedAt = performance.now();
-    const preview = buildAiLegacyLineupPreview(contextResult.context, "sqlite");
-    performanceBreakdown.aiLineupGenerationMs += elapsedSince(previewStartedAt);
-    const modifierStartedAt = performance.now();
-    const modifiers = buildAiLegacyLineupModifiers(contextResult.context, preview.entries);
-    performanceBreakdown.mutatorPlanningMs += elapsedSince(modifierStartedAt);
+    const { preview, modifiers, modifierPlanningMs } = buildAiLegacyLineupPreviewWithModifiers(
+      contextResult.context,
+      "sqlite",
+    );
+    // Der Formkarten-Zug steckt jetzt IN der Vorschau (er geht der Kapitaenswahl voraus). Damit
+    // die Aufschluesselung weiter zwei getrennte Groessen zeigt, meldet die Vorschau ihre eigene
+    // Modifier-Zeit zurueck und wird hier wieder herausgerechnet.
+    performanceBreakdown.aiLineupGenerationMs += Math.max(0, elapsedSince(previewStartedAt) - modifierPlanningMs);
+    performanceBreakdown.mutatorPlanningMs += modifierPlanningMs;
     const validationStartedAt = performance.now();
     const validationPreview = calculateLocalLegacyLineupPreviewFromContext(
       contextResult.context,

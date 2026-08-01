@@ -1,8 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { buildAiLegacyLineupModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
-import { buildAiLegacyLineupPreview } from "@/lib/ai/ai-legacy-lineup-engine";
+import { buildAiLegacyLineupPreviewWithModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import { buildAiLeagueManagementPreview } from "@/lib/ai/ai-team-management-preview-service";
 import { buildTeamObjectiveOverview, refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
 import type { GameState, LineupDraftModifiers, TeamPowerEffectType, TeamPowerTargetMode } from "@/lib/data/olyDataTypes";
@@ -582,8 +581,9 @@ function auditTeamPowersAndAi(gameState: GameState, saveId: string, seasonId: st
     }
     aiContextsLoaded += 1;
     const context = contextResult.context;
-    const preview = buildAiLegacyLineupPreview(context, "sqlite");
-    const modifiers = buildAiLegacyLineupModifiers(context, preview.entries);
+    // Formkarten VOR der Kapitaenswahl — ein Aufruf, damit der Audit dieselbe Kopplung misst
+    // wie das Spiel (keine Kapitaene in Disziplinen mit negativer Formbilanz).
+    const { preview, modifiers } = buildAiLegacyLineupPreviewWithModifiers(context, "sqlite");
     if (preview.d1.captainSelectionStatus === "selected") aiCaptainSelections += 1;
     if (preview.d2.captainSelectionStatus === "selected") aiCaptainSelections += 1;
 
@@ -594,7 +594,10 @@ function auditTeamPowersAndAi(gameState: GameState, saveId: string, seasonId: st
       teamId: team.teamId,
     });
     if (captainAvailableContextResult.ok) {
-      const captainAvailablePreview = buildAiLegacyLineupPreview(captainAvailableContextResult.context, "sqlite");
+      const { preview: captainAvailablePreview } = buildAiLegacyLineupPreviewWithModifiers(
+        captainAvailableContextResult.context,
+        "sqlite",
+      );
       if (captainAvailablePreview.d1.captainSelectionStatus === "selected") aiCaptainSelectionsWhenAvailable += 1;
       if (captainAvailablePreview.d2.captainSelectionStatus === "selected") aiCaptainSelectionsWhenAvailable += 1;
     }

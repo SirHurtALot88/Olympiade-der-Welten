@@ -1,5 +1,4 @@
-import { buildAiLegacyLineupPreview } from "@/lib/ai/ai-legacy-lineup-engine";
-import { applyAiLegacyLineupBatchLocally, buildAiLegacyLineupModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
+import { applyAiLegacyLineupBatchLocally, buildAiLegacyLineupPreviewWithModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import { reevaluateAiTrainingModesForMatchday } from "@/lib/ai/ai-training-mode-reevaluation-service";
 import { type GameState, type LineupDraftModifiers, type TeamControlMode } from "@/lib/data/olyDataTypes";
 import { buildTeamControlSettingsMap, isAiLineupBatchApplyEnabled } from "@/lib/foundation/team-control-settings";
@@ -287,8 +286,8 @@ function simulateAiLineupState(
       continue;
     }
 
-    const preview = buildAiLegacyLineupPreview(contextResult.context, "sqlite");
-    const modifiers = buildAiLegacyLineupModifiers(contextResult.context, preview.entries);
+    // Formkarten VOR der Kapitaenswahl — beides kommt deshalb aus einem Aufruf.
+    const { preview, modifiers } = buildAiLegacyLineupPreviewWithModifiers(contextResult.context, "sqlite");
     const hasExistingDraft = Boolean(contextResult.context.existingDraft?.entries?.length);
     if (preview.status === "blocked") {
       continue;
