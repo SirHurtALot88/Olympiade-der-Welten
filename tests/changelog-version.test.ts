@@ -60,6 +60,20 @@ describe("Changelog: die Versionsnummer kommt im Spiel an", () => {
     expect(mitVersion.length).toBeGreaterThan(0);
   });
 
+  /**
+   * EINE Schreibweise. Im Changelog stand `0.3.0` neben `0.2` und `0.3` — zwei Formate fuer
+   * dieselbe Sache. Das faellt niemandem auf, weil beide fuer sich plausibel aussehen, und
+   * genau deshalb bleibt es stehen: die Marke am Eintrag zeigt dann mal `v0.3`, mal `v0.3.0`.
+   *
+   * Die Paketversion traegt drei Stellen (`0.3.0`), der Changelog zwei (`0.3`) — er benennt den
+   * Einschnitt, nicht den Patch-Stand.
+   */
+  it("nennt die Version in EINER Schreibweise — zwei Stellen, nicht drei", () => {
+    for (const version of new Set(versionenAusDatei())) {
+      expect(version, `Changelog-Version "${version}" hat nicht die Form 0.2`).toMatch(/^\d+\.\d+$/);
+    }
+  });
+
   it("die HOECHSTE Changelog-Version passt zur Paketversion", () => {
     // `package.json` traegt drei Stellen (0.3.0), der Changelog zwei (0.3) — die Patch-Stelle
     // unterscheidet Fixes, und die gehoeren hier gerade nicht hin. Die hoechste Changelog-Nummer

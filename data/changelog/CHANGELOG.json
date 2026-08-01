@@ -98,7 +98,7 @@
       "text": "Das Sponsorsystem ist grundlegend umgebaut: Die Auszahlung eines Vertrags richtet sich jetzt nach Preisgeld und Platzierung deines Teams, und keine Angebotskarte ist im Schnitt mehr wert als eine andere — vorher konnte die gezogene Karte mehr entscheiden als die eigene Leistung. Die Karten unterscheiden sich jetzt nur noch darin, wie viel Risiko du nimmst.",
       "quelle": "gepflegt",
       "gewicht": "grundlegend",
-      "version": null
+      "version": "0.2"
     },
     {
       "datum": "2026-08-01",
@@ -125,7 +125,7 @@
       "text": "Im Changelog stand alles untereinander in einer schmalen Spalte, waehrend daneben der halbe Bildschirm leer blieb. Jetzt liegen die Aenderungen eines Tages nebeneinander, und oben steht, wie viele es insgesamt sind und wann zuletzt etwas dazugekommen ist.",
       "quelle": "gepflegt",
       "gewicht": "feinschliff",
-      "version": "0.3.0"
+      "version": "0.3"
     },
     {
       "datum": "2026-08-01",
@@ -152,7 +152,7 @@
       "text": "Am Changelog wird intern anders gearbeitet: jeder Eintrag liegt jetzt in einer eigenen Datei statt gesammelt in einer Liste. Im Spiel sieht das gleich aus — es sorgt nur dafuer, dass sich gleichzeitig gebaute Aenderungen nicht mehr gegenseitig blockieren und Fixes schneller bei dir ankommen.",
       "quelle": "gepflegt",
       "gewicht": "feinschliff",
-      "version": "0.3.0"
+      "version": "0.3"
     },
     {
       "datum": "2026-07-30",

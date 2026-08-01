@@ -28,7 +28,7 @@ reproduzierbar bleibt; die Anzeige sortiert am Ende ohnehin nach Datum.
   "text": "Ein Satz Alltagssprache: was war vorher, was ist jetzt anders.",
   "gewicht": "behebung",
   "pr": "#299",
-  "version": "0.3.0"
+  "version": "0.3"
 }
 ```
 
@@ -39,7 +39,7 @@ reproduzierbar bleibt; die Anzeige sortiert am Ende ohnehin nach Datum.
 | `gewicht` | ja¹     | `grundlegend`, `spielblockierend`, `behebung` oder `feinschliff` |
 | `seite`   | nein    | Betroffene Seite in den Worten der Navigation |
 | `pr`      | nein    | PR-Nummer als Beleg |
-| `version` | nein    | Der `package.json`-Stand zum Merge-Zeitpunkt — nur setzen, wenn wirklich bekannt |
+| `version` | nein    | Zwei Stellen (`0.3`), passend zum `package.json`-Stand zum Merge-Zeitpunkt — nur setzen, wenn wirklich bekannt |
 
 ¹ Technisch optional: fehlt es, erscheint der Eintrag unter „Ohne Einstufung" und der Generator
 mahnt es an. Sichtbar unvollständig ist besser als still geraten.

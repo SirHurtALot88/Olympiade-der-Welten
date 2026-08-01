@@ -4,5 +4,5 @@
   "text": "Am Changelog wird intern anders gearbeitet: jeder Eintrag liegt jetzt in einer eigenen Datei statt gesammelt in einer Liste. Im Spiel sieht das gleich aus — es sorgt nur dafuer, dass sich gleichzeitig gebaute Aenderungen nicht mehr gegenseitig blockieren und Fixes schneller bei dir ankommen.",
   "gewicht": "feinschliff",
   "pr": "#326",
-  "version": "0.3.0"
+  "version": "0.3"
 }
