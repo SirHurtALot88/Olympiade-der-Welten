@@ -47067,6 +47067,65 @@ button.foundation-team-portrait-card {
   border-top: 1px solid var(--nl-line);
 }
 
+/* Saison-Awards: eine Karte je Auszeichnung, unter dem Kategorien-Grid. Bewusst schmaler als
+   die Leader-Kacheln — es sind viele, und jede trägt nur einen Halter. */
+.is-new-look .nl-leaders-awards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: var(--nl-s2, 10px);
+}
+
+.is-new-look .nl-leaders-award {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  border: 1px solid var(--nl-line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 10px 12px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.is-new-look .nl-leaders-award:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.is-new-look .nl-leaders-award:focus-visible {
+  outline: 2px solid var(--nl-accent, #5b9bff);
+  outline-offset: 2px;
+}
+
+/* Eigenes Team hervorgehoben — dieselbe Sprache wie in den Ranglisten-Zeilen. */
+.is-new-look .nl-leaders-award.is-own-team {
+  border-color: var(--nl-accent, #5b9bff);
+  background: rgba(91, 155, 255, 0.08);
+}
+
+.is-new-look .nl-leaders-award-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut, #93a3bd);
+}
+
+.is-new-look .nl-leaders-award-holder {
+  font-size: 0.94rem;
+  line-height: 1.2;
+}
+
+.is-new-look .nl-leaders-award-team,
+.is-new-look .nl-leaders-award-kontext {
+  font-size: 0.72rem;
+  color: var(--nl-mut, #93a3bd);
+}
+
+.is-new-look .nl-leaders-award-value {
+  font-size: 1.02rem;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
 /* "Ganze Rangliste · 332 Spieler" — der sichtbare Weg aus der Top-5-Kachel in die volle
    Liste. Vorher gab es ihn nur versteckt als Nebenwirkung der Kennzahl-Chips. Bewusst
    zurueckhaltend gestylt: die Kachel selbst bleibt der Blickfang. */

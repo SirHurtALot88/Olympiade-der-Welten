@@ -38,6 +38,11 @@ import {
   type OwnTeamLeaderboardFootprint,
 } from "@/lib/foundation/league-season-bests";
 import {
+  buildLeagueSeasonAwards,
+  type LeagueSeasonAward,
+  type LeagueSeasonAwards,
+} from "@/lib/foundation/league-season-awards";
+import {
   buildLeagueAchievements,
   getLeagueAchievementGroupLabel,
   type LeagueAchievement,
@@ -294,6 +299,19 @@ export default function LeagueLeadersNewLook({
 
   // D11 — Own-Team-Leaderboard-Footprint: Top-5-Slots + beste Platzierung des
   // Manager-Teams, rein aus den öffentlichen Ranglisten-Einträgen (fog-safe).
+  /**
+   * Saison-Awards — die Frage, die die Kategorie-Kacheln NICHT beantworten.
+   *
+   * Die Kacheln zeigen achtmal „wer hat am meisten". Diese Karten zeigen, WIE jemand zu seinen
+   * Punkten kam: Spezialist gegen Allrounder, Konstanz gegen Ausreißer, Schnäppchen gegen
+   * Rekordkauf. Read-time aus dem Punkte-Ledger — nichts davon wird gespeichert, damit es keine
+   * zweite Wahrheit neben den Daten gibt, aus denen es entstand.
+   */
+  const seasonAwards = useMemo<LeagueSeasonAwards>(
+    () => (foundationGameState ? buildLeagueSeasonAwards(foundationGameState) : { matchdaysPlayed: 0, awards: [] }),
+    [foundationGameState],
+  );
+
   const footprint = useMemo<OwnTeamLeaderboardFootprint>(
     () => buildOwnTeamLeaderboardFootprint({ categories, selectedTeamId }),
     [categories, selectedTeamId],
@@ -500,6 +518,10 @@ export default function LeagueLeadersNewLook({
         })}
       </div>
       )}
+
+      {subTab === "leaders" && seasonAwards.awards.length > 0 ? (
+        <SeasonAwardsPanel awards={seasonAwards} selectedTeamId={selectedTeamId} onOpenPlayer={onOpenPlayer} />
+      ) : null}
 
       <NlRankingDrawer
         open={rankingDrawerCategory != null}
@@ -774,6 +796,78 @@ const LEGENDS_TABLE_COLUMNS: Array<NlTableColumn<PlayerCareerLeaderRow>> = [
   { key: "mvpTotal", label: "MVP", align: "right", sortable: true },
   { key: "seasonsPlayed", label: "Saisons", align: "right", sortable: true },
 ];
+
+/**
+ * "Saison-Awards" — Auszeichnungen, die eine ROLLE erzählen.
+ *
+ * GEWÜNSCHT: „ob wir hier noch mehr awards vergeben könnten für spieler basierend auf ihren
+ * achievements".
+ *
+ * Sitzt bewusst UNTER dem Kategorien-Grid im selben Reiter, nicht in einem eigenen: Awards sind
+ * die zweite Lesart derselben Saison, keine andere Ansicht. Jede Karte nennt ihre Bedingung —
+ * ein Award, den man nicht nachvollziehen kann, ist nur eine Zahl mit Schleife.
+ *
+ * Nicht vergebene Awards erscheinen GAR NICHT (der Selector liefert sie erst gar nicht):
+ * „Neuzugang der Saison — niemand" wäre eine leere Behauptung.
+ */
+function SeasonAwardsPanel({
+  awards,
+  selectedTeamId,
+  onOpenPlayer,
+}: {
+  awards: LeagueSeasonAwards;
+  selectedTeamId: string | null;
+  onOpenPlayer: (playerId: string) => void;
+}) {
+  return (
+    <NlCard
+      eyebrow={
+        awards.matchdaysPlayed > 0
+          ? `Stand Spieltag ${formatNlNumber(awards.matchdaysPlayed, 0)} · wird laufend neu vergeben`
+          : "wird laufend neu vergeben"
+      }
+      title="Saison-Awards"
+      className="nl-leaders-awards-card"
+    >
+      <div className="nl-leaders-awards" data-testid="season-awards">
+        {awards.awards.map((award) => (
+          <SeasonAwardCard
+            key={award.id}
+            award={award}
+            isOwn={award.teamId != null && award.teamId === selectedTeamId}
+            onOpenPlayer={onOpenPlayer}
+          />
+        ))}
+      </div>
+    </NlCard>
+  );
+}
+
+function SeasonAwardCard({
+  award,
+  isOwn,
+  onOpenPlayer,
+}: {
+  award: LeagueSeasonAward;
+  isOwn: boolean;
+  onOpenPlayer: (playerId: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`nl-leaders-award${isOwn ? " is-own-team" : ""}`}
+      onClick={() => onOpenPlayer(award.playerId)}
+      title={`${award.bedingung} — Profil von ${award.playerName} öffnen`}
+      data-award-id={award.id}
+    >
+      <span className="nl-leaders-award-label">{award.label}</span>
+      <strong className="nl-leaders-award-holder">{award.playerName}</strong>
+      <span className="nl-leaders-award-team">{award.teamCode ?? award.teamName ?? "—"}</span>
+      <span className="nl-leaders-award-value nl-tnum">{award.displayValue}</span>
+      {award.kontext ? <span className="nl-leaders-award-kontext">{award.kontext}</span> : null}
+    </button>
+  );
+}
 
 /**
  * "Legendäre Spieler" — eigenständiger Hall-of-Fame-Sub-Tab (statt einer
