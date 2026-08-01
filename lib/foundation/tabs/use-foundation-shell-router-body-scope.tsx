@@ -3739,15 +3739,16 @@ export function useFoundationShellRouterBodyScope({
         return teams === current.teams ? current : { ...current, teams };
       });
 
-      await Promise.all([
-        loadSave(activeSaveId),
-        reloadMarketFeed(marketTeamId),
+      // Dieselbe Aufteilung wie beim Kauf: vorn nur das Sichtbare, der Rest läuft nach.
+      await Promise.all([loadSave(activeSaveId), reloadMarketFeed(marketTeamId)]);
+      setMarketReloadToken((current) => current + 1);
+
+      void Promise.all([
         reloadHistoryFeed(),
         reloadTransferRecapFeed(),
         reloadSeasonStandingsOverview(),
         reloadSeasonManagementOverview(),
-      ]);
-      setMarketReloadToken((current) => current + 1);
+      ]).catch(() => {});
     } catch {
       setMarketSellError("Verkauf konnte nicht bestätigt werden.");
     } finally {
@@ -5296,9 +5297,23 @@ export function useFoundationShellRouterBodyScope({
         return teams === current.teams ? current : { ...current, teams };
       });
 
+      // VORDERGRUND: nur, was der Spieler in diesem Moment vor sich hat. Der Spielstand (Kader,
+      // Gehalt) und die Marktliste, aus der der gekaufte Spieler verschwinden muss.
       await Promise.all([
         loadSave(buyContext.saveId),
-        reloadMarketFeed(payload.summary.team?.id ?? marketBuyPreview.team.id),
+        reloadMarketFeed(payload.summary.team?.id ?? marketBuyPreview.team?.id),
+      ]);
+      setMarketReloadToken((current) => current + 1);
+
+      // HINTERGRUND: Ansichten, die der Spieler gerade nicht ansieht — Saison-Übersichten,
+      // Transferhistorie, KI-Vorschauen. Sie waren bisher mit im `await` und hielten damit das
+      // Kauf-Fenster offen, obwohl keine von ihnen im Transfermarkt sichtbar ist. Wer nach dem Kauf
+      // in den Saisonstand wechselt, findet ihn dann längst aktualisiert vor.
+      //
+      // Fehler werden hier bewusst verschluckt: Ein fehlgeschlagener Nachlauf einer nicht
+      // sichtbaren Ansicht darf keine Fehlermeldung über einen GELUNGENEN Kauf legen. Beim
+      // nächsten Öffnen lädt die Ansicht ohnehin neu.
+      void Promise.all([
         marketAiPreviewFeed ? reloadAiTransferPreview(marketAiPreviewSelectedTeamId) : Promise.resolve(null),
         marketAiSellPreviewFeed ? reloadAiSellPreview(marketAiSellPreviewSelectedTeamId) : Promise.resolve(null),
         marketAiPlanPreviewFeed ? reloadAiMarketPlanPreview(marketAiPlanPreviewSelectedTeamId) : Promise.resolve(null),
@@ -5306,8 +5321,7 @@ export function useFoundationShellRouterBodyScope({
         reloadHistoryFeed(),
         reloadSeasonStandingsOverview(),
         reloadSeasonManagementOverview(),
-      ]);
-      setMarketReloadToken((current) => current + 1);
+      ]).catch(() => {});
     } catch {
       setMarketBuyError("Kauf konnte nicht bestätigt werden.");
     } finally {
