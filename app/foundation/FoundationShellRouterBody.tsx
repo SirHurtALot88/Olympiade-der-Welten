@@ -271,6 +271,10 @@ const FoundationFinancesHost = dynamic(() => import("@/app/foundation/finances/F
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Finanzen werden geladen…" />,
 });
+const FoundationChangelogHost = dynamic(() => import("@/app/foundation/changelog/FoundationChangelogHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Changelog wird geladen…" />,
+});
 
 // Derived render-only types for callback params below. These mirror the real
 // producer shapes (leaf hooks under lib/foundation/tabs/*) even though the
@@ -3047,6 +3051,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           {activeView === "finances" ? (
             <FoundationFinancesHost gameState={gameState} teamId={activeManagerTeamId} saveId={activeSaveId} />
           ) : null}
+
+          {/* Der Changelog braucht keinen Spielstand — er liest die zur Build-Zeit generierte Datei. */}
+          {activeView === "changelog" ? <FoundationChangelogHost /> : null}
 
           <div className={`foundation-warning-grid${getViewClass("debug")}`}>
             <WarningList title="Spieler ohne Team" warnings={gameState.mappingReport.unmappedPlayers} />

@@ -3,6 +3,9 @@ ergebnis: Die Sperre greift — der Fehler war die Erklärung. Roher Code-String
 pr: #264
 titel: Verletzung war nicht erkennbar — roher Code-String als Nutzertext, „blockiert" statt „Verletzt"
 schwere: hoch
+gemergt: 2026-07-30
+changelog: Warum ein Spieler nicht aufgestellt werden konnte, war nicht zu erkennen — statt eines Grundes stand nur „blockiert" oder ein kryptischer Code da. Jetzt steht „Verletzt" direkt am Spieler.
+seite: Spieltag · Einsatzliste
 
 > Diese Meldung kam direkt im Gespräch, nicht über die Flagge — deshalb ohne Rohmeldung.
 
