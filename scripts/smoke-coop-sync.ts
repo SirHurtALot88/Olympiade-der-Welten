@@ -16,7 +16,11 @@
  *   npm run app:smoke-coop-sync -- --no-start        (gegen laufenden Server)
  *   npm run app:smoke-coop-sync                       (startet dev-Server selbst)
  */
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+// `ChildProcess`, nicht `ChildProcessWithoutNullStreams`: der Server wird mit `stdio: "ignore"`
+// gestartet, hat also gar keine Streams. Der engere Typ war schlicht falsch und meldete sich
+// als tsc-Fehler — unbemerkt, weil `tsx` beim Ausfuehren nicht typprueft und dieses Skript
+// bisher in keinem Gate lief.
+import { spawn, type ChildProcess } from "node:child_process";
 
 import { io, type Socket } from "socket.io-client";
 
@@ -65,7 +69,7 @@ async function isServerReachable(baseUrl: string) {
   }
 }
 
-async function ensureServer(baseUrl: string, noStart: boolean): Promise<ChildProcessWithoutNullStreams | null> {
+async function ensureServer(baseUrl: string, noStart: boolean): Promise<ChildProcess | null> {
   if (await isServerReachable(baseUrl)) return null;
   if (noStart) throw new Error(`Server nicht erreichbar unter ${baseUrl} (und --no-start gesetzt).`);
   const child = spawn("npm", ["run", "dev"], { stdio: "ignore", detached: false });
