@@ -1,6 +1,7 @@
 import type { GameState, StandingRecord } from "@/lib/data/olyDataTypes";
 import type { LeagueLeaderCategory } from "@/lib/foundation/league-leaders-service";
 import { buildOwnTeamLeaderboardFootprint, buildTeamSquadMarketValues } from "@/lib/foundation/league-season-bests";
+import { buildExtendedLeagueAchievements } from "@/lib/foundation/league-achievements-extended";
 import { resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 import { formatNlNumber, type NlTone } from "@/components/foundation/new-look/nl-tones";
@@ -21,7 +22,20 @@ import { formatNlNumber, type NlTone } from "@/components/foundation/new-look/nl
  */
 
 export type LeagueAchievementState = "reached" | "locked";
-export type LeagueAchievementGroup = "leaderboard" | "squad" | "table" | "transfers" | "history";
+/**
+ * `disciplines`, `streaks` und `economy` kamen dazu, weil die bestehenden Gruppen ausgerechnet
+ * das nicht abdeckten, was in diesem Spiel jeden Spieltag passiert: Disziplinen gewinnen und
+ * Serien aufbauen. Und die Wirtschaft fehlte ganz, obwohl Sponsoren die Haupteinnahme sind.
+ */
+export type LeagueAchievementGroup =
+  | "leaderboard"
+  | "squad"
+  | "table"
+  | "transfers"
+  | "history"
+  | "disciplines"
+  | "streaks"
+  | "economy";
 
 export type LeagueAchievement = {
   id: string;
@@ -56,6 +70,9 @@ const GROUP_LABELS: Record<LeagueAchievementGroup, string> = {
   table: "Tabelle",
   transfers: "Transfers",
   history: "Historie",
+  disciplines: "Disziplinen",
+  streaks: "Serien",
+  economy: "Wirtschaft",
 };
 
 export function getLeagueAchievementGroupLabel(group: LeagueAchievementGroup): string {
@@ -369,6 +386,28 @@ export function buildLeagueAchievements(input: {
     tone: "warn",
     playerId: null,
   });
+
+  /**
+   * Die neuen Meilensteine (Disziplinen, Serien, Wirtschaft, Kaderaufbau) liegen in einer
+   * eigenen Datei — nicht aus Groesse, sondern weil sie eine andere Datenlage lesen: Ergebnisse
+   * je Spieltag statt Momentaufnahmen des Kaders. Sie werden hier angehaengt und teilen sich
+   * Zaehlung, Sortierung und Anzeige mit dem Bestand.
+   */
+  for (const extra of buildExtendedLeagueAchievements(gameState, selectedTeamId)) {
+    achievements.push({
+      id: extra.id,
+      group: extra.group,
+      label: extra.label,
+      description: extra.description,
+      state: extra.reached ? "reached" : "locked",
+      detail: extra.detail,
+      contextLabel: null,
+      progressLabel: extra.progressLabel,
+      targetLabel: extra.targetLabel,
+      tone: extra.tone,
+      playerId: extra.playerId,
+    });
+  }
 
   const reachedCount = achievements.filter((achievement) => achievement.state === "reached").length;
 
