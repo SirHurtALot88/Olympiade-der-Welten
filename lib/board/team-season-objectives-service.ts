@@ -1796,6 +1796,22 @@ function mergeStoredTeamObjectives(input: {
   const merged: TeamSeasonObjectiveRecord[] = [];
   const appendObjectiveSource = (source: string | null | undefined, nextSource: string) =>
     Array.from(new Set([...(source ?? "").split("+"), nextSource].map((entry) => entry.trim()).filter(Boolean))).join("+");
+  const splitObjectiveSource = (source: string | null | undefined) =>
+    (source ?? "").split("+").map((entry) => entry.trim()).filter(Boolean);
+  // Labels, die der Generator selbst geschrieben hat, tragen die Zielmarke im Text ("Übertreffe die
+  // Erwartung (Top 25)"). Zielmarke und Status werden hier bei jedem Refresh neu gerechnet — das
+  // eingefrorene Label blieb dagegen stehen. Nach einer Neukalibrierung zeigte die Oberfläche darum
+  // eine Marke an, gegen die längst nicht mehr gewertet wird: Endrang 21 unter dem Label "Top 25" und
+  // trotzdem "verfehlt", weil real gegen "Top 10" gewertet wurde. Anzeige und Auswertung müssen
+  // dieselbe Marke nennen, also wird ein Generator-Label zusammen mit seiner Zielmarke erneuert.
+  // Fremde, im Spielstand hinterlegte Labels (eigene Board-Aufträge, andere Quelle) bleiben unangetastet.
+  const isGeneratorAuthoredLabel = (
+    storedObjective: TeamSeasonObjectiveRecord,
+    generatedObjective: TeamSeasonObjectiveRecord,
+  ) => {
+    if (!generatedObjective.source) return false;
+    return splitObjectiveSource(storedObjective.source).includes(generatedObjective.source);
+  };
   for (const storedObjective of stored) {
     const generatedObjective = generatedById.get(storedObjective.objectiveId);
     if (!generatedObjective) {
@@ -1804,7 +1820,9 @@ function mergeStoredTeamObjectives(input: {
 
     merged.push({
       ...storedObjective,
-      label: storedObjective.label || generatedObjective.label,
+      label: isGeneratorAuthoredLabel(storedObjective, generatedObjective)
+        ? generatedObjective.label || storedObjective.label
+        : storedObjective.label || generatedObjective.label,
       targetValue: generatedObjective.targetValue,
       rewardCash: generatedObjective.rewardCash,
       penaltyCash: generatedObjective.penaltyCash,
