@@ -66,6 +66,15 @@
     },
     {
       "datum": "2026-08-01",
+      "seite": "Team · Training",
+      "pr": "#330 + #340",
+      "text": "Wie stark sich ein Spieler über die Saison entwickelt, hängt jetzt zur Hälfte von seinen Spieltagsleistungen ab statt nur zu einem Drittel — und starke Spieler treten dabei nicht mehr auf der Stelle.",
+      "quelle": "triage",
+      "gewicht": "feinschliff",
+      "version": null
+    },
+    {
+      "datum": "2026-08-01",
       "seite": "Team · Teams",
       "pr": "#298",
       "text": "Verkaufen war nach dem ersten Spieltag dauerhaft gesperrt — auch am Saisonende. Jetzt schaltet das Saisonende weiter, und Verkaeufe sind dort wieder moeglich.",
@@ -99,6 +108,60 @@
       "quelle": "triage",
       "gewicht": "behebung",
       "version": null
+    },
+    {
+      "datum": "2026-08-01",
+      "seite": "Spieltag · Inbox",
+      "pr": "#339",
+      "text": "Die Inbox nennt ihre Sprungziele jetzt so, wie die Reiter heißen: statt „Springe zu trainingV2.\" steht dort „Öffnet: Gebäude\".",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-01",
+      "seite": "Spieltag · Inbox",
+      "pr": "#339",
+      "text": "Gebäude-Meldungen ohne Stufenwechsel („fan_shop: Level 1 → 1\") entfallen, und ein echter Ausbau nennt das Gebäude beim Namen.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-01",
+      "seite": "Spieltag · Inbox",
+      "pr": "#339",
+      "text": "Spieltage stehen im Nachrichtentext als „Spieltag 10\" statt als „matchday-10\" — auch bei Verletzungen („fällt bis Spieltag 9 aus\") und beim Preisgeld.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-01",
+      "seite": "Spieltag · Inbox",
+      "pr": "#339",
+      "text": "Derselbe Spieltag wird nur noch einmal gemeldet: „Spieltagsergebnis verfügbar\" ist weg, der Recap sagt ohnehin, was passiert ist.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-01",
+      "seite": "Spieltag · Inbox",
+      "pr": "#339",
+      "text": "Board-Ziele tragen ihr Ziel im Titel — mehrere Karten heißen nicht mehr alle „Board-Ziel gefährdet\".",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-01",
+      "seite": "Spieltag · Inbox",
+      "pr": "#339",
+      "text": "Preisgeld-Karten ohne Zahlen („— Teams, — Preisgeld\") entstehen gar nicht mehr, und die Pre-Season-Karte nennt die Phase im Klartext statt „preseason_management\".",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.3"
     },
     {
       "datum": "2026-08-01",
