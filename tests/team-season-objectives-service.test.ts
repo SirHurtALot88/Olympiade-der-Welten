@@ -758,8 +758,11 @@ describe("team season objectives service", () => {
     const giantsBias = getTeamObjectiveAiBias(gameState, "T-G");
     const teachersBias = getTeamObjectiveAiBias(gameState, "T-T");
 
-    expect(giantsGoal?.label).toBe("Power Top 5");
-    expect(wizardsGoal?.label).toBe("Mental Top 5");
+    // Ein Achsen-Rangziel ist im Slate immer das ZWEITE Rang-Ziel (Slot 1 hält die Rang-Erwartung),
+    // wird also als optionales Zusatzziel vergeben — daran hängt der Labelzusatz.
+    expect(giantsGoal?.label).toBe("Power Top 5 (optional)");
+    expect(giantsGoal?.optional).toBe(true);
+    expect(wizardsGoal?.label).toBe("Mental Top 5 (optional)");
     expect(teachersGoal?.targetValue).toContain("4/4 Achsen");
     expect(giantsBias?.axisPriorities.pow).toBeGreaterThan(0);
     expect(teachersBias?.axisPriorities.pow).toBeGreaterThan(0);
@@ -1543,5 +1546,215 @@ describe("board goal targets: expectation, upset-avoidance, transfer ceiling, si
     const coreObjectives = overview.objectives.filter((objective) => objective.teamId === "M-M" && objective.category !== "sponsor");
 
     expect(coreObjectives).toHaveLength(4);
+  });
+});
+
+describe("Rang-Erwartungen: angezeigte Zielmarke und Auswertung dürfen nicht auseinanderfallen", () => {
+  // Chris' Fall aus dem Live-Save (C-C, Endrang 21): Die Erwartung stand mit dem Label
+  // "Übertreffe die Erwartung (Top 25)" in der Liste, gewertet wurde sie aber gegen "Top 10" —
+  // das Label war aus der Vergabe eingefroren, die Zielmarke wurde bei jedem Refresh neu gerechnet.
+  // Ergebnis: Rang 21 unter der Marke "Top 25" und trotzdem "verfehlt". Zwei Erwartungen desselben
+  // Endrangs konnten so denselben Stand zeigen, obwohl ihre Marken auseinanderliegen.
+  const LEAGUE_SIZE = 32;
+  /** Marke aus dem Label ziehen ("Übertreffe die Erwartung (Top 25)" -> 25). */
+  const markInLabel = (label: string) => {
+    const match = label.match(/Top\s+(\d+)/i);
+    return match ? Number(match[1]) : null;
+  };
+  /** Marke aus dem gewerteten Zielwert ziehen ("Top 25" -> 25). */
+  const markInTarget = (targetValue: number | string | boolean | null) => {
+    const match = String(targetValue ?? "").match(/Top\s+(\d+)/i);
+    return match ? Number(match[1]) : null;
+  };
+
+  /**
+   * Liga mit streng monoton fallender Stärke: Marktwert UND coreStats sinken mit dem Index, damit
+   * PPs- und Marktwert-Rang dieselbe Reihenfolge ergeben. Der Stärke-Erwartungsrang eines Teams ist
+   * damit index+1, und mit Ambition 0 (Stretch 0) ist die Zielmarke exakt dieser Erwartungsrang.
+   */
+  const buildLeague = (input: {
+    focus: { teamId: string; strengthIndex: number; finalRank: number; storedLabel: string; storedTarget: string }[];
+  }) => {
+    const teams = Array.from({ length: LEAGUE_SIZE }, (_, index) => {
+      const focus = input.focus.find((entry) => entry.strengthIndex === index);
+      const teamId = focus?.teamId ?? `L-${index}`;
+      return createTeam({ teamId, shortCode: teamId, name: teamId, identityId: teamId });
+    });
+    const players = teams.map((team, index) =>
+      createPlayer(`${team.teamId}-p`, {
+        rating: 95 - index * 2,
+        marketValue: 400 - index * 10,
+        displayMarketValue: 400 - index * 10,
+        coreStats: { pow: 80 - index * 2, spe: 80 - index * 2, men: 80 - index * 2, soc: 80 - index * 2 },
+      }),
+    );
+    const rosters = teams.map((team) => createRoster(`${team.teamId}-p`, { teamId: team.teamId, currentValue: 0 }));
+    const finalRankByTeamId = new Map(input.focus.map((entry) => [entry.teamId, entry.finalRank] as const));
+
+    return createGameState({
+      teams,
+      // Ambition 0 -> Dispositions-Ambition am Minimum -> Stretch 0 -> Zielmarke == Erwartungsrang.
+      identities: teams.map((team) => createIdentity(team.teamId, { ambition: 0 })),
+      players,
+      rosters,
+      // Saisonpunkte je Team (Disziplinwert) fallen mit dem Index — damit ergeben PPs-Rang und
+      // Marktwert-Rang dieselbe Reihenfolge und der Stärke-Erwartungsrang ist exakt index+1.
+      standings: Object.fromEntries(
+        teams.map((team, index) => [
+          team.teamId,
+          {
+            points: 200 - index,
+            rank: finalRankByTeamId.get(team.teamId) ?? index + 1,
+            disciplineValues: { tdm: 200 - index },
+          },
+        ]),
+      ) as GameState["seasonState"]["standings"],
+      // Gespeicherte Erwartungen aus der Vergabe — mit der Marke, die damals galt.
+      teamSeasonObjectives: input.focus.map((entry) => ({
+        seasonId: "season-3",
+        teamId: entry.teamId,
+        objectiveId: "expectation-rank",
+        category: "sport" as const,
+        label: entry.storedLabel,
+        targetValue: entry.storedTarget,
+        currentValue: entry.finalRank,
+        status: "open" as const,
+        boardConfidenceDelta: 0,
+        source: "team_expectation_rank_model",
+      })),
+    });
+  };
+
+  it("wertet zwei Erwartungen mit Endrang 21 gegen ihre eigene Marke — Top 25 erfüllt, Top 10 verfehlt", () => {
+    // Beide Teams beenden die Saison auf Rang 21. Ihre gespeicherten Labels nennen jeweils die
+    // Marke des ANDEREN Ziels — genau der eingefrorene Stand, den Chris gesehen hat.
+    const gameState = buildLeague({
+      focus: [
+        {
+          teamId: "C-C",
+          strengthIndex: 9, // Stärke-Erwartungsrang 10 -> neu kalibrierte Marke "Top 10"
+          finalRank: 21,
+          storedLabel: "Übertreffe die Erwartung (Top 25)",
+          storedTarget: "Top 25",
+        },
+        {
+          teamId: "K-K",
+          strengthIndex: 24, // Stärke-Erwartungsrang 25 -> neu kalibrierte Marke "Top 25"
+          finalRank: 21,
+          storedLabel: "Übertreffe die Erwartung (Top 20)",
+          storedTarget: "Top 20",
+        },
+      ],
+    });
+
+    // EINE Auswertung für beide Ziele.
+    const objectives = buildTeamObjectiveOverview(gameState).objectives;
+    const ccGoal = objectives.find((objective) => objective.teamId === "C-C" && objective.objectiveId === "expectation-rank");
+    const kkGoal = objectives.find((objective) => objective.teamId === "K-K" && objective.objectiveId === "expectation-rank");
+
+    expect(ccGoal).toBeDefined();
+    expect(kkGoal).toBeDefined();
+
+    // Die Marken laufen auseinander — und die Anzeige nennt dieselbe Marke, gegen die gewertet wird.
+    expect(markInTarget(ccGoal?.targetValue ?? null)).toBe(10);
+    expect(markInLabel(ccGoal?.label ?? "")).toBe(10);
+    expect(markInTarget(kkGoal?.targetValue ?? null)).toBe(25);
+    expect(markInLabel(kkGoal?.label ?? "")).toBe(25);
+
+    // Endrang 21: gegen Top 25 erfüllt, gegen Top 10 verfehlt — nicht derselbe Stand.
+    expect(ccGoal?.currentValue).toBe(21);
+    expect(kkGoal?.currentValue).toBe(21);
+    expect(kkGoal?.status).toBe("completed");
+    expect(ccGoal?.status).toBe("failed");
+    expect(ccGoal?.status).not.toBe(kkGoal?.status);
+  });
+
+  it("hält bei jeder Rang-Erwartung Label-Marke und gewertete Marke deckungsgleich", () => {
+    const gameState = buildLeague({
+      focus: [
+        {
+          teamId: "C-C",
+          strengthIndex: 19, // Marke "Top 20"
+          finalRank: 21,
+          storedLabel: "Übertreffe die Erwartung (Top 25)",
+          storedTarget: "Top 25",
+        },
+      ],
+    });
+
+    const goal = buildTeamObjectiveOverview(gameState).objectives.find(
+      (objective) => objective.teamId === "C-C" && objective.objectiveId === "expectation-rank",
+    );
+
+    // Rang 21 gegen Marke Top 20: nicht erfüllt — und das Label darf nicht länger "Top 25" behaupten.
+    expect(markInTarget(goal?.targetValue ?? null)).toBe(20);
+    expect(markInLabel(goal?.label ?? "")).toBe(20);
+    expect(goal?.status).not.toBe("completed");
+  });
+});
+
+describe("Vergabe: höchstens ein verbindliches Rang-Ziel je Saison", () => {
+  // Chris' Regel: "man kann ja nicht 2 Rank Targets haben". Der Slot-1-Sportauftrag (die
+  // Rang-Erwartung) bleibt verbindlich; jedes weitere Rang-Ziel im Slate wird zum optionalen
+  // Zusatzziel — es kann Bonus bringen, kostet aber nichts, wenn es verfehlt wird.
+  const buildTeamWithSecondRankGoal = () => {
+    // Klares Achsenprofil (kein Allrounder), aber Bias/Ambition unter der Schwelle für ein eigenes
+    // Achsen-Rangziel — damit rutscht der Spieler-Durchbruch ("Top-20-Durchbruch schaffen") in den
+    // Slate und ist dort das zweite Rang-Ziel.
+    const team = createTeam({ teamId: "C-C", shortCode: "C-C", identityId: "C-C" });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity("C-C", { pow: 7, spe: 2, men: 2, soc: 2, ambition: 6 })],
+    });
+    // Saison durchgespielt, ohne dass ein Spieler je Top 20 war -> der Durchbruch ist verfehlt.
+    gameState.seasonState.matchdayResults = [createMatchdayResult("md-result-1", "md-1")];
+    return gameState;
+  };
+
+  it("stuft das zweite Rang-Ziel zum optionalen Zusatzziel herab", () => {
+    const objectives = buildTeamObjectiveOverview(buildTeamWithSecondRankGoal()).objectives.filter(
+      (objective) => objective.teamId === "C-C",
+    );
+
+    const expectationGoal = objectives.find((objective) => objective.objectiveId === "expectation-rank");
+    const breakthroughGoal = objectives.find((objective) => objective.objectiveId === "player-top20-breakthrough");
+
+    // Das Rang-Ziel des Vorstands bleibt verbindlich.
+    expect(expectationGoal).toBeDefined();
+    expect(expectationGoal?.optional).toBeFalsy();
+
+    // Das zweite Rang-Ziel wird als Zusatzziel vergeben: erkennbar im Label, ohne Strafe.
+    expect(breakthroughGoal).toBeDefined();
+    expect(breakthroughGoal?.optional).toBe(true);
+    expect(breakthroughGoal?.label).toContain("(optional)");
+    expect(breakthroughGoal?.status).toBe("failed");
+    expect(breakthroughGoal?.penaltyCash).toBeUndefined();
+    expect(breakthroughGoal?.boardConfidenceDelta ?? 0).toBeGreaterThanOrEqual(0);
+  });
+
+  it("führt genau ein verbindliches Rang-Ziel im Board-Slate", () => {
+    const objectives = buildTeamObjectiveOverview(buildTeamWithSecondRankGoal()).objectives.filter(
+      (objective) => objective.teamId === "C-C" && objective.category !== "sponsor",
+    );
+    // Ziele, deren Marke ein Rang ist (Liga-, Achsen- oder Disziplin-Rang).
+    const rankGoals = objectives.filter((objective) => /Top\s+\d+|Rang/i.test(String(objective.targetValue ?? "")));
+
+    expect(rankGoals.length).toBeGreaterThan(1);
+    expect(rankGoals.filter((objective) => !objective.optional)).toHaveLength(1);
+  });
+
+  it("ein verfehltes Zusatzziel kostet weder Cash noch Vorstandsvertrauen", () => {
+    const gameState = buildTeamWithSecondRankGoal();
+    const overview = buildTeamObjectiveOverview(gameState);
+    const settlement = buildTeamSeasonObjectiveSettlement(gameState);
+    const breakthroughRow = settlement.rows.find(
+      (row) => row.teamId === "C-C" && row.objectiveId === "player-top20-breakthrough",
+    );
+
+    expect(breakthroughRow?.status).toBe("failed");
+    expect(breakthroughRow?.cashDelta).toBe(0);
+    expect(breakthroughRow?.boardConfidenceDelta).toBeGreaterThanOrEqual(0);
+    // Und es taucht nicht als Vorstands-Warnung auf, solange die verbindlichen Ziele stehen.
+    expect(overview.boardConfidence["C-C"]).toBeDefined();
   });
 });

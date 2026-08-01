@@ -1581,6 +1581,13 @@ export type TeamSeasonObjectiveRecord = {
   penaltyCash?: number;
   boardConfidenceDelta?: number;
   source: string;
+  /**
+   * Optionales Zusatzziel: Der Vorstand stellt pro Saison nur EIN verbindliches Rang-Ziel. Jedes
+   * weitere Rang-Ziel im Slate wird bei der Vergabe herabgestuft — es kann Bonus bringen, kostet
+   * aber weder Cash noch Vertrauen, wenn es verfehlt wird. Ältere Spielstände führen das Feld
+   * nicht; fehlend bedeutet "verbindlich".
+   */
+  optional?: boolean;
 };
 
 export type TeamBoardConfidenceRecord = {
