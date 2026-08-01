@@ -98,19 +98,28 @@ function createGameState(partial?: Partial<GameState>): GameState {
 }
 
 describe("sponsor offer service", () => {
-  it("generates a five-card slate per team — one card each, rarity-varied, no legacy curve shape", () => {
+  it("stellt eine Basis-Karte plus je eine Achsenkarte ins Slate", () => {
     const gameState = ensureSeasonSponsorOffers(createGameState());
     const offers = buildSponsorOffersForTeam({ gameState, teamId: "M-M" });
-    expect(offers).toHaveLength(5);
+    // Diese Fixture hat KEINE Spieler: ohne Kader gibt es weder Kaderwert noch Frische, beide Achsen
+    // waeren also unerfuellbar und werden gar nicht erst angeboten. Ein echtes Team traegt alle fuenf
+    // und bekommt damit die vollen fuenf Slots (Basis + vier Achsen).
+    expect(offers.length).toBeGreaterThanOrEqual(4);
+    expect(offers.length).toBeLessThanOrEqual(5);
 
     // Jedes Angebot trägt den Rarity-Layer …
     expect(offers.every((offer) => offer.rarity != null && SPONSOR_RARITY_KEYS.includes(offer.rarity))).toBe(true);
     // … und die V3-Konditionen, aus denen seine Auszahlung stammt.
     expect(offers.every((offer) => getSponsorV3Terms(offer) != null)).toBe(true);
-    // Das Slate ist NICHT gewuerfelt: jedes Team sieht dieselben fuenf Entscheidungen.
-    expect(offers.map((offer) => getSponsorV3Terms(offer)!.cardKey)).toEqual(
-      SPONSOR_V3_CARDS.map((card) => card.key),
-    );
+    // Slot 0 ist der risikofreie Anker, jeder weitere Slot eine ANDERE Achse.
+    const terms = offers.map((offer) => getSponsorV3Terms(offer)!);
+    expect(terms[0]!.cardKey).toBe("basis");
+    expect(terms[0]!.axis).toBeUndefined();
+    const axisKeys = terms.slice(1).map((entry) => entry.axis?.key);
+    expect(axisKeys.every((key) => key != null)).toBe(true);
+    expect(new Set(axisKeys).size).toBe(axisKeys.length);
+    // Die Achse ist FIX bepreist — kein Schaetzwert mehr, der zum Etatfehler werden koennte.
+    expect(terms.slice(1).every((entry) => entry.goalP === 0.5)).toBe(true);
 
     // KEINE Legacy-Kurvenform mehr: die elf alten Formen sind aus der Erzeugung entfernt und leben nur
     // noch als Lese-Pfad fuer Altangebote/-vertraege weiter.
@@ -253,7 +262,9 @@ describe("sponsor board objectives", () => {
     const parentIdsByTeam = new Map<string, string[]>();
     for (const team of gameState.teams) {
       const offers = offersByTeam[team.teamId] ?? [];
-      expect(offers.length, `Team ${team.teamId} ohne Angebote`).toBe(5);
+      // Ohne Kader faellt in dieser Fixture eine Achse aus dem Slate (siehe oben) — die Aussage
+      // dieses Tests ist die Marken-Verteilung, nicht die Slot-Zahl.
+      expect(offers.length, `Team ${team.teamId} ohne Angebote`).toBeGreaterThanOrEqual(4);
       parentIdsByTeam.set(
         team.teamId,
         offers.map((offer) => offer.sponsorParentBrandId).filter((id): id is string => Boolean(id)),
@@ -274,6 +285,7 @@ describe("sponsor board objectives", () => {
 
     // Gegenprobe, dass der Lauf ueberhaupt die volle Liga abgedeckt hat und nicht bloss wenige
     // Marken vergeben wurden (sonst waere die Eindeutigkeit oben trivial erfuellt).
-    expect(ownerByParentId.size).toBe(gameState.teams.length * 5);
+    const offerTotal = gameState.teams.reduce((sum, team) => sum + (offersByTeam[team.teamId]?.length ?? 0), 0);
+    expect(ownerByParentId.size).toBe(offerTotal);
   });
 });

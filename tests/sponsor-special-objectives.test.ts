@@ -27,7 +27,7 @@ import {
   type SponsorGoldenObjectiveKey,
 } from "@/lib/sponsor/sponsor-special-objectives";
 import { mapSponsorCardToArchetype } from "@/lib/sponsor/sponsor-tier-pool";
-import { SPONSOR_V3_CARDS } from "@/lib/sponsor/sponsor-v3-model";
+import { SPONSOR_V4_AXIS_KEYS } from "@/lib/sponsor/sponsor-v3-model";
 import type { SponsorArchetype, SponsorCurveShape } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
@@ -376,9 +376,11 @@ describe("sponsor bonus objectives — new targets (Fable B)", () => {
       expect(pickGoldenObjective("season-4", "T-1", archetype)).toBe(pick); // deterministisch
       expect(getAvailableBonusObjectiveKeys(archetype, "season-4")).not.toContain(pick as never);
     }
-    // Jede KARTE landet in genau einem Eimer, und alle drei Eimer werden bedient.
-    // (V3: aus den Kurvennamen sind die fuenf Risikokarten geworden.)
-    const buckets = new Set(SPONSOR_V3_CARDS.map((card) => mapSponsorCardToArchetype(card.key)));
+    // Alle drei Eimer werden bedient — seit V4 ueber die ACHSE statt ueber die Karte. Das ist die
+    // inhaltlich passende Quelle: wer fuer Finanzen zahlt, ist eine Sicherheits-Marke; wer fuer
+    // Kaderwert zahlt, eine Leistungs-Marke. Die Karten selbst (Basis/Achse) tragen die Unterscheidung
+    // nicht mehr, seit sie sich ueber die Achse unterscheiden statt ueber das Risikoprofil.
+    const buckets = new Set(SPONSOR_V4_AXIS_KEYS.map((key) => mapSponsorCardToArchetype("achse", key)));
     expect([...buckets].sort()).toEqual(["identity", "performance", "security"]);
   });
 

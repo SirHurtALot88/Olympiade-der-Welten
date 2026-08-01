@@ -48,6 +48,13 @@ import {
   sponsorObjectiveFamilyForKey,
 } from "@/lib/sponsor/sponsor-special-objectives";
 import { applySponsorV3ToOffers, getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
+import {
+  buildSponsorV4AxisTerms,
+  sponsorV4AxisLabel,
+  sponsorV4AxisSpecialKey,
+  sponsorV4OfferableAxes,
+  type SponsorV4AxisKey,
+} from "@/lib/sponsor/sponsor-v4-axes";
 
 /** Demand profile derived from rarity: legendär→elite, selten→ambitious, magisch→balanced, gewöhnlich→safe. */
 function getDemandProfileForRarity(rarity: SponsorRarity): SponsorDemandProfile {
@@ -82,6 +89,8 @@ function buildOfferSkeleton(input: {
   identity: TeamIdentity | null;
   profile: TeamStrategyProfile | null;
   cardKey: SponsorV3CardKey;
+  /** Achse dieser Karte (V4). Gesetzt = die Karte zahlt fuer die Achse statt fuer ein Sonderziel. */
+  axisKey?: SponsorV4AxisKey | null;
   rarity: SponsorRarity;
   commercialRating: number;
   slotIndex: number;
@@ -98,7 +107,7 @@ function buildOfferSkeleton(input: {
   // Der Marken- und der Sonderziel-Katalog sind noch nach den drei alten Archetypen verschlagwortet; die
   // Karte wird dafür auf einen Eimer abgebildet (SPONSOR_CARD_ARCHETYPE). Der Archetyp ist ab hier
   // reines Katalog-Schlagwort — an der Auszahlung hängt er nicht mehr.
-  const archetype: SponsorArchetype = mapSponsorCardToArchetype(cardKey);
+  const archetype: SponsorArchetype = mapSponsorCardToArchetype(cardKey, input.axisKey);
   const { brand, parent, special } = pickSponsorBrandForOffer({
     seasonId: gameState.season.id,
     teamId: team.teamId,
@@ -140,7 +149,26 @@ function buildOfferSkeleton(input: {
   let specialComponent: SponsorOfferComponent | null = card.goal
     ? { ...special, rewardCash: 0, penaltyCash: undefined }
     : null;
-  if (card.goal) {
+
+  // V4-ACHSENKARTE: die Zielkomponente ist die Achse selbst. Kein Katalogwurf, kein
+  // Wahrscheinlichkeitsband — eine Achse misst den eigenen Zuwachs gegen die eigene Ausgangslage und
+  // ist damit fuer jedes Team erfuellbar. Die Konditionen wandern in den `targetValue`, damit Karte,
+  // Anzeige und Settlement dieselbe Zahl lesen und ein spaeterer Zustandswechsel den Vertrag nicht
+  // nachtraeglich verschiebt.
+  if (input.axisKey) {
+    const axisTerms = buildSponsorV4AxisTerms(gameState, team.teamId, input.axisKey);
+    specialComponent = {
+      ...special,
+      componentId: "axis-target",
+      kind: "special",
+      specialKey: sponsorV4AxisSpecialKey(input.axisKey),
+      label: `Zielachse · ${sponsorV4AxisLabel(input.axisKey)}`,
+      targetValue: `axisbase:${axisTerms.baseline};axisscale:${axisTerms.scale};axisoffset:${axisTerms.offset}`,
+      stages: undefined,
+      rewardCash: 0,
+      penaltyCash: undefined,
+    };
+  } else if (card.goal) {
     if (isGolden) {
       const goldenKey = pickGoldenObjective(gameState.season.id, team.teamId, archetype, teamQualityRank);
       // Auch Golden-Ziele muessen im bepreisbaren Band liegen — sonst steht auf der Karte eine
@@ -267,6 +295,9 @@ export function buildSponsorOffersForTeam(input: {
     hadGoldenLastSeason,
     teamCount: rows.length,
     slotCount: SLOT_COUNT,
+    // GEFILTERT STATT GEKLAMMERT: eine Achse, die dieses Team gar nicht bewegen kann (kein
+    // Ausbauspielraum, kein Kaderwert), wird nicht angeboten, statt als wertlose Karte dazuliegen.
+    offerableAxes: sponsorV4OfferableAxes(input.gameState, input.teamId),
   });
   const usedParentBrandIds: string[] = [];
   const recentParentBrandIds = getRecentSponsorParentIds(input.gameState, input.teamId);
@@ -294,6 +325,7 @@ export function buildSponsorOffersForTeam(input: {
       identity,
       profile,
       cardKey: entry.cardKey,
+      axisKey: entry.axisKey ?? null,
       rarity: entry.rarity,
       commercialRating: commercialRating.score,
       slotIndex,
@@ -327,6 +359,9 @@ export function buildSponsorOffersForTeam(input: {
     gameState: input.gameState,
     offers: built,
     cardKeys: slate.entries.map((entry) => entry.cardKey),
+    axisKeys: slate.entries.map((entry) => entry.axisKey ?? null),
+    goldenSlots: slate.goldenCardSlots,
+    teamId: input.teamId,
     startRank,
   });
 }

@@ -19,6 +19,7 @@ import type { GameState, SponsorOffer, SponsorRarity, TeamSponsorContract } from
 
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildPrizeMoneyTable } from "@/lib/season/prize-money";
+import { buildSponsorV4AxisTerms } from "@/lib/sponsor/sponsor-v4-axes";
 import { getPrizePlacementBonus } from "@/lib/season/prize-placement-table";
 import { buildSponsorOfferModuleIds } from "@/lib/sponsor/sponsor-modules";
 import {
@@ -27,9 +28,11 @@ import {
   sponsorV3GuaranteedLadder,
   sponsorV3LadderValue,
   sponsorV3Settle,
+  sponsorV4AxisSizeFor,
   SPONSOR_V3_CARDS,
   type SponsorV3CardKey,
   type SponsorV3ContractTerms,
+  type SponsorV4AxisKey,
 } from "@/lib/sponsor/sponsor-v3-model";
 
 export type { SponsorV3ContractTerms } from "@/lib/sponsor/sponsor-v3-model";
@@ -174,18 +177,29 @@ export function buildSponsorV3Terms(input: {
   /** Startrang der Saison — Basis des Platzierungsbonus in der Leiter. */
   startRank: number;
   cardKey: SponsorV3CardKey;
+  /** Achse dieser Karte (V4). Gesetzt = fix mit p = 0,5 bepreist statt ueber eine Schaetztabelle. */
+  axisKey?: SponsorV4AxisKey | null;
+  teamId?: string;
+  golden?: boolean;
 }): SponsorV3ContractTerms {
   const card = sponsorV3CardByKey(input.cardKey);
   const goalKey = card.goal
     ? input.offer.components.find((component) => component.kind === "special")?.specialKey ?? null
     : null;
+  const rarity = input.offer.rarity ?? RARITY_FALLBACK;
+  const axis =
+    input.axisKey && input.teamId
+      ? buildSponsorV4AxisTerms(input.gameState, input.teamId, input.axisKey)
+      : null;
   return buildSponsorV3TermsCore({
     prizeCurve: getSponsorV3PrizeCurve(input.gameState),
     placementBonus: getPrizePlacementBonus,
     startRank: input.startRank,
-    rarity: input.offer.rarity ?? RARITY_FALLBACK,
+    rarity,
     card,
     goalKey,
+    axis,
+    axisSize: axis ? sponsorV4AxisSizeFor(rarity, input.golden === true) : undefined,
     salaryFactor: getSponsorV3SalaryFactor(input.gameState),
     floor: SPONSOR_V3_FLOOR_C,
   });
@@ -207,6 +221,11 @@ export function applySponsorV3ToOffers(input: {
   offers: SponsorOffer[];
   /** Karte je Angebot, in derselben Reihenfolge. Kommt aus dem Slate-Wurf der Erzeugung. */
   cardKeys: SponsorV3CardKey[];
+  /** Achse je Angebot, in derselben Reihenfolge. null bei der Basis-Karte. */
+  axisKeys?: (SponsorV4AxisKey | null)[];
+  /** Slots, die das Golden-Los gezogen haben — dort ist der Achsenhebel groesser. */
+  goldenSlots?: number[];
+  teamId?: string;
   startRank: number;
 }): SponsorOffer[] {
   if (input.offers.length === 0) return input.offers;
@@ -217,6 +236,9 @@ export function applySponsorV3ToOffers(input: {
       offer,
       startRank: input.startRank,
       cardKey,
+      axisKey: input.axisKeys?.[index] ?? null,
+      teamId: input.teamId,
+      golden: input.goldenSlots?.includes(index) === true,
     });
     const ladder = sponsorV3GuaranteedLadder(terms);
     const floor = ladder[31]!;

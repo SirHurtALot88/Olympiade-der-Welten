@@ -1,6 +1,8 @@
 import type { SponsorArchetype, SponsorRarity } from "@/lib/data/olyDataTypes";
 import { SPONSOR_RARITIES, SPONSOR_RARITY_KEYS } from "@/lib/sponsor/sponsor-curve-shapes";
-import { SPONSOR_V3_CARDS, type SponsorV3CardKey } from "@/lib/sponsor/sponsor-v3-model";
+import {
+  SPONSOR_V4_AXIS_KEYS, type SponsorV3CardKey, type SponsorV4AxisKey,
+} from "@/lib/sponsor/sponsor-v3-model";
 import type { SponsorTeamQualityRank } from "@/lib/sponsor/sponsor-team-quality-rank";
 
 /** ENV-Zahl, die EXPLIZIT 0 erlaubt (0 = Feature aus), im Gegensatz zum "0→fallback"-Muster anderswo. */
@@ -118,7 +120,12 @@ export function getDemandMultiplierForRarity(rarity: SponsorRarity): number {
 
 // ── Rarity + Kurven-Slate-Wurf ───────────────────────────────────────────────────────────────────────────
 
-export type SponsorSlateEntry = { cardKey: SponsorV3CardKey; rarity: SponsorRarity };
+export type SponsorSlateEntry = {
+  cardKey: SponsorV3CardKey;
+  rarity: SponsorRarity;
+  /** Nur bei Achsenkarten gesetzt — die Sache, fuer die dieser Sponsor zahlt. */
+  axisKey?: SponsorV4AxisKey;
+};
 export type SponsorSlateResult = { entries: SponsorSlateEntry[]; goldenCardSlots: number[] };
 
 /**
@@ -130,16 +137,34 @@ export type SponsorSlateResult = { entries: SponsorSlateEntry[]; goldenCardSlots
  * Kurven->Archetyp-Tabelle des V2-Modells. Sie passt inhaltlich: die Sicherheitskarte zieht
  * Sicherheits-Marken, die Ambitionskarte Leistungs-Marken.
  */
-const SPONSOR_CARD_ARCHETYPE: Record<SponsorV3CardKey, SponsorArchetype> = {
-  sicherheit: "security",
+const SPONSOR_CARD_ARCHETYPE: Partial<Record<SponsorV3CardKey, SponsorArchetype>> = {
   basis: "identity",
+  achse: "identity",
+  // Altvertraege: die vier V3-Risikokarten behalten ihren Eimer.
+  sicherheit: "security",
   ambition: "performance",
   sonderziel: "identity",
   ambition_ziel: "performance",
 };
 
-/** Karte -> Archetyp-Eimer fuer Marken- und Sonderziel-Auswahl. */
-export function mapSponsorCardToArchetype(cardKey: SponsorV3CardKey): SponsorArchetype {
+/**
+ * ACHSE -> ARCHETYP-EIMER. Seit die Karten sich ueber die Achse unterscheiden statt ueber das
+ * Risikoprofil, ist die Achse die inhaltlich passende Quelle fuer die Markenwahl: wer fuer Finanzen
+ * zahlt, ist eine Sicherheits-Marke; wer fuer Kaderwert zahlt, eine Leistungs-Marke.
+ */
+const SPONSOR_AXIS_ARCHETYPE: Record<SponsorV4AxisKey, SponsorArchetype> = {
+  wachstum: "performance",
+  ausbau: "identity",
+  soliditaet: "security",
+  entwicklung: "identity",
+  kaderpflege: "security",
+};
+
+/** Karte -> Archetyp-Eimer fuer Marken- und Sonderziel-Auswahl; die Achse hat Vorrang. */
+export function mapSponsorCardToArchetype(
+  cardKey: SponsorV3CardKey, axisKey?: SponsorV4AxisKey | null,
+): SponsorArchetype {
+  if (axisKey) return SPONSOR_AXIS_ARCHETYPE[axisKey] ?? "identity";
   return SPONSOR_CARD_ARCHETYPE[cardKey] ?? "identity";
 }
 
@@ -163,12 +188,31 @@ export function rollSponsorOfferSlate(input: {
   beliebtheit?: number | null;
   hadGoldenLastSeason?: boolean;
   teamCount?: number;
+  /**
+   * Achsen, die diesem Team ueberhaupt angeboten werden duerfen (Eligibility kommt vom Aufrufer, der
+   * den Spielzustand hat). Fehlt die Liste, wird der volle Satz angenommen.
+   */
+  offerableAxes?: readonly SponsorV4AxisKey[];
 }): SponsorSlateResult {
-  // Ein Slot je Karte: mehr Slots als Karten kann es nicht geben, sonst stuende dieselbe
-  // Entscheidung zweimal im Slate. Das Spiel nutzt genau 5.
-  const requestedSlotCount = input.slotCount ?? 5;
-  const slotCount = Math.min(requestedSlotCount, SPONSOR_V3_CARDS.length);
   const teamCount = input.teamCount ?? 32;
+
+  // DER SLATE: EIN Basis-Slot plus je ein Slot pro Achse. Mehr Slots als 1 + verfuegbare Achsen kann
+  // es nicht geben, sonst stuende dieselbe Entscheidung zweimal — und zwei Karten auf derselben
+  // Achse waeren keine Wahl, sondern nur zwei Preise fuer dasselbe.
+  const axisPool = (input.offerableAxes && input.offerableAxes.length > 0
+    ? input.offerableAxes
+    : SPONSOR_V4_AXIS_KEYS
+  ).slice();
+  const requestedSlotCount = input.slotCount ?? 5;
+  const slotCount = Math.max(1, Math.min(requestedSlotCount, 1 + axisPool.length));
+
+  // Ziehung OHNE ZURUECKLEGEN ueber eine deterministische Sortierung: jede Achse bekommt einen
+  // stabilen Wurf, sortiert wird danach. Eine Achse bleibt je Saison uebrig — das rotiert den Slate
+  // von selbst, ohne dass eine Anti-Wiederholungsliste gepflegt werden muesste.
+  const shuffledAxes = axisPool
+    .map((key) => ({ key, roll: getStableUnitHash(`sponsor-achse:${key}:${input.seasonId}:${input.teamId}`) }))
+    .sort((left, right) => left.roll - right.roll)
+    .map((entry) => entry.key);
 
   // Rebalance (2026-07): KEIN qualitäts-rang-basierter Rarity-Deckel mehr. Früher deckelte der Team-
   // Qualitätsrang die maximale Rarity (die untere Liga-Hälfte saß hart auf `gewöhnlich`), sodass schwache
@@ -205,11 +249,17 @@ export function rollSponsorOfferSlate(input: {
     rarities.push(picked);
   }
 
-  // Karten-Slate: die fuenf Karten in ihrer festen Reihenfolge, eine je Slot.
-  const entries: SponsorSlateEntry[] = SPONSOR_V3_CARDS.slice(0, slotCount).map((card, i) => ({
-    cardKey: card.key,
-    rarity: rarities[i] ?? fallbackRarity,
-  }));
+  // Slot 0 traegt die Basis-Karte: der risikofreie Anker, gegen den jede Achse gemessen wird.
+  const entries: SponsorSlateEntry[] = Array.from({ length: slotCount }, (_, slot) => {
+    if (slot === 0) {
+      return { cardKey: "basis" as SponsorV3CardKey, rarity: rarities[0] ?? fallbackRarity };
+    }
+    return {
+      cardKey: "achse" as SponsorV3CardKey,
+      rarity: rarities[slot] ?? fallbackRarity,
+      axisKey: shuffledAxes[slot - 1]!,
+    };
+  });
 
   // Golden bleibt orthogonal zur Rarity: derselbe Golden-Los-Pfad (Wahrscheinlichkeit + Seeds), höchstens
   // EIN goldener Slot.

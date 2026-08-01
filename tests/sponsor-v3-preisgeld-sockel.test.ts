@@ -31,9 +31,22 @@ import {
   sponsorV3IsGoalOfferable,
   sponsorV3IsMonotone,
   sponsorV3Settle,
-  SPONSOR_V3_CARDS,
+  sponsorV3CardByKey,
   type SponsorV3ContractTerms,
 } from "@/lib/sponsor/sponsor-v3-model";
+
+/**
+ * Die fuenf Karten, die dieses Abnahmeprotokoll misst: der V3-Slate in seiner damaligen Form
+ * (Basis plus die vier Risikokarten). Sie werden nicht mehr ANGEBOTEN — dafuer sind seit V4 Basis
+ * und Achsenkarten zustaendig —, rechnen in bestehenden Vertraegen aber unveraendert weiter.
+ */
+/**
+ * Die REIHENFOLGE ist Teil der Messung, nicht Kosmetik: der Zufallsmix unten greift den Slate ueber
+ * den Index ab. Eine andere Reihenfolge gibt jedem Team eine andere Karte und verschiebt saemtliche
+ * Kennzahlen — deshalb steht hier der Slate exakt so, wie V3 ihn ausgeliefert hat.
+ */
+const SPONSOR_V3_MESSKARTEN = ["sicherheit", "basis", "ambition", "sonderziel", "ambition_ziel"]
+  .map((key) => sponsorV3CardByKey(key));
 import { SPONSOR_V3_FLOOR_C } from "@/lib/sponsor/sponsor-v3-offer-service";
 
 const teams = SPONSOR_LIVE_SAVE_S1_TEAMS;
@@ -70,10 +83,17 @@ function goalKeyFor(team: SponsorLiveSaveTeam): string {
   return key!;
 }
 
-/** Der volle Karten-Slate eines Teams, gebaut mit der PRODUKTIVEN Terms-Funktion. */
+/**
+ * Der volle V3-Karten-Slate eines Teams, gebaut mit der PRODUKTIVEN Terms-Funktion.
+ *
+ * DIESE DATEI IST DAS ABNAHMEPROTOKOLL DES V3-MODELLS und misst gegen die EINGEFRORENE
+ * Fixture-Kurve, nicht gegen die laufende Liga — sie bleibt damit auch nach dem V4-Kurvenumbau
+ * gueltig und aussagekraeftig. Angeboten werden die vier Risikokarten nicht mehr, aber sie rechnen
+ * in bestehenden Vertraegen weiter; genau deshalb muss ihre Rechnung weiter belegt sein.
+ */
 function slateOf(team: SponsorLiveSaveTeam): SponsorV3ContractTerms[] {
   const goalKey = goalKeyFor(team);
-  return SPONSOR_V3_CARDS.map((card) =>
+  return SPONSOR_V3_MESSKARTEN.map((card) =>
     buildSponsorV3TermsCore({
       prizeCurve: SPONSOR_LIVE_SAVE_S1_PRIZE_CURVE,
       placementBonus: getPrizePlacementBonus,
@@ -230,7 +250,7 @@ describe("Sponsormodell V3 — Abnahme an den 32 echten Teams des Live-Saves", (
         placementBonus: getPrizePlacementBonus,
         startRank: team.startRank,
         rarity,
-        card: SPONSOR_V3_CARDS.find((card) => card.key === "ambition_ziel")!,
+        card: sponsorV3CardByKey("ambition_ziel"),
         goalKey: goalKeyFor(team),
         salaryFactor: SALARY_FACTOR,
         floor: SPONSOR_V3_FLOOR_C,

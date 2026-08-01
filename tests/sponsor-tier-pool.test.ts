@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { SponsorTeamQualityRank } from "@/lib/sponsor/sponsor-team-quality-rank";
 import { getDemandMultiplierForRarity, rollSponsorOfferSlate } from "@/lib/sponsor/sponsor-tier-pool";
-import { SPONSOR_V3_CARDS } from "@/lib/sponsor/sponsor-v3-model";
+import { SPONSOR_V4_AXIS_KEYS } from "@/lib/sponsor/sponsor-v3-model";
 
 function createQualityRank(overrides: Partial<SponsorTeamQualityRank> & Pick<SponsorTeamQualityRank, "teamId">): SponsorTeamQualityRank {
   return {
@@ -28,23 +28,54 @@ describe("sponsor demand multiplier (rarity-keyed)", () => {
 });
 
 describe("sponsor offer slate (rarity + Modellkurven)", () => {
-  it("rolls five DISTINCT model curves out of the six the model knows", () => {
-    // Gewuerfelt werden die sechs Kurven des Sponsormodells. Die frueheren elf Legacy-Kurvenformen samt
-    // Familien-Deckel sind aus der Erzeugung entfernt — bei 6 Kurven und 5 Slots ist "distinkt" die
-    // ganze Regel, ein Deckel je Familie waere gegenstandslos.
+  it("stellt eine Basis-Karte und vier VERSCHIEDENE Achsen ins Slate", () => {
+    // Frueher waren es fuenf Risikoprofile um dieselbe Rangleiter — alle mit identischem
+    // Erwartungswert, aber mit einem Ausschlag von nur +-1 bis 3 C. Das war keine Wahl.
+    // Jetzt traegt Slot 0 die risikofreie Basis, und jeder weitere Slot eine ANDERE Achse: die
+    // Entscheidung ist, wofuer man diese Saison bezahlt werden will.
     const slate = rollSponsorOfferSlate({
       seasonId: "season-slate",
       teamId: "M-M",
       qualityRank: createQualityRank({ teamId: "M-M", qualityRank: 5, maxRarity: "legendär", targetRarity: "selten" }),
     });
     expect(slate.entries).toHaveLength(5);
-    // V3: die Auswahl besteht aus KARTEN (`cardKey`), nicht mehr aus Kurvennamen —
-    // fuenf Risikoprofile mit identischem Erwartungswert.
-    const cards = slate.entries.map((entry) => entry.cardKey);
-    expect(new Set(cards).size).toBe(cards.length); // distinkt
-    for (const key of cards) {
-      expect(SPONSOR_V3_CARDS.some((card) => card.key === key)).toBe(true);
+    expect(slate.entries[0]!.cardKey).toBe("basis");
+    expect(slate.entries[0]!.axisKey).toBeUndefined();
+
+    const axes = slate.entries.slice(1).map((entry) => entry.axisKey);
+    expect(axes.every((key) => key != null)).toBe(true);
+    // Zwei Karten auf derselben Achse waeren keine Wahl, sondern zwei Preise fuer dasselbe.
+    expect(new Set(axes).size).toBe(axes.length);
+    for (const key of axes) {
+      expect(SPONSOR_V4_AXIS_KEYS).toContain(key);
     }
+    // Eine Achse bleibt je Saison uebrig — das rotiert das Slate von selbst.
+    expect(axes.length).toBe(SPONSOR_V4_AXIS_KEYS.length - 1);
+  });
+
+  it("bietet keine Achse an, die dieses Team gar nicht bewegen kann", () => {
+    // GEFILTERT STATT GEKLAMMERT: waere eine unerfuellbare Achse im Slate, stuende dort eine Karte,
+    // die dieses Team niemals einloest — genau die wertlose Option, die V3 bei den Sonderzielen
+    // bereits abgeschafft hat.
+    const slate = rollSponsorOfferSlate({
+      seasonId: "season-slate",
+      teamId: "M-M",
+      qualityRank: createQualityRank({ teamId: "M-M", qualityRank: 5, maxRarity: "legendär", targetRarity: "selten" }),
+      offerableAxes: ["ausbau", "soliditaet"],
+    });
+    // 1 Basis + 2 verfuegbare Achsen: mehr Slots gibt es nicht zu vergeben.
+    expect(slate.entries).toHaveLength(3);
+    expect(slate.entries.slice(1).map((entry) => entry.axisKey).sort()).toEqual(["ausbau", "soliditaet"]);
+  });
+
+  it("wuerfelt deterministisch — zweimal dasselbe Team ergibt dasselbe Slate", () => {
+    const roll = () =>
+      rollSponsorOfferSlate({
+        seasonId: "season-det",
+        teamId: "V-D",
+        qualityRank: createQualityRank({ teamId: "V-D", qualityRank: 16, maxRarity: "legendär", targetRarity: "magisch" }),
+      });
+    expect(roll()).toEqual(roll());
   });
 
   it("gives EVERY team the same full rarity distribution — no quality-rank cap (bottom teams can roll legendär)", () => {

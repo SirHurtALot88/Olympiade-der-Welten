@@ -6,6 +6,9 @@ import { calculateFacilityIncome, calculateFacilityUpkeep, getTeamFacilityState 
 import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
 import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import {
+  evaluateSponsorV4Axis, sponsorV4AxisDefinition, sponsorV4AxisKeyFromSpecialKey,
+} from "@/lib/sponsor/sponsor-v4-axes";
+import {
   FAN_INFRASTRUCTURE_LEVEL_CAP,
   fanInfrastructureLevelSum,
   getTeamAxisRank,
@@ -635,6 +638,31 @@ export function evaluateSpecialComponentStage(
   component: SponsorOfferComponent,
 ): SponsorObjectiveStageResult {
   const key = component.specialKey ?? "";
+
+  // V4-ACHSE: gemessen gegen die im Vertrag eingefrorene EIGENE Ausgangslage, nie gegen die Liga.
+  // Die Konditionen stehen im targetValue, damit Anzeige und Settlement dieselbe Zahl lesen und ein
+  // spaeterer Zustandswechsel den Vertrag nicht nachtraeglich verschiebt.
+  const axisKey = sponsorV4AxisKeyFromSpecialKey(key);
+  if (axisKey) {
+    const number = (tag: string, fallback: number) => {
+      const raw = taggedTargetValue(component.targetValue, tag);
+      const parsed = raw != null ? Number(raw) : NaN;
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
+    const definition = sponsorV4AxisDefinition(axisKey);
+    const progress = evaluateSponsorV4Axis(gameState, teamId, {
+      key: axisKey,
+      baseline: number("axisbase", 0),
+      scale: number("axisscale", definition.scale),
+      offset: number("axisoffset", definition.offset),
+    });
+    return {
+      fraction: progress.fraction,
+      stageIndex: progress.fraction > 0 ? 0 : -1,
+      metric: progress.metric,
+      reachedLabel: `${progress.label} ${progress.metric}${progress.unit} von ${progress.target}${progress.unit}`,
+    };
+  }
 
   // Fan-Infrastruktur: kontinuierliche Skalierung (levelSum / CAP) — kein Stufen-Raster.
   if (key === "fan_infrastructure") {
