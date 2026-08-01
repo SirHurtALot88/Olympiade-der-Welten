@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import type { GameInboxItem, GameState, Player, Team } from "@/lib/data/olyDataTypes";
@@ -904,5 +907,127 @@ describe("game inbox service", () => {
       },
     ];
     expect(getPrimaryInboxTask(items)?.itemId).toBe("injury-task");
+  });
+});
+
+/**
+ * GEMELDET AUS DEM SPIEL (Screenshot der Inbox). Vier Beschwerden, die alle dieselbe Wurzel haben:
+ * Rohdaten wurden ohne Uebersetzung in Nachrichtentexte geschrieben.
+ *
+ *  - "fan_shop: Level 1 → 1."           — ein Ereignis, bei dem gar nichts passiert ist
+ *  - "matchday-10: +3 Plätze"           — der Spieltags-Bezeichner statt "Spieltag 10"
+ *  - "Preisgeld angewendet: — Teams"    — eine Karte, die nur ihre eigenen Platzhalter zeigt
+ *  - zweimal derselbe Spieltag          — "Ergebnis verfügbar" UND der Recap
+ */
+describe("Inbox — keine Rohdaten im Nachrichtentext", () => {
+  const FACILITY_SEASON = "season-3";
+
+  function withFacilityEvent(previousLevel: number, nextLevel: number) {
+    const gameState = makeGameState({
+      seasonState: {
+        seasonId: FACILITY_SEASON,
+        schedule: [],
+        standings: {},
+        facilityEvents: [
+          {
+            eventId: "fe-1",
+            seasonId: FACILITY_SEASON,
+            teamId: "M-M",
+            facilityId: "fan_shop",
+            previousLevel,
+            nextLevel,
+            timestamp: "2026-06-12T00:00:00.000Z",
+          },
+        ],
+      } as GameState["seasonState"],
+    });
+    return buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" }).filter(
+      (item) => item.source === "facility_events",
+    );
+  }
+
+  it("ein Gebaeude-Ereignis ohne Stufenwechsel erzeugt keine Nachricht", () => {
+    expect(withFacilityEvent(1, 1)).toEqual([]);
+  });
+
+  it("ein echter Ausbau nennt das Gebaeude beim Namen, nicht bei seiner Id", () => {
+    const [item] = withFacilityEvent(1, 2);
+    expect(item).toBeDefined();
+    expect(item!.title).toContain("Fan Shop");
+    expect(`${item!.title} ${item!.description}`).not.toContain("fan_shop");
+  });
+
+  it("eine Preisgeld-Karte ohne Zahlen entsteht gar nicht erst", () => {
+    const gameState = makeGameState({
+      seasonState: {
+        seasonId: FACILITY_SEASON,
+        schedule: [],
+        standings: {},
+        cashPrizeApplyLogs: [
+          { id: "log-empty", seasonId: FACILITY_SEASON, matchdayId: "season-3-matchday-1", createdAt: "2026-06-12T00:00:00.000Z" },
+        ],
+      } as GameState["seasonState"],
+    });
+    const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
+    expect(items.filter((item) => item.source === "cash_prize_apply_logs")).toEqual([]);
+  });
+
+  it("eine Preisgeld-Karte mit Zahlen nennt den Spieltag im Klartext", () => {
+    const gameState = makeGameState({
+      seasonState: {
+        seasonId: FACILITY_SEASON,
+        schedule: [],
+        standings: {},
+        cashPrizeApplyLogs: [
+          {
+            id: "log-1",
+            seasonId: FACILITY_SEASON,
+            matchdayId: "season-3-matchday-1",
+            createdAt: "2026-06-12T00:00:00.000Z",
+            payload: { appliedTeams: 8, totalPrizeMoney: 12.5 },
+          },
+        ],
+      } as GameState["seasonState"],
+    });
+    const [item] = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" }).filter(
+      (entry) => entry.source === "cash_prize_apply_logs",
+    );
+    expect(item).toBeDefined();
+    expect(item!.title).toContain("Spieltag 1");
+    expect(item!.title).not.toContain("season-3-matchday-1");
+  });
+
+  it("derselbe Spieltag wird nicht zweimal gemeldet", () => {
+    // "Spieltagsergebnis verfügbar" ist ersatzlos gestrichen — der Recap IST die Meldung.
+    const gameState = makeGameState({
+      seasonState: {
+        seasonId: FACILITY_SEASON,
+        schedule: [],
+        standings: {},
+        matchdayResults: [
+          {
+            id: "mr-1",
+            seasonId: FACILITY_SEASON,
+            matchdayId: "season-3-matchday-1",
+            status: "preview_applied",
+            updatedAt: "2026-06-12T00:00:00.000Z",
+          },
+        ],
+      } as GameState["seasonState"],
+    });
+    const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
+    expect(items.filter((item) => item.source === "matchday_results")).toEqual([]);
+  });
+
+  it("die Board-Ziel-Karte traegt ihr Ziel im Titel — sonst heissen mehrere Karten gleich", () => {
+    /**
+     * Bei zwei gefaehrdeten Zielen entstanden zwei Karten mit WORTGLEICHEM Titel; was gemeint war,
+     * stand nur in der Kleinzeile. Geprueft wird deshalb die Eigenschaft, die das verhindert: der
+     * Titel darf keine feste Zeichenkette sein, sondern muss das Ziel einsetzen.
+     */
+    const source = readFileSync(join(process.cwd(), "lib/foundation/game-inbox-service.ts"), "utf8");
+    const staticTitles = ['"Board-Ziel verfehlt"', '"Board-Ziel gefährdet"'].filter((literal) => source.includes(literal));
+    expect(staticTitles, "ein fester Board-Ziel-Titel macht mehrere Karten ununterscheidbar").toEqual([]);
+    expect(source).toContain("Board-Ziel verfehlt: ${objective.label}");
   });
 });
