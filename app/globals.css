@@ -73578,12 +73578,28 @@ button.is-new-look .nl-thist-season-pill,
 /* --- Changelog-Reiter (unterster Reiter, Nur-Lese-Ansicht) ------------------
    Ruhig und lesbar: eine Karte pro Tag, ein Eintrag pro Aenderung. Die Seite
    steht als Kicker ueber dem Satz, die PR-Nummer als dezenter Beleg rechts —
-   mehr Entwickler-Verweis bekommt die Oberflaeche absichtlich nicht. */
+   mehr Entwickler-Verweis bekommt die Oberflaeche absichtlich nicht.
+
+   Die Eintraege eines Tages stehen NEBENEINANDER statt untereinander: ein Tag
+   bringt schnell ein halbes Dutzend Zeilen, und als eine schmale Spalte liess
+   das den halben Bildschirm leer. Das Raster fuellt die Breite, deckelt die
+   Spalte aber bei ~460px — laengere Zeilen liest niemand mehr angenehm. */
 .is-new-look .nl-changelog {
   display: flex;
   flex-direction: column;
   gap: var(--nl-s4);
-  max-width: 860px;
+  /* Bewusst OHNE eigenen max-width: die Breite kommt vom Shell (Standard/Breit/
+     Cinema, siehe data-view-width weiter unten). Ein fester Deckel hier haette
+     genau den Fehler wiederholt, den die Cinema-Regeln aufraeumen mussten —
+     die Ansicht bliebe schmal, egal wie breit der Nutzer den Shell stellt. */
+}
+
+.is-new-look .nl-changelog-kopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s4);
 }
 
 /* Aeussere Gliederung nach Version, sobald Eintraege eine Versionsangabe tragen. Eintraege ohne
@@ -73608,33 +73624,67 @@ button.is-new-look .nl-thist-season-pill,
   margin: 0;
   color: var(--nl-mut);
   line-height: 1.5;
+  /* Der Fliesstext bleibt schmal, auch wenn die Karte breit ist. */
+  max-width: 62ch;
+}
+
+.is-new-look .nl-changelog-kennzahlen {
+  display: flex;
+  margin: 0;
+  gap: var(--nl-s5);
+}
+
+.is-new-look .nl-changelog-kennzahl {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.is-new-look .nl-changelog-kennzahl dt {
+  font-size: var(--nl-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut-2);
+}
+
+.is-new-look .nl-changelog-kennzahl dd {
+  margin: 0;
+  font-family: var(--nl-display);
+  font-size: var(--nl-fs-xl);
+  color: var(--nl-ink);
+  white-space: nowrap;
 }
 
 .is-new-look .nl-changelog-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  /* auto-FIT, nicht auto-fill: seit der Gliederung nach Gewicht und Version enthalten viele
+     Tageskarten nur noch einen einzigen Eintrag. `auto-fill` haette daneben zwei leere Spalten
+     stehen lassen — also genau die leere Flaeche, gegen die dieses Raster gebaut wurde. `auto-fit`
+     klappt ungenutzte Spuren zusammen, der einzelne Eintrag nimmt die Breite ein. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
   gap: var(--nl-s3);
 }
 
+/* Als Kachel statt als Zeile mit Trennstrich: im Raster haetten Unterkanten
+   quer durch die Spalten gezogen, ohne etwas zu trennen. */
 .is-new-look .nl-changelog-item {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding-bottom: var(--nl-s3);
-  border-bottom: 1px solid var(--nl-line);
-}
-
-.is-new-look .nl-changelog-item:last-child {
-  padding-bottom: 0;
-  border-bottom: none;
+  gap: var(--nl-s2);
+  padding: var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
 }
 
 .is-new-look .nl-changelog-item-head {
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: var(--nl-s2);
 }
 
@@ -73657,6 +73707,10 @@ button.is-new-look .nl-thist-season-pill,
   margin: 0;
   color: var(--nl-ink);
   line-height: 1.55;
+  /* Greift nur, wenn die Kachel breit ist (einzelner Eintrag eines Tages, Cinema): in einer
+     360px-Spalte ist die Spalte ohnehin schmaler. Verhindert Zeilen ueber die volle Shell-Breite,
+     die niemand mehr angenehm liest. */
+  max-width: 90ch;
 }
 
 /* Die Gewichtungs-Abschnitte: das Grosse zuerst, deutlich abgesetzt. Jede Stufe traegt eine

@@ -308,3 +308,32 @@ export function gruppiereChangelogNachVersion(eintraege: ChangelogEintrag[]): Ch
   if (ohneVersion.length > 0) gruppen.push({ version: null, eintraege: ohneVersion });
   return gruppen;
 }
+
+/** Die Kennzahlen im Kopf des Reiters. */
+export type ChangelogZusammenfassung = {
+  /** Eintraege insgesamt. */
+  eintraege: number;
+  /** Zahl der verschiedenen Tage, an denen etwas dazukam. */
+  tage: number;
+  /** Juengstes Datum (ISO) oder null, wenn es nichts gibt. */
+  letztesDatum: string | null;
+};
+
+/**
+ * Zaehlt den Kopfbereich aus. Bewusst auf der FLACHEN Eintragsliste und nicht auf einer der
+ * Gruppierungen: die Anzeige gliedert inzwischen dreifach (Gewicht → Version → Tag), und eine
+ * Kennzahl, die an einer dieser Ebenen haengt, waere beim naechsten Umbau der Gliederung still
+ * falsch geworden. Das juengste Datum wird als Maximum bestimmt statt als erstes Element gelesen,
+ * damit die Zahl auch auf einer unsortiert durchgereichten Liste stimmt.
+ */
+export function fasseChangelogZusammen(eintraege: ChangelogEintrag[]): ChangelogZusammenfassung {
+  const tage = new Set<string>();
+  let letztesDatum: string | null = null;
+  for (const eintrag of eintraege) {
+    tage.add(eintrag.datum);
+    if (letztesDatum === null || eintrag.datum.localeCompare(letztesDatum) > 0) {
+      letztesDatum = eintrag.datum;
+    }
+  }
+  return { eintraege: eintraege.length, tage: tage.size, letztesDatum };
+}

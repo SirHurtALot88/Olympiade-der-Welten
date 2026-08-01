@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   changelogAusTriage,
   dedupliziereChangelog,
+  fasseChangelogZusammen,
   gewichtAusTriage,
   gruppiereChangelogNachDatum,
   gruppiereChangelogNachGewicht,
@@ -250,6 +251,42 @@ describe("Datum, Sortierung, Gruppierung", () => {
     ]);
     expect(gruppen.map((g) => g.datum)).toEqual(["2026-08-01", "2026-07-30"]);
     expect(gruppen[1].eintraege.map((e) => e.text)).toEqual(["a", "c"]);
+  });
+
+  it("zaehlt Eintraege, verschiedene Tage und den juengsten Tag fuer den Kopf des Reiters", () => {
+    expect(
+      fasseChangelogZusammen([
+        eintrag({ datum: "2026-08-01", text: "b" }),
+        eintrag({ datum: "2026-07-30", text: "a" }),
+        eintrag({ datum: "2026-07-30", text: "c" }),
+      ]),
+    ).toEqual({ eintraege: 3, tage: 2, letztesDatum: "2026-08-01" });
+  });
+
+  it("nennt das juengste Datum auch bei unsortierter Liste und bleibt leer sauber", () => {
+    expect(
+      fasseChangelogZusammen([
+        eintrag({ datum: "2026-07-30" }),
+        eintrag({ datum: "2026-08-01" }),
+        eintrag({ datum: "2026-07-31" }),
+      ]).letztesDatum,
+    ).toBe("2026-08-01");
+    expect(fasseChangelogZusammen([])).toEqual({ eintraege: 0, tage: 0, letztesDatum: null });
+  });
+
+  it("zaehlt die Kennzahlen unabhaengig von der Gliederung — Gewicht und Version aendern sie nicht", () => {
+    // Der Kopf soll die dreistufige Gliederung (Gewicht → Version → Tag) ueberleben: dieselben
+    // Eintraege ergeben dieselben Zahlen, egal wie sie darunter einsortiert sind.
+    const eintraege = [
+      eintrag({ datum: "2026-08-01", gewicht: "grundlegend", version: "0.3" }),
+      eintrag({ datum: "2026-08-01", gewicht: "feinschliff", version: null }),
+      eintrag({ datum: "2026-07-30", gewicht: "behebung", version: "0.2" }),
+    ];
+    expect(fasseChangelogZusammen(eintraege)).toEqual({
+      eintraege: 3,
+      tage: 2,
+      letztesDatum: "2026-08-01",
+    });
   });
 });
 

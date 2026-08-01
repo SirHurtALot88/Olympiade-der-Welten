@@ -6,6 +6,7 @@ import changelogDatei from "@/data/changelog/CHANGELOG.json";
 import { NlCard, NlEmptyState } from "@/components/foundation/new-look";
 import {
   CHANGELOG_GEWICHT_BESCHRIFTUNG,
+  fasseChangelogZusammen,
   gruppiereChangelogNachDatum,
   gruppiereChangelogNachGewicht,
   gruppiereChangelogNachVersion,
@@ -73,27 +74,55 @@ function ChangelogEintragZeile({ eintrag }: { eintrag: ChangelogEintrag }) {
 
 export default function FoundationChangelogHost() {
   // Die Datei ist zur Build-Zeit eingebacken — einmal parsen und gruppieren reicht.
+  const eintraege = useMemo(() => sortiereChangelog(parseChangelogDatei(changelogDatei)), []);
+
   // Erst nach Gewichtung, darin nach Version, darin nach Tag: alle drei Bausteine bleiben
   // getrennt wiederverwendbar (siehe lib/changelog/changelog.ts).
-  const abschnitte = useMemo(() => {
-    const eintraege = sortiereChangelog(parseChangelogDatei(changelogDatei));
-    return gruppiereChangelogNachGewicht(eintraege).map((gruppe) => ({
-      gewicht: gruppe.gewicht,
-      beschriftung: gruppe.gewicht ? CHANGELOG_GEWICHT_BESCHRIFTUNG[gruppe.gewicht] : OHNE_EINSTUFUNG,
-      versionen: gruppiereChangelogNachVersion(gruppe.eintraege).map((versionsGruppe) => ({
-        version: versionsGruppe.version,
-        tage: gruppiereChangelogNachDatum(versionsGruppe.eintraege),
+  const abschnitte = useMemo(
+    () =>
+      gruppiereChangelogNachGewicht(eintraege).map((gruppe) => ({
+        gewicht: gruppe.gewicht,
+        beschriftung: gruppe.gewicht ? CHANGELOG_GEWICHT_BESCHRIFTUNG[gruppe.gewicht] : OHNE_EINSTUFUNG,
+        versionen: gruppiereChangelogNachVersion(gruppe.eintraege).map((versionsGruppe) => ({
+          version: versionsGruppe.version,
+          tage: gruppiereChangelogNachDatum(versionsGruppe.eintraege),
+        })),
       })),
-    }));
-  }, []);
+    [eintraege],
+  );
+
+  // Aus der flachen Liste, nicht aus `abschnitte` — die Kennzahlen sollen die Gliederung ueberleben.
+  const zusammenfassung = useMemo(() => fasseChangelogZusammen(eintraege), [eintraege]);
 
   return (
     <div className="nl-changelog" data-testid="foundation-changelog" data-new-look="true">
       <NlCard eyebrow="Changelog" title="Was sich geändert hat">
-        <p className="nl-changelog-intro">
-          Gefixte Fehler und Neuerungen — das Große zuerst, darin neueste zuerst. Die PR-Nummer ist
-          der Beleg für alle, die nachsehen wollen.
-        </p>
+        <div className="nl-changelog-kopf">
+          <p className="nl-changelog-intro">
+            Gefixte Fehler und Neuerungen — das Große zuerst, darin neueste zuerst. Die PR-Nummer ist
+            der Beleg für alle, die nachsehen wollen.
+          </p>
+          {zusammenfassung.eintraege > 0 ? (
+            <dl className="nl-changelog-kennzahlen">
+              <div className="nl-changelog-kennzahl">
+                <dt>Einträge</dt>
+                <dd>{zusammenfassung.eintraege}</dd>
+              </div>
+              <div className="nl-changelog-kennzahl">
+                <dt>Tage</dt>
+                <dd>{zusammenfassung.tage}</dd>
+              </div>
+              <div className="nl-changelog-kennzahl">
+                <dt>Zuletzt</dt>
+                <dd>
+                  {zusammenfassung.letztesDatum
+                    ? formatChangelogDatum(zusammenfassung.letztesDatum)
+                    : "—"}
+                </dd>
+              </div>
+            </dl>
+          ) : null}
+        </div>
       </NlCard>
 
       {abschnitte.length === 0 ? (
