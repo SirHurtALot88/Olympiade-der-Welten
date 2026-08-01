@@ -26,16 +26,19 @@ import {
 } from "@/lib/sponsor/sponsor-team-quality-rank";
 import {
   buildOfferRankPayoutLadderPreview,
-  estimateExpectedPayout,
   getCurrentSponsorSalaryFactor,
 } from "@/lib/sponsor/sponsor-economy-calibration";
 import { SPONSOR_RARITIES } from "@/lib/sponsor/sponsor-curve-shapes";
 import { applySpotlightPerkToComponents, buildSponsorOfferModuleIds } from "@/lib/sponsor/sponsor-modules";
 import {
-  mapSponsorCurveToArchetype,
+  mapSponsorCardToArchetype,
   rollSponsorOfferSlate,
 } from "@/lib/sponsor/sponsor-tier-pool";
-import type { SponsorV2CurveName } from "@/lib/sponsor/sponsor-v2-model";
+import {
+  sponsorV3CardByKey,
+  sponsorV3IsGoalOfferable,
+  type SponsorV3CardKey,
+} from "@/lib/sponsor/sponsor-v3-model";
 import {
   buildBonusObjectiveComponent,
   buildGoldenObjectiveComponent,
@@ -44,7 +47,7 @@ import {
   resolveChallengeSlotIndex,
   sponsorObjectiveFamilyForKey,
 } from "@/lib/sponsor/sponsor-special-objectives";
-import { applySponsorV2ToOffers } from "@/lib/sponsor/sponsor-v2-offer-service";
+import { applySponsorV3ToOffers, getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 
 /** Demand profile derived from rarity: legendär→elite, selten→ambitious, magisch→balanced, gewöhnlich→safe. */
 function getDemandProfileForRarity(rarity: SponsorRarity): SponsorDemandProfile {
@@ -78,7 +81,7 @@ function buildOfferSkeleton(input: {
   team: Team;
   identity: TeamIdentity | null;
   profile: TeamStrategyProfile | null;
-  curveName: SponsorV2CurveName;
+  cardKey: SponsorV3CardKey;
   rarity: SponsorRarity;
   commercialRating: number;
   slotIndex: number;
@@ -90,11 +93,12 @@ function buildOfferSkeleton(input: {
   specialMode?: "standard" | "challenge";
   usedSpecialFamilies?: Set<string>;
 }): SponsorOffer {
-  const { team, identity, profile, curveName, rarity, gameState, commercialRating, slotIndex, teamQualityRank, specialMode } = input;
+  const { team, identity, profile, cardKey, rarity, gameState, commercialRating, slotIndex, teamQualityRank, specialMode } = input;
+  const card = sponsorV3CardByKey(cardKey);
   // Der Marken- und der Sonderziel-Katalog sind noch nach den drei alten Archetypen verschlagwortet; die
-  // Modellkurve wird dafür auf einen Eimer abgebildet (SPONSOR_CURVE_ARCHETYPE). Der Archetyp ist ab hier
+  // Karte wird dafür auf einen Eimer abgebildet (SPONSOR_CARD_ARCHETYPE). Der Archetyp ist ab hier
   // reines Katalog-Schlagwort — an der Auszahlung hängt er nicht mehr.
-  const archetype: SponsorArchetype = mapSponsorCurveToArchetype(curveName);
+  const archetype: SponsorArchetype = mapSponsorCardToArchetype(cardKey);
   const { brand, parent, special } = pickSponsorBrandForOffer({
     seasonId: gameState.season.id,
     teamId: team.teamId,
@@ -118,6 +122,10 @@ function buildOfferSkeleton(input: {
   // Beliebtheit). Golden-Angebote bekommen ein Golden-Ziel, Challenge-Angebote behalten ihr Achsen-Rang-
   // Sonderziel (eigenes UI-Panel), Standard-Angebote ziehen deterministisch ein passendes Bonusziel. Fällt
   // der Pool aus, bleibt das Sonderziel der Markenvorlage stehen.
+  //
+  // NUR DIE ZWEI ZIELKARTEN TRAGEN UEBERHAUPT EIN SONDERZIEL. Sicherheit, Basis und Ambition sind reine
+  // Kurven-Entscheidungen; eine Sonderziel-Zeile mit 0,0 C waere dort ein totes Modul und genau die
+  // Anzeige, die das Settlement nie einloest.
   const bonusObjectiveInput = {
     gameState,
     team,
@@ -128,24 +136,45 @@ function buildOfferSkeleton(input: {
     seasonId: gameState.season.id,
     teamQualityRank,
   };
-  let specialComponent: SponsorOfferComponent = { ...special, rewardCash: 0, penaltyCash: undefined };
-  if (isGolden) {
-    specialComponent = buildGoldenObjectiveComponent(
-      pickGoldenObjective(gameState.season.id, team.teamId, archetype, teamQualityRank),
-      bonusObjectiveInput,
-    );
-  } else if (specialMode !== "challenge") {
-    const bonusKey = pickBonusObjective(
-      gameState.season.id,
-      team.teamId,
-      archetype,
-      slotIndex,
-      teamQualityRank,
-      input.usedSpecialFamilies,
-      gameState,
-    );
-    if (bonusKey) {
-      specialComponent = buildBonusObjectiveComponent(bonusKey, bonusObjectiveInput);
+  const goalStrengthRank = teamQualityRank ?? 16;
+  let specialComponent: SponsorOfferComponent | null = card.goal
+    ? { ...special, rewardCash: 0, penaltyCash: undefined }
+    : null;
+  if (card.goal) {
+    if (isGolden) {
+      const goldenKey = pickGoldenObjective(gameState.season.id, team.teamId, archetype, teamQualityRank);
+      // Auch Golden-Ziele muessen im bepreisbaren Band liegen — sonst steht auf der Karte eine
+      // Praemie, die dieses Team praktisch nicht holen kann.
+      if (sponsorV3IsGoalOfferable(goldenKey, goalStrengthRank)) {
+        specialComponent = buildGoldenObjectiveComponent(goldenKey, bonusObjectiveInput);
+      }
+    }
+    if (specialComponent != null && specialComponent.specialKey == null) {
+      specialComponent = { ...special, rewardCash: 0, penaltyCash: undefined };
+    }
+    if (!isGolden && specialMode !== "challenge") {
+      const bonusKey = pickBonusObjective(
+        gameState.season.id,
+        team.teamId,
+        archetype,
+        slotIndex,
+        teamQualityRank,
+        input.usedSpecialFamilies,
+        gameState,
+        // KATALOG-FILTER (Entwurf 3B): angeboten wird nur, was fuer die Staerkeklasse DIESES Teams
+        // im Wahrscheinlichkeitsband [0,15, 0,72] liegt. "Top 8" fuer den Tabellenletzten faellt
+        // damit aus dem Katalog, statt wertlos herumzuliegen.
+        (key) => sponsorV3IsGoalOfferable(key, goalStrengthRank),
+      );
+      if (bonusKey) {
+        specialComponent = buildBonusObjectiveComponent(bonusKey, bonusObjectiveInput);
+      }
+    }
+    // Faellt das Ziel durch den Filter (Golden-Ziel ausserhalb des Bandes, Markenvorlage ohne Key),
+    // traegt die Karte keine Zielpraemie — sie ist dann eine reine Kurven-Karte und wird auch so
+    // bepreist. Lieber eine Karte weniger im Slate als eine unerfuellbare Praemie.
+    if (specialComponent != null && !sponsorV3IsGoalOfferable(specialComponent.specialKey, goalStrengthRank)) {
+      specialComponent = null;
     }
   }
 
@@ -164,7 +193,7 @@ function buildOfferSkeleton(input: {
       targetValue: 1,
       rewardCash: 0,
     },
-    specialComponent,
+    ...(specialComponent ? [specialComponent] : []),
   ];
 
   // P4 Baukasten: Spotlight-Perk (nur legendär/golden) verstärkt den Beliebtheits-Impuls des Sonderziels —
@@ -243,9 +272,19 @@ export function buildSponsorOffersForTeam(input: {
   const recentParentBrandIds = getRecentSponsorParentIds(input.gameState, input.teamId);
   const globalParentUsage =
     input.globalParentUsage ?? buildGlobalParentUsageFromOffers(input.gameState.seasonState.sponsorOffersByTeamId);
-  const challengeSlotIndex = resolveChallengeSlotIndex(input.gameState.season.id, input.teamId, SLOT_COUNT);
+  // Der Challenge-Slot muss auf einer der beiden ZIELKARTEN sitzen — nur sie tragen ueberhaupt ein
+  // Sonderziel. Gewuerfelt wird deshalb unter den Zielkarten-Slots, nicht mehr unter allen fuenf.
+  const goalSlotIndexes = slate.entries
+    .map((entry, index) => (sponsorV3CardByKey(entry.cardKey).goal ? index : -1))
+    .filter((index) => index >= 0);
+  const challengeSlotIndex =
+    goalSlotIndexes.length > 0
+      ? goalSlotIndexes[
+          resolveChallengeSlotIndex(input.gameState.season.id, input.teamId, goalSlotIndexes.length)
+        ] ?? goalSlotIndexes[0]!
+      : -1;
 
-  // Slate-Anti-Wiederholung (Fable C3): über die 5 Slots hinweg möglichst nur EIN Sonderziel je Familie.
+  // Slate-Anti-Wiederholung (Fable C3): über die Slots hinweg möglichst nur EIN Sonderziel je Familie.
   const usedSpecialFamilies = new Set<string>();
 
   const built = slate.entries.map((entry, slotIndex) => {
@@ -254,7 +293,7 @@ export function buildSponsorOffersForTeam(input: {
       team,
       identity,
       profile,
-      curveName: entry.curveName,
+      cardKey: entry.cardKey,
       rarity: entry.rarity,
       commercialRating: commercialRating.score,
       slotIndex,
@@ -279,17 +318,16 @@ export function buildSponsorOffersForTeam(input: {
 
   // DIE EINZIGE STELLE, AN DER EIN ANGEBOT BETRAEGE BEKOMMT.
   //
-  // Vor dem Cutover stand hier eine Weiche: ein Spielstand ohne `sponsorSystemVersion: 2` bekam die nach
-  // ALTEM Recht gerechneten Beträge zurück. Diese Weiche ist entfallen — der alte Erzeugungspfad
-  // existiert nicht mehr, es gibt also nichts mehr, wohin sie schalten könnte. Auch ein vor der
-  // Umstellung angelegter Spielstand bekommt beim nächsten Saisonübergang neue Angebote nach neuem
-  // Recht. Was er BEHÄLT, ist seine bereits unterschriebene Vertragsseite: ein Vertrag ohne
-  // `sponsorV2`-Block wird unverändert nach altem Recht abgerechnet (siehe sponsor-settlement-service).
-  return applySponsorV2ToOffers({
+  // Der Startrang der Saison ist die Basis des Platzierungsbonus in der Leiter — dieselbe Groesse,
+  // gegen die der Preisgeld-Benchmark am Saisonende misst. Fehlt sie (Saison 1 vor dem ersten
+  // Spieltag), tritt die Liga-Position der Staerkerangliste an ihre Stelle.
+  const startRank =
+    rows.find((entry) => entry.teamId === input.teamId)?.startplatz ?? qualityRank.leaguePosition;
+  return applySponsorV3ToOffers({
     gameState: input.gameState,
     offers: built,
-    curveNames: slate.entries.map((entry) => entry.curveName),
-    expectedRank: qualityRank.leaguePosition,
+    cardKeys: slate.entries.map((entry) => entry.cardKey),
+    startRank,
   });
 }
 
@@ -359,8 +397,12 @@ export function ensureSeasonSponsorOffers(gameState: GameState): GameState {
       continue;
     }
     const currentOffers = existingOffers[team.teamId] ?? [];
+    // Angebote aus einem Spielstand von VOR dem V3-Umbau tragen keine V3-Konditionen. Sie werden
+    // ersetzt statt gerechnet — ein noch nicht unterschriebenes Angebot ist keine Zusage, und ein
+    // Angebot ohne V3-Block koennte die Auszahlung gar nicht mehr beziffern.
     const hasCurrentSeasonOffers =
-      currentOffers.length === 5 && currentOffers.every((offer) => offer.seasonId === seasonId);
+      currentOffers.length === 5 &&
+      currentOffers.every((offer) => offer.seasonId === seasonId && getSponsorV3Terms(offer) != null);
     if (!hasCurrentSeasonOffers) {
       const built = buildSponsorOffersForTeam({ gameState, teamId: team.teamId, globalParentUsage });
       nextOffers[team.teamId] = built;
@@ -448,11 +490,10 @@ export function chooseSponsorOffer(input: {
     isGolden: offer.isGolden,
     lockedRankPayoutLadder,
     salaryFactorAtSign,
-    // Die eingefrorenen Konditionen wandern 1:1 vom Angebot in den Vertrag. Fehlt das Feld — das ist
-    // nur noch bei einem Angebot moeglich, das VOR der Umstellung in einem Spielstand erzeugt und erst
-    // jetzt unterschrieben wurde —, rechnet das Settlement nach altem Recht. Das ist die gesamte
-    // Migrationsregel.
-    ...(offer.sponsorV2 ? { sponsorV2: offer.sponsorV2 } : {}),
+    // Die eingefrorenen Konditionen wandern 1:1 vom Angebot in den Vertrag. Fehlt das Feld — nur bei
+    // einem Angebot moeglich, das VOR dem V3-Umbau erzeugt und erst jetzt unterschrieben wurde —,
+    // holt die Leiter-Migration (`sponsor-v3-migration.ts`) es beim naechsten Laden nach.
+    ...(offer.sponsorV3 ? { sponsorV3: offer.sponsorV3 } : {}),
   };
 
   let nextGameState: GameState = {
@@ -509,6 +550,16 @@ function resolveAiSponsorArchetypePreference(input: {
   return "balanced";
 }
 
+/**
+ * DIE KI-WAHL IST TRIVIAL GEWORDEN — und das ist die Pointe des Entwurfs.
+ *
+ * Alle Karten eines Slates haben denselben Erwartungswert; oekonomisch kann die KI nichts falsch
+ * machen. Bewertet wird deshalb ausschliesslich die RISIKOPRAEFERENZ: ein klammes oder
+ * sicherheitsorientiertes Team nimmt die Sicherheitskarte, ein ehrgeiziges die Ambitionskarte,
+ * ein steuerfreudiges die Zielkarte. Der frueher hier stehende Erwartungswert-Term (`payout * 3`)
+ * plus Rarity-Etat-Gewicht ist ersatzlos entfallen: er belohnte genau die Vertrags-Lotterie, die
+ * V3 abgeschafft hat.
+ */
 function scoreOfferForAi(input: {
   offer: SponsorOffer;
   profile: TeamStrategyProfile | null;
@@ -527,18 +578,7 @@ function scoreOfferForAi(input: {
     powerRank: rank,
   });
 
-  let score = estimateExpectedPayout(offer, rank) * 3;
-  // Rarity-Etat-Gewicht (order 0..3) statt Sterne — höhere Rarity ist mehr Etat wert.
-  score += SPONSOR_RARITIES[offer.rarity ?? "magisch"].order * 4;
-
-  // Kurven-Präferenz: die Modellkurve des Angebots zur bevorzugten Ausrichtung matchen. Altangebote ohne
-  // V2-Block (nur noch in Spielstaenden von vor der Umstellung) haben keine Modellkurve und fallen hier
-  // schlicht durch — bewertet werden sie weiter ueber Archetyp und Erwartungswert.
-  const curveArchetype = offer.sponsorV2 ? mapSponsorCurveToArchetype(offer.sponsorV2.curveName as never) : null;
-  if (curveArchetype != null && preferredArchetype === curveArchetype && curveArchetype !== "identity") {
-    score += 6;
-  }
-
+  let score = 0;
   if (preferredArchetype === offer.archetype) {
     score += 22;
   } else if (preferredArchetype === "balanced") {
@@ -557,6 +597,13 @@ function scoreOfferForAi(input: {
   if (rank != null && rank <= 5 && offer.archetype === "security" && (profile?.bias.starPriority ?? 0) >= 8) {
     score -= 6;
   }
+
+  // Flavour-Feinschliff bei Gleichstand: hoehere Rarity heisst groesserer Hebel (nicht mehr Geld) —
+  // wer ohnehin Risiko sucht, nimmt bei gleicher Ausrichtung die groessere Karte, ein klammes Team
+  // die kleinere. Deterministischer Tiebreak ueber die offerId, damit die Wahl reproduzierbar bleibt.
+  const rarityOrder = SPONSOR_RARITIES[offer.rarity ?? "magisch"].order;
+  score += (preferredArchetype === "security" ? -1 : 1) * rarityOrder * 0.5;
+  score += (offer.offerId.length % 7) * 0.01;
 
   return score;
 }

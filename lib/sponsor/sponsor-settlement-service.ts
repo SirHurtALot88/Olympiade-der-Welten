@@ -3,20 +3,12 @@ import { randomUUID } from "@/lib/utils/random-id";
 import type { GameState, SponsorOfferComponent, TeamSponsorContract } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
-import {
-  getSponsorRank32BaseAnchorSalary,
-  getRankMilestoneBonus,
-  getSponsorPayoutForFinalRankAndTier,
-  getUnlockedMilestones,
-  readLockedRankPayout,
-} from "@/lib/sponsor/sponsor-economy-calibration";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-service";
-import { getSponsorProfileComponentFactors } from "@/lib/sponsor/sponsor-negotiation";
 import { evaluateSpecialComponentStage } from "@/lib/sponsor/sponsor-objective-evaluator";
-import { sponsorV2EvaluateClause } from "@/lib/sponsor/sponsor-v2-clause-evaluator";
+import { buildMigratedSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-migration";
 import {
-  getSponsorV2Terms, sponsorV2SettlementParts, type SponsorV2ContractTerms,
-} from "@/lib/sponsor/sponsor-v2-offer-service";
+  getSponsorV3Terms, sponsorV3SettlementParts, type SponsorV3ContractTerms,
+} from "@/lib/sponsor/sponsor-v3-offer-service";
 
 export type SponsorSettlementPhase = "season_end";
 
@@ -71,48 +63,31 @@ function getTeamSalaryTotal(gameState: GameState, teamId: string): number {
 }
 
 /**
- * SPONSORSYSTEM V2 — Abrechnung aus den beim Unterschreiben eingefrorenen Konditionen.
+ * SPONSORSYSTEM V3 — Abrechnung aus den bei Unterschrift eingefrorenen Konditionen.
  *
- * Die vier Zeilen sind DIFFERENZEN echter Modellwerte und addieren sich per Teleskopsumme exakt auf
- * `sponsorV2Settle(...)`. Deshalb koennen Rundung, Untergrenze und K-Skalierung die Summe nicht
- * verfaelschen, egal an welcher Stelle sie greifen — und deshalb ist die im Angebot angezeigte
- * garantierte Rangleiter zeichengleich die Summe der Zeilen "Saisonbasis" und "Tabellenplatz".
+ * Die drei Zeilen sind DIFFERENZEN echter Modellwerte und addieren sich per Teleskopsumme exakt auf
+ * `sponsorV3Settle(...)`. Deshalb koennen Rundung und Untergrenze die Summe nicht verfaelschen, egal
+ * an welcher Stelle sie greifen — und deshalb ist die im Angebot angezeigte garantierte Leiter
+ * zeichengleich die Summe der Zeilen "Saisonbasis" und "Tabellenplatz".
  *
- * Das SONDERZIEL wird weiterhin vom bestehenden `evaluateSpecialComponentStage` ausgewertet: V2
- * preist es neu (nach Schwierigkeit), erfindet es aber nicht neu. Die KLAUSEL kommt aus dem neuen
- * Evaluator, der nur Klauseln kennt, die am Saison-End-Zustand trivial messbar sind.
+ * Das SONDERZIEL wird weiterhin vom bestehenden `evaluateSpecialComponentStage` ausgewertet: V3
+ * bepreist es neu (Praemie nach Rarity, Sockelabzug −p·G), erfindet es aber nicht neu. Die KLAUSEL
+ * ist ersatzlos entfallen — ihre Risikofunktion uebernimmt der Kurven-Tilt der Karte.
  */
-function buildSponsorV2SeasonEndRows(
-  gameState: GameState, contract: TeamSponsorContract, terms: SponsorV2ContractTerms, currentRank: number | null,
+function buildSponsorV3SeasonEndRows(
+  gameState: GameState, contract: TeamSponsorContract, terms: SponsorV3ContractTerms, currentRank: number | null,
 ): SponsorSettlementRow[] {
   const team = gameState.teams.find((entry) => entry.teamId === contract.teamId);
-  const clause = sponsorV2EvaluateClause({
-    gameState,
-    teamId: contract.teamId,
-    seasonId: contract.seasonId,
-    clauseName: terms.clauseName,
-    expectedRank: terms.expectedRank,
-  });
   const goalComponent = contract.components.find((component) => component.kind === "special") ?? null;
-  const goalFraction = goalComponent
+  const goalFraction = goalComponent && terms.goalSize > 0
     ? Math.max(0, Math.min(1, evaluateSpecialComponentStage(gameState, contract.teamId, goalComponent).fraction))
     : 0;
-  const parts = sponsorV2SettlementParts({
-    terms,
-    finalRank: currentRank,
-    clauseMet: clause.met,
-    clauseAssumed: clause.assumedMet,
-    clauseMetric: clause.metric,
-    goalFraction,
-  });
+  const parts = sponsorV3SettlementParts({ terms, finalRank: currentRank, goalFraction });
   return parts.map((part) => ({
     teamId: contract.teamId,
     teamName: team?.name ?? contract.teamId,
-    componentId: `${contract.offerId}:v2:${part.key}`,
-    // Die `kind`-Werte bleiben im bestehenden Vokabular, damit Finanz-Sichten und UI unveraendert
-    // weiterlaufen. Die Klausel laeuft als "special" mit — sie ist eine Zielbedingung, nur eine
-    // rangunabhaengige.
-    kind: part.key === "clause" ? "special" : part.key,
+    componentId: `${contract.offerId}:v3:${part.key}`,
+    kind: part.key,
     label: part.label,
     status: part.cashDelta > 0 ? "paid" : part.met ? "paid" : "skipped",
     cashDelta: part.cashDelta,
@@ -120,222 +95,19 @@ function buildSponsorV2SeasonEndRows(
   }));
 }
 
+/**
+ * DIE EINE ABRECHNUNGSREGEL. Jeder Vertrag wird aus seiner eingefrorenen V3-Leiter bezahlt.
+ *
+ * Traegt ein Vertrag noch keine V3-Konditionen — moeglich nur in einem Spielstand, dessen
+ * Leiter-Migration (`sponsor-v3-migration.ts`) noch nicht gelaufen ist —, werden sie hier mit
+ * DERSELBEN Funktion nachgebaut, die auch die Migration benutzt. Es gibt damit keinen zweiten
+ * Rechenweg und keine "alte Rechnung" mehr, in die etwas zurueckfallen koennte.
+ */
 function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract): SponsorSettlementRow[] {
-  const team = gameState.teams.find((entry) => entry.teamId === contract.teamId);
   const row = buildTeamSeasonOverviewRows({ gameState }).find((entry) => entry.teamId === contract.teamId) ?? null;
   const currentRank = row?.rank ?? null;
-  // BESTANDSVERTRAEGE: fehlt der `sponsorV2`-Block, laeuft die Abrechnung unveraendert nach altem
-  // Recht weiter. Das ist die gesamte Migrationsregel — kein Stichtag, kein Backfill. Ein Vertrag,
-  // der vor dem Umbau (oder mit ausgeschaltetem Flag) unterschrieben wurde, darf seine Auszahlung
-  // nicht nachtraeglich aendern.
-  const v2Terms = getSponsorV2Terms(contract);
-  if (v2Terms) {
-    return buildSponsorV2SeasonEndRows(gameState, contract, v2Terms, currentRank);
-  }
-  const startRank = contract.startRank ?? row?.startplatz ?? currentRank;
-  const salaryFactor = getCurrentSalaryFactor(gameState);
-  const baseAnchorSalary = getSponsorRank32BaseAnchorSalary(gameState);
-  const rows: SponsorSettlementRow[] = [];
-
-  for (const component of contract.components) {
-    if (component.kind === "base") {
-      if (contract.payouts.baseSecondPaid) {
-        rows.push({
-          teamId: contract.teamId,
-          teamName: team?.name ?? contract.teamId,
-          componentId: component.componentId,
-          kind: component.kind,
-          label: component.label,
-          status: "skipped",
-          cashDelta: 0,
-          reason: "Basis zweite Rate bereits ausgezahlt",
-        });
-        continue;
-      }
-      // Sponsorengeld flieszt ausschliesslich hier, am Saisonende — inklusive der vollen Basis.
-      // `baseFirstPaid` kann nur noch bei ALTVERTRAEGEN gesetzt sein: frueher zahlte
-      // `chooseSponsorOffer` beim Unterschreiben sofort die halbe Basisrate aus. Fuer solche
-      // Vertraege bleibt es bei der zweiten Haelfte, sonst wuerde die Basis doppelt ausgezahlt.
-      const payout = contract.payouts.baseFirstPaid
-        ? roundCash(component.rewardCash / 2)
-        : roundCash(component.rewardCash);
-      rows.push({
-        teamId: contract.teamId,
-        teamName: team?.name ?? contract.teamId,
-        componentId: component.componentId,
-        kind: component.kind,
-        label: contract.payouts.baseFirstPaid ? `${component.label} (2. Rate)` : `${component.label} (Saisonbasis)`,
-        status: "paid",
-        cashDelta: payout,
-        reason: contract.payouts.baseFirstPaid ? `Restbasis ${payout}` : `Saisonbasis ${payout}`,
-      });
-      continue;
-    }
-
-    if (component.kind === "rank") {
-      // "gewöhnlich" ist hier das exakte Äquivalent des alten Default-Fallbacks (`contract.starTier ?? 2`).
-      const rarity = contract.rarity ?? "gewöhnlich";
-      const baseComponent = contract.components.find((entry) => entry.kind === "base");
-      const baseTotal = baseComponent?.rewardCash ?? 0;
-      // GELOCKTE LEITER (Kern-Fix): existiert `lockedRankPayoutLadder`, wird der Payout aus der bei der
-      // Unterschrift eingefrorenen Leiter am ERREICHTEN Endrang gelesen — NICHT aus den (über die Saison
-      // gedrifteten) Season-End-Ankern neu abgeleitet. Das Rang-Residual = gelockter Gesamt-Payout am Endrang
-      // MINUS gelocktem Sockel (Rang 32 = 0 Meilensteine) = reine, monotone Meilenstein-Upside für diesen
-      // Rang; für Teams ohne freigeschalteten Meilenstein exakt 0 (keine Selbst-Widersprüche mehr). Fehlt die
-      // Leiter (Altsaves), fällt der Pfad auf die alte Season-End-Ableitung zurück (Back-Compat).
-      const lockedLadder = contract.lockedRankPayoutLadder;
-      const ladderSalaryFactor =
-        typeof contract.salaryFactorAtSign === "number" && contract.salaryFactorAtSign > 0
-          ? contract.salaryFactorAtSign
-          : salaryFactor;
-      const negotiationFactors = getSponsorProfileComponentFactors(contract.negotiationProfile ?? "balanced");
-      let rankResidual: number;
-      if (lockedLadder && lockedLadder.length > 0) {
-        const targetTotalLocked = readLockedRankPayout(lockedLadder, currentRank);
-        const baseFloorLocked = readLockedRankPayout(lockedLadder, 32);
-        rankResidual = Math.max(0, targetTotalLocked - baseFloorLocked);
-      } else {
-        // Kein gelockter Ladder ⇒ ALTVERTRAG (jeder NEUE Vertrag friert die Leiter bei der Unterschrift ein).
-        // Solche Verträge behalten ihre ursprüngliche rarity/ihren archetype (die Load-Migration in
-        // save-repository.ts backfillt rarity aus dem alten Sternrang, ändert aber sonst nichts) und werden
-        // bewusst über den LEGACY-Archetyp-Pfad abgerechnet — der Kurven-Payout darf die Auszahlung eines vor
-        // dem Umbau unterschriebenen Vertrags NICHT nachträglich verändern.
-        const targetTotal = getSponsorPayoutForFinalRankAndTier(
-          currentRank,
-          salaryFactor,
-          rarity,
-          baseAnchorSalary,
-          contract.archetype,
-          contract.teamQualityRankAtSign,
-          // Feed 2: expectedRank = Vorsaison-Stärkerang beim Vertragsabschluss (teamQualityRankAtSign). Für den
-          // performance-Archetyp belohnt getSponsorPayoutForFinalRankAndTier so das Übertreffen der Erwartung
-          // als KONKAVEN Bonus (absolute Rang-Leiter + Anteil der gewonnenen Meilenstein-SCHWIERIGKEIT) — ein
-          // schwaches Team, das über seine Erwartung klettert, schlägt damit security, monoton im Endrang.
-          contract.teamQualityRankAtSign,
-          // Golden: der gedeckelte Rang-Boost muss im Settlement dasselbe zahlen wie in der Angebots-Anzeige.
-          contract.isGolden ?? false,
-        );
-        // Back-Compat (Altsaves ohne gelockte Leiter): das Rang-Residual gegen die BALANCED-Base messen
-        // (negotiated Base / baseMult rekonstruiert die balanced Base). Für balanced (baseMult=1) exakt das
-        // alte max(0, targetTotal - baseTotal).
-        const neutralBaseTotal =
-          negotiationFactors.baseMult !== 0 ? baseTotal / negotiationFactors.baseMult : baseTotal;
-        rankResidual = Math.max(0, targetTotal - neutralBaseTotal);
-      }
-      // Verhandlungsprofil zahlt am Rang-Upside: das (gelockte) Residual mit upsideMult skalieren. Für balanced
-      // (upsideMult=1) unverändert; ambitious (1.25) zahlt bei hohem Endrang echt mehr, safe (0.85) weniger.
-      const payout = roundCash(rankResidual * negotiationFactors.upsideMult);
-      const unlockedLabels = getUnlockedMilestones(currentRank).map((milestone) => milestone.label);
-      const unlockedBonus = getRankMilestoneBonus(currentRank, ladderSalaryFactor);
-      const completed = payout > 0;
-      const noMilestones = unlockedBonus <= 0;
-      rows.push({
-        teamId: contract.teamId,
-        teamName: team?.name ?? contract.teamId,
-        componentId: component.componentId,
-        kind: component.kind,
-        label: component.label,
-        status: completed ? "paid" : noMilestones ? "skipped" : component.penaltyCash ? "failed_penalty" : "skipped",
-        cashDelta: completed ? payout : noMilestones ? 0 : -(component.penaltyCash ?? 0),
-        reason: completed
-          ? `Rang ${currentRank} → ${unlockedLabels.join(", ") || "—"} (+${unlockedBonus} C Stufen)`
-          : `Rang ${currentRank ?? "—"} — keine Gewinnstufe freigeschaltet`,
-      });
-      continue;
-    }
-
-    if (component.kind === "improvement") {
-      const improvement = startRank != null && currentRank != null ? startRank - currentRank : 0;
-      if (typeof component.ratePerUnitC === "number") {
-        // P3 — per-Platz-Verbesserung: min(cap=rewardCash, rate × verbesserte Plätze). Gedeckelt über
-        // maxUnits (rewardCash = rate × maxUnits beim Signieren). Anzeige == Settlement per Konstruktion.
-        const paidUnits = Math.max(0, improvement);
-        const rawPayout = roundCash(component.ratePerUnitC * paidUnits);
-        const payout = Math.min(component.rewardCash, rawPayout);
-        rows.push({
-          teamId: contract.teamId,
-          teamName: team?.name ?? contract.teamId,
-          componentId: component.componentId,
-          kind: component.kind,
-          label: component.label,
-          status: payout > 0 ? "paid" : "skipped",
-          cashDelta: payout,
-          reason:
-            payout > 0
-              ? `Verbesserung +${improvement} Plätze → ${payout} C (${component.ratePerUnitC} C/Platz)`
-              : `Verbesserung +${improvement} — kein Klettern ggü. Startrang`,
-        });
-        continue;
-      }
-      // Legacy-Binärziel (Alt-Verträge ohne ratePerUnitC): Auszahlung bei ≥ targetValue verbesserten Plätzen.
-      const target = typeof component.targetValue === "number" ? component.targetValue : 2;
-      const completed = improvement >= target;
-      rows.push({
-        teamId: contract.teamId,
-        teamName: team?.name ?? contract.teamId,
-        componentId: component.componentId,
-        kind: component.kind,
-        label: component.label,
-        status: completed ? "paid" : "skipped",
-        cashDelta: completed ? component.rewardCash : 0,
-        reason: completed
-          ? `Verbesserung +${improvement} (Ziel ${target})`
-          : `Verbesserung +${improvement} unter Ziel ${target}`,
-      });
-      continue;
-    }
-
-    if (component.kind === "overperformance") {
-      // P3 — Überperformance: min(cap=rewardCash, rate × Plätze über Erwartungsrang). Der Erwartungsrang ist
-      // als targetValue eingefroren; die Rate in ratePerUnitC. Monoton im Endrang (additiv auf die Rang-Leiter),
-      // kein Tanking-Anreiz. Anzeige == Settlement.
-      const expectedRank = typeof component.targetValue === "number" ? component.targetValue : null;
-      const rate = component.ratePerUnitC ?? 0;
-      const ranksAbove = expectedRank != null && currentRank != null ? Math.max(0, expectedRank - currentRank) : 0;
-      const payout = Math.min(component.rewardCash, roundCash(rate * ranksAbove));
-      rows.push({
-        teamId: contract.teamId,
-        teamName: team?.name ?? contract.teamId,
-        componentId: component.componentId,
-        kind: component.kind,
-        label: component.label,
-        status: payout > 0 ? "paid" : "skipped",
-        cashDelta: payout,
-        reason:
-          payout > 0
-            ? `Überperformance +${ranksAbove} Plätze über Erwartung #${expectedRank} → ${payout} C`
-            : `Rang ${currentRank ?? "—"} — Erwartung #${expectedRank ?? "—"} nicht übertroffen`,
-      });
-      continue;
-    }
-
-    if (component.kind === "special") {
-      // TEIL B — generalisierter Skalier-Pfad: der Evaluator liefert eine ERREICHTE STUFE (Fraction 0..1),
-      // die Settlement zahlt `rewardCash * fraction`. Bestehende binäre Sonderziele (ohne `stages`) liefern
-      // Fraction 0 oder 1 und verhalten sich damit exakt wie zuvor; die Fan-Infrastruktur-Skalierung
-      // (levelSum/CAP) und die mehrstufigen Bonusziele laufen über denselben Pfad.
-      const stageResult = evaluateSpecialComponentStage(gameState, contract.teamId, component);
-      const cashDelta = roundCash(component.rewardCash * stageResult.fraction);
-      const reason =
-        stageResult.fraction >= 1
-          ? "Sonderziel voll erfüllt"
-          : stageResult.fraction > 0
-            ? `Sonderziel Teilstufe (${Math.round(stageResult.fraction * 100)}% — ${stageResult.reachedLabel})`
-            : "Sonderziel offen";
-      rows.push({
-        teamId: contract.teamId,
-        teamName: team?.name ?? contract.teamId,
-        componentId: component.componentId,
-        kind: component.kind,
-        label: component.label,
-        status: cashDelta > 0 ? "paid" : "skipped",
-        cashDelta,
-        reason,
-      });
-    }
-  }
-
-  return rows;
+  const terms = getSponsorV3Terms(contract) ?? buildMigratedSponsorV3Terms(gameState, contract);
+  return buildSponsorV3SeasonEndRows(gameState, contract, terms, currentRank);
 }
 
 export function previewSponsorSettlement(

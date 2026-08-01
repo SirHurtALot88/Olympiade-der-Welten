@@ -1318,36 +1318,45 @@ export type SponsorEventRecord = {
 };
 
 /**
- * SPONSORSYSTEM V2 — die vor der Saison eingefrorenen Konditionen des neuen Sponsormodells.
+ * SPONSORSYSTEM V3 — die bei Unterschrift eingefrorenen Konditionen ("Preisgeld-Sockel").
  *
- * Fehlt das Feld, ist es ein Angebot/Vertrag nach ALTEM Recht und wird unveraendert so abgerechnet.
- * Genau daran erkennt das Settlement einen Bestandsvertrag: die Migration braucht keinen Stichtag
- * und kein Backfill, nur diese Abwesenheit.
+ * `rankLadder[finalRank - 1]` ist die FERTIG GETILTETE Leiter `L(f) = M(f) + beta·(M(f) − A)` — die
+ * Auszahlung vor Untergrenze und Sonderziel. `baseLadder` ist dieselbe Leiter OHNE Tilt, also die
+ * reine Liga-Benchmark `M(f) = Preisgeld(f) + Platzierungsbonus(Startrang − f)`; sie steht mit im
+ * Vertrag, damit Anzeige und Abrechnung zeigen koennen, WOVON die gewaehlte Karte abweicht, ohne die
+ * Liga-Groessen des Unterschriftszeitpunkts noch einmal zu rekonstruieren.
  *
- * `rankLadder[finalRank - 1]` ist der Rangteil VOR Klausel, Sonderziel, Untergrenze und
- * K-Skalierung — die vollstaendige Auszahlung liefert `sponsorV2Settle` in
- * lib/sponsor/sponsor-v2-offer-service.ts. Bewusst nicht die fertige Auszahlung: Klausel und
- * Sonderziel sind Lotterien, deren Ausgang erst am Saisonende feststeht, und die Untergrenze wirkt
- * auf die SUMME. Wer sie vorher einrechnet, floort viermal statt einmal.
+ * Die vollstaendige Auszahlung liefert `sponsorV3Settle` in lib/sponsor/sponsor-v3-model.ts.
  */
-export type SponsorV2ContractTermsRecord = {
-  version: 2;
+export type SponsorV3ContractTermsRecord = {
+  version: 3;
   rankLadder: number[];
-  curveName: string;
-  profileName: string;
+  baseLadder: number[];
+  anchor: number;
+  tilt: number;
+  cardKey: string;
+  cardName: string;
   rarity: string;
-  expectedRank: number;
-  clauseName: string;
-  clauseLabel: string;
-  clauseDirection: "up" | "down";
-  clauseThreshold: number | null;
-  clauseBonus: number;
-  clauseMalus: number;
-  goalPayout: number;
-  goalProbability: number;
+  startRank: number;
   goalKey: string | null;
+  goalP: number;
+  goalSize: number;
   salaryFactor: number;
-  k: number;
+  floor: number;
+};
+
+/**
+ * LEGACY-FELD: die eingefrorenen Konditionen des abgeloesten V2-Modells, wie sie in Spielstaenden von
+ * vor dem V3-Umbau stehen. Sie werden NICHT mehr gerechnet — die einmalige, versionierte Migration
+ * (`lib/sponsor/sponsor-v3-migration.ts`) ersetzt sie bei jedem noch nicht abgerechneten Vertrag
+ * durch die V3-Basisleiter. Der Typ bleibt nur, damit das Lesen alter Saves typisiert bleibt.
+ */
+export type SponsorLegacyV2TermsRecord = {
+  version: 2;
+  rankLadder?: number[];
+  rarity?: string;
+  goalKey?: string | null;
+  [key: string]: unknown;
 };
 
 export type SponsorOffer = {
@@ -1386,8 +1395,10 @@ export type SponsorOffer = {
    * UI/Debug; die Auszahlung läuft weiter über `components`. Optional/rückwärtskompatibel.
    */
   moduleIds?: string[];
-  /** SPONSORSYSTEM V2: eingefrorene Konditionen des neuen Modells. Fehlt = altes Recht. */
-  sponsorV2?: SponsorV2ContractTermsRecord;
+  /** SPONSORSYSTEM V3: eingefrorene Konditionen. Jedes erzeugte Angebot traegt sie. */
+  sponsorV3?: SponsorV3ContractTermsRecord;
+  /** LEGACY, nur noch gelesen: V2-Konditionen aus Spielstaenden von vor dem V3-Umbau. */
+  sponsorV2?: SponsorLegacyV2TermsRecord;
 };
 
 export type SponsorCommercialRating = {
@@ -1455,11 +1466,13 @@ export type TeamSponsorContract = {
   /** salaryFactor zum Zeitpunkt der Unterschrift — für konsistente Meilenstein-Anzeige im Settlement. */
   salaryFactorAtSign?: number;
   /**
-   * SPONSORSYSTEM V2: beim Unterschreiben aus dem Angebot mitkopierte Konditionen des neuen Modells.
-   * FEHLT DAS FELD, ist es ein BESTANDSVERTRAG und wird nach altem Recht abgerechnet — das ist die
-   * gesamte Migrationsregel, ohne Stichtag und ohne Backfill.
+   * SPONSORSYSTEM V3: beim Unterschreiben aus dem Angebot mitkopierte Konditionen. Fehlt das Feld,
+   * stammt der Vertrag aus einem Spielstand von vor dem V3-Umbau; die einmalige, versionierte
+   * Migration (`lib/sponsor/sponsor-v3-migration.ts`) setzt es beim Laden nach.
    */
-  sponsorV2?: SponsorV2ContractTermsRecord;
+  sponsorV3?: SponsorV3ContractTermsRecord;
+  /** LEGACY, nur noch gelesen: V2-Konditionen aus Spielstaenden von vor dem V3-Umbau. */
+  sponsorV2?: SponsorLegacyV2TermsRecord;
 };
 
 export type ScoutIntelSource = "watchlist" | "wishlist_mirror" | "passive_need" | "roster";
@@ -2659,14 +2672,26 @@ export type SeasonState = {
    * Server gestartet wurde.
    *
    * Deshalb steht die Version jetzt IM SPIELSTAND und wird genau einmal bei der Erzeugung gesetzt.
-   * `2` = neues Sponsormodell (Kurve x Klausel x Sonderziel, Modell in lib/sponsor/sponsor-v2-*).
-   * `1` = altes Modell.
+   * `3` = Preisgeld-Sockel mit EV-neutralen Aufsaetzen (lib/sponsor/sponsor-v3-*), `2` = das
+   * abgeloeste Kurve-x-Klausel-x-Sonderziel-Modell, `1` = das Modell davor.
    *
-   * FEHLT DAS FELD, IST ES V1 UND BLEIBT V1. Das ist die harte Migrationsgrenze: jeder vor der
-   * Umstellung angelegte Spielstand hat den Vermerk nicht, laeuft unveraendert nach altem Recht
-   * weiter und wird nie nachtraeglich umgestellt. Es gibt bewusst kein Backfill.
+   * DER VERMERK BESCHREIBT AB V3 NUR NOCH DIE HERKUNFT. Die Abrechnung selbst haengt nicht mehr
+   * daran: `sponsorLadderMigrationVersion` unten sagt, ob die Leitern dieses Spielstands schon auf
+   * die V3-Basis gehoben wurden — und danach rechnen alle noch offenen Vertraege nach V3.
    */
-  sponsorSystemVersion?: 1 | 2;
+  sponsorSystemVersion?: 1 | 2 | 3;
+  /**
+   * MIGRATION M1 (docs/SPONSOR_PREISGELD_SOCKEL_ENTWURF.md, Abschnitt 5). Versionsstempel der
+   * einmaligen Neuberechnung noch NICHT abgerechneter Sponsorleitern auf die V3-Basisleiter.
+   *
+   * Warum ueberhaupt eine Migration, obwohl unterschriebene Vertraege sonst nie nachtraeglich
+   * geaendert werden: die Regel schuetzt vor STILLER DRIFT (Anzeige != Settlement, Ankerwanderung).
+   * M1 ist das Gegenteil davon — eine explizite, einmalige, versionierte Design-Korrektur. Wer die
+   * alte Leiter behaelt, konserviert einen erkannten Systemfehler eine volle Saison lang; das
+   * schuetzt keinen Spieler, es schuetzt den Fehler. Der Stempel sorgt dafuer, dass sie GENAU EINMAL
+   * laeuft; danach gilt die Nie-nachtraeglich-Regel unveraendert auch fuer V3-Leitern.
+   */
+  sponsorLadderMigrationVersion?: number;
   sponsorOffersByTeamId?: Record<string, SponsorOffer[]>;
   sponsorContractsByTeamId?: Record<string, TeamSponsorContract>;
   sponsorBrandHistoryByTeamId?: Record<string, string[]>;

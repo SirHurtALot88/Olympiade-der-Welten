@@ -1,10 +1,7 @@
 import type { GameState, SponsorOffer, SponsorOfferComponent, SponsorRarity } from "@/lib/data/olyDataTypes";
 import { SPONSOR_RARITIES } from "@/lib/sponsor/sponsor-curve-shapes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
-import {
-  readLockedRankPayout,
-  SPONSOR_RANK_MILESTONES,
-} from "@/lib/sponsor/sponsor-economy-calibration";
+import { readLockedRankPayout } from "@/lib/sponsor/sponsor-economy-calibration";
 import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import { formatNlNumber } from "@/components/foundation/new-look/nl-tones";
 import {
@@ -12,8 +9,10 @@ import {
   parseAxisTargetValue,
   type SponsorAxisKey,
 } from "@/lib/sponsor/sponsor-special-objectives";
-import { sponsorV2CurveByName, sponsorV2ProfileByName } from "@/lib/sponsor/sponsor-v2-model";
-import { getSponsorV2Terms, sponsorV2GuaranteedLadder, sponsorV2Settle } from "@/lib/sponsor/sponsor-v2-offer-service";
+import { sponsorV3CardByKey } from "@/lib/sponsor/sponsor-v3-model";
+import {
+  getSponsorV3Terms, sponsorV3GuaranteedLadder, sponsorV3Settle, sponsorV3StandardDeviation,
+} from "@/lib/sponsor/sponsor-v3-offer-service";
 
 export type SponsorChallengeDifficulty = "leicht" | "mittel" | "hart";
 
@@ -33,47 +32,46 @@ export type SponsorOfferPresentation = {
   offerBadge: string | null;
   special: SponsorSpecialPresentation | null;
   /**
-   * SPONSORSYSTEM V2: die Struktur des neuen Modells, fertig fuer die Karte. `null` = altes Angebot.
+   * SPONSORSYSTEM V3: die Struktur der Karte, fertig fuer die Anzeige. `null` = Angebot ohne
+   * V3-Konditionen (nur in einem Spielstand moeglich, dessen Angebote noch nicht neu erzeugt wurden).
    *
-   * WARUM EIGENE FELDER statt der alten mit neuen Zahlen zu fuellen: die V2-Karte hat Achsen, die
-   * es vorher nicht gab — eine Klausel mit BONUS UND MALUS, eine garantierte Untergrenze und ein
-   * Sonderziel, dessen Betrag von seiner Schwierigkeit abhaengt. Wer das in `rewardCash`-Kacheln
-   * presst, zeigt Zahlen ohne die Bedingung, unter der sie gelten. Genau daran erkennt der Spieler
-   * sonst nicht, dass er auch VERLIEREN kann.
+   * WARUM EIGENE FELDER statt der alten `rewardCash`-Kacheln: die V3-Karte hat Achsen, die es
+   * vorher nicht gab — einen Kurven-Tilt gegen den eingefrorenen Erwartungsanker und ein Sonderziel
+   * mit SOCKELABZUG. Wer das in Belohnungs-Kacheln presst, zeigt Zahlen ohne die Bedingung, unter
+   * der sie gelten; genau daran erkennt der Spieler sonst nicht, dass er auch VERLIEREN kann.
    */
-  v2: SponsorV2Presentation | null;
+  v3: SponsorV3Presentation | null;
 };
 
-/** Anzeigefertige V2-Struktur. Alle Betraege sind die, aus denen das Settlement zahlt. */
-export type SponsorV2Presentation = {
-  curveName: string;
-  curveNote: string;
-  profileName: string;
-  profileNote: string;
-  expectedRank: number;
-  /** Garantiert auf JEDEM Endrang — die Untergrenze der Karte. */
+/** Anzeigefertige V3-Struktur. Alle Betraege sind die, aus denen das Settlement zahlt. */
+export type SponsorV3Presentation = {
+  cardKey: string;
+  cardName: string;
+  cardNote: string;
+  /** Kurven-Tilt der Karte in Prozent: negativ = gedaempft, 0 = Benchmark, positiv = verstaerkt. */
+  tiltPercent: number;
+  /** Startrang, gegen den der Platzierungsbonus der Leiter rechnet. */
+  startRank: number;
+  /** Eingefrorener Erwartungsanker — der Betrag, um den die Karte dreht. */
+  anchor: number;
+  /** Garantiert auf JEDEM Endrang — der Boden der Karte. */
   guaranteedFloor: number;
-  /** Auszahlung bei Titelgewinn, ohne Klausel und Sonderziel. */
+  /** Auszahlung bei Titelgewinn, ohne Sonderziel. */
   guaranteedTop: number;
-  clause: {
-    label: string;
-    /** "Fatigue-Schnitt ≥ 23.4" — Praedikat mit der wirklich geprueften Schwelle. */
-    thresholdText: string;
-    bonus: number;
-    malus: number;
-    /** Erfuellungswahrscheinlichkeit, aus der Bonus und Malus abgeleitet sind. */
-    probability: number;
-  };
+  /** Streuung der Karte ueber die Erwartungsverteilung — die Risikoachse. */
+  risk: number;
   goal: {
     label: string;
+    /** Praemie bei voller Erfuellung. */
     payout: number;
+    /** Sockelabzug −p·G, der IMMER faellig wird (auch bei Erfolg schon eingepreist). */
+    upfrontCost: number;
     probability: number;
-    /** "Leicht" | "Mittel" | "Hart" — abgeleitet aus der Erfolgswahrscheinlichkeit. */
     difficultyLabel: string;
-  };
-  /** Bestwert der Karte: Titel + Klausel erfuellt + Sonderziel erreicht. */
+  } | null;
+  /** Bestwert der Karte: Titel plus erreichtes Sonderziel. */
   maxPayout: number;
-  /** Schlechtestwert: letzter Platz, Klausel verletzt, Ziel verfehlt. */
+  /** Schlechtestwert: letzter Platz, Ziel verfehlt. */
   minPayout: number;
 };
 
@@ -332,50 +330,42 @@ export function buildSponsorOfferPresentation(input: {
           teamId: input.teamId ?? input.offer.teamId,
         })
       : null,
-    v2: buildSponsorV2Presentation(input.offer),
+    v3: buildSponsorV3Presentation(input.offer),
   };
 }
 
 /**
- * Baut die V2-Anzeige aus den EINGEFRORENEN Konditionen des Angebots — nicht aus einer zweiten
- * Rechnung. `sponsorV2GuaranteedLadder` und `sponsorV2Settle` sind exakt die Funktionen, aus denen
+ * Baut die V3-Anzeige aus den EINGEFRORENEN Konditionen des Angebots — nicht aus einer zweiten
+ * Rechnung. `sponsorV3GuaranteedLadder` und `sponsorV3Settle` sind exakt die Funktionen, aus denen
  * auch das Settlement zahlt; die Karte kann deshalb keine anderen Zahlen zeigen als die gebuchten.
  */
-export function buildSponsorV2Presentation(offer: SponsorOffer): SponsorV2Presentation | null {
-  const terms = getSponsorV2Terms(offer);
+export function buildSponsorV3Presentation(offer: SponsorOffer): SponsorV3Presentation | null {
+  const terms = getSponsorV3Terms(offer);
   if (!terms) return null;
-  const ladder = sponsorV2GuaranteedLadder(terms);
-  const clauseP = terms.clauseBonus + terms.clauseMalus > 0
-    ? terms.clauseMalus / (terms.clauseBonus + terms.clauseMalus)
-    : 0.5;
-  const dir = terms.clauseDirection === "up" ? "≥" : "≤";
-  const curve = sponsorV2CurveByName(terms.curveName);
-  const profile = sponsorV2ProfileByName(terms.profileName);
+  const ladder = sponsorV3GuaranteedLadder(terms);
+  const card = sponsorV3CardByKey(terms.cardKey);
+  const hasGoal = terms.goalSize > 0 && terms.goalKey != null;
   return {
-    curveName: terms.curveName,
-    curveNote: curve.note,
-    profileName: terms.profileName,
-    profileNote: profile.note,
-    expectedRank: terms.expectedRank,
+    cardKey: terms.cardKey,
+    cardName: terms.cardName,
+    cardNote: card.note,
+    tiltPercent: Math.round(terms.tilt * 100),
+    startRank: terms.startRank,
+    anchor: roundOfferCash(terms.anchor),
     guaranteedFloor: roundOfferCash(ladder[31] ?? 0),
     guaranteedTop: roundOfferCash(ladder[0] ?? 0),
-    clause: {
-      label: terms.clauseLabel,
-      thresholdText: terms.clauseThreshold != null
-        ? `${dir} ${Math.round(terms.clauseThreshold * 10) / 10}`
-        : "Schwelle wird am Saisonende gesetzt",
-      bonus: roundOfferCash(terms.clauseBonus),
-      malus: roundOfferCash(terms.clauseMalus),
-      probability: Math.round(clauseP * 100) / 100,
-    },
-    goal: {
-      label: terms.goalKey ?? "Sonderziel",
-      payout: roundOfferCash(terms.goalPayout),
-      probability: terms.goalProbability,
-      difficultyLabel: terms.goalProbability >= 0.55 ? "Leicht" : terms.goalProbability >= 0.35 ? "Mittel" : "Hart",
-    },
-    maxPayout: roundOfferCash(sponsorV2Settle(terms, 1, true, 1)),
-    minPayout: roundOfferCash(sponsorV2Settle(terms, 32, false, 0)),
+    risk: roundOfferCash(sponsorV3StandardDeviation(terms)),
+    goal: hasGoal
+      ? {
+          label: terms.goalKey ?? "Sonderziel",
+          payout: roundOfferCash(terms.goalSize),
+          upfrontCost: roundOfferCash(terms.goalP * terms.goalSize),
+          probability: Math.round(terms.goalP * 100) / 100,
+          difficultyLabel: terms.goalP >= 0.55 ? "Leicht" : terms.goalP >= 0.35 ? "Mittel" : "Hart",
+        }
+      : null,
+    maxPayout: roundOfferCash(sponsorV3Settle(terms, 1, 1)),
+    minPayout: roundOfferCash(sponsorV3Settle(terms, 32, 0)),
   };
 }
 
@@ -403,6 +393,25 @@ export const SPONSOR_RARITY_LABELS: Record<number, string> = {
 export function getSponsorRarityLabel(tier: number): string {
   return SPONSOR_RARITY_LABELS[tier] ?? `Stufe ${tier}`;
 }
+
+/**
+ * DIE SPROSSEN DER ANGEZEIGTEN GEWINNSTUFEN-LEITER — reine BESCHRIFTUNG, keine Oekonomie.
+ *
+ * Die Betraege kommen aus der eingefrorenen Leiter des Vertrags; diese Tabelle sagt nur, an welchen
+ * Raengen die Karte Sprossen zeigt. Frueher stand hier die Meilenstein-Leiter der alten
+ * Auszahlungsmathematik (`SPONSOR_RANK_MILESTONES` samt Bonus-Betraegen) — die Betraege sind mit dem
+ * V3-Umbau entfallen, die Beschriftung ist geblieben.
+ */
+export const SPONSOR_RANK_LADDER_RUNGS = [
+  { maxRank: 28, label: "Top 28" },
+  { maxRank: 24, label: "Top 24" },
+  { maxRank: 20, label: "Top 20" },
+  { maxRank: 16, label: "Top 16" },
+  { maxRank: 12, label: "Top 12" },
+  { maxRank: 8, label: "Top 8" },
+  { maxRank: 4, label: "Top 4" },
+  { maxRank: 1, label: "Meister" },
+] as const;
 
 export type SponsorRankTierRow = {
   label: string;
@@ -442,7 +451,7 @@ export function buildSponsorRankTierRows(input: {
   // exakt `readLockedRankPayout(ladder, maxRank) − readLockedRankPayout(ladder, 32)`, wie das Settlement
   // (sponsor-settlement-service) den rankResidual berechnet.
   const floorPayout = readLockedRankPayout(input.rankLadder, 32);
-  const milestoneRows = SPONSOR_RANK_MILESTONES.map((milestone) => {
+  const milestoneRows = SPONSOR_RANK_LADDER_RUNGS.map((milestone) => {
     const rankPortion = Math.max(0, readLockedRankPayout(input.rankLadder, milestone.maxRank) - floorPayout);
     return {
       label: milestone.label,

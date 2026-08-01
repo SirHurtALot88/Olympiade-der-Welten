@@ -23,11 +23,10 @@ import {
   getSponsorCurveFamily,
   mapArchetypeToCurveShape,
 } from "@/lib/sponsor/sponsor-curve-shapes";
-import { buildOfferRankPayoutLadderPreview } from "@/lib/sponsor/sponsor-economy-calibration";
+import { buildOfferRankPayoutLadderPreview, estimateExpectedPayout } from "@/lib/sponsor/sponsor-economy-calibration";
 import { SponsorRankLadder } from "@/components/foundation/sponsor/SponsorRankLadder";
 import { describeSponsorOfferModules } from "@/lib/sponsor/sponsor-modules";
 import { NlDeltaChip, type NlTone } from "@/components/foundation/new-look";
-import { sponsorV2ExpectedPayout } from "@/lib/sponsor/sponsor-v2-offer-service";
 
 /**
  * "Neuer Look" Sponsor-Angebotskarte — flag-gated, additiv. Wird nur von
@@ -218,13 +217,15 @@ export function SponsorOfferCardNewLook({
   // Fallback konservativ auf „gewöhnlich" (deckungsgleich mit Settlement) statt „magisch" — sonst rendert
   // jedes Angebot ohne rarity-Feld (Alt-Save vor der Rarity-Migration) fälschlich als Magisch.
   const rarity = offer.rarity ?? "gewöhnlich";
-  // Kurven-Beschriftung: neue Angebote tragen ihre Modellkurve im `sponsorV2`-Block. Nur Angebote aus
-  // Spielstaenden von VOR der Umstellung haben noch eine der elf Legacy-Kurvenformen (bzw. gar keine, dann
+  // Karten-Beschriftung: neue Angebote tragen ihre Karte im `sponsorV3`-Block. Nur Angebote aus
+  // Spielstaenden von VOR dem Umbau haben noch eine der Legacy-Kurvenformen (bzw. gar keine, dann
   // wird sie aus dem Archetyp abgeleitet) — fuer die bleibt die alte Beschriftung stehen.
   const shape = offer.curveShape ?? mapArchetypeToCurveShape(offer.archetype);
-  const shapeLabel = offer.sponsorV2?.curveName ?? SPONSOR_CURVE_SHAPES[shape].labelDe;
-  const familyLabel = offer.sponsorV2
-    ? offer.sponsorV2.profileName
+  const shapeLabel = presentation.v3?.cardName ?? SPONSOR_CURVE_SHAPES[shape].labelDe;
+  const familyLabel = presentation.v3
+    ? presentation.v3.tiltPercent === 0
+      ? "EV-neutral"
+      : `${presentation.v3.tiltPercent > 0 ? "+" : ""}${presentation.v3.tiltPercent} % Hebel`
     : SPONSOR_CURVE_FAMILIES[getSponsorCurveFamily(shape)].labelDe;
   // P4 Baukasten: die Modul-Zusammensetzung des Angebots (Cash-Komponenten + evtl. Perk) fürs UI.
   const offerModules = describeSponsorOfferModules(offer);
@@ -344,45 +345,48 @@ export function SponsorOfferCardNewLook({
         </div>
       ) : null}
 
-      {/* SPONSORSYSTEM V2: die neue Kartenstruktur. Sie ersetzt nicht die Kacheln darunter, sondern
-          stellt VOR sie, was das neue Modell ausmacht und was die alten Kacheln nicht ausdruecken
-          koennen: die garantierte Untergrenze, die Klausel MIT Malus (man kann verlieren) und den
-          schwierigkeitsabhaengigen Sonderziel-Betrag. In einem Spielstand nach altem Recht ist
-          presentation.v2 null und die Karte sieht Zeichen fuer Zeichen aus wie vorher. */}
-      {presentation.v2 ? (
-        <div className="nl-sponsor-v2" data-testid="sponsor-v2-panel">
+      {/* SPONSORSYSTEM V3: die Kartenstruktur. Sie stellt VOR die Kacheln, was das Modell ausmacht
+          und was die Kacheln nicht ausdruecken koennen: die garantierte Untergrenze, den Hebel
+          gegen den eingefrorenen Erwartungsanker (man kann auch VERLIEREN) und beim Sonderziel den
+          Sockelabzug, der immer faellig wird. */}
+      {presentation.v3 ? (
+        <div className="nl-sponsor-v2" data-testid="sponsor-v3-panel">
           <div className="nl-sponsor-v2-head">
-            <span className="nl-sponsor-axis-chip is-neutral">{presentation.v2.curveName}</span>
-            <small>{presentation.v2.curveNote}</small>
+            <span className="nl-sponsor-axis-chip is-neutral">{presentation.v3.cardName}</span>
+            <small>{presentation.v3.cardNote}</small>
           </div>
           <ul className="nl-sponsor-v2-list">
-            <li data-testid="sponsor-v2-floor">
+            <li data-testid="sponsor-v3-floor">
               <span>Garantiert auf jedem Platz</span>
-              <strong className="nl-tnum">{formatCash(presentation.v2.guaranteedFloor)}</strong>
+              <strong className="nl-tnum">{formatCash(presentation.v3.guaranteedFloor)}</strong>
             </li>
-            <li data-testid="sponsor-v2-top">
-              <span>Bei Titelgewinn (ohne Klausel und Ziel)</span>
-              <strong className="nl-tnum">{formatCash(presentation.v2.guaranteedTop)}</strong>
+            <li data-testid="sponsor-v3-top">
+              <span>Bei Titelgewinn (ohne Sonderziel)</span>
+              <strong className="nl-tnum">{formatCash(presentation.v3.guaranteedTop)}</strong>
             </li>
-            <li data-testid="sponsor-v2-clause">
+            <li data-testid="sponsor-v3-anchor">
               <span>
-                Klausel: {presentation.v2.clause.label} <em>({presentation.v2.clause.thresholdText})</em>
+                Erwartet auf Startrang {presentation.v3.startRank} <em>(Risiko ±{formatCash(presentation.v3.risk)})</em>
               </span>
-              <strong className="nl-tnum">
-                +{formatCash(presentation.v2.clause.bonus)} / −{formatCash(presentation.v2.clause.malus)}
-              </strong>
+              <strong className="nl-tnum">{formatCash(presentation.v3.anchor)}</strong>
             </li>
-            <li data-testid="sponsor-v2-goal">
-              <span>
-                Sonderziel <em>({presentation.v2.goal.difficultyLabel}, {Math.round(presentation.v2.goal.probability * 100)} %)</em>
-              </span>
-              <strong className="nl-tnum">+{formatCash(presentation.v2.goal.payout)}</strong>
-            </li>
+            {presentation.v3.goal ? (
+              <li data-testid="sponsor-v3-goal">
+                <span>
+                  Sonderziel{" "}
+                  <em>
+                    ({presentation.v3.goal.difficultyLabel}, {Math.round(presentation.v3.goal.probability * 100)} % ·
+                    Sockelabzug −{formatCash(presentation.v3.goal.upfrontCost)})
+                  </em>
+                </span>
+                <strong className="nl-tnum">+{formatCash(presentation.v3.goal.payout)}</strong>
+              </li>
+            ) : null}
           </ul>
-          <div className="nl-sponsor-v2-range nl-tnum" data-testid="sponsor-v2-range">
-            Spanne {formatCash(presentation.v2.minPayout)} – {formatCash(presentation.v2.maxPayout)}
+          <div className="nl-sponsor-v2-range nl-tnum" data-testid="sponsor-v3-range">
+            Spanne {formatCash(presentation.v3.minPayout)} – {formatCash(presentation.v3.maxPayout)}
             <small>
-              {" "}schlechtester Fall: letzter Platz, Klausel verletzt, Ziel verfehlt · bester Fall: Titel, beides erfüllt
+              {" "}schlechtester Fall: letzter Platz, Ziel verfehlt · bester Fall: Titel, Ziel erreicht
             </small>
           </div>
         </div>
@@ -390,12 +394,13 @@ export function SponsorOfferCardNewLook({
 
       <div className="nl-sponsor-negotiation" data-testid="nl-sponsor-negotiation">
         <div className="nl-sponsor-negotiation-live nl-tnum" aria-live="polite">
-          {/* Unter V2 ist die reine Komponentensumme irrefuehrend: sie kennt den Klausel-Malus nicht
-              und suggeriert einen Betrag, den es so nicht gibt. Angezeigt wird deshalb der
-              ERWARTUNGSWERT der Karte — also das, was sie im Mittel wirklich bringt. */}
+          {/* Unter V3 ist die reine Komponentensumme irrefuehrend: sie kennt den Sockelabzug des
+              Sonderziels nicht und suggeriert einen Betrag, den es so nicht gibt. Angezeigt wird
+              deshalb der ERWARTUNGSWERT der Karte — der fuer ALLE Karten eines Slates derselbe ist:
+              die Wahl ist eine Risiko-Entscheidung, kein Etat-Upgrade. */}
           <span>
-            {presentation.v2 ? "Erwartungswert" : "Gesamt"}{" "}
-            <strong>{formatCash(presentation.v2 ? sponsorV2ExpectedPayout(offer.sponsorV2!) : totalCash)}</strong>
+            {presentation.v3 ? "Erwartungswert" : "Gesamt"}{" "}
+            <strong>{formatCash(presentation.v3 ? estimateExpectedPayout(offer) : totalCash)}</strong>
           </span>
         </div>
       </div>
