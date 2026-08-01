@@ -142,9 +142,12 @@ describe("Sponsor-Achsen: gemessen gegen die eingefrorene eigene Ausgangslage", 
     expect(viaEvaluator.fraction).toBeCloseTo(viaAxis.fraction, 9);
 
     // Und die Settlement-Zeilen addieren sich per Teleskopsumme exakt auf die Auszahlung.
+    // Die Zerlegung ist VOR der Rundung exakt (Teleskopsumme echter Modellwerte). Jede der bis zu
+    // vier Zeilen wird auf 0,1 C gerundet, also bleiben bis zu 0,2 C Rundungsrest — alles darueber
+    // waere ein echter Bruch zwischen Anzeige und Settlement.
     const parts = sponsorV3SettlementParts({ terms, finalRank: 12, goalFraction: 0.5 });
     const sum = parts.reduce((acc, part) => acc + part.cashDelta, 0);
-    expect(sum).toBeCloseTo(sponsorV3Settle(terms, 12, 0.5), 1);
+    expect(Math.abs(sum - sponsorV3Settle(terms, 12, 0.5))).toBeLessThanOrEqual(0.2);
   });
 
   it("traegt die Konditionen im Vertrag, nicht in einer Tabelle nebenan", () => {

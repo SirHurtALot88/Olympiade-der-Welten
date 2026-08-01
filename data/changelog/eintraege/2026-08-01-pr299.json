@@ -1,0 +1,8 @@
+{
+  "datum": "2026-08-01",
+  "seite": "Info · Changelog",
+  "text": "Im Changelog stand alles untereinander in einer schmalen Spalte, waehrend daneben der halbe Bildschirm leer blieb. Jetzt liegen die Aenderungen eines Tages nebeneinander, und oben steht, wie viele es insgesamt sind und wann zuletzt etwas dazugekommen ist.",
+  "gewicht": "feinschliff",
+  "pr": "#299",
+  "version": "0.3"
+}

@@ -30,19 +30,40 @@ export const PRIZE_PLACEMENT_SHEET_TABLE: ReadonlyMap<number, number> = new Map<
   [30, 25.69], [31, 26.33],
 ]);
 
-/** Kleinster/groesster in der Tabelle gefuehrter Rangsprung — darueber hinaus wird geklammert. */
+/** Kleinster/groesster in der Tabelle gefuehrter Rangsprung. */
 export const PRIZE_PLACEMENT_MIN_DELTA = -31;
 export const PRIZE_PLACEMENT_MAX_DELTA = 31;
 
 /**
+ * WIRKSAME OBERGRENZE DES RANGSPRUNGS — ab hier zahlt kein weiterer Platz mehr.
+ *
+ * Die Sheet-Tabelle laeuft bis ±31 durch und honoriert damit einen Sprung von Rang 32 auf 1 mit
+ * +26,33 C. Das ist mehr als ein Drittel dessen, was ein Mittelfeldteam eine ganze Saison lang
+ * bekommt, und es entsteht in einer einzigen Saison. Zwei Folgen: die Auszahlung haengt an einem
+ * Ausreisser statt an der Leistung, und weil die Tabelle ASYMMETRISCH ist (aufwaerts +1,28 je Platz,
+ * abwaerts nur −0,96), leckt die Ligasumme in den Extremen umso staerker nach oben.
+ *
+ * Sechs Plaetze sind die Grenze: +7,71 C fuer den Aufstieg, −5,78 C fuer den Absturz. Wer weiter
+ * klettert, bekommt dafuer nichts mehr extra — die Belohnung dafuer steckt ohnehin schon in der
+ * Rangkurve selbst, denn ein besserer Endrang zahlt dort bereits mehr. Der Platzierungsbonus soll
+ * nur die BEWEGUNG gegenueber der Erwartung wuerdigen, nicht ein zweites Mal den Endrang.
+ *
+ * Die Tabelle selbst bleibt vollstaendig (sie ist Zeile fuer Zeile gegen das CSV abgesichert); die
+ * Kappung sitzt ausschliesslich hier im Zugriff.
+ */
+export const PRIZE_PLACEMENT_EFFECTIVE_CAP = 6;
+
+/**
  * Platzierungsbonus fuer einen Rangsprung. `rankDelta` ist POSITIV bei Verbesserung
- * (Startrang − Endrang). Ausserhalb der Tabelle wird auf den Rand geklammert statt auf 0 zu fallen —
- * ein Sprung von Rang 40 auf 1 (andere Ligagroessen) darf nicht plotzlich nichts mehr wert sein.
+ * (Startrang − Endrang), und er wird auf `PRIZE_PLACEMENT_EFFECTIVE_CAP` Plaetze gekappt.
  */
 export function getPrizePlacementBonus(rankDelta: number): number {
   if (!Number.isFinite(rankDelta)) return 0;
-  const clamped = Math.min(PRIZE_PLACEMENT_MAX_DELTA, Math.max(PRIZE_PLACEMENT_MIN_DELTA, Math.round(rankDelta)));
-  return PRIZE_PLACEMENT_SHEET_TABLE.get(clamped) ?? 0;
+  const capped = Math.min(
+    PRIZE_PLACEMENT_EFFECTIVE_CAP,
+    Math.max(-PRIZE_PLACEMENT_EFFECTIVE_CAP, Math.round(rankDelta)),
+  );
+  return PRIZE_PLACEMENT_SHEET_TABLE.get(capped) ?? 0;
 }
 
 /** Tabellenform fuer Anzeigen, absteigend nach rankDelta (wie die Sheet-Spalte). */
