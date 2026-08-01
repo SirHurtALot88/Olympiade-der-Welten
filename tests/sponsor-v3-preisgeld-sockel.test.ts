@@ -22,7 +22,7 @@ import {
   SPONSOR_LIVE_SAVE_S1_TEAMS,
   type SponsorLiveSaveTeam,
 } from "./_fixtures/sponsor-live-save-s1.fixture";
-import { getPrizePlacementBonus } from "@/lib/season/prize-placement-table";
+import { getPrizePlacementBonus, PRIZE_PLACEMENT_EFFECTIVE_CAP } from "@/lib/season/prize-placement-table";
 import { pickBonusObjective } from "@/lib/sponsor/sponsor-special-objectives";
 import {
   buildSponsorV3TermsCore,
@@ -50,6 +50,18 @@ const SPONSOR_V3_MESSKARTEN = ["sicherheit", "basis", "ambition", "sonderziel", 
 import { SPONSOR_V3_FLOOR_C } from "@/lib/sponsor/sponsor-v3-offer-service";
 
 const teams = SPONSOR_LIVE_SAVE_S1_TEAMS;
+
+/**
+ * DER PLATZIERUNGSBONUS DES BENCHMARKS — mit derselben Funktion gerechnet, aus der auch die Leiter
+ * ihn zieht. Die Fixture fuehrt eine eigene `placementBonus`-Spalte; sie wurde gemessen, als die
+ * Sheet-Tabelle noch bis +-31 durchlief. Seit der Rangsprung bei sechs Plaetzen gekappt wird, weicht
+ * sie fuer die eine Bewegung ueber sechs Plaetze ab (L-R faellt sieben Plaetze). Wuerde der Test
+ * weiter gegen die eingefrorene Spalte messen, pruefte er einen historischen Zahlenstand statt der
+ * Zusicherung, um die es geht: dass Basis-Karte und Benchmark DIESELBE Rechnung sind.
+ */
+const zielOf = (team: SponsorLiveSaveTeam): number =>
+  team.prizeMoney + getPrizePlacementBonus(team.startRank - team.rank);
+
 const SALARY_FACTOR = 1.15;
 
 /** Deterministischer Hash — nur fuer die Auswahl "welches Team zieht welches Ziel", nie fuer Betraege. */
@@ -126,7 +138,7 @@ type Metrics = {
 function metricsOf(payoutByCode: Map<string, number>): Metrics {
   const rows = teams.map((team) => {
     const pay = payoutByCode.get(team.code) ?? 0;
-    const ziel = team.prizeMoney + team.placementBonus;
+    const ziel = zielOf(team);
     return { code: team.code, rank: team.rank, pay, dev: pay - ziel, guv: pay - team.salary };
   });
   const rmse = Math.sqrt(rows.reduce((acc, row) => acc + row.dev ** 2, 0) / rows.length);
@@ -167,7 +179,7 @@ function formatMetrics(label: string, m: Metrics): string {
 
 // ── Szenarien ueber die Entscheidungs-Bandbreite ───────────────────────────────────────────────
 const heute = new Map(teams.map((team) => [team.code, team.sponsorCash] as const));
-const benchmark = new Map(teams.map((team) => [team.code, team.prizeMoney + team.placementBonus] as const));
+const benchmark = new Map(teams.map((team) => [team.code, zielOf(team)] as const));
 
 const alleBasis = new Map(
   teams.map((team) => [team.code, sponsorV3Settle(cardOf(team, "basis"), team.rank, 0)] as const),
@@ -198,16 +210,22 @@ describe("Sponsormodell V3 — Abnahme an den 32 echten Teams des Live-Saves", (
     // Wenn die Angebotserzeugung eine andere Platzierungstabelle benutzt als der Benchmark, kann die
     // Basis-Karte den Benchmark gar nicht treffen — und genau das war der Nebenbefund des Entwurfs
     // (Sheet-Tabelle +1,28/−0,96 gegen die Code-Tabelle ±8,33).
+    // Innerhalb der Kappung Zeile fuer Zeile identisch …
     for (const [delta, expected] of SPONSOR_LIVE_SAVE_S1_PLACEMENT.entries()) {
+      if (Math.abs(delta) > PRIZE_PLACEMENT_EFFECTIVE_CAP) continue;
       expect(getPrizePlacementBonus(delta), `rankDelta ${delta}`).toBeCloseTo(expected, 6);
     }
+    // … und darueber hinaus bewusst gekappt: ein Sprung von Rang 32 auf 1 zahlte ungekappt +26,33 C
+    // und haette damit mehr gewogen als eine halbe Saison Leistung.
+    expect(getPrizePlacementBonus(31)).toBeCloseTo(getPrizePlacementBonus(PRIZE_PLACEMENT_EFFECTIVE_CAP), 6);
+    expect(getPrizePlacementBonus(-31)).toBeCloseTo(getPrizePlacementBonus(-PRIZE_PLACEMENT_EFFECTIVE_CAP), 6);
   });
 
   it("Basis-Karte == Benchmark: RMSE exakt 0", () => {
     const m = metricsOf(alleBasis);
     expect(m.rmse).toBeCloseTo(0, 6);
     for (const team of teams) {
-      expect(alleBasis.get(team.code)!).toBeCloseTo(team.prizeMoney + team.placementBonus, 6);
+      expect(alleBasis.get(team.code)!).toBeCloseTo(zielOf(team), 6);
     }
     // Overspender-Mechanik unangetastet: Kadereffizienz schlaegt Rang.
     const tc = teams.find((team) => team.code === "T-C")!;
@@ -296,7 +314,7 @@ describe("Sponsormodell V3 — Abnahme an den 32 echten Teams des Live-Saves", (
     // Einzel-Team-Bandbreite: keine Karte springt mehr als 13,5 C ueber/unter den Benchmark
     // (heutige Ausreisser: +34,2 / −26,7).
     for (const team of teams) {
-      const ziel = team.prizeMoney + team.placementBonus;
+      const ziel = zielOf(team);
       expect(besterFall.get(team.code)! - ziel, `${team.code} best`).toBeLessThan(13.5);
       expect(schlechtesterFall.get(team.code)! - ziel, `${team.code} worst`).toBeGreaterThan(-13.5);
     }
