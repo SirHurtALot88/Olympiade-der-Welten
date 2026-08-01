@@ -29,6 +29,7 @@ import {
 } from "@/lib/sponsor/sponsor-offer-presenter";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { resolveSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
+import { sponsorV4AxisLabel, type SponsorV4AxisKey } from "@/lib/sponsor/sponsor-v4-axes";
 import { previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { SponsorRankLadder } from "@/components/foundation/sponsor/SponsorRankLadder";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
@@ -203,11 +204,17 @@ function ActiveContractHero({
   // Vertraege aus Spielstaenden von vor der Umstellung.
   const shape = contract.curveShape ?? mapArchetypeToCurveShape(contract.archetype);
   const shapeLabel = contract.sponsorV3?.cardName ?? SPONSOR_CURVE_SHAPES[shape].labelDe;
-  const familyLabel = contract.sponsorV3
-    ? contract.sponsorV3.tilt === 0
-      ? "EV-neutral"
-      : `${contract.sponsorV3.tilt > 0 ? "+" : ""}${Math.round(contract.sponsorV3.tilt * 100)} % Hebel`
-    : SPONSOR_CURVE_FAMILIES[getSponsorCurveFamily(shape)].labelDe;
+  // Woran sich diese Karte von den anderen unterscheidet. Seit V4 ist das die ZIELACHSE — der
+  // Tilt ist bei allen neuen Karten 0, "EV-neutral" stuende also auf jeder Karte und saegte
+  // genau nichts aus. Altvertraege tragen weiterhin ihren Tilt.
+  const axisKey = contract.sponsorV3?.axis?.key ?? null;
+  const familyLabel = axisKey
+    ? `Zielachse · ${sponsorV4AxisLabel(axisKey as SponsorV4AxisKey)}`
+    : contract.sponsorV3
+      ? contract.sponsorV3.tilt === 0
+        ? "EV-neutral"
+        : `${contract.sponsorV3.tilt > 0 ? "+" : ""}${Math.round(contract.sponsorV3.tilt * 100)} % Hebel`
+      : SPONSOR_CURVE_FAMILIES[getSponsorCurveFamily(shape)].labelDe;
   const payoutTiles = buildContractPayoutTiles(contract);
   const paidCount = payoutTiles.filter((tile) => tile.paid).length;
   const termSeasons = contract.termSeasons ?? null;
@@ -351,9 +358,9 @@ export default function FoundationSponsorsNewLook({
     const map = new Map<string, number>();
     try {
       for (const row of previewSponsorSettlement(gameState).rows) {
-        if (row.cashDelta > 0) {
-          map.set(row.teamId, (map.get(row.teamId) ?? 0) + row.cashDelta);
-        }
+        // Saldiert, nicht geklammert: die Vorschuss-Verrechnung ist negativ und die Achse kann
+        // es sein. Wer nur die positiven Zeilen zaehlt, zeigt eine Projektion, die es nicht gibt.
+        map.set(row.teamId, (map.get(row.teamId) ?? 0) + row.cashDelta);
       }
     } catch {
       // Vorschau ist optional — ohne gültige Verträge bleibt die Projektion leer.

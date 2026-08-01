@@ -93,14 +93,18 @@ describe("finances: league table ↔ detail view sponsor parity", () => {
     //
     // Seit V3 rechnet das Settlement NICHT mehr aus den Vertrags-Komponenten, sondern aus der
     // eingefrorenen Rang-Leiter; ein Vertrag ohne V3-Terme wird beim Abrechnen migriert
-    // (`buildMigratedSponsorV3Terms`). Diese Fixture hat zwei Teams ohne Kader — die Leiter faellt
-    // damit auf die Untergrenze `SPONSOR_V3_FLOOR_C`. Das ist korrektes Verhalten fuer eine
-    // Fixture ohne Gehaelter, kein Defekt: die Leiter ist gehaltsverankert und hat hier nichts,
-    // woran sie sich verankern koennte.
+    // (`buildMigratedSponsorV3Terms`).
+    //
+    // Diese Fixture hat zwei Teams ohne Kader. Frueher fiel die Leiter deshalb auf die Untergrenze
+    // `SPONSOR_V3_FLOOR_C` (32): der Topf wurde aus der TEAMZAHL gebildet, zwei Teams trugen also
+    // 2/32 eines Liga-Topfes, und die ganze Kurve lag unter der Untergrenze. Seit die Kurve ihren
+    // Topf ueber das MITTLERE Gehalt auf ihre 32 Raenge hochrechnet, greift stattdessen die
+    // Frisch-Save-Schranke (`SPONSOR_V3_REFERENCE_SALARY_PER_TEAM`) und die Fixture bekommt eine
+    // massstabsgetreue Kurve — Rang 1 zahlt 91,8 statt geklammerter 32.
     //
     // Die AUSSAGE dieses Tests ist ohnehin die Parität der beiden Ansichten (Zusicherung unten),
     // nicht der Absolutwert. Der frühere Wert 69,3 stammte aus der Komponenten-Summe von V2.
-    expect(detailSponsorTotal).toBeCloseTo(32, 1);
+    expect(detailSponsorTotal).toBeCloseTo(91.8, 1);
     // Gegenprobe zum ursprünglichen Regressionsgrund: der 99er Überperformance-CAP darf in KEINER
     // Ansicht mitgezählt werden (er zahlte im Settlement 84 — läge er drin, wäre die Summe > 150).
     expect(detailSponsorTotal).toBeLessThan(100);

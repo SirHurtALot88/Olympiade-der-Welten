@@ -38,7 +38,95 @@ export const SPONSOR_V3_TILT_BY_RARITY: Readonly<Record<SponsorV3Rarity, number>
   "gewöhnlich": 0.15, magisch: 0.2, selten: 0.25, "legendär": 0.3,
 };
 
+// ── V4: die Achsen ─────────────────────────────────────────────────────────────────────────────
+
+export const SPONSOR_V4_AXIS_KEYS = ["wachstum", "ausbau", "soliditaet", "entwicklung", "kaderpflege"] as const;
+export type SponsorV4AxisKey = (typeof SPONSOR_V4_AXIS_KEYS)[number];
+
 /**
+ * Bei ANGEBOTSERZEUGUNG eingefrorene Achsen-Konditionen. Frueh eingefroren, nicht erst bei
+ * Unterschrift: sonst liesse sich zwischen Angebot und Signatur die eigene Ausgangslage
+ * herunterspielen, um den Zuwachs billiger zu machen.
+ *
+ * Die MESSUNG dazu steht in `sponsor-v4-axes.ts` (sie braucht Spielzustand); hier liegen nur die
+ * reinen Zahlen, damit diese Datei rechenschicht bleibt.
+ */
+export type SponsorV4AxisTerms = {
+  key: SponsorV4AxisKey;
+  /** Ausgangswert, gegen den gemessen wird. */
+  baseline: number;
+  /** Rohwert der Messgroesse, der Erfuellungsgrad 1,0 bedeutet. */
+  scale: number;
+  /** Verschiebung des Nullpunkts, VOR der Division addiert. */
+  offset: number;
+};
+
+/**
+ * Groesse des Achsen-Hebels je Rarity. DIESELBE REGEL WIE ZUVOR: Rarity skaliert den Hebel, nie den
+ * Erwartungswert — die Achse ist mit `p = 0,5` bepreist, ihr EV-Beitrag ist also exakt 0, egal wie
+ * gross G ist. Eine legendaere Karte laesst mehr Ausschlag zu, bringt im Mittel aber dasselbe.
+ *
+ * Warum deutlich groesser als die alten 6-10 C: mit dem alten Deckel bewegte die Kartenwahl +-2 bis
+ * 3 C gegen eine Faktorschwankung von +-30 C — spuerbar war das nicht. Bei G = 16 (magisch) liegen
+ * zwischen bester und schlechtester Wahl rund 16 C. Der Deckel bleibt trotzdem noetig: der maximale
+ * systematische Bepreisungsfehler ist |E[Erfuellung] − 0,5| * G, bei 0,1 Fehlkalibrierung also
+ * hoechstens 2,4 C je Team.
+ */
+export const SPONSOR_V4_AXIS_SIZE_BY_RARITY: Readonly<Record<SponsorV3Rarity, number>> = {
+  "gewöhnlich": 12, magisch: 16, selten: 20, "legendär": 24,
+};
+
+/**
+ * DIE FIXE BEPREISUNG DER ACHSE. Kein Schaetzwert, keine Tabelle: `Auszahlung = G * (Erfuellung − 0,5)`.
+ *
+ * In V3 war die Erfolgswahrscheinlichkeit je Ziel geschaetzt (36 Eintraege in `GOAL_PROBABILITY`) und
+ * WAR DER PREIS — ein Schaetzfehler wurde damit zur dauerhaften Etatverzerrung. Hier ist der Preis
+ * fest und die Schaetzung steckt nur in der Skala der Achse; ein Skalenfehler verschiebt, wie leicht
+ * die Achse faellt, nicht ihren Erwartungswert.
+ */
+export const SPONSOR_V4_AXIS_PBAR = 0.5;
+
+/** Golden-Los: mehr Hebel, unveraenderter Erwartungswert. */
+export const SPONSOR_V4_GOLDEN_AXIS_MULT = 1.25;
+
+/**
+ * DIE ZWEITE WAHLDIMENSION: Vorschuss statt Saisonende.
+ *
+ * Warum es sie braucht: die Achse allein macht die Wahl inhaltlich, aber alle Angebote zahlen zum
+ * selben Zeitpunkt. Liquiditaet ist fuer ein klammes Team real wertvoll — die Alternative ist ein
+ * Kredit zu 7 bis 20 Prozent Zins — und fuer ein reiches wertlos. Damit haengt die richtige Wahl an
+ * der eigenen Lage statt an einer Rangfolge, die fuer alle gleich waere.
+ *
+ * Der Vorschuss ist ein VORGEZOGENER TEIL der eigenen Auszahlung, kein Geschenk: er wird am
+ * Saisonende samt Gebuehr wieder verrechnet. Die Gebuehr liegt bewusst unter dem Kreditzins — der
+ * Sponsor ist der guenstigste Kredit im Spiel, aber eben nicht gratis.
+ */
+export type SponsorV4AdvanceTerms = {
+  /** Bei Unterschrift ausgezahlt. */
+  amount: number;
+  /** Gebuehr, am Saisonende zusammen mit dem Vorschuss verrechnet. */
+  fee: number;
+};
+
+/** Anteil des Leiterbodens, der als Vorschuss ausgezahlt wird. */
+export const SPONSOR_V4_ADVANCE_SHARE = 0.35;
+/**
+ * Gebuehr auf den Vorschuss. Sie MUSS unter dem guenstigsten Bankkredit liegen (MIN_INTEREST_RATE =
+ * 0,07 je Saison, lib/finance/loan-service.ts) — sonst waere die Vorschusskarte strikt schlechter
+ * als ein Kredit und damit keine Option, sondern eine Falle. 5 Prozent lassen genug Abstand, ohne
+ * den Vorschuss zum Selbstlaeufer zu machen.
+ */
+export const SPONSOR_V4_ADVANCE_FEE_RATE = 0.05;
+
+export function sponsorV4AxisSizeFor(rarity: string, golden = false): number {
+  const base = SPONSOR_V4_AXIS_SIZE_BY_RARITY[rarity as SponsorV3Rarity] ?? SPONSOR_V4_AXIS_SIZE_BY_RARITY.magisch;
+  return golden ? Math.round(base * SPONSOR_V4_GOLDEN_AXIS_MULT * 10) / 10 : base;
+}
+
+/**
+ * @deprecated V4 bepreist Achsen fix mit `SPONSOR_V4_AXIS_PBAR`. Diese Tabelle bleibt ausschliesslich
+ * fuer ALTVERTRAEGE, deren `goalP` bereits eingefroren ist, und fuer nie migrierte Spielstaende.
+ *
  * Auszahlung des Sonderziels bei voller Erfuellung, je Rarity — gedeckelt bei 10 C.
  * Warum nicht groesser: damit Sonderziele allein die Sponsoren differenzieren, muesste G >= 20-25 C
  * sein; dann schlaegt jeder Fehler in den `GOAL_PROBABILITY`-SCHAETZWERTEN als SYSTEMATISCHER
@@ -76,7 +164,10 @@ export const SPONSOR_V3_RANKS = 32;
 
 // ── Der Karten-Slate ───────────────────────────────────────────────────────────────────────────
 
-export type SponsorV3CardKey = "sicherheit" | "basis" | "ambition" | "sonderziel" | "ambition_ziel";
+export type SponsorV3CardKey =
+  | "basis" | "achse"
+  /** @deprecated V3-Risikokarten — nur noch in Altvertraegen. */
+  | "sicherheit" | "ambition" | "sonderziel" | "ambition_ziel";
 
 export type SponsorV3Card = {
   key: SponsorV3CardKey;
@@ -88,15 +179,37 @@ export type SponsorV3Card = {
 };
 
 /**
- * DIE ENTSCHEIDUNG: fuenf echte Karten, alle mit IDENTISCHEM Erwartungswert, unterschieden
- * ausschliesslich im Risikoprofil. Am Erwartungsrang liegen sie fast gleich — genau dort trennt
- * sich nichts; verdient wird die Differenz ueber die Saisonleistung.
+ * DER SLATE: eine Basis-Karte plus Achsenkarten.
+ *
+ * WAS SICH GEGENUEBER V3 GEAENDERT HAT — und warum. V3 hatte fuenf Karten, die sich ausschliesslich
+ * im RISIKOPROFIL um dieselbe Rangleiter unterschieden (Tilt −1/0/+1, dazu ein Sonderziel). Alle
+ * hatten denselben Erwartungswert, was richtig war; nur war der Ausschlag mit +-1 bis 3 C gegen eine
+ * Faktorschwankung von +-30 C so klein, dass die Wahl keine war. Schlimmer: der Tilt ist proportional
+ * zum Abstand vom Erwartungsanker und schrumpft mit dem Gehaltsfaktor — der Regler war also genau in
+ * den Saisons am kleinsten, in denen Geld knapp ist.
+ *
+ * Die Differenzierung laeuft deshalb nicht mehr ueber Risiko, sondern ueber PASSUNG: jede
+ * Achsenkarte zahlt fuer eine andere Sache (Kaderwert, Ausbau, Finanzen, Entwicklung, Frische),
+ * gemessen gegen die eigene Ausgangslage. Damit ist keine Karte fuer alle Teams besser — sie ist
+ * besser fuer das Team, dessen Plan zu ihr passt.
+ *
+ * Der Tilt bleibt im Code (Altvertraege tragen eingefrorene getiltete Leitern), ist fuer neue Karten
+ * aber ueberall 0.
  */
 export const SPONSOR_V3_CARDS: readonly SponsorV3Card[] = [
+  { key: "basis", name: "Basis", tiltFactor: 0, goal: false,
+    note: "die reine Liga-Kurve plus Platzierungsbonus — kein Zusatzrisiko, keine Zusatzchance" },
+  { key: "achse", name: "Achse", tiltFactor: 0, goal: true,
+    note: "die Liga-Kurve plus eine Zielachse gegen die eigene Ausgangslage (EV-Beitrag exakt 0)" },
+];
+
+/**
+ * @deprecated Die V3-Risikokarten. Sie werden NICHT mehr angeboten, bleiben aber lesbar, damit
+ * bestehende Vertraege ihren Kartennamen behalten.
+ */
+export const SPONSOR_V3_LEGACY_CARDS: readonly SponsorV3Card[] = [
   { key: "sicherheit", name: "Sicherheit", tiltFactor: -1, goal: false,
     note: "Abweichungen vom Erwartungsanker gedaempft — weniger Absturzrisiko, weniger Upside" },
-  { key: "basis", name: "Basis", tiltFactor: 0, goal: false,
-    note: "exakt die Liga-Benchmark: Preisgeldkurve plus Platzierungsbonus" },
   { key: "ambition", name: "Ambition", tiltFactor: 1, goal: false,
     note: "Abweichungen verstaerkt — Ueberperformance zahlt mehr, Unterperformance kostet" },
   { key: "sonderziel", name: "Sonderziel", tiltFactor: 0, goal: true,
@@ -106,7 +219,13 @@ export const SPONSOR_V3_CARDS: readonly SponsorV3Card[] = [
 ];
 
 export function sponsorV3CardByKey(key: string): SponsorV3Card {
-  return SPONSOR_V3_CARDS.find((card) => card.key === key) ?? SPONSOR_V3_CARDS[1]!;
+  // Altvertraege tragen die V3-Risikoschluessel; sie muessen ihren Namen behalten, auch wenn diese
+  // Karten nicht mehr angeboten werden. Der Fallback ist die Basis-Karte.
+  return (
+    SPONSOR_V3_CARDS.find((card) => card.key === key)
+    ?? SPONSOR_V3_LEGACY_CARDS.find((card) => card.key === key)
+    ?? SPONSOR_V3_CARDS[0]!
+  );
 }
 
 /** Tilt-Staerke dieser Rarity, hart auf [−0,3, +0,3] geklammert. */
@@ -300,6 +419,16 @@ export type SponsorV3ContractTerms = {
   salaryFactor: number;
   /** Absolute Untergrenze (Sicherheitsnetz), mit dem Vertrag eingefroren. */
   floor: number;
+  /**
+   * Die Achse dieses Vertrags (V4). Fehlt bei Altvertraegen und bei der Basis-Karte — dann laeuft
+   * die Auszahlung ueber `goalKey`/`goalP` wie zuvor.
+   */
+  axis?: SponsorV4AxisTerms;
+  /**
+   * Vorschuss-Konditionen (V4). Fehlt beim Standard-Profil und bei Altvertraegen — dann kommt die
+   * ganze Auszahlung am Saisonende.
+   */
+  advance?: SponsorV4AdvanceTerms;
 };
 
 /**
@@ -315,6 +444,12 @@ export function buildSponsorV3TermsCore(input: {
   goalKey: string | null;
   salaryFactor: number;
   floor: number;
+  /** V4-Achse dieser Karte. Gesetzt = fix mit `SPONSOR_V4_AXIS_PBAR` bepreist, statt geschaetzt. */
+  axis?: SponsorV4AxisTerms | null;
+  /** Hebelgroesse der Achse (Rarity, ggf. Golden). Nur wirksam mit `axis`. */
+  axisSize?: number;
+  /** Zahlt diese Karte einen Vorschuss bei Unterschrift? */
+  withAdvance?: boolean;
   /** Nur fuer Sensitivitaets-Laeufe: skaliert die Rarity-Tilts global. Default 1. */
   tiltScale?: number;
   anchorSigma?: number;
@@ -328,9 +463,29 @@ export function buildSponsorV3TermsCore(input: {
   const anchor = sponsorV3Anchor(baseLadder, weights);
   const beta = sponsorV3TiltFor(input.rarity) * input.card.tiltFactor * (input.tiltScale ?? 1);
   const rankLadder = sponsorV3TiltedLadder(baseLadder, anchor, beta);
-  const hasGoal = input.card.goal && input.goalKey != null;
-  const goalP = hasGoal ? sponsorV3GoalProbability(input.goalKey, input.startRank) : 0;
-  const goalSize = hasGoal ? sponsorV3GoalSizeFor(input.rarity) : 0;
+  // Eine Achse (V4) bepreist FIX mit p = 0,5; ein Sonderziel (V3) mit seiner geschaetzten
+  // Erfolgswahrscheinlichkeit. Beides landet in denselben zwei Feldern, damit das Settlement genau
+  // eine Rechnung kennt: `Auszahlung = Leiter + Erfuellung*G − p*G`.
+  const axis = input.axis ?? null;
+  // Der Vorschuss haengt am LEITERBODEN, nicht am Erwartungswert: er ist der Teil der Auszahlung,
+  // der auf jedem Endrang sicher kommt. Auf mehr darf kein Vorschuss laufen, sonst koennte ein
+  // Absturz den Vertrag ins Minus drehen.
+  const ladderFloor = Math.max(input.floor, Math.min(...rankLadder));
+  const advanceAmount = input.withAdvance === true ? Math.round(ladderFloor * SPONSOR_V4_ADVANCE_SHARE * 10) / 10 : 0;
+  const advance: SponsorV4AdvanceTerms | null =
+    advanceAmount > 0
+      ? { amount: advanceAmount, fee: Math.round(advanceAmount * SPONSOR_V4_ADVANCE_FEE_RATE * 10) / 10 }
+      : null;
+  const hasGoal = axis == null && input.card.goal && input.goalKey != null;
+  const goalP = axis != null ? SPONSOR_V4_AXIS_PBAR : hasGoal ? sponsorV3GoalProbability(input.goalKey, input.startRank) : 0;
+  const goalSize =
+    axis != null
+      ? (Number.isFinite(input.axisSize) && (input.axisSize ?? 0) > 0
+          ? input.axisSize!
+          : sponsorV4AxisSizeFor(input.rarity))
+      : hasGoal
+        ? sponsorV3GoalSizeFor(input.rarity)
+        : 0;
   return {
     version: 3,
     rankLadder,
@@ -341,11 +496,13 @@ export function buildSponsorV3TermsCore(input: {
     cardName: input.card.name,
     rarity: input.rarity,
     startRank: clampRank(input.startRank),
-    goalKey: input.goalKey,
+    goalKey: axis != null ? `axis_v4_${axis.key}` : input.goalKey,
     goalP,
     goalSize,
     salaryFactor: input.salaryFactor,
     floor: input.floor,
+    ...(axis != null ? { axis } : {}),
+    ...(advance != null ? { advance } : {}),
   };
 }
 

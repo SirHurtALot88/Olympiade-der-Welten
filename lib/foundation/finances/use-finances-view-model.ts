@@ -178,7 +178,10 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
     : isV3Contract
       ? sponsorSettlementRows
           .filter((row) => FINANCE_SPONSOR_INCOME_COMPONENT_KINDS.includes(row.kind))
-          .filter((row) => Number.isFinite(row.cashDelta) && row.cashDelta > 0)
+          // Auch NEGATIVE Zeilen gehoeren dazu: eine verfehlte Achse traegt −G/2 und die
+          // Vorschuss-Verrechnung ist immer negativ. Wegzulassen hiesse, dem Team eine Einnahme
+          // auszuweisen, die es nie bekommt.
+          .filter((row) => Number.isFinite(row.cashDelta) && row.cashDelta !== 0)
           .map((row) => ({ kind: row.kind, label: row.label, rewardCash: round1(row.cashDelta) }))
       : SPONSOR_COMPONENT_KIND_ORDER.flatMap((kind) => {
           const rewardCash = sponsorSettlementRows

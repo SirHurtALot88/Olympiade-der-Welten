@@ -37,6 +37,7 @@ import {
 import {
   sponsorV3CardByKey,
   sponsorV3IsGoalOfferable,
+  SPONSOR_V4_AXIS_PBAR,
   type SponsorV3CardKey,
 } from "@/lib/sponsor/sponsor-v3-model";
 import {
@@ -48,6 +49,13 @@ import {
   sponsorObjectiveFamilyForKey,
 } from "@/lib/sponsor/sponsor-special-objectives";
 import { applySponsorV3ToOffers, getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
+import {
+  buildSponsorV4AxisTerms,
+  sponsorV4AxisLabel,
+  sponsorV4AxisSpecialKey,
+  sponsorV4OfferableAxes,
+  type SponsorV4AxisKey,
+} from "@/lib/sponsor/sponsor-v4-axes";
 
 /** Demand profile derived from rarity: legendär→elite, selten→ambitious, magisch→balanced, gewöhnlich→safe. */
 function getDemandProfileForRarity(rarity: SponsorRarity): SponsorDemandProfile {
@@ -82,6 +90,8 @@ function buildOfferSkeleton(input: {
   identity: TeamIdentity | null;
   profile: TeamStrategyProfile | null;
   cardKey: SponsorV3CardKey;
+  /** Achse dieser Karte (V4). Gesetzt = die Karte zahlt fuer die Achse statt fuer ein Sonderziel. */
+  axisKey?: SponsorV4AxisKey | null;
   rarity: SponsorRarity;
   commercialRating: number;
   slotIndex: number;
@@ -98,7 +108,7 @@ function buildOfferSkeleton(input: {
   // Der Marken- und der Sonderziel-Katalog sind noch nach den drei alten Archetypen verschlagwortet; die
   // Karte wird dafür auf einen Eimer abgebildet (SPONSOR_CARD_ARCHETYPE). Der Archetyp ist ab hier
   // reines Katalog-Schlagwort — an der Auszahlung hängt er nicht mehr.
-  const archetype: SponsorArchetype = mapSponsorCardToArchetype(cardKey);
+  const archetype: SponsorArchetype = mapSponsorCardToArchetype(cardKey, input.axisKey);
   const { brand, parent, special } = pickSponsorBrandForOffer({
     seasonId: gameState.season.id,
     teamId: team.teamId,
@@ -140,7 +150,26 @@ function buildOfferSkeleton(input: {
   let specialComponent: SponsorOfferComponent | null = card.goal
     ? { ...special, rewardCash: 0, penaltyCash: undefined }
     : null;
-  if (card.goal) {
+
+  // V4-ACHSENKARTE: die Zielkomponente ist die Achse selbst. Kein Katalogwurf, kein
+  // Wahrscheinlichkeitsband — eine Achse misst den eigenen Zuwachs gegen die eigene Ausgangslage und
+  // ist damit fuer jedes Team erfuellbar. Die Konditionen wandern in den `targetValue`, damit Karte,
+  // Anzeige und Settlement dieselbe Zahl lesen und ein spaeterer Zustandswechsel den Vertrag nicht
+  // nachtraeglich verschiebt.
+  if (input.axisKey) {
+    const axisTerms = buildSponsorV4AxisTerms(gameState, team.teamId, input.axisKey);
+    specialComponent = {
+      ...special,
+      componentId: "axis-target",
+      kind: "special",
+      specialKey: sponsorV4AxisSpecialKey(input.axisKey),
+      label: `Zielachse · ${sponsorV4AxisLabel(input.axisKey)}`,
+      targetValue: `axisbase:${axisTerms.baseline};axisscale:${axisTerms.scale};axisoffset:${axisTerms.offset}`,
+      stages: undefined,
+      rewardCash: 0,
+      penaltyCash: undefined,
+    };
+  } else if (card.goal) {
     if (isGolden) {
       const goldenKey = pickGoldenObjective(gameState.season.id, team.teamId, archetype, teamQualityRank);
       // Auch Golden-Ziele muessen im bepreisbaren Band liegen — sonst steht auf der Karte eine
@@ -267,6 +296,9 @@ export function buildSponsorOffersForTeam(input: {
     hadGoldenLastSeason,
     teamCount: rows.length,
     slotCount: SLOT_COUNT,
+    // GEFILTERT STATT GEKLAMMERT: eine Achse, die dieses Team gar nicht bewegen kann (kein
+    // Ausbauspielraum, kein Kaderwert), wird nicht angeboten, statt als wertlose Karte dazuliegen.
+    offerableAxes: sponsorV4OfferableAxes(input.gameState, input.teamId),
   });
   const usedParentBrandIds: string[] = [];
   const recentParentBrandIds = getRecentSponsorParentIds(input.gameState, input.teamId);
@@ -294,6 +326,7 @@ export function buildSponsorOffersForTeam(input: {
       identity,
       profile,
       cardKey: entry.cardKey,
+      axisKey: entry.axisKey ?? null,
       rarity: entry.rarity,
       commercialRating: commercialRating.score,
       slotIndex,
@@ -327,6 +360,10 @@ export function buildSponsorOffersForTeam(input: {
     gameState: input.gameState,
     offers: built,
     cardKeys: slate.entries.map((entry) => entry.cardKey),
+    axisKeys: slate.entries.map((entry) => entry.axisKey ?? null),
+    goldenSlots: slate.goldenCardSlots,
+    advanceSlots: slate.entries.map((entry) => entry.advance === true),
+    teamId: input.teamId,
     startRank,
   });
 }
@@ -506,12 +543,43 @@ export function chooseSponsorOffer(input: {
       },
     },
   };
-  // Sponsorengeld flieszt AUSSCHLIESZLICH am Saisonende (sponsor-settlement-service). Frueher wurde
-  // beim Unterschreiben sofort die halbe Basisrate ausgezahlt; das Settlement zahlte danach nur noch
+  // Sponsorengeld flieszt grundsaetzlich am Saisonende (sponsor-settlement-service). Frueher wurde
+  // beim Unterschreiben IMMER die halbe Basisrate ausgezahlt; das Settlement zahlte danach nur noch
   // die zweite Haelfte. Das hatte zwei Nachteile: die angezeigte Saison-Summe sackte im Moment des
   // Abschlusses ab (ohne dass der Vertrag weniger wert war), und am Saisonende kam entsprechend
-  // wenig nach — obwohl genau dann Gehaelter und Transfers zu bezahlen sind. Jetzt kommt die volle
-  // Basis mit dem Rest gemeinsam am Saisonende.
+  // wenig nach — obwohl genau dann Gehaelter und Transfers zu bezahlen sind.
+  //
+  // VORSCHUSS-KARTEN sind die bewusste Ausnahme und genau deshalb eine Entscheidung: wer sie waehlt,
+  // holt sich Liquiditaet fuers Transferfenster und zahlt dafuer eine Gebuehr. Der Vorschuss wird am
+  // Saisonende samt Gebuehr wieder verrechnet — er ist vorgezogenes eigenes Geld, kein Zuschuss.
+  const advance = offer.sponsorV3?.advance ?? null;
+  if (advance && advance.amount > 0) {
+    nextGameState = {
+      ...nextGameState,
+      teams: nextGameState.teams.map((team) =>
+        team.teamId === input.teamId
+          ? { ...team, cash: Math.round((team.cash + advance.amount) * 10) / 10 }
+          : team,
+      ),
+      seasonState: {
+        ...nextGameState.seasonState,
+        sponsorPayoutLogs: [
+          {
+            id: `sponsor-payout:${nextGameState.season.id}:${input.teamId}:advance:${randomUUID()}`,
+            saveId: input.saveId ?? "",
+            seasonId: nextGameState.season.id,
+            teamId: input.teamId,
+            phase: "base_first" as const,
+            componentId: "v4_advance",
+            cashDelta: advance.amount,
+            action: "apply" as const,
+            createdAt: new Date().toISOString(),
+          },
+          ...(nextGameState.seasonState.sponsorPayoutLogs ?? []),
+        ],
+      },
+    };
+  }
   nextGameState = appendSponsorBrandHistory(nextGameState, input.teamId, offer.sponsorParentBrandId);
   const updatedContract = getTeamSponsorContract(nextGameState, input.teamId);
   return { gameState: nextGameState, contract: updatedContract };
@@ -560,6 +628,68 @@ function resolveAiSponsorArchetypePreference(input: {
  * plus Rarity-Etat-Gewicht ist ersatzlos entfallen: er belohnte genau die Vertrags-Lotterie, die
  * V3 abgeschafft hat.
  */
+/**
+ * WIE GUT PASST DIESE ACHSE ZU DIESEM TEAM? Schaetzung des Erfuellungsgrads, den das Team mit
+ * seiner Spielweise realistisch erreicht — 0 bis 1.
+ *
+ * Das ist bewusst eine HEURISTIK und keine Simulation: die KI kennt ihren eigenen Saisonplan so
+ * wenig wie ein Mensch am Saisonstart. Sie muss aber ueberhaupt schaetzen, sonst waehlt sie
+ * blind — und seit die Karten sich ueber die Achse unterscheiden, ist Blindwahl ein echter
+ * Nachteil gegenueber einem Menschen, der seine Achse kennt.
+ */
+function estimateAxisFitForAi(input: {
+  axisKey: SponsorV4AxisKey;
+  profile: TeamStrategyProfile | null;
+  identity: TeamIdentity | null;
+  cash: number;
+  rosterSize: number;
+  rosterOpt: number;
+}): number {
+  const bias = input.profile?.bias;
+  const cashPriority = bias?.cashPriority ?? input.identity?.finances ?? 5;
+  const starPriority = bias?.starPriority ?? input.identity?.ambition ?? 5;
+  const valuePriority = bias?.valuePriority ?? 5;
+  const depthPreference = bias?.rosterDepthPreference ?? 5;
+  const scale10 = (value: number) => Math.max(0, Math.min(1, value / 10));
+
+  switch (input.axisKey) {
+    case "ausbau":
+      // Gebaeudestufen kosten Cash und sonst nichts — wer welchen hat, schafft die Achse sicher.
+      return input.cash >= 40 ? 0.9 : input.cash >= 20 ? 0.6 : 0.2;
+    case "wachstum":
+      // Kaderwert waechst ueber Zukaeufe und Entwicklung; beides braucht Budget und Ehrgeiz.
+      return 0.35 + 0.4 * scale10((starPriority + valuePriority) / 2) * (input.cash >= 25 ? 1 : 0.4);
+    case "soliditaet":
+      // Wer ohnehin auf die Kasse achtet, verbessert seine Nettoposition fast nebenbei.
+      return 0.3 + 0.5 * scale10(cashPriority);
+    case "entwicklung":
+      // Marktwert-Spruenge kommen von jungen Spielern mit Spielzeit — ein Wert-Team spielt so.
+      return 0.3 + 0.45 * scale10(valuePriority);
+    case "kaderpflege":
+      // Frische braucht Rotation, Rotation braucht Kadertiefe.
+      return (
+        0.25
+        + 0.35 * scale10(depthPreference)
+        + (input.rosterSize > input.rosterOpt ? 0.25 : 0)
+      );
+    default:
+      return 0.5;
+  }
+}
+
+/**
+ * DIE KI-WAHL BEWERTET JETZT PASSUNG STATT RISIKO.
+ *
+ * Bis V3 war die Wahl fuer die KI trivial und das war beabsichtigt: alle Karten hatten denselben
+ * Erwartungswert und unterschieden sich nur im Risikoprofil, also bewertete die KI ausschliesslich
+ * ihre Risikopraeferenz. Mit Achsenkarten ist das gegenstandslos — der Erwartungswert ist zwar
+ * weiterhin bei allen gleich, aber er gilt fuer ein DURCHSCHNITTLICHES Team. Wer seine Achse
+ * trifft, holt bis zu +G/2; wer sie verfehlt, verliert ebenso viel. Eine KI, die das ignoriert,
+ * verliert systematisch gegen jeden Menschen, der seine eigene Spielweise kennt.
+ *
+ * Bewertet wird deshalb: der geschaetzte eigene Erfuellungsgrad mal Hebelgroesse (das ist der
+ * erwartete Cash-Beitrag der Karte), plus der Wert des Vorschusses fuer die eigene Kassenlage.
+ */
 function scoreOfferForAi(input: {
   offer: SponsorOffer;
   profile: TeamStrategyProfile | null;
@@ -567,42 +697,47 @@ function scoreOfferForAi(input: {
   cashPressure: number;
   powerRank?: number | null;
   teamId: string;
+  cash?: number;
+  rosterSize?: number;
 }): number {
-  const { offer, profile, identity, cashPressure, powerRank, teamId } = input;
-  const rank = powerRank ?? null;
+  const { offer, profile, identity, cashPressure } = input;
+  const terms = getSponsorV3Terms(offer);
+  const axisKey = terms?.axis?.key as SponsorV4AxisKey | undefined;
+
+  let score = 0;
+
+  if (axisKey && terms) {
+    const fit = estimateAxisFitForAi({
+      axisKey,
+      profile,
+      identity,
+      cash: input.cash ?? 0,
+      rosterSize: input.rosterSize ?? 0,
+      rosterOpt: identity?.playerOpt ?? 14,
+    });
+    // Der erwartete Cash-Beitrag der Achse: `G * (Erfuellung − 0,5)`. Genau die Groesse, um die es
+    // geht — negativ, wenn das Team die Achse voraussichtlich verfehlt.
+    score += terms.goalSize * (fit - SPONSOR_V4_AXIS_PBAR);
+  }
+
+  // Der Vorschuss ist fuer ein klammes Team echtes Geld zur richtigen Zeit und fuer ein reiches nur
+  // eine Gebuehr. Genau dieser Unterschied ist der Sinn der zweiten Dimension.
+  if (terms?.advance) {
+    score += cashPressure >= 7 ? terms.advance.amount * 0.25 : -terms.advance.fee;
+  }
+
+  // Markenpassung bleibt als milder Flavour-Term: sie bewegt kein Geld, soll aber bei aehnlicher
+  // Rechnung das Team waehlen lassen, das zu ihm passt.
   const preferredArchetype = resolveAiSponsorArchetypePreference({
-    teamId,
+    teamId: input.teamId,
     profile,
     identity,
     cashPressure,
-    powerRank: rank,
+    powerRank: input.powerRank ?? null,
   });
+  if (preferredArchetype === offer.archetype) score += 1.5;
 
-  let score = 0;
-  if (preferredArchetype === offer.archetype) {
-    score += 22;
-  } else if (preferredArchetype === "balanced") {
-    if (offer.archetype === "identity") score += 12;
-    if (offer.archetype === "security") score += 10;
-    if (offer.archetype === "performance" && rank != null && rank <= 14) score += 8;
-  } else if (preferredArchetype === "security" && offer.archetype === "performance") {
-    score -= 18;
-  } else if (preferredArchetype === "performance" && offer.archetype === "security") {
-    score -= 8;
-  }
-
-  if (rank != null && rank >= 22 && offer.archetype === "performance") {
-    score -= 25;
-  }
-  if (rank != null && rank <= 5 && offer.archetype === "security" && (profile?.bias.starPriority ?? 0) >= 8) {
-    score -= 6;
-  }
-
-  // Flavour-Feinschliff bei Gleichstand: hoehere Rarity heisst groesserer Hebel (nicht mehr Geld) —
-  // wer ohnehin Risiko sucht, nimmt bei gleicher Ausrichtung die groessere Karte, ein klammes Team
-  // die kleinere. Deterministischer Tiebreak ueber die offerId, damit die Wahl reproduzierbar bleibt.
-  const rarityOrder = SPONSOR_RARITIES[offer.rarity ?? "magisch"].order;
-  score += (preferredArchetype === "security" ? -1 : 1) * rarityOrder * 0.5;
+  // Deterministischer Tiebreak, damit die Wahl reproduzierbar bleibt.
   score += (offer.offerId.length % 7) * 0.01;
 
   return score;
@@ -637,10 +772,11 @@ export function chooseSponsorOfferForAiTeams(gameState: GameState, settingsMap?:
     const row = rowByTeamId.get(team.teamId) ?? null;
     const cashPressure = row?.cash != null && row.cash < 0 ? 10 : row?.cash != null && row.cash < 20 ? 7 : 3;
     const powerRank = row?.rank ?? null;
+    const rosterSize = nextGameState.rosters.filter((entry) => entry.teamId === team.teamId).length;
+    const scoreArgs = { profile, identity, cashPressure, powerRank, teamId: team.teamId, cash: row?.cash ?? 0, rosterSize };
     const bestOffer = [...offers].sort(
       (left, right) =>
-        scoreOfferForAi({ offer: right, profile, identity, cashPressure, powerRank, teamId: team.teamId }) -
-        scoreOfferForAi({ offer: left, profile, identity, cashPressure, powerRank, teamId: team.teamId }),
+        scoreOfferForAi({ offer: right, ...scoreArgs }) - scoreOfferForAi({ offer: left, ...scoreArgs }),
     )[0];
     if (!bestOffer) {
       continue;
