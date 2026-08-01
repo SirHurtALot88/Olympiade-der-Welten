@@ -7,7 +7,8 @@ import { getRankToPointsValue } from "@/lib/resolve/rank-to-points";
 
 const OUTPUT_DIR =
   process.env.OLY_OUTPUT_DIR ??
-  "/Users/chrisfalk/Documents/Codex/2026-06-11/wir-machen-weiter-mit-dem-olympiade/outputs";
+  // Standardablage im Repo, damit das Audit auch ohne den Rechner des Autors laeuft.
+  path.join(process.cwd(), "outputs");
 const TARGET_SAVE_ID = process.env.OLY_TARGET_SAVE_ID ?? null;
 const TARGET_SEASON_ID = process.env.OLY_TARGET_SEASON_ID ?? null;
 const TARGET_MATCHDAY_ID = process.env.OLY_TARGET_MATCHDAY_ID ?? null;

@@ -1,8 +1,19 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const sourcePath = "/Users/chrisfalk/Downloads/Olympiade%20der%20Welten%20Draftboard (7).json";
-const outputDir = "/Users/chrisfalk/Documents/Codex/2026-06-01/baue-einen-lokalen-web-app-prototyp/references/retool-ai-golden-master";
+// Der Retool-Export liegt nicht im Repo — er muss pro Lauf angegeben werden. Ohne Angabe
+// brechen wir unten mit einer klaren Fehlermeldung ab statt mit ENOENT auf einem fremden Pfad.
+const sourcePath = argValue("--datei") ?? argValue("--source") ?? process.env.OLY_RETOOL_SOURCE ?? null;
+// Zielverzeichnis liegt im Repo — andere Retool-Extraktionsskripte legen dort bereits ab
+// (siehe references/retool-player-attributes, references/retool-transfermarkt-columns).
+const outputDir = path.resolve("references/retool-ai-golden-master");
+
+function argValue(flag: string) {
+  const index = process.argv.indexOf(flag);
+  if (index !== -1) return process.argv[index + 1] ?? null;
+  const inline = process.argv.find((entry) => entry.startsWith(`${flag}=`));
+  return inline ? inline.slice(flag.length + 1) : null;
+}
 
 const targetTerms = [
   "aiTeamNeeds",
@@ -288,7 +299,7 @@ function writeReadme(hits: ExtractedHit[], missingTerms: string[]) {
 
   for (const hit of hits) {
     lines.push(`### ${hit.term}`);
-    lines.push(`- Datei: [${hit.fileName}](/Users/chrisfalk/Documents/Codex/2026-06-01/baue-einen-lokalen-web-app-prototyp/references/retool-ai-golden-master/${hit.fileName})`);
+    lines.push(`- Datei: [${hit.fileName}](./${hit.fileName})`);
     lines.push(`- Typ: ${hit.type ?? "unknown"}`);
     lines.push(`- Subtype: ${hit.subtype ?? "unknown"}`);
     lines.push(`- Page: ${hit.page ?? "unknown"}`);
@@ -313,6 +324,12 @@ function writeReadme(hits: ExtractedHit[], missingTerms: string[]) {
 }
 
 function main() {
+  if (!sourcePath) {
+    throw new Error(
+      "Keine Retool-Quelle angegeben. Datei angeben mit --datei=<pfad-zur-json> oder OLY_RETOOL_SOURCE=<pfad-zur-json> setzen.",
+    );
+  }
+
   fs.mkdirSync(outputDir, { recursive: true });
   const root = JSON.parse(fs.readFileSync(sourcePath, "utf8")) as { page?: { data?: { appState?: string } } };
   const serialized = root.page?.data?.appState;

@@ -2,7 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 
 const OUTPUT_DIR = path.resolve("references/retool-player-attributes");
-const DOWNLOADS_DIR = "/Users/chrisfalk/Downloads";
+// Kein Downloads-Ordner im Repo — die Retool-Exporte liegen nur lokal beim Autor. Ohne
+// OLY_RETOOL_DOWNLOADS_DIR faellt findRetoolJsonCandidates() unten auf die im Repo
+// committete Referenzdatei zurueck, statt auf einen fremden Pfad zu scheitern.
+const DOWNLOADS_DIR = process.env.OLY_RETOOL_DOWNLOADS_DIR ?? null;
 const RETOOL_JSON_PATTERN = /^Olympiade%20der%20Welten%20Draftboard(?: \(\d+\))?\.json$/;
 const PROJECT_RETROOL_REF = path.resolve("references/retool-ai-golden-master/getPlayerAttributesForAI.state.js");
 
@@ -45,12 +48,11 @@ function ensureOutputDir() {
 }
 
 function findRetoolJsonCandidates() {
-  // DOWNLOADS_DIR only exists on the original author's machine. On any other
-  // machine (CI, other contributors) the directory itself is absent, which
-  // made fs.readdirSync throw ENOENT instead of falling through to the
-  // "no candidates found" path the rest of this module already handles
-  // gracefully. Treat a missing directory the same as an empty one.
-  if (!fs.existsSync(DOWNLOADS_DIR)) {
+  // DOWNLOADS_DIR ist nur gesetzt, wenn OLY_RETOOL_DOWNLOADS_DIR konfiguriert wurde — auf
+  // jeder anderen Maschine (CI, andere Beitragende) fehlt sie. fs.readdirSync wuerde sonst mit
+  // ENOENT abbrechen statt auf den "keine Kandidaten gefunden"-Pfad durchzufallen, den der Rest
+  // dieses Moduls bereits sauber behandelt (Fallback auf die committete Referenzdatei).
+  if (!DOWNLOADS_DIR || !fs.existsSync(DOWNLOADS_DIR)) {
     return [];
   }
 

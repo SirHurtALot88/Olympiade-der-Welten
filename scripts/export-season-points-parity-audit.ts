@@ -8,7 +8,9 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import type { GameState } from "@/lib/data/olyDataTypes";
 
 const OUTPUT_DIR =
-  "/Users/chrisfalk/Documents/Codex/2026-06-11/wir-machen-weiter-mit-dem-olympiade/outputs";
+  process.env.OLY_OUTPUT_DIR ??
+  // Standardablage im Repo, damit das Audit auch ohne den Rechner des Autors laeuft.
+  path.join(process.cwd(), "outputs");
 
 type RankToPointsRow = Record<string, string>;
 

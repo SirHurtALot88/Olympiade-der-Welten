@@ -1,8 +1,17 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const DOWNLOADS_DIR = "/Users/chrisfalk/Downloads";
+// Kein Downloads-Ordner im Repo vorhanden — die Retool-Exporte liegen nur lokal beim Autor.
+// Ohne Angabe brechen wir mit einer klaren Fehlermeldung ab, statt auf einen fremden Pfad zu raten.
+const DOWNLOADS_DIR = process.env.OLY_RETOOL_DOWNLOADS_DIR ?? null;
 const OUTPUT_DIR = path.resolve("references/retool-transfermarkt-columns");
+
+function argValue(flag: string) {
+  const index = process.argv.indexOf(flag);
+  if (index !== -1) return process.argv[index + 1] ?? null;
+  const inline = process.argv.find((entry) => entry.startsWith(`${flag}=`));
+  return inline ? inline.slice(flag.length + 1) : null;
+}
 const RETOOL_JSON_PATTERN = /^Olympiade%20der%20Welten%20Draftboard(?: \(\d+\))?\.json$/;
 
 export type RetoolTransfermarktColumn = {
@@ -575,11 +584,17 @@ export function buildTransfermarktFormattingExtraction(
   };
 }
 
-function findLatestRetoolJsonPath() {
+function findLatestRetoolJsonPath(downloadsDir: string) {
+  if (!fs.existsSync(downloadsDir)) {
+    throw new Error(
+      `Downloads-Verzeichnis nicht gefunden: ${downloadsDir}. Angeben mit --datei=<pfad-zur-json> oder OLY_RETOOL_DOWNLOADS_DIR=<verzeichnis>.`,
+    );
+  }
+
   const entries = fs
-    .readdirSync(DOWNLOADS_DIR)
+    .readdirSync(downloadsDir)
     .filter((entry) => RETOOL_JSON_PATTERN.test(entry))
-    .map((entry) => path.join(DOWNLOADS_DIR, entry))
+    .map((entry) => path.join(downloadsDir, entry))
     .map((filePath) => ({
       filePath,
       mtimeMs: fs.statSync(filePath).mtimeMs,
@@ -610,10 +625,14 @@ function loadRetoolAppState(sourcePath: string) {
 export function writeTransfermarktColumnExtraction(params?: {
   sourcePath?: string;
   outputDir?: string;
+  downloadsDir?: string;
 }) {
-  const sourcePath = params?.sourcePath ?? findLatestRetoolJsonPath();
+  const downloadsDir = params?.downloadsDir ?? DOWNLOADS_DIR;
+  const sourcePath = params?.sourcePath ?? (downloadsDir ? findLatestRetoolJsonPath(downloadsDir) : null);
   if (!sourcePath) {
-    throw new Error("No Retool Draftboard JSON found in Downloads.");
+    throw new Error(
+      "Keine Retool-Quelle angegeben. Datei angeben mit --datei=<pfad-zur-json> oder Downloads-Ordner mit OLY_RETOOL_DOWNLOADS_DIR=<verzeichnis> setzen.",
+    );
   }
 
   const outputDir = params?.outputDir ?? OUTPUT_DIR;
@@ -689,7 +708,8 @@ export function writeTransfermarktColumnExtraction(params?: {
 }
 
 if (process.argv[1]?.includes("extract-retool-transfermarkt-columns.ts")) {
-  const result = writeTransfermarktColumnExtraction();
+  const sourcePath = argValue("--datei") ?? argValue("--source") ?? undefined;
+  const result = writeTransfermarktColumnExtraction(sourcePath ? { sourcePath } : undefined);
   console.log(`sourcePath: ${result.sourcePath}`);
   console.log(`tablesFound: ${result.tables.length}`);
   console.log(`foundColorCodes: ${result.formatting.foundColorCodes.length}`);

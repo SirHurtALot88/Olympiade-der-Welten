@@ -10,7 +10,8 @@ import { buildPrizeMoneyPreview } from "@/lib/season/prize-money-preview";
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 const OUTPUT_DIR =
   process.env.OLY_PRIZE_AUDIT_OUTPUT_DIR ??
-  "/Users/chrisfalk/Documents/Codex/2026-06-11/wir-machen-weiter-mit-dem-olympiade/outputs";
+  // Standardablage im Repo, damit das Audit auch ohne den Rechner des Autors laeuft.
+  path.join(PROJECT_ROOT, "outputs");
 
 function csvEscape(value: unknown) {
   if (value == null) return "";

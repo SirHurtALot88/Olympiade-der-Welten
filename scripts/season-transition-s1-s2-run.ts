@@ -29,7 +29,8 @@ import { buildPlayerProgressionForecast } from "@/lib/training/player-progressio
 import { buildSeasonEndProgressionPreview, type SeasonEndProgressionPreview } from "@/lib/training/season-end-progression-preview";
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
-const OUTPUT_DIR = "/Users/chrisfalk/Documents/Codex/2026-06-11/wir-machen-weiter-mit-dem-olympiade/outputs";
+// Standardablage im Repo, damit der Lauf auch ohne den Rechner des Autors funktioniert.
+const OUTPUT_DIR = process.env.OLY_OUTPUT_DIR ?? path.join(PROJECT_ROOT, "outputs");
 const TARGET_SEASON_ID = process.env.OLY_TARGET_SEASON_ID ?? "season-1";
 const TARGET_SAVE_ID = process.env.OLY_TARGET_SAVE_ID ?? null;
 const EXPORT_PREFIX = process.env.OLY_EXPORT_PREFIX ?? "season-transition-s1-s2";
