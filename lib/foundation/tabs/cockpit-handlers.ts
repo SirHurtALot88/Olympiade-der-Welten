@@ -378,7 +378,12 @@ export type CockpitSeasonTransitionHandlersDeps = {
  * weiter kam man trotzdem nur bis `season_review` — und weil Verkaufen erst in
  * `preseason_management` oeffnet, blieb es gesperrt.
  */
-export type CockpitSeasonTransitionAction = "preview" | "start_transition" | "advance_step";
+export type CockpitSeasonTransitionAction =
+  | "preview"
+  | "start_transition"
+  | "advance_step"
+  /** In einem Zug bis zum offenen Transferfenster — der Weg des Saisonabschluss-Bildschirms. */
+  | "open_transfer_window";
 
 export type CockpitSeasonTransitionHandlers = {
   runSeasonTransition: (action: CockpitSeasonTransitionAction) => Promise<SeasonTransitionApiResponse | null>;
@@ -428,13 +433,13 @@ export function createCockpitSeasonTransitionHandlers(
     syncFoundationViewInUrl,
   } = deps;
 
-  async function runSeasonTransition(action: "preview" | "start_transition" | "advance_step") {
+  async function runSeasonTransition(action: CockpitSeasonTransitionAction) {
     if (readMetaSource === "prisma") {
       showReadOnlyNotice();
       return null;
     }
 
-    const productive = action === "start_transition" || action === "advance_step";
+    const productive = action !== "preview";
     setSeasonTransitionBusy(true);
     setSeasonTransitionError(null);
     setCockpitBusyKey(
@@ -442,7 +447,9 @@ export function createCockpitSeasonTransitionHandlers(
         ? "season-transition-start"
         : action === "advance_step"
           ? "season-transition-advance"
-          : "season-transition-preview",
+          : action === "open_transfer_window"
+            ? "season-transition-open-transfer-window"
+            : "season-transition-preview",
     );
     try {
       const response = await fetch("/api/season/transition", {
@@ -471,6 +478,14 @@ export function createCockpitSeasonTransitionHandlers(
           tone: "success",
           title: "Saisonende: nächster Schritt",
           detail: label ? `Weiter zu „${label}“.` : "Assistent einen Schritt weitergeschaltet.",
+        });
+        await loadSave(activeSaveId);
+      }
+      if (action === "open_transfer_window" && response.ok && payload.success) {
+        setFoundationActionFeedback({
+          tone: "success",
+          title: "Transferfenster offen",
+          detail: "Verträge verlängern, verkaufen und kaufen sind jetzt freigeschaltet.",
         });
         await loadSave(activeSaveId);
       }

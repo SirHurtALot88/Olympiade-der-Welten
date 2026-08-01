@@ -4073,7 +4073,9 @@ export function useFoundationShellRouterBodyScope({
   );
 
   const { runPreSeasonWorkflowPreview, runPreSeasonNextSeasonSetup } = seasonEndPreseasonHandlers;
-  const { runSeasonCompletion } = seasonEndTransitionHandlers;
+  // `runSeasonTransition` zusaetzlich: der Saisonabschluss-Bildschirm braucht den Weg zum
+  // offenen Transferfenster, sonst schickt seine Checkliste in einen gesperrten Kader.
+  const { runSeasonCompletion, runSeasonTransition } = seasonEndTransitionHandlers;
 
   async function runAiPreseasonBackground() {
     if (readMeta.source === "prisma") {
@@ -11817,6 +11819,7 @@ export function useFoundationShellRouterBodyScope({
     runPreSeasonWorkflowPreview,
     runPreSeasonNextSeasonSetup,
     runSeasonCompletion,
+    runSeasonTransition,
     runFoundationCommand,
     runNewGameSetup,
     runSaveAction,

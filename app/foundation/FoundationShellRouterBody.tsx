@@ -5,6 +5,7 @@
 import dynamic from "next/dynamic";
 import { FoundationDeferredMount } from "@/lib/foundation/FoundationDeferredMount";
 import { getSeasonEndPayoutStatus } from "@/lib/season/season-end-sponsor-payout-status";
+import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { FoundationSharedProvider } from "@/lib/foundation/foundation-shared-context";
 import { FoundationShellRouterCockpit, FoundationShellRouterHistoryV2, FoundationShellRouterMarketSell, FoundationShellRouterMarketV2, FoundationShellRouterMatchdayResult, FoundationShellRouterPrize, FoundationShellRouterSeasonPreview, FoundationShellRouterTeams, FoundationShellRouterTraining } from "@/app/foundation/FoundationShellRouter";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
@@ -573,6 +574,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   runCockpitCashApply,
   runPreSeasonWorkflowPreview,
   runPreSeasonNextSeasonSetup,
+  runSeasonTransition,
   runFoundationCommand,
   runNewGameSetup,
   runSaveAction,
@@ -2651,7 +2653,11 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           {/* SAISONABSCHLUSS. Sichtbar, sobald die Saison durch ist — genau dann, wenn der
               Flow bisher ins Cockpit zeigte. Steht UEBER der Tabelle, weil am Saisonende
               nicht der Tabellenstand die Frage ist, sondern "was jetzt". */}
-          {activeView === "seasonV2" && (gameState.gamePhase === "season_completed" || gameState.gamePhase === "season_review") ? (
+          {/* Sichtbar in JEDER Saisonende-Phase, nicht nur in den ersten beiden. Vorher stand
+              hier `season_completed || season_review` — die Liste verschwand also genau dann,
+              wenn der Spieler ueber den Rueckblick hinaus war und die restlichen Schritte
+              (Transferfenster, Vertraege, neue Saison) noch offen hatte. */}
+          {activeView === "seasonV2" && isSeasonEndPhase(gameState.gamePhase) ? (
             <FoundationSeasonFinalePanel
               gameState={gameState}
               activeTeamId={activeManagerTeamId}
@@ -2676,6 +2682,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               }}
               onOpenDevelopment={() => setFoundationView("trainingCompact", setActiveView, { push: true })}
               onOpenRoster={() => setFoundationView("teams", setActiveView, { push: true })}
+              onOpenTransferWindow={() => void runSeasonTransition("open_transfer_window")}
             />
           ) : null}
 

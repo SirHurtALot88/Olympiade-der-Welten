@@ -45,8 +45,11 @@ describe("Saisonende-Assistent: die Kette ist von der Oberflaeche aus bedienbar"
   it("laesst die Aktion durch ALLE drei Schichten — dort riss die Kette", () => {
     // Die Signatur war die eigentliche Sperre: sie liess `advance_step` nicht durch, also konnte
     // in der Oberflaeche gar kein Knopf dafuer entstehen. Route und Handler waren schon fertig.
-    expect(handlers()).toContain('export type CockpitSeasonTransitionAction = "preview" | "start_transition" | "advance_step"');
-    expect(handlers()).toContain('async function runSeasonTransition(action: "preview" | "start_transition" | "advance_step")');
+    // Auf die Mitglieder geprueft, nicht auf die Schreibweise der Union — sonst bricht der Test
+    // beim naechsten Umbruch, ohne dass an der Verdrahtung etwas fehlt.
+    const typDeklaration = handlers().slice(handlers().indexOf("export type CockpitSeasonTransitionAction"));
+    expect(typDeklaration.slice(0, 400)).toContain('"advance_step"');
+    expect(handlers()).toContain("async function runSeasonTransition(action: CockpitSeasonTransitionAction)");
     expect(route()).toContain('body.action === "advance_step"');
     expect(route()).toContain("advanceSeasonTransitionStep(save, persistence)");
 

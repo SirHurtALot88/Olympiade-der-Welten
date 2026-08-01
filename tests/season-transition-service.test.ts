@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import {
+  advanceSeasonTransitionToTransferWindow,
   buildSeasonTransitionPreview,
   resolveGamePhase,
   startSeasonTransition,
@@ -79,6 +80,27 @@ function persistenceMock(sourceSave: PersistedSaveGame) {
   };
 }
 
+/**
+ * Wie `persistenceMock`, aber mit Gedaechtnis: `advanceSeasonTransitionToTransferWindow` laeuft
+ * mehrere Stationen und liest den Spielstand zwischen den Schritten neu ein. Ein Mock, der nur
+ * schreibt, liesse die Schleife auf der Startphase stehen.
+ */
+function statefulPersistenceMock(sourceSave: PersistedSaveGame) {
+  let current = sourceSave;
+  const saveSingleplayerState = vi.fn((saveId: string, nextGameState: GameState) => {
+    current = { ...current, saveId, gameState: nextGameState };
+    return current;
+  });
+  return {
+    persistence: {
+      saveSingleplayerState,
+      getSaveById: (saveId: string) => (saveId === current.saveId ? current : null),
+    } as unknown as PersistenceService,
+    saveSingleplayerState,
+    gespeichertePhasen: () => saveSingleplayerState.mock.calls.map((call) => call[1].gamePhase),
+  };
+}
+
 describe("season transition service", () => {
   it("reads gamePhase and falls back to season_active for legacy saves", () => {
     expect(resolveGamePhase(gameState())).toBe("season_active");
@@ -137,6 +159,64 @@ describe("season transition service", () => {
     expect(savedState.rosters).toEqual(sourceSave.gameState.rosters);
     expect(savedState.transferHistory).toEqual(sourceSave.gameState.transferHistory);
     expect(savedState.teams).toEqual(sourceSave.gameState.teams);
+  });
+
+  /**
+   * GEMELDET: „wenn hier gesagt wird sponsoren + preisgeld dann training und dann kader, würde
+   * ich erwarten dass wenn ich da drauf gehe auch meine verträge verlängern und spieler
+   * verkaufen kann! sonst ist das n fehler im system."
+   *
+   * Vom Saisonende bis zur ersten Phase mit offenem Transferfenster sind es VIER Stationen.
+   * Einzeln anklicken ist der Weg des Cockpit-Assistenten; der Saisonabschluss-Bildschirm
+   * stellt eine andere Frage („ich will jetzt meine Vertraege machen") und beantwortet sie in
+   * einem Zug.
+   */
+  it("schaltet in einem Zug bis zum offenen Transferfenster durch", () => {
+    const sourceSave = save({ completed: true });
+    const { persistence, saveSingleplayerState, gespeichertePhasen } = statefulPersistenceMock(sourceSave);
+
+    const result = advanceSeasonTransitionToTransferWindow(sourceSave, persistence);
+
+    expect(result.applied).toBe(true);
+    expect(result.gamePhase).toBe("preseason_management");
+    // Jede Station einzeln geschrieben — die Schleife ueberspringt keine, sie ruft nur
+    // denselben Einzelschritt mehrfach auf.
+    expect(gespeichertePhasen()).toEqual([
+      "season_review",
+      "season_rewards",
+      "player_development",
+      "preseason_management",
+    ]);
+    expect(saveSingleplayerState).toHaveBeenCalledTimes(4);
+  });
+
+  it("bewegt sich nicht mehr, wenn das Fenster schon offen ist", () => {
+    // Ein zweiter Klick darf nicht weiter in Richtung neue Saison rutschen — sonst schoebe
+    // das versehentliche Doppeltippen den Spieler an seiner Transferrunde vorbei.
+    const sourceSave = save({ completed: true, gamePhase: "preseason_management" });
+    const { persistence, saveSingleplayerState } = statefulPersistenceMock(sourceSave);
+
+    const result = advanceSeasonTransitionToTransferWindow(sourceSave, persistence);
+
+    expect(result.gamePhase).toBe("preseason_management");
+    expect(saveSingleplayerState).not.toHaveBeenCalled();
+  });
+
+  it("bricht ab, solange der letzte Spieltag nicht durch ist", () => {
+    // Mitten in der Saison, NICHT am Saisonstart: dort ist das Transferfenster ueber
+    // `isEarlySeasonTransferSetup` legitim offen, und die Funktion haette schlicht nichts zu
+    // tun. Der interessante Fall ist der andere — Spieltag 2 laeuft noch.
+    const laufend = save({ completed: false });
+    laufend.gameState.season.currentMatchday = 2;
+    laufend.gameState.matchdayState = { matchdayId: "md-2", status: "planning", pendingTeamIds: ["team-1"], resolvedFixtureIds: [] };
+    const sourceSave = laufend;
+    const { persistence, saveSingleplayerState } = statefulPersistenceMock(sourceSave);
+
+    const result = advanceSeasonTransitionToTransferWindow(sourceSave, persistence);
+
+    expect(result.applied).toBe(false);
+    expect(result.blockingReasons).toContain("last_matchday_not_completed");
+    expect(saveSingleplayerState).not.toHaveBeenCalled();
   });
 
   it("keeps service source free from Prisma write paths", async () => {
