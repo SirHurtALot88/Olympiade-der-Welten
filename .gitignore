@@ -1,5 +1,9 @@
 # dependencies
-node_modules/
+# Ohne Schraegstrich, damit auch ein SYMLINK dieses Namens greift: Wer mit `git worktree`
+# arbeitet, verlinkt node_modules ueblicherweise ins Hauptverzeichnis. `node_modules/` traf
+# nur das Verzeichnis — der Symlink rutschte durch `git add -A` in den Baum und lag danach
+# als toter Pfad auf main (siehe #302).
+node_modules
 
 # Next.js / build output
 .next/
