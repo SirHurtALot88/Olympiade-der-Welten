@@ -132,19 +132,39 @@ export function parseTriage(reportId: string, raw: string, file: string): BugTri
   const head = new Map<string, string>();
   const headPattern = new RegExp(`^(${HEAD_KEYS.join("|")}):\\s*(.*)$`, "i");
   let bodyStart = 0;
+  // Der zuletzt gesetzte Schluessel — nur an DEN darf eine Fortsetzungszeile andocken. Ohne einen
+  // bereits offenen Wert waere jede eingerueckte Fliesstext-Zeile (Aufzaehlung, Codeblock) faelschlich
+  // eine Fortsetzung.
+  let letzterSchluessel: string | null = null;
 
   for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index].trim();
-    // Der Kopf endet bei der ersten Zeile, die kein bekanntes "schluessel: wert" mehr ist.
+    const rawLine = lines[index];
+    const line = rawLine.trim();
     const match = headPattern.exec(line);
-    if (!match) {
-      if (line === "" && bodyStart === 0) continue;
-      if (line.startsWith("#")) continue;
-      bodyStart = index;
-      break;
+    if (match) {
+      const schluessel = match[1].toLowerCase();
+      head.set(schluessel, match[2].trim());
+      letzterSchluessel = schluessel;
+      bodyStart = index + 1;
+      continue;
     }
-    head.set(match[1].toLowerCase(), match[2].trim());
-    bodyStart = index + 1;
+    // Fortsetzungszeile eines mehrzeiligen Werts: im Rohtext eingerueckt (nicht nur getrimmt leer)
+    // UND haengt an einem bereits offenen Kopf-Schluessel. Zu einem Leerzeichen normalisiert, nicht
+    // zusammengeklebt — sonst verschmelzen die letzten und ersten Woerter zweier Zeilen.
+    const istFortsetzung = letzterSchluessel !== null && line !== "" && /^[ \t]/.test(rawLine);
+    if (istFortsetzung && letzterSchluessel) {
+      const bisher = head.get(letzterSchluessel) ?? "";
+      head.set(letzterSchluessel, bisher ? `${bisher} ${line}` : line);
+      bodyStart = index + 1;
+      continue;
+    }
+    // Der Kopf endet bei der ersten Zeile, die weder ein bekanntes "schluessel: wert" noch eine
+    // eingerueckte Fortsetzung ist. Der Fliesstext einer Notiz beginnt IMMER unindentiert (siehe
+    // `writeTriage` und alle bestehenden Notizen) — genau das haelt ihn hier draussen.
+    if (line === "" && bodyStart === 0) continue;
+    if (line.startsWith("#")) continue;
+    bodyStart = index;
+    break;
   }
 
   const value = (key: string) => head.get(key)?.trim() || null;
