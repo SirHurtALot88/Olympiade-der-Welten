@@ -19,7 +19,7 @@
 | [9](triage/bug-2026-07-31T07-53-56-901Z-o366jv.md) | 31.07., 09:53 | Chris | Spieltag · Arena | Arena-Teamkarte zeigt bei mScoring niemanden unter „in dieser Disziplin" | vorgeprüft | — |
 | [10](triage/bug-2026-07-31T07-59-10-609Z-xqz47b.md) | 31.07., 09:59 | Chris | Spieltag · Arena | Endrang des Spieltags und Rang im Saisonstand widersprechen sich — Rang 1 mit 22 Punkten steht auf 14 | vorgeprüft | — |
 | [11](triage/bug-2026-07-31T08-03-19-596Z-7mjqbg.md) | 31.07., 10:03 | Chris | Spieltag · Arena | KI verschwendet den Kapitän an eine Disziplin, die sie mit einer negativen Formkarte abschreibt | vorgeprüft | — |
-| [12](triage/bug-2026-07-31T08-07-22-039Z-32k3rk.md) | 31.07., 10:07 | Chris | Spieltag · Arena | Eine Verletzung nach dem Abgeben der Aufstellung sperrt den Spieltag dauerhaft — zwei KI-Teams blockieren die ganze Liga | gebaut ⚠ | Chris' Entscheidung gebaut — die KI prueft ihre vorgeplanten Aufstellungen beim Speichern der Spieler-Aufstellung gegen den aktuellen Kaderzustand nach und rechnet neu, wenn ein Aufgestellter verletzt, nicht mehr im Kader oder ueber der Schoner-Schwelle ist. Zusaetzlich nennt die Sperre jetzt das blockierende Team statt nur "Standings Apply fehlt". · PR #297 · **Wirkung nicht bestaetigt** |
+| [12](triage/bug-2026-07-31T08-07-22-039Z-32k3rk.md) | 31.07., 10:07 | Chris | Spieltag · Arena | Eine Verletzung nach dem Abgeben der Aufstellung sperrt den Spieltag dauerhaft — zwei KI-Teams blockieren die ganze Liga | gebaut ⚠ | Chris' Entscheidung gebaut — die KI prueft ihre vorgeplanten Aufstellungen beim Speichern der Spieler-Aufstellung gegen den aktuellen Kaderzustand nach und rechnet neu, wenn ein Aufgestellter verletzt, nicht mehr im Kader oder ueber der Schoner-Schwelle ist. Zusaetzlich nennt die Sperre jetzt das blockierende Team statt nur "Standings Apply fehlt". · PR #297 · `c8f0849b` · **Wirkung nicht bestaetigt** |
 | [13](triage/bug-2026-07-31T08-08-24-989Z-9zyqg6.md) | 31.07., 10:08 | Chris | Spieltag · Saisonstand | Rang im Saisonstand folgt nicht der Punktreihung — dieselbe Ursache wie xqz47b | vorgeprüft | — |
 | [14](triage/bug-2026-07-31T08-10-17-777Z-ydxtgl.md) | 31.07., 10:10 | Chris | Team · Spieler | Schwarze Schrift auf dunklem Grund in der Spieler-Ansicht | vorgeprüft | — |
 | [15](triage/bug-2026-07-31T09-22-07-823Z-a0mgbp.md) | 31.07., 11:22 | Chris | Team · Training | Performance-Training bringt zu wenig gegenüber normalem Training und Regression — vom Melder ausdrücklich zurückgestellt | vorgeprüft | — |
@@ -35,4 +35,4 @@ von einem Zwischenspeicher verschluckt.
 
 Details je Ticket: die Nummer verlinkt auf die Triage-Notiz. Volltext: `npm run bugs:review`.
 
-_Erzeugt: 1.8.2026, 18:11:00_
+_Erzeugt: 1.8.2026, 18:40:14_
