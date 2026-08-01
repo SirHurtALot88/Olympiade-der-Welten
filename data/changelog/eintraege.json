@@ -3,10 +3,17 @@
   "eintraege": [
     {
       "datum": "2026-08-01",
+      "seite": "Cockpit · Saisonende",
+      "text": "Das Saisonende laeuft jetzt wirklich durch: nach dem letzten Spieltag fuehrt der Assistent Schritt fuer Schritt ueber Rueckblick, Finanzen und Spielerentwicklung bis zu Verkaufs- und Kaufphase. Vorher blieb er nach dem Rueckblick stehen — Verkaeufe waren dadurch ab dem ersten Spieltag einer Saison dauerhaft gesperrt.",
+      "pr": "#298",
+      "version": "0.2"
+    },
+    {
+      "datum": "2026-08-01",
       "seite": "Team · Einsatzliste",
       "text": "Jede Slot-Karte zeigt jetzt einen Risiko-Balken mit exakter Prozentzahl: das Verletzungsrisiko, mit dem der Spieltag wirklich wuerfelt (inklusive Einsatz-Last — deshalb nie 0 %, auch ausgeruht bleiben ~2 % Restrisiko). Vorher war das Risiko vor dem Spieltag unsichtbar und eine Verletzung wirkte wie ein Fehler; die Posteingangs-Meldung erklaert sie jetzt auch im Nachhinein (Fatigue beim Wurf + Prozent).",
       "pr": "#302",
-      "version": "0.2.0"
+      "version": "0.3"
     }
   ]
 }

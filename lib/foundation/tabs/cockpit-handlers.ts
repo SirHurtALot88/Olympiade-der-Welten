@@ -417,15 +417,22 @@ export function createCockpitSeasonTransitionHandlers(
     syncFoundationViewInUrl,
   } = deps;
 
-  async function runSeasonTransition(action: "preview" | "start_transition") {
+  async function runSeasonTransition(action: "preview" | "start_transition" | "advance_step") {
     if (readMetaSource === "prisma") {
       showReadOnlyNotice();
       return null;
     }
 
+    const productive = action === "start_transition" || action === "advance_step";
     setSeasonTransitionBusy(true);
     setSeasonTransitionError(null);
-    setCockpitBusyKey(action === "start_transition" ? "season-transition-start" : "season-transition-preview");
+    setCockpitBusyKey(
+      action === "start_transition"
+        ? "season-transition-start"
+        : action === "advance_step"
+          ? "season-transition-advance"
+          : "season-transition-preview",
+    );
     try {
       const response = await fetch("/api/season/transition", {
         method: "POST",
@@ -434,7 +441,7 @@ export function createCockpitSeasonTransitionHandlers(
           withRoomBody({
             saveId: activeSaveId,
             source: readMetaSource,
-            dryRun: action !== "start_transition",
+            dryRun: !productive,
             action,
           }),
         ),
@@ -443,6 +450,18 @@ export function createCockpitSeasonTransitionHandlers(
       setSeasonTransitionFeed(payload.summary ?? null);
       if (!response.ok || payload.error) {
         setSeasonTransitionError(payload.error ?? payload.blockingReasons?.join(" · ") ?? "Season Transition blockiert.");
+      }
+      if (action === "advance_step" && response.ok && payload.success) {
+        // Die Phase steuert, was ueberhaupt anklickbar ist (Verkaeufe, Kaeufe, Aufstellung) —
+        // ohne Neuladen zeigte das Cockpit weiter die Sperren der vorigen Station.
+        const step = payload.summary?.transition.currentStep ?? null;
+        const label = payload.summary?.steps.find((entry) => entry.stepId === step)?.label ?? step;
+        setFoundationActionFeedback({
+          tone: "success",
+          title: "Saisonende: nächster Schritt",
+          detail: label ? `Weiter zu „${label}“.` : "Assistent einen Schritt weitergeschaltet.",
+        });
+        await loadSave(activeSaveId);
       }
       if (action === "start_transition" && response.ok && payload.success) {
         setFoundationActionFeedback({

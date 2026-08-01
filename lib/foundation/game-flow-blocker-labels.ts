@@ -50,6 +50,21 @@ export function formatGameFlowBlocker(reason: string) {
     return `Blocker: ${reason.replace("blockedRule:", "")}`;
   }
 
+  // Diese beiden trugen bisher kein Label und fielen auf `reason.replaceAll("_", " ")` zurück —
+  // aus "incomplete_result:H-R" wurde "incomplete result:H-R". Der Spieler sah davon ohnehin
+  // nichts: der Spieltag meldete nur "Standings Apply fehlt noch für diesen Spieltag", waehrend
+  // der eigentliche Grund (zwei benannte Teams) in den Daten stand. Eine Sperre, die ihren Grund
+  // nicht nennt, ist von einem Absturz nicht zu unterscheiden.
+  if (reason.startsWith("incomplete_result:")) {
+    const teamId = reason.slice("incomplete_result:".length);
+    return `Team ${teamId} hat eine unvollständige Ergebniszeile — meist ein verletzter Spieler in der bereits abgegebenen Aufstellung. Solange das offen ist, lässt sich der Spieltag nicht übernehmen.`;
+  }
+
+  if (reason.startsWith("missing_result:")) {
+    const teamId = reason.slice("missing_result:".length);
+    return `Für Team ${teamId} fehlt die Ergebniszeile dieses Spieltags ganz.`;
+  }
+
   if (reason.startsWith("missing_projected_cash:")) {
     return "Mindestens ein Team hat noch keinen berechenbaren Cash-nachher-Wert.";
   }
