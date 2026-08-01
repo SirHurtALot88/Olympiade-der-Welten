@@ -292,14 +292,25 @@ Rückfahrkarte ist ein Revert, kein „nochmal drüber schauen".
 
 Deshalb gilt die Grenze schärfer als vorher.
 
-### Was der Agent nicht selbst entscheidet
+### Wer meldet, entscheidet den Weg
 
-Diese Fälle werden **weder gebaut noch gemergt**. Sie bleiben auf `vorgeprueft`, werden Chris
-vorgelegt, und der Lauf macht mit den anderen Meldungen weiter — eine Rückfrage hält nie den ganzen
-Durchgang an:
+Nicht jede Meldung braucht dieselbe Vorsicht. Es kommt darauf an, wer sie geschrieben hat.
 
-- **Es steckt eine Produkt- oder Designentscheidung darin.** „Soll X ganz verschwinden?", „Wie lange
-  soll eine Verletzung wehtun?" — das sind keine Fehler, das sind Festlegungen.
+**Meldungen von Chris werden direkt gebaut** — ohne Vorlage, ohne Rückfrage. Auch Feature-Wünsche,
+auch „das stört mich auf der Seite". Chris verantwortet das Spiel; ihm einen Vorschlag vorzulegen und
+auf seine Freigabe zu warten, ist eine Schleife, an deren beiden Enden dieselbe Person steht. Die
+Meldung **ist** die Freigabe. Die Notiz geht direkt auf `gebaut`.
+
+**Meldungen von Franky (und allen anderen) werden vorgelegt.** Der Weg bleibt, wie er war: vorprüfen,
+Befund schreiben, und wenn eine Produkt- oder Designentscheidung darin steckt, bleibt die Notiz auf
+`vorgeprueft` und wartet. „Soll X ganz verschwinden?", „Wie lange soll eine Verletzung wehtun?" — das
+sind keine Fehler, das sind Festlegungen, und die trifft nicht, wer sie bemerkt hat.
+
+### Was niemand freigeben kann
+
+Drei Fälle bleiben stehen, gleich wer gemeldet hat. Das ist keine Frage der Freigabe, sondern der
+Vorsicht: hier geht es nicht darum, ob jemand es will, sondern ob der Agent es sicher kann.
+
 - **Bestehende Spielstände würden verändert oder migriert.** Ein Datenverlust lässt sich nicht
   reverten.
 - **Der Fix baut ein zentrales System um** — Persistenz, Auth, Save-Auflösung, Scoring. Auch wenn er
@@ -308,13 +319,42 @@ Durchgang an:
   gegen eine Vermutung ist eine zweite Vermutung.
 
 Die Faustregel dahinter: **ein zurückgestellter Fehler kostet Wartezeit, ein falsch gebauter kostet
-einen Spielstand.** Im Zweifel zurückstellen.
+einen Spielstand.** Im Zweifel zurückstellen — und mit den übrigen Meldungen weitermachen, eine
+Rückfrage hält nie den ganzen Durchgang an.
+
+---
+
+## Der Changelog — was gefixt wurde, im Spiel sichtbar
+
+Ein gemergter Fix, von dem niemand erfährt, ist für den Spieler nicht von einem ungefixten zu
+unterscheiden. Franky meldet einen Fehler, drei Stunden später ist er behoben — und Franky probiert
+es beim nächsten Mal gar nicht erst wieder, weil er es nicht weiß. Genau dafür gibt es den Changelog:
+**unterster Reiter im Spiel**, in Alltagssprache, ohne Dateinamen und ohne Commit-Hashes.
+
+Ein Eintrag ist ein Satz und beantwortet zwei Fragen: *Was war kaputt?* und *Was ist jetzt anders?*
+Dazu Datum, betroffene Seite und die PR-Nummer als Beleg für alle, die nachsehen wollen.
+
+> **Cash-Anzeige im Transfermarkt** — 30.07. · PR #273
+> Nach einem Kauf blieb der alte Kontostand stehen, bis man die Seite neu geladen hat. Jetzt
+> aktualisiert er sich sofort.
+
+Zwei Regeln halten den Changelog ehrlich:
+
+- **Gepflegt wird er beim Mergen, nicht später.** Der Eintrag gehört in denselben Lauf wie der Fix.
+  Nachträglich aus der Git-Historie rekonstruiert, wird er zur Liste von Commit-Betreffs — und die
+  liest niemand, der das Spiel spielt.
+- **Er beschreibt die Wirkung, nicht den Eingriff.** „Ref-Cache entwertet" ist der Eingriff. „Der
+  Kontostand aktualisiert sich sofort" ist das, was der Spieler merkt. Nur Letzteres gehört hinein.
+
+Auch Änderungen ohne Bug-Meldung gehören hinein — ein neues Feature, eine umgebaute Ansicht. Der
+Changelog beantwortet „was hat sich geändert", nicht „welche Tickets gab es".
 
 ---
 
 ## Was der Agent nicht tut
 
-- **Nichts bauen, das eine Entscheidung enthält.** Siehe oben — im Zweifel zurückstellen.
+- **Nichts bauen, das eine fremde Entscheidung enthält.** Siehe oben — bei Meldungen von Chris ist
+  die Entscheidung schon getroffen, bei allen anderen im Zweifel zurückstellen.
 - **Nichts erfinden.** Kein Fehler wird nachgestellt „vermutlich so" — entweder nachgestellt oder als
   nicht nachstellbar gemeldet.
 - **Keine Rohmeldung anfassen.** `data/bug-reports/*.json` ist unveränderlich.
@@ -330,10 +370,15 @@ einen Spielstand.** Im Zweifel zurückstellen.
 
 ## Der Auftrag (zum Kopieren)
 
-Das ist der Text, mit dem der Agent läuft — als geplante Routine oder von Hand in einer neuen Sitzung:
+Das ist der Text, mit dem der Agent läuft — als geplante Routine oder von Hand in einer neuen Sitzung.
+Er läuft als **eine einzige stündliche Routine**, rund um die Uhr. Vorher waren es drei mit
+unterschiedlichen Takten; das war Verwaltungsaufwand ohne Gegenwert, weil ohnehin jeder Lauf dieselbe
+Frage stellt und die allermeisten sie mit „nichts Neues" beantworten:
 
 ```text
 Du bist der Bugfixing-Agent für „Olympiade der Welten". Arbeite nach docs/BUGFIXING_AGENT.md.
+Du läufst stündlich und schaust kurz nach, ob neue Meldungen da sind. Die meisten Läufe finden
+nichts — das ist der Normalfall, kein Fehler.
 
 1. Neue Meldungen holen:
    - git fetch origin bug-reports und den Branch-Inhalt nach data/bug-reports/ übernehmen
@@ -345,25 +390,39 @@ Du bist der Bugfixing-Agent für „Olympiade der Welten". Arbeite nach docs/BUG
    - Den Zustand aus der Meldung nachstellen (Save, Saison, Spieltag, Seite, geführtes Team).
      Der passende Spielstand liegt auf Branch "live-save".
    - Ursache im Code belegen, mit Datei:Zeile. Keine Vermutungen als Befund ausgeben.
-   - data/bug-reports/triage/<reportId>.md schreiben, Format siehe docs/BUGFIXING_AGENT.md,
-     status: vorgeprueft. Abschnitt "Was dagegen spricht" ist Pflicht.
+   - data/bug-reports/triage/<reportId>.md schreiben, Format siehe docs/BUGFIXING_AGENT.md.
+     Abschnitt "Was dagegen spricht" ist Pflicht.
    - Nicht nachstellbar? Genauso dokumentieren, mit dem, was du versucht hast und was fehlt.
-5. Bauen, was eindeutig ist — ohne Rückfrage: Fix + ein Test, der ohne den Fix ROT ist
-   (das gegenprüfen, nicht behaupten). Branch, PR (kein Draft), dann SOFORT Auto-Merge
-   (Squash) aktivieren. Die grüne CI ist das Tor — GitHub mergt von selbst.
-   NICHT auf den CI-Lauf warten (~20 Minuten). Stattdessen subscribe_pr_activity auf den
-   PR: eine rote CI weckt dich von allein, dann Logs holen, fixen, pushen, bis grün.
-   Nie an einer roten oder laufenden CI vorbei von Hand mergen.
-6. Triage-Notiz auf status: gebaut, mit pr und commit. NICHT auf erledigt — das setzt
-   erst Chris' bestaetigt-Zeile, wenn die Wirkung im Spiel gesehen wurde.
-7. npm run bugs:tabelle laufen lassen, damit TICKETS.md den neuen Stand zeigt.
-8. Zurückstellen statt bauen, wenn eines davon zutrifft — Notiz bleibt auf vorgeprueft,
-   der Lauf macht mit den anderen Meldungen weiter, eine Rückfrage hält nie alles an:
-   - es steckt eine Produkt- oder Designentscheidung darin
-   - bestehende Spielstände würden verändert oder migriert
-   - der Fix baut ein zentrales System um (Persistenz, Auth, Save-Auflösung, Scoring)
-   - die Ursache ist nicht belegt
-9. Chris am Ende kurz berichten: was gebaut und gemergt wurde, was auf ihn wartet und warum.
+
+5. WER GEMELDET HAT, ENTSCHEIDET DEN WEG:
+   - Meldungen von CHRIS: direkt bauen, ohne Rückfrage — auch Feature-Wünsche und
+     Änderungswünsche an einer Seite. Chris ist der Entscheider; auf seine eigene Freigabe
+     zu warten ist eine Schleife ohne Zweck. Notiz geht direkt auf gebaut.
+   - Meldungen von FRANKY (oder anderen): wie bisher vorprüfen und vorlegen. Steckt eine
+     Produkt- oder Designentscheidung darin, bleibt die Notiz auf vorgeprueft.
+   - Für ALLE gilt trotzdem, unabhängig vom Melder: NICHT bauen, wenn die Ursache nicht
+     belegt ist, wenn bestehende Spielstände migriert würden, oder wenn der Fix ein
+     zentrales System umbaut (Persistenz, Auth, Save-Auflösung, Scoring). Keine
+     Freigabefrage, sondern Vorsicht. Eine Rückfrage hält nie den ganzen Lauf an.
+
+6. Bauen heißt: Fix + ein Test, der ohne den Fix ROT ist (das gegenprüfen, nicht behaupten).
+   Branch, PR (kein Draft), dann SOFORT Auto-Merge (Squash) aktivieren. Die grüne CI ist das
+   Tor — GitHub mergt von selbst. NICHT auf den CI-Lauf warten (~20 Minuten). Stattdessen
+   subscribe_pr_activity auf den PR: eine rote CI weckt dich von allein, dann Logs holen,
+   fixen, pushen, bis grün. Nie an einer roten oder laufenden CI vorbei von Hand mergen.
+
+7. Triage-Notiz auf status: gebaut, mit pr und commit. NICHT auf erledigt — das setzt
+   erst die bestaetigt-Zeile, wenn die Wirkung im Spiel gesehen wurde.
+
+8. CHANGELOG PFLEGEN — Pflicht, sobald etwas gemergt wurde. Jeder Fix bekommt einen Eintrag:
+   ein Satz Alltagssprache (was war kaputt, was ist jetzt anders), Datum, PR-Nummer und die
+   betroffene Seite. Kein Entwicklerjargon, keine Dateinamen. Der Changelog ist im Spiel
+   sichtbar — unterster Reiter. Wer spielt, soll ohne Nachfragen sehen, was gefixt wurde.
+
+9. npm run bugs:tabelle laufen lassen, damit TICKETS.md den neuen Stand zeigt.
+
+10. Chris am Ende kurz berichten: was gebaut und gemergt wurde, was auf ihn wartet und warum.
+    Nichts gefunden heißt: gar keine Meldung.
 
 Nie direkt nach main pushen — jeder Fix läuft über Branch und PR. Rohmeldungen nie verändern.
 "Schon erledigt?" immer gegen origin/main prüfen, nie gegen den lokalen Stand.
