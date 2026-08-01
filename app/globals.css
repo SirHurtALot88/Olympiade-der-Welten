@@ -73661,7 +73661,11 @@ button.is-new-look .nl-thist-season-pill,
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
+  /* auto-FIT, nicht auto-fill: seit der Gliederung nach Gewicht und Version enthalten viele
+     Tageskarten nur noch einen einzigen Eintrag. `auto-fill` haette daneben zwei leere Spalten
+     stehen lassen — also genau die leere Flaeche, gegen die dieses Raster gebaut wurde. `auto-fit`
+     klappt ungenutzte Spuren zusammen, der einzelne Eintrag nimmt die Breite ein. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
   gap: var(--nl-s3);
 }
 
@@ -73703,6 +73707,10 @@ button.is-new-look .nl-thist-season-pill,
   margin: 0;
   color: var(--nl-ink);
   line-height: 1.55;
+  /* Greift nur, wenn die Kachel breit ist (einzelner Eintrag eines Tages, Cinema): in einer
+     360px-Spalte ist die Spalte ohnehin schmaler. Verhindert Zeilen ueber die volle Shell-Breite,
+     die niemand mehr angenehm liest. */
+  max-width: 90ch;
 }
 
 /* Die Gewichtungs-Abschnitte: das Grosse zuerst, deutlich abgesetzt. Jede Stufe traegt eine
