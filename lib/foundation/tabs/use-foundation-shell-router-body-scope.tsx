@@ -11524,6 +11524,7 @@ export function useFoundationShellRouterBodyScope({
     closeFoundationDrilldownPanel,
     openMarketSellModal,
     loadSave: loadSave as unknown as FoundationMarketV2ShellHostProps["loadSave"],
+    applyGameStateFromGameplayResponse,
     // Der Markt-Feed haengt an diesem Zaehler, nicht am Spielstand — siehe Begruendung
     // beim Kauf-Abschluss im Host.
     bumpMarketReloadToken: () => setMarketReloadToken((current) => current + 1),
