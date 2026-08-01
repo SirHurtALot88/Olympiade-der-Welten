@@ -1,5 +1,5 @@
 {
-  "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und data/changelog/eintraege.json. Neu bauen: npm run changelog:bauen.",
+  "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
       "datum": "2026-08-01",
@@ -93,24 +93,6 @@
     },
     {
       "datum": "2026-08-01",
-      "seite": "Cockpit · Saisonende",
-      "pr": "#298",
-      "text": "Das Saisonende laeuft jetzt wirklich durch: nach dem letzten Spieltag fuehrt der Assistent Schritt fuer Schritt ueber Rueckblick, Finanzen und Spielerentwicklung bis zu Verkaufs- und Kaufphase. Vorher blieb er nach dem Rueckblick stehen — Verkaeufe waren dadurch ab dem ersten Spieltag einer Saison dauerhaft gesperrt.",
-      "quelle": "gepflegt",
-      "gewicht": "spielblockierend",
-      "version": "0.2"
-    },
-    {
-      "datum": "2026-08-01",
-      "seite": "Team · Einsatzliste",
-      "pr": "#302",
-      "text": "Jede Slot-Karte zeigt jetzt einen Risiko-Balken mit exakter Prozentzahl: das Verletzungsrisiko, mit dem der Spieltag wirklich wuerfelt (inklusive Einsatz-Last — deshalb nie 0 %, auch ausgeruht bleiben ~2 % Restrisiko). Vorher war das Risiko vor dem Spieltag unsichtbar und eine Verletzung wirkte wie ein Fehler; die Posteingangs-Meldung erklaert sie jetzt auch im Nachhinein (Fatigue beim Wurf + Prozent).",
-      "quelle": "gepflegt",
-      "gewicht": "grundlegend",
-      "version": "0.3"
-    },
-    {
-      "datum": "2026-08-01",
       "seite": "Welt · Sponsoren",
       "pr": "#294",
       "text": "Das Sponsorsystem ist grundlegend umgebaut: Die Auszahlung eines Vertrags richtet sich jetzt nach Preisgeld und Platzierung deines Teams, und keine Angebotskarte ist im Schnitt mehr wert als eine andere — vorher konnte die gezogene Karte mehr entscheiden als die eigene Leistung. Die Karten unterscheiden sich jetzt nur noch darin, wie viel Risiko du nimmst.",
@@ -129,6 +111,24 @@
     },
     {
       "datum": "2026-08-01",
+      "seite": "Cockpit · Saisonende",
+      "pr": "#298",
+      "text": "Das Saisonende laeuft jetzt wirklich durch: nach dem letzten Spieltag fuehrt der Assistent Schritt fuer Schritt ueber Rueckblick, Finanzen und Spielerentwicklung bis zu Verkaufs- und Kaufphase. Vorher blieb er nach dem Rueckblick stehen — Verkaeufe waren dadurch ab dem ersten Spieltag einer Saison dauerhaft gesperrt.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.2"
+    },
+    {
+      "datum": "2026-08-01",
+      "seite": "Info · Changelog",
+      "pr": "#299",
+      "text": "Im Changelog stand alles untereinander in einer schmalen Spalte, waehrend daneben der halbe Bildschirm leer blieb. Jetzt liegen die Aenderungen eines Tages nebeneinander, und oben steht, wie viele es insgesamt sind und wann zuletzt etwas dazugekommen ist.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.3.0"
+    },
+    {
+      "datum": "2026-08-01",
       "seite": "Markt · Transfermarkt",
       "pr": "#300",
       "text": "Nach einem Kauf oder Verkauf im Transfermarkt lud die ganze Seite neu, nur damit der Kontostand stimmt. Jetzt steht der neue Betrag sofort da, und die uebrigen Ansichten aktualisieren sich im Hintergrund.",
@@ -138,9 +138,18 @@
     },
     {
       "datum": "2026-08-01",
+      "seite": "Team · Einsatzliste",
+      "pr": "#302",
+      "text": "Jede Slot-Karte zeigt jetzt einen Risiko-Balken mit exakter Prozentzahl: das Verletzungsrisiko, mit dem der Spieltag wirklich wuerfelt (inklusive Einsatz-Last — deshalb nie 0 %, auch ausgeruht bleiben ~2 % Restrisiko). Vorher war das Risiko vor dem Spieltag unsichtbar und eine Verletzung wirkte wie ein Fehler; die Posteingangs-Meldung erklaert sie jetzt auch im Nachhinein (Fatigue beim Wurf + Prozent).",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-01",
       "seite": "Info · Changelog",
-      "pr": "#299",
-      "text": "Im Changelog stand alles untereinander in einer schmalen Spalte, waehrend daneben der halbe Bildschirm leer blieb. Jetzt liegen die Aenderungen eines Tages nebeneinander, und oben steht, wie viele es insgesamt sind und wann zuletzt etwas dazugekommen ist.",
+      "pr": "#326",
+      "text": "Am Changelog wird intern anders gearbeitet: jeder Eintrag liegt jetzt in einer eigenen Datei statt gesammelt in einer Liste. Im Spiel sieht das gleich aus — es sorgt nur dafuer, dass sich gleichzeitig gebaute Aenderungen nicht mehr gegenseitig blockieren und Fixes schneller bei dir ankommen.",
       "quelle": "gepflegt",
       "gewicht": "feinschliff",
       "version": "0.3.0"

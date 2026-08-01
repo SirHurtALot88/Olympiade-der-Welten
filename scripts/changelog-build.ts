@@ -3,8 +3,10 @@
  *
  * Erzeugt `data/changelog/CHANGELOG.json` aus zwei Quellen: den `changelog:`-Zeilen der
  * Triage-Notizen (nur Status `gebaut`/`erledigt` — was nicht gemergt ist, hat im Changelog
- * nichts verloren) und den von Hand gepflegten Eintraegen in `data/changelog/eintraege.json`
- * (Aenderungen ohne Bug-Meldung: neues Feature, umgebaute Ansicht).
+ * nichts verloren) und den von Hand gepflegten Eintraegen in `data/changelog/eintraege/`
+ * (Aenderungen ohne Bug-Meldung: neues Feature, umgebaute Ansicht — eine Datei pro Eintrag,
+ * siehe die README.md dort). Die abgeloeste Sammeldatei `data/changelog/eintraege.json` wird
+ * weiterhin gelesen und ihr Restbestand angemahnt.
  *
  * WARUM ABGELEITET UND NICHT GEPFLEGT — dieselbe Begruendung wie bei `npm run bugs:tabelle`:
  * einer abgeleiteten Datei sieht man die Luecke an (der Generator mahnt jeden gemergten Fix ohne
@@ -32,7 +34,7 @@ function main() {
   const naechste = `${JSON.stringify(
     {
       hinweis:
-        "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und data/changelog/eintraege.json. Neu bauen: npm run changelog:bauen.",
+        "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
       eintraege: sammlung.eintraege,
     },
     null,
@@ -77,8 +79,19 @@ function main() {
       console.log(`  ${eintrag.kennung}: ${eintrag.grund}`);
     }
   }
+  // Nicht als Fehler, sondern als Aufraeum-Hinweis: die Eintraege zaehlen normal mit. Solange dort
+  // aber etwas liegt, kollidieren PRs wieder an derselben Zeile — und genau das war der Grund fuer
+  // die Umstellung auf eine Datei pro Eintrag.
+  if (sammlung.ausSammeldatei > 0) {
+    console.log("");
+    console.log(
+      `Hinweis: ${sammlung.ausSammeldatei} Eintrag/Eintraege liegen noch in der alten Sammeldatei ` +
+        "data/changelog/eintraege.json — bitte nach data/changelog/eintraege/ umziehen " +
+        "(eine Datei pro Eintrag, siehe dortige README.md).",
+    );
+  }
   if (sammlung.verworfeneGepflegte > 0) {
-    console.log(`Achtung: ${sammlung.verworfeneGepflegte} gepflegte(r) Eintrag/Eintraege unbrauchbar (Datum oder Text fehlt) — eintraege.json pruefen.`);
+    console.log(`Achtung: ${sammlung.verworfeneGepflegte} gepflegte(r) Eintrag/Eintraege unbrauchbar (Datum oder Text fehlt) — data/changelog/eintraege/ pruefen.`);
   }
 }
 

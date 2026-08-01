@@ -349,6 +349,22 @@ Zwei Regeln halten den Changelog ehrlich:
 Auch Änderungen ohne Bug-Meldung gehören hinein — ein neues Feature, eine umgebaute Ansicht. Der
 Changelog beantwortet „was hat sich geändert", nicht „welche Tickets gab es".
 
+### Wohin der Eintrag kommt
+
+Zu einer **Bug-Meldung** gehört er als `changelog:`-Zeile in die Triage-Notiz. Ohne Meldung wird er
+eine **eigene Datei** unter `data/changelog/eintraege/`, benannt `<datum>-pr<nummer>.json` — Aufbau
+und Felder stehen in der README.md dort. Danach `npm run changelog:bauen`.
+
+**Eine Datei pro Eintrag, nie eine gemeinsame Liste.** Vorher hängten alle PRs ihren Eintrag ans Ende
+desselben Arrays in `eintraege.json`. Bei einem Dutzend PRs an einem Tag kollidiert damit jeder PR
+mit jedem anderen gleichzeitig offenen — ein rein mechanischer Konflikt ohne inhaltliche Bedeutung,
+der aber jedes Mal einen Rebase und einen neuen CI-Lauf von rund zwanzig Minuten kostet. Da `main`
+sich schneller bewegt, als die CI läuft, hat ein PR dieses Rennen auch schon dreimal hintereinander
+verloren. Zwei PRs fassen nie dieselbe Datei an, wenn jeder Eintrag seine eigene hat.
+
+Die alte `eintraege.json` wird weiterhin gelesen, damit ein älterer Zweig seinen Eintrag beim Mergen
+nicht still verliert; der Generator mahnt an, was dort noch liegt.
+
 ---
 
 ## Was der Agent nicht tut

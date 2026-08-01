@@ -557,6 +557,101 @@ describe("sammleChangelog — beide Quellen, ein Ergebnis", () => {
     expect(sammlung.eintraege).toEqual([]);
     expect(sammlung.luecken).toEqual([]);
     expect(sammlung.verworfeneGepflegte).toBe(0);
+    expect(sammlung.ausSammeldatei).toBe(0);
     expect(sammlung.ohneGewicht).toEqual([]);
+  });
+
+  /**
+   * EINE DATEI PRO EINTRAG — der Grund, warum es das Verzeichnis gibt: an der alten Sammeldatei
+   * kollidierte jeder PR mit jedem anderen zeitgleich offenen, weil alle ans Ende desselben Arrays
+   * schrieben. Getestet wird deshalb beides: dass die neue Ablage traegt, UND dass die alte
+   * weiterhin gelesen wird — sonst verloere ein aelterer Zweig beim Mergen still seinen Eintrag.
+   */
+  function schreibeEintragsDatei(dir: string, name: string, inhalt: unknown) {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, name), JSON.stringify(inhalt), "utf8");
+  }
+
+  it("liest gepflegte Eintraege aus dem Verzeichnis, in Dateinamen-Reihenfolge", async () => {
+    const { sammleChangelog, CHANGELOG_EINTRAEGE_DIR } = await importModules();
+    // Absichtlich in umgekehrter Namensfolge angelegt: die Reihenfolge soll aus dem Dateinamen
+    // kommen, nicht aus der Anlegereihenfolge — sonst waere der Generator-Lauf nicht reproduzierbar.
+    schreibeEintragsDatei(CHANGELOG_EINTRAEGE_DIR, "2026-08-01-pr302.json", {
+      datum: "2026-08-01",
+      text: "Zweiter am selben Tag.",
+      gewicht: "behebung",
+      pr: "#302",
+    });
+    schreibeEintragsDatei(CHANGELOG_EINTRAEGE_DIR, "2026-08-01-pr299.json", {
+      datum: "2026-08-01",
+      text: "Erster am selben Tag.",
+      gewicht: "feinschliff",
+      pr: "#299",
+    });
+
+    const sammlung = sammleChangelog();
+    expect(sammlung.eintraege.map((e) => e.pr)).toEqual(["#299", "#302"]);
+    expect(sammlung.eintraege.every((e) => e.quelle === "gepflegt")).toBe(true);
+    expect(sammlung.ausSammeldatei).toBe(0);
+    expect(sammlung.ohneGewicht).toEqual([]);
+  });
+
+  it("liest die alte Sammeldatei weiter mit und weist gesondert darauf hin", async () => {
+    const { sammleChangelog, CHANGELOG_DIR, CHANGELOG_EINTRAEGE_DIR, CHANGELOG_EINTRAEGE_FILE } =
+      await importModules();
+    schreibeEintragsDatei(CHANGELOG_EINTRAEGE_DIR, "2026-08-01-pr299.json", {
+      datum: "2026-08-01",
+      text: "Aus dem Verzeichnis.",
+      gewicht: "feinschliff",
+      pr: "#299",
+    });
+    fs.mkdirSync(CHANGELOG_DIR, { recursive: true });
+    fs.writeFileSync(
+      CHANGELOG_EINTRAEGE_FILE,
+      JSON.stringify({
+        eintraege: [
+          { datum: "2026-07-30", text: "Aus der alten Sammeldatei.", gewicht: "behebung", pr: "#280" },
+        ],
+      }),
+      "utf8",
+    );
+
+    const sammlung = sammleChangelog();
+    expect(sammlung.eintraege.map((e) => e.text)).toEqual([
+      "Aus dem Verzeichnis.",
+      "Aus der alten Sammeldatei.",
+    ]);
+    // Nur der Rest aus der alten Ablage wird gezaehlt — daran haengt die Aufraeum-Mahnung.
+    expect(sammlung.ausSammeldatei).toBe(1);
+  });
+
+  it("laesst eine kaputte Eintragsdatei herausfallen, ohne den Lauf zu reissen", async () => {
+    const { sammleChangelog, CHANGELOG_EINTRAEGE_DIR } = await importModules();
+    fs.mkdirSync(CHANGELOG_EINTRAEGE_DIR, { recursive: true });
+    fs.writeFileSync(path.join(CHANGELOG_EINTRAEGE_DIR, "2026-08-01-kaputt.json"), "{ kein json", "utf8");
+    // Kein Datum → unbrauchbar, faellt ebenfalls heraus.
+    schreibeEintragsDatei(CHANGELOG_EINTRAEGE_DIR, "2026-08-01-ohne-datum.json", { text: "ohne Datum" });
+    schreibeEintragsDatei(CHANGELOG_EINTRAEGE_DIR, "2026-08-01-pr299.json", {
+      datum: "2026-08-01",
+      text: "Der heile Eintrag.",
+      gewicht: "feinschliff",
+      pr: "#299",
+    });
+
+    const sammlung = sammleChangelog();
+    expect(sammlung.eintraege.map((e) => e.text)).toEqual(["Der heile Eintrag."]);
+    expect(sammlung.verworfeneGepflegte).toBe(2);
+  });
+
+  it("nimmt auch mehrere Eintraege aus einer Datei", async () => {
+    const { sammleChangelog, CHANGELOG_EINTRAEGE_DIR } = await importModules();
+    schreibeEintragsDatei(CHANGELOG_EINTRAEGE_DIR, "2026-08-01-sammel.json", [
+      { datum: "2026-08-01", text: "Eins.", gewicht: "feinschliff" },
+      { datum: "2026-08-01", text: "Zwei.", gewicht: "feinschliff" },
+    ]);
+
+    const sammlung = sammleChangelog();
+    expect(sammlung.eintraege.map((e) => e.text)).toEqual(["Eins.", "Zwei."]);
+    expect(sammlung.verworfeneGepflegte).toBe(0);
   });
 });
