@@ -20,9 +20,9 @@ describe("Changelog: Versionsnummer nur bei grossen Aenderungen", () => {
     const eintrag = parseChangelogEintrag({
       datum: "2026-08-01",
       text: "Grosser Umbau.",
-      version: "1.1",
+      version: "0.2",
     });
-    expect(eintrag?.version).toBe("1.1");
+    expect(eintrag?.version).toBe("0.2");
   });
 
   it("laesst sie weg, wenn keine da ist — und stolpert nicht ueber Leerzeichen", () => {
@@ -36,9 +36,12 @@ describe("Changelog: Versionsnummer nur bei grossen Aenderungen", () => {
     const datei = parseChangelogDatei(read("data/changelog/CHANGELOG.json"));
     const versionen = datei.map((eintrag) => eintrag.version).filter((wert): wert is string => Boolean(wert));
     expect(versionen.length).toBeGreaterThan(0);
-    // `package.json` traegt drei Stellen (1.1.0), der Changelog zwei (1.1) — die Nummer im
+    // `package.json` traegt drei Stellen (0.2.0), der Changelog zwei (0.2) — die Nummer im
     // Changelog muss ein Praefix der Paketversion sein, sonst behauptet das Spiel eine Version,
     // die es nicht ausliefert.
+    //
+    // Waehrend 0.x zaehlt die MITTLERE Stelle die Umbauten: das Sponsormodell ist 0.2, ein
+    // Bugfix darin waere 0.2.1. Der Sprung auf 1.0 bleibt dem fertigen Spiel vorbehalten.
     for (const version of new Set(versionen)) {
       expect(paket.version.startsWith(version), `Changelog nennt v${version}, package.json ${paket.version}`).toBe(true);
     }
