@@ -193,8 +193,14 @@ function softKneeMarketValueForRegression(marktwertBase: number): number {
   );
 }
 const NEGATIVE_TRAINING_SIDE_EFFECT_SHARE = 0.14;
-/** Performance budget scale — boosts peak P90 vs league median. Tunable via auto-tune. */
-export const ORGANIC_PERFORMANCE_SETPOINT_SCALE = 1.05;
+/** Performance budget scale — boosts peak P90 vs league median. Tunable via auto-tune.
+ *
+ *  2026-08-01: 1,05 → 1,53 (Faktor 1,46). Gegenstueck zur Senkung von
+ *  `TRAINING_SETPOINTS_BY_MODE` um 0,76 — zusammen heben die beiden den Ø-Performance-Anteil am
+ *  Bruttozuwachs von gemessenen 34,3 % auf Chris' Zielwert 50 %, ohne die Bruttosumme und damit den
+ *  Liga-Netto-Haushalt zu verschieben. Belege in
+ *  data/bug-reports/triage/bug-2026-07-29T18-25-42-114Z-a0mgbp.md. */
+export const ORGANIC_PERFORMANCE_SETPOINT_SCALE = 1.53;
 const PERFORMANCE_SEASON_SOFT_KNEE = 5.5;
 /**
  * 2026-07-04 design correction: growth floors must derive from the player's own
