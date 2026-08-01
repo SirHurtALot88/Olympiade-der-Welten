@@ -84,7 +84,23 @@ export type LeagueLeaderCategory = {
   id: string;
   label: string;
   tone: LeagueLeaderTone;
+  /** Die Kachel-Ansicht: die ersten `limit` Plaetze (Standard 5). */
   entries: LeagueLeaderEntry[];
+  /**
+   * Dieselbe Rangliste, ungekappt — fuer das Aufklappen ("Ganze Rangliste").
+   *
+   * GEWUENSCHT: „dass man in jede top 5 rein klicken kann auf nen button und dann die tabelle
+   * aufgeht wo man z.B. dann ne top 50 oder so sehen kann oder sogar alle."
+   *
+   * Bewusst ein zweites FELD und nicht ein zweiter Aufruf mit hoeherem Limit: sortiert und
+   * bewertet wird genau einmal, `entries` ist woertlich `fullEntries.slice(0, limit)`. Damit
+   * kann die lange Liste gar nicht in einer anderen Reihenfolge stehen als die kurze.
+   *
+   * Und bewusst NICHT `entries` selbst ungekappt: daran haengen Zaehlungen, die „Top 5"
+   * woertlich meinen — der Leaderboard-Footprint („2× Top-5") und das Achievement „Top-5 der
+   * Liga". Waere `entries` die volle Liste, zaehlten beide jeden Spieler der Liga mit.
+   */
+  fullEntries: LeagueLeaderEntry[];
 };
 
 export const LEAGUE_LEADER_DEFAULT_LIMIT = 5;
@@ -118,7 +134,7 @@ function buildCategory(
   rows: LeaderCandidateRow[],
   limit: number,
 ): LeagueLeaderCategory {
-  const entries = rows
+  const fullEntries = rows
     .filter((row) => row.value != null && Number.isFinite(row.value))
     .sort((left, right) => {
       const valueDelta = (right.value ?? Number.NEGATIVE_INFINITY) - (left.value ?? Number.NEGATIVE_INFINITY);
@@ -128,7 +144,6 @@ function buildCategory(
 
       return left.name.localeCompare(right.name, "de");
     })
-    .slice(0, limit)
     .map((row, index) => ({
       rank: index + 1,
       playerId: row.playerId,
@@ -141,7 +156,7 @@ function buildCategory(
       ovrRank: row.ovrRank,
     }));
 
-  return { id, label, tone, entries };
+  return { id, label, tone, entries: fullEntries.slice(0, limit), fullEntries };
 }
 
 /**
@@ -159,9 +174,8 @@ function buildPreSortedCategory(
   rows: Array<LeaderCandidateRow & { displayValue: string }>,
   limit: number,
 ): LeagueLeaderCategory {
-  const entries = rows
+  const fullEntries = rows
     .filter((row) => row.value != null && Number.isFinite(row.value))
-    .slice(0, limit)
     .map((row, index) => ({
       rank: index + 1,
       playerId: row.playerId,
@@ -174,7 +188,7 @@ function buildPreSortedCategory(
       ovrRank: row.ovrRank,
     }));
 
-  return { id, label, tone, entries };
+  return { id, label, tone, entries: fullEntries.slice(0, limit), fullEntries };
 }
 
 export function buildLeagueLeaderBoards(input: {

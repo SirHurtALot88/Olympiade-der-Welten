@@ -47067,6 +47067,31 @@ button.foundation-team-portrait-card {
   border-top: 1px solid var(--nl-line);
 }
 
+/* "Ganze Rangliste · 332 Spieler" — der sichtbare Weg aus der Top-5-Kachel in die volle
+   Liste. Vorher gab es ihn nur versteckt als Nebenwirkung der Kennzahl-Chips. Bewusst
+   zurueckhaltend gestylt: die Kachel selbst bleibt der Blickfang. */
+.is-new-look .nl-leaders-openall {
+  margin-top: var(--nl-s1, 6px);
+  width: 100%;
+  border: 1px solid var(--nl-line);
+  background: transparent;
+  color: var(--nl-mut, #93a3bd);
+  border-radius: 10px;
+  padding: 7px 10px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.is-new-look .nl-leaders-openall:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+}
+
+.is-new-look .nl-leaders-openall:focus-visible {
+  outline: 2px solid var(--nl-accent, #5b9bff);
+  outline-offset: 2px;
+}
+
 .is-new-look .nl-leaders-stats .nl-stat-chip {
   flex: 1 1 0;
   min-width: 88px;
@@ -67497,6 +67522,37 @@ button.is-new-look .nl-thist-season-pill,
   color: var(--nl-mut, #93a3bd);
   font-size: 0.88rem;
   margin: 0;
+}
+
+/* Aktionen, die zur GANZEN Rangliste gehoeren: "Alle 332 anzeigen", "Zu meinem Besten".
+   Sitzt unter der Liste und scrollt mit — wer bis ans Ende gelesen hat, findet dort den
+   naechsten Schritt. */
+.is-new-look .nl-rankdrawer-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 0 2px;
+}
+
+.is-new-look .nl-rankdrawer-more {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 0.84rem;
+  cursor: pointer;
+  text-align: center;
+}
+
+.is-new-look .nl-rankdrawer-more:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.is-new-look .nl-rankdrawer-more:focus-visible {
+  outline: 2px solid var(--nl-accent, #5b9bff);
+  outline-offset: 2px;
 }
 
 .is-new-look .nl-rankdrawer-list {

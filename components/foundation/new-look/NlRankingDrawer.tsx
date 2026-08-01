@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
+import type { ReactNode } from "react";
 
 import { useFocusTrap } from "@/lib/foundation/use-focus-trap";
 import { NlMedalBadge, type NlMedalKind } from "@/components/foundation/new-look/NlMedalBadge";
@@ -56,6 +57,14 @@ export type NlRankingDrawerProps = {
    * bleibt der Drawer die primäre (nicht-navigierende) Ansicht.
    */
   onSelectRow?: (row: NlRankingDrawerRow) => void;
+  /**
+   * Zeile unter der Liste — fuer Aktionen, die zur GANZEN Rangliste gehoeren, nicht zu einer
+   * einzelnen Zeile: „Alle 332 anzeigen", „Zu meinem Besten".
+   *
+   * Bewusst ein freier Slot statt fester Knoepfe: der Drawer weiss nicht, wie lang die
+   * Gesamtliste ist oder was „mein Bester" bedeutet — das weiss nur die Ansicht, die ihn oeffnet.
+   */
+  footer?: ReactNode;
   className?: string;
 };
 
@@ -76,6 +85,7 @@ export function NlRankingDrawer({
   highlightId,
   emptyLabel = "Keine Rangliste verfügbar.",
   onSelectRow,
+  footer,
   className,
 }: NlRankingDrawerProps) {
   const dialogRef = useRef<HTMLElement | null>(null);
@@ -212,6 +222,7 @@ export function NlRankingDrawer({
               })}
             </ol>
           )}
+          {footer ? <div className="nl-rankdrawer-footer">{footer}</div> : null}
         </div>
       </aside>
     </div>

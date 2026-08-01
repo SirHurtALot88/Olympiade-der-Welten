@@ -63,9 +63,12 @@ import {
  * Ladefehler) fällt jeder Avatar ehrlich auf die Initialen zurück.
  *
  * Bewusst weggelassen, weil es dafür keine echten Daten gibt:
- * - keine Rang-Bewegung/Trends (nicht in den Props vorhanden),
- * - kein erfundener Rang außerhalb der gelisteten Einträge: ist kein eigener
- *   Spieler in `entries`, zeigt "Dein Bester" ehrlich "außerhalb Top N".
+ * - keine Rang-Bewegung/Trends (nicht in den Props vorhanden).
+ *
+ * "Dein Bester" nannte hier frueher keinen Rang, sondern nur "außerhalb Top N" — damals lagen
+ * wirklich nur fünf Plätze vor, und ein geratener Rang wäre eine Falschaussage gewesen. Seit
+ * die Kategorie ihre vollständige Rangliste mitliefert (`fullEntries`), ist der echte Rang
+ * bekannt und steht dort: "#87 · Name".
  */
 
 const NL_LEADER_TONE_MAP: Record<LeagueLeaderTone, NlTone> = {
@@ -205,6 +208,7 @@ export default function LeagueLeadersNewLook({
   function openCategoryRankingDrawer(categoryId: string, highlightPlayerId?: string | null) {
     setRankingDrawerCategoryId(categoryId);
     setRankingDrawerHighlightId(highlightPlayerId ?? null);
+    setRankingDrawerVisibleCount(NL_RANKING_DRAWER_STEP);
   }
 
   function closeCategoryRankingDrawer() {
@@ -217,12 +221,29 @@ export default function LeagueLeadersNewLook({
     [categories, rankingDrawerCategoryId],
   );
 
+  /**
+   * Wie viele Plaetze der Drawer gerade zeigt.
+   *
+   * GEWUENSCHT: „…dann die tabelle aufgeht wo man z.B. dann ne top 50 oder so sehen kann oder
+   * sogar alle."
+   *
+   * Die Staffelung ist reine RENDER-Kappung: `fullEntries` liegt vollstaendig vor, hier wird nur
+   * entschieden, wie viel davon gezeichnet wird. Beim Oeffnen startet es wieder bei 50, damit
+   * eine zuvor aufgeklappte Liste nicht die naechste Kategorie mit 332 Zeilen aufreisst.
+   */
+  const NL_RANKING_DRAWER_STEP = 50;
+  const [rankingDrawerVisibleCount, setRankingDrawerVisibleCount] = useState(NL_RANKING_DRAWER_STEP);
+
   const rankingDrawerRows = useMemo<NlRankingDrawerRow[]>(() => {
     if (!rankingDrawerCategory) {
       return [];
     }
     const tone = NL_LEADER_TONE_MAP[rankingDrawerCategory.tone] ?? "accent";
-    return rankingDrawerCategory.entries.map((entry) => ({
+    // `fullEntries` statt `entries`: die Kachel zeigt weiter die Top 5, der Drawer die ganze
+    // Rangliste. Beide stammen aus derselben Sortierung — `entries` IST der Anfang von
+    // `fullEntries`, die Raenge koennen also nicht auseinanderlaufen.
+    const alle = rankingDrawerCategory.fullEntries ?? rankingDrawerCategory.entries;
+    return alle.slice(0, rankingDrawerVisibleCount).map((entry) => ({
       id: entry.playerId,
       rank: entry.rank,
       name: entry.name,
@@ -232,6 +253,22 @@ export default function LeagueLeadersNewLook({
       tone,
       isOwn: entry.teamId != null && entry.teamId === selectedTeamId,
     }));
+  }, [rankingDrawerCategory, rankingDrawerVisibleCount, selectedTeamId]);
+
+  /** Wie viele Plaetze die Kategorie insgesamt hat — fuer „Alle 332 anzeigen". */
+  const rankingDrawerTotal = (rankingDrawerCategory?.fullEntries ?? rankingDrawerCategory?.entries ?? []).length;
+
+  /**
+   * Der beste eigene Spieler in dieser Kategorie — jetzt IMMER mit Rang.
+   *
+   * Vorher stand auf der Kachel „außerhalb Top 5", weil nur fuenf Plaetze bekannt waren. Das
+   * war keine Information. Mit der vollen Liste ist „#87" moeglich, und der Drawer kann
+   * dorthin springen.
+   */
+  const rankingDrawerOwnBest = useMemo(() => {
+    if (!rankingDrawerCategory || !selectedTeamId) return null;
+    const alle = rankingDrawerCategory.fullEntries ?? rankingDrawerCategory.entries;
+    return alle.find((entry) => entry.teamId === selectedTeamId) ?? null;
   }, [rankingDrawerCategory, selectedTeamId]);
 
   // Optionaler Foundation-State: Rekorde/Hall-of-Fame brauchen den vollen
@@ -317,10 +354,17 @@ export default function LeagueLeadersNewLook({
           const chasers = category.entries.slice(1);
           const median = getCategoryMedian(category);
           const statDecimals = getCategoryStatDecimals(category.id);
-          // Bester eigener Spieler: erster Eintrag (nach Rang sortiert) des eigenen Teams.
+          /**
+           * Bester eigener Spieler — gesucht in der GANZEN Rangliste, nicht nur in den Top 5.
+           *
+           * Vorher stand hier meistens „außerhalb Top 5", weil nur fuenf Plaetze bekannt waren.
+           * Das war keine Information: es sagte nicht, ob der eigene Beste Sechster ist oder
+           * Dreihundertster. Mit `fullEntries` steht dort jetzt „#87 · Name".
+           */
+          const alleEintraege = category.fullEntries ?? category.entries;
           const ownBest =
             selectedTeamId != null
-              ? category.entries.find((entry) => entry.teamId != null && entry.teamId === selectedTeamId) ?? null
+              ? alleEintraege.find((entry) => entry.teamId != null && entry.teamId === selectedTeamId) ?? null
               : null;
 
           return (
@@ -428,13 +472,28 @@ export default function LeagueLeadersNewLook({
                       <StatChip
                         label="Dein Bester"
                         value="—"
-                        sub={`außerhalb Top ${formatNlNumber(category.entries.length, 0)}`}
+                        sub="kein Spieler gewertet"
                         onClick={() => openCategoryRankingDrawer(category.id)}
-                        title={`Rangliste ${category.label} — kein eigener Spieler unter den gelisteten Top ${formatNlNumber(category.entries.length, 0)}`}
+                        title={`Rangliste ${category.label} — kein eigener Spieler in dieser Wertung`}
                       />
                     )
                   ) : null}
                 </StatChipRow>
+              ) : null}
+
+              {hasData ? (
+                // Der Knopf, den es vorher nicht gab: die Chips oeffneten den Drawer nur als
+                // Nebeneffekt („Leader", „Median"). Gewuenscht war ein sichtbarer Weg in die
+                // ganze Rangliste.
+                <button
+                  type="button"
+                  className="nl-leaders-openall"
+                  data-testid="leaders-open-full-ranking"
+                  onClick={() => openCategoryRankingDrawer(category.id, ownBest?.playerId ?? null)}
+                  title={`Ganze Rangliste ${category.label} — ${formatNlNumber(alleEintraege.length, 0)} Spieler`}
+                >
+                  Ganze Rangliste · {formatNlNumber(alleEintraege.length, 0)} Spieler
+                </button>
               ) : null}
             </article>
           );
@@ -451,6 +510,35 @@ export default function LeagueLeadersNewLook({
         rows={rankingDrawerRows}
         highlightId={rankingDrawerHighlightId}
         onSelectRow={(row) => onOpenPlayer(row.id)}
+        footer={
+          <>
+            {rankingDrawerTotal > rankingDrawerRows.length ? (
+              <button
+                type="button"
+                className="nl-rankdrawer-more"
+                data-testid="ranking-drawer-show-all"
+                onClick={() => setRankingDrawerVisibleCount(rankingDrawerTotal)}
+              >
+                Alle {rankingDrawerTotal} anzeigen
+              </button>
+            ) : null}
+            {rankingDrawerOwnBest ? (
+              <button
+                type="button"
+                className="nl-rankdrawer-more"
+                data-testid="ranking-drawer-own-best"
+                onClick={() => {
+                  // Erst so weit aufklappen, dass der eigene Spieler ueberhaupt gezeichnet ist —
+                  // sonst springt der Drawer auf eine Zeile, die es im DOM noch nicht gibt.
+                  setRankingDrawerVisibleCount((sichtbar) => Math.max(sichtbar, rankingDrawerOwnBest.rank));
+                  setRankingDrawerHighlightId(rankingDrawerOwnBest.playerId);
+                }}
+              >
+                Zu meinem Besten · #{rankingDrawerOwnBest.rank} {rankingDrawerOwnBest.name}
+              </button>
+            ) : null}
+          </>
+        }
       />
     </section>
   );
