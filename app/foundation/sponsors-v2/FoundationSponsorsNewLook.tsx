@@ -28,7 +28,7 @@ import {
   type LeagueSponsorSort,
 } from "@/lib/sponsor/sponsor-offer-presenter";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
-import { resolveSponsorSystemVersion } from "@/lib/sponsor/sponsor-v2-offer-service";
+import { resolveSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { SponsorRankLadder } from "@/components/foundation/sponsor/SponsorRankLadder";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
@@ -202,9 +202,11 @@ function ActiveContractHero({
   // Siehe SponsorOfferCardNewLook: die Modellkurve gewinnt, die Legacy-Kurvenform bleibt nur fuer
   // Vertraege aus Spielstaenden von vor der Umstellung.
   const shape = contract.curveShape ?? mapArchetypeToCurveShape(contract.archetype);
-  const shapeLabel = contract.sponsorV2?.curveName ?? SPONSOR_CURVE_SHAPES[shape].labelDe;
-  const familyLabel = contract.sponsorV2
-    ? contract.sponsorV2.profileName
+  const shapeLabel = contract.sponsorV3?.cardName ?? SPONSOR_CURVE_SHAPES[shape].labelDe;
+  const familyLabel = contract.sponsorV3
+    ? contract.sponsorV3.tilt === 0
+      ? "EV-neutral"
+      : `${contract.sponsorV3.tilt > 0 ? "+" : ""}${Math.round(contract.sponsorV3.tilt * 100)} % Hebel`
     : SPONSOR_CURVE_FAMILIES[getSponsorCurveFamily(shape)].labelDe;
   const payoutTiles = buildContractPayoutTiles(contract);
   const paidCount = payoutTiles.filter((tile) => tile.paid).length;

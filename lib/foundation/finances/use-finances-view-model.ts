@@ -33,7 +33,7 @@ import type {
   FinancesViewModel,
   TeamFinancesState,
 } from "@/lib/foundation/finances/finances-types";
-import { getSponsorV2Terms } from "@/lib/sponsor/sponsor-v2-offer-service";
+import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 
 /** Gleiche Rundung wie Cash-Werte im Kredit-/Sponsor-Service (1 Nachkommastelle). */
 function round1(value: number): number {
@@ -167,15 +167,15 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
     // Sponsor-Vorschau ist optional — fehlt sie, greift unten der Estimate-Fallback.
     sponsorSettlementRows = [];
   }
-  // SPONSORSYSTEM V2: die Aufschluesselung kommt dann ZEILENWEISE aus dem Settlement statt ueber
-  // `kind` gruppiert. Grund: V2 liefert ZWEI Zeilen mit kind "special" — die rangunabhaengige
-  // Klausel und das Sonderziel. Gruppiert man sie, verschmelzen sie unter dem Etikett "Sonderziel"
-  // zu einem Betrag, den es so nicht gibt. Die SUMME ist in beiden Faellen dieselbe (und damit die
-  // Invariante Anzeige == Settlement gewahrt), aber die Aufschluesselung waere gelogen.
-  const isV2Contract = getSponsorV2Terms(sponsorContract) != null;
+  // SPONSORSYSTEM V3: die Aufschluesselung kommt ZEILENWEISE aus dem Settlement statt ueber `kind`
+  // gruppiert. Die Settlement-Zeilen sind Teleskop-Differenzen der eingefrorenen Leiter; gruppiert
+  // man sie nach `kind` und summiert die Belohnungsbetraege der Komponenten, entstehen Betraege, die
+  // es so nicht gibt. Die SUMME waere zwar dieselbe (Invariante Anzeige == Settlement gewahrt), die
+  // Aufschluesselung aber gelogen.
+  const isV3Contract = getSponsorV3Terms(sponsorContract) != null;
   const sponsorComponents = !sponsorContract
     ? []
-    : isV2Contract
+    : isV3Contract
       ? sponsorSettlementRows
           .filter((row) => FINANCE_SPONSOR_INCOME_COMPONENT_KINDS.includes(row.kind))
           .filter((row) => Number.isFinite(row.cashDelta) && row.cashDelta > 0)

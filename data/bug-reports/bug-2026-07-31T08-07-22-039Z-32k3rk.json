@@ -1,0 +1,41 @@
+{
+  "note": "Spieltag hängt obwohl alles sauber gescored wurde - Aktion\nSpieltag konnte nicht abgeschlossen werden\nStandings Apply fehlt noch für diesen Spieltag.",
+  "view": "matchdayArena",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=matchdayArena&team=L-K&saveId=new-game-1785476771457-e4yvyl",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 3127,
+    "height": 1155
+  },
+  "clientTime": "2026-07-31T08:07:22.013Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-07-31T08-07-22-039Z-32k3rk",
+  "createdAt": "2026-07-31T08:07:22.039Z",
+  "page": {
+    "path": "/foundation",
+    "view": "matchdayArena",
+    "tab": null,
+    "label": "Spieltag · Arena"
+  },
+  "game": {
+    "saveId": "new-game-1785476771457-e4yvyl",
+    "saveName": "Oly New Game Custom 31.7.2026, 07:46:11",
+    "saveSource": "url",
+    "seasonId": "season-1",
+    "seasonYear": 1,
+    "currentMatchday": 1,
+    "matchdayId": "matchday-1",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "L-K"
+    ]
+  }
+}

@@ -13,7 +13,7 @@ export type FoundationNavItem = {
 };
 
 export type FoundationNavGroup = {
-  id: "matchday" | "team" | "market" | "world" | "admin";
+  id: "matchday" | "team" | "market" | "world" | "admin" | "info";
   label: string;
   items: FoundationNavItem[];
 };
@@ -81,6 +81,21 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
     items: [
       { id: "generator", label: "Generator", tooltip: "Spieler generieren.", icon: "+" },
       { id: "teamSettings", label: "Settings", tooltip: "Team-Konfiguration und Speicherstände.", icon: "⚙" },
+    ],
+  },
+  // Bewusst die letzte Gruppe: das Konzept (docs/BUGFIXING_AGENT.md, "Der Changelog") verlangt den
+  // Changelog als UNTERSTEN Reiter — und er ist weder Spielsteuerung noch Verwaltung, sondern
+  // Auskunft. Eine eigene Gruppe haelt ihn aus dem Weg, ohne ihn zu verstecken.
+  {
+    id: "info",
+    label: "Info",
+    items: [
+      {
+        id: "changelog",
+        label: "Changelog",
+        tooltip: "Was zuletzt gefixt oder geändert wurde — mit PR-Nummer als Beleg.",
+        icon: "✓",
+      },
     ],
   },
 ];

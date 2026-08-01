@@ -68,7 +68,11 @@ describe("sponsor offer presenter", () => {
     const floor = readLockedRankPayout(rankLadder, 32);
     for (const row of rows.slice(1)) {
       const expected = baseCash + Math.max(0, readLockedRankPayout(rankLadder, row.rankAt) - floor);
-      expect(row.absolutePayout).toBeCloseTo(Number(expected.toFixed(2)), 1);
+      // Mit DERSELBEN Funktion runden wie die Anzeige (`roundOfferCash`), nicht mit `toFixed`.
+      // Beide runden auf eine Stelle, aber bei Werten wie 62,95 liegt der gespeicherte Double
+      // knapp darunter: `Math.round(629.5)/10` ergibt 63, `(62.95).toFixed(1)` ergibt "62.9".
+      // Der Test kippte damit an einem Rundungsartefakt statt an einer echten Abweichung.
+      expect(row.absolutePayout).toBeCloseTo(Math.round(expected * 10) / 10, 2);
     }
     // Non-decreasing über die gesamte Leiter inkl. Boden-Stufe.
     for (let index = 1; index < rows.length; index += 1) {

@@ -11,9 +11,10 @@
  * Für NEUE Features NICHT verwenden — überall Sponsoren nutzen. Ziel: bei einem späteren
  * Cleanup ganz entfernen.
  */
-import type { PrizeMoneyRow, SponsorPlacementRow, TeamPrizeSummaryRow } from "@/lib/season/types";
+import type { PrizeMoneyRow, TeamPrizeSummaryRow } from "@/lib/season/types";
 import type { AdminBalancingConfigInput } from "@/lib/data/olyDataTypes";
 import { resolveAdminBalancingConfig } from "@/lib/admin/balancing-config";
+import { getPrizePlacementBonus } from "@/lib/season/prize-placement-table";
 
 const SPONSOR_SEASON_PERCENTS = [
   7.67, 7.29, 6.9, 6.52, 6.13, 5.75, 5.37, 4.98, 4.6, 4.22, 3.99, 3.76, 3.53, 3.3, 3.07, 2.84,
@@ -25,35 +26,8 @@ const BASIS_DIFFS = [
   7.2, 7.5, 7.8, 8.1, 8.4, 8.7, 9, 9.3, 9.6, 9.9, 10.2, 10.5,
 ] as const;
 
-const SPONSOR_PLACEMENT_POSITIVE = Array.from({ length: 31 }, (_, index) => {
-  const rankDelta = 31 - index;
-  const placement = Number((30.68 - index * 0.745).toFixed(2));
-  const percent = Number((20.5 - index * 0.5).toFixed(1));
-  return {
-    rankDelta,
-    placement,
-    percent,
-  };
-});
-
 function round2(value: number) {
   return Math.round(value * 100) / 100;
-}
-
-export function getSponsorPlacementRows(): SponsorPlacementRow[] {
-  return [
-    ...SPONSOR_PLACEMENT_POSITIVE,
-    { rankDelta: 0, placement: 0, percent: 0 },
-    ...SPONSOR_PLACEMENT_POSITIVE.map((row) => ({
-      rankDelta: -row.rankDelta,
-      placement: -row.placement,
-      percent: -row.percent,
-    })),
-  ].sort((left, right) => right.rankDelta - left.rankDelta);
-}
-
-export function getSponsorPlacementLookup() {
-  return Object.fromEntries(getSponsorPlacementRows().map((row) => [row.rankDelta, row.placement]));
 }
 
 export function buildPrizeMoneyTable(teamSalaries: number[], salaryFactor = 1, adminConfig?: AdminBalancingConfigInput | null): PrizeMoneyRow[] {
@@ -104,7 +78,6 @@ export function buildTeamPrizeSummary(
 ): TeamPrizeSummaryRow[] {
   const prizeRows = buildPrizeMoneyTable(seasonStandRows.map((row) => row.upkeep), salaryFactor, adminConfig);
   const prizeMap = new Map(prizeRows.map((row) => [row.rank, row]));
-  const placementMap = getSponsorPlacementLookup();
 
   return seasonStandRows.map((row, index) => {
     const prize = prizeMap.get(row.rank);
@@ -113,7 +86,11 @@ export function buildTeamPrizeSummary(
     const transfers = round2(row.transfers ?? 0);
     const basis = prize?.basis ?? 0;
     const sponsorSeason = prize?.seasonShare ?? 0;
-    const placementBonus = placementMap[rankDiff] ?? 0;
+    // EINE Platzierungstabelle, die des Sheets — dieselbe, aus der der Preisgeld-Benchmark und die
+    // Sponsorleiter rechnen. Die frueher hier benutzte Code-Tabelle (`getSponsorPlacementLookup`,
+    // ±8,33 fuer einen Platz) war das zweite Exemplar desselben Begriffs und lag um Faktor sechs
+    // daneben; sie ist mit dem V3-Umbau ersatzlos entfallen.
+    const placementBonus = getPrizePlacementBonus(rankDiff);
     const sponsorTotal = round2(basis + sponsorSeason + placementBonus);
     const profitLoss = round2(sponsorTotal - row.upkeep);
     // `team.cash` is already the local in-season cash state, including transfer effects.

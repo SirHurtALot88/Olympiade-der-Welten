@@ -14,7 +14,7 @@ import type { SponsorSpecialTemplateId } from "@/lib/sponsor/sponsor-brand-varia
 import { SPONSOR_RARITIES } from "@/lib/sponsor/sponsor-curve-shapes";
 import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { DEFAULT_ROSTER_MAX } from "@/lib/foundation/roster-limits";
-import { SPONSOR_V2_REFERENCE_SALARY_PER_TEAM } from "@/lib/sponsor/sponsor-v2-offer-service";
+import { SPONSOR_V3_REFERENCE_SALARY_PER_TEAM } from "@/lib/sponsor/sponsor-v3-offer-service";
 
 /**
  * Rarity-Ordnung (0..3, gewöhnlich..legendär) als neue Schwierigkeits-Achse anstelle des Sternrangs. Die
@@ -322,7 +322,7 @@ export function resolveSalaryDisciplineTarget(input: {
   // greift dieselbe Referenz, mit der auch K geloest wird (gemessener S1-Schnitt je Team).
   const median = leagueSalaries.length
     ? leagueSalaries[Math.floor(leagueSalaries.length / 2)]!
-    : Math.max(input.ownSalary, SPONSOR_V2_REFERENCE_SALARY_PER_TEAM);
+    : Math.max(input.ownSalary, SPONSOR_V3_REFERENCE_SALARY_PER_TEAM);
   const basis = Math.max(input.ownSalary, 0.6 * median);
   const expensive = input.ownSalary >= median;
   const order = input.rarityOrder;
@@ -1503,6 +1503,14 @@ export function pickBonusObjective(
   usedFamilies?: Set<string>,
   /** Optional: erlaubt das Applicability-Gate (Schulden/Verträge/Gebäude) für die neuen Ziele (Fable B). */
   gameState?: GameState,
+  /**
+   * KATALOG-FILTER des V3-Sponsormodells: nur Ziele durchlassen, deren geschätzte
+   * Erfolgswahrscheinlichkeit für die Stärkeklasse DIESES Teams im bepreisbaren Band [0,15, 0,72]
+   * liegt (`sponsorV3IsGoalOfferable`). Anders als die frühere Klammer in der Bepreisung fällt ein
+   * unerreichbares Ziel damit aus dem KATALOG, statt wertlos angeboten zu werden. Ohne Filter
+   * (Aufrufer ausserhalb der Angebotserzeugung) bleibt der Pool unverändert.
+   */
+  isPriceable?: (key: SponsorBonusObjectiveKey) => boolean,
 ): SponsorBonusObjectiveKey | null {
   const strengthKeys = filterBonusObjectivesByStrength(
     getAvailableBonusObjectiveKeys(archetype, seasonId).filter((key) => key !== "transfer_trader"),
@@ -1511,10 +1519,16 @@ export function pickBonusObjective(
   if (strengthKeys.length === 0) {
     return null;
   }
+  const priceable = isPriceable ? strengthKeys.filter((key) => isPriceable(key)) : strengthKeys;
+  // Bliebe durch den Filter NICHTS übrig, ist das ein Katalog-Loch und kein Grund, ein
+  // unbepreisbares Ziel anzubieten: dann trägt die Karte lieber gar kein Sonderziel.
+  if (priceable.length === 0) {
+    return null;
+  }
   const applicable = gameState
-    ? strengthKeys.filter((key) => isBonusObjectiveApplicable(gameState, teamId, key))
-    : strengthKeys;
-  const poolKeys = applicable.length > 0 ? applicable : strengthKeys;
+    ? priceable.filter((key) => isBonusObjectiveApplicable(gameState, teamId, key))
+    : priceable;
+  const poolKeys = applicable.length > 0 ? applicable : priceable;
   // Familien meiden, die im Slate schon vorkommen; nur wenn dadurch nichts übrig bliebe, den vollen Pool.
   const fresh = usedFamilies
     ? poolKeys.filter((key) => !usedFamilies.has(SPONSOR_OBJECTIVE_FAMILY[key] ?? ""))

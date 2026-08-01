@@ -102,8 +102,6 @@
     "season:prep-draft-inspect": "tsx scripts/season-prep-draft-inspect.ts",
     "season:realistic-multi-sim": "tsx scripts/season-realistic-multi-sim.ts",
     "debug:planner-convergence": "tsx scripts/debug-planner-convergence-teams.ts",
-    "sponsor:5year-sim": "tsx scripts/sponsor-5year-sim.ts",
-    "sponsor:5year-sim-verbose": "tsx scripts/sponsor-5year-sim.ts --verbose",
     "sponsor:prize-compare": "tsx scripts/sponsor-prize-comparison.ts",
     "balance:block3-run": "tsx scripts/run-realistic-5season-simulation.ts",
     "balance:block3-audit": "tsx scripts/export-block3-multiseason-playability-audit.ts",
@@ -127,6 +125,7 @@
     "retool:extract-standings-economy": "tsx scripts/extract-retool-standings-economy.ts",
     "bugs:review": "tsx scripts/bug-reports-review.ts",
     "bugs:tabelle": "tsx scripts/bug-reports-table.ts",
+    "changelog:bauen": "tsx scripts/changelog-build.ts",
     "saves:export": "tsx scripts/save-export.ts",
     "saves:import": "tsx scripts/save-import.ts"
   },

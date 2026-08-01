@@ -1,8 +1,25 @@
+/**
+ * SETTLEMENT DES SONDERZIELS unter dem V3-Sponsormodell.
+ *
+ * Was sich gegenueber V2 geaendert hat und warum diese Datei anders prueft als vorher:
+ *  - Die Zielpraemie steht NICHT mehr in `component.rewardCash`, sondern im Vertrag (`goalSize`,
+ *    nach Rarity). Ein Test, der `rewardCash × fraction` erwartet, wuerde eine Groesse pruefen, die
+ *    das Settlement gar nicht mehr liest.
+ *  - Das Ziel ist FAIR BEPREIST: die Zeile enthaelt zusaetzlich den Sockelabzug `−p·G`, der auch bei
+ *    Misserfolg faellig wird. Absolute Betraege sind deshalb nicht mehr die interessante Groesse —
+ *    die Zusage des Entwurfs ist, dass die DIFFERENZ zwischen "erreicht" und "verfehlt" exakt
+ *    `fraction × G` ist. Genau das wird hier geprueft.
+ *  - Die Komponentenarten `improvement` und `overperformance` gibt es nicht mehr: die Rangleiter IST
+ *    die Preisgeld-Benchmark und traegt Verbesserung und Ueberperformance bereits in sich
+ *    (Platzierungsbonus gegen den Startrang). Die frueheren Tests dafuer sind mit den Modulen
+ *    entfallen.
+ */
 import { describe, expect, it } from "vitest";
 
 import type { GameState, SponsorOfferComponent, TeamSponsorContract } from "@/lib/data/olyDataTypes";
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
 import { applySponsorSettlement, previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
+import { sponsorV3GoalSizeFor } from "@/lib/sponsor/sponsor-v3-offer-service";
 
 function withSpecialContract(teamId: string, component: SponsorOfferComponent): GameState {
   const gs = structuredClone(createSingleplayerGameState());
@@ -31,10 +48,24 @@ function specialRow(gs: GameState, teamId: string) {
   return preview.rows.find((row) => row.teamId === teamId && row.kind === "special") ?? null;
 }
 
-describe("sponsor settlement — special component fraction payout (Teil B)", () => {
-  it("keeps binary specials backward-compatible (full rewardCash or 0)", () => {
-    // form_color_cover ohne stages = Legacy-binär. Zielfarben 99 → unerfüllbar → 0.
-    const gs = withSpecialContract(gs0Team(), {
+/**
+ * Die Zielzeile bei VERFEHLTEM Ziel — der reine Sockelabzug −p·G. Gegen ihn wird gemessen, wie viel
+ * eine erreichte Stufe wirklich zusaetzlich bringt.
+ */
+function missedGoalRow(component: SponsorOfferComponent): number {
+  const teamId = gs0Team();
+  const gs = withSpecialContract(teamId, component);
+  // Ohne jede Datengrundlage erreicht kein Ziel eine Stufe.
+  return specialRow(gs, teamId)?.cashDelta ?? 0;
+}
+
+const GOAL_SIZE_MAGISCH = sponsorV3GoalSizeFor("magisch");
+
+describe("sponsor settlement — Sonderziel-Stufen unter dem V3-Modell", () => {
+  it("ein verfehltes Ziel kostet den Sockelabzug — und nur ihn", () => {
+    // form_color_cover ohne stages = binaeres Legacy-Ziel. Zielfarben 99 → unerfuellbar.
+    const teamId = gs0Team();
+    const gs = withSpecialContract(teamId, {
       componentId: "special-roster-form",
       kind: "special",
       label: "Kader-Form",
@@ -42,16 +73,17 @@ describe("sponsor settlement — special component fraction payout (Teil B)", ()
       rewardCash: 8,
       specialKey: "form_color_cover",
     });
-    const row = specialRow(gs, gs0Team());
-    expect(row?.cashDelta).toBe(0);
+    const row = specialRow(gs, teamId);
+    // Der Abzug ist p·G und liegt damit im Band (0,15 … 0,72) × 7,5 C.
+    expect(row?.cashDelta).toBeLessThan(0);
+    expect(row?.cashDelta).toBeGreaterThanOrEqual(-GOAL_SIZE_MAGISCH * 0.72 - 0.05);
     expect(row?.status).toBe("skipped");
   }, 60000);
 
-  it("pays a staged special proportionally to the reached stage", () => {
+  it("eine erreichte Stufe zahlt exakt fraction × G ueber dem verfehlten Fall", () => {
     const teamId = gs0Team();
     const seasonId = createSingleplayerGameState().season.id;
-    // transfer_trader Stufen: >0 → 0.4 / >12 → 0.7 / >24 → 1.0. Netto knapp positiv → Stufe 1 (0.4).
-    const gs = withSpecialContract(teamId, {
+    const component: SponsorOfferComponent = {
       componentId: "special-transfer-trader",
       kind: "special",
       label: "Transfer-Händler",
@@ -64,37 +96,39 @@ describe("sponsor settlement — special component fraction payout (Teil B)", ()
         { threshold: 24, fraction: 1.0, label: "Netto >24" },
       ],
       spotlightBonus: 0.25,
-    });
+    };
+    const gs = withSpecialContract(teamId, component);
     gs.transferHistory = [
       { id: "s1", playerId: "p1", seasonId, transferType: "sell", fromTeamId: teamId, toTeamId: null, fee: 8, netCashImpact: 8 },
       { id: "b1", playerId: "p2", seasonId, transferType: "buy", fromTeamId: null, toTeamId: teamId, fee: 3, netCashImpact: 3 },
     ] as never;
-    const row = specialRow(gs, teamId);
-    // net = 8 − 3 = 5 → nur Stufe 1 (0.4) → 10 × 0.4 = 4.
-    expect(row?.cashDelta).toBe(4);
-    expect(row?.status).toBe("paid");
+    const reached = specialRow(gs, teamId)?.cashDelta ?? 0;
+    // net = 8 − 3 = 5 → Stufe 1 (fraction 0.4). Der Aufschlag gegen den verfehlten Fall ist 0.4 × G.
+    expect(reached - missedGoalRow(component)).toBeCloseTo(0.4 * GOAL_SIZE_MAGISCH, 1);
+    expect(specialRow(gs, teamId)?.status).toBe("paid");
   }, 60000);
 
-  it("scales fan_infrastructure continuously (levelSum / CAP)", () => {
+  it("skaliert fan_infrastructure weiter stufenlos (levelSum / CAP)", () => {
     const teamId = gs0Team();
-    const gs = withSpecialContract(teamId, {
+    const component: SponsorOfferComponent = {
       componentId: "special-fan-infrastructure",
       kind: "special",
       label: "Fan-Infrastruktur",
       targetValue: 1,
       rewardCash: 12,
       specialKey: "fan_infrastructure",
-    });
+    };
+    const gs = withSpecialContract(teamId, component);
     gs.seasonState.teamFacilities = {
       ...(gs.seasonState.teamFacilities ?? {}),
       [teamId]: { facilities: { fan_shop: { level: 3, enabled: true } } },
     } as never;
-    const row = specialRow(gs, teamId);
-    // levelSum 3 / CAP 6 = 0.5 → 12 × 0.5 = 6.
-    expect(row?.cashDelta).toBe(6);
+    const reached = specialRow(gs, teamId)?.cashDelta ?? 0;
+    // levelSum 3 / CAP 6 = 0.5 → Aufschlag 0.5 × G gegenueber dem verfehlten Fall.
+    expect(reached - missedGoalRow(component)).toBeCloseTo(0.5 * GOAL_SIZE_MAGISCH, 1);
   }, 60000);
 
-  it("applies the fractional special payout to team cash", () => {
+  it("bucht die Auszahlung auf die Teamkasse", () => {
     const teamId = gs0Team();
     const gs = withSpecialContract(teamId, {
       componentId: "special-solvency",
@@ -110,99 +144,8 @@ describe("sponsor settlement — special component fraction payout (Teil B)", ()
     const applied = applySponsorSettlement({ gameState: gs, saveId: "settle-test", phase: "season_end", execute: true });
     const after = applied.gameState.teams.find((t) => t.teamId === teamId)!.cash;
     expect(applied.applied).toBe(true);
-    expect(after).toBeGreaterThan(before); // voller Bonus (5) gutgeschrieben
-  }, 60000);
-});
-
-describe("sponsor settlement — P3 overperformance + per-place improvement", () => {
-  function withComponentAtRank(
-    component: SponsorOfferComponent,
-    currentRank: number,
-    startRank = 16,
-  ): { gs: GameState; teamId: string } {
-    const teamId = gs0Team();
-    const gs = structuredClone(createSingleplayerGameState());
-    const contract: TeamSponsorContract = {
-      seasonId: gs.season.id,
-      teamId,
-      offerId: "p3-test-offer",
-      archetype: "performance",
-      name: "P3 Test",
-      chosenAt: new Date().toISOString(),
-      startRank,
-      components: [component],
-      payouts: {},
-      rarity: "magisch",
-      teamQualityRankAtSign: 16,
-    };
-    gs.seasonState.sponsorContractsByTeamId = {
-      ...(gs.seasonState.sponsorContractsByTeamId ?? {}),
-      [teamId]: contract,
-    };
-    gs.seasonState.standings = {
-      ...(gs.seasonState.standings ?? {}),
-      [teamId]: { rank: currentRank, points: 100 },
-    } as GameState["seasonState"]["standings"];
-    return { gs, teamId };
-  }
-  function rowFor(gs: GameState, teamId: string, kind: SponsorOfferComponent["kind"]) {
-    return previewSponsorSettlement(gs, "season_end").rows.find((r) => r.teamId === teamId && r.kind === kind) ?? null;
-  }
-
-  it("overperformance pays min(cap, rate × ranks above the frozen expected rank)", () => {
-    const comp: SponsorOfferComponent = {
-      componentId: "overperformance",
-      kind: "overperformance",
-      label: "Überperformance",
-      targetValue: 16, // eingefrorener Erwartungsrang
-      rewardCash: 14, // Cap
-      ratePerUnitC: 1.8,
-    };
-    // Endrang 12 → 4 Plätze über Erwartung #16 → 1.8×4 = 7.2 C
-    const a = withComponentAtRank(comp, 12);
-    expect(rowFor(a.gs, a.teamId, "overperformance")?.cashDelta).toBeCloseTo(7.2, 1);
-    // Endrang 2 → 14 Plätze → 1.8×14 = 25.2, gedeckelt bei 14
-    const b = withComponentAtRank(comp, 2);
-    expect(rowFor(b.gs, b.teamId, "overperformance")?.cashDelta).toBe(14);
-    // Endrang = Erwartung (16) → 0, skipped
-    const c = withComponentAtRank(comp, 16);
-    expect(rowFor(c.gs, c.teamId, "overperformance")?.cashDelta).toBe(0);
-    expect(rowFor(c.gs, c.teamId, "overperformance")?.status).toBe("skipped");
-  }, 60000);
-
-  it("per-place improvement pays min(cap, rate × places improved vs start rank)", () => {
-    const comp: SponsorOfferComponent = {
-      componentId: "improvement-target",
-      kind: "improvement",
-      label: "Tabellenziel",
-      targetValue: 1,
-      rewardCash: 9, // Cap = rate × maxUnits
-      ratePerUnitC: 1.5,
-      maxUnits: 6,
-    };
-    // startRank 16, Endrang 13 → +3 Plätze → 1.5×3 = 4.5 C
-    const a = withComponentAtRank(comp, 13, 16);
-    expect(rowFor(a.gs, a.teamId, "improvement")?.cashDelta).toBeCloseTo(4.5, 1);
-    // Endrang 4 → +12 Plätze → 1.5×12 = 18, gedeckelt bei 9
-    const b = withComponentAtRank(comp, 4, 16);
-    expect(rowFor(b.gs, b.teamId, "improvement")?.cashDelta).toBe(9);
-    // schlechter als Start (Endrang 20) → 0
-    const c = withComponentAtRank(comp, 20, 16);
-    expect(rowFor(c.gs, c.teamId, "improvement")?.cashDelta).toBe(0);
-  }, 60000);
-
-  it("keeps legacy binary improvement (no ratePerUnitC) backward-compatible", () => {
-    const comp: SponsorOfferComponent = {
-      componentId: "improvement-target",
-      kind: "improvement",
-      label: "≥ 2 Plätze verbessern",
-      targetValue: 2,
-      rewardCash: 3,
-    };
-    const a = withComponentAtRank(comp, 13, 16); // +3 ≥ 2 → voller Reward 3
-    expect(rowFor(a.gs, a.teamId, "improvement")?.cashDelta).toBe(3);
-    const b = withComponentAtRank(comp, 15, 16); // +1 < 2 → 0
-    expect(rowFor(b.gs, b.teamId, "improvement")?.cashDelta).toBe(0);
+    // Die Saisonbasis der Benchmark-Leiter liegt weit ueber dem Sonderziel-Sockelabzug.
+    expect(after).toBeGreaterThan(before);
   }, 60000);
 });
 

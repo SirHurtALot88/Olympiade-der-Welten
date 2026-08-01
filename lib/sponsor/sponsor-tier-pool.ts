@@ -1,6 +1,6 @@
 import type { SponsorArchetype, SponsorRarity } from "@/lib/data/olyDataTypes";
 import { SPONSOR_RARITIES, SPONSOR_RARITY_KEYS } from "@/lib/sponsor/sponsor-curve-shapes";
-import { SPONSOR_V2_CURVES, type SponsorV2CurveName } from "@/lib/sponsor/sponsor-v2-model";
+import { SPONSOR_V3_CARDS, type SponsorV3CardKey } from "@/lib/sponsor/sponsor-v3-model";
 import type { SponsorTeamQualityRank } from "@/lib/sponsor/sponsor-team-quality-rank";
 
 /** ENV-Zahl, die EXPLIZIT 0 erlaubt (0 = Feature aus), im Gegensatz zum "0→fallback"-Muster anderswo. */
@@ -118,44 +118,42 @@ export function getDemandMultiplierForRarity(rarity: SponsorRarity): number {
 
 // ── Rarity + Kurven-Slate-Wurf ───────────────────────────────────────────────────────────────────────────
 
-export type SponsorSlateEntry = { curveName: SponsorV2CurveName; rarity: SponsorRarity };
+export type SponsorSlateEntry = { cardKey: SponsorV3CardKey; rarity: SponsorRarity };
 export type SponsorSlateResult = { entries: SponsorSlateEntry[]; goldenCardSlots: number[] };
 
-const SPONSOR_V2_CURVE_NAMES: readonly SponsorV2CurveName[] = SPONSOR_V2_CURVES.map((c) => c.name);
-
 /**
- * MODELLKURVE -> LEGACY-ARCHETYP-EIMER.
+ * KARTE -> LEGACY-ARCHETYP-EIMER.
  *
- * Der Marken-Katalog und der Sonderziel-Katalog sind noch nach den drei alten Archetypen
- * verschlagwortet (`security` / `performance` / `identity`). Diese Abbildung ist die EINZIGE Stelle,
- * an der die Kurvenachse der Erzeugung diese Eimer noch beruehrt — sie ersetzt die frueher
- * dazwischenliegende Doppel-Uebersetzung "Kurvenform -> Kurven-Familie -> Archetyp", die nur
- * existierte, weil die Erzeugung noch die 11 alten Kurvenformen wuerfelte.
+ * Der Marken- und der Sonderziel-Katalog sind nach den drei alten Archetypen verschlagwortet
+ * (`security` / `performance` / `identity`). Diese Abbildung ist die EINZIGE Stelle, an der die
+ * Kartenachse der Erzeugung diese Eimer noch beruehrt — sie ersetzt die frueher hier stehende
+ * Kurven->Archetyp-Tabelle des V2-Modells. Sie passt inhaltlich: die Sicherheitskarte zieht
+ * Sicherheits-Marken, die Ambitionskarte Leistungs-Marken.
  */
-const SPONSOR_CURVE_ARCHETYPE: Record<SponsorV2CurveName, SponsorArchetype> = {
-  Gipfel: "performance",
-  Steil: "performance",
-  Linear: "identity",
-  Halten: "identity",
-  Flach: "identity",
-  Sockel: "security",
+const SPONSOR_CARD_ARCHETYPE: Record<SponsorV3CardKey, SponsorArchetype> = {
+  sicherheit: "security",
+  basis: "identity",
+  ambition: "performance",
+  sonderziel: "identity",
+  ambition_ziel: "performance",
 };
 
-/** Kurve -> Archetyp-Eimer fuer Marken- und Sonderziel-Auswahl. */
-export function mapSponsorCurveToArchetype(curveName: SponsorV2CurveName): SponsorArchetype {
-  return SPONSOR_CURVE_ARCHETYPE[curveName] ?? "identity";
+/** Karte -> Archetyp-Eimer fuer Marken- und Sonderziel-Auswahl. */
+export function mapSponsorCardToArchetype(cardKey: SponsorV3CardKey): SponsorArchetype {
+  return SPONSOR_CARD_ARCHETYPE[cardKey] ?? "identity";
 }
 
 /**
- * Angebots-Slate-Wurf: pro Slot eine RARITY (beliebtheits-gehoben Richtung höherer Rarity) und dazu ein
- * SLATE aus DISTINCT Modellkurven. Vollständig deterministisch über getStableUnitHash (kein Math.random).
- * Golden bleibt orthogonal und läuft über denselben Golden-Los-Pfad wie zuvor.
+ * Angebots-Slate-Wurf: pro Slot eine RARITY (beliebtheits-gehoben Richtung höherer Rarity) und
+ * GENAU EINE der fuenf Karten des Sponsormodells. Vollständig deterministisch über
+ * getStableUnitHash (kein Math.random). Golden bleibt orthogonal und läuft über denselben
+ * Golden-Los-Pfad wie zuvor.
  *
- * Gewuerfelt werden die SECHS Kurven des Sponsormodells (Sockel/Halten/Linear/Gipfel/Steil/Flach). Die
- * frueheren elf Kurvenformen (Koenigsklasse, Europapokal, Conference-Rang, Aufsteiger, Konsolidierung, …)
- * sind aus der Erzeugung entfernt: sie wurden ohnehin nur auf diese sechs gefaltet, und die Faltung
- * erzeugte Doppel, die danach wieder aufgeloest werden mussten. Ihr Typ und ihre Payout-Tabellen bleiben
- * ausschliesslich fuer das LESEN von Altvertraegen bestehen (siehe sponsor-curve-shapes.ts).
+ * DIE KARTEN WERDEN NICHT MEHR GEWUERFELT. In V2 wuerfelte der Slate distinkte Kurvenformen — die
+ * Auswahl war damit selbst schon eine Lotterie darueber, WELCHE Entscheidungen ein Team ueberhaupt
+ * angeboten bekommt. In V3 sieht jedes Team dieselben fuenf Entscheidungen (Sicherheit / Basis /
+ * Ambition / Sonderziel / Ambition+Ziel); gewuerfelt werden nur noch Marke, Rarity (= Groesse des
+ * Hebels) und das Sonderziel.
  */
 export function rollSponsorOfferSlate(input: {
   seasonId: string;
@@ -166,12 +164,10 @@ export function rollSponsorOfferSlate(input: {
   hadGoldenLastSeason?: boolean;
   teamCount?: number;
 }): SponsorSlateResult {
-  // Guard: es gibt nur SPONSOR_V2_CURVE_NAMES.length distinkte Kurven. Fragt ein Aufrufer mehr Slots an,
-  // könnten wir nie so viele DISTINCT-Kurven liefern und würden stillschweigend weniger Einträge zurückgeben.
-  // Deshalb den effektiven slotCount hart auf die Anzahl verfügbarer Kurven deckeln. Das Spiel nutzt 5 (< 6),
-  // daher ist das rein defensiv — das slotCount=5-Verhalten bleibt unverändert.
+  // Ein Slot je Karte: mehr Slots als Karten kann es nicht geben, sonst stuende dieselbe
+  // Entscheidung zweimal im Slate. Das Spiel nutzt genau 5.
   const requestedSlotCount = input.slotCount ?? 5;
-  const slotCount = Math.min(requestedSlotCount, SPONSOR_V2_CURVE_NAMES.length);
+  const slotCount = Math.min(requestedSlotCount, SPONSOR_V3_CARDS.length);
   const teamCount = input.teamCount ?? 32;
 
   // Rebalance (2026-07): KEIN qualitäts-rang-basierter Rarity-Deckel mehr. Früher deckelte der Team-
@@ -209,19 +205,9 @@ export function rollSponsorOfferSlate(input: {
     rarities.push(picked);
   }
 
-  // Kurven-Slate: DISTINCT Modellkurven in deterministischer (hash-sortierter) Reihenfolge. Bei 6 Kurven und
-  // 5 Slots bleibt immer genau eine uebrig — der frueher noetige Familien-Deckel (≤2 je Familie, mit Lockerung
-  // auf 3) entfaellt ersatzlos, weil die Faltung 11→6 samt ihrer Doppel weg ist.
-  const curveNames = [...SPONSOR_V2_CURVE_NAMES]
-    .sort(
-      (a, b) =>
-        getStableUnitHash(`${input.seasonId}:${input.teamId}:sponsor-curve:${a}`) -
-        getStableUnitHash(`${input.seasonId}:${input.teamId}:sponsor-curve:${b}`),
-    )
-    .slice(0, slotCount);
-
-  const entries: SponsorSlateEntry[] = curveNames.map((curveName, i) => ({
-    curveName,
+  // Karten-Slate: die fuenf Karten in ihrer festen Reihenfolge, eine je Slot.
+  const entries: SponsorSlateEntry[] = SPONSOR_V3_CARDS.slice(0, slotCount).map((card, i) => ({
+    cardKey: card.key,
     rarity: rarities[i] ?? fallbackRarity,
   }));
 

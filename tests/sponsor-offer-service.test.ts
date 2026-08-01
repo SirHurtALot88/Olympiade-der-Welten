@@ -10,9 +10,10 @@ import {
 } from "@/lib/sponsor/sponsor-offer-service";
 import { applySponsorSettlement, previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
-import type { SponsorCurveShape, SponsorOffer } from "@/lib/data/olyDataTypes";
 import { estimateExpectedPayout } from "@/lib/sponsor/sponsor-economy-calibration";
-import { SPONSOR_CURVE_SHAPE_KEYS, SPONSOR_RARITY_KEYS, getSponsorCurveFamily } from "@/lib/sponsor/sponsor-curve-shapes";
+import { SPONSOR_RARITY_KEYS } from "@/lib/sponsor/sponsor-curve-shapes";
+import { SPONSOR_V3_CARDS } from "@/lib/sponsor/sponsor-v3-model";
+import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 
 function createTeam(partial: Partial<Team> = {}): Team {
   return {
@@ -97,17 +98,19 @@ function createGameState(partial?: Partial<GameState>): GameState {
 }
 
 describe("sponsor offer service", () => {
-  it("generates a distinct-curve, rarity-varied slate per team — and no legacy curve shape", () => {
+  it("generates a five-card slate per team — one card each, rarity-varied, no legacy curve shape", () => {
     const gameState = ensureSeasonSponsorOffers(createGameState());
     const offers = buildSponsorOffersForTeam({ gameState, teamId: "M-M" });
     expect(offers).toHaveLength(5);
 
     // Jedes Angebot trägt den Rarity-Layer …
     expect(offers.every((offer) => offer.rarity != null && SPONSOR_RARITY_KEYS.includes(offer.rarity))).toBe(true);
-    // … und die Modellkurve, aus der seine Auszahlung stammt.
-    expect(offers.every((offer) => offer.sponsorV2 != null)).toBe(true);
-    const curves = offers.map((offer) => offer.sponsorV2!.curveName);
-    expect(new Set(curves).size).toBe(curves.length);
+    // … und die V3-Konditionen, aus denen seine Auszahlung stammt.
+    expect(offers.every((offer) => getSponsorV3Terms(offer) != null)).toBe(true);
+    // Das Slate ist NICHT gewuerfelt: jedes Team sieht dieselben fuenf Entscheidungen.
+    expect(offers.map((offer) => getSponsorV3Terms(offer)!.cardKey)).toEqual(
+      SPONSOR_V3_CARDS.map((card) => card.key),
+    );
 
     // KEINE Legacy-Kurvenform mehr: die elf alten Formen sind aus der Erzeugung entfernt und leben nur
     // noch als Lese-Pfad fuer Altangebote/-vertraege weiter.
@@ -184,41 +187,18 @@ describe("sponsor offer service", () => {
   });
 });
 
-describe("ai sponsor curve-shape preference", () => {
-  // Baut ein minimales Angebot mit fester Kurvenform + erwartetem Endrang (teamQualityRank). estimateExpectedPayout
-  // ist die Bewertung, die scoreOfferForAi antreibt: es muss die Form am ERWARTETEN Rang bewerten, sonst liefern
-  // alle Formen einer Familie denselben Payout und die AI wählt beliebig.
-  function offerWithShape(curveShape: SponsorCurveShape, teamQualityRank: number): SponsorOffer {
-    return {
-      offerId: `offer-${curveShape}`,
-      seasonId: "season-2",
-      teamId: "T",
-      archetype: "balanced",
-      curveShape,
-      rarity: "magisch",
-      name: curveShape,
-      flavor: "",
-      totalUpsideEstimate: 0,
-      teamQualityRank,
-      isGolden: false,
-      components: [{ kind: "base", label: "Basis", rewardCash: 40 }],
-    } as SponsorOffer;
-  }
-
-  function topFamilyForRank(rank: number): string {
-    const scored = SPONSOR_CURVE_SHAPE_KEYS.map((shape) => ({
-      family: getSponsorCurveFamily(shape),
-      payout: estimateExpectedPayout(offerWithShape(shape, rank), rank),
-    })).sort((left, right) => right.payout - left.payout);
-    return scored[0]!.family;
-  }
-
-  it("a title-contender team (expected ~3rd) values titel-family curves highest", () => {
-    expect(topFamilyForRank(3)).toBe("titel");
-  });
-
-  it("a relegation team (expected ~28th) values sicherheit-family curves highest", () => {
-    expect(topFamilyForRank(28)).toBe("sicherheit");
+describe("ai sponsor choice — oekonomisch kann sie nichts falsch machen", () => {
+  // DIE ZENTRALE ZUSAGE DES ENTWURFS, an der ECHTEN Angebotserzeugung gemessen: alle fuenf Karten
+  // eines Slates haben denselben Erwartungswert. Die Wahl ist eine Risiko-Entscheidung, nie ein
+  // Etat-Upgrade — und deshalb kann die KI-Wahl (und die des Spielers) den Etat nicht verschieben.
+  it("alle Karten eines Slates haben denselben Erwartungswert (bis auf Rundung)", () => {
+    const gameState = ensureSeasonSponsorOffers(createGameState());
+    for (const team of gameState.teams) {
+      const offers = buildSponsorOffersForTeam({ gameState, teamId: team.teamId });
+      const values = offers.map((offer) => estimateExpectedPayout(offer));
+      const spread = Math.max(...values) - Math.min(...values);
+      expect(spread, `${team.teamId}: EV-Spreizung ${spread.toFixed(3)} — ${values.join(" / ")}`).toBeLessThanOrEqual(0.1);
+    }
   });
 });
 
@@ -243,10 +223,10 @@ describe("sponsor board objectives", () => {
     gameState = chooseSponsorOffer({ gameState, teamId: "M-M", offerId: offer.offerId }).gameState;
     const overview = buildTeamObjectiveOverview(gameState);
     const sponsorObjectives = overview.objectives.filter((objective) => objective.teamId === "M-M" && objective.category === "sponsor");
-    // Drei Cash-Komponenten (Basis, Gewinnstufen, Sonderziel) ergeben drei Vertragsziele. Die
-    // Tabellenziel- und Ueberperformance-Komponenten des alten Systems gibt es nicht mehr; die Klausel
-    // des neuen Systems ist keine Komponente und taucht deshalb (unveraendert) nicht in dieser Liste auf.
-    expect(sponsorObjectives.length).toBeGreaterThanOrEqual(3);
+    // Angebot 0 ist die SICHERHEITS-Karte: sie traegt kein Sonderziel, also genau zwei Cash-Komponenten
+    // (Basis, Gewinnstufen) und damit zwei Vertragsziele. Die Tabellenziel- und Ueberperformance-
+    // Komponenten des alten Systems gibt es nicht mehr.
+    expect(sponsorObjectives.length).toBeGreaterThanOrEqual(2);
   });
 
   it("shows sponsor choice pending objective without contract", () => {
