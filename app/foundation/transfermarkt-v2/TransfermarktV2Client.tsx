@@ -956,20 +956,22 @@ export default function TransfermarktV2Client({
     selectedPlayer && scoutingIntelByPlayerId[selectedPlayer.playerId] != null
       ? scoutingIntelByPlayerId[selectedPlayer.playerId]!
       : null;
+  // Anders als die Scouting-Pipeline unten (im Draft praktisch unbegrenzt,
+  // Grenze 999) hat die Wunschliste selbst im Draft eine echte Grenze (15,
+  // siehe DRAFT_TRANSFER_WISHLIST_SLOT_LIMIT) — die Voll-Prüfung gilt also in
+  // beiden Phasen, nur die Meldung unterscheidet sich.
   const wishlistSlotsFull = Boolean(
     scoutingPipelineCapacity &&
-      !scoutingPipelineCapacity.draftSuspended &&
       scoutingPipelineCapacity.max != null &&
       scoutingPipelineCapacity.max > 0 &&
       scoutingPipelineCapacity.occupied >= scoutingPipelineCapacity.max &&
       !selectedPlayerWishlisted,
   );
-  const wishlistDisabledReason =
-    scoutingPipelineCapacity?.draftSuspended
-      ? null
-      : wishlistSlotsFull
-        ? `Wishlist voll (${scoutingPipelineCapacity?.occupied}/${scoutingPipelineCapacity?.max}) — Spieler entfernen oder Scouting Office upgraden.`
-        : null;
+  const wishlistDisabledReason = !wishlistSlotsFull
+    ? null
+    : scoutingPipelineCapacity?.draftSuspended
+      ? `Wunschliste im Draft voll (${scoutingPipelineCapacity?.occupied}/${scoutingPipelineCapacity?.max}) — erst einen Spieler entfernen.`
+      : `Wishlist voll (${scoutingPipelineCapacity?.occupied}/${scoutingPipelineCapacity?.max}) — Spieler entfernen oder Scouting Office upgraden.`;
   const scoutingPipelineFull = Boolean(
     scoutingPipelineCapacity &&
       !scoutingPipelineCapacity.draftSuspended &&
