@@ -33,6 +33,11 @@ export default defineConfig({
       // verfaelscht es jeden vollen Lauf.
       "**/.claude/worktrees/**",
     ],
+    // Laeuft einmal JE TESTDATEI und gibt jeder ihre eigene SQLite-Datei. Ohne das teilen sich
+    // alle Testdateien eines Workers eine Datenbank auf der Platte — gemessen: eine einzige
+    // zusaetzliche LEERE Testdatei faerbte zwei unbeteiligte Dateien rot, weil sich dadurch die
+    // Verteilung auf die Worker verschob. Begruendung im Detail in der Setup-Datei.
+    setupFiles: ["tests/setup/sqlite-pro-testdatei.ts"],
     env: {
       // Der Online-Save-Auto-Export (lib/persistence/online-save-auto-export.ts) läuft per Default
       // (OLY_AUTO_EXPORT_SAVES=1) und spiegelt jeden erzeugten Spielstand nach `data/online-saves/` —
