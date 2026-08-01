@@ -73575,6 +73575,19 @@ button.is-new-look .nl-thist-season-pill,
   gap: var(--nl-s2);
 }
 
+/* Versions-Marke am Changelog-Eintrag. Nur die wenigen grossen Aenderungen tragen eine —
+   deshalb darf sie deutlich sein, ohne den Alltag zu ueberdecken. */
+.is-new-look .nl-changelog-version {
+  font-size: var(--nl-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  color: var(--nl-accent);
+  background: color-mix(in srgb, var(--nl-accent) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--nl-accent) 34%, transparent);
+}
+
 .is-new-look .nl-changelog-seite {
   font-size: var(--nl-fs-xs);
   font-weight: 700;

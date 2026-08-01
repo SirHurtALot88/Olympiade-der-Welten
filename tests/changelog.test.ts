@@ -69,6 +69,10 @@ describe("changelogAusTriage — nur Gemergtes erscheint", () => {
         pr: "#273",
         text: "Jetzt anders.",
         quelle: "triage",
+        // Fixes innerhalb einer Version tragen KEINE Versionsnummer — die vergibt der
+        // gepflegte Eintrag des jeweiligen grossen Umbaus. Stuende hier ueberall eine,
+        // sagte sie nichts mehr aus.
+        version: null,
       },
     });
   });

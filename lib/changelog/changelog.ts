@@ -29,6 +29,15 @@ export type ChangelogEintrag = {
   text: string;
   /** Woher der Eintrag stammt — nur fuer Nachvollziehbarkeit, die Oberflaeche zeigt es nicht. */
   quelle: "triage" | "gepflegt";
+  /**
+   * Spielversion, mit der die Aenderung ausgeliefert wurde ("1.1") — gesetzt bei GROSSEN
+   * Aenderungen, die eine eigene Versionsnummer bekommen (Sponsormodell, Saisonoekonomie).
+   *
+   * Optional, und das ist Absicht: die meisten Eintraege sind Fixes innerhalb einer Version und
+   * traegen keine. Stuende hier ueberall eine Nummer, sagte sie nichts mehr aus — die Version
+   * markiert den Einschnitt, nicht den Alltag.
+   */
+  version: string | null;
 };
 
 /**
@@ -85,6 +94,9 @@ export function changelogAusTriage(triage: BugTriage, seiteAusMeldung: string | 
       pr: triage.pr,
       text: triage.changelog,
       quelle: "triage",
+      // Triage-Eintraege sind Fixes innerhalb einer Version — die Versionsnummer vergibt der
+      // gepflegte Eintrag des jeweiligen grossen Umbaus, nicht jeder einzelne Bugfix.
+      version: null,
     },
   };
 }
@@ -106,6 +118,7 @@ export function parseChangelogEintrag(roh: unknown): ChangelogEintrag | null {
     pr: typeof wert.pr === "string" && wert.pr.trim() ? wert.pr.trim() : null,
     text,
     quelle: wert.quelle === "triage" ? "triage" : "gepflegt",
+    version: typeof wert.version === "string" && wert.version.trim() ? wert.version.trim() : null,
   };
 }
 

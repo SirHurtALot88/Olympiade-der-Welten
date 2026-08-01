@@ -2,53 +2,76 @@
   "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und data/changelog/eintraege.json. Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
+      "datum": "2026-08-01",
+      "seite": "Welt · Sponsoren",
+      "pr": "#294",
+      "text": "Die fünf Sponsorenangebote waren unterschiedlich viel wert — eines brachte über die Saison fast doppelt so viel wie ein anderes, und welches man angeboten bekam, entschied mehr als die eigene Platzierung. Jetzt sind alle fünf gleich viel wert und unterscheiden sich nur im Risiko: Sicherheit zahlt gleichmäßig, Ambition setzt auf einen guten Endrang, Sonderziel auf eine erfüllte Aufgabe.",
+      "quelle": "gepflegt",
+      "version": "1.1"
+    },
+    {
+      "datum": "2026-08-01",
+      "seite": "Welt · Sponsoren",
+      "pr": "#294",
+      "text": "Teams mit teuren Kadern bekamen bisher auch die dicksten Sponsorenverträge und wurden für hohe Gehälter faktisch belohnt. Die Sponsorenkurve ist jetzt flacher als die Gehaltsspanne — wer über seine Verhältnisse zahlt, macht Verlust, unabhängig vom Tabellenplatz.",
+      "quelle": "gepflegt",
+      "version": "1.1"
+    },
+    {
       "datum": "2026-07-30",
       "seite": "Spieltag · Einsatzliste",
       "pr": "#264",
       "text": "Warum ein Spieler nicht aufgestellt werden konnte, war nicht zu erkennen — statt eines Grundes stand nur „blockiert\" oder ein kryptischer Code da. Jetzt steht „Verletzt\" direkt am Spieler.",
-      "quelle": "triage"
+      "quelle": "triage",
+      "version": null
     },
     {
       "datum": "2026-07-30",
       "seite": "Spieltag · Einsatzliste",
       "pr": "#264",
       "text": "Die Formkarten in der Einsatzliste waren manchmal am eigenen Team gesperrt, weil das Spiel den falschen Spielstand ansah. Jetzt erkennt es zuverlässig, wer gerade spielt — die eigenen Formkarten bleiben bedienbar.",
-      "quelle": "triage"
+      "quelle": "triage",
+      "version": null
     },
     {
       "datum": "2026-07-30",
       "seite": "Welt · Sponsoren",
       "pr": "#268 + #264",
       "text": "Der Knopf „Sponsoren\" im Saisonstand landete in der Preisgeld-Ansicht, aus der kein Weg zurückführte. Jetzt öffnet er wieder die Sponsorenübersicht mit den Sponsoren aller Teams.",
-      "quelle": "triage"
+      "quelle": "triage",
+      "version": null
     },
     {
       "datum": "2026-07-30",
       "seite": "Markt · Transfermarkt",
       "pr": "#264",
       "text": "Aus der Wunschliste entfernte Spieler tauchten nach wenigen Sekunden von selbst wieder auf. Jetzt bleiben Änderungen an der Wunschliste während des Drafts erhalten.",
-      "quelle": "triage"
+      "quelle": "triage",
+      "version": null
     },
     {
       "datum": "2026-07-30",
       "seite": "Markt · Transfermarkt",
       "pr": "#273 + #264",
       "text": "Nach einem Kauf blieb der alte Kontostand stehen, bis man die Seite neu geladen hat. Jetzt aktualisiert er sich sofort.",
-      "quelle": "triage"
+      "quelle": "triage",
+      "version": null
     },
     {
       "datum": "2026-07-30",
       "seite": "Spieltag · Inbox",
       "pr": "#264",
       "text": "Ein Klick in der Inbox öffnete manchmal das Ziel einer anderen Karte — „Training öffnen\" landete in der Team-Ansicht. Jetzt zählt genau die Karte, die man angeklickt hat.",
-      "quelle": "triage"
+      "quelle": "triage",
+      "version": null
     },
     {
       "datum": "2026-07-30",
       "seite": "Spieltag · Einsatzliste",
       "pr": "#274",
       "text": "„Bester Fit\" schlug in der Einsatzliste Spieler nach einer anderen Zahl vor, als daneben angezeigt wurde. Jetzt richten sich Vorschlag und Anzeige nach demselben Wert.",
-      "quelle": "triage"
+      "quelle": "triage",
+      "version": null
     }
   ]
 }

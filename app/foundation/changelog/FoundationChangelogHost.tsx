@@ -38,6 +38,9 @@ function ChangelogEintragZeile({ eintrag }: { eintrag: ChangelogEintrag }) {
   return (
     <li className="nl-changelog-item">
       <div className="nl-changelog-item-head">
+        {/* Die Version steht VOR der Seite: sie markiert den Einschnitt und traegt nur bei den
+            wenigen grossen Aenderungen ueberhaupt einen Wert. */}
+        {eintrag.version ? <span className="nl-changelog-version">v{eintrag.version}</span> : null}
         {eintrag.seite ? <span className="nl-changelog-seite">{eintrag.seite}</span> : null}
         {eintrag.pr ? <span className="nl-changelog-pr">PR {eintrag.pr}</span> : null}
       </div>
