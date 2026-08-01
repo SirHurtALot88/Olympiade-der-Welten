@@ -18,6 +18,39 @@
  */
 import type { BugTriage, BugTriageStatus } from "@/lib/bug-report/bug-report-triage";
 
+/**
+ * DIE GEWICHTUNG — vier Stufen, in Anzeige-Reihenfolge. Bewusst nicht mehr: ab der fuenften Stufe
+ * entscheidet niemand mehr richtig, welche gemeint ist. Die Namen gelten fuer jemanden, der das
+ * Spiel SPIELT, nicht fuer Entwickler:
+ *
+ *   grundlegend      — etwas Grundlegendes ist neu oder umgebaut (Sponsorsystem, neuer Reiter).
+ *   spielblockierend — etwas verhinderte das Weiterspielen und ist behoben (Spieltag liess sich
+ *                      nicht abschliessen, Verkaeufe dauerhaft gesperrt).
+ *   behebung         — eine normale Behebung: das Spiel lief weiter, aber falsch.
+ *   feinschliff      — Beschriftung, Farbe, Kleinigkeit.
+ *
+ * Die Reihenfolge ist zugleich die Ordnung des Reiters: erst was am Spiel neu ist, dann ob der
+ * eigene Blocker weg ist, dann der Rest. `null` heisst "die Quelle sagt nichts" — das bleibt
+ * sichtbar (eigener Abschnitt am Ende, Mahnung im Generator) statt still geraten zu werden.
+ */
+export const CHANGELOG_GEWICHTE = ["grundlegend", "spielblockierend", "behebung", "feinschliff"] as const;
+export type ChangelogGewicht = (typeof CHANGELOG_GEWICHTE)[number];
+
+/** Beschriftung der Stufen im Reiter — Spielersprache, kein Entwicklerjargon. */
+export const CHANGELOG_GEWICHT_BESCHRIFTUNG: Record<ChangelogGewicht, { titel: string; erklaerung: string }> = {
+  grundlegend: { titel: "Groß umgebaut & neu", erklaerung: "Neue oder grundlegend umgebaute Teile des Spiels." },
+  spielblockierend: { titel: "Spielblocker behoben", erklaerung: "Fehler, die das Weiterspielen verhindert haben." },
+  behebung: { titel: "Behoben", erklaerung: "Fehler, die das Spiel gestört haben." },
+  feinschliff: { titel: "Feinschliff", erklaerung: "Beschriftungen, Farben, Kleinigkeiten." },
+};
+
+/** Prueft einen freien Wert gegen die vier Stufen. Alles andere ist keine Stufe — lieber null als geraten. */
+export function normalisiereChangelogGewicht(wert: string | null | undefined): ChangelogGewicht | null {
+  if (!wert) return null;
+  const bereinigt = wert.trim().toLowerCase();
+  return (CHANGELOG_GEWICHTE as readonly string[]).includes(bereinigt) ? (bereinigt as ChangelogGewicht) : null;
+}
+
 export type ChangelogEintrag = {
   /** ISO-Datum (JJJJ-MM-TT) des Merges — der Tag, ab dem die Aenderung im Spiel ist. */
   datum: string;
@@ -29,6 +62,13 @@ export type ChangelogEintrag = {
   text: string;
   /** Woher der Eintrag stammt — nur fuer Nachvollziehbarkeit, die Oberflaeche zeigt es nicht. */
   quelle: "triage" | "gepflegt";
+  /**
+   * Die Gewichtung — bestimmt, in welchem Abschnitt des Reiters der Eintrag steht. `null` heisst
+   * "die Quelle hat nichts gesagt": der Eintrag erscheint trotzdem (ein gemergter Fix darf nicht
+   * an einer fehlenden Einstufung scheitern), aber erkennbar uneingestuft, und der Generator
+   * mahnt es an — genau wie bei fehlender changelog:-Zeile.
+   */
+  gewicht: ChangelogGewicht | null;
 };
 
 /**
@@ -67,6 +107,27 @@ export type TriageChangelogErgebnis =
   | { art: "luecke"; grund: string };
 
 /**
+ * Bestimmt die Gewichtung einer Triage-Notiz.
+ *
+ * Vorrang hat die ausdrueckliche `gewicht:`-Zeile. Steht sie da, ist aber unlesbar (Tippfehler),
+ * gibt es KEINEN Rueckfall — sonst wuerde der Tippfehler still zu einer anderen Stufe, statt als
+ * Luecke aufzufallen und korrigiert zu werden.
+ *
+ * DER RUECKFALL AUS `schwere:`, wenn die Zeile fehlt: `niedrig` wird `feinschliff` (das sagt
+ * niedrig genau aus), `mittel` und `hoch` werden beide `behebung`. Bewusst NIE `spielblockierend`
+ * oder `grundlegend`: `schwere` misst, wie dringend der Fehler war — der falsch beschriftete
+ * „Bester Fit" stand auf `hoch` und blockierte trotzdem nichts. "Du kamst nicht weiter" und
+ * "hier wurde umgebaut" sind Behauptungen gegenueber dem Spieler, die jemand ausdruecklich
+ * treffen muss, nicht Nebenwirkungen einer Dringlichkeitsangabe.
+ */
+export function gewichtAusTriage(triage: Pick<BugTriage, "gewicht" | "schwere">): ChangelogGewicht | null {
+  if (triage.gewicht !== null) return normalisiereChangelogGewicht(triage.gewicht);
+  if (triage.schwere === "niedrig") return "feinschliff";
+  if (triage.schwere === "mittel" || triage.schwere === "hoch") return "behebung";
+  return null;
+}
+
+/**
  * Baut aus einer Triage-Notiz den Changelog-Eintrag. `seiteAusMeldung` kommt aus der Rohmeldung
  * (`page.label`) — sie gewinnt gegen die `seite:`-Zeile der Notiz, weil die Rohmeldung festhaelt,
  * wo der Melder wirklich stand, waehrend die Notiz-Zeile nur der Notnagel fuer Zurufe ohne
@@ -85,6 +146,7 @@ export function changelogAusTriage(triage: BugTriage, seiteAusMeldung: string | 
       pr: triage.pr,
       text: triage.changelog,
       quelle: "triage",
+      gewicht: gewichtAusTriage(triage),
     },
   };
 }
@@ -106,6 +168,8 @@ export function parseChangelogEintrag(roh: unknown): ChangelogEintrag | null {
     pr: typeof wert.pr === "string" && wert.pr.trim() ? wert.pr.trim() : null,
     text,
     quelle: wert.quelle === "triage" ? "triage" : "gepflegt",
+    // Ein unlesbares Gewicht faellt auf null — der Eintrag bleibt, aber sichtbar uneingestuft.
+    gewicht: normalisiereChangelogGewicht(typeof wert.gewicht === "string" ? wert.gewicht : null),
   };
 }
 
@@ -133,7 +197,7 @@ export function sortiereChangelog(eintraege: ChangelogEintrag[]): ChangelogEintr
 
 export type ChangelogTagesgruppe = { datum: string; eintraege: ChangelogEintrag[] };
 
-/** Gruppiert bereits sortierte Eintraege nach Tag — die Anzeigeform des Reiters. */
+/** Gruppiert bereits sortierte Eintraege nach Tag — ein Baustein der Anzeige (siehe unten). */
 export function gruppiereChangelogNachDatum(eintraege: ChangelogEintrag[]): ChangelogTagesgruppe[] {
   const gruppen: ChangelogTagesgruppe[] = [];
   for (const eintrag of eintraege) {
@@ -145,4 +209,28 @@ export function gruppiereChangelogNachDatum(eintraege: ChangelogEintrag[]): Chan
     }
   }
   return gruppen;
+}
+
+export type ChangelogGewichtsgruppe = {
+  /** null = "ohne Einstufung" — der Abschnitt fuer Eintraege, deren Quelle nichts hergab. */
+  gewicht: ChangelogGewicht | null;
+  eintraege: ChangelogEintrag[];
+};
+
+/**
+ * Gruppiert nach Gewichtung, in der festen Reihenfolge von `CHANGELOG_GEWICHTE` — die oberste
+ * Ebene des Reiters. WARUM GEWICHT VOR DATUM: Chris' Frage beim Oeffnen ist "was war gross?",
+ * nicht "was war am Dienstag?" — ein Sponsoren-Umbau muss oben stehen, auch wenn seither drei
+ * Tage Feinschliff gemergt wurden. Innerhalb eines Abschnitts bleibt die Eingangsreihenfolge
+ * (neueste zuerst) stehen, dort uebernimmt `gruppiereChangelogNachDatum` wieder — die
+ * Tagesgruppierung bleibt als Baustein bestehen, nur eine Ebene tiefer.
+ *
+ * Leere Stufen erscheinen nicht; Eintraege OHNE Gewichtung bilden den letzten Abschnitt, statt
+ * herauszufallen oder still einer Stufe zugeschlagen zu werden.
+ */
+export function gruppiereChangelogNachGewicht(eintraege: ChangelogEintrag[]): ChangelogGewichtsgruppe[] {
+  const stufen: Array<ChangelogGewicht | null> = [...CHANGELOG_GEWICHTE, null];
+  return stufen
+    .map((gewicht) => ({ gewicht, eintraege: eintraege.filter((eintrag) => eintrag.gewicht === gewicht) }))
+    .filter((gruppe) => gruppe.eintraege.length > 0);
 }

@@ -67,6 +67,16 @@ function main() {
       console.log(`  ${luecke.reportId}: ${luecke.grund}`);
     }
   }
+  // Uneingestufte Eintraege erscheinen zwar (unter "Ohne Einstufung"), aber der Sinn der
+  // Gewichtung ist ja gerade, dass Grosses oben steht — deshalb wird jede fehlende Stufe
+  // angemahnt statt still hingenommen.
+  if (sammlung.ohneGewicht.length > 0) {
+    console.log("");
+    console.log("Eintraege ohne Gewichtung (erscheinen unter \"Ohne Einstufung\"):");
+    for (const eintrag of sammlung.ohneGewicht) {
+      console.log(`  ${eintrag.kennung}: ${eintrag.grund}`);
+    }
+  }
   if (sammlung.verworfeneGepflegte > 0) {
     console.log(`Achtung: ${sammlung.verworfeneGepflegte} gepflegte(r) Eintrag/Eintraege unbrauchbar (Datum oder Text fehlt) — eintraege.json pruefen.`);
   }

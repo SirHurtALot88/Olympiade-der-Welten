@@ -31,6 +31,12 @@ export type ChangelogSammlung = {
   luecken: Array<{ reportId: string; grund: string }>;
   /** Gepflegte Eintraege, die beim Lesen herausgefallen sind (Datum oder Text unbrauchbar). */
   verworfeneGepflegte: number;
+  /**
+   * Eintraege, die es in den Changelog geschafft haben, aber OHNE Gewichtung dastehen — der
+   * Reiter zeigt sie als "ohne Einstufung", der Generator mahnt sie an. Eine eigene Liste neben
+   * `luecken`, weil dort nur steht, was GANZ fehlt; hier steht, was da ist, aber unsortiert bleibt.
+   */
+  ohneGewicht: Array<{ kennung: string; grund: string }>;
 };
 
 /**
@@ -75,6 +81,7 @@ export function sammleChangelog(): ChangelogSammlung {
   const reports = listBugReports(500);
   const eintraege: ChangelogEintrag[] = [];
   const luecken: ChangelogSammlung["luecken"] = [];
+  const ohneGewicht: ChangelogSammlung["ohneGewicht"] = [];
 
   // Direkt ueber die Triage-Ablage statt ueber die Rohmeldungen: es gibt Notizen ohne Rohmeldung
   // (Zuruf im Gespraech statt Flagge), und deren Fixes gehoeren genauso in den Changelog.
@@ -96,16 +103,35 @@ export function sammleChangelog(): ChangelogSammlung {
       continue;
     }
     const ergebnis = changelogAusTriage(triage, seiteAusRohmeldung(reportId, reports));
-    if (ergebnis.art === "eintrag") eintraege.push(ergebnis.eintrag);
+    if (ergebnis.art === "eintrag") {
+      eintraege.push(ergebnis.eintrag);
+      if (ergebnis.eintrag.gewicht === null) {
+        // Zwei verschiedene Mahnungen, weil zwei verschiedene Handgriffe folgen: eine unlesbare
+        // Zeile wird korrigiert, eine fehlende ergaenzt (oder wenigstens `schwere:` gesetzt).
+        ohneGewicht.push({
+          kennung: reportId,
+          grund: triage.gewicht ? "gewicht:-Zeile unlesbar" : "weder gewicht:- noch schwere:-Zeile",
+        });
+      }
+    }
     if (ergebnis.art === "luecke") luecken.push({ reportId, grund: ergebnis.grund });
   }
 
   const gepflegte = leseGepflegteEintraege();
   eintraege.push(...gepflegte.eintraege);
+  for (const eintrag of gepflegte.eintraege) {
+    if (eintrag.gewicht === null) {
+      ohneGewicht.push({
+        kennung: eintrag.pr ?? eintrag.text.slice(0, 60),
+        grund: "kein (lesbares) gewicht-Feld in eintraege.json",
+      });
+    }
+  }
 
   return {
     eintraege: sortiereChangelog(eintraege),
     luecken,
     verworfeneGepflegte: gepflegte.verworfen,
+    ohneGewicht,
   };
 }
