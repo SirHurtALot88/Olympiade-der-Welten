@@ -1,4 +1,5 @@
 "use client";
+import { applyTeamCashPatch } from "@/lib/foundation/apply-team-cash-patch";
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
 import {
   FoundationShellRouterCockpit,
@@ -3726,6 +3727,18 @@ export function useFoundationShellRouterBodyScope({
       setMarketSellSubject(null);
     setMarketSellRiskAcknowledged(false);
       setFoundationPanel(null);
+
+      // Wie beim Kauf: Der neue Kontostand steht bereits in der Antwort und wird oben schon im
+      // Erfolgstext angezeigt. Ihn sofort zu übernehmen macht die Zahl richtig, bevor der Nachlauf
+      // überhaupt anläuft — siehe `applyTeamCashPatch`.
+      setGameState((current) => {
+        const teams = applyTeamCashPatch(current.teams, {
+          teamId: payload.summary?.team?.id ?? marketTeamId,
+          cash: payload.summary?.cashAfter,
+        });
+        return teams === current.teams ? current : { ...current, teams };
+      });
+
       await Promise.all([
         loadSave(activeSaveId),
         reloadMarketFeed(marketTeamId),
@@ -5262,6 +5275,27 @@ export function useFoundationShellRouterBodyScope({
       syncFoundationViewInUrl("marketV2", null, null, { team: selectedTeamId });
       setMarketBuySubject(null);
       setMarketBuyPreviewContext(null);
+
+      // Der neue Kontostand steht bereits in der Antwort — `cashAfter` wird oben schon für den
+      // Erfolgstext benutzt. Ihn hier sofort in den Spielstand zu schreiben, macht die Anzeige in
+      // dem Moment richtig, in dem der Kauf bestätigt ist.
+      //
+      // Vorher hing die Zahl an `loadSave()` weiter unten, und das holt den GESAMTEN Spielstand neu
+      // über das Netz und baut ihn neu auf (Normalisierung, Zielzustände, Sponsor-Vergleich) — für
+      // eine einzige geänderte Zahl. Genau das war als „die Seite lädt nach jedem Kauf nochmal"
+      // sichtbar.
+      //
+      // Der Wert ist nicht geraten: Er stammt aus dem ausgeführten Kauf, ist also derselbe, den der
+      // Nachlauf gleich darauf bestätigt. Bleibt der Nachlauf aus (Netz weg), steht trotzdem der
+      // richtige Betrag da statt des alten — strikt besser als vorher.
+      setGameState((current) => {
+        const teams = applyTeamCashPatch(current.teams, {
+          teamId: payload.summary?.team?.id ?? marketBuyPreview.team?.id,
+          cash: payload.summary?.cashAfter,
+        });
+        return teams === current.teams ? current : { ...current, teams };
+      });
+
       await Promise.all([
         loadSave(buyContext.saveId),
         reloadMarketFeed(payload.summary.team?.id ?? marketBuyPreview.team.id),
