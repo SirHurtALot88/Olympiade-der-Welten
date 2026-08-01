@@ -47067,6 +47067,65 @@ button.foundation-team-portrait-card {
   border-top: 1px solid var(--nl-line);
 }
 
+/* Rekordbuch: eine Kachel je Bestmarke. Der Wert steht groß, der Kontext („Tennis · Spieltag 5")
+   klein darunter — er ist die Geschichte, nicht die Verwaltungsangabe. */
+.is-new-look .nl-recordbook {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: var(--nl-s2, 10px);
+}
+
+.is-new-look .nl-recordbook-entry {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  border: 1px solid var(--nl-line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 10px 12px;
+  color: inherit;
+}
+
+.is-new-look button.nl-recordbook-entry {
+  cursor: pointer;
+}
+
+.is-new-look button.nl-recordbook-entry:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.is-new-look button.nl-recordbook-entry:focus-visible {
+  outline: 2px solid var(--nl-accent, #5b9bff);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-recordbook-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut, #93a3bd);
+}
+
+.is-new-look .nl-recordbook-value {
+  font-size: 1.24rem;
+  line-height: 1.15;
+}
+
+.is-new-look .nl-recordbook-holder {
+  font-size: 0.86rem;
+}
+
+.is-new-look .nl-recordbook-kontext {
+  font-size: 0.72rem;
+  color: var(--nl-mut, #93a3bd);
+}
+
+/* Eine laufende Serie ist eine andere Aussage als eine abgeschlossene — sie kann heute noch
+   wachsen. Das darf man sehen. */
+.is-new-look .nl-recordbook-kontext.is-running {
+  color: var(--nl-good, #59c88a);
+}
+
 /* Legenden-Kriterien: je Anwärter eine Checkliste. Die Häkchen sind die eigentliche Aussage —
    sie zeigen, WAS noch fehlt, nicht nur dass etwas fehlt. */
 .is-new-look .nl-legend-candidates {

@@ -48,6 +48,7 @@ import {
   type EternalPlayerStatus,
 } from "@/lib/foundation/eternal-player-table";
 import { buildLeagueLegends } from "@/lib/foundation/league-legend-criteria";
+import { buildLeagueRecordBook } from "@/lib/foundation/league-record-book";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import {
   buildLeagueAchievements,
@@ -361,7 +362,12 @@ export default function LeagueLeadersNewLook({
       </NlCard>
 
       {subTab === "records" ? (
-        <LeagueRecordsPanel records={records} seasonBests={seasonBests} onOpenPlayer={onOpenPlayer} />
+        <LeagueRecordsPanel
+          records={records}
+          seasonBests={seasonBests}
+          gameState={foundationGameState}
+          onOpenPlayer={onOpenPlayer}
+        />
       ) : subTab === "legends" ? (
         <LegendaryPlayersPanel
           records={records}
@@ -586,13 +592,21 @@ export default function LeagueLeadersNewLook({
 function LeagueRecordsPanel({
   records,
   seasonBests,
+  gameState,
   onOpenPlayer,
 }: {
   records: LeagueRecordsHallOfFame | null;
   seasonBests: LeagueSeasonBests;
+  /** Fuer das Rekordbuch — es liest Spieltagsergebnisse direkt, nicht ueber Snapshots. */
+  gameState: GameState | null;
   onOpenPlayer: (playerId: string) => void;
 }) {
-  const seasonBestsSection = <SeasonBestsSection seasonBests={seasonBests} onOpenPlayer={onOpenPlayer} />;
+  const seasonBestsSection = (
+    <>
+      <SeasonBestsSection seasonBests={seasonBests} onOpenPlayer={onOpenPlayer} />
+      {gameState ? <RecordBookSection gameState={gameState} onOpenPlayer={onOpenPlayer} /> : null}
+    </>
+  );
 
   // D7: Season-Bestwerte werden immer gezeigt (ab S1/MD1 lebendig). Der
   // All-Time-Teil erscheint erst, wenn mindestens eine Saison archiviert ist —
@@ -808,6 +822,76 @@ const LEGENDS_TABLE_COLUMNS: Array<NlTableColumn<PlayerCareerLeaderRow>> = [
   { key: "mvpTotal", label: "MVP", align: "right", sortable: true },
   { key: "seasonsPlayed", label: "Saisons", align: "right", sortable: true },
 ];
+
+/**
+ * "Rekordbuch" — Superlative, die ab dem ersten Spieltag entstehen.
+ *
+ * GEMELDET: „der rekorde tab ist noch tot da passiert fast gar nichts, keine interessanten
+ * infos."
+ *
+ * Der Reiter hing komplett an archivierten Saisons. Diese Sektion liest stattdessen, was jeder
+ * Spieltag ohnehin schreibt — und weil der Snapshot dieselben Listen 1:1 archiviert, gilt jeder
+ * Rekord später unverändert weiter. In Saison 1 stammt jeder Halter zwangsläufig aus Saison 1;
+ * das ist kein Leerzustand, sondern die Geburt des Rekordbuchs.
+ */
+function RecordBookSection({
+  gameState,
+  onOpenPlayer,
+}: {
+  gameState: GameState;
+  onOpenPlayer: (playerId: string) => void;
+}) {
+  const buch = useMemo(() => buildLeagueRecordBook(gameState), [gameState]);
+  const alle = [...buch.spieltagsSuperlative, ...buch.serien];
+
+  if (alle.length === 0) {
+    return null;
+  }
+
+  return (
+    <NlCard
+      className="nl-recordbook-card"
+      eyebrow={`aus ${formatNlNumber(buch.matchdaysPlayed, 0)} gespielten Spieltagen`}
+      title="Rekordbuch"
+    >
+      <p className="nl-leaders-hint">
+        Bestmarken aus jedem einzelnen Spieltag. Sie gelten weiter, wenn die Saison ins Archiv wandert — spätere Saisons
+        müssen sie brechen.
+      </p>
+      <div className="nl-recordbook" data-testid="record-book">
+        {alle.map((eintrag) => {
+          const klickbar = eintrag.playerId != null;
+          const inhalt = (
+            <>
+              <span className="nl-recordbook-label">{eintrag.label}</span>
+              <strong className="nl-recordbook-value nl-tnum">{eintrag.displayValue}</strong>
+              <span className="nl-recordbook-holder">{eintrag.halter}</span>
+              {eintrag.kontext ? (
+                <span className={`nl-recordbook-kontext${eintrag.laeuftNoch ? " is-running" : ""}`}>{eintrag.kontext}</span>
+              ) : null}
+            </>
+          );
+          return klickbar ? (
+            <button
+              key={eintrag.id}
+              type="button"
+              className="nl-recordbook-entry"
+              onClick={() => onOpenPlayer(eintrag.playerId as string)}
+              title={`${eintrag.beschreibung} — Profil von ${eintrag.halter} öffnen`}
+              data-record-id={eintrag.id}
+            >
+              {inhalt}
+            </button>
+          ) : (
+            <div key={eintrag.id} className="nl-recordbook-entry" title={eintrag.beschreibung} data-record-id={eintrag.id}>
+              {inhalt}
+            </div>
+          );
+        })}
+      </div>
+    </NlCard>
+  );
+}
 
 /**
  * "Saison-Awards" — Auszeichnungen, die eine ROLLE erzählen.
