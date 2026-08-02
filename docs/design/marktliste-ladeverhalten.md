@@ -63,3 +63,62 @@ Den zweiten Ladepfad in `use-foundation-market-feed-actions.ts` würde ich nur d
 Die Server-Sortierung (Option B) würde ich nicht bauen, solange der Pool in der Grössenordnung 3000–5000 bleibt: Mit fullPool und Virtualisierung trägt der Client-Ansatz diese Grösse bequem, und die Instant-Filter sind spielerisch wertvoller als die letzten gesparten Kilobytes. Erst wenn Pools Richtung fünfstellig wachsen oder der eine fullPool-Request serverseitig spürbar über ~3–4 Sekunden liegt, lohnt die Migration.
 
 Die nicht präfix-stabile Diverse-Slice-Paginierung im sqlite-Pfad würde ich nicht reparieren, sondern für den verbleibenden Nutzer (prisma-Fallback, Legacy-Pfad) als bekannte Einschränkung dokumentieren — auf dem Hauptpfad macht fullPool sie schlicht bedeutungslos. Und die Cache-Entwertung nach dem Kauf (kompletter Neuaufbau statt Delta) bleibt wie sie ist: Sie ist die bewusst einfache Antwort auf den Cash-Anzeige-Bug aus #273, und mit einem einzigen Request statt dreizehn ist ihr Preis akzeptabel; ein Delta-Mechanismus wäre neue Komplexität an einer Stelle, die gerade erst stabil geworden ist.
+
+---
+
+# 6. Gebaut — und was die Messung danach sagt
+
+Status: **umgesetzt**. Empfehlung A + C, wie vorgeschlagen, mit einer ehrlichen Korrektur unterwegs.
+
+## 6.1 Was gebaut wurde
+
+**A — ein Request statt dreizehn.** `app/api/transfermarkt/free-agents/route.ts` reicht `fullPool`
+jetzt durch, mit zwei Kappen: nur zusammen mit `compact`, und nur auf dem sqlite-Pfad (der
+Prisma-Referenzpfad deckelt `limit` ohnehin hart auf 250). Der Client zeigt die erste 250er-Seite
+sofort und holt den Rest in **einem** Aufruf nach — genau zwei Veröffentlichungen statt sieben.
+Kann die Route den Voll-Pool nicht liefern, greift die alte Seiten-Schleife als Rückfallstufe,
+aber **ohne** Zwischenveröffentlichungen (das ist Option D als eingebauter Notnagel).
+
+Dazu ein neuer Zustand `marketCompleting`, getrennt von `marketBusy`: „bedienbar, aber noch nicht
+vollständig" ist etwas anderes als „noch nichts da". Die Liste sagt in dieser Phase ausdrücklich
+_„Markt wird vervollständigt — Reihenfolge noch vorläufig"_, weil die ersten 250 in
+Server-Reihenfolge kommen und nicht in der gewählten Sortierung.
+
+**C — echtes Scroll-Fenster.** Erst mit `content-visibility: auto` versucht, wie im Entwurf als
+billigste Variante angedacht. **Nachgemessen: 0 von 1533 Karten wurden übersprungen**, die
+Umsortierung blieb bei rund 2 Sekunden. Also verworfen und ein Fenster gebaut: gerendert wird der
+sichtbare Ausschnitt plus acht Karten Puffer, darüber und darunter halten zwei Platzhalter die
+Bildlaufleiste ehrlich. Der 90-ms-Trickle und `renderedCandidateCount` sind ersatzlos weg.
+
+Die Auswahl wird immer ins Fenster gezwungen. Das ist keine Kür: `candidateButtonRefs`,
+Tastaturnavigation und `scrollIntoView` arbeiten auf gerenderten Karten — läge die Auswahl
+außerhalb, bräche genau der Weg, der zuvor repariert wurde.
+
+## 6.2 Gemessen, gleicher Spielstand, gleiche Maschine
+
+```
+                              vorher        nachher
+Erste bedienbare Liste        ~5 s          1,4 s
+Liste vollständig             54–59 s       1,9 s
+Netzaufrufe free-agents       13            3
+Karten gleichzeitig im DOM    1887          25
+Umsortieren „Bester Fit"      ~2000 ms      ~500 ms
+Klick auf Zeile 4             daneben       trifft
+```
+
+Nach einem Sprung ans Listenende: weiterhin 25 Karten im DOM, das Fenster trägt mit.
+
+## 6.3 Was der Entwurf richtig und was er zu optimistisch gesehen hat
+
+Richtig war die Ursachentrennung: Ladezeit und DOM-Last sind zwei unabhängige Hälften, und beide
+mussten angefasst werden. Richtig war auch, `fullPool` als bereits vorhandenen, nur nicht
+durchgereichten Hebel zu erkennen — das war der ganze Unterschied zwischen dreizehn und einem
+Aufruf.
+
+Zu optimistisch war `content-visibility` als Abkürzung. Es steht so auch nicht im Entwurf (der
+empfahl richtig Virtualisierung), aber ich habe es zuerst probiert, weil es risikoärmer aussah.
+Es hat nachweislich nichts bewirkt. Der Umweg steht hier, damit ihn niemand ein zweites Mal geht.
+
+Offen geblieben, wie im Entwurf vorgeschlagen: die Offset-Semantik der Seiten-Paginierung ist
+weiterhin wackelig — auf dem sqlite-Hauptpfad spielt das keine Rolle mehr, weil gar nicht mehr
+paginiert wird, aber die Rückfallstufe erbt das Problem.

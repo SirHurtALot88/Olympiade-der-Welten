@@ -66,6 +66,8 @@ describe("transfermarkt free agents api", () => {
       maxSalary: null,
       scoutingLevel: null,
       compactList: true,
+      // Ohne `fullPool=true` bleibt es bei der Seite — der Voll-Pool ist ausdrueckliches Opt-in.
+      fullPool: false,
     });
     expect(listTransfermarktFreeAgents).not.toHaveBeenCalled();
     expect(body.total).toBe(1);
@@ -127,6 +129,8 @@ describe("transfermarkt free agents api", () => {
       maxSalary: null,
       scoutingLevel: null,
       compactList: true,
+      // Der Prisma-Referenzpfad bekommt nie den Voll-Pool: er deckelt `limit` hart auf 250.
+      fullPool: false,
     });
     expect(listLocalTransfermarktFreeAgents).not.toHaveBeenCalled();
     expect(body.scope.saveId).toBe("save-initial");
@@ -146,5 +150,30 @@ describe("transfermarkt free agents api", () => {
     expect(body.warnings).toEqual([]);
     expect(body.poolAudit.activeFreeAgentCount).toBe(0);
     expect(body.poolAudit.visibleFeedCount).toBe(0);
+  });
+
+  /**
+   * `fullPool` liefert den KOMPLETTEN Pool in einer Antwort statt einer 250er-Seite. Das ist der
+   * Grund, warum der Markt jetzt in ~2 statt ~59 Sekunden steht — und genau deshalb braucht es
+   * Kappen, damit daraus kein offener Hahn wird.
+   */
+  it("reicht fullPool auf dem sqlite-Pfad durch", async () => {
+    const { GET } = await import("@/app/api/transfermarkt/free-agents/route");
+    await GET(new Request("http://localhost/api/transfermarkt/free-agents?fullPool=true"));
+    expect(listLocalTransfermarktFreeAgents).toHaveBeenCalledWith(expect.objectContaining({ fullPool: true }));
+  });
+
+  it("verweigert fullPool ohne compact", async () => {
+    // Die Vollansicht je Spieler ist um ein Vielfaches groesser als die kompakte — beides
+    // zusammen waere die teuerste denkbare Antwort.
+    const { GET } = await import("@/app/api/transfermarkt/free-agents/route");
+    await GET(new Request("http://localhost/api/transfermarkt/free-agents?fullPool=true&compact=false"));
+    expect(listLocalTransfermarktFreeAgents).toHaveBeenCalledWith(expect.objectContaining({ fullPool: false }));
+  });
+
+  it("verweigert fullPool auf dem Prisma-Referenzpfad", async () => {
+    const { GET } = await import("@/app/api/transfermarkt/free-agents/route");
+    await GET(new Request("http://localhost/api/transfermarkt/free-agents?fullPool=true&source=prisma"));
+    expect(listTransfermarktFreeAgents).toHaveBeenCalledWith(expect.objectContaining({ fullPool: false }));
   });
 });
