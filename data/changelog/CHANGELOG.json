@@ -3,9 +3,81 @@
   "eintraege": [
     {
       "datum": "2026-08-02",
+      "seite": "Spieltag · Inbox",
+      "pr": null,
+      "text": "Aufstellung setzen, Formkarten erzeugen und bestätigen sind jetzt eine Karte statt drei — mit Fortschritt: „Spieltag vorbereiten · Schritt 2 von 3\".",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Spieltag · Inbox",
+      "pr": null,
+      "text": "Ein belasteter Spieler löst nur noch eine Meldung aus statt bis zu drei, die alle dieselbe Person meinten. Der Knopf „Training leicht\" bleibt dabei erhalten.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Spieltag · Inbox",
+      "pr": null,
+      "text": "Mehrere Scouting-Fortschritte werden zu einer Notiz zusammengefasst („3 Scouting-Reports sind schärfer geworden\") statt je Spieler und Meilenstein einzeln zu melden.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Spieltag · Inbox",
+      "pr": null,
+      "text": "Die Inbox hat jetzt drei Räume nebeneinander — „Jetzt handeln\", „Im Blick behalten\" und „Berichte & Momente\". Was dich etwas kostet, wenn du es liegen lässt, steht links; was nur informiert, kapert nicht mehr den Platz davor.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Spieltag · Inbox",
+      "pr": null,
+      "text": "Der Umschalter zwischen „Entscheidungen\" und „Chronik\" ist weg: beides ist gleichzeitig sichtbar, statt dass eine Hälfte hinter einem Reiter verschwindet.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Spieltag · Inbox",
+      "pr": null,
+      "text": "Jede Karte trägt ihr Sprungziel als Chip („→ Teams · Verträge\") — du siehst vor dem Klick, wo du landest.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Spieltag · Inbox",
+      "pr": null,
+      "text": "Auf breiten Schirmen füllt die Inbox die Fläche aus, statt eine schmale Spalte links zu lassen; auf schmalen stapeln die drei Räume untereinander.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
       "seite": "Team · Verträge",
       "pr": "#344",
       "text": "Ob ein Spieler sein Gehalt wert ist, wird jetzt am Ligadurchschnitt gemessen statt am reinen Verhaeltnis von Gehalt und Leistung. Vorher standen schwache Spieler dabei immer schlecht da, egal wie wenig sie kosteten — jetzt faellt auf, wer wirklich mehr verdient als ueblich, und die Computer-Teams entscheiden auf derselben Grundlage ueber ihre Verkaeufe.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Team · Verträge",
+      "pr": "#348",
+      "text": "Der Verträge-Reiter sagt jetzt, was zu tun ist, statt nur Zahlen zu zeigen: je Spieler eine Empfehlung mit Begruendung, dazu OVR, PPs und MVS als Leitzahlen, die Punkte je Achse mit Ligarang, und zwei Balken fuer 'verdient er mehr als ueblich' und 'bringt ein Verkauf mehr oder weniger als der Marktwert'. Oben steht die Bilanz des Vorstands, und die dringendsten Faelle stehen zuerst.",
       "quelle": "gepflegt",
       "gewicht": "grundlegend",
       "version": "0.3"
