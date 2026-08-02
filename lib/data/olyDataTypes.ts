@@ -39,6 +39,21 @@ export type SeasonTransitionState = {
   errors: string[];
   createdAt: string;
   appliedAt?: string;
+  /**
+   * Saison-Id, fuer die die Saisonende-Entwicklung bereits WIRKLICH auf die Attribute geschrieben
+   * wurde (verhandlung-/saisonende-Ablauf).
+   *
+   * GEMELDET: „Kannst du dafuer sorgen, dass nach MD10 bevor man verkaufen kann die
+   * Trainingsupgrades der spieler schon durch laufen und die neuen Marktwerte dann verfuegbar
+   * sind? erst DANN darf wirklich verkauft werden."
+   *
+   * Genau das ging vorher nicht: der Schritt „Spielerentwicklung" schaltete nur die Phase weiter
+   * („preview_only_no_attribute_writes"), gerechnet wurde erst beim Start der NEUEN Saison — also
+   * hinter dem Transferfenster. Man verkaufte zu Marktwerten, die der Spieler schon nicht mehr
+   * hatte. Jetzt schreibt der Schritt selbst, und dieser Marker verhindert, dass die Entwicklung
+   * beim Saisonstart ein zweites Mal laeuft.
+   */
+  progressionAppliedForSeasonId?: string | null;
 };
 
 export type ScenarioType =

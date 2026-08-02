@@ -351,6 +351,31 @@ function materializeSeasonEndProgressionBeforeNextSeason(
   save: PersistedSaveGame,
   persistence: PersistenceService,
 ): PreSeasonProgressionMaterializationResult {
+  /**
+   * Nicht zweimal entwickeln.
+   *
+   * Der Saisonende-Assistent laesst den Schritt „Spielerentwicklung" seit Kurzem selbst rechnen —
+   * damit die neuen Marktwerte VOR dem Transferfenster feststehen und man nicht zu Preisen
+   * verkauft, die der Spieler schon nicht mehr hat. Lief er dort, ist die Arbeit getan; ein
+   * zweiter Durchgang hier gaebe jedem Spieler seinen Saisonsprung doppelt.
+   *
+   * Der Marker haengt an der ABGESCHLOSSENEN Saison-Id, nicht an einem Ja/Nein-Schalter: nur so
+   * bleibt er ueber Saisongrenzen hinweg richtig und blockiert die Entwicklung der naechsten
+   * Saison nicht.
+   */
+  if (save.gameState.seasonTransition?.progressionAppliedForSeasonId === save.gameState.season.id) {
+    return {
+      save,
+      teamsProcessed: 0,
+      teamsApplied: 0,
+      humanOrganicTeams: 0,
+      aiPlannedTeams: 0,
+      aiOrganicFallbackTeams: 0,
+      playerEventsCreated: 0,
+      warnings: ["season_end_progression_already_applied_in_transition_step"],
+      blockingReasons: [],
+    };
+  }
   return runSeasonEndProgressionBatch({ save, persistence, persistFinalState: false });
 }
 
