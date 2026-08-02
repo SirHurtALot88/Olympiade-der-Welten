@@ -235,20 +235,14 @@ describe("lineup v2 portrait hover preview ui contract", () => {
   });
 });
 
-describe("lineup portrait hover preview ui contract", () => {
-  it("wraps lineup roster cards with portrait hover preview", async () => {
-    const fs = await import("node:fs/promises");
-    const path = await import("node:path");
-    const root = process.cwd();
-
-    const lineupText = await fs.readFile(
-      path.join(root, "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"),
-      "utf8",
-    );
-
-    expect(lineupText).toContain("FoundationPlayerPortraitPreview");
-    expect(lineupText).toContain("wrapLineupPortraitHoverPreview");
-    expect(lineupText).toContain('context="roster"');
-    expect(lineupText).toContain("player.coreStats.pow");
-  });
-});
+// Die frühere "lineup portrait hover preview ui contract"-Gruppe stand hier:
+// Sie pinnte ausschließlich `wrapLineupPortraitHoverPreview` in
+// LegacyLineupLabClient.tsx — eine Funktion, die seit
+// SHOW_CLASSIC_LINEUP_WORKSPACE = false nie mehr aufgerufen wurde (der
+// klassische Roster-Kartenbaum, der sie einband, ist tot). Mit dem
+// Dead-Code-Cleanup ist die Funktion samt ihres einzigen Imports
+// (FoundationPlayerPortraitPreview, createEmptyLeaguePlayerHeatPools) entfernt;
+// der lebende Nachfolger ist bereits oben über "wrapNlPortraitPreview" in
+// LineupNewLook.tsx abgedeckt. Die Gruppe testete also keine echte Funktion
+// mehr, sondern nur die Existenz toten Codes — deshalb komplett gestrichen
+// statt auf eine andere Datei umgebogen.

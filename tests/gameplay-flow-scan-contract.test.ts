@@ -90,7 +90,11 @@ describe("gameplay flow scan contract", () => {
     ]);
 
     expect(packageText).toContain("@tanstack/react-virtual");
-    expect(lineupText).toContain("LegacyLineupVirtualCardGrid");
+    // "LegacyLineupVirtualCardGrid" pinnte nur einen nie genutzten Import aus
+    // der toten Geschwisterdatei LegacyLineupVirtualTableBody.tsx — beide sind
+    // mit dem Dead-Code-Cleanup entfernt. Die echte Virtualisierung der
+    // Spieler-Tabelle läuft über useRowVirtualWindow / expertPlayerTableVirtualWindow
+    // (siehe Assertion unten), die davon unberührt bleibt.
     expect(lineupText).toContain("scheduleHoveredCandidate");
     expect(lineupText).toContain("expertPlayerTableVirtualWindow");
     // NOTE: react-virtual / useVirtualizer is now only used by the players
