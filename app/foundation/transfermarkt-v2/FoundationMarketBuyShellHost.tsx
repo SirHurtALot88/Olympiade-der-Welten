@@ -3,6 +3,7 @@
 import type { Dispatch, RefObject, SetStateAction } from "react";
 
 import ClassIcon from "@/app/foundation/ClassIcon";
+import { FoundationDecisionSurface } from "@/app/foundation/decision-surface/FoundationDecisionSurface";
 import ContractOfferClient from "@/app/foundation/contract-offer/ContractOfferClient";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import {
@@ -223,18 +224,74 @@ export default function FoundationMarketBuyShellHost({
   });
 
   return (
-    <section className="foundation-drilldown-page transfer-offer-page" data-testid="transfer-offer-page" ref={buyModalRef}>
-      <header className="foundation-drilldown-header">
-        <div>
-          <span className="market-v2-kicker">Vertragsangebot</span>
-          <h1>{selectedPlayer?.name ?? "Spieler prüfen"}</h1>
-        </div>
-        <button className="secondary-button" type="button" onClick={closeBuyModal} disabled={buyBusy}>
-          Zurück
-        </button>
-      </header>
-
-      <div className="foundation-drilldown-body transfer-buy-modal-body" ref={buyModalBodyRef}>
+    <FoundationDecisionSurface
+      kicker={`Transfermarkt · Vertragsangebot${selectedPlayer?.name ? ` · ${selectedPlayer.name}` : ""}`}
+      ariaLabel="Vertragsangebot"
+      testId="transfer-offer-page"
+      className="transfer-offer-page"
+      status={
+        source !== "sqlite"
+          ? { label: "nur Ansicht", tone: "neutral" }
+          : buyNegotiationOutcome?.status === "accepted"
+            ? { label: "Annahme liegt vor", tone: "ready" }
+            : buyNegotiationOutcome?.status === "rejected"
+              ? { label: "abgelehnt", tone: "blocked" }
+              : buyPreview?.canBuy
+                ? { label: "bereit", tone: "ready" }
+                : { label: "prüfen", tone: "warning" }
+      }
+      onClose={closeBuyModal}
+      closeDisabled={buyBusy}
+      /*
+        Schritt 1 des Kaufs. Er ist KEIN zweiter Hauptknopf, sondern der vorgelagerte Schritt:
+        solange keine Annahme vorliegt, ist der Abschluss gesperrt. Hervorgehoben wird deshalb
+        genau der Knopf, der gerade dran ist.
+      */
+      secondary={{
+        label:
+          buyNegotiationOutcome?.status === "accepted" ? "Annahme liegt vor" : "Schritt 1: Verhandeln",
+        busyLabel: "verhandelt…",
+        busy: buyBusy,
+        emphasized: buyNegotiationOutcome?.status !== "accepted",
+        disabled:
+          source !== "sqlite" ||
+          !selectedTeamCanManage ||
+          previewBusy ||
+          !selectedPlayer ||
+          !selectedTeamId ||
+          !buyPreview?.canBuy ||
+          buyNegotiationOutcome?.status === "rejected",
+        title:
+          source !== "sqlite"
+            ? "Im Referenzmodus bleibt die Verhandlung gesperrt."
+            : !buyPreview?.canBuy
+              ? buyPreview?.blockingReasons?.map(formatNegotiationSignalLabel).join(" · ") ||
+                "Der Deal ist noch nicht bereit."
+              : buyNegotiationOutcome?.status === "rejected"
+                ? "Nach einer Absage erst Angebot oder Vertrag anpassen."
+                : "Verhandlung starten und Reaktion der Gegenseite prüfen.",
+        onAct: () => void negotiateBuy(),
+      }}
+      primary={{
+        label: "Schritt 2: Kauf final abschließen",
+        confirmLabel: "Schritt 2: Kauf final abschließen",
+        busyLabel: "kauft…",
+        busy: buyBusy,
+        buttonTestId: "transfer-buy-confirm-button",
+        disabledReasonTestId: "transfer-buy-disabled-reason",
+        disabledReason: finalBuyDisabledReason ?? null,
+        disabled:
+          source !== "sqlite" ||
+          !selectedTeamCanManage ||
+          previewBusy ||
+          !selectedPlayer ||
+          !selectedTeamId ||
+          !buyPreview?.canBuy ||
+          buyNegotiationOutcome?.status !== "accepted",
+        onConfirm: () => void confirmBuy(),
+      }}
+    >
+      <div className="transfer-buy-modal-body" ref={buyModalBodyRef}>
               {/* Velo-Hero: Portrait + Meta + KPIs als StatChips (F1 — ersetzt die
                   alte transfer-modal-kpi/pill/muted-Sprache durch das Kit-Vokabular). */}
               <NlCard
@@ -782,40 +839,6 @@ export default function FoundationMarketBuyShellHost({
                 ) : null}
               </div>
             ) : null}
-
-            <div className="foundation-modal-actions">
-              <button className="secondary-button" type="button" onClick={closeBuyModal} disabled={buyBusy}>
-                Abbrechen
-              </button>
-              <button
-                className={buyNegotiationOutcome?.status === "accepted" ? "primary-button" : "secondary-button"}
-                type="button"
-                disabled={source !== "sqlite" || !selectedTeamCanManage || previewBusy || buyBusy || !selectedPlayer || !selectedTeamId || !buyPreview?.canBuy || buyNegotiationOutcome?.status === "rejected"}
-                onClick={() => void negotiateBuy()}
-                title={
-                  source !== "sqlite"
-                    ? "Im Referenzmodus bleibt die Verhandlung gesperrt."
-                    : !buyPreview?.canBuy
-                      ? buyPreview?.blockingReasons?.map(formatNegotiationSignalLabel).join(" · ") || "Der Deal ist noch nicht bereit."
-                      : buyNegotiationOutcome?.status === "rejected"
-                        ? "Nach einer Absage erst Angebot oder Vertrag anpassen."
-                        : "Verhandlung starten und Reaktion der Gegenseite prüfen."
-                }
-              >
-                {buyBusy ? "verhandelt..." : buyNegotiationOutcome?.status === "accepted" ? "Annahme liegt vor" : "Schritt 1: Verhandeln"}
-              </button>
-              <button
-                className="primary-button"
-                type="button"
-                data-testid="transfer-buy-confirm-button"
-                disabled={source !== "sqlite" || !selectedTeamCanManage || previewBusy || buyBusy || !selectedPlayer || !selectedTeamId || !buyPreview?.canBuy || buyNegotiationOutcome?.status !== "accepted"}
-                onClick={() => void confirmBuy()}
-                title={finalBuyDisabledReason ?? "Bestätigt den Kauf jetzt final in deinem lokalen Spielstand."}
-              >
-                {buyBusy ? "kauft..." : "Schritt 2: Kauf final abschließen"}
-              </button>
-            </div>
-      {finalBuyDisabledReason ? <p className="foundation-screen-action-reason" data-testid="transfer-buy-disabled-reason">Warum nicht: {finalBuyDisabledReason}</p> : null}
-    </section>
+    </FoundationDecisionSurface>
   );
 }

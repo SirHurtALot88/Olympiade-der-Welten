@@ -51,6 +51,31 @@ export type DecisionSurfacePrimaryAction = {
   onConfirm: () => void | Promise<void>;
 };
 
+/**
+ * Ein ZWEITER Handlungsknopf links neben dem Hauptknopf — für Abläufe, die vor der endgültigen
+ * Handlung einen eigenen Schritt haben.
+ *
+ * Der Kauf ist genau so einer: erst „Verhandeln" (Reaktion der Gegenseite einholen), dann
+ * „Kauf abschließen". Das ist kein Doppel-Primary, sondern eine echte Reihenfolge — der zweite
+ * Knopf ist bis zur Annahme gesperrt. Ohne diesen Slot hätte der Kauf seine Fußleiste weiterhin
+ * selbst bauen müssen, und die Hülle wäre für ihn nutzlos gewesen.
+ *
+ * Kein Bestätigungsschritt: der Zweiklick gehört zur endgültigen Handlung, und die ist der
+ * Hauptknopf.
+ */
+export type DecisionSurfaceSecondaryAction = {
+  label: string;
+  busyLabel?: string;
+  busy?: boolean;
+  disabled?: boolean;
+  /** Tooltip am Knopf — der sichtbare „Warum nicht"-Text gehört dem Hauptknopf. */
+  title?: string;
+  buttonTestId?: string;
+  /** Hebt den zweiten Knopf hervor, solange ER der nächste Schritt ist. */
+  emphasized?: boolean;
+  onAct: () => void | Promise<void>;
+};
+
 export type FoundationDecisionSurfaceProps = {
   /** Kleine Zeile über dem Titel, z. B. „Transfermarkt · Verkauf". */
   kicker: string;
@@ -77,6 +102,8 @@ export type FoundationDecisionSurfaceProps = {
    */
   confirmNote?: ReactNode;
   primary?: DecisionSurfacePrimaryAction | null;
+  /** Vorgelagerter Schritt links vom Hauptknopf (z. B. „Verhandeln" vor „Kauf abschließen"). */
+  secondary?: DecisionSurfaceSecondaryAction | null;
   /** Ist die Handlung erledigt, ersetzt ein einzelner „Schließen"-Knopf die Fußleiste. */
   done?: boolean;
   cancelLabel?: string;
@@ -105,6 +132,7 @@ export function FoundationDecisionSurface({
   children,
   confirmNote,
   primary,
+  secondary,
   done = false,
   cancelLabel = "Abbrechen",
 }: FoundationDecisionSurfaceProps) {
@@ -195,6 +223,18 @@ export function FoundationDecisionSurface({
                   {confirmStep ? "Zurück" : cancelLabel}
                 </button>
                 <span className="nl-decision-foot-spacer" />
+                {secondary ? (
+                  <button
+                    className={secondary.emphasized ? "primary-button" : "secondary-button"}
+                    type="button"
+                    data-testid={secondary.buttonTestId}
+                    disabled={Boolean(secondary.disabled) || Boolean(secondary.busy) || Boolean(primary?.busy)}
+                    title={secondary.title}
+                    onClick={() => void secondary.onAct()}
+                  >
+                    {secondary.busy ? secondary.busyLabel ?? "Läuft…" : secondary.label}
+                  </button>
+                ) : null}
                 {disabledReason ? (
                   <p
                     className="foundation-screen-action-reason"

@@ -1144,9 +1144,20 @@ Die linke Spalte ist der gemeldete Missstand in Reinform: **je weiter man entgeg
 höher wurde seine Forderung.** Rechts sinkt sie und bleibt dann stehen — ein glaubwürdiges
 „mehr geht nicht" statt einer stur identischen Zahl.
 
-## 11.6 Weiterhin offen
+## 11.6 Der Tooltip erklärt alle drei Gedächtnisse an EINER Stelle
 
-- Der Trotz-Aufschlag ist im Kaufdialog sichtbar (zwei Banner: was gilt, was ein Klick auslösen
-  würde) und in der Forderungs-Aufschlüsselung als eigener Posten. Ein **Tooltip** an der
-  Verhandlungszeile, der beide Gedächtnisse zusammen erklärt, fehlt noch.
+Das Bündel „Ist was vorgefallen?" (Abschnitt 5) trägt jetzt alle drei — Vertrauensbruch, Trotz
+(geltend und angekündigt getrennt) und Erwiderung. Verteilt auf drei Ecken der Oberfläche wäre
+jedes einzeln ein Rätsel; die Frage lautet „warum ist seine Forderung anders als eben?", und die
+hat genau eine Antwortstelle zu haben.
+
+Dazu im Kaufdialog zwei Banner, und die Trennung ist der Punkt: einer sagt, was SCHON gilt, der
+andere, was ein Klick auslösen WÜRDE. Ohne den zweiten wäre der Aufschlag eine Überraschung nach
+dem Klick; ohne den ersten wäre die erhöhte Forderung unerklärt.
+
+## 11.7 Weiterhin offen
+
 - `base_interest` ist weiterhin eine Konstante 45 (Abschnitt 10.5).
+- Vier W-Zutaten bleiben an diesem Spielstand stumm, weil ihm die Ausbaustufen und die
+  Verhandlungshistorie fehlen (Abschnitt 10.5) — kein Defekt, aber beim nächsten Kalibrieren zu
+  beachten.

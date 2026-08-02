@@ -210,7 +210,15 @@ export function buildNegotiationTooltip(buyPreview: TransfermarktBuyPreview | nu
     bundles.push({ id: "money", title: "Reicht das Paket?", items });
   }
 
-  // 4. Ist was vorgefallen? (Geschichte) — Bündel entfällt, wenn nichts vorgefallen ist.
+  /**
+   * 4. Ist was vorgefallen? (Geschichte) — Bündel entfällt, wenn nichts vorgefallen ist.
+   *
+   * Hier stehen jetzt ALLE DREI Verhandlungsgedächtnisse zusammen, und das ist der Punkt: sie
+   * hängen an der Richtung des Angebots (runter = Affront, tief = Trotz, rauf = Erwiderung) und
+   * erklären sich nur gemeinsam. Verteilt auf drei Ecken der Oberfläche wären sie einzeln je
+   * ein Rätsel — „warum ist seine Forderung anders als eben?" ist genau die Frage, die dieses
+   * Bündel beantworten muss (verhandlung-rework.md Abschnitt 9.1/9.3, 11.6).
+   */
   {
     const items: string[] = [];
     if (findScore("bad_experience")) {
@@ -218,6 +226,25 @@ export function buildNegotiationTooltip(buyPreview: TransfermarktBuyPreview | nu
     }
     if (buyPreview.verdict === "reject_affront") {
       items.push("Ihr seid nach seinem Entgegenkommen mit einem niedrigeren Angebot zurückgerudert.");
+    }
+    const defiance = buyPreview.defianceSurchargePct ?? 0;
+    if (defiance > 0) {
+      const von = buyPreview.baseDemandSalary;
+      const bis = buyPreview.expectedSalary;
+      items.push(
+        von != null && bis != null
+          ? `Trotz: euer Lowball hat seine Forderung von ${formatTransfermarktCurrency(von)} auf ${formatTransfermarktCurrency(bis)} gehoben (+${Math.round(defiance * 1000) / 10} %). Gilt bis zum Ende dieser Verhandlung, eine neue Season setzt es zurück.`
+          : `Trotz: euer Lowball hat seine Forderung um ${Math.round(defiance * 1000) / 10} % gehoben — bis zum Ende dieser Verhandlung.`,
+      );
+    }
+    const pending = buyPreview.pendingDefianceSurchargePct ?? 0;
+    if (pending > defiance) {
+      items.push(
+        `Dieses Angebot würde ihn zusätzlich verärgern: verhandelst du so, steigt seine Forderung auf +${Math.round(pending * 1000) / 10} %. Tippen ist folgenlos, verhandeln nicht.`,
+      );
+    }
+    if (buyPreview.concededFromLastCounter) {
+      items.push("Er hat auf euer Entgegenkommen reagiert und seine Forderung gegenüber der letzten Runde gesenkt.");
     }
     if (items.length > 0) {
       bundles.push({ id: "history", title: "Ist was vorgefallen?", items });
