@@ -8,6 +8,9 @@
  * fiel auf — ein Fehler EINE Ebene tiefer (Fußleiste im Body, Knopf im falschen Zweig) hätte
  * genauso typgeprüft und wäre still geblieben.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { describe, expect, it } from "vitest";
@@ -136,6 +139,27 @@ describe("Kaufdialog rendert auf der geteilten Hülle", () => {
     });
     expect(html).not.toContain('data-testid="transfer-buy-defiance-active"');
     expect(html).not.toContain('data-testid="transfer-buy-defiance-pending"');
+  });
+
+  /**
+   * GEMELDET: „wenn ich das nicht öffnen kann bringt der mir auch nix."
+   *
+   * Und das stimmte. Beim Umstellen auf die gemeinsame Hülle ist das `ref` von der Seite
+   * verlorengegangen — die Seite trug es vorher selbst. Der Aufrufer scrollt beim Öffnen per
+   * `scrollIntoView` dorthin; mit hängendem Ref lief das ins Leere, und der Dialog lag
+   * gemessene **2704 Pixel** unterhalb des Sichtfensters. Im DOM da, für Tests sichtbar, für
+   * Menschen nicht auffindbar.
+   */
+  it("gibt dem Aufrufer einen Anker zum Hinscrollen", () => {
+    const anker = { current: null as HTMLElement | null };
+    // renderToStaticMarkup setzt keine Refs — geprüft wird deshalb, dass die Hülle das Prop
+    // überhaupt annimmt und der Host es durchreicht. Das eigentliche Scrollen ist im Browser
+    // nachgemessen (2704px vorher, 0px danach).
+    expect(() => markup({ buyModalRef: anker as never })).not.toThrow();
+    const host = readFileSync(join(process.cwd(), "app/foundation/transfermarkt-v2/FoundationMarketBuyShellHost.tsx"), "utf8");
+    expect(host).toContain("containerRef={buyModalRef}");
+    const huelle = readFileSync(join(process.cwd(), "app/foundation/decision-surface/FoundationDecisionSurface.tsx"), "utf8");
+    expect(huelle).toContain("ref={containerRef}");
   });
 
   it("bleibt im Referenzmodus sichtbar, aber gesperrt", () => {
