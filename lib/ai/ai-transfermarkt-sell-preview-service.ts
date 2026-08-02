@@ -15,6 +15,13 @@ import { projectFoundationStateFromPrisma } from "@/lib/db/read/foundation-read-
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
 import { buildPlayerRatingContractMap, type PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
+import { bewerteGehalt, ordneGehaltEin } from "@/lib/contracts/salary-benchmark";
+import {
+  buildLeagueSalaryBenchmarks,
+  leseLeistung,
+  modellFuerSpieler,
+  type LeagueSalaryBenchmarks,
+} from "@/lib/contracts/salary-benchmark-league";
 import { getTeamControlSettings, withNormalizedTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { getTeamStrategyProfile, withNormalizedTeamStrategyProfiles } from "@/lib/foundation/team-strategy-profiles";
 import { normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
@@ -490,6 +497,8 @@ function buildCandidate(
   cache: SellPreviewRunCache,
   teamWeakness: TeamWeaknessInfo = NEUTRAL_TEAM_WEAKNESS,
   allowSellBelowRosterMin = false,
+  /** Gehaltskurven je Marktwert-Bracket; null, wenn die Stichprobe dafuer nicht reicht. */
+  salaryBenchmarks: LeagueSalaryBenchmarks | null = null,
 ) {
   const profile = getTeamStrategyProfile(context.gameState, team.teamId);
   const playerRating = playerRatingsById.get(player.id) ?? null;
@@ -635,6 +644,30 @@ function buildCandidate(
     pushSell("high_wage_burden", "hohes Gehalt im Verhaeltnis zum aktuellen Teambudget");
   } else if (salary != null && wagePressureScore <= 0.12) {
     pushKeep("low_wage_burden", "geringe Gehaltslast");
+  }
+
+  // GEHALT GEGEN UEBLICH — eine ANDERE Frage als der Block darueber. Dort geht es darum, ob das
+  // Team sich den Spieler leisten kann (Gehalt gegen Budget); hier darum, ob er sein Geld wert
+  // ist (Gehalt gegen das, was Spieler seiner Leistung ueblicherweise kosten). Bewusst als
+  // Abweichung und nicht als Quotient aus Gehalt und Leistung: der Quotient wird von der
+  // Leistungsspanne dominiert und wuerde schwache Spieler unabhaengig von ihrem Gehalt nach
+  // unten sortieren — die KI gaebe sie dann ab, weil sie schwach sind, nicht weil sie zu teuer
+  // sind (Begruendung und Nachweis in lib/contracts/salary-benchmark.ts).
+  // Verglichen wird innerhalb des eigenen Marktwert-Brackets (bei duenner Besetzung um die
+  // Nachbar-Brackets erweitert), nicht gegen die ganze Liga: Spitzenspieler werden ueber-
+  // proportional bezahlt, eine einzige Gerade liesse sie faelschlich ueberbezahlt aussehen.
+  const gehaltsbewertung = bewerteGehalt(salaryBenchmarks ? modellFuerSpieler(salaryBenchmarks, player.id) : null, {
+    salary,
+    leistung: leseLeistung(playerRating, "mvs"),
+    // Ohne die Laufzeit gaelte ein langfristig gebundener Spieler als ueberbezahlt, nur weil
+    // lange Vertraege ueblicherweise besser dotiert sind.
+    laufzeit: Number.isFinite(roster.contractLength) ? roster.contractLength : null,
+  });
+  const gehaltsEinordnung = ordneGehaltEin(gehaltsbewertung);
+  if (gehaltsEinordnung === "teuer") {
+    pushSell("overpaid_for_output", "teurer als fuer diese Leistung ueblich");
+  } else if (gehaltsEinordnung === "guenstig") {
+    pushKeep("bargain_contract", "guenstiger als fuer diese Leistung ueblich");
   }
 
   const sellRunway = assessTeamSellRunwayPressure({
@@ -1048,6 +1081,12 @@ export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParam
   // Computed across the WHOLE league (not just the requested scope) so a single-team lookup
   // still reflects true league standing.
   const teamWeaknessByTeamId = buildTeamWeaknessByTeamId(context.gameState);
+  // Ebenfalls ligaweit und einmal je Lauf: die Kurve "was kostet diese Leistung ueblicherweise".
+  // Nur den eigenen Kader zu befragen hiesse, sich am eigenen Gehaltsgefuege zu messen.
+  const salaryBenchmarks = buildLeagueSalaryBenchmarks({
+    gameState: context.gameState,
+    ratingsById: playerRatingsById,
+  });
   const teamScope = params.teamScope === "all" ? "all" : "ai";
   const fullRosterCandidates = params.fullRosterCandidates === true;
   const limit =
@@ -1125,6 +1164,7 @@ export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParam
           runCache,
           teamWeakness,
           allowSellBelowRosterMin,
+          salaryBenchmarks,
         ),
       )
       .sort((left, right) => right.sellPriority - left.sellPriority || left.playerName.localeCompare(right.playerName, "de"));
@@ -1284,5 +1324,7 @@ export function buildSellCoachingCandidateForActivePlayer(input: {
     playerOpt,
     cache,
     teamWeakness,
+    false,
+    buildLeagueSalaryBenchmarks({ gameState, ratingsById: playerRatingsById }),
   );
 }

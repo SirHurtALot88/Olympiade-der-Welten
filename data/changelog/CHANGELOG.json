@@ -2,6 +2,15 @@
   "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
+      "datum": "2026-08-02",
+      "seite": "Team · Verträge",
+      "pr": "#344",
+      "text": "Ob ein Spieler sein Gehalt wert ist, wird jetzt am Ligadurchschnitt gemessen statt am reinen Verhaeltnis von Gehalt und Leistung. Vorher standen schwache Spieler dabei immer schlecht da, egal wie wenig sie kosteten — jetzt faellt auf, wer wirklich mehr verdient als ueblich, und die Computer-Teams entscheiden auf derselben Grundlage ueber ihre Verkaeufe.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.3"
+    },
+    {
       "datum": "2026-08-01",
       "seite": "Spieltag · Einsatzliste",
       "pr": "#323",
