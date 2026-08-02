@@ -456,7 +456,7 @@ describe("ai transfermarkt sell preview", () => {
           // "underperformed" (lib/ai/ai-transfermarkt-sell-preview-service.ts:573-579) requires BOTH
           // averageFinalScore well below the player's OVR expectation AND averageContribution < 12 --
           // below 12 falls into the stronger "Performance blieb unter Erwartung" reason, whereas
-          // 12..25 only yields the milder "schwache lokale Score-Beitraege" (weak_contribution, see
+          // 12..25 only yields the milder "schwache lokale Score-Beiträge" (weak_contribution, see
           // line 701). The original perf-3/perf-4 scoreContribution values (14, 16) average to 14
           // together with perf-1's 12, i.e. exactly the milder band, so the underperformance reason
           // never fired; lowered here to land the average under 12.
@@ -479,7 +479,7 @@ describe("ai transfermarkt sell preview", () => {
 
     const candidate = result.teams[0]?.sellCandidates.find((entry) => entry.playerId === "ai-core");
     expect(candidate?.reasonsToSell).toContain("Performance blieb unter Erwartung");
-    expect(candidate?.reasonsToSell).toContain("Vertrag laeuft aus und Fit/Leistung rechtfertigt keine automatische Verlaengerung");
+    expect(candidate?.reasonsToSell).toContain("Vertrag läuft aus und Fit/Leistung rechtfertigt keine automatische Verlängerung");
   });
 
   it("adds board trust renewal limits when low board confidence meets missed expectations", async () => {
@@ -574,7 +574,7 @@ describe("ai transfermarkt sell preview", () => {
     });
 
     const candidate = result.teams[0]?.sellCandidates.find((entry) => entry.playerId === "ai-core");
-    expect(candidate?.reasonsToSell).toContain("faellt in ein Team-Hard-No-Go");
+    expect(candidate?.reasonsToSell).toContain("fällt in ein Team-Hard-No-Go");
     expect(candidate?.sellPriorityScore).toBeTypeOf("number");
   });
 

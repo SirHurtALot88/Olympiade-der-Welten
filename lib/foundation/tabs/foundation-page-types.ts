@@ -295,6 +295,11 @@ export type TransfermarktBuySummary = {
   counterChance?: number | null;
   rejectChance?: number | null;
   contractPreference?: PlayerContractPreference | null;
+  /** Trotz und Erwiderung (verhandlung-rework.md Abschnitt 9.1/9.3). */
+  baseDemandSalary?: number | null;
+  defianceSurchargePct?: number;
+  pendingDefianceSurchargePct?: number;
+  concededFromLastCounter?: boolean;
   demandBreakdown?: NegotiationDemandBreakdownEntry[];
   negotiationScoreBreakdown?: NegotiationScoreBreakdownEntry[];
   negotiationReasons?: string[];

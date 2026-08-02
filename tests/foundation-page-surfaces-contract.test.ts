@@ -35,13 +35,33 @@ describe("foundation page surfaces contract", () => {
     const foundationText = await readFoundationSurfaceSource(root);
     const facilityText = await fs.readFile(`${root}/app/foundation/facilities-v2/facility-ui-shared.tsx`, "utf8");
 
-    expect(buyHostText).toContain("foundation-drilldown-page");
-    expect(buyHostText).toContain('data-testid="transfer-offer-page"');
+    /**
+     * Kauf und Verkauf bringen die Klasse `foundation-drilldown-page` nicht mehr selbst mit —
+     * sie kommt aus `FoundationDecisionSurface`, seit beide auf der gemeinsamen Hülle sitzen.
+     *
+     * Der alte Test suchte den Klassennamen als Zeichenkette in den Host-Dateien. Beim Verkauf
+     * fand er ihn zuletzt nur noch in einem KOMMENTAR — die Prüfung war also bereits grün, ohne
+     * irgendetwas über das gerenderte Markup auszusagen. Geprüft wird deshalb jetzt die Kette:
+     * beide Hosts rendern die Hülle, und die Hülle trägt die Klasse (und kein Backdrop, siehe
+     * `tests/foundation-decision-surface.test.tsx`).
+     */
+    const decisionSurfaceText = await fs.readFile(
+      `${root}/app/foundation/decision-surface/FoundationDecisionSurface.tsx`,
+      "utf8",
+    );
+    expect(decisionSurfaceText).toContain('"foundation-drilldown-page"');
+    expect(decisionSurfaceText).not.toContain('className="foundation-modal-backdrop');
+    for (const [name, text] of [
+      ["Kauf", buyHostText],
+      ["Verkauf", sellHostText],
+    ] as const) {
+      expect(text, `${name} rendert die gemeinsame Huelle nicht`).toContain("<FoundationDecisionSurface");
+    }
+    expect(buyHostText).toContain('testId="transfer-offer-page"');
     expect(transferText).not.toContain("foundation-modal-backdrop");
     // Verkaufs-Drilldown lebt im dedizierten Shell-Host, der Body rendert ihn
     // über FoundationShellRouterMarketSell (Strangler Phase 5.3 abgeschlossen).
-    expect(sellHostText).toContain("foundation-drilldown-page");
-    expect(sellHostText).toContain('data-testid="transfer-sell-page"');
+    expect(sellHostText).toContain('testId="transfer-sell-page"');
     expect(foundationText).toContain("FoundationShellRouterMarketSell");
     expect(foundationText).toContain('data-testid="season-briefing-page"');
     expect(orchestratorText).not.toContain("season-briefing-modal");

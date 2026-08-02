@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 import React from "react";
 import { renderToString } from "react-dom/server";
@@ -105,6 +108,49 @@ function countOccurrences(haystack: string, needle: string) {
   return haystack.split(needle).length - 1;
 }
 
+/**
+ * `FoundationDecisionSurface` (app/foundation/decision-surface/) existierte schon vorher,
+ * hatte aber null Nutzer — die vierte Kopie der Entscheidungs-Hülle statt der
+ * Zusammenführung. Dieser Test hält fest, dass der Verkaufs-Host jetzt tatsächlich DIE Hülle
+ * benutzt, statt weiterhin eine eigene mitzubringen — sonst schleicht sich die Kopie zurück.
+ */
+describe("FoundationMarketSellShellHost — benutzt die geteilte Entscheidungs-Hülle", () => {
+  const source = readFileSync(
+    join(process.cwd(), "app/foundation/transfermarkt-v2/FoundationMarketSellShellHost.tsx"),
+    "utf8",
+  );
+
+  it("importiert FoundationDecisionSurface", () => {
+    expect(source).toContain(
+      'import {\n  FoundationDecisionSurface,\n  type DecisionSurfaceStatusTone,\n} from "@/app/foundation/decision-surface/FoundationDecisionSurface";',
+    );
+  });
+
+  it("bringt keine eigene Kopf/Karte/Fuß-Hülle mehr mit", () => {
+    // Diese Klassen kamen aus dem alten, selbstgebauten Rahmen — Kopf, Karte, Fußleiste,
+    // Zweiklick-Streifen, Abstandhalter. Taucht eine davon wieder auf, baut der Host seine
+    // Hülle erneut selbst statt sie von FoundationDecisionSurface zu bekommen.
+    for (const relikt of [
+      "nl-decision-head",
+      "transfer-sell-card",
+      "transfer-sell-head",
+      "transfer-sell-close",
+      "transfer-sell-body",
+      "transfer-sell-foot",
+      "transfer-sell-confirm-strip",
+      "transfer-sell-foot-row",
+      "transfer-sell-foot-spacer",
+    ]) {
+      expect(source, `"${relikt}" sollte nicht mehr im Host stehen`).not.toContain(relikt);
+    }
+  });
+
+  it("hat keinen eigenen confirmStep-Zustand mehr — der Zweiklick lebt in der Hülle", () => {
+    expect(source).not.toContain("confirmStep");
+    expect(source).not.toContain("useState");
+  });
+});
+
 describe("FoundationMarketSellShellHost — Zustandsmaschine", () => {
   it("lädt: echter Skeleton statt leerer Strich-Kacheln, keine Fehler-Banner", () => {
     const html = render({ marketSellBusy: true });
@@ -164,7 +210,7 @@ describe("FoundationMarketSellShellHost — Zustandsmaschine", () => {
     expect(html).toContain('data-testid="transfer-sell-disabled-reason"');
   });
 
-  it("bereit: Entscheidungsvorlage mit KPIs, Vorher→Nachher und aktivem, endgültig beschriftetem Confirm", () => {
+  it("bereit: Entscheidungsvorlage mit KPIs, Vorher→Nachher und aktivem Primärbutton", () => {
     const html = render({ marketSellPreview: makeSummary() });
     expect(html).toContain("Netto-Erlös");
     expect(html).toContain("Verkaufspreis");
@@ -172,8 +218,16 @@ describe("FoundationMarketSellShellHost — Zustandsmaschine", () => {
     expect(html).toContain("GuV");
     expect(html).toContain("Team-Auswirkung");
     expect(html).toContain("Aufstellung danach");
-    expect(html).toContain("Endgültig verkaufen");
-    // Endgültigkeit steht ausdrücklich am Ende des Dialogs:
+    // Redesign (docs/design/verkauf-popup.md Abschnitt 4, "zwei Klicks statt
+    // Checkbox-Pflicht"): der erste Klick heißt jetzt "Verkaufen…" und öffnet
+    // nur den lokalen Bestätigen-Schritt der Fußleiste — "Ja, endgültig
+    // verkaufen" (der eigentliche Sell-Call) erscheint erst danach und ist per
+    // SSR-String-Render nicht simulierbar (kein Klick-Handling ohne Hydration).
+    // Die alte Erwartung "Endgültig verkaufen" beim ersten Render entfällt
+    // deshalb bewusst.
+    expect(html).toContain("Verkaufen…");
+    expect(html).not.toContain("Ja, endgültig verkaufen");
+    // Endgültigkeit steht ausdrücklich in der Konsequenzen-Zeile:
     expect(html).toContain('data-testid="transfer-sell-final-note"');
     expect(html).not.toMatch(/data-testid="transfer-sell-confirm-button"[^>]*disabled/);
     expect(html).not.toContain('data-testid="transfer-sell-disabled-reason"');
@@ -242,6 +296,56 @@ describe("FoundationMarketSellShellHost — Zustandsmaschine", () => {
     expect(html).toContain('data-testid="transfer-sell-warnings"');
     expect(html).toContain("unter 7 Spieler");
     expect(html).toContain('data-testid="transfer-sell-roster-min-note"');
+  });
+
+  // Nutzerwunsch nach der Freigabe #1: "beim verkauf wärs cool wenn angezeigt
+  // wird ob ein buyout gezogen werden müsste" — der Hero-Preis muss eine echte
+  // Aussage treffen, nicht nur "kein Buyout" nebenbei erwähnen.
+  it("Buyout sichtbar: nennt den Betrag und dass er vom Brutto abgeht, wenn einer fällig ist", () => {
+    const html = render({ marketSellPreview: makeSummary({ buyoutCost: 5.24, salePrice: 28.37 }) });
+    expect(html).toContain("Buyout");
+    expect(html).toContain("5,2 Mio");
+    // Kein Fehl-Rendering des negativen Falls daneben:
+    expect(html).not.toContain("Kein Buyout fällig");
+  });
+
+  it("Buyout sichtbar: sagt ehrlich, dass keiner fällig ist, wenn buyoutCost 0 ist", () => {
+    const html = render({ marketSellPreview: makeSummary({ buyoutCost: 0 }) });
+    expect(html).toContain("Kein Buyout fällig");
+    expect(html).not.toContain("− Buyout");
+  });
+
+  // Nutzerwunsch nach der Freigabe #2: "in grün oder rot der vergleich mit dem
+  // echten aktuellen MW" — ANDERE Aussage als die GuV-vs-Kaufpreis-Zeile in
+  // Kachel 1 (vergleicht mit dem Einkaufspreis), deshalb eigenes Label.
+  it("MW-Vergleich: grün und 'über Marktwert', wenn der Netto-Erlös über dem MW liegt", () => {
+    const html = render({
+      marketSellPreview: makeSummary({ netProceeds: 30, marketValueReference: 20 }),
+    });
+    expect(html).toContain("vs. Marktwert:");
+    expect(html).toContain("über Marktwert");
+    expect(html).toMatch(/transfer-sell-price-mw-diff is-good/);
+    expect(html).not.toMatch(/transfer-sell-price-mw-diff is-risk/);
+    // Von der GuV-vs-Kaufpreis-Zeile klar unterscheidbar beschriftet — sonst
+    // hält man die beiden Zahlen für dieselbe:
+    expect(html).toContain("GuV vs. Kaufpreis");
+  });
+
+  it("MW-Vergleich: rot und 'unter Marktwert', wenn der Netto-Erlös unter dem MW liegt", () => {
+    const html = render({
+      marketSellPreview: makeSummary({ netProceeds: 15, marketValueReference: 20 }),
+    });
+    expect(html).toContain("vs. Marktwert:");
+    expect(html).toContain("unter Marktwert");
+    expect(html).toMatch(/transfer-sell-price-mw-diff is-risk/);
+    expect(html).not.toMatch(/transfer-sell-price-mw-diff is-good/);
+  });
+
+  it("MW-Vergleich: zeigt ehrlich nichts, wenn kein Marktwert-Referenzwert vorliegt (kein erfundener Wert)", () => {
+    const html = render({
+      marketSellPreview: makeSummary({ marketValueReference: null }),
+    });
+    expect(html).not.toContain("vs. Marktwert:");
   });
 });
 

@@ -320,7 +320,10 @@ describe("foundation transfermarkt ui contract", () => {
 
     expect(v2Text).toContain("Kauf von ${playerName} abgebrochen");
     expect(v2Text).toContain("Verhandlung mit ${playerName} abgebrochen");
-    expect(buyHostText).toContain("data-testid=\"transfer-offer-page\"");
+    // Die Testid kommt jetzt aus der geteilten Entscheidungs-Huelle (`testId`-Prop), seit der
+    // Kaufdialog seine Huelle nicht mehr selbst baut. Der Wert ist derselbe geblieben — nur die
+    // Stelle, an der er im Quelltext steht, hat sich verschoben.
+    expect(buyHostText).toContain('testId="transfer-offer-page"');
     expect(v2Text).toContain("FoundationShellRouterMarketBuy");
   });
 
@@ -332,7 +335,7 @@ describe("foundation transfermarkt ui contract", () => {
     ]);
 
     expect(buyHostText).toContain("data-testid=\"transfer-buy-preview-skeleton\"");
-    expect(buyHostText).toContain("data-testid=\"transfer-buy-confirm-button\"");
+    expect(buyHostText).toContain('buttonTestId: "transfer-buy-confirm-button"');
     expect(buyHostText).toContain("Kauf final abschließen");
     expect(buyHostText).toContain("buyNegotiationOutcome?.status !== \"accepted\"");
     expect(v2Text).toContain("negotiation_cancelled_after_contact");

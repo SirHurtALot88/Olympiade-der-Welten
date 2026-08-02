@@ -31,7 +31,7 @@ import { officialDisciplineWeightOrder, type OfficialDisciplineWeightId } from "
 import { appendRoomContextToParams, readFoundationRoomContextFromLocation, withRoomContextBody, type FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
 import { formatMarketPreviewError } from "@/lib/room/parse-room-write-context";
 import { DEFAULT_ACTIVE_OWNER_ID } from "@/lib/foundation/team-control-settings";
-import type { MarketBuyNegotiationOutcome } from "@/lib/foundation/tabs/use-market-buy-derivations";
+import { formatContractShapeLabel, type MarketBuyNegotiationOutcome } from "@/lib/foundation/tabs/use-market-buy-derivations";
 
 export type TransfermarktV2ClientProps = {
   defaultSaveId: string;
@@ -1859,53 +1859,83 @@ export default function TransfermarktV2Client({
     }
   }
 
+  // negotiateBuy() liest NUR NOCH buyPreview.verdict — das deterministische Band-Verdikt aus
+  // verhandlung-rework.md Abschnitt 2.2, serverseitig in buildContractNegotiationPreview
+  // berechnet. Kein argmax mehr ueber acceptChance/counterChance/rejectChance (das war Defekt 3:
+  // die drei Prozente sind seit dem Rework Anzeige, ABGELEITET vom Verdikt, nicht die
+  // Entscheidung selbst) und vor allem: KEIN setOfferedSalary(counterSalary) mehr. Das war die
+  // Ratsche (Defekt 2) — ein Gegenangebot wird angezeigt, nicht ins eigene Angebot zurueck-
+  // geschrieben. Wer es will, klickt "Einschlagen" (acceptCounterOffer, Abschnitt 3.4) oder passt
+  // sein Angebot selbst an und verhandelt neu.
   async function negotiateBuy() {
     if (!buyPreview?.player?.id || !buyPreview.team?.id || buyBusy) {
       return;
     }
 
-    const acceptChance = buyPreview.acceptChance ?? 0;
-    const counterChance = buyPreview.counterChance ?? 0;
-    const rejectChance = buyPreview.rejectChance ?? 0;
-    const expectedSalary = buyPreview.expectedSalary ?? buyPreview.salary ?? null;
-    const activeSalaryOffer = effectiveOfferedSalary ?? buyPreview.offeredSalary ?? expectedSalary;
+    const verdict = buyPreview.verdict;
+    const playerName = buyPreview.player.name;
 
-    if (rejectChance >= acceptChance && rejectChance >= counterChance) {
+    if (verdict === "reject_lowball" || verdict === "reject_not_about_money" || verdict === "reject_affront") {
       void persistNegotiationOutcome(
         buyPreview,
         "rejected_bad_experience",
-        ["negotiation_rejected_bad_experience"],
+        [
+          verdict === "reject_affront"
+            ? "negotiation_rejected_affront"
+            : verdict === "reject_not_about_money"
+              ? "negotiation_rejected_not_about_money"
+              : "negotiation_rejected_bad_experience",
+        ],
       );
-      setBuyNegotiationOutcome({
-        status: "rejected",
-        tone: "error",
-        title: "Angebot abgelehnt",
-        message: `${buyPreview.player.name} lehnt dieses Angebot aktuell ab. Heb das Gehalt an oder passe den Vertrag an, dann kannst du neu verhandeln.`,
-      });
+      setBuyNegotiationOutcome(
+        verdict === "reject_not_about_money"
+          ? {
+              status: "rejected",
+              tone: "error",
+              title: "Absage — am Geld liegt's nicht",
+              message: `${playerName} sagt ab, obwohl das Angebot ueber seinem Anspruch liegt: er will einfach nicht zu ${selectedTeam?.shortCode ?? "diesem Team"} wechseln. Mehr Geld wuerde daran nichts aendern.`,
+            }
+          : verdict === "reject_affront"
+            ? {
+                status: "rejected",
+                tone: "error",
+                title: "Absage — Rückzieher",
+                message: `${playerName} zieht sich zurueck: Ihr habt nach seinem Entgegenkommen ein NIEDRIGERES Angebot vorgelegt als zuletzt gezeigt. Das zaehlt als Vertrauensbruch.`,
+              }
+            : {
+                status: "rejected",
+                tone: "error",
+                title: "Angebot abgelehnt",
+                message: `${playerName} lehnt dieses Angebot aktuell ab. Heb das Gehalt an oder passe den Vertrag an, dann kannst du neu verhandeln.`,
+              },
+      );
       window.requestAnimationFrame(() => {
         scrollBuyModalToTop();
       });
       return;
     }
 
-    if (counterChance > acceptChance) {
-      const counterSalary =
-        expectedSalary != null
-          ? Number(Math.max(expectedSalary * 1.04, (activeSalaryOffer ?? expectedSalary) * 1.08).toFixed(2))
-          : activeSalaryOffer ?? null;
+    if (verdict === "counter_money") {
+      void persistNegotiationOutcome(buyPreview, "countered");
+      const counterSalary = buyPreview.counterSalary ?? null;
+      const activeSalaryOffer = effectiveOfferedSalary ?? buyPreview.offeredSalary ?? null;
       const counterDelta =
         counterSalary != null && activeSalaryOffer != null
           ? Number((counterSalary - activeSalaryOffer).toFixed(2))
           : null;
-      void persistNegotiationOutcome(buyPreview, "countered");
-      setOfferedSalary(counterSalary);
-      setSalaryEditedManually(true);
+      // Erwiderung (Abschnitt 9.3): hat er auf euer Entgegenkommen selbst nachgegeben, muss die
+      // Ueberschrift das sagen. „Gegenseite verhandelt nach" waere bei einer GESUNKENEN Zahl
+      // schlicht falsch — und genau das Signal, auf das man beim Feilschen wartet.
+      const conceded = buyPreview.concededFromLastCounter === true;
       setBuyNegotiationOutcome({
         status: "countered",
         tone: "warning",
-        title: "Gegenseite verhandelt nach",
-        message: `${buyPreview.player.name} will weitermachen, aber eher ${formatTransfermarktCurrency(counterSalary)} pro Season${counterDelta != null ? ` (${counterDelta > 0 ? "+" : ""}${formatTransfermarktCurrency(counterDelta)} gegenüber deinem Angebot)` : ""}. Das Angebot wurde direkt auf den neuen Rahmen gesetzt.`,
+        title: conceded ? "Er kommt euch entgegen" : "Gegenseite verhandelt nach",
+        message: conceded
+          ? `Ihr habt nachgelegt — ${playerName} geht mit und senkt seine Forderung auf ${formatTransfermarktCurrency(counterSalary)} pro Season${counterDelta != null ? ` (noch ${formatTransfermarktCurrency(counterDelta)} über deinem Angebot)` : ""}. Schlag ein oder komm ihm noch ein Stück entgegen.`
+          : `${playerName} will eher ${formatTransfermarktCurrency(counterSalary)} pro Season${counterDelta != null ? ` (${counterDelta > 0 ? "+" : ""}${formatTransfermarktCurrency(counterDelta)} gegenüber deinem Angebot)` : ""}. Schlag ein oder passe dein Angebot an und verhandle neu.`,
         counterSalary,
+        counterKind: "money",
       });
       window.requestAnimationFrame(() => {
         scrollBuyModalToTop();
@@ -1913,12 +1943,72 @@ export default function TransfermarktV2Client({
       return;
     }
 
+    if (verdict === "counter_conditions") {
+      void persistNegotiationOutcome(buyPreview, "countered");
+      const conditions = buyPreview.counterConditions ?? null;
+      const lengthLabel = conditions ? `${conditions.contractLength} Saison${conditions.contractLength === 1 ? "" : "en"}` : "eine andere Laufzeit";
+      const shapeLabel = conditions ? formatContractShapeLabel(conditions.contractShape) : "eine andere Form";
+      setBuyNegotiationOutcome({
+        status: "countered",
+        tone: "warning",
+        title: "Beim Gehalt einig, Vertrag noch nicht",
+        message: `${playerName} ist mit dem Gehalt zufrieden, will aber ${lengthLabel} (Form: ${shapeLabel}). Gib ihm den Wunschvertrag (Einschlagen) oder leg beim Gehalt nach und verhandle neu.`,
+        counterKind: "conditions",
+        counterConditions: conditions,
+      });
+      window.requestAnimationFrame(() => {
+        scrollBuyModalToTop();
+      });
+      return;
+    }
+
+    // verdict === "accept" (oder Bagatelle-Zusage, Abschnitt 2.2 Regel 5)
     void persistNegotiationOutcome(buyPreview, "accepted_pending_confirm");
     setBuyNegotiationOutcome({
       status: "accepted",
       tone: "success",
       title: "Angebot angenommen",
-      message: `${buyPreview.player.name} akzeptiert den Rahmen. Du kannst den Kauf jetzt final abschließen.`,
+      message: `${playerName} akzeptiert den Rahmen. Du kannst den Kauf jetzt final abschließen.`,
+    });
+    window.requestAnimationFrame(() => {
+      scrollBuyModalToTop();
+    });
+  }
+
+  // Ein angenommenes Gegenangebot ist bindend (verhandlung-rework.md Abschnitt 3.4) — die
+  // EINZIGE Stelle, an der der Ablauf die Formel uebersteuert: der Spieler hat die Zahl (oder den
+  // Vertrag) selbst genannt, sie erneut durch die Baender zu schicken waere Wortbruch durch
+  // Formel (das Gegenangebot kann mit Haerte h<1 unter R_full liegen und würde vom Verdikt sonst
+  // wieder als Gegenangebot zurueckkommen statt als Zusage zu gelten).
+  async function acceptCounterOffer() {
+    if (!buyPreview?.player?.id || !buyPreview.team?.id || buyBusy) {
+      return;
+    }
+    if (buyNegotiationOutcome?.status !== "countered") {
+      return;
+    }
+
+    let acceptedSummary = buyPreview;
+    if (buyPreview.verdict === "counter_money" && buyPreview.counterSalary != null) {
+      setOfferedSalary(buyPreview.counterSalary);
+      setSalaryEditedManually(true);
+      acceptedSummary = { ...buyPreview, offeredSalary: buyPreview.counterSalary };
+    } else if (buyPreview.verdict === "counter_conditions" && buyPreview.counterConditions) {
+      setContractLength(buyPreview.counterConditions.contractLength);
+      setContractShape(buyPreview.counterConditions.contractShape);
+      acceptedSummary = {
+        ...buyPreview,
+        contractLength: buyPreview.counterConditions.contractLength,
+        contractShape: buyPreview.counterConditions.contractShape,
+      };
+    }
+
+    void persistNegotiationOutcome(acceptedSummary, "accepted_pending_confirm");
+    setBuyNegotiationOutcome({
+      status: "accepted",
+      tone: "success",
+      title: "Gegenangebot eingeschlagen",
+      message: `${buyPreview.player.name} ist einverstanden. Du kannst den Kauf jetzt final abschließen.`,
     });
     window.requestAnimationFrame(() => {
       scrollBuyModalToTop();
@@ -2211,6 +2301,7 @@ export default function TransfermarktV2Client({
               onBuyNegotiationOutcomeChange: setBuyNegotiationOutcome,
               closeBuyModal,
               negotiateBuy,
+              acceptCounterOffer,
               confirmBuy,
               resetBuyDemandFrame,
             }}

@@ -126,7 +126,7 @@ function buildSlotFromSell(input: {
       (input.candidate?.productiveElite ?? false)
         ? "high"
         : "normal",
-    slotLabel: `Nachfolger fuer ${input.playerName} — aehnliche ${axisLabel}-Staerke, guenstiger`,
+    slotLabel: `Nachfolger für ${input.playerName} — ähnliche ${axisLabel}-Stärke, günstiger`,
     fulfilled: false,
   };
 }
@@ -246,7 +246,7 @@ export function scoreReplacementFit(input: {
   if (score < 18) return { score: 0, reason: null };
   return {
     score: round(score),
-    reason: `Nachfolger fuer verkauften ${input.slot.soldPlayerName} — aehnliche Staerke, guenstiger`,
+    reason: `Nachfolger für verkauften ${input.slot.soldPlayerName} — ähnliche Stärke, günstiger`,
   };
 }
 

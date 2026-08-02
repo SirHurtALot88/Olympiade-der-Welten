@@ -1378,7 +1378,7 @@ describe("transfermarkt local service", () => {
     );
   });
 
-  it("lowers acceptance score for lowball offers and raises it for stronger offers", () => {
+  it("keeps acceptanceScore (Wechselwille W) offer-independent while chances still move with the offer", () => {
     const team = persistenceState.save!.gameState.teams[0]!;
     const player = persistenceState.save!.gameState.players.find((entry) => entry.id === "fa-1")!;
 
@@ -1422,8 +1422,14 @@ describe("transfermarkt local service", () => {
       seasonLabelBase: "Season 1",
     });
 
-    expect(lowball.acceptanceScore ?? -1).toBeLessThan(fair.acceptanceScore ?? 0);
-    expect(premium.acceptanceScore ?? -1).toBeGreaterThan(fair.acceptanceScore ?? 0);
+    // verhandlung-rework.md Abschnitt 1: W (acceptanceScore) haengt NICHT vom Angebot ab —
+    // das ist der Kern des Rework (Defekt: Geld zaehlte vorher doppelt, einmal als Score-Punkte
+    // via "salary_offer", einmal als offerRatio gegen die Schwelle). Gleiche Teamdaten/Traits,
+    // nur das Angebot unterscheidet sich -> identisches W.
+    expect(lowball.acceptanceScore).toBe(fair.acceptanceScore);
+    expect(premium.acceptanceScore).toBe(fair.acceptanceScore);
+    // Die ANZEIGE-Prozente sind weiterhin aus dem Gehaltsabstand zu den Schwellen abgeleitet
+    // (Abschnitt 2.5) und bewegen sich sehr wohl mit dem Angebot.
     expect(lowball.acceptChance ?? -1).toBeLessThan(fair.acceptChance ?? 0);
     expect(premium.acceptChance ?? -1).toBeGreaterThan(fair.acceptChance ?? 0);
     expect(lowball.rejectChance ?? 0).toBeGreaterThan(premium.rejectChance ?? -1);
@@ -1538,7 +1544,11 @@ describe("transfermarkt local service", () => {
     expect(strictCulture.demandMultiplier ?? 0).toBeGreaterThan(1);
     expect(strictCulture.expectedSalary ?? 0).toBeGreaterThan(relaxedCulture.expectedSalary ?? 0);
     expect(strictCulture.scoreBreakdown.some((entry) => entry.key === "trait_culture" && entry.points < 0)).toBe(true);
-    expect(strictCulture.scoreBreakdown.some((entry) => entry.key === "salary_offer")).toBe(true);
+    // "salary_offer" entfaellt seit dem Verhandlungs-Rework (verhandlung-rework.md Abschnitt 1):
+    // Geld zaehlte vorher doppelt (Score-Punkte + offerRatio gegen die Schwelle). Es wirkt jetzt
+    // nur noch ueber die Schwellen (acceptThresholdSalary/rejectThresholdSalary).
+    expect(strictCulture.scoreBreakdown.some((entry) => entry.key === "salary_offer")).toBe(false);
+    expect(strictCulture.acceptThresholdSalary ?? 0).toBeGreaterThan(0);
   });
 
   it("keeps annual salary demands lower for longer contracts while showing the length reason", () => {
