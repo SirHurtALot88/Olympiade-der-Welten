@@ -115,6 +115,45 @@ describe("Die Oberflaeche nutzt die volle Liste auch wirklich", () => {
     expect(text).toContain("Math.max(sichtbar, rankingDrawerOwnBest.rank)");
   });
 
+  /**
+   * GEMELDET: „der drawer ist recht klein und nutzt den platz nicht sonderlich gut, und die
+   * spieler haben gar keine bilder … da kann auch ne tabelle in der mitte kommen die man dann
+   * wieder weg klicken kann."
+   *
+   * Beides hing zusammen: in einer 420px-Randleiste ist fuer ein Portrait kein Platz. Als breite
+   * Tafel in der Mitte passen Bild, Rang, Name, Team und Wert nebeneinander — und 330 Zeilen in
+   * drei Spalten statt in eine Endlos-Rolle.
+   */
+  it("oeffnet die Rangliste als breite Tafel, nicht als schmale Randleiste", () => {
+    expect(ansicht()).toContain('layout="modal"');
+  });
+
+  it("zeigt Spielerportraits in der Liste", () => {
+    const text = ansicht();
+    expect(text).toContain("renderLeading={(row) => (");
+    expect(text).toContain('className="nl-rankdrawer-avatar"');
+    // Der Star-Rahmen haengt am ligaweiten OVR-Rang, nicht am Rang IN dieser Kategorie.
+    expect(text).toContain("rankingDrawerOvrRankById");
+  });
+
+  it("laesst die anderen Aufrufstellen unveraendert bei der Randleiste", () => {
+    // `layout` ist optional mit Standard "drawer" — der Saisonstand und die Spieler-Tabelle
+    // nutzen den Drawer neben ihrem Inhalt, dort waere eine Tafel in der Mitte falsch.
+    const komponente = readFileSync(
+      join(process.cwd(), "components/foundation/new-look/NlRankingDrawer.tsx"),
+      "utf8",
+    );
+    expect(komponente).toContain('layout = "drawer"');
+    for (const datei of [
+      "app/foundation/season-v2/SeasonStandingsNewLook.tsx",
+      "app/foundation/players-table/FoundationPlayersTableNewLook.tsx",
+    ]) {
+      expect(readFileSync(join(process.cwd(), datei), "utf8"), `${datei} unerwartet umgestellt`).not.toContain(
+        'layout="modal"',
+      );
+    }
+  });
+
   it("sucht den eigenen Besten in der vollen Liste, nicht in den Top 5", () => {
     const text = ansicht();
     expect(text).toContain("category.fullEntries ?? category.entries");
