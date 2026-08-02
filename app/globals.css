@@ -62706,12 +62706,44 @@ button.is-new-look .nl-thist-season-pill,
   outline-offset: 2px;
 }
 
-.is-new-look .nl-sponsor-league-cash {
+/* Auszahlung und Deckungsgrad stehen untereinander in einer Spalte — die Zahl allein sagt nicht,
+   ob sie reicht. Rechtsbuendig, damit die Betraege ueber alle 32 Zeilen auf einer Kante liegen. */
+.is-new-look .nl-sponsor-league-figures {
   flex-shrink: 0;
   align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.is-new-look .nl-sponsor-league-cash {
+  flex-shrink: 0;
   font-size: 13px;
   font-weight: 700;
   color: var(--nl-ink);
+}
+
+/* Deckungsgrad der Fixkosten (Gehaelter + Gebaeude-Unterhalt). Die Farbe ist bewusst NUR Verstaerkung: der Prozentwert und das Wort
+   stehen daneben, damit die Aussage auch ohne Farbunterscheidung ankommt (Rot/Gruen allein ist fuer
+   Farbfehlsichtige unbrauchbar). */
+.is-new-look .nl-sponsor-league-coverage {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-sponsor-league-coverage.is-good {
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-sponsor-league-coverage.is-warn {
+  color: var(--nl-warn);
+}
+
+.is-new-look .nl-sponsor-league-coverage.is-bad {
+  color: var(--nl-risk);
 }
 
 /* --- Sponsoren #79: Rank-Ladder — aktuell erreichte Gewinnstufe --- */

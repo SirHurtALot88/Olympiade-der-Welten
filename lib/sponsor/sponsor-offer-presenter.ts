@@ -570,3 +570,39 @@ export function sortLeagueSponsorRows<T extends LeagueSponsorSortRow>(rows: read
     return left.teamName.localeCompare(right.teamName, "de", { sensitivity: "base" });
   });
 }
+
+/**
+ * Deckungsgrad: traegt der Sponsor die laufenden Fixkosten des Teams?
+ *
+ * Die Liga-Uebersicht zeigte bisher nur den Betrag. Ein Betrag allein sagt aber nichts, solange die
+ * Teams unterschiedlich gross sind — 90 sind fuer einen Kader mit 84 Gehalt etwas anderes als fuer
+ * einen mit 48. Erst das Verhaeltnis ist ueber alle 32 Zeilen vergleichbar.
+ *
+ * Bezugsgroesse sind Gehaelter PLUS Gebaeude-Unterhalt, nicht die Gehaelter allein: der Sponsor-
+ * Sockel wird auf genau diese Summe geankert (getTeamSponsorBaseReferenceTotal). Nur die Gehaelter
+ * zu nehmen wuerde die Deckung systematisch zu gut aussehen lassen.
+ *
+ * `null`, wenn kein Vertrag laeuft oder das Team keine Fixkosten hat — dann gibt es nichts zu decken
+ * und eine Prozentzahl waere eine erfundene Aussage.
+ */
+export function computeSponsorCostCoverage(projectedCash: number | null, fixedCostTotal: number): number | null {
+  if (projectedCash == null || !Number.isFinite(projectedCash)) return null;
+  if (!Number.isFinite(fixedCostTotal) || fixedCostTotal <= 0) return null;
+  return projectedCash / fixedCostTotal;
+}
+
+export type SponsorCoverageTone = "good" | "warn" | "bad";
+
+/**
+ * Ampel zum Deckungsgrad. Die Schwellen sind bewusst nicht symmetrisch: ab 100 % traegt sich das
+ * Team aus dem Sponsor allein, unter 85 % reisst die Luecke so weit auf, dass Preisgeld und
+ * Transfers sie in einer normalen Saison nicht mehr schliessen.
+ *
+ * Die Farbe ist in der UI nur Verstaerkung — der Prozentwert steht daneben, damit die Aussage auch
+ * ohne Farbunterscheidung ankommt.
+ */
+export function getSponsorCoverageTone(coverage: number): SponsorCoverageTone {
+  if (coverage >= 1) return "good";
+  if (coverage >= 0.85) return "warn";
+  return "bad";
+}
