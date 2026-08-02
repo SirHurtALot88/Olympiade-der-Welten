@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import FoundationPlayerPortraitCard, {
   type FoundationPlayerPortraitCardProps,
 } from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
+import { useRafThrottledCallback } from "@/lib/foundation/use-raf-throttled-scroll";
 
 export type FoundationPlayerPortraitPreviewProps = Omit<
   FoundationPlayerPortraitCardProps,
@@ -47,12 +48,17 @@ export default function FoundationPlayerPortraitPreview({
     setOpen(false);
   }, []);
 
+  // Scroll/Resize passieren waehrend die Preview offen ist deutlich haeufiger
+  // als einmal pro Frame (v.a. Trackpad-Scroll) — rAF-throttlen statt bei
+  // jedem Event zu repositionieren. Der initiale `updatePosition()`-Aufruf in
+  // `show()` bleibt unthrottled, damit der erste Frame sofort korrekt sitzt.
+  const onScroll = useRafThrottledCallback(updatePosition);
+
   useEffect(() => {
     if (!open) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") hide();
     };
-    const onScroll = () => updatePosition();
     const onPointerDown = (event: PointerEvent) => {
       const anchor = anchorRef.current;
       const panel = document.getElementById(previewId);
@@ -74,7 +80,7 @@ export default function FoundationPlayerPortraitPreview({
       window.removeEventListener("resize", onScroll);
       window.removeEventListener("pointerdown", onPointerDown, true);
     };
-  }, [hide, open, previewId, updatePosition]);
+  }, [hide, onScroll, open, previewId]);
 
   const previewPanel =
     open && position && typeof document !== "undefined"
