@@ -651,6 +651,9 @@ function buildCandidate(
   const gehaltsbewertung = bewerteGehalt(salaryBenchmark, {
     salary,
     leistung: leseLeistung(playerRating, "mvs"),
+    // Ohne die Laufzeit gaelte ein langfristig gebundener Spieler als ueberbezahlt, nur weil
+    // lange Vertraege ueblicherweise besser dotiert sind.
+    laufzeit: Number.isFinite(roster.contractLength) ? roster.contractLength : null,
   });
   const gehaltsEinordnung = ordneGehaltEin(gehaltsbewertung);
   if (gehaltsEinordnung === "teuer") {

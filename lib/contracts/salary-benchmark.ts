@@ -18,20 +18,32 @@
  * so bei ~0 statt am Pranger; auffaellig wird, wer aus der Reihe faellt.
  */
 
-/** Ein Spieler in der Grundgesamtheit: was er kostet, und was er leistet. */
+/** Ein Spieler in der Grundgesamtheit: was er kostet, was er leistet, wie lange er gebunden ist. */
 export type SalaryBenchmarkSample = {
   /** Jahresgehalt. */
   salary: number;
   /** Leistungsmass — MVS oder PPs, aber ueber die ganze Grundgesamtheit dasselbe. */
   leistung: number;
+  /**
+   * Restlaufzeit in Saisons. Optional, aber dringend empfohlen — siehe `buildSalaryBenchmark`:
+   * lange Vertraege sind oft besser dotiert, und ohne diese Spalte haelt das Modell genau die
+   * langfristig gebundenen Spieler faelschlich fuer ueberbezahlt.
+   */
+  laufzeit?: number | null;
 };
 
-/** Die geschaetzte Gerade "uebliches Gehalt bei dieser Leistung". */
+/** Die geschaetzte Flaeche "uebliches Gehalt bei dieser Leistung und dieser Bindung". */
 export type SalaryBenchmarkModel = {
-  /** Gehalt bei Leistung 0. */
+  /** Gehalt bei Leistung 0 und Laufzeit 0. */
   sockel: number;
   /** Aufschlag je Leistungspunkt. Nie negativ — siehe `buildSalaryBenchmark`. */
   jeLeistungspunkt: number;
+  /**
+   * Aufschlag je Vertragsjahr. Darf negativ sein: ob eine lange Bindung teurer (Sicherheit fuer
+   * den Spieler) oder billiger (Sicherheit fuer den Verein) ist, entscheidet der Markt, nicht
+   * die Erwartung des Modells. 0 heisst: die Laufzeit erklaert hier nichts.
+   */
+  jeVertragsjahr: number;
   /** Zahl der Spieler, auf denen die Schaetzung beruht. */
   stichprobe: number;
 };
@@ -84,34 +96,86 @@ export function buildSalaryBenchmark(stichprobe: SalaryBenchmarkSample[]): Salar
   const mittelLeistung = brauchbar.reduce((summe, e) => summe + e.leistung, 0) / anzahl;
   const mittelGehalt = brauchbar.reduce((summe, e) => summe + e.salary, 0) / anzahl;
 
-  let kovarianz = 0;
-  let varianz = 0;
+  // ZWEITE ERKLAERENDE GROESSE: DIE LAUFZEIT. Lange Vertraege sind oft besser dotiert — teils
+  // weil man sie den Spielern gibt, die man halten will, teils weil eine lange Bindung selbst
+  // bezahlt wird. Ohne diese Spalte schoebe das Modell den Laufzeit-Aufschlag der Leistung zu
+  // und erklaerte jeden langfristig gebundenen Spieler fuer ueberbezahlt — also ausgerechnet
+  // die, an die sich der Verein bewusst gebunden hat.
+  const mitLaufzeit = brauchbar.filter((eintrag) => istZahl(eintrag.laufzeit));
+  const laufzeitNutzbar = mitLaufzeit.length === anzahl;
+  const mittelLaufzeit = laufzeitNutzbar
+    ? brauchbar.reduce((summe, e) => summe + (e.laufzeit as number), 0) / anzahl
+    : 0;
+
+  let sLL = 0; // Streuung der Leistung
+  let sZZ = 0; // Streuung der Laufzeit
+  let sLZ = 0; // gemeinsame Streuung
+  let sLY = 0; // Leistung gegen Gehalt
+  let sZY = 0; // Laufzeit gegen Gehalt
   for (const eintrag of brauchbar) {
-    const abstand = eintrag.leistung - mittelLeistung;
-    kovarianz += abstand * (eintrag.salary - mittelGehalt);
-    varianz += abstand * abstand;
-  }
-  // Alle gleich stark → keine Steigung ablesbar. Das uebliche Gehalt ist dann schlicht der
-  // Mittelwert, und jede Abweichung davon ist eine echte Abweichung.
-  if (varianz <= 0) {
-    return { sockel: runde(mittelGehalt), jeLeistungspunkt: 0, stichprobe: anzahl };
+    const dL = eintrag.leistung - mittelLeistung;
+    const dZ = laufzeitNutzbar ? (eintrag.laufzeit as number) - mittelLaufzeit : 0;
+    const dY = eintrag.salary - mittelGehalt;
+    sLL += dL * dL;
+    sZZ += dZ * dZ;
+    sLZ += dL * dZ;
+    sLY += dL * dY;
+    sZY += dZ * dY;
   }
 
-  const jeLeistungspunkt = Math.max(0, kovarianz / varianz);
-  const sockel = mittelGehalt - jeLeistungspunkt * mittelLeistung;
-  return { sockel: runde(sockel), jeLeistungspunkt: runde(jeLeistungspunkt, 4), stichprobe: anzahl };
+  // Alle gleich stark → keine Steigung ablesbar. Das uebliche Gehalt ist dann schlicht der
+  // Mittelwert, und jede Abweichung davon ist eine echte Abweichung.
+  if (sLL <= 0) {
+    return { sockel: runde(mittelGehalt), jeLeistungspunkt: 0, jeVertragsjahr: 0, stichprobe: anzahl };
+  }
+
+  const nenner = sLL * sZZ - sLZ * sLZ;
+  // Die Laufzeit hilft nur, wenn sie ueberhaupt streut UND nicht deckungsgleich mit der Leistung
+  // ist. Sonst (alle gleich lang gebunden, oder Laufzeit = Funktion der Leistung) laesst sich ihr
+  // Beitrag nicht von dem der Leistung trennen — dann lieber eindimensional als zwei Zahlen, die
+  // sich gegenseitig erklaeren.
+  const zweidimensional = laufzeitNutzbar && sZZ > 0 && Math.abs(nenner) > 1e-9;
+
+  let jeLeistungspunkt: number;
+  let jeVertragsjahr: number;
+  if (zweidimensional) {
+    jeLeistungspunkt = (sZZ * sLY - sLZ * sZY) / nenner;
+    jeVertragsjahr = (sLL * sZY - sLZ * sLY) / nenner;
+  } else {
+    jeLeistungspunkt = sLY / sLL;
+    jeVertragsjahr = 0;
+  }
+
+  // Negative Leistungssteigung wird abgeschnitten (Begruendung siehe oben). Faellt sie weg,
+  // wird der Laufzeit-Anteil neu bestimmt, damit der Sockel nicht auf eine Steigung baut, die
+  // gar nicht mehr im Modell steht.
+  if (jeLeistungspunkt < 0) {
+    jeLeistungspunkt = 0;
+    jeVertragsjahr = zweidimensional && sZZ > 0 ? sZY / sZZ : 0;
+  }
+
+  const sockel = mittelGehalt - jeLeistungspunkt * mittelLeistung - jeVertragsjahr * mittelLaufzeit;
+  return {
+    sockel: runde(sockel),
+    jeLeistungspunkt: runde(jeLeistungspunkt, 4),
+    jeVertragsjahr: runde(jeVertragsjahr, 4),
+    stichprobe: anzahl,
+  };
 }
 
 /** Wendet das Modell auf einen einzelnen Spieler an. `null`, wenn Gehalt oder Leistung fehlen. */
 export function bewerteGehalt(
   modell: SalaryBenchmarkModel | null,
-  spieler: { salary: number | null; leistung: number | null },
+  spieler: { salary: number | null; leistung: number | null; laufzeit?: number | null },
 ): SalaryBenchmarkResult | null {
   if (!modell) return null;
   if (!istZahl(spieler.salary) || !istZahl(spieler.leistung)) return null;
+  // Fehlt die Laufzeit beim einzelnen Spieler, faellt nur ihr Anteil weg — der Rest der
+  // Schaetzung bleibt gueltig, statt die ganze Aussage zu verlieren.
+  const laufzeitAnteil = istZahl(spieler.laufzeit) ? modell.jeVertragsjahr * spieler.laufzeit : 0;
   // Ein negatives uebliches Gehalt waere Unsinn (kaeme bei stark negativem Sockel und Leistung 0
   // vor); der Sockel selbst ist die Untergrenze dessen, was ueberhaupt gezahlt wird.
-  const ueblich = Math.max(0, modell.sockel + modell.jeLeistungspunkt * spieler.leistung);
+  const ueblich = Math.max(0, modell.sockel + modell.jeLeistungspunkt * spieler.leistung + laufzeitAnteil);
   const abweichung = spieler.salary - ueblich;
   return {
     ueblich: runde(ueblich),

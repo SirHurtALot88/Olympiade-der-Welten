@@ -54,7 +54,10 @@ export function buildLeagueSalaryBenchmark(input: {
     if (!Number.isFinite(salary) || salary <= 0) continue;
     const leistung = leseLeistung(input.ratingsById.get(eintrag.playerId), mass);
     if (leistung == null) continue;
-    stichprobe.push({ salary, leistung });
+    // Die Restlaufzeit kommt mit: lange Vertraege sind oft besser dotiert, und ohne diese Spalte
+    // hielte das Modell die langfristig gebundenen Spieler faelschlich fuer ueberbezahlt.
+    const laufzeit = Number.isFinite(eintrag.contractLength) ? eintrag.contractLength : null;
+    stichprobe.push({ salary, leistung, laufzeit });
   }
   return buildSalaryBenchmark(stichprobe);
 }

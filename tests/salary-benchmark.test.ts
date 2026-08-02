@@ -159,6 +159,61 @@ describe("buildSalaryBenchmark — die Schaetzung selbst", () => {
   });
 });
 
+describe("Die Laufzeit-Falle — lange Vertraege sind oft besser dotiert", () => {
+  /**
+   * Eine Liga, in der BEIDES das Gehalt erklaert: Leistung und Bindungsdauer.
+   * Gehalt = 6 + 0,4 × Leistung + 1,5 × Vertragsjahre.
+   */
+  const LIGA = Array.from({ length: 24 }, (_, index) => {
+    const leistung = 2 + (index % 8) * 2;
+    const laufzeit = 1 + Math.floor(index / 8) * 2; // 1, 3, 5
+    return { salary: Number((6 + 0.4 * leistung + 1.5 * laufzeit).toFixed(2)), leistung, laufzeit };
+  });
+
+  it("liest den Laufzeit-Aufschlag als eigene Groesse aus", () => {
+    const modell = buildSalaryBenchmark(LIGA)!;
+    expect(modell.jeLeistungspunkt).toBeCloseTo(0.4, 2);
+    expect(modell.jeVertragsjahr).toBeCloseTo(1.5, 2);
+  });
+
+  it("erklaert einen langfristig gebundenen Spieler NICHT fuer ueberbezahlt", () => {
+    // Genau die Verwischung, um die es geht: derselbe Spieler, einmal mit kurzem und einmal mit
+    // langem Vertrag, jeweils exakt zum ueblichen Satz bezahlt. Beide muessen bei ~0 landen.
+    const modell = buildSalaryBenchmark(LIGA)!;
+    const kurz = bewerteGehalt(modell, { salary: 6 + 0.4 * 10 + 1.5 * 1, leistung: 10, laufzeit: 1 })!;
+    const lang = bewerteGehalt(modell, { salary: 6 + 0.4 * 10 + 1.5 * 5, leistung: 10, laufzeit: 5 })!;
+    expect(kurz.abweichung).toBeCloseTo(0, 1);
+    expect(lang.abweichung).toBeCloseTo(0, 1);
+    expect(ordneGehaltEin(lang)).toBe("ueblich");
+  });
+
+  it("ohne die Laufzeit-Spalte kippt genau dieser Spieler faelschlich auf 'teuer'", () => {
+    // Der Beleg, warum die zweite Spalte noetig ist: dasselbe Modell ohne Laufzeit schiebt deren
+    // Aufschlag der Leistung zu — der lang gebundene Spieler sieht dann ueberbezahlt aus.
+    const ohneLaufzeit = buildSalaryBenchmark(LIGA.map(({ salary, leistung }) => ({ salary, leistung })))!;
+    expect(ohneLaufzeit.jeVertragsjahr).toBe(0);
+    const langBlind = bewerteGehalt(ohneLaufzeit, { salary: 6 + 0.4 * 10 + 1.5 * 5, leistung: 10 })!;
+    expect(langBlind.abweichung).toBeGreaterThan(0);
+    expect(ordneGehaltEin(langBlind)).toBe("teuer");
+  });
+
+  it("faellt auf eine Dimension zurueck, wenn alle gleich lang gebunden sind", () => {
+    // Dann laesst sich der Laufzeit-Anteil nicht trennen — lieber gar keine zweite Zahl als eine,
+    // die nur die erste doppelt erklaert.
+    const gleichLang = LIGA.map((eintrag) => ({ ...eintrag, laufzeit: 3 }));
+    const modell = buildSalaryBenchmark(gleichLang)!;
+    expect(modell.jeVertragsjahr).toBe(0);
+    expect(modell.jeLeistungspunkt).toBeGreaterThan(0);
+  });
+
+  it("kommt ohne Laufzeit-Angabe weiter zurecht", () => {
+    const modell = buildSalaryBenchmark(KADER)!;
+    expect(modell.jeVertragsjahr).toBe(0);
+    // Auch beim einzelnen Spieler faellt nur der Laufzeit-Anteil weg, nicht die ganze Aussage.
+    expect(bewerteGehalt(modell, { salary: 15, leistung: 4.5 })).not.toBeNull();
+  });
+});
+
 describe("leistungJeVollemPensum — die Einsatzzeit-Falle", () => {
   it("rechnet einen Teilzeit-Spieler auf ein volles Pensum hoch", () => {
     // 4 Punkte aus 5 Einsaetzen sind bei 10 Spieltagen keine 4-Punkte-Saison, sondern eine mit 8.
