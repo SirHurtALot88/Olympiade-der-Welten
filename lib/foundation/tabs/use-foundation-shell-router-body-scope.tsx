@@ -6861,6 +6861,26 @@ export function useFoundationShellRouterBodyScope({
       maxWidth: column.maxWidth,
     };
 
+    /**
+     * Waehrend des Ziehens wird KEIN React-State geschrieben.
+     *
+     * Vorher setzte jeder `mousemove` die Tabellen-Praeferenzen im Wurzel-Zustand der
+     * Shell — bei ~60 Ereignissen pro Sekunde also 60 komplette Shell-Renders pro
+     * Sekunde Ziehen, mitsamt allem, was daran haengt. Das war der teuerste
+     * Interaktionspfad der ganzen Oberflaeche.
+     *
+     * Stattdessen wird die Breite live direkt am DOM gesetzt und erst beim Loslassen
+     * EINMAL in den Zustand uebernommen. Die Zellen kommen ohne Zutun der
+     * Tabellen-Komponenten zusammen: vom Anfasser aus per `closest("th")` zur
+     * Kopfzelle, ueber deren `cellIndex` zum passenden `<col>` derselben Tabelle.
+     * Findet sich eines von beiden nicht, bleibt die Optik eben bis zum Loslassen
+     * stehen — korrekt wird sie in jedem Fall.
+     */
+    const headerCell = (event.target as HTMLElement | null)?.closest("th") ?? null;
+    const columnElement =
+      headerCell?.closest("table")?.querySelector("colgroup")?.children[headerCell.cellIndex] ?? null;
+    let liveWidth = tableResizeState.current.startWidth;
+
     const handlePointerMove = (moveEvent: MouseEvent) => {
       const resizeState = tableResizeState.current;
       if (!resizeState) {
@@ -6868,22 +6888,36 @@ export function useFoundationShellRouterBodyScope({
       }
 
       const nextWidth = Math.round(resizeState.startWidth + (moveEvent.clientX - resizeState.startX));
+      liveWidth = clampTableColumnWidth(resizeState, nextWidth);
+      const nextCss = `${liveWidth}px`;
+      if (headerCell) {
+        headerCell.style.width = nextCss;
+      }
+      if (columnElement instanceof HTMLElement) {
+        columnElement.style.width = nextCss;
+      }
+    };
+
+    const handlePointerUp = () => {
+      const resizeState = tableResizeState.current;
+      tableResizeState.current = null;
+      window.removeEventListener("mousemove", handlePointerMove);
+      window.removeEventListener("mouseup", handlePointerUp);
+      if (!resizeState) {
+        return;
+      }
+      // Die eine Zustandsschreibung des ganzen Zieh-Vorgangs. Danach rendert React die
+      // Breite aus dem Zustand und ueberschreibt die direkt gesetzten Inline-Stile.
       setTableColumnPreferences((current) => ({
         ...current,
         [resizeState.tableId]: {
           ...markTableAsCustom(current[resizeState.tableId]),
           widths: {
             ...(current[resizeState.tableId]?.widths ?? {}),
-            [resizeState.columnId]: clampTableColumnWidth(resizeState, nextWidth),
+            [resizeState.columnId]: liveWidth,
           },
         },
       }));
-    };
-
-    const handlePointerUp = () => {
-      tableResizeState.current = null;
-      window.removeEventListener("mousemove", handlePointerMove);
-      window.removeEventListener("mouseup", handlePointerUp);
     };
 
     window.addEventListener("mousemove", handlePointerMove);
