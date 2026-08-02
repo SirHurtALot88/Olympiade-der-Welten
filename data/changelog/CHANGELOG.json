@@ -21,6 +21,15 @@
     },
     {
       "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": null,
+      "text": "Das Grundinteresse eines Spielers war bisher für jeden gleich. Jetzt hängt es davon ab, wo er in eurem Kader stünde und wie viel Platz ihr habt: wer bei euch sofort gesetzt wäre, will eher kommen — wer hinter dem halben Kader einsortiert oder in ein volles Team käme, weniger. Der Tooltip sagt jeweils, welcher Fall zutrifft.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
       "seite": "Spieltag · Inbox",
       "pr": null,
       "text": "Aufstellung setzen, Formkarten erzeugen und bestätigen sind jetzt eine Karte statt drei — mit Fortschritt: „Spieltag vorbereiten · Schritt 2 von 3\".",

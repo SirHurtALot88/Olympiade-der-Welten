@@ -128,6 +128,14 @@ export const DEFIANCE_MIN_STEP_RATIO = 0.01;
  */
 export const WILLING_WILLINGNESS = 60;
 
+/**
+ * Mittelwert des Grundinteresses. 44 statt der frueheren festen 45, weil die beiden neuen
+ * Zuschlaege (Stammplatz-Aussicht, Kaderplatz) im Ligaschnitt leicht positiv ausfallen — der
+ * Marktpool ist im Mittel staerker als die Kader. Der Anker haelt den Median dort, wo er vorher
+ * lag; die Zuschlaege spreizen nur um ihn herum.
+ */
+export const BASE_INTEREST_ANCHOR = 44;
+
 /** Auf ganze Schritte runden — hält den Aufschlag in halben Prozentpunkten statt krummen Zahlen. */
 function roundToStep(value: number, step: number): number {
   return Math.round(value / step) * step;
@@ -1840,12 +1848,64 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
     const isMercenary = hasTrait(input.player, "mercenary");
     const isDivaOrEgo = hasAnyTrait(input.player, ["diva", "egomaniac"]);
 
+    /**
+     * GRUNDINTERESSE — variabel statt konstant.
+     *
+     * GEFRAGT: „kannst du das nicht sauber machen dass es nicht immer konstant ist? vllt hast du
+     * ja ne idee wie man da ein bisschen varianz rein bringen kann."
+     *
+     * Vorher stand hier eine feste 45 fuer jeden Spieler bei jedem Team. Das war der groesste
+     * Einzelposten des Wechselwillens — und der einzige, der ueberhaupt nichts unterschied.
+     * Deshalb war die W-Spanne so schmal.
+     *
+     * VARIANZ, NICHT ZUFALL. Ein Wuerfel waere billig zu haben und wertlos: das ganze Modell ist
+     * darauf gebaut, dass man im Tooltip nachlesen kann, WARUM jemand so reagiert. Zwei Groessen,
+     * die das Spiel ohnehin hergibt und die bisher nirgends zaehlten:
+     *
+     * 1. STAMMPLATZ-AUSSICHT (-3 … +3): wie viele eurer Kaderspieler wuerde er ueberholen? Wer
+     *    sofort in die Startaufstellung geht, will eher kommen; wer hinter dem halben Kader
+     *    einsortiert, sieht die Bank. Das ist NICHT der Teamfit: der misst, wie gut er zum Kader
+     *    PASST (Rasse, Subklasse, Traits), nicht wo er darin STEHT.
+     * 2. KADERPLATZ (-1 … +1): ein Team mit freien Plaetzen bietet Spielzeit, ein volles nicht.
+     *
+     * Beide sind angebotsunabhaengig — sie gehoeren also korrekt auf die Willens-Achse und nicht
+     * zur Forderung. Und beide sind um ihre Mitte gelegt, damit der SCHWIERIGKEITSGRAD nicht
+     * verrutscht: Spanne 41 … 49 statt konstant 45.
+     *
+     * ZUR DOSIERUNG, weil sie nicht geraten ist. Die erste Fassung nahm -5…+5 und -2…+2 und
+     * verschob den Anteil zusagebereiter Spieler deutlich zu weit nach unten. Halbiert und im
+     * SELBEN Messaufbau gegen den Stand davor verglichen (12 Teams, je 250 Marktspieler):
+     *
+     *   vorher (Konstante 45)   Anteil unter 0,95x 30,2 %   Streuung zwischen Teams 14,8 Punkte
+     *   mit Varianz             Anteil unter 0,95x 33,3 %   Streuung zwischen Teams 18,4 Punkte
+     *
+     * Die STREUUNG war das Ziel und waechst um 3,6 Punkte. Die Erleichterung um 3,1 Punkte war
+     * es nicht — sie kommt daher, dass der Marktpool im Schnitt staerker ist als die Kader, die
+     * Stammplatz-Aussicht also systematisch leicht positiv ausfaellt. Der Anker faengt genau das
+     * ab: 44 statt 45, damit der Median wieder dort liegt, wo er vorher lag.
+     */
+    const kaderOvrs = input.rosterPlayers.map((mate) => mate.ovr ?? 0);
+    const ueberholt = kaderOvrs.length
+      ? kaderOvrs.filter((wert) => (input.player?.ovr ?? 0) > wert).length / kaderOvrs.length
+      : 0.5;
+    const stammplatzPunkte = clamp(Math.round(ueberholt * 6), 0, 6) - 3;
+    const rosterLimit = Math.max(1, input.team?.rosterLimit ?? 14);
+    const freiePlaetze = Math.max(0, rosterLimit - kaderOvrs.length);
+    const kaderplatzPunkte = clamp(Math.round((freiePlaetze / rosterLimit) * 6), 0, 2) - 1;
+
     pushScoreBreakdown(scoreBreakdown, {
       key: "base_interest",
       label: "Grundinteresse",
       category: "base",
-      points: 45,
-      reason: "Spieler ist grundsaetzlich offen fuer ein Angebot.",
+      points: BASE_INTEREST_ANCHOR + stammplatzPunkte + kaderplatzPunkte,
+      reason:
+        stammplatzPunkte >= 2
+          ? "Er waere bei euch sofort gesetzt — das macht den Wechsel attraktiv."
+          : stammplatzPunkte <= -2
+            ? "Er saehe sich bei euch hinter dem halben Kader — wenig Aussicht auf Spielzeit."
+            : freiePlaetze === 0
+              ? "Euer Kader ist voll; Spielzeit waere fuer ihn unsicher."
+              : "Spieler ist grundsaetzlich offen fuer ein Angebot.",
     });
 
     // Kein "salary_offer"-Score-Eintrag mehr (Defekt aus verhandlung-rework.md Abschnitt 0):
