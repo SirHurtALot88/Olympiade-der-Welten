@@ -73622,6 +73622,135 @@ button.is-new-look .nl-thist-season-pill,
    Drilldown-Seite mit Browser-Historie, kein Overlay). Die Seite scrollt
    normal mit; Kopf/Fuß sind deshalb Teil des normalen Kartenflusses, nicht
    viewport-fixiert wie in einem echten Modal. */
+/* =========================================================================
+   ENTSCHEIDUNGS-HUELLE — die gemeinsame Form fuer Kauf, Verkauf und Gebaeude.
+
+   Vorher baute jeder der drei Abläufe seine eigene Hülle: Kopf, Zustands-Pill,
+   Abbruchpunkt, Fußleiste, Zweiklick. Drei Kopien derselben Idee — und genau
+   deshalb sah der Verkauf alt aus, während der Kauf schon anders aussah.
+
+   Kein Overlay: das Projekt hat Modals bewusst zu Drilldown-Seiten migriert,
+   weil ein Backdrop Klicks abfängt, die nicht für ihn bestimmt sind (siehe
+   docs/tab-performance-hotspots-v6.1.md, "intercepts pointer events"). Das
+   Fenster-Gefühl kommt hier aus der zentrierten Karte, nicht aus einer Schicht
+   darüber.
+   ========================================================================= */
+.is-new-look .nl-decision-page {
+  display: block;
+}
+
+.is-new-look .nl-decision-card {
+  width: min(960px, 100%);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--nl-panel);
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-lg);
+  box-shadow: var(--nl-e3);
+  overflow: hidden;
+}
+
+.is-new-look .nl-decision-head {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-decision-kicker {
+  flex: 1 1 auto;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-decision-close {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--nl-line);
+  background: transparent;
+  color: inherit;
+  border-radius: 9px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.is-new-look .nl-decision-close:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.is-new-look .nl-decision-close:focus-visible,
+.is-new-look .nl-decision-primary:focus-visible {
+  outline: 2px solid var(--nl-accent, #5b9bff);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-decision-hero {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-decision-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3, 14px);
+  padding: 16px 18px;
+}
+
+/* Die Fußleiste bleibt beim Scrollen sichtbar — die Entscheidung soll nicht
+   davonlaufen, während man die Begründung liest. */
+.is-new-look .nl-decision-foot {
+  position: sticky;
+  bottom: 0;
+  padding: 12px 18px 14px;
+  border-top: 1px solid var(--nl-line);
+  background: var(--nl-panel);
+}
+
+.is-new-look .nl-decision-foot-row {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-decision-foot-spacer {
+  flex: 1 1 auto;
+}
+
+/* Der Satz, der sagt, was gleich endgültig passiert — direkt am Klickpunkt,
+   nicht weiter oben, wo man ihn beim Bestätigen nicht mehr sieht. */
+.is-new-look .nl-decision-confirmnote {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--nl-warn, #d9a441);
+  border-radius: var(--nl-r-md, 12px);
+  background: rgba(217, 164, 65, 0.08);
+  font-size: 0.82rem;
+}
+
+/* Rot erst im Bestätigungsschritt: der erste Klick öffnet nur, er nimmt nichts weg. */
+.is-new-look .nl-decision-primary.is-danger {
+  background: var(--nl-risk, #d9534f);
+  border-color: var(--nl-risk, #d9534f);
+}
+
+@media (max-width: 640px) {
+  .is-new-look .nl-decision-head,
+  .is-new-look .nl-decision-hero,
+  .is-new-look .nl-decision-body,
+  .is-new-look .nl-decision-foot {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}
+
 .is-new-look .transfer-sell-page .transfer-sell-card {
   width: min(920px, 100%);
   margin: 0 auto;
