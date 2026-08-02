@@ -67823,6 +67823,98 @@ button.is-new-look .nl-thist-season-pill,
   animation: nl-rankdrawer-slide-in 0.22s ease-out;
 }
 
+/* MODAL-VARIANTE — die breite Tafel in der Mitte.
+   GEMELDET: „der drawer ist recht klein und nutzt den platz nicht sonderlich gut … da kann auch
+   ne tabelle in der mitte kommen die man dann wieder weg klicken kann."
+   Bei 330 Zeilen ist die Liste selbst der Inhalt; die schmale Randleiste war fuer zehn Zeilen
+   neben etwas anderem gedacht. */
+.is-new-look .nl-rankdrawer-backdrop.is-modal {
+  justify-content: center;
+  align-items: center;
+  padding: clamp(12px, 4vh, 48px) clamp(12px, 4vw, 48px);
+}
+
+.is-new-look .nl-rankdrawer.is-modal {
+  width: min(1080px, 100%);
+  height: auto;
+  max-height: 100%;
+  border-left: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.55);
+  animation: nl-rankdrawer-zoom-in 0.18s ease-out;
+}
+
+/* Mehrspaltig, sobald Platz da ist: 330 Zeilen einspaltig sind eine Endlos-Rolle, in drei
+   Spalten passen dieselben Zeilen auf ein Drittel der Hoehe. Die Leserichtung bleibt dabei
+   senkrecht — Rang 1 bis 20 stehen untereinander in der ersten Spalte, erst danach beginnt die
+   zweite. Genau so liest man eine Rangliste. */
+.is-new-look .nl-rankdrawer.is-modal .nl-rankdrawer-list {
+  display: block;
+  columns: 1;
+  column-gap: 14px;
+}
+
+@media (min-width: 760px) {
+  .is-new-look .nl-rankdrawer.is-modal .nl-rankdrawer-list {
+    columns: 2;
+  }
+}
+
+@media (min-width: 1180px) {
+  .is-new-look .nl-rankdrawer.is-modal .nl-rankdrawer-list {
+    columns: 3;
+  }
+}
+
+/* `break-inside` verhindert, dass eine Zeile ueber den Spaltenumbruch zerrissen wird. */
+.is-new-look .nl-rankdrawer.is-modal .nl-rankdrawer-row {
+  break-inside: avoid;
+  margin-bottom: 6px;
+}
+
+/* Portrait vor dem Rang. */
+.is-new-look .nl-rankdrawer-leading {
+  display: inline-flex;
+  flex: none;
+}
+
+.is-new-look .nl-rankdrawer-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--nl-mut, #93a3bd);
+}
+
+.is-new-look .nl-rankdrawer-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Mit Portrait bekommt die Zeile eine Spalte mehr. */
+.is-new-look .nl-rankdrawer-rowinner.has-leading {
+  grid-template-columns: auto auto 1fr auto auto;
+}
+
+@keyframes nl-rankdrawer-zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 @keyframes nl-rankdrawer-fade {
   from {
     opacity: 0;
