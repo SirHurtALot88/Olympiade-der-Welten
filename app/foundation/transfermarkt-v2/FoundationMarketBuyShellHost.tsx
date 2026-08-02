@@ -381,6 +381,38 @@ export default function FoundationMarketBuyShellHost({
                 </div>
               ) : null}
 
+              {/*
+                Trotz (verhandlung-rework.md Abschnitt 9.1) — zwei getrennte Zustände, und die
+                Trennung ist der Punkt: der obere Banner sagt, was SCHON gilt, der untere, was
+                ein Klick auslösen WÜRDE. Ohne den zweiten wäre der Aufschlag eine Überraschung
+                nach dem Klick; ohne den ersten wäre die erhöhte Forderung unerklärt.
+              */}
+              {(buyPreview?.defianceSurchargePct ?? 0) > 0 ? (
+                <div className="transfer-feedback-banner is-warning" data-testid="transfer-buy-defiance-active">
+                  <strong>Er trägt euch euer Lowball-Angebot nach</strong>
+                  <span>
+                    Seine Forderung steht für den Rest dieser Verhandlung bei{" "}
+                    {formatTransfermarktCurrency(buyPreview?.expectedSalary ?? null)} statt{" "}
+                    {formatTransfermarktCurrency(buyPreview?.baseDemandSalary ?? null)}
+                    {" "}(+{Math.round((buyPreview?.defianceSurchargePct ?? 0) * 1000) / 10} %). Eine neue Season setzt das zurück.
+                  </span>
+                </div>
+              ) : null}
+              {(buyPreview?.pendingDefianceSurchargePct ?? 0) > (buyPreview?.defianceSurchargePct ?? 0) ? (
+                <div className="transfer-feedback-banner is-warning" data-testid="transfer-buy-defiance-pending">
+                  <strong>Dieses Angebot nimmt er persönlich</strong>
+                  <span>
+                    Wenn du so verhandelst, steigt seine Forderung auf{" "}
+                    {formatTransfermarktCurrency(
+                      buyPreview?.baseDemandSalary != null
+                        ? Number((buyPreview.baseDemandSalary * (1 + (buyPreview.pendingDefianceSurchargePct ?? 0))).toFixed(2))
+                        : null,
+                    )}{" "}
+                    (+{Math.round((buyPreview?.pendingDefianceSurchargePct ?? 0) * 1000) / 10} %) — und bleibt dort. Tippen ist frei, verhandeln nicht.
+                  </span>
+                </div>
+              ) : null}
+
               <ContractOfferClient
                 playerName={modalPlayerName}
                 roleLabel={modalPlayerClass}

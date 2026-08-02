@@ -123,6 +123,15 @@ export type TransfermarktBuyPreview = {
   counterSalary?: number | null;
   /** Konditionen-Gegenangebot (nur bei verdict === "counter_conditions"). */
   counterConditions?: { contractLength: number; contractShape: ContractShape } | null;
+  /**
+   * Trotz und Erwiderung (verhandlung-rework.md Abschnitt 9.1/9.3).
+   * `baseDemandSalary` ist die Forderung OHNE Aufschlag — der Dialog zeigt beide Zahlen
+   * ("Forderung: 10,00 → 10,30"), sonst waere der Aufschlag unsichtbar und damit Willkuer.
+   */
+  baseDemandSalary?: number | null;
+  defianceSurchargePct?: number;
+  pendingDefianceSurchargePct?: number;
+  concededFromLastCounter?: boolean;
   contractPreference?: PlayerContractPreference | null;
   demandBreakdown?: NegotiationDemandBreakdownEntry[];
   negotiationScoreBreakdown?: NegotiationScoreBreakdownEntry[];

@@ -1869,6 +1869,32 @@ export type ContractNegotiationDraft = {
   warnings: string[];
   blockingReasons: string[];
   status: ContractNegotiationDraftStatus;
+  /**
+   * Sein letztes GELD-Wort in dieser Verhandlung (verhandlung-rework.md Abschnitt 9.3).
+   *
+   * Abschnitt 7 hatte das Gegenangebot ausdrücklich für nicht speicherwürdig erklärt — es war
+   * eine gedächtnislose Funktion von (Angebot, Forderung, Wille, Traits) und jederzeit neu
+   * herleitbar. Mit der Erwiderung ist es das nicht mehr: wer entgegenkommt, soll die Zahl
+   * sinken sehen, und dafür muss die Vorrunde bekannt sein.
+   *
+   * Geschrieben bei `status = "countered"` mit Geld-Gegenangebot; genullt bei jedem
+   * Statuswechsel weg von "countered" und bei Konditionenwechsel (sein Wort galt für die
+   * damalige Laufzeit/Form — andere Konditionen sind eine neue Sachlage).
+   */
+  lastCounterSalary?: number | null;
+  /**
+   * Trotz-Aufschlag auf die Forderung, als Anteil (0,03 = +3 %) — verhandlung-rework.md
+   * Abschnitt 9.1.
+   *
+   * Wächst nur monoton (`max`): es zählt der tiefste je VERHANDELTE Griff, nicht der zuletzt
+   * getippte. Tippen ist frei, die Vorschau warnt vorher; Verhandeln klebt. Klebrig für die
+   * Dauer dieses Drafts (Season/Team/Spieler) — wäre er durch anschließendes Wohlverhalten
+   * abbaubar, wäre Lowball-zuerst gratis.
+   *
+   * Genullt beim Übergang zu `rejected_bad_experience`: dort greift die Vertrauensbruch-Strafe
+   * (×1,12), und beides zu stapeln wäre zweimal kassiert für denselben Vorfall.
+   */
+  defianceSurchargePct?: number;
   updatedAt: string;
 };
 

@@ -49,6 +49,20 @@ type NegotiationPreviewInput = {
    * uebersteuert er das Verdikt zu "reject_affront", unabhaengig von den Schwellen-Baendern.
    */
   affrontRetreat?: boolean;
+  /**
+   * Trotz-Aufschlag aus dem gespeicherten Draft (verhandlung-rework.md Abschnitt 9.1), Anteil.
+   * Wirkt SOFORT auf die Forderung dieser Runde — er ist das Ergebnis eines früheren Klicks
+   * auf „Verhandeln", nicht des gerade getippten Angebots.
+   */
+  priorDefianceSurchargePct?: number;
+  /**
+   * Sein Geld-Gegenangebot aus der Vorrunde (Abschnitt 9.3), oder `null`, wenn es keins gibt
+   * bzw. die Konditionen seither gewechselt haben. Der Aufrufer entscheidet das — er hält den
+   * Draft mit `contractLength`/`contractShape`, die Vorschau kennt nur die aktuelle Runde.
+   */
+  lastCounterSalary?: number | null;
+  /** Das Angebot, auf das dieses Gegenangebot folgte — Bezugspunkt für „du bist entgegengekommen". */
+  lastNegotiatedSalary?: number | null;
   seasonIdBase?: string | null;
   seasonLabelBase: string;
 };
@@ -65,6 +79,60 @@ type NegotiationPreviewInput = {
  * - "counter_money": alles dazwischen — Geld-Gegenangebot nach der Haerte-Formel
  * - "reject_affront": Sonderfall ausserhalb der Baender, siehe `affrontRetreat` oben
  */
+/**
+ * Schwellen, ab denen „guter Fit" und „starkes Projekt" als Wechselgrund zählen
+ * (verhandlung-rework.md Abschnitt 11).
+ *
+ * Beide standen vorher oberhalb dessen, was im Spiel real vorkommt, und feuerten deshalb an
+ * einem echten Spielstand für **0 %** der Marktspieler:
+ *
+ * - `LOYAL_FIT_THRESHOLD` stand auf 20. Gemessener Teamfit über drei Teams × 500 Marktspieler:
+ *   −49 … +28, P90 = 11,4. Ein Fit über 10 ist bereits ein starker Wert — 20 traf so gut wie
+ *   nie mit dem Loyal-Trait zusammen.
+ * - `AMBITION_PROJECT_THRESHOLD` stand auf 8. Team-Ambition liegt an echten Ständen bei 2,8
+ *   bis 8,8, `starPriority` bei 4. Die 8 war praktisch der Maximalwert, nicht eine hohe Hürde.
+ *
+ * Das ist derselbe Fehler wie beim verworfenen Eile-Rabatt (Abschnitt 10.1): Gates aus
+ * angenommenen statt gemessenen Verteilungen. Wer diese Werte anfasst, misst vorher.
+ */
+export const LOYAL_FIT_THRESHOLD = 10;
+export const AMBITION_PROJECT_THRESHOLD = 7;
+
+/**
+ * Trotz-Aufschlag (verhandlung-rework.md Abschnitt 9.1) — die vier Konstanten und warum sie so
+ * stehen.
+ *
+ * - `DEFIANCE_INSULT_RATIO = 0,90`: zehn Prozent unter Forderung. Deutlich unterhalb von allem,
+ *   was der Spieler je selbst als Gegenangebot nennt (gemessene Zusage-Schwellen der Sturen
+ *   Ø 1,007) — also eindeutig Provokations-, nicht Verhandlungszone. Und oberhalb ihrer
+ *   gemessenen Absage-Schwellen (Ø 0,855): genau die bis dahin straffreie Zone dazwischen
+ *   bekommt einen Preis.
+ * - `DEFIANCE_FACTOR = 1,5`: jeder Prozentpunkt tiefer kostet anderthalb Punkte Aufschlag.
+ *   Überproportional, und das ist notwendig: es ist der einzige Grund, warum sich ein Lowball
+ *   nicht durch anschließendes Entgegenkommen zurückverdienen lässt. Der größte
+ *   Erwiderungs-Faktor ist 0,7 (siehe unten) — 1,5 > 0,7, also ist der Saldo jedes
+ *   Lowball-Pfads negativ.
+ * - `DEFIANCE_MAX_SURCHARGE = 0,06`: bleibt unter der Vertrauensbruch-Strafe (×1,12). Trotz ist
+ *   Ärger, kein Bruch.
+ * - `DEFIANCE_MIN_STEP_RATIO = 0,01`: unter einem Prozent der Forderung ist ein „Schritt" kein
+ *   Entgegenkommen, sondern Theater — und würde die Erwiderung in Fünf-Cent-Häppchen auslösen.
+ */
+export const DEFIANCE_INSULT_RATIO = 0.9;
+export const DEFIANCE_FACTOR = 1.5;
+export const DEFIANCE_MAX_SURCHARGE = 0.06;
+export const DEFIANCE_MIN_STEP_RATIO = 0.01;
+
+/**
+ * Ab diesem Wechselwillen gilt jemand als „willig" und erwidert großzügiger (Abschnitt 9.3).
+ * 60 ist knapp über dem gemessenen P90 (59) — der obere Rand, nicht die obere Hälfte.
+ */
+export const WILLING_WILLINGNESS = 60;
+
+/** Auf ganze Schritte runden — hält den Aufschlag in halben Prozentpunkten statt krummen Zahlen. */
+function roundToStep(value: number, step: number): number {
+  return Math.round(value / step) * step;
+}
+
 /**
  * Fit → Wechselwille (verhandlung-rework.md Abschnitt 10.2).
  *
@@ -216,6 +284,20 @@ export type ContractNegotiationPreview = {
   counterSalary?: number | null;
   /** Konditionen-Gegenangebot (Regel 3, Abschnitt 3.2). Nur gesetzt bei verdict === "counter_conditions". */
   counterConditions?: { contractLength: number; contractShape: ContractShape } | null;
+  /**
+   * Trotz (Abschnitt 9.1), drei Zahlen, damit der Dialog Ursache, Wirkung und Folge trennen kann:
+   * - `baseDemandSalary` = D0, die Forderung OHNE jeden Aufschlag — Bezugspunkt der Anzeige
+   *   „Forderung: 10,00 → 10,30" und Messlatte des Trotz-Auslösers (misst er gegen die bereits
+   *   erhöhte Forderung, verschiebt der Aufschlag seinen eigenen Auslöser).
+   * - `defianceSurchargePct` = der Aufschlag, der JETZT SCHON gilt (aus dem Draft).
+   * - `pendingDefianceSurchargePct` = was nach einem Klick auf „Verhandeln" gälte. Beim Tippen
+   *   ist das die Warnung; sie ist exakt das Klick-Ergebnis, kein Ungefähr.
+   */
+  baseDemandSalary?: number | null;
+  defianceSurchargePct?: number;
+  pendingDefianceSurchargePct?: number;
+  /** Erwiderung (Abschnitt 9.3): hat sein Gegenangebot diese Runde nachgegeben, weil ihr erhöht habt? */
+  concededFromLastCounter?: boolean;
   contractPreference?: PlayerContractPreference | null;
   demandBreakdown: NegotiationDemandBreakdownEntry[];
   scoreBreakdown: NegotiationScoreBreakdownEntry[];
@@ -1454,7 +1536,9 @@ function deriveTeamDemandSignals(input: NegotiationPreviewInput, player: Player,
   }
 
   if (hasTrait(player, "ambitious")) {
-    if (ambition >= 8 || (profile?.bias.starPriority ?? 0) >= 8) {
+    // Gate 7 statt 8 (verhandlung-rework.md Abschnitt 11): dieselbe Nachmessung wie beim
+    // Wechselwillen — die 8 lag oberhalb dessen, was Teamidentitaeten real erreichen.
+    if (ambition >= 7 || (profile?.bias.starPriority ?? 0) >= 7) {
       pushDemandBreakdown(entries, {
         key: "ambition_project_match",
         label: "Ambition passt",
@@ -1462,7 +1546,7 @@ function deriveTeamDemandSignals(input: NegotiationPreviewInput, player: Player,
         multiplier: 0.97,
         reason: "Ambitious sieht sportische Perspektive im Projekt.",
       });
-    } else if (ambition <= 4 || teamFit < 8) {
+    } else if (ambition <= 3 || teamFit < 8) {
       pushDemandBreakdown(entries, {
         key: "ambition_project_doubt",
         label: "Ambition zweifelt",
@@ -1698,6 +1782,22 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
     reasons.push(...natureSignals.reasons);
   }
 
+  /**
+   * Trotz-Aufschlag (Abschnitt 9.1) — hier, VOR `offerRatio` und vor allem anderen, weil er die
+   * Forderung selbst verändert und nicht bloß eine Schwelle. Stünde er weiter unten, zeigte der
+   * Dialog „Forderung 10,00", während intern gegen 10,30 gerechnet würde.
+   *
+   * Nur der bereits VERHANDELTE Aufschlag aus dem Draft wirkt hier. Der aus dem gerade
+   * getippten Angebot wird weiter unten als Hypothese ausgewiesen und erst beim Klick wirksam —
+   * sonst wäre das Verdikt die Antwort auf eine Forderung, die es im Moment des Tippens noch
+   * gar nicht gibt.
+   */
+  const baseDemandBeforeDefiance = expectedSalary;
+  const appliedDefianceSurchargePct = clamp(input.priorDefianceSurchargePct ?? 0, 0, DEFIANCE_MAX_SURCHARGE);
+  if (expectedSalary != null && appliedDefianceSurchargePct > 0) {
+    expectedSalary = roundMoney(expectedSalary * (1 + appliedDefianceSurchargePct), 2);
+  }
+
   offeredSalary = offeredSalary ?? expectedSalary ?? baseExpectedSalary;
   if (offeredSalary == null || offeredSalary <= 0) {
     blockingReasons.push("offer_salary_missing");
@@ -1729,6 +1829,10 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
   let verdict: NegotiationVerdict | null = null;
   let counterSalary: number | null = null;
   let counterConditions: { contractLength: number; contractShape: ContractShape } | null = null;
+  let baseDemandSalary: number | null = null;
+  let effectiveDefianceSurchargePct = 0;
+  let pendingDefianceSurchargePct = 0;
+  let concededFromLastCounter = false;
 
   if (blockingReasons.length === 0 && input.player && expectedSalary != null && offeredSalary != null && offerRatio != null) {
     // Zwei Traitgruppen werden mehrfach gebraucht (Schwellen-Verschiebung, Stolz-Kappe,
@@ -1851,7 +1955,7 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
       reasons.push("Mercenary reagiert empfindlich auf Lowball-Angebote.");
     }
 
-    if (input.player && hasTrait(input.player, "loyal") && teamFit >= 20) {
+    if (input.player && hasTrait(input.player, "loyal") && teamFit >= LOYAL_FIT_THRESHOLD) {
       pushScoreBreakdown(scoreBreakdown, {
         key: "loyal_fit",
         label: "Loyalitaet",
@@ -1864,7 +1968,7 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
 
     if (input.player && hasTrait(input.player, "ambitious")) {
       const ambition = input.teamIdentity?.ambition ?? 0;
-      if (ambition >= 8 || (input.teamStrategyProfile?.bias.starPriority ?? 0) >= 8) {
+      if (ambition >= AMBITION_PROJECT_THRESHOLD || (input.teamStrategyProfile?.bias.starPriority ?? 0) >= AMBITION_PROJECT_THRESHOLD) {
         pushScoreBreakdown(scoreBreakdown, {
           key: "ambition_match",
           label: "Ambition",
@@ -1873,7 +1977,7 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
           reason: "Ambitionierter Spieler sieht sportische Perspektive.",
         });
         reasons.push("Ambitious mag ambitionierte Teamumfelder.");
-      } else if (ambition <= 4 && (input.teamStrategyProfile?.bias.starPriority ?? 0) < 8) {
+      } else if (ambition <= 3 && (input.teamStrategyProfile?.bias.starPriority ?? 0) < AMBITION_PROJECT_THRESHOLD) {
         // Aenderung ggue. dem alten Modell (verhandlung-rework.md Abschnitt 1, Tabellenzeile
         // ambition_match/mismatch): der Mismatch-Zweig feuerte frueher bei offerRatio < 1 —
         // das war Geld, das hier nicht hingehoert (W ist angebotsunabhaengig). Ambition ist eine
@@ -1966,9 +2070,58 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
     const rFull = rMoney + conditionsAdjustmentPct;
     const pride = 1.04 + (isMercenary || isDivaOrEgo ? 0.02 : 0);
 
+    // --- Trotz-Aufschlag (Abschnitt 9.1) -----------------------------------------------
+    // GEMELDET: „sollte bei so sturen spielern wenn verhandelt wird die forderung nicht teils
+    // hoch gehen? vor allem wenn ich lowballen will?"
+    //
+    // Vorher gab es unter der Forderung nur zwei Zustaende: feilschen oder Abbruch. Zwischen
+    // der Absage-Schwelle der Sturen (gemessen Ø 0,855) und dem Beginn echten Feilschens lag
+    // eine Zone, in der ein Lowball folgenlos gekontert wurde. Die bekommt jetzt einen Preis —
+    // aber einen, den man vorher sieht und der die Verhandlung nicht abbricht.
+    const isStubborn = isMercenary || isDivaOrEgo;
+    // D' — die Forderung, gegen die diese Runde gerechnet wird; sie traegt den bereits
+    // verhandelten Aufschlag schon (oben, vor `offerRatio`, angebracht).
     const D = expectedSalary;
     const O = offeredSalary;
     const r = offerRatio;
+    const priorSurcharge = appliedDefianceSurchargePct;
+    // D0 — die Forderung OHNE jeden Aufschlag. Der Ausloeser misst gegen sie; gegen die bereits
+    // erhoehte Forderung gemessen wuerde der Aufschlag seinen eigenen Ausloeser verschieben und
+    // sich Runde um Runde selbst nachladen.
+    const D0 = baseDemandBeforeDefiance ?? D;
+
+    // Die Beleidigungsgrenze wandert mit dem realen Zusagepunkt: beleidigend ist, was weit
+    // unter dem liegt, wozu er wirklich unterschreiben wuerde — nicht eine absolute Zahl.
+    const insultRatio = Math.min(DEFIANCE_INSULT_RATIO, rFull - 0.04);
+    const baseRatio = D0 > 0 ? O / D0 : 1;
+    const surchargeFromOffer =
+      isStubborn && baseRatio < insultRatio && baseRatio >= rReject
+        ? Math.min(DEFIANCE_MAX_SURCHARGE, roundToStep(DEFIANCE_FACTOR * (insultRatio - baseRatio), 0.005))
+        : 0;
+    // Monoton: es zaehlt der tiefste je verhandelte Griff. Tippen ist frei, Verhandeln klebt.
+    const pendingSurcharge = Math.max(priorSurcharge, surchargeFromOffer);
+    baseDemandSalary = roundMoney(D0, 2);
+    effectiveDefianceSurchargePct = priorSurcharge;
+    pendingDefianceSurchargePct = pendingSurcharge;
+
+    if (priorSurcharge > 0) {
+      pushDemandBreakdown(demandBreakdown, {
+        key: "defiance_surcharge",
+        label: "Trotz",
+        category: "personality",
+        multiplier: roundMoney(1 + priorSurcharge, 4),
+        reason: `Euer Lowball in dieser Verhandlung hat er persoenlich genommen: +${Math.round(priorSurcharge * 1000) / 10} % auf die Forderung, fuer den Rest dieser Verhandlung.`,
+      });
+      reasons.push(
+        `Seine Forderung steht wegen eures frueheren Lowballs bei ${roundMoney(D, 2)} statt ${roundMoney(D0, 2)}.`,
+      );
+    }
+    if (surchargeFromOffer > priorSurcharge) {
+      warnings.push("defiance_surcharge_pending");
+      reasons.push(
+        `Wenn ihr DAS verhandelt, steigt seine Forderung auf ${roundMoney(D0 * (1 + pendingSurcharge), 2)} — mehr als ${Math.round((1 - insultRatio) * 100)} % unter der Forderung nimmt er persoenlich.`,
+      );
+    }
 
     rejectThresholdSalary = roundMoney(D * rReject, 2);
     moneyThresholdSalary = roundMoney(D * rMoney, 2);
@@ -1985,7 +2138,11 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
       verdict = "reject_affront";
       warnings.push("retreat_after_counter_affront");
       reasons.push("Ihr seid nach seinem Entgegenkommen mit einem niedrigeren Angebot zurueckgerudert — er bricht ab.");
-    } else if (r < rReject) {
+    } else if (baseRatio < rReject) {
+      // Der Abbruch misst gegen D0, nicht gegen die trotzig erhoehte Forderung: „Trotz ist
+      // Aerger, kein Bruch" (Abschnitt 9.1). Sonst koennte ein Aufschlag, den der Spieler
+      // selbst ausgeloest hat, dasselbe Angebot in der naechsten Runde zum Vertrauensbruch
+      // machen — zweimal bestraft fuer denselben Griff.
       verdict = "reject_lowball";
       reasons.push("Angebot ist zu weit von der Forderung entfernt — er bricht die Verhandlung ab.");
     } else if (r >= rFull) {
@@ -2022,9 +2179,71 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
         // "erst lowballen, dann Gegenangebot einschlagen" die dominante Strategie). Deckel 1,00:
         // er geht nie ueber seinen Zielpunkt hinaus, das waere die alte Ratsche.
         const hardness = clamp(0.8 - (W - 50) * 0.006 + (rMoney - r) * 0.9, 0.55, 1.0);
-        counterSalary = roundMoney(O + (target - O) * hardness, 2);
-        verdict = "counter_money";
-        reasons.push("Er verhandelt nach: ein hoeheres Gehalt als euer aktuelles Angebot.");
+        const formulaCounter = O + (target - O) * hardness;
+
+        // --- Erwiderung (Abschnitt 9.3) ------------------------------------------------
+        // GEMELDET: „wenn ich dann entgegen komme und bei umbros zb 13,5 biete muesste er ggf.
+        // auch noch mal entgegen kommen."
+        //
+        // Gemessen war genau das nicht so: Angebote 13,25 / 13,50 / 14,00 ergaben Gegenangebote
+        // 14,44 / 14,43 / 14,44 — ein festes Ziel, kein Zugestaendnis. Das lag nicht an der
+        // Kalibrierung, sondern daran, dass die Haerte-Formel GEDAECHTNISLOS ist: der
+        // Anti-Exploit-Term (+0,9 x Lowball-Tiefe) hebt fast exakt auf, was der Nutzer drauflegt.
+        // Eine Formel ohne Vorrunde kann Entgegenkommen prinzipiell nicht belohnen. Deshalb
+        // bekommt das Gegenangebot hier ein Gedaechtnis — sein letztes Wort aus dem Draft.
+        const lastCounter = input.lastCounterSalary ?? null;
+        const lastOffer = input.lastNegotiatedSalary ?? null;
+        const step = lastOffer != null ? O - lastOffer : 0;
+        const hasRealStep = lastCounter != null && lastOffer != null && step >= DEFIANCE_MIN_STEP_RATIO * D0;
+
+        if (hasRealStep) {
+          // g: wie weit er mitgeht, je Einheit, die ihr drauflegt. Sture bewegen sich zaeh,
+          // Willige springen fast mit. Alle drei Werte liegen unter dem Trotz-Faktor 1,5 —
+          // sonst liesse sich ein Lowball durch spaeteres Entgegenkommen zurueckverdienen.
+          const g = isStubborn ? 0.3 : W >= WILLING_WILLINGNESS ? 0.7 : 0.5;
+          // rho: was Erwiderung INSGESAMT gegenueber dem Direktangebot sparen darf. Ohne diesen
+          // Boden waere Salami-Taktik dominant — viele kleine Schritte, jeder halb erwidert,
+          // konvergieren deutlich unter die Zusage-Schwelle.
+          const rho = isStubborn ? 0.01 : W >= WILLING_WILLINGNESS ? 0.03 : 0.02;
+          const memoryCounter = lastCounter - g * step;
+          const floor = D * (Math.min(rFull, pride) - rho);
+          // Er steht zu seinem letzten Wort: sein Gegenangebot steigt innerhalb einer
+          // Verhandlung nie. (Die FORDERUNG kann per Trotz steigen — aber nur als Antwort auf
+          // einen Lowball, und nach einem Konter loest ein niedrigeres Angebot ohnehin die
+          // Affront-Regel aus. Beide Gedaechtnisse koennen sich nie widersprechen.)
+          //
+          // Reihenfolge: erst der Budget-Boden, DANN die Deckelung auf sein letztes Wort. Anders
+          // herum konnte der Boden das Gegenangebot ueber sein letztes Wort heben — bei hoher
+          // Zusage-Schwelle liegt `floor` naemlich darueber. Das waere die Ratsche zurueck
+          // durch die Hintertuer: er kaeme entgegen und forderte trotzdem mehr als vorher.
+          counterSalary = roundMoney(Math.min(lastCounter, Math.max(Math.min(formulaCounter, memoryCounter), floor)), 2);
+          concededFromLastCounter = counterSalary < lastCounter - 0.005;
+        } else if (lastCounter != null) {
+          // Kein QUALIFIZIERTER Schritt (zu klein, oder gar keiner) — dann gibt er nichts nach.
+          // Aber sein letztes Wort deckelt trotzdem: die Mindestschritt-Regel entscheidet, ob er
+          // ENTGEGENKOMMT, nicht ob er wieder hochgehen darf. Ohne diese Deckelung kam die
+          // Ratsche am Rand zurueck: ein Schritt einen Cent unter der Schwelle fiel aus dem
+          // Gedaechtnis, und die gedaechtnislose Formel nannte prompt wieder eine hoehere Zahl
+          // als in der Vorrunde.
+          counterSalary = roundMoney(Math.min(formulaCounter, lastCounter), 2);
+        } else {
+          counterSalary = roundMoney(formulaCounter, 2);
+        }
+
+        if (counterSalary - O < 0.02) {
+          // Bagatelle, erweitert (Abschnitt 9.3): die Erwiderung hat die Restluecke unter einen
+          // sinnvollen Gehaltsschritt gedrueckt — dann sagt er zu, statt um Cents zu feilschen.
+          counterSalary = null;
+          verdict = "accept";
+          reasons.push("Ihr seid ihm entgegengekommen — der Rest ist ihm zu klein, um noch zu verhandeln.");
+        } else {
+          verdict = "counter_money";
+          reasons.push(
+            concededFromLastCounter
+              ? `Ihr seid ihm entgegengekommen — er geht mit und senkt seine Forderung auf ${counterSalary}.`
+              : "Er verhandelt nach: ein hoeheres Gehalt als euer aktuelles Angebot.",
+          );
+        }
       }
     }
 
@@ -2075,6 +2294,10 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
     verdict,
     counterSalary,
     counterConditions,
+    baseDemandSalary,
+    defianceSurchargePct: effectiveDefianceSurchargePct,
+    pendingDefianceSurchargePct,
+    concededFromLastCounter,
     contractPreference,
     demandBreakdown,
     scoreBreakdown,
@@ -2095,6 +2318,8 @@ export function buildContractNegotiationDraft(input: {
   playerId: string;
   playerName: string;
   preview: ContractNegotiationPreview;
+  /** Trotz-Aufschlag des VORHERIGEN Drafts — der neue Wert waechst nur monoton daraus. */
+  priorDefianceSurchargePct?: number;
 }): ContractNegotiationDraft {
   return {
     draftId: `contract-draft:${input.seasonId}:${input.teamId}:${input.playerId}`,
@@ -2121,6 +2346,24 @@ export function buildContractNegotiationDraft(input: {
     warnings: input.preview.warnings,
     blockingReasons: input.preview.blockingReasons,
     status: input.preview.status,
+    /**
+     * Verhandlungsgedaechtnis (Abschnitt 9.3/9.1). Beide Felder haengen am STATUS, nicht am
+     * Zufall des Zeitpunkts:
+     *
+     * - Sein letztes Geld-Wort gilt nur, solange die Verhandlung auf "countered" steht. Jeder
+     *   andere Status beendet die Runde — dann gibt es nichts mehr zu erwidern.
+     * - Der Trotz-Aufschlag waechst monoton (`max` gegen den Vorwert, den der Aufrufer
+     *   uebergibt) und wird bei `rejected_bad_experience` genullt: dort greift die
+     *   Vertrauensbruch-Strafe, und beides zu stapeln waere zweimal kassiert.
+     */
+    lastCounterSalary:
+      input.preview.status === "countered" && input.preview.verdict === "counter_money"
+        ? input.preview.counterSalary ?? null
+        : null,
+    defianceSurchargePct:
+      input.preview.status === "rejected_bad_experience"
+        ? 0
+        : Math.max(input.priorDefianceSurchargePct ?? 0, input.preview.pendingDefianceSurchargePct ?? 0),
     updatedAt: new Date().toISOString(),
   };
 }

@@ -1923,11 +1923,17 @@ export default function TransfermarktV2Client({
         counterSalary != null && activeSalaryOffer != null
           ? Number((counterSalary - activeSalaryOffer).toFixed(2))
           : null;
+      // Erwiderung (Abschnitt 9.3): hat er auf euer Entgegenkommen selbst nachgegeben, muss die
+      // Ueberschrift das sagen. „Gegenseite verhandelt nach" waere bei einer GESUNKENEN Zahl
+      // schlicht falsch — und genau das Signal, auf das man beim Feilschen wartet.
+      const conceded = buyPreview.concededFromLastCounter === true;
       setBuyNegotiationOutcome({
         status: "countered",
         tone: "warning",
-        title: "Gegenseite verhandelt nach",
-        message: `${playerName} will eher ${formatTransfermarktCurrency(counterSalary)} pro Season${counterDelta != null ? ` (${counterDelta > 0 ? "+" : ""}${formatTransfermarktCurrency(counterDelta)} gegenüber deinem Angebot)` : ""}. Schlag ein oder passe dein Angebot an und verhandle neu.`,
+        title: conceded ? "Er kommt euch entgegen" : "Gegenseite verhandelt nach",
+        message: conceded
+          ? `Ihr habt nachgelegt — ${playerName} geht mit und senkt seine Forderung auf ${formatTransfermarktCurrency(counterSalary)} pro Season${counterDelta != null ? ` (noch ${formatTransfermarktCurrency(counterDelta)} über deinem Angebot)` : ""}. Schlag ein oder komm ihm noch ein Stück entgegen.`
+          : `${playerName} will eher ${formatTransfermarktCurrency(counterSalary)} pro Season${counterDelta != null ? ` (${counterDelta > 0 ? "+" : ""}${formatTransfermarktCurrency(counterDelta)} gegenüber deinem Angebot)` : ""}. Schlag ein oder passe dein Angebot an und verhandle neu.`,
         counterSalary,
         counterKind: "money",
       });

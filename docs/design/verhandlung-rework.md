@@ -511,8 +511,8 @@ Anzeige-Prozente:
 
 # Nachtrag: Trotz, williger Pol, Erwiderung
 
-**Status: Entwurf. Abschnitte 0–8 sind live (Commit cbd9da1b) und bleiben unverändert
-beschrieben; alles ab hier ist noch nicht gebaut.**
+**Status: 9.1 (Trotz) und 9.3 (Erwiderung) sind LIVE. 9.2 (Eile-Rabatt) ist verworfen —
+begründet in Abschnitt 10. Die Abweichungen der gebauten Fassung stehen in Abschnitt 11.**
 
 Auftrag (Chris, nach dem Ausprobieren des Live-Modells): _„aber sollte bei so sturen spielern
 wenn verhandelt wird die forderung nicht teils hoch gehen? vor allem wenn ich lowballen will?
@@ -1054,3 +1054,99 @@ die Erklärung wertlos).
   Verhandlungshistorie, die dieser Spielstand schlicht nicht hat. Sie werden lauter, wenn das
   Team wächst. Wichtig ist nur, sie nicht mit „wirkt" zu verwechseln, wenn kalibriert wird —
   genau dieser Fehler steckte in 9.2.
+
+---
+
+# 11. Was beim Bauen anders wurde als im Entwurf
+
+Alle Abweichungen kommen aus derselben Quelle wie Abschnitt 10: Nachmessen am echten Save.
+
+## 11.1 Zwei weitere Gates lagen oberhalb der Wirklichkeit
+
+Chris beim Lesen von Abschnitt 10: _„teamFit >30 ist kaum erreichbar, >10 ist schon stark!
+ambition würde ich auch auf >6 oder >7 runter setzen."_ — bestätigt durch dieselbe Messung, die
+schon die vier Eile-Quellen erledigt hat. Beide Schwellen sind LIVE-Code, nicht nur Entwurf:
+
+| Konstante | vorher | jetzt | Warum |
+|---|---|---|---|
+| `LOYAL_FIT_THRESHOLD` | 20 | **10** | Teamfit real −49 … +28, P90 = 11,4. Traf zusammen mit dem Loyal-Trait so gut wie nie: Trefferquote **0 %** → jetzt 7 % |
+| `AMBITION_PROJECT_THRESHOLD` | 8 | **7** | Team-Ambition real 2,8 … 8,8, `starPriority` = 4. Die 8 war praktisch der Maximalwert, nicht eine hohe Hürde |
+
+Der Zweifel-Zweig auf der Forderungsseite rutscht entsprechend von `ambition ≤ 4` auf `≤ 3`,
+damit zwischen „passt" und „zweifelt" ein neutraler Bereich bleibt.
+
+Beide Werte stehen jetzt als benannte Konstanten mit der Messung im Kommentar — dieselbe
+Vorsichtsmaßnahme wie bei den Kennlinien: wer sie anfasst, misst vorher.
+
+## 11.2 Trotz: der Aufschlag wirkt ab der NÄCHSTEN Runde
+
+Der Entwurf ließ offen, gegen welche Forderung das Verdikt derselben Runde rechnet. Beide
+naheliegenden Lesarten sind kaputt:
+
+- Rechnet das Verdikt sofort gegen `D′`, ist es die Antwort auf eine Forderung, die es im
+  Moment des Tippens noch gar nicht gibt — man tippt eine Zahl und bekommt eine Absage auf eine
+  andere.
+- Rechnet der Auslöser gegen `D′`, verschiebt der Aufschlag seinen eigenen Auslöser und lädt
+  sich Runde um Runde selbst nach.
+
+Gebaut ist deshalb: **Auslöser misst gegen `D0`, Verdikt rechnet gegen `D′` mit dem bereits
+VERHANDELTEN Aufschlag.** Die Vorschau weist den neuen Aufschlag als Hypothese aus
+(`pendingDefianceSurchargePct`), der Klick schreibt ihn fest. Das ist zugleich das WYSIWYG, das
+Abschnitt 9.1 verlangt: was der Banner ankündigt, ist exakt das Klick-Ergebnis.
+
+**Und: der Abbruch misst ebenfalls gegen `D0`.** Sonst könnte ein Aufschlag, den der Spieler
+selbst ausgelöst hat, dasselbe Angebot eine Runde später zum Vertrauensbruch machen — zweimal
+bestraft für denselben Griff. „Trotz ist Ärger, kein Bruch" gilt damit auch mechanisch.
+
+## 11.3 Erwiderung: zwei Fehler, die erst der Test gezeigt hat
+
+Die Formel aus 9.3 war in dieser Reihenfolge geschrieben:
+
+```
+C = max( min(C_formel, C_mem, lastCounter), T_min )
+```
+
+Der Budget-Boden `T_min` steht außen — er kann das Gegenangebot also **über** `lastCounter`
+heben, sobald die Zusage-Schwelle hoch liegt. Genau das trat auf: 79,77 statt der versprochenen
+höchstens 79,74. Das ist die Ratsche durch die Hintertür: er kommt entgegen und fordert
+trotzdem mehr als vorher. Gebaut ist deshalb **erst Boden, dann Deckel**:
+
+```
+C = min( lastCounter, max( min(C_formel, C_mem), T_min ) )
+```
+
+Der zweite Fehler saß am Rand des Mindestschritts. Ein Schritt einen Cent unter der 1-%-Grenze
+fiel aus dem Gedächtnis heraus — und die gedächtnislose Formel nannte prompt wieder eine höhere
+Zahl als in der Vorrunde. Der Mindestschritt entscheidet jetzt nur noch, ob er **entgegenkommt**,
+nicht ob er wieder **hochgehen** darf: sein letztes Wort deckelt in jedem Fall.
+
+## 11.4 Der Willens-Pol ersetzt `E` als Unterscheidung „stur / normal / willig"
+
+9.3 staffelte Gegenzug-Faktor `g` und Budget `ρ` nach `E < 0`. `E` gibt es nicht mehr. An seine
+Stelle tritt der Wechselwille selbst: `W ≥ 60` — knapp über dem gemessenen P90 (59), also der
+obere Rand und nicht die obere Hälfte. Dieselbe Dreiteilung, aber an einer Größe, die es
+wirklich gibt.
+
+## 11.5 Gemessen nach dem Bauen
+
+```
+Trotz, 215 sture Kandidaten, Lowball bei 0,88x Forderung:
+  löst Aufschlag aus: 202/215 = 94 %
+  Beispiel Zed (Egomaniac): Forderung 13,64 -> 14,05 (+3,0 %), Verdikt bleibt counter_money
+
+Erwiderung, derselbe Spieler, Gegenangebot der Vorrunde 13,57:
+  Angebot +1 %   ohne Gedächtnis 13,57   mit 13,53
+  Angebot +2 %   ohne Gedächtnis 13,58   mit 13,51
+  Angebot +4 %   ohne Gedächtnis 13,61   mit 13,51   (Budget ausgeschöpft)
+```
+
+Die linke Spalte ist der gemeldete Missstand in Reinform: **je weiter man entgegenkam, desto
+höher wurde seine Forderung.** Rechts sinkt sie und bleibt dann stehen — ein glaubwürdiges
+„mehr geht nicht" statt einer stur identischen Zahl.
+
+## 11.6 Weiterhin offen
+
+- Der Trotz-Aufschlag ist im Kaufdialog sichtbar (zwei Banner: was gilt, was ein Klick auslösen
+  würde) und in der Forderungs-Aufschlüsselung als eigener Posten. Ein **Tooltip** an der
+  Verhandlungszeile, der beide Gedächtnisse zusammen erklärt, fehlt noch.
+- `base_interest` ist weiterhin eine Konstante 45 (Abschnitt 10.5).

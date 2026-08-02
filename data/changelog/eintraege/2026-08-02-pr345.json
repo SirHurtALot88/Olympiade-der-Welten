@@ -1,0 +1,34 @@
+[
+  {
+    "datum": "2026-08-02",
+    "seite": "Markt · Transfermarkt",
+    "text": "Beim Verhandeln stieg das Gegenangebot bisher, je weiter du entgegengekommen bist. Jetzt merkt sich die Gegenseite ihr letztes Wort: legst du nach, geht sie mit und senkt ihre Forderung — bis sie irgendwann glaubwürdig sagt, dass mehr nicht drin ist.",
+    "gewicht": "grundlegend",
+    "pr": "#345",
+    "version": "0.3"
+  },
+  {
+    "datum": "2026-08-02",
+    "seite": "Markt · Transfermarkt",
+    "text": "Söldner, Divas und Egomanen nehmen dir ein Lowball-Angebot jetzt übel: ihre Forderung steigt für den Rest dieser Verhandlung. Der Kaufdialog warnt dich vorher, wie viel es kosten würde, und eine neue Season setzt es zurück.",
+    "gewicht": "grundlegend",
+    "pr": "#345",
+    "version": "0.3"
+  },
+  {
+    "datum": "2026-08-02",
+    "seite": "Markt · Transfermarkt",
+    "text": "Es gibt endlich Spieler, die unter ihrer Forderung unterschreiben: wer wirklich zu euch will, sagt jetzt auch deutlich darunter zu, während Unwillige teurer werden. Vorher lagen praktisch alle im selben schmalen Band.",
+    "gewicht": "grundlegend",
+    "pr": "#345",
+    "version": "0.3"
+  },
+  {
+    "datum": "2026-08-02",
+    "seite": "Markt · Transfermarkt",
+    "text": "Der Verkaufsdialog nutzt jetzt dieselbe Form wie Kauf und Ausbau — Kopfzeile, Fußleiste und Sicherheitsabfrage kommen aus einem Bauteil statt dreimal nachgebaut. Die Fußleiste bleibt beim Scrollen sichtbar, und Esc nimmt im Bestätigungsschritt nur den letzten Klick zurück.",
+    "gewicht": "feinschliff",
+    "pr": "#345",
+    "version": "0.3"
+  }
+]
