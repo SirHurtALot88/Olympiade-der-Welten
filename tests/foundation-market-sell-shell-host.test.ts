@@ -251,6 +251,56 @@ describe("FoundationMarketSellShellHost — Zustandsmaschine", () => {
     expect(html).toContain("unter 7 Spieler");
     expect(html).toContain('data-testid="transfer-sell-roster-min-note"');
   });
+
+  // Nutzerwunsch nach der Freigabe #1: "beim verkauf wärs cool wenn angezeigt
+  // wird ob ein buyout gezogen werden müsste" — der Hero-Preis muss eine echte
+  // Aussage treffen, nicht nur "kein Buyout" nebenbei erwähnen.
+  it("Buyout sichtbar: nennt den Betrag und dass er vom Brutto abgeht, wenn einer fällig ist", () => {
+    const html = render({ marketSellPreview: makeSummary({ buyoutCost: 5.24, salePrice: 28.37 }) });
+    expect(html).toContain("Buyout");
+    expect(html).toContain("5,2 Mio");
+    // Kein Fehl-Rendering des negativen Falls daneben:
+    expect(html).not.toContain("Kein Buyout fällig");
+  });
+
+  it("Buyout sichtbar: sagt ehrlich, dass keiner fällig ist, wenn buyoutCost 0 ist", () => {
+    const html = render({ marketSellPreview: makeSummary({ buyoutCost: 0 }) });
+    expect(html).toContain("Kein Buyout fällig");
+    expect(html).not.toContain("− Buyout");
+  });
+
+  // Nutzerwunsch nach der Freigabe #2: "in grün oder rot der vergleich mit dem
+  // echten aktuellen MW" — ANDERE Aussage als die GuV-vs-Kaufpreis-Zeile in
+  // Kachel 1 (vergleicht mit dem Einkaufspreis), deshalb eigenes Label.
+  it("MW-Vergleich: grün und 'über Marktwert', wenn der Netto-Erlös über dem MW liegt", () => {
+    const html = render({
+      marketSellPreview: makeSummary({ netProceeds: 30, marketValueReference: 20 }),
+    });
+    expect(html).toContain("vs. Marktwert:");
+    expect(html).toContain("über Marktwert");
+    expect(html).toMatch(/transfer-sell-price-mw-diff is-good/);
+    expect(html).not.toMatch(/transfer-sell-price-mw-diff is-risk/);
+    // Von der GuV-vs-Kaufpreis-Zeile klar unterscheidbar beschriftet — sonst
+    // hält man die beiden Zahlen für dieselbe:
+    expect(html).toContain("GuV vs. Kaufpreis");
+  });
+
+  it("MW-Vergleich: rot und 'unter Marktwert', wenn der Netto-Erlös unter dem MW liegt", () => {
+    const html = render({
+      marketSellPreview: makeSummary({ netProceeds: 15, marketValueReference: 20 }),
+    });
+    expect(html).toContain("vs. Marktwert:");
+    expect(html).toContain("unter Marktwert");
+    expect(html).toMatch(/transfer-sell-price-mw-diff is-risk/);
+    expect(html).not.toMatch(/transfer-sell-price-mw-diff is-good/);
+  });
+
+  it("MW-Vergleich: zeigt ehrlich nichts, wenn kein Marktwert-Referenzwert vorliegt (kein erfundener Wert)", () => {
+    const html = render({
+      marketSellPreview: makeSummary({ marketValueReference: null }),
+    });
+    expect(html).not.toContain("vs. Marktwert:");
+  });
 });
 
 describe("describeSellPreviewIssue — Einordnung der Preview-Fehler", () => {
