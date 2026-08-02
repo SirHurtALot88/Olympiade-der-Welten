@@ -45680,6 +45680,105 @@ button.foundation-team-portrait-card {
   max-width: 960px;
 }
 
+/* --- Die drei Räume (docs/INBOX_KONZEPT.md) ------------------------------
+   Gemeldet war „alles gleich wichtig" und „auf breiten Schirmen bleibt die
+   rechte Hälfte leer". Beides beantwortet dasselbe Raster: drei Spalten,
+   nebeneinander, jede mit ihrer eigenen Frage im Kopf. Auf schmalen Schirmen
+   stapeln sie in derselben Reihenfolge — Handeln bleibt oben. */
+.is-new-look .nl-inbox-lanes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--nl-s4);
+  align-items: start;
+}
+
+.is-new-look .nl-inbox-lanes .nl-inbox-list {
+  /* Im Raster bestimmt die Spalte die Breite, nicht die Karte. */
+  max-width: none;
+}
+
+.is-new-look .nl-inbox-lane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+  min-width: 0;
+  padding: var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: color-mix(in srgb, var(--nl-panel-2) 55%, transparent);
+}
+
+/* Der Handeln-Raum trägt seine Dringlichkeit im Rahmen — sichtbar, bevor man
+   eine einzelne Karte gelesen hat. */
+.is-new-look .nl-inbox-lane-act {
+  border-color: color-mix(in srgb, var(--nl-risk) 35%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-risk) 6%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-inbox-lane-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.is-new-look .nl-inbox-lane-title {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-inbox-lane-count {
+  padding: 0 7px;
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel);
+  border: 1px solid var(--nl-line);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-inbox-lane-act .nl-inbox-lane-count {
+  border-color: color-mix(in srgb, var(--nl-risk) 45%, transparent);
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-inbox-lane-question {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-inbox-lane-empty {
+  margin: 0;
+  padding: var(--nl-s4) var(--nl-s3);
+  font-size: 13px;
+  color: var(--nl-mut);
+  text-align: center;
+}
+
+/* Das Sprungziel als Chip: man sieht VOR dem Klick, wo man landet. */
+.is-new-look .nl-inbox-card-target {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 2px 9px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--nl-mut);
+}
+
+@media (max-width: 1180px) {
+  .is-new-look .nl-inbox-lanes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .is-new-look .nl-inbox-card {
   border-left: 4px solid var(--nl-tone);
   cursor: pointer;

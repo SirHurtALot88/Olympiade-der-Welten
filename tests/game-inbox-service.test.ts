@@ -939,7 +939,7 @@ describe("Inbox — keine Rohdaten im Nachrichtentext", () => {
             timestamp: "2026-06-12T00:00:00.000Z",
           },
         ],
-      } as GameState["seasonState"],
+      } as unknown as GameState["seasonState"],
     });
     return buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" }).filter(
       (item) => item.source === "facility_events",
@@ -966,7 +966,7 @@ describe("Inbox — keine Rohdaten im Nachrichtentext", () => {
         cashPrizeApplyLogs: [
           { id: "log-empty", seasonId: FACILITY_SEASON, matchdayId: "season-3-matchday-1", createdAt: "2026-06-12T00:00:00.000Z" },
         ],
-      } as GameState["seasonState"],
+      } as unknown as GameState["seasonState"],
     });
     const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
     expect(items.filter((item) => item.source === "cash_prize_apply_logs")).toEqual([]);
@@ -987,7 +987,7 @@ describe("Inbox — keine Rohdaten im Nachrichtentext", () => {
             payload: { appliedTeams: 8, totalPrizeMoney: 12.5 },
           },
         ],
-      } as GameState["seasonState"],
+      } as unknown as GameState["seasonState"],
     });
     const [item] = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" }).filter(
       (entry) => entry.source === "cash_prize_apply_logs",
@@ -1013,7 +1013,7 @@ describe("Inbox — keine Rohdaten im Nachrichtentext", () => {
             updatedAt: "2026-06-12T00:00:00.000Z",
           },
         ],
-      } as GameState["seasonState"],
+      } as unknown as GameState["seasonState"],
     });
     const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
     expect(items.filter((item) => item.source === "matchday_results")).toEqual([]);
