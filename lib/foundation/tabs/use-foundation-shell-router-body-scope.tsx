@@ -1031,7 +1031,7 @@ export function useFoundationShellRouterBodyScope({
     setMarketBuyError, marketBuySuccess, setMarketBuySuccess, foundationActionFeedback, setFoundationActionFeedback, seasonBriefingOpen, setSeasonBriefingOpen, freshSeasonStartMessage, setFreshSeasonStartMessage, newGamePresetId,
     setNewGamePresetId, newGameChrisTeamIds, setNewGameChrisTeamIds, newGameFrankyTeamIds, setNewGameFrankyTeamIds, newGameSandbox, setNewGameSandbox, newGameSaveName, setNewGameSaveName, newGamePreview,
     setNewGamePreview, newGameBusy, setNewGameBusy, newGameError, setNewGameError, newGameSuccess, setNewGameSuccess, marketBuyPreview, setMarketBuyPreview, marketBuyPreviewContext,
-    setMarketBuyPreviewContext, marketNegotiationOutcome, setMarketNegotiationOutcome, marketPreviewPlayerId, setMarketPreviewPlayerId, marketBuySubject, setMarketBuySubject, marketSellBusy, setMarketSellBusy, marketSellError,
+    setMarketBuyPreviewContext, marketNegotiationOutcome, setMarketNegotiationOutcome, marketPreviewPlayerId, setMarketPreviewPlayerId, marketPreviewPlayerSummary, setMarketPreviewPlayerSummary, marketBuySubject, setMarketBuySubject, marketSellBusy, setMarketSellBusy, marketSellError,
     setMarketSellError, marketSellSuccess, setMarketSellSuccess, marketSellPreview, setMarketSellPreview, contractRenewalBusy, setContractRenewalBusy, contractRenewalMessage, setContractRenewalMessage, contractRenewalError,
     setContractRenewalError, contractRenewalNegotiation, setContractRenewalNegotiation, sponsorChoiceBusy, setSponsorChoiceBusy, sponsorChoiceMessage, setSponsorChoiceMessage, marketSellSubject,
     setMarketSellSubject, marketSellRiskAcknowledged, setMarketSellRiskAcknowledged, marketContractLengthDraft, setMarketContractLengthDraft, marketContractShapeDraft, setMarketContractShapeDraft, marketOfferedSalaryDraft, setMarketOfferedSalaryDraft, marketAiTeamScope,
@@ -7101,9 +7101,30 @@ export function useFoundationShellRouterBodyScope({
     () => marketAiCompareFeed?.teams.find((team) => team.teamId === marketAiCompareSelectedTeamId) ?? null,
     [marketAiCompareFeed, marketAiCompareSelectedTeamId],
   );
+  /**
+   * Der ausgewaehlte Kandidat fuer die Hauptaktion im Kopf ("Vertragsangebot oeffnen").
+   *
+   * GEMELDET beim Durchspielen: der Knopf blieb dauerhaft gesperrt mit "Waehle links erst einen
+   * Kandidaten aus der Liste aus", obwohl links sichtbar einer markiert war.
+   *
+   * Zwei Ursachen uebereinander:
+   * 1. Die Auswahl lebte nur im Transfermarkt-Client; `marketPreviewPlayerId` erfuhr nie davon.
+   *    Das meldet der Client jetzt hoch (`onSelectCandidate`).
+   * 2. Selbst mit gesetzter Id half das nicht: aufgeloest wurde sie ueber `marketFeed`, und
+   *    DIESER Feed wird beim normalen Oeffnen des Marktes gar nicht geladen — der zustaendige
+   *    Effekt in `use-foundation-market-feed-actions.ts` steht auf `shouldLoadMarketFeed = false`.
+   *    `reloadMarketFeed` laeuft nur ueber Live-Sync und nach einem Kauf. Der Knopf haette also
+   *    beim ersten Oeffnen nie funktionieren koennen.
+   *
+   * Deshalb faellt die Aufloesung auf die Auswahl-Zusammenfassung zurueck, die der Client
+   * mitschickt: die Liste, die der Spieler tatsaechlich vor sich hat, ist hier die verlaesslichere
+   * Quelle als ein Feed, der oft leer ist.
+   */
   const marketPreviewPlayer = useMemo(
-    () => marketFeed?.items.find((item) => item.playerId === marketPreviewPlayerId) ?? null,
-    [marketFeed?.items, marketPreviewPlayerId],
+    () =>
+      marketFeed?.items.find((item) => item.playerId === marketPreviewPlayerId) ??
+      (marketPreviewPlayerSummary?.playerId === marketPreviewPlayerId ? marketPreviewPlayerSummary : null),
+    [marketFeed?.items, marketPreviewPlayerId, marketPreviewPlayerSummary],
   );
   useEffect(() => {
     setMarketBuyPreview(null);
@@ -11548,6 +11569,10 @@ export function useFoundationShellRouterBodyScope({
     removeTransferWishlistEntry,
     toggleScoutingWatch,
     openMarketOfferPanel,
+    onSelectMarketCandidate: (playerId: string, name: string) => {
+      setMarketPreviewPlayerId(playerId);
+      setMarketPreviewPlayerSummary({ playerId, name });
+    },
     closeFoundationDrilldownPanel,
     openMarketSellModal,
     loadSave: loadSave as unknown as FoundationMarketV2ShellHostProps["loadSave"],
