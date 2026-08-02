@@ -1,5 +1,6 @@
 "use client";
 import { applyTeamCashPatch } from "@/lib/foundation/apply-team-cash-patch";
+import { describeInboxTargetDestination } from "@/lib/foundation/inbox-target-labels";
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
 import {
   FoundationShellRouterCockpit,
@@ -9845,7 +9846,7 @@ export function useFoundationShellRouterBodyScope({
         status: item.status,
         choices:
           item.ctaLabel && item.targetView
-            ? [{ id: "open-target", label: item.ctaLabel, detail: `Springe zu ${item.targetView}.` }]
+            ? [{ id: "open-target", label: item.ctaLabel, detail: describeInboxTargetDestination(item) }]
             : undefined,
       })),
     [visibleInboxItems],

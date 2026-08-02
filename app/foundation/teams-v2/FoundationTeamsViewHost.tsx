@@ -250,6 +250,7 @@ export default function FoundationTeamsViewHost({
     gameState,
     selectedTeam,
     showTeamContractPreviewRows,
+    playerRatingsById,
   });
 
   const extendedPanelDerivations = useTeamsExtendedPanelDerivations({

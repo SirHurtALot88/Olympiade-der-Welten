@@ -41,6 +41,19 @@ jobs:
       - run: npm run ci:ensure-gameplay-smoke-save
       - run: npm run perf:resolve-preview
       - run: npm run app:smoke-gameplay
+      # Coop-Smoke (Ebene 3 aus docs/design/coop-absicherung.md). Bis hierher lief KEIN einziger
+      # Coop-Pfad in CI: der 2-Browser-E2E darunter ist auskommentiert, und dieser Smoke existierte
+      # zwar, war aber nirgends verdrahtet. Jede Coop-Regression waere also nur im Spiel
+      # aufgefallen.
+      #
+      # Er haengt bewusst HINTER app:smoke-gameplay: derselbe Produktionsserver laeuft schon, und
+      # ist der Solo-Pfad kaputt, sagt ein roter Coop-Smoke nichts Eigenes. Er ist UI-selektorfrei
+      # gebaut und prueft die zwei Kern-Garantien — eine Aenderung erreicht den Mitspieler, und die
+      # Besitz-Isolation haelt.
+      #
+      # `--no-start`, weil der Produktionsserver oben schon laeuft — ohne das startet der Smoke
+      # einen zweiten (dev-)Server auf demselben Port.
+      - run: npm run app:smoke-coop-sync -- --no-start
       # TODO(online-mp): Re-enable when online multiplayer is prioritized.
       # Online 4v4 is explicitly deferred ("Nur Solo 1 Team — Online 4v4 kommt später",
       # docs/pm-briefings/SPIELBAR-STATUS.md). This 2-browser room E2E is the only remaining

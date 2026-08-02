@@ -45694,6 +45694,105 @@ button.foundation-team-portrait-card {
   max-width: 960px;
 }
 
+/* --- Die drei Räume (docs/INBOX_KONZEPT.md) ------------------------------
+   Gemeldet war „alles gleich wichtig" und „auf breiten Schirmen bleibt die
+   rechte Hälfte leer". Beides beantwortet dasselbe Raster: drei Spalten,
+   nebeneinander, jede mit ihrer eigenen Frage im Kopf. Auf schmalen Schirmen
+   stapeln sie in derselben Reihenfolge — Handeln bleibt oben. */
+.is-new-look .nl-inbox-lanes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--nl-s4);
+  align-items: start;
+}
+
+.is-new-look .nl-inbox-lanes .nl-inbox-list {
+  /* Im Raster bestimmt die Spalte die Breite, nicht die Karte. */
+  max-width: none;
+}
+
+.is-new-look .nl-inbox-lane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+  min-width: 0;
+  padding: var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: color-mix(in srgb, var(--nl-panel-2) 55%, transparent);
+}
+
+/* Der Handeln-Raum trägt seine Dringlichkeit im Rahmen — sichtbar, bevor man
+   eine einzelne Karte gelesen hat. */
+.is-new-look .nl-inbox-lane-act {
+  border-color: color-mix(in srgb, var(--nl-risk) 35%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-risk) 6%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-inbox-lane-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.is-new-look .nl-inbox-lane-title {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-inbox-lane-count {
+  padding: 0 7px;
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel);
+  border: 1px solid var(--nl-line);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-inbox-lane-act .nl-inbox-lane-count {
+  border-color: color-mix(in srgb, var(--nl-risk) 45%, transparent);
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-inbox-lane-question {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-inbox-lane-empty {
+  margin: 0;
+  padding: var(--nl-s4) var(--nl-s3);
+  font-size: 13px;
+  color: var(--nl-mut);
+  text-align: center;
+}
+
+/* Das Sprungziel als Chip: man sieht VOR dem Klick, wo man landet. */
+.is-new-look .nl-inbox-card-target {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 2px 9px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--nl-mut);
+}
+
+@media (max-width: 1180px) {
+  .is-new-look .nl-inbox-lanes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .is-new-look .nl-inbox-card {
   border-left: 4px solid var(--nl-tone);
   cursor: pointer;
@@ -49004,6 +49103,233 @@ button.foundation-team-portrait-card {
   display: flex;
   gap: var(--nl-s2);
 }
+
+/* --- PPs je Achse: vier feste Spalten, damit sich Profile ueber die Karten hinweg
+       vergleichen lassen statt nur einzelne Zahlen. Achsen ohne Punkte bleiben stehen
+       und werden gedaempft — dass dort nichts kommt, ist selbst eine Aussage. --- */
+.is-new-look .team-auslauf-axes {
+  display: grid;
+  /* Zwei Reihen zu zwei Achsen statt einer Reihe zu vier: bei Kartenbreiten um 250px hatten
+     Wert und Rang in einer 4er-Reihe keinen Platz und liefen ineinander. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--nl-s1);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 1700px) {
+  .is-new-look .team-auslauf-axes {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.is-new-look .team-auslauf-axis {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  padding: 2px var(--nl-s1);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line);
+  font-size: var(--nl-fs-xs);
+  min-width: 0;
+}
+
+.is-new-look .team-auslauf-axis b {
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.is-new-look .team-auslauf-axis.is-pow b { color: var(--nl-pow); }
+.is-new-look .team-auslauf-axis.is-spe b { color: var(--nl-spe); }
+.is-new-look .team-auslauf-axis.is-men b { color: var(--nl-men); }
+.is-new-look .team-auslauf-axis.is-soc b { color: var(--nl-soc); }
+
+.is-new-look .team-auslauf-axis-val {
+  margin-left: auto;
+  white-space: nowrap;
+  color: var(--nl-ink);
+  font-weight: 600;
+}
+
+.is-new-look .team-auslauf-axis-rank {
+  color: var(--nl-mut-2);
+  white-space: nowrap;
+  min-width: 2.4em;
+  text-align: right;
+}
+
+.is-new-look .team-auslauf-axis.is-empty {
+  opacity: 0.45;
+}
+
+.is-new-look .team-auslauf-axis.is-empty b,
+.is-new-look .team-auslauf-axis.is-empty .team-auslauf-axis-val {
+  color: var(--nl-mut-2);
+  font-weight: 500;
+}
+
+/* --- Bewertung: zwei Abweichungs-Skalen um die Null plus der Empfehlungssatz. --- */
+.is-new-look .team-auslauf-board {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s2) var(--nl-s3);
+  padding: var(--nl-s2) var(--nl-s3);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line);
+  border-left: 3px solid var(--nl-accent);
+}
+
+.is-new-look .team-auslauf-board-label {
+  font-size: var(--nl-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut-2);
+}
+
+.is-new-look .team-auslauf-board-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .team-auslauf-board-chip {
+  font-size: var(--nl-fs-xs);
+  font-weight: 700;
+  padding: 2px var(--nl-s2);
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .team-auslauf-board-chip.is-abgeben {
+  color: var(--nl-risk);
+  border-color: color-mix(in srgb, var(--nl-risk) 40%, transparent);
+}
+
+.is-new-look .team-auslauf-board-chip.is-beobachten {
+  color: var(--nl-warn);
+  border-color: color-mix(in srgb, var(--nl-warn) 40%, transparent);
+}
+
+.is-new-look .team-auslauf-board-chip.is-verlaengern {
+  color: var(--nl-good);
+  border-color: color-mix(in srgb, var(--nl-good) 40%, transparent);
+}
+
+.is-new-look .team-auslauf-verdict {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .team-auslauf-gauge {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .team-auslauf-gauge-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .team-auslauf-gauge-head small {
+  font-size: var(--nl-fs-xs);
+  color: var(--nl-mut);
+}
+
+.is-new-look .team-auslauf-gauge-head strong {
+  font-size: var(--nl-fs-lg);
+  font-weight: 700;
+}
+
+.is-new-look .team-auslauf-gauge-head strong.is-bad { color: var(--nl-risk); }
+.is-new-look .team-auslauf-gauge-head strong.is-good { color: var(--nl-good); }
+.is-new-look .team-auslauf-gauge-head strong.is-neutral { color: var(--nl-mut); }
+
+/* Die Null in der Mitte, der Balken waechst nach links (guenstig) oder rechts (teuer).
+   Die VK-Skala ist flacher gesetzt, damit man die beiden nicht verwechselt. */
+.is-new-look .team-auslauf-gauge-rail {
+  position: relative;
+  height: 10px;
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line);
+  overflow: hidden;
+}
+
+.is-new-look .team-auslauf-gauge.is-vk .team-auslauf-gauge-rail {
+  height: 6px;
+  border-radius: var(--nl-r-pill);
+}
+
+.is-new-look .team-auslauf-gauge-zero {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--nl-line-2);
+}
+
+.is-new-look .team-auslauf-gauge-bar {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  border-radius: 2px;
+}
+
+.is-new-look .team-auslauf-gauge-bar.is-bad { background: var(--nl-risk); }
+.is-new-look .team-auslauf-gauge-bar.is-good { background: var(--nl-good); }
+.is-new-look .team-auslauf-gauge-bar.is-neutral { background: var(--nl-mut-2); }
+
+.is-new-look .team-auslauf-gauge-sub {
+  font-size: var(--nl-fs-xs);
+  color: var(--nl-mut-2);
+}
+
+.is-new-look .team-auslauf-advice {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: var(--nl-s2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  border-left: 3px solid var(--nl-mut-2);
+  font-size: var(--nl-fs-md);
+  line-height: 1.45;
+  color: var(--nl-mut);
+}
+
+.is-new-look .team-auslauf-advice strong {
+  font-size: var(--nl-fs-xs);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.is-new-look .team-auslauf-advice.is-abgeben {
+  border-left-color: var(--nl-risk);
+}
+.is-new-look .team-auslauf-advice.is-abgeben strong { color: var(--nl-risk); }
+
+.is-new-look .team-auslauf-advice.is-beobachten {
+  border-left-color: var(--nl-warn);
+}
+.is-new-look .team-auslauf-advice.is-beobachten strong { color: var(--nl-warn); }
+
+.is-new-look .team-auslauf-advice.is-verlaengern {
+  border-left-color: var(--nl-good);
+}
+.is-new-look .team-auslauf-advice.is-verlaengern strong { color: var(--nl-good); }
 
 .is-new-look .team-auslauf-stat {
   display: flex;

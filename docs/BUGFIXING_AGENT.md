@@ -387,15 +387,47 @@ nicht still verliert; der Generator mahnt an, was dort noch liegt.
 ## Der Auftrag (zum Kopieren)
 
 Das ist der Text, mit dem der Agent läuft — als geplante Routine oder von Hand in einer neuen Sitzung.
-Er läuft als **eine einzige stündliche Routine**, rund um die Uhr. Vorher waren es drei mit
+Er läuft als **eine einzige Routine alle vier Stunden**, rund um die Uhr. Vorher waren es drei mit
 unterschiedlichen Takten; das war Verwaltungsaufwand ohne Gegenwert, weil ohnehin jeder Lauf dieselbe
-Frage stellt und die allermeisten sie mit „nichts Neues" beantworten:
+Frage stellt und die allermeisten sie mit „nichts Neues" beantworten.
+
+### Warum vier Stunden und nicht eine
+
+Gemessen an den ersten 19 Meldungen: sie kommen **in Schüben während Spielsitzungen**, nicht
+gleichmäßig — sechs in fünfzig Minuten, dann Stunden nichts, dann sieben an einem Vormittag, danach
+über vierzig Stunden Stille. Ein stündlicher Takt kauft in einem Schub bestenfalls eine Stunde
+Vorsprung und bezahlt sie mit rund zwanzig Leerläufen dazwischen. Vier Stunden verlieren im
+schlimmsten Fall drei Stunden bei einer Meldung, die ohnehin liegen geblieben wäre — dringende Dinge
+sagt Chris direkt.
+
+### Die Billig-Vorprüfung
+
+Noch mehr spart die Reihenfolge. **Schritt 0 klärt für ein paar Sekunden, ob der Lauf überhaupt
+etwas zu tun hat**, bevor irgendetwas ausgecheckt oder `npm` gestartet wird:
+
+```bash
+git fetch -q origin bug-reports main
+comm -23 \
+  <(git ls-tree -r --name-only origin/bug-reports data/bug-reports/ | sed -n 's#.*/bug-\(.*\)\.json#\1#p' | sort) \
+  <(git ls-tree -r --name-only origin/main data/bug-reports/triage/ | sed -n 's#.*/bug-\(.*\)\.md#\1#p' | sort)
+```
+
+Leere Ausgabe heißt: zu jeder Meldung auf dem Branch gibt es schon eine Triage-Notiz auf `main` —
+nichts zu tun, Lauf beenden. Rund zwölf Sekunden statt einer Minute plus vollem Kontext.
+
+**Warum nicht einfach die Commit-SHA vergleichen:** der Live-Server pusht `bug-reports` stündlich als
+elternlosen Commit neu, auch wenn sich inhaltlich nichts geändert hat. Die SHA ist jedes Mal eine
+andere, der *Inhalt* nicht (die Tree-SHA war über sieben aufeinanderfolgende Pushes identisch). Ein
+SHA-Vergleich würde also bei jedem Lauf „neu!" rufen und damit genau nichts sparen.
+
+Der volle Lauf startet nur, wenn die Vorprüfung Ids ausgibt:
 
 ```text
 Du bist der Bugfixing-Agent für „Olympiade der Welten". Arbeite nach docs/BUGFIXING_AGENT.md.
-Du läufst stündlich und schaust kurz nach, ob neue Meldungen da sind. Die meisten Läufe finden
-nichts — das ist der Normalfall, kein Fehler.
+Du läufst alle vier Stunden und schaust kurz nach, ob neue Meldungen da sind. Die meisten Läufe
+finden nichts — das ist der Normalfall, kein Fehler.
 
+0. BILLIG-VORPRÜFUNG (siehe oben). Leere Ausgabe → sofort aufhören, ohne Checkout und ohne npm.
 1. Neue Meldungen holen:
    - git fetch origin bug-reports und den Branch-Inhalt nach data/bug-reports/ übernehmen
      (der Branch ist ein Spiegel des Live-Servers, ein einzelner elternloser Commit)

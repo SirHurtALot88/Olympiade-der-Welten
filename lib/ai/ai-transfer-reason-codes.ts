@@ -16,7 +16,15 @@ export type AiSellReasonCode =
   | "board_renewal_warning"
   | "board_do_not_renew"
   | "cash_runway_pressure"
-  | "roster_quality_floor";
+  | "roster_quality_floor"
+  /**
+   * Verdient mehr, als Spieler seiner Leistung ueblicherweise verdienen. BEWUSST GETRENNT von
+   * `high_wage_burden`: das misst "kostet viel im Verhaeltnis zum Teambudget" (also die Frage,
+   * ob wir ihn uns leisten koennen), dieses hier "kostet mehr als er wert ist" (ob er es wert
+   * ist). Ein Spitzenspieler kann teuer und trotzdem angemessen bezahlt sein; ein Ergaenzungs-
+   * spieler billig und trotzdem ueberbezahlt.
+   */
+  | "overpaid_for_output";
 
 export type AiKeepReasonCode =
   | "low_wage_burden"
@@ -30,7 +38,9 @@ export type AiKeepReasonCode =
   | "healthy_cash"
   | "player_demand_keep"
   | "high_board_confidence"
-  | "negative_net_proceeds";
+  | "negative_net_proceeds"
+  /** Verdient weniger als fuer seine Leistung ueblich — ein Vertrag, den man nicht aufgibt. */
+  | "bargain_contract";
 
 const SELL_REASON_PATTERNS: Array<{ code: AiSellReasonCode; patterns: string[] }> = [
   { code: "negative_cash", patterns: ["negatives Teamcash"] },
@@ -49,8 +59,12 @@ const SELL_REASON_PATTERNS: Array<{ code: AiSellReasonCode; patterns: string[] }
   { code: "board_salary_cap", patterns: ["begrenzt Vertragsrahmen"] },
   { code: "board_renewal_warning", patterns: ["warnt vor voller Verlaengerung"] },
   { code: "board_do_not_renew", patterns: ["will keine Verlaengerung"] },
+  // Umlaute wie in der QUELLE (lib/ai/ai-transfermarkt-sell-preview-service.ts): dieser Zweig
+  // hat die Begruendungstexte dort auf echte Umlaute umgestellt, statt sie in der Anzeige zu
+  // ueberkleben. Die Muster muessen mitziehen, sonst greift die Zuordnung ins Leere.
   { code: "cash_runway_pressure", patterns: ["Gehaltslast übersteigt verfügbares Cash", "Kein Verkauf in dieser Saison trotz enger Cash-Lage"] },
   { code: "roster_quality_floor", patterns: ["unteres Kader-Drittel", "Qualität upgraden"] },
+  { code: "overpaid_for_output", patterns: ["teurer als für diese Leistung üblich"] },
 ];
 
 const KEEP_REASON_PATTERNS: Array<{ code: AiKeepReasonCode; patterns: string[] }> = [
@@ -65,6 +79,7 @@ const KEEP_REASON_PATTERNS: Array<{ code: AiKeepReasonCode; patterns: string[] }
   { code: "healthy_cash", patterns: ["Teamcash ist entspannt"] },
   { code: "player_demand_keep", patterns: ["offene Forderung muss eingeplant"] },
   { code: "high_board_confidence", patterns: ["statische Board-Confidence", "Kaderzusammenhalt bevorzugen"] },
+  { code: "bargain_contract", patterns: ["günstiger als für diese Leistung üblich"] },
 ];
 
 export function inferSellReasonCodes(reasons: string[]): AiSellReasonCode[] {

@@ -94,3 +94,70 @@ describe("ai-sell-decision-engine", () => {
     expect(withDoctrine.strategicSellScore).not.toBe(base.strategicSellScore);
   });
 });
+
+/**
+ * GEHALT GEGEN UEBLICH IN DER KI.
+ *
+ * `overpaid_for_output` beantwortet eine andere Frage als `high_wage_burden`: nicht "koennen wir
+ * ihn uns leisten" (Gehalt gegen Budget), sondern "ist er es wert" (Gehalt gegen den ueblichen
+ * Preis fuer diese Leistung). Der letzte Test ist der wichtige — er haelt fest, dass die
+ * Kennzahl NICHT einfach schwache Spieler abstraft: Leistung allein darf den Ausschlag nicht
+ * geben, sonst verkauft die KI Spieler fuer ihre Schwaeche und nennt es Wirtschaftlichkeit.
+ */
+describe("ai-sell-decision-engine — Gehalt gegen ueblich", () => {
+  const basis = {
+    sellPriority: 40,
+    reasonToSell: [] as string[],
+    reasonToKeep: [] as string[],
+    expectedSellValue: 20,
+    marketValue: 20,
+    contractLength: 3,
+    teamCash: 10,
+    ovrRank: 40,
+    ppsSeasonRank: 40,
+  };
+
+  it("hebt die Verkaufsneigung, wenn ein Spieler mehr verdient als ueblich", () => {
+    const neutral = evaluateAiSellDecision(basis);
+    const teuer = evaluateAiSellDecision({ ...basis, sellReasonCodes: ["overpaid_for_output"] });
+    expect(teuer.sellIntentScore).toBeGreaterThan(neutral.sellIntentScore);
+    expect(teuer.strategicSellScore).toBeGreaterThan(neutral.strategicSellScore);
+  });
+
+  it("senkt sie, wenn der Vertrag guenstiger ist als ueblich", () => {
+    const neutral = evaluateAiSellDecision(basis);
+    const guenstig = evaluateAiSellDecision({ ...basis, keepReasonCodes: ["bargain_contract"] });
+    expect(guenstig.keepIntentScore).toBeGreaterThan(neutral.keepIntentScore);
+    expect(guenstig.strategicSellScore).toBeLessThan(neutral.strategicSellScore);
+  });
+
+  it("loest allein noch keinen Verkauf aus — es ist ein Argument, kein Zwang", () => {
+    // Ein Wirtschaftlichkeits-Hinweis darf abwaegen helfen, aber nicht so schwer wiegen wie
+    // eine echte Cash-Not. Sonst verkauft die KI reihenweise brauchbare Spieler, nur weil ihr
+    // Vertrag etwas ueber der Kurve liegt.
+    const teuer = evaluateAiSellDecision({ ...basis, sellReasonCodes: ["overpaid_for_output"] });
+    const cashNot = evaluateAiSellDecision({ ...basis, sellReasonCodes: ["negative_cash"], teamCash: -5 });
+    expect(teuer.sellIntentScore).toBeLessThan(cashNot.sellIntentScore);
+  });
+
+  it("straft Leistungsschwaeche NICHT als Kostenproblem ab", () => {
+    // Zwei schwache Spieler (gleich schlechte Raenge). Nur einer ist ueber der Gehaltskurve.
+    // Ohne den Marker darf sich die Verkaufsneigung nicht erhoehen — sonst waere die Schwaeche
+    // selbst der Grund, und genau das soll die Kennzahl vermeiden.
+    const schwachUndBillig = evaluateAiSellDecision({ ...basis, ovrRank: 78, ppsSeasonRank: 80 });
+    const schwachUndTeuer = evaluateAiSellDecision({
+      ...basis,
+      ovrRank: 78,
+      ppsSeasonRank: 80,
+      sellReasonCodes: ["overpaid_for_output"],
+    });
+    const starkUndBillig = evaluateAiSellDecision({ ...basis, ovrRank: 3, ppsSeasonRank: 4 });
+
+    expect(schwachUndBillig.sellIntentScore).toBe(basis.sellPriority);
+    expect(schwachUndTeuer.sellIntentScore).toBeGreaterThan(schwachUndBillig.sellIntentScore);
+    // Der starke Spieler wird geschuetzt (productiveElite) — der schwache aber nicht bestraft:
+    // beide starten bei derselben Verkaufsneigung, sie unterscheiden sich nur im Behalten-Wert.
+    expect(starkUndBillig.sellIntentScore).toBe(schwachUndBillig.sellIntentScore);
+    expect(starkUndBillig.keepIntentScore).toBeGreaterThan(schwachUndBillig.keepIntentScore);
+  });
+});

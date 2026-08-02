@@ -4,6 +4,7 @@
 import { Fragment, memo, startTransition, useEffect, useState, type CSSProperties } from "react";
 import dynamic from "next/dynamic";
 
+import type { ContractAssessment } from "@/lib/foundation/tabs/use-teams-contract-derivations";
 import ClassColorChip, { getClassColorClassName } from "@/app/foundation/ClassColorChip";
 import ClassIcon from "@/app/foundation/ClassIcon";
 import DisciplineIcon from "@/app/foundation/DisciplineIcon";
@@ -104,6 +105,38 @@ function getContractLengthHeatBandClass(length) {
   if (length === 3) return "heat-band-5";
   if (length === 4) return "heat-band-6";
   return "heat-band-8";
+}
+
+/** Die vier Achsen in Anzeige-Reihenfolge — Werte und Ligarang kommen aus demselben Rating. */
+const AUSLAUF_ACHSEN = [
+  { kuerzel: "POW", titel: "Kraft", ton: "pow", wertKey: "ppPow", rangKey: "ppPowRank" },
+  { kuerzel: "SPE", titel: "Tempo", ton: "spe", wertKey: "ppSpe", rangKey: "ppSpeRank" },
+  { kuerzel: "MEN", titel: "Kopf", ton: "men", wertKey: "ppMen", rangKey: "ppMenRank" },
+  { kuerzel: "SOC", titel: "Sozial", ton: "soc", wertKey: "ppSoc", rangKey: "ppSocRank" },
+] as const;
+
+const EMPFEHLUNG_LABEL: Record<"verlaengern" | "beobachten" | "abgeben", string> = {
+  verlaengern: "Verlängern",
+  beobachten: "Beobachten",
+  abgeben: "Abgeben",
+};
+
+/** Teuer ist ein Risiko-Ton, guenstig ein guter — "ueblich" bleibt bewusst unauffaellig. */
+function gehaltsTon(einordnung: "teuer" | "ueblich" | "guenstig" | null): string {
+  if (einordnung === "teuer") return "bad";
+  if (einordnung === "guenstig") return "good";
+  return "neutral";
+}
+
+/**
+ * Balkenbreite fuer die Abweichungs-Skalen. Die Skala endet bei ±40 % — darueber hinaus wird
+ * nicht weiter gestreckt, sondern der Balken laeuft an, damit ein Ausreisser die Skala aller
+ * anderen Karten nicht unlesbar macht. Die Zahl daneben nennt den echten Wert.
+ */
+function gaugeStyle(relativ: number | null | undefined): CSSProperties {
+  const wert = relativ != null && Number.isFinite(relativ) ? relativ : 0;
+  const anteil = Math.min(1, Math.abs(wert) / 0.4);
+  return { width: `${(anteil * 50).toFixed(1)}%`, [wert >= 0 ? "left" : "right"]: "50%" } as CSSProperties;
 }
 
 /** Moral-Vertragsintent → Ton-Klasse für den Intent-Chip (Verträge-Tabelle):
@@ -324,6 +357,9 @@ export type FoundationTeamsDetailPanelProps = {
   selectedTeamContractTable: unknown;
   selectedTeamContractPreviewRowCount: unknown;
   visibleSelectedTeamContractRows: unknown;
+  /** Gehalt-gegen-ueblich und Board-Empfehlung je Spieler (siehe use-teams-contract-derivations). */
+  contractAssessmentByPlayerId?: Map<string, ContractAssessment>;
+  contractRecommendationCounts?: { verlaengern: number; beobachten: number; abgeben: number };
   showTeamContractPreviewRows: unknown;
   setShowTeamContractPreviewRows: unknown;
   contractRenewalBusy: unknown;
@@ -458,6 +494,8 @@ function FoundationTeamsDetailPanel({
   selectedTeamContractTable,
   selectedTeamContractPreviewRowCount,
   visibleSelectedTeamContractRows,
+  contractAssessmentByPlayerId,
+  contractRecommendationCounts,
   showTeamContractPreviewRows,
   setShowTeamContractPreviewRows,
   contractRenewalBusy,
@@ -1392,9 +1430,21 @@ function FoundationTeamsDetailPanel({
                               currentSalary: staircase.lastActiveSalary,
                               ppsSeason: ratings?.ppsSeason ?? null,
                               netProceeds,
+                              assessment: contractAssessmentByPlayerId?.get(row.playerId) ?? null,
                             };
                           });
                           const auslaufSorted = [...auslaufDecorated].sort((left, right) => {
+                            // Dringlichkeit zuerst: was abgegeben werden sollte, dann was
+                            // beobachtet gehoert. Erst danach greift die alte Ordnung
+                            // (auslaufende Vertraege, dann Leistung, dann Name) — wer den Reiter
+                            // oeffnet, soll die Entscheidungen sehen und nicht danach suchen.
+                            const rang = (empfehlung: string | null | undefined) =>
+                              empfehlung === "abgeben" ? 0 : empfehlung === "beobachten" ? 1 : 2;
+                            const leftRank = rang(left.assessment?.empfehlung);
+                            const rightRank = rang(right.assessment?.empfehlung);
+                            if (leftRank !== rightRank) {
+                              return leftRank - rightRank;
+                            }
                             // Auslaufende (LZ ≤ 1) immer oben, dann PPs Saison desc, dann Name.
                             const leftExpiring = left.row.contractLength <= 1 ? 0 : 1;
                             const rightExpiring = right.row.contractLength <= 1 ? 0 : 1;
@@ -1458,6 +1508,26 @@ function FoundationTeamsDetailPanel({
                               >
                                 ⓘ
                               </span>
+                              {contractRecommendationCounts &&
+                              contractRecommendationCounts.abgeben +
+                                contractRecommendationCounts.beobachten +
+                                contractRecommendationCounts.verlaengern >
+                                0 ? (
+                                <div className="team-auslauf-board" aria-label="Board-Vorschlag">
+                                  <span className="team-auslauf-board-label">Board-Vorschlag</span>
+                                  <span className="team-auslauf-board-chips">
+                                    <span className="team-auslauf-board-chip is-abgeben">
+                                      {formatWholeNumber(contractRecommendationCounts.abgeben)}× abgeben
+                                    </span>
+                                    <span className="team-auslauf-board-chip is-beobachten">
+                                      {formatWholeNumber(contractRecommendationCounts.beobachten)}× beobachten
+                                    </span>
+                                    <span className="team-auslauf-board-chip is-verlaengern">
+                                      {formatWholeNumber(contractRecommendationCounts.verlaengern)}× verlängern
+                                    </span>
+                                  </span>
+                                </div>
+                              ) : null}
                               <StatChipRow aria-label="Auslauf-Kennzahlen">
                                 <StatChip
                                   label={auslaufIsAll ? "Angezeigt" : "Auslaufend"}
@@ -1477,7 +1547,7 @@ function FoundationTeamsDetailPanel({
                                 />
                               </StatChipRow>
                               <div className="team-auslauf-grid" role="list">
-                                {auslaufSorted.map(({ row, ratings, currentSalary, ppsSeason, netProceeds }) => {
+                                {auslaufSorted.map(({ row, ratings, currentSalary, ppsSeason, netProceeds, assessment }) => {
                                   const auslaufPlayer = auslaufPlayersById.get(row.playerId);
                                   const auslaufPortrait = auslaufPlayer ? getPlayerPortraitModel(auslaufPlayer) : null;
                                   const auslaufShapeClass = (row.contractShape ?? "balanced").replace("_", "-");
@@ -1518,7 +1588,14 @@ function FoundationTeamsDetailPanel({
                                           )}
                                         </div>
                                       </header>
-                                      <div className="team-auslauf-perf" aria-label="Performance">
+                                      {/* OVR, PPs und MVS als die drei Leitzahlen — OVR steht an
+                                          vielen Stellen im Spiel, PPs sind die erzielten Punkte,
+                                          MVS beantwortet die Gehaltsfrage. */}
+                                      <div className="team-auslauf-perf" aria-label="Leistung">
+                                        <span className="team-auslauf-stat">
+                                          <small>OVR</small>
+                                          <strong>{ratings?.ovrNormalized != null ? formatWholeNumber(ratings.ovrNormalized) : "—"}</strong>
+                                        </span>
                                         <span className="team-auslauf-stat">
                                           <small>PPs Saison</small>
                                           <strong>
@@ -1527,10 +1604,40 @@ function FoundationTeamsDetailPanel({
                                           </strong>
                                         </span>
                                         <span className="team-auslauf-stat">
-                                          <small>OVR</small>
-                                          <strong>{ratings?.ovrNormalized != null ? formatWholeNumber(ratings.ovrNormalized) : "—"}</strong>
+                                          <small>MVS</small>
+                                          <strong>
+                                            {ratings?.mvs != null ? formatLocalePoints(ratings.mvs, 1) : "—"}
+                                            {ratings?.mvsRank != null ? ` · #${formatWholeNumber(ratings.mvsRank)}` : ""}
+                                          </strong>
                                         </span>
                                       </div>
+                                      {/* PPs je Achse mit Ligarang. Achsen ohne Punkte bleiben
+                                          sichtbar und gedaempft stehen: dass ein Spieler dort
+                                          nichts liefert, ist selbst eine Aussage. */}
+                                      {ratings ? (
+                                        <div className="team-auslauf-axes" aria-label="PPs je Achse">
+                                          {AUSLAUF_ACHSEN.map((achse) => {
+                                            const wert = ratings[achse.wertKey];
+                                            const rang = ratings[achse.rangKey];
+                                            const leer = wert == null || wert <= 0;
+                                            return (
+                                              <span
+                                                key={achse.kuerzel}
+                                                className={`team-auslauf-axis is-${achse.ton}${leer ? " is-empty" : ""}`}
+                                                title={`${achse.titel}: ${wert != null ? formatLocalePoints(wert, 1) : "—"} PPs${rang != null ? `, Liga-Rang ${formatWholeNumber(rang)}` : ""}`}
+                                              >
+                                                <b>{achse.kuerzel}</b>
+                                                <span className="team-auslauf-axis-val">
+                                                  {wert != null ? formatLocalePoints(wert, 1) : "—"}
+                                                </span>
+                                                <span className="team-auslauf-axis-rank">
+                                                  {!leer && rang != null ? `#${formatWholeNumber(rang)}` : "—"}
+                                                </span>
+                                              </span>
+                                            );
+                                          })}
+                                        </div>
+                                      ) : null}
                                       <dl className="team-auslauf-facts">
                                         <div>
                                           <dt>Gehalt</dt>
@@ -1584,6 +1691,64 @@ function FoundationTeamsDetailPanel({
                                           </span>
                                         ) : null}
                                       </div>
+                                      {assessment ? (
+                                        <div className="team-auslauf-verdict">
+                                          {assessment.gehalt ? (
+                                            <div
+                                              className="team-auslauf-gauge"
+                                              title="Verglichen wird mit Spielern derselben Marktwert-Klasse, ligaweit — nicht mit dem eigenen Kader. Berücksichtigt ist auch die Vertragslaufzeit, weil lange Verträge üblicherweise besser dotiert sind."
+                                            >
+                                              <span className="team-auslauf-gauge-head">
+                                                <small>Gehalt gegen üblich</small>
+                                                <strong className={`is-${gehaltsTon(assessment.gehaltsEinordnung)}`}>
+                                                  {formatSignedDisplayMoney(assessment.gehalt.abweichung)}
+                                                </strong>
+                                              </span>
+                                              <span className="team-auslauf-gauge-rail">
+                                                <span className="team-auslauf-gauge-zero" />
+                                                <span
+                                                  className={`team-auslauf-gauge-bar is-${gehaltsTon(assessment.gehaltsEinordnung)}`}
+                                                  style={gaugeStyle(assessment.gehalt.relativ)}
+                                                />
+                                              </span>
+                                              <span className="team-auslauf-gauge-sub">
+                                                üblich {formatNlMoney(assessment.gehalt.ueblich)}
+                                              </span>
+                                            </div>
+                                          ) : null}
+                                          {assessment.vkAbweichung != null ? (
+                                            <div
+                                              className="team-auslauf-gauge is-vk"
+                                              title="Erzielbarer Verkaufspreis im Vergleich zum aktuellen Marktwert. Unter Marktwert heißt: ein Verkauf jetzt verbrennt Wert."
+                                            >
+                                              <span className="team-auslauf-gauge-head">
+                                                <small>VK gegen Marktwert</small>
+                                                <strong className={assessment.vkAbweichung >= 0 ? "is-good" : "is-bad"}>
+                                                  {formatSignedDisplayMoney(assessment.vkAbweichung)}
+                                                </strong>
+                                              </span>
+                                              <span className="team-auslauf-gauge-rail">
+                                                <span className="team-auslauf-gauge-zero" />
+                                                <span
+                                                  className={`team-auslauf-gauge-bar ${assessment.vkAbweichung >= 0 ? "is-good" : "is-bad"}`}
+                                                  style={gaugeStyle(
+                                                    row.marketValueAtExit != null && row.marketValueAtExit > 0
+                                                      ? assessment.vkAbweichung / row.marketValueAtExit
+                                                      : 0,
+                                                  )}
+                                                />
+                                              </span>
+                                              <span className="team-auslauf-gauge-sub">
+                                                MW {row.marketValueAtExit != null ? formatNlMoney(row.marketValueAtExit) : "—"}
+                                              </span>
+                                            </div>
+                                          ) : null}
+                                          <p className={`team-auslauf-advice is-${assessment.empfehlung}`}>
+                                            <strong>{EMPFEHLUNG_LABEL[assessment.empfehlung]}</strong>
+                                            <span>{assessment.begruendung}</span>
+                                          </p>
+                                        </div>
+                                      ) : null}
                                       {/* Immer sichtbar: außerhalb des Season-End-Fensters
                                           ausgegraut + Tooltip statt versteckt (Discoverability). */}
                                       <div className="team-auslauf-actions" onClick={(event) => event.stopPropagation()}>

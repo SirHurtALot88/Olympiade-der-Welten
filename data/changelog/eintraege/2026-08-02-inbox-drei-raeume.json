@@ -1,0 +1,30 @@
+[
+  {
+    "datum": "2026-08-02",
+    "seite": "Spieltag · Inbox",
+    "text": "Die Inbox hat jetzt drei Räume nebeneinander — „Jetzt handeln\", „Im Blick behalten\" und „Berichte & Momente\". Was dich etwas kostet, wenn du es liegen lässt, steht links; was nur informiert, kapert nicht mehr den Platz davor.",
+    "gewicht": "grundlegend",
+    "version": "0.3"
+  },
+  {
+    "datum": "2026-08-02",
+    "seite": "Spieltag · Inbox",
+    "text": "Der Umschalter zwischen „Entscheidungen\" und „Chronik\" ist weg: beides ist gleichzeitig sichtbar, statt dass eine Hälfte hinter einem Reiter verschwindet.",
+    "gewicht": "behebung",
+    "version": "0.3"
+  },
+  {
+    "datum": "2026-08-02",
+    "seite": "Spieltag · Inbox",
+    "text": "Jede Karte trägt ihr Sprungziel als Chip („→ Teams · Verträge\") — du siehst vor dem Klick, wo du landest.",
+    "gewicht": "feinschliff",
+    "version": "0.3"
+  },
+  {
+    "datum": "2026-08-02",
+    "seite": "Spieltag · Inbox",
+    "text": "Auf breiten Schirmen füllt die Inbox die Fläche aus, statt eine schmale Spalte links zu lassen; auf schmalen stapeln die drei Räume untereinander.",
+    "gewicht": "feinschliff",
+    "version": "0.3"
+  }
+]

@@ -74,6 +74,13 @@ export function evaluateAiSellDecision(input: AiSellDecisionInput): AiSellDecisi
   if (hasSellReason(sellReasonCodes, "short_contract") || hasSellReason(sellReasonCodes, "expiring_contract")) {
     sellIntentScore += 5;
   }
+  // "Teurer als fuer diese Leistung ueblich" — bewusst schwaecher gewichtet als eine echte
+  // Cash-Not: es ist ein Wirtschaftlichkeits-Argument, kein Zwang. Es soll den Ausschlag geben,
+  // wenn ohnehin abgewogen wird, und nicht allein einen Verkauf ausloesen. Anders als
+  // `high_wage_burden` haengt es nicht am Budget, sondern am Gegenwert.
+  if (hasSellReason(sellReasonCodes, "overpaid_for_output")) {
+    sellIntentScore += 7;
+  }
 
   if (hasKeepReason(keepReasonCodes, "star_core_protection")) {
     keepIntentScore += 18;
@@ -83,6 +90,12 @@ export function evaluateAiSellDecision(input: AiSellDecisionInput): AiSellDecisi
   }
   if (hasKeepReason(keepReasonCodes, "healthy_cash")) {
     keepIntentScore += 6;
+  }
+  // Ein Vertrag unter Marktniveau ist selbst ein Wert: verkauft man den Spieler, ist der
+  // guenstige Vertrag weg und der Ersatz kostet regulaer. Gleiches Gewicht wie das
+  // Verkaufs-Gegenstueck, damit die Kennzahl nicht in eine Richtung zieht.
+  if (hasKeepReason(keepReasonCodes, "bargain_contract")) {
+    keepIntentScore += 7;
   }
   if (input.contractLength != null && input.contractLength >= 5) {
     keepIntentScore += 10;
