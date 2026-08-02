@@ -25,7 +25,6 @@ import type {
   FoundationView,
   SaveActionRequest,
 } from "@/lib/foundation/tabs/foundation-page-types";
-import { TRANSFER_MARKET_INITIAL_RENDER_LIMIT } from "@/lib/foundation/tabs/foundation-page-types";
 import type { ActiveManagerTeamSource } from "@/lib/foundation/tabs/foundation-page-types";
 import {
   normalizeLoadedFoundationGameState,
@@ -71,8 +70,6 @@ import type {
   PreSeasonWorkflowSummaryResponse,
   SeasonCompletionSummaryResponse,
   SeasonTransitionSummaryResponse,
-  TransfermarktBuyPreviewSubject,
-  TransfermarktBuyRequestContext,
   TransfermarktBuySummary,
   TransfermarktSellPreviewSubject,
   TransfermarktSellSummary,
@@ -80,13 +77,8 @@ import type {
 
 export type FoundationSaveScopedFeedSetters = {
   setMarketFeed: Dispatch<SetStateAction<FoundationTransfermarktResponse | null>>;
-  setMarketRenderLimit: Dispatch<SetStateAction<number>>;
-  setMarketLoadingMore: Dispatch<SetStateAction<boolean>>;
-  setMarketBuyPreview: Dispatch<SetStateAction<TransfermarktBuySummary | null>>;
-  setMarketBuyPreviewContext: Dispatch<SetStateAction<TransfermarktBuyRequestContext | null>>;
   setMarketBuyError: Dispatch<SetStateAction<string | null>>;
-  setMarketBuySuccess: Dispatch<SetStateAction<string | null>>;
-  setMarketBuySubject: Dispatch<SetStateAction<TransfermarktBuyPreviewSubject | null>>;
+  setMarketBuyPreview: Dispatch<SetStateAction<TransfermarktBuySummary | null>>;
   setFoundationPanel: Dispatch<SetStateAction<FoundationPanelId>>;
   setMarketSellPreview: Dispatch<SetStateAction<TransfermarktSellSummary | null>>;
   setMarketSellError: Dispatch<SetStateAction<string | null>>;
@@ -265,13 +257,8 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
   const clearSaveScopedFeeds = useCallback(() => {
     const setters = feedSettersRef.current;
     setters.setMarketFeed(null);
-    setters.setMarketRenderLimit(TRANSFER_MARKET_INITIAL_RENDER_LIMIT);
-    setters.setMarketLoadingMore(false);
-    setters.setMarketBuyPreview(null);
-    setters.setMarketBuyPreviewContext(null);
     setters.setMarketBuyError(null);
-    setters.setMarketBuySuccess(null);
-    setters.setMarketBuySubject(null);
+    setters.setMarketBuyPreview(null);
     setters.setFoundationPanel(null);
     setters.setMarketSellPreview(null);
     setters.setMarketSellError(null);

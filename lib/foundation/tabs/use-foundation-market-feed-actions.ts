@@ -16,7 +16,6 @@ import type {
 } from "@/lib/foundation/tabs/foundation-page-types";
 import {
   TRANSFER_HISTORY_SEASON_LIMIT,
-  TRANSFER_MARKET_INITIAL_RENDER_LIMIT,
   TRANSFER_MARKET_RENDER_STEP,
 } from "@/lib/foundation/tabs/foundation-page-types";
 import { isAbortError } from "@/lib/foundation/tabs/foundation-page-module-helpers";
@@ -33,9 +32,6 @@ export type UseFoundationMarketFeedActionsInput = {
   marketMaxValue: number;
   marketFeed: FoundationTransfermarktResponse | null;
   setMarketFeed: Dispatch<SetStateAction<FoundationTransfermarktResponse | null>>;
-  setMarketRenderLimit: Dispatch<SetStateAction<number>>;
-  marketLoadingMore: boolean;
-  setMarketLoadingMore: Dispatch<SetStateAction<boolean>>;
   marketReloadToken: number;
   marketAiTeamScope: string;
   marketAiSellTeamScope: string;
@@ -80,9 +76,6 @@ export function useFoundationMarketFeedActions(input: UseFoundationMarketFeedAct
     marketMaxValue,
     marketFeed,
     setMarketFeed,
-    setMarketRenderLimit,
-    marketLoadingMore,
-    setMarketLoadingMore,
     marketReloadToken,
     marketAiTeamScope,
     marketAiSellTeamScope,
@@ -164,9 +157,6 @@ export function useFoundationMarketFeedActions(input: UseFoundationMarketFeedAct
                 payload.items.filter((item) => !marketFeed.items.some((existing) => existing.playerId === item.playerId)).length,
             }
           : payload;
-      if (!options?.append) {
-        setMarketRenderLimit(TRANSFER_MARKET_INITIAL_RENDER_LIMIT);
-      }
       setMarketFeed(nextPayload);
       return nextPayload;
     } catch (error) {
@@ -434,32 +424,6 @@ export function useFoundationMarketFeedActions(input: UseFoundationMarketFeedAct
     }
   }
 
-  async function loadMoreMarketFeed() {
-    if (marketLoadingMore || !marketFeed?.hasMore) {
-      return;
-    }
-
-    marketFeedAbortRef.current?.abort();
-    const controller = new AbortController();
-    marketFeedAbortRef.current = controller;
-    setMarketLoadingMore(true);
-    try {
-      const payload = await reloadMarketFeed(undefined, controller.signal, {
-        append: true,
-        offset: marketFeed.items.length,
-      });
-      if (!payload) {
-        return;
-      }
-      setMarketRenderLimit(payload.items.length);
-    } finally {
-      setMarketLoadingMore(false);
-      if (marketFeedAbortRef.current === controller) {
-        marketFeedAbortRef.current = null;
-      }
-    }
-  }
-
   useEffect(() => {
     const shouldLoadMarketFeed = false;
     if (!shouldLoadMarketFeed || isFoundationBootstrapState) {
@@ -593,6 +557,5 @@ export function useFoundationMarketFeedActions(input: UseFoundationMarketFeedAct
     reloadHistoryFeed,
     loadMoreHistoryFeed,
     reloadTransferRecapFeed,
-    loadMoreMarketFeed,
   };
 }
