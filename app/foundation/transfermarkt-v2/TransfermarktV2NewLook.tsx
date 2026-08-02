@@ -1,6 +1,16 @@
 "use client";
 
-import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+
+/**
+ * Zeilenhoehe einer eingeklappten Kandidatenkarte in Pixeln (gemessen: ~84 px inkl. Abstand).
+ * Muss nicht exakt sein — sie steuert nur, wie viele Karten ins Fenster passen und wie hoch die
+ * Platzhalter sind. Ein zu kleiner Wert rendert ein paar Karten zu viel, ein zu grosser laesst
+ * beim schnellen Scrollen kurz eine Luecke; deshalb der Puffer darunter.
+ */
+const NL_CANDIDATE_ROW_HEIGHT = 84;
+/** Karten ober- und unterhalb des Sichtbereichs, die trotzdem gerendert werden. */
+const NL_CANDIDATE_OVERSCAN = 8;
 
 import { NlAbilityStars } from "@/components/foundation/velo-ui";
 import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
@@ -305,6 +315,8 @@ export type TransfermarktV2NewLookProps = {
   /** Read-only-Hinweis bei geschlossenem Transferfenster; null = Fenster offen. */
   marketWindowNotice: string | null;
   marketBusy: boolean;
+  /** Erste Seite steht, der Rest wird noch nachgeholt — die Sortierung ist dann noch vorlaeufig. */
+  marketCompleting?: boolean;
   marketError: string | null;
   onRetryMarket?: () => void;
   buySuccess: string | null;
@@ -809,6 +821,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     availabilityLabel,
     marketWindowNotice,
     marketBusy,
+    marketCompleting = false,
     marketError,
     onRetryMarket,
     buySuccess,
@@ -939,6 +952,60 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
   // per explizitem Toggle (Touch/Tastatur) dauerhaft aufgeklappt. Hover/Fokus
   // enthüllt den Detail-Layer zusätzlich rein via CSS (kein State nötig).
   const [expandedCandidateId, setExpandedCandidateId] = useState<string | null>(null);
+
+  /**
+   * VIRTUALISIERUNG der Kandidatenliste.
+   *
+   * GEMELDET: „dann sorge dafuer dass die Ladezeit nicht so lang ist."
+   *
+   * Nachdem das Laden selbst von 59 auf ~5 Sekunden gefallen war, blieb die zweite Haelfte des
+   * Problems: der Markt zeigt bis zu ~1900 Kandidaten, und die standen alle gleichzeitig im DOM.
+   * Gemessen kostete ein Klick auf „Bester Fit" dadurch **rund 2 Sekunden**, weil die komplette
+   * Liste neu gerendert wurde.
+   *
+   * Zuerst mit `content-visibility: auto` versucht — der Browser sollte alles ausserhalb des
+   * Scroll-Bereichs ueberspringen. Nachgemessen: **0 von 1533** Karten wurden uebersprungen, die
+   * Umsortierung blieb bei ~2 s. Also ehrlich verworfen und ein Fenster gebaut.
+   *
+   * Gerendert wird nur der sichtbare Ausschnitt plus Puffer; darueber und darunter halten zwei
+   * Platzhalter die Bildlaufleiste ehrlich. Die Karten sind gleich hoch, ausser der einen
+   * ausgeklappten — die liegt per Definition im Fenster, ihre Mehrhoehe faellt also in den
+   * gerenderten Teil und verschiebt nur die Platzhalter unter ihr.
+   */
+  const candidateListRef = useRef<HTMLDivElement | null>(null);
+  const [fensterStart, setFensterStart] = useState(0);
+  const [listenHoehe, setListenHoehe] = useState(720);
+
+  const onCandidateListScroll = useCallback(() => {
+    const el = candidateListRef.current;
+    if (!el) return;
+    setFensterStart(Math.max(0, Math.floor(el.scrollTop / NL_CANDIDATE_ROW_HEIGHT) - NL_CANDIDATE_OVERSCAN));
+    setListenHoehe(el.clientHeight || 720);
+  }, []);
+
+  // Filter- oder Sortierwechsel setzen die Liste zurueck an den Anfang — sonst zeigte das Fenster
+  // nach dem Wechsel eine Stelle, die es in der neuen Reihenfolge gar nicht mehr gibt.
+  useEffect(() => {
+    setFensterStart(0);
+    candidateListRef.current?.scrollTo({ top: 0 });
+  }, [sortMode, candidates.length]);
+
+  const sichtbareAnzahl = Math.ceil(listenHoehe / NL_CANDIDATE_ROW_HEIGHT) + NL_CANDIDATE_OVERSCAN * 2;
+  /**
+   * Die Auswahl muss IMMER im Fenster liegen, auch wenn sie per Tastatur oder von aussen
+   * (Wunschliste, Sprung zum eigenen Besten) an eine Stelle wandert, die gerade nicht gescrollt
+   * ist. Sonst zeigt `candidateButtonRefs` auf nichts und die Tastaturnavigation bricht ab —
+   * genau die Wege, die zuletzt repariert wurden.
+   */
+  const auswahlIndex = selectedPlayerId ? candidates.findIndex((item) => item.playerId === selectedPlayerId) : -1;
+  const start =
+    auswahlIndex >= 0 && (auswahlIndex < fensterStart || auswahlIndex >= fensterStart + sichtbareAnzahl)
+      ? Math.max(0, auswahlIndex - NL_CANDIDATE_OVERSCAN)
+      : Math.min(fensterStart, Math.max(0, candidates.length - sichtbareAnzahl));
+  const ende = Math.min(candidates.length, start + sichtbareAnzahl);
+  const sichtbaresFenster = candidates.slice(start, ende);
+  const fensterOben = start * NL_CANDIDATE_ROW_HEIGHT;
+  const fensterUnten = Math.max(0, (candidates.length - ende) * NL_CANDIDATE_ROW_HEIGHT);
 
   // F(neu) — Quick/Erweitert-Split der Controls-Karte: nur Suche/Sortierung/
   // Achsen-Pills bleiben inline ("Quick"), der Rest (Achs-Mindestwerte,
@@ -1093,7 +1160,9 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
         eyebrow="Transfermarkt"
         title={teamName ?? "Markt-Überblick"}
         actions={
-          <span className={`nl-market-live-pill${marketBusy ? " is-busy" : ""}`}>{marketBusy ? "lädt" : "live"}</span>
+          <span className={`nl-market-live-pill${marketBusy || marketCompleting ? " is-busy" : ""}`}>
+            {marketBusy ? "lädt" : marketCompleting ? "ergänzt" : "live"}
+          </span>
         }
       >
         <StatChipRow className="nl-market-board" aria-label="Transfer-Entscheidungsboard">
@@ -1394,10 +1463,20 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
           className="nl-market-rail-card"
           eyebrow="Kandidaten"
           title={`${totalVisibleCount} sichtbar`}
-          actions={<small className="nl-market-rail-meta">{availabilityLabel}</small>}
+          actions={
+            <small className="nl-market-rail-meta">
+              {/* Waehrend nachgeladen wird, ist die Reihenfolge noch die des Servers und nicht
+                  die gewaehlte Sortierung — das gehoert gesagt, sonst haelt man die ersten 250
+                  fuer „die Besten". */}
+              {marketCompleting ? "Markt wird vervollständigt — Reihenfolge noch vorläufig" : availabilityLabel}
+            </small>
+          }
         >
-          <div className="nl-market-candidate-list">
-            {candidates.map((item) => {
+          <div className="nl-market-candidate-list" ref={candidateListRef} onScroll={onCandidateListScroll}>
+            {/* Platzhalter fuer die uebersprungenen Karten oberhalb des Fensters — haelt die
+                Bildlaufleiste ehrlich. */}
+            {fensterOben > 0 ? <div style={{ height: fensterOben }} aria-hidden="true" /> : null}
+            {sichtbaresFenster.map((item) => {
               const portrait = getTransfermarktPortraitModel(item);
               const portraitSrc = appendMediaImageVariant(portrait.src, "preview") ?? portrait.src;
               const isSelected = selectedPlayerId === item.playerId;
@@ -1579,6 +1658,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                 </div>
               );
             })}
+            {fensterUnten > 0 ? <div style={{ height: fensterUnten }} aria-hidden="true" /> : null}
             {marketBusy && candidates.length === 0 ? (
               <div className="nl-market-loading-skeletons" role="status" aria-busy="true">
                 <span className="sr-only">Kandidaten laden…</span>

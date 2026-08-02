@@ -68,6 +68,24 @@
       "datum": "2026-08-02",
       "seite": "Markt · Transfermarkt",
       "pr": null,
+      "text": "Der Transfermarkt hat beim Öffnen fast eine Minute gebraucht, bis die Liste stand — und währenddessen sortierte sie sich immer wieder um, sodass ein Klick auf einen Spieler oft einen anderen erwischte. Jetzt ist die Liste nach knapp zwei Sekunden vollständig und steht still.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": null,
+      "text": "Sortieren und Filtern im Markt reagiert jetzt spürbar schneller: statt aller ~1900 Kandidaten zeichnet die Liste nur noch den sichtbaren Ausschnitt. Ein Klick auf \"Bester Fit\" braucht rund eine halbe statt zwei Sekunden.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": null,
       "text": "Der große Knopf oben rechts blieb dauerhaft auf \"Kandidat wählen\" und ließ sich nicht drücken, obwohl links längst einer markiert war. Er wusste schlicht nichts von deiner Auswahl. Jetzt heißt er \"Vertragsangebot öffnen\" und führt dich direkt in den Kaufdialog.",
       "quelle": "gepflegt",
       "gewicht": "spielblockierend",

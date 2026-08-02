@@ -21,6 +21,21 @@ export async function GET(request: Request) {
     const read = source === "sqlite" ? listLocalTransfermarktFreeAgents : listTransfermarktFreeAgents;
     const scoutingLevel = parseOptionalNumber(searchParams.get("scoutingLevel"));
     const compactList = searchParams.get("compact") !== "false";
+    /**
+     * `fullPool=true` liefert den KOMPLETTEN gefilterten Pool in einer Antwort statt einer
+     * 250er-Seite.
+     *
+     * Der Lesedienst kann das laengst (`input.fullPool`, bisher nur intern von den KI-Diensten
+     * genutzt) — die Route reichte es nur nicht durch. Genau deshalb hat der Markt beim Oeffnen
+     * dreizehn Mal nacheinander angefragt und dabei jedes Mal den Slice ueber den ganzen Pool
+     * neu aufgebaut: gemessene 54-59 Sekunden, bis die Liste stand.
+     *
+     * Zwei Schutzkappen, damit daraus kein offener Hahn wird:
+     * - nur zusammen mit `compact` (die Vollansicht je Spieler waere um ein Vielfaches groesser),
+     * - nur auf dem sqlite-Pfad; der Prisma-Referenzpfad deckelt `limit` hart auf 250 und
+     *   ignoriert `fullPool` ohnehin — dort bleibt es beim Seiten-Fallback im Client.
+     */
+    const fullPool = searchParams.get("fullPool") === "true" && compactList && source === "sqlite";
     const result = await read({
       saveId: searchParams.get("saveId")?.trim() || null,
       seasonId: searchParams.get("seasonId")?.trim() || null,
@@ -34,6 +49,7 @@ export async function GET(request: Request) {
       maxSalary: parseOptionalNumber(searchParams.get("maxSalary")),
       scoutingLevel,
       compactList,
+      fullPool,
     });
 
     return NextResponse.json(result);

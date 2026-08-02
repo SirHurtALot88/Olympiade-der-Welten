@@ -189,9 +189,6 @@ export type TransfermarktV2RosterRow = {
 };
 
 const MARKET_PAGE_LIMIT = 250;
-const MARKET_INITIAL_RENDER_COUNT = 32;
-const MARKET_RENDER_STEP = 24;
-const MARKET_BATCH_PUBLISH_SIZE = 500;
 const DEFAULT_MAX_MARKET_VALUE = 0;
 const DEFAULT_MAX_SALARY = 0;
 const DEFAULT_MAX_RATIO = 0;
@@ -737,7 +734,13 @@ export default function TransfermarktV2Client({
   const [marketHasMore, setMarketHasMore] = useState(false);
   const [marketTotal, setMarketTotal] = useState(0);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
-  const [renderedCandidateCount, setRenderedCandidateCount] = useState(MARKET_INITIAL_RENDER_COUNT);
+  /**
+   * Die erste Seite steht, der Rest wird gerade nachgeholt. Getrennt von `marketBusy`, weil das
+   * zwei verschiedene Zustaende sind: „noch nichts da" gegen „bedienbar, aber noch nicht
+   * vollstaendig". Der Unterschied gehoert dem Spieler gesagt — unter „Meistes Potenzial" sieht
+   * er in dieser Phase noch nicht die echten Besten.
+   */
+  const [marketCompleting, setMarketCompleting] = useState(false);
   const [historyFeed, setHistoryFeed] = useState<MarketHistoryResponse | null>(null);
   const [contractLength, setContractLength] = useState<number | null>(null);
   const [contractShape, setContractShape] = useState<ContractShape | null>(null);
@@ -961,16 +964,23 @@ export default function TransfermarktV2Client({
     () => (selectedPlayerId ? visibleItems.findIndex((item) => item.playerId === selectedPlayerId) : -1),
     [selectedPlayerId, visibleItems],
   );
-  const effectiveRenderedCandidateCount = useMemo(() => {
-    if (selectedVisibleIndex < 0) {
-      return renderedCandidateCount;
-    }
-    return Math.max(renderedCandidateCount, selectedVisibleIndex + 8);
-  }, [renderedCandidateCount, selectedVisibleIndex]);
-  const renderedVisibleItems = useMemo(
-    () => visibleItems.slice(0, Math.min(visibleItems.length, effectiveRenderedCandidateCount)),
-    [effectiveRenderedCandidateCount, visibleItems],
-  );
+  /**
+   * ALLE sichtbaren Kandidaten werden gerendert — die Auslagerung uebernimmt der Browser.
+   *
+   * Vorher wuchs ein Praefix-Fenster alle 90 ms um 24 Karten, bis der ganze Bestand drin war
+   * (gemessen: 1887 Karten). Das hatte zwei Nachteile auf einmal: es dauerte fast eine Minute,
+   * bis die Liste vollstaendig war, und JEDE Umsortierung schob Karten aus dem Fenster heraus
+   * und wieder hinein — sie wurden ab- und neu gemountet, weshalb ein Klick auf eine Zeile ins
+   * Leere lief. Am Ende standen trotzdem alle 1887 im DOM; das Fenster hat nur den Weg dorthin
+   * in eine Zitterpartie verwandelt.
+   *
+   * Statt eines JS-Fensters uebernimmt jetzt `content-visibility: auto` auf der Karte (siehe
+   * globals.css): der Browser ueberspringt Layout und Zeichnen fuer alles ausserhalb des
+   * Scroll-Bereichs. Bewusst SO und nicht als eigener Virtualisierer: Tastaturnavigation,
+   * `scrollIntoView` und die Karten-Refs arbeiten weiter auf einer vollstaendigen Liste — ein
+   * Fenster-Virtualisierer haette genau die Wege gebrochen, die gerade erst repariert wurden.
+   */
+  const renderedVisibleItems = visibleItems;
   const selectedPlayerWishlisted = Boolean(selectedPlayer && wishlistPlayerIdSet.has(selectedPlayer.playerId));
   const selectedPlayerScoutingWatched = Boolean(selectedPlayer && scoutingWatchPlayerIdSet.has(selectedPlayer.playerId));
   const selectedPlayerScoutCertainty =
@@ -1401,30 +1411,6 @@ export default function TransfermarktV2Client({
   }
 
   useEffect(() => {
-    setRenderedCandidateCount(MARKET_INITIAL_RENDER_COUNT);
-  }, [selectedTeamId, deferredSearch, sortMode, minFit, hidePoorFit, maxValue, maxSalary, maxRatio, selectedDisciplineLens, selectedClassNames, selectedClassAxes, selectedRaceNames, selectedAxes, axisMinimums]);
-
-  useEffect(() => {
-    if (visibleItems.length <= renderedCandidateCount) {
-      return;
-    }
-    const handle = window.setTimeout(() => {
-      setRenderedCandidateCount((current) => Math.min(visibleItems.length, current + MARKET_RENDER_STEP));
-    }, 90);
-    return () => window.clearTimeout(handle);
-  }, [renderedCandidateCount, visibleItems.length]);
-
-  useEffect(() => {
-    if (selectedVisibleIndex < 0) {
-      return;
-    }
-    if (selectedVisibleIndex < renderedCandidateCount) {
-      return;
-    }
-    setRenderedCandidateCount(Math.min(visibleItems.length, selectedVisibleIndex + MARKET_RENDER_STEP));
-  }, [renderedCandidateCount, selectedVisibleIndex, visibleItems.length]);
-
-  useEffect(() => {
     if (!visibleItems.length) {
       if (
         !selectedPlayerId ||
@@ -1553,103 +1539,130 @@ export default function TransfermarktV2Client({
       };
     }
 
-    async function loadFullMarketInPages() {
+    /**
+     * ERSTE SEITE SOFORT, REST IN EINEM ZUG.
+     *
+     * GEMELDET: „dann sorge dafuer dass die Ladezeit nicht so lang ist."
+     *
+     * Vorher lief hier eine `while (hasMore)`-Schleife, die den gesamten Pool in 250er-Seiten
+     * nacheinander holte und die wachsende Liste alle 500 Eintraege neu veroeffentlichte.
+     * Gemessen an einem echten Spielstand: 13 Netzaufrufe, 54-59 Sekunden bis die Liste stand,
+     * dazwischen sieben Neuveroeffentlichungen. Und weil die Standardsortierung („Meistes
+     * Potenzial") ueber den GANZEN Bestand laeuft, sortierte sich die Liste bei jeder davon
+     * komplett um — die Zeile unter dem Mauszeiger war danach eine andere. Ein Klick auf einen
+     * Kandidaten war Gluecksache.
+     *
+     * Der Server konnte den vollen Pool die ganze Zeit in EINER Antwort liefern; die Route
+     * reichte den Parameter nur nicht durch (siehe dort). Jetzt:
+     *
+     *   1. Seite 1 (250) holen und SOFORT anzeigen — bedienbar nach ~2 s.
+     *   2. Den kompletten Pool in EINEM Aufruf nachholen und GENAU EINMAL nachpublizieren.
+     *
+     * Damit bleibt ein einziger Umsortier-Moment uebrig statt sieben, und der ist angekuendigt
+     * (`marketCompleting`) statt ueberraschend.
+     *
+     * WARUM NICHT NUR SEITE 1: saemtliche Sortierungen und Filter (Bester Fit, Bestes Value,
+     * Achs-Minima, die Schieberegler-Maxima) rechnen im Client ueber den geladenen Bestand. Wer
+     * nur 250 von 3100 laedt, zeigt unter „Meistes Potenzial" schlicht die falschen Besten. Der
+     * Voll-Bestand ist kein Luxus, er ist die Voraussetzung fuer die Sortierung — nur muss er
+     * nicht in dreizehn Etappen kommen.
+     */
+    async function loadMarket() {
       setMarketBusy(true);
       setMarketError(null);
       setBuySuccess(null);
       setMarketItems([]);
       setMarketHasMore(false);
-      try {
-        const mergedItems: TransfermarktFreeAgentItem[] = [];
-        const seen = new Set<string>();
-        let latestPayload: MarketFeedResponse | null = null;
-        let publishedCount = 0;
-        let nextOffset = 0;
-        let hasMore = true;
 
-        const searchActive = deferredSearch.trim().length > 0;
-
-        while (hasMore) {
-          const params = appendRoomContextToParams(new URLSearchParams({
+      const searchActive = deferredSearch.trim().length > 0;
+      const basisParams = (extra: Record<string, string>) =>
+        appendRoomContextToParams(
+          new URLSearchParams({
             saveId: defaultSaveId,
             seasonId: defaultSeasonId,
             source,
             teamId: selectedTeamId,
-            limit: String(MARKET_PAGE_LIMIT),
-            offset: String(nextOffset),
             ...(searchActive ? { search: deferredSearch.trim() } : {}),
-          }), roomContextRef.current);
-          const response = await fetch(`/api/transfermarkt/free-agents?${params.toString()}`, {
-            cache: "no-store",
-            signal: controller.signal,
-          });
-          const payload = (await response.json()) as MarketFeedResponse;
-          if (cancelled || controller.signal.aborted) {
-            return;
-          }
-          if (!response.ok || payload.error) {
-            setMarketFeed(payload);
-            setMarketItems([]);
-            setMarketTotal(0);
-            setMarketHasMore(false);
-            setMarketError(formatMarketPreviewError(payload.error) ?? "Transfermarkt konnte nicht geladen werden.");
-            return;
-          }
+            ...extra,
+          }),
+          roomContextRef.current,
+        );
 
-          payload.items.forEach((item) => {
-            if (!seen.has(item.playerId)) {
-              mergedItems.push(item);
-              seen.add(item.playerId);
-            }
-          });
-          latestPayload = payload;
-          nextOffset += payload.returned;
-          hasMore = Boolean(payload.hasMore && payload.returned > 0);
-
-          const shouldPublish =
-            mergedItems.length <= MARKET_PAGE_LIMIT ||
-            !hasMore ||
-            mergedItems.length - publishedCount >= MARKET_BATCH_PUBLISH_SIZE;
-
-          if (shouldPublish) {
-            setMarketFeed({
-              ...payload,
-              items: mergedItems,
-              offset: 0,
-              returned: mergedItems.length,
-              hasMore,
-            });
-            setMarketItems([...mergedItems]);
-            setMarketTotal(payload.total);
-            setMarketHasMore(hasMore);
-            publishedCount = mergedItems.length;
-          }
-
-          if (hasMore) {
-            await new Promise((resolve) => window.setTimeout(resolve, 0));
-          }
+      async function hole(extra: Record<string, string>) {
+        const response = await fetch(`/api/transfermarkt/free-agents?${basisParams(extra).toString()}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = (await response.json()) as MarketFeedResponse;
+        if (!response.ok || payload.error) {
+          throw new Error(payload.error ?? "Transfermarkt konnte nicht geladen werden.");
         }
+        return payload;
+      }
 
-        if (!latestPayload) {
-          setMarketFeed(null);
-          setMarketItems([]);
-          setMarketTotal(0);
-          setMarketHasMore(false);
-        } else {
-          const finalHasMore = hasMore;
+      function veroeffentliche(payload: MarketFeedResponse, items: TransfermarktFreeAgentItem[], hasMore: boolean) {
+        setMarketFeed({ ...payload, items, offset: 0, returned: items.length, hasMore });
+        setMarketItems(items);
+        setMarketTotal(payload.total);
+        setMarketHasMore(hasMore);
+      }
+
+      try {
+        // --- Schritt 1: sofort bedienbar ---
+        const ersteSeite = await hole({ limit: String(MARKET_PAGE_LIMIT), offset: "0" });
+        if (cancelled || controller.signal.aborted) return;
+        const restOffen = Boolean(ersteSeite.hasMore && ersteSeite.returned > 0);
+        veroeffentliche(ersteSeite, [...ersteSeite.items], restOffen);
+        setMarketBusy(false);
+        if (!restOffen) {
           marketCacheRef.current.set(marketCacheKey, {
-            items: [...mergedItems],
-            feed: {
-              ...latestPayload,
-              items: mergedItems,
-              offset: 0,
-              returned: mergedItems.length,
-              hasMore: finalHasMore,
-            },
-            total: latestPayload.total,
-            hasMore: finalHasMore,
+            items: [...ersteSeite.items],
+            feed: { ...ersteSeite, items: [...ersteSeite.items], offset: 0, returned: ersteSeite.items.length, hasMore: false },
+            total: ersteSeite.total,
+            hasMore: false,
           });
+          return;
         }
+
+        // --- Schritt 2: der Rest, in einem Zug ---
+        setMarketCompleting(true);
+        let vollstaendig: MarketFeedResponse;
+        try {
+          vollstaendig = await hole({ fullPool: "true" });
+        } catch {
+          // Der Prisma-Referenzpfad kennt `fullPool` nicht und deckelt hart auf 250. Dann bleibt
+          // die alte Seiten-Schleife — aber OHNE Zwischenveroeffentlichungen, damit wenigstens
+          // die Zeilen stillstehen. Das ist die Rueckfallstufe, nicht der Normalfall.
+          const gesammelt: TransfermarktFreeAgentItem[] = [...ersteSeite.items];
+          const gesehen = new Set(gesammelt.map((item) => item.playerId));
+          let naechsterOffset = ersteSeite.returned;
+          let weiter: boolean = restOffen;
+          let letzte: MarketFeedResponse = ersteSeite;
+          while (weiter) {
+            const seite = await hole({ limit: String(MARKET_PAGE_LIMIT), offset: String(naechsterOffset) });
+            if (cancelled || controller.signal.aborted) return;
+            seite.items.forEach((item) => {
+              if (!gesehen.has(item.playerId)) {
+                gesehen.add(item.playerId);
+                gesammelt.push(item);
+              }
+            });
+            letzte = seite;
+            naechsterOffset += seite.returned;
+            weiter = Boolean(seite.hasMore && seite.returned > 0);
+          }
+          vollstaendig = { ...letzte, items: gesammelt, total: letzte.total };
+        }
+        if (cancelled || controller.signal.aborted) return;
+
+        const alle = vollstaendig.items;
+        veroeffentliche(vollstaendig, [...alle], false);
+        marketCacheRef.current.set(marketCacheKey, {
+          items: [...alle],
+          feed: { ...vollstaendig, items: [...alle], offset: 0, returned: alle.length, hasMore: false },
+          total: vollstaendig.total,
+          hasMore: false,
+        });
       } catch (error) {
         if (cancelled || controller.signal.aborted || isAbortError(error)) {
           return;
@@ -1658,15 +1671,19 @@ export default function TransfermarktV2Client({
         setMarketItems([]);
         setMarketTotal(0);
         setMarketHasMore(false);
-        setMarketError("Transfermarkt konnte nicht geladen werden.");
+        setMarketError(
+          formatMarketPreviewError(error instanceof Error ? error.message : null) ??
+            "Transfermarkt konnte nicht geladen werden.",
+        );
       } finally {
         if (!cancelled && !controller.signal.aborted) {
           setMarketBusy(false);
+          setMarketCompleting(false);
         }
       }
     }
 
-    void loadFullMarketInPages();
+    void loadMarket();
 
     return () => {
       cancelled = true;
@@ -2201,6 +2218,7 @@ export default function TransfermarktV2Client({
         onSaveFilterPreset={saveMarketFilterPreset}
         onDeleteFilterPreset={deleteMarketFilterPreset}
         candidates={renderedVisibleItems}
+        marketCompleting={marketCompleting}
         totalVisibleCount={visibleItems.length}
         selectedPlayerId={selectedPlayer?.playerId ?? null}
         onSelectCandidate={(playerId) => {
