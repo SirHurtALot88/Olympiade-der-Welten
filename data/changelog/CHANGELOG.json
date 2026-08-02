@@ -68,6 +68,24 @@
       "datum": "2026-08-02",
       "seite": "Markt · Transfermarkt",
       "pr": null,
+      "text": "Der große Knopf oben rechts blieb dauerhaft auf \"Kandidat wählen\" und ließ sich nicht drücken, obwohl links längst einer markiert war. Er wusste schlicht nichts von deiner Auswahl. Jetzt heißt er \"Vertragsangebot öffnen\" und führt dich direkt in den Kaufdialog.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": null,
+      "text": "Nach einer Absage sagte der Kaufdialog \"heb das Gehalt an, dann kannst du erneut verhandeln\" — aber Verhandeln blieb gesperrt, auch wenn man genau das tat. Der einzige Ausweg war Schließen. Jetzt gibt eine Gehaltsänderung die Verhandlung wieder frei.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": null,
       "text": "Der Kaufdialog ließ sich nicht mehr öffnen: er wurde gerendert, lag aber gut zweitausend Pixel unterhalb des Bildschirms, weil beim letzten Umbau der Sprungpunkt verlorenging. Jetzt springt die Ansicht wieder direkt hin.",
       "quelle": "gepflegt",
       "gewicht": "spielblockierend",

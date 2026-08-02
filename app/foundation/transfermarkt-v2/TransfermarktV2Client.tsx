@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent, type SetStateAction } from "react";
 
 import { getClassColorToken } from "@/app/foundation/ClassColorChip";
 import { FoundationShellRouterMarketBuy } from "@/app/foundation/FoundationShellRouter";
@@ -75,6 +75,18 @@ export type TransfermarktV2ClientProps = {
   onInitialPlayerFocusConsumed?: (() => void) | null;
   offerPanelActive?: boolean;
   onOpenOfferPanel?: (playerId: string) => void;
+  /**
+   * Meldet die Auswahl in der Kandidatenliste nach oben.
+   *
+   * GEMELDET beim Durchspielen: der Hauptaktions-Knopf im Kopf ("Kandidat waehlen") blieb
+   * dauerhaft gesperrt mit dem Hinweis "Waehle links erst einen Kandidaten aus der Liste aus" —
+   * obwohl links sichtbar einer markiert war. Ursache: die Auswahl lebte NUR hier lokal
+   * (`selectedPlayerId`), waehrend der Knopf `marketPreviewPlayer` aus dem Shell-Zustand liest.
+   * Zwei Wahrheiten ueber dieselbe Frage; die eine hat der anderen nie Bescheid gesagt. Der
+   * Deal war ueber "Deal pruefen" im Panel trotzdem erreichbar, aber der prominenteste Knopf
+   * der Ansicht sah kaputt aus und war es faktisch auch.
+   */
+  onSelectCandidate?: (playerId: string, name: string) => void;
   onCloseOfferPanel?: () => void;
   onSell?: ((payload: { activePlayerId: string; playerId: string; playerName: string; className: string; race: string | null; portraitUrl: string | null }) => void) | null;
   roomContext?: FoundationRoomContext | null;
@@ -634,6 +646,7 @@ export default function TransfermarktV2Client({
   onInitialPlayerFocusConsumed = null,
   offerPanelActive = false,
   onOpenOfferPanel,
+  onSelectCandidate: onSelectCandidateUpstream,
   onCloseOfferPanel,
   onSell,
   roomContext: roomContextProp = null,
@@ -2015,6 +2028,26 @@ export default function TransfermarktV2Client({
     });
   }
 
+  /**
+   * Ein Gehaltswechsel nach einer ABSAGE hebt die Absage auf.
+   *
+   * GEMELDET beim Durchspielen: nach „Angebot abgelehnt — heb das Gehalt an oder passe den
+   * Vertrag an, dann kannst du erneut verhandeln" blieb „Schritt 1: Verhandeln" gesperrt, auch
+   * nachdem das Gehalt angehoben war. Eine Sackgasse: der einzige Ausweg war, den Dialog zu
+   * schliessen — was zusaetzlich den Abbruch-Malus riskiert. Der Hinweis versprach etwas, das
+   * die Oberflaeche nicht einloeste. Vertragslaenge und -form haben das ueber
+   * `resetBuyDemandFrame` schon immer getan, nur das Gehalt nicht.
+   *
+   * NUR bei einer Absage zuruecksetzen, nicht generell: bei „countered" traegt der Zustand das
+   * Gegenangebot samt „Einschlagen"-Knopf, und `acceptCounterOffer` setzt das Gehalt selbst auf
+   * die Gegenangebots-Zahl. Wuerde jeder Gehaltswechsel den Zustand loeschen, verschwaende
+   * genau dieser Klick sein eigenes Ziel.
+   */
+  function applyOfferedSalaryChange(value: SetStateAction<number | null>) {
+    setOfferedSalary(value);
+    setBuyNegotiationOutcome((current) => (current?.status === "rejected" ? null : current));
+  }
+
   function openBuyModal() {
     if (!selectedPlayer || !selectedTeamId) {
       return;
@@ -2173,6 +2206,10 @@ export default function TransfermarktV2Client({
         onSelectCandidate={(playerId) => {
           shouldFocusSelectedCandidateRef.current = false;
           setSelectedPlayerId(playerId);
+          // Der Name kommt aus der Liste, die der Spieler gerade sieht — nicht aus einem Feed,
+          // der beim Oeffnen des Marktes leer ist.
+          const gewaehlt = marketItems.find((item) => item.playerId === playerId);
+          onSelectCandidateUpstream?.(playerId, gewaehlt?.name ?? playerId);
         }}
         selectedPlayer={selectedPlayer}
         onOpenPlayerDetails={onOpenPlayerDetails}
@@ -2216,7 +2253,7 @@ export default function TransfermarktV2Client({
         onOfferedSalaryChange={(value) => {
           // Phase-2 F2 — Deal-Desk-Slider setzt dasselbe Angebots-State wie das Modal; der
           // Manuell-Flag hält den Preview-Effekt auf dem 90-ms-Debounce-Pfad statt Auto-Reset.
-          setOfferedSalary(value);
+          applyOfferedSalaryChange(value);
           setSalaryEditedManually(true);
         }}
         previewYearlySalarySchedule={buyPreview?.yearlySalarySchedule ?? null}
@@ -2296,7 +2333,7 @@ export default function TransfermarktV2Client({
               },
               onContractLengthChange: setContractLength,
               onContractShapeChange: setContractShape,
-              onOfferedSalaryChange: setOfferedSalary,
+              onOfferedSalaryChange: applyOfferedSalaryChange,
               onSalaryEditedManuallyChange: setSalaryEditedManually,
               onBuyNegotiationOutcomeChange: setBuyNegotiationOutcome,
               closeBuyModal,

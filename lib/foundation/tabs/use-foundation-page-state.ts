@@ -546,6 +546,12 @@ export function useFoundationPageState({
   const [marketBuyPreviewContext, setMarketBuyPreviewContext] = useState<TransfermarktBuyRequestContext | null>(null);
   const [marketNegotiationOutcome, setMarketNegotiationOutcome] = useState<MarketNegotiationOutcome | null>(null);
   const [marketPreviewPlayerId, setMarketPreviewPlayerId] = useState<string | null>(null);
+  /**
+   * Name und Id des in der Liste markierten Kandidaten, gemeldet vom Transfermarkt-Client.
+   * Braucht es, weil `marketFeed` beim normalen Oeffnen des Marktes leer bleibt und die Id
+   * allein dort nicht aufloesbar ist — siehe Begruendung an `marketPreviewPlayer`.
+   */
+  const [marketPreviewPlayerSummary, setMarketPreviewPlayerSummary] = useState<{ playerId: string; name: string } | null>(null);
   const [marketBuySubject, setMarketBuySubject] = useState<TransfermarktBuyPreviewSubject | null>(null);
   const [marketSellBusy, setMarketSellBusy] = useState<boolean>(false);
   const [marketSellError, setMarketSellError] = useState<string | null>(null);
@@ -939,6 +945,8 @@ export function useFoundationPageState({
     marketNegotiationOutcome,
     setMarketNegotiationOutcome,
     marketPreviewPlayerId,
+    marketPreviewPlayerSummary,
+    setMarketPreviewPlayerSummary,
     setMarketPreviewPlayerId,
     marketBuySubject,
     setMarketBuySubject,
