@@ -65,6 +65,56 @@ type NegotiationPreviewInput = {
  * - "counter_money": alles dazwischen — Geld-Gegenangebot nach der Haerte-Formel
  * - "reject_affront": Sonderfall ausserhalb der Baender, siehe `affrontRetreat` oben
  */
+/**
+ * Fit → Wechselwille (verhandlung-rework.md Abschnitt 10.2).
+ *
+ * STETIG, und das ist der ganze Punkt. Vorher gab es drei Zweige mit einer Klippe bei Fit 25:
+ * darunter `teamFit / 5` (bei Fit 25 also +5), darüber `max(fit25Bonus, clamp(fit·0,65, 8, 28))`
+ * — ein Sprung von +5 auf +16 innerhalb eines Zehntels Fit.
+ *
+ * Gemessen an einem echten Spielstand (drei Teams × 500 Marktspieler) liegt der Teamfit
+ * zwischen −49 und +28; der obere Zweig feuerte bei **4 von 1500**. Der gesamte Ast, der bis zu
+ * +28 Willenspunkte vergeben konnte, war praktisch tot — während der mittlere bei +5 deckelte.
+ * Deshalb war der Wechselwille auf ein Band von ~20 Punkten gestaucht, und deshalb gab es
+ * keinen willigen Pol: nicht weil ein Boden ihn abschnitt, sondern weil die Achse nie dorthin
+ * kam.
+ *
+ * Jetzt gilt derselbe Anstieg 0,65 durchgehend ab 0 — die Steigung des alten oberen Zweigs,
+ * nur ohne Sprungstelle. `fit25Bonus` (die Fit-Politik der Teamidentität) bleibt ab Fit 25 ein
+ * BODEN: dort war er schon vorher ein Mindestwert und ist eine bewusste Team-Entscheidung,
+ * keine Kennlinie.
+ */
+export function deriveTeamFitWillingnessPoints(teamFit: number, fit25Bonus: number): number {
+  if (teamFit < 0) {
+    return Math.max(-10, teamFit / 2.5);
+  }
+  const curve = clamp(teamFit * 0.65, 0, 28);
+  return teamFit >= 25 ? Math.max(fit25Bonus, curve) : curve;
+}
+
+/**
+ * Wechselwille → Geld-Schwelle `R_money` (verhandlung-rework.md Abschnitt 10.3).
+ *
+ * Vorher `clamp(1,14 − 0,003·W, 0,92, 1,14)`. Der Entwurf hatte den Boden 0,92 als Ursache
+ * dafür benannt, dass niemand unter Forderung unterschreibt. Die Messung sagt etwas anderes:
+ * der Boden greift erst ab W = 73 und hat an einem echten Spielstand **0 von 1500** Spielern
+ * gekappt (Median-W = 46). Ursache war die flache Steigung — 0,003 pro Willenspunkt macht aus
+ * der realistischen W-Spanne nur wenige Prozentpunkte Schwellenunterschied, und der größte
+ * Teil davon liegt oberhalb der Forderung.
+ *
+ * `1,20 − 0,0045·W` dreht dieselbe Gerade um ihren Angelpunkt bei W = 42, knapp unter dem
+ * gemessenen Median: die MITTLERE Schwelle bleibt praktisch stehen (1,004 → 0,990), die ENDEN
+ * spreizen sich. Genau die waren die Beschwerde — Unwillige werden teurer, Willige wirklich
+ * billig. Der Boden fällt auf 0,88, damit die neue Steigung oben nicht sofort wieder
+ * abgeschnitten wird.
+ *
+ * Gemessen, Anteil mit Zusage unter 0,95× Forderung, drei Teams:
+ * vorher 0,6 % / 0,0 % / 3,2 %  →  danach 16,2 % / 7,4 % / 17,2 % (Zielband des Entwurfs 10–20 %).
+ */
+export function deriveMoneyThresholdRatio(willingness: number): number {
+  return clamp(1.2 - 0.0045 * willingness, 0.88, 1.2);
+}
+
 export type NegotiationVerdict =
   | "accept"
   | "counter_conditions"
@@ -1699,35 +1749,27 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
     // offerRatio gegen die Schwelle. Jetzt wirkt das Angebot NUR noch ueber r gegen R_rej/
     // R_money/R_full (Abschnitt 2.1); W bleibt angebotsunabhaengig.
 
-    if (teamFit >= 25) {
-      pushScoreBreakdown(scoreBreakdown, {
-        key: "team_fit",
-        label: "Teamfit",
-        category: "fit",
-        points: Math.max(fit25Bonus, clamp(teamFit * 0.65, 8, 28)),
-        reason: `Hoher Fit (${roundMoney(teamFit, 1)}) macht den Wechsel attraktiver.`,
-      });
-      reasons.push(`Hoher Team-Fit (${roundMoney(teamFit, 1)}) gibt Bonus.`);
-    } else if (teamFit >= 0) {
-      const scaledBonus = fit25Bonus > 0 ? (teamFit / 25) * fit25Bonus : teamFit / 5;
-      pushScoreBreakdown(scoreBreakdown, {
-        key: "team_fit",
-        label: "Teamfit",
-        category: "fit",
-        points: scaledBonus,
-        reason: `Fit (${roundMoney(teamFit, 1)}) hilft leicht, ist aber kein klarer Wechselgrund.`,
-      });
-      reasons.push(`Team-Fit (${roundMoney(teamFit, 1)}) stuetzt das Angebot leicht.`);
-    } else {
-      const fitPenalty = Math.max(-10, teamFit / 2.5);
-      pushScoreBreakdown(scoreBreakdown, {
-        key: "team_fit",
-        label: "Teamfit",
-        category: "fit",
-        points: fitPenalty,
-        reason: `Negativer Fit (${roundMoney(teamFit, 1)}) macht den Wechsel riskanter.`,
-      });
+    const fitPoints = deriveTeamFitWillingnessPoints(teamFit, fit25Bonus);
+    pushScoreBreakdown(scoreBreakdown, {
+      key: "team_fit",
+      label: "Teamfit",
+      category: "fit",
+      points: fitPoints,
+      reason:
+        teamFit < 0
+          ? `Negativer Fit (${roundMoney(teamFit, 1)}) macht den Wechsel riskanter.`
+          : teamFit >= 25
+            ? `Hoher Fit (${roundMoney(teamFit, 1)}) macht den Wechsel attraktiver.`
+            : `Fit (${roundMoney(teamFit, 1)}) hilft, ist aber kein alleiniger Wechselgrund.`,
+    });
+    if (teamFit < 0) {
       warnings.push("low_team_fit_reduces_acceptance");
+    } else {
+      reasons.push(
+        teamFit >= 25
+          ? `Hoher Team-Fit (${roundMoney(teamFit, 1)}) gibt Bonus.`
+          : `Team-Fit (${roundMoney(teamFit, 1)}) stuetzt das Angebot.`,
+      );
     }
 
     if (scoutingRecruitmentBonus > 0) {
@@ -1920,7 +1962,7 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
 
     // --- Schwellen (Abschnitt 2.1) — alles Verhaeltnisse zur Forderung D = expectedSalary ---
     const rReject = clamp(0.98 - 0.004 * W, 0.7, 0.95) + persRej;
-    const rMoney = clamp(1.14 - 0.003 * W, 0.92, 1.14) + persReq;
+    const rMoney = deriveMoneyThresholdRatio(W) + persReq;
     const rFull = rMoney + conditionsAdjustmentPct;
     const pride = 1.04 + (isMercenary || isDivaOrEgo ? 0.02 : 0);
 

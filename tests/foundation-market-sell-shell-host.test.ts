@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 import React from "react";
 import { renderToString } from "react-dom/server";
@@ -104,6 +107,49 @@ function render(overrides: Partial<FoundationMarketSellShellHostProps> = {}) {
 function countOccurrences(haystack: string, needle: string) {
   return haystack.split(needle).length - 1;
 }
+
+/**
+ * `FoundationDecisionSurface` (app/foundation/decision-surface/) existierte schon vorher,
+ * hatte aber null Nutzer — die vierte Kopie der Entscheidungs-Hülle statt der
+ * Zusammenführung. Dieser Test hält fest, dass der Verkaufs-Host jetzt tatsächlich DIE Hülle
+ * benutzt, statt weiterhin eine eigene mitzubringen — sonst schleicht sich die Kopie zurück.
+ */
+describe("FoundationMarketSellShellHost — benutzt die geteilte Entscheidungs-Hülle", () => {
+  const source = readFileSync(
+    join(process.cwd(), "app/foundation/transfermarkt-v2/FoundationMarketSellShellHost.tsx"),
+    "utf8",
+  );
+
+  it("importiert FoundationDecisionSurface", () => {
+    expect(source).toContain(
+      'import {\n  FoundationDecisionSurface,\n  type DecisionSurfaceStatusTone,\n} from "@/app/foundation/decision-surface/FoundationDecisionSurface";',
+    );
+  });
+
+  it("bringt keine eigene Kopf/Karte/Fuß-Hülle mehr mit", () => {
+    // Diese Klassen kamen aus dem alten, selbstgebauten Rahmen — Kopf, Karte, Fußleiste,
+    // Zweiklick-Streifen, Abstandhalter. Taucht eine davon wieder auf, baut der Host seine
+    // Hülle erneut selbst statt sie von FoundationDecisionSurface zu bekommen.
+    for (const relikt of [
+      "nl-decision-head",
+      "transfer-sell-card",
+      "transfer-sell-head",
+      "transfer-sell-close",
+      "transfer-sell-body",
+      "transfer-sell-foot",
+      "transfer-sell-confirm-strip",
+      "transfer-sell-foot-row",
+      "transfer-sell-foot-spacer",
+    ]) {
+      expect(source, `"${relikt}" sollte nicht mehr im Host stehen`).not.toContain(relikt);
+    }
+  });
+
+  it("hat keinen eigenen confirmStep-Zustand mehr — der Zweiklick lebt in der Hülle", () => {
+    expect(source).not.toContain("confirmStep");
+    expect(source).not.toContain("useState");
+  });
+});
 
 describe("FoundationMarketSellShellHost — Zustandsmaschine", () => {
   it("lädt: echter Skeleton statt leerer Strich-Kacheln, keine Fehler-Banner", () => {

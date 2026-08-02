@@ -20,7 +20,9 @@
  */
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
-export type DecisionSurfaceStatusTone = "ready" | "warning" | "blocked" | "done";
+// "neutral" gibt es zusätzlich zu den drei Ampel-Tönen: für einen Status ohne
+// Wertung, z. B. "nur Ansicht" im Referenzmodus — dafür ist Amber/Rot/Grün falsch.
+export type DecisionSurfaceStatusTone = "ready" | "warning" | "blocked" | "neutral" | "done";
 
 export type DecisionSurfacePrimaryAction = {
   /** Beschriftung im ersten Schritt, z. B. „Verkaufen…" oder „Angebot senden". */
@@ -38,6 +40,14 @@ export type DecisionSurfacePrimaryAction = {
   disabledReason?: string | null;
   /** Rot, wenn die Handlung endgültig etwas wegnimmt (Verkauf). Sonst Akzent (Kauf, Ausbau). */
   danger?: boolean;
+  /**
+   * Überschreibt die Standard-Testid `${testId}-primary` — für Aufrufer, die bereits eine
+   * eigene, dokumentierte Testid verdrahtet haben (E2E-Skripte, siehe
+   * docs/design/verkauf-popup.md Abschnitt 8: "Testids bleiben stabil").
+   */
+  buttonTestId?: string;
+  /** Überschreibt analog die Standard-Testid `${testId}-disabled-reason`. */
+  disabledReasonTestId?: string;
   onConfirm: () => void | Promise<void>;
 };
 
@@ -51,6 +61,12 @@ export type FoundationDecisionSurfaceProps = {
   /** Zusätzliche Klasse für ablaufspezifisches CSS. */
   className?: string;
   onClose: () => void;
+  /**
+   * Sperrt den X-Knopf im Kopf (nicht Esc/Abbrechen) — für den Moment, in dem eine
+   * endgültige Buchung tatsächlich unterwegs ist und ein Schließen mittendrin keinen
+   * Sinn ergibt. Ohne Angabe immer klickbar.
+   */
+  closeDisabled?: boolean;
   /** Kopfzone: Portrait, Identität und die eine große Zahl. */
   hero?: ReactNode;
   /** Alles zwischen Hero und Fußleiste. */
@@ -66,10 +82,14 @@ export type FoundationDecisionSurfaceProps = {
   cancelLabel?: string;
 };
 
+// Die Töne mappen auf die Klassen, die `.transfer-status-pill` (app/globals.css) schon
+// kennt — dieselbe Pille wird an mehreren Stellen im Spiel wiederverwendet. "neutral"
+// bleibt bewusst ohne Zusatzklasse: die Basis-Pille ist grau, keine Wertung.
 const STATUS_TONE_CLASS: Record<DecisionSurfaceStatusTone, string> = {
   ready: " is-ready",
   warning: " is-warning",
-  blocked: " is-risk",
+  blocked: " is-blocked",
+  neutral: "",
   done: " is-ready",
 };
 
@@ -80,6 +100,7 @@ export function FoundationDecisionSurface({
   testId,
   className,
   onClose,
+  closeDisabled = false,
   hero,
   children,
   confirmNote,
@@ -130,7 +151,14 @@ export function FoundationDecisionSurface({
           {status ? (
             <span className={`transfer-status-pill${STATUS_TONE_CLASS[status.tone]}`}>{status.label}</span>
           ) : null}
-          <button className="nl-decision-close" type="button" aria-label="Schließen" onClick={onClose}>
+          <button
+            className="nl-decision-close"
+            type="button"
+            aria-label="Schließen"
+            title="Schließen (Esc)"
+            onClick={onClose}
+            disabled={closeDisabled}
+          >
             ✕
           </button>
         </header>
@@ -141,7 +169,12 @@ export function FoundationDecisionSurface({
 
         <footer className="nl-decision-foot">
           {confirmStep && hasConfirmStep ? (
-            <div className="nl-decision-confirmnote" data-testid={`${testId}-confirm-note`}>
+            // "is-danger" faerbt den Hinweis rot statt amber — nur wenn die Handlung
+            // selbst gefaehrlich ist (Verkauf), nicht bei jedem Zweiklick (Ausbau).
+            <div
+              className={`nl-decision-confirmnote${primary?.danger ? " is-danger" : ""}`}
+              data-testid={`${testId}-confirm-note`}
+            >
               {confirmNote}
             </div>
           ) : null}
@@ -163,7 +196,10 @@ export function FoundationDecisionSurface({
                 </button>
                 <span className="nl-decision-foot-spacer" />
                 {disabledReason ? (
-                  <p className="foundation-screen-action-reason" data-testid={`${testId}-disabled-reason`}>
+                  <p
+                    className="foundation-screen-action-reason"
+                    data-testid={primary?.disabledReasonTestId ?? `${testId}-disabled-reason`}
+                  >
                     Warum nicht: {disabledReason}
                   </p>
                 ) : null}
@@ -171,7 +207,7 @@ export function FoundationDecisionSurface({
                   <button
                     className={`primary-button nl-decision-primary${primary.danger && confirmStep ? " is-danger" : ""}`}
                     type="button"
-                    data-testid={`${testId}-primary`}
+                    data-testid={primary.buttonTestId ?? `${testId}-primary`}
                     disabled={primaryDisabled}
                     title={disabledReason ?? undefined}
                     onClick={() => {

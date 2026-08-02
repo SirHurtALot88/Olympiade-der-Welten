@@ -73627,15 +73627,12 @@ button.is-new-look .nl-thist-season-pill,
    Zonen A-H. Struktur/Klassenlogik aus dem freigegebenen Mockup
    (docs/design/verkauf-popup-mockup.html, Präfix "vk-"), hier unter
    .is-new-look mit den bestehenden Tokens statt Hex-Werten.
-   ============================================================ */
 
-/* Kartenoptik des Mockups (Zonen A-H), gerendert INNERHALB der
-   Drilldown-Seite (`.transfer-sell-page`) — kein `.foundation-modal-backdrop`-
-   Portal (siehe Strangler-Architektur-Kontrakt,
-   tests/foundation-page-surfaces-contract.test.ts: Verkauf bleibt eine
-   Drilldown-Seite mit Browser-Historie, kein Overlay). Die Seite scrollt
-   normal mit; Kopf/Fuß sind deshalb Teil des normalen Kartenflusses, nicht
-   viewport-fixiert wie in einem echten Modal. */
+   Karte, Kopf, Fuß, Zweiklick-Streifen und Abstandhalter (Zonen A + H) leben
+   nicht mehr hier — die liefert seit der Zusammenführung mit Kauf und Gebäude
+   die geteilte Hülle direkt darunter (`.nl-decision-*`). Was hier bleibt, ist
+   Zone B-G: Inhalt, der dem Verkauf gehört, nicht der Hülle.
+   ============================================================ */
 /* =========================================================================
    ENTSCHEIDUNGS-HUELLE — die gemeinsame Form fuer Kauf, Verkauf und Gebaeude.
 
@@ -73693,8 +73690,13 @@ button.is-new-look .nl-thist-season-pill,
   line-height: 1;
 }
 
-.is-new-look .nl-decision-close:hover {
+.is-new-look .nl-decision-close:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.07);
+}
+
+.is-new-look .nl-decision-close:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .is-new-look .nl-decision-close:focus-visible,
@@ -73737,22 +73739,60 @@ button.is-new-look .nl-thist-season-pill,
 }
 
 /* Der Satz, der sagt, was gleich endgültig passiert — direkt am Klickpunkt,
-   nicht weiter oben, wo man ihn beim Bestätigen nicht mehr sieht. */
+   nicht weiter oben, wo man ihn beim Bestätigen nicht mehr sieht. Zeile statt
+   Raster (aus dem Verkaufs-Entwurf übernommen, docs/design/verkauf-popup.md
+   Zone H): Kopfsatz und Begründung stehen nebeneinander und brechen erst um,
+   wenn der Platz nicht reicht. */
 .is-new-look .nl-decision-confirmnote {
-  display: grid;
-  gap: 3px;
+  display: flex;
+  gap: var(--nl-s2);
+  align-items: baseline;
+  flex-wrap: wrap;
   margin-bottom: 10px;
-  padding: 10px 12px;
+  padding: var(--nl-s2) var(--nl-s3);
   border: 1px solid var(--nl-warn, #d9a441);
   border-radius: var(--nl-r-md, 12px);
   background: rgba(217, 164, 65, 0.08);
-  font-size: 0.82rem;
+  font-size: var(--nl-fs-md, 0.82rem);
+}
+
+.is-new-look .nl-decision-confirmnote strong {
+  color: var(--nl-warn, #d9a441);
+}
+
+.is-new-look .nl-decision-confirmnote span {
+  color: var(--nl-mut);
+}
+
+/* Zweite, leisere Zeile innerhalb der Notiz (z. B. "Checkbox oben bestätigen") —
+   erzwingt einen Umbruch, statt sich an den Kopfsatz zu hängen. */
+.is-new-look .nl-decision-confirmnote .variant {
+  flex-basis: 100%;
+  color: var(--nl-mut-2);
+  font-size: var(--nl-fs-sm);
+  font-style: italic;
+}
+
+/* Rot statt Amber, wenn die Handlung selbst endgültig etwas wegnimmt (Verkauf) —
+   siehe `primary.danger` in FoundationDecisionSurface. */
+.is-new-look .nl-decision-confirmnote.is-danger {
+  border-color: var(--nl-risk, #e5615a);
+  background: color-mix(in srgb, var(--nl-risk, #e5615a) 7%, transparent);
+}
+
+.is-new-look .nl-decision-confirmnote.is-danger strong {
+  color: var(--nl-risk, #e5615a);
 }
 
 /* Rot erst im Bestätigungsschritt: der erste Klick öffnet nur, er nimmt nichts weg. */
 .is-new-look .nl-decision-primary.is-danger {
   background: var(--nl-risk, #d9534f);
   border-color: var(--nl-risk, #d9534f);
+  color: #180b0a;
+}
+
+.is-new-look .nl-decision-primary.is-danger:hover:not(:disabled) {
+  filter: brightness(1.08);
 }
 
 @media (max-width: 640px) {
@@ -73763,67 +73803,6 @@ button.is-new-look .nl-thist-season-pill,
     padding-left: 12px;
     padding-right: 12px;
   }
-}
-
-.is-new-look .transfer-sell-page .transfer-sell-card {
-  width: min(920px, 100%);
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  background: var(--nl-panel);
-  border: 1px solid var(--nl-line-2);
-  border-radius: var(--nl-r-lg);
-  box-shadow: var(--nl-e3);
-  overflow: hidden;
-}
-
-/* --- A: Kopf -------------------------------------------------- */
-.is-new-look .transfer-sell-head {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--nl-s3);
-  padding: var(--nl-s3) var(--nl-s4);
-  border-bottom: 1px solid var(--nl-line);
-  background: var(--nl-panel-2);
-  border-radius: var(--nl-r-lg) var(--nl-r-lg) 0 0;
-}
-
-.is-new-look .transfer-sell-kicker {
-  flex: 1;
-  font-size: var(--nl-fs-sm);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--nl-mut);
-}
-
-.is-new-look .transfer-sell-close {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--nl-r-sm);
-  border: 1px solid var(--nl-line);
-  background: transparent;
-  color: var(--nl-mut);
-  font-size: 15px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.is-new-look .transfer-sell-close:hover:not(:disabled) {
-  color: var(--nl-ink);
-  border-color: var(--nl-line-2);
-}
-
-.is-new-look .transfer-sell-close:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.is-new-look .transfer-sell-body {
-  padding: var(--nl-s4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--nl-s3);
 }
 
 /* --- B: Hero — Identität + Netto-Erlös als DIE Zahl ------------ */
@@ -74225,67 +74204,6 @@ button.is-new-look .nl-thist-season-pill,
 
 .is-new-look .transfer-sell-more-section-title:first-child {
   margin-top: 0;
-}
-
-/* --- H: Fußleiste (fixiert am Dialog-Boden) --------------------- */
-.is-new-look .transfer-sell-foot {
-  flex-shrink: 0;
-  border-top: 1px solid var(--nl-line);
-  background: var(--nl-panel-2);
-  padding: var(--nl-s3) var(--nl-s4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--nl-s2);
-  border-radius: 0 0 var(--nl-r-lg) var(--nl-r-lg);
-}
-
-.is-new-look .transfer-sell-confirm-strip {
-  display: flex;
-  gap: var(--nl-s2);
-  align-items: baseline;
-  flex-wrap: wrap;
-  border: 1px solid color-mix(in srgb, var(--nl-risk) 40%, transparent);
-  background: color-mix(in srgb, var(--nl-risk) 7%, transparent);
-  border-radius: var(--nl-r-md);
-  padding: var(--nl-s2) var(--nl-s3);
-  font-size: var(--nl-fs-md);
-}
-
-.is-new-look .transfer-sell-confirm-strip strong {
-  color: var(--nl-risk);
-}
-
-.is-new-look .transfer-sell-confirm-strip span {
-  color: var(--nl-mut);
-}
-
-.is-new-look .transfer-sell-confirm-strip .variant {
-  flex-basis: 100%;
-  color: var(--nl-mut-2);
-  font-size: var(--nl-fs-sm);
-  font-style: italic;
-}
-
-.is-new-look .transfer-sell-foot-row {
-  display: flex;
-  align-items: center;
-  gap: var(--nl-s3);
-}
-
-.is-new-look .transfer-sell-foot-row .transfer-sell-foot-spacer {
-  flex: 1;
-}
-
-/* Primärbutton im letzten Bestätigen-Schritt: eigener Rot-Akzent, damit der
-   endgültige Klick sich sichtbar vom normalen "Verkaufen…"-Schritt abhebt. */
-.is-new-look .transfer-sell-confirm-button.is-danger {
-  background: var(--nl-risk);
-  border-color: var(--nl-risk);
-  color: #180b0a;
-}
-
-.is-new-look .transfer-sell-confirm-button.is-danger:hover:not(:disabled) {
-  filter: brightness(1.08);
 }
 
 @media (max-width: 720px) {
