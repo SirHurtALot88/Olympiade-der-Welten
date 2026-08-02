@@ -272,6 +272,18 @@ export default function LeagueLeadersNewLook({
   const rankingDrawerTotal = (rankingDrawerCategory?.fullEntries ?? rankingDrawerCategory?.entries ?? []).length;
 
   /**
+   * Ligaweiter OVR-Rang je Spieler — nur fuer den Star-Rahmen am Portrait.
+   *
+   * Die Drawer-Zeile traegt ihn nicht (sie kennt nur den Rang IN dieser Kategorie), und ihn dort
+   * hineinzureichen hiesse, dem Drawer eine Kennzahl beizubringen, die ihn nichts angeht. Statt
+   * dessen schlaegt die Ansicht ihn beim Zeichnen nach.
+   */
+  const rankingDrawerOvrRankById = useMemo(() => {
+    const eintraege = rankingDrawerCategory?.fullEntries ?? rankingDrawerCategory?.entries ?? [];
+    return new Map(eintraege.map((entry) => [entry.playerId, entry.ovrRank] as const));
+  }, [rankingDrawerCategory]);
+
+  /**
    * Der beste eigene Spieler in dieser Kategorie — jetzt IMMER mit Rang.
    *
    * Vorher stand auf der Kachel „außerhalb Top 5", weil nur fuenf Plaetze bekannt waren. Das
@@ -550,6 +562,19 @@ export default function LeagueLeadersNewLook({
         rows={rankingDrawerRows}
         highlightId={rankingDrawerHighlightId}
         onSelectRow={(row) => onOpenPlayer(row.id)}
+        // GEMELDET: „der drawer ist recht klein und nutzt den platz nicht sonderlich gut, und die
+        // spieler haben gar keine bilder." Beides hing zusammen: in einer 420px-Leiste ist fuer
+        // ein Portrait kein Platz. Als breite Tafel in der Mitte passen Bild, Rang, Name, Team
+        // und Wert nebeneinander — und bei 330 Zeilen auch noch in drei Spalten.
+        layout="modal"
+        renderLeading={(row) => (
+          <LeaderAvatar
+            playerId={row.id}
+            name={row.name}
+            className="nl-rankdrawer-avatar"
+            starTier={getLeaderStarTier(rankingDrawerOvrRankById.get(row.id) ?? null)}
+          />
+        )}
         footer={
           <>
             {rankingDrawerTotal > rankingDrawerRows.length ? (
