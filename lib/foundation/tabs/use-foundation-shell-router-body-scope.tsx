@@ -827,10 +827,6 @@ const ScoutingCenterV2Client = dynamic(() => import("@/app/foundation/scouting-c
   ssr: false,
 });
 const InboxV2Client = dynamic(() => import("@/app/foundation/inbox-v2/InboxV2Client"), { ssr: false });
-const FoundationDebugGameStatePanel = dynamic(
-  () => import("@/app/foundation/debug/FoundationDebugGameStatePanel"),
-  { ssr: false },
-);
 const FoundationPlayersTablePanel = dynamic(
   () => import("@/app/foundation/players-table/FoundationPlayersTablePanel"),
   {
