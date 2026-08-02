@@ -40,7 +40,6 @@ export default function FoundationInboxV2Host({
   activeTeamInboxItems,
   activeTeamDecisionInboxItems,
   activeTeamDecisionCriticalInboxItems,
-  activeTeamChronicleInboxItems,
   inboxMode,
   inboxCategoryFilter,
   inboxIncludeDone,
@@ -57,12 +56,14 @@ export default function FoundationInboxV2Host({
   navigateToInboxItem,
   updateInboxItemStatus,
 }: FoundationInboxV2HostProps) {
+  // Drei-Raeume-Ansicht: alle Meldungen gleichzeitig, kein Modus-Umschalter mehr.
   const { visibleInboxItems, inboxV2Items } = useInboxV2Derivations({
     activeTeamInboxItems,
     inboxMode,
     inboxCategoryFilter,
     inboxIncludeDone,
     inboxIncludeDismissed,
+    laneLayout: true,
   });
 
   if (!selectedTeam) {
@@ -83,8 +84,10 @@ export default function FoundationInboxV2Host({
             setInboxV2SelectedItemId(itemId);
           }
         }}
-        openCount={inboxMode === "decisions" ? activeTeamDecisionInboxItems.length : activeTeamChronicleInboxItems.length}
-        criticalCount={inboxMode === "decisions" ? activeTeamDecisionCriticalInboxItems.length : 0}
+        // Die Zaehler bleiben auf den Entscheidungen: „6 offen" meint, was zu TUN ist. Berichte
+        // mitzuzaehlen wuerde die Zahl aufblaehen, ohne dass mehr zu tun waere.
+        openCount={activeTeamDecisionInboxItems.length}
+        criticalCount={activeTeamDecisionCriticalInboxItems.length}
         mode={inboxMode}
         teamLabel={`${selectedTeam.shortCode} · ${selectedTeam.name}`}
         categoryFilter={inboxCategoryFilter}

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent } fro
 import type { InboxV2ClientProps, InboxV2Item, InboxV2Mode } from "@/app/foundation/inbox-v2/inbox-v2-types";
 import { NlCard, NlSubTabs, formatNlNumber, nlToneClass, useCountUp, type NlTone } from "@/components/foundation/new-look";
 import { getInboxItemCadence, isAutoResolvingInboxItemId } from "@/lib/foundation/game-inbox-service";
+import { INBOX_LANES, groupInboxItemsByLane } from "@/lib/foundation/inbox-lanes";
 
 /**
  * "Neuer Look" Entscheidungs-Triage fuer Inbox V2 (flag-gated, additive).
@@ -507,6 +508,148 @@ export default function InboxV2NewLook({
     );
   };
 
+  /**
+   * DIE DREI RÄUME (docs/INBOX_KONZEPT.md). Sobald die Ableitung eine `lane` mitliefert, ersetzt
+   * das Spaltenraster den Modus-Umschalter: „Jetzt handeln", „Im Blick behalten" und
+   * „Berichte & Momente" stehen gleichzeitig da. Dringlichkeit ist dann POSITION statt nur Farbe —
+   * genau das war die Beschwerde („alles gleich wichtig, alles führt an denselben Ort").
+   *
+   * Ohne `lane` bleibt es bei der bisherigen einspaltigen Liste; kein Mount bricht dadurch weg.
+   */
+  const laneLayout = displayedItems.some((item) => item.lane != null);
+  const lanes = useMemo(
+    () => groupInboxItemsByLane(displayedItems, (item) => item.lane ?? "act"),
+    [displayedItems],
+  );
+
+  /** Eine Karte, ein Renderer — im Raster wie in der Liste, damit sie sich nie auseinanderleben. */
+  const renderItemCard = (item: InboxV2Item, index: number) => {
+    const meta = getCategoryMeta(item.category);
+    const CategoryIcon = meta.icon;
+    const severityTone = getSeverityTone(item.severity);
+    const statusLabel = getStatusLabel(item);
+    const isSelected = selectedItemId === item.id;
+    const isAutoResolving = isAutoResolvingInboxItemId(item.id);
+    const cadenceLabel = getCadenceLabel(item);
+    const showManualActions = item.status === "open" && !isAutoResolving && (onMarkDone || onDismiss);
+    return (
+      <li
+        key={item.id}
+        id={getInboxItemDomId(item.id)}
+        className="nl-inbox-list-row nl-reveal"
+        style={{ "--nl-reveal-i": Math.min(index, 14) } as CSSProperties}
+      >
+        <NlCard
+          interactive
+          onClick={() => activateItem(item.id)}
+          className={`nl-inbox-card ${nlToneClass(severityTone)}${isSelected ? " is-selected" : ""}${statusLabel ? " is-resolved" : ""}`}
+          data-testid={`nl-inbox-card-${item.id}`}
+        >
+          <div className="nl-inbox-card-row">
+            <span className={`nl-inbox-card-icon ${nlToneClass(severityTone)}`} title={meta.label}>
+              <CategoryIcon />
+            </span>
+            <div className="nl-inbox-card-copy">
+              <span className="nl-inbox-card-meta">
+                <span className="nl-inbox-card-category">{meta.label}</span>
+                {cadenceLabel ? (
+                  <span className={`nl-inbox-cadence-tag nl-inbox-cadence-${cadenceLabel.cadence}`}>{cadenceLabel.text}</span>
+                ) : null}
+                {item.status === "open" && isAutoResolving ? (
+                  <span className="nl-inbox-auto-tag" title="Löst sich automatisch, sobald die Bedingung erfüllt ist.">
+                    Automatisch
+                  </span>
+                ) : null}
+                {statusLabel ? (
+                  <span className="nl-inbox-card-status">
+                    {item.status === "done" && isAutoResolving ? <IconCheck className="nl-inbox-card-status-icon" /> : null}
+                    {statusLabel}
+                  </span>
+                ) : null}
+              </span>
+              <strong className="nl-inbox-card-title">{item.title}</strong>
+              {item.detail ? <p className="nl-inbox-card-detail">{item.detail}</p> : null}
+
+              {/* Das Ziel steht VOR dem Klick da — man sieht, wo man landet, statt es zu erraten. */}
+              {item.targetLabel ? <span className="nl-inbox-card-target">→ {item.targetLabel}</span> : null}
+
+              {item.choices && item.choices.length > 0 ? (
+                <div className="nl-inbox-card-choices" data-testid="inbox-v2-quick-actions">
+                  {item.choices.map((choice, choiceIndex) => (
+                    <button
+                      key={choice.id}
+                      type="button"
+                      className={`nl-inbox-choice${choiceIndex === 0 ? " is-recommended" : ""}`}
+                      data-testid={`inbox-quick-action-${choice.id}`}
+                      onClick={(event) => runInnerAction(event, () => onRunChoice?.(item.id, choice.id))}
+                    >
+                      <span className="nl-inbox-choice-label">
+                        {choice.label}
+                        {choiceIndex === 0 && item.choices && item.choices.length > 1 ? (
+                          <span className="nl-inbox-choice-tag">Empfohlen</span>
+                        ) : null}
+                      </span>
+                      {choice.detail ? <small className="nl-inbox-choice-hint">{choice.detail}</small> : null}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {showManualActions ? (
+                <div className="nl-inbox-card-actions">
+                  {onMarkDone ? (
+                    <button
+                      type="button"
+                      className="nl-inbox-card-action"
+                      onClick={(event) => runInnerAction(event, () => onMarkDone(item.id))}
+                    >
+                      Erledigt
+                    </button>
+                  ) : null}
+                  {onDismiss ? (
+                    <button
+                      type="button"
+                      className="nl-inbox-card-action"
+                      onClick={(event) => runInnerAction(event, () => onDismiss(item.id))}
+                    >
+                      Ausblenden
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </NlCard>
+      </li>
+    );
+  };
+
+  const renderLanes = () => (
+    <div className="nl-inbox-lanes" aria-label="Inbox — drei Räume">
+      {INBOX_LANES.map((lane) => {
+        const laneItems = lanes[lane.id];
+        return (
+          <section key={lane.id} className={`nl-inbox-lane nl-inbox-lane-${lane.id}`} aria-label={lane.title}>
+            <header className="nl-inbox-lane-head">
+              <h3 className="nl-inbox-lane-title">
+                {lane.title}
+                <span className="nl-inbox-lane-count nl-tnum">{laneItems.length}</span>
+              </h3>
+              <p className="nl-inbox-lane-question">{lane.question}</p>
+            </header>
+            {laneItems.length === 0 ? (
+              <p className="nl-inbox-lane-empty">{lane.emptyText}</p>
+            ) : (
+              <ul className="nl-inbox-list" aria-label={lane.title}>
+                {laneItems.map((item, index) => renderItemCard(item, index))}
+              </ul>
+            )}
+          </section>
+        );
+      })}
+    </div>
+  );
+
   const emptyTitle = mode === "chronicle" ? "Noch keine Chronik-Einträge" : "Alles erledigt";
   const emptyText =
     mode === "chronicle"
@@ -538,13 +681,17 @@ export default function InboxV2NewLook({
         </div>
       </header>
 
-      <NlSubTabs
-        className="nl-inbox-mode-tabs"
-        items={modeTabs}
-        activeId={mode}
-        onSelect={(id) => onModeChange?.(id as InboxV2Mode)}
-        aria-label="Inbox Modus"
-      />
+      {/* Der Modus-Umschalter versteckte konstruktionsbedingt immer die eine Hälfte. In der
+          Räume-Ansicht ist alles gleichzeitig sichtbar — die Leiste hat dort nichts mehr zu tun. */}
+      {laneLayout ? null : (
+        <NlSubTabs
+          className="nl-inbox-mode-tabs"
+          items={modeTabs}
+          activeId={mode}
+          onSelect={(id) => onModeChange?.(id as InboxV2Mode)}
+          aria-label="Inbox Modus"
+        />
+      )}
 
       <div className="nl-inbox-filter-row" role="group" aria-label="Inbox Kategorien">
         {categoryFilters.map((filter) => {
@@ -607,113 +754,13 @@ export default function InboxV2NewLook({
         <NlCard className="nl-inbox-empty-card" title={emptyTitle} eyebrow="Inbox">
           <p className="nl-inbox-empty-text">{emptyText}</p>
         </NlCard>
+      ) : laneLayout ? (
+        renderLanes()
       ) : mode === "chronicle" ? (
         renderChronicleMagazine()
       ) : (
-        <ul className="nl-inbox-list" aria-label="Inbox Einträge">
-          {displayedItems.map((item, index) => {
-            const meta = getCategoryMeta(item.category);
-            const CategoryIcon = meta.icon;
-            const severityTone = getSeverityTone(item.severity);
-            const statusLabel = getStatusLabel(item);
-            const isSelected = selectedItemId === item.id;
-            // #43: Bedingungs-Items lösen sich selbst auf — keine manuelle
-            // "Erledigt/Ausblenden"-Aktion, die einen unerfüllten Zustand
-            // vortäuschen könnte. Solange die Bedingung offen ist, zeigt ein
-            // kleines "Automatisch"-Tag, warum hier kein Button steht.
-            const isAutoResolving = isAutoResolvingInboxItemId(item.id);
-            const cadenceLabel = getCadenceLabel(item);
-            const showManualActions = item.status === "open" && !isAutoResolving && (onMarkDone || onDismiss);
-            return (
-              <li
-                key={item.id}
-                id={getInboxItemDomId(item.id)}
-                className="nl-inbox-list-row nl-reveal"
-                style={{ "--nl-reveal-i": Math.min(index, 14) } as CSSProperties}
-              >
-                <NlCard
-                  interactive
-                  onClick={() => activateItem(item.id)}
-                  className={`nl-inbox-card ${nlToneClass(severityTone)}${isSelected ? " is-selected" : ""}${statusLabel ? " is-resolved" : ""}`}
-                  data-testid={`nl-inbox-card-${item.id}`}
-                >
-                  <div className="nl-inbox-card-row">
-                    <span className={`nl-inbox-card-icon ${nlToneClass(severityTone)}`} title={meta.label}>
-                      <CategoryIcon />
-                    </span>
-                    <div className="nl-inbox-card-copy">
-                      <span className="nl-inbox-card-meta">
-                        <span className="nl-inbox-card-category">{meta.label}</span>
-                        {cadenceLabel ? (
-                          <span className={`nl-inbox-cadence-tag nl-inbox-cadence-${cadenceLabel.cadence}`}>
-                            {cadenceLabel.text}
-                          </span>
-                        ) : null}
-                        {item.status === "open" && isAutoResolving ? (
-                          <span className="nl-inbox-auto-tag" title="Löst sich automatisch, sobald die Bedingung erfüllt ist.">
-                            Automatisch
-                          </span>
-                        ) : null}
-                        {statusLabel ? (
-                          <span className="nl-inbox-card-status">
-                            {item.status === "done" && isAutoResolving ? <IconCheck className="nl-inbox-card-status-icon" /> : null}
-                            {statusLabel}
-                          </span>
-                        ) : null}
-                      </span>
-                      <strong className="nl-inbox-card-title">{item.title}</strong>
-                      {item.detail ? <p className="nl-inbox-card-detail">{item.detail}</p> : null}
-
-                      {item.choices && item.choices.length > 0 ? (
-                        <div className="nl-inbox-card-choices" data-testid="inbox-v2-quick-actions">
-                          {item.choices.map((choice, choiceIndex) => (
-                            <button
-                              key={choice.id}
-                              type="button"
-                              className={`nl-inbox-choice${choiceIndex === 0 ? " is-recommended" : ""}`}
-                              data-testid={`inbox-quick-action-${choice.id}`}
-                              onClick={(event) => runInnerAction(event, () => onRunChoice?.(item.id, choice.id))}
-                            >
-                              <span className="nl-inbox-choice-label">
-                                {choice.label}
-                                {choiceIndex === 0 && item.choices && item.choices.length > 1 ? (
-                                  <span className="nl-inbox-choice-tag">Empfohlen</span>
-                                ) : null}
-                              </span>
-                              {choice.detail ? <small className="nl-inbox-choice-hint">{choice.detail}</small> : null}
-                            </button>
-                          ))}
-                        </div>
-                      ) : null}
-
-                      {showManualActions ? (
-                        <div className="nl-inbox-card-actions">
-                          {onMarkDone ? (
-                            <button
-                              type="button"
-                              className="nl-inbox-card-action"
-                              onClick={(event) => runInnerAction(event, () => onMarkDone(item.id))}
-                            >
-                              Erledigt
-                            </button>
-                          ) : null}
-                          {onDismiss ? (
-                            <button
-                              type="button"
-                              className="nl-inbox-card-action"
-                              onClick={(event) => runInnerAction(event, () => onDismiss(item.id))}
-                            >
-                              Ausblenden
-                            </button>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                </NlCard>
-              </li>
-            );
-          })}
+        <ul className="nl-inbox-list" aria-label="Inbox Eintraege">
+          {displayedItems.map((item, index) => renderItemCard(item, index))}
         </ul>
       )}
     </div>
