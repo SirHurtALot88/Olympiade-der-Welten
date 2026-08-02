@@ -211,6 +211,65 @@ export function ordneGehaltEin(bewertung: SalaryBenchmarkResult | null): SalaryB
  * Einsaetzen eine Saison hochzurechnen ist geraten, nicht gemessen — und die Oberflaeche soll
  * "noch keine Aussage" zeigen duerfen statt einer erfundenen Zahl.
  */
+/**
+ * DIE VERGLEICHSGRUPPE — mit wem wird ein Spieler eigentlich verglichen?
+ *
+ * Eine einzige Gerade ueber die ganze Liga ist zu grob: der Zusammenhang zwischen Leistung und
+ * Gehalt ist nach oben hin steiler (Spitzenspieler werden ueberproportional bezahlt). Eine
+ * Gerade durch alle unterschaetzt deshalb das uebliche Gehalt der Besten — die dann faelschlich
+ * ueberbezahlt aussehen — und ueberschaetzt es am unteren Rand.
+ *
+ * Verglichen wird darum innerhalb des Marktwert-Brackets: Superstars mit Superstars, Backups mit
+ * Backups. Ist ein Bracket zu duenn besetzt, werden die NACHBAR-Brackets dazugenommen, bis die
+ * Gruppe traegt — eine etwas breitere Vergleichsgruppe ist allemal besser als gar keine Aussage
+ * oder eine aus vier Spielern.
+ *
+ * `bracketIndex` ist dabei die Ordnung der Brackets (0 = staerkstes). Welche Skala dahinter
+ * steckt, weiss dieses Modul bewusst nicht — das haelt die Rechnung frei vom Spielmodell.
+ */
+export type SalaryBenchmarkGroupedSample = SalaryBenchmarkSample & { bracketIndex: number };
+
+export type SalaryBenchmarkGroupResult = {
+  modell: SalaryBenchmarkModel;
+  /** Wie weit nach oben/unten ausgeweitet wurde: 0 = nur das eigene Bracket. */
+  ausweitung: number;
+};
+
+/**
+ * Baut die Schaetzung fuer ein Bracket und weitet dabei so weit auf die Nachbarn aus, wie noetig.
+ * `null`, wenn selbst die ganze Liga die Mindest-Stichprobe nicht hergibt.
+ */
+export function buildBracketSalaryBenchmark(
+  stichprobe: SalaryBenchmarkGroupedSample[],
+  bracketIndex: number,
+): SalaryBenchmarkGroupResult | null {
+  const maxAbstand = stichprobe.reduce(
+    (max, eintrag) => Math.max(max, Math.abs(eintrag.bracketIndex - bracketIndex)),
+    0,
+  );
+  for (let ausweitung = 0; ausweitung <= maxAbstand; ausweitung += 1) {
+    const gruppe = stichprobe.filter((eintrag) => Math.abs(eintrag.bracketIndex - bracketIndex) <= ausweitung);
+    // Erst zaehlen, dann schaetzen: `buildSalaryBenchmark` wirft unbrauchbare Zeilen selbst
+    // heraus, deshalb entscheidet sein Ergebnis und nicht die rohe Gruppengroesse.
+    const modell = buildSalaryBenchmark(gruppe);
+    if (modell) return { modell, ausweitung };
+  }
+  return null;
+}
+
+/** Alle Brackets auf einmal — ein Lauf statt einer Schaetzung je Spieler. */
+export function buildBracketSalaryBenchmarks(
+  stichprobe: SalaryBenchmarkGroupedSample[],
+): Map<number, SalaryBenchmarkGroupResult> {
+  const ergebnis = new Map<number, SalaryBenchmarkGroupResult>();
+  const brackets = new Set(stichprobe.map((eintrag) => eintrag.bracketIndex));
+  for (const bracketIndex of brackets) {
+    const gruppe = buildBracketSalaryBenchmark(stichprobe, bracketIndex);
+    if (gruppe) ergebnis.set(bracketIndex, gruppe);
+  }
+  return ergebnis;
+}
+
 export function leistungJeVollemPensum(input: {
   leistung: number | null;
   einsaetze: number | null;

@@ -14,10 +14,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   bewerteGehalt,
+  buildBracketSalaryBenchmark,
+  buildBracketSalaryBenchmarks,
   buildSalaryBenchmark,
   leistungJeVollemPensum,
   ordneGehaltEin,
   SALARY_BENCHMARK_MIN_STICHPROBE,
+  type SalaryBenchmarkGroupedSample,
   type SalaryBenchmarkSample,
 } from "@/lib/contracts/salary-benchmark";
 
@@ -211,6 +214,88 @@ describe("Die Laufzeit-Falle — lange Vertraege sind oft besser dotiert", () =>
     expect(modell.jeVertragsjahr).toBe(0);
     // Auch beim einzelnen Spieler faellt nur der Laufzeit-Anteil weg, nicht die ganze Aussage.
     expect(bewerteGehalt(modell, { salary: 15, leistung: 4.5 })).not.toBeNull();
+  });
+});
+
+describe("Vergleichsgruppe: Bracket statt ganzer Liga", () => {
+  /**
+   * Eine Liga, in der die Bezahlung nach oben STEILER wird — genau der Fall, an dem eine einzige
+   * Gerade scheitert: sie unterschaetzt das uebliche Gehalt der Besten und laesst sie
+   * ueberbezahlt aussehen.
+   */
+  const GESTAFFELT: SalaryBenchmarkGroupedSample[] = [
+    // Bracket 0 (Spitze): Gehalt ~ 4 × Leistung
+    ...[20, 22, 24, 26, 28, 30].map((leistung) => ({ salary: leistung * 4, leistung, bracketIndex: 0 })),
+    // Bracket 1 (Mittelfeld): Gehalt ~ 1,5 × Leistung
+    ...[8, 9, 10, 11, 12, 13].map((leistung) => ({ salary: leistung * 1.5, leistung, bracketIndex: 1 })),
+    // Bracket 2 (unten): Gehalt ~ 1 × Leistung
+    ...[2, 3, 4, 5, 6, 7].map((leistung) => ({ salary: leistung * 1, leistung, bracketIndex: 2 })),
+  ];
+
+  it("bewertet jeden, der genau seinen Bracket-Satz verdient, als unauffaellig", () => {
+    // Drei Spieler, jeder exakt zum ueblichen Satz SEINER Klasse bezahlt. Alle drei muessen bei
+    // null landen — das ist der ganze Anspruch der Kennzahl.
+    const faelle = [
+      { spieler: { salary: 25 * 4, leistung: 25 }, bracketIndex: 0 },
+      { spieler: { salary: 10 * 1.5, leistung: 10 }, bracketIndex: 1 },
+      { spieler: { salary: 4 * 1, leistung: 4 }, bracketIndex: 2 },
+    ];
+    for (const fall of faelle) {
+      const modell = buildBracketSalaryBenchmark(GESTAFFELT, fall.bracketIndex)!.modell;
+      const bewertung = bewerteGehalt(modell, fall.spieler)!;
+      expect(bewertung.abweichung).toBeCloseTo(0, 1);
+      expect(ordneGehaltEin(bewertung)).toBe("ueblich");
+    }
+  });
+
+  it("die Gesamtgerade verrechnet sich dabei — und zwar in der Mitte", () => {
+    // Eine Gerade durch alle drei Staffeln legt sich an die steil bezahlte Spitze an und bekommt
+    // dadurch einen negativen Sockel. Der Mittelfeldspieler, der exakt seinen Satz verdient,
+    // sieht danach aus wie ein Schnaeppchen — er ist keins.
+    const ueberAlle = buildSalaryBenchmark(GESTAFFELT)!;
+    expect(ueberAlle.sockel).toBeLessThan(0);
+
+    const mittelfeld = { salary: 10 * 1.5, leistung: 10 };
+    const blind = bewerteGehalt(ueberAlle, mittelfeld)!;
+    const imBracket = bewerteGehalt(buildBracketSalaryBenchmark(GESTAFFELT, 1)!.modell, mittelfeld)!;
+
+    expect(ordneGehaltEin(blind)).toBe("guenstig");
+    expect(ordneGehaltEin(imBracket)).toBe("ueblich");
+    expect(Math.abs(imBracket.abweichung)).toBeLessThan(Math.abs(blind.abweichung));
+  });
+
+  it("nimmt bei duennem Bracket die Nachbarn dazu, statt nichts zu sagen", () => {
+    // Nur drei Spieler im Spitzen-Bracket — allein zu wenig fuer eine Schaetzung.
+    const duenn: SalaryBenchmarkGroupedSample[] = [
+      ...GESTAFFELT.filter((eintrag) => eintrag.bracketIndex !== 0),
+      ...[20, 24, 28].map((leistung) => ({ salary: leistung * 4, leistung, bracketIndex: 0 })),
+    ];
+    expect(buildSalaryBenchmark(duenn.filter((e) => e.bracketIndex === 0))).toBeNull();
+
+    const gruppe = buildBracketSalaryBenchmark(duenn, 0)!;
+    expect(gruppe.ausweitung).toBe(1); // ein Bracket nach unten dazugenommen
+    expect(gruppe.modell.stichprobe).toBe(9);
+  });
+
+  it("bleibt beim eigenen Bracket, wenn es traegt", () => {
+    const gruppe = buildBracketSalaryBenchmark(GESTAFFELT, 1)!;
+    expect(gruppe.ausweitung).toBe(0);
+    expect(gruppe.modell.stichprobe).toBe(6);
+  });
+
+  it("liefert fuer jedes belegte Bracket eine eigene Kurve", () => {
+    const alle = buildBracketSalaryBenchmarks(GESTAFFELT);
+    expect([...alle.keys()].sort()).toEqual([0, 1, 2]);
+    // Die Spitze wird steiler bezahlt als die Breite — genau deshalb der getrennte Vergleich.
+    expect(alle.get(0)!.modell.jeLeistungspunkt).toBeGreaterThan(alle.get(2)!.modell.jeLeistungspunkt);
+  });
+
+  it("sagt nichts, wenn selbst die ganze Liga zu klein ist", () => {
+    const winzig: SalaryBenchmarkGroupedSample[] = [
+      { salary: 10, leistung: 5, bracketIndex: 0 },
+      { salary: 12, leistung: 6, bracketIndex: 1 },
+    ];
+    expect(buildBracketSalaryBenchmark(winzig, 0)).toBeNull();
   });
 });
 

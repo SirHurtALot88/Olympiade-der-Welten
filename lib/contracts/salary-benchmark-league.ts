@@ -14,10 +14,17 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import {
+  buildBracketSalaryBenchmarks,
   buildSalaryBenchmark,
+  type SalaryBenchmarkGroupResult,
+  type SalaryBenchmarkGroupedSample,
   type SalaryBenchmarkModel,
-  type SalaryBenchmarkSample,
 } from "@/lib/contracts/salary-benchmark";
+import {
+  buildLeagueMarketBrackets,
+  classifyMarketBracket,
+  type MarketBracketTierLabel,
+} from "@/lib/ai/market-pick-engine/market-brackets";
 
 /**
  * Welches Leistungsmass in die Schaetzung geht. MVS ist die Vorgabe: er ist im Spiel
@@ -47,17 +54,94 @@ export function buildLeagueSalaryBenchmark(input: {
   ratingsById: Map<string, PlayerRatingContractRow>;
   mass?: SalaryBenchmarkLeistungsmass;
 }): SalaryBenchmarkModel | null {
+  return buildLeagueSalaryBenchmarks(input).gesamt;
+}
+
+/** Die Reihenfolge der Brackets, staerkstes zuerst — der Index ist die Naehe-Skala. */
+const BRACKET_REIHENFOLGE: readonly MarketBracketTierLabel[] = [
+  "Superstar",
+  "Star",
+  "Core",
+  "Depth",
+  "Backup",
+  "Reserve",
+];
+
+export function bracketIndexFuer(label: MarketBracketTierLabel): number {
+  const index = BRACKET_REIHENFOLGE.indexOf(label);
+  return index >= 0 ? index : BRACKET_REIHENFOLGE.length - 1;
+}
+
+export type LeagueSalaryBenchmarks = {
+  /** Eine Kurve ueber die ganze Liga — Rueckfall, wenn ein Bracket gar nichts hergibt. */
+  gesamt: SalaryBenchmarkModel | null;
+  /** Je Bracket eine eigene Kurve, bei duenner Besetzung um Nachbar-Brackets erweitert. */
+  jeBracket: Map<number, SalaryBenchmarkGroupResult>;
+  /** Bracket-Zuordnung je Spieler, damit die Aufrufer sie nicht neu bestimmen muessen. */
+  bracketByPlayerId: Map<string, number>;
+};
+
+/**
+ * Sammelt (Gehalt, Leistung, Laufzeit, Bracket) ueber ALLE Kader ein.
+ *
+ * Verglichen wird innerhalb des Marktwert-Brackets statt gegen die ganze Liga: der Zusammenhang
+ * von Leistung und Gehalt ist nach oben steiler, eine einzige Gerade liesse deshalb die Besten
+ * ueberbezahlt aussehen. Reicht ein Bracket nicht, werden die Nachbarn dazugenommen (siehe
+ * `buildBracketSalaryBenchmark`).
+ *
+ * Spieler ohne Leistungswert fallen heraus statt als Null mitgezaehlt zu werden: eine fehlende
+ * Saisonleistung ist keine schwache Saisonleistung, und als Null wuerde sie die Kurve nach unten
+ * ziehen und alle uebrigen Spieler faelschlich teuer aussehen lassen.
+ */
+export function buildLeagueSalaryBenchmarks(input: {
+  gameState: Pick<GameState, "rosters">;
+  ratingsById: Map<string, PlayerRatingContractRow>;
+  mass?: SalaryBenchmarkLeistungsmass;
+}): LeagueSalaryBenchmarks {
   const mass = input.mass ?? "mvs";
-  const stichprobe: SalaryBenchmarkSample[] = [];
-  for (const eintrag of input.gameState.rosters ?? []) {
+  const rosters = input.gameState.rosters ?? [];
+  // Die Bracket-Grenzen kommen aus den Marktwerten der Liga selbst — dieselbe Einteilung, die
+  // auch der Transfermarkt benutzt, damit "Star" hier und dort dasselbe heisst.
+  const brackets = buildLeagueMarketBrackets(
+    rosters.map((eintrag) => input.ratingsById.get(eintrag.playerId)?.marketValue ?? null),
+  );
+
+  const stichprobe: SalaryBenchmarkGroupedSample[] = [];
+  const bracketByPlayerId = new Map<string, number>();
+  for (const eintrag of rosters) {
+    const rating = input.ratingsById.get(eintrag.playerId);
+    const bracketIndex = bracketIndexFuer(classifyMarketBracket(rating?.marketValue ?? null, brackets));
+    bracketByPlayerId.set(eintrag.playerId, bracketIndex);
+
     const salary = eintrag.salary;
     if (!Number.isFinite(salary) || salary <= 0) continue;
-    const leistung = leseLeistung(input.ratingsById.get(eintrag.playerId), mass);
+    const leistung = leseLeistung(rating, mass);
     if (leistung == null) continue;
     // Die Restlaufzeit kommt mit: lange Vertraege sind oft besser dotiert, und ohne diese Spalte
     // hielte das Modell die langfristig gebundenen Spieler faelschlich fuer ueberbezahlt.
     const laufzeit = Number.isFinite(eintrag.contractLength) ? eintrag.contractLength : null;
-    stichprobe.push({ salary, leistung, laufzeit });
+    stichprobe.push({ salary, leistung, laufzeit, bracketIndex });
   }
-  return buildSalaryBenchmark(stichprobe);
+
+  return {
+    gesamt: buildSalaryBenchmark(stichprobe),
+    jeBracket: buildBracketSalaryBenchmarks(stichprobe),
+    bracketByPlayerId,
+  };
+}
+
+/**
+ * Die passende Kurve fuer einen Spieler: erst sein Bracket (ggf. um Nachbarn erweitert), sonst
+ * die Gesamtliga. Lieber ein breiterer Vergleich als gar keine Aussage.
+ */
+export function modellFuerSpieler(
+  benchmarks: LeagueSalaryBenchmarks,
+  playerId: string,
+): SalaryBenchmarkModel | null {
+  const bracketIndex = benchmarks.bracketByPlayerId.get(playerId);
+  if (bracketIndex != null) {
+    const gruppe = benchmarks.jeBracket.get(bracketIndex);
+    if (gruppe) return gruppe.modell;
+  }
+  return benchmarks.gesamt;
 }

@@ -15,8 +15,13 @@ import { projectFoundationStateFromPrisma } from "@/lib/db/read/foundation-read-
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
 import { buildPlayerRatingContractMap, type PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
-import { bewerteGehalt, ordneGehaltEin, type SalaryBenchmarkModel } from "@/lib/contracts/salary-benchmark";
-import { buildLeagueSalaryBenchmark, leseLeistung } from "@/lib/contracts/salary-benchmark-league";
+import { bewerteGehalt, ordneGehaltEin } from "@/lib/contracts/salary-benchmark";
+import {
+  buildLeagueSalaryBenchmarks,
+  leseLeistung,
+  modellFuerSpieler,
+  type LeagueSalaryBenchmarks,
+} from "@/lib/contracts/salary-benchmark-league";
 import { getTeamControlSettings, withNormalizedTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { getTeamStrategyProfile, withNormalizedTeamStrategyProfiles } from "@/lib/foundation/team-strategy-profiles";
 import { normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
@@ -492,8 +497,8 @@ function buildCandidate(
   cache: SellPreviewRunCache,
   teamWeakness: TeamWeaknessInfo = NEUTRAL_TEAM_WEAKNESS,
   allowSellBelowRosterMin = false,
-  /** Ligaweite Gehaltskurve; null, wenn die Stichprobe dafuer nicht reicht. */
-  salaryBenchmark: SalaryBenchmarkModel | null = null,
+  /** Gehaltskurven je Marktwert-Bracket; null, wenn die Stichprobe dafuer nicht reicht. */
+  salaryBenchmarks: LeagueSalaryBenchmarks | null = null,
 ) {
   const profile = getTeamStrategyProfile(context.gameState, team.teamId);
   const playerRating = playerRatingsById.get(player.id) ?? null;
@@ -648,7 +653,10 @@ function buildCandidate(
   // Leistungsspanne dominiert und wuerde schwache Spieler unabhaengig von ihrem Gehalt nach
   // unten sortieren — die KI gaebe sie dann ab, weil sie schwach sind, nicht weil sie zu teuer
   // sind (Begruendung und Nachweis in lib/contracts/salary-benchmark.ts).
-  const gehaltsbewertung = bewerteGehalt(salaryBenchmark, {
+  // Verglichen wird innerhalb des eigenen Marktwert-Brackets (bei duenner Besetzung um die
+  // Nachbar-Brackets erweitert), nicht gegen die ganze Liga: Spitzenspieler werden ueber-
+  // proportional bezahlt, eine einzige Gerade liesse sie faelschlich ueberbezahlt aussehen.
+  const gehaltsbewertung = bewerteGehalt(salaryBenchmarks ? modellFuerSpieler(salaryBenchmarks, player.id) : null, {
     salary,
     leistung: leseLeistung(playerRating, "mvs"),
     // Ohne die Laufzeit gaelte ein langfristig gebundener Spieler als ueberbezahlt, nur weil
@@ -1075,7 +1083,7 @@ export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParam
   const teamWeaknessByTeamId = buildTeamWeaknessByTeamId(context.gameState);
   // Ebenfalls ligaweit und einmal je Lauf: die Kurve "was kostet diese Leistung ueblicherweise".
   // Nur den eigenen Kader zu befragen hiesse, sich am eigenen Gehaltsgefuege zu messen.
-  const salaryBenchmark = buildLeagueSalaryBenchmark({
+  const salaryBenchmarks = buildLeagueSalaryBenchmarks({
     gameState: context.gameState,
     ratingsById: playerRatingsById,
   });
@@ -1156,7 +1164,7 @@ export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParam
           runCache,
           teamWeakness,
           allowSellBelowRosterMin,
-          salaryBenchmark,
+          salaryBenchmarks,
         ),
       )
       .sort((left, right) => right.sellPriority - left.sellPriority || left.playerName.localeCompare(right.playerName, "de"));
@@ -1317,6 +1325,6 @@ export function buildSellCoachingCandidateForActivePlayer(input: {
     cache,
     teamWeakness,
     false,
-    buildLeagueSalaryBenchmark({ gameState, ratingsById: playerRatingsById }),
+    buildLeagueSalaryBenchmarks({ gameState, ratingsById: playerRatingsById }),
   );
 }
