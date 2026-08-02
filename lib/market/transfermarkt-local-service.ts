@@ -746,6 +746,8 @@ type LocalTransfermarktBuyContext = {
   contractLength: number;
   contractShape: ContractShape;
   priorRejectedNegotiation: boolean;
+  /** Affront-Regel (verhandlung-rework.md Abschnitt 4.3), s. resolveLocalTransfermarktBuyContext. */
+  affrontRetreat: boolean;
   promisedRole: RosterPromisedRole;
   blockingReasons: string[];
   warnings: string[];
@@ -887,6 +889,7 @@ function buildLocalTransfermarktBuyPreviewFromContext(
     blockingReasons,
     warnings,
     priorRejectedNegotiation,
+    affrontRetreat,
   } = context;
   const canBuy = blockingReasons.length === 0;
   const scoutingLevel = team ? getFacilityLevel(getTeamFacilityState(gameState, team.teamId), "scouting_office") : 0;
@@ -899,6 +902,7 @@ function buildLocalTransfermarktBuyPreviewFromContext(
     params.offeredSalary ?? salary ?? "-",
     scoutingLevel,
     priorRejectedNegotiation ? "prior_rejected" : "fresh",
+    affrontRetreat ? "affront" : "no_affront",
     params.saveId ?? marketContext.save.saveId,
   ].join(":");
   let negotiationPreview = localNegotiationPreviewCache.get(negotiationCacheKey);
@@ -917,6 +921,7 @@ function buildLocalTransfermarktBuyPreviewFromContext(
       offeredSalary: params.offeredSalary ?? null,
       scoutingLevel,
       priorBadExperience: priorRejectedNegotiation,
+      affrontRetreat,
       seasonIdBase: gameState.season.id,
       seasonLabelBase: gameState.season.name,
     });
@@ -973,6 +978,14 @@ function buildLocalTransfermarktBuyPreviewFromContext(
     acceptChance: negotiationPreview.acceptChance,
     counterChance: negotiationPreview.counterChance,
     rejectChance: negotiationPreview.rejectChance,
+    conditionsAdjustmentPct: negotiationPreview.conditionsAdjustmentPct,
+    rejectThresholdSalary: negotiationPreview.rejectThresholdSalary,
+    moneyThresholdSalary: negotiationPreview.moneyThresholdSalary,
+    acceptThresholdSalary: negotiationPreview.acceptThresholdSalary,
+    prideCapSalary: negotiationPreview.prideCapSalary,
+    verdict: negotiationPreview.verdict,
+    counterSalary: negotiationPreview.counterSalary,
+    counterConditions: negotiationPreview.counterConditions,
     contractPreference: negotiationPreview.contractPreference,
     demandBreakdown: negotiationPreview.demandBreakdown,
     negotiationScoreBreakdown: negotiationPreview.scoreBreakdown,
@@ -1215,6 +1228,22 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
       draft.status === "rejected_bad_experience",
   );
 
+  // Affront-Regel (verhandlung-rework.md Abschnitt 4.3): der gespeicherte Draft dieser
+  // Season/Team/Spieler-Kombi steht auf "countered" (der Spieler hat mit einem Gegenangebot
+  // vorgelegt) UND das jetzt eingehende Angebot ist niedriger als das, das ihm damals gezeigt
+  // wurde — ein Rueckzieher, nachdem er schon entgegengekommen ist. `draft.offeredSalary` ist
+  // das Angebot, das zu diesem Gegenangebot fuehrte (nicht das Gegenangebot selbst — das steht
+  // per Abschnitt 7 bewusst nirgends persistiert, weil es aus (O, D, W, Traits) jederzeit neu
+  // herleitbar ist). Nur Ruecknahmen zaehlen: seitwaerts/aufwaerts bleibt frei (4.3).
+  const activeNegotiationDraft = (gameState.seasonState.contractNegotiationDrafts ?? []).find(
+    (draft) => draft.teamId === params.teamId && draft.playerId === params.playerId,
+  );
+  const affrontRetreat =
+    activeNegotiationDraft?.status === "countered" &&
+    typeof activeNegotiationDraft.offeredSalary === "number" &&
+    typeof params.offeredSalary === "number" &&
+    params.offeredSalary < activeNegotiationDraft.offeredSalary - 0.005;
+
   return {
     marketContext,
     save,
@@ -1227,6 +1256,7 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
     rosterPlayers,
     playerAlreadyOwned,
     recentlySoldBySameTeam,
+    affrontRetreat,
     purchasePrice,
     marketValueReference,
     salary,

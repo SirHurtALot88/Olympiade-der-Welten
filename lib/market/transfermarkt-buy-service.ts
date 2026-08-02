@@ -8,6 +8,7 @@ import type { ContractShape, ContractYearSalary, GameState, RosterPromisedRole }
 import type {
   NegotiationDemandBreakdownEntry,
   NegotiationScoreBreakdownEntry,
+  NegotiationVerdict,
   PlayerContractPreference,
 } from "@/lib/market/contract-negotiation-preview";
 
@@ -104,6 +105,24 @@ export type TransfermarktBuyPreview = {
   acceptChance?: number | null;
   counterChance?: number | null;
   rejectChance?: number | null;
+  /** K (verhandlung-rework.md Abschnitt 1, Achse C) — Konditionen-Aufschlag in Gehaltsprozent. */
+  conditionsAdjustmentPct?: number | null;
+  /** D * R_rej — unter diesem Gehalt bricht die Verhandlung ohne Gegenangebot ab. */
+  rejectThresholdSalary?: number | null;
+  /** D * R_money — reine Geld-Schwelle. */
+  moneyThresholdSalary?: number | null;
+  /** D * R_full — "Zusage ab X", die feste Schwelle fuer den Tooltip. */
+  acceptThresholdSalary?: number | null;
+  /** D * P (Stolz-Kappe) — mehr fordert der Spieler nie selbst. */
+  prideCapSalary?: number | null;
+  /** Deterministisches Verdikt; steuert negotiateBuy() im Client statt eines argmax ueber die
+   *  drei Anzeige-Prozente. */
+  verdict?: NegotiationVerdict | null;
+  /** Geld-Gegenangebot (nur bei verdict === "counter_money"); wird angezeigt, NICHT ins eigene
+   *  Angebot zurueckgeschrieben (das war die Ratsche, Abschnitt 4.1). */
+  counterSalary?: number | null;
+  /** Konditionen-Gegenangebot (nur bei verdict === "counter_conditions"). */
+  counterConditions?: { contractLength: number; contractShape: ContractShape } | null;
   contractPreference?: PlayerContractPreference | null;
   demandBreakdown?: NegotiationDemandBreakdownEntry[];
   negotiationScoreBreakdown?: NegotiationScoreBreakdownEntry[];

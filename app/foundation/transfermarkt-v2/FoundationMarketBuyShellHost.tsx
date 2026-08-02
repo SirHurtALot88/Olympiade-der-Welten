@@ -144,6 +144,9 @@ export type FoundationMarketBuyShellHostProps = {
   onBuyNegotiationOutcomeChange: Dispatch<SetStateAction<MarketBuyNegotiationOutcome | null>>;
   closeBuyModal: () => void;
   negotiateBuy: () => void | Promise<void>;
+  /** Bindend uebernehmen (verhandlung-rework.md Abschnitt 3.4) — die einzige Stelle, an der ein
+   *  Gegenangebot direkt zur Zusage wird, statt erneut durch die Verdikt-Baender zu laufen. */
+  acceptCounterOffer: () => void | Promise<void>;
   confirmBuy: () => void | Promise<void>;
   resetBuyDemandFrame: () => void;
 };
@@ -180,6 +183,7 @@ export default function FoundationMarketBuyShellHost({
   onBuyNegotiationOutcomeChange,
   closeBuyModal,
   negotiateBuy,
+  acceptCounterOffer,
   confirmBuy,
   resetBuyDemandFrame,
 }: FoundationMarketBuyShellHostProps) {
@@ -202,6 +206,7 @@ export default function FoundationMarketBuyShellHost({
     priorBadExperienceDemandEntry,
     priorBadExperienceScoreEntry,
     priorBadExperienceActive,
+    negotiationTooltip,
     finalBuyDisabledReason,
     formatNegotiationSignalLabel,
     visibleBuyWarnings,
@@ -644,32 +649,36 @@ export default function FoundationMarketBuyShellHost({
                       )}
                     </NlCard>
                     <NlCard
-                      className="market-v2-buy-meta-card"
-                      eyebrow={`${buyPreview.negotiationScoreBreakdown?.length ?? 0} Faktoren`}
-                      title="Warum der Deal so ausfällt"
+                      className="market-v2-buy-meta-card market-v2-buy-negotiation-tooltip"
+                      eyebrow="Warum der Deal so ausfällt"
+                      title={negotiationTooltip?.headline ?? "Warum er so reagiert"}
+                      data-testid="transfer-negotiation-tooltip"
                     >
-                      {buyPreview.negotiationScoreBreakdown?.length ? (
-                        <ul className="negotiation-factor-list">
-                          {buyPreview.negotiationScoreBreakdown.map((entry) => (
-                            <li className={`negotiation-factor is-${entry.tone}`} key={entry.key}>
-                              <strong>{entry.points > 0 ? `+${entry.points}` : entry.points}</strong>
-                              <span>{entry.label}: {entry.reason}</span>
-                            </li>
+                      {/* Antwortet auf die Ausgangsfrage ("von was das abhängt — traits vom
+                          spieler, oder ob er aus gründen lieber/weniger gern wechseln will"):
+                          vier Bündel statt einer 15er-Rohliste aus scoreBreakdown
+                          (verhandlung-rework.md Abschnitt 5). Jedes Bündel beantwortet EINE
+                          menschliche Frage; leere Bündel fallen weg. */}
+                      {negotiationTooltip?.bundles.length ? (
+                        <div className="negotiation-tooltip-bundles">
+                          {negotiationTooltip.bundles.map((bundle) => (
+                            <div className={`negotiation-tooltip-bundle is-${bundle.id}`} key={bundle.id}>
+                              <p className="negotiation-tooltip-bundle-title">{bundle.title}</p>
+                              {bundle.items.length ? (
+                                <ul className="negotiation-factor-list">
+                                  {bundle.items.map((item, index) => (
+                                    <li className="negotiation-factor is-neutral" key={`${bundle.id}-${index}`}>
+                                      {item}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : null}
+                            </div>
                           ))}
-                        </ul>
+                        </div>
                       ) : (
-                        <p className="nl-market-muted">Noch keine Score-Faktoren verfügbar.</p>
+                        <p className="nl-market-muted">Noch keine Verhandlungsdaten verfügbar.</p>
                       )}
-                      {buyPreview.negotiationReasons?.length ? (
-                        <>
-                          <p className="market-v2-buy-subhead-inline">Treiber</p>
-                          <ul className="negotiation-factor-list">
-                            {buyPreview.negotiationReasons.map((reason) => (
-                              <li className="negotiation-factor is-positive" key={reason}>{formatNegotiationSignalLabel(reason)}</li>
-                            ))}
-                          </ul>
-                        </>
-                      ) : null}
                       {buyPreview.negotiationWarnings?.length ? (
                         <>
                           <p className="market-v2-buy-subhead-inline">Risiken</p>
@@ -709,6 +718,26 @@ export default function FoundationMarketBuyShellHost({
                 <span>Kauf final abschließen (erst nach Annahme möglich)</span>
               </span>
             </div>
+
+            {buyNegotiationOutcome?.status === "countered" ? (
+              // Bindend uebernehmen statt Ratsche (Abschnitt 3.4/4.1): das Gegenangebot steht
+              // hier nur zur Ansicht — "Einschlagen" ist der einzige Weg, es zu uebernehmen.
+              // Wer stattdessen das eigene Angebot aendert und erneut auf "Verhandeln" klickt,
+              // bekommt ein neues, deterministisch aus (O, D, W, Traits) berechnetes Ergebnis.
+              <div className="transfer-feedback-banner is-warning" data-testid="transfer-buy-counter-offer">
+                <strong>{buyNegotiationOutcome.title}</strong>
+                <span>{buyNegotiationOutcome.message}</span>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  data-testid="transfer-buy-accept-counter-button"
+                  disabled={source !== "sqlite" || !selectedTeamCanManage || buyBusy}
+                  onClick={() => void acceptCounterOffer()}
+                >
+                  Gegenangebot einschlagen
+                </button>
+              </div>
+            ) : null}
 
             {buyNegotiationOutcome?.status === "rejected" ? (
               <div className="transfer-feedback-banner is-error" data-testid="transfer-buy-rejection-reason">

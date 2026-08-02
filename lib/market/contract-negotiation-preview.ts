@@ -40,9 +40,38 @@ type NegotiationPreviewInput = {
   offeredSalary: number | null;
   scoutingLevel?: number | null;
   priorBadExperience?: boolean;
+  /**
+   * Affront-Regel (verhandlung-rework.md Abschnitt 4.3): der Draft dieser Season/Team/Spieler-
+   * Kombi steht auf "countered" und das JETZT eingehende Angebot ist niedriger als das zuletzt
+   * gespeicherte — ein Rueckzieher, nachdem der Spieler schon entgegengekommen ist. Das ist ein
+   * Ablauf-Fakt (Vergleich gegen den persistierten Draft), keine der Formel-Groessen, deshalb
+   * kommt er von aussen rein statt aus einer der acht W-Zutaten berechnet zu werden. Wenn gesetzt,
+   * uebersteuert er das Verdikt zu "reject_affront", unabhaengig von den Schwellen-Baendern.
+   */
+  affrontRetreat?: boolean;
   seasonIdBase?: string | null;
   seasonLabelBase: string;
 };
+
+/**
+ * Die Reaktion der Gegenseite auf das aktuelle Angebot, deterministisch aus den Schwellen-
+ * Baendern in Abschnitt 2.2 von docs/design/verhandlung-rework.md (Reihenfolge ist die
+ * Entscheidung, nicht ein Vergleich von drei Prozentwerten):
+ * - "accept": r >= R_full (oder Bagatelle-Regel: Restluecke unter 0,02 * D)
+ * - "counter_conditions": Geld reicht (r >= R_money), aber Laufzeit/Form nicht (K > 0)
+ * - "reject_not_about_money": Angebot ueber der Stolz-Kappe P, aber unter R_money — mehr Geld
+ *   waere unglaubwuerdig, er sagt ehrlich ab
+ * - "reject_lowball": r < R_rej, zu weit von der Forderung entfernt
+ * - "counter_money": alles dazwischen — Geld-Gegenangebot nach der Haerte-Formel
+ * - "reject_affront": Sonderfall ausserhalb der Baender, siehe `affrontRetreat` oben
+ */
+export type NegotiationVerdict =
+  | "accept"
+  | "counter_conditions"
+  | "counter_money"
+  | "reject_not_about_money"
+  | "reject_lowball"
+  | "reject_affront";
 
 export type ContractSchedulePreview = {
   yearlySalarySchedule: ContractYearSalary[];
@@ -98,10 +127,45 @@ export type ContractNegotiationPreview = {
   buyoutCost: number | null;
   bracket: number | null;
   teamFit: number | null;
+  /**
+   * Wechselwille W (verhandlung-rework.md Abschnitt 1, Achse A): Summe der acht angebots-
+   * UNABHAENGIGEN scoreBreakdown-Eintraege (base_interest, team_fit, scouting_network,
+   * trait_culture, loyal_fit, ambition_match/mismatch, bad_experience, negotiation_mood),
+   * geklemmt auf 0..99. Der Feldname blieb aus Kompat-Gruenden "acceptanceScore" (viele
+   * Aufrufer lesen ihn schon), die BEDEUTUNG ist neu: er haengt nicht mehr am Angebot, darum
+   * kann der Tooltip jetzt einen festen Satz sagen ("Zusage ab X") statt eines Werts, der sich
+   * beim Tippen mitbewegt.
+   */
   acceptanceScore: number | null;
   acceptChance: number | null;
   counterChance: number | null;
   rejectChance: number | null;
+  /**
+   * Konditionen-Aufschlag K in Gehaltsprozent (Achse C, Abschnitt 1): negativ = Wunschvertrag
+   * senkt die noetige Summe (bis -4%), positiv = Laufzeit/Form verlangen Aufschlag (bis +8%).
+   * Fliesst in acceptThresholdSalary ein (R_full = R_money + K).
+   */
+  // Ab hier optional: gebraucht nur, wenn die Preview live durch buildContractNegotiationPreview
+  // lief. Stellen, die einen ContractNegotiationPreview-Rumpf synthetisch fuer
+  // buildContractNegotiationDraft zusammenbauen (der persistierte Draft kennt diese Felder
+  // ohnehin nicht, siehe verhandlung-rework.md Abschnitt 7 — "counterSalary im Draft nicht
+  // noetig"), muessen sie nicht mit angeben.
+  conditionsAdjustmentPct?: number | null;
+  /** D * R_rej — darunter bricht die Verhandlung ohne Gegenangebot ab. */
+  rejectThresholdSalary?: number | null;
+  /** D * R_money — reine Geld-Schwelle; ab hier reicht das Gehalt, auch wenn K > 0 offen bleibt. */
+  moneyThresholdSalary?: number | null;
+  /** D * R_full — "Zusage ab X". Die eine Zahl, die der Tooltip fest nennen kann. */
+  acceptThresholdSalary?: number | null;
+  /** D * P (Stolz-Kappe) — mehr fordert der Spieler nie selbst als Gegenangebot. */
+  prideCapSalary?: number | null;
+  /** Deterministisches Verdikt aus den Baendern in Abschnitt 2.2 — Anzeige-Prozente sind
+   *  daraus ABGELEITET, nicht die Entscheidung selbst. */
+  verdict?: NegotiationVerdict | null;
+  /** Geld-Gegenangebot (Regel 6, Abschnitt 3.1). Nur gesetzt bei verdict === "counter_money". */
+  counterSalary?: number | null;
+  /** Konditionen-Gegenangebot (Regel 3, Abschnitt 3.2). Nur gesetzt bei verdict === "counter_conditions". */
+  counterConditions?: { contractLength: number; contractShape: ContractShape } | null;
   contractPreference?: PlayerContractPreference | null;
   demandBreakdown: NegotiationDemandBreakdownEntry[];
   scoreBreakdown: NegotiationScoreBreakdownEntry[];
@@ -1420,32 +1484,26 @@ function normalizeChances(accept: number, counter: number, reject: number) {
   };
 }
 
+// Anzeige-Prozente (verhandlung-rework.md Abschnitt 2.5) — ABGELEITET aus dem bereits
+// feststehenden Verdikt, nicht die Entscheidung selbst (das war Defekt 3 im alten Modell:
+// argmax ueber drei Prozentwerte statt ein Band-Verdikt). mA/mR sind die Gehaltsabstaende zur
+// Zusage- bzw. Absage-Schwelle; 300 macht 1 Prozentpunkt Abstand zu 3 Rohpunkten, damit sich die
+// Balken bei jedem Regler-Schritt sichtbar bewegen (±10% Abstand saettigt Richtung Extrem,
+// 50 + 30 = 80). 150/Floor 6 lassen das Gegenangebot im Korridor dominieren (beide Abstaende
+// negativ -> 50) und schnell nach aussen schrumpfen.
 function calculateNegotiationChances(input: {
-  acceptanceScore: number;
   offerRatio: number;
+  rReject: number;
+  rFull: number;
   teamFit: number;
-  isMercenary: boolean;
 }) {
-  const offerSignal = input.offerRatio - 1;
-  const scoreSignal = (input.acceptanceScore - 50) / 50;
   const fitSignal = clamp(input.teamFit / 60, -0.8, 0.8);
-  const mercenaryLowballPenalty = input.isMercenary && input.offerRatio < 1 ? (1 - input.offerRatio) * 18 : 0;
+  const mA = input.offerRatio - input.rFull;
+  const mR = input.rReject - input.offerRatio;
 
-  const rawAccept = clamp(
-    18 + input.acceptanceScore * 0.8 + Math.max(0, offerSignal) * 95 + fitSignal * 8,
-    2,
-    94,
-  );
-  const rawCounter = clamp(
-    26 + (1 - Math.abs(input.offerRatio - 0.98)) * 34 - Math.max(0, scoreSignal) * 8 + Math.max(0, -scoreSignal) * 10,
-    5,
-    72,
-  );
-  const rawReject = clamp(
-    18 + (50 - input.acceptanceScore) * 1.05 + Math.max(0, -offerSignal) * 120 - Math.max(0, offerSignal) * 45 - fitSignal * 8 + mercenaryLowballPenalty,
-    2,
-    94,
-  );
+  const rawAccept = clamp(50 + 300 * mA + 6 * fitSignal, 2, 96);
+  const rawReject = clamp(50 + 300 * mR - 6 * fitSignal, 2, 96);
+  const rawCounter = clamp(50 - 150 * Math.max(mA, mR), 6, 50);
 
   return normalizeChances(rawAccept, rawCounter, rawReject);
 }
@@ -1613,8 +1671,21 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
   let acceptChance: number | null = null;
   let counterChance: number | null = null;
   let rejectChance: number | null = null;
+  let conditionsAdjustmentPct: number | null = null;
+  let rejectThresholdSalary: number | null = null;
+  let moneyThresholdSalary: number | null = null;
+  let acceptThresholdSalary: number | null = null;
+  let prideCapSalary: number | null = null;
+  let verdict: NegotiationVerdict | null = null;
+  let counterSalary: number | null = null;
+  let counterConditions: { contractLength: number; contractShape: ContractShape } | null = null;
 
   if (blockingReasons.length === 0 && input.player && expectedSalary != null && offeredSalary != null && offerRatio != null) {
+    // Zwei Traitgruppen werden mehrfach gebraucht (Schwellen-Verschiebung, Stolz-Kappe,
+    // Tooltip-Hinweise) — einmal vorne bestimmen statt hasTrait ueberall neu aufzurufen.
+    const isMercenary = hasTrait(input.player, "mercenary");
+    const isDivaOrEgo = hasAnyTrait(input.player, ["diva", "egomaniac"]);
+
     pushScoreBreakdown(scoreBreakdown, {
       key: "base_interest",
       label: "Grundinteresse",
@@ -1623,17 +1694,10 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
       reason: "Spieler ist grundsaetzlich offen fuer ein Angebot.",
     });
 
-    const offerDelta = offerRatio - 1;
-    pushScoreBreakdown(scoreBreakdown, {
-      key: "salary_offer",
-      label: "Gehaltsangebot",
-      category: "offer",
-      points: clamp(offerDelta * 95, -42, 32),
-      reason:
-        offerRatio >= 1
-          ? "Angebot liegt auf oder ueber der aktuellen Forderung."
-          : "Angebot liegt unter der aktuellen Forderung.",
-    });
+    // Kein "salary_offer"-Score-Eintrag mehr (Defekt aus verhandlung-rework.md Abschnitt 0):
+    // Geld zaehlte im alten Modell doppelt — einmal hier als Score-Punkte, dann nochmal als
+    // offerRatio gegen die Schwelle. Jetzt wirkt das Angebot NUR noch ueber r gegen R_rej/
+    // R_money/R_full (Abschnitt 2.1); W bleibt angebotsunabhaengig.
 
     if (teamFit >= 25) {
       pushScoreBreakdown(scoreBreakdown, {
@@ -1737,25 +1801,11 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
       });
     }
 
-    const isMercenary = hasTrait(input.player, "mercenary");
+    // mercenary_lowball/_paid sind keine Score-Punkte mehr, sondern Schwellen-Verschiebungen
+    // (persReq/persRej weiter unten) — sie beschreiben, wie empfindlich jemand auf die Hoehe
+    // des Angebots reagiert, nicht ob er grundsaetzlich wechseln will. Der Hinweistext bleibt
+    // fuer den Tooltip (Buendel 3, "Reicht das Paket?").
     if (isMercenary) {
-      if (offerRatio < 1) {
-        pushScoreBreakdown(scoreBreakdown, {
-          key: "mercenary_lowball",
-          label: "Mercenary",
-          category: "personality",
-          points: -7,
-          reason: "Mercenary reagiert empfindlich auf Angebote unter Forderung.",
-        });
-      } else if (offerRatio > 1.05) {
-        pushScoreBreakdown(scoreBreakdown, {
-          key: "mercenary_paid",
-          label: "Mercenary",
-          category: "personality",
-          points: 4,
-          reason: "Ueberdurchschnittliches Angebot trifft seine Geldmotivation.",
-        });
-      }
       reasons.push("Mercenary reagiert empfindlich auf Lowball-Angebote.");
     }
 
@@ -1781,51 +1831,35 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
           reason: "Ambitionierter Spieler sieht sportische Perspektive.",
         });
         reasons.push("Ambitious mag ambitionierte Teamumfelder.");
-      } else if (offerRatio < 1) {
+      } else if (ambition <= 4 && (input.teamStrategyProfile?.bias.starPriority ?? 0) < 8) {
+        // Aenderung ggue. dem alten Modell (verhandlung-rework.md Abschnitt 1, Tabellenzeile
+        // ambition_match/mismatch): der Mismatch-Zweig feuerte frueher bei offerRatio < 1 —
+        // das war Geld, das hier nicht hingehoert (W ist angebotsunabhaengig). Ambition ist eine
+        // Eigenschaft des Umfelds: ein schwaches Projekt (niedrige Team-Ambition UND kein
+        // Star-Fokus) enttaeuscht einen ambitionierten Spieler unabhaengig vom Angebot.
         pushScoreBreakdown(scoreBreakdown, {
           key: "ambition_mismatch",
           label: "Ambition",
           category: "personality",
           points: -3,
-          reason: "Ambitionierter Spieler sieht wenig Signal im Angebot.",
+          reason: "Ambitionierter Spieler sieht wenig sportliche Perspektive im Projekt.",
         });
-        warnings.push("Ambitious reagiert bei schwachem Angebot kritischer.");
+        warnings.push("Ambitious reagiert bei schwachem Projekt kritischer.");
       }
     }
 
-    if (input.player && (hasTrait(input.player, "diva") || hasTrait(input.player, "egomaniac"))) {
-      if (offerRatio < 1) {
-        pushScoreBreakdown(scoreBreakdown, {
-          key: "ego_lowball",
-          label: "Ego",
-          category: "personality",
-          points: -8,
-          reason: "Diva/Egomaniac empfindet Lowball als fehlende Wertschaetzung.",
-        });
-      } else if (offerRatio > 1.08) {
-        pushScoreBreakdown(scoreBreakdown, {
-          key: "ego_signal",
-          label: "Ego",
-          category: "personality",
-          points: 4,
-          reason: "Starkes Angebot liefert das erwartete Statussignal.",
-        });
-      }
+    // ego_lowball/_signal sind wie mercenary_lowball/_paid keine Score-Punkte mehr, sondern
+    // Schwellen-Verschiebung (persReq/persRej) — sie zaehlten sonst effektiv zweimal, denn ein
+    // Teil des Diva-/Ego-Malus steckt bereits in trait_culture (Status-Erwartung) oben.
+    if (isDivaOrEgo) {
       reasons.push("Diva/Egomaniac erwarten ein sichtbares Signal im Angebot.");
     }
 
-    if (input.teamStrategyProfile?.bias.wageSensitivity != null && offerRatio < 1) {
-      const wagePenalty = ((input.teamStrategyProfile.bias.wageSensitivity - 5) / 5) * 4;
-      if (wagePenalty > 0) {
-        pushScoreBreakdown(scoreBreakdown, {
-          key: "team_wage_sensitivity",
-          label: "Team-Gehaltsdisziplin",
-          category: "culture",
-          points: -Math.max(0, wagePenalty),
-          reason: "Gehaltsbewusstes Umfeld drueckt bei schwachem Angebot nicht automatisch nach oben.",
-        });
-      }
-    }
+    // Gestrichen: "team_wage_sensitivity" (verhandlung-rework.md Abschnitt 1). Der Eintrag zog
+    // dem SPIELER Punkte ab, weil das TEAM gehaltsdiszipliniert ist — das ist Team-Politik,
+    // keine Spielerpsychologie, und fuer den Spieler unsichtbar. Die Team-Gehaltsdisziplin
+    // wirkt bereits korrekt auf der Forderungsseite (wage_disciplined_team-Eintrag in
+    // deriveTeamDemandSignals, x0.98). Ersatzlos gestrichen, kein Ersatz noetig.
 
     const mood = deriveNegotiationMood(input);
     pushScoreBreakdown(scoreBreakdown, {
@@ -1844,13 +1878,119 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
       warnings.push("offer_below_expected_salary");
     }
 
-    const score = scoreBreakdown.reduce((sum, entry) => sum + entry.points, 0);
-    acceptanceScore = clamp(Math.round(score), 0, 99);
+    // --- Achse A: Wechselwille W (verhandlung-rework.md Abschnitt 1) ---
+    // NUR diese neun Keys (acht Faktoren, ambition_match/mismatch teilen sich einen Faktor)
+    // zaehlen — nicht "alles in scoreBreakdown". contract_style/player_contract_preference/
+    // contract_length_security bleiben oben im Array fuer die Anzeige ("Warum der Deal so
+    // ausfaellt"), speisen aber K (Achse C) statt W. Das ist der Kern des Rework: Geld zaehlte
+    // vorher doppelt (score + offerRatio) und Vertragskonditionen zaehlten in denselben Topf wie
+    // Wechselwille. Jetzt getrennt.
+    const W_AXIS_KEYS = new Set([
+      "base_interest",
+      "team_fit",
+      "scouting_network",
+      "trait_culture",
+      "loyal_fit",
+      "ambition_match",
+      "ambition_mismatch",
+      "bad_experience",
+      "negotiation_mood",
+    ]);
+    const willingnessRaw = scoreBreakdown
+      .filter((entry) => W_AXIS_KEYS.has(entry.key))
+      .reduce((sum, entry) => sum + entry.points, 0);
+    const W = clamp(Math.round(willingnessRaw), 0, 99);
+    acceptanceScore = W;
+
+    // --- Achse C: Konditionen K (Abschnitt 1) ---
+    // 1 Score-Punkt ≈ 0,5% Gehalt. Die drei Rohwerte (nicht die gerundeten Anzeige-Punkte aus
+    // scoreBreakdown) fuer volle Praezision; die Rundung fuer die Anzeige oben aendert das
+    // Verdikt nicht messbar, aber unnoetiges Rundungsrauschen ist unnoetig.
+    const styleScoreRaw = contractStyleScore;
+    const prefScoreRaw = contractPreference?.scoreAdjustment ?? 0;
+    const lengthScoreRaw = contractLengthSignal.score;
+    conditionsAdjustmentPct = clamp(-(styleScoreRaw + prefScoreRaw + lengthScoreRaw) * 0.005, -0.04, 0.08);
+
+    // --- Persoenlichkeits-Schwellen (Abschnitt 1, "angebotsreaktive Traits") ---
+    // Ersetzen die alten mercenary_lowball/_paid + ego_lowball/_signal Score-Eintraege: wie
+    // empfindlich jemand auf die HOEHE des Angebots reagiert, ist keine Frage des Wechselwillens
+    // (W), sondern verschiebt die Geld-Schwellen direkt.
+    const persReq = (isMercenary ? 0.02 : 0) + (isDivaOrEgo ? 0.015 : 0);
+    const persRej = (isMercenary ? 0.05 : 0) + (isDivaOrEgo ? 0.03 : 0);
+
+    // --- Schwellen (Abschnitt 2.1) — alles Verhaeltnisse zur Forderung D = expectedSalary ---
+    const rReject = clamp(0.98 - 0.004 * W, 0.7, 0.95) + persRej;
+    const rMoney = clamp(1.14 - 0.003 * W, 0.92, 1.14) + persReq;
+    const rFull = rMoney + conditionsAdjustmentPct;
+    const pride = 1.04 + (isMercenary || isDivaOrEgo ? 0.02 : 0);
+
+    const D = expectedSalary;
+    const O = offeredSalary;
+    const r = offerRatio;
+
+    rejectThresholdSalary = roundMoney(D * rReject, 2);
+    moneyThresholdSalary = roundMoney(D * rMoney, 2);
+    acceptThresholdSalary = roundMoney(D * rFull, 2);
+    prideCapSalary = roundMoney(D * pride, 2);
+
+    // --- Verdikt (Abschnitt 2.2) — Reihenfolge IST die Entscheidung, kein Vergleich von drei
+    // Prozentwerten (das war Defekt 3: argmax ohne echten Mittelbereich). ---
+    if (input.affrontRetreat) {
+      // Ausserhalb der Baender (Abschnitt 4.3): ein Rueckzieher unter das zuletzt gezeigte
+      // Entgegenkommen ist kein Verhandlungspunkt, sondern ein Vertrauensbruch. Uebersteuert
+      // jedes Band — die bestehenden Strafen (W -14, D x1.12) greifen erst bei der NAECHSTEN
+      // Vorschau, sobald "rejected_bad_experience" persistiert und priorBadExperience gesetzt ist.
+      verdict = "reject_affront";
+      warnings.push("retreat_after_counter_affront");
+      reasons.push("Ihr seid nach seinem Entgegenkommen mit einem niedrigeren Angebot zurueckgerudert — er bricht ab.");
+    } else if (r < rReject) {
+      verdict = "reject_lowball";
+      reasons.push("Angebot ist zu weit von der Forderung entfernt — er bricht die Verhandlung ab.");
+    } else if (r >= rFull) {
+      verdict = "accept";
+    } else if (r >= rMoney) {
+      verdict = "counter_conditions";
+      if (contractPreference) {
+        counterConditions = {
+          contractLength: clamp(
+            contractPreference.idealLength,
+            contractPreference.preferredMinLength,
+            contractPreference.preferredMaxLength,
+          ),
+          contractShape: contractPreference.shapePreference,
+        };
+      }
+      reasons.push("Beim Gehalt ist man sich einig — er verhandelt jetzt ueber Laufzeit/Form statt ueber Geld.");
+    } else if (r >= pride) {
+      // Ueber Anspruch + Stolz-Kappe, aber unter der Geld-Schwelle: mehr Geld zu fordern waere
+      // fuer ihn selbst unglaubwuerdig (er nennt nie mehr als D*P). Er sagt ehrlich ab, statt
+      // eine Zahl zu nennen, die er selbst nicht vertreten kann.
+      verdict = "reject_not_about_money";
+      reasons.push("Am Geld liegt es nicht — er will einfach nicht zu euch, unabhaengig vom Angebot.");
+    } else {
+      const target = D * Math.min(rFull, pride);
+      if (target - O < 0.02) {
+        // Bagatelle (Regel 5): die Restluecke ist kleiner als ein sinnvoller Gehaltsschritt —
+        // ein Mini-Gegenangebot waere Theater, also sagt er direkt zu.
+        verdict = "accept";
+      } else {
+        // Geld-Gegenangebot (Regel 6, Abschnitt 3.1). Haerte h: 0,80 Basis (er gibt standardmaessig
+        // ~20% der Restluecke nach), -0,006 je Willenspunkt (willige Spieler kommen entgegen),
+        // +0,9 x Lowball-Tiefe (je tiefer unter der Geld-Schwelle, desto haerter — sonst waere
+        // "erst lowballen, dann Gegenangebot einschlagen" die dominante Strategie). Deckel 1,00:
+        // er geht nie ueber seinen Zielpunkt hinaus, das waere die alte Ratsche.
+        const hardness = clamp(0.8 - (W - 50) * 0.006 + (rMoney - r) * 0.9, 0.55, 1.0);
+        counterSalary = roundMoney(O + (target - O) * hardness, 2);
+        verdict = "counter_money";
+        reasons.push("Er verhandelt nach: ein hoeheres Gehalt als euer aktuelles Angebot.");
+      }
+    }
+
     const normalized = calculateNegotiationChances({
-      acceptanceScore,
       offerRatio,
+      rReject,
+      rFull,
       teamFit,
-      isMercenary,
     });
     acceptChance = normalized.acceptChance;
     counterChance = normalized.counterChance;
@@ -1885,6 +2025,14 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
     acceptChance,
     counterChance,
     rejectChance,
+    conditionsAdjustmentPct: conditionsAdjustmentPct != null ? roundMoney(conditionsAdjustmentPct, 4) : null,
+    rejectThresholdSalary,
+    moneyThresholdSalary,
+    acceptThresholdSalary,
+    prideCapSalary,
+    verdict,
+    counterSalary,
+    counterConditions,
     contractPreference,
     demandBreakdown,
     scoreBreakdown,
