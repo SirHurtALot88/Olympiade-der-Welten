@@ -460,45 +460,19 @@ export function useFoundationMarketFeedActions(input: UseFoundationMarketFeedAct
     }
   }
 
-  useEffect(() => {
-    const shouldLoadMarketFeed = false;
-    if (!shouldLoadMarketFeed || isFoundationBootstrapState) {
-      marketFeedAbortRef.current?.abort();
-      marketFeedAbortRef.current = null;
-      return undefined;
-    }
-
-    let cancelled = false;
-    marketFeedAbortRef.current?.abort();
-    const controller = new AbortController();
-    marketFeedAbortRef.current = controller;
-
-    async function loadMarketFeed() {
-      try {
-        const payload = await reloadMarketFeed(undefined, controller.signal);
-        if (cancelled || !payload) {
-          return;
-        }
-      } catch (error) {
-        if (isAbortError(error) || controller.signal.aborted) {
-          return;
-        }
-        if (!cancelled) {
-          setMarketFeed(null);
-        }
-      }
-    }
-
-    void loadMarketFeed();
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-      if (marketFeedAbortRef.current === controller) {
-        marketFeedAbortRef.current = null;
-      }
-    };
-  }, [activeSaveId, activeView, gameStateSeasonId, isFoundationBootstrapState, marketMaxValue, marketReloadToken, marketTeamId, readMeta.source]);
+  /**
+   * HIER STAND EIN EFFEKT, DER NIE LIEF.
+   *
+   * Er begann mit `const shouldLoadMarketFeed = false;` und stieg direkt danach wieder aus — ein
+   * abgeschalteter Ladepfad, der nur noch so aussah, als wuerde er den Markt-Feed fuellen. Beim
+   * Nachgehen eines ganz anderen Fehlers hat genau dieser Anschein Zeit gekostet: der
+   * Hauptaktions-Knopf im Markt loeste seine Auswahl ueber `marketFeed` auf und blieb dauerhaft
+   * gesperrt — weil dieser Feed beim normalen Oeffnen eben NICHT geladen wird.
+   *
+   * `reloadMarketFeed` selbst bleibt und ist NICHT tot: Live-Sync und die Wege nach einem Kauf
+   * rufen sie ueber `marketFeedReloadersRef` weiterhin auf. Nur der automatische Erstlauf ist
+   * weg, und zwar sichtbar statt als abgeschaltete Attrappe.
+   */
 
   useEffect(() => {
     if (!shouldLoadTransferHistoryFeed) {

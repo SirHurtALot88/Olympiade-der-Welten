@@ -3,6 +3,24 @@
   "eintraege": [
     {
       "datum": "2026-08-02",
+      "seite": "Cockpit · Saisonende",
+      "pr": null,
+      "text": "Der Schritt \"Spielerentwicklung\" im Saisonende hat bisher nur weitergeschaltet — gerechnet wurde erst beim Start der neuen Saison, also hinter dem Transferfenster. Man verkaufte damit zu Marktwerten, die der Spieler schon nicht mehr hatte. Jetzt läuft die Entwicklung wirklich in diesem Schritt, und erst danach öffnet der Verkauf.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Cockpit · Saisonende",
+      "pr": null,
+      "text": "Sollte die Entwicklung einmal nicht durchlaufen, hängt der Saisonübergang trotzdem nicht fest: es geht weiter, der Saisonstart holt sie nach, und eine Notiz sagt, dass die Marktwerte in diesem Durchgang noch die alten sind.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
       "seite": "Spieltag · Inbox",
       "pr": null,
       "text": "Aufstellung setzen, Formkarten erzeugen und bestätigen sind jetzt eine Karte statt drei — mit Fortschritt: „Spieltag vorbereiten · Schritt 2 von 3\".",
