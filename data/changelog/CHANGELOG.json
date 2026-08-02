@@ -66,6 +66,33 @@
     },
     {
       "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": null,
+      "text": "Der Kaufdialog ließ sich nicht mehr öffnen: er wurde gerendert, lag aber gut zweitausend Pixel unterhalb des Bildschirms, weil beim letzten Umbau der Sprungpunkt verlorenging. Jetzt springt die Ansicht wieder direkt hin.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": null,
+      "text": "Im Vertragsangebot standen die Verhandlungschancen als \"Zusage 5100 % · Nachverhandlung 4700 % · Absage 200 %\" — die Prozente wurden doppelt gerechnet und liefen ohne Abstand ineinander. Jetzt stimmen sie und stehen getrennt.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": null,
+      "text": "Kauf- und Verkaufsdialog scrollen jetzt wirklich in sich selbst statt die ganze Seite zu verlängern. Dadurch bleiben Abbrechen, Verhandeln und Abschließen beim Lesen immer sichtbar.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
       "seite": "Team · Verträge",
       "pr": "#344",
       "text": "Ob ein Spieler sein Gehalt wert ist, wird jetzt am Ligadurchschnitt gemessen statt am reinen Verhaeltnis von Gehalt und Leistung. Vorher standen schwache Spieler dabei immer schlecht da, egal wie wenig sie kosteten — jetzt faellt auf, wer wirklich mehr verdient als ueblich, und die Computer-Teams entscheiden auf derselben Grundlage ueber ihre Verkaeufe.",

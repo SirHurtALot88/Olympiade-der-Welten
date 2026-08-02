@@ -1,0 +1,23 @@
+[
+  {
+    "datum": "2026-08-02",
+    "seite": "Markt · Transfermarkt",
+    "text": "Der Kaufdialog ließ sich nicht mehr öffnen: er wurde gerendert, lag aber gut zweitausend Pixel unterhalb des Bildschirms, weil beim letzten Umbau der Sprungpunkt verlorenging. Jetzt springt die Ansicht wieder direkt hin.",
+    "gewicht": "spielblockierend",
+    "version": "0.3"
+  },
+  {
+    "datum": "2026-08-02",
+    "seite": "Markt · Transfermarkt",
+    "text": "Im Vertragsangebot standen die Verhandlungschancen als \"Zusage 5100 % · Nachverhandlung 4700 % · Absage 200 %\" — die Prozente wurden doppelt gerechnet und liefen ohne Abstand ineinander. Jetzt stimmen sie und stehen getrennt.",
+    "gewicht": "behebung",
+    "version": "0.3"
+  },
+  {
+    "datum": "2026-08-02",
+    "seite": "Markt · Transfermarkt",
+    "text": "Kauf- und Verkaufsdialog scrollen jetzt wirklich in sich selbst statt die ganze Seite zu verlängern. Dadurch bleiben Abbrechen, Verhandeln und Abschließen beim Lesen immer sichtbar.",
+    "gewicht": "feinschliff",
+    "version": "0.3"
+  }
+]

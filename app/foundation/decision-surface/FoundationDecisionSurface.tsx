@@ -18,7 +18,7 @@
  * Das Fenster-GEFÜHL entsteht trotzdem: zentrierte Karte mit Maximalbreite, ruhiger Grund,
  * gescrollt wird in der Karte. Nur ohne die Klick-Falle.
  */
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode, type RefObject } from "react";
 
 // "neutral" gibt es zusätzlich zu den drei Ampel-Tönen: für einen Status ohne
 // Wertung, z. B. "nur Ansicht" im Referenzmodus — dafür ist Amber/Rot/Grün falsch.
@@ -85,6 +85,16 @@ export type FoundationDecisionSurfaceProps = {
   testId: string;
   /** Zusätzliche Klasse für ablaufspezifisches CSS. */
   className?: string;
+  /**
+   * Anker auf die Seite selbst, damit der Aufrufer sie ins Sichtfeld holen kann.
+   *
+   * Klingt nach Kleinigkeit, ist aber der Unterschied zwischen "geht auf" und "geht nicht auf":
+   * die Entscheidungs-Seite wird UNTER der Ansicht gerendert, aus der man kommt. Ohne diesen
+   * Anker läuft `scrollIntoView` beim Aufrufer ins Leere, und der Dialog liegt einfach zweitausend
+   * Pixel weiter unten — sichtbar für Tests, unsichtbar für Menschen. Genau das ist beim
+   * Umstellen des Kaufdialogs passiert, weil die Seite ihr `ref` vorher selbst trug.
+   */
+  containerRef?: RefObject<HTMLElement | null>;
   onClose: () => void;
   /**
    * Sperrt den X-Knopf im Kopf (nicht Esc/Abbrechen) — für den Moment, in dem eine
@@ -126,6 +136,7 @@ export function FoundationDecisionSurface({
   ariaLabel,
   testId,
   className,
+  containerRef,
   onClose,
   closeDisabled = false,
   hero,
@@ -169,6 +180,7 @@ export function FoundationDecisionSurface({
 
   return (
     <section
+      ref={containerRef}
       className={["foundation-drilldown-page", "nl-decision-page", className ?? ""].filter(Boolean).join(" ")}
       data-testid={testId}
       aria-label={ariaLabel}

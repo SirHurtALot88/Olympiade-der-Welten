@@ -73986,6 +73986,12 @@ button.is-new-look .nl-thist-season-pill,
   border-radius: var(--nl-r-lg);
   box-shadow: var(--nl-e3);
   overflow: hidden;
+  /* Gescrollt wird IN der Karte, nicht auf der Seite — das ist die Zusage im Kopfkommentar
+     von FoundationDecisionSurface, und ohne diese Hoehenbegrenzung war sie unwahr: die Karte
+     wuchs auf ihre volle Inhaltshoehe (beim Kaufdialog knapp 3000px), die SEITE scrollte, und
+     die sticky-Fussleiste klebte an einem Kartenende, das nie im Bild war. Gemessen: nach
+     1400px Scrollen stand die Fussleiste bei top 1560 in einem 1000px hohen Fenster. */
+  max-height: calc(100vh - 32px);
 }
 
 .is-new-look .nl-decision-head {
@@ -74036,11 +74042,23 @@ button.is-new-look .nl-thist-season-pill,
   border-bottom: 1px solid var(--nl-line);
 }
 
+/* Die drei Verhandlungschancen standen als nackte <span> nebeneinander und liefen ineinander:
+   "Zusage 57%Nachverhandlung 41%Absage 2%". Es gab fuer diesen Block ueberhaupt keine Regel. */
+.contract-offer-chances {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
 .is-new-look .nl-decision-body {
   display: flex;
   flex-direction: column;
   gap: var(--nl-s3, 14px);
   padding: 16px 18px;
+  /* Der Teil, der scrollt. min-height: 0 ist noetig, damit ein Flex-Kind ueberhaupt kleiner
+     werden darf als sein Inhalt — sonst sprengt es die Hoehenbegrenzung der Karte wieder. */
+  overflow-y: auto;
+  min-height: 0;
 }
 
 /* Die Fußleiste bleibt beim Scrollen sichtbar — die Entscheidung soll nicht

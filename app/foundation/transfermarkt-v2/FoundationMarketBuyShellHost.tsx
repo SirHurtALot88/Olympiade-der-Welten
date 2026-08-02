@@ -229,6 +229,7 @@ export default function FoundationMarketBuyShellHost({
       ariaLabel="Vertragsangebot"
       testId="transfer-offer-page"
       className="transfer-offer-page"
+      containerRef={buyModalRef}
       status={
         source !== "sqlite"
           ? { label: "nur Ansicht", tone: "neutral" }
