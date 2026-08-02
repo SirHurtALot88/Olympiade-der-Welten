@@ -136,7 +136,10 @@ describe("transfermarkt v2 performance contract", () => {
 
     expect(source).toContain("getAttributeTierClass");
     expect(source).toContain("buildTransfermarktScoutedAttributeRows");
-    expect(source).toContain('aria-label="Attribut-Tiers"');
+    // Die vier Achsen laufen seit dem Velo-Umbau ueber `VeloAxisRail` statt ueber flache
+    // Tier-Pillen — die Note kommt weiter aus derselben Quelle, nur der Traeger ist neu.
+    expect(source).toContain('aria-label="Attribut-Achsen"');
+    expect(source).toContain("<VeloAxisRail");
     expect(source).toContain('aria-label="Feinattribute"');
     expect(source).not.toContain("<span>Entwicklungspfad</span>");
     expect(source).not.toContain("Route {formatDevelopmentRouteLabel(selectedPlayer.developmentRoute)}");

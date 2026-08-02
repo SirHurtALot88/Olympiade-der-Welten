@@ -2,6 +2,8 @@
  * Velo UI catalog — when to use which component on Foundation surfaces:
  *
  * - VeloStatOrbitRow: POW/SPE/MEN/SOC on player/team cards (Teams, Season cards, Lineup deck)
+ * - VeloAxisRail: POW/SPE/MEN/SOC when the four values need to be COMPARED — meter per axis,
+ *   optional reference mark (e.g. squad average). Scouting/Transfermarkt rather than card overlays.
  * - VeloImpactStrip: phased metrics (Base / Form / Mutator / Final, XP / Fatigue, Rank window)
  * - VeloIntensityRail: Push / Normal / Conserve selection rails (Training, filters)
  * - VeloAttributeFocusTags: training weight gain/loss tags
@@ -10,6 +12,7 @@
  * Prefer `.velo-*` classes; feature aliases (e.g. `training-v2-rider-orbit`) stay for legacy CSS.
  * Avoid parallel chip styles (`arena-v2-axis-chip`, custom breakdown spans) — use components here.
  */
+export { VeloAxisRail, type VeloAxisRailEntry, type VeloAxisRailProps } from "@/components/foundation/velo-ui/VeloAxisRail";
 export { VeloScoutMetric } from "@/components/foundation/velo-ui/VeloScoutMetric";
 export { VeloAttributeFocusTags, type VeloAttributeFocusEntry } from "@/components/foundation/velo-ui/VeloAttributeFocusTags";
 export { buildTrainingImpactItems, VeloImpactStrip, type VeloImpactItem } from "@/components/foundation/velo-ui/VeloImpactStrip";

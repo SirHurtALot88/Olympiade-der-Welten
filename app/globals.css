@@ -50376,7 +50376,10 @@ button.foundation-team-portrait-card {
   display: grid;
   /* Deal-Spalte (rechts) schlanker: nimmt weniger Breite, mehr Raum fürs
      Scouting-Profil in der Mitte. */
-  grid-template-columns: minmax(280px, 0.92fr) minmax(340px, 1.4fr) minmax(250px, 0.78fr);
+  /* Das Scouting-Profil traegt jetzt das grosse Portrait UND die zweizeilige Kachelspalte
+     daneben — die Mitte bekommt dafuer etwas mehr Breite, Liste und Deal-Spalte geben je
+     ein Stueck ab. */
+  grid-template-columns: minmax(280px, 0.86fr) minmax(340px, 1.56fr) minmax(250px, 0.72fr);
   gap: var(--nl-s4);
   align-items: start;
 }
@@ -50388,10 +50391,15 @@ button.foundation-team-portrait-card {
   gap: var(--nl-s2);
 }
 
+/* Als Query-Container, nicht per Viewport: die Breite dieser Spalte haengt am
+   Ansichtsmodus (Standard/Breit/Cinema) genauso wie am Fenster — eine Media-Query
+   auf die Fensterbreite trifft daher regelmaessig die falsche Karte. */
 .is-new-look .nl-market-focus-column {
   display: flex;
   flex-direction: column;
   gap: var(--nl-s4);
+  container-type: inline-size;
+  container-name: nl-focus;
 }
 
 .is-new-look .nl-market-deal-column {
@@ -50464,9 +50472,19 @@ button.foundation-team-portrait-card {
   flex: none;
 }
 
+/* GEFRAGT: „bitte das bild auf dem transfermarkt größer machen". Das Portrait ist die einzige
+   Stelle, an der der Kandidat ein Gesicht bekommt — es darf den Kopf der Karte tragen. Feste
+   Breite (kein flex-Schrumpfen), damit die Kachelspalte daneben rechnerisch planbar bleibt. */
 .is-new-look .nl-market-focus-portrait {
-  width: 196px;
-  height: 196px;
+  width: 240px;
+  height: 240px;
+  border-radius: var(--nl-r-lg, 14px);
+}
+
+/* Im grossen Kasten wuerde ein 13px-Kuerzel verloren wirken. */
+.is-new-look .nl-market-focus-portrait .nl-market-portrait-initials {
+  font-size: 34px;
+  letter-spacing: 0.06em;
 }
 
 .is-new-look .nl-market-portrait-img {
@@ -50717,6 +50735,9 @@ button.foundation-team-portrait-card {
   display: flex;
   flex-direction: column;
   gap: var(--nl-s2);
+  /* Nimmt den Rest neben dem Portrait — sonst schrumpft die Kachelspalte auf ihre
+     Inhaltsbreite und die Zahlen brechen um. */
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -50725,9 +50746,59 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
-.is-new-look .nl-market-focus-stats,
 .is-new-look .nl-market-roster-stats {
   flex-wrap: wrap;
+}
+
+/* GEFRAGT: „die Kacheln daneben nur in 2 zeilen". Freies Wrappen konnte je nach Zahlenlänge
+   drei oder vier Zeilen ergeben — hier steht die Zeilenzahl fest: 3 Spalten × 2 Zeilen, die
+   Bracket-Kachel füllt als einzige den Rest der zweiten Zeile. Die Zeilen sind gleich hoch,
+   damit die Spalte neben dem Portrait ruhig steht. */
+.is-new-look .nl-market-focus-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 72px;
+  gap: var(--nl-s2);
+  align-content: center;
+}
+
+.is-new-look .nl-market-focus-stats > *:nth-child(5) {
+  grid-column: span 2;
+}
+
+.is-new-look .nl-market-focus-stats .nl-stat-chip {
+  min-width: 0;
+  padding: var(--nl-s2);
+  justify-content: center;
+}
+
+/* Gemessen: 81px Inhaltsbreite je Kachel, „128,4 Mio" braucht in der Kachelschrift 76px —
+   die volle Wertgroesse passt also. Abschneiden statt Umbrechen bleibt als Notnagel drin,
+   damit eine unerwartet lange Zahl das Raster nicht auf drei Zeilen sprengt. */
+.is-new-look .nl-market-focus-stats .nl-stat-chip-value {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Gemessen: nebeneinander braucht der Kopf 240px Portrait + 16px Abstand + rund 264px
+   Kachelspalte, also gut 550px Kartenbreite. Darunter stellt sich der Kopf hochkant —
+   das Bild bleibt gross, die Kacheln bleiben zwei Zeilen, statt beides zu quetschen.
+   (Bei 444px Karte waren die Kacheln vorher 46px breit und schnitten „11,6 Mio" ab.) */
+@container nl-focus (max-width: 570px) {
+  .is-new-look .nl-market-focus-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .is-new-look .nl-market-focus-portrait {
+    width: 100%;
+    max-width: 320px;
+    height: auto;
+    aspect-ratio: 1 / 1;
+    align-self: center;
+  }
 }
 
 .is-new-look .nl-market-axis-grid {
@@ -61496,11 +61567,6 @@ span.nl-facility-ampel-chip {
   color: var(--nl-mut);
   text-align: center;
 }
-.is-new-look .nl-market-radar-row .nl-market-attr-chips {
-  flex: 1 1 160px;
-  margin: 0;
-}
-
 /* --- Transfermarkt #18: Potenzial-Sterne & Entwicklungs-Trend --- */
 .is-new-look .nl-market-talent-row {
   display: flex;
@@ -61620,38 +61686,163 @@ span.nl-facility-ampel-chip {
   }
 }
 
-/* --- Transfermarkt: farbige Tier-Chips je Achse (POW/SPE/MEN/SOC) --- */
-.is-new-look .nl-market-attr-chips {
+/* =======================================================================
+   Velo-Achsen-Rail — POW/SPE/MEN/SOC als Meter statt flacher Tier-Pillen.
+   GEFRAGT: „Das Pow spe men soc kannst du sicher auch hübscher und mehr im
+   velo style darstellen!"
+
+   Zwei Kanäle, bewusst getrennt: die ACHSFARBE (dieselben vier Töne wie die
+   Orbit-Chips im Training) sagt WELCHE Achse, die Note rechts sagt WIE GUT,
+   und die Meterlänge sagt WIE VIEL. Die feine Marke im Meter ist der
+   Kader-Schnitt derselben Achse — dieselbe Quelle, aus der der Radar sein
+   Ghost-Polygon zieht, hier nur ablesbar statt erahnbar.
+   ======================================================================= */
+.velo-axis-rail {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 6px;
-  margin: var(--nl-s2) 0;
+  min-width: 0;
 }
 
-.is-new-look .nl-market-attr-chip {
-  display: inline-flex;
+.velo-axis-rail-row {
+  display: grid;
+  grid-template-columns: 22px 30px minmax(24px, 1fr) auto auto;
   align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border-radius: var(--nl-r-pill);
-  border: 1px solid var(--nl-line);
-  background: var(--nl-panel-2);
-  color: var(--nl-ink);
-  font-size: 12px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  gap: 8px;
+  padding: 4px 8px 4px 4px;
+  border-radius: var(--nl-r-pill, 999px);
+  border: 1px solid color-mix(in srgb, var(--velo-axis, currentColor) 26%, transparent);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--velo-axis, currentColor) 14%, transparent),
+    color-mix(in srgb, var(--velo-axis, currentColor) 4%, transparent)
+  );
+  min-width: 0;
 }
 
-.is-new-look .nl-market-attr-chip b {
+.velo-axis-rail-row.is-pow {
+  --velo-axis: rgb(214, 93, 86);
+}
+.velo-axis-rail-row.is-spe {
+  --velo-axis: rgb(98, 179, 110);
+}
+.velo-axis-rail-row.is-men {
+  --velo-axis: rgb(113, 153, 235);
+}
+.velo-axis-rail-row.is-soc {
+  --velo-axis: rgb(225, 184, 92);
+}
+
+.velo-axis-rail-badge {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--velo-axis, currentColor) 24%, transparent);
+  border: 1px solid color-mix(in srgb, var(--velo-axis, currentColor) 42%, transparent);
+}
+
+.velo-axis-rail-icon {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  opacity: 0.92;
+}
+
+.velo-axis-rail-label {
   font-size: 10px;
-  letter-spacing: 0.06em;
-  color: inherit;
-  opacity: 0.8;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--velo-axis, currentColor) 68%, var(--nl-ink, currentColor));
 }
 
-.is-new-look .nl-market-attr-chip em {
-  font-style: normal;
+.velo-axis-rail-meter {
+  position: relative;
+  display: block;
+  height: 6px;
+  min-width: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--nl-ink, currentColor) 12%, transparent);
+  overflow: hidden;
+}
+
+.velo-axis-rail-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--velo-axis, currentColor) 55%, transparent),
+    var(--velo-axis, currentColor)
+  );
+}
+
+/* Kader-Referenz: eine Marke, kein zweiter Balken — sie soll den Wert einordnen,
+   nicht mit ihm um Aufmerksamkeit ringen. */
+.velo-axis-rail-mark {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--nl-ink, currentColor) 62%, transparent);
+}
+
+.velo-axis-rail-value {
+  font-size: 13px;
   font-weight: 700;
+  font-family: var(--nl-display, inherit);
+  font-variant-numeric: tabular-nums;
+  color: var(--nl-ink, currentColor);
+  text-align: right;
+  min-width: 2ch;
+}
+
+.velo-axis-rail-grade {
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: var(--nl-r-sm, 6px);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--heat-neutral-text);
+  background: var(--heat-neutral-bg);
+}
+
+.velo-axis-rail-row.is-grade-s .velo-axis-rail-grade {
+  color: var(--heat-elite-text);
+  background: var(--heat-elite-bg);
+}
+.velo-axis-rail-row.is-grade-a .velo-axis-rail-grade {
+  color: var(--heat-strong-text);
+  background: var(--heat-strong-bg);
+}
+.velo-axis-rail-row.is-grade-b .velo-axis-rail-grade {
+  color: var(--heat-good-text);
+  background: var(--heat-good-bg);
+}
+.velo-axis-rail-row.is-grade-c .velo-axis-rail-grade {
+  color: var(--heat-neutral-text);
+  background: var(--heat-neutral-bg);
+}
+.velo-axis-rail-row.is-grade-d .velo-axis-rail-grade {
+  color: var(--heat-risk-text);
+  background: var(--heat-risk-bg);
+}
+.velo-axis-rail-row.is-grade-f .velo-axis-rail-grade {
+  color: var(--heat-danger-text);
+  background: var(--heat-danger-bg);
+}
+
+/* Im Scouting-Profil läuft die Rail neben dem Radar und darf den Rest der Zeile füllen. */
+.is-new-look .nl-market-radar-row .nl-market-axis-rail {
+  flex: 1 1 210px;
+  margin: 0;
 }
 
 /* --- Feinattribute (12) — nur freigeschaltete Werte, gleiche Tier-Farben wie die Achsen-Chips --- */
@@ -61691,56 +61882,48 @@ span.nl-facility-ampel-chip {
   opacity: 0.8;
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-splus,
 .is-new-look .nl-market-fine-attr-chip.is-tier-splus {
   color: var(--heat-best-text);
   background: var(--heat-best-bg);
   border-color: rgba(230, 240, 255, 0.34);
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-s,
 .is-new-look .nl-market-fine-attr-chip.is-tier-s {
   color: var(--heat-elite-text);
   background: var(--heat-elite-bg);
   border-color: rgba(12, 21, 39, 0.2);
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-a,
 .is-new-look .nl-market-fine-attr-chip.is-tier-a {
   color: var(--heat-strong-text);
   background: var(--heat-strong-bg);
   border-color: rgba(240, 255, 235, 0.22);
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-b,
 .is-new-look .nl-market-fine-attr-chip.is-tier-b {
   color: var(--heat-good-text);
   background: var(--heat-good-bg);
   border-color: rgba(20, 28, 20, 0.18);
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-c,
 .is-new-look .nl-market-fine-attr-chip.is-tier-c {
   color: var(--heat-neutral-text);
   background: var(--heat-neutral-bg);
   border-color: rgba(42, 31, 8, 0.18);
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-d,
 .is-new-look .nl-market-fine-attr-chip.is-tier-d {
   color: var(--heat-risk-text);
   background: var(--heat-risk-bg);
   border-color: rgba(42, 31, 8, 0.2);
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-e,
 .is-new-look .nl-market-fine-attr-chip.is-tier-e {
   color: var(--heat-danger-light-text);
   background: var(--heat-danger-light-bg);
   border-color: rgba(42, 18, 14, 0.2);
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-f,
 .is-new-look .nl-market-fine-attr-chip.is-tier-f {
   color: var(--heat-danger-text);
   background: var(--heat-danger-bg);
