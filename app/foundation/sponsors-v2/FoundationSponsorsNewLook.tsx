@@ -23,11 +23,17 @@ import {
 } from "@/components/foundation/sponsor/SponsorOfferCardNewLook";
 import {
   buildSponsorOfferPresentation,
+  computeSponsorCostCoverage,
   getSponsorComponentKindLabel,
+  getSponsorCoverageTone,
   sortLeagueSponsorRows,
   type LeagueSponsorSort,
 } from "@/lib/sponsor/sponsor-offer-presenter";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
+import {
+  getTeamDisplaySalaryTotal,
+  getTeamFacilityUpkeepTotal,
+} from "@/lib/sponsor/sponsor-team-salary-display";
 import { resolveSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { sponsorV4AxisLabel, type SponsorV4AxisKey } from "@/lib/sponsor/sponsor-v4-axes";
 import { previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
@@ -446,7 +452,19 @@ export default function FoundationSponsorsNewLook({
         : null;
       // Hauptzahl: voraussichtliche Auszahlung beim aktuellen Rang.
       const projectedCash = contract ? (sponsorProjectedByTeamId.get(team.teamId) ?? 0) : null;
+      // EINNAHME UND KOSTEN NEBENEINANDER. Bis hierher beantwortete die Uebersicht nur "wer hat
+      // welchen Sponsor" — nicht die Frage, die dahinter steht: traegt der Sponsor die Mannschaft
+      // ueberhaupt? Der Betrag allein kann das nicht beantworten, solange die Kader unterschiedlich
+      // teuer sind: 90 sind fuer einen Kader mit 84 Gehalt etwas anderes als fuer einen mit 48.
+      const salaryTotal = getTeamDisplaySalaryTotal(gameState, team.teamId);
+      const upkeepTotal = getTeamFacilityUpkeepTotal(gameState, team.teamId);
+      const fixedCostTotal = Math.round((salaryTotal + upkeepTotal) * 10) / 10;
+      const costCoverage = computeSponsorCostCoverage(projectedCash, fixedCostTotal);
       return {
+        salaryTotal,
+        upkeepTotal,
+        fixedCostTotal,
+        costCoverage,
         teamId: team.teamId,
         teamName: team.name,
         shortCode: team.shortCode,
@@ -946,17 +964,34 @@ export default function FoundationSponsorsNewLook({
                       <span className="nl-sponsor-league-sponsor is-empty">— noch keiner —</span>
                     )}
                   </div>
-                  <span
-                    className="nl-sponsor-league-cash nl-tnum"
-                    title={
-                      row.projectedCash != null
-                        ? `Voraussichtliche Auszahlung beim aktuellen Rang${
-                            row.rank != null ? ` #${row.rank}` : ""
-                          }${row.maxCash != null ? ` · max. Vertragswert ${formatMoney(row.maxCash)}` : ""}`
-                        : "Kein Sponsor unter Vertrag"
-                    }
-                  >
-                    {row.projectedCash != null ? formatMoney(row.projectedCash) : "—"}
+                  <span className="nl-sponsor-league-figures">
+                    <span
+                      className="nl-sponsor-league-cash nl-tnum"
+                      title={
+                        row.projectedCash != null
+                          ? `Voraussichtliche Auszahlung beim aktuellen Rang${
+                              row.rank != null ? ` #${row.rank}` : ""
+                            }${row.maxCash != null ? ` · max. Vertragswert ${formatMoney(row.maxCash)}` : ""}`
+                          : "Kein Sponsor unter Vertrag"
+                      }
+                    >
+                      {row.projectedCash != null ? formatMoney(row.projectedCash) : "—"}
+                    </span>
+                    {/* Deckungsgrad: traegt der Sponsor die laufenden Kosten? Unter 100 % zahlt das
+                        Team drauf. Die Farbe ist NICHT der einzige Traeger — der Prozentwert steht
+                        daneben, damit die Aussage auch ohne Farbunterscheidung ankommt. */}
+                    {row.costCoverage != null ? (
+                      <span
+                        className={`nl-sponsor-league-coverage nl-tnum is-${getSponsorCoverageTone(row.costCoverage)}`}
+                        title={`Sponsor deckt ${Math.round(
+                          row.costCoverage * 100,
+                        )} % der Fixkosten · Gehälter ${formatMoney(row.salaryTotal)}${
+                          row.upkeepTotal > 0 ? ` + Unterhalt ${formatMoney(row.upkeepTotal)}` : ""
+                        } = ${formatMoney(row.fixedCostTotal)}`}
+                      >
+                        {Math.round(row.costCoverage * 100)} % der Fixkosten
+                      </span>
+                    ) : null}
                   </span>
                 </div>
               );
