@@ -1,6 +1,7 @@
 import type { GameState, SeasonSnapshotRecord } from "@/lib/data/olyDataTypes";
 import { buildAllTimeTableFromSnapshots, resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
 import { buildPlayerLeagueCareerStatsMap } from "@/lib/foundation/player-league-career-stats";
+import { isFiniteNumber } from "@/lib/foundation/foundation-number-utils";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 
@@ -109,10 +110,6 @@ export type LeagueRecordsHallOfFame = {
   /** Erweiterte Liste (Top 25) für die "Legendäre Spieler"-Sektion. */
   legendaryPlayers: PlayerCareerLeaderRow[];
 };
-
-function isFiniteNumber(value: number | null | undefined): value is number {
-  return typeof value === "number" && Number.isFinite(value);
-}
 
 function getSeasonSortValue(seasonId: string) {
   const numericMatch = seasonId.match(/(\d+)$/);

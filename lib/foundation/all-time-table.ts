@@ -1,4 +1,5 @@
 import type { GameState, SeasonSnapshotRecord } from "@/lib/data/olyDataTypes";
+import { isFiniteNumber } from "@/lib/foundation/foundation-number-utils";
 import { buildAllTimeTableFromSnapshots, resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 
@@ -106,10 +107,6 @@ export interface BuildAllTimeTableModelInput {
    * Modell nur archivierte Saisons (kein erfundener Live-Wert).
    */
   liveStandingsByTeamId?: Record<string, LiveTeamStanding> | null;
-}
-
-function isFiniteNumber(value: number | null | undefined): value is number {
-  return typeof value === "number" && Number.isFinite(value);
 }
 
 function sortSnapshotsAsc(snapshots: SeasonSnapshotRecord[]): SeasonSnapshotRecord[] {

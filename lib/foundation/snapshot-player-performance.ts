@@ -1,12 +1,5 @@
 import type { GameState, SeasonSnapshotPlayerPerformanceRecord, SeasonSnapshotRecord } from "@/lib/data/olyDataTypes";
-
-function roundValue(value: number, digits = 1) {
-  return Number(value.toFixed(digits));
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value);
-}
+import { isFiniteNumber, roundValue } from "@/lib/foundation/foundation-number-utils";
 
 /**
  * True when the row already carries the per-area metric data the Historie table

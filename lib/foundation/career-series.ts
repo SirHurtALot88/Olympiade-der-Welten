@@ -1,4 +1,5 @@
 import type { GameState, SeasonSnapshotRecord } from "@/lib/data/olyDataTypes";
+import { isFiniteNumber } from "@/lib/foundation/foundation-number-utils";
 import {
   resolveSnapshotPlayerPerformanceRow,
   snapshotPerformanceRowHasData,
@@ -81,10 +82,6 @@ export type TeamCareerSeries = {
   medals: CareerMedalCabinet;
   superlatives: TeamCareerSuperlatives;
 };
-
-function isFiniteNumber(value: number | null | undefined): value is number {
-  return typeof value === "number" && Number.isFinite(value);
-}
 
 function getSeasonSortValue(seasonId: string) {
   const numericMatch = seasonId.match(/(\d+)$/);

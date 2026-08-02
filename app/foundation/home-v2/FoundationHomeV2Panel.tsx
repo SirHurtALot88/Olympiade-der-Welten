@@ -4,17 +4,18 @@ import dynamic from "next/dynamic";
 
 import type { ManagerOfficeClientProps } from "@/app/foundation/home-v2/ManagerOfficeClient";
 import type { HomeV2ClientProps } from "@/app/foundation/home-v2/home-v2-types";
+import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
 
 const HomeV2Client = dynamic(() => import("@/app/foundation/home-v2/HomeV2Client"), {
   ssr: false,
-  loading: () => <p className="foundation-view-loading">Home wird geladen …</p>,
+  loading: () => <FoundationPanelSkeleton variant="homeV2" label="Home wird geladen…" />,
 });
 
 const ManagerOfficeClient = dynamic(
   () => import("@/app/foundation/home-v2/ManagerOfficeClient").then((mod) => mod.ManagerOfficeClient),
   {
     ssr: false,
-    loading: () => <p className="foundation-view-loading">Office wird geladen …</p>,
+    loading: () => <FoundationPanelSkeleton label="Office wird geladen…" />,
   },
 );
 

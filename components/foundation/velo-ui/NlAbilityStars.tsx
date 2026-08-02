@@ -39,6 +39,7 @@
  */
 
 import { formatNlNumber } from "@/components/foundation/new-look/nl-tones";
+import { isFiniteNumber } from "@/lib/foundation/foundation-number-utils";
 import { potentialScoreToStars } from "@/lib/progression/player-potential-service";
 
 type NlRange = { min: number; max: number };
@@ -73,10 +74,6 @@ export type NlAbilityStarsProps = {
   tone?: "gold" | "danger";
   className?: string;
 };
-
-function isFiniteNumber(value: number | null | undefined): value is number {
-  return typeof value === "number" && Number.isFinite(value);
-}
 
 function parseStarValue(value: number | string | null | undefined): number | null {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;

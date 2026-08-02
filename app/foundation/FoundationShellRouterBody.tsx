@@ -2058,7 +2058,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             ) : activeView === "playerProfile" ? (
               <div className="foundation-view-loading-panel" data-testid="foundation-player-profile-loading">
                 {gameState.season.id === "loading" || playerProfileLoading ? (
-                  <p className="foundation-view-loading">Spielerprofil wird geladen …</p>
+                  <FoundationPanelSkeleton label="Spielerprofil wird geladen…" />
                 ) : (
                   <div className="player-drawer-callout">
                     <strong>Spielerprofil nicht verfügbar</strong>

@@ -8,6 +8,7 @@ import {
 import type { PlayerEconomyCompareRow } from "@/lib/foundation/player-economy-compare-service";
 import { buildPlayerEconomyCompareMap } from "@/lib/foundation/player-economy-compare-service";
 import { resolvePlayerEconomyContract, type PlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { isFiniteNumber, roundValue } from "@/lib/foundation/foundation-number-utils";
 import { getFatiguePerformancePenaltyPercent } from "@/lib/fatigue/fatigue-calibration";
 import { calculateTeamRecovery, getInjuryRiskBand, getInjuryRiskPercent, getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 import {
@@ -556,14 +557,6 @@ export type PlayerDetailDrawerData = {
   historyRows: PlayerDrawerHistoryRow[];
   ratingWarnings: string[];
 };
-
-function isFiniteNumber(value: number | null | undefined): value is number {
-  return typeof value === "number" && Number.isFinite(value);
-}
-
-function roundValue(value: number, digits = 1) {
-  return Number(value.toFixed(digits));
-}
 
 function calculateMoneyDelta(value: number | null | undefined, reference: number | null | undefined, digits = 2) {
   if (!isFiniteNumber(value) || !isFiniteNumber(reference)) {

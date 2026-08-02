@@ -6,6 +6,7 @@ import type { GameState, Player, RosterEntry } from "@/lib/data/olyDataTypes";
 // includes `buyoutCost`/`netProceeds`) — reuse the canonical definition instead of
 // keeping a second, drifting copy here.
 import type { TransfermarktSellSummary } from "@/lib/foundation/tabs/foundation-page-types";
+import { roundViewNumberByFactor as roundViewNumber } from "@/lib/foundation/foundation-number-utils";
 
 export type { TransfermarktSellSummary } from "@/lib/foundation/tabs/foundation-page-types";
 
@@ -64,11 +65,6 @@ export type MarketSellPlayerPerformance = {
     averageFinalScore: number | null;
   }>;
 };
-
-function roundViewNumber(value: number, digits = 4) {
-  const factor = 10 ** digits;
-  return Math.round(value * factor) / factor;
-}
 
 function getTransferTypeLabel(type: "buy" | "sell" | "contract_exit") {
   if (type === "contract_exit") return "Vertragsende";

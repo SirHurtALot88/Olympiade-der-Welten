@@ -1,4 +1,5 @@
 import type { GameState, Team, TeamIdentity, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
+import { clamp } from "@/lib/foundation/foundation-number-utils";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 
@@ -14,10 +15,6 @@ export type TeamDevelopmentTendency = {
 
 const DEVELOPMENT_ARCHETYPES = ["teacher", "mentor", "leader", "captain", "scholar", "tactician"];
 const DEVELOPMENT_KEYWORDS = ["develop", "entwickl", "prospect", "youth", "train", "mentor", "lehrer", "teacher", "günstig", "günstig", "schueler", "schüler"];
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
-}
 
 function round(value: number, digits = 2) {
   return Number(value.toFixed(digits));

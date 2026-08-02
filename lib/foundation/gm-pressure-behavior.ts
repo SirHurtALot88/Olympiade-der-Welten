@@ -1,4 +1,5 @@
 import type { GameState, TeamGeneralManagerProfile, TeamIdentity } from "@/lib/data/olyDataTypes";
+import { clamp } from "@/lib/foundation/foundation-number-utils";
 import { buildGmStoryView } from "@/lib/foundation/gm-story";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import { isBoardObjectivesV2Enabled } from "@/lib/board/board-objectives-config";
@@ -16,10 +17,6 @@ export type GmPressureBehavior = {
   softBlockStarSell: boolean;
   detail: string;
 };
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
 
 function getBoardPressure(identity: TeamIdentity | null) {
   return clamp((10 - (identity?.boardConfidence ?? 5)) / 10, 0, 1);

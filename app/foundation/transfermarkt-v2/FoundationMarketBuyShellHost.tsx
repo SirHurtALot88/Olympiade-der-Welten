@@ -13,6 +13,7 @@ import { NlCard, NlCountUpValue, StatChip, StatChipRow } from "@/components/foun
 import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import type { ContractShape, Team, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
 import {
+  formatContractShapeLabel,
   useMarketBuyDerivations,
   type MarketBuyNegotiationOutcome,
   type UseMarketBuyDerivationsInput,
@@ -68,13 +69,6 @@ function formatContractLengthPreference(value: "short" | "medium" | "long" | nul
   if (value === "short") return "kurze Verträge";
   if (value === "long") return "lange Verträge";
   if (value === "medium") return "mittlere Verträge";
-  return "offen";
-}
-
-function formatContractShapeLabel(value: ContractShape | null | undefined) {
-  if (value === "front_loaded") return "vorne schwer";
-  if (value === "back_loaded") return "hinten schwer";
-  if (value === "balanced") return "ausgeglichen";
   return "offen";
 }
 

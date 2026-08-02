@@ -34,6 +34,7 @@ import { formatPlayerIdentitySubMeta } from "@/lib/foundation/player-identity-me
 import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import type { FieldRaceLedgerEntry } from "@/lib/foundation/build-field-race-ledger";
 import { buildTeamDisciplineRankRowsFromGameState } from "@/lib/foundation/team-discipline-rank-engine";
+import { isFiniteNumber } from "@/lib/foundation/foundation-number-utils";
 import { calculateFacilityIncome, calculateFacilityUpkeep } from "@/lib/facilities/facility-effects";
 import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
 import { buildOrderedFoundationDisciplines, getTeamAxisRankTooltip } from "@/lib/foundation/tabs/teams-ui-helpers";
@@ -323,10 +324,6 @@ function getBoardSortValue(row: TeamsViewRow, key: NlTeamsBoardSortKey): number 
     default:
       return null;
   }
-}
-
-function isFiniteNumber(value: number | null | undefined): value is number {
-  return value != null && Number.isFinite(value);
 }
 
 // === Disziplin-Profil: Einzeldisziplinen-Radar + Breakdown (#46) ==========

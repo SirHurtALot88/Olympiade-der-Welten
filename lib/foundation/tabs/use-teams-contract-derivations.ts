@@ -1,13 +1,9 @@
 import { useMemo } from "react";
 
 import type { ContractShape, GameState, Team } from "@/lib/data/olyDataTypes";
+import { roundViewNumberByFactor as roundViewNumber } from "@/lib/foundation/foundation-number-utils";
 import { buildTeamContractSeasonTable } from "@/lib/market/contract-negotiation-preview";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
-
-function roundViewNumber(value: number, digits = 2) {
-  const factor = 10 ** digits;
-  return Math.round(value * factor) / factor;
-}
 
 export type UseTeamsContractDerivationsInput = {
   enabled: boolean;

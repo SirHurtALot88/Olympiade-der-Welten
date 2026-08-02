@@ -1,5 +1,6 @@
 import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
+import { clamp } from "@/lib/foundation/foundation-number-utils";
 import { distributePerPlayerFormShares, seededFormJitter } from "@/lib/lineups/legacy-lineup-modifiers";
 import { buildLeagueDisciplineRatingsWithAttributeOverrides } from "@/lib/player-formulas/discipline-rating-engine";
 
@@ -33,10 +34,6 @@ export type DisciplineStageModel = {
   slotCount: number;
   teams: DisciplineStageTeam[]; // absteigend nach total sortiert = Rang
 };
-
-function clamp(value: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, value));
-}
 
 function computeSlot(player: Player, disciplineId: string, slotIndex: number, formSwing: number, rawBase: number): DisciplineStageSlot {
   // Grundwert kann im Save bis zu 2 Nachkommastellen haben — zuerst auf 1

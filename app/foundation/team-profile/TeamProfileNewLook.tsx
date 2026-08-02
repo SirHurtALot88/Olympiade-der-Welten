@@ -34,6 +34,7 @@ import { getClassColorClassName } from "@/app/foundation/classVisuals";
 import { getSeasonV2TeamTagStyle } from "@/app/foundation/season-v2/SeasonStandingsV2Client";
 import { getGameTermTooltip } from "@/components/ui/GameTerm";
 import { buildTeamCareerSeries } from "@/lib/foundation/career-series";
+import { isFiniteNumber } from "@/lib/foundation/foundation-number-utils";
 import { useFoundationStateOptional } from "@/lib/foundation/foundation-state-context";
 import {
   createEmptyLeaguePlayerHeatPools,
@@ -92,10 +93,6 @@ const NL_TEAMPROFILE_AXES: Array<{
   { key: "men", label: "MEN", rankKey: "menRank" },
   { key: "soc", label: "SOC", rankKey: "socRank" },
 ];
-
-function isFiniteNumber(value: number | null | undefined): value is number {
-  return value != null && Number.isFinite(value);
-}
 
 function average(values: Array<number | null | undefined>): number | null {
   const valid = values.filter(isFiniteNumber);

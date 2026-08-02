@@ -23,7 +23,7 @@ export type MarketBuyWishlistEntry = {
   salary?: number | null;
 };
 
-function formatContractShapeLabel(value: ContractShape | null | undefined) {
+export function formatContractShapeLabel(value: ContractShape | null | undefined) {
   if (value === "front_loaded") return "vorne schwer";
   if (value === "back_loaded") return "hinten schwer";
   if (value === "balanced") return "ausgeglichen";

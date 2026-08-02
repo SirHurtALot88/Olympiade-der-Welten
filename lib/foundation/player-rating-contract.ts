@@ -1,6 +1,7 @@
 import { getImportedPlayerDisplayMarketValue } from "@/lib/data/player-economy-display";
 import type { GameState, Player, PlayerDisciplinePerformanceRecord } from "@/lib/data/olyDataTypes";
 import { buildSeasonPointsLedger, type SeasonPlayerPointsSummary, type SeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
+import { isFiniteNumber, roundValue } from "@/lib/foundation/foundation-number-utils";
 import { getFrozenRatingRowsMap, isValuationFrozen } from "@/lib/season/frozen-valuation-snapshot";
 
 export type PlayerRatingWarning =
@@ -37,14 +38,6 @@ export type PlayerRatingContractRow = {
   sourceStatus: PlayerRatingSourceStatus;
   warnings: PlayerRatingWarning[];
 };
-
-function roundValue(value: number, digits = 2) {
-  return Number(value.toFixed(digits));
-}
-
-function isFiniteNumber(value: number | null | undefined): value is number {
-  return typeof value === "number" && Number.isFinite(value);
-}
 
 const MARKET_VALUE_BRACKET_STARTS = [0, 12.5, 17.5, 22.5, 30, 37.5, 45, 55, 70];
 const RETOOL_MVS_CLUTCH_DISCIPLINES = new Set(["showcase", "eiskunstlauf", "football", "basketball", "battlefield"]);

@@ -4,47 +4,8 @@ import type { Player, RosterEntry } from "@/lib/data/olyDataTypes";
 import type { FoundationTableColumn } from "@/lib/foundation/tabs/cockpit-types";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import { compareTeamRosterPlayersByOvrOrMarketValue } from "@/lib/foundation/team-roster-player-sort";
+import { applyStoredColumnOrder } from "@/lib/foundation/tabs/foundation-page-module-helpers";
 import { TEAMS_VIEW_COLUMNS } from "@/lib/foundation/tabs/teams-ui-helpers";
-
-function uniqueColumnIds(columnIds: string[]) {
-  return [...new Set(columnIds.filter(Boolean))];
-}
-
-function applyStoredColumnOrder(
-  columns: FoundationTableColumn[],
-  columnOrder?: string[],
-  pinnedLeft?: string[],
-  pinnedRight?: string[],
-) {
-  const orderIndex = new Map((columnOrder ?? []).map((columnId, index) => [columnId, index]));
-  const baseColumns = [...columns].sort((left, right) => {
-    const leftIndex = orderIndex.get(left.id);
-    const rightIndex = orderIndex.get(right.id);
-
-    if (leftIndex == null && rightIndex == null) {
-      return columns.findIndex((column) => column.id === left.id) - columns.findIndex((column) => column.id === right.id);
-    }
-    if (leftIndex == null) {
-      return 1;
-    }
-    if (rightIndex == null) {
-      return -1;
-    }
-    return leftIndex - rightIndex;
-  });
-
-  const columnById = new Map(baseColumns.map((column) => [column.id, column]));
-  const leftPinnedColumns = uniqueColumnIds(pinnedLeft ?? [])
-    .map((columnId) => columnById.get(columnId))
-    .filter((column): column is FoundationTableColumn => Boolean(column));
-  const rightPinnedColumns = uniqueColumnIds(pinnedRight ?? [])
-    .map((columnId) => columnById.get(columnId))
-    .filter((column): column is FoundationTableColumn => Boolean(column));
-  const handled = new Set([...leftPinnedColumns, ...rightPinnedColumns].map((column) => column.id));
-  const middleColumns = baseColumns.filter((column) => !handled.has(column.id));
-
-  return [...leftPinnedColumns, ...middleColumns, ...rightPinnedColumns];
-}
 
 export type TeamsRosterPlayerPair = {
   entry: RosterEntry;

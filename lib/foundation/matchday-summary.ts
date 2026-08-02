@@ -1,4 +1,5 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { isFiniteNumber, roundValue } from "@/lib/foundation/foundation-number-utils";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 
 type RankDirection = "up" | "down" | "same" | "unknown";
@@ -62,14 +63,6 @@ export type MatchdaySummary = {
   highlights: MatchdaySummaryHighlight[];
   warnings: string[];
 };
-
-function roundValue(value: number, digits = 1) {
-  return Number(value.toFixed(digits));
-}
-
-function isFiniteNumber(value: number | null | undefined): value is number {
-  return typeof value === "number" && Number.isFinite(value);
-}
 
 function rankTeams(rows: Array<{ teamId: string; teamName: string; points: number | null }>) {
   return new Map(
