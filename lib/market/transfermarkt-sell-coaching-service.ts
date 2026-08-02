@@ -89,7 +89,7 @@ export function buildTransfermarktSellCoachingView(input: {
     replacementSlot: replacementSlots[0] ?? null,
     pricingPolicyNotes: input.pricingPolicy?.notes ?? [],
     soldPlayerSeasonBanNote:
-      "Nach dem Verkauf ist der Spieler fuer die restliche Saison fuer alle Teams nicht kaufbar.",
+      "Nach dem Verkauf ist der Spieler für die restliche Saison für alle Teams nicht kaufbar.",
   };
 }
 

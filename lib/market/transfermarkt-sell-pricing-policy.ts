@@ -156,7 +156,7 @@ export function buildSellPricingPolicyBreakdown(input: {
 
   const timingMultiplier = getTimingMultiplier(input.gameState);
   if (timingMultiplier < 1) {
-    notes.push("Verkauf ausserhalb des idealen Verkaufsfensters.");
+    notes.push("Verkauf außerhalb des idealen Verkaufsfensters.");
   }
 
   const liquidationMalus = getLiquidationMalus(input.gameState, input.teamId, input.rosterAfter, playerMin);
@@ -166,9 +166,9 @@ export function buildSellPricingPolicyBreakdown(input: {
 
   const identityFitMultiplier = getIdentityFitMultiplier(input.gameState, input.teamId, input.player);
   if (identityFitMultiplier > 1.02) {
-    notes.push("Starker Team-Fit stuetzt den Verkaufspreis.");
+    notes.push("Starker Team-Fit stützt den Verkaufspreis.");
   } else if (identityFitMultiplier < 0.98) {
-    notes.push("Schwacher Team-Fit drueckt den Verkaufspreis.");
+    notes.push("Schwacher Team-Fit drückt den Verkaufspreis.");
   }
 
   const combinedMultiplier = round(

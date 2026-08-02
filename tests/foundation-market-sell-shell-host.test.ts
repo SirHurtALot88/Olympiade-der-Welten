@@ -164,7 +164,7 @@ describe("FoundationMarketSellShellHost — Zustandsmaschine", () => {
     expect(html).toContain('data-testid="transfer-sell-disabled-reason"');
   });
 
-  it("bereit: Entscheidungsvorlage mit KPIs, Vorher→Nachher und aktivem, endgültig beschriftetem Confirm", () => {
+  it("bereit: Entscheidungsvorlage mit KPIs, Vorher→Nachher und aktivem Primärbutton", () => {
     const html = render({ marketSellPreview: makeSummary() });
     expect(html).toContain("Netto-Erlös");
     expect(html).toContain("Verkaufspreis");
@@ -172,8 +172,16 @@ describe("FoundationMarketSellShellHost — Zustandsmaschine", () => {
     expect(html).toContain("GuV");
     expect(html).toContain("Team-Auswirkung");
     expect(html).toContain("Aufstellung danach");
-    expect(html).toContain("Endgültig verkaufen");
-    // Endgültigkeit steht ausdrücklich am Ende des Dialogs:
+    // Redesign (docs/design/verkauf-popup.md Abschnitt 4, "zwei Klicks statt
+    // Checkbox-Pflicht"): der erste Klick heißt jetzt "Verkaufen…" und öffnet
+    // nur den lokalen Bestätigen-Schritt der Fußleiste — "Ja, endgültig
+    // verkaufen" (der eigentliche Sell-Call) erscheint erst danach und ist per
+    // SSR-String-Render nicht simulierbar (kein Klick-Handling ohne Hydration).
+    // Die alte Erwartung "Endgültig verkaufen" beim ersten Render entfällt
+    // deshalb bewusst.
+    expect(html).toContain("Verkaufen…");
+    expect(html).not.toContain("Ja, endgültig verkaufen");
+    // Endgültigkeit steht ausdrücklich in der Konsequenzen-Zeile:
     expect(html).toContain('data-testid="transfer-sell-final-note"');
     expect(html).not.toMatch(/data-testid="transfer-sell-confirm-button"[^>]*disabled/);
     expect(html).not.toContain('data-testid="transfer-sell-disabled-reason"');

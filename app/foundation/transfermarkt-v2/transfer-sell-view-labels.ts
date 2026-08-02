@@ -200,6 +200,79 @@ export function translateSellWarning(warning: string): string {
   }
 }
 
+/**
+ * Kategorie-Tag für einen Verkaufs-/Haltegrund (Board-Bilanz, Zone D).
+ *
+ * Die Preview liefert `reasonsToSell`/`reasonsToKeep` nur als fertige Sätze —
+ * die internen Reason-Codes (die die Kategorie eindeutig kennen würden)
+ * verlassen den Service nicht. Statt den Kontrakt aufzubohren (neues Feld
+ * durch Service → API → View für eine reine Anzeige-Gruppierung), ordnen wir
+ * hier anhand von Stichworten ein — dieselbe Copy-Schicht-Logik wie
+ * `translateSellWarning`. Reine Textklassifikation, kein neuer Wert.
+ */
+export type SellReasonCategory = "Finanzen" | "Leistung" | "Vertrag" | "Strategie";
+
+export function classifySellReasonCategory(reason: string): SellReasonCategory {
+  // Vertrag zuerst prüfen: "Buyout-Wahrscheinlichkeit" steckt im Vertragsjahr-Grund,
+  // würde sonst über das Wort "Buyout" fälschlich als Finanzen einsortiert.
+  if (/vertrag/i.test(reason)) {
+    return "Vertrag";
+  }
+  if (/cash|gehalt|erlös|gewinn|verlust|marktwert|etat|einkauf|buyout|teamcash/i.test(reason)) {
+    return "Finanzen";
+  }
+  if (/performance|score|top-10|erwartung|qualität/i.test(reason)) {
+    return "Leistung";
+  }
+  // Fallback deckt Teamprofil/Hard-No-Go/Achsenlücke/Core-Schutz/Forderungen/Board-Confidence —
+  // alles, was eher eine strategische als eine finanzielle/sportliche/vertragliche Aussage ist.
+  return "Strategie";
+}
+
+/**
+ * Gewichtsklasse eines Warning-Keys für Zone E ("Hinweise nach Gewicht" statt
+ * vier gleich lauter roter Balken). Klassifikation ist PRO KEY, nicht pro
+ * Text — neue, unbekannte Keys fallen defensiv auf "warn" (Achtung), nie auf
+ * "blocker" (würde optisch fälschlich sperren) und nie auf "good" (könnte
+ * einen echten Risikohinweis verschlucken).
+ */
+export type SellNoticeWeight = "blocker" | "warn" | "info" | "good";
+
+const SELL_WARNING_BLOCKER_KEYS = new Set(["team_would_fall_under_7", "team_would_fall_under_player_min"]);
+const SELL_WARNING_ACHTUNG_KEYS = new Set([
+  "team_would_fall_under_player_opt",
+  "team_readiness_would_get_worse",
+  "active_player_referenced_in_lineup",
+]);
+const SELL_WARNING_HINWEIS_KEYS = new Set([
+  "matchday_missing_for_readiness_preview",
+  "readiness_context_unavailable_for_sell_preview",
+]);
+
+export function classifySellWarningWeight(warning: string): SellNoticeWeight {
+  if (SELL_WARNING_BLOCKER_KEYS.has(warning)) {
+    return "blocker";
+  }
+  if (SELL_WARNING_ACHTUNG_KEYS.has(warning)) {
+    return "warn";
+  }
+  if (warning.startsWith("readiness_context:") || SELL_WARNING_HINWEIS_KEYS.has(warning)) {
+    return "info";
+  }
+  return "warn";
+}
+
+/**
+ * Gewichtsklasse einer `pricingPolicyNotes`-Zeile (freier Text, kein Key —
+ * anders als `translateSellWarning` gibt es hier keinen stabilen Code, nur
+ * die vier festen Sätze aus `buildSellPricingPolicyBreakdown`). Nur der
+ * Team-Fit-Satz ist positiv; alles andere sind neutrale Preis-Mechanik-
+ * Hinweise, kein Risiko — daher nie "blocker".
+ */
+export function classifySellPricingNoteWeight(note: string): "good" | "info" {
+  return /stützt den Verkaufspreis/i.test(note) ? "good" : "info";
+}
+
 /** Matchday-IDs ("matchday-3") → kurzes Spieltext-Label ("MD 3"). */
 export function formatMatchdayShortLabel(matchdayId: string): string {
   const numeric = matchdayId.match(/matchday-(\d+)/i)?.[1] ?? matchdayId.match(/md-?(\d+)/i)?.[1] ?? null;

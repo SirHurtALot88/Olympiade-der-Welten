@@ -1,10 +1,14 @@
 "use client";
 
-import type { Dispatch, SetStateAction } from "react";
+import { useEffect, useState } from "react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
 
 import ClassColorChip from "@/app/foundation/ClassColorChip";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import {
+  classifySellPricingNoteWeight,
+  classifySellReasonCategory,
+  classifySellWarningWeight,
   describeSellPreviewIssue,
   formatBoardTrustMoodLabel,
   formatBoardTrustPolicyLabel,
@@ -16,6 +20,7 @@ import {
   formatRosterRoleTagLabel,
   translateSellBlockingReason,
   translateSellWarning,
+  type SellNoticeWeight,
 } from "@/app/foundation/transfermarkt-v2/transfer-sell-view-labels";
 import { NlMarketBeforeAfterRow } from "@/app/foundation/transfermarkt-v2/TransfermarktV2NewLook";
 import { NlCard, NlCountUpValue, StatChip, StatChipRow } from "@/components/foundation/new-look";
@@ -46,6 +51,32 @@ function getReadinessTone(status: string | null | undefined): "good" | "neutral"
   return status === "ready" ? "good" : "risk";
 }
 
+/** Deutsche Kurz-Beschriftung je Hinweis-Gewichtsklasse (Zone E). */
+const NOTICE_BADGE_LABEL: Record<SellNoticeWeight, string> = {
+  blocker: "Blocker",
+  warn: "Achtung",
+  info: "Hinweis",
+  good: "Stärkt den Deal",
+};
+
+/** Eine Zeile in den 3-Sekunden-Kacheln (Zone C): Label links, Wert rechts, optional getönt. */
+function SellTileRow({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: ReactNode;
+  tone?: "good" | "risk" | "warn";
+}) {
+  return (
+    <div className="transfer-sell-tile-row">
+      <span className="k">{label}</span>
+      <span className={`v nl-tnum${tone ? ` is-${tone}` : ""}`}>{value}</span>
+    </div>
+  );
+}
+
 export type FoundationMarketSellShellHostProps = {
   readMetaSource: "sqlite" | "prisma";
   selectedTeam: Team | null;
@@ -72,7 +103,8 @@ export type FoundationMarketSellShellHostProps = {
 };
 
 /**
- * Market sell drilldown shell host (Strangler Phase 5.3) — Neuer Look.
+ * Verkaufs-Popup (Strangler Phase 5.3+) — Neuer Look, Redesign nach
+ * docs/design/verkauf-popup.md (abgesegnetes Mockup).
  *
  * Zustandsmaschine statt Meldungs-Stapel: genau EIN Zustand trägt den Screen —
  * lädt (Skeleton) · Transferfenster zu (ruhiger Info-Screen, kein Fehler) ·
@@ -83,6 +115,11 @@ export type FoundationMarketSellShellHostProps = {
  * `phase_blocked:sell_players:<phase>` und `summary: null` ab — das ist ein
  * regulärer Spielzustand (verkauft wird am Saisonende), siehe
  * `describeSellPreviewIssue` in transfer-sell-view-labels.
+ *
+ * Der "Bestätigen"-Schritt (zweiter Klick vor dem eigentlichen Verkauf) ist
+ * bewusst lokaler Popup-Zustand (`confirmStep`), kein Teil der obigen
+ * Zustandsmaschine — er verändert nur die Fußleiste, nicht den Screen-Inhalt
+ * (Zonen B-G bleiben sichtbar), siehe Entwurf Abschnitt 4.
  */
 export default function FoundationMarketSellShellHost({
   readMetaSource,
@@ -112,6 +149,11 @@ export default function FoundationMarketSellShellHost({
   const preview = marketSellPreview;
   const context = marketSellPlayerContext;
 
+  // Zweiter Klick vor dem endgültigen Verkauf (Entwurf Abschnitt 4: "zwei Klicks
+  // statt Checkbox-Pflicht"). Reiner UI-Zustand der Fußleiste, keine der sechs
+  // tragenden Screen-Zustände — Board-Bilanz, Hinweise etc. bleiben sichtbar.
+  const [confirmStep, setConfirmStep] = useState(false);
+
   // --- Zustands-Ableitung: genau ein tragender Zustand pro Render. ---
   const issue = marketSellError ? describeSellPreviewIssue(marketSellError) : null;
   const isLoading = marketSellBusy && !preview && !marketSellSuccess;
@@ -120,9 +162,23 @@ export default function FoundationMarketSellShellHost({
   // eine Banner-Meldung über der weiterhin lesbaren Vorschau.
   const showInlineError = !isLoading && preview != null && issue != null && issue.kind === "error";
 
-  // Friction fix (Generalprobe #4): der Bestätigen-Button war ohne sichtbare
-  // Begründung deaktiviert. Der konkrete Grund steht neben dem Button, nicht
-  // nur im Tooltip. Kader-Minimum wird zusätzlich immer markiert.
+  // Esc schließt das Popup — außer während eine Buchung tatsächlich läuft
+  // (marketSellBusy mit vorhandener Vorschau), analog zum Bestand
+  // (PlayerDetailDrawer, TransfermarktV2 Kaufmodal).
+  useEffect(() => {
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape" && !(marketSellBusy && preview != null)) {
+        closeMarketSellModal();
+      }
+    }
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [closeMarketSellModal, marketSellBusy, preview]);
+
+  // Friction fix (Generalprobe #4, unverändert aus dem Bestand): der
+  // Bestätigen-Button war ohne sichtbare Begründung deaktiviert. Der konkrete
+  // Grund steht neben dem Button, nicht nur im Tooltip. Kader-Minimum wird
+  // zusätzlich immer markiert.
   const rosterAtMinimum =
     (preview?.warnings ?? []).some(
       (warning) => warning === "team_would_fall_under_7" || warning === "team_would_fall_under_player_min",
@@ -155,6 +211,11 @@ export default function FoundationMarketSellShellHost({
               ? "Bitte bestätige zuerst die Board-/GM-Warnung oben, dann kannst du final verkaufen."
               : null;
 
+  // Zeigt den zweiten Bestätigen-Schritt nur, wenn der Verkauf tatsächlich
+  // ansteht — verschwindet automatisch, falls sich der Preview-Zustand
+  // zwischenzeitlich ändert (z. B. Fenster schließt während der Vorbereitung).
+  const showConfirmStep = confirmStep && !!preview?.canSell && !marketSellSuccess;
+
   // --- Hero-Basisdaten (auch ohne Preview vorhanden: Identität statt Striche). ---
   const playerName = preview?.player?.name ?? marketSellSubject?.playerName ?? "Spieler verkaufen";
   const className = preview?.player?.className ?? marketSellSubject?.className ?? "—";
@@ -169,11 +230,45 @@ export default function FoundationMarketSellShellHost({
   const buyoutCost = preview?.buyoutCost ?? 0;
   const hasBuyout = buyoutCost > 0;
   const netProceeds = preview?.netProceeds ?? preview?.salePrice ?? null;
-  const saleVsMarketValue =
-    preview?.salePrice != null && preview.marketValueReference != null
-      ? preview.salePrice - preview.marketValueReference
+  const saleProfit = context?.saleProfit ?? preview?.profit ?? null; // GuV vs. KAUFPREIS (Kachel C1)
+
+  // Netto-Erlös vs. MARKTWERT — eine ANDERE Aussage als die GuV-Zeile oben (die
+  // vergleicht mit dem Einkaufspreis). Grün = über MW verkauft, Rot = darunter.
+  // Nur der Netto-Erlös (was am Ende wirklich ankommt) wird verglichen, nicht
+  // das Brutto — sonst würde ein offener Buyout die Farbe verfälschen.
+  const netVsMarketValue =
+    netProceeds != null && preview?.marketValueReference != null
+      ? netProceeds - preview.marketValueReference
       : null;
-  const saleProfit = context?.saleProfit ?? preview?.profit ?? null;
+  const netVsMarketValuePct =
+    netVsMarketValue != null && preview?.marketValueReference
+      ? (netVsMarketValue / preview.marketValueReference) * 100
+      : null;
+  const mwDiffTone: "good" | "risk" | null = netVsMarketValue == null ? null : netVsMarketValue >= 0 ? "good" : "risk";
+  const mwDiffText =
+    netVsMarketValue == null
+      ? null
+      : `${formatSignedTransfermarktCurrency(netVsMarketValue)}${
+          netVsMarketValuePct != null
+            ? ` (${netVsMarketValuePct >= 0 ? "+" : ""}${formatLocalePoints(netVsMarketValuePct, 1)} %)`
+            : ""
+        } ${netVsMarketValue >= 0 ? "über" : "unter"} Marktwert`;
+
+  // Buyout-Herleitung unter dem Netto-Erlös: sagt explizit, ob ein Buyout
+  // absetzt UND wie viel — statt der bisherigen "kein Buyout"-Nebenbemerkung.
+  const buyoutSubText = !preview
+    ? null
+    : hasBuyout
+      ? `Verkaufspreis brutto ${formatTransfermarktCurrency(preview.salePrice)} − Buyout ${formatTransfermarktCurrency(buyoutCost)}`
+      : `Kein Buyout fällig — Verkaufspreis brutto ${formatTransfermarktCurrency(preview.salePrice)} bleibt komplett Netto`;
+
+  const sellScore = preview?.coaching?.sellIntentScore ?? null;
+  const keepScore = preview?.coaching?.keepIntentScore ?? null;
+  const intentTotal = (sellScore ?? 0) + (keepScore ?? 0);
+  const sellSharePct = intentTotal > 0 ? Math.round(((sellScore ?? 0) / intentTotal) * 1000) / 10 : 50;
+
+  const pricingNotes = preview?.coaching?.pricingPolicyNotes ?? [];
+  const hasNotices = (preview?.warnings.length ?? 0) > 0 || pricingNotes.length > 0;
 
   const statusPill =
     readMetaSource === "prisma"
@@ -185,170 +280,188 @@ export default function FoundationMarketSellShellHost({
           : preview
             ? preview.canSell
               ? { className: " is-ready", label: "bereit" }
-              : { className: " is-blocked", label: "geblockt" }
+              : { className: " is-blocked", label: "blockiert" }
             : issue?.kind === "window_closed"
               ? { className: " is-warning", label: "Fenster zu" }
               : { className: " is-blocked", label: "nicht verfügbar" };
 
-  return (
-    <section className="foundation-drilldown-page transfer-sell-page" data-testid="transfer-sell-page" aria-label="Verkaufsdialog">
-      <header className="foundation-drilldown-header">
-        <div>
-          <span className="market-v2-kicker">Verkauf</span>
-          <h1>{playerName}</h1>
-        </div>
-        <button className="secondary-button" type="button" onClick={closeMarketSellModal} disabled={marketSellBusy && preview != null}>
-          Zurück
-        </button>
-      </header>
+  // Beschriftung des Primärbuttons je Zustand (Entwurf Abschnitt 4). Der Klick
+  // selbst löst im "bereit"-Zustand nur `confirmStep` aus — der tatsächliche
+  // Verkauf passiert erst im zweiten Schritt (siehe Fußleiste unten).
+  const primaryLabel = isLoading
+    ? "Vorschau lädt…"
+    : !preview
+      ? issue?.kind === "window_closed"
+        ? "Verkauf öffnet nach MD10"
+        : "Verkauf nicht möglich"
+      : !preview.canSell
+        ? "Verkauf blockiert"
+        : marketSellBusy
+          ? "Verkauf läuft…"
+          : "Verkaufen…";
 
-      <div className="foundation-drilldown-body foundation-modal-body transfer-buy-modal-body">
-        {/* Hero: Identität + Verkaufs-KPIs im Kit-Vokabular des Kaufmodals.
-            Ohne Preview zeigt der Hero nur die Identität — keine Wand aus „—". */}
-        <NlCard
-          className="market-v2-buy-hero-card transfer-sell-hero-card"
-          eyebrow="Verkaufskandidat"
-          title={playerName}
-          actions={<span className={`transfer-status-pill${statusPill.className}`}>{statusPill.label}</span>}
-        >
-          <div className="market-v2-buy-hero">
+  return (
+    // Drilldown-Seite (Strangler-Architektur, siehe
+    // tests/foundation-page-surfaces-contract.test.ts), keine echte Overlay-
+    // Modal-Komponente — die Kartenoptik (Zonen A-H, siehe Mockup) lebt in
+    // `.transfer-sell-card` innerhalb dieser Seite, nicht als
+    // `.foundation-modal-backdrop`-Portal darüber.
+    <section
+      className="foundation-drilldown-page transfer-sell-page"
+      data-testid="transfer-sell-page"
+      aria-label="Verkaufsdialog"
+    >
+      <div className="transfer-sell-card">
+        {/* A: Kopf */}
+        <header className="transfer-sell-head">
+          <span className="transfer-sell-kicker">Transfermarkt · Verkauf</span>
+          <span className={`transfer-status-pill${statusPill.className}`}>{statusPill.label}</span>
+          <button
+            className="transfer-sell-close"
+            type="button"
+            aria-label="Schließen"
+            title="Schließen (Esc)"
+            onClick={closeMarketSellModal}
+            disabled={marketSellBusy && preview != null}
+          >
+            ✕
+          </button>
+        </header>
+
+        <div className="transfer-sell-body">
+          {/* B: Hero — Identität links, Netto-Erlös als DIE Zahl rechts. */}
+          <section className="transfer-sell-hero" aria-label="Spieler und Erlös">
             <OptimizedMediaImage
-              className="transfermarkt-portrait market-v2-buy-hero-portrait"
+              className="transfer-sell-hero-portrait"
               src={portraitSrc}
               alt={playerName}
-              width={72}
-              height={72}
+              width={96}
+              height={96}
               loading="lazy"
               fetchPriority="low"
               fallback={
                 <div
-                  className="transfermarkt-portrait transfermarkt-portrait-placeholder market-v2-buy-hero-portrait"
-                  aria-label={`${playerName} placeholder`}
+                  className="transfer-sell-hero-portrait transfer-sell-hero-portrait-placeholder"
+                  aria-label={`${playerName} Platzhalter`}
                 >
                   {playerName.slice(0, 2).toUpperCase()}
                 </div>
               }
             />
-            <div className="market-v2-buy-hero-copy">
-              <div className="market-v2-buy-hero-meta">
+            <div className="transfer-sell-hero-copy">
+              <span className="transfer-sell-hero-eyebrow">Verkaufskandidat</span>
+              <h1 className="transfer-sell-hero-name">{playerName}</h1>
+              <div className="transfer-sell-hero-chips">
                 <ClassColorChip className={className} />
-                <span>{race}</span>
-                <span className="market-v2-buy-hero-tag">{teamLabel}</span>
+                <span className="transfer-sell-hero-chip">{race}</span>
+                <span className="transfer-sell-hero-chip">{teamLabel}</span>
                 {preview?.activePlayer ? (
-                  <span className="market-v2-buy-hero-tag">
+                  <span className="transfer-sell-hero-chip">
                     Rolle {formatRosterRoleTagLabel(preview.activePlayer.roleTag)}
                   </span>
                 ) : null}
+                {preview?.activePlayer ? (
+                  <span className="transfer-sell-hero-chip">
+                    Vertrag{" "}
+                    {preview.activePlayer.contractLength <= 1
+                      ? "letztes Jahr"
+                      : `${preview.activePlayer.contractLength} Jahre`}
+                  </span>
+                ) : null}
+                {preview?.activePlayer?.salary != null ? (
+                  <span className="transfer-sell-hero-chip">
+                    Gehalt {formatTransfermarktCurrency(preview.activePlayer.salary)} p.a.
+                  </span>
+                ) : null}
               </div>
-              {preview ? (
-                <StatChipRow className="market-v2-buy-hero-stats" aria-label="Verkaufs-Kennzahlen">
-                  <StatChip
-                    label="Netto-Erlös"
-                    value={formatTransfermarktCurrency(netProceeds)}
-                    tone="accent"
-                    sub={
-                      hasBuyout
-                        ? `Brutto ${formatTransfermarktCurrency(preview.salePrice)} − Buyout ${formatTransfermarktCurrency(buyoutCost)}`
-                        : `Brutto ${formatTransfermarktCurrency(preview.salePrice)} · kein Buyout`
-                    }
-                  />
-                  <StatChip
-                    label="Verkaufspreis"
-                    value={formatTransfermarktCurrency(preview.salePrice)}
-                    tone="neutral"
-                    sub={`vs. MW ${saleVsMarketValue != null ? formatSignedTransfermarktCurrency(saleVsMarketValue) : "—"}`}
-                  />
-                  <StatChip
-                    label="Faktor"
-                    value={preview.saleFactor != null ? `${formatLocalePoints(preview.saleFactor, 2)}x` : "—"}
-                    tone="neutral"
-                    sub="auf den Marktwert"
-                  />
-                  <StatChip
-                    label="GuV"
-                    value={saleProfit != null ? formatSignedTransfermarktCurrency(saleProfit) : "—"}
-                    tone={saleProfit != null ? (saleProfit >= 0 ? "good" : "risk") : "neutral"}
-                    sub="Netto minus Einstieg"
-                  />
-                  <StatChip
-                    label="OVR"
-                    value={formatWholeNumber(context?.rating?.ovrNormalized ?? context?.player?.ovr ?? null)}
-                    tone="neutral"
-                    sub={`PPs ${formatPpsValue(context?.rating?.ppsSeason ?? context?.performance?.totalPoints ?? null)}`}
-                  />
-                </StatChipRow>
-              ) : null}
             </div>
-          </div>
-        </NlCard>
-
-        {/* --- Zustandsschicht: genau EIN tragender Zustand. --- */}
-
-        {marketSellSuccess ? (
-          // Abschlussmoment analog zum „VERPFLICHTET"-Moment des Kaufmodals:
-          // Netto-Erlös und Cash danach zählen hoch (NlCountUpValue respektiert
-          // prefers-reduced-motion), die Karte fährt über `.nl-reveal` ein.
-          <div
-            className="transfer-feedback-banner is-success market-v2-buy-signed nl-reveal"
-            data-testid="transfer-sell-sold"
-            role="status"
-            aria-live="polite"
-          >
-            <strong>Verkauf abgeschlossen</strong>
-            <span>{marketSellSuccess}</span>
             {preview ? (
-              <div className="market-v2-buy-signed-figures" aria-label="Erlös und Cash">
-                <span className="market-v2-buy-signed-figure">
-                  <small>Netto-Erlös</small>
-                  <NlCountUpValue
-                    value={netProceeds}
-                    format={(value) => formatTransfermarktCurrency(value)}
-                    className="market-v2-buy-signed-value nl-tnum"
-                  />
+              <div className="transfer-sell-price">
+                <span className="transfer-sell-price-label">Netto-Erlös</span>
+                <span className="transfer-sell-price-value nl-tnum">{formatTransfermarktCurrency(netProceeds)}</span>
+                {buyoutSubText ? <span className="transfer-sell-price-sub">{buyoutSubText}</span> : null}
+                <span className="transfer-sell-price-sub">
+                  Faktor {preview.saleFactor != null ? `${formatLocalePoints(preview.saleFactor, 2)}×` : "—"} auf MW{" "}
+                  {formatTransfermarktCurrency(preview.marketValueReference)}
                 </span>
-                <span className="market-v2-buy-signed-figure">
-                  <small>Cash danach</small>
-                  <NlCountUpValue
-                    value={preview.cashAfter}
-                    format={(value) => formatTransfermarktCurrency(value)}
-                    className="market-v2-buy-signed-value nl-tnum"
-                  />
-                </span>
+                {mwDiffText ? (
+                  <span className={`transfer-sell-price-mw-diff${mwDiffTone ? ` is-${mwDiffTone}` : ""}`}>
+                    vs. Marktwert: {mwDiffText}
+                  </span>
+                ) : null}
               </div>
             ) : null}
-          </div>
-        ) : null}
+          </section>
 
-        {isLoading ? (
-          // Echter Ladezustand statt leerer Kacheln mit „—".
-          <div
-            className="transfer-buy-preview-skeleton"
-            data-testid="transfer-sell-preview-skeleton"
-            aria-busy="true"
-            aria-label="Verkaufsvorschau lädt"
-          >
-            <div className="transfer-buy-preview-skeleton__banner">
-              <strong>Verkaufsvorschau lädt</strong>
-              <span>Preis, Erlös und Team-Auswirkung werden berechnet.</span>
+          {/* Sperr-Banner: nur im Zustand "Fenster zu". Amber, kein Alarm — das
+              ist ein regulärer Spielzustand, kein Fehler. */}
+          {showIssueScreen && issue && issue.kind === "window_closed" ? (
+            <div className="transfer-sell-lock-banner" role="status" data-testid="transfer-sell-window-closed">
+              <strong>{issue.title}</strong>
+              <span>
+                {issue.message} {issue.hint ?? ""}
+              </span>
             </div>
-            <div className="transfer-buy-preview-skeleton__grid">
-              <div className="transfer-buy-preview-skeleton__block" />
-              <div className="transfer-buy-preview-skeleton__block" />
-              <div className="transfer-buy-preview-skeleton__block" />
-              <div className="transfer-buy-preview-skeleton__block is-wide" />
-            </div>
-          </div>
-        ) : null}
+          ) : null}
 
-        {showIssueScreen && issue ? (
-          issue.kind === "window_closed" ? (
-            // Regulärer Spielzustand, kein Fehler: ruhig erklären, wann verkauft wird.
-            <div className="transfer-callout is-info transfer-sell-state-callout" data-testid="transfer-sell-window-closed" role="status">
-              <span className="transfer-sell-state-kicker">{issue.title}</span>
-              <strong className="transfer-sell-state-headline">{issue.message}</strong>
-              {issue.hint ? <span className="transfer-sell-state-hint">{issue.hint}</span> : null}
+          {/* Erfolgskarte: ersetzt die Entscheidungs-Zonen C-F, sobald verkauft. */}
+          {marketSellSuccess ? (
+            <div
+              className="market-v2-buy-signed nl-reveal"
+              data-testid="transfer-sell-sold"
+              role="status"
+              aria-live="polite"
+            >
+              <strong>Verkauf abgeschlossen</strong>
+              <span>{marketSellSuccess}</span>
+              {preview ? (
+                <div className="market-v2-buy-signed-figures" aria-label="Erlös und Cash">
+                  <span className="market-v2-buy-signed-figure">
+                    <small>Netto-Erlös</small>
+                    <NlCountUpValue
+                      value={netProceeds}
+                      format={(value) => formatTransfermarktCurrency(value)}
+                      className="market-v2-buy-signed-value nl-tnum"
+                    />
+                  </span>
+                  <span className="market-v2-buy-signed-figure">
+                    <small>Cash danach</small>
+                    <NlCountUpValue
+                      value={preview.cashAfter}
+                      format={(value) => formatTransfermarktCurrency(value)}
+                      className="market-v2-buy-signed-value nl-tnum"
+                    />
+                  </span>
+                </div>
+              ) : null}
+              {preview?.coaching?.soldPlayerSeasonBanNote ? (
+                <span>{preview.coaching.soldPlayerSeasonBanNote}</span>
+              ) : null}
             </div>
-          ) : (
+          ) : null}
+
+          {isLoading ? (
+            // Echter Ladezustand statt leerer Kacheln mit "—".
+            <div
+              className="transfer-buy-preview-skeleton"
+              data-testid="transfer-sell-preview-skeleton"
+              aria-busy="true"
+              aria-label="Verkaufsvorschau lädt"
+            >
+              <div className="transfer-buy-preview-skeleton__banner">
+                <strong>Verkaufsvorschau lädt</strong>
+                <span>Preis, Erlös und Team-Auswirkung werden berechnet.</span>
+              </div>
+              <div className="transfer-buy-preview-skeleton__grid">
+                <div className="transfer-buy-preview-skeleton__block" />
+                <div className="transfer-buy-preview-skeleton__block" />
+                <div className="transfer-buy-preview-skeleton__block" />
+                <div className="transfer-buy-preview-skeleton__block is-wide" />
+              </div>
+            </div>
+          ) : null}
+
+          {showIssueScreen && issue && issue.kind === "error" ? (
             // Echter Fehler: EINE Meldung, ein konkreter nächster Schritt.
             <div className="transfer-callout is-blocked transfer-sell-state-callout" data-testid="transfer-sell-preview-error" role="alert">
               <span className="transfer-sell-state-kicker">{issue.title}</span>
@@ -367,461 +480,618 @@ export default function FoundationMarketSellShellHost({
                 </div>
               ) : null}
             </div>
-          )
-        ) : null}
+          ) : null}
 
-        {showInlineError && issue ? (
-          <div className="transfer-feedback-banner is-error" data-testid="transfer-sell-inline-error" role="alert">
-            <strong>{issue.title}</strong>
-            <span>{issue.message}</span>
-          </div>
-        ) : null}
+          {showInlineError && issue ? (
+            <div className="transfer-feedback-banner is-error" data-testid="transfer-sell-inline-error" role="alert">
+              <strong>{issue.title}</strong>
+              <span>{issue.message}</span>
+            </div>
+          ) : null}
 
-        {preview ? (
-          <>
-            {!preview.canSell ? (
-              // Blockiert mit Grund: der Grund groß und einzeln nach vorn.
-              <div className="transfer-callout is-blocked transfer-sell-state-callout" data-testid="transfer-sell-blocked-callout">
-                <span className="transfer-sell-state-kicker">Verkauf blockiert</span>
-                <strong className="transfer-sell-state-headline">
-                  {preview.blockingReasons[0]
-                    ? translateSellBlockingReason(preview.blockingReasons[0])
-                    : "Dieser Verkauf ist gerade nicht möglich."}
-                </strong>
-                {preview.blockingReasons.length > 1 ? (
-                  <ul className="warning-list">
-                    {preview.blockingReasons.slice(1).map((reason) => (
-                      <li key={reason}>{translateSellBlockingReason(reason)}</li>
-                    ))}
-                  </ul>
-                ) : null}
-                <span className="transfer-sell-state-hint">
-                  Die Vorschau unten bleibt vollständig lesbar — nur der letzte Klick ist gesperrt.
-                </span>
-              </div>
-            ) : null}
-
-            {preview.warnings.length ? (
-              <div className="transfer-callout is-warning" data-testid="transfer-sell-warnings">
-                <div className="transfer-callout-title">
-                  <strong>Warnungen</strong>
-                  <span className="muted">{preview.warnings.length}</span>
+          {preview && !marketSellSuccess ? (
+            // Erfolgskarte ersetzt C-F (Entwurf Abschnitt 4, Zustand "Gebucht") —
+            // nach dem Verkauf zählen nur noch Erlös und Cash danach.
+            <>
+              {!preview.canSell ? (
+                // Blockiert mit Grund: der Grund groß und einzeln nach vorn.
+                <div className="transfer-callout is-blocked transfer-sell-state-callout" data-testid="transfer-sell-blocked-callout">
+                  <span className="transfer-sell-state-kicker">Verkauf blockiert</span>
+                  <strong className="transfer-sell-state-headline">
+                    {preview.blockingReasons[0]
+                      ? translateSellBlockingReason(preview.blockingReasons[0])
+                      : "Dieser Verkauf ist gerade nicht möglich."}
+                  </strong>
+                  {preview.blockingReasons.length > 1 ? (
+                    <ul className="warning-list">
+                      {preview.blockingReasons.slice(1).map((reason) => (
+                        <li key={reason}>{translateSellBlockingReason(reason)}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  <span className="transfer-sell-state-hint">
+                    Die Vorschau unten bleibt vollständig lesbar — nur der letzte Klick ist gesperrt.
+                  </span>
                 </div>
-                <ul className="warning-list">
-                  {preview.warnings.map((warning) => (
-                    <li key={warning}>{translateSellWarning(warning)}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
+              ) : null}
 
-            {/* Team-Auswirkung: Vorher→Nachher in derselben Delta-Chip-Sprache
-                wie Deal-Desk und Kaufmodal (NlMarketBeforeAfterRow). */}
-            <NlCard
-              className="market-v2-buy-impact-card transfer-sell-impact-card"
-              eyebrow="Vorher → Nachher beim Verkauf"
-              title="Team-Auswirkung"
-            >
-              <div className="nl-market-deal-rows" aria-label="Vorher-Nachher mit Verkauf">
-                <NlMarketBeforeAfterRow
-                  label="Cash"
-                  before={preview.cashBefore}
-                  after={preview.cashAfter}
-                  format={(value) => formatTransfermarktCurrency(value)}
-                />
-                <NlMarketBeforeAfterRow
-                  label="Teamgehalt"
-                  before={preview.teamSalaryBefore}
-                  after={preview.teamSalaryAfter}
-                  format={(value) => formatTransfermarktCurrency(value)}
-                  invert
-                />
-                <NlMarketBeforeAfterRow
-                  label="Kader"
-                  before={preview.rosterBefore}
-                  after={preview.rosterAfter}
-                  format={(value) => (value != null ? String(Math.round(value)) : "—")}
-                />
-              </div>
-              <StatChipRow className="transfer-sell-impact-stats" aria-label="Aufstellung und Entlastung">
-                <StatChip
-                  label="Aufstellung danach"
-                  value={formatReadinessAfterSellLabel(preview.projectedReadinessAfterSell)}
-                  tone={getReadinessTone(preview.projectedReadinessAfterSell)}
-                  sub="Aufstellungs-Check"
-                />
-                <StatChip
-                  label="Entlastung p.a."
-                  value={formatTransfermarktCurrency(preview.salaryReduction)}
-                  tone="good"
-                  sub="Gehalt fällt weg"
-                />
-              </StatChipRow>
-            </NlCard>
+              {/* C: 3-Sekunden-Zeile — wer nur diese Zeile liest, kann entscheiden. */}
+              <section className="transfer-sell-triple" aria-label="Entscheidung in drei Sekunden">
+                <article className="transfer-sell-tile">
+                  <span className="transfer-sell-tile-label">Du bekommst</span>
+                  <SellTileRow label="Netto-Erlös" value={formatTransfermarktCurrency(netProceeds)} />
+                  <SellTileRow
+                    label="Cash"
+                    value={
+                      <>
+                        {formatTransfermarktCurrency(preview.cashBefore)}{" "}
+                        <span className="transfer-sell-tile-arrow" aria-hidden="true">
+                          →
+                        </span>{" "}
+                        {formatTransfermarktCurrency(preview.cashAfter)}
+                      </>
+                    }
+                  />
+                  <SellTileRow
+                    label="GuV vs. Kaufpreis"
+                    value={saleProfit != null ? formatSignedTransfermarktCurrency(saleProfit) : "—"}
+                    tone={saleProfit != null ? (saleProfit >= 0 ? "good" : "risk") : undefined}
+                  />
+                </article>
+                <article className="transfer-sell-tile">
+                  <span className="transfer-sell-tile-label">Dein Team danach</span>
+                  <SellTileRow
+                    label="Kader"
+                    value={
+                      <>
+                        {preview.rosterBefore ?? "—"}{" "}
+                        <span className="transfer-sell-tile-arrow" aria-hidden="true">
+                          →
+                        </span>{" "}
+                        {preview.rosterAfter ?? "—"}
+                      </>
+                    }
+                  />
+                  <SellTileRow
+                    label="Entlastung p.a."
+                    value={`−${formatTransfermarktCurrency(preview.salaryReduction)}`}
+                    tone="good"
+                  />
+                  <SellTileRow
+                    label="Aufstellung danach"
+                    value={formatReadinessAfterSellLabel(preview.projectedReadinessAfterSell)}
+                    tone={getReadinessTone(preview.projectedReadinessAfterSell) === "risk" ? "warn" : undefined}
+                  />
+                </article>
+                <article className="transfer-sell-tile">
+                  <span className="transfer-sell-tile-label">Board &amp; GM</span>
+                  {preview.coaching ? (
+                    <>
+                      <SellTileRow label="Auto-Empfehlung" value={preview.coaching.sellDecisionLabel ?? "—"} />
+                      <SellTileRow
+                        label="Board-Reaktion"
+                        value={
+                          <>
+                            {preview.coaching.boardReaction.title} ·{" "}
+                            <span
+                              className={preview.coaching.boardReaction.confidenceDelta >= 0 ? "is-good" : "is-risk"}
+                            >
+                              {/* Vertrauens-Impuls ist kein Geldbetrag (typ. -1..+0.5) — eigene
+                                  Vorzeichen-Formatierung statt der Mio-Formatierung. */}
+                              {preview.coaching.boardReaction.confidenceDelta >= 0 ? "+" : ""}
+                              {formatLocalePoints(preview.coaching.boardReaction.confidenceDelta, 2)}
+                            </span>{" "}
+                            Vertrauen
+                          </>
+                        }
+                      />
+                      <SellTileRow
+                        label="GM"
+                        value={`${preview.coaching.gmName ?? "—"} · ${formatGmArchetypeLabel(preview.coaching.gmArchetype)} · ${formatGmPressureLabel(preview.coaching.gmPressureLevel)}`}
+                      />
+                    </>
+                  ) : (
+                    <p className="transfer-sell-reason-empty">Keine Board-/GM-Daten verfügbar.</p>
+                  )}
+                </article>
+              </section>
 
-            {preview.coaching ? (
+              {/* Detaillierte Vorher→Nachher-Zahlen zur kompakten Kachel oben. */}
               <NlCard
-                className="transfer-sell-coaching-card"
-                eyebrow={`Doktrin: ${formatDoctrinePersonaLabel(preview.coaching.doctrinePersona)}`}
-                title="Strategie & Board"
-                data-testid="transfer-sell-coaching-panel"
+                className="market-v2-buy-impact-card transfer-sell-impact-card"
+                eyebrow="Vorher → Nachher beim Verkauf"
+                title="Team-Auswirkung"
               >
-                <p className="nl-market-muted">{preview.coaching.strategyFitSummary}</p>
-                <div className="metric-grid compact transfer-sell-metric-grid">
-                  <article className="metric-card">
-                    <span>Auto-Empfehlung</span>
-                    <strong>{preview.coaching.sellDecisionLabel ?? "—"}</strong>
-                    <small>Priorität {preview.coaching.sellPriority ?? "—"}</small>
-                  </article>
-                  <article className="metric-card">
-                    <span>GM</span>
-                    <strong>{preview.coaching.gmName ?? "—"}</strong>
-                    <small>
-                      {formatGmArchetypeLabel(preview.coaching.gmArchetype)} ·{" "}
-                      {formatGmPressureLabel(preview.coaching.gmPressureLevel)}
-                    </small>
-                  </article>
-                  <article className="metric-card">
-                    <span>Board</span>
-                    <strong>{preview.coaching.boardReaction.title}</strong>
-                    <small>
-                      Stimmung {formatBoardTrustMoodLabel(preview.coaching.boardTrustSmiley)} ·{" "}
-                      {formatBoardTrustPolicyLabel(preview.coaching.boardTrustPolicy)}
-                    </small>
-                  </article>
-                  <article className="metric-card">
-                    <span>Marktsperre</span>
-                    <strong>1 Saison</strong>
-                    <small>{preview.coaching.soldPlayerSeasonBanNote}</small>
-                  </article>
+                <div className="nl-market-deal-rows" aria-label="Vorher-Nachher mit Verkauf">
+                  <NlMarketBeforeAfterRow
+                    label="Cash"
+                    before={preview.cashBefore}
+                    after={preview.cashAfter}
+                    format={(value) => formatTransfermarktCurrency(value)}
+                  />
+                  <NlMarketBeforeAfterRow
+                    label="Teamgehalt"
+                    before={preview.teamSalaryBefore}
+                    after={preview.teamSalaryAfter}
+                    format={(value) => formatTransfermarktCurrency(value)}
+                    invert
+                  />
+                  <NlMarketBeforeAfterRow
+                    label="Kader"
+                    before={preview.rosterBefore}
+                    after={preview.rosterAfter}
+                    format={(value) => (value != null ? String(Math.round(value)) : "—")}
+                  />
                 </div>
-                {preview.coaching.gmWarning ? (
-                  <div className="transfer-feedback-banner is-warning">
-                    <strong>GM-Hinweis</strong>
-                    <span>{preview.coaching.gmWarning}</span>
-                    {preview.coaching.gmDetail ? <small className="muted">{preview.coaching.gmDetail}</small> : null}
-                  </div>
-                ) : null}
-                {preview.coaching.replacementSlot ? (
-                  <div className="transfer-callout is-warning">
-                    <strong>Nachfolger-Slot</strong>
-                    <p>{preview.coaching.replacementSlot.slotLabel}</p>
-                    <small className="muted">
-                      Budget bis {formatTransfermarktCurrency(preview.coaching.replacementSlot.maxBuyPrice)} · Ziel-OVR{" "}
-                      {preview.coaching.replacementSlot.minOvrBand ?? "—"}
-                    </small>
-                  </div>
-                ) : null}
-                {/* Sichtbarkeit der Risiko-Bestätigung MUSS exakt der
-                    `strongAckRequired`-Bedingung entsprechen, die oben den Verkauf
-                    sperrt (strongAckPending): sobald die Bestätigung sperrt, muss
-                    die Checkbox erscheinen — sonst gäbe es einen stillen Dead-End
-                    (kritische Board-Reaktion + keepIntent < 55: gesperrt, aber ohne
-                    Checkbox und ohne Weg nach vorn). Der keepIntent≥55-Gate gilt
-                    nur für den GM-Soft-Block, nicht für die zwingende
-                    Board-Bestätigung. */}
-                {strongAckRequired ? (
-                  <label className="transfer-sell-risk-ack" data-testid="transfer-sell-risk-ack">
-                    <input
-                      type="checkbox"
-                      checked={marketSellRiskAcknowledged}
-                      onChange={(event) => onMarketSellRiskAcknowledgedChange(event.target.checked)}
-                    />
-                    <span>
-                      Ich bestätige den Verkauf trotz Board-/GM-Warnung ({preview.coaching.boardReaction.title})
-                    </span>
-                  </label>
-                ) : null}
-                <details className="transfer-sell-disclosure">
-                  <summary>
-                    Gründe für & gegen den Verkauf
-                    <span className="muted">
-                      {preview.coaching.reasonsToSell.length} dafür · {preview.coaching.reasonsToKeep.length} dagegen
-                    </span>
-                  </summary>
-                  <div className="transfer-sell-disclosure-body">
-                    <div className="transfer-buy-meta-grid">
-                      <div className="transfer-callout">
-                        <strong>Gründe für Verkauf</strong>
-                        {preview.coaching.reasonsToSell.length ? (
-                          <ul className="warning-list">
-                            {preview.coaching.reasonsToSell.map((reason) => (
-                              <li key={`sell-${reason}`}>{reason}</li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="muted">Keine Verkaufsgründe.</p>
-                        )}
-                      </div>
-                      <div className="transfer-callout">
-                        <strong>Gründe dagegen</strong>
-                        {preview.coaching.reasonsToKeep.length ? (
-                          <ul className="warning-list">
-                            {preview.coaching.reasonsToKeep.map((reason) => (
-                              <li key={`keep-${reason}`}>{reason}</li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="muted">Keine Haltegründe.</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </details>
+                <StatChipRow className="transfer-sell-impact-stats" aria-label="Aufstellung und Entlastung">
+                  <StatChip
+                    label="Aufstellung danach"
+                    value={formatReadinessAfterSellLabel(preview.projectedReadinessAfterSell)}
+                    tone={getReadinessTone(preview.projectedReadinessAfterSell)}
+                    sub="Aufstellungs-Check"
+                  />
+                  <StatChip
+                    label="Entlastung p.a."
+                    value={formatTransfermarktCurrency(preview.salaryReduction)}
+                    tone="good"
+                    sub="Gehalt fällt weg"
+                  />
+                </StatChipRow>
               </NlCard>
-            ) : null}
 
-            <details className="transfer-sell-disclosure">
-              <summary>
-                Leistung & PP-Profil
-                <span className="muted">
-                  {context?.performance?.appearances ?? 0} Einsätze · Season-PPs{" "}
-                  {formatPpsValue(context?.rating?.ppsSeason ?? context?.performance?.totalPoints ?? null)}
+              {/* D: Board-Bilanz — der Kern, NIE zugeklappt. */}
+              {preview.coaching ? (
+                <NlCard
+                  className="transfer-sell-board-card"
+                  eyebrow={
+                    preview.coaching.doctrineHint
+                      ? `Doktrin: ${formatDoctrinePersonaLabel(preview.coaching.doctrinePersona)} · ${preview.coaching.doctrineHint}`
+                      : `Doktrin: ${formatDoctrinePersonaLabel(preview.coaching.doctrinePersona)}`
+                  }
+                  title={
+                    <>
+                      Board-Bilanz
+                      <span className="transfer-sell-board-title-sub">
+                        {preview.coaching.reasonsToSell.length} dafür · {preview.coaching.reasonsToKeep.length} dagegen
+                        {preview.coaching.sellPriority != null ? ` · Priorität ${preview.coaching.sellPriority}` : ""}
+                      </span>
+                    </>
+                  }
+                  data-testid="transfer-sell-coaching-panel"
+                >
+                  {sellScore != null || keepScore != null ? (
+                    <div className="transfer-sell-intent">
+                      <div
+                        className="transfer-sell-intent-bar"
+                        role="img"
+                        aria-label={`Verkaufs-Gewichtung ${sellScore ?? 0} zu ${keepScore ?? 0}`}
+                      >
+                        <span className="transfer-sell-intent-fill" style={{ width: `${sellSharePct}%` }} />
+                      </div>
+                      <div className="transfer-sell-intent-legend">
+                        <b>Verkaufen · {sellScore ?? 0}</b>
+                        <b>Halten · {keepScore ?? 0}</b>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="transfer-sell-reasons">
+                    <div>
+                      <div className="transfer-sell-reason-col-head">
+                        <span>Dafür</span>
+                        <span>{preview.coaching.reasonsToSell.length}</span>
+                      </div>
+                      {preview.coaching.reasonsToSell.length ? (
+                        preview.coaching.reasonsToSell.map((reason, index) => (
+                          <div className="transfer-sell-reason is-for" key={`sell-${index}-${reason}`}>
+                            <span className="transfer-sell-reason-dot" aria-hidden="true" />
+                            <span className="transfer-sell-reason-tag">{classifySellReasonCategory(reason)}</span>
+                            <span>{reason}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="transfer-sell-reason-empty">Keine Verkaufsgründe.</p>
+                      )}
+                    </div>
+                    <div>
+                      <div className="transfer-sell-reason-col-head">
+                        <span>Dagegen</span>
+                        <span>{preview.coaching.reasonsToKeep.length}</span>
+                      </div>
+                      {/* Diese Spalte bleibt IMMER sichtbar, auch leer — bei wenigen,
+                          schweren Haltegründen trägt genau sie die Entscheidung. */}
+                      {preview.coaching.reasonsToKeep.length ? (
+                        preview.coaching.reasonsToKeep.map((reason, index) => (
+                          <div className="transfer-sell-reason is-keep" key={`keep-${index}-${reason}`}>
+                            <span className="transfer-sell-reason-dot" aria-hidden="true" />
+                            <span className="transfer-sell-reason-tag">{classifySellReasonCategory(reason)}</span>
+                            <span>{reason}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="transfer-sell-reason-empty">Keine Haltegründe.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <p className="transfer-sell-strategy nl-market-muted">{preview.coaching.strategyFitSummary}</p>
+                  {preview.coaching.boardTrustSmiley || preview.coaching.boardTrustPolicy ? (
+                    <p className="nl-market-muted">
+                      Board-Stimmung {formatBoardTrustMoodLabel(preview.coaching.boardTrustSmiley)} · Linie:{" "}
+                      {formatBoardTrustPolicyLabel(preview.coaching.boardTrustPolicy)}
+                    </p>
+                  ) : null}
+
+                  {/* Sichtbarkeit der Risiko-Bestätigung MUSS exakt der
+                      `strongAckRequired`-Bedingung entsprechen, die oben den Verkauf
+                      sperrt (strongAckPending): sobald die Bestätigung sperrt, muss
+                      die Checkbox erscheinen — sonst gäbe es einen stillen Dead-End. */}
+                  {strongAckRequired ? (
+                    <label className="transfer-sell-risk-ack" data-testid="transfer-sell-risk-ack">
+                      <input
+                        type="checkbox"
+                        checked={marketSellRiskAcknowledged}
+                        onChange={(event) => onMarketSellRiskAcknowledgedChange(event.target.checked)}
+                      />
+                      <span>
+                        Ich bestätige den Verkauf trotz Board-/GM-Warnung ({preview.coaching.boardReaction.title})
+                      </span>
+                    </label>
+                  ) : null}
+                </NlCard>
+              ) : null}
+
+              {/* E: Hinweise nach Gewicht — statt vier gleich lauter roter Balken. */}
+              {hasNotices ? (
+                <NlCard
+                  className="transfer-sell-notice-card"
+                  title="Hinweise"
+                  eyebrow="nach Gewicht — rot nur, wenn wirklich etwas blockiert"
+                  data-testid="transfer-sell-warnings"
+                >
+                  <div className="transfer-sell-notice-list">
+                    {preview.warnings.map((warning) => {
+                      const weight = classifySellWarningWeight(warning);
+                      return (
+                        <div className={`transfer-sell-notice is-${weight}`} key={warning}>
+                          <span className="transfer-sell-notice-badge">{NOTICE_BADGE_LABEL[weight]}</span>
+                          <span className="transfer-sell-notice-text">{translateSellWarning(warning)}</span>
+                        </div>
+                      );
+                    })}
+                    {pricingNotes.map((note, index) => {
+                      const weight = classifySellPricingNoteWeight(note);
+                      return (
+                        <div className={`transfer-sell-notice is-${weight}`} key={`pricing-${index}-${note}`}>
+                          <span className="transfer-sell-notice-badge">{NOTICE_BADGE_LABEL[weight]}</span>
+                          <span className="transfer-sell-notice-text">{note}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </NlCard>
+              ) : null}
+
+              {/* F: Konsequenzen — schmale Zeile, kein Balken-Drama. */}
+              <div className="transfer-sell-consequences" aria-label="Konsequenzen">
+                <span>
+                  <b>Marktsperre:</b> 1 Saison —{" "}
+                  {preview.coaching?.soldPlayerSeasonBanNote ?? "Der Spieler ist danach für dein Team gesperrt."}
                 </span>
-              </summary>
-              <div className="transfer-sell-disclosure-body">
-                <div className="metric-grid compact transfer-sell-metric-grid">
-                  <article className="metric-card">
-                    <span>OVR</span>
-                    <strong>{formatWholeNumber(context?.rating?.ovrNormalized ?? context?.player?.ovr ?? null)}</strong>
-                    <small>Rang {context?.rating?.ovrRank ?? "—"}</small>
-                  </article>
-                  <article className="metric-card">
-                    <span>MVS</span>
-                    <strong>{formatPpsValue(context?.rating?.mvs ?? null)}</strong>
-                    <small>Rang {context?.rating?.mvsRank ?? "—"}</small>
-                  </article>
-                  <article className="metric-card">
-                    <span>Season PPs</span>
-                    <strong>{formatPpsValue(context?.rating?.ppsSeason ?? context?.performance?.totalPoints ?? null)}</strong>
-                    <small>Rang {context?.rating?.ppsSeasonRank ?? "—"}</small>
-                  </article>
-                  <article className="metric-card">
-                    <span>Einsätze</span>
-                    <strong>{context?.performance?.appearances ?? "—"}</strong>
-                    <small>
-                      Top 10 {context?.performance?.top10Count ?? "—"} · MVP {context?.performance?.mvpCount ?? "—"}
-                    </small>
-                  </article>
-                  <article className="metric-card">
-                    <span>Letzter Einsatz</span>
-                    <strong>{context?.performance?.latestDisciplineLabel ?? "—"}</strong>
-                    <small>
-                      Score {formatPpsValue(context?.performance?.latestFinalScore ?? null)} · Rang{" "}
-                      {context?.performance?.latestRankInDiscipline ?? "—"}
-                    </small>
-                  </article>
-                  <article className="metric-card">
-                    <span>Beste Diszi</span>
-                    <strong>{context?.performance?.bestDisciplineLabel ?? "—"}</strong>
-                    <small>{formatPpsValue(context?.performance?.bestDisciplineScore ?? null)} Score</small>
-                  </article>
+                {preview.canSell && !marketSellSuccess ? (
+                  <span data-testid="transfer-sell-final-note">
+                    <b>Endgültig:</b> Ein Verkauf lässt sich nicht rückgängig machen.
+                  </span>
+                ) : null}
+              </div>
+
+              {preview.coaching?.gmWarning ? (
+                <div className="transfer-feedback-banner is-warning">
+                  <strong>GM-Hinweis</strong>
+                  <span>{preview.coaching.gmWarning}</span>
+                  {preview.coaching.gmDetail ? <small className="muted">{preview.coaching.gmDetail}</small> : null}
                 </div>
-                <div className="transfer-sell-area-grid">
-                  {(context?.areaRows ?? []).map((area) => (
-                    <article className={`transfer-sell-area-card is-${area.tone}`} key={area.key}>
-                      <span>{area.key}</span>
-                      <strong>{formatPpsValue(area.value)}</strong>
+              ) : null}
+
+              {preview.coaching?.replacementSlot ? (
+                <div className="transfer-callout is-warning">
+                  <strong>Nachfolger-Slot</strong>
+                  <p>{preview.coaching.replacementSlot.slotLabel}</p>
+                  <small className="muted">
+                    Budget bis {formatTransfermarktCurrency(preview.coaching.replacementSlot.maxBuyPrice)} · Ziel-OVR{" "}
+                    {preview.coaching.replacementSlot.minOvrBand ?? "—"}
+                  </small>
+                </div>
+              ) : null}
+
+              {/* G: Zweite Ebene — der EINZIGE zugeklappte Bereich. Leistung,
+                  Vertrag und Historie waren drei getrennte Disclosures; die
+                  Board-Bilanz war zugeklappt und die Statistik offen — das dreht
+                  der Entwurf exakt um: hier ist alles zusammengefasst, zugeklappt,
+                  weil es die Entscheidung informiert, aber nicht trägt. */}
+              <details className="transfer-sell-disclosure transfer-sell-more">
+                <summary>
+                  Mehr zum Spieler — Leistung, Vertrag, Historie
+                  <span className="muted">
+                    OVR {formatWholeNumber(context?.rating?.ovrNormalized ?? context?.player?.ovr ?? null)} · Season-PPs{" "}
+                    {formatPpsValue(context?.rating?.ppsSeason ?? context?.performance?.totalPoints ?? null)} ·{" "}
+                    {context?.performance?.appearances ?? 0} Einsätze
+                  </span>
+                </summary>
+                <div className="transfer-sell-disclosure-body">
+                  <p className="transfer-sell-more-section-title">Leistung &amp; PP-Profil</p>
+                  <div className="metric-grid compact transfer-sell-metric-grid">
+                    <article className="metric-card">
+                      <span>OVR</span>
+                      <strong>{formatWholeNumber(context?.rating?.ovrNormalized ?? context?.player?.ovr ?? null)}</strong>
+                      <small>Rang {context?.rating?.ovrRank ?? "—"}</small>
                     </article>
-                  ))}
-                </div>
-              </div>
-            </details>
-
-            <details className="transfer-sell-disclosure">
-              <summary>
-                Entwicklung & Vertrag
-                <span className="muted">
-                  MW {formatTransfermarktCurrency(context?.currentMarketValue ?? preview.marketValueReference)} · Gehalt{" "}
-                  {formatTransfermarktCurrency(context?.salary ?? preview.activePlayer?.salary ?? null)}
-                </span>
-              </summary>
-              <div className="transfer-sell-disclosure-body">
-                <div className="metric-grid compact transfer-sell-metric-grid">
-                  <article className="metric-card">
-                    <span>MW aktuell</span>
-                    <strong>{formatTransfermarktCurrency(context?.currentMarketValue ?? preview.marketValueReference)}</strong>
-                    <small>
-                      Kaderwert{" "}
-                      {formatTransfermarktCurrency(context?.rosterMarketValue ?? preview.activePlayer?.currentValue ?? null)}
-                    </small>
-                  </article>
-                  <article className="metric-card">
-                    <span>MW Delta</span>
-                    <strong
-                      className={
-                        context?.marketValueDelta != null
-                          ? context.marketValueDelta >= 0
-                            ? "text-positive"
-                            : "text-negative"
-                          : undefined
-                      }
-                    >
-                      {context?.marketValueDelta != null ? formatSignedTransfermarktCurrency(context.marketValueDelta) : "—"}
-                    </strong>
-                    <small>aktuell vs. Kaderwert</small>
-                  </article>
-                  <article className="metric-card">
-                    <span>Kaufpreis</span>
-                    <strong>
-                      {formatTransfermarktCurrency(context?.purchasePrice ?? preview.activePlayer?.purchasePrice ?? null)}
-                    </strong>
-                    <small>letzter Einstieg</small>
-                  </article>
-                  <article className="metric-card">
-                    <span>GuV Verkauf</span>
-                    <strong
-                      className={
-                        context?.saleProfit != null ? (context.saleProfit >= 0 ? "text-positive" : "text-negative") : undefined
-                      }
-                    >
-                      {context?.saleProfit != null ? formatSignedTransfermarktCurrency(context.saleProfit) : "—"}
-                    </strong>
-                    <small>Netto minus Einstieg</small>
-                  </article>
-                  <article className="metric-card">
-                    <span>Gehalt</span>
-                    <strong>{formatTransfermarktCurrency(context?.salary ?? preview.activePlayer?.salary ?? null)}</strong>
-                    <small
-                      className={
-                        context?.salaryDelta != null
-                          ? context.salaryDelta <= 0
-                            ? "text-positive"
-                            : "text-negative"
-                          : undefined
-                      }
-                    >
-                      vs. normal {context?.salaryDelta != null ? formatSignedTransfermarktCurrency(context.salaryDelta) : "—"}
-                    </small>
-                  </article>
-                  <article className="metric-card">
-                    <span>Laufzeit</span>
-                    <strong>{preview.activePlayer?.contractLength ?? "—"}</strong>
-                    <small>Rolle {formatRosterRoleTagLabel(preview.activePlayer?.roleTag)}</small>
-                  </article>
-                </div>
-              </div>
-            </details>
-
-            <details className="transfer-sell-disclosure">
-              <summary>
-                Einsätze, Diszis & Transferhistorie
-                <span className="muted">
-                  {context?.recentMatchdays.length ?? 0} Spieltage · {context?.topDisciplines.length ?? 0} Diszis ·{" "}
-                  {context?.transferEvents.length ?? 0} Transfers
-                </span>
-              </summary>
-              <div className="transfer-sell-disclosure-body">
-                <div className="transfer-sell-history-grid">
-                  <div className="transfer-modal-section">
-                    <div className="transfer-callout-title">
-                      <strong>Letzte Einsätze</strong>
-                      <span className="muted">{context?.recentMatchdays.length ?? 0}</span>
-                    </div>
-                    {context?.recentMatchdays.length ? (
-                      <div className="transfer-sell-mini-table">
-                        {context.recentMatchdays.map((entry) => (
-                          <div className="transfer-sell-mini-row" key={entry.matchdayId}>
-                            <span>{formatMatchdayShortLabel(entry.matchdayId)}</span>
-                            <strong>{formatPpsValue(entry.totalContribution)}</strong>
-                            <small>
-                              {entry.bestDisciplineLabel ?? "—"} · Score {formatPpsValue(entry.averageFinalScore)}
-                            </small>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="muted transfer-empty-hint">Noch keine Matchday-Historie für diesen Spieler.</p>
-                    )}
+                    <article className="metric-card">
+                      <span>MVS</span>
+                      <strong>{formatPpsValue(context?.rating?.mvs ?? null)}</strong>
+                      <small>Rang {context?.rating?.mvsRank ?? "—"}</small>
+                    </article>
+                    <article className="metric-card">
+                      <span>Season PPs</span>
+                      <strong>{formatPpsValue(context?.rating?.ppsSeason ?? context?.performance?.totalPoints ?? null)}</strong>
+                      <small>Rang {context?.rating?.ppsSeasonRank ?? "—"}</small>
+                    </article>
+                    <article className="metric-card">
+                      <span>Einsätze</span>
+                      <strong>{context?.performance?.appearances ?? "—"}</strong>
+                      <small>
+                        Top 10 {context?.performance?.top10Count ?? "—"} · MVP {context?.performance?.mvpCount ?? "—"}
+                      </small>
+                    </article>
+                    <article className="metric-card">
+                      <span>Letzter Einsatz</span>
+                      <strong>{context?.performance?.latestDisciplineLabel ?? "—"}</strong>
+                      <small>
+                        Score {formatPpsValue(context?.performance?.latestFinalScore ?? null)} · Rang{" "}
+                        {context?.performance?.latestRankInDiscipline ?? "—"}
+                      </small>
+                    </article>
+                    <article className="metric-card">
+                      <span>Beste Diszi</span>
+                      <strong>{context?.performance?.bestDisciplineLabel ?? "—"}</strong>
+                      <small>{formatPpsValue(context?.performance?.bestDisciplineScore ?? null)} Score</small>
+                    </article>
+                  </div>
+                  <div className="transfer-sell-area-grid">
+                    {(context?.areaRows ?? []).map((area) => (
+                      <article className={`transfer-sell-area-card is-${area.tone}`} key={area.key}>
+                        <span>{area.key}</span>
+                        <strong>{formatPpsValue(area.value)}</strong>
+                      </article>
+                    ))}
                   </div>
 
-                  <div className="transfer-modal-section">
-                    <div className="transfer-callout-title">
-                      <strong>Top-Diszis</strong>
-                      <span className="muted">{context?.topDisciplines.length ?? 0}</span>
-                    </div>
-                    {context?.topDisciplines.length ? (
-                      <div className="transfer-sell-mini-table">
-                        {context.topDisciplines.map((entry) => (
-                          <div className="transfer-sell-mini-row" key={entry.disciplineId}>
-                            <span>{entry.disciplineName}</span>
-                            <strong>{formatPpsValue(entry.totalContribution)}</strong>
-                            <small>
-                              Ø Beitrag {formatPpsValue(entry.averageContribution)} · Ø Score{" "}
-                              {formatPpsValue(entry.averageFinalScore)}
-                            </small>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="muted transfer-empty-hint">Noch keine Disziplin-Historie verfügbar.</p>
-                    )}
+                  <p className="transfer-sell-more-section-title">Entwicklung &amp; Vertrag</p>
+                  <div className="metric-grid compact transfer-sell-metric-grid">
+                    <article className="metric-card">
+                      <span>MW aktuell</span>
+                      <strong>{formatTransfermarktCurrency(context?.currentMarketValue ?? preview.marketValueReference)}</strong>
+                      <small>
+                        Kaderwert{" "}
+                        {formatTransfermarktCurrency(context?.rosterMarketValue ?? preview.activePlayer?.currentValue ?? null)}
+                      </small>
+                    </article>
+                    <article className="metric-card">
+                      <span>MW Delta</span>
+                      <strong
+                        className={
+                          context?.marketValueDelta != null
+                            ? context.marketValueDelta >= 0
+                              ? "text-positive"
+                              : "text-negative"
+                            : undefined
+                        }
+                      >
+                        {context?.marketValueDelta != null ? formatSignedTransfermarktCurrency(context.marketValueDelta) : "—"}
+                      </strong>
+                      <small>aktuell vs. Kaderwert</small>
+                    </article>
+                    <article className="metric-card">
+                      <span>Kaufpreis</span>
+                      <strong>
+                        {formatTransfermarktCurrency(context?.purchasePrice ?? preview.activePlayer?.purchasePrice ?? null)}
+                      </strong>
+                      <small>letzter Einstieg</small>
+                    </article>
+                    <article className="metric-card">
+                      <span>GuV Verkauf</span>
+                      <strong
+                        className={
+                          context?.saleProfit != null ? (context.saleProfit >= 0 ? "text-positive" : "text-negative") : undefined
+                        }
+                      >
+                        {context?.saleProfit != null ? formatSignedTransfermarktCurrency(context.saleProfit) : "—"}
+                      </strong>
+                      <small>Netto minus Einstieg</small>
+                    </article>
+                    <article className="metric-card">
+                      <span>Gehalt</span>
+                      <strong>{formatTransfermarktCurrency(context?.salary ?? preview.activePlayer?.salary ?? null)}</strong>
+                      <small
+                        className={
+                          context?.salaryDelta != null
+                            ? context.salaryDelta <= 0
+                              ? "text-positive"
+                              : "text-negative"
+                            : undefined
+                        }
+                      >
+                        vs. normal {context?.salaryDelta != null ? formatSignedTransfermarktCurrency(context.salaryDelta) : "—"}
+                      </small>
+                    </article>
+                    <article className="metric-card">
+                      <span>Laufzeit</span>
+                      <strong>{preview.activePlayer?.contractLength ?? "—"}</strong>
+                      <small>Rolle {formatRosterRoleTagLabel(preview.activePlayer?.roleTag)}</small>
+                    </article>
                   </div>
 
-                  <div className="transfer-modal-section">
-                    <div className="transfer-callout-title">
-                      <strong>Transferhistorie</strong>
-                      <span className="muted">{context?.transferEvents.length ?? 0}</span>
-                    </div>
-                    {context?.transferEvents.length ? (
-                      <div className="transfer-sell-mini-table">
-                        {context.transferEvents.map((entry) => (
-                          <div className="transfer-sell-mini-row" key={entry.id}>
-                            <span className={getTransferTypePillClass(entry.type)}>{entry.label}</span>
-                            <strong>{formatTransfermarktCurrency(entry.fee)}</strong>
-                            <small>
-                              {entry.seasonLabel} · {entry.fromTeam} → {entry.toTeam} · Gehalt{" "}
-                              {formatTransfermarktCurrency(entry.salary)}
-                            </small>
-                          </div>
-                        ))}
+                  <p className="transfer-sell-more-section-title">Einsätze, Diszis &amp; Transferhistorie</p>
+                  <div className="transfer-sell-history-grid">
+                    <div className="transfer-modal-section">
+                      <div className="transfer-callout-title">
+                        <strong>Letzte Einsätze</strong>
+                        <span className="muted">{context?.recentMatchdays.length ?? 0}</span>
                       </div>
-                    ) : (
-                      <p className="muted transfer-empty-hint">Keine Transfers im Save gefunden.</p>
-                    )}
+                      {context?.recentMatchdays.length ? (
+                        <div className="transfer-sell-mini-table">
+                          {context.recentMatchdays.map((entry) => (
+                            <div className="transfer-sell-mini-row" key={entry.matchdayId}>
+                              <span>{formatMatchdayShortLabel(entry.matchdayId)}</span>
+                              <strong>{formatPpsValue(entry.totalContribution)}</strong>
+                              <small>
+                                {entry.bestDisciplineLabel ?? "—"} · Score {formatPpsValue(entry.averageFinalScore)}
+                              </small>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="muted transfer-empty-hint">Noch keine Matchday-Historie für diesen Spieler.</p>
+                      )}
+                    </div>
+
+                    <div className="transfer-modal-section">
+                      <div className="transfer-callout-title">
+                        <strong>Top-Diszis</strong>
+                        <span className="muted">{context?.topDisciplines.length ?? 0}</span>
+                      </div>
+                      {context?.topDisciplines.length ? (
+                        <div className="transfer-sell-mini-table">
+                          {context.topDisciplines.map((entry) => (
+                            <div className="transfer-sell-mini-row" key={entry.disciplineId}>
+                              <span>{entry.disciplineName}</span>
+                              <strong>{formatPpsValue(entry.totalContribution)}</strong>
+                              <small>
+                                Ø Beitrag {formatPpsValue(entry.averageContribution)} · Ø Score{" "}
+                                {formatPpsValue(entry.averageFinalScore)}
+                              </small>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="muted transfer-empty-hint">Noch keine Disziplin-Historie verfügbar.</p>
+                      )}
+                    </div>
+
+                    <div className="transfer-modal-section">
+                      <div className="transfer-callout-title">
+                        <strong>Transferhistorie</strong>
+                        <span className="muted">{context?.transferEvents.length ?? 0}</span>
+                      </div>
+                      {context?.transferEvents.length ? (
+                        <div className="transfer-sell-mini-table">
+                          {context.transferEvents.map((entry) => (
+                            <div className="transfer-sell-mini-row" key={entry.id}>
+                              <span className={getTransferTypePillClass(entry.type)}>{entry.label}</span>
+                              <strong>{formatTransfermarktCurrency(entry.fee)}</strong>
+                              <small>
+                                {entry.seasonLabel} · {entry.fromTeam} → {entry.toTeam} · Gehalt{" "}
+                                {formatTransfermarktCurrency(entry.salary)}
+                              </small>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="muted transfer-empty-hint">Keine Transfers im Save gefunden.</p>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </details>
-          </>
+              </details>
+            </>
+          ) : null}
+        </div>
+
+        {rosterAtMinimum && !marketSellSuccess ? (
+          <p className="foundation-screen-action-reason" data-testid="transfer-sell-roster-min-note">
+            Kader ist am Minimum — ein weiterer Verkauf würde die Aufstellung unmöglich machen. Kaufe zuerst Ersatz.
+          </p>
         ) : null}
+
+        {/* H: Fußleiste — fixiert, Zustand bestimmt die Aktion. Ist der
+            Primärbutton deaktiviert, steht der Grund als Text direkt daneben. */}
+        <footer className="transfer-sell-foot">
+          {showConfirmStep ? (
+            <div className="transfer-sell-confirm-strip" data-testid="transfer-sell-confirm-strip">
+              <strong>Wirklich verkaufen?</strong>
+              <span>
+                Endgültig — {playerName} verlässt den Kader.{" "}
+                {preview?.coaching?.soldPlayerSeasonBanNote ?? "Der Spieler ist danach 1 Saison für dein Team gesperrt."} Netto-Erlös{" "}
+                {formatTransfermarktCurrency(netProceeds)}.
+              </span>
+              {strongAckRequired ? (
+                <span className="variant">
+                  Bestätige zuerst die Checkbox oben bei der Board-Bilanz — erst danach wird der Button aktiv.
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="transfer-sell-foot-row">
+            {marketSellSuccess ? (
+              <button className="primary-button" type="button" onClick={closeMarketSellModal}>
+                Schließen
+              </button>
+            ) : showConfirmStep ? (
+              <>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => setConfirmStep(false)}
+                  disabled={marketSellBusy}
+                >
+                  Zurück
+                </button>
+                <span className="transfer-sell-foot-spacer" />
+                {sellDisabledReason ? (
+                  <p className="foundation-screen-action-reason" data-testid="transfer-sell-disabled-reason">
+                    Warum nicht: {sellDisabledReason}
+                  </p>
+                ) : null}
+                <button
+                  className="primary-button transfer-sell-confirm-button is-danger"
+                  type="button"
+                  data-testid="transfer-sell-confirm-button"
+                  disabled={sellDisabled}
+                  title={sellDisabledReason ?? "Bestätigt den Verkauf jetzt endgültig."}
+                  onClick={() => {
+                    void confirmTransfermarktSell();
+                  }}
+                >
+                  {marketSellBusy ? "Verkauf läuft…" : "Ja, endgültig verkaufen"}
+                </button>
+              </>
+            ) : (
+              <>
+                <button className="secondary-button" type="button" onClick={closeMarketSellModal}>
+                  Abbrechen
+                </button>
+                <span className="transfer-sell-foot-spacer" />
+                {sellDisabledReason ? (
+                  <p className="foundation-screen-action-reason" data-testid="transfer-sell-disabled-reason">
+                    Warum nicht: {sellDisabledReason}
+                  </p>
+                ) : null}
+                <button
+                  className="primary-button transfer-sell-confirm-button"
+                  type="button"
+                  data-testid="transfer-sell-confirm-button"
+                  disabled={sellDisabled}
+                  title={sellDisabledReason ?? "Öffnet den letzten Bestätigungsschritt."}
+                  onClick={() => setConfirmStep(true)}
+                >
+                  {primaryLabel}
+                </button>
+              </>
+            )}
+          </div>
+        </footer>
       </div>
-
-      {rosterAtMinimum ? (
-        <p className="foundation-screen-action-reason" data-testid="transfer-sell-roster-min-note">
-          Kader ist am Minimum — ein weiterer Verkauf würde die Aufstellung unmöglich machen. Kaufe zuerst Ersatz.
-        </p>
-      ) : null}
-
-      {preview?.canSell && !marketSellSuccess ? (
-        <p className="transfer-sell-final-note" data-testid="transfer-sell-final-note">
-          Ein Verkauf ist endgültig und lässt sich nicht rückgängig machen.{" "}
-          {preview.coaching?.soldPlayerSeasonBanNote ?? "Der Spieler ist danach 1 Saison für dein Team gesperrt."}
-        </p>
-      ) : null}
-
-      <div className="foundation-modal-actions">
-        <button className="secondary-button" type="button" onClick={closeMarketSellModal}>
-          Abbrechen
-        </button>
-        <button
-          className="primary-button"
-          type="button"
-          data-testid="transfer-sell-confirm-button"
-          disabled={sellDisabled}
-          title={sellDisabledReason ?? "Bestätigt den Verkauf jetzt endgültig."}
-          onClick={() => {
-            void confirmTransfermarktSell();
-          }}
-        >
-          {marketSellBusy && preview ? "Verkauf läuft…" : "Endgültig verkaufen"}
-        </button>
-      </div>
-      {sellDisabledReason ? (
-        <p className="foundation-screen-action-reason" data-testid="transfer-sell-disabled-reason">
-          Warum nicht: {sellDisabledReason}
-        </p>
-      ) : null}
     </section>
   );
 }

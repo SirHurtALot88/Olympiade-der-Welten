@@ -28,7 +28,7 @@ export function computeSellBoardReaction(input: {
       confidenceDelta: 0,
       severity: "info",
       title: "Vorstand registriert Verkauf",
-      description: `${input.playerName} verlaesst den Kader.`,
+      description: `${input.playerName} verlässt den Kader.`,
       gmNote: null,
       requiresStrongAcknowledgment: false,
     };
@@ -71,10 +71,10 @@ export function computeSellBoardReaction(input: {
 
   const description =
     severity === "critical"
-      ? `${input.playerName} war ein geschuetzter Core-Spieler. Der Verkauf belastet das Board-Vertrauen.`
+      ? `${input.playerName} war ein geschützter Core-Spieler. Der Verkauf belastet das Board-Vertrauen.`
       : profitWindow
         ? `${input.playerName} wurde mit Gewinn verkauft. Das Board sieht die Entscheidung eher positiv.`
-        : `${input.playerName} verlaesst den Kader. Das Board beobachtet die sportliche Luecke.`;
+        : `${input.playerName} verlässt den Kader. Das Board beobachtet die sportliche Lücke.`;
 
   return {
     confidenceDelta: clamp(confidenceDelta, -1, 0.5),

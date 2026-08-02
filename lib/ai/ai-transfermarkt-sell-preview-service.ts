@@ -527,13 +527,13 @@ function buildCandidate(
   const rosterAfter = Math.max(rosterSize - 1, 0);
 
   if (!allowSellBelowRosterMin && playerMin != null && rosterSize - 1 < playerMin) {
-    warnings.push("Verkauf wuerde den Kader unter das Team-Minimum druecken.");
+    warnings.push("Verkauf würde den Kader unter das Team-Minimum drücken.");
   }
   if (!allowSellBelowRosterMin && rosterSize <= 7) {
     warnings.push("Kader ist bereits sehr klein.");
   }
   if (expectedSellValue != null && expectedSellValue <= 0) {
-    warnings.push("Netto-Verkaufserloes deckt den offenen Buyout nicht.");
+    warnings.push("Netto-Verkaufserlös deckt den offenen Buyout nicht.");
     pushKeep("negative_net_proceeds", "Verkauf bringt nach Buyout keinen positiven Cash-Zufluss");
   } else if (
     buyoutCost != null &&
@@ -548,7 +548,7 @@ function buildCandidate(
     warnings.push("Kein belastbarer Verkaufswert aus der aktuellen Sell-Preview vorhanden.");
   }
   if (performance.appearances === 0) {
-    warnings.push("Noch keine lokale Leistungs-Historie fuer diesen Spieler.");
+    warnings.push("Noch keine lokale Leistungs-Historie für diesen Spieler.");
   }
 
   const budgetPressure = getBudgetPressure(team, salaryTotal);
@@ -632,7 +632,7 @@ function buildCandidate(
   });
 
   if (salary != null && wagePressureScore >= 0.28) {
-    pushSell("high_wage_burden", "hohes Gehalt im Verhaeltnis zum aktuellen Teambudget");
+    pushSell("high_wage_burden", "hohes Gehalt im Verhältnis zum aktuellen Teambudget");
   } else if (salary != null && wagePressureScore <= 0.12) {
     pushKeep("low_wage_burden", "geringe Gehaltslast");
   }
@@ -668,30 +668,30 @@ function buildCandidate(
 
   if (cashPressureGate && !starProtection) {
     if (sellRunway.salaryExceedsCash) {
-      pushSell("cash_runway_pressure", "Gehaltslast uebersteigt verfuegbares Cash — Verkauf entlastet den Etat");
+      pushSell("cash_runway_pressure", "Gehaltslast übersteigt verfügbares Cash — Verkauf entlastet den Etat");
     }
     if (cashPressureProfitAttractive) {
-      pushSell("profit_window", "Verkaufspreis liegt ueber Marktwert — lukrativer Exit moeglich");
+      pushSell("profit_window", "Verkaufspreis liegt über Marktwert — lukrativer Exit möglich");
     }
   } else if (proactiveOfferGate && proactiveProfitAttractive) {
     pushSell(
       "profit_window",
       teamWeakness.isWeakTeam
-        ? "Verkaufspreis liegt deutlich ueber Marktwert — starkes Angebot fuer ein Team im unteren Tabellendrittel nutzen"
-        : "Verkaufspreis liegt weit ueber Marktwert — ein derart starkes Angebot lohnt sich auch ohne Cash-Druck",
+        ? "Verkaufspreis liegt deutlich über Marktwert — starkes Angebot für ein Team im unteren Tabellendrittel nutzen"
+        : "Verkaufspreis liegt weit über Marktwert — ein derart starkes Angebot lohnt sich auch ohne Cash-Druck",
     );
   }
 
   if (profitDelta != null && profitDelta > 0) {
     pushSell("profit_window", `realisierbarer Netto-Gewinn von ${roundValue(profitDelta, 1)}`);
   } else if (profitDelta != null && profitDelta < 0) {
-    pushKeep("sell_below_purchase", "aktueller Netto-Verkauf wuerde unter Einkauf liegen");
+    pushKeep("sell_below_purchase", "aktueller Netto-Verkauf würde unter Einkauf liegen");
     const isFreshPurchase =
       roster.joinedSeasonId != null && roster.joinedSeasonId === context.gameState.season.id;
     if (isFreshPurchase && purchasePrice != null && purchasePrice > 0) {
       pushKeep(
         "sell_below_purchase",
-        `frisch gekauft (${roster.joinedSeasonId}) — Netto-Verlust ${roundValue(-profitDelta, 1)}M wuerde Teamwert schnell zerstoeren`,
+        `frisch gekauft (${roster.joinedSeasonId}) — Netto-Verlust ${roundValue(-profitDelta, 1)}M würde Teamwert schnell zerstören`,
       );
     }
   }
@@ -699,13 +699,13 @@ function buildCandidate(
   if (underperformed) {
     pushSell("underperformance", "Performance blieb unter Erwartung");
   } else if (performance.averageContribution != null && performance.averageContribution < 25) {
-    pushSell("weak_contribution", "schwache lokale Score-Beitraege");
+    pushSell("weak_contribution", "schwache lokale Score-Beiträge");
   }
   if (performance.averageContribution != null && performance.averageContribution >= 40) {
-    pushKeep("strong_contribution", "starke lokale Score-Beitraege");
+    pushKeep("strong_contribution", "starke lokale Score-Beiträge");
   }
   if (performance.top10Count > 0) {
-    pushKeep("top10_presence", `Top-10-Praesenz in ${performance.top10Count} Diszi-Einsaetzen`);
+    pushKeep("top10_presence", `Top-10-Präsenz in ${performance.top10Count} Diszi-Einsätzen`);
   }
 
   if (strategy.avoidedHits > strategy.preferredHits) {
@@ -724,7 +724,7 @@ function buildCandidate(
   const premiumQualityGm =
     gmProfile?.archetype === "elite_curator" || gmProfile?.archetype === "star_chaser";
   if (premiumQualityGm && isFloorPlayer && !starProtection && !coversNeedAxis) {
-    pushSell("roster_quality_floor", "unteres Kader-Drittel — GM will Qualitaet upgraden");
+    pushSell("roster_quality_floor", "unteres Kader-Drittel — GM will Qualität upgraden");
   }
   // Graduierter GM-Concession-Kanal unter Druck: der Hot-Seat-/Archetyp-Multiplikator
   // (concedeDemandsMultiplier) moduliert jetzt WIE STARK der GM auf offene Forderungen eingeht —
@@ -760,21 +760,21 @@ function buildCandidate(
     }
   }
   if (hardNoGoHit) {
-    pushSell("hard_no_go", "faellt in ein Team-Hard-No-Go");
+    pushSell("hard_no_go", "fällt in ein Team-Hard-No-Go");
   }
   // Board-Renewal-Signale sind reine Anzeige (Drawer-UI) und treiben keine Verkäufe mehr.
   // Verkauf/Entlassung liegt allein beim Team/GM.
   if (coversNeedAxis) {
-    pushKeep("covers_need_axis", `deckt die aktuelle Achsenluecke ${playerAxis?.toUpperCase() ?? ""}`);
+    pushKeep("covers_need_axis", `deckt die aktuelle Achsenlücke ${playerAxis?.toUpperCase() ?? ""}`);
   }
   if (roster.contractLength <= 1) {
     if (strategy.avoidedHits >= strategy.preferredHits || underperformed || hardNoGoHit) {
-      pushSell("short_contract", "Vertrag laeuft aus und Fit/Leistung rechtfertigt keine automatische Verlaengerung");
+      pushSell("short_contract", "Vertrag läuft aus und Fit/Leistung rechtfertigt keine automatische Verlängerung");
     } else {
-      pushSell("short_contract", "kurze Restvertragslaenge");
+      pushSell("short_contract", "kurze Restvertragslänge");
     }
   } else if (roster.contractLength >= 3) {
-    pushKeep("long_contract", "laengerer Restvertrag");
+    pushKeep("long_contract", "längerer Restvertrag");
   }
   const expiringStrategicPressure = roster.contractLength <= 1 && !coversNeedAxis && keepPerformanceScore < 0.7;
   const expiringCoreDecisionPressure =
@@ -862,7 +862,7 @@ function buildCandidate(
   if (negativeCashPressure) {
     unshiftSell("negative_cash", "negatives Teamcash zum Seasonstart");
   } else if (lowCashReservePressure) {
-    unshiftSell("low_cash_reserve", "Cash-Reserve ist zu knapp fuer sichere Kaderplanung");
+    unshiftSell("low_cash_reserve", "Cash-Reserve ist zu knapp für sichere Kaderplanung");
   } else if (budgetPressure === "healthy") {
     pushKeep("healthy_cash", "Teamcash ist entspannt");
   }
@@ -1104,7 +1104,7 @@ export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParam
       warnings.push("passives Team – Vorschlag nur informativ");
     }
     if (control?.controlMode === "ai" && !control.aiSellPreviewEnabled) {
-      blockingReasons.push("AI-Sell-Preview ist fuer dieses Team deaktiviert");
+      blockingReasons.push("AI-Sell-Preview ist für dieses Team deaktiviert");
     }
     if (roster.length === 0) {
       blockingReasons.push("kein aktiver Kader vorhanden");
