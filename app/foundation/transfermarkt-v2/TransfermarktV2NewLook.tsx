@@ -12,7 +12,7 @@ const NL_CANDIDATE_ROW_HEIGHT = 84;
 /** Karten ober- und unterhalb des Sichtbereichs, die trotzdem gerendert werden. */
 const NL_CANDIDATE_OVERSCAN = 8;
 
-import { NlAbilityStars } from "@/components/foundation/velo-ui";
+import { NlAbilityStars, VeloAxisRail } from "@/components/foundation/velo-ui";
 import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import type { TransfermarktV2RosterRow } from "@/app/foundation/transfermarkt-v2/TransfermarktV2Client";
@@ -52,7 +52,6 @@ import {
   type AttributeTierFilters,
   type TransfermarktAttributeKey,
 } from "@/lib/market/transfermarkt-attribute-filter";
-import { getCoreStatGrade } from "@/lib/matchday-arena/arena-stat-visuals";
 import type { TransferHistoryItem } from "@/lib/market/transfer-history-read-service";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
 import {
@@ -1718,7 +1717,8 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                       const portrait = getTransfermarktPortraitModel(selectedPlayer);
                       const src = appendMediaImageVariant(portrait.src, "preview") ?? portrait.src;
                       return src ? (
-                        <OptimizedMediaImage src={src} alt="" width={196} height={196} className="nl-market-portrait-img" />
+                        // 240px — die "preview"-Variante liefert bis 280px, das Bild bleibt also scharf.
+                        <OptimizedMediaImage src={src} alt="" width={240} height={240} className="nl-market-portrait-img" />
                       ) : (
                         <span className="nl-market-portrait-initials">{portrait.initials}</span>
                       );
@@ -1807,29 +1807,31 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     </span>
                   </div>
 
-                  {/* Farbige Tier-Chips je Achse (POW/SPE/MEN/SOC) — nur fog-gated echte Werte.
-                      Note/Farbe über getCoreStatGrade: an die GEMESSENE Achs-Verteilung
-                      (Median ~42,5) verankert, damit ein Mittelwert wie 55 grün/„A" liest und
-                      nicht rot/„E" — Achswerte sind Disziplin-Durchschnitte, keine 0–100-Rohskala. */}
-                  <div className="nl-market-attr-chips" aria-label="Attribut-Tiers">
-                    {NL_MARKET_AXES.flatMap((axis) => {
+                  {/* Achsen als Velo-Rail statt flacher Tier-Pillen: Disziplin-Icon in der
+                      Achsfarbe, Meter für „wie viel", Note für „wie gut" — und dieselbe
+                      Team-Top-6-Referenz, die der Radar als Ghost-Polygon zeichnet, hier als
+                      Marke im Meter. Damit ist der Vergleich Kandidat↔Kader auch ablesbar,
+                      nicht nur erahnbar. Nur fog-gated echte Werte. */}
+                  <VeloAxisRail
+                    className="nl-market-axis-rail"
+                    aria-label="Attribut-Achsen"
+                    max={100}
+                    referenceLabel={`Team Top-${topSixCount} Ø`}
+                    entries={NL_MARKET_AXES.flatMap((axis) => {
                       const value = selectedPlayer[axis];
                       if (typeof value !== "number" || !Number.isFinite(value)) {
                         return [];
                       }
-                      const grade = getCoreStatGrade(value);
+                      const summary = squadAxisSummaries.find((entry) => entry.axis === axis);
                       return [
-                        <span
-                          key={`nl-attr-chip-${axis}`}
-                          className={`nl-market-attr-chip ${getAttributeTierClass(grade)}`}
-                        >
-                          <b>{NL_AXIS_LABELS[axis]}</b>
-                          <span className="nl-tnum">{formatNlNumber(value, 0)}</span>
-                          <em>{grade}</em>
-                        </span>,
+                        {
+                          axis,
+                          value,
+                          reference: summary?.topAvg != null && Number.isFinite(summary.topAvg) ? summary.topAvg : null,
+                        },
                       ];
                     })}
-                  </div>
+                  />
                 </div>
 
                 {/* F(neu) — Head-to-Head: angehefteter vs. fokussierter Kandidat als
