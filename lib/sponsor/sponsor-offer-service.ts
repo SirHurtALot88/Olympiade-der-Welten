@@ -36,6 +36,7 @@ import {
   rollSponsorOfferSlate,
 } from "@/lib/sponsor/sponsor-tier-pool";
 import {
+  sponsorV3AnchorWeights,
   sponsorV3CardByKey,
   SPONSOR_V4_AXIS_PBAR,
   type SponsorV3CardKey,
@@ -620,6 +621,63 @@ function estimateAxisFitForAi(input: {
   }
 }
 
+/** Wieviele Raenge Ambition den Zielrang je Prioritaetspunkt (0..10, Mitte 5) verschiebt. */
+const AMBITION_RANK_SHIFT_PER_POINT = 1.2;
+/**
+ * Deckel auf die Ambitions-Verschiebung. Ohne ihn zoege ein Team mit Extremwert (0 oder 10) seinen
+ * Zielrang bis an die Tabellenenden — dann waehlten am Ende doch wieder fast alle Teams dieselben
+ * zwei, drei Extremformen (Titel- bzw. Sicherheitsfamilie), nur nach Ambition statt nach Startrang
+ * sortiert. Das widerspraeche Punkt 4 des Auftrags ("nicht ueberdrehen"): ein Rest Streuung um den
+ * eigenen Startrang ist gewollt, eine zweite Kollaps-Achse nicht.
+ */
+const AMBITION_RANK_SHIFT_MAX = 7;
+
+/**
+ * Sigma des Passungs-Fensters — bewusst ENGER als `SPONSOR_V3_ANCHOR_SIGMA` (4), mit dem jede Form
+ * auf denselben Erwartungswert normiert ist. Mit demselben Sigma waere der Passungsterm fuer jedes
+ * Team mit `Zielrang == Startrang` exakt 0 — per Konstruktion, denn genau das ist die Definition von
+ * `terms.anchor` (sponsor-liga-leiter.ts). Das traefe ausgerechnet die Randfaelle: ein Team auf
+ * Startrang 1 kann seinen Zielrang nicht ueber 1 hinaus verschieben (geklammert), bliebe mit dem
+ * gleichen Sigma also ohne jedes Passungssignal — genau der Titelfavorit-auf-Mittelfeldkurve-Fall
+ * aus dem Befund. Ein engeres Fenster gewichtet die Raenge nahe am Zielrang staerker als die weite
+ * Anker-Verteilung es tut und macht den Term auch ohne Ambitions-Shift ungleich 0: er misst dann,
+ * wie sehr sich eine Kurve auf den eigenen (Start-)Rang konzentriert statt sich brav auf das ganze
+ * Ankerfenster zu verteilen — und das ist die Passungsfrage.
+ */
+const SPONSOR_AI_CURVE_FIT_SIGMA = 2.5;
+
+/**
+ * Skalierung des Passungsterms. Der rohe Wert (`fitValue - terms.anchor`) liegt typischerweise bei
+ * 0,5 bis 2 C, mit Ausreissern bis ~11 C bei starker Ambition nahe den Ligaenden — deutlich kleiner
+ * als der Achsenterm (bis zu G/2, bei legendaer/golden bis 15 C). Ohne Skalierung waere die
+ * Kurvenform trotz eigenem Kriterium meist die schwaechste der vier Wahldimensionen. Der Faktor
+ * hebt sie auf dieselbe Groessenordnung, ohne die anderen drei zu entwerten.
+ */
+const SPONSOR_AI_CURVE_FIT_WEIGHT = 3;
+
+/**
+ * DER ZIELRANG, GEGEN DEN DIE KURVENFORM PASSEN MUSS.
+ *
+ * Der Startrang allein waere die Wahl eines Teams ohne Plan — ein Team, das aufsteigen will, darf
+ * eine Kurve waehlen, die weiter oben zahlt, als es aktuell steht (Auftrag Punkt 3). Die Ambition
+ * kommt aus derselben Quelle wie der bereits bestehende Archetyp-Praeferenz-Term
+ * (`resolveAiSponsorArchetypePreference`): `profile.bias.starPriority`, mit `identity.ambition` als
+ * Fallback fuer Teams ohne eigenes Strategieprofil. 5 ist die neutrale Mitte (kein Shift).
+ */
+function resolveAmbitionTargetRank(input: {
+  startRank: number;
+  profile: TeamStrategyProfile | null;
+  identity: TeamIdentity | null;
+}): number {
+  const starPriority = input.profile?.bias.starPriority ?? input.identity?.ambition ?? 5;
+  const shift = Math.max(
+    -AMBITION_RANK_SHIFT_MAX,
+    Math.min(AMBITION_RANK_SHIFT_MAX, (starPriority - 5) * AMBITION_RANK_SHIFT_PER_POINT),
+  );
+  // Hoehere Ambition zieht den Zielrang NACH OBEN (kleinere Zahl = besserer Platz), deshalb minus.
+  return Math.max(1, Math.min(32, Math.round(input.startRank - shift)));
+}
+
 /**
  * DIE KI-WAHL BEWERTET JETZT PASSUNG STATT RISIKO.
  *
@@ -632,6 +690,17 @@ function estimateAxisFitForAi(input: {
  *
  * Bewertet wird deshalb: der geschaetzte eigene Erfuellungsgrad mal Hebelgroesse (das ist der
  * erwartete Cash-Beitrag der Karte), plus der Wert des Vorschusses fuer die eigene Kassenlage.
+ *
+ * SEIT PR #360 traegt jedes Angebot zusaetzlich eine KURVENFORM (`offer.curveShape` /
+ * `terms.baseLadder`) — WO auf der Ligaleiter das Geld liegt, siehe `sponsor-liga-leiter.ts`. Alle
+ * 11 Formen sind auf denselben Erwartungswert beim STARTRANG normiert (`terms.anchor`), eine reine
+ * EV-Bewertung kann sie also nicht unterscheiden — die KI wuerfelte hier faktisch (siehe PR-Text:
+ * Messung ueber alle 32 Teams zeigte Titelfavoriten auf Mittelfeldkurven und Schlusslichter auf
+ * Titelkurven). Der dritte Term unten behebt das: er gewichtet dieselbe Leiter mit
+ * `sponsorV3AnchorWeights` um einen AMBITIONS-VERSCHOBENEN Zielrang statt um den Startrang (Details
+ * und warum das Fenster dabei enger als das der Anker-Normierung sein muss: siehe
+ * `resolveAmbitionTargetRank` / `SPONSOR_AI_CURVE_FIT_SIGMA` unten) — er schlaegt zugunsten der
+ * Form aus, die dort am meisten zahlt, wo das Team seiner eigenen Ambition nach landen will.
  */
 function scoreOfferForAi(input: {
   offer: SponsorOffer;
@@ -661,6 +730,26 @@ function scoreOfferForAi(input: {
     // Der erwartete Cash-Beitrag der Achse: `G * (Erfuellung − 0,5)`. Genau die Groesse, um die es
     // geht — negativ, wenn das Team die Achse voraussichtlich verfehlt.
     score += terms.goalSize * (fit - SPONSOR_V4_AXIS_PBAR);
+  }
+
+  // DAS PASSUNGSKRITERIUM DER KURVENFORM: wo auf der Leiter zahlt DIESE Form, gewichtet um den
+  // ambitions-verschobenen Zielrang statt den blossen Startrang? `terms.anchor` ist der
+  // Startrang-Mittelwert (breites Sigma), auf den ALLE 11 Formen normiert sind
+  // (sponsorKurvenLeiter) — der Vergleichspunkt, ab dem eine Form "besser als neutral" faellt.
+  // `fitValue` liest exakt dieselbe Leiter (`terms.baseLadder`), aber mit dem engeren
+  // Passungs-Fenster um den Zielrang. Bei einem Team ohne Ambitionsausschlag UND fernab der
+  // Ligaenden liegt `fitValue` nahe an `terms.anchor` (schmaleres Fenster um denselben Rang misst
+  // fast dasselbe wie das breite) — der Term bleibt dann klein und ueberlaesst die Wahl den uebrigen
+  // Termen (Achse, Vorschuss, Markenpassung). Ambition oder ein Randrang machen ihn spuerbar: dann
+  // gewinnt, wessen Geld dort liegt, wo das Team hinwill. `SPONSOR_AI_CURVE_FIT_WEIGHT` skaliert den
+  // Term auf dieselbe Groessenordnung wie der Achsenterm oben — ohne die Skalierung waere die
+  // Kurvenform trotz allem meist die schwaechste der vier Wahldimensionen, genau das Gegenteil vom
+  // Auftrag.
+  if (terms) {
+    const targetRank = resolveAmbitionTargetRank({ startRank: terms.startRank, profile, identity });
+    const fitWeights = sponsorV3AnchorWeights(targetRank, SPONSOR_AI_CURVE_FIT_SIGMA);
+    const fitValue = terms.baseLadder.reduce((sum, value, index) => sum + value * (fitWeights[index] ?? 0), 0);
+    score += (fitValue - terms.anchor) * SPONSOR_AI_CURVE_FIT_WEIGHT;
   }
 
   // Der Vorschuss ist fuer ein klammes Team echtes Geld zur richtigen Zeit und fuer ein reiches nur

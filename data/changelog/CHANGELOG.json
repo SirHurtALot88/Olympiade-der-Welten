@@ -14,6 +14,15 @@
       "datum": "2026-08-03",
       "seite": "Verein · Sponsoren",
       "pr": null,
+      "text": "KI-Teams wählen ihre Sponsor-Kurvenform jetzt danach, wo sie realistisch landen: die Bewertung liest die Ligaleiter statt nur Sonderziel und Marke, und ein ehrgeiziges Team darf dabei bewusst höher greifen als sein Startrang — vorher unterschrieb ein Titelfavorit auch mal eine Mittelfeldkurve.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-03",
+      "seite": "Verein · Sponsoren",
+      "pr": null,
       "text": "Die Reihenfolge der Sponsoren-Achsen im Angebots-Slate wechselt jetzt zwischen Teams: vorher bekamen alle Teams derselben Saison dieselbe Reihenfolge, weil der Zufallswurf falsch verschaltet war.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
