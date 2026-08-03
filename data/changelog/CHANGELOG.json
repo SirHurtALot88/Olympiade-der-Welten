@@ -3,6 +3,15 @@
   "eintraege": [
     {
       "datum": "2026-08-03",
+      "seite": "Saison · Spieltagswechsel",
+      "pr": null,
+      "text": "Beim Spieltagswechsel schrieb das automatische Aufstellen der KI-Teams unter Umständen direkt in die echte Spielstand-Ablage, statt in die vom Aufrufer vorgegebene — dadurch konnte ein reiner Vorschau-Durchlauf den gespeicherten Stand verändern.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-03",
       "seite": "Verein · Sponsoren",
       "pr": null,
       "text": "Die Reihenfolge der Sponsoren-Achsen im Angebots-Slate wechselt jetzt zwischen Teams: vorher bekamen alle Teams derselben Saison dieselbe Reihenfolge, weil der Zufallswurf falsch verschaltet war.",
