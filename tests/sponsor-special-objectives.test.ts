@@ -3,34 +3,14 @@ import { describe, expect, it } from "vitest";
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
 import { buildSponsorOffersForTeam } from "@/lib/sponsor/sponsor-offer-service";
 import {
-  buildBonusObjectiveComponent,
-  buildChallengeSpecialComponent,
-  buildGoldenObjectiveComponent,
-  buildStandardSpecialComponent,
   computeTransferWindowNet,
-  getAvailableBonusObjectiveKeys,
   getTeamAxisRank,
-  isFirstSeason,
-  isTransferTraderAvailableForSeason,
   parseAxisTargetValue,
-  resolveMarketValueGrowthStages,
-  resolveSeasonNumber,
-  SPONSOR_OBJ_MV_GROWTH_STAGES_STRONG,
-  SPONSOR_OBJ_MV_GROWTH_STAGES_WEAK,
-  pickChallengeSpecialKind,
-  pickGoldenObjective,
   resolveChallengeSlotIndex,
-  resolveRealisticAxisTargetRank,
-  filterBonusObjectivesByStrength,
-  SPONSOR_BONUS_OBJECTIVE_ARCHETYPE,
-  SPONSOR_GOLDEN_OBJECTIVE_ARCHETYPE,
-  type SponsorGoldenObjectiveKey,
 } from "@/lib/sponsor/sponsor-special-objectives";
 import { mapSponsorCardToArchetype } from "@/lib/sponsor/sponsor-tier-pool";
 import { SPONSOR_V4_AXIS_KEYS } from "@/lib/sponsor/sponsor-v3-model";
-import type { SponsorArchetype, SponsorCurveShape } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
-import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import {
   computeLeagueSpotlightDeltas,
   type TeamSpotlightSignals,
@@ -49,42 +29,17 @@ import {
 import { SPONSOR_OBJ_FATIGUE_CAP } from "@/lib/sponsor/sponsor-special-objectives";
 import type { GameState, SponsorOfferComponent } from "@/lib/data/olyDataTypes";
 
+/**
+ * DIE ERZEUGUNGSSEITE DER 27 BONUS- UND 6 GOLDEN-ZIELE IST ENTFERNT (2026-08, siehe Kopf-Kommentar in
+ * sponsor-special-objectives.ts) — Kein Test hier baut also mehr ueber `buildBonusObjectiveComponent`
+ * o.ae. Was von dieser Datei bleibt, testet die AUSWERTUNGSSEITE (`sponsor-objective-evaluator.ts`,
+ * bleibt vollstaendig fuer bestehende Vertraege) und die weiterhin gebrauchten Achsen-Bausteine. Wo ein
+ * Test vorher eine Komponente ueber die entfernte Erzeugung baute, baut er sie jetzt direkt als Literal
+ * — exakt in der Form, die die Erzeugung frueher lieferte, damit die Evaluator-Zusicherung unveraendert
+ * bleibt.
+ */
+
 describe("sponsor special objectives", () => {
-  it("never asks weak teams for unrealistic axis top-10 targets", () => {
-    expect(resolveRealisticAxisTargetRank(28, 32)).toBeGreaterThanOrEqual(14);
-    expect(resolveRealisticAxisTargetRank(28, 32)).toBeLessThanOrEqual(24);
-    expect(resolveRealisticAxisTargetRank(15, 32)).toBeGreaterThan(10);
-    expect(resolveRealisticAxisTargetRank(32, 32)).toBeGreaterThanOrEqual(24);
-  }, 60000);
-
-  it("builds W-W challenge on MEN with reachable target", () => {
-    const gameState = createSingleplayerGameState();
-    const team = gameState.teams.find((entry) => entry.shortCode === "W-W")!;
-    const identity = gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
-    const profile = getTeamStrategyProfile(gameState, team.teamId);
-    const rows = buildTeamSeasonOverviewRows({ gameState });
-    const menRank = getTeamAxisRank(rows, team.teamId, "men", gameState);
-
-    const component = buildChallengeSpecialComponent({
-      gameState,
-      team,
-      identity,
-      profile,
-      rarity: "gewöhnlich",
-      rewardCash: 4,
-      seasonId: gameState.season.id,
-    });
-
-    if (component.specialKey === "axis_rank_top") {
-      const parsed = parseAxisTargetValue(component.targetValue);
-      expect(parsed?.axis).toBe("men");
-      expect(parsed?.topRank ?? 99).toBeGreaterThan(10);
-      if (menRank.rank != null) {
-        expect(parsed?.topRank ?? 99).toBeLessThan(menRank.rank);
-      }
-    }
-  }, 60000);
-
   it("offers exactly one challenge sponsor among five choices", () => {
     const gameState = createSingleplayerGameState();
     const teamId = gameState.teams.find((entry) => entry.shortCode === "R-R")?.teamId ?? gameState.teams[0]!.teamId;
@@ -112,36 +67,28 @@ describe("sponsor special objectives", () => {
     expect(status).toBe(powRank <= 3 ? "completed" : powRank <= 5 ? "at_risk" : "open");
   }, 60000);
 
-  it("never offers the transfer-profit challenge in S1 (draft = only buys), but can from S2", () => {
-    const gameState = createSingleplayerGameState();
-    const rows = buildTeamSeasonOverviewRows({ gameState });
-    // Transfer-fokussiertes Profil erzwingen (sellForProfitAggression ≥ 7), damit
-    // "transfer_profit_min" überhaupt in den Optionen landen KÖNNTE.
-    const transferFocusInput = (seasonId: string, team: (typeof gameState.teams)[number]) => {
-      const base = getTeamStrategyProfile(gameState, team.teamId);
-      return {
-        seasonId,
-        teamId: team.teamId,
-        team,
-        identity: gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null,
-        profile: { ...base, bias: { ...base.bias, sellForProfitAggression: 10 } },
-        rows,
-      };
-    };
+  it("achse-Karten bedienen alle drei Archetyp-Eimer (performance/identity/security)", () => {
+    // Frueher ein Nebenbefund im Golden-Picker-Test (entfernt); die Zusicherung selbst haengt nicht an
+    // der entfernten Golden-Auswahl, sondern an `mapSponsorCardToArchetype` (sponsor-tier-pool.ts,
+    // unveraendert) — seit V4 unterscheiden sich die Karten ueber die ACHSE statt ueber ein
+    // Risikoprofil, und alle drei Eimer muessen ueber die vier Achsen weiterhin erreichbar bleiben.
+    const buckets = new Set(SPONSOR_V4_AXIS_KEYS.map((key) => mapSponsorCardToArchetype("achse", key)));
+    expect([...buckets].sort()).toEqual(["identity", "performance", "security"]);
+  });
 
-    // S1: für KEIN Team darf das Transfergewinn-Ziel angeboten werden.
-    for (const team of gameState.teams) {
-      expect(pickChallengeSpecialKind(transferFocusInput("season-1", team))).not.toBe("transfer_profit_min");
-    }
-
-    // S2: es ist wieder erreichbar (sonst wäre der Gate ein Blankett-Entfernen).
-    const s2Kinds = gameState.teams.map((team) => pickChallengeSpecialKind(transferFocusInput("season-2", team)));
-    expect(s2Kinds).toContain("transfer_profit_min");
-  }, 60000);
+  it("parses an encoded axis target value back into axis + top rank", () => {
+    expect(parseAxisTargetValue("men:7")).toEqual({ axis: "men", topRank: 7 });
+    expect(parseAxisTargetValue("nonsense")).toBeNull();
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────────
-// TEIL B — Sponsor-Bonusziele (staged / spotlightBonus-Framework)
+// TEIL B — Auswertung bestehender Alt-Ziel-Vertraege (staged / spotlightBonus-Framework).
+//
+// Die Komponenten unten sind Literale, keine Erzeugnisse eines Katalogs — der Katalog ist entfernt
+// (siehe Datei-Kopf). Sie spiegeln exakt die Form, die die frueheren Bauer-Funktionen lieferten, weil
+// genau diese Form in bestehenden Spielstaenden liegt und `evaluateSpecialComponentStage` sie lesen
+// koennen muss.
 // ─────────────────────────────────────────────────────────────────────────────────────────────────
 
 function setRank(gs: GameState, teamId: string, rank: number) {
@@ -151,118 +98,20 @@ function setRank(gs: GameState, teamId: string, rank: number) {
   } as GameState["seasonState"]["standings"];
 }
 
-function bonusInput(gs: GameState, teamId: string, overrides: Record<string, unknown> = {}) {
-  const team = gs.teams.find((entry) => entry.teamId === teamId)!;
-  return {
-    gameState: gs,
-    team,
-    identity: gs.teamIdentities.find((entry) => entry.teamId === teamId) ?? null,
-    profile: null,
-    rewardCash: 5,
-    rarity: "magisch" as const,
-    seasonId: gs.season.id,
-    ...overrides,
-  };
-}
-
-describe("sponsor bonus objectives — new targets (Fable B)", () => {
-  it("builds every new target and measures market-value growth vs frozen baseline", () => {
+describe("sponsor bonus objectives — Auswertung bestehender Alt-Vertraege", () => {
+  it("returns null for debt_payoff when no debt exists (kein Gratis-Fortschritt)", () => {
     const gs = structuredClone(createSingleplayerGameState());
     const teamId = gs.teams[0]!.teamId;
-    const keys = [
-      "market_value_growth",
-      "discipline_specialist",
-      "beliebtheit_climb",
-      "captain_era",
-      "injury_prevention",
-      "debt_payoff",
-      "facility_condition",
-      "contract_stability",
-      "budget_overachiever",
-      "cellar_escape",
-      "giant_killer",
-    ] as const;
-    for (const key of keys) {
-      const comp = buildBonusObjectiveComponent(key, bonusInput(gs, teamId) as never);
-      expect(comp.specialKey).toBe(key);
-      // Metrik ist berechenbar oder null (nicht anwendbar) — kein Wurf.
-      expect(() => computeObjectiveProgressMetric(gs, teamId, comp)).not.toThrow();
-    }
-
-    // market_value_growth: Baseline eingefroren; wächst der Kaderwert, steigt die %-Metrik.
-    const comp = buildBonusObjectiveComponent("market_value_growth", bonusInput(gs, teamId) as never);
-    const base = Number(/mvbase:([\d.]+)/.exec(String(comp.targetValue))?.[1] ?? NaN);
-    expect(Number.isFinite(base)).toBe(true);
-    // Ohne Änderung ~0 %.
-    const metric0 = computeObjectiveProgressMetric(gs, teamId, comp);
-    expect(metric0).toBeCloseTo(0, 1);
-  }, 60000);
-
-  it("scales the market-value-growth ladder down in season 1, where only training can move the squad value", () => {
-    const gs = structuredClone(createSingleplayerGameState());
-    const teamId = gs.teams[0]!.teamId;
-    const stagesFor = (seasonId: string, teamQualityRank: number) =>
-      buildBonusObjectiveComponent(
-        "market_value_growth",
-        bonusInput(gs, teamId, { seasonId, teamQualityRank }) as never,
-      ).stages?.map((entry) => entry.threshold) ?? [];
-
-    // Ab S2 wirken ZWEI Hebel (Entwicklung + Zukäufe) → die ambitionierte Leiter bleibt unverändert.
-    expect(stagesFor("season-2", 1)).toEqual([...SPONSOR_OBJ_MV_GROWTH_STAGES_STRONG]);
-    expect(stagesFor("season-2", 30)).toEqual([...SPONSOR_OBJ_MV_GROWTH_STAGES_WEAK]);
-
-    // In S1 fehlt der Transfermarkt: jede Stufe muss unter der jeweiligen S2-Stufe liegen.
-    const s1Strong = stagesFor("season-1", 1);
-    const s1Weak = stagesFor("season-1", 30);
-    expect(s1Strong).toHaveLength(3);
-    for (const [index, threshold] of s1Strong.entries()) {
-      expect(threshold).toBeLessThan(SPONSOR_OBJ_MV_GROWTH_STAGES_STRONG[index]!);
-    }
-    for (const [index, threshold] of s1Weak.entries()) {
-      expect(threshold).toBeLessThan(SPONSOR_OBJ_MV_GROWTH_STAGES_WEAK[index]!);
-    }
-
-    // Kern der Regression: die UNTERSTE S1-Schwelle liegt im mit reinem Training erreichbaren Bereich.
-    // Die alte, saison-unabhängige Untergrenze von +5 % war in S1 für kein Team erreichbar.
-    expect(s1Strong[0]!).toBeLessThanOrEqual(2);
-    expect(s1Strong[0]!).toBeGreaterThan(0);
-
-    // Junge/günstige Kader wachsen relativ schneller → höhere Leiter als starke Teams, auch in S1.
-    expect(s1Weak[0]!).toBeGreaterThan(s1Strong[0]!);
-
-    // Stufen bleiben in beiden Saisons streng aufsteigend.
-    for (const ladder of [s1Strong, s1Weak]) {
-      expect(ladder[0]!).toBeLessThan(ladder[1]!);
-      expect(ladder[1]!).toBeLessThan(ladder[2]!);
-    }
-
-    // Das Label nennt die tatsächlich geforderten Prozentwerte (Anzeige == Auswertung).
-    const s1Component = buildBonusObjectiveComponent(
-      "market_value_growth",
-      bonusInput(gs, teamId, { seasonId: "season-1", teamQualityRank: 1 }) as never,
-    );
-    expect(s1Component.label).toBe(`Kaderwert-Wachstum +${s1Strong[0]}/${s1Strong[1]}/${s1Strong[2]} %`);
-  }, 60000);
-
-  it("derives the season number defensively and only treats a reliable season-1 suffix as season 1", () => {
-    expect(resolveSeasonNumber("season-1")).toBe(1);
-    expect(resolveSeasonNumber("season-12")).toBe(12);
-    expect(resolveSeasonNumber("no-suffix")).toBeNull();
-
-    expect(isFirstSeason("season-1")).toBe(true);
-    expect(isFirstSeason("season-2")).toBe(false);
-    // Ohne verlässlichen Suffix KEINE S1-Sonderregel — sonst bekämen spätere Saisons still die flache Leiter.
-    expect(isFirstSeason("no-suffix")).toBe(false);
-    expect(resolveMarketValueGrowthStages({ seasonId: "no-suffix", weak: false })).toEqual(
-      SPONSOR_OBJ_MV_GROWTH_STAGES_STRONG,
-    );
-  });
-
-  it("returns null for debt_payoff / contract_stability / facility_condition when the precondition is absent", () => {
-    const gs = structuredClone(createSingleplayerGameState());
-    const teamId = gs.teams[0]!.teamId;
-    const debt = buildBonusObjectiveComponent("debt_payoff", bonusInput(gs, teamId) as never);
-    // Kein Kredit → Baseline 0 → Metrik null (kein Gratis-Fortschritt).
+    // Kein Kredit → eingefrorene Baseline 0 (so baute buildBonusObjectiveComponent sie frueher auch:
+    // die Summe der aktiven Kredite beim Signing, hier 0).
+    const debt: SponsorOfferComponent = {
+      componentId: "special-debt-payoff",
+      kind: "special",
+      label: "Schuldenfrei (Kredite tilgen)",
+      targetValue: "debtbase:0",
+      rewardCash: 5,
+      specialKey: "debt_payoff",
+    };
     expect(computeObjectiveProgressMetric(gs, teamId, debt)).toBeNull();
   }, 60000);
 
@@ -273,27 +122,44 @@ describe("sponsor bonus objectives — new targets (Fable B)", () => {
     const rowsByTeamId = new Map(rows.map((r) => [r.teamId, r] as const));
     const expected = computeTeamExpectation({ row: rowsByTeamId.get(teamId)!, rowsByTeamId, identity: null }).expectedRank;
     setRank(gs, teamId, Math.max(1, expected - 6));
-    const comp = buildBonusObjectiveComponent("underdog_story", bonusInput(gs, teamId) as never);
+    const comp: SponsorOfferComponent = {
+      componentId: "special-underdog-story",
+      kind: "special",
+      label: "Underdog-Story (über Erwartung abschneiden)",
+      targetValue: "underdog",
+      rewardCash: 5,
+      specialKey: "underdog_story",
+      stages: [
+        { threshold: 3, fraction: 0.4, label: "+3" },
+        { threshold: 6, fraction: 0.7, label: "+6" },
+        { threshold: 9, fraction: 1.0, label: "+9" },
+      ],
+    };
     const res = evaluateSpecialComponentStage(gs, teamId, comp);
     expect(res.metric).toBe(expected - Math.max(1, expected - 6));
     expect(res.fraction).toBeCloseTo(0.7, 5); // +6 → mittlere Stufe
   }, 60000);
 
-  it("underdog family: nur schwachen/Aufbau-Teams angeboten, Top-Teams nicht", () => {
-    const keys = ["budget_overachiever", "cellar_escape", "giant_killer"] as const;
-    // Starkes Team (kleine Qualitäts-Platzierung) → keines der drei angeboten.
-    expect(filterBonusObjectivesByStrength([...keys], 3)).toEqual([]);
-    // Schwaches Team (Qualitäts-Platzierung ≥ 17) → alle drei im Pool.
-    expect(filterBonusObjectivesByStrength([...keys], 28).slice().sort()).toEqual([...keys].slice().sort());
-  });
-
   it("cellar_escape: invertierter Endrang, erste Stufe = raus aus Bottom-5", () => {
     const gs = structuredClone(createSingleplayerGameState());
     const teamId = gs.teams[0]!.teamId;
     const teamCount = gs.teams.length;
+    const inv = (rank: number) => teamCount - rank + 1;
     setRank(gs, teamId, teamCount - 5); // Endrang: gerade aus der Kellerzone heraus
     gs.seasonState.standings![teamId]!.startplatz = teamCount; // Start im Keller (Bottom-5) → echter Aufstieg
-    const comp = buildBonusObjectiveComponent("cellar_escape", bonusInput(gs, teamId) as never);
+    const comp: SponsorOfferComponent = {
+      componentId: "special-cellar-escape",
+      kind: "special",
+      label: "Kellerkind-Aufstieg",
+      targetValue: "cellar",
+      rewardCash: 5,
+      specialKey: "cellar_escape",
+      stages: [
+        { threshold: inv(teamCount - 5), fraction: 0.4, label: "raus aus Bottom-5" },
+        { threshold: inv(teamCount - 11), fraction: 0.7, label: `≤ Rang ${teamCount - 11}` },
+        { threshold: inv(teamCount - 16), fraction: 1.0, label: `≤ Rang ${teamCount - 16}` },
+      ],
+    };
     const res = evaluateSpecialComponentStage(gs, teamId, comp);
     expect(res.metric).toBe(teamCount - (teamCount - 5) + 1); // = 6 (invertierter Rang)
     expect(res.fraction).toBeCloseTo(0.4, 5); // erste Stufe
@@ -303,9 +169,22 @@ describe("sponsor bonus objectives — new targets (Fable B)", () => {
     const gs = structuredClone(createSingleplayerGameState());
     const teamId = gs.teams[0]!.teamId;
     const teamCount = gs.teams.length;
+    const inv = (rank: number) => teamCount - rank + 1;
     setRank(gs, teamId, teamCount - 5); // guter Endrang (raus aus Bottom-5) …
     gs.seasonState.standings![teamId]!.startplatz = teamCount - 10; // … aber Start deutlich über der Kellerzone
-    const comp = buildBonusObjectiveComponent("cellar_escape", bonusInput(gs, teamId) as never);
+    const comp: SponsorOfferComponent = {
+      componentId: "special-cellar-escape",
+      kind: "special",
+      label: "Kellerkind-Aufstieg",
+      targetValue: "cellar",
+      rewardCash: 5,
+      specialKey: "cellar_escape",
+      stages: [
+        { threshold: inv(teamCount - 5), fraction: 0.4, label: "raus aus Bottom-5" },
+        { threshold: inv(teamCount - 11), fraction: 0.7, label: `≤ Rang ${teamCount - 11}` },
+        { threshold: inv(teamCount - 16), fraction: 1.0, label: `≤ Rang ${teamCount - 16}` },
+      ],
+    };
     const res = evaluateSpecialComponentStage(gs, teamId, comp);
     expect(res.metric).toBe(0); // Kellerkind-Bedingung nicht erfüllt → keine Auszahlung
     expect(res.fraction).toBeCloseTo(0, 5);
@@ -316,17 +195,23 @@ describe("sponsor bonus objectives — new targets (Fable B)", () => {
     const teamId = gs.teams[0]!.teamId;
     const teamCount = gs.teams.length;
     setRank(gs, teamId, 8);
-    const built = buildBonusObjectiveComponent("budget_overachiever", bonusInput(gs, teamId) as never);
-    expect(String(built.targetValue)).toMatch(/^mwcap:/);
+    const base: SponsorOfferComponent = {
+      componentId: "special-budget-overachiever",
+      kind: "special",
+      label: "Über Verhältnisse",
+      targetValue: "mwcap:0",
+      rewardCash: 5,
+      specialKey: "budget_overachiever",
+    };
     // Deckel sehr hoch → unter Deckel → invertierter Endrang zählt.
-    const under = { ...built, targetValue: "mwcap:9999999" } as SponsorOfferComponent;
+    const under: SponsorOfferComponent = { ...base, targetValue: "mwcap:9999999" };
     expect(computeObjectiveProgressMetric(gs, teamId, under)).toBe(teamCount - 8 + 1);
     // Deckel praktisch 0 → Kaderwert sprengt Deckel → kein Bonus.
-    const over = { ...built, targetValue: "mwcap:0.01" } as SponsorOfferComponent;
+    const over: SponsorOfferComponent = { ...base, targetValue: "mwcap:0.01" };
     expect(computeObjectiveProgressMetric(gs, teamId, over)).toBe(0);
   }, 60000);
 
-  it("windows transfer-trader net to the season and excludes it in season 1", () => {
+  it("windows transfer-trader net to the season", () => {
     const gs = structuredClone(createSingleplayerGameState());
     const teamId = gs.teams[0]!.teamId;
     const seasonId = gs.season.id;
@@ -336,11 +221,6 @@ describe("sponsor bonus objectives — new targets (Fable B)", () => {
       { id: "x", playerId: "p3", seasonId: "season-99", transferType: "sell", fromTeamId: teamId, toTeamId: null, fee: 999 },
     ] as never;
     expect(computeTransferWindowNet(gs, teamId, seasonId)).toBe(15);
-    expect(isTransferTraderAvailableForSeason("season-1")).toBe(false);
-    expect(isTransferTraderAvailableForSeason("season-2")).toBe(true);
-    // Bucketing läuft über den Archetyp-Eimer der Modellkurve ("Sockel" → security).
-    expect(getAvailableBonusObjectiveKeys("security", "season-1")).not.toContain("transfer_trader");
-    expect(getAvailableBonusObjectiveKeys("security", "season-2")).toContain("transfer_trader");
   }, 60000);
 
   it("keeps the objective spotlight league-centered (Σ ≈ 0)", () => {
@@ -362,56 +242,6 @@ describe("sponsor bonus objectives — new targets (Fable B)", () => {
     for (const result of deltas.values()) sumObjective += result.components.objective ?? 0;
     // Zentrierung exakt 0 vor Rundung; nur Rundungsdrift (≤ teamCount × 0.5e-4) bleibt.
     expect(Math.abs(sumObjective)).toBeLessThan(teamCount * 0.5e-4 + 1e-9);
-  });
-
-  it("separates golden objectives from the standard pool and picks them curve-family-consistently", () => {
-    const goldenKeys = Object.keys(SPONSOR_GOLDEN_OBJECTIVE_ARCHETYPE) as SponsorGoldenObjectiveKey[];
-    const stdKeys = Object.keys(SPONSOR_BONUS_OBJECTIVE_ARCHETYPE);
-    expect(goldenKeys.some((k) => stdKeys.includes(k))).toBe(false);
-    // Die Pickers nehmen den Archetyp-Eimer direkt entgegen; die Modellkurve wird in der Erzeugung ueber
-    // SPONSOR_CURVE_ARCHETYPE darauf abgebildet (frueher lag dazwischen noch die Legacy-Kurvenform).
-    for (const archetype of ["performance", "identity", "security"] as const) {
-      const pick = pickGoldenObjective("season-4", "T-1", archetype);
-      expect(SPONSOR_GOLDEN_OBJECTIVE_ARCHETYPE[pick]).toBe(archetype);
-      expect(pickGoldenObjective("season-4", "T-1", archetype)).toBe(pick); // deterministisch
-      expect(getAvailableBonusObjectiveKeys(archetype, "season-4")).not.toContain(pick as never);
-    }
-    // Alle drei Eimer werden bedient — seit V4 ueber die ACHSE statt ueber die Karte. Das ist die
-    // inhaltlich passende Quelle: wer fuer Finanzen zahlt, ist eine Sicherheits-Marke; wer fuer
-    // Kaderwert zahlt, eine Leistungs-Marke. Die Karten selbst (Basis/Achse) tragen die Unterscheidung
-    // nicht mehr, seit sie sich ueber die Achse unterscheiden statt ueber das Risikoprofil.
-    const buckets = new Set(SPONSOR_V4_AXIS_KEYS.map((key) => mapSponsorCardToArchetype("achse", key)));
-    expect([...buckets].sort()).toEqual(["identity", "performance", "security"]);
-  });
-
-  it("scales standard special difficulty with rarity order and buckets bonus keys by curve family", () => {
-    // Schwierigkeit skaliert mit der Rarity-Ordnung: gewöhnlich (order 0) fordert weniger als legendär (order 3).
-    const easy = buildStandardSpecialComponent({ templateId: "transfer_profit_min", rarity: "gewöhnlich", rewardCash: 5 });
-    const hard = buildStandardSpecialComponent({ templateId: "transfer_profit_min", rarity: "legendär", rewardCash: 5 });
-    expect(Number(hard.targetValue)).toBeGreaterThan(Number(easy.targetValue));
-
-    // discipline_top3_count kodiert jetzt "rank:N;count:M" (stärke-skalierter Rang + rarity-skalierte
-    // Spielerzahl). Die geforderte Spielerzahl (count) steigt mit der Rarity.
-    const parseCount = (value: string | number) => Number(/count:\s*(\d+)/.exec(String(value))?.[1] ?? NaN);
-    const discEasy = buildStandardSpecialComponent({ templateId: "discipline_top3_count", rarity: "gewöhnlich", rewardCash: 5, teamQualityRank: 16 });
-    const discHard = buildStandardSpecialComponent({ templateId: "discipline_top3_count", rarity: "legendär", rewardCash: 5, teamQualityRank: 16 });
-    expect(parseCount(discHard.targetValue)).toBeGreaterThan(parseCount(discEasy.targetValue));
-
-    // Stärke-Skalierung: ein schwaches Team (hoher qualityRank) bekommt einen leichteren Disziplin-Rang
-    // (höhere Rangzahl = obere Tabellenhälfte) als ein Elite-Team.
-    const parseRank = (value: string | number) => Number(/rank:\s*(\d+)/.exec(String(value))?.[1] ?? NaN);
-    const discWeak = buildStandardSpecialComponent({ templateId: "discipline_top3_count", rarity: "gewöhnlich", rewardCash: 5, teamQualityRank: 30 });
-    const discElite = buildStandardSpecialComponent({ templateId: "discipline_top3_count", rarity: "gewöhnlich", rewardCash: 5, teamQualityRank: 2 });
-    expect(parseRank(discWeak.targetValue)).toBeGreaterThan(parseRank(discElite.targetValue));
-
-    // Bucketing folgt dem Archetyp-Eimer: zwei Karten desselben Eimers ziehen den identischen
-    // Bonus-Pool, eine Karte eines anderen Eimers einen disjunkten.
-    const security1 = getAvailableBonusObjectiveKeys(mapSponsorCardToArchetype("sicherheit"), "season-4");
-    const security2 = getAvailableBonusObjectiveKeys("security", "season-4");
-    const performance = getAvailableBonusObjectiveKeys(mapSponsorCardToArchetype("ambition"), "season-4");
-    expect([...security1].sort()).toEqual([...security2].sort());
-    expect(security1.some((key) => performance.includes(key))).toBe(false);
-    expect(performance.length).toBeGreaterThan(0);
   });
 
   it("measures fatigue_management against pure availability fatigue, not the training layer", () => {
@@ -519,16 +349,21 @@ describe("sponsor bonus objectives — new targets (Fable B)", () => {
     const gs = structuredClone(createSingleplayerGameState());
     const teamId = gs.teams[0]!.teamId;
     setRank(gs, teamId, 1);
-    const weak = evaluateSpecialComponentStage(
-      gs,
-      teamId,
-      buildGoldenObjectiveComponent("golden_title_shock", bonusInput(gs, teamId, { teamQualityRank: 30 }) as never),
-    );
-    const strong = evaluateSpecialComponentStage(
-      gs,
-      teamId,
-      buildGoldenObjectiveComponent("golden_title_shock", bonusInput(gs, teamId, { teamQualityRank: 3 }) as never),
-    );
+    const goldenTitleShock = (teamQualityRank: number): SponsorOfferComponent => ({
+      componentId: "special-golden-title-shock",
+      kind: "special",
+      label: "Der Titel-Schock (schwaches Team, ganz nach oben)",
+      targetValue: `title_shock:${Math.round(teamQualityRank)}`,
+      rewardCash: 5,
+      specialKey: "golden_title_shock",
+      stages: [
+        { threshold: 1, fraction: 0.5, label: "Top-3" },
+        { threshold: 2, fraction: 0.75, label: "Top-2" },
+        { threshold: 3, fraction: 1.0, label: "Meister" },
+      ],
+    });
+    const weak = evaluateSpecialComponentStage(gs, teamId, goldenTitleShock(30));
+    const strong = evaluateSpecialComponentStage(gs, teamId, goldenTitleShock(3));
     expect(weak.fraction).toBeCloseTo(1, 5); // schwaches Team, Meister
     expect(strong.fraction).toBe(0); // starkes Team nicht eignungsberechtigt
   }, 60000);
