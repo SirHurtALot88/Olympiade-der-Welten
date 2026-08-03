@@ -659,52 +659,64 @@ const SPONSOR_AI_CURVE_FIT_SIGMA = 2.5;
 const SPONSOR_AI_CURVE_FIT_WEIGHT = 3;
 
 /**
- * GEWICHT DES ECO-DOWNSIDE-TERMS. Kalibriert an `eco-messung.ts` (6 Seeds x 32 Teams), nicht am
- * Gefuehl — Sweep 2/3/4/5/6/8/20 auf dem Live-Save, Ergebnis fuer die klammen Teams (Druck >= 7), plus
- * `mitVorschuss` aus dem bestehenden `tests/sponsor-v4-ki-wahl.test.ts`-Szenario (alle 32 Teams auf
- * Kasse −30, Schwelle: > 8 von 32 muessen die Vorschuss-Karte nehmen):
+ * GEWICHT DES ECO-DOWNSIDE-TERMS. Kalibriert an `eco-messung.ts` (6 Seeds x 32 Teams) UND an
+ * `tests/sponsor-v4-ki-wahl.test.ts` ("greift bei Geldnot zum Vorschuss": alle 32 Teams auf Kasse −30,
+ * Schwelle: > 8 von 32 muessen trotzdem die Vorschuss-Karte nehmen) — nicht am Gefuehl.
  *
- *   Gewicht | Ø Bodenrang | bestbodig | Formen | mitVorschuss/32 | Test "greift bei Geldnot"
- *   2       | 3,10        | 13 %      | 11     | 15              | gruen
- *   3       | 3,01        | 18 %      | 11     | 15              | gruen
- *   4       | 2,94        | 18 %      | 11     | 13              | gruen — GEWAEHLT
- *   5       | ~2,9        | ~19 %     | 11     | 12              | gruen
- *   6       | 2,87        | 20 %      | 11     | 8               | ROT (Schwelle > 8 knapp verfehlt)
- *   8..20   | 2,86-2,89   | 20-23 %   | 11     | < 8 (vermutet)  | ROT
+ * NACHBESSERUNG (dieser Kommentar ersetzt eine fruehere, fehlerhafte Kalibrierung): die erste Fassung
+ * von `resolveEcoIntent01` mischte `cash_recovery` aus `buildSeasonStrategyState` als Hauptsignal ein.
+ * Direktmessung ueber ALLE 32 Teams des Live-Saves (`new-game-1785174792968-8d7mdx`) zeigte danach:
+ * `cash_recovery` triggert dort bei 31 von 32 Teams — nicht ueber die Kasse, sondern ueber
+ * `salaryPressure = Gehalt/Kasse > 1,25` (Gehaelter 50-84 gegen typische Kassenstaende reissen diese
+ * Schwelle praktisch immer). `cash_recovery` ist der NORMALZUSTAND dieser Liga, kein Ausnahmesignal.
+ * `ecoIntent01` lag dadurch fuer ALLE 32 Teams zwischen 0,3 und 1,0 (Mittel 0,75, KEIN Team bei 0) —
+ * der Term war de facto eine globale Risikoaversion von rund 0,75 * Gewicht fuer jedes Team, keine
+ * Eco-Entscheidung, und die "entspannte" Gruppe bewegte sich in der Messung sichtbar mit (3,46 → 3,38).
+ * Siehe `resolveEcoIntent01` fuer die korrigierte Formel: `cash_recovery` traegt jetzt KEIN Gewicht
+ * mehr, das Hauptsignal ist die bestehende `cashPressure`-Kaskade (binaer bei `cashPressure >= 7`,
+ * dieselbe Schwelle wie ueberall sonst in dieser Datei).
  *
- * GEWICHT 4 IST NICHT DAS STAERKSTE MOEGLICHE, SONDERN DAS GROESSTE, DAS EINEN BESTEHENDEN TEST NICHT
- * BRICHT. `tests/sponsor-v4-ki-wahl.test.ts` ("greift bei Geldnot zum Vorschuss") verlangt bei extremer
- * Geldnot einen "klaren Teil" der Teams auf der Vorschuss-Karte — der bestehende Vorschuss-Term
- * (`+0,25 * advance.amount`) und der neue Eco-Downside-Term konkurrieren um dieselben Angebote, denn
- * eine Vorschuss-Karte ist nicht zwangslaeufig die bodenstaerkste. Zwischen Gewicht 5 und 6 kippt die
- * Konkurrenz (12 → 8 von 32) und verletzt die bestehende Schwelle. Diese Grenze ist damit die
- * tatsaechliche Kalibrierungsgrenze, nicht eine gefuehlte — sie wurde gemessen, indem genau dieser Test
- * bei wachsendem Gewicht beobachtet wurde.
+ * Sweep 2/3/3.2/3.5/4 mit der KORRIGIERTEN Formel, klamme Teams (Druck >= 7):
  *
- * ZWEI WEITERE BEFUNDE AUS DEM SWEEP, die in jede Weiterarbeit an dieser Zahl gehoeren:
+ *   Gewicht | Ø Bodenrang | bestbodig | Ø Bodenrang entspannt | mitVorschuss/32 | Test "greift bei Geldnot"
+ *   2       | ~3,1        | ~13 %     | 3,45 (unveraendert)   | ~14             | gruen
+ *   3       | 2,99        | 17 %      | 3,45 (unveraendert)   | 10              | gruen — GEWAEHLT
+ *   3,2     | 2,97        | 16 %      | 3,45 (unveraendert)   | 9               | gruen, Marge nur 1
+ *   3,5     | 2,96        | 17 %      | 3,45 (unveraendert)   | 6               | ROT
+ *   4       | ~2,95       | ~17 %     | 3,45 (unveraendert)   | < 6 (vermutet)  | ROT
  *
- * ERSTENS erreicht die Wirkung bei KEINEM Gewicht die im Auftrag genannte Zielmarke 2,2 — auch nicht
- * bei den (durch obige Testgrenze ohnehin ausgeschlossenen) hohen Werten 8-20, wo die Kurve bereits
- * plateaut (2,87 → 2,86 zwischen Gewicht 6 und 20). Grund, per Direktmessung bestaetigt (argmin(downside)
- * ganz ohne die uebrigen Scoreterme liefert Bodenrang ~3,0 — kaum besser als eine Zufallswahl unter 5
- * Karten): die Anker-Gewichte in `sponsorV3DownsideShortfall` (Sigma 4, zentriert auf den Startrang)
- * lassen fuer ein starkes, aber klammes Team den extremen Rangbereich, in dem der Boden ueberhaupt
- * entsteht, kaum Gewicht — dieses Team landet dort realistisch nie. Der Boden-Rang aus
- * `eco-messung.ts` ist damit ein UNVOLLKOMMENER Proxy fuer das, was diese Groesse tatsaechlich
- * optimiert (Abwaertsrisiko im REALISTISCHEN Rangfenster, nicht am Tabellenende) — exakt die
+ * Vorher (kein Term): klamm 3,15 / 11 % (Druck 7 allein: 3,26 / 4 % — schwaecher als der Durchschnitt,
+ * weil 72 der 102 klammen Vertraege bei Druck 7 liegen, nicht 10), entspannt 3,46 / 10 %.
+ *
+ * WARUM DIE FRUEHERE FASSUNG TROTZ STAERKEREM GEWICHT (4) EINEN SCHWAECHEREN ECHTEN EFFEKT ZEIGTE, ALS
+ * ES AUSSAH: mit `pressure01` linear zwischen Druck 3 und 10 gemischt (`(cashPressure-3)/7`) bekam ein
+ * Druck-7-Team nur `ecoIntent01 = 0,571 * Gewicht` statt `1,0 * Gewicht` — und Druck 7 stellt 70 % der
+ * klammen Vertraege. Die Testgrenze wird aber ausschliesslich von Druck-10-Teams gesetzt (das
+ * Vorschuss-Testszenario setzt fuer ALLE 32 Teams Kasse < 0, also `cashPressure === 10` fuer jedes
+ * einzelne — kein Team dort hat je Druck 7). Die lineare Mischung liess sich also nicht hoeher drehen,
+ * ohne die ohnehin schon voll ausgereizten Druck-10-Teams ueber die Testschwelle zu drueberdruecken —
+ * und blieb fuer die MEHRHEIT der klammen Teams (Druck 7) strukturell zu schwach. Die jetzige binaere
+ * Fassung (`cashPressure >= 7` behandelt Druck 7 und 10 gleich, wie es `resolveAiSponsorArchetypePreference`
+ * und der Vorschuss-Term selbst bereits tun) hebt Druck 7 auf denselben `ecoIntent01 = 1,0` wie Druck 10
+ * an, OHNE die Testgrenze zu beruehren (das Testszenario hat nie ein Druck-7-Team) — und genau das
+ * erklaert den staerkeren Effekt bei GLEICHEM Gewicht 3.
+ *
+ * `tests/sponsor-v4-ki-wahl.test.ts` bleibt die tatsaechliche Kalibrierungsgrenze: der bestehende
+ * Vorschuss-Term (`+0,25 * advance.amount`) und der Eco-Downside-Term konkurrieren um dieselben
+ * Angebote, eine Vorschuss-Karte ist nicht zwangslaeufig die bodenstaerkste. Zwischen Gewicht 3 und 3,5
+ * kippt die Konkurrenz (10 → 6 von 32). Gewicht 3 ist damit das groesste mit komfortabler Marge (2 ueber
+ * der Schwelle), nicht das theoretisch staerkste.
+ *
+ * Auch mit der korrigierten Formel erreicht die Wirkung nicht die im Auftrag genannte Zielmarke 2,2 —
+ * Grund ist strukturell, nicht die Kalibrierung: `sponsorV3DownsideShortfall` gewichtet ueber die
+ * Anker-Verteilung (Sigma 4, zentriert auf den Startrang) und laesst fuer ein starkes, aber klammes
+ * Team den extremen Rangbereich, in dem der Boden ueberhaupt entsteht, bewusst kaum Gewicht — dieses
+ * Team landet dort realistisch nie (Direktmessung: `argmin(downside)` ganz ohne die uebrigen Scoreterme
+ * liefert Bodenrang ~3,0, kaum besser als Zufall unter 5 Karten). Der Boden-Rang aus `eco-messung.ts`
+ * ist ein UNVOLLKOMMENER Proxy fuer das, was diese Groesse tatsaechlich optimiert — exakt die
  * Eigenschaft, die laut Auftrag den bloßen Boden als Kriterium disqualifiziert.
- *
- * ZWEITENS bleibt "entspannt" NICHT exakt unveraendert: `buildSeasonStrategyState` klassifiziert in
- * diesem Save 13 von 14 stichprobenartig geprueften Druck-3-Teams als `cash_recovery` — nicht ueber
- * die Kasse (die ist bei ihnen ja bereits >= 20), sondern ueber `salaryPressure = Gehalt/Kasse > 1,25`.
- * `ecoIntent01` ist bei diesen Teams also trotz "entspannter" Kassenlage strukturell ungleich 0
- * (~0,6 statt 0). Das ist keine Fehlmessung, sondern folgt exakt aus der vorgegebenen Formel und
- * greift wortgetreu das im Auftrag vorgesehene zweite Signal (`strategy01`) auf. Bit-identisch bleibt
- * nur der in Test 2 explizit konstruierte Fall (hohe Kasse UND neutrale Doktrin) — die reale
- * "entspannt (Druck 3)"-Gruppe aus `eco-messung.ts` bewegt sich mit, weil sie eben nicht nur ueber die
- * Kasse "entspannt" ist. Siehe PR-Beschreibung fuer die volle Vorher/Nachher-Tabelle und die Analyse.
  */
-const SPONSOR_AI_ECO_DOWNSIDE_WEIGHT = 4;
+const SPONSOR_AI_ECO_DOWNSIDE_WEIGHT = 3;
 
 /**
  * DER ZIELRANG, GEGEN DEN DIE KURVENFORM PASSEN MUSS.
@@ -817,10 +829,11 @@ function scoreOfferForAi(input: {
 
   // SPARABSICHT: der Vorschuss-Term oben waehlt nur, welche Karte UEBERHAUPT einen Vorschuss traegt —
   // nicht welche den hoechsten Boden hat. Ein Team mit echter Sparabsicht (klamm und/oder in der
-  // Doktrin auf Eco-Kurs) soll stattdessen die Karte mit der GERINGSTEN erwarteten Abwaertsseite
-  // bevorzugen, siehe `sponsorV3DownsideShortfall` fuer die Begruendung dieser Groesse. Bei
-  // `ecoIntent01 == 0` (die grosse Mehrheit entspannter Teams) ist dieser Term exakt 0 — unveraendertes
-  // Verhalten.
+  // seltenen Eco-Round-Doktrin) soll stattdessen die Karte mit der GERINGSTEN erwarteten Abwaertsseite
+  // bevorzugen, siehe `sponsorV3DownsideShortfall` fuer die Begruendung dieser Groesse. `ecoIntent01`
+  // ist fuer jedes Team mit `cashPressure == 3` (entspannte Kasse, keine Eco-Round-Doktrin) exakt 0 —
+  // fuer diese Teams ist dieser Term dann exakt 0, unveraendertes Verhalten (siehe `resolveEcoIntent01`
+  // fuer die Messung, die diese Formel ersetzt hat).
   if (terms && (input.ecoIntent01 ?? 0) > 0) {
     score -= (input.ecoIntent01 ?? 0) * SPONSOR_AI_ECO_DOWNSIDE_WEIGHT * sponsorV3DownsideShortfall(terms);
   }
@@ -843,21 +856,45 @@ function scoreOfferForAi(input: {
 }
 
 /**
- * SPARABSICHT EINES TEAMS — bewusst schlank: nur zwei Signale, kein Konjunktur-Anteil und kein
- * Ambitions-Daempfer. Beim Konjunktur-Anteil ist schon das Vorzeichen eine Designvermutung ("im
- * mageren Jahr ist Ambition billig zu opfern" ist genauso plausibel wie "vor mageren Jahren Runway
- * aufbauen") — ein Koeffizient, dessen Richtung geraten ist, waere schlechter als ihn wegzulassen.
+ * SPARABSICHT EINES TEAMS — bewusst schlank: kein Konjunktur-Anteil und kein Ambitions-Daempfer. Beim
+ * Konjunktur-Anteil ist schon das Vorzeichen eine Designvermutung ("im mageren Jahr ist Ambition
+ * billig zu opfern" ist genauso plausibel wie "vor mageren Jahren Runway aufbauen") — ein
+ * Koeffizient, dessen Richtung geraten ist, waere schlechter als ihn wegzulassen.
  *
- * `strategy01` liest die bereits vorhandene Saison-Doktrin (`buildSeasonStrategyState`,
- * lib/ai/ai-manager-doctrine-service.ts): `cash_recovery` ist die staerkste Sparabsicht (1,0),
- * `eco_round` eine mildere (0,5), jede andere Doktrin 0. `pressure01` ist dieselbe Kassenlage, die
- * auch `resolveAiSponsorArchetypePreference` bereits nutzt, linear auf `[0,1]` gestreckt zwischen den
- * bestehenden Druckstufen 3 (entspannt) und 10 (klamm).
+ * FRUEHERE FASSUNG (bis zur Nachbesserung hier) mischte `cash_recovery` aus `buildSeasonStrategyState`
+ * als HAUPTSIGNAL ein (Gewicht 0,6). Direktmessung am Live-Save (`new-game-1785174792968-8d7mdx`, 32
+ * Teams) zeigt, warum das falsch war: `cash_recovery` triggert dort bei 31 von 32 Teams — nicht ueber
+ * die Kasse, sondern ueber `salaryPressure = Gehalt/Kasse > 1,25` (Gehaelter 50-84 gegen typische
+ * Kassenstaende reissen diese Schwelle praktisch immer). `cash_recovery` IST DER NORMALZUSTAND DIESER
+ * LIGA, nicht das Ausnahmesignal, als das es hier gebraucht wurde — ein Team davon zu unterscheiden
+ * traegt keine Information. Mit `strategy01` als Hauptgewicht lag `ecoIntent01` fuer ALLE 32 Teams
+ * zwischen 0,3 und 1,0 (Mittel 0,75, KEIN Team bei 0) — der Term war de facto eine globale
+ * Risikoaversion von rund 0,75 * Gewicht fuer jedes Team, keine Eco-Entscheidung. Das erklaerte auch,
+ * warum sich "entspannte" Teams in der Messung mitverbesserten: sie bekamen denselben Term wie klamme.
+ *
+ * DESHALB TRAEGT `cash_recovery` HIER JETZT KEIN GEWICHT MEHR. Das Hauptsignal ist `pressure01` — die
+ * bestehende, tatsaechlich trennscharfe `cashPressure`-Kaskade aus `chooseSponsorOfferForAiTeams`
+ * (ueber 6 Saison-Seeds: 102 von 186 Vertraegen bei Druck >= 7, 84 bei Druck 3 — eine echte, keine
+ * gesaettigte Verteilung). `eco_round` bleibt als kleiner Zuschlag: mit 1 von 32 Teams ist es SELTEN
+ * und damit informativ, im Unterschied zu `cash_recovery`.
+ *
+ * `pressure01` ist BINAER bei `cashPressure >= 7`, nicht linear zwischen 3 und 10 hochgezogen — eine
+ * erste Fassung hatte hier linear gemischt (`(cashPressure-3)/7`, also 0,571 bei Druck 7 gegen 1,0 bei
+ * Druck 10) und blieb dadurch fuer den GROSSTEIL der klammen Teams zu schwach: 72 von 102 klammen
+ * Vertraegen liegen bei Druck 7, nicht 10, aber die Gewichtsobergrenze wird vom Vorschuss-Test
+ * (`tests/sponsor-v4-ki-wahl.test.ts`, siehe `SPONSOR_AI_ECO_DOWNSIDE_WEIGHT`) allein ueber Druck-10-
+ * Teams gesetzt — mit linearer Mischung blieb fuer Druck 7 dadurch nur ein effektiver Multiplikator von
+ * `0,571 * Gewicht`, spuerbar zu wenig. Die binaere Fassung deckt sich zudem mit der bereits
+ * bestehenden Konvention dieser Datei: `resolveAiSponsorArchetypePreference` und der Vorschuss-Term
+ * selbst (`cashPressure >= 7 ? ... : ...`, weiter oben) behandeln Druck 7 und Druck 10 schon jetzt als
+ * EINEN Zustand, nicht als Kontinuum — `pressure01` folgt hier nur derselben Linie. Die Vorschuss-
+ * Testschranke (siehe unten) pruefte immer schon ausschliesslich Druck-10-Teams (Kasse < 0 fuer alle
+ * 32 Teams des Szenarios); Druck 7 auf denselben Wert zu heben aendert an dieser Schranke NICHTS.
  */
 function resolveEcoIntent01(input: { seasonStrategy: AiSeasonStrategy | undefined; cashPressure: number }): number {
-  const strategy01 = input.seasonStrategy === "cash_recovery" ? 1 : input.seasonStrategy === "eco_round" ? 0.5 : 0;
-  const pressure01 = Math.max(0, Math.min(1, (input.cashPressure - 3) / 7));
-  return Math.max(0, Math.min(1, 0.6 * strategy01 + 0.4 * pressure01));
+  const pressure01 = input.cashPressure >= 7 ? 1 : 0;
+  const ecoRoundBonus = input.seasonStrategy === "eco_round" ? 0.25 : 0;
+  return Math.max(0, Math.min(1, pressure01 + ecoRoundBonus));
 }
 
 export function chooseSponsorOfferForAiTeams(gameState: GameState, settingsMap?: Record<string, TeamControlSettings>): GameState {
