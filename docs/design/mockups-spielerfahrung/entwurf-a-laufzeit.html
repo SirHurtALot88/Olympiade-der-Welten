@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entwurf A — Laufzeit · Saisonökonomie-Mockup</title>
+<style>
+  :root{
+    --bg:#0b0f17; --bg2:#0e131d; --panel:#131a26; --panel2:#0f1621;
+    --line:#1f2937; --line2:#2a3a52; --ink:#eaf0fa; --mut:#93a3bd; --mut2:#63748f;
+    --accent:#5b9bff; --accent-soft:#15294b; --good:#4cc56b; --warn:#e0a53a; --risk:#e5615a; --gold:#f6c750;
+    --r-gew:#98a2ab; --r-mag:#4f9be0; --r-sel:#e0b83a; --r-leg:#e07f2e;
+    --b-soli:#3f7f5c; --b-grund:#4f9be0; --b-praem:#e0b83a;
+    --boom:#e0b83a; --flaute:#5b9bff;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);
+       font-size:15px;line-height:1.5;padding:0 0 64px}
+  .wrap{max-width:1280px;margin:0 auto;padding:0 20px}
+  header{padding:36px 0 12px;background:radial-gradient(1100px 380px at 22% -30%,#16233a 0%,transparent 62%)}
+  .kicker{font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;color:var(--mut2)}
+  h1{font-size:1.9rem;letter-spacing:-.01em;margin:6px 0 8px}
+  h1 small{display:block;font-size:.95rem;font-weight:400;color:var(--mut);letter-spacing:0;margin-top:6px;max-width:76ch}
+  h2{font-size:1.02rem;margin:34px 0 12px;letter-spacing:.01em}
+  h2 .h-note{font-weight:400;color:var(--mut2);font-size:.82rem;margin-left:8px}
+  .note{color:var(--mut);font-size:.85rem;max-width:82ch;margin-bottom:14px}
+
+  /* Konjunkturstreifen */
+  .konj{display:flex;gap:10px;align-items:stretch;background:var(--panel2);border:1px solid var(--line);
+        border-radius:14px;padding:14px 16px;margin-top:18px;flex-wrap:wrap}
+  .konj-lead{min-width:190px}
+  .konj-lead .lbl{font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--mut2)}
+  .konj-lead .val{font-size:1.5rem;font-weight:650;color:var(--gold);line-height:1.2}
+  .konj-lead .sub{font-size:.78rem;color:var(--mut)}
+  .konj-scale{flex:1;min-width:320px;display:flex;flex-direction:column;justify-content:center;gap:7px}
+  .band-row{display:flex;align-items:center;gap:10px;font-size:.76rem;color:var(--mut)}
+  .band-row b{color:var(--ink);font-weight:600;min-width:74px;font-size:.72rem}
+  .band-track{position:relative;flex:1;height:10px;background:#0a0e15;border:1px solid var(--line);border-radius:6px}
+  .band-fill{position:absolute;top:0;bottom:0;border-radius:5px;background:linear-gradient(90deg,#2c4a76,#4f9be0)}
+  .band-dot{position:absolute;top:-3px;width:4px;height:16px;border-radius:2px;background:var(--gold)}
+  .band-val{min-width:88px;text-align:right;color:var(--mut);font-variant-numeric:tabular-nums;font-size:.74rem}
+
+  /* Zwei Saisons nebeneinander */
+  .duo{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:900px){.duo{grid-template-columns:1fr}}
+  .season{background:var(--panel2);border:1px solid var(--line);border-radius:16px;padding:16px 16px 18px}
+  .season.strong{border-color:#4a3c18;background:linear-gradient(180deg,#161307 0%,var(--panel2) 46%)}
+  .season.weak{border-color:#1d2f4d;background:linear-gradient(180deg,#0b1524 0%,var(--panel2) 46%)}
+  .season-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:14px}
+  .season-head .t{font-size:.94rem;font-weight:640;letter-spacing:.01em}
+  .season.strong .t{color:var(--boom)} .season.weak .t{color:var(--flaute)}
+  .season-head .f{font-variant-numeric:tabular-nums;font-size:1.3rem;font-weight:660}
+  .season.strong .f{color:var(--boom)} .season.weak .f{color:var(--flaute)}
+
+  /* Karten */
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:1180px){.cards{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line2);border-radius:13px;padding:13px 13px 14px;position:relative;overflow:hidden}
+  .card::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:var(--cc,var(--r-mag))}
+  .card-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:2px}
+  .card-name{font-weight:640;font-size:.93rem}
+  .pill{font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--cc,var(--r-mag));
+        color:var(--cc,var(--r-mag));border-radius:999px;padding:2px 8px;white-space:nowrap}
+  .card-sub{color:var(--mut);font-size:.76rem;margin-bottom:11px;min-height:2.4em}
+
+  /* Bausteinbalken */
+  .stack{display:flex;height:26px;border-radius:6px;overflow:hidden;background:#0a0e15;border:1px solid var(--line)}
+  .seg{display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:640;color:#0b0f17;
+       font-variant-numeric:tabular-nums;min-width:0}
+  .seg.s{background:var(--b-soli)} .seg.g{background:var(--b-grund)} .seg.p{background:var(--b-praem)}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:.7rem;color:var(--mut);margin-top:7px}
+  .legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+
+  .rowset{margin-top:11px;border-top:1px solid var(--line);padding-top:9px}
+  .rw{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:baseline;padding:4px 0;font-size:.82rem}
+  .rw + .rw{border-top:1px solid #161d2b}
+  .rw .who{color:var(--mut)}
+  .rw .who b{color:var(--ink);font-weight:600}
+  .rw .inc{font-variant-numeric:tabular-nums;font-weight:640;min-width:62px;text-align:right}
+  .rw .guv{font-variant-numeric:tabular-nums;min-width:64px;text-align:right;font-weight:640}
+  .pos{color:var(--good)} .neg{color:var(--risk)} .neu{color:var(--mut)}
+
+  /* Laufzeitwahl */
+  .terms{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .term{flex:1;min-width:96px;border:1px solid var(--line2);border-radius:9px;padding:8px 9px;background:var(--panel2)}
+  .term.sel{border-color:var(--accent);background:var(--accent-soft)}
+  .term .tt{font-size:.75rem;font-weight:640}
+  .term .td{font-size:.68rem;color:var(--mut);margin-top:2px}
+
+  /* Tabellen */
+  .tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
+  table{border-collapse:collapse;width:100%;font-size:.82rem;min-width:640px}
+  th,td{padding:8px 12px;text-align:right;border-bottom:1px solid #161d2b;font-variant-numeric:tabular-nums;white-space:nowrap}
+  th:first-child,td:first-child{text-align:left;font-variant-numeric:normal}
+  thead th{color:var(--mut2);font-size:.68rem;letter-spacing:.09em;text-transform:uppercase;font-weight:600;
+           background:#0d131d;position:sticky;top:0}
+  tbody tr:last-child td{border-bottom:none}
+  tr.sum td{background:#0d131d;font-weight:650}
+  .foot{margin-top:26px;padding-top:16px;border-top:1px solid var(--line);color:var(--mut2);font-size:.76rem;max-width:88ch}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Saisonökonomie · Mockup 1 von 3</div>
+  <h1>Entwurf A — „Laufzeit"
+    <small>Die Entscheidung ist ZEIT. Der Grundvertrag wird über eine bis drei Saisons unterschrieben — entweder
+    zu einem <b>festen</b> Betrag, den die Konjunktur nicht berührt, oder <b>gekoppelt</b> an das Ligajahr.
+    Solidarpauschale und Rangprämie bleiben für alle gleich.</small>
+  </h1>
+
+  <div class="konj">
+    <div class="konj-lead">
+      <div class="lbl">Ligajahr · Saison 2</div>
+      <div class="val">1,24 — Boom</div>
+      <div class="sub">stärkstes Jahr seit Ligagründung</div>
+    </div>
+    <div class="konj-scale">
+      <div class="band-row"><b>Aktuell</b>
+        <div class="band-track"><div class="band-fill" style="left:100%;width:0"></div><div class="band-dot" style="left:calc(100% - 4px)"></div></div>
+        <span class="band-val">1,24 exakt</span></div>
+      <div class="band-row"><b>Saison +1</b>
+        <div class="band-track"><div class="band-fill" style="left:52%;width:16%"></div></div>
+        <span class="band-val">0,99 – 1,11</span></div>
+      <div class="band-row"><b>Saison +2</b>
+        <div class="band-track"><div class="band-fill" style="left:26%;width:44%"></div></div>
+        <span class="band-val">0,89 – 1,13</span></div>
+      <div class="band-row"><b>Saison +3</b>
+        <div class="band-track"><div class="band-fill" style="left:6%;width:88%"></div></div>
+        <span class="band-val">Tendenz fallend</span></div>
+    </div>
+  </div>
+  <p class="note" style="margin-top:12px">Diese vier Zeilen sind der eigentliche Kern des Entwurfs. Die Werte liegen
+  bereits im Spielstand (<code>SEASON_ECONOMY_FACTOR_WINDOW_SIZE = 5</code>, Horizonte <i>Aktuell</i> bis <i>Season +4</i>) —
+  sie werden dem Spieler heute nur nicht gezeigt. Ohne sie ist jede Laufzeitwahl ein Münzwurf.</p>
+</header>
+
+<h2>Dieselbe Unterschrift, zwei Ligajahre <span class="h-note">Zahlen für Platz 1 · 16 · 32 des bespielten Saves</span></h2>
+<p class="note">Links das Boom-Jahr, rechts die Flaute. Der Balken zeigt, woraus die Einnahme besteht:
+<b>Solidarpauschale</b> (faktorfrei, steigt nach unten), <b>Grundvertrag</b> (mehrjährig) und <b>Rangprämie</b>
+(voll konjunkturabhängig).</p>
+
+<div class="duo">
+
+  <!-- ═══ STARKE SAISON ═══ -->
+  <section class="season strong">
+    <div class="season-head"><span class="t">Starke Saison · Boom</span><span class="f">Faktor 1,24</span></div>
+    <div class="cards">
+
+      <article class="card" style="--cc:var(--r-mag)">
+        <div class="card-top"><span class="card-name">Grundvertrag fest</span><span class="pill">3 Saisons</span></div>
+        <div class="card-sub">Der Nennwert steht. Preis der Gewissheit: −3 %.</div>
+        <div class="stack" title="Platz 1: 30,0 + 19,4 + 62,0">
+          <div class="seg s" style="flex:30">30,0</div>
+          <div class="seg g" style="flex:19.4">19,4</div>
+          <div class="seg p" style="flex:62">62,0</div>
+        </div>
+        <div class="legend"><span><i style="background:var(--b-soli)"></i>Solidarpauschale</span>
+          <span><i style="background:var(--b-grund)"></i>Grundvertrag</span>
+          <span><i style="background:var(--b-praem)"></i>Rangprämie × f</span></div>
+        <div class="rowset">
+          <div class="rw"><span class="who"><b>Platz 1</b> Mayhem Mavericks · 95,7</span><span class="inc">111,4</span><span class="guv pos">+15,7</span></div>
+          <div class="rw"><span class="who"><b>Platz 16</b> Vigorous Vikings · 64,0</span><span class="inc">77,4</span><span class="guv pos">+13,4</span></div>
+          <div class="rw"><span class="who"><b>Platz 32</b> Undercover Agents · 54,1</span><span class="inc">57,8</span><span class="guv pos">+3,7</span></div>
+        </div>
+      </article>
+
+      <article class="card" style="--cc:var(--r-leg)">
+        <div class="card-top"><span class="card-name">Grundvertrag gekoppelt</span><span class="pill">3 Saisons</span></div>
+        <div class="card-sub">Auch der Grundvertrag atmet mit dem Ligajahr. Voller Ausschlag.</div>
+        <div class="stack" title="Platz 1: 30,0 + 24,8 + 62,0">
+          <div class="seg s" style="flex:30">30,0</div>
+          <div class="seg g" style="flex:24.8">24,8</div>
+          <div class="seg p" style="flex:62">62,0</div>
+        </div>
+        <div class="legend"><span><i style="background:var(--b-soli)"></i>Solidarpauschale</span>
+          <span><i style="background:var(--b-grund)"></i>Grundvertrag × f</span>
+          <span><i style="background:var(--b-praem)"></i>Rangprämie × f</span></div>
+        <div class="rowset">
+          <div class="rw"><span class="who"><b>Platz 1</b> · 95,7</span><span class="inc">116,8</span><span class="guv pos">+21,1</span></div>
+          <div class="rw"><span class="who"><b>Platz 16</b> · 64,0</span><span class="inc">80,6</span><span class="guv pos">+16,6</span></div>
+          <div class="rw"><span class="who"><b>Platz 32</b> · 54,1</span><span class="inc">59,4</span><span class="guv pos">+5,3</span></div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ═══ SCHWACHE SAISON ═══ -->
+  <section class="season weak">
+    <div class="season-head"><span class="t">Schwache Saison · Flaute</span><span class="f">Faktor 0,82</span></div>
+    <div class="cards">
+
+      <article class="card" style="--cc:var(--r-mag)">
+        <div class="card-top"><span class="card-name">Grundvertrag fest</span><span class="pill">3 Saisons</span></div>
+        <div class="card-sub">Der feste Betrag hält — genau dafür wurde er unterschrieben.</div>
+        <div class="stack" title="Platz 1: 30,0 + 19,4 + 41,0">
+          <div class="seg s" style="flex:30">30,0</div>
+          <div class="seg g" style="flex:19.4">19,4</div>
+          <div class="seg p" style="flex:41">41,0</div>
+        </div>
+        <div class="legend"><span><i style="background:var(--b-soli)"></i>Solidarpauschale</span>
+          <span><i style="background:var(--b-grund)"></i>Grundvertrag</span>
+          <span><i style="background:var(--b-praem)"></i>Rangprämie × f</span></div>
+        <div class="rowset">
+          <div class="rw"><span class="who"><b>Platz 1</b> Mayhem Mavericks · 95,7</span><span class="inc">90,4</span><span class="guv neg">−5,3</span></div>
+          <div class="rw"><span class="who"><b>Platz 16</b> Vigorous Vikings · 64,0</span><span class="inc">68,8</span><span class="guv pos">+4,8</span></div>
+          <div class="rw"><span class="who"><b>Platz 32</b> Undercover Agents · 54,1</span><span class="inc">57,8</span><span class="guv pos">+3,7</span></div>
+        </div>
+      </article>
+
+      <article class="card" style="--cc:var(--r-leg)">
+        <div class="card-top"><span class="card-name">Grundvertrag gekoppelt</span><span class="pill">3 Saisons</span></div>
+        <div class="card-sub">Der Ausschlag geht in beide Richtungen — hier nach unten.</div>
+        <div class="stack" title="Platz 1: 30,0 + 16,4 + 41,0">
+          <div class="seg s" style="flex:30">30,0</div>
+          <div class="seg g" style="flex:16.4">16,4</div>
+          <div class="seg p" style="flex:41">41,0</div>
+        </div>
+        <div class="legend"><span><i style="background:var(--b-soli)"></i>Solidarpauschale</span>
+          <span><i style="background:var(--b-grund)"></i>Grundvertrag × f</span>
+          <span><i style="background:var(--b-praem)"></i>Rangprämie × f</span></div>
+        <div class="rowset">
+          <div class="rw"><span class="who"><b>Platz 1</b> · 95,7</span><span class="inc">87,4</span><span class="guv neg">−8,3</span></div>
+          <div class="rw"><span class="who"><b>Platz 16</b> · 64,0</span><span class="inc">67,1</span><span class="guv pos">+3,1</span></div>
+          <div class="rw"><span class="who"><b>Platz 32</b> · 54,1</span><span class="inc">56,9</span><span class="guv pos">+2,8</span></div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+</div>
+
+<h2>Die Laufzeit ist die eigentliche Wahl <span class="h-note">nur der Grundvertrag wird gebunden</span></h2>
+<div class="terms">
+  <div class="term"><div class="tt">1 Saison</div><div class="td">volle Beweglichkeit, jedes Jahr neu verhandeln — und jedes Jahr zu den dann geltenden Konditionen</div></div>
+  <div class="term sel"><div class="tt">2 Saisons</div><div class="td">ein Kompromiss: eine Flaute wird überbrückt, ein Boom nur halb verpasst</div></div>
+  <div class="term"><div class="tt">3 Saisons</div><div class="td">im Boom fest unterschrieben ist die beste Entscheidung des Spiels — in der Flaute die schlechteste</div></div>
+</div>
+
+<h2>Vier Saisons, Faktorfolge 1,18 / 0,86 / 1,24 / 0,91 <span class="h-note">kumuliertes GuV in Klammern</span></h2>
+<div class="tblwrap">
+<table>
+<thead><tr><th>Wahl</th><th>S1 · 1,18</th><th>S2 · 0,86</th><th>S3 · 1,24</th><th>S4 · 0,91</th><th>Ende</th></tr></thead>
+<tbody>
+<tr><td>Meister, fest · Gehalt 95,7</td><td>108,4 <span class="neu">(+12,7)</span></td><td>92,4 <span class="neu">(+9,4)</span></td><td>111,4 <span class="neu">(+25,1)</span></td><td>94,9 <span class="neu">(+24,3)</span></td><td class="pos">+24,3</td></tr>
+<tr><td>Meister, gekoppelt</td><td>112,6 <span class="neu">(+16,9)</span></td><td>90,2 <span class="neu">(+11,4)</span></td><td>116,8 <span class="neu">(+32,5)</span></td><td>93,7 <span class="neu">(+30,5)</span></td><td class="pos">+30,5</td></tr>
+<tr><td>Letzter, fest · Gehalt 54,1</td><td>57,8 <span class="neu">(+3,7)</span></td><td>57,8 <span class="neu">(+7,4)</span></td><td>57,8 <span class="neu">(+11,2)</span></td><td>57,8 <span class="neu">(+14,9)</span></td><td class="pos">+14,9</td></tr>
+<tr><td>Letzter, gekoppelt</td><td>59,1 <span class="neu">(+5,0)</span></td><td>57,2 <span class="neu">(+8,0)</span></td><td>59,4 <span class="neu">(+13,4)</span></td><td>57,5 <span class="neu">(+16,7)</span></td><td class="pos">+16,7</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>Was der Rang allein bringt <span class="h-note">Bausteine je Platz, Grundvertrag fest</span></h2>
+<div class="tblwrap">
+<table>
+<thead><tr><th>Rang</th><th>Solidarpauschale</th><th>Grundvertrag</th><th>Rangprämie 0,82</th><th>1,00</th><th>1,24</th><th>Summe 0,82</th><th>1,00</th><th>1,24</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>30,0</td><td>19,4</td><td>41,0</td><td>50,0</td><td>62,0</td><td>90,4</td><td>99,4</td><td>111,4</td></tr>
+<tr><td>4</td><td>32,1</td><td>17,7</td><td>35,7</td><td>43,6</td><td>54,0</td><td>85,5</td><td>93,4</td><td>103,8</td></tr>
+<tr><td>8</td><td>35,0</td><td>15,4</td><td>29,0</td><td>35,4</td><td>43,9</td><td>79,4</td><td>85,8</td><td>94,3</td></tr>
+<tr><td>12</td><td>37,8</td><td>13,3</td><td>22,7</td><td>27,7</td><td>34,3</td><td>73,8</td><td>78,8</td><td>85,5</td></tr>
+<tr><td>16</td><td>40,6</td><td>11,4</td><td>16,8</td><td>20,5</td><td>25,4</td><td>68,8</td><td>72,5</td><td>77,4</td></tr>
+<tr><td>20</td><td>43,5</td><td>9,6</td><td>11,4</td><td>13,9</td><td>17,2</td><td>64,5</td><td>67,0</td><td>70,3</td></tr>
+<tr><td>24</td><td>46,3</td><td>8,0</td><td>6,6</td><td>8,0</td><td>10,0</td><td>60,9</td><td>62,4</td><td>64,3</td></tr>
+<tr><td>28</td><td>49,2</td><td>6,7</td><td>2,6</td><td>3,2</td><td>3,9</td><td>58,4</td><td>59,0</td><td>59,7</td></tr>
+<tr><td>32</td><td>52,0</td><td>5,8</td><td>0</td><td>0</td><td>0</td><td>57,8</td><td>57,8</td><td>57,8</td></tr>
+<tr class="sum"><td>Liga</td><td colspan="5">Ligasumme bei f = 1,00</td><td>2245,7</td><td>2369,0</td><td>2533,3</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>GuV-Verschiebung gegenüber heute</h2>
+<div class="tblwrap">
+<table>
+<thead><tr><th>Gruppe</th><th>Ø Gehalt</th><th>IST heute</th><th>A · 0,82</th><th>A · 1,00</th><th>A · 1,24</th><th>Spannweite</th></tr></thead>
+<tbody>
+<tr><td>Top 8</td><td>78,8</td><td class="pos">+21,7</td><td class="pos">+6,0</td><td class="pos">+13,7</td><td class="pos">+23,9</td><td>17,9</td></tr>
+<tr><td>Mitte (9–24)</td><td>63,7</td><td class="pos">+11,2</td><td class="pos">+5,0</td><td class="pos">+8,6</td><td class="pos">+13,4</td><td>8,4</td></tr>
+<tr><td>Letzte 8</td><td>49,3</td><td class="neg">−1,3</td><td class="pos">+9,3</td><td class="pos">+9,8</td><td class="pos">+10,5</td><td>1,2</td></tr>
+</tbody>
+</table>
+</div>
+<p class="note" style="margin-top:12px"><b>Der Punkt:</b> das Tabellenende wird von −1,3 auf rund +10 gehoben und
+schwankt über den gesamten Faktorbereich nur um 1,2 — es ist abgesichert. Die Spitze schwankt um 17,9.
+<b>Was A nicht schafft:</b> mit den echten Gehältern dieses Saves verliert die Spitze im Schnitt auch in der
+Flaute nicht (+6,0). Erst bei sauberer Gehaltsspreizung (Szenario 2, 2,9×) kippt sie auf −5,7.</p>
+
+<p class="foot">Mockup, kein Produktivstand. Alle Werte gegen die 32 Teams des bespielten Saves
+<code>new-game-1785174792968-8d7mdx</code> (Saison 1 abgeschlossen, Ligagehalt 2043,6). Fundament:
+S(r) = 30 + 22·(r−1)/31 · G(r) = 6 + 14·w(r) · P(r) = 50·w(r)·f mit w(r) = ((32−r)/31)<sup>1,35</sup>.
+Fester Grundvertrag mit 3 % Sicherheitsabschlag.</p>
+
+</div>
+</body>
+</html>
