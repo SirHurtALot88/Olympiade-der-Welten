@@ -217,22 +217,23 @@ export function rollSponsorOfferSlate(input: {
   // Ziehung OHNE ZURUECKLEGEN ueber eine deterministische Sortierung: jede Achse bekommt einen
   // stabilen Wurf, sortiert wird danach. Eine Achse bleibt je Saison uebrig — das rotiert den Slate
   // von selbst, ohne dass eine Anti-Wiederholungsliste gepflegt werden muesste.
+  //
+  // Saison+Team stehen bewusst VOR der Achse im Seed — dieselbe Regel wie beim Kurvenform-Seed unten:
+  // gebraucht wird Varianz ZWISCHEN VERSCHIEDENEN TEAMS bei GLEICHER Achse, und FNV-1a avalanched nur
+  // NACH dem Zeichen, an dem sich zwei Seeds zum ersten Mal unterscheiden (siehe Kommentar beim
+  // Rarity-Wurf unten). Mit der Achse vorne (kurzem, immer gleich langem Praefix je Achse) und
+  // Saison/Team dahinter blieb die Achsen-REIHENFOLGE ueber alle Teams EINER Saison hinweg praktisch
+  // IDENTISCH — gemessen: bei 12 Teams derselben Saison lieferten 10 von 12 exakt dieselbe Reihenfolge,
+  // nur 2 abweichende Werte kamen ueberhaupt vor. Das rotiert zwar zwischen Saisons, aber nicht
+  // zwischen Teams — und genau die Team-Varianz soll dieser Wurf liefern.
   const shuffledAxes = axisPool
-    .map((key) => ({ key, roll: getStableUnitHash(`sponsor-achse:${key}:${input.seasonId}:${input.teamId}`) }))
+    .map((key) => ({ key, roll: getStableUnitHash(`sponsor-achse:${input.seasonId}:${input.teamId}:${key}`) }))
     .sort((left, right) => left.roll - right.roll)
     .map((entry) => entry.key);
 
   // Dieselbe Ziehung-ohne-Zuruecklegen wie bei den Achsen, diesmal ueber die 11 Kurvenformen: jeder
   // Slot bekommt eine ANDERE Form, damit die fuenf Angebote fuenf verschiedene Stellen auf der
   // Ligaleiter zeigen (sponsor-liga-leiter.ts) statt fuenfmal dieselbe Verteilung mit anderem Namen.
-  //
-  // Saison+Team stehen HIER bewusst VOR der Form im Seed, anders als beim Achsen-Seed oben: gebraucht
-  // wird nicht nur Varianz ZWISCHEN den 11 Formen EINES Teams (dafuer reicht jede Platzierung), sondern
-  // auch Varianz ZWISCHEN VERSCHIEDENEN TEAMS bei GLEICHER Form — und FNV-1a avalanched nur NACH dem
-  // Zeichen, an dem sich zwei Seeds zum ersten Mal unterscheiden (siehe Kommentar beim Rarity-Wurf
-  // unten). Mit Team/Saison am Ende (kurze Suffixe wie "T-0"/"T-7") blieb die Formen-REIHENFOLGE ueber
-  // alle Teams hinweg IDENTISCH, weil der unterscheidende Rest zu kurz war, um sich noch durchzumischen
-  // — gemessen: bei 8 Teams lieferten alle acht denselben Formen-Satz in derselben Reihenfolge.
   const shuffledCurveShapes = SPONSOR_CURVE_SHAPE_KEYS
     .map((shape) => ({ shape, roll: getStableUnitHash(`sponsor-curve:${input.seasonId}:${input.teamId}:${shape}`) }))
     .sort((left, right) => left.roll - right.roll)
