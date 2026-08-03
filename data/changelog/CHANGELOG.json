@@ -2,6 +2,24 @@
   "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
+      "datum": "2026-08-03",
+      "seite": "Verein · Sponsoren",
+      "pr": null,
+      "text": "Sponsoren zahlen nicht mehr alle dieselbe Kurve: der Betrag setzt sich jetzt aus einem festen Sockel nach Startrang und einem Wertungstopf nach Endrang zusammen, und die Kurvenform der Karte entscheidet, wo auf der Tabelle dieses Geld liegt — bei gleichem Erwartungswert.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-03",
+      "seite": "Verein · Sponsoren",
+      "pr": null,
+      "text": "Die Ausschüttung ist nachkalibriert: bei normaler Konjunktur zahlen die Sponsoren der Liga ungefähr so viel, wie alle Gehälter zusammen kosten — vorher waren es 15 Prozent mehr, wodurch fast jedes Team automatisch im Plus landete.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.3"
+    },
+    {
       "datum": "2026-08-02",
       "seite": "Cockpit · Saisonende",
       "pr": null,

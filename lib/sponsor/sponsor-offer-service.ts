@@ -3,6 +3,7 @@ import { randomUUID } from "@/lib/utils/random-id";
 import type {
   GameState,
   SponsorArchetype,
+  SponsorCurveShape,
   SponsorDemandProfile,
   SponsorOffer,
   SponsorOfferComponent,
@@ -92,6 +93,8 @@ function buildOfferSkeleton(input: {
   cardKey: SponsorV3CardKey;
   /** Achse dieser Karte (V4). Gesetzt = die Karte zahlt fuer die Achse statt fuer ein Sonderziel. */
   axisKey?: SponsorV4AxisKey | null;
+  /** WO auf der Sponsor-Ligaleiter dieses Angebot sein Geld hat (sponsor-liga-leiter.ts). */
+  curveShape: SponsorCurveShape;
   rarity: SponsorRarity;
   commercialRating: number;
   slotIndex: number;
@@ -234,6 +237,11 @@ function buildOfferSkeleton(input: {
     seasonId: gameState.season.id,
     teamId: team.teamId,
     archetype,
+    // Die Kurvenform ist wieder ein ERZEUGUNGS-Feld statt nur Altvertrags-Erinnerung: sie entscheidet
+    // via `sponsorKurvenLeiter` (sponsor-liga-leiter.ts), WO auf der Ligaleiter dieses Angebot sein
+    // Geld hat. Der Doku-Kommentar am Typ selbst ("NUR NOCH LESEN") gilt damit nur noch fuer die
+    // Spielstaende von VOR diesem Umbau.
+    curveShape: input.curveShape,
     rarity,
     name: parent.name,
     flavor: input.forcePremiumElite ? `★ Golden Card · ${brand.flavor}` : brand.flavor,
@@ -327,6 +335,7 @@ export function buildSponsorOffersForTeam(input: {
       profile,
       cardKey: entry.cardKey,
       axisKey: entry.axisKey ?? null,
+      curveShape: entry.curveShape,
       rarity: entry.rarity,
       commercialRating: commercialRating.score,
       slotIndex,
@@ -351,9 +360,9 @@ export function buildSponsorOffersForTeam(input: {
 
   // DIE EINZIGE STELLE, AN DER EIN ANGEBOT BETRAEGE BEKOMMT.
   //
-  // Der Startrang der Saison ist die Basis des Platzierungsbonus in der Leiter — dieselbe Groesse,
-  // gegen die der Preisgeld-Benchmark am Saisonende misst. Fehlt sie (Saison 1 vor dem ersten
-  // Spieltag), tritt die Liga-Position der Staerkerangliste an ihre Stelle.
+  // Der Startrang der Saison bestimmt den Sockel der Ligaleiter UND den Erwartungsanker, gegen den
+  // jede Kurvenform normiert wird (sponsor-liga-leiter.ts). Fehlt er (Saison 1 vor dem ersten
+  // Spieltag), tritt die Liga-Position der Staerkerangliste an seine Stelle.
   const startRank =
     rows.find((entry) => entry.teamId === input.teamId)?.startplatz ?? qualityRank.leaguePosition;
   return applySponsorV3ToOffers({
@@ -361,6 +370,7 @@ export function buildSponsorOffersForTeam(input: {
     offers: built,
     cardKeys: slate.entries.map((entry) => entry.cardKey),
     axisKeys: slate.entries.map((entry) => entry.axisKey ?? null),
+    curveShapes: slate.entries.map((entry) => entry.curveShape),
     goldenSlots: slate.goldenCardSlots,
     advanceSlots: slate.entries.map((entry) => entry.advance === true),
     teamId: input.teamId,
@@ -505,9 +515,11 @@ export function chooseSponsorOffer(input: {
     teamId: input.teamId,
     offerId: offer.offerId,
     archetype: offer.archetype,
-    // Nur noch fuer Altangebote gesetzt: neue Angebote tragen keine Legacy-Kurvenform mehr. Das Feld
-    // bleibt am Vertrag, damit ein aus einem Alt-Spielstand unterschriebenes Angebot seine Form behaelt.
-    ...(offer.curveShape ? { curveShape: offer.curveShape } : {}),
+    // Unbedingt statt optional: seit dem Ligaleiter-Umbau erzeugt jedes Angebot seine Kurvenform
+    // selbst (sponsor-tier-pool.ts), und ein Alt-Angebot ohne sie bekommt sie beim Laden ueber
+    // `normalizeLegacySponsors` (save-repository.ts) nachgetragen — `offer.curveShape` ist an
+    // dieser Stelle also nie mehr undefined.
+    curveShape: offer.curveShape,
     rarity: offer.rarity,
     name: offer.name,
     chosenAt: new Date().toISOString(),

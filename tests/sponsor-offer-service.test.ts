@@ -121,9 +121,12 @@ describe("sponsor offer service", () => {
     // Die Achse ist FIX bepreist — kein Schaetzwert mehr, der zum Etatfehler werden koennte.
     expect(terms.slice(1).every((entry) => entry.goalP === 0.5)).toBe(true);
 
-    // KEINE Legacy-Kurvenform mehr: die elf alten Formen sind aus der Erzeugung entfernt und leben nur
-    // noch als Lese-Pfad fuer Altangebote/-vertraege weiter.
-    expect(offers.every((offer) => offer.curveShape === undefined)).toBe(true);
+    // GEAENDERT MIT DEM LIGALEITER-UMBAU: die Kurvenform ist wieder ein Erzeugungs-Feld (sie
+    // entscheidet ueber `sponsorKurvenLeiter`, WO auf der Sponsor-Ligaleiter das Angebot sein Geld
+    // hat) statt nur ein Lese-Pfad fuer Altangebote — jedes Angebot traegt jetzt eine der 11 Formen,
+    // und weil der Slate ohne Zuruecklegen zieht, sind sie innerhalb eines Teams paarweise verschieden.
+    expect(offers.every((offer) => offer.curveShape != null)).toBe(true);
+    expect(new Set(offers.map((offer) => offer.curveShape)).size).toBe(offers.length);
 
     // Legacy-Ableitungen bleiben konsistent gefüllt (Marken-/Sonderziel-Infrastruktur läuft weiter).
     expect(offers.every((offer) => offer.demandProfile != null)).toBe(true);

@@ -32,7 +32,7 @@ import {
   getSponsorV3SalaryFactor,
   SPONSOR_V3_FLOOR_C,
 } from "@/lib/sponsor/sponsor-v3-offer-service";
-import { buildSponsorV3TermsCore, sponsorV3CardByKey } from "@/lib/sponsor/sponsor-v3-model";
+import { buildSponsorV3TermsCore, sponsorV3BenchmarkLadder, sponsorV3CardByKey } from "@/lib/sponsor/sponsor-v3-model";
 
 /** Version des Leiter-Formats, auf das migriert wird. Erhoehen heisst: noch einmal migrieren. */
 export const SPONSOR_LADDER_MIGRATION_VERSION = 3;
@@ -69,13 +69,23 @@ export function resolveContractStartRank(gameState: GameState, contract: TeamSpo
  * TILT-FREIE: der Spieler hat seinerzeit keine Risiko-Entscheidung getroffen, die man ihm jetzt
  * unterschieben duerfte. Traegt der Vertrag ein Sonderziel, bekommt er die Sonderziel-Karte
  * (Benchmark + fair bepreiste Zielpraemie), sonst die reine Basis-Karte.
+ *
+ * DIE LEITER BLEIBT DIE ALTE PREISGELD-BENCHMARK (`sponsorV3BenchmarkLadder`), NICHT die neue
+ * Sponsor-Ligaleiter: genau wie beim Tilt hat der Spieler seinerzeit auch keine Kurvenform gewaehlt,
+ * die man ihm jetzt unterschieben duerfte — ein Altvertrag hebt auf die Referenzspalte, die er beim
+ * V3-Cutover schon bekommen haette, nicht auf eine Form-Entscheidung, die es damals nicht gab.
  */
 export function buildMigratedSponsorV3Terms(gameState: GameState, contract: TeamSponsorContract) {
   const goalKey = contract.components.find((component) => component.kind === "special")?.specialKey ?? null;
-  return buildSponsorV3TermsCore({
+  const startRank = resolveContractStartRank(gameState, contract);
+  const baseLadder = sponsorV3BenchmarkLadder({
     prizeCurve: getSponsorV3PrizeCurve(gameState),
+    startRank,
     placementBonus: getPrizePlacementBonus,
-    startRank: resolveContractStartRank(gameState, contract),
+  });
+  return buildSponsorV3TermsCore({
+    baseLadder,
+    startRank,
     rarity: contract.rarity ?? "magisch",
     card: sponsorV3CardByKey(goalKey ? "sonderziel" : "basis"),
     goalKey,
