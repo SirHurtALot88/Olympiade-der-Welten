@@ -13,12 +13,14 @@
  * das Lesen einer eingefrorenen Leiter und die beiden Umschaltstellen, an denen Anzeige und
  * KI-Bewertung die Konditionen eines Angebots abfragen.
  */
-import type { GameState, SponsorOffer } from "@/lib/data/olyDataTypes";
+import type { GameState, SponsorOffer, SponsorTermSeasons } from "@/lib/data/olyDataTypes";
 import {
   getSponsorV3Terms,
   sponsorV3ExpectedPayout,
   sponsorV3GuaranteedLadder,
 } from "@/lib/sponsor/sponsor-v3-offer-service";
+import { sponsorSockelFuerStartrang, sponsorKurvenLeiter } from "@/lib/sponsor/sponsor-liga-leiter";
+import { getSponsorTermMultiplier } from "@/lib/sponsor/sponsor-negotiation";
 
 /**
  * ABSOLUTE UNTERGRENZE der Sponsor-Oekonomie. Sie ist als Sicherheitsnetz geblieben (Guardrail aus
@@ -75,4 +77,50 @@ export function estimateExpectedPayout(offer: SponsorOffer, _powerRank?: number 
   const terms = getSponsorV3Terms(offer);
   if (!terms) return 0;
   return Math.round(sponsorV3ExpectedPayout(terms) * 10) / 10;
+}
+
+export type SponsorOfferTermForecastEntry = {
+  /** 1-basiertes Vertragsjahr (1 = Unterschriftssaison). */
+  seasonYear: number;
+  /** Salary Factor, mit dem DIESE Saison gerechnet ist — vorausgewuerfelt, keine Schaetzung. */
+  salaryFactor: number;
+  /** Auszahlung an der AKTUELLEN Tabellenposition (`terms.startRank`) in dieser Vertragssaison. */
+  payoutAtCurrentRank: number;
+};
+
+/**
+ * AUSBLICK UEBER DIE LAUFZEIT (Umsetzungsplan D, Punkt 4): was der Vertrag bei der AKTUELLEN
+ * Tabellenposition in JEDER Saison der Laufzeit einbringen wuerde — Sockel bleibt nach dem bei
+ * Unterschrift eingefrorenen Startrang fest, der Wertungsanteil skaliert mit dem fuer diese Saison
+ * bereits vorausgewuerfelten Salary Factor (`gameState.seasonState.seasonEconomyFactors`,
+ * `SEASON_ECONOMY_FACTOR_WINDOW_SIZE` Saisons im Voraus bekannt — dieselben Zahlen, die
+ * `sponsorSupportForecast5` fuer die KI liest, siehe lib/ai/retool-ai2-pick-engine.ts). Keine erfundene
+ * Zahl: nur eine bereits vorliegende Information sichtbar gemacht, die dem Spieler heute vorenthalten
+ * bleibt.
+ *
+ * Rein deterministisch aus dem Angebot + der Salary-Factor-Vorausschau — KEIN Zufall, KEINE
+ * Spielzustandsmutation.
+ */
+export function buildSponsorOfferTermForecast(gameState: GameState, offer: SponsorOffer): SponsorOfferTermForecastEntry[] {
+  const terms = getSponsorV3Terms(offer);
+  if (!terms || !terms.curveShape) {
+    return [];
+  }
+  const termSeasons = offer.termSeasons ?? 1;
+  const window = gameState.seasonState.seasonEconomyFactors ?? [];
+  const sockel = sponsorSockelFuerStartrang(terms.startRank);
+  const rankIndex = Math.max(0, Math.min(31, Math.round(terms.startRank) - 1));
+  return Array.from({ length: termSeasons }, (_, seasonIndex) => {
+    const factor = window.find((entry) => entry.horizonIndex === seasonIndex)?.factor ?? terms.salaryFactor;
+    const ladder = sponsorKurvenLeiter({ shape: terms.curveShape!, startRank: terms.startRank, salaryFactor: factor });
+    const contractYear = Math.max(1, Math.min(3, seasonIndex + 1)) as SponsorTermSeasons;
+    const multiplier = getSponsorTermMultiplier(contractYear);
+    const rawValue = ladder[rankIndex] ?? sockel;
+    const eroded = sockel + multiplier * (rawValue - sockel);
+    return {
+      seasonYear: seasonIndex + 1,
+      salaryFactor: factor,
+      payoutAtCurrentRank: Math.round(Math.max(terms.floor, eroded) * 10) / 10,
+    };
+  });
 }

@@ -148,9 +148,13 @@ const SPONSOR_STACK_SEGMENTS: Array<{ kind: SponsorComponentKind; tone: NlTone }
  * Konsumiert exakt dieselben Props wie `FoundationSponsorsPanel` und läuft über
  * den echten Abschluss (`chooseTeamSponsor`).
  *
- * Laufzeit (`termSeasons`): NUR Anzeige, kein Selector — der Apply-Pfad
- * (`chooseTeamSponsor(offerId)` → POST /api/sponsor/choose) nimmt keine
- * Laufzeit an und rechnet serverseitig fest mit `termSeasons: 1`.
+ * Laufzeit (`termSeasons`): weiterhin kein Selector — der Spieler waehlt die Laufzeit nicht separat
+ * aus. Seit Umsetzungsplan D ist sie aber auch keine feste 1-Saison-Konstante mehr: sie steht am
+ * gewaehlten ANGEBOT (je Slot gewuerfelt, `rollSponsorOfferSlate` in sponsor-tier-pool.ts) und der
+ * Apply-Pfad (`chooseTeamSponsor(offerId)` → POST /api/sponsor/choose → `chooseSponsorOffer`)
+ * uebernimmt sie 1:1 vom Angebot. Der Betrag bleibt an die Konjunktur der Saison gekoppelt: der Sockel
+ * friert beim Startrang zur Unterschrift ein, der Wertungsanteil skaliert jede Saison neu mit dem
+ * dann aktuellen Salary Factor (`rerollSponsorV3TermsForNewSeason`, sponsor-v3-offer-service.ts).
  */
 
 type ContractPayoutTile = {

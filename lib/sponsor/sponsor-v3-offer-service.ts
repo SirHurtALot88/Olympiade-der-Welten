@@ -16,20 +16,26 @@
  * Sonderziel-Engine (`evaluateSpecialComponentStage`, 22+ fertige Ziele), der Settlement-Pfad und die
  * `lockedRankPayoutLadder`-Infrastruktur.
  */
-import type { GameState, SponsorCurveShape, SponsorOffer, SponsorRarity, TeamSponsorContract } from "@/lib/data/olyDataTypes";
+import type {
+  GameState, SponsorCurveShape, SponsorOffer, SponsorRarity, SponsorTermSeasons, TeamSponsorContract,
+} from "@/lib/data/olyDataTypes";
 
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildPrizeMoneyTable } from "@/lib/season/prize-money";
 import { buildSponsorV4AxisTerms } from "@/lib/sponsor/sponsor-v4-axes";
 import { buildSponsorOfferModuleIds } from "@/lib/sponsor/sponsor-modules";
-import { SPONSOR_BODEN, sponsorKurvenLeiter } from "@/lib/sponsor/sponsor-liga-leiter";
+import { SPONSOR_BODEN, sponsorKurvenLeiter, sponsorSockelFuerStartrang } from "@/lib/sponsor/sponsor-liga-leiter";
 import { SPONSOR_CURVE_SHAPE_KEYS } from "@/lib/sponsor/sponsor-curve-shapes";
+import { getSponsorTermMultiplier } from "@/lib/sponsor/sponsor-negotiation";
 import {
   buildSponsorV3TermsCore,
+  sponsorV3Anchor,
+  sponsorV3AnchorWeights,
   sponsorV3CardByKey,
   sponsorV3GuaranteedLadder,
   sponsorV3LadderValue,
   sponsorV3Settle,
+  sponsorV3TiltedLadder,
   sponsorV4AxisSizeFor,
   SPONSOR_V3_CARDS,
   type SponsorV3CardKey,
@@ -223,6 +229,61 @@ export function buildSponsorV3Terms(input: {
     // das alte Netz (32) saesse fuer diese Leiter zu tief.
     floor: SPONSOR_BODEN,
   });
+}
+
+/**
+ * MEHRJAHRESVERTRAG ROLLT IN DIE FOLGESAISON (Umsetzungsplan D) — `advanceSponsorContractsForNewSeason`
+ * (sponsor-contract-lifecycle.ts) ruft das fuer jeden Vertrag mit `seasonsRemaining > 1` auf.
+ *
+ * ZWEI DINGE PASSIEREN, TECHNISCH IN EINEM SCHRITT: die Kopplung an den Salary Factor UND die
+ * Rendite-Erosion.
+ *
+ * KOPPLUNG (ausdrueckliche Nutzervorgabe): der eingefrorene `startRank` UND die eingefrorene
+ * `curveShape` bleiben stehen — nur der Salary Factor wird durch den DER NEUEN SAISON ersetzt.
+ * `sponsorKurvenLeiter` leitet den Sockel ausschliesslich aus `startRank` ab (er bleibt damit exakt
+ * gleich) und skaliert NUR den Wertungsanteil mit dem Faktor — das ist die ganze Kopplung, siehe
+ * `sponsor-liga-leiter.ts`. Ohne diesen Neubau wuerde ein in einem starken Jahr (f = 1,24)
+ * unterschriebener Vertrag drei Saisons lang auf 1,24-Niveau weiterzahlen, unabhaengig davon, ob die
+ * Liga danach in eine Flaute faellt (f = 0,82) — das genau das Schlupfloch, das die Erosion allein
+ * nicht schliessen koennte (siehe TERM_MULTIPLIERS-Kommentar in sponsor-negotiation.ts).
+ *
+ * EROSION: `contractYear` (1 = Unterschriftssaison, 2/3 = gerollte Folgesaisons) waehlt den
+ * Multiplikator aus `getSponsorTermMultiplier`. Er wirkt NUR auf den WERTUNGSANTEIL — die Differenz
+ * zwischen der neu gebauten Leiter und dem (unveraenderten) Sockel — nicht auf den Sockel selbst,
+ * sonst schrumpfte genau die Absicherung, die der Sockel sein soll.
+ *
+ * ALTVERTRAEGE: fehlt `curveShape` (Vertraege aus Spielstaenden von vor dem Ligaleiter-Umbau, die
+ * ohne Neuerzeugung weitergerollt wurden), kann keine neue Leiter gebaut werden — die Funktion wirft
+ * NICHT, sondern gibt die eingefrorene Leiter unveraendert zurueck (heutiges Verhalten vor diesem
+ * Patch bleibt fuer sie bestehen).
+ */
+export function rerollSponsorV3TermsForNewSeason(
+  terms: SponsorV3ContractTerms,
+  input: { newSalaryFactor: number; contractYear: SponsorTermSeasons },
+): SponsorV3ContractTerms {
+  if (!terms.curveShape) {
+    return terms;
+  }
+  const sockel = sponsorSockelFuerStartrang(terms.startRank);
+  const newBaseLadderRaw = sponsorKurvenLeiter({
+    shape: terms.curveShape,
+    startRank: terms.startRank,
+    salaryFactor: input.newSalaryFactor,
+  });
+  const multiplier = getSponsorTermMultiplier(input.contractYear);
+  // Erosion NUR auf den Wertungsanteil (Wert oberhalb des Sockels) — der Sockel selbst bleibt exakt
+  // der nach Startrang eingefrorene Wert, unveraendert durch Erosion oder Salary-Factor-Wechsel.
+  const baseLadder = newBaseLadderRaw.map((value) => sockel + multiplier * (value - sockel));
+  const weights = sponsorV3AnchorWeights(terms.startRank);
+  const anchor = sponsorV3Anchor(baseLadder, weights);
+  const rankLadder = sponsorV3TiltedLadder(baseLadder, anchor, terms.tilt);
+  return {
+    ...terms,
+    baseLadder,
+    rankLadder,
+    anchor,
+    salaryFactor: input.newSalaryFactor,
+  };
 }
 
 const round1 = (value: number): number => Math.round(value * 10) / 10;
