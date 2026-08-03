@@ -26,6 +26,7 @@ import { getPrizePlacementBonus, PRIZE_PLACEMENT_EFFECTIVE_CAP } from "@/lib/sea
 import { pickBonusObjective } from "@/lib/sponsor/sponsor-special-objectives";
 import {
   buildSponsorV3TermsCore,
+  sponsorV3BenchmarkLadder,
   sponsorV3ExpectedPayout,
   sponsorV3GoalProbability,
   sponsorV3IsGoalOfferable,
@@ -105,10 +106,18 @@ function goalKeyFor(team: SponsorLiveSaveTeam): string {
  */
 function slateOf(team: SponsorLiveSaveTeam): SponsorV3ContractTerms[] {
   const goalKey = goalKeyFor(team);
+  // `buildSponsorV3TermsCore` ist seit dem Sponsor-Ligaleiter-Umbau leiter-agnostisch (nimmt eine
+  // fertige `baseLadder` statt Preisgeldkurve + Platzierungsbonus). Dieses Abnahmeprotokoll misst
+  // weiterhin GEGEN DIE PREISGELD-BENCHMARK — die Zahlen unten sind dadurch unveraendert, nur der
+  // Aufruf baut die Leiter jetzt einmal vorab statt inline.
+  const baseLadder = sponsorV3BenchmarkLadder({
+    prizeCurve: SPONSOR_LIVE_SAVE_S1_PRIZE_CURVE,
+    startRank: team.startRank,
+    placementBonus: getPrizePlacementBonus,
+  });
   return SPONSOR_V3_MESSKARTEN.map((card) =>
     buildSponsorV3TermsCore({
-      prizeCurve: SPONSOR_LIVE_SAVE_S1_PRIZE_CURVE,
-      placementBonus: getPrizePlacementBonus,
+      baseLadder,
       startRank: team.startRank,
       rarity: team.rarity,
       card,
@@ -262,10 +271,14 @@ describe("Sponsormodell V3 — Abnahme an den 32 echten Teams des Live-Saves", (
 
   it("Rarity skaliert NUR die Hebelgroesse, nie den Erwartungswert", () => {
     const team = teams.find((entry) => entry.code === "T-C")!;
+    const baseLadder = sponsorV3BenchmarkLadder({
+      prizeCurve: SPONSOR_LIVE_SAVE_S1_PRIZE_CURVE,
+      startRank: team.startRank,
+      placementBonus: getPrizePlacementBonus,
+    });
     const build = (rarity: string) =>
       buildSponsorV3TermsCore({
-        prizeCurve: SPONSOR_LIVE_SAVE_S1_PRIZE_CURVE,
-        placementBonus: getPrizePlacementBonus,
+        baseLadder,
         startRank: team.startRank,
         rarity,
         card: sponsorV3CardByKey("ambition_ziel"),

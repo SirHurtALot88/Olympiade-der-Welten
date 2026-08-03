@@ -1235,14 +1235,14 @@ export type SponsorRarity = "gewöhnlich" | "magisch" | "selten" | "legendär";
 export type SponsorCurveFamily = "titel" | "europa" | "stetig" | "aufstieg" | "sicherheit";
 
 /**
- * NUR NOCH LESEN — KEIN ERZEUGUNGS-TYP MEHR.
- *
  * Die Kurvenform beschreibt, WO ueber die Endtabelle (Platz 1..32) das feste Etat eines Sponsors sitzt.
- * Sie war die Auszahlungsachse des ALTEN Sponsorsystems (11 Formen in 5 Familien). Neue Angebote tragen
- * sie NICHT mehr: ihre Auszahlung kommt aus dem Sponsormodell (lib/sponsor/sponsor-v2-model.ts) und
- * steht im `sponsorV2`-Block. Typ und Payout-Tabellen (lib/sponsor/sponsor-curve-shapes.ts) bleiben
- * ausschliesslich stehen, damit Angebote und Vertraege aus Spielstaenden von VOR der Umstellung weiter
- * angezeigt, unterschrieben und abgerechnet werden koennen.
+ *
+ * War zwischen dem V2-Cutover und dem Ligaleiter-Umbau (sponsor-liga-leiter.ts) nur noch ein
+ * Anzeige-Etikett ohne Wirkung auf die Auszahlung. Seit dem Umbau ist sie WIEDER ein Erzeugungs-Feld:
+ * jedes Angebot zieht eine der 11 Formen (sponsor-tier-pool.ts), und `sponsorKurvenLeiter`
+ * (sponsor-liga-leiter.ts) normiert sie auf denselben Erwartungswert wie die neutrale Ligaleiter — die
+ * Form entscheidet also NUR NOCH, wo das Geld liegt, nicht wie viel es insgesamt ist. Die 11
+ * `reference`-Arrays dazu stehen in lib/sponsor/sponsor-curve-shapes.ts.
  */
 export type SponsorCurveShape =
   | "titeljaeger"
@@ -1333,11 +1333,13 @@ export type SponsorEventRecord = {
 };
 
 /**
- * SPONSORSYSTEM V3 — die bei Unterschrift eingefrorenen Konditionen ("Preisgeld-Sockel").
+ * SPONSORSYSTEM V3 — die bei Unterschrift eingefrorenen Konditionen (Sponsor-Ligaleiter: Sockel nach
+ * Startrang + Wertungstopf nach Endrang, seit dem Ligaleiter-Umbau).
  *
  * `rankLadder[finalRank - 1]` ist die FERTIG GETILTETE Leiter `L(f) = M(f) + beta·(M(f) − A)` — die
- * Auszahlung vor Untergrenze und Sonderziel. `baseLadder` ist dieselbe Leiter OHNE Tilt, also die
- * reine Liga-Benchmark `M(f) = Preisgeld(f) + Platzierungsbonus(Startrang − f)`; sie steht mit im
+ * Auszahlung vor Untergrenze und Sonderziel. `baseLadder` ist dieselbe Leiter OHNE Tilt — beim
+ * Live-Pfad die geshapete Ligaleiter (`sponsorKurvenLeiter`, sponsor-liga-leiter.ts), bei aus der
+ * Migration gehobenen Altvertraegen weiterhin die reine Preisgeld-Benchmark; sie steht mit im
  * Vertrag, damit Anzeige und Abrechnung zeigen koennen, WOVON die gewaehlte Karte abweicht, ohne die
  * Liga-Groessen des Unterschriftszeitpunkts noch einmal zu rekonstruieren.
  *
@@ -1358,6 +1360,8 @@ export type SponsorV3ContractTermsRecord = {
   goalSize: number;
   salaryFactor: number;
   floor: number;
+  /** Kurvenform, aus der `baseLadder` gebaut wurde — nur Anzeige, siehe SponsorCurveShape. */
+  curveShape?: SponsorCurveShape;
   /**
    * V4-Zielachse: wofuer dieser Sponsor zahlt, gemessen gegen die bei Angebotserzeugung
    * eingefrorene eigene Ausgangslage. Fehlt bei der Basis-Karte und bei Altvertraegen.
@@ -1389,8 +1393,13 @@ export type SponsorOffer = {
   seasonId: string;
   teamId: string;
   archetype: SponsorArchetype;
-  /** NUR NOCH LESEN: gesetzt an Angeboten aus Spielstaenden von vor dem Sponsor-Cutover. Neue Angebote
-   * tragen ihre Kurve im `sponsorV2`-Block. */
+  /**
+   * WIEDER EIN ERZEUGUNGS-FELD (Sponsor-Ligaleiter, sponsor-liga-leiter.ts): die Kurvenform bestimmt,
+   * WO auf der Sockel+Wertungstopf-Leiter dieses Angebot sein Geld hat — `sponsorKurvenLeiter` liest
+   * sie beim Bauen der `sponsorV3`-Konditionen. War zwischenzeitlich (V2/V3-Cutover bis zu diesem
+   * Umbau) nur noch ein Anzeige-Feld an Alt-Angeboten; optional bleibt sie trotzdem, weil sehr alte
+   * Spielstaende sie erst beim Laden ueber `normalizeLegacySponsors` (save-repository.ts) bekommen.
+   */
   curveShape?: SponsorCurveShape;
   /** Rarity = the Etat dial that replaced the legacy star tier (transitional-optional; required after cutover). */
   rarity?: SponsorRarity;
@@ -1459,7 +1468,7 @@ export type TeamSponsorContract = {
   teamId: string;
   offerId: string;
   archetype: SponsorArchetype;
-  /** NUR NOCH LESEN: nur an Vertraegen, die aus einem Angebot von vor dem Sponsor-Cutover stammen. */
+  /** Die Kurvenform des unterschriebenen Angebots, 1:1 uebernommen (siehe `SponsorOffer.curveShape`). */
   curveShape?: SponsorCurveShape;
   /** Rarity — the Etat dial that replaced the legacy star tier (transitional-optional; required after cutover). */
   rarity?: SponsorRarity;

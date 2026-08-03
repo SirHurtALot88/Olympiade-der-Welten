@@ -1,5 +1,5 @@
-import type { SponsorArchetype, SponsorRarity } from "@/lib/data/olyDataTypes";
-import { SPONSOR_RARITIES, SPONSOR_RARITY_KEYS } from "@/lib/sponsor/sponsor-curve-shapes";
+import type { SponsorArchetype, SponsorCurveShape, SponsorRarity } from "@/lib/data/olyDataTypes";
+import { SPONSOR_CURVE_SHAPE_KEYS, SPONSOR_RARITIES, SPONSOR_RARITY_KEYS } from "@/lib/sponsor/sponsor-curve-shapes";
 import {
   SPONSOR_V4_AXIS_KEYS, type SponsorV3CardKey, type SponsorV4AxisKey,
 } from "@/lib/sponsor/sponsor-v3-model";
@@ -127,6 +127,12 @@ export type SponsorSlateEntry = {
   axisKey?: SponsorV4AxisKey;
   /** Zahlt dieser Sponsor einen Teil schon bei Unterschrift aus? */
   advance?: boolean;
+  /**
+   * WO auf der Sponsor-Ligaleiter (sponsor-liga-leiter.ts) dieses Angebot sein Geld hat — jeder
+   * Slot bekommt eine ANDERE Form (Ziehung ohne Zuruecklegen), sonst waere die Formwahl stumpf: fuenf
+   * Angebote, aber nur eine tatsaechliche Kurve dahinter.
+   */
+  curveShape: SponsorCurveShape;
 };
 export type SponsorSlateResult = { entries: SponsorSlateEntry[]; goldenCardSlots: number[] };
 
@@ -216,6 +222,22 @@ export function rollSponsorOfferSlate(input: {
     .sort((left, right) => left.roll - right.roll)
     .map((entry) => entry.key);
 
+  // Dieselbe Ziehung-ohne-Zuruecklegen wie bei den Achsen, diesmal ueber die 11 Kurvenformen: jeder
+  // Slot bekommt eine ANDERE Form, damit die fuenf Angebote fuenf verschiedene Stellen auf der
+  // Ligaleiter zeigen (sponsor-liga-leiter.ts) statt fuenfmal dieselbe Verteilung mit anderem Namen.
+  //
+  // Saison+Team stehen HIER bewusst VOR der Form im Seed, anders als beim Achsen-Seed oben: gebraucht
+  // wird nicht nur Varianz ZWISCHEN den 11 Formen EINES Teams (dafuer reicht jede Platzierung), sondern
+  // auch Varianz ZWISCHEN VERSCHIEDENEN TEAMS bei GLEICHER Form — und FNV-1a avalanched nur NACH dem
+  // Zeichen, an dem sich zwei Seeds zum ersten Mal unterscheiden (siehe Kommentar beim Rarity-Wurf
+  // unten). Mit Team/Saison am Ende (kurze Suffixe wie "T-0"/"T-7") blieb die Formen-REIHENFOLGE ueber
+  // alle Teams hinweg IDENTISCH, weil der unterscheidende Rest zu kurz war, um sich noch durchzumischen
+  // — gemessen: bei 8 Teams lieferten alle acht denselben Formen-Satz in derselben Reihenfolge.
+  const shuffledCurveShapes = SPONSOR_CURVE_SHAPE_KEYS
+    .map((shape) => ({ shape, roll: getStableUnitHash(`sponsor-curve:${input.seasonId}:${input.teamId}:${shape}`) }))
+    .sort((left, right) => left.roll - right.roll)
+    .map((entry) => entry.shape);
+
   // Rebalance (2026-07): KEIN qualitäts-rang-basierter Rarity-Deckel mehr. Früher deckelte der Team-
   // Qualitätsrang die maximale Rarity (die untere Liga-Hälfte saß hart auf `gewöhnlich`), sodass schwache
   // Teams praktisch nie ein selten/legendäres Angebot sahen und Top-Teams bevorzugt wurden. Jetzt zieht
@@ -275,14 +297,16 @@ export function rollSponsorOfferSlate(input: {
 
   // Slot 0 traegt die Basis-Karte: der risikofreie Anker, gegen den jede Achse gemessen wird.
   const entries: SponsorSlateEntry[] = Array.from({ length: slotCount }, (_, slot) => {
+    const curveShape = shuffledCurveShapes[slot]!;
     if (slot === 0) {
-      return { cardKey: "basis" as SponsorV3CardKey, rarity: rarities[0] ?? fallbackRarity };
+      return { cardKey: "basis" as SponsorV3CardKey, rarity: rarities[0] ?? fallbackRarity, curveShape };
     }
     return {
       cardKey: "achse" as SponsorV3CardKey,
       rarity: rarities[slot] ?? fallbackRarity,
       axisKey: shuffledAxes[slot - 1]!,
       advance: advanceRolls[slot - 1] === true,
+      curveShape,
     };
   });
 
