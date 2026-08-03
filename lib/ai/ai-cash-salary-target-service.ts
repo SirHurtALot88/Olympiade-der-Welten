@@ -1,6 +1,8 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { parseSeasonNumber } from "@/lib/season/transfer-standings-balance";
+import { computeApronLines, type ApronLines } from "@/lib/season/apron-service";
 
 function round(value: number, digits = 2) {
   return Number(value.toFixed(digits));
@@ -95,4 +97,63 @@ export function resolveHoardTighteningMultiplier(
   if (cashSalaryRatio > softTarget + 0.15) return 0.7;
   if (cashSalaryRatio > softTarget) return 0.85;
   return 1;
+}
+
+// ── APRON ──────────────────────────────────────────────────────────────────────────────────────
+//
+// Ohne diese Anbindung ist der Apron kaputt, und zwar in beide Richtungen: entweder laeuft die KI
+// blind ueber die Linien (Apron wird zur Steuer, die 31 KI-Teams zahlen, das eine menschliche Team
+// kassiert), oder sie kommt nie in ihre Naehe (der Topf bleibt leer, weil niemand je ueber Linie 1
+// geht). Beides macht das Gummiband bedeutungslos.
+
+/**
+ * KI-AMBITION FUER DEN APRON — dieselbe Quelle, die die Sponsor-Kurvenform-Wahl schon nutzt
+ * (`profile.bias.starPriority`, sonst `identity.ambition`, Default 5 — siehe sponsor-offer-service.ts
+ * `resolveAiSponsorArchetypePreference`). EIN Titelanwaerter, der Abgabe zahlt, um den Kader zu
+ * halten, entscheidet richtig — die Bereitschaft, die Apron-Linien zu ueberschreiten, haengt deshalb
+ * an derselben Ambition wie die Sponsorwahl, nicht an einer eigenen neuen Zahl.
+ */
+export function resolveTeamApronAmbition(gameState: GameState, teamId: string): number {
+  const profile = getTeamStrategyProfile(gameState, teamId);
+  const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId);
+  return profile?.bias.starPriority ?? identity?.ambition ?? 5;
+}
+
+/**
+ * Effektive Gehalts-Obergrenze, bis zu der die KI (ambitionsabhaengig) bereit ist, die Apron-Linien
+ * zu reissen — ZUSAETZLICH zum Soft-Target/Hard-Cap oben, die die Cash-Reserve steuern, waehrend
+ * diese Grenze die GEHALTSSUMME selbst betrifft:
+ *   - Ambition >= 8 (Titelanwaerter): bis zur 2. Linie — die hoehere Abgabe ist eingepreist.
+ *   - Ambition >= 6 (solide): 40 % in die Zone zwischen 1. und 2. Linie hinein.
+ *   - sonst (vorsichtig): an der 1. Linie — meidet die Abgabe komplett.
+ * Nutzt die EINGEFRORENEN Linien der laufenden Saison, falls vorhanden; sonst eine frische
+ * Berechnung (haelt die Funktion auch isoliert testbar, ohne den Einfrier-Schritt zu durchlaufen).
+ */
+export function resolveTeamApronSalaryCeiling(gameState: GameState, teamId: string): number {
+  const frozen = gameState.seasonState.apronLinesSnapshot;
+  const lines: ApronLines = frozen && frozen.seasonId === gameState.season.id ? frozen : computeApronLines(gameState);
+  const ambition = resolveTeamApronAmbition(gameState, teamId);
+  if (ambition >= 8) return lines.line2;
+  if (ambition >= 6) return lines.line1 + (lines.line2 - lines.line1) * 0.4;
+  return lines.line1;
+}
+
+export function isTeamOverApronSalaryCeiling(gameState: GameState, teamId: string): boolean {
+  return getTeamSalarySum(gameState, teamId) > resolveTeamApronSalaryCeiling(gameState, teamId);
+}
+
+/**
+ * Bremst zusaetzliche Kaufbereitschaft, sobald ein Team seine (ambitionsabhaengige) Apron-Decke
+ * ueberschreitet — NIE auf 0: ein Team darf die Linie reissen, wenn der Kader es zwingend braucht
+ * (Verletzungsersatz etc., siehe planner-cash-buffer-policy.ts). Je weiter drueber, desto
+ * zurueckhaltender, mit einem Boden bei 0,5 (dieselbe Untergrenze wie `resolveHoardTighteningMultiplier`
+ * beim harten Cash-Cap).
+ */
+export function resolveApronTighteningMultiplier(gameState: GameState, teamId: string): number {
+  const ceiling = resolveTeamApronSalaryCeiling(gameState, teamId);
+  if (ceiling <= 0) return 1;
+  const salary = getTeamSalarySum(gameState, teamId);
+  if (salary <= ceiling) return 1;
+  const overshoot = (salary - ceiling) / ceiling;
+  return clamp(1 - overshoot, 0.5, 1);
 }

@@ -14,6 +14,7 @@ import {
 } from "@/lib/board/team-season-objectives-service";
 import { applyFormCardPenaltyWithRerank } from "@/lib/season/form-card-penalty-service";
 import { applySponsorSettlement, previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
+import { applyApronSettlement, previewApronSettlement } from "@/lib/season/apron-settlement-service";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
 import {
@@ -48,6 +49,7 @@ export type SeasonCompletionStep = {
     | "objective_rewards"
     | "cash_apply"
     | "sponsor_settlement"
+    | "apron_settlement"
     | "loan_settlement"
     | "facility_finance"
     | "insolvency_backstop"
@@ -351,17 +353,60 @@ async function runLocalSeasonCompletionUnsafe(
     ? resolveLocalSave(persistence, initialSave.saveId)
     : afterCashSave;
 
-  const loanSettlementPreview = previewLoanSettlement(afterSponsorSave.gameState, seasonId);
+  // APRON — NACH der Sponsor-Abrechnung (braucht den bereits bekannten rangabhaengigen
+  // Wertungsanteil des Teams, siehe apron-service.ts) und VOR der Kassenbuchung der uebrigen
+  // Saisonend-Schritte (Kredit-Tilgung, Facility-Einnahmen, Board-Objectives, Zahlungsunfaehigkeit)
+  // — sonst rechnete der Deckel gegen einen Cash-Stand, den die Sponsor-Abrechnung selbst gerade
+  // erst hergestellt hat, waehrend die nachfolgenden Schritte schon auf dem alten Stand aufsetzen.
+  const apronSettlementPreview = previewApronSettlement(afterSponsorSave.gameState);
+  const existingApronEndPayout = (afterSponsorSave.gameState.seasonState.apronSettlementLogs ?? []).some(
+    (log) => log.seasonId === seasonId && log.phase === "season_end",
+  );
+  const shouldApplyApronSettlement = !dryRun && blockingReasons.size === 0 && !existingApronEndPayout;
+  const apronSettlementApply = shouldApplyApronSettlement
+    ? applyApronSettlement({ gameState: afterSponsorSave.gameState, saveId: afterSponsorSave.saveId, execute: true })
+    : { gameState: afterSponsorSave.gameState, preview: apronSettlementPreview, applied: false };
+  if (shouldApplyApronSettlement && apronSettlementApply.applied) {
+    persistence.saveSingleplayerState(afterSponsorSave.saveId, apronSettlementApply.gameState);
+  }
+  addStep(
+    steps,
+    {
+      key: "apron_settlement",
+      label: "Apron-Abrechnung",
+      status: existingApronEndPayout
+        ? "already_done"
+        : apronSettlementApply.applied
+          ? "applied"
+          : apronSettlementPreview.canApply
+            ? "planned"
+            : "skipped",
+      warnings: apronSettlementPreview.warnings,
+      // Ein fehlender Snapshot (Save vor dieser Funktion angelegt, nie eingefroren) blockiert die
+      // Saison NICHT — er zeigt nur, dass diese Saison keinen Apron kennt (kein Nachtrags-Zwang für
+      // Bestandsspielstände).
+      blockingReasons: [],
+      auditId: null,
+    },
+    warnings,
+    blockingReasons,
+  );
+
+  const afterApronSave = apronSettlementApply.applied
+    ? resolveLocalSave(persistence, initialSave.saveId)
+    : afterSponsorSave;
+
+  const loanSettlementPreview = previewLoanSettlement(afterApronSave.gameState, seasonId);
   const existingLoanSettlementLog =
-    (afterSponsorSave.gameState.seasonState.loanApplyLogs ?? []).some(
+    (afterApronSave.gameState.seasonState.loanApplyLogs ?? []).some(
       (log) => log.seasonId === seasonId && log.kind !== "early_payoff",
     ) ?? false;
   const shouldApplyLoanSettlement = !dryRun && blockingReasons.size === 0 && !existingLoanSettlementLog;
   const loanSettlementApply: LoanSettlementApplyResult = shouldApplyLoanSettlement
-    ? applyLoanSettlement(afterSponsorSave.gameState, { execute: true, seasonId })
-    : { ok: true, applied: false, duplicateDetected: existingLoanSettlementLog, preview: loanSettlementPreview, gameState: afterSponsorSave.gameState };
+    ? applyLoanSettlement(afterApronSave.gameState, { execute: true, seasonId })
+    : { ok: true, applied: false, duplicateDetected: existingLoanSettlementLog, preview: loanSettlementPreview, gameState: afterApronSave.gameState };
   if (shouldApplyLoanSettlement && loanSettlementApply.applied) {
-    persistence.saveSingleplayerState(afterSponsorSave.saveId, loanSettlementApply.gameState);
+    persistence.saveSingleplayerState(afterApronSave.saveId, loanSettlementApply.gameState);
   }
   addStep(
     steps,
@@ -383,7 +428,7 @@ async function runLocalSeasonCompletionUnsafe(
     blockingReasons,
   );
 
-  const afterLoanSave = loanSettlementApply.applied ? resolveLocalSave(persistence, initialSave.saveId) : afterSponsorSave;
+  const afterLoanSave = loanSettlementApply.applied ? resolveLocalSave(persistence, initialSave.saveId) : afterApronSave;
 
   // Facility finance: fan-shop/arena income minus paid upkeep, applied once per team per
   // season. `applyFacilitySeasonEndFinance` computes the NET result (income - upkeep) — the

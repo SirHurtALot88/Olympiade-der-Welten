@@ -1534,6 +1534,37 @@ export type SponsorPayoutLogRecord = {
   createdAt: string;
 };
 
+/**
+ * APRON — die zu SAISONBEGINN eingefrorenen Gehaltslinien (siehe lib/season/apron-service.ts).
+ * Bewusst NICHT am Saisonende berechnet: sonst kauft man blind gegen eine Grenze, die sich durch die
+ * eigenen Käufe verschiebt. `medianSalary`/`line1`/`line2` sind fix für die gesamte Saison, egal wie
+ * sich die Gehälter danach noch verschieben (Verletzungsersatz, Nachverpflichtungen etc.).
+ */
+export type ApronLinesSnapshot = {
+  seasonId: string;
+  frozenAtMatchdayId: string;
+  createdAt: string;
+  medianSalary: number;
+  line1: number;
+  line2: number;
+  /** true = die Liga hatte beim Einfrieren noch keine echten Gehälter (Season-1-Fallback). */
+  usedReferenceSalary: boolean;
+};
+
+/** Ein Ledger-Eintrag der Apron-Abrechnung (Saisonende) — analog zu SponsorPayoutLogRecord. */
+export type ApronSettlementLogRecord = {
+  id: string;
+  saveId: string;
+  seasonId: string;
+  teamId: string;
+  phase: "season_end";
+  /** "levy" = Abgabe (negativ), "payout" = Ausschüttung aus dem Topf (positiv oder 0). */
+  kind: "levy" | "payout";
+  cashDelta: number;
+  action: "apply";
+  createdAt: string;
+};
+
 export type LoanLenderType = "bank" | "team"; // "team" erst Phase 3
 
 export type LoanRecord = {
@@ -2764,6 +2795,10 @@ export type SeasonState = {
   sponsorBrandHistoryByTeamId?: Record<string, string[]>;
   sponsorEvents?: SponsorEventRecord[];
   sponsorPayoutLogs?: SponsorPayoutLogRecord[];
+  /** Zu Saisonbeginn eingefrorene Apron-Linien dieser Saison. Siehe ApronLinesSnapshot. */
+  apronLinesSnapshot?: ApronLinesSnapshot;
+  /** Ledger der Apron-Abgaben/Ausschüttungen — Idempotenz-Marker + Audit-Trail, analog sponsorPayoutLogs. */
+  apronSettlementLogs?: ApronSettlementLogRecord[];
   /**
    * Fortgeschriebener Beliebtheits-KPI pro Team (TEIL A). Wird 1×/Saison am Saison-Ende (vor der
    * Sponsor-Angebots-Generierung des nächsten Zyklus) fortgeschrieben. Rückwärtskompatibel optional:

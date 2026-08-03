@@ -62746,6 +62746,28 @@ button.is-new-look .nl-thist-season-pill,
   color: var(--nl-risk);
 }
 
+/* Apron-Badge: Text traegt die Aussage ("ueber 1./2. Linie"), Farbe ist NUR Verstaerkung — analog
+   zum Deckungsgrad oben, aus demselben Grund (Farbe allein ist fuer Farbfehlsichtige unbrauchbar). */
+.is-new-look .nl-sponsor-league-apron {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-sponsor-league-apron.is-linie1 {
+  color: var(--nl-warn);
+}
+
+.is-new-look .nl-sponsor-league-apron.is-linie2 {
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-sponsor-league-apron-lines {
+  margin: 10px 2px 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
 /* --- Sponsoren #79: Rank-Ladder — aktuell erreichte Gewinnstufe --- */
 .is-new-look .nl-sponsor-rank-current-hint {
   margin-left: auto;

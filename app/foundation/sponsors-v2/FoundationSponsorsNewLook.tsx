@@ -37,6 +37,7 @@ import {
 import { resolveSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { sponsorV4AxisLabel, type SponsorV4AxisKey } from "@/lib/sponsor/sponsor-v4-axes";
 import { previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
+import { computeApronLines, type ApronLines } from "@/lib/season/apron-service";
 import { SponsorRankLadder } from "@/components/foundation/sponsor/SponsorRankLadder";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamObjectives } from "@/lib/board/team-season-objectives-service";
@@ -439,6 +440,18 @@ export default function FoundationSponsorsNewLook({
   // es nur fuer die eigenen Angebote.
   const [leagueDetailTeamId, setLeagueDetailTeamId] = useState<string | null>(null);
 
+  // Apron — die zu Saisonbeginn eingefrorenen Gehaltslinien (siehe lib/season/apron-service.ts).
+  // Bevorzugt der EINGEFRORENE Snapshot der laufenden Saison; nur Bestandsspielstände ohne Snapshot
+  // (vor diesem Feature angelegt) fallen auf eine frische Berechnung zurück — deutlich markiert, damit
+  // niemand eine "eingefrorene" Linie für bar nimmt, die es in diesem Save noch gar nicht gibt.
+  const apronLines: ApronLines & { frozen: boolean } = useMemo(() => {
+    const frozen = gameState.seasonState.apronLinesSnapshot;
+    if (frozen && frozen.seasonId === gameState.season.id) {
+      return { ...frozen, frozen: true };
+    }
+    return { ...computeApronLines(gameState), frozen: false };
+  }, [gameState]);
+
   const leagueSponsorRows = useMemo(() => {
     return gameState.teams.map((team) => {
       const contract = getTeamSponsorContract(gameState, team.teamId);
@@ -460,11 +473,15 @@ export default function FoundationSponsorsNewLook({
       const upkeepTotal = getTeamFacilityUpkeepTotal(gameState, team.teamId);
       const fixedCostTotal = Math.round((salaryTotal + upkeepTotal) * 10) / 10;
       const costCoverage = computeSponsorCostCoverage(projectedCash, fixedCostTotal);
+      // Apron: über welcher der beiden eingefrorenen Linien liegt das Gehalt dieses Teams?
+      const apronStatus: "unter" | "ueber_linie_1" | "ueber_linie_2" =
+        salaryTotal > apronLines.line2 ? "ueber_linie_2" : salaryTotal > apronLines.line1 ? "ueber_linie_1" : "unter";
       return {
         salaryTotal,
         upkeepTotal,
         fixedCostTotal,
         costCoverage,
+        apronStatus,
         teamId: team.teamId,
         teamName: team.name,
         shortCode: team.shortCode,
@@ -482,7 +499,7 @@ export default function FoundationSponsorsNewLook({
         isGolden: contract?.variantKey === "premium_elite",
       };
     });
-  }, [gameState]);
+  }, [gameState, apronLines]);
   // Komponenten-Aufschluesselung des geoeffneten Teams — dieselbe Quelle wie das echte
   // Season-End-Settlement, damit das Fenster nicht eine andere Zahl zeigt als die Uebersicht.
   const leagueDetail = useMemo(() => {
@@ -992,11 +1009,31 @@ export default function FoundationSponsorsNewLook({
                         {Math.round(row.costCoverage * 100)} % der Fixkosten
                       </span>
                     ) : null}
+                    {/* Apron: Text-Badge, Farbe ist NUR Verstärkung (nie der einzige Träger) — wer
+                        über einer Linie liegt, gibt am Saisonende einen Teil des Überschusses ab. */}
+                    {row.apronStatus !== "unter" ? (
+                      <span
+                        className={`nl-sponsor-league-apron nl-tnum is-${row.apronStatus === "ueber_linie_2" ? "linie2" : "linie1"}`}
+                        title={`Gehalt ${formatMoney(row.salaryTotal)} liegt über der ${
+                          row.apronStatus === "ueber_linie_2" ? "2." : "1."
+                        } Apron-Linie (${formatMoney(row.apronStatus === "ueber_linie_2" ? apronLines.line2 : apronLines.line1)}) — Abgabe am Saisonende möglich.`}
+                      >
+                        über {row.apronStatus === "ueber_linie_2" ? "2." : "1."} Linie
+                      </span>
+                    ) : null}
                   </span>
                 </div>
               );
             })}
           </div>
+          {/* Apron-Linien dieser Saison — zu Saisonbeginn eingefroren und ab da unveränderlich,
+              genau deshalb hier sichtbar: eine Grenze, gegen die man kalkuliert, muss man kennen. */}
+          <p className="nl-sponsor-league-apron-lines">
+            Apron-Linien{apronLines.frozen ? " (eingefroren)" : " (noch nicht eingefroren — Vorschau)"}: Median-Gehalt{" "}
+            {formatMoney(apronLines.medianSalary)} · 1. Linie {formatMoney(apronLines.line1)} · 2. Linie{" "}
+            {formatMoney(apronLines.line2)}
+            {apronLines.usedReferenceSalary ? " · Referenzgehalt (Liga noch ohne echte Gehälter)" : ""}
+          </p>
         </NlCard>
 
         {/* Sponsor-Details eines beliebigen Teams — dieselbe Aufschluesselung, die es bisher nur fuer

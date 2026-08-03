@@ -3,6 +3,15 @@
   "eintraege": [
     {
       "datum": "2026-08-03",
+      "seite": "Verein · Sponsoren",
+      "pr": null,
+      "text": "Neu: der Apron. Wer deutlich mehr für Gehälter ausgibt als der Median der Liga, gibt am Saisonende einen Teil ab — der Topf geht zu gleichen Teilen an die sparsamen Teams. Die zwei Linien werden zu Saisonbeginn eingefroren und stehen in der Sponsorenübersicht, die Abgabe hängt an der Konjunktur der Saison und ist gedeckelt.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-03",
       "seite": "Saison · Spieltagswechsel",
       "pr": null,
       "text": "Beim Spieltagswechsel schrieb das automatische Aufstellen der KI-Teams unter Umständen direkt in die echte Spielstand-Ablage, statt in die vom Aufrufer vorgegebene — dadurch konnte ein reiner Vorschau-Durchlauf den gespeicherten Stand verändern.",
