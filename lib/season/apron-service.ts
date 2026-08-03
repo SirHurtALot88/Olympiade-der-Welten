@@ -11,24 +11,45 @@
  * Funktion `computeApronLines`, die die Liga-Gehaltssumme braucht). Die eigentliche Anwendung
  * (Cash-Aenderungen schreiben, Ledger fuehren) lebt in `lib/season/apron-settlement-service.ts`.
  *
+ * BEMESSUNGSGRUNDLAGE: `getTeamDisplaySalaryTotal` (geglättet, `contract.expectedSalary`) — DIESELBE
+ * Zahl, die die Sponsorenübersicht als "Gehälter" zeigt, NICHT die echte, front-/back-loaded
+ * Vertragssumme (`resolvePlayerEconomyContract().salary`, wie sie `applySponsorSettlement` beim
+ * Gehaltsabzug real bucht). Bewusst so, aus zwei Gründen: (1) die geglättete Zahl ist genau das, was
+ * ein Team in der UI als seine Gehaltslast sieht — die Apron-Badges müssen gegen dieselbe Zahl
+ * rechnen, sonst zeigt die Zeile eine Warnung, die der daneben stehende Betrag nicht erklärt. (2) sie
+ * glättet gerade die Front-/Back-Loading-Spitzen weg, die sonst ein Team allein durch die zeitliche
+ * Verteilung seiner Vertragsraten über oder unter die Linie schieben würden — der Apron soll echte
+ * Mehrausgabe treffen, nicht Buchungstechnik. FOLGE, gemessen (siehe unten): ein Team KANN trotzdem
+ * eine echte Vertragssumme weit über der Linie haben, während seine geglättete Zahl nur knapp
+ * darüber liegt (Save-Beispiel Z-H: 97,7 echt gegen 83,3 geglättet) — DAS ist der Fall, gegen den die
+ * Raten unten kalibriert sind, nicht der Regelfall.
+ *
  * SAETZE UND LINIENFAKTOREN, GEMESSEN GEGEN DEN GESPIELTEN SAVE (nicht die ursprüngliche Vorgabe):
  * die Ausgangswerte (Raten 0,7 / 1,8 auf den Ueberschuss) stammen aus einer Rechnung gegen ein
  * AELTERES Sponsormodell. Gegen das AKTUELLE Modell (Sockel 18-48, Wertungstopf 1030, Boden 43 —
  * siehe sponsor-liga-leiter.ts) nachgerechnet (Save new-game-1785174792968-8d7mdx, 32 Teams,
- * Median-Gehalt ~65,7 zum gemessenen Zeitpunkt) haetten die urspruenglichen Raten bei f=1,24 ein
- * Team (Startrang 1, hohes Gehalt, aber nur mittlere GuV vor Apron) von +15,6 auf -13,6 GuV gekippt —
- * ein Bruch der Vorgabe "kein Team darf von positiv auf stark negativ kippen". Die hier stehenden,
- * auf ~55 % herabgesetzten Raten (0,4 / 1,0) halten alle drei Kriterien gleichzeitig ein (siehe
- * Messkriterien unten) und liegen bei f=1,00/1,24 nahe an der urspruenglichen Groessenordnungs-
- * Erwartung (Topf ~9 / ~52 gegen die Annahme ~10 / ~55). Miss NACH JEDER Aenderung an Median-Gehalt,
- * Wertungstopf oder Ligagroesse neu (siehe scripts/apron-messung.ts-Vorlage im PR) — die Raten sind
- * ein MESSERGEBNIS, kein Naturgesetz.
+ * Median-Gehalt [geglättet] 63,2) waeren SELBST die stark reduzierten 0,4/1,0 einer ersten
+ * Nachmessung noch zu hoch gewesen: das Team Z-H (Rang 5, GuV vor Apron nur −1,4 — sein Gehalt ist
+ * ECHT weit ueber der Linie, aber GEGLAETTET nur knapp drueber) waere bei f=1,24 auf −8,4 GuV
+ * gedrueckt worden — mehr als die vom Reviewer gesetzte Grenze "keine ABGABE drueckt ein gesundes
+ * Team (GuV vor Apron > −5) unter etwa −5". Die hier stehenden Raten (0,2 / 0,45) sind das Ergebnis
+ * einer Rastersuche ueber Ratenpaare GEGEN GENAU DIESES KRITERIUM (Skript-Vorlage im PR): der
+ * groesstmoegliche Topf, bei dem KEIN gesundes Team durch die Abgabe unter −5 GuV faellt (Z-H bleibt
+ * bei −4,8..−5,0, je nach Salary Factor). Der Deckel (Haelfte des Wertungsanteils) GREIFT DABEI NIE —
+ * bei den in diesem Save vorkommenden Rangverteilungen ist der Wertungsanteil selbst der Topteams
+ * immer gross genug, dass die Abgabe darunter bleibt. Er ist damit eine Sicherung fuer einen
+ * Randfall (ein Grossverdiener, der trotzdem auf einen schlechten Rang faellt), nicht der Hebel, der
+ * die Hoehe der Abgabe im Alltag bestimmt — das sind ausschliesslich die beiden Raten hier. Miss NACH
+ * JEDER Aenderung an Median-Gehalt, Wertungstopf oder Ligagroesse neu — die Raten sind ein
+ * MESSERGEBNIS, kein Naturgesetz, und mit ihnen bleibt der Ausgleich je Empfaenger bewusst moderat
+ * (rund 1,5 % der Fixkosten eines Empfaengers bei f=1,24 in diesem Save) statt spuerbar gross — DAS
+ * ist der Preis dafuer, dass ein einzelnes fragiles Team (Z-H) nicht unter die Raeder kommt. Erlaubt
+ * die Gehaltsverteilung einer kuenftigen Saison groessere Raten (kein Team so nah an −5 vor Apron),
+ * gehoert das hierher neu gemessen und die Raten entsprechend angehoben.
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
-import {
-  SPONSOR_V3_REFERENCE_SALARY_PER_TEAM,
-  getSponsorV3LeagueSalaries,
-} from "@/lib/sponsor/sponsor-v3-offer-service";
+import { SPONSOR_V3_REFERENCE_SALARY_PER_TEAM } from "@/lib/sponsor/sponsor-v3-offer-service";
+import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import { SPONSOR_WERTUNGSTOPF, sponsorWertungsGewichte } from "@/lib/sponsor/sponsor-liga-leiter";
 
 export { SPONSOR_V3_REFERENCE_SALARY_PER_TEAM };
@@ -40,9 +61,9 @@ export const APRON_LINE_1_MEDIAN_FACTOR = 1.1;
 /** 2. Apron-Linie = Median-Gehalt × diesen Faktor. */
 export const APRON_LINE_2_MEDIAN_FACTOR = 1.28;
 /** Satz auf den Gehaltsüberschuss ZWISCHEN 1. und 2. Linie. Gemessen, siehe Kopfkommentar. */
-export const APRON_RATE_ZONE_1 = 0.4;
+export const APRON_RATE_ZONE_1 = 0.2;
 /** Satz auf den Gehaltsüberschuss ÜBER der 2. Linie. Gemessen, siehe Kopfkommentar. */
-export const APRON_RATE_ZONE_2 = 1.0;
+export const APRON_RATE_ZONE_2 = 0.45;
 /** Deckel: höchstens dieser Anteil des rangabhängigen Sponsor-Wertungsanteils. */
 export const APRON_CAP_SHARE_OF_RANK_PAYOUT = 0.5;
 /** Konjunkturhebel: 0 bei salaryFactor <= diesem Wert. */
@@ -92,16 +113,32 @@ export type ApronLines = {
 };
 
 /**
+ * Dieselbe Frisch-Save-Schranke wie `getSponsorV3LeagueSalaries` (Sponsorsystem), nur auf der
+ * GEGLÄTTETEN Gehaltszahl (`getTeamDisplaySalaryTotal`) statt der echten — siehe Kopfkommentar,
+ * warum der Apron geglättet rechnet. Schwelle und Referenzwert sind dieselben, keine zweite
+ * erfundene Zahl: gemessene Summe unter 25 % der erwarteten (32 × Referenz) ⇒ Referenz je Team.
+ */
+function getLeagueDisplaySalaries(gameState: GameState): { salaries: number[]; usedReference: boolean } {
+  const measured = gameState.teams.map((team) => getTeamDisplaySalaryTotal(gameState, team.teamId));
+  const teamCount = Math.max(1, measured.length);
+  const measuredSum = measured.reduce((sum, value) => sum + value, 0);
+  if (measuredSum >= teamCount * SPONSOR_V3_REFERENCE_SALARY_PER_TEAM * 0.25) {
+    return { salaries: measured, usedReference: false };
+  }
+  return { salaries: measured.map(() => SPONSOR_V3_REFERENCE_SALARY_PER_TEAM), usedReference: true };
+}
+
+/**
  * Bestimmt die Apron-Linien aus dem AKTUELL gültigen Gehaltsstand des GameState. Wird zu
  * Saisonbeginn EINMAL aufgerufen und das Ergebnis eingefroren (siehe apron-settlement-service.ts) —
  * diese Funktion selbst kennt "Saisonbeginn" nicht, sie liest nur, was gerade da ist.
  *
  * Season-1/leere-Liga-Fallback: dieselbe Referenz und dieselbe Schranke, die das Sponsorsystem dafür
- * schon benutzt (`getSponsorV3LeagueSalaries` — gemessene Summe unter 25 % der erwarteten ⇒
- * Referenz `SPONSOR_V3_REFERENCE_SALARY_PER_TEAM` je Team). Keine zweite erfundene Zahl.
+ * schon benutzt (gemessene Summe unter 25 % der erwarteten ⇒ Referenz `SPONSOR_V3_REFERENCE_SALARY_PER_TEAM`
+ * je Team). Keine zweite erfundene Zahl.
  */
 export function computeApronLines(gameState: GameState): ApronLines {
-  const { salaries, usedReference } = getSponsorV3LeagueSalaries(gameState);
+  const { salaries, usedReference } = getLeagueDisplaySalaries(gameState);
   const medianSalary = median(salaries);
   return {
     medianSalary: round1(medianSalary),
@@ -122,6 +159,13 @@ const WERTUNGS_GEWICHTE_SUMME = WERTUNGS_GEWICHTE.reduce((sum, value) => sum + v
  * oder ob überhaupt ein Vertrag unterschrieben ist. Das macht den Deckel robust: er braucht keinen
  * signierten Sponsorvertrag, um zu greifen (wichtig für KI-Teams vor der Sponsorwahl und für
  * Messungen gegen bereits abgerechnete Saisons).
+ *
+ * `finalRank` ist der ENDRANG, nicht der Startrang: der Apron läuft am Saisonende (siehe
+ * apron-settlement-service.ts — nach der Sponsor-Abrechnung, die zu diesem Zeitpunkt bereits mit der
+ * finalen, ggf. formkarten-bestraften Tabelle rechnet), also ist der Endrang zu diesem Zeitpunkt die
+ * einzig sinnvolle Größe. Der Startrang bestimmt stattdessen den SOCKEL des Sponsors
+ * (`sponsorSockelFuerStartrang`) — beide Ränge messen bewusst Verschiedenes und werden hier nicht
+ * vermischt.
  */
 export function apronWertungsanteil(finalRank: number, salaryFactor: number): number {
   const league = WERTUNGS_GEWICHTE.length;

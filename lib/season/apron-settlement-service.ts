@@ -16,8 +16,8 @@
  */
 import type { ApronSettlementLogRecord, GameState } from "@/lib/data/olyDataTypes";
 import { randomUUID } from "@/lib/utils/random-id";
-import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
+import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import {
   apronWertungsanteil,
   computeApronLines,
@@ -33,17 +33,6 @@ function roundCash(value: number): number {
 function getCurrentSalaryFactor(gameState: GameState): number {
   const factor = gameState.seasonState.seasonEconomyFactors?.[0]?.factor;
   return typeof factor === "number" && Number.isFinite(factor) && factor > 0 ? factor : 1;
-}
-
-function getTeamRealSalaryTotal(gameState: GameState, teamId: string): number {
-  const rosterEntries = gameState.rosters.filter((entry) => entry.teamId === teamId);
-  if (rosterEntries.length === 0) return 0;
-  return roundCash(
-    rosterEntries.reduce((sum, entry) => {
-      const player = gameState.players.find((candidate) => candidate.id === entry.playerId) ?? null;
-      return sum + (resolvePlayerEconomyContract({ player, rosterEntry: entry }).salary ?? 0);
-    }, 0),
-  );
 }
 
 // ── Einfrieren zu Saisonbeginn ────────────────────────────────────────────────────────────────
@@ -141,7 +130,9 @@ export function previewApronSettlement(gameState: GameState): ApronSettlementPre
     }
     return {
       teamId: team.teamId,
-      salary: getTeamRealSalaryTotal(gameState, team.teamId),
+      // GEGLÄTTETE Gehaltssumme (dieselbe Basis wie computeApronLines) — siehe apron-service.ts
+      // Kopfkommentar, warum nicht die echte, front-/back-loaded Vertragssumme.
+      salary: getTeamDisplaySalaryTotal(gameState, team.teamId),
       rankShare: apronWertungsanteil(finalRank ?? 32, salaryFactor),
     };
   });
