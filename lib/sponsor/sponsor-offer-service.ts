@@ -1,6 +1,7 @@
 import { randomUUID } from "@/lib/utils/random-id";
 
 import type {
+  AiSeasonStrategy,
   GameState,
   SponsorArchetype,
   SponsorCurveShape,
@@ -38,9 +39,11 @@ import {
 import {
   sponsorV3AnchorWeights,
   sponsorV3CardByKey,
+  sponsorV3DownsideShortfall,
   SPONSOR_V4_AXIS_PBAR,
   type SponsorV3CardKey,
 } from "@/lib/sponsor/sponsor-v3-model";
+import { buildSeasonStrategyState } from "@/lib/ai/ai-manager-doctrine-service";
 import { resolveChallengeSlotIndex } from "@/lib/sponsor/sponsor-special-objectives";
 import { applySponsorV3ToOffers, getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 import {
@@ -656,6 +659,54 @@ const SPONSOR_AI_CURVE_FIT_SIGMA = 2.5;
 const SPONSOR_AI_CURVE_FIT_WEIGHT = 3;
 
 /**
+ * GEWICHT DES ECO-DOWNSIDE-TERMS. Kalibriert an `eco-messung.ts` (6 Seeds x 32 Teams), nicht am
+ * Gefuehl — Sweep 2/3/4/5/6/8/20 auf dem Live-Save, Ergebnis fuer die klammen Teams (Druck >= 7), plus
+ * `mitVorschuss` aus dem bestehenden `tests/sponsor-v4-ki-wahl.test.ts`-Szenario (alle 32 Teams auf
+ * Kasse −30, Schwelle: > 8 von 32 muessen die Vorschuss-Karte nehmen):
+ *
+ *   Gewicht | Ø Bodenrang | bestbodig | Formen | mitVorschuss/32 | Test "greift bei Geldnot"
+ *   2       | 3,10        | 13 %      | 11     | 15              | gruen
+ *   3       | 3,01        | 18 %      | 11     | 15              | gruen
+ *   4       | 2,94        | 18 %      | 11     | 13              | gruen — GEWAEHLT
+ *   5       | ~2,9        | ~19 %     | 11     | 12              | gruen
+ *   6       | 2,87        | 20 %      | 11     | 8               | ROT (Schwelle > 8 knapp verfehlt)
+ *   8..20   | 2,86-2,89   | 20-23 %   | 11     | < 8 (vermutet)  | ROT
+ *
+ * GEWICHT 4 IST NICHT DAS STAERKSTE MOEGLICHE, SONDERN DAS GROESSTE, DAS EINEN BESTEHENDEN TEST NICHT
+ * BRICHT. `tests/sponsor-v4-ki-wahl.test.ts` ("greift bei Geldnot zum Vorschuss") verlangt bei extremer
+ * Geldnot einen "klaren Teil" der Teams auf der Vorschuss-Karte — der bestehende Vorschuss-Term
+ * (`+0,25 * advance.amount`) und der neue Eco-Downside-Term konkurrieren um dieselben Angebote, denn
+ * eine Vorschuss-Karte ist nicht zwangslaeufig die bodenstaerkste. Zwischen Gewicht 5 und 6 kippt die
+ * Konkurrenz (12 → 8 von 32) und verletzt die bestehende Schwelle. Diese Grenze ist damit die
+ * tatsaechliche Kalibrierungsgrenze, nicht eine gefuehlte — sie wurde gemessen, indem genau dieser Test
+ * bei wachsendem Gewicht beobachtet wurde.
+ *
+ * ZWEI WEITERE BEFUNDE AUS DEM SWEEP, die in jede Weiterarbeit an dieser Zahl gehoeren:
+ *
+ * ERSTENS erreicht die Wirkung bei KEINEM Gewicht die im Auftrag genannte Zielmarke 2,2 — auch nicht
+ * bei den (durch obige Testgrenze ohnehin ausgeschlossenen) hohen Werten 8-20, wo die Kurve bereits
+ * plateaut (2,87 → 2,86 zwischen Gewicht 6 und 20). Grund, per Direktmessung bestaetigt (argmin(downside)
+ * ganz ohne die uebrigen Scoreterme liefert Bodenrang ~3,0 — kaum besser als eine Zufallswahl unter 5
+ * Karten): die Anker-Gewichte in `sponsorV3DownsideShortfall` (Sigma 4, zentriert auf den Startrang)
+ * lassen fuer ein starkes, aber klammes Team den extremen Rangbereich, in dem der Boden ueberhaupt
+ * entsteht, kaum Gewicht — dieses Team landet dort realistisch nie. Der Boden-Rang aus
+ * `eco-messung.ts` ist damit ein UNVOLLKOMMENER Proxy fuer das, was diese Groesse tatsaechlich
+ * optimiert (Abwaertsrisiko im REALISTISCHEN Rangfenster, nicht am Tabellenende) — exakt die
+ * Eigenschaft, die laut Auftrag den bloßen Boden als Kriterium disqualifiziert.
+ *
+ * ZWEITENS bleibt "entspannt" NICHT exakt unveraendert: `buildSeasonStrategyState` klassifiziert in
+ * diesem Save 13 von 14 stichprobenartig geprueften Druck-3-Teams als `cash_recovery` — nicht ueber
+ * die Kasse (die ist bei ihnen ja bereits >= 20), sondern ueber `salaryPressure = Gehalt/Kasse > 1,25`.
+ * `ecoIntent01` ist bei diesen Teams also trotz "entspannter" Kassenlage strukturell ungleich 0
+ * (~0,6 statt 0). Das ist keine Fehlmessung, sondern folgt exakt aus der vorgegebenen Formel und
+ * greift wortgetreu das im Auftrag vorgesehene zweite Signal (`strategy01`) auf. Bit-identisch bleibt
+ * nur der in Test 2 explizit konstruierte Fall (hohe Kasse UND neutrale Doktrin) — die reale
+ * "entspannt (Druck 3)"-Gruppe aus `eco-messung.ts` bewegt sich mit, weil sie eben nicht nur ueber die
+ * Kasse "entspannt" ist. Siehe PR-Beschreibung fuer die volle Vorher/Nachher-Tabelle und die Analyse.
+ */
+const SPONSOR_AI_ECO_DOWNSIDE_WEIGHT = 4;
+
+/**
  * DER ZIELRANG, GEGEN DEN DIE KURVENFORM PASSEN MUSS.
  *
  * Der Startrang allein waere die Wahl eines Teams ohne Plan — ein Team, das aufsteigen will, darf
@@ -711,6 +762,12 @@ function scoreOfferForAi(input: {
   teamId: string;
   cash?: number;
   rosterSize?: number;
+  /**
+   * Sparabsicht dieses Teams, 0..1 (siehe `resolveEcoIntent01` fuer die Berechnung). Optional: fehlt
+   * es (z. B. in bestehenden Aufrufen/Tests ausserhalb von `chooseSponsorOfferForAiTeams`), bleibt der
+   * Downside-Term unwirksam — exakt dasselbe Verhalten wie vor dieser Aenderung.
+   */
+  ecoIntent01?: number;
 }): number {
   const { offer, profile, identity, cashPressure } = input;
   const terms = getSponsorV3Terms(offer);
@@ -758,6 +815,16 @@ function scoreOfferForAi(input: {
     score += cashPressure >= 7 ? terms.advance.amount * 0.25 : -terms.advance.fee;
   }
 
+  // SPARABSICHT: der Vorschuss-Term oben waehlt nur, welche Karte UEBERHAUPT einen Vorschuss traegt —
+  // nicht welche den hoechsten Boden hat. Ein Team mit echter Sparabsicht (klamm und/oder in der
+  // Doktrin auf Eco-Kurs) soll stattdessen die Karte mit der GERINGSTEN erwarteten Abwaertsseite
+  // bevorzugen, siehe `sponsorV3DownsideShortfall` fuer die Begruendung dieser Groesse. Bei
+  // `ecoIntent01 == 0` (die grosse Mehrheit entspannter Teams) ist dieser Term exakt 0 — unveraendertes
+  // Verhalten.
+  if (terms && (input.ecoIntent01 ?? 0) > 0) {
+    score -= (input.ecoIntent01 ?? 0) * SPONSOR_AI_ECO_DOWNSIDE_WEIGHT * sponsorV3DownsideShortfall(terms);
+  }
+
   // Markenpassung bleibt als milder Flavour-Term: sie bewegt kein Geld, soll aber bei aehnlicher
   // Rechnung das Team waehlen lassen, das zu ihm passt.
   const preferredArchetype = resolveAiSponsorArchetypePreference({
@@ -775,6 +842,24 @@ function scoreOfferForAi(input: {
   return score;
 }
 
+/**
+ * SPARABSICHT EINES TEAMS — bewusst schlank: nur zwei Signale, kein Konjunktur-Anteil und kein
+ * Ambitions-Daempfer. Beim Konjunktur-Anteil ist schon das Vorzeichen eine Designvermutung ("im
+ * mageren Jahr ist Ambition billig zu opfern" ist genauso plausibel wie "vor mageren Jahren Runway
+ * aufbauen") — ein Koeffizient, dessen Richtung geraten ist, waere schlechter als ihn wegzulassen.
+ *
+ * `strategy01` liest die bereits vorhandene Saison-Doktrin (`buildSeasonStrategyState`,
+ * lib/ai/ai-manager-doctrine-service.ts): `cash_recovery` ist die staerkste Sparabsicht (1,0),
+ * `eco_round` eine mildere (0,5), jede andere Doktrin 0. `pressure01` ist dieselbe Kassenlage, die
+ * auch `resolveAiSponsorArchetypePreference` bereits nutzt, linear auf `[0,1]` gestreckt zwischen den
+ * bestehenden Druckstufen 3 (entspannt) und 10 (klamm).
+ */
+function resolveEcoIntent01(input: { seasonStrategy: AiSeasonStrategy | undefined; cashPressure: number }): number {
+  const strategy01 = input.seasonStrategy === "cash_recovery" ? 1 : input.seasonStrategy === "eco_round" ? 0.5 : 0;
+  const pressure01 = Math.max(0, Math.min(1, (input.cashPressure - 3) / 7));
+  return Math.max(0, Math.min(1, 0.6 * strategy01 + 0.4 * pressure01));
+}
+
 export function chooseSponsorOfferForAiTeams(gameState: GameState, settingsMap?: Record<string, TeamControlSettings>): GameState {
   const controlSettings = settingsMap ?? buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings);
   let nextGameState = ensureSeasonSponsorOffers(gameState);
@@ -782,6 +867,9 @@ export function chooseSponsorOfferForAiTeams(gameState: GameState, settingsMap?:
   // Build overview rows once — reused for all teams instead of O(n²) per-team calls.
   const overviewRows = buildTeamSeasonOverviewRows({ gameState: nextGameState });
   const rowByTeamId = new Map(overviewRows.map((row) => [row.teamId, row]));
+  // Fuer die Liga EINMAL berechnen, nicht je Team — `buildSeasonStrategyState` ist eine reine
+  // Funktion ueber den gesamten `gameState` und liefert die Doktrin aller Teams in einem Rutsch.
+  const seasonStrategyByTeamId = buildSeasonStrategyState(nextGameState);
 
   for (const team of nextGameState.teams) {
     if (getTeamSponsorContract(nextGameState, team.teamId)) {
@@ -805,7 +893,13 @@ export function chooseSponsorOfferForAiTeams(gameState: GameState, settingsMap?:
     const cashPressure = row?.cash != null && row.cash < 0 ? 10 : row?.cash != null && row.cash < 20 ? 7 : 3;
     const powerRank = row?.rank ?? null;
     const rosterSize = nextGameState.rosters.filter((entry) => entry.teamId === team.teamId).length;
-    const scoreArgs = { profile, identity, cashPressure, powerRank, teamId: team.teamId, cash: row?.cash ?? 0, rosterSize };
+    const ecoIntent01 = resolveEcoIntent01({
+      seasonStrategy: seasonStrategyByTeamId[team.teamId]?.seasonStrategy,
+      cashPressure,
+    });
+    const scoreArgs = {
+      profile, identity, cashPressure, powerRank, teamId: team.teamId, cash: row?.cash ?? 0, rosterSize, ecoIntent01,
+    };
     const bestOffer = [...offers].sort(
       (left, right) =>
         scoreOfferForAi({ offer: right, ...scoreArgs }) - scoreOfferForAi({ offer: left, ...scoreArgs }),
