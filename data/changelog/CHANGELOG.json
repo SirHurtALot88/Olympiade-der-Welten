@@ -22,6 +22,15 @@
     {
       "datum": "2026-08-03",
       "seite": "Verein · Sponsoren",
+      "pr": "#365",
+      "text": "Zwei der fünf Sponsor-Achsenziele wurden nachjustiert: Entwicklung und Solidität fielen in einer komplett durchgespielten Saison bei praktisch jedem Vertrag voll aus (100 % bzw. 99,3 % im Schnitt) statt eine echte Entscheidung zu sein — die Zielwerte wurden auf den Bereich angehoben, in dem rund die Hälfte der Verträge landet. Kaderwert wird ab Saison 1 nicht mehr angeboten, weil die Draft-Startbewertung und die Neubewertung am Saisonende nach unterschiedlichen Methoden rechnen und der Vergleich dadurch systematisch schlecht ausfiel, nicht wegen echter Wertentwicklung.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-03",
+      "seite": "Verein · Sponsoren",
       "pr": null,
       "text": "Sponsoren zahlen nicht mehr alle dieselbe Kurve: der Betrag setzt sich jetzt aus einem festen Sockel nach Startrang und einem Wertungstopf nach Endrang zusammen, und die Kurvenform der Karte entscheidet, wo auf der Tabelle dieses Geld liegt — bei gleichem Erwartungswert.",
       "quelle": "gepflegt",

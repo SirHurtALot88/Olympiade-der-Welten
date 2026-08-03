@@ -160,11 +160,17 @@ function freshSharePct(gameState: GameState, teamId: string): number {
 /**
  * DIE FUENF ACHSEN.
  *
- * Die Skalen sind DESIGNWERTE: sie sind so gesetzt, dass ein normal gespieltes Team etwa in der
- * Mitte landet, aber die echten Liga-Verteilungen sind noch nicht gemessen. Ein Skalenfehler
- * verschiebt nur, wie leicht eine Achse faellt — der Erwartungswert haengt an `p = 0,5` und bleibt
- * davon unberuehrt. Nachziehen ueber `scripts/sponsor-v4-achsen-kalibrierung.ts`, Zielkorridor:
- * Median-Erfuellung 0,45 bis 0,55.
+ * Die Skalen sind DESIGNWERTE, kalibriert gegen eine komplett durchgespielte Saison 1 (32 Teams,
+ * `scripts/sponsor-achsen-messung.ts`, Befund in `docs/analyse/sponsor-achsen-messung.md`). Ein
+ * Skalenfehler verschiebt nur, wie leicht eine Achse faellt — der Erwartungswert haengt an `p = 0,5`
+ * und bleibt davon unberuehrt. Zielkorridor der Ø Erfuellung (= Trefferquote gegen `p = 0,5`):
+ * 35 bis 65 %, Anker ist die Stelle, an der etwa die Haelfte der gemessenen Vertraege landet.
+ *
+ * `entwicklung` (Ziel 3 → 20 Sprünge) und `soliditaet` (Ziel 30 → 110 C) wurden nachkalibriert, weil
+ * die alten Ziele bei 100 % bzw. 99,3 % Ø Erfuellung lagen (siehe „Nachkalibrierung" im Messdokument).
+ * `kaderpflege` lag mit 44,3 % bereits im Korridor und blieb unveraendert. `wachstum` wird ab
+ * Saison 1 nicht mehr angeboten (siehe Kommentar dort) statt mit geratenen Skalenwerten kalibriert.
+ * `ausbau` hat mit n = 0 keine Messgrundlage und blieb unveraendert.
  */
 const SPONSOR_V4_AXIS_DEFINITIONS: Readonly<Record<SponsorV4AxisKey, SponsorV4AxisDefinition>> = {
   wachstum: {
@@ -173,17 +179,47 @@ const SPONSOR_V4_AXIS_DEFINITIONS: Readonly<Record<SponsorV4AxisKey, SponsorV4Ax
     unit: "%",
     // 12 Prozent Kaderwert-Zuwachs. Prozentual gemessen, damit ein kleiner Kader dieselbe Chance hat
     // wie ein grosser — absolut waere die Achse ein verkappter Reichtums-Bonus.
+    //
+    // UNVERAENDERT GELASSEN, NICHT KALIBRIERT — die gemessene Saison-1-Verteilung (6 Vertraege, Ø
+    // Rohmetrik −29,91 %, kein einziger positiv) ist kein Skalenproblem. Ursache: der Kaderwert
+    // eines Teams (`teamMarketValue`) liest `player.marketValue`. Direkt nach dem Draft steht dort
+    // die HEURISTISCHE Draft-Schaetzung (`commit-draft-to-free-agent.ts`, Kommentar dort: "the
+    // draft's heuristic estimate"), noch nicht gegen die Liga gerankt. Am Saisonende (nach dem
+    // letzten Spieltag, `season-end-xp-apply-service.ts` → `applyRankTableMarketValuesToGameState`)
+    // wird `player.marketValue` fuer JEDEN Spieler einmalig durch den rang-basierten Wert ersetzt
+    // (`calculateMarketValueFromRankTable`, `league-market-value-snapshot.ts`) — eine andere, nicht
+    // vergleichbare Bewertungsmethode. Die Vertrags-Baseline (bei Preseason-Angebot eingefroren)
+    // steht damit auf der heuristischen Skala, der Endwert auf der rang-basierten — der gemessene
+    // Einbruch ist ueberwiegend ein Methodenwechsel, keine reale Kaderwert-Entwicklung.
+    //
+    // Das trifft NUR Saison 1: ab Saison 2 ist die Baseline selbst schon rang-basiert (vom Vorjahres-
+    // Saisonende), Baseline und Endwert nutzen dieselbe Methode. Fuer S2+ liegen keine Messdaten vor
+    // — eine Skala zu raten waere Ratenkalibrierung, siehe Dateikopf-Kommentar. Deshalb: Achse bleibt
+    // auf Zielwert 12 % stehen, wird aber in Saison 1 gar nicht mehr angeboten (`offerable` unten).
+    // Fuer das historische Vorbild einer eigenen S1-Leiter siehe `resolveMarketValueGrowthStages` in
+    // `sponsor-special-objectives.ts` (Stand vor PR #361 / Commit 3efa6801^) — dort war "S1 hat keinen
+    // Transfermarkt, nur organisches Training" bereits als eigener Fall behandelt, allerdings ohne
+    // den hier gefundenen Methodenwechsel-Effekt, der deutlich groesser ist als reine Trainingsdaempfung.
     scale: 12,
     offset: 0,
     baseline: (gameState, teamId) => teamMarketValue(gameState, teamId),
     metric: (gameState, teamId, baseline) =>
       baseline > 0 ? (100 * (teamMarketValue(gameState, teamId) - baseline)) / baseline : 0,
-    offerable: (gameState, teamId) => teamMarketValue(gameState, teamId) > 0,
+    // Saison 1 ausgenommen — siehe Begruendung oben.
+    offerable: (gameState, teamId) => gameState.season.id !== "season-1" && teamMarketValue(gameState, teamId) > 0,
   },
   ausbau: {
     key: "ausbau",
     label: "Ausbau",
     unit: "Stufen",
+    // UNVERAENDERT — n = 0 in der gemessenen Saison ist keine Messgrundlage fuer eine Skala.
+    // Kurz nachgeschaut, warum: `offerable` war fuer alle 32 Teams true (Headroom 37–40 von 40
+    // Gebaeudestufen), und die Slate-Ziehung (`rollSponsorOfferSlate`) hat die Achse nur bei 7 von 32
+    // Teams aus dem 5-Slot-Angebot herausrotiert — 25 Teams hatten die Karte also im Angebot. Trotzdem
+    // hat sie kein einziges Team unterschrieben. Der Ausschluss liegt also nicht in `offerable`, aus
+    // dieser Datei, sondern vermutlich in der KI-Angebotswahl (`scoreOfferForAi` /
+    // `chooseSponsorOfferForAiTeams` in `sponsor-offer-service.ts`) oder in der Kartengroesse
+    // (`goalSize`) der Achse — nicht weiter untersucht, siehe docs/analyse/sponsor-achsen-messung.md.
     scale: 2,
     offset: 0,
     baseline: (gameState, teamId) => facilityLevelSum(gameState, teamId),
@@ -196,7 +232,11 @@ const SPONSOR_V4_AXIS_DEFINITIONS: Readonly<Record<SponsorV4AxisKey, SponsorV4Ax
     label: "Solidität",
     unit: "C",
     // Nullpunkt bei -10: ein Team darf ein moderates Minus fahren und liegt trotzdem nicht bei 0.
-    scale: 40,
+    // Ziel nachkalibriert 30 → 110 C (2026-08-03): bei 30 C lagen 9 von 10 gemessenen Vertraegen bei
+    // voller Erfuellung (Ø 99,3 %, Rohmetrik-Median 44,7 C, Spanne 27,3–117,0 C). Bei 110 C liegt die
+    // Ø Erfuellung derselben zehn Vertraege bei 56,1 % — im Zielkorridor 35–65 %. Siehe
+    // docs/analyse/sponsor-achsen-messung.md, Abschnitt „Nachkalibrierung".
+    scale: 120,
     offset: 10,
     baseline: (gameState, teamId) => netFinancialPosition(gameState, teamId),
     metric: (gameState, teamId, baseline) => netFinancialPosition(gameState, teamId) - baseline,
@@ -206,7 +246,11 @@ const SPONSOR_V4_AXIS_DEFINITIONS: Readonly<Record<SponsorV4AxisKey, SponsorV4Ax
     key: "entwicklung",
     label: "Entwicklung",
     unit: "Sprünge",
-    scale: 3,
+    // Ziel nachkalibriert 3 → 20 Spruenge (2026-08-03): bei 3 lagen alle 8 gemessenen Vertraege bei
+    // voller Erfuellung (Ø 100 %, Rohmetrik-Spanne 7–13 Spruenge, Median 10). Bei 20 liegt keiner der
+    // acht Werte mehr am Deckel, Ø Erfuellung 50,6 % — mittig im Zielkorridor 35–65 %. Siehe
+    // docs/analyse/sponsor-achsen-messung.md, Abschnitt „Nachkalibrierung".
+    scale: 20,
     offset: 0,
     // Zaehlt nur den Saisonzuwachs — es gibt keinen Ausgangsbestand, gegen den zu messen waere.
     baseline: () => 0,
