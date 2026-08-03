@@ -607,6 +607,46 @@ export function sponsorV3StandardDeviation(terms: SponsorV3ContractTerms): numbe
   return Math.sqrt(acc);
 }
 
+/**
+ * DOWNSIDE-SEMIABWEICHUNG — die Groesse, gegen die "sicher" ueberhaupt gemessen werden soll.
+ *
+ * Warum nicht einfach der Leiterboden (`min(sponsorV3GuaranteedLadder(terms))`): `ladder[31]` ist
+ * der Wert bei Endrang 32 — fuer ein Spitzenteam ausserhalb jedes realistischen Rangbereichs, und der
+ * Floor-Clamp (`Math.max(terms.floor, ...)`) staucht ihn ohnehin fast immer auf denselben Bodenwert.
+ * Der Boden unterscheidet Karten damit kaum, obwohl ihr tatsaechliches Absturzrisiko sehr wohl
+ * unterschiedlich ist.
+ *
+ * Warum nicht die Standardabweichung (`sponsorV3StandardDeviation`): sie bestraft symmetrisch auch
+ * Upside — eine Karte, die bei Ueberperformance mehr zahlt, gilt ihr als genauso riskant wie eine, die
+ * bei Unterperformance mehr verliert. Fuer ein sparendes Team kostet Upside aber nichts; nur die
+ * Abwaertsseite ist das Risiko, das es vermeiden will.
+ *
+ * Und die Semiabweichung zaehlt die ACHSEN-LOTTERIE automatisch mit: eine flache Leiter mit
+ * legendaerer Achse (G = 24) ist keine sichere Karte, denn `sponsorV3Settle` zieht bei verfehltem
+ * Ziel `-goalP*G` vom Leiterwert ab. Wer nur die Leiter anschaut, uebersieht genau dieses Abwaertsrisiko;
+ * `sponsorV3DownsideShortfall` misst ueber `sponsorV3Settle` und erfasst damit beide Zweige (Ziel
+ * erreicht / verfehlt) an jedem Anker-Rang.
+ *
+ * Definition: `Σ_rank w_rank · [ goalP·max(0, EV−Settle(rank,1)) + (1−goalP)·max(0, EV−Settle(rank,0)) ]`
+ * — der erwartete Fehlbetrag UNTER dem Erwartungswert, ueber dieselben Anker-Gewichte und denselben
+ * EV wie `sponsorV3StandardDeviation`. Je kleiner, desto sicherer die Karte.
+ */
+export function sponsorV3DownsideShortfall(terms: SponsorV3ContractTerms): number {
+  const weights = sponsorV3AnchorWeights(terms.startRank);
+  const ev = sponsorV3ExpectedPayout(terms);
+  let acc = 0;
+  for (let rank = 1; rank <= SPONSOR_V3_RANKS; rank += 1) {
+    const weight = weights[rank - 1] ?? 0;
+    for (const [probability, value] of [
+      [terms.goalP, sponsorV3Settle(terms, rank, 1)] as const,
+      [1 - terms.goalP, sponsorV3Settle(terms, rank, 0)] as const,
+    ]) {
+      acc += weight * probability * Math.max(0, ev - value);
+    }
+  }
+  return acc;
+}
+
 /** Ist die Leiter dieser Karte streng monoton im Endrang? (Guardrail, im Test asserted.) */
 export function sponsorV3IsMonotone(terms: SponsorV3ContractTerms): boolean {
   const ladder = sponsorV3GuaranteedLadder(terms);
