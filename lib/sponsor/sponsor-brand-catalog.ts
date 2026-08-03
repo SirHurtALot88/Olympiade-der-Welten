@@ -1,4 +1,4 @@
-import type { GameState, SponsorArchetype, SponsorRarity, Team, TeamIdentity, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
+import type { SponsorArchetype, SponsorRarity, Team, TeamIdentity, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 
 import {
   SPONSOR_BRAND_PARENTS,
@@ -12,13 +12,7 @@ import {
   parentSupportsArchetype,
   pickVariantForParent,
   type SponsorBrandTemplate,
-  type SponsorSpecialTemplateId,
 } from "@/lib/sponsor/sponsor-brand-variants";
-import {
-  buildChallengeSpecialComponent,
-  buildStandardSpecialComponent,
-  SPONSOR_OBJECTIVE_FAMILY,
-} from "@/lib/sponsor/sponsor-special-objectives";
 
 export type { SponsorBrandTemplate, SponsorSpecialTemplateId, SponsorVariantKey } from "@/lib/sponsor/sponsor-brand-variants";
 export {
@@ -198,62 +192,19 @@ function pickBrandForSlot(input: {
   return { parent, brand };
 }
 
-function pickSpecialTemplate(input: {
-  brand: SponsorBrandTemplate;
-  team: Team;
-  identity: TeamIdentity | null;
-  profile: TeamStrategyProfile | null;
-  slotIndex: number;
-  seasonId: string;
-  /** Bereits im Slate belegte Ziel-Familien (Fable C3): möglichst keine zweite aus derselben Familie. */
-  usedFamilies?: Set<string>;
-}) {
-  // Ein Template gilt als „frei", wenn seine Familie im Slate noch nicht belegt ist.
-  const familyFree = (templateId: SponsorSpecialTemplateId) =>
-    !input.usedFamilies || !input.usedFamilies.has(SPONSOR_OBJECTIVE_FAMILY[templateId] ?? templateId);
-
-  const preferred: SponsorSpecialTemplateId[] = [];
-  if ((input.profile?.bias?.sellForProfitAggression ?? 0) >= 8) {
-    preferred.push("transfer_profit_min");
-  }
-  if ((input.identity?.ambition ?? 0) >= 9 || (input.profile?.bias?.starPriority ?? 0) >= 9) {
-    preferred.push("discipline_top3_count");
-  }
-  preferred.push("form_color_cover");
-
-  // Zuerst ein bevorzugtes Template AUS EINER FREIEN FAMILIE.
-  for (const templateId of preferred) {
-    if (input.brand.specialTemplates.includes(templateId) && familyFree(templateId)) {
-      return templateId;
-    }
-  }
-  // Fallback-Pool: bevorzugt Templates aus freien Familien, sonst alle (damit immer etwas zurückkommt).
-  const freeTemplates = input.brand.specialTemplates.filter(familyFree);
-  const pool = freeTemplates.length > 0 ? freeTemplates : input.brand.specialTemplates;
-  const fallbackIndex = Math.floor(
-    getStableUnitHash(`${input.seasonId}:${input.team.teamId}:${input.slotIndex}:special`) * pool.length,
-  );
-  return pool[fallbackIndex] ?? (preferred.find((id) => input.brand.specialTemplates.includes(id)) ?? "form_color_cover");
-}
-
-/** Aktueller Tabellenplatz eines Teams (rank → startplatz), als Stärke-Snapshot fürs Signing. null wenn unbekannt. */
-function resolveTeamOverallRankFromGameState(gameState: GameState | undefined, teamId: string): number | null {
-  const standing = gameState?.seasonState?.standings?.[teamId] as { rank?: number; startplatz?: number } | undefined;
-  if (typeof standing?.rank === "number" && Number.isFinite(standing.rank)) return standing.rank;
-  if (typeof standing?.startplatz === "number" && Number.isFinite(standing.startplatz)) return standing.startplatz;
-  return null;
-}
-
-function buildSpecialComponent(input: {
-  templateId: SponsorSpecialTemplateId;
-  rarity: SponsorRarity;
-  rewardCash: number;
-  teamQualityRank?: number | null;
-  teamCount?: number;
-}) {
-  return buildStandardSpecialComponent(input);
-}
-
+/**
+ * WELCHE MARKE + WELCHER FLAVOURTEXT — das Sonderziel selbst baut diese Funktion nicht mehr.
+ *
+ * Frueher entschied hier zusaetzlich `pickSpecialTemplate`/`buildSpecialComponent`
+ * (bzw. `buildChallengeSpecialComponent` im Challenge-Fall) ueber die Sonderziel-Komponente der
+ * Karte. Das Ergebnis wurde in JEDEM Fall verworfen: `buildOfferSkeleton`
+ * (sponsor-offer-service.ts) ersetzt die Sonderziel-Komponente einer Achsenkarte immer durch die
+ * Achse selbst, und nur Achsenkarten tragen ueberhaupt ein Sonderziel (siehe
+ * sponsor-special-objectives.ts, Datei-Kopf). Der `specialMode === "challenge"`-Zweig bleibt
+ * trotzdem stehen — er entscheidet weiterhin den "Challenge-Sponsor · "-Flavourtext-Praefix und
+ * `offer.isChallengeOffer`, beides sichtbare Angebotsfelder, unabhaengig vom (nicht mehr gebauten)
+ * Sonderziel.
+ */
 export function pickSponsorBrandForOffer(input: {
   seasonId: string;
   teamId: string;
@@ -268,42 +219,9 @@ export function pickSponsorBrandForOffer(input: {
   globalParentUsage?: Record<string, number>;
   forcePremiumElite?: boolean;
   specialMode?: "standard" | "challenge";
-  gameState?: GameState;
-  specialRewardCash?: number;
-  /** Bereits im Slate belegte Ziel-Familien (Slate-Anti-Wiederholung, Fable C3). */
-  usedSpecialFamilies?: Set<string>;
 }) {
   const { parent, brand } = pickBrandForSlot(input);
   const display = resolveSponsorBrandDisplay(parent, brand);
-  const rewardCash = input.specialRewardCash ?? brand.specialCash;
-  const special =
-    input.specialMode === "challenge" && input.gameState
-      ? buildChallengeSpecialComponent({
-          gameState: input.gameState,
-          team: input.team,
-          identity: input.identity,
-          profile: input.profile,
-          rarity: input.rarity,
-          rewardCash,
-          seasonId: input.seasonId,
-        })
-      : buildSpecialComponent({
-          templateId: pickSpecialTemplate({
-            brand,
-            team: input.team,
-            identity: input.identity,
-            profile: input.profile,
-            slotIndex: input.slotIndex,
-            seasonId: input.seasonId,
-            usedFamilies: input.usedSpecialFamilies,
-          }),
-          rarity: input.rarity,
-          rewardCash,
-          // Stärke-Snapshot aus dem aktuellen Tabellenplatz (falls gameState vorhanden), damit
-          // discipline_top3_count den Zielrang stärke-skaliert einfriert (Fable #3).
-          teamQualityRank: resolveTeamOverallRankFromGameState(input.gameState, input.teamId),
-          teamCount: input.gameState?.teams.length,
-        });
   return {
     parent,
     brand: {
@@ -314,7 +232,6 @@ export function pickSponsorBrandForOffer(input: {
           ? `Challenge-Sponsor · ${display.flavor}`
           : display.flavor,
     },
-    special,
   };
 }
 

@@ -37,18 +37,10 @@ import {
 } from "@/lib/sponsor/sponsor-tier-pool";
 import {
   sponsorV3CardByKey,
-  sponsorV3IsGoalOfferable,
   SPONSOR_V4_AXIS_PBAR,
   type SponsorV3CardKey,
 } from "@/lib/sponsor/sponsor-v3-model";
-import {
-  buildBonusObjectiveComponent,
-  buildGoldenObjectiveComponent,
-  pickBonusObjective,
-  pickGoldenObjective,
-  resolveChallengeSlotIndex,
-  sponsorObjectiveFamilyForKey,
-} from "@/lib/sponsor/sponsor-special-objectives";
+import { resolveChallengeSlotIndex } from "@/lib/sponsor/sponsor-special-objectives";
 import { applySponsorV3ToOffers, getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 import {
   buildSponsorV4AxisTerms,
@@ -104,15 +96,13 @@ function buildOfferSkeleton(input: {
   forcePremiumElite?: boolean;
   teamQualityRank?: number | null;
   specialMode?: "standard" | "challenge";
-  usedSpecialFamilies?: Set<string>;
 }): SponsorOffer {
   const { team, identity, profile, cardKey, rarity, gameState, commercialRating, slotIndex, teamQualityRank, specialMode } = input;
-  const card = sponsorV3CardByKey(cardKey);
   // Der Marken- und der Sonderziel-Katalog sind noch nach den drei alten Archetypen verschlagwortet; die
   // Karte wird dafür auf einen Eimer abgebildet (SPONSOR_CARD_ARCHETYPE). Der Archetyp ist ab hier
   // reines Katalog-Schlagwort — an der Auszahlung hängt er nicht mehr.
   const archetype: SponsorArchetype = mapSponsorCardToArchetype(cardKey, input.axisKey);
-  const { brand, parent, special } = pickSponsorBrandForOffer({
+  const { brand, parent } = pickSponsorBrandForOffer({
     seasonId: gameState.season.id,
     teamId: team.teamId,
     team,
@@ -126,33 +116,20 @@ function buildOfferSkeleton(input: {
     globalParentUsage: input.globalParentUsage,
     forcePremiumElite: input.forcePremiumElite,
     specialMode: specialMode ?? "standard",
-    gameState,
-    usedSpecialFamilies: input.usedSpecialFamilies,
   });
   const isGolden = input.forcePremiumElite === true;
 
-  // Das Saison-Sonderziel kommt aus dem 14+6-Pool (staged, anteilige Auszahlung + Spotlight-Impuls in die
-  // Beliebtheit). Golden-Angebote bekommen ein Golden-Ziel, Challenge-Angebote behalten ihr Achsen-Rang-
-  // Sonderziel (eigenes UI-Panel), Standard-Angebote ziehen deterministisch ein passendes Bonusziel. Fällt
-  // der Pool aus, bleibt das Sonderziel der Markenvorlage stehen.
-  //
-  // NUR DIE ZWEI ZIELKARTEN TRAGEN UEBERHAUPT EIN SONDERZIEL. Sicherheit, Basis und Ambition sind reine
-  // Kurven-Entscheidungen; eine Sonderziel-Zeile mit 0,0 C waere dort ein totes Modul und genau die
-  // Anzeige, die das Settlement nie einloest.
-  const bonusObjectiveInput = {
-    gameState,
-    team,
-    identity,
-    profile,
-    rewardCash: 0,
-    rarity,
-    seasonId: gameState.season.id,
-    teamQualityRank,
-  };
-  const goalStrengthRank = teamQualityRank ?? 16;
-  let specialComponent: SponsorOfferComponent | null = card.goal
-    ? { ...special, rewardCash: 0, penaltyCash: undefined }
-    : null;
+  // DAS SONDERZIEL EINER KARTE IST DIE ACHSE — SONST NICHTS. Bis 2026-08 zog dieser Zweig zusaetzlich
+  // aus einem 27+6-Bonus-/Golden-Katalog (sponsor-special-objectives.ts, Katalog inzwischen entfernt).
+  // Das Audit (scripts/sponsor-ziele-audit.ts; 1024 gemessene Angebots-Komponenten ueber 8 Saison-Seeds
+  // x 32 Teams) zeigte: JEDE einzige Komponente war eine der fuenf Achsen, KEINE einzige ein Katalog-
+  // Ziel. Grund: `SPONSOR_V3_CARDS` fuehrt seit dem V4-Umbau nur noch `basis` (kein Ziel) und `achse`
+  // (Ziel = die Achse), und jede Achsenkarte traegt ihr `axisKey` — der Katalog-Zweig unten lief bei
+  // JEDER Angebotserzeugung durch und wurde sofort wieder verworfen. NUR DIE ACHSENKARTEN TRAGEN
+  // UEBERHAUPT EIN SONDERZIEL: die Basis-Karte (slotIndex 0) ist eine reine Kurven-Entscheidung; eine
+  // Sonderziel-Zeile mit 0,0 C waere dort ein totes Modul und genau die Anzeige, die das Settlement nie
+  // einloest.
+  let specialComponent: SponsorOfferComponent | null = null;
 
   // V4-ACHSENKARTE: die Zielkomponente ist die Achse selbst. Kein Katalogwurf, kein
   // Wahrscheinlichkeitsband — eine Achse misst den eigenen Zuwachs gegen die eigene Ausgangslage und
@@ -162,7 +139,6 @@ function buildOfferSkeleton(input: {
   if (input.axisKey) {
     const axisTerms = buildSponsorV4AxisTerms(gameState, team.teamId, input.axisKey);
     specialComponent = {
-      ...special,
       componentId: "axis-target",
       kind: "special",
       specialKey: sponsorV4AxisSpecialKey(input.axisKey),
@@ -172,42 +148,6 @@ function buildOfferSkeleton(input: {
       rewardCash: 0,
       penaltyCash: undefined,
     };
-  } else if (card.goal) {
-    if (isGolden) {
-      const goldenKey = pickGoldenObjective(gameState.season.id, team.teamId, archetype, teamQualityRank);
-      // Auch Golden-Ziele muessen im bepreisbaren Band liegen — sonst steht auf der Karte eine
-      // Praemie, die dieses Team praktisch nicht holen kann.
-      if (sponsorV3IsGoalOfferable(goldenKey, goalStrengthRank)) {
-        specialComponent = buildGoldenObjectiveComponent(goldenKey, bonusObjectiveInput);
-      }
-    }
-    if (specialComponent != null && specialComponent.specialKey == null) {
-      specialComponent = { ...special, rewardCash: 0, penaltyCash: undefined };
-    }
-    if (!isGolden && specialMode !== "challenge") {
-      const bonusKey = pickBonusObjective(
-        gameState.season.id,
-        team.teamId,
-        archetype,
-        slotIndex,
-        teamQualityRank,
-        input.usedSpecialFamilies,
-        gameState,
-        // KATALOG-FILTER (Entwurf 3B): angeboten wird nur, was fuer die Staerkeklasse DIESES Teams
-        // im Wahrscheinlichkeitsband [0,15, 0,72] liegt. "Top 8" fuer den Tabellenletzten faellt
-        // damit aus dem Katalog, statt wertlos herumzuliegen.
-        (key) => sponsorV3IsGoalOfferable(key, goalStrengthRank),
-      );
-      if (bonusKey) {
-        specialComponent = buildBonusObjectiveComponent(bonusKey, bonusObjectiveInput);
-      }
-    }
-    // Faellt das Ziel durch den Filter (Golden-Ziel ausserhalb des Bandes, Markenvorlage ohne Key),
-    // traegt die Karte keine Zielpraemie — sie ist dann eine reine Kurven-Karte und wird auch so
-    // bepreist. Lieber eine Karte weniger im Slate als eine unerfuellbare Praemie.
-    if (specialComponent != null && !sponsorV3IsGoalOfferable(specialComponent.specialKey, goalStrengthRank)) {
-      specialComponent = null;
-    }
   }
 
   const components: SponsorOfferComponent[] = [
@@ -324,9 +264,6 @@ export function buildSponsorOffersForTeam(input: {
         ] ?? goalSlotIndexes[0]!
       : -1;
 
-  // Slate-Anti-Wiederholung (Fable C3): über die Slots hinweg möglichst nur EIN Sonderziel je Familie.
-  const usedSpecialFamilies = new Set<string>();
-
   const built = slate.entries.map((entry, slotIndex) => {
     const offer = buildOfferSkeleton({
       gameState: input.gameState,
@@ -345,15 +282,9 @@ export function buildSponsorOffersForTeam(input: {
       globalParentUsage,
       teamQualityRank: qualityRank.qualityRank,
       specialMode: slotIndex === challengeSlotIndex ? "challenge" : "standard",
-      usedSpecialFamilies,
     });
     if (offer.sponsorParentBrandId) {
       usedParentBrandIds.push(offer.sponsorParentBrandId);
-    }
-    const specialKey = offer.components.find((component) => component.kind === "special")?.specialKey ?? null;
-    const family = sponsorObjectiveFamilyForKey(specialKey);
-    if (family) {
-      usedSpecialFamilies.add(family);
     }
     return offer;
   });
