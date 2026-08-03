@@ -7,6 +7,7 @@ import { CASH_PRIZE_BENCHMARK_ONLY } from "@/lib/season/cash-prize-benchmark-fla
 import { hasSeasonEndSponsorPayout } from "@/lib/season/season-end-sponsor-payout-status";
 import type { StandingsPreviewSource } from "@/lib/standings/standings-preview-engine";
 import { applySponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
+import { applyApronSettlement } from "@/lib/season/apron-settlement-service";
 import {
   applyFacilitySeasonEndFinance,
   hasFacilitySeasonEndFinanceApplied,
@@ -412,7 +413,32 @@ function writeLocalCashPrizeApply(input: {
         })
       : null;
 
-  input.persistence.saveSingleplayerState(save.saveId, settlement?.applied ? settlement.gameState : nextGameState);
+  /**
+   * APRON — NACH der Sponsor-Abrechnung und VOR der Kassenbuchung (dem `saveSingleplayerState`
+   * gleich darunter). Reihenfolge ist hier nicht kosmetisch: der Deckel des Apron braucht den
+   * rangabhaengigen Wertungsanteil, den `apronWertungsanteil` zwar unabhaengig vom Sponsorvertrag
+   * berechnet (siehe apron-service.ts) — er liest aber denselben, an dieser Stelle bereits
+   * finalen Endrang, den auch die Sponsor-Abrechnung gerade genutzt hat. Liefe der Apron vor der
+   * Sponsor-Abrechnung, gaebe es noch keinen Cash-Stand, gegen den GuV-Kriterien (siehe
+   * apron-service.ts Kopfkommentar) ueberhaupt Sinn ergeben.
+   */
+  const apronSettlement =
+    input.phase === "season_end"
+      ? applyApronSettlement({
+          gameState: settlement?.applied ? settlement.gameState : nextGameState,
+          saveId: save.saveId,
+          execute: true,
+        })
+      : null;
+
+  input.persistence.saveSingleplayerState(
+    save.saveId,
+    apronSettlement?.applied
+      ? apronSettlement.gameState
+      : settlement?.applied
+        ? settlement.gameState
+        : nextGameState,
+  );
 
   /**
    * GEBAEUDE GEHOEREN ZUR SAISONABRECHNUNG.

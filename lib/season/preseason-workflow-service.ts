@@ -30,6 +30,7 @@ import {
   regenerateSponsorOffersForSeason,
 } from "@/lib/sponsor/sponsor-offer-service";
 import { getSeasonSponsorCashTotal, previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
+import { ensureSeasonApronLinesFrozen } from "@/lib/season/apron-settlement-service";
 import type { PlayerGeneratorAttributeName, PlayerGeneratorAttributes } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 
@@ -750,9 +751,13 @@ function buildNextSeasonGameState(
         }),
       );
 
+  // Apron-Linien fuer die NEUE Saison einfrieren, unmittelbar nachdem `gamePhase` auf `season_active`
+  // geschaltet hat: das Transferfenster ist zu diesem Zeitpunkt bereits durchlaufen (dieser Workflow
+  // laeuft am Ende von `next_season_ready`), der Gehaltsstand, gegen den die Saison antritt, steht
+  // also fest. Idempotent — ein bereits vorhandener Snapshot fuer diese Saison bleibt unangetastet.
   return {
     auditLog,
-    gameState: nextGameState,
+    gameState: ensureSeasonApronLinesFrozen(nextGameState),
   };
 }
 

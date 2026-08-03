@@ -11,6 +11,7 @@ import { createNewGameFromPlayerBaseline } from "@/lib/players/player-baseline-s
 import { buildPlayerPotentialRecordsForSave } from "@/lib/progression/player-potential-service";
 import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
+import { ensureSeasonApronLinesFrozen } from "@/lib/season/apron-settlement-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService, PersistedSaveGame } from "@/lib/persistence/types";
 import { DEFAULT_ACTIVE_OWNER_ID, AI_OWNER_ID, applyChrisFrankyOwnershipToTeamControlSettings } from "@/lib/foundation/team-control-settings";
@@ -431,7 +432,9 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   // Save, waeren die Angebote nach altem Recht gebaut und der Save behauptete "V2" — Anzeige und
   // Abrechnung liefen auseinander. Der Vermerk bleibt danach fuer die gesamte Lebensdauer des
   // Spielstands stehen und traegt ihn auch ueber Saisonuebergaenge und Serverneustarts.
-  const baseGameStateWithSponsorSystem: GameState = stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers);
+  const baseGameStateWithSponsorSystem: GameState = ensureSeasonApronLinesFrozen(
+    stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers),
+  );
 
   // Seed sponsor offers up front so the "choose_sponsor" flow step (open by default, see
   // newGameFlow.steps above) always has real, selectable offers to show — otherwise the

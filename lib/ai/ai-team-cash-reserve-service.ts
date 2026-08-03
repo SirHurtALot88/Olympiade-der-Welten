@@ -1,5 +1,6 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import {
+  resolveApronTighteningMultiplier,
   resolveHoardTighteningMultiplier,
 } from "@/lib/ai/ai-cash-salary-target-service";
 import { previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-season-end-service";
@@ -112,6 +113,11 @@ export function resolveTeamCashRunwayReserve(
     gameState.season.id,
     cashSalaryRatio,
   );
+  // APRON: ein Team, das seine (ambitionsabhaengige) Apron-Decke bereits gerissen hat, haelt mehr
+  // Cash zurueck statt weiter draufzusatteln — reserve steigt, wenn apronTightening < 1 sinkt.
+  // Titelanwaerter (hohe Ambition) haben eine hoehere Decke und spueren die Bremse spaeter/gar
+  // nicht; ein Team darf die Linie trotzdem reissen (Multiplikator hat einen Boden bei 0,5, nie 0).
+  const apronTightening = resolveApronTighteningMultiplier(gameState, teamId);
   const facilityPreview = previewFacilitySeasonEndFinance(
     {
       saveId: "reserve-preview",
@@ -124,7 +130,7 @@ export function resolveTeamCashRunwayReserve(
     teamId,
   );
   const maintenancePad = round(Math.max(5, (facilityPreview.facilityUpkeepTotal ?? 0) * 0.5), 2);
-  let reserve = round(expectedSalary * hoardMultiplier * hoardTightening + maintenancePad, 2);
+  let reserve = round((expectedSalary * hoardMultiplier * hoardTightening) / apronTightening + maintenancePad, 2);
   const rosterCount = getTeamRosterCount(gameState, teamId);
   if (rosterCount < playerOpt) {
     reserve = round(Math.max(5, Math.min(reserve * 0.45, reserve - 10)), 2);
