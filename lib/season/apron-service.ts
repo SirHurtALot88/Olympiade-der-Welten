@@ -19,33 +19,34 @@
  * rechnen, sonst zeigt die Zeile eine Warnung, die der daneben stehende Betrag nicht erklärt. (2) sie
  * glättet gerade die Front-/Back-Loading-Spitzen weg, die sonst ein Team allein durch die zeitliche
  * Verteilung seiner Vertragsraten über oder unter die Linie schieben würden — der Apron soll echte
- * Mehrausgabe treffen, nicht Buchungstechnik. FOLGE, gemessen (siehe unten): ein Team KANN trotzdem
- * eine echte Vertragssumme weit über der Linie haben, während seine geglättete Zahl nur knapp
- * darüber liegt (Save-Beispiel Z-H: 97,7 echt gegen 83,3 geglättet) — DAS ist der Fall, gegen den die
- * Raten unten kalibriert sind, nicht der Regelfall.
+ * Mehrausgabe treffen, nicht Buchungstechnik. FOLGE, gemessen: ein Team KANN trotzdem eine echte
+ * Vertragssumme weit über der Linie haben, während seine geglättete Zahl nur knapp darüber liegt
+ * (Save-Beispiel Z-H: 97,7 echt gegen 83,3 geglättet).
  *
  * SAETZE UND LINIENFAKTOREN, GEMESSEN GEGEN DEN GESPIELTEN SAVE (nicht die ursprüngliche Vorgabe):
- * die Ausgangswerte (Raten 0,7 / 1,8 auf den Ueberschuss) stammen aus einer Rechnung gegen ein
- * AELTERES Sponsormodell. Gegen das AKTUELLE Modell (Sockel 18-48, Wertungstopf 1030, Boden 43 —
- * siehe sponsor-liga-leiter.ts) nachgerechnet (Save new-game-1785174792968-8d7mdx, 32 Teams,
- * Median-Gehalt [geglättet] 63,2) waeren SELBST die stark reduzierten 0,4/1,0 einer ersten
- * Nachmessung noch zu hoch gewesen: das Team Z-H (Rang 5, GuV vor Apron nur −1,4 — sein Gehalt ist
- * ECHT weit ueber der Linie, aber GEGLAETTET nur knapp drueber) waere bei f=1,24 auf −8,4 GuV
- * gedrueckt worden — mehr als die vom Reviewer gesetzte Grenze "keine ABGABE drueckt ein gesundes
- * Team (GuV vor Apron > −5) unter etwa −5". Die hier stehenden Raten (0,2 / 0,45) sind das Ergebnis
- * einer Rastersuche ueber Ratenpaare GEGEN GENAU DIESES KRITERIUM (Skript-Vorlage im PR): der
- * groesstmoegliche Topf, bei dem KEIN gesundes Team durch die Abgabe unter −5 GuV faellt (Z-H bleibt
- * bei −4,8..−5,0, je nach Salary Factor). Der Deckel (Haelfte des Wertungsanteils) GREIFT DABEI NIE —
- * bei den in diesem Save vorkommenden Rangverteilungen ist der Wertungsanteil selbst der Topteams
- * immer gross genug, dass die Abgabe darunter bleibt. Er ist damit eine Sicherung fuer einen
- * Randfall (ein Grossverdiener, der trotzdem auf einen schlechten Rang faellt), nicht der Hebel, der
- * die Hoehe der Abgabe im Alltag bestimmt — das sind ausschliesslich die beiden Raten hier. Miss NACH
- * JEDER Aenderung an Median-Gehalt, Wertungstopf oder Ligagroesse neu — die Raten sind ein
- * MESSERGEBNIS, kein Naturgesetz, und mit ihnen bleibt der Ausgleich je Empfaenger bewusst moderat
- * (rund 1,5 % der Fixkosten eines Empfaengers bei f=1,24 in diesem Save) statt spuerbar gross — DAS
- * ist der Preis dafuer, dass ein einzelnes fragiles Team (Z-H) nicht unter die Raeder kommt. Erlaubt
- * die Gehaltsverteilung einer kuenftigen Saison groessere Raten (kein Team so nah an −5 vor Apron),
- * gehoert das hierher neu gemessen und die Raten entsprechend angehoben.
+ * ENDGÜLTIGE ENTSCHEIDUNG (Nutzer, nach drei Kalibrierungsrunden — siehe scripts/apron-kalibrierung.ts
+ * und PR #368 für die vollständige Herleitung): die 2. Linie rückt von × 1,28 auf × 1,25 näher an die
+ * 1. Linie heran, die Sätze steigen von den ursprünglich vorgegebenen 0,7 / 1,8 auf 0,8 / 1,6. Eine
+ * erste Kalibrierungsrunde hatte gegen ein Kriterium "kein Team unter etwa −5 GuV" auf 0,2 / 0,45
+ * herabgerechnet — das Kriterium wurde ausdrücklich AUFGEHOBEN: ein Team, das die Liga um rund ein
+ * Drittel überzahlt, SOLL das im Ergebnis spüren — das ist der Sinn des Gummibands, keine
+ * Fehlkalibrierung. Eine zweite Runde (1,10 / 1,20 / 0,7 / 1,8) konzentrierte die Last zu stark auf
+ * die zwei Extremzahler (53 % des Topfes); die hier stehende Kombination — 2. Linie etwas weiter
+ * aussen (1,25 statt 1,20), dafür ein höherer erster Satz (0,8 statt 0,7) und ein niedrigerer zweiter
+ * (1,6 statt 1,8) — verlagert die Last von den Extremzahlern auf die breitere Gruppe: die
+ * Spitzenzahler geben je rund 3,5 weniger ab, die fünf mittleren Zahler je etwa 0,5 mehr, der Anteil
+ * der beiden größten Zahler am Topf fällt auf 47 %, der Topf selbst schrumpft dabei nur um 8 %. Die
+ * Abgabekurve wird flacher statt einem Sprung von 4 auf 20 zahlende Teams zu folgen.
+ *
+ * Gegen den gespielten Save (new-game-1785174792968-8d7mdx, Median [geglättet] 63,2, Linien
+ * 69,5 / 79,0) ergibt das bei f=1,00/1,10/1,24 einen Topf von 11,3 / 33,9 / 65,6 bei 12 von 32
+ * zahlenden Teams (nicht die halbe Liga) und einem Ausgleich von 0,6 / 1,7 / 3,3 je Empfänger (an 20
+ * Empfänger) — vollständig gegengerechnet mit `scripts/apron-kalibrierung.ts --guv-basis recorded`,
+ * das die AUFGEZEICHNETE Ist-GuV des Saves als Baseline nutzt (nicht eine Neuberechnung). Der Deckel
+ * (Hälfte des Wertungsanteils) GREIFT bei den in diesem Save vorkommenden Rangverteilungen NIE — er
+ * ist eine Sicherung für einen Randfall (Großverdiener stürzt trotzdem auf einen schlechten Rang),
+ * nicht der Hebel, der die Abgabenhöhe im Alltag bestimmt. Miss NACH JEDER Änderung an Median-Gehalt,
+ * Wertungstopf, Sockelfächer oder Ligagröße neu — die Werte sind ein MESSERGEBNIS, kein Naturgesetz.
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { SPONSOR_V3_REFERENCE_SALARY_PER_TEAM } from "@/lib/sponsor/sponsor-v3-offer-service";
@@ -58,12 +59,12 @@ export { SPONSOR_V3_REFERENCE_SALARY_PER_TEAM };
 
 /** 1. Apron-Linie = Median-Gehalt × diesen Faktor. */
 export const APRON_LINE_1_MEDIAN_FACTOR = 1.1;
-/** 2. Apron-Linie = Median-Gehalt × diesen Faktor. */
-export const APRON_LINE_2_MEDIAN_FACTOR = 1.28;
+/** 2. Apron-Linie = Median-Gehalt × diesen Faktor. Bewusst nah an der 1. Linie (siehe Kopfkommentar). */
+export const APRON_LINE_2_MEDIAN_FACTOR = 1.25;
 /** Satz auf den Gehaltsüberschuss ZWISCHEN 1. und 2. Linie. Gemessen, siehe Kopfkommentar. */
-export const APRON_RATE_ZONE_1 = 0.2;
+export const APRON_RATE_ZONE_1 = 0.8;
 /** Satz auf den Gehaltsüberschuss ÜBER der 2. Linie. Gemessen, siehe Kopfkommentar. */
-export const APRON_RATE_ZONE_2 = 0.45;
+export const APRON_RATE_ZONE_2 = 1.6;
 /** Deckel: höchstens dieser Anteil des rangabhängigen Sponsor-Wertungsanteils. */
 export const APRON_CAP_SHARE_OF_RANK_PAYOUT = 0.5;
 /** Konjunkturhebel: 0 bei salaryFactor <= diesem Wert. */

@@ -12,23 +12,28 @@
  * dieses Skript erfindet keine zweite Abgaben-Formel, es fuettert nur andere Parameter hinein.
  *
  * BEMESSUNGSGRUNDLAGE (Gehalt fuer Linien + Abgabe): geglaettet (`getTeamDisplaySalaryTotal`),
- * DIESELBE Zahl wie im ausgelieferten Code (siehe apron-service.ts Kopfkommentar). Die GuV-Spalten
- * rechnen dagegen mit der ECHTEN Gehaltssumme (`buildTeamSeasonOverviewRows().salaryTotal`), weil das
- * ist, was am Saisonende tatsaechlich vom Konto geht (`applySponsorSettlement`) — die beiden Zahlen
- * koennen bei front-/back-loaded Vertraegen weit auseinanderliegen (Save-Beispiel Z-H: 97,7 echt
- * gegen 83,3 geglaettet), und genau das ist der Grund, warum die Sponsor-Projektion vor Apron
- * (Sockel + Wertungsanteil, OHNE Kurven-Tilt — der Erwartungswert jeder der 11 Kurvenformen) und die
- * ECHTE Gehaltssumme fuer die GuV kombiniert werden, nicht die geglaettete.
+ * DIESELBE Zahl wie im ausgelieferten Code (siehe apron-service.ts Kopfkommentar).
+ *
+ * GUV-BASIS (--guv-basis): "recorded" (Default) liest die AUFGEZEICHNETE Ist-GuV dieser Saison aus
+ * `seasonState.standings[teamId].guv` — das echte, bereits abgerechnete Ergebnis des Saves, nicht
+ * irgendeine Neuberechnung. "projected" rechnet stattdessen eine neutrale V3-Projektion (Sockel +
+ * Wertungsanteil, ohne Kurven-Tilt) minus der ECHTEN Gehaltssumme — nur als Fallback fuer Saves ohne
+ * aufgezeichnete GuV. Die beiden Basen koennen abweichen (aufgezeichnete GuV traegt reale
+ * Sponsor-Auszahlungen des damaligen Modells; die Projektion ist eine Naeherung mit dem AKTUELLEN
+ * Modell) — bei Meinungsverschiedenheiten ist "recorded" die verbindliche Zahl.
  *
  * REPRODUZIERBARKEITS-DIAGNOSE (--diagnose): rechnet dieselbe Frage zusaetzlich mit der ECHTEN statt
  * der geglaetteten Gehaltssumme fuer Linien+Abgabe durch — das war die Quelle der ersten
  * Diskrepanz in der PR-Review (Topf 51,7 vs. 18,3 bei angeblich denselben Eingangsgroessen).
  *
+ * --detail druckt zusaetzlich die volle Zahler-Liste (absteigend nach Abgabe, mit GuV vorher/nachher)
+ * und die untere-N-Liste mit GuV vorher/nachher (statt nur Deckung %) — die Rohdaten fuer den PR-Text.
+ *
  * Aufruf:
  *   OLY_APP_SQLITE_PATH=<pfad> npx tsx scripts/apron-kalibrierung.ts --save <id> \
  *     [--sockel-min 18] [--sockel-max 48] [--wertungstopf 1030] [--wertung-kurve 1.35] \
- *     [--linie1 1.10] [--linie2 1.28] [--capshare 0.5] [--untere 8] \
- *     [--raten "0.4:1.0,0.7:1.8,1.2:3.0,1.8:4.5"] [--f "0.82,0.95,1.00,1.10,1.24"] [--diagnose]
+ *     [--linie1 1.10] [--linie2 1.25] [--capshare 0.5] [--untere 8] [--guv-basis recorded] \
+ *     [--raten "0.8:1.6"] [--f "0.82,0.95,1.00,1.10,1.24"] [--diagnose] [--detail]
  */
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
@@ -53,10 +58,11 @@ const SOCKEL_MAX = argNum("--sockel-max", 48);
 const WERTUNGSTOPF = argNum("--wertungstopf", 1030);
 const WERTUNG_KURVE = argNum("--wertung-kurve", 1.35);
 const LINIE1_FAKTOR = argNum("--linie1", 1.1);
-const LINIE2_FAKTOR = argNum("--linie2", 1.28);
+const LINIE2_FAKTOR = argNum("--linie2", 1.25);
 const CAP_SHARE = argNum("--capshare", 0.5);
 const UNTERE_N = Math.round(argNum("--untere", 8));
-const RATEN = argWert("--raten", "0.4:1.0,0.7:1.8,1.2:3.0,1.8:4.5")
+const GUV_BASIS = argWert("--guv-basis", "recorded") === "projected" ? "projected" : "recorded";
+const RATEN = argWert("--raten", "0.8:1.6")
   .split(",")
   .map((paar) => {
     const [r1, r2] = paar.split(":").map(Number);
@@ -66,6 +72,7 @@ const SALARY_FACTORS = argWert("--f", "0.82,0.95,1.00,1.10,1.24")
   .split(",")
   .map(Number);
 const DIAGNOSE = argFlag("--diagnose");
+const DETAIL = argFlag("--detail");
 
 if (!SAVE_ID) {
   console.error("Aufruf: npx tsx scripts/apron-kalibrierung.ts --save <id> [Optionen]");
@@ -109,6 +116,7 @@ type TeamRow = {
   displaySalary: number;
   realSalary: number;
   fixedCost: number;
+  recordedGuv: number | null;
 };
 
 function loadTeams(gameState: GameState): TeamRow[] {
@@ -116,7 +124,7 @@ function loadTeams(gameState: GameState): TeamRow[] {
   const standings = gameState.seasonState.standings ?? {};
   return gameState.teams.map((team) => {
     const overview = overviewRows.find((row) => row.teamId === team.teamId);
-    const standing = standings[team.teamId] as { startplatz?: number } | undefined;
+    const standing = standings[team.teamId] as { startplatz?: number; guv?: number } | undefined;
     const finalRank = overview?.rank ?? LEAGUE_SIZE;
     const startRank = standing?.startplatz ?? finalRank;
     const displaySalary = getTeamDisplaySalaryTotal(gameState, team.teamId);
@@ -130,8 +138,17 @@ function loadTeams(gameState: GameState): TeamRow[] {
       displaySalary,
       realSalary,
       fixedCost: displaySalary + upkeep,
+      recordedGuv: typeof standing?.guv === "number" && Number.isFinite(standing.guv) ? standing.guv : null,
     };
   });
+}
+
+function guvVorApron(team: TeamRow, f: number): number {
+  if (GUV_BASIS === "recorded" && team.recordedGuv != null) {
+    return team.recordedGuv;
+  }
+  const sponsorProjection = sockelFuerStartrang(team.startRank) + wertungsanteilFuerEndrang(team.finalRank, f);
+  return sponsorProjection - team.realSalary;
 }
 
 type ZeileErgebnis = {
@@ -139,7 +156,8 @@ type ZeileErgebnis = {
   ausgleichProEmpfaenger: number;
   zahlerCount: number;
   minGuvNach: number;
-  untereN: { shortCode: string; finalRank: number; deckungPct: number | null }[];
+  untereN: { shortCode: string; finalRank: number; guvVor: number; guvNach: number; deckungPct: number | null }[];
+  zahler: { shortCode: string; finalRank: number; abgabe: number; guvVor: number; guvNach: number }[];
 };
 
 /**
@@ -176,8 +194,7 @@ function rechneZeile(
   const rowById = new Map(settlement.rows.map((row) => [row.teamId, row] as const));
   const guvNachByTeamId = new Map<string, number>();
   for (const team of teams) {
-    const sponsorProjection = sockelFuerStartrang(team.startRank) + wertungsanteilFuerEndrang(team.finalRank, f);
-    const guvVor = sponsorProjection - team.realSalary;
+    const guvVor = guvVorApron(team, f);
     const nettoDelta = rowById.get(team.teamId)?.nettoDelta ?? 0;
     guvNachByTeamId.set(team.teamId, r1(guvVor + nettoDelta));
   }
@@ -191,12 +208,29 @@ function rechneZeile(
     .slice(0, UNTERE_N)
     .sort((a, b) => a.finalRank - b.finalRank)
     .map((team) => {
+      const guvVor = guvVorApron(team, f);
       const sponsorProjection = sockelFuerStartrang(team.startRank) + wertungsanteilFuerEndrang(team.finalRank, f);
       const nettoDelta = rowById.get(team.teamId)?.nettoDelta ?? 0;
       const cashMitApron = sponsorProjection + nettoDelta;
       const deckungPct = team.fixedCost > 0 ? Math.round((cashMitApron / team.fixedCost) * 100) : null;
-      return { shortCode: team.shortCode, finalRank: team.finalRank, deckungPct };
+      return { shortCode: team.shortCode, finalRank: team.finalRank, guvVor: r1(guvVor), guvNach: r1(guvVor + nettoDelta), deckungPct };
     });
+
+  const zahler = teams
+    .map((team) => ({ team, row: rowById.get(team.teamId) }))
+    .filter((entry) => (entry.row?.abgabe ?? 0) > 0.001)
+    .map((entry) => {
+      const guvVor = guvVorApron(entry.team, f);
+      const nettoDelta = entry.row!.nettoDelta;
+      return {
+        shortCode: entry.team.shortCode,
+        finalRank: entry.team.finalRank,
+        abgabe: r1(entry.row!.abgabe),
+        guvVor: r1(guvVor),
+        guvNach: r1(guvVor + nettoDelta),
+      };
+    })
+    .sort((a, b) => b.abgabe - a.abgabe);
 
   return {
     topf: r1(settlement.topf),
@@ -204,6 +238,7 @@ function rechneZeile(
     zahlerCount: settlement.zahlerCount,
     minGuvNach,
     untereN,
+    zahler,
   };
 }
 
@@ -222,7 +257,7 @@ function main() {
 
   console.log(`Save: ${SAVE_ID}  (${teams.length} Teams)`);
   console.log(
-    `Parameter: Sockel ${SOCKEL_MIN}-${SOCKEL_MAX} · Wertungstopf ${WERTUNGSTOPF} · Kurve ${WERTUNG_KURVE} · Linienfaktoren ${LINIE1_FAKTOR}/${LINIE2_FAKTOR} · Deckel ${CAP_SHARE} · untere ${UNTERE_N}`,
+    `Parameter: Sockel ${SOCKEL_MIN}-${SOCKEL_MAX} · Wertungstopf ${WERTUNGSTOPF} · Kurve ${WERTUNG_KURVE} · Linienfaktoren ${LINIE1_FAKTOR}/${LINIE2_FAKTOR} · Deckel ${CAP_SHARE} · untere ${UNTERE_N} · GuV-Basis ${GUV_BASIS}`,
   );
   console.log(
     `Median-Gehalt geglaettet (Produktivstand) ${medianSalaryDisplay.toFixed(1)} -> Linien ${(medianSalaryDisplay * LINIE1_FAKTOR).toFixed(1)} / ${(medianSalaryDisplay * LINIE2_FAKTOR).toFixed(1)}`,
@@ -240,15 +275,27 @@ function main() {
     console.log(`=== Bemessungsgrundlage: ${basis === "display" ? "GEGLAETTET (Produktivstand)" : "ECHT (nur Diagnose)"} ===`);
     for (const { r1: r1rate, r2: r2rate } of RATEN) {
       console.log(`\n--- Saetze ${r1rate}/${r2rate} ---`);
-      console.log("f      Topf   Ausgleich  Zahler  minGuvNach  untere-" + UNTERE_N + "-Deckung(%)");
+      console.log("f      Hebel  Topf   Ausgleich  Zahler  minGuvNach");
       for (const f of SALARY_FACTORS) {
         const ergebnis = rechneZeile(teams, medianSalaryDisplay, medianSalaryReal, r1rate, r2rate, f, basis);
-        const deckungText = ergebnis.untereN
-          .map((row) => `${row.shortCode}:${row.deckungPct ?? "-"}`)
-          .join(" ");
+        const hebel = Math.max(0, Math.min(1, (f - 0.95) / (1.24 - 0.95)));
         console.log(
-          `${f.toFixed(2).padStart(5)}  ${ergebnis.topf.toFixed(1).padStart(6)}  ${ergebnis.ausgleichProEmpfaenger.toFixed(2).padStart(9)}  ${String(ergebnis.zahlerCount).padStart(6)}  ${ergebnis.minGuvNach.toFixed(1).padStart(10)}  ${deckungText}`,
+          `${f.toFixed(2).padStart(5)}  ${hebel.toFixed(2)}  ${ergebnis.topf.toFixed(1).padStart(6)}  ${ergebnis.ausgleichProEmpfaenger.toFixed(2).padStart(9)}  ${String(ergebnis.zahlerCount).padStart(6)}  ${ergebnis.minGuvNach.toFixed(1).padStart(10)}`,
         );
+        if (DETAIL) {
+          console.log(
+            "    Zahler (abgabe, guvVor->guvNach): " +
+              ergebnis.zahler
+                .map((z) => `${z.shortCode}(FR${z.finalRank}) ${z.abgabe.toFixed(1)} [${z.guvVor.toFixed(1)}->${z.guvNach.toFixed(1)}]`)
+                .join(" · "),
+          );
+          console.log(
+            `    Untere ${UNTERE_N} (Rang, guvVor->guvNach, Deckung%): ` +
+              ergebnis.untereN
+                .map((u) => `${u.shortCode}(#${u.finalRank}) ${u.guvVor.toFixed(1)}->${u.guvNach.toFixed(1)} (${u.deckungPct ?? "-"}%)`)
+                .join(" · "),
+          );
+        }
       }
     }
     console.log("");
