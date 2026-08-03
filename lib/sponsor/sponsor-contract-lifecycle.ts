@@ -1,4 +1,10 @@
-import type { GameState, TeamSponsorContract } from "@/lib/data/olyDataTypes";
+import type { GameState, SponsorTermSeasons, TeamSponsorContract } from "@/lib/data/olyDataTypes";
+import {
+  getSponsorV3SalaryFactor,
+  getSponsorV3Terms,
+  rerollSponsorV3TermsForNewSeason,
+  sponsorV3GuaranteedLadder,
+} from "@/lib/sponsor/sponsor-v3-offer-service";
 
 const BRAND_HISTORY_LIMIT = 4;
 
@@ -66,12 +72,43 @@ export function advanceSponsorContractsForNewSeason(gameState: GameState, nextSe
       continue;
     }
 
+    // MEHRJAHRESVERTRAG ROLLT (Umsetzungsplan D): eingefrorener Startrang + eingefrorene Kurvenform
+    // bleiben stehen, aber der Salary Factor der NEUEN Saison und die Rendite-Erosion des ERREICHTEN
+    // Vertragsjahres muessen neu einfliessen — sonst zahlt ein in einem starken Jahr unterschriebener
+    // Mehrjahresvertrag ueber seine ganze Laufzeit auf dem eingefrorenen Konjunktur-Niveau weiter (die
+    // Luecke, die die Kopplung an den Salary Factor schliessen soll). `gameState` traegt an dieser
+    // Stelle bereits das `seasonEconomyFactors`-Fenster der neuen Saison (siehe Aufrufer in
+    // preseason-workflow-service.ts) — `getSponsorV3SalaryFactor` liest daraus den neuen Faktor.
+    //
+    // ALTVERTRAEGE: `rerollSponsorV3TermsForNewSeason` gibt ohne `curveShape` (Vertraege aus der Zeit
+    // vor dem Ligaleiter-Umbau) die eingefrorene Leiter unveraendert zurueck — kein Wurf, kein Absturz.
+    const newRemaining = remaining - 1;
+    const terms = getSponsorV3Terms(contract);
+    const termSeasons: SponsorTermSeasons = contract.termSeasons ?? ((remaining <= 3 ? remaining : 3) as SponsorTermSeasons);
+    const contractYear = Math.max(1, Math.min(3, termSeasons - newRemaining + 1)) as SponsorTermSeasons;
+    const rerolledTerms = terms
+      ? rerollSponsorV3TermsForNewSeason(terms, {
+          newSalaryFactor: getSponsorV3SalaryFactor(gameState),
+          contractYear,
+        })
+      : null;
+
     const rolledContract: TeamSponsorContract = {
       ...contract,
       seasonId: nextSeasonId,
-      seasonsRemaining: remaining - 1,
+      seasonsRemaining: newRemaining,
       payouts: {},
       chosenAt: contract.chosenAt,
+      ...(rerolledTerms
+        ? {
+            sponsorV3: rerolledTerms,
+            // Anzeige == Settlement: die league-detail-Drilldown liest diese Leiter direkt
+            // (FoundationSponsorsNewLook.tsx), die Settlement-Rechnung `contract.sponsorV3` — ohne
+            // diesen Nachtrag zeigte der Drilldown die eingefrorene Jahr-1-Leiter weiter, waehrend das
+            // Settlement bereits aus der neu gebauten, erodierten Leiter zahlt.
+            lockedRankPayoutLadder: sponsorV3GuaranteedLadder(rerolledTerms),
+          }
+        : {}),
     };
     contracts[team.teamId] = rolledContract;
     offers[team.teamId] = [];

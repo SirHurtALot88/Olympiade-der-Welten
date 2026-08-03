@@ -59,6 +59,15 @@
       "datum": "2026-08-03",
       "seite": "Verein · Sponsoren",
       "pr": null,
+      "text": "Sponsor-Angebote laufen jetzt teils über mehrere Saisons: der Sockel steht beim Unterschreiben fest, der Wertungsanteil richtet sich weiter jede Saison neu nach der Konjunktur — und ein Mehrjahresvertrag zahlt dafür spürbar weniger als die gleiche Zahl Einjahresverträge hintereinander. Die Karte zeigt Laufzeit, Bedingung und einen Ausblick über jede Saison der Laufzeit.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-03",
+      "seite": "Verein · Sponsoren",
+      "pr": null,
       "text": "Sponsoren zahlen nicht mehr alle dieselbe Kurve: der Betrag setzt sich jetzt aus einem festen Sockel nach Startrang und einem Wertungstopf nach Endrang zusammen, und die Kurvenform der Karte entscheidet, wo auf der Tabelle dieses Geld liegt — bei gleichem Erwartungswert.",
       "quelle": "gepflegt",
       "gewicht": "grundlegend",

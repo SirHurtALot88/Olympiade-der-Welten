@@ -31,6 +31,8 @@ import {
   getCurrentSponsorSalaryFactor,
 } from "@/lib/sponsor/sponsor-economy-calibration";
 import { SPONSOR_RARITIES } from "@/lib/sponsor/sponsor-curve-shapes";
+import { sponsorSockelFuerStartrang } from "@/lib/sponsor/sponsor-liga-leiter";
+import { getSponsorTermMultiplier } from "@/lib/sponsor/sponsor-negotiation";
 import { applySpotlightPerkToComponents, buildSponsorOfferModuleIds } from "@/lib/sponsor/sponsor-modules";
 import {
   mapSponsorCardToArchetype,
@@ -91,6 +93,8 @@ function buildOfferSkeleton(input: {
   axisKey?: SponsorV4AxisKey | null;
   /** WO auf der Sponsor-Ligaleiter dieses Angebot sein Geld hat (sponsor-liga-leiter.ts). */
   curveShape: SponsorCurveShape;
+  /** Vertragslaufzeit dieses Angebots (Umsetzungsplan D) — aus dem Slate-Wurf, siehe sponsor-tier-pool.ts. */
+  termSeasons: SponsorTermSeasons;
   rarity: SponsorRarity;
   commercialRating: number;
   slotIndex: number;
@@ -186,6 +190,7 @@ function buildOfferSkeleton(input: {
     // Geld hat. Der Doku-Kommentar am Typ selbst ("NUR NOCH LESEN") gilt damit nur noch fuer die
     // Spielstaende von VOR diesem Umbau.
     curveShape: input.curveShape,
+    termSeasons: input.termSeasons,
     rarity,
     name: parent.name,
     flavor: input.forcePremiumElite ? `★ Golden Card · ${brand.flavor}` : brand.flavor,
@@ -277,6 +282,7 @@ export function buildSponsorOffersForTeam(input: {
       cardKey: entry.cardKey,
       axisKey: entry.axisKey ?? null,
       curveShape: entry.curveShape,
+      termSeasons: entry.termSeasons,
       rarity: entry.rarity,
       commercialRating: commercialRating.score,
       slotIndex,
@@ -417,6 +423,13 @@ export function chooseSponsorOffer(input: {
   teamId: string;
   offerId: string;
   saveId?: string;
+  /**
+   * @deprecated wird IGNORIERT. Umsetzungsplan D: die Laufzeit ist keine Wahl beim Unterschreiben mehr,
+   * sondern steht bereits am gewaehlten ANGEBOT (`offer.termSeasons`, gewuerfelt im Slate — siehe
+   * `rollSponsorOfferSlate` in sponsor-tier-pool.ts). Ein Aufrufer waehlt die Laufzeit also implizit
+   * durch die Wahl DES Angebots, nicht durch dieses Feld. Bleibt nur fuer Rueckwaertskompatibilitaet
+   * bestehender Aufrufer (z. B. `app/api/sponsor/choose/route.ts`) im Typ stehen.
+   */
   termSeasons?: SponsorTermSeasons;
 }): { gameState: GameState; contract: TeamSponsorContract | null; error?: string } {
   // Audit R2/A2: Server-Guard gegen Re-Sign. Ohne diesen Guard konnte ein zweiter POST /api/sponsor/choose
@@ -432,7 +445,10 @@ export function chooseSponsorOffer(input: {
     return { gameState: input.gameState, contract: null, error: "sponsor_offer_not_found" };
   }
 
-  const termSeasons: SponsorTermSeasons = 1;
+  // Laufzeit steht am Angebot, nicht mehr an einer Konstante — siehe Deprecation-Kommentar oben.
+  // Fallback 1 nur fuer Alt-Angebote aus Spielstaenden von vor diesem Umbau (`offer.termSeasons`
+  // fehlt dort).
+  const termSeasons: SponsorTermSeasons = offer.termSeasons ?? 1;
 
   const rows = buildTeamSeasonOverviewRows({ gameState: input.gameState });
   const row = rows.find((entry) => entry.teamId === input.teamId) ?? null;
@@ -659,6 +675,28 @@ const SPONSOR_AI_CURVE_FIT_SIGMA = 2.5;
 const SPONSOR_AI_CURVE_FIT_WEIGHT = 3;
 
 /**
+ * LAUFZEIT-TERM (Umsetzungsplan D, Messpunkt 5): `scoreOfferForAi` kannte `termSeasons` bisher gar
+ * nicht — bei einer Erosion, die Mehrjahresvertraege systematisch schlechter macht als eine passende
+ * Folge von Einjahresvertraegen (siehe TERM_MULTIPLIERS-Kommentar in sponsor-negotiation.ts), waehlte
+ * die KI einen erodierten Mehrjahresvertrag also GENAUSO oft wie einen gleichwertigen Einjaehrigen —
+ * ein systematischer Selbstschaden.
+ *
+ * Der Term rechnet in echten Cash-Einheiten (Gewicht 1, keine Skalierung noetig): erwarteter
+ * Erosionsverlust ueber die Restlaufzeit (Jahre 2..termSeasons, Multiplikator jeweils < 1 auf den
+ * Wertungsanteil `terms.anchor − Sockel`) MINUS ein kleiner Versicherungswert fuer den eingefrorenen
+ * Sockel (er schuetzt vor einem schwachen Slate/Formtief in den Folgesaisons — genau das, was
+ * `SPONSOR_AI_TERM_INSURANCE_SHARE` bepreist). Ein Einjahresvertrag (`termSeasons == 1`) bleibt
+ * unveraendert bei 0 — dieselbe Logik wie bei den anderen bedingten Termen oben.
+ *
+ * GEMESSEN (tests/sponsor-laufzeit-ki-wahl.test.ts, 8 unabhaengige Ligen x 32 Teams): ein zunaechst
+ * versuchter Anteil von 0.15 drehte das Vorzeichen — die Versicherung ueberwog die Erosion vor allem
+ * bei Teams mit hohem Sockel (Tabellenende), die KI wählte Mehrjahresvertraege dadurch HAEUFIGER
+ * (61,8 % statt der angebotenen 42,9 %) statt seltener. Bei 0.02 waehlt sie sie in 31,6 % der Faelle —
+ * spuerbar UNTER den angebotenen 42,9 %.
+ */
+const SPONSOR_AI_TERM_INSURANCE_SHARE = 0.02;
+
+/**
  * GEWICHT DES ECO-DOWNSIDE-TERMS. Kalibriert an `eco-messung.ts` (6 Seeds x 32 Teams) UND an
  * `tests/sponsor-v4-ki-wahl.test.ts` ("greift bei Geldnot zum Vorschuss": alle 32 Teams auf Kasse −30,
  * Schwelle: > 8 von 32 muessen trotzdem die Vorschuss-Karte nehmen) — nicht am Gefuehl.
@@ -819,6 +857,20 @@ function scoreOfferForAi(input: {
     const fitWeights = sponsorV3AnchorWeights(targetRank, SPONSOR_AI_CURVE_FIT_SIGMA);
     const fitValue = terms.baseLadder.reduce((sum, value, index) => sum + value * (fitWeights[index] ?? 0), 0);
     score += (fitValue - terms.anchor) * SPONSOR_AI_CURVE_FIT_WEIGHT;
+  }
+
+  // LAUFZEIT-TERM (siehe SPONSOR_AI_TERM_INSURANCE_SHARE oben): erwarteter Erosionsverlust ueber die
+  // Restlaufzeit gegen einen kleinen Versicherungswert fuer den eingefrorenen Sockel aufgewogen.
+  if (terms && offer.termSeasons != null && offer.termSeasons > 1) {
+    const sockel = sponsorSockelFuerStartrang(terms.startRank);
+    const wertungsanteil = Math.max(0, terms.anchor - sockel);
+    let erosionLoss = 0;
+    for (let year = 2; year <= offer.termSeasons; year += 1) {
+      const contractYear = Math.max(1, Math.min(3, year)) as 1 | 2 | 3;
+      erosionLoss += (1 - getSponsorTermMultiplier(contractYear)) * wertungsanteil;
+    }
+    const insuranceValue = SPONSOR_AI_TERM_INSURANCE_SHARE * sockel * (offer.termSeasons - 1);
+    score += insuranceValue - erosionLoss;
   }
 
   // Der Vorschuss ist fuer ein klammes Team echtes Geld zur richtigen Zeit und fuer ein reiches nur

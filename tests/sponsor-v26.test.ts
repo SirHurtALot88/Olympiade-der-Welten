@@ -150,19 +150,21 @@ describe("sponsor tier pool v2.6", () => {
   it("signs a contract using the offer components unchanged (negotiation axis removed)", () => {
     const base = baseGameState();
     const offers = buildSponsorOffersForTeam({ gameState: base, teamId: "M-M" });
+    // Umsetzungsplan D: `chooseSponsorOffer` liest die Laufzeit aus dem Angebot, nicht mehr aus dem
+    // (jetzt ignorierten) `termSeasons`-Aufrufparameter — das Angebot wird hier auf 1 Saison gezwungen,
+    // damit dieser Test unabhaengig vom Slate-Wurf bleibt (der ist Gegenstand von sponsor-tier-pool.test.ts).
+    const offer = { ...offers[0]!, termSeasons: 1 as const };
     const withOffers: GameState = {
       ...base,
       seasonState: {
         ...base.seasonState,
-        sponsorOffersByTeamId: { "M-M": offers },
+        sponsorOffersByTeamId: { "M-M": [offer, ...offers.slice(1)] },
       },
     };
-    const offer = offers[0]!;
     const result = chooseSponsorOffer({
       gameState: withOffers,
       teamId: "M-M",
       offerId: offer.offerId,
-      termSeasons: 1,
     });
     const contract = result.contract;
     expect(contract?.termSeasons).toBe(1);
@@ -181,18 +183,18 @@ describe("sponsor tier pool v2.6", () => {
   it("carries single-season contracts only until season advance", () => {
     const base = baseGameState();
     const offers = buildSponsorOffersForTeam({ gameState: base, teamId: "M-M" });
+    const offer = { ...offers[0]!, termSeasons: 1 as const };
     const withOffers: GameState = {
       ...base,
       seasonState: {
         ...base.seasonState,
-        sponsorOffersByTeamId: { "M-M": offers },
+        sponsorOffersByTeamId: { "M-M": [offer, ...offers.slice(1)] },
       },
     };
     const signed = chooseSponsorOffer({
       gameState: withOffers,
       teamId: "M-M",
-      offerId: offers[0]!.offerId,
-      termSeasons: 3,
+      offerId: offer.offerId,
     }).gameState;
     const advanced = advanceSponsorContractsForNewSeason(
       {
@@ -203,5 +205,66 @@ describe("sponsor tier pool v2.6", () => {
     );
     const contract = getTeamSponsorContract(advanced, "M-M");
     expect(contract).toBeNull();
+  });
+
+  it("carries multi-season contracts through season advance and rebuilds the ladder for the new salary factor", () => {
+    // Umsetzungsplan D: die Laufzeit kommt aus dem Angebot (hier auf 3 Saisons gezwungen), und ein
+    // Vertrag mit seasonsRemaining > 1 muss den Advance UEBERLEBEN (statt geloescht zu werden) UND
+    // seine `sponsorV3`-Leiter mit dem SalaryFactor der neuen Saison neu bauen (Kopplung an die
+    // Konjunktur, siehe sponsor-v3-offer-service.ts::rerollSponsorV3TermsForNewSeason).
+    const base = baseGameState();
+    const offers = buildSponsorOffersForTeam({ gameState: base, teamId: "M-M" });
+    const offer = { ...offers[0]!, termSeasons: 3 as const };
+    const withOffers: GameState = {
+      ...base,
+      seasonState: {
+        ...base.seasonState,
+        sponsorOffersByTeamId: { "M-M": [offer, ...offers.slice(1)] },
+      },
+    };
+    const signed = chooseSponsorOffer({
+      gameState: withOffers,
+      teamId: "M-M",
+      offerId: offer.offerId,
+    }).gameState;
+    const signedContract = getTeamSponsorContract(signed, "M-M");
+    expect(signedContract?.termSeasons).toBe(3);
+    expect(signedContract?.seasonsRemaining).toBe(3);
+
+    // Ein neuer, DEUTLICH anderer Salary Factor fuer die Folgesaison — muss sich in der neu gebauten
+    // Leiter niederschlagen, NICHT im eingefrorenen Sockel.
+    const nextFactor = (signedContract?.salaryFactorAtSign ?? 1) > 1 ? 0.82 : 1.24;
+    const advanced = advanceSponsorContractsForNewSeason(
+      {
+        ...signed,
+        season: { ...signed.season, id: "season-3" },
+        seasonState: {
+          ...signed.seasonState,
+          seasonEconomyFactors: [{
+            seasonId: "season-3",
+            seasonLabel: "Aktuell",
+            horizonIndex: 0,
+            factor: nextFactor,
+            source: "rolled",
+            rollSeed: null,
+            carriedFromSeasonId: null,
+            generatedAt: new Date().toISOString(),
+          }],
+        },
+      },
+      "season-3",
+    );
+    const rolled = getTeamSponsorContract(advanced, "M-M");
+    expect(rolled).not.toBeNull();
+    expect(rolled?.termSeasons).toBe(3);
+    expect(rolled?.seasonsRemaining).toBe(2);
+    expect(rolled?.startRank).toBe(signedContract?.startRank);
+    // Der eingefrorene Startrang (und damit der daraus abgeleitete Sockel, siehe
+    // tests/sponsor-laufzeit-rollover.test.ts fuer den direkten Sockel-Beweis) bleibt beim Rollen
+    // unangetastet.
+    expect(rolled?.sponsorV3?.startRank).toBe(signedContract?.sponsorV3?.startRank);
+    // Salary Factor der neu gebauten Leiter ist der NEUE, nicht mehr der bei Unterschrift eingefrorene.
+    expect(rolled?.sponsorV3?.salaryFactor).toBeCloseTo(nextFactor, 5);
+    expect(rolled?.sponsorV3?.salaryFactor).not.toBeCloseTo(signedContract?.sponsorV3?.salaryFactor ?? -1, 5);
   });
 });

@@ -54097,6 +54097,46 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
+/* Laufzeit-Ausblick (Umsetzungsplan D): Bedingungssatz + Ausblick je Vertragssaison bei
+   Mehrjahresangeboten. Eigener, dezenter Block statt Farbe als einzigem Signal — die Konjunktur-
+   Bedingung steht als Fließtext, der Ausblick als Liste mit Zahl je Saison. */
+.is-new-look .nl-sponsor-term-outlook {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+  padding: var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px dashed var(--nl-line-2);
+  background: var(--nl-panel-2);
+  font-size: 12px;
+}
+
+.is-new-look .nl-sponsor-term-condition {
+  margin: 0;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-sponsor-term-outlook-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.is-new-look .nl-sponsor-term-outlook-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+  align-items: baseline;
+}
+
+.is-new-look .nl-sponsor-term-outlook-row em {
+  color: var(--nl-mut);
+  font-style: normal;
+}
+
 .is-new-look .nl-sponsor-challenge {
   display: flex;
   flex-direction: column;
