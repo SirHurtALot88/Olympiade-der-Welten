@@ -225,15 +225,28 @@ export function computeApronSettlement(input: {
   lines: Pick<ApronLines, "line1" | "line2">;
   salaryFactor: number;
   teams: readonly ApronTeamInput[];
+  /**
+   * Überschreibt die Sätze/den Deckelanteil für DIESEN Aufruf — ausschließlich für Kalibrierung
+   * (siehe scripts/apron-kalibrierung.ts), die Ratenpaare gegeneinander messen muss, ohne die
+   * Modul-Konstanten (und damit die echte Abrechnung) anzufassen. Default: die aktuellen,
+   * gemessenen Modul-Konstanten — jeder andere Aufrufer lässt diese Felder weg und bekommt exakt
+   * das bisherige Verhalten.
+   */
+  rateZone1?: number;
+  rateZone2?: number;
+  capShareOfRankPayout?: number;
 }): ApronSettlement {
   const { line1, line2 } = input.lines;
   const k = apronKonjunkturhebel(input.salaryFactor);
+  const rateZone1 = input.rateZone1 ?? APRON_RATE_ZONE_1;
+  const rateZone2 = input.rateZone2 ?? APRON_RATE_ZONE_2;
+  const capShareOfRankPayout = input.capShareOfRankPayout ?? APRON_CAP_SHARE_OF_RANK_PAYOUT;
 
   const partial = input.teams.map((team) => {
     const ueberLinie1 = Math.max(0, Math.min(team.salary, line2) - line1);
     const ueberLinie2 = Math.max(0, team.salary - line2);
-    const rohAbgabe = (ueberLinie1 * APRON_RATE_ZONE_1 + ueberLinie2 * APRON_RATE_ZONE_2) * k;
-    const deckel = APRON_CAP_SHARE_OF_RANK_PAYOUT * Math.max(0, team.rankShare);
+    const rohAbgabe = (ueberLinie1 * rateZone1 + ueberLinie2 * rateZone2) * k;
+    const deckel = capShareOfRankPayout * Math.max(0, team.rankShare);
     const abgabe = Math.max(0, Math.min(rohAbgabe, deckel));
     return { ...team, ueberLinie1, ueberLinie2, rohAbgabe, deckel, abgabe };
   });
