@@ -138,6 +138,15 @@
     },
     {
       "datum": "2026-08-04",
+      "seite": "Spieltag · Arena",
+      "pr": null,
+      "text": "Die Spalte „S-Rang\" in der Spieltags-Wertung zeigte zweimal denselben Rang — „7 → 7\", „17 → 17\" — statt der Bewegung durch den Spieltag. Sobald der Spieltag übernommen war, rechneten beide Seiten mit dem neuen Punktestand. Der Rang vor dem Spieltag kommt jetzt aus dem gespeicherten Stand davor, die Auf- und Absteiger sind wieder zu sehen.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
       "seite": "Welt · Sponsoren",
       "pr": null,
       "text": "Bei mehrjährigen Verträgen stand hinter jeder Saison „Faktor 1.00\" — das war nicht der Faktor, sondern ein Ersatzwert, weil die Salary-Factor-Vorausschau in Saison 1 noch leer ist. Die Karte sagt jetzt, ob der Faktor für diese Saison schon feststeht oder nur fortgeschrieben wurde.",
@@ -165,6 +174,15 @@
     },
     {
       "datum": "2026-08-04",
+      "seite": "Team · Training",
+      "pr": null,
+      "text": "In der Klassenliste im Training war Badass rot, obwohl Badass gelb ist — gefärbt wurde nach der Achse, die die Klasse trainiert, statt nach der Klassenfarbe. Bei Badass, Tactician und Templar sind das zwei verschiedene Dinge. Jetzt trägt jede Zeile die Farbe, an der man die Klasse überall sonst erkennt.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
       "seite": "Team · Aufstellung",
       "pr": null,
       "text": "Bis zu einer Fatigue von 25 ist das Verletzungsrisiko jetzt exakt 0 % — vorher konnte sich auch ein ausgeruhter Spieler verletzen, und die Anzeige sagte dabei „kein Risiko\", obwohl real bis zu 4,8 % anlagen. Ab Fatigue 50 bleibt die Kurve unverändert: wer seine Spieler verheizt, trägt dasselbe Risiko wie bisher.",
@@ -186,6 +204,24 @@
       "seite": "Spieltag · Einsatzliste",
       "pr": null,
       "text": "Die Karte zeigte die Fatigue vor dem Spieltag neben einem Risiko, das für die Fatigue nach dem Einsatz gilt — das sah aus, als sei die Schutzzone bis 25 kaputt. Jetzt steht dort, wohin die Fatigue durch den Einsatz wandert, etwa 'F 22→36'.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
+      "seite": "Team · Spieler",
+      "pr": null,
+      "text": "Der kleine Wert neben dem VK-Wert in der Spielerliste rechnete heimlich den Rest-Buyout mit ein und ließ sich aus der Zeile nicht nachvollziehen — ein Spieler mit 27,1 Mio Marktwert und 41,5 Mio Verkaufspreis zeigte „+0,38\". Jetzt steht dort der Aufschlag des Verkaufsfaktors: VK-Wert minus Marktwert, beides nebeneinander ablesbar. Buyout, Netto und der Gewinn gegenüber dem Kaufpreis stehen im Tooltip der Zelle.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
+      "seite": "Team · Spieler",
+      "pr": null,
+      "text": "In der Spielerliste stand als VK-Wert bei jedem Spieler stumpf der Marktwert — der Verkaufsfaktor aus dem Rang in der eigenen Preisklasse fiel im Browser komplett unter den Tisch, in jedem Bracket. Jetzt zeigt die Spalte denselben Verkaufspreis, mit dem das Spiel auch rechnet: von 339 Kaderspielern des Testspielstands weichen 328 wieder vom Marktwert ab.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
       "version": "0.4"

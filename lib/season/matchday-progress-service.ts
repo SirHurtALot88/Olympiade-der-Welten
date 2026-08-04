@@ -8,6 +8,7 @@ import { advanceScoutIntelTick } from "@/lib/scouting/facility-scout-pipeline-se
 import { advancePlayerPotentialRevealTick } from "@/lib/progression/player-potential-service";
 import { maybeGenerateSponsorEvents } from "@/lib/sponsor/sponsor-event-service";
 import { buildFrozenValuationSnapshot } from "@/lib/season/frozen-valuation-snapshot";
+import { isMatchdayResultFullyCommitted } from "@/lib/season/season-discipline-schedule";
 
 export const ADVANCE_MATCHDAY_CONFIRM_TOKEN = "ADVANCE_LOCAL_MATCHDAY";
 
@@ -173,9 +174,17 @@ async function prepareMatchdayProgress(
     (gameState.seasonState.matchdayAdvanceLogs ?? []).find((entry) => entry.payload.idempotencyKey === idempotencyKey) ?? null;
   const duplicateDetected = existingAuditLog != null;
 
-  const resultApplied = (gameState.seasonState.matchdayResults ?? []).some(
+  const hasAnyResultRow = (gameState.seasonState.matchdayResults ?? []).some(
     (entry) => entry.seasonId === params.seasonId && entry.matchdayId === currentMatchdayId,
   );
+  // Ein D1-Teil-Commit legt schon eine `matchdayResults`-Zeile an (die Arena bucht D1 und D2
+  // einzeln) -- `hasAnyResultRow` allein haelt einen halben Spieltag faelschlich fuer fertig
+  // und liesse den Wechsel zu, OHNE dass D2 je gebucht wird. Danach ist der Spieltag schon
+  // weitergeschaltet und D2 aus der normalen Ansicht nicht mehr nachholbar: alle Spieler, die
+  // in D2 standen, fehlen fuer diesen Spieltag dauerhaft in `playerDisciplinePerformances` --
+  // sichtbar u. a. als ein zu niedriger `appearances`-Wert in Moral/Forderungen.
+  const resultFullyCommitted = hasAnyResultRow && isMatchdayResultFullyCommitted(gameState, currentMatchdayId);
+  const resultApplied = resultFullyCommitted;
   const standingsApplied = (gameState.seasonState.standingsApplyLogs ?? []).some(
     (entry) => entry.seasonId === params.seasonId && entry.matchdayId === currentMatchdayId,
   );
@@ -189,7 +198,8 @@ async function prepareMatchdayProgress(
   const resolvedFixtures = (gameState.seasonState.schedule ?? []).filter((fixture) => fixture.matchdayId === currentMatchdayId);
 
   const blockingReasons: string[] = [];
-  if (!resultApplied) blockingReasons.push("result_apply_missing_for_current_matchday");
+  if (!hasAnyResultRow) blockingReasons.push("result_apply_missing_for_current_matchday");
+  else if (!resultFullyCommitted) blockingReasons.push("result_apply_incomplete_missing_d2_for_current_matchday");
   if (!standingsApplied) blockingReasons.push("standings_apply_missing_for_current_matchday");
   if (duplicateDetected) blockingReasons.push("duplicate_matchday_advance_for_current_scope");
   // A missing next matchday is the normal season-end path. The writer below

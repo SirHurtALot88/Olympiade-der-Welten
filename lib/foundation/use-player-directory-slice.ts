@@ -17,6 +17,7 @@ const EMPTY_RATINGS_MAP = new Map<string, PlayerRatingContractRow>();
 const EMPTY_PERFORMANCE_BY_PLAYER_ID: PlayerDirectorySliceResponse["performanceByPlayerId"] = {};
 const EMPTY_CAREER_STATS_BY_PLAYER_ID: PlayerDirectorySliceResponse["careerStatsByPlayerId"] = {};
 const EMPTY_DISCIPLINE_POINTS_BY_PLAYER_ID: PlayerDirectorySliceResponse["disciplinePointsByPlayerId"] = {};
+const EMPTY_SELL_VALUE_BY_PLAYER_ID: PlayerDirectorySliceResponse["sellValueByPlayerId"] = {};
 
 function buildPlayerDirectorySliceRequestKey(input: {
   saveId: string;
@@ -126,6 +127,9 @@ export function usePlayerDirectorySlice(input: {
   // greift der stabile Leer-Fallback statt `undefined` durch die Deps zu tragen.
   const disciplinePointsByPlayerId =
     payload?.disciplinePointsByPlayerId ?? EMPTY_DISCIPLINE_POINTS_BY_PLAYER_ID;
+  // Gleiche Vorsichtsmassnahme: ein vor diesem Feld gecachter Payload (oder der
+  // Projektions-Pfad, der es leer laesst) darf kein `undefined` durch die Deps tragen.
+  const sellValueByPlayerId = payload?.sellValueByPlayerId ?? EMPTY_SELL_VALUE_BY_PLAYER_ID;
 
   return {
     payload,
@@ -133,6 +137,7 @@ export function usePlayerDirectorySlice(input: {
     performanceByPlayerId,
     careerStatsByPlayerId,
     disciplinePointsByPlayerId,
+    sellValueByPlayerId,
     loading,
     error,
   };

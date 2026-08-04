@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-04",
+  "seite": "Spieltag · Arena",
+  "text": "Die Spalte „S-Rang\" in der Spieltags-Wertung zeigte zweimal denselben Rang — „7 → 7\", „17 → 17\" — statt der Bewegung durch den Spieltag. Sobald der Spieltag übernommen war, rechneten beide Seiten mit dem neuen Punktestand. Der Rang vor dem Spieltag kommt jetzt aus dem gespeicherten Stand davor, die Auf- und Absteiger sind wieder zu sehen.",
+  "gewicht": "behebung",
+  "version": "0.4"
+}

@@ -2,6 +2,15 @@ const GAME_FLOW_BLOCKER_LABELS: Record<string, string> = {
   missing_manual_lineup: "Mindestens ein manuell gesteuertes Team hat noch keine gespeicherte Einsatzliste.",
   passive_missing_lineup: "Mindestens ein passives Team hat noch keine gespeicherte Einsatzliste.",
   result_apply_missing_for_current_matchday: "Result Apply fehlt noch für diesen Spieltag.",
+  // Beide Schluessel stehen fuer denselben Zustand (D1 gebucht, D2 offen) -- einmal aus dem
+  // Server-Check (matchday-progress-service.ts), einmal aus dem Client-Flow-Schritt
+  // (game-flow-controller.ts). Ohne Eintrag hier faellt der Text auf `reason.replaceAll("_", " ")`
+  // zurueck ("result apply incomplete missing d2 for current matchday") -- exakt die Art
+  // kryptischer Meldung, ueber die sich der Eigentuemer schon einmal beschwert hat.
+  result_apply_incomplete_missing_d2_for_current_matchday:
+    "Nur Disziplin 1 dieses Spieltags ist gebucht — in der Arena zuerst Disziplin 2 abschließen, danach lässt sich der Spieltag wechseln.",
+  result_incomplete_missing_d2:
+    "Nur Disziplin 1 dieses Spieltags ist gebucht — in der Arena zuerst Disziplin 2 abschließen, danach lässt sich der Spieltag wechseln.",
   standings_apply_missing_for_current_matchday: "Standings Apply fehlt noch für diesen Spieltag.",
   cash_apply_missing_for_current_matchday: "Cash Apply fehlt noch für diesen Spieltag.",
   tie_groups_require_confirmed_policy: "Tie-Policy blockiert den lokalen Standings-Schritt.",

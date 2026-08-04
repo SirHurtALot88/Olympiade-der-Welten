@@ -201,6 +201,8 @@ export function useFoundationCrossTabPlayerDirectory(input: {
     careerStatsByPlayerId: Record<string, PlayerLeagueCareerStats>;
     /** Disziplin-ID → in dieser Saison geholte PPs, je Spieler (Server-Ledger). */
     disciplinePointsByPlayerId: Record<string, Record<string, number>>;
+    /** Erwarteter Verkaufswert je Kaderspieler, gerechnet auf dem vollen Save. */
+    sellValueByPlayerId: Record<string, ExpectedSellValueEntry>;
   };
   playerScope: PlayerTableScope;
   playerSeasonPerformanceMap: Map<string, PlayerSeasonPerformanceSummary>;
@@ -318,6 +320,12 @@ export function useFoundationCrossTabPlayerDirectory(input: {
     const rosterByPlayerId = new Map(input.gameState.rosters.map((roster) => [roster.playerId, roster] as const));
     // EIN Batch-Lauf für alle Kaderspieler (der Sale-Factor-Rank-Kontext ist pro
     // GameState gecacht) — ein Preview-Aufruf pro Zeile wäre bei ~330 Zeilen zu teuer.
+    // Nur noch RÜCKFALLEBENE: der Verkaufspreis ist Marktwert × Verkaufsfaktor, und
+    // ob der Faktor überhaupt greift, hängt an den gewerteten `matchdayResults` der
+    // Saison — die im kompakten Client-Payload auf den aktiven Spieltag beschnitten
+    // sind. Clientseitig steht deshalb bei JEDEM Spieler Faktor 1,0 und damit
+    // VK-Wert == Marktwert (am gemeldeten Spielstand: 339 von 339 Zeilen). Die echten
+    // Werte kommen aus dem Slice, siehe `useSliceSellValues` unten.
     const sellValueByPlayerId = buildExpectedSellValueByPlayerId(input.gameState);
     // Sobald der Directory-Slice da ist, ist ER die Quelle der Disziplin-PPs:
     // Der Slice rechnet SERVERSEITIG auf dem vollständigen Save, der Client hält
@@ -329,6 +337,15 @@ export function useFoundationCrossTabPlayerDirectory(input: {
     // (aus demselben Slice) längst echte Saisonwerte zeigten.
     const useSliceDisciplinePoints =
       Boolean(input.playerDirectorySlice.payload) && !input.playerDirectorySlice.error;
+    // Dieselbe Regel für den Verkaufswert — mit einer zusätzlichen Bedingung: der
+    // Projektions-Pfad des Slices liefert das Feld bewusst leer (kein GameState,
+    // keine Verträge). Ein leeres Feld darf die Spalte nicht auf "—" setzen,
+    // sondern lässt die lokale Rückfallebene stehen.
+    const sliceSellValues = input.playerDirectorySlice.sellValueByPlayerId;
+    const useSliceSellValues =
+      Boolean(input.playerDirectorySlice.payload) &&
+      !input.playerDirectorySlice.error &&
+      Object.keys(sliceSellValues).length > 0;
 
     return input.gameState.players
       .map((player) => {
@@ -392,7 +409,9 @@ export function useFoundationCrossTabPlayerDirectory(input: {
               },
             });
           })(),
-          sellPreview: sellValueByPlayerId.get(player.id) ?? null,
+          sellPreview: useSliceSellValues
+            ? sliceSellValues[player.id] ?? null
+            : sellValueByPlayerId.get(player.id) ?? null,
           seasonPoints: seasonPerformance?.totalPoints ?? null,
           appearances: seasonPerformance?.appearances ?? null,
           bestDiscipline: seasonPerformance?.bestDisciplineLabel ?? null,
@@ -428,6 +447,9 @@ export function useFoundationCrossTabPlayerDirectory(input: {
     input.playerDirectorySlice.error,
     input.playerDirectorySlice.payload,
     input.playerDirectorySlice.performanceByPlayerId,
+    // Aus demselben Grund: der Verkaufswert trifft mit dem Slice ein, nicht beim
+    // ersten Rendern — ohne Dep bliebe in der Spalte der lokale Marktwert stehen.
+    input.playerDirectorySlice.sellValueByPlayerId,
     input.playerRatingsById,
     input.playerScope,
     input.playerSeasonPerformanceMap,

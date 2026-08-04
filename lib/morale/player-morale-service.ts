@@ -17,6 +17,7 @@ import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-co
 import { calculateTransfermarktFit } from "@/lib/market/transfermarkt-fit";
 import { buildPlayerDemands, selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { buildTrainingModeDemandRecord, evaluateTrainingModeDemandDelta } from "@/lib/training/training-mode-demand-service";
+import { resolveSeasonTotalMatchdays } from "@/lib/training/matchday-training-accumulator";
 
 export type PlayerMoraleAssessment = PlayerMoraleState & {
   smiley: string;
@@ -280,6 +281,44 @@ function hasCurrentSeasonResults(gameState: GameState) {
   return hasMatchdayResult || hasPlayerResult;
 }
 
+export type PromisedRoleAttendanceOutcome = {
+  outcome: "exceeded" | "fulfilled" | "broken";
+  delta: number;
+};
+
+/**
+ * Hat die Einsatzzeit die versprochene Rolle eingehalten? `contract-renewal-service.ts` und
+ * `season-simulation-runner.ts` lasen dafuer frueher die Moral-Reasons "good_playtime"/
+ * "low_playtime" mit -- die sind mit der Behebung der Doppelzaehlung entfallen (derselbe
+ * `appearances`-Wert loeste sonst zusaetzlich zur "Einsätze"-Forderung noch einen zweiten,
+ * direkten Moral-Ausschlag aus, siehe `computePlayerMorale`). Diese Funktion fuehrt exakt
+ * dieselbe Rechnung eigenstaendig weiter -- fuer die Vertrags-/Beziehungs-Story, aber OHNE
+ * Rueckwirkung auf `assessPlayerMorale`.
+ */
+export function evaluatePromisedRoleAttendanceOutcome(
+  gameState: GameState,
+  playerId: string,
+  promisedRole: string | null | undefined,
+): PromisedRoleAttendanceOutcome | null {
+  const seasonPerformance = buildPlayerSeasonPerformance(gameState, playerId) ?? {
+    appearances: 0,
+    averageContribution: null,
+  };
+  const hasSeasonPerformance = seasonPerformance.appearances > 0 || seasonPerformance.averageContribution != null;
+  const currentSeasonHasResults = hasCurrentSeasonResults(gameState);
+  const expectedAppearances = getRoleExpectedAppearances(promisedRole);
+
+  if (seasonPerformance.appearances > 0) {
+    const appearanceGap = seasonPerformance.appearances - expectedAppearances;
+    const delta = clamp(appearanceGap * (promisedRole === "starter" ? 2.4 : 1.6), -14, 10);
+    return { outcome: delta >= 5 ? "exceeded" : delta < 0 ? "broken" : "fulfilled", delta };
+  }
+  if (promisedRole === "starter" && currentSeasonHasResults && !hasSeasonPerformance) {
+    return { outcome: "broken", delta: -12 };
+  }
+  return null;
+}
+
 function getCurrentSeasonMatchdayResultIds(gameState: GameState) {
   const seasonId = gameState.season.id;
   return new Set(
@@ -388,8 +427,37 @@ function evaluateDemandDelta(input: {
     if (target == null || target <= 0) return { delta: 0, outcome: "open" as const };
     if (input.seasonAppearances >= target) return { delta: reward, outcome: "fulfilled" as const };
     if (!input.currentSeasonHasResults) return { delta: 0, outcome: "open" as const };
-    const gapShare = clamp((target - input.seasonAppearances) / target, 0.25, 1);
-    return { delta: penalty * gapShare, outcome: demand.status === "at_risk" ? "pressure" as const : "failed" as const };
+
+    // `target` ist der SAISONEND-Wert (buildAppearanceDemand: 8/5/3 je Kaderrang) -- er direkt
+    // gegen den bis heute erreichten Stand zu pruefen, macht die Forderung vor Saisonende gar
+    // nicht erfuellbar: ein Spieler, der JEDEN Spieltag spielt, stand am Spieltag 5 einer
+    // 10er-Saison bei 5/8 und kassierte trotzdem "Forderung verfehlt". Die ehrliche Erwartung
+    // "bis heute" ist der Zielwert anteilig zum Saisonfortschritt.
+    const totalMatchdays = resolveSeasonTotalMatchdays(gameState);
+    const matchdaysElapsed = Math.min(
+      totalMatchdays,
+      (gameState.seasonState.matchdayResults ?? []).filter((entry) => entry.seasonId === gameState.season.id).length,
+    );
+    const seasonOver = matchdaysElapsed >= totalMatchdays;
+    const remainingMatchdays = Math.max(0, totalMatchdays - matchdaysElapsed);
+    // Rechnerisch nicht mehr erreichbar (selbst mit Einsatz an jedem verbleibenden Spieltag) --
+    // das ist auch VOR Saisonende ein ehrliches "verfehlt", kein Fortschritts-Problem mehr.
+    const targetUnreachable = input.seasonAppearances + remainingMatchdays < target;
+
+    if (seasonOver || targetUnreachable) {
+      const gapShare = clamp((target - input.seasonAppearances) / target, 0.25, 1);
+      return { delta: penalty * gapShare, outcome: "failed" as const };
+    }
+
+    const expectedByNow = (target * matchdaysElapsed) / totalMatchdays;
+    if (input.seasonAppearances >= expectedByNow) {
+      // Im Soll oder besser -- vor Saisonende ist das kein Verfehlen, auch wenn der
+      // Saisonend-Zielwert selbst noch nicht erreicht ist.
+      return { delta: 0, outcome: "open" as const };
+    }
+
+    const gapShare = clamp((expectedByNow - input.seasonAppearances) / Math.max(expectedByNow, 1), 0.25, 1);
+    return { delta: penalty * gapShare, outcome: "pressure" as const };
   }
 
   if (demand.type === "facility") {
@@ -652,13 +720,28 @@ export function assessPlayerMorale(input: PlayerMoraleInput): PlayerMoraleAssess
     renewalSalaryPreview: input.renewalSalaryPreview ?? null,
   });
 
+  // Nur die ersten zwei GESPEICHERTEN Reasons wandern unveraendert (Text UND Wert) in die
+  // Anzeige -- das haelt die Moral "ruhig" statt bei jedem Aufruf zu springen. Fuer
+  // `player_demands`-Reasons (Forderungen: Einsätze/Disziplin/Captain/...) ist das aber ein
+  // Bug, kein Feature: die werden JEDES Mal komplett frisch aus dem aktuellen Stand berechnet
+  // (`applyPlayerDemandMoraleImpact` oben), es gibt fuer sie also nichts zu "glaetten". Landete
+  // ein Forderungs-Reason einmal in den ersten zwei Slots (z. B. "Forderung verfehlt: 1/8
+  // Einsätze" am Spieltag 1), wanderte er unveraendert von Snapshot zu Snapshot weiter -- auch
+  // wenn die Forderung laengst erfuellt ist oder gar nicht mehr existiert, DENN eine erfuellte/
+  // offene Forderung erzeugt selbst gar keinen frischen Reason (delta 0 wird nicht hinzugefuegt,
+  // siehe `applyPlayerDemandMoraleImpact`), der den alten haette verdraengen koennen. Das war
+  // exakt der gemeldete Fall: Der Chip zeigte "1/8 Einsätze" weit ueber den Spieltag hinaus, an
+  // dem das zuletzt gestimmt hatte. `player_demands`-Reasons deshalb NIE aus dem Speicher
+  // uebernehmen -- nur aus der eben berechneten `assessment` (bereits frisch, siehe oben).
+  const carryableStoredReasons = stored.reasons.filter((reason) => reason.source !== "player_demands").slice(0, 2);
+
   return {
     ...assessment,
     morale: blendedMorale,
     visibleMood,
     smiley: getSmiley(visibleMood),
     moodLabel: getMoodLabel(visibleMood),
-    reasons: [...stored.reasons.slice(0, 2), ...assessment.reasons].slice(0, 8),
+    reasons: [...carryableStoredReasons, ...assessment.reasons].slice(0, 8),
     contractIntent: intent,
     moraleSalaryModifier: salaryModifier,
     moraleContractLengthLimit: getContractLengthLimit(blendedMorale, player),
@@ -733,16 +816,15 @@ function computePlayerMorale(input: {
   const expectationRole = rosterEntry.promisedRole ?? rosterEntry.roleTag;
   const expectedAppearances = getRoleExpectedAppearances(expectationRole);
   const appearanceGap = seasonPerformance.appearances - expectedAppearances;
+  // Kein eigener Einsatzzeit-Delta mehr HIER: dieselbe Kennzahl (`seasonPerformance.appearances`)
+  // treibt bereits die "Einsätze"-Forderung (player-demands-service.ts `buildAppearanceDemand`,
+  // ausgewertet unten via `applyPlayerDemandMoraleImpact`/`evaluateDemandDelta`). Ein zweiter,
+  // pauschaler Ausschlag aus derselben Zahl war doppelt gemoppelt -- bis zu -28 aus einem
+  // einzigen Wert (-14 Forderung + -14 "Einsatzzeit unter Rollenerwartung"). Die Forderung bleibt
+  // die einzige Quelle: sie ist sichtbar, hat ein Ziel/Fortschritt und kann auch belohnen.
+  // `star_not_used`/`depth_not_used` unten bleiben unveraendert -- die greifen bei NULL Einsätzen
+  // und sind eine andere Aussage als "zu wenig relativ zur Rollenerwartung".
   if (seasonPerformance.appearances > 0) {
-    const usageDelta = clamp(appearanceGap * (expectationRole === "starter" ? 2.4 : 1.6), -14, 10);
-    morale += usageDelta;
-    addReason(
-      reasons,
-      usageDelta >= 0 ? "good_playtime" : "low_playtime",
-      usageDelta >= 0 ? "Einsatzzeit passt" : "Einsatzzeit unter Rollenerwartung",
-      usageDelta,
-      "season_performance",
-    );
     if (relativeContext.strengthTier === "depth" && appearanceGap >= -1) {
       morale += 3;
       addReason(reasons, "relative_role_fulfilled", "Rolle passt zur relativen Teamposition", 3, "roster_context");

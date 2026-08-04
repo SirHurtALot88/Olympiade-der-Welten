@@ -38,7 +38,7 @@ import {
   previewLocalTransfermarktSell,
   type LocalTransfermarktRunContext,
 } from "@/lib/market/transfermarkt-local-service";
-import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
+import { assessPlayerMorale, evaluatePromisedRoleAttendanceOutcome } from "@/lib/morale/player-morale-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { assertOlyProjectRoot } from "@/lib/persistence/project-root-guard";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
@@ -1747,25 +1747,27 @@ function buildPromisedRoleRelationshipEvents(
   for (const morale of moraleState) {
     const promisedRole = promisedRoleByPlayerId.get(morale.playerId);
     if (!promisedRole) continue;
-    const playtimeReason = morale.reasons.find((reason) =>
-      ["good_playtime", "relative_role_fulfilled", "low_playtime", "star_not_used"].includes(reason.reasonId),
-    );
-    if (!playtimeReason) continue;
+    // Liest die Einsatzzeit-vs-Rollenerwartung direkt aus (siehe `evaluatePromisedRoleAttendanceOutcome`),
+    // statt wie frueher ueber Moral-Reasons ("good_playtime"/"low_playtime") -- die wirken seit der
+    // Behebung der Doppelzaehlung (`appearances` trieb zusaetzlich zur "Einsätze"-Forderung noch einen
+    // zweiten, direkten Moral-Ausschlag) nicht mehr auf die Moral und tauchen dort nicht mehr auf.
+    const outcome = evaluatePromisedRoleAttendanceOutcome(gameState, morale.playerId, promisedRole);
+    if (!outcome) continue;
 
     const reason =
-      playtimeReason.reasonId === "star_not_used" || playtimeReason.reasonId === "low_playtime"
+      outcome.outcome === "broken"
         ? "promised_role_broken"
-        : playtimeReason.valueDelta >= 5
+        : outcome.outcome === "exceeded"
           ? "promised_role_exceeded"
           : "promised_role_fulfilled";
-    const severity = playtimeReason.valueDelta < 0 ? "negative" : playtimeReason.valueDelta > 0 ? "positive" : "neutral";
+    const severity = outcome.delta < 0 ? "negative" : outcome.delta > 0 ? "positive" : "neutral";
     events.push({
       eventId: `relationship__${gameState.season.id}__${morale.teamId}__${morale.playerId}__${reason}`,
       seasonId: gameState.season.id,
       teamId: morale.teamId,
       playerId: morale.playerId,
       reason: `${reason}:${promisedRole}`,
-      delta: playtimeReason.valueDelta,
+      delta: outcome.delta,
       severity,
       createdAt: timestamp,
       source: "promised_role_morale",

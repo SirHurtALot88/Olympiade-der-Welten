@@ -406,3 +406,45 @@ export function withNormalizedSeasonDisciplineSchedule(gameState: GameState, sav
     },
   };
 }
+
+/**
+ * Ist der Spieltag WIRKLICH fertig -- beide geplanten Disziplin-Seiten gebucht, nicht nur
+ * eine? `matchdayResults` bekommt schon nach einem D1-Teil-Commit eine Zeile (die Arena
+ * bucht D1 und D2 einzeln, siehe legacy-matchday-result-apply-service.ts `commitThroughSide`)
+ * -- eine reine "existiert ein Ergebnis?"-Pruefung haelt einen halben Spieltag deshalb faelschlich
+ * fuer abgeschlossen.
+ *
+ * Genau diese Luecke liess sich ausnutzen: Wird "Zum naechsten Spieltag" nach D1 allein
+ * ausgeloest (Doppelklick, Reload waehrend D2 laedt, oder schlicht weil der Schritt dafuer
+ * bereits als "ready" markiert war), bucht der Spieltagswechsel D2 NIE nach -- der naechste
+ * Spieltag ist schon aktiv, D2 laesst sich aus der normalen Ansicht nicht mehr nachholen.
+ * Alle Spieler, die in D2 eingesetzt waren, verlieren damit den `playerDisciplinePerformances`-
+ * Eintrag fuer genau diesen Spieltag: `buildPlayerSeasonPerformance` zaehlt `appearances` direkt
+ * aus dieser Liste (player-season-performance.ts), der Wert bleibt fuer immer zu niedrig -- ohne
+ * dass irgendwo eine falsche Spieler-Identitaet im Spiel war.
+ *
+ * Diese Funktion ist die EINZIGE Quelle fuer "Ergebnis vollstaendig?" auf Client (game-flow-
+ * controller.ts) und Server (matchday-progress-service.ts) -- vorher hatten beide ihre eigene,
+ * zu grosszuegige `matchdayResults.some(...)`-Pruefung.
+ */
+export function isMatchdayResultFullyCommitted(gameState: GameState, matchdayId: string): boolean {
+  const result = (gameState.seasonState.matchdayResults ?? []).find(
+    (entry) => entry.seasonId === gameState.season.id && entry.matchdayId === matchdayId,
+  );
+  if (!result) return false;
+
+  const scheduleEntry = getSeasonDisciplineScheduleEntry(gameState, matchdayId);
+  const requiredSides: Array<"d1" | "d2"> = [];
+  if (scheduleEntry?.discipline1?.disciplineId) requiredSides.push("d1");
+  if (scheduleEntry?.discipline2?.disciplineId) requiredSides.push("d2");
+  // Ohne (oder mit unvollstaendigem) Schedule bleibt es bei der alten, grosszuegigen Regel --
+  // sonst haengt ein Altstand ohne `disciplineSchedule` unbegruendet fest.
+  if (requiredSides.length === 0) return true;
+
+  const committedSides = new Set(
+    (gameState.seasonState.disciplineResults ?? [])
+      .filter((entry) => entry.matchdayResultId === result.id)
+      .map((entry) => entry.disciplineSide),
+  );
+  return requiredSides.every((side) => committedSides.has(side));
+}

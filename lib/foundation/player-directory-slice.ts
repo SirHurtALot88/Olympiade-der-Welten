@@ -4,6 +4,10 @@ import { buildPlayerLeagueCareerStatsMap } from "@/lib/foundation/player-league-
 import type { PersistedSeasonDerivationsRecord } from "@/lib/foundation/materialize-season-derivations";
 import { hydrateSeasonDerivations } from "@/lib/foundation/materialize-season-derivations";
 import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
+import {
+  buildExpectedSellValueByPlayerId,
+  type ExpectedSellValueEntry,
+} from "@/lib/market/transfermarkt-expected-sell-value";
 import { ratingsSliceRowsFromPersisted } from "@/lib/foundation/resolve-slice-save-context";
 import {
   buildSeasonRatingsSlice,
@@ -58,6 +62,41 @@ export type PlayerDirectorySliceResponse = {
    * `buildRosterDisciplinePpsByAxis`. Ein Spieler ohne Punkte fehlt ganz.
    */
   disciplinePointsByPlayerId: Record<string, Record<string, number>>;
+  /**
+   * Erwarteter Verkaufswert je Kaderspieler ("VK-Wert"-Spalte der Spielerliste),
+   * gerechnet auf dem VOLLSTAENDIGEN Save.
+   *
+   * GEMELDET: „warum haben die spieler keinen +/- im verkaufswert obwohl 17
+   * spieler in dem bracket sind?" — und kurz darauf „scheint nun ueberall
+   * kaputt zu sein egal welches bracket".
+   *
+   * Es war nicht der Verkaufsfaktor, sondern die Datenlage des Clients. Der
+   * Verkaufspreis ist Marktwert x Verkaufsfaktor, und der Faktor haengt am Rang
+   * des Spielers in seiner Preisklasse. Ob dieses Ranking ueberhaupt gilt,
+   * entscheidet `hasCurrentSeasonSaleFactorRanking` an den gewerteten
+   * `matchdayResults` der laufenden Saison — die im kompakten Client-Payload
+   * (`compactFoundationInitialGameState`) auf den AKTIVEN Spieltag beschnitten
+   * sind. Ein noch nicht ausgewerteter aktiver Spieltag heisst dort: gar kein
+   * gewertetes Ergebnis, also kein Ranking, also Faktor 1,0 fuer JEDEN Spieler
+   * — und damit VK-Wert == Marktwert in jeder Zeile, in jedem Bracket.
+   *
+   * Am gemeldeten Spielstand (Saison 1, Spieltag 7) nachgemessen: auf dem
+   * vollen Save weichen 328 von 339 Kaderspielern vom Marktwert ab, auf dem
+   * kompakten Payload 0 von 339. Amystheta (Bracket 7, Rang 1 von 17): 65,84
+   * Mio auf dem Server, 47,03 Mio (= exakt ihr Marktwert) im Browser.
+   *
+   * Deshalb kommt der Wert von hier — dieselbe Begruendung und derselbe Weg wie
+   * bei `disciplinePointsByPlayerId` einen Absatz weiter oben. Die fehlenden
+   * `matchdayResults` im Payload nachzuliefern loest es NICHT: der Client
+   * rechnet dann zwar wieder mit Ranking, aber ohne die Server-Derivations mit
+   * anderen MVS — gemessen 292 von 339 Zeilen abweichend vom Server. Eine
+   * zweite, leicht andere Zahl ist schlechter als eine offensichtlich gleiche.
+   *
+   * Nur Kaderspieler stehen drin: Free Agents koennen nicht verkauft werden,
+   * fuer sie ist "—" die ehrliche Antwort (siehe
+   * `buildExpectedSellValueByPlayerId`).
+   */
+  sellValueByPlayerId: Record<string, ExpectedSellValueEntry>;
   count: number;
 };
 
@@ -171,6 +210,14 @@ export function maskPlayerDirectorySliceForRequestingTeam(input: {
       ([playerId]) => resolveVisibility(playerId) === "exact",
     ),
   );
+  // Der Verkaufswert traegt den Bracket-Rang aus MVS/PPs in sich — also exakte
+  // Saison-Leistung, nur anders verpackt. Dieselbe Fog-Regel wie eine Zeile
+  // hoeher: nicht sichtbar ⇒ Eintrag faellt weg.
+  const sellValueByPlayerId = Object.fromEntries(
+    Object.entries(input.payload.sellValueByPlayerId ?? {}).filter(
+      ([playerId]) => resolveVisibility(playerId) === "exact",
+    ),
+  );
 
   return {
     ...input.payload,
@@ -178,6 +225,7 @@ export function maskPlayerDirectorySliceForRequestingTeam(input: {
     performanceByPlayerId,
     careerStatsByPlayerId,
     disciplinePointsByPlayerId,
+    sellValueByPlayerId,
   };
 }
 
@@ -218,6 +266,10 @@ export function buildPlayerDirectorySliceFromPersisted(input: {
     performanceByPlayerId,
     careerStatsByPlayerId,
     disciplinePointsByPlayerId: buildDisciplinePointsByPlayerId(derivations.ledger.playerSummariesByPlayerId),
+    // Der Projektions-Pfad hat nur Derivations + SeasonState, keinen GameState mit
+    // Rostern/Vertraegen — ohne die gibt es keinen Verkaufswert. Leer statt geraten:
+    // der Client faellt dann auf seine eigene Rechnung zurueck (siehe Feldkommentar).
+    sellValueByPlayerId: {},
     count: Object.keys(ratingsByPlayerId).length,
   };
 }
@@ -265,6 +317,11 @@ export function buildPlayerDirectorySlice(input: {
     performanceByPlayerId,
     careerStatsByPlayerId,
     disciplinePointsByPlayerId: buildDisciplinePointsByPlayerId(derivations.ledger.playerSummariesByPlayerId),
+    // Mit `saveId`, damit der Sale-Factor dieselben Season-Derivations (MVS/PPs) sieht
+    // wie der Rest dieses Slices — sonst rankt die Preisklasse gegen andere Zahlen.
+    sellValueByPlayerId: Object.fromEntries(
+      buildExpectedSellValueByPlayerId(input.gameState, { saveId: input.saveId }),
+    ),
     count: Object.keys(ratingsSlice.ratingsByPlayerId).length,
   };
 }
