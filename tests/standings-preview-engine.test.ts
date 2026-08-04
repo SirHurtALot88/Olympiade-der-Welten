@@ -270,6 +270,85 @@ describe("standings preview engine", () => {
     expect(alpha?.projectedPoints).toBe(35.1);
   });
 
+  /**
+   * GEMELDET: „rank änderungen in der spieltagstabelle funktionieren nicht!"
+   *
+   * Die Spalte verspricht „Rang VOR → NACH dem Spieltag", zeigte aber zweimal dieselbe Zahl. An
+   * einem echten Spielstand mit zwei gespielten Spieltagen nachgemessen: 32 von 32 Teams standen
+   * auf „vor == nach". Die Ursache steckte in `buildCurrentRankMap` — gerankt wurde nach
+   * `currentPoints`, und sobald der Spieltag uebernommen ist, steht darin bereits die NEUE Summe.
+   * Beide Spalten rechneten also mit demselben Punktestand.
+   *
+   * Der Zustand hier ist genau der aus der Meldung: der Spieltag ist uebernommen (`points`
+   * enthaelt das Delta schon), die Baseline traegt den Stand davor.
+   */
+  it("ranks the before-column by the pre-matchday baseline, not by the already-updated points", async () => {
+    // A-A steht nach dem Spieltag vorn (35.1), lag davor aber HINTER W-W (12 gegen 20).
+    persistenceState.save.gameState.seasonState.standings = {
+      "A-A": { points: 35.1, matchdayBaselinePoints: 12, matchdayBaselineId: "matchday-1" },
+      "W-W": { points: 20, matchdayBaselinePoints: 20, matchdayBaselineId: "matchday-1" },
+    };
+
+    const result = await buildStandingsPreview({
+      saveId: "save-local",
+      seasonId: "season-1",
+      matchdayId: "matchday-1",
+      source: "sqlite",
+    });
+
+    const alpha = result.items.find((item) => item.teamId === "A-A");
+    const wizards = result.items.find((item) => item.teamId === "W-W");
+
+    // Vorher: W-W 20 vor A-A 12. Nachher: A-A 35.1 vor W-W 20. Die Spalte muss den Wechsel zeigen.
+    expect(alpha?.currentRank).toBe(2);
+    expect(alpha?.projectedRank).toBe(1);
+    expect(wizards?.currentRank).toBe(1);
+    // Genau das war der Fehler: „vor" und „nach" waren identisch.
+    expect(alpha?.currentRank).not.toBe(alpha?.projectedRank);
+  });
+
+  it("leaves the before-column alone while the matchday is not applied yet", async () => {
+    // Ohne Baseline fuer DIESEN Spieltag ist der aktuelle Stand auch der Stand davor — die
+    // Vorschau vor der Uebernahme darf sich durch den Fix nicht veraendern.
+    persistenceState.save.gameState.seasonState.standings = {
+      "A-A": { points: 12 },
+      "W-W": { points: 20 },
+    };
+
+    const result = await buildStandingsPreview({
+      saveId: "save-local",
+      seasonId: "season-1",
+      matchdayId: "matchday-1",
+      source: "sqlite",
+    });
+
+    const alpha = result.items.find((item) => item.teamId === "A-A");
+    const wizards = result.items.find((item) => item.teamId === "W-W");
+    expect(alpha?.currentRank).toBe(2);
+    expect(wizards?.currentRank).toBe(1);
+    // Und die Projektion bleibt eine echte Vorschau: A-A zieht mit dem Spieltag vorbei.
+    expect(alpha?.projectedRank).toBe(1);
+  });
+
+  it("falls back to the current points when the baseline belongs to an earlier matchday", async () => {
+    // Baseline eines FRUEHEREN Spieltags darf nicht als „vor diesem Spieltag" durchgehen —
+    // sonst zeigte die Spalte einen Rang von vorletzter Woche.
+    persistenceState.save.gameState.seasonState.standings = {
+      "A-A": { points: 12, matchdayBaselinePoints: 999, matchdayBaselineId: "matchday-0" },
+      "W-W": { points: 20, matchdayBaselinePoints: 0, matchdayBaselineId: "matchday-0" },
+    };
+
+    const result = await buildStandingsPreview({
+      saveId: "save-local",
+      seasonId: "season-1",
+      matchdayId: "matchday-1",
+      source: "sqlite",
+    });
+
+    // Nach den 999 waere A-A auf Rang 1 — richtig ist Rang 2 nach den echten 12 Punkten.
+    expect(result.items.find((item) => item.teamId === "A-A")?.currentRank).toBe(2);
+  });
+
   it("shows missing_result warnings when no stored matchday result exists", async () => {
     persistenceState.save.gameState.seasonState.matchdayResults = [];
     persistenceState.save.gameState.seasonState.disciplineResults = [];
