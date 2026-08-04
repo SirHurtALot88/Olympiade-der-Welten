@@ -75,6 +75,24 @@
     },
     {
       "datum": "2026-08-04",
+      "seite": "Multiplayer · Raum",
+      "pr": null,
+      "text": "Mitten im Spiel konnte ein Mitspieler plötzlich nichts mehr speichern — Aufstellung, Kauf oder Bereitmeldung liefen ins Leere, weil der Server ihn während einer langen Berechnung fälschlich für abgemeldet hielt. Wer noch einen gültigen Sitzplatz hat, wird jetzt einfach wieder als anwesend geführt.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
+      "seite": "Multiplayer · Neues Spiel",
+      "pr": null,
+      "text": "Der Einstieg zählte für den ganzen Spielstand statt für jeden Spieler einzeln: Team-Auswahl und abgehakte Schritte teilten sich beide Mitspieler. Jeder hat jetzt seinen eigenen Einstieg — und im Raum schließt er sich auch wirklich, was vorher gar nicht passieren konnte.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
       "seite": "Multiplayer · Spielansicht",
       "pr": null,
       "text": "Koordiniert wurde im Raum, gespielt in der Spielansicht — den Flow sah man dort nur als Tooltip, also musste man zwischen zwei Seiten pendeln. Ready melden, Weiterschalten und wer gerade blockiert steht jetzt direkt in der Spielansicht, und bei jedem Schrittwechsel springt sie von selbst in die passende Ansicht.",
