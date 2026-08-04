@@ -746,6 +746,12 @@ type LocalTransfermarktBuyContext = {
   contractLength: number;
   contractShape: ContractShape;
   priorRejectedNegotiation: boolean;
+  /** Affront-Regel (verhandlung-rework.md Abschnitt 4.3), s. resolveLocalTransfermarktBuyContext. */
+  affrontRetreat: boolean;
+  /** Verhandlungsgedaechtnis aus dem Draft (verhandlung-rework.md Abschnitt 9.1/9.3). */
+  priorDefianceSurchargePct: number;
+  lastCounterSalary: number | null;
+  lastNegotiatedSalary: number | null;
   promisedRole: RosterPromisedRole;
   blockingReasons: string[];
   warnings: string[];
@@ -887,6 +893,10 @@ function buildLocalTransfermarktBuyPreviewFromContext(
     blockingReasons,
     warnings,
     priorRejectedNegotiation,
+    affrontRetreat,
+    priorDefianceSurchargePct,
+    lastCounterSalary,
+    lastNegotiatedSalary,
   } = context;
   const canBuy = blockingReasons.length === 0;
   const scoutingLevel = team ? getFacilityLevel(getTeamFacilityState(gameState, team.teamId), "scouting_office") : 0;
@@ -899,6 +909,13 @@ function buildLocalTransfermarktBuyPreviewFromContext(
     params.offeredSalary ?? salary ?? "-",
     scoutingLevel,
     priorRejectedNegotiation ? "prior_rejected" : "fresh",
+    affrontRetreat ? "affront" : "no_affront",
+    // Verhandlungsgedaechtnis gehoert in den Cache-Schluessel: dieselbe Eingabe liefert bei
+    // anderem Gedaechtnis ein anderes Verdikt (Abschnitt 9.1/9.3). Ohne die drei Werte zeigte
+    // die Vorschau nach dem Verhandeln noch die Zahlen der Vorrunde.
+    priorDefianceSurchargePct,
+    lastCounterSalary ?? "-",
+    lastNegotiatedSalary ?? "-",
     params.saveId ?? marketContext.save.saveId,
   ].join(":");
   let negotiationPreview = localNegotiationPreviewCache.get(negotiationCacheKey);
@@ -917,6 +934,10 @@ function buildLocalTransfermarktBuyPreviewFromContext(
       offeredSalary: params.offeredSalary ?? null,
       scoutingLevel,
       priorBadExperience: priorRejectedNegotiation,
+      affrontRetreat,
+      priorDefianceSurchargePct,
+      lastCounterSalary,
+      lastNegotiatedSalary,
       seasonIdBase: gameState.season.id,
       seasonLabelBase: gameState.season.name,
     });
@@ -973,6 +994,18 @@ function buildLocalTransfermarktBuyPreviewFromContext(
     acceptChance: negotiationPreview.acceptChance,
     counterChance: negotiationPreview.counterChance,
     rejectChance: negotiationPreview.rejectChance,
+    conditionsAdjustmentPct: negotiationPreview.conditionsAdjustmentPct,
+    rejectThresholdSalary: negotiationPreview.rejectThresholdSalary,
+    moneyThresholdSalary: negotiationPreview.moneyThresholdSalary,
+    acceptThresholdSalary: negotiationPreview.acceptThresholdSalary,
+    prideCapSalary: negotiationPreview.prideCapSalary,
+    verdict: negotiationPreview.verdict,
+    counterSalary: negotiationPreview.counterSalary,
+    counterConditions: negotiationPreview.counterConditions,
+    baseDemandSalary: negotiationPreview.baseDemandSalary,
+    defianceSurchargePct: negotiationPreview.defianceSurchargePct,
+    pendingDefianceSurchargePct: negotiationPreview.pendingDefianceSurchargePct,
+    concededFromLastCounter: negotiationPreview.concededFromLastCounter,
     contractPreference: negotiationPreview.contractPreference,
     demandBreakdown: negotiationPreview.demandBreakdown,
     negotiationScoreBreakdown: negotiationPreview.scoreBreakdown,
@@ -1215,6 +1248,44 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
       draft.status === "rejected_bad_experience",
   );
 
+  // Affront-Regel (verhandlung-rework.md Abschnitt 4.3): der gespeicherte Draft dieser
+  // Season/Team/Spieler-Kombi steht auf "countered" (der Spieler hat mit einem Gegenangebot
+  // vorgelegt) UND das jetzt eingehende Angebot ist niedriger als das, das ihm damals gezeigt
+  // wurde — ein Rueckzieher, nachdem er schon entgegengekommen ist. `draft.offeredSalary` ist
+  // das Angebot, das zu diesem Gegenangebot fuehrte (nicht das Gegenangebot selbst — das steht
+  // per Abschnitt 7 bewusst nirgends persistiert, weil es aus (O, D, W, Traits) jederzeit neu
+  // herleitbar ist). Nur Ruecknahmen zaehlen: seitwaerts/aufwaerts bleibt frei (4.3).
+  const activeNegotiationDraft = (gameState.seasonState.contractNegotiationDrafts ?? []).find(
+    (draft) => draft.teamId === params.teamId && draft.playerId === params.playerId,
+  );
+  const affrontRetreat =
+    activeNegotiationDraft?.status === "countered" &&
+    typeof activeNegotiationDraft.offeredSalary === "number" &&
+    typeof params.offeredSalary === "number" &&
+    params.offeredSalary < activeNegotiationDraft.offeredSalary - 0.005;
+
+  // Trotz-Aufschlag (verhandlung-rework.md Abschnitt 9.1): klebt fuer die Dauer dieses Drafts,
+  // also Season/Team/Spieler. Neue Season = neuer Draft = Aufschlag weg — Trotz ist
+  // Verhandlungsgedaechtnis, kein Lebensgroll; dafuer gibt es rejected_bad_experience.
+  const priorDefianceSurchargePct = activeNegotiationDraft?.defianceSurchargePct ?? 0;
+
+  // Erwiderung (Abschnitt 9.3): sein letztes Geld-Wort zaehlt nur, solange die Verhandlung
+  // offen steht UND die Konditionen dieselben sind. Sein Wort galt fuer die damalige
+  // Laufzeit/Form — aendert der Nutzer sie, ist es eine neue Sachlage und die naechste Runde
+  // beginnt gedaechtnislos. Diese Entscheidung gehoert hierher und nicht in die Vorschau: nur
+  // hier liegt der Draft mit den damaligen Konditionen.
+  const negotiationConditionsUnchanged =
+    activeNegotiationDraft?.contractLength === contractLength &&
+    (activeNegotiationDraft?.contractShape ?? "balanced") === contractShape;
+  const lastCounterSalary =
+    activeNegotiationDraft?.status === "countered" && negotiationConditionsUnchanged
+      ? activeNegotiationDraft.lastCounterSalary ?? null
+      : null;
+  const lastNegotiatedSalary =
+    activeNegotiationDraft?.status === "countered" && negotiationConditionsUnchanged
+      ? activeNegotiationDraft.offeredSalary ?? null
+      : null;
+
   return {
     marketContext,
     save,
@@ -1227,6 +1298,10 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
     rosterPlayers,
     playerAlreadyOwned,
     recentlySoldBySameTeam,
+    affrontRetreat,
+    priorDefianceSurchargePct,
+    lastCounterSalary,
+    lastNegotiatedSalary,
     purchasePrice,
     marketValueReference,
     salary,

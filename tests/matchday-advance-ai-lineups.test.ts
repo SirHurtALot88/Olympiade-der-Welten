@@ -127,6 +127,12 @@ describe("KI stellt beim Spieltagswechsel auf", () => {
     // Vorhandene Aufstellungen bleiben unangetastet -> der Aufruf ist idempotent, und
     // die spaeteren Aufrufe beim Speichern und beim Ergebnis-Commit finden nichts mehr.
     expect(call.overwriteExisting).toBe(false);
+    // Die injizierte Persistence MUSS durchgereicht werden — sonst faellt der Aufruf
+    // intern auf seine eigene createPersistenceService() zurueck und schreibt an einem
+    // Persistence-Sandbox (z. B. dem des Whole-Season-DryRuns) vorbei direkt in die
+    // echte Ablage. Das war der Grund fuer den vorher fast immer roten
+    // `season:smoke-whole-season-dry-run`-Wachhund.
+    expect(aiBatch.mock.calls[0][1]).toBe(persistence);
   });
 
   it("laeuft NACH dem Persistieren, damit der Wechsel sicher geschrieben ist", async () => {

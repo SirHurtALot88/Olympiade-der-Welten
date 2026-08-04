@@ -358,6 +358,13 @@ function writeLocalMatchdayAdvance(prepared: PreparedMatchdayProgress, persisten
   // Aufruf nach.
   if (prepared.nextMatchdayId) {
     try {
+      // `persistence` MUSS durchgereicht werden: ohne zweites Argument faellt
+      // applyAiLegacyLineupBatchLocally auf ihre eigene createPersistenceService()
+      // zurueck und schreibt am injizierten Persistence-Sandbox vorbei direkt in die
+      // echte SQLite-Ablage. Im Whole-Season-DryRun laeuft dieser Aufwaerm-Batch dann
+      // gegen die echte Datenbank, obwohl der Vorlauf komplett in-memory laufen soll
+      // (siehe scripts/smoke-whole-season-dry-run.ts, das genau das per Vorher/Nachher-
+      // Vergleich abfaengt).
       applyAiLegacyLineupBatchLocally({
         saveId: save.saveId,
         seasonId: prepared.seasonId,
@@ -365,7 +372,7 @@ function writeLocalMatchdayAdvance(prepared: PreparedMatchdayProgress, persisten
         dryRun: false,
         includeWarningTeams: false,
         overwriteExisting: false,
-      });
+      }, persistence);
     } catch {
       // bewusst geschluckt, siehe oben
     }

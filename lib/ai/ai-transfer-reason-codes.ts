@@ -16,7 +16,15 @@ export type AiSellReasonCode =
   | "board_renewal_warning"
   | "board_do_not_renew"
   | "cash_runway_pressure"
-  | "roster_quality_floor";
+  | "roster_quality_floor"
+  /**
+   * Verdient mehr, als Spieler seiner Leistung ueblicherweise verdienen. BEWUSST GETRENNT von
+   * `high_wage_burden`: das misst "kostet viel im Verhaeltnis zum Teambudget" (also die Frage,
+   * ob wir ihn uns leisten koennen), dieses hier "kostet mehr als er wert ist" (ob er es wert
+   * ist). Ein Spitzenspieler kann teuer und trotzdem angemessen bezahlt sein; ein Ergaenzungs-
+   * spieler billig und trotzdem ueberbezahlt.
+   */
+  | "overpaid_for_output";
 
 export type AiKeepReasonCode =
   | "low_wage_burden"
@@ -30,41 +38,48 @@ export type AiKeepReasonCode =
   | "healthy_cash"
   | "player_demand_keep"
   | "high_board_confidence"
-  | "negative_net_proceeds";
+  | "negative_net_proceeds"
+  /** Verdient weniger als fuer seine Leistung ueblich — ein Vertrag, den man nicht aufgibt. */
+  | "bargain_contract";
 
 const SELL_REASON_PATTERNS: Array<{ code: AiSellReasonCode; patterns: string[] }> = [
   { code: "negative_cash", patterns: ["negatives Teamcash"] },
   { code: "low_cash_reserve", patterns: ["Cash-Reserve ist zu knapp"] },
-  { code: "high_wage_burden", patterns: ["hohes Gehalt im Verhaeltnis"] },
+  { code: "high_wage_burden", patterns: ["hohes Gehalt im Verhältnis"] },
   { code: "profit_window", patterns: ["realisierbarer Gewinn", "realisierbarer Netto-Gewinn", "Verkaufsfenster"] },
   { code: "underperformance", patterns: ["Performance blieb unter Erwartung", "Abgang sinnvoll"] },
-  { code: "weak_contribution", patterns: ["schwache lokale Score-Beitraege"] },
+  { code: "weak_contribution", patterns: ["schwache lokale Score-Beiträge"] },
   { code: "poor_team_fit", patterns: ["passt nur schwach zum Teamprofil"] },
   { code: "hard_no_go", patterns: ["Hard-No-Go"] },
   { code: "roster_over_opt", patterns: ["Kader liegt ueber dem Optimum"] },
-  { code: "short_contract", patterns: ["kurze Restvertragslaenge", "Vertrag laeuft aus und Fit"] },
+  { code: "short_contract", patterns: ["kurze Restvertragslänge", "Vertrag läuft aus und Fit"] },
   { code: "expiring_contract", patterns: ["auslaufender Vertrag braucht"] },
   { code: "proactive_early_buyout", patterns: ["letztes Vertragsjahr"] },
   { code: "player_demand_pressure", patterns: ["offene Spielerforderung erzeugt Kaderdruck"] },
   { code: "board_salary_cap", patterns: ["begrenzt Vertragsrahmen"] },
   { code: "board_renewal_warning", patterns: ["warnt vor voller Verlaengerung"] },
   { code: "board_do_not_renew", patterns: ["will keine Verlaengerung"] },
-  { code: "cash_runway_pressure", patterns: ["Gehaltslast uebersteigt verfuegbares Cash", "Kein Verkauf in dieser Saison trotz enger Cash-Lage"] },
-  { code: "roster_quality_floor", patterns: ["unteres Kader-Drittel", "Qualitaet upgraden"] },
+  // Umlaute wie in der QUELLE (lib/ai/ai-transfermarkt-sell-preview-service.ts): dieser Zweig
+  // hat die Begruendungstexte dort auf echte Umlaute umgestellt, statt sie in der Anzeige zu
+  // ueberkleben. Die Muster muessen mitziehen, sonst greift die Zuordnung ins Leere.
+  { code: "cash_runway_pressure", patterns: ["Gehaltslast übersteigt verfügbares Cash", "Kein Verkauf in dieser Saison trotz enger Cash-Lage"] },
+  { code: "roster_quality_floor", patterns: ["unteres Kader-Drittel", "Qualität upgraden"] },
+  { code: "overpaid_for_output", patterns: ["teurer als für diese Leistung üblich"] },
 ];
 
 const KEEP_REASON_PATTERNS: Array<{ code: AiKeepReasonCode; patterns: string[] }> = [
   { code: "low_wage_burden", patterns: ["geringe Gehaltslast"] },
   { code: "sell_below_purchase", patterns: ["unter Einkauf liegen"] },
-  { code: "strong_contribution", patterns: ["starke lokale Score-Beitraege"] },
-  { code: "top10_presence", patterns: ["Top-10-Praesenz"] },
+  { code: "strong_contribution", patterns: ["starke lokale Score-Beiträge"] },
+  { code: "top10_presence", patterns: ["Top-10-Präsenz"] },
   { code: "good_team_fit", patterns: ["passt gut zum Teamprofil"] },
   { code: "star_core_protection", patterns: ["Star-/Core-Spieler", "Star bleibt Core", "Topstar"] },
-  { code: "covers_need_axis", patterns: ["deckt die aktuelle Achsenluecke", "deckt aktuelle Achsenluecke"] },
-  { code: "long_contract", patterns: ["laengerer Restvertrag"] },
+  { code: "covers_need_axis", patterns: ["deckt die aktuelle Achsenlücke", "deckt aktuelle Achsenlücke"] },
+  { code: "long_contract", patterns: ["längerer Restvertrag"] },
   { code: "healthy_cash", patterns: ["Teamcash ist entspannt"] },
   { code: "player_demand_keep", patterns: ["offene Forderung muss eingeplant"] },
   { code: "high_board_confidence", patterns: ["statische Board-Confidence", "Kaderzusammenhalt bevorzugen"] },
+  { code: "bargain_contract", patterns: ["günstiger als für diese Leistung üblich"] },
 ];
 
 export function inferSellReasonCodes(reasons: string[]): AiSellReasonCode[] {

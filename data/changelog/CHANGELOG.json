@@ -2,6 +2,330 @@
   "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
+      "datum": "2026-08-03",
+      "seite": "Verein · Sponsoren",
+      "pr": null,
+      "text": "Neu: der Apron. Wer deutlich mehr für Gehälter ausgibt als der Median der Liga, gibt am Saisonende einen Teil ab — der Topf geht zu gleichen Teilen an die sparsamen Teams. Die zwei Linien werden zu Saisonbeginn eingefroren und stehen in der Sponsorenübersicht, die Abgabe hängt an der Konjunktur der Saison und ist gedeckelt.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-03",
+      "seite": "Saison · Spieltagswechsel",
+      "pr": null,
+      "text": "Beim Spieltagswechsel schrieb das automatische Aufstellen der KI-Teams unter Umständen direkt in die echte Spielstand-Ablage, statt in die vom Aufrufer vorgegebene — dadurch konnte ein reiner Vorschau-Durchlauf den gespeicherten Stand verändern.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-03",
+      "seite": "Verein · Sponsoren",
+      "pr": null,
+      "text": "KI-Teams wählen ihre Sponsor-Kurvenform jetzt danach, wo sie realistisch landen: die Bewertung liest die Ligaleiter statt nur Sonderziel und Marke, und ein ehrgeiziges Team darf dabei bewusst höher greifen als sein Startrang — vorher unterschrieb ein Titelfavorit auch mal eine Mittelfeldkurve.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-03",
+      "seite": "Verein · Sponsoren",
+      "pr": null,
+      "text": "KI-Teams in Geldnot bevorzugen bei der Sponsorwahl jetzt gezielt die Karte mit dem sichersten Boden statt nur die mit dem Vorschuss: eine sparsame Saison mit hohem, verlässlichem Einkommen ist jetzt möglich.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-03",
+      "seite": "Verein · Sponsoren",
+      "pr": null,
+      "text": "Die Reihenfolge der Sponsoren-Achsen im Angebots-Slate wechselt jetzt zwischen Teams: vorher bekamen alle Teams derselben Saison dieselbe Reihenfolge, weil der Zufallswurf falsch verschaltet war.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-03",
+      "seite": "Verein · Sponsoren",
+      "pr": "#365",
+      "text": "Zwei der fünf Sponsor-Achsenziele wurden nachjustiert: Entwicklung und Solidität fielen in einer komplett durchgespielten Saison bei praktisch jedem Vertrag voll aus (100 % bzw. 99,3 % im Schnitt) statt eine echte Entscheidung zu sein — die Zielwerte wurden auf den Bereich angehoben, in dem rund die Hälfte der Verträge landet. Kaderwert wird ab Saison 1 nicht mehr angeboten, weil die Draft-Startbewertung und die Neubewertung am Saisonende nach unterschiedlichen Methoden rechnen und der Vergleich dadurch systematisch schlecht ausfiel, nicht wegen echter Wertentwicklung.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-03",
+      "seite": "Verein · Sponsoren",
+      "pr": null,
+      "text": "Sponsor-Angebote laufen jetzt teils über mehrere Saisons: der Sockel steht beim Unterschreiben fest, der Wertungsanteil richtet sich weiter jede Saison neu nach der Konjunktur — und ein Mehrjahresvertrag zahlt dafür spürbar weniger als die gleiche Zahl Einjahresverträge hintereinander. Die Karte zeigt Laufzeit, Bedingung und einen Ausblick über jede Saison der Laufzeit.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-03",
+      "seite": "Verein · Sponsoren",
+      "pr": null,
+      "text": "Sponsoren zahlen nicht mehr alle dieselbe Kurve: der Betrag setzt sich jetzt aus einem festen Sockel nach Startrang und einem Wertungstopf nach Endrang zusammen, und die Kurvenform der Karte entscheidet, wo auf der Tabelle dieses Geld liegt — bei gleichem Erwartungswert.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-03",
+      "seite": "Verein · Sponsoren",
+      "pr": null,
+      "text": "Die Ausschüttung ist nachkalibriert: bei normaler Konjunktur zahlen die Sponsoren der Liga ungefähr so viel, wie alle Gehälter zusammen kosten — vorher waren es 15 Prozent mehr, wodurch fast jedes Team automatisch im Plus landete.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-03",
+      "seite": "Verein · Sponsoren",
+      "pr": null,
+      "text": "Aufräumarbeit unter der Haube: der Katalog mit 27 Bonus- und 6 Golden-Sonderzielen wurde entfernt, weil seit der Achsenkarten-Umstellung ohnehin kein Angebot mehr eines davon zieht — jede Zielkarte trägt heute eine der fünf Achsen. Bereits unterschriebene Sponsorverträge mit einem Alt-Ziel rechnen unverändert weiter.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Cockpit · Saisonende",
+      "pr": null,
+      "text": "Der Schritt \"Spielerentwicklung\" im Saisonende hat bisher nur weitergeschaltet — gerechnet wurde erst beim Start der neuen Saison, also hinter dem Transferfenster. Man verkaufte damit zu Marktwerten, die der Spieler schon nicht mehr hatte. Jetzt läuft die Entwicklung wirklich in diesem Schritt, und erst danach öffnet der Verkauf.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Cockpit · Saisonende",
+      "pr": null,
+      "text": "Sollte die Entwicklung einmal nicht durchlaufen, hängt der Saisonübergang trotzdem nicht fest: es geht weiter, der Saisonstart holt sie nach, und eine Notiz sagt, dass die Marktwerte in diesem Durchgang noch die alten sind.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": null,
+      "text": "Das Grundinteresse eines Spielers war bisher für jeden gleich. Jetzt hängt es davon ab, wo er in eurem Kader stünde und wie viel Platz ihr habt: wer bei euch sofort gesetzt wäre, will eher kommen — wer hinter dem halben Kader einsortiert oder in ein volles Team käme, weniger. Der Tooltip sagt jeweils, welcher Fall zutrifft.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Spieltag · Inbox",
+      "pr": null,
+      "text": "Aufstellung setzen, Formkarten erzeugen und bestätigen sind jetzt eine Karte statt drei — mit Fortschritt: „Spieltag vorbereiten · Schritt 2 von 3\".",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Spieltag · Inbox",
+      "pr": null,
+      "text": "Ein belasteter Spieler löst nur noch eine Meldung aus statt bis zu drei, die alle dieselbe Person meinten. Der Knopf „Training leicht\" bleibt dabei erhalten.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Spieltag · Inbox",
+      "pr": null,
+      "text": "Mehrere Scouting-Fortschritte werden zu einer Notiz zusammengefasst („3 Scouting-Reports sind schärfer geworden\") statt je Spieler und Meilenstein einzeln zu melden.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Spieltag · Inbox",
+      "pr": null,
+      "text": "Die Inbox hat jetzt drei Räume nebeneinander — „Jetzt handeln\", „Im Blick behalten\" und „Berichte & Momente\". Was dich etwas kostet, wenn du es liegen lässt, steht links; was nur informiert, kapert nicht mehr den Platz davor.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Spieltag · Inbox",
+      "pr": null,
+      "text": "Der Umschalter zwischen „Entscheidungen\" und „Chronik\" ist weg: beides ist gleichzeitig sichtbar, statt dass eine Hälfte hinter einem Reiter verschwindet.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Spieltag · Inbox",
+      "pr": null,
+      "text": "Jede Karte trägt ihr Sprungziel als Chip („→ Teams · Verträge\") — du siehst vor dem Klick, wo du landest.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Spieltag · Inbox",
+      "pr": null,
+      "text": "Auf breiten Schirmen füllt die Inbox die Fläche aus, statt eine schmale Spalte links zu lassen; auf schmalen stapeln die drei Räume untereinander.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": null,
+      "text": "Der Transfermarkt hat beim Öffnen fast eine Minute gebraucht, bis die Liste stand — und währenddessen sortierte sie sich immer wieder um, sodass ein Klick auf einen Spieler oft einen anderen erwischte. Jetzt ist die Liste nach knapp zwei Sekunden vollständig und steht still.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": null,
+      "text": "Sortieren und Filtern im Markt reagiert jetzt spürbar schneller: statt aller ~1900 Kandidaten zeichnet die Liste nur noch den sichtbaren Ausschnitt. Ein Klick auf \"Bester Fit\" braucht rund eine halbe statt zwei Sekunden.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": null,
+      "text": "Der große Knopf oben rechts blieb dauerhaft auf \"Kandidat wählen\" und ließ sich nicht drücken, obwohl links längst einer markiert war. Er wusste schlicht nichts von deiner Auswahl. Jetzt heißt er \"Vertragsangebot öffnen\" und führt dich direkt in den Kaufdialog.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": null,
+      "text": "Nach einer Absage sagte der Kaufdialog \"heb das Gehalt an, dann kannst du erneut verhandeln\" — aber Verhandeln blieb gesperrt, auch wenn man genau das tat. Der einzige Ausweg war Schließen. Jetzt gibt eine Gehaltsänderung die Verhandlung wieder frei.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": null,
+      "text": "Der Kaufdialog ließ sich nicht mehr öffnen: er wurde gerendert, lag aber gut zweitausend Pixel unterhalb des Bildschirms, weil beim letzten Umbau der Sprungpunkt verlorenging. Jetzt springt die Ansicht wieder direkt hin.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": null,
+      "text": "Im Vertragsangebot standen die Verhandlungschancen als \"Zusage 5100 % · Nachverhandlung 4700 % · Absage 200 %\" — die Prozente wurden doppelt gerechnet und liefen ohne Abstand ineinander. Jetzt stimmen sie und stehen getrennt.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": null,
+      "text": "Kauf- und Verkaufsdialog scrollen jetzt wirklich in sich selbst statt die ganze Seite zu verlängern. Dadurch bleiben Abbrechen, Verhandeln und Abschließen beim Lesen immer sichtbar.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Team · Verträge",
+      "pr": "#344",
+      "text": "Ob ein Spieler sein Gehalt wert ist, wird jetzt am Ligadurchschnitt gemessen statt am reinen Verhaeltnis von Gehalt und Leistung. Vorher standen schwache Spieler dabei immer schlecht da, egal wie wenig sie kosteten — jetzt faellt auf, wer wirklich mehr verdient als ueblich, und die Computer-Teams entscheiden auf derselben Grundlage ueber ihre Verkaeufe.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": "#345",
+      "text": "Beim Verhandeln stieg das Gegenangebot bisher, je weiter du entgegengekommen bist. Jetzt merkt sich die Gegenseite ihr letztes Wort: legst du nach, geht sie mit und senkt ihre Forderung — bis sie irgendwann glaubwürdig sagt, dass mehr nicht drin ist.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": "#345",
+      "text": "Söldner, Divas und Egomanen nehmen dir ein Lowball-Angebot jetzt übel: ihre Forderung steigt für den Rest dieser Verhandlung. Der Kaufdialog warnt dich vorher, wie viel es kosten würde, und eine neue Season setzt es zurück.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": "#345",
+      "text": "Es gibt endlich Spieler, die unter ihrer Forderung unterschreiben: wer wirklich zu euch will, sagt jetzt auch deutlich darunter zu, während Unwillige teurer werden. Vorher lagen praktisch alle im selben schmalen Band.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": "#345",
+      "text": "Der Verkaufsdialog nutzt jetzt dieselbe Form wie Kauf und Ausbau — Kopfzeile, Fußleiste und Sicherheitsabfrage kommen aus einem Bauteil statt dreimal nachgebaut. Die Fußleiste bleibt beim Scrollen sichtbar, und Esc nimmt im Bestätigungsschritt nur den letzten Klick zurück.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": "#345",
+      "text": "Auch das Kaufmodal nutzt jetzt dieselbe Form wie Verkauf und Ausbau. Neu darin: der Tooltip erklärt an einer Stelle, warum seine Forderung anders ist als eben — ob er euer Lowball nachträgt, ob dieses Angebot ihn gleich verärgern würde, oder ob er auf euer Entgegenkommen reagiert hat.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Team · Verträge",
+      "pr": "#348",
+      "text": "Der Verträge-Reiter sagt jetzt, was zu tun ist, statt nur Zahlen zu zeigen: je Spieler eine Empfehlung mit Begruendung, dazu OVR, PPs und MVS als Leitzahlen, die Punkte je Achse mit Ligarang, und zwei Balken fuer 'verdient er mehr als ueblich' und 'bringt ein Verkauf mehr oder weniger als der Marktwert'. Oben steht die Bilanz des Vorstands, und die dringendsten Faelle stehen zuerst.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": null,
+      "text": "Das Scouting-Profil zeigt das Spielerbild jetzt in 240 statt 196 Pixeln, und die Kacheln daneben (MW, Gehalt, Value, Fit, Bracket) stehen in einem festen Raster aus genau zwei Zeilen statt frei umzubrechen.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": null,
+      "text": "POW, SPE, MEN und SOC stehen nicht mehr als vier flache Pillen nebeneinander, sondern als Achsen-Rail im Velo-Stil: Disziplin-Symbol in der Achsfarbe, Balken für die Höhe, Note rechts — und eine feine Marke im Balken zeigt den Schnitt der eigenen Top-6 auf derselben Achse.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.3"
+    },
+    {
       "datum": "2026-08-01",
       "seite": "Spieltag · Einsatzliste",
       "pr": "#323",

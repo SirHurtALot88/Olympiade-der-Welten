@@ -55,10 +55,12 @@ import {
   getTeamFacilityState,
 } from "@/lib/facilities/facility-effects";
 import {
+  buildContractNegotiationDraft,
   type NegotiationDemandBreakdownEntry,
   type NegotiationScoreBreakdownEntry,
   type PlayerContractPreference,
 } from "@/lib/market/contract-negotiation-preview";
+import { getTransfermarktAdvancedColumns, getTransfermarktBaseColumns } from "@/lib/market/transfermarkt-column-contract";
 import {
   formatTransfermarktCurrency,
   formatTransfermarktPoints,
@@ -92,6 +94,7 @@ import type {
   NewGameFlowStepStatus,
   Player,
   PlayerGeneratorDraft,
+  ContractNegotiationDraft,
   ContractShape,
   PlayerGeneratorAttributeName,
   RosterEntry,
@@ -485,6 +488,7 @@ import {
   FoundationWholeSeasonDryRunSummary,
   MATCHDAY_AUTO_RUN_CONFIRM_TOKEN,
   MATCHDAY_MVP_SCORING_CONFIRM_TOKEN,
+  MarketNegotiationOutcome,
   NEW_GAME_PRESET_DEFAULTS,
   NEW_GAME_VISIBLE_PRESET_IDS,
   NewGamePresetId,
@@ -520,6 +524,8 @@ import {
   SeasonTransitionSummaryResponse,
   SortState,
   TRANSFER_HISTORY_SEASON_LIMIT,
+  TRANSFER_MARKET_INITIAL_RENDER_LIMIT,
+  TRANSFER_MARKET_RENDER_STEP,
   TeamControlDraftMap,
   TeamIdentityDraftMap,
   TeamRosterFocusMode,
@@ -528,7 +534,10 @@ import {
   TrainingClassDraft,
   TrainingDevelopmentFilter,
   TrainingModeDraft,
+  TransfermarktBuyApiResponse,
   TransfermarktBuyPreviewSubject,
+  TransfermarktBuyRequestContext,
+  TransfermarktBuySummary,
   TransfermarktSellApiResponse,
   TransfermarktSellPreviewSubject,
   TransfermarktSellSummary,
@@ -818,6 +827,10 @@ const ScoutingCenterV2Client = dynamic(() => import("@/app/foundation/scouting-c
   ssr: false,
 });
 const InboxV2Client = dynamic(() => import("@/app/foundation/inbox-v2/InboxV2Client"), { ssr: false });
+const FoundationDebugGameStatePanel = dynamic(
+  () => import("@/app/foundation/debug/FoundationDebugGameStatePanel"),
+  { ssr: false },
+);
 const FoundationPlayersTablePanel = dynamic(
   () => import("@/app/foundation/players-table/FoundationPlayersTablePanel"),
   {
@@ -1008,18 +1021,20 @@ export function useFoundationShellRouterBodyScope({
     setTeamSettingsSearch, showTeamDisciplines, setShowTeamDisciplines, selectedTeamDetailTab, setSelectedTeamDetailTab, showTeamContractPreviewRows, setShowTeamContractPreviewRows, teamRosterRoleFilter, setTeamRosterRoleFilter, teamRosterFocusMode,
     setTeamRosterFocusMode, showSelectedRosterPpsBreakdown, setShowSelectedRosterPpsBreakdown, trainingModeDraft, setTrainingModeDraft, trainingClassDraft, setTrainingClassDraft, trainingDevelopmentFilter, setTrainingDevelopmentFilter, trainingFacilityPreviewId,
     setTrainingFacilityPreviewId, seasonTableMode, setSeasonTableMode, showSeasonTopPlayerAreas, setShowSeasonTopPlayerAreas, tableSorts, setTableSorts, playerScope,
-    setPlayerScope, playerTeamFilter, setPlayerTeamFilter, playerClassFilter, setPlayerClassFilter, playerBracketFilter, setPlayerBracketFilter,
-    marketTeamId, setMarketTeamId, marketFocusPlayerId, setMarketFocusPlayerId, foundationPanel, setFoundationPanel, foundationFacilityTarget, setFoundationFacilityTarget,
-    marketMaxValue, setMarketMaxValue,
-    historyLoadingMore, setHistoryLoadingMore, bootstrapError, setBootstrapError, persistenceError,
+    setPlayerScope, playerTeamFilter, setPlayerTeamFilter, playerClassFilter, setPlayerClassFilter, playerBracketFilter, setPlayerBracketFilter, marketClassFilter, setMarketClassFilter, marketRaceFilter, setMarketRaceFilter, marketSubclassFilter,
+    setMarketSubclassFilter, marketAlignmentFilter, setMarketAlignmentFilter, marketGenderFilter, setMarketGenderFilter, marketPositiveTraitFilter, setMarketPositiveTraitFilter, marketNegativeTraitFilter, setMarketNegativeTraitFilter, marketBracketFilter,
+    setMarketBracketFilter, marketTeamId, setMarketTeamId, marketFocusPlayerId, setMarketFocusPlayerId, foundationPanel, setFoundationPanel, foundationFacilityTarget, setFoundationFacilityTarget, marketSearch,
+    setMarketSearch, marketMaxValue, setMarketMaxValue, marketMaxSalary, setMarketMaxSalary, marketMinRatio, setMarketMinRatio, marketMinPow, setMarketMinPow, marketMinSpe,
+    setMarketMinSpe, marketMinMen, setMarketMinMen, marketMinSoc, setMarketMinSoc, marketShowAdvancedColumns, setMarketShowAdvancedColumns, marketShowAutoAnalysis, setMarketShowAutoAnalysis, marketShowTransferRecap,
+    setMarketShowTransferRecap, marketRenderLimit, setMarketRenderLimit, marketLoadingMore, setMarketLoadingMore, historyLoadingMore, setHistoryLoadingMore, bootstrapError, setBootstrapError, persistenceError,
     setPersistenceError, saveSyncError, setSaveSyncError, marketReloadToken, setMarketReloadToken, marketFeed, setMarketFeed, marketBuyBusy, setMarketBuyBusy, marketBuyError,
-    setMarketBuyError, marketBuyPreview, setMarketBuyPreview, foundationActionFeedback, setFoundationActionFeedback, seasonBriefingOpen, setSeasonBriefingOpen, freshSeasonStartMessage, setFreshSeasonStartMessage, newGamePresetId,
+    setMarketBuyError, marketBuySuccess, setMarketBuySuccess, foundationActionFeedback, setFoundationActionFeedback, seasonBriefingOpen, setSeasonBriefingOpen, freshSeasonStartMessage, setFreshSeasonStartMessage, newGamePresetId,
     setNewGamePresetId, newGameChrisTeamIds, setNewGameChrisTeamIds, newGameFrankyTeamIds, setNewGameFrankyTeamIds, newGameSandbox, setNewGameSandbox, newGameSaveName, setNewGameSaveName, newGamePreview,
-    setNewGamePreview, newGameBusy, setNewGameBusy, newGameError, setNewGameError, newGameSuccess, setNewGameSuccess,
-    marketPreviewPlayerId, setMarketPreviewPlayerId, marketSellBusy, setMarketSellBusy, marketSellError,
+    setNewGamePreview, newGameBusy, setNewGameBusy, newGameError, setNewGameError, newGameSuccess, setNewGameSuccess, marketBuyPreview, setMarketBuyPreview, marketBuyPreviewContext,
+    setMarketBuyPreviewContext, marketNegotiationOutcome, setMarketNegotiationOutcome, marketPreviewPlayerId, setMarketPreviewPlayerId, marketPreviewPlayerSummary, setMarketPreviewPlayerSummary, marketBuySubject, setMarketBuySubject, marketSellBusy, setMarketSellBusy, marketSellError,
     setMarketSellError, marketSellSuccess, setMarketSellSuccess, marketSellPreview, setMarketSellPreview, contractRenewalBusy, setContractRenewalBusy, contractRenewalMessage, setContractRenewalMessage, contractRenewalError,
     setContractRenewalError, contractRenewalNegotiation, setContractRenewalNegotiation, sponsorChoiceBusy, setSponsorChoiceBusy, sponsorChoiceMessage, setSponsorChoiceMessage, marketSellSubject,
-    setMarketSellSubject, marketSellRiskAcknowledged, setMarketSellRiskAcknowledged, marketAiTeamScope,
+    setMarketSellSubject, marketSellRiskAcknowledged, setMarketSellRiskAcknowledged, marketContractLengthDraft, setMarketContractLengthDraft, marketContractShapeDraft, setMarketContractShapeDraft, marketOfferedSalaryDraft, setMarketOfferedSalaryDraft, marketAiTeamScope,
     setMarketAiTeamScope, marketAiPreviewBusy, setMarketAiPreviewBusy, marketAiPreviewError, setMarketAiPreviewError, marketAiPreviewFeed, setMarketAiPreviewFeed, marketAiPreviewSelectedTeamId, setMarketAiPreviewSelectedTeamId, marketAiSellTeamScope,
     setMarketAiSellTeamScope, marketAiSellPreviewBusy, setMarketAiSellPreviewBusy, marketAiSellPreviewError, setMarketAiSellPreviewError, marketAiSellPreviewFeed, setMarketAiSellPreviewFeed, marketAiSellPreviewSelectedTeamId, setMarketAiSellPreviewSelectedTeamId, marketAiPlanTeamScope,
     setMarketAiPlanTeamScope, marketAiPlanPreviewBusy, setMarketAiPlanPreviewBusy, marketAiPlanPreviewError, setMarketAiPlanPreviewError, marketAiPlanPreviewFeed, setMarketAiPlanPreviewFeed, marketAiPlanPreviewSelectedTeamId, setMarketAiPlanPreviewSelectedTeamId, marketAiCompareTeamScope,
@@ -1426,6 +1441,7 @@ export function useFoundationShellRouterBodyScope({
     };
   }, []);
   const [isTeamSwitchPending, startTeamSwitchTransition] = useTransition();
+  const deferredMarketSearch = useDeferredValue(marketSearch);
   const deferredHistorySearch = useDeferredValue(historySearch);
   const deferredPlayerTeamFilter = useDeferredValue(playerTeamFilter);
   const deferredPlayerClassFilter = useDeferredValue(playerClassFilter);
@@ -1440,6 +1456,7 @@ export function useFoundationShellRouterBodyScope({
     maxWidth?: number;
   } | null>(null);
   const tableDragState = useRef<{ tableId: string; columnId: string } | null>(null);
+  const marketBuyPreviewRequestVersion = useRef(0);
   const marketSellPreviewRequestVersion = useRef(0);
   const marketFeedReloadersRef = useRef<FoundationMarketFeedReloaders>({
     reloadMarketFeed: async () => null,
@@ -1539,8 +1556,13 @@ export function useFoundationShellRouterBodyScope({
     roomContext,
     feedSetters: {
       setMarketFeed,
-      setMarketBuyError,
+      setMarketRenderLimit,
+      setMarketLoadingMore,
       setMarketBuyPreview,
+      setMarketBuyPreviewContext,
+      setMarketBuyError,
+      setMarketBuySuccess,
+      setMarketBuySubject,
       setFoundationPanel,
       setMarketSellPreview,
       setMarketSellError,
@@ -1628,6 +1650,7 @@ export function useFoundationShellRouterBodyScope({
     reloadHistoryFeed,
     loadMoreHistoryFeed,
     reloadTransferRecapFeed,
+    loadMoreMarketFeed,
   } = useFoundationMarketFeedActions({
     activeSaveId,
     activeView,
@@ -1638,6 +1661,9 @@ export function useFoundationShellRouterBodyScope({
     marketMaxValue,
     marketFeed,
     setMarketFeed,
+    setMarketRenderLimit,
+    marketLoadingMore,
+    setMarketLoadingMore,
     marketReloadToken,
     marketAiTeamScope,
     marketAiSellTeamScope,
@@ -2628,6 +2654,25 @@ export function useFoundationShellRouterBodyScope({
     }
   }
 
+  function saveContractNegotiationDrafts(nextDrafts: ContractNegotiationDraft[]) {
+    if (readMeta.readOnly) {
+      showReadOnlyNotice();
+      return;
+    }
+    if (!selectedTeamCanManage) {
+      showTeamManagementLockedNotice();
+      return;
+    }
+
+    setGameState((current) => ({
+      ...current,
+      seasonState: {
+        ...current.seasonState,
+        contractNegotiationDrafts: nextDrafts,
+      },
+    }));
+  }
+
   /**
    * GEMELDET: „,Wishlist & Scouting' fuellt sich immer wieder mit Spielern, die ich schon entfernt
    * habe."
@@ -3298,6 +3343,172 @@ export function useFoundationShellRouterBodyScope({
     openMarketOfferPanel(player.playerId);
   }
 
+  function persistContractNegotiationDraftFromSummary(summary: TransfermarktBuySummary | null) {
+    if (readMeta.readOnly || !summary?.player?.id || !summary.team?.id) {
+      return;
+    }
+
+    const draft = buildContractNegotiationDraft({
+      saveId: activeSaveId,
+      seasonId: gameState.season.id,
+      teamId: summary.team.id,
+      playerId: summary.player.id,
+      playerName: summary.player.name,
+      preview: {
+        expectedSalary: summary.expectedSalary ?? null,
+        baseExpectedSalary: summary.baseExpectedSalary ?? null,
+        demandMultiplier: summary.demandMultiplier ?? null,
+        offeredSalary: summary.offeredSalary ?? null,
+        offerRatio: summary.offerRatio ?? null,
+        contractLength: summary.contractLength,
+        contractShape: summary.contractShape ?? "balanced",
+        yearlySalarySchedule: summary.yearlySalarySchedule ?? [],
+        totalSalary: summary.totalSalary ?? null,
+        roundingAdjustment: summary.roundingAdjustment ?? null,
+        buyoutCost: summary.buyoutCost ?? null,
+        bracket: summary.bracket ?? null,
+        teamFit: summary.teamFit ?? null,
+        acceptanceScore: summary.acceptanceScore ?? null,
+        acceptChance: summary.acceptChance ?? null,
+        counterChance: summary.counterChance ?? null,
+        rejectChance: summary.rejectChance ?? null,
+        demandBreakdown: summary.demandBreakdown ?? [],
+        scoreBreakdown: summary.negotiationScoreBreakdown ?? [],
+        reasons: summary.negotiationReasons ?? [],
+        warnings: summary.negotiationWarnings ?? [],
+        blockingReasons: summary.negotiationBlockingReasons ?? [],
+        status:
+          summary.negotiationBlockingReasons && summary.negotiationBlockingReasons.length > 0
+            ? "blocked_missing_salary_source"
+            : "ready_for_review",
+      },
+    });
+
+    const currentDrafts = gameState.seasonState.contractNegotiationDrafts ?? [];
+    const nextDrafts = [
+      draft,
+      ...currentDrafts.filter((entry) => entry.draftId !== draft.draftId),
+    ];
+    saveContractNegotiationDrafts(nextDrafts);
+  }
+
+  function persistContractNegotiationOutcome(summary: TransfermarktBuySummary | null, status: ContractNegotiationDraft["status"], extraWarnings: string[] = []) {
+    if (readMeta.readOnly || !summary?.player?.id || !summary.team?.id) {
+      return;
+    }
+
+    const draft = buildContractNegotiationDraft({
+      saveId: activeSaveId,
+      seasonId: gameState.season.id,
+      teamId: summary.team.id,
+      playerId: summary.player.id,
+      playerName: summary.player.name,
+      preview: {
+        expectedSalary: summary.expectedSalary ?? null,
+        baseExpectedSalary: summary.baseExpectedSalary ?? null,
+        demandMultiplier: summary.demandMultiplier ?? null,
+        offeredSalary: summary.offeredSalary ?? null,
+        offerRatio: summary.offerRatio ?? null,
+        contractLength: summary.contractLength,
+        contractShape: summary.contractShape ?? "balanced",
+        yearlySalarySchedule: summary.yearlySalarySchedule ?? [],
+        totalSalary: summary.totalSalary ?? null,
+        roundingAdjustment: summary.roundingAdjustment ?? null,
+        buyoutCost: summary.buyoutCost ?? null,
+        bracket: summary.bracket ?? null,
+        teamFit: summary.teamFit ?? null,
+        acceptanceScore: summary.acceptanceScore ?? null,
+        acceptChance: summary.acceptChance ?? null,
+        counterChance: summary.counterChance ?? null,
+        rejectChance: summary.rejectChance ?? null,
+        demandBreakdown: summary.demandBreakdown ?? [],
+        scoreBreakdown: summary.negotiationScoreBreakdown ?? [],
+        reasons: summary.negotiationReasons ?? [],
+        warnings: [...(summary.negotiationWarnings ?? []), ...extraWarnings],
+        blockingReasons: summary.negotiationBlockingReasons ?? [],
+        status,
+      },
+    });
+
+    const currentDrafts = gameState.seasonState.contractNegotiationDrafts ?? [];
+    const nextDrafts = [
+      draft,
+      ...currentDrafts.filter((entry) => entry.draftId !== draft.draftId),
+    ];
+    const nextGameState = {
+      ...gameState,
+      seasonState: {
+        ...gameState.seasonState,
+        contractNegotiationDrafts: nextDrafts,
+      },
+    };
+    setGameState(nextGameState);
+    void persistLocalGameStateImmediately(nextGameState).catch((error) => {
+      console.warn("Contract negotiation draft persist failed.", error);
+    });
+  }
+
+  async function negotiateTransfermarktBuy() {
+    if (!marketBuyPreview?.player?.id || !marketBuyPreview.team?.id || marketBuyBusy) {
+      return;
+    }
+
+    const acceptChance = marketBuyPreview.acceptChance ?? 0;
+    const counterChance = marketBuyPreview.counterChance ?? 0;
+    const rejectChance = marketBuyPreview.rejectChance ?? 0;
+    const expectedSalary = marketBuyPreview.expectedSalary ?? marketBuyPreview.salary ?? null;
+    const offeredSalary = marketOfferedSalaryDraft ?? marketBuyPreview.offeredSalary ?? expectedSalary;
+
+    if (rejectChance >= acceptChance && rejectChance >= counterChance) {
+      persistContractNegotiationOutcome(marketBuyPreview, "rejected_bad_experience", ["negotiation_rejected_bad_experience"]);
+      setMarketNegotiationOutcome({
+        status: "rejected",
+        tone: "error",
+        title: "Angebot abgelehnt",
+        message: `${marketBuyPreview.player.name} bricht die Verhandlung mit ${marketBuyPreview.team.shortCode} ab. Dieses Team-Spieler-Paar bekommt für künftige Angebote einen Vertrauensmalus.`,
+      });
+      window.requestAnimationFrame(() => {
+      });
+      return;
+    }
+
+    if (counterChance > acceptChance) {
+      const counterSalary =
+        expectedSalary != null
+          ? Number(Math.max(expectedSalary * 1.04, (offeredSalary ?? expectedSalary) * 1.08).toFixed(2))
+          : offeredSalary ?? null;
+      persistContractNegotiationOutcome(marketBuyPreview, "countered");
+      setMarketOfferedSalaryDraft(counterSalary);
+      if (marketBuySubject && counterSalary != null) {
+        await requestTransfermarktBuyPreview(marketBuySubject, marketBuyPreview.team.id, {
+          contractLength: marketContractLengthDraft,
+          contractShape: marketContractShapeDraft,
+          offeredSalary: counterSalary,
+        });
+      }
+      setMarketNegotiationOutcome({
+        status: "countered",
+        tone: "warning",
+        title: "Gegenseite verhandelt nach",
+        message: `${marketBuyPreview.player.name} will weiterreden, erwartet aber eher ${counterSalary != null ? formatDisplayMoney(counterSalary) : "—"} pro Season. Das Angebot wurde angepasst und kann erneut verhandelt werden.`,
+        counterSalary,
+      });
+      window.requestAnimationFrame(() => {
+      });
+      return;
+    }
+
+    persistContractNegotiationOutcome(marketBuyPreview, "accepted_pending_confirm");
+    setMarketNegotiationOutcome({
+      status: "accepted",
+      tone: "success",
+      title: "Angebot angenommen",
+      message: `${marketBuyPreview.player.name} akzeptiert: Ablöse ${formatTransfermarktCurrency(marketBuyPreview.purchasePrice)}, Vertrag ${marketBuyPreview.contractLength} Season(s), Gehalt gesamt ${marketBuyPreview.totalSalary != null ? formatDisplayMoney(marketBuyPreview.totalSalary) : "—"}, Cash danach ${formatTransfermarktCurrency(marketBuyPreview.cashAfter)}.`,
+    });
+    window.requestAnimationFrame(() => {
+    });
+  }
+
   function resolveMarketBuyTeamId(teamIdOverride?: string | null) {
     return teamIdOverride ?? marketTeamId ?? selectedTeamId ?? activeManagerTeamId ?? "";
   }
@@ -3324,6 +3535,21 @@ export function useFoundationShellRouterBodyScope({
 
     setMarketFocusPlayerId(item.playerId);
     openMarketOfferPanel(item.playerId);
+  }
+
+  function resetMarketBuyDemandFrame() {
+    if (!marketBuySubject) {
+      return;
+    }
+    setMarketContractLengthDraft(null);
+    setMarketContractShapeDraft(null);
+    setMarketOfferedSalaryDraft(null);
+    setMarketNegotiationOutcome(null);
+    void requestTransfermarktBuyPreview(marketBuySubject, resolveMarketBuyTeamId(marketBuyPreview?.team?.id), {
+      contractLength: null,
+      contractShape: null,
+      offeredSalary: null,
+    });
   }
 
   async function requestTransfermarktSellPreview(subject: TransfermarktSellPreviewSubject, teamIdOverride?: string) {
@@ -4830,6 +5056,291 @@ export function useFoundationShellRouterBodyScope({
     }
   }, [activeView]);
 
+  async function requestTransfermarktBuyPreview(
+    item: TransfermarktBuyPreviewSubject,
+    teamIdOverride?: string,
+    previewOverrides?: {
+      contractLength?: number | null;
+      contractShape?: ContractShape | null;
+      offeredSalary?: number | null;
+      clearNegotiationOutcome?: boolean;
+    },
+  ) {
+    const requestVersion = ++marketBuyPreviewRequestVersion.current;
+    const effectiveTeamId = resolveMarketBuyTeamId(teamIdOverride);
+    const effectiveContractLength = previewOverrides?.contractLength ?? marketContractLengthDraft;
+    const effectiveContractShape = previewOverrides?.contractShape ?? marketContractShapeDraft;
+    const effectiveOfferedSalary =
+      previewOverrides && "offeredSalary" in previewOverrides
+        ? previewOverrides.offeredSalary ?? null
+        : marketOfferedSalaryDraft;
+
+    if (readMeta.source === "prisma") {
+      if (requestVersion !== marketBuyPreviewRequestVersion.current) {
+        return;
+      }
+      setMarketBuyError("Prisma-Referenz ist read-only. Für Käufe bitte lokalen Testspielstand starten.");
+      setMarketBuyPreview(null);
+      setMarketBuyPreviewContext(null);
+      setMarketPreviewPlayerId(item.playerId);
+      return;
+    }
+
+    if (!effectiveTeamId) {
+      if (requestVersion !== marketBuyPreviewRequestVersion.current) {
+        return;
+      }
+      setMarketBuyError("Bitte zuerst ein Team wählen.");
+      setMarketBuyPreview(null);
+      setMarketBuyPreviewContext(null);
+      setMarketPreviewPlayerId(item.playerId);
+      return;
+    }
+
+    if (!canManageTeamId(effectiveTeamId)) {
+      if (requestVersion !== marketBuyPreviewRequestVersion.current) {
+        return;
+      }
+      setMarketBuyError(`${getTeamLockedName(effectiveTeamId)} gehört nicht zu deinen steuerbaren Teams. Kaufen ist gesperrt.`);
+      setMarketBuyPreview(null);
+      setMarketBuyPreviewContext(null);
+      setMarketPreviewPlayerId(item.playerId);
+      return;
+    }
+
+    const feedSaveId = marketFeed?.scope?.saveId ?? activeSaveId;
+    const feedSeasonId = marketFeed?.scope?.seasonId ?? gameState.season.id;
+    if (feedSaveId !== activeSaveId || feedSeasonId !== gameState.season.id) {
+      if (requestVersion !== marketBuyPreviewRequestVersion.current) {
+        return;
+      }
+      setMarketBuyError(
+        `buy_save_context_mismatch: Transfermarkt-Feed ${feedSaveId}/${feedSeasonId}, aktiver Save ${activeSaveId}/${gameState.season.id}. Bitte Feed neu laden.`,
+      );
+      setMarketBuyPreview(null);
+      setMarketBuyPreviewContext(null);
+      setMarketPreviewPlayerId(item.playerId);
+      return;
+    }
+
+    const requestContext: TransfermarktBuyRequestContext = {
+      saveId: activeSaveId,
+      seasonId: gameState.season.id,
+      teamId: effectiveTeamId,
+      playerId: item.playerId,
+      source: readMeta.source,
+      view: activeView,
+    };
+
+    const shouldClearNegotiationOutcome = previewOverrides?.clearNegotiationOutcome !== false;
+
+    setMarketBuyBusy(true);
+    setMarketBuyError(null);
+    setMarketBuySuccess(null);
+    if (shouldClearNegotiationOutcome) {
+      setMarketNegotiationOutcome(null);
+    }
+    setMarketBuyPreviewContext(null);
+    setMarketPreviewPlayerId(item.playerId);
+
+    try {
+      const response = await fetch("/api/transfermarkt/buy", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(withRoomBody({
+          saveId: requestContext.saveId,
+          seasonId: requestContext.seasonId,
+          teamId: requestContext.teamId,
+          playerId: requestContext.playerId,
+          ...(effectiveContractLength != null ? { contractLength: effectiveContractLength } : {}),
+          ...(effectiveContractShape != null ? { contractShape: effectiveContractShape } : {}),
+          ...(effectiveOfferedSalary != null ? { offeredSalary: effectiveOfferedSalary } : {}),
+          dryRun: true,
+          source: readMeta.source,
+        })),
+      });
+      const payload = (await response.json()) as TransfermarktBuyApiResponse;
+      if (requestVersion !== marketBuyPreviewRequestVersion.current) {
+        return;
+      }
+      if (payload.summary) {
+        setMarketBuyPreview(payload.summary);
+        setMarketBuyPreviewContext(requestContext);
+        persistContractNegotiationDraftFromSummary(payload.summary);
+      } else {
+        setMarketBuyPreview(null);
+        setMarketBuyPreviewContext(null);
+      }
+      if (payload.error) {
+        setMarketBuyError(payload.error);
+        return;
+      }
+      if (!payload.summary) {
+        setMarketBuyError("Kaufvorschau konnte nicht geladen werden.");
+        return;
+      }
+      setMarketBuyError(null);
+    } catch {
+      if (requestVersion === marketBuyPreviewRequestVersion.current) {
+        setMarketBuyError("Kaufvorschau konnte nicht geladen werden.");
+        setMarketBuyPreview(null);
+        setMarketBuyPreviewContext(null);
+      }
+    } finally {
+      if (requestVersion === marketBuyPreviewRequestVersion.current) {
+        setMarketBuyBusy(false);
+      }
+    }
+  }
+
+  async function confirmTransfermarktBuy() {
+    if (readMeta.source === "prisma") {
+      setMarketBuyError("Prisma-Referenz ist read-only. Für Käufe bitte lokalen Testspielstand starten.");
+      return;
+    }
+
+    if (!marketBuyPreview?.player?.id || !marketBuyPreview?.team?.id) {
+      return;
+    }
+    if (!canManageTeamId(marketBuyPreview.team.id)) {
+      setMarketBuyError(`${getTeamLockedName(marketBuyPreview.team.id)} gehört nicht zu deinen steuerbaren Teams. Kaufen ist gesperrt.`);
+      showTeamManagementLockedNotice(getTeamLockedName(marketBuyPreview.team.id));
+      return;
+    }
+
+    const buyContext = marketBuyPreviewContext;
+    if (!buyContext) {
+      setMarketBuyError("buy_save_context_missing: Bitte Kaufvorschau erneut laden.");
+      return;
+    }
+
+    if (
+      buyContext.saveId !== activeSaveId ||
+      buyContext.seasonId !== gameState.season.id ||
+      buyContext.teamId !== marketBuyPreview.team.id ||
+      buyContext.playerId !== marketBuyPreview.player.id ||
+      buyContext.source !== readMeta.source
+    ) {
+      setMarketBuyError(
+        `buy_save_context_mismatch: Preview ${buyContext.saveId}/${buyContext.seasonId}/${buyContext.teamId}/${buyContext.playerId}, aktiv ${activeSaveId}/${gameState.season.id}/${marketBuyPreview.team.id}/${marketBuyPreview.player.id}. Bitte Kaufvorschau neu laden.`,
+      );
+      return;
+    }
+
+    setMarketBuyBusy(true);
+    setMarketBuyError(null);
+    setMarketBuySuccess(null);
+
+    try {
+      const response = await fetch("/api/transfermarkt/buy", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(withRoomBody({
+          saveId: buyContext.saveId,
+          seasonId: buyContext.seasonId,
+          teamId: buyContext.teamId,
+          playerId: buyContext.playerId,
+          ...(marketContractLengthDraft != null ? { contractLength: marketContractLengthDraft } : {}),
+          ...(marketContractShapeDraft != null ? { contractShape: marketContractShapeDraft } : {}),
+          ...(marketOfferedSalaryDraft != null ? { offeredSalary: marketOfferedSalaryDraft } : {}),
+          dryRun: false,
+          source: buyContext.source,
+        })),
+      });
+      const payload = (await response.json()) as TransfermarktBuyApiResponse;
+      if (payload.summary) {
+        setMarketBuyPreview(payload.summary);
+      }
+      if (!response.ok || payload.error || !payload.summary || !payload.summary.canBuy) {
+        setMarketBuyError(
+          payload.error ??
+            payload.summary?.blockingReasons?.[0] ??
+            "Kauf konnte nicht bestätigt werden.",
+        );
+        return;
+      }
+
+      setMarketBuyPreview(payload.summary);
+      const buyFeedback = `${payload.summary.player?.name ?? "Spieler"} gekauft: Cash ${formatTransfermarktCurrency(payload.summary.cashBefore)} → ${formatTransfermarktCurrency(
+          payload.summary.cashAfter,
+        )} · Gehalt ${formatTransfermarktCurrency(payload.summary.salaryBefore)} → ${formatTransfermarktCurrency(payload.summary.salaryAfter)} · Kader ${
+          payload.summary.rosterBefore ?? "—"
+        } → ${payload.summary.rosterAfter ?? "—"}.`;
+      setMarketBuySuccess(buyFeedback);
+      setFoundationActionFeedback({
+        tone: "success",
+        title: "Kauf abgeschlossen",
+        detail: buyFeedback,
+      });
+      setActiveManagerTeam(payload.summary.team?.id ?? marketBuyPreview.team.id, "manual_select");
+      setFoundationPanel(null);
+      syncFoundationViewInUrl("marketV2", null, null, { team: selectedTeamId });
+      setMarketBuySubject(null);
+      setMarketBuyPreviewContext(null);
+
+      // Der neue Kontostand steht bereits in der Antwort — `cashAfter` wird oben schon für den
+      // Erfolgstext benutzt. Ihn hier sofort in den Spielstand zu schreiben, macht die Anzeige in
+      // dem Moment richtig, in dem der Kauf bestätigt ist.
+      //
+      // Vorher hing die Zahl an `loadSave()` weiter unten, und das holt den GESAMTEN Spielstand neu
+      // über das Netz und baut ihn neu auf (Normalisierung, Zielzustände, Sponsor-Vergleich) — für
+      // eine einzige geänderte Zahl. Genau das war als „die Seite lädt nach jedem Kauf nochmal"
+      // sichtbar.
+      //
+      // Der Wert ist nicht geraten: Er stammt aus dem ausgeführten Kauf, ist also derselbe, den der
+      // Nachlauf gleich darauf bestätigt. Bleibt der Nachlauf aus (Netz weg), steht trotzdem der
+      // richtige Betrag da statt des alten — strikt besser als vorher.
+      setGameState((current) => {
+        const teams = applyTeamCashPatch(current.teams, {
+          teamId: payload.summary?.team?.id ?? marketBuyPreview.team?.id,
+          cash: payload.summary?.cashAfter,
+        });
+        return teams === current.teams ? current : { ...current, teams };
+      });
+
+      // VORDERGRUND: nur, was der Spieler in diesem Moment vor sich hat. Der Spielstand (Kader,
+      // Gehalt) und die Marktliste, aus der der gekaufte Spieler verschwinden muss.
+      //
+      // Der Kauf-Endpunkt hat den resultierenden Spielstand nach dem Kauf bereits fertig berechnet
+      // und schickt ihn kompakt mit (`payload.gameStateAfter`) — den übernehmen wir direkt, statt
+      // ihn über `loadSave` ein zweites Mal komplett über das Netz zu holen. Fehlt er (alter Server,
+      // Fehler), greift unverändert der bisherige volle Reload.
+      await Promise.all([
+        payload.gameStateAfter
+          ? Promise.resolve(applyGameStateFromGameplayResponse(payload.gameStateAfter))
+          : loadSave(buyContext.saveId),
+        reloadMarketFeed(payload.summary.team?.id ?? marketBuyPreview.team?.id),
+      ]);
+      setMarketReloadToken((current) => current + 1);
+
+      // HINTERGRUND: Ansichten, die der Spieler gerade nicht ansieht — Saison-Übersichten,
+      // Transferhistorie, KI-Vorschauen. Sie waren bisher mit im `await` und hielten damit das
+      // Kauf-Fenster offen, obwohl keine von ihnen im Transfermarkt sichtbar ist. Wer nach dem Kauf
+      // in den Saisonstand wechselt, findet ihn dann längst aktualisiert vor.
+      //
+      // Fehler werden hier bewusst verschluckt: Ein fehlgeschlagener Nachlauf einer nicht
+      // sichtbaren Ansicht darf keine Fehlermeldung über einen GELUNGENEN Kauf legen. Beim
+      // nächsten Öffnen lädt die Ansicht ohnehin neu.
+      void Promise.all([
+        marketAiPreviewFeed ? reloadAiTransferPreview(marketAiPreviewSelectedTeamId) : Promise.resolve(null),
+        marketAiSellPreviewFeed ? reloadAiSellPreview(marketAiSellPreviewSelectedTeamId) : Promise.resolve(null),
+        marketAiPlanPreviewFeed ? reloadAiMarketPlanPreview(marketAiPlanPreviewSelectedTeamId) : Promise.resolve(null),
+        marketAiCompareFeed ? reloadAiNeedsPicksCompare(marketAiCompareSelectedTeamId) : Promise.resolve(null),
+        reloadHistoryFeed(),
+        reloadSeasonStandingsOverview(),
+        reloadSeasonManagementOverview(),
+      ]).catch(() => {});
+    } catch {
+      setMarketBuyError("Kauf konnte nicht bestätigt werden.");
+    } finally {
+      setMarketBuyBusy(false);
+    }
+  }
+
   /**
    * Dry-run-Preview für die Gehaltsverhandlung (Verlängern-Fenster). Reine
    * Lese-Operation gegen /api/contracts/renewal — liefert die vollständige
@@ -6055,8 +6566,24 @@ export function useFoundationShellRouterBodyScope({
       const targetTeam = gameState.teams.find((team) => team.teamId === targetTeamId) ?? selectedTeam;
       const cashBudget = Math.max(12, Math.min(150, Math.floor(((targetTeam?.cash ?? 40) * 0.65))));
       setMarketTeamId(targetTeamId);
+      setMarketSearch("");
+      setMarketClassFilter("ALL");
+      setMarketRaceFilter("ALL");
+      setMarketSubclassFilter("ALL");
+      setMarketAlignmentFilter("ALL");
+      setMarketGenderFilter("ALL");
+      setMarketPositiveTraitFilter("ALL");
+      setMarketNegativeTraitFilter("ALL");
+      setMarketBracketFilter("ALL");
       setMarketMaxValue(cashBudget);
       marketValueFilterManualRef.current = true;
+      setMarketMaxSalary(40);
+      setMarketMinRatio(stepId === "first_transfers" ? 3 : 2);
+      setMarketMinPow(1);
+      setMarketMinSpe(1);
+      setMarketMinMen(1);
+      setMarketMinSoc(1);
+      setMarketShowAutoAnalysis(true);
       setFoundationView("marketV2", setActiveView);
       scrollToFoundationTarget("transfer-market");
       return;
@@ -6574,19 +7101,48 @@ export function useFoundationShellRouterBodyScope({
     () => marketAiCompareFeed?.teams.find((team) => team.teamId === marketAiCompareSelectedTeamId) ?? null,
     [marketAiCompareFeed, marketAiCompareSelectedTeamId],
   );
+  /**
+   * Der ausgewaehlte Kandidat fuer die Hauptaktion im Kopf ("Vertragsangebot oeffnen").
+   *
+   * GEMELDET beim Durchspielen: der Knopf blieb dauerhaft gesperrt mit "Waehle links erst einen
+   * Kandidaten aus der Liste aus", obwohl links sichtbar einer markiert war.
+   *
+   * Zwei Ursachen uebereinander:
+   * 1. Die Auswahl lebte nur im Transfermarkt-Client; `marketPreviewPlayerId` erfuhr nie davon.
+   *    Das meldet der Client jetzt hoch (`onSelectCandidate`).
+   * 2. Selbst mit gesetzter Id half das nicht: aufgeloest wurde sie ueber `marketFeed`, und
+   *    DIESER Feed wird beim normalen Oeffnen des Marktes gar nicht geladen — der zustaendige
+   *    Effekt in `use-foundation-market-feed-actions.ts` steht auf `shouldLoadMarketFeed = false`.
+   *    `reloadMarketFeed` laeuft nur ueber Live-Sync und nach einem Kauf. Der Knopf haette also
+   *    beim ersten Oeffnen nie funktionieren koennen.
+   *
+   * Deshalb faellt die Aufloesung auf die Auswahl-Zusammenfassung zurueck, die der Client
+   * mitschickt: die Liste, die der Spieler tatsaechlich vor sich hat, ist hier die verlaesslichere
+   * Quelle als ein Feed, der oft leer ist.
+   */
   const marketPreviewPlayer = useMemo(
-    () => marketFeed?.items.find((item) => item.playerId === marketPreviewPlayerId) ?? null,
-    [marketFeed?.items, marketPreviewPlayerId],
+    () =>
+      marketFeed?.items.find((item) => item.playerId === marketPreviewPlayerId) ??
+      (marketPreviewPlayerSummary?.playerId === marketPreviewPlayerId ? marketPreviewPlayerSummary : null),
+    [marketFeed?.items, marketPreviewPlayerId, marketPreviewPlayerSummary],
   );
   useEffect(() => {
+    setMarketBuyPreview(null);
+    setMarketBuyPreviewContext(null);
     setMarketBuyError(null);
+    setMarketBuySuccess(null);
     setMarketPreviewPlayerId(null);
+    setMarketBuySubject(null);
     setFoundationPanel(null);
   }, [activeSaveId, marketTeamId, readMeta.source]);
 
   useEffect(() => {
+    setMarketBuyPreview(null);
+    setMarketBuyPreviewContext(null);
     setMarketPreviewPlayerId(null);
     setMarketBuyError(null);
+    setMarketBuySuccess(null);
+    setMarketBuySubject(null);
     setFoundationPanel(null);
   }, [marketTeamId]);
 
@@ -6657,6 +7213,13 @@ export function useFoundationShellRouterBodyScope({
       { id: "traits", label: "Traits", dataKey: "traits", defaultWidth: 230, minWidth: 180 },
     ],
     [],
+  );
+  const transfermarktColumns = useMemo(
+    () => [
+      ...getTransfermarktBaseColumns(),
+      ...(marketShowAdvancedColumns ? getTransfermarktAdvancedColumns() : []),
+    ],
+    [marketShowAdvancedColumns],
   );
   const transferHistoryColumns = useMemo<FoundationTableColumn[]>(
     () => [
@@ -6959,6 +7522,34 @@ export function useFoundationShellRouterBodyScope({
             ...(current[tableId]?.columnVisibility ?? {}),
             [columnId]: nextVisible,
           },
+        },
+      };
+    });
+  };
+
+  const setTransferMarketAdvancedColumnsVisible = (nextVisible: boolean) => {
+    setMarketShowAdvancedColumns(nextVisible);
+    setTableColumnPreferences((current) => {
+      const advancedIds = getTransfermarktAdvancedColumns().map((column) => column.id);
+      const hidden = new Set(current.transferMarketTable?.hiddenColumnIds ?? []);
+      const columnVisibility = { ...(current.transferMarketTable?.columnVisibility ?? {}) };
+
+      for (const columnId of advancedIds) {
+        if (nextVisible) {
+          hidden.delete(columnId);
+        } else {
+          hidden.add(columnId);
+        }
+        columnVisibility[columnId] = nextVisible;
+      }
+
+      return {
+        ...current,
+        transferMarketTable: {
+          ...markTableAsCustom(current.transferMarketTable),
+          widths: current.transferMarketTable?.widths ?? {},
+          hiddenColumnIds: Array.from(hidden),
+          columnVisibility,
         },
       };
     });
@@ -7941,6 +8532,93 @@ export function useFoundationShellRouterBodyScope({
       behavior: "smooth",
     });
   };
+
+  const visibleTransfermarktColumns = useMemo(
+    () =>
+      applyStoredColumnOrder(
+        transfermarktColumns,
+        tableColumnPreferences.transferMarketTable?.columnOrder,
+        getTablePinnedLeftIds("transferMarketTable"),
+        getTablePinnedRightIds("transferMarketTable"),
+      ).filter((column) => isTableColumnVisible("transferMarketTable", column.id, true)),
+    [tableColumnPreferences, transfermarktColumns],
+  );
+
+  const transferMarketRows = useMemo(() => {
+    if (!shouldBuildMarketView) {
+      return [];
+    }
+
+    return (marketFeed?.items ?? [])
+      .map((item, index) => ({
+        id: `derived-free-agent-${index + 1}`,
+        item,
+        sortRecommendation: marketSelectedTeam ? item.fitSource : "watch",
+      }))
+      .filter((entry) => {
+        const normalizedMarketSearch = deferredMarketSearch.trim().toLowerCase();
+        const matchesSearch =
+          normalizedMarketSearch.length === 0 ||
+          entry.item.name.toLowerCase().includes(normalizedMarketSearch);
+        const matchesClass = marketClassFilter === "ALL" || entry.item.className === marketClassFilter;
+        const matchesRace = marketRaceFilter === "ALL" || entry.item.race === marketRaceFilter;
+        const matchesSubclass =
+          marketSubclassFilter === "ALL" || entry.item.subclasses.includes(marketSubclassFilter);
+        const matchesAlignment = marketAlignmentFilter === "ALL" || entry.item.alignment === marketAlignmentFilter;
+        const matchesGender = marketGenderFilter === "ALL" || entry.item.gender === marketGenderFilter;
+        const matchesPositiveTrait =
+          marketPositiveTraitFilter === "ALL" || entry.item.traitsPositive.includes(marketPositiveTraitFilter);
+        const matchesNegativeTrait =
+          marketNegativeTraitFilter === "ALL" || entry.item.traitsNegative.includes(marketNegativeTraitFilter);
+        const matchesBracket = marketBracketFilter === "ALL" || String(entry.item.bracket ?? "") === marketBracketFilter;
+        const matchesValue = (entry.item.marketValue ?? Number.POSITIVE_INFINITY) <= marketMaxValue;
+        const matchesSalary = (entry.item.salary ?? Number.POSITIVE_INFINITY) <= marketMaxSalary;
+        const matchesRatio = (entry.item.marketValueSalaryRatio ?? Number.NEGATIVE_INFINITY) >= marketMinRatio;
+        const matchesPow = (entry.item.pow ?? Number.NEGATIVE_INFINITY) >= marketMinPow;
+        const matchesSpe = (entry.item.spe ?? Number.NEGATIVE_INFINITY) >= marketMinSpe;
+        const matchesMen = (entry.item.men ?? Number.NEGATIVE_INFINITY) >= marketMinMen;
+        const matchesSoc = (entry.item.soc ?? Number.NEGATIVE_INFINITY) >= marketMinSoc;
+
+        return (
+          matchesSearch &&
+          matchesClass &&
+          matchesRace &&
+          matchesSubclass &&
+          matchesAlignment &&
+          matchesGender &&
+          matchesPositiveTrait &&
+          matchesNegativeTrait &&
+          matchesBracket &&
+          matchesValue &&
+          matchesSalary &&
+          matchesRatio &&
+          matchesPow &&
+          matchesSpe &&
+          matchesMen &&
+          matchesSoc
+        );
+      });
+  }, [
+    marketAlignmentFilter,
+    marketClassFilter,
+    marketBracketFilter,
+    marketFeed,
+    marketGenderFilter,
+    marketMaxSalary,
+    marketMaxValue,
+    marketMinMen,
+    marketMinPow,
+    marketMinRatio,
+    marketMinSoc,
+    marketMinSpe,
+    marketNegativeTraitFilter,
+    marketPositiveTraitFilter,
+    marketRaceFilter,
+    deferredMarketSearch,
+    marketSelectedTeam,
+    shouldBuildMarketView,
+    marketSubclassFilter,
+  ]);
 
   const historyPlayerById = useMemo(
     () => (shouldBuildTransferHistoryView ? new Map(gameState.players.map((player) => [player.id, player] as const)) : new Map()),
@@ -9854,6 +10532,204 @@ export function useFoundationShellRouterBodyScope({
     }),
     [seasonTopPlayerRows],
   );
+  const sortedTransferMarketRows = useMemo(
+    () =>
+      sortRows(transferMarketRows, tableSorts.transferMarket, {
+        name: (row) => row.item.name,
+        imageUrl: (row) => row.item.imageUrl ?? "",
+        className: (row) => row.item.className,
+        subclasses: (row) => row.item.subclasses.join(", "),
+        traits: (row) => [...row.item.traitsPositive, ...row.item.traitsNegative].join(", "),
+        race: (row) => row.item.race,
+        alignment: (row) => row.item.alignment,
+        gender: (row) => row.item.gender,
+        marketValue: (row) => row.item.marketValue ?? Number.NEGATIVE_INFINITY,
+        salary: (row) => row.item.salary ?? Number.NEGATIVE_INFINITY,
+        ovr: (row) => row.item.ovr ?? Number.NEGATIVE_INFINITY,
+        mvs: (row) => row.item.mvs ?? Number.NEGATIVE_INFINITY,
+        currentAbilityTier: (row) => row.item.currentAbilityTier ?? "",
+        potentialTier: (row) => row.item.potentialTier ?? "",
+        trainingFormTier: (row) => row.item.trainingFormTier ?? "",
+        developmentTrend: (row) => row.item.developmentTrend ?? "",
+        developmentRoute: (row) => row.item.developmentRoute ?? "",
+        regressionRisk: (row) => row.item.regressionRisk ?? "",
+        marketValueSalaryRatio: (row) => row.item.marketValueSalaryRatio ?? Number.NEGATIVE_INFINITY,
+        bracket: (row) => row.item.bracket ?? Number.NEGATIVE_INFINITY,
+        pow: (row) => row.item.pow ?? Number.NEGATIVE_INFINITY,
+        spe: (row) => row.item.spe ?? Number.NEGATIVE_INFINITY,
+        men: (row) => row.item.men ?? Number.NEGATIVE_INFINITY,
+        soc: (row) => row.item.soc ?? Number.NEGATIVE_INFINITY,
+        topDisciplineScores: (row) => row.item.topDisciplineScores.map((entry) => entry.scoreTier ?? "").join(","),
+        above20: (row) => row.item.above20 ?? Number.NEGATIVE_INFINITY,
+        above40: (row) => row.item.above40 ?? Number.NEGATIVE_INFINITY,
+        above60: (row) => row.item.above60 ?? Number.NEGATIVE_INFINITY,
+        above80: (row) => row.item.above80 ?? Number.NEGATIVE_INFINITY,
+        powerRating: (row) => row.item.powerRating ?? "",
+        healthRating: (row) => row.item.healthRating ?? "",
+        staminaRating: (row) => row.item.staminaRating ?? "",
+        intelligenceRating: (row) => row.item.intelligenceRating ?? "",
+        determinationRating: (row) => row.item.determinationRating ?? "",
+        awarenessRating: (row) => row.item.awarenessRating ?? "",
+        speedRating: (row) => row.item.speedRating ?? "",
+        dexterityRating: (row) => row.item.dexterityRating ?? "",
+        charismaRating: (row) => row.item.charismaRating ?? "",
+        willRating: (row) => row.item.willRating ?? "",
+        spiritRating: (row) => row.item.spiritRating ?? "",
+        tormentRating: (row) => row.item.tormentRating ?? "",
+        subclass1: (row) => row.item.subclasses[0] ?? "",
+        subclass2: (row) => row.item.subclasses[1] ?? "",
+        subclass3: (row) => row.item.subclasses[2] ?? "",
+        traitPos1: (row) => row.item.traitsPositive[0] ?? "",
+        traitPos2: (row) => row.item.traitsPositive[1] ?? "",
+        traitPos3: (row) => row.item.traitsPositive[2] ?? "",
+        traitNeg1: (row) => row.item.traitsNegative[0] ?? "",
+        traitNeg2: (row) => row.item.traitsNegative[1] ?? "",
+        traitNeg3: (row) => row.item.traitsNegative[2] ?? "",
+        fitRace: (row) => row.item.fitRace ?? Number.NEGATIVE_INFINITY,
+        fitSubclasses: (row) => row.item.fitSubclasses ?? Number.NEGATIVE_INFINITY,
+        fitTraits: (row) => row.item.fitTraits ?? Number.NEGATIVE_INFINITY,
+        fitAlignment: (row) => row.item.fitAlignment ?? Number.NEGATIVE_INFINITY,
+        fitDisplay: (row) => row.item.fitDisplay,
+      }),
+    [tableSorts.transferMarket, transferMarketRows],
+  );
+  useEffect(() => {
+    setMarketRenderLimit(TRANSFER_MARKET_INITIAL_RENDER_LIMIT);
+  }, [
+    activeView,
+    marketAlignmentFilter,
+    marketBracketFilter,
+    marketClassFilter,
+    marketGenderFilter,
+    marketMaxSalary,
+    marketMaxValue,
+    marketMinMen,
+    marketMinPow,
+    marketMinRatio,
+    marketMinSoc,
+    marketMinSpe,
+    marketNegativeTraitFilter,
+    marketPositiveTraitFilter,
+    marketRaceFilter,
+    marketSearch,
+    marketSubclassFilter,
+    marketTeamId,
+    tableSorts.transferMarket.direction,
+    tableSorts.transferMarket.key,
+  ]);
+  const visibleTransferMarketRows = useMemo(
+    () => sortedTransferMarketRows.slice(0, marketRenderLimit),
+    [marketRenderLimit, sortedTransferMarketRows],
+  );
+  const marketLoadedCount = marketFeed?.items.length ?? 0;
+
+  const transferWishlistByPlayerId = useMemo(
+    () => new Map(transferWishlistEntries.map((entry) => [entry.playerId, entry] as const)),
+    [transferWishlistEntries],
+  );
+
+  const transferDecisionBoard = useMemo(() => {
+    const buyPick =
+      sortedTransferMarketRows.find((row) => marketSelectedTeam && (row.item.fit ?? 0) > 0 && row.item.teamContextAvailable) ??
+      sortedTransferMarketRows[0] ??
+      null;
+    const watchPick =
+      sortedTransferMarketRows.find((row) => transferWishlistByPlayerId.has(row.item.playerId)) ??
+      sortedTransferMarketRows.find((row) => (row.item.mvs ?? 0) >= 4 || (row.item.ovr ?? 0) >= 65) ??
+      sortedTransferMarketRows[1] ??
+      null;
+    const sellPick =
+      selectedRosterTableRows
+        .map((row) => {
+          const salary = getRosterEntryDisplaySalary(row.entry, row.player) ?? 0;
+          const pps = row.playerPps ?? 0;
+          return {
+            row,
+            salary,
+            score: salary / Math.max(pps, 1),
+          };
+        })
+        .sort((left, right) => right.score - left.score)[0] ?? null;
+
+    const buyReasons = buyPick
+      ? [
+          formatFitDisplay(buyPick.item),
+          buyPick.item.affordabilityStatus ? `Budget ${buyPick.item.affordabilityStatus}` : null,
+          buyPick.item.bracket ? `Rolle ${buyPick.item.bracket}` : null,
+        ].filter((entry): entry is string => Boolean(entry)).slice(0, 3)
+      : ["Filter lockern"];
+    const buyWarnings = buyPick
+      ? [
+          buyPick.item.teamContextAvailable ? null : "Team wählen",
+          buyPick.item.affordabilityStatus && buyPick.item.affordabilityStatus !== "affordable" ? "Budget prüfen" : null,
+          buyPick.item.rosterPressureStatus === "at_or_above_opt" ? "Kader voll" : null,
+        ].filter((entry): entry is string => Boolean(entry)).slice(0, 3)
+      : [];
+    const watchReasons = watchPick
+      ? [
+          watchPick.item.ovr != null ? `OVR ${formatWholeNumber(watchPick.item.ovr)}` : null,
+          watchPick.item.mvs != null ? `MVS ${formatPpsValue(watchPick.item.mvs)}` : null,
+          watchPick.item.marketValue != null ? formatTransfermarktCurrency(watchPick.item.marketValue) : null,
+        ].filter((entry): entry is string => Boolean(entry)).slice(0, 3)
+      : ["Kandidaten merken"];
+    const sellReasons = sellPick
+      ? [
+          `Gehalt ${formatMoney(sellPick.salary)}`,
+          sellPick.row.playerPps != null ? `PPs ${formatPpsValue(sellPick.row.playerPps)}` : null,
+          sellPick.score > 1 ? "teuer pro PPs" : "Verkaufskandidat",
+        ].filter((entry): entry is string => Boolean(entry)).slice(0, 3)
+      : ["Kader halten"];
+
+    return {
+      buyPick,
+      buyReasons,
+      buyWarnings,
+      watchPick,
+      watchReasons,
+      sellPick,
+      sellReasons,
+    };
+  }, [marketSelectedTeam, selectedRosterTableRows, sortedTransferMarketRows, transferWishlistByPlayerId]);
+
+  const activeMarketFilterChips = useMemo(() => {
+    const chips: string[] = [];
+    if (marketSearch.trim()) chips.push(`Suche: ${marketSearch.trim()}`);
+    if (marketClassFilter !== "ALL") chips.push(`Klasse: ${marketClassFilter}`);
+    if (marketRaceFilter !== "ALL") chips.push(`Volk: ${marketRaceFilter}`);
+    if (marketSubclassFilter !== "ALL") chips.push(`Subklasse: ${marketSubclassFilter}`);
+    if (marketAlignmentFilter !== "ALL") chips.push(`Alignment: ${marketAlignmentFilter}`);
+    if (marketGenderFilter !== "ALL") chips.push(`Gender: ${marketGenderFilter}`);
+    if (marketPositiveTraitFilter !== "ALL") chips.push(`Trait+: ${marketPositiveTraitFilter}`);
+    if (marketNegativeTraitFilter !== "ALL") chips.push(`Trait-: ${marketNegativeTraitFilter}`);
+    if (marketBracketFilter !== "ALL") chips.push(`Rolle: ${marketBracketFilter}`);
+    if (marketMaxValue !== marketCashMaxValue) chips.push(`MW bis ${formatLocalePoints(marketMaxValue, marketMaxValue % 1 === 0 ? 0 : 1)}`);
+    if (marketMaxSalary < 40) chips.push(`Gehalt bis ${marketMaxSalary}`);
+    if (marketMinRatio > 0) chips.push(`Ratio ab ${marketMinRatio}`);
+    if (marketMinPow > 1) chips.push(`POW ab ${marketMinPow}`);
+    if (marketMinSpe > 1) chips.push(`SPE ab ${marketMinSpe}`);
+    if (marketMinMen > 1) chips.push(`MEN ab ${marketMinMen}`);
+    if (marketMinSoc > 1) chips.push(`SOC ab ${marketMinSoc}`);
+    return chips.slice(0, 10);
+  }, [
+    marketAlignmentFilter,
+    marketBracketFilter,
+    marketCashMaxValue,
+    marketClassFilter,
+    marketGenderFilter,
+    marketMaxSalary,
+    marketMaxValue,
+    marketMinMen,
+    marketMinPow,
+    marketMinRatio,
+    marketMinSoc,
+    marketMinSpe,
+    marketNegativeTraitFilter,
+    marketPositiveTraitFilter,
+    marketRaceFilter,
+    marketSearch,
+    marketSubclassFilter,
+  ]);
+
   const sortedTransferHistoryRows = useMemo(
     () =>
       sortRows(transferHistoryRows, tableSorts.transferHistory, {
@@ -10727,6 +11603,10 @@ export function useFoundationShellRouterBodyScope({
     removeTransferWishlistEntry,
     toggleScoutingWatch,
     openMarketOfferPanel,
+    onSelectMarketCandidate: (playerId: string, name: string) => {
+      setMarketPreviewPlayerId(playerId);
+      setMarketPreviewPlayerSummary({ playerId, name });
+    },
     closeFoundationDrilldownPanel,
     openMarketSellModal,
     loadSave: loadSave as unknown as FoundationMarketV2ShellHostProps["loadSave"],

@@ -65,6 +65,25 @@ export type NlRankingDrawerProps = {
    * Gesamtliste ist oder was „mein Bester" bedeutet — das weiss nur die Ansicht, die ihn oeffnet.
    */
   footer?: ReactNode;
+  /**
+   * Wie das Panel steht.
+   *
+   * GEMELDET: „der drawer ist recht klein und nutzt den platz nicht sonderlich gut … muss auch
+   * nicht in nem drawer sein da kann auch ne tabelle in der mitte kommen die man dann wieder weg
+   * klicken kann."
+   *
+   * `drawer` (Standard) ist die schmale Leiste am rechten Rand — richtig, wenn zehn Zeilen
+   * neben dem Inhalt stehen sollen. `modal` ist die breite Tafel in der Mitte: bei 330 Zeilen
+   * ist die Liste selbst der Inhalt, dann soll sie auch den Platz bekommen.
+   */
+  layout?: "drawer" | "modal";
+  /**
+   * Was VOR dem Rang steht — in aller Regel das Spielerportrait.
+   *
+   * Bewusst ein Slot statt eines Bildfelds an der Zeile: der Drawer weiss nicht, wie sich ein
+   * Portrait aufloest oder was ein Star-Tier ist. Die Ansicht, die ihn oeffnet, weiss es.
+   */
+  renderLeading?: (row: NlRankingDrawerRow) => ReactNode;
   className?: string;
 };
 
@@ -86,6 +105,8 @@ export function NlRankingDrawer({
   emptyLabel = "Keine Rangliste verfügbar.",
   onSelectRow,
   footer,
+  layout = "drawer",
+  renderLeading,
   className,
 }: NlRankingDrawerProps) {
   const dialogRef = useRef<HTMLElement | null>(null);
@@ -140,10 +161,23 @@ export function NlRankingDrawer({
     onClose();
   }
 
+  /**
+   * Mit Portrait braucht die Zeile eine Spalte mehr.
+   *
+   * Bewusst eine Klasse und nicht `:has(.nl-rankdrawer-leading)` im CSS: die Bedingung ist hier
+   * ohnehin bekannt, und eine ausgeschriebene Klasse haengt nicht an der Selektor-Unterstuetzung
+   * des Browsers.
+   */
+  const rowInnerClass = `nl-rankdrawer-rowinner${renderLeading ? " has-leading" : ""}`;
+
   return (
-    <div className="nl-rankdrawer-backdrop" role="presentation" onClick={onClose}>
+    <div
+      className={`nl-rankdrawer-backdrop${layout === "modal" ? " is-modal" : ""}`}
+      role="presentation"
+      onClick={onClose}
+    >
       <aside
-        className={["nl-rankdrawer", className ?? ""].filter(Boolean).join(" ")}
+        className={["nl-rankdrawer", layout === "modal" ? "is-modal" : "", className ?? ""].filter(Boolean).join(" ")}
         role="dialog"
         aria-modal="true"
         aria-label={`${metricLabel} Rangliste`}
@@ -179,6 +213,7 @@ export function NlRankingDrawer({
                   .join(" ");
                 const inner = (
                   <>
+                    {renderLeading ? <span className="nl-rankdrawer-leading">{renderLeading(row)}</span> : null}
                     <span className="nl-rankdrawer-rank">
                       {medalKind ? (
                         <NlMedalBadge kind={medalKind} title={`Rang ${row.rank}`} />
@@ -208,14 +243,14 @@ export function NlRankingDrawer({
                     {onSelectRow ? (
                       <button
                         type="button"
-                        className="nl-rankdrawer-rowinner nl-rankdrawer-rowbtn"
+                        className={`${rowInnerClass} nl-rankdrawer-rowbtn`}
                         onClick={() => handleRowSelect(row)}
                         title={`${row.name} öffnen`}
                       >
                         {inner}
                       </button>
                     ) : (
-                      <div className="nl-rankdrawer-rowinner">{inner}</div>
+                      <div className={rowInnerClass}>{inner}</div>
                     )}
                   </li>
                 );

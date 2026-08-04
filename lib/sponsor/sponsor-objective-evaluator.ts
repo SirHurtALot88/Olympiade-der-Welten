@@ -23,6 +23,24 @@ import {
   type SponsorAxisKey,
 } from "@/lib/sponsor/sponsor-special-objectives";
 
+/**
+ * WARUM DIESE DATEI DEN VOLLEN 27+6-ZIEL-KATALOG WEITER AUSWERTET, OBWOHL IHN NICHTS MEHR ERZEUGT:
+ *
+ * `sponsor-special-objectives.ts` hat seit 2026-08 keine Erzeugungsseite mehr fuer Bonus-/Golden-Ziele
+ * (Audit-Befund: 1024 gemessene Angebots-Komponenten, ALLE eine V4-Achse, KEINE einzige ein
+ * Katalog-Ziel — `SPONSOR_V3_CARDS` bietet seit dem V4-Umbau nur noch Basis- und Achsenkarten an).
+ * Die Auswertung unten (`evaluateSpecialComponentForObjective`, `computeObjectiveProgressMetric`,
+ * `evaluateSpecialComponentStage`) bleibt trotzdem VOLLSTAENDIG bestehen: 32 in echten Spielstaenden
+ * bereits UNTERSCHRIEBENE Vertraege tragen genau diese Alt-Ziel-Schluessel (u. a. `form_color_cover`,
+ * `axis_rank_top`, `salary_pressure_max`, `axis_ascension`, `momentum_series`, `rival_humiliation`,
+ * `beliebtheit_climb`, `market_value_growth`, `fan_cult_player`, `discipline_specialist`,
+ * `underdog_story`, `fan_infrastructure`, `discipline_dominance`). Wuerde man ihre Auswertung mit
+ * aufraeumen, fiele jeder dieser Vertraege auf `fraction = 0` und `sponsorV3Settle` (fraction·G − p·G)
+ * zoege dauerhaft nur noch den eingepreisten Abschlag ab, ohne je auszuzahlen — eine stille
+ * Verschlechterung in jedem bestehenden Spielstand, nicht in einem neuen. Deshalb: Erzeugung raus,
+ * Auswertung bleibt. `form_color_cover` steht bewusst NICHT mehr im (entfernten) Key-Katalog, aber
+ * hier — es ist kein Waisen-Zweig, echte Spielstaende benutzen den Key weiterhin.
+ */
 export function evaluateSponsorRankObjective(currentRank: number | null, targetRank: number) {
   if (currentRank == null) return "open" as const;
   if (currentRank <= targetRank) return "completed" as const;

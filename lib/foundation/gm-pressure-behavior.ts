@@ -80,9 +80,9 @@ export function resolveGmPressureBehavior(gameState: GameState, teamId: string):
         ? "GM unter Druck: geht eher auf Spielerforderungen ein, um Ruhe zu halten."
         : gm?.profile?.archetype === "risk_gambler"
           ? "GM unter Druck: rotiert aggressiver, um Boardziele zu retten."
-          : "GM unter Druck: Verkauf eines Core-Spielers kann das Mandat gefaehrden.";
+          : "GM unter Druck: Verkauf eines Core-Spielers kann das Mandat gefährden.";
   } else if (pressureLevel === "watch") {
-    warning = "Board beobachtet: unpopulaere Verkäufe erhöhen den Druck.";
+    warning = "Board beobachtet: unpopuläre Verkäufe erhöhen den Druck.";
   }
 
   return {

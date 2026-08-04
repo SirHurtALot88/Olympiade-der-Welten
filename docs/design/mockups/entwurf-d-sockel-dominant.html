@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entwurf D — Sockel-dominant (Mockup)</title>
+<style>
+  /* Farbtoken aus app/globals.css (New-Look, dunkel) — alles inline, kein CDN */
+  :root {
+    --bg: #0b0f17; --bg2: #0e131d; --panel: #131a26; --panel2: #0f1621;
+    --line: #1f2937; --line2: #2a3a52; --ink: #eaf0fa; --mut: #93a3bd; --mut2: #63748f;
+    --accent: #5b9bff; --good: #4cc56b; --warn: #e0a53a; --risk: #e5615a; --gold: #f6c750;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font: 14px/1.45 "Segoe UI", system-ui, sans-serif; padding: 28px 20px 60px; }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  h1 { font-size: 21px; letter-spacing: 0.2px; }
+  h1 .tag { color: var(--good); }
+  .sub { color: var(--mut); margin: 6px 0 26px; max-width: 880px; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+  .season { background: var(--bg2); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+  .season-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+  .season-head h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 1px; }
+  .strong h2 { color: var(--good); } .weak h2 { color: var(--risk); }
+  .factor { font-size: 12px; color: var(--mut); }
+  .factor b { color: var(--ink); font-size: 15px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 14px 12px; margin-bottom: 14px; }
+  .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .rankchip { min-width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; background: var(--panel2); border: 1px solid var(--line2); color: var(--mut); }
+  .rankchip.r1 { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 55%, transparent); }
+  .team { font-weight: 600; }
+  .meta { font-size: 12px; color: var(--mut); }
+  .bar { display: flex; height: 22px; border-radius: 6px; overflow: hidden; background: var(--panel2);
+    border: 1px solid var(--line); margin: 8px 0 10px; }
+  .seg { height: 100%; }
+  .seg.sockel { background: color-mix(in srgb, var(--good) 68%, #204030); }
+  .seg.wertung { background: var(--accent); }
+  .rows { display: grid; gap: 4px; margin-bottom: 8px; }
+  .row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+  .dot.sockel { background: color-mix(in srgb, var(--good) 68%, #204030); }
+  .dot.wertung { background: var(--accent); }
+  .row .lbl { color: var(--mut); flex: 1; }
+  .row .val { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .pill { font-size: 10px; letter-spacing: 0.6px; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; border: 1px solid; }
+  .pill.safe { color: var(--good); border-color: color-mix(in srgb, var(--good) 55%, transparent); background: color-mix(in srgb, var(--good) 12%, transparent); }
+  .pill.konj { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .sum { display: flex; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 8px; font-size: 13px; }
+  .sum .net { font-weight: 700; }
+  .net.plus { color: var(--good); } .net.minus { color: var(--risk); }
+  .verdict { margin-top: 20px; border: 1px solid color-mix(in srgb, var(--risk) 45%, var(--line)); border-left: 3px solid var(--risk);
+    border-radius: 10px; padding: 12px 14px; color: var(--mut); font-size: 13px; max-width: 920px; background: var(--panel2); }
+  .verdict b { color: var(--risk); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1><span class="tag">Entwurf D</span> — Sockel-dominant <span style="color:var(--mut);font-weight:400">(geprüfte Eigentümer-Variante)</span></h1>
+  <p class="sub">Geprüft wurde: platzierungsabhängigen Anteil verkleinern, Sockel-Neigung vergrößern
+  (invers: unten mehr), „Top verdient gut" über den Salary Factor tragen. Der Sockel ist fix
+  (46,0 am Platz 1 bis 60,0 am Platz 32), nur der kleine Wertungstopf skaliert mit dem Faktor.
+  Zahlen: Live-Save-Benchmark, S̄ = 63,9. Balkenskala 0–125 C.</p>
+
+  <div class="cols">
+    <!-- ===================== STARKE SAISON ===================== -->
+    <section class="season strong">
+      <div class="season-head"><h2>Starke Saison</h2><span class="factor">Salary Factor <b>1,24</b></span></div>
+
+      <div class="card">
+        <div class="card-head"><span class="rankchip r1">1</span>
+          <div><div class="team">Mayhem Mavericks</div><div class="meta">Gehalt 95,7 · Meister</div></div></div>
+        <div class="bar"><span class="seg sockel" style="width:36.8%"></span><span class="seg wertung" style="width:42.0%"></span></div>
+        <div class="rows">
+          <div class="row"><span class="dot sockel"></span><span class="lbl">Geneigter Sockel Platz 1</span><span class="pill safe">Sicher</span><span class="val">46,0</span></div>
+          <div class="row"><span class="dot wertung"></span><span class="lbl">Wertungsgeld Platz 1 · 42,3 × 1,24</span><span class="pill konj">Konjunktur</span><span class="val">52,5</span></div>
+        </div>
+        <div class="sum"><span>Gesamt <b>98,5</b> − Gehalt 95,7</span><span class="net plus">Netto +2,8</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span class="rankchip">16</span>
+          <div><div class="team">Vigorous Vikings</div><div class="meta">Gehalt 64,0 · Mittelfeld</div></div></div>
+        <div class="bar"><span class="seg sockel" style="width:42.2%"></span><span class="seg wertung" style="width:15.5%"></span></div>
+        <div class="rows">
+          <div class="row"><span class="dot sockel"></span><span class="lbl">Geneigter Sockel Platz 16</span><span class="pill safe">Sicher</span><span class="val">52,8</span></div>
+          <div class="row"><span class="dot wertung"></span><span class="lbl">Wertungsgeld Platz 16 · 15,7 × 1,24</span><span class="pill konj">Konjunktur</span><span class="val">19,4</span></div>
+        </div>
+        <div class="sum"><span>Gesamt <b>72,2</b> − Gehalt 64,0</span><span class="net plus">Netto +8,2</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span class="rankchip">32</span>
+          <div><div class="team">Undercover Agents</div><div class="meta">Gehalt 54,1 · Tabellenletzter</div></div></div>
+        <div class="bar"><span class="seg sockel" style="width:48.0%"></span><span class="seg wertung" style="width:0.4%"></span></div>
+        <div class="rows">
+          <div class="row"><span class="dot sockel"></span><span class="lbl">Geneigter Sockel Platz 32</span><span class="pill safe">Sicher</span><span class="val">60,0</span></div>
+          <div class="row"><span class="dot wertung"></span><span class="lbl">Wertungsgeld Platz 32 · 0,4 × 1,24</span><span class="pill konj">Konjunktur</span><span class="val">0,5</span></div>
+        </div>
+        <div class="sum"><span>Gesamt <b>60,5</b> − Gehalt 54,1</span><span class="net plus">Netto +6,4</span></div>
+      </div>
+    </section>
+
+    <!-- ===================== SCHWACHE SAISON ===================== -->
+    <section class="season weak">
+      <div class="season-head"><h2>Schwache Saison</h2><span class="factor">Salary Factor <b>0,82</b></span></div>
+
+      <div class="card">
+        <div class="card-head"><span class="rankchip r1">1</span>
+          <div><div class="team">Mayhem Mavericks</div><div class="meta">Gehalt 95,7 · Meister</div></div></div>
+        <div class="bar"><span class="seg sockel" style="width:36.8%"></span><span class="seg wertung" style="width:27.8%"></span></div>
+        <div class="rows">
+          <div class="row"><span class="dot sockel"></span><span class="lbl">Geneigter Sockel Platz 1</span><span class="pill safe">Sicher</span><span class="val">46,0</span></div>
+          <div class="row"><span class="dot wertung"></span><span class="lbl">Wertungsgeld Platz 1 · 42,3 × 0,82</span><span class="pill konj">Konjunktur</span><span class="val">34,7</span></div>
+        </div>
+        <div class="sum"><span>Gesamt <b>80,7</b> − Gehalt 95,7</span><span class="net minus">Netto −15,0</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span class="rankchip">16</span>
+          <div><div class="team">Vigorous Vikings</div><div class="meta">Gehalt 64,0 · Mittelfeld</div></div></div>
+        <div class="bar"><span class="seg sockel" style="width:42.2%"></span><span class="seg wertung" style="width:10.3%"></span></div>
+        <div class="rows">
+          <div class="row"><span class="dot sockel"></span><span class="lbl">Geneigter Sockel Platz 16</span><span class="pill safe">Sicher</span><span class="val">52,8</span></div>
+          <div class="row"><span class="dot wertung"></span><span class="lbl">Wertungsgeld Platz 16 · 15,7 × 0,82</span><span class="pill konj">Konjunktur</span><span class="val">12,9</span></div>
+        </div>
+        <div class="sum"><span>Gesamt <b>65,6</b> − Gehalt 64,0</span><span class="net plus">Netto +1,6</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span class="rankchip">32</span>
+          <div><div class="team">Undercover Agents</div><div class="meta">Gehalt 54,1 · Tabellenletzter</div></div></div>
+        <div class="bar"><span class="seg sockel" style="width:48.0%"></span><span class="seg wertung" style="width:0.3%"></span></div>
+        <div class="rows">
+          <div class="row"><span class="dot sockel"></span><span class="lbl">Geneigter Sockel Platz 32</span><span class="pill safe">Sicher</span><span class="val">60,0</span></div>
+          <div class="row"><span class="dot wertung"></span><span class="lbl">Wertungsgeld Platz 32 · 0,4 × 0,82</span><span class="pill konj">Konjunktur</span><span class="val">0,4</span></div>
+        </div>
+        <div class="sum"><span>Gesamt <b>60,3</b> − Gehalt 54,1</span><span class="net plus">Netto +6,3</span></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="verdict"><b>Prüfergebnis: in dieser Form nicht empfohlen.</b> Die Grafik zeigt warum:
+  der Tabellenletzte hat in JEDER Konjunktur das sicherste Plus (+6,3/+6,4), der Meister erreicht
+  selbst im Boom nur +2,8 — Untenstehen wird zur profitabelsten Position, Tanking rational. Der
+  Korridor verengt sich auf 60–98 statt 40–100, und die Liga schüttet dauerhaft mehr aus als die
+  Gehaltsmasse (Inflation). Der brauchbare Kern — ein moderat geneigter, faktorunabhängiger
+  Sockel — ist als Stellschraube in Entwurf A übernommen (0,25 je Platz statt 0,45).</div>
+</div>
+</body>
+</html>

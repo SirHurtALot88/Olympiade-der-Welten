@@ -1,14 +1,21 @@
 /**
- * SPONSOR-MODELL V3 — "Preisgeld-Sockel + EV-neutrale Aufsaetze". REINE RECHENSCHICHT.
+ * SPONSOR-MODELL V3 — "Sockel + EV-neutrale Aufsaetze". REINE RECHENSCHICHT.
  *
- * Umsetzung von docs/SPONSOR_PREISGELD_SOCKEL_ENTWURF.md, Abschnitt 2 und 4. Die eine Formel:
+ * Urspruenglich Umsetzung von docs/SPONSOR_PREISGELD_SOCKEL_ENTWURF.md, Abschnitt 2 und 4. Die eine
+ * Formel, unveraendert seit damals:
  *
  *     Auszahlung(f) = M(f) + beta * (M(f) − A)  −  p*G  +  erreicht*G
- *     mit  M(f) = Preisgeld(f) + Platzierungsbonus(Startrang − f)
  *
- * `M` ist die PREISGELD-BENCHMARK-LEITER selbst — nicht eine daran angenaeherte Kurve. Damit ist der
- * Basis-Sponsor per KONSTRUKTION exakt der Benchmark (RMSE 0), und jede Sponsorentscheidung ist eine
- * erwartungswert-neutrale Transformation um den bei Unterschrift eingefrorenen Anker `A`.
+ * `M` — die BASISLEITER — war bis zum Sponsor-Ligaleiter-Umbau woertlich die Preisgeld-Benchmark-Leiter
+ * (`Preisgeld(f) + Platzierungsbonus(Startrang − f)`), RMSE 0 gegen den Preisgeld-Benchmark. Seit dem
+ * Umbau ist `buildSponsorV3TermsCore` LEITER-AGNOSTISCH: sie nimmt `baseLadder` als fertiges Array
+ * entgegen, statt es selbst aus Preisgeldkurve und Platzierungsbonus zu bauen. Der LIVE-Pfad
+ * (buildSponsorV3Terms) fuellt `baseLadder` seither aus `sponsorKurvenLeiter` (sponsor-liga-leiter.ts —
+ * Sockel nach Startrang plus Wertungstopf nach Endrang); Migration und Vergleichsskripte fuellen sie
+ * weiter aus der alten Preisgeld-Benchmark (`sponsorV3BenchmarkLadder`, @deprecated fuer den Live-Pfad).
+ * Was UNVERAENDERT bleibt: jede Sponsorentscheidung (Karte, Rarity, Achse) ist eine
+ * erwartungswert-neutrale Transformation um den bei Unterschrift eingefrorenen Anker `A` — unabhaengig
+ * davon, woher `baseLadder` kommt.
  *
  * WAS DAS ERSETZT (ersatzlos entfallen, siehe Abschnitt 4 des Entwurfs): der ex-ante geloeste Liga-K
  * samt Referenzliga, die Kalibrierungs-Fixpunkte, die Korridor-Kappung, die Meilenstein-Leiter, die
@@ -22,6 +29,7 @@
  * GEMEINSAM benutzt: eine Rechenstelle, deshalb kann die Projekt-Invariante "Anzeige == Settlement"
  * nicht durch eine zweite Variante brechen.
  */
+import type { SponsorCurveShape } from "@/lib/data/olyDataTypes";
 
 // ── Die Stellschrauben ─────────────────────────────────────────────────────────────────────────
 
@@ -342,8 +350,13 @@ const clampRank = (rank: number): number =>
  * 1..32. `prizeCurve` ist die Preisgeldtabelle der Saison (`buildPrizeMoneyTable` aus den ECHTEN
  * Liga-Gehaeltern mal Ligajahr-Faktor), `placementBonus` die Sheet-Platzierungstabelle.
  *
- * Genau diese Leiter ist die Referenzkurve, gegen die im Entwurf gemessen wird. Sie wird NICHT
- * angenaehert, sondern woertlich eingefroren — daher RMSE 0 bei reiner Basiswahl.
+ * @deprecated Der LIVE-Pfad (buildSponsorV3Terms) baut seine `baseLadder` seit dem Ligaleiter-Umbau
+ * ueber `sponsorKurvenLeiter` (sponsor-liga-leiter.ts) — Sockel nach Startrang plus Wertungstopf nach
+ * Endrang, keine Preisgeldkurve mehr. Diese Funktion bleibt fuer zwei Zwecke stehen: die Migration
+ * (sponsor-v3-migration.ts) hebt Altvertraege bewusst auf die reine Benchmark-Spalte, ohne ihnen eine
+ * Kurvenform zu unterschieben, die es beim Unterschreiben nie gab; und die Vergleichsskripte
+ * (scripts/sponsor-v3-szenarien.ts, scripts/sponsor-v4-szenarien.ts) messen den neuen Ansatz weiterhin
+ * gegen den alten Preisgeld-Benchmark.
  */
 export function sponsorV3BenchmarkLadder(input: {
   prizeCurve: readonly number[];
@@ -408,6 +421,14 @@ export type SponsorV3ContractTerms = {
   cardKey: SponsorV3CardKey;
   cardName: string;
   rarity: string;
+  /**
+   * Kurvenform dieses Vertrags — NUR fuer die Anzeige. Gerechnet wird ausschliesslich aus der bereits
+   * eingefrorenen `rankLadder`; die Form fliesst in nichts anderes mehr ein, damit Karte und
+   * Settlement niemals auseinanderlaufen koennen (dieselbe Regel wie ueberall in diesem Modell).
+   * Fehlt bei Altvertraegen aus der Migration, die bewusst tilt-/formfrei auf die Benchmark-Spalte
+   * gehoben werden.
+   */
+  curveShape?: SponsorCurveShape;
   /** Startrang, gegen den der Platzierungsbonus der Leiter gerechnet ist. */
   startRank: number;
   goalKey: string | null;
@@ -433,17 +454,22 @@ export type SponsorV3ContractTerms = {
 
 /**
  * DIE KARTE BAUEN. Alles, was danach passiert, liest nur noch aus dem Ergebnis.
- * `prizeCurve` und `placementBonus` sind die Liga-Groessen zum Unterschriftszeitpunkt.
+ *
+ * `baseLadder` ist die fertig gebaute Basisleiter M(f) — WO sie herkommt, ist dieser Funktion
+ * bewusst egal (kein Fallback auf eine zweite, hier neu konstruierte Leiter: eine Kurve, eine
+ * Wahrheit). Der Live-Pfad fuellt sie aus `sponsorKurvenLeiter` (sponsor-liga-leiter.ts), Migration
+ * und Vergleichsskripte aus der alten Preisgeld-Benchmark (`sponsorV3BenchmarkLadder`).
  */
 export function buildSponsorV3TermsCore(input: {
-  prizeCurve: readonly number[];
-  placementBonus: (rankDelta: number) => number;
+  baseLadder: readonly number[];
   startRank: number;
   rarity: string;
   card: SponsorV3Card;
   goalKey: string | null;
   salaryFactor: number;
   floor: number;
+  /** Kurvenform, aus der `baseLadder` gebaut wurde — NUR fuer die Anzeige am Vertrag. */
+  curveShape?: SponsorCurveShape;
   /** V4-Achse dieser Karte. Gesetzt = fix mit `SPONSOR_V4_AXIS_PBAR` bepreist, statt geschaetzt. */
   axis?: SponsorV4AxisTerms | null;
   /** Hebelgroesse der Achse (Rarity, ggf. Golden). Nur wirksam mit `axis`. */
@@ -454,11 +480,11 @@ export function buildSponsorV3TermsCore(input: {
   tiltScale?: number;
   anchorSigma?: number;
 }): SponsorV3ContractTerms {
-  const baseLadder = sponsorV3BenchmarkLadder({
-    prizeCurve: input.prizeCurve,
-    startRank: input.startRank,
-    placementBonus: input.placementBonus,
-  });
+  // Kopie statt Referenz: die zurueckgegebenen Konditionen duerfen nicht am Array des Aufrufers
+  // haengen, das sich (bei `sponsorKurvenLeiter`, das jedes Mal neu rechnet) ohnehin unterscheidet,
+  // aber bei einer wiederverwendeten Konstante wie `sponsorV3BenchmarkLadder`-Ergebnissen sonst
+  // implizit geteilt waere.
+  const baseLadder = [...input.baseLadder];
   const weights = sponsorV3AnchorWeights(input.startRank, input.anchorSigma ?? SPONSOR_V3_ANCHOR_SIGMA);
   const anchor = sponsorV3Anchor(baseLadder, weights);
   const beta = sponsorV3TiltFor(input.rarity) * input.card.tiltFactor * (input.tiltScale ?? 1);
@@ -501,6 +527,7 @@ export function buildSponsorV3TermsCore(input: {
     goalSize,
     salaryFactor: input.salaryFactor,
     floor: input.floor,
+    ...(input.curveShape != null ? { curveShape: input.curveShape } : {}),
     ...(axis != null ? { axis } : {}),
     ...(advance != null ? { advance } : {}),
   };
@@ -578,6 +605,46 @@ export function sponsorV3StandardDeviation(terms: SponsorV3ContractTerms): numbe
     }
   }
   return Math.sqrt(acc);
+}
+
+/**
+ * DOWNSIDE-SEMIABWEICHUNG — die Groesse, gegen die "sicher" ueberhaupt gemessen werden soll.
+ *
+ * Warum nicht einfach der Leiterboden (`min(sponsorV3GuaranteedLadder(terms))`): `ladder[31]` ist
+ * der Wert bei Endrang 32 — fuer ein Spitzenteam ausserhalb jedes realistischen Rangbereichs, und der
+ * Floor-Clamp (`Math.max(terms.floor, ...)`) staucht ihn ohnehin fast immer auf denselben Bodenwert.
+ * Der Boden unterscheidet Karten damit kaum, obwohl ihr tatsaechliches Absturzrisiko sehr wohl
+ * unterschiedlich ist.
+ *
+ * Warum nicht die Standardabweichung (`sponsorV3StandardDeviation`): sie bestraft symmetrisch auch
+ * Upside — eine Karte, die bei Ueberperformance mehr zahlt, gilt ihr als genauso riskant wie eine, die
+ * bei Unterperformance mehr verliert. Fuer ein sparendes Team kostet Upside aber nichts; nur die
+ * Abwaertsseite ist das Risiko, das es vermeiden will.
+ *
+ * Und die Semiabweichung zaehlt die ACHSEN-LOTTERIE automatisch mit: eine flache Leiter mit
+ * legendaerer Achse (G = 24) ist keine sichere Karte, denn `sponsorV3Settle` zieht bei verfehltem
+ * Ziel `-goalP*G` vom Leiterwert ab. Wer nur die Leiter anschaut, uebersieht genau dieses Abwaertsrisiko;
+ * `sponsorV3DownsideShortfall` misst ueber `sponsorV3Settle` und erfasst damit beide Zweige (Ziel
+ * erreicht / verfehlt) an jedem Anker-Rang.
+ *
+ * Definition: `Σ_rank w_rank · [ goalP·max(0, EV−Settle(rank,1)) + (1−goalP)·max(0, EV−Settle(rank,0)) ]`
+ * — der erwartete Fehlbetrag UNTER dem Erwartungswert, ueber dieselben Anker-Gewichte und denselben
+ * EV wie `sponsorV3StandardDeviation`. Je kleiner, desto sicherer die Karte.
+ */
+export function sponsorV3DownsideShortfall(terms: SponsorV3ContractTerms): number {
+  const weights = sponsorV3AnchorWeights(terms.startRank);
+  const ev = sponsorV3ExpectedPayout(terms);
+  let acc = 0;
+  for (let rank = 1; rank <= SPONSOR_V3_RANKS; rank += 1) {
+    const weight = weights[rank - 1] ?? 0;
+    for (const [probability, value] of [
+      [terms.goalP, sponsorV3Settle(terms, rank, 1)] as const,
+      [1 - terms.goalP, sponsorV3Settle(terms, rank, 0)] as const,
+    ]) {
+      acc += weight * probability * Math.max(0, ev - value);
+    }
+  }
+  return acc;
 }
 
 /** Ist die Leiter dieser Karte streng monoton im Endrang? (Guardrail, im Test asserted.) */

@@ -1,8 +1,10 @@
 import { randomUUID } from "@/lib/utils/random-id";
 
 import type {
+  AiSeasonStrategy,
   GameState,
   SponsorArchetype,
+  SponsorCurveShape,
   SponsorDemandProfile,
   SponsorOffer,
   SponsorOfferComponent,
@@ -29,25 +31,22 @@ import {
   getCurrentSponsorSalaryFactor,
 } from "@/lib/sponsor/sponsor-economy-calibration";
 import { SPONSOR_RARITIES } from "@/lib/sponsor/sponsor-curve-shapes";
+import { sponsorSockelFuerStartrang } from "@/lib/sponsor/sponsor-liga-leiter";
+import { getSponsorTermMultiplier } from "@/lib/sponsor/sponsor-negotiation";
 import { applySpotlightPerkToComponents, buildSponsorOfferModuleIds } from "@/lib/sponsor/sponsor-modules";
 import {
   mapSponsorCardToArchetype,
   rollSponsorOfferSlate,
 } from "@/lib/sponsor/sponsor-tier-pool";
 import {
+  sponsorV3AnchorWeights,
   sponsorV3CardByKey,
-  sponsorV3IsGoalOfferable,
+  sponsorV3DownsideShortfall,
   SPONSOR_V4_AXIS_PBAR,
   type SponsorV3CardKey,
 } from "@/lib/sponsor/sponsor-v3-model";
-import {
-  buildBonusObjectiveComponent,
-  buildGoldenObjectiveComponent,
-  pickBonusObjective,
-  pickGoldenObjective,
-  resolveChallengeSlotIndex,
-  sponsorObjectiveFamilyForKey,
-} from "@/lib/sponsor/sponsor-special-objectives";
+import { buildSeasonStrategyState } from "@/lib/ai/ai-manager-doctrine-service";
+import { resolveChallengeSlotIndex } from "@/lib/sponsor/sponsor-special-objectives";
 import { applySponsorV3ToOffers, getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 import {
   buildSponsorV4AxisTerms,
@@ -92,6 +91,10 @@ function buildOfferSkeleton(input: {
   cardKey: SponsorV3CardKey;
   /** Achse dieser Karte (V4). Gesetzt = die Karte zahlt fuer die Achse statt fuer ein Sonderziel. */
   axisKey?: SponsorV4AxisKey | null;
+  /** WO auf der Sponsor-Ligaleiter dieses Angebot sein Geld hat (sponsor-liga-leiter.ts). */
+  curveShape: SponsorCurveShape;
+  /** Vertragslaufzeit dieses Angebots (Umsetzungsplan D) — aus dem Slate-Wurf, siehe sponsor-tier-pool.ts. */
+  termSeasons: SponsorTermSeasons;
   rarity: SponsorRarity;
   commercialRating: number;
   slotIndex: number;
@@ -101,15 +104,13 @@ function buildOfferSkeleton(input: {
   forcePremiumElite?: boolean;
   teamQualityRank?: number | null;
   specialMode?: "standard" | "challenge";
-  usedSpecialFamilies?: Set<string>;
 }): SponsorOffer {
   const { team, identity, profile, cardKey, rarity, gameState, commercialRating, slotIndex, teamQualityRank, specialMode } = input;
-  const card = sponsorV3CardByKey(cardKey);
   // Der Marken- und der Sonderziel-Katalog sind noch nach den drei alten Archetypen verschlagwortet; die
   // Karte wird dafür auf einen Eimer abgebildet (SPONSOR_CARD_ARCHETYPE). Der Archetyp ist ab hier
   // reines Katalog-Schlagwort — an der Auszahlung hängt er nicht mehr.
   const archetype: SponsorArchetype = mapSponsorCardToArchetype(cardKey, input.axisKey);
-  const { brand, parent, special } = pickSponsorBrandForOffer({
+  const { brand, parent } = pickSponsorBrandForOffer({
     seasonId: gameState.season.id,
     teamId: team.teamId,
     team,
@@ -123,33 +124,20 @@ function buildOfferSkeleton(input: {
     globalParentUsage: input.globalParentUsage,
     forcePremiumElite: input.forcePremiumElite,
     specialMode: specialMode ?? "standard",
-    gameState,
-    usedSpecialFamilies: input.usedSpecialFamilies,
   });
   const isGolden = input.forcePremiumElite === true;
 
-  // Das Saison-Sonderziel kommt aus dem 14+6-Pool (staged, anteilige Auszahlung + Spotlight-Impuls in die
-  // Beliebtheit). Golden-Angebote bekommen ein Golden-Ziel, Challenge-Angebote behalten ihr Achsen-Rang-
-  // Sonderziel (eigenes UI-Panel), Standard-Angebote ziehen deterministisch ein passendes Bonusziel. Fällt
-  // der Pool aus, bleibt das Sonderziel der Markenvorlage stehen.
-  //
-  // NUR DIE ZWEI ZIELKARTEN TRAGEN UEBERHAUPT EIN SONDERZIEL. Sicherheit, Basis und Ambition sind reine
-  // Kurven-Entscheidungen; eine Sonderziel-Zeile mit 0,0 C waere dort ein totes Modul und genau die
-  // Anzeige, die das Settlement nie einloest.
-  const bonusObjectiveInput = {
-    gameState,
-    team,
-    identity,
-    profile,
-    rewardCash: 0,
-    rarity,
-    seasonId: gameState.season.id,
-    teamQualityRank,
-  };
-  const goalStrengthRank = teamQualityRank ?? 16;
-  let specialComponent: SponsorOfferComponent | null = card.goal
-    ? { ...special, rewardCash: 0, penaltyCash: undefined }
-    : null;
+  // DAS SONDERZIEL EINER KARTE IST DIE ACHSE — SONST NICHTS. Bis 2026-08 zog dieser Zweig zusaetzlich
+  // aus einem 27+6-Bonus-/Golden-Katalog (sponsor-special-objectives.ts, Katalog inzwischen entfernt).
+  // Das Audit (scripts/sponsor-ziele-audit.ts; 1024 gemessene Angebots-Komponenten ueber 8 Saison-Seeds
+  // x 32 Teams) zeigte: JEDE einzige Komponente war eine der fuenf Achsen, KEINE einzige ein Katalog-
+  // Ziel. Grund: `SPONSOR_V3_CARDS` fuehrt seit dem V4-Umbau nur noch `basis` (kein Ziel) und `achse`
+  // (Ziel = die Achse), und jede Achsenkarte traegt ihr `axisKey` — der Katalog-Zweig unten lief bei
+  // JEDER Angebotserzeugung durch und wurde sofort wieder verworfen. NUR DIE ACHSENKARTEN TRAGEN
+  // UEBERHAUPT EIN SONDERZIEL: die Basis-Karte (slotIndex 0) ist eine reine Kurven-Entscheidung; eine
+  // Sonderziel-Zeile mit 0,0 C waere dort ein totes Modul und genau die Anzeige, die das Settlement nie
+  // einloest.
+  let specialComponent: SponsorOfferComponent | null = null;
 
   // V4-ACHSENKARTE: die Zielkomponente ist die Achse selbst. Kein Katalogwurf, kein
   // Wahrscheinlichkeitsband — eine Achse misst den eigenen Zuwachs gegen die eigene Ausgangslage und
@@ -159,7 +147,6 @@ function buildOfferSkeleton(input: {
   if (input.axisKey) {
     const axisTerms = buildSponsorV4AxisTerms(gameState, team.teamId, input.axisKey);
     specialComponent = {
-      ...special,
       componentId: "axis-target",
       kind: "special",
       specialKey: sponsorV4AxisSpecialKey(input.axisKey),
@@ -169,42 +156,6 @@ function buildOfferSkeleton(input: {
       rewardCash: 0,
       penaltyCash: undefined,
     };
-  } else if (card.goal) {
-    if (isGolden) {
-      const goldenKey = pickGoldenObjective(gameState.season.id, team.teamId, archetype, teamQualityRank);
-      // Auch Golden-Ziele muessen im bepreisbaren Band liegen — sonst steht auf der Karte eine
-      // Praemie, die dieses Team praktisch nicht holen kann.
-      if (sponsorV3IsGoalOfferable(goldenKey, goalStrengthRank)) {
-        specialComponent = buildGoldenObjectiveComponent(goldenKey, bonusObjectiveInput);
-      }
-    }
-    if (specialComponent != null && specialComponent.specialKey == null) {
-      specialComponent = { ...special, rewardCash: 0, penaltyCash: undefined };
-    }
-    if (!isGolden && specialMode !== "challenge") {
-      const bonusKey = pickBonusObjective(
-        gameState.season.id,
-        team.teamId,
-        archetype,
-        slotIndex,
-        teamQualityRank,
-        input.usedSpecialFamilies,
-        gameState,
-        // KATALOG-FILTER (Entwurf 3B): angeboten wird nur, was fuer die Staerkeklasse DIESES Teams
-        // im Wahrscheinlichkeitsband [0,15, 0,72] liegt. "Top 8" fuer den Tabellenletzten faellt
-        // damit aus dem Katalog, statt wertlos herumzuliegen.
-        (key) => sponsorV3IsGoalOfferable(key, goalStrengthRank),
-      );
-      if (bonusKey) {
-        specialComponent = buildBonusObjectiveComponent(bonusKey, bonusObjectiveInput);
-      }
-    }
-    // Faellt das Ziel durch den Filter (Golden-Ziel ausserhalb des Bandes, Markenvorlage ohne Key),
-    // traegt die Karte keine Zielpraemie — sie ist dann eine reine Kurven-Karte und wird auch so
-    // bepreist. Lieber eine Karte weniger im Slate als eine unerfuellbare Praemie.
-    if (specialComponent != null && !sponsorV3IsGoalOfferable(specialComponent.specialKey, goalStrengthRank)) {
-      specialComponent = null;
-    }
   }
 
   const components: SponsorOfferComponent[] = [
@@ -234,6 +185,12 @@ function buildOfferSkeleton(input: {
     seasonId: gameState.season.id,
     teamId: team.teamId,
     archetype,
+    // Die Kurvenform ist wieder ein ERZEUGUNGS-Feld statt nur Altvertrags-Erinnerung: sie entscheidet
+    // via `sponsorKurvenLeiter` (sponsor-liga-leiter.ts), WO auf der Ligaleiter dieses Angebot sein
+    // Geld hat. Der Doku-Kommentar am Typ selbst ("NUR NOCH LESEN") gilt damit nur noch fuer die
+    // Spielstaende von VOR diesem Umbau.
+    curveShape: input.curveShape,
+    termSeasons: input.termSeasons,
     rarity,
     name: parent.name,
     flavor: input.forcePremiumElite ? `★ Golden Card · ${brand.flavor}` : brand.flavor,
@@ -316,9 +273,6 @@ export function buildSponsorOffersForTeam(input: {
         ] ?? goalSlotIndexes[0]!
       : -1;
 
-  // Slate-Anti-Wiederholung (Fable C3): über die Slots hinweg möglichst nur EIN Sonderziel je Familie.
-  const usedSpecialFamilies = new Set<string>();
-
   const built = slate.entries.map((entry, slotIndex) => {
     const offer = buildOfferSkeleton({
       gameState: input.gameState,
@@ -327,6 +281,8 @@ export function buildSponsorOffersForTeam(input: {
       profile,
       cardKey: entry.cardKey,
       axisKey: entry.axisKey ?? null,
+      curveShape: entry.curveShape,
+      termSeasons: entry.termSeasons,
       rarity: entry.rarity,
       commercialRating: commercialRating.score,
       slotIndex,
@@ -336,24 +292,18 @@ export function buildSponsorOffersForTeam(input: {
       globalParentUsage,
       teamQualityRank: qualityRank.qualityRank,
       specialMode: slotIndex === challengeSlotIndex ? "challenge" : "standard",
-      usedSpecialFamilies,
     });
     if (offer.sponsorParentBrandId) {
       usedParentBrandIds.push(offer.sponsorParentBrandId);
-    }
-    const specialKey = offer.components.find((component) => component.kind === "special")?.specialKey ?? null;
-    const family = sponsorObjectiveFamilyForKey(specialKey);
-    if (family) {
-      usedSpecialFamilies.add(family);
     }
     return offer;
   });
 
   // DIE EINZIGE STELLE, AN DER EIN ANGEBOT BETRAEGE BEKOMMT.
   //
-  // Der Startrang der Saison ist die Basis des Platzierungsbonus in der Leiter — dieselbe Groesse,
-  // gegen die der Preisgeld-Benchmark am Saisonende misst. Fehlt sie (Saison 1 vor dem ersten
-  // Spieltag), tritt die Liga-Position der Staerkerangliste an ihre Stelle.
+  // Der Startrang der Saison bestimmt den Sockel der Ligaleiter UND den Erwartungsanker, gegen den
+  // jede Kurvenform normiert wird (sponsor-liga-leiter.ts). Fehlt er (Saison 1 vor dem ersten
+  // Spieltag), tritt die Liga-Position der Staerkerangliste an seine Stelle.
   const startRank =
     rows.find((entry) => entry.teamId === input.teamId)?.startplatz ?? qualityRank.leaguePosition;
   return applySponsorV3ToOffers({
@@ -361,6 +311,7 @@ export function buildSponsorOffersForTeam(input: {
     offers: built,
     cardKeys: slate.entries.map((entry) => entry.cardKey),
     axisKeys: slate.entries.map((entry) => entry.axisKey ?? null),
+    curveShapes: slate.entries.map((entry) => entry.curveShape),
     goldenSlots: slate.goldenCardSlots,
     advanceSlots: slate.entries.map((entry) => entry.advance === true),
     teamId: input.teamId,
@@ -472,6 +423,13 @@ export function chooseSponsorOffer(input: {
   teamId: string;
   offerId: string;
   saveId?: string;
+  /**
+   * @deprecated wird IGNORIERT. Umsetzungsplan D: die Laufzeit ist keine Wahl beim Unterschreiben mehr,
+   * sondern steht bereits am gewaehlten ANGEBOT (`offer.termSeasons`, gewuerfelt im Slate — siehe
+   * `rollSponsorOfferSlate` in sponsor-tier-pool.ts). Ein Aufrufer waehlt die Laufzeit also implizit
+   * durch die Wahl DES Angebots, nicht durch dieses Feld. Bleibt nur fuer Rueckwaertskompatibilitaet
+   * bestehender Aufrufer (z. B. `app/api/sponsor/choose/route.ts`) im Typ stehen.
+   */
   termSeasons?: SponsorTermSeasons;
 }): { gameState: GameState; contract: TeamSponsorContract | null; error?: string } {
   // Audit R2/A2: Server-Guard gegen Re-Sign. Ohne diesen Guard konnte ein zweiter POST /api/sponsor/choose
@@ -487,7 +445,10 @@ export function chooseSponsorOffer(input: {
     return { gameState: input.gameState, contract: null, error: "sponsor_offer_not_found" };
   }
 
-  const termSeasons: SponsorTermSeasons = 1;
+  // Laufzeit steht am Angebot, nicht mehr an einer Konstante — siehe Deprecation-Kommentar oben.
+  // Fallback 1 nur fuer Alt-Angebote aus Spielstaenden von vor diesem Umbau (`offer.termSeasons`
+  // fehlt dort).
+  const termSeasons: SponsorTermSeasons = offer.termSeasons ?? 1;
 
   const rows = buildTeamSeasonOverviewRows({ gameState: input.gameState });
   const row = rows.find((entry) => entry.teamId === input.teamId) ?? null;
@@ -505,9 +466,11 @@ export function chooseSponsorOffer(input: {
     teamId: input.teamId,
     offerId: offer.offerId,
     archetype: offer.archetype,
-    // Nur noch fuer Altangebote gesetzt: neue Angebote tragen keine Legacy-Kurvenform mehr. Das Feld
-    // bleibt am Vertrag, damit ein aus einem Alt-Spielstand unterschriebenes Angebot seine Form behaelt.
-    ...(offer.curveShape ? { curveShape: offer.curveShape } : {}),
+    // Unbedingt statt optional: seit dem Ligaleiter-Umbau erzeugt jedes Angebot seine Kurvenform
+    // selbst (sponsor-tier-pool.ts), und ein Alt-Angebot ohne sie bekommt sie beim Laden ueber
+    // `normalizeLegacySponsors` (save-repository.ts) nachgetragen — `offer.curveShape` ist an
+    // dieser Stelle also nie mehr undefined.
+    curveShape: offer.curveShape,
     rarity: offer.rarity,
     name: offer.name,
     chosenAt: new Date().toISOString(),
@@ -677,6 +640,145 @@ function estimateAxisFitForAi(input: {
   }
 }
 
+/** Wieviele Raenge Ambition den Zielrang je Prioritaetspunkt (0..10, Mitte 5) verschiebt. */
+const AMBITION_RANK_SHIFT_PER_POINT = 1.2;
+/**
+ * Deckel auf die Ambitions-Verschiebung. Ohne ihn zoege ein Team mit Extremwert (0 oder 10) seinen
+ * Zielrang bis an die Tabellenenden — dann waehlten am Ende doch wieder fast alle Teams dieselben
+ * zwei, drei Extremformen (Titel- bzw. Sicherheitsfamilie), nur nach Ambition statt nach Startrang
+ * sortiert. Das widerspraeche Punkt 4 des Auftrags ("nicht ueberdrehen"): ein Rest Streuung um den
+ * eigenen Startrang ist gewollt, eine zweite Kollaps-Achse nicht.
+ */
+const AMBITION_RANK_SHIFT_MAX = 7;
+
+/**
+ * Sigma des Passungs-Fensters — bewusst ENGER als `SPONSOR_V3_ANCHOR_SIGMA` (4), mit dem jede Form
+ * auf denselben Erwartungswert normiert ist. Mit demselben Sigma waere der Passungsterm fuer jedes
+ * Team mit `Zielrang == Startrang` exakt 0 — per Konstruktion, denn genau das ist die Definition von
+ * `terms.anchor` (sponsor-liga-leiter.ts). Das traefe ausgerechnet die Randfaelle: ein Team auf
+ * Startrang 1 kann seinen Zielrang nicht ueber 1 hinaus verschieben (geklammert), bliebe mit dem
+ * gleichen Sigma also ohne jedes Passungssignal — genau der Titelfavorit-auf-Mittelfeldkurve-Fall
+ * aus dem Befund. Ein engeres Fenster gewichtet die Raenge nahe am Zielrang staerker als die weite
+ * Anker-Verteilung es tut und macht den Term auch ohne Ambitions-Shift ungleich 0: er misst dann,
+ * wie sehr sich eine Kurve auf den eigenen (Start-)Rang konzentriert statt sich brav auf das ganze
+ * Ankerfenster zu verteilen — und das ist die Passungsfrage.
+ */
+const SPONSOR_AI_CURVE_FIT_SIGMA = 2.5;
+
+/**
+ * Skalierung des Passungsterms. Der rohe Wert (`fitValue - terms.anchor`) liegt typischerweise bei
+ * 0,5 bis 2 C, mit Ausreissern bis ~11 C bei starker Ambition nahe den Ligaenden — deutlich kleiner
+ * als der Achsenterm (bis zu G/2, bei legendaer/golden bis 15 C). Ohne Skalierung waere die
+ * Kurvenform trotz eigenem Kriterium meist die schwaechste der vier Wahldimensionen. Der Faktor
+ * hebt sie auf dieselbe Groessenordnung, ohne die anderen drei zu entwerten.
+ */
+const SPONSOR_AI_CURVE_FIT_WEIGHT = 3;
+
+/**
+ * LAUFZEIT-TERM (Umsetzungsplan D, Messpunkt 5): `scoreOfferForAi` kannte `termSeasons` bisher gar
+ * nicht — bei einer Erosion, die Mehrjahresvertraege systematisch schlechter macht als eine passende
+ * Folge von Einjahresvertraegen (siehe TERM_MULTIPLIERS-Kommentar in sponsor-negotiation.ts), waehlte
+ * die KI einen erodierten Mehrjahresvertrag also GENAUSO oft wie einen gleichwertigen Einjaehrigen —
+ * ein systematischer Selbstschaden.
+ *
+ * Der Term rechnet in echten Cash-Einheiten (Gewicht 1, keine Skalierung noetig): erwarteter
+ * Erosionsverlust ueber die Restlaufzeit (Jahre 2..termSeasons, Multiplikator jeweils < 1 auf den
+ * Wertungsanteil `terms.anchor − Sockel`) MINUS ein kleiner Versicherungswert fuer den eingefrorenen
+ * Sockel (er schuetzt vor einem schwachen Slate/Formtief in den Folgesaisons — genau das, was
+ * `SPONSOR_AI_TERM_INSURANCE_SHARE` bepreist). Ein Einjahresvertrag (`termSeasons == 1`) bleibt
+ * unveraendert bei 0 — dieselbe Logik wie bei den anderen bedingten Termen oben.
+ *
+ * GEMESSEN (tests/sponsor-laufzeit-ki-wahl.test.ts, 8 unabhaengige Ligen x 32 Teams): ein zunaechst
+ * versuchter Anteil von 0.15 drehte das Vorzeichen — die Versicherung ueberwog die Erosion vor allem
+ * bei Teams mit hohem Sockel (Tabellenende), die KI wählte Mehrjahresvertraege dadurch HAEUFIGER
+ * (61,8 % statt der angebotenen 42,9 %) statt seltener. Bei 0.02 waehlt sie sie in 31,6 % der Faelle —
+ * spuerbar UNTER den angebotenen 42,9 %.
+ */
+const SPONSOR_AI_TERM_INSURANCE_SHARE = 0.02;
+
+/**
+ * GEWICHT DES ECO-DOWNSIDE-TERMS. Kalibriert an `eco-messung.ts` (6 Seeds x 32 Teams) UND an
+ * `tests/sponsor-v4-ki-wahl.test.ts` ("greift bei Geldnot zum Vorschuss": alle 32 Teams auf Kasse −30,
+ * Schwelle: > 8 von 32 muessen trotzdem die Vorschuss-Karte nehmen) — nicht am Gefuehl.
+ *
+ * NACHBESSERUNG (dieser Kommentar ersetzt eine fruehere, fehlerhafte Kalibrierung): die erste Fassung
+ * von `resolveEcoIntent01` mischte `cash_recovery` aus `buildSeasonStrategyState` als Hauptsignal ein.
+ * Direktmessung ueber ALLE 32 Teams des Live-Saves (`new-game-1785174792968-8d7mdx`) zeigte danach:
+ * `cash_recovery` triggert dort bei 31 von 32 Teams — nicht ueber die Kasse, sondern ueber
+ * `salaryPressure = Gehalt/Kasse > 1,25` (Gehaelter 50-84 gegen typische Kassenstaende reissen diese
+ * Schwelle praktisch immer). `cash_recovery` ist der NORMALZUSTAND dieser Liga, kein Ausnahmesignal.
+ * `ecoIntent01` lag dadurch fuer ALLE 32 Teams zwischen 0,3 und 1,0 (Mittel 0,75, KEIN Team bei 0) —
+ * der Term war de facto eine globale Risikoaversion von rund 0,75 * Gewicht fuer jedes Team, keine
+ * Eco-Entscheidung, und die "entspannte" Gruppe bewegte sich in der Messung sichtbar mit (3,46 → 3,38).
+ * Siehe `resolveEcoIntent01` fuer die korrigierte Formel: `cash_recovery` traegt jetzt KEIN Gewicht
+ * mehr, das Hauptsignal ist die bestehende `cashPressure`-Kaskade (binaer bei `cashPressure >= 7`,
+ * dieselbe Schwelle wie ueberall sonst in dieser Datei).
+ *
+ * Sweep 2/3/3.2/3.5/4 mit der KORRIGIERTEN Formel, klamme Teams (Druck >= 7):
+ *
+ *   Gewicht | Ø Bodenrang | bestbodig | Ø Bodenrang entspannt | mitVorschuss/32 | Test "greift bei Geldnot"
+ *   2       | ~3,1        | ~13 %     | 3,45 (unveraendert)   | ~14             | gruen
+ *   3       | 2,99        | 17 %      | 3,45 (unveraendert)   | 10              | gruen — GEWAEHLT
+ *   3,2     | 2,97        | 16 %      | 3,45 (unveraendert)   | 9               | gruen, Marge nur 1
+ *   3,5     | 2,96        | 17 %      | 3,45 (unveraendert)   | 6               | ROT
+ *   4       | ~2,95       | ~17 %     | 3,45 (unveraendert)   | < 6 (vermutet)  | ROT
+ *
+ * Vorher (kein Term): klamm 3,15 / 11 % (Druck 7 allein: 3,26 / 4 % — schwaecher als der Durchschnitt,
+ * weil 72 der 102 klammen Vertraege bei Druck 7 liegen, nicht 10), entspannt 3,46 / 10 %.
+ *
+ * WARUM DIE FRUEHERE FASSUNG TROTZ STAERKEREM GEWICHT (4) EINEN SCHWAECHEREN ECHTEN EFFEKT ZEIGTE, ALS
+ * ES AUSSAH: mit `pressure01` linear zwischen Druck 3 und 10 gemischt (`(cashPressure-3)/7`) bekam ein
+ * Druck-7-Team nur `ecoIntent01 = 0,571 * Gewicht` statt `1,0 * Gewicht` — und Druck 7 stellt 70 % der
+ * klammen Vertraege. Die Testgrenze wird aber ausschliesslich von Druck-10-Teams gesetzt (das
+ * Vorschuss-Testszenario setzt fuer ALLE 32 Teams Kasse < 0, also `cashPressure === 10` fuer jedes
+ * einzelne — kein Team dort hat je Druck 7). Die lineare Mischung liess sich also nicht hoeher drehen,
+ * ohne die ohnehin schon voll ausgereizten Druck-10-Teams ueber die Testschwelle zu drueberdruecken —
+ * und blieb fuer die MEHRHEIT der klammen Teams (Druck 7) strukturell zu schwach. Die jetzige binaere
+ * Fassung (`cashPressure >= 7` behandelt Druck 7 und 10 gleich, wie es `resolveAiSponsorArchetypePreference`
+ * und der Vorschuss-Term selbst bereits tun) hebt Druck 7 auf denselben `ecoIntent01 = 1,0` wie Druck 10
+ * an, OHNE die Testgrenze zu beruehren (das Testszenario hat nie ein Druck-7-Team) — und genau das
+ * erklaert den staerkeren Effekt bei GLEICHEM Gewicht 3.
+ *
+ * `tests/sponsor-v4-ki-wahl.test.ts` bleibt die tatsaechliche Kalibrierungsgrenze: der bestehende
+ * Vorschuss-Term (`+0,25 * advance.amount`) und der Eco-Downside-Term konkurrieren um dieselben
+ * Angebote, eine Vorschuss-Karte ist nicht zwangslaeufig die bodenstaerkste. Zwischen Gewicht 3 und 3,5
+ * kippt die Konkurrenz (10 → 6 von 32). Gewicht 3 ist damit das groesste mit komfortabler Marge (2 ueber
+ * der Schwelle), nicht das theoretisch staerkste.
+ *
+ * Auch mit der korrigierten Formel erreicht die Wirkung nicht die im Auftrag genannte Zielmarke 2,2 —
+ * Grund ist strukturell, nicht die Kalibrierung: `sponsorV3DownsideShortfall` gewichtet ueber die
+ * Anker-Verteilung (Sigma 4, zentriert auf den Startrang) und laesst fuer ein starkes, aber klammes
+ * Team den extremen Rangbereich, in dem der Boden ueberhaupt entsteht, bewusst kaum Gewicht — dieses
+ * Team landet dort realistisch nie (Direktmessung: `argmin(downside)` ganz ohne die uebrigen Scoreterme
+ * liefert Bodenrang ~3,0, kaum besser als Zufall unter 5 Karten). Der Boden-Rang aus `eco-messung.ts`
+ * ist ein UNVOLLKOMMENER Proxy fuer das, was diese Groesse tatsaechlich optimiert — exakt die
+ * Eigenschaft, die laut Auftrag den bloßen Boden als Kriterium disqualifiziert.
+ */
+const SPONSOR_AI_ECO_DOWNSIDE_WEIGHT = 3;
+
+/**
+ * DER ZIELRANG, GEGEN DEN DIE KURVENFORM PASSEN MUSS.
+ *
+ * Der Startrang allein waere die Wahl eines Teams ohne Plan — ein Team, das aufsteigen will, darf
+ * eine Kurve waehlen, die weiter oben zahlt, als es aktuell steht (Auftrag Punkt 3). Die Ambition
+ * kommt aus derselben Quelle wie der bereits bestehende Archetyp-Praeferenz-Term
+ * (`resolveAiSponsorArchetypePreference`): `profile.bias.starPriority`, mit `identity.ambition` als
+ * Fallback fuer Teams ohne eigenes Strategieprofil. 5 ist die neutrale Mitte (kein Shift).
+ */
+function resolveAmbitionTargetRank(input: {
+  startRank: number;
+  profile: TeamStrategyProfile | null;
+  identity: TeamIdentity | null;
+}): number {
+  const starPriority = input.profile?.bias.starPriority ?? input.identity?.ambition ?? 5;
+  const shift = Math.max(
+    -AMBITION_RANK_SHIFT_MAX,
+    Math.min(AMBITION_RANK_SHIFT_MAX, (starPriority - 5) * AMBITION_RANK_SHIFT_PER_POINT),
+  );
+  // Hoehere Ambition zieht den Zielrang NACH OBEN (kleinere Zahl = besserer Platz), deshalb minus.
+  return Math.max(1, Math.min(32, Math.round(input.startRank - shift)));
+}
+
 /**
  * DIE KI-WAHL BEWERTET JETZT PASSUNG STATT RISIKO.
  *
@@ -689,6 +791,17 @@ function estimateAxisFitForAi(input: {
  *
  * Bewertet wird deshalb: der geschaetzte eigene Erfuellungsgrad mal Hebelgroesse (das ist der
  * erwartete Cash-Beitrag der Karte), plus der Wert des Vorschusses fuer die eigene Kassenlage.
+ *
+ * SEIT PR #360 traegt jedes Angebot zusaetzlich eine KURVENFORM (`offer.curveShape` /
+ * `terms.baseLadder`) — WO auf der Ligaleiter das Geld liegt, siehe `sponsor-liga-leiter.ts`. Alle
+ * 11 Formen sind auf denselben Erwartungswert beim STARTRANG normiert (`terms.anchor`), eine reine
+ * EV-Bewertung kann sie also nicht unterscheiden — die KI wuerfelte hier faktisch (siehe PR-Text:
+ * Messung ueber alle 32 Teams zeigte Titelfavoriten auf Mittelfeldkurven und Schlusslichter auf
+ * Titelkurven). Der dritte Term unten behebt das: er gewichtet dieselbe Leiter mit
+ * `sponsorV3AnchorWeights` um einen AMBITIONS-VERSCHOBENEN Zielrang statt um den Startrang (Details
+ * und warum das Fenster dabei enger als das der Anker-Normierung sein muss: siehe
+ * `resolveAmbitionTargetRank` / `SPONSOR_AI_CURVE_FIT_SIGMA` unten) — er schlaegt zugunsten der
+ * Form aus, die dort am meisten zahlt, wo das Team seiner eigenen Ambition nach landen will.
  */
 function scoreOfferForAi(input: {
   offer: SponsorOffer;
@@ -699,6 +812,12 @@ function scoreOfferForAi(input: {
   teamId: string;
   cash?: number;
   rosterSize?: number;
+  /**
+   * Sparabsicht dieses Teams, 0..1 (siehe `resolveEcoIntent01` fuer die Berechnung). Optional: fehlt
+   * es (z. B. in bestehenden Aufrufen/Tests ausserhalb von `chooseSponsorOfferForAiTeams`), bleibt der
+   * Downside-Term unwirksam — exakt dasselbe Verhalten wie vor dieser Aenderung.
+   */
+  ecoIntent01?: number;
 }): number {
   const { offer, profile, identity, cashPressure } = input;
   const terms = getSponsorV3Terms(offer);
@@ -720,10 +839,55 @@ function scoreOfferForAi(input: {
     score += terms.goalSize * (fit - SPONSOR_V4_AXIS_PBAR);
   }
 
+  // DAS PASSUNGSKRITERIUM DER KURVENFORM: wo auf der Leiter zahlt DIESE Form, gewichtet um den
+  // ambitions-verschobenen Zielrang statt den blossen Startrang? `terms.anchor` ist der
+  // Startrang-Mittelwert (breites Sigma), auf den ALLE 11 Formen normiert sind
+  // (sponsorKurvenLeiter) — der Vergleichspunkt, ab dem eine Form "besser als neutral" faellt.
+  // `fitValue` liest exakt dieselbe Leiter (`terms.baseLadder`), aber mit dem engeren
+  // Passungs-Fenster um den Zielrang. Bei einem Team ohne Ambitionsausschlag UND fernab der
+  // Ligaenden liegt `fitValue` nahe an `terms.anchor` (schmaleres Fenster um denselben Rang misst
+  // fast dasselbe wie das breite) — der Term bleibt dann klein und ueberlaesst die Wahl den uebrigen
+  // Termen (Achse, Vorschuss, Markenpassung). Ambition oder ein Randrang machen ihn spuerbar: dann
+  // gewinnt, wessen Geld dort liegt, wo das Team hinwill. `SPONSOR_AI_CURVE_FIT_WEIGHT` skaliert den
+  // Term auf dieselbe Groessenordnung wie der Achsenterm oben — ohne die Skalierung waere die
+  // Kurvenform trotz allem meist die schwaechste der vier Wahldimensionen, genau das Gegenteil vom
+  // Auftrag.
+  if (terms) {
+    const targetRank = resolveAmbitionTargetRank({ startRank: terms.startRank, profile, identity });
+    const fitWeights = sponsorV3AnchorWeights(targetRank, SPONSOR_AI_CURVE_FIT_SIGMA);
+    const fitValue = terms.baseLadder.reduce((sum, value, index) => sum + value * (fitWeights[index] ?? 0), 0);
+    score += (fitValue - terms.anchor) * SPONSOR_AI_CURVE_FIT_WEIGHT;
+  }
+
+  // LAUFZEIT-TERM (siehe SPONSOR_AI_TERM_INSURANCE_SHARE oben): erwarteter Erosionsverlust ueber die
+  // Restlaufzeit gegen einen kleinen Versicherungswert fuer den eingefrorenen Sockel aufgewogen.
+  if (terms && offer.termSeasons != null && offer.termSeasons > 1) {
+    const sockel = sponsorSockelFuerStartrang(terms.startRank);
+    const wertungsanteil = Math.max(0, terms.anchor - sockel);
+    let erosionLoss = 0;
+    for (let year = 2; year <= offer.termSeasons; year += 1) {
+      const contractYear = Math.max(1, Math.min(3, year)) as 1 | 2 | 3;
+      erosionLoss += (1 - getSponsorTermMultiplier(contractYear)) * wertungsanteil;
+    }
+    const insuranceValue = SPONSOR_AI_TERM_INSURANCE_SHARE * sockel * (offer.termSeasons - 1);
+    score += insuranceValue - erosionLoss;
+  }
+
   // Der Vorschuss ist fuer ein klammes Team echtes Geld zur richtigen Zeit und fuer ein reiches nur
   // eine Gebuehr. Genau dieser Unterschied ist der Sinn der zweiten Dimension.
   if (terms?.advance) {
     score += cashPressure >= 7 ? terms.advance.amount * 0.25 : -terms.advance.fee;
+  }
+
+  // SPARABSICHT: der Vorschuss-Term oben waehlt nur, welche Karte UEBERHAUPT einen Vorschuss traegt —
+  // nicht welche den hoechsten Boden hat. Ein Team mit echter Sparabsicht (klamm und/oder in der
+  // seltenen Eco-Round-Doktrin) soll stattdessen die Karte mit der GERINGSTEN erwarteten Abwaertsseite
+  // bevorzugen, siehe `sponsorV3DownsideShortfall` fuer die Begruendung dieser Groesse. `ecoIntent01`
+  // ist fuer jedes Team mit `cashPressure == 3` (entspannte Kasse, keine Eco-Round-Doktrin) exakt 0 —
+  // fuer diese Teams ist dieser Term dann exakt 0, unveraendertes Verhalten (siehe `resolveEcoIntent01`
+  // fuer die Messung, die diese Formel ersetzt hat).
+  if (terms && (input.ecoIntent01 ?? 0) > 0) {
+    score -= (input.ecoIntent01 ?? 0) * SPONSOR_AI_ECO_DOWNSIDE_WEIGHT * sponsorV3DownsideShortfall(terms);
   }
 
   // Markenpassung bleibt als milder Flavour-Term: sie bewegt kein Geld, soll aber bei aehnlicher
@@ -743,6 +907,48 @@ function scoreOfferForAi(input: {
   return score;
 }
 
+/**
+ * SPARABSICHT EINES TEAMS — bewusst schlank: kein Konjunktur-Anteil und kein Ambitions-Daempfer. Beim
+ * Konjunktur-Anteil ist schon das Vorzeichen eine Designvermutung ("im mageren Jahr ist Ambition
+ * billig zu opfern" ist genauso plausibel wie "vor mageren Jahren Runway aufbauen") — ein
+ * Koeffizient, dessen Richtung geraten ist, waere schlechter als ihn wegzulassen.
+ *
+ * FRUEHERE FASSUNG (bis zur Nachbesserung hier) mischte `cash_recovery` aus `buildSeasonStrategyState`
+ * als HAUPTSIGNAL ein (Gewicht 0,6). Direktmessung am Live-Save (`new-game-1785174792968-8d7mdx`, 32
+ * Teams) zeigt, warum das falsch war: `cash_recovery` triggert dort bei 31 von 32 Teams — nicht ueber
+ * die Kasse, sondern ueber `salaryPressure = Gehalt/Kasse > 1,25` (Gehaelter 50-84 gegen typische
+ * Kassenstaende reissen diese Schwelle praktisch immer). `cash_recovery` IST DER NORMALZUSTAND DIESER
+ * LIGA, nicht das Ausnahmesignal, als das es hier gebraucht wurde — ein Team davon zu unterscheiden
+ * traegt keine Information. Mit `strategy01` als Hauptgewicht lag `ecoIntent01` fuer ALLE 32 Teams
+ * zwischen 0,3 und 1,0 (Mittel 0,75, KEIN Team bei 0) — der Term war de facto eine globale
+ * Risikoaversion von rund 0,75 * Gewicht fuer jedes Team, keine Eco-Entscheidung. Das erklaerte auch,
+ * warum sich "entspannte" Teams in der Messung mitverbesserten: sie bekamen denselben Term wie klamme.
+ *
+ * DESHALB TRAEGT `cash_recovery` HIER JETZT KEIN GEWICHT MEHR. Das Hauptsignal ist `pressure01` — die
+ * bestehende, tatsaechlich trennscharfe `cashPressure`-Kaskade aus `chooseSponsorOfferForAiTeams`
+ * (ueber 6 Saison-Seeds: 102 von 186 Vertraegen bei Druck >= 7, 84 bei Druck 3 — eine echte, keine
+ * gesaettigte Verteilung). `eco_round` bleibt als kleiner Zuschlag: mit 1 von 32 Teams ist es SELTEN
+ * und damit informativ, im Unterschied zu `cash_recovery`.
+ *
+ * `pressure01` ist BINAER bei `cashPressure >= 7`, nicht linear zwischen 3 und 10 hochgezogen — eine
+ * erste Fassung hatte hier linear gemischt (`(cashPressure-3)/7`, also 0,571 bei Druck 7 gegen 1,0 bei
+ * Druck 10) und blieb dadurch fuer den GROSSTEIL der klammen Teams zu schwach: 72 von 102 klammen
+ * Vertraegen liegen bei Druck 7, nicht 10, aber die Gewichtsobergrenze wird vom Vorschuss-Test
+ * (`tests/sponsor-v4-ki-wahl.test.ts`, siehe `SPONSOR_AI_ECO_DOWNSIDE_WEIGHT`) allein ueber Druck-10-
+ * Teams gesetzt — mit linearer Mischung blieb fuer Druck 7 dadurch nur ein effektiver Multiplikator von
+ * `0,571 * Gewicht`, spuerbar zu wenig. Die binaere Fassung deckt sich zudem mit der bereits
+ * bestehenden Konvention dieser Datei: `resolveAiSponsorArchetypePreference` und der Vorschuss-Term
+ * selbst (`cashPressure >= 7 ? ... : ...`, weiter oben) behandeln Druck 7 und Druck 10 schon jetzt als
+ * EINEN Zustand, nicht als Kontinuum — `pressure01` folgt hier nur derselben Linie. Die Vorschuss-
+ * Testschranke (siehe unten) pruefte immer schon ausschliesslich Druck-10-Teams (Kasse < 0 fuer alle
+ * 32 Teams des Szenarios); Druck 7 auf denselben Wert zu heben aendert an dieser Schranke NICHTS.
+ */
+function resolveEcoIntent01(input: { seasonStrategy: AiSeasonStrategy | undefined; cashPressure: number }): number {
+  const pressure01 = input.cashPressure >= 7 ? 1 : 0;
+  const ecoRoundBonus = input.seasonStrategy === "eco_round" ? 0.25 : 0;
+  return Math.max(0, Math.min(1, pressure01 + ecoRoundBonus));
+}
+
 export function chooseSponsorOfferForAiTeams(gameState: GameState, settingsMap?: Record<string, TeamControlSettings>): GameState {
   const controlSettings = settingsMap ?? buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings);
   let nextGameState = ensureSeasonSponsorOffers(gameState);
@@ -750,6 +956,9 @@ export function chooseSponsorOfferForAiTeams(gameState: GameState, settingsMap?:
   // Build overview rows once — reused for all teams instead of O(n²) per-team calls.
   const overviewRows = buildTeamSeasonOverviewRows({ gameState: nextGameState });
   const rowByTeamId = new Map(overviewRows.map((row) => [row.teamId, row]));
+  // Fuer die Liga EINMAL berechnen, nicht je Team — `buildSeasonStrategyState` ist eine reine
+  // Funktion ueber den gesamten `gameState` und liefert die Doktrin aller Teams in einem Rutsch.
+  const seasonStrategyByTeamId = buildSeasonStrategyState(nextGameState);
 
   for (const team of nextGameState.teams) {
     if (getTeamSponsorContract(nextGameState, team.teamId)) {
@@ -773,7 +982,13 @@ export function chooseSponsorOfferForAiTeams(gameState: GameState, settingsMap?:
     const cashPressure = row?.cash != null && row.cash < 0 ? 10 : row?.cash != null && row.cash < 20 ? 7 : 3;
     const powerRank = row?.rank ?? null;
     const rosterSize = nextGameState.rosters.filter((entry) => entry.teamId === team.teamId).length;
-    const scoreArgs = { profile, identity, cashPressure, powerRank, teamId: team.teamId, cash: row?.cash ?? 0, rosterSize };
+    const ecoIntent01 = resolveEcoIntent01({
+      seasonStrategy: seasonStrategyByTeamId[team.teamId]?.seasonStrategy,
+      cashPressure,
+    });
+    const scoreArgs = {
+      profile, identity, cashPressure, powerRank, teamId: team.teamId, cash: row?.cash ?? 0, rosterSize, ecoIntent01,
+    };
     const bestOffer = [...offers].sort(
       (left, right) =>
         scoreOfferForAi({ offer: right, ...scoreArgs }) - scoreOfferForAi({ offer: left, ...scoreArgs }),

@@ -30,6 +30,7 @@ import {
   regenerateSponsorOffersForSeason,
 } from "@/lib/sponsor/sponsor-offer-service";
 import { getSeasonSponsorCashTotal, previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
+import { ensureSeasonApronLinesFrozen } from "@/lib/season/apron-settlement-service";
 import type { PlayerGeneratorAttributeName, PlayerGeneratorAttributes } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 
@@ -351,6 +352,31 @@ function materializeSeasonEndProgressionBeforeNextSeason(
   save: PersistedSaveGame,
   persistence: PersistenceService,
 ): PreSeasonProgressionMaterializationResult {
+  /**
+   * Nicht zweimal entwickeln.
+   *
+   * Der Saisonende-Assistent laesst den Schritt „Spielerentwicklung" seit Kurzem selbst rechnen —
+   * damit die neuen Marktwerte VOR dem Transferfenster feststehen und man nicht zu Preisen
+   * verkauft, die der Spieler schon nicht mehr hat. Lief er dort, ist die Arbeit getan; ein
+   * zweiter Durchgang hier gaebe jedem Spieler seinen Saisonsprung doppelt.
+   *
+   * Der Marker haengt an der ABGESCHLOSSENEN Saison-Id, nicht an einem Ja/Nein-Schalter: nur so
+   * bleibt er ueber Saisongrenzen hinweg richtig und blockiert die Entwicklung der naechsten
+   * Saison nicht.
+   */
+  if (save.gameState.seasonTransition?.progressionAppliedForSeasonId === save.gameState.season.id) {
+    return {
+      save,
+      teamsProcessed: 0,
+      teamsApplied: 0,
+      humanOrganicTeams: 0,
+      aiPlannedTeams: 0,
+      aiOrganicFallbackTeams: 0,
+      playerEventsCreated: 0,
+      warnings: ["season_end_progression_already_applied_in_transition_step"],
+      blockingReasons: [],
+    };
+  }
   return runSeasonEndProgressionBatch({ save, persistence, persistFinalState: false });
 }
 
@@ -725,9 +751,13 @@ function buildNextSeasonGameState(
         }),
       );
 
+  // Apron-Linien fuer die NEUE Saison einfrieren, unmittelbar nachdem `gamePhase` auf `season_active`
+  // geschaltet hat: das Transferfenster ist zu diesem Zeitpunkt bereits durchlaufen (dieser Workflow
+  // laeuft am Ende von `next_season_ready`), der Gehaltsstand, gegen den die Saison antritt, steht
+  // also fest. Idempotent — ein bereits vorhandener Snapshot fuer diese Saison bleibt unangetastet.
   return {
     auditLog,
-    gameState: nextGameState,
+    gameState: ensureSeasonApronLinesFrozen(nextGameState),
   };
 }
 

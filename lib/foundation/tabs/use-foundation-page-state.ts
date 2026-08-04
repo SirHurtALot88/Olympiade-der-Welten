@@ -215,6 +215,7 @@ import type {
   FoundationTransfermarktResponse,
   FoundationView,
   FoundationWholeSeasonDryRunSummary,
+  MarketNegotiationOutcome,
   NewGamePresetId,
   NewGameSetupApiResponse,
   NewGameSetupPreview,
@@ -251,6 +252,8 @@ import type {
   TrainingDevelopmentFilter,
   TrainingModeDraft,
   TransfermarktBuyApiResponse,
+  TransfermarktBuyPreviewSubject,
+  TransfermarktBuyRequestContext,
   TransfermarktBuySummary,
   TransfermarktSellApiResponse,
   TransfermarktSellPreviewSubject,
@@ -273,6 +276,8 @@ import {
   SEASON_TRANSITION_STATIC_STEPS,
   STANDINGS_APPLY_CONFIRM_TOKEN,
   TRANSFER_HISTORY_SEASON_LIMIT,
+  TRANSFER_MARKET_INITIAL_RENDER_LIMIT,
+  TRANSFER_MARKET_RENDER_STEP,
   teamIdentityFieldLabels,
   teamStrategyBiasFieldLabels,
   teamStrategyIdentityListFieldLabels,
@@ -485,13 +490,33 @@ export function useFoundationPageState({
   const [playerTeamFilter, setPlayerTeamFilter] = useState<string>("ALL");
   const [playerClassFilter, setPlayerClassFilter] = useState<string>("ALL");
   const [playerBracketFilter, setPlayerBracketFilter] = useState<string>("ALL");
+  const [marketClassFilter, setMarketClassFilter] = useState<string>("ALL");
+  const [marketRaceFilter, setMarketRaceFilter] = useState<string>("ALL");
+  const [marketSubclassFilter, setMarketSubclassFilter] = useState<string>("ALL");
+  const [marketAlignmentFilter, setMarketAlignmentFilter] = useState<string>("ALL");
+  const [marketGenderFilter, setMarketGenderFilter] = useState<string>("ALL");
+  const [marketPositiveTraitFilter, setMarketPositiveTraitFilter] = useState<string>("ALL");
+  const [marketNegativeTraitFilter, setMarketNegativeTraitFilter] = useState<string>("ALL");
+  const [marketBracketFilter, setMarketBracketFilter] = useState<string>("ALL");
   const [marketTeamId, setMarketTeamId] = useState<string>("");
   const [marketFocusPlayerId, setMarketFocusPlayerId] = useState<string | null>(null);
   const [foundationPanel, setFoundationPanel] = useState<FoundationPanelId>(null);
   const [foundationFacilityTarget, setFoundationFacilityTarget] = useState<{ facilityId: string; action: string } | null>(null);
+  const [marketSearch, setMarketSearch] = useState<string>("");
   const [marketMaxValue, setMarketMaxValue] = useState<number>(150);
   const marketValueFilterManualRef = useRef(false);
   const marketCashLimitTeamRef = useRef<string | null>(null);
+  const [marketMaxSalary, setMarketMaxSalary] = useState<number>(40);
+  const [marketMinRatio, setMarketMinRatio] = useState<number>(0);
+  const [marketMinPow, setMarketMinPow] = useState<number>(1);
+  const [marketMinSpe, setMarketMinSpe] = useState<number>(1);
+  const [marketMinMen, setMarketMinMen] = useState<number>(1);
+  const [marketMinSoc, setMarketMinSoc] = useState<number>(1);
+  const [marketShowAdvancedColumns, setMarketShowAdvancedColumns] = useState<boolean>(false);
+  const [marketShowAutoAnalysis, setMarketShowAutoAnalysis] = useState<boolean>(false);
+  const [marketShowTransferRecap, setMarketShowTransferRecap] = useState<boolean>(false);
+  const [marketRenderLimit, setMarketRenderLimit] = useState<number>(TRANSFER_MARKET_INITIAL_RENDER_LIMIT);
+  const [marketLoadingMore, setMarketLoadingMore] = useState<boolean>(false);
   const [historyLoadingMore, setHistoryLoadingMore] = useState<boolean>(false);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [persistenceError, setPersistenceError] = useState<string | null>(null);
@@ -500,9 +525,7 @@ export function useFoundationPageState({
   const [marketFeed, setMarketFeed] = useState<FoundationTransfermarktResponse | null>(null);
   const [marketBuyBusy, setMarketBuyBusy] = useState<boolean>(false);
   const [marketBuyError, setMarketBuyError] = useState<string | null>(null);
-  // Wird nur noch fuers Cockpit-Statuskaertchen ("Kaufvorschau") gelesen (FoundationCockpitPanel.tsx);
-  // der V1-Verhandlungsablauf, der diesen State frueher befuellt hat, ist tot und entfernt.
-  const [marketBuyPreview, setMarketBuyPreview] = useState<TransfermarktBuySummary | null>(null);
+  const [marketBuySuccess, setMarketBuySuccess] = useState<string | null>(null);
   const [foundationActionFeedback, setFoundationActionFeedback] = useState<{
     tone: "success" | "warning" | "info" | "blocked" | "error";
     title: string;
@@ -519,7 +542,17 @@ export function useFoundationPageState({
   const [newGameBusy, setNewGameBusy] = useState<boolean>(false);
   const [newGameError, setNewGameError] = useState<string | null>(null);
   const [newGameSuccess, setNewGameSuccess] = useState<string | null>(null);
+  const [marketBuyPreview, setMarketBuyPreview] = useState<TransfermarktBuySummary | null>(null);
+  const [marketBuyPreviewContext, setMarketBuyPreviewContext] = useState<TransfermarktBuyRequestContext | null>(null);
+  const [marketNegotiationOutcome, setMarketNegotiationOutcome] = useState<MarketNegotiationOutcome | null>(null);
   const [marketPreviewPlayerId, setMarketPreviewPlayerId] = useState<string | null>(null);
+  /**
+   * Name und Id des in der Liste markierten Kandidaten, gemeldet vom Transfermarkt-Client.
+   * Braucht es, weil `marketFeed` beim normalen Oeffnen des Marktes leer bleibt und die Id
+   * allein dort nicht aufloesbar ist — siehe Begruendung an `marketPreviewPlayer`.
+   */
+  const [marketPreviewPlayerSummary, setMarketPreviewPlayerSummary] = useState<{ playerId: string; name: string } | null>(null);
+  const [marketBuySubject, setMarketBuySubject] = useState<TransfermarktBuyPreviewSubject | null>(null);
   const [marketSellBusy, setMarketSellBusy] = useState<boolean>(false);
   const [marketSellError, setMarketSellError] = useState<string | null>(null);
   const [marketSellSuccess, setMarketSellSuccess] = useState<string | null>(null);
@@ -548,6 +581,9 @@ export function useFoundationPageState({
   const [sponsorChoiceMessage, setSponsorChoiceMessage] = useState<string | null>(null);
   const [marketSellSubject, setMarketSellSubject] = useState<TransfermarktSellPreviewSubject | null>(null);
   const [marketSellRiskAcknowledged, setMarketSellRiskAcknowledged] = useState<boolean>(false);
+  const [marketContractLengthDraft, setMarketContractLengthDraft] = useState<number | null>(null);
+  const [marketContractShapeDraft, setMarketContractShapeDraft] = useState<ContractShape | null>(null);
+  const [marketOfferedSalaryDraft, setMarketOfferedSalaryDraft] = useState<number | null>(null);
   const [marketAiTeamScope, setMarketAiTeamScope] = useState<"ai" | "all">("ai");
   const [marketAiPreviewBusy, setMarketAiPreviewBusy] = useState<boolean>(false);
   const [marketAiPreviewError, setMarketAiPreviewError] = useState<string | null>(null);
@@ -810,6 +846,22 @@ export function useFoundationPageState({
     setPlayerClassFilter,
     playerBracketFilter,
     setPlayerBracketFilter,
+    marketClassFilter,
+    setMarketClassFilter,
+    marketRaceFilter,
+    setMarketRaceFilter,
+    marketSubclassFilter,
+    setMarketSubclassFilter,
+    marketAlignmentFilter,
+    setMarketAlignmentFilter,
+    marketGenderFilter,
+    setMarketGenderFilter,
+    marketPositiveTraitFilter,
+    setMarketPositiveTraitFilter,
+    marketNegativeTraitFilter,
+    setMarketNegativeTraitFilter,
+    marketBracketFilter,
+    setMarketBracketFilter,
     marketTeamId,
     setMarketTeamId,
     marketFocusPlayerId,
@@ -818,8 +870,32 @@ export function useFoundationPageState({
     setFoundationPanel,
     foundationFacilityTarget,
     setFoundationFacilityTarget,
+    marketSearch,
+    setMarketSearch,
     marketMaxValue,
     setMarketMaxValue,
+    marketMaxSalary,
+    setMarketMaxSalary,
+    marketMinRatio,
+    setMarketMinRatio,
+    marketMinPow,
+    setMarketMinPow,
+    marketMinSpe,
+    setMarketMinSpe,
+    marketMinMen,
+    setMarketMinMen,
+    marketMinSoc,
+    setMarketMinSoc,
+    marketShowAdvancedColumns,
+    setMarketShowAdvancedColumns,
+    marketShowAutoAnalysis,
+    setMarketShowAutoAnalysis,
+    marketShowTransferRecap,
+    setMarketShowTransferRecap,
+    marketRenderLimit,
+    setMarketRenderLimit,
+    marketLoadingMore,
+    setMarketLoadingMore,
     historyLoadingMore,
     setHistoryLoadingMore,
     bootstrapError,
@@ -836,8 +912,8 @@ export function useFoundationPageState({
     setMarketBuyBusy,
     marketBuyError,
     setMarketBuyError,
-    marketBuyPreview,
-    setMarketBuyPreview,
+    marketBuySuccess,
+    setMarketBuySuccess,
     foundationActionFeedback,
     setFoundationActionFeedback,
     seasonBriefingOpen,
@@ -862,8 +938,18 @@ export function useFoundationPageState({
     setNewGameError,
     newGameSuccess,
     setNewGameSuccess,
+    marketBuyPreview,
+    setMarketBuyPreview,
+    marketBuyPreviewContext,
+    setMarketBuyPreviewContext,
+    marketNegotiationOutcome,
+    setMarketNegotiationOutcome,
     marketPreviewPlayerId,
+    marketPreviewPlayerSummary,
+    setMarketPreviewPlayerSummary,
     setMarketPreviewPlayerId,
+    marketBuySubject,
+    setMarketBuySubject,
     marketSellBusy,
     setMarketSellBusy,
     marketSellError,
@@ -888,6 +974,12 @@ export function useFoundationPageState({
     setMarketSellSubject,
     marketSellRiskAcknowledged,
     setMarketSellRiskAcknowledged,
+    marketContractLengthDraft,
+    setMarketContractLengthDraft,
+    marketContractShapeDraft,
+    setMarketContractShapeDraft,
+    marketOfferedSalaryDraft,
+    setMarketOfferedSalaryDraft,
     marketAiTeamScope,
     setMarketAiTeamScope,
     marketAiPreviewBusy,

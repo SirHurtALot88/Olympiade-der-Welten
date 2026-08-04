@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verkaufs-Popup — Mockup (Olympiade der Welten)</title>
+<style>
+  /* ============================================================
+     Tokens — 1:1 aus app/globals.css (.is-new-look), Dark only.
+     ============================================================ */
+  :root {
+    --nl-bg: #0b0f17;
+    --nl-bg-2: #0e131d;
+    --nl-panel: #131a26;
+    --nl-panel-2: #0f1621;
+    --nl-line: #1f2937;
+    --nl-line-2: #2a3a52;
+    --nl-ink: #eaf0fa;
+    --nl-mut: #93a3bd;
+    --nl-mut-2: #63748f;
+    --nl-accent: #5b9bff;
+    --nl-accent-soft: #15294b;
+    --nl-good: #4cc56b;
+    --nl-warn: #e0a53a;
+    --nl-risk: #e5615a;
+    --nl-gold: #f6c750;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--nl-bg);
+    color: var(--nl-ink);
+    font-size: 16px;
+    line-height: 1.45;
+  }
+
+  /* Angedeutete Teamseite hinter dem Overlay */
+  .vk-page-behind {
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(1200px 500px at 20% -10%, #16233a 0%, transparent 60%),
+      var(--nl-bg);
+    overflow: hidden;
+  }
+  .vk-page-behind .ghost {
+    height: 84px; border-radius: 14px; margin: 18px 28px;
+    background: var(--nl-panel-2); border: 1px solid var(--nl-line); opacity: .5;
+  }
+
+  /* Mockup-Zustandsschalter (nicht Teil des Spiels) */
+  .vk-switcher {
+    position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+    z-index: 60; display: flex; align-items: center; gap: 8px;
+    background: var(--nl-panel); border: 1px solid var(--nl-line-2);
+    border-radius: 999px; padding: 6px 10px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.5);
+    font-size: .72rem;
+  }
+  .vk-switcher span { color: var(--nl-mut); letter-spacing: .06em; text-transform: uppercase; font-size: .64rem; }
+  .vk-switcher button {
+    font: inherit; color: var(--nl-mut); background: transparent;
+    border: 1px solid transparent; border-radius: 999px; padding: 5px 12px; cursor: pointer;
+  }
+  .vk-switcher button:hover { color: var(--nl-ink); }
+  .vk-switcher button.is-active {
+    color: var(--nl-ink); background: var(--nl-accent-soft); border-color: var(--nl-accent);
+  }
+
+  /* ============================================================
+     Overlay + Dialog
+     ============================================================ */
+  .vk-overlay {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(4, 7, 12, .72);
+    backdrop-filter: blur(3px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 56px 16px 24px;
+  }
+  .vk-dialog {
+    width: min(920px, 100%);
+    max-height: calc(100vh - 80px);
+    display: flex; flex-direction: column;
+    background: var(--nl-panel);
+    border: 1px solid var(--nl-line-2);
+    border-radius: 18px;
+    box-shadow: 0 24px 80px rgba(0,0,0,.6);
+    overflow: hidden;
+  }
+
+  /* --- A: Kopf ------------------------------------------------ */
+  .vk-head {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--nl-line);
+    background: var(--nl-panel-2);
+  }
+  .vk-kicker {
+    font-size: .68rem; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--nl-mut);
+  }
+  .vk-head-spacer { flex: 1; }
+  .vk-pill {
+    font-size: .68rem; letter-spacing: .06em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 999px; border: 1px solid var(--nl-line-2);
+    color: var(--nl-mut);
+  }
+  .vk-pill.is-ready  { color: var(--nl-good); border-color: rgba(76,197,107,.45); background: rgba(76,197,107,.08); }
+  .vk-pill.is-window { color: var(--nl-warn); border-color: rgba(224,165,58,.45); background: rgba(224,165,58,.08); }
+  .vk-pill.is-sold   { color: var(--nl-accent); border-color: rgba(91,155,255,.45); background: var(--nl-accent-soft); }
+  .vk-close {
+    font: inherit; font-size: 1rem; line-height: 1;
+    width: 32px; height: 32px; border-radius: 10px; cursor: pointer;
+    color: var(--nl-mut); background: transparent; border: 1px solid var(--nl-line);
+  }
+  .vk-close:hover { color: var(--nl-ink); border-color: var(--nl-line-2); }
+
+  /* --- Scrollender Mittelteil --------------------------------- */
+  .vk-body { overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+
+  /* --- B: Hero ------------------------------------------------ */
+  .vk-hero { display: flex; gap: 18px; align-items: stretch; }
+  .vk-portrait {
+    flex: 0 0 132px; width: 132px; height: 132px;
+    border-radius: 16px;
+    background: linear-gradient(160deg, #6b5a1e 0%, #2a2410 55%, #171207 100%);
+    border: 1px solid rgba(246,199,80,.5);           /* Bard = gelb (classVisuals) */
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2.2rem; font-weight: 700; letter-spacing: .04em;
+    color: var(--nl-gold);
+    text-shadow: 0 2px 10px rgba(0,0,0,.6);
+  }
+  .vk-hero-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; justify-content: center; }
+  .vk-hero-eyebrow { font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--nl-mut-2); }
+  .vk-hero-name { font-size: 1.35rem; font-weight: 700; letter-spacing: .01em; }
+  .vk-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .vk-chip {
+    font-size: .72rem; padding: 3px 9px; border-radius: 999px;
+    border: 1px solid var(--nl-line-2); color: var(--nl-mut); background: var(--nl-panel-2);
+  }
+  .vk-chip.is-class { color: var(--nl-gold); border-color: rgba(246,199,80,.5); background: rgba(246,199,80,.07); }
+  .vk-price {
+    flex: 0 0 auto; align-self: center; text-align: right;
+    padding-left: 18px; border-left: 1px solid var(--nl-line);
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .vk-price-label { font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--nl-mut); }
+  .vk-price-value {
+    font-size: 1.9rem; font-weight: 750; color: var(--nl-accent);
+    font-variant-numeric: tabular-nums; line-height: 1.1;
+  }
+  .vk-price-sub { font-size: .72rem; color: var(--nl-mut); }
+
+  /* --- Sperr-Banner (nur Zustand „gesperrt") ------------------ */
+  .vk-lock-banner {
+    display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap;
+    border: 1px solid rgba(224,165,58,.45);
+    background: rgba(224,165,58,.08);
+    border-radius: 12px; padding: 10px 14px;
+  }
+  .vk-lock-banner strong { color: var(--nl-warn); font-size: .82rem; }
+  .vk-lock-banner span { color: var(--nl-mut); font-size: .78rem; }
+
+  /* --- C: 3-Sekunden-Zeile ------------------------------------ */
+  .vk-triple { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .vk-tile {
+    background: var(--nl-panel-2); border: 1px solid var(--nl-line);
+    border-radius: 14px; padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 7px;
+  }
+  .vk-tile-label { font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--nl-mut-2); }
+  .vk-row { display: flex; justify-content: space-between; gap: 8px; font-size: .8rem; }
+  .vk-row .k { color: var(--nl-mut); }
+  .vk-row .v { font-variant-numeric: tabular-nums; text-align: right; }
+  .vk-good { color: var(--nl-good); }
+  .vk-warn-ink { color: var(--nl-warn); }
+  .vk-arrow { color: var(--nl-mut-2); }
+
+  /* --- D: Board-Bilanz (Kern) --------------------------------- */
+  .vk-card {
+    background: var(--nl-panel-2); border: 1px solid var(--nl-line);
+    border-radius: 16px; padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .vk-card.is-core { border-color: var(--nl-line-2); }
+  .vk-card-eyebrow { font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--nl-mut-2); }
+  .vk-card-title { font-size: .95rem; font-weight: 700; }
+  .vk-card-title small { font-weight: 400; color: var(--nl-mut); font-size: .78rem; margin-left: 8px; }
+
+  .vk-intent { display: flex; flex-direction: column; gap: 5px; }
+  .vk-intent-bar {
+    height: 8px; border-radius: 999px; overflow: hidden;
+    background: rgba(224,165,58,.28); display: flex;
+  }
+  .vk-intent-bar .fill { background: var(--nl-accent); border-radius: 999px; }
+  .vk-intent-legend { display: flex; justify-content: space-between; font-size: .7rem; color: var(--nl-mut); }
+  .vk-intent-legend b:first-child { color: var(--nl-accent); }
+  .vk-intent-legend b:last-child { color: var(--nl-warn); }
+
+  .vk-reasons { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .vk-reason-col-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: .74rem; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--nl-mut); padding-bottom: 6px; border-bottom: 1px solid var(--nl-line);
+    margin-bottom: 8px;
+  }
+  .vk-reason { display: flex; gap: 8px; align-items: flex-start; padding: 5px 0; font-size: .8rem; }
+  .vk-reason .dot { flex: 0 0 7px; width: 7px; height: 7px; border-radius: 50%; margin-top: 6px; }
+  .vk-reason.for  .dot { background: var(--nl-accent); }
+  .vk-reason.keep .dot { background: var(--nl-warn); }
+  .vk-tag {
+    flex: 0 0 auto; font-size: .62rem; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--nl-mut-2); border: 1px solid var(--nl-line); border-radius: 6px;
+    padding: 1px 6px; margin-top: 2px;
+  }
+  .vk-reason-empty { color: var(--nl-mut-2); font-size: .78rem; font-style: italic; padding: 5px 0; }
+  .vk-strategy { font-size: .76rem; color: var(--nl-mut); border-top: 1px solid var(--nl-line); padding-top: 10px; }
+
+  /* --- E: Hinweise nach Gewicht ------------------------------- */
+  .vk-notice { display: flex; gap: 10px; align-items: flex-start; padding: 7px 0; font-size: .8rem; }
+  .vk-notice + .vk-notice { border-top: 1px solid var(--nl-line); }
+  .vk-notice .badge {
+    flex: 0 0 auto; width: 118px; text-align: center;
+    font-size: .62rem; letter-spacing: .08em; text-transform: uppercase;
+    border-radius: 6px; padding: 3px 6px; margin-top: 1px;
+  }
+  .vk-notice.warn .badge  { color: var(--nl-warn); background: rgba(224,165,58,.1); border: 1px solid rgba(224,165,58,.4); }
+  .vk-notice.info .badge  { color: var(--nl-mut);  background: var(--nl-panel);      border: 1px solid var(--nl-line-2); }
+  .vk-notice.good .badge  { color: var(--nl-good); background: rgba(76,197,107,.08); border: 1px solid rgba(76,197,107,.4); }
+  .vk-notice .txt { color: var(--nl-ink); }
+  .vk-notice .txt small { display: block; color: var(--nl-mut-2); font-size: .72rem; }
+
+  /* --- F: Konsequenzen ---------------------------------------- */
+  .vk-consequences {
+    display: flex; flex-wrap: wrap; gap: 8px 22px;
+    font-size: .74rem; color: var(--nl-mut); padding: 2px 4px;
+  }
+  .vk-consequences b { color: var(--nl-ink); font-weight: 600; }
+
+  /* --- G: Zweite Ebene ---------------------------------------- */
+  details.vk-more { border: 1px solid var(--nl-line); border-radius: 14px; background: var(--nl-panel-2); }
+  details.vk-more summary {
+    cursor: pointer; list-style: none; padding: 11px 14px;
+    display: flex; justify-content: space-between; gap: 10px;
+    font-size: .82rem; font-weight: 600;
+  }
+  details.vk-more summary::-webkit-details-marker { display: none; }
+  details.vk-more summary .sum { color: var(--nl-mut); font-weight: 400; font-size: .74rem; }
+  details.vk-more[open] summary { border-bottom: 1px solid var(--nl-line); }
+  .vk-more-body { padding: 12px 14px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .vk-mini { border: 1px solid var(--nl-line); border-radius: 10px; padding: 8px 10px; }
+  .vk-mini span { display: block; font-size: .64rem; letter-spacing: .1em; text-transform: uppercase; color: var(--nl-mut-2); }
+  .vk-mini strong { font-size: .92rem; font-variant-numeric: tabular-nums; }
+  .vk-mini small { display: block; color: var(--nl-mut); font-size: .7rem; }
+  .vk-more-note { grid-column: 1 / -1; font-size: .72rem; color: var(--nl-mut-2); font-style: italic; }
+
+  /* --- Erfolgskarte (Zustand „gebucht") ----------------------- */
+  .vk-sold-card {
+    border: 1px solid rgba(91,155,255,.45); background: var(--nl-accent-soft);
+    border-radius: 16px; padding: 18px; text-align: center;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .vk-sold-card .headline { font-size: 1.05rem; font-weight: 700; color: var(--nl-accent); letter-spacing: .04em; text-transform: uppercase; }
+  .vk-sold-card .line { font-size: .82rem; color: var(--nl-mut); }
+  .vk-sold-figures { display: flex; justify-content: center; gap: 40px; margin-top: 4px; }
+  .vk-sold-figures small { display: block; font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: var(--nl-mut); }
+  .vk-sold-figures strong { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+
+  /* --- H: Fußleiste ------------------------------------------- */
+  .vk-foot {
+    border-top: 1px solid var(--nl-line); background: var(--nl-panel-2);
+    padding: 12px 18px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .vk-confirm-strip {
+    display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap;
+    border: 1px solid rgba(229,97,90,.4); background: rgba(229,97,90,.07);
+    border-radius: 10px; padding: 9px 12px; font-size: .78rem;
+  }
+  .vk-confirm-strip strong { color: var(--nl-risk); }
+  .vk-confirm-strip span { color: var(--nl-mut); }
+  .vk-confirm-strip .variant { flex-basis: 100%; color: var(--nl-mut-2); font-size: .7rem; font-style: italic; }
+  .vk-foot-row { display: flex; align-items: center; gap: 12px; }
+  .vk-foot-reason { flex: 1; text-align: right; font-size: .74rem; color: var(--nl-warn); }
+  .vk-btn {
+    font: inherit; font-size: .84rem; font-weight: 600; cursor: pointer;
+    border-radius: 10px; padding: 9px 18px;
+    border: 1px solid var(--nl-line-2); background: transparent; color: var(--nl-mut);
+  }
+  .vk-btn:hover:not(:disabled) { color: var(--nl-ink); border-color: var(--nl-mut-2); }
+  .vk-btn.primary {
+    background: var(--nl-accent); border-color: var(--nl-accent); color: #0b1220;
+  }
+  .vk-btn.primary:hover:not(:disabled) { filter: brightness(1.1); color: #0b1220; }
+  .vk-btn.danger { background: var(--nl-risk); border-color: var(--nl-risk); color: #180b0a; }
+  .vk-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+  /* ============================================================
+     Zustands-Sichtbarkeit — genau EIN tragender Zustand.
+     ============================================================ */
+  .only-open, .only-locked, .only-confirm, .only-sold { display: none; }
+  body[data-state="open"]    .only-open    { display: flex; }
+  body[data-state="locked"]  .only-locked  { display: flex; }
+  body[data-state="confirm"] .only-confirm { display: flex; }
+  body[data-state="sold"]    .only-sold    { display: flex; }
+  body[data-state="sold"] .hide-when-sold  { display: none; }
+
+  /* --- Responsiv ---------------------------------------------- */
+  @media (max-width: 720px) {
+    .vk-hero { flex-wrap: wrap; }
+    .vk-price { border-left: none; padding-left: 0; text-align: left; width: 100%; }
+    .vk-triple, .vk-reasons { grid-template-columns: 1fr; }
+    .vk-more-body { grid-template-columns: 1fr 1fr; }
+    .vk-notice .badge { width: 92px; }
+  }
+</style>
+</head>
+<body data-state="open">
+
+  <!-- Angedeutete Teamseite dahinter -->
+  <div class="vk-page-behind" aria-hidden="true">
+    <div class="ghost" style="margin-top:70px"></div>
+    <div class="ghost"></div><div class="ghost"></div><div class="ghost"></div>
+    <div class="ghost"></div><div class="ghost"></div><div class="ghost"></div>
+  </div>
+
+  <!-- Mockup-Schalter (nicht Teil des Spiels) -->
+  <nav class="vk-switcher" aria-label="Mockup-Zustand">
+    <span>Zustand</span>
+    <button type="button" data-set="open" class="is-active">Verkaufbar</button>
+    <button type="button" data-set="locked">Gesperrt</button>
+    <button type="button" data-set="confirm">Bestätigen</button>
+    <button type="button" data-set="sold">Gebucht</button>
+  </nav>
+
+  <div class="vk-overlay">
+    <div class="vk-dialog" role="dialog" aria-modal="true" aria-label="Spieler verkaufen">
+
+      <!-- A: Kopf -->
+      <header class="vk-head">
+        <span class="vk-kicker">Transfermarkt · Verkauf</span>
+        <span class="vk-head-spacer"></span>
+        <span class="vk-pill is-ready"  id="pill-ready">bereit</span>
+        <span class="vk-pill is-window" id="pill-locked" hidden>Fenster zu</span>
+        <span class="vk-pill is-sold"   id="pill-sold" hidden>verkauft</span>
+        <button class="vk-close" type="button" aria-label="Schließen" title="Schließen (Esc)">✕</button>
+      </header>
+
+      <div class="vk-body">
+
+        <!-- B: Hero -->
+        <section class="vk-hero" aria-label="Spieler und Erlös">
+          <div class="vk-portrait" aria-label="Portrait-Platzhalter Claudelio Feelgood">CF</div>
+          <div class="vk-hero-main">
+            <span class="vk-hero-eyebrow">Verkaufskandidat · Saison 1 · MD10</span>
+            <h1 class="vk-hero-name">Claudelio Feelgood</h1>
+            <div class="vk-chips">
+              <span class="vk-chip is-class">Bard</span>
+              <span class="vk-chip">Construct</span>
+              <span class="vk-chip">C-C · Team C-C</span>
+              <span class="vk-chip">Vertrag: letztes Jahr</span>
+              <span class="vk-chip">Gehalt 5,2 Mio p.a.</span>
+            </div>
+          </div>
+          <div class="vk-price">
+            <span class="vk-price-label">Netto-Erlös</span>
+            <span class="vk-price-value">22,0 Mio</span>
+            <span class="vk-price-sub">Brutto 22,0 Mio · kein Buyout</span>
+            <span class="vk-price-sub">Faktor 0,95× auf MW 23,2 Mio</span>
+          </div>
+        </section>
+
+        <!-- Sperr-Banner: nur im Zustand „gesperrt". Amber, kein Alarm —
+             Fenster zu ist ein regulärer Spielzustand. -->
+        <div class="vk-lock-banner only-locked" role="status">
+          <strong>Verkaufsfenster geschlossen</strong>
+          <span>Verkauft wird im Verkaufsfenster am Season-End (nach MD10). Die Vorschau unten bleibt vollständig lesbar — nur der letzte Klick ist gesperrt.</span>
+        </div>
+
+        <!-- Erfolgskarte: nur im Zustand „gebucht", ersetzt C–F. -->
+        <div class="vk-sold-card only-sold" role="status" aria-live="polite">
+          <span class="headline">Verkauf abgeschlossen</span>
+          <span class="line">Claudelio Feelgood verlässt Team C-C.</span>
+          <div class="vk-sold-figures">
+            <span><small>Netto-Erlös</small><strong data-countup="22,0 Mio">22,0 Mio</strong></span>
+            <span><small>Cash danach</small><strong data-countup="24,1 Mio">24,1 Mio</strong></span>
+          </div>
+          <span class="line">Marktsperre: 1 Saison — Team C-C kann ihn in Saison 2 nicht zurückkaufen.</span>
+        </div>
+
+        <!-- C: 3-Sekunden-Zeile -->
+        <section class="vk-triple hide-when-sold" aria-label="Entscheidung in drei Sekunden">
+          <article class="vk-tile">
+            <span class="vk-tile-label">Du bekommst</span>
+            <div class="vk-row"><span class="k">Netto-Erlös</span><span class="v">22,0 Mio</span></div>
+            <div class="vk-row"><span class="k">Cash</span><span class="v">2,1 <span class="vk-arrow">→</span> <b>24,1 Mio</b></span></div>
+            <div class="vk-row"><span class="k">GuV vs. Kaufpreis</span><span class="v vk-good">+0,1 Mio</span></div>
+          </article>
+          <article class="vk-tile">
+            <span class="vk-tile-label">Dein Team danach</span>
+            <div class="vk-row"><span class="k">Kader</span><span class="v">9 <span class="vk-arrow">→</span> <b class="vk-warn-ink">8</b></span></div>
+            <div class="vk-row"><span class="k">Entlastung p.a.</span><span class="v vk-good">−5,2 Mio Gehalt</span></div>
+            <div class="vk-row"><span class="k">Aufstellung danach</span><span class="v vk-warn-ink">eingeschränkt</span></div>
+          </article>
+          <article class="vk-tile">
+            <span class="vk-tile-label">Board &amp; GM</span>
+            <div class="vk-row"><span class="k">Empfehlung</span><span class="v"><b>Verkaufen</b> · Underperformer</span></div>
+            <div class="vk-row"><span class="k">Board-Reaktion</span><span class="v">registriert · <span class="vk-good">+0,05</span> Vertrauen</span></div>
+            <div class="vk-row"><span class="k">GM</span><span class="v">Kira Morrow · beobachtet</span></div>
+          </article>
+        </section>
+
+        <!-- D: Board-Bilanz — der Kern, nie zugeklappt -->
+        <section class="vk-card is-core hide-when-sold" aria-label="Board-Bilanz">
+          <div>
+            <span class="vk-card-eyebrow">Doktrin: Churner · 40 % Churner · 40 % Value-Hunter · 20 % Merchant</span>
+            <h2 class="vk-card-title">Board-Bilanz <small>7 Gründe dafür · 1 dagegen · Priorität 100</small></h2>
+          </div>
+          <div class="vk-intent">
+            <div class="vk-intent-bar" role="img" aria-label="Verkaufs-Gewichtung 123 zu 0">
+              <span class="fill" style="width:100%"></span>
+            </div>
+            <div class="vk-intent-legend"><b>Verkaufen · 123</b><b>Halten · 0</b></div>
+          </div>
+          <div class="vk-reasons">
+            <div>
+              <div class="vk-reason-col-head"><span>Dafür</span><span>7</span></div>
+              <div class="vk-reason for"><span class="dot"></span><span class="vk-tag">Finanzen</span><span>Cash-Reserve ist zu knapp für sichere Kaderplanung</span></div>
+              <div class="vk-reason for"><span class="dot"></span><span class="vk-tag">Finanzen</span><span>Gehaltslast übersteigt verfügbares Cash — Verkauf entlastet den Etat</span></div>
+              <div class="vk-reason for"><span class="dot"></span><span class="vk-tag">Finanzen</span><span>Realisierbarer Netto-Gewinn von 0,1 Mio</span></div>
+              <div class="vk-reason for"><span class="dot"></span><span class="vk-tag">Leistung</span><span>Performance blieb unter Erwartung</span></div>
+              <div class="vk-reason for"><span class="dot"></span><span class="vk-tag">Vertrag</span><span>Vertrag läuft aus — Fit/Leistung rechtfertigt keine automatische Verlängerung</span></div>
+              <div class="vk-reason for"><span class="dot"></span><span class="vk-tag">Vertrag</span><span>Auslaufender Vertrag braucht vor Ablauf eine aktive Marktentscheidung</span></div>
+              <div class="vk-reason for"><span class="dot"></span><span class="vk-tag">Vertrag</span><span>Letztes Vertragsjahr — vorzeitiger Marktverkauf lohnt sich (Buyout-Wahrscheinlichkeit 60 %)</span></div>
+            </div>
+            <div>
+              <div class="vk-reason-col-head"><span>Dagegen</span><span>1</span></div>
+              <div class="vk-reason keep"><span class="dot"></span><span class="vk-tag">Leistung</span><span>Top-10-Präsenz in 1 Diszi-Einsatz</span></div>
+              <p class="vk-reason-empty">Keine weiteren Haltegründe.</p>
+            </div>
+          </div>
+          <p class="vk-strategy">
+            Board-Stimmung <b>&gt;:(</b> · Policy „Verlängerungs-Warnung" — der Ärger gilt der Vertragslage im Kader,
+            nicht diesem Verkauf: der Verkauf selbst wird registriert (+0,05 Vertrauen, Einstufung: Info).
+          </p>
+        </section>
+
+        <!-- E: Hinweise nach Gewicht — statt vier gleich roter Balken -->
+        <section class="vk-card hide-when-sold" aria-label="Hinweise">
+          <h2 class="vk-card-title">Hinweise <small>nach Gewicht — rot nur, wenn wirklich etwas blockiert</small></h2>
+          <div>
+            <div class="vk-notice warn">
+              <span class="badge">Achtung</span>
+              <span class="txt">Der Kader würde unter die empfohlene Kadergröße fallen (9 → 8).</span>
+            </div>
+            <div class="vk-notice warn">
+              <span class="badge">Achtung</span>
+              <span class="txt">Nach dem Verkauf wäre das Team schlechter aufstellbar.<small>Aufstellungs-Check danach: eingeschränkt</small></span>
+            </div>
+            <div class="vk-notice info">
+              <span class="badge">Hinweis</span>
+              <span class="txt">Verkauf außerhalb des idealen Verkaufsfensters.</span>
+            </div>
+            <div class="vk-notice good">
+              <span class="badge">Stärkt den Deal</span>
+              <span class="txt">Starker Team-Fit stützt den Verkaufspreis.</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- F: Konsequenzen -->
+        <section class="vk-consequences hide-when-sold" aria-label="Konsequenzen">
+          <span><b>Marktsperre:</b> 1 Saison — kein Rückkauf durch Team C-C in Saison 2.</span>
+          <span><b>Endgültig:</b> Ein Verkauf lässt sich nicht rückgängig machen.</span>
+        </section>
+
+        <!-- G: Zweite Ebene — der EINZIGE zugeklappte Bereich -->
+        <details class="vk-more hide-when-sold">
+          <summary>
+            Mehr zum Spieler — Leistung, Vertrag, Historie
+            <span class="sum">OVR 43 · 1 Einsatz · Kaufpreis 21,9 Mio</span>
+          </summary>
+          <div class="vk-more-body">
+            <div class="vk-mini"><span>OVR</span><strong>43</strong><small>Potenzial 47</small></div>
+            <div class="vk-mini"><span>Einsätze</span><strong>1</strong><small>Top-10: 1</small></div>
+            <div class="vk-mini"><span>Marktwert</span><strong>23,2 Mio</strong><small>Kaufpreis 21,9 Mio</small></div>
+            <div class="vk-mini"><span>Vertrag</span><strong>Letztes Jahr</strong><small>Gehalt 5,2 Mio p.a.</small></div>
+            <p class="vk-more-note">
+              Hier landen die heutigen Detail-Karten (PP-Profil, MW-Verlauf, letzte Einsätze, Top-Diszis,
+              Transferhistorie) — vollständig, aber als zweite Ebene. Im Mockup nur angedeutet.
+            </p>
+          </div>
+        </details>
+
+      </div>
+
+      <!-- H: Fußleiste — fixiert, Zustand bestimmt die Aktion -->
+      <footer class="vk-foot">
+
+        <!-- Bestätigen-Stufe: Endgültigkeit dort, wo der Klick passiert -->
+        <div class="vk-confirm-strip only-confirm">
+          <strong>Wirklich verkaufen?</strong>
+          <span>Endgültig — Claudelio Feelgood ist danach 1 Saison für Team C-C gesperrt. Netto-Erlös 22,0 Mio.</span>
+          <span class="variant">Verlangt das Board eine starke Bestätigung (kritische Reaktion oder GM-Soft-Block), erscheint hier zusätzlich die Bestätigungs-Checkbox — erst danach wird der rote Button aktiv.</span>
+        </div>
+
+        <div class="vk-foot-row only-open">
+          <button class="vk-btn" type="button">Abbrechen</button>
+          <span class="vk-foot-reason"></span>
+          <button class="vk-btn primary" type="button" data-goto="confirm">Verkaufen…</button>
+        </div>
+
+        <div class="vk-foot-row only-locked">
+          <button class="vk-btn" type="button">Abbrechen</button>
+          <span class="vk-foot-reason">Warum nicht: Das Verkaufsfenster ist geschlossen — verkauft wird am Season-End (nach MD10).</span>
+          <button class="vk-btn primary" type="button" disabled>Verkauf öffnet nach MD10</button>
+        </div>
+
+        <div class="vk-foot-row only-confirm">
+          <button class="vk-btn" type="button" data-goto="open">Zurück</button>
+          <span class="vk-foot-reason"></span>
+          <button class="vk-btn danger" type="button" data-goto="sold">Ja, endgültig verkaufen</button>
+        </div>
+
+        <div class="vk-foot-row only-sold" style="justify-content: flex-end;">
+          <button class="vk-btn primary" type="button">Schließen</button>
+        </div>
+
+      </footer>
+    </div>
+  </div>
+
+<script>
+  // Mockup-Logik: Zustand umschalten (Schalter oben + Buttons im Dialog).
+  var pills = { open: 'pill-ready', locked: 'pill-locked', confirm: 'pill-ready', sold: 'pill-sold' };
+  function setState(state) {
+    document.body.dataset.state = state;
+    ['pill-ready', 'pill-locked', 'pill-sold'].forEach(function (id) {
+      document.getElementById(id).hidden = (id !== pills[state]);
+    });
+    document.querySelectorAll('.vk-switcher button').forEach(function (btn) {
+      btn.classList.toggle('is-active', btn.dataset.set === state);
+    });
+    if (state === 'sold') runCountUp();
+  }
+  document.querySelectorAll('[data-set]').forEach(function (btn) {
+    btn.addEventListener('click', function () { setState(btn.dataset.set); });
+  });
+  document.querySelectorAll('[data-goto]').forEach(function (btn) {
+    btn.addEventListener('click', function () { setState(btn.dataset.goto); });
+  });
+
+  // Count-Up der Erfolgskarte (respektiert prefers-reduced-motion, wie NlCountUpValue).
+  function runCountUp() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    document.querySelectorAll('[data-countup]').forEach(function (el) {
+      var target = parseFloat(el.dataset.countup.replace(',', '.'));
+      var suffix = ' Mio', start = null, dur = 700;
+      function step(ts) {
+        if (!start) start = ts;
+        var p = Math.min(1, (ts - start) / dur);
+        var eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = (target * eased).toFixed(1).replace('.', ',') + suffix;
+        if (p < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    });
+  }
+</script>
+</body>
+</html>

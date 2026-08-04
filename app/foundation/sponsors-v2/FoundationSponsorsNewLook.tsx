@@ -23,14 +23,21 @@ import {
 } from "@/components/foundation/sponsor/SponsorOfferCardNewLook";
 import {
   buildSponsorOfferPresentation,
+  computeSponsorCostCoverage,
   getSponsorComponentKindLabel,
+  getSponsorCoverageTone,
   sortLeagueSponsorRows,
   type LeagueSponsorSort,
 } from "@/lib/sponsor/sponsor-offer-presenter";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
+import {
+  getTeamDisplaySalaryTotal,
+  getTeamFacilityUpkeepTotal,
+} from "@/lib/sponsor/sponsor-team-salary-display";
 import { resolveSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { sponsorV4AxisLabel, type SponsorV4AxisKey } from "@/lib/sponsor/sponsor-v4-axes";
 import { previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
+import { computeApronLines, type ApronLines } from "@/lib/season/apron-service";
 import { SponsorRankLadder } from "@/components/foundation/sponsor/SponsorRankLadder";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamObjectives } from "@/lib/board/team-season-objectives-service";
@@ -141,9 +148,13 @@ const SPONSOR_STACK_SEGMENTS: Array<{ kind: SponsorComponentKind; tone: NlTone }
  * Konsumiert exakt dieselben Props wie `FoundationSponsorsPanel` und läuft über
  * den echten Abschluss (`chooseTeamSponsor`).
  *
- * Laufzeit (`termSeasons`): NUR Anzeige, kein Selector — der Apply-Pfad
- * (`chooseTeamSponsor(offerId)` → POST /api/sponsor/choose) nimmt keine
- * Laufzeit an und rechnet serverseitig fest mit `termSeasons: 1`.
+ * Laufzeit (`termSeasons`): weiterhin kein Selector — der Spieler waehlt die Laufzeit nicht separat
+ * aus. Seit Umsetzungsplan D ist sie aber auch keine feste 1-Saison-Konstante mehr: sie steht am
+ * gewaehlten ANGEBOT (je Slot gewuerfelt, `rollSponsorOfferSlate` in sponsor-tier-pool.ts) und der
+ * Apply-Pfad (`chooseTeamSponsor(offerId)` → POST /api/sponsor/choose → `chooseSponsorOffer`)
+ * uebernimmt sie 1:1 vom Angebot. Der Betrag bleibt an die Konjunktur der Saison gekoppelt: der Sockel
+ * friert beim Startrang zur Unterschrift ein, der Wertungsanteil skaliert jede Saison neu mit dem
+ * dann aktuellen Salary Factor (`rerollSponsorV3TermsForNewSeason`, sponsor-v3-offer-service.ts).
  */
 
 type ContractPayoutTile = {
@@ -433,6 +444,18 @@ export default function FoundationSponsorsNewLook({
   // es nur fuer die eigenen Angebote.
   const [leagueDetailTeamId, setLeagueDetailTeamId] = useState<string | null>(null);
 
+  // Apron — die zu Saisonbeginn eingefrorenen Gehaltslinien (siehe lib/season/apron-service.ts).
+  // Bevorzugt der EINGEFRORENE Snapshot der laufenden Saison; nur Bestandsspielstände ohne Snapshot
+  // (vor diesem Feature angelegt) fallen auf eine frische Berechnung zurück — deutlich markiert, damit
+  // niemand eine "eingefrorene" Linie für bar nimmt, die es in diesem Save noch gar nicht gibt.
+  const apronLines: ApronLines & { frozen: boolean } = useMemo(() => {
+    const frozen = gameState.seasonState.apronLinesSnapshot;
+    if (frozen && frozen.seasonId === gameState.season.id) {
+      return { ...frozen, frozen: true };
+    }
+    return { ...computeApronLines(gameState), frozen: false };
+  }, [gameState]);
+
   const leagueSponsorRows = useMemo(() => {
     return gameState.teams.map((team) => {
       const contract = getTeamSponsorContract(gameState, team.teamId);
@@ -446,7 +469,23 @@ export default function FoundationSponsorsNewLook({
         : null;
       // Hauptzahl: voraussichtliche Auszahlung beim aktuellen Rang.
       const projectedCash = contract ? (sponsorProjectedByTeamId.get(team.teamId) ?? 0) : null;
+      // EINNAHME UND KOSTEN NEBENEINANDER. Bis hierher beantwortete die Uebersicht nur "wer hat
+      // welchen Sponsor" — nicht die Frage, die dahinter steht: traegt der Sponsor die Mannschaft
+      // ueberhaupt? Der Betrag allein kann das nicht beantworten, solange die Kader unterschiedlich
+      // teuer sind: 90 sind fuer einen Kader mit 84 Gehalt etwas anderes als fuer einen mit 48.
+      const salaryTotal = getTeamDisplaySalaryTotal(gameState, team.teamId);
+      const upkeepTotal = getTeamFacilityUpkeepTotal(gameState, team.teamId);
+      const fixedCostTotal = Math.round((salaryTotal + upkeepTotal) * 10) / 10;
+      const costCoverage = computeSponsorCostCoverage(projectedCash, fixedCostTotal);
+      // Apron: über welcher der beiden eingefrorenen Linien liegt das Gehalt dieses Teams?
+      const apronStatus: "unter" | "ueber_linie_1" | "ueber_linie_2" =
+        salaryTotal > apronLines.line2 ? "ueber_linie_2" : salaryTotal > apronLines.line1 ? "ueber_linie_1" : "unter";
       return {
+        salaryTotal,
+        upkeepTotal,
+        fixedCostTotal,
+        costCoverage,
+        apronStatus,
         teamId: team.teamId,
         teamName: team.name,
         shortCode: team.shortCode,
@@ -464,7 +503,7 @@ export default function FoundationSponsorsNewLook({
         isGolden: contract?.variantKey === "premium_elite",
       };
     });
-  }, [gameState]);
+  }, [gameState, apronLines]);
   // Komponenten-Aufschluesselung des geoeffneten Teams — dieselbe Quelle wie das echte
   // Season-End-Settlement, damit das Fenster nicht eine andere Zahl zeigt als die Uebersicht.
   const leagueDetail = useMemo(() => {
@@ -946,22 +985,59 @@ export default function FoundationSponsorsNewLook({
                       <span className="nl-sponsor-league-sponsor is-empty">— noch keiner —</span>
                     )}
                   </div>
-                  <span
-                    className="nl-sponsor-league-cash nl-tnum"
-                    title={
-                      row.projectedCash != null
-                        ? `Voraussichtliche Auszahlung beim aktuellen Rang${
-                            row.rank != null ? ` #${row.rank}` : ""
-                          }${row.maxCash != null ? ` · max. Vertragswert ${formatMoney(row.maxCash)}` : ""}`
-                        : "Kein Sponsor unter Vertrag"
-                    }
-                  >
-                    {row.projectedCash != null ? formatMoney(row.projectedCash) : "—"}
+                  <span className="nl-sponsor-league-figures">
+                    <span
+                      className="nl-sponsor-league-cash nl-tnum"
+                      title={
+                        row.projectedCash != null
+                          ? `Voraussichtliche Auszahlung beim aktuellen Rang${
+                              row.rank != null ? ` #${row.rank}` : ""
+                            }${row.maxCash != null ? ` · max. Vertragswert ${formatMoney(row.maxCash)}` : ""}`
+                          : "Kein Sponsor unter Vertrag"
+                      }
+                    >
+                      {row.projectedCash != null ? formatMoney(row.projectedCash) : "—"}
+                    </span>
+                    {/* Deckungsgrad: traegt der Sponsor die laufenden Kosten? Unter 100 % zahlt das
+                        Team drauf. Die Farbe ist NICHT der einzige Traeger — der Prozentwert steht
+                        daneben, damit die Aussage auch ohne Farbunterscheidung ankommt. */}
+                    {row.costCoverage != null ? (
+                      <span
+                        className={`nl-sponsor-league-coverage nl-tnum is-${getSponsorCoverageTone(row.costCoverage)}`}
+                        title={`Sponsor deckt ${Math.round(
+                          row.costCoverage * 100,
+                        )} % der Fixkosten · Gehälter ${formatMoney(row.salaryTotal)}${
+                          row.upkeepTotal > 0 ? ` + Unterhalt ${formatMoney(row.upkeepTotal)}` : ""
+                        } = ${formatMoney(row.fixedCostTotal)}`}
+                      >
+                        {Math.round(row.costCoverage * 100)} % der Fixkosten
+                      </span>
+                    ) : null}
+                    {/* Apron: Text-Badge, Farbe ist NUR Verstärkung (nie der einzige Träger) — wer
+                        über einer Linie liegt, gibt am Saisonende einen Teil des Überschusses ab. */}
+                    {row.apronStatus !== "unter" ? (
+                      <span
+                        className={`nl-sponsor-league-apron nl-tnum is-${row.apronStatus === "ueber_linie_2" ? "linie2" : "linie1"}`}
+                        title={`Gehalt ${formatMoney(row.salaryTotal)} liegt über der ${
+                          row.apronStatus === "ueber_linie_2" ? "2." : "1."
+                        } Apron-Linie (${formatMoney(row.apronStatus === "ueber_linie_2" ? apronLines.line2 : apronLines.line1)}) — Abgabe am Saisonende möglich.`}
+                      >
+                        über {row.apronStatus === "ueber_linie_2" ? "2." : "1."} Linie
+                      </span>
+                    ) : null}
                   </span>
                 </div>
               );
             })}
           </div>
+          {/* Apron-Linien dieser Saison — zu Saisonbeginn eingefroren und ab da unveränderlich,
+              genau deshalb hier sichtbar: eine Grenze, gegen die man kalkuliert, muss man kennen. */}
+          <p className="nl-sponsor-league-apron-lines">
+            Apron-Linien{apronLines.frozen ? " (eingefroren)" : " (noch nicht eingefroren — Vorschau)"}: Median-Gehalt{" "}
+            {formatMoney(apronLines.medianSalary)} · 1. Linie {formatMoney(apronLines.line1)} · 2. Linie{" "}
+            {formatMoney(apronLines.line2)}
+            {apronLines.usedReferenceSalary ? " · Referenzgehalt (Liga noch ohne echte Gehälter)" : ""}
+          </p>
         </NlCard>
 
         {/* Sponsor-Details eines beliebigen Teams — dieselbe Aufschluesselung, die es bisher nur fuer

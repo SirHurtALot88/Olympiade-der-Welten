@@ -23,9 +23,9 @@ import {
   type SponsorLiveSaveTeam,
 } from "./_fixtures/sponsor-live-save-s1.fixture";
 import { getPrizePlacementBonus, PRIZE_PLACEMENT_EFFECTIVE_CAP } from "@/lib/season/prize-placement-table";
-import { pickBonusObjective } from "@/lib/sponsor/sponsor-special-objectives";
 import {
   buildSponsorV3TermsCore,
+  sponsorV3BenchmarkLadder,
   sponsorV3ExpectedPayout,
   sponsorV3GoalProbability,
   sponsorV3IsGoalOfferable,
@@ -75,23 +75,61 @@ function hash01(seed: string): number {
 }
 
 /**
- * Das Sonderziel, das die Angebotserzeugung diesem Team wirklich anbieten wuerde — gezogen mit der
- * PRODUKTIVEN `pickBonusObjective`, inklusive des V3-Katalogfilters. Nur so misst der Test dieselbe
- * p-Verteilung, die im Spiel entsteht; ein synthetisch gewuerfeltes p wuerde die Zielkennzahlen um
- * mehrere Zehntel verschieben (gemessen: RMSE des besten Falls 5,52 gegen 5,87).
+ * DAS SONDERZIEL, DAS DIE ANGEBOTSERZEUGUNG DIESEM TEAM WIRKLICH ANBIETEN WUERDE — eingefroren.
+ *
+ * Bis 2026-08 wurde diese Zuordnung live mit der PRODUKTIVEN `pickBonusObjective` gezogen (inklusive
+ * des V3-Katalogfilters `sponsorV3IsGoalOfferable`). Der Bonusziel-Katalog wurde entfernt (siehe
+ * Kopf-Kommentar in sponsor-special-objectives.ts): die Erzeugung setzt seit dem V4-Umbau ohnehin nie
+ * mehr ein Katalog-Ziel, `pickBonusObjective` existiert nicht mehr. Diese Datei misst aber ausdruecklich
+ * NICHT die Erzeugung, sondern die Bepreisungs-MATHEMATIK des alten V3-Kartenmodells (die vier
+ * Risikokarten rechnen in unmigrierten Alt-Vertraegen unveraendert weiter) — dafuer braucht sie pro Team
+ * irgendein realistisch verteiltes, bepreisbares Ziel, keine LIVE gezogene Auswahl.
+ *
+ * Die Zuordnung unten ist deshalb das EINGEFRORENE Ergebnis von `pickBonusObjective` fuer genau diese
+ * 32 Teams (Aufruf wie zuvor: seasonId "season-1", archetype "identity", slotIndex 3, teamId/startRank
+ * aus der Fixture, Katalogfilter `sponsorV3IsGoalOfferable`) — erfasst UNMITTELBAR VOR der Entfernung
+ * des Katalogs, damit die unten gemessenen Kennzahlen (RMSE etc.) exakt dieselbe p-Verteilung sehen wie
+ * vorher. Ein synthetisch gewuerfeltes p wuerde sie messbar verschieben (historisch gemessen: RMSE des
+ * besten Falls 5,52 gegen 5,87 mit einem Zufalls-p statt der Katalog-Verteilung).
  */
+const FROZEN_GOAL_KEY_BY_TEAM: Record<string, string> = {
+  "A-A": "fan_cult_player",
+  "B-B": "fan_infrastructure",
+  "B-P": "fan_infrastructure",
+  "C-C": "roster_diversity",
+  "C-S": "roster_diversity",
+  "D-L": "beliebtheit_climb",
+  "D-P": "rival_humiliation",
+  "G-G": "roster_diversity",
+  "H-R": "homegrown_elevation",
+  "L-K": "fan_cult_player",
+  "L-R": "fan_cult_player",
+  "M-M": "rival_humiliation",
+  "M-S": "beliebtheit_climb",
+  "N-N": "homegrown_elevation",
+  "N-W": "roster_diversity",
+  "P-C": "fan_cult_player",
+  "P-S": "rival_humiliation",
+  "R-C": "fan_cult_player",
+  "R-L": "homegrown_elevation",
+  "R-R": "rival_humiliation",
+  "S-C": "homegrown_elevation",
+  "S-S": "rival_humiliation",
+  "T-C": "captain_era",
+  "T-G": "fan_infrastructure",
+  "T-T": "rival_humiliation",
+  "U-A": "rival_humiliation",
+  "V-D": "roster_diversity",
+  "V-V": "roster_diversity",
+  "V-W": "captain_era",
+  "W-L": "homegrown_elevation",
+  "W-W": "fan_cult_player",
+  "Z-H": "homegrown_elevation",
+};
+
 function goalKeyFor(team: SponsorLiveSaveTeam): string {
-  const key = pickBonusObjective(
-    "season-1",
-    team.code,
-    "identity",
-    3,
-    team.startRank,
-    undefined,
-    undefined,
-    (candidate) => sponsorV3IsGoalOfferable(candidate, team.startRank),
-  );
-  expect(key, `${team.code}: kein bepreisbares Ziel im Katalog`).not.toBeNull();
+  const key = FROZEN_GOAL_KEY_BY_TEAM[team.code];
+  expect(key, `${team.code}: keine eingefrorene Zuordnung`).toBeDefined();
   return key!;
 }
 
@@ -105,10 +143,18 @@ function goalKeyFor(team: SponsorLiveSaveTeam): string {
  */
 function slateOf(team: SponsorLiveSaveTeam): SponsorV3ContractTerms[] {
   const goalKey = goalKeyFor(team);
+  // `buildSponsorV3TermsCore` ist seit dem Sponsor-Ligaleiter-Umbau leiter-agnostisch (nimmt eine
+  // fertige `baseLadder` statt Preisgeldkurve + Platzierungsbonus). Dieses Abnahmeprotokoll misst
+  // weiterhin GEGEN DIE PREISGELD-BENCHMARK — die Zahlen unten sind dadurch unveraendert, nur der
+  // Aufruf baut die Leiter jetzt einmal vorab statt inline.
+  const baseLadder = sponsorV3BenchmarkLadder({
+    prizeCurve: SPONSOR_LIVE_SAVE_S1_PRIZE_CURVE,
+    startRank: team.startRank,
+    placementBonus: getPrizePlacementBonus,
+  });
   return SPONSOR_V3_MESSKARTEN.map((card) =>
     buildSponsorV3TermsCore({
-      prizeCurve: SPONSOR_LIVE_SAVE_S1_PRIZE_CURVE,
-      placementBonus: getPrizePlacementBonus,
+      baseLadder,
       startRank: team.startRank,
       rarity: team.rarity,
       card,
@@ -262,10 +308,14 @@ describe("Sponsormodell V3 — Abnahme an den 32 echten Teams des Live-Saves", (
 
   it("Rarity skaliert NUR die Hebelgroesse, nie den Erwartungswert", () => {
     const team = teams.find((entry) => entry.code === "T-C")!;
+    const baseLadder = sponsorV3BenchmarkLadder({
+      prizeCurve: SPONSOR_LIVE_SAVE_S1_PRIZE_CURVE,
+      startRank: team.startRank,
+      placementBonus: getPrizePlacementBonus,
+    });
     const build = (rarity: string) =>
       buildSponsorV3TermsCore({
-        prizeCurve: SPONSOR_LIVE_SAVE_S1_PRIZE_CURVE,
-        placementBonus: getPrizePlacementBonus,
+        baseLadder,
         startRank: team.startRank,
         rarity,
         card: sponsorV3CardByKey("ambition_ziel"),

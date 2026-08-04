@@ -32,6 +32,11 @@ import { isSeasonEndRosterPhase } from "@/lib/season/season-end-roster-window";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 import { FACILITY_CATALOG_BY_ID } from "@/lib/facilities/facility-catalog";
 import { formatGamePhaseLabel } from "@/lib/foundation/tabs/foundation-format-render-helpers";
+import {
+  MATCHDAY_PREP_BUNDLE_PREFIX,
+  PLAYER_HEALTH_BUNDLE_PREFIX,
+  bundleInboxItems,
+} from "@/lib/foundation/inbox-bundling";
 
 /**
  * Fruehere Fassung war eine EIGENE, handgepflegte Liste — und darum falsch: sie enthielt den
@@ -134,13 +139,18 @@ export function groupInboxItemsForDisplay(items: GameInboxItem[]) {
     });
   }
 
-  return result.sort((left, right) => {
+  const sorted = result.sort((left, right) => {
     const statusDelta = (left.status === "open" ? 0 : 1) - (right.status === "open" ? 0 : 1);
     if (statusDelta !== 0) return statusDelta;
     const severityDelta = severityRank(left.severity) - severityRank(right.severity);
     if (severityDelta !== 0) return severityDelta;
     return Date.parse(right.createdAt) - Date.parse(left.createdAt);
   });
+
+  // Zuletzt zusammenfassen, was zusammengehoert (Aufstellungs-Schritte, Belastung je Spieler,
+  // Scouting je Team). NACH dem Sortieren, damit die gebuendelte Karte den Platz ihrer lautesten
+  // Einzelkarte einnimmt statt ans Ende zu rutschen.
+  return bundleInboxItems(sorted);
 }
 
 function getStoredStatusMap(gameState: GameState) {
@@ -163,6 +173,11 @@ function getStoredStatusMap(gameState: GameState) {
 // brauchen (z.B. welchen Spieler man verkauft, ob man jetzt Facility X
 // upgradet), bleiben aussen vor und behalten den bisherigen Mechanismus.
 const AUTO_RESOLVING_INBOX_ITEM_PREFIXES = new Set<string>([
+  // Die gebuendelte Spieltags-Karte fasst drei Bedingungs-Items zusammen und ist damit selbst eine
+  // Bedingung: sie loest sich auf, sobald alle drei Schritte erfuellt sind. Ohne diesen Eintrag
+  // stuenden auf ihr "Erledigt"/"Ausblenden" — Knoepfe, die einen unerfuellten Zustand verstecken
+  // koennten, genau der Fehler aus #43.
+  MATCHDAY_PREP_BUNDLE_PREFIX,
   "lineup_missing",
   "lineup_not_submitted",
   "formcards_open",
@@ -192,6 +207,8 @@ export function isAutoResolvingInboxItemId(itemId: string): boolean {
 // itemId-Praefix abgeleitet): wiederkehrende Reminder (tauchen jeden
 // Spieltag/immer wieder auf) vs. einmalige Setup-Aufgaben pro Saison.
 const RECURRING_INBOX_ITEM_PREFIXES = new Set<string>([
+  MATCHDAY_PREP_BUNDLE_PREFIX,
+  PLAYER_HEALTH_BUNDLE_PREFIX,
   "lineup_missing",
   "lineup_not_submitted",
   "training_missing",

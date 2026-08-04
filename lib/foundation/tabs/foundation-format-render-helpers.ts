@@ -3,6 +3,7 @@ import type { PlayerContractPreference } from "@/lib/market/contract-negotiation
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 import type { FeatureAuditStatus } from "@/lib/foundation/feature-audit-matrix";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
+import { contractShapeLabel } from "@/lib/foundation/contract-shape-label";
 import { formatLocalePoints } from "@/lib/foundation/tabs/home-v2-ui-helpers";
 import type { SaveSummary } from "@/lib/persistence/types";
 
@@ -312,16 +313,7 @@ export function formatSignedPercent(value: number | null | undefined) {
 }
 
 export function formatContractShapeLabel(shape: ContractShape | null | undefined) {
-  if (shape === "front_loaded") {
-    return "Front-loaded";
-  }
-  if (shape === "back_loaded") {
-    return "Back-loaded";
-  }
-  if (shape === "balanced") {
-    return "Balanced";
-  }
-  return "—";
+  return contractShapeLabel(shape, "—");
 }
 
 export function formatContractLengthPreferenceLabel(value: PlayerContractPreference["lengthPreference"] | null | undefined) {

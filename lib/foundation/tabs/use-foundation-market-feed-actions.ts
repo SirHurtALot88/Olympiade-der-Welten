@@ -16,6 +16,7 @@ import type {
 } from "@/lib/foundation/tabs/foundation-page-types";
 import {
   TRANSFER_HISTORY_SEASON_LIMIT,
+  TRANSFER_MARKET_INITIAL_RENDER_LIMIT,
   TRANSFER_MARKET_RENDER_STEP,
 } from "@/lib/foundation/tabs/foundation-page-types";
 import { isAbortError } from "@/lib/foundation/tabs/foundation-page-module-helpers";
@@ -32,6 +33,9 @@ export type UseFoundationMarketFeedActionsInput = {
   marketMaxValue: number;
   marketFeed: FoundationTransfermarktResponse | null;
   setMarketFeed: Dispatch<SetStateAction<FoundationTransfermarktResponse | null>>;
+  setMarketRenderLimit: Dispatch<SetStateAction<number>>;
+  marketLoadingMore: boolean;
+  setMarketLoadingMore: Dispatch<SetStateAction<boolean>>;
   marketReloadToken: number;
   marketAiTeamScope: string;
   marketAiSellTeamScope: string;
@@ -76,6 +80,9 @@ export function useFoundationMarketFeedActions(input: UseFoundationMarketFeedAct
     marketMaxValue,
     marketFeed,
     setMarketFeed,
+    setMarketRenderLimit,
+    marketLoadingMore,
+    setMarketLoadingMore,
     marketReloadToken,
     marketAiTeamScope,
     marketAiSellTeamScope,
@@ -157,6 +164,9 @@ export function useFoundationMarketFeedActions(input: UseFoundationMarketFeedAct
                 payload.items.filter((item) => !marketFeed.items.some((existing) => existing.playerId === item.playerId)).length,
             }
           : payload;
+      if (!options?.append) {
+        setMarketRenderLimit(TRANSFER_MARKET_INITIAL_RENDER_LIMIT);
+      }
       setMarketFeed(nextPayload);
       return nextPayload;
     } catch (error) {
@@ -424,45 +434,45 @@ export function useFoundationMarketFeedActions(input: UseFoundationMarketFeedAct
     }
   }
 
-  useEffect(() => {
-    const shouldLoadMarketFeed = false;
-    if (!shouldLoadMarketFeed || isFoundationBootstrapState) {
-      marketFeedAbortRef.current?.abort();
-      marketFeedAbortRef.current = null;
-      return undefined;
+  async function loadMoreMarketFeed() {
+    if (marketLoadingMore || !marketFeed?.hasMore) {
+      return;
     }
 
-    let cancelled = false;
     marketFeedAbortRef.current?.abort();
     const controller = new AbortController();
     marketFeedAbortRef.current = controller;
-
-    async function loadMarketFeed() {
-      try {
-        const payload = await reloadMarketFeed(undefined, controller.signal);
-        if (cancelled || !payload) {
-          return;
-        }
-      } catch (error) {
-        if (isAbortError(error) || controller.signal.aborted) {
-          return;
-        }
-        if (!cancelled) {
-          setMarketFeed(null);
-        }
+    setMarketLoadingMore(true);
+    try {
+      const payload = await reloadMarketFeed(undefined, controller.signal, {
+        append: true,
+        offset: marketFeed.items.length,
+      });
+      if (!payload) {
+        return;
       }
-    }
-
-    void loadMarketFeed();
-
-    return () => {
-      cancelled = true;
-      controller.abort();
+      setMarketRenderLimit(payload.items.length);
+    } finally {
+      setMarketLoadingMore(false);
       if (marketFeedAbortRef.current === controller) {
         marketFeedAbortRef.current = null;
       }
-    };
-  }, [activeSaveId, activeView, gameStateSeasonId, isFoundationBootstrapState, marketMaxValue, marketReloadToken, marketTeamId, readMeta.source]);
+    }
+  }
+
+  /**
+   * HIER STAND EIN EFFEKT, DER NIE LIEF.
+   *
+   * Er begann mit `const shouldLoadMarketFeed = false;` und stieg direkt danach wieder aus — ein
+   * abgeschalteter Ladepfad, der nur noch so aussah, als wuerde er den Markt-Feed fuellen. Beim
+   * Nachgehen eines ganz anderen Fehlers hat genau dieser Anschein Zeit gekostet: der
+   * Hauptaktions-Knopf im Markt loeste seine Auswahl ueber `marketFeed` auf und blieb dauerhaft
+   * gesperrt — weil dieser Feed beim normalen Oeffnen eben NICHT geladen wird.
+   *
+   * `reloadMarketFeed` selbst bleibt und ist NICHT tot: Live-Sync und die Wege nach einem Kauf
+   * rufen sie ueber `marketFeedReloadersRef` weiterhin auf. Nur der automatische Erstlauf ist
+   * weg, und zwar sichtbar statt als abgeschaltete Attrappe.
+   */
 
   useEffect(() => {
     if (!shouldLoadTransferHistoryFeed) {
@@ -557,5 +567,6 @@ export function useFoundationMarketFeedActions(input: UseFoundationMarketFeedAct
     reloadHistoryFeed,
     loadMoreHistoryFeed,
     reloadTransferRecapFeed,
+    loadMoreMarketFeed,
   };
 }

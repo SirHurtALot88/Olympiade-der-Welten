@@ -82,6 +82,8 @@ export type FoundationMarketV2ShellHostProps = {
   removeTransferWishlistEntry: (playerId: string) => void;
   toggleScoutingWatch: (item: TransfermarktFreeAgentItem) => void;
   openMarketOfferPanel: (playerId: string) => void;
+  /** Haelt den Shell-Zustand mit der Listenauswahl gleich — sonst bleibt die Hauptaktion blind. */
+  onSelectMarketCandidate: (playerId: string, name: string) => void;
   closeFoundationDrilldownPanel: () => void;
   openMarketSellModal: (payload: {
     activePlayerId: string;
@@ -146,6 +148,7 @@ export default function FoundationMarketV2ShellHost({
   removeTransferWishlistEntry,
   toggleScoutingWatch,
   openMarketOfferPanel,
+  onSelectMarketCandidate,
   closeFoundationDrilldownPanel,
   openMarketSellModal,
   loadSave,
@@ -239,6 +242,7 @@ export default function FoundationMarketV2ShellHost({
         onInitialPlayerFocusConsumed: () => setMarketFocusPlayerId(null),
         offerPanelActive: foundationPanel === "offer" && activeView === "marketV2",
         onOpenOfferPanel: openMarketOfferPanel,
+        onSelectCandidate: onSelectMarketCandidate,
         onCloseOfferPanel: closeFoundationDrilldownPanel,
         roomContext,
         /**

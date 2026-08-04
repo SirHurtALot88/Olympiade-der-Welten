@@ -11056,6 +11056,20 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   gap: 6px;
 }
 
+/* Verhandlungs-Tooltip (verhandlung-rework.md Abschnitt 5): vier Buendel statt einer
+   15er-Rohliste, jedes mit eigenem Frage-Titel und einer kompakten Chip-Liste darunter. */
+.negotiation-tooltip-bundles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.negotiation-tooltip-bundle-title {
+  margin: 0 0 0.3rem;
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
 .transfer-demand-breakdown {
   margin-top: 0.75rem;
   padding: 0.75rem;
@@ -49090,6 +49104,233 @@ button.foundation-team-portrait-card {
   gap: var(--nl-s2);
 }
 
+/* --- PPs je Achse: vier feste Spalten, damit sich Profile ueber die Karten hinweg
+       vergleichen lassen statt nur einzelne Zahlen. Achsen ohne Punkte bleiben stehen
+       und werden gedaempft — dass dort nichts kommt, ist selbst eine Aussage. --- */
+.is-new-look .team-auslauf-axes {
+  display: grid;
+  /* Zwei Reihen zu zwei Achsen statt einer Reihe zu vier: bei Kartenbreiten um 250px hatten
+     Wert und Rang in einer 4er-Reihe keinen Platz und liefen ineinander. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--nl-s1);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 1700px) {
+  .is-new-look .team-auslauf-axes {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.is-new-look .team-auslauf-axis {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  padding: 2px var(--nl-s1);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line);
+  font-size: var(--nl-fs-xs);
+  min-width: 0;
+}
+
+.is-new-look .team-auslauf-axis b {
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.is-new-look .team-auslauf-axis.is-pow b { color: var(--nl-pow); }
+.is-new-look .team-auslauf-axis.is-spe b { color: var(--nl-spe); }
+.is-new-look .team-auslauf-axis.is-men b { color: var(--nl-men); }
+.is-new-look .team-auslauf-axis.is-soc b { color: var(--nl-soc); }
+
+.is-new-look .team-auslauf-axis-val {
+  margin-left: auto;
+  white-space: nowrap;
+  color: var(--nl-ink);
+  font-weight: 600;
+}
+
+.is-new-look .team-auslauf-axis-rank {
+  color: var(--nl-mut-2);
+  white-space: nowrap;
+  min-width: 2.4em;
+  text-align: right;
+}
+
+.is-new-look .team-auslauf-axis.is-empty {
+  opacity: 0.45;
+}
+
+.is-new-look .team-auslauf-axis.is-empty b,
+.is-new-look .team-auslauf-axis.is-empty .team-auslauf-axis-val {
+  color: var(--nl-mut-2);
+  font-weight: 500;
+}
+
+/* --- Bewertung: zwei Abweichungs-Skalen um die Null plus der Empfehlungssatz. --- */
+.is-new-look .team-auslauf-board {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s2) var(--nl-s3);
+  padding: var(--nl-s2) var(--nl-s3);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line);
+  border-left: 3px solid var(--nl-accent);
+}
+
+.is-new-look .team-auslauf-board-label {
+  font-size: var(--nl-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut-2);
+}
+
+.is-new-look .team-auslauf-board-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .team-auslauf-board-chip {
+  font-size: var(--nl-fs-xs);
+  font-weight: 700;
+  padding: 2px var(--nl-s2);
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .team-auslauf-board-chip.is-abgeben {
+  color: var(--nl-risk);
+  border-color: color-mix(in srgb, var(--nl-risk) 40%, transparent);
+}
+
+.is-new-look .team-auslauf-board-chip.is-beobachten {
+  color: var(--nl-warn);
+  border-color: color-mix(in srgb, var(--nl-warn) 40%, transparent);
+}
+
+.is-new-look .team-auslauf-board-chip.is-verlaengern {
+  color: var(--nl-good);
+  border-color: color-mix(in srgb, var(--nl-good) 40%, transparent);
+}
+
+.is-new-look .team-auslauf-verdict {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .team-auslauf-gauge {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .team-auslauf-gauge-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .team-auslauf-gauge-head small {
+  font-size: var(--nl-fs-xs);
+  color: var(--nl-mut);
+}
+
+.is-new-look .team-auslauf-gauge-head strong {
+  font-size: var(--nl-fs-lg);
+  font-weight: 700;
+}
+
+.is-new-look .team-auslauf-gauge-head strong.is-bad { color: var(--nl-risk); }
+.is-new-look .team-auslauf-gauge-head strong.is-good { color: var(--nl-good); }
+.is-new-look .team-auslauf-gauge-head strong.is-neutral { color: var(--nl-mut); }
+
+/* Die Null in der Mitte, der Balken waechst nach links (guenstig) oder rechts (teuer).
+   Die VK-Skala ist flacher gesetzt, damit man die beiden nicht verwechselt. */
+.is-new-look .team-auslauf-gauge-rail {
+  position: relative;
+  height: 10px;
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line);
+  overflow: hidden;
+}
+
+.is-new-look .team-auslauf-gauge.is-vk .team-auslauf-gauge-rail {
+  height: 6px;
+  border-radius: var(--nl-r-pill);
+}
+
+.is-new-look .team-auslauf-gauge-zero {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--nl-line-2);
+}
+
+.is-new-look .team-auslauf-gauge-bar {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  border-radius: 2px;
+}
+
+.is-new-look .team-auslauf-gauge-bar.is-bad { background: var(--nl-risk); }
+.is-new-look .team-auslauf-gauge-bar.is-good { background: var(--nl-good); }
+.is-new-look .team-auslauf-gauge-bar.is-neutral { background: var(--nl-mut-2); }
+
+.is-new-look .team-auslauf-gauge-sub {
+  font-size: var(--nl-fs-xs);
+  color: var(--nl-mut-2);
+}
+
+.is-new-look .team-auslauf-advice {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: var(--nl-s2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  border-left: 3px solid var(--nl-mut-2);
+  font-size: var(--nl-fs-md);
+  line-height: 1.45;
+  color: var(--nl-mut);
+}
+
+.is-new-look .team-auslauf-advice strong {
+  font-size: var(--nl-fs-xs);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.is-new-look .team-auslauf-advice.is-abgeben {
+  border-left-color: var(--nl-risk);
+}
+.is-new-look .team-auslauf-advice.is-abgeben strong { color: var(--nl-risk); }
+
+.is-new-look .team-auslauf-advice.is-beobachten {
+  border-left-color: var(--nl-warn);
+}
+.is-new-look .team-auslauf-advice.is-beobachten strong { color: var(--nl-warn); }
+
+.is-new-look .team-auslauf-advice.is-verlaengern {
+  border-left-color: var(--nl-good);
+}
+.is-new-look .team-auslauf-advice.is-verlaengern strong { color: var(--nl-good); }
+
 .is-new-look .team-auslauf-stat {
   display: flex;
   flex-direction: column;
@@ -50135,7 +50376,10 @@ button.foundation-team-portrait-card {
   display: grid;
   /* Deal-Spalte (rechts) schlanker: nimmt weniger Breite, mehr Raum fürs
      Scouting-Profil in der Mitte. */
-  grid-template-columns: minmax(280px, 0.92fr) minmax(340px, 1.4fr) minmax(250px, 0.78fr);
+  /* Das Scouting-Profil traegt jetzt das grosse Portrait UND die zweizeilige Kachelspalte
+     daneben — die Mitte bekommt dafuer etwas mehr Breite, Liste und Deal-Spalte geben je
+     ein Stueck ab. */
+  grid-template-columns: minmax(280px, 0.86fr) minmax(340px, 1.56fr) minmax(250px, 0.72fr);
   gap: var(--nl-s4);
   align-items: start;
 }
@@ -50147,10 +50391,15 @@ button.foundation-team-portrait-card {
   gap: var(--nl-s2);
 }
 
+/* Als Query-Container, nicht per Viewport: die Breite dieser Spalte haengt am
+   Ansichtsmodus (Standard/Breit/Cinema) genauso wie am Fenster — eine Media-Query
+   auf die Fensterbreite trifft daher regelmaessig die falsche Karte. */
 .is-new-look .nl-market-focus-column {
   display: flex;
   flex-direction: column;
   gap: var(--nl-s4);
+  container-type: inline-size;
+  container-name: nl-focus;
 }
 
 .is-new-look .nl-market-deal-column {
@@ -50223,9 +50472,19 @@ button.foundation-team-portrait-card {
   flex: none;
 }
 
+/* GEFRAGT: „bitte das bild auf dem transfermarkt größer machen". Das Portrait ist die einzige
+   Stelle, an der der Kandidat ein Gesicht bekommt — es darf den Kopf der Karte tragen. Feste
+   Breite (kein flex-Schrumpfen), damit die Kachelspalte daneben rechnerisch planbar bleibt. */
 .is-new-look .nl-market-focus-portrait {
-  width: 196px;
-  height: 196px;
+  width: 240px;
+  height: 240px;
+  border-radius: var(--nl-r-lg, 14px);
+}
+
+/* Im grossen Kasten wuerde ein 13px-Kuerzel verloren wirken. */
+.is-new-look .nl-market-focus-portrait .nl-market-portrait-initials {
+  font-size: 34px;
+  letter-spacing: 0.06em;
 }
 
 .is-new-look .nl-market-portrait-img {
@@ -50476,6 +50735,9 @@ button.foundation-team-portrait-card {
   display: flex;
   flex-direction: column;
   gap: var(--nl-s2);
+  /* Nimmt den Rest neben dem Portrait — sonst schrumpft die Kachelspalte auf ihre
+     Inhaltsbreite und die Zahlen brechen um. */
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -50484,9 +50746,59 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
-.is-new-look .nl-market-focus-stats,
 .is-new-look .nl-market-roster-stats {
   flex-wrap: wrap;
+}
+
+/* GEFRAGT: „die Kacheln daneben nur in 2 zeilen". Freies Wrappen konnte je nach Zahlenlänge
+   drei oder vier Zeilen ergeben — hier steht die Zeilenzahl fest: 3 Spalten × 2 Zeilen, die
+   Bracket-Kachel füllt als einzige den Rest der zweiten Zeile. Die Zeilen sind gleich hoch,
+   damit die Spalte neben dem Portrait ruhig steht. */
+.is-new-look .nl-market-focus-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 72px;
+  gap: var(--nl-s2);
+  align-content: center;
+}
+
+.is-new-look .nl-market-focus-stats > *:nth-child(5) {
+  grid-column: span 2;
+}
+
+.is-new-look .nl-market-focus-stats .nl-stat-chip {
+  min-width: 0;
+  padding: var(--nl-s2);
+  justify-content: center;
+}
+
+/* Gemessen: 81px Inhaltsbreite je Kachel, „128,4 Mio" braucht in der Kachelschrift 76px —
+   die volle Wertgroesse passt also. Abschneiden statt Umbrechen bleibt als Notnagel drin,
+   damit eine unerwartet lange Zahl das Raster nicht auf drei Zeilen sprengt. */
+.is-new-look .nl-market-focus-stats .nl-stat-chip-value {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Gemessen: nebeneinander braucht der Kopf 240px Portrait + 16px Abstand + rund 264px
+   Kachelspalte, also gut 550px Kartenbreite. Darunter stellt sich der Kopf hochkant —
+   das Bild bleibt gross, die Kacheln bleiben zwei Zeilen, statt beides zu quetschen.
+   (Bei 444px Karte waren die Kacheln vorher 46px breit und schnitten „11,6 Mio" ab.) */
+@container nl-focus (max-width: 570px) {
+  .is-new-look .nl-market-focus-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .is-new-look .nl-market-focus-portrait {
+    width: 100%;
+    max-width: 320px;
+    height: auto;
+    aspect-ratio: 1 / 1;
+    align-self: center;
+  }
 }
 
 .is-new-look .nl-market-axis-grid {
@@ -53783,6 +54095,46 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-sponsor-v2-range small {
   color: var(--nl-mut);
+}
+
+/* Laufzeit-Ausblick (Umsetzungsplan D): Bedingungssatz + Ausblick je Vertragssaison bei
+   Mehrjahresangeboten. Eigener, dezenter Block statt Farbe als einzigem Signal — die Konjunktur-
+   Bedingung steht als Fließtext, der Ausblick als Liste mit Zahl je Saison. */
+.is-new-look .nl-sponsor-term-outlook {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+  padding: var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px dashed var(--nl-line-2);
+  background: var(--nl-panel-2);
+  font-size: 12px;
+}
+
+.is-new-look .nl-sponsor-term-condition {
+  margin: 0;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-sponsor-term-outlook-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.is-new-look .nl-sponsor-term-outlook-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+  align-items: baseline;
+}
+
+.is-new-look .nl-sponsor-term-outlook-row em {
+  color: var(--nl-mut);
+  font-style: normal;
 }
 
 .is-new-look .nl-sponsor-challenge {
@@ -61255,11 +61607,6 @@ span.nl-facility-ampel-chip {
   color: var(--nl-mut);
   text-align: center;
 }
-.is-new-look .nl-market-radar-row .nl-market-attr-chips {
-  flex: 1 1 160px;
-  margin: 0;
-}
-
 /* --- Transfermarkt #18: Potenzial-Sterne & Entwicklungs-Trend --- */
 .is-new-look .nl-market-talent-row {
   display: flex;
@@ -61379,38 +61726,163 @@ span.nl-facility-ampel-chip {
   }
 }
 
-/* --- Transfermarkt: farbige Tier-Chips je Achse (POW/SPE/MEN/SOC) --- */
-.is-new-look .nl-market-attr-chips {
+/* =======================================================================
+   Velo-Achsen-Rail — POW/SPE/MEN/SOC als Meter statt flacher Tier-Pillen.
+   GEFRAGT: „Das Pow spe men soc kannst du sicher auch hübscher und mehr im
+   velo style darstellen!"
+
+   Zwei Kanäle, bewusst getrennt: die ACHSFARBE (dieselben vier Töne wie die
+   Orbit-Chips im Training) sagt WELCHE Achse, die Note rechts sagt WIE GUT,
+   und die Meterlänge sagt WIE VIEL. Die feine Marke im Meter ist der
+   Kader-Schnitt derselben Achse — dieselbe Quelle, aus der der Radar sein
+   Ghost-Polygon zieht, hier nur ablesbar statt erahnbar.
+   ======================================================================= */
+.velo-axis-rail {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 6px;
-  margin: var(--nl-s2) 0;
+  min-width: 0;
 }
 
-.is-new-look .nl-market-attr-chip {
-  display: inline-flex;
+.velo-axis-rail-row {
+  display: grid;
+  grid-template-columns: 22px 30px minmax(24px, 1fr) auto auto;
   align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border-radius: var(--nl-r-pill);
-  border: 1px solid var(--nl-line);
-  background: var(--nl-panel-2);
-  color: var(--nl-ink);
-  font-size: 12px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  gap: 8px;
+  padding: 4px 8px 4px 4px;
+  border-radius: var(--nl-r-pill, 999px);
+  border: 1px solid color-mix(in srgb, var(--velo-axis, currentColor) 26%, transparent);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--velo-axis, currentColor) 14%, transparent),
+    color-mix(in srgb, var(--velo-axis, currentColor) 4%, transparent)
+  );
+  min-width: 0;
 }
 
-.is-new-look .nl-market-attr-chip b {
+.velo-axis-rail-row.is-pow {
+  --velo-axis: rgb(214, 93, 86);
+}
+.velo-axis-rail-row.is-spe {
+  --velo-axis: rgb(98, 179, 110);
+}
+.velo-axis-rail-row.is-men {
+  --velo-axis: rgb(113, 153, 235);
+}
+.velo-axis-rail-row.is-soc {
+  --velo-axis: rgb(225, 184, 92);
+}
+
+.velo-axis-rail-badge {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--velo-axis, currentColor) 24%, transparent);
+  border: 1px solid color-mix(in srgb, var(--velo-axis, currentColor) 42%, transparent);
+}
+
+.velo-axis-rail-icon {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  opacity: 0.92;
+}
+
+.velo-axis-rail-label {
   font-size: 10px;
-  letter-spacing: 0.06em;
-  color: inherit;
-  opacity: 0.8;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--velo-axis, currentColor) 68%, var(--nl-ink, currentColor));
 }
 
-.is-new-look .nl-market-attr-chip em {
-  font-style: normal;
+.velo-axis-rail-meter {
+  position: relative;
+  display: block;
+  height: 6px;
+  min-width: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--nl-ink, currentColor) 12%, transparent);
+  overflow: hidden;
+}
+
+.velo-axis-rail-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--velo-axis, currentColor) 55%, transparent),
+    var(--velo-axis, currentColor)
+  );
+}
+
+/* Kader-Referenz: eine Marke, kein zweiter Balken — sie soll den Wert einordnen,
+   nicht mit ihm um Aufmerksamkeit ringen. */
+.velo-axis-rail-mark {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--nl-ink, currentColor) 62%, transparent);
+}
+
+.velo-axis-rail-value {
+  font-size: 13px;
   font-weight: 700;
+  font-family: var(--nl-display, inherit);
+  font-variant-numeric: tabular-nums;
+  color: var(--nl-ink, currentColor);
+  text-align: right;
+  min-width: 2ch;
+}
+
+.velo-axis-rail-grade {
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: var(--nl-r-sm, 6px);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--heat-neutral-text);
+  background: var(--heat-neutral-bg);
+}
+
+.velo-axis-rail-row.is-grade-s .velo-axis-rail-grade {
+  color: var(--heat-elite-text);
+  background: var(--heat-elite-bg);
+}
+.velo-axis-rail-row.is-grade-a .velo-axis-rail-grade {
+  color: var(--heat-strong-text);
+  background: var(--heat-strong-bg);
+}
+.velo-axis-rail-row.is-grade-b .velo-axis-rail-grade {
+  color: var(--heat-good-text);
+  background: var(--heat-good-bg);
+}
+.velo-axis-rail-row.is-grade-c .velo-axis-rail-grade {
+  color: var(--heat-neutral-text);
+  background: var(--heat-neutral-bg);
+}
+.velo-axis-rail-row.is-grade-d .velo-axis-rail-grade {
+  color: var(--heat-risk-text);
+  background: var(--heat-risk-bg);
+}
+.velo-axis-rail-row.is-grade-f .velo-axis-rail-grade {
+  color: var(--heat-danger-text);
+  background: var(--heat-danger-bg);
+}
+
+/* Im Scouting-Profil läuft die Rail neben dem Radar und darf den Rest der Zeile füllen. */
+.is-new-look .nl-market-radar-row .nl-market-axis-rail {
+  flex: 1 1 210px;
+  margin: 0;
 }
 
 /* --- Feinattribute (12) — nur freigeschaltete Werte, gleiche Tier-Farben wie die Achsen-Chips --- */
@@ -61450,56 +61922,48 @@ span.nl-facility-ampel-chip {
   opacity: 0.8;
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-splus,
 .is-new-look .nl-market-fine-attr-chip.is-tier-splus {
   color: var(--heat-best-text);
   background: var(--heat-best-bg);
   border-color: rgba(230, 240, 255, 0.34);
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-s,
 .is-new-look .nl-market-fine-attr-chip.is-tier-s {
   color: var(--heat-elite-text);
   background: var(--heat-elite-bg);
   border-color: rgba(12, 21, 39, 0.2);
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-a,
 .is-new-look .nl-market-fine-attr-chip.is-tier-a {
   color: var(--heat-strong-text);
   background: var(--heat-strong-bg);
   border-color: rgba(240, 255, 235, 0.22);
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-b,
 .is-new-look .nl-market-fine-attr-chip.is-tier-b {
   color: var(--heat-good-text);
   background: var(--heat-good-bg);
   border-color: rgba(20, 28, 20, 0.18);
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-c,
 .is-new-look .nl-market-fine-attr-chip.is-tier-c {
   color: var(--heat-neutral-text);
   background: var(--heat-neutral-bg);
   border-color: rgba(42, 31, 8, 0.18);
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-d,
 .is-new-look .nl-market-fine-attr-chip.is-tier-d {
   color: var(--heat-risk-text);
   background: var(--heat-risk-bg);
   border-color: rgba(42, 31, 8, 0.2);
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-e,
 .is-new-look .nl-market-fine-attr-chip.is-tier-e {
   color: var(--heat-danger-light-text);
   background: var(--heat-danger-light-bg);
   border-color: rgba(42, 18, 14, 0.2);
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-f,
 .is-new-look .nl-market-fine-attr-chip.is-tier-f {
   color: var(--heat-danger-text);
   background: var(--heat-danger-bg);
@@ -62282,12 +62746,66 @@ button.is-new-look .nl-thist-season-pill,
   outline-offset: 2px;
 }
 
-.is-new-look .nl-sponsor-league-cash {
+/* Auszahlung und Deckungsgrad stehen untereinander in einer Spalte — die Zahl allein sagt nicht,
+   ob sie reicht. Rechtsbuendig, damit die Betraege ueber alle 32 Zeilen auf einer Kante liegen. */
+.is-new-look .nl-sponsor-league-figures {
   flex-shrink: 0;
   align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.is-new-look .nl-sponsor-league-cash {
+  flex-shrink: 0;
   font-size: 13px;
   font-weight: 700;
   color: var(--nl-ink);
+}
+
+/* Deckungsgrad der Fixkosten (Gehaelter + Gebaeude-Unterhalt). Die Farbe ist bewusst NUR Verstaerkung: der Prozentwert und das Wort
+   stehen daneben, damit die Aussage auch ohne Farbunterscheidung ankommt (Rot/Gruen allein ist fuer
+   Farbfehlsichtige unbrauchbar). */
+.is-new-look .nl-sponsor-league-coverage {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-sponsor-league-coverage.is-good {
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-sponsor-league-coverage.is-warn {
+  color: var(--nl-warn);
+}
+
+.is-new-look .nl-sponsor-league-coverage.is-bad {
+  color: var(--nl-risk);
+}
+
+/* Apron-Badge: Text traegt die Aussage ("ueber 1./2. Linie"), Farbe ist NUR Verstaerkung — analog
+   zum Deckungsgrad oben, aus demselben Grund (Farbe allein ist fuer Farbfehlsichtige unbrauchbar). */
+.is-new-look .nl-sponsor-league-apron {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-sponsor-league-apron.is-linie1 {
+  color: var(--nl-warn);
+}
+
+.is-new-look .nl-sponsor-league-apron.is-linie2 {
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-sponsor-league-apron-lines {
+  margin: 10px 2px 0;
+  font-size: 12px;
+  color: var(--nl-mut);
 }
 
 /* --- Sponsoren #79: Rank-Ladder — aktuell erreichte Gewinnstufe --- */
@@ -67821,6 +68339,98 @@ button.is-new-look .nl-thist-season-pill,
   border-left: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: -24px 0 60px rgba(0, 0, 0, 0.42);
   animation: nl-rankdrawer-slide-in 0.22s ease-out;
+}
+
+/* MODAL-VARIANTE — die breite Tafel in der Mitte.
+   GEMELDET: „der drawer ist recht klein und nutzt den platz nicht sonderlich gut … da kann auch
+   ne tabelle in der mitte kommen die man dann wieder weg klicken kann."
+   Bei 330 Zeilen ist die Liste selbst der Inhalt; die schmale Randleiste war fuer zehn Zeilen
+   neben etwas anderem gedacht. */
+.is-new-look .nl-rankdrawer-backdrop.is-modal {
+  justify-content: center;
+  align-items: center;
+  padding: clamp(12px, 4vh, 48px) clamp(12px, 4vw, 48px);
+}
+
+.is-new-look .nl-rankdrawer.is-modal {
+  width: min(1080px, 100%);
+  height: auto;
+  max-height: 100%;
+  border-left: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.55);
+  animation: nl-rankdrawer-zoom-in 0.18s ease-out;
+}
+
+/* Mehrspaltig, sobald Platz da ist: 330 Zeilen einspaltig sind eine Endlos-Rolle, in drei
+   Spalten passen dieselben Zeilen auf ein Drittel der Hoehe. Die Leserichtung bleibt dabei
+   senkrecht — Rang 1 bis 20 stehen untereinander in der ersten Spalte, erst danach beginnt die
+   zweite. Genau so liest man eine Rangliste. */
+.is-new-look .nl-rankdrawer.is-modal .nl-rankdrawer-list {
+  display: block;
+  columns: 1;
+  column-gap: 14px;
+}
+
+@media (min-width: 760px) {
+  .is-new-look .nl-rankdrawer.is-modal .nl-rankdrawer-list {
+    columns: 2;
+  }
+}
+
+@media (min-width: 1180px) {
+  .is-new-look .nl-rankdrawer.is-modal .nl-rankdrawer-list {
+    columns: 3;
+  }
+}
+
+/* `break-inside` verhindert, dass eine Zeile ueber den Spaltenumbruch zerrissen wird. */
+.is-new-look .nl-rankdrawer.is-modal .nl-rankdrawer-row {
+  break-inside: avoid;
+  margin-bottom: 6px;
+}
+
+/* Portrait vor dem Rang. */
+.is-new-look .nl-rankdrawer-leading {
+  display: inline-flex;
+  flex: none;
+}
+
+.is-new-look .nl-rankdrawer-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--nl-mut, #93a3bd);
+}
+
+.is-new-look .nl-rankdrawer-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Mit Portrait bekommt die Zeile eine Spalte mehr. */
+.is-new-look .nl-rankdrawer-rowinner.has-leading {
+  grid-template-columns: auto auto 1fr auto auto;
+}
+
+@keyframes nl-rankdrawer-zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @keyframes nl-rankdrawer-fade {
@@ -73613,6 +74223,630 @@ button.is-new-look .nl-thist-season-pill,
 
 .is-new-look .transfer-sell-impact-stats {
   margin-top: var(--nl-s2);
+}
+
+/* ============================================================
+   Verkaufs-Popup (Redesign nach docs/design/verkauf-popup.md) —
+   Zonen A-H. Struktur/Klassenlogik aus dem freigegebenen Mockup
+   (docs/design/verkauf-popup-mockup.html, Präfix "vk-"), hier unter
+   .is-new-look mit den bestehenden Tokens statt Hex-Werten.
+
+   Karte, Kopf, Fuß, Zweiklick-Streifen und Abstandhalter (Zonen A + H) leben
+   nicht mehr hier — die liefert seit der Zusammenführung mit Kauf und Gebäude
+   die geteilte Hülle direkt darunter (`.nl-decision-*`). Was hier bleibt, ist
+   Zone B-G: Inhalt, der dem Verkauf gehört, nicht der Hülle.
+   ============================================================ */
+/* =========================================================================
+   ENTSCHEIDUNGS-HUELLE — die gemeinsame Form fuer Kauf, Verkauf und Gebaeude.
+
+   Vorher baute jeder der drei Abläufe seine eigene Hülle: Kopf, Zustands-Pill,
+   Abbruchpunkt, Fußleiste, Zweiklick. Drei Kopien derselben Idee — und genau
+   deshalb sah der Verkauf alt aus, während der Kauf schon anders aussah.
+
+   Kein Overlay: das Projekt hat Modals bewusst zu Drilldown-Seiten migriert,
+   weil ein Backdrop Klicks abfängt, die nicht für ihn bestimmt sind (siehe
+   docs/tab-performance-hotspots-v6.1.md, "intercepts pointer events"). Das
+   Fenster-Gefühl kommt hier aus der zentrierten Karte, nicht aus einer Schicht
+   darüber.
+   ========================================================================= */
+.is-new-look .nl-decision-page {
+  display: block;
+}
+
+.is-new-look .nl-decision-card {
+  width: min(960px, 100%);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--nl-panel);
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-lg);
+  box-shadow: var(--nl-e3);
+  overflow: hidden;
+  /* Gescrollt wird IN der Karte, nicht auf der Seite — das ist die Zusage im Kopfkommentar
+     von FoundationDecisionSurface, und ohne diese Hoehenbegrenzung war sie unwahr: die Karte
+     wuchs auf ihre volle Inhaltshoehe (beim Kaufdialog knapp 3000px), die SEITE scrollte, und
+     die sticky-Fussleiste klebte an einem Kartenende, das nie im Bild war. Gemessen: nach
+     1400px Scrollen stand die Fussleiste bei top 1560 in einem 1000px hohen Fenster. */
+  max-height: calc(100vh - 32px);
+}
+
+.is-new-look .nl-decision-head {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-decision-kicker {
+  flex: 1 1 auto;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-decision-close {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--nl-line);
+  background: transparent;
+  color: inherit;
+  border-radius: 9px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.is-new-look .nl-decision-close:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.is-new-look .nl-decision-close:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.is-new-look .nl-decision-close:focus-visible,
+.is-new-look .nl-decision-primary:focus-visible {
+  outline: 2px solid var(--nl-accent, #5b9bff);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-decision-hero {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--nl-line);
+}
+
+/* Die drei Verhandlungschancen standen als nackte <span> nebeneinander und liefen ineinander:
+   "Zusage 57%Nachverhandlung 41%Absage 2%". Es gab fuer diesen Block ueberhaupt keine Regel. */
+.contract-offer-chances {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.is-new-look .nl-decision-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3, 14px);
+  padding: 16px 18px;
+  /* Der Teil, der scrollt. min-height: 0 ist noetig, damit ein Flex-Kind ueberhaupt kleiner
+     werden darf als sein Inhalt — sonst sprengt es die Hoehenbegrenzung der Karte wieder. */
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* Die Fußleiste bleibt beim Scrollen sichtbar — die Entscheidung soll nicht
+   davonlaufen, während man die Begründung liest. */
+.is-new-look .nl-decision-foot {
+  position: sticky;
+  bottom: 0;
+  padding: 12px 18px 14px;
+  border-top: 1px solid var(--nl-line);
+  background: var(--nl-panel);
+}
+
+.is-new-look .nl-decision-foot-row {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-decision-foot-spacer {
+  flex: 1 1 auto;
+}
+
+/* Der Satz, der sagt, was gleich endgültig passiert — direkt am Klickpunkt,
+   nicht weiter oben, wo man ihn beim Bestätigen nicht mehr sieht. Zeile statt
+   Raster (aus dem Verkaufs-Entwurf übernommen, docs/design/verkauf-popup.md
+   Zone H): Kopfsatz und Begründung stehen nebeneinander und brechen erst um,
+   wenn der Platz nicht reicht. */
+.is-new-look .nl-decision-confirmnote {
+  display: flex;
+  gap: var(--nl-s2);
+  align-items: baseline;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  padding: var(--nl-s2) var(--nl-s3);
+  border: 1px solid var(--nl-warn, #d9a441);
+  border-radius: var(--nl-r-md, 12px);
+  background: rgba(217, 164, 65, 0.08);
+  font-size: var(--nl-fs-md, 0.82rem);
+}
+
+.is-new-look .nl-decision-confirmnote strong {
+  color: var(--nl-warn, #d9a441);
+}
+
+.is-new-look .nl-decision-confirmnote span {
+  color: var(--nl-mut);
+}
+
+/* Zweite, leisere Zeile innerhalb der Notiz (z. B. "Checkbox oben bestätigen") —
+   erzwingt einen Umbruch, statt sich an den Kopfsatz zu hängen. */
+.is-new-look .nl-decision-confirmnote .variant {
+  flex-basis: 100%;
+  color: var(--nl-mut-2);
+  font-size: var(--nl-fs-sm);
+  font-style: italic;
+}
+
+/* Rot statt Amber, wenn die Handlung selbst endgültig etwas wegnimmt (Verkauf) —
+   siehe `primary.danger` in FoundationDecisionSurface. */
+.is-new-look .nl-decision-confirmnote.is-danger {
+  border-color: var(--nl-risk, #e5615a);
+  background: color-mix(in srgb, var(--nl-risk, #e5615a) 7%, transparent);
+}
+
+.is-new-look .nl-decision-confirmnote.is-danger strong {
+  color: var(--nl-risk, #e5615a);
+}
+
+/* Rot erst im Bestätigungsschritt: der erste Klick öffnet nur, er nimmt nichts weg. */
+.is-new-look .nl-decision-primary.is-danger {
+  background: var(--nl-risk, #d9534f);
+  border-color: var(--nl-risk, #d9534f);
+  color: #180b0a;
+}
+
+.is-new-look .nl-decision-primary.is-danger:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+@media (max-width: 640px) {
+  .is-new-look .nl-decision-head,
+  .is-new-look .nl-decision-hero,
+  .is-new-look .nl-decision-body,
+  .is-new-look .nl-decision-foot {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}
+
+/* --- B: Hero — Identität + Netto-Erlös als DIE Zahl ------------ */
+.is-new-look .transfer-sell-hero {
+  display: flex;
+  gap: var(--nl-s3);
+  align-items: stretch;
+}
+
+.is-new-look .transfer-sell-hero-portrait {
+  flex: 0 0 96px;
+  width: 96px;
+  height: 96px;
+  border-radius: var(--nl-r-lg);
+  object-fit: cover;
+}
+
+.is-new-look .transfer-sell-hero-portrait-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, var(--nl-panel-2) 0%, var(--nl-bg) 100%);
+  border: 1px solid var(--nl-line-2);
+  color: var(--nl-mut);
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.is-new-look .transfer-sell-hero-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  justify-content: center;
+}
+
+.is-new-look .transfer-sell-hero-eyebrow {
+  font-size: var(--nl-fs-sm);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--nl-mut-2);
+}
+
+.is-new-look .transfer-sell-hero-name {
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.is-new-look .transfer-sell-hero-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.is-new-look .transfer-sell-hero-chip {
+  font-size: var(--nl-fs-sm);
+  padding: 3px 9px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  color: var(--nl-mut);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .transfer-sell-price {
+  flex: 0 0 auto;
+  align-self: center;
+  text-align: right;
+  padding-left: var(--nl-s4);
+  border-left: 1px solid var(--nl-line);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 190px;
+}
+
+.is-new-look .transfer-sell-price-label {
+  font-size: var(--nl-fs-sm);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .transfer-sell-price-value {
+  font-size: 1.7rem;
+  font-weight: 750;
+  color: var(--nl-accent);
+  line-height: 1.1;
+}
+
+.is-new-look .transfer-sell-price-sub {
+  font-size: var(--nl-fs-md);
+  color: var(--nl-mut);
+}
+
+/* Netto-Erlös vs. Marktwert — ANDERE Aussage als "GuV vs. Kaufpreis" (Zone C),
+   deshalb eigenes Label + eigene Farbe direkt an der Herleitung im Hero. */
+.is-new-look .transfer-sell-price-mw-diff {
+  font-size: var(--nl-fs-md);
+  font-weight: 600;
+}
+
+.is-new-look .transfer-sell-price-mw-diff.is-good {
+  color: var(--nl-good);
+}
+
+.is-new-look .transfer-sell-price-mw-diff.is-risk {
+  color: var(--nl-risk);
+}
+
+/* --- Sperr-Banner (Zustand "Fenster zu"): Amber, kein Alarm --- */
+.is-new-look .transfer-sell-lock-banner {
+  display: flex;
+  gap: var(--nl-s2);
+  align-items: baseline;
+  flex-wrap: wrap;
+  border: 1px solid color-mix(in srgb, var(--nl-warn) 45%, transparent);
+  background: color-mix(in srgb, var(--nl-warn) 8%, var(--nl-panel-2));
+  border-radius: var(--nl-r-md);
+  padding: var(--nl-s3) var(--nl-s3);
+}
+
+.is-new-look .transfer-sell-lock-banner strong {
+  color: var(--nl-warn);
+  font-size: var(--nl-fs-lg);
+}
+
+.is-new-look .transfer-sell-lock-banner span {
+  color: var(--nl-mut);
+  font-size: var(--nl-fs-md);
+}
+
+/* --- C: 3-Sekunden-Zeile ---------------------------------------- */
+.is-new-look .transfer-sell-triple {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .transfer-sell-tile {
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  padding: var(--nl-s3);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.is-new-look .transfer-sell-tile-label {
+  font-size: var(--nl-fs-sm);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--nl-mut-2);
+}
+
+.is-new-look .transfer-sell-tile-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+  font-size: var(--nl-fs-lg);
+}
+
+.is-new-look .transfer-sell-tile-row .k {
+  color: var(--nl-mut);
+}
+
+.is-new-look .transfer-sell-tile-row .v {
+  text-align: right;
+  min-width: 0;
+}
+
+.is-new-look .transfer-sell-tile-row .v.is-good {
+  color: var(--nl-good);
+}
+
+.is-new-look .transfer-sell-tile-row .v.is-risk {
+  color: var(--nl-risk);
+}
+
+.is-new-look .transfer-sell-tile-row .v.is-warn {
+  color: var(--nl-warn);
+}
+
+.is-new-look .transfer-sell-tile-arrow {
+  color: var(--nl-mut-2);
+}
+
+/* --- D: Board-Bilanz — der Kern, nie zugeklappt ------------------ */
+.is-new-look .transfer-sell-board-card .nl-card-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.is-new-look .transfer-sell-board-title-sub {
+  font-weight: 400;
+  font-size: var(--nl-fs-md);
+  color: var(--nl-mut);
+}
+
+.is-new-look .transfer-sell-intent {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.is-new-look .transfer-sell-intent-bar {
+  height: 8px;
+  border-radius: var(--nl-r-pill);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--nl-warn) 28%, transparent);
+}
+
+.is-new-look .transfer-sell-intent-fill {
+  display: block;
+  height: 100%;
+  background: var(--nl-accent);
+  border-radius: var(--nl-r-pill);
+}
+
+.is-new-look .transfer-sell-intent-legend {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--nl-fs-sm);
+  color: var(--nl-mut);
+}
+
+.is-new-look .transfer-sell-intent-legend b:first-child {
+  color: var(--nl-accent);
+}
+
+.is-new-look .transfer-sell-intent-legend b:last-child {
+  color: var(--nl-warn);
+}
+
+.is-new-look .transfer-sell-reasons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--nl-s4);
+}
+
+.is-new-look .transfer-sell-reason-col-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: var(--nl-fs-sm);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--nl-line);
+  margin-bottom: var(--nl-s2);
+}
+
+.is-new-look .transfer-sell-reason {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 5px 0;
+  font-size: var(--nl-fs-lg);
+}
+
+.is-new-look .transfer-sell-reason-dot {
+  flex: 0 0 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-top: 6px;
+  background: var(--nl-accent);
+}
+
+.is-new-look .transfer-sell-reason.is-keep .transfer-sell-reason-dot {
+  background: var(--nl-warn);
+}
+
+.is-new-look .transfer-sell-reason-tag {
+  flex: 0 0 auto;
+  font-size: var(--nl-fs-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut-2);
+  border: 1px solid var(--nl-line);
+  border-radius: 6px;
+  padding: 1px 6px;
+  margin-top: 2px;
+}
+
+.is-new-look .transfer-sell-reason-empty {
+  color: var(--nl-mut-2);
+  font-size: var(--nl-fs-md);
+  font-style: italic;
+  padding: 5px 0;
+}
+
+.is-new-look .transfer-sell-strategy {
+  border-top: 1px solid var(--nl-line);
+  padding-top: var(--nl-s2);
+}
+
+/* --- E: Hinweise nach Gewicht — Rot nur, wenn wirklich etwas blockiert --- */
+.is-new-look .transfer-sell-notice-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .transfer-sell-notice-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: var(--nl-fs-lg);
+}
+
+.is-new-look .transfer-sell-notice-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.is-new-look .transfer-sell-notice {
+  display: flex;
+  gap: var(--nl-s2);
+  align-items: flex-start;
+  padding: 7px 0;
+  font-size: var(--nl-fs-lg);
+}
+
+.is-new-look .transfer-sell-notice + .transfer-sell-notice {
+  border-top: 1px solid var(--nl-line);
+}
+
+.is-new-look .transfer-sell-notice-text {
+  color: var(--nl-ink);
+}
+
+.is-new-look .transfer-sell-notice-badge {
+  flex: 0 0 auto;
+  min-width: 96px;
+  text-align: center;
+  font-size: var(--nl-fs-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 6px;
+  padding: 3px 6px;
+  margin-top: 1px;
+}
+
+.is-new-look .transfer-sell-notice.is-blocker .transfer-sell-notice-badge {
+  color: var(--nl-risk);
+  background: color-mix(in srgb, var(--nl-risk) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--nl-risk) 45%, transparent);
+}
+
+.is-new-look .transfer-sell-notice.is-warn .transfer-sell-notice-badge {
+  color: var(--nl-warn);
+  background: color-mix(in srgb, var(--nl-warn) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--nl-warn) 40%, transparent);
+}
+
+.is-new-look .transfer-sell-notice.is-info .transfer-sell-notice-badge {
+  color: var(--nl-mut);
+  background: var(--nl-panel);
+  border: 1px solid var(--nl-line-2);
+}
+
+.is-new-look .transfer-sell-notice.is-good .transfer-sell-notice-badge {
+  color: var(--nl-good);
+  background: color-mix(in srgb, var(--nl-good) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--nl-good) 40%, transparent);
+}
+
+/* --- F: Konsequenzen — schmale Zeile, kein Balken-Drama --------- */
+.is-new-look .transfer-sell-consequences {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  font-size: var(--nl-fs-md);
+  color: var(--nl-mut);
+  padding: 2px 4px;
+}
+
+.is-new-look .transfer-sell-consequences b {
+  color: var(--nl-ink);
+  font-weight: 600;
+}
+
+/* --- G: "Mehr zum Spieler" — der einzige zugeklappte Bereich ---- */
+.is-new-look .transfer-sell-more-section-title {
+  font-size: var(--nl-fs-sm);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut-2);
+  margin-top: var(--nl-s2);
+}
+
+.is-new-look .transfer-sell-more-section-title:first-child {
+  margin-top: 0;
+}
+
+@media (max-width: 720px) {
+  .is-new-look .transfer-sell-hero {
+    flex-wrap: wrap;
+  }
+
+  .is-new-look .transfer-sell-price {
+    border-left: none;
+    padding-left: 0;
+    text-align: left;
+    width: 100%;
+  }
+
+  .is-new-look .transfer-sell-triple,
+  .is-new-look .transfer-sell-reasons {
+    grid-template-columns: 1fr;
+  }
+
+  .is-new-look .transfer-sell-notice-badge {
+    min-width: 80px;
+  }
 }
 
 /* Disziplin-Bühne · Drawer-Sektion "In dieser Disziplin": größere Portrait-Karten

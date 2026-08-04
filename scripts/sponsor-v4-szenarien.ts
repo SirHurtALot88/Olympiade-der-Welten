@@ -14,6 +14,7 @@ import {
   SPONSOR_V4_ADVANCE_SHARE,
   SPONSOR_V4_AXIS_SIZE_BY_RARITY,
   buildSponsorV3TermsCore,
+  sponsorV3BenchmarkLadder,
   sponsorV3CardByKey,
   sponsorV3Settle,
   sponsorV4AxisSizeFor,
@@ -53,9 +54,11 @@ for (const factor of SALARY_FACTORS) {
 
   for (const spot of SPOTS) {
     const startRank = spot.team.startRank;
+    // Wie beim V3-Szenario: `buildSponsorV3TermsCore` ist seit dem Ligaleiter-Umbau leiter-agnostisch,
+    // dieses Vergleichsskript misst weiter gegen die alte Preisgeld-Benchmark.
+    const baseLadder = sponsorV3BenchmarkLadder({ prizeCurve: curve, startRank, placementBonus: getPrizePlacementBonus });
     const basis = buildSponsorV3TermsCore({
-      prizeCurve: curve,
-      placementBonus: getPrizePlacementBonus,
+      baseLadder,
       startRank,
       rarity: RARITY,
       card: sponsorV3CardByKey("basis"),
@@ -64,8 +67,7 @@ for (const factor of SALARY_FACTORS) {
       floor: SPONSOR_V3_FLOOR_C,
     });
     const achse = buildSponsorV3TermsCore({
-      prizeCurve: curve,
-      placementBonus: getPrizePlacementBonus,
+      baseLadder,
       startRank,
       rarity: RARITY,
       card: sponsorV3CardByKey("achse"),

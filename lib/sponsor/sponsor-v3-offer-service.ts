@@ -6,28 +6,36 @@
  * KI-Bewertung und Settlement ausschliesslich aus diesem Block — eine Rechenstelle, deshalb kann die
  * harte Projekt-Invariante "Anzeige == Settlement" nicht durch eine zweite Variante brechen.
  *
- * DER TRAEGER IST DIESELBE 32er-LEITER WIE IN V2, nur anders befuellt: statt Liga-Stufen, Kurvenform,
- * Profil, Klausel, Kalibrieroffset und Liga-K steht jetzt die PREISGELD-BENCHMARK-LEITER darin,
- * einmal um den teameigenen Erwartungsanker getiltet. Was ersatzlos entfallen ist, steht im
- * Kopfkommentar von sponsor-v3-model.ts.
+ * DER TRAEGER IST DIESELBE 32er-LEITER WIE IN V2, nur anders befuellt: seit dem Sponsor-Ligaleiter-
+ * Umbau steht darin die geshapete LIGALEITER (Sockel nach Startrang + Wertungstopf nach Endrang,
+ * `sponsorKurvenLeiter` in sponsor-liga-leiter.ts), einmal um den teameigenen Erwartungsanker
+ * getiltet. Die Kurvenform ist damit wieder ein Erzeugungs-Feld — nicht mehr nur Anzeige-Etikett. Was
+ * ersatzlos entfallen ist, steht im Kopfkommentar von sponsor-v3-model.ts.
  *
  * WAS BEWUSST WIEDERVERWENDET WIRD statt neu gebaut: Marke, Name, Flavour, Rarity-Wurf, die
  * Sonderziel-Engine (`evaluateSpecialComponentStage`, 22+ fertige Ziele), der Settlement-Pfad und die
  * `lockedRankPayoutLadder`-Infrastruktur.
  */
-import type { GameState, SponsorOffer, SponsorRarity, TeamSponsorContract } from "@/lib/data/olyDataTypes";
+import type {
+  GameState, SponsorCurveShape, SponsorOffer, SponsorRarity, SponsorTermSeasons, TeamSponsorContract,
+} from "@/lib/data/olyDataTypes";
 
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildPrizeMoneyTable } from "@/lib/season/prize-money";
 import { buildSponsorV4AxisTerms } from "@/lib/sponsor/sponsor-v4-axes";
-import { getPrizePlacementBonus } from "@/lib/season/prize-placement-table";
 import { buildSponsorOfferModuleIds } from "@/lib/sponsor/sponsor-modules";
+import { SPONSOR_BODEN, sponsorKurvenLeiter, sponsorSockelFuerStartrang } from "@/lib/sponsor/sponsor-liga-leiter";
+import { SPONSOR_CURVE_SHAPE_KEYS } from "@/lib/sponsor/sponsor-curve-shapes";
+import { getSponsorTermMultiplier } from "@/lib/sponsor/sponsor-negotiation";
 import {
   buildSponsorV3TermsCore,
+  sponsorV3Anchor,
+  sponsorV3AnchorWeights,
   sponsorV3CardByKey,
   sponsorV3GuaranteedLadder,
   sponsorV3LadderValue,
   sponsorV3Settle,
+  sponsorV3TiltedLadder,
   sponsorV4AxisSizeFor,
   SPONSOR_V3_CARDS,
   type SponsorV3CardKey,
@@ -84,6 +92,12 @@ export function stampSponsorSystemVersion(
  * Entwurfs). Sie bindet praktisch nie: typische Kartenboeden liegen bei 41-57 C. Nur die
  * schlechteste Konstellation des Live-Saves (Meister mit Ambition-Karte stuerzt auf Rang 32) landet
  * knapp darauf.
+ *
+ * @deprecated fuer NEUE Angebote seit dem Sponsor-Ligaleiter-Umbau: der Live-Pfad
+ * (`buildSponsorV3Terms`) nutzt `SPONSOR_BODEN` (sponsor-liga-leiter.ts). Diese Konstante bleibt fuer
+ * die Migration und die Vergleichsskripte stehen, die weiterhin auf der alten Preisgeld-Benchmark
+ * rechnen — deren typische Kartenboeden liegen weiterhin im hier beschriebenen Bereich, waehrend die
+ * neue Ligaleiter mit ihrem viel niedrigeren Sockel (18 statt ~41-57) ein hoeheres Netz braucht.
  */
 export const SPONSOR_V3_FLOOR_C = 32;
 
@@ -174,11 +188,13 @@ const RARITY_FALLBACK: SponsorRarity = "magisch";
 export function buildSponsorV3Terms(input: {
   gameState: GameState;
   offer: SponsorOffer;
-  /** Startrang der Saison — Basis des Platzierungsbonus in der Leiter. */
+  /** Startrang der Saison — Sockel + Erwartungsanker der Ligaleiter haengen an ihm. */
   startRank: number;
   cardKey: SponsorV3CardKey;
   /** Achse dieser Karte (V4). Gesetzt = fix mit p = 0,5 bepreist statt ueber eine Schaetztabelle. */
   axisKey?: SponsorV4AxisKey | null;
+  /** Kurvenform dieses Angebots (sponsor-tier-pool.ts) — bestimmt, WO auf der Ligaleiter das Geld liegt. */
+  curveShape: SponsorCurveShape;
   teamId?: string;
   golden?: boolean;
   /** Zahlt diese Karte einen Vorschuss bei Unterschrift? */
@@ -193,19 +209,81 @@ export function buildSponsorV3Terms(input: {
     input.axisKey && input.teamId
       ? buildSponsorV4AxisTerms(input.gameState, input.teamId, input.axisKey)
       : null;
+  const salaryFactor = getSponsorV3SalaryFactor(input.gameState);
+  // DIE SPONSOR-LIGALEITER statt der Preisgeldkurve (Umbau): Sockel nach Startrang + Wertungstopf
+  // nach Endrang, die Kurvenform entscheidet nur noch, WO auf dieser Leiter das Geld liegt. Die
+  // Preisgeldkurve selbst (`getSponsorV3PrizeCurve`) wird im Live-Pfad nicht mehr gebraucht.
+  const baseLadder = sponsorKurvenLeiter({ shape: input.curveShape, startRank: input.startRank, salaryFactor });
   return buildSponsorV3TermsCore({
-    prizeCurve: getSponsorV3PrizeCurve(input.gameState),
-    placementBonus: getPrizePlacementBonus,
+    baseLadder,
     startRank: input.startRank,
     rarity,
     card,
     goalKey,
+    curveShape: input.curveShape,
     axis,
     axisSize: axis ? sponsorV4AxisSizeFor(rarity, input.golden === true) : undefined,
     withAdvance: input.withAdvance === true,
-    salaryFactor: getSponsorV3SalaryFactor(input.gameState),
-    floor: SPONSOR_V3_FLOOR_C,
+    salaryFactor,
+    // SPONSOR_BODEN statt SPONSOR_V3_FLOOR_C: der neue Sockel reicht bei Startrang 1 bis 18 hinunter,
+    // das alte Netz (32) saesse fuer diese Leiter zu tief.
+    floor: SPONSOR_BODEN,
   });
+}
+
+/**
+ * MEHRJAHRESVERTRAG ROLLT IN DIE FOLGESAISON (Umsetzungsplan D) — `advanceSponsorContractsForNewSeason`
+ * (sponsor-contract-lifecycle.ts) ruft das fuer jeden Vertrag mit `seasonsRemaining > 1` auf.
+ *
+ * ZWEI DINGE PASSIEREN, TECHNISCH IN EINEM SCHRITT: die Kopplung an den Salary Factor UND die
+ * Rendite-Erosion.
+ *
+ * KOPPLUNG (ausdrueckliche Nutzervorgabe): der eingefrorene `startRank` UND die eingefrorene
+ * `curveShape` bleiben stehen — nur der Salary Factor wird durch den DER NEUEN SAISON ersetzt.
+ * `sponsorKurvenLeiter` leitet den Sockel ausschliesslich aus `startRank` ab (er bleibt damit exakt
+ * gleich) und skaliert NUR den Wertungsanteil mit dem Faktor — das ist die ganze Kopplung, siehe
+ * `sponsor-liga-leiter.ts`. Ohne diesen Neubau wuerde ein in einem starken Jahr (f = 1,24)
+ * unterschriebener Vertrag drei Saisons lang auf 1,24-Niveau weiterzahlen, unabhaengig davon, ob die
+ * Liga danach in eine Flaute faellt (f = 0,82) — das genau das Schlupfloch, das die Erosion allein
+ * nicht schliessen koennte (siehe TERM_MULTIPLIERS-Kommentar in sponsor-negotiation.ts).
+ *
+ * EROSION: `contractYear` (1 = Unterschriftssaison, 2/3 = gerollte Folgesaisons) waehlt den
+ * Multiplikator aus `getSponsorTermMultiplier`. Er wirkt NUR auf den WERTUNGSANTEIL — die Differenz
+ * zwischen der neu gebauten Leiter und dem (unveraenderten) Sockel — nicht auf den Sockel selbst,
+ * sonst schrumpfte genau die Absicherung, die der Sockel sein soll.
+ *
+ * ALTVERTRAEGE: fehlt `curveShape` (Vertraege aus Spielstaenden von vor dem Ligaleiter-Umbau, die
+ * ohne Neuerzeugung weitergerollt wurden), kann keine neue Leiter gebaut werden — die Funktion wirft
+ * NICHT, sondern gibt die eingefrorene Leiter unveraendert zurueck (heutiges Verhalten vor diesem
+ * Patch bleibt fuer sie bestehen).
+ */
+export function rerollSponsorV3TermsForNewSeason(
+  terms: SponsorV3ContractTerms,
+  input: { newSalaryFactor: number; contractYear: SponsorTermSeasons },
+): SponsorV3ContractTerms {
+  if (!terms.curveShape) {
+    return terms;
+  }
+  const sockel = sponsorSockelFuerStartrang(terms.startRank);
+  const newBaseLadderRaw = sponsorKurvenLeiter({
+    shape: terms.curveShape,
+    startRank: terms.startRank,
+    salaryFactor: input.newSalaryFactor,
+  });
+  const multiplier = getSponsorTermMultiplier(input.contractYear);
+  // Erosion NUR auf den Wertungsanteil (Wert oberhalb des Sockels) — der Sockel selbst bleibt exakt
+  // der nach Startrang eingefrorene Wert, unveraendert durch Erosion oder Salary-Factor-Wechsel.
+  const baseLadder = newBaseLadderRaw.map((value) => sockel + multiplier * (value - sockel));
+  const weights = sponsorV3AnchorWeights(terms.startRank);
+  const anchor = sponsorV3Anchor(baseLadder, weights);
+  const rankLadder = sponsorV3TiltedLadder(baseLadder, anchor, terms.tilt);
+  return {
+    ...terms,
+    baseLadder,
+    rankLadder,
+    anchor,
+    salaryFactor: input.newSalaryFactor,
+  };
 }
 
 const round1 = (value: number): number => Math.round(value * 10) / 10;
@@ -226,6 +304,8 @@ export function applySponsorV3ToOffers(input: {
   cardKeys: SponsorV3CardKey[];
   /** Achse je Angebot, in derselben Reihenfolge. null bei der Basis-Karte. */
   axisKeys?: (SponsorV4AxisKey | null)[];
+  /** Kurvenform je Angebot, in derselben Reihenfolge. Kommt aus dem Slate-Wurf der Erzeugung. */
+  curveShapes: SponsorCurveShape[];
   /** Slots, die das Golden-Los gezogen haben — dort ist der Achsenhebel groesser. */
   goldenSlots?: number[];
   /** Slots, die einen Vorschuss zahlen. */
@@ -236,12 +316,17 @@ export function applySponsorV3ToOffers(input: {
   if (input.offers.length === 0) return input.offers;
   return input.offers.map((offer, index) => {
     const cardKey = input.cardKeys[index] ?? SPONSOR_V3_CARDS[index % SPONSOR_V3_CARDS.length]!.key;
+    // Fallback nur fuer den theoretischen Fall eines Aufrufers, der weniger Formen als Angebote
+    // liefert (heute genau einer, `buildSponsorOffersForTeam`, liefert immer gleich viele) — lieber
+    // eine deterministisch rotierende Form als ein Absturz.
+    const curveShape = input.curveShapes[index] ?? SPONSOR_CURVE_SHAPE_KEYS[index % SPONSOR_CURVE_SHAPE_KEYS.length]!;
     const terms = buildSponsorV3Terms({
       gameState: input.gameState,
       offer,
       startRank: input.startRank,
       cardKey,
       axisKey: input.axisKeys?.[index] ?? null,
+      curveShape,
       teamId: input.teamId,
       golden: input.goldenSlots?.includes(index) === true,
       withAdvance: input.advanceSlots?.[index] === true,

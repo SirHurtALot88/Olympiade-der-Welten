@@ -17,6 +17,10 @@ type SponsorChooseBody = {
   saveId?: string;
   teamId?: string;
   offerId?: string;
+  /**
+   * @deprecated wird IGNORIERT — die Laufzeit steht am gewaehlten Angebot (Umsetzungsplan D), nicht
+   * mehr an einem separaten Request-Feld. Bleibt nur, damit Alt-Clients kein 400 bekommen.
+   */
   termSeasons?: 1 | 2 | 3;
   /** @deprecated Verhandlungs-Achse entfernt. Feld wird bei Alt-Requests ignoriert (kein 400). */
   negotiationProfile?: "safe" | "balanced" | "ambitious";
@@ -112,7 +116,6 @@ export async function POST(request: Request) {
       teamId,
       offerId,
       saveId,
-      termSeasons: 1,
     });
     if (result.error) {
       return NextResponse.json({ success: false, error: result.error, summary: null }, { status: 400 });

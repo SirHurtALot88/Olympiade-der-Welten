@@ -39,6 +39,21 @@ export type SeasonTransitionState = {
   errors: string[];
   createdAt: string;
   appliedAt?: string;
+  /**
+   * Saison-Id, fuer die die Saisonende-Entwicklung bereits WIRKLICH auf die Attribute geschrieben
+   * wurde (verhandlung-/saisonende-Ablauf).
+   *
+   * GEMELDET: „Kannst du dafuer sorgen, dass nach MD10 bevor man verkaufen kann die
+   * Trainingsupgrades der spieler schon durch laufen und die neuen Marktwerte dann verfuegbar
+   * sind? erst DANN darf wirklich verkauft werden."
+   *
+   * Genau das ging vorher nicht: der Schritt „Spielerentwicklung" schaltete nur die Phase weiter
+   * („preview_only_no_attribute_writes"), gerechnet wurde erst beim Start der NEUEN Saison — also
+   * hinter dem Transferfenster. Man verkaufte zu Marktwerten, die der Spieler schon nicht mehr
+   * hatte. Jetzt schreibt der Schritt selbst, und dieser Marker verhindert, dass die Entwicklung
+   * beim Saisonstart ein zweites Mal laeuft.
+   */
+  progressionAppliedForSeasonId?: string | null;
 };
 
 export type ScenarioType =
@@ -1220,14 +1235,14 @@ export type SponsorRarity = "gewöhnlich" | "magisch" | "selten" | "legendär";
 export type SponsorCurveFamily = "titel" | "europa" | "stetig" | "aufstieg" | "sicherheit";
 
 /**
- * NUR NOCH LESEN — KEIN ERZEUGUNGS-TYP MEHR.
- *
  * Die Kurvenform beschreibt, WO ueber die Endtabelle (Platz 1..32) das feste Etat eines Sponsors sitzt.
- * Sie war die Auszahlungsachse des ALTEN Sponsorsystems (11 Formen in 5 Familien). Neue Angebote tragen
- * sie NICHT mehr: ihre Auszahlung kommt aus dem Sponsormodell (lib/sponsor/sponsor-v2-model.ts) und
- * steht im `sponsorV2`-Block. Typ und Payout-Tabellen (lib/sponsor/sponsor-curve-shapes.ts) bleiben
- * ausschliesslich stehen, damit Angebote und Vertraege aus Spielstaenden von VOR der Umstellung weiter
- * angezeigt, unterschrieben und abgerechnet werden koennen.
+ *
+ * War zwischen dem V2-Cutover und dem Ligaleiter-Umbau (sponsor-liga-leiter.ts) nur noch ein
+ * Anzeige-Etikett ohne Wirkung auf die Auszahlung. Seit dem Umbau ist sie WIEDER ein Erzeugungs-Feld:
+ * jedes Angebot zieht eine der 11 Formen (sponsor-tier-pool.ts), und `sponsorKurvenLeiter`
+ * (sponsor-liga-leiter.ts) normiert sie auf denselben Erwartungswert wie die neutrale Ligaleiter — die
+ * Form entscheidet also NUR NOCH, wo das Geld liegt, nicht wie viel es insgesamt ist. Die 11
+ * `reference`-Arrays dazu stehen in lib/sponsor/sponsor-curve-shapes.ts.
  */
 export type SponsorCurveShape =
   | "titeljaeger"
@@ -1318,11 +1333,13 @@ export type SponsorEventRecord = {
 };
 
 /**
- * SPONSORSYSTEM V3 — die bei Unterschrift eingefrorenen Konditionen ("Preisgeld-Sockel").
+ * SPONSORSYSTEM V3 — die bei Unterschrift eingefrorenen Konditionen (Sponsor-Ligaleiter: Sockel nach
+ * Startrang + Wertungstopf nach Endrang, seit dem Ligaleiter-Umbau).
  *
  * `rankLadder[finalRank - 1]` ist die FERTIG GETILTETE Leiter `L(f) = M(f) + beta·(M(f) − A)` — die
- * Auszahlung vor Untergrenze und Sonderziel. `baseLadder` ist dieselbe Leiter OHNE Tilt, also die
- * reine Liga-Benchmark `M(f) = Preisgeld(f) + Platzierungsbonus(Startrang − f)`; sie steht mit im
+ * Auszahlung vor Untergrenze und Sonderziel. `baseLadder` ist dieselbe Leiter OHNE Tilt — beim
+ * Live-Pfad die geshapete Ligaleiter (`sponsorKurvenLeiter`, sponsor-liga-leiter.ts), bei aus der
+ * Migration gehobenen Altvertraegen weiterhin die reine Preisgeld-Benchmark; sie steht mit im
  * Vertrag, damit Anzeige und Abrechnung zeigen koennen, WOVON die gewaehlte Karte abweicht, ohne die
  * Liga-Groessen des Unterschriftszeitpunkts noch einmal zu rekonstruieren.
  *
@@ -1343,6 +1360,8 @@ export type SponsorV3ContractTermsRecord = {
   goalSize: number;
   salaryFactor: number;
   floor: number;
+  /** Kurvenform, aus der `baseLadder` gebaut wurde — nur Anzeige, siehe SponsorCurveShape. */
+  curveShape?: SponsorCurveShape;
   /**
    * V4-Zielachse: wofuer dieser Sponsor zahlt, gemessen gegen die bei Angebotserzeugung
    * eingefrorene eigene Ausgangslage. Fehlt bei der Basis-Karte und bei Altvertraegen.
@@ -1374,8 +1393,13 @@ export type SponsorOffer = {
   seasonId: string;
   teamId: string;
   archetype: SponsorArchetype;
-  /** NUR NOCH LESEN: gesetzt an Angeboten aus Spielstaenden von vor dem Sponsor-Cutover. Neue Angebote
-   * tragen ihre Kurve im `sponsorV2`-Block. */
+  /**
+   * WIEDER EIN ERZEUGUNGS-FELD (Sponsor-Ligaleiter, sponsor-liga-leiter.ts): die Kurvenform bestimmt,
+   * WO auf der Sockel+Wertungstopf-Leiter dieses Angebot sein Geld hat — `sponsorKurvenLeiter` liest
+   * sie beim Bauen der `sponsorV3`-Konditionen. War zwischenzeitlich (V2/V3-Cutover bis zu diesem
+   * Umbau) nur noch ein Anzeige-Feld an Alt-Angeboten; optional bleibt sie trotzdem, weil sehr alte
+   * Spielstaende sie erst beim Laden ueber `normalizeLegacySponsors` (save-repository.ts) bekommen.
+   */
   curveShape?: SponsorCurveShape;
   /** Rarity = the Etat dial that replaced the legacy star tier (transitional-optional; required after cutover). */
   rarity?: SponsorRarity;
@@ -1444,7 +1468,7 @@ export type TeamSponsorContract = {
   teamId: string;
   offerId: string;
   archetype: SponsorArchetype;
-  /** NUR NOCH LESEN: nur an Vertraegen, die aus einem Angebot von vor dem Sponsor-Cutover stammen. */
+  /** Die Kurvenform des unterschriebenen Angebots, 1:1 uebernommen (siehe `SponsorOffer.curveShape`). */
   curveShape?: SponsorCurveShape;
   /** Rarity — the Etat dial that replaced the legacy star tier (transitional-optional; required after cutover). */
   rarity?: SponsorRarity;
@@ -1505,6 +1529,37 @@ export type SponsorPayoutLogRecord = {
   teamId: string;
   phase: "base_first" | "base_second" | "season_end";
   componentId: string | null;
+  cashDelta: number;
+  action: "apply";
+  createdAt: string;
+};
+
+/**
+ * APRON — die zu SAISONBEGINN eingefrorenen Gehaltslinien (siehe lib/season/apron-service.ts).
+ * Bewusst NICHT am Saisonende berechnet: sonst kauft man blind gegen eine Grenze, die sich durch die
+ * eigenen Käufe verschiebt. `medianSalary`/`line1`/`line2` sind fix für die gesamte Saison, egal wie
+ * sich die Gehälter danach noch verschieben (Verletzungsersatz, Nachverpflichtungen etc.).
+ */
+export type ApronLinesSnapshot = {
+  seasonId: string;
+  frozenAtMatchdayId: string;
+  createdAt: string;
+  medianSalary: number;
+  line1: number;
+  line2: number;
+  /** true = die Liga hatte beim Einfrieren noch keine echten Gehälter (Season-1-Fallback). */
+  usedReferenceSalary: boolean;
+};
+
+/** Ein Ledger-Eintrag der Apron-Abrechnung (Saisonende) — analog zu SponsorPayoutLogRecord. */
+export type ApronSettlementLogRecord = {
+  id: string;
+  saveId: string;
+  seasonId: string;
+  teamId: string;
+  phase: "season_end";
+  /** "levy" = Abgabe (negativ), "payout" = Ausschüttung aus dem Topf (positiv oder 0). */
+  kind: "levy" | "payout";
   cashDelta: number;
   action: "apply";
   createdAt: string;
@@ -1869,6 +1924,32 @@ export type ContractNegotiationDraft = {
   warnings: string[];
   blockingReasons: string[];
   status: ContractNegotiationDraftStatus;
+  /**
+   * Sein letztes GELD-Wort in dieser Verhandlung (verhandlung-rework.md Abschnitt 9.3).
+   *
+   * Abschnitt 7 hatte das Gegenangebot ausdrücklich für nicht speicherwürdig erklärt — es war
+   * eine gedächtnislose Funktion von (Angebot, Forderung, Wille, Traits) und jederzeit neu
+   * herleitbar. Mit der Erwiderung ist es das nicht mehr: wer entgegenkommt, soll die Zahl
+   * sinken sehen, und dafür muss die Vorrunde bekannt sein.
+   *
+   * Geschrieben bei `status = "countered"` mit Geld-Gegenangebot; genullt bei jedem
+   * Statuswechsel weg von "countered" und bei Konditionenwechsel (sein Wort galt für die
+   * damalige Laufzeit/Form — andere Konditionen sind eine neue Sachlage).
+   */
+  lastCounterSalary?: number | null;
+  /**
+   * Trotz-Aufschlag auf die Forderung, als Anteil (0,03 = +3 %) — verhandlung-rework.md
+   * Abschnitt 9.1.
+   *
+   * Wächst nur monoton (`max`): es zählt der tiefste je VERHANDELTE Griff, nicht der zuletzt
+   * getippte. Tippen ist frei, die Vorschau warnt vorher; Verhandeln klebt. Klebrig für die
+   * Dauer dieses Drafts (Season/Team/Spieler) — wäre er durch anschließendes Wohlverhalten
+   * abbaubar, wäre Lowball-zuerst gratis.
+   *
+   * Genullt beim Übergang zu `rejected_bad_experience`: dort greift die Vertrauensbruch-Strafe
+   * (×1,12), und beides zu stapeln wäre zweimal kassiert für denselben Vorfall.
+   */
+  defianceSurchargePct?: number;
   updatedAt: string;
 };
 
@@ -2714,6 +2795,10 @@ export type SeasonState = {
   sponsorBrandHistoryByTeamId?: Record<string, string[]>;
   sponsorEvents?: SponsorEventRecord[];
   sponsorPayoutLogs?: SponsorPayoutLogRecord[];
+  /** Zu Saisonbeginn eingefrorene Apron-Linien dieser Saison. Siehe ApronLinesSnapshot. */
+  apronLinesSnapshot?: ApronLinesSnapshot;
+  /** Ledger der Apron-Abgaben/Ausschüttungen — Idempotenz-Marker + Audit-Trail, analog sponsorPayoutLogs. */
+  apronSettlementLogs?: ApronSettlementLogRecord[];
   /**
    * Fortgeschriebener Beliebtheits-KPI pro Team (TEIL A). Wird 1×/Saison am Saison-Ende (vor der
    * Sponsor-Angebots-Generierung des nächsten Zyklus) fortgeschrieben. Rückwärtskompatibel optional:

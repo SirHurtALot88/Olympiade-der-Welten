@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent, type SetStateAction } from "react";
 
 import { getClassColorToken } from "@/app/foundation/ClassColorChip";
 import { FoundationShellRouterMarketBuy } from "@/app/foundation/FoundationShellRouter";
@@ -31,7 +31,7 @@ import { officialDisciplineWeightOrder, type OfficialDisciplineWeightId } from "
 import { appendRoomContextToParams, readFoundationRoomContextFromLocation, withRoomContextBody, type FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
 import { formatMarketPreviewError } from "@/lib/room/parse-room-write-context";
 import { DEFAULT_ACTIVE_OWNER_ID } from "@/lib/foundation/team-control-settings";
-import type { MarketBuyNegotiationOutcome } from "@/lib/foundation/tabs/use-market-buy-derivations";
+import { formatContractShapeLabel, type MarketBuyNegotiationOutcome } from "@/lib/foundation/tabs/use-market-buy-derivations";
 
 export type TransfermarktV2ClientProps = {
   defaultSaveId: string;
@@ -75,6 +75,18 @@ export type TransfermarktV2ClientProps = {
   onInitialPlayerFocusConsumed?: (() => void) | null;
   offerPanelActive?: boolean;
   onOpenOfferPanel?: (playerId: string) => void;
+  /**
+   * Meldet die Auswahl in der Kandidatenliste nach oben.
+   *
+   * GEMELDET beim Durchspielen: der Hauptaktions-Knopf im Kopf ("Kandidat waehlen") blieb
+   * dauerhaft gesperrt mit dem Hinweis "Waehle links erst einen Kandidaten aus der Liste aus" —
+   * obwohl links sichtbar einer markiert war. Ursache: die Auswahl lebte NUR hier lokal
+   * (`selectedPlayerId`), waehrend der Knopf `marketPreviewPlayer` aus dem Shell-Zustand liest.
+   * Zwei Wahrheiten ueber dieselbe Frage; die eine hat der anderen nie Bescheid gesagt. Der
+   * Deal war ueber "Deal pruefen" im Panel trotzdem erreichbar, aber der prominenteste Knopf
+   * der Ansicht sah kaputt aus und war es faktisch auch.
+   */
+  onSelectCandidate?: (playerId: string, name: string) => void;
   onCloseOfferPanel?: () => void;
   onSell?: ((payload: { activePlayerId: string; playerId: string; playerName: string; className: string; race: string | null; portraitUrl: string | null }) => void) | null;
   roomContext?: FoundationRoomContext | null;
@@ -177,9 +189,6 @@ export type TransfermarktV2RosterRow = {
 };
 
 const MARKET_PAGE_LIMIT = 250;
-const MARKET_INITIAL_RENDER_COUNT = 32;
-const MARKET_RENDER_STEP = 24;
-const MARKET_BATCH_PUBLISH_SIZE = 500;
 const DEFAULT_MAX_MARKET_VALUE = 0;
 const DEFAULT_MAX_SALARY = 0;
 const DEFAULT_MAX_RATIO = 0;
@@ -233,9 +242,9 @@ const LABEL_MAP: Record<string, string> = {
   medium: "mittel",
   low: "niedrig",
   elite: "elite",
-  balanced: "ausgeglichen",
-  front_loaded: "vorne schwer",
-  back_loaded: "hinten schwer",
+  balanced: "Balanced",
+  front_loaded: "Front-loaded",
+  back_loaded: "Back-loaded",
 };
 
 function isAbortError(error: unknown) {
@@ -634,6 +643,7 @@ export default function TransfermarktV2Client({
   onInitialPlayerFocusConsumed = null,
   offerPanelActive = false,
   onOpenOfferPanel,
+  onSelectCandidate: onSelectCandidateUpstream,
   onCloseOfferPanel,
   onSell,
   roomContext: roomContextProp = null,
@@ -724,7 +734,13 @@ export default function TransfermarktV2Client({
   const [marketHasMore, setMarketHasMore] = useState(false);
   const [marketTotal, setMarketTotal] = useState(0);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
-  const [renderedCandidateCount, setRenderedCandidateCount] = useState(MARKET_INITIAL_RENDER_COUNT);
+  /**
+   * Die erste Seite steht, der Rest wird gerade nachgeholt. Getrennt von `marketBusy`, weil das
+   * zwei verschiedene Zustaende sind: „noch nichts da" gegen „bedienbar, aber noch nicht
+   * vollstaendig". Der Unterschied gehoert dem Spieler gesagt — unter „Meistes Potenzial" sieht
+   * er in dieser Phase noch nicht die echten Besten.
+   */
+  const [marketCompleting, setMarketCompleting] = useState(false);
   const [historyFeed, setHistoryFeed] = useState<MarketHistoryResponse | null>(null);
   const [contractLength, setContractLength] = useState<number | null>(null);
   const [contractShape, setContractShape] = useState<ContractShape | null>(null);
@@ -948,16 +964,23 @@ export default function TransfermarktV2Client({
     () => (selectedPlayerId ? visibleItems.findIndex((item) => item.playerId === selectedPlayerId) : -1),
     [selectedPlayerId, visibleItems],
   );
-  const effectiveRenderedCandidateCount = useMemo(() => {
-    if (selectedVisibleIndex < 0) {
-      return renderedCandidateCount;
-    }
-    return Math.max(renderedCandidateCount, selectedVisibleIndex + 8);
-  }, [renderedCandidateCount, selectedVisibleIndex]);
-  const renderedVisibleItems = useMemo(
-    () => visibleItems.slice(0, Math.min(visibleItems.length, effectiveRenderedCandidateCount)),
-    [effectiveRenderedCandidateCount, visibleItems],
-  );
+  /**
+   * ALLE sichtbaren Kandidaten werden gerendert — die Auslagerung uebernimmt der Browser.
+   *
+   * Vorher wuchs ein Praefix-Fenster alle 90 ms um 24 Karten, bis der ganze Bestand drin war
+   * (gemessen: 1887 Karten). Das hatte zwei Nachteile auf einmal: es dauerte fast eine Minute,
+   * bis die Liste vollstaendig war, und JEDE Umsortierung schob Karten aus dem Fenster heraus
+   * und wieder hinein — sie wurden ab- und neu gemountet, weshalb ein Klick auf eine Zeile ins
+   * Leere lief. Am Ende standen trotzdem alle 1887 im DOM; das Fenster hat nur den Weg dorthin
+   * in eine Zitterpartie verwandelt.
+   *
+   * Statt eines JS-Fensters uebernimmt jetzt `content-visibility: auto` auf der Karte (siehe
+   * globals.css): der Browser ueberspringt Layout und Zeichnen fuer alles ausserhalb des
+   * Scroll-Bereichs. Bewusst SO und nicht als eigener Virtualisierer: Tastaturnavigation,
+   * `scrollIntoView` und die Karten-Refs arbeiten weiter auf einer vollstaendigen Liste — ein
+   * Fenster-Virtualisierer haette genau die Wege gebrochen, die gerade erst repariert wurden.
+   */
+  const renderedVisibleItems = visibleItems;
   const selectedPlayerWishlisted = Boolean(selectedPlayer && wishlistPlayerIdSet.has(selectedPlayer.playerId));
   const selectedPlayerScoutingWatched = Boolean(selectedPlayer && scoutingWatchPlayerIdSet.has(selectedPlayer.playerId));
   const selectedPlayerScoutCertainty =
@@ -1388,30 +1411,6 @@ export default function TransfermarktV2Client({
   }
 
   useEffect(() => {
-    setRenderedCandidateCount(MARKET_INITIAL_RENDER_COUNT);
-  }, [selectedTeamId, deferredSearch, sortMode, minFit, hidePoorFit, maxValue, maxSalary, maxRatio, selectedDisciplineLens, selectedClassNames, selectedClassAxes, selectedRaceNames, selectedAxes, axisMinimums]);
-
-  useEffect(() => {
-    if (visibleItems.length <= renderedCandidateCount) {
-      return;
-    }
-    const handle = window.setTimeout(() => {
-      setRenderedCandidateCount((current) => Math.min(visibleItems.length, current + MARKET_RENDER_STEP));
-    }, 90);
-    return () => window.clearTimeout(handle);
-  }, [renderedCandidateCount, visibleItems.length]);
-
-  useEffect(() => {
-    if (selectedVisibleIndex < 0) {
-      return;
-    }
-    if (selectedVisibleIndex < renderedCandidateCount) {
-      return;
-    }
-    setRenderedCandidateCount(Math.min(visibleItems.length, selectedVisibleIndex + MARKET_RENDER_STEP));
-  }, [renderedCandidateCount, selectedVisibleIndex, visibleItems.length]);
-
-  useEffect(() => {
     if (!visibleItems.length) {
       if (
         !selectedPlayerId ||
@@ -1540,103 +1539,130 @@ export default function TransfermarktV2Client({
       };
     }
 
-    async function loadFullMarketInPages() {
+    /**
+     * ERSTE SEITE SOFORT, REST IN EINEM ZUG.
+     *
+     * GEMELDET: „dann sorge dafuer dass die Ladezeit nicht so lang ist."
+     *
+     * Vorher lief hier eine `while (hasMore)`-Schleife, die den gesamten Pool in 250er-Seiten
+     * nacheinander holte und die wachsende Liste alle 500 Eintraege neu veroeffentlichte.
+     * Gemessen an einem echten Spielstand: 13 Netzaufrufe, 54-59 Sekunden bis die Liste stand,
+     * dazwischen sieben Neuveroeffentlichungen. Und weil die Standardsortierung („Meistes
+     * Potenzial") ueber den GANZEN Bestand laeuft, sortierte sich die Liste bei jeder davon
+     * komplett um — die Zeile unter dem Mauszeiger war danach eine andere. Ein Klick auf einen
+     * Kandidaten war Gluecksache.
+     *
+     * Der Server konnte den vollen Pool die ganze Zeit in EINER Antwort liefern; die Route
+     * reichte den Parameter nur nicht durch (siehe dort). Jetzt:
+     *
+     *   1. Seite 1 (250) holen und SOFORT anzeigen — bedienbar nach ~2 s.
+     *   2. Den kompletten Pool in EINEM Aufruf nachholen und GENAU EINMAL nachpublizieren.
+     *
+     * Damit bleibt ein einziger Umsortier-Moment uebrig statt sieben, und der ist angekuendigt
+     * (`marketCompleting`) statt ueberraschend.
+     *
+     * WARUM NICHT NUR SEITE 1: saemtliche Sortierungen und Filter (Bester Fit, Bestes Value,
+     * Achs-Minima, die Schieberegler-Maxima) rechnen im Client ueber den geladenen Bestand. Wer
+     * nur 250 von 3100 laedt, zeigt unter „Meistes Potenzial" schlicht die falschen Besten. Der
+     * Voll-Bestand ist kein Luxus, er ist die Voraussetzung fuer die Sortierung — nur muss er
+     * nicht in dreizehn Etappen kommen.
+     */
+    async function loadMarket() {
       setMarketBusy(true);
       setMarketError(null);
       setBuySuccess(null);
       setMarketItems([]);
       setMarketHasMore(false);
-      try {
-        const mergedItems: TransfermarktFreeAgentItem[] = [];
-        const seen = new Set<string>();
-        let latestPayload: MarketFeedResponse | null = null;
-        let publishedCount = 0;
-        let nextOffset = 0;
-        let hasMore = true;
 
-        const searchActive = deferredSearch.trim().length > 0;
-
-        while (hasMore) {
-          const params = appendRoomContextToParams(new URLSearchParams({
+      const searchActive = deferredSearch.trim().length > 0;
+      const basisParams = (extra: Record<string, string>) =>
+        appendRoomContextToParams(
+          new URLSearchParams({
             saveId: defaultSaveId,
             seasonId: defaultSeasonId,
             source,
             teamId: selectedTeamId,
-            limit: String(MARKET_PAGE_LIMIT),
-            offset: String(nextOffset),
             ...(searchActive ? { search: deferredSearch.trim() } : {}),
-          }), roomContextRef.current);
-          const response = await fetch(`/api/transfermarkt/free-agents?${params.toString()}`, {
-            cache: "no-store",
-            signal: controller.signal,
-          });
-          const payload = (await response.json()) as MarketFeedResponse;
-          if (cancelled || controller.signal.aborted) {
-            return;
-          }
-          if (!response.ok || payload.error) {
-            setMarketFeed(payload);
-            setMarketItems([]);
-            setMarketTotal(0);
-            setMarketHasMore(false);
-            setMarketError(formatMarketPreviewError(payload.error) ?? "Transfermarkt konnte nicht geladen werden.");
-            return;
-          }
+            ...extra,
+          }),
+          roomContextRef.current,
+        );
 
-          payload.items.forEach((item) => {
-            if (!seen.has(item.playerId)) {
-              mergedItems.push(item);
-              seen.add(item.playerId);
-            }
-          });
-          latestPayload = payload;
-          nextOffset += payload.returned;
-          hasMore = Boolean(payload.hasMore && payload.returned > 0);
-
-          const shouldPublish =
-            mergedItems.length <= MARKET_PAGE_LIMIT ||
-            !hasMore ||
-            mergedItems.length - publishedCount >= MARKET_BATCH_PUBLISH_SIZE;
-
-          if (shouldPublish) {
-            setMarketFeed({
-              ...payload,
-              items: mergedItems,
-              offset: 0,
-              returned: mergedItems.length,
-              hasMore,
-            });
-            setMarketItems([...mergedItems]);
-            setMarketTotal(payload.total);
-            setMarketHasMore(hasMore);
-            publishedCount = mergedItems.length;
-          }
-
-          if (hasMore) {
-            await new Promise((resolve) => window.setTimeout(resolve, 0));
-          }
+      async function hole(extra: Record<string, string>) {
+        const response = await fetch(`/api/transfermarkt/free-agents?${basisParams(extra).toString()}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = (await response.json()) as MarketFeedResponse;
+        if (!response.ok || payload.error) {
+          throw new Error(payload.error ?? "Transfermarkt konnte nicht geladen werden.");
         }
+        return payload;
+      }
 
-        if (!latestPayload) {
-          setMarketFeed(null);
-          setMarketItems([]);
-          setMarketTotal(0);
-          setMarketHasMore(false);
-        } else {
-          const finalHasMore = hasMore;
+      function veroeffentliche(payload: MarketFeedResponse, items: TransfermarktFreeAgentItem[], hasMore: boolean) {
+        setMarketFeed({ ...payload, items, offset: 0, returned: items.length, hasMore });
+        setMarketItems(items);
+        setMarketTotal(payload.total);
+        setMarketHasMore(hasMore);
+      }
+
+      try {
+        // --- Schritt 1: sofort bedienbar ---
+        const ersteSeite = await hole({ limit: String(MARKET_PAGE_LIMIT), offset: "0" });
+        if (cancelled || controller.signal.aborted) return;
+        const restOffen = Boolean(ersteSeite.hasMore && ersteSeite.returned > 0);
+        veroeffentliche(ersteSeite, [...ersteSeite.items], restOffen);
+        setMarketBusy(false);
+        if (!restOffen) {
           marketCacheRef.current.set(marketCacheKey, {
-            items: [...mergedItems],
-            feed: {
-              ...latestPayload,
-              items: mergedItems,
-              offset: 0,
-              returned: mergedItems.length,
-              hasMore: finalHasMore,
-            },
-            total: latestPayload.total,
-            hasMore: finalHasMore,
+            items: [...ersteSeite.items],
+            feed: { ...ersteSeite, items: [...ersteSeite.items], offset: 0, returned: ersteSeite.items.length, hasMore: false },
+            total: ersteSeite.total,
+            hasMore: false,
           });
+          return;
         }
+
+        // --- Schritt 2: der Rest, in einem Zug ---
+        setMarketCompleting(true);
+        let vollstaendig: MarketFeedResponse;
+        try {
+          vollstaendig = await hole({ fullPool: "true" });
+        } catch {
+          // Der Prisma-Referenzpfad kennt `fullPool` nicht und deckelt hart auf 250. Dann bleibt
+          // die alte Seiten-Schleife — aber OHNE Zwischenveroeffentlichungen, damit wenigstens
+          // die Zeilen stillstehen. Das ist die Rueckfallstufe, nicht der Normalfall.
+          const gesammelt: TransfermarktFreeAgentItem[] = [...ersteSeite.items];
+          const gesehen = new Set(gesammelt.map((item) => item.playerId));
+          let naechsterOffset = ersteSeite.returned;
+          let weiter: boolean = restOffen;
+          let letzte: MarketFeedResponse = ersteSeite;
+          while (weiter) {
+            const seite = await hole({ limit: String(MARKET_PAGE_LIMIT), offset: String(naechsterOffset) });
+            if (cancelled || controller.signal.aborted) return;
+            seite.items.forEach((item) => {
+              if (!gesehen.has(item.playerId)) {
+                gesehen.add(item.playerId);
+                gesammelt.push(item);
+              }
+            });
+            letzte = seite;
+            naechsterOffset += seite.returned;
+            weiter = Boolean(seite.hasMore && seite.returned > 0);
+          }
+          vollstaendig = { ...letzte, items: gesammelt, total: letzte.total };
+        }
+        if (cancelled || controller.signal.aborted) return;
+
+        const alle = vollstaendig.items;
+        veroeffentliche(vollstaendig, [...alle], false);
+        marketCacheRef.current.set(marketCacheKey, {
+          items: [...alle],
+          feed: { ...vollstaendig, items: [...alle], offset: 0, returned: alle.length, hasMore: false },
+          total: vollstaendig.total,
+          hasMore: false,
+        });
       } catch (error) {
         if (cancelled || controller.signal.aborted || isAbortError(error)) {
           return;
@@ -1645,15 +1671,19 @@ export default function TransfermarktV2Client({
         setMarketItems([]);
         setMarketTotal(0);
         setMarketHasMore(false);
-        setMarketError("Transfermarkt konnte nicht geladen werden.");
+        setMarketError(
+          formatMarketPreviewError(error instanceof Error ? error.message : null) ??
+            "Transfermarkt konnte nicht geladen werden.",
+        );
       } finally {
         if (!cancelled && !controller.signal.aborted) {
           setMarketBusy(false);
+          setMarketCompleting(false);
         }
       }
     }
 
-    void loadFullMarketInPages();
+    void loadMarket();
 
     return () => {
       cancelled = true;
@@ -1859,53 +1889,83 @@ export default function TransfermarktV2Client({
     }
   }
 
+  // negotiateBuy() liest NUR NOCH buyPreview.verdict — das deterministische Band-Verdikt aus
+  // verhandlung-rework.md Abschnitt 2.2, serverseitig in buildContractNegotiationPreview
+  // berechnet. Kein argmax mehr ueber acceptChance/counterChance/rejectChance (das war Defekt 3:
+  // die drei Prozente sind seit dem Rework Anzeige, ABGELEITET vom Verdikt, nicht die
+  // Entscheidung selbst) und vor allem: KEIN setOfferedSalary(counterSalary) mehr. Das war die
+  // Ratsche (Defekt 2) — ein Gegenangebot wird angezeigt, nicht ins eigene Angebot zurueck-
+  // geschrieben. Wer es will, klickt "Einschlagen" (acceptCounterOffer, Abschnitt 3.4) oder passt
+  // sein Angebot selbst an und verhandelt neu.
   async function negotiateBuy() {
     if (!buyPreview?.player?.id || !buyPreview.team?.id || buyBusy) {
       return;
     }
 
-    const acceptChance = buyPreview.acceptChance ?? 0;
-    const counterChance = buyPreview.counterChance ?? 0;
-    const rejectChance = buyPreview.rejectChance ?? 0;
-    const expectedSalary = buyPreview.expectedSalary ?? buyPreview.salary ?? null;
-    const activeSalaryOffer = effectiveOfferedSalary ?? buyPreview.offeredSalary ?? expectedSalary;
+    const verdict = buyPreview.verdict;
+    const playerName = buyPreview.player.name;
 
-    if (rejectChance >= acceptChance && rejectChance >= counterChance) {
+    if (verdict === "reject_lowball" || verdict === "reject_not_about_money" || verdict === "reject_affront") {
       void persistNegotiationOutcome(
         buyPreview,
         "rejected_bad_experience",
-        ["negotiation_rejected_bad_experience"],
+        [
+          verdict === "reject_affront"
+            ? "negotiation_rejected_affront"
+            : verdict === "reject_not_about_money"
+              ? "negotiation_rejected_not_about_money"
+              : "negotiation_rejected_bad_experience",
+        ],
       );
-      setBuyNegotiationOutcome({
-        status: "rejected",
-        tone: "error",
-        title: "Angebot abgelehnt",
-        message: `${buyPreview.player.name} lehnt dieses Angebot aktuell ab. Heb das Gehalt an oder passe den Vertrag an, dann kannst du neu verhandeln.`,
-      });
+      setBuyNegotiationOutcome(
+        verdict === "reject_not_about_money"
+          ? {
+              status: "rejected",
+              tone: "error",
+              title: "Absage — am Geld liegt's nicht",
+              message: `${playerName} sagt ab, obwohl das Angebot ueber seinem Anspruch liegt: er will einfach nicht zu ${selectedTeam?.shortCode ?? "diesem Team"} wechseln. Mehr Geld wuerde daran nichts aendern.`,
+            }
+          : verdict === "reject_affront"
+            ? {
+                status: "rejected",
+                tone: "error",
+                title: "Absage — Rückzieher",
+                message: `${playerName} zieht sich zurueck: Ihr habt nach seinem Entgegenkommen ein NIEDRIGERES Angebot vorgelegt als zuletzt gezeigt. Das zaehlt als Vertrauensbruch.`,
+              }
+            : {
+                status: "rejected",
+                tone: "error",
+                title: "Angebot abgelehnt",
+                message: `${playerName} lehnt dieses Angebot aktuell ab. Heb das Gehalt an oder passe den Vertrag an, dann kannst du neu verhandeln.`,
+              },
+      );
       window.requestAnimationFrame(() => {
         scrollBuyModalToTop();
       });
       return;
     }
 
-    if (counterChance > acceptChance) {
-      const counterSalary =
-        expectedSalary != null
-          ? Number(Math.max(expectedSalary * 1.04, (activeSalaryOffer ?? expectedSalary) * 1.08).toFixed(2))
-          : activeSalaryOffer ?? null;
+    if (verdict === "counter_money") {
+      void persistNegotiationOutcome(buyPreview, "countered");
+      const counterSalary = buyPreview.counterSalary ?? null;
+      const activeSalaryOffer = effectiveOfferedSalary ?? buyPreview.offeredSalary ?? null;
       const counterDelta =
         counterSalary != null && activeSalaryOffer != null
           ? Number((counterSalary - activeSalaryOffer).toFixed(2))
           : null;
-      void persistNegotiationOutcome(buyPreview, "countered");
-      setOfferedSalary(counterSalary);
-      setSalaryEditedManually(true);
+      // Erwiderung (Abschnitt 9.3): hat er auf euer Entgegenkommen selbst nachgegeben, muss die
+      // Ueberschrift das sagen. „Gegenseite verhandelt nach" waere bei einer GESUNKENEN Zahl
+      // schlicht falsch — und genau das Signal, auf das man beim Feilschen wartet.
+      const conceded = buyPreview.concededFromLastCounter === true;
       setBuyNegotiationOutcome({
         status: "countered",
         tone: "warning",
-        title: "Gegenseite verhandelt nach",
-        message: `${buyPreview.player.name} will weitermachen, aber eher ${formatTransfermarktCurrency(counterSalary)} pro Season${counterDelta != null ? ` (${counterDelta > 0 ? "+" : ""}${formatTransfermarktCurrency(counterDelta)} gegenüber deinem Angebot)` : ""}. Das Angebot wurde direkt auf den neuen Rahmen gesetzt.`,
+        title: conceded ? "Er kommt euch entgegen" : "Gegenseite verhandelt nach",
+        message: conceded
+          ? `Ihr habt nachgelegt — ${playerName} geht mit und senkt seine Forderung auf ${formatTransfermarktCurrency(counterSalary)} pro Season${counterDelta != null ? ` (noch ${formatTransfermarktCurrency(counterDelta)} über deinem Angebot)` : ""}. Schlag ein oder komm ihm noch ein Stück entgegen.`
+          : `${playerName} will eher ${formatTransfermarktCurrency(counterSalary)} pro Season${counterDelta != null ? ` (${counterDelta > 0 ? "+" : ""}${formatTransfermarktCurrency(counterDelta)} gegenüber deinem Angebot)` : ""}. Schlag ein oder passe dein Angebot an und verhandle neu.`,
         counterSalary,
+        counterKind: "money",
       });
       window.requestAnimationFrame(() => {
         scrollBuyModalToTop();
@@ -1913,16 +1973,96 @@ export default function TransfermarktV2Client({
       return;
     }
 
+    if (verdict === "counter_conditions") {
+      void persistNegotiationOutcome(buyPreview, "countered");
+      const conditions = buyPreview.counterConditions ?? null;
+      const lengthLabel = conditions ? `${conditions.contractLength} Saison${conditions.contractLength === 1 ? "" : "en"}` : "eine andere Laufzeit";
+      const shapeLabel = conditions ? formatContractShapeLabel(conditions.contractShape) : "eine andere Form";
+      setBuyNegotiationOutcome({
+        status: "countered",
+        tone: "warning",
+        title: "Beim Gehalt einig, Vertrag noch nicht",
+        message: `${playerName} ist mit dem Gehalt zufrieden, will aber ${lengthLabel} (Form: ${shapeLabel}). Gib ihm den Wunschvertrag (Einschlagen) oder leg beim Gehalt nach und verhandle neu.`,
+        counterKind: "conditions",
+        counterConditions: conditions,
+      });
+      window.requestAnimationFrame(() => {
+        scrollBuyModalToTop();
+      });
+      return;
+    }
+
+    // verdict === "accept" (oder Bagatelle-Zusage, Abschnitt 2.2 Regel 5)
     void persistNegotiationOutcome(buyPreview, "accepted_pending_confirm");
     setBuyNegotiationOutcome({
       status: "accepted",
       tone: "success",
       title: "Angebot angenommen",
-      message: `${buyPreview.player.name} akzeptiert den Rahmen. Du kannst den Kauf jetzt final abschließen.`,
+      message: `${playerName} akzeptiert den Rahmen. Du kannst den Kauf jetzt final abschließen.`,
     });
     window.requestAnimationFrame(() => {
       scrollBuyModalToTop();
     });
+  }
+
+  // Ein angenommenes Gegenangebot ist bindend (verhandlung-rework.md Abschnitt 3.4) — die
+  // EINZIGE Stelle, an der der Ablauf die Formel uebersteuert: der Spieler hat die Zahl (oder den
+  // Vertrag) selbst genannt, sie erneut durch die Baender zu schicken waere Wortbruch durch
+  // Formel (das Gegenangebot kann mit Haerte h<1 unter R_full liegen und würde vom Verdikt sonst
+  // wieder als Gegenangebot zurueckkommen statt als Zusage zu gelten).
+  async function acceptCounterOffer() {
+    if (!buyPreview?.player?.id || !buyPreview.team?.id || buyBusy) {
+      return;
+    }
+    if (buyNegotiationOutcome?.status !== "countered") {
+      return;
+    }
+
+    let acceptedSummary = buyPreview;
+    if (buyPreview.verdict === "counter_money" && buyPreview.counterSalary != null) {
+      setOfferedSalary(buyPreview.counterSalary);
+      setSalaryEditedManually(true);
+      acceptedSummary = { ...buyPreview, offeredSalary: buyPreview.counterSalary };
+    } else if (buyPreview.verdict === "counter_conditions" && buyPreview.counterConditions) {
+      setContractLength(buyPreview.counterConditions.contractLength);
+      setContractShape(buyPreview.counterConditions.contractShape);
+      acceptedSummary = {
+        ...buyPreview,
+        contractLength: buyPreview.counterConditions.contractLength,
+        contractShape: buyPreview.counterConditions.contractShape,
+      };
+    }
+
+    void persistNegotiationOutcome(acceptedSummary, "accepted_pending_confirm");
+    setBuyNegotiationOutcome({
+      status: "accepted",
+      tone: "success",
+      title: "Gegenangebot eingeschlagen",
+      message: `${buyPreview.player.name} ist einverstanden. Du kannst den Kauf jetzt final abschließen.`,
+    });
+    window.requestAnimationFrame(() => {
+      scrollBuyModalToTop();
+    });
+  }
+
+  /**
+   * Ein Gehaltswechsel nach einer ABSAGE hebt die Absage auf.
+   *
+   * GEMELDET beim Durchspielen: nach „Angebot abgelehnt — heb das Gehalt an oder passe den
+   * Vertrag an, dann kannst du erneut verhandeln" blieb „Schritt 1: Verhandeln" gesperrt, auch
+   * nachdem das Gehalt angehoben war. Eine Sackgasse: der einzige Ausweg war, den Dialog zu
+   * schliessen — was zusaetzlich den Abbruch-Malus riskiert. Der Hinweis versprach etwas, das
+   * die Oberflaeche nicht einloeste. Vertragslaenge und -form haben das ueber
+   * `resetBuyDemandFrame` schon immer getan, nur das Gehalt nicht.
+   *
+   * NUR bei einer Absage zuruecksetzen, nicht generell: bei „countered" traegt der Zustand das
+   * Gegenangebot samt „Einschlagen"-Knopf, und `acceptCounterOffer` setzt das Gehalt selbst auf
+   * die Gegenangebots-Zahl. Wuerde jeder Gehaltswechsel den Zustand loeschen, verschwaende
+   * genau dieser Klick sein eigenes Ziel.
+   */
+  function applyOfferedSalaryChange(value: SetStateAction<number | null>) {
+    setOfferedSalary(value);
+    setBuyNegotiationOutcome((current) => (current?.status === "rejected" ? null : current));
   }
 
   function openBuyModal() {
@@ -2078,11 +2218,16 @@ export default function TransfermarktV2Client({
         onSaveFilterPreset={saveMarketFilterPreset}
         onDeleteFilterPreset={deleteMarketFilterPreset}
         candidates={renderedVisibleItems}
+        marketCompleting={marketCompleting}
         totalVisibleCount={visibleItems.length}
         selectedPlayerId={selectedPlayer?.playerId ?? null}
         onSelectCandidate={(playerId) => {
           shouldFocusSelectedCandidateRef.current = false;
           setSelectedPlayerId(playerId);
+          // Der Name kommt aus der Liste, die der Spieler gerade sieht — nicht aus einem Feed,
+          // der beim Oeffnen des Marktes leer ist.
+          const gewaehlt = marketItems.find((item) => item.playerId === playerId);
+          onSelectCandidateUpstream?.(playerId, gewaehlt?.name ?? playerId);
         }}
         selectedPlayer={selectedPlayer}
         onOpenPlayerDetails={onOpenPlayerDetails}
@@ -2126,7 +2271,7 @@ export default function TransfermarktV2Client({
         onOfferedSalaryChange={(value) => {
           // Phase-2 F2 — Deal-Desk-Slider setzt dasselbe Angebots-State wie das Modal; der
           // Manuell-Flag hält den Preview-Effekt auf dem 90-ms-Debounce-Pfad statt Auto-Reset.
-          setOfferedSalary(value);
+          applyOfferedSalaryChange(value);
           setSalaryEditedManually(true);
         }}
         previewYearlySalarySchedule={buyPreview?.yearlySalarySchedule ?? null}
@@ -2206,11 +2351,12 @@ export default function TransfermarktV2Client({
               },
               onContractLengthChange: setContractLength,
               onContractShapeChange: setContractShape,
-              onOfferedSalaryChange: setOfferedSalary,
+              onOfferedSalaryChange: applyOfferedSalaryChange,
               onSalaryEditedManuallyChange: setSalaryEditedManually,
               onBuyNegotiationOutcomeChange: setBuyNegotiationOutcome,
               closeBuyModal,
               negotiateBuy,
+              acceptCounterOffer,
               confirmBuy,
               resetBuyDemandFrame,
             }}

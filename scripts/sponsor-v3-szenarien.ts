@@ -15,6 +15,7 @@ import { getPrizePlacementBonus } from "@/lib/season/prize-placement-table";
 import {
   SPONSOR_V3_CARDS,
   buildSponsorV3TermsCore,
+  sponsorV3BenchmarkLadder,
   sponsorV3ExpectedPayout,
   sponsorV3GoalProbability,
   sponsorV3IsGoalOfferable,
@@ -70,10 +71,13 @@ for (const factor of SALARY_FACTORS) {
 
   for (const spot of SPOTS) {
     const startRank = spot.team.startRank;
+    // Diese Szenario-Rechnung misst weiterhin gegen die alte Preisgeld-Benchmark, nicht gegen die
+    // neue Sponsor-Ligaleiter — `buildSponsorV3TermsCore` selbst ist seit dem Ligaleiter-Umbau
+    // leiter-agnostisch und nimmt jede fertig gebaute `baseLadder` entgegen.
+    const baseLadder = sponsorV3BenchmarkLadder({ prizeCurve, startRank, placementBonus: getPrizePlacementBonus });
     const terms = SPONSOR_V3_CARDS.map((card) =>
       buildSponsorV3TermsCore({
-        prizeCurve,
-        placementBonus: getPrizePlacementBonus,
+        baseLadder,
         startRank,
         rarity: RARITY,
         card,

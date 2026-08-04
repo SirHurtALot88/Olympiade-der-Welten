@@ -1,0 +1,23 @@
+[
+  {
+    "datum": "2026-08-02",
+    "seite": "Spieltag · Inbox",
+    "text": "Aufstellung setzen, Formkarten erzeugen und bestätigen sind jetzt eine Karte statt drei — mit Fortschritt: „Spieltag vorbereiten · Schritt 2 von 3\".",
+    "gewicht": "behebung",
+    "version": "0.3"
+  },
+  {
+    "datum": "2026-08-02",
+    "seite": "Spieltag · Inbox",
+    "text": "Ein belasteter Spieler löst nur noch eine Meldung aus statt bis zu drei, die alle dieselbe Person meinten. Der Knopf „Training leicht\" bleibt dabei erhalten.",
+    "gewicht": "behebung",
+    "version": "0.3"
+  },
+  {
+    "datum": "2026-08-02",
+    "seite": "Spieltag · Inbox",
+    "text": "Mehrere Scouting-Fortschritte werden zu einer Notiz zusammengefasst („3 Scouting-Reports sind schärfer geworden\") statt je Spieler und Meilenstein einzeln zu melden.",
+    "gewicht": "feinschliff",
+    "version": "0.3"
+  }
+]

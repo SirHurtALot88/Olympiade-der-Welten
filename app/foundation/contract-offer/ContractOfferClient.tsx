@@ -29,9 +29,16 @@ export type ContractOfferClientProps = {
   extraActions?: ReactNode;
 };
 
+/**
+ * `acceptChance`/`counterChance`/`rejectChance` kommen bereits als PROZENTZAHLEN aus
+ * `normalizeChances` (sie summieren sich dort auf 100) — nicht als Anteile zwischen 0 und 1.
+ * Die zusätzliche Multiplikation ließ im Vertragsdialog „Zusage 5100 % · Nachverhandlung
+ * 4700 % · Absage 200 %" stehen, während dieselben Zahlen zwei Zentimeter darüber korrekt mit
+ * 51 % angezeigt wurden.
+ */
 function formatPercent(value: number | null | undefined) {
   if (value == null || !Number.isFinite(value)) return "—";
-  return `${Math.round(value * 100)}%`;
+  return `${Math.round(value)}%`;
 }
 
 export default function ContractOfferClient({
@@ -124,9 +131,9 @@ export default function ContractOfferClient({
           <label className="filter-field">
             <span>Vertragsform</span>
             <select className="input" value={contractShape} onChange={(event) => onContractShapeChange(event.target.value as ContractShape)}>
-              <option value="balanced">Ausgeglichen</option>
-              <option value="front_loaded">Vorne schwer</option>
-              <option value="back_loaded">Hinten schwer</option>
+              <option value="balanced">Balanced</option>
+              <option value="front_loaded">Front-loaded</option>
+              <option value="back_loaded">Back-loaded</option>
             </select>
           </label>
         </section>

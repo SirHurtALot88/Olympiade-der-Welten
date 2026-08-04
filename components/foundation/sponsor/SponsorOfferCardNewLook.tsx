@@ -23,7 +23,11 @@ import {
   getSponsorCurveFamily,
   mapArchetypeToCurveShape,
 } from "@/lib/sponsor/sponsor-curve-shapes";
-import { buildOfferRankPayoutLadderPreview, estimateExpectedPayout } from "@/lib/sponsor/sponsor-economy-calibration";
+import {
+  buildOfferRankPayoutLadderPreview,
+  buildSponsorOfferTermForecast,
+  estimateExpectedPayout,
+} from "@/lib/sponsor/sponsor-economy-calibration";
 import { SponsorRankLadder } from "@/components/foundation/sponsor/SponsorRankLadder";
 import { describeSponsorOfferModules } from "@/lib/sponsor/sponsor-modules";
 import { NlDeltaChip, type NlTone } from "@/components/foundation/new-look";
@@ -37,10 +41,12 @@ import { NlDeltaChip, type NlTone } from "@/components/foundation/new-look";
  * `offer.components` (die echten Vertragskomponenten) und `onChoose` (echter
  * Sponsor-Wahl-Flow).
  *
- * Laufzeit (`termSeasons`) ist bewusst NUR Anzeige: der echte Apply-Pfad
- * (`chooseTeamSponsor` → POST /api/sponsor/choose → `chooseSponsorOffer`)
- * akzeptiert keine Laufzeit und rechnet serverseitig fest mit 1 Saison —
- * ein Selector hätte keinerlei Wirkung.
+ * Laufzeit (`termSeasons`) ist kein Selector, aber seit Umsetzungsplan D auch keine feste 1-Saison-
+ * Konstante mehr: sie wird beim Slate-Wurf je Angebot gewuerfelt (`rollSponsorOfferSlate`,
+ * sponsor-tier-pool.ts, Mehrheit einjaehrig) und der Apply-Pfad (`chooseTeamSponsor` → POST
+ * /api/sponsor/choose → `chooseSponsorOffer`) uebernimmt sie 1:1 vom gewaehlten Angebot. Der Betrag
+ * bleibt dabei an die Konjunktur der jeweiligen Saison gekoppelt (Sockel eingefroren, Wertungsanteil
+ * skaliert jede Saison neu) — siehe die Bedingungs-Zeile und den Laufzeit-Ausblick weiter unten.
  */
 
 export type SponsorOfferCardNewLookProps = {
@@ -248,6 +254,10 @@ export function SponsorOfferCardNewLook({
     0,
   );
   const termSeasons = offer.termSeasons ?? 1;
+  // Ausblick ueber die Laufzeit: bei MEHRJAEHRIGEN Angeboten (2/3 Saisons) zeigt sich hier, was der
+  // Vertrag an der AKTUELLEN Tabellenposition in jeder Saison der Laufzeit einbringen wuerde — die
+  // Zahlen liegen bereits vor (Salary-Factor-Vorausschau, siehe buildSponsorOfferTermForecast).
+  const termForecast = useMemo(() => buildSponsorOfferTermForecast(gameState, offer), [gameState, offer]);
 
   // #79: aktuell erreichte Gewinnstufe live hervorheben — echter Liga-Rang
   // des Teams (`buildTeamSeasonOverviewRows`), keine erfundene Platzierung.
@@ -312,12 +322,35 @@ export function SponsorOfferCardNewLook({
           ) : null}
           <span
             className="nl-sponsor-term-chip"
-            title="Vertragslaufzeit dieses Angebots. Aktuell vergeben Sponsoren feste 1-Saison-Verträge — die Laufzeit ist beim Abschluss nicht verhandelbar."
+            title="Vertragslaufzeit dieses Angebots — beim Abschluss nicht verhandelbar, aber je Angebot unterschiedlich."
           >
             Laufzeit {termSeasons} {termSeasons === 1 ? "Saison" : "Saisons"}
           </span>
         </div>
       </header>
+
+      {termSeasons > 1 ? (
+        <div className="nl-sponsor-term-outlook" data-testid="sponsor-term-outlook">
+          <p className="nl-sponsor-term-condition">
+            Der Betrag richtet sich weiterhin nach der Konjunktur der jeweiligen Saison: der Sockel steht
+            mit dem Startrang bei Unterschrift fest, der Wertungsanteil schwankt jede Saison neu mit dem
+            Salary Factor.
+          </p>
+          {termForecast.length > 0 ? (
+            <ul className="nl-sponsor-term-outlook-list" aria-label="Ausblick über die Vertragslaufzeit">
+              {termForecast.map((entry) => (
+                <li key={entry.seasonYear} className="nl-sponsor-term-outlook-row">
+                  <span>
+                    Saison {entry.seasonYear}/{termSeasons}
+                    <em> (Faktor {entry.salaryFactor.toFixed(2)})</em>
+                  </span>
+                  <strong className="nl-tnum">{formatCash(entry.payoutAtCurrentRank)}</strong>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
 
       {presentation.isChallenge && presentation.special ? (
         <div className="nl-sponsor-challenge" data-testid="sponsor-challenge-panel">

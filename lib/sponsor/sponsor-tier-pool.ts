@@ -1,5 +1,5 @@
-import type { SponsorArchetype, SponsorRarity } from "@/lib/data/olyDataTypes";
-import { SPONSOR_RARITIES, SPONSOR_RARITY_KEYS } from "@/lib/sponsor/sponsor-curve-shapes";
+import type { SponsorArchetype, SponsorCurveShape, SponsorRarity, SponsorTermSeasons } from "@/lib/data/olyDataTypes";
+import { SPONSOR_CURVE_SHAPE_KEYS, SPONSOR_RARITIES, SPONSOR_RARITY_KEYS } from "@/lib/sponsor/sponsor-curve-shapes";
 import {
   SPONSOR_V4_AXIS_KEYS, type SponsorV3CardKey, type SponsorV4AxisKey,
 } from "@/lib/sponsor/sponsor-v3-model";
@@ -127,6 +127,17 @@ export type SponsorSlateEntry = {
   axisKey?: SponsorV4AxisKey;
   /** Zahlt dieser Sponsor einen Teil schon bei Unterschrift aus? */
   advance?: boolean;
+  /**
+   * WO auf der Sponsor-Ligaleiter (sponsor-liga-leiter.ts) dieses Angebot sein Geld hat — jeder
+   * Slot bekommt eine ANDERE Form (Ziehung ohne Zuruecklegen), sonst waere die Formwahl stumpf: fuenf
+   * Angebote, aber nur eine tatsaechliche Kurve dahinter.
+   */
+  curveShape: SponsorCurveShape;
+  /**
+   * Vertragslaufzeit dieses Angebots (1/2/3 Saisons), je Slot gewuerfelt (Umsetzungsplan D). Mehrheit
+   * einjaehrig, Mehrjahresvertraege als Minderheit — siehe die Laufzeit-Ziehung in `rollSponsorOfferSlate` unten.
+   */
+  termSeasons: SponsorTermSeasons;
 };
 export type SponsorSlateResult = { entries: SponsorSlateEntry[]; goldenCardSlots: number[] };
 
@@ -211,10 +222,27 @@ export function rollSponsorOfferSlate(input: {
   // Ziehung OHNE ZURUECKLEGEN ueber eine deterministische Sortierung: jede Achse bekommt einen
   // stabilen Wurf, sortiert wird danach. Eine Achse bleibt je Saison uebrig — das rotiert den Slate
   // von selbst, ohne dass eine Anti-Wiederholungsliste gepflegt werden muesste.
+  //
+  // Saison+Team stehen bewusst VOR der Achse im Seed — dieselbe Regel wie beim Kurvenform-Seed unten:
+  // gebraucht wird Varianz ZWISCHEN VERSCHIEDENEN TEAMS bei GLEICHER Achse, und FNV-1a avalanched nur
+  // NACH dem Zeichen, an dem sich zwei Seeds zum ersten Mal unterscheiden (siehe Kommentar beim
+  // Rarity-Wurf unten). Mit der Achse vorne (kurzem, immer gleich langem Praefix je Achse) und
+  // Saison/Team dahinter blieb die Achsen-REIHENFOLGE ueber alle Teams EINER Saison hinweg praktisch
+  // IDENTISCH — gemessen: bei 12 Teams derselben Saison lieferten 10 von 12 exakt dieselbe Reihenfolge,
+  // nur 2 abweichende Werte kamen ueberhaupt vor. Das rotiert zwar zwischen Saisons, aber nicht
+  // zwischen Teams — und genau die Team-Varianz soll dieser Wurf liefern.
   const shuffledAxes = axisPool
-    .map((key) => ({ key, roll: getStableUnitHash(`sponsor-achse:${key}:${input.seasonId}:${input.teamId}`) }))
+    .map((key) => ({ key, roll: getStableUnitHash(`sponsor-achse:${input.seasonId}:${input.teamId}:${key}`) }))
     .sort((left, right) => left.roll - right.roll)
     .map((entry) => entry.key);
+
+  // Dieselbe Ziehung-ohne-Zuruecklegen wie bei den Achsen, diesmal ueber die 11 Kurvenformen: jeder
+  // Slot bekommt eine ANDERE Form, damit die fuenf Angebote fuenf verschiedene Stellen auf der
+  // Ligaleiter zeigen (sponsor-liga-leiter.ts) statt fuenfmal dieselbe Verteilung mit anderem Namen.
+  const shuffledCurveShapes = SPONSOR_CURVE_SHAPE_KEYS
+    .map((shape) => ({ shape, roll: getStableUnitHash(`sponsor-curve:${input.seasonId}:${input.teamId}:${shape}`) }))
+    .sort((left, right) => left.roll - right.roll)
+    .map((entry) => entry.shape);
 
   // Rebalance (2026-07): KEIN qualitäts-rang-basierter Rarity-Deckel mehr. Früher deckelte der Team-
   // Qualitätsrang die maximale Rarity (die untere Liga-Hälfte saß hart auf `gewöhnlich`), sodass schwache
@@ -251,6 +279,46 @@ export function rollSponsorOfferSlate(input: {
     rarities.push(picked);
   }
 
+  // LAUFZEIT JE SLOT (Umsetzungsplan D): Mehrheit einjaehrig, Mehrjahresvertraege als Minderheit —
+  // Gewichte 3:1:1 (1/2/3 Saisons) liefern im Erwartungswert ~3 einjaehrige, ~1 zweijaehrige und
+  // ~1 dreijaehrige Karte pro Slate von fuenf.
+  //
+  // SEED-FALLE, ZUM DRITTEN MAL (siehe die Kommentare bei Rarity- und Achsen-Ziehung oben): hier
+  // greifen BEIDE bisher getrennt behobenen Bugs gleichzeitig, weil dieser Wurf BEIDE Eigenschaften
+  // braucht — Varianz ZWISCHEN DEN 5 SLOTS DESSELBEN Teams UND Varianz ZWISCHEN VERSCHIEDENEN TEAMS
+  // derselben Saison:
+  //   - Slot als SUFFIX (wie beim Achsen-/Kurvenform-Seed: `…:seasonId:teamId:slot`) behebt zwar die
+  //     Team-Varianz, macht die 5 Slot-Rolls eines Teams aber wieder fast einfarbig (gemessen: ~93 %
+  //     der Slates ziehen fuer alle 5 Slots dieselbe Laufzeit) — derselbe Fehler wie beim alten
+  //     Rarity-Suffix-Seed, nur auf einer anderen Achse.
+  //   - Slot als PRAEFIX gefolgt von NUR `teamId` (wie beim alten Rarity-Seed) behebt die Slot-Varianz,
+  //     kollabiert aber die Team-Varianz: bei kurzen, sich nur in den letzten Zeichen unterscheidenden
+  //     Team-IDs (z. B. "T-0".."T-11") avalanched FNV-1a nach dem letzten Unterschied kaum noch —
+  //     gemessen: 25 von 60 Saisons zogen fuer ALLE 12 Teams exakt dieselbe Laufzeit in Slot 0.
+  // Der Plan schlug `seasonId:teamId:slot` vor (das erste Muster) — nachgemessen bricht das an der
+  // Slot-Varianz. Behoben mit Slot ZUERST, gefolgt von `teamId` UND `seasonId` (in dieser Reihenfolge):
+  // die Team-ID divergiert fruehzeitig im String, und die nachfolgende Saison-ID liefert dahinter noch
+  // genug FNV-Runden, um diese Divergenz sauber durchzuavalanchen — gemessen ueber 40 Saisons x 32
+  // Teams: 0 Saisons mit einfarbiger Team-Verteilung in Slot 0 (3 verschiedene Laufzeiten ueblich),
+  // UND die Slot-einfarbige Quote je Team faellt auf ~7,7 % (statistische Erwartung ~8 %).
+  const TERM_SEASON_DRAW_WEIGHTS: Record<SponsorTermSeasons, number> = { 1: 3, 2: 1, 3: 1 };
+  const termSeasonCandidates: SponsorTermSeasons[] = [1, 2, 3];
+  const termWeights = termSeasonCandidates.map((term) => TERM_SEASON_DRAW_WEIGHTS[term]);
+  const termWeightTotal = termWeights.reduce((sum, w) => sum + w, 0);
+  const termSeasonsPerSlot: SponsorTermSeasons[] = Array.from({ length: slotCount }, (_, slot) => {
+    const roll = getStableUnitHash(`sponsor-laufzeit:${slot}:${input.teamId}:${input.seasonId}`) * termWeightTotal;
+    let acc = 0;
+    let picked: SponsorTermSeasons = 1;
+    for (let i = 0; i < termSeasonCandidates.length; i += 1) {
+      acc += termWeights[i]!;
+      if (roll < acc) {
+        picked = termSeasonCandidates[i]!;
+        break;
+      }
+    }
+    return picked;
+  });
+
   // ZWEITE WAHLDIMENSION: zahlt der Sponsor einen Teil schon bei Unterschrift? Gewuerfelt je
   // Achsen-Slot, aber MIT GARANTIEN — ein klammes Team muss immer eine Liquiditaetsoption finden,
   // und ein reiches darf nie nur Gebuehrenkarten vorfinden. Ohne die Garantien haette der Wurf in
@@ -275,14 +343,18 @@ export function rollSponsorOfferSlate(input: {
 
   // Slot 0 traegt die Basis-Karte: der risikofreie Anker, gegen den jede Achse gemessen wird.
   const entries: SponsorSlateEntry[] = Array.from({ length: slotCount }, (_, slot) => {
+    const curveShape = shuffledCurveShapes[slot]!;
+    const termSeasons = termSeasonsPerSlot[slot] ?? 1;
     if (slot === 0) {
-      return { cardKey: "basis" as SponsorV3CardKey, rarity: rarities[0] ?? fallbackRarity };
+      return { cardKey: "basis" as SponsorV3CardKey, rarity: rarities[0] ?? fallbackRarity, curveShape, termSeasons };
     }
     return {
       cardKey: "achse" as SponsorV3CardKey,
       rarity: rarities[slot] ?? fallbackRarity,
       axisKey: shuffledAxes[slot - 1]!,
       advance: advanceRolls[slot - 1] === true,
+      curveShape,
+      termSeasons,
     };
   });
 

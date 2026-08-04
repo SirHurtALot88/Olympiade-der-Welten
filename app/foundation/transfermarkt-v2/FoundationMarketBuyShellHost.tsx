@@ -3,6 +3,7 @@
 import type { Dispatch, RefObject, SetStateAction } from "react";
 
 import ClassIcon from "@/app/foundation/ClassIcon";
+import { FoundationDecisionSurface } from "@/app/foundation/decision-surface/FoundationDecisionSurface";
 import ContractOfferClient from "@/app/foundation/contract-offer/ContractOfferClient";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import {
@@ -138,6 +139,9 @@ export type FoundationMarketBuyShellHostProps = {
   onBuyNegotiationOutcomeChange: Dispatch<SetStateAction<MarketBuyNegotiationOutcome | null>>;
   closeBuyModal: () => void;
   negotiateBuy: () => void | Promise<void>;
+  /** Bindend uebernehmen (verhandlung-rework.md Abschnitt 3.4) — die einzige Stelle, an der ein
+   *  Gegenangebot direkt zur Zusage wird, statt erneut durch die Verdikt-Baender zu laufen. */
+  acceptCounterOffer: () => void | Promise<void>;
   confirmBuy: () => void | Promise<void>;
   resetBuyDemandFrame: () => void;
 };
@@ -174,6 +178,7 @@ export default function FoundationMarketBuyShellHost({
   onBuyNegotiationOutcomeChange,
   closeBuyModal,
   negotiateBuy,
+  acceptCounterOffer,
   confirmBuy,
   resetBuyDemandFrame,
 }: FoundationMarketBuyShellHostProps) {
@@ -196,6 +201,7 @@ export default function FoundationMarketBuyShellHost({
     priorBadExperienceDemandEntry,
     priorBadExperienceScoreEntry,
     priorBadExperienceActive,
+    negotiationTooltip,
     finalBuyDisabledReason,
     formatNegotiationSignalLabel,
     visibleBuyWarnings,
@@ -212,18 +218,75 @@ export default function FoundationMarketBuyShellHost({
   });
 
   return (
-    <section className="foundation-drilldown-page transfer-offer-page" data-testid="transfer-offer-page" ref={buyModalRef}>
-      <header className="foundation-drilldown-header">
-        <div>
-          <span className="market-v2-kicker">Vertragsangebot</span>
-          <h1>{selectedPlayer?.name ?? "Spieler prüfen"}</h1>
-        </div>
-        <button className="secondary-button" type="button" onClick={closeBuyModal} disabled={buyBusy}>
-          Zurück
-        </button>
-      </header>
-
-      <div className="foundation-drilldown-body transfer-buy-modal-body" ref={buyModalBodyRef}>
+    <FoundationDecisionSurface
+      kicker={`Transfermarkt · Vertragsangebot${selectedPlayer?.name ? ` · ${selectedPlayer.name}` : ""}`}
+      ariaLabel="Vertragsangebot"
+      testId="transfer-offer-page"
+      className="transfer-offer-page"
+      containerRef={buyModalRef}
+      status={
+        source !== "sqlite"
+          ? { label: "nur Ansicht", tone: "neutral" }
+          : buyNegotiationOutcome?.status === "accepted"
+            ? { label: "Annahme liegt vor", tone: "ready" }
+            : buyNegotiationOutcome?.status === "rejected"
+              ? { label: "abgelehnt", tone: "blocked" }
+              : buyPreview?.canBuy
+                ? { label: "bereit", tone: "ready" }
+                : { label: "prüfen", tone: "warning" }
+      }
+      onClose={closeBuyModal}
+      closeDisabled={buyBusy}
+      /*
+        Schritt 1 des Kaufs. Er ist KEIN zweiter Hauptknopf, sondern der vorgelagerte Schritt:
+        solange keine Annahme vorliegt, ist der Abschluss gesperrt. Hervorgehoben wird deshalb
+        genau der Knopf, der gerade dran ist.
+      */
+      secondary={{
+        label:
+          buyNegotiationOutcome?.status === "accepted" ? "Annahme liegt vor" : "Schritt 1: Verhandeln",
+        busyLabel: "verhandelt…",
+        busy: buyBusy,
+        emphasized: buyNegotiationOutcome?.status !== "accepted",
+        disabled:
+          source !== "sqlite" ||
+          !selectedTeamCanManage ||
+          previewBusy ||
+          !selectedPlayer ||
+          !selectedTeamId ||
+          !buyPreview?.canBuy ||
+          buyNegotiationOutcome?.status === "rejected",
+        title:
+          source !== "sqlite"
+            ? "Im Referenzmodus bleibt die Verhandlung gesperrt."
+            : !buyPreview?.canBuy
+              ? buyPreview?.blockingReasons?.map(formatNegotiationSignalLabel).join(" · ") ||
+                "Der Deal ist noch nicht bereit."
+              : buyNegotiationOutcome?.status === "rejected"
+                ? "Nach einer Absage erst Angebot oder Vertrag anpassen."
+                : "Verhandlung starten und Reaktion der Gegenseite prüfen.",
+        onAct: () => void negotiateBuy(),
+      }}
+      primary={{
+        label: "Schritt 2: Kauf final abschließen",
+        confirmLabel: "Schritt 2: Kauf final abschließen",
+        busyLabel: "kauft…",
+        busy: buyBusy,
+        buttonTestId: "transfer-buy-confirm-button",
+        disabledReasonTestId: "transfer-buy-disabled-reason",
+        disabledReason: finalBuyDisabledReason ?? null,
+        disabled:
+          source !== "sqlite" ||
+          !selectedTeamCanManage ||
+          previewBusy ||
+          !selectedPlayer ||
+          !selectedTeamId ||
+          !buyPreview?.canBuy ||
+          buyNegotiationOutcome?.status !== "accepted",
+        onConfirm: () => void confirmBuy(),
+      }}
+    >
+      <div className="transfer-buy-modal-body" ref={buyModalBodyRef}>
               {/* Velo-Hero: Portrait + Meta + KPIs als StatChips (F1 — ersetzt die
                   alte transfer-modal-kpi/pill/muted-Sprache durch das Kit-Vokabular). */}
               <NlCard
@@ -366,6 +429,38 @@ export default function FoundationMarketBuyShellHost({
                     {priorBadExperienceDemandEntry
                       ? `Die letzte Verhandlung mit diesem Team wirkt noch nach. Seine Forderung liegt dadurch aktuell bei ${formatDemandPercent(priorBadExperienceDemandEntry.percent)} und die Zusage ist spürbar schlechter.`
                       : "Die letzte Verhandlung mit diesem Team wirkt noch nach. Dadurch fordert der Spieler mehr und verhandelt misstrauischer."}
+                  </span>
+                </div>
+              ) : null}
+
+              {/*
+                Trotz (verhandlung-rework.md Abschnitt 9.1) — zwei getrennte Zustände, und die
+                Trennung ist der Punkt: der obere Banner sagt, was SCHON gilt, der untere, was
+                ein Klick auslösen WÜRDE. Ohne den zweiten wäre der Aufschlag eine Überraschung
+                nach dem Klick; ohne den ersten wäre die erhöhte Forderung unerklärt.
+              */}
+              {(buyPreview?.defianceSurchargePct ?? 0) > 0 ? (
+                <div className="transfer-feedback-banner is-warning" data-testid="transfer-buy-defiance-active">
+                  <strong>Er trägt euch euer Lowball-Angebot nach</strong>
+                  <span>
+                    Seine Forderung steht für den Rest dieser Verhandlung bei{" "}
+                    {formatTransfermarktCurrency(buyPreview?.expectedSalary ?? null)} statt{" "}
+                    {formatTransfermarktCurrency(buyPreview?.baseDemandSalary ?? null)}
+                    {" "}(+{Math.round((buyPreview?.defianceSurchargePct ?? 0) * 1000) / 10} %). Eine neue Season setzt das zurück.
+                  </span>
+                </div>
+              ) : null}
+              {(buyPreview?.pendingDefianceSurchargePct ?? 0) > (buyPreview?.defianceSurchargePct ?? 0) ? (
+                <div className="transfer-feedback-banner is-warning" data-testid="transfer-buy-defiance-pending">
+                  <strong>Dieses Angebot nimmt er persönlich</strong>
+                  <span>
+                    Wenn du so verhandelst, steigt seine Forderung auf{" "}
+                    {formatTransfermarktCurrency(
+                      buyPreview?.baseDemandSalary != null
+                        ? Number((buyPreview.baseDemandSalary * (1 + (buyPreview.pendingDefianceSurchargePct ?? 0))).toFixed(2))
+                        : null,
+                    )}{" "}
+                    (+{Math.round((buyPreview?.pendingDefianceSurchargePct ?? 0) * 1000) / 10} %) — und bleibt dort. Tippen ist frei, verhandeln nicht.
                   </span>
                 </div>
               ) : null}
@@ -638,32 +733,36 @@ export default function FoundationMarketBuyShellHost({
                       )}
                     </NlCard>
                     <NlCard
-                      className="market-v2-buy-meta-card"
-                      eyebrow={`${buyPreview.negotiationScoreBreakdown?.length ?? 0} Faktoren`}
-                      title="Warum der Deal so ausfällt"
+                      className="market-v2-buy-meta-card market-v2-buy-negotiation-tooltip"
+                      eyebrow="Warum der Deal so ausfällt"
+                      title={negotiationTooltip?.headline ?? "Warum er so reagiert"}
+                      data-testid="transfer-negotiation-tooltip"
                     >
-                      {buyPreview.negotiationScoreBreakdown?.length ? (
-                        <ul className="negotiation-factor-list">
-                          {buyPreview.negotiationScoreBreakdown.map((entry) => (
-                            <li className={`negotiation-factor is-${entry.tone}`} key={entry.key}>
-                              <strong>{entry.points > 0 ? `+${entry.points}` : entry.points}</strong>
-                              <span>{entry.label}: {entry.reason}</span>
-                            </li>
+                      {/* Antwortet auf die Ausgangsfrage ("von was das abhängt — traits vom
+                          spieler, oder ob er aus gründen lieber/weniger gern wechseln will"):
+                          vier Bündel statt einer 15er-Rohliste aus scoreBreakdown
+                          (verhandlung-rework.md Abschnitt 5). Jedes Bündel beantwortet EINE
+                          menschliche Frage; leere Bündel fallen weg. */}
+                      {negotiationTooltip?.bundles.length ? (
+                        <div className="negotiation-tooltip-bundles">
+                          {negotiationTooltip.bundles.map((bundle) => (
+                            <div className={`negotiation-tooltip-bundle is-${bundle.id}`} key={bundle.id}>
+                              <p className="negotiation-tooltip-bundle-title">{bundle.title}</p>
+                              {bundle.items.length ? (
+                                <ul className="negotiation-factor-list">
+                                  {bundle.items.map((item, index) => (
+                                    <li className="negotiation-factor is-neutral" key={`${bundle.id}-${index}`}>
+                                      {item}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : null}
+                            </div>
                           ))}
-                        </ul>
+                        </div>
                       ) : (
-                        <p className="nl-market-muted">Noch keine Score-Faktoren verfügbar.</p>
+                        <p className="nl-market-muted">Noch keine Verhandlungsdaten verfügbar.</p>
                       )}
-                      {buyPreview.negotiationReasons?.length ? (
-                        <>
-                          <p className="market-v2-buy-subhead-inline">Treiber</p>
-                          <ul className="negotiation-factor-list">
-                            {buyPreview.negotiationReasons.map((reason) => (
-                              <li className="negotiation-factor is-positive" key={reason}>{formatNegotiationSignalLabel(reason)}</li>
-                            ))}
-                          </ul>
-                        </>
-                      ) : null}
                       {buyPreview.negotiationWarnings?.length ? (
                         <>
                           <p className="market-v2-buy-subhead-inline">Risiken</p>
@@ -704,6 +803,26 @@ export default function FoundationMarketBuyShellHost({
               </span>
             </div>
 
+            {buyNegotiationOutcome?.status === "countered" ? (
+              // Bindend uebernehmen statt Ratsche (Abschnitt 3.4/4.1): das Gegenangebot steht
+              // hier nur zur Ansicht — "Einschlagen" ist der einzige Weg, es zu uebernehmen.
+              // Wer stattdessen das eigene Angebot aendert und erneut auf "Verhandeln" klickt,
+              // bekommt ein neues, deterministisch aus (O, D, W, Traits) berechnetes Ergebnis.
+              <div className="transfer-feedback-banner is-warning" data-testid="transfer-buy-counter-offer">
+                <strong>{buyNegotiationOutcome.title}</strong>
+                <span>{buyNegotiationOutcome.message}</span>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  data-testid="transfer-buy-accept-counter-button"
+                  disabled={source !== "sqlite" || !selectedTeamCanManage || buyBusy}
+                  onClick={() => void acceptCounterOffer()}
+                >
+                  Gegenangebot einschlagen
+                </button>
+              </div>
+            ) : null}
+
             {buyNegotiationOutcome?.status === "rejected" ? (
               <div className="transfer-feedback-banner is-error" data-testid="transfer-buy-rejection-reason">
                 <strong>{buyNegotiationOutcome.title}</strong>
@@ -715,40 +834,6 @@ export default function FoundationMarketBuyShellHost({
                 ) : null}
               </div>
             ) : null}
-
-            <div className="foundation-modal-actions">
-              <button className="secondary-button" type="button" onClick={closeBuyModal} disabled={buyBusy}>
-                Abbrechen
-              </button>
-              <button
-                className={buyNegotiationOutcome?.status === "accepted" ? "primary-button" : "secondary-button"}
-                type="button"
-                disabled={source !== "sqlite" || !selectedTeamCanManage || previewBusy || buyBusy || !selectedPlayer || !selectedTeamId || !buyPreview?.canBuy || buyNegotiationOutcome?.status === "rejected"}
-                onClick={() => void negotiateBuy()}
-                title={
-                  source !== "sqlite"
-                    ? "Im Referenzmodus bleibt die Verhandlung gesperrt."
-                    : !buyPreview?.canBuy
-                      ? buyPreview?.blockingReasons?.map(formatNegotiationSignalLabel).join(" · ") || "Der Deal ist noch nicht bereit."
-                      : buyNegotiationOutcome?.status === "rejected"
-                        ? "Nach einer Absage erst Angebot oder Vertrag anpassen."
-                        : "Verhandlung starten und Reaktion der Gegenseite prüfen."
-                }
-              >
-                {buyBusy ? "verhandelt..." : buyNegotiationOutcome?.status === "accepted" ? "Annahme liegt vor" : "Schritt 1: Verhandeln"}
-              </button>
-              <button
-                className="primary-button"
-                type="button"
-                data-testid="transfer-buy-confirm-button"
-                disabled={source !== "sqlite" || !selectedTeamCanManage || previewBusy || buyBusy || !selectedPlayer || !selectedTeamId || !buyPreview?.canBuy || buyNegotiationOutcome?.status !== "accepted"}
-                onClick={() => void confirmBuy()}
-                title={finalBuyDisabledReason ?? "Bestätigt den Kauf jetzt final in deinem lokalen Spielstand."}
-              >
-                {buyBusy ? "kauft..." : "Schritt 2: Kauf final abschließen"}
-              </button>
-            </div>
-      {finalBuyDisabledReason ? <p className="foundation-screen-action-reason" data-testid="transfer-buy-disabled-reason">Warum nicht: {finalBuyDisabledReason}</p> : null}
-    </section>
+    </FoundationDecisionSurface>
   );
 }

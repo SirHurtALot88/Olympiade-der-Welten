@@ -1,15 +1,40 @@
 import { useMemo } from "react";
 
-import type { ContractShape, GameState, Team } from "@/lib/data/olyDataTypes";
+import type { ContractShape, ContractYearSalary, GameState, Team } from "@/lib/data/olyDataTypes";
 import { roundViewNumberByFactor as roundViewNumber } from "@/lib/foundation/foundation-number-utils";
 import { buildTeamContractSeasonTable } from "@/lib/market/contract-negotiation-preview";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
+import { bewerteGehalt, type SalaryBenchmarkResult } from "@/lib/contracts/salary-benchmark";
+import { buildLeagueSalaryBenchmarks, modellFuerSpieler } from "@/lib/contracts/salary-benchmark-league";
+import { empfehleVertrag, type ContractRecommendationResult } from "@/lib/contracts/contract-recommendation";
+import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
+
+export type ContractAssessment = ContractRecommendationResult & {
+  /** Gehalt gegen ueblich; null, wenn die Liga dafuer noch zu wenig hergibt. */
+  gehalt: SalaryBenchmarkResult | null;
+};
+
+/**
+ * Das aktuell gezahlte Jahresgehalt: der letzte Eintrag des Zahlplans, der noch zum laufenden
+ * Vertrag gehoert. Bewusst nicht die Gesamtsumme und nicht der Durchschnitt — gefragt ist, was
+ * dieser Spieler HEUTE kostet.
+ */
+function letztesAktivesGehalt(schedule: ContractYearSalary[] | null | undefined): number | null {
+  if (!schedule || schedule.length === 0) return null;
+  for (let index = schedule.length - 1; index >= 0; index -= 1) {
+    const wert = schedule[index]?.salary;
+    if (wert != null && Number.isFinite(wert) && wert > 0) return wert;
+  }
+  return null;
+}
 
 export type UseTeamsContractDerivationsInput = {
   enabled: boolean;
   gameState: GameState;
   selectedTeam: Team | null;
   showTeamContractPreviewRows: boolean;
+  /** Ligaweite Ratings — Grundlage fuer Leistung und Marktwert-Bracket. */
+  playerRatingsById: Map<string, PlayerRatingContractRow>;
 };
 
 export function useTeamsContractDerivations(input: UseTeamsContractDerivationsInput) {
@@ -116,10 +141,60 @@ export function useTeamsContractDerivations(input: UseTeamsContractDerivationsIn
     [input.showTeamContractPreviewRows, selectedTeamContractTable],
   );
 
+  /**
+   * DIE VERTRAGS-BEWERTUNG je Spieler — dieselbe Grundlage, auf der auch die KI ueber Verkaeufe
+   * entscheidet (`lib/contracts/salary-benchmark*`), damit Anzeige und Computer-Gegner nicht
+   * verschiedene Antworten auf dieselbe Frage geben.
+   *
+   * Ligaweit gebaut und je Marktwert-Bracket getrennt: verglichen wird mit seinesgleichen, nicht
+   * mit dem eigenen Kader und nicht mit der ganzen Liga in einem Topf.
+   */
+  const salaryBenchmarks = useMemo(
+    () =>
+      input.enabled
+        ? buildLeagueSalaryBenchmarks({ gameState: input.gameState, ratingsById: input.playerRatingsById })
+        : null,
+    [input.enabled, input.gameState, input.playerRatingsById],
+  );
+
+  const contractAssessmentByPlayerId = useMemo(() => {
+    const ergebnis = new Map<string, ContractAssessment>();
+    if (!salaryBenchmarks) return ergebnis;
+    for (const row of visibleSelectedTeamContractRows) {
+      const rating = input.playerRatingsById.get(row.playerId);
+      const gehalt = bewerteGehalt(modellFuerSpieler(salaryBenchmarks, row.playerId), {
+        salary: letztesAktivesGehalt(row.yearlySalarySchedule),
+        leistung: rating?.mvs ?? null,
+        laufzeit: row.contractLength,
+      });
+      const empfehlung = empfehleVertrag({
+        gehalt,
+        vk: row.exitValue,
+        marktwert: row.marketValueAtExit,
+        restlaufzeit: row.contractLength,
+        moral: row.morale,
+        intent: row.moraleContractIntent,
+      });
+      ergebnis.set(row.playerId, { gehalt, ...empfehlung });
+    }
+    return ergebnis;
+  }, [input.playerRatingsById, salaryBenchmarks, visibleSelectedTeamContractRows]);
+
+  /** Wie viele Vertraege in welcher Empfehlung stehen — die Zusammenfassung fuer die Board-Leiste. */
+  const contractRecommendationCounts = useMemo(() => {
+    const zaehler = { verlaengern: 0, beobachten: 0, abgeben: 0 };
+    for (const eintrag of contractAssessmentByPlayerId.values()) {
+      zaehler[eintrag.empfehlung] += 1;
+    }
+    return zaehler;
+  }, [contractAssessmentByPlayerId]);
+
   return {
     selectedTeamContractTable,
     selectedTeamContractShapeMix,
     selectedTeamContractPreviewRowCount,
     visibleSelectedTeamContractRows,
+    contractAssessmentByPlayerId,
+    contractRecommendationCounts,
   };
 }

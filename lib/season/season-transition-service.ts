@@ -7,6 +7,7 @@ import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/ma
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { applySeasonEndPotentialUpdates } from "@/lib/progression/player-potential-service";
+import { runSeasonEndProgressionBatch } from "@/lib/progression/season-end-progression-batch";
 import { buildSeasonReview, type SeasonReview } from "@/lib/season/season-review-service";
 import { getNextStepAfter, getPhaseAfterStep, isStepBehind } from "@/lib/season/season-transition-chain";
 import { SEASON_TRANSITION_STEPS, type SeasonTransitionStepId } from "@/lib/season/season-transition-steps";
@@ -343,14 +344,81 @@ export function advanceSeasonTransitionStep(
   }
 
   const nextStep = getNextStepAfter(currentStep) ?? currentStep;
+
+  /**
+   * DER SCHRITT „SPIELERENTWICKLUNG" RECHNET JETZT WIRKLICH.
+   *
+   * GEMELDET: „Kannst du dafuer sorgen, dass nach MD10 bevor man verkaufen kann die
+   * Trainingsupgrades der spieler schon durch laufen und die neuen Marktwerte dann verfuegbar
+   * sind? erst DANN darf wirklich verkauft werden."
+   *
+   * Vorher schaltete dieser Schritt nur die Phase weiter — die Entwicklung lief erst beim Start
+   * der NEUEN Saison, also hinter dem Transferfenster. Man verkaufte damit zu Marktwerten, die
+   * der Spieler zu diesem Zeitpunkt schon nicht mehr hatte: ein Spieler, der ueber den Sommer
+   * zulegt, ging zum alten Preis weg.
+   *
+   * Die Reihenfolge in der Kette stimmte laengst (`player_development` liegt VOR
+   * `transfer_sell_phase`) — es fehlte nur, dass der Schritt seine eigene Arbeit tut.
+   *
+   * Der Marker sorgt dafuer, dass es bei EINEM Mal bleibt: der Pre-Season-Workflow ueberspringt
+   * die Materialisierung, wenn sie fuer diese Saison schon gelaufen ist. Ohne ihn liefe die
+   * Entwicklung zweimal und jeder Spieler bekaeme seinen Saisonsprung doppelt.
+   */
+  let progressionSave = save;
+  let progressionWarnings: string[] = [];
+  const abgeschlosseneSaisonId = save.gameState.season.id;
+  const entwicklungSchonGelaufen =
+    save.gameState.seasonTransition?.progressionAppliedForSeasonId === abgeschlosseneSaisonId;
+
+  let entwicklungGelaufen = entwicklungSchonGelaufen;
+
+  if (currentStep === "player_development" && !entwicklungSchonGelaufen) {
+    /**
+     * SCHEITERT DIE ENTWICKLUNG, SPERRT SIE DEN WEG TROTZDEM NICHT.
+     *
+     * Die naheliegende Fassung waere, bei Blockern abzubrechen — dann bliebe die Phase stehen,
+     * bis die Entwicklung sauber durchlaeuft. Genau das waere hier aber die schlechtere
+     * Entscheidung: dieser Ablauf hatte schon einmal eine Sackgasse ("ich haenge in MD10, wie
+     * komme ich sauber in den naechsten schritt"), und ein blockierter Saisonuebergang sperrt
+     * Vertragsverlaengerungen und Verkaeufe gleich mit aus.
+     *
+     * Also: weiterschalten, aber ehrlich. Der Marker wird NUR gesetzt, wenn wirklich gerechnet
+     * wurde — so holt der Saisonstart die Entwicklung nach, statt sie stillschweigend zu
+     * verlieren, und die Warnung sagt, dass die Marktwerte in diesem Durchgang noch die alten
+     * sind.
+     */
+    try {
+      const batch = runSeasonEndProgressionBatch({ save, persistence, persistFinalState: false });
+      if (batch.blockingReasons.length > 0) {
+        progressionWarnings = [
+          ...batch.warnings,
+          `season_end_progression_deferred:${batch.blockingReasons.join("|")}`,
+        ];
+      } else {
+        progressionSave = batch.save;
+        progressionWarnings = batch.warnings;
+        entwicklungGelaufen = true;
+      }
+    } catch (error) {
+      progressionWarnings = [
+        `season_end_progression_failed:${error instanceof Error ? error.message : "unknown"}`,
+      ];
+    }
+  }
+
   const transition: SeasonTransitionState = {
     ...preview.transition,
     status: "preview",
     currentStep: nextStep,
     completedSteps: [...new Set([...preview.transition.completedSteps, currentStep])],
+    warnings: [...new Set([...preview.transition.warnings, ...progressionWarnings])],
+    // Nur setzen, wenn wirklich gerechnet wurde — sonst holt der Saisonstart es nach.
+    progressionAppliedForSeasonId: entwicklungGelaufen
+      ? abgeschlosseneSaisonId
+      : save.gameState.seasonTransition?.progressionAppliedForSeasonId ?? null,
   };
   const nextGameState: GameState = {
-    ...save.gameState,
+    ...progressionSave.gameState,
     gamePhase: nextPhase,
     seasonTransition: transition,
   };

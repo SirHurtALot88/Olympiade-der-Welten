@@ -760,12 +760,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: negotiationWriteAuth.reason }, { status: negotiationWriteAuth.status });
     }
 
+    // Der Trotz-Aufschlag (verhandlung-rework.md Abschnitt 9.1) waechst nur monoton. Der
+    // Vorwert muss deshalb HIER gelesen werden, nicht im Client: der Client schickt eine
+    // Vorschau, und die kennt nur ihre eigene Runde. Ohne den Vorwert fiele der Aufschlag bei
+    // jedem Schreiben auf das zurueck, was das aktuelle Angebot gerade rechtfertigt — ein
+    // Lowball waere durch ein anschliessend hoeheres Angebot gratis zurueckgenommen.
+    const priorNegotiationDraft = (sourceSave.gameState.seasonState.contractNegotiationDrafts ?? []).find(
+      (entry) => entry.teamId === summaryTeam.id && entry.playerId === summaryPlayer.id,
+    );
+
     const draft = buildContractNegotiationDraft({
       saveId: body.saveId,
       seasonId: sourceSave.gameState.season.id,
       teamId: summaryTeam.id,
       playerId: summaryPlayer.id,
       playerName: summaryPlayer.name,
+      priorDefianceSurchargePct: priorNegotiationDraft?.defianceSurchargePct ?? 0,
       preview: {
         expectedSalary: summary.expectedSalary ?? null,
         baseExpectedSalary: summary.baseExpectedSalary ?? null,
@@ -790,6 +800,11 @@ export async function POST(request: Request) {
         reasons: summary.negotiationReasons ?? [],
         warnings: [...(summary.negotiationWarnings ?? []), ...(body.extraWarnings ?? [])],
         blockingReasons: summary.negotiationBlockingReasons ?? [],
+        // Verdikt und Gegenangebot entscheiden, ob es ein Geld-Wort zu merken gibt (9.3);
+        // pendingDefianceSurchargePct ist der Aufschlag, den der Klick jetzt festschreibt (9.1).
+        verdict: summary.verdict ?? null,
+        counterSalary: summary.counterSalary ?? null,
+        pendingDefianceSurchargePct: summary.pendingDefianceSurchargePct ?? 0,
         status: body.status,
       },
     });
