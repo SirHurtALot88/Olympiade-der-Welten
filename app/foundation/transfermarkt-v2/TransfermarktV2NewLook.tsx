@@ -1244,6 +1244,36 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
               Erweitert{advancedActiveCount > 0 ? ` · ${advancedActiveCount} aktiv` : ""}
             </span>
             <div className="nl-market-advanced-panel" id="nl-market-advanced-panel">
+          {/*
+            GEMELDET VON CHRIS: "Im Transfermarkt fehlt noch ein Feld, wo nach Bereich gesucht werden
+            muss — also welche Kartenfarbe der Spieler mitbringt: POW SPE MEN SOC."
+
+            Die Filterung dafuer gab es bereits vollstaendig: `selectedClassAxes` wird im Client
+            gesetzt, in Presets gespeichert, zurueckgesetzt UND angewendet (Klassenfarbe → Achse ueber
+            CLASS_COLOR_TO_AXIS). Auch die Props kamen hier an. Was fehlte, war ausschliesslich das
+            Bedienelement — man konnte den Filter also nie einschalten.
+
+            NICHT ZU VERWECHSELN mit den Mindestwerten darunter: die fragen "mindestens so stark in
+            dieser Achse", diese Chips fragen "welche Farbe bringt der Spieler mit". Deshalb stehen
+            sie nebeneinander und tragen unterschiedliche Beschriftungen.
+          */}
+          <div className="nl-market-axis-min-group" role="group" aria-label="Kartenfarbe des Spielers">
+            {NL_MARKET_AXES.map((axis) => {
+              const active = selectedClassAxes.includes(axis);
+              return (
+                <button
+                  key={`nl-class-axis-${axis}`}
+                  type="button"
+                  className={`nl-market-pill ${nlToneClass(axis)}${active ? " is-active" : ""}`}
+                  aria-pressed={active}
+                  title={`Nur Spieler mit ${NL_AXIS_LABELS[axis]}-Karte zeigen`}
+                  onClick={() => onToggleClassAxis(axis)}
+                >
+                  {NL_AXIS_LABELS[axis]}
+                </button>
+              );
+            })}
+          </div>
           <div className="nl-market-axis-min-group" role="group" aria-label="Mindestwerte je Achse">
             {NL_MARKET_AXES.map((axis) => {
               // Ein Mindestwert > 0 filtert eigenständig — kein separater Toggle mehr nötig.
