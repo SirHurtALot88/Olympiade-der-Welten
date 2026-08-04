@@ -411,9 +411,9 @@ function formatReadinessLabel(value: string | null | undefined) {
 function formatNegotiationSignalLabel(value: string) {
   const labels: Record<string, string> = {
     insufficient_cash: "Cash reicht für Kauf oder Gesamtpaket noch nicht.",
-    low_team_fit_reduces_acceptance: "Schwacher Teamfit drueckt die Zusage.",
+    low_team_fit_reduces_acceptance: "Schwacher Teamfit drückt die Zusage.",
     local_team_not_owned_or_ai_controlled: "Dieses Team ist hier nur Ansicht und kann keine Deals schreiben.",
-    market_bracket_factor_preview_pending: "Marktklasse ist nur grob eingeschaetzt.",
+    market_bracket_factor_preview_pending: "Marktklasse ist nur grob eingeschätzt.",
     negotiation_cancelled_after_contact: "Abbruch nach Kontakt bleibt als Vertrauensmalus hängen.",
     negotiation_rejected_bad_experience: "Die letzte Absage macht die nächste Runde härter.",
     offer_below_expected_salary: "Angebot liegt unter der aktuellen Forderung.",
@@ -431,7 +431,19 @@ function formatNegotiationSignalLabel(value: string) {
 }
 
 /** Auf Wunsch entfernter Hinweis — Laufzeit-Abweichung ist kein eigener UI-Hinweis mehr. */
-const SUPPRESSED_NEGOTIATION_WARNING_CODES = new Set(["contract_length_override_in_effect"]);
+const SUPPRESSED_NEGOTIATION_WARNING_CODES = new Set([
+  "contract_length_override_in_effect",
+  // GEMELDET VON CHRIS: "die Debug-Kommentare muessen entfernt werden" — im Verhandlungsfenster
+  // standen unter RISIKEN drei Hinweise, die keine Risiken des DEALS sind, sondern Notizen ueber den
+  // Stand unserer eigenen Rechnung. Ein Spieler kann daraus nichts ableiten; er erfaehrt nur, dass
+  // wir uns unsicher sind.
+  //
+  // Die Codes bleiben in den Vorschau-Daten (Tests und Diagnose lesen sie weiter) — nur angezeigt
+  // werden sie nicht mehr.
+  "market_bracket_factor_preview_pending", // wie grob unsere Marktklassen-Schaetzung gerade ist
+  "preview_only_contract_negotiation", // dass die Verhandlung eine Simulation ist
+  "trait_salary_factor_source_missing", // dass Trait-Effekte noch unscharf sind
+]);
 
 function filterVisibleNegotiationWarnings(warnings: string[] | null | undefined): string[] {
   return (warnings ?? []).filter((code) => !SUPPRESSED_NEGOTIATION_WARNING_CODES.has(code));
