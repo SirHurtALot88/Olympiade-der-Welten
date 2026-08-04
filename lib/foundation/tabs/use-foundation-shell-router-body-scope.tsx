@@ -143,6 +143,7 @@ import {
   getFieldRaceSeasonForm,
   type FieldRaceLedgerEntry,
 } from "@/lib/foundation/build-field-race-ledger";
+import { buildStandingsMatchdayRankDelta } from "@/lib/foundation/season-standings-matchday-rank-delta";
 import {
   deriveTeamIdentityAxisBias,
   buildResolvedTeamIdentities,
@@ -7992,9 +7993,42 @@ export function useFoundationShellRouterBodyScope({
     return map;
   }, [fieldRaceLedger]);
 
-  const homeFieldRaceRankMovement = selectedTeam
-    ? fieldRaceRankDeltaByTeamId.get(selectedTeam.teamId) ?? null
-    : null;
+  /**
+   * Zweite Quelle derselben Bewegung, direkt aus `seasonState.standings`.
+   *
+   * Auf dem Saisonstand ist der Feld-Rennen-Ledger leer: `useSeasonDerivations`
+   * läuft dort nicht (`shouldLoadSeasonDerivations` deckt die Teams-Ansicht ab,
+   * nicht den Saisonstand) und liefert `EMPTY_DERIVATIONS`; der Nachbau unten
+   * bekommt damit ein Punkte-Ledger ohne `pointEntries` und kann nichts finden.
+   * Neu bauen hilft auch nicht, weil der kompakte Foundation-Payload
+   * `matchdayResults` auf den aktiven Spieltag beschneidet.
+   *
+   * Ergebnis war eine Rang-Spalte ohne jede Bewegung — die ganze Saison lang, weil
+   * die Rückfallebene `rankDiff` erst beim Saisonabschluss geschrieben wird.
+   * `standings` überlebt den kompakten Payload vollständig und trägt mit
+   * `matchdayBaselinePoints` den Stand vor der letzten Wertung.
+   */
+  const standingsMatchdayRankDeltaByTeamId = useMemo(
+    () =>
+      buildStandingsMatchdayRankDelta(
+        (gameState.teams ?? []).map((team) => ({ teamId: team.teamId, teamName: team.name })),
+        gameState.seasonState?.standings,
+      ),
+    [gameState.teams, gameState.seasonState?.standings],
+  );
+
+  /**
+   * Ledger zuerst (er kennt den ganzen Saisonverlauf), Standings-Baseline als
+   * Rückfallebene. Beide messen dieselbe Größe — Δ Gesamtrang gegenüber der
+   * letzten Wertung —, nur aus verschieden vollständigen Quellen.
+   */
+  const resolveMatchdayRankDelta = useCallback(
+    (teamId: string): number | null =>
+      fieldRaceRankDeltaByTeamId.get(teamId) ?? standingsMatchdayRankDeltaByTeamId.get(teamId) ?? null,
+    [fieldRaceRankDeltaByTeamId, standingsMatchdayRankDeltaByTeamId],
+  );
+
+  const homeFieldRaceRankMovement = selectedTeam ? resolveMatchdayRankDelta(selectedTeam.teamId) : null;
 
   const fullPlayerRatingsById = useMemo(() => {
     if (shouldBuildPlayerDirectory && playerDirectorySlice.ratingsById.size > 0 && !playerDirectorySlice.error) {
@@ -10358,12 +10392,10 @@ export function useFoundationShellRouterBodyScope({
           // Spieltag) — letzter Ledger-Eintrag; null am ersten Spieltag. Der
           // Ledger gilt für die LIVE-Season; auf Archiv-Snapshots daher bewusst
           // kein Live-Delta (sonst irreführend) → null.
-          fieldRaceRankDelta: isViewingArchivedSeason
-            ? null
-            : fieldRaceRankDeltaByTeamId.get(row.teamId) ?? null,
+          fieldRaceRankDelta: isViewingArchivedSeason ? null : resolveMatchdayRankDelta(row.teamId),
         };
       }),
-    [fieldRaceRankDeltaByTeamId, gameState, isViewingArchivedSeason, selectedTeam?.teamId, sortedSeasonStandRows],
+    [resolveMatchdayRankDelta, gameState, isViewingArchivedSeason, selectedTeam?.teamId, sortedSeasonStandRows],
   );
   const seasonV2PpRows = useMemo(
     () =>

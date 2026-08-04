@@ -111,6 +111,15 @@
     },
     {
       "datum": "2026-08-04",
+      "seite": "Arena · Spieltag",
+      "pr": null,
+      "text": "Ein Gleichstand zwischen zwei Teams konnte den Spieltag unabschließbar machen: die Wertung lief durch, die Tabelle wurde aber nie gebucht, und „Spieltag abschließen“ meldete nur „Standings Apply fehlt noch für diesen Spieltag“. Die Arena bucht jetzt auch bei Gleichstand — und wenn eine Buchung doch ausbleibt, nennt sie den Grund.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
       "seite": "Welt · Sponsoren",
       "pr": null,
       "text": "Bei mehrjährigen Verträgen stand hinter jeder Saison „Faktor 1.00\" — das war nicht der Faktor, sondern ein Ersatzwert, weil die Salary-Factor-Vorausschau in Saison 1 noch leer ist. Die Karte sagt jetzt, ob der Faktor für diese Saison schon feststeht oder nur fortgeschrieben wurde.",
