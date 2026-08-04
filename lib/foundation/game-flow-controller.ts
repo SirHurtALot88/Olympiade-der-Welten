@@ -466,6 +466,31 @@ function buildOnboardingFlowSteps(gameState: GameState, activeTeamId: string | n
       targetPanel: "roster",
       teamId,
     }),
+    // ZUERST der Sponsor, DANN einkaufen. Gemeldet von Chris: "nachdem man beim Saisonstart-Fenster
+    // auf erledigt klickt, sollte man erstmal bei den Sponsoren landen, weil man dann besser
+    // abschaetzen kann, wie hoch das eigene Budget fuer Gehaelter ist."
+    //
+    // Vorher stand dieser Schritt GANZ AM ENDE — hinter beiden Kaufschritten. Man verpflichtete also
+    // Spieler samt Gehalt, bevor man wusste, was der Sponsor einbringt. Die Reihenfolge hier ist
+    // nicht kosmetisch: `chooseCurrentStep` nimmt den ERSTEN offenen Schritt, sie bestimmt also,
+    // wo der "Weiter"-Knopf landet.
+    step({
+      stepId: "choose_sponsor",
+      label: "Sponsor wählen",
+      cta: "Weiter: Sponsor wählen",
+      status:
+        !teamId
+          ? "blocked"
+          : getTeamSponsorContract(gameState, teamId)
+            ? "completed"
+            : resolveOnboardingStepStatus(flow, "choose_sponsor", gameState, teamId),
+      // NICHT "teams": der Sponsor-Vertrag wird im Sponsoren-Reiter (`prize`) gewaehlt.
+      targetView: "prize",
+      targetPanel: "sponsor-choice",
+      teamId,
+      blockers: teamId ? [] : ["no_active_team"],
+      warnings: teamId && !getTeamSponsorContract(gameState, teamId) ? ["sponsor_choice_required"] : [],
+    }),
     step({
       stepId: "first_transfers",
       label: "Erste Transfers",
@@ -521,25 +546,6 @@ function buildOnboardingFlowSteps(gameState: GameState, activeTeamId: string | n
       targetPanel: "captain-picker",
       teamId,
       blockers: teamId ? [] : ["no_active_team"],
-    }),
-    step({
-      // Sponsor ist unabhängig vom Training (wie im Folge-Season-Pfad), aber PFLICHT vor Saisonabschluss
-      // (harter Gate in der Season-Completion). Hier bleibt es ein Führungs-Schritt, meldet aber
-      // `sponsor_choice_required` als Warnung, damit Gate/UI das fehlende Pflicht-Sponsoring anzeigen.
-      stepId: "choose_sponsor",
-      label: "Sponsor wählen",
-      cta: "Weiter: Sponsor wählen",
-      status:
-        !teamId
-          ? "blocked"
-          : getTeamSponsorContract(gameState, teamId)
-            ? "completed"
-            : resolveOnboardingStepStatus(flow, "choose_sponsor", gameState, teamId),
-      targetView: "prize",
-      targetPanel: "sponsor-choice",
-      teamId,
-      blockers: teamId ? [] : ["no_active_team"],
-      warnings: teamId && !getTeamSponsorContract(gameState, teamId) ? ["sponsor_choice_required"] : [],
     }),
   ];
 }
@@ -663,6 +669,11 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       // ein optionaler Führungs-Schritt, meldet aber `sponsor_choice_required` als Warnung, damit
       // Playability-Gate/Smoke und UI das fehlende Pflicht-Sponsoring anzeigen. Das menschliche Team muss
       // wählen; KI/passiv signieren automatisch (chooseSponsorOfferForAiTeams).
+      //
+      // NICHT nach vorn ziehen und NICHT auf "ready" stellen: das ist der SPIELTAGS-Flow, nicht der
+      // Saisonstart. Beides zusammen wuerde den Schritt bis zur Unterschrift an jedem Spieltag zum
+      // aktuellen machen. Chris' Wunsch "erst Sponsoren, dann einkaufen" gehoert an den Saisonstart
+      // und ist dort umgesetzt (buildOnboardingFlowSteps).
       status: !hasActiveTeam ? "blocked" : hasSponsorContract ? "completed" : "optional",
       targetView: "prize",
       targetPanel: "sponsor-choice",

@@ -314,6 +314,25 @@ export function useFoundationCrossTabSeasonBriefing(input: {
         status: getResolvedStatus("roster_review", rosterCount > 0),
         progress: `${rosterCount} Spieler`,
       },
+      // Der Sponsor steht VOR den Transfers: er ist die Bezugsgroesse fuer das, was man sich an
+      // Gehaeltern leisten kann. Vorher war er der vorletzte Punkt der Liste, also hinter beiden
+      // Kaufschritten — man verpflichtete Spieler, bevor man sein Budget kannte. Die Reihenfolge
+      // muss zu `buildOnboardingFlowSteps` passen, sonst zeigt das Fenster etwas anderes an, als
+      // der "Weiter"-Knopf tut.
+      {
+        stepId: "choose_sponsor",
+        title: "Sponsor wählen",
+        kicker: "Budget",
+        detail: input.selectedTeamSponsorContract
+          ? `Aktiver Sponsor: ${input.selectedTeamSponsorContract.name}.`
+          : "Wähle einen von drei Sponsor-Verträgen — er setzt den Rahmen für Gehälter und Objectives.",
+        targetLabel: "Sponsor prüfen",
+        // NICHT "teams": gewaehlt wird im Sponsoren-Reiter. Das Ziel zeigte auf die Team-Seite,
+        // auf der es gar keine Sponsor-Auswahl gibt.
+        targetView: "prize",
+        status: getResolvedStatus("choose_sponsor", Boolean(input.selectedTeamSponsorContract)),
+        progress: input.selectedTeamSponsorContract ? "aktiv" : "offen",
+      },
       {
         stepId: "first_transfers",
         title: "Erste Transfers",
@@ -362,18 +381,6 @@ export function useFoundationCrossTabSeasonBriefing(input: {
           ),
         ),
         progress: "Saison-Rolle",
-      },
-      {
-        stepId: "choose_sponsor",
-        title: "Sponsor wählen",
-        kicker: "Budget",
-        detail: input.selectedTeamSponsorContract
-          ? `Aktiver Sponsor: ${input.selectedTeamSponsorContract.name}.`
-          : "Wähle einen von drei Sponsor-Verträgen — beeinflusst Saisoneinkommen und Objectives.",
-        targetLabel: "Sponsor prüfen",
-        targetView: "teams",
-        status: getResolvedStatus("choose_sponsor", Boolean(input.selectedTeamSponsorContract)),
-        progress: input.selectedTeamSponsorContract ? "aktiv" : "offen",
       },
       {
         stepId: "set_lineup",

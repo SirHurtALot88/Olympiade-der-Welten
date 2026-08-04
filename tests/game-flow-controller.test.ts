@@ -591,7 +591,13 @@ describe("game flow controller", () => {
     expect(flow.steps.some((entry) => entry.stepId === "roster_review")).toBe(true);
   });
 
-  it("orders the onboarding captain step after training + buying, before choosing the sponsor", () => {
+  /**
+   * Die eigentliche Regel ist "Kapitaen erst NACH dem finalen Kader und dem Training" — vorher steht
+   * gar nicht fest, wer zur Wahl steht. Dass der Sponsor frueher danach kam, war eine Nebenbeobachtung
+   * und stimmt seit Chris' Meldung nicht mehr: der Sponsor fuehrt jetzt den Saisonstart an, damit man
+   * sein Gehaltsbudget kennt, BEVOR man einkauft (tests/sponsor-before-transfers-flow.test.ts).
+   */
+  it("orders the onboarding captain step after training + buying, and the sponsor before both", () => {
     const flow = buildGameFlowState({
       gameState: gameState({
         seasonState: {
@@ -621,7 +627,10 @@ describe("game flow controller", () => {
     expect(captainIdx).toBeGreaterThan(-1);
     expect(captainIdx).toBeGreaterThan(trainingIdx);
     expect(captainIdx).toBeGreaterThan(transfersIdx);
-    expect(captainIdx).toBeLessThan(sponsorIdx);
+    // Der Sponsor eroeffnet den Saisonstart: vor den Kaeufen und damit auch vor dem Kapitaen.
+    expect(sponsorIdx).toBeGreaterThan(-1);
+    expect(sponsorIdx).toBeLessThan(transfersIdx);
+    expect(sponsorIdx).toBeLessThan(captainIdx);
   });
 
   it("blocks the human onboarding captain step until a captain is appointed", () => {
