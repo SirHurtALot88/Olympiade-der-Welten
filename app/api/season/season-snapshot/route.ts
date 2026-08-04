@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 
 import { SaveResolutionError } from "@/lib/persistence/resolve-local-save";
+import { assertSaveNotRoomBound } from "@/lib/room/assert-save-not-room-bound";
 import {
   createSeasonSnapshot,
   SEASON_SNAPSHOT_CONFIRM_TOKEN,
@@ -55,6 +56,18 @@ export async function POST(request: Request) {
         },
         { status: 409 },
       );
+    }
+
+    // Nur der Execute-Pfad schreibt (season-snapshot-service.ts:912-920) — die Preview darf auf
+    // einem raumgebundenen Save weiterhin laufen.
+    if (!dryRun) {
+      const roomCheck = assertSaveNotRoomBound(saveId, "season_snapshot");
+      if (roomCheck.blocked) {
+        return NextResponse.json(
+          { success: false, error: roomCheck.reason, blockingReasons: [roomCheck.reason] },
+          { status: roomCheck.status },
+        );
+      }
     }
 
     const result = createSeasonSnapshot({

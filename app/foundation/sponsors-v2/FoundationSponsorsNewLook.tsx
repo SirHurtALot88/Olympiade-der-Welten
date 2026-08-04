@@ -41,6 +41,10 @@ import { computeApronLines, type ApronLines } from "@/lib/season/apron-service";
 import { SponsorRankLadder } from "@/components/foundation/sponsor/SponsorRankLadder";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamObjectives } from "@/lib/board/team-season-objectives-service";
+import {
+  buildAnalyticsBoardGoalsLive,
+  buildAnalyticsSponsorAxisLive,
+} from "@/lib/facilities/analytics-live-progress";
 import { formatGameFlowBlocker } from "@/lib/foundation/game-flow-blocker-labels";
 import {
   SPONSOR_CURVE_FAMILIES,
@@ -88,6 +92,12 @@ const BOARD_TARGET_STATUS_META: Record<string, { label: string; tone: NlTone }> 
  */
 function SponsorBoardTargetsPanel({ gameState, teamId }: { gameState: GameState; teamId: string }) {
   const objectives = useMemo(() => getTeamObjectives(gameState, teamId), [gameState, teamId]);
+  // ANALYTICS ROOM AB STUFE 4: Zwischenstand je Ziel, ab Stufe 5 zusaetzlich der Abstand zum
+  // Zielwert. Ohne das Gebaeude ist die Liste leer und die Zeilen sehen aus wie bisher — Label,
+  // Zielwert, Status. Reine Anzeige, gerechnet aus denselben Records, die das Board-Settlement liest.
+  const liveById = useMemo(() => {
+    return new Map(buildAnalyticsBoardGoalsLive(gameState, teamId).map((entry) => [entry.objectiveId, entry] as const));
+  }, [gameState, teamId]);
   if (objectives.length === 0) {
     return null;
   }
@@ -99,6 +109,7 @@ function SponsorBoardTargetsPanel({ gameState, teamId }: { gameState: GameState;
       <ul className="nl-sponsor-boardtargets-list" style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: "0.35rem" }}>
         {objectives.map((objective) => {
           const meta = BOARD_TARGET_STATUS_META[objective.status] ?? BOARD_TARGET_STATUS_META.open!;
+          const live = liveById.get(objective.objectiveId) ?? null;
           return (
             <li
               key={objective.objectiveId}
@@ -113,6 +124,19 @@ function SponsorBoardTargetsPanel({ gameState, teamId }: { gameState: GameState;
               <span className="nl-sponsor-boardtarget-label" style={{ flex: "1 1 auto", minWidth: 0 }}>
                 {objective.label}
               </span>
+              {live?.stand != null ? (
+                <span
+                  className="nl-sponsor-boardtarget-live nl-tnum"
+                  style={{ flex: "0 0 auto", opacity: 0.75 }}
+                  title={live.text}
+                  data-testid="nl-boardtarget-live"
+                >
+                  {`Stand ${live.stand}`}
+                  {live.abstand != null
+                    ? ` · ${objective.status === "completed" ? "Puffer" : "Abstand"} ${live.abstand}`
+                    : ""}
+                </span>
+              ) : null}
               {objective.targetValue != null && String(objective.targetValue).trim() !== "" ? (
                 <span className="nl-sponsor-boardtarget-target nl-tnum" style={{ flex: "0 0 auto", opacity: 0.75 }}>
                   {String(objective.targetValue)}
@@ -267,6 +291,19 @@ function ActiveContractHero({
       }).special
     : null;
 
+  /**
+   * DER LIVE-FORTSCHRITT AUF DER ZIELACHSE — freigeschaltet vom Analytics Room.
+   *
+   * Bis hierher stand auf dieser Karte nur, WAS die Achse verlangt (`specialPresentation.detail`,
+   * aus den eingefrorenen Konditionen). WIE WEIT das Team ist, erfuhr es erst in der
+   * Saisonabrechnung — obwohl die Rechnung dafuer jederzeit lief. Ohne Analytics Room ist der Wert
+   * hier null und die Karte sieht aus wie vorher.
+   */
+  const axisLive = useMemo(
+    () => buildAnalyticsSponsorAxisLive(gameState, contract.teamId),
+    [gameState, contract.teamId],
+  );
+
   return (
     <NlCard className={`nl-sponsor-hero is-${contract.archetype}`} data-testid="nl-sponsor-active-contract">
       <div className="nl-sponsor-hero-main">
@@ -328,6 +365,15 @@ function ActiveContractHero({
           </div>
           <strong className="nl-sponsor-hero-tracker-headline">{specialPresentation.headline}</strong>
           <small>{specialPresentation.detail}</small>
+          {axisLive ? (
+            <small
+              className={`nl-sponsor-hero-tracker-live${axisLive.belastbar ? "" : " is-unclear"}`}
+              data-testid="nl-sponsor-axis-live"
+              style={{ opacity: axisLive.belastbar ? 1 : 0.75 }}
+            >
+              {`Analytics Room L${axisLive.analyticsLevel} · ${axisLive.text}`}
+            </small>
+          ) : null}
           {specialComponent ? (
             <span className="nl-sponsor-hero-tracker-reward nl-tnum">
               Bonus {formatCash(specialComponent.rewardCash)}

@@ -7,6 +7,7 @@ import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebth
 import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import {
   evaluateSponsorV4Axis, sponsorV4AxisDefinition, sponsorV4AxisKeyFromSpecialKey,
+  type SponsorV4AxisTerms,
 } from "@/lib/sponsor/sponsor-v4-axes";
 import {
   FAN_INFRASTRUCTURE_LEVEL_CAP,
@@ -647,6 +648,39 @@ function homegrownPlayerIds(gameState: GameState, teamId: string): Set<string> {
 }
 
 /**
+ * DIE IM VERTRAG EINGEFRORENEN ACHSEN-KONDITIONEN EINER SPECIAL-KOMPONENTE — oder null, wenn die
+ * Komponente gar keine V4-Achse ist.
+ *
+ * WARUM DAS EINE EIGENE, EXPORTIERTE FUNKTION IST: bis hierher stand diese Term-Ableitung inline in
+ * `evaluateSpecialComponentStage`. Seit der Analytics Room denselben Fortschritt WAEHREND der Saison
+ * anzeigt (`lib/facilities/analytics-live-progress.ts`), gaebe es sonst zwei Stellen, die aus
+ * demselben `targetValue` Konditionen lesen — und damit die Moeglichkeit, dass Anzeige und Abrechnung
+ * auseinanderlaufen. Eine Anzeige, die etwas anderes sagt als die Abrechnung, ist schlimmer als keine
+ * Anzeige. Also: EINE Ableitung, beide Pfade lesen hier.
+ *
+ * Verhalten unveraendert gegenueber der inline-Fassung: `axisbase` faellt auf 0 zurueck, `axisscale`
+ * und `axisoffset` auf die Katalogwerte der Achse (Altvertraege ohne Tags bleiben damit lesbar).
+ */
+export function sponsorV4AxisTermsFromComponent(
+  component: SponsorOfferComponent,
+): SponsorV4AxisTerms | null {
+  const axisKey = sponsorV4AxisKeyFromSpecialKey(component.specialKey ?? "");
+  if (!axisKey) return null;
+  const definition = sponsorV4AxisDefinition(axisKey);
+  const number = (tag: string, fallback: number) => {
+    const raw = taggedTargetValue(component.targetValue, tag);
+    const parsed = raw != null ? Number(raw) : NaN;
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+  return {
+    key: axisKey,
+    baseline: number("axisbase", 0),
+    scale: number("axisscale", definition.scale),
+    offset: number("axisoffset", definition.offset),
+  };
+}
+
+/**
  * Mehrstufige Auswertung: erreichte Stufe / Fraction 0..1 einer special-Komponente. Generalisiert den
  * bisherigen binären Pfad — bestehende binäre Keys (ohne `stages`) liefern weiterhin 0 oder 1.
  */
@@ -660,20 +694,9 @@ export function evaluateSpecialComponentStage(
   // V4-ACHSE: gemessen gegen die im Vertrag eingefrorene EIGENE Ausgangslage, nie gegen die Liga.
   // Die Konditionen stehen im targetValue, damit Anzeige und Settlement dieselbe Zahl lesen und ein
   // spaeterer Zustandswechsel den Vertrag nicht nachtraeglich verschiebt.
-  const axisKey = sponsorV4AxisKeyFromSpecialKey(key);
-  if (axisKey) {
-    const number = (tag: string, fallback: number) => {
-      const raw = taggedTargetValue(component.targetValue, tag);
-      const parsed = raw != null ? Number(raw) : NaN;
-      return Number.isFinite(parsed) ? parsed : fallback;
-    };
-    const definition = sponsorV4AxisDefinition(axisKey);
-    const progress = evaluateSponsorV4Axis(gameState, teamId, {
-      key: axisKey,
-      baseline: number("axisbase", 0),
-      scale: number("axisscale", definition.scale),
-      offset: number("axisoffset", definition.offset),
-    });
+  const axisTerms = sponsorV4AxisTermsFromComponent(component);
+  if (axisTerms) {
+    const progress = evaluateSponsorV4Axis(gameState, teamId, axisTerms);
     return {
       fraction: progress.fraction,
       stageIndex: progress.fraction > 0 ? 0 : -1,

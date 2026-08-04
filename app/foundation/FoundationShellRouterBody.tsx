@@ -21,6 +21,7 @@ import { RanksRankCell } from "@/components/foundation/RanksRankCell";
 import { RivalTag } from "@/components/foundation/RivalTag";
 import { getActiveTeamRivalTeamIds } from "@/lib/rivalries/team-rivalries";
 import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
+import { FoundationRoomFlowBar } from "@/components/foundation/FoundationRoomFlowBar";
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
 import type { RoomParticipant } from "@/types/game";
 import { canFoundationNavigateBack, foundationNavigateBack } from "@/lib/foundation/foundation-navigation-history";
@@ -1606,22 +1607,17 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           (() => {
             // Kompakter Room-Chip statt großem zentralem Banner: die schlanke
             // Pill-Zeile lebt am rechten Rand des Kontext-Banners. Room-Code +
-            // "Zur Room-Ansicht" bleiben sichtbar, die Detailzeilen (Save-ID,
-            // Flow-Schritt, Sitzplatz-Token-Hinweis, Aktivitätsnotiz) wandern in
-            // den title-Tooltip (Hover), damit sie keine Höhe fressen.
+            // "Zur Room-Ansicht" bleiben sichtbar, die Detailzeile (Save-ID,
+            // Aktivitätsnotiz) wandert in den title-Tooltip (Hover), damit sie
+            // keine Höhe frisst. Der Flow-Schritt/Weiter-Knopf steht NICHT mehr
+            // im Tooltip — die `FoundationRoomFlowBar` unten zeigt ihn sichtbar
+            // und bedienbar an; zwei Stellen mit derselben Wahrheit (eine davon
+            // nur im Hover-Text) wären nur eine Quelle für Drift gewesen.
             const roomIdentity = roomLiveState?.roomParticipants.find(
               (participant: RoomParticipant) => participant.participantId === roomContext.participantId,
             );
             const roomChipDetail = [
               `Save ${formatShortSaveId(roomContext.saveId)}`,
-              roomLiveState
-                ? `Schritt: ${getRoomFlowStep(roomLiveState.roomFlowState.step).label} · ${
-                    describeRoomFlowButton({
-                      state: roomLiveState,
-                      participantId: roomContext.participantId,
-                    }).label
-                  }`
-                : "Schreibaktionen laufen serverseitig mit Sitzplatz-Token.",
               roomActivityNotice ? `${roomActivityNotice.title} — ${roomActivityNotice.detail}` : null,
             ]
               .filter(Boolean)
@@ -1680,6 +1676,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           ))}
         </div>
       </section>
+
+      {roomContext && roomLiveState ? (
+        <FoundationRoomFlowBar roomContext={roomContext} roomLiveState={roomLiveState} />
+      ) : null}
 
       {readOnlyBannerMessage ? (
         <section

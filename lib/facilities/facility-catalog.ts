@@ -1,4 +1,5 @@
 import type { PlayerGeneratorAttributeName } from "@/lib/data/olyDataTypes";
+import type { TrainingFocusAxis } from "@/lib/training/development-route-bonus";
 
 export type FacilityId =
   | "training_center"
@@ -17,7 +18,7 @@ export type FacilityEffectType =
   | "analytics"
   | "season_income"
   | "low_tier_upgrade_discount"
-  | "specialist_upgrade_discount";
+  | "specialist_focus_axis";
 
 export type SpecialistWingVariant = "power_gym" | "agility_track" | "mind_lab" | "social_studio";
 
@@ -42,25 +43,38 @@ export type FacilityCatalogEntry = {
   disabledReason?: string;
 };
 
+/**
+ * Die vier Varianten des Specialist Wing. `focusAxis` ist seit S1 der eigentliche Effekt: die Variante
+ * SETZT die Trainings-Fokusachse des Teams (POW/SPE/MEN/SOC) und ersetzt damit die
+ * Trainingseinstellung. Die Zuordnung ist keine neue Erfindung, sondern die 1:1-Entsprechung der vier
+ * Achsen aus `classNameToDevelopmentRoute` (organic-season-progression.ts).
+ *
+ * `attributes` beschreibt weiterhin die thematische Attributgruppe (Anzeige + toter
+ * Upgrade-Kosten-Pfad) und wird von der Fokusachse NICHT benutzt.
+ */
 export const SPECIALIST_WING_VARIANTS: Record<
   SpecialistWingVariant,
-  { label: string; attributes: PlayerGeneratorAttributeName[] }
+  { label: string; attributes: PlayerGeneratorAttributeName[]; focusAxis: TrainingFocusAxis }
 > = {
   power_gym: {
     label: "Power Gym",
     attributes: ["power", "health", "stamina", "torment"],
+    focusAxis: "pow",
   },
   agility_track: {
     label: "Agility Track",
     attributes: ["speed", "dexterity", "awareness"],
+    focusAxis: "spe",
   },
   mind_lab: {
     label: "Mind Lab",
     attributes: ["intelligence", "will", "determination"],
+    focusAxis: "men",
   },
   social_studio: {
     label: "Social Studio",
     attributes: ["charisma", "spirit", "awareness"],
+    focusAxis: "soc",
   },
 };
 
@@ -118,16 +132,29 @@ export const FACILITY_CATALOG: FacilityCatalogEntry[] = [
   {
     facilityId: "analytics_room",
     label: "Analytics Room",
-    description: "Verbessert Forecast-Qualitaet, nicht Leistung.",
+    /**
+     * WAS HIER VORHER STAND UND WARUM ES WEG MUSSTE. Der Katalog bewarb bis hierher eine
+     * „Forecast Quality" mit fuenf Stufen („bessere XP-Prognose", „bessere Slot-Fit-Prognose",
+     * „bessere Salary-/MW-Warnings", „sehr genaue Season-Forecasts"). Nichts davon wurde irgendwo
+     * gemessen: die einzige Auswertefunktion (`getAnalyticsForecastQuality`) gab genau diese Texte
+     * als Label zurueck, und die Prognose-Pipeline kennt gar keinen Konfidenzbegriff, an dem sich
+     * eine Qualitaet haette aendern koennen. Ein Gebaeude, das etwas anderes verspricht als es tut,
+     * war der Ausloeser des Gebaeude-Berichts — deshalb beschreiben die Stufentexte jetzt exakt das,
+     * was `lib/facilities/analytics-live-progress.ts` tatsaechlich freischaltet, Stufe fuer Stufe.
+     *
+     * Bau- und Unterhaltskosten sind UNVERAENDERT. Es ist keine Balance-Aenderung, sondern eine
+     * Beschriftung, die zur Wirkung passt.
+     */
+    description: "Zeigt den Live-Fortschritt auf Sponsor-Achse und Board-Zielen — Auskunft, keine Leistung.",
     maxLevel: 5,
     effectType: "analytics",
-    effectDescription: "Forecast Quality",
+    effectDescription: "Live-Fortschritt",
     levels: [
-      { level: 1, effectDescription: "einfache Forecasts", upgradeCost: 5, seasonUpkeep: 0.5 },
-      { level: 2, effectDescription: "bessere XP-Prognose", upgradeCost: 10, seasonUpkeep: 0.9 },
-      { level: 3, effectDescription: "bessere Slot-Fit-Prognose", upgradeCost: 17, seasonUpkeep: 1.5 },
-      { level: 4, effectDescription: "bessere Salary-/MW-Warnings", upgradeCost: 27, seasonUpkeep: 2.4 },
-      { level: 5, effectDescription: "sehr genaue Season-Forecasts", upgradeCost: 42, seasonUpkeep: 3.6 },
+      { level: 1, effectDescription: "Sponsor-Achse: grobe Einordnung", upgradeCost: 5, seasonUpkeep: 0.5 },
+      { level: 2, effectDescription: "Sponsor-Achse: exakter Erfüllungsgrad", upgradeCost: 10, seasonUpkeep: 0.9 },
+      { level: 3, effectDescription: "Sponsor-Achse: Ist/Ziel + Restbedarf", upgradeCost: 17, seasonUpkeep: 1.5 },
+      { level: 4, effectDescription: "Board-Ziele: Zwischenstand", upgradeCost: 27, seasonUpkeep: 2.4 },
+      { level: 5, effectDescription: "Board-Ziele: Abstand zum Ziel", upgradeCost: 42, seasonUpkeep: 3.6 },
     ],
   },
   {
@@ -197,16 +224,33 @@ export const FACILITY_CATALOG: FacilityCatalogEntry[] = [
   {
     facilityId: "specialist_wing",
     label: "Specialist Wing",
-    description: "Reduziert nur Upgrade-Kosten der aktiven Spezialisten-Variante.",
+    description:
+      "Die gewählte Variante ist die Trainings-Fokusachse des Teams (POW/SPE/MEN/SOC) und ersetzt die Trainingseinstellung. Spieler mit passender Entwicklungsroute wachsen schneller.",
     maxLevel: 5,
-    effectType: "specialist_upgrade_discount",
-    effectDescription: "Specialist Attribute Group Discount",
+    effectType: "specialist_focus_axis",
+    effectDescription: "Team-Fokusachse + Routenbonus",
+    // EFFEKT-REPURPOSE (S1): Der Flügel hatte zwei Effekte, von denen der beworbene tot war (der
+    // Upgrade-Kosten-Rabatt lief auf dem abgeschafften XP-Kostensystem) und der reale unbeworben (ein
+    // Unterhaltsrabatt auf ALLE Gebäude, der zudem nicht monoton rechnete — Maximum bei L3). Der
+    // Unterhaltsrabatt ist ersatzlos entfallen, damit das Gebäude GENAU EINEN bepreisbaren Effekt hat.
+    //
+    // NEU: `modifierPct` ist der reale Routenbonus in Prozent auf das organische Trainingsbudget von
+    // Spielern, deren Entwicklungsroute zur Variante passt (siehe getSpecialistWingFocusBonusPct).
+    // Die Leiter startet BEWUSST auf dem Altwert 8 % (= DEVELOPMENT_ROUTE_BONUS_BASE_PCT): Stufe 1
+    // verkauft nicht mehr Prozente, sondern die Fokusachse selbst — sie wird ab L1 garantiert gesetzt,
+    // statt von einer separaten Trainingseinstellung abzuhängen. Erst L2..L5 legen +1/+2/+3.5/+5
+    // Prozentpunkte drauf. Obergrenze 13 % (< 2 × 8 %), weil der Routenbonus multiplikativ mit
+    // Trainingszentrum (+70 %), Academy (+30 %), Trait-Signal und Potential-Beschleuniger stapelt —
+    // Begründung im Detail an DEVELOPMENT_ROUTE_BONUS_MAX_PCT (development-route-bonus.ts).
+    //
+    // `discountPct` bleibt wie bei der Academy nur für den toten Upgrade-Kosten-Pfad stehen und hat
+    // KEINEN realen Gameplay-Effekt mehr. Ökonomie (upgradeCost/seasonUpkeep) unverändert.
     levels: [
-      { level: 1, effectDescription: "passende Upgrades -3%", upgradeCost: 6, seasonUpkeep: 0.6, discountPct: 3 },
-      { level: 2, effectDescription: "passende Upgrades -5%", upgradeCost: 12, seasonUpkeep: 1.1, discountPct: 5 },
-      { level: 3, effectDescription: "passende Upgrades -7%", upgradeCost: 20, seasonUpkeep: 1.8, discountPct: 7 },
-      { level: 4, effectDescription: "passende Upgrades -9%", upgradeCost: 32, seasonUpkeep: 2.8, discountPct: 9 },
-      { level: 5, effectDescription: "passende Upgrades -12%", upgradeCost: 50, seasonUpkeep: 4.2, discountPct: 12 },
+      { level: 1, effectDescription: "Fokusachse gesetzt · passende Routen +8% Entwicklung", upgradeCost: 6, seasonUpkeep: 0.6, modifierPct: 8, discountPct: 3 },
+      { level: 2, effectDescription: "passende Routen +9% Entwicklung", upgradeCost: 12, seasonUpkeep: 1.1, modifierPct: 9, discountPct: 5 },
+      { level: 3, effectDescription: "passende Routen +10% Entwicklung", upgradeCost: 20, seasonUpkeep: 1.8, modifierPct: 10, discountPct: 7 },
+      { level: 4, effectDescription: "passende Routen +11.5% Entwicklung", upgradeCost: 32, seasonUpkeep: 2.8, modifierPct: 11.5, discountPct: 9 },
+      { level: 5, effectDescription: "passende Routen +13% Entwicklung", upgradeCost: 50, seasonUpkeep: 4.2, modifierPct: 13, discountPct: 12 },
     ],
   },
 ];

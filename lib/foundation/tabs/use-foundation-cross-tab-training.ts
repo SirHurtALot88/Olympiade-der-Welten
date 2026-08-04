@@ -487,7 +487,12 @@ export function useFoundationCrossTabTraining(input: {
       analytics,
       warnings: [
         scouting.level > 0 ? "potential_source_missing" : null,
-        analytics.level > 0 ? "forecast_uncertainty_reduced_no_fake_values" : null,
+        // War "forecast_uncertainty_reduced_no_fake_values" — eine Unsicherheitsreduktion, die es in
+        // der Prognose-Pipeline nie gab (dort existiert gar kein Konfidenzbegriff). Der Analytics
+        // Room wirkt auf den Live-Fortschritt bei Sponsor-Achse und Board-Zielen
+        // (lib/facilities/analytics-live-progress.ts) und nicht auf das Trainings-Panel; der Marker
+        // sagt das jetzt auch.
+        analytics.level > 0 ? "analytics_room_affects_sponsor_and_board_progress_not_training" : null,
       ].filter((entry): entry is string => Boolean(entry)),
     };
   }, [

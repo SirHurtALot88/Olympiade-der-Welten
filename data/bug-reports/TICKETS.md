@@ -4,7 +4,7 @@
 > `data/bug-reports/triage/*.md` und `tickets.json`. Wer hier etwas ändert, verliert es beim
 > nächsten `npm run bugs:tabelle`. Der Stand einer Meldung wird in ihrer Triage-Notiz gepflegt.
 
-19 Meldungen — offen: 0 · vorgeprüft: 0 · angenommen: 0 · gebaut: 19 · abgelehnt: 0 · erledigt: 0
+21 Meldungen — offen: 0 · vorgeprüft: 1 · angenommen: 0 · gebaut: 20 · abgelehnt: 0 · erledigt: 0
 
 | Nr | Eingang | Von | Wo | Titel | Status | Ergebnis |
 |---:|---|---|---|---|---|---|
@@ -27,6 +27,8 @@
 | [17](triage/bug-2026-07-31T09-25-12-766Z-3gl1h9.md) | 31.07., 11:25 | Chris | Team · Teams | Vertragsverlängerungen nach MD10 geblockt — dieselbe Phasensperre wie beim Verkauf | gebaut ⚠ | Vom Gameplay-Agenten behoben (#298), gemeinsam mit iuahpx: dieselbe Ursache — die Phasenkette schaltete nicht weiter, die Verlaengerungs-Phase wurde nie erreicht. · PR #298 · **Wirkung nicht bestaetigt** |
 | [18](triage/bug-2026-07-31T09-36-21-059Z-b2hjn8.md) | 31.07., 11:36 | Chris | Team · Teams | Eigene Team-Ansicht zeigt unten keine Historie — der Live-Saison-Eintrag fehlt in der Datenquelle | gebaut ⚠ | Anders als vermutet fehlte die Live-Zeile nie — sie wird in `buildTeamDetailDrawerData` für beide Ansichten identisch gebaut. Ursache war der Session-Cache der eigenen Ansicht: Er kennt weder Spieltag noch Ligastand und lieferte deshalb bei unverändertem Cash/Kader/Transferzahl weiter die Live-Zeile vom allerersten Aufruf aus, egal wie weit die Saison inzwischen war. Die Historie wird jetzt bei jedem Aufruf frisch gebaut und erst danach in ein Cache-Ergebnis gespleisst. · PR #310 · **Wirkung nicht bestaetigt** |
 | [19](triage/bug-2026-07-31T12-35-24-932Z-hanx79.md) | 31.07., 14:35 | Chris | Spieltag · Saisonstand | Zwei Rang-Erwartungen gleichzeitig — beide zeigen denselben Stand, obwohl eine erfüllt und eine verfehlt ist | gebaut ⚠ | Keine der beiden vorgeschlagenen Deutungen traf zu. Die Auswertung war korrekt — sie prüft jedes Ziel gegen seine eigene Marke. Der Fehler saß in der Anzeige: Beim Aktualisieren wurden Zielmarke, Stand und Status neu gerechnet, das Label blieb aber aus der Vergabe eingefroren. Im Live-Save steht C-C mit Endrang 21 deshalb unter „Übertreffe die Erwartung (Top 25)" auf verfehlt, weil real gegen Top 10 gewertet wird. Label und Marke laufen jetzt wieder zusammen. Zweitens ist Chris' Regel umgesetzt: nur noch ein verbindliches Rang-Ziel, jedes weitere wird optionales Zusatzziel ohne Strafe. · PR #313 · **Wirkung nicht bestaetigt** |
+| [20](triage/bug-2026-08-04T07-16-22-440Z-vcnv6r.md) | 04.08., 09:16 | Chris | Team · Gebäude | Analytics Room und Specialist Wing haben keinen Zweck — kein Balance-Problem, sondern tote Effekte | vorgeprüft | PR #377 |
+| [21](triage/bug-2026-08-04T07-20-58-212Z-vzao8d.md) | 04.08., 09:20 | Chris | Markt · Transfermarkt | Transfermarkt — Filter nach Kartenfarbe (POW/SPE/MEN/SOC) war bis auf den Knopf fertig | gebaut ⚠ | Nicht das Feature fehlte, sondern nur sein Bedienelement. Filterlogik, Zustand, Presets und Props waren vollständig vorhanden; die Ansicht hat den Handler nie aufgerufen. Vier Chips ergänzt. · PR #378 · **Wirkung nicht bestaetigt** |
 
 **`gebaut ⚠`** heißt: Der Fix ist gemergt, die Wirkung im laufenden Spiel aber noch nicht belegt.
 Erst ein `bestaetigt:` in der Triage-Notiz macht daraus `erledigt`. Diese Unterscheidung gibt es,
@@ -35,4 +37,4 @@ von einem Zwischenspeicher verschluckt.
 
 Details je Ticket: die Nummer verlinkt auf die Triage-Notiz. Volltext: `npm run bugs:review`.
 
-_Erzeugt: 2.8.2026, 01:32:53_
+_Erzeugt: 4.8.2026, 11:02:01_

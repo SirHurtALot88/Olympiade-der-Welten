@@ -8,6 +8,7 @@ import {
   type SpecialistWingVariant,
 } from "@/lib/facilities/facility-catalog";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
+import { DEVELOPMENT_ROUTE_BONUS_BASE_PCT } from "@/lib/training/development-route-bonus";
 
 import type {
   FacilityDialogState,
@@ -92,11 +93,28 @@ export function getFacilityHealthTone(facility: FacilityRowView) {
   return "stable";
 }
 
+/** Achsen-Kurzlabel für die Variantenbeschreibung — dieselbe Sprache wie der Trainings-Fokus. */
+const FOCUS_AXIS_LABEL: Record<"pow" | "spe" | "men" | "soc", string> = {
+  pow: "POW",
+  spe: "SPE",
+  men: "MEN",
+  soc: "SOC",
+};
+
+/**
+ * S1: Der Flügel bewirbt keinen Rabatt mehr, sondern das, was er real tut — er setzt die
+ * Trainings-Fokusachse des Teams und hebt den Routenbonus passender Spieler. Die Prozentzahl kommt
+ * aus dem Katalog (`modifierPct`), der Anteil über der Basis (8 %) wird mit der Gebäude-Effizienz
+ * gewichtet — exakt wie `getSpecialistWingFocusBonusPct` rechnet.
+ */
 function describeSpecialistWingVariant(variant: SpecialistWingVariant, level: number, efficiencyPct: number) {
   const entry = SPECIALIST_WING_VARIANTS[variant];
   const labels = entry.attributes.map((attribute) => ATTRIBUTE_SHORT_LABELS[attribute]).join(" · ");
-  const discountPct = ((getFacilityLevelDefinition("specialist_wing", level)?.discountPct ?? 0) * efficiencyPct) / 100;
-  return `${entry.label}: ${labels} · ${formatLocaleNumber(discountPct, 0)}% Rabatt`;
+  const catalogPct = getFacilityLevelDefinition("specialist_wing", level)?.modifierPct ?? DEVELOPMENT_ROUTE_BONUS_BASE_PCT;
+  const bonusPct =
+    DEVELOPMENT_ROUTE_BONUS_BASE_PCT +
+    (Math.max(0, catalogPct - DEVELOPMENT_ROUTE_BONUS_BASE_PCT) * efficiencyPct) / 100;
+  return `${entry.label}: Fokusachse ${FOCUS_AXIS_LABEL[entry.focusAxis]} · ${labels} · +${formatLocaleNumber(bonusPct, 1)}% für passende Routen`;
 }
 
 export function FacilityLevelStrip({ facilityId, level }: { facilityId: FacilityId; level: number }) {
@@ -224,7 +242,7 @@ export function FacilityDecisionModal({
             </label>
           ) : null}
           {selectedFacility.id === "specialist_wing" && selectedFacility.level > 0 ? (
-            <p title="Spezialisten-Rabatt">
+            <p title="Trainings-Fokusachse des Teams">
               {describeSpecialistWingVariant(
                 specialistWingVariant,
                 Math.max(selectedFacility.level, 1),

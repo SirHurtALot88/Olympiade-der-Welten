@@ -8,6 +8,11 @@ import {
   type SpecialistWingVariant,
 } from "@/lib/facilities/facility-catalog";
 import { clampFacilityCondition, getFacilityEfficiencyPct } from "@/lib/facilities/facility-condition";
+import {
+  DEVELOPMENT_ROUTE_BONUS_BASE_PCT,
+  DEVELOPMENT_ROUTE_BONUS_MAX_PCT,
+  type TrainingFocusAxis,
+} from "@/lib/training/development-route-bonus";
 import type { PlayerProgressionRatingTier } from "@/lib/training/training-plan-types";
 
 export type FacilityStateSource = GameState | { gameState: GameState };
@@ -229,12 +234,51 @@ function getSpecialistDiscountPct(attribute: PlayerGeneratorAttributeName, facil
   return matchesVariant ? roundValue(((getFacilityLevelDefinition("specialist_wing", level)?.discountPct ?? 0) * efficiencyPct) / 100) : 0;
 }
 
-export function getSpecialistWingUpkeepDiscountPct(facilities: TeamFacilityCollection | null | undefined) {
+/**
+ * S1 — Der Specialist Wing SETZT die Trainings-Fokusachse des Teams.
+ *
+ * Gibt die Achse der aktiven Variante zurück, sobald der Flügel real wirkt (Level >= 1, aktiviert,
+ * Zustand > 0 — genau das prüft `getFacilityLevel`). Ohne Flügel `null`; dann gilt weiterhin die
+ * Trainingseinstellung (`aiManagerTrainingSettings[teamId].trainingFocus`), siehe
+ * `resolveTeamTrainingFocusAxis` in organic-season-progression.ts.
+ *
+ * Bewusst „ersetzt" statt „verstärkt nur bei Übereinstimmung": das Konzept nennt das ausdrücklich
+ * robuster, weil der Effekt sonst still an einer zweiten Einstellung hängt, die man übersehen kann.
+ */
+export function getSpecialistWingFocusAxis(
+  facilities: TeamFacilityCollection | null | undefined,
+): TrainingFocusAxis | null {
   const level = getFacilityLevel(facilities, "specialist_wing");
-  const efficiencyPct = getFacilityEfficiency(facilities, "specialist_wing").efficiencyPct;
-  return roundValue(((getFacilityLevelDefinition("specialist_wing", level)?.discountPct ?? 0) * efficiencyPct) / 100);
+  if (level <= 0) return null;
+  const variant = normalizeSpecialistVariant(facilities?.facilities?.specialist_wing?.activeVariant);
+  return SPECIALIST_WING_VARIANTS[variant].focusAxis;
 }
 
+/**
+ * Routenbonus in Prozent für Spieler, deren Entwicklungsroute zur Fokusachse passt.
+ *
+ * Ohne Flügel bleibt es beim Basiswert (+8 %, `DEVELOPMENT_ROUTE_BONUS_BASE_PCT`) — das ist exakt das
+ * heutige Verhalten. Mit Flügel kommt der Katalogwert (`modifierPct`) zum Tragen; der Anteil ÜBER der
+ * Basis wird mit der Gebäude-Effizienz gewichtet, damit ein verfallener Flügel auf die Basis
+ * zurückfällt statt unter sie. `DEVELOPMENT_ROUTE_BONUS_MAX_PCT` ist die harte Klammer nach oben.
+ */
+export function getSpecialistWingFocusBonusPct(facilities: TeamFacilityCollection | null | undefined) {
+  const level = getFacilityLevel(facilities, "specialist_wing");
+  if (level <= 0) return DEVELOPMENT_ROUTE_BONUS_BASE_PCT;
+  const efficiencyPct = getFacilityEfficiency(facilities, "specialist_wing").efficiencyPct;
+  const catalogPct = getFacilityLevelDefinition("specialist_wing", level)?.modifierPct ?? DEVELOPMENT_ROUTE_BONUS_BASE_PCT;
+  const cappedPct = Math.min(catalogPct, DEVELOPMENT_ROUTE_BONUS_MAX_PCT);
+  const surchargePct = Math.max(0, cappedPct - DEVELOPMENT_ROUTE_BONUS_BASE_PCT);
+  return roundValue(DEVELOPMENT_ROUTE_BONUS_BASE_PCT + (surchargePct * efficiencyPct) / 100);
+}
+
+/**
+ * Unterhalt einer einzelnen Facility.
+ *
+ * Der frühere Specialist-Wing-Rabatt auf DIESEN Wert ist mit S1 ersatzlos entfallen: er war nirgends
+ * beworben, rechnete nicht monoton (Maximum bei L3, danach schlechter) und hätte dem Flügel neben der
+ * Fokusachse einen zweiten, unabhängigen Effekt gelassen — womit das Gebäude nicht bepreisbar wäre.
+ */
 export function calculateFacilitySeasonUpkeep(
   facilityId: FacilityId,
   teamFacilities: TeamFacilityCollection | null | undefined,
@@ -245,8 +289,7 @@ export function calculateFacilitySeasonUpkeep(
     return 0;
   }
 
-  const specialistDiscountPct = getSpecialistWingUpkeepDiscountPct(teamFacilities);
-  return roundValue(baseUpkeep * (1 - specialistDiscountPct / 100));
+  return roundValue(baseUpkeep);
 }
 
 export function applyUpgradeCostFacilityModifiers(

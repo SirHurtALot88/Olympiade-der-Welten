@@ -9,6 +9,7 @@ import type { FoundationReadMeta, FoundationView } from "@/lib/foundation/tabs/f
 import { isFoundationNavigationQuiet, markFoundationNavigationQuiet } from "@/lib/foundation/navigation-coalescing";
 import { shouldRefreshSeasonOverviewOnReload } from "@/lib/foundation/tabs/use-standings-preview-feed";
 import { getClientSocket } from "@/lib/socket/client";
+import { getRoomFlowStep, mapRoomFlowViewToFoundationViewId } from "@/lib/room/room-flow-controller";
 import type { OlyRoomState, RoomRealtimeEvent } from "@/types/game";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 
@@ -45,6 +46,13 @@ export type UseFoundationLiveSyncInput = {
    * Arena, sodass die Clients dem Host folgen und sehen, was er macht.
    */
   onHostStartedArena?: (() => void) | null;
+  /**
+   * Wird aufgerufen, wenn sich `roomLiveState.roomFlowState.step` tatsaechlich AENDERT (nicht
+   * bei jedem `roomState`-Broadcast — der kommt bei jedem Ready-Klick jedes Mitspielers) und
+   * die Shell in die zum neuen Schritt gehoerende View wechseln soll (`RoomFlowView` →
+   * `FoundationViewId`, siehe `mapRoomFlowViewToFoundationViewId`).
+   */
+  onRoomFlowStepChanged?: ((view: FoundationViewId) => void) | null;
   setRoomActivityNotice: Dispatch<
     SetStateAction<{ title: string; detail: string } | null>
   >;
@@ -76,6 +84,9 @@ export function useFoundationLiveSync(input: UseFoundationLiveSyncInput) {
   const [liveSyncStatus, setLiveSyncStatus] = useState<"connected" | "syncing" | "reconnecting" | "disconnected" | "idle">("idle");
   // Merkt sich, für welche Arena-Sitzung dieser Client dem Host schon gefolgt ist.
   const followedArenaSessionKeyRef = useRef<string | null>(null);
+  // Merkt sich den zuletzt GESEHENEN Room-Flow-Schritt — Guard fuer den Auto-Navigations-Effekt
+  // weiter unten, damit er nur bei einem tatsaechlichen Wechsel feuert.
+  const lastRoomFlowStepRef = useRef<string | null>(null);
   const {
     gameState,
     setGameState,
@@ -88,6 +99,7 @@ export function useFoundationLiveSync(input: UseFoundationLiveSyncInput) {
     roomContext,
     roomLiveState,
     onHostStartedArena,
+    onRoomFlowStepChanged,
     setRoomActivityNotice,
     setSaveSyncError,
     setFoundationActionFeedback,
@@ -295,6 +307,45 @@ export function useFoundationLiveSync(input: UseFoundationLiveSyncInput) {
     // erneut auslösen. Der Ref-Guard oben ist die eigentliche Einmal-Semantik.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomContext, onHostStartedArena, arenaSessionKey, activeSaveId]);
+
+  /**
+   * "Der Room-Flow-Schritt wechselt → die Shell folgt in die passende View."
+   *
+   * Bewusst NUR bei einem echten Schrittwechsel (Ref-Vergleich alt/neu), NICHT bei jedem
+   * `roomState`-Broadcast — der kommt bei jedem Ready-Klick JEDES Mitspielers, und wuerde sonst
+   * bei unveraendertem Schritt staendig die aktuelle Ansicht wegreissen. Der erste bekannte
+   * Schritt nach einem (Neu-)Join wird nur gemerkt, NICHT navigiert: ein Deep-Link mitten im
+   * Spiel (z.B. "Diszis ansehen") soll beim Laden nicht sofort ueberschrieben werden — anders
+   * als der Arena-Sync oben, der bewusst auch beim ersten Join folgt, weil dort das Signal
+   * ("Host hat die Arena gestartet") ein echtes Ereignis ist und kein blosser Ausgangszustand.
+   *
+   * Ueberschneidung mit `onHostStartedArena`: der Schritt "arena" bildet ebenfalls auf
+   * `matchdayArena` ab, feuert hier aber ueber einen ANDEREN Trigger (Schrittwechsel statt
+   * `arenaSyncState`). Beide setzen im Zweifel dieselbe View — kein Widerspruch, nur doppelte
+   * (idempotente) Arbeit, die der `activeView`-Vergleich unten meist ohnehin vermeidet.
+   */
+  const roomFlowStep = roomLiveState?.roomFlowState.step ?? null;
+  useEffect(() => {
+    if (!roomContext) {
+      // Raum verlassen/gewechselt: naechster Join soll wieder frisch "nur merken, nicht
+      // navigieren" starten statt den Schritt des VORHERIGEN Raums als Referenz zu behalten.
+      lastRoomFlowStepRef.current = null;
+      return;
+    }
+    if (!onRoomFlowStepChanged || !roomFlowStep) {
+      return;
+    }
+    const previousStep = lastRoomFlowStepRef.current;
+    lastRoomFlowStepRef.current = roomFlowStep;
+    if (previousStep === null || previousStep === roomFlowStep) {
+      return;
+    }
+    const targetView = mapRoomFlowViewToFoundationViewId(getRoomFlowStep(roomFlowStep).targetView);
+    if (activeView === targetView) {
+      return;
+    }
+    onRoomFlowStepChanged(targetView);
+  }, [roomContext, onRoomFlowStepChanged, roomFlowStep, activeView]);
 
   useEffect(() => {
     if (readMeta.source !== "sqlite" || !activeSaveId || !hasLoadedPersistentState.current) {

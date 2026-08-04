@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { AI_PICK_IMPORT_CONFIRM_TOKEN } from "@/lib/ai/ai-pick-import-contract";
 import { runAiPickImportReplace } from "@/lib/ai/ai-pick-import-service";
+import { assertSaveNotRoomBound } from "@/lib/room/assert-save-not-room-bound";
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as {
@@ -33,6 +34,15 @@ export async function POST(request: Request) {
       },
       { status: 409 },
     );
+  }
+
+  // Nur der Execute-Pfad schreibt (ai-pick-import-service.ts:567ff, `executeLocalTransfermarktBuy`
+  // auf targetSaveId) — die Preview darf auf einem raumgebundenen Ziel-Save weiterhin laufen.
+  if (!dryRun) {
+    const roomCheck = assertSaveNotRoomBound(targetSaveId, "ai_picks_import");
+    if (roomCheck.blocked) {
+      return NextResponse.json({ error: roomCheck.reason }, { status: roomCheck.status });
+    }
   }
 
   try {

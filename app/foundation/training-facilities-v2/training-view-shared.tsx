@@ -29,7 +29,10 @@ import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import type { Player, PlayerDemandStatus } from "@/lib/data/olyDataTypes";
 import { estimateClassTrainingGains } from "@/lib/training/class-training-gain-estimate";
-import { getDevelopmentRouteBonusMultiplier } from "@/lib/training/development-route-bonus";
+import {
+  DEVELOPMENT_ROUTE_BONUS_BASE_PCT,
+  getDevelopmentRouteBonusMultiplier,
+} from "@/lib/training/development-route-bonus";
 import type { PlayerDevelopmentRouteSuggestion } from "@/lib/progression/player-potential-service";
 
 import type {
@@ -306,6 +309,7 @@ export function buildTrainingClassGainRanking(
       .map((entry) => [entry.attributeKey, entry.trainingGrowthMultiplier as number]),
   );
   const trainingFocusAxis = options?.trainingFocusAxis ?? row.trainingFocusAxis ?? null;
+  const trainingFocusBonusPct = row.trainingFocusBonusPct ?? DEVELOPMENT_ROUTE_BONUS_BASE_PCT;
 
   // `row.player` is the same underlying `Player` record threaded through by
   // `buildOrganicSeasonProgression`/`buildTrainingPlayerRowView` — it is only
@@ -320,6 +324,7 @@ export function buildTrainingClassGainRanking(
     engineTrainingMultiplierByAttribute,
     adminBalancingConfig: row.adminBalancingConfig,
     trainingFocusAxis,
+    trainingFocusBonusPct,
   });
   const gainByClassName = new Map(gains.map((entry) => [entry.className, entry]));
 
@@ -344,7 +349,7 @@ export function buildTrainingClassGainRanking(
       netComparableGain: roundTo(netAnchor + (estimatedGain - currentGross), 1),
       isCurrent: className === currentClass,
       developmentRoute,
-      hasFocusRouteBonus: getDevelopmentRouteBonusMultiplier(developmentRoute, trainingFocusAxis) > 1,
+      hasFocusRouteBonus: getDevelopmentRouteBonusMultiplier(developmentRoute, trainingFocusAxis, trainingFocusBonusPct) > 1,
     };
   });
 
