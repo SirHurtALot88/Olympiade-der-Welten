@@ -52,6 +52,7 @@
  * einzigen Auftritt je Haelfte entscheidet ein guter Tag, nicht eine Entwicklung.
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { roundValue } from "@/lib/foundation/foundation-number-utils";
 
 /**
  * Mindestauftritte JE Saisonhaelfte, damit ein Spieler gewertet wird.
@@ -80,10 +81,6 @@ export type MostImprovedRow = {
   /** Ligaweiter OVR-Rang — siehe `LeagueLeaderSourceRow.ovrRank`. */
   ovrRank: number | null;
 };
-
-function roundValue(value: number, digits = 1) {
-  return Number(value.toFixed(digits));
-}
 
 function average(values: number[]) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;

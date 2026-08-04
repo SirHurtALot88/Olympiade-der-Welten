@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 
 import type { ContractShape, ContractYearSalary, GameState, Team } from "@/lib/data/olyDataTypes";
+import { roundViewNumberByFactor as roundViewNumber } from "@/lib/foundation/foundation-number-utils";
 import { buildTeamContractSeasonTable } from "@/lib/market/contract-negotiation-preview";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 import { bewerteGehalt, type SalaryBenchmarkResult } from "@/lib/contracts/salary-benchmark";
@@ -25,11 +26,6 @@ function letztesAktivesGehalt(schedule: ContractYearSalary[] | null | undefined)
     if (wert != null && Number.isFinite(wert) && wert > 0) return wert;
   }
   return null;
-}
-
-function roundViewNumber(value: number, digits = 2) {
-  const factor = 10 ** digits;
-  return Math.round(value * factor) / factor;
 }
 
 export type UseTeamsContractDerivationsInput = {

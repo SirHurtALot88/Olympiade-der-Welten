@@ -4,17 +4,13 @@ import type { TransferHistoryV2Row } from "@/app/foundation/transfer-history-v2/
 import { getPlayerPortraitMediaModel } from "@/lib/data/mediaAssets";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { sortFoundationTableRows } from "@/lib/foundation/foundation-table-sort";
+import { roundViewNumberByFactor as roundViewNumber } from "@/lib/foundation/foundation-number-utils";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import type { FoundationTransferHistoryResponse, SortState } from "@/lib/foundation/tabs/cockpit-types";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 
 export const TRANSFER_HISTORY_ALL_SEASONS_PAGE_SIZE = 50;
 export const HISTORY_ALL_SEASONS_FILTER = "__ALL_SEASONS__";
-
-function roundViewNumber(value: number, digits = 4) {
-  const factor = 10 ** digits;
-  return Math.round(value * factor) / factor;
-}
 
 function getTransferSourceLabel(source: string | null | undefined) {
   if (!source) {

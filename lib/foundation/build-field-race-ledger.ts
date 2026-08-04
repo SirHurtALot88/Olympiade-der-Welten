@@ -1,4 +1,5 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { roundValue } from "@/lib/foundation/foundation-number-utils";
 import { getMatchdaySummaryOptions } from "@/lib/foundation/matchday-summary";
 import { buildSeasonPointsLedger, type SeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 
@@ -49,10 +50,6 @@ export type FieldRaceLedger = {
   matchdays: Array<{ matchdayId: string; matchdayNumber: number; played: boolean }>;
   rowsByTeamId: Map<string, FieldRaceLedgerEntry[]>;
 };
-
-function roundValue(value: number, digits = 1) {
-  return Number(value.toFixed(digits));
-}
 
 /** Ordnet Teams nach Punkten (desc), Gleichstand alphabetisch — identisch zu matchday-summary. */
 function rankByPoints(

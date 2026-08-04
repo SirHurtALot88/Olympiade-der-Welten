@@ -1,5 +1,6 @@
 import type { DisciplineResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
 import { INJURY_PERFORMANCE_MULTIPLIER } from "@/lib/fatigue/fatigue-calibration";
+import { round1ByMathRound as round1 } from "@/lib/foundation/foundation-number-utils";
 
 // Mapping der ECHTEN Resolve-Engine-Preview auf das additive Szenen-Payload der
 // Disziplin-Bühne. Ziel (Parität zur Arena): die Bühne rechnet NICHTS selbst —
@@ -50,10 +51,6 @@ export type StagePreviewTeam = {
 };
 
 export type StageTeamMeta = { code: string; name: string; logoUrl: string | null };
-
-function round1(x: number): number {
-  return Math.round(x * 10) / 10;
-}
 
 function modSum(mods: StagePreviewMod[]): number {
   return mods.reduce((sum, m) => sum + m.sign * m.amt, 0);

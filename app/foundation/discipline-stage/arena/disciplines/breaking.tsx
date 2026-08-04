@@ -12,11 +12,8 @@
 
 import { type ReactNode } from "react";
 import type { DisciplineFieldProps, RT } from "./types";
+import { clamp } from "@/lib/foundation/foundation-number-utils";
 import { useTokenGlide, tokenRef, GhostLayer, TokenChrome, tokenRadius } from "./benchmark";
-
-function clamp(v: number, lo: number, hi: number): number {
-  return v < lo ? lo : v > hi ? hi : v;
-}
 
 export default function BreakingField(props: DisciplineFieldProps): ReactNode {
   const {

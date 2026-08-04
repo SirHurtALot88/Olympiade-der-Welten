@@ -7,10 +7,7 @@ import { shouldBuildSeasonTopPlayerRows } from "@/lib/foundation/tabs/season-v2-
 import { sortFoundationTableRows } from "@/lib/foundation/foundation-table-sort";
 import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
 import { getSnapshotPlayerPerformances } from "@/lib/foundation/snapshot-player-performance";
-
-function roundViewNumber(value: number, digits = 4) {
-  return Number(value.toFixed(digits));
-}
+import { roundViewNumber } from "@/lib/foundation/tabs/season-stand-render-helpers";
 
 function resolveSeasonPlayerAxisValue(...candidates: Array<number | null | undefined>) {
   for (const value of candidates) {

@@ -207,8 +207,8 @@ describe("player economy contract", () => {
     expect(formatContractShapeShortLabel("back_loaded")).toBe("BL");
     expect(formatContractShapeShortLabel("balanced")).toBeNull();
     expect(formatContractShapeShortLabel(null)).toBeNull();
-    expect(formatContractShapeLabel("balanced")).toBe("Ausgeglichen");
-    expect(formatContractShapeLabel("front_loaded")).toBe("Vorne schwer");
+    expect(formatContractShapeLabel("balanced")).toBe("Balanced");
+    expect(formatContractShapeLabel("front_loaded")).toBe("Front-loaded");
     expect(formatContractShapeLabel(null)).toBe("—");
   });
 

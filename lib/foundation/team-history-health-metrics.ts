@@ -1,9 +1,6 @@
 import type { GameState, SeasonSnapshotRecord } from "@/lib/data/olyDataTypes";
+import { roundValue } from "@/lib/foundation/foundation-number-utils";
 import { computePlayerSeasonAverageMatchdayFatigue } from "@/lib/foundation/player-season-fatigue-stats";
-
-function roundValue(value: number, digits = 1) {
-  return Number(value.toFixed(digits));
-}
 
 export function countTeamSeasonInjuries(gameState: GameState, teamId: string, seasonId: string): number {
   const seenEventIds = new Set<string>();

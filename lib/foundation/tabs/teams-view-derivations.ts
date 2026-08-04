@@ -3,6 +3,7 @@ import {
   sortFoundationTableRows,
   type FoundationTableSortState,
 } from "@/lib/foundation/foundation-table-sort";
+import { roundViewNumber } from "@/lib/foundation/tabs/season-stand-render-helpers";
 import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 
 export type TeamsAreaRank = {
@@ -129,10 +130,6 @@ export function resolveShouldBuildTeamsRosterDerivations(input: {
   teamsHydrationPhase: "shell" | "full";
 }): boolean {
   return shouldBuildTeamsView(input.activeView) && input.teamsHydrationPhase === "full";
-}
-
-function roundViewNumber(value: number, digits = 4) {
-  return Number(value.toFixed(digits));
 }
 
 function buildSharedRankMap(values: Array<{ teamId: string; value: number }>) {

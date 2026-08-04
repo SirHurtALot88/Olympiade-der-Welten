@@ -3,10 +3,11 @@
 import dynamic from "next/dynamic";
 
 import type { TransfermarktV2ClientProps } from "@/app/foundation/transfermarkt-v2/TransfermarktV2Client";
+import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
 
 const TransfermarktV2Client = dynamic(() => import("@/app/foundation/transfermarkt-v2/TransfermarktV2Client"), {
   ssr: false,
-  loading: () => <p className="foundation-view-loading">Transfermarkt wird geladen …</p>,
+  loading: () => <FoundationPanelSkeleton variant="marketV2" label="Transfermarkt wird geladen…" />,
 });
 
 export type TransferWindowStatusView = {

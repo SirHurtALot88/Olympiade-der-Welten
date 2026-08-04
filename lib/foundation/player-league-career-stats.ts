@@ -1,4 +1,5 @@
 import type { GameState, SeasonSnapshotPlayerPerformanceRecord } from "@/lib/data/olyDataTypes";
+import { roundValue } from "@/lib/foundation/foundation-number-utils";
 import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
 import type { SeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 
@@ -12,10 +13,6 @@ type PlayerSeasonContribution = {
   appearances: number;
   totalPps: number;
 };
-
-function roundValue(value: number, digits = 1) {
-  return Number(value.toFixed(digits));
-}
 
 function extractSeasonContributionFromSnapshotRow(
   row: SeasonSnapshotPlayerPerformanceRecord,

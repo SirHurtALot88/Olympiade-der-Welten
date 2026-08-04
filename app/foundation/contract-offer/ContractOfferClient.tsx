@@ -131,9 +131,9 @@ export default function ContractOfferClient({
           <label className="filter-field">
             <span>Vertragsform</span>
             <select className="input" value={contractShape} onChange={(event) => onContractShapeChange(event.target.value as ContractShape)}>
-              <option value="balanced">Ausgeglichen</option>
-              <option value="front_loaded">Vorne schwer</option>
-              <option value="back_loaded">Hinten schwer</option>
+              <option value="balanced">Balanced</option>
+              <option value="front_loaded">Front-loaded</option>
+              <option value="back_loaded">Back-loaded</option>
             </select>
           </label>
         </section>

@@ -7,6 +7,7 @@ import type {
 } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
+import { isFiniteNumber, roundValue } from "@/lib/foundation/foundation-number-utils";
 import {
   calculateAllrounderBonus,
   calculateMarketValueBonuses,
@@ -160,10 +161,6 @@ export type PlayerEconomyCompareReport = {
 
 const playerFormulaSources = loadPlayerFormulaSources();
 
-function roundValue(value: number, digits = 2) {
-  return Number(value.toFixed(digits));
-}
-
 export function resolveRankTableMarketValueFromCompareRow(
   row: Pick<PlayerEconomyCompareRow, "calculatedMarketValue" | "calculationBreakdown"> | null | undefined,
 ): number | null {
@@ -176,10 +173,6 @@ export function resolveRankTableMarketValueFromCompareRow(
     return roundValue(protectedRaw + offset, 2);
   }
   return row.calculatedMarketValue ?? null;
-}
-
-function isFiniteNumber(value: number | null | undefined): value is number {
-  return typeof value === "number" && Number.isFinite(value);
 }
 
 function average(values: number[]) {

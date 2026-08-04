@@ -40,7 +40,6 @@ import {
   GAME_ENCYCLOPEDIA_ENTRIES,
   GameTerm,
   HISTORY_ALL_SEASONS_FILTER,
-  MappingHighlight,
   NEW_GAME_PRESET_DEFAULTS,
   NEW_GAME_VISIBLE_PRESET_IDS,
   PLAYER_PROFILE_TABS,
@@ -51,7 +50,6 @@ import {
   SPECIALIST_WING_VARIANTS,
   SortableHeader,
   TooltipHeading,
-  WarningList,
   buildResolvedTeamIdentities,
   buildScenarioWarning,
   buildTeamControlSettingsMap,
@@ -174,7 +172,7 @@ import type { TeamOwner } from "@/lib/foundation/team-control-settings";
 import type { FoundationTableColumn } from "@/lib/foundation/foundation-table-ui-types";
 import type { GameEncyclopediaEntry } from "@/lib/ui/game-encyclopedia";
 import type { InboxV2Item } from "@/app/foundation/inbox-v2/inbox-v2-types";
-import type { Discipline, GameInboxItem, MappingWarning, Player, PlayerScoutIntelRecord, Team } from "@/lib/data/olyDataTypes";
+import type { Discipline, GameInboxItem, Player, PlayerScoutIntelRecord, Team } from "@/lib/data/olyDataTypes";
 import { canAdvanceMatchdayFromStep } from "@/lib/foundation/resolve-game-flow-action-step";
 
 // Perf/DX (#57): these view panels used to come in eagerly through the
@@ -276,6 +274,14 @@ const FoundationChangelogHost = dynamic(() => import("@/app/foundation/changelog
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Changelog wird geladen…" />,
 });
+
+const FoundationDebugGameStatePanel = dynamic(
+  () => import("@/app/foundation/debug/FoundationDebugGameStatePanel"),
+  {
+    ssr: false,
+    loading: () => <FoundationPanelSkeleton label="Debug-Ansicht wird geladen…" />,
+  },
+);
 
 // Derived render-only types for callback params below. These mirror the real
 // producer shapes (leaf hooks under lib/foundation/tabs/*) even though the
@@ -2058,7 +2064,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             ) : activeView === "playerProfile" ? (
               <div className="foundation-view-loading-panel" data-testid="foundation-player-profile-loading">
                 {gameState.season.id === "loading" || playerProfileLoading ? (
-                  <p className="foundation-view-loading">Spielerprofil wird geladen …</p>
+                  <FoundationPanelSkeleton label="Spielerprofil wird geladen…" />
                 ) : (
                   <div className="player-drawer-callout">
                     <strong>Spielerprofil nicht verfügbar</strong>
@@ -2287,7 +2293,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             <FoundationTeamSettingsHost {...foundationTeamSettingsHostProps} />
           ) : null}
 
-          <section className={`panel${getViewClass("admin")}`} id="foundation-admin" data-testid="foundation-admin">
+          {/* Ebenfalls nur per CSS versteckt gewesen — siehe Generator darunter. */}
+          {activeView === "admin" ? (
+          <section className="panel" id="foundation-admin" data-testid="foundation-admin">
             <div className="panel-header">
               <div className="stack season-panel-head">
                 <h2>Admin</h2>
@@ -2512,8 +2520,14 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               </div>
             </details>
           </section>
+          ) : null}
 
-          <section className={`panel${getViewClass("generator")}`} id="foundation-generator" data-testid="foundation-generator">
+          {/* Frueher nur per CSS versteckt: `PlayerGeneratorPanel` wurde damit in JEDER
+              Ansicht gemountet und mit dem kompletten Spielerbestand gerendert. Jetzt echtes
+              Gate wie bei den uebrigen Views. `id` und `data-testid` bleiben — die
+              Perf-Audit-Skripte warten darauf. */}
+          {activeView === "generator" ? (
+          <section className="panel" id="foundation-generator" data-testid="foundation-generator">
             <div className="panel-header">
               <div className="stack season-panel-head">
                 <h2>Player Generator</h2>
@@ -2533,6 +2547,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               onCommitDraft={commitPlayerGeneratorDraft}
             />
           </section>
+          ) : null}
 
           <FoundationShellRouterCockpit
             active={activeView === "cockpit"}
@@ -3062,47 +3077,15 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           {/* Der Changelog braucht keinen Spielstand — er liest die zur Build-Zeit generierte Datei. */}
           {activeView === "changelog" ? <FoundationChangelogHost /> : null}
 
-          <div className={`foundation-warning-grid${getViewClass("debug")}`}>
-            <WarningList title="Spieler ohne Team" warnings={gameState.mappingReport.unmappedPlayers} />
-            <WarningList title="Teams ohne Spieler" warnings={gameState.mappingReport.teamsWithoutPlayers} />
-            <WarningList
-              title="Mapping ohne Player-Match"
-              warnings={gameState.mappingReport.mappingRowsWithoutPlayerMatch}
-            />
-          </div>
-
-          <section className={`panel${getViewClass("debug")}`}>
-            <div className="panel-header">
-              <h2>Import- und Mapping-Report</h2>
-            </div>
-            <div className="source-report">
-              <p>
-                <strong>Spielerquelle:</strong> {gameState.mappingReport.mappingSource}
-              </p>
-              <p>
-                <strong>Teamquelle:</strong> {gameState.mappingReport.teamSource}
-              </p>
-              <p>
-                <strong>Verarbeitete Mapping-Zeilen:</strong> {gameState.mappingReport.processedMappingRows}
-              </p>
-              <p>
-                <strong>Generiert am:</strong>{" "}
-                {new Date(gameState.mappingReport.generatedAt).toLocaleString("de-DE")}
-              </p>
-            </div>
-            <ul className="mapping-highlight-list">
-              {gameState.mappingReport.warnings.slice(0, 18).map((warning: MappingWarning, index: number) => (
-                <MappingHighlight key={`${warning.type}-${index}`} warning={warning} />
-              ))}
-            </ul>
-          </section>
-
-          <section className={`panel${getViewClass("debug")}`}>
-            <div className="panel-header">
-              <h2>GameState Debug</h2>
-            </div>
-            <pre className="debug-json">{JSON.stringify(gameState, null, 2)}</pre>
-          </section>
+          {/* Der Debug-Block hing bis hierher nur an einer CSS-Klasse (`getViewClass` gibt
+              lediglich `foundation-section-hidden` zurueck). Das hiess: der komplette
+              GameState wurde bei JEDEM Render JEDER Ansicht durch `JSON.stringify` geschickt
+              — bei einem echten Save sind das zweistellige Megabyte Text pro Render, die
+              niemand je zu sehen bekam. Jetzt haengt er an einem echten Gate und nutzt das
+              vorhandene `FoundationDebugGameStatePanel`, das ohnehin schon die bessere
+              Darstellung mitbringt (Zusammenfassung statt Rohtext, volles JSON erst auf
+              Klick und bei 2 MB abgeschnitten). */}
+          {activeView === "debug" ? <FoundationDebugGameStatePanel gameState={gameState} /> : null}
 
       </div>
       </FoundationShell>

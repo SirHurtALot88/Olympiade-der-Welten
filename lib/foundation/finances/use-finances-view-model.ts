@@ -4,6 +4,7 @@ import { useMemo } from "react";
 
 import type { GameState, SponsorOfferComponentKind } from "@/lib/data/olyDataTypes";
 import { estimateTeamAnnualRevenue, getTeamAnnualLoanInterest } from "@/lib/finance/loan-service";
+import { roundValue as round1 } from "@/lib/foundation/foundation-number-utils";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import {
   previewSponsorSettlement,
@@ -36,10 +37,6 @@ import type {
 import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 
 /** Gleiche Rundung wie Cash-Werte im Kredit-/Sponsor-Service (1 Nachkommastelle). */
-function round1(value: number): number {
-  return Number(value.toFixed(1));
-}
-
 /** 2-Nachkommastellen-Rundung — spiegelt `roundValue(x, 2)` im `facility-season-end-service`, damit die
  *  „paid vs. unpaid"-Schwelle (Cash + Einnahmen ≥ Upkeep) bit-genau zur echten Season-End-Resolution passt. */
 function round2(value: number): number {

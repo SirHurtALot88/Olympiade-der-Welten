@@ -17,6 +17,7 @@
 
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import type { DisciplineFieldProps, RT } from "./types";
+import { clamp } from "@/lib/foundation/foundation-number-utils";
 import { GhostLayer, TokenChrome, tokenRadius } from "./benchmark";
 
 // Deterministischer 0…1-Hash (FNV-1a) — Feld-Deko/Fahrer-Phasen ohne Hydration-Mismatch.
@@ -27,10 +28,6 @@ function h01(s: string): number {
     h = Math.imul(h, 16777619);
   }
   return (h >>> 0) / 4294967295;
-}
-
-function clamp(v: number, lo: number, hi: number): number {
-  return v < lo ? lo : v > hi ? hi : v;
 }
 
 // Per-Token-Gleit-/Peloton-Zustand (idx → State). Nur die Zeichnung wandert; toX = Score.

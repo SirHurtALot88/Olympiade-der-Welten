@@ -5,6 +5,7 @@ import type {
   TeamFacilityCollection,
 } from "@/lib/data/olyDataTypes";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
+import { round1ByMathRound as round1 } from "@/lib/foundation/foundation-number-utils";
 import { PROGRESSION_ATTRIBUTE_ORDER } from "@/lib/training/class-progression-config";
 import {
   buildOrganicSeasonProgression,
@@ -59,10 +60,6 @@ export type PlayerSeasonTrainingForecast = {
   regressionTotal: number;
   attributes: PlayerSeasonTrainingForecastCell[];
 };
-
-function round1(value: number) {
-  return Math.round(value * 10) / 10;
-}
 
 export function buildPlayerSeasonTrainingForecast(input: {
   gameState: GameState;

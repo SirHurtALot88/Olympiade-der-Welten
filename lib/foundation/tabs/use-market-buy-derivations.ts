@@ -4,6 +4,7 @@ import type { ContractShape } from "@/lib/data/olyDataTypes";
 import type { TransfermarktBuyPreview } from "@/lib/market/transfermarkt-buy-service";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
+import { contractShapeLabel } from "@/lib/foundation/contract-shape-label";
 
 export type MarketBuyNegotiationOutcome = {
   status: "accepted" | "countered" | "rejected";
@@ -33,10 +34,7 @@ export type MarketBuyWishlistEntry = {
 };
 
 export function formatContractShapeLabel(value: ContractShape | null | undefined) {
-  if (value === "front_loaded") return "vorne schwer";
-  if (value === "back_loaded") return "hinten schwer";
-  if (value === "balanced") return "ausgeglichen";
-  return "offen";
+  return contractShapeLabel(value, "offen");
 }
 
 function formatNegotiationSignalLabel(value: string) {

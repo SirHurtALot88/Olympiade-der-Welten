@@ -1,4 +1,5 @@
 import type { GameState, SeasonSnapshotPlayerPerformanceRecord } from "@/lib/data/olyDataTypes";
+import { roundValue } from "@/lib/foundation/foundation-number-utils";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import type { SeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import {
@@ -58,10 +59,6 @@ export type PlayerSeasonPerformanceSummary = {
   }>;
   warnings: string[];
 };
-
-function roundValue(value: number, digits = 1) {
-  return Number(value.toFixed(digits));
-}
 
 function buildEmptyAreaPoints() {
   return {

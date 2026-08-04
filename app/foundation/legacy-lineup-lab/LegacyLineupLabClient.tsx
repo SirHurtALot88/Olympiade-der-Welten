@@ -1,28 +1,15 @@
 "use client";
 
-import Link from "next/link";
 import dynamic from "next/dynamic";
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useRafThrottledScrollTop } from "@/lib/foundation/use-raf-throttled-scroll";
 
 import { calculateLocalLegacyLineupPreviewFromContext } from "@/lib/lineups/legacy-lineup-preview-from-context";
-import DraftWorkspace from "@/app/foundation/legacy-lineup-lab/DraftWorkspace";
-import LineupExpertPanels from "@/app/foundation/legacy-lineup-lab/LineupExpertPanels";
 import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
-import { LegacyLineupVirtualCardGrid } from "@/app/foundation/legacy-lineup-lab/LegacyLineupVirtualTableBody";
 import { useRowVirtualWindow } from "@/lib/foundation/use-row-virtual-window";
 import { resolveFirstOpenFormPickCell } from "@/lib/foundation/resolve-first-open-form-cell";
 
-import DisciplineIcon from "@/app/foundation/DisciplineIcon";
-import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
-import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
-import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
-import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
-import { VeloImpactStrip } from "@/components/foundation/velo-ui";
-import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import { isFoundationTeamManagementLocked } from "@/lib/foundation/foundation-admin-dev-flags";
-import { getGameTermTooltip } from "@/components/ui/GameTerm";
-import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import type { DisciplineCategory, FormCardPlanRecord, GameState, LineupDraftModifiers, Player, PlayerAttributeSheetStats } from "@/lib/data/olyDataTypes";
 import {
@@ -30,7 +17,7 @@ import {
   readFoundationRoomContextFromLocation,
   type FoundationRoomContext,
 } from "@/lib/room/foundation-room-context-client";
-import { getFatiguePerformanceMultiplier, getFatiguePerformancePenaltyPercent, getInjuryRiskPercent } from "@/lib/fatigue/fatigue-calibration";
+import { getFatiguePerformancePenaltyPercent, getInjuryRiskPercent } from "@/lib/fatigue/fatigue-calibration";
 import {
   buildLegacyLineupEntriesFromSelections,
   buildLegacyLineupLabPlayerOptions,
@@ -432,8 +419,6 @@ type MatchdayFocusAttribute = {
   ratingLabel: string | null;
 };
 
-type MatchdayWeightInfo = Pick<MatchdayFocusAttribute, "key" | "label" | "shortLabel" | "weightPct">;
-
 type MatchdayRosterCard = LineupPlayerTableRow & {
   discipline1Label: string;
   discipline2Label: string;
@@ -474,49 +459,9 @@ type MatchdaySlotDragPreviewCard = {
   slotRuleLabel: string | null;
 };
 
-type MatchdaySlotReadiness = "empty" | "optimal" | "solid" | "risky";
 type TeamdeckFilterMode = "all" | "free" | "assigned" | "blocked";
 type TeamdeckSortMode = "fit" | "top" | "d1" | "d2" | "captain" | "fatigue" | "wish";
 type TeamdeckCandidateQualityKey = "instant" | "alternative" | "fatigue" | "blocked" | "emergency";
-
-type LineupPortraitPreviewSource = Pick<
-  LineupPlayerTableRow,
-  "id" | "name" | "portraitUrl" | "className" | "playerOvr" | "playerPps" | "coreStats"
->;
-
-function wrapLineupPortraitHoverPreview(
-  card: ReactNode,
-  player: LineupPortraitPreviewSource,
-  disabled = false,
-) {
-  if (!player.coreStats) {
-    return card;
-  }
-
-  return (
-    <FoundationPlayerPortraitPreview
-      playerId={player.id}
-      name={player.name}
-      portraitUrl={player.portraitUrl}
-      portraitInitials={player.name.slice(0, 2).toUpperCase()}
-      playerOvr={player.playerOvr}
-      playerMvs={null}
-      playerPps={player.playerPps}
-      pow={player.coreStats.pow}
-      spe={player.coreStats.spe}
-      men={player.coreStats.men}
-      soc={player.coreStats.soc}
-      leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
-      variant="team"
-      context="roster"
-      previewDensity="compact"
-      playerClassName={player.className}
-      disabled={disabled}
-    >
-      {card}
-    </FoundationPlayerPortraitPreview>
-  );
-}
 
 type LineupMoraleDecision = {
   playerId: string;
@@ -545,22 +490,6 @@ type LegacyLineupUndoSnapshot = {
 type LegacyLineupHoveredCandidate = {
   slotKey: string;
   activePlayerId: string;
-};
-
-type MatchdayCardRoleInsight = {
-  role: MatchdaySlotRoleDefinition | null;
-  projected: ReturnType<typeof calculateMatchdayProjectedPreview> | null;
-  majorValue: number | null;
-  minorValue: number | null;
-  strainValue: number | null;
-  keyValues: Array<{
-    key: keyof PlayerAttributeSheetStats;
-    shortLabel: string;
-    value: number | null;
-    weightPct: number;
-    deltaPct: number;
-    emphasis: "primary" | "secondary" | "support";
-  }>;
 };
 
 type LineupPowerPointsRow = {
@@ -605,11 +534,6 @@ type LegacyLineupTablePreset = {
 };
 
 const LEGACY_LINEUP_TABLE_PREFERENCES_STORAGE_KEY = "legacy-lineup-table-preferences-v1";
-
-type LegacyLineupSortState = {
-  key: string;
-  direction: "asc" | "desc";
-};
 
 const attributeLabels: Record<keyof PlayerAttributeSheetStats, string> = {
   power: "Power",
@@ -682,70 +606,6 @@ function orderLegacyLineupColumns(columns: LegacyLineupTableColumn[], columnOrde
     }
     return leftIndex - rightIndex;
   });
-}
-
-function resolveBestCardRoleInsight(
-  roles: MatchdaySlotRoleDefinition[],
-  attributeStats: PlayerAttributeSheetStats | null | undefined,
-  baseScore: number | null | undefined,
-  fatigueCount: number | null | undefined,
-) : MatchdayCardRoleInsight | null {
-  if (!roles.length) {
-    return null;
-  }
-
-  const insights = roles.map((role) => {
-    const majorValue = attributeStats?.[role.majorPositiveAttribute] ?? null;
-    const minorValue = attributeStats?.[role.minorPositiveAttribute] ?? null;
-    const strainValue = attributeStats?.[role.strainAttribute] ?? null;
-    const keyValues = (role.keyAttributes?.length
-      ? role.keyAttributes.slice(0, 4)
-      : [
-          { attribute: role.majorPositiveAttribute, weightPct: 0, deltaPct: 0, emphasis: "primary" as const },
-          { attribute: role.minorPositiveAttribute, weightPct: 0, deltaPct: 0, emphasis: "secondary" as const },
-          { attribute: role.strainAttribute, weightPct: 0, deltaPct: 0, emphasis: "support" as const },
-        ]
-    ).map((attribute) => ({
-      key: attribute.attribute,
-      shortLabel: attributeShortLabels[attribute.attribute],
-      value: attributeStats?.[attribute.attribute] ?? null,
-      weightPct: attribute.weightPct,
-      deltaPct: attribute.deltaPct,
-      emphasis: attribute.emphasis,
-    }));
-    const projected = calculateMatchdayProjectedPreview({
-      baseScore: baseScore ?? 0,
-      role,
-      attributeStats,
-      currentFatigueCount: fatigueCount,
-      requiredPlayers: roles.length,
-      intensity: "normal",
-      knownModifierBonus: 0,
-      revealVariance: 0,
-    });
-    return {
-      role,
-      projected,
-      majorValue,
-      minorValue,
-      strainValue,
-      keyValues,
-    };
-  });
-
-  insights.sort((left, right) => {
-    const leftScore = (left.projected?.roleModifier ?? 0) - (left.projected?.fatigueModifier ?? 0);
-    const rightScore = (right.projected?.roleModifier ?? 0) - (right.projected?.fatigueModifier ?? 0);
-    if (leftScore !== rightScore) {
-      return rightScore - leftScore;
-    }
-    if ((left.projected?.additionalFatigue ?? 0) !== (right.projected?.additionalFatigue ?? 0)) {
-      return (left.projected?.additionalFatigue ?? 0) - (right.projected?.additionalFatigue ?? 0);
-    }
-    return (right.majorValue ?? 0) - (left.majorValue ?? 0);
-  });
-
-  return insights[0] ?? null;
 }
 
 function normalizeClassHintToken(value: string | null | undefined) {
@@ -831,8 +691,6 @@ type CandidateAxisReasonChip = {
   detail: string;
 };
 
-type SlotMicroStepState = "done" | "current" | "open";
-
 const attributeAxisKeys: Partial<Record<keyof PlayerAttributeSheetStats, CandidateAxisKey>> = {
   power: "pow",
   health: "pow",
@@ -909,174 +767,6 @@ function buildCandidateAxisReasonChips(
     .slice(0, 3);
 }
 
-function resolveSlotMicroStepStates(input: {
-  hasSelection: boolean;
-  isActiveSlot: boolean;
-  isHoveredAssign: boolean;
-  isRecentlyAssigned: boolean;
-}): Record<"choose" | "assign" | "next", SlotMicroStepState> {
-  if (input.hasSelection) {
-    return {
-      choose: "done",
-      assign: "done",
-      next: input.isRecentlyAssigned ? "current" : "done",
-    };
-  }
-  if (!input.isActiveSlot) {
-    return { choose: "open", assign: "open", next: "open" };
-  }
-  if (input.isHoveredAssign) {
-    return { choose: "done", assign: "current", next: "open" };
-  }
-  return { choose: "current", assign: "open", next: "open" };
-}
-
-function LegacyLineupCandidateReasonChips({ chips }: { chips: CandidateAxisReasonChip[] }) {
-  if (!chips.length) {
-    return null;
-  }
-
-  return (
-    <div className="legacy-lineup-candidate-reason-chips" aria-label="Achsen-Begruendung">
-      {chips.map((chip) => (
-        <span key={`${chip.axis}-${chip.label}`} className={`legacy-lineup-candidate-reason-chip ${chip.tone}`} title={chip.detail}>
-          {chip.label} {chip.rating ?? "—"}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function LegacyLineupSlotMicroSteps({
-  stepStates,
-}: {
-  stepStates: Record<"choose" | "assign" | "next", SlotMicroStepState>;
-}) {
-  const steps = [
-    { key: "choose" as const, label: "Wählen" },
-    { key: "assign" as const, label: "Einsetzen" },
-    { key: "next" as const, label: "Nächster Slot" },
-  ];
-
-  return (
-    <div className="legacy-lineup-slot-micro-steps" aria-label="Slot Mikro-Schritte">
-      {steps.map((step, index) => (
-        <span
-          key={step.key}
-          className={`legacy-lineup-slot-micro-step is-${stepStates[step.key]}${index < steps.length - 1 ? " has-arrow" : ""}`}
-        >
-          <strong>{step.label}</strong>
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function getDragFitTierClass(fitTier: LegacyLineupDragFitTier | string | null) {
-  switch (fitTier) {
-    case "best":
-      return "is-fit-best";
-    case "great":
-      return "is-fit-great";
-    case "okay":
-      return "is-fit-okay";
-    case "poor":
-      return "is-fit-poor";
-    case "blocked":
-      return "is-fit-blocked";
-    default:
-      return "";
-  }
-}
-
-function LegacyLineupTableCustomization({
-  columns,
-  activePreset,
-  isVisible,
-  getWidth,
-  onToggle,
-  onMove,
-  onWidthStep,
-  onWidthReset,
-  onPresetChange,
-  onReset,
-}: {
-  columns: LegacyLineupTableColumn[];
-  activePreset: LegacyLineupTablePresetId | null;
-  isVisible: (columnId: string, visibleByDefault?: boolean) => boolean;
-  getWidth: (column: LegacyLineupTableColumn) => number;
-  onToggle: (columnId: string, nextVisible: boolean) => void;
-  onMove: (columnId: string, direction: "left" | "right") => void;
-  onWidthStep: (column: LegacyLineupTableColumn, delta: number) => void;
-  onWidthReset: (column: LegacyLineupTableColumn) => void;
-  onPresetChange: (presetId: Exclude<LegacyLineupTablePresetId, "custom">) => void;
-  onReset: () => void;
-}) {
-  return (
-    <details className="column-visibility-manager">
-      <summary>Tabelle anpassen</summary>
-      <div className="table-customization-presets">
-        <label className="filter-field table-customization-preset-field">
-          <span>Preset</span>
-          <select
-            className="input"
-            value={activePreset && activePreset !== "custom" ? activePreset : "custom"}
-            onChange={(event) => {
-              if (event.target.value === "custom") {
-                return;
-              }
-              onPresetChange(event.target.value as Exclude<LegacyLineupTablePresetId, "custom">);
-            }}
-          >
-            <option value="retool_default">Retool Default</option>
-            <option value="compact">Compact</option>
-            <option value="finance">Finance</option>
-            <option value="performance">Performance</option>
-            <option value="custom">Custom</option>
-          </select>
-        </label>
-        <button className="secondary-button inline-button" type="button" onClick={onReset}>
-          Retool Default
-        </button>
-      </div>
-      <div className="column-visibility-grid">
-        {columns.map((column) => (
-          <div key={column.id} className="column-visibility-option">
-            <div className="table-customization-option-main">
-              <label className="table-customization-checkbox">
-                <input
-                  type="checkbox"
-                  checked={isVisible(column.id, column.visibleByDefault)}
-                  onChange={(event) => onToggle(column.id, event.target.checked)}
-                />
-                <span>{column.label}</span>
-              </label>
-            </div>
-            <div className="table-customization-option-actions">
-              <span className="table-customization-width">{getWidth(column)} px</span>
-              <button className="ghost-button" type="button" onClick={() => onMove(column.id, "left")} aria-label={`${column.label} nach links`}>
-                ←
-              </button>
-              <button className="ghost-button" type="button" onClick={() => onMove(column.id, "right")} aria-label={`${column.label} nach rechts`}>
-                →
-              </button>
-              <button className="ghost-button" type="button" onClick={() => onWidthStep(column, -16)} aria-label={`${column.label} schmaler`}>
-                −
-              </button>
-              <button className="ghost-button" type="button" onClick={() => onWidthStep(column, 16)} aria-label={`${column.label} breiter`}>
-                +
-              </button>
-              <button className="ghost-button" type="button" onClick={() => onWidthReset(column)} aria-label={`${column.label} Breite zurücksetzen`}>
-                Reset
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </details>
-  );
-}
-
 function compareLegacyLineupSortValues(left: string | number, right: string | number) {
   if (typeof left === "number" && typeof right === "number") {
     return left - right;
@@ -1085,40 +775,7 @@ function compareLegacyLineupSortValues(left: string | number, right: string | nu
   return String(left).localeCompare(String(right), "de", { numeric: true, sensitivity: "base" });
 }
 
-function LegacyLineupSortableHeader({
-  label,
-  columnKey,
-  sortState,
-  onToggle,
-}: {
-  label: string;
-  columnKey: string;
-  sortState?: LegacyLineupSortState | null;
-  onToggle: (columnKey: string) => void;
-}) {
-  const isActive = sortState?.key === columnKey;
-  const arrow = !isActive ? "↕" : sortState?.direction === "asc" ? "↑" : "↓";
-
-  return (
-    <button
-      className={`sortable-header${isActive ? " is-active" : ""}`}
-      type="button"
-      onClick={() => onToggle(columnKey)}
-    >
-      <span>{label}</span>
-      <span className="sortable-arrow">{arrow}</span>
-    </button>
-  );
-}
-
 function formatScore(value: number) {
-  return new Intl.NumberFormat("de-DE", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  }).format(value);
-}
-
-function formatPpsScore(value: number) {
   return new Intl.NumberFormat("de-DE", {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
@@ -1135,87 +792,11 @@ function formatDecimalScore(value: number | null | undefined, digits = 1) {
   }).format(value);
 }
 
-function formatSignedDelta(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value) || value === 0) {
-    return "0";
-  }
-  return `${value > 0 ? "+" : ""}${value}`;
-}
-
-function formatSignedCompactInteger(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) {
-    return "—";
-  }
-  const rounded = Math.round(value);
-  if (rounded === 0) {
-    return "0";
-  }
-  return `${rounded > 0 ? "+" : ""}${rounded}`;
-}
-
-function formatNegativeCompactInteger(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) {
-    return "—";
-  }
-  const rounded = Math.round(value);
-  if (rounded === 0) {
-    return "0";
-  }
-  return `-${Math.abs(rounded)}`;
-}
-
 function formatNullableScore(value: number | null | undefined) {
   if (value == null) {
     return "—";
   }
   return formatScore(value);
-}
-
-function formatWeightInfo(attributes: MatchdayWeightInfo[]) {
-  if (attributes.length === 0) {
-    return "Gewichtung fehlt";
-  }
-
-  return attributes
-    .map((attribute) => `${attribute.shortLabel} ${attribute.weightPct}%`)
-    .join(" · ");
-}
-
-function formatWholeNumber(value: number | null | undefined) {
-  return formatNullableScore(value);
-}
-
-function getTierStyleClass(value: string | null | undefined) {
-  switch (value) {
-    case "S+":
-      return "is-tier-splus";
-    case "S":
-      return "is-tier-s";
-    case "A":
-      return "is-tier-a";
-    case "B":
-      return "is-tier-b";
-    case "C":
-      return "is-tier-c";
-    case "D":
-      return "is-tier-d";
-    case "E":
-      return "is-tier-e";
-    case "F":
-      return "is-tier-f";
-    default:
-      return "";
-  }
-}
-
-function formatCompactMoney(value: number | null | undefined) {
-  if (value == null) {
-    return "—";
-  }
-  return new Intl.NumberFormat("de-DE", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
 }
 
 function formatTraitList(values: string[] | null | undefined) {
@@ -1242,10 +823,6 @@ function formatFatigueImpactDetail(fatigue: number | null | undefined) {
   return `Fatigue ${value} · −${formatDecimalScore(penalty, 1)}% Leistung · ${formatDecimalScore(injury, 1)}% Verletzungsrisiko`;
 }
 
-function getExhaustionMultiplier(fatigue: number | null | undefined) {
-  return getFatiguePerformanceMultiplier(fatigue);
-}
-
 function formatExhaustionPoints(score: number | null | undefined, fatigue: number | null | undefined) {
   const value = Math.round(fatigue ?? 0);
   if (fatigue == null) {
@@ -1260,64 +837,6 @@ function formatExhaustionPoints(score: number | null | undefined, fatigue: numbe
   }
   const penalty = Number((score * penaltyPercent / 100).toFixed(2));
   return `Erschöpfung F${value} · −${formatScore(penalty)} (−${formatDecimalScore(penaltyPercent, 1)}%)`;
-}
-
-function formatFatigueRiskCauseLabel(
-  fatigue: number | null | undefined,
-  warnings: string[] | null | undefined,
-  additionalFatigue?: number | null,
-) {
-  if (!isElevatedFatigue(fatigue) && !warnings?.length && !(additionalFatigue && additionalFatigue >= 3)) {
-    return "stabil";
-  }
-  if (warnings?.length) {
-    return warnings[0];
-  }
-  if ((fatigue ?? 0) >= FATIGUE_UI_HIGH) {
-    return "hohe Vorbelastung";
-  }
-  if ((additionalFatigue ?? 0) >= 4) {
-    return "Push macht ihn teurer";
-  }
-  return "mehr Last als normal";
-}
-
-function formatFatigueHint(score: number | null | undefined, count: number | null | undefined) {
-  return formatExhaustionPoints(score, count);
-}
-
-function formatProjectedRange(base: number | null | undefined, projected: number | null | undefined) {
-  if (base == null && projected == null) {
-    return "Projected —";
-  }
-  if (base == null) {
-    return `Projected ${formatDecimalScore(projected, 1)}`;
-  }
-  if (projected == null) {
-    return `Projected ${formatDecimalScore(base, 1)}`;
-  }
-
-  const low = Math.min(base, projected);
-  const high = Math.max(base, projected);
-  if (Math.abs(low - high) < 0.05) {
-    return `Projected ${formatDecimalScore(projected, 1)}`;
-  }
-  return `Projected ${formatDecimalScore(low, 1)}–${formatDecimalScore(high, 1)}`;
-}
-
-function formatProjectedWindow(low: number | null | undefined, high: number | null | undefined) {
-  if (low == null && high == null) {
-    return "Projected —";
-  }
-  if (low == null || high == null) {
-    return `Projected ${formatDecimalScore(low ?? high, 1)}`;
-  }
-  const rangeLow = Math.min(low, high);
-  const rangeHigh = Math.max(low, high);
-  if (Math.abs(rangeLow - rangeHigh) < 0.05) {
-    return `Projected ${formatDecimalScore(rangeHigh, 1)}`;
-  }
-  return `Projected ${formatDecimalScore(rangeLow, 1)}–${formatDecimalScore(rangeHigh, 1)}`;
 }
 
 function formatProjectedMetricWindow(low: number | null | undefined, high: number | null | undefined) {
@@ -1447,35 +966,6 @@ function resolveAttributeGrade(
   return getTransfermarktTierFromPoints(value ?? null);
 }
 
-function getDisciplineHeatClass(score: number | null | undefined) {
-  if (score == null) {
-    return "";
-  }
-  if (score >= 80) {
-    return "is-heat-strong";
-  }
-  if (score >= 60) {
-    return "is-heat-good";
-  }
-  if (score >= 40) {
-    return "is-heat-mid";
-  }
-  return "is-heat-low";
-}
-
-function getTopRankClass(rank: number) {
-  if (rank <= 3) {
-    return "is-rank-top";
-  }
-  if (rank <= 6) {
-    return "is-rank-mid";
-  }
-  if (rank <= 10) {
-    return "is-rank-alert";
-  }
-  return "";
-}
-
 function resolveTeamDisciplineRank(
   ranks: LegacyLineupLoadedContext["teamDisciplineRanks"] | null | undefined,
   disciplineId: string | null | undefined,
@@ -1500,37 +990,6 @@ function resolveTeamDisciplineRank(
   const normalizedTarget = normalizeLineupDisciplineFieldName(label ?? disciplineId);
   const fuzzyMatch = Object.entries(ranks).find(([key]) => normalizeLineupDisciplineFieldName(key) === normalizedTarget);
   return fuzzyMatch?.[1]?.rank ?? null;
-}
-
-function getFatigueHeatClass(value: number | null | undefined) {
-  if (value == null) {
-    return "";
-  }
-  if (value >= FATIGUE_UI_HIGH) {
-    return "is-fatigue-high";
-  }
-  if (value >= FATIGUE_UI_MEDIUM) {
-    return "is-fatigue-mid";
-  }
-  return "is-fatigue-low";
-}
-
-function getSlotReadiness(
-  slotPreview: MatchdaySlotPreviewCard | null | undefined,
-  selectedScore: number | null | undefined,
-): { key: MatchdaySlotReadiness; label: string; detail: string } {
-  if (!slotPreview || selectedScore == null) {
-    return { key: "empty", label: "Leer", detail: "Slot offen" };
-  }
-
-  const projected = slotPreview.projected.totalProjected ?? selectedScore;
-  if (slotPreview.projected.warnings.length > 0 || projected < 45) {
-    return { key: "risky", label: "Riskant", detail: `S ${formatDecimalScore(projected, 1)}` };
-  }
-  if (projected >= 70) {
-    return { key: "optimal", label: "Optimal", detail: `S ${formatDecimalScore(projected, 1)}` };
-  }
-  return { key: "solid", label: "Solide", detail: `S ${formatDecimalScore(projected, 1)}` };
 }
 
 function getTeamdeckCandidateGroupMeta(groupKey: TeamdeckCandidateQualityKey) {
@@ -1588,18 +1047,6 @@ function formatMoraleDelta(value: number) {
   if (value > 0) return `+${formatDecimalScore(value, 1)}`;
   if (value < 0) return formatDecimalScore(value, 1);
   return "0";
-}
-
-function formatMoraleScoreEffect(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) return "—";
-  if (Math.abs(value) < 0.05) return "±0";
-  return `${value > 0 ? "+" : ""}${formatDecimalScore(value, 1)}`;
-}
-
-function formatMoralePercentEffect(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) return "—";
-  if (Math.abs(value) < 0.05) return "±0%";
-  return `${value > 0 ? "+" : ""}${formatDecimalScore(value, 1)}%`;
 }
 
 function formatLineupHintLabel(value: string) {
@@ -1752,19 +1199,6 @@ function formatFormPlanImpact(
   return `${impact > 0 ? "+" : ""}${formatScore(impact)}`;
 }
 
-function getFormCardOptionStyle(color: LegacyFormCardOption["color"]) {
-  if (color === "red") {
-    return { color: "#ff8b86", backgroundColor: "#2b1719" };
-  }
-  if (color === "green") {
-    return { color: "#a8e7aa", backgroundColor: "#172719" };
-  }
-  if (color === "blue") {
-    return { color: "#a9ccff", backgroundColor: "#162033" };
-  }
-  return { color: "#ffd987", backgroundColor: "#2b2314" };
-}
-
 function sortFormCardsForDiscipline(cards: LegacyFormCardOption[], disciplineColor?: LegacyFormCardOption["color"] | null) {
   return [...cards].sort((left, right) => {
     const leftPriority = disciplineColor && left.color === disciplineColor ? -1 : formCardColorOrder.indexOf(left.color);
@@ -1878,14 +1312,6 @@ function formatTeamPowerOptionLabel(
   return `${power.label} · ${getTeamPowerEffectLabel(power)} · ${getTeamPowerCategoryLabel(power.category)} · ${sign}${formatDecimalScore(effectiveModifier, 1)}%${effectiveExtra ? ` +${formatDecimalScore(effectiveExtra, 1)}% Extra` : ""}${attributeFit ? ` · Fit ${attributeFit > 0 ? "+" : ""}${formatDecimalScore(attributeFit, 1)}% (${formatTeamPowerAttributeTags(power)})` : ` · Tags ${formatTeamPowerAttributeTags(power)}`} · ${power.chargesRemaining}/${power.chargesTotal} · ${source}${isFit ? "" : " · Off-Fit"}${debuffHint}`;
 }
 
-function getDisciplineToneClass(category: string | null | undefined) {
-  if (category === "power") return "is-power";
-  if (category === "speed") return "is-speed";
-  if (category === "mental") return "is-mental";
-  if (category === "social") return "is-social";
-  return "is-neutral";
-}
-
 function formatModifierSourceLabel(source: LegacyModifierSourceSummary | null | undefined) {
   if (!source) {
     return "Quelle fehlt";
@@ -1897,13 +1323,6 @@ function formatModifierSourceLabel(source: LegacyModifierSourceSummary | null | 
     return "Auswahl bereit · Effekt offen";
   }
   return "Bereit";
-}
-
-function formatLegacyTeamControlModeLabel(mode: "manual" | "ai" | "passive" | null | undefined) {
-  if (mode === "manual") return "geführt";
-  if (mode === "ai") return "automatisch";
-  if (mode === "passive") return "beobachtet";
-  return "offen";
 }
 
 function buildDraftStateFromAiPreview(preview: AiLegacyLineupPreview) {
@@ -1963,8 +1382,6 @@ function defaultParamsFromProps(props: LegacyLineupLabClientProps) {
 }
 
 const LEGACY_LINEUP_EXPERT_MODE_STORAGE_KEY = "legacy-lineup-expert-mode-v1";
-const SHOW_CLASSIC_LINEUP_WORKSPACE = false;
-const SHOW_DRAFT_LINEUP_WORKSPACE = true;
 
 function loadLegacyLineupExpertModePreference() {
   if (typeof window === "undefined") {

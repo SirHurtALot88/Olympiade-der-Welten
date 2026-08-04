@@ -24,6 +24,7 @@ import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import { getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import type { AllTimeTableClientProps } from "@/app/foundation/all-time-table-v2/AllTimeTableClient";
 import type { AllTimeTableRow } from "@/lib/foundation/all-time-table";
+import { isFiniteNumber } from "@/lib/foundation/foundation-number-utils";
 
 /**
  * "Ewige Tabelle" (All-Time Table) — "Neuer Look" Mehr-Saison-Team-
@@ -193,10 +194,6 @@ function getTeamValueNow(row: AllTimeTableRow): number | null {
     return null;
   }
   return (row.mwNow ?? 0) + (row.cashNow ?? 0);
-}
-
-function isFiniteNumber(value: number | null | undefined): value is number {
-  return typeof value === "number" && Number.isFinite(value);
 }
 
 function getSortValue(row: AllTimeTableRow, key: TableSortKey): number {

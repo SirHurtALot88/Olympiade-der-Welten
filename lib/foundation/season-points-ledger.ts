@@ -6,6 +6,7 @@ import type {
   PlayerDisciplinePerformanceRecord,
 } from "@/lib/data/olyDataTypes";
 import { resolveAwardedPlayerPoints } from "@/lib/foundation/player-points-total";
+import { isFiniteNumber, roundValue } from "@/lib/foundation/foundation-number-utils";
 import { distributeRankPointsToPlayers, resolveDisciplinePlayerCount } from "@/lib/resolve/rank-to-points";
 
 type LedgerPointSource =
@@ -70,14 +71,6 @@ export type SeasonPointsLedger = {
   playerSummariesByPlayerId: Map<string, SeasonPlayerPointsSummary>;
   warnings: string[];
 };
-
-function roundValue(value: number, digits = 1) {
-  return Number(value.toFixed(digits));
-}
-
-function isFiniteNumber(value: number | null | undefined): value is number {
-  return typeof value === "number" && Number.isFinite(value);
-}
 
 function isWithinTolerance(left: number, right: number, tolerance = 0.2) {
   return Math.abs(left - right) <= tolerance;

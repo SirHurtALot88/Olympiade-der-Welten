@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { teamPrimaryColor, floorTeamAccent } from "@/lib/foundation/team-colors";
+import { round1ByMathRound as round1 } from "@/lib/foundation/foundation-number-utils";
 import { useStageAudio } from "./useStageAudio";
 import DisciplineStageResultTable, { type ResultTableRow } from "./DisciplineStageResultTable";
 import DisciplineStageTopPlayersRow from "../DisciplineStageTopPlayersRow";
@@ -924,10 +925,6 @@ const PRIM_GEO: Record<StagePrimitive, { w: number; h: number; r: number; rOwn: 
   klassen: { w: 1180, h: 640, r: 9.5, rOwn: 13 },
   territory: { w: 1180, h: 640, r: 9.5, rOwn: 13 },
 };
-
-function round1(x: number): number {
-  return Math.round(x * 10) / 10;
-}
 
 /**
  * Team-Endsumme GENAU SO aufaddieren, wie der Reveal es tut.

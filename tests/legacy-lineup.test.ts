@@ -651,7 +651,10 @@ describe("legacy lineup draft ui contract", () => {
     const cssPath = path.join(process.cwd(), "app/globals.css");
     const [lineupText, cssText] = await Promise.all([fs.readFile(lineupPath, "utf8"), fs.readFile(cssPath, "utf8")]);
 
-    expect(lineupText).toContain("SHOW_DRAFT_LINEUP_WORKSPACE = true");
+    // SHOW_DRAFT_LINEUP_WORKSPACE war (wie SHOW_CLASSIC_LINEUP_WORKSPACE) ein
+    // nirgends gelesenes Flag ohne jeden Aufrufer — beide Flags sind mit dem
+    // Dead-Code-Cleanup entfernt. Der Rest dieses Blocks bleibt unangetastet,
+    // s. NOTE oben zum größeren, unabhängigen Feature-Verlust.
     expect(lineupText).toContain("{showExpertBackupPanels ? (");
     expect(lineupText).toContain('className="legacy-lineup-main-flow"');
     expect(lineupText).toContain("legacy-lineup-captain-strip");
@@ -660,9 +663,10 @@ describe("legacy lineup draft ui contract", () => {
     expect(lineupText).toContain("updateFormCardSelection");
     expect(lineupText).toContain("renderInlineFormCardSelectors");
     expect(lineupText).toContain("queueFormCardPlanSave");
-    expect(lineupText).toContain("LegacyLineupSlotMicroSteps");
+    // LegacyLineupSlotMicroSteps/LegacyLineupCandidateReasonChips waren die
+    // beiden nie gerenderten Slot-Komponenten aus dem toten "classic"-Baum —
+    // mit dem Dead-Code-Cleanup entfernt, s. Kommentar oben zu diesem Block.
     expect(lineupText).toContain("legacy-lineup-quick-assign-row");
-    expect(lineupText).toContain("LegacyLineupCandidateReasonChips");
     expect(lineupText).toContain("legacy-lineup-draft-flow-chip");
     expect(lineupText).toContain("Spieltag wird geladen");
     expect(lineupText).toContain('role="tablist"');
@@ -678,8 +682,15 @@ describe("legacy lineup draft ui contract", () => {
     expect(lineupText).toContain("legacy-lineup-draft-tactics-form");
     expect(lineupText).toContain("legacy-lineup-team-tactics-form");
     expect(lineupText).toContain("FormBoardPanel");
-    expect(lineupText).toContain("DraftWorkspace");
-    expect(lineupText).toContain("LineupExpertPanels");
+    // Die beiden folgenden Assertions ("DraftWorkspace", "LineupExpertPanels")
+    // sind mit dem Dead-Code-Cleanup gefallen: Sie prüften keine echte
+    // Funktion, sondern nur einen nie genutzten Import auf die gleichnamige,
+    // ebenfalls tote Geschwisterdatei (deren Render-Pfad seit
+    // SHOW_CLASSIC_LINEUP_WORKSPACE = false nie mehr erreicht wird). Ein
+    // grüner Test hier hätte weiterhin nur belegt, dass der Import existiert
+    // — nicht, dass die Komponente gerendert wird. Import und Datei sind
+    // entfernt, die Assertions daher gestrichen statt auf eine andere Datei
+    // umgebogen.
     expect(lineupText).not.toContain("legacy-lineup-team-tactics-form-readonly");
     expect(lineupText).toContain("scheduleHoveredCandidate");
     expect(formBoardText).toContain("legacy-lineup-form-board-cell-velo-strip");

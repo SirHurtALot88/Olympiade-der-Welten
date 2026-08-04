@@ -13,13 +13,10 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import type { DisciplineFieldProps, RT } from "./types";
+import { clamp } from "@/lib/foundation/foundation-number-utils";
 import { useTokenGlide, tokenRef, GhostLayer, TokenChrome, tokenRadius } from "./benchmark";
 
 const NS = "http://www.w3.org/2000/svg";
-
-function clamp(v: number, lo: number, hi: number): number {
-  return v < lo ? lo : v > hi ? hi : v;
-}
 
 // Deterministischer 0…1-Hash (Deckungs-Deko ohne Hydration-Mismatch).
 function h01(s: string): number {

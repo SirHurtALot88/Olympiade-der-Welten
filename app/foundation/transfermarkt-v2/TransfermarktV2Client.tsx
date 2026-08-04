@@ -242,9 +242,9 @@ const LABEL_MAP: Record<string, string> = {
   medium: "mittel",
   low: "niedrig",
   elite: "elite",
-  balanced: "ausgeglichen",
-  front_loaded: "vorne schwer",
-  back_loaded: "hinten schwer",
+  balanced: "Balanced",
+  front_loaded: "Front-loaded",
+  back_loaded: "Back-loaded",
 };
 
 function isAbortError(error: unknown) {

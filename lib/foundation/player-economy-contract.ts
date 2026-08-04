@@ -1,5 +1,6 @@
 import type { ContractYearSalary, Player, PlayerGeneratorAttributes, RosterEntry } from "@/lib/data/olyDataTypes";
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
+import { contractShapeLabel } from "@/lib/foundation/contract-shape-label";
 import {
   calculateMarketValueBonuses,
   deriveBaseMarketValueFromFinal,
@@ -398,16 +399,7 @@ export function formatContractShapeShortLabel(
 export function formatContractShapeLabel(
   shape: EconomyRosterEntry["contractShape"] | null | undefined,
 ): string {
-  if (shape === "front_loaded") {
-    return "Vorne schwer";
-  }
-  if (shape === "back_loaded") {
-    return "Hinten schwer";
-  }
-  if (shape === "balanced") {
-    return "Ausgeglichen";
-  }
-  return "—";
+  return contractShapeLabel(shape, "—");
 }
 
 export function rosterSalariesDifferForDisplay(

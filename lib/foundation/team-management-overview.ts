@@ -1,6 +1,7 @@
 import type { GameState, Player, RosterEntry, Team } from "@/lib/data/olyDataTypes";
 import { normalizeEconomyMoney, resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
+import { roundValue } from "@/lib/foundation/foundation-number-utils";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
@@ -168,10 +169,6 @@ export type TeamManagementSnapshotRow = {
   roster: RosterEntry[];
   rosterPlayers: Array<{ entry: RosterEntry; player: Player }>;
 };
-
-function roundValue(value: number, digits = 4) {
-  return Number(value.toFixed(digits));
-}
 
 function deriveDisplayedCash(input: {
   teamCash: number | null;

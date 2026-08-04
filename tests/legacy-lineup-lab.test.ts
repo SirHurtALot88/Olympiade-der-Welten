@@ -227,8 +227,9 @@ describe("legacy lineup lab helpers", () => {
     expect(fileText).toContain("legacy-lineup-form-card-chip");
     expect(fileText).toContain("Malus");
     expect(fileText).toContain("renderOptionLabel");
-    expect(fileText).toContain("formatFatigueHint");
-    expect(fileText).toContain("getFatigueHeatClass");
+    // formatFatigueHint/getFatigueHeatClass waren nur noch tote Wrapper ohne
+    // Aufrufer (Dead-Code-Cleanup) — hier gestrichen statt auf eine andere
+    // Datei umgebogen, s. NOTE oben zu diesem gesamten Block.
     expect(fileText).toContain("legacy-lineup-selection-meta");
     expect(fileText).toContain("legacy-lineup-side-draft-status");
     expect(fileText).toContain("legacy-lineup-main-flow");
@@ -275,27 +276,30 @@ describe("legacy lineup lab helpers", () => {
     expect(fileText).toContain("D1 / D2 Lineup-Zonen");
     expect(fileText).toContain("Expert Modus");
     expect(fileText).toContain("legacy-lineup-expert-mode-v1");
-    expect(fileText).toContain("formatWeightInfo");
+    // formatWeightInfo war ein toter Formatierer ohne Aufrufer; die folgenden
+    // fünf Strings/Namen (legacy-lineup-focus-switch bis legacy-lineup-slot-fit-pill)
+    // waren schon vor dem Dead-Code-Cleanup nicht mehr im Quelltext — Teil des
+    // in der NOTE oben dokumentierten größeren Feature-Verlusts, unangetastet.
     expect(fileText).toContain("legacy-lineup-focus-switch");
     expect(fileText).toContain("legacy-lineup-weight-band");
     expect(fileText).toContain("legacy-lineup-arena-slot");
     expect(fileText).toContain("legacy-lineup-slot-drag-callout");
     expect(fileText).toContain("legacy-lineup-slot-fit-pill");
-    expect(fileText).toContain("legacy-lineup-slot-micro-steps");
-    expect(fileText).toContain("LegacyLineupSlotMicroSteps");
-    expect(fileText).toContain("Wählen");
-    expect(fileText).toContain("Nächster Slot");
-    expect(fileText).toContain("legacy-lineup-candidate-reason-chip");
-    expect(fileText).toContain("LegacyLineupCandidateReasonChips");
+    // Die folgenden fünf Assertions (bis "getDragFitTierClass") prüften nur
+    // die nie gerenderten Komponenten LegacyLineupSlotMicroSteps und
+    // LegacyLineupCandidateReasonChips sowie den toten Helper
+    // getDragFitTierClass — mit dem Dead-Code-Cleanup entfernt.
     expect(fileText).toContain("buildCandidateAxisReasonChips");
-    expect(fileText).toContain("getDragFitTierClass");
     expect(fileText).toContain("resolveLegacyLineupDragBlockReason");
     expect(fileText).toContain("handleDropOnSlot");
     expect(fileText).toContain("attributeRatings");
     expect(fileText).toContain("resolveAttributeGrade");
     expect(fileText).toContain("TOR");
     expect(fileText).toContain("legacy-lineup-table-preferences-v1");
-    expect(fileText).toContain("LegacyLineupTableCustomization");
+    // LegacyLineupTableCustomization/LegacyLineupSortableHeader (unten) waren
+    // die beiden nie gerenderten Retool-Tabellen-Komponenten — die dahinter
+    // liegende Logik (Preferences, Spaltenbreiten/-reihenfolge, Presets,
+    // Sortierung) ist weiterhin aktiv und über die Strings unten abgedeckt.
     expect(fileText).toContain("Retool Default");
     expect(fileText).toContain("Compact");
     expect(fileText).toContain("Finance");
@@ -304,7 +308,6 @@ describe("legacy lineup lab helpers", () => {
     expect(fileText).toContain("moveLineupPlayerColumn");
     expect(fileText).toContain("stepLineupPlayerColumnWidth");
     expect(fileText).toContain("resetLineupPlayerColumnWidth");
-    expect(fileText).toContain("LegacyLineupSortableHeader");
     expect(fileText).toContain("toggleLineupPlayerTableSort");
     expect(fileText).toContain("sortState");
     expect(fileText).toContain("compareLegacyLineupSortValues");

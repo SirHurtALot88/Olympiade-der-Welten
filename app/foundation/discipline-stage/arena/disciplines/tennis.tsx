@@ -19,6 +19,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import type { DisciplineFieldProps, RT } from "./types";
+import { clamp } from "@/lib/foundation/foundation-number-utils";
 import { useTokenGlide, tokenRef, GhostLayer, TokenChrome, tokenRadius } from "./benchmark";
 
 const NS = "http://www.w3.org/2000/svg";
@@ -54,10 +55,6 @@ type Ball = {
   isNet: boolean;
   gain: number;
 };
-
-function clamp(v: number, lo: number, hi: number): number {
-  return v < lo ? lo : v > hi ? hi : v;
-}
 
 export default function TennisField(props: DisciplineFieldProps): ReactNode {
   const {

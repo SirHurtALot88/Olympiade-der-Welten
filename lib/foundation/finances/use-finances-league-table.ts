@@ -8,6 +8,7 @@ import {
   getTeamAnnualLoanInstallment,
   getTeamAnnualLoanInterest,
 } from "@/lib/finance/loan-service";
+import { roundValue as round1 } from "@/lib/foundation/foundation-number-utils";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { calculateFacilityIncome, calculateFacilitySeasonUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
@@ -20,10 +21,6 @@ import { FINANCE_SPONSOR_INCOME_COMPONENT_KINDS } from "@/lib/foundation/finance
 import type { FinanceLeagueTableRow } from "@/lib/foundation/finances/finances-types";
 
 /** Gleiche Rundung wie `use-finances-view-model.ts` (1 Nachkommastelle). */
-function round1(value: number): number {
-  return Number(value.toFixed(1));
-}
-
 /**
  * Liga-weite Finanzübersicht — für JEDES Team eine kompakte p.a.-Finanzzeile
  * (Cash, Einnahmen, Ausgaben, GuV, Marktwert). Bewusst getrennt von

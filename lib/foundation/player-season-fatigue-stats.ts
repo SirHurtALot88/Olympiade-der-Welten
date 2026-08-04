@@ -5,10 +5,7 @@ import type {
   PlayerDisciplinePerformanceRecord,
 } from "@/lib/data/olyDataTypes";
 import { MATCHDAY_FATIGUE_LOAD } from "@/lib/fatigue/fatigue-injury-service";
-
-function roundValue(value: number, digits = 1) {
-  return Number(value.toFixed(digits));
-}
+import { roundValue } from "@/lib/foundation/foundation-number-utils";
 
 function clampFatigue(value: number) {
   return Math.max(0, Math.min(100, Number(value.toFixed(2))));
