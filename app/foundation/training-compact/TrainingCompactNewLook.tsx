@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { getInitials } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import { getClassColorToken } from "@/app/foundation/classVisuals";
 import { getPlayerPortraitModel } from "@/lib/foundation/tabs/foundation-page-module-helpers";
 import FoundationPlayerPortraitPreview, {
   type FoundationPlayerPortraitPreviewProps,
@@ -408,19 +409,32 @@ function NlTrainingIntensityProjection({
 }
 
 /**
- * Ton-Klasse zur Development-Route einer Trainingsklasse.
+ * Ton-Klasse einer Trainingsklasse — nach ihrer KLASSENFARBE.
  *
  * GEMELDET VON CHRIS: „vllt kannst du die noch in der passenden Farbe einrahmen damit man sie besser
  * erkennt!" — dieselben vier Achsfarben, die das Spiel auch sonst benutzt (`--nl-pow` … `--nl-soc`,
- * siehe die Kartenfarben im Transfermarkt). BALANCED und RECOVERY entsprechen keiner Achse und
- * bleiben deshalb ungefärbt, statt sich eine fünfte Farbe auszudenken.
+ * siehe die Kartenfarben im Transfermarkt).
+ *
+ * NACHGEMELDET: „badass ist gelb". Stimmt — und die Zeile war rot. Gefärbt wurde nach der
+ * Development-Route (`classNameToDevelopmentRoute`), also danach, welche Achse die Klasse TRAINIERT.
+ * Das ist bei zehn der dreizehn Klassen dieselbe Farbe wie die Klassenfarbe, bei dreien aber nicht:
+ * Badass (Route POW, Farbe gelb), Tactician (Route MEN, Farbe gelb) und Templar (Route SOC, Farbe
+ * blau). Wiedererkannt wird eine Klasse an ihrer Klassenfarbe — dieselbe, die ihr Icon, ihr Chip im
+ * Transfermarkt und der Klassenfilter tragen. Also färbt diese Liste danach.
+ *
+ * Die Route selbst bleibt unangetastet: sie ist Spiellogik (Route-Bonus) und keine Farbe. Klassen
+ * ohne hinterlegte Farbe bleiben ungefärbt, statt sich eine fünfte auszudenken.
  */
-function classRankingRouteTone(route: string | null | undefined) {
-  if (route === "POW") return " nl-tone-pow";
-  if (route === "SPE") return " nl-tone-spe";
-  if (route === "MEN") return " nl-tone-men";
-  if (route === "SOC") return " nl-tone-soc";
-  return "";
+const CLASS_COLOR_TONE: Record<string, string> = {
+  red: " nl-tone-pow",
+  green: " nl-tone-spe",
+  blue: " nl-tone-men",
+  yellow: " nl-tone-soc",
+};
+
+function classRankingClassTone(className: string | null | undefined) {
+  const token = getClassColorToken(className);
+  return token ? CLASS_COLOR_TONE[token] ?? "" : "";
 }
 
 /**
@@ -472,7 +486,7 @@ function NlTrainingClassRanking({
           <button
             type="button"
             key={`class-rank-${row.player.id}-${entry.className}`}
-            className={`nl-training-class-ranking-row is-route-framed${classRankingRouteTone(entry.developmentRoute)}${
+            className={`nl-training-class-ranking-row is-route-framed${classRankingClassTone(entry.className)}${
               entry.isCurrent ? " is-current" : ""
             }`}
             role="radio"
