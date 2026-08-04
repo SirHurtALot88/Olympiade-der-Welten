@@ -41,6 +41,7 @@ import { fmt1 } from "@/app/foundation/discipline-stage/stage-format";
 import { buildTeamRelationshipMap } from "@/lib/foundation/team-relationship";
 import { buildPlayerRatingContractMap, type PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import { getMatchdayLeagueLineupReadiness } from "@/lib/foundation/matchday-arena-readiness";
+import { prefetchDisciplineStageMedia } from "@/lib/foundation/foundation-panel-prefetch";
 
 // Disziplinen mit fertigem nativem Renderer (löst schrittweise das iframe ab).
 // Nativer Renderer je Disziplin. Engine, FX, Sounds, Ticker, Podest, Detail-
@@ -1346,6 +1347,30 @@ export default function DisciplineStageArena({
       })),
     [payload, teamRelationshipMap],
   );
+
+  // Bug bug-2026-08-04T15-59-37-826Z-2tlf67: "Bilder in Hovers/Team-Karte sollen
+  // schon geladen sein, waehrend die Diszi laeuft, damit der Drawer beim Oeffnen
+  // nicht nachlaedt". nativeTeams traegt exakt die Portraits/Logos der Teams, die
+  // in DIESER Disziplin antreten (≤32 Teams × Disziplin-Slotzahl) — dieselben URLs,
+  // die Drawer/Hover ohnehin ueber getPlayerPortraitBrowserUrl/getTeamLogoBrowserUrl
+  // anfordern wuerden. Kein zusaetzliches Datenvolumen, nur ein frueherer Zeitpunkt
+  // (Idle-Slot statt Klick-Zeitpunkt) — siehe prefetchDisciplineStageMedia.
+  useEffect(() => {
+    if (!saveId || !seasonId || !matchdayId || nativeTeams.length === 0) {
+      return;
+    }
+    const urls: (string | null | undefined)[] = [];
+    for (const team of nativeTeams) {
+      urls.push(team.logoUrl);
+      for (const player of team.players) {
+        urls.push(player.portraitUrl);
+      }
+    }
+    prefetchDisciplineStageMedia({
+      sessionKey: `${saveId}:${matchdayId}:${disciplineId}`,
+      urls,
+    });
+  }, [saveId, seasonId, matchdayId, disciplineId, nativeTeams]);
 
   // Gefeldete Spieler je Team (aus dem Arena-Payload) — treibt im Drawer die
   // Team-Sektion „In dieser Disziplin", auch im Test/Vorschau-Modus, wo keine
