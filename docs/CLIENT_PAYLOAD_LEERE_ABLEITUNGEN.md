@@ -29,7 +29,7 @@ Liste wirft dann restlos alles weg.
 |---|---|---|---|
 | „warum haben die spieler keinen +/- im verkaufswert" | VK-Wert == Marktwert in **jeder** Zeile, jedes Bracket | `hasCurrentSeasonSaleFactorRanking` prüft `matchdayResults` → kein Ranking → Faktor 1,0 | #397 — Wert kommt aus dem Server-Slice |
 | „performance ist hier gar nicht mehr mit drin" | Performance-Anteil **+0** im Trainings-Forecast | `getPerformanceIndex` lässt Performance-Zeilen nur durch, wenn ihr `matchdayResultId` in `matchdayResults` steht | offen, Befund in `TRAINING_PERFORMANCE_ANTEIL_BEFUND.md` |
-| „Top Disziplinen … da fehlt jeweils auch der Rank" | PP-Zahlen richtig, **Ränge fehlen** | `buildDisciplineGlobalRankMaps` rankt über den Saison-Ledger und die Snapshots — beide im Browser leer | offen, s. u. |
+| „Top Disziplinen … da fehlt jeweils auch der Rank" | PP-Zahlen richtig, **Ränge fehlen** | `buildDisciplineGlobalRankMaps` rankt über den Saison-Ledger und die Snapshots — beide im Browser leer | behoben, `agent/bug-uzetn6-disziplin-rang`, s. u. |
 
 Gemessen, jeweils am selben Spielstand (`new-game-1785823388048-1hf25q`, Saison 1, MD7):
 
@@ -84,16 +84,21 @@ Für die noch offenen zwei Fälle:
   durchreichen — `buildOrganicSeasonProgression` nimmt für genau solche Fälle bereits
   `accumulatedBaseTrainingBudget` und `performanceWeightMultiplier` entgegen. Details in
   `TRAINING_PERFORMANCE_ANTEIL_BEFUND.md`.
-- **Top-Disziplinen-Ränge**: Der Rang braucht die Saison-PPs **aller** Spieler je Disziplin. Genau
-  das steht bereits als `disciplinePointsByPlayerId` im Directory-Slice. Zwei Wege stehen offen,
-  und die Wahl ist zu belegen, nicht zu raten:
-  1. Aus dem vorhandenen Slice-Feld clientseitig ranken (`buildSharedRankMap`) — kein neues
-     Payload-Feld, aber zu prüfen ist, ob der Slice im Spielerprofil-Pfad überhaupt geladen ist
-     (er wird heute für die Spielerliste angefordert).
-  2. Die fertigen Rangkarten serverseitig mitliefern — mehr Payload, dafür unabhängig davon, welche
-     Ansicht gerade offen ist.
-  Für die Spalte „−1 PPs" gibt es zusätzlich gar keinen Rang im Code (`PlayerDetailDrawer.tsx`
-  übergibt dort hart `null`); in Saison 1 fehlt ohnehin die Vorsaison, der Wert ist dort ehrlich leer.
+- **Top-Disziplinen-Ränge** (bug-2026-08-04T13-23-39-256Z-uzetn6): **behoben**, Zweig
+  `agent/bug-uzetn6-disziplin-rang`. Gewählt wurde Weg 2 aus der ursprünglichen Abwägung — die
+  fertigen Rangkarten serverseitig mitliefern, aber NICHT über den Player-Directory-Slice (der ist
+  für die ganze Spielerliste gedacht und für eine Detailansicht mit einem sichtbaren Spieler
+  unnötig groß), sondern über eine eigene, spieler-scoped Route
+  (`app/api/singleplayer-state/player-discipline-ranks/route.ts`), analog zu `player-sheet` im
+  selben Ordner. `buildPlayerDisciplineRankOverride`
+  (`lib/foundation/player-discipline-rank-service.ts`) rechnet auf `save.gameState` (voller Save)
+  und liefert nur Saison- und All-Time-Rang je Disziplin für GENAU den angefragten Spieler zurück —
+  dünn besetzt wie `disciplinePointsByPlayerId`: eine fehlende Disziplin-ID heißt „kein Rang", nicht
+  „Rang unbekannt". `buildDisciplineValuesFromPlayer` nimmt das Override entgegen und ist bei
+  Vorhandensein abschließend, fällt also nie auf die (auf dem kompakten Payload ggf. falsche)
+  lokale Berechnung zurück. Für die Spalte „−1 PPs" gibt es weiterhin gar keinen Rang im Code
+  (`PlayerDetailDrawer.tsx` übergibt dort hart `null`); in Saison 1 fehlt ohnehin die Vorsaison, der
+  Wert ist dort ehrlich leer — das war nie Teil dieser Meldung.
 
 ## Die stille Verwandte
 

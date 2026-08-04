@@ -25,6 +25,7 @@ import {
   BOARD_V2_CAPTAIN,
   BOARD_V2_COMPOSITION,
   BOARD_V2_DISPOSITION,
+  BOARD_V2_MEDALS,
   BOARD_V2_NET_TRANSFER,
   BOARD_V2_SLATE,
   isBoardObjectivesV2Enabled,
@@ -836,11 +837,42 @@ export function getSportTargetV2(input: {
  * cash priority + season maturity — a real "run a sustainable transfer economy" objective.
  */
 export function getNetTransferBalanceObjective(input: {
+  team: Team;
   row: TeamManagementSnapshotRow;
   profile: TeamStrategyProfile | null;
   seasonNum: number;
 }): ObjectiveDraft {
   const cashPriority = input.profile?.bias.cashPriority ?? 5;
+  if (input.seasonNum <= 1) {
+    // DRAFT-SAISON: der komplette Kader wird erst gekauft, die Netto-Transferbilanz ist deshalb per
+    // Konstruktion tief negativ (real gemessen: −193.7M gegen einen 8M-Deckel). Weder ein Überschuss-
+    // noch ein Ausgaben-Deckel-Ziel ist hier erfüllbar, also tritt an seine Stelle eine Vorgabe, die das
+    // Team tatsächlich steuern kann: einen Cash-Puffer über die Saison halten. Ab S2 greift wieder die
+    // reguläre Transferbilanz-Vorgabe.
+    const reserve = roundValue(
+      clamp(
+        input.team.budget * BOARD_V2_NET_TRANSFER.draftSeasonCashReserveBudgetFraction,
+        BOARD_V2_NET_TRANSFER.draftSeasonCashReserveFloorM,
+        BOARD_V2_NET_TRANSFER.draftSeasonCashReserveCapM,
+      ),
+      1,
+    );
+    const reserveStatus = statusForMin(input.row.cash ?? null, reserve);
+    return {
+      objectiveId: "finance-net-transfer-balance",
+      category: "finance",
+      label: `Cash-Reserve von ${reserve}M halten`,
+      detail: `Aufbausaison: der Kader wird komplett eingekauft, deshalb wertet der Vorstand nicht die Transferbilanz, sondern die Liquidität. Aktuell ${roundValue(input.row.cash ?? 0, 1)}M Cash.`,
+      actionHint: "Beim Kaderaufbau genug Cash zurückhalten — Gehälter und Nachverpflichtungen laufen die ganze Saison weiter.",
+      targetValue: reserve,
+      currentValue: roundValue(input.row.cash ?? 0, 1),
+      status: reserveStatus,
+      rewardCash: reserveStatus === "completed" ? 3 : undefined,
+      penaltyCash: reserveStatus === "failed" ? 2 : undefined,
+      boardConfidenceDelta: reserveStatus === "completed" ? 0.25 : reserveStatus === "failed" ? -0.35 : -0.1,
+      source: "board_v2_net_transfer_balance",
+    };
+  }
   const seasonScale = Math.min(1 + (input.seasonNum - 1) * 0.15, 1.6);
   const target = roundValue(
     Math.max(0, BOARD_V2_NET_TRANSFER.baseTargetM + (cashPriority - 5) * BOARD_V2_NET_TRANSFER.perCashPriorityM) * seasonScale,
@@ -965,7 +997,7 @@ function getPreferredAxisObjective(input: {
   };
 }
 
-function getAxisRankObjective(input: {
+export function getAxisRankObjective(input: {
   team: Team;
   identity: TeamIdentity | null;
   profile: TeamStrategyProfile | null;
@@ -980,9 +1012,19 @@ function getAxisRankObjective(input: {
   const shouldCreate = explicitPowerChase || explicitMentalChase || bias >= 8 || ambition >= 8;
   if (!shouldCreate) return null;
 
-  const targetRank = explicitPowerChase || explicitMentalChase || bias >= 9 || ambition >= 8 ? 5 : 8;
+  const ambitionTarget = explicitPowerChase || explicitMentalChase || bias >= 9 || ambition >= 8 ? 5 : 8;
   const meta = AXIS_OBJECTIVE_META[axis];
   const rank = getAxisRank({ teamId: input.team.teamId, rowsByTeamId: input.rowsByTeamId, axis });
+  // ERREICHBARKEIT: der Zielrang war fest 5 bzw. 8 — allein aus Ambition/Bias, ohne Blick darauf, wo das
+  // Team auf dieser Achse überhaupt steht. Ein ehrgeiziges Team auf POW-Rang 28 bekam so "Power Top 5",
+  // ein Ziel, das ein Kader in einer Saison nicht aufholt. Der Vorstand fordert jetzt höchstens den
+  // gleichen Sprung, den er auch beim Ligarang fordert (BOARD_V2_CALIBRATION.maxStretch Plätze) — für
+  // Teams, die ohnehin schon in Reichweite sind, bleibt die alte Ambitionsmarke unverändert stehen.
+  const stretch = BOARD_V2_CALIBRATION.maxStretch;
+  const targetRank =
+    rank.rank == null
+      ? ambitionTarget
+      : clamp(Math.max(ambitionTarget, rank.rank - stretch), 1, Math.max(1, rank.teamCount));
   const status = statusForRank(rank.rank, targetRank);
 
   return {
@@ -1225,17 +1267,36 @@ function getTopPlayerObjective(input: {
   };
 }
 
-function getMatchdayMedalObjective(input: {
+export function getMatchdayMedalObjective(input: {
   gameState: GameState;
   team: Team;
   identity: TeamIdentity | null;
   profile: TeamStrategyProfile | null;
+  rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
 }): ObjectiveDraft | null {
   const ambition = input.identity?.ambition ?? 5;
   const starPriority = input.profile?.bias.starPriority ?? ambition;
   const scheduled = input.gameState.season.matchdayIds?.length ?? 0;
   if (scheduled < 1 || (ambition < 6 && starPriority < 7)) return null;
-  const target = input.team.shortCode === "M-M" || input.team.shortCode === "Z-H" || ambition >= 9 || starPriority >= 9 ? 2 : 1;
+  // STÄRKE-GATE: eine Spieltagsmedaille ist ein Top-3-Platz in der Teamwertung EINES Spieltags. Das Ziel
+  // hing bisher allein an Ambition/Star-Priorität — ein ehrgeiziges, sportlich aber schwaches Team bekam
+  // damit eine über die ganze Saison unerreichbare Vorgabe (gemessen: "0, bestes Team-Rank #5 · Ziel 1"
+  // bei Liga-Rang 19). Wer nach Stärke-Erwartung nicht in Medaillennähe steht, bekommt sie gar nicht erst.
+  const leagueSize = Math.max(1, input.rowsByTeamId.size);
+  const expectedRank = clamp(
+    resolveExpectedLeagueRank({ teamId: input.team.teamId, rowsByTeamId: input.rowsByTeamId }),
+    1,
+    leagueSize,
+  );
+  const eligibleRank = Math.max(
+    BOARD_V2_MEDALS.eligibleExpectedRankFloor,
+    Math.ceil(leagueSize * BOARD_V2_MEDALS.eligibleExpectedRankFraction),
+  );
+  if (expectedRank > eligibleRank) return null;
+  const doubleRank = Math.max(1, Math.ceil(leagueSize * BOARD_V2_MEDALS.doubleTargetExpectedRankFraction));
+  // Zwei Medaillen fordert der Vorstand nur von der echten Spitze — der frühere shortCode-Sonderfall
+  // (M-M / Z-H) hing an Teamnamen statt an Stärke und verlangte das auch von einem abgestürzten Titelteam.
+  const target = expectedRank <= doubleRank && (ambition >= 8 || starPriority >= 8) ? 2 : 1;
   const summary = getTeamMatchdayMedalSummary(input.gameState, input.team.teamId);
   const remaining = getRemainingMatchdays(input.gameState);
   const status = statusForSeasonCount({
@@ -1625,6 +1686,28 @@ function buildSponsorObjectiveDrafts(input: {
       };
     }
     if (component.kind === "rank") {
+      if (contract.sponsorV3) {
+        // SPONSOR V3/V4: die Rang-Komponente ist KEINE Zielmarke, sondern die gestaffelte
+        // Auszahlungsleiter — jeder Endrang von 1 bis 32 zahlt, nur unterschiedlich viel. Ihr
+        // `targetValue` steht auf 1, weil Rang 1 die oberste Sprosse ist. Als Board-Ziel gespiegelt
+        // wurde daraus "Ziel Top 1", das 31 von 32 Teams jede Saison verfehlen — inklusive
+        // Inbox-Meldung "Board-Ziel verfehlt" und −0,35 Vorstandsvertrauen für ein Team, das nie
+        // Titelanwärter war. Die Leiter wird deshalb nur noch informativ gespiegelt: sichtbarer
+        // Zwischenstand, aber kein verbindliches Ziel und keine Vertrauenswirkung.
+        return {
+          objectiveId: `sponsor-${component.componentId}`,
+          category: "sponsor",
+          label: component.label,
+          detail: "Zahlt auf jeder Stufe — je besser der Endrang, desto höher die Sponsorenprämie. Kein Pass-/Fail-Ziel.",
+          targetValue: "gestaffelt nach Endrang",
+          currentValue: input.row.rank != null ? `Rang ${input.row.rank}` : "—",
+          status: "open",
+          optional: true,
+          rewardCash: component.rewardCash,
+          boardConfidenceDelta: 0,
+          source: "sponsor_v2_contract",
+        };
+      }
       const target = typeof component.targetValue === "number" ? component.targetValue : 16;
       const status = evaluateSponsorRankObjective(input.row.rank ?? null, target);
       return {
@@ -1762,7 +1845,7 @@ function buildTeamObjectives(input: {
       // net-transfer-balance goal; V1 keeps the plain cash-positive objective (so no duplicate with the
       // standalone cash-positive that origin/main added — this conditional subsumes it).
       boardV2
-        ? getNetTransferBalanceObjective({ row, profile, seasonNum })
+        ? getNetTransferBalanceObjective({ team, row, profile, seasonNum })
         : {
             objectiveId: "finance-cash-positive",
             category: "finance",
@@ -1782,7 +1865,7 @@ function buildTeamObjectives(input: {
       boardV2 ? getRosterQualityCompositionObjective({ gameState, team, identity }) : null,
       getFormColorObjective(gameState, team),
       getNextMatchdayTop10Objective(gameState, team),
-      getMatchdayMedalObjective({ gameState, team, identity, profile }),
+      getMatchdayMedalObjective({ gameState, team, identity, profile, rowsByTeamId }),
       getFacilityObjective(gameState, team, profile),
       getDevelopmentObjective(gameState, row, team),
       getTeamMoraleObjective({ gameState, team, identity, profile }),

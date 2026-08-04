@@ -4,7 +4,7 @@
 > `data/bug-reports/triage/*.md` und `tickets.json`. Wer hier etwas ändert, verliert es beim
 > nächsten `npm run bugs:tabelle`. Der Stand einer Meldung wird in ihrer Triage-Notiz gepflegt.
 
-30 Meldungen — offen: 2 · vorgeprüft: 0 · angenommen: 3 · gebaut: 25 · abgelehnt: 0 · erledigt: 0
+31 Meldungen — offen: 1 · vorgeprüft: 0 · angenommen: 3 · gebaut: 27 · abgelehnt: 0 · erledigt: 0
 
 | Nr | Eingang | Von | Wo | Titel | Status | Ergebnis |
 |---:|---|---|---|---|---|---|
@@ -37,7 +37,8 @@
 | [27](triage/bug-2026-08-04T13-20-49-011Z-191wtu.md) | 04.08., 15:20 | Chris | Spieltag · Saisonstand | Saisonstand zeigt keine Rang-Änderung zur letzten Wertung | gebaut ⚠ | Die Rang-Spalte des Saisonstands hatte die Bewegung nie zu sehen bekommen — sie hing an einer Datenquelle, die auf genau dieser Seite immer leer ist. Jetzt kommt sie aus dem gespeicherten Punktestand vor der letzten Wertung. · PR #394 · **Wirkung nicht bestaetigt** |
 | [28](triage/bug-2026-08-04T13-22-34-347Z-pqcssb.md) | 04.08., 15:22 | Chris | Spieltag · Saisonstand | Saisonstand — Rang hinter den geholten PPs, je Disziplin und je Bereich | gebaut ⚠ | PR 401 · `efca1cf2` · **kein Ergebnis angegeben, Wirkung nicht bestaetigt** |
 | [29](triage/bug-2026-08-04T13-23-39-256Z-uzetn6.md) | 04.08., 15:23 | Chris | Team · Spieler | „Top Disziplinen hat z.B. auch PPs -1 Pps und All-Time -> da fehlt jeweils auch der Rank das hatten wir früher drin und ist super hilfreich! bitte hinzufügen" | offen | — |
-| [30](triage/bug-2026-08-04T15-59-37-826Z-2tlf67.md) | 04.08., 17:59 | Chris | Spieltag · Arena | „bitte schauen dass die bilder in den hovers und team karte geladen werden während die diszi läuft damit die verfügbar sind wenn man mal den drawer öffnet" | offen | — |
+| [30](triage/bug-2026-08-04T15-59-37-826Z-2tlf67.md) | 04.08., 17:59 | Chris | Spieltag · Arena | Portraits/Team-Logos für Hover & Drawer vorladen, während die Disziplin läuft | gebaut ⚠ | Neue Funktion `prefetchDisciplineStageMedia` (im bestehenden Idle-Prefetch- Mechanismus `lib/foundation/foundation-panel-prefetch.ts`) lädt Portraits + Team-Logos der in der laufenden Disziplin antretenden Teams im Idle-Slot vor — dieselben URLs, die Drawer/Hover ohnehin anfordern würden, also kein zusätzliches Datenvolumen, nur ein früherer Zeitpunkt. · **kein PR angegeben, Wirkung nicht bestaetigt** |
+| [31](triage/bug-2026-08-04T18-19-57-891Z-64iu51.md) | 04.08., 20:19 | Chris | Spieltag · Arena | Time Trial — Arena deutlich niedriger als die Teams-Tabelle daneben | gebaut ⚠ | Die Zeitfahren-Szene bekam mit `h: 460` die mit Abstand niedrigste Geometrie aller 20 Disziplinen (nächstniedrigster Wert: 560) — die Strasse blieb dadurch deutlich kürzer als die Teams-Tabelle rechts daneben, obwohl beide dieselbe Spaltenbreite/-höhe zur Verfügung haben. Auf `h: 620` angehoben (= track/mountain/court), Belege per Playwright- Screenshot vor/nach. · **kein PR angegeben, Wirkung nicht bestaetigt** |
 
 **`gebaut ⚠`** heißt: Der Fix ist gemergt, die Wirkung im laufenden Spiel aber noch nicht belegt.
 Erst ein `bestaetigt:` in der Triage-Notiz macht daraus `erledigt`. Diese Unterscheidung gibt es,
@@ -46,4 +47,4 @@ von einem Zwischenspeicher verschluckt.
 
 Details je Ticket: die Nummer verlinkt auf die Triage-Notiz. Volltext: `npm run bugs:review`.
 
-_Erzeugt: 4.8.2026, 21:15:09_
+_Erzeugt: 4.8.2026, 23:01:20_

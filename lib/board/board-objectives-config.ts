@@ -45,6 +45,32 @@ export const BOARD_V2_NET_TRANSFER = {
    */
   overspendCeilingFloorM: 8,
   overspendCeilingCashFraction: 0.15,
+  /**
+   * DRAFT-SAISON (S1): in Season 1 kauft jedes Team seinen KOMPLETTEN Kader ein — jede Vorgabe auf die
+   * Netto-Transferbilanz (Überschuss ODER Ausgabendeckel) ist dort per Konstruktion unerfüllbar und wurde
+   * als "Transferausgaben unter 8M halten — Aktuell 193.7" verfehlt gemeldet. Das Finanzziel wird in S1
+   * deshalb durch eine erfüllbare Liquiditätsvorgabe ersetzt: halte am Saisonende einen Cash-Puffer.
+   * Zielhöhe wie bei `getRebuildCashObjective` in S1 — Budgetanteil, nach unten und oben begrenzt.
+   */
+  draftSeasonCashReserveBudgetFraction: 0.1,
+  draftSeasonCashReserveFloorM: 15,
+  draftSeasonCashReserveCapM: 30,
+} as const;
+
+/**
+ * Spieltagsmedaillen-Ziel (Top-3-Teamwertung an einem Spieltag). Das Ziel hing bisher NUR an
+ * Ambition/Star-Priorität der Identität — ein ambitioniertes, aber sportlich schwaches Team bekam
+ * damit ein Ziel, das über die ganze Saison unerreichbar ist ("0, bestes Team-Rank #5 · Ziel 1").
+ * Deshalb zusätzlich ein Stärke-Gate: nur wer nach Stärke-Erwartung überhaupt in Medaillennähe steht,
+ * bekommt die Vorgabe. Ligagrößen-relativ, damit es auch in kleineren Ligen trägt.
+ */
+export const BOARD_V2_MEDALS = {
+  /** Ein-Medaillen-Ziel nur bis zu diesem Anteil der Liga (0.25 = Top 8 von 32). */
+  eligibleExpectedRankFraction: 0.25,
+  /** Untergrenze des Gates, damit auch sehr kleine Ligen ein paar Kandidaten haben. */
+  eligibleExpectedRankFloor: 3,
+  /** Zwei-Medaillen-Ziel nur für die absolute Spitze (0.1 = Top 3 von 32). */
+  doubleTargetExpectedRankFraction: 0.1,
 } as const;
 
 /**
