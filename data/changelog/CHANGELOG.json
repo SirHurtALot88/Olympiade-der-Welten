@@ -21,6 +21,15 @@
     },
     {
       "datum": "2026-08-04",
+      "seite": "Spieltag · Saisonstand",
+      "pr": null,
+      "text": "Der Hover auf der GuV war ein zehnzeiliger Absatz. Die Rechnung steht jetzt in einer Zeile, darunter nur noch, was nicht enthalten ist und warum der Finanzen-Reiter eine andere Zahl zeigt.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
       "seite": "Gebäude · Specialist Wing",
       "pr": null,
       "text": "Die KI bewertete den Specialist Wing wie die Academy über den Youth-Anteil. Jetzt zählt, ob der Kader überhaupt ein Achsprofil hat, das sich verstärken lässt — ein gleichmäßig verteilter Kader gewinnt wenig, ein Kader ohne zuordenbare Klassen bekäme sogar eine willkürliche Achse dauerhaft festgeschrieben.",

@@ -61,7 +61,8 @@ describe("Beide Hover benennen dieselbe Abgrenzung", () => {
     for (const [name, text] of [["Saisonstand", standings], ["Finanzen", finances]] as const) {
       expect(text, `${name}: Transfers fehlen`).toContain("Transfers");
       expect(text, `${name}: Apron fehlt`).toContain("Apron");
-      expect(text, `${name}: Abgrenzung fehlt`).toContain("Nicht enthalten:");
+      // Die Abgrenzung muss dastehen — auf welches Wort sie faellt, ist Sache der Fassung.
+      expect(text, `${name}: Abgrenzung fehlt`).toMatch(/Ohne Transfers|Nicht enthalten/);
     }
   });
 
@@ -72,7 +73,8 @@ describe("Beide Hover benennen dieselbe Abgrenzung", () => {
 
   it("keiner behauptet, eine der Zahlen sei falsch", () => {
     for (const text of [standings, finances]) {
-      expect(text).toContain("Beide sind richtig");
+      // Kein Hover darf die andere Zahl fuer falsch erklaeren — die Formulierung ist frei.
+      expect(text).toMatch(/Beide stimmen|Beide sind richtig/);
     }
   });
 });
