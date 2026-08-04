@@ -44236,6 +44236,10 @@ button.foundation-team-portrait-card {
      Schleier, nie Text). Ohne Team-Theme identisch zum Akzent, damit der
      Standard-Look sich nicht ändert. */
   --nl-accent-deep: var(--nl-accent);
+  /* --nl-accent-fill = Fläche für Text-auf-Akzent (Buttons, Pills). Getrennt
+     vom Akzent, weil vier Teams sonst knapp unter dem WCAG-AA-Wert lägen;
+     ohne Team-Theme identisch zum Akzent. */
+  --nl-accent-fill: var(--nl-accent);
   /* Gemeinsamer Fokus-Ring (zusammen mit outline-offset: 2px angewandt) */
   --nl-focus-ring: 2px solid var(--nl-accent);
   /* Achsen (Spiel-Identität) */
@@ -64156,12 +64160,12 @@ button.is-new-look .nl-thist-season-pill,
    (S-S) und dunklem Stahl (L-R) lesbar bleibt. Ohne Team-Theme bleibt das
    gewohnte Blau unverändert. */
 .foundation-shell.is-new-look[data-team-theme] .primary-button {
-  background: color-mix(in srgb, var(--nl-accent) 88%, var(--nl-panel));
+  background: color-mix(in srgb, var(--nl-accent-fill, var(--nl-accent)) 92%, var(--nl-panel));
   color: var(--nl-accent-ink);
 }
 
 .foundation-shell.is-new-look[data-team-theme] .secondary-button {
-  background: color-mix(in srgb, var(--nl-accent) 72%, var(--nl-panel));
+  background: color-mix(in srgb, var(--nl-accent-fill, var(--nl-accent)) 78%, var(--nl-panel));
   color: var(--nl-accent-ink);
 }
 

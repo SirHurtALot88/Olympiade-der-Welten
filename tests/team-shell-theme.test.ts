@@ -8,7 +8,7 @@ import {
   resolveTeamAccentPair,
   teamColorChroma,
 } from "@/lib/foundation/team-shell-theme";
-import { floorTeamAccent, getTeamColor } from "@/lib/foundation/team-colors";
+import { floorTeamAccent, getTeamColor, TEAM_COLOR } from "@/lib/foundation/team-colors";
 
 /**
  * Team-Shell-Theme: die Shell-Wurzel färbt die --nl-* Akzent-Tokens nach dem
@@ -72,6 +72,55 @@ describe("buildTeamShellThemeVars", () => {
     expect(resolveTeamAccentPair("W-L").swapped).toBe(true);
     // D-L ist grau UND sein Zweitton ist grau — hier wird keine Farbe erfunden.
     expect(resolveTeamAccentPair("D-L").swapped).toBe(false);
+  });
+
+  /**
+   * GEFRAGT: „bau das so ein für alle teams!" — also nachgeprüft, ob wirklich
+   * alle 32 tragen und nicht nur die drei, die im Browser zu sehen waren.
+   *
+   * Vier fielen dabei knapp durch: C-S 4,49, Z-H 4,45, W-W 4,36 und M-M 4,34
+   * gegen die 4,5 der WCAG-AA-Schwelle. Die Schrift konnte da nichts mehr
+   * retten — sie steht mit Weiß und fast-Schwarz schon auf beiden Extremen.
+   * Deshalb wird die FLÄCHE nachjustiert, nicht die Schrift.
+   */
+  it("hält auf JEDEM der 32 Teams die Lesbarkeitsschwelle für Text auf der Fläche", () => {
+    const luminanz = (wert: string) => {
+      if (wert === "#fff") return 1;
+      if (wert === "#0b0f17") return 0.0058;
+      const m = /^hsl\(\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%\s*\)$/.exec(wert)!;
+      const [h, s, l] = [Number(m[1]), Number(m[2]) / 100, Number(m[3]) / 100];
+      const c = (1 - Math.abs(2 * l - 1)) * s;
+      const hp = (((h % 360) + 360) % 360) / 60;
+      const x = c * (1 - Math.abs((hp % 2) - 1));
+      const [r, g, b] =
+        hp < 1 ? [c, x, 0] : hp < 2 ? [x, c, 0] : hp < 3 ? [0, c, x] : hp < 4 ? [0, x, c] : hp < 5 ? [x, 0, c] : [c, 0, x];
+      const m2 = l - c / 2;
+      const lin = (ch: number) => (ch + m2 <= 0.04045 ? (ch + m2) / 12.92 : ((ch + m2 + 0.055) / 1.055) ** 2.4);
+      return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+    };
+    for (const code of Object.keys(TEAM_COLOR)) {
+      const vars = buildTeamShellThemeVars(code)!;
+      const flaeche = luminanz(vars["--nl-accent-fill"]!);
+      const schrift = luminanz(vars["--nl-accent-ink"]!);
+      const verhaeltnis = (Math.max(flaeche, schrift) + 0.05) / (Math.min(flaeche, schrift) + 0.05);
+      expect(verhaeltnis, `${code}: Text auf der Akzentfläche zu kontrastarm`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("lässt die 28 Teams in Ruhe, die die Schwelle ohnehin halten", () => {
+    // Die Fläche darf nicht pauschal verschoben werden — sonst verlöre jede
+    // Marke ihren Ton für ein Problem, das sie gar nicht hat.
+    for (const code of ["R-L", "G-G", "B-B", "S-S", "V-W"]) {
+      expect(buildTeamShellThemeVars(code)!["--nl-accent-fill"]).toBe(buildTeamShellThemeVars(code)!["--nl-accent"]);
+    }
+  });
+
+  it("verschiebt nur die Helligkeit, nicht den Farbton", () => {
+    // Sonst wäre aus einer Nachjustierung eine andere Vereinsfarbe geworden.
+    const vars = buildTeamShellThemeVars("W-W")!;
+    const farbton = (v: string) => /^hsl\(\s*([\d.]+)/.exec(v)![1];
+    expect(farbton(vars["--nl-accent-fill"]!)).toBe(farbton(vars["--nl-accent"]!));
+    expect(vars["--nl-accent-fill"]).not.toBe(vars["--nl-accent"]);
   });
 
   it("misst Buntheit als Sättigung mal Nähe zur mittleren Helligkeit", () => {

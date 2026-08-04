@@ -101,6 +101,42 @@ export function accentInkFor(accentHsl: string): string {
   return contrastDark >= contrastWhite ? BASE_BG : "#fff";
 }
 
+/** WCAG-Kontrast zweier Luminanzen. */
+function kontrast(a: number, b: number): number {
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+/**
+ * Die FÜLLFARBE für Akzentflächen mit Text darauf (Buttons, Pills) — nicht zu
+ * verwechseln mit `--nl-accent`, das Linien, Ränder und Text auf dunklem Grund
+ * färbt und deshalb die Markenfarbe unangetastet lassen soll.
+ *
+ * Warum überhaupt getrennt: über alle 32 Teams gemessen erreichten vier den
+ * WCAG-AA-Wert für normalen Text nicht ganz — C-S 4,49, Z-H 4,45, W-W 4,36 und
+ * M-M 4,34 gegen die geforderten 4,5. Die Schrift kann dort nichts mehr
+ * retten, sie steht mit Weiß und fast-Schwarz schon auf beiden Extremen. Also
+ * wird die FLÄCHE so weit in der Helligkeit verschoben, bis die Schrift die
+ * Schwelle hält — in Richtung der gewählten Schriftfarbe weg, also dunkler bei
+ * weißer Schrift und heller bei dunkler.
+ *
+ * Für die 28 Teams, die ohnehin über 4,5 liegen, ändert sich nichts.
+ */
+export function accentFillFor(accentHsl: string, ink: string): string {
+  const parsed = parseHsl(accentHsl);
+  if (!parsed) return accentHsl;
+  const inkLum = ink === "#fff" ? 1 : DARK_INK_LUMINANCE;
+  const richtung = ink === "#fff" ? -1 : 1;
+  let l = parsed.l;
+  for (let schritt = 0; schritt < 40; schritt += 1) {
+    if (kontrast(hslLuminance(parsed.h, parsed.s, l), inkLum) >= 4.5) break;
+    const next = l + richtung * 1.5;
+    // Nicht ins Unkenntliche laufen: die Marke soll erkennbar bleiben.
+    if (next < 22 || next > 88) break;
+    l = next;
+  }
+  return `hsl(${parsed.h} ${parsed.s}% ${Math.round(l * 10) / 10}%)`;
+}
+
 /** Dunkle Fläche im Team-Farbton (aktive Zustände, Selection, weiche Panels). */
 export function accentSoftFor(accentHsl: string): string {
   const parsed = parseHsl(accentHsl);
@@ -188,6 +224,9 @@ export function buildTeamShellThemeVars(code: string | null | undefined): TeamSh
     // Der dunkle Partner als eigenes Token: Flächen und Rahmen dürfen ihn nutzen,
     // ohne ihn auf Textlesbarkeit anheben zu müssen.
     "--nl-accent-deep": deep,
+    // Fläche für Text-auf-Akzent — bei Bedarf in der Helligkeit nachjustiert,
+    // damit die Schrift überall die AA-Schwelle hält (siehe accentFillFor).
+    "--nl-accent-fill": accentFillFor(accent, accentInkFor(accent)),
     "--nl-accent": accent,
     "--nl-accent-2": accent2,
     "--nl-accent-soft": accentSoftFor(accent),
