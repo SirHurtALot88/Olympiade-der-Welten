@@ -30,6 +30,42 @@
     },
     {
       "datum": "2026-08-04",
+      "seite": "Team · Kader",
+      "pr": null,
+      "text": "Auf den Kaderkarten fehlten die Saison-PPs je Achse — die vier Zahlen dort waren immer nur die Attributwerte. Jetzt steht darunter eine zweite Zeile mit den geholten Punkten und dem Ligarang je Achse.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
+      "seite": "Team · Kader",
+      "pr": null,
+      "text": "Der MW auf der Kaderkarte zeigt jetzt den Preis, den du in dieser Saison für den Spieler bekommst, statt den reinen Marktwert — darunter steht, wie viel der Verkaufsfaktor drauflegt oder abzieht.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
+      "seite": "Team · Kader",
+      "pr": null,
+      "text": "Die Portraits im Kader waren klein für das, was auf ihnen zu sehen ist. Die Karten sind jetzt breiter und die Bilder entsprechend größer.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
+      "seite": "Spieltag · Saisonstand",
+      "pr": null,
+      "text": "Der Hover auf der GuV nannte den Apron nur als etwas, das nicht enthalten ist. Jetzt steht dort, was er beim aktuellen Rang hochgerechnet ausmachen würde — mit der Gehaltszahl, gegen die gerechnet wird, und dem Hinweis, dass Deckel und Ausschüttung erst mit dem Endrang feststehen.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
       "seite": "Gebäude · Specialist Wing",
       "pr": null,
       "text": "Die KI bewertete den Specialist Wing wie die Academy über den Youth-Anteil. Jetzt zählt, ob der Kader überhaupt ein Achsprofil hat, das sich verstärken lässt — ein gleichmäßig verteilter Kader gewinnt wenig, ein Kader ohne zuordenbare Klassen bekäme sogar eine willkürliche Achse dauerhaft festgeschrieben.",

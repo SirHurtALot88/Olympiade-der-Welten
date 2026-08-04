@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 
 import SeasonStandingsNewLook from "@/app/foundation/season-v2/SeasonStandingsNewLook";
+import type { GuvApronProjectionInput } from "@/lib/finance/guv-breakdown";
 import type { SeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
 import type { SeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
 import type { SeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
@@ -62,6 +63,12 @@ export type SeasonV2StandingsRow = {
   sponsorTotal: number | null;
   /** Transferbilanz der Saison = Verkäufe − Käufe (S1 nur Käufe → großes Minus). */
   transferNet: number | null;
+  /**
+   * Apron beim AKTUELLEN Rang hochgerechnet — Grundlage der Apron-Zeile im GuV-Hover.
+   * Bewusst je Zeile durchgereicht statt im Render berechnet: Topf und Ausschüttung hängen an
+   * ALLEN 32 Teams, das lässt sich nicht pro Zeile nachziehen (siehe `apron-projection.ts`).
+   */
+  apronProjection?: GuvApronProjectionInput | null;
   marketValueTotal: number | null;
   disciplineValues: Record<SeasonV2DisciplineKey, number | null>;
   rosterCount: number;

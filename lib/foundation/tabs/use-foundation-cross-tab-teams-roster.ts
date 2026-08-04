@@ -136,6 +136,13 @@ type FoundationPlayerRatingSnapshot = {
   ppSpe?: number | null;
   ppMen?: number | null;
   ppSoc?: number | null;
+  // Die Achsen-Ränge liegen in `PlayerRatingContractRow` längst neben den Achsenwerten
+  // (`buildSharedRankMap` je Achse) — sie standen hier nur nicht im Ausschnitt, den dieser
+  // Hook liest. Ohne sie kann die Kaderkarte die PPs zwar zeigen, aber nicht einordnen.
+  ppPowRank?: number | null;
+  ppSpeRank?: number | null;
+  ppMenRank?: number | null;
+  ppSocRank?: number | null;
   ovrRank?: number | null;
   mvsRank?: number | null;
   ppsSeasonRank?: number | null;
@@ -734,6 +741,17 @@ export function useFoundationCrossTabTeamsRoster(input: {
           activePlayers.map((player) => ({ teamId: player.id, value: player.coreStats.soc ?? 0 })),
         ),
       };
+      /**
+       * Verkaufswerte je Spieler — aus DERSELBEN `contractTable`, die oben ohnehin schon für die
+       * Gehaltssummen gebaut wird. Bewusst kein zweiter Aufruf von
+       * `buildTransfermarktSaleFactorBreakdown`: der Verkaufsfaktor je Spieler ist nicht billig,
+       * und zwei Quellen für dieselbe Zahl wären zwei Zahlen, sobald eine der beiden sich ändert.
+       */
+      const saleByPlayerId = new Map(
+        contractTable.rows
+          .filter((row) => row.status === "active")
+          .map((row) => [row.playerId, { exitValue: row.exitValue, marketValueAtExit: row.marketValueAtExit }] as const),
+      );
       const rosterCardsKnown = !isFoundationTeamManagementLocked(team.teamId, input.manageableTeamIds);
       const rosterCards = rosterEntries
         .map((entry) => {
@@ -771,6 +789,15 @@ export function useFoundationCrossTabTeamsRoster(input: {
           const economy = resolvePlayerEconomyContract({ playerId: player.id, player, rosterEntry: entry });
           const marketValue = economy.marketValue;
           const marketValueDelta = getPlayerDisplayMarketValueDelta(player, entry, input.gameState);
+          const sale = saleByPlayerId.get(player.id) ?? null;
+          const saleValue = sale?.exitValue ?? null;
+          // Basis des Aufschlags ist `marketValueAtExit` (der Marktwert, gegen den der
+          // Verkaufsfaktor gerechnet hat), nicht `economy.marketValue` — sonst stünde in der
+          // Differenz auch noch der Unterschied zwischen zwei Marktwert-Quellen.
+          const saleValueVsMarketValue =
+            saleValue != null && sale?.marketValueAtExit != null
+              ? roundViewNumber(saleValue - sale.marketValueAtExit, 2)
+              : null;
           const salary = getRosterEntryDisplaySalary(entry, player);
           const salaryDelta = getRosterEntrySalaryDelta(entry, player, input.gameState);
           if (liveAverageSalary != null && salary > liveAverageSalary * 1.35) {
@@ -798,6 +825,8 @@ export function useFoundationCrossTabTeamsRoster(input: {
             ppsRank: rating?.ppsSeasonRank ?? null,
             marketValue,
             marketValueDelta,
+            saleValue,
+            saleValueVsMarketValue,
             salary,
             salaryDelta,
             contractLength: entry.contractLength ?? null,
@@ -814,6 +843,18 @@ export function useFoundationCrossTabTeamsRoster(input: {
               menRank: playerCoreRankMaps.men.get(player.id) ?? null,
               soc: player.coreStats.soc ?? null,
               socRank: playerCoreRankMaps.soc.get(player.id) ?? null,
+            },
+            // Saison-PPs je Achse — die Ligaränge kommen fertig aus dem Rating-Row, hier wird
+            // nichts nachgerechnet.
+            axisPps: {
+              pow: rating?.ppPow ?? null,
+              powRank: rating?.ppPowRank ?? null,
+              spe: rating?.ppSpe ?? null,
+              speRank: rating?.ppSpeRank ?? null,
+              men: rating?.ppMen ?? null,
+              menRank: rating?.ppMenRank ?? null,
+              soc: rating?.ppSoc ?? null,
+              socRank: rating?.ppSocRank ?? null,
             },
             issueTags,
             demands: (demandMap.get(player.id) ?? []).map((demand) => ({

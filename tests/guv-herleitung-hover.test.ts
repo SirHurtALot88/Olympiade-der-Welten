@@ -53,6 +53,70 @@ describe("Die Saisonstand-GuV wird in ihre echten Terme zerlegt", () => {
   });
 });
 
+describe("Der Apron steht als Hochrechnung beim aktuellen Rang daneben", () => {
+  const apron = {
+    nettoDelta: -3.4,
+    rank: 7,
+    salary: 83.3,
+    line1: 69.5,
+    line2: 79,
+    frozenLines: true,
+    gedeckelt: false,
+  };
+
+  it("zählt NICHT in die GuV hinein — die Zerlegung geht weiter exakt auf", () => {
+    const breakdown = buildGuvBreakdown({ sponsorTotal: 100, salaryTotal: 80, guv: 30, apron });
+    const apronLine = breakdown.lines.find((line) => line.label.startsWith("Apron"));
+    expect(apronLine?.counted).toBe(false);
+    expect(apronLine?.value).toBe(-3.4);
+    const sum = breakdown.lines.filter((line) => line.counted).reduce((total, line) => total + (line.value ?? 0), 0);
+    expect(Number(sum.toFixed(2))).toBe(30);
+  });
+
+  it("nennt den Rang, auf den hochgerechnet wurde, und weist sich als Hochrechnung aus", () => {
+    const text = buildGuvBreakdown({ sponsorTotal: 100, salaryTotal: 80, guv: 30, apron }).hoverText;
+    // Der Einwand gegen den Apron im Hover war, dass Deckel und Ausschüttung am ENDRANG hängen.
+    // Er wird nicht wegdefiniert: der Hover sagt beides — worauf gerechnet wurde und was noch offen ist.
+    expect(text).toContain("Platz 7");
+    expect(text).toContain("Hochrechnung");
+    expect(text).toContain("Endrang");
+  });
+
+  it("rechnet die GuV inklusive Apron vor, statt sie den Leser bilden zu lassen", () => {
+    const text = buildGuvBreakdown({ sponsorTotal: 100, salaryTotal: 80, guv: 30, apron }).hoverText;
+    expect(text).toContain("mit Apron +26,6");
+  });
+
+  it("nennt die GEGLÄTTETE Bemessungsgrundlage, weil sie von der Gehaltsspalte abweichen darf", () => {
+    // apron-service.ts rechnet auf `getTeamDisplaySalaryTotal`, die Tabelle zeigt die echte
+    // Vertragssumme. Ohne diesen Zusatz suchte man die Differenz in der Rechnung (Save-Beispiel
+    // im Kopfkommentar dort: 97,7 echt gegen 83,3 geglättet).
+    const text = buildGuvBreakdown({ sponsorTotal: 100, salaryTotal: 97.7, guv: 30, apron }).hoverText;
+    expect(text).toContain("83,3");
+    expect(text).toContain("geglättet");
+    expect(text).toContain("69,5 / 79");
+  });
+
+  it("meldet einen greifenden Deckel und noch nicht eingefrorene Linien", () => {
+    const text = buildGuvBreakdown({
+      sponsorTotal: 100,
+      salaryTotal: 80,
+      guv: 30,
+      apron: { ...apron, gedeckelt: true, frozenLines: false },
+    }).hoverText;
+    expect(text).toContain("Deckel begrenzt");
+    expect(text).toContain("noch nicht eingefroren");
+  });
+
+  it("ohne Apron-Daten bleibt der Hover unverändert", () => {
+    // Gegenprobe: die Hochrechnung ist additiv. Ein Aufrufer ohne Apron-Zahlen (Archivsaison,
+    // fehlendes Team) bekommt exakt den Text von vorher statt einer leeren Apron-Zeile.
+    const ohne = buildGuvBreakdown({ sponsorTotal: 100, salaryTotal: 80, guv: 30 });
+    expect(ohne.hoverText).not.toContain("Hochrechnung");
+    expect(ohne.lines.some((line) => line.label.startsWith("Apron"))).toBe(false);
+  });
+});
+
 describe("Beide Hover benennen dieselbe Abgrenzung", () => {
   const standings = buildGuvBreakdown({ sponsorTotal: 100, salaryTotal: 80, guv: 30 }).hoverText;
   const finances = buildOperatingGuvHoverText({ totalIncome: 200, totalExpenses: 170 });

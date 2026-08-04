@@ -38953,10 +38953,99 @@ button.market-v2-bucket-card.is-selected {
   font-size: 0.66rem;
 }
 
+.foundation-player-portrait-card.is-full-art.is-team-layout .foundation-player-portrait-pps {
+  gap: 3px;
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .foundation-player-portrait-pps-chip {
+  padding: 2px;
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .foundation-player-portrait-pps-chip small {
+  font-size: 0.48rem;
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .foundation-player-portrait-pps-chip strong {
+  font-size: 0.64rem;
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .foundation-player-portrait-pps-chip em {
+  font-size: 0.46rem;
+}
+
 .foundation-player-portrait-economy {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
+}
+
+/* Saison-PPs je Achse — die zweite Achsenzeile, direkt unter dem Attribut-Orbit.
+   BEWUSST DIESELBE 4er-Rasterung und dieselbe Achsenfarbe wie der Orbit darüber: die beiden
+   Zeilen gehören zusammen und werden als Paar gelesen (oben das Attribut, darunter was der
+   Spieler damit in dieser Saison geholt hat). Damit man sie trotzdem nicht verwechselt, ist
+   diese Zeile durchgehend zurückgenommen — flacherer Ton, kleinere Zahl — und trägt als
+   einzige den Ligarang (`#4`). */
+.foundation-player-portrait-pps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+}
+
+.foundation-player-portrait-pps-chip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  justify-items: center;
+  text-align: center;
+  min-width: 0;
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.foundation-player-portrait-pps-chip.is-pow {
+  border-color: rgba(214, 93, 86, 0.2);
+  background: rgba(214, 93, 86, 0.06);
+}
+
+.foundation-player-portrait-pps-chip.is-spe {
+  border-color: rgba(98, 179, 110, 0.2);
+  background: rgba(98, 179, 110, 0.06);
+}
+
+.foundation-player-portrait-pps-chip.is-men {
+  border-color: rgba(113, 153, 235, 0.2);
+  background: rgba(113, 153, 235, 0.06);
+}
+
+.foundation-player-portrait-pps-chip.is-soc {
+  border-color: rgba(225, 184, 92, 0.2);
+  background: rgba(225, 184, 92, 0.06);
+}
+
+.foundation-player-portrait-pps-chip small {
+  font-size: 0.5rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  color: rgba(218, 229, 245, 0.62);
+}
+
+.foundation-player-portrait-pps-chip strong {
+  font-size: 0.68rem;
+  line-height: 1.1;
+  color: rgba(248, 251, 255, 0.94);
+}
+
+.foundation-player-portrait-pps-chip em {
+  font-size: 0.5rem;
+  font-style: normal;
+  line-height: 1.1;
+  color: rgba(196, 208, 228, 0.62);
 }
 
 .foundation-player-portrait-economy-stat {
@@ -65427,9 +65516,13 @@ button.is-new-look .nl-thist-season-pill,
   color: var(--nl-mut);
 }
 
+/* Rasterbreite bestimmt hier die Bildgröße: die Karte ist `aspect-ratio: 2 / 3`, das Portrait
+   füllt sie ganz aus. Breitere Spalten = größeres Bild, ohne an der Karte selbst zu drehen.
+   `auto-fill` sorgt weiter dafür, dass schmale Fenster einfach eine Spalte weniger zeigen
+   statt die Karten zu stauchen. */
 .is-new-look .nl-teamprofile-portrait-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(272px, 1fr));
   gap: var(--nl-s4);
 }
 
