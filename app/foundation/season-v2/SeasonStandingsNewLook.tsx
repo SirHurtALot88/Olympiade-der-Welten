@@ -283,6 +283,37 @@ function buildValueRanks(
   return ranked;
 }
 
+/**
+ * „#3" hinter einer PP-Zahl — der Liga-Rang, den dieser Wert bedeutet.
+ *
+ * GEMELDET VON CHRIS: „5 PPs geholt was rang 3 entspricht — finde das ist eine Info, die überall
+ * sein sollte, wo man PPs sieht."
+ *
+ * Bewusst dieselbe Klasse (`nl-standings-rank-suffix`, inkl. Gold für #1) wie der Rang hinter
+ * Marktwert und Gehältern eine Tabelle weiter — dort steht schon exakt dieselbe Aussage in
+ * derselben Form. Zwei Schreibweisen für „Rang hinter einem Wert" wären eine Sprache zu viel.
+ *
+ * Kein Rang OHNE Punkte: bei 0 (oder fehlendem Wert) stünden reihum alle auf demselben Rang, und
+ * ein „#28" neben einer 0 liest sich wie eine Wertung, wo schlicht nichts passiert ist.
+ */
+function renderLeagueRankSuffix(
+  rank: number | undefined,
+  label: string,
+  value: number | null | undefined,
+) {
+  if (rank == null || !Number.isFinite(rank) || value == null || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  return (
+    <span
+      className={`nl-standings-rank-suffix nl-tnum${rank === 1 ? " is-top" : ""}`}
+      title={`${label}: Liga-Rang ${rank} nach geholten PPs`}
+    >
+      #{rank}
+    </span>
+  );
+}
+
 function getAreaValue(row: SeasonV2StandingsRow, areaId: SeasonDisciplineAreaId): number | null {
   const ledgerValue = areaId === "pow" ? row.pow : areaId === "spe" ? row.spe : areaId === "men" ? row.men : row.soc;
   return resolveSeasonDisciplineAreaTotal(row.disciplineValues, areaId, ledgerValue);
@@ -681,6 +712,29 @@ export default function SeasonStandingsNewLook({
   }, [standingsRows]);
 
   /**
+   * Liga-Rang je EINZELNER Disziplin — für das Aufklapp-Panel „Disziplinen nach Bereich".
+   *
+   * GEMELDET VON CHRIS: „Können wir wenn wir die Punkte ausklappen, neben den geholten Punkten in
+   * den Diszis auch den Rank schreiben? Also zb MIN (2) 5 #3 — also 5 PPs geholt was rang 3
+   * entspricht. Finde das ist eine Info, die überall sein sollte, wo man PPs sieht."
+   *
+   * Dieselbe Rechnung wie bei den Bereichsspalten (`buildValueRanks`, gegen ALLE Teams der Tabelle,
+   * nicht gegen die aktive Sortierung) — nur eine Ebene tiefer. Auch der Gleichstand wird gleich
+   * behandelt: die ganze Gruppe bekommt den SCHLECHTESTEN Rang. Zu Saisonbeginn stehen ganze
+   * Disziplinen auf 0; mit „bester Rang für alle" stünde dort bei jedem Team #1, obwohl niemand
+   * etwas geholt hat.
+   */
+  const disciplineRanksByTeam = useMemo(() => {
+    const ranks = new Map<SeasonDisciplineKey, Map<string, number>>();
+    for (const group of SEASON_DISCIPLINE_AREA_GROUPS) {
+      for (const key of group.keys) {
+        ranks.set(key, buildValueRanks(standingsRows, (row) => row.disciplineValues[key]));
+      }
+    }
+    return ranks;
+  }, [standingsRows]);
+
+  /**
    * Liga-Rang für Marktwert und Gehaltssumme — als kompaktes „#N" direkt hinter
    * dem Geldwert in DERSELBEN Spalte. Beide Male absteigend gerankt: der höchste
    * Marktwert ist #1, ebenso die höchste Gehaltssumme (teuerster Kader). Gerankt
@@ -928,7 +982,11 @@ export default function SeasonStandingsNewLook({
             <div key={group.id} className={`nl-standings-group ${nlToneClass(group.id)}`}>
               <div className="nl-standings-group-head">
                 <span className="nl-standings-group-label">{group.label}</span>
-                <span className="nl-standings-group-total nl-tnum">{formatNlNumber(areaValue, 1)}</span>
+                {/* Rang des Bereichs — dieselbe Auskunft wie eine Zeile tiefer je Disziplin. */}
+                <span className="nl-standings-group-total nl-tnum">
+                  {formatNlNumber(areaValue, 1)}
+                  {renderLeagueRankSuffix(areaRanksByTeam[group.id]?.get(row.teamId), group.label, areaValue)}
+                </span>
               </div>
               <ul className="nl-standings-disc-list">
                 {standardOrderKeysByArea.get(group.id)?.map((key) => {
@@ -971,7 +1029,14 @@ export default function SeasonStandingsNewLook({
                         tone={group.id}
                         showValue={false}
                       />
-                      <span className="nl-standings-disc-value nl-tnum">{formatNlNumber(value, 1)}</span>
+                      <span className="nl-standings-disc-value nl-tnum">
+                        {formatNlNumber(value, 1)}
+                        {renderLeagueRankSuffix(
+                          disciplineRanksByTeam.get(key)?.get(row.teamId),
+                          SEASON_DISCIPLINE_LABELS[key],
+                          value,
+                        )}
+                      </span>
                     </StandingsTopPlayersHover>
                   );
                 })}

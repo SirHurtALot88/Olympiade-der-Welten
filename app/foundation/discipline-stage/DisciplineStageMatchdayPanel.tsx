@@ -390,13 +390,30 @@ export function resolveMatchdayRanks<T extends { teamId: string; total: number }
   return ranks;
 }
 
+/**
+ * Projizierter Saison-Rang nach diesem Spieltag, aus den Arena-Ergebnissen.
+ *
+ * GEMELDET VON CHRIS (nach Spieltag 10): „ich weiß nicht ob da vllt noch die bonus punkte nicht
+ * berücksichtigt werden oder so aber das war eindeutig falsch weil ich schon dachte schade für M-M
+ * dass sie es nicht geschafft haben aufs treppchen und plötzlich sind sie doch 2."
+ *
+ * Genau das war es. Gerechnet wurde mit `sum` — nur den beiden Disziplin-Punkten. Die Gesamt-Spalte
+ * daneben zeigt aber `total`, und das ist `sum + mutPp`: der Mutator-Bonus des Spieltags gehört
+ * dazu und wird in der Saisontabelle auch gewertet (dort die Spalte BONUS). Die Projektion ordnete
+ * die Teams also nach einer anderen Zahl als der, die am Ende gebucht wird — und wer viel Bonus
+ * holte, stand im Endstand-Bildschirm zu tief.
+ *
+ * Formkarten- und Captain-Beitrag sind bereits in den Disziplin-Punkten enthalten (siehe die
+ * Tooltips weiter unten) und dürfen deshalb NICHT noch einmal addiert werden. Nur der Mutator-PP
+ * steht daneben.
+ */
 export function resolveProjectedRanksFromMatchday<
-  T extends { teamId: string; currentPoints: number | null; sum: number; projectedRank: number | null },
+  T extends { teamId: string; currentPoints: number | null; total: number; projectedRank: number | null },
 >(rows: T[]): Map<string, number> {
   const projected = rows
     .map((row) => ({
       teamId: row.teamId,
-      points: row.currentPoints != null && Number.isFinite(row.currentPoints) ? row.currentPoints + row.sum : null,
+      points: row.currentPoints != null && Number.isFinite(row.currentPoints) ? row.currentPoints + row.total : null,
     }))
     .filter((entry): entry is { teamId: string; points: number } => entry.points != null);
 
@@ -514,8 +531,25 @@ export default function DisciplineStageMatchdayPanel({
   // Tagesrang aus der Gesamt-Spalte — unabhaengig von der Saison-Tabelle.
   const matchdayRanks = resolveMatchdayRanks(rows);
   const derivedProjectedRanks = resolveProjectedRanksFromMatchday(rows);
-  for (const row of rows) {
-    if (row.projectedRank == null) {
+  /**
+   * GEMELDET VON CHRIS (nach Spieltag 10): „das endergebnis was mir gezeigt wurde in MD10 hat
+   * nichts mit dem zu tun was nun hier steht — M-M war dort noch platz 4, H-R blieb auf 2, G-G
+   * waren 11. wenn alle spiele durch sind muss das ja auch das endergebnis sein!"
+   *
+   * Er hat recht, und der Fehler saß hier. Die Zeile füllte NUR die Lücken: Teams mit gespeicherter
+   * Projektion behielten den Rang der Engine, alle anderen bekamen den aus den Arena-Ergebnissen
+   * abgeleiteten. Beides sind für sich stimmige Ranglisten — aber es sind ZWEI, jede über eine
+   * andere Teilmenge durchnummeriert. Zusammen in einer Spalte ergeben sie eine Reihenfolge, die
+   * keiner der beiden entspricht: Ränge doppelt vergeben, andere gar nicht, und die Endtabelle
+   * weicht von der Saisontabelle ab.
+   *
+   * Ein Rang ist nur als vollständige Ordnung eine Aussage. Also: entweder ALLE aus der Engine
+   * (dann ist der Spieltag übernommen und sie ist die verbindliche Quelle) oder ALLE abgeleitet.
+   * Gemischt wird nicht mehr.
+   */
+  const alleAusDerEngine = rows.every((row) => row.projectedRank != null);
+  if (!alleAusDerEngine) {
+    for (const row of rows) {
       row.projectedRank = derivedProjectedRanks.get(row.teamId) ?? null;
     }
   }
