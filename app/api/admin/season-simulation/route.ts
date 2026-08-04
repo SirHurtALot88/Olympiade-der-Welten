@@ -8,6 +8,7 @@ import {
   type AdminSeasonSimulationAction,
   type AdminSeasonSimulationMode,
 } from "@/lib/admin/season-simulation-runner";
+import { assertSaveNotRoomBound } from "@/lib/room/assert-save-not-room-bound";
 
 export const dynamic = "force-dynamic";
 
@@ -45,10 +46,22 @@ export async function POST(request: Request) {
       if (!saveId) {
         return NextResponse.json({ ok: false, run: null, error: "saveId is required." }, { status: 400 });
       }
+      const mode: AdminSeasonSimulationMode = body.mode === "apply" ? "apply" : "dry_run";
+
+      // Nur `mode: "apply"` schreibt real (der Runner haengt `dry_run` an eine In-Memory-Kopie,
+      // siehe createExecutionContext in season-simulation-runner.ts) — der Guard darf Dry Runs auf
+      // raumgebundenen Saves also nicht blockieren, sonst kann niemand mehr eine Vorschau sehen.
+      if (mode === "apply") {
+        const roomCheck = assertSaveNotRoomBound(saveId, "admin_season_simulation");
+        if (roomCheck.blocked) {
+          return NextResponse.json({ ok: false, run: null, error: roomCheck.reason }, { status: roomCheck.status });
+        }
+      }
+
       const run = startAdminSeasonSimulation({
         saveId,
         seasonCount: parseSeasonCount(body.seasonCount),
-        mode: body.mode === "apply" ? "apply" : "dry_run",
+        mode,
         fullChurnStress: body.fullChurnStress === true,
         injuriesTestMode: body.injuriesTestMode === true,
       });

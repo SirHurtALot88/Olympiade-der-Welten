@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { AI_PICK_AUDIT_RESET_CONFIRM_TOKEN } from "@/lib/ai/ai-pick-audit-reset-contract";
 import { runAiPickAuditReset } from "@/lib/ai/ai-pick-audit-reset-service";
+import { assertSaveNotRoomBound } from "@/lib/room/assert-save-not-room-bound";
 
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -39,6 +40,15 @@ export async function POST(request: Request) {
       },
       { status: 409 },
     );
+  }
+
+  // Nur der Execute-Pfad schreibt (ai-pick-audit-reset-service.ts:725ff) — die Preview darf auf
+  // einem raumgebundenen Save weiterhin laufen.
+  if (!dryRun) {
+    const roomCheck = assertSaveNotRoomBound(saveId, "ai_picks_audit_reset");
+    if (roomCheck.blocked) {
+      return NextResponse.json({ error: roomCheck.reason }, { status: roomCheck.status });
+    }
   }
 
   try {

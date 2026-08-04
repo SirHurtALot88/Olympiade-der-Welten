@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { SEASON_START_RESET_CONFIRM_TOKEN } from "@/lib/persistence/season-start-reset-contract";
 import { runSeasonStartReset } from "@/lib/persistence/season-start-reset-service";
+import { assertSaveNotRoomBound } from "@/lib/room/assert-save-not-room-bound";
 
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -38,6 +39,15 @@ export async function POST(request: Request) {
       },
       { status: 409 },
     );
+  }
+
+  // Nur der Execute-Pfad (`dryRun === false`) persistiert (season-start-reset-service.ts:326-330) —
+  // die Preview darf auf einem raumgebundenen Save weiterhin laufen.
+  if (!dryRun) {
+    const roomCheck = assertSaveNotRoomBound(saveId, "season_start_reset");
+    if (roomCheck.blocked) {
+      return NextResponse.json({ error: roomCheck.reason }, { status: roomCheck.status });
+    }
   }
 
   try {
