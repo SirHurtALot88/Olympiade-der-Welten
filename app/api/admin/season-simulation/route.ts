@@ -8,6 +8,7 @@ import {
   type AdminSeasonSimulationAction,
   type AdminSeasonSimulationMode,
 } from "@/lib/admin/season-simulation-runner";
+import { assertSaveNotRoomBound } from "@/lib/room/assert-save-not-room-bound";
 
 export const dynamic = "force-dynamic";
 
@@ -45,10 +46,22 @@ export async function POST(request: Request) {
       if (!saveId) {
         return NextResponse.json({ ok: false, run: null, error: "saveId is required." }, { status: 400 });
       }
+      const mode: AdminSeasonSimulationMode = body.mode === "apply" ? "apply" : "dry_run";
+
+      // Nur `mode: "apply"` schreibt real (der Runner haengt `dry_run` an eine In-Memory-Kopie,
+      // siehe createExecutionContext in season-simulation-runner.ts) — der Guard darf Dry Runs auf
+      // raumgebundenen Saves also nicht blockieren, sonst kann niemand mehr eine Vorschau sehen.
+      if (mode === "apply") {
+        const roomCheck = assertSaveNotRoomBound(saveId, "admin_season_simulation");
+        if (roomCheck.blocked) {
+          return NextResponse.json({ ok: false, run: null, error: roomCheck.reason }, { status: roomCheck.status });
+        }
+      }
+
       const run = startAdminSeasonSimulation({
         saveId,
         seasonCount: parseSeasonCount(body.seasonCount),
-        mode: body.mode === "apply" ? "apply" : "dry_run",
+        mode,
         fullChurnStress: body.fullChurnStress === true,
         injuriesTestMode: body.injuriesTestMode === true,
       });
@@ -63,12 +76,33 @@ export async function POST(request: Request) {
     }
 
     if (action === "tick") {
+      // Der Lauf ist zustandsbehaftet und zieht sich ueber viele Requests: `start` legt nur die
+      // Lauf-Metadatei an (kein saveSingleplayerState, siehe startAdminSeasonSimulation), das
+      // tatsaechliche Schreiben passiert phasenweise in JEDEM `tick` (tickAdminSeasonSimulation ->
+      // executeCurrentPhase -> saveSingleplayerState). Ein Start-Guard allein reicht deshalb nicht:
+      // ein `apply`-Lauf kann auf einem raumfreien Save gestartet werden, DANACH kann derselbe Save
+      // in einen Koop-Raum wandern — jeder folgende `tick` muss das frisch pruefen, nicht nur der
+      // erste Request.
+      const run = readAdminSeasonSimulation(runId);
+      if (run && run.mode === "apply") {
+        const roomCheck = assertSaveNotRoomBound(run.saveId, "admin_season_simulation");
+        if (roomCheck.blocked) {
+          return NextResponse.json({ ok: false, run, error: roomCheck.reason }, { status: roomCheck.status });
+        }
+      }
       return NextResponse.json({ ok: true, run: await tickAdminSeasonSimulation(runId) });
     }
     if (action === "pause") {
       return NextResponse.json({ ok: true, run: setAdminSeasonSimulationStatus(runId, "paused") });
     }
     if (action === "resume") {
+      // Bewusst OHNE Room-Bound-Check hier: `setAdminSeasonSimulationStatus` schreibt nur die
+      // Lauf-Metadatei (writeRun -> JSON unter outputs/admin-season-simulation/runs/), NIEMALS den
+      // Spielstand selbst (kein saveSingleplayerState-Aufruf im Runner) — `resume` setzt lediglich
+      // `status: "running"` und einen Log-Eintrag. Der eigentliche Schreibvorgang ist `tick`, und
+      // der prueft jetzt bei JEDEM Aufruf frisch. Ein zusaetzlicher Check hier waere reine
+      // Fruehwarnung (bessere Fehlermeldung statt "resumed, dann beim naechsten Tick doch blockiert"),
+      // aber keine Sicherheitsnotwendigkeit — der Guard sitzt bewusst nur an echten Schreibstellen.
       return NextResponse.json({ ok: true, run: setAdminSeasonSimulationStatus(runId, "running") });
     }
     if (action === "cancel") {

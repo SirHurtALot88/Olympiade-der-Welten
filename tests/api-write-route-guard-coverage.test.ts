@@ -6,13 +6,16 @@ import { describe, expect, it } from "vitest";
 import {
   API_WRITE_ROUTE_ALLOWLIST,
   API_WRITE_ROUTE_GUARD_REQUIRED,
+  API_WRITE_ROUTE_ROOM_BOUND_REFUSAL_REQUIRED,
   isAllowlistedApiWriteRoute,
+  isRoomBoundRefusalRequiredApiWriteRoute,
 } from "@/lib/room/api-write-route-policy";
 
 const API_ROOT = path.join(process.cwd(), "app/api");
 const MUTATING_METHOD_PATTERN = /export\s+async\s+function\s+(POST|PUT|PATCH|DELETE)\b/g;
 const GUARD_IMPORT_PATTERN = /authorizeServerRoomWrite/;
 const GUARD_CALL_PATTERN = /authorizeServerRoomWrite\s*\(/;
+const ROOM_BOUND_REFUSAL_CALL_PATTERN = /assertSaveNotRoomBound\s*\(/;
 
 function listRouteFiles(dir: string, prefix = ""): string[] {
   const entries = readdirSync(dir);
@@ -45,7 +48,11 @@ function readMutatingMethods(routePath: string) {
 describe("api write route guard coverage", () => {
   it("points allowlist and guard-required entries at existing route files", () => {
     const routePaths = new Set(listRouteFiles(API_ROOT));
-    const missingPaths = [...API_WRITE_ROUTE_ALLOWLIST, ...API_WRITE_ROUTE_GUARD_REQUIRED]
+    const missingPaths = [
+      ...API_WRITE_ROUTE_ALLOWLIST,
+      ...API_WRITE_ROUTE_GUARD_REQUIRED,
+      ...API_WRITE_ROUTE_ROOM_BOUND_REFUSAL_REQUIRED,
+    ]
       .map((entry) => entry.routePath)
       .filter((routePath) => !routePaths.has(routePath));
 
@@ -65,7 +72,7 @@ describe("api write route guard coverage", () => {
     expect(missingGuard).toEqual([]);
   });
 
-  it("requires authorizeServerRoomWrite on all non-allowlisted mutating routes", () => {
+  it("requires authorizeServerRoomWrite on all non-allowlisted, non-room-bound-refusal mutating routes", () => {
     const routePaths = listRouteFiles(API_ROOT);
     const unguarded: string[] = [];
 
@@ -75,8 +82,13 @@ describe("api write route guard coverage", () => {
         continue;
       }
 
-      const allAllowlisted = methods.every((method) => isAllowlistedApiWriteRoute(routePath, method));
-      if (allAllowlisted) {
+      // Room-bound-refusal-Routen sind KEIN Team-Write und kennen bewusst kein
+      // `authorizeServerRoomWrite` — dafuer verlangt der naechste Test unten den
+      // `assertSaveNotRoomBound`-Aufruf.
+      const allExempt = methods.every(
+        (method) => isAllowlistedApiWriteRoute(routePath, method) || isRoomBoundRefusalRequiredApiWriteRoute(routePath, method),
+      );
+      if (allExempt) {
         continue;
       }
 
@@ -88,8 +100,26 @@ describe("api write route guard coverage", () => {
     expect(unguarded).toEqual([]);
   });
 
+  it("requires assertSaveNotRoomBound on room-bound-refusal routes (R4: admin/AI/simulation tools bypassing the write guard)", () => {
+    const missingRefusal: string[] = [];
+
+    for (const entry of API_WRITE_ROUTE_ROOM_BOUND_REFUSAL_REQUIRED) {
+      const { source } = readMutatingMethods(entry.routePath);
+      if (!ROOM_BOUND_REFUSAL_CALL_PATTERN.test(source)) {
+        missingRefusal.push(entry.routePath);
+      }
+    }
+
+    expect(missingRefusal).toEqual([]);
+  });
+
   it("keeps allowlist entries unique", () => {
     const keys = API_WRITE_ROUTE_ALLOWLIST.map((entry) => `${entry.routePath}:${entry.methods.join(",")}`);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("keeps room-bound-refusal entries unique", () => {
+    const keys = API_WRITE_ROUTE_ROOM_BOUND_REFUSAL_REQUIRED.map((entry) => `${entry.routePath}:${entry.methods.join(",")}`);
     expect(new Set(keys).size).toBe(keys.length);
   });
 });
