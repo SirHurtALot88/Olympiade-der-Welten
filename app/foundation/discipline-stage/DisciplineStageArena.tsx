@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
@@ -22,7 +23,28 @@ import DisciplineStageHighlights from "@/app/foundation/discipline-stage/Discipl
 import DisciplineStageTopPlayers, { type DisciplineStageTopPlayer } from "@/app/foundation/discipline-stage/DisciplineStageTopPlayers";
 import { getRankToPointsValue, resolveDisciplinePlayerCount } from "@/lib/resolve/rank-to-points";
 import DisciplineStageNativeArena, { type StagePrimitive, type StageMotif, type StageEnv, type StageLiveResultsByTeam } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
-import DisciplineStageDrawer, { type DisciplineStageDrawerTarget } from "@/app/foundation/discipline-stage/DisciplineStageDrawer";
+import type { DisciplineStageDrawerTarget } from "@/app/foundation/discipline-stage/DisciplineStageDrawer";
+// PERF: Der Drawer (~1.300 Zeilen) zeigt bis zum ersten Team-/Spieler-Klick nichts an
+// (er rendert `null`, solange `target` leer ist — siehe DisciplineStageDrawer.tsx) und
+// gehört daher nicht ins Erstlade-Bundle der Arena. Er bleibt als Geschwister-Element
+// GENAUSO wie vorher immer in der Baumstruktur (siehe Render unten, „Geschwister NACH
+// der Arena" — Grund: Arena darf bei einem Drawer-Klick nicht remounten), nur die
+// Komponente selbst kommt jetzt über next/dynamic. Dadurch beginnt der Chunk-Download
+// bereits beim Arena-Mount im Hintergrund (kein Suspense-Fallback nötig, der Drawer
+// zeigt ja ohnehin nichts vor dem ersten Klick) — bis der Spieler tatsächlich klickt,
+// ist der Chunk in aller Regel längst da, kein Ladeframe beim Öffnen.
+const DisciplineStageDrawer = dynamic(() => import("@/app/foundation/discipline-stage/DisciplineStageDrawer"), {
+  ssr: false,
+});
+// PERF-GEGENPROBE: DisciplineStageMatchdayPanel (~1.187 Zeilen) bleibt bewusst STATISCH.
+// Anders als der Drawer ist es NICHT dauerhaft im Baum (siehe `{mode === "real" && preview
+// && matchdayPanel ? … : null}` weiter unten) — es erscheint, sobald die Resolve-Preview
+// steht, und die kommt oft aus dem Session-Cache (siehe `getMatchdayArenaBaseBundle` im
+// Preview-Effekt), der SYNCHRON im ersten Effekt-Durchlauf treffen kann. Ein next/dynamic
+// an dieser Stelle würde den Chunk-Import erst in genau dem Moment anstoßen, in dem das
+// Panel ohnehin sofort erscheinen soll — im Cache-Treffer-Fall bekäme der Spieler einen
+// echten Ladeframe direkt unter der Bühne zu sehen, den es vorher nicht gab. Das wäre ein
+// sichtbarer Rückschritt, deshalb bleibt dieser Import unverändert.
 import DisciplineStageMatchdayPanel, {
   type MatchdayPanelPlayerRow,
   type MatchdayPanelStandingRow,
@@ -41,6 +63,7 @@ import { fmt1 } from "@/app/foundation/discipline-stage/stage-format";
 import { buildTeamRelationshipMap } from "@/lib/foundation/team-relationship";
 import { buildPlayerRatingContractMap, type PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import { getMatchdayLeagueLineupReadiness } from "@/lib/foundation/matchday-arena-readiness";
+import { preloadDisciplineField } from "@/app/foundation/discipline-stage/arena/disciplines/registry";
 
 // Disziplinen mit fertigem nativem Renderer (löst schrittweise das iframe ab).
 // Nativer Renderer je Disziplin. Engine, FX, Sounds, Ticker, Podest, Detail-
@@ -936,6 +959,23 @@ export default function DisciplineStageArena({
     }),
     [matchdayPanel, scheduleSides],
   );
+
+  /**
+   * PERF: Feld-Chunk der NICHT aktiven Spieltags-Disziplin still im Hintergrund vorladen
+   * (registry.ts lädt seit #Arena-Erstlade-Gewicht jede Disziplin einzeln nach). Ohne
+   * diesen Vorgriff bekäme genau der "Weiter zu Disziplin 2"-Wechsel den Ladeframe zu
+   * sehen, den wir eigentlich vermeiden wollen — die zweite Disziplin steht ja schon
+   * fest, bevor sie drankommt (Spielplan), es gibt also keinen Grund, mit dem Laden bis
+   * zum Wechsel selbst zu warten. Rein additiv/best effort, kein Einfluss auf die
+   * aktuell gezeigte Disziplin.
+   */
+  useEffect(() => {
+    const otherId = matchdaySides.d1?.disciplineId === disciplineId ? matchdaySides.d2?.disciplineId : matchdaySides.d1?.disciplineId;
+    if (!otherId || otherId === disciplineId) return;
+    const primitive = NATIVE_PRIMITIVE[otherId];
+    if (!primitive) return;
+    preloadDisciplineField(primitive, otherId);
+  }, [matchdaySides, disciplineId]);
 
   // Auswählbar sind für normale Spieler NUR die zwei Disziplinen des aktuellen Spieltags (Diszi 1
   // vor Diszi 2), keine anderen — freies Einwählen in beliebige Disziplinen bleibt Admin-/Dev-Modus.
