@@ -75,6 +75,15 @@
     },
     {
       "datum": "2026-08-04",
+      "seite": "Welt · Spielplan",
+      "pr": "#391",
+      "text": "Im Spielplan gingen die Spieltage ineinander ueber — zehn fast gleich aussehende Kacheln mit duennem Rahmen. Jeder Spieltag hat jetzt einen eigenen Kopfbalken, und der laufende ist blau hervorgehoben, sodass man beim Scrollen sofort sieht, wo man steht.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
       "seite": "Multiplayer · Raum",
       "pr": null,
       "text": "Der gemeinsame Spielablauf lief bisher genau einen Spieltag lang und endete danach im Season Review — eine Season zu zweit war damit nicht spielbar. Nach dem Saisonstand geht es jetzt zurück zur Einsatzliste, solange die Saison noch einen Spieltag hergibt; erst nach dem letzten folgt das Season Review. Der Weiter-Knopf sagt jetzt auch, wohin er führt.",
@@ -96,15 +105,6 @@
       "seite": "Welt · Sponsoren",
       "pr": null,
       "text": "Die Basis-Kachel auf der Angebotskarte ist weg: der Betrag steht als „Garantiert auf jedem Platz\" schon oben, und Platz 32 ist genau die Basis.",
-      "quelle": "gepflegt",
-      "gewicht": "feinschliff",
-      "version": "0.4"
-    },
-    {
-      "datum": "2026-08-04",
-      "seite": "Welt · Spielplan",
-      "pr": null,
-      "text": "Im Spielplan gingen die Spieltage ineinander ueber — zehn fast gleich aussehende Kacheln mit duennem Rahmen. Jeder Spieltag hat jetzt einen eigenen Kopfbalken, und der laufende ist blau hervorgehoben, sodass man beim Scrollen sofort sieht, wo man steht.",
       "quelle": "gepflegt",
       "gewicht": "feinschliff",
       "version": "0.4"
