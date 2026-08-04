@@ -828,11 +828,40 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
       }
       positive.push("Fatigue/Injury-Druck ist hoch");
       if (context.rosterCount >= context.identity.playerOpt + 2) negative.push("große Rotation mildert den Druck");
-    } else if (facility.facilityId === "scouting_office" || facility.facilityId === "analytics_room") {
+    } else if (facility.facilityId === "scouting_office") {
       score += Math.max(0, context.identity.playerOpt - context.rosterCount) * 10 + context.contractExitCount * 6 + (objectiveBias?.rosterUrgency ?? 0) * 7;
       if (context.team.cash < 15) score -= 10;
       positive.push("Kaderlücken und Vertragswellen erhöhen den Informationswert");
-      if (context.team.cash < 15) negative.push("Cash ist für Scouts/Forecasts knapp");
+      if (context.team.cash < 15) negative.push("Cash ist für Scouts knapp");
+    } else if (facility.facilityId === "analytics_room") {
+      // Stand vorher wortgleich mit dem Scouting Office in einem Zweig — beide wurden über Kaderlücken
+      // und Vertragswellen bewertet. Für den Analytics Room war das nie richtig und seit A3 offen
+      // falsch: er zeigt den Live-Fortschritt auf der SPONSOR-ACHSE und den BOARD-ZIELEN
+      // (lib/facilities/analytics-live-progress.ts) und weiß über den Kader gar nichts. Eine KI, die
+      // ihn bei Kaderlücken baut, baut ihn aus dem falschen Grund.
+      //
+      // Bewertet wird deshalb der Druck, unter dem die Ziele stehen, und wie gezielt eine Achse
+      // verfolgt wird. Skala bewusst im selben Band wie der Scouting-Zweig (~0–50): `pressure` läuft
+      // 0–10, die Achsprioritäten 0–1.
+      const axisFocus = Math.max(0, ...Object.values(objectiveBias?.axisPriorities ?? {}));
+      score += (objectiveBias?.pressure ?? 0) * 3 + axisFocus * 18;
+      if (objectiveBias == null) {
+        // Ohne Board-Ziele zeigt das Gebäude den Fortschritt von nichts an.
+        score -= 12;
+        negative.push("ohne Board-Ziele hat der Live-Fortschritt keinen Gegenstand");
+      } else {
+        positive.push("Zieldruck und Achsfokus machen den Live-Fortschritt wertvoll");
+      }
+      // Die Stufen 1–3 schalten die Sponsor-Achse frei, 4–5 nur noch den Board-Zwischenstand. Über
+      // Stufe 3 hinaus lohnt der Ausbau also erst, wenn die Board-Ziele wirklich drücken.
+      if (currentLevel >= 3 && (objectiveBias?.pressure ?? 0) < 5) {
+        score -= 14;
+        negative.push("Sponsor-Achse ist ab Stufe 3 vollständig sichtbar — der Rest zahlt nur auf die Board-Ziele ein");
+      }
+      if (context.team.cash < 15) {
+        score -= 10;
+        negative.push("Cash ist für Auswertung knapp");
+      }
     } else if (facility.facilityId === "fan_shop" || facility.facilityId === "arena_upgrade") {
       score += finances * 0.25 + (context.team.cash < 20 ? 8 : 0);
       // Decaying level bonus: reliably clears the build threshold for the first level (0->1) and

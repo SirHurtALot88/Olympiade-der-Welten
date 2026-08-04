@@ -707,7 +707,14 @@ export function buildSeasonEndProgressionPreview(input: {
         appliedEffects: [
           ...cost.appliedEffects,
           trainingFacilityXp.modifierPct > 0 ? `training_center_base_xp:${trainingFacilityXp.modifierPct}pct` : null,
-          getAnalyticsForecastQuality(normalizedFacilities).level > 0 ? "analytics_room_forecast_accuracy_visible:no_fake_values" : null,
+          // War "analytics_room_forecast_accuracy_visible:no_fake_values" — eine Prognosegenauigkeit,
+          // die es hier nie gab. Der Analytics Room wirkt auf den Live-Fortschritt bei Sponsor-Achse
+          // und Board-Zielen (lib/facilities/analytics-live-progress.ts), nicht auf die
+          // Saisonend-Progression. Gleiche Formulierung wie in use-foundation-cross-tab-training.ts,
+          // damit der Marker nicht je nach Panel etwas anderes behauptet.
+          getAnalyticsForecastQuality(normalizedFacilities).level > 0
+            ? "analytics_room_affects_sponsor_and_board_progress_not_training"
+            : null,
           getScoutingConfidence(normalizedFacilities).level > 0 ? "scouting_office_potential_info_visible:potential_source_missing" : null,
           getFacilityLevel(normalizedFacilities, "recovery_center") > 0
             ? "recovery_center_fatigue_only_no_cost_discount"
@@ -741,8 +748,12 @@ export function buildSeasonEndProgressionPreview(input: {
     row.facilityEffects.appliedEffects.some((effect) => effect.includes("potential_source_missing"))
       ? `facility_forecast:${row.playerId}:potential_source_missing`
       : null,
-    row.facilityEffects.appliedEffects.some((effect) => effect.includes("no_fake_values"))
-      ? `facility_forecast:${row.playerId}:no_fake_values`
+    // Hieß "no_fake_values" und hing am alten Prognosegenauigkeits-Marker. Beides beschrieb eine
+    // Wirkung, die der Analytics Room auf diese Vorschau nie hatte.
+    row.facilityEffects.appliedEffects.some((effect) =>
+      effect.includes("analytics_room_affects_sponsor_and_board_progress_not_training"),
+    )
+      ? `facility_forecast:${row.playerId}:analytics_room_not_training`
       : null,
     ...row.economyAudit.warnings.map((warning) => `economy_audit:${row.playerId}:${warning}`),
   ]).filter((entry): entry is string => Boolean(entry));
