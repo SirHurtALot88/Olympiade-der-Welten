@@ -118,16 +118,29 @@ export const FACILITY_CATALOG: FacilityCatalogEntry[] = [
   {
     facilityId: "analytics_room",
     label: "Analytics Room",
-    description: "Verbessert Forecast-Qualitaet, nicht Leistung.",
+    /**
+     * WAS HIER VORHER STAND UND WARUM ES WEG MUSSTE. Der Katalog bewarb bis hierher eine
+     * „Forecast Quality" mit fuenf Stufen („bessere XP-Prognose", „bessere Slot-Fit-Prognose",
+     * „bessere Salary-/MW-Warnings", „sehr genaue Season-Forecasts"). Nichts davon wurde irgendwo
+     * gemessen: die einzige Auswertefunktion (`getAnalyticsForecastQuality`) gab genau diese Texte
+     * als Label zurueck, und die Prognose-Pipeline kennt gar keinen Konfidenzbegriff, an dem sich
+     * eine Qualitaet haette aendern koennen. Ein Gebaeude, das etwas anderes verspricht als es tut,
+     * war der Ausloeser des Gebaeude-Berichts — deshalb beschreiben die Stufentexte jetzt exakt das,
+     * was `lib/facilities/analytics-live-progress.ts` tatsaechlich freischaltet, Stufe fuer Stufe.
+     *
+     * Bau- und Unterhaltskosten sind UNVERAENDERT. Es ist keine Balance-Aenderung, sondern eine
+     * Beschriftung, die zur Wirkung passt.
+     */
+    description: "Zeigt den Live-Fortschritt auf Sponsor-Achse und Board-Zielen — Auskunft, keine Leistung.",
     maxLevel: 5,
     effectType: "analytics",
-    effectDescription: "Forecast Quality",
+    effectDescription: "Live-Fortschritt",
     levels: [
-      { level: 1, effectDescription: "einfache Forecasts", upgradeCost: 5, seasonUpkeep: 0.5 },
-      { level: 2, effectDescription: "bessere XP-Prognose", upgradeCost: 10, seasonUpkeep: 0.9 },
-      { level: 3, effectDescription: "bessere Slot-Fit-Prognose", upgradeCost: 17, seasonUpkeep: 1.5 },
-      { level: 4, effectDescription: "bessere Salary-/MW-Warnings", upgradeCost: 27, seasonUpkeep: 2.4 },
-      { level: 5, effectDescription: "sehr genaue Season-Forecasts", upgradeCost: 42, seasonUpkeep: 3.6 },
+      { level: 1, effectDescription: "Sponsor-Achse: grobe Einordnung", upgradeCost: 5, seasonUpkeep: 0.5 },
+      { level: 2, effectDescription: "Sponsor-Achse: exakter Erfüllungsgrad", upgradeCost: 10, seasonUpkeep: 0.9 },
+      { level: 3, effectDescription: "Sponsor-Achse: Ist/Ziel + Restbedarf", upgradeCost: 17, seasonUpkeep: 1.5 },
+      { level: 4, effectDescription: "Board-Ziele: Zwischenstand", upgradeCost: 27, seasonUpkeep: 2.4 },
+      { level: 5, effectDescription: "Board-Ziele: Abstand zum Ziel", upgradeCost: 42, seasonUpkeep: 3.6 },
     ],
   },
   {

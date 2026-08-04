@@ -274,7 +274,9 @@ const FACILITY_EFFECT_CHIP_LABEL: Record<FacilityId, string> = {
   training_center: "Base Training XP",
   recovery_center: "Recovery",
   scouting_office: "Scouting Confidence",
-  analytics_room: "Forecast Quality",
+  // War „Forecast Quality" — eine Groesse, die nirgends gemessen wurde. Der Raum schaltet den
+  // Live-Fortschritt auf Sponsor-Achse und Board-Zielen frei (lib/facilities/analytics-live-progress.ts).
+  analytics_room: "Live-Fortschritt",
   fan_shop: "Season Cash",
   arena_upgrade: "Arena-Einnahme",
   academy: "F/E/D Upgrade-Rabatt",
