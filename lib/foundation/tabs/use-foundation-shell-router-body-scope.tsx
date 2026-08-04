@@ -1363,7 +1363,14 @@ export function useFoundationShellRouterBodyScope({
     activeView === "ranks" ||
     activeView === "diszis" ||
     activeView === "leagueLeaders" ||
-    activeView === "prize";
+    activeView === "prize" ||
+    // Diszi-Buehne (matchdayArena): OVR-Anzeigen dort (Chips, Hover-Vorschau, Spieler-/
+    // Team-Karte) muessen dieselbe ligaweite OVR zeigen wie Kader/Spielerprofil, nicht
+    // eine aus dem kompakten Client-Payload lokal nachgerechnete (siehe
+    // docs/CLIENT_PAYLOAD_LEERE_ABLEITUNGEN.md — hier keine leere, sondern eine PLAUSIBLE
+    // FALSCHE Zahl, weil disciplineResults/matchdayResults dort bis auf den aktiven
+    // Spieltag gestrichen sind).
+    activeView === "matchdayArena";
   const shouldBuildSeasonTopPlayerRows =
     activeView === "seasonV2" ||
     activeView === "ranks" ||
