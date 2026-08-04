@@ -1363,7 +1363,14 @@ export function useFoundationShellRouterBodyScope({
     activeView === "ranks" ||
     activeView === "diszis" ||
     activeView === "leagueLeaders" ||
-    activeView === "prize";
+    activeView === "prize" ||
+    // Diszi-Buehne (matchdayArena): OVR-Anzeigen dort (Chips, Hover-Vorschau, Spieler-/
+    // Team-Karte) muessen dieselbe ligaweite OVR zeigen wie Kader/Spielerprofil, nicht
+    // eine aus dem kompakten Client-Payload lokal nachgerechnete (siehe
+    // docs/CLIENT_PAYLOAD_LEERE_ABLEITUNGEN.md — hier keine leere, sondern eine PLAUSIBLE
+    // FALSCHE Zahl, weil disciplineResults/matchdayResults dort bis auf den aktiven
+    // Spieltag gestrichen sind).
+    activeView === "matchdayArena";
   const shouldBuildSeasonTopPlayerRows =
     activeView === "seasonV2" ||
     activeView === "ranks" ||
@@ -1624,12 +1631,14 @@ export function useFoundationShellRouterBodyScope({
       }
       playerProfileHydrationAttemptRef.current = null;
       try {
-        const { buildPlayerDrawerDataFromGameState } = await import("@/lib/foundation/player-detail-drawer");
-        const refreshedProfile = buildPlayerDrawerDataFromGameState({
+        const { buildHydratedPlayerDrawerData } = await import("@/lib/foundation/build-hydrated-player-drawer-data");
+        const refreshedProfile = await buildHydratedPlayerDrawerData({
           gameState: reloaded,
           playerId: profilePlayerId,
           activePlayerId: playerProfileDataRef.current?.activePlayerId,
           source: readMeta.source,
+          manageableTeamIds: foundationManageableTeamIds,
+          saveId: activeSaveId,
         });
         setPlayerProfileData(refreshedProfile);
         if (refreshedProfile) {
@@ -1930,8 +1939,8 @@ export function useFoundationShellRouterBodyScope({
     }
 
     try {
-      const { buildPlayerDrawerDataFromGameState } = await import("@/lib/foundation/player-detail-drawer");
-      const refreshedProfile = buildPlayerDrawerDataFromGameState({
+      const { buildHydratedPlayerDrawerData } = await import("@/lib/foundation/build-hydrated-player-drawer-data");
+      const refreshedProfile = await buildHydratedPlayerDrawerData({
         gameState: nextGameState,
         playerId,
         activePlayerId: playerProfileDataRef.current.activePlayerId,
@@ -2932,17 +2941,9 @@ export function useFoundationShellRouterBodyScope({
         }
         resolve();
       });
-      const [{ buildPlayerDrawerDataFromGameState }, { hydrateGameStatePlayerAttributeSheet }] = await Promise.all([
-        import("@/lib/foundation/player-detail-drawer"),
-        import("@/lib/foundation/hydrate-player-attribute-sheet"),
-      ]);
-      const hydratedGameState = await hydrateGameStatePlayerAttributeSheet({
+      const { buildHydratedPlayerDrawerData } = await import("@/lib/foundation/build-hydrated-player-drawer-data");
+      const nextData = await buildHydratedPlayerDrawerData({
         gameState: gameStateRef.current,
-        saveId: activeSaveId,
-        playerId,
-      });
-      const nextData = buildPlayerDrawerDataFromGameState({
-        gameState: hydratedGameState,
         playerId,
         activePlayerId,
         source: readMeta.source,
@@ -6155,18 +6156,9 @@ export function useFoundationShellRouterBodyScope({
 
     let cancelled = false;
     void (async () => {
-      const { buildPlayerDrawerDataFromGameState } = await import("@/lib/foundation/player-detail-drawer");
-      const { hydrateGameStatePlayerAttributeSheet } = await import("@/lib/foundation/hydrate-player-attribute-sheet");
-      const hydratedGameState = await hydrateGameStatePlayerAttributeSheet({
+      const { buildHydratedPlayerDrawerData } = await import("@/lib/foundation/build-hydrated-player-drawer-data");
+      const refreshedProfile = await buildHydratedPlayerDrawerData({
         gameState: gameStateRef.current,
-        saveId: activeSaveId,
-        playerId: playerProfileData.playerId,
-      });
-      if (cancelled) {
-        return;
-      }
-      const refreshedProfile = buildPlayerDrawerDataFromGameState({
-        gameState: hydratedGameState,
         playerId: playerProfileData.playerId,
         source: readMeta.source,
         manageableTeamIds: foundationManageableTeamIds,
@@ -6207,12 +6199,13 @@ export function useFoundationShellRouterBodyScope({
       return;
     }
 
-    void import("@/lib/foundation/player-detail-drawer").then(({ buildPlayerDrawerDataFromGameState }) => {
-      const refreshedProfile = buildPlayerDrawerDataFromGameState({
+    void import("@/lib/foundation/build-hydrated-player-drawer-data").then(async ({ buildHydratedPlayerDrawerData }) => {
+      const refreshedProfile = await buildHydratedPlayerDrawerData({
         gameState: gameStateRef.current,
         playerId: profilePlayerId,
         source: readMeta.source,
         manageableTeamIds: foundationManageableTeamIds,
+        saveId: activeSaveId,
       });
       if (!refreshedProfile) {
         return;
@@ -6224,6 +6217,7 @@ export function useFoundationShellRouterBodyScope({
       );
     });
   }, [
+    activeSaveId,
     foundationManageableTeamIds,
     gameState.seasonState.seasonSnapshots,
     readMeta.source,

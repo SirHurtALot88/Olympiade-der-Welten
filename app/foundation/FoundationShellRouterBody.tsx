@@ -2650,6 +2650,11 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             saveId={activeSaveId}
             seasonId={gameState.season.id}
             matchdayId={gameState.matchdayState.matchdayId}
+            // Kanonische, ligaweite OVR/Rang-Karte (Server-Slice, volles Save) — dieselbe
+            // Quelle, aus der Kader/Spielerprofil/Ranglisten lesen. Ohne sie rechnet die
+            // Buehne selbst aus dem kompakten Client-Payload nach (siehe
+            // docs/CLIENT_PAYLOAD_LEERE_ABLEITUNGEN.md) und weicht von "der einen OVR" ab.
+            canonicalRatingByPlayerId={playerRatingsById}
             // Der Spieltagswechsel gehoert in die Arena, nicht in einen Kasten darunter.
             // Vorher stand er in der "Spieltagsergebnis"-Sektion — die ist entfernt, und
             // damit waere der Spieltag aus dem normalen Spielverlauf nicht mehr

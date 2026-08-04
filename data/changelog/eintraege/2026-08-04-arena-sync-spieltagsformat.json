@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-04",
+  "seite": "Multiplayer · Arena",
+  "text": "Startete der Gastgeber die gemeinsame Arena, konnte beim Mitspieler das Bereit-Fenster unsichtbar bleiben — der Reveal lief auf dem Server längst, sein Client verwarf ihn aber stillschweigend als „falscher Spieltag\". Behoben.",
+  "gewicht": "spielblockierend",
+  "version": "0.4"
+}

@@ -141,10 +141,27 @@ type PlayerDisciplineDrawerDetail = {
 
 export type AttributeVisibility = "exact" | "scouted";
 
-type DisciplineGlobalRankMaps = {
+export type DisciplineGlobalRankMaps = {
   valueRanksByDiscipline: Map<string, Map<string, number | null>>;
   seasonPointsRanksByDiscipline: Map<string, Map<string, number | null>>;
   allTimePointsRanksByDiscipline: Map<string, Map<string, number | null>>;
+};
+
+/**
+ * Server-berechnete Saison-/All-Time-Ränge je Disziplin für GENAU einen Spieler
+ * (bug-2026-08-04T13-23-39-256Z-uzetn6 — "Top Disziplinen ... da fehlt jeweils
+ * auch der Rank"). Siehe docs/CLIENT_PAYLOAD_LEERE_ABLEITUNGEN.md: der kompakte
+ * Client-Payload streicht `matchdayResults`/`seasonSnapshots`, also ist
+ * `buildDisciplineGlobalRankMaps` im Browser blind für alle Spieler außer dem
+ * aktiven Spieltag — die PPs-Zahl stimmt (kommt aus der Spieler-Performance im
+ * Payload), der Rang bräuchte aber den Vergleich über ALLE Spieler und fällt
+ * sonst still auf null. Bewusst DÜNN besetzt (wie `disciplinePointsByPlayerId`):
+ * eine fehlende Disziplin-ID heißt "kein Rang" (Spieler ohne Punkte in dieser
+ * Disziplin, z. B. Saisonstart), nicht "Rang unbekannt".
+ */
+export type PlayerDisciplineRankOverride = {
+  seasonPointsRankByDisciplineId: Record<string, number>;
+  allTimePointsRankByDisciplineId: Record<string, number>;
 };
 
 export type PlayerDrawerHistoryRow = {
@@ -650,7 +667,7 @@ function mergeDisciplinePointTotals(
   }
 }
 
-function buildDisciplineGlobalRankMaps(
+export function buildDisciplineGlobalRankMaps(
   gameState: GameState,
   disciplines: Array<{ id: string; name: string; category: DisciplineCategory; playerCount?: number | null }>,
   currentSeasonLedger = buildSeasonPointsLedger(gameState),
@@ -1068,6 +1085,7 @@ function buildDisciplineValuesFromPlayer(
   } | null,
   gameState?: GameState | null,
   globalRankMaps?: DisciplineGlobalRankMaps | null,
+  disciplineRankOverride?: PlayerDisciplineRankOverride | null,
 ) {
   if (!player) {
     return [];
@@ -1148,10 +1166,20 @@ function buildDisciplineValuesFromPlayer(
         category: discipline.category,
         value: current,
         seasonPoints: seasonRow?.totalContribution ?? null,
-        seasonPointsRank: globalRankMaps?.seasonPointsRanksByDiscipline.get(discipline.id)?.get(player.id) ?? null,
+        // Override (server, voller Save) hat Vorrang und ist bei Vorhandensein
+        // ABSCHLIESSEND — auch eine fehlende Disziplin-ID darin heißt "kein Rang"
+        // und fällt NICHT auf den lokal berechneten (auf dem kompakten Payload
+        // ggf. falschen, siehe docs/CLIENT_PAYLOAD_LEERE_ABLEITUNGEN.md) Wert
+        // zurück. Ohne Override (Override-Fetch lief noch/fehlgeschlagen) bleibt
+        // die bisherige lokale Berechnung als Fallback.
+        seasonPointsRank: disciplineRankOverride
+          ? disciplineRankOverride.seasonPointsRankByDisciplineId[discipline.id] ?? null
+          : globalRankMaps?.seasonPointsRanksByDiscipline.get(discipline.id)?.get(player.id) ?? null,
         seasonAppearances: seasonRow?.appearances ?? null,
         allTimePoints: allTimeRow ? roundValue(allTimeRow.points, 1) : null,
-        allTimePointsRank: globalRankMaps?.allTimePointsRanksByDiscipline.get(discipline.id)?.get(player.id) ?? null,
+        allTimePointsRank: disciplineRankOverride
+          ? disciplineRankOverride.allTimePointsRankByDisciplineId[discipline.id] ?? null
+          : globalRankMaps?.allTimePointsRanksByDiscipline.get(discipline.id)?.get(player.id) ?? null,
         allTimeAppearances: allTimeRow?.appearances ?? null,
         currentSeasonMutatorPps: currentDetail ? roundValue(currentDetail.mutatorPps, 1) : null,
         slotLabels: currentDetail?.slotLabels.slice(0, 8) ?? [],
@@ -2336,6 +2364,8 @@ export function buildPlayerDrawerDataFromGameState(input: {
   manageableTeamIds?: string[] | null;
   saveId?: string | null;
   liveRatingsById?: Map<string, PlayerRatingContractRow> | null;
+  /** Siehe Feldkommentar an `PlayerDisciplineRankOverride`. */
+  disciplineRankOverride?: PlayerDisciplineRankOverride | null;
 }): PlayerDetailDrawerData | null {
   const player = input.gameState.players.find((entry) => entry.id === input.playerId) ?? null;
   if (!player) {
@@ -2646,6 +2676,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
           latestArchivedPerformance,
           input.gameState,
           disciplineGlobalRankMaps,
+          input.disciplineRankOverride,
         );
 
   return {

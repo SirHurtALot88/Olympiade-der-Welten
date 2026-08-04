@@ -35,6 +35,12 @@ let marketBrowseIndexPrefetchScheduled = false;
 const prefetchedSeasonStandingsKeys = new Set<string>();
 const prefetchedPlayerDirectoryKeys = new Set<string>();
 const prefetchedMatchdayArenaBaseKeys = new Set<string>();
+// Bug bug-2026-08-04T15-59-37-826Z-2tlf67: Portrait-/Logo-Bilder fuer Hover-Karten
+// und den Drawer der Disziplin-Buehne. `Session` = disziplinweit (ein Eintrag pro
+// laufender Disziplin), `Urls` zusaetzlich URL-genau, damit ein Spieler, der in
+// Etappe 1 UND 2 vorkommt, kein zweites Mal angestossen wird.
+const prefetchedDisciplineMediaSessionKeys = new Set<string>();
+const prefetchedDisciplineMediaUrls = new Set<string>();
 
 export function clearPrefetchedMatchdayArenaBaseKeys(input?: {
   saveId?: string;
@@ -309,6 +315,63 @@ export function prefetchMatchdayArenaBase(input: {
   }
   scheduleIdleTask(run);
   return undefined;
+}
+
+/**
+ * Laedt Spieler-Portraits + Team-Logos im Idle-Slot vor, WAEHREND eine Disziplin
+ * laeuft — gemeldet in bug-2026-08-04T15-59-37-826Z-2tlf67: Hover-Karten und der
+ * Drawer der Disziplin-Buehne mussten beim Oeffnen erst nachladen, obwohl waehrend
+ * des Reveals reichlich Leerlaufzeit da ist.
+ *
+ * WICHTIG: `urls` muss exakt das liefern, was `getPlayerPortraitBrowserUrl` /
+ * `getTeamLogoBrowserUrl` beim echten Rendern der Karten auch liefern (der
+ * Aufrufer baut die URLs, diese Funktion generiert keine eigenen) — nur bei
+ * identischer URL trifft der Browser-Cache. Die Medien-Route setzt ohnehin schon
+ * `Cache-Control: public, max-age=3600` + ETag (siehe lib/media/serveMediaAsset.ts),
+ * das Vorladen verschiebt also nur den ZEITPUNKT des ohnehin faelligen Downloads
+ * nach vorne, es lädt nichts zusätzlich, was der Drawer nicht sowieso holen würde.
+ *
+ * Begrenzt von Natur aus: der Aufrufer übergibt nur die Bilder der Teams/Spieler,
+ * die in DIESER Disziplin tatsächlich antreten (max. 32 Teams × Disziplin-
+ * Slotzahl, siehe PRIM_GEO/NATIVE_PRIMITIVE-Kommentare) — kein Vorladen des
+ * gesamten Spielerkaders.
+ *
+ * `sessionKey` (z. B. `${saveId}:${matchdayId}:${disciplineId}`) sorgt dafür, dass
+ * ein Re-Render (Reveal-Tick, Hover, Score-Update) die Liste nicht erneut anstößt;
+ * `prefetchedDisciplineMediaUrls` verhindert zusätzlich doppelte Downloads über
+ * mehrere Disziplinen hinweg (derselbe Spieler tritt oft in D1 UND D2 an).
+ */
+export function prefetchDisciplineStageMedia(input: {
+  sessionKey: string;
+  urls: (string | null | undefined)[];
+}) {
+  if (!input.sessionKey || prefetchedDisciplineMediaSessionKeys.has(input.sessionKey)) {
+    return;
+  }
+  prefetchedDisciplineMediaSessionKeys.add(input.sessionKey);
+
+  const freshUrls = Array.from(
+    new Set(input.urls.filter((url): url is string => url != null && url !== "" && !prefetchedDisciplineMediaUrls.has(url))),
+  );
+  if (freshUrls.length === 0) {
+    return;
+  }
+  for (const url of freshUrls) {
+    prefetchedDisciplineMediaUrls.add(url);
+  }
+
+  // Idle statt sofort: der Reveal (rAF-Glide/FX) soll keine einzige Frame verlieren,
+  // weil nebenbei 100+ Bild-Downloads angestossen werden.
+  scheduleIdleTask(() => {
+    if (typeof Image === "undefined") {
+      return;
+    }
+    for (const url of freshUrls) {
+      const img = new Image();
+      img.decoding = "async";
+      img.src = url;
+    }
+  });
 }
 
 export function prefetchFoundationDefaultPanels(saveId?: string) {

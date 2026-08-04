@@ -916,7 +916,16 @@ const PRIM_GEO: Record<StagePrimitive, { w: number; h: number; r: number; rOwn: 
   sparkbar: { w: 1180, h: 600, r: 10.5, rOwn: 15.5 },
   thermometer: { w: 1180, h: 600, r: 10.5, rOwn: 15.5 },
   // Szenen
-  peloton: { w: 1180, h: 460, r: 13, rOwn: 19 },
+  // peloton (Zeitfahren) war mit h:460 die mit Abstand flachste Szene aller Primitives
+  // (naechstniedrigster Wert: 560) — die Strasse blieb dadurch klar kuerzer als die
+  // Teams-Tabelle daneben, die sich per ladderMaxH an der Hoehe der Hauptspalte
+  // ausrichtet (siehe unten `ladderMaxH`/`mainColRef`). Gemeldet von Chris (Meldung
+  // bug-2026-08-04T18-19-57-891Z-64iu51): "aktuell ist sie sehr schmal". Angehoben auf
+  // 620 (= track/mountain/court) — die Strassen-Geometrie in peloton.tsx skaliert
+  // proportional zu H (roadY = H * 0.54), Rand-Elemente wie Bahnbreite bleiben in
+  // Pixeln fix, wachsen also nicht mit — die Szene bekommt dadurch nur mehr Himmel/
+  // Wiese oben und unten, keine verzerrte Strasse.
+  peloton: { w: 1180, h: 620, r: 13, rOwn: 19 },
   parcours: { w: 1180, h: 560, r: 14, rOwn: 20 },
   bump: { w: 1180, h: 560, r: 8.5, rOwn: 12 },
   mountain: { w: 1180, h: 620, r: 13, rOwn: 19 },
