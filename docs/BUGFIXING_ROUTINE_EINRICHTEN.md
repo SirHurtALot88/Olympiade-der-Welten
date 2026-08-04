@@ -25,6 +25,17 @@ Ohne GitHub-Werkzeug und ohne geklontes Repo kann der Lauf nicht einmal Schritt 
 dann meldet („kein Zugriff", „Verzeichnis leer") beschreibt seine eigene Umgebung — nie den Zustand
 des Projekts. **Eine solche Meldung ist kein Bug-Befund.**
 
+## Nachtrag (kurz nach dem Schreiben)
+
+Die Routine läuft inzwischen wieder — sie heißt `Bugfixing alle 4 Stunden` und hängt an einer
+lebenden Arbeitssitzung. Und die Diagnose oben ist in **einem** Punkt zu pauschal: Sie schaut nur
+auf die MCP-GitHub-Werkzeuge. Ob eine frisch gestartete Sitzung per **normalem `git`** über den
+vorkonfigurierten Proxy fetchen und pushen kann, war damit nicht geprüft. Wenn ja, ist eine
+eigenständige Routine sehr wohl möglich, und der Umweg unten ist nur der sichere, nicht der einzige.
+
+Was bleibt: Eine Routine, die an eine Sitzung gebunden ist, stirbt mit deren Container. Genau daran
+ist die ursprüngliche gescheitert. Der Weg unten ist der einzige, der davon unabhängig ist.
+
 ## Was Chris tun muss
 
 1. Auf claude.ai die Routinen-Oberfläche öffnen und eine neue Routine anlegen.
