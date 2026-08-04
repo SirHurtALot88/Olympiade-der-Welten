@@ -60,6 +60,7 @@ import {
 } from "@/lib/progression/player-potential-service";
 import { reconcilePlayerPotentialRecordsForGameState } from "@/lib/scouting/player-potential-ceiling-service";
 import { withNormalizedSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
+import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import type {
   PersistedSaveGame,
   SaveRepository,
@@ -174,6 +175,50 @@ function normalizeLegacyCashCreatorsColdSteelCodes(gameState: GameState): GameSt
   ) as GameState;
 
   return normalized;
+}
+
+/**
+ * GEMELDET: „natuerlich muss season 1 immer auch den salary factor von der ersten season nehmen.
+ * das wird dem spieler ja am anfang zb auch angezeigt faktor 1,19 da geht man ja davon aus dass es
+ * gut geld gibt."
+ *
+ * `seasonState.seasonEconomyFactors` wurde bisher NUR beim Saisonuebergang geschrieben
+ * (preseason-workflow-service.ts). In Saison 1 war die Liste damit leer — und jeder Leser, der sie
+ * roh liest statt abzuleiten, fiel auf einen Ersatzwert zurueck:
+ *
+ *   getCurrentSponsorSalaryFactor  → 1.0        (Sponsor-Angebote, Abrechnung, Apron)
+ *   getSeasonEconomyFactorWindow   → 1.09 …     (Finanzen, Saisonstand, KI-Vorausschau, Skripte)
+ *
+ * Zwei Antworten auf dieselbe Frage: die Finanzseite versprach 1,09, der Sponsor zahlte nach 1,00.
+ * Gemessen ueber alle sechs Spielstaende dieses Containers war das Fenster ausnahmslos leer.
+ *
+ * Hier wird es beim Laden gefuellt — an genau einer Stelle, durch die jeder Spielstand kommt, und
+ * mit derselben Funktion, die die anderen Leser ohnehin benutzen. Damit ist die Ableitung nicht
+ * mehr eine zweite Meinung, sondern die einzige.
+ *
+ * Deterministisch aus (saveId, seasonId): derselbe Spielstand bekommt bei jedem Laden dieselben
+ * Faktoren, und `advanceSeasonEconomyFactorWindow` schreibt beim Uebergang exakt die Werte fort,
+ * die hier schon standen. Ein bereits vollstaendiges Fenster bleibt unangetastet.
+ */
+function withSeededSeasonEconomyFactors(gameState: GameState, saveId: string): GameState {
+  const window = getSeasonEconomyFactorWindow({
+    saveId,
+    seasonId: gameState.season.id,
+    seasonState: gameState.seasonState,
+  });
+  // Unveraendert lassen, wenn schon dasselbe drinsteht — sonst bekaeme jeder Ladevorgang ein neues
+  // Objekt und die Save-Session-Signatur wuerde ohne Grund wackeln.
+  const vorhanden = gameState.seasonState.seasonEconomyFactors ?? [];
+  const deckungsgleich =
+    vorhanden.length === window.length &&
+    vorhanden.every((eintrag, index) => eintrag.factor === window[index]!.factor && eintrag.horizonIndex === index);
+  if (deckungsgleich) {
+    return gameState;
+  }
+  return {
+    ...gameState,
+    seasonState: { ...gameState.seasonState, seasonEconomyFactors: window },
+  };
 }
 
 function normalizeLegacyRosterTargets(gameState: GameState): GameState {
@@ -1257,7 +1302,9 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     normalizeLegacySponsors(
     normalizeLegacyRosterTargets(
       normalizeLegacyFinanceScale(
-        withNormalizedTeamGeneralManagers(withNormalizedTeamIdentityOverrides(normalizeLegacyCashCreatorsColdSteelCodes(hydrated)), {
+        // Der Salary-Factor-Seed steht ganz innen: die Sponsor-Migration und die Leiter-Normalisierung
+        // weiter aussen lesen den Faktor bereits — sie muessen den echten sehen, nicht die 1.0.
+        withNormalizedTeamGeneralManagers(withNormalizedTeamIdentityOverrides(normalizeLegacyCashCreatorsColdSteelCodes(withSeededSeasonEconomyFactors(hydrated, saveId))), {
           saveId,
         }),
       ),
