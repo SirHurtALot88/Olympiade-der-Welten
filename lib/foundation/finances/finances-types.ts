@@ -11,6 +11,9 @@
  */
 
 import type { SponsorOfferComponentKind } from "@/lib/data/olyDataTypes";
+// Nur ein TYP-Import (wird beim Kompilieren gelöscht) — kein Laufzeit-Zyklus, obwohl
+// `operating-guv.ts` umgekehrt die Konstante `FINANCE_SPONSOR_INCOME_COMPONENT_KINDS` von hier liest.
+import type { TeamOperatingGuv } from "@/lib/finance/operating-guv";
 
 /**
  * Sponsor-Komponenten-Arten, die als laufende "Sponsor"-Einnahme gezeigt werden — GEMEINSAME Quelle für
@@ -122,6 +125,13 @@ export type TeamFinancesIncome = {
    */
   objectiveReward: number | null;
   /**
+   * Apron-AUSGLEICH (Chris, Ticket 24: „bitte berücksichtigen dass auch Apron mit einfließt").
+   * Nur gesetzt, wenn das Team unter der 1. Apron-Linie liegt und aus dem Topf etwas bekommt —
+   * Zahler und Empfänger schließen sich aus, es ist also nie zugleich `expenses.apronLevy` gesetzt.
+   * `null`, solange die Apron-Linien der Saison nicht eingefroren sind (siehe apron-service.ts).
+   */
+  apronPayout: number | null;
+  /**
    * @deprecated LEGACY — Preisgeld ist abgeschafft (nicht ausgezahlt, nicht genutzt). Wird noch
    * berechnet, aber in der UI NICHT mehr angezeigt. Immer Sponsoren verwenden. Wird bei einem
    * späteren Cleanup ganz entfernt.
@@ -145,6 +155,11 @@ export type TeamFinancesExpenses = {
    * `buildTeamSeasonObjectiveSettlement` — keine Duplikation der Logik.
    */
   objectivePenalty: number | null;
+  /**
+   * Apron-ABGABE als positiver Betrag (Chris, Ticket 24). Nur gesetzt, wenn das Team über der
+   * 1. Apron-Linie liegt und in den Topf zahlt — nie zugleich mit `income.apronPayout`.
+   */
+  apronLevy: number | null;
 };
 
 /**
@@ -183,17 +198,25 @@ export type TeamFinancesState = {
   expenses: TeamFinancesExpenses;
   /** Rohe Transfer-Saldo-Zahlen, geteilt zwischen Income/Expenses-Hover (siehe `FinanceTransferBalance`). */
   transfer: FinanceTransferBalance | null;
-  /** Σ real cash-wirksamer Einnahmen: Sponsor + Gebäude-Einnahmen + Transfer-Überschuss + Objective-Prämie. OHNE Preisgeld (Benchmark). */
+  /** Σ laufender Einnahmen: Sponsor + Gebäude-Einnahmen + Objective-Prämie + Apron-Ausgleich. OHNE Preisgeld (Benchmark) und OHNE Transfers (Sonderposten). */
   totalIncome: number;
-  /** Σ real cash-wirksamer Ausgaben: Gehälter (`contract.salary`) + bezahlter Upkeep + Kreditraten + Transfer-Defizit + Objective-Strafe. */
+  /** Σ laufender Ausgaben: Gehälter (`contract.salary`) + bezahlter Upkeep + Kreditzinsen + Objective-Strafe + Apron-Abgabe. OHNE Transfers (Sonderposten). */
   totalExpenses: number;
   /**
-   * `totalIncome - totalExpenses` — spiegelt exakt die cash-wirksame Season-End-Kette
-   * (Sponsor − Gehalt) − Kredit-Tilgung + (FacilityIncome − bezahlter Upkeep) + Objective-cashDelta
-   * ± Transfer-Saldo. Preisgeld ist NIE enthalten (Benchmark). Damit gilt
-   * `cashSeasonStart + guv + otherCashMovements == cash` (siehe `otherCashMovements`).
+   * `totalIncome - totalExpenses` — die BETRIEBS-GuV. Transfers sind bewusst NICHT enthalten
+   * (Entscheidung Chris, Ticket 24: „Lass transfers aus der GuV am besten raus die sind separat
+   * ausgewiesen"), die Kredit-Tilgung ebenso wenig (Bilanzbewegung). Beides landet in
+   * `otherCashMovements`, damit `cashSeasonStart + guv + otherCashMovements == cash` gilt.
+   *
+   * EXAKT dieselbe Zahl zeigt die Spalte „GuV" im Saisonstand — beide lesen
+   * `lib/finance/operating-guv.ts`.
    */
   guv: number;
+  /**
+   * Die vollständige Herleitung der GuV (dieselbe Struktur, die der Saisonstand liest). Trägt den
+   * Hover „wie setzt sich die Zahl zusammen" (siehe `lib/finance/guv-breakdown.ts`).
+   */
+  operating: TeamOperatingGuv;
   /**
    * Cash zu Saisonbeginn — `cashTotal ?? cashEnd` aus dem archivierten Snapshot der UNMITTELBAR
    * vorangegangenen Saison (`gameState.seasonState.seasonSnapshots`, siehe T-031). `null` in

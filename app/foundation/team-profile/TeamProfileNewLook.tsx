@@ -45,6 +45,7 @@ import { getTeamGeneralManager, getTeamGeneralManagerProfile } from "@/lib/found
 import { compareTeamRosterPlayersByOvrOrMarketValue } from "@/lib/foundation/team-roster-player-sort";
 import { getTeamAxisRankTooltip } from "@/lib/foundation/tabs/teams-ui-helpers";
 import { isSeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
+import { buildSeasonDisciplineAreaGroupsOrderedBySeasonPlayerCount } from "@/lib/season/season-discipline-schedule";
 import {
   BELIEBTHEIT_MAX,
   BELIEBTHEIT_MIN,
@@ -480,6 +481,16 @@ export default function TeamProfileNewLook({
   const werdegangSeries = useMemo(
     () => (foundationGameState ? buildTeamCareerSeries(foundationGameState, data.teamId) : null),
     [data.teamId, foundationGameState],
+  );
+
+  // Historie-Tabelle: Disziplin-Spalten je Achse nach der ECHTEN, fuer DIESE Saison gewuerfelten
+  // Kadergroesse sortiert statt dem festen Katalogwert — siehe
+  // buildSeasonDisciplineAreaGroupsOrderedBySeasonPlayerCount. Ohne GameState (kein Ligakontext)
+  // faellt die Tabelle auf ihre eigene Default-Sortierung zurueck.
+  const historyDisciplineAreaGroups = useMemo(
+    () =>
+      foundationGameState ? buildSeasonDisciplineAreaGroupsOrderedBySeasonPlayerCount(foundationGameState) : undefined,
+    [foundationGameState],
   );
 
   const visiblePlayers = useMemo(() => [...data.players].sort(comparePlayersByOvr), [data.players]);
@@ -2131,6 +2142,7 @@ export default function TeamProfileNewLook({
               tableClassName="team-drawer-history-table"
               shellClassName="team-drawer-history-table-shell nl-teamprofile-history-shell"
               axisToneVariant="drawer"
+              disciplineAreaGroups={historyDisciplineAreaGroups}
               rows={data.history}
               renderCell={(columnId: string, row: TeamDetailDrawerHistoryRow) => {
                 if (columnId === "season") {

@@ -16,7 +16,7 @@ import "@/app/foundation/season-v2/season-standings-new-look.css";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import PlayerStarFrame from "@/components/foundation/player-portrait-card/PlayerStarFrame";
-import { buildGuvBreakdown } from "@/lib/finance/guv-breakdown";
+import { buildGuvHoverText } from "@/lib/finance/guv-breakdown";
 import { getPlayerStarTier } from "@/lib/foundation/player-star-tier";
 import { RivalTag } from "@/components/foundation/RivalTag";
 import {
@@ -1463,16 +1463,10 @@ export default function SeasonStandingsNewLook({
           <td
             className={`nl-standings-td-fin${nlMoneySignClass(row.guv)}`}
             // Chris: „am besten ein Hover auf dem GuV-Posten, der noch mal aufzeigt, wie die Zahl
-            // sich zusammensetzt". Die Herleitung liegt in lib/finance/guv-breakdown.ts, damit
-            // Saisonstand und Finanzen-Reiter dieselbe Erklaerung zeigen.
-            title={
-              buildGuvBreakdown({
-                sponsorTotal: row.sponsorTotal,
-                salaryTotal: row.salaryTotal,
-                guv: row.guv,
-                transferNet: row.transferNet,
-              }).hoverText
-            }
+            // sich zusammensetzt". Herleitung UND Zahl kommen aus lib/finance/operating-guv.ts —
+            // derselben Quelle wie im Finanzen-Reiter. Ohne Herleitung (Archiv-Saison) bleibt der
+            // Hover leer, statt eine Zusammensetzung zu behaupten, die zur Snapshot-Zahl nicht passt.
+            title={row.operatingGuv ? buildGuvHoverText(row.operatingGuv) : undefined}
           >
             {formatNlMoney(row.guv)}
           </td>

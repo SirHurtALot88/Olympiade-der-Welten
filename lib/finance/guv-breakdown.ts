@@ -1,137 +1,96 @@
 /**
- * GEMELDET VON CHRIS (Seite „Spieltag · Saisonstand"): „Die GuV im Saisonstand und die im
- * Finanzen-Reiter weichen voneinander ab! Bitte fixen und bitte berücksichtigen, dass auch Apron mit
- * einfließt — am besten ein Hover auf dem GuV-Posten, der noch mal aufzeigt, wie die Zahl sich
- * zusammensetzt!"
+ * DER HOVER ZUR GUV — eine Herleitung, in beiden Ansichten dieselbe.
  *
- * ENTSCHEIDUNG VON CHRIS nach dem Befund: die zwei Definitionen bleiben, sie werden erklärt statt
- * angeglichen. Beide sind absichtlich so gebaut, und beide beantworten eine andere Frage.
+ * GEMELDET VON CHRIS (Ticket 24, Seite „Spieltag · Saisonstand"): „Die GuV im Saisonstand und die im
+ * Finanzen-Reiter weichen voneinander ab! … am besten ein Hover auf dem GuV-Posten, der noch mal
+ * aufzeigt, wie die Zahl sich zusammensetzt!"
  *
- * WAS DIE BEIDEN ZAHLEN WIRKLICH SIND — nachgelesen, nicht vermutet:
+ * ENTSCHEIDUNG VON CHRIS zu den Transfers: „Lass transfers aus der GuV am besten raus die sind
+ * separat ausgewiesen".
  *
- *  - SAISONSTAND (`app/api/season/standings-overview/route.ts:440-443`):
- *        guv = Sponsor-Abrechnung + Gebäude netto − Gehaltssumme
- *    Eine schmale Drei-Term-Rechnung für den Liga-Vergleich. Transfers stehen daneben in einer
- *    EIGENEN Spalte und sind hier NICHT enthalten.
- *  - FINANZEN-REITER (`app/foundation/finances/FoundationFinancesNewLook.tsx:164-167, 203-206`):
- *        GuV = alle laufenden Einnahmen − alle laufenden Ausgaben
- *    Also breiter als der Saisonstand (Vorstandsprämien, Kredite, Unterhalt …), aber ebenfalls ohne
- *    Transfers — die laufen dort als „Transfers (Sonderposten)" in einem eigenen Block.
+ * WAS SICH GEGENÜBER #392 GEÄNDERT HAT: dort standen noch ZWEI Definitionen nebeneinander, und der
+ * Hover erklärte, warum beide Ansichten verschiedene Zahlen zeigen („Beide sind richtig"). Das gilt
+ * nicht mehr — seit `lib/finance/operating-guv.ts` rechnen beide Ansichten dieselbe Zahl. Ein Hover,
+ * der weiterhin eine Abweichung erklärt, die es nicht mehr gibt, schickt den Leser auf die Suche
+ * nach einem Unterschied, den er nie findet. Deshalb sind diese Sätze bewusst entfernt.
  *
- * KORREKTUR ZUR ERSTEN EINSCHÄTZUNG: in der Triage-Notiz stand zuerst, der Saisonstand enthalte die
- * Transfers. Das stimmt nicht — die Formel oben hat sie nie. Der Unterschied liegt an den zusätzlichen
- * Betriebsposten des Finanzen-Reiters, nicht an den Transfers.
- *
- * APRON gehört in keine der beiden: er wird am SAISONENDE abgerechnet
- * (`lib/season/apron-service.ts` → `computeApronSettlement`, geschrieben von
- * `apron-settlement-service.ts`) und schlägt dort direkt aufs Cash durch, nicht auf die laufende GuV.
- * Der Hinweis gehört trotzdem in den Hover: eine Zahl, die einen bekannten Posten NICHT enthält, muss
- * das sagen — sonst sucht man den Unterschied wieder in der Rechnung.
- *
- * Diese Datei ist bewusst React-frei: beide Ansichten lesen dieselbe Herleitung, und sie ist ohne
- * Rendering prüfbar.
+ * Diese Datei ist React-frei: die Herleitung ist ohne Rendering prüfbar
+ * (`tests/guv-herleitung-hover.test.ts`).
  */
+import type { TeamOperatingGuv } from "@/lib/finance/operating-guv";
 
-export type GuvBreakdownInput = {
-  /** Sponsor-Abrechnung beim aktuellen Rang. */
-  sponsorTotal: number | null | undefined;
-  /** Gehaltssumme der Saison. */
-  salaryTotal: number | null | undefined;
-  /** Die im Saisonstand angezeigte GuV. */
-  guv: number | null | undefined;
-  /** Transfer-Saldo — steht im Saisonstand in einer eigenen Spalte. */
-  transferNet?: number | null;
-};
-
-export type GuvBreakdownLine = {
+export type GuvHoverLine = {
   label: string;
   value: number | null;
   /** `true` = zählt in die Zahl hinein, `false` = steht bewusst daneben. */
   counted: boolean;
 };
 
-export type GuvBreakdown = {
-  total: number | null;
-  lines: GuvBreakdownLine[];
-  /** Fertiger Hover-Text — eine Zeile je Posten, danach die Abgrenzung. */
-  hoverText: string;
-};
-
-function isNumber(value: number | null | undefined): value is number {
-  return typeof value === "number" && Number.isFinite(value);
-}
-
-function formatSigned(value: number | null) {
-  if (!isNumber(value)) return "—";
+function formatSigned(value: number | null): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
   const rounded = Math.round(value * 100) / 100;
   return `${rounded > 0 ? "+" : ""}${rounded.toLocaleString("de-DE", { maximumFractionDigits: 2 })}`;
 }
 
 /**
- * Zerlegt die Saisonstand-GuV in ihre drei Terme.
+ * Die Posten der GuV in Anzeige-Reihenfolge: erst die Einnahmen, dann die Ausgaben (als negative
+ * Beträge), zum Schluss der Sonderposten Transfers als NICHT gezählte Zeile.
  *
- * „Gebäude netto" wird als REST gerechnet (`guv − sponsor + gehälter`) und nicht separat übergeben.
- * Das ist Absicht: der Rest ist per Konstruktion exakt der dritte Term der Formel oben, während die
- * Spalte „Gebäude" der Tabelle den reinen UNTERHALT zeigt (`computeTeamBuildingCost` summiert
- * `calculateFacilitySeasonUpkeep`) — also die Kostenseite, nicht netto. Die beiden Zahlen dürfen sich
- * unterscheiden, und ein Hover, der die Spalte danebenstellt, würde genau die Verwirrung stiften,
- * die er auflösen soll.
+ * Nullposten werden weggelassen — eine Zeile „Kreditzinsen: 0" erklärt nichts und macht den Hover
+ * nur länger. Für den Apron heißt das: ein Team genau auf der 1. Linie zahlt nichts und bekommt
+ * nichts, und dann steht dazu auch keine Zeile da.
  */
-export function buildGuvBreakdown(input: GuvBreakdownInput): GuvBreakdown {
-  const sponsor = isNumber(input.sponsorTotal) ? input.sponsorTotal : null;
-  const salary = isNumber(input.salaryTotal) ? input.salaryTotal : null;
-  const total = isNumber(input.guv) ? input.guv : null;
-  const facilityNet =
-    total != null && sponsor != null && salary != null ? Number((total - sponsor + salary).toFixed(2)) : null;
+export function buildGuvHoverLines(guv: TeamOperatingGuv | null | undefined): GuvHoverLine[] {
+  if (!guv) return [];
+  const lines: GuvHoverLine[] = [];
+  const push = (label: string, value: number | null | undefined) => {
+    if (typeof value === "number" && Number.isFinite(value) && value !== 0) {
+      lines.push({ label, value, counted: true });
+    }
+  };
 
-  const lines: GuvBreakdownLine[] = [
-    { label: "Sponsor (beim aktuellen Rang)", value: sponsor, counted: true },
-    { label: "Gebäude netto", value: facilityNet, counted: true },
-    { label: "Gehälter", value: salary != null ? -salary : null, counted: true },
-  ];
-  if (isNumber(input.transferNet)) {
-    lines.push({ label: "Transfers (eigene Spalte, nicht enthalten)", value: input.transferNet, counted: false });
+  push("Sponsor", guv.sponsor?.total);
+  push("Gebäude-Einnahmen", guv.facilityIncome?.total);
+  push("Vorstandsziele (Prämie)", guv.objectiveReward);
+  push("Apron-Ausgleich", guv.apronPayout);
+  push("Gehälter", guv.salaries.total > 0 ? -guv.salaries.total : null);
+  push("Gebäude-Unterhalt (bezahlt)", guv.facilityUpkeep.total > 0 ? -guv.facilityUpkeep.total : null);
+  push("Kreditzinsen", guv.loanInstallments.total > 0 ? -guv.loanInstallments.total : null);
+  push("Vorstandsziele (Strafe)", guv.objectivePenalty != null ? -guv.objectivePenalty : null);
+  push("Apron-Abgabe", guv.apronLevy != null ? -guv.apronLevy : null);
+
+  if (guv.transfer) {
+    lines.push({ label: "Transfers (Sonderposten, nicht enthalten)", value: guv.transfer.net, counted: false });
   }
-
-  const counted = lines.filter((line) => line.counted);
-  const hoverText = [
-    "GuV im Saisonstand = Sponsor + Gebäude netto − Gehälter.",
-    ...counted.map((line) => `${line.label}: ${formatSigned(line.value)}`),
-    `Ergibt: ${formatSigned(total)}`,
-    "",
-    "Nicht enthalten:",
-    "· Transfers — stehen in der Spalte daneben. Im Finanzen-Reiter laufen sie als eigener Sonderposten.",
-    "· Apron — wird erst zum Saisonende abgerechnet und geht dann direkt aufs Cash.",
-    "",
-    "Der Finanzen-Reiter rechnet breiter (auch Vorstandsprämien, Kredite, Unterhalt) und kommt deshalb auf eine andere Zahl. Beide sind richtig, sie beantworten verschiedene Fragen.",
-  ].join("\n");
-
-  return { total, lines, hoverText };
+  return lines;
 }
 
 /**
- * Gegenstück für den Finanzen-Reiter: dieselbe Abgrenzung, aus der anderen Richtung erklärt.
+ * Der fertige `title`-Text für den GuV-Posten — identisch im Saisonstand und im Finanzen-Reiter,
+ * weil er aus derselben `TeamOperatingGuv` gebaut wird.
+ *
+ * Bewusst ein reiner `title`-String statt einer Hover-Card: niedrigrisiko und konsistent mit den
+ * übrigen `title=`-Erklärungen im neuen Look.
  */
-export function buildOperatingGuvHoverText(input: {
-  totalIncome: number | null | undefined;
-  totalExpenses: number | null | undefined;
-  transferNet?: number | null;
-}): string {
-  const income = isNumber(input.totalIncome) ? input.totalIncome : null;
-  const expenses = isNumber(input.totalExpenses) ? input.totalExpenses : null;
-  const total = income != null && expenses != null ? Number((income - expenses).toFixed(2)) : null;
+export function buildGuvHoverText(guv: TeamOperatingGuv | null | undefined): string {
+  if (!guv) {
+    return "Für dieses Team liegt keine GuV-Herleitung vor.";
+  }
+  const lines = buildGuvHoverLines(guv);
+  const counted = lines.filter((line) => line.counted);
+  const transfers = lines.find((line) => !line.counted);
+
+  const body = counted.length > 0 ? counted.map((line) => `${line.label}: ${formatSigned(line.value)}`) : ["Keine Posten erfasst."];
+
   return [
-    "GuV im Finanzen-Reiter = laufende Einnahmen − laufende Ausgaben.",
-    `Einnahmen: ${formatSigned(income)}`,
-    `Ausgaben: ${formatSigned(expenses != null ? -expenses : null)}`,
-    `Ergibt: ${formatSigned(total)}`,
+    "GuV = laufende Einnahmen − laufende Ausgaben (Saisonstand und Finanzen-Reiter rechnen dieselbe Zahl).",
+    ...body,
+    `Ergibt: ${formatSigned(guv.guv)}`,
     "",
     "Nicht enthalten:",
-    ...(isNumber(input.transferNet)
-      ? [`· Transfers (${formatSigned(input.transferNet)}) — Einmal-Ereignis, steht im eigenen Sonderposten-Block.`]
-      : ["· Transfers — Einmal-Ereignis, stehen im eigenen Sonderposten-Block."]),
-    "· Apron — wird erst zum Saisonende abgerechnet und geht dann direkt aufs Cash.",
-    "",
-    "Der Saisonstand rechnet schmaler (nur Sponsor + Gebäude netto − Gehälter) und kommt deshalb auf eine andere Zahl. Beide sind richtig, sie beantworten verschiedene Fragen.",
+    transfers
+      ? `· Transfers (${formatSigned(transfers.value)}) — Einmal-Ereignis, separat ausgewiesen (eigene Spalte im Saisonstand, eigener Block im Finanzen-Reiter).`
+      : "· Transfers — Einmal-Ereignis, separat ausgewiesen (eigene Spalte im Saisonstand, eigener Block im Finanzen-Reiter).",
+    "· Kredit-Tilgung — reine Bilanzbewegung; nur der Zinsanteil ist eine Ausgabe.",
   ].join("\n");
 }

@@ -26,6 +26,7 @@ import {
   buildPlayerSeasonPerformance,
   buildPlayerSeasonPerformanceMap,
   isCurrentSeasonLivePerformanceSummary,
+  type PlayerSeasonPerformanceSummary,
 } from "@/lib/foundation/player-season-performance";
 import { getPlayerSeasonZeroMarketValueDelta, getPlayerSeasonZeroMarketValueReference, resolveArchivedSeasonPlayerMarketValue } from "@/lib/foundation/player-display-market-value";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
@@ -144,6 +145,7 @@ export type AttributeVisibility = "exact" | "scouted";
 type DisciplineGlobalRankMaps = {
   valueRanksByDiscipline: Map<string, Map<string, number | null>>;
   seasonPointsRanksByDiscipline: Map<string, Map<string, number | null>>;
+  lastSeasonPointsRanksByDiscipline: Map<string, Map<string, number | null>>;
   allTimePointsRanksByDiscipline: Map<string, Map<string, number | null>>;
 };
 
@@ -376,6 +378,7 @@ export type PlayerDetailDrawerData = {
     currentSeasonMutatorPps: number | null;
     slotLabels: string[];
     lastSeasonPoints: number | null;
+    lastSeasonPointsRank: number | null;
     lastSeasonAppearances: number | null;
     lastSeasonId: string | null;
     upgradeDelta: number | null;
@@ -655,30 +658,77 @@ function buildDisciplineGlobalRankMaps(
   disciplines: Array<{ id: string; name: string; category: DisciplineCategory; playerCount?: number | null }>,
   currentSeasonLedger = buildSeasonPointsLedger(gameState),
   rankPoolPlayerIds?: string[] | null,
+  options?: {
+    // Liga-weite Saison-Leistungen JE SPIELER — exakt die Quelle, aus der die
+    // angezeigte PPs-Zahl der Top-Disziplinen-Tabelle stammt.
+    //
+    // Warum das hier hereingereicht wird statt weiter nur den Ledger zu lesen:
+    // Das Spieler-Profil wird IM BROWSER aus dem kompakten Foundation-Payload
+    // gebaut (`use-foundation-shell-router-body-scope.tsx:2937`), und der
+    // kompakte Payload beschneidet `matchdayResults` auf den aktiven Spieltag
+    // (`lib/persistence/foundation-initial-compact-state.ts:94/131`). Der
+    // clientseitig gebaute Ledger ist damit LEER — gemessen am Save
+    // new-game-1785823388048-1hf25q: 1573 Ledger-Einträge im vollen Save, 0 im
+    // kompakten. Ergebnis: `buildSharedRankMap` bekam für jeden Spieler `null`
+    // und lieferte für jede Disziplin Rang `null`, während die PPs-Zahl selbst
+    // sichtbar blieb (sie stammt aus `playerDisciplinePerformances`, das der
+    // kompakte Payload NICHT beschneidet: 1573 Einträge, 331 Spieler, in beiden
+    // Fassungen identisch).
+    //
+    // Über die Saison-Performance-Map ranken heißt: die Rangliste entsteht aus
+    // genau den Zahlen, die in der Tabelle stehen — Wert und Rang können nie
+    // auseinanderlaufen, egal wie vollständig der Payload ist.
+    seasonPerformanceByPlayerId?: Map<string, PlayerSeasonPerformanceSummary> | null;
+    // Saison-Id der letzten archivierten Saison (für die Spalte "−1 PPs").
+    lastSeasonId?: string | null;
+  },
 ): DisciplineGlobalRankMaps {
   const rankPoolSet = rankPoolPlayerIds != null ? new Set(rankPoolPlayerIds.filter(Boolean)) : null;
   const rankedPlayers = rankPoolSet ? gameState.players.filter((player) => rankPoolSet.has(player.id)) : gameState.players;
   const valueRanksByDiscipline = new Map<string, Map<string, number | null>>();
   const seasonPointsRanksByDiscipline = new Map<string, Map<string, number | null>>();
+  const lastSeasonPointsRanksByDiscipline = new Map<string, Map<string, number | null>>();
   const allTimePointsRanksByDiscipline = new Map<string, Map<string, number | null>>();
   const currentSeasonId = gameState.season.id ?? null;
   const currentSeasonTotalsByDiscipline = new Map<string, Map<string, number>>();
+  const lastSeasonTotalsByDiscipline = new Map<string, Map<string, number>>();
   const allTimeTotalsByDiscipline = new Map<string, Map<string, number>>();
 
   for (const snapshot of clampSeasonSnapshotsToCurrentSeason(gameState)) {
     for (const playerPerformance of snapshot.playerPerformances ?? []) {
       for (const entry of playerPerformance.disciplineBreakdown ?? []) {
         addDisciplinePoints(allTimeTotalsByDiscipline, entry.disciplineId, playerPerformance.playerId, entry.totalContribution ?? null);
+        // "−1 PPs" liest denselben archivierten Saison-Snapshot, aus dem auch
+        // `findLatestArchivedPlayerPerformance` die angezeigte Zahl holt.
+        if (options?.lastSeasonId && snapshot.seasonId === options.lastSeasonId) {
+          addDisciplinePoints(
+            lastSeasonTotalsByDiscipline,
+            entry.disciplineId,
+            playerPerformance.playerId,
+            entry.totalContribution ?? null,
+          );
+        }
       }
     }
   }
 
-  for (const entry of currentSeasonLedger.pointEntries) {
-    const seasonId = entry.seasonId ?? currentSeasonId;
-    if (currentSeasonId && seasonId !== currentSeasonId) {
-      continue;
+  if (options?.seasonPerformanceByPlayerId) {
+    for (const [playerId, performance] of options.seasonPerformanceByPlayerId.entries()) {
+      if (currentSeasonId && (performance.seasonId ?? currentSeasonId) !== currentSeasonId) {
+        continue;
+      }
+      for (const entry of performance.disciplineBreakdown ?? []) {
+        addDisciplinePoints(currentSeasonTotalsByDiscipline, entry.disciplineId, playerId, entry.totalContribution ?? null);
+      }
     }
-    addDisciplinePoints(currentSeasonTotalsByDiscipline, entry.disciplineId, entry.playerId, entry.points ?? null);
+  } else {
+    for (const entry of currentSeasonLedger.pointEntries) {
+      const seasonId = entry.seasonId ?? currentSeasonId;
+      if (currentSeasonId && seasonId !== currentSeasonId) {
+        continue;
+      }
+      addDisciplinePoints(currentSeasonTotalsByDiscipline, entry.disciplineId, entry.playerId, entry.points ?? null);
+    }
   }
 
   const hasCurrentSeasonSnapshot = Boolean(
@@ -690,6 +740,15 @@ function buildDisciplineGlobalRankMaps(
   }
 
   for (const discipline of disciplines) {
+    lastSeasonPointsRanksByDiscipline.set(
+      discipline.id,
+      buildSharedRankMap(
+        rankedPlayers.map((player) => ({
+          playerId: player.id,
+          value: lastSeasonTotalsByDiscipline.get(discipline.id)?.get(player.id) ?? null,
+        })),
+      ),
+    );
     valueRanksByDiscipline.set(
       discipline.id,
       buildSharedRankMap(
@@ -722,6 +781,7 @@ function buildDisciplineGlobalRankMaps(
   return {
     valueRanksByDiscipline,
     seasonPointsRanksByDiscipline,
+    lastSeasonPointsRanksByDiscipline,
     allTimePointsRanksByDiscipline,
   };
 }
@@ -978,6 +1038,7 @@ function buildScoutedDisciplineValuesFromPlayer(input: {
       currentSeasonMutatorPps: null,
       slotLabels: [],
       lastSeasonPoints: null,
+      lastSeasonPointsRank: null,
       lastSeasonAppearances: null,
       lastSeasonId: null,
       upgradeDelta: null,
@@ -1156,6 +1217,9 @@ function buildDisciplineValuesFromPlayer(
         currentSeasonMutatorPps: currentDetail ? roundValue(currentDetail.mutatorPps, 1) : null,
         slotLabels: currentDetail?.slotLabels.slice(0, 8) ?? [],
         lastSeasonPoints: lastSeasonRow?.totalContribution ?? null,
+        // Der Rang wird NUR aus dem archivierten Vorsaison-Snapshot gelesen —
+        // gibt es keine Vorsaison (Saison 1), bleibt Zahl UND Rang leer.
+        lastSeasonPointsRank: globalRankMaps?.lastSeasonPointsRanksByDiscipline.get(discipline.id)?.get(player.id) ?? null,
         lastSeasonAppearances: lastSeasonRow?.appearances ?? null,
         lastSeasonId: latestArchivedPerformance?.seasonId ?? null,
         upgradeDelta: delta,
@@ -2407,11 +2471,16 @@ export function buildPlayerDrawerDataFromGameState(input: {
     input.gameState.players,
     rosterEntry ? activePlayerIds : null,
   );
+  const latestArchivedPerformance = findLatestArchivedPlayerPerformance(input.gameState, player.id);
   const disciplineGlobalRankMaps = buildDisciplineGlobalRankMaps(
     input.gameState,
     input.gameState.disciplines,
     seasonDerivations.ledger,
     rosterEntry ? activePlayerIds : null,
+    {
+      seasonPerformanceByPlayerId: seasonDerivations.performanceByPlayerId,
+      lastSeasonId: latestArchivedPerformance?.seasonId ?? null,
+    },
   );
   const axisRankContext = buildAxisRankContext({
     gameState: input.gameState,
@@ -2464,7 +2533,6 @@ export function buildPlayerDrawerDataFromGameState(input: {
     player,
     buildSeasonHistory(input.gameState, player.id, player),
   );
-  const latestArchivedPerformance = findLatestArchivedPlayerPerformance(input.gameState, player.id);
   const injuryHistoryRows: PlayerDrawerInjuryHistoryRow[] = buildPlayerInjuryHistoryFromEvents({
     playerId: player.id,
     gameState: input.gameState,
@@ -2953,6 +3021,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
             currentSeasonMutatorPps: null,
             slotLabels: [],
             lastSeasonPoints: null,
+            lastSeasonPointsRank: null,
             lastSeasonAppearances: null,
             lastSeasonId: null,
             upgradeDelta: null,

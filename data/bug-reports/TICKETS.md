@@ -4,7 +4,7 @@
 > `data/bug-reports/triage/*.md` und `tickets.json`. Wer hier etwas ändert, verliert es beim
 > nächsten `npm run bugs:tabelle`. Der Stand einer Meldung wird in ihrer Triage-Notiz gepflegt.
 
-27 Meldungen — offen: 0 · vorgeprüft: 0 · angenommen: 3 · gebaut: 24 · abgelehnt: 0 · erledigt: 0
+30 Meldungen — offen: 3 · vorgeprüft: 1 · angenommen: 2 · gebaut: 24 · abgelehnt: 0 · erledigt: 0
 
 | Nr | Eingang | Von | Wo | Titel | Status | Ergebnis |
 |---:|---|---|---|---|---|---|
@@ -32,9 +32,12 @@
 | [22](triage/bug-2026-08-04T10-47-20-790Z-02kdiz.md) | 04.08., 12:47 | Chris | Team · Training | Trainingsansicht zeigt nur die vier besten Klassen — und ohne Achsfarbe | gebaut ⚠ | PR #389 · **kein Ergebnis angegeben, Wirkung nicht bestaetigt** |
 | [23](triage/bug-2026-08-04T12-07-33-898Z-y72yr9.md) | 04.08., 14:07 | Chris | Team · Teams | Teamansicht — größere Portraits, PP über den Stats, auch je Disziplin | angenommen | — |
 | [24](triage/bug-2026-08-04T12-10-34-702Z-1rh8lx.md) | 04.08., 14:10 | Chris | Spieltag · Saisonstand | GuV im Saisonstand weicht von der GuV im Finanzen-Reiter ab | angenommen | — |
-| [25](triage/bug-2026-08-04T12-13-40-352Z-fm2opo.md) | 04.08., 14:13 | Chris | Spieltag · Saisonstand | KI nutzt Front-/Back-loaded-Verträge nicht, um Apron-Probleme zu umgehen | angenommen | — |
+| [25](triage/bug-2026-08-04T12-13-40-352Z-fm2opo.md) | 04.08., 14:13 | Chris | Spieltag · Saisonstand | KI nutzt Front-/Back-loaded-Verträge nicht, um Apron-Probleme zu umgehen | vorgeprüft | Nicht gebaut — der Apron ist gegen die Vertragsform blind (bewusst so, PR #368); der gewünschte Effekt wäre exakt 0. Befund in docs/KI_VERTRAGSFORMEN_APRON_BEFUND.md. |
 | [26](triage/bug-2026-08-04T13-18-59-798Z-vlsakj.md) | 04.08., 15:18 | Chris | Spieltag · Arena | Trotz Tagesplatz 2 und 20,8 Punkten zeigt der Saisonstand keine Rang-Bewegung (15 auf 15) | gebaut ⚠ | Der Anzeigeteil ist behoben — die Rang-Spalte zeigt die Bewegung zur letzten Wertung jetzt überhaupt, und ein gehaltener Platz steht sichtbar als ±0 statt als leere Zelle. Ob M-S rechnerisch hätte steigen müssen, ließ sich ohne Zugriff auf den Spielstand nicht nachrechnen. · PR #394 · **Wirkung nicht bestaetigt** |
 | [27](triage/bug-2026-08-04T13-20-49-011Z-191wtu.md) | 04.08., 15:20 | Chris | Spieltag · Saisonstand | Saisonstand zeigt keine Rang-Änderung zur letzten Wertung | gebaut ⚠ | Die Rang-Spalte des Saisonstands hatte die Bewegung nie zu sehen bekommen — sie hing an einer Datenquelle, die auf genau dieser Seite immer leer ist. Jetzt kommt sie aus dem gespeicherten Punktestand vor der letzten Wertung. · PR #394 · **Wirkung nicht bestaetigt** |
+| [28](triage/bug-2026-08-04T13-22-34-347Z-pqcssb.md) | 04.08., 15:22 | Chris | Spieltag · Saisonstand | „Können wir wenn wir die Punkte ausklappen, neben den geholten Punkten in den Diszis auch den Rakn schreiben? Also zb MIN (2) 5 # 3   Also 5 PPs geholt was rang 3 entspricht - finde das ist eine info die überall sein sollte wo man PPs sieht, dass man sowohl bei den Teams als auch Spielern sihet welchem Rank das entspricht" | offen | — |
+| [29](triage/bug-2026-08-04T13-23-39-256Z-uzetn6.md) | 04.08., 15:23 | Chris | Team · Spieler | „Top Disziplinen hat z.B. auch PPs -1 Pps und All-Time -> da fehlt jeweils auch der Rank das hatten wir früher drin und ist super hilfreich! bitte hinzufügen" | offen | — |
+| [30](triage/bug-2026-08-04T15-59-37-826Z-2tlf67.md) | 04.08., 17:59 | Chris | Spieltag · Arena | „bitte schauen dass die bilder in den hovers und team karte geladen werden während die diszi läuft damit die verfügbar sind wenn man mal den drawer öffnet" | offen | — |
 
 **`gebaut ⚠`** heißt: Der Fix ist gemergt, die Wirkung im laufenden Spiel aber noch nicht belegt.
 Erst ein `bestaetigt:` in der Triage-Notiz macht daraus `erledigt`. Diese Unterscheidung gibt es,
@@ -43,4 +46,4 @@ von einem Zwischenspeicher verschluckt.
 
 Details je Ticket: die Nummer verlinkt auf die Triage-Notiz. Volltext: `npm run bugs:review`.
 
-_Erzeugt: 4.8.2026, 15:51:13_
+_Erzeugt: 4.8.2026, 19:33:09_

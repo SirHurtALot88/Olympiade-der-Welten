@@ -24,7 +24,11 @@ import { useSeasonV2PanelDerivations } from "@/lib/foundation/tabs/use-season-v2
  */
 export type FoundationSeasonV2HostProps = Omit<
   UseSeasonV2PanelModelInput,
-  "sortedSeasonStandRows" | "sortedSeasonTopPlayerRows" | "archivedSeasonDisciplineLeaderboards"
+  // `isViewingArchivedSeason` leitet der Host selbst aus `useSeasonV2PanelDerivations` ab.
+  | "sortedSeasonStandRows"
+  | "sortedSeasonTopPlayerRows"
+  | "archivedSeasonDisciplineLeaderboards"
+  | "isViewingArchivedSeason"
 > &
   Omit<UseSeasonV2DataInput, "selectedSeasonSnapshot"> &
   UseSeasonV2StandingsDerivationsInput &
@@ -135,6 +139,8 @@ export default function FoundationSeasonV2Host({
     seasonHistorySnapshots,
     archivedSeasonDisciplineLeaderboards,
     boardConfidence,
+    // Im Archiv bleibt die GuV die des Snapshots — live gerechnet wäre sie dort gelogen.
+    isViewingArchivedSeason,
   });
 
   return (

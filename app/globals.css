@@ -38766,6 +38766,19 @@ button.market-v2-bucket-card.is-selected {
   border-style: solid;
 }
 
+/* Achsen-PPs dieser Saison, ÜBER dem POW/SPE/MEN/SOC-Stat (Ticket 23, Chris:
+   "POW 5,3 über dem POW 42 stat"). Additiv: Chips ohne `ppValue` rendern das
+   `<em>` gar nicht erst, also bleibt jeder andere Aufrufer unverändert. */
+.velo-stat-orbit-pp {
+  display: block;
+  font-style: normal;
+  font-weight: 700;
+  font-size: var(--nl-portrait-pp-fs, 0.56rem);
+  letter-spacing: 0.01em;
+  line-height: 1.1;
+  color: var(--nl-accent, #5b9bff);
+}
+
 .foundation-player-portrait-stat {
   border-radius: 8px;
   padding: 4px 6px;
@@ -38951,6 +38964,10 @@ button.market-v2-bucket-card.is-selected {
 
 .foundation-player-portrait-card.is-full-art.is-team-layout .home-v2-player-orbit.is-overlay .velo-stat-orbit-chip strong {
   font-size: 0.66rem;
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .home-v2-player-orbit.is-overlay .velo-stat-orbit-chip .velo-stat-orbit-pp {
+  font-size: 0.5rem;
 }
 
 .foundation-player-portrait-economy {
@@ -65429,7 +65446,10 @@ button.is-new-look .nl-thist-season-pill,
 
 .is-new-look .nl-teamprofile-portrait-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  /* Ticket 23 (Chris): Portraits in der Team-Ansicht groesser — von 220px auf
+     284px angehoben, damit jede Karte deutlich mehr Flaeche fuer das Bild
+     bekommt (weniger Karten pro Zeile, aber jede davon groesser). */
+  grid-template-columns: repeat(auto-fill, minmax(284px, 1fr));
   gap: var(--nl-s4);
 }
 

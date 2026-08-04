@@ -6,6 +6,14 @@ import type {
   SeasonDisciplineScheduleEntry,
   SeasonDisciplineScheduleSlot,
 } from "@/lib/data/olyDataTypes";
+import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
+import {
+  SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER,
+  SEASON_DISCIPLINE_PLAYER_COUNT,
+  isSeasonDisciplineKey,
+  type SeasonDisciplineAreaId,
+  type SeasonDisciplineKey,
+} from "@/lib/season/season-discipline-area-groups";
 
 const SCHEDULE_SOURCE_NOTE =
   "Legacy-Fallback fuer alte Saves ohne vollstaendigen Season-Schedule.";
@@ -372,6 +380,53 @@ export function buildSeasonDisciplinePlayerCountMap(gameState: GameState) {
   }
 
   return playerCountByDisciplineId;
+}
+
+/**
+ * `SEASON_DISCIPLINE_AREA_GROUPS` (lib/season/season-discipline-area-groups.ts) sortiert seine
+ * Disziplin-Spalten nach dem FESTEN Katalog-`playerCount` — der Kommentar dort nennt das "Fixed
+ * roster size per discipline". Das stimmt nicht mehr, seit `buildSeasonPlayerCountByDiscipline`
+ * (weiter oben in dieser Datei) jeder 5er-Achse pro Saison eine GEWUERFELTE Permutation aus
+ * {2,3,4,5,6} zuweist — bewusst, fuer Abwechslung ("player-count-balance"). Der Katalogwert ist
+ * damit nur noch ein Fallback fuer Saisons ohne Schedule, nicht die tatsaechliche Kadergroesse
+ * der laufenden Saison.
+ *
+ * Gemeldet von Chris: "Showcase hat 6 Spieler in der Season und trotzdem ist SHO nur 2" — im
+ * gemeldeten Save (new-game-1785823388048-1hf25q, Saison 1) wuerfelt genau dieser Mechanismus
+ * fuer die SOC-Achse basketball=2, football=4, battlefield=5, eiskunst=3, showcase=6. Sortiert
+ * nach dem STATISCHEN Katalogwert (bas=6, sho=5, foo=4, eis=3, bat=2) liest die Spalte
+ * BAS · SHO · FOO · EIS · BAT — Showcase landet trotz der realen 6 Spieler auf Platz 2. Sortiert
+ * nach der ECHTEN, gewuerfelten Zahl dieser Saison waere es SHO · BAT · FOO · EIS · BAS.
+ *
+ * Diese Funktion liefert dieselbe Gruppen-Form wie `SEASON_DISCIPLINE_AREA_GROUPS`, aber mit den
+ * Spalten je Achse nach der ECHTEN, fuer DIESE Saison gewuerfelten Kadergroesse sortiert (Quelle:
+ * `buildSeasonDisciplinePlayerCountMap`, dieselbe, aus der die Spielerzahl-Anzeige "(N)" im
+ * Spielerprofil kommt — Anzeige und Sortierung folgen so derselben Zahl). Fehlt ein Schedule-Wert
+ * (z. B. noch kein Save-Schedule vorhanden), faellt die Sortierung auf den Katalogwert zurueck.
+ */
+export function buildSeasonDisciplineAreaGroupsOrderedBySeasonPlayerCount(
+  gameState: GameState,
+): Array<{ id: SeasonDisciplineAreaId; label: string; keys: SeasonDisciplineKey[] }> {
+  const seasonPlayerCountByDisciplineId = buildSeasonDisciplinePlayerCountMap(gameState);
+  const seasonCountByKey = new Map<SeasonDisciplineKey, number>();
+
+  for (const discipline of gameState.disciplines) {
+    const key = normalizeLineupDisciplineFieldName(discipline.id);
+    if (!isSeasonDisciplineKey(key)) {
+      continue;
+    }
+    const count = seasonPlayerCountByDisciplineId.get(discipline.id) ?? discipline.playerCount ?? null;
+    if (count != null && Number.isFinite(count)) {
+      seasonCountByKey.set(key, count);
+    }
+  }
+
+  const resolvedCount = (key: SeasonDisciplineKey) => seasonCountByKey.get(key) ?? SEASON_DISCIPLINE_PLAYER_COUNT[key];
+
+  return SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER.map((group) => ({
+    ...group,
+    keys: [...group.keys].sort((left, right) => resolvedCount(right) - resolvedCount(left)),
+  }));
 }
 
 export function withNormalizedSeasonDisciplineSchedule(gameState: GameState, saveId?: string | null): GameState {

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import { EmptyState } from "@/components/foundation/EmptyState";
-import { buildOperatingGuvHoverText } from "@/lib/finance/guv-breakdown";
+import { buildGuvHoverText } from "@/lib/finance/guv-breakdown";
 import {
   NL_TONE_VAR,
   NlCard,
@@ -113,6 +113,19 @@ function buildTransferTooltip(team: TeamFinancesState): string | undefined {
   );
 }
 
+// --- Apron (Ticket 24) ---------------------------------------------------
+// Der Apron ist die jährliche Umverteilung der Liga: wer deutlich mehr für Gehälter ausgibt als der
+// Median, gibt einen Teil ab; der Topf geht zu gleichen Teilen an alle Teams unter der 1. Linie
+// (siehe lib/season/apron-service.ts). Anders als ein Transfer ist er KEIN Einmal-Ereignis, sondern
+// läuft jede Saison — deshalb gehört er in die GuV und nicht in die Sonderposten.
+const APRON_PAYOUT_TOOLTIP =
+  "Anteil am Apron-Topf: Teams unter der 1. Apron-Linie (Median-Gehalt der Liga × 1,1) teilen sich zu " +
+  "gleichen Teilen, was die Vielzahler abgeben. Wird zum Saisonende ausgezahlt.";
+const APRON_LEVY_TOOLTIP =
+  "Apron-Abgabe: Gehaltssumme über der 1. Apron-Linie (Median-Gehalt der Liga × 1,1) wird anteilig " +
+  "abgegeben, über der 2. Linie stärker. Gedeckelt auf die Hälfte des eigenen Sponsor-Wertungsanteils. " +
+  "Wird zum Saisonende abgebucht.";
+
 /** Mehr Zeilen würden den Tooltip sprengen — Rest wird als "+ N weitere" zusammengefasst. */
 const SALARY_TOOLTIP_MAX_ROWS = 12;
 
@@ -175,6 +188,17 @@ function buildIncomeLines(team: TeamFinancesState): FinanceLineItem[] {
       title: "Netto-Prämie erfüllter Vorstandsziele (Board-Objective-Settlement).",
     });
   }
+  // Chris (Ticket 24): „bitte berücksichtigen dass auch Apron mit einfließt". Wer unter der
+  // 1. Apron-Linie bleibt, bekommt seinen Anteil am Topf der Vielzahler.
+  if (team.income.apronPayout != null) {
+    lines.push({
+      key: "apron",
+      label: "Apron-Ausgleich",
+      amount: team.income.apronPayout,
+      tone: "good",
+      title: APRON_PAYOUT_TOOLTIP,
+    });
+  }
   return lines;
 }
 
@@ -212,6 +236,15 @@ function buildExpenseLines(team: TeamFinancesState): FinanceLineItem[] {
       amount: team.expenses.objectivePenalty,
       tone: "warn",
       title: "Netto-Strafe verfehlter Vorstandsziele (Board-Objective-Settlement).",
+    });
+  }
+  if (team.expenses.apronLevy != null) {
+    lines.push({
+      key: "apron",
+      label: "Apron-Abgabe",
+      amount: team.expenses.apronLevy,
+      tone: "risk",
+      title: APRON_LEVY_TOOLTIP,
     });
   }
   return lines;
@@ -489,13 +522,10 @@ function CashReconciliation({ team }: { team: TeamFinancesState }) {
         label="+ GuV"
         value={formatNlMoney(team.guv)}
         tone={guvTone(team.guv)}
-        // Gegenstueck zum Hover im Saisonstand — dieselbe Abgrenzung, aus dieser Richtung erklaert.
-        // Sonst steht an zwei Stellen dieselbe Ueberschrift ueber verschiedenen Zahlen, ohne dass
-        // irgendwo steht, warum (genau Chris' Meldung).
-        title={buildOperatingGuvHoverText({
-          totalIncome: team.totalIncome,
-          totalExpenses: team.totalExpenses,
-        })}
+        // Derselbe Hover wie im Saisonstand, aus derselben Herleitung gebaut — seit Ticket 24 ist es
+        // auch dieselbe ZAHL. Vorher standen an zwei Stellen dieselbe Ueberschrift ueber
+        // verschiedenen Zahlen (genau Chris' Meldung).
+        title={buildGuvHoverText(team.operating)}
       />
       <StatChip
         label="+ Sonstige Cash-Bewegungen"
@@ -705,19 +735,21 @@ export default function FoundationFinancesNewLook({
               label="Einnahmen (Saison)"
               value={formatNlMoney(animatedIncome ?? team.totalIncome)}
               tone="good"
-              title="Sponsor + Gebäude-Einnahmen + Vorstandsziel-Prämien der laufenden Saison (Transfersaldo separat als Sonderposten)"
+              title="Sponsor + Gebäude-Einnahmen + Vorstandsziel-Prämien + Apron-Ausgleich der laufenden Saison (Transfersaldo separat als Sonderposten)"
             />
             <StatChip
               label="Ausgaben (Saison)"
               value={formatNlMoney(animatedExpenses ?? team.totalExpenses)}
               tone="risk"
-              title="Gehälter + bezahlter Gebäude-Unterhalt + Kreditraten + Vorstandsziel-Strafen der laufenden Saison (Transfersaldo separat als Sonderposten)"
+              title="Gehälter + bezahlter Gebäude-Unterhalt + Kreditzinsen + Vorstandsziel-Strafen + Apron-Abgabe der laufenden Saison (Transfersaldo separat als Sonderposten)"
             />
             <StatChip
               label="GuV"
               value={formatNlMoney(animatedGuv ?? team.guv)}
               tone={guvTone(team.guv)}
-              title="Einnahmen minus Ausgaben der laufenden Saison"
+              // Chris (Ticket 24): „am besten ein Hover auf dem GuV Posten der noch mal aufzeigt wie
+              // die Zahl sich zusammensetzt". Gleiche Quelle wie der Hover im Saisonstand.
+              title={buildGuvHoverText(team.operating)}
             />
             {/* Salary Factor: Wert der laufenden Season + Richtung zur (bereits ausgewürfelten)
                 nächsten Season — Tonwahl siehe salaryFactorDirectionTone. Ohne validen Wert

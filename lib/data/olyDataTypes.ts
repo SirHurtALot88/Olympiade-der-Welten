@@ -2857,10 +2857,61 @@ export type SeasonState = {
   /** Pre-computed ledger + OVR/PPS/MVS ratings; invalidated via contentSignature. */
   persistedSeasonDerivations?: unknown;
   /**
+   * Zwischenspeicher der pro Spieltag erspielten Performance-Punkte (eigener Kader).
+   *
+   * Warum: Der Performance-Anteil im Trainings-Forecast wurde bis dahin bei JEDEM Rendern
+   * aus zwei Quellen rekonstruiert — den Performance-Zeilen UND der Liste gültiger
+   * `matchdayResults`-Ids. Der Browser hält aber nur den kompakten Payload, in dem diese
+   * Id-Liste auf den aktiven Spieltag beschnitten ist: alle Performance-Zeilen fielen durch
+   * das Sieb, der Anteil stand auf 0. Statt die schweren Ergebnis-Listen zurückzugeben (das
+   * verdirbt den clientseitigen Saison-Ledger) legt der Server die bereits gewerteten
+   * Punkte hier einmal fertig ab, und der Forecast liest sie nur noch.
+   *
+   * ABGELEITET, nicht autoritativ: wird bei jedem Server-Read neu aus dem vollständigen Save
+   * gebaut und im kompakten PUT wieder abgestreift. Fehlt das Feld (Altstände, fremde
+   * Payloads), bleibt es schlicht `undefined` — nie eine 0, die als echte 0 durchgeht.
+   */
+  seasonPerformanceProgression?: SeasonPerformanceProgressionCache;
+  /**
    * Snapshot of OVR/MVS/PPs/MW + sale-factor bracket ranks taken at MD10 season end. Present only
    * after the season completes; cleared when a new season activates. See FrozenValuationSnapshot.
    */
   frozenValuationSnapshot?: FrozenValuationSnapshot;
+};
+
+/**
+ * Ein gewerteter Spieltags-Einsatz eines Spielers, auf das reduziert, was der
+ * Trainings-Forecast davon braucht: in welcher Disziplin die Punkte anfielen und
+ * wie hoch das daraus abgeleitete Performance-Budget ist.
+ *
+ * `budget` ist KEINE neue Rechnung — es ist derselbe Setpoint-Wert, den die
+ * Progression bisher schon aus der Performance-Zeile gezogen hat, nur einmal
+ * serverseitig ausgerechnet statt bei jedem Rendern neu.
+ */
+export type SeasonPerformanceMatchdayEntry = {
+  matchdayResultId: string;
+  matchdayId: string | null;
+  disciplineId: string;
+  /** Performance-Budget (Setpoints) dieses Einsatzes. */
+  budget: number;
+  /** Roh-Score des Spielers in diesem Einsatz (für die Saison-Signale). */
+  finalPlayerScore: number;
+};
+
+/** Siehe `SeasonState.seasonPerformanceProgression`. */
+export type SeasonPerformanceProgressionCache = {
+  seasonId: string;
+  /** Spieltag, auf dessen Stand der Zwischenspeicher gebaut wurde. */
+  matchdayId: string | null;
+  generatedAt: string;
+  /**
+   * Anzahl der gewerteten Spieltags-Ergebnisse, aus denen der Zwischenspeicher entstand.
+   * Vollständigkeits-Marke: ein Stand, der selbst mehr Ergebnisse kennt, ignoriert den
+   * Zwischenspeicher und rechnet aus seinen eigenen Daten (so kann eine veraltete Kopie
+   * den Saisonende-Apply nie überstimmen).
+   */
+  sourceMatchdayResultCount: number;
+  byPlayerId: Record<string, SeasonPerformanceMatchdayEntry[]>;
 };
 
 export type SeasonEconomyFactorRecord = {

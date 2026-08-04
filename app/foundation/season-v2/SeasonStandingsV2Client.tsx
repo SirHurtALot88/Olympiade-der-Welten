@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 
 import SeasonStandingsNewLook from "@/app/foundation/season-v2/SeasonStandingsNewLook";
+import type { TeamOperatingGuv } from "@/lib/finance/operating-guv";
 import type { SeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
 import type { SeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
 import type { SeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
@@ -59,6 +60,12 @@ export type SeasonV2StandingsRow = {
   /** Gebäude-Unterhalt p.a. (Summe der Season-Upkeeps gebauter Anlagen). */
   buildingCost: number | null;
   guv: number | null;
+  /**
+   * Die Herleitung hinter `guv` — trägt den Hover „wie setzt sich die Zahl zusammen" (Ticket 24).
+   * `null` in archivierten Saisons: dort steht die Snapshot-Zahl, für die es keine Live-Herleitung
+   * gibt, und ein erfundener Hover wäre schlimmer als gar keiner.
+   */
+  operatingGuv?: TeamOperatingGuv | null;
   sponsorTotal: number | null;
   /** Transferbilanz der Saison = Verkäufe − Käufe (S1 nur Käufe → großes Minus). */
   transferNet: number | null;

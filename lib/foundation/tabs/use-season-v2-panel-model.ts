@@ -11,6 +11,7 @@ import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management
 import { resolveSeasonDisciplineAreaTotal } from "@/lib/season/season-discipline-area-groups";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { calculateFacilitySeasonUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { buildLeagueOperatingGuv, type TeamOperatingGuv } from "@/lib/finance/operating-guv";
 
 /** Gebäude-Unterhalt p.a. für ein Team — Summe der Season-Upkeeps aller gebauten
  * Anlagen (gleiche Rechnung wie die Liga-Finanzübersicht, client-safe, kein Leak). */
@@ -72,6 +73,12 @@ export interface UseSeasonV2PanelModelInput {
   seasonHistorySnapshots: SeasonSnapshotInput[];
   archivedSeasonDisciplineLeaderboards: SeasonV2DisciplineLeaderboardInput[];
   boardConfidence: BoardConfidenceMap;
+  /**
+   * `true`, wenn der Saisonstand eine ARCHIVIERTE Saison zeigt. Dann bleibt die GuV die im Snapshot
+   * festgehaltene Zahl — eine live aus dem heutigen `gameState` gerechnete GuV wäre im Archiv
+   * schlicht gelogen (heutige Gehälter, heutiger Rang, heutige Ziele).
+   */
+  isViewingArchivedSeason?: boolean;
 }
 
 function getPlayerPortraitModel(player: Parameters<typeof getPlayerPortraitMediaModel>[0]) {
@@ -94,12 +101,33 @@ export function useSeasonV2PanelModel({
   seasonHistorySnapshots,
   archivedSeasonDisciplineLeaderboards,
   boardConfidence,
+  isViewingArchivedSeason = false,
 }: UseSeasonV2PanelModelInput) {
+  /**
+   * DIE GUV DER SPALTE „GuV" — Ticket 24 (Chris: „Die GuV im Saisonstand und die im Finanzen reiter
+   * weichen voneinander ab!").
+   *
+   * Die Zahl kommt NICHT mehr aus dem Standings-Feed (`row.guv`, dort: Sponsor + Gebäude netto −
+   * Gehälter), sondern aus derselben Herleitung, aus der auch der Finanzen-Reiter seine GuV liest.
+   * Dem Feed fehlten die Vorstandsziele, die Kreditzinsen und der Apron, und er zog den BRUTTO-
+   * Gebäudeunterhalt statt des bezahlten ab — gemessen am Save vom 4.8. lagen beide Ansichten
+   * dadurch zwischen −6,9 und +6,1 auseinander.
+   *
+   * Gerechnet wird EINMAL für die ganze Liga (ein Sponsor-Settlement, eine Vorstandsziel-Abrechnung,
+   * eine Apron-Vorschau für alle 32 Teams), nicht je Zeile — genau wie `buildingCost` daneben eine
+   * client-safe Ableitung aus dem `gameState` ist.
+   */
+  const operatingGuvByTeamId = useMemo(
+    () => (isViewingArchivedSeason ? null : buildLeagueOperatingGuv(gameState)),
+    [gameState, isViewingArchivedSeason],
+  );
+
   const standingsRows = useMemo(
     () =>
       sortedSeasonStandRows.map((row) => {
         const logo = getTeamLogoModel(row.team, { variant: "thumb" });
         const generalManager = getTeamGeneralManager(gameState, row.teamId);
+        const operatingGuv: TeamOperatingGuv | null = operatingGuvByTeamId?.get(row.teamId) ?? null;
         return {
           teamId: row.teamId,
           teamName: row.teamName,
@@ -120,7 +148,9 @@ export function useSeasonV2PanelModel({
           cash: row.cash ?? null,
           salaryTotal: row.salaryTotal ?? null,
           buildingCost: computeTeamBuildingCost(gameState, row.teamId),
-          guv: row.guv ?? null,
+          guv: operatingGuv?.guv ?? row.guv ?? null,
+          /** Trägt den Hover „wie setzt sich die Zahl zusammen" (siehe lib/finance/guv-breakdown.ts). */
+          operatingGuv,
           sponsorTotal: row.sponsorTotal ?? null,
           transferNet: row.transferNet ?? row.transfersSeasonValue ?? null,
           marketValueTotal: row.marketValueTotal ?? null,
@@ -155,7 +185,7 @@ export function useSeasonV2PanelModel({
           historicalPointsBySeason: row.historicalPointsBySeason ?? [],
         };
       }),
-    [gameState, selectedTeamId, sortedSeasonStandRows],
+    [gameState, operatingGuvByTeamId, selectedTeamId, sortedSeasonStandRows],
   );
 
   const topPlayers = useMemo(() => {
@@ -225,11 +255,13 @@ export function useSeasonV2PanelModel({
       pps: selectedStandingRow.ppsTotal ?? null,
       cash: selectedStandingRow.cash ?? null,
       salaryTotal: selectedStandingRow.salaryTotal ?? null,
-      guv: selectedStandingRow.guv ?? null,
+      // Dieselbe Zahl wie in der Tabellenspalte darunter — sonst zeigt die Kopfzeile des eigenen
+      // Teams eine dritte GuV.
+      guv: operatingGuvByTeamId?.get(selectedStandingRow.teamId)?.guv ?? selectedStandingRow.guv ?? null,
       sponsorTotal: selectedStandingRow.sponsorTotal ?? null,
       marketValueTotal: selectedStandingRow.marketValueTotal ?? null,
     };
-  }, [selectedStandingRow]);
+  }, [operatingGuvByTeamId, selectedStandingRow]);
 
   const leaderTeam = standingsRows[0] ?? null;
 

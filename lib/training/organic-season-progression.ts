@@ -5,6 +5,8 @@ import type {
   PlayerGeneratorAttributeName,
   PlayerGeneratorAttributes,
   PlayerPotentialRecord,
+  SeasonPerformanceMatchdayEntry,
+  SeasonPerformanceProgressionCache,
   TeamFacilityCollection,
 } from "@/lib/data/olyDataTypes";
 import {
@@ -620,6 +622,10 @@ function getSecondaryTrainingClass(player: Player, facilities: TeamFacilityColle
 
 type PerformanceIndex = {
   byPlayerId: Map<string, PlayerDisciplinePerformanceRecord[]>;
+  /** Anzahl der Spieltags-Ergebnisse dieser Saison, die dieser Stand kennt. */
+  validResultCount: number;
+  /** Spieltag je Ergebnis-Id — damit der Zwischenspeicher „pro Spieltag" lesbar bleibt. */
+  matchdayIdByResultId: Map<string, string | null>;
 };
 
 const performanceIndexCache = new WeakMap<GameState, PerformanceIndex>();
@@ -628,10 +634,12 @@ function getPerformanceIndex(gameState: GameState): PerformanceIndex {
   const cached = performanceIndexCache.get(gameState);
   if (cached) return cached;
   const seasonId = gameState.season.id;
-  const validResultIds = new Set(
-    (gameState.seasonState.matchdayResults ?? [])
-      .filter((r) => (r.seasonId ?? seasonId) === seasonId)
-      .map((r) => r.id),
+  const seasonResults = (gameState.seasonState.matchdayResults ?? []).filter(
+    (r) => (r.seasonId ?? seasonId) === seasonId,
+  );
+  const validResultIds = new Set(seasonResults.map((r) => r.id));
+  const matchdayIdByResultId = new Map<string, string | null>(
+    seasonResults.map((r) => [r.id, r.matchdayId ?? null] as const),
   );
   const byPlayerId = new Map<string, PlayerDisciplinePerformanceRecord[]>();
   for (const entry of gameState.seasonState.playerDisciplinePerformances ?? []) {
@@ -643,13 +651,98 @@ function getPerformanceIndex(gameState: GameState): PerformanceIndex {
       byPlayerId.set(entry.playerId, [entry]);
     }
   }
-  const index: PerformanceIndex = { byPlayerId };
+  const index: PerformanceIndex = {
+    byPlayerId,
+    validResultCount: validResultIds.size,
+    matchdayIdByResultId,
+  };
   performanceIndexCache.set(gameState, index);
   return index;
 }
 
 function getPerformanceRecords(gameState: GameState, playerId: string): PlayerDisciplinePerformanceRecord[] {
   return getPerformanceIndex(gameState).byPlayerId.get(playerId) ?? [];
+}
+
+function toPerformanceEntry(
+  record: PlayerDisciplinePerformanceRecord,
+  index: PerformanceIndex,
+): SeasonPerformanceMatchdayEntry {
+  return {
+    matchdayResultId: record.matchdayResultId,
+    matchdayId: index.matchdayIdByResultId.get(record.matchdayResultId) ?? null,
+    disciplineId: record.disciplineId,
+    budget: getPerformanceSetpoints(record),
+    finalPlayerScore: record.finalPlayerScore ?? 0,
+  };
+}
+
+/**
+ * Die Spieltags-Einsätze, aus denen der Performance-Anteil eines Spielers entsteht — in
+ * dieser Reihenfolge:
+ *
+ * 1. ausdrücklicher Override (`performanceEntries`),
+ * 2. der serverseitig gefüllte Zwischenspeicher `seasonState.seasonPerformanceProgression`,
+ *    aber NUR wenn er mehr gewertete Spieltage kennt als der vorliegende Stand selbst,
+ * 3. sonst wie bisher aus den Performance-Zeilen des GameState.
+ *
+ * Regel 2 ist die Sicherung: der Server (der alle Ergebnisse hat) rechnet immer aus seinen
+ * eigenen Daten und kann von einer mitgereisten Kopie nie überstimmt werden. Nur der
+ * kompakte Browser-Stand, dem die Ergebnis-Ids fehlen, greift auf den Zwischenspeicher.
+ */
+function resolvePerformanceEntries(
+  gameState: GameState,
+  playerId: string,
+  override?: readonly SeasonPerformanceMatchdayEntry[] | null,
+): SeasonPerformanceMatchdayEntry[] {
+  if (override) {
+    return [...override];
+  }
+  const index = getPerformanceIndex(gameState);
+  const cache = gameState.seasonState.seasonPerformanceProgression;
+  if (
+    cache &&
+    cache.seasonId === gameState.season.id &&
+    cache.sourceMatchdayResultCount > index.validResultCount &&
+    cache.byPlayerId
+  ) {
+    const cached = cache.byPlayerId[playerId];
+    if (cached) {
+      return [...cached];
+    }
+  }
+  return (index.byPlayerId.get(playerId) ?? []).map((record) => toPerformanceEntry(record, index));
+}
+
+/**
+ * Baut den Zwischenspeicher der pro Spieltag erspielten Performance-Punkte — serverseitig,
+ * auf dem VOLLSTÄNDIGEN Save, und nur für die übergebenen Spieler (in der Praxis der eigene
+ * Kader, ~12 Spieler).
+ *
+ * Gibt `null` zurück, wenn dieser Stand gar keine gewerteten Spieltage kennt: dann gibt es
+ * nichts zwischenzuspeichern, und ein leerer Zwischenspeicher würde als „echte 0" gelesen.
+ */
+export function buildSeasonPerformanceProgressionCache(input: {
+  gameState: GameState;
+  playerIds: Iterable<string>;
+  generatedAt?: string;
+}): SeasonPerformanceProgressionCache | null {
+  const index = getPerformanceIndex(input.gameState);
+  if (index.validResultCount <= 0) {
+    return null;
+  }
+  const byPlayerId: Record<string, SeasonPerformanceMatchdayEntry[]> = {};
+  for (const playerId of input.playerIds) {
+    if (byPlayerId[playerId]) continue;
+    byPlayerId[playerId] = (index.byPlayerId.get(playerId) ?? []).map((record) => toPerformanceEntry(record, index));
+  }
+  return {
+    seasonId: input.gameState.season.id,
+    matchdayId: input.gameState.matchdayState.matchdayId ?? null,
+    generatedAt: input.generatedAt ?? new Date().toISOString(),
+    sourceMatchdayResultCount: index.validResultCount,
+    byPlayerId,
+  };
 }
 
 function getDisciplineWeightDistribution(disciplineId: string) {
@@ -682,9 +775,11 @@ export function buildSeasonPerformanceSignals(input: {
   gameState: GameState;
   playerId: string;
   playerRating: number;
+  /** Siehe `resolvePerformanceEntries` — Override für den kompakten Browser-Stand. */
+  performanceEntries?: readonly SeasonPerformanceMatchdayEntry[] | null;
 }): SeasonPerformanceSignals {
-  const records = getPerformanceRecords(input.gameState, input.playerId);
-  const appearances = records.length;
+  const entries = resolvePerformanceEntries(input.gameState, input.playerId, input.performanceEntries);
+  const appearances = entries.length;
   const isRostered = input.gameState.rosters.some((entry) => entry.playerId === input.playerId);
   if (appearances === 0) {
     return {
@@ -698,9 +793,9 @@ export function buildSeasonPerformanceSignals(input: {
 
   let totalBudget = 0;
   let totalScore = 0;
-  for (const record of records) {
-    totalBudget += getPerformanceSetpoints(record);
-    totalScore += record.finalPlayerScore ?? 0;
+  for (const entry of entries) {
+    totalBudget += entry.budget;
+    totalScore += entry.finalPlayerScore ?? 0;
   }
 
   const avgPerformanceBudget = roundValue(totalBudget / appearances, 3);
@@ -715,14 +810,14 @@ export function buildSeasonPerformanceSignals(input: {
   };
 }
 
-function buildPerformanceDeltas(gameState: GameState, playerId: string) {
+function buildPerformanceDeltas(entries: readonly SeasonPerformanceMatchdayEntry[]) {
   const deltas = Object.fromEntries(PROGRESSION_ATTRIBUTE_ORDER.map((attribute) => [attribute, 0])) as Record<PlayerGeneratorAttributeName, number>;
   let totalBudget = 0;
 
-  for (const record of getPerformanceRecords(gameState, playerId)) {
+  for (const record of entries) {
     const distribution = getDisciplineWeightDistribution(record.disciplineId);
     if (!distribution) continue;
-    const budget = getPerformanceSetpoints(record);
+    const budget = record.budget;
     totalBudget += budget;
     for (const attribute of PROGRESSION_ATTRIBUTE_ORDER) {
       deltas[attribute] += budget * distribution[attribute];
@@ -889,6 +984,22 @@ export function buildOrganicSeasonProgression(input: {
    * maximum, so averaging modes then looking up would over-reward mixed schedules — see B.2.)
    */
   performanceWeightMultiplier?: number;
+  /**
+   * Override der pro Spieltag erspielten Performance-Punkte — die Spieltags-Einsätze, aus
+   * denen `buildPerformanceDeltas` den Performance-Anteil auf die Stats der jeweiligen
+   * Disziplin verteilt. Gedacht für den kompakten Browser-Stand, dem die `matchdayResults`
+   * fehlen, an denen die Performance-Zeilen hängen: ohne diese Id-Liste fiel JEDE Zeile durch
+   * das Sieb und der Performance-Anteil stand auf 0 (Meldung „performance ist hier gar nicht
+   * mehr mit drin").
+   *
+   * Klassenunabhängig — dieselben Deltas gelten für jede Trainingsklasse, die Verteilung folgt
+   * allein der Disziplin, in der die Punkte anfielen. Deshalb darf der Server sie EINMAL
+   * rechnen, während die klassenabhängigen Multiplikatoren im Client bleiben und der
+   * Klassenwechsel ohne Server-Runde sofort sichtbar ist.
+   *
+   * Absent → `seasonState.seasonPerformanceProgression`, sonst wie bisher aus dem GameState.
+   */
+  performanceEntries?: readonly SeasonPerformanceMatchdayEntry[] | null;
   /**
    * Saisonale Entwicklungs-Route des Spielers (aus dem Forecast). Wenn gesetzt, verschiebt der
    * Signature-Shift die Wachstums-Affinität auf das saisonale Route-Attribut (×1,15/×0,8 wirken
@@ -1071,11 +1182,17 @@ export function buildOrganicSeasonProgression(input: {
         adminConfig: input.gameState.seasonState.adminBalancingConfig,
       })
     : (Object.fromEntries(PROGRESSION_ATTRIBUTE_ORDER.map((attribute) => [attribute, 0])) as Record<PlayerGeneratorAttributeName, number>);
-  const performance = buildPerformanceDeltas(input.gameState, input.player.id);
+  const performanceEntries = resolvePerformanceEntries(
+    input.gameState,
+    input.player.id,
+    input.performanceEntries,
+  );
+  const performance = buildPerformanceDeltas(performanceEntries);
   const performanceSignals = buildSeasonPerformanceSignals({
     gameState: input.gameState,
     playerId: input.player.id,
     playerRating: input.player.rating,
+    performanceEntries,
   });
   const marktwertBase = getMarktwertForRegression(input.player);
   // B2: soft-knee the market value driving regression so extreme-value stars aren't penalized without bound.

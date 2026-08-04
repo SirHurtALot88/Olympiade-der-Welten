@@ -78,6 +78,14 @@ type TeamDrawerHistoryTableProps = {
   renderCell: (columnId: string, row: TeamDetailDrawerHistoryRow) => ReactNode;
   getHeaderClassName?: (columnId: string) => string | undefined;
   getRowClassName?: (row: TeamDetailDrawerHistoryRow) => string | undefined;
+  /**
+   * Reihenfolge der Disziplin-Spalten je aufgeklappter Achse. Ohne Angabe
+   * `SEASON_DISCIPLINE_AREA_GROUPS` (fester Katalog-`playerCount`) — das ist NICHT die reale
+   * Kadergroesse dieser Saison, siehe `buildSeasonDisciplineAreaGroupsOrderedBySeasonPlayerCount`
+   * in lib/season/season-discipline-schedule.ts. Aufrufer mit GameState sollten diese Funktion
+   * hier durchreichen, damit z. B. SOC bei Showcase=6 diese Saison auch Showcase zuerst zeigt.
+   */
+  disciplineAreaGroups?: typeof SEASON_DISCIPLINE_AREA_GROUPS;
 };
 
 export default function TeamDrawerHistoryTable({
@@ -88,6 +96,7 @@ export default function TeamDrawerHistoryTable({
   renderCell,
   getHeaderClassName,
   getRowClassName,
+  disciplineAreaGroups = SEASON_DISCIPLINE_AREA_GROUPS,
 }: TeamDrawerHistoryTableProps) {
   const [expandedAreas, setExpandedAreas] = useState<Record<SeasonDisciplineAreaId, boolean>>({
     pow: false,
@@ -97,7 +106,7 @@ export default function TeamDrawerHistoryTable({
   });
 
   const tableColumns = useMemo(() => {
-    const axisColumns = SEASON_DISCIPLINE_AREA_GROUPS.flatMap((group) => {
+    const axisColumns = disciplineAreaGroups.flatMap((group) => {
       const items: GlobalTableColumnConfig[] = [TEAM_DRAWER_HISTORY_AXIS_COLUMN[group.id]];
       if (expandedAreas[group.id]) {
         items.push(
@@ -117,7 +126,7 @@ export default function TeamDrawerHistoryTable({
     });
 
     return [...TEAM_DRAWER_HISTORY_PREFIX_COLUMNS, ...axisColumns, ...TEAM_DRAWER_HISTORY_SUFFIX_COLUMNS];
-  }, [expandedAreas]);
+  }, [expandedAreas, disciplineAreaGroups]);
 
   const tableId = "teamDrawerHistoryTable";
   const { visibleColumns, getTableColumnWidth, startTableColumnResize, resetTableColumnWidth, getTableHeaderDragProps } =
