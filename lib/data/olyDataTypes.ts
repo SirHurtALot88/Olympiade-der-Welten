@@ -2640,6 +2640,28 @@ export type NewGameFlowState = {
   completedAt?: string | null;
   updatedAt?: string | null;
   steps?: NewGameFlowStepRecord[];
+  /**
+   * KOOP: der Einstiegs-Fortschritt EINES Raum-Teilnehmers, keyed per `participantId`.
+   *
+   * WARUM: Beim 4v4-Preset baut JEDER Mensch seinen eigenen Kader auf (siehe
+   * `kickoffLeagueSetupDraft`-Ausschluss beider Team-Saetze in `startRoom`). Die Top-Level-Felder
+   * oben (`active`/`selectedTeamId`/`steps`/`completedAt`/`dismissed`) sind aber EIN Wert fuer den
+   * GANZEN Save — bei zwei Menschen ueberschreibt jeder Schreibzugriff den des anderen
+   * (`selectedTeamId` last-writer-wins) und ein team-loser Schritt wie `season_intro` gilt nach
+   * EINEM Abschluss faelschlich fuer BEIDE. Siehe Messbefund in
+   * `tests/coop-onboarding-new-game-flow-zwei-sitzungen.test.ts`.
+   *
+   * MIGRATIONSREGEL (bindend fuer jeden Leser dieses Feldes, siehe
+   * `lib/game/new-game-flow-scope.ts`): fehlt `byParticipant` ODER fehlt darin ein Eintrag fuer den
+   * fragenden Teilnehmer (aeltere Saves, Solo-Saves, oder der Teilnehmer hat noch keinen eigenen
+   * Schritt geschrieben), gelten die TOP-LEVEL-Felder dieses Objekts unveraendert als Fallback —
+   * das IST der Normalfall fuer Solo, kein Sonderfall. Ein Solo-Save befuellt `byParticipant` nie
+   * und verhaelt sich dadurch bit-identisch zum Verhalten vor Einfuehrung dieses Feldes. Sobald ein
+   * Save an einen Raum mit einem bekannten Teilnehmer gebunden ist, wird ausschliesslich hier
+   * gelesen/geschrieben — die Top-Level-Felder bleiben dann auf ihrem Anfangszustand eingefroren
+   * (kein Feld wird doppelt gepflegt, sie sind nur noch der Alt-Save-Fallback).
+   */
+  byParticipant?: Record<string, NewGameFlowState>;
 };
 
 export type AdminBalancingConfigInput = {

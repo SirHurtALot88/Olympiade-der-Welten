@@ -148,6 +148,14 @@ export function useFoundationCrossTabSeasonBriefing(input: {
   activeSaveId: string;
   activeManagerTeamId: string | null;
   gameState: GameState;
+  /**
+   * KOOP: der fuer DIESE Sitzung geltende Einstiegs-Flow (bereits mit
+   * `resolveScopedNewGameFlow` aufgeloest, siehe use-foundation-shell-router-body-scope.tsx).
+   * NICHT `gameState.seasonState.newGameFlow` direkt lesen — das ist das geteilte
+   * Top-Level-Objekt fuer den ganzen Save und wuerde Chris' Fortschritt faelschlich auch fuer
+   * Franky anzeigen (siehe Messbefund in tests/coop-onboarding-new-game-flow-zwei-sitzungen.test.ts).
+   */
+  newGameFlow: GameState["seasonState"]["newGameFlow"];
   selectedTeam: Team | null;
   rosterPlayers: RosterPlayerRow[];
   selectedTeamFacilityState: TeamFacilityState;
@@ -205,7 +213,7 @@ export function useFoundationCrossTabSeasonBriefing(input: {
       return null;
     }
 
-    const storedFlow = input.gameState.seasonState.newGameFlow ?? null;
+    const storedFlow = input.newGameFlow ?? null;
     const currentSeasonText = `${input.gameState.season.id} ${input.gameState.season.name}`.toLowerCase();
     const isFirstSeason = /season[-_\s]*1\b/.test(currentSeasonText) || /\bsaison[-_\s]*1\b/.test(currentSeasonText);
     const hasSeasonResults = (input.gameState.seasonState.matchdayResults ?? []).some(
@@ -418,6 +426,7 @@ export function useFoundationCrossTabSeasonBriefing(input: {
     input.currentMatchdayDisciplineSchedule?.discipline1?.displayName,
     input.currentMatchdayDisciplineSchedule?.discipline2?.displayName,
     input.gameState,
+    input.newGameFlow,
     input.homeNextMatchdayStatus.filledSlots,
     input.homeNextMatchdayStatus.openSlots,
     input.homeNextMatchdayStatus.requiredSlots,

@@ -38,8 +38,10 @@ import { setTeamCaptain } from "@/lib/morale/team-captain-service";
 import { buildContractNegotiationDraft } from "@/lib/market/contract-negotiation-preview";
 import type { TransfermarktBuyPreview } from "@/lib/market/transfermarkt-buy-service";
 import { getActiveRoomBySaveId } from "@/lib/room/room-store";
+import { findSeatByToken } from "@/lib/room/rejoin";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite, type ServerRoomWriteAuthorization } from "@/lib/room/server-authoritative-write-guard";
+import { applyNewGameFlowStepUpdate } from "@/lib/game/new-game-flow-scope";
 import { ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import { kickoffLeagueSetupDraft } from "@/lib/game/league-setup-draft-service";
@@ -613,33 +615,66 @@ export async function POST(request: Request) {
       }
     }
 
-    const nextSteps = NEW_GAME_FLOW_STEP_IDS.map((stepId) => {
-      const stored = previousFlow.steps?.find((step) => step.stepId === stepId);
-      if (stepId !== body.stepId) {
-        return stored ?? { stepId, status: "open" as const };
+    // KOOP: pro Raum-Teilnehmer getrennter Fortschritt statt EINES Werts fuer den ganzen Save,
+    // siehe `NewGameFlowState.byParticipant` (olyDataTypes.ts) und `applyNewGameFlowStepUpdate`
+    // (lib/game/new-game-flow-scope.ts) fuer die Migrationsregel/Begruendung. Der obige Guard
+    // kennt den Teilnehmer nur, sobald ein Team bekannt ist (`flowStepTeamId`) — der allererste,
+    // team-lose Schritt (`season_intro`) braucht eine eigene, rein lesende Identitaets-Aufloesung
+    // ueber Raum-Code + Sitzplatz-Token (keine Schreibrechte-Pruefung, nur "wer schreibt hier").
+    let writingParticipantId: string | null = flowStepWriteAuth?.participant?.participantId ?? null;
+    if (!writingParticipantId && body.roomCode && body.seatToken) {
+      const room = getActiveRoomBySaveId(body.saveId);
+      if (room) {
+        const role = findSeatByToken(room, body.seatToken);
+        writingParticipantId = role ? (room.seats[role]?.participantId ?? null) : null;
       }
+    }
 
-      return {
-        stepId,
-        status: body.status,
-        completedAt: body.status === "completed" ? now : stored?.completedAt ?? null,
-        skippedAt: body.status === "skipped" ? now : stored?.skippedAt ?? null,
-      };
-    });
-    const isHandled = nextSteps.every((step) => step.status === "completed" || step.status === "skipped");
+    // KOOP-Zweig: getrennter Fortschritt pro Teilnehmer, korrekt aus `isHandled` berechnet (siehe
+    // `applyNewGameFlowStepUpdate`). SOLO-Zweig (kein `writingParticipantId`): bewusst NICHT ueber
+    // dieselbe Funktion, sondern beim alten, hart codierten `active:true`/`dismissed:false`
+    // belassen — das IST das bestehende, bekannt selbstheilende Solo-Verhalten (siehe Kommentar an
+    // `applyNewGameFlowStepUpdate`), "Solo bleibt unveraendert" heisst hier woertlich unveraendert.
+    const nextSharedFlow = writingParticipantId
+      ? applyNewGameFlowStepUpdate({
+          previous: sourceSave.gameState.seasonState.newGameFlow,
+          participantId: writingParticipantId,
+          stepId: body.stepId,
+          status: body.status,
+          selectedTeamId: body.selectedTeamId,
+          stepIds: NEW_GAME_FLOW_STEP_IDS,
+          now,
+        })
+      : (() => {
+          const nextSteps = NEW_GAME_FLOW_STEP_IDS.map((stepId) => {
+            const stored = previousFlow.steps?.find((step) => step.stepId === stepId);
+            if (stepId !== body.stepId) {
+              return stored ?? { stepId, status: "open" as const };
+            }
+            return {
+              stepId,
+              status: body.status,
+              completedAt: body.status === "completed" ? now : (stored?.completedAt ?? null),
+              skippedAt: body.status === "skipped" ? now : (stored?.skippedAt ?? null),
+            };
+          });
+          const isHandled = nextSteps.every((step) => step.status === "completed" || step.status === "skipped");
+          return {
+            ...previousFlow,
+            active: true,
+            dismissed: false,
+            selectedTeamId: body.selectedTeamId ?? previousFlow.selectedTeamId ?? null,
+            steps: nextSteps,
+            updatedAt: now,
+            completedAt: isHandled ? (previousFlow.completedAt ?? now) : (previousFlow.completedAt ?? null),
+          };
+        })();
+
     const nextGameState = withNormalizedLocalTeamSettings({
       ...sourceSave.gameState,
       seasonState: {
         ...sourceSave.gameState.seasonState,
-        newGameFlow: {
-          ...previousFlow,
-          active: true,
-          dismissed: false,
-          selectedTeamId: body.selectedTeamId ?? previousFlow.selectedTeamId ?? null,
-          steps: nextSteps,
-          updatedAt: now,
-          completedAt: isHandled ? previousFlow.completedAt ?? now : previousFlow.completedAt ?? null,
-        },
+        newGameFlow: nextSharedFlow,
       },
     });
 
