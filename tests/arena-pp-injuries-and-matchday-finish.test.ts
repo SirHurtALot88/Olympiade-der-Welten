@@ -115,7 +115,12 @@ describe("Arena: Verletzungs-Zeile unter den Top-Spielern", () => {
 describe("Spieltag: Abschluss ist wieder eine Entscheidung", () => {
   it("laesst die Arena nach D2 stehen statt automatisch weiterzuschalten", () => {
     const scope = read("lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx");
-    expect(scope).toContain("runCockpitMatchdayAutoRun(true, side, false)");
+    // Geprueft wird das dritte Argument (`advanceAfterCashApply: false`), nicht die exakte
+    // Aufrufzeile. Die stand hier als Zeichenkette mit GENAU drei Argumenten und war schon rot,
+    // bevor jemand sie gebraucht haette: die Arena reicht laengst zusaetzlich die gezeigte Preview
+    // durch, seit dem Fix fuer Chris' blockierten Spieltag ausserdem die Lauf-Optionen. Ein Test,
+    // der bei jedem neuen Parameter bricht, sagt nichts ueber die Regel, die er schuetzen soll.
+    expect(scope).toMatch(/runCockpitMatchdayAutoRun\(\s*true,\s*side,\s*false\b/);
   });
 
   it("reicht die Option bis zum Service durch, Cockpit behaelt seinen Default", () => {

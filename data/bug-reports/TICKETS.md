@@ -4,7 +4,7 @@
 > `data/bug-reports/triage/*.md` und `tickets.json`. Wer hier etwas ändert, verliert es beim
 > nächsten `npm run bugs:tabelle`. Der Stand einer Meldung wird in ihrer Triage-Notiz gepflegt.
 
-21 Meldungen — offen: 0 · vorgeprüft: 1 · angenommen: 0 · gebaut: 20 · abgelehnt: 0 · erledigt: 0
+25 Meldungen — offen: 0 · vorgeprüft: 0 · angenommen: 3 · gebaut: 22 · abgelehnt: 0 · erledigt: 0
 
 | Nr | Eingang | Von | Wo | Titel | Status | Ergebnis |
 |---:|---|---|---|---|---|---|
@@ -27,8 +27,12 @@
 | [17](triage/bug-2026-07-31T09-25-12-766Z-3gl1h9.md) | 31.07., 11:25 | Chris | Team · Teams | Vertragsverlängerungen nach MD10 geblockt — dieselbe Phasensperre wie beim Verkauf | gebaut ⚠ | Vom Gameplay-Agenten behoben (#298), gemeinsam mit iuahpx: dieselbe Ursache — die Phasenkette schaltete nicht weiter, die Verlaengerungs-Phase wurde nie erreicht. · PR #298 · **Wirkung nicht bestaetigt** |
 | [18](triage/bug-2026-07-31T09-36-21-059Z-b2hjn8.md) | 31.07., 11:36 | Chris | Team · Teams | Eigene Team-Ansicht zeigt unten keine Historie — der Live-Saison-Eintrag fehlt in der Datenquelle | gebaut ⚠ | Anders als vermutet fehlte die Live-Zeile nie — sie wird in `buildTeamDetailDrawerData` für beide Ansichten identisch gebaut. Ursache war der Session-Cache der eigenen Ansicht: Er kennt weder Spieltag noch Ligastand und lieferte deshalb bei unverändertem Cash/Kader/Transferzahl weiter die Live-Zeile vom allerersten Aufruf aus, egal wie weit die Saison inzwischen war. Die Historie wird jetzt bei jedem Aufruf frisch gebaut und erst danach in ein Cache-Ergebnis gespleisst. · PR #310 · **Wirkung nicht bestaetigt** |
 | [19](triage/bug-2026-07-31T12-35-24-932Z-hanx79.md) | 31.07., 14:35 | Chris | Spieltag · Saisonstand | Zwei Rang-Erwartungen gleichzeitig — beide zeigen denselben Stand, obwohl eine erfüllt und eine verfehlt ist | gebaut ⚠ | Keine der beiden vorgeschlagenen Deutungen traf zu. Die Auswertung war korrekt — sie prüft jedes Ziel gegen seine eigene Marke. Der Fehler saß in der Anzeige: Beim Aktualisieren wurden Zielmarke, Stand und Status neu gerechnet, das Label blieb aber aus der Vergabe eingefroren. Im Live-Save steht C-C mit Endrang 21 deshalb unter „Übertreffe die Erwartung (Top 25)" auf verfehlt, weil real gegen Top 10 gewertet wird. Label und Marke laufen jetzt wieder zusammen. Zweitens ist Chris' Regel umgesetzt: nur noch ein verbindliches Rang-Ziel, jedes weitere wird optionales Zusatzziel ohne Strafe. · PR #313 · **Wirkung nicht bestaetigt** |
-| [20](triage/bug-2026-08-04T07-16-22-440Z-vcnv6r.md) | 04.08., 09:16 | Chris | Team · Gebäude | Analytics Room und Specialist Wing haben keinen Zweck — kein Balance-Problem, sondern tote Effekte | vorgeprüft | PR #377 |
+| [20](triage/bug-2026-08-04T07-16-22-440Z-vcnv6r.md) | 04.08., 09:16 | Chris | Team · Gebäude | Analytics Room und Specialist Wing haben keinen Zweck — kein Balance-Problem, sondern tote Effekte | gebaut ⚠ | PR #377, #381, #382, #383 · **kein Ergebnis angegeben, Wirkung nicht bestaetigt** |
 | [21](triage/bug-2026-08-04T07-20-58-212Z-vzao8d.md) | 04.08., 09:20 | Chris | Markt · Transfermarkt | Transfermarkt — Filter nach Kartenfarbe (POW/SPE/MEN/SOC) war bis auf den Knopf fertig | gebaut ⚠ | Nicht das Feature fehlte, sondern nur sein Bedienelement. Filterlogik, Zustand, Presets und Props waren vollständig vorhanden; die Ansicht hat den Handler nie aufgerufen. Vier Chips ergänzt. · PR #378 · **Wirkung nicht bestaetigt** |
+| [22](triage/bug-2026-08-04T10-47-20-790Z-02kdiz.md) | 04.08., 12:47 | Chris | Team · Training | Trainingsansicht zeigt nur die vier besten Klassen — und ohne Achsfarbe | gebaut ⚠ | PR #389 · **kein Ergebnis angegeben, Wirkung nicht bestaetigt** |
+| [23](triage/bug-2026-08-04T12-07-33-898Z-y72yr9.md) | 04.08., 14:07 | Chris | Team · Teams | Teamansicht — größere Portraits, PP über den Stats, auch je Disziplin | angenommen | — |
+| [24](triage/bug-2026-08-04T12-10-34-702Z-1rh8lx.md) | 04.08., 14:10 | Chris | Spieltag · Saisonstand | GuV im Saisonstand weicht von der GuV im Finanzen-Reiter ab | angenommen | — |
+| [25](triage/bug-2026-08-04T12-13-40-352Z-fm2opo.md) | 04.08., 14:13 | Chris | Spieltag · Saisonstand | KI nutzt Front-/Back-loaded-Verträge nicht, um Apron-Probleme zu umgehen | angenommen | — |
 
 **`gebaut ⚠`** heißt: Der Fix ist gemergt, die Wirkung im laufenden Spiel aber noch nicht belegt.
 Erst ein `bestaetigt:` in der Triage-Notiz macht daraus `erledigt`. Diese Unterscheidung gibt es,
@@ -37,4 +41,4 @@ von einem Zwischenspeicher verschluckt.
 
 Details je Ticket: die Nummer verlinkt auf die Triage-Notiz. Volltext: `npm run bugs:review`.
 
-_Erzeugt: 4.8.2026, 11:02:01_
+_Erzeugt: 4.8.2026, 14:41:24_

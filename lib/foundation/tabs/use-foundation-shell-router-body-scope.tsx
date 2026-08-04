@@ -4498,54 +4498,79 @@ export function useFoundationShellRouterBodyScope({
       showReadOnlyNotice();
       return null;
     }
-    const savedInclude = matchdayAutoRunIncludeWarningLineups;
-    const savedOverwrite = matchdayAutoRunOverwriteExistingLineups;
-    const savedStop = matchdayAutoRunStopOnTie;
-    setMatchdayAutoRunIncludeWarningLineups(false);
-    // Vorhandene Aufstellungen NIE ueberschreiben — sonst wuerde der Lauf andere
-    // Aufstellungen erzeugen als die, gegen die die Arena gerade gespielt hat.
-    setMatchdayAutoRunOverwriteExistingLineups(false);
-    setMatchdayAutoRunStopOnTie(false);
-    try {
-      const runCockpitMatchdayAutoRun = matchdayArenaApplyHandlers?.runCockpitMatchdayAutoRun;
-      if (!runCockpitMatchdayAutoRun) {
-        return null;
-      }
-      // `advanceAfterCashApply: false` — die Arena schaltet NICHT selbst weiter.
-      // Vorher sprang die Ansicht direkt nach D2 auf den naechsten Spieltag, und die
-      // gerade gespielte Spieltagstabelle war weg, bevor man sie lesen konnte. Der
-      // Wechsel passiert jetzt ueber den "Spieltag abschliessen"-Knopf im
-      // Spieltagsergebnis — also dann, wenn der Manager fertig geschaut hat.
-      const result = await runCockpitMatchdayAutoRun(true, side, false, shownPreview);
-      const booked = result?.summary?.standingsApplyAllowed ?? false;
-      if (!booked) {
-        setFoundationActionFeedback({
-          tone: "warning",
-          title: "Punkte nicht gebucht",
-          detail: "Die Wertung dieser Disziplin ist blockiert — bitte Cockpit pruefen.",
-        });
-        return result;
-      }
-      if (side === "d2") {
-        setFoundationActionFeedback({
-          tone: "success",
-          title: "Beide Disziplinen gewertet",
-          detail:
-            "Die Spieltagstabelle bleibt stehen, solange du sie ansiehst. Weiter geht es ueber „Spieltag abschliessen“.",
-        });
-      } else {
-        setFoundationActionFeedback({
-          tone: "success",
-          title: "Disziplin 1 gewertet",
-          detail: "Die Platzierungspunkte stehen im Saisonstand. Weiter mit Disziplin 2.",
-        });
-      }
-      return result;
-    } finally {
-      setMatchdayAutoRunIncludeWarningLineups(savedInclude);
-      setMatchdayAutoRunOverwriteExistingLineups(savedOverwrite);
-      setMatchdayAutoRunStopOnTie(savedStop);
+    /**
+     * GEMELDET VON CHRIS: „obwohl alles gescored und berechnet ist und oben sogar steht es ist im
+     * Saisonstand drin, kann ich den Spieltag 2 nicht abschliessen!" — mit
+     * „Standings Apply fehlt noch fuer diesen Spieltag."
+     *
+     * HIER LAG ES. Die drei Lauf-Optionen wurden ueber React-State gesetzt:
+     *
+     *     setMatchdayAutoRunStopOnTie(false);
+     *     const result = await runCockpitMatchdayAutoRun(true, side, false, shownPreview);
+     *
+     * Das konnte nie wirken. `runCockpitMatchdayAutoRun` liest die Schalter aus dem Closure des
+     * AKTUELLEN Renders; ein Setter direkt davor aendert daran nichts, er plant nur den naechsten
+     * Render. Der Lauf sah also weiter `stopOnTie` auf seinem Default `true`.
+     *
+     * Folge: sobald zwei Teams denselben Score oder dieselben projizierten Punkte hatten — bei zwoelf
+     * Teams keine Seltenheit —, meldete die Standings-Preview `tie_groups_require_confirmed_policy`,
+     * der Lauf brach VOR `executeStandingsApply` ab, und der Spieltag hatte zwar Ergebnisse und
+     * Punkte, aber keinen Standings-Apply-Eintrag. „Spieltag abschliessen" pruefte genau diesen
+     * Eintrag und verweigerte — mit einer Begruendung, die den eigentlichen Grund (ein Gleichstand)
+     * nicht nennt.
+     *
+     * Die Optionen gehen deshalb jetzt als Argument mit, nicht ueber den Umweg State.
+     */
+    const runCockpitMatchdayAutoRun = matchdayArenaApplyHandlers?.runCockpitMatchdayAutoRun;
+    if (!runCockpitMatchdayAutoRun) {
+      return null;
     }
+    // `advanceAfterCashApply: false` — die Arena schaltet NICHT selbst weiter.
+    // Vorher sprang die Ansicht direkt nach D2 auf den naechsten Spieltag, und die
+    // gerade gespielte Spieltagstabelle war weg, bevor man sie lesen konnte. Der
+    // Wechsel passiert jetzt ueber den "Spieltag abschliessen"-Knopf im
+    // Spieltagsergebnis — also dann, wenn der Manager fertig geschaut hat.
+    const result = await runCockpitMatchdayAutoRun(true, side, false, shownPreview, {
+      includeWarningLineups: false,
+      // Vorhandene Aufstellungen NIE ueberschreiben — sonst wuerde der Lauf andere
+      // Aufstellungen erzeugen als die, gegen die die Arena gerade gespielt hat.
+      overwriteExistingLineups: false,
+      // Ein Gleichstand darf die Buchung nicht anhalten: die Tie-Policy ist deterministisch, und in
+      // der Arena gibt es niemanden, der eine Policy bestaetigen koennte. `stopOnTie` bleibt der
+      // Cockpit-Schalter fuer den manuellen Durchlauf.
+      stopOnTie: false,
+    });
+    const booked = result?.summary?.standingsApplyAllowed ?? false;
+    if (!booked) {
+      // Der eigentliche Grund steht in den Schritten des Laufs. Ihn hier zu nennen erspart den
+      // Umweg ueber das Cockpit — und vor allem den Zustand, in dem der Spieltag gewertet aussieht,
+      // sich aber nicht abschliessen laesst.
+      const blockers = [
+        ...(result?.blockingReasons ?? []),
+        ...(result?.steps ?? []).flatMap((step) => step.blockingReasons ?? []),
+      ];
+      const detail =
+        blockers.length > 0
+          ? [...new Set(blockers.map((reason) => formatCockpitReason(reason)))].join(" · ")
+          : "Die Wertung dieser Disziplin ist blockiert — bitte Cockpit pruefen.";
+      setFoundationActionFeedback({ tone: "warning", title: "Punkte nicht gebucht", detail });
+      return result;
+    }
+    if (side === "d2") {
+      setFoundationActionFeedback({
+        tone: "success",
+        title: "Beide Disziplinen gewertet",
+        detail:
+          "Die Spieltagstabelle bleibt stehen, solange du sie ansiehst. Weiter geht es ueber „Spieltag abschliessen“.",
+      });
+    } else {
+      setFoundationActionFeedback({
+        tone: "success",
+        title: "Disziplin 1 gewertet",
+        detail: "Die Platzierungspunkte stehen im Saisonstand. Weiter mit Disziplin 2.",
+      });
+    }
+    return result;
   }
 
   /**
@@ -4576,6 +4601,64 @@ export function useFoundationShellRouterBodyScope({
    * sieht sie nie und haelt den Knopf fuer tot. Genau diese Verwechslung war schon einmal die
    * Meldung ("der macht aktuell noch nichts").
    */
+  /**
+   * Gruende, die den Spieltag NICHT dauerhaft sperren duerfen.
+   *
+   * Alle hier gelisteten verschwinden in `prepareStandingsApply` mit `forceReplace`
+   * (standings-apply-service.ts:133-165) und beschreiben Lagen, die im normalen Spiel entstehen:
+   *
+   *  - GLEICHSTAND (`tie_groups_require_confirmed_policy`, `blockedRule:global_score_tie_breaker_missing`,
+   *    `tie_warning:<team>`, `missing_preview_value:<team>`): zwei Teams exakt gleichauf. Der Rang
+   *    bleibt dabei absichtlich offen — deshalb auch `missing_preview_value`, es fehlt kein Wert.
+   *  - UNVOLLSTAENDIGE ERGEBNISZEILE (`incomplete_result:<team>`): meist ein Spieler, der nach der
+   *    abgegebenen Aufstellung ausgefallen ist. Genau das ist Chris' Fall (`incomplete_result:B-B`).
+   *    Teil-Aufstellungen sind erlaubt (legacy-matchday-partial-lineup-rule), das Ergebnis ist
+   *    gerechnet — es waere widersinnig, wenn eine Verletzung die Saison anhaelt.
+   *
+   * BEWUSST NICHT DABEI: `missing_result:<team>` (die Zeile fehlt ganz, da ist wirklich nichts
+   * gerechnet), `duplicate_apply_for_save_season_matchday` und `stale_baseline_replace_not_supported`
+   * — die beiden letzten wuerden Punkte doppelt zaehlen. Sie muessen die Ablehnung ausloesen.
+   */
+  function isRecoverableStandingsBlocker(reason: string) {
+    return (
+      reason === "tie_groups_require_confirmed_policy" ||
+      reason === "blockedRule:global_score_tie_breaker_missing" ||
+      reason.startsWith("tie_warning:") ||
+      reason.startsWith("missing_preview_value:") ||
+      reason.startsWith("incomplete_result:")
+    );
+  }
+
+  /**
+   * GEMELDET VON CHRIS: „bitte gib Bescheid wenn in meinem aktiven Save der Bug gefixt ist, damit ich
+   * den Spieltag abschliessen kann!"
+   *
+   * Der Fix an `commitArenaDiscipline` verhindert den Zustand kuenftig — er REPARIERT aber keinen
+   * Spielstand, der schon darin steht: dort fehlt der Standings-Apply-Eintrag, und kein spaeterer
+   * Klick schreibt ihn nach.
+   *
+   * Der manuelle Weg ueber das Cockpit half dabei nicht, obwohl es genau dafuer einen Knopf hat —
+   * Chris hat ihn probiert: „9. Standings Apply" stand auf BLOCKIERT mit `incomplete_result:B-B`,
+   * und „2. Standings lokal anwenden" war ausgegraut. `runCockpitStandingsApply` schickte nie
+   * `forceReplace`, ohne das aber blockiert eine unvollstaendige Ergebniszeile. Beide Wege waren
+   * also zu — der Spieltag war endgueltig unabschliessbar.
+   *
+   * Deshalb heilt „Spieltag abschliessen" den Fall selbst, aber eng gefuehrt: nur wenn der Wechsel
+   * GENAU an der fehlenden Tabelle scheitert, und nur wenn ein DryRun vorher zeigt, dass
+   * ausschliesslich behebbare Gruende blockieren (`isRecoverableStandingsBlocker`). Ein Doppel-Apply
+   * oder eine fehlende Ergebniszeile laeuft weiter auf die normale Ablehnung.
+   */
+  async function recoverMissingStandingsApply() {
+    const dryRun = await matchdayArenaApplyHandlers.runCockpitStandingsApply(false);
+    const blockers = [...(dryRun?.blockingReasons ?? []), ...(dryRun?.summary?.blockingReasons ?? [])];
+    if (blockers.length > 0 && !blockers.every((reason) => isRecoverableStandingsBlocker(reason))) {
+      return { recovered: false as const, blockers };
+    }
+    // Der Notausgang nur, wenn ueberhaupt etwas blockiert — sonst laeuft der Apply normal durch.
+    const applied = await matchdayArenaApplyHandlers.runCockpitStandingsApply(true, blockers.length > 0);
+    return { recovered: applied?.applied === true, blockers };
+  }
+
   async function finishMatchdayAndAdvance() {
     if (readMeta.readOnly) {
       showReadOnlyNotice();
@@ -4589,14 +4672,42 @@ export function useFoundationShellRouterBodyScope({
       title: "Spieltag wird abgeschlossen …",
       detail: "Tabelle, Preisgeld-Vorschau und naechster Spieltag werden aktualisiert.",
     });
-    const result = await matchdayArenaApplyHandlers.runCockpitMatchdayAdvance(true);
+    let result = await matchdayArenaApplyHandlers.runCockpitMatchdayAdvance(true);
+    let recoveryNote = "";
+
+    // Fehlt NUR die Tabelle, wird sie hier nachgeholt und der Wechsel genau einmal wiederholt.
+    // Mehr als einmal waere ein Kreisel: was der zweite Anlauf ablehnt, lehnt auch der dritte ab.
+    const firstReasons = [...(result?.blockingReasons ?? []), ...(result?.summary?.blockingReasons ?? [])];
+    if (
+      !result?.applied &&
+      firstReasons.length > 0 &&
+      firstReasons.every((reason) => reason === "standings_apply_missing_for_current_matchday")
+    ) {
+      setFoundationActionFeedback({
+        tone: "info",
+        title: "Tabelle wird nachgetragen …",
+        detail: "Der Spieltag ist gewertet, aber noch nicht in der Tabelle gebucht.",
+      });
+      const recovery = await recoverMissingStandingsApply();
+      if (recovery.recovered) {
+        result = await matchdayArenaApplyHandlers.runCockpitMatchdayAdvance(true);
+        // Was dabei ueberfahren wurde, gehoert benannt — sonst bucht das Spiel still ueber eine
+        // unvollstaendige Ergebniszeile hinweg, und niemand erfaehrt es. Der Hinweis geht in die
+        // ERFOLGSMELDUNG; als eigene Meldung wuerde sie eine Zeile spaeter ueberschrieben.
+        recoveryNote =
+          recovery.blockers.length > 0
+            ? ` Die Tabelle wurde nachgetragen trotz: ${[...new Set(recovery.blockers.map((reason) => formatCockpitReason(reason)))].join(" · ")}`
+            : " Die Tabelle wurde nachgetragen.";
+      }
+    }
+
     if (result?.applied) {
       // Der Flow zeigt danach die naechsten offenen Schritte — alte Haken weg.
       setAcknowledgedFlowStepIds(new Set());
       setFoundationActionFeedback({
         tone: "success",
         title: "Spieltag abgeschlossen",
-        detail: "Der naechste Spieltag ist bereit.",
+        detail: `Der naechste Spieltag ist bereit.${recoveryNote}`,
       });
       // In den Saisonstand: dort steht, was der gerade abgeschlossene Spieltag bewirkt hat. Ohne
       // den Wechsel bleibt man in der Arena des SCHON ABGESCHLOSSENEN Spieltags stehen und sieht

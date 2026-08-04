@@ -162,21 +162,39 @@ describe("Einsatzlisten-Anzeige wuerfelt mit denselben Zahlen wie der Spieltag",
   );
 
   /**
-   * Ddimbas Fall: Ruhetag davor, keine harte Intensitaet — trotzdem verletzt. Das ist
-   * kein Bug, sondern das Restrisiko der Einsatz-Last. Die Anzeige MUSS es ausweisen:
-   * fuer keinen aufgestellten Spieler darf je 0 % erscheinen.
+   * DIESER TEST STAND FRUEHER GENAU ANDERSHERUM und hiess „Restrisiko: auch ein komplett
+   * ausgeruhter Spieler hat beim Einsatz > 0 %" — begruendet mit Ddimbas Fall (Ruhetag davor,
+   * normale Intensitaet, trotzdem verletzt).
+   *
+   * GEMELDET VON CHRIS: „bis zu einer Fatigue von 25 sollte die Wahrscheinlichkeit einfach 0 %
+   * sein." Damit ist die Owner-Entscheidung getroffen, und sie widerspricht dem alten Restrisiko:
+   * ein ausgeruhter Spieler landet nach EINEM Spieltag bei Fatigue 10 (push 14, conserve 7,5) und
+   * damit mitten in der Schutzzone. Ddimbas Fall kann so nicht mehr auftreten — das ist die
+   * beabsichtigte Wirkung, nicht ein uebersehener Nebeneffekt.
+   *
+   * Festgehalten wird deshalb die neue Zusicherung samt der Grenze, ab der es wieder losgeht.
    */
-  it("Restrisiko: auch ein komplett ausgeruhter Spieler hat beim Einsatz > 0 %", () => {
+  it("Schutzzone: ein ausgeruhter Spieler hat auch beim Einsatz 0 %", () => {
     for (const intensity of ["conserve", "normal", "push"] as const) {
       const projection = projectMatchdayInjuryRisk({ player: NEUTRAL_PLAYER, currentFatigue: 0, intensity });
-      expect(projection.riskPercent, `Intensitaet ${intensity}`).toBeGreaterThan(0);
+      expect(projection.riskPercent, `Intensitaet ${intensity}`).toBe(0);
     }
-    // Konkrete Kalibrierung des Normalfalls festnageln: Last 10 => Wurf bei Fatigue 10 => 1,67 %.
-    // Aendert jemand Last oder Kurve, soll dieser Test bewusst rot werden — die im PR
-    // dokumentierten Zahlen (und die Erklaertexte im UI) haengen daran.
+    // Konkrete Kalibrierung festnageln: Last 10 => Wurf bei Fatigue 10 => in der Schutzzone => 0 %.
     const normal = projectMatchdayInjuryRisk({ player: NEUTRAL_PLAYER, currentFatigue: 0, intensity: "normal" });
     expect(normal.fatigueBeforeRoll).toBe(10);
-    expect(normal.riskPercent).toBe(1.67);
+    expect(normal.riskPercent).toBe(0);
+  });
+
+  it("und ab der zweiten/dritten Einsatz-Last endet die Schutzzone", () => {
+    // Gegenprobe zum Test darueber: die Schutzzone darf nicht dauerhaft sein, sonst waere die
+    // Fatigue als Constraint erledigt. Bei 20 Vor-Fatigue traegt der Einsatz ueber die 25.
+    const stillProtected = projectMatchdayInjuryRisk({ player: NEUTRAL_PLAYER, currentFatigue: 10 });
+    expect(stillProtected.fatigueBeforeRoll).toBe(20);
+    expect(stillProtected.riskPercent).toBe(0);
+
+    const exposed = projectMatchdayInjuryRisk({ player: NEUTRAL_PLAYER, currentFatigue: 20 });
+    expect(exposed.fatigueBeforeRoll).toBe(30);
+    expect(exposed.riskPercent).toBeGreaterThan(0);
   });
 
   it("Intensitaet ordnet das Risiko: Schonen < Normal < Pushen", () => {
@@ -203,9 +221,15 @@ describe("Einsatzlisten-Anzeige wuerfelt mit denselben Zahlen wie der Spieltag",
    * dem Risiko der aktuellen Fatigue.
    */
   it("Projektion liegt immer ueber dem Risiko der aktuellen Fatigue", () => {
-    for (const fatigue of [0, 10, 30, 55, 75]) {
+    // Innerhalb der Schutzzone sind beide Seiten 0 — dort gibt es nichts zu unterschlagen. Geprueft
+    // wird deshalb ab der Fatigue, bei der die Einsatz-Last ueber die 25 traegt.
+    for (const fatigue of [20, 30, 55, 75]) {
       const projection = projectMatchdayInjuryRisk({ player: NEUTRAL_PLAYER, currentFatigue: fatigue });
-      expect(projection.riskPercent).toBeGreaterThan(getInjuryRiskPercent(fatigue));
+      expect(projection.riskPercent, `Fatigue ${fatigue}`).toBeGreaterThan(getInjuryRiskPercent(fatigue));
+    }
+    for (const fatigue of [0, 10]) {
+      const projection = projectMatchdayInjuryRisk({ player: NEUTRAL_PLAYER, currentFatigue: fatigue });
+      expect(projection.riskPercent, `Fatigue ${fatigue}`).toBe(0);
     }
   });
 });

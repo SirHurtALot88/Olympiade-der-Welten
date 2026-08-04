@@ -152,9 +152,12 @@ describe("fatigue injury service", () => {
       "stark",
       "sehr_stark",
     ]);
-    expect(getInjuryRiskPercent(29)).toBe(4.83);
-    expect(getInjuryRiskBand(29).label).toBe("none");
-    expect(getInjuryRiskPercent(30)).toBe(5);
+    // Schutzzone bis 25 (Chris): darunter 0 %, und „kein Risiko" heißt dasselbe.
+    expect(getInjuryRiskPercent(24)).toBe(0);
+    expect(getInjuryRiskBand(24).label).toBe("none");
+    expect(getInjuryRiskPercent(29)).toBe(1.6);
+    expect(getInjuryRiskBand(29).label).toBe("minimal");
+    expect(getInjuryRiskPercent(30)).toBe(2);
     expect(getInjuryRiskBand(30).label).toBe("minimal");
     expect(getInjuryRiskPercent(50)).toBe(10);
     expect(getInjuryRiskBand(50).label).toBe("mittel");
