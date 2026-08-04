@@ -408,9 +408,29 @@ function NlTrainingIntensityProjection({
 }
 
 /**
- * #53 — Top-4 Klassen nach geschätztem Trainings-SP-Zugewinn (siehe
- * `buildTrainingClassGainRanking` für die Herleitung). Die aktuell trainierte
- * Klasse wird, falls unter den Top-4, klar markiert ("aktiv").
+ * Ton-Klasse zur Development-Route einer Trainingsklasse.
+ *
+ * GEMELDET VON CHRIS: „vllt kannst du die noch in der passenden Farbe einrahmen damit man sie besser
+ * erkennt!" — dieselben vier Achsfarben, die das Spiel auch sonst benutzt (`--nl-pow` … `--nl-soc`,
+ * siehe die Kartenfarben im Transfermarkt). BALANCED und RECOVERY entsprechen keiner Achse und
+ * bleiben deshalb ungefärbt, statt sich eine fünfte Farbe auszudenken.
+ */
+function classRankingRouteTone(route: string | null | undefined) {
+  if (route === "POW") return " nl-tone-pow";
+  if (route === "SPE") return " nl-tone-spe";
+  if (route === "MEN") return " nl-tone-men";
+  if (route === "SOC") return " nl-tone-soc";
+  return "";
+}
+
+/**
+ * Klassen nach geschätztem Trainings-SP-Zugewinn (siehe `buildTrainingClassGainRanking` für die
+ * Herleitung). Die aktuell trainierte Klasse ist klar markiert („aktiv").
+ *
+ * GEMELDET VON CHRIS: „ich würde gerne beim Training nicht nur die besten 4 Klassen sehen, sondern
+ * alle!" Vorher stand hier `limit: 4`. Die Beschränkung nahm dem Vergleich genau das, wofür er da
+ * ist: welche Klasse für DIESEN Spieler die richtige ist, sieht man erst, wenn auch die schlechten
+ * Optionen danebenstehen — und die vier besten sind bei ähnlichen Werten ohnehin austauschbar.
  */
 function NlTrainingClassRanking({
   row,
@@ -424,25 +444,27 @@ function NlTrainingClassRanking({
   onSelectClass: (className: string) => void;
 }) {
   const ranking = useMemo(
-    () => buildTrainingClassGainRanking(row, trainingClassOptions, { limit: 4, includeCurrent: true }),
+    // `limit: 99` statt einer Zahl: die Liste ist so lang wie `trainingClassOptions`, und die kennt
+    // diese Komponente nicht im Voraus. Derselbe Wert wird an der zweiten Aufrufstelle in dieser
+    // Datei bereits benutzt.
+    () => buildTrainingClassGainRanking(row, trainingClassOptions, { limit: 99, includeCurrent: true }),
     [row, trainingClassOptions],
   );
   if (ranking.length === 0) return null;
   const best = ranking.reduce((max, entry) => Math.max(max, entry.estimatedGain), 0.01);
-  const currentOutsideTop = ranking.some((entry) => entry.isCurrent && entry.rank > 4);
 
   return (
     <div
       className="nl-training-class-ranking is-selectable"
       data-testid="nl-training-class-ranking"
       role="radiogroup"
-      aria-label="Trainingsklasse wählen — Top-4 plus deine aktuelle"
+      aria-label="Trainingsklasse wählen — alle Klassen nach geschätztem Netto-SP"
     >
       <span
         className="nl-training-class-ranking-title"
         title={`Netto-vergleichbar: verankert am echten Netto-Forecast deiner aktuellen Klasse (${formatNlSignedNumber(row.organicForecast.netSetpoints, 1)} SP, nach Performance − Regression). Jede andere Klasse zeigt, wo dein Netto läge, wenn du sie trainierst (Delta aus Klassen-Attributgewichtung, Potential-Decke, Signature-/Weak-Affinität und Route-Bonus). Der Balken zeigt das relative Brutto-Trainingsbudget.`}
       >
-        Beste Klassen + deine aktuelle · Netto-SP{" "}
+        Alle Klassen · Netto-SP{" "}
         {readOnly ? "" : <span className="nl-training-intensity-hint-inline">· tippen zum Wählen</span>}
       </span>
       <div className="nl-training-class-ranking-rows">
@@ -450,8 +472,8 @@ function NlTrainingClassRanking({
           <button
             type="button"
             key={`class-rank-${row.player.id}-${entry.className}`}
-            className={`nl-training-class-ranking-row${entry.isCurrent ? " is-current" : ""}${
-              entry.isCurrent && currentOutsideTop ? " is-current-outside" : ""
+            className={`nl-training-class-ranking-row is-route-framed${classRankingRouteTone(entry.developmentRoute)}${
+              entry.isCurrent ? " is-current" : ""
             }`}
             role="radio"
             aria-checked={entry.isCurrent}
