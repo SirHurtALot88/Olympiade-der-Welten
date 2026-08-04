@@ -2,7 +2,12 @@ import type { GameState, Player, PlayerGeneratorAttributeName, PlayerPotentialRe
 import type { TrainingPlayerRowView } from "@/app/foundation/training-facilities-v2/training-view-types";
 import { buildAffinityAlignedTopGains, buildAffinityForecastFocus } from "@/lib/training/affinity-forecast-focus";
 import type { OrganicProgressionAttributeBreakdown } from "@/lib/training/organic-season-progression";
-import { resolveSeasonTrainingAccumulatorInputs, resolveTeamTrainingFocusAxis } from "@/lib/training/organic-season-progression";
+import {
+  resolveSeasonTrainingAccumulatorInputs,
+  resolveTeamTrainingFocusAxis,
+  resolveTeamTrainingFocusBonusPct,
+} from "@/lib/training/organic-season-progression";
+import { DEVELOPMENT_ROUTE_BONUS_BASE_PCT } from "@/lib/training/development-route-bonus";
 import { resolveSeasonTotalMatchdays } from "@/lib/training/matchday-training-accumulator";
 import { TRAINING_SETPOINTS_BY_MODE } from "@/lib/training/training-mode-presentation";
 import type { TrainingModeDemandView } from "@/lib/training/training-mode-demand-service";
@@ -128,6 +133,10 @@ export function buildTrainingPlayerRowView(
     weakAttribute: row.organicProgression.attributeAffinity.weakAttribute,
   });
   const trainingFocusAxis = row.gameState ? resolveTeamTrainingFocusAxis(row.gameState, row.player.id) : null;
+  // S1: Bonushöhe kommt aus derselben Quelle wie die Achse — mit Specialist Wing aus der Gebäudestufe.
+  const trainingFocusBonusPct = row.gameState
+    ? resolveTeamTrainingFocusBonusPct(row.gameState, row.player.id)
+    : DEVELOPMENT_ROUTE_BONUS_BASE_PCT;
   const trainingAccumulatorForecast = buildTrainingAccumulatorForecast(row);
 
   return {
@@ -207,6 +216,7 @@ export function buildTrainingPlayerRowView(
     forecast: row.forecast,
     adminBalancingConfig: row.adminBalancingConfig ?? null,
     trainingFocusAxis,
+    trainingFocusBonusPct,
     trainingAccumulatorForecast,
   };
 }

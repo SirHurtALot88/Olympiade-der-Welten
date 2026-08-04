@@ -27,6 +27,7 @@ import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { previewFacilityMaintenance, applyFacilityMaintenance } from "@/lib/facilities/facility-maintenance-service";
 import { previewFacilityUpgrade, applyFacilityUpgrade } from "@/lib/facilities/facility-upgrade-service";
 import type { FacilityId } from "@/lib/facilities/facility-catalog";
+import { chooseSpecialistWingVariantForTeam } from "@/lib/facilities/specialist-wing-variant-choice";
 import { createCaptureBatchPersistence } from "@/lib/persistence/capture-batch-persistence";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
@@ -230,6 +231,26 @@ function buildBudgetActions(input: {
   }));
 }
 
+/**
+ * Variante für einen Facility-Aufruf. Nur der Specialist Wing hat überhaupt Varianten; für ihn wählt
+ * die KI seit S1 ECHT nach Kaderzusammensetzung (`chooseSpecialistWingVariantForTeam`) statt wie
+ * früher hart „mind_lab" zu übergeben. Die Variante ist jetzt die Trainings-Fokusachse des Teams —
+ * eine Hartverdrahtung würde der halben Liga einen MEN-Fokus verpassen, den nie jemand gewählt hat.
+ * Für alle anderen Gebäude bleibt die durchgereichte Variante (praktisch immer `undefined`/`null`).
+ *
+ * Exportiert, damit die Regel „die KI-Variante hängt am Kader, nicht an einer Konstante" testbar ist,
+ * ohne einen kompletten KI-Bauplan erzeugen zu müssen.
+ */
+export function resolveSpecialistWingVariant(
+  gameState: GameState,
+  teamId: string,
+  facilityId: FacilityId,
+  variant?: string | null,
+) {
+  if (facilityId !== "specialist_wing") return variant;
+  return chooseSpecialistWingVariantForTeam(gameState, teamId);
+}
+
 function buildBuildingActions(save: PersistedSaveGame, preview: AiLeagueManagementPreview, sourcePlanId: string) {
   const actions: AiManagerAction[] = [];
   const maintenanceCache = new Map<string, ReturnType<typeof previewFacilityMaintenance>>();
@@ -244,7 +265,7 @@ function buildBuildingActions(save: PersistedSaveGame, preview: AiLeagueManageme
     if (!upgradeCache.has(key)) {
       upgradeCache.set(
         key,
-        previewFacilityUpgrade(save, teamId, facilityId, facilityId === "specialist_wing" ? "mind_lab" : variant, action),
+        previewFacilityUpgrade(save, teamId, facilityId, resolveSpecialistWingVariant(save.gameState, teamId, facilityId, variant), action),
       );
     }
     return upgradeCache.get(key)!;
@@ -320,7 +341,7 @@ function buildBuildingActions(save: PersistedSaveGame, preview: AiLeagueManageme
       if (leftRecovery !== rightRecovery) return rightRecovery - leftRecovery;
       return (right.score ?? 0) - (left.score ?? 0);
     })) {
-      const upgrade = getUpgrade(row.teamId, row.buildingType, row.buildingType === "specialist_wing" ? "mind_lab" : undefined);
+      const upgrade = getUpgrade(row.teamId, row.buildingType, undefined);
       const cost = upgrade.upgradeCost ?? row.cost;
       const budgetBlockers = [
         cost > remainingBuildingBudget ? "building_budget_exceeded" : null,
@@ -700,13 +721,16 @@ export function applyAiManagerPlan(input: {
       }
       continue;
     }
-    const upgradePreview = previewFacilityUpgrade(currentSave, action.teamId, action.facilityId, action.facilityId === "specialist_wing" ? "mind_lab" : undefined);
+    // WICHTIG: Preview und Apply müssen DIESELBE Variante sehen — der Confirm-Token ist über die
+    // Variante gebildet (facility-upgrade-service). Deshalb einmal auflösen und beide Male benutzen.
+    const specialistVariant = resolveSpecialistWingVariant(currentSave.gameState, action.teamId, action.facilityId, undefined);
+    const upgradePreview = previewFacilityUpgrade(currentSave, action.teamId, action.facilityId, specialistVariant);
     const result = applyFacilityUpgrade(
       currentSave,
       action.teamId,
       action.facilityId,
       upgradePreview.confirmToken,
-      action.facilityId === "specialist_wing" ? "mind_lab" : undefined,
+      specialistVariant,
       persistence,
     );
     if (result.applied) {

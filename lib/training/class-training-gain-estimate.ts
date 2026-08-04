@@ -13,7 +13,10 @@ import {
   getOrganicGrowthMultiplier,
 } from "@/lib/training/organic-season-progression";
 import { deriveAttributeAffinityProfile, getAttributeAffinityKind } from "@/lib/training/training-levelup-service";
-import { getDevelopmentRouteBonusMultiplier } from "@/lib/training/development-route-bonus";
+import {
+  DEVELOPMENT_ROUTE_BONUS_BASE_PCT,
+  getDevelopmentRouteBonusMultiplier,
+} from "@/lib/training/development-route-bonus";
 import type { PlayerDevelopmentRouteSuggestion } from "@/lib/progression/player-potential-service";
 
 export type ClassTrainingGainEstimateInput = {
@@ -56,6 +59,13 @@ export type ClassTrainingGainEstimateInput = {
    * does for players without a matching team training focus.
    */
   trainingFocusAxis?: "pow" | "spe" | "men" | "soc" | null;
+  /**
+   * Höhe des Routenbonus in Prozent, wenn Route und Fokusachse zusammenfallen. Default ist die Basis
+   * (+8 %). Steht ein Specialist Wing, liefert `resolveTeamTrainingFocusBonusPct` hier den realen
+   * Wert der Gebäudestufe (bis +13 %) — sonst würde die Schätzung unter dem liegen, was die Engine
+   * tatsächlich anwendet.
+   */
+  trainingFocusBonusPct?: number;
 };
 
 export type ClassTrainingGainEstimate = {
@@ -112,9 +122,10 @@ function roundTo(value: number, digits = 1) {
 export function estimateClassTrainingGains(input: ClassTrainingGainEstimateInput): ClassTrainingGainEstimate[] {
   const currentClass = normalizeProgressionClassName(input.currentClassName);
   const trainingFocusAxis = input.trainingFocusAxis ?? null;
+  const trainingFocusBonusPct = input.trainingFocusBonusPct ?? DEVELOPMENT_ROUTE_BONUS_BASE_PCT;
 
   const currentRouteMultiplier = currentClass
-    ? getDevelopmentRouteBonusMultiplier(classNameToDevelopmentRoute(currentClass), trainingFocusAxis)
+    ? getDevelopmentRouteBonusMultiplier(classNameToDevelopmentRoute(currentClass), trainingFocusAxis, trainingFocusBonusPct)
     : 1;
   const budgetBase =
     currentRouteMultiplier > 0 ? input.trainingSetpoints / currentRouteMultiplier : input.trainingSetpoints;
@@ -128,7 +139,7 @@ export function estimateClassTrainingGains(input: ClassTrainingGainEstimateInput
 
     let estimatedGain = 0;
     if (positiveTotal > 0 && budgetBase > 0) {
-      const routeMultiplier = getDevelopmentRouteBonusMultiplier(developmentRoute, trainingFocusAxis);
+      const routeMultiplier = getDevelopmentRouteBonusMultiplier(developmentRoute, trainingFocusAxis, trainingFocusBonusPct);
       const weightedSum = PROGRESSION_ATTRIBUTE_ORDER.reduce((sum, key) => {
         const weight = Math.max(0, profile[key]);
         if (weight <= 0) return sum;

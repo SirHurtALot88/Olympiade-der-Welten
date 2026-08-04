@@ -280,7 +280,9 @@ const FACILITY_EFFECT_CHIP_LABEL: Record<FacilityId, string> = {
   fan_shop: "Season Cash",
   arena_upgrade: "Arena-Einnahme",
   academy: "F/E/D Upgrade-Rabatt",
-  specialist_wing: "Specialist-Attribut-Rabatt",
+  // S1: Der Flügel bewirbt keinen Rabatt mehr — er setzt die Trainings-Fokusachse des Teams und
+  // hebt den Routenbonus passender Spieler (Katalog `modifierPct`, 8 % → 13 %).
+  specialist_wing: "Fokusachse-Routenbonus",
 };
 
 /**
@@ -357,13 +359,28 @@ function FacilityEffectDeltaChip({
         />
       );
     }
-    case "low_tier_upgrade_discount":
-    case "specialist_upgrade_discount": {
+    case "low_tier_upgrade_discount": {
       const delta = (nextDef?.discountPct ?? 0) - (currentDef?.discountPct ?? 0);
       return (
         <NlDeltaChip
           value={delta}
           format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 0)}% ${label}`}
+          title={effectTitle}
+        />
+      );
+    }
+    case "specialist_focus_axis": {
+      // S1: reale Zahl ist der Routenbonus (`modifierPct`), NICHT mehr der tote Upgrade-Rabatt.
+      // Auf Stufe 0→1 ist der Prozent-Zuwachs bewusst 0 — der Nutzen von L1 ist die Fokusachse
+      // selbst, deshalb hier Klartext statt einer 0 %-Anzeige.
+      const delta = (nextDef?.modifierPct ?? 0) - (currentDef?.modifierPct ?? 0);
+      if (facility.level === 0) {
+        return <NlDeltaChip value={1} format={() => `${label}: Achse gesetzt · +8%`} title={effectTitle} />;
+      }
+      return (
+        <NlDeltaChip
+          value={delta}
+          format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 1)}% ${label}`}
           title={effectTitle}
         />
       );
@@ -660,23 +677,16 @@ export default function FacilitiesV2NewLook({
    * die Formeln aus `calculateFacilityUpkeep` / `calculateFacilityIncome`
    * (lib/facilities/facility-effects.ts, gleiche Katalog-Quelle), damit
    * „Einnahmen − Unterhalt" dem Netto-Chip (`summary.netFacilityResult`)
-   * entspricht: Einnahmen effizienzgewichtet, Unterhalt inkl.
-   * Spezialisten-Flügel-Rabatt. Arena-Einnahme fließt EFFEKTIV (Basis ×
+   * entspricht: Einnahmen effizienzgewichtet, Unterhalt ungewichtet (der
+   * frühere Specialist-Wing-Rabatt auf den Unterhalt ist mit S1 entfallen —
+   * der Flügel hat jetzt genau einen Effekt, die Trainings-Fokusachse).
+   * Arena-Einnahme fließt EFFEKTIV (Basis ×
    * Beliebtheit) ein — genau wie das reale Cash am Season-End
    * (facility-season-end-service) — sonst würde der Header-Chip von
    * `summary.netFacilityResult` abweichen. Reine Präsentation — keine neuen
    * Balance-Zahlen.
    */
   const portfolioFinance = useMemo(() => {
-    const specialistRow = facilityRows.find((facility) => facility.id === "specialist_wing");
-    const specialistDiscountPct = specialistRow
-      ? Number(
-          (((getFacilityLevelDefinition("specialist_wing", specialistRow.level)?.discountPct ?? 0) *
-            specialistRow.efficiencyPct) /
-            100).toFixed(2),
-        )
-      : 0;
-
     let upkeepTotal = 0;
     let incomeTotal = 0;
     let builtCount = 0;
@@ -685,7 +695,7 @@ export default function FacilitiesV2NewLook({
         builtCount += 1;
       }
       if (facility.currentUpkeep > 0) {
-        upkeepTotal += Number((facility.currentUpkeep * (1 - specialistDiscountPct / 100)).toFixed(2));
+        upkeepTotal += Number(facility.currentUpkeep.toFixed(2));
       }
       incomeTotal += (effectiveSeasonIncome(facility, beliebtheit) * facility.efficiencyPct) / 100;
     }

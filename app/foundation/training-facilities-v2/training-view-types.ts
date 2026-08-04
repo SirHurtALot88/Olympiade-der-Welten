@@ -173,11 +173,17 @@ export type TrainingPlayerRowView = {
   recommendedTrainingMatchesCurrent?: boolean;
   adminBalancingConfig?: AdminBalancingConfigInput | null;
   /**
-   * The player's team's current training focus axis (AI manager training settings), if any.
-   * Drives the development-route ×1.08 bonus in `estimateClassTrainingGains` /
-   * `buildTrainingClassGainRanking` — null means no focus is set (bonus dormant everywhere).
+   * Trainings-Fokusachse des Teams. Quelle ist seit S1 zuerst die Specialist-Wing-Variante
+   * (power_gym→POW, agility_track→SPE, mind_lab→MEN, social_studio→SOC) und nur ohne Flügel die
+   * KI-Trainingseinstellung. Treibt den Routenbonus in `estimateClassTrainingGains` /
+   * `buildTrainingClassGainRanking` — null heißt: keine Achse gesetzt (Bonus überall inaktiv).
    */
   trainingFocusAxis?: "pow" | "spe" | "men" | "soc" | null;
+  /**
+   * Höhe des Routenbonus in Prozent (Basis 8 %, mit Specialist Wing bis 13 %). Getrennt vom Achsen-
+   * Feld, damit die Anzeige denselben Wert zeigt, den die Engine rechnet.
+   */
+  trainingFocusBonusPct?: number;
 };
 
 export type TrainingDevelopmentFilter = "all" | "growth" | "stable" | "regression";
