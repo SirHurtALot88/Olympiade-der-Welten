@@ -113,3 +113,67 @@ describe("Eine ausbleibende Buchung nennt ihren Grund", () => {
     expect(body).toContain("formatCockpitReason");
   });
 });
+
+/**
+ * NACHTRAG — Chris hat den Cockpit-Weg probiert und einen Screenshot geschickt:
+ * „9. Standings Apply · BLOCKIERT · incomplete_result:B-B", der Knopf „2. Standings lokal anwenden"
+ * ausgegraut, Duplicate Schutz false, Planned Changes 32.
+ *
+ * Damit war die erste Vermutung (Gleichstand) für SEINEN Fall falsch: es blockiert eine
+ * unvollständige Ergebniszeile von Team B-B — meist ein Spieler, der nach der abgegebenen
+ * Aufstellung ausgefallen ist. Und beide Wege waren zu: der Auto-Run über den State-Bug, das
+ * Cockpit, weil `runCockpitStandingsApply` nie `forceReplace` mitschickte.
+ *
+ * Deshalb holt „Spieltag abschließen" die Tabelle selbst nach — eng gefasst.
+ */
+describe("Ein hängender Spieltag holt die Tabelle selbst nach", () => {
+  const ARENA_SRC = readFileSync(
+    join(root, "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx"),
+    "utf8",
+  );
+
+  it("die Nachhol-Aktion greift nur, wenn AUSSCHLIESSLICH die Tabelle fehlt", () => {
+    expect(ARENA_SRC).toContain(
+      'firstReasons.every((reason) => reason === "standings_apply_missing_for_current_matchday")',
+    );
+  });
+
+  it("sie prüft vorher im DryRun und bricht bei jedem anderen Grund ab", () => {
+    expect(ARENA_SRC).toContain("runCockpitStandingsApply(false)");
+    expect(ARENA_SRC).toContain("isRecoverableStandingsBlocker(reason)");
+    expect(ARENA_SRC).toMatch(/if \(blockers\.length > 0 && !blockers\.every/);
+  });
+
+  it("behebbar sind Gleichstand und unvollständige Ergebniszeile — mehr nicht", () => {
+    const start = ARENA_SRC.indexOf("function isRecoverableStandingsBlocker");
+    const block = ARENA_SRC.slice(start, ARENA_SRC.indexOf("\n  }", start));
+    expect(block).toContain('reason === "tie_groups_require_confirmed_policy"');
+    expect(block).toContain('reason.startsWith("incomplete_result:")');
+    // Gegenprobe: was Punkte doppelt zählen würde oder wo gar nichts gerechnet ist, bleibt draußen.
+    expect(block, "eine fehlende Ergebniszeile darf nicht überfahren werden").not.toContain(
+      'reason.startsWith("missing_result:")',
+    );
+    expect(block, "Doppel-Apply würde Punkte doppelt zählen").not.toContain("duplicate_apply");
+    expect(block).not.toContain("stale_baseline_replace_not_supported");
+  });
+
+  it("der Wechsel wird höchstens einmal wiederholt", () => {
+    const start = ARENA_SRC.indexOf("async function finishMatchdayAndAdvance");
+    const body = ARENA_SRC.slice(start, ARENA_SRC.indexOf("\n  }\n", start));
+    const advanceCalls = body.match(/runCockpitMatchdayAdvance\(true\)/g) ?? [];
+    expect(advanceCalls.length, "mehr als zwei Anläufe wären ein Kreisel").toBe(2);
+  });
+
+  it("was überfahren wurde, steht in der Erfolgsmeldung", () => {
+    // Sonst bucht das Spiel still über eine unvollständige Ergebniszeile hinweg.
+    expect(ARENA_SRC).toContain("recoveryNote");
+    expect(ARENA_SRC).toContain("Die Tabelle wurde nachgetragen trotz:");
+  });
+
+  it("das Cockpit kann forceReplace jetzt überhaupt mitschicken", () => {
+    // Ohne das Flag blockiert `prepareStandingsApply` bei genau diesen Lagen — der Apply-Knopf war
+    // deshalb dauerhaft ausgegraut, wie in Chris' Screenshot.
+    expect(HANDLERS).toContain("runCockpitStandingsApply(execute: boolean, forceReplace = false)");
+    expect(HANDLERS).toContain("forceReplace,");
+  });
+});

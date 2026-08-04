@@ -68,7 +68,8 @@ export type CockpitMatchdayMvpScoringFeed = FoundationMatchdayMvpScoringResponse
 export type CockpitMatchdayApplyHandlers = {
   runCockpitMatchdayMvpScoring: (execute: boolean) => Promise<CockpitMatchdayMvpScoringFeed | null>;
   runCockpitResultApply: (execute: boolean) => Promise<FoundationApplySummary | null>;
-  runCockpitStandingsApply: (execute: boolean) => Promise<FoundationApplySummary | null>;
+  /** `forceReplace` ist der Gleichstands-Notausgang — siehe die Erklaerung an der Implementierung. */
+  runCockpitStandingsApply: (execute: boolean, forceReplace?: boolean) => Promise<FoundationApplySummary | null>;
   runCockpitCashApply: (execute: boolean) => Promise<FoundationApplySummary | null>;
   runCockpitMatchdayAdvance: (execute: boolean) => Promise<FoundationApplySummary | null>;
   runCockpitMatchdayAutoRun: (
@@ -243,7 +244,19 @@ export function createCockpitMatchdayApplyHandlers(
     }
   }
 
-  async function runCockpitStandingsApply(execute: boolean) {
+  /**
+   * @param forceReplace Notausgang fuer einen Gleichstand.
+   *
+   *   `prepareStandingsApply` blockiert bei `tieGroups.length > 0`, solange dieses Flag fehlt
+   *   (standings-apply-service.ts). Das Cockpit hat es nie mitgeschickt — bei einem exakten
+   *   Gleichstand war der Apply-Knopf deshalb dauerhaft gesperrt, und mit ihm der einzige manuelle
+   *   Weg, einen haengenden Spieltag zu buchen.
+   *
+   *   Es umgeht auch den Doppel-Schutz, deshalb setzt es NUR der Aufrufer, der vorher im DryRun
+   *   geprueft hat, dass ausschliesslich Gleichstands-Gruende blockieren — siehe
+   *   `recoverMissingStandingsApply`.
+   */
+  async function runCockpitStandingsApply(execute: boolean, forceReplace = false) {
     if (readMetaSource === "prisma") {
       showReadOnlyNotice();
       return null;
@@ -262,6 +275,7 @@ export function createCockpitMatchdayApplyHandlers(
             source: readMetaSource,
             dryRun: !execute,
             execute,
+            forceReplace,
             confirm: execute ? STANDINGS_APPLY_CONFIRM_TOKEN : undefined,
           }),
         ),
