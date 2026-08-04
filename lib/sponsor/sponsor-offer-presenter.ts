@@ -225,9 +225,15 @@ function buildSpecialPresentation(input: {
       headline: `Zielachse · ${definition.label}`,
       difficulty: "mittel",
       difficultyLabel: DIFFICULTY_LABELS.mittel,
+      // Jede Achse erklaert sich selbst (`erklaerung` in sponsor-v4-axes.ts). Vorher stand hier ein
+      // Sammelsatz fuer alle fuenf Achsen — er sagte nie, WAS gezaehlt wird, und war fuer die
+      // Entwicklungs-Achse sogar falsch: die hat gar keine Ausgangslage, gegen die man "Zuwachs
+      // gegenueber dem Saisonstart" messen koennte. Gemeldet von Chris ("was bedeutet 20 Sprünge?").
+      //
+      // Das Leerzeichen zwischen Zahl und Einheit ist Absicht: vorher stand dort "20Sprünge".
       detail:
-        `${definition.label}: ${ziel}${definition.unit} Zuwachs gegenueber dem eigenen Saisonstart` +
-        (baseline != null && baseline !== 0 ? ` (Ausgangswert ${baseline}${definition.unit})` : "") +
+        definition.erklaerung.replace("{ziel}", `${ziel} ${definition.unit}`) +
+        (baseline != null && baseline !== 0 ? ` · Ausgangswert ${baseline} ${definition.unit}` : "") +
         " · anteilige Auszahlung",
     };
   }

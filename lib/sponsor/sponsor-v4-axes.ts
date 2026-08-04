@@ -51,6 +51,20 @@ type SponsorV4AxisDefinition = {
   label: string;
   /** Einheit der Messgroesse — fuer Karten- und Settlement-Text. */
   unit: string;
+  /**
+   * WAS GENAU GEZAEHLT WIRD, in einem Satz und in Nutzersprache.
+   *
+   * Gemeldet von Chris: „Ziele muessen klarer formuliert sein — was bedeutet 20 Sprünge? Sind damit
+   * 20 SP gemeint, die die Spieler erreichen muessen? Und ist das brutto oder netto nach Regression?"
+   *
+   * Vorher stand auf JEDER Karte derselbe Sammelsatz („X Einheiten Zuwachs gegenueber dem eigenen
+   * Saisonstart"). Der war fuer manche Achsen sogar sachlich falsch: `entwicklung` hat gar keine
+   * Ausgangslage (`baseline: () => 0`), es gibt also nichts, wogegen „gegenueber dem Saisonstart"
+   * gemessen wuerde. Und die Einheit allein sagt nie, WAS springt oder waechst.
+   *
+   * `{ziel}` wird beim Anzeigen durch den Zielwert samt Einheit ersetzt.
+   */
+  erklaerung: string;
   scale: number;
   offset: number;
   /** Ausgangswert bei Angebotserzeugung. 0, wenn die Achse ohnehin nur Saisonzuwachs zaehlt. */
@@ -177,6 +191,9 @@ const SPONSOR_V4_AXIS_DEFINITIONS: Readonly<Record<SponsorV4AxisKey, SponsorV4Ax
     key: "wachstum",
     label: "Kaderwert",
     unit: "%",
+    erklaerung:
+      "Dein Kader soll am Saisonende {ziel} mehr wert sein als beim Vertragsabschluss. Gemessen am " +
+      "Gesamt-Marktwert, prozentual — damit ein kleiner Kader dieselbe Chance hat wie ein großer.",
     // 12 Prozent Kaderwert-Zuwachs. Prozentual gemessen, damit ein kleiner Kader dieselbe Chance hat
     // wie ein grosser — absolut waere die Achse ein verkappter Reichtums-Bonus.
     //
@@ -212,6 +229,9 @@ const SPONSOR_V4_AXIS_DEFINITIONS: Readonly<Record<SponsorV4AxisKey, SponsorV4Ax
     key: "ausbau",
     label: "Ausbau",
     unit: "Stufen",
+    erklaerung:
+      "Bau deine Gebäude bis Saisonende um insgesamt {ziel} aus. Gezählt wird die Summe über alle " +
+      "Gebäude — welches du ausbaust, ist egal.",
     // UNVERAENDERT — n = 0 in der gemessenen Saison ist keine Messgrundlage fuer eine Skala.
     // Kurz nachgeschaut, warum: `offerable` war fuer alle 32 Teams true (Headroom 37–40 von 40
     // Gebaeudestufen), und die Slate-Ziehung (`rollSponsorOfferSlate`) hat die Achse nur bei 7 von 32
@@ -231,6 +251,9 @@ const SPONSOR_V4_AXIS_DEFINITIONS: Readonly<Record<SponsorV4AxisKey, SponsorV4Ax
     key: "soliditaet",
     label: "Solidität",
     unit: "C",
+    erklaerung:
+      "Steh am Saisonende {ziel} besser da als beim Vertragsabschluss. Gerechnet wird Cash minus " +
+      "laufende Kredite minus Sponsor-Vorschuss — ein Vorschuss zählt also nicht als Guthaben.",
     // Nullpunkt bei -10: ein Team darf ein moderates Minus fahren und liegt trotzdem nicht bei 0.
     // Ziel nachkalibriert 30 → 110 C (2026-08-03): bei 30 C lagen 9 von 10 gemessenen Vertraegen bei
     // voller Erfuellung (Ø 99,3 %, Rohmetrik-Median 44,7 C, Spanne 27,3–117,0 C). Bei 110 C liegt die
@@ -245,7 +268,14 @@ const SPONSOR_V4_AXIS_DEFINITIONS: Readonly<Record<SponsorV4AxisKey, SponsorV4Ax
   entwicklung: {
     key: "entwicklung",
     label: "Entwicklung",
-    unit: "Sprünge",
+    // Einheit war "Sprünge" — genau das Wort, das Chris nicht deuten konnte ("sind das 20 SP?").
+    // Gezaehlt werden Spieler, also heisst die Einheit auch so. Die Einheit steht auch im
+    // Abrechnungstext, dort liest sich "20 Spieler" ebenso richtig.
+    unit: "Spieler",
+    erklaerung:
+      "{ziel} sollen über die Saison mindestens " + String(AXIS_TALENT_JUMP_MV) + " Marktwert dazugewinnen. " +
+      "Gezählt werden Spieler, nicht Punkte: wer zweimal zulegt, zählt einmal. Gemeint ist Marktwert, " +
+      "nicht SP — und der Endstand nach Regression, nicht der Bruttozuwachs.",
     // Ziel nachkalibriert 3 → 20 Spruenge (2026-08-03): bei 3 lagen alle 8 gemessenen Vertraege bei
     // voller Erfuellung (Ø 100 %, Rohmetrik-Spanne 7–13 Spruenge, Median 10). Bei 20 liegt keiner der
     // acht Werte mehr am Deckel, Ø Erfuellung 50,6 % — mittig im Zielkorridor 35–65 %. Siehe
@@ -261,6 +291,9 @@ const SPONSOR_V4_AXIS_DEFINITIONS: Readonly<Record<SponsorV4AxisKey, SponsorV4Ax
     key: "kaderpflege",
     label: "Frische",
     unit: "%",
+    erklaerung:
+      "{ziel} deines Kaders sollen am Saisonende frisch sein. Frisch heißt Match-Fatigue höchstens " +
+      String(AXIS_FRESH_FATIGUE_CAP) + "; unter 40 % zählt die Achse gar nicht.",
     // 40 % frischer Kader ist der Nullpunkt, 90 % die volle Erfuellung.
     scale: 50,
     offset: -40,
