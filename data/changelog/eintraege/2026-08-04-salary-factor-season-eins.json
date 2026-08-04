@@ -1,0 +1,16 @@
+[
+  {
+    "datum": "2026-08-04",
+    "seite": "Welt · Sponsoren",
+    "text": "Saison 1 rechnet endlich mit dem Salary Factor, der dir zu Saisonbeginn angezeigt wird. Vorher stand die Zahl zwar auf der Finanzseite, aber Sponsor-Angebote, Abrechnung und Apron rechneten intern mit 1,00 — je nach Wurf bis zu 8 % zu wenig oder 10 % zu viel.",
+    "gewicht": "spielblockierend",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-04",
+    "seite": "Welt · Sponsoren",
+    "text": "Die Basis-Kachel auf der Angebotskarte ist weg: der Betrag steht als „Garantiert auf jedem Platz\" schon oben, und Platz 32 ist genau die Basis.",
+    "gewicht": "feinschliff",
+    "version": "0.4"
+  }
+]

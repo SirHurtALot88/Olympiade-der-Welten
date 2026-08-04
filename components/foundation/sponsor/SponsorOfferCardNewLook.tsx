@@ -243,10 +243,6 @@ export function SponsorOfferCardNewLook({
   const standardComponents = offer.components.filter(
     (component) => component.kind !== "special" && component.kind !== "overperformance",
   );
-  // Zweite Doppelung im Mittelteil: die BASIS-Kachel zeigt unter V3 exakt den Betrag, der zwei
-  // Bloecke weiter oben schon als „Garantiert auf jedem Platz" steht. Sie faellt nur weg, wenn die
-  // Zahlen wirklich gleich sind — weichen sie ab, sagt die Kachel etwas Eigenes und bleibt.
-  const v3Floor = presentation.v3?.guaranteedFloor ?? null;
   const baseCash = offer.components.find((component) => component.kind === "base")?.rewardCash ?? 0;
   // Audit #4: gelockte curveShape-Rang-Leiter (== Settlement) einmal bauen und in die Gewinnstufen-Leiter
   // reichen, damit die angezeigten Stufenbeträge der echten Auszahlung entsprechen.
@@ -494,12 +490,12 @@ export function SponsorOfferCardNewLook({
 
       <div className="nl-sponsor-reward-tiles" aria-label="Vertragskomponenten">
         {standardComponents.map((component) => {
-          if (
-            component.kind === "base" &&
-            v3Floor != null &&
-            typeof component.rewardCash === "number" &&
-            Math.abs(component.rewardCash - v3Floor) < 0.05
-          ) {
+          // GEMELDET: „Basis braucht auch keine sau, man sieht ja platz 32 waere ja die basis!"
+          // Stimmt — unter V3 ist die Basis definitionsgemaess der Betrag am letzten Platz, und der
+          // steht als „Garantiert auf jedem Platz" schon oben auf der Karte. Eine eigene Kachel
+          // dafuer sagt nichts Neues. Ohne V3-Block (Altangebote) bleibt sie, dort ist sie die
+          // einzige Stelle, an der die Basis ueberhaupt steht.
+          if (component.kind === "base" && presentation.v3) {
             return null;
           }
           if (component.kind === "rank") {

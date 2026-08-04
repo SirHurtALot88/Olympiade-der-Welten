@@ -200,9 +200,14 @@ describe("Der Mittelteil der Sponsorkarte wiederholt sich nicht mehr", () => {
     expect(quelle).toContain("presentation.v3 ? (");
   });
 
-  it("laesst die BASIS-Kachel weg, wenn sie exakt den garantierten Boden wiederholt", () => {
-    expect(quelle).toContain("const v3Floor = presentation.v3?.guaranteedFloor ?? null;");
-    expect(quelle).toContain("Math.abs(component.rewardCash - v3Floor) < 0.05");
+  /**
+   * Ueberholt: die Kachel fiel zuerst nur bei exakt gleichem Betrag weg. „Basis braucht auch keine
+   * sau, man sieht ja platz 32 waere ja die basis!" — sie faellt unter V3 jetzt immer weg. Die
+   * Zusage steht in `salary-factor-season-eins.test.ts`; hier bleibt nur, dass die Kachel im
+   * V3-Zweig nicht wieder auftaucht.
+   */
+  it("zeigt unter V3 keine BASIS-Kachel mehr", () => {
+    expect(quelle).toContain('if (component.kind === "base" && presentation.v3) {');
   });
 
   it("macht jede Vertragssaison aufklappbar und haengt die Rangtabelle daran", () => {
