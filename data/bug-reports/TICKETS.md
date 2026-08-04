@@ -33,8 +33,8 @@
 | [23](triage/bug-2026-08-04T12-07-33-898Z-y72yr9.md) | 04.08., 14:07 | Chris | Team · Teams | Teamansicht — größere Portraits, PP über den Stats, auch je Disziplin | angenommen | — |
 | [24](triage/bug-2026-08-04T12-10-34-702Z-1rh8lx.md) | 04.08., 14:10 | Chris | Spieltag · Saisonstand | GuV im Saisonstand weicht von der GuV im Finanzen-Reiter ab | angenommen | — |
 | [25](triage/bug-2026-08-04T12-13-40-352Z-fm2opo.md) | 04.08., 14:13 | Chris | Spieltag · Saisonstand | KI nutzt Front-/Back-loaded-Verträge nicht, um Apron-Probleme zu umgehen | angenommen | — |
-| [26](triage/bug-2026-08-04T13-18-59-798Z-vlsakj.md) | 04.08., 15:18 | Chris | Spieltag · Arena | Trotz Tagesplatz 2 und 20,8 Punkten zeigt der Saisonstand keine Rang-Bewegung (15 auf 15) | gebaut ⚠ | Der Anzeigeteil ist behoben — die Rang-Spalte zeigt die Bewegung zur letzten Wertung jetzt überhaupt, und ein gehaltener Platz steht sichtbar als ±0 statt als leere Zelle. Ob M-S rechnerisch hätte steigen müssen, ließ sich ohne Zugriff auf den Spielstand nicht nachrechnen. · PR #393 · **Wirkung nicht bestaetigt** |
-| [27](triage/bug-2026-08-04T13-20-49-011Z-191wtu.md) | 04.08., 15:20 | Chris | Spieltag · Saisonstand | Saisonstand zeigt keine Rang-Änderung zur letzten Wertung | gebaut ⚠ | Die Rang-Spalte des Saisonstands hatte die Bewegung nie zu sehen bekommen — sie hing an einer Datenquelle, die auf genau dieser Seite immer leer ist. Jetzt kommt sie aus dem gespeicherten Punktestand vor der letzten Wertung. · PR #393 · **Wirkung nicht bestaetigt** |
+| [26](triage/bug-2026-08-04T13-18-59-798Z-vlsakj.md) | 04.08., 15:18 | Chris | Spieltag · Arena | Trotz Tagesplatz 2 und 20,8 Punkten zeigt der Saisonstand keine Rang-Bewegung (15 auf 15) | gebaut ⚠ | Der Anzeigeteil ist behoben — die Rang-Spalte zeigt die Bewegung zur letzten Wertung jetzt überhaupt, und ein gehaltener Platz steht sichtbar als ±0 statt als leere Zelle. Ob M-S rechnerisch hätte steigen müssen, ließ sich ohne Zugriff auf den Spielstand nicht nachrechnen. · PR #394 · **Wirkung nicht bestaetigt** |
+| [27](triage/bug-2026-08-04T13-20-49-011Z-191wtu.md) | 04.08., 15:20 | Chris | Spieltag · Saisonstand | Saisonstand zeigt keine Rang-Änderung zur letzten Wertung | gebaut ⚠ | Die Rang-Spalte des Saisonstands hatte die Bewegung nie zu sehen bekommen — sie hing an einer Datenquelle, die auf genau dieser Seite immer leer ist. Jetzt kommt sie aus dem gespeicherten Punktestand vor der letzten Wertung. · PR #394 · **Wirkung nicht bestaetigt** |
 
 **`gebaut ⚠`** heißt: Der Fix ist gemergt, die Wirkung im laufenden Spiel aber noch nicht belegt.
 Erst ein `bestaetigt:` in der Triage-Notiz macht daraus `erledigt`. Diese Unterscheidung gibt es,
@@ -43,4 +43,4 @@ von einem Zwischenspeicher verschluckt.
 
 Details je Ticket: die Nummer verlinkt auf die Triage-Notiz. Volltext: `npm run bugs:review`.
 
-_Erzeugt: 4.8.2026, 15:48:10_
+_Erzeugt: 4.8.2026, 15:51:13_
