@@ -54126,15 +54126,161 @@ button.foundation-team-portrait-card {
 }
 
 .is-new-look .nl-sponsor-term-outlook-row {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--nl-s2);
-  align-items: baseline;
+  display: block;
 }
 
-.is-new-look .nl-sponsor-term-outlook-row em {
+/* GEFRAGT: Rangtabelle beim Aufklappen einer Vertragssaison. Als <details>, damit sie auch
+   per Tastatur erreichbar ist — ein reines :hover-Panel waere es nicht. */
+.is-new-look .nl-sponsor-term-season-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--nl-s2);
+  padding: 2px 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+.is-new-look .nl-sponsor-term-season-summary::-webkit-details-marker {
+  display: none;
+}
+
+.is-new-look .nl-sponsor-term-season-summary:hover .nl-sponsor-term-season-label,
+.is-new-look .nl-sponsor-term-season[open] .nl-sponsor-term-season-label {
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-sponsor-term-season-summary:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--nl-r-sm);
+}
+
+/* Aufklapp-Pfeil vor dem Saisonlabel — ohne ihn sieht die Zeile nicht bedienbar aus. */
+.is-new-look .nl-sponsor-term-season-label::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 6px;
   color: var(--nl-mut);
+  transition: transform 120ms ease;
+}
+
+.is-new-look .nl-sponsor-term-season[open] .nl-sponsor-term-season-label::before {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-sponsor-term-season-label::before {
+    transition: none;
+  }
+}
+
+.is-new-look .nl-sponsor-term-season-numbers {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--nl-s2);
+}
+
+/* Der Unterschied zum Vorjahr ist die eigentliche Aussage der Zeile — die absolute Zahl
+   allein sagt nicht, ob der Vertrag ueber die Laufzeit traegt oder abbaut. */
+.is-new-look .nl-sponsor-term-season-numbers em {
   font-style: normal;
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-sponsor-term-season-numbers em[data-direction="up"] {
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-sponsor-term-season-numbers em[data-direction="down"] {
+  color: var(--nl-bad);
+}
+
+.is-new-look .nl-sponsor-term-season-detail {
+  padding: var(--nl-s2) 0 var(--nl-s2) 14px;
+}
+
+.is-new-look .nl-sponsor-term-season-factor {
+  margin: 0 0 var(--nl-s2);
+  color: var(--nl-mut);
+  font-size: 11px;
+}
+
+.is-new-look .nl-sponsor-season-rank-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.is-new-look .nl-sponsor-season-rank-caption {
+  caption-side: top;
+  text-align: left;
+  padding-bottom: 4px;
+  color: var(--nl-mut);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.is-new-look .nl-sponsor-season-rank-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--nl-mut);
+  padding: 2px 0;
+}
+
+.is-new-look .nl-sponsor-season-rank-table td {
+  text-align: right;
+  padding: 2px 0;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-sponsor-season-rank-table tr.is-current th,
+.is-new-look .nl-sponsor-season-rank-table tr.is-current td {
+  color: var(--nl-good);
+  font-weight: 700;
+}
+
+.is-new-look .nl-sponsor-season-rank-live {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* Die volle Gewinnstufen-Leiter steht unter V3 nur noch auf Abruf — ihre beiden Endpunkte
+   stehen bereits als „Bei Titelgewinn" und „Garantiert auf jedem Platz" auf der Karte. */
+.is-new-look .nl-sponsor-rank-ladder-disclosure > summary {
+  cursor: pointer;
+  padding: 4px 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--nl-mut);
+  list-style: none;
+}
+
+.is-new-look .nl-sponsor-rank-ladder-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.is-new-look .nl-sponsor-rank-ladder-disclosure > summary::before {
+  content: "▸ ";
+  display: inline-block;
+}
+
+.is-new-look .nl-sponsor-rank-ladder-disclosure[open] > summary::before {
+  content: "▾ ";
+}
+
+.is-new-look .nl-sponsor-rank-ladder-disclosure > summary:hover {
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-sponsor-rank-ladder-disclosure > summary:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--nl-r-sm);
 }
 
 .is-new-look .nl-sponsor-challenge {

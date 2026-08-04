@@ -1,0 +1,23 @@
+[
+  {
+    "datum": "2026-08-04",
+    "seite": "Welt · Sponsoren",
+    "text": "Bei mehrjährigen Verträgen stand hinter jeder Saison „Faktor 1.00\" — das war nicht der Faktor, sondern ein Ersatzwert, weil die Salary-Factor-Vorausschau in Saison 1 noch leer ist. Die Karte sagt jetzt, ob der Faktor für diese Saison schon feststeht oder nur fortgeschrieben wurde.",
+    "gewicht": "behebung",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-04",
+    "seite": "Welt · Sponsoren",
+    "text": "Jede Vertragssaison lässt sich aufklappen und zeigt dann, was jeder Endrang in genau dieser Saison einbringt — plus den Unterschied zum Vorjahr direkt in der Zeile.",
+    "gewicht": "feinschliff",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-04",
+    "seite": "Welt · Sponsoren",
+    "text": "Der Mittelteil der Angebotskarte wiederholt sich nicht mehr: die volle Gewinnstufen-Leiter steht nur noch auf Abruf, und die Basis-Kachel verschwindet, wenn sie denselben Betrag zeigt wie „Garantiert auf jedem Platz\" darüber.",
+    "gewicht": "feinschliff",
+    "version": "0.4"
+  }
+]

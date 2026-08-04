@@ -82,10 +82,28 @@ export function estimateExpectedPayout(offer: SponsorOffer, _powerRank?: number 
 export type SponsorOfferTermForecastEntry = {
   /** 1-basiertes Vertragsjahr (1 = Unterschriftssaison). */
   seasonYear: number;
-  /** Salary Factor, mit dem DIESE Saison gerechnet ist — vorausgewuerfelt, keine Schaetzung. */
+  /** Salary Factor, mit dem DIESE Saison gerechnet ist. */
   salaryFactor: number;
+  /**
+   * Woher der Faktor stammt. `"vorausgewuerfelt"` heisst: er steht als eigener Eintrag im
+   * Salary-Factor-Fenster und gilt fuer genau diese Saison. `"fortgeschrieben"` heisst: fuer
+   * diese Saison liegt (noch) kein eigener Wert vor, gerechnet wird mit dem bei Unterschrift
+   * eingefrorenen Faktor.
+   *
+   * Der Unterschied ist nicht kosmetisch. In Season 1 ist `seasonEconomyFactors` leer — das
+   * Fenster wird erst beim Saisonuebergang geschrieben (preseason-workflow-service.ts). Die Karte
+   * zeigte deshalb fuer JEDE Vertragssaison „Faktor 1.00" und behauptete damit drei unabhaengige
+   * Prognosen, wo in Wahrheit einmal derselbe Platzhalter stand.
+   */
+  factorSource: "vorausgewuerfelt" | "fortgeschrieben";
   /** Auszahlung an der AKTUELLEN Tabellenposition (`terms.startRank`) in dieser Vertragssaison. */
   payoutAtCurrentRank: number;
+  /**
+   * Auszahlungsleiter Rang 1..32 fuer GENAU diese Vertragssaison (Faktor + Laufzeit-Erosion
+   * eingerechnet). Damit zeigt der Hover auf eine Saisonzeile, was jeder Rang IN DIESER SAISON
+   * bringt — was sich zwischen den Vertragsjahren tatsaechlich unterscheidet.
+   */
+  rankPayouts: number[];
 };
 
 /**
@@ -111,16 +129,22 @@ export function buildSponsorOfferTermForecast(gameState: GameState, offer: Spons
   const sockel = sponsorSockelFuerStartrang(terms.startRank);
   const rankIndex = Math.max(0, Math.min(31, Math.round(terms.startRank) - 1));
   return Array.from({ length: termSeasons }, (_, seasonIndex) => {
-    const factor = window.find((entry) => entry.horizonIndex === seasonIndex)?.factor ?? terms.salaryFactor;
+    const vorausgewuerfelt = window.find((entry) => entry.horizonIndex === seasonIndex)?.factor;
+    const hatEigenenFaktor = typeof vorausgewuerfelt === "number" && Number.isFinite(vorausgewuerfelt);
+    const factor = hatEigenenFaktor ? vorausgewuerfelt : terms.salaryFactor;
     const ladder = sponsorKurvenLeiter({ shape: terms.curveShape!, startRank: terms.startRank, salaryFactor: factor });
     const contractYear = Math.max(1, Math.min(3, seasonIndex + 1)) as SponsorTermSeasons;
     const multiplier = getSponsorTermMultiplier(contractYear);
-    const rawValue = ladder[rankIndex] ?? sockel;
-    const eroded = sockel + multiplier * (rawValue - sockel);
+    // Dieselbe Erosion, mit der `payoutAtCurrentRank` rechnet — nur eben fuer JEDEN Rang, damit
+    // Hover-Tabelle und Zeilenbetrag garantiert dieselbe Zahl zeigen (eine Quelle, nicht zwei).
+    const erodiert = (rohwert: number) =>
+      Math.round(Math.max(terms.floor, sockel + multiplier * (rohwert - sockel)) * 10) / 10;
     return {
       seasonYear: seasonIndex + 1,
       salaryFactor: factor,
-      payoutAtCurrentRank: Math.round(Math.max(terms.floor, eroded) * 10) / 10,
+      factorSource: hatEigenenFaktor ? ("vorausgewuerfelt" as const) : ("fortgeschrieben" as const),
+      payoutAtCurrentRank: erodiert(ladder[rankIndex] ?? sockel),
+      rankPayouts: Array.from({ length: 32 }, (_, index) => erodiert(ladder[index] ?? sockel)),
     };
   });
 }
