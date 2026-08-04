@@ -45,12 +45,21 @@ vi.mock("@/lib/persistence/persistence-service", () => ({
   }),
 }));
 
-function buildFakeGameState(overrides?: Partial<GameState["seasonState"]>): GameState {
+function buildFakeGameState(input?: {
+  teamIds?: string[];
+  seasonState?: Partial<GameState["seasonState"]>;
+}): GameState {
+  const teamIds = input?.teamIds ?? ["M-M", "A-A", "Z-H"];
   return {
+    season: { id: "season-1" },
+    // Der geteilte league-setup-draft-service (Teil A) liest `gameState.teams`, um aus
+    // `excludeTeamIds` (menschliche Teams) die `callerWritableTeamIds`-Liste zu bauen — die
+    // Fixture braucht deshalb ein reales `teams`-Array, nicht nur `seasonState`.
+    teams: teamIds.map((teamId) => ({ teamId })),
     seasonState: {
       leagueSetupStatus: undefined,
       teamControlSettings: {},
-      ...overrides,
+      ...input?.seasonState,
     },
   } as unknown as GameState;
 }
