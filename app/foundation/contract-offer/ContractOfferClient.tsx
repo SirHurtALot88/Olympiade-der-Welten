@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 
+import { CONTRACT_SHAPE_LABELS } from "@/lib/foundation/contract-shape-label";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 import type { ContractShape } from "@/lib/data/olyDataTypes";
 
@@ -131,9 +132,9 @@ export default function ContractOfferClient({
           <label className="filter-field">
             <span>Vertragsform</span>
             <select className="input" value={contractShape} onChange={(event) => onContractShapeChange(event.target.value as ContractShape)}>
-              <option value="balanced">Balanced</option>
-              <option value="front_loaded">Front-loaded</option>
-              <option value="back_loaded">Back-loaded</option>
+              <option value="balanced">{CONTRACT_SHAPE_LABELS.balanced}</option>
+              <option value="front_loaded">{CONTRACT_SHAPE_LABELS.front_loaded}</option>
+              <option value="back_loaded">{CONTRACT_SHAPE_LABELS.back_loaded}</option>
             </select>
           </label>
         </section>

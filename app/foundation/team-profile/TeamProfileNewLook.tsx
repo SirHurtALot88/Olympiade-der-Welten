@@ -22,6 +22,7 @@ import {
   type NlAxisKey,
   type NlTone,
 } from "@/components/foundation/new-look";
+import { CONTRACT_SHAPE_LABELS } from "@/lib/foundation/contract-shape-label";
 import { buildTeamDisciplineRankRowsFromGameState } from "@/lib/foundation/team-discipline-rank-engine";
 import { calculateFacilityIncome, calculateFacilityUpkeep } from "@/lib/facilities/facility-effects";
 import type {
@@ -335,12 +336,12 @@ function getContractShapeTag(shape: ContractShape | null | undefined): {
   tone: NlTone;
 } {
   if (shape === "front_loaded") {
-    return { tag: "FL", label: "front-loaded (jetzt teurer)", tone: "warn" };
+    return { tag: "FL", label: `${CONTRACT_SHAPE_LABELS.front_loaded} (jetzt teurer)`, tone: "warn" };
   }
   if (shape === "back_loaded") {
-    return { tag: "BL", label: "back-loaded (später teurer)", tone: "accent" };
+    return { tag: "BL", label: `${CONTRACT_SHAPE_LABELS.back_loaded} (später teurer)`, tone: "accent" };
   }
-  return { tag: "STD", label: "normal (gleichmäßig)", tone: "neutral" };
+  return { tag: "STD", label: `${CONTRACT_SHAPE_LABELS.balanced} (gleichmäßig verteilt)`, tone: "neutral" };
 }
 
 /** Anzahl der Zeilen, die die MW-/GEHALT-Hover maximal einzeln listen (Rest → "…"). */

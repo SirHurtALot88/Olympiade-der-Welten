@@ -22,6 +22,7 @@ import type {
   TeamGeneralManagerProfile,
   TeamIdentity,
 } from "@/lib/data/olyDataTypes";
+import { CONTRACT_SHAPE_LABELS } from "@/lib/foundation/contract-shape-label";
 import { deriveTeamIdentityAxisWeightMap } from "@/lib/foundation/team-identity-settings";
 import { resolveSlotRolesForDiscipline, type MatchdaySlotRoleDefinition } from "@/lib/lineups/matchday-slot-roles";
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
@@ -1230,8 +1231,8 @@ function buildEconomyProjection(input: {
             : 1;
   const warnings = [
     ...(salaryPressure === "high" ? ["Gehalt liegt klar ueber dem Team-Schnitt."] : []),
-    ...(mode === "front_loaded" ? ["Front-loaded entlastet spaetere Seasons, kostet aber jetzt Cashdruck."] : []),
-    ...(mode === "back_loaded" ? ["Back-loaded schont jetzt Cash, kann spaeter teuer werden."] : []),
+    ...(mode === "front_loaded" ? [`${CONTRACT_SHAPE_LABELS.front_loaded} entlastet spaetere Seasons, kostet aber jetzt Cashdruck.`] : []),
+    ...(mode === "back_loaded" ? [`${CONTRACT_SHAPE_LABELS.back_loaded} schont jetzt Cash, kann spaeter teuer werden.`] : []),
   ];
 
   return {
