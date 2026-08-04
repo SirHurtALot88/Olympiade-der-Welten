@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 
 import { ONLINE_ROOM_TEAM_IDS } from "@/lib/room/online-room-model";
 import { describeRoomFlowButton, getRoomFlowStep, isSandboxRoomSave } from "@/lib/room/room-flow-controller";
+import { emitRoomFlowButtonAction } from "@/lib/room/room-flow-socket-actions";
 import { SocketProvider, useSocket } from "@/lib/socket/socket-context";
 import type { RoomErrorPayload, RoomJoinedPayload, RoomOwnershipPreset } from "@/types/events";
 import type { OlyRoomState } from "@/types/game";
@@ -426,31 +427,16 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
                   disabled={!seatToken || !roomFlowButton?.canClick}
                   onClick={() => {
                     if (!seatToken || !roomFlowButton) return;
-                    if (!roomFlowButton.isHostAction) {
-                      socket.emit("setReadyState", {
-                        roomCode: roomCode.toUpperCase(),
-                        seatToken,
-                        ready: currentParticipant?.readyState !== "ready",
-                      });
-                      return;
-                    }
-                    if (roomFlowButton.label === "AI Teams vorbereiten") {
-                      socket.emit("runRoomAiAutoStep", {
-                        roomCode: roomCode.toUpperCase(),
-                        seatToken,
-                      });
-                      return;
-                    }
-                    if (state.multiplayerRoom.status === "lobby") {
-                      socket.emit("startRoom", {
-                        roomCode: roomCode.toUpperCase(),
-                        seatToken,
-                      });
-                      return;
-                    }
-                    socket.emit("advanceRoomFlow", {
+                    // Welches Socket-Event ein Klick sendet, entscheidet `roomFlowButton.action`
+                    // (typisiert, von `describeRoomFlowButton` gesetzt) — NICHT mehr ein
+                    // String-Vergleich auf `label`. Ein Vergleich auf die Beschriftung brach
+                    // lautlos, sobald jemand nur den Text aenderte (siehe Commit-Historie);
+                    // `action` ist von `label` unabhaengig und dafuer typsicher verdrahtet.
+                    emitRoomFlowButtonAction({
+                      action: roomFlowButton.action,
                       roomCode: roomCode.toUpperCase(),
                       seatToken,
+                      toggleReadyTo: currentParticipant?.readyState !== "ready",
                     });
                   }}
                 >
