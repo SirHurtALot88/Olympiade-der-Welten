@@ -30,12 +30,12 @@ describe("fatigue-calibration", () => {
 
   it("interpolates injury risk across anchor points", () => {
     expect(getInjuryRiskPercent(0)).toBe(0);
-    expect(getInjuryRiskPercent(30)).toBe(2);
-    expect(getInjuryRiskPercent(50)).toBe(10);
+    expect(getInjuryRiskPercent(30)).toBe(0.6);
+    expect(getInjuryRiskPercent(50)).toBe(3);
     expect(getInjuryRiskPercent(80)).toBe(25);
     expect(getInjuryRiskPercent(100)).toBe(40);
-    expect(getInjuryRiskPercent(40)).toBe(6);
-    expect(getInjuryRiskPercent(65)).toBe(17.5);
+    expect(getInjuryRiskPercent(40)).toBe(1.8);
+    expect(getInjuryRiskPercent(65)).toBe(14);
   });
 
   /**
@@ -46,18 +46,36 @@ describe("fatigue-calibration", () => {
       expect(getInjuryRiskPercent(fatigue), `Fatigue ${fatigue}`).toBe(0);
     }
     // Direkt darüber beginnt es — flach, nicht als Sprung.
-    expect(getInjuryRiskPercent(26)).toBe(0.4);
-    expect(getInjuryRiskPercent(35)).toBe(4);
+    expect(getInjuryRiskPercent(26)).toBe(0.12);
+    expect(getInjuryRiskPercent(35)).toBe(1.2);
   });
 
-  it("ab Fatigue 50 bleibt die Kurve unverändert", () => {
-    // Gegenprobe: die Schutzzone darf das hohe Ende nicht entschärfen. Wer verheizt, trägt weiter
-    // dasselbe Risiko — sonst wäre die Fatigue als Constraint erledigt.
-    expect(getInjuryRiskPercent(50)).toBe(10);
-    expect(getInjuryRiskPercent(60)).toBe(15);
+  /**
+   * GEMELDET VON CHRIS (Nachschaerfung): „erst ab 50 fatigue soll es staerker steigen, bis dahin
+   * soll es eher so bei 2-3% liegen bis 50".
+   *
+   * Dieser Test ersetzt einen frueheren namens „ab Fatigue 50 bleibt die Kurve unveraendert".
+   * Dessen Zusicherung ist bewusst aufgehoben: der Anker bei 50 ist von 10 % auf 3 % gefallen.
+   * Umbenannt statt angepasst, damit der Name nicht das Gegenteil dessen behauptet, was er prueft.
+   */
+  it("bis 50 bleibt es flach, danach wird es steil", () => {
+    // Die ganze Zone bis 50 liegt unter 3 % — „noch harmlos" heisst jetzt auch harmlos.
+    for (const fatigue of [26, 30, 35, 40, 45, 50]) {
+      expect(getInjuryRiskPercent(fatigue), `Fatigue ${fatigue}`).toBeLessThanOrEqual(3);
+    }
+    expect(getInjuryRiskPercent(50)).toBe(3);
+
+    // Das hohe Ende ist UNVERAENDERT teuer — die Abflachung unten darf die Fatigue nicht als
+    // Constraint erledigen.
     expect(getInjuryRiskPercent(80)).toBe(25);
-    expect(getInjuryRiskPercent(90)).toBe(32.5);
     expect(getInjuryRiskPercent(100)).toBe(40);
+
+    // Und dazwischen ist die Strecke dadurch STEILER als vorher, nicht flacher: sie traegt jetzt
+    // den gesamten Anstieg von 3 auf 25. Gegenprobe in Steigung pro Fatigue-Punkt.
+    const steigungUnten = (getInjuryRiskPercent(50) - getInjuryRiskPercent(25)) / 25;
+    const steigungOben = (getInjuryRiskPercent(80) - getInjuryRiskPercent(50)) / 30;
+    expect(steigungUnten).toBeCloseTo(0.12, 5);
+    expect(steigungOben).toBeGreaterThan(steigungUnten * 5);
   });
 
   it("„kein Risiko“ heißt jetzt wörtlich 0 % — Anzeige und Rechnung sagen dasselbe", () => {
@@ -69,7 +87,7 @@ describe("fatigue-calibration", () => {
     }
     expect(getInjuryRiskBand(25).label).toBe("minimal");
     expect(getInjuryRiskBand(29).label).toBe("minimal");
-    expect(getInjuryRiskBand(29).riskPercent).toBe(1.6);
+    expect(getInjuryRiskBand(29).riskPercent).toBe(0.48);
   });
 
   it("returns ui bands with live risk percent", () => {
@@ -81,5 +99,51 @@ describe("fatigue-calibration", () => {
     expect(getFatigueRiskLevel(20)).toBe("niedrig");
     expect(getFatigueRiskLevel(45)).toBe("mittel");
     expect(getFatigueRiskLevel(70)).toBe("hoch");
+  });
+});
+
+/**
+ * Diese Suite haelt die BESCHREIBUNG der Kurve fest, nicht einzelne Stuetzwerte — damit eine
+ * kuenftige Rebalancierung sofort auffaellt, wenn sie die zugesagte FORM verletzt, und nicht erst,
+ * wenn jemand im Spiel eine seltsame Zahl bemerkt.
+ *
+ * Die Zusagen stammen woertlich von Chris:
+ *   „bis zu einer Fatigue von 25 sollte die Wahrscheinlichkeit einfach 0 % sein"
+ *   „erst ab 50 fatigue soll es staerker steigen, bis dahin soll es eher so bei 2-3% liegen bis 50"
+ */
+describe("Verletzungskurve: die zugesagte Form", () => {
+  it("ist bis 25 exakt null — keine unsichtbare Restwahrscheinlichkeit", () => {
+    for (let fatigue = 0; fatigue <= 25; fatigue += 0.5) {
+      expect(getInjuryRiskPercent(fatigue), `Fatigue ${fatigue}`).toBe(0);
+    }
+  });
+
+  it("bleibt von 25 bis 50 unter 3 Prozent", () => {
+    for (let fatigue = 25; fatigue <= 50; fatigue += 0.5) {
+      expect(getInjuryRiskPercent(fatigue), `Fatigue ${fatigue}`).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it("steigt monoton — mehr Erschoepfung darf nie weniger Risiko bedeuten", () => {
+    let vorher = -1;
+    for (let fatigue = 0; fatigue <= 100; fatigue += 0.5) {
+      const jetzt = getInjuryRiskPercent(fatigue);
+      expect(jetzt, `Fatigue ${fatigue}`).toBeGreaterThanOrEqual(vorher);
+      vorher = jetzt;
+    }
+  });
+
+  it("wird oberhalb von 50 deutlich steiler als darunter", () => {
+    // Der Kern der Zusage: die Kurve ist nicht gleichmaessig, sie knickt bei 50 nach oben.
+    const unten = (getInjuryRiskPercent(50) - getInjuryRiskPercent(25)) / 25;
+    const oben = (getInjuryRiskPercent(80) - getInjuryRiskPercent(50)) / 30;
+    expect(oben).toBeGreaterThan(unten * 5);
+  });
+
+  it("laesst das hohe Ende teuer — Verheizen bleibt bestraft", () => {
+    // Gegenprobe zur Abflachung unten: waere hier mitgesenkt worden, waere die Fatigue als
+    // Constraint erledigt und die ganze Rotationsentscheidung bedeutungslos.
+    expect(getInjuryRiskPercent(80)).toBe(25);
+    expect(getInjuryRiskPercent(100)).toBe(40);
   });
 });

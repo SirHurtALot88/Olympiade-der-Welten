@@ -28,10 +28,29 @@ export const MAX_COMBINED_FATIGUE_INJURY_MULTIPLIER = Number(
  * 5 %, 40: 6 statt 7,5 %). Ab 50 ist die Kurve unverändert — wer seine Spieler wirklich verheizt,
  * trägt dasselbe Risiko wie bisher. Genau das war der Zweck der Fatigue.
  */
+/**
+ * GEMELDET VON CHRIS (Nachschaerfung): „erst ab 50 fatigue soll es staerker steigen, bis dahin
+ * soll es eher so bei 2-3% liegen bis 50".
+ *
+ * DER ANKER BEI 50 FAELLT VON 10 % AUF 3 %. Die Strecke 25→50 war mit 0,4 % pro Punkt viel zu
+ * steil fuer eine Zone, die sich „noch harmlos" anfuehlen soll: bei 40 lagen schon 6 % an, bei
+ * 50 volle 10 % — ein Viertel des Maximums, bevor die Erschoepfung ueberhaupt sichtbar wird.
+ * Jetzt sind es 0,12 % pro Punkt: 30 → 0,6 %, 40 → 1,8 %, 50 → 3 %.
+ *
+ * DIE HOHEN ANKER BLEIBEN (80 → 25 %, 100 → 40 %). Das ist der Punkt der Aenderung: die Strecke
+ * ab 50 traegt jetzt den ganzen Anstieg und wird dadurch von selbst steiler — 0,73 % pro Punkt
+ * statt vorher 0,5 %. Wer seine Spieler verheizt, zahlt also MEHR als vorher, nicht weniger.
+ * Genau das war gewuenscht: unten flach, oben teuer.
+ *
+ * WORAUF ZU ACHTEN IST: die Baender (`injuryRiskBands`) sind an FATIGUE-Grenzen gebunden, nicht
+ * an Prozente. „mittleres Verletzungsrisiko" beginnt weiterhin bei Fatigue 50 — dort stehen jetzt
+ * 3 % statt 10 %. Das Band beschreibt die Belastung, nicht die Wahrscheinlichkeit; wer die
+ * Beschriftung an Prozente koppeln will, muss beides gemeinsam neu schneiden.
+ */
 export const FATIGUE_INJURY_RISK_ANCHORS = [
   { fatigue: 0, riskPercent: 0 },
   { fatigue: 25, riskPercent: 0 },
-  { fatigue: 50, riskPercent: 10 },
+  { fatigue: 50, riskPercent: 3 },
   { fatigue: 80, riskPercent: 25 },
   { fatigue: 100, riskPercent: 40 },
 ] as const;

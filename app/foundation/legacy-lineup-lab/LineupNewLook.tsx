@@ -2017,7 +2017,18 @@ export default function LineupNewLook({
                 {player && injuryProjection ? (
                   <NlProgressBar
                     className="nl-lineup-injury-meter"
-                    label="Verl.-Risiko"
+                    // Die Fatigue-Wanderung gehoert SICHTBAR ins Etikett, nicht in den Tooltip.
+                    // Vorher stand hier nur "Verl.-Risiko", waehrend die Karte daneben die
+                    // AKTUELLE Fatigue zeigte und der Prozentwert auf der Fatigue NACH dem
+                    // Einsatz beruhte. Gemeldet als "das Verletzungsrisiko kommt mir seltsam
+                    // hoch vor — bis 25 soll doch 0 sein": bei angezeigter Fatigue 22 standen
+                    // 4,2 %, weil der Wurf real bei 36 faellt. Es gibt nur EINE Fatigue (der
+                    // Wert wird nach dem Spieltag genau so gespeichert, siehe
+                    // fatigue-injury-service.ts, `fatigue: fatigueBeforeRoll`) — aber wer nur
+                    // "22" und "4,2 %" nebeneinander sieht, muss die Schutzzone fuer kaputt
+                    // halten. Im Tooltip stand es bereits; ein Tooltip beantwortet die Frage
+                    // nur dem, der sie schon hat.
+                    label={`Verl.-Risiko · F ${formatNlNumber(fatigue ?? 0, 0)}→${formatNlNumber(injuryProjection.fatigueBeforeRoll, 0)}`}
                     value={injuryProjection.riskPercent}
                     max={MAX_MATCHDAY_INJURY_RISK_PERCENT}
                     tone={getNlInjuryProjectionTone(injuryProjection.bandLabel)}

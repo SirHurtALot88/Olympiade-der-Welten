@@ -192,6 +192,24 @@
     },
     {
       "datum": "2026-08-04",
+      "seite": "Spieltag · Einsatzliste",
+      "pr": null,
+      "text": "Bis Fatigue 50 war das Verletzungsrisiko zu steil — bei 40 lagen schon 6 %, bei 50 volle 10 %. Jetzt bleibt es bis 50 unter 3 % und steigt erst danach kräftig. Wer seine Spieler verheizt, zahlt oberhalb von 50 sogar mehr als vorher.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
+      "seite": "Spieltag · Einsatzliste",
+      "pr": null,
+      "text": "Die Karte zeigte die Fatigue vor dem Spieltag neben einem Risiko, das für die Fatigue nach dem Einsatz gilt — das sah aus, als sei die Schutzzone bis 25 kaputt. Jetzt steht dort, wohin die Fatigue durch den Einsatz wandert, etwa 'F 22→36'.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
       "seite": "Team · Spieler",
       "pr": null,
       "text": "Der kleine Wert neben dem VK-Wert in der Spielerliste rechnete heimlich den Rest-Buyout mit ein und ließ sich aus der Zeile nicht nachvollziehen — ein Spieler mit 27,1 Mio Marktwert und 41,5 Mio Verkaufspreis zeigte „+0,38\". Jetzt steht dort der Aufschlag des Verkaufsfaktors: VK-Wert minus Marktwert, beides nebeneinander ablesbar. Buyout, Netto und der Gewinn gegenüber dem Kaufpreis stehen im Tooltip der Zelle.",

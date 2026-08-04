@@ -1,0 +1,16 @@
+[
+  {
+    "datum": "2026-08-04",
+    "seite": "Spieltag · Einsatzliste",
+    "text": "Bis Fatigue 50 war das Verletzungsrisiko zu steil — bei 40 lagen schon 6 %, bei 50 volle 10 %. Jetzt bleibt es bis 50 unter 3 % und steigt erst danach kräftig. Wer seine Spieler verheizt, zahlt oberhalb von 50 sogar mehr als vorher.",
+    "gewicht": "grundlegend",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-04",
+    "seite": "Spieltag · Einsatzliste",
+    "text": "Die Karte zeigte die Fatigue vor dem Spieltag neben einem Risiko, das für die Fatigue nach dem Einsatz gilt — das sah aus, als sei die Schutzzone bis 25 kaputt. Jetzt steht dort, wohin die Fatigue durch den Einsatz wandert, etwa 'F 22→36'.",
+    "gewicht": "behebung",
+    "version": "0.4"
+  }
+]

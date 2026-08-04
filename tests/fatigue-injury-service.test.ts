@@ -155,13 +155,15 @@ describe("fatigue injury service", () => {
     // Schutzzone bis 25 (Chris): darunter 0 %, und „kein Risiko" heißt dasselbe.
     expect(getInjuryRiskPercent(24)).toBe(0);
     expect(getInjuryRiskBand(24).label).toBe("none");
-    expect(getInjuryRiskPercent(29)).toBe(1.6);
+    expect(getInjuryRiskPercent(29)).toBe(0.48);
     expect(getInjuryRiskBand(29).label).toBe("minimal");
-    expect(getInjuryRiskPercent(30)).toBe(2);
+    expect(getInjuryRiskPercent(30)).toBe(0.6);
     expect(getInjuryRiskBand(30).label).toBe("minimal");
-    expect(getInjuryRiskPercent(50)).toBe(10);
+    // Anker 50 liegt seit der Nachschaerfung bei 3 % (vorher 10). Das Band heisst dort weiter
+    // "mittel" — die Baender haengen an FATIGUE-Grenzen, nicht an Prozenten.
+    expect(getInjuryRiskPercent(50)).toBe(3);
     expect(getInjuryRiskBand(50).label).toBe("mittel");
-    expect(getInjuryRiskPercent(70)).toBe(20);
+    expect(getInjuryRiskPercent(70)).toBe(17.67);
     expect(getInjuryRiskBand(70).label).toBe("stark");
     expect(getInjuryRiskPercent(85)).toBe(28.75);
     expect(getInjuryRiskBand(85).label).toBe("sehr_stark");
