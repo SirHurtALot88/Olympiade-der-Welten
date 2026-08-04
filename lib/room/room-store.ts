@@ -298,6 +298,68 @@ export function markDisconnected(socketId: string) {
   return betroffeneRaeume;
 }
 
+/**
+ * Heilt die Praesenz eines Teilnehmers, den der Server faelschlich als offline fuehrt, wenn ein
+ * Schreibvorgang mit gueltigem Sitzplatz-Token hereinkommt.
+ *
+ * WARUM DAS KEIN SICHERHEITSPROBLEM IST: der Token ist DASSELBE Geheimnis, das `rejoinRoom` oben
+ * akzeptiert, um genau diesen Sitzplatz online zu setzen. Trifft derselbe Token stattdessen an
+ * einem Schreibvorgang ein, ist das kein schwaecheres Signal — nur ein anderer Kanal fuer
+ * dieselbe Erkenntnis: "dieser Client ist noch da". Aufgerufen vom Server-Write-Guard
+ * (`lib/room/server-authoritative-write-guard.ts`), wenn der Ping-Heartbeat waehrend einer
+ * blockierten Event-Loop (Liga-Draft, Spieltagsaufloesung, grosse Kauf-Batches) ausgeblieben ist,
+ * `markDisconnected` den Teilnehmer offline gemeldet hat, der Client selbst den Raum aber nie
+ * verlassen hat.
+ *
+ * SICHERHEITSGRENZE — der eigentliche Grund, warum `participant_offline` ueberhaupt blockt: heilt
+ * NUR, wenn der Token zum SELBEN Teilnehmer gehoert, der hier schreiben will
+ * (`expectedParticipantId`). Ein Sitzplatz kann serverseitig nie an einen anderen Teilnehmer neu
+ * vergeben werden (jeder Sitz bekommt seinen Token einmalig in `createRoom`/`joinRoom`, siehe
+ * `buildSeat`) — dieser Zweig ist also aktuell nicht erreichbar. Er bleibt trotzdem als
+ * Verteidigungslinie stehen: sollte sich das je aendern, heilt ein fremder/veralteter Token dann
+ * weiterhin NICHTS, und der urspruenglich offline markierte Teilnehmer bleibt draussen — exakt
+ * das Verhalten vor dieser Aenderung.
+ *
+ * Anders als `rejoinRoom`: kein neuer Socket wird gebunden — ein HTTP-Schreibvorgang hat keinen.
+ * `seat.socketId` bleibt unveraendert; ein spaeterer echter Socket-Reconnect ueberschreibt ihn
+ * ohnehin ueber `rejoinRoom`.
+ *
+ * Gibt `null` zurueck, wenn nichts geheilt wurde (ungueltiger/fremder Token, Sitz schon online) —
+ * der Aufrufer bleibt dann beim bisherigen 403.
+ */
+export function healParticipantPresenceByToken(
+  room: RuntimeRoom,
+  seatToken: string,
+  expectedParticipantId: string,
+): RuntimeRoom | null {
+  const role = findSeatByToken(room, seatToken);
+  const seat = role ? room.seats[role] : null;
+  if (!seat || seat.participantId !== expectedParticipantId || seat.connected) {
+    return null;
+  }
+
+  seat.connected = true;
+  room.state.roomParticipants = room.state.roomParticipants.map((participant) =>
+    participant.participantId === seat.participantId
+      ? { ...participant, connectionStatus: "online", lastSeenAt: new Date().toISOString() }
+      : participant,
+  );
+  room.state.actionLog.push(
+    createActionLogEntry({
+      turnNumber: room.state.turnNumber,
+      actorRole: role!,
+      type: "player_rejoined",
+      message: `Coach ${role} war offline gemeldet — ein Schreibvorgang mit gueltigem Sitzplatz-Token hat die Verbindung als weiter bestehend erkannt.`,
+    }),
+  );
+  room.state = appendRoomEvent(room.state, "room_state_updated", {
+    source: "participant_presence_healed_by_write_guard",
+    participantId: seat.participantId,
+  });
+  syncPlayers(room);
+  return room;
+}
+
 export function getRoom(roomCode: string) {
   return runtimeRooms.get(roomCode.trim().toUpperCase()) ?? null;
 }
