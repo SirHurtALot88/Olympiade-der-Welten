@@ -12,6 +12,9 @@ import {
   getFacilityEfficiency,
   getFacilityLevel,
   getRecoveryTrainingFatigueReductionPct,
+  getSpecialistWingFocusAxis,
+  getSpecialistWingFocusBonusPct,
+  getTeamFacilityState,
 } from "@/lib/facilities/facility-effects";
 import { getFacilityLevelDefinition } from "@/lib/facilities/facility-catalog";
 import {
@@ -47,7 +50,11 @@ import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles"
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import type { PlayerProgressionRatingTier, PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import { FATIGUE_LOAD_BY_MODE, TRAINING_SETPOINTS_BY_MODE } from "@/lib/training/training-mode-presentation";
-import { getDevelopmentRouteBonusMultiplier } from "@/lib/training/development-route-bonus";
+import {
+  DEVELOPMENT_ROUTE_BONUS_BASE_PCT,
+  getDevelopmentRouteBonusMultiplier,
+  type TrainingFocusAxis,
+} from "@/lib/training/development-route-bonus";
 import type { PlayerDevelopmentRouteSuggestion } from "@/lib/progression/player-potential-service";
 import {
   officialDisciplineWeightOrder,
@@ -411,15 +418,39 @@ export function classNameToDevelopmentRoute(className: ProgressionClassName): Pl
   return "BALANCED";
 }
 
-export function resolveTeamTrainingFocusAxis(gameState: GameState, playerId: string) {
+/**
+ * Trainings-Fokusachse des Teams, zu dem der Spieler gehört.
+ *
+ * RANGFOLGE (S1): Steht ein Specialist Wing (Level >= 1, aktiviert, Zustand > 0), ERSETZT dessen
+ * Variante die Achse — power_gym→POW, agility_track→SPE, mind_lab→MEN, social_studio→SOC. Die
+ * Variantenwahl ist unwiderruflich (facility-upgrade-service.ts) und damit die dauerhafte Aussage des
+ * Teams; sie soll nicht von einer zweiten, jederzeit umschaltbaren Trainingseinstellung ausgehebelt
+ * werden können. Ohne Flügel gilt unverändert `aiManagerTrainingSettings[teamId].trainingFocus`.
+ */
+export function resolveTeamTrainingFocusAxis(gameState: GameState, playerId: string): TrainingFocusAxis | null {
   const rosterEntry = gameState.rosters.find((entry) => entry.playerId === playerId);
   if (!rosterEntry) return null;
+  const wingAxis = getSpecialistWingFocusAxis(getTeamFacilityState(gameState, rosterEntry.teamId));
+  if (wingAxis) return wingAxis;
   const focus = gameState.seasonState.aiManagerTrainingSettings?.[rosterEntry.teamId]?.trainingFocus;
   if (focus === "POW") return "pow" as const;
   if (focus === "SPE") return "spe" as const;
   if (focus === "MEN") return "men" as const;
   if (focus === "SOC") return "soc" as const;
   return null;
+}
+
+/**
+ * Routenbonus-Prozentsatz des Teams, zu dem der Spieler gehört — Gegenstück zu
+ * `resolveTeamTrainingFocusAxis`. Ohne Flügel die Basis (+8 %), mit Flügel die Katalogleiter
+ * (siehe `getSpecialistWingFocusBonusPct`). Wird von der realen Progression UND von den
+ * UI-Schätzungen (`estimateClassTrainingGains`) benutzt, damit Anzeige und Wirkung nicht auseinander
+ * laufen.
+ */
+export function resolveTeamTrainingFocusBonusPct(gameState: GameState, playerId: string): number {
+  const rosterEntry = gameState.rosters.find((entry) => entry.playerId === playerId);
+  if (!rosterEntry) return DEVELOPMENT_ROUTE_BONUS_BASE_PCT;
+  return getSpecialistWingFocusBonusPct(getTeamFacilityState(gameState, rosterEntry.teamId));
 }
 
 /** Marktwert für organische Regression — bewusst ohne MVS/displayMarketValue. */
@@ -1007,9 +1038,13 @@ export function buildOrganicSeasonProgression(input: {
     input.performanceWeightMultiplier != null && Number.isFinite(input.performanceWeightMultiplier)
       ? input.performanceWeightMultiplier
       : PERFORMANCE_WEIGHT_MULTIPLIER_BY_MODE[trainingMode];
+  // S1: Achse UND Bonushöhe kommen aus derselben Quelle — steht ein Specialist Wing, setzt seine
+  // Variante die Achse und seine Stufe die Bonushöhe (8 % → 13 %). Ohne Flügel: Achse aus der
+  // Trainingseinstellung, Bonus auf der historischen Basis von 8 %.
   const routeBonusMultiplier = getDevelopmentRouteBonusMultiplier(
     classNameToDevelopmentRoute(primaryTrainingClass),
     resolveTeamTrainingFocusAxis(input.gameState, input.player.id),
+    getSpecialistWingFocusBonusPct(input.facilities),
   );
   const trainingSetpoints = roundValue(
     baseTrainingBudget *

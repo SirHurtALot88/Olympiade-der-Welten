@@ -186,13 +186,17 @@ describe("facility effects", () => {
     expect(applyUpgradeCostFacilityModifiers("power", "B", 100, teamFacilities).costAfterFacility).toBe(100);
   });
 
-  it("specialist wing also reduces facility upkeep", () => {
+  // S1: Der Unterhaltsrabatt des Specialist Wing ist ersatzlos entfallen — der Flügel hat jetzt genau
+  // einen Effekt (die Trainings-Fokusachse) und ist damit bepreisbar. Details in
+  // tests/specialist-wing-focus-axis.test.ts.
+  it("specialist wing does NOT reduce facility upkeep any more", () => {
     const teamFacilities = facilities({
       training_center: { level: 5, enabled: true },
       specialist_wing: { level: 5, enabled: true, activeVariant: "agility_track" },
     });
 
-    expect(calculateFacilityUpkeep(teamFacilities)).toBe(8.54);
+    // Trainingszentrum L5 (5.5) + Specialist Wing L5 (4.2) = 9.7, ungerabattet.
+    expect(calculateFacilityUpkeep(teamFacilities)).toBe(9.7);
   });
 
   it("scouting and analytics expose information quality without performance bonuses", () => {
