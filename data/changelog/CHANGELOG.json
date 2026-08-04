@@ -3,6 +3,15 @@
   "eintraege": [
     {
       "datum": "2026-08-04",
+      "seite": "Markt · Transfermarkt",
+      "pr": "#378",
+      "text": "Im Transfermarkt kannst du jetzt nach der Kartenfarbe filtern — POW, SPE, MEN oder SOC anklicken, und die Liste zeigt nur Spieler dieser Farbe.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-04",
       "seite": "Multiplayer · Spielansicht",
       "pr": null,
       "text": "Koordiniert wurde im Raum, gespielt in der Spielansicht — den Flow sah man dort nur als Tooltip, also musste man zwischen zwei Seiten pendeln. Ready melden, Weiterschalten und wer gerade blockiert steht jetzt direkt in der Spielansicht, und bei jedem Schrittwechsel springt sie von selbst in die passende Ansicht.",
@@ -17,15 +26,6 @@
       "text": "Ein Klick auf \"Saison simulieren\" konnte den gemeinsamen Spielstand auf Saisonende schieben, während der Mitspieler noch bei Spieltag 3 stand. Admin- und Simulationswerkzeuge lehnen Spielstände, die zu einem laufenden Raum gehören, jetzt ab; Vorschauen und Trockenläufe funktionieren weiter.",
       "quelle": "gepflegt",
       "gewicht": "spielblockierend",
-      "version": "0.4"
-    },
-    {
-      "datum": "2026-08-04",
-      "seite": "Markt · Transfermarkt",
-      "pr": null,
-      "text": "Im Transfermarkt kannst du jetzt nach der Kartenfarbe filtern — POW, SPE, MEN oder SOC anklicken, und die Liste zeigt nur Spieler dieser Farbe.",
-      "quelle": "gepflegt",
-      "gewicht": "behebung",
       "version": "0.4"
     },
     {
