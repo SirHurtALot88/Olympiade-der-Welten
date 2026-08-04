@@ -218,6 +218,9 @@ describe("getNetTransferBalanceObjective (finance)", () => {
   function profileWithCashPriority(cashPriority: number) {
     return { bias: { cashPriority } } as unknown as Parameters<typeof getNetTransferBalanceObjective>[0]["profile"];
   }
+  // Die Transferbilanz-Vorgabe gilt erst ab Season 2 — in der Draft-Saison steht an ihrer Stelle die
+  // Cash-Reserve (eigener Block unten). Deshalb laufen diese Fälle mit seasonNum 2 (seasonScale 1.15).
+  const team = { teamId: "T", budget: 200 } as unknown as Parameters<typeof getNetTransferBalanceObjective>[0]["team"];
 
   it("does not auto-fail a modest net-buy for a neutral/low cash-priority board (target 0)", () =>
     withV2(() => {
@@ -225,9 +228,10 @@ describe("getNetTransferBalanceObjective (finance)", () => {
       // net-buy (transferNet -5) must NOT be an automatic failure; it becomes a soft overspend ceiling
       // (max(8, cash*0.15) = 15) with netSpend 5 <= 15 -> completed.
       const objective = getNetTransferBalanceObjective({
+        team,
         row: financeRow({ transferNet: -5, cash: 100 }),
         profile: profileWithCashPriority(5),
-        seasonNum: 1,
+        seasonNum: 2,
       });
       expect(objective.targetValue).toBe(15);
       expect(objective.status).toBe("completed");
@@ -237,27 +241,74 @@ describe("getNetTransferBalanceObjective (finance)", () => {
     withV2(() => {
       const cash = 100; // ceiling = 15; at_risk up to 15 * 1.15 = 17.25
       const atRisk = getNetTransferBalanceObjective({
+        team,
         row: financeRow({ transferNet: -16, cash }),
         profile: profileWithCashPriority(5),
-        seasonNum: 1,
+        seasonNum: 2,
       });
       expect(atRisk.status).toBe("at_risk");
       const failed = getNetTransferBalanceObjective({
+        team,
         row: financeRow({ transferNet: -30, cash }),
         profile: profileWithCashPriority(5),
-        seasonNum: 1,
+        seasonNum: 2,
       });
       expect(failed.status).toBe("failed");
     }));
 
   it("still demands a real surplus for a cash-focused board (target > 0)", () =>
     withV2(() => {
+      // cashPriority 8 -> (8-5)*1.2 = 3.6, mal seasonScale 1.15 (Season 2) = 4.1.
       const objective = getNetTransferBalanceObjective({
+        team,
         row: financeRow({ transferNet: 12, cash: 100 }),
         profile: profileWithCashPriority(8),
+        seasonNum: 2,
+      });
+      expect(objective.targetValue).toBe(4.1);
+      expect(objective.status).toBe("completed");
+    }));
+
+  // FAIRNESS-REGRESSION (Draft-Saison): In S1 kauft jedes Team seinen kompletten Kader ein. Der reale
+  // Fall aus dem Spielstand war "Transferausgaben unter 8M halten — Aktuell 193.7", also ein Ziel, das
+  // per Konstruktion unerfüllbar ist. In S1 darf deshalb GAR KEINE Vorgabe auf die Transferbilanz
+  // stehen — weder Deckel noch Überschuss —, sondern nur die steuerbare Cash-Reserve.
+  it("stellt in der Draft-Saison keine Transferbilanz-Vorgabe, sondern eine Cash-Reserve", () =>
+    withV2(() => {
+      const objective = getNetTransferBalanceObjective({
+        team,
+        // Genau der Spielstand-Fall: 193.7M netto ausgegeben, weil der Kader erst entsteht.
+        row: financeRow({ transferNet: -193.7, cash: 40 }),
+        profile: profileWithCashPriority(5),
         seasonNum: 1,
       });
-      expect(objective.targetValue).toBe(3.6);
+      expect(objective.label).toBe("Cash-Reserve von 20M halten");
+      expect(objective.targetValue).toBe(20); // clamp(200 * 0.1, 15, 30)
+      expect(objective.currentValue).toBe(40);
+      expect(objective.status).toBe("completed");
+      expect(objective.status).not.toBe("failed");
+    }));
+
+  it("bestraft in der Draft-Saison eine leergekaufte Kasse — die Reserve ist steuerbar", () =>
+    withV2(() => {
+      const objective = getNetTransferBalanceObjective({
+        team,
+        row: financeRow({ transferNet: -193.7, cash: 2 }),
+        profile: profileWithCashPriority(5),
+        seasonNum: 1,
+      });
+      expect(objective.status).toBe("failed");
+    }));
+
+  it("auch ein cash-fixiertes Board fordert in der Draft-Saison keinen Transferüberschuss", () =>
+    withV2(() => {
+      const objective = getNetTransferBalanceObjective({
+        team,
+        row: financeRow({ transferNet: -150, cash: 35 }),
+        profile: profileWithCashPriority(9),
+        seasonNum: 1,
+      });
+      expect(String(objective.label)).not.toContain("Transfer");
       expect(objective.status).toBe("completed");
     }));
 });
