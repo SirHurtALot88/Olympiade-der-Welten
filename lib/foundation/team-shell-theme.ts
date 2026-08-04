@@ -1,0 +1,156 @@
+// Team-Shell-Theme: übersetzt die kanonische Team-Farbe (team-colors.ts) in die
+// zentralen Akzent-Tokens der Neuer-Look-Shell. Die Shell-Wurzel (<main> in
+// FoundationShellRouterBody) setzt diese Variablen inline, sobald ein aktives
+// Manager-Team gewählt ist — dadurch färben sich ALLE Seiten mit, ohne dass
+// eine einzelne Seite angefasst wird: alles, was `--nl-accent`,
+// `--nl-accent-soft`, Fokus-Ringe oder color-mix-Ableitungen davon nutzt,
+// zieht automatisch nach.
+//
+// Was hier BEWUSST NICHT übersteuert wird (bedingte Formatierung bleibt):
+//   --nl-good/--nl-warn/--nl-risk   (Semantik: gut/Warnung/Risiko)
+//   --nl-pow/--nl-spe/--nl-men/--nl-soc (Achs-Identität POW/SPE/MEN/SOC)
+//   --nl-gold/--nl-silver/--nl-bronze/--nl-diamond (Podest/Metall)
+//   --heat-* / is-tier-* (Heat- und Tier-Skala)
+//   --nl-mine/--nl-ally/--nl-rival  (Freund/Feind-Kodierung der Arena)
+//
+// Kontrast-Contract:
+//   --nl-accent      = floorTeamAccent(Primär)  → L in [44, 72], auf dunklen
+//                      Panels als Linie/Text lesbar (Vorbild: DisciplineStageDrawer).
+//   --nl-accent-2    = floorTeamAccent(Sekundär); Teams ohne kuratierte
+//                      Sekundärfarbe (z.B. R-L, S-S) bleiben sauber einfarbig —
+//                      der Rückfall ist die Primärfarbe selbst, kein Absturz.
+//   --nl-accent-ink  = Textfarbe AUF Akzent-Flächen. Wird per WCAG-Luminanz
+//                      entschieden (dunkel vs. weiß, je nachdem was mehr
+//                      Kontrast liefert): helles Silber (S-S) bekommt dunkle
+//                      Schrift, ein dunkler Stahl-Akzent (L-R) weiße.
+//   --nl-accent-soft = dunkle Fläche im Team-Farbton (aktive Zustände,
+//                      Selection) — Helligkeit fest bei 18%, damit --nl-ink
+//                      darauf immer lesbar bleibt, egal wie hell die Marke ist.
+//
+// Flächen (--nl-bg/--nl-panel/--nl-line) werden nur GANZ leicht (3–24%) in den
+// Team-Farbton gemischt — genug für "die Seite trägt Teamfarbe", zu wenig, um
+// die Lesbarkeit von Ink/Mut-Text oder den Semantik-Chips darauf zu bewegen.
+// Die Hex-Basiswerte spiegeln die `.is-new-look`-Tokens aus globals.css (die
+// liegen auf derselben Wurzel und sind daher hier nicht per var() erreichbar —
+// gleiche Begründung wie beim body:has()-Void in globals.css).
+
+import { getTeamColor, floorTeamAccent } from "./team-colors";
+
+// Basiswerte der Neuer-Look-Tokens (Spiegel von .is-new-look in globals.css).
+const BASE_BG = "#0b0f17";
+const BASE_BG_2 = "#0e131d";
+const BASE_PANEL = "#131a26";
+const BASE_PANEL_2 = "#0f1621";
+const BASE_LINE = "#1f2937";
+const BASE_LINE_2 = "#2a3a52";
+
+// Helligkeit der weichen Akzent-Fläche: fest, damit --nl-ink darauf lesbar
+// bleibt (die Basis --nl-accent-soft #15294b liegt bei ~L 19%).
+const SOFT_L = 18;
+// Sättigungsdeckel für die weiche Fläche: sehr grelle Marken (S 95%) würden
+// als vollgesättigte Fläche neonartig leuchten statt "getönt" zu wirken.
+const SOFT_S_MAX = 55;
+
+export type TeamShellThemeVars = Record<string, string>;
+
+function parseHsl(value: string): { h: number; s: number; l: number } | null {
+  const match = /^hsl\(\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%\s*\)$/i.exec(value.trim());
+  if (!match) return null;
+  return { h: Number(match[1]), s: Number(match[2]), l: Number(match[3]) };
+}
+
+// HSL → relative WCAG-Luminanz (0..1). Bewusst hier implementiert statt einer
+// Farb-Library: wir brauchen genau diesen einen Wert für die Ink-Entscheidung.
+function hslLuminance(h: number, s: number, l: number): number {
+  const sN = s / 100;
+  const lN = l / 100;
+  const c = (1 - Math.abs(2 * lN - 1)) * sN;
+  const hp = ((h % 360) + 360) % 360 / 60;
+  const x = c * (1 - Math.abs((hp % 2) - 1));
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (hp < 1) [r, g, b] = [c, x, 0];
+  else if (hp < 2) [r, g, b] = [x, c, 0];
+  else if (hp < 3) [r, g, b] = [0, c, x];
+  else if (hp < 4) [r, g, b] = [0, x, c];
+  else if (hp < 5) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+  const m = lN - c / 2;
+  const lin = (ch: number) => {
+    const v = ch + m;
+    return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+// Luminanz des dunklen Ink-Kandidaten (--nl-bg #0b0f17), vorberechnet.
+const DARK_INK_LUMINANCE = 0.0058;
+
+/**
+ * Textfarbe AUF einer Akzent-Fläche: dunkel oder weiß — je nachdem, welcher
+ * WCAG-Kontrast zur gegebenen Akzentfarbe höher ist. Nicht parsebare Eingaben
+ * fallen auf Weiß zurück (sicher, weil floorTeamAccent nie über L 72 hinausgeht).
+ */
+export function accentInkFor(accentHsl: string): string {
+  const parsed = parseHsl(accentHsl);
+  if (!parsed) return "#fff";
+  const lum = hslLuminance(parsed.h, parsed.s, parsed.l);
+  const contrastDark = (lum + 0.05) / (DARK_INK_LUMINANCE + 0.05);
+  const contrastWhite = (1 + 0.05) / (lum + 0.05);
+  return contrastDark >= contrastWhite ? BASE_BG : "#fff";
+}
+
+/** Dunkle Fläche im Team-Farbton (aktive Zustände, Selection, weiche Panels). */
+export function accentSoftFor(accentHsl: string): string {
+  const parsed = parseHsl(accentHsl);
+  // Rückfall: Basis-Soft-Ton der Shell (kommt praktisch nicht vor, weil
+  // getTeamColor immer hsl(...) liefert — auch für unbekannte Codes).
+  if (!parsed) return "#15294b";
+  const s = Math.min(parsed.s, SOFT_S_MAX);
+  return `hsl(${parsed.h} ${s}% ${SOFT_L}%)`;
+}
+
+/**
+ * Die CSS-Variablen für die Shell-Wurzel — oder null, wenn kein Team gewählt
+ * ist ("Alle 32 Teams anzeigen"): dann behält die Shell ihren Standard-Look.
+ */
+export function buildTeamShellThemeVars(code: string | null | undefined): TeamShellThemeVars | null {
+  if (!code) return null;
+  const color = getTeamColor(code);
+  const accent = floorTeamAccent(color.primary);
+  const accent2 = color.secondary ? floorTeamAccent(color.secondary) : accent;
+  return {
+    "--nl-accent": accent,
+    "--nl-accent-2": accent2,
+    "--nl-accent-soft": accentSoftFor(accent),
+    "--nl-accent-ink": accentInkFor(accent),
+    // Flächen: nur eine Ahnung von Teamfarbe — Prozentwerte bewusst klein.
+    "--nl-bg": `color-mix(in srgb, ${accent} 3%, ${BASE_BG})`,
+    "--nl-bg-2": `color-mix(in srgb, ${accent} 4%, ${BASE_BG_2})`,
+    "--nl-panel": `color-mix(in srgb, ${accent} 5%, ${BASE_PANEL})`,
+    "--nl-panel-2": `color-mix(in srgb, ${accent} 4%, ${BASE_PANEL_2})`,
+    "--nl-line": `color-mix(in srgb, ${accent} 12%, ${BASE_LINE})`,
+    "--nl-line-2": `color-mix(in srgb, ${accent} 24%, ${BASE_LINE_2})`,
+  };
+}
+
+/**
+ * Der Body-Void (die Fläche NEBEN dem Shell auf breiten Monitoren) wird über
+ * zwei Variablen auf dem <body> mitgefärbt — die body:has()-Regel in
+ * globals.css liest sie mit neutralem Rückfall. Primär oben links, Sekundär
+ * oben rechts, beide als hauchdünner Schleier.
+ */
+export function buildTeamVoidVars(code: string | null | undefined): { primary: string; secondary: string } | null {
+  if (!code) return null;
+  const color = getTeamColor(code);
+  const accent = floorTeamAccent(color.primary);
+  const accent2 = color.secondary ? floorTeamAccent(color.secondary) : accent;
+  return {
+    primary: `color-mix(in srgb, ${accent} 7%, transparent)`,
+    secondary: `color-mix(in srgb, ${accent2} 5%, transparent)`,
+  };
+}
+
+export const TEAM_VOID_VAR_PRIMARY = "--oly-team-void-a";
+export const TEAM_VOID_VAR_SECONDARY = "--oly-team-void-b";
