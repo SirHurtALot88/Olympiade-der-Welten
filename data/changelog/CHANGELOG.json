@@ -14,6 +14,33 @@
       "datum": "2026-08-04",
       "seite": "Multiplayer · Spielansicht",
       "pr": null,
+      "text": "In der Spielansicht konnte der Flow stillstehen: der Gastgeber bekam keinen Bereit-Knopf und sah \"Warten auf sich selbst\", während der Mitspieler auf ihn wartete — niemand konnte klicken. Bereitmelden hängt jetzt daran, wer eigene Teams hat, nicht an der Rolle.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
+      "seite": "Multiplayer · Raum",
+      "pr": null,
+      "text": "Verlässt jemand den Raum, sieht der Verbliebene das sofort statt weiter auf einen Abwesenden zu warten.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
+      "seite": "Entwicklung",
+      "pr": null,
+      "text": "Neues Audit spielt eine komplette Saison zu zweit durch und prüft dabei Spieltag-Zyklus, Bedienbarkeit und die Admin-Schreibsperre im Zusammenspiel.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
+      "seite": "Multiplayer · Spielansicht",
+      "pr": null,
       "text": "Koordiniert wurde im Raum, gespielt in der Spielansicht — den Flow sah man dort nur als Tooltip, also musste man zwischen zwei Seiten pendeln. Ready melden, Weiterschalten und wer gerade blockiert steht jetzt direkt in der Spielansicht, und bei jedem Schrittwechsel springt sie von selbst in die passende Ansicht.",
       "quelle": "gepflegt",
       "gewicht": "grundlegend",

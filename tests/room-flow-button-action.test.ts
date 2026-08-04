@@ -12,6 +12,7 @@ import {
   startRoom,
 } from "@/lib/room/room-store";
 import { describeRoomFlowButton } from "@/lib/room/room-flow-controller";
+import type { OlyRoomState } from "@/types/game";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 
 const roomPagePath = path.join(process.cwd(), "app/room/[roomCode]/RoomPageClient.tsx");
@@ -131,5 +132,83 @@ describe("room flow button action ist unabhaengig vom Label", () => {
     expect(roomText).toContain("emitRoomFlowButtonAction");
     // Der fruehere fragile Vergleich darf nicht wiederkehren.
     expect(roomText).not.toContain('roomFlowButton.label === "AI Teams vorbereiten"');
+  });
+});
+
+/**
+ * Regression aus dem Koop-Audit (scripts/audit-koop-spielbarkeit.ts, B6/B7): der Bereit-Zweig
+ * hing an `!isHost`. Ein Host mit eigenen Teams bekam dadurch NIE einen Bereit-Knopf, fiel bis
+ * "Warten auf <sich selbst>" durch (`canClick: false`) — und der Gast sah gleichzeitig "Warten
+ * auf Host". In der Foundation-Shell, die genau diesen einen Knopf spiegelt, konnte damit
+ * niemand weiterklicken. Auf der Room-Seite blieb es unsichtbar, weil die einen zweiten,
+ * eigenstaendigen Bereit-Knopf hat.
+ */
+describe("Bereit-Pflicht haengt am Teambesitz, nicht an der Rolle", () => {
+  const zustand = (input: { rolle: "host" | "guest"; bereit: boolean; pflichtig: boolean }) =>
+    ({
+      multiplayerRoom: { status: "season_active" },
+      roomParticipants: [
+        {
+          participantId: "p-chris",
+          displayName: "Chris",
+          role: input.rolle,
+          readyState: input.bereit ? "ready" : "not_ready",
+          connectionStatus: "online",
+          controlledTeamIds: ["P-S"],
+        },
+      ],
+      teamOwnership: [],
+      roomFlowState: {
+        roomId: "r",
+        saveId: "s",
+        activeSeasonId: "season-1",
+        activeMatchday: 3,
+        phase: "active",
+        step: "lineup",
+        requiredParticipantIds: input.pflichtig ? ["p-chris"] : [],
+        completedParticipantIds: input.bereit ? ["p-chris"] : [],
+        blockingTeamIds: [],
+        aiAutoCompletedTeamIds: [],
+        canHostAdvance: false,
+        warnings: [],
+      },
+    }) as unknown as OlyRoomState;
+
+  it("gibt auch dem HOST einen klickbaren Bereit-Knopf, solange er noch nicht bereit ist", () => {
+    const knopf = describeRoomFlowButton({
+      state: zustand({ rolle: "host", bereit: false, pflichtig: true }),
+      participantId: "p-chris",
+    });
+    expect(knopf.action).toBe("set_ready");
+    expect(knopf.canClick).toBe(true);
+    // Genau das war der Deadlock: vorher "Warten auf Chris" mit canClick=false.
+    expect(knopf.label).not.toContain("Warten auf");
+  });
+
+  it("meldet Bereitmelden nicht als privilegierte Host-Aktion", () => {
+    // Sonst ueberschriebe `RoomPageClient` die Beschriftung in der Lobby zu "Spiel starten",
+    // waehrend der Knopf nur "bereit" sendet.
+    const knopf = describeRoomFlowButton({
+      state: zustand({ rolle: "host", bereit: false, pflichtig: true }),
+      participantId: "p-chris",
+    });
+    expect(knopf.isHostAction).toBe(false);
+  });
+
+  it("ueberspringt den Bereit-Schritt fuer einen Host ohne eigene Bereit-Pflicht", () => {
+    const knopf = describeRoomFlowButton({
+      state: zustand({ rolle: "host", bereit: false, pflichtig: false }),
+      participantId: "p-chris",
+    });
+    expect(knopf.action).not.toBe("set_ready");
+  });
+
+  it("laesst den Gast-Weg unveraendert", () => {
+    const knopf = describeRoomFlowButton({
+      state: zustand({ rolle: "guest", bereit: false, pflichtig: true }),
+      participantId: "p-chris",
+    });
+    expect(knopf.action).toBe("set_ready");
+    expect(knopf.canClick).toBe(true);
   });
 });

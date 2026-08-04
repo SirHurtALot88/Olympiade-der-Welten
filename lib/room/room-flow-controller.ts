@@ -251,19 +251,6 @@ export function describeRoomFlowButton(input: {
     };
   }
 
-  if (!isHost && participant.readyState !== "ready") {
-    return {
-      label: `Ready: ${stepDefinition.label}`,
-      status: "ready",
-      targetView: stepDefinition.targetView,
-      activeTeamId: ownedTeamId,
-      canClick: true,
-      isHostAction: false,
-      warnings: [],
-      action: "set_ready",
-    };
-  }
-
   if (aiPending && isHost) {
     return {
       label: "AI Teams vorbereiten",
@@ -274,6 +261,47 @@ export function describeRoomFlowButton(input: {
       isHostAction: true,
       warnings: ["ai_auto_step_pending"],
       action: "run_ai_auto_step",
+    };
+  }
+
+  // Bereit melden muss JEDER, der eigene Teams hat — auch der Host.
+  //
+  // Vorher stand hier `!isHost`, und das war ein Deadlock: `canHostAdvance` verlangt, dass ALLE
+  // `requiredParticipantIds` bereit sind, und `getRequiredParticipants` nimmt jeden auf, dem
+  // Teams gehoeren — den Host eingeschlossen. Ein Host mit eigenen Teams fiel also durch bis zum
+  // `!flow.canHostAdvance`-Zweig und bekam "Warten auf <sich selbst>" mit `canClick: false`,
+  // waehrend der Gast "Warten auf Host" sah: niemand hatte einen klickbaren Knopf. Auf der
+  // Room-Seite fiel das nie auf, weil die einen ZWEITEN, eigenstaendigen "Bereit melden"-Knopf
+  // hat (RoomPageClient), der gar nicht ueber diese Funktion laeuft. In der Foundation-Shell, die
+  // nur diesen Knopf spiegelt, stand der Flow damit still. Gefunden vom Koop-Audit
+  // (scripts/audit-koop-spielbarkeit.ts, Faelle B6/B7).
+  //
+  // Massgeblich ist deshalb die Bereit-PFLICHT aus dem Flow-Zustand, nicht die Rolle: wer nicht
+  // in `requiredParticipantIds` steht (z.B. ein Host ohne eigene Teams), ueberspringt das hier
+  // weiterhin und landet direkt beim Weiter-Knopf.
+  //
+  // Reihenfolge: die KI-Vorbereitung oben kommt bewusst ZUERST. Sie ist eine Host-Pflicht fuer
+  // den ganzen Raum, und "bereit" soll heissen "ich bin mit diesem Schritt durch" — das waere
+  // gelogen, solange die KI-Teams noch offen sind. Beide Gates muessen ohnehin erfuellt sein
+  // (`canHostAdvance = humanReady && aiReady`), es geht hier nur darum, in welcher der Host sie
+  // angeboten bekommt.
+  const mussBereitMelden =
+    flow.requiredParticipantIds.includes(participant.participantId) &&
+    !flow.completedParticipantIds.includes(participant.participantId);
+  if (mussBereitMelden && participant.readyState !== "ready") {
+    return {
+      label: `Ready: ${stepDefinition.label}`,
+      status: "ready",
+      targetView: stepDefinition.targetView,
+      activeTeamId: ownedTeamId,
+      canClick: true,
+      // Bewusst `false`, auch wenn der Host klickt: `isHostAction` markiert die PRIVILEGIERTE
+      // Host-Aktion, und `RoomPageClient` ueberschreibt damit in der Lobby die Beschriftung zu
+      // "Spiel starten". Bereitmelden ist keine Host-Aktion — mit `true` bekaeme der Host in der
+      // Lobby einen Knopf, der "Spiel starten" sagt und nur "bereit" meldet.
+      isHostAction: false,
+      action: "set_ready",
+      warnings: [],
     };
   }
 
