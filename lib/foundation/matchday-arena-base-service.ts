@@ -1,5 +1,3 @@
-import type { MatchdayMvpScoringResult } from "@/lib/season/matchday-mvp-scoring-service";
-import { runMatchdayMvpScoring } from "@/lib/season/matchday-mvp-scoring-service";
 import { loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-lineup-local-service";
 import type { LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
 import { DEFAULT_ACTIVE_OWNER_ID, buildTeamControlSettingsMap, canLocalUserManageTeam } from "@/lib/foundation/team-control-settings";
@@ -200,14 +198,15 @@ export async function loadMatchdayArenaBase(input: {
     teamId: input.teamId,
   };
   const contextResult = loadLocalLegacyLineupContextFromGameState(save.gameState, params);
-  const scoreResult = await runMatchdayMvpScoring({
-    saveId: save.saveId,
-    seasonId: params.seasonId,
-    matchdayId: params.matchdayId,
-    source: "sqlite",
-    dryRun: true,
-    execute: false,
-  });
+
+  // Hier lief bis hierher `runMatchdayMvpScoring` als Dry-Run — bei JEDEM Arena-Aufruf,
+  // auch ohne Details. Gemessen: 18,6 von 19,3 Sekunden der gesamten Ladezeit. Der Lauf
+  // zieht ueber `prepareLegacyMatchdayResultApply` alle 32 Team-Kontexte und baut die
+  // volle Ergebnis-Vorschau — nur um ein `scoreSummary` zu liefern, das nachweislich
+  // KEIN Aufrufer liest: weder die Buehne (sie nimmt aus der Antwort ausschliesslich
+  // `resolvePreview.preview`, `briefingStandings.items` und `standingsPreview.items`)
+  // noch der Prefetch. Wer die MVP-Wertung wirklich braucht, ruft weiterhin
+  // `/api/season/matchday-mvp-score` — die Route bleibt unveraendert.
 
   let resolvePreview: LegacyMatchdayResolvePreviewPayload | null = null;
   let standingsPreview: Awaited<ReturnType<typeof buildStandingsPreview>> | null = null;
@@ -270,17 +269,23 @@ export async function loadMatchdayArenaBase(input: {
     writeStandingsPreviewCache(standingsCacheKey, cacheSignature, standingsPreview);
   }
 
+  // Der Lineup-Kontext traegt den kompletten `gameState` mit sich — gemessen 16,2 MB von
+  // 16,3 MB der gesamten Antwort. Ueber die Leitung gehoert er nicht: Die Buehne hat den
+  // Spielstand ohnehin schon (er kommt als Prop aus der Shell), und beide Aufrufer pruefen
+  // `context` nur auf Vorhandensein, ohne je hineinzuschauen. Das Feld bleibt also
+  // vorhanden und wahrheitswertig, nur ohne den Spielstand darin.
+  const { gameState: _contextGameState, ...contextWithoutGameState } = contextResult.ok
+    ? contextResult.context
+    : ({ gameState: null } as { gameState: unknown });
+
   return {
     params,
     source: "sqlite" as const,
     readOnly: !canLocalUserManageTeam(save.gameState, params.teamId, input.activeOwnerId ?? DEFAULT_ACTIVE_OWNER_ID),
-    context: contextResult.ok ? contextResult.context : null,
+    context: contextResult.ok ? contextWithoutGameState : null,
     contextWarnings: contextResult.ok ? contextResult.warnings : contextResult.warnings,
     contextErrors: contextResult.ok ? [] : contextResult.errors,
     options: buildArenaOptions(save, params),
-    scoreSummary: scoreResult,
-    scoreWarnings: scoreResult.warnings ?? [],
-    scoreBlockingReasons: scoreResult.blockingReasons ?? [],
     resolvePreview,
     standingsPreview,
     briefingStandings: buildArenaBriefingStandings(save),
