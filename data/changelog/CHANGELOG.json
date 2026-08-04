@@ -128,6 +128,15 @@
       "version": "0.4"
     },
     {
+      "datum": "2026-08-04",
+      "seite": "Team · Spieler",
+      "pr": null,
+      "text": "Der kleine Wert neben dem VK-Wert in der Spielerliste rechnete heimlich den Rest-Buyout mit ein und ließ sich aus der Zeile nicht nachvollziehen — ein Spieler mit 27,1 Mio Marktwert und 41,5 Mio Verkaufspreis zeigte „+0,38\". Jetzt steht dort der Aufschlag des Verkaufsfaktors: VK-Wert minus Marktwert, beides nebeneinander ablesbar. Buyout, Netto und der Gewinn gegenüber dem Kaufpreis stehen im Tooltip der Zelle.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
       "datum": "2026-08-03",
       "seite": "Verein · Sponsoren",
       "pr": null,

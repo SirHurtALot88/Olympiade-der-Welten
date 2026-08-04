@@ -439,7 +439,7 @@ const NL_PLAYERS_COLUMNS: ReadonlyArray<{
     // war dann nicht mehr ablesbar. Buyout und Netto stehen jetzt im Zellen-Tooltip,
     // Gewinn/Verlust im Chip daneben.
     tooltip:
-      "Verkaufspreis = Marktwert × Verkaufsfaktor (aus Leistung und Rang in der eigenen Preisklasse). Brutto — ein noch offener Rest-Buyout ist NICHT abgezogen; er steht im Tooltip der Zelle, zusammen mit dem Netto-Erlös. Darunter Gewinn/Verlust gegenüber dem gezahlten Kaufpreis. \"—\" bei Free Agents (kein Kader, kein Verkauf).",
+      "Verkaufspreis = Marktwert × Verkaufsfaktor (aus Leistung und Rang in der eigenen Preisklasse). Brutto — ein noch offener Rest-Buyout ist NICHT abgezogen; er steht im Tooltip der Zelle, zusammen mit dem Netto-Erlös und dem Gewinn gegenüber dem Kaufpreis. Der Chip daneben ist der Aufschlag des Verkaufsfaktors: VK-Wert minus Marktwert, beides in dieser Zeile ablesbar. \"—\" bei Free Agents (kein Kader, kein Verkauf).",
   },
   { id: "salary", label: "Gehalt", sortKey: "salary", align: "right" },
   { id: "contract", label: "Vertrag", sortKey: "contract", align: "right" },
@@ -1761,7 +1761,12 @@ export default function FoundationPlayersTableNewLook({
               ? `Verkaufspreis = Marktwert × Verkaufsfaktor = ${formatNlMoney(row.sellPreview.grossSalePrice)}` +
                 (row.sellPreview.buyoutCost != null && row.sellPreview.buyoutCost > 0
                   ? ` · Bei einem Verkauf JETZT geht davon noch der Rest-Buyout von ${formatNlMoney(row.sellPreview.buyoutCost)} ab → ${formatNlMoney(row.sellPreview.expectedSellValue)} netto.`
-                  : " · Kein Rest-Buyout (Vertrag läuft aus) — der Preis geht voll ins Team-Cash.")
+                  : " · Kein Rest-Buyout (Vertrag läuft aus) — der Preis geht voll ins Team-Cash.") +
+                (row.sellPreview.profitVsPurchase != null
+                  ? ` · Gegenüber dem gezahlten Kaufpreis (${formatNlMoney(row.sellPreview.purchasePrice ?? 0)}) wären das netto ${
+                      row.sellPreview.profitVsPurchase > 0 ? "+" : ""
+                    }${formatNlMoney(row.sellPreview.profitVsPurchase)}.`
+                  : "")
               : "Kein Verkaufswert — Free Agent (kein Kader) oder kein belastbarer Marktwert."
           }
         >
@@ -1772,16 +1777,38 @@ export default function FoundationPlayersTableNewLook({
                 des Spielers. Der Buyout haengt am Vertrag, nicht am Spieler; er steht jetzt im
                 Tooltip und im G/V-Chip daneben. */}
             <span className="nl-tnum">{row.sellPreview ? formatNlMoney(row.sellPreview.grossSalePrice) : "—"}</span>
-            {/* G/V statt Buyout: was ein Verkauf gegenüber dem GEZAHLTEN Kaufpreis einbringt/kostet.
-                Ohne dokumentierten Kaufpreis (Eigengewächs/Startkader ohne purchasePrice) bewusst
-                kein Chip — eine G/V-Basis aus dem Marktwert wäre erfunden. */}
-            {row.sellPreview && row.sellPreview.profitVsPurchase != null ? (
-              <NlDeltaChip
-                value={row.sellPreview.profitVsPurchase}
-                format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 2)}`}
-                title={`Gewinn/Verlust bei Verkauf zum Saisonende gegenüber gezahltem Kaufpreis (${formatNlMoney(row.sellPreview.purchasePrice)})`}
-              />
-            ) : null}
+            {/* GEMELDET: „VK wert + wird hier falsch angezeigt, angeblich nur geringes plus obwohl
+                der Wert change eigentlich >12 mio oder so sein sollte."
+
+                Der Chip stand neben dem BRUTTO-Preis, rechnete aber Netto minus Kaufpreis — also
+                mit dem Rest-Buyout drin, der nirgends in der Zeile steht. Am Spielstand gemessen:
+                Brutto 92,8 / Chip −28,32, und die 28,32 waren exakt der Buyout. Zwei Spieler mit
+                demselben Wertzuwachs bekamen damit voellig verschiedene Chips, nur weil der eine
+                laenger unter Vertrag stand. Herleiten liess sich die Zahl aus der Zeile nie.
+
+                Jetzt steht dort, was die Spalte ueberhaupt aussagt: der Aufschlag des
+                Verkaufsfaktors, also VK-Wert minus Marktwert — beide Zahlen stehen nebeneinander
+                in der Tabelle, die Rechnung geht auf dem Bildschirm auf. Buyout, Netto und der
+                Gewinn gegenueber dem Kaufpreis stehen weiter im Tooltip der Zelle. */}
+            {(() => {
+              if (!row.sellPreview || marketValue == null || !Number.isFinite(marketValue)) {
+                return null;
+              }
+              const aufschlag = row.sellPreview.grossSalePrice - marketValue;
+              // Wie die MW-Spalte nebenan: kein Chip bei 0. Ein Faktor von 1,0 ist daran zu
+              // erkennen, dass beide Betraege gleich sind — ein „±0,00" in jeder Zeile waere
+              // nur Rauschen.
+              if (Math.abs(aufschlag) < 0.005) {
+                return null;
+              }
+              return (
+                <NlDeltaChip
+                  value={aufschlag}
+                  format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 2)}`}
+                  title={`Aufschlag des Verkaufsfaktors: ${formatNlMoney(row.sellPreview.grossSalePrice)} Verkaufspreis − ${formatNlMoney(marketValue)} Marktwert`}
+                />
+              );
+            })()}
           </span>
         </td>
         ) : null}
