@@ -1,9 +1,10 @@
-import { getActiveRoomBySaveId, getRoom } from "@/lib/room/room-store";
+import { getActiveRoomBySaveId, getRoom, healParticipantPresenceByToken } from "@/lib/room/room-store";
 import { findSeatByToken } from "@/lib/room/rejoin";
 import { authorizeTeamWrite, type TeamWriteAction } from "@/lib/room/online-room-model";
 import { DEFAULT_ACTIVE_OWNER_ID, canLocalUserManageTeam } from "@/lib/foundation/team-control-settings";
 import { canFoundationLocalUserManageTeam } from "@/lib/foundation/foundation-admin-dev-flags";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { broadcastRoomGameplayUpdate } from "@/lib/socket/room-gameplay-broadcast";
 import type { RoomParticipant, TeamControllerType, TeamOwnershipRecord } from "@/types/game";
 import type { RuntimeRoom } from "@/types/room";
 
@@ -182,7 +183,7 @@ export function authorizeServerRoomWrite(input: ServerRoomWriteContext): ServerR
     };
   }
 
-  const participant = resolveParticipant(room, input);
+  let participant = resolveParticipant(room, input);
   if (!participant) {
     return { allowed: false, status: 401, reason: "participant_missing", warnings };
   }
@@ -190,7 +191,29 @@ export function authorizeServerRoomWrite(input: ServerRoomWriteContext): ServerR
     return { allowed: false, status: 403, reason: "user_participant_mismatch", warnings };
   }
   if (participant.connectionStatus === "offline") {
-    return { allowed: false, status: 403, reason: "participant_offline", warnings };
+    // Der Ping-Heartbeat verpasst den Teilnehmer regelmaessig, waehrend eine schwere Route
+    // (Liga-Draft, Spieltagsaufloesung, grosse Kauf-Batches) die Event-Loop synchron blockiert —
+    // `markDisconnected` markiert ihn dann offline, obwohl der Client nie weg war (siehe Koop-
+    // Audit `scripts/audit-koop-spielbarkeit.ts`). Ein Schreibvorgang mit GUELTIGEM Sitzplatz-
+    // Token traegt dasselbe Geheimnis, das `rejoinRoom` akzeptiert, um diesen Teilnehmer wieder
+    // online zu setzen — er darf also heilen statt hart abzulehnen. Die Sicherheitsgrenze bleibt:
+    // heilt nur, wenn der Token zum SELBEN Teilnehmer gehoert, der hier schreiben will (siehe
+    // Kommentar an `healParticipantPresenceByToken`) — ein fremder/veralteter Token faellt weiter
+    // auf den 403 unten durch.
+    const healedRoom = input.seatToken
+      ? healParticipantPresenceByToken(room, input.seatToken, participant.participantId)
+      : null;
+    if (!healedRoom) {
+      return { allowed: false, status: 403, reason: "participant_offline", warnings };
+    }
+    participant = healedRoom.state.roomParticipants.find(
+      (entry) => entry.participantId === participant!.participantId,
+    )!;
+    warnings.push("source:offline_presence_healed_by_valid_seat_token");
+    // Sofort broadcasten statt auf den naechsten Schreibvorgang zu warten: sonst wartet der
+    // Mitspieler in der UI weiter auf jemanden, der laengst wieder da ist (siehe Kommentar an
+    // `markDisconnected` — gleiches Muster, gleicher Unfall ohne den Broadcast).
+    broadcastRoomGameplayUpdate(healedRoom);
   }
 
   if (input.expectedConfirmToken != null && input.dryRun === false && input.confirmToken !== input.expectedConfirmToken) {
