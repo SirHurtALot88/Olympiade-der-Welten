@@ -2,6 +2,15 @@
   "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
+      "datum": "2026-08-04",
+      "seite": "Multiplayer · Raum",
+      "pr": null,
+      "text": "Der gemeinsame Spielablauf lief bisher genau einen Spieltag lang und endete danach im Season Review — eine Season zu zweit war damit nicht spielbar. Nach dem Saisonstand geht es jetzt zurück zur Einsatzliste, solange die Saison noch einen Spieltag hergibt; erst nach dem letzten folgt das Season Review. Der Weiter-Knopf sagt jetzt auch, wohin er führt.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
       "datum": "2026-08-03",
       "seite": "Verein · Sponsoren",
       "pr": null,
