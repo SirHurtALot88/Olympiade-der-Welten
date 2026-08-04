@@ -12,7 +12,13 @@ import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import ContractRenewalNegotiationModal from "@/app/foundation/teams-v2/ContractRenewalNegotiationModal";
 import { formatNlMoney } from "@/components/foundation/new-look/nl-format";
 import { NlCard, StatChip, NlCountUpValue, nlToneClass, formatNlNumber, type NlTone } from "@/components/foundation/new-look";
-import type { CSSProperties } from "react";
+import { useEffect, useMemo, type CSSProperties } from "react";
+import {
+  buildTeamShellThemeVars,
+  buildTeamVoidVars,
+  TEAM_VOID_VAR_PRIMARY,
+  TEAM_VOID_VAR_SECONDARY,
+} from "@/lib/foundation/team-shell-theme";
 import { getTeamAnnualLoanInstallment, getTeamOutstandingDebt } from "@/lib/finance/loan-service";
 import { useViewWidth } from "@/lib/ui/view-width-preference";
 import { groupGameEncyclopediaEntriesByCategory } from "@/lib/ui/game-encyclopedia";
@@ -916,6 +922,31 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
     </div>
   ) : null;
 
+  // Team-Shell-Theme: die Akzent-Tokens der ganzen Shell folgen dem aktiven
+  // Manager-Team (Primär-/Sekundärfarbe aus team-colors.ts). Ohne gewähltes
+  // Team ("Alle 32 Teams anzeigen") bleibt der Standard-Look — vars ist dann
+  // null und <main> bekommt weder style noch data-team-theme.
+  const teamThemeCode = selectedTeam?.shortCode ?? null;
+  const teamShellThemeVars = useMemo(() => buildTeamShellThemeVars(teamThemeCode), [teamThemeCode]);
+  useEffect(() => {
+    // Der Body-Void (Fläche neben dem Shell auf breiten Monitoren) liegt
+    // außerhalb von <main> — die body:has()-Regel in globals.css liest diese
+    // beiden Variablen mit neutralem Rückfall.
+    const voidVars = buildTeamVoidVars(teamThemeCode);
+    const body = document.body;
+    if (voidVars) {
+      body.style.setProperty(TEAM_VOID_VAR_PRIMARY, voidVars.primary);
+      body.style.setProperty(TEAM_VOID_VAR_SECONDARY, voidVars.secondary);
+    } else {
+      body.style.removeProperty(TEAM_VOID_VAR_PRIMARY);
+      body.style.removeProperty(TEAM_VOID_VAR_SECONDARY);
+    }
+    return () => {
+      body.style.removeProperty(TEAM_VOID_VAR_PRIMARY);
+      body.style.removeProperty(TEAM_VOID_VAR_SECONDARY);
+    };
+  }, [teamThemeCode]);
+
   // #82 — echte Zähler-Badges (nur Neuer Look, nur reale Zahlen).
   const inboxAllBadgeCount =
     Array.isArray(activeTeamOpenInboxItems) && activeTeamOpenInboxItems.length > 0
@@ -927,7 +958,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   return (
     (
     <FoundationSharedProvider>
-    <main className="app-shell foundation-shell foundation-app is-new-look" data-view-width={viewWidthMode}>
+    <main
+      className="app-shell foundation-shell foundation-app is-new-look"
+      data-view-width={viewWidthMode}
+      data-team-theme={teamShellThemeVars ? teamThemeCode ?? undefined : undefined}
+      style={teamShellThemeVars ? (teamShellThemeVars as CSSProperties) : undefined}
+    >
       {bootstrapError && gameState?.season?.id === "loading" ? (
         <div className="foundation-persistence-banner transfer-callout is-warning" role="status">
           <strong>{bootstrapError}</strong>

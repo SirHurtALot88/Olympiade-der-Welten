@@ -138,6 +138,15 @@
     },
     {
       "datum": "2026-08-04",
+      "seite": "Alle Seiten",
+      "pr": "#402",
+      "text": "Die ganze Oberfläche trägt jetzt die Farben des aktiven Teams: Navigationsleiste, aktiver Eintrag, Kartenrahmen, Überschriften, Buttons und Fokusringe folgen der Vereinsfarbe. Bei zweifarbigen Marken führt die Farbe, an der man das Team erkennt — bei Last Ride also das Rot, während das Schwarz die Flächen trägt. Bedeutungs-Farben (gut/schlecht, POW/SPE/MEN/SOC, Heat, Medaillen) bleiben unverändert.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
       "seite": "Multiplayer · Raum",
       "pr": null,
       "text": "Der gemeinsame Spielablauf lief bisher genau einen Spieltag lang und endete danach im Season Review — eine Season zu zweit war damit nicht spielbar. Nach dem Saisonstand geht es jetzt zurück zur Einsatzliste, solange die Saison noch einen Spieltag hergibt; erst nach dem letzten folgt das Season Review. Der Weiter-Knopf sagt jetzt auch, wohin er führt.",
