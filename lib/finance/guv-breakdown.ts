@@ -93,17 +93,17 @@ export function buildGuvBreakdown(input: GuvBreakdownInput): GuvBreakdown {
     lines.push({ label: "Transfers (eigene Spalte, nicht enthalten)", value: input.transferNet, counted: false });
   }
 
-  const counted = lines.filter((line) => line.counted);
+  // KOMPAKT STATT VOLLSTAENDIG: die Rechnung passt in eine Zeile, weil sie nur drei Terme hat —
+  // sie als Aufzaehlung zu setzen machte aus einer Formel einen Absatz. Was der Hover leisten muss,
+  // ist "woraus besteht die Zahl" und "warum weicht der Finanzen-Reiter ab"; alles andere sind
+  // Saetze, die man beim zweiten Hover ueberspringt.
+  const rechnung = `Sponsor ${formatSigned(sponsor)} · Gebäude ${formatSigned(facilityNet)} · Gehälter ${formatSigned(salary != null ? -salary : null)}`;
   const hoverText = [
-    "GuV im Saisonstand = Sponsor + Gebäude netto − Gehälter.",
-    ...counted.map((line) => `${line.label}: ${formatSigned(line.value)}`),
-    `Ergibt: ${formatSigned(total)}`,
+    `GuV = ${rechnung} → ${formatSigned(total)}`,
+    "Sponsor beim aktuellen Rang.",
     "",
-    "Nicht enthalten:",
-    "· Transfers — stehen in der Spalte daneben. Im Finanzen-Reiter laufen sie als eigener Sonderposten.",
-    "· Apron — wird erst zum Saisonende abgerechnet und geht dann direkt aufs Cash.",
-    "",
-    "Der Finanzen-Reiter rechnet breiter (auch Vorstandsprämien, Kredite, Unterhalt) und kommt deshalb auf eine andere Zahl. Beide sind richtig, sie beantworten verschiedene Fragen.",
+    `Ohne Transfers (eigene Spalte${isNumber(input.transferNet) ? `, ${formatSigned(input.transferNet)}` : ""}) und ohne Apron — der wird erst zum Saisonende abgerechnet und geht direkt aufs Cash.`,
+    "Der Finanzen-Reiter rechnet breiter (Prämien, Kredite, Unterhalt) und kommt auf eine andere Zahl. Beide stimmen.",
   ].join("\n");
 
   return { total, lines, hoverText };
@@ -121,17 +121,9 @@ export function buildOperatingGuvHoverText(input: {
   const expenses = isNumber(input.totalExpenses) ? input.totalExpenses : null;
   const total = income != null && expenses != null ? Number((income - expenses).toFixed(2)) : null;
   return [
-    "GuV im Finanzen-Reiter = laufende Einnahmen − laufende Ausgaben.",
-    `Einnahmen: ${formatSigned(income)}`,
-    `Ausgaben: ${formatSigned(expenses != null ? -expenses : null)}`,
-    `Ergibt: ${formatSigned(total)}`,
+    `GuV = Einnahmen ${formatSigned(income)} · Ausgaben ${formatSigned(expenses != null ? -expenses : null)} → ${formatSigned(total)}`,
     "",
-    "Nicht enthalten:",
-    ...(isNumber(input.transferNet)
-      ? [`· Transfers (${formatSigned(input.transferNet)}) — Einmal-Ereignis, steht im eigenen Sonderposten-Block.`]
-      : ["· Transfers — Einmal-Ereignis, stehen im eigenen Sonderposten-Block."]),
-    "· Apron — wird erst zum Saisonende abgerechnet und geht dann direkt aufs Cash.",
-    "",
-    "Der Saisonstand rechnet schmaler (nur Sponsor + Gebäude netto − Gehälter) und kommt deshalb auf eine andere Zahl. Beide sind richtig, sie beantworten verschiedene Fragen.",
+    `Ohne Transfers (eigener Sonderposten${isNumber(input.transferNet) ? `, ${formatSigned(input.transferNet)}` : ""}) und ohne Apron — der wird erst zum Saisonende abgerechnet und geht direkt aufs Cash.`,
+    "Der Saisonstand rechnet schmaler (nur Sponsor + Gebäude − Gehälter) und kommt auf eine andere Zahl. Beide stimmen.",
   ].join("\n");
 }
