@@ -7,6 +7,7 @@ const lobbyPath = path.join(process.cwd(), "app/HomePageClient.tsx");
 const roomPagePath = path.join(process.cwd(), "app/room/[roomCode]/RoomPageClient.tsx");
 const modelPath = path.join(process.cwd(), "lib/room/online-room-model.ts");
 const flowPath = path.join(process.cwd(), "lib/room/room-flow-controller.ts");
+const flowSocketActionsPath = path.join(process.cwd(), "lib/room/room-flow-socket-actions.ts");
 const arenaSyncPath = path.join(process.cwd(), "lib/room/arena-sync-state.ts");
 
 describe("online multiplayer room UI contract", () => {
@@ -33,7 +34,10 @@ describe("online multiplayer room UI contract", () => {
     expect(roomText).toContain("state.teamOwnership");
     expect(roomText).toContain("setReadyState");
     expect(roomText).toContain("applyRoomPreset");
-    expect(roomText).toContain("startRoom");
+    // "startRoom" ist als literales Socket-Event aus der Room-Seite in den geteilten Emitter
+    // gewandert (`emitRoomFlowButtonAction` in `lib/room/room-flow-socket-actions.ts`) — hier
+    // reicht der Nachweis, dass der Host-Knopf ueber die typisierte Aktion darauf zeigt.
+    expect(roomText).toContain("emitRoomFlowButtonAction");
     expect(roomText).toContain("chris_4_franky_4_rest_ai");
     // The primary CTA into the game reuses the existing foundation-room-context href.
     expect(roomText).toContain("foundationHref");
@@ -48,11 +52,20 @@ describe("online multiplayer room UI contract", () => {
   it("renders a multiplayer-ready room flow controller with AI and participant gates", async () => {
     const roomText = await fs.readFile(roomPagePath, "utf8");
     const flowText = await fs.readFile(flowPath, "utf8");
+    const flowSocketActionsText = await fs.readFile(flowSocketActionsPath, "utf8");
 
     expect(roomText).toContain("room-flow-controller");
     expect(roomText).toContain("describeRoomFlowButton");
-    expect(roomText).toContain("runRoomAiAutoStep");
-    expect(roomText).toContain("advanceRoomFlow");
+    // Welches Socket-Event ein Klick sendet, entscheidet jetzt `roomFlowButton.action` ueber
+    // den geteilten Emitter (`emitRoomFlowButtonAction`) statt eines Label-Vergleichs in der
+    // Room-Seite selbst — siehe `lib/room/room-flow-socket-actions.ts`.
+    expect(roomText).toContain("roomFlowButton.action");
+    expect(roomText).toContain("emitRoomFlowButtonAction");
+    expect(roomText).not.toContain('roomFlowButton.label === "AI Teams vorbereiten"');
+    expect(flowSocketActionsText).toContain("runRoomAiAutoStep");
+    expect(flowSocketActionsText).toContain("advanceRoomFlow");
+    expect(flowSocketActionsText).toContain("startRoom");
+    expect(flowSocketActionsText).toContain("setReadyState");
     expect(flowText).toContain("Warten auf");
     expect(flowText).toContain("AI Teams vorbereiten");
     expect(flowText).toContain("host_only");

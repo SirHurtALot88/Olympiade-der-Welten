@@ -162,6 +162,10 @@ describe("Room-Flow: Spieltag-Zyklus", () => {
     };
     const zustand = (seasonContinues: boolean | null) =>
       ({
+        // `describeRoomFlowButton` liest fuer die "start_room"/"advance_flow"-Weiche jetzt
+        // `multiplayerRoom.status` (statt dass der Aufrufer das selbst entscheidet) — dieses
+        // Minimal-Fixture braucht das Feld deshalb, sonst crasht der Zugriff.
+        multiplayerRoom: { status: "season_active" },
         roomParticipants: [chris],
         teamOwnership: [],
         roomFlowState: { ...basis, seasonContinues },
@@ -171,6 +175,8 @@ describe("Room-Flow: Spieltag-Zyklus", () => {
     expect(describeRoomFlowButton({ state: zustand(false), participantId: "p-chris" }).label).toBe("Weiter: Season Review");
     // Unbekannt heisst: nichts erfinden, alter Text.
     expect(describeRoomFlowButton({ state: zustand(null), participantId: "p-chris" }).label).toBe("Saisonstand ansehen");
+    // Und die Aktion bleibt konsistent "advance_flow" (kein Lobby-Status hier).
+    expect(describeRoomFlowButton({ state: zustand(true), participantId: "p-chris" }).action).toBe("advance_flow");
   });
 
   it("haelt den Host-Vorbehalt und das Ready-Gate auch im Zyklus", () => {
