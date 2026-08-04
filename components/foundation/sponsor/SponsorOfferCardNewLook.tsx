@@ -29,6 +29,7 @@ import {
   estimateExpectedPayout,
 } from "@/lib/sponsor/sponsor-economy-calibration";
 import { SponsorRankLadder } from "@/components/foundation/sponsor/SponsorRankLadder";
+import { SponsorSeasonRankTable } from "@/components/foundation/sponsor/SponsorSeasonRankTable";
 import { describeSponsorOfferModules } from "@/lib/sponsor/sponsor-modules";
 import { NlDeltaChip, type NlTone } from "@/components/foundation/new-look";
 
@@ -242,6 +243,10 @@ export function SponsorOfferCardNewLook({
   const standardComponents = offer.components.filter(
     (component) => component.kind !== "special" && component.kind !== "overperformance",
   );
+  // Zweite Doppelung im Mittelteil: die BASIS-Kachel zeigt unter V3 exakt den Betrag, der zwei
+  // Bloecke weiter oben schon als „Garantiert auf jedem Platz" steht. Sie faellt nur weg, wenn die
+  // Zahlen wirklich gleich sind — weichen sie ab, sagt die Kachel etwas Eigenes und bleibt.
+  const v3Floor = presentation.v3?.guaranteedFloor ?? null;
   const baseCash = offer.components.find((component) => component.kind === "base")?.rewardCash ?? 0;
   // Audit #4: gelockte curveShape-Rang-Leiter (== Settlement) einmal bauen und in die Gewinnstufen-Leiter
   // reichen, damit die angezeigten Stufenbeträge der echten Auszahlung entsprechen.
@@ -331,24 +336,62 @@ export function SponsorOfferCardNewLook({
 
       {termSeasons > 1 ? (
         <div className="nl-sponsor-term-outlook" data-testid="sponsor-term-outlook">
-          <p className="nl-sponsor-term-condition">
-            Der Betrag richtet sich weiterhin nach der Konjunktur der jeweiligen Saison: der Sockel steht
-            mit dem Startrang bei Unterschrift fest, der Wertungsanteil schwankt jede Saison neu mit dem
-            Salary Factor.
-          </p>
           {termForecast.length > 0 ? (
             <ul className="nl-sponsor-term-outlook-list" aria-label="Ausblick über die Vertragslaufzeit">
-              {termForecast.map((entry) => (
-                <li key={entry.seasonYear} className="nl-sponsor-term-outlook-row">
-                  <span>
-                    Saison {entry.seasonYear}/{termSeasons}
-                    <em> (Faktor {entry.salaryFactor.toFixed(2)})</em>
-                  </span>
-                  <strong className="nl-tnum">{formatCash(entry.payoutAtCurrentRank)}</strong>
-                </li>
-              ))}
+              {termForecast.map((entry, index) => {
+                const vorjahr = index > 0 ? termForecast[index - 1] : null;
+                const delta = vorjahr ? entry.payoutAtCurrentRank - vorjahr.payoutAtCurrentRank : null;
+                return (
+                  <li key={entry.seasonYear} className="nl-sponsor-term-outlook-row">
+                    {/* Aufklappbar statt nur Hover: eine reine Hover-Tabelle waere per Tastatur und
+                        auf dem Touchpad nicht erreichbar. Geoeffnet zeigt sie, was jeder Rang IN
+                        DIESER Vertragssaison bringt — der Unterschied zwischen den Jahren ist genau
+                        das, was die Zeile sonst nur als eine Zahl andeutet. */}
+                    <details className="nl-sponsor-term-season">
+                      <summary className="nl-sponsor-term-season-summary">
+                        <span className="nl-sponsor-term-season-label">
+                          Saison {entry.seasonYear}/{termSeasons}
+                        </span>
+                        <span className="nl-sponsor-term-season-numbers">
+                          {delta != null && Math.abs(delta) >= 0.05 ? (
+                            <em className="nl-tnum" data-direction={delta > 0 ? "up" : "down"}>
+                              {delta > 0 ? "+" : "−"}
+                              {formatCash(Math.abs(delta))}
+                            </em>
+                          ) : null}
+                          <strong className="nl-tnum">{formatCash(entry.payoutAtCurrentRank)}</strong>
+                        </span>
+                      </summary>
+                      <div className="nl-sponsor-term-season-detail">
+                        <p className="nl-sponsor-term-season-factor">
+                          {entry.factorSource === "vorausgewuerfelt" ? (
+                            <>
+                              Salary Factor dieser Saison <strong className="nl-tnum">{entry.salaryFactor.toFixed(2)}</strong>{" "}
+                              — steht bereits fest.
+                            </>
+                          ) : (
+                            <>
+                              Für diese Saison ist der Salary Factor noch nicht gewürfelt. Gerechnet mit dem
+                              Faktor bei Unterschrift (<strong className="nl-tnum">{entry.salaryFactor.toFixed(2)}</strong>).
+                            </>
+                          )}
+                        </p>
+                        <SponsorSeasonRankTable
+                          rankPayouts={entry.rankPayouts}
+                          currentTeamRank={currentTeamRank}
+                          formatCash={formatCash}
+                        />
+                      </div>
+                    </details>
+                  </li>
+                );
+              })}
             </ul>
           ) : null}
+          <p className="nl-sponsor-term-condition">
+            Sockel steht mit dem Startrang bei Unterschrift fest, der Wertungsanteil schwankt jede Saison
+            neu mit dem Salary Factor.
+          </p>
         </div>
       ) : null}
 
@@ -451,6 +494,14 @@ export function SponsorOfferCardNewLook({
 
       <div className="nl-sponsor-reward-tiles" aria-label="Vertragskomponenten">
         {standardComponents.map((component) => {
+          if (
+            component.kind === "base" &&
+            v3Floor != null &&
+            typeof component.rewardCash === "number" &&
+            Math.abs(component.rewardCash - v3Floor) < 0.05
+          ) {
+            return null;
+          }
           if (component.kind === "rank") {
             return (
               <div key={component.componentId} className="nl-sponsor-reward-tile is-rank">
@@ -462,12 +513,33 @@ export function SponsorOfferCardNewLook({
                     <small className="nl-sponsor-rank-current-hint">Aktuell #{currentTeamRank}</small>
                   ) : null}
                 </div>
-                <SponsorRankLadder
-                  baseCash={baseCash}
-                  rankLadder={offerRankPayoutLadder}
-                  currentTeamRank={currentTeamRank}
-                  formatCash={formatCash}
-                />
+                {/* GEMELDET: „dann steht im mittleren bereich sehr viel ohne dass es wirklich mehr
+                    aussagt als das drumherum … Ich brauche nicht noch mal sehen was man als meister
+                    oder als letzter bekommt das sieht man ja!"
+
+                    Er hatte recht: die Dauer-Leiter wiederholte ihre beiden Endpunkte woertlich aus
+                    dem Block darueber — „Meister" == „Bei Titelgewinn", „Platz 32" == „Garantiert auf
+                    jedem Platz" — und dazwischen lagen acht Zwischenschritte derselben Kurve. Unter V3
+                    steht die Leiter deshalb nur noch auf Abruf; ohne V3-Block (Altangebote) bleibt sie
+                    sichtbar, denn dort ist sie die einzige Quelle fuer die beiden Endpunkte. */}
+                {presentation.v3 ? (
+                  <details className="nl-sponsor-rank-ladder-disclosure" data-testid="sponsor-rank-ladder-disclosure">
+                    <summary>Alle Gewinnstufen</summary>
+                    <SponsorRankLadder
+                      baseCash={baseCash}
+                      rankLadder={offerRankPayoutLadder}
+                      currentTeamRank={currentTeamRank}
+                      formatCash={formatCash}
+                    />
+                  </details>
+                ) : (
+                  <SponsorRankLadder
+                    baseCash={baseCash}
+                    rankLadder={offerRankPayoutLadder}
+                    currentTeamRank={currentTeamRank}
+                    formatCash={formatCash}
+                  />
+                )}
                 {/* P3 — Überperformance-Modul (familien-differenziert) als konkrete, bezifferte Zeile unter der
                     Rang-Leiter: Rate je Platz über dem Erwartungsrang + Cap, exakt die beim Signieren
                     eingefrorenen Werte (Anzeige == Settlement). Sponsoren OHNE das Modul (Sicherheits-Familie
