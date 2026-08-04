@@ -102,6 +102,15 @@
     },
     {
       "datum": "2026-08-04",
+      "seite": "Welt · Spielplan",
+      "pr": null,
+      "text": "Im Spielplan gingen die Spieltage ineinander ueber — zehn fast gleich aussehende Kacheln mit duennem Rahmen. Jeder Spieltag hat jetzt einen eigenen Kopfbalken, und der laufende ist blau hervorgehoben, sodass man beim Scrollen sofort sieht, wo man steht.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
       "seite": "Welt · Sponsoren",
       "pr": null,
       "text": "Bei mehrjährigen Verträgen stand hinter jeder Saison „Faktor 1.00\" — das war nicht der Faktor, sondern ein Ersatzwert, weil die Salary-Factor-Vorausschau in Saison 1 noch leer ist. Die Karte sagt jetzt, ob der Faktor für diese Saison schon feststeht oder nur fortgeschrieben wurde.",
@@ -125,6 +134,15 @@
       "text": "Der Mittelteil der Angebotskarte wiederholt sich nicht mehr: die volle Gewinnstufen-Leiter steht nur noch auf Abruf, und die Basis-Kachel verschwindet, wenn sie denselben Betrag zeigt wie „Garantiert auf jedem Platz\" darüber.",
       "quelle": "gepflegt",
       "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
+      "seite": "Team · Aufstellung",
+      "pr": null,
+      "text": "Bis zu einer Fatigue von 25 ist das Verletzungsrisiko jetzt exakt 0 % — vorher konnte sich auch ein ausgeruhter Spieler verletzen, und die Anzeige sagte dabei „kein Risiko\", obwohl real bis zu 4,8 % anlagen. Ab Fatigue 50 bleibt die Kurve unverändert: wer seine Spieler verheizt, trägt dasselbe Risiko wie bisher.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
       "version": "0.4"
     },
     {

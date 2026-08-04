@@ -73940,13 +73940,33 @@ button.is-new-look .nl-thist-season-pill,
   box-shadow: var(--nl-e1), 0 0 0 1px color-mix(in srgb, var(--nl-accent) 45%, transparent);
 }
 
+/* Ein Kopfbalken je Spieltag statt einer blossen Textzeile. Im Raster standen
+   die Karten vorher nur mit duennem Rahmen nebeneinander und verschwammen beim
+   Ueberfliegen — man sah nicht, wo ein Spieltag aufhoert und der naechste anfaengt.
+   Der Balken zieht ueber die volle Kartenbreite (negative Innenabstaende) und
+   traegt eine Trennlinie nach unten. */
 .is-new-look .nl-diszis-md-card-head {
   display: flex;
   align-items: baseline;
   gap: 6px;
-  font-size: 13px;
+  margin: calc(var(--nl-s3, 12px) * -1) calc(var(--nl-s3, 12px) * -1) 0;
+  padding: var(--nl-s2, 8px) var(--nl-s3, 12px);
+  border-bottom: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md) var(--nl-r-md) 0 0;
+  background: var(--nl-panel-2);
+  font-family: var(--nl-display);
+  font-size: 14px;
+  font-weight: 600;
   color: var(--nl-ink);
 }
+
+/* Der laufende Spieltag bekommt den Balken in der Akzentfarbe — beim Scrollen
+   findet man damit sofort die Stelle, an der man gerade steht. */
+.is-new-look .nl-diszis-md-card.is-current .nl-diszis-md-card-head {
+  background: color-mix(in srgb, var(--nl-accent) 18%, var(--nl-panel-2));
+  border-bottom-color: color-mix(in srgb, var(--nl-accent) 45%, var(--nl-line));
+}
+
 
 .is-new-look .nl-diszis-md-current-tag {
   color: var(--nl-accent);
