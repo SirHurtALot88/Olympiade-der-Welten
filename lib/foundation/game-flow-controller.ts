@@ -19,6 +19,7 @@ import { getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { hasPersistedTeamCaptain } from "@/lib/morale/team-captain-service";
 import { isTeamTrainingComplete } from "@/lib/foundation/team-training-status";
+import { isMatchdayResultFullyCommitted } from "@/lib/season/season-discipline-schedule";
 
 export type GameFlowPhase =
   | "preseason"
@@ -573,6 +574,17 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
   // Reuses hasFormCardPool as the completion signal (see form-card-flow.ts).
   const transfersFinalized = activeTeamTransfersFinalized(gameState, activeTeamId);
   const hasResults = hasCurrentMatchdayResult(gameState) || gameState.matchdayState.status === "resolved";
+  // Fuer den Spieltagswechsel reicht "irgendein Ergebnis existiert" NICHT: die Arena bucht
+  // D1 und D2 einzeln (commitThroughSide), ein D1-Teil-Commit legt aber schon eine
+  // `matchdayResults`-Zeile an. `hasResults` allein wuerde "Zum naechsten Spieltag" also
+  // schon nach D1 freigeben -- und D2 laesst sich nach dem Wechsel nicht mehr nachholen. Jeder
+  // Spieler, der in D2 stand, fehlt dann dauerhaft in diesem Spieltag (sichtbar als zu
+  // niedriger `appearances`-Wert in Moral/Forderungen). Nur DIESER Schritt braucht die
+  // strengere Pruefung; die anderen "es gibt etwas zu sehen"-Schritte (Arena/Reveal/Ergebnis)
+  // duerfen nach D1 weiter "fertig" wirken.
+  const hasFullMatchdayResult =
+    gameState.matchdayState.status === "resolved" ||
+    isMatchdayResultFullyCommitted(gameState, gameState.matchdayState.matchdayId);
   const formCardsRequired = hasLineup && !hasResults;
   const arenaPreparationReady = hasLineup;
   const matchdayArenaReady = arenaPreparationReady && lineupConfirmed;
@@ -851,10 +863,10 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       stepId: "advance_to_next_matchday",
       label: isFinalMatchday ? "Saison abschließen" : "Zum nächsten Spieltag",
       cta: isFinalMatchday ? "Weiter: Zur Saison-Auswertung" : "Weiter: Matchday fortsetzen",
-      status: hasResults ? (boardSignals.blockers.length > 0 ? "warning" : "ready") : "blocked",
+      status: hasFullMatchdayResult ? (boardSignals.blockers.length > 0 ? "warning" : "ready") : "blocked",
       targetView: "cockpit",
       teamId: activeTeamId,
-      blockers: hasResults ? [] : ["missing_results"],
+      blockers: hasFullMatchdayResult ? [] : !hasResults ? ["missing_results"] : ["result_incomplete_missing_d2"],
       warnings: boardFlowWarnings,
     }),
   ];

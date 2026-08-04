@@ -300,4 +300,96 @@ describe("matchday progress service", () => {
       expect(save.gameState.season.currentMatchday).toBe(2);
     });
   });
+
+  // Reproduces the reported "appearances counter too low" bug: the Arena books D1 and D2
+  // separately (legacy-matchday-result-apply-service.ts `commitThroughSide`). A D1-only
+  // partial commit already writes a `matchdayResults` row, and BEFORE this fix that alone
+  // satisfied `resultApplied` -- the matchday could be advanced without D2 ever landing.
+  // Once advanced, D2 is not reachable from the normal flow anymore: every player who was
+  // scheduled for D2 that matchday permanently loses their `playerDisciplinePerformances`
+  // entry for it, which is exactly what `buildPlayerSeasonPerformance` (player-season-
+  // performance.ts) sums into `appearances` -- so the counter reads too low forever, with no
+  // player-identity mismatch anywhere involved.
+  describe("regression: advancing must not skip an un-booked D2 half", () => {
+    function withTwoSidedSchedule(save: PersistedSaveGame) {
+      save.gameState.seasonState.disciplineSchedule = [
+        {
+          seasonId: "season-1",
+          matchdayId: "matchday-1",
+          matchdayIndex: 1,
+          matchdayLabel: "Spieltag 1",
+          discipline1: { disciplineId: "climb", displayName: "Klettern", order: 1, playerCount: 3, category: "power" },
+          discipline2: { disciplineId: "sprint", displayName: "Sprint", order: 2, playerCount: 3, category: "speed" },
+          sourceStatus: "season_seeded",
+          sourceNote: null,
+        },
+      ] as never;
+    }
+
+    function d1DisciplineResult(): NonNullable<GameState["seasonState"]["disciplineResults"]>[number] {
+      return {
+        id: "discipline-result-1-d1",
+        matchdayResultId: "result-1",
+        teamId: "A-A",
+        disciplineId: "climb",
+        disciplineSide: "d1",
+        rank: 1,
+        baseScore: 10,
+        totalScore: 10,
+        readinessStatus: "ready",
+        warnings: [],
+        createdAt: "2026-06-04T00:00:00.000Z",
+      } as never;
+    }
+
+    function d2DisciplineResult(): NonNullable<GameState["seasonState"]["disciplineResults"]>[number] {
+      return {
+        id: "discipline-result-1-d2",
+        matchdayResultId: "result-1",
+        teamId: "A-A",
+        disciplineId: "sprint",
+        disciplineSide: "d2",
+        rank: 1,
+        baseScore: 10,
+        totalScore: 10,
+        readinessStatus: "ready",
+        warnings: [],
+        createdAt: "2026-06-04T00:00:00.000Z",
+      } as never;
+    }
+
+    it("blocks the advance when only D1 was booked for a two-sided matchday", async () => {
+      const { save, persistence } = createPersistenceMock();
+      withTwoSidedSchedule(save);
+      save.gameState.seasonState.disciplineResults = [d1DisciplineResult()];
+
+      const result = await executeMatchdayAdvance(
+        { saveId: "save-local", seasonId: "season-1", execute: true, confirm: ADVANCE_MATCHDAY_CONFIRM_TOKEN },
+        persistence as never,
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.applied).toBe(false);
+      expect(result.blockingReasons).toContain("result_apply_incomplete_missing_d2_for_current_matchday");
+      // Nothing was written -- the matchday must still be matchday-1 afterwards.
+      expect(save.gameState.matchdayState.matchdayId).toBe("matchday-1");
+      expect(save.gameState.season.currentMatchday).toBe(1);
+    });
+
+    it("allows the advance once both D1 and D2 are booked for a two-sided matchday", async () => {
+      const { save, persistence } = createPersistenceMock();
+      withTwoSidedSchedule(save);
+      save.gameState.seasonState.disciplineResults = [d1DisciplineResult(), d2DisciplineResult()];
+
+      const result = await executeMatchdayAdvance(
+        { saveId: "save-local", seasonId: "season-1", execute: true, confirm: ADVANCE_MATCHDAY_CONFIRM_TOKEN },
+        persistence as never,
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.applied).toBe(true);
+      expect(save.gameState.matchdayState.matchdayId).toBe("matchday-2");
+      expect(save.gameState.season.currentMatchday).toBe(2);
+    });
+  });
 });

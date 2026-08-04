@@ -30,7 +30,12 @@ import {
 } from "@/lib/market/contract-negotiation-preview";
 import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
 import { MARKET_BRACKET_DEFINITIONS } from "@/lib/ai/market-pick-engine/market-brackets";
-import { applyMoraleToSalary, assessPlayerMorale, type PlayerMoraleAssessment } from "@/lib/morale/player-morale-service";
+import {
+  applyMoraleToSalary,
+  assessPlayerMorale,
+  evaluatePromisedRoleAttendanceOutcome,
+  type PlayerMoraleAssessment,
+} from "@/lib/morale/player-morale-service";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 
@@ -1150,15 +1155,16 @@ function buildPromisedRoleRelationshipEvents(gameState: GameState): PlayerRelati
   const timestamp = new Date().toISOString();
   return gameState.rosters.flatMap((entry) => {
     if (!entry.promisedRole) return [];
-    const morale = assessPlayerMorale({ gameState, playerId: entry.playerId, teamId: entry.teamId });
-    const reason = morale?.reasons.find((candidate) =>
-      ["good_playtime", "relative_role_fulfilled", "low_playtime", "star_not_used"].includes(candidate.reasonId),
-    );
-    if (!reason) return [];
+    // Liest die Einsatzzeit-vs-Rollenerwartung direkt aus (siehe `evaluatePromisedRoleAttendanceOutcome`),
+    // statt wie frueher ueber Moral-Reasons ("good_playtime"/"low_playtime") -- die wirken seit der
+    // Behebung der Doppelzaehlung (`appearances` trieb zusaetzlich zur "Einsätze"-Forderung noch einen
+    // zweiten, direkten Moral-Ausschlag) nicht mehr auf die Moral und tauchen dort nicht mehr auf.
+    const outcome = evaluatePromisedRoleAttendanceOutcome(gameState, entry.playerId, entry.promisedRole);
+    if (!outcome) return [];
     const result =
-      reason.reasonId === "star_not_used" || reason.reasonId === "low_playtime"
+      outcome.outcome === "broken"
         ? "promised_role_broken"
-        : reason.valueDelta >= 5
+        : outcome.outcome === "exceeded"
           ? "promised_role_exceeded"
           : "promised_role_fulfilled";
     return [{
@@ -1167,8 +1173,8 @@ function buildPromisedRoleRelationshipEvents(gameState: GameState): PlayerRelati
       teamId: entry.teamId,
       playerId: entry.playerId,
       reason: `${result}:${entry.promisedRole}`,
-      delta: reason.valueDelta,
-      severity: reason.valueDelta < 0 ? "negative" : reason.valueDelta > 0 ? "positive" : "neutral",
+      delta: outcome.delta,
+      severity: outcome.delta < 0 ? "negative" : outcome.delta > 0 ? "positive" : "neutral",
       createdAt: timestamp,
       source: "promised_role_morale",
     } satisfies PlayerRelationshipEventRecord];

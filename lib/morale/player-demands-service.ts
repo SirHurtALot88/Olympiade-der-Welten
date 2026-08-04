@@ -10,6 +10,7 @@ import { getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { buildPlayerSeasonPerformance } from "@/lib/foundation/player-season-performance";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildTrainingModeDemandRecord } from "@/lib/training/training-mode-demand-service";
+import { resolveSeasonTotalMatchdays } from "@/lib/training/matchday-training-accumulator";
 
 type DemandPlayerLike = Pick<
   Player,
@@ -41,6 +42,10 @@ type DemandContext = {
   rosterEntries?: RosterEntry[];
   playerSeasonAppearances?: Record<string, number>;
   facilityLevels?: Record<string, number>;
+  /** Fuer die "Einsätze"-Forderung: Saisonfortschritt, damit der Saisonend-Zielwert nicht
+   *  vom ersten Spieltag an gegen den bisherigen Stand geprueft wird (siehe buildAppearanceDemand). */
+  matchdaysElapsed?: number;
+  totalMatchdays?: number;
 };
 
 const CAPTAIN_POSITIVE_TRAITS = new Set(["eloquent", "motivated", "ambitious", "disciplined", "resourceful", "loyal"]);
@@ -413,6 +418,33 @@ function buildAppearanceDemand(input: {
   const current = input.context.playerSeasonAppearances?.[input.player.id] ?? 0;
   const target = input.rosterRank <= 3 ? 8 : input.rosterRank <= 6 ? 5 : 3;
   if (current >= target || (hasAnyTrait(input.player, LOW_MAINTENANCE_TRAITS) && current >= 1)) return null;
+
+  // `target` ist der SAISONEND-Wert. Ohne Saisonfortschritt (Lab-Aufrufer ohne vollen
+  // GameState, siehe buildLineupPlayerDemandMap) faellt das auf die alte, einfache
+  // Anzeige zurueck -- dort gibt es ohnehin keine Moral-Auswertung ueber diesen Wert.
+  const totalMatchdays = input.context.totalMatchdays ?? null;
+  const matchdaysElapsed = input.context.matchdaysElapsed ?? null;
+  const hasProgress = totalMatchdays != null && totalMatchdays > 0 && matchdaysElapsed != null;
+  const expectedByNow = hasProgress ? (target * matchdaysElapsed!) / totalMatchdays! : null;
+  const remainingMatchdays = hasProgress ? Math.max(0, totalMatchdays! - matchdaysElapsed!) : null;
+  const targetUnreachable = hasProgress ? current + remainingMatchdays! < target : false;
+  const seasonOver = hasProgress ? matchdaysElapsed! >= totalMatchdays! : false;
+
+  // Status folgt derselben Saisonfortschritts-Logik wie `evaluateDemandDelta` (player-morale-
+  // service.ts): "at_risk"/"failed" erst, wenn der Spieler wirklich hinter dem anteiligen Soll
+  // liegt -- nicht schon deshalb, weil der SAISONEND-Wert noch nicht erreicht ist.
+  const status: PlayerDemandRecord["status"] =
+    seasonOver || targetUnreachable
+      ? "failed"
+      : !hasProgress
+        ? current >= target - 1
+          ? "at_risk"
+          : "open"
+        : current >= expectedByNow!
+          ? "open"
+          : "at_risk";
+
+  const progressLabel = hasProgress ? ` · Soll bis Spieltag ${matchdaysElapsed}: ${Math.round(expectedByNow!)}` : "";
   return {
     demandId: `${input.context.seasonId}:${input.context.teamId}:${input.player.id}:appearances`,
     seasonId: input.context.seasonId,
@@ -420,13 +452,14 @@ function buildAppearanceDemand(input: {
     playerId: input.player.id,
     type: "appearances",
     // Headline zeigt die SAISON-Einsätze (0 zu Saisonstart / MD1), das Ziel bleibt als
-    // Fortschritt sichtbar — nicht die All-Time-`appearances`. So liest sich der Chip am
-    // MD1 als "0/5 Einsätze" statt fälschlich "5 Einsätze".
-    label: `${current}/${target} Einsätze`,
-    detail: `${input.player.name} will diese Season sichtbar eingebunden werden (${current}/${target} Einsätze).`,
+    // Fortschritt sichtbar — nicht die All-Time-`appearances`. `target` ist der SAISONEND-Wert,
+    // deshalb der Zusatz "(Saisonziel)" plus das anteilige Soll bis heute -- sonst liest sich
+    // "1/8 Einsätze" wie ein Versagen, obwohl der Spieler bei Spieltag 1 von 10 planmäßig liegt.
+    label: `${current}/${target} Einsätze (Saisonziel)${progressLabel}`,
+    detail: `${input.player.name} will diese Season sichtbar eingebunden werden (${current}/${target} Einsätze, Saisonziel).`,
     targetValue: target,
     currentValue: current,
-    status: current >= target ? "fulfilled" : current >= target - 1 ? "at_risk" : "open",
+    status,
     moraleReward: 6,
     moralePenalty: input.rosterRank <= 3 ? -14 : -8,
     priority: input.rosterRank <= 3 ? "high" : "medium",
@@ -494,6 +527,11 @@ function buildDemandContext(gameState: GameState, teamId: string): DemandContext
     .map((id) => gameState.disciplines.find((discipline) => discipline.id === id))
     .filter((discipline): discipline is Discipline => Boolean(discipline));
   const facilities = getTeamFacilityState(gameState, teamId).facilities;
+  const totalMatchdays = resolveSeasonTotalMatchdays(gameState);
+  const matchdaysElapsed = Math.min(
+    totalMatchdays,
+    (gameState.seasonState.matchdayResults ?? []).filter((entry) => entry.seasonId === gameState.season.id).length,
+  );
   return {
     seasonId: gameState.season.id,
     teamId,
@@ -505,6 +543,8 @@ function buildDemandContext(gameState: GameState, teamId: string): DemandContext
     playerSeasonAppearances: Object.fromEntries(
       rosterPlayers.map((player) => [player.id, buildPlayerSeasonPerformance(gameState, player.id)?.appearances ?? 0] as const),
     ),
+    matchdaysElapsed,
+    totalMatchdays,
     facilityLevels: Object.fromEntries(Object.entries(facilities).map(([facilityId, state]) => [facilityId, state.level ?? 0] as const)),
   };
 }
