@@ -497,4 +497,127 @@ describe("ai team management preview service", () => {
       expect(scouting?.score ?? 0).toBeGreaterThanOrEqual(20);
     });
   });
+
+  /**
+   * GEMELDET VON CHRIS: „und schau dass die AI das auch versteht und nutzt und weiß wofür das gut
+   * ist, nicht stupide investieren gebäude sind teuer aber punktuell wenn das geld da ist."
+   *
+   * Zwei getrennte Fragen, beide hier festgehalten:
+   *
+   *  1. VERSTEHT die KI, wofür der Specialist Wing gut ist? Er stand mit der Academy im selben Zweig
+   *     und wurde über den Youth-Anteil bewertet. Seit #382 ist seine Variante die Fokusachse des
+   *     Teams — sein Wert hängt daran, ob der Kader überhaupt eine Achse hat, die sich verstärken
+   *     lässt. Ein gleichmäßig verteilter Kader gewinnt fast nichts, ein Kader ohne zuordenbare
+   *     Klassen bekommt sogar eine willkürliche Achse dauerhaft festgeschrieben.
+   *  2. INVESTIERT sie punktuell statt stupide? Die Bau-Schwelle war starr; ob eine Stufe vom freien
+   *     Cash gedeckt ist, spielte keine Rolle.
+   */
+  describe("Die KI versteht, wofür der Specialist Wing gut ist", () => {
+    /** Default-Kader: vier „Hero" → alle auf SOC. Konzentration 1,0. */
+    const focusedRoster = buildGameState({ team: { cash: 200 } });
+    /** Vier Klassen, vier Achsen — Konzentration 0,25. */
+    const scatteredRoster = buildGameState({
+      team: { cash: 200 },
+      players: [
+        buildPlayer("p1", { className: "Berserker" }),
+        buildPlayer("p2", { className: "Sprinter" }),
+        buildPlayer("p3", { className: "Mage" }),
+        buildPlayer("p4", { className: "Hero" }),
+      ],
+    });
+
+    const wingOf = (state: ReturnType<typeof buildGameState>) =>
+      buildAiTeamManagementPreview(state, "T-1")?.buildingPlan.find((row) => row.buildingType === "specialist_wing");
+
+    it("ein Kader mit klarem Achsprofil bewertet den Flügel höher als ein verteilter", () => {
+      expect(wingOf(focusedRoster)?.score ?? 0).toBeGreaterThan(wingOf(scatteredRoster)?.score ?? 0);
+    });
+
+    it("und begründet beide Fälle unterschiedlich", () => {
+      expect(wingOf(focusedRoster)?.reasonsPositive ?? []).toContain(
+        "der Kader hat ein klares Achsprofil — genau das verstärkt der Flügel",
+      );
+      expect(wingOf(scatteredRoster)?.reasonsNegative ?? []).toContain(
+        "der Kader verteilt sich über mehrere Achsen — eine Fokusachse trägt wenig",
+      );
+    });
+
+    it("die Bewertung hängt nicht mehr am Youth-Anteil wie bei der Academy", () => {
+      // Gegenprobe zur alten Zusammenlegung: beide Kader haben denselben Youth-Anteil (keinen).
+      // Waeren sie noch im selben Zweig, muessten die Zahlen identisch sein.
+      const academyFocused = buildAiTeamManagementPreview(focusedRoster, "T-1")?.buildingPlan.find(
+        (row) => row.buildingType === "academy",
+      );
+      const academyScattered = buildAiTeamManagementPreview(scatteredRoster, "T-1")?.buildingPlan.find(
+        (row) => row.buildingType === "academy",
+      );
+      expect(academyFocused?.score).toBe(academyScattered?.score);
+      expect(wingOf(focusedRoster)?.score).not.toBe(wingOf(scatteredRoster)?.score);
+    });
+  });
+
+  /**
+   * ZU CHRIS' „nicht stupide investieren, gebäude sind teuer aber punktuell wenn das geld da ist".
+   *
+   * NACHGEMESSEN, NICHT NACHGEBAUT: bei identischem Bedarf und steigendem Cash liegt die Bau-Grenze
+   * heute schon dort, wo sie hingehört — nichts unter 60, ab 60 Recovery, ab 80 zusätzlich Fan Shop,
+   * ab 100 zusätzlich Arena, darüber unverändert. `canSpend` prüft gegen den Bau-Topf, und der ist
+   * aus dem Cash abgeleitet. Eine zusätzliche Schwelle nach Deckungsgrad war zwischenzeitlich
+   * eingebaut und hat an dieser Grenze bei keinem einzigen Cash-Wert etwas geändert; sie ist deshalb
+   * wieder raus.
+   *
+   * Die Tests halten die gemessene Grenze fest, damit sie nicht unbemerkt verrutscht — sie behaupten
+   * kein neues Verhalten.
+   */
+  describe("Die KI investiert punktuell, nicht stupide", () => {
+    /**
+     * Derselbe akute Bedarf in beiden Fällen — ein müder, teils verletzter Kader, für den das
+     * Recovery Center die richtige Antwort ist. Verändert wird NUR der Kontostand. Ohne diese
+     * Trennung misst man den Bedarf statt der Deckung: ein Team ohne Baustellen baut auch mit vollem
+     * Konto nichts.
+     */
+    const fatiguedRoster = [
+      buildPlayer("p1", { fatigue: 92 }),
+      buildPlayer("p2", { fatigue: 88 }),
+      buildPlayer("p3", { fatigue: 74 }),
+      buildPlayer("p4", { fatigue: 70 }),
+      buildPlayer("p5", { fatigue: 68 }),
+      buildPlayer("p6", { fatigue: 65 }),
+    ];
+    const withCash = (cash: number) =>
+      buildGameState({ players: fatiguedRoster, injuries: ["p1", "p2"], team: { cash } });
+    const buildsOf = (cash: number) =>
+      (buildAiTeamManagementPreview(withCash(cash), "T-1")?.buildingPlan ?? [])
+        .filter((row) => row.action === "build_new" || row.action === "upgrade_existing")
+        .map((row) => row.buildingType);
+
+    it("beim selben Bedarf mit knappem Konto baut sie gar nicht", () => {
+      expect(buildsOf(20)).toEqual([]);
+      expect(buildsOf(40)).toEqual([]);
+    });
+
+    it("und greift zu, sobald das Geld da ist — in der Reihenfolge der Dringlichkeit", () => {
+      // Zuerst das Recovery Center, das den akuten Bedarf deckt; die Income-Gebäude erst darüber.
+      expect(buildsOf(60)).toEqual(["recovery_center"]);
+      expect(buildsOf(80)).toEqual(["recovery_center", "fan_shop"]);
+    });
+
+    it("ein voller Kontostand ist trotzdem kein Freibrief", () => {
+      // Gegenprobe: die Score-Schwelle gilt weiter, sonst würde aus „punktuell" ein Rundumschlag.
+      const plan = buildAiTeamManagementPreview(withCash(400), "T-1")?.buildingPlan ?? [];
+      const built = plan.filter((row) => row.action === "build_new" || row.action === "upgrade_existing");
+      expect(built.length).toBeGreaterThan(0);
+      expect(built.length).toBeLessThan(plan.length);
+    });
+
+    it("der Specialist Wing baut sich nicht selbst, nur weil der Kader gleichförmig ist", () => {
+      // Beim Bauen fast falsch gemacht: eine erste Fassung der Wing-Bewertung vergab bis zu 90 Punkte
+      // für ein klares Achsprofil — die KI hat den Flügel damit ab 60 Cash sofort mitgebaut. Ein
+      // klares Profil ist ein Argument, kein Automatismus.
+      for (const cash of [60, 100, 200, 400]) {
+        expect(buildsOf(cash), `bei ${cash} Cash`).not.toContain("specialist_wing");
+      }
+    });
+  });
+
 });
