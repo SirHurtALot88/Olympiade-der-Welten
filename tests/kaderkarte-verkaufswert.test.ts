@@ -10,6 +10,12 @@
  * Beide Zahlen kommen aus `buildTeamContractSeasonTable`, also aus DERSELBEN Quelle wie die
  * VK-Spalte der Verträge-Karte und wie die KI-Verkaufsentscheidung. Zwei Rechnungen für denselben
  * Verkaufspreis wären zwei Preise, sobald eine von beiden sich ändert — das prüft der letzte Test.
+ *
+ * Der Posten heißt seitdem „VK" (Chris: „dann nenne es an der Stelle VK"). Das ist nicht Kosmetik:
+ * MW ist im Spiel ein eigener, benachbarter Begriff mit eigenem Tooltip — ein Feld, das den
+ * Verkaufspreis zeigt, darf nicht so heißen. Im Fallback, wo wirklich der Marktwert steht, heißt
+ * es weiter „MW". Ein fester Name über zwei verschiedenen Größen wäre genau die Verwechslung,
+ * die der Umbau abstellt.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -53,5 +59,20 @@ describe("Kaderkarte zeigt den Verkaufswert statt des Marktwerts", () => {
     const view = readFileSync(join(root, "app/foundation/team-profile/TeamProfileNewLook.tsx"), "utf8");
     expect(view).toContain("buildRosterSaleValueStat");
     expect(view).toMatch(/if \(!isFiniteNumber\(player\.saleValue\)\)/);
+  });
+
+  it("der Posten heißt VK, wenn er den Verkaufspreis zeigt — und MW nur noch im Fallback", () => {
+    const view = readFileSync(join(root, "app/foundation/team-profile/TeamProfileNewLook.tsx"), "utf8");
+    const funktion = view.slice(
+      view.indexOf("function buildRosterSaleValueStat"),
+      view.indexOf("function getContractShapeTag"),
+    );
+    expect(funktion).not.toBe("");
+    // Der Fallback-Zweig steht vor dem Verkaufswert-Zweig: erst MW, dann VK. Genau in dieser
+    // Reihenfolge — wären beide "MW", stünde über zwei verschiedenen Größen derselbe Name.
+    const mwIndex = funktion.indexOf('label: "MW"');
+    const vkIndex = funktion.indexOf('label: "VK"');
+    expect(mwIndex).toBeGreaterThan(-1);
+    expect(vkIndex).toBeGreaterThan(mwIndex);
   });
 });

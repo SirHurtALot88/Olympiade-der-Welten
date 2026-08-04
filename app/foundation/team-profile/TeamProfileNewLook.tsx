@@ -327,14 +327,20 @@ function getMoneyDeltaClass(value: number | null | undefined, positiveDirection:
 }
 
 /**
- * Der MW-Posten der Kaderkarte zeigt den in DIESER Saison erzielbaren VERKAUFSPREIS, nicht den
+ * Der Wert-Posten der Kaderkarte zeigt den in DIESER Saison erzielbaren VERKAUFSPREIS, nicht den
  * Marktwert — die Frage am Kader lautet „was bekomme ich für ihn", nicht „was steht auf dem
  * Papier". Darunter steht der Auf-/Abschlag des Verkaufsfaktors gegen den Marktwert; damit
  * bleibt der Marktwert aus der Karte ablesbar (Wert − Delta), es geht also keine Information
  * verloren, sie wechselt nur die Reihenfolge.
  *
+ * DESHALB HEISST DER POSTEN „VK" UND NICHT MEHR „MW": ein Feld, das den Verkaufspreis zeigt,
+ * darf nicht Marktwert heißen — das ist im Spiel ein eigener, benachbarter Begriff mit eigenem
+ * Tooltip. „VK" ist derselbe Name, den die Verträge-Karte für dieselbe Zahl benutzt.
+ *
  * FALLBACK: fehlt der Verkaufswert (Spieler ohne aktive Vertragszeile), steht wieder der
  * Marktwert samt seiner bisherigen Wertentwicklung da — lieber die alte Zahl als ein Strich.
+ * Dann heißt der Posten auch wieder „MW", denn dann ist es wirklich der Marktwert. Ein fester
+ * Name über zwei verschiedenen Größen wäre genau die Verwechslung, die der Umbau abstellt.
  */
 function buildRosterSaleValueStat(player: TeamDetailDrawerPlayerCard): FoundationPlayerPortraitEconomyStat {
   if (!isFiniteNumber(player.saleValue)) {
@@ -352,7 +358,7 @@ function buildRosterSaleValueStat(player: TeamDetailDrawerPlayerCard): Foundatio
 
   const aufschlag = player.saleValueVsMarketValue ?? null;
   return {
-    label: "MW",
+    label: "VK",
     value: formatNlNumber(player.saleValue, 2),
     delta: isFiniteNumber(aufschlag) && Math.abs(aufschlag) >= 0.01 ? formatSignedNlNumber(aufschlag, 2) : null,
     deltaClass: getMoneyDeltaClass(aufschlag, "higher"),

@@ -41,7 +41,7 @@
       "datum": "2026-08-04",
       "seite": "Team · Kader",
       "pr": null,
-      "text": "Der MW auf der Kaderkarte zeigt jetzt den Preis, den du in dieser Saison für den Spieler bekommst, statt den reinen Marktwert — darunter steht, wie viel der Verkaufsfaktor drauflegt oder abzieht.",
+      "text": "Wo auf der Kaderkarte der Marktwert stand, steht jetzt VK: der Preis, den du in dieser Saison für den Spieler bekommst — darunter, wie viel der Verkaufsfaktor gegenüber dem Marktwert drauflegt oder abzieht.",
       "quelle": "gepflegt",
       "gewicht": "feinschliff",
       "version": "0.4"
