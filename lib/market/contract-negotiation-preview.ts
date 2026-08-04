@@ -677,7 +677,7 @@ export function buildPlayerContractPreference(
     scoreAdjustment -= 2;
   }
 
-  const label = lengthPreference === "long" ? "lange Vertraege" : lengthPreference === "short" ? "kurze Vertraege" : "mittlere Vertraege";
+  const label = lengthPreference === "long" ? "lange Verträge" : lengthPreference === "short" ? "kurze Verträge" : "mittlere Verträge";
   reasons.unshift(`Wunschprofil: ${label}, am liebsten ${idealLength} Saisons, Form ${shapePreference}.`);
 
   return {
@@ -784,7 +784,7 @@ export function recommendContractOfferForPlayer(input: {
   }
   if ((input.teamStrategyProfile?.bias.shortContractPreference ?? 0) >= 8 && basePreference.lengthPreference !== "long") {
     contractLength = Math.min(contractLength, 2);
-    reasons.push("Teamstrategie bevorzugt kurze Vertraege.");
+    reasons.push("Teamstrategie bevorzugt kurze Verträge.");
   }
   if ((input.teamStrategyProfile?.bias.longContractPreference ?? 0) >= 8 && basePreference.lengthPreference !== "short") {
     contractLength = Math.max(contractLength, 3);
@@ -1263,7 +1263,7 @@ function derivePlayerNatureDemandSignals(player: Player) {
     multiplier: alignmentMultiplier,
     reason:
       alignmentDelta > 0
-        ? "Chaotisches/boeses Wesen verhandelt haerter."
+        ? "Chaotisches oder böses Wesen verhandelt härter."
         : "Rechtschaffenes/gutes Wesen verhandelt fairer.",
   });
 
@@ -2023,7 +2023,7 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
         points: 6,
         reason: "Loyaler Spieler akzeptiert guten Fit eher.",
       });
-      reasons.push("Loyal + guter Fit erhoeht die Toleranz.");
+      reasons.push("Loyalität und guter Fit erhöhen die Toleranz.");
     }
 
     if (input.player && hasTrait(input.player, "ambitious")) {
