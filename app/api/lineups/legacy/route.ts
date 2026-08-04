@@ -14,7 +14,7 @@ import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-poli
 import { LegacyLineupService } from "@/lib/lineups/legacy-lineup-service";
 import type { LegacyLineupEntryInput, LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
-import { mapSaveResolutionErrorToResponse } from "@/lib/persistence/resolve-local-save";
+import { mapSaveResolutionErrorToResponse } from "@/lib/persistence/save-resolution-response";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 

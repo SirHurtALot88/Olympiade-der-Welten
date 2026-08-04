@@ -1,5 +1,3 @@
-import { NextResponse } from "next/server";
-
 import type { PersistedSaveGame } from "@/lib/persistence/types";
 import type { PersistenceService } from "@/lib/persistence/types";
 
@@ -56,19 +54,13 @@ export function requireLocalPersistedSave(
 }
 
 /**
- * Maps a `SaveResolutionError` thrown by `requireLocalPersistedSave` to the JSON error response
- * routes should return (400/404 with `{ error: code, message }`, matching the shape the
- * `ai-batch-apply` route established first). Returns `null` for anything else so callers can fall
- * through to their own generic 500 handling. Centralised here (next to the resolver) so the six+
- * gameplay-write routes that call `requireLocalPersistedSave` transitively don't each hand-roll
- * their own copy of this mapping.
+ * `mapSaveResolutionErrorToResponse` ist nach `@/lib/persistence/save-resolution-response`
+ * gewandert. Es brauchte `NextResponse`, und dieser Import ist in einem nackten Node-Prozess
+ * (unser Socket-Server, `server.ts` via tsx) toedlich — er wirft beim Laden
+ * "Invariant: AsyncLocalStorage accessed in runtime where it is not available". Der Resolver hier
+ * ist reine Server-Logik und muss von ueberall ladbar bleiben; die Begruendung steht ausfuehrlich
+ * in der neuen Datei.
  */
-export function mapSaveResolutionErrorToResponse(error: unknown): NextResponse | null {
-  if (error instanceof SaveResolutionError) {
-    return NextResponse.json({ error: error.code, message: error.message }, { status: error.status });
-  }
-  return null;
-}
 
 /**
  * Explicit, OPT-IN "continue the current game" resolution: only for genuine read/preview entry
