@@ -95,6 +95,13 @@ type StandingsPreviewWorkingItem = StandingsPreviewItem & {
   rankToPointsKey: number;
   hasStoredResult: boolean;
   isIncomplete: boolean;
+  /**
+   * Punktestand VOR diesem Spieltag. Solange der Spieltag noch nicht uebernommen ist, ist das
+   * derselbe Wert wie `currentPoints`; danach steht in `currentPoints` bereits die neue Summe,
+   * und nur hier steht noch der Stand davor. Aus dieser Zahl entsteht der „vor"-Rang — siehe
+   * `buildCurrentRankMap`.
+   */
+  preMatchdayPoints: number | null;
 };
 
 type LocalResolvedScope = {
@@ -224,12 +231,33 @@ function normalizeSource(source?: string): StandingsPreviewSource {
   return source === "prisma" ? "prisma" : "sqlite";
 }
 
-function buildCurrentRankMap<T extends { teamId: string; teamName: string; currentPoints: number | null }>(items: T[]) {
+/**
+ * GEMELDET: „rank änderungen in der spieltagstabelle funktionieren nicht!"
+ *
+ * Die Spalte verspricht „Rang VOR → NACH dem Spieltag", zeigte aber zweimal dieselbe Zahl —
+ * an einem echten Spielstand nachgemessen bei 32 von 32 Teams. Der Grund lag hier: gerankt
+ * wurde nach `currentPoints`, und sobald der Spieltag uebernommen ist, steht darin bereits
+ * die NEUE Summe (Armageddon Aftermath: Baseline 23 + Delta 19,2 = 42,2 — und beide Spalten
+ * rechneten mit 42,2). Damit war „vor" derselbe Rang wie „nach", und die Bewegung, um die es
+ * in der Spalte geht, verschwand.
+ *
+ * Der „vor"-Rang kommt deshalb aus `preMatchdayPoints`. Vor der Uebernahme ist das derselbe
+ * Wert wie `currentPoints` — die Rechnung stimmt also in beiden Zustaenden, ohne Fallunterscheidung.
+ * Dieselbe Quelle nutzt die Saisonstand-Tabelle schon laenger
+ * (`buildStandingsMatchdayRankDelta`, season-standings-matchday-rank-delta.ts).
+ */
+function buildCurrentRankMap<
+  T extends { teamId: string; teamName: string; currentPoints: number | null; preMatchdayPoints?: number | null },
+>(items: T[]) {
+  const punkteVorher = (item: T) =>
+    item.preMatchdayPoints != null && Number.isFinite(item.preMatchdayPoints) ? item.preMatchdayPoints : item.currentPoints;
   const sorted = [...items]
-    .filter((item) => item.currentPoints != null)
+    .filter((item) => punkteVorher(item) != null)
     .sort((left, right) => {
-      if ((right.currentPoints ?? Number.NEGATIVE_INFINITY) !== (left.currentPoints ?? Number.NEGATIVE_INFINITY)) {
-        return (right.currentPoints ?? Number.NEGATIVE_INFINITY) - (left.currentPoints ?? Number.NEGATIVE_INFINITY);
+      const rechts = punkteVorher(right) ?? Number.NEGATIVE_INFINITY;
+      const links = punkteVorher(left) ?? Number.NEGATIVE_INFINITY;
+      if (rechts !== links) {
+        return rechts - links;
       }
       return left.teamName.localeCompare(right.teamName, "de");
     });
@@ -481,6 +509,10 @@ export async function buildStandingsPreview(
         currentRank: null,
         projectedRank: null,
         currentPoints,
+        // Der Stand VOR diesem Spieltag. `baselineRaw` greift nur, wenn die gespeicherte Baseline
+        // wirklich zu DIESEM Spieltag gehoert (`matchdayBaselineId === scope.matchdayId`) — sonst
+        // ist sie die eines frueheren und `currentPoints` ist der richtige „vorher"-Wert.
+        preMatchdayPoints: baselinePoints,
         projectedPoints:
           baselinePoints != null && pointsDelta != null ? roundValue(baselinePoints + pointsDelta, 1) : null,
         pointsDelta,
@@ -725,6 +757,10 @@ export async function buildStandingsPreview(
       currentRank: sheetRow?.rank ?? null,
       projectedRank: null,
       currentPoints: sheetRow?.points ?? null,
+      // Im Sheet-Pfad ist der Punktestand aus der gemappten Tabelle per Definition der Stand
+      // VOR dem Spieltag (die Projektion entsteht erst weiter unten). „Vorher" und „aktuell"
+      // sind hier also dieselbe Zahl — der Fix oben aendert an diesem Pfad nichts.
+      preMatchdayPoints: sheetRow?.points ?? null,
       projectedPoints: null,
       pointsDelta: null,
       matchdayRank: null,
