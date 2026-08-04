@@ -451,4 +451,50 @@ describe("ai team management preview service", () => {
       poorPreview?.budgetPlan.bucketsBefore.salaryReserve ?? 0,
     );
   });
+
+  /**
+   * GEMELDET VON CHRIS: „analytic muss was anderes machen sonst bringt das gebäude nix und kann raus."
+   *
+   * Die Wirkung hat A3 (#381) nachgeliefert — der Analytics Room zeigt den Live-Fortschritt auf der
+   * Sponsor-Achse und den Board-Zielen. Die KI-Bewertung war davon unberührt: `analytics_room` stand
+   * mit `scouting_office` im SELBEN Zweig und wurde wortgleich über Kaderlücken und Vertragswellen
+   * bewertet. Über den Kader weiß das Gebäude aber nichts. Eine KI, die es bei Kaderlücken baut, baut
+   * es aus einem Grund, den es nicht bedient.
+   */
+  describe("Analytics Room wird nicht mehr wie das Scouting Office bewertet", () => {
+    /** Kaderlücke (4 Spieler bei playerOpt 6), keine Board-Ziele — Scouting-Argument, kein Analytics-Argument. */
+    const gameState = buildGameState({ team: { cash: 200 } });
+    const preview = buildAiTeamManagementPreview(gameState, "T-1");
+    const scouting = preview?.buildingPlan.find((row) => row.buildingType === "scouting_office");
+    const analytics = preview?.buildingPlan.find((row) => row.buildingType === "analytics_room");
+
+    it("bei einer Kaderlücke ohne Board-Ziele steht das Scouting Office höher", () => {
+      // Vorher waren die beiden Zahlen identisch — genau das ist der Fehler.
+      expect(scouting?.score ?? 0).toBeGreaterThan(analytics?.score ?? 0);
+    });
+
+    it("und die Begründungen sind nicht mehr dieselben", () => {
+      expect(analytics?.reasonsPositive ?? []).not.toContain(
+        "Kaderlücken und Vertragswellen erhöhen den Informationswert",
+      );
+      expect(scouting?.reasonsPositive ?? []).toContain(
+        "Kaderlücken und Vertragswellen erhöhen den Informationswert",
+      );
+    });
+
+    it("er wird über Zieldruck und Achsfokus begründet — das ist seine Wirkung", () => {
+      // Die Zeile ist da: das Testszenario hat Board-Ziele (`objectiveAiBias` ist nicht null), also
+      // greift der positive Zweig. Der Fall ohne Ziele senkt den Score stattdessen — beides steht in
+      // derselben Verzweigung, und genau diese Begründung gab es vorher für den Raum überhaupt nicht.
+      expect(analytics?.reasonsPositive ?? []).toContain(
+        "Zieldruck und Achsfokus machen den Live-Fortschritt wertvoll",
+      );
+    });
+
+    it("das Scouting Office behält seine eigene Bewertung unverändert", () => {
+      // Gegenprobe: die Trennung darf nur den Analytics Room verändern, nicht beide Gebäude entwerten.
+      // Kaderlücke 2 × 10 = 20, keine auslaufenden Verträge, keine Board-Ziele.
+      expect(scouting?.score ?? 0).toBeGreaterThanOrEqual(20);
+    });
+  });
 });

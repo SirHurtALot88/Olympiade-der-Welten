@@ -257,7 +257,7 @@ describe("season-end progression preview", () => {
     expect(preview.rows[0]?.legacyAvailableXP).toBe(preview.rows[0]?.availableXP);
   });
 
-  it("shows scouting and analytics quality without faking missing potential values", () => {
+  it("nennt den Analytics Room bei seiner echten Wirkung statt bei Prognosegenauigkeit", () => {
     const preview = buildSeasonEndProgressionPreview({
       gameState: createGameState(createPlayer()),
       teamId: "team-1",
@@ -267,9 +267,15 @@ describe("season-end progression preview", () => {
     });
 
     expect(preview.rows[0]?.facilityEffects.appliedEffects).toContain("scouting_office_potential_info_visible:potential_source_missing");
-    expect(preview.rows[0]?.facilityEffects.appliedEffects).toContain("analytics_room_forecast_accuracy_visible:no_fake_values");
+    expect(preview.rows[0]?.facilityEffects.appliedEffects).toContain(
+      "analytics_room_affects_sponsor_and_board_progress_not_training",
+    );
+    // Gegenprobe: die alte Behauptung darf nirgends mehr auftauchen. Der Analytics Room macht seit A3
+    // den Live-Fortschritt auf Sponsor-Achse und Board-Zielen sichtbar — auf diese Vorschau wirkt er
+    // gar nicht, und ein Marker über "Prognosegenauigkeit" hat hier nie etwas beschrieben.
+    expect(preview.rows[0]?.facilityEffects.appliedEffects.join(" ")).not.toContain("forecast_accuracy");
     expect(preview.warnings).toContain("facility_forecast:player-1:potential_source_missing");
-    expect(preview.warnings).toContain("facility_forecast:player-1:no_fake_values");
+    expect(preview.warnings).toContain("facility_forecast:player-1:analytics_room_not_training");
   });
 
   it("shows discipline changes after an attribute preview", () => {
