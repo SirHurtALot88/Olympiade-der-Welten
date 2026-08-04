@@ -412,6 +412,7 @@ import {
   useFoundationSeasonOverviewFeedEffect,
 } from "@/lib/foundation/tabs/use-foundation-season-feed-actions";
 import { buildGameStateContentSignature } from "@/lib/foundation/season-derivations-signature";
+import { applyNewGameFlowStepUpdate, resolveScopedNewGameFlow } from "@/lib/game/new-game-flow-scope";
 // --- Phase 5.4: module scope extracted to lib/foundation (import instead of inline duplicate) ---
 import {
   ADVANCE_MATCHDAY_CONFIRM_TOKEN,
@@ -1056,6 +1057,12 @@ export function useFoundationShellRouterBodyScope({
     setAdminBalancingMessage, adminBalancingBusy, setAdminBalancingBusy, historySeasonFilter, setHistorySeasonFilter, historyTeamFilter, setHistoryTeamFilter, historyTypeFilter, setHistoryTypeFilter, historyClassFilter,
     setHistoryClassFilter, historySourceFilter, setHistorySourceFilter, historySearch, setHistorySearch, tableColumnPreferences, setTableColumnPreferences,
   } = foundationPageState;
+
+  // KOOP: der Einstiegs-Flow, der fuer DIESE Sitzung gilt — nie das geteilte Top-Level-Objekt
+  // direkt lesen/schreiben, siehe `NewGameFlowState.byParticipant` (olyDataTypes.ts) und
+  // `lib/game/new-game-flow-scope.ts`. Ohne aktiven Raum (`roomContext` null, Solo) liefert der
+  // Resolver exakt das Top-Level-Objekt zurueck — bit-identisch zum Verhalten vor der Trennung.
+  const activeNewGameFlow = resolveScopedNewGameFlow(gameState.seasonState.newGameFlow, roomContext?.participantId ?? null);
 
   const [historyPage, setHistoryPage] = useState(1);
   const [assignTeamCaptainBusy, setAssignTeamCaptainBusy] = useState(false);
@@ -3270,7 +3277,10 @@ export function useFoundationShellRouterBodyScope({
       return true;
     }
     const briefingKey = buildSeasonBriefingDismissKey(activeSaveId, gameState.season.id);
-    const seasonIntroStep = gameState.seasonState.newGameFlow?.steps?.find((step) => step.stepId === "season_intro");
+    // KOOP: die EIGENE Sicht (`activeNewGameFlow`), nicht das geteilte Top-Level-Objekt — sonst
+    // unterdrueckt Chris' abgeschlossenes Intro-Briefing das Briefing auch fuer Franky, der es nie
+    // gesehen hat (siehe Messbefund, Fund #2).
+    const seasonIntroStep = activeNewGameFlow?.steps?.find((step) => step.stepId === "season_intro");
     return (
       seasonBriefingDismissedRef.current.has(briefingKey) ||
       readSeasonBriefingDismissedFromStorage(activeSaveId, gameState.season.id) ||
@@ -4912,11 +4922,17 @@ export function useFoundationShellRouterBodyScope({
       }
     }
 
+    // KOOP: `roomContext` (State) ist hier evtl. noch nicht hydriert — dieser Effekt laeuft im
+    // selben Flush wie der `setRoomContext`-Mount-Effekt und sieht dessen Update noch nicht. Die
+    // URL direkt lesen (dieselbe Quelle, ohne die Render-Verzoegerung) statt auf den State zu
+    // warten, sonst faellt der allererste Ladevorgang eines Raum-Teilnehmers auf das geteilte
+    // Top-Level-`selectedTeamId` zurueck (siehe Messbefund, Fund #1).
+    const bootstrapParticipantId = readFoundationRoomContextFromLocation()?.participantId ?? roomContext?.participantId ?? null;
     const requestedTeamContext = resolvePreferredFoundationTeamContext(initialClientGameState.teams, {
       currentTeamId: selectedTeamId,
       currentSource: activeManagerTeamSource,
       initialTeamId: initialSelectedTeamId,
-      savedTeamId: initialClientGameState.seasonState.newGameFlow?.selectedTeamId ?? null,
+      savedTeamId: resolveScopedNewGameFlow(initialClientGameState.seasonState.newGameFlow, bootstrapParticipantId)?.selectedTeamId ?? null,
       activeSaveId,
       settingsMap: buildTeamControlSettingsMap(initialClientGameState.teams, initialClientGameState.seasonState.teamControlSettings),
     });
@@ -5024,7 +5040,7 @@ export function useFoundationShellRouterBodyScope({
         currentTeamId: null,
         currentSource: activeManagerTeamSource,
         initialTeamId: initialSelectedTeamId,
-        savedTeamId: gameState.seasonState.newGameFlow?.selectedTeamId ?? null,
+        savedTeamId: activeNewGameFlow?.selectedTeamId ?? null,
         activeSaveId,
         settingsMap: buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings),
       });
@@ -6487,49 +6503,30 @@ export function useFoundationShellRouterBodyScope({
       console.error(error);
       skipNextFullPersistCountRef.current = Math.max(0, skipNextFullPersistCountRef.current - 1);
     });
-    setGameState((current) => {
-      const previous = current.seasonState.newGameFlow ?? {
-        active: true,
-        selectedTeamId,
-        steps: [],
-      };
-      const nextSteps = SEASON_SETUP_STEP_IDS.map((id) => {
-        const stored = previous.steps?.find((step) => step.stepId === id);
-        if (id !== stepId) {
-          return stored ?? { stepId: id, status: "open" as const };
-        }
-
-        return {
-          stepId: id,
+    // KOOP: dieselbe Kernlogik wie der Server-Route-Zweig fuer Raum-Teilnehmer (siehe
+    // `applyNewGameFlowStepUpdate`), damit optimistischer Client-Zustand und Server-Antwort nie
+    // auseinanderlaufen. Ohne Raum (`roomContext` null) verhaelt sich das exakt wie vorher: das
+    // TOP-LEVEL-Objekt wird geschrieben, `active`/`dismissed` korrekt aus `isHandled` berechnet.
+    setGameState((current) => ({
+      ...current,
+      seasonState: {
+        ...current.seasonState,
+        newGameFlow: applyNewGameFlowStepUpdate({
+          previous: current.seasonState.newGameFlow,
+          participantId: roomContext?.participantId ?? null,
+          stepId,
           status,
-          completedAt: status === "completed" ? now : stored?.completedAt ?? null,
-          skippedAt: status === "skipped" ? now : stored?.skippedAt ?? null,
-        };
-      });
-      const isHandled = nextSteps.every((step) => step.status === "completed" || step.status === "skipped");
-
-      return {
-        ...current,
-        seasonState: {
-          ...current.seasonState,
-          newGameFlow: {
-            ...previous,
-            // Sind alle Einstiegsschritte erledigt, ist der Einstieg vorbei. Vorher stand
-            // hier hart `active: true` — das Flag ging nie aus, und der Flow bot die
-            // Neues-Spiel-Kette noch mitten in der Saison an.
-            active: !isHandled,
-            dismissed: isHandled ? true : false,
-            selectedTeamId: selectedTeamId ?? previous.selectedTeamId ?? null,
-            steps: nextSteps,
-            updatedAt: now,
-            completedAt: isHandled ? previous.completedAt ?? now : previous.completedAt ?? null,
-          },
-        },
-      };
-    });
+          selectedTeamId,
+          stepIds: SEASON_SETUP_STEP_IDS,
+          now,
+        }),
+      },
+    }));
   };
   useEffect(() => {
-    const flow = gameState.seasonState.newGameFlow;
+    // KOOP: die EIGENE Sicht (`activeNewGameFlow`), nicht das geteilte Top-Level-Objekt — sonst
+    // gilt ein von Chris' Sitzung ausgeloester Auto-Abschluss faelschlich auch fuer Franky.
+    const flow = activeNewGameFlow;
     const selectedFlowTeamId = resolveFoundationTeamId(
       gameState.teams,
       flow?.selectedTeamId ?? selectedTeamId ?? activeManagerTeamId,
@@ -6548,14 +6545,14 @@ export function useFoundationShellRouterBodyScope({
     updateNewGameFlowStepStatus("team_confirm", "completed");
   }, [
     activeManagerTeamId,
-    gameState.seasonState.newGameFlow,
+    activeNewGameFlow,
     gameState.teams,
     readMeta.readOnly,
     readMeta.source,
     selectedTeamId,
   ]);
   useEffect(() => {
-    const flow = gameState.seasonState.newGameFlow;
+    const flow = activeNewGameFlow;
     const trainingStepStatus = flow?.steps?.find((step) => step.stepId === "training_facilities")?.status ?? "open";
     const selectedTeamRosterIds = new Set(
       gameState.rosters.filter((entry) => entry.teamId === activeManagerTeamId).map((entry) => entry.playerId),
@@ -6577,15 +6574,15 @@ export function useFoundationShellRouterBodyScope({
     updateNewGameFlowStepStatus("training_facilities", "completed");
   }, [
     activeManagerTeamId,
+    activeNewGameFlow,
     activeView,
     gameState.players,
     gameState.rosters,
-    gameState.seasonState.newGameFlow,
     readMeta.readOnly,
     readMeta.source,
   ]);
   useEffect(() => {
-    const flow = gameState.seasonState.newGameFlow;
+    const flow = activeNewGameFlow;
     if (readMeta.source !== "sqlite" || readMeta.readOnly || !flow?.active || flow.dismissed || !activeManagerTeamId) {
       return;
     }
@@ -6613,9 +6610,9 @@ export function useFoundationShellRouterBodyScope({
     }
   }, [
     activeManagerTeamId,
+    activeNewGameFlow,
     gameState.rosters,
     gameState.season.id,
-    gameState.seasonState.newGameFlow,
     gameState.transferHistory,
     gameState.teams,
     readMeta.readOnly,
@@ -6627,24 +6624,35 @@ export function useFoundationShellRouterBodyScope({
       return;
     }
 
+    // KOOP: siehe `updateNewGameFlowStepStatus` — ohne Raum (`roomContext` null) exakt das alte
+    // Verhalten (Top-Level-Objekt). `dismissNewGameFlow` selbst ist aktuell an keine sichtbare
+    // Aktion angebunden (siehe Bericht), die Trennung wird trotzdem konsistent gehalten.
     const now = new Date().toISOString();
-    setGameState((current) => ({
-      ...current,
-      seasonState: {
-        ...current.seasonState,
-        newGameFlow: {
-          ...(current.seasonState.newGameFlow ?? { steps: [] }),
-          active: false,
-          dismissed: true,
-          selectedTeamId: selectedTeamId ?? current.seasonState.newGameFlow?.selectedTeamId ?? null,
-          updatedAt: now,
+    const participantId = roomContext?.participantId ?? null;
+    setGameState((current) => {
+      const sharedPrevious = current.seasonState.newGameFlow ?? { active: true, steps: [] };
+      const scopedPrevious = resolveScopedNewGameFlow(sharedPrevious, participantId) ?? { active: true, steps: [] };
+      const nextScoped = {
+        ...scopedPrevious,
+        active: false,
+        dismissed: true,
+        selectedTeamId: selectedTeamId ?? scopedPrevious.selectedTeamId ?? null,
+        updatedAt: now,
+      };
+      return {
+        ...current,
+        seasonState: {
+          ...current.seasonState,
+          newGameFlow: participantId
+            ? { ...sharedPrevious, byParticipant: { ...sharedPrevious.byParticipant, [participantId]: nextScoped } }
+            : nextScoped,
         },
-      },
-    }));
+      };
+    });
   };
   const navigateSeasonSetupStep = (stepId: NewGameFlowStepId) => {
     const targetTeamId =
-      resolveFoundationTeamId(gameState.teams, gameState.seasonState.newGameFlow?.selectedTeamId ?? selectedTeamId ?? activeManagerTeamId) ??
+      resolveFoundationTeamId(gameState.teams, activeNewGameFlow?.selectedTeamId ?? selectedTeamId ?? activeManagerTeamId) ??
       activeManagerTeamId;
     if (targetTeamId && targetTeamId !== activeManagerTeamId) {
       setActiveManagerTeam(targetTeamId, "manual_select");
@@ -8488,6 +8496,9 @@ export function useFoundationShellRouterBodyScope({
     activeSaveId,
     activeManagerTeamId,
     gameState,
+    // KOOP: die EIGENE Sicht statt des geteilten Top-Level-`newGameFlow` — sonst zeigt der
+    // Einstiegs-Checklisten-Block (Home) Chris' Fortschritt auch fuer Franky an.
+    newGameFlow: activeNewGameFlow,
     selectedTeam,
     rosterPlayers,
     selectedTeamFacilityState,
@@ -9141,7 +9152,7 @@ export function useFoundationShellRouterBodyScope({
         ? selectedTeam.budget
         : null;
   const seasonBriefingStepStatus =
-    gameState.seasonState.newGameFlow?.steps?.find((step) => step.stepId === "season_intro")?.status ??
+    activeNewGameFlow?.steps?.find((step) => step.stepId === "season_intro")?.status ??
     seasonSetupFlow?.steps.find((step) => step.stepId === "season_intro")?.status ??
     null;
   const aiPreseasonStoredRun =
@@ -9246,7 +9257,7 @@ export function useFoundationShellRouterBodyScope({
     gameState.season.currentMatchday,
     gameState.season.id,
     gameState.season.isCompleted,
-    gameState.seasonState.newGameFlow?.steps,
+    activeNewGameFlow?.steps,
     seasonBriefingScheduleReady,
     seasonBriefingStepStatus,
   ]);

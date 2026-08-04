@@ -19,6 +19,8 @@ import {
 } from "@/lib/persistence/foundation-save-mode";
 import type { SaveSummary } from "@/lib/persistence/types";
 import { describeRoomWriteError, isStaleSaveVersionError } from "@/lib/room/parse-room-write-context";
+import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
+import { resolveScopedNewGameFlow } from "@/lib/game/new-game-flow-scope";
 import type {
   FoundationReadMeta,
   FoundationReadSource,
@@ -165,7 +167,7 @@ export type UseFoundationPersistenceActionsInput = {
   setTrainingClassDraft: Dispatch<SetStateAction<Record<string, TrainingClassDraft>>>;
   setActiveView: Dispatch<SetStateAction<FoundationView>>;
   setSeasonOverviewSeasonId: Dispatch<SetStateAction<string>>;
-  roomContext: unknown;
+  roomContext: FoundationRoomContext | null;
   feedSetters: FoundationSaveScopedFeedSetters;
   onSaveConflictReload: (reloaded: GameState) => Promise<void>;
   showReadOnlyNotice: () => void;
@@ -488,7 +490,12 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
           setReadMeta(payload._meta);
         }
         const saveTeamSettingsMap = buildTeamControlSettingsMap(nextGameState.teams, nextGameState.seasonState.teamControlSettings);
-        const saveSelectedTeamId = resolveFoundationTeamId(nextGameState.teams, nextGameState.seasonState.newGameFlow?.selectedTeamId);
+        // KOOP: die EIGENE Sicht (`resolveScopedNewGameFlow`), nicht das geteilte
+        // Top-Level-`selectedTeamId` — sonst kann Frankys Client beim Laden auf Chris' Team
+        // aufgehen (`saveTeamSettingsMap[...]?.controlMode === "manual"` prueft nur "irgendein
+        // Mensch steuert das", nicht "ICH"). Ohne Raum (`roomContext` null) unveraendert.
+        const scopedNewGameFlowForLoad = resolveScopedNewGameFlow(nextGameState.seasonState.newGameFlow, roomContext?.participantId ?? null);
+        const saveSelectedTeamId = resolveFoundationTeamId(nextGameState.teams, scopedNewGameFlowForLoad?.selectedTeamId);
         const saveHasOwnedTeam = nextGameState.teams.some((team) => saveTeamSettingsMap[team.teamId]?.controlMode === "manual");
         const saveSelectionIsOwned =
           saveSelectedTeamId != null && saveTeamSettingsMap[saveSelectedTeamId]?.controlMode === "manual";
@@ -504,7 +511,7 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
                 currentTeamId: selectedTeamId,
                 currentSource: activeManagerTeamSource,
                 initialTeamId: initialSelectedTeamId,
-                savedTeamId: nextGameState.seasonState.newGameFlow?.selectedTeamId ?? null,
+                savedTeamId: scopedNewGameFlowForLoad?.selectedTeamId ?? null,
                 activeSaveId: payload.save.saveId,
                 settingsMap: saveTeamSettingsMap,
               });
@@ -800,7 +807,9 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
         setReadMeta(payload._meta);
       }
       const saveTeamSettingsMap = buildTeamControlSettingsMap(nextGameState.teams, nextGameState.seasonState.teamControlSettings);
-      const saveSelectedTeamId = resolveFoundationTeamId(nextGameState.teams, nextGameState.seasonState.newGameFlow?.selectedTeamId);
+      // KOOP: siehe Kommentar am ersten Vorkommen dieses Musters weiter oben in dieser Datei.
+      const scopedNewGameFlowForLoad = resolveScopedNewGameFlow(nextGameState.seasonState.newGameFlow, roomContext?.participantId ?? null);
+      const saveSelectedTeamId = resolveFoundationTeamId(nextGameState.teams, scopedNewGameFlowForLoad?.selectedTeamId);
       const saveHasOwnedTeam = nextGameState.teams.some((team) => saveTeamSettingsMap[team.teamId]?.controlMode === "manual");
       const saveSelectionIsOwned =
         saveSelectedTeamId != null && saveTeamSettingsMap[saveSelectedTeamId]?.controlMode === "manual";
@@ -816,7 +825,7 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
               currentTeamId: selectedTeamId,
               currentSource: activeManagerTeamSource,
               initialTeamId: initialSelectedTeamId,
-              savedTeamId: nextGameState.seasonState.newGameFlow?.selectedTeamId ?? null,
+              savedTeamId: scopedNewGameFlowForLoad?.selectedTeamId ?? null,
               activeSaveId: payload.save.saveId,
               settingsMap: saveTeamSettingsMap,
             });
