@@ -9,10 +9,8 @@ import {
 } from "@/lib/game/new-game-setup-service";
 import { isAuthEnabled } from "@/lib/auth/config";
 import { getSessionUser } from "@/lib/auth/session";
-import type { LeagueSetupTeamWarning } from "@/lib/data/olyDataTypes";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
-import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
-import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
+import { kickoffLeagueSetupDraft } from "@/lib/game/league-setup-draft-service";
 
 type NewGameRequestBody = {
   presetId?: NewGamePresetId;
@@ -76,79 +74,24 @@ export async function POST(request: Request) {
     const result = applyNewGameSetup(input, persistence, { ownerId });
 
     // Every team (the caller's own plus every AI/passive team) is created with an EMPTY roster —
-    // matchdays cannot resolve until each team has a roster/lineup. Unlike the `fresh-season-1`
-    // quick-action in app/api/singleplayer-state/route.ts, this route previously returned without
-    // ever kicking off the whole-league AI draft, so a fresh save created through this "Neues Spiel
-    // erstellen" wizard left every AI team permanently empty (no automatic or reachable trigger ever
-    // populated them). Mirror the same detached background-draft pattern here: mark the save
-    // "in_progress" now (the Foundation shell shows a "Liga wird erstellt…" gate and polls until
-    // "ready" — see use-foundation-shell-router-body-scope.tsx) and run the whole-league draft
-    // through the same ORGANIC engine (`/api/ai/picks-run`'s service) used everywhere else, so the
-    // "new game" HTTP request itself still returns immediately instead of blocking ~40s+.
+    // matchdays cannot resolve until each team has a roster/lineup. Runs through the SHARED
+    // league-setup-draft-service (also used by the `fresh-season-1` quick-action in
+    // app/api/singleplayer-state/route.ts and by `startRoom` in lib/room/room-store.ts) — same
+    // detached background draft, same "in_progress"/"ready"/"failed" status contract.
     const setupSaveId = result.save.saveId;
     const setupSeasonId = result.preview.seasonSetup.seasonId;
-    // Draft ONLY the AI-controlled teams. Unlike the `fresh-season-1` quick-action (which has no
-    // human team, so its whole-league `allowSetupAllTeams` draft is harmless), the "Neues Spiel"
-    // wizard hands one or more teams to Chris/Franky (controlMode "manual", humanControlled true).
-    // The `allowSetupAllTeams` bypass in `chooseTeams` ignores control mode entirely, so without a
-    // writable-scope restriction the background draft would ALSO fill the player's own roster — the
-    // player then finds their squad pre-picked instead of drafting it themselves. Passing the
-    // server-computed AI-team set as `callerWritableTeamIds` (the same guard that stops a bulk run
-    // from mutating another human participant's team) skips every human team; their rosters stay
-    // empty for manual drafting and never surface as spurious below-minimum setup warnings.
-    const aiTeamIdsForDraft = result.preview.aiTeamIds;
-    const savedForDraft = persistence.getSaveById(setupSaveId);
-    if (savedForDraft) {
-      persistence.saveSingleplayerState(setupSaveId, {
-        ...savedForDraft.gameState,
-        seasonState: { ...savedForDraft.gameState.seasonState, leagueSetupStatus: "in_progress" },
-      });
-      void (async () => {
-        try {
-          const runResult = await runAiPicksExecutePreview(
-            {
-              source: "sqlite",
-              saveId: setupSaveId,
-              seasonId: setupSeasonId,
-              dryRun: false,
-              confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
-              teamScope: "all",
-              allowSetupAllTeams: true,
-              callerWritableTeamIds: aiTeamIdsForDraft,
-              draftSeed: `${setupSaveId}:${setupSeasonId}:setup`,
-              yieldBetweenTeams: true,
-              batchPersistence: true,
-            },
-            persistence,
-          );
-          const leagueSetupWarnings: LeagueSetupTeamWarning[] = runResult.teams
-            .filter((team) => team.targetRosterMin != null && team.rosterAfter < team.targetRosterMin)
-            .map((team) => ({
-              teamId: team.teamId,
-              teamName: team.teamName,
-              rosterAfter: team.rosterAfter,
-              targetMin: team.targetRosterMin ?? 0,
-              status: team.blockingReasons.length > 0 ? "blocked" : "below_min",
-            }));
-          const filled = persistence.getSaveById(setupSaveId);
-          if (filled) {
-            persistence.saveSingleplayerState(setupSaveId, {
-              ...filled.gameState,
-              seasonState: { ...filled.gameState.seasonState, leagueSetupStatus: "ready", leagueSetupWarnings },
-            });
-          }
-        } catch (error) {
-          console.error("[new-game] background AI draft failed (retryable from Cockpit):", error);
-          const errored = persistence.getSaveById(setupSaveId);
-          if (errored) {
-            persistence.saveSingleplayerState(setupSaveId, {
-              ...errored.gameState,
-              seasonState: { ...errored.gameState.seasonState, leagueSetupStatus: "failed" },
-            });
-          }
-        }
-      })();
-    }
+    // Exclude every HUMAN team from the draft. Unlike the `fresh-season-1` quick-action (which has
+    // no human team, so its whole-league draft is harmless), the "Neues Spiel" wizard hands one or
+    // more teams to Chris/Franky (controlMode "manual", humanControlled true) — those players draft
+    // their own squad, so their team ids must never reach `runAiPicksExecutePreview`.
+    const humanTeamIds = [...result.preview.chrisTeamIds, ...result.preview.frankyTeamIds];
+    kickoffLeagueSetupDraft({
+      persistence,
+      saveId: setupSaveId,
+      seasonId: setupSeasonId,
+      excludeTeamIds: humanTeamIds,
+      logPrefix: "[new-game]",
+    });
 
     return NextResponse.json({ result });
   } catch (error) {
