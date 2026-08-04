@@ -15,6 +15,8 @@ import type {
 } from "@/types/events";
 import type { OlyRoomState } from "@/types/game";
 import { isRoomArenaReady } from "@/lib/room/arena-sync-state";
+import { ROOM_FLOW_STEPS } from "@/lib/room/room-flow-controller";
+import { createPersistenceService } from "@/lib/persistence/persistence-service";
 
 type JsonObject = Record<string, any>;
 type OlySocket = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -200,8 +202,15 @@ async function setSeatStorage(page: Page, roomCode: string, seatToken: string) {
 
 async function openRoomPage(page: Page, baseUrl: string, roomCode: string, expectedName: string) {
   await page.goto(`${baseUrl}/room/${roomCode}`, { waitUntil: "networkidle" });
-  await page.getByText(`Participant ${expectedName}`).waitFor({ timeout: 20_000 });
-  await page.getByText(`Code ${roomCode}`).waitFor({ timeout: 20_000 });
+  // Die "Participant <Name>"-Textzusicherung existierte so nie auf der Room-Seite (RoomPageClient
+  // zeigt den Namen nur als reine Tabellenzelle) - data-testid statt sichtbarem Text, siehe
+  // app/room/[roomCode]/RoomPageClient.tsx.
+  await page
+    .getByTestId("room-participant-name")
+    .filter({ hasText: expectedName })
+    .first()
+    .waitFor({ timeout: 20_000 });
+  await page.getByTestId("room-code-pill").getByText(roomCode, { exact: false }).waitFor({ timeout: 20_000 });
 }
 
 function buildFoundationHref(input: {
@@ -240,7 +249,11 @@ async function openFoundationArenaPage(
     }),
     { waitUntil: "networkidle" },
   );
-  await page.getByTestId("nl-matchday-arena").waitFor({ timeout: 90_000 });
+  // "nl-matchday-arena" war das Testid der frueheren MatchdayArenaNewLook-Komponente, die es
+  // laut Code-Kommentaren in lib/room/use-arena-room-sync.ts zwar noch geben sollte, tatsaechlich
+  // aber durch die Discipline-Stage-Arena ersetzt wurde (app/foundation/discipline-stage/arena/
+  // DisciplineStageNativeArena.tsx) - "arena-stage" ist deren aktueller Container.
+  await page.getByTestId("arena-stage").waitFor({ timeout: 90_000 });
 }
 
 async function screenshot(page: Page, name: keyof typeof SCREENSHOTS) {
@@ -256,7 +269,12 @@ async function completeStep(input: {
   frankySeat: string;
   currentState: OlyRoomState;
 }) {
-  const aiAutoSteps = new Set(["sell_players", "buy_players", "facilities", "xp_spend", "training", "lineup", "formcards"]);
+  // Aus dem echten Room-Flow-Controller abgeleitet statt hier dupliziert - eine hart codierte
+  // Kopie war genau der Grund, warum dieser E2E zuletzt bei "finalize_transfers" haengen blieb:
+  // die Liste kannte den (neuen) Step nicht und den (laengst abgeschafften) "xp_spend" noch.
+  // `Set<string>` statt `Set<RoomFlowStepId>`: `roomFlowState.step` ist `RoomFlowStepId | string`
+  // (types/game.ts) - der breitere String-Typ deckt auch abgeschaffte/unbekannte Legacy-Steps ab.
+  const aiAutoSteps = new Set<string>(ROOM_FLOW_STEPS.filter((step) => step.aiAutoStep).map((step) => step.stepId));
   let state = input.currentState;
   if (aiAutoSteps.has(state.roomFlowState.step)) {
     state = await emitAndWait(
@@ -320,6 +338,54 @@ function renderSummary(input: JsonObject) {
   ].join("\n");
 }
 
+/**
+ * Legt einen eigenen, isolierten Save fuer diesen Lauf an (Snapshot des gerade aktiven Saves),
+ * statt "irgendeinen aktiven Save" wiederzuverwenden.
+ *
+ * Gefundener echter Bug: ein Save bleibt seinem Room PERMANENT gebunden, sobald ein Host beigetreten
+ * ist - `getSeatCount()` (lib/room/room-store.ts) zaehlt belegte Sitzplaetze, nicht verbundene; der
+ * Host-Sitz bleibt nach `createRoom` immer belegt, auch nach Disconnect. Die "paused"-Markierung in
+ * `syncPlayers()`, die `getActiveRoomBySaveId()` (Grundlage von `save_bound_to_different_room`) von
+ * so einem Room befreien wuerde, ist dadurch fuer JEDEN echten Room unerreichbar - und nirgends im
+ * Code wird `status: "completed"` je gesetzt. Ein Save, der einmal fuer einen Room genutzt wurde,
+ * bleibt es fuer die Lebensdauer des Serverprozesses, unabhaengig davon, wie lange niemand mehr
+ * verbunden ist. Empirisch bestaetigt: >3 Minuten nach Verbindungsabbruch weiterhin blockiert.
+ *
+ * Das trifft `scripts/smoke-coop-sync.ts` GENAUSO (nutzt denselben "aktiven Save" per Default) -
+ * beide Skripte im selben CI-Lauf gegen denselben Server/DB haetten sich sonst gegenseitig
+ * ausgesperrt (der zweite Lauf haette IMMER `save_bound_to_different_room` bekommen). Das ist kein
+ * Nebeneffekt dieses Fixes, sondern war latent, seit es zwei room-erzeugende Smokes gibt - nur eben
+ * nie beide im selben Lauf scharf. Ein eigener Save pro Lauf umgeht das sauber, behebt aber NICHT
+ * den zugrundeliegenden Lifecycle-Bug (siehe Bericht) - der bleibt fuer echte Spieler bestehen, die
+ * denselben Save absichtlich in einem NEUEN Room weiterspielen wollen (z. B. nach Verlust des
+ * Raum-Codes).
+ */
+async function ensureIsolatedMultiplayerE2ESave(baseUrl: string) {
+  const persistence = createPersistenceService();
+  const bootstrap = persistence.bootstrapSingleplayerSave().save;
+  // `status: "archived"`, NICHT "active": `createScenarioSnapshot` (lib/persistence/save-repository.ts)
+  // ruft bei status "active" intern `setActiveSave` auf - das haette den globalen "aktive
+  // Save"-Zeiger umgebogen und GENAU das Problem reproduziert, das dieser ganze Save erst umgehen
+  // soll (z. B. app:smoke-coop-sync haette dann DIESEN Save als "aktiv" vorgefunden). "archived"
+  // laesst den Save unangetastet lesbar - `getSaveById`/das `saveId`-Query von
+  // /api/singleplayer-state filtern nicht nach Status - ohne den globalen Zeiger zu beruehren.
+  const snapshot = persistence.createScenarioSnapshot({
+    sourceSaveId: bootstrap.saveId,
+    name: `Multiplayer E2E Smoke ${new Date().toISOString()}`,
+    status: "archived",
+    scenarioMeta: {
+      scenarioType: "manager_multiplayer_test",
+      label: "Multiplayer E2E Smoke",
+      description: "Isolierter Save fuer scripts/smoke-multiplayer-e2e.ts - nie mit anderen Smokes geteilt.",
+      createdAt: new Date().toISOString(),
+      sourceSaveId: bootstrap.saveId,
+      saveCategory: "manual",
+    },
+  });
+  const scoped = await fetchJson(baseUrl, `/api/singleplayer-state?saveId=${encodeURIComponent(snapshot.saveId)}`);
+  return { saveId: snapshot.saveId, gameState: scoped.save?.gameState };
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   let server: ChildProcessWithoutNullStreams | null = null;
@@ -329,8 +395,8 @@ async function main() {
 
   try {
     server = await ensureServer(options.baseUrl, options.noStart);
-    const activeSave = await fetchJson(options.baseUrl, "/api/singleplayer-state");
-    const saveId = activeSave.save?.saveId ?? "local-multiplayer-e2e-save";
+    const isolatedSave = await ensureIsolatedMultiplayerE2ESave(options.baseUrl);
+    const saveId = isolatedSave.saveId;
 
     socketA = await createSocket(options.baseUrl);
     const created = await waitForJoined(socketA, () =>
@@ -485,6 +551,21 @@ async function main() {
     };
 
     if (state.roomFlowState.step === "arena") {
+      // Die Discipline-Stage-Arena startet den Reveal-Sync nur, wenn `getMatchdayLeagueLineupReadiness`
+      // fuer ALLE 32 Liga-Teams "bereit" meldet (echte Aufstellung + Formkarten). Dieses V1-Skript
+      // schreibt - wie schon fuer sell/buy/facilities/training/lineup/formcards weiter oben - bewusst
+      // KEINE echten Gameplay-Daten (siehe writeAudit.note unten), kann das Client-Gate also nicht ueber
+      // echte Aufstellungen erfuellen. Der servergetriebene Start-Socket-Event ist von diesem Gate
+      // unabhaengig (das Gate lebt rein im Client-Effect, siehe DisciplineStageArena.tsx), genau wie es
+      // `scripts/audit-koop-spielbarkeit.ts` (B3) fuer den Server-Pfad bereits verifiziert — hier wird
+      // derselbe Weg genommen, um die Arena fuer den DOM-Teil dieses Tests ueberhaupt erreichbar zu
+      // machen.
+      //
+      // "arena-coop-ready-gate" / "Bereit für den Spieltag" / "Weiter" / "Phase X/7" waren
+      // Selektoren der frueheren MatchdayArenaNewLook-Komponente. Die Arena wurde seither durch
+      // die Discipline-Stage-Arena ersetzt (app/foundation/discipline-stage/arena/
+      // DisciplineStageNativeArena.tsx) - deren Coop-Gate traegt eigene, stabilere Testids
+      // (arena-coop-status/arena-coop-ready/arena-coop-follow/arena-primary-step).
       await openFoundationArenaPage(pageA, {
         baseUrl: options.baseUrl,
         state,
@@ -498,46 +579,103 @@ async function main() {
         seatToken: joined.seatToken,
       });
 
-      // New-Look co-op ready gate: both real participants control teams, so
-      // the shared reveal must NOT start until both click ready — verified
-      // via the actual UI (not raw socket emits) to exercise the real
-      // MatchdayArenaNewLook + useArenaRoomSync wiring end-to-end.
-      await pageA.getByTestId("arena-coop-ready-gate").waitFor({ timeout: 30_000 });
-      await pageB.getByTestId("arena-coop-ready-gate").waitFor({ timeout: 30_000 });
+      const coopStatusA = pageA.getByTestId("arena-coop-status");
+      const coopStatusB = pageB.getByTestId("arena-coop-status");
+      await coopStatusA.waitFor({ timeout: 30_000 });
+      await coopStatusB.waitFor({ timeout: 30_000 });
+
+      // Beide Seiten sind bewusst VOR dem Arena-Start geladen: der Guest muss den
+      // "Warte auf den Host"-Hinweis sehen (arenaSyncState noch "idle"), bevor der Host ueberhaupt
+      // gestartet hat - das ist der Zustand, den ein echter Mitspieler beim Betreten zuerst sieht.
+      await pageB.getByTestId("arena-coop-follow").getByText("Warte auf den Host").waitFor({ timeout: 20_000 });
       screenshots.foundationArenaSync = await screenshot(pageA, "foundationArenaSync");
 
-      await pageA.getByRole("button", { name: "Bereit für den Spieltag" }).click();
-      await pageA.getByText("Warte auf Franky").waitFor({ timeout: 20_000 });
-      await pageB.getByRole("button", { name: "Bereit für den Spieltag" }).click();
+      // Die Discipline-Stage-Arena startet den Reveal-Sync nur automatisch, wenn
+      // `getMatchdayLeagueLineupReadiness` fuer ALLE 32 Liga-Teams "bereit" meldet (echte
+      // Aufstellung + Formkarten). Dieses V1-Skript schreibt - wie schon fuer
+      // sell/buy/facilities/training/lineup/formcards weiter oben - bewusst KEINE echten
+      // Gameplay-Daten (siehe writeAudit.note unten), kann das Client-Gate also nicht ueber echte
+      // Aufstellungen erfuellen. Der servergetriebene Start-Socket-Event ist von diesem Gate
+      // unabhaengig (das Gate lebt rein im Client-Effect), genau wie es
+      // `scripts/audit-koop-spielbarkeit.ts` (B3) fuer den Server-Pfad bereits verifiziert - hier
+      // wird derselbe Weg genommen, um den Reveal fuer den DOM-Teil dieses Tests ueberhaupt
+      // erreichbar zu machen. Beide Browser sind schon offen und reagieren auf den folgenden
+      // Broadcast wie auf jeden echten Room-Sync auch.
+      //
+      // Gefundener echter Bug beim ersten Anlauf dieses Fixes: `startRoomArena` OHNE explizites
+      // matchdayId liess den Server auf `String(activeMatchday)` ("1") zurueckfallen, waehrend die
+      // Discipline-Stage-Arena selbst mit dem echten `gameState.matchdayState.matchdayId`
+      // ("matchday-1") scoped (`matchesArenaScope` in lib/room/arena-sync-state.ts vergleicht
+      // exact) - das Ready-Gate blieb dadurch fuer die UI unsichtbar (arenaSyncState "lief", aber
+      // ausserhalb des vom Client erwarteten Scopes), obwohl der Server den Sync korrekt hielt.
+      // Der echte Client (DisciplineStageArena.tsx) uebergibt matchdayId/seasonId immer explizit -
+      // hier tun wir dasselbe, statt uns auf den (fuer echte Aufrufer nie genutzten) Server-Fallback
+      // zu verlassen. Fix des Fallbacks selbst: lib/room/arena-sync-state.ts.
+      // Scoped auf `saveId`, NICHT den global "aktiven" Save: dieses Skript aktiviert seinen
+      // isolierten Save bewusst nicht global (siehe ensureIsolatedMultiplayerE2ESave), also wuerde
+      // eine ungescopte Abfrage hier den FALSCHEN Save lesen.
+      const matchdayScope = await fetchJson(options.baseUrl, `/api/singleplayer-state?saveId=${encodeURIComponent(saveId)}`);
+      const currentMatchdayId = matchdayScope.save?.gameState?.matchdayState?.matchdayId ?? null;
+      state = await emitAndWait(
+        socketA,
+        "startRoomArena",
+        {
+          roomCode,
+          seatToken: created.seatToken,
+          seasonId: state.roomFlowState.activeSeasonId,
+          matchdayId: currentMatchdayId,
+          maxSlotRevealCountByDiscipline: { d1: 2, d2: 2 },
+        },
+        (next) => next.arenaSyncState?.status === "ready_check",
+        "start-room-arena",
+      );
 
-      // Once both are ready the gate disappears on both screens and the
-      // host-controlled note appears.
-      await pageA.getByTestId("arena-coop-ready-gate").waitFor({ state: "detached", timeout: 20_000 });
-      await pageB.getByTestId("arena-coop-ready-gate").waitFor({ state: "detached", timeout: 20_000 });
-      await pageA.getByText("Du steuerst den Reveal für alle.").waitFor({ timeout: 20_000 });
-      await pageB.getByText("Der Host steuert den Reveal.").waitFor({ timeout: 20_000 });
+      // Co-op ready gate: both real participants control teams, so the shared reveal must NOT
+      // start until both click ready — verified via the actual UI (not raw socket emits) to
+      // exercise the real DisciplineStageNativeArena + useArenaRoomSync wiring end-to-end.
+      await pageA.getByTestId("arena-coop-ready").waitFor({ timeout: 20_000 });
+      await pageB.getByTestId("arena-coop-ready").waitFor({ timeout: 20_000 });
 
-      // Guest controls must be locked: the "Weiter" button reflects the
+      const primaryStepA = pageA.getByTestId("arena-primary-step");
+      const primaryStepB = pageB.getByTestId("arena-primary-step");
+      // Der Ticker ist vor dem ersten Reveal-Schritt leer ("Läuft, sobald die erste Etappe
+      // startet.") - ein zuverlässigerer "ist wirklich etwas passiert"-Beleg als die
+      // primary-step-Beschriftung. Die zeigt naemlich fuer den Gast IMMER "Start · Etappe 1/N":
+      // `started` (DisciplineStageNativeArena.tsx) wird nur im eigenen onClick-Handler gesetzt,
+      // den der Gast nie ausloest (Knopf ist disabled). Der Gast folgt dem Host stattdessen ueber
+      // einen separaten Effekt (`roomSync.syncedRound > round` -> `advance()`), der round/Ticker
+      // trotzdem korrekt mitzieht - nur das Knopf-Label bleibt hier ein rein lokaler, fuer den
+      // Gast nie erreichter Zustand. Kein Sync-Bug, nur ein irrefuehrender Test-Proxy - hier durch
+      // den echten Ticker-Inhalt ersetzt.
+      const tickerPlaceholder = "Läuft, sobald die erste Etappe startet.";
+
+      await pageA.getByTestId("arena-coop-ready").click();
+      await coopStatusA.getByText(/Warte auf: Franky/).waitFor({ timeout: 20_000 });
+      await pageB.getByTestId("arena-coop-ready").click();
+
+      // Once both are ready the ready-toggle button disappears on both screens (coopGate.active
+      // flips false) and the host-controlled note appears for the guest.
+      await pageA.getByTestId("arena-coop-ready").waitFor({ state: "detached", timeout: 20_000 });
+      await pageB.getByTestId("arena-coop-ready").waitFor({ state: "detached", timeout: 20_000 });
+      await pageB.getByTestId("arena-coop-follow").getByText("Der Host steuert den Reveal").waitFor({ timeout: 20_000 });
+
+      // Guest controls must be locked: the primary-step button reflects the
       // gate/host-only rule via the disabled attribute.
-      const guestWeiter = pageB.getByRole("button", { name: "Weiter" });
-      const guestWeiterDisabled = await guestWeiter.isDisabled();
+      const guestWeiterDisabled = await primaryStepB.isDisabled();
 
-      await pageA.getByText(/Phase\s+1\/7/).waitFor({ timeout: 20_000 });
-      await pageB.getByText(/Phase\s+1\/7/).waitFor({ timeout: 20_000 });
+      // Host advances via the real primary-step button — this is the lockstep-reveal path
+      // (`handleHostRoomArenaAdvance` -> `useArenaRoomSync().emitHostRoomArenaAdvance` -> socket
+      // -> server -> `roomState` -> `onApplyRevealSync` on both screens). Wir warten auf den
+      // Ticker-Inhalt, NICHT auf den Knopf-Text (siehe Kommentar oben) - das ist der reale Beweis,
+      // dass der Reveal-Effekt auf dem GAST-Bildschirm gelaufen ist, nicht nur beim Host.
+      await primaryStepA.click();
 
-      // Host advances via the real "Weiter" button — this is the
-      // lockstep-reveal path (`handleHostRoomArenaAdvance` ->
-      // `useArenaRoomSync().emitHostRoomArenaAdvance` -> socket ->
-      // server -> `roomState` -> `onApplyRevealSync` on both screens).
-      await pageA.getByRole("button", { name: "Weiter" }).click();
-
-      await pageA.getByText(/Phase\s+2\/7/).waitFor({ timeout: 20_000 });
-      await pageB.getByText(/Phase\s+2\/7/).waitFor({ timeout: 20_000 });
+      await pageB.getByText(tickerPlaceholder).waitFor({ state: "detached", timeout: 45_000 });
       screenshots.resultSync = await screenshot(pageB, "resultSync");
 
       foundationArenaSync = {
         ok: true,
-        reason: "new_look_coop_gate_and_host_advance_synced_to_guest",
+        reason: "discipline_stage_arena_coop_gate_and_host_advance_synced_to_guest",
         hostSlotRevealIndex: null,
         guestSawHostControlledCopy: guestWeiterDisabled,
       };
@@ -560,8 +698,13 @@ async function main() {
     await pageB.getByText("Saisonstand ansehen").first().waitFor({ timeout: 20_000 });
     screenshots.resultSync = await screenshot(pageA, "resultSync");
 
+    // Das ist der frueher dokumentierte CI-Blocker: nach einem Reload der Foundation-Ansicht
+    // muss Frankys Teilnehmer-Identitaet wieder auftauchen (Room-Chip aus PR #374,
+    // app/foundation/FoundationShellRouterBody.tsx). Die alte Zusicherung suchte den Text
+    // "Participant Franky", den es auf dieser Seite nie gab (der Chip zeigt nur den nackten
+    // Namen) - data-testid statt sichtbarem Text, der ist stabiler.
     await pageB.reload({ waitUntil: "networkidle" });
-    await pageB.getByText("Participant Franky").waitFor({ timeout: 20_000 });
+    await pageB.getByTestId("foundation-room-participant-identity").getByText("Franky").waitFor({ timeout: 20_000 });
     const reloadedFranky = participantByName(state, "Franky");
 
     const generatedWrites = state.roomEvents
