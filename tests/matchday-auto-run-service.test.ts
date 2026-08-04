@@ -689,6 +689,76 @@ describe("matchday auto-run per-discipline commit", () => {
       expect(points).toBeGreaterThanOrEqual(baseline);
     }
   }, 120_000);
+
+  // Coordinator follow-up: does a D1-only save (advance blocked) leave the player a visible,
+  // clickable way to actually book D2 -- or does it recreate the historical #224 dead end
+  // (button removed, replacement only reachable via a spot the player never finds)? Answered
+  // against a REAL post-D1-commit save, not a hand-built fixture, so this is belegt.
+  it("keeps the flow pointing at the Arena (never the Cockpit) once D1 is booked and D2 is still open", async () => {
+    const { buildGameFlowState } = await import("@/lib/foundation/game-flow-controller");
+    const { resolveGameFlowActionStep } = await import("@/lib/foundation/resolve-game-flow-action-step");
+
+    const gameState = makeAllAiGameState();
+    const persistence = createInMemoryPersistence(gameState, true);
+    const matchdayId = gameState.matchdayState.matchdayId;
+    const activeTeamId = gameState.teams[0]!.teamId;
+
+    const d1 = await runCommit(persistence, gameState, "d1");
+    expect(d1.summary.resultApplyAllowed).toBe(true);
+
+    const afterD1 = persistence.getSaveById("test-save")!.gameState;
+    expect(afterD1.matchdayState.matchdayId).toBe(matchdayId); // sanity: still on the same matchday.
+
+    const flow = buildGameFlowState({ gameState: afterD1, activeTeamId });
+    const advanceStep = flow.steps.find((step) => step.stepId === "advance_to_next_matchday");
+    expect(advanceStep?.status).toBe("blocked");
+    expect(advanceStep?.blockers).toContain("result_incomplete_missing_d2");
+
+    // 1) The season's own "which step is current" picker must not surface the blocked advance
+    //    step as something to act on directly without a route back to the Arena.
+    expect(flow.currentStep.targetView === "matchdayArena" || flow.currentStep.stepId === "advance_to_next_matchday").toBe(
+      true,
+    );
+
+    // 2) Worst realistic case: every OTHER step that also points at the Arena
+    //    ("review_matchday_results", "open_season_standings") has already been acknowledged by
+    //    the player earlier (see use-foundation-cross-tab-game-flow.ts) and therefore drops out
+    //    of `actionableSteps`. There's ALSO a pre-existing, unrelated detour once both of those
+    //    are acknowledged: `resolveGameFlowActionStep` nudges towards an affordable facility
+    //    upgrade first ("matchday_facilities", optional) before ever looking at the advance
+    //    step -- that's intentional UX, not part of this fix, and it's dismissable exactly like
+    //    any other optional step. Acknowledging it too reaches the actual worst case: nothing
+    //    left recommending a next action except the blocked advance step itself, whose OWN
+    //    targetView is then the entire safety net.
+    const acknowledgedFlowStepIds = new Set(["review_matchday_results", "open_season_standings", "matchday_facilities"]);
+    const actionableSteps = flow.steps.filter(
+      (step) => step.status !== "completed" && !(step.status !== "blocked" && acknowledgedFlowStepIds.has(step.stepId)),
+    );
+    const fallbackStep = flow.currentStep.status === "completed" ? (flow.nextStep ?? flow.currentStep) : flow.currentStep;
+    const actionStep = resolveGameFlowActionStep(actionableSteps, fallbackStep, acknowledgedFlowStepIds);
+
+    // This is exactly what `createTriggerGlobalNext` (foundation-global-next-actions.ts) would
+    // navigate to once `canAdvanceMatchdayFromStep(actionStep)` is false (status "blocked"):
+    // `navigateToGameFlowStep(actionStep.targetView, ..., actionStep.targetPanel)`. Landing on
+    // "cockpit" here would silently reopen the #224 dead end
+    // (tests/arena-finish-matchday-reachable.test.ts) for exactly the players this fix is meant
+    // to protect.
+    expect(actionStep.targetView).toBe("matchdayArena");
+    expect(actionStep.targetPanel).toBe("foundation-matchday-arena");
+
+    // 3) And the concrete, always-on escape hatch regardless of which step "wins" above: the
+    //    Arena itself accepts a D2 commit for this matchday right now, independent of the flow
+    //    picker entirely (`onCommitDiscipline` is wired unconditionally in
+    //    FoundationShellRouterBody.tsx, never gated on `hasFullMatchdayResult`). With
+    //    `advanceAfterCashApply: true` (this describe block's default `runCommit` options) a
+    //    full D2 commit also advances the season on its own -- the clearest possible proof that
+    //    nothing is stuck: the matchday actually moves on.
+    const d2 = await runCommit(persistence, gameState, "d2");
+    expect(d2.summary.resultApplyAllowed).toBe(true);
+    expect(d2.summary.advanceAllowed).toBe(true);
+    const afterD2 = persistence.getSaveById("test-save")!.gameState;
+    expect(afterD2.matchdayState.matchdayId).not.toBe(matchdayId);
+  }, 120_000);
 });
 
 describe("matchday resolve snapshot equality", () => {
