@@ -7,7 +7,6 @@ import { loadFoundationSnapshotFromPrisma } from "@/lib/db/read/foundation-read-
 import type {
   ContractNegotiationDraftStatus,
   GameState,
-  LeagueSetupTeamWarning,
   NewGameFlowStepId,
   NewGameFlowStepStatus,
 } from "@/lib/data/olyDataTypes";
@@ -43,8 +42,7 @@ import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier
 import { authorizeServerRoomWrite, type ServerRoomWriteAuthorization } from "@/lib/room/server-authoritative-write-guard";
 import { ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
-import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
-import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
+import { kickoffLeagueSetupDraft } from "@/lib/game/league-setup-draft-service";
 import { resolveSessionOwnerId } from "@/lib/auth/session";
 
 /**
@@ -456,80 +454,20 @@ export async function POST(request: Request) {
     const ownerId = await resolveSessionOwnerId();
     const created = persistence.createFreshSeasonOneSave({ name: body.name, ownerId });
     // A fresh Season 1 seeds all 32 teams with EMPTY rosters; matchdays cannot resolve until every team has a
-    // roster/lineup. The whole-league AI draft (~40s) runs in the BACKGROUND (detached) on this long-lived
-    // custom Node server so the "new game" request returns immediately instead of blocking ~40s (which would
-    // time out behind a proxy). We mark the save "in_progress" now; the background draft flips it to "ready"
-    // when every team is populated (or "failed" on error, retryable from the Cockpit). The UI shows a
-    // "Liga wird erstellt…" gate and polls until "ready".
+    // roster/lineup. The whole-league AI draft (~40s) runs in the BACKGROUND (detached) via the SHARED
+    // league-setup-draft-service (also used by app/api/new-game/route.ts and lib/room/room-store.ts's
+    // `startRoom`, so all three "new league" entry points behave identically — see that module's header
+    // comment for the full rationale). No `excludeTeamIds`: fresh-season-1 has no human team yet, the whole
+    // league (including the eventual human team) is drafted.
     const setupSaveId = created.saveId;
     const setupSeasonId = created.gameState.season.id;
-    save = persistence.saveSingleplayerState(setupSaveId, {
-      ...created.gameState,
-      seasonState: { ...created.gameState.seasonState, leagueSetupStatus: "in_progress" },
-    });
-    void (async () => {
-      try {
-        // Route the fresh-season-1 whole-league draft through the ORGANIC engine (the same path S2+ and
-        // the manual re-pick buttons already use via /api/ai/picks-run) instead of the legacy
-        // auto-roster-fill planner, which was proven to produce bipolar/broken squads (superstars + trash,
-        // or an all-mid blob) on a fresh S1. teamScope:"all" + allowSetupAllTeams:true drafts every team
-        // (teamIds omitted); yieldBetweenTeams:true keeps the 5s league-setup status poll unblocked during
-        // this long (whole-league) run.
-        const runResult = await runAiPicksExecutePreview(
-          {
-            source: "sqlite",
-            saveId: setupSaveId,
-            seasonId: setupSeasonId,
-            dryRun: false,
-            confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
-            teamScope: "all",
-            allowSetupAllTeams: true,
-            draftSeed: `${setupSaveId}:${setupSeasonId}:setup`,
-            yieldBetweenTeams: true,
-            batchPersistence: true,
-          },
-          persistence,
-        );
-        // Surface teams the draft could not bring up to their minimum roster (or that ended blocked) so the
-        // "ready" banner can flag them instead of pretending everything worked. The league is still playable
-        // ("ready"); these are "needs attention" markers, not a hard failure.
-        const leagueSetupWarnings: LeagueSetupTeamWarning[] = runResult.teams
-          .filter((team) => team.targetRosterMin != null && team.rosterAfter < team.targetRosterMin)
-          .map((team) => ({
-            teamId: team.teamId,
-            teamName: team.teamName,
-            rosterAfter: team.rosterAfter,
-            targetMin: team.targetRosterMin ?? 0,
-            status: team.blockingReasons.length > 0 ? "blocked" : "below_min",
-          }));
-        const blockedTeamCount = runResult.teams.filter((team) => team.blockingReasons.length > 0).length;
-        if (leagueSetupWarnings.length > 0 || blockedTeamCount > 0) {
-          console.warn(
-            `[fresh-season-1] AI draft left ${leagueSetupWarnings.length} team(s) below minimum, ${blockedTeamCount} blocked team(s).`,
-          );
-        }
-        const filled = persistence.getSaveById(setupSaveId);
-        if (filled) {
-          persistence.saveSingleplayerState(setupSaveId, {
-            ...filled.gameState,
-            seasonState: {
-              ...filled.gameState.seasonState,
-              leagueSetupStatus: "ready",
-              leagueSetupWarnings,
-            },
-          });
-        }
-      } catch (error) {
-        console.error("[fresh-season-1] background AI draft failed (retryable from Cockpit):", error);
-        const errored = persistence.getSaveById(setupSaveId);
-        if (errored) {
-          persistence.saveSingleplayerState(setupSaveId, {
-            ...errored.gameState,
-            seasonState: { ...errored.gameState.seasonState, leagueSetupStatus: "failed" },
-          });
-        }
-      }
-    })();
+    save =
+      kickoffLeagueSetupDraft({
+        persistence,
+        saveId: setupSaveId,
+        seasonId: setupSeasonId,
+        logPrefix: "[fresh-season-1]",
+      }) ?? created;
   } else if (body.action === "delete") {
     if (!Array.isArray(body.saveIds) || body.saveIds.length === 0) {
       return NextResponse.json({ error: "saveIds ist erforderlich und darf nicht leer sein." }, { status: 400 });

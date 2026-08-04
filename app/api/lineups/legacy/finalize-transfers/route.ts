@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 import { ensureLocalLegacyFormCardsForSeason } from "@/lib/lineups/legacy-lineup-local-service";
 import type { LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
-import { mapSaveResolutionErrorToResponse } from "@/lib/persistence/resolve-local-save";
+import { mapSaveResolutionErrorToResponse } from "@/lib/persistence/save-resolution-response";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { parseRoomWriteContextFromRequest } from "@/lib/room/parse-room-write-context";

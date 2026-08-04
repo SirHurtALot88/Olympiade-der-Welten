@@ -57,6 +57,24 @@
     },
     {
       "datum": "2026-08-04",
+      "seite": "Multiplayer · Raum",
+      "pr": null,
+      "text": "Ein Koop-Spiel startete mit 31 von 32 Teams ohne einen einzigen Spieler — kein Spieltag ließ sich abschließen. Der Liga-Draft läuft jetzt beim Raumstart genauso wie im Solo-Modus.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
+      "seite": "Entwicklung",
+      "pr": null,
+      "text": "Spielstände, die schon mit leeren Kadern feststecken, lassen sich reparieren: der Draft wird nachgeholt, gefüllte Teams bleiben unangetastet, und ohne ausdrückliches Anwenden passiert nichts.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
       "seite": "Multiplayer · Spielansicht",
       "pr": null,
       "text": "Koordiniert wurde im Raum, gespielt in der Spielansicht — den Flow sah man dort nur als Tooltip, also musste man zwischen zwei Seiten pendeln. Ready melden, Weiterschalten und wer gerade blockiert steht jetzt direkt in der Spielansicht, und bei jedem Schrittwechsel springt sie von selbst in die passende Ansicht.",

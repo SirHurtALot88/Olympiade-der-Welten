@@ -1,6 +1,6 @@
 {
   "name": "baue-einen-lokalen-web-app-prototyp",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "private": true,
   "scripts": {
     "next:clean": "tsx scripts/clean-next-runtime.ts",
@@ -46,6 +46,7 @@
     "app:smoke-gameplay-write": "tsx scripts/smoke-gameplay.ts --write --confirm-testsave",
     "test:e2e": "playwright test",
     "save:repair-team-control": "tsx scripts/repair-save-team-control.ts",
+    "save:repair-empty-rosters": "tsx scripts/repair-save-empty-rosters.ts",
     "app:smoke-multiplayer-e2e": "tsx scripts/smoke-multiplayer-e2e.ts",
     "ci:client-bundle-lint": "tsx scripts/lint-client-bundle-boundaries.ts",
     "audit:ui": "tsx scripts/ui-audit-scan.ts",

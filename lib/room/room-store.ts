@@ -27,6 +27,7 @@ import {
 import { findSeatByToken } from "@/lib/room/rejoin";
 import { createSeatToken } from "@/lib/room/seat-tokens";
 import { createRoomCoopSave } from "@/lib/game/new-game-setup-service";
+import { kickoffLeagueSetupDraft } from "@/lib/game/league-setup-draft-service";
 import { registerLiveRoomSaveId } from "@/lib/room/live-room-save-registry";
 import { applyGameModeOwnership } from "@/lib/foundation/team-control-settings";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -646,6 +647,22 @@ export function startRoom(
       boundSaveId = existingSave.saveId;
     } else {
       boundSaveId = createRoomCoopSave({ chrisTeamIds, frankyTeamIds, roomCode: room.roomCode }, persistence).saveId;
+      // Genau wie ein frischer Solo-Save (fresh-season-1) und die "Neues Spiel"-Wizard-Route
+      // startet ein frisch angelegter Koop-Save alle 32 Teams mit LEEREN Kadern — ohne diesen Lauf
+      // ist im Room kein Spieltag aufloesbar (siehe league-setup-draft-service.ts Kopfkommentar).
+      // Detached (kein `await`): `startRoom` ist synchron und darf den Room-Start nicht ~40s
+      // blockieren. `excludeTeamIds` schliesst BEIDE menschlichen Teamsaetze aus (Host + ggf.
+      // Gast) — sie draften ihren Grundkader wie im Solo-"Neues Spiel"-Assistenten NICHT
+      // automatisch mit, sondern bekommen (aktuell) einen leeren Kader zum manuellen Aufbau. Das
+      // ist eine bewusste Fortsetzung des bestehenden new-game-Verhaltens, kein neuer Unterschied
+      // zu Solo — siehe Bericht zur verbleibenden Luecke "Gast-Erstkader" im Abschlussbericht der
+      // Aufgabe.
+      kickoffLeagueSetupDraft({
+        persistence,
+        saveId: boundSaveId,
+        excludeTeamIds: [...chrisTeamIds, ...frankyTeamIds],
+        logPrefix: "[room-start]",
+      });
     }
 
     // Register the live co-op save so rolling save retention (see save-retention.ts) never

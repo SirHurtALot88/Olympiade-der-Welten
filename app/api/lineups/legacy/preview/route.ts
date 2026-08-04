@@ -9,7 +9,7 @@ import {
 } from "@/lib/lineups/legacy-lineup-local-service";
 import { LegacyLineupService } from "@/lib/lineups/legacy-lineup-service";
 import type { LegacyLineupEntryInput, LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
-import { mapSaveResolutionErrorToResponse } from "@/lib/persistence/resolve-local-save";
+import { mapSaveResolutionErrorToResponse } from "@/lib/persistence/save-resolution-response";
 
 function parseKeyParams(request: Request): LegacyLineupKeyParams | null {
   const { searchParams } = new URL(request.url);
