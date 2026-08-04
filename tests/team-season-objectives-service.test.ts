@@ -8,7 +8,9 @@ import {
   buildTeamObjectiveOverview,
   buildTeamSeasonObjectiveSettlement,
   computeTeamExpectation,
+  getAxisRankObjective,
   getExpectationRankObjective,
+  getMatchdayMedalObjective,
   getSignatureAxisWinObjective,
   getSportTarget,
   getSportTargetV2,
@@ -1756,5 +1758,148 @@ describe("Vergabe: höchstens ein verbindliches Rang-Ziel je Saison", () => {
     expect(breakthroughRow?.boardConfidenceDelta).toBeGreaterThanOrEqual(0);
     // Und es taucht nicht als Vorstands-Warnung auf, solange die verbindlichen Ziele stehen.
     expect(overview.boardConfidence["C-C"]).toBeDefined();
+  });
+});
+
+// FAIRNESS DER BOARD-ZIELE: zwei Vorgaben, die ein Team gar nicht erreichen KONNTE, wurden trotzdem
+// gestellt und am Saisonende als "verfehlt" gemeldet — inklusive Vertrauensabzug. Beide Fälle stammen
+// aus einem echten Spielstand (Team auf Liga-Rang 19).
+describe("Board-Ziele bleiben erreichbar", () => {
+  /** Liga mit streng monoton fallender Stärke: Index 0 = stärkstes Team, Index n-1 = schwächstes. */
+  function buildStrengthLadderLeague(teamCount: number, identityPartial?: Partial<TeamIdentity>) {
+    const teams = Array.from({ length: teamCount }, (_, i) =>
+      createTeam({ teamId: `L-${i}`, shortCode: `L${i}`, name: `Ladder ${i}` }),
+    );
+    const players = teams.map((team, i) =>
+      createPlayer(`${team.teamId}-p`, {
+        rating: 95 - i * 2,
+        marketValue: 400 - i * 10,
+        displayMarketValue: 400 - i * 10,
+        coreStats: { pow: 80 - i * 2, spe: 80 - i * 2, men: 80 - i * 2, soc: 80 - i * 2 },
+      }),
+    );
+    const rosters = teams.map((team) => createRoster(`${team.teamId}-p`, { teamId: team.teamId, currentValue: 0 }));
+    const gameState = createGameState({
+      teams,
+      // Ambition 8 für ALLE: das Medaillenziel hing bisher allein daran, also ist der Identity-Gate offen.
+      identities: teams.map((team) => createIdentity(team.teamId, { ambition: 8, ...identityPartial })),
+      players,
+      rosters,
+      standings: Object.fromEntries(teams.map((team, i) => [team.teamId, { points: 100 - i, rank: i + 1 }])),
+    });
+    const rowsByTeamId = new Map(buildTeamSeasonOverviewRows({ gameState }).map((row) => [row.teamId, row] as const));
+    return { gameState, teams, rowsByTeamId };
+  }
+
+  function medalObjectiveFor(teamIndex: number) {
+    const { gameState, teams, rowsByTeamId } = buildStrengthLadderLeague(32);
+    const team = teams[teamIndex]!;
+    return getMatchdayMedalObjective({
+      gameState,
+      team,
+      identity: gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null,
+      profile: null,
+      rowsByTeamId,
+    });
+  }
+
+  it("stellt einem Team ausserhalb der Medaillenreichweite kein Spieltagsmedaillen-Ziel", () => {
+    // Der Spielstand-Fall: ehrgeiziges Team, sportlich aber Rang 19 von 32 — bestes Team-Rank #5, also
+    // nie eine Medaille (Top 3 an einem Spieltag). Vorher wurde das Ziel trotzdem gestellt und verfehlt.
+    expect(medalObjectiveFor(18)).toBeNull();
+  });
+
+  it("stellt es dem Spitzenteam derselben Liga weiterhin", () => {
+    const objective = medalObjectiveFor(0);
+    expect(objective).not.toBeNull();
+    expect(objective?.objectiveId).toBe("sport-matchday-medals");
+  });
+
+  it("fordert zwei Medaillen nur von der Ligaspitze, nicht mehr per Team-Kürzel", () => {
+    // Vorher hing das 2er-Ziel u. a. an shortCode M-M/Z-H — unabhängig davon, wie stark das Team war.
+    expect(medalObjectiveFor(0)?.targetValue).toBe(2);
+    // Rang ~6: noch medaillenfähig (Ein-Medaillen-Ziel), aber keine Doppelvorgabe.
+    expect(medalObjectiveFor(5)?.targetValue).toBe(1);
+  });
+
+  it("spiegelt die V3-Gewinnstufenleiter nicht als Pass-/Fail-Ziel 'Top 1'", () => {
+    // Die Rang-Komponente eines V3-Vertrags ist die gestaffelte Auszahlungsleiter; ihr targetValue steht
+    // auf 1, weil Rang 1 die oberste Sprosse ist. Als Board-Ziel gespiegelt wurde daraus "Ziel Top 1",
+    // das 31 von 32 Teams jede Saison verfehlen — mitsamt Vertrauensabzug und Inbox-Meldung.
+    const { gameState, teams } = buildStrengthLadderLeague(32);
+    const team = teams[18]!;
+    gameState.seasonState.sponsorContractsByTeamId = {
+      [team.teamId]: {
+        seasonId: gameState.season.id,
+        teamId: team.teamId,
+        offerId: "offer-1",
+        archetype: "balanced",
+        name: "Testsponsor",
+        chosenAt: "2026-06-13T10:00:00.000Z",
+        startRank: 19,
+        components: [
+          { componentId: "rank-target", kind: "rank", label: "Gewinnstufen nach Endrang · Basis", targetValue: 1, rewardCash: 30 },
+        ],
+        payouts: {},
+        sponsorV3: { cardKey: "test", cardName: "Basis" },
+      },
+    } as unknown as NonNullable<GameState["seasonState"]["sponsorContractsByTeamId"]>;
+
+    const ladder = buildTeamObjectiveOverview(gameState).objectives.find(
+      (objective) => objective.teamId === team.teamId && objective.objectiveId === "sponsor-rank-target",
+    );
+
+    expect(ladder).toBeDefined();
+    expect(ladder?.targetValue).not.toBe("Top 1");
+    expect(ladder?.status).not.toBe("failed");
+    expect(ladder?.optional).toBe(true);
+    expect(ladder?.boardConfidenceDelta ?? 0).toBe(0);
+
+    // Und es schlägt nicht mehr auf das Vorstandsvertrauen durch: keine failed-Warnung aus der Leiter.
+    const settlementRow = buildTeamSeasonObjectiveSettlement(gameState).rows.find(
+      (row) => row.teamId === team.teamId && row.objectiveId === "sponsor-rank-target",
+    );
+    expect(settlementRow?.cashDelta).toBe(0);
+    expect(settlementRow?.boardConfidenceDelta).toBe(0);
+  });
+});
+
+describe("Achsen-Rangziel bleibt in Reichweite", () => {
+  /** Liga, in der Team `L-i` auf der POW-Achse exakt Rang i+1 belegt. */
+  function axisLeague(teamCount: number) {
+    const teams = Array.from({ length: teamCount }, (_, i) =>
+      createTeam({ teamId: `L-${i}`, shortCode: `L${i}`, name: `Ladder ${i}` }),
+    );
+    const rowsByTeamId = new Map(
+      teams.map((team, i) => [team.teamId, createRow(team.teamId, { ppsPow: 100 - i, ppsTotal: 100 - i })] as const),
+    );
+    return { teams, rowsByTeamId };
+  }
+
+  function axisTargetFor(teamIndex: number) {
+    const { teams, rowsByTeamId } = axisLeague(32);
+    const team = teams[teamIndex]!;
+    return getAxisRankObjective({
+      team,
+      // Ambition 9 + POW-Bias 9: der Identity-Gate ist offen, die alte Marke wäre fest "Top 5".
+      identity: createIdentity(team.teamId, { ambition: 9, pow: 9, spe: 1, men: 1, soc: 1 }),
+      profile: null,
+      rowsByTeamId,
+    });
+  }
+
+  it("verlangt von einem Team weit hinten keinen Sprung auf Top 5", () => {
+    // POW-Rang 28: "Power Top 5" holt kein Kader in einer Saison auf. Höchstens der gleiche Sprung,
+    // den der Vorstand auch beim Ligarang fordert (6 Plätze) -> Top 22.
+    const objective = axisTargetFor(27);
+    expect(objective?.targetValue).toBe("Top 22");
+    expect(objective?.label).toBe("Power Top 22");
+  });
+
+  it("lässt die Ambitionsmarke stehen, wo sie ohnehin in Reichweite ist", () => {
+    // POW-Rang 6 -> 6 - 6 = 0, geklemmt auf die Ambitionsmarke 5. Verhalten unverändert.
+    expect(axisTargetFor(5)?.targetValue).toBe("Top 5");
+    // Und ein Spitzenteam bekommt kein leichteres Ziel als vorher.
+    expect(axisTargetFor(0)?.targetValue).toBe("Top 5");
   });
 });
