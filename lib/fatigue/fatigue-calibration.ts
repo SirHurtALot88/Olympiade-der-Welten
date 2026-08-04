@@ -10,17 +10,43 @@ export const MAX_COMBINED_FATIGUE_INJURY_MULTIPLIER = Number(
   ((1 - FATIGUE_PERFORMANCE_MAX_PENALTY_PERCENT / 100) * INJURY_PERFORMANCE_MULTIPLIER).toFixed(4),
 );
 
+/**
+ * GEMELDET VON CHRIS: „momentan haben wir noch zu viele Verletzungen, die unpredictable sind. Ich
+ * finde, bis zu einer Fatigue von 25 sollte die Wahrscheinlichkeit einfach 0 % sein."
+ *
+ * SCHUTZZONE BIS 25. Die Kurve begann bei 0 und stieg von der ersten Fatigue an — bei Fatigue 10 lag
+ * das Risiko schon bei 1,67 %, bei 25 bei 4,17 %. Ein frischer Spieler konnte sich also verletzen,
+ * ohne dass irgendetwas darauf hingedeutet hätte. Bis 25 ist das Risiko jetzt exakt 0.
+ *
+ * WARUM DER ANKER BEI 30 WEGGEFALLEN IST. Hätte man nur `{25, 0}` eingefügt und die 5 % bei 30
+ * stehen lassen, müssten fünf Fatigue-Punkte den kompletten Anstieg von 0 auf 5 % tragen — 1 % pro
+ * Punkt, sechsmal so steil wie vorher. Aus „unberechenbar von Anfang an" wäre „unberechenbar ab 25"
+ * geworden. Die Strecke läuft deshalb glatt von 25 auf die unveränderten 10 % bei 50 (0,4 % pro
+ * Punkt).
+ *
+ * WAS SICH DAMIT ÄNDERT: unter 25 gar kein Risiko mehr, dazwischen weniger als vorher (30: 2 statt
+ * 5 %, 40: 6 statt 7,5 %). Ab 50 ist die Kurve unverändert — wer seine Spieler wirklich verheizt,
+ * trägt dasselbe Risiko wie bisher. Genau das war der Zweck der Fatigue.
+ */
 export const FATIGUE_INJURY_RISK_ANCHORS = [
   { fatigue: 0, riskPercent: 0 },
-  { fatigue: 30, riskPercent: 5 },
+  { fatigue: 25, riskPercent: 0 },
   { fatigue: 50, riskPercent: 10 },
   { fatigue: 80, riskPercent: 25 },
   { fatigue: 100, riskPercent: 40 },
 ] as const;
 
+/**
+ * Die Grenze bei 25 gilt auch für die Bänder — sonst sagt die Anzeige etwas anderes als die Rechnung.
+ *
+ * Vorher hieß 0–29 „kein Risiko", während bei 29 real 4,83 % anlagen. Das Spiel hat dem Spieler also
+ * Sicherheit angezeigt und ihn dann verletzt; das ist der zweite Teil von Chris' „unpredictable",
+ * und er lag nicht an der Kurve, sondern an der Beschriftung. „kein Risiko" heißt jetzt wörtlich
+ * 0 %.
+ */
 export const injuryRiskBands = [
-  { min: 0, max: 29, label: "none", uiLabel: "kein Risiko" },
-  { min: 30, max: 49, label: "minimal", uiLabel: "minimales Verletzungsrisiko" },
+  { min: 0, max: 24, label: "none", uiLabel: "kein Risiko" },
+  { min: 25, max: 49, label: "minimal", uiLabel: "minimales Verletzungsrisiko" },
   { min: 50, max: 69, label: "mittel", uiLabel: "mittleres Verletzungsrisiko" },
   { min: 70, max: 79, label: "stark", uiLabel: "starkes Verletzungsrisiko" },
   { min: 80, max: 100, label: "sehr_stark", uiLabel: "sehr starkes Verletzungsrisiko" },
