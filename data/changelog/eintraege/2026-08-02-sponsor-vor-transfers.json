@@ -1,0 +1,16 @@
+[
+  {
+    "datum": "2026-08-02",
+    "seite": "Spieltag · Saisonstart",
+    "text": "Beim Saisonstart führt der Weg jetzt zuerst zu den Sponsoren und erst danach auf den Transfermarkt — du kennst dein Budget für Gehälter, bevor du Spieler verpflichtest.",
+    "gewicht": "behebung",
+    "version": "0.3"
+  },
+  {
+    "datum": "2026-08-02",
+    "seite": "Spieltag · Saisonstart",
+    "text": "Der Schritt „Sponsor wählen\" im Saisonstart-Fenster führt jetzt auf die Sponsoren-Seite statt auf Teams, wo es gar keine Sponsor-Auswahl gibt.",
+    "gewicht": "behebung",
+    "version": "0.3"
+  }
+]
