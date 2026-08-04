@@ -1,5 +1,6 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
+import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 import type {
   MultiplayerRoomStatus,
   OlyRoomState,
@@ -19,6 +20,44 @@ export type RoomFlowView =
   | "matchdayArena"
   | "season"
   | "cockpit";
+
+/**
+ * Welches Socket-Event der Host-/Weiter-Knopf auslösen muss.
+ *
+ * Frueher entschied `RoomPageClient` das per String-Vergleich auf `label` (z.B.
+ * `roomFlowButton.label === "AI Teams vorbereiten"`) — brach lautlos, sobald jemand nur die
+ * Beschriftung aenderte. Die Aktion ist jetzt ein eigenes, von `label` unabhaengiges Feld:
+ * `describeRoomFlowButton` setzt es explizit in jedem Rueckgabe-Zweig, Aufrufer schalten nur
+ * noch darauf.
+ */
+export type RoomFlowButtonAction = "set_ready" | "run_ai_auto_step" | "start_room" | "advance_flow" | "none";
+
+/**
+ * `RoomFlowView` (Room-Flow-Domäne) und `FoundationViewId` (Shell-Routing) sind zwei
+ * unabhaengige Typen, die zufaellig teilweise gleich benannte Werte haben. Diese Map macht die
+ * Entsprechung explizit und typsicher: `Record<RoomFlowView, FoundationViewId>` erzwingt einen
+ * Eintrag pro `RoomFlowView`-Variante — ein neuer, nicht gemappter Wert bricht den Build statt
+ * zur Laufzeit still auf `undefined`/eine falsche View zu verpuffen.
+ *
+ * Die Ziele folgen bewusst `normalizeFoundationViewParam` (Legacy-View-Aliasing): "market" →
+ * "marketV2", "season" → "seasonV2", "training" → "trainingCompact" — exakt das Ziel, das ein
+ * `?view=`-Query-Param mit demselben Rohwert heute schon aufloest (siehe `buildFoundationHref`
+ * in `RoomPageClient.tsx`), damit Auto-Navigation und manueller Deep-Link nie auseinanderlaufen.
+ */
+const ROOM_FLOW_VIEW_TO_FOUNDATION_VIEW: Record<RoomFlowView, FoundationViewId> = {
+  teams: "teams",
+  market: "marketV2",
+  training: "trainingCompact",
+  trainingV2: "trainingV2",
+  lineup: "lineup",
+  matchdayArena: "matchdayArena",
+  season: "seasonV2",
+  cockpit: "cockpit",
+};
+
+export function mapRoomFlowViewToFoundationViewId(view: RoomFlowView): FoundationViewId {
+  return ROOM_FLOW_VIEW_TO_FOUNDATION_VIEW[view];
+}
 
 export type RoomFlowStepDefinition = {
   stepId: RoomFlowStepId;
@@ -55,6 +94,8 @@ export type RoomFlowButtonModel = {
   canClick: boolean;
   isHostAction: boolean;
   warnings: string[];
+  /** Welches Socket-Event ein Klick sendet — siehe Kommentar bei `RoomFlowButtonAction`. */
+  action: RoomFlowButtonAction;
 };
 
 function uniq(values: Array<string | null | undefined>) {
@@ -206,6 +247,7 @@ export function describeRoomFlowButton(input: {
       canClick: false,
       isHostAction: false,
       warnings: ["participant_missing"],
+      action: "none",
     };
   }
 
@@ -218,6 +260,7 @@ export function describeRoomFlowButton(input: {
       canClick: true,
       isHostAction: false,
       warnings: [],
+      action: "set_ready",
     };
   }
 
@@ -230,6 +273,7 @@ export function describeRoomFlowButton(input: {
       canClick: true,
       isHostAction: true,
       warnings: ["ai_auto_step_pending"],
+      action: "run_ai_auto_step",
     };
   }
 
@@ -243,6 +287,7 @@ export function describeRoomFlowButton(input: {
       canClick: false,
       isHostAction: isHost,
       warnings: flow.warnings,
+      action: "none",
     };
   }
 
@@ -255,6 +300,7 @@ export function describeRoomFlowButton(input: {
       canClick: false,
       isHostAction: false,
       warnings: ["host_only"],
+      action: "none",
     };
   }
 
@@ -266,6 +312,11 @@ export function describeRoomFlowButton(input: {
     canClick: true,
     isHostAction: true,
     warnings: flow.warnings,
+    // Im Lobby-Status bindet/erzeugt der Weiter-Knopf noch den Save (`startRoom`); danach ist
+    // es der normale Flow-Vorschub (`advanceRoomFlow`). Diese Fallunterscheidung gehoert hier in
+    // den Controller, der `multiplayerRoom.status` ohnehin schon kennt — nicht mehr an den
+    // Aufrufer, der dafuer frueher denselben Status ein zweites Mal auswerten musste.
+    action: input.state.multiplayerRoom.status === "lobby" ? "start_room" : "advance_flow",
   };
 }
 

@@ -3,6 +3,24 @@
   "eintraege": [
     {
       "datum": "2026-08-04",
+      "seite": "Multiplayer · Spielansicht",
+      "pr": null,
+      "text": "Koordiniert wurde im Raum, gespielt in der Spielansicht — den Flow sah man dort nur als Tooltip, also musste man zwischen zwei Seiten pendeln. Ready melden, Weiterschalten und wer gerade blockiert steht jetzt direkt in der Spielansicht, und bei jedem Schrittwechsel springt sie von selbst in die passende Ansicht.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
+      "seite": "Multiplayer · Raum",
+      "pr": null,
+      "text": "Ein Klick auf \"Saison simulieren\" konnte den gemeinsamen Spielstand auf Saisonende schieben, während der Mitspieler noch bei Spieltag 3 stand. Admin- und Simulationswerkzeuge lehnen Spielstände, die zu einem laufenden Raum gehören, jetzt ab; Vorschauen und Trockenläufe funktionieren weiter.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
       "seite": "Multiplayer · Raum",
       "pr": null,
       "text": "Der gemeinsame Spielablauf lief bisher genau einen Spieltag lang und endete danach im Season Review — eine Season zu zweit war damit nicht spielbar. Nach dem Saisonstand geht es jetzt zurück zur Einsatzliste, solange die Saison noch einen Spieltag hergibt; erst nach dem letzten folgt das Season Review. Der Weiter-Knopf sagt jetzt auch, wohin er führt.",

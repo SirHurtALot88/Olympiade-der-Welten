@@ -1713,6 +1713,14 @@ export function useFoundationShellRouterBodyScope({
     onHostStartedArena: () => {
       setActiveView("matchdayArena");
     },
+    // Der Room-Flow-Schritt hat gewechselt (Ready/Weiter irgendeines Mitspielers hat den Raum
+    // vorangebracht) → die Shell folgt in die zum neuen Schritt gehoerende View. Direktes
+    // `setActiveView` statt `setFoundationView(...)`, bewusst symmetrisch zu
+    // `onHostStartedArena` oben: beides sind Server-getriebene Folge-Navigationen, keine
+    // Nutzer-Klicks, die einen Browser-Verlaufseintrag verdienen wuerden.
+    onRoomFlowStepChanged: (view: FoundationViewId) => {
+      setActiveView(view);
+    },
     setRoomActivityNotice,
     setSaveSyncError,
     setFoundationActionFeedback,

@@ -3437,6 +3437,16 @@ body:has(.oly-auth-status-badge) .oly-bug-report-flag {
   justify-content: flex-end;
 }
 
+/* Wartenamen/KI-Fortschritt der Room-Flow-Leiste (`FoundationRoomFlowBar`) — bewusst eigene,
+   engere Zeile statt der generischen `.room-meta` (die traegt 16px margin-bottom, das würde die
+   kompakte Leiste im Kontext-Banner unnötig aufblähen). */
+.foundation-room-flow-waiting {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
 .foundation-context-banner.is-compact .foundation-flow-copy strong,
 .foundation-context-banner.is-compact .foundation-flow-copy span {
   font-size: 0.78rem;
