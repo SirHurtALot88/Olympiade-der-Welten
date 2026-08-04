@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { resolveSpecialistWingVariant } from "@/lib/ai/ai-manager-apply-service";
 import type { GameState, Player, TeamFacilityCollection } from "@/lib/data/olyDataTypes";
 import {
   FACILITY_CATALOG_BY_ID,
@@ -454,5 +455,28 @@ describe("specialist wing — die KI wählt die Variante nach Kader", () => {
   it("fällt bei leerem oder routenlosem Kader auf den Katalog-Default zurück", () => {
     expect(chooseSpecialistWingVariantForTeam(gameState({ classNames: [] }), "T-1")).toBe("power_gym");
     expect(chooseSpecialistWingVariantForTeam(gameState({ classNames: ["Nonexistent Class"] }), "T-1")).toBe("power_gym");
+  });
+
+  it("der KI-Bau-/Apply-Pfad benutzt genau diese Wahl — keine Konstante mehr", () => {
+    // `resolveSpecialistWingVariant` ist die Stelle, an der früher hart "mind_lab" stand
+    // (ai-manager-apply-service.ts) und die Preview UND Apply mit der Variante versorgt.
+    const rosters: Array<[string[], SpecialistWingVariant]> = [
+      [["Berserker", "Warlord", "Tank"], "power_gym"],
+      [["Sprinter", "Rogue", "Charger"], "agility_track"],
+      [["Mage", "Overseer", "Tactician"], "mind_lab"],
+      [["Bard", "Hero", "Templar"], "social_studio"],
+    ];
+
+    for (const [classNames, expected] of rosters) {
+      const state = gameState({ classNames });
+      expect(resolveSpecialistWingVariant(state, "T-1", "specialist_wing", undefined)).toBe(expected);
+      // … und deckt sich mit der Kaderwahl selbst.
+      expect(resolveSpecialistWingVariant(state, "T-1", "specialist_wing", undefined)).toBe(
+        chooseSpecialistWingVariantForTeam(state, "T-1"),
+      );
+    }
+
+    // Andere Gebäude haben keine Varianten — die durchgereichte bleibt unangetastet.
+    expect(resolveSpecialistWingVariant(gameState({ classNames: ["Mage"] }), "T-1", "academy", undefined)).toBeUndefined();
   });
 });

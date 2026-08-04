@@ -237,8 +237,11 @@ function buildBudgetActions(input: {
  * früher hart „mind_lab" zu übergeben. Die Variante ist jetzt die Trainings-Fokusachse des Teams —
  * eine Hartverdrahtung würde der halben Liga einen MEN-Fokus verpassen, den nie jemand gewählt hat.
  * Für alle anderen Gebäude bleibt die durchgereichte Variante (praktisch immer `undefined`/`null`).
+ *
+ * Exportiert, damit die Regel „die KI-Variante hängt am Kader, nicht an einer Konstante" testbar ist,
+ * ohne einen kompletten KI-Bauplan erzeugen zu müssen.
  */
-function resolveSpecialistWingVariant(
+export function resolveSpecialistWingVariant(
   gameState: GameState,
   teamId: string,
   facilityId: FacilityId,
