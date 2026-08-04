@@ -326,7 +326,12 @@ export function ensureSocketServer(httpServer: HttpServer) {
     });
 
     socket.on("disconnect", () => {
-      markDisconnected(socket.id);
+      // Den neuen Stand auch senden: `markDisconnected` nimmt den Teilnehmer aus der
+      // Bereit-Pflicht, aber ohne Broadcast erfaehrt der verbliebene Spieler das erst beim
+      // naechsten beliebigen Ereignis und wartet solange auf jemanden, der gar nicht mehr da ist.
+      for (const room of markDisconnected(socket.id)) {
+        io.to(room.roomCode).emit("roomState", room.state);
+      }
     });
   });
 

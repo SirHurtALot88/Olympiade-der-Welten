@@ -1,0 +1,23 @@
+[
+  {
+    "datum": "2026-08-04",
+    "seite": "Multiplayer · Spielansicht",
+    "text": "In der Spielansicht konnte der Flow stillstehen: der Gastgeber bekam keinen Bereit-Knopf und sah \"Warten auf sich selbst\", während der Mitspieler auf ihn wartete — niemand konnte klicken. Bereitmelden hängt jetzt daran, wer eigene Teams hat, nicht an der Rolle.",
+    "gewicht": "spielblockierend",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-04",
+    "seite": "Multiplayer · Raum",
+    "text": "Verlässt jemand den Raum, sieht der Verbliebene das sofort statt weiter auf einen Abwesenden zu warten.",
+    "gewicht": "behebung",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-04",
+    "seite": "Entwicklung",
+    "text": "Neues Audit spielt eine komplette Saison zu zweit durch und prüft dabei Spieltag-Zyklus, Bedienbarkeit und die Admin-Schreibsperre im Zusammenspiel.",
+    "gewicht": "feinschliff",
+    "version": "0.4"
+  }
+]

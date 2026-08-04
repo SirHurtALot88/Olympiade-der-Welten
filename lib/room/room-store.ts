@@ -264,7 +264,19 @@ export function rejoinRoom(roomCode: string, seatToken: string, socketId: string
   return { ok: true as const, room, seat };
 }
 
+/**
+ * Meldet den Sitzplatz hinter `socketId` als offline — und gibt die betroffenen Raeume zurueck,
+ * damit der Aufrufer den neuen Stand broadcasten kann.
+ *
+ * Der Rueckgabewert kam nachtraeglich dazu: `lib/socket/server.ts` rief das hier im
+ * `disconnect`-Handler auf, ohne danach `roomState` zu senden. Der verbliebene Spieler sah
+ * deshalb weiter "Warten auf <Name>" fuer jemanden, den der Server laengst nicht mehr als
+ * bereit-pflichtig fuehrt (`getRequiredParticipants` filtert `connectionStatus === "offline"`
+ * heraus) — bis irgendein anderes Ereignis zufaellig einen Broadcast ausloeste. Gefunden vom
+ * Koop-Audit (scripts/audit-koop-spielbarkeit.ts, Fall D2a).
+ */
 export function markDisconnected(socketId: string) {
+  const betroffeneRaeume: RuntimeRoom[] = [];
   for (const room of runtimeRooms.values()) {
     for (const role of ["A", "B"] as const) {
       const seat = room.seats[role];
@@ -278,9 +290,11 @@ export function markDisconnected(socketId: string) {
         );
         room.state = appendRoomEvent(room.state, "participant_left", { participantId: seat.participantId, connectionStatus: "offline" });
         syncPlayers(room);
+        betroffeneRaeume.push(room);
       }
     }
   }
+  return betroffeneRaeume;
 }
 
 export function getRoom(roomCode: string) {
