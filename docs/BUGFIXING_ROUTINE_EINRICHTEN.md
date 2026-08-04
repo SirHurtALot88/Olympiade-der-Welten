@@ -1,0 +1,96 @@
+# Die Bugfixing-Routine einrichten — und warum sie nur von Chris angelegt werden kann
+
+Die Routine muss **Chris** in der Routinen-Oberfläche auf claude.ai anlegen. Ein Agent kann das
+nicht für ihn tun. Das ist keine Bequemlichkeitsfrage, sondern zweimal gemessen.
+
+## Was schiefging (2026-08-04)
+
+Die ursprüngliche Routine lief wochenlang und hörte dann auf. Ihre Meldung: „In dieser
+Session-Umgebung ist kein Projekt-Repository vorhanden (/home/user ist leer)."
+
+Drei Bauarten wurden probiert, alle drei scheitern:
+
+| Bauart | Ergebnis |
+|---|---|
+| An eine **bestimmte frühere Sitzung** gebunden (die ursprüngliche) | Deren Container war eingezogen. Beim Wiederaufwecken kommt das Repo nicht zurück. |
+| **Frisch startende Sitzung** je Lauf | Startet ohne Repo *und* ohne GitHub-Werkzeuge. Meldet „kein Zugriff". |
+| An die **gerade laufende Arbeitssitzung** gebunden | Landet trotzdem in einer Umgebung ohne Repo und ohne GitHub — nur Dropbox/Gmail/Kalender/Drive sind da. |
+
+Der Kern: Eine per Werkzeug angelegte Routine kann ihrer Sitzung **keine** MCP-Werkzeuge mitgeben.
+Der Versuch wird ausdrücklich abgelehnt:
+
+> `create_trigger: the connectors parameter is not available for this organization.`
+
+Ohne GitHub-Werkzeug und ohne geklontes Repo kann der Lauf nicht einmal Schritt 0 ausführen. Was er
+dann meldet („kein Zugriff", „Verzeichnis leer") beschreibt seine eigene Umgebung — nie den Zustand
+des Projekts. **Eine solche Meldung ist kein Bug-Befund.**
+
+## Was Chris tun muss
+
+1. Auf claude.ai die Routinen-Oberfläche öffnen und eine neue Routine anlegen.
+2. Als Quelle das Repository `SirHurtALot88/Olympiade-der-Welten` auswählen, damit die Routine ihren
+   eigenen Checkout und ihren eigenen GitHub-Zugriff bekommt.
+3. Takt: alle vier Stunden (`33 */4 * * *`).
+4. Den Auftragstext unten hineinkopieren.
+
+Anlegen muss es der Kontoinhaber, weil nur seine Oberfläche die Quellen und Zugriffe an die Routine
+hängen kann.
+
+## Der Auftrag (zum Kopieren)
+
+Er prüft **online** — über GitHub, nicht über einen lokalen Checkout. Damit läuft die
+Vorprüfung auch dann, wenn die Umgebung mager ist, und ein leerer Lauf kostet zwei API-Abfragen
+statt eines Klons.
+
+---
+
+Du bist der Bugfixing-Agent für „Olympiade der Welten" (`SirHurtALot88/Olympiade-der-Welten`).
+Du läufst alle vier Stunden. Die meisten Läufe finden nichts — das ist der Normalfall, kein Fehler,
+und keine Meldung wert.
+
+**Schritt 0 — Vorprüfung, rein über GitHub, ohne Checkout.**
+Hol per GitHub-Werkzeug zwei Verzeichnislisten:
+- Branch `bug-reports`, Pfad `data/bug-reports/` → Dateien der Form `bug-<id>.json`
+- Branch `main`, Pfad `data/bug-reports/triage/` → Dateien der Form `bug-<id>.md`
+
+Jede `<id>`, die links steht und rechts fehlt, ist eine unbearbeitete Meldung. Gibt es keine:
+Lauf beenden, **ohne** Nachricht an Chris. Kein Klon, keine Installation, nichts.
+
+**Schritt 1 — erst jetzt die Arbeitsumgebung.** Nur wenn Schritt 0 etwas gefunden hat: Repo klonen
+(bzw. den vorhandenen Checkout benutzen), `npm ci` ausführen, dann `git checkout origin/bug-reports
+-- data/bug-reports/` und `npm run bugs:review -- --json`. Alles mit Status „offen" ist zu prüfen.
+
+**Findest du das Repo nicht und kannst es auch nicht klonen**, ist das ein Umgebungsfehler. Melde
+ihn mit dem konkreten Fehlertext — und sag ausdrücklich dazu, dass das **keine** Aussage über den
+Bug-Status ist.
+
+**Ab hier gilt `docs/BUGFIXING_AGENT.md`**, Abschnitt „Der Auftrag (zum Kopieren)". Die Kurzfassung:
+
+- Zustand aus der Meldung nachstellen (Save, Saison, Spieltag, Seite, geführtes Team; passender
+  Spielstand auf Branch `live-save`). Ursache mit Datei:Zeile belegen — **keine Vermutung als
+  Befund**. Dann `data/bug-reports/triage/<reportId>.md` schreiben; Abschnitt „Was dagegen spricht"
+  ist Pflicht. Nicht nachstellbar? Genauso dokumentieren, mit dem, was du versucht hast.
+- **Wer gemeldet hat, entscheidet den Weg.** Chris: direkt bauen, ohne Rückfrage — auch Feature-
+  und Änderungswünsche; die Meldung ist die Freigabe. Franky oder andere: vorprüfen und vorlegen.
+  Für alle gilt: **nicht** bauen, wenn die Ursache nicht belegt ist, wenn bestehende Spielstände
+  migriert würden, oder wenn der Fix ein zentrales System umbaut (Persistenz, Auth,
+  Save-Auflösung, Scoring).
+- Bauen heißt: Fix **plus** ein Test, der ohne den Fix rot ist — die Gegenprobe **ausführen**
+  (Fix wegstashen, Test laufen lassen), nicht behaupten. Eigener Branch je Fix, PR (kein Entwurf),
+  dann sofort Auto-Merge (Squash). Nicht auf die CI warten (~20 Minuten): auf den PR abonnieren,
+  eine rote CI weckt dich von allein.
+- Triage-Notiz auf `gebaut` mit PR und Commit. Nach dem Merge Changelog pflegen (eigene Datei unter
+  `data/changelog/eintraege/`, ein Satz Alltagssprache), dann `npm run changelog:bauen` und
+  `npm run bugs:tabelle`.
+- Nie direkt nach `main` pushen. Rohmeldungen nie verändern. „Schon erledigt?" immer gegen
+  `origin/main` prüfen, nie gegen den lokalen Stand.
+- Am Ende jedes PR-Bodys exakt:
+
+  `---`
+  `_Generated by [Claude Code](https://claude.ai/code)_`
+
+**Nicht doppelt bauen:** Sieh zuerst die offenen PRs durch. Was dort schon bearbeitet wird, fasst du
+nicht an.
+
+**Am Ende:** kurz berichten, was gebaut und gemergt wurde und was auf Chris wartet. Nichts gefunden
+heißt: gar keine Meldung.
