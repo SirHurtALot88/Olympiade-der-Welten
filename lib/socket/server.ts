@@ -77,6 +77,26 @@ export function ensureSocketServer(httpServer: HttpServer) {
     cors: {
       origin: "*",
     },
+    // Vorgabe waere pingInterval=25000/pingTimeout=20000 -> maximal 45s bis ein ausbleibender
+    // Pong als Disconnect gilt. Der Liga-Draft (kickoffLeagueSetupDraft, ~40s synchron, siehe
+    // lib/game/league-setup-draft-service.ts) blockiert genau in dieser Groessenordnung die
+    // Event-Loop dieses Custom-Servers - waehrenddessen kann der Server ueberhaupt keinen Pong
+    // verarbeiten, egal wie kurz das Zeitfenster ist. 45s reicht damit kaum, 60s pingTimeout gibt
+    // ~2x Marge auf den EINEN gemessenen Wert.
+    //
+    // NACHTEIL, nicht nur Kosmetik: ein WIRKLICH abgebrochener Client (Tab zu, Laptop zu) wird
+    // jetzt erst nach bis zu pingInterval+pingTimeout = 85s als offline erkannt statt nach 45s -
+    // 40s laenger "Warten auf <Name>" fuer den verbliebenen Mitspieler, bevor der Server ueberhaupt
+    // reagiert.
+    //
+    // Das ist bewusst NUR Linderung: andere schwere Routen ohne eigene Messung (Spieltags-
+    // Aufloesung, KI-Markt-Batches, Standings-Apply - siehe Bericht) koennten laenger als 40s
+    // laufen und dieses Fenster trotzdem reissen. Die eigentliche Heilung ist serverseitig in
+    // `authorizeServerRoomWrite` (lib/room/server-authoritative-write-guard.ts): ein Schreibvorgang
+    // mit gueltigem Sitzplatz-Token stellt die Praesenz wieder her, UNABHAENGIG davon, wie lange
+    // die Event-Loop blockiert war - dieser Wert hier verkleinert nur, wie oft es ueberhaupt dazu
+    // kommt.
+    pingTimeout: 60_000,
   });
 
   io.on("connection", (socket) => {

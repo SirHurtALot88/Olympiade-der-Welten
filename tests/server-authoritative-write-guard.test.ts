@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createRoom, joinRoom, markDisconnected, rejoinRoom } from "@/lib/room/room-store";
+import { createRoom, getRoom, joinRoom, markDisconnected, rejoinRoom } from "@/lib/room/room-store";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 describe("server-authoritative room write guard", () => {
@@ -448,5 +448,129 @@ describe("server-authoritative room write guard", () => {
         }).allowed,
       ).toBe(true);
     }
+  });
+
+  /**
+   * DIE SYMPTOMKETTE AUS DEM PROBLEMBERICHT: ein Spieler faellt MITTEN IM SPIEL offline (blockierte
+   * Event-Loop verpasst den Ping-Heartbeat, `markDisconnected` markiert ihn offline), versucht zu
+   * schreiben — und darf das jetzt sofort wieder, weil sein Schreibvorgang dasselbe Sitzplatz-
+   * Token mitbringt, das auch `rejoinRoom` akzeptieren wuerde. Vorher musste dafuer explizit
+   * `rejoinRoom` dazwischenkommen (siehe Test "S10" oben) — echte Clients, die nur schreiben statt
+   * erst neu zu verbinden, blieben bei `403 participant_offline` haengen.
+   */
+  it("S11: ein Schreibvorgang mit gueltigem Sitzplatz-Token heilt offline-Praesenz VON SELBST — ohne expliziten rejoinRoom-Aufruf, und ohne die Team-Besitzpruefung aufzuweichen", () => {
+    const created = createRoom("s11-socket-a", {
+      displayName: "Chris",
+      saveId: "s11-heal-save",
+      preset: "chris_4_franky_4_rest_ai",
+    });
+    const joined = joinRoom(created.room.roomCode, "s11-socket-b", { displayName: "Franky" });
+    expect(joined.ok).toBe(true);
+    if (!joined.ok) return;
+
+    const chris = joined.room.state.roomParticipants.find((participant) => participant.displayName === "Chris");
+    const franky = joined.room.state.roomParticipants.find((participant) => participant.displayName === "Franky");
+    expect(chris).toBeTruthy();
+    expect(franky).toBeTruthy();
+    if (!chris || !franky) return;
+
+    const chrisTeamId = joined.room.state.teamOwnership.find(
+      (entry) => entry.controllerType === "human" && entry.participantId === chris.participantId,
+    )?.teamId;
+    const frankyTeamId = joined.room.state.teamOwnership.find(
+      (entry) => entry.controllerType === "human" && entry.participantId === franky.participantId,
+    )?.teamId;
+    expect(chrisTeamId).toBeTruthy();
+    expect(frankyTeamId).toBeTruthy();
+    if (!chrisTeamId || !frankyTeamId) return;
+
+    // 1) Schreibvorgang gelingt normal, solange Chris online ist.
+    expect(
+      authorizeServerRoomWrite({
+        roomCode: created.room.roomCode,
+        participantId: chris.participantId,
+        seatToken: created.seat.seatToken,
+        userId: chris.userId,
+        saveId: "s11-heal-save",
+        teamId: chrisTeamId,
+        action: "buy",
+      }).allowed,
+    ).toBe(true);
+
+    // 2) Chris faellt offline — genau das, was ein verpasster Ping-Heartbeat waehrend einer
+    // blockierten Event-Loop ausloest (kein expliziter "Raum verlassen"-Klick).
+    markDisconnected("s11-socket-a");
+    expect(
+      getRoom(created.room.roomCode)?.state.roomParticipants.find((p) => p.participantId === chris.participantId)
+        ?.connectionStatus,
+    ).toBe("offline");
+
+    // 3) GEGENPROBE ZUERST: ein ungueltiges/fremdes Token heilt NICHTS — der offline markierte
+    // Teilnehmer bleibt bei 403. Ohne diese Gegenprobe koennte "irgendein Token vorhanden" schon
+    // genuegen, um zu heilen.
+    expect(
+      authorizeServerRoomWrite({
+        roomCode: created.room.roomCode,
+        participantId: chris.participantId,
+        seatToken: "ein-erfundenes-fremdes-token",
+        userId: chris.userId,
+        saveId: "s11-heal-save",
+        teamId: chrisTeamId,
+        action: "buy",
+      }),
+    ).toMatchObject({ allowed: false, status: 403, reason: "participant_offline" });
+    expect(
+      getRoom(created.room.roomCode)?.state.roomParticipants.find((p) => p.participantId === chris.participantId)
+        ?.connectionStatus,
+    ).toBe("offline");
+
+    // 4) DER KERN: der naechste Schreibvorgang traegt das gueltige Sitzplatz-Token mit — und darf
+    // jetzt durch, OHNE dass zuvor `rejoinRoom` aufgerufen wurde.
+    const healed = authorizeServerRoomWrite({
+      roomCode: created.room.roomCode,
+      participantId: chris.participantId,
+      seatToken: created.seat.seatToken,
+      userId: chris.userId,
+      saveId: "s11-heal-save",
+      teamId: chrisTeamId,
+      action: "buy",
+    });
+    expect(healed).toMatchObject({ allowed: true });
+    if (!healed.allowed) return;
+    expect(healed.warnings).toContain("source:offline_presence_healed_by_valid_seat_token");
+
+    // Die Heilung ist kein reiner Rueckgabewert-Trick: die Praesenz im Raum selbst ist jetzt
+    // wieder "online" — sonst wuerde die naechste beliebige Room-Mutation (`syncPlayers`) sie beim
+    // naechsten Aufruf sofort zurueck auf "offline" rechnen, weil sie vom Sitzplatz abgeleitet
+    // wird, nicht vom Teilnehmer-Datensatz.
+    const roomNachHeilung = getRoom(created.room.roomCode);
+    expect(
+      roomNachHeilung?.state.roomParticipants.find((p) => p.participantId === chris.participantId)?.connectionStatus,
+    ).toBe("online");
+    expect(roomNachHeilung?.seats.A?.connected).toBe(true);
+
+    // Und der Mitspieler erfaehrt es SOFORT — nicht erst beim naechsten zufaelligen Broadcast (das
+    // ist genau der Unfall, den `markDisconnected`s Rueckgabewert schon fuer den Disconnect-Fall
+    // behebt; hier gilt dasselbe Muster fuer den Heal-Fall).
+    expect(
+      roomNachHeilung?.state.roomEvents.some(
+        (event) => event.type === "room_state_updated" && event.payload?.source === "participant_presence_healed_by_write_guard",
+      ),
+    ).toBe(true);
+
+    // 5) GEGENPROBE: die Besitz-Isolation weicht durch die Heilung nicht mit auf. Chris' eigenes
+    // (gueltiges) Token heilt zwar seine Praesenz, darf ihn aber weiterhin nicht auf FRANKYS Team
+    // schreiben lassen.
+    expect(
+      authorizeServerRoomWrite({
+        roomCode: created.room.roomCode,
+        participantId: chris.participantId,
+        seatToken: created.seat.seatToken,
+        userId: chris.userId,
+        saveId: "s11-heal-save",
+        teamId: frankyTeamId,
+        action: "buy",
+      }),
+    ).toMatchObject({ allowed: false, status: 403 });
   });
 });
