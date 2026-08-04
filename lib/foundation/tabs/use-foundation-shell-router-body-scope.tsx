@@ -4498,54 +4498,79 @@ export function useFoundationShellRouterBodyScope({
       showReadOnlyNotice();
       return null;
     }
-    const savedInclude = matchdayAutoRunIncludeWarningLineups;
-    const savedOverwrite = matchdayAutoRunOverwriteExistingLineups;
-    const savedStop = matchdayAutoRunStopOnTie;
-    setMatchdayAutoRunIncludeWarningLineups(false);
-    // Vorhandene Aufstellungen NIE ueberschreiben — sonst wuerde der Lauf andere
-    // Aufstellungen erzeugen als die, gegen die die Arena gerade gespielt hat.
-    setMatchdayAutoRunOverwriteExistingLineups(false);
-    setMatchdayAutoRunStopOnTie(false);
-    try {
-      const runCockpitMatchdayAutoRun = matchdayArenaApplyHandlers?.runCockpitMatchdayAutoRun;
-      if (!runCockpitMatchdayAutoRun) {
-        return null;
-      }
-      // `advanceAfterCashApply: false` — die Arena schaltet NICHT selbst weiter.
-      // Vorher sprang die Ansicht direkt nach D2 auf den naechsten Spieltag, und die
-      // gerade gespielte Spieltagstabelle war weg, bevor man sie lesen konnte. Der
-      // Wechsel passiert jetzt ueber den "Spieltag abschliessen"-Knopf im
-      // Spieltagsergebnis — also dann, wenn der Manager fertig geschaut hat.
-      const result = await runCockpitMatchdayAutoRun(true, side, false, shownPreview);
-      const booked = result?.summary?.standingsApplyAllowed ?? false;
-      if (!booked) {
-        setFoundationActionFeedback({
-          tone: "warning",
-          title: "Punkte nicht gebucht",
-          detail: "Die Wertung dieser Disziplin ist blockiert — bitte Cockpit pruefen.",
-        });
-        return result;
-      }
-      if (side === "d2") {
-        setFoundationActionFeedback({
-          tone: "success",
-          title: "Beide Disziplinen gewertet",
-          detail:
-            "Die Spieltagstabelle bleibt stehen, solange du sie ansiehst. Weiter geht es ueber „Spieltag abschliessen“.",
-        });
-      } else {
-        setFoundationActionFeedback({
-          tone: "success",
-          title: "Disziplin 1 gewertet",
-          detail: "Die Platzierungspunkte stehen im Saisonstand. Weiter mit Disziplin 2.",
-        });
-      }
-      return result;
-    } finally {
-      setMatchdayAutoRunIncludeWarningLineups(savedInclude);
-      setMatchdayAutoRunOverwriteExistingLineups(savedOverwrite);
-      setMatchdayAutoRunStopOnTie(savedStop);
+    /**
+     * GEMELDET VON CHRIS: „obwohl alles gescored und berechnet ist und oben sogar steht es ist im
+     * Saisonstand drin, kann ich den Spieltag 2 nicht abschliessen!" — mit
+     * „Standings Apply fehlt noch fuer diesen Spieltag."
+     *
+     * HIER LAG ES. Die drei Lauf-Optionen wurden ueber React-State gesetzt:
+     *
+     *     setMatchdayAutoRunStopOnTie(false);
+     *     const result = await runCockpitMatchdayAutoRun(true, side, false, shownPreview);
+     *
+     * Das konnte nie wirken. `runCockpitMatchdayAutoRun` liest die Schalter aus dem Closure des
+     * AKTUELLEN Renders; ein Setter direkt davor aendert daran nichts, er plant nur den naechsten
+     * Render. Der Lauf sah also weiter `stopOnTie` auf seinem Default `true`.
+     *
+     * Folge: sobald zwei Teams denselben Score oder dieselben projizierten Punkte hatten — bei zwoelf
+     * Teams keine Seltenheit —, meldete die Standings-Preview `tie_groups_require_confirmed_policy`,
+     * der Lauf brach VOR `executeStandingsApply` ab, und der Spieltag hatte zwar Ergebnisse und
+     * Punkte, aber keinen Standings-Apply-Eintrag. „Spieltag abschliessen" pruefte genau diesen
+     * Eintrag und verweigerte — mit einer Begruendung, die den eigentlichen Grund (ein Gleichstand)
+     * nicht nennt.
+     *
+     * Die Optionen gehen deshalb jetzt als Argument mit, nicht ueber den Umweg State.
+     */
+    const runCockpitMatchdayAutoRun = matchdayArenaApplyHandlers?.runCockpitMatchdayAutoRun;
+    if (!runCockpitMatchdayAutoRun) {
+      return null;
     }
+    // `advanceAfterCashApply: false` — die Arena schaltet NICHT selbst weiter.
+    // Vorher sprang die Ansicht direkt nach D2 auf den naechsten Spieltag, und die
+    // gerade gespielte Spieltagstabelle war weg, bevor man sie lesen konnte. Der
+    // Wechsel passiert jetzt ueber den "Spieltag abschliessen"-Knopf im
+    // Spieltagsergebnis — also dann, wenn der Manager fertig geschaut hat.
+    const result = await runCockpitMatchdayAutoRun(true, side, false, shownPreview, {
+      includeWarningLineups: false,
+      // Vorhandene Aufstellungen NIE ueberschreiben — sonst wuerde der Lauf andere
+      // Aufstellungen erzeugen als die, gegen die die Arena gerade gespielt hat.
+      overwriteExistingLineups: false,
+      // Ein Gleichstand darf die Buchung nicht anhalten: die Tie-Policy ist deterministisch, und in
+      // der Arena gibt es niemanden, der eine Policy bestaetigen koennte. `stopOnTie` bleibt der
+      // Cockpit-Schalter fuer den manuellen Durchlauf.
+      stopOnTie: false,
+    });
+    const booked = result?.summary?.standingsApplyAllowed ?? false;
+    if (!booked) {
+      // Der eigentliche Grund steht in den Schritten des Laufs. Ihn hier zu nennen erspart den
+      // Umweg ueber das Cockpit — und vor allem den Zustand, in dem der Spieltag gewertet aussieht,
+      // sich aber nicht abschliessen laesst.
+      const blockers = [
+        ...(result?.blockingReasons ?? []),
+        ...(result?.steps ?? []).flatMap((step) => step.blockingReasons ?? []),
+      ];
+      const detail =
+        blockers.length > 0
+          ? [...new Set(blockers.map((reason) => formatCockpitReason(reason)))].join(" · ")
+          : "Die Wertung dieser Disziplin ist blockiert — bitte Cockpit pruefen.";
+      setFoundationActionFeedback({ tone: "warning", title: "Punkte nicht gebucht", detail });
+      return result;
+    }
+    if (side === "d2") {
+      setFoundationActionFeedback({
+        tone: "success",
+        title: "Beide Disziplinen gewertet",
+        detail:
+          "Die Spieltagstabelle bleibt stehen, solange du sie ansiehst. Weiter geht es ueber „Spieltag abschliessen“.",
+      });
+    } else {
+      setFoundationActionFeedback({
+        tone: "success",
+        title: "Disziplin 1 gewertet",
+        detail: "Die Platzierungspunkte stehen im Saisonstand. Weiter mit Disziplin 2.",
+      });
+    }
+    return result;
   }
 
   /**

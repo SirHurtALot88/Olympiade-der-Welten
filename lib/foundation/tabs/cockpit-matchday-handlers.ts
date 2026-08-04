@@ -79,6 +79,20 @@ export type CockpitMatchdayApplyHandlers = {
     advanceAfterCashApply?: boolean,
     /** Die Preview, die die Arena gezeigt hat — sie wird gebucht statt neu gerechnet. */
     submittedPreview?: LegacyMatchdayResolvePreview | null,
+    /**
+     * Lauf-Optionen, die den Cockpit-Schaltern VORGEHEN.
+     *
+     * Die Arena hat sie vorher gesetzt, indem sie `setMatchdayAutoRunStopOnTie(false)` &Co. rief und
+     * unmittelbar danach diesen Lauf startete. Das konnte nicht wirken: die Setter aktualisieren erst
+     * beim naechsten Render, waehrend dieser Handler seine Werte aus dem Closure des AKTUELLEN
+     * Renders liest. Der Lauf sah also weiter die alten Schalter — `stopOnTie` blieb bei seinem
+     * Default `true`.
+     */
+    optionOverrides?: {
+      includeWarningLineups?: boolean;
+      overwriteExistingLineups?: boolean;
+      stopOnTie?: boolean;
+    },
   ) => Promise<FoundationMatchdayAutoRunSummary | null>;
 };
 
@@ -371,6 +385,15 @@ export function createCockpitMatchdayApplyHandlers(
      * vor sich und laesst das Feld leer.
      */
     submittedPreview: LegacyMatchdayResolvePreview | null = null,
+    /**
+     * Lauf-Optionen, die den Cockpit-Schaltern vorgehen — siehe die Erklaerung am Typ.
+     * Ohne Angabe gelten die Schalter wie bisher.
+     */
+    optionOverrides: {
+      includeWarningLineups?: boolean;
+      overwriteExistingLineups?: boolean;
+      stopOnTie?: boolean;
+    } = {},
   ) {
     if (readMetaSource === "prisma") {
       showReadOnlyNotice();
@@ -392,9 +415,10 @@ export function createCockpitMatchdayApplyHandlers(
             execute,
             confirmToken: execute ? MATCHDAY_AUTO_RUN_CONFIRM_TOKEN : undefined,
             options: {
-              includeWarningLineups: matchdayAutoRunIncludeWarningLineups,
-              overwriteExistingLineups: matchdayAutoRunOverwriteExistingLineups,
-              stopOnTie: matchdayAutoRunStopOnTie,
+              includeWarningLineups: optionOverrides.includeWarningLineups ?? matchdayAutoRunIncludeWarningLineups,
+              overwriteExistingLineups:
+                optionOverrides.overwriteExistingLineups ?? matchdayAutoRunOverwriteExistingLineups,
+              stopOnTie: optionOverrides.stopOnTie ?? matchdayAutoRunStopOnTie,
               advanceAfterCashApply,
               commitThroughSide,
               submittedPreview,
