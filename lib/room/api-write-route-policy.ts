@@ -172,7 +172,11 @@ export const API_WRITE_ROUTE_ROOM_BOUND_REFUSAL_REQUIRED: ApiWriteRoutePolicyEnt
       "(season-simulation-runner.ts:283,484,553,612,1525,1846,1866, saveSingleplayerState) — no " +
       "room context, no ready-gates, no broadcast. This is exactly the reported R4 incident: a " +
       "click on \"Saison simulieren\" fast-forwarded a room-bound save to season end while the " +
-      "co-player's client still showed matchday 3.",
+      "co-player's client still showed matchday 3. This run is STATEFUL across many requests — " +
+      "\"start\" only writes the run-metadata file, the actual per-phase save writes happen inside " +
+      "every \"tick\" — so the room-bound check runs on BOTH \"start\" and every \"tick\" for " +
+      "mode: \"apply\" runs (route.ts), not just once at start; otherwise a save could go room-bound " +
+      "*after* a start that was legitimately allowed, and ticks would keep writing regardless.",
   },
   {
     routePath: "singleplayer-state/season-start-reset",

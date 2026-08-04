@@ -118,6 +118,93 @@ describe("Admin-/KI-/Simulationswerkzeuge auf raumgebundenen Saves", () => {
       },
       AUFBAU_ZEITGRENZE_MS,
     );
+
+    /**
+     * DIE LUECKE, DIE EIN START-GUARD ALLEIN NICHT SCHLIESST: der Lauf ist zustandsbehaftet und
+     * zieht sich ueber viele Requests. `start` schreibt nur die Lauf-Metadatei (kein
+     * saveSingleplayerState) — das eigentliche Schreiben passiert phasenweise in JEDEM `tick`.
+     * Ein `apply`-Lauf kann also auf einem raumfreien Save starten und ERST DANACH kann derselbe
+     * Save in einen Koop-Raum wandern; jeder folgende `tick` muss das frisch pruefen. Genau diese
+     * zeitliche Reihenfolge bildet der Test ab — ein Test, der Raum und Lauf gleichzeitig anlegt,
+     * wuerde diese Luecke nicht zeigen.
+     */
+    it(
+      "apply-Lauf startet OHNE Raum, danach wird ein Raum fuer denselben Save eroeffnet -> der naechste tick wird geblockt",
+      async () => {
+        const spaeterRaumSaveId = createPersistenceService().createFreshSeasonOneSave({
+          name: "Admin-Guard-Tick-Luecke",
+        }).saveId;
+        const { POST } = await import("@/app/api/admin/season-simulation/route");
+
+        // 1) Start auf einem Save OHNE Raum -> geht durch.
+        const startAntwort = await POST(
+          new Request("http://localhost/api/admin/season-simulation", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "start", saveId: spaeterRaumSaveId, mode: "apply", seasonCount: 1 }),
+          }),
+        );
+        const startBody = await startAntwort.json();
+        expect(startAntwort.status, "Start auf raumfreiem Save faelschlich blockiert").toBe(200);
+        const runId = startBody.run?.runId as string | undefined;
+        expect(runId, "kein runId aus dem Start erhalten — Testaufbau unbrauchbar").toBeTruthy();
+
+        // 2) ERST JETZT wird ein Koop-Raum fuer denselben Save eroeffnet — der Lauf existiert schon.
+        erstelleCoopRaum(spaeterRaumSaveId);
+
+        // 3) tick muss die Bindung erkennen, obwohl der Start laengst durch war.
+        const tickAntwort = await POST(
+          new Request("http://localhost/api/admin/season-simulation", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "tick", runId }),
+          }),
+        );
+        const tickBody = await tickAntwort.json();
+
+        expect(tickAntwort.status).toBe(409);
+        expect(tickBody.error).toBe(`${BLOCKED_MARKER}:${WERKZEUG}`);
+      },
+      AUFBAU_ZEITGRENZE_MS,
+    );
+
+    it(
+      "GEGENPROBE: dry_run-Lauf bleibt tickbar, selbst wenn der Save nachtraeglich an einen Raum gebunden wird",
+      async () => {
+        const spaeterRaumSaveId = createPersistenceService().createFreshSeasonOneSave({
+          name: "Admin-Guard-Tick-Dryrun",
+        }).saveId;
+        const { POST } = await import("@/app/api/admin/season-simulation/route");
+
+        const startAntwort = await POST(
+          new Request("http://localhost/api/admin/season-simulation", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "start", saveId: spaeterRaumSaveId, mode: "dry_run", seasonCount: 1 }),
+          }),
+        );
+        const startBody = await startAntwort.json();
+        const runId = startBody.run?.runId as string | undefined;
+        expect(runId, "kein runId aus dem Start erhalten — Testaufbau unbrauchbar").toBeTruthy();
+
+        erstelleCoopRaum(spaeterRaumSaveId);
+
+        const tickAntwort = await POST(
+          new Request("http://localhost/api/admin/season-simulation", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "tick", runId }),
+          }),
+        );
+        const tickBody = await tickAntwort.json();
+
+        expect(tickBody.error, "Dry-Run-Tick im nachtraeglich gebundenen Raum faelschlich blockiert").not.toBe(
+          `${BLOCKED_MARKER}:${WERKZEUG}`,
+        );
+        expect(tickAntwort.status).not.toBe(409);
+      },
+      AUFBAU_ZEITGRENZE_MS,
+    );
   });
 
   describe("singleplayer-state/season-start-reset", () => {
