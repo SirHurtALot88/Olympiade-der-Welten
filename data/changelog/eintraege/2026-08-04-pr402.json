@@ -1,7 +1,7 @@
 {
   "datum": "2026-08-04",
   "seite": "Alle Seiten",
-  "text": "Die ganze Oberfläche trägt jetzt die Farben des aktiven Teams: Akzente, aktive Zustände, Buttons, Fokusringe und Flächen folgen der Primär- und Sekundärfarbe des gewählten Teams — Bedeutungs-Farben (gut/schlecht, POW/SPE/MEN/SOC, Heat, Medaillen) bleiben unverändert.",
+  "text": "Die ganze Oberfläche trägt jetzt die Farben des aktiven Teams: Navigationsleiste, aktiver Eintrag, Kartenrahmen, Überschriften, Buttons und Fokusringe folgen der Vereinsfarbe. Bei zweifarbigen Marken führt die Farbe, an der man das Team erkennt — bei Last Ride also das Rot, während das Schwarz die Flächen trägt. Bedeutungs-Farben (gut/schlecht, POW/SPE/MEN/SOC, Heat, Medaillen) bleiben unverändert.",
   "gewicht": "grundlegend",
   "pr": "#402",
   "version": "0.4"

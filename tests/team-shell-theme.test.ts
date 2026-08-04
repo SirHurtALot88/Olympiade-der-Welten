@@ -5,6 +5,8 @@ import {
   accentSoftFor,
   buildTeamShellThemeVars,
   buildTeamVoidVars,
+  resolveTeamAccentPair,
+  teamColorChroma,
 } from "@/lib/foundation/team-shell-theme";
 import { floorTeamAccent, getTeamColor } from "@/lib/foundation/team-colors";
 
@@ -33,15 +35,51 @@ describe("buildTeamShellThemeVars", () => {
     expect(vars!["--nl-accent-2"]).toBe(vars!["--nl-accent"]);
   });
 
-  it("L-R (fast schwarz): Akzent wird auf den Lesbarkeits-Floor angehoben, Ink ist weiß", () => {
+  /**
+   * GEMELDET: „bei Last-Ride sieht man fast nix von dem schwarz rot".
+   *
+   * Vorher führte hier die Primärfarbe: `hsl(220 12% 20%)`, auf den Floor
+   * angehoben zu `hsl(220 12% 44%)` — neutrales Stahlgrau, an dem man kein Team
+   * erkennt. Das Rot, DIE Erkennungsfarbe von Last Ride, lag im Zweitton-Slot,
+   * den fast keine Regel liest.
+   *
+   * Gemessen über alle 32 Teams trägt die Primärfarbe hier ein Chroma von 0,04
+   * gegen 0,65 der Sekundärfarbe — Faktor 16. Jetzt führt das Rot, und das
+   * Schwarz bleibt als `deep` der Ton für Flächen und Schleier. Genau so sieht
+   * „schwarz + rot" aus.
+   */
+  it("L-R (fast schwarz + rot): das ROT führt, das Schwarz bleibt die Fläche", () => {
     const vars = buildTeamShellThemeVars("L-R");
-    // Roh hsl(220 12% 20%) → floorTeamAccent hebt L auf 44.
-    expect(vars!["--nl-accent"]).toBe("hsl(220 12% 44%)");
-    // Auf einem L-44-Grau liefert Weiß mehr WCAG-Kontrast als dunkle Schrift.
+    expect(vars!["--nl-accent"]).toBe(floorTeamAccent(getTeamColor("L-R").secondary!));
+    // Das Stahlgrau ist nicht weg — es ist jetzt der Zweitton.
+    expect(vars!["--nl-accent-2"]).toBe(floorTeamAccent(getTeamColor("L-R").primary));
+    // Und die dunkle Primärfarbe steht ungefiltert als Flächen-Ton bereit.
+    expect(vars!["--nl-accent-deep"]).toBe(getTeamColor("L-R").primary);
+    // Auf dem kräftigen Rot ist Weiß die kontraststärkere Schrift.
     expect(vars!["--nl-accent-ink"]).toBe("#fff");
-    // Die Sekundärfarbe (rot) bleibt als eigener zweiter Ton erhalten.
-    expect(vars!["--nl-accent-2"]).toBe(floorTeamAccent(getTeamColor("L-R").secondary!));
-    expect(vars!["--nl-accent-2"]).not.toBe(vars!["--nl-accent"]);
+  });
+
+  it("dreht NUR, wo die Primärfarbe wirklich als Grau liest", () => {
+    // Die Regel darf keine „nimm immer die buntere Farbe"-Regel sein: Vicious &
+    // Delicious ist die grüne Kriegerin (Chroma 0,42) mit orangem Zweitton
+    // (0,76) — würde hier gedreht, stünde die kuratierte Identität auf dem Kopf.
+    expect(resolveTeamAccentPair("V-D").swapped).toBe(false);
+    expect(resolveTeamAccentPair("T-C").swapped).toBe(false);
+    expect(resolveTeamAccentPair("R-L").swapped).toBe(false);
+    // Gedreht wird bei den dreien, deren Primärfarbe unter dem Chroma-Tot liegt.
+    expect(resolveTeamAccentPair("L-R").swapped).toBe(true);
+    expect(resolveTeamAccentPair("M-M").swapped).toBe(true);
+    expect(resolveTeamAccentPair("W-L").swapped).toBe(true);
+    // D-L ist grau UND sein Zweitton ist grau — hier wird keine Farbe erfunden.
+    expect(resolveTeamAccentPair("D-L").swapped).toBe(false);
+  });
+
+  it("misst Buntheit als Sättigung mal Nähe zur mittleren Helligkeit", () => {
+    // Derselbe Farbton, einmal fast schwarz, einmal auf mittlerer Helligkeit.
+    expect(teamColorChroma("hsl(354 72% 50%)")).toBeGreaterThan(0.6);
+    expect(teamColorChroma("hsl(354 72% 8%)")).toBeLessThan(0.15);
+    // Neutralgrau trägt gar keine Farbe.
+    expect(teamColorChroma("hsl(220 0% 50%)")).toBe(0);
   });
 
   it("S-S (helles Silber): Ink auf dem Akzent ist dunkel, nicht weiß", () => {
@@ -111,8 +149,9 @@ describe("buildTeamVoidVars", () => {
   it("liefert Primär- und Sekundär-Schleier; ohne Team null", () => {
     expect(buildTeamVoidVars(null)).toBeNull();
     const voidVars = buildTeamVoidVars("L-R")!;
-    expect(voidVars.primary).toContain("hsl(220 12% 44%)");
-    // Sekundärfarbe (rot, geflochen) als zweiter Schleier.
-    expect(voidVars.secondary).toContain(floorTeamAccent(getTeamColor("L-R").secondary!));
+    // Der Schleier folgt derselben Führung wie der Akzent — bei Last Ride also
+    // Rot oben links, Stahl oben rechts.
+    expect(voidVars.primary).toContain(floorTeamAccent(getTeamColor("L-R").secondary!));
+    expect(voidVars.secondary).toContain(floorTeamAccent(getTeamColor("L-R").primary));
   });
 });

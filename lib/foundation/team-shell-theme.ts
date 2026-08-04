@@ -112,15 +112,82 @@ export function accentSoftFor(accentHsl: string): string {
 }
 
 /**
+ * Wie viel MARKENFARBE ein Ton überhaupt auf den Schirm bringt — 0 (wirkt grau)
+ * bis 1 (voll). Sättigung allein reicht als Maß nicht: derselbe Farbton bei
+ * L 20 % oder L 92 % erscheint fast unbunt, deshalb die Gewichtung mit der
+ * Nähe zur mittleren Helligkeit.
+ */
+export function teamColorChroma(value: string): number {
+  const parsed = parseHsl(value);
+  if (!parsed) return 0;
+  const mitte = 1 - Math.abs(parsed.l - 55) / 55;
+  return (parsed.s / 100) * Math.max(0, mitte);
+}
+
+/**
+ * Ab hier gilt ein Ton als „trägt keine erkennbare Farbe mehr". Gemessen an den
+ * 32 kuratierten Teams liegt genau die Gruppe darunter, deren Primärfarbe fast
+ * schwarz oder neutrales Grau ist: L-R 0.04, D-L 0.04, M-M 0.10, W-L 0.11 —
+ * der nächste Wert darüber ist P-C mit 0.20.
+ */
+const CHROMA_TOT = 0.15;
+
+/**
+ * GEMELDET: „bei Last-Ride sieht man fast nix von dem schwarz rot".
+ *
+ * Stimmt, und der Grund ist messbar. Last Ride ist „schwarz + rot": Primärfarbe
+ * `hsl(220 12% 20%)`, Sekundärfarbe `hsl(354 72% 50%)`. Der Akzent kam blind aus
+ * der Primärfarbe — die auf den Lesbarkeits-Floor angehoben zu neutralem
+ * Stahlgrau wird (`hsl(220 12% 44%)`). Die Farbe, an der man das Team ERKENNT,
+ * lag damit im Slot, den fast keine Regel liest.
+ *
+ * Also: trägt die Primärfarbe keine erkennbare Farbe (Chroma unter CHROMA_TOT)
+ * und die Sekundärfarbe deutlich mehr, dann führt die Sekundärfarbe. Das ist
+ * bewusst KEINE „nimm immer die buntere"-Regel — die würde Vicious & Delicious
+ * (grüne Kriegerin, 0.42) auf Orange und Thunder Cats (blaue Flügel, 0.80) auf
+ * Gelb drehen und der kuratierten Absicht widersprechen. Betroffen sind exakt
+ * die drei Teams, deren Primärfarbe wirklich als Grau liest: L-R, M-M, W-L.
+ *
+ * Die dunkle Primärfarbe verschwindet dabei nicht — sie bleibt als `deep` der
+ * Ton für Flächen und Schleier. Genau so sieht „schwarz + rot" aus: schwarze
+ * Flächen, rote Akzente.
+ */
+export function resolveTeamAccentPair(code: string | null | undefined): {
+  accent: string;
+  accent2: string;
+  /** Der dunkle/unbunte Partner — Flächen und Schleier, nie Text. */
+  deep: string;
+  /** Ob die Sekundärfarbe die Führung übernommen hat (für Tests und Doku). */
+  swapped: boolean;
+} {
+  const color = getTeamColor(code);
+  const primaryChroma = teamColorChroma(color.primary);
+  const secondaryChroma = color.secondary ? teamColorChroma(color.secondary) : 0;
+  const swapped =
+    color.secondary != null && primaryChroma < CHROMA_TOT && secondaryChroma > primaryChroma + 0.05;
+
+  const fuehrend = swapped ? color.secondary! : color.primary;
+  const zweiter = swapped ? color.primary : color.secondary ?? color.primary;
+  return {
+    accent: floorTeamAccent(fuehrend),
+    accent2: floorTeamAccent(zweiter),
+    // Bewusst OHNE Floor: hier ist das Dunkle der Punkt.
+    deep: swapped ? color.primary : color.secondary ?? color.primary,
+    swapped,
+  };
+}
+
+/**
  * Die CSS-Variablen für die Shell-Wurzel — oder null, wenn kein Team gewählt
  * ist ("Alle 32 Teams anzeigen"): dann behält die Shell ihren Standard-Look.
  */
 export function buildTeamShellThemeVars(code: string | null | undefined): TeamShellThemeVars | null {
   if (!code) return null;
-  const color = getTeamColor(code);
-  const accent = floorTeamAccent(color.primary);
-  const accent2 = color.secondary ? floorTeamAccent(color.secondary) : accent;
+  const { accent, accent2, deep } = resolveTeamAccentPair(code);
   return {
+    // Der dunkle Partner als eigenes Token: Flächen und Rahmen dürfen ihn nutzen,
+    // ohne ihn auf Textlesbarkeit anheben zu müssen.
+    "--nl-accent-deep": deep,
     "--nl-accent": accent,
     "--nl-accent-2": accent2,
     "--nl-accent-soft": accentSoftFor(accent),
@@ -143,9 +210,7 @@ export function buildTeamShellThemeVars(code: string | null | undefined): TeamSh
  */
 export function buildTeamVoidVars(code: string | null | undefined): { primary: string; secondary: string } | null {
   if (!code) return null;
-  const color = getTeamColor(code);
-  const accent = floorTeamAccent(color.primary);
-  const accent2 = color.secondary ? floorTeamAccent(color.secondary) : accent;
+  const { accent, accent2 } = resolveTeamAccentPair(code);
   return {
     primary: `color-mix(in srgb, ${accent} 7%, transparent)`,
     secondary: `color-mix(in srgb, ${accent2} 5%, transparent)`,

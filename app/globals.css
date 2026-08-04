@@ -44232,6 +44232,10 @@ button.foundation-team-portrait-card {
                        und dunkle Marken weiße. */
   --nl-accent-2: var(--nl-accent);
   --nl-accent-ink: var(--nl-bg);
+  /* --nl-accent-deep = der dunkle/unbunte Partner der Team-Farbe (Flächen und
+     Schleier, nie Text). Ohne Team-Theme identisch zum Akzent, damit der
+     Standard-Look sich nicht ändert. */
+  --nl-accent-deep: var(--nl-accent);
   /* Gemeinsamer Fokus-Ring (zusammen mit outline-offset: 2px angewandt) */
   --nl-focus-ring: 2px solid var(--nl-accent);
   /* Achsen (Spiel-Identität) */
@@ -75786,4 +75790,105 @@ button.is-new-look .nl-thist-season-pill,
 
 .is-new-look .nl-changelog-abschnitt[data-gewicht="feinschliff"] {
   --nl-gewicht-farbe: var(--nl-mut-2);
+}
+
+/* =======================================================================
+   TEAM-THEME, ZWEITE RUNDE — mehr Präsenz.
+
+   GEMELDET: „das grün kommt gut aber könnte noch paar mehr stellen haben wo
+   das ist und ggf. rahmen usw. bau das noch bisschen aus, auch die
+   navigationsleiste oder so, das soll n richtig coolen modernen style haben."
+
+   Alles hier hängt an `[data-team-theme]` — ohne gewähltes Team („Alle 32
+   Teams") bleibt der Standard-Look Zeichen für Zeichen unverändert.
+
+   Was BEWUSST nicht angefasst wird: `.is-attention` (rot = Aufmerksamkeit),
+   Semantik-, Achsen- und Heat-Tokens. Die färben nach Bedeutung, nicht nach
+   Verein — dieselbe Grenze wie in der ersten Runde.
+   ======================================================================= */
+
+/* --- Navigationsleiste ------------------------------------------------
+   Vorher: flaches `rgba(8,14,28,0.92)`, unabhängig vom Team. Jetzt trägt die
+   Leiste den dunklen Partnerton (bei „schwarz + rot" also wirklich Schwarz)
+   und grenzt sich mit einer Akzent-Haarlinie zum Inhalt ab. */
+.foundation-shell.is-new-look[data-team-theme] .foundation-sidebar {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--nl-accent-deep, var(--nl-accent)) 16%, rgba(8, 14, 28, 0.92)),
+    rgba(8, 14, 28, 0.94) 42%
+  );
+  border-color: color-mix(in srgb, var(--nl-accent) 22%, rgba(255, 255, 255, 0.08));
+  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--nl-accent) 26%, transparent);
+}
+
+/* Gruppen-Überschriften (SPIELTAG · TEAM · MARKT · WELT) im Teamton statt
+   in neutralem Grau — sie gliedern die Leiste und sind billig zu färben. */
+.foundation-shell.is-new-look[data-team-theme] .foundation-sidebar-group-label {
+  color: color-mix(in srgb, var(--nl-accent) 62%, var(--nl-mut-2));
+}
+
+/* Der aktive Eintrag bekommt eine Akzent-Kante links — die Stelle, an der man
+   ohne Hinsehen erkennt, wo man ist. */
+.foundation-shell.is-new-look[data-team-theme] .foundation-sidebar-item.is-active {
+  border-color: color-mix(in srgb, var(--nl-accent) 55%, transparent);
+  box-shadow: inset 3px 0 0 var(--nl-accent);
+}
+
+.foundation-shell.is-new-look[data-team-theme] .foundation-sidebar-item:hover:not(.is-active):not(.is-attention) {
+  background: color-mix(in srgb, var(--nl-accent) 7%, transparent);
+}
+
+/* --- Kanten und Rahmen ------------------------------------------------
+   Eine durchgehende Akzentlinie am oberen Rand des Shells: der eine Strich,
+   der die ganze Seite als „diesem Team gehörend" markiert. Zweifarbige Teams
+   zeigen hier beide Töne — genau dort wird „schwarz + rot" ablesbar. */
+.foundation-shell.is-new-look[data-team-theme]::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: linear-gradient(
+    90deg,
+    var(--nl-accent),
+    color-mix(in srgb, var(--nl-accent-2) 85%, transparent) 55%,
+    transparent
+  );
+  pointer-events: none;
+  z-index: 2;
+}
+
+.foundation-shell.is-new-look[data-team-theme] {
+  position: relative;
+}
+
+/* Karten: der Rahmen trägt den Teamton deutlicher, dazu ein feiner Lichtsaum
+   an der Oberkante. Beides bleibt weit unter der Kontraststärke der
+   Semantik-Ränder (good/risk), damit ein farbiger Rahmen nie mit einer
+   Bewertung verwechselt wird. */
+.is-new-look[data-team-theme] .nl-card {
+  border-color: color-mix(in srgb, var(--nl-accent) 26%, var(--nl-line));
+  box-shadow:
+    var(--nl-e2),
+    inset 0 1px 0 color-mix(in srgb, var(--nl-accent) 16%, transparent);
+}
+
+/* Karten-Eyebrows (SCOUTING-PROFIL, GEWINNSTUFEN, …) im Teamton — sie sind
+   über die ganze App verteilt und geben dem Schema Präsenz, ohne dass
+   irgendwo ein Messwert die Farbe wechselt. */
+.is-new-look[data-team-theme] .nl-card-eyebrow {
+  color: color-mix(in srgb, var(--nl-accent) 70%, var(--nl-mut-2));
+}
+
+/* Tabellenkopf und Trennlinien: die Flächen, an denen man „Rahmen" am
+   ehesten wahrnimmt. */
+.is-new-look[data-team-theme] .nl-table thead th {
+  border-bottom-color: color-mix(in srgb, var(--nl-accent) 34%, var(--nl-line-2));
+}
+
+/* Unterreiter (Verzeichnis · Analyse-Hub …): aktiver Reiter im Teamton. */
+.is-new-look[data-team-theme] .nl-subtab.is-active,
+.is-new-look[data-team-theme] .foundation-subnav-item.is-active {
+  border-color: color-mix(in srgb, var(--nl-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--nl-accent) 14%, transparent);
 }
