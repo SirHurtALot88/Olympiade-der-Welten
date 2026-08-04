@@ -4,7 +4,7 @@
 > `data/bug-reports/triage/*.md` und `tickets.json`. Wer hier etwas ändert, verliert es beim
 > nächsten `npm run bugs:tabelle`. Der Stand einer Meldung wird in ihrer Triage-Notiz gepflegt.
 
-27 Meldungen — offen: 0 · vorgeprüft: 0 · angenommen: 3 · gebaut: 24 · abgelehnt: 0 · erledigt: 0
+30 Meldungen — offen: 2 · vorgeprüft: 0 · angenommen: 3 · gebaut: 25 · abgelehnt: 0 · erledigt: 0
 
 | Nr | Eingang | Von | Wo | Titel | Status | Ergebnis |
 |---:|---|---|---|---|---|---|
@@ -35,6 +35,9 @@
 | [25](triage/bug-2026-08-04T12-13-40-352Z-fm2opo.md) | 04.08., 14:13 | Chris | Spieltag · Saisonstand | KI nutzt Front-/Back-loaded-Verträge nicht, um Apron-Probleme zu umgehen | angenommen | — |
 | [26](triage/bug-2026-08-04T13-18-59-798Z-vlsakj.md) | 04.08., 15:18 | Chris | Spieltag · Arena | Trotz Tagesplatz 2 und 20,8 Punkten zeigt der Saisonstand keine Rang-Bewegung (15 auf 15) | gebaut ⚠ | Der Anzeigeteil ist behoben — die Rang-Spalte zeigt die Bewegung zur letzten Wertung jetzt überhaupt, und ein gehaltener Platz steht sichtbar als ±0 statt als leere Zelle. Ob M-S rechnerisch hätte steigen müssen, ließ sich ohne Zugriff auf den Spielstand nicht nachrechnen. · PR #394 · **Wirkung nicht bestaetigt** |
 | [27](triage/bug-2026-08-04T13-20-49-011Z-191wtu.md) | 04.08., 15:20 | Chris | Spieltag · Saisonstand | Saisonstand zeigt keine Rang-Änderung zur letzten Wertung | gebaut ⚠ | Die Rang-Spalte des Saisonstands hatte die Bewegung nie zu sehen bekommen — sie hing an einer Datenquelle, die auf genau dieser Seite immer leer ist. Jetzt kommt sie aus dem gespeicherten Punktestand vor der letzten Wertung. · PR #394 · **Wirkung nicht bestaetigt** |
+| [28](triage/bug-2026-08-04T13-22-34-347Z-pqcssb.md) | 04.08., 15:22 | Chris | Spieltag · Saisonstand | Saisonstand — Rang hinter den geholten PPs, je Disziplin und je Bereich | gebaut ⚠ | PR 401 · `efca1cf2` · **kein Ergebnis angegeben, Wirkung nicht bestaetigt** |
+| [29](triage/bug-2026-08-04T13-23-39-256Z-uzetn6.md) | 04.08., 15:23 | Chris | Team · Spieler | „Top Disziplinen hat z.B. auch PPs -1 Pps und All-Time -> da fehlt jeweils auch der Rank das hatten wir früher drin und ist super hilfreich! bitte hinzufügen" | offen | — |
+| [30](triage/bug-2026-08-04T15-59-37-826Z-2tlf67.md) | 04.08., 17:59 | Chris | Spieltag · Arena | „bitte schauen dass die bilder in den hovers und team karte geladen werden während die diszi läuft damit die verfügbar sind wenn man mal den drawer öffnet" | offen | — |
 
 **`gebaut ⚠`** heißt: Der Fix ist gemergt, die Wirkung im laufenden Spiel aber noch nicht belegt.
 Erst ein `bestaetigt:` in der Triage-Notiz macht daraus `erledigt`. Diese Unterscheidung gibt es,
@@ -43,4 +46,4 @@ von einem Zwischenspeicher verschluckt.
 
 Details je Ticket: die Nummer verlinkt auf die Triage-Notiz. Volltext: `npm run bugs:review`.
 
-_Erzeugt: 4.8.2026, 15:51:13_
+_Erzeugt: 4.8.2026, 21:15:09_

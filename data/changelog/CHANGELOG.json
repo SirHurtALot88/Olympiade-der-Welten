@@ -12,6 +12,15 @@
     },
     {
       "datum": "2026-08-04",
+      "seite": "Spieltag · Saisonstand",
+      "pr": "401",
+      "text": "Im Saisonstand steht beim Aufklappen jetzt hinter jeder Disziplin und hinter jedem Bereich der Liga-Rang, den die geholten Punkte bedeuten — vorher sah man nur die Punktzahl und nicht, was sie wert ist.",
+      "quelle": "triage",
+      "gewicht": "feinschliff",
+      "version": null
+    },
+    {
+      "datum": "2026-08-04",
       "seite": "Gebäude · Analytics Room",
       "pr": null,
       "text": "Die KI bewertete den Analytics Room wortgleich wie das Scouting Office — über Kaderlücken und Vertragswellen, von denen das Gebäude nichts weiß. Jetzt zählt für ihn der Zieldruck und der Achsfokus, also genau das, was er anzeigt; außerdem behauptet die Saisonend-Vorschau keine Prognosegenauigkeit mehr.",
@@ -161,6 +170,15 @@
       "text": "Ein Gleichstand zwischen zwei Teams konnte den Spieltag unabschließbar machen: die Wertung lief durch, die Tabelle wurde aber nie gebucht, und „Spieltag abschließen“ meldete nur „Standings Apply fehlt noch für diesen Spieltag“. Die Arena bucht jetzt auch bei Gleichstand — und wenn eine Buchung doch ausbleibt, nennt sie den Grund.",
       "quelle": "gepflegt",
       "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
+      "seite": "Spieltag · Arena",
+      "pr": "#401",
+      "text": "Die Endtabelle am Ende eines Spieltags rechnete den Bonus des Spieltags nicht mit und zeigte deshalb eine andere Reihenfolge als der Saisonstand danach — ein Team mit viel Bonus stand dort zu tief und rutschte hinterher überraschend nach oben. Jetzt zählt derselbe Bonus, der auch gebucht wird, und alle Ränge kommen aus einer einzigen Rangliste statt aus zwei zusammengesetzten.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
       "version": "0.4"
     },
     {
