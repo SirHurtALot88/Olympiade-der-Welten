@@ -68,6 +68,13 @@ export type DisciplineStageDrawerProps = {
   liveResultsByTeam?: StageLiveResultsByTeam;
   /** Die 2 aktiven Mutatoren dieser Disziplin (welche beiden es sind). */
   disciplineMutators?: string[];
+  /**
+   * Kanonische, ligaweite OVR/Rang-Karte (Server-Slice, volles Save) — dieselbe Quelle wie
+   * Kader/Spielerprofil/Ranglisten. Fehlt sie, rechnen Spieler- und Team-Karte defensiv
+   * lokal aus `gameState` (kompakter Client-Payload → siehe
+   * docs/CLIENT_PAYLOAD_LEERE_ABLEITUNGEN.md, das ist der bisherige, ungenaue Fallback).
+   */
+  ratingByPlayerId?: Map<string, PlayerRatingContractRow> | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -300,10 +307,13 @@ function PlayerBody({
   gameState,
   playerId,
   disciplineId,
+  ratingByPlayerId,
 }: {
   gameState: GameState;
   playerId: string;
   disciplineId: string;
+  /** Kanonische OVR/Rang-Karte (siehe DisciplineStageDrawerProps.ratingByPlayerId). */
+  ratingByPlayerId?: Map<string, PlayerRatingContractRow> | null;
 }) {
   const player = findPlayer(gameState, playerId);
 
@@ -320,11 +330,14 @@ function PlayerBody({
         playerId,
         source: "sqlite",
         manageableTeamIds: [teamIdOfPlayer].filter(Boolean) as string[],
+        // Kanonische OVR statt der lokal aus dem kompakten Client-Payload nachgerechneten
+        // (siehe ratingByPlayerId-Kommentar oben / docs/CLIENT_PAYLOAD_LEERE_ABLEITUNGEN.md).
+        liveRatingsById: ratingByPlayerId ?? null,
       });
     } catch {
       return null;
     }
-  }, [gameState, playerId]);
+  }, [gameState, playerId, ratingByPlayerId]);
 
   const leagueRankUsable = useMemo(() => isLeagueRankUsable(gameState), [gameState]);
   /** Rang nur zeigen, wenn er aus einem echten Ligavergleich stammt (siehe MIN_LEAGUE_RANK_POOL). */
@@ -778,6 +791,7 @@ function TeamBody({
   fieldedPlayerIdsByTeam,
   liveResultsByTeam,
   disciplineMutators,
+  ratingByPlayerId,
 }: {
   gameState: GameState;
   teamId: string;
@@ -786,6 +800,8 @@ function TeamBody({
   fieldedPlayerIdsByTeam?: Record<string, string[]>;
   liveResultsByTeam?: StageLiveResultsByTeam;
   disciplineMutators?: string[];
+  /** Kanonische OVR/Rang-Karte (siehe DisciplineStageDrawerProps.ratingByPlayerId). */
+  ratingByPlayerId?: Map<string, PlayerRatingContractRow> | null;
 }) {
   const team = findTeam(gameState, teamId);
   // Live-Ergebnis je Spieler-ID für dieses Team (schnelle Lookup-Map).
@@ -802,11 +818,16 @@ function TeamBody({
   );
 
   // Kanonische Ratings je Roster-Spieler — EINMAL gebaut (kein schwerer Drawer-Builder
-  // pro Zeile). Quelle: buildPlayerRatingContractMap OHNE playerIds-Filter → Normalisierung
-  // UND Rang über den vollen aktiven/gerosterten Pool (stabil) — exakt derselbe Pool, den
-  // der Karten-Builder (buildPlayerDrawerData…) und die Hover-Vorschau nutzen. Würde man
-  // hier { playerIds: rosterIds } übergeben, kollabierte der OVR-Normalisierungs-/Rang-Pool
-  // auf ein einzelnes Team → OVR + „OVR #N" wichen von der geöffneten Karte ab.
+  // pro Zeile). Quelle bevorzugt die durchgereichte `ratingByPlayerId` (Server-Slice auf
+  // dem vollen Save — dieselbe wie Kader/Spielerprofil/Ranglisten). Lokaler Fallback:
+  // buildPlayerRatingContractMap OHNE playerIds-Filter → Normalisierung UND Rang über den
+  // vollen aktiven/gerosterten Pool (stabil) — exakt derselbe Pool, den der Karten-Builder
+  // (buildPlayerDrawerData…) und die Hover-Vorschau nutzen. Würde man hier
+  // { playerIds: rosterIds } übergeben, kollabierte der OVR-Normalisierungs-/Rang-Pool auf
+  // ein einzelnes Team → OVR + „OVR #N" wichen von der geöffneten Karte ab. Der Fallback
+  // rechnet aus dem KOMPAKTEN Client-Payload nach und liefert dort eine plausible, aber
+  // FALSCHE OVR (siehe docs/CLIENT_PAYLOAD_LEERE_ABLEITUNGEN.md) — er greift nur, wenn
+  // keine kanonische Karte durchgereicht wurde (z. B. dev-arena ohne Shell-Kontext).
   const { ratingById, ovrById, ovrRankById, seasonPpsById } = useMemo(() => {
     const rows = new Map<string, PlayerRatingContractRow>();
     const ovr = new Map<string, number | null>();
@@ -816,7 +837,8 @@ function TeamBody({
       return { ratingById: rows, ovrById: ovr, ovrRankById: ovrRank, seasonPpsById: pps };
     }
     try {
-      const ratingMap = buildPlayerRatingContractMap(gameState);
+      const ratingMap =
+        ratingByPlayerId && ratingByPlayerId.size > 0 ? ratingByPlayerId : buildPlayerRatingContractMap(gameState);
       // Bei degeneriertem Pool (fast leere Kader) wäre jeder Spieler „#1" — dann gar kein
       // Rang statt eines erfundenen. Gleiches Gate wie in der Spieler-Ansicht.
       const rankUsable = isLeagueRankUsable(gameState);
@@ -831,7 +853,7 @@ function TeamBody({
       // defensiv: keine Ratings → Werte bleiben leer statt Crash.
     }
     return { ratingById: rows, ovrById: ovr, ovrRankById: ovrRank, seasonPpsById: pps };
-  }, [gameState, rosterIds]);
+  }, [gameState, rosterIds, ratingByPlayerId]);
 
   if (!team) {
     return <div style={{ fontSize: 13, color: "var(--nl-mut)", fontStyle: "italic" }}>Team nicht gefunden.</div>;
@@ -1100,6 +1122,7 @@ export default function DisciplineStageDrawer({
   liveResultsByTeam,
   disciplineMutators,
   onClose,
+  ratingByPlayerId,
 }: DisciplineStageDrawerProps): React.JSX.Element | null {
   // Erst nach dem Mount in document.body portalen (SSR-fest) — verhindert, dass ein
   // ancestor-`transform` das `position:fixed`-Overlay zur containing-block-relativen
@@ -1280,7 +1303,12 @@ export default function DisciplineStageDrawer({
         {/* Scroll-Inhalt */}
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 14 }}>
           {target.kind === "player" ? (
-            <PlayerBody gameState={gameState} playerId={target.playerId} disciplineId={disciplineId} />
+            <PlayerBody
+              gameState={gameState}
+              playerId={target.playerId}
+              disciplineId={disciplineId}
+              ratingByPlayerId={ratingByPlayerId}
+            />
           ) : (
             <TeamBody
               gameState={gameState}
@@ -1290,6 +1318,7 @@ export default function DisciplineStageDrawer({
               fieldedPlayerIdsByTeam={fieldedPlayerIdsByTeam}
               liveResultsByTeam={liveResultsByTeam}
               disciplineMutators={disciplineMutators}
+              ratingByPlayerId={ratingByPlayerId}
             />
           )}
         </div>
