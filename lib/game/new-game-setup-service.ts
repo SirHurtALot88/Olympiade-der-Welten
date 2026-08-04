@@ -10,6 +10,7 @@ import type {
 import { createNewGameFromPlayerBaseline } from "@/lib/players/player-baseline-service";
 import { buildPlayerPotentialRecordsForSave } from "@/lib/progression/player-potential-service";
 import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
+import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { ensureSeasonApronLinesFrozen } from "@/lib/season/apron-settlement-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -245,6 +246,34 @@ function createConfirmToken(input: {
   ].join(":");
 }
 
+/**
+ * DER GEHALTSFAKTOR MUSS STEHEN, BEVOR DIE SPONSORANGEBOTE GEBAUT WERDEN.
+ *
+ * GEMESSENER FEHLER (Live-Spielstand vom 4.8.): die Angebote entstanden hier im Neuspiel-Setup um
+ * 06:03, das Faktor-Fenster wurde aber erst beim Speichern in der Persistenzschicht gesaet
+ * (`withSeededSeasonEconomyFactors`, save-repository.ts) — im gemessenen Fall um 11:32. Die
+ * Sponsorleiter friert den Faktor bei Unterschrift ein und fand zu diesem Zeitpunkt keinen: sie
+ * nahm den Standardwert 1,0 (`getSponsorV3SalaryFactor`). Die Saison lief danach mit 1,18.
+ *
+ * Ergebnis: alle 32 Vertraege zahlten nach einem Faktor-1,0-Jahr, obwohl ein 1,18-Jahr gespielt
+ * wurde. Der Liga fehlten 267,6 C — 10,7 Prozent des Topfes —, und 12 von 32 Teams standen nach
+ * einem GUTEN Jahr im Minus. Die Verteilung stimmte, das Niveau nicht.
+ *
+ * Gesaet wird mit DERSELBEN Funktion und demselben Seed wie in der Persistenzschicht, damit beide
+ * exakt dasselbe Fenster erzeugen; steht schon eines im Zustand, bleibt es unberuehrt.
+ */
+function withSeededSeasonEconomyFactorsForNewGame(gameState: GameState, saveId?: string): GameState {
+  if ((gameState.seasonState.seasonEconomyFactors ?? []).length > 0) {
+    return gameState;
+  }
+  const window = getSeasonEconomyFactorWindow({
+    saveId: saveId ?? "season-1-new-game-preview",
+    seasonId: gameState.season.id,
+    seasonState: gameState.seasonState,
+  });
+  return { ...gameState, seasonState: { ...gameState.seasonState, seasonEconomyFactors: window } };
+}
+
 export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveId?: string }) {
   const now = input.now ?? new Date().toISOString();
   // Passing input.saveId (when the caller already generated the real unique saveId, e.g.
@@ -432,8 +461,9 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   // Save, waeren die Angebote nach altem Recht gebaut und der Save behauptete "V2" — Anzeige und
   // Abrechnung liefen auseinander. Der Vermerk bleibt danach fuer die gesamte Lebensdauer des
   // Spielstands stehen und traegt ihn auch ueber Saisonuebergaenge und Serverneustarts.
-  const baseGameStateWithSponsorSystem: GameState = ensureSeasonApronLinesFrozen(
-    stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers),
+  const baseGameStateWithSponsorSystem: GameState = withSeededSeasonEconomyFactorsForNewGame(
+    ensureSeasonApronLinesFrozen(stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers)),
+    input.saveId,
   );
 
   // Seed sponsor offers up front so the "choose_sponsor" flow step (open by default, see
