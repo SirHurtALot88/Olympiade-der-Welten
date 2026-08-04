@@ -19,6 +19,7 @@ import { getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { hasPersistedTeamCaptain } from "@/lib/morale/team-captain-service";
 import { isTeamTrainingComplete } from "@/lib/foundation/team-training-status";
+import { isMatchdayResultFullyCommitted } from "@/lib/season/season-discipline-schedule";
 
 export type GameFlowPhase =
   | "preseason"
@@ -573,6 +574,26 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
   // Reuses hasFormCardPool as the completion signal (see form-card-flow.ts).
   const transfersFinalized = activeTeamTransfersFinalized(gameState, activeTeamId);
   const hasResults = hasCurrentMatchdayResult(gameState) || gameState.matchdayState.status === "resolved";
+  // Fuer den Spieltagswechsel reicht "irgendein Ergebnis existiert" NICHT: die Arena bucht
+  // D1 und D2 einzeln (commitThroughSide), ein D1-Teil-Commit legt aber schon eine
+  // `matchdayResults`-Zeile an. `hasResults` allein wuerde "Zum naechsten Spieltag" also
+  // schon nach D1 freigeben -- und D2 laesst sich nach dem Wechsel nicht mehr nachholen. Jeder
+  // Spieler, der in D2 stand, fehlt dann dauerhaft in diesem Spieltag (sichtbar als zu
+  // niedriger `appearances`-Wert in Moral/Forderungen). Nur DIESER Schritt braucht die
+  // strengere Pruefung; die anderen "es gibt etwas zu sehen"-Schritte (Arena/Reveal/Ergebnis)
+  // duerfen nach D1 weiter "fertig" wirken.
+  const hasFullMatchdayResult =
+    gameState.matchdayState.status === "resolved" ||
+    isMatchdayResultFullyCommitted(gameState, gameState.matchdayState.matchdayId);
+  // Genau der Fall, den der Spieltagswechsel jetzt zusaetzlich blockiert: D1 ist gebucht
+  // (hasResults), D2 fehlt noch (!hasFullMatchdayResult). Der Weg raus MUSS sichtbar bleiben —
+  // #224 hing der Spieltag schon einmal fest, weil der Ersatz-Knopf nur im Cockpit lag und dort
+  // nicht auffindbar war (siehe tests/arena-finish-matchday-reachable.test.ts). Der
+  // "advance_to_next_matchday"-Schritt zeigt deshalb in GENAU diesem Blockfall zurueck auf die
+  // Arena statt aufs Cockpit — unabhaengig davon, ob `review_matchday_results`/
+  // `open_season_standings` (die ebenfalls auf die Arena zeigen) im jeweiligen Aufrufer schon
+  // quittiert und damit aus der Schritt-Auswahl gefallen sind.
+  const advanceBlockedByMissingD2 = hasResults && !hasFullMatchdayResult;
   const formCardsRequired = hasLineup && !hasResults;
   const arenaPreparationReady = hasLineup;
   const matchdayArenaReady = arenaPreparationReady && lineupConfirmed;
@@ -851,10 +872,11 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       stepId: "advance_to_next_matchday",
       label: isFinalMatchday ? "Saison abschließen" : "Zum nächsten Spieltag",
       cta: isFinalMatchday ? "Weiter: Zur Saison-Auswertung" : "Weiter: Matchday fortsetzen",
-      status: hasResults ? (boardSignals.blockers.length > 0 ? "warning" : "ready") : "blocked",
-      targetView: "cockpit",
+      status: hasFullMatchdayResult ? (boardSignals.blockers.length > 0 ? "warning" : "ready") : "blocked",
+      targetView: advanceBlockedByMissingD2 ? "matchdayArena" : "cockpit",
+      targetPanel: advanceBlockedByMissingD2 ? "foundation-matchday-arena" : null,
       teamId: activeTeamId,
-      blockers: hasResults ? [] : ["missing_results"],
+      blockers: hasFullMatchdayResult ? [] : !hasResults ? ["missing_results"] : ["result_incomplete_missing_d2"],
       warnings: boardFlowWarnings,
     }),
   ];

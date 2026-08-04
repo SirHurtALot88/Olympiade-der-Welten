@@ -487,7 +487,11 @@ describe("player morale service", () => {
 
     expect(depthMorale?.morale).toBeGreaterThan(starMorale?.morale ?? 100);
     expect(depthMorale?.reasons.map((reason) => reason.reasonId)).toContain("relative_role_fulfilled");
-    expect(starMorale?.reasons.map((reason) => reason.reasonId)).toContain("low_playtime");
+    // "low_playtime" wirkt seit der Behebung der Doppelzaehlung (Task B: derselbe
+    // `appearances`-Wert trieb zusaetzlich zur "Einsätze"-Forderung noch einen zweiten, direkten
+    // Moral-Ausschlag) nicht mehr auf die Moral -- der Reason-Chip taucht folgerichtig nicht mehr auf.
+    expect(starMorale?.reasons.map((reason) => reason.reasonId)).not.toContain("low_playtime");
+    expect(starMorale?.reasons.map((reason) => reason.reasonId)).not.toContain("good_playtime");
   });
 
   it("limits very low morale to short renewal offers and suggests countermeasures", () => {
@@ -631,5 +635,99 @@ describe("player morale service", () => {
     const deposed = assessPlayerMorale({ gameState, playerId: player.id, teamId: "M-M" });
     const malus = deposed?.reasons.find((reason) => reason.reasonId === "team_captain_deposed");
     expect(malus).toBeUndefined();
+  });
+
+  // Owner-reported bug: a player who has played every matchday so far still got hit with
+  // "Forderung verfehlt: Einsätze" -- because the "Einsätze" demand compares the CURRENT
+  // count against the SAISONEND target from matchday 1 onward, not against what's realistic
+  // this early in the season. Regression for the fix in `evaluateDemandDelta`
+  // (player-morale-service.ts, `demand.type === "appearances"`).
+  it("does not punish a player who is on pace for the season-end appearances target", () => {
+    const player = createPlayer("on-pace");
+    const gameState = createGameState({
+      player,
+      roster: createRosterEntry(player.id, { roleTag: "starter" }),
+      appearances: 1,
+    });
+    // A 10-matchday season, only matchday 1 played so far -- rosterRank <= 3 in this
+    // 2-player fixture, so the season-end target is 8. 1/1 possible so far is ON PACE
+    // (expectedByNow = 8 * 1/10 = 0.8), it must not read as "failed".
+    gameState.season.matchdayIds = Array.from({ length: 10 }, (_, index) => `matchday-${index + 1}`);
+
+    const assessment = assessPlayerMorale({ gameState, playerId: player.id, teamId: "M-M" });
+    const demandReason = assessment?.reasons.find((reason) => reason.reasonId.endsWith("_appearances"));
+    expect(demandReason).toBeUndefined();
+  });
+
+  it("still flags the appearances demand once the season-end target is mathematically unreachable", () => {
+    const player = createPlayer("way-behind");
+    const gameState = createGameState({
+      player,
+      roster: createRosterEntry(player.id, { roleTag: "starter" }),
+      appearances: 1,
+    });
+    // 10-matchday season, 9 matchdays already played (only matchday-1's performance exists,
+    // i.e. 1 appearance) -- even playing every remaining matchday (1) cannot reach target 8.
+    gameState.season.matchdayIds = Array.from({ length: 10 }, (_, index) => `matchday-${index + 1}`);
+    gameState.seasonState.matchdayResults = Array.from({ length: 9 }, (_, index) => ({
+      id: `result-${index + 1}`,
+      saveId: "save",
+      seasonId: "season-2",
+      matchdayId: `matchday-${index + 1}`,
+      status: "preview_applied",
+      sourceVersion: "test",
+      teamsTotal: 1,
+      teamsReady: 1,
+      teamsUnderfilled: 0,
+      teamsMissingLineup: 0,
+      teamsInvalidLineup: 0,
+      teamsMissingScoreCoverage: 0,
+      warningsCount: 0,
+      createdAt: "",
+      updatedAt: "",
+    })) as never;
+
+    const assessment = assessPlayerMorale({ gameState, playerId: player.id, teamId: "M-M" });
+    const demandReason = assessment?.reasons.find((reason) => reason.reasonId === "player_demand_failed_appearances");
+    expect(demandReason).toBeDefined();
+    expect(demandReason?.valueDelta).toBeLessThan(0);
+  });
+
+  // Owner-reported bug, root cause #2: once a "Forderung"-Reason (deterministically
+  // recomputed every call) landed in the stored snapshot's first two slots, it stuck there
+  // forever -- `[...stored.reasons.slice(0, 2), ...fresh.reasons]` always prepends it verbatim,
+  // and a FULFILLED demand produces no fresh reason (delta 0) that could ever displace it. This
+  // is why the screenshot showed "1/8 Einsätze" long after the real count had moved on.
+  it("does not keep echoing a stale player-demand reason once the demand is no longer failing", () => {
+    const player = createPlayer("was-behind");
+    const laggingState = createGameState({
+      player,
+      roster: createRosterEntry(player.id, { roleTag: "starter" }),
+      appearances: 1,
+    });
+    const staleSnapshot = assessPlayerMorale({ gameState: laggingState, playerId: player.id, teamId: "M-M" });
+    const staleDemandReason = staleSnapshot?.reasons.find((reason) => reason.reasonId === "player_demand_failed_appearances");
+    expect(staleDemandReason).toBeDefined(); // sanity: the stale reason really is present to begin with.
+
+    const caughtUpState = createGameState({
+      player,
+      roster: createRosterEntry(player.id, { roleTag: "starter" }),
+      appearances: 8, // meets the season-end target -> fulfilled, no fresh demand reason at all.
+      playerMoraleState: [
+        {
+          playerId: player.id,
+          teamId: "M-M",
+          morale: staleSnapshot!.morale,
+          visibleMood: staleSnapshot!.visibleMood,
+          lastUpdatedSeasonId: "season-2",
+          inactiveSeasons: 0,
+          reasons: staleSnapshot!.reasons,
+          contractIntent: staleSnapshot!.contractIntent,
+        },
+      ],
+    });
+
+    const freshSnapshot = assessPlayerMorale({ gameState: caughtUpState, playerId: player.id, teamId: "M-M" });
+    expect(freshSnapshot?.reasons.some((reason) => reason.reasonId === "player_demand_failed_appearances")).toBe(false);
   });
 });

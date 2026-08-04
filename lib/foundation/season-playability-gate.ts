@@ -58,6 +58,7 @@ const BLOCKER_KEYS = new Set([
   "missing_lineup",
   "missing_results",
   "no_active_team",
+  "result_incomplete_missing_d2",
 ]);
 
 const AUDIT_HINT_LABELS: Record<string, string> = {
@@ -118,6 +119,13 @@ function blockerLabel(key: string) {
   if (key === "no_active_team") return "Kein aktives Team gesetzt; Flow kann nicht sauber fortfahren.";
   if (key === "missing_lineup") return "Lineup fehlt; Spieltag darf nicht fortgesetzt werden.";
   if (key === "missing_results") return "Spieltagsergebnis fehlt; Season-Fortschritt darf nicht weiterlaufen.";
+  // Muss VOR der generischen "result"+"missing"-Regel unten stehen, sonst faengt die den
+  // Schluessel zuerst ab (er enthaelt beide Substrings) und meldet den falschen, irrefuehrenden
+  // Text ("Resultat-Quelle fehlt; Seasonabschluss nicht belastbar" -- hier geht es aber gar
+  // nicht um den Seasonabschluss). Eigentuemer-Feedback: ein Blocker, der den Spieltagswechsel
+  // sperrt, muss in einem Satz sagen, was fehlt UND wo es sich beheben laesst.
+  if (key === "result_incomplete_missing_d2")
+    return "Die zweite Disziplin (D2) dieses Spieltags ist noch nicht gebucht; in der Arena zuerst D2 abschließen, dann schaltet der Spieltag weiter.";
   if (key === "season_consequences_missing") return "Season-Konsequenzen fehlen im Review-State.";
   if (key === "season_snapshot_missing") return "Season-Snapshot fehlt; Seasonabschluss ist nicht nachvollziehbar.";
   if (key.includes("lineup") && key.includes("missing")) return "Lineup-Quelle fehlt; Spieltag nicht spielbar.";
