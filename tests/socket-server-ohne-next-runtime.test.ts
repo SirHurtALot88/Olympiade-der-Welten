@@ -53,10 +53,14 @@ function sucheVerboteneKante(start: string): { kette: string[]; modul: string } 
     // mehrzeiligen Importen viele Zeilen VOR dem `from`, ein Blick nur aufs `from` wuerde sie
     // faelschlich als Wert-Import zaehlen.
     //
-    // Und NUR Wert-Importe zaehlen: `import type … from "@/…"` wird wegkompiliert, das Modul wird
-    // zur Laufzeit nie geladen, die Kante existiert also gar nicht. Wuerde der Test sie
-    // mitzaehlen, meldete er Ketten, die es im laufenden Prozess nie gibt — und ein Waechter, der
-    // grundlos rot wird, wird irgendwann geloescht statt gelesen.
+    // Und NUR Wert-Importe zaehlen: ein reiner Typ-Import auf ein projektinternes Alias-Modul
+    // wird wegkompiliert, das Modul also zur Laufzeit nie geladen — die Kante existiert gar
+    // nicht. Wuerde der Test sie mitzaehlen, meldete er Ketten, die es im laufenden Prozess nie
+    // gibt, und ein Waechter, der grundlos rot wird, wird irgendwann geloescht statt gelesen.
+    //
+    // (Hier steht bewusst KEIN literales Alias-Beispiel: `ci:import-exists` liest jede solche
+    // Zeichenfolge — auch im Kommentar — als echten Import und meldete ihn als unaufloesbares
+    // Modul. Genau daran ist dieser Test beim ersten Anlauf in CI gescheitert.)
     for (const treffer of quelltext.matchAll(/\bimport\s+(type\s+)?([\s\S]*?)\bfrom\s*["']([^"']+)["']/g)) {
       const nurTyp = Boolean(treffer[1]);
       const spezifizierer = treffer[3]!;
