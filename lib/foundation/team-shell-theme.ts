@@ -87,6 +87,11 @@ function hslLuminance(h: number, s: number, l: number): number {
 // Luminanz des dunklen Ink-Kandidaten (--nl-bg #0b0f17), vorberechnet.
 const DARK_INK_LUMINANCE = 0.0058;
 
+// Luminanz des Panelgrunds (--nl-panel #131a26), gegen den Teamton-TEXT steht.
+// Die Navigationsleiste liegt mit rgba(8,14,28,0.92) noch darunter — der
+// Panelwert ist damit der strengere der beiden Fälle.
+const PANEL_LUMINANCE = 0.0095;
+
 /**
  * Textfarbe AUF einer Akzent-Fläche: dunkel oder weiß — je nachdem, welcher
  * WCAG-Kontrast zur gegebenen Akzentfarbe höher ist. Nicht parsebare Eingaben
@@ -133,6 +138,35 @@ export function accentFillFor(accentHsl: string, ink: string): string {
     // Nicht ins Unkenntliche laufen: die Marke soll erkennbar bleiben.
     if (next < 22 || next > 88) break;
     l = next;
+  }
+  return `hsl(${parsed.h} ${parsed.s}% ${Math.round(l * 10) / 10}%)`;
+}
+
+/**
+ * Der Teamton als TEXTFARBE auf den dunklen Flächen der App (Navigations-
+ * Überschriften, Karten-Eyebrows) — angehoben, bis er gegen den Panelgrund
+ * lesbar ist.
+ *
+ * GEMESSEN, und zwar erst im gerenderten Zustand: die erste Fassung mischte den
+ * Akzent per `color-mix` mit einem festen Grauton (62 bzw. 70 %). Bei dunklen
+ * oder entsättigten Vereinsfarben rutscht das Ergebnis damit an den ohnehin
+ * dunklen Grund heran — 13 von 32 Teams lagen beim Navigationslabel unter der
+ * Schwelle, 14 beim Eyebrow, im schlechtesten Fall 2,97:1 (Stronghold
+ * Crusaders) statt der geforderten 4,5:1. Der Fehler war strukturell, nicht
+ * zufällig: je dunkler die Marke, desto leiser der Text.
+ *
+ * Statt zu mischen wird der Ton deshalb in der Helligkeit angehoben, bis er
+ * die Schwelle hält. Der Farbton bleibt unangetastet — die Marke bleibt
+ * erkennbar, sie wird nur hell genug, um sie zu lesen.
+ */
+export function accentTextFor(accentHsl: string, hintergrundLum = PANEL_LUMINANCE): string {
+  const parsed = parseHsl(accentHsl);
+  if (!parsed) return accentHsl;
+  let l = parsed.l;
+  for (let schritt = 0; schritt < 60; schritt += 1) {
+    if (kontrast(hslLuminance(parsed.h, parsed.s, l), hintergrundLum) >= 4.5) break;
+    if (l >= 92) break;
+    l += 1.5;
   }
   return `hsl(${parsed.h} ${parsed.s}% ${Math.round(l * 10) / 10}%)`;
 }
@@ -227,6 +261,8 @@ export function buildTeamShellThemeVars(code: string | null | undefined): TeamSh
     // Fläche für Text-auf-Akzent — bei Bedarf in der Helligkeit nachjustiert,
     // damit die Schrift überall die AA-Schwelle hält (siehe accentFillFor).
     "--nl-accent-fill": accentFillFor(accent, accentInkFor(accent)),
+    // Teamton als TEXT auf dunklem Grund — angehoben bis zur Lesbarkeit.
+    "--nl-accent-text": accentTextFor(accent),
     "--nl-accent": accent,
     "--nl-accent-2": accent2,
     "--nl-accent-soft": accentSoftFor(accent),

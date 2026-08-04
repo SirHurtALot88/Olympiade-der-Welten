@@ -44240,6 +44240,11 @@ button.foundation-team-portrait-card {
      vom Akzent, weil vier Teams sonst knapp unter dem WCAG-AA-Wert lägen;
      ohne Team-Theme identisch zum Akzent. */
   --nl-accent-fill: var(--nl-accent);
+  /* --nl-accent-text = Teamton als TEXT auf dunklem Grund (Navigations-
+     Überschriften, Karten-Eyebrows). Getrennt vom Akzent, weil eine dunkle
+     Vereinsfarbe als Text sonst im Grund verschwindet — gemessen lagen 13 von
+     32 Teams beim Navigationslabel unter der Lesbarkeitsschwelle. */
+  --nl-accent-text: var(--nl-mut-2);
   /* Gemeinsamer Fokus-Ring (zusammen mit outline-offset: 2px angewandt) */
   --nl-focus-ring: 2px solid var(--nl-accent);
   /* Achsen (Spiel-Identität) */
@@ -64160,12 +64165,12 @@ button.is-new-look .nl-thist-season-pill,
    (S-S) und dunklem Stahl (L-R) lesbar bleibt. Ohne Team-Theme bleibt das
    gewohnte Blau unverändert. */
 .foundation-shell.is-new-look[data-team-theme] .primary-button {
-  background: color-mix(in srgb, var(--nl-accent-fill, var(--nl-accent)) 92%, var(--nl-panel));
+  background: var(--nl-accent-fill, var(--nl-accent));
   color: var(--nl-accent-ink);
 }
 
 .foundation-shell.is-new-look[data-team-theme] .secondary-button {
-  background: color-mix(in srgb, var(--nl-accent-fill, var(--nl-accent)) 78%, var(--nl-panel));
+  background: color-mix(in srgb, var(--nl-accent-fill, var(--nl-accent)) 88%, var(--nl-accent-deep, var(--nl-panel)));
   color: var(--nl-accent-ink);
 }
 
@@ -75828,7 +75833,7 @@ button.is-new-look .nl-thist-season-pill,
 /* Gruppen-Überschriften (SPIELTAG · TEAM · MARKT · WELT) im Teamton statt
    in neutralem Grau — sie gliedern die Leiste und sind billig zu färben. */
 .foundation-shell.is-new-look[data-team-theme] .foundation-sidebar-group-label {
-  color: color-mix(in srgb, var(--nl-accent) 62%, var(--nl-mut-2));
+  color: var(--nl-accent-text, var(--nl-accent));
 }
 
 /* Der aktive Eintrag bekommt eine Akzent-Kante links — die Stelle, an der man
@@ -75881,7 +75886,7 @@ button.is-new-look .nl-thist-season-pill,
    über die ganze App verteilt und geben dem Schema Präsenz, ohne dass
    irgendwo ein Messwert die Farbe wechselt. */
 .is-new-look[data-team-theme] .nl-card-eyebrow {
-  color: color-mix(in srgb, var(--nl-accent) 70%, var(--nl-mut-2));
+  color: var(--nl-accent-text, var(--nl-accent));
 }
 
 /* Tabellenkopf und Trennlinien: die Flächen, an denen man „Rahmen" am

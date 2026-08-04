@@ -107,6 +107,49 @@ describe("buildTeamShellThemeVars", () => {
     }
   });
 
+  /**
+   * NACHGEMESSEN IM BROWSER, nicht gerechnet — und das war der Unterschied.
+   *
+   * Meine erste Prüfung rechnete auf den Token-Werten und meldete „32 von 32 in
+   * Ordnung". Eine Messung am gerenderten Zustand fand danach 31 Verstöße: die
+   * Navigations-Überschriften und die Karten-Eyebrows mischten den Akzent per
+   * `color-mix` mit einem Grauton und rutschten bei dunklen Vereinsfarben in
+   * den Grund — im schlechtesten Fall 2,97:1 (S-C) statt 4,5:1. Auch die
+   * Buttons fielen bei vier Teams durch, weil das `color-mix` mit dem Panel die
+   * eigens berechnete Füllfarbe wieder verdünnte.
+   *
+   * Lehre für diesen Test: er prüft die Tokens, die im GERENDERTEN Zustand
+   * gemessen wurden — nicht die Zwischenwerte, aus denen sie entstehen.
+   */
+  it("hält den Teamton auch als TEXT auf dunklem Grund lesbar", () => {
+    const luminanz = (wert: string) => {
+      const m = /^hsl\(\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%\s*\)$/.exec(wert)!;
+      const [h, s, l] = [Number(m[1]), Number(m[2]) / 100, Number(m[3]) / 100];
+      const c = (1 - Math.abs(2 * l - 1)) * s;
+      const hp = (((h % 360) + 360) % 360) / 60;
+      const x = c * (1 - Math.abs((hp % 2) - 1));
+      const [r, g, b] =
+        hp < 1 ? [c, x, 0] : hp < 2 ? [x, c, 0] : hp < 3 ? [0, c, x] : hp < 4 ? [0, x, c] : hp < 5 ? [x, 0, c] : [c, 0, x];
+      const m2 = l - c / 2;
+      const lin = (ch: number) => (ch + m2 <= 0.04045 ? (ch + m2) / 12.92 : ((ch + m2 + 0.055) / 1.055) ** 2.4);
+      return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+    };
+    const PANEL = 0.0095; // --nl-panel #131a26
+    for (const code of Object.keys(TEAM_COLOR)) {
+      const text = luminanz(buildTeamShellThemeVars(code)!["--nl-accent-text"]!);
+      const verhaeltnis = (Math.max(text, PANEL) + 0.05) / (Math.min(text, PANEL) + 0.05);
+      expect(verhaeltnis, `${code}: Teamton als Text zu leise`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("hebt für den Text nur die Helligkeit, nicht den Farbton", () => {
+    const farbton = (v: string) => /^hsl\(\s*([\d.]+)/.exec(v)![1];
+    for (const code of ["L-R", "S-C", "R-L"]) {
+      const vars = buildTeamShellThemeVars(code)!;
+      expect(farbton(vars["--nl-accent-text"]!)).toBe(farbton(vars["--nl-accent"]!));
+    }
+  });
+
   it("lässt die 28 Teams in Ruhe, die die Schwelle ohnehin halten", () => {
     // Die Fläche darf nicht pauschal verschoben werden — sonst verlöre jede
     // Marke ihren Ton für ein Problem, das sie gar nicht hat.
