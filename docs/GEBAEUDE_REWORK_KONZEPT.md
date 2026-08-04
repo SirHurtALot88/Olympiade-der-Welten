@@ -10,6 +10,16 @@ schlägt dann Umbauten vor, die ausschließlich vorhandene Mechaniken benutzen. 
 einen eigenen Abschnitt „Was dagegen spricht"; am Ende steht, welche Vorschläge in bestehende
 Spielstände eingreifen.
 
+> **UMGESETZT — dieses Dokument beschreibt den Stand VOR dem Umbau.**
+>
+> Alles ab Abschnitt 1 ist eine Momentaufnahme vom 2026-08-04 und im Präsens geschrieben. Dieses
+> Präsens gilt nicht mehr: die Empfehlungen aus Abschnitt 7 sind am selben Tag gebaut worden. Was
+> heute gilt, steht in **Abschnitt 8** am Ende.
+>
+> Das Dokument bleibt trotzdem im Repo, weil die Messung die Begründung für die gewählten Zahlen ist
+> — wer wissen will, warum der Routenbonus bei 13 % gedeckelt wurde oder warum der Unterhaltsrabatt
+> ersatzlos gestrichen wurde statt repariert, findet die Rechnung hier und nirgends sonst.
+
 ---
 
 ## 1. Kurzfassung des Befundes
@@ -582,3 +592,42 @@ Beschreibungstexte korrigieren und die wirkungslosen Zwischenstufen benennen.** 
 Room auf Level 1, 3 und 5 nichts tut und der Specialist Wing auf Level 4 und 5 schlechter rechnet als
 auf Level 3, ist heute für den Spieler nicht erkennbar — und das ist ein größerer Schaden als der
 fehlende Effekt selbst.
+
+---
+
+## 8. Was daraus geworden ist (2026-08-04)
+
+Chris hat nach dem Lesen entschieden: „specialist wing als fokusachse finde ich gut kannst du
+umsetzen — analytic muss was anderes machen sonst bringt das gebäude nix und kann raus." Beide
+Empfehlungen sind gebaut. Ab hier gilt nicht mehr, was oben im Präsens steht.
+
+| Vorschlag | Stand | PR |
+|---|---|---|
+| **S1** — Variante wird die Trainings-Fokusachse | gebaut | #382 |
+| **A3** — Live-Fortschritt auf Sponsor-Achse und Board-Zielen | gebaut | #381 |
+| A1 — echte Prognosequalität | nicht gebaut, bleibt der mögliche nächste Schritt | — |
+| Falsche Beschreibungstexte | korrigiert | #381, #382, #383 |
+
+**Specialist Wing (#382).** Die Variante ersetzt die Fokusachse, sie kommt nicht additiv obendrauf.
+Der Routenbonus steht als Leiter 8 / 9 / 10 / 11,5 / 13 % im Katalog; die 13 % sind im Code geklammert,
+nicht nur im Kommentar behauptet. Der Unterhaltsrabatt aus Abschnitt 2.3 ist ersatzlos entfernt —
+`getSpecialistWingUpkeepDiscountPct` gibt es nicht mehr. Damit steigt der Unterhalt bei Teams mit
+Flügel leicht, spürbar ab Stufe 3.
+
+Die Warnung aus Abschnitt 7 — „S1 sollte nur zusammen mit einer echten KI-Variantenwahl kommen, sonst
+erbt die halbe Liga rückwirkend einen MEN-Fokus, den niemand gewählt hat" — ist zur Hälfte
+eingelöst: `chooseSpecialistWingVariantForTeam` leitet die Variante aus dem Kader ab und ersetzt die
+drei hartkodierten `"mind_lab"` im KI-Pfad. **Für bereits gespeicherte Flügel greift das aber nicht.**
+Eine Migration hätte gespeicherte Spielerentscheidungen überschrieben und wurde deshalb bewusst nicht
+gemacht. Bestandsstände tragen also weiterhin `mind_lab` — genau der Fall, vor dem dieses Dokument
+gewarnt hat. Wer das ändern will, braucht eine bewusste Migrationsentscheidung, keine stille.
+
+**Analytics Room (#381, #383).** Jede der fünf Stufen schaltet genau eine neue Information frei:
+Stufen 1–3 die Sponsor-Achse (grobe Einordnung → Prozent → Ist/Ziel mit Restbedarf), Stufen 4–5 den
+Board-Zwischenstand und den Abstand zum Zielwert. Damit sind die Stufen 1, 3 und 5 aus Abschnitt 2.1
+keine reinen Kosten mehr. #383 hat zwei Stellen nachgezogen, die noch das Alte behaupteten: die KI
+bewertete den Raum wortgleich wie das Scouting Office über Kaderlücken, und die Saisonend-Vorschau
+setzte weiter einen Marker über Prognosegenauigkeit.
+
+Was **nicht** passiert ist: das Gebäude wurde nicht entfernt („kann raus" war Chris' Alternative,
+falls sich kein Zweck findet). Der Zweck ist gefunden, das Gebäude bleibt.
