@@ -98,6 +98,13 @@ export type RoomFlowState = {
   blockingTeamIds: string[];
   aiAutoCompletedTeamIds: string[];
   canHostAdvance: boolean;
+  /**
+   * Steht in dieser Saison noch ein Spieltag aus? Wird beim Weiterschalten aus dem gebundenen
+   * Spielstand gesetzt (`roomFlowSeasonContinues`) und steuert am Zyklus-Ende sowohl den
+   * naechsten Schritt als auch die Beschriftung des Host-Knopfes. `null` heisst "unbekannt"
+   * (Spielstand nicht lesbar) — dann bleibt es beim linearen Verhalten.
+   */
+  seasonContinues?: boolean | null;
   warnings: string[];
 };
 

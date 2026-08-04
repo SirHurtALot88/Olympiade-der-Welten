@@ -1,3 +1,5 @@
+import type { GameState } from "@/lib/data/olyDataTypes";
+import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
 import type {
   MultiplayerRoomStatus,
   OlyRoomState,
@@ -63,7 +65,50 @@ export function getRoomFlowStep(stepId: string): RoomFlowStepDefinition {
   return ROOM_FLOW_STEPS.find((entry) => entry.stepId === stepId) ?? ROOM_FLOW_STEPS[0]!;
 }
 
-export function getNextRoomFlowStepId(stepId: string): RoomFlowStepId {
+/**
+ * Erster Schritt des Spieltag-Zyklus.
+ *
+ * Alles DAVOR laeuft genau einmal pro Saison, und das ist keine Designwahl an dieser Stelle,
+ * sondern folgt den Gates, die das Spiel ohnehin durchsetzt:
+ * `sell_players`/`buy_players`/`facilities` sind in `evaluateGamePhaseAction` an die
+ * Vorsaison-Phasen gebunden — die Routen antworten ab Spieltag 2 mit 409. Und
+ * `finalize_transfers` erzeugt den Formkarten-Pool, den es pro Saison nur einmal gibt
+ * (`activeTeamTransfersFinalized` ist buchstaeblich `activeTeamHasFormCardPool`).
+ *
+ * Wiederholbar sind damit genau: Einsatzliste, Formkarten (der PLAN ist pro Spieltag,
+ * s. `activeTeamHasFormCardPlanSelections`), Arena, Ergebnis, Saisonstand.
+ */
+export const ROOM_FLOW_MATCHDAY_CYCLE_START = "lineup" satisfies RoomFlowStepId;
+
+/** Letzter Schritt des Zyklus — von hier geht es zurueck an den Anfang oder ins Season Review. */
+export const ROOM_FLOW_MATCHDAY_CYCLE_END = "standings" satisfies RoomFlowStepId;
+
+/**
+ * Steht in dieser Saison noch ein Spieltag aus?
+ *
+ * Bewusst KEINE eigene Spieltagsrechnung (`currentMatchday < totalMatchdays`), sondern
+ * dieselbe Regel, die das Spiel ohnehin durchsetzt: `resolve_matchday` ist erlaubt, solange
+ * die Saison laeuft. `advanceMatchday` setzt `gamePhase` nach dem letzten Spieltag auf
+ * "season_completed" (`lib/season/matchday-progress-service.ts`), womit dieser Gate zumacht.
+ * Eine eigene Formel muesste bei jeder Aenderung der Phasenlogik nachgezogen werden — und
+ * wuerde es beim ersten Mal nicht.
+ */
+export function roomFlowSeasonContinues(gameState: GameState): boolean {
+  return evaluateGamePhaseAction(gameState, "resolve_matchday").allowed;
+}
+
+/**
+ * Der naechste Schritt im Room-Flow.
+ *
+ * `seasonContinues` ist optional, weil die Kette ausserhalb des Zyklus-Endes gar nicht davon
+ * abhaengt. FEHLT es am Zyklus-Ende, bleibt es beim alten linearen Verhalten (Sackgasse im
+ * Season Review) — das ist der sichere Rueckfall fuer einen Aufrufer, der den Spielstand
+ * nicht aufloesen kann, und ausdruecklich nicht die Normalannahme.
+ */
+export function getNextRoomFlowStepId(stepId: string, input?: { seasonContinues: boolean }): RoomFlowStepId {
+  if (stepId === ROOM_FLOW_MATCHDAY_CYCLE_END) {
+    return input?.seasonContinues ? ROOM_FLOW_MATCHDAY_CYCLE_START : "season_review";
+  }
   const index = ROOM_FLOW_STEPS.findIndex((entry) => entry.stepId === stepId);
   return ROOM_FLOW_STEPS[Math.min(index + 1, ROOM_FLOW_STEPS.length - 1)]?.stepId ?? "season_review";
 }
@@ -86,6 +131,8 @@ export function buildRoomFlowState(input: {
   state: Pick<OlyRoomState, "multiplayerRoom" | "roomParticipants" | "teamOwnership" | "systemControlledTeamIds" | "turnState">;
   currentStep?: string | null;
   aiAutoCompletedTeamIds?: string[];
+  /** Aus dem Spielstand; `undefined`, wenn der Aufrufer ihn nicht aufloesen konnte. */
+  seasonContinues?: boolean | null;
 }): RoomFlowState {
   const stepId = (input.currentStep ?? input.state.turnState.currentStep ?? "lobby_ready") as RoomFlowStepId;
   const stepDefinition = getRoomFlowStep(stepId);
@@ -123,6 +170,7 @@ export function buildRoomFlowState(input: {
     blockingTeamIds,
     aiAutoCompletedTeamIds,
     canHostAdvance: humanReady && aiReady,
+    seasonContinues: input.seasonContinues ?? null,
     warnings: [
       ...(!humanReady ? ["waiting_for_human_ready"] : []),
       ...(stepDefinition.aiAutoStep && aiPendingTeamIds.length > 0 ? ["ai_auto_step_pending"] : []),
@@ -211,7 +259,7 @@ export function describeRoomFlowButton(input: {
   }
 
   return {
-    label: stepDefinition.cta,
+    label: describeAdvanceCta(stepDefinition, flow),
     status: "ready",
     targetView: stepDefinition.targetView,
     activeTeamId: ownedTeamId,
@@ -219,4 +267,22 @@ export function describeRoomFlowButton(input: {
     isHostAction: true,
     warnings: flow.warnings,
   };
+}
+
+/**
+ * Die Beschriftung des Weiter-Knopfes benennt, WOHIN es geht — so sind alle CTAs gebaut
+ * ("Weiter: Transfermarkt" auf dem Verkaufs-Schritt). Am Zyklus-Ende gibt es dafuer zwei
+ * Ziele, und "Saisonstand ansehen" waere in beiden Faellen falsch: es beschreibt den Schritt,
+ * auf dem man schon steht.
+ *
+ * Ist unbekannt, ob die Saison weiterlaeuft (`seasonContinues == null`, Spielstand nicht
+ * lesbar), bleibt der alte Text stehen statt eines geratenen Ziels.
+ */
+function describeAdvanceCta(stepDefinition: RoomFlowStepDefinition, flow: RoomFlowState): string {
+  if (stepDefinition.stepId !== ROOM_FLOW_MATCHDAY_CYCLE_END || flow.seasonContinues == null) {
+    return stepDefinition.cta;
+  }
+  return flow.seasonContinues
+    ? `Weiter: Spieltag ${Math.max(1, flow.activeMatchday)}`
+    : "Weiter: Season Review";
 }

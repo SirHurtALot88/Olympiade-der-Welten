@@ -18,7 +18,12 @@ import {
   canParticipantControlTeam,
   syncParticipantControlledTeams,
 } from "@/lib/room/online-room-model";
-import { buildRoomFlowState, getNextRoomFlowStepId, isSandboxRoomSave } from "@/lib/room/room-flow-controller";
+import {
+  buildRoomFlowState,
+  getNextRoomFlowStepId,
+  isSandboxRoomSave,
+  roomFlowSeasonContinues,
+} from "@/lib/room/room-flow-controller";
 import { findSeatByToken } from "@/lib/room/rejoin";
 import { createSeatToken } from "@/lib/room/seat-tokens";
 import { createRoomCoopSave } from "@/lib/game/new-game-setup-service";
@@ -105,6 +110,11 @@ function syncPlayers(room: RuntimeRoom) {
       },
       currentStep: turnState.currentStep,
       aiAutoCompletedTeamIds: room.state.roomFlowState?.aiAutoCompletedTeamIds,
+      // Wie `aiAutoCompletedTeamIds` aus dem Vorzustand uebernommen: dieser Rebuild laeuft bei
+      // jedem Beitritt/Ready und hat den Spielstand nicht zur Hand. Ohne das Weiterreichen
+      // wuerde die beim Weiterschalten ermittelte Auskunft "Saison laeuft noch" sofort wieder
+      // auf null fallen und der Host-Knopf am Zyklus-Ende falsch beschriftet.
+      seasonContinues: room.state.roomFlowState?.seasonContinues,
     }),
     arenaSyncState: syncRoomArenaParticipants({
       ...room.state,
@@ -695,7 +705,23 @@ export function runRoomAiAutoStep(roomCode: string, seatToken: string) {
   return { ok: true as const, room };
 }
 
-export function advanceRoomFlow(roomCode: string, seatToken: string) {
+/**
+ * Liest den gebundenen Spielstand, um den Room-Flow an der Realitaet auszurichten.
+ *
+ * Gibt `null` zurueck, wenn der Save nicht aufloesbar ist — der Aufrufer faellt dann auf das
+ * lineare Verhalten zurueck, statt zu werfen. Ein nicht lesbarer Spielstand darf den Host
+ * nicht daran hindern, den Flow ueberhaupt weiterzuschalten.
+ */
+function readRoomGameState(room: RuntimeRoom, persistence?: PersistenceService) {
+  try {
+    const service = persistence ?? createPersistenceService();
+    return service.getSaveById(room.state.multiplayerRoom.saveId)?.gameState ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function advanceRoomFlow(roomCode: string, seatToken: string, options?: { persistence?: PersistenceService }) {
   const room = getRoom(roomCode);
   if (!room) {
     return { ok: false as const, error: "Der Raum existiert nicht mehr." };
@@ -708,9 +734,30 @@ export function advanceRoomFlow(roomCode: string, seatToken: string) {
     return { ok: false as const, error: "Room-Flow ist noch blockiert: Human- oder AI-Schritte sind offen." };
   }
 
-  const nextStep = getNextRoomFlowStepId(room.state.roomFlowState.step);
+  // Der Spieltag-Zyklus: nach dem Saisonstand geht es zurueck zur Einsatzliste, solange die
+  // Saison noch einen Spieltag hergibt. Ohne das endete die Kette nach EINEM Spieltag im
+  // Season Review und der Raum war eine Sackgasse — eine gemeinsame Saison war schlicht
+  // nicht spielbar. Die Entscheidung kommt aus dem Spielstand, nicht aus einem Room-Zaehler.
+  const gameState = readRoomGameState(room, options?.persistence);
+  const seasonContinues = gameState ? roomFlowSeasonContinues(gameState) : null;
+  const nextStep = getNextRoomFlowStepId(
+    room.state.roomFlowState.step,
+    seasonContinues == null ? undefined : { seasonContinues },
+  );
+
+  // `activeMatchday` stand seit der Raumerstellung fest auf 1 und wurde nie nachgezogen. Mit
+  // dem Zyklus ist das nicht mehr nur kosmetisch: `syncRoomArenaParticipants` benutzt den Wert
+  // als Rueckfall-`matchdayId` fuer den Arena-Sync, und der Room-Chip zeigt ihn an.
+  const activeMatchday = gameState?.season.currentMatchday ?? room.state.multiplayerRoom.activeMatchday;
+  const activeSeasonId = gameState?.season.id ?? room.state.multiplayerRoom.activeSeasonId;
+
   room.state = {
     ...room.state,
+    multiplayerRoom: {
+      ...room.state.multiplayerRoom,
+      activeMatchday,
+      activeSeasonId,
+    },
     roomParticipants: room.state.roomParticipants.map((participant) => ({ ...participant, readyState: "not_ready" })),
     turnState: {
       ...room.state.turnState,
@@ -724,10 +771,15 @@ export function advanceRoomFlow(roomCode: string, seatToken: string) {
       completedParticipantIds: [],
       aiAutoCompletedTeamIds: [],
       canHostAdvance: false,
+      seasonContinues,
       warnings: [],
     },
   };
-  room.state = appendRoomEvent(room.state, "flow_step_changed", { step: nextStep, source: "advance_room_flow" });
+  room.state = appendRoomEvent(room.state, "flow_step_changed", {
+    step: nextStep,
+    source: "advance_room_flow",
+    activeMatchday,
+  });
   syncPlayers(room);
   return { ok: true as const, room };
 }
