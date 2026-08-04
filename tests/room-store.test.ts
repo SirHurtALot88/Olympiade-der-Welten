@@ -218,6 +218,24 @@ describe("room store", () => {
     }
   });
 
+  // Regression: der Server-Fallback fuer ein fehlendes matchdayId lieferte frueher die nackte
+  // Spieltagsnummer ("1") statt "matchday-1" (das Format aus gameState.matchdayState.matchdayId,
+  // siehe lib/data/dataAdapter.ts). matchesArenaScope() in lib/room/arena-sync-state.ts vergleicht
+  // beide Strings exakt - der Sync lief serverseitig, aber JEDER echte Client (scoped auf das
+  // richtige Format) verwarf ihn lautlos, und das Ready-Gate blieb fuer die Spieler unsichtbar.
+  // Gefunden beim Reparieren von scripts/smoke-multiplayer-e2e.ts.
+  it("falls back to the real matchdayId format ('matchday-N') when the caller omits matchdayId", () => {
+    const created = createRoom("socket-arena-fallback-a", { displayName: "Chris", preset: "chris_4_rest_ai", saveId: "arena-fallback-save" });
+    const joined = joinRoom(created.room.roomCode, "socket-arena-fallback-b", { displayName: "Franky" });
+    expect(joined.ok).toBe(true);
+    if (!joined.ok) return;
+
+    const started = startRoomArenaSync(created.room.roomCode, created.seat.seatToken, {});
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+    expect(started.room.state.arenaSyncState.matchdayId).toBe(`matchday-${started.room.state.multiplayerRoom.activeMatchday}`);
+  });
+
   it("advances from d1 slots through d2 into total result phases", () => {
     const created = createRoom("socket-arena-d1d2-a", { displayName: "Chris", preset: "chris_4_franky_4_rest_ai", saveId: "arena-d1d2-save" });
     const joined = joinRoom(created.room.roomCode, "socket-arena-d1d2-b", { displayName: "Franky" });
