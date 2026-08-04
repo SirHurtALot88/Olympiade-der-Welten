@@ -12,6 +12,7 @@ import { previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-seaso
 import { FACILITY_CATALOG, getFacilityLevelDefinition, type FacilityId } from "@/lib/facilities/facility-catalog";
 import { calculateFacilityMaintenanceCost, FACILITY_CONDITION_FULL } from "@/lib/facilities/facility-condition";
 import { applyRecoveryFacilityModifiers, applyTrainingXpFacilityModifiers, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { countTeamRosterFocusAxes } from "@/lib/facilities/specialist-wing-variant-choice";
 import { countTeamInjuredPlayers, getInjuryRiskPercent } from "@/lib/fatigue/fatigue-injury-service";
 import { assessPlayerMorale, type PlayerMoraleAssessment } from "@/lib/morale/player-morale-service";
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
@@ -904,13 +905,69 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
       if (profile.strategicIntent === "roster_repair") score -= 10;
       positive.push("langfristiger Cashflow hilft Reserven");
       if (profile.strategicIntent === "roster_repair") negative.push("akute Kaderbaustellen sind wichtiger");
-    } else if (facility.facilityId === "academy" || facility.facilityId === "specialist_wing") {
+    } else if (facility.facilityId === "academy") {
       score += context.youthCount * 7 + ambition * 0.12 + (objectiveBias?.developmentPriority ?? 0) * 8;
-      // Entwickler-/Mentor-Identität wertet die Development-Gebäude (Academy/Spezialisten) mit auf.
+      // Entwickler-/Mentor-Identität wertet die Development-Gebäude mit auf.
       score += round(developmentTendency.score * 18, 2);
       if (context.team.cash < 18) score -= 8;
       positive.push("Development-/Upgrade-Plan profitiert");
       if (context.team.cash < 18) negative.push("wenig freies Cash für Spezial-Investments");
+    } else if (facility.facilityId === "specialist_wing") {
+      // Stand bis #382 im selben Zweig wie die Academy und wurde über Youth-Anteil bewertet. Seit S1
+      // ist die Variante des Flügels die FOKUSACHSE des Teams — er verstärkt eine Achse und ERSETZT
+      // dabei die eingestellte. Damit hängt sein Wert an genau einer Frage: hat der Kader überhaupt
+      // eine Achse, die sich zu verstärken lohnt?
+      //
+      // Gemessen wird über dieselbe Funktion, die auch die Variante wählt und baut
+      // (`countTeamRosterFocusAxes` → `chooseSpecialistWingVariantForTeam`). Die KI bewertet damit
+      // exakt den Flügel, den sie hinterher hinstellt — nicht einen gedachten.
+      const axisCounts = countTeamRosterFocusAxes(gameState, context.team.teamId);
+      const routedPlayers = axisCounts.pow + axisCounts.spe + axisCounts.men + axisCounts.soc;
+      const leadingCount = Math.max(axisCounts.pow, axisCounts.spe, axisCounts.men, axisCounts.soc);
+      // Anteil der stärksten Achse an den zuordenbaren Spielern. 1.0 = alle auf einer Achse,
+      // 0.25 = gleichmäßig über vier Achsen verteilt (dann bringt eine Fokusachse fast nichts).
+      const axisConcentration = routedPlayers > 0 ? leadingCount / routedPlayers : 0;
+
+      if (routedPlayers === 0) {
+        // Ohne zuordenbare Spieler fiele die Wahl auf den Default `power_gym` — eine willkürliche
+        // Achse, endgültig festgeschrieben. Das ist der eine Fall, in dem der Flügel schadet.
+        score -= 15;
+        negative.push("kein Kaderprofil erkennbar — der Flügel würde eine beliebige Achse festschreiben");
+      } else {
+        // Ab etwa der Hälfte des Kaders auf einer Achse trägt der Flügel; darunter verteilt sich der
+        // Bonus auf Spieler, die ihn kaum nutzen.
+        //
+        // BEWUSST KLEIN GEHALTEN. Eine erste Fassung vergab hier bis zu 90 Punkte — gemessen im
+        // Cash-Sweep hat die KI den Flügel damit bei jedem gleichförmigen Kader ab 60 Cash sofort
+        // gebaut. Genau das ist das „stupide investieren", das nicht passieren soll. Ein klares
+        // Achsprofil allein bringt jetzt rund 39 Punkte und bleibt damit unter der Bau-Schwelle von
+        // 45: der Flügel wird zur Option, nicht zum Automatismus. Gebaut wird er, wenn ein zweiter
+        // Grund dazukommt — ein Board-Ziel auf derselben Achse oder eine Entwickler-Identität.
+        score += round(Math.max(0, axisConcentration - 0.4) * 45, 2);
+        score += Math.min(leadingCount, 6) * 2;
+        if (axisConcentration >= 0.55) {
+          positive.push("der Kader hat ein klares Achsprofil — genau das verstärkt der Flügel");
+        } else {
+          negative.push("der Kader verteilt sich über mehrere Achsen — eine Fokusachse trägt wenig");
+        }
+      }
+
+      // Ein Board-Ziel auf derselben Achse macht den Flügel doppelt wertvoll: er zahlt dann nicht nur
+      // auf die Entwicklung ein, sondern auf ein Ziel, an dem das Team gemessen wird.
+      const chosenAxis = (["pow", "spe", "men", "soc"] as const).reduce((best, axis) =>
+        axisCounts[axis] > axisCounts[best] ? axis : best,
+      );
+      const objectiveAxisWeight = routedPlayers > 0 ? (objectiveBias?.axisPriorities?.[chosenAxis] ?? 0) : 0;
+      if (objectiveAxisWeight > 0) {
+        score += round(objectiveAxisWeight * 20, 2);
+        if (objectiveAxisWeight >= 0.5) positive.push("ein Board-Ziel läuft auf derselben Achse");
+      }
+
+      score += round(developmentTendency.score * 12, 2);
+      if (context.team.cash < 18) {
+        score -= 8;
+        negative.push("wenig freies Cash für Spezial-Investments");
+      }
     }
 
     // Facility architect: general build bonus across all facilities — the archetype leads on
@@ -952,6 +1009,18 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
     if (facility.facilityId === "training_center" && developmentTendency.score > 0) {
       buildScoreThreshold = Math.min(buildScoreThreshold, round(45 - developmentTendency.score * 24, 2));
     }
+    /**
+     * ZU CHRIS' „nicht stupide investieren, gebäude sind teuer aber punktuell wenn das geld da ist":
+     * hier stand kurzzeitig eine zusätzliche Schwelle nach Deckungsgrad (freies Cash ÷ Baukosten).
+     * Sie ist wieder raus, weil sie GEMESSEN nichts geändert hat: über einen Cash-Sweep von 20 bis
+     * 400 bei identischem Bedarf lag die Bau-Grenze mit und ohne sie exakt gleich (nichts unter 60,
+     * ab 60 Recovery, ab 80 Fan Shop, ab 100 Arena). `canSpend` prüft gegen
+     * `bucketsBefore.buildingBudget`, und der ist bereits aus dem Cash abgeleitet — die Deckung war
+     * damit doppelt geprüft.
+     *
+     * Eine zweite Schwelle, die nie greift, hätte nur so ausgesehen, als sei etwas dazugekommen.
+     * Was wirklich fehlte, war nicht das OB, sondern das WARUM — siehe die Gebäude-Zweige oben.
+     */
     const wantsBuildOrUpgrade =
       score >= buildScoreThreshold && currentLevel < facility.maxLevel && canSpend;
     const action: AiManagementBuildingAction = shouldDowngrade
