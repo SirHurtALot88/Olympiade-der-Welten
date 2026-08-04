@@ -51658,6 +51658,93 @@ button.foundation-team-portrait-card {
 /* Team-Stärke-Block im Kader (F4/F5): Ø POW/SPE/MEN/SOC über Top-6 und
    ganzen Kader, je Achse aufklappbar zu den Sub-Disziplinen (Muster wie
    .nl-standings-group im Saisonstand-Board). */
+/* --- Klasse sichtbar machen: Symbol + Farbe statt grauem Fliesstext ------------
+   Die Klasse entscheidet, auf welcher Achse ein Spieler traegt (rot POW, gruen SPE,
+   blau MEN, gelb SOC). Als Teil einer grauen Zeile "Berserker · Demon · LZ 3" war sie
+   beim Ueberfliegen nicht zu finden — genau die Angabe, nach der man beim Kaderbau
+   sucht. Jetzt Chip mit Symbol, der Rest bleibt Nebentext. */
+.is-new-look .nl-market-ident-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--nl-s1) var(--nl-s2);
+}
+
+.is-new-look .nl-market-ident-line > span {
+  color: var(--nl-mut-2);
+}
+
+/* --- Farbbilanz des Kaders: wovon habe ich wie viele --- */
+.is-new-look .nl-market-classmix {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  margin-bottom: var(--nl-s3);
+  padding-bottom: var(--nl-s3);
+  border-bottom: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-market-classmix-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-market-classmix-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--nl-s2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line);
+  border-top: 2px solid var(--nl-mut-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .nl-market-classmix-item b {
+  font-size: var(--nl-fs-xs);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.is-new-look .nl-market-classmix-count {
+  font-family: var(--nl-display);
+  font-size: var(--nl-fs-xl);
+  line-height: 1.1;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-market-classmix-bar {
+  display: block;
+  height: 3px;
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-line);
+  overflow: hidden;
+}
+
+.is-new-look .nl-market-classmix-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: currentColor;
+}
+
+.is-new-look .nl-market-classmix-item.is-red { border-top-color: var(--nl-pow); color: var(--nl-pow); }
+.is-new-look .nl-market-classmix-item.is-green { border-top-color: var(--nl-spe); color: var(--nl-spe); }
+.is-new-look .nl-market-classmix-item.is-blue { border-top-color: var(--nl-men); color: var(--nl-men); }
+.is-new-look .nl-market-classmix-item.is-yellow { border-top-color: var(--nl-soc); color: var(--nl-soc); }
+
+/* Eine Farbe, die im Kader fehlt, bleibt sichtbar stehen — die Luecke IST die Aussage. */
+.is-new-look .nl-market-classmix-item.is-empty {
+  border-top-style: dashed;
+  opacity: 0.6;
+}
+
+.is-new-look .nl-market-classmix-item.is-empty .nl-market-classmix-count {
+  color: var(--nl-mut-2);
+}
+
 .is-new-look .nl-market-squad-summary {
   display: flex;
   flex-direction: column;

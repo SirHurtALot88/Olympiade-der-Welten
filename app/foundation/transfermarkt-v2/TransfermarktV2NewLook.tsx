@@ -15,6 +15,7 @@ const NL_CANDIDATE_OVERSCAN = 8;
 import { NlAbilityStars, VeloAxisRail } from "@/components/foundation/velo-ui";
 import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import ClassColorChip, { getClassColorToken } from "@/app/foundation/ClassColorChip";
 import type { TransfermarktV2RosterRow } from "@/app/foundation/transfermarkt-v2/TransfermarktV2Client";
 import {
   NlBarChart,
@@ -1098,6 +1099,45 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     () => nlAverage(squadAxisSummaries.map((entry) => entry.squadAvg).filter((value): value is number => value != null)),
     [squadAxisSummaries],
   );
+  /**
+   * Die Klassenfarben des Kaders. Bewusst gezaehlt und nicht gemittelt: gefragt ist
+   * "wie viele habe ich wovon", nicht "wie stark bin ich dort" — das beantwortet schon
+   * die Team-Staerke darunter. Leere Farben bleiben mit 0 stehen, denn genau die Luecke
+   * ist die Information, nach der man beim Kaderbau sucht.
+   */
+  const classBalance = useMemo(() => {
+    const definitionen = [
+      { token: "red", axis: "POW", label: "Kraft" },
+      { token: "green", axis: "SPE", label: "Tempo" },
+      { token: "blue", axis: "MEN", label: "Kopf" },
+      { token: "yellow", axis: "SOC", label: "Sozial" },
+    ] as const;
+    const namenJeToken = new Map<string, Set<string>>();
+    let total = 0;
+    for (const row of rosterRows) {
+      const token = getClassColorToken(row.className);
+      if (!token) continue;
+      total += 1;
+      const menge = namenJeToken.get(token) ?? new Set<string>();
+      if (row.className) menge.add(row.className);
+      namenJeToken.set(token, menge);
+    }
+    const zaehler = new Map<string, number>();
+    for (const row of rosterRows) {
+      const token = getClassColorToken(row.className);
+      if (!token) continue;
+      zaehler.set(token, (zaehler.get(token) ?? 0) + 1);
+    }
+    return {
+      total,
+      entries: definitionen.map((definition) => ({
+        ...definition,
+        count: zaehler.get(definition.token) ?? 0,
+        classNames: [...(namenJeToken.get(definition.token) ?? [])].sort(),
+      })),
+    };
+  }, [rosterRows]);
+
   const hasSquadSummary = rosterRows.length > 0 && squadAxisSummaries.some((entry) => entry.squadAvg != null);
 
   // Phase 3 — "Ähnliche Spieler": clientseitige Nearest-Neighbor-Empfehlung über
@@ -1599,8 +1639,13 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                       ) : (
                         <strong>{item.name}</strong>
                       )}
-                      <small>
-                        {item.className} · {item.race}
+                      {/* Die Klasse traegt die Farbe (rot/gruen/blau/gelb = POW/SPE/MEN/SOC) und
+                          entscheidet damit, wo ein Spieler dem Kader hilft. Als grauer Fliesstext
+                          neben der Rasse war sie beim Ueberfliegen nicht zu erkennen — jetzt Symbol
+                          plus Farbe, der Rest bleibt Nebentext. */}
+                      <small className="nl-market-ident-line">
+                        <ClassColorChip className={item.className} />
+                        <span>{item.race}</span>
                       </small>
                       {/* Persistentes Deal-Signal: Fit/Value-Ton immer sichtbar, nicht nur bei Auswahl. */}
                       <span className="nl-market-candidate-signals" aria-label={`${item.name} Deal-Signal`}>
@@ -2615,6 +2660,30 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
           title={`Was ich habe — ${rosterRows.length} Spieler`}
           actions={teamShortCode ? <small className="nl-market-rail-meta">{teamShortCode}</small> : null}
         >
+          {/* DIE KLASSENFARBEN AUF EINEN BLICK. Jede Klasse gehoert zu einer Achse
+              (rot POW, gruen SPE, blau MEN, gelb SOC). Beim Kaderbau ist die Frage
+              "wovon habe ich zu wenig?" — die liess sich vorher nur beantworten, indem
+              man die Spielerliste durchging und die Klassennamen im Kopf zuordnete. */}
+          {classBalance.total > 0 ? (
+            <div className="nl-market-classmix" aria-label="Klassenfarben im Kader">
+              <span className="nl-market-eyebrow">Klassenfarben — wovon habe ich wie viele</span>
+              <div className="nl-market-classmix-row">
+                {classBalance.entries.map((entry) => (
+                  <span
+                    key={entry.token}
+                    className={`nl-market-classmix-item is-${entry.token}${entry.count === 0 ? " is-empty" : ""}`}
+                    title={`${entry.label}: ${entry.count} von ${classBalance.total} — ${entry.classNames.join(", ") || "keiner im Kader"}`}
+                  >
+                    <b>{entry.axis}</b>
+                    <span className="nl-market-classmix-count">{entry.count}</span>
+                    <span className="nl-market-classmix-bar" aria-hidden="true">
+                      <span style={{ width: `${classBalance.total > 0 ? (entry.count / classBalance.total) * 100 : 0}%` }} />
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
           {/* F4/F5 — Team-Stärke: Ø der vier Achsen (Top-6 vs. ganzer Kader),
               je Achse aufklappbar zu den Sub-Disziplinen (Muster wie
               SeasonStandingsNewLook "Disziplinen nach Bereich"). */}
@@ -2852,10 +2921,12 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                       </span>
                       <span className="nl-market-roster-copy">
                         <strong>{row.name}</strong>
-                        <small>
-                          {row.className}
-                          {row.race ? ` · ${row.race}` : ""}
-                          {row.contractLength != null ? ` · LZ ${row.contractLength}` : ""}
+                        <small className="nl-market-ident-line">
+                          <ClassColorChip className={row.className} />
+                          <span>
+                            {row.race ?? ""}
+                            {row.contractLength != null ? `${row.race ? " · " : ""}LZ ${row.contractLength}` : ""}
+                          </span>
                         </small>
                       </span>
                     </button>

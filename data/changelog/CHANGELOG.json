@@ -12,6 +12,24 @@
     },
     {
       "datum": "2026-08-04",
+      "seite": "Gebäude · Analytics Room",
+      "pr": null,
+      "text": "Die KI bewertete den Analytics Room wortgleich wie das Scouting Office — über Kaderlücken und Vertragswellen, von denen das Gebäude nichts weiß. Jetzt zählt für ihn der Zieldruck und der Achsfokus, also genau das, was er anzeigt; außerdem behauptet die Saisonend-Vorschau keine Prognosegenauigkeit mehr.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
+      "seite": "Gebäude · Specialist Wing",
+      "pr": null,
+      "text": "Die KI bewertete den Specialist Wing wie die Academy über den Youth-Anteil. Jetzt zählt, ob der Kader überhaupt ein Achsprofil hat, das sich verstärken lässt — ein gleichmäßig verteilter Kader gewinnt wenig, ein Kader ohne zuordenbare Klassen bekäme sogar eine willkürliche Achse dauerhaft festgeschrieben.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
       "seite": "Multiplayer · Spielansicht",
       "pr": null,
       "text": "In der Spielansicht konnte der Flow stillstehen: der Gastgeber bekam keinen Bereit-Knopf und sah \"Warten auf sich selbst\", während der Mitspieler auf ihn wartete — niemand konnte klicken. Bereitmelden hängt jetzt daran, wer eigene Teams hat, nicht an der Rolle.",
@@ -413,6 +431,15 @@
       "text": "Der Verträge-Reiter sagt jetzt, was zu tun ist, statt nur Zahlen zu zeigen: je Spieler eine Empfehlung mit Begruendung, dazu OVR, PPs und MVS als Leitzahlen, die Punkte je Achse mit Ligarang, und zwei Balken fuer 'verdient er mehr als ueblich' und 'bringt ein Verkauf mehr oder weniger als der Marktwert'. Oben steht die Bilanz des Vorstands, und die dringendsten Faelle stehen zuerst.",
       "quelle": "gepflegt",
       "gewicht": "grundlegend",
+      "version": "0.3"
+    },
+    {
+      "datum": "2026-08-02",
+      "seite": "Markt · Transfermarkt",
+      "pr": "#386",
+      "text": "Die Klasse eines Spielers stand auf dem Transfermarkt nur als grauer Text zwischen Rasse und Restlaufzeit — dabei entscheidet sie, auf welcher Achse er traegt. Jetzt hat sie ueberall Symbol und Farbe, und ueber dem Kader steht eine Bilanz, wie viele Spieler du von jeder Farbe hast. Fehlende Farben bleiben mit einer Null stehen, damit die Luecke auffaellt.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
       "version": "0.3"
     },
     {
