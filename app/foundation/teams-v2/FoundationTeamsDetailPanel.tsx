@@ -798,9 +798,11 @@ function FoundationTeamsDetailPanel({
                     <div>
                       <h3>Vertragsauflösung auf Spielerwunsch</h3>
                       <p className="muted">
-                        Diese Spieler bieten an, ihren Vertrag aufzulösen. Nimmst du an, kassierst du den vollen
-                        Verkaufspreis und der Rest-Buyout entfällt — den Zeitpunkt suchst du dir aber nicht aus.
-                        Lehnst du ab, erfüllt der Spieler seinen Vertrag und verliert weiter Moral.
+                        Diese Spieler bieten an, ihren Vertrag aufzulösen. Nimmst du an, kassierst du den
+                        Verkaufspreis und zahlst nur den Teil des Rest-Buyouts, auf den der Spieler nicht
+                        verzichtet — wie viel das ist, hängt an seiner Moral und seinem Charakter. Den Zeitpunkt
+                        suchst du dir nicht aus. Lehnst du ab, erfüllt er seinen Vertrag und seine Moral bricht
+                        deutlich ein.
                       </p>
                     </div>
                   </div>
@@ -825,12 +827,26 @@ function FoundationTeamsDetailPanel({
                               {offer.previouslyDeclined ? " · hat schon einmal gefragt" : ""}
                             </small>
                           </div>
+                          {/* Der Netto-Betrag steht vorn, weil er die Entscheidung traegt: der
+                              Bruttopreis allein sagte frueher „Erlös 15,2" und verschwieg, dass ein
+                              Rest-Buyout offen bleibt. Darunter die Herleitung. */}
                           <div className="teams-dissolution-money nl-tnum">
-                            <span title="Was das Team bei Annahme bekommt.">
-                              Erlös <strong>{formatNlMoney(offer.salePrice)}</strong>
+                            <span title="Was nach Abzug des offenen Buyout-Rests wirklich ins Team-Cash geht.">
+                              Netto{" "}
+                              <strong>{formatNlMoney(offer.salePrice - (offer.payableBuyout ?? 0))}</strong>
                             </span>
-                            {offer.waivedBuyout > 0 ? (
-                              <small className="muted" title="Rest-Buyout, der bei Annahme entfällt.">
+                            {(offer.payableBuyout ?? 0) > 0 ? (
+                              <small
+                                className="muted"
+                                title="Der Spieler verzichtet nur anteilig — den Rest zahlt das Team."
+                              >
+                                {formatNlMoney(offer.salePrice)} − Buyout {formatNlMoney(offer.payableBuyout ?? 0)}
+                                {offer.waivedBuyout > 0
+                                  ? ` · ${formatWholeNumber(Math.round((offer.waiverShare ?? 0) * 100))} % erlassen`
+                                  : ""}
+                              </small>
+                            ) : offer.waivedBuyout > 0 ? (
+                              <small className="muted" title="Der offene Rest-Buyout entfällt vollständig.">
                                 Buyout {formatNlMoney(offer.waivedBuyout)} entfällt
                               </small>
                             ) : null}
@@ -841,7 +857,7 @@ function FoundationTeamsDetailPanel({
                               className="nl-teams-action"
                               disabled={busy || anyBusy}
                               onClick={() => void onDecideContractDissolution?.(offer.playerId, "accepted")}
-                              title="Der Spieler geht, das Team kassiert den Verkaufspreis."
+                              title="Der Spieler geht; das Team kassiert den Verkaufspreis abzüglich des nicht erlassenen Buyout-Rests."
                             >
                               {busy ? "…" : "Auflösen"}
                             </button>
@@ -850,7 +866,7 @@ function FoundationTeamsDetailPanel({
                               className="nl-teams-action nl-teams-action-danger"
                               disabled={busy || anyBusy}
                               onClick={() => void onDecideContractDissolution?.(offer.playerId, "declined")}
-                              title="Der Spieler bleibt und erfüllt seinen Vertrag — kostet ihn Moral."
+                              title="Der Spieler bleibt und erfüllt seinen Vertrag — seine Moral bricht deutlich ein."
                             >
                               {busy ? "…" : "Ablehnen"}
                             </button>
