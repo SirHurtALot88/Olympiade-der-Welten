@@ -3,6 +3,15 @@
   "eintraege": [
     {
       "datum": "2026-08-05",
+      "seite": "Shell · Aktives Team",
+      "pr": null,
+      "text": "Das aktive Team sprang beim Ansichtswechsel, beim Neuladen und beim direkten Aufruf einer Team-URL zurück auf den eigenen Klub — gemeldet als „die Trainingsansicht setzt das Team auf M-M zurück\". Drei Stellen taten unabhängig voneinander dasselbe; die Auswahl bleibt jetzt stehen. Die Trainingsansicht zeigt ein fremdes Team im Nur-Ansicht-Modus, statt wegzuschalten. Ein veralteter team-Parameter aus einem anderen Spielstand landet weiterhin beim eigenen Klub.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-05",
       "seite": "Teams · Verträge",
       "pr": null,
       "text": "Ein Klick auf eine Kaderzeile öffnet jetzt eine Verkaufs-Einschätzung als Seitenleiste: Verkaufspreis, Buyout, Netto-Erlös und die volle Board-Bilanz mit Dafür/Dagegen. Bisher bekam man die erst zu sehen, wenn man den Verkauf schon eingeleitet hatte — also genau bei den Spielern, bei denen man ohnehin entschieden hatte.",

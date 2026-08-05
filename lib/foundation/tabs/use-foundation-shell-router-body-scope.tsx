@@ -6331,8 +6331,20 @@ export function useFoundationShellRouterBodyScope({
     readMeta.source,
   ]);
 
+  /**
+   * Ansichten, die ein fremdes Team NICHT anzeigen koennen und deshalb aufs eigene umschalten.
+   *
+   * GEMELDET: „die Trainingsansicht setzt das aktive Team auf M-M zurueck" — reproduzierbar ueber
+   * drei Teams. Stimmt, und die Trainingsansicht stand hier zu Unrecht: sie hat laengst einen
+   * Nur-Ansicht-Modus (`managementLocked` / „Training ist nur zur Ansicht offen", siehe die
+   * Props weiter unten) — nur war der unerreichbar, weil dieser Effekt vorher wegschaltete.
+   * Zwei Mechanismen, die sich widersprachen; der aeltere von beiden gewann.
+   *
+   * Die uebrigen Ansichten bleiben drin: fuer sie ist kein solcher Lesemodus gebaut, und ein
+   * stillschweigend schreibbarer fremder Kader waere schlimmer als ein Teamwechsel.
+   */
   const managementViews = useMemo(
-    () => new Set<FoundationView>(["lineup", "market", "marketV2", "training", "trainingCompact", "trainingV2", "teamSettings"]),
+    () => new Set<FoundationView>(["lineup", "market", "marketV2", "teamSettings"]),
     [],
   );
 
@@ -6410,7 +6422,9 @@ export function useFoundationShellRouterBodyScope({
     }
     setActiveManagerTeam(fallbackTeam.teamId, "saved_preference");
     setActiveManagerTeamWarning(
-      `${selectedTeam.name} war hier nur Ansicht. Für ${activeView === "trainingV2" || activeView === "trainingCompact" || activeView === "training" ? "Training oder Gebäude" : "diese Management-Ansicht"} wurde auf ${fallbackTeam.name} gewechselt.`,
+      // Der Training-Zweig ist hier weg: Training/Gebäude schalten nicht mehr um, sie zeigen das
+      // fremde Team im Nur-Ansicht-Modus (siehe `managementViews` oben).
+      `${selectedTeam.name} war hier nur Ansicht. Für diese Management-Ansicht wurde auf ${fallbackTeam.name} gewechselt.`,
     );
   }, [
     activeView,

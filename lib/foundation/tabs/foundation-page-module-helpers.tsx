@@ -711,8 +711,37 @@ export function resolvePreferredFoundationTeamContext(
   };
   const hasOwnedTeam = teams.some((team) => isTeamManaged(team.teamId));
   const ownedDefaultTeamId = resolveDefaultManagerTeamId(teams, settingsMap ?? undefined);
-  const withOwnedTeamGuard = (context: ActiveManagerTeamContext): ActiveManagerTeamContext => {
-    if (!hasOwnedTeam || isTeamManaged(context.teamId)) {
+  /**
+   * GEMELDET: „die Trainingsansicht setzt das aktive Team auf M-M zurueck" — reproduzierbar ueber
+   * drei Teams.
+   *
+   * Im Browser nachgemessen war es nicht die Trainingsansicht: JEDER Ansichtswechsel und jeder
+   * Ladevorgang warf die Auswahl weg. `?team=A-A` direkt aufgerufen landete auf M-M, und ein im
+   * Picker gewaehltes B-B ueberlebte den Klick auf „Teams" nicht — die URL wurde dabei auf
+   * `team=M-M` zurueckgeschrieben.
+   *
+   * Der Grund war dieser Schutz, und zwar ohne Ausnahme: er schnappte JEDEN Kandidaten auf das
+   * eigene Team zurueck, der nicht manuell gesteuert ist. Das widerspricht dem Team-Picker, der
+   * seit dem Umbau BEWUSST alle 32 Teams listet (siehe use-foundation-cross-tab-team-control:
+   * „Schreibaktionen bleiben unabhaengig davon gesperrt … nicht die Sichtbarkeit im Picker").
+   * Ansehen sollte gehen, schreiben nicht — der Schutz verhinderte beides.
+   *
+   * Was der Schutz WIRKLICH abfangen soll, steht in seiner eigenen Begruendung: ein VERALTETER
+   * `team=`-Parameter aus einem anderen Save/einer anderen Sitzung. Genau daran wird jetzt
+   * unterschieden: eine Auswahl, die fuer DIESEN Save gespeichert ist, ist eine bewusste
+   * Entscheidung und bleibt stehen. Alles andere (Route-Prop, fremder URL-Parameter, Fallback)
+   * faellt weiter auf das eigene Team zurueck.
+   */
+  const gespeicherteAuswahl = options?.ignoreStoredPreference
+    ? null
+    : readStoredFoundationManagerTeamId(teams, options?.activeSaveId);
+  const istBewussteAuswahl = (teamId: string | null | undefined) =>
+    Boolean(teamId && gespeicherteAuswahl && teamId === gespeicherteAuswahl);
+  const withOwnedTeamGuard = (
+    context: ActiveManagerTeamContext,
+    optionen?: { bewusst?: boolean },
+  ): ActiveManagerTeamContext => {
+    if (!hasOwnedTeam || isTeamManaged(context.teamId) || optionen?.bewusst) {
       return context;
     }
     return { teamId: ownedDefaultTeamId, source: "default_human_team", warning: context.warning ?? null };
@@ -720,7 +749,10 @@ export function resolvePreferredFoundationTeamContext(
 
   const requestedFromUrl = parseFoundationTeamIdFromUrl(teams);
   if (requestedFromUrl) {
-    return withOwnedTeamGuard({ teamId: requestedFromUrl, source: "route" });
+    return withOwnedTeamGuard(
+      { teamId: requestedFromUrl, source: "route" },
+      { bewusst: istBewussteAuswahl(requestedFromUrl) },
+    );
   }
 
   const rawTeamParam = getRawFoundationTeamParam();
@@ -731,24 +763,50 @@ export function resolvePreferredFoundationTeamContext(
 
   const requestedFromInitial = resolveFoundationTeamId(teams, options?.initialTeamId);
   if (requestedFromInitial) {
-    return withOwnedTeamGuard({ teamId: requestedFromInitial, source: "route", warning: invalidRouteWarning });
+    // Dieselbe Quelle wie der URL-Zweig oben, nur serverseitig gelesen (`page.tsx` reicht den
+    // `team`-Parameter durch) — also gilt hier dieselbe Unterscheidung.
+    return withOwnedTeamGuard(
+      { teamId: requestedFromInitial, source: "route", warning: invalidRouteWarning },
+      { bewusst: istBewussteAuswahl(requestedFromInitial) },
+    );
   }
 
   const currentTeamId = options?.currentTeamId ?? null;
   if (currentTeamId && teams.some((team) => team.teamId === currentTeamId)) {
-    return withOwnedTeamGuard({ teamId: currentTeamId, source: options?.currentSource ?? "manual_select", warning: invalidRouteWarning });
+    // Das in DIESER Sitzung bereits aktive Team ist per Definition die aktuelle Auswahl — es kann
+    // nicht aus einem anderen Save stammen. Der Schutz gilt hier nicht.
+    return withOwnedTeamGuard(
+      { teamId: currentTeamId, source: options?.currentSource ?? "manual_select", warning: invalidRouteWarning },
+      { bewusst: true },
+    );
   }
 
+  /**
+   * REIHENFOLGE: zuletzt gewaehlt schlaegt Startklub.
+   *
+   * Der Startklub des Spielstands (`newGameFlow.selectedTeamId`) stand hier frueher VOR der
+   * gespeicherten Auswahl, mit der Begruendung, er schlage die „browser-globale"
+   * localStorage-Praeferenz. Global ist die aber nicht mehr — `readStoredFoundationManagerTeamId`
+   * prueft seit dem Save-Scoping die saveId, liest also nur die Wahl fuer genau diesen
+   * Spielstand. Uebrig blieb ein Vorrang ohne Grund, und er hat gekostet:
+   *
+   * Im Browser gemessen war das die eigentliche Ursache des gemeldeten „Team springt auf M-M
+   * zurueck". Ein Ansichtswechsel navigiert ohne `team=`-Parameter; beim Neuaufbau fielen URL-
+   * und Route-Zweig aus, und der Startklub setzte sich gegen das gerade gewaehlte Team durch.
+   * Drei Ansichten, dreimal derselbe Rueckfall.
+   */
+  if (gespeicherteAuswahl) {
+    return withOwnedTeamGuard(
+      { teamId: gespeicherteAuswahl, source: "saved_preference", warning: invalidRouteWarning },
+      { bewusst: true },
+    );
+  }
+
+  // Ohne gespeicherte Wahl (frischer Browser, erster Start) traegt der Startklub — genau dafuer
+  // ist er da.
   const requestedFromSave = resolveFoundationTeamId(teams, options?.savedTeamId);
   if (requestedFromSave) {
     return withOwnedTeamGuard({ teamId: requestedFromSave, source: "saved_preference", warning: invalidRouteWarning });
-  }
-
-  if (!options?.ignoreStoredPreference) {
-    const requestedFromStorage = readStoredFoundationManagerTeamId(teams, options?.activeSaveId);
-    if (requestedFromStorage) {
-      return withOwnedTeamGuard({ teamId: requestedFromStorage, source: "saved_preference", warning: invalidRouteWarning });
-    }
   }
 
   return { teamId: ownedDefaultTeamId, source: "default_human_team", warning: invalidRouteWarning };

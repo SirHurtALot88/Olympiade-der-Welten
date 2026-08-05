@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-05",
+  "seite": "Shell · Aktives Team",
+  "text": "Das aktive Team sprang beim Ansichtswechsel, beim Neuladen und beim direkten Aufruf einer Team-URL zurück auf den eigenen Klub — gemeldet als „die Trainingsansicht setzt das Team auf M-M zurück\". Drei Stellen taten unabhängig voneinander dasselbe; die Auswahl bleibt jetzt stehen. Die Trainingsansicht zeigt ein fremdes Team im Nur-Ansicht-Modus, statt wegzuschalten. Ein veralteter team-Parameter aus einem anderen Spielstand landet weiterhin beim eigenen Klub.",
+  "gewicht": "behebung",
+  "version": "0.4"
+}
