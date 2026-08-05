@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -12,7 +13,21 @@ import {
 
 const SOURCE_PATH = "/Users/chrisfalk/Downloads/Olympiade%20der%20Welten%20Draftboard (7).json";
 
-describe("extract retool transfermarkt columns", () => {
+/**
+ * DIESER TEST BRAUCHT EINE DATEI, DIE ES NUR AUF EINEM RECHNER GIBT.
+ *
+ * `SOURCE_PATH` zeigt in den Downloads-Ordner eines bestimmten Macs, auf einen Retool-Export mit
+ * „(7)" im Namen — ein Zwischenstand aus einer einmaligen Datenuebernahme. Ueberall sonst schlug er
+ * mit `ENOENT` fehl: in der CI, in jedem frischen Checkout, auf jedem anderen Geraet. Drei
+ * Fehlschlaege, die nie etwas ueber das Spiel ausgesagt haben.
+ *
+ * Geloescht wird er trotzdem nicht — liegt die Datei da, prueft er echtes Verhalten des
+ * Extraktions-Skripts. Er sagt jetzt nur ehrlich, dass er ohne sie nichts pruefen kann, statt rot zu
+ * leuchten. Wer die Uebernahme erneut fahren will, legt die Datei hin und der Test lebt wieder.
+ */
+const sourceAvailable = existsSync(SOURCE_PATH);
+
+describe.skipIf(!sourceAvailable)("extract retool transfermarkt columns", () => {
   it("finds transfermarkt table components in the Retool JSON", async () => {
     const rawJson = await fs.readFile(SOURCE_PATH, "utf8");
     const parsed = JSON.parse(rawJson) as {

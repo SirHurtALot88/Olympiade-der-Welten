@@ -69,7 +69,18 @@ export type ScenarioType =
   | "live_feature_test"
   | "sandbox_multiseason_test"
   | "manager_multiplayer_test"
-  | "sandbox_snapshot";
+  | "sandbox_snapshot"
+  /**
+   * Der dedizierte, schreibgeschuetzte Spielstand fuer den CI-Gameplay-Smoke
+   * (`scripts/ensure-ci-gameplay-smoke-save.ts`).
+   *
+   * Das Skript benutzte diesen Wert seit jeher, nur stand er nie in der Union. Folge: der Vergleich
+   * `save.scenarioMeta?.scenarioType === SMOKE_SCENARIO_TYPE`, mit dem es einen BESTEHENDEN
+   * Smoke-Save wiederfinden will, verglich zwei Typen ohne Schnittmenge — er konnte nie wahr werden.
+   * Das Skript legte deshalb bei JEDEM CI-Lauf einen neuen Smoke-Save an, statt den vorhandenen
+   * wiederzuverwenden. Zur Laufzeit faellt das nicht auf, weil `tsx` nicht typprueft.
+   */
+  | "gameplay_smoke_readonly";
 
 export type ScenarioMeta = {
   scenarioType: ScenarioType;

@@ -61,7 +61,15 @@ describe("singleplayer game state", () => {
     expect(second?.gameState.teams[0]?.logoPath).toBeTruthy();
     expect(second?.gameState.players[0]?.portraitPath).toBeTruthy();
     expect(persistence.listSaves().length).toBeGreaterThan(0);
-    expect(getDatabasePath()).toContain("oly-app");
+    /**
+     * Der Test prueft, dass ueberhaupt eine Datenbankdatei aufgeloest wird — NICHT wie sie heisst.
+     * Vorher stand hier `toContain("oly-app")`, also der Name der Produktionsdatei. Genau den setzt
+     * die Test-Einrichtung aber absichtlich um: `tests/setup/sqlite-pro-testdatei.ts` gibt jeder
+     * Testdatei ueber `OLY_APP_SQLITE_PATH` ihre EIGENE SQLite-Datei unter `/tmp/oly-test-<pid>-…`,
+     * damit sich Testdateien desselben Workers keine Datenbank teilen. Die Zusicherung widersprach
+     * damit der eigenen Einrichtung und konnte nie erfuellt sein.
+     */
+    expect(getDatabasePath()).toMatch(/\.sqlite$/);
   }, 60000);
 
   it("normalizes legacy 10-player roster limits from season management targets", () => {
