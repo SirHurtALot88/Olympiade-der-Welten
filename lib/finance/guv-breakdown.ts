@@ -28,9 +28,35 @@
  * Der Hinweis gehört trotzdem in den Hover: eine Zahl, die einen bekannten Posten NICHT enthält, muss
  * das sagen — sonst sucht man den Unterschied wieder in der Rechnung.
  *
+ * NACHGEZOGEN (Chris): der Apron steht jetzt nicht nur als Abgrenzung da, sondern als HOCHRECHNUNG
+ * beim aktuellen Rang — dieselbe Behandlung, die die Sponsor-Zeile im selben Hover schon hat. Der
+ * Einwand „Deckel und Ausschüttung hängen am Endrang" bleibt richtig und wird nicht wegdefiniert:
+ * die Zeile ist als Hochrechnung benannt und nennt den Rang, auf den sie sich stützt. Gerechnet wird
+ * sie von `lib/finance/apron-projection.ts`, das seinerseits nur die Saisonende-Arithmetik aufruft —
+ * diese Datei formuliert, sie rechnet nicht.
+ *
  * Diese Datei ist bewusst React-frei: beide Ansichten lesen dieselbe Herleitung, und sie ist ohne
  * Rendering prüfbar.
  */
+
+/**
+ * Der auf den AKTUELLEN Rang hochgerechnete Apron dieses Teams. Alle Werte kommen aus
+ * `buildApronProjection` — hier wird nichts abgeleitet, nur formuliert.
+ */
+export type GuvApronProjectionInput = {
+  /** `ausgleich − abgabe`: was am Saisonende aufs Cash ginge. Negativ = Abgabe. */
+  nettoDelta: number;
+  /** Rang, auf den hochgerechnet wurde. `null` = unbekannt. */
+  rank: number | null;
+  /** GEGLÄTTETE Gehaltssumme — die Bemessungsgrundlage, nicht die Gehaltsspalte der Tabelle. */
+  salary: number;
+  line1: number;
+  line2: number;
+  /** `true` = Linien vom Saisonbeginn (verbindlich), `false` = aus dem aktuellen Stand abgeleitet. */
+  frozenLines: boolean;
+  /** `true` = der Deckel (halber Wertungsanteil) begrenzt die Abgabe. */
+  gedeckelt: boolean;
+};
 
 export type GuvBreakdownInput = {
   /** Sponsor-Abrechnung beim aktuellen Rang. */
@@ -41,6 +67,8 @@ export type GuvBreakdownInput = {
   guv: number | null | undefined;
   /** Transfer-Saldo — steht im Saisonstand in einer eigenen Spalte. */
   transferNet?: number | null;
+  /** Apron beim aktuellen Rang hochgerechnet — fehlt er, bleibt der Hover wie zuvor. */
+  apron?: GuvApronProjectionInput | null;
 };
 
 export type GuvBreakdownLine = {
@@ -65,6 +93,32 @@ function formatSigned(value: number | null) {
   if (!isNumber(value)) return "—";
   const rounded = Math.round(value * 100) / 100;
   return `${rounded > 0 ? "+" : ""}${rounded.toLocaleString("de-DE", { maximumFractionDigits: 2 })}`;
+}
+
+function formatPlain(value: number | null) {
+  if (!isNumber(value)) return "—";
+  return (Math.round(value * 10) / 10).toLocaleString("de-DE", { maximumFractionDigits: 1 });
+}
+
+/**
+ * Die zwei Apron-Zeilen des Hovers: was hochgerechnet herauskäme, und woran diese Hochrechnung
+ * hängt. Die zweite Zeile ist keine Ausschmückung — sie nennt die geglättete Bemessungsgrundlage
+ * (die von der Gehaltsspalte der Tabelle abweichen DARF, siehe apron-service.ts) und sagt, dass
+ * Deckel und Ausschüttung erst mit dem Endrang feststehen. Ohne beides läse sich die Zahl wie ein
+ * bereits gebuchter Posten.
+ */
+function buildApronLines(apron: GuvApronProjectionInput, guv: number | null): string[] {
+  const rangText = apron.rank != null ? `beim aktuellen Rang (Platz ${apron.rank})` : "beim aktuellen Rang";
+  const mitApron = guv != null ? ` → mit Apron ${formatSigned(Number((guv + apron.nettoDelta).toFixed(2)))}` : "";
+  const zusaetze = [
+    `Gehälter ${formatPlain(apron.salary)} (geglättet) gegen Linien ${formatPlain(apron.line1)} / ${formatPlain(apron.line2)}`,
+    apron.gedeckelt ? "durch den Deckel begrenzt" : null,
+    apron.frozenLines ? null : "Linien noch nicht eingefroren",
+  ].filter(Boolean);
+  return [
+    `Apron ${rangText}: ${formatSigned(apron.nettoDelta)}${mitApron}`,
+    `Hochrechnung — ${zusaetze.join(" · ")}; Deckel und Ausschüttung stehen erst mit dem Endrang fest.`,
+  ];
 }
 
 /**
@@ -92,6 +146,17 @@ export function buildGuvBreakdown(input: GuvBreakdownInput): GuvBreakdown {
   if (isNumber(input.transferNet)) {
     lines.push({ label: "Transfers (eigene Spalte, nicht enthalten)", value: input.transferNet, counted: false });
   }
+  // Der Apron zählt NICHT in die GuV (`counted: false`) — er wird am Saisonende gebucht und geht
+  // direkt aufs Cash. Er steht als eigene Zeile daneben, damit die Zerlegung weiter exakt aufgeht:
+  // die Summe der gezählten Zeilen bleibt die angezeigte Zahl.
+  const apron = input.apron ?? null;
+  if (apron && isNumber(apron.nettoDelta)) {
+    lines.push({
+      label: `Apron (Hochrechnung${apron.rank != null ? `, Platz ${apron.rank}` : ""}, nicht enthalten)`,
+      value: Number(apron.nettoDelta.toFixed(2)),
+      counted: false,
+    });
+  }
 
   // KOMPAKT STATT VOLLSTAENDIG: die Rechnung passt in eine Zeile, weil sie nur drei Terme hat —
   // sie als Aufzaehlung zu setzen machte aus einer Formel einen Absatz. Was der Hover leisten muss,
@@ -101,6 +166,7 @@ export function buildGuvBreakdown(input: GuvBreakdownInput): GuvBreakdown {
   const hoverText = [
     `GuV = ${rechnung} → ${formatSigned(total)}`,
     "Sponsor beim aktuellen Rang.",
+    ...(apron && isNumber(apron.nettoDelta) ? buildApronLines(apron, total) : []),
     "",
     `Ohne Transfers (eigene Spalte${isNumber(input.transferNet) ? `, ${formatSigned(input.transferNet)}` : ""}) und ohne Apron — der wird erst zum Saisonende abgerechnet und geht direkt aufs Cash.`,
     "Der Finanzen-Reiter rechnet breiter (Prämien, Kredite, Unterhalt) und kommt auf eine andere Zahl. Beide stimmen.",

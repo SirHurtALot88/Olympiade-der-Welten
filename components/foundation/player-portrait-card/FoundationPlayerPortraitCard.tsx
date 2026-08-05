@@ -3,6 +3,7 @@
 import type { CSSProperties, ReactNode } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
+import { formatNlNumber } from "@/components/foundation/new-look/nl-tones";
 import { NlAbilityStars, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
 import {
   buildContextOverlayStats,
@@ -21,6 +22,26 @@ import {
   isHoloPlayerStarTier,
   resolveLeagueRankFromPool,
 } from "@/lib/foundation/player-star-tier";
+
+/**
+ * SAISON-PPs je Achse — die zweite Achsenzeile der Karte.
+ *
+ * WARUM ES DAS BRAUCHT: `pow`/`spe`/`men`/`soc` an dieser Karte sind die ATTRIBUTWERTE
+ * (29/35/60/63) und werden vom Orbit-Ring gerendert. Wer die PPs auf der Karte suchte, fand
+ * dort vier Achsenzahlen und nichts zu reparieren — es waren nur die falschen. Die Saison-PPs
+ * sind eine eigene Größe (`PlayerRatingContractRow.ppPow/…`) und bekommen deshalb eine eigene
+ * Zeile statt den Orbit umzudeuten.
+ */
+export type FoundationPlayerPortraitAxisPps = {
+  pow: number | null;
+  powRank?: number | null;
+  spe: number | null;
+  speRank?: number | null;
+  men: number | null;
+  menRank?: number | null;
+  soc: number | null;
+  socRank?: number | null;
+};
 
 export type FoundationPlayerPortraitEconomyStat = {
   label: string;
@@ -43,6 +64,8 @@ export type FoundationPlayerPortraitCardProps = {
   spe: number | null;
   men: number | null;
   soc: number | null;
+  /** Saison-PPs je Achse (optional) — rendert eine zweite Achsenzeile unter dem Orbit. */
+  axisPps?: FoundationPlayerPortraitAxisPps | null;
   leagueHeatPools?: LeaguePlayerHeatPools;
   onOpen?: () => void;
   title?: string;
@@ -89,6 +112,13 @@ export type FoundationPlayerPortraitCardProps = {
   portraitFetchPriority?: "high" | "low" | "auto";
 };
 
+const PORTRAIT_AXIS_PPS_CELLS = [
+  { axis: "pow", label: "POW" },
+  { axis: "spe", label: "SPE" },
+  { axis: "men", label: "MEN" },
+  { axis: "soc", label: "SOC" },
+] as const;
+
 function renderOverlayStat(stat: PortraitOverlayStat) {
   return (
     <span
@@ -118,6 +148,7 @@ export default function FoundationPlayerPortraitCard({
   spe,
   men,
   soc,
+  axisPps,
   leagueHeatPools,
   onOpen,
   title,
@@ -257,14 +288,55 @@ export default function FoundationPlayerPortraitCard({
     />
   ) : null;
 
+  /**
+   * Die PPs-Zeile hängt an denselben Sichtbarkeitsregeln wie der Orbit (`showOrbit`): wo die
+   * Attributzeile keinen Platz hat (Mini-Dichte, Rail-Kacheln), hat die PPs-Zeile erst recht
+   * keinen. Fehlt der Achsenwert komplett — Saisonstart, noch kein Spieltag gewertet — bleibt
+   * die Zeile ganz weg, statt vier Nullen zu zeigen, die wie ein Datenfehler aussehen.
+   */
+  const axisPpsCells = axisPps
+    ? PORTRAIT_AXIS_PPS_CELLS.map((cell) => ({
+        ...cell,
+        value: axisPps[cell.axis] ?? null,
+        rank: axisPps[`${cell.axis}Rank` as const] ?? null,
+      }))
+    : [];
+  const axisPpsRow =
+    showOrbit && axisPpsCells.some((cell) => cell.value != null) ? (
+      <div
+        className="foundation-player-portrait-pps"
+        aria-label={`${name} Saison-PPs je Achse`}
+        data-testid="foundation-player-portrait-pps"
+      >
+        {axisPpsCells.map((cell) => (
+          <span
+            key={cell.axis}
+            className={`foundation-player-portrait-pps-chip is-${cell.axis}`}
+            title={`${cell.label} · ${formatNlNumber(cell.value, 1)} PPs diese Saison${
+              cell.rank != null ? ` · Liga-Rang ${cell.rank}` : ""
+            }`}
+          >
+            <small>{cell.label}</small>
+            <strong>{formatNlNumber(cell.value, 1)}</strong>
+            {/* Als EIN Textknoten, nicht `#{cell.rank}` — sonst schiebt React beim
+                Server-Rendern einen Kommentar-Marker zwischen Raute und Zahl. */}
+            {cell.rank != null ? <em>{`#${cell.rank}`}</em> : null}
+          </span>
+        ))}
+      </div>
+    ) : null;
+
   const portraitMedia = portraitUrl ? (
     <BudgetedMediaImage
       className="home-v2-player-portrait"
       src={portraitUrl}
       placeholderSrc={portraitPlaceholderUrl}
       alt={name}
-      width={portraitLayout === "rail" ? 108 : 280}
-      height={portraitLayout === "rail" ? 108 : 373}
+      // Intrinsische Maße = Anforderungsgröße beim Bild-Optimizer, nicht die Layoutgröße (die
+      // kommt aus dem Raster, das Bild ist `object-fit: cover` auf 100 %). Mit den breiteren
+      // Kader-Spalten reichten 280 px nicht mehr — das Portrait wurde hochskaliert und weich.
+      width={portraitLayout === "rail" ? 108 : 340}
+      height={portraitLayout === "rail" ? 108 : 453}
       loading={portraitLoading}
       fetchPriority={portraitFetchPriority}
       eager={portraitLoading === "eager" || portraitFetchPriority === "high"}
@@ -329,6 +401,7 @@ export default function FoundationPlayerPortraitCard({
           {abilityStarsRow}
           {economyRow}
           {orbitRow}
+          {axisPpsRow}
           {footerSlot && density !== "mini" ? (
             <div className="foundation-player-portrait-footer" onClick={(event) => event.stopPropagation()}>
               {footerSlot}

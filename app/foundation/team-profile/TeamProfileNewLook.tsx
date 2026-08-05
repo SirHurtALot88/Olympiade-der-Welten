@@ -2,7 +2,9 @@
 
 import { useMemo, useRef, useState, type ReactNode } from "react";
 
-import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
+import FoundationPlayerPortraitCard, {
+  type FoundationPlayerPortraitEconomyStat,
+} from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import TeamDrawerHistoryTable from "@/components/foundation/team-drawer/TeamDrawerHistoryTable";
 import WerdegangPanel from "@/components/foundation/werdegang/WerdegangPanel";
 import {
@@ -322,6 +324,54 @@ function getMoneyDeltaClass(value: number | null | undefined, positiveDirection:
   }
   const isPositive = positiveDirection === "higher" ? value > 0 : value < 0;
   return isPositive ? " text-positive" : " text-negative";
+}
+
+/**
+ * Der Wert-Posten der Kaderkarte zeigt den in DIESER Saison erzielbaren VERKAUFSPREIS, nicht den
+ * Marktwert — die Frage am Kader lautet „was bekomme ich für ihn", nicht „was steht auf dem
+ * Papier". Darunter steht der Auf-/Abschlag des Verkaufsfaktors gegen den Marktwert; damit
+ * bleibt der Marktwert aus der Karte ablesbar (Wert − Delta), es geht also keine Information
+ * verloren, sie wechselt nur die Reihenfolge.
+ *
+ * DESHALB HEISST DER POSTEN „VK" UND NICHT MEHR „MW": ein Feld, das den Verkaufspreis zeigt,
+ * darf nicht Marktwert heißen — das ist im Spiel ein eigener, benachbarter Begriff mit eigenem
+ * Tooltip. „VK" ist derselbe Name, den die Verträge-Karte für dieselbe Zahl benutzt.
+ *
+ * FALLBACK: fehlt der Verkaufswert (Spieler ohne aktive Vertragszeile), steht wieder der
+ * Marktwert samt seiner bisherigen Wertentwicklung da — lieber die alte Zahl als ein Strich.
+ * Dann heißt der Posten auch wieder „MW", denn dann ist es wirklich der Marktwert. Ein fester
+ * Name über zwei verschiedenen Größen wäre genau die Verwechslung, die der Umbau abstellt.
+ */
+function buildRosterSaleValueStat(player: TeamDetailDrawerPlayerCard): FoundationPlayerPortraitEconomyStat {
+  if (!isFiniteNumber(player.saleValue)) {
+    return {
+      label: "MW",
+      value: formatNlNumber(player.marketValue, 2),
+      delta:
+        isFiniteNumber(player.marketValueDelta) && Math.abs(player.marketValueDelta) >= 0.01
+          ? formatSignedNlNumber(player.marketValueDelta, 2)
+          : null,
+      deltaClass: getMoneyDeltaClass(player.marketValueDelta, "higher"),
+      title: getGameTermTooltip("MW") ?? undefined,
+    };
+  }
+
+  const aufschlag = player.saleValueVsMarketValue ?? null;
+  return {
+    label: "VK",
+    value: formatNlNumber(player.saleValue, 2),
+    delta: isFiniteNumber(aufschlag) && Math.abs(aufschlag) >= 0.01 ? formatSignedNlNumber(aufschlag, 2) : null,
+    deltaClass: getMoneyDeltaClass(aufschlag, "higher"),
+    title: [
+      `Verkaufswert diese Saison: ${formatNlNumber(player.saleValue, 2)}`,
+      `Marktwert: ${formatNlNumber(player.marketValue, 2)}`,
+      isFiniteNumber(aufschlag)
+        ? `Verkaufsfaktor: ${formatSignedNlNumber(aufschlag, 2)} (Alter, Restlaufzeit, Form)`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+  };
 }
 
 /**
@@ -906,6 +956,7 @@ export default function TeamProfileNewLook({
             spe={player.coreStats.spe}
             men={player.coreStats.men}
             soc={player.coreStats.soc}
+            axisPps={player.axisPps ?? null}
             leagueHeatPools={resolvedHeatPools}
             variant="team"
             roleTag={player.roleTag}
@@ -921,16 +972,7 @@ export default function TeamProfileNewLook({
             onOpen={() => onOpenPlayer(player.playerId, player.activePlayerId)}
             title={`${player.name} öffnen`}
             economyStats={[
-              {
-                label: "MW",
-                value: formatNlNumber(player.marketValue, 2),
-                delta:
-                  isFiniteNumber(player.marketValueDelta) && Math.abs(player.marketValueDelta) >= 0.01
-                    ? formatSignedNlNumber(player.marketValueDelta, 2)
-                    : null,
-                deltaClass: getMoneyDeltaClass(player.marketValueDelta, "higher"),
-                title: getGameTermTooltip("MW") ?? undefined,
-              },
+              buildRosterSaleValueStat(player),
               {
                 label: "Gehalt",
                 value: formatNlNumber(player.salary, 2),

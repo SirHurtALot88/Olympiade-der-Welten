@@ -18,6 +18,17 @@ export type TeamDetailDrawerPlayerCard = {
   ppsRank: number | null;
   marketValue: number | null;
   marketValueDelta: number | null;
+  /**
+   * Der in DIESER Saison erzielbare Verkaufspreis (`exitValue` aus
+   * `buildTeamContractSeasonTable`) — dieselbe Zahl, die die Verträge-Karte als „VK" zeigt,
+   * und dieselbe, gegen die die KI ihre Verkäufe rechnet. Bewusst NEBEN `marketValue`:
+   * der Marktwert ist die Bewertung, der Verkaufswert das Angebot inklusive Verkaufsfaktor
+   * (Alter, Restlaufzeit, Form …). Auf der Kaderkarte steht der Verkaufswert vorn, weil die
+   * Frage dort „was bekomme ich dafür" lautet, nicht „was ist er auf dem Papier wert".
+   */
+  saleValue?: number | null;
+  /** Verkaufswert − Marktwert (`exitValue` − `marketValueAtExit`): der Auf-/Abschlag des Verkaufsfaktors. */
+  saleValueVsMarketValue?: number | null;
   salary: number | null;
   salaryDelta: number | null;
   contractLength: number | null;
@@ -26,6 +37,23 @@ export type TeamDetailDrawerPlayerCard = {
   d2Label: string;
   d2Score: number | null;
   coreStats: {
+    pow: number | null;
+    powRank: number | null;
+    spe: number | null;
+    speRank: number | null;
+    men: number | null;
+    menRank: number | null;
+    soc: number | null;
+    socRank: number | null;
+  };
+  /**
+   * SAISON-PPs je Achse samt ligaweitem Rang — NICHT zu verwechseln mit `coreStats`, das die
+   * Attributwerte (POW 29, SPE 35 …) trägt. Genau diese Verwechslung war der Grund, warum die
+   * PPs auf der Kaderkarte nie auftauchten: die Karte bekam vier POW/SPE/MEN/SOC-Zahlen
+   * geliefert, nur eben die falschen. Quelle ist `PlayerRatingContractRow.ppPow/…` — dieselbe,
+   * aus der die Spielertabelle ihre Achsenspalten speist.
+   */
+  axisPps?: {
     pow: number | null;
     powRank: number | null;
     spe: number | null;
