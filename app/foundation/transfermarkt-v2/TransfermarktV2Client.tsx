@@ -671,11 +671,22 @@ export default function TransfermarktV2Client({
   const transferCanBuy = transferWindow?.canBuy ?? true;
   const transferCanSell = transferWindow?.canSell ?? true;
   const marketReadOnlyReason = "Transferfenster geschlossen — nur Ansicht.";
-  const marketWindowNotice = transferWindowOpen
-    ? null
-    : transferWindow?.phaseLabel
+  /**
+   * „Offen" ist nicht dasselbe wie „kaufen erlaubt". Kaufen und Verkaufen liegen in getrennten
+   * Fenstern (`transfer-window-policy.ts`): am Saisonende wird verkauft und verlaengert, gekauft
+   * wird in der neuen Saison vor dem ersten Spieltag. Vorher fiel dieser Hinweis auf `null`,
+   * sobald irgendein Fenster offen war — der Markt sah dann normal aus und der Kauf-Knopf war
+   * ohne erkennbaren Grund tot.
+   */
+  const marketWindowNotice = !transferWindowOpen
+    ? transferWindow?.phaseLabel
       ? `Transferfenster geschlossen (${transferWindow.phaseLabel}) — Markt und Scouting bleiben offen, Kauf und Verkauf sind gesperrt.`
-      : `${marketReadOnlyReason} Markt und Scouting bleiben sichtbar, Kauf und Verkauf sind gesperrt.`;
+      : `${marketReadOnlyReason} Markt und Scouting bleiben sichtbar, Kauf und Verkauf sind gesperrt.`
+    : !transferCanBuy
+      ? "Verkaufsfenster der Saisonwende — verkaufen und verlängern ist offen. Gekauft wird erst in der neuen Saison, vor dem 1. Spieltag."
+      : !transferCanSell
+        ? "Kaufphase — kaufen ist offen. Das Verkaufsfenster dieser Saisonwende ist vorbei."
+        : null;
   const roomContextRef = useRef<FoundationRoomContext | null>(roomContextProp ?? readFoundationRoomContextFromLocation());
   useEffect(() => {
     roomContextRef.current = roomContextProp ?? readFoundationRoomContextFromLocation();
@@ -2168,7 +2179,11 @@ export default function TransfermarktV2Client({
       : formatTransfermarktCurrency(previewAnnualSalary);
   const dealOpenDisabledReason =
     !transferCanBuy
-      ? marketReadOnlyReason
+      ? // Ist gleichzeitig das Verkaufsfenster offen, ist „Transferfenster geschlossen" schlicht
+        // falsch — dann ist nur das KAUFEN dran und der Spieler braucht den Termin dafuer.
+        transferCanSell
+        ? "Gerade ist das Verkaufsfenster offen — gekauft wird in der neuen Saison, vor dem 1. Spieltag."
+        : marketReadOnlyReason
       : !selectedTeamId
         ? "Bitte erst ein Team wählen."
         : !selectedPlayer

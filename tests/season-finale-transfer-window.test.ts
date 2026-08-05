@@ -49,13 +49,53 @@ describe("Saisonabschluss: die Checkliste verspricht nichts, was die Phase verbi
     }
   });
 
-  it("die erste Station des Transferfensters oeffnet alle vier auf einmal", () => {
+  it("die erste Station oeffnet Verkaufen, Verlaengern und Training — aber NICHT Kaufen", () => {
     // Deshalb reicht EIN Schritt in der Liste: `preseason_management` schaltet Verhandeln,
-    // Verkaufen, Kaufen und Training gemeinsam frei — es braucht keine vier Zeilen dafuer.
+    // Verkaufen und Training gemeinsam frei — es braucht keine drei Zeilen dafuer.
     const state = mkState("preseason_management");
-    for (const action of ["renew_contract", "sell_players", "buy_players", "set_training"] as const) {
+    for (const action of ["renew_contract", "sell_players", "set_training"] as const) {
       expect(evaluateGamePhaseAction(state, action).allowed, `${action} sollte offen sein`).toBe(true);
     }
+
+    // GEMELDET: „Man soll noch NICHT kaufen. Kaufen findet in S2 vor MD1 statt! Das muss sauber
+    // getrennt sein". War es nicht: `preseason_management` stand in `TRANSFER_BUY_PHASES`, der
+    // Knopf im Saisonabschluss schaltete genau dorthin, und die Zeile sagte es sogar laut
+    // („verkaufen und kaufen sind freigeschaltet"). Ohne den Fix ist diese Zeile rot.
+    const kauf = evaluateGamePhaseAction(state, "buy_players");
+    expect(kauf.allowed, "Kaufen gehoert nicht ans Saisonende").toBe(false);
+    expect(kauf.reason).toBe("phase_blocked:buy_players:preseason_management");
+  });
+
+  it("Kaufen oeffnet dort, wo Chris es haben will: neue Saison, vor dem 1. Spieltag", () => {
+    // Der Weg, den die Checkliste selbst geht — verkaufen/verlaengern, dann „Neue Saison
+    // starten". Danach steht der Spielstand auf `season_active` mit offenem Spieltag 1, und
+    // GENAU dort geht das Kaufen auf (`isEarlySeasonTransferSetup`).
+    const neueSaison = {
+      gamePhase: "season_active",
+      season: { id: "s2", currentMatchday: 1, matchdayIds: Array.from({ length: 10 }, (_, i) => `s2-md-${i + 1}`) },
+      matchdayState: { matchdayId: "s2-md-1", status: "open" },
+      seasonState: { matchdayResults: [] },
+    } as never;
+
+    expect(evaluateGamePhaseAction(neueSaison, "buy_players").allowed).toBe(true);
+  });
+
+  it("die beiden Fenster ueberlappen nirgends", () => {
+    // „Das muss sauber getrennt sein" als Regel, nicht als Einzelfall: es darf KEINE
+    // Saisonende-Phase geben, in der Kaufen und Verkaufen gleichzeitig offen sind.
+    const beide: GamePhase[] = [];
+    for (const step of SEASON_TRANSITION_STEPS) {
+      const phase = getPhaseAfterStep(step);
+      if (!phase) continue;
+      const state = mkState(phase);
+      if (
+        evaluateGamePhaseAction(state, "buy_players").allowed &&
+        evaluateGamePhaseAction(state, "sell_players").allowed
+      ) {
+        beide.push(phase);
+      }
+    }
+    expect(beide, "Phasen mit gleichzeitig offenem Kauf- und Verkaufsfenster").toEqual([]);
   });
 
   it("die Liste liest die Regel, statt sie nachzubauen", () => {
@@ -71,8 +111,18 @@ describe("Saisonabschluss: die Checkliste verspricht nichts, was die Phase verbi
     // Der Kern der Meldung: ein Knopf, der irgendwohin fuehrt, wo die Handlung gesperrt ist.
     const text = panel();
     const zeile = text.slice(text.indexOf('key: "contracts"'), text.indexOf('key: "next-season"'));
-    expect(zeile).toContain("transferWindowOpen ? { label: \"Zum Kader\"");
-    expect(zeile).toContain("Verhandeln geht erst, wenn das Transferfenster offen ist.");
+    expect(zeile).toContain("sellWindowOpen ? { label: \"Zum Kader\"");
+    expect(zeile).toContain("Verhandeln geht erst, wenn das Verkaufsfenster offen ist.");
+  });
+
+  it("die Zeile verspricht kein Kaufen mehr — und sagt, wann es dran ist", () => {
+    // Die Beschriftung war der zweite Teil der Meldung: „Transferfenster öffnen" klang nach
+    // allem auf einmal. Sie heisst jetzt nach dem, was sie wirklich aufmacht.
+    const text = panel();
+    const zeile = text.slice(text.indexOf('key: "transfer-window"'), text.indexOf('key: "contracts"'));
+    expect(zeile).toContain('title: "Verkäufe & Verträge öffnen"');
+    expect(zeile).not.toContain("verkaufen und kaufen sind freigeschaltet");
+    expect(zeile).toContain("vor dem 1. Spieltag");
   });
 });
 

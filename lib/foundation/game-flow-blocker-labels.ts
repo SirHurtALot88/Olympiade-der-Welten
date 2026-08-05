@@ -78,12 +78,16 @@ export function formatGameFlowBlocker(reason: string) {
     return "Mindestens ein Team hat noch keinen berechenbaren Cash-nachher-Wert.";
   }
 
+  // Kaufen und Verkaufen liegen in VERSCHIEDENEN Fenstern (`transfer-window-policy.ts`): am
+  // Saisonende wird verkauft und verlaengert, gekauft wird in der neuen Saison vor dem ersten
+  // Spieltag. Beide Meldungen sagten vorher pauschal „im Transferfenster" — das half genau dann
+  // nicht, wenn ein Fenster offen war und trotzdem gesperrt blieb, was man gerade wollte.
   if (reason.startsWith("phase_blocked:buy_players:")) {
-    return "Kaufphase ist geschlossen — Transfers sind nur im Transferfenster oder vor dem ersten Resultat möglich.";
+    return "Kaufen ist gerade gesperrt — gekauft wird in der neuen Saison vor dem 1. Spieltag, nicht am Saisonende.";
   }
 
   if (reason.startsWith("phase_blocked:sell_players:")) {
-    return "Verkaufsphase ist geschlossen — Verkäufe sind nur im Transferfenster oder vor dem ersten Resultat möglich.";
+    return "Verkaufen ist gerade gesperrt — verkauft wird am Saisonende, nachdem der letzte Spieltag gerechnet ist.";
   }
 
   if (reason.startsWith("phase_blocked:sponsor_choice:")) {
