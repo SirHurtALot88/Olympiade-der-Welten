@@ -10,8 +10,8 @@
  *
  * `FoundationPageClient.tsx` re-imports everything it needs from here; a
  * handful of previously `export`ed types are re-exported from the parent so
- * existing consumers (`cockpit-types.ts`, `foundation-shared-context.tsx`,
- * `cockpit-handlers.ts`) keep working unchanged.
+ * existing consumers (`cockpit-types.ts`, `cockpit-handlers.ts`) keep working
+ * unchanged.
  */
 import type { ContractShape, GameState, NewGameFlowStepId, RosterEntry, TeamControlMode, TeamControlSettings, TeamIdentity, TeamStrategyBias, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 import type { FacilityId, SpecialistWingVariant } from "@/lib/facilities/facility-catalog";

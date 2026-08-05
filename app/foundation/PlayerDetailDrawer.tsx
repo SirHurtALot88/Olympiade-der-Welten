@@ -1715,11 +1715,14 @@ export default function PlayerDetailDrawer({
 }: {
   data: PlayerDetailDrawerData | null;
   /**
-   * Voller GameState, durchgereicht vom Render-Ort (Profil-Seite über
-   * `PlayerProfileClient`), da der `FoundationStateProvider` im Foundation-Shell
-   * nicht mehr gemountet wird und `useFoundationStateOptional()` hier dauerhaft
-   * `null` liefert. Speist den Werdegang/Karriere-Verlauf; bevorzugt vor dem
-   * (toten) Kontext: `gameState ?? foundationState?.gameState`.
+   * Voller GameState, optional durchgereicht vom Render-Ort. Speist den
+   * Werdegang/Karriere-Verlauf; bevorzugt vor dem Kontext:
+   * `gameState ?? foundationState?.gameState`. `FoundationStateProvider` ist
+   * inzwischen um `FoundationShellRouterBody` gemountet (`FoundationPageClient.tsx`)
+   * und liefert innerhalb der Foundation-Shell (u. a. über `PlayerProfileClient`)
+   * einen echten Wert — dieses Prop bleibt trotzdem der Vorrang-Pfad, weil die
+   * Drawer auch ausserhalb dieser Shell rendert (z. B. `LegacyResolveLabClient`),
+   * wo `useFoundationStateOptional()` weiterhin `null` liefert.
    */
   gameState?: GameState | null;
   onClose: () => void;
@@ -1824,14 +1827,14 @@ export default function PlayerDetailDrawer({
     setComparePlayerBData(null);
   }, [data?.playerId]);
 
-  // Bugfix: `useFoundationStateOptional()` liefert hier dauerhaft `null` — der
-  // App-weite Foundation-State-Context wird nirgends mit einem echten Value
-  // gemountet (kein `<FoundationStateProvider>` in der Komponenten-Baum). Der
-  // Picker konnte dadurch nie Kandidaten anzeigen, weder mit noch ohne
-  // Sucheingabe: `compareCandidates` brach immer auf `!werdegangGameState` ab.
-  // Fix: eigene, schlanke Kopie des Savegames direkt über den bestehenden
-  // `/api/singleplayer-state`-Read-Endpoint laden (denselben, den auch der
-  // reguläre Spielstand-Loader nutzt) statt auf den toten Context zu warten.
+  // Bewusst eine EIGENE, unabhaengige Kopie des Savegames laden statt einfach
+  // `werdegangGameState` (Prop bzw. `FoundationStateProvider`-Kontext) zu
+  // nehmen: der Picker soll ggf. gegen ein ANDERES Save/Source vergleichen
+  // koennen als das aktuell aktive (`data?.source === "prisma"`, `saveId` aus
+  // der URL) — beides hat mit dem aktiven Kontext-Wert nichts zu tun.
+  // Zusaetzlich rendert die Drawer auch ausserhalb der Foundation-Shell (z. B.
+  // `LegacyResolveLabClient`), wo weder Prop noch Kontext einen GameState
+  // liefern — auch dort bleibt dieser eigene Read-Endpoint-Load der einzige Weg.
   const [compareRosterGameState, setCompareRosterGameState] = useState<GameState | null>(null);
   const [compareRosterSaveId, setCompareRosterSaveId] = useState<string | null>(null);
   const [compareRosterLoading, setCompareRosterLoading] = useState(false);

@@ -86,10 +86,12 @@ function appendDeltaSource(baseTitle: string, deltaSourceLabel: string | null | 
 export type PlayerHeroNewLookProps = {
   data: PlayerDetailDrawerData;
   /**
-   * Voller GameState, durchgereicht vom Render-Ort (Profil-Seite/Drawer), da der
-   * `FoundationStateProvider` im Foundation-Shell nicht mehr gemountet wird und
-   * `useFoundationStateOptional()` hier dauerhaft `null` liefert. Wird bevorzugt
-   * vor dem (toten) Kontext genutzt: `gameState ?? foundationState?.gameState`.
+   * Voller GameState, optional durchgereicht vom Render-Ort (Profil-Seite/Drawer).
+   * Wird bevorzugt vor dem Kontext genutzt: `gameState ?? foundationState?.gameState`.
+   * `FoundationStateProvider` ist um `FoundationShellRouterBody` gemountet
+   * (`FoundationPageClient.tsx`) und liefert innerhalb der Foundation-Shell einen
+   * echten Wert; ausserhalb davon (Storybook/Isolation, ältere Standalone-
+   * Render-Orte) bleibt `foundationState` `null` und dieses Prop der einzige Weg.
    */
   gameState?: GameState | null;
   /** Bereits formatiertes Rollen-Label (formatRoleTag im Drawer), z. B. "Starter". */
@@ -118,7 +120,9 @@ export default function PlayerHeroNewLook({
   // Foundation-Kontext (z. B. Storybook/Isolation) bleibt es bei `null` —
   // dann liefert `formatLeaguePercentile` schlicht kein Perzentil-Label.
   const foundationState = useFoundationStateOptional();
-  // Prop zuerst (durchgereichter GameState), dann der (tote) Kontext als Fallback.
+  // Prop zuerst (durchgereichter GameState), dann der Kontext als Fallback —
+  // der liefert innerhalb der Foundation-Shell inzwischen einen echten Wert
+  // (siehe `PlayerHeroNewLookProps.gameState`), aber nicht ausserhalb davon.
   const resolvedGameState = gameState ?? foundationState?.gameState ?? null;
   // Perzentil-Nenner MUSS zum Rang-Pool passen: OVR/PPs/MVS-Ränge werden in
   // `buildPlayerRatingContractMap` gegen die AKTIVEN (rostierten) Spieler

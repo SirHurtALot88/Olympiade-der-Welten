@@ -6,7 +6,6 @@ import dynamic from "next/dynamic";
 import { FoundationDeferredMount } from "@/lib/foundation/FoundationDeferredMount";
 import { getSeasonEndPayoutStatus } from "@/lib/season/season-end-sponsor-payout-status";
 import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
-import { FoundationSharedProvider } from "@/lib/foundation/foundation-shared-context";
 import { FoundationShellRouterCockpit, FoundationShellRouterHistoryV2, FoundationShellRouterMarketSell, FoundationShellRouterMarketV2, FoundationShellRouterMatchdayResult, FoundationShellRouterPrize, FoundationShellRouterSeasonPreview, FoundationShellRouterTeams, FoundationShellRouterTraining } from "@/app/foundation/FoundationShellRouter";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import ContractRenewalNegotiationModal from "@/app/foundation/teams-v2/ContractRenewalNegotiationModal";
@@ -190,9 +189,9 @@ import { canAdvanceMatchdayFromStep } from "@/lib/foundation/resolve-game-flow-a
 // only ever mounted behind a single `activeView === "…"` (or equivalent)
 // gate below, so lazy-loading them via next/dynamic lets each view's chunk
 // compile on demand instead of all up front. ssr:false is used throughout:
-// this shell only ever renders client-side (see FoundationSharedProvider /
-// the "use client" pragma above and the `gameState.season.id === "loading"`
-// bootstrap gate), so there is no server-rendered markup for these panels to
+// this shell only ever renders client-side (see the "use client" pragma
+// above and the `gameState.season.id === "loading"` bootstrap gate), so
+// there is no server-rendered markup for these panels to
 // match — ssr:false simply skips a wasted server render of code that would
 // never produce visible output pre-hydration anyway. `prefetchFoundationPanel`
 // (lib/foundation/foundation-panel-prefetch.ts) already calls `import(...)`
@@ -957,7 +956,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
 
   return (
     (
-    <FoundationSharedProvider>
     <main
       className="app-shell foundation-shell foundation-app is-new-look"
       data-view-width={viewWidthMode}
@@ -3126,7 +3124,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
       </div>
       </FoundationShell>
     </main>
-    </FoundationSharedProvider>
   )
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 
 import FoundationCockpitPanel, {
   type FoundationCockpitPanelProps,
@@ -12,7 +12,6 @@ import type {
   MultiSeasonBalancePlayerRow,
   MultiSeasonBalanceTeamRow,
 } from "@/lib/foundation/multiseason-balance-dashboard";
-import { useFoundationShared } from "@/lib/foundation/foundation-shared-context";
 import {
   createCockpitAiBatchHandlers,
   createCockpitMatchdayApplyHandlers,
@@ -148,6 +147,11 @@ export type FoundationCockpitHostProps = Omit<
   preseasonDeps: FoundationCockpitHostPreseasonDeps;
   seasonTransitionDeps: FoundationCockpitHostSeasonTransitionDeps;
   wholeSeasonMaxMatchdays: number;
+  // Nur hier gebraucht (die Panel selbst setzt den Feed nie) — deshalb kein
+  // Teil von `FoundationCockpitPanelProps`, sondern ein eigenes Host-Prop,
+  // genau wie `cockpitBusyKey` etc. jetzt von der Root-State-Quelle kommt
+  // statt vom entfernten geteilten Shell-Kontext.
+  setCockpitAiBatchApplyFeed: Dispatch<SetStateAction<FoundationCockpitPanelProps["cockpitAiBatchApplyFeed"]>>;
 };
 
 export default function FoundationCockpitHost(props: FoundationCockpitHostProps) {
@@ -165,6 +169,7 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
     wholeSeasonMaxMatchdays,
     formatLocalePoints,
     formatMoney,
+    setCockpitAiBatchApplyFeed,
     ...panelProps
   } = props;
   const [featureAuditFilter, setFeatureAuditFilter] = useState<FeatureAuditFilter>("all");
@@ -234,13 +239,12 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
     if (columnId === "source") return row.source;
     return "—";
   };
-  const {
-    cockpitAiBatchApplyFeed,
-    cockpitAiIncludeWarningTeams,
-    cockpitAiOverwriteExisting,
-    setCockpitAiBatchApplyFeed,
-    setCockpitBusyKey,
-  } = useFoundationShared();
+  // Kommt jetzt aus `panelProps` (Root-State-Quelle, `use-foundation-page-state.ts`)
+  // statt aus dem entfernten geteilten Shell-Kontext — siehe Kommentar bei
+  // `cockpitAiBatchApplyFeed` in `FoundationCockpitPanelProps`. `setCockpitAiBatchApplyFeed`
+  // bleibt ein eigenes Host-Prop (die Panel selbst setzt den Feed nie).
+  const { cockpitAiBatchApplyFeed, cockpitAiIncludeWarningTeams, cockpitAiOverwriteExisting, setCockpitBusyKey } =
+    panelProps;
 
   const aiBatchHandlers = useMemo(
     () =>

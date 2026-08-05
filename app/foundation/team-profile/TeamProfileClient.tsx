@@ -11,7 +11,11 @@ export type TeamProfileClientProps = {
   onOpenPlayer: (playerId: string, activePlayerId: string) => void;
   onOpenContracts?: () => void;
   leagueHeatPools?: LeaguePlayerHeatPools;
-  /** Voller GameState — die Team-Profil-Seite liegt außerhalb des FoundationStateProvider. */
+  /**
+   * Voller GameState, optional — siehe `TeamProfileNewLookProps.gameState`:
+   * `FoundationStateProvider` liefert innerhalb der Foundation-Shell inzwischen
+   * einen echten Fallback-Wert, dieses Prop bleibt der Vorrang-Pfad.
+   */
   gameState?: GameState | null;
 };
 

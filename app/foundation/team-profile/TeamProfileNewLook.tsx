@@ -444,12 +444,12 @@ export type TeamProfileNewLookProps = {
   onOpenContracts?: () => void;
   leagueHeatPools?: LeaguePlayerHeatPools;
   /**
-   * Voller GameState direkt als Prop. Die Team-Profil-Seite wird im Shell nicht
-   * innerhalb des `FoundationStateProvider` gemountet, deshalb liefert der
-   * optionale Kontext dort `null` — was RANG-/CASH-/MW-/GEHALT-Hover und das
-   * volle Squad-Depth-Chart auf "Kein Ligakontext" degradieren ließ. Wird der
-   * GameState als Prop durchgereicht (Shell hat ihn im Scope), nutzen wir ihn
-   * bevorzugt und der Kontext bleibt nur Fallback.
+   * Voller GameState, optional direkt als Prop. `FoundationStateProvider` ist
+   * um `FoundationShellRouterBody` gemountet (`FoundationPageClient.tsx`) und
+   * liefert dort inzwischen einen echten Wert für RANG-/CASH-/MW-/GEHALT-Hover
+   * und das volle Squad-Depth-Chart. Dieses Prop bleibt trotzdem der
+   * Vorrang-Pfad — der Kontext ist nur innerhalb dieser Shell gemountet, nicht
+   * an jedem denkbaren Render-Ort von `TeamProfileNewLook`.
    */
   gameState?: GameState | null;
 };
