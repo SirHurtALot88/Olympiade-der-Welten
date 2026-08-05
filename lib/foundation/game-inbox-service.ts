@@ -10,6 +10,7 @@ import type {
   Team,
   TeamControlSettings,
 } from "@/lib/data/olyDataTypes";
+import { buildSeasonRecap } from "@/lib/foundation/season-recap-service";
 import { getInjuryRiskPercent, getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 import { buildTeamControlSettingsMap, DEFAULT_ACTIVE_OWNER_ID, getTeamOwner } from "@/lib/foundation/team-control-settings";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
@@ -1285,6 +1286,44 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
         createdAt: latestCompletedSnapshot.archivedAt ?? createdAt,
       }),
     );
+  }
+
+  /**
+   * SAISONENDE-RÜCKBLICK (`season-recap-service.ts`) — max. 6 Karten über die letzte abgeschlossene
+   * Saison, im Bericht-Raum der Inbox.
+   *
+   * `source: "story:season_recap"` sorgt dafür, dass sie über `isGameInboxChronicleItem` automatisch
+   * im dritten Raum landen („Berichte & Momente — Was ist passiert?") und nie im Handeln-Raum:
+   * ein Rückblick ist nie eine Aufgabe.
+   *
+   * `teamId: null` bei den Liga-Karten ist nicht kosmetisch — `filterGameInboxItems` würde eine
+   * Karte mit fremder `teamId` beim aktiven Team-Filter wegfiltern. Nur die persönliche
+   * Zeugnis-Karte trägt eine, und die ist ohnehin für genau dieses Team gedacht.
+   *
+   * `createdAt` ist der Archivierungszeitpunkt des Snapshots, damit die Karten in der Sortierung
+   * dorthin fallen, wo das Ereignis war, statt sich beim jedem Inbox-Aufbau nach oben zu schieben.
+   */
+  const recap = buildSeasonRecap({ gameState: input.gameState, eigeneTeamIds: visibleTeamIds });
+  if (recap) {
+    for (const entry of recap.entries) {
+      if (entry.teamId && !teamVisible(entry.teamId)) continue;
+      items.push(
+        createItem({
+          itemId: `season_recap:${input.saveId}:${recap.seasonId}:${entry.slot}:${entry.teamId ?? "liga"}`,
+          saveId: input.saveId,
+          seasonId: recap.seasonId,
+          teamId: entry.teamId,
+          category: "news",
+          severity: "info",
+          title: entry.title,
+          description: entry.description,
+          targetView: entry.targetView,
+          targetParams: entry.targetParams,
+          source: "story:season_recap",
+          createdAt: recap.archivedAt,
+        }),
+      );
+    }
   }
 
   for (const log of input.gameState.seasonState.cashPrizeApplyLogs ?? []) {
