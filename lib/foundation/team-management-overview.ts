@@ -1,4 +1,5 @@
 import type { GameState, Player, RosterEntry, Team } from "@/lib/data/olyDataTypes";
+import type { SeasonGuvPosten } from "@/lib/finance/season-end-guv";
 import { normalizeEconomyMoney, resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
 import { roundValue } from "@/lib/foundation/foundation-number-utils";
@@ -24,6 +25,8 @@ type TeamManagementSnapshotStanding = {
   sponsorTotal?: number | null;
   sponsorSeason?: number | null;
   guv?: number | null;
+  /** Aufschlüsselung der GuV in ihre Posten — kommt aus dem Feed, damit der Hover nichts neu rechnet. */
+  guvPosten?: SeasonGuvPosten[] | null;
   cashTotal?: number | null;
   form?: number | null;
   transfers?: number | null;
@@ -133,6 +136,11 @@ export type TeamManagementSnapshotRow = {
   sponsorTotal: number | null;
   sponsorSeason: number | null;
   guv: number | null;
+  /**
+   * Die Posten, aus denen `guv` besteht — IMMER vollständig, auch die mit 0. Chris: „bitte alles was
+   * berechnet wird dann auch in das Hover rein bringen damit man es sieht selbst wenn es 0 ist."
+   */
+  guvPosten: SeasonGuvPosten[] | null;
   cashTotal: number | null;
   historicalPow: number | null;
   historicalSpe: number | null;
@@ -649,6 +657,7 @@ function buildTeamSeasonOverviewRowsUncached(input: TeamManagementSnapshotInput)
       sponsorTotal: standing?.sponsorTotal ?? null,
       sponsorSeason,
       guv: standing?.guv ?? null,
+      guvPosten: standing?.guvPosten ?? null,
       cashTotal: standing?.cashTotal ?? null,
       historicalPow: allTimeRow?.historicalPow ?? null,
       historicalSpe: allTimeRow?.historicalSpe ?? null,
@@ -713,6 +722,26 @@ function buildTeamSeasonOverviewRowsUncached(input: TeamManagementSnapshotInput)
       };
     });
 
+  /**
+   * GEMELDET VON CHRIS („ROTER ALARM"): die GuV-Spalte wies dicke Gewinne aus, während dieselben
+   * Teams mit NEGATIVEM Cash aus der Saison gingen.
+   *
+   * DIE URSACHE STAND HIER. Bis zu diesem Fix gewann `prizeSummary` gegen den echten Wert:
+   *
+   *     guv: normalizeEconomyMoney(prizeSummary?.profitLoss ?? row.guv) ?? …
+   *
+   * `prizeSummary` kommt aus `buildTeamPrizeSummary` → `prize-money.ts`, also aus der ABGESCHAFFTEN
+   * Preisgeldkurve (`CASH_PRIZE_BENCHMARK_ONLY = true`, wird nie ausgezahlt). Weil `??` nur bei
+   * `null`/`undefined` weiterfällt und der Benchmark für JEDE Zeile eine Zahl liefert, war
+   * `row.guv` — der Wert, der wirklich gebucht wird — ein toter Fallback. Der Benchmark kennt weder
+   * Gebäude noch Apron noch Kredite noch Vorstandsziele; bei Rang `null` (→ `rank ?? 0`) fiel er
+   * zusätzlich auf „Basis 0 minus Gehälter" zurück. Dazu skalierte `normalizeEconomyMoney` jeden
+   * Betrag über 1000 still durch 100 — asymmetrisch, denn unter −1000 blieb er unangetastet.
+   *
+   * JETZT: der echte Stand gewinnt, der Benchmark füllt nur noch Spalten, die es ohne ihn gar nicht
+   * gäbe (Cash-Forecast). Für GuV und Sponsorsumme gibt es KEINEN Preisgeld-Rückfall mehr — fehlt
+   * der echte Wert, steht dort nichts. Eine leere Zelle ist ehrlich; eine falsche Zahl war der Bug.
+   */
   const prizeSummaryByTeamId = new Map(
     buildTeamPrizeSummary(
       rowsWithDerivedRanks.map((row) => ({
@@ -736,13 +765,14 @@ function buildTeamSeasonOverviewRowsUncached(input: TeamManagementSnapshotInput)
       const prizeSummary = prizeSummaryByTeamId.get(row.teamId) ?? null;
       return {
         ...row,
-        cashFc: prizeSummary?.cashForecast ?? row.cashFc ?? null,
-        sponsorBasis: prizeSummary?.basis ?? row.sponsorBasis ?? null,
-        sponsorRank: prizeSummary?.placementBonus ?? row.sponsorRank ?? null,
-        sponsorSeason: prizeSummary?.sponsorSeason ?? row.sponsorSeason ?? null,
-        sponsorTotal: normalizeEconomyMoney(prizeSummary?.sponsorTotal ?? row.sponsorTotal) ?? prizeSummary?.sponsorTotal ?? row.sponsorTotal ?? null,
-        guv: normalizeEconomyMoney(prizeSummary?.profitLoss ?? row.guv) ?? prizeSummary?.profitLoss ?? row.guv ?? null,
-        cashTotal: prizeSummary?.cashTotal ?? row.cashTotal ?? null,
+        cashFc: row.cashFc ?? prizeSummary?.cashForecast ?? null,
+        sponsorBasis: row.sponsorBasis ?? prizeSummary?.basis ?? null,
+        sponsorRank: row.sponsorRank ?? prizeSummary?.placementBonus ?? null,
+        sponsorSeason: row.sponsorSeason ?? prizeSummary?.sponsorSeason ?? null,
+        sponsorTotal: row.sponsorTotal ?? null,
+        guv: row.guv ?? null,
+        guvPosten: row.guvPosten ?? null,
+        cashTotal: row.cashTotal ?? prizeSummary?.cashTotal ?? null,
       };
     })
     .sort((left, right) => {
@@ -859,6 +889,7 @@ export function buildLightweightTeamSeasonStandRows(input: {
         sponsorTotal: standing?.sponsorTotal ?? null,
         sponsorSeason: standing?.sponsorSeason ?? null,
         guv: standing?.guv ?? null,
+        guvPosten: standing?.guvPosten ?? null,
         cashTotal: standing?.cashTotal ?? null,
         historicalPow: null,
         historicalSpe: null,

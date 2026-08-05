@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
+import type { SeasonGuvPosten } from "@/lib/finance/season-end-guv";
 import {
   buildLightweightTeamSeasonStandRows,
   buildTeamSeasonOverviewRows,
@@ -21,6 +22,7 @@ type SeasonStandingsFeedItem = {
   sponsorRank: number | null;
   sponsorTotal: number | null;
   guv: number | null;
+  guvPosten: SeasonGuvPosten[] | null;
   cashTotal: number | null;
   form: number | null;
   transfers: number | null;
@@ -106,6 +108,7 @@ export function useSeasonStandRows(input: UseSeasonStandRowsInput): { seasonStan
           sponsorRank: item.sponsorRank,
           sponsorTotal: item.sponsorTotal,
           guv: item.guv,
+          guvPosten: item.guvPosten ?? null,
           cashTotal: item.cashTotal,
           form: item.form,
           transfers: item.transfers,

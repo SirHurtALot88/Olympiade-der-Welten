@@ -57,6 +57,8 @@ export type SeasonV2StandingsRow = {
   soc: number | null;
   cash: number | null;
   salaryTotal: number | null;
+  /** Posten der EINEN GuV — vollständig, auch die mit 0. Speist den GuV-Hover. */
+  guvPosten?: import("@/lib/finance/season-end-guv").SeasonGuvPosten[] | null;
   /** Gebäude-Unterhalt p.a. (Summe der Season-Upkeeps gebauter Anlagen). */
   buildingCost: number | null;
   guv: number | null;
