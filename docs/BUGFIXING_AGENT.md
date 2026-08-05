@@ -496,3 +496,35 @@ Nie direkt nach main pushen — jeder Fix läuft über Branch und PR. Rohmeldung
 | Meldungen vom Live-Server holen | `deploy/hetzner/push-bug-reports.sh` |
 | Volume gegen Datenverlust | `deploy/hetzner/docker-compose.yml` |
 | Tests | `tests/bug-report-service.test.ts`, `tests/bug-report-triage.test.ts` |
+
+---
+
+## Stehende Anweisung von Chris (2026-08-04)
+
+> „bitte die meldungen immer screenen und wenn sie von mir sind kannst du die step by step
+> abarbeiten ohne dass du rückfragen stellen musst, balancing können wir am ende noch anpassen und
+> an schrauben drehen wenn es da mal themen gibt!"
+
+Drei Dinge folgen daraus, und sie gelten ab sofort für jeden Lauf:
+
+**1. Meldungen werden JEDE Runde gelesen, nicht nur gezählt.** Die Billig-Vorprüfung sagt nur, ob
+etwas Neues da ist. Was drinsteht, wird gelesen — der Text (`note`), die Seite und der Spielstand.
+Vier Meldungen sind an einem Nachmittag liegengeblieben, weil niemand über die Id hinaussah; zwei
+davon waren derselbe Wunsch, doppelt abgeschickt, und eine war eine echte Fehlfunktion zwischen zwei
+Wünschen. Das sieht man nur, wenn man hineinschaut.
+
+**2. Meldungen von Chris werden Schritt für Schritt abgearbeitet, ohne Rückfrage.** Die Meldung IST
+die Freigabe — auch für Wünsche, Umbauten und Anzeige-Änderungen. Nicht sammeln, nicht nachfragen,
+nicht auf eine Bestätigung warten. Eine Rückfrage kostet ihn eine Runde und bringt nichts, was nicht
+in der Meldung steht.
+
+**3. Balancing ist KEIN Blocker mehr.** Bisher galt „Balance-Fragen wartet auf Chris" und Punkte wie
+die Fatigue-Balance lagen deshalb still. Seine Ansage: an den Schrauben wird am Ende gedreht, wenn
+es Themen gibt. Also bauen, was gemeldet ist, und die Zahl notieren, an der man später drehen würde
+— statt den Punkt liegenzulassen, bis jemand eine Zahl bestätigt.
+
+**Was das NICHT aufhebt.** Die drei harten Grenzen bleiben, sie sind keine Rückfragen, sondern
+Sicherungen: kein Fix ohne belegte Ursache, keine Migration bestehender Spielstände, kein Umbau von
+Persistenz, Auth, Save-Auflösung oder Scoring. Stößt eine Meldung dagegen, wird nicht gefragt,
+sondern ein Befund geschrieben — mit dem, was nötig wäre. Ebenso bleibt: ein Test, der ohne den Fix
+nachweislich rot ist, mit AUSGEFÜHRTER Gegenprobe. Ohne Rückfrage heißt nicht ohne Beleg.

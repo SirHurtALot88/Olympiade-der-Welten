@@ -65,7 +65,11 @@ Gehaltsmechanik. Ein Befund ist hier ein vollwertiges Ergebnis.
 
 ## Wartet auf Chris — nicht selbst entscheiden
 
-- **Fatigue-Balance.** Eine Balance-Frage, keine Fehlfunktion.
+Kürzer geworden: Chris hat am 2026-08-04 angesagt, dass Balancing **kein** Blocker ist („balancing
+können wir am ende noch anpassen und an schrauben drehen wenn es da mal themen gibt"). Was vorher
+wegen einer Zahl stillstand, wird jetzt gebaut; die Schraube wird notiert, nicht abgewartet.
+
+- ~~**Fatigue-Balance.**~~ Kein Blocker mehr — bauen, Schraube notieren.
 - **Cash-danach-Spalte.** Blockiert, bis geklärt ist, ob `team.cash` realisierte Transfers schon
   enthält. Ohne diese Antwort zeigt die Spalte eine doppelt gezählte Zahl.
 - **Eigenständige Routine** in der Routinen-Oberfläche (`docs/BUGFIXING_ROUTINE_EINRICHTEN.md`). Die
