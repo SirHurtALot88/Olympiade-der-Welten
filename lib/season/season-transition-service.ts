@@ -8,6 +8,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { applySeasonEndPotentialUpdates } from "@/lib/progression/player-potential-service";
 import { runSeasonEndProgressionBatch } from "@/lib/progression/season-end-progression-batch";
+import { patchSeasonSnapshotMarketValueAfterProgression } from "@/lib/season/season-snapshot-service";
 import { buildSeasonReview, type SeasonReview } from "@/lib/season/season-review-service";
 import { getNextStepAfter, getPhaseAfterStep, isStepBehind } from "@/lib/season/season-transition-chain";
 import { SEASON_TRANSITION_STEPS, type SeasonTransitionStepId } from "@/lib/season/season-transition-steps";
@@ -395,8 +396,23 @@ export function advanceSeasonTransitionStep(
           `season_end_progression_deferred:${batch.blockingReasons.join("|")}`,
         ];
       } else {
-        progressionSave = batch.save;
-        progressionWarnings = batch.warnings;
+        /**
+         * SAISONEND-MARKTWERT EINFRIEREN — genau hier, und nirgends sonst.
+         *
+         * Chris: „MW Werte können gerne NACH Apply von Training und MW-Neuberechnung übernommen
+         * werden, weil Training soll übernommen werden bevor Spieler verkauft werden." An dieser
+         * Stelle ist beides passiert (`runSeasonEndProgressionBatch` rechnet Entwicklung UND
+         * Marktwerte neu) und das Transferfenster ist noch zu. Der Snapshot selbst entstand
+         * frueher in der Kette und traegt deshalb noch den Vor-Entwicklungs-Stand.
+         */
+        const eingefroren = patchSeasonSnapshotMarketValueAfterProgression(
+          batch.save.gameState,
+          abgeschlosseneSaisonId,
+        );
+        progressionSave = eingefroren.patched ? { ...batch.save, gameState: eingefroren.gameState } : batch.save;
+        progressionWarnings = eingefroren.patched
+          ? batch.warnings
+          : [...batch.warnings, `season_end_market_value_freeze_skipped:${abgeschlosseneSaisonId}`];
         entwicklungGelaufen = true;
       }
     } catch (error) {
