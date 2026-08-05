@@ -39,6 +39,15 @@ const mkState = (phase: GamePhase) =>
     seasonState: { matchdayResults: [{ seasonId: "s1", matchdayId: "md-10" }] },
   }) as never;
 
+/** Die neue Saison, bevor ihr erster Spieltag gerechnet ist — die Kaufphase. */
+const neueSaison = () =>
+  ({
+    gamePhase: "season_active",
+    season: { id: "s2", currentMatchday: 1, matchdayIds: Array.from({ length: 10 }, (_, i) => `s2-md-${i + 1}`) },
+    matchdayState: { matchdayId: "s2-md-1", status: "open" },
+    seasonState: { matchdayResults: [] },
+  }) as never;
+
 describe("Saisonabschluss: die Checkliste verspricht nichts, was die Phase verbietet", () => {
   it("in season_completed ist WIRKLICH alles gesperrt, was die Liste anbot", () => {
     // Der gemeldete Zustand. Faellt eine dieser Sperren je weg, ist der Schritt „Transferfenster
@@ -70,32 +79,49 @@ describe("Saisonabschluss: die Checkliste verspricht nichts, was die Phase verbi
     // Der Weg, den die Checkliste selbst geht — verkaufen/verlaengern, dann „Neue Saison
     // starten". Danach steht der Spielstand auf `season_active` mit offenem Spieltag 1, und
     // GENAU dort geht das Kaufen auf (`isEarlySeasonTransferSetup`).
-    const neueSaison = {
-      gamePhase: "season_active",
-      season: { id: "s2", currentMatchday: 1, matchdayIds: Array.from({ length: 10 }, (_, i) => `s2-md-${i + 1}`) },
-      matchdayState: { matchdayId: "s2-md-1", status: "open" },
-      seasonState: { matchdayResults: [] },
-    } as never;
-
-    expect(evaluateGamePhaseAction(neueSaison, "buy_players").allowed).toBe(true);
+    expect(evaluateGamePhaseAction(neueSaison(), "buy_players").allowed).toBe(true);
   });
 
-  it("die beiden Fenster ueberlappen nirgends", () => {
-    // „Das muss sauber getrennt sein" als Regel, nicht als Einzelfall: es darf KEINE
-    // Saisonende-Phase geben, in der Kaufen und Verkaufen gleichzeitig offen sind.
-    const beide: GamePhase[] = [];
-    for (const step of SEASON_TRANSITION_STEPS) {
-      const phase = getPhaseAfterStep(step);
-      if (!phase) continue;
-      const state = mkState(phase);
-      if (
-        evaluateGamePhaseAction(state, "buy_players").allowed &&
-        evaluateGamePhaseAction(state, "sell_players").allowed
-      ) {
-        beide.push(phase);
-      }
-    }
-    expect(beide, "Phasen mit gleichzeitig offenem Kauf- und Verkaufsfenster").toEqual([]);
+  it("und im Saisonstart wird NICHT MEHR verkauft", () => {
+    // GEMELDET: „zu beginn der neuen saison wird eingekauft dafür wird dort NICHT MEHR
+    // verkauft!". War es nicht: `isEarlySeasonTransferSetup` zaehlte fuer BEIDE Richtungen, das
+    // Verkaufsfenster lief also ueber den Saisonwechsel hinweg einfach weiter. Ohne den Fix ist
+    // diese Zeile rot.
+    const verkauf = evaluateGamePhaseAction(neueSaison(), "sell_players");
+    expect(verkauf.allowed, "Verkaufen gehoert ans Saisonende").toBe(false);
+    expect(verkauf.reason).toBe("phase_blocked:sell_players:season_active");
+  });
+
+  it("die beiden Fenster ueberlappen nirgends — auch nicht ueber den Saisonwechsel", () => {
+    // „Das muss sauber getrennt sein" als Regel, nicht als Einzelfall: es darf KEINEN Zustand
+    // geben, in dem Kaufen und Verkaufen gleichzeitig offen sind. Geprueft ueber jede Station
+    // der Saisonende-Kette PLUS den Saisonstart — die beiden Enden des Uebergangs, an denen die
+    // Fenster bisher ineinandergelaufen sind.
+    const zustaende: Array<{ name: string; state: never }> = [
+      ...SEASON_TRANSITION_STEPS.map(getPhaseAfterStep)
+        .filter((phase): phase is GamePhase => phase !== null)
+        .map((phase) => ({ name: phase, state: mkState(phase) })),
+      { name: "Saisonstart (neue Saison, vor MD1)", state: neueSaison() },
+    ];
+
+    const beide = zustaende
+      .filter(
+        ({ state }) =>
+          evaluateGamePhaseAction(state, "buy_players").allowed &&
+          evaluateGamePhaseAction(state, "sell_players").allowed,
+      )
+      .map(({ name }) => name);
+    expect(beide, "Zustaende mit gleichzeitig offenem Kauf- und Verkaufsfenster").toEqual([]);
+  });
+
+  it("jede Richtung hat ueberhaupt ein Fenster — sonst waere die Trennung nur eine Sperre", () => {
+    // Gegenprobe zur Disjunktheit: zwei leere Mengen ueberlappen auch nirgends. Verkaufen MUSS
+    // am Saisonende gehen und Kaufen MUSS im Saisonstart gehen, sonst ist der Weg zu.
+    const saisonende = SEASON_TRANSITION_STEPS.map(getPhaseAfterStep)
+      .filter((phase): phase is GamePhase => phase !== null)
+      .filter((phase) => evaluateGamePhaseAction(mkState(phase), "sell_players").allowed);
+    expect(saisonende.length, "keine einzige Saisonende-Phase laesst verkaufen").toBeGreaterThan(0);
+    expect(evaluateGamePhaseAction(neueSaison(), "buy_players").allowed).toBe(true);
   });
 
   it("die Liste liest die Regel, statt sie nachzubauen", () => {

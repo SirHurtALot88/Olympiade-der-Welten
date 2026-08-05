@@ -118,6 +118,15 @@ function createRosterEntry(id: string, playerId: string, partial?: Partial<Roste
   };
 }
 
+/**
+ * Der Standard-Spielstand steht auf Saison 1, Spieltag 1, Spieltag noch offen — also im
+ * Saisonstart-Fenster (`isEarlySeasonTransferSetup`). Das ist die KAUFPHASE.
+ *
+ * Kauf-Fixtures setzen deshalb `gamePhase: "season_active"` und nicht `transfer_buy_phase`:
+ * letztere liegt in der Saisonende-Kette, also noch in der ALTEN Saison, und ist die Station der
+ * KI. Menschliche Kaeufe gehoeren in die neue Saison vor ihrem ersten Spieltag
+ * (`lib/market/transfer-window-policy.ts`).
+ */
 function createGameState(input?: {
   teams?: Team[];
   players?: Player[];
@@ -423,7 +432,7 @@ describe("transfermarkt local service", () => {
     const buyWindowSaveId = "save-singleplayer-dev-buy-window-open";
     persistenceState.save = {
       saveId: buyWindowSaveId,
-      gameState: { ...persistenceState.save!.gameState, gamePhase: "transfer_buy_phase" },
+      gameState: { ...persistenceState.save!.gameState, gamePhase: "season_active" },
     };
 
     const beforeRow = buildTeamSeasonOverviewRows({ gameState: persistenceState.save!.gameState }).find(
@@ -529,7 +538,7 @@ describe("transfermarkt local service", () => {
       gameState: createGameState({
         // S7: buy service now enforces the buy transfer window too — this test is about roster
         // slots, not window gating, so keep the buy window explicitly open.
-        gamePhase: "transfer_buy_phase",
+        gamePhase: "season_active",
         teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 175, rosterLimit: 14 })],
         players: [...rosterPlayers, ...freeAgents],
         rosters: buildRoster(12),
@@ -547,7 +556,7 @@ describe("transfermarkt local service", () => {
     persistenceState.save = {
       saveId: "save-singleplayer-dev",
       gameState: createGameState({
-        gamePhase: "transfer_buy_phase",
+        gamePhase: "season_active",
         teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 175, rosterLimit: 14 })],
         players: [...rosterPlayers, ...freeAgents],
         rosters: buildRoster(13),
@@ -565,7 +574,7 @@ describe("transfermarkt local service", () => {
     persistenceState.save = {
       saveId: "save-singleplayer-dev",
       gameState: createGameState({
-        gamePhase: "transfer_buy_phase",
+        gamePhase: "season_active",
         teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 175, rosterLimit: 14 })],
         players: [...rosterPlayers, ...freeAgents],
         rosters: buildRoster(14),
@@ -1937,7 +1946,7 @@ describe("transfermarkt local service", () => {
       gameState: createGameState({
         // S7: buy service now enforces the buy transfer window too — this test is about contract
         // negotiation, not window gating, so keep the buy window explicitly open.
-        gamePhase: "transfer_buy_phase",
+        gamePhase: "season_active",
         teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 175 })],
         players: [
           createPlayer("fa-negotiated", {
@@ -2184,7 +2193,7 @@ describe("transfermarkt local service", () => {
       const gameState = createGameState({
         // S7: buy service now enforces the buy transfer window too — this test is about the AI
         // liquidity buffer, not window gating, so keep the buy window explicitly open.
-        gamePhase: "transfer_buy_phase",
+        gamePhase: "season_active",
         teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 10, rosterLimit: 14, humanControlled })],
         players: [...rosterPlayers, freeAgent],
         rosters,
@@ -2256,7 +2265,7 @@ describe("transfermarkt local service", () => {
         teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 175 })],
         players: [createPlayer("fa-window-buy", { marketValue: 25, displayMarketValue: 25, salaryDemand: 6, displaySalary: 6 })],
         rosters: [],
-        gamePhase: "transfer_buy_phase",
+        gamePhase: "season_active",
       });
       persistenceState.save = { saveId: "save-buy-window-open", gameState: openGameState };
 

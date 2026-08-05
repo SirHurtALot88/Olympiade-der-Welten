@@ -103,14 +103,25 @@ function getIdentityFitMultiplier(gameState: GameState, teamId: string, player: 
   return round(clamp(0.92 + fit * 0.1, 0.88, 1.08), 3);
 }
 
+/**
+ * Timing-Zuschlag auf den Verkaufspreis — an der PHASE festgemacht, nicht an `window.label`.
+ *
+ * Vorher las diese Funktion die Anzeige-Beschriftung („Verkaufsfenster", „Saisonstart-Setup").
+ * Das koppelte die Preisbildung an einen Text, der aus `canSell`/`canBuy` abgeleitet wird — und
+ * kippte damit still, sobald sich die Fenster-Regel aendert: seit `preseason_management` ein
+ * reines Verkaufsfenster ist, traegt es die Beschriftung „Verkaufsfenster" und waere von 0.98 auf
+ * 1 gesprungen, ohne dass jemand an der Preisbildung etwas aendern wollte.
+ *
+ * Die Zuordnung hier ist exakt die, die der Label-Vergleich urspruenglich ergab — nur direkt
+ * hingeschrieben, damit sie beim naechsten Regel-Umbau nicht wieder mitwandert.
+ */
 function getTimingMultiplier(gameState: GameState) {
-  const window = getTransferWindowStatus(gameState);
   const phase = gameState.gamePhase ?? "season_active";
 
-  if (phase === "transfer_sell_phase" || window.label === "Verkaufsfenster") {
+  if (phase === "transfer_sell_phase") {
     return 1;
   }
-  if (window.label === "Saisonstart-Setup") {
+  if (getTransferWindowStatus(gameState).isSeasonStartSetup) {
     return 0.95;
   }
   if (phase === "preseason_management") {

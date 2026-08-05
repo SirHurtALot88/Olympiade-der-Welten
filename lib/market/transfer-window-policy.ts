@@ -5,8 +5,21 @@ export const LOCAL_TRANSFER_WINDOW_PHASE = "manual_transfer_window";
 export type LocalTransferWindowPhase = typeof LOCAL_TRANSFER_WINDOW_PHASE;
 
 /**
- * Am Saisonende darf VERKAUFT und VERLAENGERT werden. `preseason_management` ist die erste
- * Station, auf die die Saisonende-Kette schaltet — sie oeffnet genau dieses Fenster.
+ * DIE REGEL — zwei Fenster, die sich NIE ueberschneiden.
+ *
+ * GEMELDET: „am ENDE der saison werden verträge verlängert, leute abgelöst und verkauft — zu
+ * beginn der neuen saison wird eingekauft dafür wird dort NICHT MEHR verkauft!"
+ *
+ *   Saisonende (alte Saison)   → verkaufen, abloesen, verlaengern.  KEIN Kaufen.
+ *   Saisonstart (neue Saison)  → kaufen.                            KEIN Verkaufen.
+ *
+ * Vorher stimmte keine der beiden Haelften: `preseason_management` stand in BEIDEN Mengen (also
+ * Kaufen schon am Saisonende), und `isEarlySeasonTransferSetup` oeffnete ebenfalls beides (also
+ * Verkaufen noch im Saisonstart). Die zwei Fenster waren de facto ein einziges, das ueber den
+ * Saisonwechsel hinweg durchlief.
+ *
+ * Beide Mengen sind darum bewusst DISJUNKT, und `isEarlySeasonTransferSetup` zaehlt nur noch fuers
+ * Kaufen. Ein Test haelt die Disjunktheit fest, damit die Trennung nicht wieder verwaescht.
  */
 const TRANSFER_SELL_PHASES = new Set<GamePhase>([
   "preseason_management",
@@ -14,25 +27,17 @@ const TRANSFER_SELL_PHASES = new Set<GamePhase>([
 ]);
 
 /**
- * KAUFEN gehoert NICHT ans Saisonende.
+ * Fuer MENSCHLICHE Kaeufe gibt es am Saisonende keine Phase — leer ist hier die Aussage.
  *
- * GEMELDET: „bei Transferfenster öffnen wäre eher Verkäufe / Verträge öffnen. Man soll noch NICHT
- * kaufen. Kaufen findet in S2 vor MD1 statt! Das muss sauber getrennt sein"
- *
- * Genau so war es NICHT. `preseason_management` stand in beiden Mengen — die Phase, auf die der
- * Knopf „Transferfenster öffnen" im Saisonabschluss schaltet, machte damit Verkaufen UND Kaufen in
- * einem Zug auf. Der Saisonabschluss sagte das sogar laut („verkaufen und kaufen sind
- * freigeschaltet"), also war die Anzeige ehrlich und die Regel falsch.
- *
- * Kaufen bleibt an zwei Stellen offen, beide NACH dem Verkaufsfenster:
- *   - `transfer_buy_phase` — die eigene Kaufstation der Kette (nur ueber den Cockpit-Assistenten
- *     erreichbar; die Checkliste haelt bei `preseason_management` an),
- *   - `isEarlySeasonTransferSetup` — die neue Saison vor ihrem ersten Spieltag. Das ist der Weg,
- *     den die Checkliste selbst geht: verkaufen/verlaengern → „Neue Saison starten" → kaufen.
+ * `transfer_buy_phase` stand hier und ist raus: die Station liegt in der Saisonende-Kette, also
+ * VOR „Neue Saison starten" und damit noch in der alten Saison. Sie ist die Station der KI
+ * („AI-Käufe laufen nach Verkäufen über Buy-Service", `season-transition-service`); KI- und
+ * System-Kaeufe tragen eine eigene `transferSource` und laufen ohnehin an diesem Gate vorbei.
+ * Der Mensch kauft ausschliesslich in der neuen Saison vor ihrem ersten Spieltag
+ * (`isEarlySeasonTransferSetup`) — der Weg, den die Checkliste selbst geht:
+ * verkaufen/verlaengern → „Neue Saison starten" → kaufen.
  */
-const TRANSFER_BUY_PHASES = new Set<GamePhase>([
-  "transfer_buy_phase",
-]);
+const TRANSFER_BUY_PHASES = new Set<GamePhase>([]);
 
 export function isExplicitLocalTransferWindowPhase(value: string | null | undefined): value is LocalTransferWindowPhase {
   return value === LOCAL_TRANSFER_WINDOW_PHASE;
@@ -58,7 +63,10 @@ export function isTransferMarketPhaseOpen(gameState: GameState) {
 
 export function isTransferSellPhaseOpen(gameState: GameState) {
   const phase = gameState.gamePhase ?? "season_active";
-  return TRANSFER_SELL_PHASES.has(phase) || isEarlySeasonTransferSetup(gameState);
+  // KEIN `isEarlySeasonTransferSetup`: der Saisonstart ist die Kaufphase. Wer verkaufen will,
+  // tut das am Ende der Saison — das Fenster davor ist dafuer da und laesst sich nicht in die
+  // neue Saison mitnehmen.
+  return TRANSFER_SELL_PHASES.has(phase);
 }
 
 export function isTransferBuyPhaseOpen(gameState: GameState) {
@@ -100,12 +108,13 @@ export function getTransferWindowStatus(gameState: GameState) {
   const canSell = isTransferSellPhaseOpen(gameState);
   const canBuy = isTransferBuyPhaseOpen(gameState);
   const open = canSell || canBuy;
+  const isSeasonStartSetup = isEarlySeasonTransferSetup(gameState);
   // Beschriftung aus canSell/canBuy abgeleitet statt aus der Phase aufgezaehlt: sonst heisst
   // `preseason_management` weiter „Transferfenster offen", obwohl dort nur noch verkauft werden
   // darf — genau die Vermischung, die gemeldet wurde.
   const label = !open
     ? "Transferfenster geschlossen"
-    : isEarlySeasonTransferSetup(gameState)
+    : isSeasonStartSetup
       ? "Saisonstart-Setup"
       : canSell && !canBuy
         ? "Verkaufsfenster"
@@ -119,6 +128,9 @@ export function getTransferWindowStatus(gameState: GameState) {
     label,
     canSell,
     canBuy,
+    /** Neue Saison vor ihrem ersten Spieltag — die Kaufphase. Trennt die Preisbildung
+     *  (`transfermarkt-sell-pricing-policy`) von der Anzeige-Beschriftung. */
+    isSeasonStartSetup,
     explicitWindowPhase: LOCAL_TRANSFER_WINDOW_PHASE,
     reason: open ? null : `phase_blocked:${phase}`,
   };

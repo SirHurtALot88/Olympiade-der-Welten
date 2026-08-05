@@ -685,7 +685,7 @@ export default function TransfermarktV2Client({
     : !transferCanBuy
       ? "Verkaufsfenster der Saisonwende — verkaufen und verlängern ist offen. Gekauft wird erst in der neuen Saison, vor dem 1. Spieltag."
       : !transferCanSell
-        ? "Kaufphase — kaufen ist offen. Das Verkaufsfenster dieser Saisonwende ist vorbei."
+        ? "Kaufphase vor dem 1. Spieltag — kaufen ist offen. Verkauft und verlängert wird am Ende der Saison."
         : null;
   const roomContextRef = useRef<FoundationRoomContext | null>(roomContextProp ?? readFoundationRoomContextFromLocation());
   useEffect(() => {
