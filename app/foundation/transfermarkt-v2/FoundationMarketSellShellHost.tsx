@@ -10,12 +10,8 @@ import {
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import {
   classifySellPricingNoteWeight,
-  classifySellReasonCategory,
   classifySellWarningWeight,
   describeSellPreviewIssue,
-  formatBoardTrustMoodLabel,
-  formatBoardTrustPolicyLabel,
-  formatDoctrinePersonaLabel,
   formatGmArchetypeLabel,
   formatGmPressureLabel,
   formatMatchdayShortLabel,
@@ -25,6 +21,7 @@ import {
   translateSellWarning,
   type SellNoticeWeight,
 } from "@/app/foundation/transfermarkt-v2/transfer-sell-view-labels";
+import TransferSellBoardBalance from "@/app/foundation/transfermarkt-v2/TransferSellBoardBalance";
 import { NlMarketBeforeAfterRow } from "@/app/foundation/transfermarkt-v2/TransfermarktV2NewLook";
 import { NlCard, NlCountUpValue, StatChip, StatChipRow } from "@/components/foundation/new-look";
 import type { Team } from "@/lib/data/olyDataTypes";
@@ -225,27 +222,38 @@ export default function FoundationMarketSellShellHost({
   const netProceeds = preview?.netProceeds ?? preview?.salePrice ?? null;
   const saleProfit = context?.saleProfit ?? preview?.profit ?? null; // GuV vs. KAUFPREIS (Kachel C1)
 
-  // Netto-Erlös vs. MARKTWERT — eine ANDERE Aussage als die GuV-Zeile oben (die
-  // vergleicht mit dem Einkaufspreis). Grün = über MW verkauft, Rot = darunter.
-  // Nur der Netto-Erlös (was am Ende wirklich ankommt) wird verglichen, nicht
-  // das Brutto — sonst würde ein offener Buyout die Farbe verfälschen.
-  const netVsMarketValue =
-    netProceeds != null && preview?.marketValueReference != null
-      ? netProceeds - preview.marketValueReference
+  // GEMELDET: „hier sehe ich, dass trotz positivem Verkaufswert im Save nur ein Nettoerlös von
+  // 21,6 raus kommen soll und somit ein verlust?"
+  //
+  // Verglichen wurde der NETTO-Erlös mit dem Marktwert — also nach Abzug des Rest-Buyouts. Der
+  // Buyout ist aber eine Kosten des VERTRAGS, kein Abschlag auf den Wert des Spielers. Ergebnis
+  // im gemeldeten Fall: Faktor 1,21× auf 24,9 Mio, Bruttopreis 30,1 Mio — und direkt darunter
+  // „−14,5 % unter Marktwert". Zwei Zeilen, die sich widersprachen.
+  //
+  // Die frühere Begründung („sonst würde ein offener Buyout die Farbe verfälschen") war genau
+  // verkehrt herum: den Buyout HINEINZURECHNEN verfälscht die Aussage, weil er mit dem Marktwert
+  // nichts zu tun hat. Wie sich der Buyout aufs Cash auswirkt, steht ohnehin eine Zeile höher
+  // („brutto X − Buyout Y") und in der GuV-Kachel.
+  //
+  // Verglichen wird deshalb der BRUTTOPREIS — dieselbe Größe, aus der auch der Faktor stammt.
+  const grossSalePrice = preview?.salePrice ?? null;
+  const saleVsMarketValue =
+    grossSalePrice != null && preview?.marketValueReference != null
+      ? grossSalePrice - preview.marketValueReference
       : null;
-  const netVsMarketValuePct =
-    netVsMarketValue != null && preview?.marketValueReference
-      ? (netVsMarketValue / preview.marketValueReference) * 100
+  const saleVsMarketValuePct =
+    saleVsMarketValue != null && preview?.marketValueReference
+      ? (saleVsMarketValue / preview.marketValueReference) * 100
       : null;
-  const mwDiffTone: "good" | "risk" | null = netVsMarketValue == null ? null : netVsMarketValue >= 0 ? "good" : "risk";
+  const mwDiffTone: "good" | "risk" | null = saleVsMarketValue == null ? null : saleVsMarketValue >= 0 ? "good" : "risk";
   const mwDiffText =
-    netVsMarketValue == null
+    saleVsMarketValue == null
       ? null
-      : `${formatSignedTransfermarktCurrency(netVsMarketValue)}${
-          netVsMarketValuePct != null
-            ? ` (${netVsMarketValuePct >= 0 ? "+" : ""}${formatLocalePoints(netVsMarketValuePct, 1)} %)`
+      : `${formatSignedTransfermarktCurrency(saleVsMarketValue)}${
+          saleVsMarketValuePct != null
+            ? ` (${saleVsMarketValuePct >= 0 ? "+" : ""}${formatLocalePoints(saleVsMarketValuePct, 1)} %)`
             : ""
-        } ${netVsMarketValue >= 0 ? "über" : "unter"} Marktwert`;
+        } ${saleVsMarketValue >= 0 ? "über" : "unter"} Marktwert`;
 
   // Buyout-Herleitung unter dem Netto-Erlös: sagt explizit, ob ein Buyout
   // absetzt UND wie viel — statt der bisherigen "kein Buyout"-Nebenbemerkung.
@@ -254,11 +262,6 @@ export default function FoundationMarketSellShellHost({
     : hasBuyout
       ? `Verkaufspreis brutto ${formatTransfermarktCurrency(preview.salePrice)} − Buyout ${formatTransfermarktCurrency(buyoutCost)}`
       : `Kein Buyout fällig — Verkaufspreis brutto ${formatTransfermarktCurrency(preview.salePrice)} bleibt komplett Netto`;
-
-  const sellScore = preview?.coaching?.sellIntentScore ?? null;
-  const keepScore = preview?.coaching?.keepIntentScore ?? null;
-  const intentTotal = (sellScore ?? 0) + (keepScore ?? 0);
-  const sellSharePct = intentTotal > 0 ? Math.round(((sellScore ?? 0) / intentTotal) * 1000) / 10 : 50;
 
   const pricingNotes = preview?.coaching?.pricingPolicyNotes ?? [];
   const hasNotices = (preview?.warnings.length ?? 0) > 0 || pricingNotes.length > 0;
@@ -653,106 +656,31 @@ export default function FoundationMarketSellShellHost({
             </StatChipRow>
           </NlCard>
 
-          {/* D: Board-Bilanz — der Kern, NIE zugeklappt. */}
+          {/* D: Board-Bilanz — der Kern, NIE zugeklappt. Die Karte selbst liegt in
+              `TransferSellBoardBalance`, weil der Kader-Drawer dieselbe zeigt; hier bleibt nur,
+              was zum VERKAUFEN gehört: die Risiko-Bestätigung. */}
           {preview.coaching ? (
-            <NlCard
-              className="transfer-sell-board-card"
-              eyebrow={
-                preview.coaching.doctrineHint
-                  ? `Doktrin: ${formatDoctrinePersonaLabel(preview.coaching.doctrinePersona)} · ${preview.coaching.doctrineHint}`
-                  : `Doktrin: ${formatDoctrinePersonaLabel(preview.coaching.doctrinePersona)}`
+            <TransferSellBoardBalance
+              coaching={preview.coaching}
+              footer={
+                /* Sichtbarkeit der Risiko-Bestätigung MUSS exakt der
+                   `strongAckRequired`-Bedingung entsprechen, die oben den Verkauf
+                   sperrt (strongAckPending): sobald die Bestätigung sperrt, muss
+                   die Checkbox erscheinen — sonst gäbe es einen stillen Dead-End. */
+                strongAckRequired ? (
+                  <label className="transfer-sell-risk-ack" data-testid="transfer-sell-risk-ack">
+                    <input
+                      type="checkbox"
+                      checked={marketSellRiskAcknowledged}
+                      onChange={(event) => onMarketSellRiskAcknowledgedChange(event.target.checked)}
+                    />
+                    <span>
+                      Ich bestätige den Verkauf trotz Board-/GM-Warnung ({preview.coaching.boardReaction.title})
+                    </span>
+                  </label>
+                ) : null
               }
-              title={
-                <>
-                  Board-Bilanz
-                  <span className="transfer-sell-board-title-sub">
-                    {preview.coaching.reasonsToSell.length} dafür · {preview.coaching.reasonsToKeep.length} dagegen
-                    {preview.coaching.sellPriority != null ? ` · Priorität ${preview.coaching.sellPriority}` : ""}
-                  </span>
-                </>
-              }
-              data-testid="transfer-sell-coaching-panel"
-            >
-              {sellScore != null || keepScore != null ? (
-                <div className="transfer-sell-intent">
-                  <div
-                    className="transfer-sell-intent-bar"
-                    role="img"
-                    aria-label={`Verkaufs-Gewichtung ${sellScore ?? 0} zu ${keepScore ?? 0}`}
-                  >
-                    <span className="transfer-sell-intent-fill" style={{ width: `${sellSharePct}%` }} />
-                  </div>
-                  <div className="transfer-sell-intent-legend">
-                    <b>Verkaufen · {sellScore ?? 0}</b>
-                    <b>Halten · {keepScore ?? 0}</b>
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="transfer-sell-reasons">
-                <div>
-                  <div className="transfer-sell-reason-col-head">
-                    <span>Dafür</span>
-                    <span>{preview.coaching.reasonsToSell.length}</span>
-                  </div>
-                  {preview.coaching.reasonsToSell.length ? (
-                    preview.coaching.reasonsToSell.map((reason, index) => (
-                      <div className="transfer-sell-reason is-for" key={`sell-${index}-${reason}`}>
-                        <span className="transfer-sell-reason-dot" aria-hidden="true" />
-                        <span className="transfer-sell-reason-tag">{classifySellReasonCategory(reason)}</span>
-                        <span>{reason}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="transfer-sell-reason-empty">Keine Verkaufsgründe.</p>
-                  )}
-                </div>
-                <div>
-                  <div className="transfer-sell-reason-col-head">
-                    <span>Dagegen</span>
-                    <span>{preview.coaching.reasonsToKeep.length}</span>
-                  </div>
-                  {/* Diese Spalte bleibt IMMER sichtbar, auch leer — bei wenigen,
-                      schweren Haltegründen trägt genau sie die Entscheidung. */}
-                  {preview.coaching.reasonsToKeep.length ? (
-                    preview.coaching.reasonsToKeep.map((reason, index) => (
-                      <div className="transfer-sell-reason is-keep" key={`keep-${index}-${reason}`}>
-                        <span className="transfer-sell-reason-dot" aria-hidden="true" />
-                        <span className="transfer-sell-reason-tag">{classifySellReasonCategory(reason)}</span>
-                        <span>{reason}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="transfer-sell-reason-empty">Keine Haltegründe.</p>
-                  )}
-                </div>
-              </div>
-
-              <p className="transfer-sell-strategy nl-market-muted">{preview.coaching.strategyFitSummary}</p>
-              {preview.coaching.boardTrustSmiley || preview.coaching.boardTrustPolicy ? (
-                <p className="nl-market-muted">
-                  Board-Stimmung {formatBoardTrustMoodLabel(preview.coaching.boardTrustSmiley)} · Linie:{" "}
-                  {formatBoardTrustPolicyLabel(preview.coaching.boardTrustPolicy)}
-                </p>
-              ) : null}
-
-              {/* Sichtbarkeit der Risiko-Bestätigung MUSS exakt der
-                  `strongAckRequired`-Bedingung entsprechen, die oben den Verkauf
-                  sperrt (strongAckPending): sobald die Bestätigung sperrt, muss
-                  die Checkbox erscheinen — sonst gäbe es einen stillen Dead-End. */}
-              {strongAckRequired ? (
-                <label className="transfer-sell-risk-ack" data-testid="transfer-sell-risk-ack">
-                  <input
-                    type="checkbox"
-                    checked={marketSellRiskAcknowledged}
-                    onChange={(event) => onMarketSellRiskAcknowledgedChange(event.target.checked)}
-                  />
-                  <span>
-                    Ich bestätige den Verkauf trotz Board-/GM-Warnung ({preview.coaching.boardReaction.title})
-                  </span>
-                </label>
-              ) : null}
-            </NlCard>
+            />
           ) : null}
 
           {/* E: Hinweise nach Gewicht — statt vier gleich lauter roter Balken. */}

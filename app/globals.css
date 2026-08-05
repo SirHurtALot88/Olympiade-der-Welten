@@ -6866,6 +6866,23 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   color: var(--nl-accent);
 }
 
+/*
+ * „Und mir fehlt noch eine Spalte für die Gesamt PPs die der spieler geholt hat." — die Summe
+ * steht jetzt links neben der Achsen-Aufschlüsselung. Der Rang-Chip hängt tiefgestellt daran,
+ * damit die Zahl selbst die Spaltenflucht der übrigen Zahlenspalten hält.
+ */
+.is-new-look .selected-roster-pps-total {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-weight: 650;
+}
+.is-new-look .selected-roster-pps-total-rank {
+  font-size: 0.72em;
+  font-weight: 600;
+  color: var(--nl-muted-2);
+}
+
 .is-new-look .selected-roster-pps-diszi-toggle {
   display: inline-flex;
   align-items: center;
@@ -75993,4 +76010,142 @@ button.is-new-look .nl-thist-season-pill,
 .is-new-look[data-team-theme] .foundation-subnav-item.is-active {
   border-color: color-mix(in srgb, var(--nl-accent) 55%, transparent);
   background: color-mix(in srgb, var(--nl-accent) 14%, transparent);
+}
+
+/*
+ * KADER-DRAWER: VERKAUFS-EINSCHÄTZUNG BEIM ZEILENKLICK
+ *
+ * GEMELDET: „ich finde auch das verkaufsfenster sollte ggf als drawer oder so rein kommen schon
+ * wenn man den spieler in der zeile anklickt, damit man auch bei spielern die man nicht verkaufen
+ * will direkt sehen kann was das board dazu sagt!"
+ *
+ * Rechte Randleiste wie `.nl-rankdrawer` — dieselben Konventionen (fixed inset, Blur,
+ * Slide-in, `prefers-reduced-motion` schaltet die Animation ab), nur breiter, weil die
+ * Board-Bilanz zwei Spalten (Dafür/Dagegen) trägt.
+ */
+.roster-sell-peek-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 132;
+  display: flex;
+  justify-content: flex-end;
+  align-items: stretch;
+  background: rgba(3, 7, 13, 0.6);
+  backdrop-filter: blur(4px);
+  animation: nl-rankdrawer-fade 0.18s ease-out;
+}
+
+.roster-sell-peek-panel {
+  width: min(620px, 100vw);
+  max-width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, rgba(32, 35, 42, 0.98), rgba(19, 22, 28, 0.98));
+  border-left: 1px solid var(--nl-accent, rgba(255, 255, 255, 0.12));
+  box-shadow: -24px 0 60px rgba(0, 0, 0, 0.42);
+  animation: nl-rankdrawer-slide-in 0.22s ease-out;
+}
+
+/* Rechts bleibt Platz fuer die Bug-Melde-Flagge: die sitzt `position: fixed` bei top 10 / right 12
+   auf der hoechsten z-Ebene des Spiels (`.oly-bug-report-flag`) und lag im Browser genau auf dem
+   Schliessen-Kreuz. Statt an der z-Ebene zu drehen — die Flagge soll ja immer klickbar bleiben —
+   rueckt das Kreuz zur Seite. */
+.roster-sell-peek-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 52px 12px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Vier Kacheln in zwei sauberen Reihen statt 3 + 1 — bei 620px Breite passen genau zwei
+   nebeneinander, ohne dass die Beschriftung umbricht. */
+.roster-sell-peek-body .nl-stat-chip-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.roster-sell-peek-head > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.roster-sell-peek-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-accent-text, var(--nl-muted-2));
+}
+
+.roster-sell-peek-name {
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+
+.roster-sell-peek-sub {
+  font-size: 0.82rem;
+  color: var(--nl-muted-2);
+}
+
+.roster-sell-peek-close {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  cursor: pointer;
+}
+
+.roster-sell-peek-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.roster-sell-peek-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 18px 18px;
+}
+
+.roster-sell-peek-error {
+  color: var(--nl-risk, #ff7a7a);
+}
+
+.roster-sell-peek-gm {
+  font-size: 0.82rem;
+}
+
+.roster-sell-peek-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 18px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Die Zeile muss als anklickbar zu erkennen sein — sonst findet den Drawer niemand. */
+.is-new-look .team-contracts-table tbody tr.is-clickable {
+  cursor: pointer;
+}
+
+.is-new-look .team-contracts-table tbody tr.is-clickable:hover {
+  background: var(--nl-accent-soft, rgba(255, 255, 255, 0.04));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .roster-sell-peek-backdrop,
+  .roster-sell-peek-panel {
+    animation: none;
+  }
 }

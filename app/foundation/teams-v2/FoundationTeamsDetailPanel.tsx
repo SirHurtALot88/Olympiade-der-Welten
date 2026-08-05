@@ -19,6 +19,11 @@ import { isSeasonDisciplineKey } from "@/lib/season/season-discipline-area-group
 import type { ContractDissolutionOffer } from "@/lib/morale/contract-dissolution-service";
 import { TEAM_BOARD_PRESSURE_TOOLTIP, TEAM_BOARD_RATING_TOOLTIP } from "@/lib/foundation/team-board-tooltips";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
+import type {
+  TransfermarktSellPreviewSubject,
+  TransfermarktSellSummary,
+} from "@/lib/foundation/tabs/use-market-sell-derivations";
+import FoundationRosterSellPeekDrawer from "@/app/foundation/teams-v2/FoundationRosterSellPeekDrawer";
 import {
   NlCard,
   NlEmptyState,
@@ -371,6 +376,23 @@ export type FoundationTeamsDetailPanelProps = {
   onDecideContractDissolution?: (playerId: string, decision: "accepted" | "declined") => void | Promise<void>;
   openContractRenewalNegotiation: unknown;
   openMarketSellModal: unknown;
+  /**
+   * DER BLICK STATT DES SCHRITTS — Kader-Drawer mit der Board-Bilanz beim Klick auf eine Zeile.
+   *
+   * GEMELDET: „ich finde auch das verkaufsfenster sollte ggf als drawer oder so rein kommen schon
+   * wenn man den spieler in der zeile anklickt, damit man auch bei spielern die man nicht
+   * verkaufen will direkt sehen kann was das board dazu sagt!"
+   *
+   * Optional gehalten, damit ein Host ohne Verkaufs-Verdrahtung (Prisma-Referenz, Tests) die
+   * Tabelle unveraendert rendert — ohne die Props bleiben die Zeilen einfach nicht klickbar.
+   */
+  openMarketSellPeek?: (subject: TransfermarktSellPreviewSubject, teamId?: string) => void | Promise<void>;
+  closeMarketSellPeek?: () => void;
+  openMarketSellFromPeek?: (subject: TransfermarktSellPreviewSubject, teamId?: string) => void | Promise<void>;
+  marketSellPeekSubject?: TransfermarktSellPreviewSubject | null;
+  marketSellPeekPreview?: TransfermarktSellSummary | null;
+  marketSellPeekBusy?: boolean;
+  marketSellPeekError?: string | null;
   openPlayerDrawerById: unknown;
   playerRatingsById: Map<string, PlayerRatingContractRow>;
   getPlayerPortraitModel: unknown;
@@ -505,6 +527,13 @@ function FoundationTeamsDetailPanel({
   onDecideContractDissolution,
   openContractRenewalNegotiation,
   openMarketSellModal,
+  openMarketSellPeek,
+  closeMarketSellPeek,
+  openMarketSellFromPeek,
+  marketSellPeekSubject = null,
+  marketSellPeekPreview = null,
+  marketSellPeekBusy = false,
+  marketSellPeekError = null,
   openPlayerDrawerById,
   playerRatingsById,
   getPlayerPortraitModel,
@@ -2057,6 +2086,11 @@ function FoundationTeamsDetailPanel({
                                 return rosterRowByPlayerId.get(row.playerId)?.ppMen ?? null;
                               case "pps:soc":
                                 return rosterRowByPlayerId.get(row.playerId)?.ppSoc ?? null;
+                              // Die Summe, die der Spieler in dieser Saison geholt hat — dieselbe
+                              // Zahl, die auch die Spielerliste als „PPs" führt (`playerPps`),
+                              // NICHT die Summe der vier Achsen-Chips nachgerechnet.
+                              case "ppsTotal":
+                                return rosterRowByPlayerId.get(row.playerId)?.playerPps ?? null;
                               default:
                                 return null;
                             }
@@ -2113,6 +2147,24 @@ function FoundationTeamsDetailPanel({
                             align: "right",
                             sortable: true,
                             tooltip: "Marktwert-Score.",
+                          },
+                          /**
+                           * GEMELDET: „Und mir fehlt noch eine Spalte für die Gesamt PPs die der
+                           * spieler geholt hat."
+                           *
+                           * Die PPs-Zelle daneben zeigt die vier Achsen einzeln — die Summe stand
+                           * nirgends, und aus vier Balken im Kopf zu addieren ist keine Antwort.
+                           * Die Zahl kommt aus derselben Quelle wie die PPs-Spalte der
+                           * Spielerliste (`playerPps` aus dem Season-Points-Ledger), damit nicht
+                           * zwei Ansichten verschiedene Summen für denselben Spieler zeigen.
+                           */
+                          {
+                            key: "ppsTotal",
+                            label: "PPs ges.",
+                            align: "right",
+                            sortable: true,
+                            tooltip:
+                              "Performance-Punkte dieser Saison insgesamt — die Summe über alle Disziplinen. Die Aufschlüsselung nach Bereich steht in der Spalte daneben.",
                           },
                           {
                             key: "pps",
@@ -2226,6 +2278,23 @@ function FoundationTeamsDetailPanel({
                             case "mvs": {
                               const value = rosterRowByPlayerId.get(row.playerId)?.playerMvs ?? null;
                               return value != null ? formatPpsValue(value) : "—";
+                            }
+                            case "ppsTotal": {
+                              const rosterRow = rosterRowByPlayerId.get(row.playerId) ?? null;
+                              const value = rosterRow?.playerPps ?? null;
+                              if (value == null) {
+                                return "—";
+                              }
+                              return (
+                                <span className="selected-roster-pps-total nl-tnum">
+                                  {formatPpsValue(value)}
+                                  {rosterRow?.ppsRank != null ? (
+                                    <small className="selected-roster-pps-total-rank" title="Ligaweiter Platz nach Season-PPs.">
+                                      #{formatWholeNumber(rosterRow.ppsRank)}
+                                    </small>
+                                  ) : null}
+                                </span>
+                              );
                             }
                             case "pps": {
                               const rosterRow = rosterRowByPlayerId.get(row.playerId) ?? null;
@@ -2445,6 +2514,39 @@ function FoundationTeamsDetailPanel({
                               }}
                               sortState={nlContractSort}
                               onSort={handleNlContractSort}
+                              /**
+                               * GEMELDET: „ich finde auch das verkaufsfenster sollte ggf als
+                               * drawer oder so rein kommen schon wenn man den spieler in der
+                               * zeile anklickt, damit man auch bei spielern die man nicht
+                               * verkaufen will direkt sehen kann was das board dazu sagt!"
+                               *
+                               * Die Zeile öffnet deshalb den Einschätzungs-Drawer, nicht den
+                               * Verkauf. Preview-Zeilen (Kaufdialog-Drafts) bleiben stumm — zu
+                               * ihnen gibt es keinen Kaderspieler, den man abgeben könnte. Die
+                               * Aktions-Knöpfe in der Zeile stoppen ihr Event bereits selbst,
+                               * „Verkaufen" führt also weiterhin direkt zur Verkaufsseite.
+                               */
+                              onRowClick={
+                                openMarketSellPeek && selectedTeam
+                                  ? (row) => {
+                                      if (row.status !== "active") {
+                                        return;
+                                      }
+                                      const player = gameState.players.find((candidate) => candidate.id === row.playerId);
+                                      void openMarketSellPeek(
+                                        {
+                                          activePlayerId: row.rowId,
+                                          playerId: row.playerId,
+                                          playerName: row.playerName,
+                                          className: player?.className ?? "—",
+                                          race: player?.race ?? "—",
+                                          portraitUrl: player?.portraitUrl ?? null,
+                                        },
+                                        selectedTeam.teamId,
+                                      );
+                                    }
+                                  : undefined
+                              }
                               renderCell={renderNlContractCell}
                               isRowExpanded={(row) => expandedContractPpsPlayerId === row.playerId}
                               renderExpandedRow={(row) =>
@@ -2454,6 +2556,18 @@ function FoundationTeamsDetailPanel({
                                   panelId: `contract-pps-diszi-${row.rowId}`,
                                 })
                               }
+                            />
+                            {/* Der Einschätzungs-Drawer hängt an der Tabelle, nicht an der
+                                Seite: er gehört zu dieser Zeilenliste und schließt mit ihr. */}
+                            <FoundationRosterSellPeekDrawer
+                              subject={marketSellPeekSubject}
+                              preview={marketSellPeekPreview}
+                              busy={marketSellPeekBusy}
+                              error={marketSellPeekError}
+                              onClose={() => closeMarketSellPeek?.()}
+                              onOpenSell={(subject) => {
+                                void openMarketSellFromPeek?.(subject, selectedTeam?.teamId);
+                              }}
                             />
                             {selectedTeamContractTable ? (
                               <StatChipRow aria-label="Gehaltssumme je Saison">

@@ -10,6 +10,7 @@ import type {
   TeamStrategyProfile,
 } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { resolveElapsedContractSeasonsForBuyout } from "@/lib/market/contract-buyout-season-window";
 import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
 import { calculateTransfermarktFit, getTransfermarktBracket, normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
 import { getTransfermarktScoutingRecruitmentBonus } from "@/lib/market/transfermarkt-scouting";
@@ -2480,27 +2481,21 @@ export function buildTeamContractSeasonTable(input: {
          * Buyout trotz auslaufender Vertraege — der Buyout muesste zu dem Zeitpunkt bei allen
          * schon um 1 Vertragsjahr geringer sein."
          *
-         * Stimmt, und zwar nicht nur am Saisonende: ein Verkauf (und damit der Buyout) ist
-         * ueberhaupt nur moeglich, wenn das Verkaufsfenster offen ist —
-         * `isLocalTransferSellWindowOpen` in `transfermarkt-local-service`, sonst lehnt der
-         * Server mit `sell_only_at_season_end` ab. Zu diesem Zeitpunkt ist das laufende
-         * Vertragsjahr aber gespielt und bezahlt; es gehoert nicht mehr in die Abloese.
+         * Die Beobachtung stimmt, die erste Antwort darauf war aber nur die halbe: hier stand
+         * ein festes `1`, waehrend Verkaufsdialog und Ausfuehrung weiter mit der vollen
+         * Restlaufzeit rechneten — und der Kommentar schrieb ausdruecklich hin, dass der echte
+         * Flow „unberuehrt" bleibt. Damit widersprachen sich Tabelle und Dialog fuer denselben
+         * Spieler; gemeldet als „da schau, das passt nicht" (Tabelle 0,0 Mio, Dialog 8,8 Mio).
          *
-         * Mit `seasonsElapsed: 0` stand hier die volle Restlaufzeit INKLUSIVE des laufenden
-         * Jahres. Ein auslaufender Vertrag (Restlaufzeit 1) zeigte damit noch ein volles
-         * Jahresgehalt als Buyout, obwohl der Spieler ohnehin geht — er hat richtigerweise
-         * gar keinen mehr.
-         *
-         * Dieselbe Rechnung macht die Spalte „VK" der Spielerliste seit jeher
-         * (`transfermarkt-expected-sell-value.ts`, dort ausfuehrlich begruendet). Zwei
-         * Tabellen zeigten also verschiedene Buyouts fuer denselben Spieler. Jetzt eine Regel.
-         *
-         * UNBERUEHRT bleibt der echte Verkaufs-Flow (`previewLocalTransfermarktSell` /
-         * `executeLocalTransfermarktSell`): der rechnet weiter mit der vollen Restlaufzeit.
-         * Was am Ende abgebucht wird, aendert dieser Commit nicht — nur was die Uebersicht
-         * dazu behauptet.
+         * Ob das laufende Vertragsjahr noch in der Abloese steckt, haengt nicht daran, WER
+         * fragt, sondern ob das Gehalt dieser Saison schon gebucht ist. Genau das entscheidet
+         * jetzt `resolveElapsedContractSeasonsForBuyout` — fuer diese Tabelle, fuer die VK-Spalte
+         * der Spielerliste und fuer den Verkauf selbst.
          */
-        buyoutCost: calculateOpenBuyoutCost(yearlySalarySchedule, 1),
+        buyoutCost: calculateOpenBuyoutCost(
+          yearlySalarySchedule,
+          resolveElapsedContractSeasonsForBuyout({ gameState: input.gameState, teamId: input.teamId }),
+        ),
         exitValue,
         saleFactor: saleFactorBreakdown.saleFactor,
         marketValueAtExit,

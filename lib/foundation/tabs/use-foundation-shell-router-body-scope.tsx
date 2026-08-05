@@ -1034,7 +1034,7 @@ export function useFoundationShellRouterBodyScope({
     setNewGamePresetId, newGameChrisTeamIds, setNewGameChrisTeamIds, newGameFrankyTeamIds, setNewGameFrankyTeamIds, newGameSandbox, setNewGameSandbox, newGameSaveName, setNewGameSaveName, newGamePreview,
     setNewGamePreview, newGameBusy, setNewGameBusy, newGameError, setNewGameError, newGameSuccess, setNewGameSuccess, marketBuyPreview, setMarketBuyPreview, marketBuyPreviewContext,
     setMarketBuyPreviewContext, marketNegotiationOutcome, setMarketNegotiationOutcome, marketPreviewPlayerId, setMarketPreviewPlayerId, marketPreviewPlayerSummary, setMarketPreviewPlayerSummary, marketBuySubject, setMarketBuySubject, marketSellBusy, setMarketSellBusy, marketSellError,
-    setMarketSellError, marketSellSuccess, setMarketSellSuccess, marketSellPreview, setMarketSellPreview, contractRenewalBusy, setContractRenewalBusy, contractRenewalMessage, setContractRenewalMessage, contractRenewalError,
+    setMarketSellError, marketSellSuccess, setMarketSellSuccess, marketSellPreview, setMarketSellPreview, marketSellPeekSubject, setMarketSellPeekSubject, marketSellPeekPreview, setMarketSellPeekPreview, marketSellPeekBusy, setMarketSellPeekBusy, marketSellPeekError, setMarketSellPeekError, contractRenewalBusy, setContractRenewalBusy, contractRenewalMessage, setContractRenewalMessage, contractRenewalError,
     setContractRenewalError, contractRenewalNegotiation, setContractRenewalNegotiation, sponsorChoiceBusy, setSponsorChoiceBusy, sponsorChoiceMessage, setSponsorChoiceMessage, marketSellSubject,
     setMarketSellSubject, marketSellRiskAcknowledged, setMarketSellRiskAcknowledged, marketContractLengthDraft, setMarketContractLengthDraft, marketContractShapeDraft, setMarketContractShapeDraft, marketOfferedSalaryDraft, setMarketOfferedSalaryDraft, marketAiTeamScope,
     setMarketAiTeamScope, marketAiPreviewBusy, setMarketAiPreviewBusy, marketAiPreviewError, setMarketAiPreviewError, marketAiPreviewFeed, setMarketAiPreviewFeed, marketAiPreviewSelectedTeamId, setMarketAiPreviewSelectedTeamId, marketAiSellTeamScope,
@@ -1473,6 +1473,8 @@ export function useFoundationShellRouterBodyScope({
   const tableDragState = useRef<{ tableId: string; columnId: string } | null>(null);
   const marketBuyPreviewRequestVersion = useRef(0);
   const marketSellPreviewRequestVersion = useRef(0);
+  /** Eigener Zaehler fuer den Kader-Drawer — er darf den laufenden Verkaufs-Flow nicht abbrechen. */
+  const marketSellPeekRequestVersion = useRef(0);
   const marketFeedReloadersRef = useRef<FoundationMarketFeedReloaders>({
     reloadMarketFeed: async () => null,
     reloadHistoryFeed: async () => null,
@@ -3663,12 +3665,118 @@ export function useFoundationShellRouterBodyScope({
     setMarketSellPreview(null);
     setMarketSellSubject(subject);
     setFoundationPanel("sell");
+    // GEMELDET: „wenn ich einen spieler verkaufen will, springt der screen nicht zum
+    // verkaufsmodal, das irritiert."
+    //
+    // Der Verkauf ist eine eigene Drilldown-Seite, kein Overlay — die Seite tauscht also nur
+    // ihren Inhalt aus, waehrend die Scrollposition stehen bleibt. Wer weit unten in der
+    // Kaderliste auf „Verkaufen" tippt, landet entsprechend weit unten in der neuen Ansicht
+    // und sieht den Dialog gar nicht. Der Kauf-Flow raeumt das seit laengerem selbst auf
+    // (`scrollBuyModalToTop` in TransfermarktV2Client) — dem Verkauf fehlte das Gegenstueck.
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "auto" });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
     syncFoundationViewInUrl(activeView, null, subject.playerId, {
       panel: "sell",
       push: true,
       team: effectiveTeamId,
     });
     await requestTransfermarktSellPreview(subject, teamIdOverride);
+  }
+
+  /**
+   * DER BLICK STATT DES SCHRITTS — Verkaufsvorschau in einen Drawer laden, ohne zu navigieren.
+   *
+   * GEMELDET: „ich finde auch das verkaufsfenster sollte ggf als drawer oder so rein kommen schon
+   * wenn man den spieler in der zeile anklickt, damit man auch bei spielern die man nicht
+   * verkaufen will direkt sehen kann was das board dazu sagt!"
+   *
+   * Es ist DIESELBE Vorschau, die auch die Verkaufsseite liest (`/api/transfermarkt/sell` mit
+   * `dryRun`) — der Drawer rechnet nichts nach. Die Board-Bilanz haengt am AI-Sell-Preview-Service,
+   * der ueber Prisma/Persistenz geht und deshalb nicht im Browser laufen kann; ein zweiter,
+   * clientseitiger Rechenweg waere ohnehin die naechste Stelle mit zwei Antworten auf eine Frage.
+   *
+   * Ohne Verkaufsrecht am Team bleibt der Drawer zu: eine Board-Bilanz zu einem Team, das man
+   * nicht steuert, waere ein Blick in fremde Buecher.
+   */
+  async function openMarketSellPeek(subject: TransfermarktSellPreviewSubject, teamIdOverride?: string) {
+    const effectiveTeamId = teamIdOverride ?? selectedTeam?.teamId ?? "";
+    if (!effectiveTeamId || !canManageTeamId(effectiveTeamId)) {
+      return;
+    }
+    const requestVersion = ++marketSellPeekRequestVersion.current;
+    setMarketSellPeekSubject(subject);
+    setMarketSellPeekPreview(null);
+    setMarketSellPeekError(null);
+    setMarketSellPeekBusy(true);
+    try {
+      const response = await fetch("/api/transfermarkt/sell", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({
+          saveId: activeSaveId,
+          seasonId: gameState.season.id,
+          teamId: effectiveTeamId,
+          activePlayerId: subject.activePlayerId,
+          dryRun: true,
+          source: readMeta.source,
+        })),
+      });
+      const payload = (await response.json()) as TransfermarktSellApiResponse;
+      if (requestVersion !== marketSellPeekRequestVersion.current) {
+        return;
+      }
+      setMarketSellPeekPreview(payload.summary ?? null);
+      if (!payload.summary) {
+        setMarketSellPeekError(payload.error ?? "Verkaufsvorschau konnte nicht geladen werden.");
+      }
+    } catch {
+      if (requestVersion === marketSellPeekRequestVersion.current) {
+        setMarketSellPeekError("Verkaufsvorschau konnte nicht geladen werden.");
+        setMarketSellPeekPreview(null);
+      }
+    } finally {
+      if (requestVersion === marketSellPeekRequestVersion.current) {
+        setMarketSellPeekBusy(false);
+      }
+    }
+  }
+
+  function closeMarketSellPeek() {
+    marketSellPeekRequestVersion.current += 1;
+    setMarketSellPeekSubject(null);
+    setMarketSellPeekPreview(null);
+    setMarketSellPeekError(null);
+    setMarketSellPeekBusy(false);
+  }
+
+  /** Aus dem Drawer in den echten Verkauf — der Drawer schliesst, die Seite uebernimmt. */
+  async function openMarketSellFromPeek(subject: TransfermarktSellPreviewSubject, teamIdOverride?: string) {
+    const effectiveTeamId = teamIdOverride ?? marketSellPeekPreview?.team?.id ?? selectedTeam?.teamId;
+    closeMarketSellPeek();
+    const geoeffnet = openMarketSellModal(subject, effectiveTeamId);
+    /**
+     * NOCH EINMAL NACH OBEN — eine Frame spaeter.
+     *
+     * Im Browser gemessen: nach diesem Uebergang stand die Seite wieder bei 966px, obwohl
+     * `openMarketSellModal` an den Anfang scrollt. Grund ist die Fokusfalle des Drawers: sie gibt
+     * den Fokus beim Schliessen an das zuvor fokussierte Element zurueck — die geklickte
+     * Kaderzeile — und der Browser scrollt die dabei ins Bild. Das passiert erst, wenn React das
+     * Schliessen committet hat, also NACH dem scrollTo oben.
+     *
+     * Der Sprung muss der letzte sein, sonst landet man wieder genau dort, wo der gemeldete
+     * Bug („springt nicht zum verkaufsmodal") herkam.
+     */
+    if (typeof window !== "undefined") {
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, behavior: "auto" });
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      });
+    }
+    await geoeffnet;
   }
 
   function closeMarketSellModal() {
@@ -11316,6 +11424,13 @@ export function useFoundationShellRouterBodyScope({
     contractRenewalBusy,
     openContractRenewalNegotiation,
     openMarketSellModal,
+    openMarketSellPeek,
+    closeMarketSellPeek,
+    openMarketSellFromPeek,
+    marketSellPeekSubject,
+    marketSellPeekPreview,
+    marketSellPeekBusy,
+    marketSellPeekError,
     openPlayerDrawerById,
     getPlayerPortraitModel,
     getClassColorClassName,
@@ -11982,6 +12097,9 @@ export function useFoundationShellRouterBodyScope({
     openFoundationViewCommand,
     openMarketOfferPanel,
     openMarketSellModal,
+    openMarketSellPeek,
+    closeMarketSellPeek,
+    openMarketSellFromPeek,
     openPlayerDrawerById,
     openPlayerProfileById,
     openPrizeFinanceView,

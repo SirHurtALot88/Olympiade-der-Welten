@@ -7,11 +7,12 @@ export type ExpectedSellValueEntry = {
   /** Brutto-Verkaufspreis laut Sale-Factor (Bracket-Rang × MW), Fallback MW. */
   grossSalePrice: number;
   /**
-   * Offener Buyout aus SAISONENDE-Sicht: das laufende Vertragsjahr gilt als verbraucht
-   * (Laufzeit −1), d. h. bei Restlaufzeit 1 ("expiring") ist der Buyout 0.
+   * Offener Buyout — dieselbe Zahl, die der Verkaufsdialog zeigt und die Ausführung abbucht.
+   * Ob das laufende Vertragsjahr noch darin steckt, hängt daran, ob das Gehalt dieser Saison
+   * schon gebucht wurde (`resolveElapsedContractSeasonsForBuyout`).
    */
   buyoutCost: number;
-  /** Netto-Erlös = Brutto − Saisonende-Buyout; kann negativ sein (Mehrjahresvertrag). */
+  /** Netto-Erlös = Brutto − Buyout; kann negativ sein (Mehrjahresvertrag). */
   expectedSellValue: number;
   /**
    * Tatsächlich gezahlter Kaufpreis (RosterEntry.purchasePrice, display-skaliert).
@@ -35,14 +36,12 @@ export type ExpectedSellValueEntry = {
  * Fenster und Bracket-Rang-Pool, dessen Rank-Kontext pro GameState per WeakMap gecacht ist) plus
  * Buyout-Abzug (`resolveTransfermarktSellProceeds`).
  *
- * SAISONENDE-SICHT (bewusste Abweichung von der Sofort-Verkaufs-Vorschau): Die Spalte beantwortet
- * "Was bringt ein Verkauf am SAISONENDE?" — dort ist das laufende Vertragsjahr abbezahlt
- * (`statusAfterSeasonTick` zählt `contractLength` herunter und kürzt das erste Schedule-Jahr weg).
- * Deshalb wird der Buyout mit `seasonsElapsed: 1` gerechnet: das erste (laufende) Vertragsjahr
- * fällt aus dem Rest-Schedule, auslaufende Verträge (Restlaufzeit 1 = "expiring") haben KEINEN
- * Buyout mehr. Der echte Verkaufs-Flow (`previewLocalTransfermarktSell` /
- * `executeLocalTransfermarktSell`) rechnet weiterhin mit der vollen Restlaufzeit und bleibt
- * unberührt — nur diese Übersichtsspalte modelliert die Saisonende-Sicht.
+ * KEINE EIGENE SICHT MEHR: Diese Spalte rechnete früher bewusst anders als der Verkaufs-Flow
+ * (`seasonsElapsed: 1` — "Saisonende-Sicht") und sagte damit für denselben Spieler einen anderen
+ * Buyout voraus als der Dialog, der dann abbuchte. Gemeldet als "da schau, das passt nicht".
+ * Jetzt entscheidet `resolveElapsedContractSeasonsForBuyout` am Spielstand, ob das laufende
+ * Vertragsjahr noch offen ist — für diese Spalte, für die Verträge-Karte, für Vorschau und
+ * Ausführung gleichermaßen.
  *
  * Nur Spieler MIT Roster-Eintrag bekommen einen Wert: Free Agents stehen in keinem Kader und
  * können nicht verkauft werden — für sie ist "—" (kein Eintrag in der Map) die ehrliche Antwort,
@@ -83,9 +82,9 @@ export function buildExpectedSellValueByPlayerId(
       grossSalePrice,
       purchasePrice,
       gameState,
-      // Saisonende-Sicht (Laufzeit −1): das laufende Vertragsjahr fällt aus dem Buyout —
-      // siehe Funktions-Kommentar. Der echte Sell-Flow nutzt weiterhin den Default 0.
-      seasonsElapsed: 1,
+      // KEIN `seasonsElapsed` mehr: ob das laufende Vertragsjahr noch in der Ablöse steckt,
+      // entscheidet `resolveElapsedContractSeasonsForBuyout` am Spielstand — dieselbe Antwort,
+      // die auch Verkaufsdialog und Ausführung bekommen.
     });
 
     result.set(player.id, {
