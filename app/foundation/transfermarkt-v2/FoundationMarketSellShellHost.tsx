@@ -225,27 +225,38 @@ export default function FoundationMarketSellShellHost({
   const netProceeds = preview?.netProceeds ?? preview?.salePrice ?? null;
   const saleProfit = context?.saleProfit ?? preview?.profit ?? null; // GuV vs. KAUFPREIS (Kachel C1)
 
-  // Netto-Erlös vs. MARKTWERT — eine ANDERE Aussage als die GuV-Zeile oben (die
-  // vergleicht mit dem Einkaufspreis). Grün = über MW verkauft, Rot = darunter.
-  // Nur der Netto-Erlös (was am Ende wirklich ankommt) wird verglichen, nicht
-  // das Brutto — sonst würde ein offener Buyout die Farbe verfälschen.
-  const netVsMarketValue =
-    netProceeds != null && preview?.marketValueReference != null
-      ? netProceeds - preview.marketValueReference
+  // GEMELDET: „hier sehe ich, dass trotz positivem Verkaufswert im Save nur ein Nettoerlös von
+  // 21,6 raus kommen soll und somit ein verlust?"
+  //
+  // Verglichen wurde der NETTO-Erlös mit dem Marktwert — also nach Abzug des Rest-Buyouts. Der
+  // Buyout ist aber eine Kosten des VERTRAGS, kein Abschlag auf den Wert des Spielers. Ergebnis
+  // im gemeldeten Fall: Faktor 1,21× auf 24,9 Mio, Bruttopreis 30,1 Mio — und direkt darunter
+  // „−14,5 % unter Marktwert". Zwei Zeilen, die sich widersprachen.
+  //
+  // Die frühere Begründung („sonst würde ein offener Buyout die Farbe verfälschen") war genau
+  // verkehrt herum: den Buyout HINEINZURECHNEN verfälscht die Aussage, weil er mit dem Marktwert
+  // nichts zu tun hat. Wie sich der Buyout aufs Cash auswirkt, steht ohnehin eine Zeile höher
+  // („brutto X − Buyout Y") und in der GuV-Kachel.
+  //
+  // Verglichen wird deshalb der BRUTTOPREIS — dieselbe Größe, aus der auch der Faktor stammt.
+  const grossSalePrice = preview?.salePrice ?? null;
+  const saleVsMarketValue =
+    grossSalePrice != null && preview?.marketValueReference != null
+      ? grossSalePrice - preview.marketValueReference
       : null;
-  const netVsMarketValuePct =
-    netVsMarketValue != null && preview?.marketValueReference
-      ? (netVsMarketValue / preview.marketValueReference) * 100
+  const saleVsMarketValuePct =
+    saleVsMarketValue != null && preview?.marketValueReference
+      ? (saleVsMarketValue / preview.marketValueReference) * 100
       : null;
-  const mwDiffTone: "good" | "risk" | null = netVsMarketValue == null ? null : netVsMarketValue >= 0 ? "good" : "risk";
+  const mwDiffTone: "good" | "risk" | null = saleVsMarketValue == null ? null : saleVsMarketValue >= 0 ? "good" : "risk";
   const mwDiffText =
-    netVsMarketValue == null
+    saleVsMarketValue == null
       ? null
-      : `${formatSignedTransfermarktCurrency(netVsMarketValue)}${
-          netVsMarketValuePct != null
-            ? ` (${netVsMarketValuePct >= 0 ? "+" : ""}${formatLocalePoints(netVsMarketValuePct, 1)} %)`
+      : `${formatSignedTransfermarktCurrency(saleVsMarketValue)}${
+          saleVsMarketValuePct != null
+            ? ` (${saleVsMarketValuePct >= 0 ? "+" : ""}${formatLocalePoints(saleVsMarketValuePct, 1)} %)`
             : ""
-        } ${netVsMarketValue >= 0 ? "über" : "unter"} Marktwert`;
+        } ${saleVsMarketValue >= 0 ? "über" : "unter"} Marktwert`;
 
   // Buyout-Herleitung unter dem Netto-Erlös: sagt explizit, ob ein Buyout
   // absetzt UND wie viel — statt der bisherigen "kein Buyout"-Nebenbemerkung.

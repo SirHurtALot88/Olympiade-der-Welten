@@ -2057,6 +2057,11 @@ function FoundationTeamsDetailPanel({
                                 return rosterRowByPlayerId.get(row.playerId)?.ppMen ?? null;
                               case "pps:soc":
                                 return rosterRowByPlayerId.get(row.playerId)?.ppSoc ?? null;
+                              // Die Summe, die der Spieler in dieser Saison geholt hat — dieselbe
+                              // Zahl, die auch die Spielerliste als „PPs" führt (`playerPps`),
+                              // NICHT die Summe der vier Achsen-Chips nachgerechnet.
+                              case "ppsTotal":
+                                return rosterRowByPlayerId.get(row.playerId)?.playerPps ?? null;
                               default:
                                 return null;
                             }
@@ -2113,6 +2118,24 @@ function FoundationTeamsDetailPanel({
                             align: "right",
                             sortable: true,
                             tooltip: "Marktwert-Score.",
+                          },
+                          /**
+                           * GEMELDET: „Und mir fehlt noch eine Spalte für die Gesamt PPs die der
+                           * spieler geholt hat."
+                           *
+                           * Die PPs-Zelle daneben zeigt die vier Achsen einzeln — die Summe stand
+                           * nirgends, und aus vier Balken im Kopf zu addieren ist keine Antwort.
+                           * Die Zahl kommt aus derselben Quelle wie die PPs-Spalte der
+                           * Spielerliste (`playerPps` aus dem Season-Points-Ledger), damit nicht
+                           * zwei Ansichten verschiedene Summen für denselben Spieler zeigen.
+                           */
+                          {
+                            key: "ppsTotal",
+                            label: "PPs ges.",
+                            align: "right",
+                            sortable: true,
+                            tooltip:
+                              "Performance-Punkte dieser Saison insgesamt — die Summe über alle Disziplinen. Die Aufschlüsselung nach Bereich steht in der Spalte daneben.",
                           },
                           {
                             key: "pps",
@@ -2226,6 +2249,23 @@ function FoundationTeamsDetailPanel({
                             case "mvs": {
                               const value = rosterRowByPlayerId.get(row.playerId)?.playerMvs ?? null;
                               return value != null ? formatPpsValue(value) : "—";
+                            }
+                            case "ppsTotal": {
+                              const rosterRow = rosterRowByPlayerId.get(row.playerId) ?? null;
+                              const value = rosterRow?.playerPps ?? null;
+                              if (value == null) {
+                                return "—";
+                              }
+                              return (
+                                <span className="selected-roster-pps-total nl-tnum">
+                                  {formatPpsValue(value)}
+                                  {rosterRow?.ppsRank != null ? (
+                                    <small className="selected-roster-pps-total-rank" title="Ligaweiter Platz nach Season-PPs.">
+                                      #{formatWholeNumber(rosterRow.ppsRank)}
+                                    </small>
+                                  ) : null}
+                                </span>
+                              );
                             }
                             case "pps": {
                               const rosterRow = rosterRowByPlayerId.get(row.playerId) ?? null;

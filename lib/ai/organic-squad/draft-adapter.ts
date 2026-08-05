@@ -757,8 +757,9 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
       .map((entry) => [entry.playerId, entry] as const),
   );
   // SELL views carry NET-including-buyout proceeds: for each held player resolve the open buyout/release
-  // clause from its live roster entry (same resolveOpenBuyoutCostForRoster the real sale uses; no
-  // seasonsElapsed, mirroring transfermarkt-sell-service) so sellUtility scores what the club actually banks.
+  // clause from its live roster entry (same resolveOpenBuyoutCostForRoster the real sale uses — the
+  // laufende Vertragsjahr faellt dort am Spielstand raus, siehe contract-buyout-season-window) so
+  // sellUtility scores what the club actually banks.
   const held = input.roster.map((player) => {
     const rosterEntry = rosterEntryByPlayerId.get(player.id) ?? null;
     const openBuyoutCost = rosterEntry

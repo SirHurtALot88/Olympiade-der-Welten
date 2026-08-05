@@ -314,6 +314,7 @@ async function resolveSellContext(
     activePlayer && salePrice != null
       ? resolveTransfermarktSellProceeds({
           rosterEntry: {
+            teamId: activePlayer.teamId,
             contractLength: activePlayer.contractLength,
             salary: activePlayer.salary,
             // yearlySalarySchedule/contractShape sind in Prisma nicht persistiert – siehe Kommentar oben.

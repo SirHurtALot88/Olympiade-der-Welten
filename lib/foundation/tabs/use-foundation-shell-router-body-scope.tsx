@@ -3663,6 +3663,19 @@ export function useFoundationShellRouterBodyScope({
     setMarketSellPreview(null);
     setMarketSellSubject(subject);
     setFoundationPanel("sell");
+    // GEMELDET: „wenn ich einen spieler verkaufen will, springt der screen nicht zum
+    // verkaufsmodal, das irritiert."
+    //
+    // Der Verkauf ist eine eigene Drilldown-Seite, kein Overlay — die Seite tauscht also nur
+    // ihren Inhalt aus, waehrend die Scrollposition stehen bleibt. Wer weit unten in der
+    // Kaderliste auf „Verkaufen" tippt, landet entsprechend weit unten in der neuen Ansicht
+    // und sieht den Dialog gar nicht. Der Kauf-Flow raeumt das seit laengerem selbst auf
+    // (`scrollBuyModalToTop` in TransfermarktV2Client) — dem Verkauf fehlte das Gegenstueck.
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "auto" });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
     syncFoundationViewInUrl(activeView, null, subject.playerId, {
       panel: "sell",
       push: true,

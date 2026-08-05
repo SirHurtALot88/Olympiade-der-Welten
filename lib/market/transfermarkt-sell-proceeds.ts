@@ -1,4 +1,5 @@
 import type { ContractShape, ContractYearSalary, GameState, RosterEntry } from "@/lib/data/olyDataTypes";
+import { resolveElapsedContractSeasonsForBuyout } from "@/lib/market/contract-buyout-season-window";
 import {
   buildContractSalarySchedule,
   calculateOpenBuyoutCost,
@@ -69,7 +70,7 @@ export function resolveRemainingSalaryScheduleForBuyout(input: {
 }
 
 export function resolveOpenBuyoutCostForRoster(input: {
-  rosterEntry: Pick<RosterEntry, "contractLength" | "yearlySalarySchedule" | "salary" | "contractShape">;
+  rosterEntry: Pick<RosterEntry, "teamId" | "contractLength" | "yearlySalarySchedule" | "salary" | "contractShape">;
   gameState?: GameState | null;
   seasonsElapsed?: number;
 }) {
@@ -80,11 +81,14 @@ export function resolveOpenBuyoutCostForRoster(input: {
   if (schedule.length === 0) {
     return 0;
   }
-  return calculateOpenBuyoutCost(schedule, input.seasonsElapsed ?? 0) ?? 0;
+  const seasonsElapsed =
+    input.seasonsElapsed ??
+    resolveElapsedContractSeasonsForBuyout({ gameState: input.gameState, teamId: input.rosterEntry.teamId });
+  return calculateOpenBuyoutCost(schedule, seasonsElapsed) ?? 0;
 }
 
 export function resolveTransfermarktSellProceeds(input: {
-  rosterEntry: Pick<RosterEntry, "contractLength" | "yearlySalarySchedule" | "salary" | "contractShape">;
+  rosterEntry: Pick<RosterEntry, "teamId" | "contractLength" | "yearlySalarySchedule" | "salary" | "contractShape">;
   grossSalePrice: number;
   purchasePrice?: number | null;
   gameState?: GameState | null;

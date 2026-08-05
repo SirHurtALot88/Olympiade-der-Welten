@@ -58,19 +58,43 @@ describe("Buyout — das laufende Vertragsjahr zählt nicht mehr mit", () => {
   });
 });
 
-describe("Buyout — die Verträge-Tabelle benutzt die Saisonende-Sicht", () => {
+/**
+ * NACHTRAG — die erste Antwort auf den Befund oben war nur die halbe.
+ *
+ * Sie setzte in der Verträge-Tabelle eine feste `1` und schrieb ausdrücklich hin, dass der echte
+ * Verkaufs-Flow „unberührt" bleibt. Damit rechneten Tabelle und Verkaufsdialog für denselben
+ * Spieler verschieden — gemeldet als „da schau, das passt nicht" (Tabelle 0,0 Mio, Dialog 8,8 Mio)
+ * und „Buyout kosten — obwohl der Vertrag ausläuft — das darf nicht sein".
+ *
+ * Am Spielstand gemessen (`fresh-season-1-1785859604037`): 288 von 288 Kaderzeilen bekamen zwei
+ * verschiedene Antworten, in Summe 2.334 Mio Unterschied. Jetzt entscheidet
+ * `resolveElapsedContractSeasonsForBuyout` — für Tabelle, VK-Spalte, Dialog und Ausführung
+ * dieselbe Regel, dieselbe Zahl.
+ */
+describe("Buyout — Tabelle und Verkaufsdialog fragen dieselbe Regel", () => {
   const SOURCE = readFileSync(join(process.cwd(), "lib/market/contract-negotiation-preview.ts"), "utf8");
 
-  it("die Roster-Zeilen rechnen mit einem abgelaufenen Vertragsjahr", () => {
-    expect(SOURCE).toContain("buyoutCost: calculateOpenBuyoutCost(yearlySalarySchedule, 1),");
+  it("die Roster-Zeilen setzen das abgelaufene Jahr nicht mehr von Hand", () => {
+    expect(SOURCE).not.toContain("buyoutCost: calculateOpenBuyoutCost(yearlySalarySchedule, 1),");
     expect(SOURCE).not.toContain("buyoutCost: calculateOpenBuyoutCost(yearlySalarySchedule, 0),");
+    expect(SOURCE).toContain("resolveElapsedContractSeasonsForBuyout({ gameState: input.gameState, teamId: input.teamId })");
+  });
+
+  it("die VK-Spalte der Spielerliste hat ihre Sonderrechnung abgegeben", () => {
+    const spalte = readFileSync(join(process.cwd(), "lib/market/transfermarkt-expected-sell-value.ts"), "utf8");
+    // Nur der Aufruf zählt, nicht die Erklärung darüber — deshalb ohne Kommentarzeilen geprüft.
+    const code = spalte
+      .split("\n")
+      .filter((zeile) => !/^\s*(\/\/|\*|\/\*)/.test(zeile))
+      .join("\n");
+    expect(code).not.toContain("seasonsElapsed");
   });
 
   /**
-   * Der echte Verkaufs-Flow bleibt unberührt: was am Ende abgebucht wird, ändert sich nicht — nur
-   * was die Übersicht dazu behauptet. Der Default der Funktion bleibt deshalb 0.
+   * Der Parameter bleibt überschreibbar (Fixtures, der nicht verdrahtete Prisma-Pfad) — nur setzt
+   * ihn keine Ansicht mehr auf Verdacht.
    */
-  it("der Default der Funktion bleibt bei der vollen Restlaufzeit", () => {
+  it("der Default der reinen Funktion bleibt bei der vollen Restlaufzeit", () => {
     expect(SOURCE).toContain("export function calculateOpenBuyoutCost(yearlySalarySchedule: ContractYearSalary[], seasonsElapsed = 0)");
   });
 });

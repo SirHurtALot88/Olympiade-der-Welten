@@ -318,9 +318,9 @@ describe("FoundationMarketSellShellHost — Zustandsmaschine", () => {
   // Nutzerwunsch nach der Freigabe #2: "in grün oder rot der vergleich mit dem
   // echten aktuellen MW" — ANDERE Aussage als die GuV-vs-Kaufpreis-Zeile in
   // Kachel 1 (vergleicht mit dem Einkaufspreis), deshalb eigenes Label.
-  it("MW-Vergleich: grün und 'über Marktwert', wenn der Netto-Erlös über dem MW liegt", () => {
+  it("MW-Vergleich: grün und 'über Marktwert', wenn der Verkaufspreis über dem MW liegt", () => {
     const html = render({
-      marketSellPreview: makeSummary({ netProceeds: 30, marketValueReference: 20 }),
+      marketSellPreview: makeSummary({ salePrice: 30, buyoutCost: 0, netProceeds: 30, marketValueReference: 20 }),
     });
     expect(html).toContain("vs. Marktwert:");
     expect(html).toContain("über Marktwert");
@@ -331,14 +331,41 @@ describe("FoundationMarketSellShellHost — Zustandsmaschine", () => {
     expect(html).toContain("GuV vs. Kaufpreis");
   });
 
-  it("MW-Vergleich: rot und 'unter Marktwert', wenn der Netto-Erlös unter dem MW liegt", () => {
+  it("MW-Vergleich: rot und 'unter Marktwert', wenn der Verkaufspreis unter dem MW liegt", () => {
     const html = render({
-      marketSellPreview: makeSummary({ netProceeds: 15, marketValueReference: 20 }),
+      marketSellPreview: makeSummary({ salePrice: 15, buyoutCost: 0, netProceeds: 15, marketValueReference: 20 }),
     });
     expect(html).toContain("vs. Marktwert:");
     expect(html).toContain("unter Marktwert");
     expect(html).toMatch(/transfer-sell-price-mw-diff is-risk/);
     expect(html).not.toMatch(/transfer-sell-price-mw-diff is-good/);
+  });
+
+  /**
+   * GEMELDET: „im VK Modal steht auch n Faktor von 1,21 was dem angezeigten widerspricht …
+   * das darf nicht sein" — im Screenshot: Faktor 1,21× auf MW 24,9, brutto 30,1, Buyout 8,8,
+   * und darunter „vs. Marktwert: -3,6 Mio (-14,5 %) unter Marktwert".
+   *
+   * Verglichen wurde der NETTO-Erlös, also nach Abzug des Buyouts. Der Buyout ist aber eine
+   * Sache des Vertrags und keine Aussage über den Wert des Spielers — er drehte den Aufschlag
+   * des Verkaufsfaktors ins Minus und widersprach damit der Zeile direkt darüber. Wie sich der
+   * Buyout aufs Cash auswirkt, steht ohnehin eine Zeile höher („brutto X − Buyout Y").
+   */
+  it("MW-Vergleich: widerspricht dem Verkaufsfaktor nicht mehr, wenn ein Buyout offen ist", () => {
+    const html = render({
+      marketSellPreview: makeSummary({
+        salePrice: 30.1,
+        buyoutCost: 8.8,
+        netProceeds: 21.3,
+        marketValueReference: 24.9,
+        saleFactor: 1.21,
+      }),
+    });
+    expect(html).toContain("über Marktwert");
+    expect(html).not.toContain("unter Marktwert");
+    expect(html).toMatch(/transfer-sell-price-mw-diff is-good/);
+    // Der Buyout verschwindet dabei nicht — er steht weiter in der Herleitung des Netto-Erlöses.
+    expect(html).toContain("− Buyout");
   });
 
   it("MW-Vergleich: zeigt ehrlich nichts, wenn kein Marktwert-Referenzwert vorliegt (kein erfundener Wert)", () => {

@@ -6866,6 +6866,23 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   color: var(--nl-accent);
 }
 
+/*
+ * „Und mir fehlt noch eine Spalte für die Gesamt PPs die der spieler geholt hat." — die Summe
+ * steht jetzt links neben der Achsen-Aufschlüsselung. Der Rang-Chip hängt tiefgestellt daran,
+ * damit die Zahl selbst die Spaltenflucht der übrigen Zahlenspalten hält.
+ */
+.is-new-look .selected-roster-pps-total {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-weight: 650;
+}
+.is-new-look .selected-roster-pps-total-rank {
+  font-size: 0.72em;
+  font-weight: 600;
+  color: var(--nl-muted-2);
+}
+
 .is-new-look .selected-roster-pps-diszi-toggle {
   display: inline-flex;
   align-items: center;
