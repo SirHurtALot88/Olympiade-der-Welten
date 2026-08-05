@@ -130,6 +130,22 @@ export type SeasonGuvParts = {
   apronFrozenLines?: boolean;
   /** `true` = der Deckel (halber Wertungsanteil) hat die Abgabe begrenzt. */
   apronGedeckelt?: boolean;
+  /**
+   * `true` = die Apron-Abrechnung dieser Saison ist BEREITS GEBUCHT (`apronSettlementLogs` trägt
+   * einen `season_end`-Eintrag). Nur dann zählt der Apron in die GuV.
+   *
+   * WARUM DIESE UNTERSCHEIDUNG NÖTIG IST — ich hatte den Apron zuerst bedingungslos mitgezählt, weil
+   * er eine der drei Einnahmequellen ist. Das war falsch, und zwei Invarianten-Tests haben es
+   * gefangen: der Finanzen-Reiter verspricht `Σ(Einnahmen) − Σ(Ausgaben) == GuV == echte
+   * Cash-Veränderung der Saison`, und die Geldfluss-Invariante verlangt `cashVorher + Σ Buchungen ==
+   * cashNachher`. Eine HOCHRECHNUNG in der GuV bricht beide: das Geld ist noch nicht geflossen
+   * (gemessen: 11,3 bzw. 3,0 Differenz).
+   *
+   * Beides zusammen geht: vor der Buchung steht der Apron als Hochrechnung DANEBEN (sichtbar, aber
+   * nicht gezählt), nach der Buchung zählt er wie jede andere Einnahme. Die Zeile ist in beiden
+   * Fällen da — nur ihr Status ändert sich mit der Realität.
+   */
+  apronGebucht?: boolean;
   /** Netto-Cash aus Vorstandszielen (Prämien − Strafen). */
   objectiveCashDelta?: number | null;
   /** Gehaltssumme der Saison, als positive Zahl. */
@@ -169,13 +185,17 @@ export function buildSeasonGuv(parts: SeasonGuvParts): SeasonGuv {
       key: "apron",
       label: POSTEN_LABEL.apron,
       amount: apronNetto,
-      counted: true,
+      counted: parts.apronGebucht === true,
       // Der Apron wird erst am Saisonende abgerechnet, und Deckel wie Ausschüttung hängen am ENDrang.
       // Die Zeile sagt deshalb, worauf sie sich stützt — sonst läse sie sich wie ein gebuchter Posten.
       note: [
-        parts.apronRank != null ? `Hochrechnung, Platz ${parts.apronRank}` : "Hochrechnung",
+        parts.apronGebucht === true
+          ? "gebucht"
+          : parts.apronRank != null
+            ? `Hochrechnung auf Platz ${parts.apronRank}, noch nicht gebucht`
+            : "Hochrechnung, noch nicht gebucht",
         parts.apronGedeckelt ? "durch den Deckel begrenzt" : null,
-        parts.apronFrozenLines === false ? "Linien noch nicht eingefroren" : null,
+        parts.apronGebucht !== true && parts.apronFrozenLines === false ? "Linien noch nicht eingefroren" : null,
       ]
         .filter(Boolean)
         .join(" · "),

@@ -85,6 +85,11 @@ export function resolveSeasonGuvPartsByTeam(
   const rankByTeamId = new Map<string, number | null>(
     gameState.teams.map((team) => [team.teamId, gameState.seasonState.standings?.[team.teamId]?.rank ?? null] as const),
   );
+  // Gebucht oder nur hochgerechnet? Entscheidet, ob der Apron in die GuV zaehlt (siehe
+  // `apronGebucht` in season-end-guv.ts).
+  const apronGebucht = (gameState.seasonState.apronSettlementLogs ?? []).some(
+    (log) => log.seasonId === gameState.season.id && log.phase === "season_end",
+  );
   const apron = (() => {
     try {
       return buildApronProjection({ gameState, rankByTeamId });
@@ -107,6 +112,7 @@ export function resolveSeasonGuvPartsByTeam(
       apronRank: apronRow?.rank ?? null,
       apronFrozenLines: apron?.frozenLines ?? false,
       apronGedeckelt: apronRow?.gedeckelt ?? false,
+      apronGebucht,
       objectiveCashDelta: objectiveSettlement[team.teamId]?.cashDelta ?? 0,
       salaryTotal: salaryTotals.get(team.teamId) ?? 0,
       loanInterest: loans.interest,

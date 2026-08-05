@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
 import type { GameState, TeamSponsorContract } from "@/lib/data/olyDataTypes";
+import { buildTeamSeasonObjectiveSettlement } from "@/lib/board/team-season-objectives-service";
 import type { PersistedSaveGame, PersistenceService, SaveVersionMetadata } from "@/lib/persistence/types";
 
 import { createFreshSeasonOneGameState } from "@/lib/game-state/singleplayer-state";
@@ -752,6 +753,32 @@ beforeAll(async () => {
   // `newCash === oldCash` wäre nur zufällig richtig. Maßgeblich ist der tatsächliche `team.cash`-Wert
   // im Save VOR/NACH `executeCashPrizeApply` (`cashBeforePrize`/`cashAfterPrize`), ergänzt um die
   // Flags aus dem geschriebenen Audit-Log.
+  /**
+   * NEU SEIT DER GuV-VEREINHEITLICHUNG (#419): der Cash-Apply fuehrt am Saisonende jetzt denselben
+   * Schwanz aus wie der Saisonabschluss im Cockpit — Kreditraten, VORSTANDSZIELE und den
+   * Insolvenz-Backstop (`season-end-tail-settlement.ts`). Vorher hoerte er nach Sponsor, Apron und
+   * Gebaeuden auf, und genau deshalb konnten Teams mit negativem Cash aus der Saison gehen.
+   *
+   * Die Kreditrate ist hier schon in Phase 4 gebucht (der Tail ueberspringt sie dann per
+   * Idempotenz-Sperre), die Vorstandsziel-Praemien sind neu. Ihr Audit-Log traegt nur Summen, keine
+   * Aufteilung je Team — die massgebliche Quelle je Team ist dieselbe, aus der auch der Apply liest.
+   * Ohne diese Zeile faellt die Invariante mit „Cash-Aenderung ohne Buchung" auf, obwohl das Geld
+   * einen sauberen Beleg hat.
+   */
+  const objectiveRewardLogsBefore = new Set(
+    (prizeSave.gameState.seasonState.objectiveRewardApplyLogs ?? []).map((log) => log.id),
+  );
+  const objectiveRewardApplied = (afterPrizeGameState.seasonState.objectiveRewardApplyLogs ?? []).some(
+    (log) => !objectiveRewardLogsBefore.has(log.id),
+  );
+  if (objectiveRewardApplied) {
+    const settlement = buildTeamSeasonObjectiveSettlement(prizeSave.gameState);
+    for (const [teamId, summary] of Object.entries(settlement.byTeamId)) {
+      if (!summary?.cashDelta) continue;
+      addPrizePhaseBooking(teamId, summary.cashDelta, "season_end:board_objectives", "objectiveRewardApplyLogs");
+    }
+  }
+
   const oldCashByTeam = new Map(prizeApply.plannedChanges.map((change) => [change.teamId, change.oldCash] as const));
   const newCashByTeam = new Map(prizeApply.plannedChanges.map((change) => [change.teamId, change.newCash] as const));
   const prizeMoneyByTeam = new Map(prizeApply.plannedChanges.map((change) => [change.teamId, change.prizeMoney] as const));
