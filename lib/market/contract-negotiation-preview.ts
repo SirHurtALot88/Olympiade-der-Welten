@@ -9,6 +9,7 @@ import type {
   TeamIdentity,
   TeamStrategyProfile,
 } from "@/lib/data/olyDataTypes";
+import { CONTRACT_SHAPE_LABELS } from "@/lib/foundation/contract-shape-label";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { resolveElapsedContractSeasonsForBuyout } from "@/lib/market/contract-buyout-season-window";
 import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
@@ -679,7 +680,9 @@ export function buildPlayerContractPreference(
   }
 
   const label = lengthPreference === "long" ? "lange Verträge" : lengthPreference === "short" ? "kurze Verträge" : "mittlere Verträge";
-  reasons.unshift(`Wunschprofil: ${label}, am liebsten ${idealLength} Saisons, Form ${shapePreference}.`);
+  // Bug gefunden bei der Vertragsform-Vereinheitlichung: hier stand `Form ${shapePreference}`,
+  // also der rohe Enum-Wert ("front_loaded") direkt im angezeigten Satz statt des Labels.
+  reasons.unshift(`Wunschprofil: ${label}, am liebsten ${idealLength} Saisons, Form ${CONTRACT_SHAPE_LABELS[shapePreference]}.`);
 
   return {
     lengthPreference,
@@ -1477,7 +1480,7 @@ function deriveContractShapeDemandSignal(contractShape: ContractShape) {
   if (contractShape === "front_loaded") {
     pushDemandBreakdown(entries, {
       key: "shape_front_loaded_cash_now",
-      label: "Front-loaded",
+      label: CONTRACT_SHAPE_LABELS.front_loaded,
       category: "contract",
       multiplier: 0.98,
       reason: "Fruehes Geld reduziert die Jahresforderung leicht.",
@@ -1485,7 +1488,7 @@ function deriveContractShapeDemandSignal(contractShape: ContractShape) {
   } else if (contractShape === "back_loaded") {
     pushDemandBreakdown(entries, {
       key: "shape_back_loaded_late_money",
-      label: "Back-loaded",
+      label: CONTRACT_SHAPE_LABELS.back_loaded,
       category: "contract",
       multiplier: 1.02,
       reason: "Spaeteres Geld verlangt leichte Kompensation.",
@@ -2320,11 +2323,11 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
   }
 
   if (contractShape === "front_loaded") {
-    reasons.push("Front-loaded legt frueh mehr Gehalt in den Vertrag.");
+    reasons.push(`${CONTRACT_SHAPE_LABELS.front_loaded} legt frueh mehr Gehalt in den Vertrag.`);
   } else if (contractShape === "back_loaded") {
-    reasons.push("Back-loaded schiebt Gehalt in spaetere Seasons.");
+    reasons.push(`${CONTRACT_SHAPE_LABELS.back_loaded} schiebt Gehalt in spaetere Seasons.`);
   } else {
-    reasons.push("Balanced verteilt das Gehalt gleichmaessig.");
+    reasons.push(`${CONTRACT_SHAPE_LABELS.balanced} verteilt das Gehalt gleichmaessig.`);
   }
 
   warnings.push("preview_only_contract_negotiation");

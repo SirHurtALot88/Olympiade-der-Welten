@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 
 import type { ContractShape, ContractYearSalary, GameState, Team } from "@/lib/data/olyDataTypes";
+import { CONTRACT_SHAPE_LABELS } from "@/lib/foundation/contract-shape-label";
 import { roundViewNumberByFactor as roundViewNumber } from "@/lib/foundation/foundation-number-utils";
 import { buildTeamContractSeasonTable } from "@/lib/market/contract-negotiation-preview";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
@@ -77,9 +78,9 @@ export function useTeamsContractDerivations(input: UseTeamsContractDerivationsIn
         futureDelta: number;
       }
     > = {
-      balanced: { shape: "balanced", label: "Balanced", count: 0, totalSalary: 0, currentDelta: 0, futureDelta: 0 },
-      front_loaded: { shape: "front_loaded", label: "Front-loaded", count: 0, totalSalary: 0, currentDelta: 0, futureDelta: 0 },
-      back_loaded: { shape: "back_loaded", label: "Back-loaded", count: 0, totalSalary: 0, currentDelta: 0, futureDelta: 0 },
+      balanced: { shape: "balanced", label: CONTRACT_SHAPE_LABELS.balanced, count: 0, totalSalary: 0, currentDelta: 0, futureDelta: 0 },
+      front_loaded: { shape: "front_loaded", label: CONTRACT_SHAPE_LABELS.front_loaded, count: 0, totalSalary: 0, currentDelta: 0, futureDelta: 0 },
+      back_loaded: { shape: "back_loaded", label: CONTRACT_SHAPE_LABELS.back_loaded, count: 0, totalSalary: 0, currentDelta: 0, futureDelta: 0 },
     };
 
     activeRows.forEach((row) => {

@@ -6,6 +6,7 @@ import { getClassColorToken } from "@/app/foundation/ClassColorChip";
 import { FoundationShellRouterMarketBuy } from "@/app/foundation/FoundationShellRouter";
 import TransfermarktV2NewLook from "@/app/foundation/transfermarkt-v2/TransfermarktV2NewLook";
 import type { ContractShape, Discipline, GameState, Team, TeamControlMode, TeamSeasonObjectiveRecord, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
+import { CONTRACT_SHAPE_LABELS } from "@/lib/foundation/contract-shape-label";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 import { getTransfermarktPortraitModel } from "@/lib/market/transfermarkt-lab";
 import type { TransferHistoryReadResult } from "@/lib/market/transfer-history-read-service";
@@ -242,9 +243,13 @@ const LABEL_MAP: Record<string, string> = {
   medium: "mittel",
   low: "niedrig",
   elite: "elite",
-  balanced: "Balanced",
-  front_loaded: "Front-loaded",
-  back_loaded: "Back-loaded",
+  // Vertragsform-Keys spiegeln bewusst `CONTRACT_SHAPE_LABELS`, damit diese generische Karte
+  // nicht wieder eine eigene (englische) Variante mitschleppt, falls sie je fuer eine
+  // Vertragsform-gestuetzte Anzeige benutzt wird — aktuell liest `formatToneLabel` nur
+  // `affordabilityStatus`, das diese Keys nicht trifft.
+  balanced: CONTRACT_SHAPE_LABELS.balanced,
+  front_loaded: CONTRACT_SHAPE_LABELS.front_loaded,
+  back_loaded: CONTRACT_SHAPE_LABELS.back_loaded,
 };
 
 function isAbortError(error: unknown) {

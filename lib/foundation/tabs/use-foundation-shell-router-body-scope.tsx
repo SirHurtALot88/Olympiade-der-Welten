@@ -226,8 +226,6 @@ import {
 import { buildSponsorCommercialRating } from "@/lib/sponsor/sponsor-commercial-rating-service";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import { buildFoundationNavAttention } from "@/lib/foundation/foundation-nav-attention";
-import { FoundationSharedProvider, useFoundationShared } from "@/lib/foundation/foundation-shared-context";
-import { FoundationStateProvider } from "@/lib/foundation/foundation-state-context";
 import type { SponsorNegotiationProfile } from "@/lib/data/olyDataTypes";
 import { buildScoutPipelineSummary } from "@/lib/scouting/facility-scout-pipeline-service";
 import {
@@ -11503,6 +11501,17 @@ export function useFoundationShellRouterBodyScope({
     aiTeams,
     canonicalSeasonLabel,
     cashApplyFeed,
+    // Root-State-Quelle (`use-foundation-page-state.ts`) statt des entfernten
+    // geteilten Shell-Kontexts — siehe Kommentar bei `cockpitAiBatchApplyFeed`
+    // in `FoundationCockpitPanelProps`.
+    cockpitAiBatchApplyFeed,
+    cockpitAiIncludeWarningTeams,
+    cockpitAiOverwriteExisting,
+    cockpitBusyKey,
+    setCockpitAiBatchApplyFeed,
+    setCockpitAiIncludeWarningTeams,
+    setCockpitAiOverwriteExisting,
+    setCockpitBusyKey,
     currentMatchdayDisciplineSchedule,
     currentMatchdayDisplayLabel,
     currentSeasonCashPrizeApplyLogs,
@@ -12141,6 +12150,9 @@ export function useFoundationShellRouterBodyScope({
     readMeta,
     readOnlyBannerMessage,
     readSourceLabel,
+    // Fuer den `FoundationStateProvider`-Value, den `FoundationPageClient.tsx`
+    // um `FoundationShellRouterBody` herum rendert — siehe `use-foundation-state-context-value.ts`.
+    reloadLiveSeasonState,
     reloadPrizePreviewFeed,
     reloadResolvePreview,
     reloadSeasonStandingsOverview,

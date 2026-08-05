@@ -6,7 +6,6 @@ import dynamic from "next/dynamic";
 import { FoundationDeferredMount } from "@/lib/foundation/FoundationDeferredMount";
 import { getSeasonEndPayoutStatus } from "@/lib/season/season-end-sponsor-payout-status";
 import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
-import { FoundationSharedProvider } from "@/lib/foundation/foundation-shared-context";
 import { FoundationShellRouterCockpit, FoundationShellRouterHistoryV2, FoundationShellRouterMarketSell, FoundationShellRouterMarketV2, FoundationShellRouterMatchdayResult, FoundationShellRouterPrize, FoundationShellRouterSeasonPreview, FoundationShellRouterTeams, FoundationShellRouterTraining } from "@/app/foundation/FoundationShellRouter";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import ContractRenewalNegotiationModal from "@/app/foundation/teams-v2/ContractRenewalNegotiationModal";
@@ -190,9 +189,9 @@ import { canAdvanceMatchdayFromStep } from "@/lib/foundation/resolve-game-flow-a
 // only ever mounted behind a single `activeView === "…"` (or equivalent)
 // gate below, so lazy-loading them via next/dynamic lets each view's chunk
 // compile on demand instead of all up front. ssr:false is used throughout:
-// this shell only ever renders client-side (see FoundationSharedProvider /
-// the "use client" pragma above and the `gameState.season.id === "loading"`
-// bootstrap gate), so there is no server-rendered markup for these panels to
+// this shell only ever renders client-side (see the "use client" pragma
+// above and the `gameState.season.id === "loading"` bootstrap gate), so
+// there is no server-rendered markup for these panels to
 // match — ssr:false simply skips a wasted server render of code that would
 // never produce visible output pre-hydration anyway. `prefetchFoundationPanel`
 // (lib/foundation/foundation-panel-prefetch.ts) already calls `import(...)`
@@ -281,6 +280,44 @@ const FoundationChangelogHost = dynamic(() => import("@/app/foundation/changelog
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Changelog wird geladen…" />,
 });
+
+/**
+ * Was gerade laeuft, in Worten — fuer Ablaeufe, die spuerbar Zeit brauchen.
+ *
+ * Bewusst nur die langen: Ein Hinweis fuer jede Kleinigkeit waere Rauschen. Aufgenommen
+ * ist, was den Spieler sonst vor einer stillen Oberflaeche sitzen laesst. Der Saisonende-
+ * Schritt rechnet die Entwicklung von rund 3000 Spielern durch — gemessen etwa 13 der
+ * insgesamt 17 Sekunden. Das ist echte Arbeit und soll auch so benannt werden, statt
+ * wegoptimiert oder verschwiegen zu werden.
+ *
+ * Schluessel sind die `cockpitBusyKey`-Werte aus `cockpit-handlers.ts`.
+ */
+const FOUNDATION_BUSY_NOTICES: Record<string, { title: string; detail: string } | undefined> = {
+  "season-transition-open-transfer-window": {
+    title: "Saisonende wird gerechnet",
+    detail: "Spielerentwicklung für alle Teams, danach öffnet das Transferfenster. Das dauert einen Moment.",
+  },
+  "season-transition-advance": {
+    title: "Nächster Saisonende-Schritt",
+    detail: "Der Assistent rechnet den Schritt durch.",
+  },
+  "season-transition-start": {
+    title: "Season-Wechsel wird gestartet",
+    detail: "Saisonabschluss wird vorbereitet.",
+  },
+  "preseason-next-season-setup": {
+    title: "Neue Saison wird aufgesetzt",
+    detail: "Spielplan, Kader und Ausgangslage werden erzeugt.",
+  },
+  "whole-season-dryrun": {
+    title: "Saison wird durchsimuliert",
+    detail: "Alle Spieltage werden probeweise gerechnet.",
+  },
+  "matchday-auto-run-execute": {
+    title: "Spieltag wird gewertet",
+    detail: "Ergebnisse werden geschrieben und der Saisonstand aktualisiert.",
+  },
+};
 
 const FoundationDebugGameStatePanel = dynamic(
   () => import("@/app/foundation/debug/FoundationDebugGameStatePanel"),
@@ -957,7 +994,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
 
   return (
     (
-    <FoundationSharedProvider>
     <main
       className="app-shell foundation-shell foundation-app is-new-look"
       data-view-width={viewWidthMode}
@@ -1678,6 +1714,27 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               </div>
             );
           })()
+        ) : null}
+        {/* Laufende Langlaeufer benennen, solange sie laufen.
+            Das Aktions-Feedback darunter meldet erst das ERGEBNIS und blendet sich nach
+            6 Sekunden aus — fuer einen Lauf, der laenger dauert als das, taugt es nicht.
+            Der Saisonende-Schritt rechnet die Spielerentwicklung fuer alle Teams und
+            braucht dafuer echte Sekunden; ohne Ansage sieht das aus, als haenge das Spiel.
+            Diese Zeile haengt am Busy-Schluessel und steht damit exakt so lange wie die
+            Arbeit — kein Timer, der zu frueh oder zu spaet abraeumt. */}
+        {FOUNDATION_BUSY_NOTICES[cockpitBusyKey ?? ""] ? (
+          <div
+            className="foundation-action-feedback is-toast is-info"
+            role="status"
+            aria-live="polite"
+            data-testid="foundation-busy-notice"
+          >
+            <div className="foundation-ai-preseason-copy">
+              <span className="eyebrow">Läuft gerade</span>
+              <strong>{FOUNDATION_BUSY_NOTICES[cockpitBusyKey ?? ""]!.title}</strong>
+              <span className="muted">{FOUNDATION_BUSY_NOTICES[cockpitBusyKey ?? ""]!.detail}</span>
+            </div>
+          </div>
         ) : null}
         {foundationActionFeedback ? (
           <div
@@ -3131,7 +3188,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
       </div>
       </FoundationShell>
     </main>
-    </FoundationSharedProvider>
   )
   );
 }

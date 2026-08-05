@@ -79,7 +79,6 @@ import type {
 } from "@/lib/foundation/multiseason-balance-dashboard";
 import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 import type { SaveSummary } from "@/lib/persistence/types";
-import { useFoundationShared } from "@/lib/foundation/foundation-shared-context";
 import { formatGermanSaveTimestamp } from "@/lib/utils/format-datetime";
 
 export interface FoundationCockpitPanelProps {
@@ -92,8 +91,20 @@ export interface FoundationCockpitPanelProps {
   aiTeams: Team[];
   canonicalSeasonLabel: string;
   cashApplyFeed: FoundationApplySummary | null;
+  // Cockpit-Busy/AI-Batch-State kommt als Prop von der Root-State-Quelle
+  // (`use-foundation-page-state.ts`, via FoundationCockpitHost durchgereicht) —
+  // nicht mehr über den entfernten geteilten Shell-Kontext. Der hielt
+  // dieselben vier Werte ein zweites Mal in einem eigenen
+  // `useState`, ohne dass beide je synchronisiert wurden: Aktionen aus dem
+  // Cockpit selbst setzten den Kontext-Wert, waehrend Verbraucher ausserhalb
+  // des Cockpits (Arena, Saisonabschluss-Panel, globaler „Weiter"-Button)
+  // den Hook-Wert lasen — zwei Wahrheiten fuer denselben Busy-Zustand.
+  cockpitAiBatchApplyFeed: FoundationAiLineupBatchApplyResponse | null;
+  cockpitAiIncludeWarningTeams: boolean;
   cockpitAiLineupStatus: { status: "blocked"; message: string; } | { status: "applied"; message: string; } | { status: "warning"; message: string; } | { status: "ready"; message: string; } | { status: "open"; message: string; };
+  cockpitAiOverwriteExisting: boolean;
   cockpitAutoRunStatus: { status: "open"; message: string; } | { status: "applied"; message: string; } | { status: "blocked"; message: string; } | { status: "warning"; message: string; } | { status: "ready"; message: string; };
+  cockpitBusyKey: string | null;
   cockpitCashApplyStatus: { status: "applied"; message: string; } | { status: "blocked"; message: string; } | { status: "ready"; message: string; } | { status: "open"; message: string; };
   cockpitFlowChecklist: ({ label: string; done: boolean; active?: undefined; } | { label: string; done: boolean; active: boolean; })[];
   cockpitFreshSeasonStatus: { status: "blocked"; message: string; } | { status: "ready"; message: string; } | { status: "applied"; message: string; } | { status: "warning"; message: string; };
@@ -198,6 +209,9 @@ export interface FoundationCockpitPanelProps {
   selectedPrizePreviewRow: FoundationPrizePreviewItem | null;
   selectedStandingRow: TeamManagementSnapshotRow | null;
   setActiveView: Dispatch<SetStateAction<FoundationView>>;
+  setCockpitAiIncludeWarningTeams: Dispatch<SetStateAction<boolean>>;
+  setCockpitAiOverwriteExisting: Dispatch<SetStateAction<boolean>>;
+  setCockpitBusyKey: Dispatch<SetStateAction<string | null>>;
   setFeatureAuditFilter: Dispatch<SetStateAction<FeatureAuditFilter>>;
   setFreshSeasonStartMessage: Dispatch<SetStateAction<string | null>>;
   setMatchdayAutoRunIncludeWarningLineups: Dispatch<SetStateAction<boolean>>;
@@ -252,8 +266,6 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
     setCockpitAiIncludeWarningTeams,
     setCockpitAiOverwriteExisting,
     setCockpitBusyKey,
-  } = useFoundationShared();
-  const {
     activeSaveId,
     activeSaveName,
     activeSaveSummary,

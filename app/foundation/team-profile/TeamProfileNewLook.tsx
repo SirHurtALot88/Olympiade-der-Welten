@@ -24,6 +24,7 @@ import {
   type NlAxisKey,
   type NlTone,
 } from "@/components/foundation/new-look";
+import { CONTRACT_SHAPE_LABELS } from "@/lib/foundation/contract-shape-label";
 import { buildTeamDisciplineRankRowsFromGameState } from "@/lib/foundation/team-discipline-rank-engine";
 import { calculateFacilityIncome, calculateFacilityUpkeep } from "@/lib/facilities/facility-effects";
 import type {
@@ -385,12 +386,12 @@ function getContractShapeTag(shape: ContractShape | null | undefined): {
   tone: NlTone;
 } {
   if (shape === "front_loaded") {
-    return { tag: "FL", label: "front-loaded (jetzt teurer)", tone: "warn" };
+    return { tag: "FL", label: `${CONTRACT_SHAPE_LABELS.front_loaded} (jetzt teurer)`, tone: "warn" };
   }
   if (shape === "back_loaded") {
-    return { tag: "BL", label: "back-loaded (später teurer)", tone: "accent" };
+    return { tag: "BL", label: `${CONTRACT_SHAPE_LABELS.back_loaded} (später teurer)`, tone: "accent" };
   }
-  return { tag: "STD", label: "normal (gleichmäßig)", tone: "neutral" };
+  return { tag: "STD", label: `${CONTRACT_SHAPE_LABELS.balanced} (gleichmäßig verteilt)`, tone: "neutral" };
 }
 
 /** Anzahl der Zeilen, die die MW-/GEHALT-Hover maximal einzeln listen (Rest → "…"). */
@@ -493,12 +494,12 @@ export type TeamProfileNewLookProps = {
   onOpenContracts?: () => void;
   leagueHeatPools?: LeaguePlayerHeatPools;
   /**
-   * Voller GameState direkt als Prop. Die Team-Profil-Seite wird im Shell nicht
-   * innerhalb des `FoundationStateProvider` gemountet, deshalb liefert der
-   * optionale Kontext dort `null` — was RANG-/CASH-/MW-/GEHALT-Hover und das
-   * volle Squad-Depth-Chart auf "Kein Ligakontext" degradieren ließ. Wird der
-   * GameState als Prop durchgereicht (Shell hat ihn im Scope), nutzen wir ihn
-   * bevorzugt und der Kontext bleibt nur Fallback.
+   * Voller GameState, optional direkt als Prop. `FoundationStateProvider` ist
+   * um `FoundationShellRouterBody` gemountet (`FoundationPageClient.tsx`) und
+   * liefert dort inzwischen einen echten Wert für RANG-/CASH-/MW-/GEHALT-Hover
+   * und das volle Squad-Depth-Chart. Dieses Prop bleibt trotzdem der
+   * Vorrang-Pfad — der Kontext ist nur innerhalb dieser Shell gemountet, nicht
+   * an jedem denkbaren Render-Ort von `TeamProfileNewLook`.
    */
   gameState?: GameState | null;
 };

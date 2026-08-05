@@ -43,7 +43,6 @@ import {
   type LegacyLineupDragBlockReason,
   type LegacyLineupDragFitTier,
 } from "@/lib/lineups/legacy-lineup-drag-drop";
-import { getTransfermarktTierFromPoints } from "@/lib/market/transfermarkt-sheet-stats";
 import {
   filterLegacyLineupCandidateEntries,
   type LegacyLineupCandidateTab,
@@ -61,6 +60,53 @@ import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-disciplin
 import { areTeamPowersEnabled, describeTeamPowerDebuffEffect, isTeamPowerDebuffEffect } from "@/lib/lineups/team-powers";
 import type { AiLegacyLineupPreview } from "@/lib/ai/ai-needs-types";
 import { prefetchMatchdayArenaBase } from "@/lib/foundation/foundation-panel-prefetch";
+// Rechenkern der Kandidaten-/Kader-Ableitungen und der Bewertungs-/Freigabe-Kette:
+// nach `lib/lineups/lineup-candidate-model.ts` und `lib/lineups/lineup-audit.ts`
+// verschoben (siehe dortige Kommentare). Diese Komponente behaelt nur noch duenne
+// `useMemo`-Huellen, die diese Funktionen mit denselben Eingaben aufrufen wie vorher.
+import {
+  attributeShortLabels,
+  buildActiveSlotCandidateByActivePlayerId,
+  buildCandidateAxisReasonChips,
+  buildMatchdayRosterCards,
+  buildPlayerBestSlotSummaryByActivePlayerId,
+  buildSlotCandidateSummaryByKey,
+  buildSlotFitExplanation,
+  buildSlotPreviewByKey,
+  buildTeamdeckCandidateEntries,
+  buildTeamdeckCandidateGroups,
+  formatDecimalScore,
+  formatNullableScore,
+  formatScore,
+  getTeamdeckCandidateGroupMeta,
+  isElevatedFatigue,
+  formatFatigueImpactDetail,
+  normalizeClassHintToken,
+  resolveAttributeGrade,
+  type ActiveSlotCandidate,
+  type LineupPlayerTableRow,
+  type MatchdayFocusAttribute,
+  type MatchdayRosterCard,
+  type MatchdaySlotPreviewCard,
+  type PlayerBestSlotEntry,
+  type SlotCandidateSummaryEntry,
+  type TeamdeckCandidateEntry,
+  type TeamdeckCandidateGroup,
+  type TeamdeckCandidateQualityKey,
+  type TeamdeckFilterMode,
+  type TeamdeckSortMode,
+} from "@/lib/lineups/lineup-candidate-model";
+import {
+  buildLineupFlowSummary,
+  buildLineupMiniAudit,
+  buildLineupSaveCta,
+  buildMatchdayPreviewCards,
+  buildSlotIssuesByKey,
+  computeLineupReadyToSave,
+  formatLineupHintLabel,
+  formatMoraleDelta,
+  type LineupMoraleDecision,
+} from "@/lib/lineups/lineup-audit";
 
 // Perf/DX (#57): these three sub-views are each only rendered behind a single
 // runtime condition (newLook flag, formBoard tab, focusV2 variant) — never all
@@ -370,82 +416,8 @@ type LegacyLineupLabClientProps = {
   roomContext?: FoundationRoomContext | null;
 };
 
-type LineupPlayerTableRow = {
-  id: string;
-  activePlayerId: string | null;
-  portraitUrl: string | null;
-  name: string;
-  teamName: string;
-  contractLength: number | null;
-  className: string | null;
-  potential: number | null;
-  discipline1Score: number | null;
-  discipline2Score: number | null;
-  appearances: number | null;
-  marketValue: number | null;
-  playerOvr: number | null;
-  playerPps: number | null;
-  coreStats: {
-    pow: number;
-    spe: number;
-    men: number;
-    soc: number;
-  } | null;
-  traitsPositive: string[];
-  traitsNegative: string[];
-  injuryStatus: "healthy" | "injured" | "recovering" | null;
-  injuryRiskLabel: string | null;
-  availabilityBlocker: string | null;
-  demands: Array<{
-    demandId: string;
-    label: string;
-    detail: string;
-    targetDisciplineId?: string | null;
-    status: "open" | "fulfilled" | "at_risk" | "failed";
-    priority: "low" | "medium" | "high";
-    moraleReward: number;
-    moralePenalty: number;
-  }>;
-  attributeStats: PlayerAttributeSheetStats | null;
-  attributeRatings: Partial<Record<keyof PlayerAttributeSheetStats, string | null>> | null;
-};
-
-type MatchdayFocusAttribute = {
-  key: keyof PlayerAttributeSheetStats;
-  label: string;
-  shortLabel: string;
-  weightPct: number;
-  value: number | null;
-  ratingLabel: string | null;
-};
-
-type MatchdayRosterCard = LineupPlayerTableRow & {
-  discipline1Label: string;
-  discipline2Label: string;
-  selectedSides: Array<"d1" | "d2">;
-  topAttributesD1: MatchdayFocusAttribute[];
-  topAttributesD2: MatchdayFocusAttribute[];
-  fitLane: "d1" | "flex" | "d2";
-  fitDelta: number;
-  fatigueCount: number | null;
-  captainEligible: boolean;
-};
-
-type MatchdaySlotPreviewCard = {
-  slotKey: string;
-  disciplineSide: "d1" | "d2";
-  role: MatchdaySlotRoleDefinition | null;
-  intensity: MatchdayIntensityStage;
-  projected: ReturnType<typeof calculateMatchdayProjectedPreview>;
-  selectedScore: number | null;
-  selectedPlayerName: string | null;
-  /**
-   * Rohe Eingabe der Slot-Projektion OHNE Intensitaet. Damit laesst sich dieselbe
-   * Funktion (`calculateMatchdayProjectedPreview`) mit einer hypothetischen
-   * Intensitaet erneut aufrufen, statt deren Formel irgendwo nachzubauen.
-   */
-  projectionInput: Omit<Parameters<typeof calculateMatchdayProjectedPreview>[0], "intensity">;
-};
+// LineupPlayerTableRow/MatchdayFocusAttribute/MatchdayRosterCard/MatchdaySlotPreviewCard:
+// siehe lib/lineups/lineup-candidate-model.ts (dort importiert).
 
 type MatchdaySlotDragPreviewCard = {
   slotKey: string;
@@ -459,23 +431,9 @@ type MatchdaySlotDragPreviewCard = {
   slotRuleLabel: string | null;
 };
 
-type TeamdeckFilterMode = "all" | "free" | "assigned" | "blocked";
-type TeamdeckSortMode = "fit" | "top" | "d1" | "d2" | "captain" | "fatigue" | "wish";
-type TeamdeckCandidateQualityKey = "instant" | "alternative" | "fatigue" | "blocked" | "emergency";
-
-type LineupMoraleDecision = {
-  playerId: string;
-  activePlayerId: string | null;
-  playerName: string;
-  demandId: string;
-  label: string;
-  detail: string;
-  priority: "low" | "medium" | "high";
-  targetDisciplineId: string | null;
-  fulfilled: boolean;
-  isRelevant: boolean;
-  moraleDelta: number;
-};
+// TeamdeckFilterMode/TeamdeckSortMode/TeamdeckCandidateQualityKey: siehe
+// lib/lineups/lineup-candidate-model.ts. LineupMoraleDecision: siehe
+// lib/lineups/lineup-audit.ts (beide importiert).
 
 type LegacyLineupUndoSnapshot = {
   id: string;
@@ -551,21 +509,7 @@ const attributeLabels: Record<keyof PlayerAttributeSheetStats, string> = {
   height: "Height",
 };
 
-const attributeShortLabels: Record<keyof PlayerAttributeSheetStats, string> = {
-  power: "POW",
-  health: "HEA",
-  stamina: "STA",
-  intelligence: "INT",
-  awareness: "AWA",
-  determination: "DET",
-  speed: "SPD",
-  dexterity: "DEX",
-  charisma: "CHA",
-  will: "WIL",
-  spirit: "SPI",
-  torment: "TOR",
-  height: "HGT",
-};
+// attributeShortLabels: siehe lib/lineups/lineup-candidate-model.ts (dort importiert).
 
 function loadLegacyLineupTablePreferences(): LegacyLineupTablePreferences {
   if (typeof window === "undefined") {
@@ -608,13 +552,7 @@ function orderLegacyLineupColumns(columns: LegacyLineupTableColumn[], columnOrde
   });
 }
 
-function normalizeClassHintToken(value: string | null | undefined) {
-  return (value ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ");
-}
+// normalizeClassHintToken: siehe lib/lineups/lineup-candidate-model.ts (dort importiert).
 
 function formatIntensityStageLabel(value: MatchdayIntensityStage) {
   if (value === "conserve") return "Schonen";
@@ -622,150 +560,8 @@ function formatIntensityStageLabel(value: MatchdayIntensityStage) {
   return "Normal";
 }
 
-function buildSlotFitExplanation(
-  role: MatchdaySlotRoleDefinition | null,
-  rosterCard: Pick<LineupPlayerTableRow, "className" | "attributeStats" | "attributeRatings"> | null,
-  projected: ReturnType<typeof calculateMatchdayProjectedPreview> | null,
-  scoreDelta?: number | null,
-) {
-  const keyAttributes = (role?.keyAttributes ?? [])
-    .slice(0, 3)
-    .map((attribute) => {
-      const value = rosterCard?.attributeStats?.[attribute.attribute] ?? null;
-      const rating = rosterCard?.attributeRatings?.[attribute.attribute] ?? null;
-      return {
-        shortLabel: attributeShortLabels[attribute.attribute],
-        value,
-        rating,
-        weightPct: attribute.weightPct,
-        emphasis: attribute.emphasis,
-      };
-    });
-  const positiveAttributes = keyAttributes.filter((attribute) => attribute.emphasis !== "support");
-  const strainAttribute = keyAttributes.find((attribute) => attribute.emphasis === "support") ?? null;
-  const normalizedClass = normalizeClassHintToken(rosterCard?.className ?? null);
-  const roleClassFit =
-    role?.classHints?.length && normalizedClass
-      ? role.classHints.some((hint) => normalizeClassHintToken(hint) === normalizedClass)
-      : false;
-  const attributeLine = positiveAttributes.length
-    ? positiveAttributes
-        .map((attribute) => `${attribute.shortLabel} ${attribute.rating ?? (attribute.value != null ? Math.round(attribute.value) : "—")}`)
-        .join(" · ")
-    : "Basiswert entscheidet";
-  const roleDelta = projected?.roleModifier ?? 0;
-  const roleDeltaText = roleDelta
-    ? `Rolle ${roleDelta > 0 ? "+" : ""}${formatDecimalScore(roleDelta, 1)}`
-    : "Rolle neutral";
-  const deltaText =
-    scoreDelta != null
-      ? `Δ ${scoreDelta >= 0 ? "+" : ""}${formatDecimalScore(scoreDelta, 1)}`
-      : projected?.totalProjected != null
-        ? `Slot ${formatDecimalScore(projected.totalProjected, 1)}`
-        : "Slot offen";
-  const summary = role
-    ? `${role.label}: ${attributeLine} · ${roleDeltaText}`
-    : `${attributeLine} · ${roleDeltaText}`;
-  const detailParts = [
-    roleClassFit ? "Klassenfit" : role?.classHints?.length ? `Off-Role gegen ${role.classHints.join(" / ")}` : null,
-    strainAttribute ? `Belastung ${strainAttribute.shortLabel} ${strainAttribute.rating ?? (strainAttribute.value != null ? Math.round(strainAttribute.value) : "—")}` : null,
-    projected?.fatigueModifier ? `Fatigue -${formatDecimalScore(projected.fatigueModifier, 1)}` : null,
-    deltaText,
-  ].filter(Boolean);
-
-  return {
-    summary,
-    detail: detailParts.join(" · ") || "Keine besonderen Slot-Abweichungen.",
-    roleClassFit,
-  };
-}
-
-type CandidateAxisKey = "pow" | "spe" | "men" | "soc";
-
-type CandidateAxisReasonChip = {
-  axis: CandidateAxisKey;
-  label: string;
-  rating: string | null;
-  tone: string;
-  weightPct: number;
-  detail: string;
-};
-
-const attributeAxisKeys: Partial<Record<keyof PlayerAttributeSheetStats, CandidateAxisKey>> = {
-  power: "pow",
-  health: "pow",
-  stamina: "pow",
-  determination: "pow",
-  speed: "spe",
-  dexterity: "spe",
-  awareness: "spe",
-  intelligence: "men",
-  will: "men",
-  spirit: "men",
-  charisma: "soc",
-  torment: "soc",
-};
-
-const axisReasonLabels: Record<CandidateAxisKey, string> = {
-  pow: "POW",
-  spe: "SPE",
-  men: "MEN",
-  soc: "SOC",
-};
-
-const axisReasonToneClasses: Record<CandidateAxisKey, string> = {
-  pow: "is-pow",
-  spe: "is-spe",
-  men: "is-men",
-  soc: "is-soc",
-};
-
-function buildCandidateAxisReasonChips(
-  role: MatchdaySlotRoleDefinition | null,
-  rosterCard: Pick<LineupPlayerTableRow, "attributeStats" | "attributeRatings"> | null,
-): CandidateAxisReasonChip[] {
-  if (!role || !rosterCard) {
-    return [];
-  }
-
-  const roleAttributes = role.keyAttributes?.length
-    ? role.keyAttributes.slice(0, 4)
-    : [
-        { attribute: role.majorPositiveAttribute, weightPct: 100, deltaPct: 0, emphasis: "primary" as const },
-        { attribute: role.minorPositiveAttribute, weightPct: 70, deltaPct: 0, emphasis: "secondary" as const },
-        { attribute: role.strainAttribute, weightPct: 40, deltaPct: 0, emphasis: "support" as const },
-      ];
-  const axisMap = new Map<CandidateAxisKey, CandidateAxisReasonChip>();
-
-  for (const attribute of roleAttributes) {
-    if (attribute.emphasis === "support") {
-      continue;
-    }
-    const axis = attributeAxisKeys[attribute.attribute];
-    if (!axis) {
-      continue;
-    }
-    const rating = rosterCard.attributeRatings?.[attribute.attribute] ?? null;
-    const value = rosterCard.attributeStats?.[attribute.attribute] ?? null;
-    const detail = `${axisReasonLabels[axis]} ${rating ?? (value != null ? Math.round(value) : "—")} · Slot ${formatDecimalScore(attribute.weightPct, 0)}%`;
-    const existing = axisMap.get(axis);
-    if (!existing || attribute.weightPct > existing.weightPct) {
-      axisMap.set(axis, {
-        axis,
-        label: axisReasonLabels[axis],
-        rating,
-        tone: axisReasonToneClasses[axis],
-        weightPct: attribute.weightPct,
-        detail,
-      });
-    }
-  }
-
-  return (["pow", "spe", "men", "soc"] as const)
-    .map((axis) => axisMap.get(axis))
-    .filter((chip): chip is CandidateAxisReasonChip => chip != null)
-    .slice(0, 3);
-}
+// buildSlotFitExplanation/buildCandidateAxisReasonChips: siehe
+// lib/lineups/lineup-candidate-model.ts (dort importiert).
 
 function compareLegacyLineupSortValues(left: string | number, right: string | number) {
   if (typeof left === "number" && typeof right === "number") {
@@ -775,52 +571,15 @@ function compareLegacyLineupSortValues(left: string | number, right: string | nu
   return String(left).localeCompare(String(right), "de", { numeric: true, sensitivity: "base" });
 }
 
-function formatScore(value: number) {
-  return new Intl.NumberFormat("de-DE", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  }).format(value);
-}
-
-function formatDecimalScore(value: number | null | undefined, digits = 1) {
-  if (value == null || !Number.isFinite(value)) {
-    return "—";
-  }
-  return new Intl.NumberFormat("de-DE", {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  }).format(value);
-}
-
-function formatNullableScore(value: number | null | undefined) {
-  if (value == null) {
-    return "—";
-  }
-  return formatScore(value);
-}
+// formatScore/formatDecimalScore/formatNullableScore/isElevatedFatigue/
+// formatFatigueImpactDetail: siehe lib/lineups/lineup-candidate-model.ts
+// (dort importiert).
 
 function formatTraitList(values: string[] | null | undefined) {
   if (!values || values.length === 0) {
     return "—";
   }
   return values.join(", ");
-}
-
-const FATIGUE_UI_MEDIUM = 40;
-const FATIGUE_UI_HIGH = 65;
-
-function isElevatedFatigue(fatigue: number | null | undefined) {
-  return (fatigue ?? 0) >= FATIGUE_UI_MEDIUM;
-}
-
-function formatFatigueImpactDetail(fatigue: number | null | undefined) {
-  const value = Math.round(fatigue ?? 0);
-  if (value <= 0) {
-    return "Fatigue 0";
-  }
-  const penalty = getFatiguePerformancePenaltyPercent(fatigue);
-  const injury = getInjuryRiskPercent(fatigue);
-  return `Fatigue ${value} · −${formatDecimalScore(penalty, 1)}% Leistung · ${formatDecimalScore(injury, 1)}% Verletzungsrisiko`;
 }
 
 function formatExhaustionPoints(score: number | null | undefined, fatigue: number | null | undefined) {
@@ -954,17 +713,7 @@ function getTopAttributeWeights(
     }));
 }
 
-function resolveAttributeGrade(
-  ratings: Partial<Record<keyof PlayerAttributeSheetStats, string | null>> | null | undefined,
-  key: keyof PlayerAttributeSheetStats,
-  value: number | null | undefined,
-) {
-  const explicit = ratings?.[key];
-  if (explicit) {
-    return explicit;
-  }
-  return getTransfermarktTierFromPoints(value ?? null);
-}
+// resolveAttributeGrade: siehe lib/lineups/lineup-candidate-model.ts (dort importiert).
 
 function resolveTeamDisciplineRank(
   ranks: LegacyLineupLoadedContext["teamDisciplineRanks"] | null | undefined,
@@ -992,46 +741,9 @@ function resolveTeamDisciplineRank(
   return fuzzyMatch?.[1]?.rank ?? null;
 }
 
-function getTeamdeckCandidateGroupMeta(groupKey: TeamdeckCandidateQualityKey) {
-  switch (groupKey) {
-    case "instant":
-      return {
-        label: "Passt sofort",
-        description: "Saubere Sofort-Picks für den aktiven Slot.",
-        tone: "ready" as const,
-        order: 0,
-      };
-    case "alternative":
-      return {
-        label: "Gute Alternative",
-        description: "Spielbar, aber nicht ganz der klarste Direktzug.",
-        tone: "info" as const,
-        order: 1,
-      };
-    case "fatigue":
-      return {
-        label: "Riskant wegen Fatigue",
-        description: "Nur mit Bedacht einsetzen oder über Team-Einsatz abfedern.",
-        tone: "warning" as const,
-        order: 2,
-      };
-    case "blocked":
-      return {
-        label: "Blockiert / schon eingesetzt",
-        description: "Sichtbar zum Verstehen, aber nicht für den direkten Flow.",
-        tone: "blocked" as const,
-        order: 3,
-      };
-    case "emergency":
-    default:
-      return {
-        label: "Nur Notfall",
-        description: "Geht im Zweifel, fuehlt sich aber klar nach Fallback an.",
-        tone: "muted" as const,
-        order: 4,
-      };
-  }
-}
+// getTeamdeckCandidateGroupMeta/formatMoraleDelta/formatLineupHintLabel: siehe
+// lib/lineups/lineup-candidate-model.ts bzw. lib/lineups/lineup-audit.ts (dort
+// importiert).
 
 function getDemandPriorityMultiplier(priority: "low" | "medium" | "high") {
   if (priority === "high") return 1.15;
@@ -1041,56 +753,6 @@ function getDemandPriorityMultiplier(priority: "low" | "medium" | "high") {
 
 function getDemandMoraleValue(value: number, priority: "low" | "medium" | "high") {
   return Number((value * getDemandPriorityMultiplier(priority)).toFixed(1));
-}
-
-function formatMoraleDelta(value: number) {
-  if (value > 0) return `+${formatDecimalScore(value, 1)}`;
-  if (value < 0) return formatDecimalScore(value, 1);
-  return "0";
-}
-
-function formatLineupHintLabel(value: string) {
-  const normalized = value.trim().toLowerCase();
-  if (!normalized) {
-    return "Hinweis";
-  }
-  if (normalized.includes("captain")) {
-    return "Captain prüfen";
-  }
-  if (normalized.includes("fatigue") || normalized.includes("ersch")) {
-    if (normalized.includes("kostet bereits")) {
-      return "Fatigue-Malus";
-    }
-    return "Fatigue-Risiko";
-  }
-  if (normalized.includes("form")) {
-    return "Formkarten prüfen";
-  }
-  if (normalized.includes("off-role") || normalized.includes("passt schwach")) {
-    return "Off-Role";
-  }
-  if (normalized.includes("starker slot-fit") || normalized.includes("playbook-profil")) {
-    return "Guter Slot-Fit";
-  }
-  if (normalized.includes("push bei stark")) {
-    return "Push riskant";
-  }
-  if (normalized.includes("rivalitaet") || normalized.includes("rivalitätsdruck")) {
-    return "Rivalitätsdruck";
-  }
-  if (normalized.includes("schwaches") && normalized.includes("strain")) {
-    return "Strain-Risiko";
-  }
-  if (normalized.includes("slotrolle fehlt")) {
-    return "Keine Rolle";
-  }
-  if (normalized.includes("slot")) {
-    return "Rollen-Hinweis";
-  }
-  if (normalized.includes("lineup") || normalized.includes("vollst")) {
-    return "Lineup prüfen";
-  }
-  return "Hinweis";
 }
 
 function hasLineupDraftValues(
@@ -2163,101 +1825,20 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     context?.matchdayContract?.discipline1?.disciplineId,
     context?.matchdayContract?.discipline2?.disciplineId,
   ]);
-  const matchdayRosterCards = useMemo<MatchdayRosterCard[]>(() => {
-    const d1DisciplineId = context?.matchdayContract?.discipline1?.disciplineId ?? null;
-    const d2DisciplineId = context?.matchdayContract?.discipline2?.disciplineId ?? null;
-    const discipline1Label = context?.matchdayContract?.discipline1?.displayName ?? "D1";
-    const discipline2Label = context?.matchdayContract?.discipline2?.displayName ?? "D2";
-    const d1Focus = disciplineWeightInfo.d1;
-    const d2Focus = disciplineWeightInfo.d2;
-
-    return playerRows
-      .map((row) => {
-        const selectedSides: Array<"d1" | "d2"> = [];
-        if (Object.values(selections).includes(row.activePlayerId ?? "")) {
-          if (
-            row.activePlayerId &&
-            slots.some((slot) => slot.disciplineSide === "d1" && selections[slot.key] === row.activePlayerId)
-          ) {
-            selectedSides.push("d1");
-          }
-          if (
-            row.activePlayerId &&
-            slots.some((slot) => slot.disciplineSide === "d2" && selections[slot.key] === row.activePlayerId)
-          ) {
-            selectedSides.push("d2");
-          }
-        }
-
-        const fitLane: MatchdayRosterCard["fitLane"] =
-          (row.discipline1Score ?? Number.NEGATIVE_INFINITY) - (row.discipline2Score ?? Number.NEGATIVE_INFINITY) >= 8
-            ? "d1"
-            : (row.discipline2Score ?? Number.NEGATIVE_INFINITY) - (row.discipline1Score ?? Number.NEGATIVE_INFINITY) >= 8
-              ? "d2"
-              : "flex";
-
-        return {
-          ...row,
-          discipline1Label,
-          discipline2Label,
-          selectedSides,
-          topAttributesD1: d1Focus.map((attribute) => ({
-            ...attribute,
-            value: row.attributeStats?.[attribute.key] ?? null,
-            ratingLabel: resolveAttributeGrade(row.attributeRatings, attribute.key, row.attributeStats?.[attribute.key] ?? null),
-          })),
-          topAttributesD2: d2Focus.map((attribute) => ({
-            ...attribute,
-            value: row.attributeStats?.[attribute.key] ?? null,
-            ratingLabel: resolveAttributeGrade(row.attributeRatings, attribute.key, row.attributeStats?.[attribute.key] ?? null),
-          })),
-          fitLane,
-          fitDelta: (row.discipline1Score ?? 0) - (row.discipline2Score ?? 0),
-          fatigueCount: row.appearances ?? null,
-          captainEligible: Boolean(row.activePlayerId),
-        };
-      })
-      .sort((left, right) => {
-        if (left.selectedSides.length !== right.selectedSides.length) {
-          return right.selectedSides.length - left.selectedSides.length;
-        }
-
-        const leftD1 = left.discipline1Score ?? Number.NEGATIVE_INFINITY;
-        const rightD1 = right.discipline1Score ?? Number.NEGATIVE_INFINITY;
-        const leftD2 = left.discipline2Score ?? Number.NEGATIVE_INFINITY;
-        const rightD2 = right.discipline2Score ?? Number.NEGATIVE_INFINITY;
-        const leftBias = leftD1 - leftD2;
-        const rightBias = rightD1 - rightD2;
-
-        const getBiasBucket = (bias: number) => {
-          if (bias >= 8) {
-            return 0;
-          }
-          if (bias <= -8) {
-            return 2;
-          }
-          return 1;
-        };
-
-        const leftBucket = getBiasBucket(leftBias);
-        const rightBucket = getBiasBucket(rightBias);
-        if (leftBucket !== rightBucket) {
-          return leftBucket - rightBucket;
-        }
-
-        const leftTopScore = Math.max(leftD1, leftD2);
-        const rightTopScore = Math.max(rightD1, rightD2);
-        if (leftTopScore !== rightTopScore) {
-          return rightTopScore - leftTopScore;
-        }
-
-        if (Math.abs(leftBias) !== Math.abs(rightBias)) {
-          return Math.abs(rightBias) - Math.abs(leftBias);
-        }
-
-        return left.name.localeCompare(right.name, "de");
-      });
-  }, [context?.matchdayContract?.discipline1?.disciplineId, context?.matchdayContract?.discipline1?.displayName, context?.matchdayContract?.discipline2?.disciplineId, context?.matchdayContract?.discipline2?.displayName, disciplineWeightInfo.d1, disciplineWeightInfo.d2, playerRows, selections, slots]);
+  // Rechenkern in lib/lineups/lineup-candidate-model.ts (buildMatchdayRosterCards) —
+  // duenne Huelle, identische Eingaben wie vorher inline.
+  const matchdayRosterCards = useMemo<MatchdayRosterCard[]>(
+    () =>
+      buildMatchdayRosterCards({
+        playerRows,
+        selections,
+        slots,
+        discipline1Label: context?.matchdayContract?.discipline1?.displayName ?? "D1",
+        discipline2Label: context?.matchdayContract?.discipline2?.displayName ?? "D2",
+        disciplineWeightInfo,
+      }),
+    [context?.matchdayContract?.discipline1?.displayName, context?.matchdayContract?.discipline2?.displayName, disciplineWeightInfo, playerRows, selections, slots],
+  );
   const rosterCardByActivePlayerId = useMemo(() => {
     return new Map(
       matchdayRosterCards
@@ -2549,66 +2130,42 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   const getRivalryPressureForDiscipline = (disciplineId: string | null | undefined) =>
     disciplineId ? rivalryPressureByDiscipline[disciplineId] ?? 0 : 0;
 
-  const slotPreviewByKey = useMemo(() => {
-    const previews = slots.map<MatchdaySlotPreviewCard>((slot) => {
-      const selectedOption = getSelectedOptionMeta(selections[slot.key]);
-      const selectedScore = getSelectedOptionScore(selectedOption, slot.disciplineId);
-      const selectedRosterCard = rosterCardByActivePlayerId.get(selections[slot.key] ?? "");
-      const sidePreview = resolvedPreview?.disciplineSideScores.find((entry) => entry.disciplineSide === slot.disciplineSide) ?? null;
-      const role: MatchdaySlotRoleDefinition | null = slotRoleByKey.get(slot.key) ?? null;
-      const intensity = getDisciplineIntensity(slot.disciplineSide);
-      const knownModifierBonus =
-        calculatePerPlayerFormModifier({
-          formModifier: sidePreview?.formModifier,
-          selectedPlayers: sidePreview?.selectedPlayers,
-          requiredPlayers: sidePreview?.requiredPlayers,
-        }) +
-        (sidePreview?.mutatorModifier ?? 0) +
-        (sidePreview?.teamPowerModifier ?? 0) +
-        (captains[slot.disciplineSide] === selections[slot.key] ? sidePreview?.captainBonusTotal ?? 0 : 0);
-      const revealVariance =
-        (context?.formCardSource?.effectStatus === "ready" ? 0 : 2) +
-        (context?.mutatorSource?.effectStatus === "ready" ? 0 : 2) +
-        (context?.teamPowerSource?.effectStatus === "ready" ? 0 : 2);
+  // Intensitaet je Seite als Wert statt Closure — die verschobenen Rechenkerne in
+  // lib/lineups/lineup-candidate-model.ts nehmen Daten, keine Funktionen entgegen.
+  const intensityBySide = useMemo(
+    () => ({ d1: getDisciplineIntensity("d1"), d2: getDisciplineIntensity("d2") }),
+    [getDisciplineIntensity],
+  );
 
-      const projectionInput = {
-        baseScore: selectedScore,
-        role,
-        attributeStats: selectedRosterCard?.attributeStats ?? null,
-        currentFatigueCount: selectedOption?.fatigueCount ?? null,
-        requiredPlayers: context?.disciplinePlayerCounts[slot.disciplineId] ?? null,
-        knownModifierBonus,
-        revealVariance,
-        rivalryPressure: getRivalryPressureForDiscipline(slot.disciplineId),
-      };
-
-      return {
-        slotKey: slot.key,
-        disciplineSide: slot.disciplineSide,
-        role,
-        intensity,
-        selectedScore,
-        selectedPlayerName: selectedRosterCard?.name ?? null,
-        projectionInput,
-        projected: calculateMatchdayProjectedPreview({ ...projectionInput, intensity }),
-      };
-    });
-
-    return new Map(previews.map((entry) => [entry.slotKey, entry]));
-  }, [
-    captains,
-    context?.disciplinePlayerCounts,
-    context?.formCardSource?.effectStatus,
-    context?.mutatorSource?.effectStatus,
-    context?.teamPowerSource?.effectStatus,
-    resolvedPreview,
-    rosterCardByActivePlayerId,
-    selections,
-    getDisciplineIntensity,
-    rivalryPressureByDiscipline,
-    slotRoleByKey,
-    slots,
-  ]);
+  // Rechenkern in lib/lineups/lineup-candidate-model.ts (buildSlotPreviewByKey) —
+  // duenne Huelle, identische Eingaben wie vorher inline.
+  const slotPreviewByKey = useMemo(
+    () =>
+      buildSlotPreviewByKey({
+        slots,
+        selections,
+        playerOptions,
+        rosterCardByActivePlayerId,
+        resolvedPreview,
+        slotRoleByKey,
+        intensityBySide,
+        context,
+        captains,
+        rivalryPressureByDiscipline,
+      }),
+    [
+      captains,
+      context,
+      intensityBySide,
+      playerOptions,
+      resolvedPreview,
+      rosterCardByActivePlayerId,
+      rivalryPressureByDiscipline,
+      selections,
+      slotRoleByKey,
+      slots,
+    ],
+  );
   const captainCandidateInfoBySide = useMemo(() => {
     const getPriorityMultiplier = (priority: "low" | "medium" | "high") => {
       if (priority === "high") return 1.15;
@@ -2675,438 +2232,105 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     slotPreviewByKey,
     slots,
   ]);
-  const slotCandidateSummaryByKey = useMemo(() => {
-    return new Map(
-      slots.map((slot) => {
-        const currentProjected = slotPreviewByKey.get(slot.key)?.projected.totalProjected ?? null;
-        const role = slotRoleByKey.get(slot.key) ?? null;
-        // Bug T-002: getAvailableOptionsForSlot() prüft nur Slot-Kollision, NICHT
-        // Verfügbarkeit/Captain-Regel/Slot-Regel. Ohne diesen Filter konnte
-        // Best-Fit/Top-Pick einen laut Kandidatenliste blockierten Spieler
-        // vorschlagen & zuweisen. Denselben Check wie teamdeckCandidateEntries
-        // (resolveLegacyLineupDragBlockReason) anwenden, BEVOR sortiert/geslict wird.
-        const topCandidates = sortOptionsByDisciplineSkill(
-          getAvailableOptionsForSlot(slot.key).filter((option) => {
-            const rosterCard = rosterCardByActivePlayerId.get(option.activePlayerId) ?? null;
-            const blockReason = resolveLegacyLineupDragBlockReason({
-              availabilityBlocker: rosterCard?.availabilityBlocker ?? null,
-              selectedSides: rosterCard?.selectedSides ?? [],
-              targetDisciplineSide: slot.disciplineSide,
-              captainSide: captainSideByActivePlayerId.get(option.activePlayerId) ?? null,
-              hasBaseScore: option.disciplineScores[slot.disciplineId] != null,
-            });
-            return blockReason == null;
-          }),
-          slot.disciplineId,
-        )
-          // GEMELDET: „bester fit wird nich immer korrekt angezeigt".
-          //
-          // Hier stand `.slice(0, 3)` VOR dem `.map(...)`. Die Auswahl fiel damit nach
-          // `sortOptionsByDisciplineSkill` — dem rohen Disziplin-Skill —, waehrend die
-          // angezeigte Zahl (und der Tooltip, und der Gewinn beim "Optimieren") der
-          // PROJIZIERTE Score ist: Rolle, Attribute, Fatigue, Intensitaet, Rivalitaet.
-          //
-          // Zwei verschiedene Massstaebe fuer dieselbe Aussage. Ein Spieler mit etwas
-          // weniger Grund-Skill, aber besserer Rollen-Passung oder frischer, projiziert
-          // regelmaessig hoeher — er stand dann hinter dem "Best Fit" oder war durch den
-          // Schnitt schon raus. Der Knopf zeigte also einen Vorschlag, dessen eigene Zahl
-          // eine andere Reihenfolge behauptete.
-          //
-          // Jetzt wird erst projiziert, dann nach der projizierten Zahl sortiert und
-          // zuletzt geschnitten. Die Vorsortierung nach Skill bleibt als stabile
-          // Ausgangsreihenfolge (Gleichstand faellt auf sie zurueck).
-          //
-          // Kosten: die Projektion laeuft jetzt fuer alle zulaessigen Optionen statt fuer
-          // drei. Das ist dieselbe Groessenordnung, die `playerBestSlotSummaryByActivePlayerId`
-          // direkt darunter ohnehin schon rechnet (jeder Spieler × jeder Slot).
-          .map((option) => {
-            const rosterCard = rosterCardByActivePlayerId.get(option.activePlayerId) ?? null;
-            const projected = calculateMatchdayProjectedPreview({
-              baseScore: option.disciplineScores[slot.disciplineId] ?? null,
-              role,
-              attributeStats: rosterCard?.attributeStats ?? null,
-              currentFatigueCount: option.fatigueCount ?? null,
-              requiredPlayers: context?.disciplinePlayerCounts[slot.disciplineId] ?? null,
-              intensity: getDisciplineIntensity(slot.disciplineSide),
-              knownModifierBonus: 0,
-              revealVariance: 0,
-              rivalryPressure: getRivalryPressureForDiscipline(slot.disciplineId),
-            });
-            const scoreDelta =
-              projected.totalProjected != null && currentProjected != null
-                ? Number((projected.totalProjected - currentProjected).toFixed(1))
-                : null;
-            const fitExplanation = buildSlotFitExplanation(role, rosterCard, projected, scoreDelta);
-            return {
-              activePlayerId: option.activePlayerId,
-              name: option.name,
-              projectedScore: projected.totalProjected ?? null,
-              scoreDelta,
-              fitSummary: fitExplanation.summary,
-              fitDetail: fitExplanation.detail,
-              reasonChips: buildCandidateAxisReasonChips(role, rosterCard),
-              roleModifier: projected.roleModifier,
-              rangeLow: projected.rangeLow,
-              rangeHigh: projected.rangeHigh,
-              warnings: projected.warnings,
-            };
-          })
-          // Nach der PROJIZIERTEN Zahl ordnen — das ist die, die am Knopf steht. Ohne
-          // Projektion (kein Basis-Score fuer diese Diszi) nach hinten: ein Vorschlag ohne
-          // Zahl ist kein Vorschlag.
-          .sort((left, right) => (right.projectedScore ?? Number.NEGATIVE_INFINITY) - (left.projectedScore ?? Number.NEGATIVE_INFINITY))
-          .slice(0, 3);
-
-        return [slot.key, { topCandidates, currentProjected }] as const;
+  // Rechenkern in lib/lineups/lineup-candidate-model.ts (buildSlotCandidateSummaryByKey) —
+  // duenne Huelle, identische Eingaben wie vorher inline (inkl. Bug-T-002-Fix und
+  // Projektions-vor-Slice-Reihenfolge, siehe Kommentar dort).
+  const slotCandidateSummaryByKey = useMemo(
+    () =>
+      buildSlotCandidateSummaryByKey({
+        slots,
+        selections,
+        playerOptions,
+        slotPreviewByKey,
+        slotRoleByKey,
+        rosterCardByActivePlayerId,
+        captainSideByActivePlayerId,
+        context,
+        intensityBySide,
+        rivalryPressureByDiscipline,
       }),
-    );
-  }, [
-    captainSideByActivePlayerId,
-    context?.disciplinePlayerCounts,
-    getDisciplineIntensity,
-    rivalryPressureByDiscipline,
-    rosterCardByActivePlayerId,
-    slotPreviewByKey,
-    slotRoleByKey,
-    slots,
-  ]);
-  const playerBestSlotSummaryByActivePlayerId = useMemo(() => {
-    return new Map(
-      playerOptions.map((option) => {
-        const candidateSlots = slots
-          .map((slot) => {
-            const rosterCard = rosterCardByActivePlayerId.get(option.activePlayerId) ?? null;
-            const role = slotRoleByKey.get(slot.key) ?? null;
-            const projected = calculateMatchdayProjectedPreview({
-              baseScore: option.disciplineScores[slot.disciplineId] ?? null,
-              role,
-              attributeStats: rosterCard?.attributeStats ?? null,
-              currentFatigueCount: option.fatigueCount ?? null,
-              requiredPlayers: context?.disciplinePlayerCounts[slot.disciplineId] ?? null,
-              intensity: getDisciplineIntensity(slot.disciplineSide),
-              knownModifierBonus: 0,
-              revealVariance: 0,
-              rivalryPressure: getRivalryPressureForDiscipline(slot.disciplineId),
-            });
-            const currentProjected = slotPreviewByKey.get(slot.key)?.projected.totalProjected ?? null;
-            const projectedDelta =
-              projected.totalProjected != null && currentProjected != null
-                ? Number((projected.totalProjected - currentProjected).toFixed(1))
-                : null;
-            return {
-              slotKey: slot.key,
-              disciplineSide: slot.disciplineSide,
-              slotIndex: slot.slotIndex,
-              projectedScore: projected.totalProjected ?? null,
-              projectedDelta,
-              fitSummary: buildSlotFitExplanation(role, rosterCard, projected, projectedDelta).summary,
-            };
-          })
-          .filter((entry) => entry.projectedScore != null)
-          .sort((left, right) => {
-            if ((right.projectedScore ?? Number.NEGATIVE_INFINITY) !== (left.projectedScore ?? Number.NEGATIVE_INFINITY)) {
-              return (right.projectedScore ?? Number.NEGATIVE_INFINITY) - (left.projectedScore ?? Number.NEGATIVE_INFINITY);
-            }
-            return left.slotKey.localeCompare(right.slotKey, "de");
-          });
-        // Keep the full ranked list here (bounded by slot count, so cheap); callers that only
-        // want the top picks (e.g. classic "Wunsch" tags) slice further at the usage site. The
-        // v2 focus board's player-focus highlight needs the delta for every slot, not just top 2.
-
-        return [option.activePlayerId, candidateSlots] as const;
+    [
+      captainSideByActivePlayerId,
+      context,
+      intensityBySide,
+      playerOptions,
+      rivalryPressureByDiscipline,
+      rosterCardByActivePlayerId,
+      selections,
+      slotPreviewByKey,
+      slotRoleByKey,
+      slots,
+    ],
+  );
+  // Rechenkern in lib/lineups/lineup-candidate-model.ts (buildPlayerBestSlotSummaryByActivePlayerId).
+  const playerBestSlotSummaryByActivePlayerId = useMemo(
+    () =>
+      buildPlayerBestSlotSummaryByActivePlayerId({
+        playerOptions,
+        slots,
+        rosterCardByActivePlayerId,
+        slotRoleByKey,
+        context,
+        intensityBySide,
+        rivalryPressureByDiscipline,
+        slotPreviewByKey,
       }),
-    );
-  }, [context?.disciplinePlayerCounts, getDisciplineIntensity, playerOptions, rivalryPressureByDiscipline, rosterCardByActivePlayerId, slotPreviewByKey, slotRoleByKey, slots]);
+    [context, intensityBySide, playerOptions, rivalryPressureByDiscipline, rosterCardByActivePlayerId, slotPreviewByKey, slotRoleByKey, slots],
+  );
 
-  const activeSlotCandidateByActivePlayerId = useMemo(() => {
-    if (!activeSlot) {
-      return new Map<
-        string,
-        {
-          baseScore: number | null;
-          projectedScore: number | null;
-          scoreDelta: number | null;
-          blockReason: ReturnType<typeof resolveLegacyLineupDragBlockReason>;
-          fitSummary: string;
-          fitDetail: string;
-          roleModifier: number;
-          rangeLow: number | null;
-          rangeHigh: number | null;
-          warnings: string[];
-          fatigueModifier: number;
-          additionalFatigue: number;
-        }
-      >();
-    }
-
-    const currentProjectedScore = slotPreviewByKey.get(activeSlot.key)?.projected.totalProjected ?? null;
-    return new Map(
-      playerOptions.map((option) => {
-        const rosterCard = rosterCardByActivePlayerId.get(option.activePlayerId) ?? null;
-        const role = slotRoleByKey.get(activeSlot.key) ?? null;
-        const projected = getProjectedCandidateForSlot(activeSlot, option);
-        const blockReason = resolveLegacyLineupDragBlockReason({
-          availabilityBlocker: rosterCard?.availabilityBlocker ?? null,
-          selectedSides: rosterCard?.selectedSides ?? [],
-          targetDisciplineSide: activeSlot.disciplineSide,
-          captainSide: captainSideByActivePlayerId.get(option.activePlayerId) ?? null,
-          hasBaseScore: option.disciplineScores[activeSlot.disciplineId] != null,
-        });
-
-        const scoreDelta =
-          projected.totalProjected != null && currentProjectedScore != null
-            ? Number((projected.totalProjected - currentProjectedScore).toFixed(1))
-            : null;
-        const fitExplanation = buildSlotFitExplanation(role, rosterCard, projected, scoreDelta);
-
-        return [
-          option.activePlayerId,
-          {
-            baseScore: option.disciplineScores[activeSlot.disciplineId] ?? null,
-            projectedScore: projected.totalProjected,
-            scoreDelta,
-            blockReason,
-            fitSummary: fitExplanation.summary,
-            fitDetail: fitExplanation.detail,
-            roleModifier: projected.roleModifier,
-            rangeLow: projected.rangeLow,
-            rangeHigh: projected.rangeHigh,
-            warnings: projected.warnings,
-            fatigueModifier: projected.fatigueModifier,
-            additionalFatigue: projected.additionalFatigue,
-          },
-        ] as const;
+  // Rechenkern in lib/lineups/lineup-candidate-model.ts (buildActiveSlotCandidateByActivePlayerId).
+  const activeSlotCandidateByActivePlayerId: Map<string, ActiveSlotCandidate> = useMemo(
+    () =>
+      buildActiveSlotCandidateByActivePlayerId({
+        activeSlot,
+        captainSideByActivePlayerId,
+        context,
+        intensityBySide,
+        playerOptions,
+        rosterCardByActivePlayerId,
+        slotPreviewByKey,
+        slotRoleByKey,
+        rivalryPressureByDiscipline,
       }),
-    );
-  }, [activeSlot, captainSideByActivePlayerId, context?.disciplinePlayerCounts, getDisciplineIntensity, playerOptions, rosterCardByActivePlayerId, slotPreviewByKey, slotRoleByKey]);
+    [activeSlot, captainSideByActivePlayerId, context, intensityBySide, playerOptions, rosterCardByActivePlayerId, rivalryPressureByDiscipline, slotPreviewByKey, slotRoleByKey],
+  );
 
   const activeSlotCandidateSummary = activeSlot ? slotCandidateSummaryByKey.get(activeSlot.key) ?? null : null;
 
-  const teamdeckCandidateEntries = useMemo(() => {
-    const selectedInActiveSlot = activeSlot ? selections[activeSlot.key] ?? "" : "";
-    const bestProjectedScore = activeSlotCandidateSummary?.topCandidates[0]?.projectedScore ?? null;
-    const currentProjectedScore = activeSlotCandidateSummary?.currentProjected ?? null;
-    const activeSlotTag = activeSlot ? `${activeSlot.disciplineSide.toUpperCase()}-${activeSlot.slotIndex + 1}` : null;
-    const currentTeamdeckDisciplineId =
-      activeSlot?.disciplineId ??
-      (focusedDisciplineSide === "d1"
-        ? context?.matchdayContract?.discipline1?.disciplineId ?? null
-        : context?.matchdayContract?.discipline2?.disciplineId ?? null);
-
-    return matchdayRosterCards
-      .map((player) => {
-        const activeSlotCandidate = player.activePlayerId
-          ? activeSlotCandidateByActivePlayerId.get(player.activePlayerId) ?? null
-          : null;
-        const selectedElsewhere = Boolean(
-          player.activePlayerId &&
-            player.activePlayerId !== selectedInActiveSlot &&
-            player.selectedSides.length > 0,
-        );
-        const projectedScore = activeSlotCandidate?.projectedScore ?? null;
-        const scoreDelta = activeSlotCandidate?.scoreDelta ?? null;
-        const fitTier =
-          activeSlot && player.activePlayerId
-            ? getLegacyLineupDragFitTier({
-                blocked: Boolean(activeSlotCandidate?.blockReason || selectedElsewhere),
-                projectedScore,
-                bestProjectedScore,
-                currentProjectedScore,
-              })
-            : "blocked";
-        const relevantDisciplineDemands = player.demands.filter(
-          (demand) => demand.targetDisciplineId && demand.targetDisciplineId === currentTeamdeckDisciplineId,
-        );
-        const preferredSlotTags = (playerBestSlotSummaryByActivePlayerId.get(player.activePlayerId ?? "") ?? [])
-          .slice(0, 2)
-          .map((entry) => `${entry.disciplineSide.toUpperCase()}-${entry.slotIndex + 1}`);
-        const wantsActiveSlot = Boolean(activeSlotTag && preferredSlotTags.includes(activeSlotTag));
-        const captainDemand = relevantDisciplineDemands.find((demand) => demand.label === "Captain-Rolle") ?? null;
-
-        let groupKey: TeamdeckCandidateQualityKey = "alternative";
-        let detail = "Spielbar für diesen Slot.";
-        let shortReason = `${formatNullableScore(projectedScore)} Score`;
-
-        if (selectedElsewhere) {
-          groupKey = "blocked";
-          detail = `Schon in ${player.selectedSides.join(" + ").toUpperCase()} eingesetzt.`;
-          shortReason = player.selectedSides.join(" + ").toUpperCase();
-        } else if (activeSlotCandidate?.blockReason) {
-          groupKey = "blocked";
-          detail = formatLegacyLineupDragBlockReason(activeSlotCandidate.blockReason) ?? "Gerade nicht legal einsetzbar.";
-          // "Verletzt" statt "blockiert": In der Auswahlliste stand fuer JEDEN Sperrgrund dasselbe
-          // Wort. Warum ein Spieler nicht geht, sah man erst im Hovertext — eine Verletzung war
-          // damit vor dem Setzen nicht erkennbar, obwohl sie der haeufigste und wichtigste Grund
-          // ist. Genau so gemeldet: "verletzungen muessen im ui direkt erkennbar sein".
-          shortReason = activeSlotCandidate.blockReason === "player_injured_unavailable" ? "Verletzt" : "blockiert";
-        } else if (isElevatedFatigue(player.fatigueCount)) {
-          groupKey = "fatigue";
-          detail = `${formatFatigueImpactDetail(player.fatigueCount)} macht den Pick spürbar riskanter.`;
-          shortReason = `F ${Math.round(player.fatigueCount ?? 0)}`;
-        } else if (
-          fitTier === "poor" ||
-          projectedScore == null ||
-          (scoreDelta != null && scoreDelta <= -6) ||
-          (projectedScore != null && projectedScore < 45)
-        ) {
-          groupKey = "emergency";
-          detail = "Nur als Notfall-Pick sinnvoll.";
-          shortReason = scoreDelta != null ? `${scoreDelta >= 0 ? "+" : ""}${formatDecimalScore(scoreDelta, 1)}` : "Notfall";
-        } else if (
-          fitTier === "best" ||
-          fitTier === "great" ||
-          (scoreDelta != null && scoreDelta >= 0)
-        ) {
-          groupKey = "instant";
-          detail = "Passt direkt sauber in den Slot.";
-          shortReason = scoreDelta != null ? `${scoreDelta >= 0 ? "+" : ""}${formatDecimalScore(scoreDelta, 1)}` : "direkt";
-        } else {
-          groupKey = "alternative";
-          detail = "Gute Alternative, falls du bewusst variieren willst.";
-          shortReason = scoreDelta != null ? `${scoreDelta >= 0 ? "+" : ""}${formatDecimalScore(scoreDelta, 1)}` : "Alternative";
-        }
-
-        return {
-          player,
-          activeSlotCandidate,
-          relevantDisciplineDemands,
-          preferredSlotTags,
-          captainDemand,
-          wantsActiveSlot,
-          isWishMatch: relevantDisciplineDemands.length > 0,
-          fitTier,
-          groupKey,
-          detail,
-          shortReason,
-          groupMeta: getTeamdeckCandidateGroupMeta(groupKey),
-        };
-      })
-      .filter((entry) => {
-        if (teamdeckFilterMode === "free") {
-          return entry.player.selectedSides.length === 0 && !entry.player.availabilityBlocker;
-        }
-        if (teamdeckFilterMode === "assigned") {
-          return entry.player.selectedSides.length > 0;
-        }
-        if (teamdeckFilterMode === "blocked") {
-          return entry.groupKey === "blocked";
-        }
-        return true;
-      })
-      .sort((left, right) => {
-        const leftBlocked = left.groupKey === "blocked";
-        const rightBlocked = right.groupKey === "blocked";
-        if (leftBlocked !== rightBlocked) {
-          return leftBlocked ? 1 : -1;
-        }
-        const leftSlotScore = left.activeSlotCandidate?.projectedScore ?? Number.NEGATIVE_INFINITY;
-        const rightSlotScore = right.activeSlotCandidate?.projectedScore ?? Number.NEGATIVE_INFINITY;
-        if (teamdeckSortMode === "top" && leftSlotScore !== rightSlotScore) {
-          return rightSlotScore - leftSlotScore;
-        }
-        if (teamdeckSortMode === "d1") {
-          const leftScore = left.player.discipline1Score ?? Number.NEGATIVE_INFINITY;
-          const rightScore = right.player.discipline1Score ?? Number.NEGATIVE_INFINITY;
-          if (leftScore !== rightScore) {
-            return rightScore - leftScore;
-          }
-        }
-        if (teamdeckSortMode === "d2") {
-          const leftScore = left.player.discipline2Score ?? Number.NEGATIVE_INFINITY;
-          const rightScore = right.player.discipline2Score ?? Number.NEGATIVE_INFINITY;
-          if (leftScore !== rightScore) {
-            return rightScore - leftScore;
-          }
-        }
-        if (teamdeckSortMode === "captain") {
-          const leftCaptainScore =
-            (left.player.captainEligible ? 1000 : 0) +
-            (left.captainDemand ? 200 : 0) +
-            (left.activeSlotCandidate?.projectedScore ?? Number.NEGATIVE_INFINITY);
-          const rightCaptainScore =
-            (right.player.captainEligible ? 1000 : 0) +
-            (right.captainDemand ? 200 : 0) +
-            (right.activeSlotCandidate?.projectedScore ?? Number.NEGATIVE_INFINITY);
-          if (leftCaptainScore !== rightCaptainScore) {
-            return rightCaptainScore - leftCaptainScore;
-          }
-        }
-        if (teamdeckSortMode === "fatigue") {
-          const leftFatigue = left.player.fatigueCount ?? Number.POSITIVE_INFINITY;
-          const rightFatigue = right.player.fatigueCount ?? Number.POSITIVE_INFINITY;
-          if (leftFatigue !== rightFatigue) {
-            return leftFatigue - rightFatigue;
-          }
-        }
-        if (teamdeckSortMode === "wish") {
-          const leftWishScore =
-            (left.isWishMatch ? 1000 : 0) +
-            (left.wantsActiveSlot ? 160 : 0) +
-            (left.activeSlotCandidate?.projectedScore ?? Number.NEGATIVE_INFINITY);
-          const rightWishScore =
-            (right.isWishMatch ? 1000 : 0) +
-            (right.wantsActiveSlot ? 160 : 0) +
-            (right.activeSlotCandidate?.projectedScore ?? Number.NEGATIVE_INFINITY);
-          if (leftWishScore !== rightWishScore) {
-            return rightWishScore - leftWishScore;
-          }
-        }
-        if (left.groupMeta.order !== right.groupMeta.order) {
-          return left.groupMeta.order - right.groupMeta.order;
-        }
-        if (leftSlotScore !== rightSlotScore) {
-          return rightSlotScore - leftSlotScore;
-        }
-        const leftFocusedScore =
-          teamdeckSortMode === "d1"
-            ? left.player.discipline2Score ?? Number.NEGATIVE_INFINITY
-            : teamdeckSortMode === "d2"
-              ? left.player.discipline1Score ?? Number.NEGATIVE_INFINITY
-              : Math.max(left.player.discipline1Score ?? Number.NEGATIVE_INFINITY, left.player.discipline2Score ?? Number.NEGATIVE_INFINITY);
-        const rightFocusedScore =
-          teamdeckSortMode === "d1"
-            ? right.player.discipline2Score ?? Number.NEGATIVE_INFINITY
-            : teamdeckSortMode === "d2"
-              ? right.player.discipline1Score ?? Number.NEGATIVE_INFINITY
-              : Math.max(right.player.discipline1Score ?? Number.NEGATIVE_INFINITY, right.player.discipline2Score ?? Number.NEGATIVE_INFINITY);
-        if (leftFocusedScore !== rightFocusedScore) {
-          return rightFocusedScore - leftFocusedScore;
-        }
-        return left.player.name.localeCompare(right.player.name, "de");
-      });
-  }, [
-    activeSlot,
-    activeSlotCandidateByActivePlayerId,
-    activeSlotCandidateSummary?.currentProjected,
-    activeSlotCandidateSummary?.topCandidates,
-    context?.matchdayContract?.discipline1?.disciplineId,
-    context?.matchdayContract?.discipline2?.disciplineId,
-    focusedDisciplineSide,
-    matchdayRosterCards,
-    playerBestSlotSummaryByActivePlayerId,
-    selections,
-    teamdeckFilterMode,
-    teamdeckSortMode,
-  ]);
-  const teamdeckCandidateGroups = useMemo(() => {
-    const keys: TeamdeckCandidateQualityKey[] = ["instant", "alternative", "fatigue", "blocked", "emergency"];
-    return keys
-      .map((groupKey) => {
-        const meta = getTeamdeckCandidateGroupMeta(groupKey);
-        const entries = teamdeckCandidateEntries.filter((entry) => entry.groupKey === groupKey);
-        const limitedEntries =
-          showOnlyTopSlotCandidates && teamdeckFilterMode !== "blocked"
-            ? entries.slice(0, groupKey === "instant" ? 5 : groupKey === "blocked" ? 4 : 3)
-            : entries;
-        return {
-          key: groupKey,
-          meta,
-          entries: limitedEntries,
-          totalCount: entries.length,
-        };
-      })
-      .filter((group) => group.entries.length > 0);
-  }, [showOnlyTopSlotCandidates, teamdeckCandidateEntries, teamdeckFilterMode]);
+  // Rechenkern in lib/lineups/lineup-candidate-model.ts (buildTeamdeckCandidateEntries) —
+  // entscheidet, welcher Spieler beim Druecken von "1" im Teamdeck landet.
+  const teamdeckCandidateEntries: TeamdeckCandidateEntry[] = useMemo(
+    () =>
+      buildTeamdeckCandidateEntries({
+        activeSlot,
+        selections,
+        activeSlotCandidateSummary,
+        activeSlotCandidateByActivePlayerId,
+        matchdayRosterCards,
+        playerBestSlotSummaryByActivePlayerId,
+        context,
+        focusedDisciplineSide,
+        teamdeckFilterMode,
+        teamdeckSortMode,
+      }),
+    [
+      activeSlot,
+      activeSlotCandidateByActivePlayerId,
+      activeSlotCandidateSummary,
+      context,
+      focusedDisciplineSide,
+      matchdayRosterCards,
+      playerBestSlotSummaryByActivePlayerId,
+      selections,
+      teamdeckFilterMode,
+      teamdeckSortMode,
+    ],
+  );
+  // Rechenkern in lib/lineups/lineup-candidate-model.ts (buildTeamdeckCandidateGroups).
+  const teamdeckCandidateGroups: TeamdeckCandidateGroup[] = useMemo(
+    () => buildTeamdeckCandidateGroups({ teamdeckCandidateEntries, showOnlyTopSlotCandidates, teamdeckFilterMode }),
+    [showOnlyTopSlotCandidates, teamdeckCandidateEntries, teamdeckFilterMode],
+  );
   // Mirrors the v2 focus board's own candidate-tab + search filtering exactly (same helper,
   // same source list), so keyboard digit-shortcuts always match what the user visually sees
   // there instead of a separately-computed "spotlight" list.
@@ -3306,82 +2530,28 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     return Array.from(new Set(nextWarnings));
   }, [captainBudgetExceeded, captainDraftUsedCount, captainSeasonLimit, captainUsedBeforeCurrentDraft, captains.d1, captains.d2, resolvedPreview?.disciplineSideScores, resolvedPreview?.validation?.warnings, selections, slotPreviewByKey, slots, warnings]);
 
-  const matchdayPreviewCards = useMemo(() => {
-    const bySide = {
-      d1: resolvedPreview?.disciplineSideScores.find((entry) => entry.disciplineSide === "d1") ?? null,
-      d2: resolvedPreview?.disciplineSideScores.find((entry) => entry.disciplineSide === "d2") ?? null,
-    };
-    const d1SlotPreviews = slots
-      .filter((slot) => slot.disciplineSide === "d1")
-      .map((slot) => slotPreviewByKey.get(slot.key))
-      .filter((entry): entry is MatchdaySlotPreviewCard => Boolean(entry));
-    const d2SlotPreviews = slots
-      .filter((slot) => slot.disciplineSide === "d2")
-      .map((slot) => slotPreviewByKey.get(slot.key))
-      .filter((entry): entry is MatchdaySlotPreviewCard => Boolean(entry));
-    const sumProjected = (entries: MatchdaySlotPreviewCard[]) =>
-      entries.reduce((sum, entry) => sum + (entry.projected.totalProjected ?? 0), 0);
-    const sumFatigueCost = (entries: MatchdaySlotPreviewCard[]) =>
-      entries.reduce((sum, entry) => sum + (entry.projected.additionalFatigue ?? 0), 0);
-    const sumFatiguePenalty = (entries: MatchdaySlotPreviewCard[]) =>
-      entries.reduce((sum, entry) => sum + (entry.projected.fatigueModifier ?? 0), 0);
-    const sumRangeLow = (entries: MatchdaySlotPreviewCard[]) =>
-      entries.reduce((sum, entry) => sum + (entry.projected.rangeLow ?? entry.projected.totalProjected ?? 0), 0);
-    const sumRangeHigh = (entries: MatchdaySlotPreviewCard[]) =>
-      entries.reduce((sum, entry) => sum + (entry.projected.rangeHigh ?? entry.projected.totalProjected ?? 0), 0);
-    const d1Projected = sumProjected(d1SlotPreviews);
-    const d2Projected = sumProjected(d2SlotPreviews);
-    const d1Fatigue = sumFatigueCost(d1SlotPreviews);
-    const d2Fatigue = sumFatigueCost(d2SlotPreviews);
-    const d1FatiguePenalty = sumFatiguePenalty(d1SlotPreviews);
-    const d2FatiguePenalty = sumFatiguePenalty(d2SlotPreviews);
-    const totalFatigue = sumFatigueCost(d1SlotPreviews) + sumFatigueCost(d2SlotPreviews);
-    const d1Required = context?.matchdayContract?.discipline1?.requiredPlayers ?? 0;
-    const d2Required = context?.matchdayContract?.discipline2?.requiredPlayers ?? 0;
-    const openSlots =
-      Math.max(d1Required - lineupMeta.d1Selected, bySide.d1?.missingPlayers ?? 0, 0) +
-      Math.max(d2Required - lineupMeta.d2Selected, bySide.d2?.missingPlayers ?? 0, 0);
-    const totalProjected = d1Projected + d2Projected;
-    const totalBase =
-      d1SlotPreviews.reduce((sum, entry) => sum + (entry.selectedScore ?? 0), 0) +
-      d2SlotPreviews.reduce((sum, entry) => sum + (entry.selectedScore ?? 0), 0);
-    const riskLevel =
-      openSlots > 0
-        ? "hoch"
-        : Math.abs(totalFatigue) >= 40
-          ? "mittel"
-          : "niedrig";
-
-    return {
-      d1: bySide.d1 ? { ...bySide.d1, totalScore: d1Projected || bySide.d1.totalScore } : bySide.d1,
-      d2: bySide.d2 ? { ...bySide.d2, totalScore: d2Projected || bySide.d2.totalScore } : bySide.d2,
-      d1RangeLow: sumRangeLow(d1SlotPreviews),
-      d1RangeHigh: sumRangeHigh(d1SlotPreviews),
-      d2RangeLow: sumRangeLow(d2SlotPreviews),
-      d2RangeHigh: sumRangeHigh(d2SlotPreviews),
-      totalRangeLow: sumRangeLow(d1SlotPreviews) + sumRangeLow(d2SlotPreviews),
-      totalRangeHigh: sumRangeHigh(d1SlotPreviews) + sumRangeHigh(d2SlotPreviews),
-      d1Projected,
-      d2Projected,
-      d1Fatigue,
-      d2Fatigue,
-      d1FatiguePenalty,
-      d2FatiguePenalty,
-      totalFatigue,
-      openSlots,
-      totalProjected,
-      totalBase,
-      riskLevel,
-    };
-  }, [
-    context?.matchdayContract?.discipline1?.requiredPlayers,
-    context?.matchdayContract?.discipline2?.requiredPlayers,
-    lineupMeta.d1Selected,
-    lineupMeta.d2Selected,
-    resolvedPreview,
-    slotPreviewByKey,
-    slots,
-  ]);
+  // Rechenkern in lib/lineups/lineup-audit.ts (buildMatchdayPreviewCards).
+  const matchdayPreviewCards = useMemo(
+    () =>
+      buildMatchdayPreviewCards({
+        resolvedPreview,
+        slots,
+        slotPreviewByKey,
+        d1RequiredPlayers: context?.matchdayContract?.discipline1?.requiredPlayers ?? 0,
+        d2RequiredPlayers: context?.matchdayContract?.discipline2?.requiredPlayers ?? 0,
+        lineupMetaD1Selected: lineupMeta.d1Selected,
+        lineupMetaD2Selected: lineupMeta.d2Selected,
+      }),
+    [
+      context?.matchdayContract?.discipline1?.requiredPlayers,
+      context?.matchdayContract?.discipline2?.requiredPlayers,
+      lineupMeta.d1Selected,
+      lineupMeta.d2Selected,
+      resolvedPreview,
+      slotPreviewByKey,
+      slots,
+    ],
+  );
 
   const focusV2DisciplineTacticPreviewBySide = useMemo(() => {
     const buildForSide = (disciplineSide: "d1" | "d2") => {
@@ -3482,14 +2652,18 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     entries,
   ]);
 
-  const lineupReadyToSave = useMemo(() => {
-    return (
-      (matchdayPreviewCards.openSlots === 0 || allAvailablePlayersDeployed) &&
-      duplicateSelections.length === 0 &&
-      !captainBudgetExceeded &&
-      entries.length > 0
-    );
-  }, [allAvailablePlayersDeployed, captainBudgetExceeded, duplicateSelections.length, entries.length, matchdayPreviewCards.openSlots]);
+  // Rechenkern in lib/lineups/lineup-audit.ts (computeLineupReadyToSave).
+  const lineupReadyToSave = useMemo(
+    () =>
+      computeLineupReadyToSave({
+        openSlots: matchdayPreviewCards.openSlots,
+        allAvailablePlayersDeployed,
+        duplicateSelectionsCount: duplicateSelections.length,
+        captainBudgetExceeded,
+        entriesCount: entries.length,
+      }),
+    [allAvailablePlayersDeployed, captainBudgetExceeded, duplicateSelections.length, entries.length, matchdayPreviewCards.openSlots],
+  );
 
   const draftIntensityPreview = useMemo(
     () => ({
@@ -3500,83 +2674,47 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     [matchdayPreviewCards.totalBase, matchdayPreviewCards.totalFatigue, matchdayPreviewCards.totalProjected],
   );
 
-  const lineupFlowSummary = useMemo(() => {
-    const d1Required = context?.matchdayContract?.discipline1?.requiredPlayers ?? 0;
-    const d2Required = context?.matchdayContract?.discipline2?.requiredPlayers ?? 0;
-    const totalRequired = d1Required + d2Required;
-    const selectedCount = lineupMeta.d1Selected + lineupMeta.d2Selected;
-    const progressPercent = totalRequired > 0 ? Math.min(100, Math.round((selectedCount / totalRequired) * 100)) : 0;
-    const captainCount = Number(Boolean(captains.d1)) + Number(Boolean(captains.d2));
-    const hasDuplicateSelections = duplicateSelections.length > 0;
-    const hasOpenSlots = matchdayPreviewCards.openSlots > 0;
-    const missingCaptainCount = Number(!captains.d1) + Number(!captains.d2);
-    const nextStep = hasOpenSlots
-      ? {
-          label: "Slots füllen",
-          detail: `${matchdayPreviewCards.openSlots} offene Slots · aktiver Fokus ${activeSlot ? `${activeSlot.disciplineSide.toUpperCase()}-${activeSlot.slotIndex + 1}` : "Auto"}`,
-          tone: "warning" as const,
-        }
-      : hasDuplicateSelections
-        ? {
-            label: "Doppelte Spieler lösen",
-            detail: `${duplicateSelections.length} Konflikt${duplicateSelections.length === 1 ? "" : "e"} vor dem Speichern`,
-            tone: "blocked" as const,
-          }
-        : captainBudgetExceeded
-          ? {
-              label: "Captain-Limit prüfen",
-              detail: `${captainUsedBeforeCurrentDraft + captainDraftUsedCount}/${captainSeasonLimit} Saison-Captains`,
-              tone: "blocked" as const,
-            }
-          : lineupMoraleSummary.atRiskCount > 0 && lineupMoraleSummary.netDelta < 0
-            ? {
-                label: "Forderungen abwägen",
-                detail: `${lineupMoraleSummary.atRiskCount} offen · Moral ${formatMoraleDelta(lineupMoraleSummary.netDelta)}`,
-                tone: "warning" as const,
-              }
-          : lineupReadyToSave
-            ? {
-                label: "Lineup speichern",
-                detail:
-                  missingCaptainCount > 0
-                    ? `Slots voll · Captain optional (${missingCaptainCount} offen)`
-                    : "Slots voll · Captain gesetzt · bereit für den Matchday-Save",
-                tone: "ready" as const,
-              }
-            : {
-                label: draft ? "Bereit für Arena" : "Preview prüfen",
-                detail: draft ? "Gespeicherter Draft liegt vor" : "Optional Preview berechnen oder direkt speichern",
-                tone: "ready" as const,
-              };
-
-    return {
-      totalRequired,
-      selectedCount,
-      progressPercent,
-      captainCount,
-      nextStep,
-    };
-  }, [
-    activeSlot,
-    captainBudgetExceeded,
-    captainDraftUsedCount,
-    captainSeasonLimit,
-    captainUsedBeforeCurrentDraft,
-    captains.d1,
-    captains.d2,
-    context?.matchdayContract?.discipline1?.requiredPlayers,
-    context?.matchdayContract?.discipline2?.requiredPlayers,
-    d1Label,
-    d2Label,
-    draft,
-    duplicateSelections.length,
-    lineupMeta.d1Selected,
-    lineupMeta.d2Selected,
-    lineupMoraleSummary.atRiskCount,
-    lineupMoraleSummary.netDelta,
-    lineupReadyToSave,
-    matchdayPreviewCards.openSlots,
-  ]);
+  // Rechenkern in lib/lineups/lineup-audit.ts (buildLineupFlowSummary).
+  const lineupFlowSummary = useMemo(
+    () =>
+      buildLineupFlowSummary({
+        activeSlot,
+        captainBudgetExceeded,
+        captainDraftUsedCount,
+        captainSeasonLimit,
+        captainUsedBeforeCurrentDraft,
+        captains,
+        d1RequiredPlayers: context?.matchdayContract?.discipline1?.requiredPlayers ?? 0,
+        d2RequiredPlayers: context?.matchdayContract?.discipline2?.requiredPlayers ?? 0,
+        hasDraft: Boolean(draft),
+        duplicateSelectionsCount: duplicateSelections.length,
+        lineupMetaD1Selected: lineupMeta.d1Selected,
+        lineupMetaD2Selected: lineupMeta.d2Selected,
+        moraleAtRiskCount: lineupMoraleSummary.atRiskCount,
+        moraleNetDelta: lineupMoraleSummary.netDelta,
+        lineupReadyToSave,
+        openSlots: matchdayPreviewCards.openSlots,
+      }),
+    [
+      activeSlot,
+      captainBudgetExceeded,
+      captainDraftUsedCount,
+      captainSeasonLimit,
+      captainUsedBeforeCurrentDraft,
+      captains.d1,
+      captains.d2,
+      context?.matchdayContract?.discipline1?.requiredPlayers,
+      context?.matchdayContract?.discipline2?.requiredPlayers,
+      draft,
+      duplicateSelections.length,
+      lineupMeta.d1Selected,
+      lineupMeta.d2Selected,
+      lineupMoraleSummary.atRiskCount,
+      lineupMoraleSummary.netDelta,
+      lineupReadyToSave,
+      matchdayPreviewCards.openSlots,
+    ],
+  );
   const lineupCoachSteps = useMemo(() => {
     const slotsDone = lineupFlowSummary.totalRequired > 0 && matchdayPreviewCards.openSlots === 0;
     const hasDuplicates = duplicateSelections.length > 0;
@@ -3755,107 +2893,51 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     lineupMoraleSummary.netDelta,
 	    previewPanelWarnings.length,
 	  ]);
-	  const lineupMiniAudit = useMemo(() => {
-	    const items: Array<{
-	      key: string;
-	      label: string;
-	      detail: string;
-	      tone: "ready" | "warning" | "blocked";
-	    }> = [];
-    if (matchdayPreviewCards.openSlots > 0) {
-      items.push({
-        key: "open-slots",
-        label: "Slots",
-        detail: allAvailablePlayersDeployed
-          ? `${matchdayPreviewCards.openSlots} offen · alle Spieler eingesetzt`
-          : `${matchdayPreviewCards.openSlots} offen`,
-        tone: allAvailablePlayersDeployed ? "warning" : "blocked",
-      });
-    } else {
-      items.push({
-        key: "open-slots",
-        label: "Slots",
-        detail: `${lineupFlowSummary.selectedCount}/${lineupFlowSummary.totalRequired || "—"} voll`,
-        tone: "ready",
-      });
-    }
-	    if (duplicateSelections.length > 0) {
-	      items.push({
-	        key: "duplicates",
-	        label: "Doppelwahl",
-	        detail: `${duplicateSelections.length} Konflikt${duplicateSelections.length === 1 ? "" : "e"}`,
-	        tone: "blocked",
-	      });
-	    }
-	    items.push({
-	      key: "captain",
-	      label: "Captain",
-	      detail: captainBudgetExceeded
-	        ? `${captainUsedBeforeCurrentDraft + captainDraftUsedCount}/${captainSeasonLimit} Limit`
-	        : !captains.d1 && !captains.d2
-	          ? "Optional · beide offen"
-	          : !captains.d1
-	            ? `Optional · ${d1Label} offen`
-	            : !captains.d2
-	              ? `Optional · ${d2Label} offen`
-	              : `${captainSeasonUsedWithDraft}/${captainSeasonLimit} Saison`,
-	      tone: captainBudgetExceeded ? "blocked" : captains.d1 || captains.d2 ? "ready" : "warning",
-	    });
-	    if (missingSeasonFormCards) {
-	      items.push({
-	        key: "form-source",
-	        label: "Form",
-	        detail: "Quelle fehlt",
-	        tone: "warning",
-	      });
-	    }
-	    if (lineupMoraleSummary.atRiskCount > 0) {
-	      items.push({
-	        key: "morale",
-	        label: "Forderungen",
-	        detail: `${lineupMoraleSummary.atRiskCount} offen · ${formatMoraleDelta(lineupMoraleSummary.netDelta)}`,
-	        tone: lineupMoraleSummary.netDelta < 0 ? "warning" : "ready",
-	      });
-	    }
-	    if (previewPanelWarnings.length > 0) {
-	      items.push({
-	        key: "preview",
-	        label: "Preview",
-	        detail: `${previewPanelWarnings.length} Hinweis${previewPanelWarnings.length === 1 ? "" : "e"}`,
-	        tone: "warning",
-	      });
-	    }
-	    const status = items.some((item) => item.tone === "blocked")
-	      ? "blocked"
-	      : items.some((item) => item.tone === "warning")
-	        ? "warning"
-	        : "ready";
-	    return {
-	      status,
-	      items,
-	      blockingItems: items.filter((item) => item.tone === "blocked"),
-	      warningItems: items.filter((item) => item.tone === "warning"),
-	    };
-	  }, [
-	    allAvailablePlayersDeployed,
-	    captainBudgetExceeded,
-	    captainDraftUsedCount,
-	    captainSeasonLimit,
-	    captainSeasonUsedWithDraft,
-	    captainUsedBeforeCurrentDraft,
-	    captains.d1,
-	    captains.d2,
-	    d1Label,
-	    d2Label,
-	    duplicateSelections.length,
-	    lineupFlowSummary.selectedCount,
-	    lineupFlowSummary.totalRequired,
-	    lineupMoraleSummary.atRiskCount,
-	    lineupMoraleSummary.netDelta,
-	    matchdayPreviewCards.openSlots,
-	    missingSeasonFormCards,
+	  // Rechenkern in lib/lineups/lineup-audit.ts (buildLineupMiniAudit) — gatet das
+	  // Speichern. Ein hier verlorenes Blocking-Item liesse eine ungueltige Aufstellung
+	  // in einen Spieltag, der danach nicht mehr korrigierbar ist.
+	  const lineupMiniAudit = useMemo(
+	    () =>
+	      buildLineupMiniAudit({
+	        openSlots: matchdayPreviewCards.openSlots,
+	        allAvailablePlayersDeployed,
+	        selectedCount: lineupFlowSummary.selectedCount,
+	        totalRequired: lineupFlowSummary.totalRequired,
+	        duplicateSelectionsCount: duplicateSelections.length,
+	        captainBudgetExceeded,
+	        captainUsedBeforeCurrentDraft,
+	        captainDraftUsedCount,
+	        captainSeasonLimit,
+	        captains,
+	        d1Label,
+	        d2Label,
+	        captainSeasonUsedWithDraft,
+	        missingSeasonFormCards,
+	        moraleAtRiskCount: lineupMoraleSummary.atRiskCount,
+	        moraleNetDelta: lineupMoraleSummary.netDelta,
+	        previewWarningsCount: previewPanelWarnings.length,
+	      }),
+	    [
+	      allAvailablePlayersDeployed,
+	      captainBudgetExceeded,
+	      captainDraftUsedCount,
+	      captainSeasonLimit,
+	      captainSeasonUsedWithDraft,
+	      captainUsedBeforeCurrentDraft,
+	      captains.d1,
+	      captains.d2,
+	      d1Label,
+	      d2Label,
+	      duplicateSelections.length,
+	      lineupFlowSummary.selectedCount,
+	      lineupFlowSummary.totalRequired,
+	      lineupMoraleSummary.atRiskCount,
+	      lineupMoraleSummary.netDelta,
+	      matchdayPreviewCards.openSlots,
+	      missingSeasonFormCards,
 	      previewPanelWarnings.length,
-	  ]);
+	    ],
+	  );
 	  const aiInsightPreview = useMemo(() => {
 	    if (selectedTeamOption?.controlMode !== "ai" || aiPreview?.teamId !== params.teamId) {
 	      return null;
@@ -3863,82 +2945,21 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 	    return aiPreview;
 	  }, [aiPreview, params.teamId, selectedTeamOption?.controlMode]);
 	  const duplicateSelectionIds = useMemo(() => new Set(duplicateSelections), [duplicateSelections]);
-  const slotIssuesByKey = useMemo(() => {
-    return new Map(
-      slots.map((slot) => {
-        const selectedId = selections[slot.key] ?? "";
-        const selectedOption = getSelectedOptionMeta(selectedId);
-        const selectedRosterCard = rosterCardByActivePlayerId.get(selectedId) ?? null;
-        const slotPreview = slotPreviewByKey.get(slot.key) ?? null;
-        const selectedDemandDecisions =
-          selectedId && selectedRosterCard
-            ? (moraleDecisionsByActivePlayerId.get(selectedId) ?? []).filter(
-                (decision) =>
-                  !decision.targetDisciplineId ||
-                  decision.targetDisciplineId === slot.disciplineId ||
-                  decision.label === "Captain-Rolle",
-              )
-            : [];
-        const issues: Array<{
-          tone: "ready" | "warning" | "blocked";
-          label: string;
-          detail: string;
-        }> = [];
-
-        if (!selectedId) {
-          issues.push({
-            tone: activeSlot?.key === slot.key ? "blocked" : "warning",
-            label: activeSlot?.key === slot.key ? "Hier weiter" : "Spieler fehlt",
-            detail: `${slot.disciplineSide.toUpperCase()}-${slot.slotIndex + 1} wartet noch auf einen Spieler.`,
-          });
-        }
-        if (selectedId && duplicateSelectionIds.has(selectedId)) {
-          issues.push({
-            tone: "blocked",
-            label: "Doppelwahl",
-            detail: "Dieser Spieler ist schon in einem anderen Slot gesetzt.",
-          });
-        }
-        if (selectedOption?.injuryStatus === "injured") {
-          issues.unshift({
-            tone: "blocked",
-            label: "Verletzt",
-            detail: "Verletzter Spieler — aus dem Lineup nehmen oder ersetzen.",
-          });
-        } else if (selectedOption?.injuryStatus === "recovering") {
-          issues.unshift({
-            tone: "warning",
-            label: "Recovery",
-            detail: "Spieler erholt sich noch — Belastung reduzieren.",
-          });
-        }
-        if (isElevatedFatigue(selectedOption?.fatigueCount)) {
-          issues.push({
-            tone: "warning",
-            label: "Fatigue-Risiko",
-            detail: `${formatFatigueImpactDetail(selectedOption?.fatigueCount)}: eher rotieren oder Team-Einsatz senken.`,
-          });
-        }
-        const firstWarning = slotPreview?.projected.warnings[0];
-        if (firstWarning) {
-          issues.push({
-            tone: "warning",
-            label: formatLineupHintLabel(firstWarning),
-            detail: firstWarning,
-          });
-        }
-        for (const decision of selectedDemandDecisions) {
-          issues.push({
-            tone: decision.fulfilled ? "ready" : "warning",
-            label: decision.fulfilled ? "Forderung erfüllt" : "Forderung offen",
-            detail: `${decision.playerName}: ${decision.label} (${formatMoraleDelta(decision.moraleDelta)} Moral)`,
-          });
-        }
-
-        return [slot.key, issues.slice(0, 4)] as const;
+  // Rechenkern in lib/lineups/lineup-audit.ts (buildSlotIssuesByKey).
+  const slotIssuesByKey = useMemo(
+    () =>
+      buildSlotIssuesByKey({
+        slots,
+        selections,
+        playerOptions,
+        rosterCardByActivePlayerId,
+        slotPreviewByKey,
+        duplicateSelectionIds,
+        moraleDecisionsByActivePlayerId,
+        activeSlotKey: activeSlot?.key ?? null,
       }),
-    );
-  }, [activeSlot?.key, duplicateSelectionIds, moraleDecisionsByActivePlayerId, rosterCardByActivePlayerId, selections, slotPreviewByKey, slots]);
+    [activeSlot?.key, duplicateSelectionIds, moraleDecisionsByActivePlayerId, playerOptions, rosterCardByActivePlayerId, selections, slotPreviewByKey, slots],
+  );
   const slotRoleAttributesByKey = useMemo(() => {
     return new Map(
       slots.map((slot) => {
@@ -4080,49 +3101,23 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     lineupMeta.d1Selected,
     lineupMeta.d2Selected,
   ]);
-  const lineupSaveCta = useMemo(() => {
-    const blockers: string[] = [];
-    if (matchdayPreviewCards.openSlots > 0 && !allAvailablePlayersDeployed) {
-      blockers.push(`${matchdayPreviewCards.openSlots} Slot${matchdayPreviewCards.openSlots === 1 ? "" : "s"} offen`);
-    }
-    if (captainBudgetExceeded) {
-      blockers.push(`Captain-Limit ${captainUsedBeforeCurrentDraft + captainDraftUsedCount}/${captainSeasonLimit}`);
-    }
-    if (duplicateSelections.length > 0) {
-      blockers.push(`${duplicateSelections.length} Konflikt${duplicateSelections.length === 1 ? "" : "e"}`);
-    }
-
-    if (draft) {
-      return {
-        tone: "ready" as const,
-        label: "Arena bereit",
-        detail: "Draft ist gespeichert und kann direkt in die Arena gehen.",
-        buttonLabel: "Arena bereit",
-      };
-    }
-
-    if (lineupReadyToSave) {
-      const allDeployedHint = allAvailablePlayersDeployed && matchdayPreviewCards.openSlots > 0
-        ? "Alle Spieler eingesetzt · Formkarte & Captain optional."
-        : !captains.d1 && !captains.d2
-          ? "Slots voll, keine Konflikte. Captains sind optional und können gespart werden."
-          : "Slots voll, Captain-Plan passt, keine Konflikte mehr.";
-      return {
-        tone: "ready" as const,
-        label: "Lineup bereit speichern",
-        detail: allDeployedHint,
-        buttonLabel: "Lineup bereit speichern",
-      };
-    }
-
-    const blockerCount = blockers.length;
-    return {
-      tone: blockers.some((entry) => entry.includes("Konflikt")) ? ("blocked" as const) : ("warning" as const),
-      label: blockerCount > 0 ? `Noch ${blockerCount} ${blockerCount === 1 ? "Ding" : "Dinge"} offen` : "Noch nicht bereit",
-      detail: blockers.slice(0, 3).join(" · ") || "Bitte offene Punkte zuerst aufraeumen.",
-      buttonLabel: blockerCount > 0 ? `Noch ${blockerCount} offen` : "Noch nicht bereit",
-    };
-  }, [allAvailablePlayersDeployed, captainBudgetExceeded, captainDraftUsedCount, captainSeasonLimit, captainUsedBeforeCurrentDraft, captains.d1, captains.d2, draft, duplicateSelections.length, lineupReadyToSave, matchdayPreviewCards.openSlots]);
+  // Rechenkern in lib/lineups/lineup-audit.ts (buildLineupSaveCta).
+  const lineupSaveCta = useMemo(
+    () =>
+      buildLineupSaveCta({
+        openSlots: matchdayPreviewCards.openSlots,
+        allAvailablePlayersDeployed,
+        captainBudgetExceeded,
+        captainUsedBeforeCurrentDraft,
+        captainDraftUsedCount,
+        captainSeasonLimit,
+        duplicateSelectionsCount: duplicateSelections.length,
+        hasDraft: Boolean(draft),
+        lineupReadyToSave,
+        captains,
+      }),
+    [allAvailablePlayersDeployed, captainBudgetExceeded, captainDraftUsedCount, captainSeasonLimit, captainUsedBeforeCurrentDraft, captains.d1, captains.d2, draft, duplicateSelections.length, lineupReadyToSave, matchdayPreviewCards.openSlots],
+  );
   const lineupFinishItems = useMemo(() => lineupMiniAudit.items.slice(0, 6), [lineupMiniAudit]);
   // Der Weg in die Arena darf nicht strenger sein als die Bereitschaftspruefung des Spieltags:
   // ein Kader, der die Plaetze gar nicht besetzen KANN, erreicht "0 offene Slots" nie und waere

@@ -340,7 +340,19 @@ describe("legacy matchday result apply service", () => {
     expect(result.ok).toBe(true);
     const performanceRows = save.gameState.seasonState.playerDisciplinePerformances ?? [];
     expect(performanceRows.length).toBeGreaterThan(0);
-    expect(performanceRows.some((entry) => entry.mutatorPpsBonus === 0.3)).toBe(true);
+    // War vorbestehend rot mit `=== 0.3`: Commit 0c8f79df ("der Spieltags-Wurf gilt fuer alle
+    // Teams — und zwei Treffer zaehlen auch in den PP doppelt") hat die Mutator-PP absichtlich
+    // von flach 0,3 auf `hits * 0,3` umgestellt (siehe calculateMutatorModifierForSide in
+    // legacy-lineup-modifiers.ts), damit ein Spieler mit BEIDEN ausgewuerfelten Traits auch
+    // doppelt zaehlt statt genauso viel wie einer mit nur einem Treffer. In dieser Fixture hat
+    // jeder Kaderspieler genau einen positiven und einen negativen Trait, die beide von
+    // getPlayerMutatorTraitSlots kommen und wegen des identischen Scores/derselben
+    // disciplineScoreSum-Herkunft immer ALS PAAR ausgewaehlt werden (siehe
+    // calculateMvpForcedMutatorModifierForSide) — ein Treffer ist hier also strukturell immer
+    // 0 oder 2 Traits, nie genau 1. Der maximal moegliche (und tatsaechlich erreichte) Bonus ist
+    // deshalb 0,6, kein 0,3 mehr. Nachgerechnet per Debug-Lauf: alle acht Performance-Zeilen
+    // liefern entweder 0 oder 0.6.
+    expect(performanceRows.some((entry) => entry.mutatorPpsBonus === 0.6)).toBe(true);
   });
 
   it("blocks duplicate apply without forceReplace", async () => {
