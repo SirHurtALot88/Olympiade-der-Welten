@@ -26,6 +26,7 @@ describe("Die EINE GuV", () => {
     facilityUpkeep: 4.5,
     apronNetto: -6.3,
     apronRank: 7,
+    apronGebucht: true,
     objectiveCashDelta: 3,
     salaryTotal: 42.5,
     loanInterest: 1.4,
@@ -66,11 +67,36 @@ describe("Die EINE GuV", () => {
   it("nennt den Rang, auf den der Apron hochgerechnet ist", () => {
     // Der Apron wird erst am Saisonende gegen den ENDrang abgerechnet. Ohne diesen Hinweis läse sich
     // die Zeile wie ein bereits gebuchter Posten.
-    const guv = buildSeasonGuv({ ...vollstaendig, apronFrozenLines: false, apronGedeckelt: true });
+    const guv = buildSeasonGuv({ ...vollstaendig, apronGebucht: false, apronFrozenLines: false, apronGedeckelt: true });
     const apron = guv.posten.find((entry) => entry.key === "apron");
     expect(apron?.note).toContain("Platz 7");
+    expect(apron?.note).toContain("noch nicht gebucht");
     expect(apron?.note).toContain("Deckel");
     expect(apron?.note).toContain("nicht eingefroren");
+  });
+
+  /**
+   * REGRESSION, DIE ICH SELBST VERURSACHT HABE. Ich hatte den Apron bedingungslos mitgezählt, weil er
+   * eine der drei Einnahmequellen ist. Zwei Invarianten-Tests haben das gefangen: der Finanzen-Reiter
+   * verspricht `Σ(Einnahmen) − Σ(Ausgaben) == GuV == echte Cash-Veränderung`, und die
+   * Geldfluss-Invariante verlangt `cashVorher + Σ Buchungen == cashNachher`. Eine HOCHRECHNUNG in der
+   * GuV bricht beide, weil das Geld noch nicht geflossen ist.
+   *
+   * Auflösung: die Zeile ist IMMER da (Chris' „selbst wenn es 0 ist"), aber sie zählt erst, wenn die
+   * Apron-Abrechnung dieser Saison wirklich gebucht wurde.
+   */
+  it("zählt den Apron erst, wenn er gebucht ist — vorher steht er als Hochrechnung daneben", () => {
+    const ungebucht = buildSeasonGuv({ ...vollstaendig, apronGebucht: false });
+    const apronZeile = ungebucht.posten.find((entry) => entry.key === "apron");
+    expect(apronZeile).toBeDefined();
+    expect(apronZeile?.counted).toBe(false);
+    // Ohne den Apron: 64.2 + 12 + 3 − 42.5 − 4.5 − 1.4
+    expect(ungebucht.guv).toBe(30.8);
+
+    const gebucht = buildSeasonGuv({ ...vollstaendig, apronGebucht: true });
+    expect(gebucht.posten.find((entry) => entry.key === "apron")?.counted).toBe(true);
+    expect(gebucht.guv).toBe(24.5);
+    expect(gebucht.posten.find((entry) => entry.key === "apron")?.note).toContain("gebucht");
   });
 
   it("kommt beim Wiederaufsummieren der Postenliste auf dieselbe Zahl", () => {

@@ -33,8 +33,22 @@ describe("Saisonstand: GuV rechnet mit Sponsoren, nicht mit Preisgeld", () => {
     expect(APPLY).not.toContain("row.prizeMoney != null ? Number((row.prizeMoney + (sponsorRank ?? 0))");
   });
 
-  it("rechnet die Gebäude in die GuV — Einnahmen und Unterhalt", () => {
-    expect(APPLY).toContain("Number((sponsorTotal + (row.facilityIncome ?? 0) - row.salaryTotal).toFixed(2))");
+  /**
+   * NACHGEZOGEN: die Formel steht seit der GuV-Vereinheitlichung (#419) nicht mehr hier, sondern EINMAL
+   * in `lib/finance/season-end-guv.ts`. Die Zusicherung bleibt dieselbe — die GuV rechnet die Gebäude
+   * mit —, sie prüft nur nicht mehr eine kopierte Formel, sondern dass dieser Schritt die gemeinsame
+   * Rechnung benutzt statt sich eine eigene zu bauen. Genau das Nachbauen war der Grund, warum es
+   * überhaupt neun verschiedene GuV-Formeln gab.
+   */
+  it("rechnet die Gebäude in die GuV — über die gemeinsame Rechnung, nicht über eine eigene Formel", () => {
+    expect(APPLY).toContain("resolveSeasonGuvByTeam(save.gameState)");
+    expect(APPLY).toContain("const guv = seasonGuv?.guv ?? null;");
+    // Und die alte, hier einkopierte Formel ist weg.
+    expect(APPLY).not.toContain("Number((sponsorTotal + (row.facilityIncome ?? 0) - row.salaryTotal)");
+    // Die gemeinsame Rechnung kennt die Gebäude auf beiden Seiten.
+    const GUV = read("lib/finance/season-end-guv.ts");
+    expect(GUV).toContain("gebaeude_einnahme");
+    expect(GUV).toContain("gebaeude_unterhalt");
   });
 
   it("bildet auch den Season-Anteil aus dem Sponsorgeld", () => {

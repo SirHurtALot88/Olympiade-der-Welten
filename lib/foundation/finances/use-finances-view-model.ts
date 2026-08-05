@@ -343,6 +343,11 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
     apronNetto: apronNettoDelta?.nettoDelta ?? 0,
     apronRank: apronNettoDelta?.rank ?? null,
     apronGedeckelt: apronNettoDelta?.gedeckelt ?? false,
+    // Nur der GEBUCHTE Apron zaehlt in die GuV — sonst bricht die Zusage dieses Reiters
+    // (`cashSeasonStart + guv + otherCashMovements == cash`) an einer Hochrechnung.
+    apronGebucht: (gameState.seasonState.apronSettlementLogs ?? []).some(
+      (log) => log.seasonId === gameState.season.id && log.phase === "season_end",
+    ),
     objectiveCashDelta,
     salaryTotal,
     loanInterest: loanInterestTotal,
