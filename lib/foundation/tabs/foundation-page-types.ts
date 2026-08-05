@@ -14,6 +14,7 @@
  * `cockpit-handlers.ts`) keep working unchanged.
  */
 import type { ContractShape, GameState, NewGameFlowStepId, RosterEntry, TeamControlMode, TeamControlSettings, TeamIdentity, TeamStrategyBias, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
+import type { SeasonGuvPosten } from "@/lib/finance/season-end-guv";
 import type { FacilityId, SpecialistWingVariant } from "@/lib/facilities/facility-catalog";
 import type { getFacilityConditionStatus } from "@/lib/facilities/facility-condition";
 import type { FoundationSaveMode } from "@/lib/persistence/foundation-save-mode";
@@ -2544,6 +2545,12 @@ export type FoundationSeasonStandingsOverviewItem = {
   sponsorRank: number | null;
   sponsorTotal: number | null;
   guv: number | null;
+  /**
+   * Aufschlüsselung der GuV in ihre Posten — jeder Posten IMMER dabei, auch bei 0. Kommt fertig aus
+   * der Route (`lib/finance/season-end-guv.ts`), damit der Hover nichts nachrechnen muss und die
+   * Zahl im Saisonstand, im Sponsoren-Reiter und im Finanzen-Reiter dieselbe ist.
+   */
+  guvPosten: SeasonGuvPosten[] | null;
   cashTotal: number | null;
   form: number | null;
   transfers: number | null;

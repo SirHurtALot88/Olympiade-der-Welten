@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import { EmptyState } from "@/components/foundation/EmptyState";
 import { buildOperatingGuvHoverText } from "@/lib/finance/guv-breakdown";
+import { buildSeasonGuvHoverText, seasonGuvFromPosten } from "@/lib/finance/season-end-guv";
 import {
   NL_TONE_VAR,
   NlCard,
@@ -489,13 +490,17 @@ function CashReconciliation({ team }: { team: TeamFinancesState }) {
         label="+ GuV"
         value={formatNlMoney(team.guv)}
         tone={guvTone(team.guv)}
-        // Gegenstueck zum Hover im Saisonstand — dieselbe Abgrenzung, aus dieser Richtung erklaert.
-        // Sonst steht an zwei Stellen dieselbe Ueberschrift ueber verschiedenen Zahlen, ohne dass
-        // irgendwo steht, warum (genau Chris' Meldung).
-        title={buildOperatingGuvHoverText({
-          totalIncome: team.totalIncome,
-          totalExpenses: team.totalExpenses,
-        })}
+        // DERSELBE Hover wie im Saisonstand — nicht mehr nur dieselbe Abgrenzung, sondern dieselbe
+        // Rechnung und dieselben Zeilen (`lib/finance/season-end-guv.ts`). Jeder Posten steht drin,
+        // auch die mit 0. Der alte Kurztext bleibt nur als Rueckfall, falls die Posten fehlen.
+        title={
+          team.guvPosten && team.guvPosten.length > 0
+            ? buildSeasonGuvHoverText(seasonGuvFromPosten(team.teamId, team.guvPosten))
+            : buildOperatingGuvHoverText({
+                totalIncome: team.totalIncome,
+                totalExpenses: team.totalExpenses,
+              })
+        }
       />
       <StatChip
         label="+ Sonstige Cash-Bewegungen"

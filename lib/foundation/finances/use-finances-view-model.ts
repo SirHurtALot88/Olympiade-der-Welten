@@ -4,6 +4,8 @@ import { useMemo } from "react";
 
 import type { GameState, SponsorOfferComponentKind } from "@/lib/data/olyDataTypes";
 import { estimateTeamAnnualRevenue, getTeamAnnualLoanInterest } from "@/lib/finance/loan-service";
+import { buildApronProjection } from "@/lib/finance/apron-projection";
+import { buildSeasonGuv, computeTeamLoanShares } from "@/lib/finance/season-end-guv";
 import { roundValue as round1 } from "@/lib/foundation/foundation-number-utils";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import {
@@ -314,11 +316,42 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
   // Betriebs-GuV) und lief der bewusst transferfreien Liga-Vergleichstabelle zuwider. Die Cash-
   // Reconciliation `cashSeasonStart + guv + otherCashMovements == cash` bleibt gültig: otherCashMovements
   // ist eine reine Differenz und absorbiert den nun nicht mehr in der GuV enthaltenen Transfer-Cashfluss.
-  const totalIncome = round1((sponsor?.total ?? 0) + (facilityIncome?.total ?? 0) + (objectiveReward ?? 0));
-  const totalExpenses = round1(
-    salaryTotal + facilityUpkeepTotal + loanInterestTotal + (objectivePenalty ?? 0),
-  );
-  const guv = round1(totalIncome - totalExpenses);
+  // --- Apron (GuV-Posten) --------------------------------------------------
+  // NEU: der Apron zählt mit. Chris: „Sponsoren + Gebäude + Apron sind doch die möglichen Einkünfte."
+  // Er wird erst am Saisonende abgerechnet und hängt am ENDrang — die Zahl ist deshalb eine
+  // Hochrechnung auf den aktuellen Rang, und der Hover sagt das auch. Vorher fehlte er hier ganz,
+  // während der Saisonstand ihn schon als Nebenzeile zeigte: zwei Bildschirme, zwei Zahlen.
+  const apronNettoDelta = (() => {
+    try {
+      const rankByTeamId = new Map<string, number | null>(
+        gameState.teams.map((entry) => [entry.teamId, gameState.seasonState.standings?.[entry.teamId]?.rank ?? null] as const),
+      );
+      return buildApronProjection({ gameState, rankByTeamId }).byTeamId.get(teamId) ?? null;
+    } catch {
+      return null;
+    }
+  })();
+
+  // DIE EINE GuV (`lib/finance/season-end-guv.ts`) — dieselbe Funktion, die auch der Saisonstand und
+  // die Buchung benutzen. Vorher stand hier eine eigene Summenbildung; sie kannte den Apron nicht und
+  // wich dadurch von der Zahl im Saisonstand ab. Genau das war die Meldung.
+  const seasonGuv = buildSeasonGuv({
+    teamId,
+    sponsorCash: sponsor?.total ?? 0,
+    facilityIncome: facilityIncome?.total ?? 0,
+    facilityUpkeep: facilityUpkeepTotal,
+    apronNetto: apronNettoDelta?.nettoDelta ?? 0,
+    apronRank: apronNettoDelta?.rank ?? null,
+    apronGedeckelt: apronNettoDelta?.gedeckelt ?? false,
+    objectiveCashDelta,
+    salaryTotal,
+    loanInterest: loanInterestTotal,
+    loanPrincipal: computeTeamLoanShares(gameState, teamId).principal,
+    transferNet: null,
+  });
+  const totalIncome = seasonGuv.einnahmen;
+  const totalExpenses = seasonGuv.ausgaben;
+  const guv = seasonGuv.guv;
 
   // --- Saison-Verlauf + Cash-Abgleich (T-107, T-031) -----------------------
   // Echte archivierte Season-End-Werte aus `gameState.seasonState.seasonSnapshots`
@@ -375,6 +408,7 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
     totalIncome,
     totalExpenses,
     guv,
+    guvPosten: seasonGuv.posten,
     cashSeasonStart,
     otherCashMovements,
     history,
