@@ -10,12 +10,8 @@ import {
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import {
   classifySellPricingNoteWeight,
-  classifySellReasonCategory,
   classifySellWarningWeight,
   describeSellPreviewIssue,
-  formatBoardTrustMoodLabel,
-  formatBoardTrustPolicyLabel,
-  formatDoctrinePersonaLabel,
   formatGmArchetypeLabel,
   formatGmPressureLabel,
   formatMatchdayShortLabel,
@@ -25,6 +21,7 @@ import {
   translateSellWarning,
   type SellNoticeWeight,
 } from "@/app/foundation/transfermarkt-v2/transfer-sell-view-labels";
+import TransferSellBoardBalance from "@/app/foundation/transfermarkt-v2/TransferSellBoardBalance";
 import { NlMarketBeforeAfterRow } from "@/app/foundation/transfermarkt-v2/TransfermarktV2NewLook";
 import { NlCard, NlCountUpValue, StatChip, StatChipRow } from "@/components/foundation/new-look";
 import type { Team } from "@/lib/data/olyDataTypes";
@@ -265,11 +262,6 @@ export default function FoundationMarketSellShellHost({
     : hasBuyout
       ? `Verkaufspreis brutto ${formatTransfermarktCurrency(preview.salePrice)} − Buyout ${formatTransfermarktCurrency(buyoutCost)}`
       : `Kein Buyout fällig — Verkaufspreis brutto ${formatTransfermarktCurrency(preview.salePrice)} bleibt komplett Netto`;
-
-  const sellScore = preview?.coaching?.sellIntentScore ?? null;
-  const keepScore = preview?.coaching?.keepIntentScore ?? null;
-  const intentTotal = (sellScore ?? 0) + (keepScore ?? 0);
-  const sellSharePct = intentTotal > 0 ? Math.round(((sellScore ?? 0) / intentTotal) * 1000) / 10 : 50;
 
   const pricingNotes = preview?.coaching?.pricingPolicyNotes ?? [];
   const hasNotices = (preview?.warnings.length ?? 0) > 0 || pricingNotes.length > 0;
@@ -664,106 +656,31 @@ export default function FoundationMarketSellShellHost({
             </StatChipRow>
           </NlCard>
 
-          {/* D: Board-Bilanz — der Kern, NIE zugeklappt. */}
+          {/* D: Board-Bilanz — der Kern, NIE zugeklappt. Die Karte selbst liegt in
+              `TransferSellBoardBalance`, weil der Kader-Drawer dieselbe zeigt; hier bleibt nur,
+              was zum VERKAUFEN gehört: die Risiko-Bestätigung. */}
           {preview.coaching ? (
-            <NlCard
-              className="transfer-sell-board-card"
-              eyebrow={
-                preview.coaching.doctrineHint
-                  ? `Doktrin: ${formatDoctrinePersonaLabel(preview.coaching.doctrinePersona)} · ${preview.coaching.doctrineHint}`
-                  : `Doktrin: ${formatDoctrinePersonaLabel(preview.coaching.doctrinePersona)}`
+            <TransferSellBoardBalance
+              coaching={preview.coaching}
+              footer={
+                /* Sichtbarkeit der Risiko-Bestätigung MUSS exakt der
+                   `strongAckRequired`-Bedingung entsprechen, die oben den Verkauf
+                   sperrt (strongAckPending): sobald die Bestätigung sperrt, muss
+                   die Checkbox erscheinen — sonst gäbe es einen stillen Dead-End. */
+                strongAckRequired ? (
+                  <label className="transfer-sell-risk-ack" data-testid="transfer-sell-risk-ack">
+                    <input
+                      type="checkbox"
+                      checked={marketSellRiskAcknowledged}
+                      onChange={(event) => onMarketSellRiskAcknowledgedChange(event.target.checked)}
+                    />
+                    <span>
+                      Ich bestätige den Verkauf trotz Board-/GM-Warnung ({preview.coaching.boardReaction.title})
+                    </span>
+                  </label>
+                ) : null
               }
-              title={
-                <>
-                  Board-Bilanz
-                  <span className="transfer-sell-board-title-sub">
-                    {preview.coaching.reasonsToSell.length} dafür · {preview.coaching.reasonsToKeep.length} dagegen
-                    {preview.coaching.sellPriority != null ? ` · Priorität ${preview.coaching.sellPriority}` : ""}
-                  </span>
-                </>
-              }
-              data-testid="transfer-sell-coaching-panel"
-            >
-              {sellScore != null || keepScore != null ? (
-                <div className="transfer-sell-intent">
-                  <div
-                    className="transfer-sell-intent-bar"
-                    role="img"
-                    aria-label={`Verkaufs-Gewichtung ${sellScore ?? 0} zu ${keepScore ?? 0}`}
-                  >
-                    <span className="transfer-sell-intent-fill" style={{ width: `${sellSharePct}%` }} />
-                  </div>
-                  <div className="transfer-sell-intent-legend">
-                    <b>Verkaufen · {sellScore ?? 0}</b>
-                    <b>Halten · {keepScore ?? 0}</b>
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="transfer-sell-reasons">
-                <div>
-                  <div className="transfer-sell-reason-col-head">
-                    <span>Dafür</span>
-                    <span>{preview.coaching.reasonsToSell.length}</span>
-                  </div>
-                  {preview.coaching.reasonsToSell.length ? (
-                    preview.coaching.reasonsToSell.map((reason, index) => (
-                      <div className="transfer-sell-reason is-for" key={`sell-${index}-${reason}`}>
-                        <span className="transfer-sell-reason-dot" aria-hidden="true" />
-                        <span className="transfer-sell-reason-tag">{classifySellReasonCategory(reason)}</span>
-                        <span>{reason}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="transfer-sell-reason-empty">Keine Verkaufsgründe.</p>
-                  )}
-                </div>
-                <div>
-                  <div className="transfer-sell-reason-col-head">
-                    <span>Dagegen</span>
-                    <span>{preview.coaching.reasonsToKeep.length}</span>
-                  </div>
-                  {/* Diese Spalte bleibt IMMER sichtbar, auch leer — bei wenigen,
-                      schweren Haltegründen trägt genau sie die Entscheidung. */}
-                  {preview.coaching.reasonsToKeep.length ? (
-                    preview.coaching.reasonsToKeep.map((reason, index) => (
-                      <div className="transfer-sell-reason is-keep" key={`keep-${index}-${reason}`}>
-                        <span className="transfer-sell-reason-dot" aria-hidden="true" />
-                        <span className="transfer-sell-reason-tag">{classifySellReasonCategory(reason)}</span>
-                        <span>{reason}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="transfer-sell-reason-empty">Keine Haltegründe.</p>
-                  )}
-                </div>
-              </div>
-
-              <p className="transfer-sell-strategy nl-market-muted">{preview.coaching.strategyFitSummary}</p>
-              {preview.coaching.boardTrustSmiley || preview.coaching.boardTrustPolicy ? (
-                <p className="nl-market-muted">
-                  Board-Stimmung {formatBoardTrustMoodLabel(preview.coaching.boardTrustSmiley)} · Linie:{" "}
-                  {formatBoardTrustPolicyLabel(preview.coaching.boardTrustPolicy)}
-                </p>
-              ) : null}
-
-              {/* Sichtbarkeit der Risiko-Bestätigung MUSS exakt der
-                  `strongAckRequired`-Bedingung entsprechen, die oben den Verkauf
-                  sperrt (strongAckPending): sobald die Bestätigung sperrt, muss
-                  die Checkbox erscheinen — sonst gäbe es einen stillen Dead-End. */}
-              {strongAckRequired ? (
-                <label className="transfer-sell-risk-ack" data-testid="transfer-sell-risk-ack">
-                  <input
-                    type="checkbox"
-                    checked={marketSellRiskAcknowledged}
-                    onChange={(event) => onMarketSellRiskAcknowledgedChange(event.target.checked)}
-                  />
-                  <span>
-                    Ich bestätige den Verkauf trotz Board-/GM-Warnung ({preview.coaching.boardReaction.title})
-                  </span>
-                </label>
-              ) : null}
-            </NlCard>
+            />
           ) : null}
 
           {/* E: Hinweise nach Gewicht — statt vier gleich lauter roter Balken. */}

@@ -3,6 +3,15 @@
   "eintraege": [
     {
       "datum": "2026-08-05",
+      "seite": "Teams · Verträge",
+      "pr": null,
+      "text": "Ein Klick auf eine Kaderzeile öffnet jetzt eine Verkaufs-Einschätzung als Seitenleiste: Verkaufspreis, Buyout, Netto-Erlös und die volle Board-Bilanz mit Dafür/Dagegen. Bisher bekam man die erst zu sehen, wenn man den Verkauf schon eingeleitet hatte — also genau bei den Spielern, bei denen man ohnehin entschieden hatte.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-05",
       "seite": "Markt · Transfermarkt",
       "pr": null,
       "text": "Der Buyout beim Verkauf hatte zwei Rechnungen: die Kader-Tabelle zeigte 0,0 Mio, der Verkaufsdialog zog für denselben Spieler 8,8 Mio ab. Am Spielstand gemessen bekamen 288 von 288 Kaderzeilen zwei verschiedene Antworten. Jetzt entscheidet eine Regel für alle Ansichten: das laufende Vertragsjahr fällt aus der Ablöse, sobald das Gehalt dieser Saison gebucht ist — ein auslaufender Vertrag kostet im Saisonende-Fenster damit gar nichts mehr.",

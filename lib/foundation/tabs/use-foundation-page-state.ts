@@ -557,6 +557,22 @@ export function useFoundationPageState({
   const [marketSellError, setMarketSellError] = useState<string | null>(null);
   const [marketSellSuccess, setMarketSellSuccess] = useState<string | null>(null);
   const [marketSellPreview, setMarketSellPreview] = useState<TransfermarktSellSummary | null>(null);
+  /**
+   * VERKAUFS-VORSCHAU ZUM NACHSEHEN (Kader-Drawer), getrennt vom Verkaufs-Flow.
+   *
+   * GEMELDET: „ich finde auch das verkaufsfenster sollte ggf als drawer oder so rein kommen schon
+   * wenn man den spieler in der zeile anklickt, damit man auch bei spielern die man nicht
+   * verkaufen will direkt sehen kann was das board dazu sagt!"
+   *
+   * Bewusst EIGENE Zustaende statt eines Flags auf `marketSellPreview`: der Drawer ist ein Blick,
+   * kein Schritt im Verkauf. Teilten sich beide den Zustand, wuerde ein Klick auf eine
+   * Kaderzeile die halb ausgefuellte Verkaufsseite darunter mit fremden Daten ueberschreiben —
+   * und ein Fehler im Drawer stuende als Fehler im Verkaufsdialog.
+   */
+  const [marketSellPeekSubject, setMarketSellPeekSubject] = useState<TransfermarktSellPreviewSubject | null>(null);
+  const [marketSellPeekPreview, setMarketSellPeekPreview] = useState<TransfermarktSellSummary | null>(null);
+  const [marketSellPeekBusy, setMarketSellPeekBusy] = useState<boolean>(false);
+  const [marketSellPeekError, setMarketSellPeekError] = useState<string | null>(null);
   const [contractRenewalBusy, setContractRenewalBusy] = useState<string | null>(null);
   const [contractRenewalMessage, setContractRenewalMessage] = useState<string | null>(null);
   const [contractRenewalError, setContractRenewalError] = useState<string | null>(null);
@@ -958,6 +974,14 @@ export function useFoundationPageState({
     setMarketSellSuccess,
     marketSellPreview,
     setMarketSellPreview,
+    marketSellPeekSubject,
+    setMarketSellPeekSubject,
+    marketSellPeekPreview,
+    setMarketSellPeekPreview,
+    marketSellPeekBusy,
+    setMarketSellPeekBusy,
+    marketSellPeekError,
+    setMarketSellPeekError,
     contractRenewalBusy,
     setContractRenewalBusy,
     contractRenewalMessage,
