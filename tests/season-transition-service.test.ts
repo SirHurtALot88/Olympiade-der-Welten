@@ -1,14 +1,35 @@
 import path from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { isTransferMarketPhaseOpen } from "@/lib/market/transfer-window-policy";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import {
+  advanceSeasonTransitionStep,
   advanceSeasonTransitionToTransferWindow,
   buildSeasonTransitionPreview,
   resolveGamePhase,
+  SEASON_TRANSITION_STEPS,
   startSeasonTransition,
 } from "@/lib/season/season-transition-service";
+
+// `node:crypto` ist ESM — `vi.spyOn` scheitert dort an "Module namespace is not configurable"
+// (die Exporte sind read-only). `vi.mock` ersetzt das Modul stattdessen komplett; `uuidCounter`
+// lebt auf Modulebene, damit der Gleichheitstest unten ihn zwischen den beiden Laeufen (alter Weg
+// vs. neuer, gebatchter Weg) gezielt auf denselben Startwert zuruecksetzen kann — nur so ziehen
+// beide Laeufe dieselbe UUID-Sequenz und landen im selben GameState.
+let uuidCounter = 0;
+vi.mock("node:crypto", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:crypto")>();
+  return {
+    ...actual,
+    randomUUID: () => `test-uuid-${uuidCounter++}` as ReturnType<typeof actual.randomUUID>,
+  };
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 function gameState(input?: { completed?: boolean; gamePhase?: GameState["gamePhase"] }): GameState {
   const completed = input?.completed ?? false;
@@ -171,7 +192,7 @@ describe("season transition service", () => {
    * stellt eine andere Frage („ich will jetzt meine Vertraege machen") und beantwortet sie in
    * einem Zug.
    */
-  it("schaltet in einem Zug bis zum offenen Transferfenster durch", () => {
+  it("schaltet in einem Zug bis zum offenen Transferfenster durch — und schreibt dabei nur EINMAL", () => {
     const sourceSave = save({ completed: true });
     const { persistence, saveSingleplayerState, gespeichertePhasen } = statefulPersistenceMock(sourceSave);
 
@@ -179,15 +200,78 @@ describe("season transition service", () => {
 
     expect(result.applied).toBe(true);
     expect(result.gamePhase).toBe("preseason_management");
-    // Jede Station einzeln geschrieben — die Schleife ueberspringt keine, sie ruft nur
-    // denselben Einzelschritt mehrfach auf.
-    expect(gespeichertePhasen()).toEqual([
-      "season_review",
-      "season_rewards",
-      "player_development",
-      "preseason_management",
-    ]);
-    expect(saveSingleplayerState).toHaveBeenCalledTimes(4);
+    // PERF: die vier Hops (season_review, season_rewards, player_development,
+    // preseason_management) laufen komplett im Speicher durch — geschrieben wird der Spielstand
+    // erst am Ende, EINMAL, nicht mehr nach jedem einzelnen Hop. Auf der Platte landet direkt die
+    // Endphase, keine der Zwischenphasen ist je sichtbar (siehe `advanceSeasonTransitionToTransferWindow`,
+    // PERF-Kommentar dort, fuer die Zeitmessung, die diesen Umbau ausgeloest hat).
+    expect(gespeichertePhasen()).toEqual(["preseason_management"]);
+    expect(saveSingleplayerState).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * DER BEWEIS, dass der Umbau auf Batch-Schreiben das FACHERGEBNIS nicht veraendert hat: derselbe
+   * Ausgangs-Save, einmal ueber den alten Weg nachgebaut (`advanceSeasonTransitionStep` — schreibt
+   * nach wie vor pro Aufruf einmal — Hop fuer Hop mit Schreiben + Neuladen dazwischen, genau das
+   * Muster, das `advanceSeasonTransitionToTransferWindow` VOR diesem Umbau selbst gefahren ist),
+   * einmal ueber die neue gebatchte Schleife. Beide muessen im BYTE-IDENTISCHEN GameState landen.
+   *
+   * `randomUUID` und die Systemzeit werden fuer beide Laeufe deterministisch gemacht (gleicher
+   * Zaehler ab 0, gleiche fixe Zeit) — sonst wichen `transitionId` und die Progression-Event-IDs
+   * allein durch den doppelten Aufruf voneinander ab, obwohl die Fachlogik identisch rechnet.
+   */
+  it("liefert exakt denselben Endzustand wie der alte, schrittweise persistierende Ablauf", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-11T00:00:00.000Z"));
+
+    try {
+      // Alter Weg: Hop -> schreiben -> `getSaveById` neu laden -> naechster Hop. Die alte
+      // `advanceSeasonTransitionToTransferWindow` rechnete VOR der Schleife bereits einmal
+      // `buildSeasonTransitionPreview` (fuer den Rueckgabewert, falls das Fenster schon offen
+      // ist) — dieser verworfene Aufruf zieht ebenfalls eine UUID und gehoert fuer eine
+      // lueckenlose Nachbildung mit dazu, sonst laufen beide Seiten um eins versetzt.
+      uuidCounter = 0;
+      const manualRun = statefulPersistenceMock(save({ completed: true }));
+      let manualCurrent: PersistedSaveGame = manualRun.persistence.getSaveById("save-1")!;
+      buildSeasonTransitionPreview(manualCurrent);
+      for (let hop = 0; hop < SEASON_TRANSITION_STEPS.length; hop += 1) {
+        if (isTransferMarketPhaseOpen(manualCurrent.gameState)) break;
+        const step = advanceSeasonTransitionStep(manualCurrent, manualRun.persistence);
+        if (!("applied" in step) || !step.applied) break;
+        const reloaded = manualRun.persistence.getSaveById(manualCurrent.saveId);
+        if (!reloaded) break;
+        manualCurrent = reloaded;
+      }
+      expect(manualCurrent.gameState.gamePhase).toBe("preseason_management");
+
+      // Neuer Weg: dieselbe Ausgangslage, einmal gebatcht durchgereicht.
+      uuidCounter = 0;
+      const batchedRun = statefulPersistenceMock(save({ completed: true }));
+      const batchedResult = advanceSeasonTransitionToTransferWindow(
+        batchedRun.persistence.getSaveById("save-1")!,
+        batchedRun.persistence,
+      );
+      expect(batchedResult.gamePhase).toBe("preseason_management");
+      const batchedFinal = batchedRun.persistence.getSaveById("save-1");
+      if (!batchedFinal) throw new Error("Batched run left no save behind.");
+
+      // Der eigentliche Beweis: identischer GameState, nicht nur identische Endphase.
+      expect(batchedFinal.gameState).toEqual(manualCurrent.gameState);
+      // Und beide haben tatsaechlich dieselben vier Hops durchlaufen (kein Kurzschluss).
+      // `season_check` selbst taucht hier NICHT auf — der schaltet ueber `startSeasonTransition`
+      // (bzw. dessen In-Memory-Pendant `computeStartSeasonTransition`), das `completedSteps`
+      // unangetastet laesst; das war schon vor diesem Umbau so.
+      expect(batchedFinal.gameState.seasonTransition?.completedSteps).toEqual([
+        "season_review",
+        "season_rewards",
+        "player_development",
+      ]);
+      expect(manualCurrent.gameState.seasonTransition?.completedSteps).toEqual(
+        batchedFinal.gameState.seasonTransition?.completedSteps,
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("bewegt sich nicht mehr, wenn das Fenster schon offen ist", () => {
