@@ -2,6 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const buildAiLegacyLineupPreview = vi.fn();
 const loadLocalLegacyLineupContext = vi.fn();
+/**
+ * NACHGEZOGEN: die Batch-Vorschau laedt die Team-Kontexte inzwischen GEBUENDELT
+ * (`loadAllLocalLegacyLineupContexts` — den Spielstand einmal aufloesen statt einmal je Team). Der
+ * Modul-Mock kannte nur die Einzelvariante; der Import lief auf `undefined`, der Aufruf warf, und die
+ * Route antwortete 500. Geprueft wird weiterhin dasselbe — nur ueber den Aufruf, den sie wirklich macht.
+ */
+const loadAllLocalLegacyLineupContexts = vi.fn();
 const loadLocalLegacyLineupContextFromGameState = vi.fn();
 const loadLegacyLineupContext = vi.fn();
 const createPersistenceService = vi.fn();
@@ -34,6 +41,7 @@ vi.mock("@/lib/ai/ai-legacy-lineup-engine", () => ({
 
 vi.mock("@/lib/lineups/legacy-lineup-local-service", () => ({
   loadLocalLegacyLineupContext,
+  loadAllLocalLegacyLineupContexts,
   loadLocalLegacyLineupContextFromGameState,
   saveLocalLegacyLineupDraft,
   saveLocalLegacyLineupDraftBatch,
@@ -199,9 +207,10 @@ describe("ai legacy lineup preview api", () => {
       getActiveSave: () => null,
     });
 
-    loadLocalLegacyLineupContext
-      .mockReturnValueOnce({ ok: true, warnings: [], context: { teamId: "A-A" } })
-      .mockReturnValueOnce({ ok: true, warnings: [], context: { teamId: "B-B" } });
+    loadAllLocalLegacyLineupContexts.mockReturnValue([
+      { ok: true, warnings: [], context: { teamId: "A-A" } },
+      { ok: true, warnings: [], context: { teamId: "B-B" } },
+    ]);
     buildAiLegacyLineupPreview
       .mockReturnValueOnce({
         teamId: "A-A",
@@ -242,7 +251,8 @@ describe("ai legacy lineup preview api", () => {
     expect(body.teams[0].teamName).toBe("Alpha");
     expect(body.teams[0].d1CaptainName).toBe("Captain A");
     expect(body.teams[1].d2MissingSlots).toBe(1);
-    expect(loadLocalLegacyLineupContext).toHaveBeenCalledTimes(2);
+    // EIN gebuendelter Aufruf statt zwei einzelner — genau der Punkt der Umstellung.
+    expect(loadAllLocalLegacyLineupContexts).toHaveBeenCalledTimes(1);
   }, 20000);
 
   it("keeps prisma batch preview read-only", async () => {
@@ -314,7 +324,21 @@ describe("ai legacy lineup preview api", () => {
           },
         },
       }),
-      getSaveById: () => null,
+      /**
+       * Audit S5: SCHREIBENDE Routen weigern sich, auf den aktiven Spielstand zurueckzufallen —
+       * `requireLocalPersistedSave` liest AUSSCHLIESSLICH `getSaveById(saveId)` und wirft sonst.
+       * Die Vorlage lieferte den Save aber nur ueber `bootstrapSingleplayerSave`, waehrend
+       * `getSaveById` auf null lief. Die Route fand nichts und antwortete 404 — nicht weil das
+       * Verhalten kaputt waere, sondern weil die Vorlage den Save an einer Stelle hinlegte, an der
+       * seit dieser Regel niemand mehr nachsieht.
+       */
+      getSaveById: function (
+        this: { bootstrapSingleplayerSave: () => { save: { saveId: string } } },
+        angefragteSaveId: string,
+      ) {
+        const save = this.bootstrapSingleplayerSave().save;
+        return angefragteSaveId === save.saveId ? save : null;
+      },
       getActiveSave: () => null,
     });
     getLocalLegacyLineupDraft.mockReturnValue(null);
@@ -385,7 +409,21 @@ describe("ai legacy lineup preview api", () => {
           },
         },
       }),
-      getSaveById: () => null,
+      /**
+       * Audit S5: SCHREIBENDE Routen weigern sich, auf den aktiven Spielstand zurueckzufallen —
+       * `requireLocalPersistedSave` liest AUSSCHLIESSLICH `getSaveById(saveId)` und wirft sonst.
+       * Die Vorlage lieferte den Save aber nur ueber `bootstrapSingleplayerSave`, waehrend
+       * `getSaveById` auf null lief. Die Route fand nichts und antwortete 404 — nicht weil das
+       * Verhalten kaputt waere, sondern weil die Vorlage den Save an einer Stelle hinlegte, an der
+       * seit dieser Regel niemand mehr nachsieht.
+       */
+      getSaveById: function (
+        this: { bootstrapSingleplayerSave: () => { save: { saveId: string } } },
+        angefragteSaveId: string,
+      ) {
+        const save = this.bootstrapSingleplayerSave().save;
+        return angefragteSaveId === save.saveId ? save : null;
+      },
       getActiveSave: () => null,
     });
     getLocalLegacyLineupDraft.mockReturnValue({
@@ -458,7 +496,21 @@ describe("ai legacy lineup preview api", () => {
           },
         },
       }),
-      getSaveById: () => null,
+      /**
+       * Audit S5: SCHREIBENDE Routen weigern sich, auf den aktiven Spielstand zurueckzufallen —
+       * `requireLocalPersistedSave` liest AUSSCHLIESSLICH `getSaveById(saveId)` und wirft sonst.
+       * Die Vorlage lieferte den Save aber nur ueber `bootstrapSingleplayerSave`, waehrend
+       * `getSaveById` auf null lief. Die Route fand nichts und antwortete 404 — nicht weil das
+       * Verhalten kaputt waere, sondern weil die Vorlage den Save an einer Stelle hinlegte, an der
+       * seit dieser Regel niemand mehr nachsieht.
+       */
+      getSaveById: function (
+        this: { bootstrapSingleplayerSave: () => { save: { saveId: string } } },
+        angefragteSaveId: string,
+      ) {
+        const save = this.bootstrapSingleplayerSave().save;
+        return angefragteSaveId === save.saveId ? save : null;
+      },
       getActiveSave: () => null,
     });
     getLocalLegacyLineupDraft.mockReturnValue({
@@ -593,7 +645,21 @@ describe("ai legacy lineup preview api", () => {
           },
         },
       }),
-      getSaveById: () => null,
+      /**
+       * Audit S5: SCHREIBENDE Routen weigern sich, auf den aktiven Spielstand zurueckzufallen —
+       * `requireLocalPersistedSave` liest AUSSCHLIESSLICH `getSaveById(saveId)` und wirft sonst.
+       * Die Vorlage lieferte den Save aber nur ueber `bootstrapSingleplayerSave`, waehrend
+       * `getSaveById` auf null lief. Die Route fand nichts und antwortete 404 — nicht weil das
+       * Verhalten kaputt waere, sondern weil die Vorlage den Save an einer Stelle hinlegte, an der
+       * seit dieser Regel niemand mehr nachsieht.
+       */
+      getSaveById: function (
+        this: { bootstrapSingleplayerSave: () => { save: { saveId: string } } },
+        angefragteSaveId: string,
+      ) {
+        const save = this.bootstrapSingleplayerSave().save;
+        return angefragteSaveId === save.saveId ? save : null;
+      },
       getActiveSave: () => null,
     });
     getLocalLegacyLineupDraft.mockReturnValue(null);
