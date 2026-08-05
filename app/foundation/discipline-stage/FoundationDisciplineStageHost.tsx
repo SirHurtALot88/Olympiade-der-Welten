@@ -5,6 +5,7 @@ import { Component, type ReactNode } from "react";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
 import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
+import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import DisciplineStageArena from "@/app/foundation/discipline-stage/DisciplineStageArena";
 
 // Die Disziplin-Bühne bekommt den vollen GameState + die Team-Auswahl bewusst
@@ -35,6 +36,12 @@ export type FoundationDisciplineStageHostProps = {
   // Öffnet die volle Team-Karte — nötig, damit der „Volles Profil"-Button im
   // Team-Drawer der Bühne nicht ins Leere läuft (S3).
   onOpenTeam?: ((teamId: string) => void) | null;
+  /**
+   * Kanonische, ligaweite OVR/Rang-Karte (Server-Slice auf dem VOLLEN Save) — dieselbe
+   * Quelle wie Kader/Spielerprofil/Ranglisten. Fehlt sie (z. B. `dev-arena`-Vorschau ohne
+   * Shell-Kontext), rechnet die Bühne defensiv lokal weiter — siehe DisciplineStageArena.
+   */
+  canonicalRatingByPlayerId?: Map<string, PlayerRatingContractRow> | null;
 };
 
 // Diagnose-Fehlergrenze: zeigt die ECHTE Fehlermeldung + Stack direkt im Tab an,

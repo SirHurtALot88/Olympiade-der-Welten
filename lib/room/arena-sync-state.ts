@@ -187,7 +187,15 @@ export function startRoomArena(input: {
     version: (input.state.arenaSyncState?.version ?? 0) + 1,
     saveId: input.state.multiplayerRoom.saveId,
     seasonId: input.seasonId ?? input.state.multiplayerRoom.activeSeasonId,
-    matchdayId: input.matchdayId ?? String(input.state.multiplayerRoom.activeMatchday),
+    // Format muss exakt `matchdayState.matchdayId` treffen ("matchday-1", siehe
+    // lib/data/dataAdapter.ts), NICHT die nackte Spieltagsnummer - `matchesArenaScope()`
+    // vergleicht beide Strings exakt. Ein Aufruf ohne explizites matchdayId (Fallback hier)
+    // erzeugte bisher "1" statt "matchday-1": der Sync lief serverseitig korrekt, aber JEDER
+    // echte Client (DisciplineStageArena.tsx scoped auf gameState.matchdayState.matchdayId)
+    // verwarf ihn lautlos als "falscher Spieltag" - das Ready-Gate blieb unsichtbar, obwohl der
+    // Reveal serverseitig laengst lief. Gefunden beim Reparieren von
+    // scripts/smoke-multiplayer-e2e.ts (dem einzigen Aufrufer, der bisher ohne matchdayId rief).
+    matchdayId: input.matchdayId ?? `matchday-${input.state.multiplayerRoom.activeMatchday}`,
     disciplineSide: input.disciplineSide ?? "d1",
     activeDisciplinePhase: mapRoomDisciplineSideToFoundationPhase(input.disciplineSide ?? "d1"),
     phaseId: "slots",

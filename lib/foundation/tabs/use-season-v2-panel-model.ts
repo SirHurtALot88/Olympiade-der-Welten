@@ -8,6 +8,7 @@ import {
   getTeamGeneralManagerProfile,
 } from "@/lib/foundation/team-general-managers";
 import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
+import { buildApronProjection } from "@/lib/finance/apron-projection";
 import { resolveSeasonDisciplineAreaTotal } from "@/lib/season/season-discipline-area-groups";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { calculateFacilitySeasonUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
@@ -95,6 +96,21 @@ export function useSeasonV2PanelModel({
   archivedSeasonDisciplineLeaderboards,
   boardConfidence,
 }: UseSeasonV2PanelModelInput) {
+  /**
+   * Apron-Hochrechnung für die ganze Liga — EINMAL je Tabellenaufbau, nicht je Zeile: Topf und
+   * Ausschüttung eines Teams hängen daran, was die anderen 31 zahlen. Die Ränge kommen aus den
+   * bereits sortierten Standings-Zeilen, damit die Hochrechnung genau den Rang benutzt, der in
+   * derselben Tabelle daneben steht.
+   */
+  const apronProjection = useMemo(
+    () =>
+      buildApronProjection({
+        gameState,
+        rankByTeamId: new Map(sortedSeasonStandRows.map((row) => [row.teamId, row.rank ?? null] as const)),
+      }),
+    [gameState, sortedSeasonStandRows],
+  );
+
   const standingsRows = useMemo(
     () =>
       sortedSeasonStandRows.map((row) => {
@@ -123,6 +139,21 @@ export function useSeasonV2PanelModel({
           guv: row.guv ?? null,
           sponsorTotal: row.sponsorTotal ?? null,
           transferNet: row.transferNet ?? row.transfersSeasonValue ?? null,
+          apronProjection: (() => {
+            const apronRow = apronProjection.byTeamId.get(row.teamId);
+            if (!apronRow) {
+              return null;
+            }
+            return {
+              nettoDelta: apronRow.nettoDelta,
+              rank: apronRow.rank,
+              salary: apronRow.salary,
+              line1: apronProjection.lines.line1,
+              line2: apronProjection.lines.line2,
+              frozenLines: apronProjection.frozenLines,
+              gedeckelt: apronRow.gedeckelt,
+            };
+          })(),
           marketValueTotal: row.marketValueTotal ?? null,
           disciplineValues: {
             bonuspunkte: row.disciplineValues.bonuspunkte ?? null,
@@ -155,7 +186,7 @@ export function useSeasonV2PanelModel({
           historicalPointsBySeason: row.historicalPointsBySeason ?? [],
         };
       }),
-    [gameState, selectedTeamId, sortedSeasonStandRows],
+    [apronProjection, gameState, selectedTeamId, sortedSeasonStandRows],
   );
 
   const topPlayers = useMemo(() => {

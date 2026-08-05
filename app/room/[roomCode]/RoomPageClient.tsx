@@ -220,7 +220,7 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
       </header>
 
       <div className="room-meta">
-        <span className="pill oly-room-code-pill">
+        <span className="pill oly-room-code-pill" data-testid="room-code-pill">
           Raum-Code <strong>{roomCode.toUpperCase()}</strong>
         </span>
         <CopyRoomCodeButton roomCode={roomCode.toUpperCase()} />
@@ -252,7 +252,7 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
                 <tbody>
                   {state.roomParticipants.map((participant) => (
                     <tr key={participant.participantId}>
-                      <td>{participant.displayName}</td>
+                      <td data-testid="room-participant-name">{participant.displayName}</td>
                       <td>{participant.role === "host" ? "Host" : participant.role === "spectator" ? "Zuschauer" : "Mitspieler"}</td>
                       <td>{participant.controlledTeamIds.join(", ") || "—"}</td>
                       <td>

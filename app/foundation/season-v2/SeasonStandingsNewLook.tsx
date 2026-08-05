@@ -1529,13 +1529,16 @@ export default function SeasonStandingsNewLook({
             className={`nl-standings-td-fin${nlMoneySignClass(row.guv)}`}
             // Chris: „am besten ein Hover auf dem GuV-Posten, der noch mal aufzeigt, wie die Zahl
             // sich zusammensetzt". Die Herleitung liegt in lib/finance/guv-breakdown.ts, damit
-            // Saisonstand und Finanzen-Reiter dieselbe Erklaerung zeigen.
+            // Saisonstand und Finanzen-Reiter dieselbe Erklaerung zeigen. Der Apron steht darin
+            // als Hochrechnung beim aktuellen Rang — gerechnet in `apron-projection.ts` und je
+            // Zeile mitgeliefert, weil Topf und Ausschuettung an der ganzen Liga haengen.
             title={
               buildGuvBreakdown({
                 sponsorTotal: row.sponsorTotal,
                 salaryTotal: row.salaryTotal,
                 guv: row.guv,
                 transferNet: row.transferNet,
+                apron: row.apronProjection ?? null,
               }).hoverText
             }
           >

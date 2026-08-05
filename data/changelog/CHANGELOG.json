@@ -30,9 +30,54 @@
     },
     {
       "datum": "2026-08-04",
+      "seite": "Multiplayer · Arena",
+      "pr": null,
+      "text": "Startete der Gastgeber die gemeinsame Arena, konnte beim Mitspieler das Bereit-Fenster unsichtbar bleiben — der Reveal lief auf dem Server längst, sein Client verwarf ihn aber stillschweigend als „falscher Spieltag\". Behoben.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
       "seite": "Spieltag · Saisonstand",
       "pr": null,
       "text": "Der Hover auf der GuV war ein zehnzeiliger Absatz. Die Rechnung steht jetzt in einer Zeile, darunter nur noch, was nicht enthalten ist und warum der Finanzen-Reiter eine andere Zahl zeigt.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
+      "seite": "Team · Kader",
+      "pr": null,
+      "text": "Auf den Kaderkarten fehlten die Saison-PPs je Achse — die vier Zahlen dort waren immer nur die Attributwerte. Jetzt steht darunter eine zweite Zeile mit den geholten Punkten und dem Ligarang je Achse.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
+      "seite": "Team · Kader",
+      "pr": null,
+      "text": "Wo auf der Kaderkarte der Marktwert stand, steht jetzt VK: der Preis, den du in dieser Saison für den Spieler bekommst — darunter, wie viel der Verkaufsfaktor gegenüber dem Marktwert drauflegt oder abzieht.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
+      "seite": "Team · Kader",
+      "pr": null,
+      "text": "Die Portraits im Kader waren klein für das, was auf ihnen zu sehen ist. Die Karten sind jetzt breiter und die Bilder entsprechend größer.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-04",
+      "seite": "Spieltag · Saisonstand",
+      "pr": null,
+      "text": "Der Hover auf der GuV nannte den Apron nur als etwas, das nicht enthalten ist. Jetzt steht dort, was er beim aktuellen Rang hochgerechnet ausmachen würde — mit der Gehaltszahl, gegen die gerechnet wird, und dem Hinweis, dass Deckel und Ausschüttung erst mit dem Endrang feststehen.",
       "quelle": "gepflegt",
       "gewicht": "feinschliff",
       "version": "0.4"

@@ -49,6 +49,20 @@ const baseState = () => (basisCache ??= createSingleplayerGameState());
 
 const vertragCache = new Map<string, GameState>();
 
+/**
+ * Derselbe Spielstand, nur als Saison 2 etikettiert. Die Saisonnummer wird aus `season.id`/`season.name`
+ * gelesen, und einige Board-Ziele haengen daran (der Transferausgaben-Deckel z. B. gilt erst ab S2, weil
+ * in der Draft-Saison der komplette Kader eingekauft wird). Der Sponsorvertrag wird danach unterschrieben,
+ * traegt also dieselbe Saison-ID.
+ */
+let saisonZweiCache: GameState | null = null;
+const seasonTwoState = () =>
+  (saisonZweiCache ??= {
+    ...baseState(),
+    season: { ...baseState().season, id: "season-2", name: "Season 2" },
+    seasonState: { ...baseState().seasonState, seasonId: "season-2" },
+  });
+
 function withAnalyticsLevel(gameState: GameState, teamId: string, level: number): GameState {
   const existing = gameState.seasonState.teamFacilities?.[teamId]?.facilities ?? {};
   return {
@@ -79,7 +93,10 @@ function withCash(gameState: GameState, teamId: string, delta: number): GameStat
 
 /** Unterschreibt ueber den echten Signierpfad ein Angebot, das eine V4-Achse traegt. */
 function signAxisContract(gameState: GameState, teamId: string): GameState {
-  const gecacht = vertragCache.get(`sign:${teamId}`);
+  // Saison-ID im Schluessel: derselbe Team-Slot wird auch fuer den Saison-2-Stand signiert, und ein
+  // Vertrag der falschen Saison wuerde von `isActiveSponsorContract` verworfen.
+  const cacheKey = `sign:${gameState.season.id}:${teamId}`;
+  const gecacht = vertragCache.get(cacheKey);
   if (gecacht) return gecacht;
   const offers = buildSponsorOffersForTeam({ gameState, teamId });
   const withOffers: GameState = {
@@ -96,7 +113,7 @@ function signAxisContract(gameState: GameState, teamId: string): GameState {
   expect(offer, "Slate enthaelt keine Achsenkarte — der Test haette nichts geprueft").toBeDefined();
   const result = chooseSponsorOffer({ gameState: withOffers, teamId, offerId: offer!.offerId });
   expect(result.contract, result.error ?? "kein Vertrag").not.toBeNull();
-  vertragCache.set(`sign:${teamId}`, result.gameState);
+  vertragCache.set(cacheKey, result.gameState);
   return result.gameState;
 }
 
@@ -416,7 +433,11 @@ describe("Analytics Room: eine Achse ohne belastbare Zahl wird als solche ausgew
    * einem Teil davon verkehrt herum. Der Abstand ist richtungsfrei und stimmt immer.
    */
   it("behauptet nie eine Richtung: ein Ziel kann den Zielwert ueberschreiten und trotzdem verfehlt sein", () => {
-    const gameState = baseState();
+    // SAISON 2, nicht 1: Das gegenlaeufige Ziel im Slate ist der Transferausgaben-Deckel („Ist ueber
+    // Ziel und trotzdem verfehlt"). In der Draft-Saison steht er nicht mehr — dort kauft jedes Team
+    // seinen kompletten Kader ein, ein Ausgabendeckel waere per Konstruktion unerfuellbar, und an
+    // seiner Stelle steht die gleichlaeufige Cash-Reserve. Ab S2 ist der Deckel wieder da.
+    const gameState = seasonTwoState();
     const teamId = gameState.teams[0]!.teamId;
     const state = withAnalyticsLevel(signAxisContract(gameState, teamId), teamId, 5);
     const board = buildAnalyticsBoardGoalsLive(state, teamId);
