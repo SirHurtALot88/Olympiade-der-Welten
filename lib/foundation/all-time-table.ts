@@ -216,8 +216,21 @@ export function buildAllTimeTableModel(input: BuildAllTimeTableModelInput): AllT
         isLive: false,
         rank: record.rank ?? null,
         points: record.points ?? null,
-        marketValue: record.marketValueTotalEnd ?? record.marketValueEnd ?? null,
-        cash: record.cashTotal ?? record.cashEnd ?? null,
+        /**
+         * MARKTWERT: `marketValueSeasonEnd` zuerst — das ist der Stand NACH dem Trainings-Apply und
+         * der Marktwert-Neuberechnung, also der Wert, mit dem das Team die Saison wirklich beendet
+         * hat. `marketValueTotalEnd`/`marketValueEnd` werden beim Preseason-Patch mit dem
+         * Eintrittsstand der NÄCHSTEN Saison überschrieben und beantworten deshalb eine andere Frage.
+         *
+         * CASH: `cashEnd` zuerst — der echte Kontostand zum Snapshot-Zeitpunkt (`team.cash`).
+         * `cashTotal` ist `projectedCash` aus dem Cash-Apply, eine PROGNOSE, die vor Sponsor-
+         * Settlement, Krediten, Gebäuden, Vorstandszielen und Insolvenz-Backstop gebildet wurde.
+         * Sie stand hier vorne — deshalb Chris' Meldung „in der ewigen Tabelle stehen auch noch die
+         * alten Cash-Werte". Ein Prognosewert aus der Vorsaison sieht genau so aus.
+         */
+        marketValue:
+          record.marketValueSeasonEnd ?? record.marketValueTotalEnd ?? record.marketValueEnd ?? null,
+        cash: record.cashEnd ?? record.cashTotal ?? null,
       });
     }
 

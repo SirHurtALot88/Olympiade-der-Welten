@@ -239,6 +239,41 @@ function getSortValue(row: AllTimeTableRow, key: TableSortKey): number {
   }
 }
 
+/**
+ * Beschriftung je Punkt fuer den Hover — „Saison 3 · 412,5". Gerechnet aus DENSELBEN Reihen wie
+ * `getChartValues`, damit Punkt und Beschriftung nicht auseinanderlaufen koennen: beide filtern
+ * anschliessend die Luecken raus, also muss der Filter auf dem Paar passieren, nicht auf den Reihen
+ * einzeln.
+ */
+function getChartSeries(
+  row: AllTimeTableRow,
+  metric: ChartMetricKey,
+): { values: number[]; labels: string[] } {
+  const seasons = row.seasons.slice(-10);
+  const paare = seasons
+    .map((season) => ({ season, value: getChartValueForSeason(season, metric) }))
+    .filter((eintrag): eintrag is { season: (typeof seasons)[number]; value: number } => isFiniteNumber(eintrag.value));
+  return {
+    values: paare.map((eintrag) => eintrag.value),
+    labels: paare.map((eintrag) => {
+      // Der Rang steckt negiert in der Reihe (siehe unten) — im Hover wieder als echter Platz.
+      const anzeige = metric === "rank" ? `Platz ${Math.abs(eintrag.value)}` : formatNlMoney(eintrag.value);
+      const zahl = metric === "points" ? `${eintrag.value} Punkte` : anzeige;
+      return `${eintrag.season.seasonLabel} · ${zahl}`;
+    }),
+  };
+}
+
+function getChartValueForSeason(season: AllTimeTableRow["seasons"][number], metric: ChartMetricKey): number | null {
+  if (metric === "mw") return season.marketValue;
+  if (metric === "cash") return season.cash;
+  if (metric === "teamValue") {
+    return season.marketValue != null || season.cash != null ? (season.marketValue ?? 0) + (season.cash ?? 0) : null;
+  }
+  if (metric === "points") return season.points;
+  return season.rank != null ? -season.rank : null;
+}
+
 function getChartValues(row: AllTimeTableRow, metric: ChartMetricKey): number[] {
   const seasons = row.seasons.slice(-10);
   const raw = seasons.map((season) => {
@@ -470,7 +505,7 @@ export default function AllTimeTableNewLook({ model, selectedTeamId, seasonLabel
         <>
           <div className="nl-alltime-chart-grid">
             {chartRows.map((row) => {
-              const values = getChartValues(row, chartMetric);
+              const { values, labels } = getChartSeries(row, chartMetric);
               const tone = CHART_METRICS.find((metric) => metric.id === chartMetric)?.tone ?? "accent";
               return (
                 <article
@@ -489,6 +524,9 @@ export default function AllTimeTableNewLook({ model, selectedTeamId, seasonLabel
                     <NlSparkline
                       points={values}
                       tone={tone}
+                      // Chris: „mit nem Hover ne Liniendiagramm-Grafik ... sieht wie die Entwicklung war."
+                      // Jeder Punkt traegt jetzt seine Saison und seinen Wert.
+                      pointLabels={labels}
                       aria-label={`${row.teamName} · ${CHART_METRICS.find((metric) => metric.id === chartMetric)?.label ?? ""}-Verlauf`}
                     />
                   ) : MONEY_CHART_METRICS.has(chartMetric) && values.length === 1 ? (

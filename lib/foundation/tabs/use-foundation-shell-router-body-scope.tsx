@@ -10428,7 +10428,10 @@ export function useFoundationShellRouterBodyScope({
           rank: item.rank ?? null,
           points: item.points ?? null,
           marketValue: item.marketValueTotal ?? rosterMwByTeamId.get(item.teamId) ?? null,
-          cash: item.cashTotal ?? item.cash ?? null,
+          // LIVE-Zeile: der echte Kontostand zuerst. `cashTotal` ist der `projectedCash`-Prognosewert
+          // aus dem letzten Cash-Apply — er stand hier vorne und war der Grund, warum in der Ewigen
+          // Tabelle waehrend der laufenden Saison der Stand der VORSAISON zu lesen war.
+          cash: item.cash ?? item.cashTotal ?? null,
         },
       ]),
     );
