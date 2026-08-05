@@ -17,7 +17,13 @@ vi.mock("@/lib/persistence/persistence-service", () => ({
   }),
 }));
 
-function phaseSave(gamePhase = "transfer_buy_phase") {
+/**
+ * Standard: Saison 1, Spieltag 1, Spieltag noch offen — das Saisonstart-Fenster, in dem der
+ * Spieler kauft (`isEarlySeasonTransferSetup`). NICHT `transfer_buy_phase`: die liegt in der
+ * Saisonende-Kette, also noch in der alten Saison, und gehoert der KI
+ * (`lib/market/transfer-window-policy.ts`).
+ */
+function phaseSave(gamePhase = "season_active") {
   return {
     saveId: "save-singleplayer-dev",
     status: "active",

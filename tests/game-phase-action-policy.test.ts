@@ -124,7 +124,13 @@ describe("game phase action policy", () => {
     expect(sellPhaseBuyGate.allowed).toBe(false);
     expect(sellPhaseBuyGate.reason).toBe("phase_blocked:buy_players:transfer_sell_phase");
     expect(sellPhaseSellGate.allowed).toBe(true);
-    expect(buyPhaseBuyGate.allowed).toBe(true);
+
+    // `transfer_buy_phase` ist die Station der KI, nicht die des Spielers: sie liegt in der
+    // Saisonende-Kette, also VOR „Neue Saison starten" und damit noch in der alten Saison.
+    // Menschliche Kaeufe gehoeren in die neue Saison vor ihrem ersten Spieltag; KI- und
+    // System-Kaeufe tragen eine eigene `transferSource` und laufen an diesem Gate vorbei.
+    expect(buyPhaseBuyGate.allowed).toBe(false);
+    expect(buyPhaseBuyGate.reason).toBe("phase_blocked:buy_players:transfer_buy_phase");
     expect(buyPhaseSellGate.allowed).toBe(false);
     expect(buyPhaseSellGate.reason).toBe("phase_blocked:sell_players:transfer_buy_phase");
   });
