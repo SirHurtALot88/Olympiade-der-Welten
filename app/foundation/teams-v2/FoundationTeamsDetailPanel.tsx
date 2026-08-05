@@ -24,6 +24,7 @@ import type {
   TransfermarktSellSummary,
 } from "@/lib/foundation/tabs/use-market-sell-derivations";
 import FoundationRosterSellPeekDrawer from "@/app/foundation/teams-v2/FoundationRosterSellPeekDrawer";
+import { VeloSplitMeter } from "@/components/foundation/velo-ui";
 import {
   NlCard,
   NlEmptyState,
@@ -789,72 +790,123 @@ function FoundationTeamsDetailPanel({
                   Die Liste kommt vom Server — Preis und Anspruch werden dort gerechnet, damit die
                   Ansicht keinen veralteten Preis buchen kann. */}
               {rosterActionsEnabled && contractDissolutionOffers.length > 0 ? (
-                <section
-                  className="panel team-focus-panel"
+                <NlCard
+                  className="teams-dissolution-card"
                   id="team-focus-dissolution"
                   data-testid="teams-contract-dissolution"
+                  eyebrow="Kader · Saisonende"
+                  title={
+                    <>
+                      Vertragsauflösung auf Spielerwunsch
+                      <span className="teams-dissolution-count">
+                        {contractDissolutionOffers.length}{" "}
+                        {contractDissolutionOffers.length === 1 ? "Anfrage" : "Anfragen"}
+                      </span>
+                    </>
+                  }
                 >
-                  <div className="panel-header">
-                    <div>
-                      <h3>Vertragsauflösung auf Spielerwunsch</h3>
-                      <p className="muted">
-                        Diese Spieler bieten an, ihren Vertrag aufzulösen. Nimmst du an, kassierst du den
-                        Verkaufspreis und zahlst nur den Teil des Rest-Buyouts, auf den der Spieler nicht
-                        verzichtet — wie viel das ist, hängt an seiner Moral und seinem Charakter. Den Zeitpunkt
-                        suchst du dir nicht aus. Lehnst du ab, erfüllt er seinen Vertrag und seine Moral bricht
-                        deutlich ein.
-                      </p>
-                    </div>
-                  </div>
+                  {/* Kurz halten: die Herleitung steht in der Zeile selbst und in den Tooltips.
+                      Vier Zeilen Fließtext über drei Angeboten liest ohnehin niemand. */}
+                  <p className="nl-market-muted teams-dissolution-intro">
+                    Er verzichtet nur <b>anteilig</b> auf seinen Rest-Buyout — wie viel, hängt an Moral und Charakter.
+                    Den Zeitpunkt suchst du dir nicht aus; lehnst du ab, bricht seine Moral deutlich ein.
+                  </p>
                   <ul className="teams-dissolution-list">
                     {contractDissolutionOffers.map((offer) => {
                       const busy = contractDissolutionBusyPlayerId === offer.playerId;
                       const anyBusy = contractDissolutionBusyPlayerId != null;
+                      const zahlbar = offer.payableBuyout ?? 0;
+                      const netto = offer.salePrice - zahlbar;
+                      const offerPlayer =
+                        gameState.players.find((candidate) => candidate.id === offer.playerId) ?? null;
+                      const portrait = offerPlayer ? getPlayerPortraitModel(offerPlayer) : null;
                       return (
                         <li key={offer.playerId} className="teams-dissolution-item">
                           <div className="teams-dissolution-identity">
-                            <button
-                              type="button"
-                              className="nl-teams-playerlink is-inline"
-                              onClick={() => void openPlayerDrawerById(offer.playerId)}
-                              title={`${offer.playerName} öffnen`}
+                            {/* Kompaktes Bild statt der Hover-Vorschau: die Zeile ist eine
+                                Entscheidung, kein Spielerprofil — das oeffnet der Namensklick. */}
+                            <span className="teams-dissolution-portrait" aria-hidden="true">
+                              {portrait?.thumbSrc ?? portrait?.src ? (
+                                <BudgetedMediaImage
+                                  src={(portrait.thumbSrc ?? portrait.src) as string}
+                                  alt=""
+                                  width={44}
+                                  height={44}
+                                  fallbackLabel={portrait.initials}
+                                  fallback={<span className="teams-dissolution-portrait-fallback">{portrait.initials}</span>}
+                                />
+                              ) : (
+                                <span className="teams-dissolution-portrait-fallback">
+                                  {offer.playerName.slice(0, 2).toUpperCase()}
+                                </span>
+                              )}
+                            </span>
+                            <div className="teams-dissolution-identity-copy">
+                              <button
+                                type="button"
+                                className="nl-teams-playerlink is-inline"
+                                onClick={() => void openPlayerDrawerById(offer.playerId)}
+                                title={`${offer.playerName} öffnen`}
+                              >
+                                {offer.playerName}
+                              </button>
+                              <span className="teams-dissolution-chips">
+                                <span className="teams-dissolution-chip is-risk" title="Je unzufriedener, desto mehr gibt er auf.">
+                                  Moral {formatNlNumber(offer.morale, 1)}
+                                </span>
+                                <span className="teams-dissolution-chip" title="Restlaufzeit seines Vertrags.">
+                                  {offer.remainingContractLength}{" "}
+                                  {offer.remainingContractLength === 1 ? "Saison" : "Saisons"}
+                                </span>
+                                {offer.previouslyDeclined ? (
+                                  <span
+                                    className="teams-dissolution-chip is-warn"
+                                    title="Du hast schon einmal abgelehnt — das verschiebt seinen Verzicht, je nach Charakter in beide Richtungen."
+                                  >
+                                    fragt erneut
+                                  </span>
+                                ) : null}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Der geteilte Balken IST die neue Regel: er zeigt, wie viel des offenen
+                              Buyouts der Spieler liegen lässt und was am Team hängen bleibt. */}
+                          <div className="teams-dissolution-split">
+                            {offer.openBuyout > 0 ? (
+                              <VeloSplitMeter
+                                share={offer.waiverShare ?? 0}
+                                leadLabel="erlässt"
+                                leadValue={formatNlMoney(offer.waivedBuyout)}
+                                restLabel="du zahlst"
+                                restValue={formatNlMoney(zahlbar)}
+                                ariaLabel={`Rest-Buyout ${formatNlMoney(offer.openBuyout)}: ${formatNlMoney(offer.waivedBuyout)} erlassen, ${formatNlMoney(zahlbar)} zahlbar`}
+                              />
+                            ) : (
+                              <span className="nl-market-muted teams-dissolution-nobuyout">
+                                Vertrag läuft aus — kein offener Buyout.
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="teams-dissolution-money nl-tnum">
+                            <span
+                              className="teams-dissolution-net"
+                              title="Was nach Abzug des offenen Buyout-Rests wirklich ins Team-Cash geht."
                             >
-                              {offer.playerName}
-                            </button>
+                              <small>Netto</small>
+                              <strong>{formatNlMoney(netto)}</strong>
+                            </span>
                             <small className="muted">
-                              Moral {formatNlNumber(offer.morale, 1)} · Restlaufzeit {offer.remainingContractLength}{" "}
-                              {offer.remainingContractLength === 1 ? "Saison" : "Saisons"}
-                              {offer.previouslyDeclined ? " · hat schon einmal gefragt" : ""}
+                              {formatNlMoney(offer.salePrice)} Verkaufspreis
+                              {zahlbar > 0 ? ` − ${formatNlMoney(zahlbar)} Buyout` : ""}
                             </small>
                           </div>
-                          {/* Der Netto-Betrag steht vorn, weil er die Entscheidung traegt: der
-                              Bruttopreis allein sagte frueher „Erlös 15,2" und verschwieg, dass ein
-                              Rest-Buyout offen bleibt. Darunter die Herleitung. */}
-                          <div className="teams-dissolution-money nl-tnum">
-                            <span title="Was nach Abzug des offenen Buyout-Rests wirklich ins Team-Cash geht.">
-                              Netto{" "}
-                              <strong>{formatNlMoney(offer.salePrice - (offer.payableBuyout ?? 0))}</strong>
-                            </span>
-                            {(offer.payableBuyout ?? 0) > 0 ? (
-                              <small
-                                className="muted"
-                                title="Der Spieler verzichtet nur anteilig — den Rest zahlt das Team."
-                              >
-                                {formatNlMoney(offer.salePrice)} − Buyout {formatNlMoney(offer.payableBuyout ?? 0)}
-                                {offer.waivedBuyout > 0
-                                  ? ` · ${formatWholeNumber(Math.round((offer.waiverShare ?? 0) * 100))} % erlassen`
-                                  : ""}
-                              </small>
-                            ) : offer.waivedBuyout > 0 ? (
-                              <small className="muted" title="Der offene Rest-Buyout entfällt vollständig.">
-                                Buyout {formatNlMoney(offer.waivedBuyout)} entfällt
-                              </small>
-                            ) : null}
-                          </div>
+
                           <div className="teams-dissolution-actions">
                             <button
                               type="button"
-                              className="nl-teams-action"
+                              className="primary-button nl-teams-action"
                               disabled={busy || anyBusy}
                               onClick={() => void onDecideContractDissolution?.(offer.playerId, "accepted")}
                               title="Der Spieler geht; das Team kassiert den Verkaufspreis abzüglich des nicht erlassenen Buyout-Rests."
@@ -875,7 +927,7 @@ function FoundationTeamsDetailPanel({
                       );
                     })}
                   </ul>
-                </section>
+                </NlCard>
               ) : null}
               <section className="panel team-focus-panel teams-primary-roster-panel" id="team-focus-roster">
                 <div className="panel-header team-focus-header">
