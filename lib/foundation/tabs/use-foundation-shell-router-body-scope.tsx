@@ -11327,7 +11327,13 @@ export function useFoundationShellRouterBodyScope({
         success?: boolean;
         error?: string;
         offers?: ContractDissolutionOffer[];
-        applied?: { playerName: string; decision: string; salePrice: number; waivedBuyout: number } | null;
+        applied?: {
+          playerName: string;
+          decision: string;
+          salePrice: number;
+          waivedBuyout: number;
+          payableBuyout?: number;
+        } | null;
       };
 
       setContractDissolutionOffers(payload.offers ?? []);
@@ -11351,8 +11357,10 @@ export function useFoundationShellRouterBodyScope({
         detail:
           applied.decision === "accepted"
             ? `${applied.playerName} geht. Erlös ${formatTransfermarktCurrency(applied.salePrice)}${
-                applied.waivedBuyout > 0
-                  ? ` · Buyout von ${formatTransfermarktCurrency(applied.waivedBuyout)} entfällt`
+                (applied.payableBuyout ?? 0) > 0
+                  ? ` · Buyout: ${formatTransfermarktCurrency(applied.waivedBuyout)} erlassen, ${formatTransfermarktCurrency(applied.payableBuyout ?? 0)} gezahlt`
+                  : applied.waivedBuyout > 0
+                    ? ` · Buyout von ${formatTransfermarktCurrency(applied.waivedBuyout)} entfällt`
                   : ""
               }.`
             : `${applied.playerName} erfüllt seinen Vertrag weiter — das kostet ihn Moral. Nächste Saison darf er erneut fragen.`,

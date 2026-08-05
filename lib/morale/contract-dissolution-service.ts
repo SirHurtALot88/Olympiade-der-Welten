@@ -7,14 +7,14 @@
 //
 // Nimmt der Manager an:
 //   • Der Spieler geht sofort.
-//   • Das Team kassiert den VOLLEN Verkaufspreis (Marktwert x Verkaufsfaktor).
-//   • Ein offener Rest-Buyout entfaellt — der Spieler verzichtet darauf.
+//   • Das Team kassiert den Verkaufspreis (Marktwert x Verkaufsfaktor) …
+//   • … zahlt aber den Teil des Rest-Buyouts, auf den der Spieler NICHT verzichtet.
 //   Der Preis: man kann sich den Zeitpunkt nicht aussuchen. Es gilt der Faktor, der
 //   gerade anliegt, auch wenn der Spieler eine schwache Saison hatte.
 //
 // Lehnt der Manager ab:
 //   • Der Spieler erfuellt seinen Vertrag weiter.
-//   • Seine Moral leidet zusaetzlich — die Ablehnung ist nicht folgenlos.
+//   • Seine Moral bricht deutlich ein — die Ablehnung ist teuer, nicht nur unangenehm.
 //   • Naechste Saison darf er erneut fragen, sofern es ihm dann immer noch nicht passt.
 //
 // Bewusst als eigener Dienst und als reine GameState-Transformation: der Verkaufspfad in
@@ -24,14 +24,25 @@
 // damit Angebot und regulaerer Verkauf nicht auseinanderlaufen.
 
 import type { GameState, Player, RosterEntry } from "@/lib/data/olyDataTypes";
+import { derivePlayerNatureDemandSignals } from "@/lib/market/contract-negotiation-preview";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 
 /** Moral-Schwelle, ab der ein Spieler ueber einen Wechsel nachdenkt (siehe getContractIntent). */
 export const DISSOLUTION_MORALE_THRESHOLD = 34;
 
-/** Moral-Abzug, wenn der Manager die Aufloesung ablehnt. */
-export const DISSOLUTION_DECLINE_MORALE_PENALTY = 6;
+/**
+ * Moral-Abzug, wenn der Manager die Aufloesung ablehnt.
+ *
+ * GEMELDET: „bekommt dann noch mal einen großen Moral Malus von -20 oder so — damit seine
+ * leistung auch spürbar schlechter wird und man es nicht nutzt um zu wissen ja der spieler will
+ * eh raus dann kann ich ihn nächste saison abgeben".
+ *
+ * Die frueheren 6 Punkte waren zu wenig, um die Entscheidung zu tragen: ablehnen kostete kaum
+ * etwas, und wer wusste, dass der Spieler ohnehin weg will, konnte in Ruhe abwarten. Jetzt
+ * bricht die Moral so weit ein, dass die Leistung in der Zwischensaison spuerbar leidet.
+ */
+export const DISSOLUTION_DECLINE_MORALE_PENALTY = 20;
 
 export type ContractDissolutionOffer = {
   playerId: string;
@@ -41,8 +52,14 @@ export type ContractDissolutionOffer = {
   morale: number;
   /** Was das Team bei Annahme bekommt: Marktwert x Verkaufsfaktor, brutto. */
   salePrice: number;
-  /** Rest-Buyout, der bei Annahme entfaellt (0, wenn der Vertrag ohnehin auslaeuft). */
+  /** Offener Rest-Buyout VOR dem Verzicht (0, wenn der Vertrag ohnehin auslaeuft). */
+  openBuyout: number;
+  /** Anteil davon, auf den der Spieler verzichtet. */
   waivedBuyout: number;
+  /** Was das Team trotz Aufloesung noch zahlt — `openBuyout` minus Verzicht. */
+  payableBuyout: number;
+  /** Der Verzichtsanteil selbst (0…1), damit die Anzeige „x %" nennen kann statt nur den Betrag. */
+  waiverShare: number;
   /** Restlaufzeit in Saisons — je laenger, desto mehr verzichtet der Spieler. */
   remainingContractLength: number;
   /** Hat der Spieler in einer frueheren Saison schon einmal gefragt? */
@@ -105,7 +122,13 @@ export function buildContractDissolutionOffers(input: OfferInput): ContractDisso
     );
     if (decidedThisSeason) continue;
 
-    const priced = priceDissolution(input.gameState, player, rosterEntry);
+    const zuvorAbgelehnt = log.some(
+      (entry) => entry.playerId === player.id && entry.teamId === input.teamId && entry.decision === "declined",
+    );
+    const priced = priceDissolution(input.gameState, player, rosterEntry, {
+      morale,
+      previouslyDeclined: zuvorAbgelehnt,
+    });
     if (priced == null) continue;
 
     offers.push({
@@ -114,16 +137,87 @@ export function buildContractDissolutionOffers(input: OfferInput): ContractDisso
       teamId: input.teamId,
       morale: Number(morale.toFixed(1)),
       salePrice: priced.salePrice,
+      openBuyout: priced.openBuyout,
       waivedBuyout: priced.waivedBuyout,
+      payableBuyout: priced.payableBuyout,
+      waiverShare: priced.waiverShare,
       remainingContractLength: rosterEntry.contractLength ?? 0,
-      previouslyDeclined: log.some(
-        (entry) => entry.playerId === player.id && entry.teamId === input.teamId && entry.decision === "declined",
-      ),
+      previouslyDeclined: zuvorAbgelehnt,
     });
   }
 
   // Teuerster Abgang zuerst — das ist die Entscheidung, die am meisten weh tut.
   return offers.sort((left, right) => right.salePrice - left.salePrice || left.playerId.localeCompare(right.playerId));
+}
+
+/**
+ * WIE VIEL DER SPIELER AUFGIBT — der Anteil am offenen Rest-Buyout.
+ *
+ * GEMELDET: „buyout soll nicht zu 100% weg fallen sondern nur anteilig je nachdem was der
+ * spieler noch für forderungen stellt. sonst wäre das ja OP. so bekommt man ggf. positiven MW +
+ * kein Buyout! dann macht man sogar noch gewinn beim verkauf."
+ *
+ * Stimmt: mit vollem Verzicht war die Annahme IMMER besser als ein regulaerer Verkauf, also gar
+ * keine Entscheidung. Zwei Groessen bestimmen den Anteil jetzt:
+ *
+ * 1. MORAL — der Ausloeser des Angebots und das, was der Spieler „noch fordert". An der Schwelle
+ *    (34) gibt er 30 % auf, bei Moral 0 sind es 60 %. Wer unbedingt weg will, laesst mehr liegen.
+ *
+ * 2. CHARAKTER — dasselbe Verhandlungswesen, das auch die Nachverhandlungs-Forderung treibt
+ *    (`derivePlayerNatureDemandSignals`: Traits, Subklasse, Gesinnung). Es wirkt hier GEGEN den
+ *    Verzicht: ein Mercenary/Egomaniac will sein Geld und sitzt den Vertrag notfalls ab, ein
+ *    loyaler/bescheidener Spieler geht sauber und guenstig. Genau der Fall aus der Rueckfrage —
+ *    „müsste es bei manchen Spielern nicht sogar anders laufen?"
+ *
+ * Und die zweite Anfrage nach einer Ablehnung laeuft deshalb je nach Wesen in verschiedene
+ * Richtungen (`DISSOLUTION_SECOND_ASK_SHIFT`): der Bescheidene fragt zerknirscht und gibt mehr
+ * auf, der Harte nimmt es persoenlich und gibt weniger. Sonst waere Ablehnen ein sicherer Weg,
+ * den Verzicht hochzufarmen — „so soll das ja nicht sein".
+ */
+
+/** Verzicht an der Moral-Schwelle (34) — der guenstigste Fall fuer den Spieler. */
+export const DISSOLUTION_WAIVER_AT_THRESHOLD = 0.3;
+/** Zusaetzlicher Verzicht bei Moral 0 — zusammen also die Spanne 30…60 %. */
+export const DISSOLUTION_WAIVER_MORALE_SPAN = 0.3;
+/**
+ * Wie stark das Verhandlungswesen den Verzicht dreht. Der Multiplikator aus
+ * `derivePlayerNatureDemandSignals` liegt in [0,85; 1,18]; mal 2 ergibt das rund [0,64; 1,30] —
+ * spuerbar, aber die Moral bleibt der Haupttreiber.
+ */
+export const DISSOLUTION_NATURE_WEIGHT = 2;
+/** Verschiebung bei der zweiten Anfrage nach einer Ablehnung — Vorzeichen je nach Wesen. */
+export const DISSOLUTION_SECOND_ASK_SHIFT = 0.1;
+/** Ab hier gilt ein Spieler als harter Verhandler (Multiplikator ueber neutral). */
+export const DISSOLUTION_HARD_NEGOTIATOR_THRESHOLD = 1.02;
+/** Der Verzicht bleibt in diesen Grenzen — weder geschenkt noch wirkungslos. */
+export const DISSOLUTION_WAIVER_MIN = 0.15;
+export const DISSOLUTION_WAIVER_MAX = 0.75;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+/** Verzichtsanteil am offenen Rest-Buyout, 0…1. Getrennt gehalten, damit Tests ihn direkt messen. */
+export function resolveDissolutionWaiverShare(input: {
+  player: Player;
+  morale: number;
+  previouslyDeclined: boolean;
+}): number {
+  const morale = clamp(input.morale, 0, DISSOLUTION_MORALE_THRESHOLD);
+  const grundVerzicht =
+    DISSOLUTION_WAIVER_AT_THRESHOLD + DISSOLUTION_WAIVER_MORALE_SPAN * (1 - morale / DISSOLUTION_MORALE_THRESHOLD);
+
+  const naturMultiplikator = derivePlayerNatureDemandSignals(input.player).salaryMultiplier;
+  const charakterFaktor = 1 - (naturMultiplikator - 1) * DISSOLUTION_NATURE_WEIGHT;
+  const istHartnaeckig = naturMultiplikator > DISSOLUTION_HARD_NEGOTIATOR_THRESHOLD;
+
+  const zweiteAnfrage = input.previouslyDeclined
+    ? istHartnaeckig
+      ? -DISSOLUTION_SECOND_ASK_SHIFT
+      : DISSOLUTION_SECOND_ASK_SHIFT
+    : 0;
+
+  return clamp(grundVerzicht * charakterFaktor + zweiteAnfrage, DISSOLUTION_WAIVER_MIN, DISSOLUTION_WAIVER_MAX);
 }
 
 /**
@@ -134,18 +228,33 @@ export function priceDissolution(
   gameState: GameState,
   player: Player,
   rosterEntry: RosterEntry,
-): { salePrice: number; waivedBuyout: number } | null {
+  options?: { morale?: number; previouslyDeclined?: boolean },
+): { salePrice: number; openBuyout: number; waivedBuyout: number; payableBuyout: number; waiverShare: number } | null {
   const economy = resolvePlayerEconomyContract({ player, rosterEntry });
   const breakdown = buildTransfermarktSaleFactorBreakdown(gameState, player, rosterEntry);
   const salePrice = breakdown.salePrice ?? economy.marketValue ?? null;
   if (salePrice == null || salePrice <= 0) return null;
 
-  // Der Buyout entfaellt — hier nur ausgewiesen, damit der Spieler sieht, worauf der
-  // Abgang verzichtet. Ein auslaufender Vertrag hat ohnehin keinen.
+  // Der offene Rest-Buyout wie beim regulaeren Verkauf: das laufende Vertragsjahr ist zum
+  // Saisonende gespielt, uebrig bleiben die Folgejahre.
   const remaining = Math.max(0, (rosterEntry.contractLength ?? 0) - 1);
-  const waivedBuyout = roundMoney(remaining * (rosterEntry.salary ?? 0));
+  const openBuyout = roundMoney(remaining * (rosterEntry.salary ?? 0));
 
-  return { salePrice: roundMoney(salePrice), waivedBuyout };
+  const waiverShare = resolveDissolutionWaiverShare({
+    player,
+    morale: options?.morale ?? DISSOLUTION_MORALE_THRESHOLD,
+    previouslyDeclined: options?.previouslyDeclined ?? false,
+  });
+  const waivedBuyout = roundMoney(openBuyout * waiverShare);
+  const payableBuyout = roundMoney(Math.max(0, openBuyout - waivedBuyout));
+
+  return {
+    salePrice: roundMoney(salePrice),
+    openBuyout,
+    waivedBuyout,
+    payableBuyout,
+    waiverShare: Number(waiverShare.toFixed(4)),
+  };
 }
 
 type DecisionInput = {
@@ -157,14 +266,19 @@ type DecisionInput = {
 };
 
 /**
- * Annahme: Der Spieler geht, das Team kassiert den vollen Verkaufspreis, der Rest-Buyout
- * entfaellt. Reine Transformation — kein Transferfenster, keine Wiederkauf-Sperre.
+ * Annahme: Der Spieler geht, das Team kassiert den Verkaufspreis und zahlt den NICHT erlassenen
+ * Teil des Rest-Buyouts. Reine Transformation — kein Transferfenster, keine Wiederkauf-Sperre.
+ *
+ * Der `payableBuyout` ist der Kern der Meldung: vorher floss der Verkaufspreis ungekuerzt aufs
+ * Konto, egal wie lang und teuer der Vertrag noch lief. Annehmen war damit nie falsch. Aeltere
+ * Angebote ohne das Feld (im Zustand gespeicherte Zeilen) verhalten sich unveraendert.
  */
 export function acceptContractDissolution(input: DecisionInput): GameState {
   const { gameState, offer } = input;
 
+  const kassenwirkung = roundMoney(offer.salePrice - (offer.payableBuyout ?? 0));
   const teams = gameState.teams.map((team) =>
-    team.teamId === offer.teamId ? { ...team, cash: roundMoney((team.cash ?? 0) + offer.salePrice) } : team,
+    team.teamId === offer.teamId ? { ...team, cash: roundMoney((team.cash ?? 0) + kassenwirkung) } : team,
   );
 
   const rosters = gameState.rosters.filter(
