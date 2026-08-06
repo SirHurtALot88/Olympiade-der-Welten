@@ -217,4 +217,32 @@ export function startOnlineSaveAutoExport() {
   console.log(
     `[online-saves] Auto-Export aktiv (alle ${Math.round(intervalMs / 1000)}s, Push=${pushEnabled ? `an → ${branch}` : "aus"}).`,
   );
+
+  /**
+   * EINMAL BEIM START PRUEFEN, OB DER PUSH UEBERHAUPT KANN.
+   *
+   * GEFUNDEN IM SERVER-LOG, alle 180 Sekunden, seit dem ersten Tag:
+   *     [online-saves] exportiert: 8 Save(s) → /app/data/online-saves
+   *     [online-saves] Auto-Export-Fehler: Command failed: git add -- ...
+   *     /bin/sh: 1: git: not found
+   *
+   * Das Laufzeit-Image hatte kein git. Der Export meldete Erfolg, der Push-Fehler stand eine Zeile
+   * darunter — und weil er sich alle drei Minuten wiederholte, sah er aus wie Rauschen. Ueber Wochen
+   * kam so kein einziger echter Spielstand ins Repo, und niemand hat es bemerkt.
+   *
+   * Eine Meldung beim Start ist etwas anderes als dieselbe Meldung im Minutentakt: sie steht einmal
+   * da, ganz oben, und sagt was zu tun ist. Der Zyklus laeuft trotzdem weiter — die Dateien im
+   * Ordner sind auch ohne Push nuetzlich (`push-live-save.sh` auf dem Host nimmt sie mit).
+   */
+  if (pushEnabled) {
+    void git("--version", { allowFail: true }).then((version) => {
+      if (version) return;
+      console.warn(
+        "[online-saves] ACHTUNG: `git` ist in dieser Umgebung nicht aufrufbar — der Auto-PUSH kann nicht laufen.\n" +
+          "[online-saves] Exportiert wird weiter in den Ordner, aber nichts landet im Repo.\n" +
+          "[online-saves] Im Docker-Image gehoert `git` in die Paketliste des runner-Stage (siehe Dockerfile).\n" +
+          "[online-saves] Zum Abschalten dieser Meldung: OLY_AUTO_EXPORT_PUSH=0.",
+      );
+    });
+  }
 }
