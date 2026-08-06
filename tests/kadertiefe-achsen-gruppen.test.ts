@@ -110,7 +110,9 @@ describe("Depth-Chart · Kontrakt der Bedienung", () => {
     // Gespeichert wird das ZUgeklappte: leerer Startwert = alles offen. Damit bleibt der
     // Anblick derselbe wie vor der Gruppierung, und eine neue Achse ist sichtbar statt
     // versteckt.
-    expect(source).toMatch(/collapsedDepthAxes.*useState<readonly NlAxisKey\[\]>\(\[\]\)/s);
+    // `[\s\S]*` statt des dotAll-Flags: das `s`-Flag setzt ES2018 voraus, worauf dieses
+    // Projekt nicht zielt — `tsc` bricht daran, vitest schluckt es stillschweigend.
+    expect(source).toMatch(/collapsedDepthAxes[\s\S]*useState<readonly NlAxisKey\[\]>\(\[\]\)/);
   });
 
   it("verdrahtet den Gruppenkopf als Schalter mit ARIA", () => {
