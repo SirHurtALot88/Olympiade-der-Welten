@@ -111,6 +111,22 @@ function shouldRunSetupDraft(gameState: GameState, teamIds: string[]) {
   if (gameState.season.id !== "season-1") return false;
   if (gameState.gamePhase && gameState.gamePhase !== "preseason_management") return false;
   if (gameState.seasonState.newGameFlow?.active === false) return false;
+  // GEMELDET: „nein das ist mein save und da wurden die schon wieder bei mir rein gepickt"
+  //
+  // `preseason_management` bedeutet ZWEI Dinge: frischer Saison-1-Aufbau UND erste Station jedes
+  // Saisonendes (`season-transition-chain.ts`). Die Bedingungen darueber treffen am Saisonende von
+  // Saison 1 alle zu — also feuerte hier der komplette Setup-Draft ein zweites Mal und kaufte
+  // Kader voll, die laengst spielten.
+  //
+  // Derselbe Fehler steckte im Client (`use-foundation-shell-router-body-scope.tsx`) und ist dort
+  // bereits behoben; hier stand er ein zweites Mal. Ein Fix an einer Stelle haette den anderen Weg
+  // offen gelassen — genau deshalb ist es dem Spieler ein zweites Mal passiert.
+  //
+  // Unterscheidungsmerkmal ist nicht die Phase, sondern ob ueberhaupt schon gespielt wurde: ein
+  // frischer Aufbau hat kein einziges Spieltagsergebnis, jedes Saisonende hat welche.
+  if ((gameState.seasonState.matchdayResults ?? []).some((result) => result.seasonId === gameState.season.id)) {
+    return false;
+  }
 
   return teamIds.some((teamId) => {
     const rosterCount = gameState.rosters.filter((entry) => entry.teamId === teamId).length;

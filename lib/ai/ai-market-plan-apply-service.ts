@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { resolveTeamRosterMarketValue } from "@/lib/ai/planner-cash-buffer-policy";
 import { GAMEPLAY_HARD_ROSTER_MIN } from "@/lib/foundation/roster-limits";
+import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import {
   buildAiMarketPlanPreview,
   type AiMarketPlanBuyPlan,
@@ -1192,7 +1193,8 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
   const preseasonMarketBuysAllowed = isTransferActionAllowed(input.seasonId, "preseason_market_buy");
   const seasonEndMarketBuysAllowed = isTransferActionAllowed(input.seasonId, "season_end_market_buy");
   const marketBuysAllowed = preseasonMarketBuysAllowed || seasonEndMarketBuysAllowed;
-  const executeBuySteps = options.applyBuySteps && marketBuysAllowed;
+  // `executeBuySteps` wird ERST nach dem Laden des Spielstands festgelegt (siehe Kaufsperre am
+  // Saisonende weiter unten) — vorher ist die Phase nicht bekannt.
   const policyWarnings: string[] =
     options.applyBuySteps && !marketBuysAllowed ? ["season_market_buy_forbidden"] : [];
   const includeWarningTeams = options.includeWarningTeams;
@@ -1201,6 +1203,29 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
   const preflightStartedAt = Date.now();
   const preflightSave = input.localRunContext?.save ?? resolveLocalSave(persistence, input.saveId);
   const preflightGameState = preflightSave.gameState;
+
+  /**
+   * KAUFSPERRE AM SAISONENDE — verbindlich fuer JEDEN Aufrufer dieses Dienstes.
+   *
+   * GEMELDET: „eigentlich müsste hier nur verkauft werden auch von den AI teams" und „käufe erst
+   * NACH saisonübergang!!!"
+   *
+   * `applyAiMarketPlanLocally` ist der Engpass, durch den alle KI-Marktschreibvorgaenge laufen —
+   * Cockpit-Knopf, Preseason-Hintergrundlauf, Konvergenz. Keiner davon setzte `applyBuySteps`
+   * ausdruecklich, und der Standard ist `true`. Eine Phasenpruefung gab es hier nirgends: der
+   * vorhandene Haken `isTransferActionAllowed(..., "season_end_market_buy")` gibt seit dem Wegfall
+   * der Saison-1-Sonderregel immer `true` zurueck (`transfer-season-policy.ts`) und sperrt damit
+   * nichts mehr.
+   *
+   * Solange der Spielstand in der alten Saison steht, wird also nur noch verkauft. Bewusst hier
+   * und nicht bei den Aufrufern: ein vergessener Aufrufer waere sonst wieder ein offenes Tor.
+   */
+  const saisonendeKaufsperre = isSeasonEndPhase(preflightGameState.gamePhase);
+  if (saisonendeKaufsperre && options.applyBuySteps) {
+    options = { ...options, applyBuySteps: false };
+    policyWarnings.push(`ai_buys_blocked_at_season_end:${preflightGameState.gamePhase ?? "?"}`);
+  }
+  const executeBuySteps = options.applyBuySteps && marketBuysAllowed;
   const preflightPlayersById = new Map(preflightGameState.players.map((player) => [player.id, player] as const));
   const preflightIdentityByTeamId = new Map(preflightGameState.teamIdentities.map((entry) => [entry.teamId, entry] as const));
   const aiTeamIds = new Set(
