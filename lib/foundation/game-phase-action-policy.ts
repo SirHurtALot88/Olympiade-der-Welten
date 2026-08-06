@@ -1,4 +1,5 @@
 import type { GamePhase, GameState } from "@/lib/data/olyDataTypes";
+import { hasFinalMatchdayResult } from "@/lib/season/season-completion-state";
 import {
   getTransferWindowStatus,
   isTransferBuyPhaseOpen,
@@ -65,14 +66,6 @@ function isPreseasonManagementOpen(gameState: GameState) {
   return isTransferMarketPhaseOpen(gameState);
 }
 
-function isSeasonComplete(gameState: GameState) {
-  const lastMatchdayId = gameState.season.matchdayIds[gameState.season.matchdayIds.length - 1] ?? null;
-  if (!lastMatchdayId) return false;
-  return (gameState.seasonState.matchdayResults ?? []).some(
-    (result) => result.seasonId === gameState.season.id && result.matchdayId === lastMatchdayId,
-  );
-}
-
 export function evaluateGamePhaseAction(gameState: GameState, action: GamePhaseAction): GamePhaseActionGate {
   const phase = gameState.gamePhase ?? "season_active";
   const warnings: string[] = [];
@@ -119,7 +112,10 @@ export function evaluateGamePhaseAction(gameState: GameState, action: GamePhaseA
     allowed = phase === "season_active" || phase === "lineup_setup";
     reason = allowed ? null : `phase_blocked:resolve_matchday:${phase}`;
   } else if (action === "complete_season") {
-    allowed = phase === "season_completed" || phase === "season_review" || isSeasonComplete(gameState);
+    // Bewusst die schwaechste Lesart (`hasFinalMatchdayResult`, nicht `isSeasonComplete`): die
+    // strenge Variante wuerde jede Phase ausserhalb `season_active` durchlassen — also auch die
+    // Vorsaison-Phasen der FOLGE-Saison, in denen der Saisonabschluss ein zweites Mal liefe.
+    allowed = phase === "season_completed" || phase === "season_review" || hasFinalMatchdayResult(gameState);
     reason = allowed ? null : `phase_blocked:complete_season:${phase}`;
   } else if (action === "apply_progression") {
     allowed = PROGRESSION_PHASES.has(phase);

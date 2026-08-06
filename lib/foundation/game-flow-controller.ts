@@ -20,6 +20,7 @@ import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { hasPersistedTeamCaptain } from "@/lib/morale/team-captain-service";
 import { isTeamTrainingComplete } from "@/lib/foundation/team-training-status";
 import { isMatchdayResultFullyCommitted } from "@/lib/season/season-discipline-schedule";
+import { isLegacySeasonCompletedFlagSet } from "@/lib/season/season-completion-state";
 
 export type GameFlowPhase =
   | "preseason"
@@ -935,7 +936,7 @@ export function shouldAutoOpenSeasonBriefing(
     return false;
   }
 
-  if (gameState.season.isCompleted === true) {
+  if (isLegacySeasonCompletedFlagSet(gameState)) {
     return false;
   }
 

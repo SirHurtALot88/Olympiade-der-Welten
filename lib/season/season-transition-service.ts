@@ -4,6 +4,7 @@ import type { GamePhase, GameState, SeasonTransitionState } from "@/lib/data/oly
 import { buildFormCardSeasonUsageAudit } from "@/lib/lineups/legacy-lineup-modifiers";
 import { isTransferMarketPhaseOpen } from "@/lib/market/transfer-window-policy";
 import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
+import { isSeasonComplete } from "@/lib/season/season-completion-state";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { applySeasonEndPotentialUpdates } from "@/lib/progression/player-potential-service";
@@ -100,26 +101,9 @@ function getNextSeasonId(gameState: GameState) {
   return `season-${parseSeasonNumber(gameState) + 1}`;
 }
 
-export function isSeasonComplete(gameState: GameState) {
-  if (gameState.gamePhase && gameState.gamePhase !== "season_active") {
-    return true;
-  }
-
-  const matchdayIds = gameState.season.matchdayIds ?? [];
-  const lastMatchdayId = matchdayIds[matchdayIds.length - 1] ?? gameState.matchdayState.matchdayId;
-  const lastFixtures = gameState.seasonState.schedule.filter((fixture) => fixture.matchdayId === lastMatchdayId);
-  const lastFixturesResolved = lastFixtures.length === 0 || lastFixtures.every((fixture) => fixture.status === "resolved");
-  const hasLastMatchdayResult = (gameState.seasonState.matchdayResults ?? []).some(
-    (result) => result.seasonId === gameState.season.id && result.matchdayId === lastMatchdayId,
-  );
-  const hasLastStandingsApply = (gameState.seasonState.standingsApplyLogs ?? []).some(
-    (log) => log.seasonId === gameState.season.id && log.matchdayId === lastMatchdayId,
-  );
-  const activeMatchdayIsLast = gameState.matchdayState.matchdayId === lastMatchdayId || gameState.season.currentMatchday >= matchdayIds.length;
-  const matchdayResolved = gameState.matchdayState.status === "resolved";
-
-  return activeMatchdayIsLast && matchdayResolved && (lastFixturesResolved || (hasLastMatchdayResult && hasLastStandingsApply));
-}
+// Die Definition steht in `lib/season/season-completion-state.ts` — hier nur der Re-Export, damit die
+// bisherigen Importpfade (Season-Completion, Debug-Bootstrap, Tests) unveraendert bleiben.
+export { isSeasonComplete };
 
 function buildTransitionState(save: PersistedSaveGame, input?: { status?: SeasonTransitionState["status"]; currentStep?: SeasonTransitionStepId }) {
   const existing = save.gameState.seasonTransition;

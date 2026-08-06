@@ -12,6 +12,7 @@ import type {
   TeamFacilityCollection,
 } from "@/lib/data/olyDataTypes";
 import { getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { isLegacySeasonCompletedFlagSet } from "@/lib/season/season-completion-state";
 import {
   buildPlayerEconomyCompareReport,
   resolveRankTableMarketValueFromCompareRow,
@@ -200,8 +201,7 @@ function isFiniteNumber(value: number | null | undefined): value is number {
 }
 
 function resolveGamePhase(gameState: GameState): GamePhase {
-  const seasonCompleted = (gameState.season as { isCompleted?: boolean }).isCompleted === true;
-  return gameState.gamePhase ?? (seasonCompleted ? "season_completed" : "season_active");
+  return gameState.gamePhase ?? (isLegacySeasonCompletedFlagSet(gameState) ? "season_completed" : "season_active");
 }
 
 function normalizeAttributes(player: Player): PlayerGeneratorAttributes | null {
