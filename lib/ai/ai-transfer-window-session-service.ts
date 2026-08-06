@@ -38,6 +38,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import type { ContractStatus, GameState, Player } from "@/lib/data/olyDataTypes";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
 import type { LocalTransferWindowPhase } from "@/lib/market/transfer-window-policy";
 
@@ -632,7 +633,31 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   // how much it sells or buys, which naturally produces a heterogeneous per-team result. No new
   // roster floor is introduced — see .cursor/rules/balancing-no-sell-floor-full-rebuild.mdc.
   const isSeasonEndSellPhase = input.phase === "season_end";
-  const isPreseasonBuyPhase = input.phase === "preseason";
+
+  /**
+   * GEMELDET: „käufe erst NACH saisonübergang!!! … eigentlich müsste hier nur verkauft werden auch
+   * von den AI teams"
+   *
+   * `input.phase` sagt nur, was der AUFRUFER vorhat — `phase: "preseason"` steht in
+   * `ai-market-plan-convergence-service` fest verdrahtet. Ob der Spielstand ueberhaupt schon in der
+   * neuen Saison ist, hat niemand gefragt. Die KI konnte deshalb mitten in der Saisonende-Kette
+   * einkaufen, waehrend fuer den Menschen dort seit #429 nur Verkaufen offen ist.
+   *
+   * Massstab ist jetzt der Spielstand selbst: `isSeasonEndPhase` deckt genau die Stationen der
+   * alten Saison ab (`season_completed` bis `next_season_ready`, abgeleitet aus der Kette, nicht
+   * aufgezaehlt). Solange der Uebergang nicht durch ist, verkauft die KI nur — danach kauft sie
+   * wie bisher. Bewusst NICHT `isTransferBuyPhaseOpen` (die Regel des Menschen): die haette die
+   * KI zusaetzlich auf „vor dem 1. Spieltag" eingeengt, und der Preseason-Workflow laeuft zum Teil
+   * noch vor dem Umschalten auf `season_active` — die KI wuerde dann gar nicht mehr kaufen.
+   */
+  const liveGameStateForPhase = readLiveSave()?.gameState ?? null;
+  const saveStehtNochInDerAltenSaison = liveGameStateForPhase
+    ? isSeasonEndPhase(liveGameStateForPhase.gamePhase)
+    : false;
+  const isPreseasonBuyPhase = input.phase === "preseason" && !saveStehtNochInDerAltenSaison;
+  if (input.phase === "preseason" && saveStehtNochInDerAltenSaison) {
+    warnings.push(`ai_buys_deferred_until_after_season_transition:${liveGameStateForPhase?.gamePhase ?? "?"}`);
+  }
 
   // Sell-cap mechanism removed entirely (2026-07-04, explicit user correction — see
   // .cursor/rules/balancing-no-sell-floor-full-rebuild.mdc and
