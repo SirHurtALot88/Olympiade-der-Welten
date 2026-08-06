@@ -30,7 +30,7 @@ export type GamePhaseActionGate = {
 };
 
 const PRESEASON_MANAGEMENT_PHASES = new Set<GamePhase>([
-  "preseason_management",
+  "season_end_management",
   "transfer_sell_phase",
   "transfer_buy_phase",
   "lineup_setup",
@@ -42,7 +42,7 @@ const PROGRESSION_PHASES = new Set<GamePhase>([
   "season_review",
   "season_rewards",
   "player_development",
-  "preseason_management",
+  "season_end_management",
   "transfer_sell_phase",
   "transfer_buy_phase",
   "lineup_setup",

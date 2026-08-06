@@ -27,7 +27,7 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 function mkState(teams: Array<{ teamId: string; humanControlled?: boolean }>): GameState {
   return {
     season: { id: "season-1", name: "Season 1", year: 2026, currentMatchday: 1, matchdayIds: ["md-1"] },
-    gamePhase: "preseason_management",
+    gamePhase: "season_end_management",
     teams: teams.map((t) => ({
       teamId: t.teamId,
       shortCode: t.teamId,

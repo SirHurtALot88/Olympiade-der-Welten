@@ -1516,7 +1516,7 @@ function resolveSeasonNumberFromState(gameState: GameState) {
 }
 
 const SEASON_ONE_PRESEASON_BOARD_NEUTRAL_PHASES = new Set<GamePhase>([
-  "preseason_management",
+  "season_end_management",
   "transfer_sell_phase",
   "transfer_buy_phase",
   "lineup_setup",

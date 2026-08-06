@@ -85,7 +85,7 @@ function createSeasonStartGameState(input?: {
   const players = input?.players ?? [createPlayer("p1")];
   const rosters = input?.rosters ?? [createRosterEntry("r1", "p1", { currentValue: 60, purchasePrice: 60 })];
   return {
-    gamePhase: "preseason_management",
+    gamePhase: "season_end_management",
     season: {
       id: input?.seasonId ?? "season-1",
       name: "Season 1",

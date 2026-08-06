@@ -14,7 +14,7 @@
  *   cockpit-handlers.ts:373          runSeasonTransition: (action: "preview" | "start_transition")
  *
  * „Saison abschließen" macht Station 1 (`season_check` → Phase `season_review`). Danach gab es
- * keinen zweiten Knopf. Verkaufen oeffnet erst in `preseason_management` — drei Klicks weiter
+ * keinen zweiten Knopf. Verkaufen oeffnet erst in `season_end_management` — drei Klicks weiter
  * (`transfer-window-policy.ts`). Also blieb es zu, obwohl der Fix darunter lief.
  *
  * Ein Motor ohne Anlasser sieht in jedem Service-Test korrekt aus. Diese Datei prueft deshalb
@@ -71,13 +71,13 @@ describe("Saisonende-Assistent: die Kette ist von der Oberflaeche aus bedienbar"
 
   it("bis zum Verkaufsfenster sind es DREI weitere Klicks — deshalb reicht „Saison abschließen“ nicht", () => {
     // Der Grund, warum der Knopf ueberhaupt gebraucht wird: „Saison abschließen" schaltet auf
-    // `season_review` und ist damit fertig. Verkaufen oeffnet erst in `preseason_management`
+    // `season_review` und ist damit fertig. Verkaufen oeffnet erst in `season_end_management`
     // (`transfer-window-policy.ts`) — von dort aus drei Stationen weiter. Ohne zweiten Knopf
     // waren diese drei Klicks nicht ausfuehrbar, und das Verkaufsfenster blieb zu.
     //
     // Faellt die Distanz je auf null, ist der Knopf ueberfluessig; dann soll das hier auffallen
     // statt still gruen zu bleiben.
-    const SELL_OPEN_PHASES = new Set(["preseason_management", "transfer_sell_phase"]);
+    const SELL_OPEN_PHASES = new Set(["season_end_management", "transfer_sell_phase"]);
     const ab = SEASON_TRANSITION_STEPS.indexOf("season_review");
     const klicks = SEASON_TRANSITION_STEPS.slice(ab).findIndex((step) =>
       SELL_OPEN_PHASES.has(getPhaseAfterStep(step) ?? ""),

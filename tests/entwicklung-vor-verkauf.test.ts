@@ -26,8 +26,8 @@ describe("Die Entwicklung läuft vor dem Transferfenster", () => {
     const schritte = [...SEASON_TRANSITION_STEPS];
     expect(schritte.indexOf("player_development")).toBeGreaterThanOrEqual(0);
     expect(schritte.indexOf("player_development")).toBeLessThan(schritte.indexOf("transfer_sell_phase"));
-    // Auch vor `preseason_management` — dort öffnet das Verkaufsfenster bereits.
-    expect(schritte.indexOf("player_development")).toBeLessThan(schritte.indexOf("preseason_management"));
+    // Auch vor `season_end_management` — dort öffnet das Verkaufsfenster bereits.
+    expect(schritte.indexOf("player_development")).toBeLessThan(schritte.indexOf("season_end_management"));
   });
 
   it("rechnet im Schritt wirklich, statt nur die Phase zu schalten", () => {

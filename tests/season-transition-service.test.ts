@@ -146,7 +146,7 @@ describe("season transition service", () => {
       "season_review",
       "season_rewards",
       "player_development",
-      "preseason_management",
+      "season_end_management",
       "transfer_sell_phase",
       "transfer_buy_phase",
       "lineup_setup",
@@ -199,13 +199,13 @@ describe("season transition service", () => {
     const result = advanceSeasonTransitionToTransferWindow(sourceSave, persistence);
 
     expect(result.applied).toBe(true);
-    expect(result.gamePhase).toBe("preseason_management");
+    expect(result.gamePhase).toBe("season_end_management");
     // PERF: die vier Hops (season_review, season_rewards, player_development,
-    // preseason_management) laufen komplett im Speicher durch — geschrieben wird der Spielstand
+    // season_end_management) laufen komplett im Speicher durch — geschrieben wird der Spielstand
     // erst am Ende, EINMAL, nicht mehr nach jedem einzelnen Hop. Auf der Platte landet direkt die
     // Endphase, keine der Zwischenphasen ist je sichtbar (siehe `advanceSeasonTransitionToTransferWindow`,
     // PERF-Kommentar dort, fuer die Zeitmessung, die diesen Umbau ausgeloest hat).
-    expect(gespeichertePhasen()).toEqual(["preseason_management"]);
+    expect(gespeichertePhasen()).toEqual(["season_end_management"]);
     expect(saveSingleplayerState).toHaveBeenCalledTimes(1);
   });
 
@@ -242,7 +242,7 @@ describe("season transition service", () => {
         if (!reloaded) break;
         manualCurrent = reloaded;
       }
-      expect(manualCurrent.gameState.gamePhase).toBe("preseason_management");
+      expect(manualCurrent.gameState.gamePhase).toBe("season_end_management");
 
       // Neuer Weg: dieselbe Ausgangslage, einmal gebatcht durchgereicht.
       uuidCounter = 0;
@@ -251,7 +251,7 @@ describe("season transition service", () => {
         batchedRun.persistence.getSaveById("save-1")!,
         batchedRun.persistence,
       );
-      expect(batchedResult.gamePhase).toBe("preseason_management");
+      expect(batchedResult.gamePhase).toBe("season_end_management");
       const batchedFinal = batchedRun.persistence.getSaveById("save-1");
       if (!batchedFinal) throw new Error("Batched run left no save behind.");
 
@@ -277,12 +277,12 @@ describe("season transition service", () => {
   it("bewegt sich nicht mehr, wenn das Fenster schon offen ist", () => {
     // Ein zweiter Klick darf nicht weiter in Richtung neue Saison rutschen — sonst schoebe
     // das versehentliche Doppeltippen den Spieler an seiner Transferrunde vorbei.
-    const sourceSave = save({ completed: true, gamePhase: "preseason_management" });
+    const sourceSave = save({ completed: true, gamePhase: "season_end_management" });
     const { persistence, saveSingleplayerState } = statefulPersistenceMock(sourceSave);
 
     const result = advanceSeasonTransitionToTransferWindow(sourceSave, persistence);
 
-    expect(result.gamePhase).toBe("preseason_management");
+    expect(result.gamePhase).toBe("season_end_management");
     expect(saveSingleplayerState).not.toHaveBeenCalled();
   });
 

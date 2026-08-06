@@ -103,7 +103,7 @@ export function formatGamePhaseLabel(phase?: string | null) {
   if (phase === "season_active") return "Saison läuft";
   if (phase === "season_review") return "Saisonrückblick";
   if (phase === "season_completed") return "Saison abgeschlossen";
-  if (phase === "preseason_management") return "Preseason-Management";
+  if (phase === "season_end_management") return "Training / Ziele";
   if (phase === "transfer_sell_phase") return "Verkaufsfenster";
   if (phase === "transfer_buy_phase") return "Kaufphase";
   if (phase === "lineup_setup") return "Lineup Setup";

@@ -39,7 +39,7 @@ function createSave(humanTeamId: string) {
     saveId: "save-preseason-batch",
     gameState: {
       season: { id: "season-2", name: "Season 2", year: 2027, currentMatchday: 1, matchdayIds: ["md-1"] },
-      gamePhase: "preseason_management",
+      gamePhase: "season_end_management",
       teams: teamIds.map((teamId) => ({
         teamId,
         shortCode: teamId,

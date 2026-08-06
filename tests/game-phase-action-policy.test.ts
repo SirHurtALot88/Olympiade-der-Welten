@@ -145,7 +145,7 @@ describe("game phase action policy", () => {
   });
 
   it("treats facility writes like preseason management actions", () => {
-    expect(evaluateGamePhaseAction(gameState("preseason_management"), "facility_apply").allowed).toBe(true);
+    expect(evaluateGamePhaseAction(gameState("season_end_management"), "facility_apply").allowed).toBe(true);
 
     const gate = evaluateGamePhaseAction(gameState("season_completed"), "facility_apply");
     expect(gate.allowed).toBe(false);
@@ -160,15 +160,15 @@ describe("game phase action policy", () => {
   it("keeps sponsor choice open at season end so the completion gate can never soft-lock (P1-5)", () => {
     // Sponsor ist Pflicht vor der Abrechnung; der Season-Completion-Gate blockt vertragslose Teams.
     // Damit das kein Soft-Lock wird, MUSS die Sponsor-Wahl in den Abschlussphasen erreichbar bleiben.
-    expect(evaluateGamePhaseAction(gameState("preseason_management"), "sponsor_choice").allowed).toBe(true);
+    expect(evaluateGamePhaseAction(gameState("season_end_management"), "sponsor_choice").allowed).toBe(true);
     expect(evaluateGamePhaseAction(gameState("season_completed"), "sponsor_choice").allowed).toBe(true);
     expect(evaluateGamePhaseAction(gameState("season_review"), "sponsor_choice").allowed).toBe(true);
   });
 
   it("keeps training intensity open during preseason and before the first matchday result", () => {
-    expect(evaluateGamePhaseAction(gameState("preseason_management"), "set_training").allowed).toBe(true);
+    expect(evaluateGamePhaseAction(gameState("season_end_management"), "set_training").allowed).toBe(true);
     expect(evaluateGamePhaseAction(gameState("season_active"), "set_training").allowed).toBe(true);
-    expect(isTrainingIntensityLockedForSeason(gameState("preseason_management"))).toBe(false);
+    expect(isTrainingIntensityLockedForSeason(gameState("season_end_management"))).toBe(false);
     expect(isTrainingIntensityLockedForSeason(gameState("season_active"))).toBe(false);
   });
 

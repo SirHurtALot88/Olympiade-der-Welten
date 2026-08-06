@@ -61,6 +61,7 @@ import {
 import { reconcilePlayerPotentialRecordsForGameState } from "@/lib/scouting/player-potential-ceiling-service";
 import { withNormalizedSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
+import { migrateLegacyPreseasonManagementPhase } from "@/lib/season/season-transition-chain";
 import type {
   PersistedSaveGame,
   SaveRepository,
@@ -632,7 +633,15 @@ function inferCompletedGamePhase(input: {
   matchdayState: MatchdayState;
 }): GamePhase | undefined {
   if (input.metadata?.gamePhase) {
-    return input.metadata.gamePhase;
+    // Altstand-Umschrift beim Laden: die Saisonende-Station hiess bis 0.4.11 `preseason_management`
+    // — derselbe Name wie der frische Spielaufbau. Hier faellt die Entscheidung EINMAL, damit alle
+    // Lesestellen danach eine eindeutige Phase sehen. Beide Ladewege (`loadSave`, Projektion) gehen
+    // durch diese Funktion, deshalb steht sie hier und nicht an den zwei Aufrufstellen.
+    return migrateLegacyPreseasonManagementPhase({
+      gamePhase: input.metadata.gamePhase,
+      seasonId: input.season.id,
+      matchdayResults: input.seasonState.matchdayResults,
+    });
   }
 
   const matchdayIds = input.season.matchdayIds ?? [];

@@ -139,7 +139,7 @@ function buildPlayer(id: string, overrides: Partial<Player> = {}): Player {
 
 function buildGameState(players: Player[]): GameState {
   return {
-    gamePhase: "preseason_management",
+    gamePhase: "season_end_management",
     season: {
       id: "season-1",
       name: "Season 1",

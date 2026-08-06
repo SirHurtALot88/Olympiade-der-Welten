@@ -3,7 +3,7 @@
  * diszis durch sind und bepunktet sind waere eigentlich end of season dran mit awards usw."
  *
  * Der Kern des Fehlers war nicht das Verkaufs-Gate, sondern eine Sackgasse in der Phasenkette:
- * `preseason_management` und `transfer_sell_phase` — die einzigen Phasen, in denen Verkaufen
+ * `season_end_management` und `transfer_sell_phase` — die einzigen Phasen, in denen Verkaufen
  * oeffnet — wurden im normalen Spiel nie gesetzt.
  */
 import { describe, expect, it } from "vitest";
@@ -56,7 +56,7 @@ describe("Die Kette fuehrt vom Saisonende bis zur neuen Saison", () => {
       }) as never;
 
     expect(evaluateGamePhaseAction(mkState("transfer_sell_phase"), "sell_players").allowed).toBe(true);
-    expect(evaluateGamePhaseAction(mkState("preseason_management"), "sell_players").allowed).toBe(true);
+    expect(evaluateGamePhaseAction(mkState("season_end_management"), "sell_players").allowed).toBe(true);
 
     // Die Kette oeffnet das VERKAUFEN — mehr nicht. Gekauft wird erst in der neuen Saison vor
     // ihrem ersten Spieltag, also hinter „Neue Saison starten" und damit ausserhalb dieser Kette.

@@ -61,7 +61,7 @@ describe("Am Saisonende wird weder gedraftet noch gekauft", () => {
   it("und sie deckt jede Station der Saisonende-Kette ab, nicht nur eine Phase", () => {
     // `isSeasonEndPhase` leitet aus der Kette ab statt aufzuzaehlen — damit gilt die Sperre auch
     // fuer Stationen, die spaeter dazukommen.
-    for (const phase of ["season_completed", "preseason_management", "transfer_sell_phase", "lineup_setup"] as const) {
+    for (const phase of ["season_completed", "season_end_management", "transfer_sell_phase", "lineup_setup"] as const) {
       expect(isSeasonEndPhase(phase), `${phase} muss als Saisonende gelten`).toBe(true);
     }
     // Gegenrichtung: die laufende Saison ist kein Saisonende, dort darf gekauft werden.

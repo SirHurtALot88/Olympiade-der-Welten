@@ -89,7 +89,7 @@ function gameState(input?: {
     player(`p-${index + 1}`, { fatigue, potential: index < 4 ? 82 : 55 }),
   );
   return {
-    gamePhase: "preseason_management",
+    gamePhase: "season_end_management",
     season: { id: "season-1", name: "Season 1", year: 1, currentMatchday: 1, matchdayIds: ["matchday-1"] },
     seasonState: {
       seasonId: "season-1",

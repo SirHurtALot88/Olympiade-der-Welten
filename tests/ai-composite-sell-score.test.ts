@@ -78,7 +78,7 @@ function gameState(input: {
 }): GameState {
   const testTeam = input.team ?? team();
   return {
-    gamePhase: "preseason_management",
+    gamePhase: "season_end_management",
     season: { id: "season-1", name: "Season 1", year: 2026, currentMatchday: 1, matchdayIds: [] },
     seasonState: {
       seasonId: "season-1",

@@ -24,6 +24,13 @@ export type GamePhase =
   | "season_review"
   | "season_rewards"
   | "player_development"
+  // Die Station des SAISONENDES (Training/Ziele, nach der Spielerentwicklung). Hiess bis 0.4.11
+  // ebenfalls `preseason_management` — derselbe Name wie der frische Spielaufbau, obwohl es der
+  // gegenteilige Zeitpunkt ist. Aus dieser Doppeldeutigkeit sind zwei Fehler entstanden (der
+  // Setup-Draft feuerte am Saisonende erneut, Client wie Server). Deshalb ein eigener Name.
+  | "season_end_management"
+  // Nur noch der FRISCHE Aufbau vor dem allerersten Spieltag. Neue Spiele legt
+  // `new-game-setup-service` in `season_active` an; diese Phase tragen nur noch Altstaende.
   | "preseason_management"
   | "transfer_sell_phase"
   | "transfer_buy_phase"
