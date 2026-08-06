@@ -47,8 +47,24 @@ import path from "node:path";
  */
 const MANUELLE_KAUF_QUELLEN = new Set(["manual_transfermarkt_buy"]);
 
+/**
+ * Eintraege OHNE Quelle werden NICHT zurueckgenommen.
+ *
+ * Aeltere Spielstaende haben Historien-Zeilen ohne `source` (im Bericht als `[undefined]`
+ * sichtbar). Ob so eine Zeile ein KI-Kauf oder ein Kauf des Spielers von damals war, laesst sich
+ * nicht mehr entscheiden — und dieses Skript schreibt in einen echten Spielstand. Im Zweifel also
+ * nichts anfassen: solche Zeilen werden getrennt ausgewiesen, damit der Mensch entscheidet, statt
+ * sie stillschweigend mitzuloeschen.
+ */
+function hatKeineQuelle(entry: TransferHistoryEntry) {
+  const source = entry.source == null ? "" : String(entry.source).trim();
+  return source === "" || source === "undefined" || source === "null";
+}
+
 function istAutomatischerKauf(entry: TransferHistoryEntry) {
-  return entry.transferType === "buy" && !MANUELLE_KAUF_QUELLEN.has(String(entry.source ?? ""));
+  if (entry.transferType !== "buy") return false;
+  if (hatKeineQuelle(entry)) return false;
+  return !MANUELLE_KAUF_QUELLEN.has(String(entry.source));
 }
 
 function parseArgs(argv: string[]) {
@@ -119,7 +135,53 @@ async function main() {
     `\nMenschlich gesteuert: ${menschlicheTeams.map((t) => `${t.name} (${t.teamId})`).join(", ") || "— keins"}`,
   );
 
+  // ---- Verkaufsbild: die Vorbereitung fuer den naechsten Schritt ------------------------------
+  // Der fehlende Kontrollmodus-Filter in `scopeTeam` betraf nicht nur die Kaufpfade, sondern auch
+  // die Saisonende-Verkaufsschleife. Ein automatischer Verkauf AUS einem menschlich gesteuerten
+  // Team heraus ist derselbe Uebergriff wie ein Kauf hinein — deshalb steht er hier als eigene
+  // Zeile, auch wenn dieses Skript ihn (noch) nicht zurueckninmt.
+  if (verkaeufe.length > 0) {
+    const verkaufProTeam = new Map<string, TransferHistoryEntry[]>();
+    for (const entry of verkaeufe) {
+      const key = entry.fromTeamId ?? "?";
+      if (!verkaufProTeam.has(key)) verkaufProTeam.set(key, []);
+      verkaufProTeam.get(key)!.push(entry);
+    }
+    const teamNameKurz = (teamId: string | null) =>
+      gameState.teams.find((t) => t.teamId === teamId)?.name ?? teamId ?? "?";
+    console.log(`\n${"-".repeat(78)}\nVERKAEUFE je Team (Bestandsaufnahme, wird NICHT angefasst)`);
+    const auffaellig: string[] = [];
+    for (const [teamId, list] of [...verkaufProTeam.entries()].sort()) {
+      const summe = runde(list.reduce((sum, e) => sum + (e.fee ?? 0), 0));
+      const automatisch = list.filter((e) => !String(e.source ?? "").startsWith("manual_")).length;
+      const manuell = list.length - automatisch;
+      const istMeins = istManuellGesteuert(gameState, teamId);
+      const markierung = istMeins ? "  ← DEIN TEAM" : "";
+      console.log(
+        `  ${teamNameKurz(teamId).padEnd(24)} ${String(list.length).padStart(3)} Verkaeufe` +
+          ` (${automatisch} automatisch, ${manuell} manuell), ${summe} Mio${markierung}`,
+      );
+      if (istMeins && automatisch > 0) {
+        auffaellig.push(`${teamNameKurz(teamId)}: ${automatisch} AUTOMATISCHE Verkaeufe aus deinem Team`);
+      }
+    }
+    if (auffaellig.length > 0) {
+      console.log("\n  ACHTUNG:");
+      for (const zeile of auffaellig) console.log(`    - ${zeile}`);
+      console.log("    Das ist derselbe Fehler wie bei den Kaeufen, nur andersherum.");
+    }
+    console.log("-".repeat(78));
+  }
+
   // ---- Auswahl: was wird zurueckgenommen? ----------------------------------------------------
+  const ohneQuelle = derSaison.filter((entry) => entry.transferType === "buy" && hatKeineQuelle(entry));
+  if (ohneQuelle.length > 0) {
+    console.log(
+      `\nHINWEIS: ${ohneQuelle.length} Kaeufe ohne erkennbare Quelle — die bleiben unangetastet.\n` +
+        `  Bei denen laesst sich nicht mehr entscheiden, ob KI oder du. Im Zweifel nichts anfassen.`,
+    );
+  }
+
   let ruecknahme = derSaison.filter(istAutomatischerKauf);
   if (nurMeinTeam) {
     const ids = new Set(menschlicheTeams.map((t) => t.teamId));
