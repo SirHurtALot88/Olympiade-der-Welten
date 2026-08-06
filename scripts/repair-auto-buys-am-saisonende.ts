@@ -40,12 +40,22 @@ import fs from "node:fs";
 import path from "node:path";
 
 /**
- * Ein Kauf gilt als AUTOMATISCH, wenn seine Quelle nicht die manuelle Kaufaktion des Spielers ist.
- * Bewusst so herum: die Liste der KI-/System-Quellen waechst (`ai_roster_fill`,
- * `ai_preseason_market_buy`, `season1_draft`, …), die manuelle ist genau eine. Wer eine neue
- * KI-Quelle ergaenzt, bekommt den Schutz damit automatisch statt ihn zu vergessen.
+ * NUR diese Quellen werden zurueckgenommen — eine Positivliste, keine Ausschlussliste.
+ *
+ * Die Vorfassung nahm „alles, was nicht `manual_transfermarkt_buy` ist". Am echten Spielstand
+ * gemessen waeren das 347 Kaeufe gewesen — davon 343 mit der Quelle `ai_roster_fill`, also der
+ * ERSTMALIGE LIGA-DRAFT: die Startkader aller 32 Teams. Ein `--apply` haette die komplette Liga
+ * ausgeleert. Nur 4 Kaeufe stammten tatsaechlich vom gemeldeten Preseason-Lauf.
+ *
+ * Deshalb andersherum: hier steht ausschliesslich das drin, was der gemeldete Fehler erzeugt hat.
+ * Eine neue KI-Quelle wird damit NICHT automatisch zurueckgenommen — sie taucht im Bericht unter
+ * „nicht zurueckgenommen" auf und jemand entscheidet bewusst, ob sie dazugehoert. Bei einem
+ * Werkzeug, das in einen echten Spielstand schreibt, ist Vergessen die harmlosere Richtung.
  */
-const MANUELLE_KAUF_QUELLEN = new Set(["manual_transfermarkt_buy"]);
+const RUECKNEHMBARE_KAUF_QUELLEN = new Set(["ai_preseason_market_buy"]);
+
+/** Der erstmalige Liga-Draft. Steht hier nur, damit der Bericht ihn benennen kann. */
+const LIGA_DRAFT_QUELLE = "ai_roster_fill";
 
 /**
  * Eintraege OHNE Quelle werden NICHT zurueckgenommen.
@@ -61,10 +71,10 @@ function hatKeineQuelle(entry: TransferHistoryEntry) {
   return source === "" || source === "undefined" || source === "null";
 }
 
-function istAutomatischerKauf(entry: TransferHistoryEntry) {
+function istRuecknehmbarerKauf(entry: TransferHistoryEntry) {
   if (entry.transferType !== "buy") return false;
   if (hatKeineQuelle(entry)) return false;
-  return !MANUELLE_KAUF_QUELLEN.has(String(entry.source));
+  return RUECKNEHMBARE_KAUF_QUELLEN.has(String(entry.source));
 }
 
 function parseArgs(argv: string[]) {
@@ -182,7 +192,23 @@ async function main() {
     );
   }
 
-  let ruecknahme = derSaison.filter(istAutomatischerKauf);
+  const nichtAngefasst = derSaison.filter(
+    (entry) => entry.transferType === "buy" && !hatKeineQuelle(entry) && !istRuecknehmbarerKauf(entry),
+  );
+  if (nichtAngefasst.length > 0) {
+    const proQuelle = new Map<string, number>();
+    for (const entry of nichtAngefasst) {
+      const key = String(entry.source);
+      proQuelle.set(key, (proQuelle.get(key) ?? 0) + 1);
+    }
+    console.log("\nNICHT zurueckgenommen (keine Quelle des gemeldeten Fehlers):");
+    for (const [quelle, anzahl] of [...proQuelle.entries()].sort()) {
+      const hinweis = quelle === LIGA_DRAFT_QUELLE ? "  ← erstmaliger Liga-Draft, MUSS stehen bleiben" : "";
+      console.log(`  ${String(anzahl).padStart(4)}  ${quelle}${hinweis}`);
+    }
+  }
+
+  let ruecknahme = derSaison.filter(istRuecknehmbarerKauf);
   if (nurMeinTeam) {
     const ids = new Set(menschlicheTeams.map((t) => t.teamId));
     ruecknahme = ruecknahme.filter((entry) => entry.toTeamId && ids.has(entry.toTeamId));
