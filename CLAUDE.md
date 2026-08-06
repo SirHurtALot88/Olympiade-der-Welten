@@ -11,6 +11,8 @@ nichts lokal gespeichert. Wer über „den Spielstand" redet, meint den auf dies
 | IPv4 | `135.181.102.2` |
 | IPv6 | `2a01:4f9:c012:9009::` |
 | Benutzer | `root` |
+| App-URL | `https://olympiade.duckdns.org/foundation` |
+| Healthcheck | `https://olympiade.duckdns.org/api/health` |
 | Repo auf dem Server | `/root/Olympiade-der-Welten` |
 | Spielstand im Container | `/app/data/persistence/oly-app.sqlite` (Volume `oly-data`) |
 | Compose-Datei | `deploy/hetzner/docker-compose.yml` |
@@ -22,6 +24,12 @@ ssh root@135.181.102.2
 
 Der Zugang selbst (Schlüssel/Passwort) liegt bei Chris, nicht im Repo. Ebenso `deploy/hetzner/.env`
 mit Domain und Login-Geheimnissen — die Datei ist absichtlich nicht versioniert.
+
+**Agenten kommen an den Server NICHT heran** — nachgemessen, nicht vermutet: kein `ssh` im Container,
+Port 22 nicht erreichbar, und HTTPS auf IP wie Domain wird vom Umgebungs-Proxy mit `403 CONNECT
+tunnel failed` abgelehnt (nur eine Allowlist mit GitHub/npm ist offen). Der einzige Weg zu den
+Spielständen führt über GitHub, siehe unten. Wer den Server direkt braucht, muss Chris bitten — oder
+die Domain müsste in der Netzwerk-Policy der Claude-Code-Umgebung freigeschaltet werden.
 
 **Befehle für Chris immer ohne nachgestellte `#`-Kommentare schreiben.** Seine Shell ist zsh, und
 die behandelt `#` interaktiv nicht als Kommentar — eine Zeile wie `befehl   # erklaerung` scheitert
