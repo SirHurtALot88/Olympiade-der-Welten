@@ -38,6 +38,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import type { ContractStatus, GameState, Player } from "@/lib/data/olyDataTypes";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
 import type { LocalTransferWindowPhase } from "@/lib/market/transfer-window-policy";
 
@@ -570,8 +571,41 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   }
 
   const scopedTeamIds = unique(input.targetTeamIds ?? []);
-  const scopeTeam = (teamIds: string[]) =>
-    scopedTeamIds.length > 0 ? teamIds.filter((teamId) => scopedTeamIds.includes(teamId)) : teamIds;
+
+  /**
+   * GEMELDET: „Was zur hölle ist passiert mit meinem save am season ende, dass ich plötzlich 3 neue
+   * spieler habe? Wieso wird für mich gepickt und gedraftet???"
+   *
+   * Weil `scopeTeam` nur nach den angeforderten Team-IDs filterte und NIE nach dem Kontrollmodus.
+   * Zwei Pfade dieser Datei zogen den Modus von Hand nach (Kredite, Vorab-Abloesung), die
+   * Kaufpfade nicht: der Preseason-Draft-Batch (`batchTeamIds`) reichte schlicht ALLE Teams weiter,
+   * inklusive des menschlich gesteuerten — und `chooseTeams` liess sie wegen
+   * `allowSetupAllTeams` durch. Ergebnis: das Spiel hat fuer den Spieler eingekauft.
+   *
+   * Der Modus wird EINMAL aufgeloest und in `scopeTeam` erzwungen, statt an jedem Aufrufer
+   * wiederholt zu werden — sonst haengt der Schutz wieder daran, dass ihn jemand nicht vergisst.
+   * Damit ist er fuer JEDEN Pfad dieser Session verbindlich: Kaeufe, Verkaeufe, Konvergenz,
+   * Rescue, Kredite. Das deckt auch den Koop-Fall ab, wo mehrere Teams manuell gesteuert sind —
+   * kein Teilnehmer bekommt seinen Kader von der Automatik umgebaut.
+   */
+  const manualTeamIds = (() => {
+    const gameState = readLiveSave()?.gameState;
+    if (!gameState) return new Set<string>();
+    return new Set(
+      gameState.teams
+        .filter((team) => {
+          const controlMode =
+            getTeamControlSettings(gameState, team.teamId)?.controlMode ?? (team.humanControlled ? "manual" : "ai");
+          return controlMode !== "ai";
+        })
+        .map((team) => team.teamId),
+    );
+  })();
+
+  const scopeTeam = (teamIds: string[]) => {
+    const scoped = scopedTeamIds.length > 0 ? teamIds.filter((teamId) => scopedTeamIds.includes(teamId)) : teamIds;
+    return scoped.filter((teamId) => !manualTeamIds.has(teamId));
+  };
 
   const excludeBuyPlayerIds = new Set<string>();
   const excludeSellPlayerIds = new Set<string>();
@@ -599,7 +633,31 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   // how much it sells or buys, which naturally produces a heterogeneous per-team result. No new
   // roster floor is introduced — see .cursor/rules/balancing-no-sell-floor-full-rebuild.mdc.
   const isSeasonEndSellPhase = input.phase === "season_end";
-  const isPreseasonBuyPhase = input.phase === "preseason";
+
+  /**
+   * GEMELDET: „käufe erst NACH saisonübergang!!! … eigentlich müsste hier nur verkauft werden auch
+   * von den AI teams"
+   *
+   * `input.phase` sagt nur, was der AUFRUFER vorhat — `phase: "preseason"` steht in
+   * `ai-market-plan-convergence-service` fest verdrahtet. Ob der Spielstand ueberhaupt schon in der
+   * neuen Saison ist, hat niemand gefragt. Die KI konnte deshalb mitten in der Saisonende-Kette
+   * einkaufen, waehrend fuer den Menschen dort seit #429 nur Verkaufen offen ist.
+   *
+   * Massstab ist jetzt der Spielstand selbst: `isSeasonEndPhase` deckt genau die Stationen der
+   * alten Saison ab (`season_completed` bis `next_season_ready`, abgeleitet aus der Kette, nicht
+   * aufgezaehlt). Solange der Uebergang nicht durch ist, verkauft die KI nur — danach kauft sie
+   * wie bisher. Bewusst NICHT `isTransferBuyPhaseOpen` (die Regel des Menschen): die haette die
+   * KI zusaetzlich auf „vor dem 1. Spieltag" eingeengt, und der Preseason-Workflow laeuft zum Teil
+   * noch vor dem Umschalten auf `season_active` — die KI wuerde dann gar nicht mehr kaufen.
+   */
+  const liveGameStateForPhase = readLiveSave()?.gameState ?? null;
+  const saveStehtNochInDerAltenSaison = liveGameStateForPhase
+    ? isSeasonEndPhase(liveGameStateForPhase.gamePhase)
+    : false;
+  const isPreseasonBuyPhase = input.phase === "preseason" && !saveStehtNochInDerAltenSaison;
+  if (input.phase === "preseason" && saveStehtNochInDerAltenSaison) {
+    warnings.push(`ai_buys_deferred_until_after_season_transition:${liveGameStateForPhase?.gamePhase ?? "?"}`);
+  }
 
   // Sell-cap mechanism removed entirely (2026-07-04, explicit user correction — see
   // .cursor/rules/balancing-no-sell-floor-full-rebuild.mdc and

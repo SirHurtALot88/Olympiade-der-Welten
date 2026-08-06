@@ -248,6 +248,7 @@ export async function runSeasonOnePicksDraft(
       confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
       teamScope: "all",
       allowSetupAllTeams: true,
+          includeManualTeams: true,
       teamIds: options?.teamIds,
       stepsPerTeam: options?.stepsPerTeam ?? Number(process.env.OLY_LONG_RUN_DRAFT_STEPS ?? 16),
       runMode: "season1_optimum_execute",

@@ -262,6 +262,7 @@ async function main() {
       confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
       teamScope: "all",
       allowSetupAllTeams: true,
+      includeManualTeams: true,
       stepsPerTeam: s1StepsPerTeam,
       runMode: "season1_optimum_execute",
       draftSeed: `fresh-s1-s2-audit:${fresh.saveId}`,
