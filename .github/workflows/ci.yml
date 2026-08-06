@@ -4,6 +4,16 @@ on:
   push:
     branches: [main, master]
   pull_request:
+  # Von Hand startbar.
+  #
+  # GRUND: Am 06.08. hat GitHub Actions fuer dieses Repo ueber Stunden keine Laeufe mehr gestartet —
+  # weder fuer `push` noch fuer `pull_request`, auf keinem Branch. Ein Lauf hing seit 16:16 in der
+  # Warteschlange, der letzte gestartete war von 17:49. Damit stand ein fertiger PR still: die
+  # Branch-Regeln verlangen zwei Status-Checks, und ein Check, der nie startet, wird nie gruen.
+  #
+  # Ohne `workflow_dispatch` gab es in dieser Lage KEINEN Weg, die CI anzustossen — nur warten oder
+  # die Schutzregel abschalten. Der Schalter kostet nichts und gibt die Kontrolle zurueck.
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
