@@ -118,6 +118,7 @@ export function kickoffLeagueSetupDraft(input: LeagueSetupDraftKickoffInput): Pe
           confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
           teamScope: "all",
           allowSetupAllTeams: true,
+          includeManualTeams: true,
           callerWritableTeamIds,
           draftSeed: `${saveId}:${seasonId}:setup`,
           yieldBetweenTeams: true,
@@ -274,6 +275,7 @@ export async function repairLeagueSetupEmptyRosters(input: {
       confirmToken: dryRun ? null : AI_PICKS_RUN_CONFIRM_TOKEN,
       teamScope: "all",
       allowSetupAllTeams: true,
+          includeManualTeams: true,
       // NUR die leeren Teams — das ist der eigentliche Sicherheitsmechanismus dieser Funktion.
       teamIds: emptyTeamIds,
       // "season1_optimum_execute" statt des "default"-Modus (den der ERZEUGUNGS-Kickoff fuer die

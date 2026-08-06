@@ -570,8 +570,41 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   }
 
   const scopedTeamIds = unique(input.targetTeamIds ?? []);
-  const scopeTeam = (teamIds: string[]) =>
-    scopedTeamIds.length > 0 ? teamIds.filter((teamId) => scopedTeamIds.includes(teamId)) : teamIds;
+
+  /**
+   * GEMELDET: „Was zur hölle ist passiert mit meinem save am season ende, dass ich plötzlich 3 neue
+   * spieler habe? Wieso wird für mich gepickt und gedraftet???"
+   *
+   * Weil `scopeTeam` nur nach den angeforderten Team-IDs filterte und NIE nach dem Kontrollmodus.
+   * Zwei Pfade dieser Datei zogen den Modus von Hand nach (Kredite, Vorab-Abloesung), die
+   * Kaufpfade nicht: der Preseason-Draft-Batch (`batchTeamIds`) reichte schlicht ALLE Teams weiter,
+   * inklusive des menschlich gesteuerten — und `chooseTeams` liess sie wegen
+   * `allowSetupAllTeams` durch. Ergebnis: das Spiel hat fuer den Spieler eingekauft.
+   *
+   * Der Modus wird EINMAL aufgeloest und in `scopeTeam` erzwungen, statt an jedem Aufrufer
+   * wiederholt zu werden — sonst haengt der Schutz wieder daran, dass ihn jemand nicht vergisst.
+   * Damit ist er fuer JEDEN Pfad dieser Session verbindlich: Kaeufe, Verkaeufe, Konvergenz,
+   * Rescue, Kredite. Das deckt auch den Koop-Fall ab, wo mehrere Teams manuell gesteuert sind —
+   * kein Teilnehmer bekommt seinen Kader von der Automatik umgebaut.
+   */
+  const manualTeamIds = (() => {
+    const gameState = readLiveSave()?.gameState;
+    if (!gameState) return new Set<string>();
+    return new Set(
+      gameState.teams
+        .filter((team) => {
+          const controlMode =
+            getTeamControlSettings(gameState, team.teamId)?.controlMode ?? (team.humanControlled ? "manual" : "ai");
+          return controlMode !== "ai";
+        })
+        .map((team) => team.teamId),
+    );
+  })();
+
+  const scopeTeam = (teamIds: string[]) => {
+    const scoped = scopedTeamIds.length > 0 ? teamIds.filter((teamId) => scopedTeamIds.includes(teamId)) : teamIds;
+    return scoped.filter((teamId) => !manualTeamIds.has(teamId));
+  };
 
   const excludeBuyPlayerIds = new Set<string>();
   const excludeSellPlayerIds = new Set<string>();
