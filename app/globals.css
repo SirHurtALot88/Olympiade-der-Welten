@@ -64639,21 +64639,29 @@ button.is-new-look .nl-thist-season-pill,
    Der "aktive Sortierspalte"-Zustand (`.is-active-sort`, s.u.) bleibt
    optisch klar davon abgesetzt: er nutzt ein anderes, kräftiges
    Blau-Wasch unabhängig vom Spalten-Akzent (auch auf Gold/Bronze). ---- */
+/* GEMELDET: „MVS bitte die überschrift nicht transaparent!"
+   Die Kopfzeile ist `position: sticky` und bekam ihren Farbton als
+   `color-mix(… , transparent)` — also mit LOCH. Beim Scrollen liefen die Zeilen darunter
+   sichtbar durch die Beschriftung (im Screenshot stand „23,9 / #28" mitten im Wort MVS).
+   Der Ton wird jetzt UEBER `--nl-panel-2` gemischt statt über Transparenz: gleiche Farbe,
+   aber deckend. Betrifft alle drei Kennzahl-Köpfe, nicht nur MVS. */
 .is-new-look .nl-players-th.is-highlight-pps {
-  background: var(--nl-accent-soft);
-  color: var(--nl-accent);
+  background: color-mix(in srgb, var(--nl-accent) 16%, var(--nl-panel-2));
+  color: var(--nl-accent-text, var(--nl-accent));
   box-shadow: inset 0 -2px 0 var(--nl-accent);
 }
 
 .is-new-look .nl-players-th.is-highlight-ovr {
-  background: color-mix(in srgb, var(--nl-gold) 16%, transparent);
+  background: color-mix(in srgb, var(--nl-gold) 16%, var(--nl-panel-2));
   color: var(--nl-gold);
   box-shadow: inset 0 -2px 0 var(--nl-gold);
 }
 
 .is-new-look .nl-players-th.is-highlight-mvs {
-  background: color-mix(in srgb, var(--nl-bronze) 18%, transparent);
-  color: var(--nl-bronze);
+  background: color-mix(in srgb, var(--nl-bronze) 18%, var(--nl-panel-2));
+  /* Aufgehelltes Bronze: der Grundton (#cd7f32) trägt als 10px-Versalie auf getöntem Dunkel
+     zu wenig — die Farbe bleibt Bronze, die Schrift wird lesbar. */
+  color: color-mix(in srgb, var(--nl-bronze) 62%, #ffffff);
   box-shadow: inset 0 -2px 0 var(--nl-bronze);
 }
 
@@ -70379,8 +70387,14 @@ button.is-new-look .nl-thist-season-pill,
   color: var(--heat-elite-text, #0b1220);
 }
 
+/* GEMELDET (dieselbe Sache wie bei den PPs-Zellen): „schwarze schrift auf schwarzem
+   background". Der Kopf der aktiven Sortierspalte steht auf dem VOLLEN hellen Blau — dort ist
+   dunkle Schrift richtig. Die Zellen darunter nahmen davon aber nur 45 % und mischten den Rest
+   aus dem dunklen Panel: heraus kam ein mittleres Schiefergrau, auf dem dieselbe dunkle Schrift
+   im Browser nur 2,8:1 erreichte. Statt hier eine zweite Entscheidung einzuführen (helle Schrift
+   in den Zellen, dunkle im Kopf) wird der Wasch so hell, wie die Schrift es voraussetzt. */
 .is-new-look td.is-active-sort {
-  background: color-mix(in srgb, var(--heat-blue-light, #7fa2d1) 45%, var(--nl-panel) 55%);
+  background: color-mix(in srgb, var(--heat-blue-light, #7fa2d1) 78%, var(--nl-panel) 22%);
   color: #0b1220;
 }
 
@@ -70515,8 +70529,21 @@ button.is-new-look .nl-thist-season-pill,
    unabhängig vom Farbton ausreichenden Kontrast liefert.
    ------------------------------------------------------------ */
 
+/* GEMELDET: „bitte darauf achten, dass die schwarze schrift auf schwarzem background weg ist,
+   hier in der spieler liste zb müsste schrift weiß sein bei PPs!"
+
+   Die Regeln hier ueberschrieben den `background` der `.heat-band-N`-Klasse — die `color` aber
+   nicht. Und `.heat-band-N` setzt eine DUNKLE Schrift, weil sie fuer ihren eigenen HELLEN
+   Heat-Grund gedacht ist (`--heat-elite-text: #101929`). Auf dem dunklen Spalten-Ton blieb also
+   Schwarz auf Schwarz stehen. Im Browser gemessen: PPs 11 von 40 sichtbaren Zellen unter 4,5:1,
+   die schlechtesten bei 1,19:1 — praktisch unlesbar.
+
+   `color` gehoert deshalb in dieselbe Regel wie der Hintergrund. Die aktive Sortierspalte
+   (`.is-active-sort`, weiter unten) setzt bewusst weiter dunkle Schrift — sie hat einen hellen
+   Wasch und mehr Klassen, gewinnt also. */
 .is-new-look td.nl-players-td-metric.nl-players-td-pps {
   background: color-mix(in srgb, var(--nl-accent) 10%, transparent);
+  color: var(--nl-ink);
   box-shadow:
     inset 2px 0 0 var(--nl-accent),
     inset -2px 0 0 var(--nl-accent);
@@ -70524,6 +70551,7 @@ button.is-new-look .nl-thist-season-pill,
 
 .is-new-look td.nl-players-td-metric.nl-ptable-ovr-cell {
   background: color-mix(in srgb, var(--nl-gold) 10%, transparent);
+  color: var(--nl-ink);
   box-shadow:
     inset 2px 0 0 var(--nl-gold),
     inset -1px 0 0 var(--nl-line-2);
@@ -70531,6 +70559,7 @@ button.is-new-look .nl-thist-season-pill,
 
 .is-new-look td.nl-players-td-metric.nl-ptable-mvs-cell {
   background: color-mix(in srgb, var(--nl-bronze) 10%, transparent);
+  color: var(--nl-ink);
   box-shadow:
     inset 2px 0 0 var(--nl-bronze),
     inset -1px 0 0 var(--nl-line-2);
@@ -70546,7 +70575,7 @@ button.is-new-look .nl-thist-season-pill,
    Regel (2 Klassen) gewinnen würden. Der farbige Rand bleibt als
    Spalten-Identität erhalten. */
 .is-new-look td.nl-players-td-metric.nl-players-td-pps.is-active-sort {
-  background: color-mix(in srgb, var(--heat-blue-light, #7fa2d1) 45%, var(--nl-panel) 55%);
+  background: color-mix(in srgb, var(--heat-blue-light, #7fa2d1) 78%, var(--nl-panel) 22%);
   color: #0b1220;
   box-shadow:
     inset 2px 0 0 var(--nl-accent),
@@ -70554,7 +70583,7 @@ button.is-new-look .nl-thist-season-pill,
 }
 
 .is-new-look td.nl-players-td-metric.nl-ptable-ovr-cell.is-active-sort {
-  background: color-mix(in srgb, var(--heat-blue-light, #7fa2d1) 45%, var(--nl-panel) 55%);
+  background: color-mix(in srgb, var(--heat-blue-light, #7fa2d1) 78%, var(--nl-panel) 22%);
   color: #0b1220;
   box-shadow:
     inset 2px 0 0 var(--nl-gold),
@@ -70562,7 +70591,7 @@ button.is-new-look .nl-thist-season-pill,
 }
 
 .is-new-look td.nl-players-td-metric.nl-ptable-mvs-cell.is-active-sort {
-  background: color-mix(in srgb, var(--heat-blue-light, #7fa2d1) 45%, var(--nl-panel) 55%);
+  background: color-mix(in srgb, var(--heat-blue-light, #7fa2d1) 78%, var(--nl-panel) 22%);
   color: #0b1220;
   box-shadow:
     inset 2px 0 0 var(--nl-bronze),
