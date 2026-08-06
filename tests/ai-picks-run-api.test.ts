@@ -62,6 +62,9 @@ describe("ai picks run api", () => {
         confirmToken: null,
         teamScope: "all",
         allowSetupAllTeams: true,
+        // Standard NEIN: die Route schaltet den Control-Mode-Schutz nur frei, wenn der Aufrufer
+        // es ausdruecklich verlangt (Nachpick-Knopf fuers eigene Team, erstmaliger Liga-Draft).
+        includeManualTeams: false,
         stepsPerTeam: 4,
         runMode: "default",
       });

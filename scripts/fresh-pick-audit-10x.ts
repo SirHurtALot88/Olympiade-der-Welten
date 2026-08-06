@@ -807,6 +807,7 @@ async function main() {
       confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
       teamScope: "all",
       allowSetupAllTeams: true,
+      includeManualTeams: true,
       stepsPerTeam: args.stepsPerTeam,
       runMode: "season1_optimum_execute",
       draftSeed,

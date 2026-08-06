@@ -21,6 +21,15 @@
     },
     {
       "datum": "2026-08-05",
+      "seite": "Saison · Saisonabschluss",
+      "pr": null,
+      "text": "Am Saisonende stand „Transferfenster öffnen — verkaufen und kaufen sind freigeschaltet\", und Kaufen war dort tatsächlich schon offen. Der Schritt heißt jetzt „Verkäufe & Verträge öffnen\" und macht nur noch das auf: verkaufen und verlängern. Gekauft wird erst in der neuen Saison, vor dem 1. Spieltag — der Transfermarkt sagt in beiden Fenstern, welches gerade läuft.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-05",
       "seite": "Spieler · Liste",
       "pr": null,
       "text": "In den Spalten PPs, OVR und MVS stand ein Teil der Werte schwarz auf dunklem Grund und war praktisch unlesbar — gemessen bis hinunter zu 1,19:1. Die Spaltenfarbe hatte nur den Hintergrund der Heat-Skala ersetzt, deren dunkle Schrift blieb stehen. Alle Werte sind jetzt hell; keine Zelle liegt mehr unter 4,5:1.",

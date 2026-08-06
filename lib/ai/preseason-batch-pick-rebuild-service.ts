@@ -14,6 +14,7 @@ import {
   runChunkedRedraftTopup,
 } from "@/lib/ai/chunked-redraft-topup-service";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
+import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import type { PersistenceService } from "@/lib/persistence/types";
 
 export type PreseasonBatchPickRebuildResult = {
@@ -56,6 +57,16 @@ export async function runPreseasonBatchPickRebuild(input: {
       : save.gameState.teams.map((team) => team.teamId);
 
   const batchTeamIds = candidateTeamIds.filter((teamId) => {
+    // Menschlich gesteuerte Teams kaufen NIE automatisch — der Kader gehoert dem Spieler.
+    // Zweite Schicht neben `scopeTeam` in `ai-transfer-window-session-service`: dieser Dienst ist
+    // exportiert und wird auch direkt aus Skripten gerufen, wo es kein `scopeTeam` gibt. Ohne die
+    // Pruefung hier reichte der Aufruf ALLE Teams weiter (`candidateTeamIds` = alle, wenn keine
+    // Liste kommt) und der Filter darunter fragte nur nach Kaderluecke und Kassenlage.
+    const controlMode =
+      getTeamControlSettings(save.gameState, teamId)?.controlMode ??
+      (save.gameState.teams.find((entry) => entry.teamId === teamId)?.humanControlled ? "manual" : "ai");
+    if (controlMode !== "ai") return false;
+
     const roster = rosterCount(save.gameState, teamId);
     const optTarget = getTeamOptTarget(save.gameState, teamId);
     if (roster < optTarget) return true;

@@ -507,4 +507,34 @@ describe("ai transfer window session service", () => {
     expect(buyCalls[1]?.options?.excludeBuyPlayerIds).toContain("claimed-player");
     expect(buyCalls[1]?.options?.excludeBuyPlayerIds).not.toContain("skipped-for-a");
   });
+
+  it("kauft NICHT, solange der Spielstand noch in der alten Saison steht", async () => {
+    // GEMELDET: „käufe erst NACH saisonübergang!!! … auch von den AI teams".
+    // `phase: "preseason"` sagt nur, was der AUFRUFER vorhat — hier steht der Spielstand aber noch
+    // in der Saisonende-Kette. Ohne den Fix kauft die KI trotzdem: `isPreseasonBuyPhase` las
+    // ausschliesslich `input.phase` und nie den Spielstand.
+    applyAiMarketPlanLocally.mockImplementation(async () => buildApplyResult({ appliedBuys: 1, rosterAfter: 9 }));
+    const persistence = {
+      getSaveById: () => ({
+        saveId: "save-1",
+        gameState: buildGameState({ gamePhase: "preseason_management" }),
+      }),
+    };
+
+    const result = await runTransferWindowSession({
+      saveId: "save-1",
+      seasonId: "season-2",
+      persistence: persistence as never,
+      phase: "preseason",
+      preseasonBuyMode: "convergence_loop",
+      dryRun: true,
+      maxTeamCycles: 1,
+      maxLeagueRounds: 1,
+      skipIfExistingMarketTransfers: false,
+    });
+
+    expect(result.appliedBuys, "am Saisonende wird nicht gekauft").toBe(0);
+    expect(result.warnings.some((w) => w.startsWith("ai_buys_deferred_until_after_season_transition"))).toBe(true);
+  });
+
 });
