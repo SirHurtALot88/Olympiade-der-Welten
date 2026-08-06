@@ -11,6 +11,7 @@
 #   deploy/hetzner/pull-repaired-save.sh --branch <branch>    # anderer Branch
 #   deploy/hetzner/pull-repaired-save.sh --datei <pfad-im-branch>
 #   deploy/hetzner/pull-repaired-save.sh --pruefen            # nur pruefen, nichts einsetzen
+#   deploy/hetzner/pull-repaired-save.sh --zurueck            # letzte Sicherung wieder einsetzen
 #
 # ES WIRD ERST GESICHERT, DANN GETAUSCHT. Die Sicherung des bisherigen Spielstands landet unter
 # /root/oly-save-sicherungen/ und wird am Ende genannt.
@@ -19,12 +20,14 @@ set -euo pipefail
 BRANCH="save-repariert"
 DATEI_IM_BRANCH="data/online-saves/hetzner-live-repariert.sqlite.gz"
 NUR_PRUEFEN=0
+ZURUECK=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --branch) BRANCH="$2"; shift 2 ;;
     --datei) DATEI_IM_BRANCH="$2"; shift 2 ;;
     --pruefen) NUR_PRUEFEN=1; shift ;;
+    --zurueck) ZURUECK=1; shift ;;
     *) echo "Unbekannte Option: $1" >&2; exit 2 ;;
   esac
 done
@@ -61,7 +64,67 @@ STEMPEL="$(date '+%Y%m%d-%H%M%S')"
 
 compose() { docker compose -f "$COMPOSE" --env-file "$ENV_FILE" "$@"; }
 
-echo "[1/6] Reparierten Spielstand von GitHub holen (Branch $BRANCH) ..."
+# Spielstand-Datei einsetzen — der eine Ablauf, den BEIDE Richtungen brauchen (einsetzen und
+# zurueckdrehen). Einmal geschrieben statt zweimal: sonst haette der Rueckweg genau die WAL-Falle
+# wieder, gegen die der Hinweg abgesichert ist.
+einsetzen() {
+  local quelle="$1"
+  echo "      App anhalten ..."
+  # Die Datei darf NICHT unter einer laufenden App getauscht werden: offene Verbindungen halten die
+  # alte Datei weiter, und der naechste Schreibvorgang mischt beide Staende.
+  compose stop oly-app
+  echo "      Datei einsetzen ..."
+  compose cp "$quelle" "oly-app:$DB_IM_CONTAINER"
+  # DIESE ZEILE IST DER GANZE GRUND, WARUM ES DIESES SKRIPT GIBT.
+  #
+  # Die App laeuft mit `journal_mode = WAL`. Neben `oly-app.sqlite` liegen `-wal` und `-shm` und
+  # gehoeren zur ALTEN Datei. Tauscht man nur die Hauptdatei aus, arbeitet SQLite beim naechsten
+  # Start die alte WAL auf den neuen Spielstand an — bestenfalls ist der alte Stand zurueck,
+  # schlimmstenfalls ist die Datenbank kaputt.
+  compose run --rm --no-deps --entrypoint sh oly-app \
+    -c "rm -f ${DB_IM_CONTAINER}-wal ${DB_IM_CONTAINER}-shm" >/dev/null 2>&1 || true
+  echo "      App starten ..."
+  compose up -d oly-app
+}
+
+# Liest die App den Spielstand wieder? Wartet bis zu zwei Minuten.
+warte_auf_app() {
+  sleep 5
+  for _versuch in $(seq 1 24); do
+    if compose exec -T oly-app node -e "
+        const Database = require('better-sqlite3');
+        const db = new Database('$DB_IM_CONTAINER', { readonly: true });
+        const n = db.prepare('SELECT COUNT(*) AS n FROM saves').get().n;
+        db.close();
+        if (!n) process.exit(1);
+      " >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 5
+  done
+  return 1
+}
+
+if [ "$ZURUECK" = "1" ]; then
+  LETZTE="$(ls -1t "$SICHERUNG_DIR"/oly-app-vor-reparatur-*.sqlite.gz 2>/dev/null | head -1 || true)"
+  if [ -z "$LETZTE" ]; then
+    echo "FEHLER: Keine Sicherung in $SICHERUNG_DIR gefunden." >&2
+    exit 1
+  fi
+  echo "Zurueckdrehen auf: $LETZTE"
+  gunzip -cf "$LETZTE" > "$TMP_DB"
+  einsetzen "$TMP_DB"
+  rm -f "$TMP_DB"
+  if warte_auf_app; then
+    echo ""
+    echo "FERTIG — der Stand von vor der Reparatur ist wieder eingesetzt."
+    exit 0
+  fi
+  echo "WARNUNG: Die App meldet sich nach 2 Minuten nicht mit lesbaren Spielstaenden." >&2
+  exit 1
+fi
+
+echo "[1/5] Reparierten Spielstand von GitHub holen (Branch $BRANCH) ..."
 # Nur fetch, kein pull/merge: der Arbeitsbaum des Servers wird NICHT angefasst. Das ist wichtig,
 # solange dort noch ein liegengebliebener lokaler Commit den Auto-Deploy blockiert — dieses Skript
 # soll davon unabhaengig funktionieren.
@@ -73,7 +136,7 @@ fi
 git show "origin/$BRANCH:$DATEI_IM_BRANCH" > "$TMP_GZ"
 echo "      geholt: $(du -h "$TMP_GZ" | cut -f1)"
 
-echo "[2/6] Entpacken und pruefen ..."
+echo "[2/5] Entpacken und pruefen ..."
 # `gunzip -t` faengt genau den Fall ab, der beim ersten Versuch von Hand passiert ist: eine leere
 # oder halbe Datei, weil der vorherige Befehl fehlgeschlagen war. Lieber hier abbrechen als eine
 # kaputte Datei in den Spielstand schieben.
@@ -97,6 +160,7 @@ ANZAHL="$(compose exec -T oly-app node -e "
   db.close();
   process.stdout.write(n + '|' + namen.join(' / '));
 ")"
+compose exec -T oly-app sh -c "rm -f /tmp-pruefen.sqlite" >/dev/null 2>&1 || true
 echo "      Spielstaende in der Datei: ${ANZAHL%%|*}"
 echo "      neueste: ${ANZAHL#*|}"
 if [ "${ANZAHL%%|*}" = "0" ]; then
@@ -110,7 +174,7 @@ if [ "$NUR_PRUEFEN" = "1" ]; then
   exit 0
 fi
 
-echo "[3/6] Bisherigen Spielstand sichern ..."
+echo "[3/5] Bisherigen Spielstand sichern ..."
 mkdir -p "$SICHERUNG_DIR"
 # WAL zuerst einarbeiten, sonst sichert man einen veralteten Stand — derselbe Fehler, den
 # push-live-save.sh hatte (siehe dort).
@@ -124,42 +188,21 @@ compose cp "oly-app:$DB_IM_CONTAINER" "$SICHERUNG_DIR/oly-app-vor-reparatur-$STE
 gzip -f "$SICHERUNG_DIR/oly-app-vor-reparatur-$STEMPEL.sqlite"
 echo "      gesichert: $SICHERUNG_DIR/oly-app-vor-reparatur-$STEMPEL.sqlite.gz"
 
-echo "[4/6] App anhalten ..."
-# Die Datei darf NICHT unter einer laufenden App getauscht werden: offene Verbindungen halten die
-# alte Datei weiter, und der naechste Schreibvorgang mischt beide Staende.
-compose stop oly-app
-
-echo "[5/6] Spielstand einsetzen ..."
-compose cp "$TMP_DB" "oly-app:$DB_IM_CONTAINER"
-# DIE ZWEI ZEILEN SIND DER GANZE GRUND, WARUM ES DIESES SKRIPT GIBT.
-#
-# Die App laeuft mit `journal_mode = WAL`. Neben `oly-app.sqlite` liegen `-wal` und `-shm` und
-# gehoeren zur ALTEN Datei. Tauscht man nur die Hauptdatei aus, arbeitet SQLite beim naechsten
-# Start die alte WAL auf den neuen Spielstand an — das Ergebnis ist im besten Fall der alte Stand
-# zurueck, im schlechtesten eine kaputte Datenbank.
-compose run --rm --no-deps --entrypoint sh oly-app -c "rm -f ${DB_IM_CONTAINER}-wal ${DB_IM_CONTAINER}-shm" >/dev/null 2>&1 || true
+echo "[4/5] Spielstand einsetzen ..."
+einsetzen "$TMP_DB"
 rm -f "$TMP_DB"
 
-echo "[6/6] App starten und pruefen ..."
-compose up -d oly-app
-sleep 5
-for versuch in $(seq 1 24); do
-  if compose exec -T oly-app node -e "
-      const Database = require('better-sqlite3');
-      const db = new Database('$DB_IM_CONTAINER', { readonly: true });
-      const n = db.prepare('SELECT COUNT(*) AS n FROM saves').get().n;
-      db.close();
-      if (!n) process.exit(1);
-    " >/dev/null 2>&1; then
-    echo ""
-    echo "FERTIG — der reparierte Spielstand ist eingesetzt."
-    echo "Zurueckdrehen: $SICHERUNG_DIR/oly-app-vor-reparatur-$STEMPEL.sqlite.gz"
-    exit 0
-  fi
-  sleep 5
-done
+echo "[5/5] Startpruefung ..."
+if warte_auf_app; then
+  echo ""
+  echo "FERTIG — der reparierte Spielstand ist eingesetzt."
+  echo "Falls doch etwas nicht stimmt, EIN Befehl zurueck:"
+  echo "    $0 --zurueck"
+  exit 0
+fi
 
 echo "" >&2
 echo "WARNUNG: Die App meldet sich nach 2 Minuten nicht mit lesbaren Spielstaenden." >&2
-echo "Sicherung zum Zurueckdrehen: $SICHERUNG_DIR/oly-app-vor-reparatur-$STEMPEL.sqlite.gz" >&2
+echo "Zurueckdrehen mit:  $0 --zurueck" >&2
+echo "(Sicherung: $SICHERUNG_DIR/oly-app-vor-reparatur-$STEMPEL.sqlite.gz)" >&2
 exit 1
