@@ -220,7 +220,7 @@ describe("season transition service", () => {
    * Zaehler ab 0, gleiche fixe Zeit) — sonst wichen `transitionId` und die Progression-Event-IDs
    * allein durch den doppelten Aufruf voneinander ab, obwohl die Fachlogik identisch rechnet.
    */
-  it("liefert exakt denselben Endzustand wie der alte, schrittweise persistierende Ablauf", () => {
+  it("liefert exakt denselben Endzustand wie der alte, schrittweise persistierende Ablauf", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-11T00:00:00.000Z"));
 
@@ -236,7 +236,7 @@ describe("season transition service", () => {
       buildSeasonTransitionPreview(manualCurrent);
       for (let hop = 0; hop < SEASON_TRANSITION_STEPS.length; hop += 1) {
         if (isTransferMarketPhaseOpen(manualCurrent.gameState)) break;
-        const step = advanceSeasonTransitionStep(manualCurrent, manualRun.persistence);
+        const step = await advanceSeasonTransitionStep(manualCurrent, manualRun.persistence);
         if (!("applied" in step) || !step.applied) break;
         const reloaded = manualRun.persistence.getSaveById(manualCurrent.saveId);
         if (!reloaded) break;

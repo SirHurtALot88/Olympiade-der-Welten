@@ -63,6 +63,15 @@ export type SeasonTransitionState = {
    * beim Saisonstart ein zweites Mal laeuft.
    */
   progressionAppliedForSeasonId?: string | null;
+  /**
+   * Saison-Id, fuer die die KI-Verkaeufe des Saisonendes bereits gelaufen sind.
+   *
+   * Derselbe Zweck wie `progressionAppliedForSeasonId` eine Zeile darueber, und aus demselben
+   * Grund noetig: der Schritt „Verkaeufe" schreibt jetzt selbst, also muss er sich merken, dass er
+   * fertig ist. Ohne den Marker verkauft die KI bei jedem erneuten Durchlauf der Station ein
+   * weiteres Mal Spieler — und ein Klick zurueck und wieder vor wuerde Kader leerraeumen.
+   */
+  aiSeasonEndSellsAppliedForSeasonId?: string | null;
 };
 
 export type ScenarioType =
