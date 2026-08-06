@@ -66260,6 +66260,67 @@ button.is-new-look .nl-thist-season-pill,
   background: var(--nl-warn);
 }
 
+/* --- Achsen-Gruppen der Depth-Chart (aufklappbar) -------------------- */
+/* Die Gruppenzeile ist ein <th> und erbt damit `position: sticky` aus der
+   Kopfzeilen-Regel oben — ohne dieses Zurücksetzen würden alle vier Achsen-
+   köpfe beim Scrollen übereinander am oberen Rand kleben. */
+.is-new-look .nl-teamprofile-depth-groupcell {
+  position: static;
+  padding: 0;
+  text-align: left;
+  text-transform: none;
+  letter-spacing: normal;
+  background: transparent;
+  border-bottom: 1px solid var(--nl-line-2);
+}
+
+.is-new-look .nl-teamprofile-depth-grouptoggle {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  width: 100%;
+  padding: var(--nl-s2) var(--nl-s3);
+  border: 0;
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 10%, transparent);
+  color: var(--nl-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.is-new-look .nl-teamprofile-depth-grouptoggle:hover,
+.is-new-look .nl-teamprofile-depth-grouptoggle:focus-visible {
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 18%, transparent);
+}
+
+.is-new-look .nl-teamprofile-depth-groupcaret {
+  width: 1em;
+  flex: 0 0 auto;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamprofile-depth-grouplabel {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--nl-tone, var(--nl-ink));
+}
+
+.is-new-look .nl-teamprofile-depth-groupcount {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamprofile-depth-groupthin {
+  margin-left: auto;
+  padding: 1px var(--nl-s2);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--nl-risk) 16%, transparent);
+  color: var(--nl-risk);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 /* --- Responsive (nl-teamprofile-fan-/board-/depth-) ------------------ */
 @media (max-width: 900px) {
   .is-new-look .nl-teamprofile-fan-grid {
