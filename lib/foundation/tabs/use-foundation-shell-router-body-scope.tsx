@@ -9612,7 +9612,23 @@ export function useFoundationShellRouterBodyScope({
       !activeSaveId ||
       activeSaveId === "loading-save" ||
       leagueSetupStatus !== "ready" ||
-      gameState.gamePhase !== "preseason_management"
+      gameState.gamePhase !== "preseason_management" ||
+      // GEMELDET: „die sind ja sogar mit 4.8. und 5.8. datiert die käufe! da sind sehr viele
+      // falsche käufe bei" — der Liga-Draft lief einen Tag nach dem Anlegen des Spielstands
+      // erneut und kaufte Kader voll, die laengst spielten (Quelle `ai_roster_fill`, 5.8.).
+      //
+      // Ursache war die Bedingung darueber: `preseason_management` galt hier als „frischer
+      // S1-Aufbau". Seit der Saisonende-Kette ist das aber die ERSTE STATION JEDES SAISONENDES —
+      // und genau dort stehen nach den KI-Verkaeufen reihenweise Teams unter Kadermindestgroesse.
+      // Beide Gates zusammen waren am Saisonende also praktisch immer erfuellt, und der
+      // Ref-Guard haelt nur pro Browser-Sitzung; jedes Neuladen scharfte ihn neu.
+      //
+      // Der belastbare Unterschied ist nicht die Phase, sondern ob ueberhaupt schon gespielt
+      // wurde: dieser Effekt existiert einzig, um einen ABGEBROCHENEN ERST-DRAFT zu Ende zu
+      // bringen. In dem Moment liegt noch kein einziges Spieltagsergebnis vor. An jedem
+      // Saisonende liegen welche vor — dort hat er nichts verloren, das Auffuellen uebernimmt
+      // die KI-Preseason.
+      (gameState.seasonState.matchdayResults ?? []).length > 0
     ) {
       return undefined;
     }

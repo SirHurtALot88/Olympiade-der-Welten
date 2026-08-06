@@ -20,6 +20,7 @@
  *   npx tsx scripts/repair-auto-buys-am-saisonende.ts --save <saveId>      # anderer Spielstand
  *   npx tsx scripts/repair-auto-buys-am-saisonende.ts --season season-3    # nur diese Saison
  *   npx tsx scripts/repair-auto-buys-am-saisonende.ts --nur-mein-team      # nur das menschliche Team
+ *   npx tsx scripts/repair-auto-buys-am-saisonende.ts --ab 2026-08-05      # nur ab diesem Zeitpunkt
  *   npx tsx scripts/repair-auto-buys-am-saisonende.ts --apply              # SCHREIBT (Backup vorher)
  *
  * Umgekehrt wird genau das, was `applyLocalTransfermarktBuy` schreibt
@@ -54,6 +55,19 @@ import path from "node:path";
  */
 const RUECKNEHMBARE_KAUF_QUELLEN = new Set(["ai_preseason_market_buy"]);
 
+/**
+ * Quellen, die NUR zusammen mit `--ab <zeitpunkt>` zurueckgenommen werden duerfen.
+ *
+ * `ai_roster_fill` traegt zwei voellig verschiedene Dinge: den echten Erst-Draft beim Anlegen des
+ * Spielstands (muss bleiben — sonst steht die halbe Liga ohne Kader da) und die faelschlich
+ * spaeter gelaufenen Wiederholungen (`use-foundation-shell-router-body-scope.tsx`, Auto-Finish am
+ * Saisonende). An der Quelle sind die beiden nicht zu unterscheiden, nur an der ZEIT.
+ *
+ * Am echten Spielstand: 329 Eintraege vom Anlegetag, 14+ vom Tag darauf. Ohne `--ab` verweigert
+ * das Skript diese Quelle deshalb komplett, statt zu raten.
+ */
+const NUR_MIT_ZEITGRENZE = new Set(["ai_roster_fill"]);
+
 /** Der erstmalige Liga-Draft. Steht hier nur, damit der Bericht ihn benennen kann. */
 const LIGA_DRAFT_QUELLE = "ai_roster_fill";
 
@@ -71,10 +85,13 @@ function hatKeineQuelle(entry: TransferHistoryEntry) {
   return source === "" || source === "undefined" || source === "null";
 }
 
-function istRuecknehmbarerKauf(entry: TransferHistoryEntry) {
+function istRuecknehmbarerKauf(entry: TransferHistoryEntry, ab: string | null) {
   if (entry.transferType !== "buy") return false;
   if (hatKeineQuelle(entry)) return false;
-  return RUECKNEHMBARE_KAUF_QUELLEN.has(String(entry.source));
+  const source = String(entry.source);
+  if (ab != null && (entry.happenedAt ?? "") < ab) return false;
+  if (NUR_MIT_ZEITGRENZE.has(source)) return ab != null;
+  return RUECKNEHMBARE_KAUF_QUELLEN.has(source);
 }
 
 function parseArgs(argv: string[]) {
@@ -82,14 +99,16 @@ function parseArgs(argv: string[]) {
   let seasonId: string | null = null;
   let apply = false;
   let nurMeinTeam = false;
+  let ab: string | null = null;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--apply") apply = true;
     else if (arg === "--nur-mein-team") nurMeinTeam = true;
     else if (arg === "--save") saveId = argv[++i] ?? null;
     else if (arg === "--season") seasonId = argv[++i] ?? null;
+    else if (arg === "--ab") ab = argv[++i] ?? null;
   }
-  return { saveId, seasonId, apply, nurMeinTeam };
+  return { saveId, seasonId, apply, nurMeinTeam, ab };
 }
 
 function istManuellGesteuert(gameState: GameState, teamId: string) {
@@ -103,7 +122,7 @@ function runde(value: number) {
 }
 
 async function main() {
-  const { saveId: saveIdArg, seasonId: seasonArg, apply, nurMeinTeam } = parseArgs(process.argv.slice(2));
+  const { saveId: saveIdArg, seasonId: seasonArg, apply, nurMeinTeam, ab } = parseArgs(process.argv.slice(2));
   const persistence = createPersistenceService();
 
   const saveId = saveIdArg ?? persistence.getActiveSave()?.saveId ?? null;
@@ -193,7 +212,7 @@ async function main() {
   }
 
   const nichtAngefasst = derSaison.filter(
-    (entry) => entry.transferType === "buy" && !hatKeineQuelle(entry) && !istRuecknehmbarerKauf(entry),
+    (entry) => entry.transferType === "buy" && !hatKeineQuelle(entry) && !istRuecknehmbarerKauf(entry, ab),
   );
   if (nichtAngefasst.length > 0) {
     const proQuelle = new Map<string, number>();
@@ -208,7 +227,7 @@ async function main() {
     }
   }
 
-  let ruecknahme = derSaison.filter(istRuecknehmbarerKauf);
+  let ruecknahme = derSaison.filter((entry) => istRuecknehmbarerKauf(entry, ab));
   if (nurMeinTeam) {
     const ids = new Set(menschlicheTeams.map((t) => t.teamId));
     ruecknahme = ruecknahme.filter((entry) => entry.toTeamId && ids.has(entry.toTeamId));
