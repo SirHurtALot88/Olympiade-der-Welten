@@ -11,7 +11,15 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # Der Event-Typ gehört in den Gruppennamen, sonst teilt sich ein manuell
+  # angeforderter Lauf die Gruppe mit dem automatischen desselben Refs. Genau
+  # daran ist der Branch hier hängengeblieben: Ein Re-run (Run 31119230237) blieb
+  # dauerhaft in "queued" stehen, ließ sich weder abbrechen ("Cannot cancel a
+  # workflow re-run that has not yet queued") noch löschen — und blockierte damit
+  # jeden weiteren Lauf DIESES Pull Requests, während andere Branches normal
+  # Runner bekamen. Mit dem Event im Namen kommt man an so einem Zombie vorbei,
+  # ohne auf GitHub-Support angewiesen zu sein.
+  group: ci-${{ github.event_name }}-${{ github.ref }}
   # Auf main NICHT abbrechen. Ein abgebrochener Lauf schließt mit conclusion
   # "failure" ab — main sah dadurch rot aus, obwohl kein einziger Test
   # fehlgeschlagen war (Lauf 31124228216: 15 Minuten, kein Runner, kein
