@@ -176,7 +176,11 @@ export function startOnlineSaveAutoExport() {
 
       let publish = false;
       if (signature !== lastSignature) {
-        const result = exportOnlineSaves();
+        // `prune: false`: der Timer laeuft unbeaufsichtigt in JEDER Umgebung, die den Server
+        // startet — auch in Containern, deren Store nur Smoke-Saves enthaelt. Mit Loeschabgleich
+        // raeumt so eine Umgebung fremde Spielstaende aus `data/online-saves/` und pusht das nach
+        // `main`. Aufraeumen bleibt dem ausdruecklichen CLI-Export vorbehalten.
+        const result = exportOnlineSaves({ prune: false });
         lastSignature = signature;
         if (result.changed) {
           console.log(`[online-saves] exportiert: ${result.saves.length} Save(s) → ${ONLINE_SAVES_DIR}`);
