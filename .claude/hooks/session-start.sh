@@ -63,6 +63,16 @@ hole_hetzner_stand() {
 
 if hole_hetzner_stand; then
   echo "[session-start] Spielstaende vom Hetzner-Server geladen (Branch $LIVE_BRANCH)."
+  # FRISCHE-PRUEFUNG, und zwar laut.
+  #
+  # Ein Abbild ohne WAL sieht aus wie ein gueltiger Spielstand und ist trotzdem Tage alt. Genau
+  # daran ist einmal eine fertige Reparatur gescheitert: sie haette beim Einspielen anderthalb Tage
+  # Spielfortschritt geloescht. Deshalb steht die Warnung hier am Anfang jeder Sitzung, nicht in
+  # einer Datei, die jemand lesen muesste.
+  GEPUSHT="$(git log -1 --format=%cI "origin/$LIVE_BRANCH" 2>/dev/null || echo "")"
+  if [ -n "$GEPUSHT" ]; then
+    npx tsx scripts/pruefe-save-abbild-frische.ts --gepusht "$GEPUSHT" 2>&1 || true
+  fi
   exit 0
 fi
 
