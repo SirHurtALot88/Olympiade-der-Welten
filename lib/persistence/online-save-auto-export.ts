@@ -101,10 +101,41 @@ async function publishToGitHub(branch: string) {
   await git(`commit -m "chore(daten): auto-export ${parts.join(" + ")} [skip ci]" -- ${pathspecs}`);
 
   if (!(await pendingCommitsAreOnlyData(branch))) {
+    await git(`reset --mixed HEAD~1`, { allowFail: true });
     return { pushed: false, reason: "offene-code-commits-vorhanden-push-uebersprungen" };
   }
+
+  // VOR dem Push den Remote-Stand einholen.
+  //
+  // GEMELDET: „FIX DAS ENDLICH DASS DER SAVE IM GIT LANDET". Hier war die Ursache: der Push ging
+  // direkt auf `HEAD:<branch>`. Sobald der Branch weitergelaufen ist — bei aktiver Entwicklung
+  // staendig — lehnt GitHub ihn als non-fast-forward ab. `allowFail` schluckte das, der lokale
+  // Commit blieb liegen, und der naechste Zyklus lief in exakt denselben Fehler. Dauerhafter
+  // Stillstand, sichtbar nur als eine Logzeile.
+  //
+  // Schlimmer noch die Nebenwirkung: `deploy/hetzner/auto-deploy.sh` aktualisiert mit
+  // `git merge --ff-only origin/<branch>`. Ein liegengebliebener lokaler Commit macht das
+  // unmoeglich — mit dem Export standen also auch die Deployments still.
+  await git(`fetch origin ${branch}`, { allowFail: true });
+  const rebased = await git(`rebase origin/${branch}`, { allowFail: true });
+  if (rebased == null) {
+    // Rebase gescheitert (z. B. Konflikt in einer generierten Datei): sauber zuruecktreten statt
+    // einen halben Zustand stehen zu lassen.
+    await git(`rebase --abort`, { allowFail: true });
+    await git(`reset --mixed HEAD~1`, { allowFail: true });
+    return { pushed: false, reason: "rebase-fehlgeschlagen" };
+  }
+
   const pushed = await git(`push origin HEAD:${branch}`, { allowFail: true });
-  return { pushed: pushed != null, reason: pushed != null ? "ok" : "push-fehlgeschlagen" };
+  if (pushed == null) {
+    // Auch nach dem Rebase abgelehnt (Rennen mit einem anderen Push). Den eigenen Commit wieder
+    // aufloesen, damit HEAD gleich `origin/<branch>` bleibt und der Auto-Deploy weiter
+    // fast-forwarden kann. Die Dateien bleiben auf der Platte — der naechste Zyklus committet
+    // und versucht es erneut. So kann sich NICHTS dauerhaft festfahren.
+    await git(`reset --mixed HEAD~1`, { allowFail: true });
+    return { pushed: false, reason: "push-abgelehnt-commit-zurueckgenommen" };
+  }
+  return { pushed: true, reason: "ok" };
 }
 
 function computeSignature() {
