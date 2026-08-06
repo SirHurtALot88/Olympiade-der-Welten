@@ -9,6 +9,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import { resolveLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import { resolveSessionOwnerId } from "@/lib/auth/session";
 import { readStandingsOverviewCache, writeStandingsOverviewCache } from "@/lib/season/standings-overview-cache";
+import { resolveSeasonGuvByTeam } from "@/lib/finance/season-guv-resolver";
 import { getLeagueSponsorIncome } from "@/lib/season/prize-money-preview";
 import { buildArchivedSeasonStandingsOverviewItems } from "@/lib/season/archived-standings-overview";
 import { buildTeamPrizeSummary } from "@/lib/season/prize-money";
@@ -332,6 +333,19 @@ export async function GET(request: Request) {
           })()
         : null;
 
+    /**
+     * DIE EINE GuV je Team (`lib/finance/season-end-guv.ts`) — einmal fuer die Liga gerechnet.
+     * `sponsorCashByTeamId` kommt aus dem bereits gecachten `getLeagueSponsorIncome`, damit die
+     * teure Sponsor-Vorschau nicht ein zweites Mal laeuft.
+     */
+    const localSeasonGuvByTeamId =
+      source === "sqlite"
+        ? resolveSeasonGuvByTeam(localSave!.gameState, {
+            sponsorCashByTeamId: localSponsorIncome?.sponsorCashByTeamId ?? null,
+            salaryTotalByTeamId: localSalaryTotalByTeamId ?? null,
+          })
+        : null;
+
     const localPrizeSummaryByTeamId =
       source === "sqlite"
         ? (() => {
@@ -406,6 +420,7 @@ export async function GET(request: Request) {
               const liveSponsorCash = localSponsorIncome?.sponsorCashByTeamId.get(team.teamId) ?? null;
               const liveFacilityIncome = localSponsorIncome?.facilityIncomeByTeamId.get(team.teamId) ?? null;
               const teamSalaryTotal = localSalaryTotalByTeamId?.get(team.teamId) ?? 0;
+              const liveGuv = localSeasonGuvByTeamId?.get(team.teamId) ?? null;
               return {
                 teamId: team.teamId,
                 teamName: team.name,
@@ -437,10 +452,17 @@ export async function GET(request: Request) {
                  */
                 sponsorTotal:
                   liveSponsorCash ?? standing?.sponsorTotal ?? prizeSummary?.sponsorTotal ?? null,
-                guv:
-                  liveSponsorCash != null
-                    ? Number((liveSponsorCash + (liveFacilityIncome ?? 0) - teamSalaryTotal).toFixed(2))
-                    : standing?.guv ?? prizeSummary?.profitLoss ?? null,
+                /**
+                 * EINE GuV, ueberall dieselbe (`lib/finance/season-end-guv.ts`). Vorher stand hier
+                 * eine eigene Drei-Term-Rechnung (Sponsor + Gebaeude netto − Gehaelter), die den
+                 * Apron, die Kreditzinsen und die Vorstandsziele nicht kannte — und damit eine
+                 * andere Zahl auswies als der Finanzen-Reiter auf demselben Bildschirm.
+                 *
+                 * `guvPosten` faehrt die Aufschluesselung gleich mit, damit der Hover jeden Posten
+                 * zeigen kann, ohne ihn im Client neu zu rechnen — auch die, die 0 sind.
+                 */
+                guv: liveGuv?.guv ?? standing?.guv ?? null,
+                guvPosten: liveGuv?.posten ?? null,
                 cashTotal: standing?.cashTotal ?? prizeSummary?.cashTotal ?? null,
                 form: null,
                 transfers: prizeSummary?.transfers ?? null,

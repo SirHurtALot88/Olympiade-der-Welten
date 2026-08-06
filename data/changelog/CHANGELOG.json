@@ -12,11 +12,29 @@
     },
     {
       "datum": "2026-08-05",
+      "seite": "Shell · Aktives Team",
+      "pr": null,
+      "text": "Das aktive Team sprang beim Ansichtswechsel, beim Neuladen und beim direkten Aufruf einer Team-URL zurück auf den eigenen Klub — gemeldet als „die Trainingsansicht setzt das Team auf M-M zurück\". Drei Stellen taten unabhängig voneinander dasselbe; die Auswahl bleibt jetzt stehen. Die Trainingsansicht zeigt ein fremdes Team im Nur-Ansicht-Modus, statt wegzuschalten. Ein veralteter team-Parameter aus einem anderen Spielstand landet weiterhin beim eigenen Klub.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-05",
       "seite": "Teams · Verträge",
       "pr": null,
       "text": "Ein Klick auf eine Kaderzeile öffnet jetzt eine Verkaufs-Einschätzung als Seitenleiste: Verkaufspreis, Buyout, Netto-Erlös und die volle Board-Bilanz mit Dafür/Dagegen. Bisher bekam man die erst zu sehen, wenn man den Verkauf schon eingeleitet hatte — also genau bei den Spielern, bei denen man ohnehin entschieden hatte.",
       "quelle": "gepflegt",
       "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-05",
+      "seite": "Saison · Saisonabschluss",
+      "pr": null,
+      "text": "Am Saisonende stand „Transferfenster öffnen — verkaufen und kaufen sind freigeschaltet\", und Kaufen war dort tatsächlich schon offen. Der Schritt heißt jetzt „Verkäufe & Verträge öffnen\" und macht nur noch das auf: verkaufen und verlängern. Gekauft wird erst in der neuen Saison, vor dem 1. Spieltag — der Transfermarkt sagt in beiden Fenstern, welches gerade läuft.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
       "version": "0.4"
     },
     {
@@ -51,6 +69,42 @@
       "seite": "Teams · Kader",
       "pr": null,
       "text": "Die Kader-Tabelle hat eine Spalte „PPs ges.\" bekommen: die Summe der Performance-Punkte dieser Saison samt Ligaplatz. Bisher standen dort nur die vier Bereiche einzeln, und die Summe musste man im Kopf bilden.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-05",
+      "seite": "Teams · Vertragsauflösung",
+      "pr": null,
+      "text": "Bot ein unzufriedener Spieler an, seinen Vertrag aufzulösen, entfiel bisher der komplette Rest-Buyout und das Team kassierte den vollen Verkaufspreis — Annehmen war damit immer besser als ein regulärer Verkauf und gar keine Entscheidung. Der Spieler verzichtet jetzt nur anteilig: zwischen 30 % an der Moral-Schwelle und 60 % bei Moral 0. Den Rest zahlt das Team, und die Zeile zeigt Netto statt Brutto.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-05",
+      "seite": "Teams · Vertragsauflösung",
+      "pr": null,
+      "text": "Der Charakter entscheidet mit, wie teuer ein Abgang wird: ein geld- oder egogetriebener Spieler will sein Geld und sitzt den Vertrag notfalls ab, ein loyaler geht sauber und günstig. Fragt er nach einer Ablehnung ein zweites Mal, laufen die beiden Naturen auseinander — der Bescheidene gibt mehr auf, der Harte weniger. Ablehnen ist damit keine sichere Bank mehr, um den Verzicht hochzutreiben.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-05",
+      "seite": "Teams · Vertragsauflösung",
+      "pr": null,
+      "text": "Eine abgelehnte Auflösung kostet den Spieler jetzt 20 statt 6 Moralpunkte. Wer den Wunsch abschlägt, bekommt eine spürbar schwächere Saison von ihm — vorher war die Ablehnung fast folgenlos.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-05",
+      "seite": "Teams · Vertragsauflösung",
+      "pr": null,
+      "text": "Die Vertragsauflösung sah noch aus wie vor dem Neuen Look — ein alter Panel-Block mit drei Textspalten zwischen lauter modernen Karten. Sie trägt jetzt dieselbe Hülle wie der Rest der Ansicht: Karte je Anfrage mit Bild und Chips, und ein geteilter Balken zeigt auf einen Blick, wie viel des Rest-Buyouts der Spieler erlässt und was am Team hängen bleibt. Der Netto-Betrag steht vorn, die Herleitung darunter.",
       "quelle": "gepflegt",
       "gewicht": "feinschliff",
       "version": "0.4"

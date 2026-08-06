@@ -247,7 +247,7 @@ describe("Formkarten bei Kauf und Verkauf", () => {
   it("legt beim Kauf durch ein menschlich gesteuertes Team zwei Formkarten fuer den neuen Spieler an", () => {
     const saveId = installSave("save-formcards-kauf-mensch", {
       ...ensureLocalFormCardsForSeason(baseGameState(), "save-formcards-kauf-mensch", SEASON_ID),
-      gamePhase: "transfer_buy_phase",
+      gamePhase: "season_active",
     });
     expect(cardsOf(persistenceState.save!.gameState, "A-A", "fa-1")).toHaveLength(0);
 
@@ -267,7 +267,7 @@ describe("Formkarten bei Kauf und Verkauf", () => {
   it("gibt einem KI-Team beim Kauf genau dieselben zwei Karten wie einem menschlichen Team", () => {
     const saveId = installSave("save-formcards-kauf-ki", {
       ...baseGameState(),
-      gamePhase: "transfer_buy_phase",
+      gamePhase: "season_active",
     });
 
     expect(executeLocalTransfermarktBuy({ saveId, seasonId: SEASON_ID, teamId: "A-A", playerId: "fa-1" }).canBuy).toBe(

@@ -16,10 +16,13 @@
  * aus derselben Projektion rechnet, den Kandidaten aber aus derselben skill-sortierten Liste nahm.
  *
  * WAS HIER GEPRUEFT WIRD: die Reihenfolge der Schritte am Quelltext — projizieren, DANN nach der
- * projizierten Zahl ordnen, DANN schneiden. Die Funktion sitzt in einem sehr grossen
- * Client-Bauteil und ist nicht isoliert aufrufbar; ein Render-Test dafuer braeuchte den halben
- * Lineup-Lab. Das belegt nicht, welchen Namen der Knopf im Browser zeigt — es haelt fest, dass
- * Auswahl und angezeigte Zahl denselben Massstab benutzen.
+ * projizierten Zahl ordnen, DANN schneiden. Die Funktion sass urspruenglich in einem sehr grossen
+ * Client-Bauteil und war nicht isoliert aufrufbar; inzwischen ist sie als reine Funktion
+ * (`buildSlotCandidateSummaryByKey`) nach lib/lineups/lineup-candidate-model.ts verschoben — die
+ * eigentliche Verhaltenspruefung liegt jetzt zusaetzlich in tests/lineup-candidate-model.test.ts.
+ * Diese Quelltext-Kontrolle bleibt bestehen und zeigt jetzt auf den neuen Ort; sie belegt nicht,
+ * welchen Namen der Knopf im Browser zeigt — sie haelt fest, dass Auswahl und angezeigte Zahl
+ * denselben Massstab benutzen.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -27,14 +30,14 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const SOURCE = readFileSync(
-  join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"),
+  join(process.cwd(), "lib/lineups/lineup-candidate-model.ts"),
   "utf8",
 );
 
 /** Nur der Block, der die Slot-Kandidaten baut. */
 const BLOCK = SOURCE.slice(
-  SOURCE.indexOf("const slotCandidateSummaryByKey = useMemo(() => {"),
-  SOURCE.indexOf("const playerBestSlotSummaryByActivePlayerId"),
+  SOURCE.indexOf("export function buildSlotCandidateSummaryByKey(input: {"),
+  SOURCE.indexOf("/** Vormals `playerBestSlotSummaryByActivePlayerId`"),
 );
 
 /**

@@ -226,8 +226,6 @@ import {
 import { buildSponsorCommercialRating } from "@/lib/sponsor/sponsor-commercial-rating-service";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import { buildFoundationNavAttention } from "@/lib/foundation/foundation-nav-attention";
-import { FoundationSharedProvider, useFoundationShared } from "@/lib/foundation/foundation-shared-context";
-import { FoundationStateProvider } from "@/lib/foundation/foundation-state-context";
 import type { SponsorNegotiationProfile } from "@/lib/data/olyDataTypes";
 import { buildScoutPipelineSummary } from "@/lib/scouting/facility-scout-pipeline-service";
 import {
@@ -3950,6 +3948,7 @@ export function useFoundationShellRouterBodyScope({
                 teamScope: "all",
                 teamIds: [teamId],
                 allowSetupAllTeams: true,
+          includeManualTeams: true,
               },
               roomContext,
             ),
@@ -6197,6 +6196,7 @@ export function useFoundationShellRouterBodyScope({
                   teamScope: "all",
                   teamIds: [teamId],
                   allowSetupAllTeams: true,
+          includeManualTeams: true,
                 },
                 roomContext,
               ),
@@ -6331,8 +6331,20 @@ export function useFoundationShellRouterBodyScope({
     readMeta.source,
   ]);
 
+  /**
+   * Ansichten, die ein fremdes Team NICHT anzeigen koennen und deshalb aufs eigene umschalten.
+   *
+   * GEMELDET: „die Trainingsansicht setzt das aktive Team auf M-M zurueck" — reproduzierbar ueber
+   * drei Teams. Stimmt, und die Trainingsansicht stand hier zu Unrecht: sie hat laengst einen
+   * Nur-Ansicht-Modus (`managementLocked` / „Training ist nur zur Ansicht offen", siehe die
+   * Props weiter unten) — nur war der unerreichbar, weil dieser Effekt vorher wegschaltete.
+   * Zwei Mechanismen, die sich widersprachen; der aeltere von beiden gewann.
+   *
+   * Die uebrigen Ansichten bleiben drin: fuer sie ist kein solcher Lesemodus gebaut, und ein
+   * stillschweigend schreibbarer fremder Kader waere schlimmer als ein Teamwechsel.
+   */
   const managementViews = useMemo(
-    () => new Set<FoundationView>(["lineup", "market", "marketV2", "training", "trainingCompact", "trainingV2", "teamSettings"]),
+    () => new Set<FoundationView>(["lineup", "market", "marketV2", "teamSettings"]),
     [],
   );
 
@@ -6410,7 +6422,9 @@ export function useFoundationShellRouterBodyScope({
     }
     setActiveManagerTeam(fallbackTeam.teamId, "saved_preference");
     setActiveManagerTeamWarning(
-      `${selectedTeam.name} war hier nur Ansicht. Für ${activeView === "trainingV2" || activeView === "trainingCompact" || activeView === "training" ? "Training oder Gebäude" : "diese Management-Ansicht"} wurde auf ${fallbackTeam.name} gewechselt.`,
+      // Der Training-Zweig ist hier weg: Training/Gebäude schalten nicht mehr um, sie zeigen das
+      // fremde Team im Nur-Ansicht-Modus (siehe `managementViews` oben).
+      `${selectedTeam.name} war hier nur Ansicht. Für diese Management-Ansicht wurde auf ${fallbackTeam.name} gewechselt.`,
     );
   }, [
     activeView,
@@ -9637,6 +9651,7 @@ export function useFoundationShellRouterBodyScope({
                   teamScope: "all",
                   teamIds: chunk,
                   allowSetupAllTeams: true,
+          includeManualTeams: true,
                 },
                 roomContext,
               ),
@@ -9687,6 +9702,7 @@ export function useFoundationShellRouterBodyScope({
               confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
               teamScope: "all",
               allowSetupAllTeams: true,
+          includeManualTeams: true,
             },
             roomContext,
           ),
@@ -10430,7 +10446,10 @@ export function useFoundationShellRouterBodyScope({
           rank: item.rank ?? null,
           points: item.points ?? null,
           marketValue: item.marketValueTotal ?? rosterMwByTeamId.get(item.teamId) ?? null,
-          cash: item.cashTotal ?? item.cash ?? null,
+          // LIVE-Zeile: der echte Kontostand zuerst. `cashTotal` ist der `projectedCash`-Prognosewert
+          // aus dem letzten Cash-Apply — er stand hier vorne und war der Grund, warum in der Ewigen
+          // Tabelle waehrend der laufenden Saison der Stand der VORSAISON zu lesen war.
+          cash: item.cash ?? item.cashTotal ?? null,
         },
       ]),
     );
@@ -11312,7 +11331,13 @@ export function useFoundationShellRouterBodyScope({
         success?: boolean;
         error?: string;
         offers?: ContractDissolutionOffer[];
-        applied?: { playerName: string; decision: string; salePrice: number; waivedBuyout: number } | null;
+        applied?: {
+          playerName: string;
+          decision: string;
+          salePrice: number;
+          waivedBuyout: number;
+          payableBuyout?: number;
+        } | null;
       };
 
       setContractDissolutionOffers(payload.offers ?? []);
@@ -11336,8 +11361,10 @@ export function useFoundationShellRouterBodyScope({
         detail:
           applied.decision === "accepted"
             ? `${applied.playerName} geht. Erlös ${formatTransfermarktCurrency(applied.salePrice)}${
-                applied.waivedBuyout > 0
-                  ? ` · Buyout von ${formatTransfermarktCurrency(applied.waivedBuyout)} entfällt`
+                (applied.payableBuyout ?? 0) > 0
+                  ? ` · Buyout: ${formatTransfermarktCurrency(applied.waivedBuyout)} erlassen, ${formatTransfermarktCurrency(applied.payableBuyout ?? 0)} gezahlt`
+                  : applied.waivedBuyout > 0
+                    ? ` · Buyout von ${formatTransfermarktCurrency(applied.waivedBuyout)} entfällt`
                   : ""
               }.`
             : `${applied.playerName} erfüllt seinen Vertrag weiter — das kostet ihn Moral. Nächste Saison darf er erneut fragen.`,
@@ -11503,6 +11530,17 @@ export function useFoundationShellRouterBodyScope({
     aiTeams,
     canonicalSeasonLabel,
     cashApplyFeed,
+    // Root-State-Quelle (`use-foundation-page-state.ts`) statt des entfernten
+    // geteilten Shell-Kontexts — siehe Kommentar bei `cockpitAiBatchApplyFeed`
+    // in `FoundationCockpitPanelProps`.
+    cockpitAiBatchApplyFeed,
+    cockpitAiIncludeWarningTeams,
+    cockpitAiOverwriteExisting,
+    cockpitBusyKey,
+    setCockpitAiBatchApplyFeed,
+    setCockpitAiIncludeWarningTeams,
+    setCockpitAiOverwriteExisting,
+    setCockpitBusyKey,
     currentMatchdayDisciplineSchedule,
     currentMatchdayDisplayLabel,
     currentSeasonCashPrizeApplyLogs,
@@ -12141,6 +12179,9 @@ export function useFoundationShellRouterBodyScope({
     readMeta,
     readOnlyBannerMessage,
     readSourceLabel,
+    // Fuer den `FoundationStateProvider`-Value, den `FoundationPageClient.tsx`
+    // um `FoundationShellRouterBody` herum rendert — siehe `use-foundation-state-context-value.ts`.
+    reloadLiveSeasonState,
     reloadPrizePreviewFeed,
     reloadResolvePreview,
     reloadSeasonStandingsOverview,

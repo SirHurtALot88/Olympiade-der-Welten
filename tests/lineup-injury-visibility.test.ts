@@ -75,19 +75,22 @@ describe("Verletzung — die Erklaerung ist lesbar", () => {
 });
 
 /**
- * Die Auswahlliste zeigt jetzt "Verletzt" statt "blockiert". Geprueft am Quelltext, weil die Zelle
- * in einem 7000-Zeilen-Client entsteht, der sich ohne halbe Foundation-Shell nicht rendern laesst —
- * das belegt nicht das Bild im Browser, haelt aber fest, dass die Unterscheidung existiert und
- * nicht wieder verschwindet.
+ * Die Auswahlliste zeigt jetzt "Verletzt" statt "blockiert". Der Rechenkern
+ * (`buildTeamdeckCandidateEntries`) lag frueher inline in einem 7000-Zeilen-Client, der sich ohne
+ * halbe Foundation-Shell nicht rendern laesst — deshalb wurde hier am Quelltext geprueft statt am
+ * Verhalten. Nach dem Umzug nach lib/lineups/lineup-candidate-model.ts (reine Funktion, keine
+ * React-Abhaengigkeit) ist die eigentliche Verhaltenspruefung jetzt in
+ * tests/lineup-candidate-model.test.ts moeglich; diese Quelltext-Kontrolle bleibt zusaetzlich
+ * bestehen und zeigt jetzt auf den neuen Ort.
  */
 describe("Verletzung — in der Auswahlliste erkennbar, bevor man klickt", () => {
   it("die Kandidatenliste unterscheidet Verletzung von sonstigen Sperren", async () => {
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
-    const client = readFileSync(
-      join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"),
+    const source = readFileSync(
+      join(process.cwd(), "lib/lineups/lineup-candidate-model.ts"),
       "utf8",
     );
-    expect(client).toContain('activeSlotCandidate.blockReason === "player_injured_unavailable" ? "Verletzt"');
+    expect(source).toContain('activeSlotCandidate.blockReason === "player_injured_unavailable" ? "Verletzt"');
   });
 });

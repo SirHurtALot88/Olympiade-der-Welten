@@ -29,6 +29,11 @@ async function readTransfermarktV2Source() {
 }
 const marketBuyHostPath = path.join(root, "app/foundation/transfermarkt-v2/FoundationMarketBuyShellHost.tsx");
 const lineupPath = path.join(root, "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx");
+// Der Kandidaten-Qualitaets-Wortlaut ("Passt sofort" usw.) und die Save-CTA-Texte sitzen seit dem
+// Verschieben des Rechenkerns nicht mehr inline im Client, sondern in lib/lineups/. Beide Quellen
+// zusammen lesen, damit dieser Vertrag ueber den Umzug hinweg bestehen bleibt.
+const lineupCandidateModelPath = path.join(root, "lib/lineups/lineup-candidate-model.ts");
+const lineupAuditPath = path.join(root, "lib/lineups/lineup-audit.ts");
 const teamProfileNewLookPath = path.join(root, "app/foundation/team-profile/TeamProfileNewLook.tsx");
 const teamsRosterHookPath = path.join(root, "lib/foundation/tabs/use-foundation-cross-tab-teams-roster.ts");
 const fitServicePath = path.join(root, "lib/market/transfermarkt-fit.ts");
@@ -272,18 +277,20 @@ describe("foundation transfermarkt ui contract", () => {
   });
 
   it("keeps the lineup coach wording tied to the new candidate quality flow", async () => {
-    const [lineupText, cssText] = await Promise.all([
+    const [lineupText, candidateModelText, auditText, cssText] = await Promise.all([
       fs.readFile(lineupPath, "utf8"),
+      fs.readFile(lineupCandidateModelPath, "utf8"),
+      fs.readFile(lineupAuditPath, "utf8"),
       fs.readFile(globalsPath, "utf8"),
     ]);
 
-    expect(lineupText).toContain("Passt sofort");
-    expect(lineupText).toContain("Gute Alternative");
-    expect(lineupText).toContain("Riskant wegen Fatigue");
-    expect(lineupText).toContain("Blockiert / schon eingesetzt");
-    expect(lineupText).toContain("Nur Notfall");
-    expect(lineupText).toContain("Hier weiter");
-    expect(lineupText).toContain("Lineup bereit speichern");
+    expect(candidateModelText).toContain("Passt sofort");
+    expect(candidateModelText).toContain("Gute Alternative");
+    expect(candidateModelText).toContain("Riskant wegen Fatigue");
+    expect(candidateModelText).toContain("Blockiert / schon eingesetzt");
+    expect(candidateModelText).toContain("Nur Notfall");
+    expect(auditText).toContain("Hier weiter");
+    expect(auditText).toContain("Lineup bereit speichern");
     expect(lineupText).toContain("Captains offen");
     expect(cssText).toContain(".legacy-lineup-slot-conflict-chip");
     expect(cssText).toContain(".legacy-lineup-side-issue-chip");

@@ -190,6 +190,7 @@ async function main() {
     dryRun: true,
     teamScope: "all",
     allowSetupAllTeams: true,
+      includeManualTeams: true,
     stepsPerTeam: args.stepsPerTeam ?? 12,
     runMode: "season1_optimum_execute",
   });

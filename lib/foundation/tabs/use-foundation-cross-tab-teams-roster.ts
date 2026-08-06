@@ -517,9 +517,14 @@ export function useFoundationCrossTabTeamsRoster(input: {
             ppSpe: resolveSeasonDisciplineAreaTotal(disciplineValues, "spe", areaPoints.spe),
             ppMen: resolveSeasonDisciplineAreaTotal(disciplineValues, "men", areaPoints.men),
             ppSoc: resolveSeasonDisciplineAreaTotal(disciplineValues, "soc", areaPoints.soc),
-            cash: teamSnapshot.cashTotal ?? teamSnapshot.cashEnd ?? null,
+            cash: teamSnapshot.cashEnd ?? teamSnapshot.cashTotal ?? null,
             salaryTotal: teamSnapshot.salaryTotalEnd ?? teamSnapshot.salaryEnd ?? null,
-            marketValue: teamSnapshot.marketValueTotalEnd ?? teamSnapshot.marketValueEnd ?? null,
+            // Saisonend-Marktwert NACH Trainings-Apply/Neuberechnung zuerst — siehe all-time-table.ts.
+            marketValue:
+              teamSnapshot.marketValueSeasonEnd ??
+              teamSnapshot.marketValueTotalEnd ??
+              teamSnapshot.marketValueEnd ??
+              null,
             guv: teamSnapshot.guv ?? null,
             topBuyPlayer: topBuy?.playerName ?? null,
             topBuyPlayerId: topBuy?.playerId ?? null,

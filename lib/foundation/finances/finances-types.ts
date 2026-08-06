@@ -195,6 +195,11 @@ export type TeamFinancesState = {
    */
   guv: number;
   /**
+   * Die Posten, aus denen `guv` besteht — vollständig, auch die mit 0. Speist den GuV-Hover; er zeigt
+   * damit dieselben Zeilen wie der Saisonstand (Chris: „überall dasselbe", „selbst wenn es 0 ist").
+   */
+  guvPosten?: import("@/lib/finance/season-end-guv").SeasonGuvPosten[];
+  /**
    * Cash zu Saisonbeginn — `cashTotal ?? cashEnd` aus dem archivierten Snapshot der UNMITTELBAR
    * vorangegangenen Saison (`gameState.seasonState.seasonSnapshots`, siehe T-031). `null` in
    * Season 1 bzw. wenn keine Vorsaison archiviert ist (kein Season-Start-Wert bekannt — dann bleibt

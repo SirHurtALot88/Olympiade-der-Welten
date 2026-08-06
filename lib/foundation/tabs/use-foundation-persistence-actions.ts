@@ -34,6 +34,7 @@ import {
   persistFoundationManagerTeamId,
   persistFoundationSaveMode,
   resolveFoundationTeamId,
+  readStoredFoundationManagerTeamId,
   resolvePreferredFoundationTeamContext,
   syncFoundationSaveIdInUrl,
   syncFoundationTeamIdInUrl,
@@ -504,8 +505,19 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
         // stale/AI newGameFlow.selectedTeamId would bypass the owned-team guard in
         // resolvePreferredFoundationTeamContext and reopen the save on a club the
         // player cannot manage.
+        //
+        // GEMELDET: „die Trainingsansicht setzt das aktive Team auf M-M zurueck". Im Browser
+        // nachgemessen war DIESE Abkuerzung der letzte und wirksamste der drei Rueckfalle: sie
+        // uebersprang den Resolver komplett — URL, laufende Auswahl und gespeicherte Wahl gleich
+        // mit — und setzte bei JEDEM Save-Laden den Startklub. Da ein Ansichtswechsel den Save neu
+        // laedt, war das gewaehlte Team nach einem Klick auf „Teams" wieder weg.
+        //
+        // Sie gilt jetzt nur noch, wenn es fuer DIESEN Spielstand keine gespeicherte Wahl gibt —
+        // also beim erstmaligen Oeffnen. Danach traegt der Resolver, der die eigene Auswahl kennt
+        // und den Schutz vor fremden Klubs weiterhin anwendet.
+        const gespeicherteAuswahlFuerSave = readStoredFoundationManagerTeamId(nextGameState.teams, payload.save.saveId);
         const nextTeamContext =
-          saveSelectedTeamId && (saveSelectionIsOwned || !saveHasOwnedTeam)
+          !gespeicherteAuswahlFuerSave && saveSelectedTeamId && (saveSelectionIsOwned || !saveHasOwnedTeam)
             ? { teamId: saveSelectedTeamId, source: "saved_preference" as const, warning: null }
             : resolvePreferredFoundationTeamContext(nextGameState.teams, {
                 currentTeamId: selectedTeamId,
@@ -818,8 +830,19 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
       // stale/AI newGameFlow.selectedTeamId would bypass the owned-team guard in
       // resolvePreferredFoundationTeamContext and reopen the save on a club the
       // player cannot manage.
+      //
+      // GEMELDET: „die Trainingsansicht setzt das aktive Team auf M-M zurueck". Im Browser
+      // nachgemessen war DIESE Abkuerzung der letzte und wirksamste der drei Rueckfalle: sie
+      // uebersprang den Resolver komplett — URL, laufende Auswahl und gespeicherte Wahl gleich
+      // mit — und setzte bei JEDEM Save-Laden den Startklub. Da ein Ansichtswechsel den Save neu
+      // laedt, war das gewaehlte Team nach einem Klick auf „Teams" wieder weg.
+      //
+      // Sie gilt jetzt nur noch, wenn es fuer DIESEN Spielstand keine gespeicherte Wahl gibt —
+      // also beim erstmaligen Oeffnen. Danach traegt der Resolver, der die eigene Auswahl kennt
+      // und den Schutz vor fremden Klubs weiterhin anwendet.
+      const gespeicherteAuswahlFuerSave = readStoredFoundationManagerTeamId(nextGameState.teams, payload.save.saveId);
       const nextTeamContext =
-        saveSelectedTeamId && (saveSelectionIsOwned || !saveHasOwnedTeam)
+        !gespeicherteAuswahlFuerSave && saveSelectedTeamId && (saveSelectionIsOwned || !saveHasOwnedTeam)
           ? { teamId: saveSelectedTeamId, source: "saved_preference" as const, warning: null }
           : resolvePreferredFoundationTeamContext(nextGameState.teams, {
               currentTeamId: selectedTeamId,

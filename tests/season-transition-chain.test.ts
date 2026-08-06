@@ -57,7 +57,20 @@ describe("Die Kette fuehrt vom Saisonende bis zur neuen Saison", () => {
 
     expect(evaluateGamePhaseAction(mkState("transfer_sell_phase"), "sell_players").allowed).toBe(true);
     expect(evaluateGamePhaseAction(mkState("preseason_management"), "sell_players").allowed).toBe(true);
-    expect(evaluateGamePhaseAction(mkState("transfer_buy_phase"), "buy_players").allowed).toBe(true);
+
+    // Die Kette oeffnet das VERKAUFEN — mehr nicht. Gekauft wird erst in der neuen Saison vor
+    // ihrem ersten Spieltag, also hinter „Neue Saison starten" und damit ausserhalb dieser Kette.
+    // `transfer_buy_phase` ist die Station der KI (`season-transition-service`: „AI-Käufe laufen
+    // nach Verkäufen über Buy-Service"), nicht die des Spielers.
+    expect(evaluateGamePhaseAction(mkState("transfer_buy_phase"), "buy_players").allowed).toBe(false);
+    const neueSaison = {
+      gamePhase: "season_active",
+      season: { id: "s2", currentMatchday: 1, matchdayIds: Array.from({ length: 10 }, (_, i) => `s2-md-${i + 1}`) },
+      matchdayState: { matchdayId: "s2-md-1", status: "open" },
+      seasonState: { matchdayResults: [] },
+    } as never;
+    expect(evaluateGamePhaseAction(neueSaison, "buy_players").allowed).toBe(true);
+    expect(evaluateGamePhaseAction(neueSaison, "sell_players").allowed, "im Saisonstart wird nicht verkauft").toBe(false);
 
     // Gegenprobe: die drei Phasen, auf die das Spiel vorher beschraenkt war, bleiben zu —
     // die Lockerung darf NICHT bedeuten, dass mitten in der Saison verkauft werden kann.

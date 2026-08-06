@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { getTeamLogoModel } from "@/lib/data/mediaAssets";
 import type { GameState, RosterEntry, Team } from "@/lib/data/olyDataTypes";
-import { getTeamAnnualLoanInstallment, getTeamOutstandingDebt } from "@/lib/finance/loan-service";
+import { getTeamAnnualLoanInstallment, getTeamAnnualLoanInterest, getTeamOutstandingDebt } from "@/lib/finance/loan-service";
 import type {
   FoundationPrizePreviewItem,
   FoundationPrizePreviewResponse,
@@ -132,14 +132,24 @@ export function usePrizeV2PanelModel({
 
     const labels = ["GuV", "GuV +1", "GuV +2", "GuV +3", "GuV +4"];
     let runningCash = startCash;
+    /**
+     * DIE EINE GuV auch hier (`lib/finance/season-end-guv.ts`). Vorher zog diese Zeile die VOLLE
+     * Kreditrate ab; die GuV ist aber nur um den ZINS gemindert — die Tilgung ist eine
+     * Bilanzbewegung. Auf demselben Bildschirm stand dadurch eine andere Zahl als im Saisonstand
+     * und im Finanzen-Reiter. Der Cash-Verlauf darunter zieht die Tilgung weiterhin ab, denn
+     * cash-wirksam ist sie sehr wohl.
+     *
+     * Die Zeilen „+1" bis „+4" bleiben eine flache Fortschreibung: Apron und Vorstandsziele der
+     * kommenden Saisons sind nicht bekannt, und sie zu erfinden waere schlechter als sie
+     * wegzulassen. Die erste Zeile ist die laufende Saison und stimmt mit den anderen Ansichten.
+     */
     return labels.map((label) => {
       const projectedSalaryTotal = roundViewNumber(salaryTotal, 1);
       const projectedLoanInstallment = loanInstallment > 0 ? roundViewNumber(loanInstallment, 1) : null;
-      const guv = roundViewNumber(
-        sponsorCash + facilityIncome - projectedSalaryTotal - (projectedLoanInstallment ?? 0),
-        1,
-      );
-      const cashAfter = roundViewNumber(runningCash + guv, 1);
+      const projectedLoanInterest = selectedTeam ? getTeamAnnualLoanInterest(gameState, selectedTeam.teamId) : 0;
+      const projectedLoanPrincipal = Math.max(0, (projectedLoanInstallment ?? 0) - projectedLoanInterest);
+      const guv = roundViewNumber(sponsorCash + facilityIncome - projectedSalaryTotal - projectedLoanInterest, 1);
+      const cashAfter = roundViewNumber(runningCash + guv - projectedLoanPrincipal, 1);
       runningCash = cashAfter;
 
       return {

@@ -1,3 +1,5 @@
+import type { SeasonGuvPosten } from "@/lib/finance/season-end-guv";
+
 export type DisciplineCategory =
   | "power"
   | "speed"
@@ -263,6 +265,13 @@ export type StandingRecord = {
   sponsorSeason?: number | null;
   sponsorTotal?: number | null;
   guv?: number | null;
+  /**
+   * Aufschlüsselung der GuV in ihre Posten (`lib/finance/season-end-guv.ts`) — VOLLSTÄNDIG, auch die
+   * Posten mit 0. Wird bei der Saisonende-Buchung mitgeschrieben, damit der Hover die Zusammensetzung
+   * auch dann zeigen kann, wenn eine Ansicht aus dem gespeicherten Stand statt aus dem Live-Feed liest.
+   * Fehlt das Feld (ältere Spielstände), fällt der Hover auf die schmale Herleitung zurück.
+   */
+  guvPosten?: SeasonGuvPosten[] | null;
   cashTotal?: number | null;
 };
 
@@ -2266,6 +2275,22 @@ export type SeasonSnapshotTeamRecord = {
   salaryTotalEnd?: number | null;
   marketValueEnd: number | null;
   marketValueTotalEnd?: number | null;
+  /**
+   * DER MARKTWERT, MIT DEM DAS TEAM DIE SAISON WIRKLICH BEENDET HAT — eingefroren NACH dem
+   * Trainings-Apply und der Marktwert-Neuberechnung (`player_development`), aber VOR dem
+   * Transferfenster.
+   *
+   * Nötig, weil der Snapshot selbst frueher entsteht: die Reihenfolge am Saisonende ist
+   * `… → snapshot → transition → player_development → transfer_sell_phase`. `marketValueEnd` traegt
+   * deshalb den Stand VOR der Entwicklung, und `patchCompletedSeasonSnapshotAfterPreseasonBuy`
+   * ueberschreibt ihn spaeter zusaetzlich mit dem Eintrittsstand der NAECHSTEN Saison. Beide Werte
+   * beantworten eine andere Frage als „wie stark war das Team am Saisonende" — und genau die
+   * braucht man, um Saisons ueber Jahre miteinander zu vergleichen.
+   *
+   * Dieses Feld wird nach dem Einfrieren NICHT mehr angefasst. Fehlt es (Altsaves, oder eine Saison,
+   * in der die Entwicklung nicht lief), fallen die Ansichten auf `marketValueTotalEnd` zurueck.
+   */
+  marketValueSeasonEnd?: number | null;
   transferCount: number;
   transferBuyCount: number;
   transferSellCount: number;

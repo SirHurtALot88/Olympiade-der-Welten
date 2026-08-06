@@ -75569,44 +75569,160 @@ button.is-new-look .nl-thist-season-pill,
 }
 
 /* --- Vertragsauflösung auf Spielerwunsch (Kader, Season-End) -------------
-   Drei Spalten je Angebot: wer fragt, was es einbringt, und die Entscheidung.
-   Die Geldspalte steht mittig, damit der Blick von links (Name) nach rechts
-   (Knöpfe) über die Zahl läuft, die die Entscheidung trägt. */
+   GEMELDET: „bitte noch anpassen dass es im modernen velo design kommt das sieht noch so
+   altbacken aus mit vertragsauflösung."
+
+   Vorher war das ein `panel` mit `<h3>` und drei Textspalten — dieselbe Optik wie vor dem
+   Neuen Look. Jetzt eine `NlCard` mit Eyebrow/Titel, und je Angebot eine Karte mit Bild,
+   Chips und dem geteilten Balken (`VeloSplitMeter`), der die eigentliche Regel zeigt: wie viel
+   des offenen Buyouts der Spieler liegen lässt und was am Team hängen bleibt. Vier Spalten im
+   Raster, damit die Zahlen untereinander fluchten statt zu flattern. */
+.is-new-look .teams-dissolution-card {
+  margin-bottom: 14px;
+}
+
+.is-new-look .teams-dissolution-count {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--nl-accent-text, var(--nl-muted-2));
+  background: var(--nl-accent-soft, rgba(148, 163, 184, 0.16));
+}
+
+.is-new-look .teams-dissolution-intro {
+  margin: 0 0 12px;
+  max-width: 78ch;
+}
+
 .teams-dissolution-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
-.teams-dissolution-item {
-  display: flex;
-  flex-wrap: wrap;
+.is-new-look .teams-dissolution-item {
+  display: grid;
+  grid-template-columns: minmax(190px, 1.1fr) minmax(180px, 1.2fr) minmax(130px, auto) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 10px;
+  gap: 14px;
+  padding: 12px 14px;
   border: 1px solid var(--nl-line, rgba(148, 163, 184, 0.28));
-  border-radius: 10px;
-  background: var(--nl-panel-2, rgba(15, 23, 42, 0.55));
+  border-left: 3px solid var(--nl-accent, rgba(148, 163, 184, 0.5));
+  border-radius: 14px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--nl-panel-2, rgba(15, 23, 42, 0.55)) 92%, transparent),
+    var(--nl-panel-2, rgba(15, 23, 42, 0.55))
+  );
 }
 
-.teams-dissolution-identity {
+.is-new-look .teams-dissolution-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.is-new-look .teams-dissolution-identity-copy {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
-  flex: 1 1 220px;
 }
 
-.teams-dissolution-money {
+.is-new-look .teams-dissolution-portrait {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--nl-ink, currentColor) 10%, transparent);
+}
+
+.is-new-look .teams-dissolution-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.is-new-look .teams-dissolution-portrait-fallback {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--nl-muted-2);
+}
+
+.is-new-look .teams-dissolution-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Eigene Chip-Klasse statt eines geliehenen Feature-Namens: `.nl-chip` gibt es nicht (der Griff
+   danach lief still ins Leere und die Angaben klebten als blanker Text aneinander). */
+.is-new-look .teams-dissolution-chip {
+  font-size: var(--nl-fs-sm, 0.76rem);
+  line-height: 1.25;
+  padding: 2px 8px;
+  border-radius: var(--nl-r-pill, 999px);
+  border: 1px solid var(--nl-line-2, rgba(148, 163, 184, 0.22));
+  color: var(--nl-mut, var(--nl-muted-2));
+  background: var(--nl-panel-2, rgba(15, 23, 42, 0.5));
+  white-space: nowrap;
+}
+
+.is-new-look .teams-dissolution-chip.is-risk {
+  border-color: color-mix(in srgb, var(--nl-risk, #ef5350) 45%, transparent);
+  color: var(--nl-risk, #ef5350);
+}
+
+.is-new-look .teams-dissolution-chip.is-warn {
+  border-color: color-mix(in srgb, var(--nl-warn, #f0b429) 45%, transparent);
+  color: var(--nl-warn, #f0b429);
+}
+
+.is-new-look .teams-dissolution-split {
+  min-width: 0;
+}
+
+.is-new-look .teams-dissolution-nobuyout {
+  font-size: 0.8rem;
+}
+
+.is-new-look .teams-dissolution-money {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 1px;
-  flex: 0 0 auto;
+  gap: 2px;
+  text-align: right;
+}
+
+.is-new-look .teams-dissolution-net {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.12;
+}
+
+.is-new-look .teams-dissolution-net small {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-muted-2);
+}
+
+.is-new-look .teams-dissolution-net strong {
+  font-size: 1.12rem;
+  font-weight: 750;
 }
 
 .teams-dissolution-actions {
@@ -75614,6 +75730,102 @@ button.is-new-look .nl-thist-season-pill,
   align-items: center;
   gap: 6px;
   flex: 0 0 auto;
+}
+
+/* Unter ~900px tragen vier Spalten nicht mehr — dann untereinander, Balken volle Breite. */
+@media (max-width: 900px) {
+  .is-new-look .teams-dissolution-item {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .is-new-look .teams-dissolution-money {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .is-new-look .teams-dissolution-net {
+    align-items: flex-start;
+  }
+}
+
+/* --- Velo-Split-Meter: eine Größe, zwei Teile ---------------------------- */
+.velo-split-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.velo-split-meter-track {
+  position: relative;
+  display: block;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  /* Der Grund ist der ZAHLBARE Teil — er bleibt stehen, wenn der Verzicht schrumpft. */
+  background: color-mix(in srgb, var(--nl-warn, #f0b429) 42%, transparent);
+}
+
+.velo-split-meter-lead {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--nl-good, #34d399) 60%, transparent),
+    var(--nl-good, #34d399)
+  );
+}
+
+.velo-split-meter.is-lead-warn .velo-split-meter-lead {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--nl-warn, #f0b429) 60%, transparent),
+    var(--nl-warn, #f0b429)
+  );
+}
+
+.velo-split-meter.is-lead-neutral .velo-split-meter-lead {
+  background: color-mix(in srgb, var(--nl-ink, currentColor) 45%, transparent);
+}
+
+.velo-split-meter-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 0.74rem;
+  color: var(--nl-muted-2);
+}
+
+.velo-split-meter-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.velo-split-meter-entry b {
+  color: var(--nl-ink, inherit);
+  font-weight: 700;
+}
+
+.velo-split-meter-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.velo-split-meter-entry.is-lead .velo-split-meter-dot {
+  background: var(--nl-good, #34d399);
+}
+
+.velo-split-meter.is-lead-warn .velo-split-meter-entry.is-lead .velo-split-meter-dot {
+  background: var(--nl-warn, #f0b429);
+}
+
+.velo-split-meter-entry.is-rest .velo-split-meter-dot {
+  background: color-mix(in srgb, var(--nl-warn, #f0b429) 62%, transparent);
 }
 
 /* ==========================================================================

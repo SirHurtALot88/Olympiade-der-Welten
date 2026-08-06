@@ -2,6 +2,8 @@ import type { CashPrizeApplyLogRecord, GameState } from "@/lib/data/olyDataTypes
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import type { PersistenceService } from "@/lib/persistence/types";
+import { resolveSeasonGuvByTeam } from "@/lib/finance/season-guv-resolver";
+import { applySeasonEndTail } from "@/lib/season/season-end-tail-settlement";
 import { buildPrizeMoneyPreview, type PrizeMoneyPreviewResult } from "@/lib/season/prize-money-preview";
 import { CASH_PRIZE_BENCHMARK_ONLY } from "@/lib/season/cash-prize-benchmark-flag";
 import { hasSeasonEndSponsorPayout } from "@/lib/season/season-end-sponsor-payout-status";
@@ -288,6 +290,14 @@ function writeLocalCashPrizeApply(input: {
   const save = resolveLocalSave(input.persistence, input.saveId);
   const now = new Date().toISOString();
   const previewByTeamId = new Map(input.preview.items.map((item) => [item.teamId, item] as const));
+  /**
+   * DIE EINE GuV (`lib/finance/season-end-guv.ts`), einmal fuer die Liga. Bis hierher schrieb dieser
+   * Schritt eine EIGENE Drei-Term-Rechnung in die Standings (Sponsor + Gebaeude netto − Gehaelter);
+   * sie kannte weder Apron noch Kreditzins noch Vorstandsziele und wich damit von dem ab, was die
+   * Finanzen-Ansicht auf demselben Bildschirm zeigte. Jetzt schreibt die Buchung genau die Zahl in
+   * den Spielstand, die die Oberflaeche ausweist — samt Aufschluesselung.
+   */
+  const seasonGuvByTeamId = resolveSeasonGuvByTeam(save.gameState);
   const nextTeams = save.gameState.teams;
   const nextStandings = Object.fromEntries(
     Object.entries(save.gameState.seasonState.standings ?? {}).map(([teamId, standing]) => {
@@ -315,11 +325,8 @@ function writeLocalCashPrizeApply(input: {
       const sponsorTotal = row.sponsorCash != null ? Number(row.sponsorCash.toFixed(2)) : null;
       const cashFc =
         row.currentCash != null && row.salaryTotal != null ? Number((row.currentCash - row.salaryTotal).toFixed(2)) : null;
-      // GuV = was die Saison real einbringt: Sponsoren + Gebaeude (netto) − Gehaelter.
-      const guv =
-        sponsorTotal != null && row.salaryTotal != null
-          ? Number((sponsorTotal + (row.facilityIncome ?? 0) - row.salaryTotal).toFixed(2))
-          : null;
+      const seasonGuv = seasonGuvByTeamId.get(teamId) ?? null;
+      const guv = seasonGuv?.guv ?? null;
       return [
         teamId,
         {
@@ -332,6 +339,9 @@ function writeLocalCashPrizeApply(input: {
           sponsorSeason,
           sponsorTotal,
           guv,
+          // Die Posten wandern mit in den Spielstand, damit der Hover sie auch dann zeigen kann,
+          // wenn die Ansicht spaeter aus dem gespeicherten Stand statt aus dem Live-Feed liest.
+          guvPosten: seasonGuv?.posten ?? null,
           cashTotal: row.projectedCash,
         },
       ] as const;
@@ -478,6 +488,33 @@ function writeLocalCashPrizeApply(input: {
         continue;
       }
       applyFacilitySeasonEndFinance(latestSave, team.teamId, facilityPreview.confirmToken, input.persistence);
+    }
+  }
+
+  /**
+   * DER GEMEINSAME SCHWANZ — Kreditraten, Vorstandsziele, Insolvenz-Backstop.
+   *
+   * DAS WAR DIE LUECKE HINTER CHRIS' MELDUNG: „ich habe jetzt das Cash gebucht und so viele Teams
+   * hatten ne positive GuV und jetzt haben so viele Teams negatives Cash????" Dieser Weg buchte
+   * Sponsor, Apron und Gebaeude — und hoerte danach auf. Der Saisonabschluss im Cockpit fuehrt
+   * danach noch drei cash-wirksame Schritte aus, von denen der letzte GARANTIERT, dass kein Team
+   * mit negativem Cash aus der Saison geht. Ueber diesen Knopf lief er nie: der Spielstand zeigte
+   * 12 Teams im Minus, 0 Kredite und 0 Notkredit-Logs.
+   *
+   * Jetzt laeuft derselbe Schwanz (`season-end-tail-settlement.ts`) auf beiden Wegen, in derselben
+   * Reihenfolge, mit denselben Idempotenz-Sperren. Nur am Saisonende — bei `phase === "matchday"`
+   * ist keiner dieser Schritte faellig.
+   */
+  if (input.phase === "season_end") {
+    const beforeTail = resolveLocalSave(input.persistence, save.saveId);
+    const tail = applySeasonEndTail({
+      gameState: beforeTail.gameState,
+      saveId: beforeTail.saveId,
+      seasonId: beforeTail.gameState.season.id,
+      execute: true,
+    });
+    if (tail.loanSettlementApplied || tail.objectiveRewardsApplied || tail.emergencyLoans.length > 0) {
+      input.persistence.saveSingleplayerState(beforeTail.saveId, tail.gameState);
     }
   }
 

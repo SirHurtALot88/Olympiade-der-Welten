@@ -6,6 +6,7 @@ import { getClassColorToken } from "@/app/foundation/ClassColorChip";
 import { FoundationShellRouterMarketBuy } from "@/app/foundation/FoundationShellRouter";
 import TransfermarktV2NewLook from "@/app/foundation/transfermarkt-v2/TransfermarktV2NewLook";
 import type { ContractShape, Discipline, GameState, Team, TeamControlMode, TeamSeasonObjectiveRecord, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
+import { CONTRACT_SHAPE_LABELS } from "@/lib/foundation/contract-shape-label";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 import { getTransfermarktPortraitModel } from "@/lib/market/transfermarkt-lab";
 import type { TransferHistoryReadResult } from "@/lib/market/transfer-history-read-service";
@@ -242,9 +243,13 @@ const LABEL_MAP: Record<string, string> = {
   medium: "mittel",
   low: "niedrig",
   elite: "elite",
-  balanced: "Balanced",
-  front_loaded: "Front-loaded",
-  back_loaded: "Back-loaded",
+  // Vertragsform-Keys spiegeln bewusst `CONTRACT_SHAPE_LABELS`, damit diese generische Karte
+  // nicht wieder eine eigene (englische) Variante mitschleppt, falls sie je fuer eine
+  // Vertragsform-gestuetzte Anzeige benutzt wird — aktuell liest `formatToneLabel` nur
+  // `affordabilityStatus`, das diese Keys nicht trifft.
+  balanced: CONTRACT_SHAPE_LABELS.balanced,
+  front_loaded: CONTRACT_SHAPE_LABELS.front_loaded,
+  back_loaded: CONTRACT_SHAPE_LABELS.back_loaded,
 };
 
 function isAbortError(error: unknown) {
@@ -666,11 +671,22 @@ export default function TransfermarktV2Client({
   const transferCanBuy = transferWindow?.canBuy ?? true;
   const transferCanSell = transferWindow?.canSell ?? true;
   const marketReadOnlyReason = "Transferfenster geschlossen — nur Ansicht.";
-  const marketWindowNotice = transferWindowOpen
-    ? null
-    : transferWindow?.phaseLabel
+  /**
+   * „Offen" ist nicht dasselbe wie „kaufen erlaubt". Kaufen und Verkaufen liegen in getrennten
+   * Fenstern (`transfer-window-policy.ts`): am Saisonende wird verkauft und verlaengert, gekauft
+   * wird in der neuen Saison vor dem ersten Spieltag. Vorher fiel dieser Hinweis auf `null`,
+   * sobald irgendein Fenster offen war — der Markt sah dann normal aus und der Kauf-Knopf war
+   * ohne erkennbaren Grund tot.
+   */
+  const marketWindowNotice = !transferWindowOpen
+    ? transferWindow?.phaseLabel
       ? `Transferfenster geschlossen (${transferWindow.phaseLabel}) — Markt und Scouting bleiben offen, Kauf und Verkauf sind gesperrt.`
-      : `${marketReadOnlyReason} Markt und Scouting bleiben sichtbar, Kauf und Verkauf sind gesperrt.`;
+      : `${marketReadOnlyReason} Markt und Scouting bleiben sichtbar, Kauf und Verkauf sind gesperrt.`
+    : !transferCanBuy
+      ? "Verkaufsfenster der Saisonwende — verkaufen und verlängern ist offen. Gekauft wird erst in der neuen Saison, vor dem 1. Spieltag."
+      : !transferCanSell
+        ? "Kaufphase vor dem 1. Spieltag — kaufen ist offen. Verkauft und verlängert wird am Ende der Saison."
+        : null;
   const roomContextRef = useRef<FoundationRoomContext | null>(roomContextProp ?? readFoundationRoomContextFromLocation());
   useEffect(() => {
     roomContextRef.current = roomContextProp ?? readFoundationRoomContextFromLocation();
@@ -2163,7 +2179,11 @@ export default function TransfermarktV2Client({
       : formatTransfermarktCurrency(previewAnnualSalary);
   const dealOpenDisabledReason =
     !transferCanBuy
-      ? marketReadOnlyReason
+      ? // Ist gleichzeitig das Verkaufsfenster offen, ist „Transferfenster geschlossen" schlicht
+        // falsch — dann ist nur das KAUFEN dran und der Spieler braucht den Termin dafuer.
+        transferCanSell
+        ? "Gerade ist das Verkaufsfenster offen — gekauft wird in der neuen Saison, vor dem 1. Spieltag."
+        : marketReadOnlyReason
       : !selectedTeamId
         ? "Bitte erst ein Team wählen."
         : !selectedPlayer

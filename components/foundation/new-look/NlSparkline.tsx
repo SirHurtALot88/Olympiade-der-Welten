@@ -8,6 +8,15 @@ export type NlSparklineProps = {
   /** Werte-Reihe in zeitlicher Reihenfolge; nicht-numerische Einträge werden übersprungen. */
   points: number[];
   tone?: NlTone;
+  /**
+   * Beschriftung je Punkt, in derselben Reihenfolge wie `points` — z. B. „Saison 3 · 412,5".
+   *
+   * GEMELDET VON CHRIS: „mit nem Hover zb ne Liniendiagramm-Grafik oder so von dem Team sieht wie
+   * die Entwicklung war." Ohne Beschriftung ist eine Sparkline eine Form ohne Zahlen: man sieht,
+   * DASS es hoch ging, aber nicht von wo nach wo. Sind Labels da, bekommt jeder Punkt einen
+   * Treffer-Bereich mit `<title>`; ohne bleibt die Grafik exakt wie bisher.
+   */
+  pointLabels?: string[];
   "aria-label"?: string;
   className?: string;
 };
@@ -44,7 +53,7 @@ function buildSparklineGeometry(points: number[]) {
  * Inline-Sparkline (handgerolltes SVG, viewBox-basiert) für kleine
  * Verlaufs-Hinweise in Chips, Karten und Tabellenzellen.
  */
-export function NlSparkline({ points, tone = "accent", "aria-label": ariaLabel, className }: NlSparklineProps) {
+export function NlSparkline({ points, tone = "accent", pointLabels, "aria-label": ariaLabel, className }: NlSparklineProps) {
   const geometry = useMemo(() => buildSparklineGeometry(points), [points]);
 
   if (!geometry) {
@@ -66,6 +75,21 @@ export function NlSparkline({ points, tone = "accent", "aria-label": ariaLabel, 
     >
       <polyline points={geometry.polyline} fill="none" stroke={stroke} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
       <circle cx={geometry.last.x} cy={geometry.last.y} r={2.5} fill={stroke} />
+      {/*
+        Treffer-Bereiche fuer den Hover. Sie sind bewusst groesser als der sichtbare Punkt (r=6 auf
+        einer 120x32-Flaeche) — ein 2,5px-Punkt ist mit der Maus nicht zu treffen. `fill="transparent"`
+        statt `opacity: 0`, weil ein vollstaendig transparentes Element sonst keine Zeigerereignisse
+        bekaeme und der Hover nie ausloeste.
+      */}
+      {pointLabels && pointLabels.length > 0
+        ? geometry.coordinates.map((point, index) =>
+            pointLabels[index] ? (
+              <circle key={`${point.x}-${index}`} cx={point.x} cy={point.y} r={6} fill="transparent">
+                <title>{pointLabels[index]}</title>
+              </circle>
+            ) : null,
+          )
+        : null}
     </svg>
   );
 }

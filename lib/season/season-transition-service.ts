@@ -8,6 +8,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { applySeasonEndPotentialUpdates } from "@/lib/progression/player-potential-service";
 import { runSeasonEndProgressionBatch } from "@/lib/progression/season-end-progression-batch";
+import { patchSeasonSnapshotMarketValueAfterProgression } from "@/lib/season/season-snapshot-service";
 import { buildSeasonReview, type SeasonReview } from "@/lib/season/season-review-service";
 import { getNextStepAfter, getPhaseAfterStep, isStepBehind } from "@/lib/season/season-transition-chain";
 import { SEASON_TRANSITION_STEPS, type SeasonTransitionStepId } from "@/lib/season/season-transition-steps";
@@ -234,20 +235,29 @@ export function buildSeasonTransitionPreview(save: PersistedSaveGame): SeasonTra
   };
 }
 
-export function startSeasonTransition(
-  save: PersistedSaveGame,
-  persistence: PersistenceService = createPersistenceService(),
-): SeasonTransitionPreview {
+type SeasonTransitionStartCompute =
+  | { blocked: SeasonTransitionPreview }
+  | { nextGameState: GameState; transition: SeasonTransitionState };
+
+/**
+ * Rechnet den Einstieg der Kette (`season_check` → `season_review`) im Speicher — OHNE zu
+ * schreiben. `startSeasonTransition` haengt nur noch den einen Persistenz-Aufruf dran;
+ * `advanceSeasonTransitionToTransferWindow` ruft diese Funktion direkt und reicht das Ergebnis
+ * im Speicher weiter, statt jeden Hop einzeln zu schreiben und neu zu laden (siehe dort).
+ */
+function computeStartSeasonTransition(save: PersistedSaveGame): SeasonTransitionStartCompute {
   const preview = buildSeasonTransitionPreview(save);
   if (!preview.canCompleteSeason) {
     return {
-      ...preview,
-      dryRun: false,
-      applied: false,
-      transition: {
-        ...preview.transition,
-        status: "failed",
-        errors: [...preview.transition.errors, "last_matchday_not_completed"],
+      blocked: {
+        ...preview,
+        dryRun: false,
+        applied: false,
+        transition: {
+          ...preview.transition,
+          status: "failed",
+          errors: [...preview.transition.errors, "last_matchday_not_completed"],
+        },
       },
     };
   }
@@ -279,13 +289,24 @@ export function startSeasonTransition(
     seasonTransition: transition,
     playerPotential: updatedPlayerPotential,
   };
-  persistGameStateWithMaterializedDerivations(persistence, save.saveId, nextGameState);
+  return { nextGameState, transition };
+}
+
+export function startSeasonTransition(
+  save: PersistedSaveGame,
+  persistence: PersistenceService = createPersistenceService(),
+): SeasonTransitionPreview {
+  const computed = computeStartSeasonTransition(save);
+  if ("blocked" in computed) {
+    return computed.blocked;
+  }
+  persistGameStateWithMaterializedDerivations(persistence, save.saveId, computed.nextGameState);
 
   return {
-    ...buildSeasonTransitionPreview({ ...save, gameState: nextGameState }),
+    ...buildSeasonTransitionPreview({ ...save, gameState: computed.nextGameState }),
     dryRun: false,
     applied: true,
-    transition,
+    transition: computed.transition,
   };
 }
 
@@ -308,38 +329,64 @@ export function startSeasonTransition(
  * Weiterschalten ist deshalb absichtlich NICHT an sie gekoppelt — es oeffnet die Phase, in der
  * sie stattfinden.
  */
-export function advanceSeasonTransitionStep(
+type SeasonTransitionAdvanceCompute =
+  | { status: "blocked" | "chain_complete"; preview: SeasonTransitionPreview }
+  | { status: "advanced"; nextGameState: GameState; transition: SeasonTransitionState };
+
+/**
+ * Rechnet EINEN Schritt der Kette im Speicher — OHNE zu schreiben. `advanceSeasonTransitionStep`
+ * haengt nur noch den einen Persistenz-Aufruf dran; die Mehrfach-Schleife
+ * (`advanceSeasonTransitionToTransferWindow`) ruft diese Funktion direkt und reicht den
+ * Zwischenstand im Speicher weiter, statt nach jedem Hop zu schreiben und den Save per
+ * `getSaveById` neu einzulesen. Bei bis zu sechs Hops auf einem grossen Save (32 Teams, ~3000
+ * Spieler, ~16 MB) waren das mehrere Sekunden reine Persistenz, bevor ueberhaupt Fachlogik lief —
+ * siehe Perf-Befund im PR.
+ *
+ * Fachlich unveraendert gegenueber vorher: dieselbe Reihenfolge an Pruefungen und derselbe Inhalt
+ * pro Zweig, nur ohne den Schreib-Aufruf am Ende.
+ */
+function computeSeasonTransitionAdvance(
   save: PersistedSaveGame,
-  persistence: PersistenceService = createPersistenceService(),
-): SeasonTransitionPreview {
+  persistence: PersistenceService,
+): SeasonTransitionAdvanceCompute {
   const preview = buildSeasonTransitionPreview(save);
   const currentStep = preview.transition.currentStep as SeasonTransitionStepId;
 
   // Solange der letzte Spieltag nicht durch ist, faengt die Kette gar nicht erst an.
   if (!preview.canCompleteSeason) {
     return {
-      ...preview,
-      ok: false,
-      dryRun: false,
-      applied: false,
-      blockingReasons: [...new Set([...preview.blockingReasons, "last_matchday_not_completed"])],
+      status: "blocked",
+      preview: {
+        ...preview,
+        ok: false,
+        dryRun: false,
+        applied: false,
+        blockingReasons: [...new Set([...preview.blockingReasons, "last_matchday_not_completed"])],
+      },
     };
   }
 
   // Der Einstieg behaelt seinen eigenen Weg — wegen des Drift-Guards, siehe oben.
   if (currentStep === "season_check") {
-    return startSeasonTransition(save, persistence);
+    const started = computeStartSeasonTransition(save);
+    if ("blocked" in started) {
+      return { status: "blocked", preview: started.blocked };
+    }
+    return { status: "advanced", nextGameState: started.nextGameState, transition: started.transition };
   }
 
   const nextPhase = getPhaseAfterStep(currentStep);
   if (!nextPhase) {
     // Ende der Kette: ab hier legt der Pre-Season-Workflow die neue Saison an, nicht dieser Weg.
     return {
-      ...preview,
-      ok: false,
-      dryRun: false,
-      applied: false,
-      blockingReasons: [...new Set([...preview.blockingReasons, "season_transition_chain_complete"])],
+      status: "chain_complete",
+      preview: {
+        ...preview,
+        ok: false,
+        dryRun: false,
+        applied: false,
+        blockingReasons: [...new Set([...preview.blockingReasons, "season_transition_chain_complete"])],
+      },
     };
   }
 
@@ -395,8 +442,23 @@ export function advanceSeasonTransitionStep(
           `season_end_progression_deferred:${batch.blockingReasons.join("|")}`,
         ];
       } else {
-        progressionSave = batch.save;
-        progressionWarnings = batch.warnings;
+        /**
+         * SAISONEND-MARKTWERT EINFRIEREN — genau hier, und nirgends sonst.
+         *
+         * Chris: „MW Werte können gerne NACH Apply von Training und MW-Neuberechnung übernommen
+         * werden, weil Training soll übernommen werden bevor Spieler verkauft werden." An dieser
+         * Stelle ist beides passiert (`runSeasonEndProgressionBatch` rechnet Entwicklung UND
+         * Marktwerte neu) und das Transferfenster ist noch zu. Der Snapshot selbst entstand
+         * frueher in der Kette und traegt deshalb noch den Vor-Entwicklungs-Stand.
+         */
+        const eingefroren = patchSeasonSnapshotMarketValueAfterProgression(
+          batch.save.gameState,
+          abgeschlosseneSaisonId,
+        );
+        progressionSave = eingefroren.patched ? { ...batch.save, gameState: eingefroren.gameState } : batch.save;
+        progressionWarnings = eingefroren.patched
+          ? batch.warnings
+          : [...batch.warnings, `season_end_market_value_freeze_skipped:${abgeschlosseneSaisonId}`];
         entwicklungGelaufen = true;
       }
     } catch (error) {
@@ -422,13 +484,32 @@ export function advanceSeasonTransitionStep(
     gamePhase: nextPhase,
     seasonTransition: transition,
   };
-  persistGameStateWithMaterializedDerivations(persistence, save.saveId, nextGameState);
+
+  return { status: "advanced", nextGameState, transition };
+}
+
+/**
+ * Einen Schritt des Saisonende-Assistenten anwenden und die Phase auf die naechste Station
+ * schalten — duenner Wrapper um `computeSeasonTransitionAdvance`, der bei Erfolg GENAU EINMAL
+ * schreibt. Fuer den Einzelschritt (Route-Aktion `advance_step`, ein Klick im Cockpit) bleibt das
+ * bei einem Schreibvorgang; die Mehrfach-Schleife (`advanceSeasonTransitionToTransferWindow`)
+ * nutzt die Compute-Funktion direkt und schreibt selbst nur einmal am Ende der Kette.
+ */
+export function advanceSeasonTransitionStep(
+  save: PersistedSaveGame,
+  persistence: PersistenceService = createPersistenceService(),
+): SeasonTransitionPreview {
+  const computed = computeSeasonTransitionAdvance(save, persistence);
+  if (computed.status !== "advanced") {
+    return computed.preview;
+  }
+  persistGameStateWithMaterializedDerivations(persistence, save.saveId, computed.nextGameState);
 
   return {
-    ...buildSeasonTransitionPreview({ ...save, gameState: nextGameState }),
+    ...buildSeasonTransitionPreview({ ...save, gameState: computed.nextGameState }),
     dryRun: false,
     applied: true,
-    transition,
+    transition: computed.transition,
   };
 }
 
@@ -458,31 +539,69 @@ export function advanceSeasonTransitionStep(
  * War es schon offen, ist das Ergebnis dasselbe und der Aufrufer soll es nicht als Fehler
  * anzeigen — ein zweiter Klick auf denselben Knopf ist kein Fehlschlag. Geschrieben wird dann
  * nichts; die Phase rutscht insbesondere NICHT weiter Richtung neuer Saison.
+ *
+ * PERF: bis zu vier Hops liegen zwischen Saisonende und offenem Transferfenster
+ * (season_review → season_rewards → player_development → preseason_management). Die Schleife lief
+ * frueher ueber `advanceSeasonTransitionStep`, das nach JEDEM Hop den kompletten Spielstand
+ * schrieb (`persistGameStateWithMaterializedDerivations`) und ihn per `getSaveById` wieder
+ * einlas — auf einem echten Save (32 Teams, ~3000 Spieler, ~16 MB) mehrere Sekunden reine
+ * Persistenz, bevor ueberhaupt Fachlogik lief (siehe Perf-Befund im PR). Die Kette braucht das
+ * nicht: kein Schritt in ihr liest je aus der Persistenz statt aus dem uebergebenen `save`
+ * (gilt NICHT fuer `player_development` selbst — dort laeuft `runSeasonEndProgressionBatch`
+ * bereits `persistFinalState: false` und rechnet rein im Speicher). Also: `current` haelt den
+ * Zwischenstand nur im Speicher (`computeSeasonTransitionAdvance`, dieselbe Fachlogik wie in
+ * `advanceSeasonTransitionStep`, nur ohne den Schreib-Aufruf), und geschrieben wird GENAU EINMAL
+ * — entweder am Ende der Kette oder gar nicht, wenn kein Hop lief.
+ *
+ * Kehrseite: auf der Platte liegt zwischen den Hops kein konsistenter Zwischenstand mehr. Bricht
+ * die Funktion nach hop 2 von 4 mit einer echten Exception ab (nicht abgefangen wie der
+ * `player_development`-Fehlerfall oben, der schon als Warnung weiterschaltet), bleibt der Save
+ * exakt auf dem Stand VOR diesem Aufruf stehen statt — wie vorher — auf dem Stand nach Hop 2. Das
+ * ist bewusst in Kauf genommen: kein halb angewandter Zwischenstand auf der Platte, dafuer geht
+ * der Fortschritt vorheriger Hops bei einem Fehler auf halber Strecke verloren — ein zweiter
+ * Aufruf faengt wieder bei Hop 1 an. Das ist unschaedlich, WEIL nichts von diesem gescheiterten
+ * Aufruf je auf der Platte stand: der Save ist exakt der Stand von vor diesem Aufruf, und
+ * `computeStartSeasonTransition` erkennt an der Phase, dass season_check dort noch nicht
+ * gelaufen ist (der Idempotenz-Guard dort greift erst, wenn die Phase wirklich auf
+ * "season_review" steht).
  */
 export function advanceSeasonTransitionToTransferWindow(
   save: PersistedSaveGame,
   persistence: PersistenceService = createPersistenceService(),
 ): SeasonTransitionPreview {
   let current = save;
-  let result = buildSeasonTransitionPreview(current);
+  let lastTransition = buildSeasonTransitionPreview(current).transition;
+  let hopsApplied = false;
 
   // Obergrenze = Laenge der Kette. Kein Sicherheitsnetz gegen Fehler, sondern gegen eine
-  // Endlosschleife, falls ein Schritt je aufhoert weiterzuschalten (`applied: false`) — dann
-  // bricht die Schleife ohnehin unten ab; die Grenze ist der Guertel dazu.
+  // Endlosschleife, falls ein Schritt je aufhoert weiterzuschalten — dann bricht die Schleife
+  // ohnehin unten ab; die Grenze ist der Guertel dazu.
   for (let hop = 0; hop < SEASON_TRANSITION_STEPS.length; hop += 1) {
     if (isTransferMarketPhaseOpen(current.gameState)) break;
-    const step = advanceSeasonTransitionStep(current, persistence);
-    if (!("applied" in step) || !step.applied) return step;
-    const reloaded = persistence.getSaveById(current.saveId);
-    if (!reloaded) return step;
-    current = reloaded;
-    result = step;
+    const computed = computeSeasonTransitionAdvance(current, persistence);
+    if (computed.status !== "advanced") {
+      // Kein weiterer Hop moeglich (blockiert oder Kette zu Ende). Was bis hierher im Speicher
+      // gelaufen ist, wird trotzdem einmal geschrieben — genau der Zustand, den die alte
+      // Schleife an dieser Stelle auf der Platte gehabt haette (jeder erfolgreiche Hop schrieb
+      // dort einzeln, bevor der scheiternde Hop unbeschrieben zurueckkam).
+      if (hopsApplied) {
+        persistGameStateWithMaterializedDerivations(persistence, save.saveId, current.gameState);
+      }
+      return computed.preview;
+    }
+    current = { ...current, gameState: computed.nextGameState };
+    lastTransition = computed.transition;
+    hopsApplied = true;
+  }
+
+  if (hopsApplied) {
+    persistGameStateWithMaterializedDerivations(persistence, save.saveId, current.gameState);
   }
 
   return {
     ...buildSeasonTransitionPreview(current),
     dryRun: false,
     applied: true,
-    transition: result.transition,
+    transition: lastTransition,
   };
 }

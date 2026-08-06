@@ -137,6 +137,7 @@ export function useSeasonV2PanelModel({
           salaryTotal: row.salaryTotal ?? null,
           buildingCost: computeTeamBuildingCost(gameState, row.teamId),
           guv: row.guv ?? null,
+          guvPosten: row.guvPosten ?? null,
           sponsorTotal: row.sponsorTotal ?? null,
           transferNet: row.transferNet ?? row.transfersSeasonValue ?? null,
           apronProjection: (() => {

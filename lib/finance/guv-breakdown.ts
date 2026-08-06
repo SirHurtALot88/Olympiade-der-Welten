@@ -1,41 +1,29 @@
+import { buildSeasonGuvHoverText, seasonGuvFromPosten, type SeasonGuvPosten } from "@/lib/finance/season-end-guv";
+
 /**
  * GEMELDET VON CHRIS (Seite „Spieltag · Saisonstand"): „Die GuV im Saisonstand und die im
  * Finanzen-Reiter weichen voneinander ab! Bitte fixen und bitte berücksichtigen, dass auch Apron mit
  * einfließt — am besten ein Hover auf dem GuV-Posten, der noch mal aufzeigt, wie die Zahl sich
  * zusammensetzt!"
  *
- * ENTSCHEIDUNG VON CHRIS nach dem Befund: die zwei Definitionen bleiben, sie werden erklärt statt
- * angeglichen. Beide sind absichtlich so gebaut, und beide beantworten eine andere Frage.
+ * FRÜHERE ENTSCHEIDUNG, INZWISCHEN VON CHRIS AUFGEHOBEN: „die zwei Definitionen bleiben, sie werden
+ * erklärt statt angeglichen." Das gilt nicht mehr. Der Auftrag lautet jetzt: „ich will auch endlich
+ * dass überall die GuV das gleiche ausweist und nicht hier was anderes steht als im Sponsor-Tab oder
+ * dem Finanzen-Tab." Deshalb gibt es genau EINE Rechnung — `lib/finance/season-end-guv.ts` —, und
+ * diese Datei ist nur noch ihr Sprachrohr.
  *
- * WAS DIE BEIDEN ZAHLEN WIRKLICH SIND — nachgelesen, nicht vermutet:
+ * ROLLENVERTEILUNG:
+ *  - `season-end-guv.ts` rechnet und benennt die Posten.
+ *  - `buildGuvBreakdown` (hier) nimmt die fertigen Posten und macht Zeilen + Hover-Text daraus.
+ *  - Der ALTE Drei-Term-Zweig weiter unten bleibt als Rückfall für Ansichten ohne Feed stehen. Er
+ *    rechnet „Gebäude netto" als REST und kann deshalb einen Fehler in `guv` nicht sichtbar machen —
+ *    genau das hat den Preisgeld-Bug so lange verdeckt. Neue Aufrufer geben `posten` mit.
  *
- *  - SAISONSTAND (`app/api/season/standings-overview/route.ts:440-443`):
- *        guv = Sponsor-Abrechnung + Gebäude netto − Gehaltssumme
- *    Eine schmale Drei-Term-Rechnung für den Liga-Vergleich. Transfers stehen daneben in einer
- *    EIGENEN Spalte und sind hier NICHT enthalten.
- *  - FINANZEN-REITER (`app/foundation/finances/FoundationFinancesNewLook.tsx:164-167, 203-206`):
- *        GuV = alle laufenden Einnahmen − alle laufenden Ausgaben
- *    Also breiter als der Saisonstand (Vorstandsprämien, Kredite, Unterhalt …), aber ebenfalls ohne
- *    Transfers — die laufen dort als „Transfers (Sonderposten)" in einem eigenen Block.
+ * APRON zählt jetzt MIT (Chris: „Sponsoren + Gebäude + Apron sind doch die möglichen Einkünfte"). Er
+ * wird erst am Saisonende abgerechnet und hängt am Endrang; die Zeile sagt deshalb, dass sie eine
+ * Hochrechnung auf den aktuellen Rang ist.
  *
- * KORREKTUR ZUR ERSTEN EINSCHÄTZUNG: in der Triage-Notiz stand zuerst, der Saisonstand enthalte die
- * Transfers. Das stimmt nicht — die Formel oben hat sie nie. Der Unterschied liegt an den zusätzlichen
- * Betriebsposten des Finanzen-Reiters, nicht an den Transfers.
- *
- * APRON gehört in keine der beiden: er wird am SAISONENDE abgerechnet
- * (`lib/season/apron-service.ts` → `computeApronSettlement`, geschrieben von
- * `apron-settlement-service.ts`) und schlägt dort direkt aufs Cash durch, nicht auf die laufende GuV.
- * Der Hinweis gehört trotzdem in den Hover: eine Zahl, die einen bekannten Posten NICHT enthält, muss
- * das sagen — sonst sucht man den Unterschied wieder in der Rechnung.
- *
- * NACHGEZOGEN (Chris): der Apron steht jetzt nicht nur als Abgrenzung da, sondern als HOCHRECHNUNG
- * beim aktuellen Rang — dieselbe Behandlung, die die Sponsor-Zeile im selben Hover schon hat. Der
- * Einwand „Deckel und Ausschüttung hängen am Endrang" bleibt richtig und wird nicht wegdefiniert:
- * die Zeile ist als Hochrechnung benannt und nennt den Rang, auf den sie sich stützt. Gerechnet wird
- * sie von `lib/finance/apron-projection.ts`, das seinerseits nur die Saisonende-Arithmetik aufruft —
- * diese Datei formuliert, sie rechnet nicht.
- *
- * Diese Datei ist bewusst React-frei: beide Ansichten lesen dieselbe Herleitung, und sie ist ohne
+ * Diese Datei ist bewusst React-frei: alle Ansichten lesen dieselbe Herleitung, und sie ist ohne
  * Rendering prüfbar.
  */
 
@@ -59,6 +47,11 @@ export type GuvApronProjectionInput = {
 };
 
 export type GuvBreakdownInput = {
+  /**
+   * Die Posten der EINEN GuV. Liegen sie vor, ist alles andere in diesem Objekt nur noch Rückfall
+   * für Ansichten, die den Feed nicht haben.
+   */
+  posten?: SeasonGuvPosten[] | null;
   /** Sponsor-Abrechnung beim aktuellen Rang. */
   sponsorTotal: number | null | undefined;
   /** Gehaltssumme der Saison. */
@@ -132,6 +125,29 @@ function buildApronLines(apron: GuvApronProjectionInput, guv: number | null): st
  * die er auflösen soll.
  */
 export function buildGuvBreakdown(input: GuvBreakdownInput): GuvBreakdown {
+  /**
+   * NEU (Chris: „ich will endlich dass überall die GuV das gleiche ausweist" + „alles was berechnet
+   * wird auch in das Hover rein, selbst wenn es 0 ist"): liegen die Posten der EINEN GuV vor
+   * (`lib/finance/season-end-guv.ts`, geliefert über den Saisonstand-Feed), wird der Hover daraus
+   * gebaut — jeder Posten mit eigener Zeile, auch die mit 0.
+   *
+   * Der Zweig darunter ist nur noch der Rückfall für Ansichten ohne Feed. Er rechnet „Gebäude netto"
+   * bewusst als REST (`guv − sponsor + gehälter`) und kann deshalb keinen Fehler in `guv` sichtbar
+   * machen — genau das war die Schwäche, die den Preisgeld-Bug so lange verdeckt hat.
+   */
+  if (input.posten && input.posten.length > 0) {
+    const ausPosten = seasonGuvFromPosten("", input.posten);
+    return {
+      total: ausPosten.guv,
+      lines: input.posten.map((entry) => ({
+        label: entry.note ? `${entry.label} (${entry.note})` : entry.label,
+        value: entry.amount,
+        counted: entry.counted,
+      })),
+      hoverText: buildSeasonGuvHoverText(ausPosten),
+    };
+  }
+
   const sponsor = isNumber(input.sponsorTotal) ? input.sponsorTotal : null;
   const salary = isNumber(input.salaryTotal) ? input.salaryTotal : null;
   const total = isNumber(input.guv) ? input.guv : null;

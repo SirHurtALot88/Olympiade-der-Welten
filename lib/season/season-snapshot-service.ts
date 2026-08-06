@@ -935,3 +935,66 @@ export function createSeasonSnapshot(
     snapshot: latest,
   };
 }
+
+/**
+ * FRIERT DEN SAISONEND-MARKTWERT EIN — nach dem Trainings-Apply, vor dem Transferfenster.
+ *
+ * GEMELDET VON CHRIS: „dort soll JEDE Season einmal der Cash und MW festgeschrieben werden am Ende
+ * der Saison, damit man die Seasons über mehrere Jahre miteinander vergleichen kann." Und die
+ * Präzisierung dazu: „MW Werte können gerne NACH Apply von Training und MW-Neuberechnung übernommen
+ * werden, weil Training soll übernommen werden bevor Spieler verkauft werden."
+ *
+ * WARUM DAS EIN EIGENER SCHRITT SEIN MUSS. Der Snapshot entsteht am Saisonende in dieser Reihenfolge:
+ *
+ *     … → snapshot → transition → player_development → transfer_sell_phase → transfer_buy_phase
+ *
+ * `createSeasonSnapshot` liegt VOR `player_development`. Der dort geschriebene `marketValueEnd` ist
+ * also der Stand VOR der Entwicklung. Und `patchCompletedSeasonSnapshotAfterPreseasonBuy`
+ * überschreibt ihn danach nochmals mit dem Eintrittsstand der NÄCHSTEN Saison. In der Historie stand
+ * damit nie der Wert, mit dem das Team seine Saison beendet hat — Saisons liessen sich nicht
+ * vergleichen.
+ *
+ * Dieser Schritt läuft genau einmal, direkt nachdem die Entwicklung gerechnet hat, und schreibt
+ * `marketValueSeasonEnd`. Das Feld wird von keinem späteren Patch mehr angefasst. Cash bleibt
+ * unberührt: `cashEnd` steht bereits korrekt im Snapshot und ist der echte Kontostand.
+ */
+export function patchSeasonSnapshotMarketValueAfterProgression(
+  gameState: GameState,
+  seasonId: string,
+): { gameState: GameState; patched: boolean } {
+  const snapshots = gameState.seasonState.seasonSnapshots ?? [];
+  const index = snapshots.findIndex((entry) => entry.seasonId === seasonId);
+  if (index < 0) {
+    return { gameState, patched: false };
+  }
+
+  const snapshot = snapshots[index]!;
+  const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
+  const marketValueByTeamId = new Map<string, number>();
+  for (const entry of gameState.rosters) {
+    const value = getRosterMarketValue(gameState, entry.playerId, entry.currentValue, entry.purchasePrice, playerById) ?? 0;
+    marketValueByTeamId.set(entry.teamId, (marketValueByTeamId.get(entry.teamId) ?? 0) + value);
+  }
+
+  const patchTeams = (records: SeasonSnapshotTeamRecord[]) =>
+    records.map((record) => ({
+      ...record,
+      // Einmalig: ein bereits eingefrorener Wert bleibt stehen, damit ein zweiter Durchlauf
+      // (z. B. nach einem Reload) die Historie nicht nachträglich verschiebt.
+      marketValueSeasonEnd:
+        record.marketValueSeasonEnd ?? roundValue(marketValueByTeamId.get(record.teamId) ?? 0, 2),
+    }));
+
+  const patched: SeasonSnapshotRecord = {
+    ...snapshot,
+    finalStandings: patchTeams(resolveSeasonSnapshotTeamRecords(snapshot)),
+    teamSnapshots: patchTeams(resolveSeasonSnapshotTeamRecords(snapshot)),
+  };
+  const nextSnapshots = [...snapshots];
+  nextSnapshots[index] = patched;
+
+  return {
+    gameState: { ...gameState, seasonState: { ...gameState.seasonState, seasonSnapshots: nextSnapshots } },
+    patched: true,
+  };
+}

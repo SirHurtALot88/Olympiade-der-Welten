@@ -498,8 +498,8 @@ describe("foundation performance architecture helpers", () => {
       "utf8",
     );
     const foundationSurfaceText = await readFoundationSurfaceSource(root);
-    const sharedContextText = await fs.readFile(
-      path.join(root, "lib/foundation/foundation-shared-context.tsx"),
+    const pageStateText = await fs.readFile(
+      path.join(root, "lib/foundation/tabs/use-foundation-page-state.ts"),
       "utf8",
     );
     const cockpitHostText = await fs.readFile(
@@ -510,8 +510,14 @@ describe("foundation performance architecture helpers", () => {
       path.join(root, "app/foundation/cockpit-v2/FoundationCockpitPanel.tsx"),
       "utf8",
     );
-    expect(foundationText).toContain("FoundationSharedProvider");
-    expect(foundationText).toContain("useFoundationShared");
+    // Cockpit-Duplikat aufgeloest (siehe Plan): `FoundationSharedProvider`
+    // hielt dieselben vier `cockpit*`-States ein zweites Mal parallel zu
+    // `use-foundation-page-state.ts`, ohne dass beide je synchronisiert
+    // wurden — zwei Wahrheiten fuer denselben Busy-Zustand. Jetzt gibt es
+    // nur noch eine Quelle (den Hook); Host und Panel bekommen sie als Props.
+    expect(foundationText).not.toContain("FoundationSharedProvider");
+    expect(foundationText).not.toContain("useFoundationShared");
+    expect(foundationText).toContain("FoundationStateProvider");
     expect(foundationText).toContain("useFoundationCrossTabGameFlow");
     expect(foundationText).toContain("useFoundationCrossTabHomeV2");
     expect(foundationText).toContain("useFoundationCrossTabSeasonPrize");
@@ -528,13 +534,13 @@ describe("foundation performance architecture helpers", () => {
     expect(foundationSurfaceText).toContain('activeView === "debug"');
     expect(foundationSurfaceText).toContain('active={activeView === "history" || activeView === "historyV2"}');
     expect(foundationSurfaceText).toContain('activeView === "training" || activeView === "trainingCompact"');
-    expect(sharedContextText).toContain("cockpitBusyKey");
-    expect(sharedContextText).toContain("cockpitAiBatchApplyFeed");
-    expect(sharedContextText).toContain("cockpitAiIncludeWarningTeams");
-    expect(sharedContextText).toContain("cockpitAiOverwriteExisting");
-    expect(cockpitHostText).toContain("useFoundationShared");
+    expect(pageStateText).toContain("cockpitBusyKey");
+    expect(pageStateText).toContain("cockpitAiBatchApplyFeed");
+    expect(pageStateText).toContain("cockpitAiIncludeWarningTeams");
+    expect(pageStateText).toContain("cockpitAiOverwriteExisting");
+    expect(cockpitHostText).not.toContain("useFoundationShared");
     expect(cockpitHostText).toContain("use-cockpit-panel-derivations");
-    expect(cockpitPanelText).toContain("useFoundationShared");
+    expect(cockpitPanelText).not.toContain("useFoundationShared");
     expect(foundationText).not.toContain("cockpitBusyKey={cockpitBusyKey}");
     expect(foundationText).not.toContain("setCockpitBusyKey={setCockpitBusyKey}");
     const teamsText = await fs.readFile(
@@ -776,5 +782,21 @@ describe("foundation performance architecture helpers", () => {
     );
     expect(fileText).not.toContain("gameState.activeRoster");
     expect(fileText).toContain("(input.gameState.rosters ?? [])");
+  });
+
+  it("keeps the useState count in use-foundation-page-state.ts from growing back", async () => {
+    // Ratsche: der Plan haelt fest, dass genau diese Absicherung zwischen
+    // frueheren Aufraeumrunden gefehlt hat — Zustand wanderte an die
+    // Verbrauchsstelle (Cockpit-Dup entfernt, `FoundationStateProvider`
+    // verdrahtet), aber ohne Obergrenze wuchs die Wurzel bei der naechsten
+    // Feature-Runde einfach wieder zu. Der Wert ist der IST-Stand nach dieser
+    // Aufraeumrunde, keine willkuerliche Zielzahl — jeder neue `useState` hier
+    // muss diese Zahl bewusst anheben, nicht heimlich durchrutschen.
+    const pageStateText = await fs.readFile(
+      path.join(root, "lib/foundation/tabs/use-foundation-page-state.ts"),
+      "utf8",
+    );
+    const useStateCallCount = (pageStateText.match(/=\s*useState[<(]/g) ?? []).length;
+    expect(useStateCallCount).toBeLessThanOrEqual(233);
   });
 });

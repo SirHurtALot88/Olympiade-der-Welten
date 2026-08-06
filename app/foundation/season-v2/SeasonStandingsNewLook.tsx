@@ -1534,6 +1534,8 @@ export default function SeasonStandingsNewLook({
             // Zeile mitgeliefert, weil Topf und Ausschuettung an der ganzen Liga haengen.
             title={
               buildGuvBreakdown({
+                // Die Posten der EINEN GuV kommen fertig aus dem Feed — jeder davon, auch die mit 0.
+                posten: row.guvPosten ?? null,
                 sponsorTotal: row.sponsorTotal,
                 salaryTotal: row.salaryTotal,
                 guv: row.guv,

@@ -841,6 +841,7 @@ describe("ai picks run service", () => {
       dryRun: true,
       teamScope: "all",
       allowSetupAllTeams: true,
+      includeManualTeams: true,
     });
 
     expect(result.readOnly).toBe(true);
@@ -1015,6 +1016,7 @@ describe("ai picks run service", () => {
       dryRun: true,
       teamScope: "all",
       allowSetupAllTeams: true,
+      includeManualTeams: true,
     });
 
     expect(result.qualityGate.passed).toBe(true);
@@ -1049,6 +1051,7 @@ describe("ai picks run service", () => {
       confirmToken: "EXECUTE_AI_PICK_RUN",
       teamScope: "all",
       allowSetupAllTeams: true,
+      includeManualTeams: true,
     });
 
     expect(result.executed).toBe(false);
@@ -1145,6 +1148,7 @@ describe("ai picks run service", () => {
       confirmToken: "EXECUTE_AI_PICK_RUN",
       teamScope: "all",
       allowSetupAllTeams: true,
+      includeManualTeams: true,
     });
 
     expect(result.executed).toBe(false);
@@ -1192,6 +1196,7 @@ describe("ai picks run service", () => {
       confirmToken: "EXECUTE_AI_PICK_RUN",
       teamScope: "all",
       allowSetupAllTeams: true,
+      includeManualTeams: true,
     });
 
     expect(result.executed).toBe(false);
@@ -1242,6 +1247,7 @@ describe("ai picks run service", () => {
       confirmToken: "EXECUTE_AI_PICK_RUN",
       teamScope: "all",
       allowSetupAllTeams: true,
+      includeManualTeams: true,
     });
 
     expect(result.executed).toBe(false);
@@ -1288,6 +1294,7 @@ describe("ai picks run service", () => {
       confirmToken: "EXECUTE_AI_PICK_RUN",
       teamScope: "all",
       allowSetupAllTeams: true,
+      includeManualTeams: true,
     });
 
     expect(result.executed).toBe(false);
@@ -1344,6 +1351,7 @@ describe("ai picks run service", () => {
       confirmToken: "EXECUTE_AI_PICK_RUN",
       teamScope: "all",
       allowSetupAllTeams: true,
+      includeManualTeams: true,
     });
 
     expect(result.executed).toBe(false);
@@ -1394,6 +1402,7 @@ describe("ai picks run service", () => {
       confirmToken: "EXECUTE_AI_PICK_RUN",
       teamScope: "all",
       allowSetupAllTeams: true,
+      includeManualTeams: true,
     });
 
     expect(result.executed).toBe(false);
@@ -1445,6 +1454,7 @@ describe("ai picks run service", () => {
       confirmToken: "EXECUTE_AI_PICK_RUN",
       teamScope: "all",
       allowSetupAllTeams: true,
+      includeManualTeams: true,
     });
 
     expect(result.executed).toBe(false);
@@ -1473,6 +1483,7 @@ describe("ai picks run service", () => {
       confirmToken: "EXECUTE_AI_PICK_RUN",
       teamScope: "all",
       allowSetupAllTeams: true,
+      includeManualTeams: true,
       stepsPerTeam: 1,
     });
 
@@ -1537,6 +1548,7 @@ describe("ai picks run service", () => {
       dryRun: true,
       teamScope: "all",
       allowSetupAllTeams: true,
+      includeManualTeams: true,
       stepsPerTeam: 1,
       // Simulates a caller who may only write the AI-controlled C-C — never W-W, which per this
       // fixture's teamControlSettings is manual/humanControlled (another human's team).
@@ -1547,9 +1559,15 @@ describe("ai picks run service", () => {
     expect(result.teams.some((entry) => entry.teamId === "W-W")).toBe(false);
     expect(result.teams.some((entry) => entry.teamId === "C-C")).toBe(true);
 
-    // Without the restriction, the exact same bypass call plans picks for BOTH teams (this is the
-    // underlying S6 bug this fixture demonstrates: W-W is manual/humanControlled — another human's
-    // team — yet teamScope:"all" + allowSetupAllTeams ignores controlMode entirely).
+    // GEMELDET: „Wieso wird für mich gepickt und gedraftet???"
+    //
+    // Hier stand die alte Annahme als Erwartung: derselbe Aufruf OHNE `callerWritableTeamIds`
+    // plant fuer BEIDE Teams — W-W ist manuell gesteuert und wurde trotzdem bedient. Das war
+    // kein Sonderfall des Koop, sondern die Regel: `allowSetupAllTeams` hob den Control-Mode-
+    // Schutz generell auf, also auch im Solo-Spiel fuer das Team des Spielers.
+    //
+    // Jetzt gilt: ohne `includeManualTeams` bleibt ein manuell gesteuertes Team aussen vor,
+    // ganz gleich wer aufruft.
     const unrestricted = await runAiPicksExecutePreview({
       source: "sqlite",
       saveId: "save-ai-run",
@@ -1559,9 +1577,25 @@ describe("ai picks run service", () => {
       allowSetupAllTeams: true,
       stepsPerTeam: 1,
     });
-    expect(unrestricted.skippedTeamIds).toEqual([]);
-    expect(unrestricted.teams.some((entry) => entry.teamId === "W-W")).toBe(true);
+    expect(unrestricted.teams.some((entry) => entry.teamId === "W-W")).toBe(false);
     expect(unrestricted.teams.some((entry) => entry.teamId === "C-C")).toBe(true);
+
+    // Und die Gegenrichtung: der erstmalige Liga-Draft bedient das menschliche Team weiterhin —
+    // sonst startet der Spieler ohne Kader. Der Unterschied ist jetzt ausdruecklich, nicht
+    // implizit.
+    const setupDraft = await runAiPicksExecutePreview({
+      source: "sqlite",
+      saveId: "save-ai-run",
+      seasonId: "season-1",
+      dryRun: true,
+      teamScope: "all",
+      allowSetupAllTeams: true,
+      includeManualTeams: true,
+      includeManualTeams: true,
+      stepsPerTeam: 1,
+    });
+    expect(setupDraft.teams.some((entry) => entry.teamId === "W-W")).toBe(true);
+    expect(setupDraft.teams.some((entry) => entry.teamId === "C-C")).toBe(true);
   });
 
   it("blocks execute drift instead of silently replanning when a frozen preview pick becomes invalid", async () => {
@@ -1641,6 +1675,7 @@ describe("ai picks run service", () => {
       confirmToken: "EXECUTE_AI_PICK_RUN",
       teamScope: "all",
       allowSetupAllTeams: true,
+      includeManualTeams: true,
       stepsPerTeam: 1,
     });
 

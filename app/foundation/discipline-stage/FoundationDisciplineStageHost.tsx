@@ -8,10 +8,13 @@ import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import DisciplineStageArena from "@/app/foundation/discipline-stage/DisciplineStageArena";
 
-// Die Disziplin-Bühne wird — wie Spieler-Detail und Team-Profil — AUSSERHALB
-// des (nirgends gemounteten) FoundationStateProvider gerendert. Deshalb kommt
-// der volle GameState + die Team-Auswahl über Props aus dem Router-Body, statt
-// über useFoundationState()/useFoundationGameState() (die hier immer werfen würden).
+// Die Disziplin-Bühne bekommt den vollen GameState + die Team-Auswahl bewusst
+// über Props aus dem Router-Body statt über useFoundationState()/
+// useFoundationGameState() — auch nachdem FoundationStateProvider um
+// FoundationShellRouterBody gemountet ist (FoundationPageClient.tsx). Grund:
+// die Bühne wird in `tests/discipline-stage-host.test.ts` isoliert ohne jeden
+// Provider gerendert; useFoundationState() würde dort hart werfen. Props
+// halten die Komponente providerunabhängig testbar.
 export type FoundationDisciplineStageHostProps = {
   gameState: GameState;
   selectedTeamId: string;
