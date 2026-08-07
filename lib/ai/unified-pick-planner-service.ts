@@ -214,12 +214,34 @@ export function resolveUnifiedMarketPickSteps(team: {
   const rosterAfterSell =
     roster != null ? roster - team.sellPlan.candidates.length : null;
   const legacyCount = team.buyPlan.candidates.length;
+  /**
+   * Was fehlt bis zum harten Kader-Minimum — die Zahl, die keine andere ueberstimmen darf.
+   *
+   * GEMELDET: „warum blockieren überhaupt teams?"
+   *
+   * Darunter stand `if (legacyCount > 0) return legacyCount;`. Hatte der alte Pfad IRGENDEINEN
+   * Kandidaten geliefert, uebernahm der Planer schlicht dessen Anzahl — ohne je zu pruefen, ob die
+   * bis zum Minimum reicht. Die Bedarfsrechnung weiter unten war damit nur erreichbar, wenn gar
+   * nichts geliefert wurde.
+   *
+   * Am Spielstand gemessen war das der Grund, warum Teams unter dem Minimum stehen blieben und
+   * anschliessend an `roster_after_market_plan_below_player_min` blockierten: sie planten ein paar
+   * teure Kaeufe, blieben unter acht Spielern und liessen dabei 54 bis 62 Mio liegen. Der Blocker
+   * meldete einen Missstand, den die Schrittzahl selbst erzeugt hatte.
+   */
+  const bedarfBisMinimum =
+    rosterAfterSell != null && playerMin != null && rosterAfterSell < playerMin
+      ? playerMin - rosterAfterSell
+      : 0;
+
   if (rosterAfterSell != null && playerOpt != null && rosterAfterSell >= playerOpt) {
     return legacyCount > 0 ? legacyCount : 0;
   }
-  if (legacyCount > 0) return legacyCount;
-  if (rosterAfterSell != null && playerMin != null && rosterAfterSell < playerMin) {
-    return Math.max(1, playerMin - rosterAfterSell);
+  // `Math.max` statt roher Uebernahme: die Qualitaetsauswahl darf mehr Schritte wollen als das
+  // Minimum verlangt, aber nie weniger.
+  if (legacyCount > 0) return Math.max(legacyCount, bedarfBisMinimum);
+  if (bedarfBisMinimum > 0) {
+    return Math.max(1, bedarfBisMinimum);
   }
   if (rosterAfterSell != null && playerOpt != null && rosterAfterSell < playerOpt) {
     return Math.max(1, playerOpt - rosterAfterSell);
