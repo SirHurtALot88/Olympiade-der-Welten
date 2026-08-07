@@ -471,7 +471,7 @@ function chooseSellCandidates(
     .sort((left, right) => right.score - left.score || left.candidate.playerName.localeCompare(right.candidate.playerName, "de"));
   const rosterCount = gameState.rosters.filter((entry) => entry.teamId === team.teamId).length;
   const hardMin = getTeamHardMinRequired(gameState, team.teamId);
-  return uniqueById(
+  const regulaer = uniqueById(
     selectCompositeSellCandidates({
       candidates: qualified.map((entry) => ({ candidate: entry.candidate, score: entry.score })),
       teamCash: teamState?.cash ?? 0,
@@ -486,6 +486,109 @@ function chooseSellCandidates(
     }),
     (candidate) => candidate.activePlayerId,
   );
+
+  return ergaenzeNotverkaeufe({
+    regulaer,
+    bewertet: scored,
+    teamCash: teamState?.cash ?? 0,
+    teamSalaryTotal: salaryTotal,
+  });
+}
+
+/**
+ * NOTVERKAUF — der Ausweg fuer ein Team, das im Minus steht und sonst nichts verkaufen wuerde.
+ *
+ * GEMELDET: „D-P hat nicht verkauft und negatives cash die müssten eigentlich noch jemanden
+ * verkaufen oder einen Kredit aufnehmen"
+ *
+ * Am Spielstand nachgemessen: Death Peaches stand bei -4.20 Mio, hatte elf Spieler im Kader
+ * (Minimum 8) im Gesamtwert von 236.85 Mio — und plante NULL Verkaeufe. Der Verkaufs-Scan lieferte
+ * durchaus alle elf als Kandidaten, aber bei jedem einzelnen stand derselbe Keep-Grund:
+ * „aktueller Netto-Verkauf würde unter Einkauf liegen" und „frisch gekauft (season-1)".
+ *
+ * Das ist kein Zufall: das Team hatte seinen kompletten Kader im Liga-Draft der Saison 1 gekauft,
+ * also traegt JEDER Spieler diese Marke. Sie druecken den Composite-Score unter die Schwelle, und
+ * damit blieb `qualified` leer. Kredite sind in Saison 1 per Designregel gesperrt
+ * (`ai-loan-decision-service.ts:237`) — das Team konnte also weder verkaufen noch leihen und hing
+ * mit `negative_cash_unresolved_after_safe_sells` fest. Der Blocker BENANNTE die Lage, aus der es
+ * keinen Weg gab.
+ *
+ * REIHENFOLGE: nicht der verlustaermste Spieler zuerst, sondern der groesste Underperformer —
+ * „underperformer dürfen doch auch mit verlust verkauft werden solange der organisch in relation
+ * steht". Genau das misst der Composite-Sell-Score bereits: hoher Wert = dieser Spieler soll weg.
+ * Die Verhaeltnismaessigkeit steckt in der Schranke darunter: ein Verkauf, dessen Verlust groesser
+ * waere als der Erloes, zerstoert mehr Wert als er einbringt und kommt nur zum Zug, wenn sonst
+ * nichts das Minus abraeumt.
+ *
+ * KEINE ROSTER-UNTERGRENZE. Ein erster Entwurf brach ab, sobald der Kader das harte Minimum
+ * erreicht haette — das ist falsch: „teams müssen erst NACH DEM KAUFEN genügend spieler haben,
+ * nicht schon am ende der season nach dem verkaufen genug behalten, man kann theoretisch sein
+ * gesamtes team verkaufen". Die Kadergroesse wird in der Kaufphase wieder hergestellt; sie hier
+ * zu schuetzen wuerde das Minus konservieren, das der Notverkauf gerade aufloesen soll.
+ *
+ * Ansonsten bewusst eng gehalten:
+ *   - Greift NUR bei negativem Cash. Ein Team im Plus verhaelt sich unveraendert.
+ *   - Verkauft nur so viele, bis Cash wieder positiv ist plus dieselbe kleine Reserve, die auch
+ *     `cash_after_market_plan_below_reserve` ansetzt (5 % der Gehaltslast) — und keinen mehr.
+ */
+export function ergaenzeNotverkaeufe(input: {
+  regulaer: AiSellPreviewCandidate[];
+  bewertet: Array<{ candidate: AiSellPreviewCandidate; score: number }>;
+  teamCash: number;
+  teamSalaryTotal: number;
+}): AiSellPreviewCandidate[] {
+  if (input.teamCash >= 0) return input.regulaer;
+
+  // Dieselbe Reserve-Definition wie im Blocker weiter unten — sonst raeumt der Notverkauf zwar das
+  // Minus ab, und `cash_after_market_plan_below_reserve` blockiert danach trotzdem weiter.
+  const reserve = Math.max(1, input.teamSalaryTotal * 0.05);
+  const erloes = (candidate: AiSellPreviewCandidate) => candidate.expectedSellValue ?? 0;
+
+  let cash = input.teamCash + input.regulaer.reduce((summe, candidate) => summe + erloes(candidate), 0);
+  if (cash >= reserve) return input.regulaer;
+
+  const schonDrin = new Set(input.regulaer.map((candidate) => candidate.activePlayerId));
+  // Verlust = was der Verkauf gegenueber dem Einkaufspreis kostet. Genau die Groesse, die der
+  // Keep-Grund schuetzt.
+  const verlust = (candidate: AiSellPreviewCandidate) =>
+    Math.max(0, (candidate.purchasePrice ?? 0) - erloes(candidate));
+  /**
+   * „solange der organisch in relation steht" — die Schranke.
+   *
+   * Ein Verlust, der den Erloes uebersteigt, steht in keinem Verhaeltnis mehr: das Team gibt mehr
+   * Teamwert auf, als es Geld sieht. Solche Verkaeufe wandern ans Ende und kommen nur zum Zug,
+   * wenn die verhaeltnismaessigen zusammen das Minus nicht abraeumen — besser ein schmerzhafter
+   * Verkauf als ein Team, das den Saisonwechsel blockiert.
+   */
+  const verhaeltnismaessig = (candidate: AiSellPreviewCandidate) =>
+    verlust(candidate) <= erloes(candidate);
+
+  const nachDringlichkeit = (links: AiSellPreviewCandidate, rechts: AiSellPreviewCandidate) =>
+    // Hoher Sell-Score = groesster Underperformer, der soll zuerst gehen.
+    (rechts.strategicSellScore ?? rechts.sellPriorityScore ?? rechts.sellPriority ?? 0) -
+      (links.strategicSellScore ?? links.sellPriorityScore ?? links.sellPriority ?? 0) ||
+    // Gleich dringlich: der kleinere Verlust, dann der hoehere Erloes (weniger Verkaeufe noetig).
+    verlust(links) - verlust(rechts) ||
+    erloes(rechts) - erloes(links) ||
+    links.playerName.localeCompare(rechts.playerName, "de");
+
+  const offen = input.bewertet
+    .map((entry) => entry.candidate)
+    .filter((candidate) => !schonDrin.has(candidate.activePlayerId));
+  const kandidaten = [
+    ...offen.filter(verhaeltnismaessig).sort(nachDringlichkeit),
+    ...offen.filter((candidate) => !verhaeltnismaessig(candidate)).sort(nachDringlichkeit),
+  ];
+
+  const notverkaeufe: AiSellPreviewCandidate[] = [];
+  for (const candidate of kandidaten) {
+    if (cash >= reserve) break;
+    if (erloes(candidate) <= 0) continue;
+    notverkaeufe.push(candidate);
+    cash += erloes(candidate);
+  }
+
+  return [...input.regulaer, ...notverkaeufe];
 }
 
 function normalizeMarketPlanGameState(gameState: GameState) {
