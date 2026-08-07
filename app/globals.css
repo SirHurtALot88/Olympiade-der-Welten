@@ -66329,6 +66329,28 @@ button.is-new-look .nl-thist-season-pill,
   font-weight: 700;
 }
 
+/* Die Gruppenzeile trägt jetzt Schnitt und Top-Spieler in denselben Spalten wie
+   die Disziplin-Zeilen. Ihre Zellen bekommen daher die Tönung der Achse, damit
+   der Kopf trotz Spaltenraster als zusammenhängender Block lesbar bleibt. */
+.is-new-look .nl-teamprofile-depth-grouprow > td {
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 10%, transparent);
+  border-bottom: 1px solid var(--nl-line-2);
+}
+
+.is-new-look .nl-teamprofile-depth-groupavg {
+  color: var(--nl-tone, var(--nl-ink));
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Der Achsen-Schnitt eines Spielers ist eine andere Größe als sein Wert in einer
+   einzelnen Disziplin — etwas zurückgenommen, damit die Kopfzeile die Zeilen
+   darunter nicht überstrahlt. */
+.is-new-look .nl-teamprofile-depth-cell.is-axis {
+  min-width: 76px;
+  opacity: 0.92;
+}
+
 /* --- Responsive (nl-teamprofile-fan-/board-/depth-) ------------------ */
 @media (max-width: 900px) {
   .is-new-look .nl-teamprofile-fan-grid {
