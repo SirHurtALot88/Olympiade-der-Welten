@@ -70,7 +70,54 @@ export type FoundationSeasonFinalePanelProps = {
    * die Phase nicht zuliess.
    */
   onOpenTransferWindow: () => void;
+  /**
+   * Was der Server zuletzt abgelehnt hat — oder `null`.
+   *
+   * GEMELDET: „habe saisonwechsel prüfen gedrückt dann kam so ne meldung dass training etc
+   * geschrieben wird ich hab ok gedrückt aber es passiert nix"
+   *
+   * Genau so sah es aus, und das war kein Missverstaendnis: `runPreSeasonNextSeasonSetup`
+   * (`lib/foundation/tabs/cockpit-handlers.ts:305`) legt jede Ablehnung in
+   * `preSeasonWorkflowError` ab. Der Router reicht das ans Cockpit weiter, wo es als roter Text
+   * erscheint — an DIESE Ansicht bisher nicht. Wer den Saisonwechsel hier startete, bekam bei
+   * einer Ablehnung nichts: kein Fehler, keine Bewegung, kein Hinweis. Nachgemessen am
+   * Spielstand des Servers: der Klick hatte NICHTS geschrieben, der Stand war unveraendert.
+   *
+   * Ein Knopf, der stumm nichts tut, ist schlimmer als einer, der eine haessliche Meldung
+   * zeigt — deshalb steht der Text jetzt hier, ohne Umweg ueber das Cockpit.
+   */
+  workflowError: string | null;
+  /** Blocker aus der letzten Vorschau, in Klartext uebersetzt weiter unten. */
+  workflowBlockingReasons: string[];
+  /**
+   * Wie viele Teams noch auf eine manuelle Sponsorenwahl warten.
+   *
+   * Der Schritt existierte im Workflow (`preseason-workflow-service.ts:1206`) und blockiert
+   * mit `manual_sponsor_choice_pending` — nur fuehrte aus dieser Liste kein Weg dorthin.
+   */
+  sponsorChoicePending: number;
+  /** Fuehrt zur Sponsorenseite (Finanzen), wo die Wahl getroffen wird. */
+  onOpenSponsors: () => void;
 };
+
+/**
+ * Blocker-Codes in Alltagssprache.
+ *
+ * Der Server antwortet mit Kuerzeln wie `manual_sponsor_choice_pending`. Die roh anzuzeigen
+ * waere derselbe Fehler wie der Debug-Screen, von dem diese Ansicht wegfuehren soll — aber
+ * unuebersetzt durchzureichen ist immer noch besser, als sie zu verschlucken.
+ */
+const BLOCKER_TEXTE: Record<string, string> = {
+  manual_sponsor_choice_pending: "Es fehlt noch eine Sponsorenwahl.",
+  season_not_complete: "Die Saison ist noch nicht zu Ende gespielt.",
+  transfer_window_open: "Das Transferfenster ist noch offen.",
+  pending_payout: "Die Sponsorenzahlung dieser Saison ist noch nicht gebucht.",
+};
+
+function blockerText(code: string): string {
+  const nackt = code.split(":")[0] ?? code;
+  return BLOCKER_TEXTE[nackt] ?? code;
+}
 
 function formatValue(value: number | string | null): string {
   if (value == null) return "—";
@@ -99,6 +146,10 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
     onOpenDevelopment,
     onOpenRoster,
     onOpenTransferWindow,
+    workflowError,
+    workflowBlockingReasons,
+    sponsorChoicePending,
+    onOpenSponsors,
   } = props;
 
   /**
@@ -204,6 +255,29 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
       // auch niemanden hin. Der Schritt darueber ist dann der einzige, der weiterfuehrt.
       action: expiringContracts > 0 && sellWindowOpen ? { label: "Zum Kader", onClick: onOpenRoster } : null,
     },
+    /**
+     * Der zweite Schritt, der vorher fehlte.
+     *
+     * `sponsor_choice` blockiert den Saisonwechsel mit `manual_sponsor_choice_pending`, sobald
+     * ein von Hand gefuehrtes Team noch keinen Sponsor hat. Diese Liste kannte den Schritt
+     * nicht — der Start scheiterte also an etwas, das hier nicht einmal erwaehnt war. Steht die
+     * Wahl an, fuehrt diese Zeile direkt zur Sponsorenseite statt in den Cockpit-Assistenten.
+     */
+    ...(sponsorChoicePending > 0
+      ? [
+          {
+            key: "sponsor-choice",
+            title:
+              sponsorChoicePending === 1
+                ? "Sponsor wählen"
+                : `Sponsor wählen (${sponsorChoicePending} Teams)`,
+            detail:
+              "Ohne Sponsorenvertrag geht der Saisonwechsel nicht weiter. Die Angebote liegen unter Finanzen.",
+            state: (readOnly ? "blocked" : "ready") as SeasonFinaleStepState,
+            action: readOnly ? null : { label: "Zu den Sponsoren", onClick: onOpenSponsors },
+          },
+        ]
+      : []),
     {
       key: "next-season",
       title: "Neue Saison starten",
@@ -278,6 +352,24 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
                   <small>{row.status === "completed" ? "erfüllt" : row.status === "failed" ? "verfehlt" : "offen"}</small>
                 </li>
               ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {/* WAS DER SERVER SAGT. Vorher landete das ausschliesslich im Cockpit — hier sah eine
+          Ablehnung aus wie ein toter Knopf. Ein Fehler wiegt schwerer als ein Blocker, deshalb
+          steht er zuerst und beides erscheint nie gleichzeitig doppelt. */}
+      {workflowError ? (
+        <p className="text-negative nl-season-finale-error" role="alert" data-testid="season-finale-error">
+          {workflowError}
+        </p>
+      ) : workflowBlockingReasons.length > 0 ? (
+        <div className="nl-season-finale-blockers" data-testid="season-finale-blockers">
+          <strong>Das hält den Saisonwechsel noch auf:</strong>
+          <ul>
+            {workflowBlockingReasons.map((code) => (
+              <li key={code}>{blockerText(code)}</li>
+            ))}
           </ul>
         </div>
       ) : null}
