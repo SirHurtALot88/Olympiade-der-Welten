@@ -19,6 +19,12 @@ export type UnifiedTeamPickPlanInput = {
   excludedPlayerIds?: string[];
   draftSeed?: string | null;
   source?: AiNeedsPicksCompareParams["source"];
+  /**
+   * Erloes der Verkaeufe aus demselben Plan — Geld, das das Team gleich hat, aber noch nicht auf
+   * dem Konto. Ohne diese Weitergabe bemisst die Pick-Engine ihr Budget am Kontostand VOR den
+   * Verkaeufen und liefert weniger Picks, als angefordert wurden.
+   */
+  zusaetzlichesCash?: number | null;
 };
 
 export type UnifiedTeamPickPlanResult = {
@@ -44,6 +50,7 @@ export async function planUnifiedTeamPicks(input: UnifiedTeamPickPlanInput): Pro
     excludedPlayerIds: input.excludedPlayerIds ?? [],
     draftSeed: input.draftSeed ?? null,
     teamScope: "all",
+    zusaetzlichesCash: input.zusaetzlichesCash ?? null,
   });
 
   const team = compare.teams.find((entry) => entry.teamId === input.teamId) ?? compare.teams[0] ?? null;
