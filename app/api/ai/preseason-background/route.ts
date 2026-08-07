@@ -18,6 +18,7 @@ import {
 } from "@/lib/ai/ai-preseason-manual-team-guard";
 import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
 import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
+import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { resolveAiBulkTeamWriteScope } from "@/lib/room/ai-bulk-team-write-scope";
@@ -289,6 +290,12 @@ async function executeAiPreseasonBackgroundWork(input: {
       options: {
         includeWarningTeams: false,
         stopOnTeamFailure: false,
+        // Kauffenster der neuen Saison = reine KAUF-Phase (Chris: verkauft wird als separater
+        // Schritt am Saisonende, ueber die Saisonende-Kette). Ein Verkaufslauf hier wuerde die
+        // frisch am Saisonende verkauften Teams ein zweites Mal schrumpfen — und das Fenster
+        // ist fuer den Menschen aus demselben Grund ebenfalls kauf-only
+        // (`isEarlySeasonTransferSetup` zaehlt nur fuers Kaufen, transfer-window-policy).
+        applySellSteps: false,
       },
     });
     const completedTeams = market.results.filter(
@@ -419,6 +426,26 @@ export async function POST(request: Request) {
     const aiTeamIds = getAiTeamIds(protectedSave.gameState, callerWritableTeamIds);
     const startedAt = nowIso();
     const setupDraftMode = shouldRunSetupDraft(protectedSave.gameState, aiTeamIds);
+
+    /**
+     * CHRIS' REGEL: „wir verkaufen als separaten schritt zum ende der saison und gekauft wird
+     * erst in der folgesaison."
+     *
+     * Der Season-Market-Lauf gehoert ins Kauffenster der NEUEN Saison. Solange der Spielstand
+     * noch in der Saisonende-Kette steht (`isSeasonEndPhase`), laufen die Verkaeufe dort ueber
+     * den Saisonende-Assistenten (`runSeasonEndAiSellsIfDue`) — ein Marktlauf hier waere ein
+     * zweiter, konkurrierender Schreiber mitten in der Kette. Bewusst wird KEIN Run-Record
+     * geschrieben: der Lauf ist nicht erledigt, sondern verschoben; im Kauffenster der neuen
+     * Saison stoesst der Client ihn unter der neuen Saison-ID regulaer an.
+     */
+    if (!setupDraftMode && isSeasonEndPhase(protectedSave.gameState.gamePhase)) {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: "ai_preseason_deferred_until_new_season_buy_window",
+        run: null,
+      });
+    }
     const baseRecord: AiPreseasonAutomationRunRecord = {
       runId: `ai-preseason-${saveId}-${seasonId}-${Date.now()}`,
       seasonId,
