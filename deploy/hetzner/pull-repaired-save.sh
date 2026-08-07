@@ -151,16 +151,25 @@ rm -f "$TMP_GZ"
 # Plausibilitaet: ist es ueberhaupt eine SQLite mit Spielstaenden drin? Geprueft wird IM Container,
 # weil dort `better-sqlite3` garantiert vorhanden ist (ein `sqlite3`-CLI waere es nicht) — dieselbe
 # Ueberlegung wie in push-live-save.sh.
-compose cp "$TMP_DB" "oly-app:/tmp-pruefen.sqlite"
+#
+# Die Pruefdatei MUSS in einem Ordner liegen, den der Container-Benutzer beschreiben darf, und
+# `/tmp/` ist genau das. Vorher stand hier `/tmp-pruefen.sqlite` — ein fehlender Schraegstrich, der
+# die Datei nicht IN /tmp legte, sondern als `tmp-pruefen.sqlite` direkt ins Wurzelverzeichnis.
+# Das gehoert root, der Dienst laeuft aber als `oly`. Und weil der Spielstand im WAL-Modus liegt,
+# genuegt Leserecht nicht: SQLite legt beim Oeffnen einer WAL-Datenbank IMMER `-shm` und `-wal`
+# daneben an, auch bei `readonly: true`. In `/` scheiterte das mit SQLITE_READONLY_DIRECTORY —
+# und zwar erst beim `--pruefen`, also genau in dem Schritt, der Sicherheit geben sollte.
+compose cp "$TMP_DB" "oly-app:/tmp/oly-pruefen.sqlite"
 ANZAHL="$(compose exec -T oly-app node -e "
   const Database = require('better-sqlite3');
-  const db = new Database('/tmp-pruefen.sqlite', { readonly: true });
+  const db = new Database('/tmp/oly-pruefen.sqlite', { readonly: true });
   const n = db.prepare('SELECT COUNT(*) AS n FROM saves').get().n;
   const namen = db.prepare('SELECT name FROM saves ORDER BY updated_at DESC LIMIT 3').all().map(r => r.name);
   db.close();
   process.stdout.write(n + '|' + namen.join(' / '));
 ")"
-compose exec -T oly-app sh -c "rm -f /tmp-pruefen.sqlite" >/dev/null 2>&1 || true
+# `-shm`/`-wal` mit wegraeumen, sonst bleiben nach jedem Lauf zwei Seitendateien im Container liegen.
+compose exec -T oly-app sh -c "rm -f /tmp/oly-pruefen.sqlite /tmp/oly-pruefen.sqlite-shm /tmp/oly-pruefen.sqlite-wal" >/dev/null 2>&1 || true
 echo "      Spielstaende in der Datei: ${ANZAHL%%|*}"
 echo "      neueste: ${ANZAHL#*|}"
 if [ "${ANZAHL%%|*}" = "0" ]; then
