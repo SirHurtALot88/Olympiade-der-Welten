@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-07",
+  "seite": "Server · Spielstand zurückspielen",
+  "text": "Nach dem Einsetzen eines reparierten Spielstands war das Spiel eingefroren: „attempt to write a readonly database\". Die Datei wird als root in den Container kopiert, der Dienst läuft aber als eigener Benutzer — lesen ging, schreiben nicht. Das Skript setzt die Besitzrechte jetzt zurück, auf dem Hin- wie auf dem Rückweg.",
+  "gewicht": "spielblockierend",
+  "version": "0.4"
+}

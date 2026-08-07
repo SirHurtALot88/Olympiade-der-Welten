@@ -83,6 +83,23 @@ einsetzen() {
   # schlimmstenfalls ist die Datenbank kaputt.
   compose run --rm --no-deps --entrypoint sh oly-app \
     -c "rm -f ${DB_IM_CONTAINER}-wal ${DB_IM_CONTAINER}-shm" >/dev/null 2>&1 || true
+  # BESITZRECHTE ZURUECKSETZEN — sonst ist der Spielstand nur noch lesbar.
+  #
+  # GEMELDET, nach dem ersten echten Einsatz dieses Skripts: "Neue Saison starten" brach mit
+  # „attempt to write a readonly database" ab. Die Datei war da, der Inhalt stimmte, gelesen wurde
+  # sie auch — nur schreiben ging nicht mehr.
+  #
+  # Ursache: `docker compose cp` schreibt als ROOT in den Container. Der Dienst laeuft aber als
+  # `oly` (Dockerfile:67 `adduser --system --uid 1001 oly`, Dockerfile:82 `USER oly`), und
+  # Dockerfile:80 setzt beim Bauen eigens `chown -R oly:nodejs /app/data`. Nach dem Einsetzen
+  # gehoerte die Datei root — die App konnte sie oeffnen und lesen, aber keine Zeile mehr
+  # schreiben. Der Spielstand sah damit voellig gesund aus und war doch eingefroren.
+  #
+  # `--user 0`, weil nur root fremde Dateien uebereignen darf. Das `|| true` faengt den Fall ab,
+  # dass ein Image ohne `oly` gebaut wurde; dann bleibt es beim alten Verhalten statt abzubrechen.
+  echo "      Besitzrechte auf den Dienst-Benutzer zuruecksetzen ..."
+  compose run --rm --no-deps --user 0 --entrypoint sh oly-app \
+    -c "chown oly:nodejs ${DB_IM_CONTAINER}" >/dev/null 2>&1 || true
   echo "      App starten ..."
   compose up -d oly-app
 }
