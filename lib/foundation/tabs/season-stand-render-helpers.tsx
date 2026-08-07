@@ -1,5 +1,12 @@
 "use client";
 
+// Beide Helfer sind reine Rechnung und liegen jetzt in einem serverfaehigen Modul: ueber
+// team-discipline-rank-engine.ts zog season-snapshot-service.ts dieses "use client"-Modul sonst
+// in einen Route-Handler, und der Saisonwechsel starb mit
+// "roundViewNumber ... is on the client". Re-Export, damit kein Aufrufer angefasst werden muss.
+export { buildSharedRankMap, roundViewNumber } from "@/lib/foundation/season-stand-rank-helpers";
+import { buildSharedRankMap, roundViewNumber } from "@/lib/foundation/season-stand-rank-helpers";
+
 import type { CSSProperties } from "react";
 import type { GameState, Player, RosterEntry } from "@/lib/data/olyDataTypes";
 import type { SaisonstandColumnContractEntry } from "@/lib/foundation/saisonstand-column-contract";
@@ -303,9 +310,6 @@ export function renderEconomyDelta(
   );
 }
 
-export function roundViewNumber(value: number, digits = 4) {
-  return Number(value.toFixed(digits));
-}
 
 export function resolveSeasonPlayerAxisValue(...candidates: Array<number | null | undefined>) {
   for (const value of candidates) {
@@ -475,32 +479,6 @@ export function getSeasonMatrixRankClass(rank: number) {
     return "pp-rank-watch";
   }
   return "pp-rank-muted";
-}
-
-export function buildSharedRankMap(values: Array<{ teamId: string; value: number }>) {
-  const sortedValues = [...values].sort((left, right) => {
-    if (right.value !== left.value) {
-      return right.value - left.value;
-    }
-    return left.teamId.localeCompare(right.teamId, "de");
-  });
-  const rankMap = new Map<string, number>();
-  let previousValue: number | null = null;
-  let previousRank = 0;
-
-  sortedValues.forEach((entry, index) => {
-    if (previousValue != null && Math.abs(previousValue - entry.value) < 0.0001) {
-      rankMap.set(entry.teamId, previousRank);
-      return;
-    }
-
-    const nextRank = index + 1;
-    previousValue = entry.value;
-    previousRank = nextRank;
-    rankMap.set(entry.teamId, nextRank);
-  });
-
-  return rankMap;
 }
 
 export function buildMetricRankMap(values: Array<{ id: string; value: number | null | undefined }>) {
