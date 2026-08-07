@@ -18,6 +18,7 @@ const applyAiMarketPlanLocally = vi.fn();
 const applyAiManagerPlan = vi.fn();
 const applyAiInjuryDepthTopup = vi.fn();
 const runAiPicksExecutePreview = vi.fn();
+const runAutoRosterFillForMatchdaySetup = vi.fn();
 const saveSingleplayerState = vi.fn();
 
 vi.mock("@/lib/ai/ai-market-plan-apply-service", () => ({
@@ -34,6 +35,13 @@ vi.mock("@/lib/ai/ai-injury-depth-topup-service", () => ({
 
 vi.mock("@/lib/ai/ai-picks-run-service", () => ({
   runAiPicksExecutePreview,
+}));
+
+// Der Kader-Fuell-Lauf haengt hier nur als Nachbar mit drin; sein echter Modulbaum ist gross genug,
+// dass das Laden allein den Test ueber die Zeit bringt. Was er tut, prueft
+// tests/kader-auf-optimum-in-neuer-saison.test.ts.
+vi.mock("@/lib/ai/auto-roster-fill-service", () => ({
+  runAutoRosterFillForMatchdaySetup,
 }));
 
 vi.mock("@/lib/room/server-authoritative-write-guard", () => ({
@@ -97,7 +105,7 @@ function baueGameState(gamePhase: GameState["gamePhase"]): GameState {
       duplicateTeamCodes: [],
       warnings: [],
     },
-  } as GameState;
+  } as unknown as GameState;
 }
 
 function baueRequest() {
@@ -114,7 +122,9 @@ describe("Preseason-Hintergrundlauf: Kaeufe gehoeren ins Kauffenster der neuen S
     applyAiManagerPlan.mockReset();
     applyAiInjuryDepthTopup.mockReset();
     runAiPicksExecutePreview.mockReset();
+    runAutoRosterFillForMatchdaySetup.mockReset();
     saveSingleplayerState.mockReset();
+    runAutoRosterFillForMatchdaySetup.mockResolvedValue({ summary: { appliedBuys: 0 }, teams: [] });
     applyAiManagerPlan.mockReturnValue({ actions: [], warnings: [], blockers: [] });
     applyAiInjuryDepthTopup.mockReturnValue({ playersBoughtTotal: 0, warnings: [] });
     applyAiMarketPlanLocally.mockResolvedValue({

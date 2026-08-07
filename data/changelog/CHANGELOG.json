@@ -23,6 +23,15 @@
       "datum": "2026-08-07",
       "seite": "Markt · Preseason-Marktplan",
       "pr": null,
+      "text": "KI-Teams blieben zum Saisonstart auf dem Kader-Minimum stehen, obwohl Geld da war. Grund: in der neuen Saison lief nur der pflegende Marktplan, nicht der aufbauende Füll-Lauf aus Saison 1. Der ist jetzt im Kauffenster mit verdrahtet und füllt nach dem Marktlauf bis zum Optimum der Team-Identität — am Spielstand gemessen kein Team mehr unter dem Minimum statt sechs, und nur noch drei unter ihrem Optimum (alle drei aus Geldmangel).",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Markt · Preseason-Marktplan",
+      "pr": null,
       "text": "KI-Teams mit zu kleinem Kader blieben unter dem Minimum stehen und blockierten den Preseason-Markt — obwohl Geld und freie Spieler reichlich da waren. Die Vorschlagsliste war auf drei Spieler fest verdrahtet, egal wie viele fehlten, und die Schrittzahl des Pick-Planers übernahm ungeprüft eine zu kleine Vorgabe. Beides richtet sich jetzt nach dem tatsächlichen Bedarf bis zum Kader-Minimum.",
       "quelle": "gepflegt",
       "gewicht": "spielblockierend",
@@ -116,7 +125,7 @@
       "text": "Das Saisonende kommt jetzt bis zum Ende durch. Vorher konnte man in einer Schleife hängenbleiben: die KI verkaufte, dadurch fielen Teams unter Kadermindestgröße, und der Liga-Draft hielt das für einen abgebrochenen Spielaufbau und kaufte erneut ganze Kader voll — auch für manuell geführte Teams. Ursache war ein Name für zwei gegenteilige Zeitpunkte: die erste Station des Saisonendes hieß genauso wie der frische Spielaufbau. Sie heißt jetzt eigenständig, alte Spielstände werden beim Laden umgeschrieben. Außerdem verkauft die Station „Verkäufe\" endlich wirklich: der Verkaufsdienst war fertig und getestet, wurde vom Saisonende-Assistenten aber nie aufgerufen — KI-Teams gingen mit unverändertem Kader und ohne frisches Geld in die neue Saison, und auf dem Markt lag nichts zu kaufen.",
       "quelle": "gepflegt",
       "gewicht": "grundlegend",
-      "version": "0.4.14"
+      "version": "0.4"
     },
     {
       "datum": "2026-08-05",
