@@ -4,10 +4,28 @@ on:
   push:
     branches: [main, master]
   pull_request:
+  # Manuell startbar: wenn ein Lauf ohne eigenes Zutun stirbt (kein Runner
+  # zugeteilt, Kontingent leer, Abbruch von außen), gab es bisher keinen Weg,
+  # die Checks eines Branches neu anzufordern — ein Re-run hängt am alten
+  # Commit, und ein Leer-Commit nur zum Auslösen verschmutzt die Historie.
+  workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Der Event-Typ gehört in den Gruppennamen, sonst teilt sich ein manuell
+  # angeforderter Lauf die Gruppe mit dem automatischen desselben Refs. Genau
+  # daran ist der Branch hier hängengeblieben: Ein Re-run (Run 31119230237) blieb
+  # dauerhaft in "queued" stehen, ließ sich weder abbrechen ("Cannot cancel a
+  # workflow re-run that has not yet queued") noch löschen — und blockierte damit
+  # jeden weiteren Lauf DIESES Pull Requests, während andere Branches normal
+  # Runner bekamen. Mit dem Event im Namen kommt man an so einem Zombie vorbei,
+  # ohne auf GitHub-Support angewiesen zu sein.
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  # Auf main NICHT abbrechen. Ein abgebrochener Lauf schließt mit conclusion
+  # "failure" ab — main sah dadurch rot aus, obwohl kein einziger Test
+  # fehlgeschlagen war (Lauf 31124228216: 15 Minuten, kein Runner, kein
+  # ausgeführter Step, trotzdem rot). Für Pull Requests bleibt das Abbrechen
+  # richtig: dort macht ein neuer Push den vorherigen Lauf gegenstandslos.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master' }}
 
 jobs:
   test-and-smoke:

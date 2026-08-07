@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useRef, useState, type ReactNode } from "react";
 
 import FoundationPlayerPortraitCard, {
   type FoundationPlayerPortraitEconomyStat,
@@ -240,6 +240,35 @@ type NlTeamProfileDepthFallbackRow = {
   label: string;
   cells: Array<{ playerId: string; playerName: string; rating: number } | null>;
 };
+
+type NlTeamProfileDepthGroup = {
+  axis: NlAxisKey;
+  label: "POW" | "SPE" | "MEN" | "SOC";
+  rows: NlTeamProfileDepthRow[];
+  thinCount: number;
+};
+
+/**
+ * Gruppiert die Depth-Chart nach Achse (POW → SPE → MEN → SOC), damit die 20
+ * Disziplinen nicht als eine lange Liste stehen. Innerhalb einer Achse bleibt
+ * die `displayOrder` aus `buildTeamDepthChart` erhalten — hier wird nur
+ * zusammengefasst, nicht umsortiert.
+ *
+ * Achsen ohne Disziplin fallen raus statt als leere Gruppe zu erscheinen: das
+ * tritt nur auf, wenn der Disziplinen-Katalog eine Achse gar nicht bedient, und
+ * eine leere aufklappbare Gruppe wäre dann bloß eine Sackgasse.
+ */
+export function groupDepthRowsByAxis(rows: NlTeamProfileDepthRow[]): NlTeamProfileDepthGroup[] {
+  return NL_TEAMPROFILE_AXES.map(({ key, label }) => {
+    const axisRows = rows.filter((row) => row.axis === key);
+    return {
+      axis: key,
+      label,
+      rows: axisRows,
+      thinCount: axisRows.filter((row) => row.isThin).length,
+    };
+  }).filter((group) => group.rows.length > 0);
+}
 
 function buildTeamDepthChart(gameState: GameState, teamId: string): NlTeamProfileDepthRow[] | null {
   const rosterEntries = gameState.rosters.filter((entry) => entry.teamId === teamId);
@@ -513,6 +542,11 @@ export default function TeamProfileNewLook({
   gameState: gameStateProp = null,
 }: TeamProfileNewLookProps) {
   const [rosterMode, setRosterMode] = useState<NlTeamProfileRosterMode>("portraits");
+  // Gespeichert wird das ZUgeklappte, nicht das Aufgeklappte: so startet die
+  // Karte vollständig offen (derselbe Anblick wie vor der Gruppierung — es
+  // verschwindet nichts, was vorher da war), und eine neu hinzukommende Achse
+  // ist automatisch sichtbar statt versteckt.
+  const [collapsedDepthAxes, setCollapsedDepthAxes] = useState<readonly NlAxisKey[]>([]);
 
   const developmentCardRef = useRef<HTMLDivElement | null>(null);
   const rosterCardRef = useRef<HTMLDivElement | null>(null);
@@ -782,6 +816,11 @@ export default function TeamProfileNewLook({
     [foundationGameState, data.teamId],
   );
 
+  const depthChartGroups = useMemo(
+    () => (depthChart != null ? groupDepthRowsByAxis(depthChart) : null),
+    [depthChart],
+  );
+
   const depthChartFallback = useMemo<NlTeamProfileDepthFallbackRow[] | null>(() => {
     if (foundationGameState || visiblePlayers.length === 0) {
       return null;
@@ -1008,6 +1047,68 @@ export default function TeamProfileNewLook({
           />
         ))}
       </div>
+    );
+  }
+
+  /**
+   * Eine Disziplin-Zeile der Depth-Chart. Ausgelagert, weil die Zeilen seit der
+   * Achsen-Gruppierung aus vier getrennten <tbody> heraus gerendert werden —
+   * inline stünde derselbe Block sonst mehrfach verschachtelt im Tabellenkörper.
+   */
+  function renderDepthRow(row: NlTeamProfileDepthRow) {
+    return (
+      <tr key={row.disciplineId} className={`nl-teamprofile-depth-row${row.isThin ? " is-thin" : ""}`}>
+        <td className={`nl-teamprofile-depth-discipline ${nlToneClass(row.axis)}`}>
+          <span className="nl-teamprofile-depth-axis-dot" aria-hidden="true" />
+          {row.disciplineLabel}
+        </td>
+        <td
+          className="nl-teamprofile-depth-slots"
+          title={
+            row.slotsNeeded != null
+              ? `${row.capableCount} von ${row.slotsNeeded} Slots mit Rating ≥ ${DEPTH_CAPABLE_RATING_FLOOR} besetzbar`
+              : `${row.capableCount} Spieler mit Rating ≥ ${DEPTH_CAPABLE_RATING_FLOOR}`
+          }
+        >
+          {row.slotsNeeded != null
+            ? `${row.capableCount}/${row.slotsNeeded}`
+            : formatNlNumber(row.capableCount, 0)}
+        </td>
+        {row.cells.map((cell, index) => (
+          <td key={index} className="nl-teamprofile-depth-cell-wrap">
+            {cell != null ? (
+              <button
+                type="button"
+                className={`nl-teamprofile-depth-cell ${nlToneClass(getDepthRatingTone(cell.rating))}`}
+                onClick={() => onOpenPlayer(cell.playerId, cell.playerId)}
+                title={`${cell.playerName} · ${row.disciplineLabel} ${formatNlNumber(cell.rating, 0)}`}
+              >
+                <span className="nl-teamprofile-depth-cell-name">{cell.playerName}</span>
+                <span className="nl-teamprofile-depth-cell-rating nl-tnum">
+                  {formatNlNumber(cell.rating, 0)}
+                </span>
+                {cell.injuryStatus === "injured" || cell.injuryStatus === "recovering" ? (
+                  <span
+                    className="nl-teamprofile-depth-badge is-injury"
+                    title={cell.injuryStatus === "injured" ? "Verletzt" : "In Reha"}
+                  >
+                    V
+                  </span>
+                ) : cell.fatigue != null && cell.fatigue >= DEPTH_FATIGUE_WARN_THRESHOLD ? (
+                  <span
+                    className="nl-teamprofile-depth-badge is-fatigue"
+                    title={`Erschöpfung ${formatNlNumber(cell.fatigue, 0)}`}
+                  >
+                    M
+                  </span>
+                ) : null}
+              </button>
+            ) : (
+              <span className="nl-teamprofile-depth-cell is-empty">—</span>
+            )}
+          </td>
+        ))}
+      </tr>
     );
   }
 
@@ -1737,65 +1838,62 @@ export default function TeamProfileNewLook({
                     <th>6.</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {depthChart.map((row) => (
-                    <tr
-                      key={row.disciplineId}
-                      className={`nl-teamprofile-depth-row${row.isThin ? " is-thin" : ""}`}
-                    >
-                      <td className={`nl-teamprofile-depth-discipline ${nlToneClass(row.axis)}`}>
-                        <span className="nl-teamprofile-depth-axis-dot" aria-hidden="true" />
-                        {row.disciplineLabel}
-                      </td>
-                      <td
-                        className="nl-teamprofile-depth-slots"
-                        title={
-                          row.slotsNeeded != null
-                            ? `${row.capableCount} von ${row.slotsNeeded} Slots mit Rating ≥ ${DEPTH_CAPABLE_RATING_FLOOR} besetzbar`
-                            : `${row.capableCount} Spieler mit Rating ≥ ${DEPTH_CAPABLE_RATING_FLOOR}`
-                        }
-                      >
-                        {row.slotsNeeded != null
-                          ? `${row.capableCount}/${row.slotsNeeded}`
-                          : formatNlNumber(row.capableCount, 0)}
-                      </td>
-                      {row.cells.map((cell, index) => (
-                        <td key={index} className="nl-teamprofile-depth-cell-wrap">
-                          {cell != null ? (
+                {(depthChartGroups ?? []).map((group) => {
+                  const isCollapsed = collapsedDepthAxes.includes(group.axis);
+                  const groupBodyId = `nl-teamprofile-depth-axis-${group.axis}`;
+                  return (
+                    <Fragment key={group.axis}>
+                      {/* Kopf und Disziplinen liegen in zwei getrennten <tbody>: so trägt
+                          genau ein Element die Id, auf die `aria-controls` zeigt, und der
+                          zugeklappte Block bleibt im DOM (nur `hidden`), statt zu
+                          verschwinden — ein aria-controls ins Leere wäre kaputt. */}
+                      <tbody className="nl-teamprofile-depth-groupbody">
+                        <tr
+                          className={`nl-teamprofile-depth-grouprow ${nlToneClass(group.axis)}${isCollapsed ? " is-collapsed" : ""}`}
+                        >
+                          <th colSpan={8} scope="colgroup" className="nl-teamprofile-depth-groupcell">
                             <button
                               type="button"
-                              className={`nl-teamprofile-depth-cell ${nlToneClass(getDepthRatingTone(cell.rating))}`}
-                              onClick={() => onOpenPlayer(cell.playerId, cell.playerId)}
-                              title={`${cell.playerName} · ${row.disciplineLabel} ${formatNlNumber(cell.rating, 0)}`}
+                              className="nl-teamprofile-depth-grouptoggle"
+                              aria-expanded={!isCollapsed}
+                              aria-controls={groupBodyId}
+                              onClick={() =>
+                                setCollapsedDepthAxes((current) =>
+                                  current.includes(group.axis)
+                                    ? current.filter((axis) => axis !== group.axis)
+                                    : [...current, group.axis],
+                                )
+                              }
                             >
-                              <span className="nl-teamprofile-depth-cell-name">{cell.playerName}</span>
-                              <span className="nl-teamprofile-depth-cell-rating nl-tnum">
-                                {formatNlNumber(cell.rating, 0)}
+                              <span className="nl-teamprofile-depth-groupcaret" aria-hidden="true">
+                                {isCollapsed ? "▸" : "▾"}
                               </span>
-                              {cell.injuryStatus === "injured" || cell.injuryStatus === "recovering" ? (
+                              <span className="nl-teamprofile-depth-axis-dot" aria-hidden="true" />
+                              <span className="nl-teamprofile-depth-grouplabel">{group.label}</span>
+                              <span className="nl-teamprofile-depth-groupcount nl-tnum">
+                                {formatNlNumber(group.rows.length, 0)} Disziplinen
+                              </span>
+                              {/* Der Engpass-Zähler steht im Kopf und nicht nur in den Zeilen:
+                                  zugeklappt wäre er sonst weg — und genau er ist der Grund, eine
+                                  Achse überhaupt aufzuklappen. */}
+                              {group.thinCount > 0 ? (
                                 <span
-                                  className="nl-teamprofile-depth-badge is-injury"
-                                  title={cell.injuryStatus === "injured" ? "Verletzt" : "In Reha"}
+                                  className="nl-teamprofile-depth-groupthin nl-tnum"
+                                  title={`${group.thinCount} von ${group.rows.length} Disziplinen dieser Achse haben weniger Spieler mit Rating ≥ ${DEPTH_CAPABLE_RATING_FLOOR} als Slots`}
                                 >
-                                  V
-                                </span>
-                              ) : cell.fatigue != null && cell.fatigue >= DEPTH_FATIGUE_WARN_THRESHOLD ? (
-                                <span
-                                  className="nl-teamprofile-depth-badge is-fatigue"
-                                  title={`Erschöpfung ${formatNlNumber(cell.fatigue, 0)}`}
-                                >
-                                  M
+                                  {formatNlNumber(group.thinCount, 0)} dünn
                                 </span>
                               ) : null}
                             </button>
-                          ) : (
-                            <span className="nl-teamprofile-depth-cell is-empty">—</span>
-                          )}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
+                          </th>
+                        </tr>
+                      </tbody>
+                      <tbody id={groupBodyId} hidden={isCollapsed}>
+                        {group.rows.map((row) => renderDepthRow(row))}
+                      </tbody>
+                    </Fragment>
+                  );
+                })}
               </table>
             </div>
           ) : depthChartFallback != null ? (

@@ -2,6 +2,24 @@
   "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
+      "datum": "2026-08-06",
+      "seite": "Spieltag · Kopfleiste",
+      "pr": null,
+      "text": "Oben stand mitten in der Saison dauerhaft „Preseason-Markt blockiert\" mit 124 Blockern — dahinter steckte keine Störung, sondern die Drossel, die KI-Teams davon abhält, ihr Training an jedem Spieltag umzustellen. Diese planmäßigen Abweisungen lösen keinen Alarm mehr aus und werden nicht mehr mitgezählt; echte Blockaden meldet die Leiste unverändert.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-06",
+      "seite": "Team · Profil",
+      "pr": null,
+      "text": "Der Squad Depth Chart listete alle 20 Disziplinen am Stück — die Achse war nur am farbigen Punkt zu erkennen. Jetzt stehen sie unter POW, SPE, MEN und SOC, mit den jeweils 5 Disziplinen direkt darunter. Jede Achse lässt sich zuklappen; im Kopf steht, wie viele ihrer Disziplinen zu dünn besetzt sind.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
       "datum": "2026-08-05",
       "seite": "Shell · Aktives Team",
       "pr": null,
