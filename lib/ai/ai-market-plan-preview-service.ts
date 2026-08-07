@@ -619,6 +619,65 @@ async function loadMarketPlanGameState(params: {
   }
 }
 
+/**
+ * Die Blocker-Regel — EINE Quelle fuer beide Aufrufer.
+ *
+ * GEMELDET: „warum blockieren überhaupt teams?"
+ *
+ * Sie stand nur inline in `buildTeamEntry` und wurde damit ausschliesslich auf den LEGACY-Kaufplan
+ * angewendet. Das Unified-Overlay ersetzt diesen Plan anschliessend komplett, reichte `status`,
+ * `projectedState` und `blockingReasons` aber unveraendert durch — die Meldung beschrieb danach
+ * einen Plan, den es nicht mehr gab.
+ *
+ * Folge: N-N stand auf `blocked` mit „roster_after_market_plan_below_player_min", obwohl der
+ * tatsaechlich ausgefuehrte Plan den Kader auf das Minimum bringt. Und jede Messung an diesen
+ * Feldern las den alten Stand — auch meine eigenen, weshalb mehrere Aenderungen „ohne Wirkung"
+ * aussahen, die in Wahrheit gar nicht in der abgelesenen Zahl auftauchen konnten.
+ */
+function berechneBlockingReasons(input: {
+  buyEnabled: boolean;
+  sellEnabled: boolean;
+  currentState: AiMarketPlanCurrentState;
+  projectedState: AiMarketPlanProjectedState;
+  buyCount: number;
+  sellCount: number;
+}): string[] {
+  const { currentState, projectedState } = input;
+  return unique([
+    !input.buyEnabled ? "ai_transfer_preview_disabled" : null,
+    !input.sellEnabled ? "ai_sell_preview_disabled" : null,
+    currentState.rosterCount != null &&
+    currentState.playerMin != null &&
+    currentState.rosterCount < currentState.playerMin &&
+    input.buyCount === 0
+      ? "roster_under_min_without_buy_candidate"
+      : null,
+    currentState.rosterCount != null &&
+    currentState.playerOpt != null &&
+    currentState.rosterCount > currentState.playerOpt &&
+    input.sellCount === 0
+      ? "roster_over_opt_without_sell_candidate"
+      : null,
+    currentState.cash != null && currentState.cash < 0 && projectedState.cashAfterPlan != null && projectedState.cashAfterPlan <= 0
+      ? "negative_cash_unresolved_after_safe_sells"
+      : null,
+    projectedState.cashAfterPlan != null && projectedState.cashAfterPlan <= 0
+      ? "cash_after_market_plan_not_positive"
+      : null,
+    projectedState.cashAfterPlan != null &&
+    projectedState.salaryAfterPlan != null &&
+    projectedState.cashAfterPlan < Math.max(1, projectedState.salaryAfterPlan * 0.05)
+      ? "cash_after_market_plan_below_reserve"
+      : null,
+    projectedState.rosterAfterPlan != null &&
+    input.buyCount > 0 &&
+    currentState.playerMin != null &&
+    projectedState.rosterAfterPlan < currentState.playerMin
+      ? "roster_after_market_plan_below_player_min"
+      : null,
+  ]);
+}
+
 function buildProjectedState(input: {
   currentState: AiMarketPlanCurrentState;
   sellPlan: AiMarketPlanSellPlan;
@@ -861,39 +920,14 @@ function buildTeamEntry(input: {
     sellPlan,
     buyPlan,
   });
-  const blockingReasons = unique([
-    !buyEnabled ? "ai_transfer_preview_disabled" : null,
-    !sellEnabled ? "ai_sell_preview_disabled" : null,
-    currentState.rosterCount != null &&
-    currentState.playerMin != null &&
-    currentState.rosterCount < currentState.playerMin &&
-    chosenBuys.length === 0
-      ? "roster_under_min_without_buy_candidate"
-      : null,
-    currentState.rosterCount != null &&
-    currentState.playerOpt != null &&
-    currentState.rosterCount > currentState.playerOpt &&
-    finalSells.length === 0
-      ? "roster_over_opt_without_sell_candidate"
-      : null,
-    currentState.cash != null && currentState.cash < 0 && projectedState.cashAfterPlan != null && projectedState.cashAfterPlan <= 0
-      ? "negative_cash_unresolved_after_safe_sells"
-      : null,
-    projectedState.cashAfterPlan != null && projectedState.cashAfterPlan <= 0
-      ? "cash_after_market_plan_not_positive"
-      : null,
-    projectedState.cashAfterPlan != null &&
-    projectedState.salaryAfterPlan != null &&
-    projectedState.cashAfterPlan < Math.max(1, projectedState.salaryAfterPlan * 0.05)
-      ? "cash_after_market_plan_below_reserve"
-      : null,
-    projectedState.rosterAfterPlan != null &&
-    chosenBuys.length > 0 &&
-    currentState.playerMin != null &&
-    projectedState.rosterAfterPlan < currentState.playerMin
-      ? "roster_after_market_plan_below_player_min"
-      : null,
-  ]);
+  const blockingReasons = berechneBlockingReasons({
+    buyEnabled,
+    sellEnabled,
+    currentState,
+    projectedState,
+    buyCount: chosenBuys.length,
+    sellCount: finalSells.length,
+  });
   const status = getTeamStatus({
     controlMode,
     buyEnabled,
@@ -1050,24 +1084,66 @@ async function overlayUnifiedCompareBuyPlans(input: {
       continue;
     }
 
+    const neuerBuyPlan: AiMarketPlanBuyPlan = {
+      ...team.buyPlan,
+      candidates: unifiedBuys,
+      plannedSpend: unifiedBuys.length > 0 ? sumKnown(unifiedBuys.map((candidate) => candidate.price)) : 0,
+      plannedSalaryAdded:
+        unifiedBuys.length > 0 ? sumKnown(unifiedBuys.map((candidate) => candidate.salary)) : 0,
+      rosterAfterBuy:
+        team.currentState.rosterCount != null ? team.currentState.rosterCount + unifiedBuys.length : null,
+      warnings: unique([
+        ...team.buyPlan.warnings,
+        ...planned.warnings,
+        unifiedBuys.length < steps ? "unified_pick_partial_fill" : null,
+      ]),
+    };
+
+    /**
+     * NEU BEWERTEN statt durchreichen.
+     *
+     * Hier stand `...team` plus `blockingReasons: [...team.blockingReasons, ...]`. Damit trug der
+     * Eintrag weiterhin `status`, `projectedState` und die Blocker des LEGACY-Plans — obwohl der
+     * Kaufplan eine Zeile darueber komplett ersetzt wurde. Die Meldung beschrieb einen Plan, den es
+     * nicht mehr gab: N-N stand auf `blocked` mit „roster_after_market_plan_below_player_min",
+     * waehrend der ausgefuehrte Plan den Kader auf das Minimum bringt.
+     *
+     * Das war auch eine Messfalle: wer diese Felder abliest — Werkzeuge wie Menschen — sah den
+     * alten Stand und hielt Aenderungen am echten Plan fuer wirkungslos.
+     */
+    const neuerProjectedState = buildProjectedState({
+      currentState: team.currentState,
+      sellPlan: team.sellPlan,
+      buyPlan: neuerBuyPlan,
+    });
+    const neueBlocker = unique([
+      ...berechneBlockingReasons({
+        buyEnabled: team.aiTransferPreviewEnabled,
+        sellEnabled: team.aiSellPreviewEnabled,
+        currentState: team.currentState,
+        projectedState: neuerProjectedState,
+        buyCount: unifiedBuys.length,
+        sellCount: team.sellPlan.candidates.length,
+      }),
+      ...planned.blockingReasons,
+    ]);
+
     overlayed.push({
       ...team,
-      buyPlan: {
-        ...team.buyPlan,
-        candidates: unifiedBuys,
-        plannedSpend: unifiedBuys.length > 0 ? sumKnown(unifiedBuys.map((candidate) => candidate.price)) : 0,
-        plannedSalaryAdded:
-          unifiedBuys.length > 0 ? sumKnown(unifiedBuys.map((candidate) => candidate.salary)) : 0,
-        rosterAfterBuy:
-          team.currentState.rosterCount != null ? team.currentState.rosterCount + unifiedBuys.length : null,
-        warnings: unique([
-          ...team.buyPlan.warnings,
-          ...planned.warnings,
-          unifiedBuys.length < steps ? "unified_pick_partial_fill" : null,
-        ]),
-      },
+      buyPlan: neuerBuyPlan,
+      projectedState: neuerProjectedState,
+      status: getTeamStatus({
+        controlMode: team.controlMode,
+        buyEnabled: team.aiTransferPreviewEnabled,
+        sellEnabled: team.aiSellPreviewEnabled,
+        buyCandidates: unifiedBuys,
+        sellCandidates: team.sellPlan.candidates,
+        currentState: team.currentState,
+        warnings: team.warnings,
+        blockingReasons: neueBlocker,
+      }),
       warnings: unique([...team.warnings, ...planned.warnings]),
-      blockingReasons: unique([...team.blockingReasons, ...planned.blockingReasons]),
+      blockingReasons: neueBlocker,
     });
   }
 
