@@ -32,6 +32,15 @@
       "datum": "2026-08-07",
       "seite": "Saison · Saisonabschluss",
       "pr": null,
+      "text": "„Neue Saison starten\" brach mit „roundViewNumber is on the client\" ab und schrieb nichts: der Saison-Snapshot zog über die Ranglisten-Engine ein reines Anzeige-Modul in den Server hinein. Die beiden benötigten Rechenhelfer liegen jetzt in einem serverfähigen Modul, und ein Test läuft den Import-Graphen ab, damit so etwas nicht wieder unbemerkt hineinrutscht.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Saison · Saisonabschluss",
+      "pr": null,
       "text": "„Neue Saison starten\" tat bei einer Ablehnung des Servers scheinbar gar nichts — der Grund landete nur im Cockpit und war auf der Saisonabschluss-Seite unsichtbar. Jetzt steht er dort, offene Blocker werden im Klartext genannt, und eine fehlende Sponsorenwahl führt mit einem Knopf direkt zu den Sponsoren statt in den Assistenten.",
       "quelle": "gepflegt",
       "gewicht": "spielblockierend",

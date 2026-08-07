@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-07",
+  "seite": "Saison · Saisonabschluss",
+  "text": "„Neue Saison starten\" brach mit „roundViewNumber is on the client\" ab und schrieb nichts: der Saison-Snapshot zog über die Ranglisten-Engine ein reines Anzeige-Modul in den Server hinein. Die beiden benötigten Rechenhelfer liegen jetzt in einem serverfähigen Modul, und ein Test läuft den Import-Graphen ab, damit so etwas nicht wieder unbemerkt hineinrutscht.",
+  "gewicht": "spielblockierend",
+  "version": "0.4"
+}

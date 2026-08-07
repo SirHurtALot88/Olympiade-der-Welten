@@ -1,5 +1,5 @@
 import type { Discipline, GameState, Team, TeamDisciplineRankSnapshotRecord } from "@/lib/data/olyDataTypes";
-import { buildSharedRankMap, roundViewNumber } from "@/lib/foundation/tabs/season-stand-render-helpers";
+import { buildSharedRankMap, roundViewNumber } from "@/lib/foundation/season-stand-rank-helpers";
 
 export type TeamDisciplineRankScorePack = {
   total: number;
