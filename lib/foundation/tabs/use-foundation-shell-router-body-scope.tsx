@@ -68,7 +68,7 @@ import {
   type TransfermarktTier,
 } from "@/lib/market/transfermarkt-formatting-contract";
 import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
-import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
+import { LOCAL_TRANSFER_WINDOW_PHASE, getTransferWindowStatus } from "@/lib/market/transfer-window-policy";
 import {
   getTransfermarktScoutingDisclosure,
   getTransfermarktScoutingVisibilityBuckets,
@@ -9416,10 +9416,25 @@ export function useFoundationShellRouterBodyScope({
       isFirstSeason &&
       seasonIntroHandled &&
       (gameFlowState.currentStepId === "scouting_facilities" || gameFlowState.currentStepId === "buy_players");
+    /**
+     * CHRIS' REGEL: „wir verkaufen als separaten schritt zum ende der saison und gekauft wird
+     * erst in der folgesaison."
+     *
+     * Vorher feuerte der Folgesaison-Ausloeser auf `gameFlowState.phase === "preseason"` —
+     * das sind die Stationen der Saisonende-Kette der ALTEN Saison (`derivePreseasonPhase`).
+     * Der KI-Marktlauf startete also mitten im Saisonende (wo nur verkauft werden darf) und in
+     * der NEUEN Saison nie wieder: dort ist die Flow-Phase nicht mehr „preseason", der einzige
+     * S2+-Kaufausloeser des Spiels lief damit ins Leere und die KI-Teams blieben nach ihren
+     * Saisonende-Verkaeufen dauerhaft ohne Zugaenge.
+     *
+     * Massstab ist jetzt DASSELBE Fenster wie beim Menschen: das Saisonstart-Setup der neuen
+     * Saison (`isEarlySeasonTransferSetup` via `getTransferWindowStatus`) — Saison aktiv,
+     * Spieltag 1 noch offen. Dort ist der Erloes der Saisonende-Verkaeufe das Kaufbudget.
+     * Der Run-Record (`aiPreseasonAutomationRuns[seasonId]`) haelt den Lauf wie bisher auf
+     * genau einmal pro Saison.
+     */
     const followingSeasonTrigger =
-      !isFirstSeason &&
-      gameFlowState.phase === "preseason" &&
-      gameFlowState.currentStepId === "buy_players";
+      !isFirstSeason && getTransferWindowStatus(gameState).isSeasonStartSetup;
     const runKey = `${activeSaveId}:${gameState.season.id}`;
 
     if (staleOrphanRun) {
@@ -9451,6 +9466,10 @@ export function useFoundationShellRouterBodyScope({
     aiTeams.length,
     gameFlowState.currentStepId,
     gameFlowState.phase,
+    // Das Saisonstart-Fenster (getTransferWindowStatus) haengt an Phase, Spieltag und
+    // Spieltagsstatus — der ganze gameState als Dep, damit der Ausloeser den Fensterwechsel
+    // nicht verpasst (die Wachen im Effekt verhindern Doppellaeufe).
+    gameState,
     gameState.season.id,
     gameState.season.name,
     isFoundationBootstrapState,

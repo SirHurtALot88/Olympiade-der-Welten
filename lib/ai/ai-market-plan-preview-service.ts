@@ -48,6 +48,7 @@ import { projectFoundationStateFromPrisma } from "@/lib/db/read/foundation-read-
 import { withNormalizedTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { withNormalizedTeamStrategyProfiles } from "@/lib/foundation/team-strategy-profiles";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import type { GameState, TeamControlMode } from "@/lib/data/olyDataTypes";
 import type { LocalTransfermarktRunContext } from "@/lib/market/transfermarkt-local-service";
 
@@ -641,15 +642,21 @@ function berechneBlockingReasons(input: {
   projectedState: AiMarketPlanProjectedState;
   buyCount: number;
   sellCount: number;
+  /** Saisonende: Kaeufe sind bewusst in die neue Saison verschoben — kein Blocker. */
+  kaeufeAufsKauffensterVerschoben?: boolean;
 }): string[] {
   const { currentState, projectedState } = input;
   return unique([
     !input.buyEnabled ? "ai_transfer_preview_disabled" : null,
     !input.sellEnabled ? "ai_sell_preview_disabled" : null,
+    // „Unter Minimum ohne Kaufkandidat" ist am Saisonende KEIN Blocker: dort wird per Regel
+    // (Chris) nur verkauft, der Kader wird erst im Kauffenster der neuen Saison wieder
+    // aufgefuellt. Der Zustand ist dann geplant, nicht blockiert.
     currentState.rosterCount != null &&
     currentState.playerMin != null &&
     currentState.rosterCount < currentState.playerMin &&
-    input.buyCount === 0
+    input.buyCount === 0 &&
+    input.kaeufeAufsKauffensterVerschoben !== true
       ? "roster_under_min_without_buy_candidate"
       : null,
     currentState.rosterCount != null &&
@@ -758,6 +765,8 @@ function buildTeamEntry(input: {
   buyScanSkipped?: boolean;
   sellScanSkipped?: boolean;
   gameState?: GameState | null;
+  /** Spielstand steht noch in der alten Saison — Kaeufe sind ins Kauffenster verschoben. */
+  kaeufeAufsKauffensterVerschoben?: boolean;
 }) {
   const buyTeam = input.buyTeam;
   const sellTeam = input.sellTeam;
@@ -914,6 +923,9 @@ function buildTeamEntry(input: {
       : null,
     input.teamScope === "all" && controlMode === "manual" ? "manuell gesteuertes Team – Marktplan nur informativ" : null,
     input.teamScope === "all" && controlMode === "passive" ? "passives Team – Marktplan nur informativ" : null,
+    input.kaeufeAufsKauffensterVerschoben
+      ? "Saisonende: es wird nur verkauft – Käufe folgen im Kauffenster der neuen Saison."
+      : null,
   ]);
   const projectedState = buildProjectedState({
     currentState,
@@ -927,6 +939,7 @@ function buildTeamEntry(input: {
     projectedState,
     buyCount: chosenBuys.length,
     sellCount: finalSells.length,
+    kaeufeAufsKauffensterVerschoben: input.kaeufeAufsKauffensterVerschoben,
   });
   const status = getTeamStatus({
     controlMode,
@@ -1158,8 +1171,6 @@ export async function buildAiMarketPlanPreview(params: AiMarketPlanPreviewParams
     teamId: params.teamId ?? null,
     teamScope: params.teamScope === "all" ? "all" : "ai",
   };
-  const skipBuyScan = params.buyLimit === 0;
-  const skipSellScan = params.sellLimit === 0;
   const gameState =
     params.gameState != null
       ? normalizeMarketPlanGameState(params.gameState)
@@ -1169,6 +1180,22 @@ export async function buildAiMarketPlanPreview(params: AiMarketPlanPreviewParams
             source: previewParams.source,
             saveId: previewParams.saveId,
           });
+  /**
+   * CHRIS' REGEL: „wir verkaufen als separaten schritt zum ende der saison und gekauft wird erst
+   * in der folgesaison."
+   *
+   * Der Apply-Dienst hatte diese Sperre bereits (`saisonendeKaufsperre` in
+   * `ai-market-plan-apply-service`), die VORSCHAU nicht: solange der Spielstand in der
+   * Saisonende-Kette stand, plante sie munter Kaeufe — und aus genau diesen Phantom-Kaufplaenen
+   * entstanden Blocker wie `roster_after_market_plan_below_player_min` fuer Plaene, die nie
+   * ausgefuehrt werden duerfen. Deshalb sitzt die Regel jetzt auch hier, an der Planungsquelle:
+   * am Saisonende wird der Kauf-Scan gar nicht erst gestartet, der Plan ist reiner Verkaufsplan.
+   * Gekauft wird im Kauffenster der neuen Saison (derselbe Weg wie beim Menschen,
+   * `isEarlySeasonTransferSetup`) — dort ist `isSeasonEndPhase` falsch und alles laeuft wie gehabt.
+   */
+  const kaeufeAufsKauffensterVerschoben = isSeasonEndPhase(gameState?.gamePhase);
+  const skipBuyScan = params.buyLimit === 0 || kaeufeAufsKauffensterVerschoben;
+  const skipSellScan = params.sellLimit === 0;
   const previewContext = {
     localRunContext: params.localRunContext ?? undefined,
   };
@@ -1210,6 +1237,7 @@ export async function buildAiMarketPlanPreview(params: AiMarketPlanPreviewParams
         buyScanSkipped: skipBuyScan,
         sellScanSkipped: skipSellScan,
         gameState,
+        kaeufeAufsKauffensterVerschoben,
       }),
     )
     .filter((entry): entry is AiMarketPlanTeamEntry => Boolean(entry))
@@ -1224,12 +1252,16 @@ export async function buildAiMarketPlanPreview(params: AiMarketPlanPreviewParams
 
   const seasonId = previewParams.seasonId ?? buyPreview?.scope.seasonId ?? sellPreview?.scope.seasonId ?? "";
   const saveId = previewParams.saveId ?? buyPreview?.scope.saveId ?? sellPreview?.scope.saveId ?? "";
-  const unifiedTeams = await overlayUnifiedCompareBuyPlans({
-    teams,
-    saveId,
-    seasonId,
-    buyPreview,
-  });
+  // Auch das Unified-Overlay plant Kaeufe — am Saisonende darf es genauso wenig laufen wie der
+  // Kauf-Scan, sonst kaemen die verschobenen Kaeufe durch die Hintertuer wieder in den Plan.
+  const unifiedTeams = kaeufeAufsKauffensterVerschoben
+    ? teams
+    : await overlayUnifiedCompareBuyPlans({
+        teams,
+        saveId,
+        seasonId,
+        buyPreview,
+      });
 
   return {
     readOnly: true,

@@ -163,7 +163,8 @@ function buildStepPreviews(save: PersistedSaveGame, transition: SeasonTransition
       player_development: `Preview berechnet die organische Saisonende-Entwicklung für ${rosterCount} aktive Spieler (identisch zum Apply, ohne Attribut-Writes bis zur Bestätigung).`,
       season_end_management: `Training, Gebäude, Scouting und Board-Hinweise als Vorschau; ${formCardCount} Formkarten im Save.`,
       transfer_sell_phase: "AI-Verkäufe werden später über Sell-Service vorbereitet; Human-Teams bleiben manuell.",
-      transfer_buy_phase: "AI-Käufe laufen nach Verkäufen über Buy-Service; keine Duplikate/kein negatives Cash als spätere Gate-Regeln.",
+      transfer_buy_phase:
+        "Reine Durchgangsstation: am Saisonende kauft niemand mehr. Käufe (Mensch wie KI) laufen erst im Kauffenster der neuen Saison; die Verkaufserlöse sind dort das Budget.",
       lineup_setup: `${lineupCount} gespeicherte Lineups würden für neue Season geprüft/resetet.`,
       next_season_ready: "Neue Saison startet ueber den bestaetigten Pre-Season Workflow.",
     };
