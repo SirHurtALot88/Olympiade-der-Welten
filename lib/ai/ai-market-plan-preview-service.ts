@@ -1028,6 +1028,9 @@ async function overlayUnifiedCompareBuyPlans(input: {
       // separate code path. See ai-needs-picks-compare-service.ts buildCashStrategy for the
       // matching startingCash fix that keeps the spend corridor correct outside season 1.
       runMode: "season1_optimum_execute",
+      // Das Team verkauft und kauft im selben Plan — die Engine muss den Erloes kennen, sonst
+      // rechnet ihr Ausgabebudget mit dem Kontostand von vorher und liefert zu wenige Picks.
+      zusaetzlichesCash: team.sellPlan.expectedSellValue ?? team.sellPlan.totalExpectedSellValue ?? 0,
     });
     // Compare already scored against budget_wide FA pool — use pick metadata directly so mapping
     // does not depend on a narrower market-plan preview pool.

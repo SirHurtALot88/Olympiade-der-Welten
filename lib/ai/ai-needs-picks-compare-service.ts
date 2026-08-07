@@ -152,6 +152,17 @@ export type AiNeedsPicksCompareParams = {
   draftSeed?: string | null;
   gameState?: GameState | null;
   localRunContext?: LocalTransfermarktRunContext | null;
+  /**
+   * Erloes der Verkaeufe, die im SELBEN Plan vorgesehen sind — Geld, das das Team gleich haben
+   * wird, aber noch nicht auf dem Konto hat.
+   *
+   * GEMELDET: „warum blockieren überhaupt teams?"
+   *
+   * Gemessen: A-A fordert 2 Picks an und bekommt 1, weil `season1_draft_spend_budget` 0 ergibt —
+   * das Budget rechnete mit 8.94 Mio, obwohl das Team nach den Verkaeufen desselben Plans 94.39
+   * hat. Ein Team, das verkauft, um zu kaufen, durfte das erloeste Geld nicht sehen.
+   */
+  zusaetzlichesCash?: number | null;
 };
 
 export type AiNeedsPicksOpenNeed = {
@@ -5591,9 +5602,18 @@ function buildCashStrategy(input: {
   playerMin: number;
   expectedPrizeSignal: ComparePrizeSignal;
   runMode?: AiNeedsPicksRunMode | null;
+  /** Siehe `AiNeedsPicksCompareParams.zusaetzlichesCash`. */
+  zusaetzlichesCash?: number | null;
 }) : AiNeedsPicksCashStrategy {
   const financeConfig = RETOOL_AI_PACKAGE_SCORING_CONFIG.financePosture;
-  const currentCash = Number.isFinite(input.team.cash) ? input.team.cash : null;
+  // Die geplanten Verkaufserloese gehoeren zum verfuegbaren Geld dieses Plans: das Team verkauft
+  // und kauft im selben Zug. Ohne diesen Zuschlag bemisst sich das Ausgabebudget am Kontostand
+  // VOR den Verkaeufen — bei A-A 8.94 statt 94.39, und das Budget fiel damit auf 0.
+  const zusaetzlichesCash =
+    typeof input.zusaetzlichesCash === "number" && Number.isFinite(input.zusaetzlichesCash)
+      ? Math.max(0, input.zusaetzlichesCash)
+      : 0;
+  const currentCash = Number.isFinite(input.team.cash) ? input.team.cash + zusaetzlichesCash : null;
   // Spend-corridor reference must be "cash at the start of THIS planning call", not the frozen
   // season-1 starting budget: at S1 draft time team.cash === team.budget (fresh save, no prior
   // transfers), so this is a no-op for the draft. Reusing the same season1_optimum_execute mode
@@ -7864,6 +7884,8 @@ function buildTeamEntry(input: {
   excludedPlayerIds?: string[];
   runMode: AiNeedsPicksRunMode;
   draftSeed?: string | null;
+  /** Siehe `AiNeedsPicksCompareParams.zusaetzlichesCash`. */
+  zusaetzlichesCash?: number | null;
 }): AiNeedsPicksCompareTeamEntry | null {
   const team = input.context.gameState.teams.find((entry) => entry.teamId === input.previewTeam.teamId) ?? null;
   if (!team) {
@@ -8003,6 +8025,7 @@ function buildTeamEntry(input: {
     playerMin,
     expectedPrizeSignal,
     runMode: input.runMode,
+    zusaetzlichesCash: input.zusaetzlichesCash ?? null,
   });
   const gmProfileForPickLoop = getTeamGeneralManager(input.context.gameState, team.teamId)?.profile ?? null;
   const lanePhilosophyForPickLoop = applyGmBiasToLaneAppetite(
@@ -9729,6 +9752,7 @@ export async function buildAiNeedsPicksCompare(
         excludedPlayerIds: params.excludedPlayerIds ?? undefined,
         runMode: params.runMode ?? "default",
         draftSeed: params.draftSeed ?? null,
+        zusaetzlichesCash: params.zusaetzlichesCash ?? null,
       }),
     );
 

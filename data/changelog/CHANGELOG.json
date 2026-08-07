@@ -3,6 +3,15 @@
   "eintraege": [
     {
       "datum": "2026-08-07",
+      "seite": "Markt · Preseason-Marktplan",
+      "pr": null,
+      "text": "Das Ausgabebudget eines KI-Teams rechnete mit dem Kontostand vor den Verkäufen desselben Plans — ein Team, das für 118 Mio verkauft, um einzukaufen, durfte das Geld nicht sehen und stand mit Budget null da. Die Erlöse fließen jetzt in die Rechnung ein.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
       "seite": "Server · Spielstand zurückspielen",
       "pr": null,
       "text": "Nach dem Einsetzen eines reparierten Spielstands war das Spiel eingefroren: „attempt to write a readonly database\". Die Datei wird als root in den Container kopiert, der Dienst läuft aber als eigener Benutzer — lesen ging, schreiben nicht. Das Skript setzt die Besitzrechte jetzt zurück, auf dem Hin- wie auf dem Rückweg.",
