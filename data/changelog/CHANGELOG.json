@@ -48,6 +48,15 @@
     },
     {
       "datum": "2026-08-07",
+      "seite": "Finanzen · Kredite",
+      "pr": null,
+      "text": "KI-Teams haben noch nie einen Kredit aufgenommen — der einzige Aufruf dafür hing an einer Marktsitzung, die im laufenden Spiel gar nicht mehr mit Kaufabsicht startet. Im Kauffenster der neuen Saison wird jetzt zweimal geprüft: einmal vorher und einmal nachdem der Markt das Geld ausgegeben hat. Am Spielstand gemessen nehmen dadurch acht Teams einen Kredit auf, meist von einem anderen Team statt von der Bank. Neu ist außerdem: wer mit negativem Cash in die Saison geht, leiht sich das Minus weg, auch wenn der Kader eigentlich voll ist — sonst hätte er im reinen Kauffenster keinen Weg mehr heraus.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
       "seite": "Markt · Preseason-Marktplan",
       "pr": null,
       "text": "Ein KI-Team mit negativem Kontostand plante gar keine Verkäufe, wenn sein ganzer Kader aus dem Liga-Draft stammte: jeder Spieler trug die Marke „würde unter Einkauf verkauft\" und war damit gesperrt — und Kredite gibt es in Saison 1 nicht. Jetzt verkauft ein Team im Minus so lange, bis das Konto wieder im Plus ist: zuerst den größten Underperformer, solange sein Verlust im Verhältnis zum Erlös steht.",

@@ -12,6 +12,8 @@ import { buildAiActionBreakdown } from "@/lib/ai/ai-action-breakdown";
 import { AI_PRESEASON_RUN_STALE_MS } from "@/lib/ai/ai-preseason-run-timing";
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
+import { resolveAiLoanDecision } from "@/lib/ai/ai-loan-decision-service";
+import { buildLoanOffers, originateLoan } from "@/lib/finance/loan-service";
 import type { AiPreseasonAutomationRunRecord, GameState } from "@/lib/data/olyDataTypes";
 import {
   allowsAiPreseasonManualTeamOverride,
@@ -280,6 +282,76 @@ async function executeAiPreseasonBackgroundWork(input: {
       persistence,
     });
 
+    /**
+     * KREDITE — der Schritt, den es nie gab.
+     *
+     * GEMELDET: „Kredite sollen verfügbar sein und ich will sehen ob die genutzt werden. Gerade
+     * auch bei teams wie D-P die mit negativem Cash rein gehen. … Wenn kein team sich dafür
+     * interessiert wäre das auch falsch."
+     *
+     * BEFUND, am Klon von Chris' Spielstand gemessen: `resolveAiLoanDecision` qualifiziert Teams
+     * (zwei im Kauffenster), aber im Spielstand stand `seasonState.loans` auf LEER — kein einziger
+     * KI-Kredit, ueber die ganze Historie.
+     *
+     * URSACHE, mit Zeile: der einzige KI-Kredit-Aufruf liegt in
+     * `ai-transfer-window-session-service.ts:704` und haengt an
+     * `isPreseasonBuyPhase && allowBuys`. Der einzige Aufrufer dieser Sitzung im Spiel ist
+     * `season-transition-service.ts` — und der ruft sie mit `phase: "season_end"` und
+     * `allowBuys: false` auf. `phase: "preseason"` benutzen nur noch Skripte. Der Kredit-Hook war
+     * damit im laufenden Spiel unerreichbar; das Kauffenster hier laeuft ueber
+     * `applyAiMarketPlanLocally` und den Fuell-Dienst, die beide nichts von Krediten wissen.
+     *
+     * ZWEI DURCHGAENGE, und der zweite ist der wichtigere. Vor dem Markt liest sich fast jedes Team
+     * als `cash_sufficient` — das Geld ist ja noch da. Erst NACH dem Markt steht fest, wer sich
+     * leergekauft hat und trotzdem unter seinem Kader-Ziel steht. Am Klon gemessen, jeweils ab
+     * demselben Zustand nach dem Saisonwechsel:
+     *
+     *   ohne Kredite       : 0 Kredite, Kader 343, 3 Teams unter Optimum
+     *   nur Pass 1         : 2 Kredite, Kader 342, 3 Teams unter Optimum
+     *   Pass 1 + Pass 2    : 8 Kredite, Kader 346, 2 Teams unter Optimum (A-A 9 -> 11, B-B am Ziel)
+     *
+     * Nach dem Fuell-Lauf wird NICHT mehr geliehen: dann kaeme das Geld zu spaet und waere nur
+     * Zinslast ohne Gegenwert.
+     */
+    const kreditNotizen: string[] = [];
+    const kreditPass = () => {
+      for (const teamId of aiTeamIds) {
+        const aktuell = persistence.getSaveById(saveId);
+        if (!aktuell) break;
+        const entscheidung = resolveAiLoanDecision(aktuell.gameState, teamId);
+        if (!entscheidung.shouldBorrow) continue;
+        // `buildLoanOffers` ist aufsteigend nach Zinssatz sortiert und enthaelt immer die Bank —
+        // es gibt also mindestens ein Angebot, und das erste ist das guenstigste.
+        const angebote = buildLoanOffers(
+          aktuell.gameState,
+          teamId,
+          entscheidung.loanAmount,
+          entscheidung.termSeasons,
+        );
+        const bestes = angebote[0] ?? null;
+        const ergebnis = originateLoan(
+          aktuell.gameState,
+          {
+            borrowerTeamId: teamId,
+            principal: entscheidung.loanAmount,
+            termSeasons: entscheidung.termSeasons,
+            lenderType: bestes?.lenderType ?? "bank",
+            lenderTeamId: bestes?.lenderTeamId ?? undefined,
+          },
+          { execute: true },
+        );
+        if (!ergebnis.ok) {
+          kreditNotizen.push(`ai_loan_abgelehnt:${teamId}:${ergebnis.reason ?? "unbekannt"}`);
+          continue;
+        }
+        persistence.saveSingleplayerState(saveId, ergebnis.gameState);
+        kreditNotizen.push(
+          `ai_loan_borrow:${teamId}:${entscheidung.loanAmount}:${entscheidung.termSeasons}s:${entscheidung.reason}`,
+        );
+      }
+    };
+    kreditPass();
+
     const market = await applyAiMarketPlanLocally({
       source: "sqlite",
       saveId,
@@ -303,6 +375,9 @@ async function executeAiPreseasonBackgroundWork(input: {
     const completedTeams = market.results.filter(
       (team) => team.result !== "blocked" && team.result !== "failed_buy" && team.result !== "failed_sell",
     ).length;
+    // Zweiter Kredit-Durchgang: jetzt ist die Kasse leer und die Luecke sichtbar (Begruendung und
+    // Messung oben beim ersten Pass). Er laeuft vor dem Fuell-Lauf, damit das Geld noch wirkt.
+    kreditPass();
     /**
      * KADER AUFS OPTIMUM FUELLEN — mit demselben Dienst, der das in Saison 1 tut.
      *
@@ -363,6 +438,7 @@ async function executeAiPreseasonBackgroundWork(input: {
         ...market.warnings,
         ...injuryDepthTopup.warnings,
         `roster_fill_auf_optimum:${rosterFillFilled}/${rosterFill.teams.length}`,
+        ...kreditNotizen,
       ],
       blockingReasons: [...managerResult.blockers, ...market.blockingReasons],
       actionBreakdown: buildAiActionBreakdown(managerResult.actions),
