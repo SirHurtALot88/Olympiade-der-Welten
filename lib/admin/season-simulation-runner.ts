@@ -1859,7 +1859,7 @@ function runFacilities(run: AdminSeasonSimulationRunState, save: PersistedSaveGa
 }
 
 function runContracts(run: AdminSeasonSimulationRunState, save: PersistedSaveGame, persistence: PersistenceService) {
-  const transitionSave = setSavePhase(save, "preseason_management", persistence);
+  const transitionSave = setSavePhase(save, "season_end_management", persistence);
   const moraleState = buildCurrentMoraleState(transitionSave.gameState);
   const relationshipEvents = buildPromisedRoleRelationshipEvents(transitionSave.gameState, moraleState);
   const relationshipEventIds = new Set(relationshipEvents.map((event) => event.eventId));

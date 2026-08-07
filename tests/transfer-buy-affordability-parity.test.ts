@@ -6,7 +6,7 @@ import type { GameState, Team } from "@/lib/data/olyDataTypes";
 
 function createGameState(team: Team, rosterCount: number): GameState {
   return {
-    gamePhase: "preseason_management",
+    gamePhase: "season_end_management",
     season: { id: "season-2", name: "Season 2", year: 2026, currentMatchday: 10, matchdayIds: [] },
     seasonState: { seasonId: "season-2", schedule: [], standings: { [team.teamId]: { points: 0 } } },
     matchdayState: { matchdayId: "md-1", status: "resolved", pendingTeamIds: [], resolvedFixtureIds: [] },

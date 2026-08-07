@@ -24,6 +24,13 @@ export type GamePhase =
   | "season_review"
   | "season_rewards"
   | "player_development"
+  // Die Station des SAISONENDES (Training/Ziele, nach der Spielerentwicklung). Hiess bis 0.4.11
+  // ebenfalls `preseason_management` — derselbe Name wie der frische Spielaufbau, obwohl es der
+  // gegenteilige Zeitpunkt ist. Aus dieser Doppeldeutigkeit sind zwei Fehler entstanden (der
+  // Setup-Draft feuerte am Saisonende erneut, Client wie Server). Deshalb ein eigener Name.
+  | "season_end_management"
+  // Nur noch der FRISCHE Aufbau vor dem allerersten Spieltag. Neue Spiele legt
+  // `new-game-setup-service` in `season_active` an; diese Phase tragen nur noch Altstaende.
   | "preseason_management"
   | "transfer_sell_phase"
   | "transfer_buy_phase"
@@ -56,6 +63,15 @@ export type SeasonTransitionState = {
    * beim Saisonstart ein zweites Mal laeuft.
    */
   progressionAppliedForSeasonId?: string | null;
+  /**
+   * Saison-Id, fuer die die KI-Verkaeufe des Saisonendes bereits gelaufen sind.
+   *
+   * Derselbe Zweck wie `progressionAppliedForSeasonId` eine Zeile darueber, und aus demselben
+   * Grund noetig: der Schritt „Verkaeufe" schreibt jetzt selbst, also muss er sich merken, dass er
+   * fertig ist. Ohne den Marker verkauft die KI bei jedem erneuten Durchlauf der Station ein
+   * weiteres Mal Spieler — und ein Klick zurueck und wieder vor wuerde Kader leerraeumen.
+   */
+  aiSeasonEndSellsAppliedForSeasonId?: string | null;
 };
 
 export type ScenarioType =

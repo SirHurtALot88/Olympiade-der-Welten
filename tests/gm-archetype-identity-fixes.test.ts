@@ -152,7 +152,7 @@ function buildFacilityGameState(gmId: string | null): GameState {
   } as unknown as TeamIdentity;
   const players = [testPlayer("f1"), testPlayer("f2"), testPlayer("f3"), testPlayer("f4")];
   return {
-    gamePhase: "preseason_management",
+    gamePhase: "season_end_management",
     season: { id: "season-1", name: "Season 1", currentMatchday: 1 },
     seasonState: {
       seasonId: "season-1",

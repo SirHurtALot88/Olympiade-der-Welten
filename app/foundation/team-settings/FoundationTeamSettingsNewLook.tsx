@@ -1023,14 +1023,44 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                   ? getReadOnlyActionReason("einen neuen Save")
                   : isSaveBusy
                     ? getBusyActionReason("Die Save-Aktion")
-                    : "Erstellt einen neuen lokalen Spielstand auf Basis des aktuellen Zustands."
+                    // Der Text sagte frueher „auf Basis des aktuellen Zustands". Das war schlicht
+                    // falsch: `createSave` baut ueber `loadSeedData()` ein FRISCHES Spiel und
+                    // schaltet darauf um. Gemeldet als „S1 MD 1 speichert er den save und nicht auf
+                    // dem aktuellen Stand wo ich gerade war" — der Knopf tat, was er tat, nur eben
+                    // nicht das, was danebenstand. Wer den laufenden Stand sichern will, nimmt
+                    // „Manuell speichern".
+                    : "Legt ein KOMPLETT NEUES Spiel an (frische Season 1) und schaltet darauf um. Dein laufender Spielstand bleibt erhalten, ist danach aber nicht mehr aktiv."
               }
               onClick={() => {
-                const name = `Save ${formatGermanSaveTimestamp()}`;
+                const name = `Neues Spiel ${formatGermanSaveTimestamp()}`;
                 void runSaveAction({ action: "create", name });
               }}
             >
-              Neuer Save
+              Neues Spiel anlegen
+            </button>
+            <button
+              type="button"
+              className="nl-teamsettings-btn"
+              disabled={isSaveBusy || readMeta.readOnly || !activeSaveId}
+              title={
+                readMeta.readOnly
+                  ? getReadOnlyActionReason("einen Sicherungspunkt")
+                  : isSaveBusy
+                    ? getBusyActionReason("Die Save-Aktion")
+                    : "Legt eine Sicherung deines AKTUELLEN Spielstands an. Du spielst danach normal weiter — die Sicherung liegt daneben."
+              }
+              onClick={() => {
+                if (!activeSaveId) return;
+                // `clone` und NICHT `create`: nur das Klonen kopiert wirklich den laufenden Stand.
+                // `stayOnCurrentSave` haelt uns dabei im Spiel — eine Sicherung, in die man
+                // hineingeworfen wird, ist keine.
+                void runSaveAction(
+                  { action: "clone", sourceSaveId: activeSaveId, name: `Sicherung ${formatGermanSaveTimestamp()}` },
+                  { stayOnCurrentSave: true },
+                );
+              }}
+            >
+              Manuell speichern
             </button>
             {/* Der frühere „Neues Spiel / Season 1 starten"-Button (action: "fresh-season-1") wurde
                 entfernt: der „Neues Spiel erstellen"-Wizard oben (renderNewGameWizard) ist jetzt der

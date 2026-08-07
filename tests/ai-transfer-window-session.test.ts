@@ -517,7 +517,7 @@ describe("ai transfer window session service", () => {
     const persistence = {
       getSaveById: () => ({
         saveId: "save-1",
-        gameState: buildGameState({ gamePhase: "preseason_management" }),
+        gameState: buildGameState({ gamePhase: "season_end_management" }),
       }),
     };
 

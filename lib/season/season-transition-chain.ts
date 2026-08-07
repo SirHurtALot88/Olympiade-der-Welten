@@ -41,8 +41,8 @@ const STEP_TO_NEXT_PHASE: Record<SeasonTransitionStepId, GamePhase | null> = {
   season_check: "season_review",
   season_review: "season_rewards",
   season_rewards: "player_development",
-  player_development: "preseason_management",
-  preseason_management: "transfer_sell_phase",
+  player_development: "season_end_management",
+  season_end_management: "transfer_sell_phase",
   transfer_sell_phase: "transfer_buy_phase",
   transfer_buy_phase: "lineup_setup",
   lineup_setup: "next_season_ready",
@@ -68,6 +68,34 @@ const SEASON_END_PHASES = new Set<GamePhase>([
 
 export function isSeasonEndPhase(phase: GamePhase | null | undefined): boolean {
   return phase != null && SEASON_END_PHASES.has(phase);
+}
+
+/**
+ * ALTSTAND-UMSCHRIFT: `preseason_management` → `season_end_management`.
+ *
+ * Bis 0.4.11 trug die Saisonende-Station denselben Namen wie der frische Spielaufbau. Beides
+ * `preseason_management` zu nennen war die Ursache von gleich zwei Fehlern (Setup-Draft feuerte am
+ * Saisonende erneut — Client in 135a9a4f, Server in 8f2bba10). Beide wurden mit derselben
+ * Hilfsfrage geflickt: „liegt fuer diese Saison schon ein Spieltagsergebnis vor?" Wenn ja, ist es
+ * kein Aufbau, sondern ein Saisonende.
+ *
+ * Genau diese Frage steht jetzt EINMAL hier und schreibt die Phase um, statt sie an jeder Lesestelle
+ * erneut zu stellen. Danach ist die Phase im Save eindeutig, und die Lesestellen brauchen keine
+ * Hilfskonstruktion mehr.
+ *
+ * Ein Altstand OHNE Spieltagsergebnis bleibt unangetastet auf `preseason_management` — das ist der
+ * festhaengende Neustart, fuer den es `scripts/repair-save-unstick-preseason.ts` gibt.
+ */
+export function migrateLegacyPreseasonManagementPhase(input: {
+  gamePhase: GamePhase | undefined;
+  seasonId: string;
+  matchdayResults: ReadonlyArray<{ seasonId: string }> | undefined;
+}): GamePhase | undefined {
+  if (input.gamePhase !== "preseason_management") {
+    return input.gamePhase;
+  }
+  const hasPlayedThisSeason = (input.matchdayResults ?? []).some((result) => result.seasonId === input.seasonId);
+  return hasPlayedThisSeason ? "season_end_management" : input.gamePhase;
 }
 
 /** Der Schritt, der auf diese Phase folgt — oder `null`, wenn die Kette zu Ende ist. */

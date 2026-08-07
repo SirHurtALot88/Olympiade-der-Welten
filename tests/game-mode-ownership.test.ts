@@ -71,7 +71,7 @@ function makeMinimalGameState(teams: Team[]): GameState {
         steps: [],
       },
     },
-    gamePhase: "preseason_management",
+    gamePhase: "season_end_management",
     scenarioMeta: {
       saveMode: "solo_1",
       newGamePresetId: "solo_1",

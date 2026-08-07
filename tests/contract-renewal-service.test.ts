@@ -95,7 +95,7 @@ function createGameState(input?: {
 }): GameState {
   const teams = input?.teams ?? [createTeam()];
   return {
-    gamePhase: "preseason_management",
+    gamePhase: "season_end_management",
     season: {
       id: "season-2",
       name: "Season 2",

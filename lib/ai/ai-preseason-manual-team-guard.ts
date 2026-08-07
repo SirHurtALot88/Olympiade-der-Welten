@@ -20,7 +20,21 @@ export function getProtectedHumanTeamIds(gameState: GameState): Set<string> {
   return new Set(
     [
       gameState.seasonState.newGameFlow?.selectedTeamId ?? null,
-      ...gameState.teams.filter((team) => team.humanControlled !== false).map((team) => team.teamId),
+      // GEMELDET: „und wieso ist M-S auch als mein team getaggt? Das ist ein AI Team!!! da ist
+      // irgendwas durcheinander geraten durch das season ende"
+      //
+      // Hier stand `team.humanControlled !== false` — das ist auch fuer `undefined` wahr. Ein Team,
+      // dessen Flag unterwegs verlorengeht (kompakte Payloads, Projektionen, aeltere Saves), galt
+      // damit als Spieler-Team. Schlimmer: `protectManualPlayerTeams` SCHREIBT diese Annahme
+      // zurueck — `humanControlled: true` plus `controlMode: "manual"`. Ein einziger Durchlauf
+      // macht aus einem KI-Team dauerhaft ein Spieler-Team, und weil das Zusammenfuehren die
+      // Beschriftung behaelt, steht dann „AI" an einem Team im Manual-Modus. Genau so sah M-S aus.
+      //
+      // „Im Zweifel schuetzen" waere richtig, wenn der Schutz nur LESEND waere. Er ist es nicht.
+      // Deshalb zaehlt jetzt nur noch ein ausdrueckliches `true`. Echte Spieler-Teams verlieren
+      // dadurch nichts: sie tragen das Flag (`new-game-setup-service.ts:395`) oder stehen unten
+      // ueber `controlMode === "manual"` in den Kontrolleinstellungen.
+      ...gameState.teams.filter((team) => team.humanControlled === true).map((team) => team.teamId),
       ...Object.values(gameState.seasonState.teamControlSettings ?? {})
         .filter((settings) => settings.controlMode === "manual")
         .map((settings) => settings.teamId),

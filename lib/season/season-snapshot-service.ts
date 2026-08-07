@@ -6,6 +6,7 @@ import type {
   SeasonSnapshotTeamRecord,
   SeasonSnapshotTransferRecord,
 } from "@/lib/data/olyDataTypes";
+import { isSeasonCoverageComplete } from "@/lib/season/season-completion-state";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
@@ -544,10 +545,7 @@ function buildSeasonSnapshotRecord(
     .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
     .sort((left, right) => left.teamName.localeCompare(right.teamName, "de"));
 
-  const seasonCompleted =
-    coverage.totalMatchdays > 0 &&
-    coverage.resultAppliedMatchdays === coverage.totalMatchdays &&
-    coverage.standingsAppliedMatchdays === coverage.totalMatchdays;
+  const seasonCompleted = isSeasonCoverageComplete(coverage);
   const sourceStatus: SeasonSnapshotRecord["sourceStatus"] = seasonCompleted
     ? "mapped"
     : coverage.completedMatchdayIds.length > 0
@@ -730,10 +728,7 @@ export function buildSeasonSnapshotDryRun(
   const snapshot = buildSeasonSnapshotRecord(gameState, seasonId, input?.saveId ?? null);
   const existingSnapshot =
     (gameState.seasonState.seasonSnapshots ?? []).find((entry) => entry.seasonId === seasonId) ?? null;
-  const seasonCompleted =
-    coverage.totalMatchdays > 0 &&
-    coverage.resultAppliedMatchdays === coverage.totalMatchdays &&
-    coverage.standingsAppliedMatchdays === coverage.totalMatchdays;
+  const seasonCompleted = isSeasonCoverageComplete(coverage);
   const warnings = Array.from(new Set(snapshot.warnings));
   const blockingReasons: string[] = [];
 

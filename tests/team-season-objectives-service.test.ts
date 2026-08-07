@@ -665,7 +665,7 @@ describe("team season objectives service", () => {
     });
     gameState.season = { ...gameState.season, id: "season-1", name: "Season 1" };
     gameState.seasonState.seasonId = "season-1";
-    gameState.gamePhase = "preseason_management";
+    gameState.gamePhase = "season_end_management";
 
     const overview = buildTeamObjectiveOverview(gameState);
     const board = overview.boardConfidence[team.teamId];

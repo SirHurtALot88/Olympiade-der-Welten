@@ -10,7 +10,7 @@ export const SEASON_TRANSITION_STEPS = [
   "season_review",
   "season_rewards",
   "player_development",
-  "preseason_management",
+  "season_end_management",
   "transfer_sell_phase",
   "transfer_buy_phase",
   "lineup_setup",

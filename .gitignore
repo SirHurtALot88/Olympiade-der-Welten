@@ -31,6 +31,9 @@ backups/
 data/local-dev.sqlite
 data/persistence/
 data/persistence/*.sqlite
+# Sicherungen, die die Reparaturskripte vor jedem Schreiblauf anlegen (--apply). Sie gehoeren zu der
+# Maschine, auf der repariert wurde, nicht ins Repo: es sind vollstaendige Spielstaende, je ~40 MB.
+data/save-backups/
 
 # environment files with secrets
 .env
