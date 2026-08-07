@@ -465,3 +465,75 @@ describe("resolveTeamLiquidityBufferTarget with outstanding debt", () => {
     expect(indebtedBuffer).toBeGreaterThan(debtFreeBuffer);
   });
 });
+
+/**
+ * GEMELDET: „Gerade auch bei teams wie D-P die mit negativem Cash rein gehen. Nach den Käufen darf
+ * man kein negatives Cash haben. Also müssten die einen Kredit aufnehmen oder nicht?"
+ *
+ * BEFUND: ein Team mit vollem Kader und negativem Cash bekam `no_need` — die Pruefung fragt nur nach
+ * der Kaderluecke, nicht nach dem Konto. Seit die Verkaeufe am Saisonende stattfinden (#445) und das
+ * Kauffenster reines Kaufen ist, hat so ein Team dort keinen Weg mehr aus dem Minus: verkaufen darf
+ * es nicht, leihen wollte es nicht.
+ */
+describe("Liquiditaets-Kredit bei negativem Cash", () => {
+  it("leiht auch bei vollem Kader, wenn das Konto im Minus steht", () => {
+    // Genau der gemeldete Fall: Kader auf Optimum, also keine Luecke — aber Cash negativ.
+    const gameState = buildTeamGameState({ cash: -4.2, rosterCount: 12, playerOpt: 12, annualRevenue: 50 });
+    const decision = resolveAiLoanDecision(gameState, "T-1");
+    expect(decision.shouldBorrow).toBe(true);
+    expect(decision.reason).toBe("liquidity_negative_cash");
+  });
+
+  it("leiht mindestens so viel, dass das Konto wieder ins Plus kommt", () => {
+    // Ein zu kleiner Kredit waere derselbe Zustand, nur mit Zinsen.
+    const gameState = buildTeamGameState({ cash: -4.2, rosterCount: 12, playerOpt: 12, annualRevenue: 50 });
+    const decision = resolveAiLoanDecision(gameState, "T-1");
+    expect(decision.loanAmount).toBeGreaterThan(4.2);
+  });
+
+  it("deckt zusaetzlich den Liquiditaetspuffer ab, nicht nur die nackte Null", () => {
+    // Cash exakt 0 wuerde jeden Kauf weiterhin am Puffer scheitern lassen — das Team waere formal
+    // schuldenfrei im Plus und trotzdem handlungsunfaehig.
+    const gameState = buildTeamGameState({ cash: -4.2, rosterCount: 12, playerOpt: 12, annualRevenue: 50 });
+    const puffer = resolveTeamLiquidityBufferTarget(gameState, "T-1");
+    const decision = resolveAiLoanDecision(gameState, "T-1");
+    expect(decision.loanAmount).toBeGreaterThanOrEqual(4.2 + puffer - 0.05);
+  });
+
+  it("laesst ein Team im Plus unangetastet", () => {
+    // Die wichtigste Eigenschaft: der neue Zweig darf den Normalfall nicht anfassen.
+    const gameState = buildTeamGameState({ cash: 60, rosterCount: 12, playerOpt: 12, annualRevenue: 50 });
+    const decision = resolveAiLoanDecision(gameState, "T-1");
+    expect(decision.shouldBorrow).toBe(false);
+    expect(decision.reason).toBe("no_need");
+  });
+
+  it("gilt auch fuer ein Hort-Team — im Minus zaehlt der Charakter nicht", () => {
+    // `strategic_hoard` blockt sonst jede Kreditaufnahme. Ein Konto im Minus muss trotzdem aufgeloest
+    // werden; sonst haengt ausgerechnet das sparsamste Team am laengsten fest.
+    const gameState = buildTeamGameState({
+      cash: -9.6,
+      rosterCount: 12,
+      playerOpt: 12,
+      annualRevenue: 50,
+      cashPriority: 9,
+    });
+    const decision = resolveAiLoanDecision(gameState, "T-1");
+    expect(decision.shouldBorrow).toBe(true);
+    expect(decision.reason).toBe("liquidity_negative_cash");
+  });
+
+  it("bleibt in Saison 1 gesperrt", () => {
+    // Die harte Regel aus docs/design/kredit-system.md gilt weiter — auch fuer den Liquiditaetsfall.
+    const gameState = buildTeamGameState({
+      cash: -4.2,
+      rosterCount: 12,
+      playerOpt: 12,
+      annualRevenue: 50,
+      seasonId: "season-1",
+    });
+    const decision = resolveAiLoanDecision(gameState, "T-1");
+    expect(decision.shouldBorrow).toBe(false);
+    expect(decision.reason).toBe("season_one_no_loans");
+  });
+});

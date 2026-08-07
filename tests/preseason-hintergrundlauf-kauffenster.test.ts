@@ -44,6 +44,17 @@ vi.mock("@/lib/ai/auto-roster-fill-service", () => ({
   runAutoRosterFillForMatchdaySetup,
 }));
 
+// Der Kredit-Pass des Kauffensters haengt hier nur als Nachbar mit drin. Sein Modulbaum ist gross
+// genug, dass das Laden allein den Test ueber die Zeit bringt; was er tut, prueft
+// tests/kredite-im-kauffenster.test.ts.
+vi.mock("@/lib/ai/ai-loan-decision-service", () => ({
+  resolveAiLoanDecision: () => ({ shouldBorrow: false, loanAmount: 0, termSeasons: 0, reason: "test_kein_kredit" }),
+}));
+vi.mock("@/lib/finance/loan-service", () => ({
+  buildLoanOffers: () => [],
+  originateLoan: (gameState: unknown) => ({ ok: false, loan: null, reason: "test", capacity: 0, terms: null, gameState }),
+}));
+
 vi.mock("@/lib/room/server-authoritative-write-guard", () => ({
   authorizeServerRoomWrite: () => ({ allowed: true, warnings: [], room: null, participant: null, status: 200 }),
 }));
