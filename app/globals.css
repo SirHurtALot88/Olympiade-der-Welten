@@ -75906,6 +75906,31 @@ button.is-new-look .nl-thist-season-pill,
   color: var(--nl-mut);
 }
 
+/* Ablehnung des Servers und offene Blocker — vorher landete beides nur im Cockpit, und
+   der Saisonwechsel-Knopf sah hier aus, als tue er nichts. Auffaellig genug, um nicht
+   uebersehen zu werden, aber ohne den Rest der Seite zu erschlagen. */
+.nl-season-finale-error,
+.nl-season-finale-blockers {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--nl-neg, #d4183d) 45%, transparent);
+  background: color-mix(in srgb, var(--nl-neg, #d4183d) 10%, transparent);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.nl-season-finale-blockers strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.nl-season-finale-blockers ul {
+  list-style: disc;
+  margin: 0;
+  padding-left: 18px;
+}
+
 .nl-season-finale-awards ul {
   list-style: none;
   margin: 0;
