@@ -2102,8 +2102,31 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
           return (right.score ?? 0) - (left.score ?? 0);
         });
 
+      /**
+       * WIE VIELE VORSCHLAEGE — nach Bedarf, nicht nach fester Zahl.
+       *
+       * GEMELDET: „warum blockieren überhaupt teams?"
+       *
+       * Hier stand `.slice(0, 3)`. Drei Vorschlaege, immer, egal wie leer der Kader ist. Am
+       * Spielstand gemessen hiess das: Nunchuck Ninjas standen bei DREI Spielern (Minimum 8) mit
+       * 164.81 Mio auf dem Konto — und bekamen drei Kandidaten angeboten. Selbst wenn das Team alle
+       * drei kauft, bleibt es bei sechs und faellt anschliessend in
+       * `roster_after_market_plan_below_player_min`. Der Blocker meldete damit einen Missstand, den
+       * die Vorschlagsliste eine Zeile vorher selbst erzeugt hatte.
+       *
+       * Am Angebot lag es nicht: im Spielstand liegen 2696 Spieler ohne Kader, und `limit` war 90.
+       *
+       * Jetzt richtet sich die Zahl nach der Luecke bis zum Kader-Minimum, mit zwei Reserve-Picks
+       * fuer die Auswahl danach — und mindestens den bisherigen drei, damit ein voller Kader
+       * genauso viele Vorschlaege sieht wie vorher.
+       */
+      const kaderLuecke = Math.max(
+        0,
+        (effectivePlayerMin > 0 ? effectivePlayerMin : 0) - rosterEconomy.rosterCount,
+      );
+      const empfehlungsAnzahl = Math.max(3, kaderLuecke + 2);
       const recommendedBuysRaw = rankedAffordableCandidates
-        .slice(0, 3)
+        .slice(0, empfehlungsAnzahl)
         .map<AiTransferPreviewRecommendation>((entry) =>
           toPreviewRecommendation({
             item: entry.item,

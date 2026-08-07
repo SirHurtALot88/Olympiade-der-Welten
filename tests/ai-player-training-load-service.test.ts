@@ -42,7 +42,7 @@ function buildGameState(input?: {
     buildPlayer("bench", { fatigue: 18, potential: 55, rating: 45, disciplineRatings: { tdm: 40 } }),
   ];
   return {
-    gamePhase: "preseason_management",
+    gamePhase: "season_end_management",
     season: {
       id: "season-1",
       name: "Season 1",

@@ -129,7 +129,7 @@ function createGameState(input: {
   }));
 
   return {
-    gamePhase: "preseason_management",
+    gamePhase: "season_end_management",
     season: { id: input.seasonId ?? "season-2", name: "Season 2", year: 2026, currentMatchday: 10, matchdayIds: ["matchday-1"] },
     seasonState: {
       seasonId: input.seasonId ?? "season-2",

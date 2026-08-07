@@ -80,7 +80,7 @@ function gameState(input?: {
   const seasonId = input?.seasonId ?? "season-1";
   const players = [player("p-1"), player("p-2")];
   return {
-    gamePhase: input?.gamePhase ?? "preseason_management",
+    gamePhase: input?.gamePhase ?? "season_end_management",
     season: { id: seasonId, name: "Season 1", year: 1, currentMatchday: 1, matchdayIds: [`${seasonId}-md-1`, `${seasonId}-md-2`] },
     seasonState: {
       seasonId,
@@ -233,14 +233,14 @@ describe("training-settings-service: season-long training intensity lock", () =>
     // Mid-season is no longer blocked (anti-cheese Teil B).
     expect(previewTeamTrainingSettings({ save: seasonOne, teamId: "T-1", trainingFocus: "BALANCED", trainingIntensity: "hard" }).ok).toBe(true);
 
-    const seasonTwo = save(gameState({ seasonId: "season-2", gamePhase: "preseason_management" }));
+    const seasonTwo = save(gameState({ seasonId: "season-2", gamePhase: "season_end_management" }));
     const preview = previewTeamTrainingSettings({ save: seasonTwo, teamId: "T-1", trainingFocus: "BALANCED", trainingIntensity: "hard" });
     expect(preview.ok).toBe(true);
     expect(preview.blockingReasons).not.toContain(TRAINING_INTENSITY_LOCKED_BLOCKING_REASON);
   });
 
   it("does not block AI teams from their single regular preseason confirmation", () => {
-    const source = save(gameState({ gamePhase: "preseason_management" }));
+    const source = save(gameState({ gamePhase: "season_end_management" }));
     const preview = previewPlayerTrainingModes({
       save: source,
       teamId: "T-1",

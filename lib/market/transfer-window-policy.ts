@@ -22,7 +22,7 @@ export type LocalTransferWindowPhase = typeof LOCAL_TRANSFER_WINDOW_PHASE;
  * Kaufen. Ein Test haelt die Disjunktheit fest, damit die Trennung nicht wieder verwaescht.
  */
 const TRANSFER_SELL_PHASES = new Set<GamePhase>([
-  "preseason_management",
+  "season_end_management",
   "transfer_sell_phase",
 ]);
 

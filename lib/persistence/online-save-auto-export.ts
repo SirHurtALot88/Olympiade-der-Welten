@@ -101,10 +101,41 @@ async function publishToGitHub(branch: string) {
   await git(`commit -m "chore(daten): auto-export ${parts.join(" + ")} [skip ci]" -- ${pathspecs}`);
 
   if (!(await pendingCommitsAreOnlyData(branch))) {
+    await git(`reset --mixed HEAD~1`, { allowFail: true });
     return { pushed: false, reason: "offene-code-commits-vorhanden-push-uebersprungen" };
   }
+
+  // VOR dem Push den Remote-Stand einholen.
+  //
+  // GEMELDET: „FIX DAS ENDLICH DASS DER SAVE IM GIT LANDET". Hier war die Ursache: der Push ging
+  // direkt auf `HEAD:<branch>`. Sobald der Branch weitergelaufen ist — bei aktiver Entwicklung
+  // staendig — lehnt GitHub ihn als non-fast-forward ab. `allowFail` schluckte das, der lokale
+  // Commit blieb liegen, und der naechste Zyklus lief in exakt denselben Fehler. Dauerhafter
+  // Stillstand, sichtbar nur als eine Logzeile.
+  //
+  // Schlimmer noch die Nebenwirkung: `deploy/hetzner/auto-deploy.sh` aktualisiert mit
+  // `git merge --ff-only origin/<branch>`. Ein liegengebliebener lokaler Commit macht das
+  // unmoeglich — mit dem Export standen also auch die Deployments still.
+  await git(`fetch origin ${branch}`, { allowFail: true });
+  const rebased = await git(`rebase origin/${branch}`, { allowFail: true });
+  if (rebased == null) {
+    // Rebase gescheitert (z. B. Konflikt in einer generierten Datei): sauber zuruecktreten statt
+    // einen halben Zustand stehen zu lassen.
+    await git(`rebase --abort`, { allowFail: true });
+    await git(`reset --mixed HEAD~1`, { allowFail: true });
+    return { pushed: false, reason: "rebase-fehlgeschlagen" };
+  }
+
   const pushed = await git(`push origin HEAD:${branch}`, { allowFail: true });
-  return { pushed: pushed != null, reason: pushed != null ? "ok" : "push-fehlgeschlagen" };
+  if (pushed == null) {
+    // Auch nach dem Rebase abgelehnt (Rennen mit einem anderen Push). Den eigenen Commit wieder
+    // aufloesen, damit HEAD gleich `origin/<branch>` bleibt und der Auto-Deploy weiter
+    // fast-forwarden kann. Die Dateien bleiben auf der Platte — der naechste Zyklus committet
+    // und versucht es erneut. So kann sich NICHTS dauerhaft festfahren.
+    await git(`reset --mixed HEAD~1`, { allowFail: true });
+    return { pushed: false, reason: "push-abgelehnt-commit-zurueckgenommen" };
+  }
+  return { pushed: true, reason: "ok" };
 }
 
 function computeSignature() {
@@ -145,7 +176,11 @@ export function startOnlineSaveAutoExport() {
 
       let publish = false;
       if (signature !== lastSignature) {
-        const result = exportOnlineSaves();
+        // `prune: false`: der Timer laeuft unbeaufsichtigt in JEDER Umgebung, die den Server
+        // startet — auch in Containern, deren Store nur Smoke-Saves enthaelt. Mit Loeschabgleich
+        // raeumt so eine Umgebung fremde Spielstaende aus `data/online-saves/` und pusht das nach
+        // `main`. Aufraeumen bleibt dem ausdruecklichen CLI-Export vorbehalten.
+        const result = exportOnlineSaves({ prune: false });
         lastSignature = signature;
         if (result.changed) {
           console.log(`[online-saves] exportiert: ${result.saves.length} Save(s) → ${ONLINE_SAVES_DIR}`);
@@ -182,4 +217,32 @@ export function startOnlineSaveAutoExport() {
   console.log(
     `[online-saves] Auto-Export aktiv (alle ${Math.round(intervalMs / 1000)}s, Push=${pushEnabled ? `an → ${branch}` : "aus"}).`,
   );
+
+  /**
+   * EINMAL BEIM START PRUEFEN, OB DER PUSH UEBERHAUPT KANN.
+   *
+   * GEFUNDEN IM SERVER-LOG, alle 180 Sekunden, seit dem ersten Tag:
+   *     [online-saves] exportiert: 8 Save(s) → /app/data/online-saves
+   *     [online-saves] Auto-Export-Fehler: Command failed: git add -- ...
+   *     /bin/sh: 1: git: not found
+   *
+   * Das Laufzeit-Image hatte kein git. Der Export meldete Erfolg, der Push-Fehler stand eine Zeile
+   * darunter — und weil er sich alle drei Minuten wiederholte, sah er aus wie Rauschen. Ueber Wochen
+   * kam so kein einziger echter Spielstand ins Repo, und niemand hat es bemerkt.
+   *
+   * Eine Meldung beim Start ist etwas anderes als dieselbe Meldung im Minutentakt: sie steht einmal
+   * da, ganz oben, und sagt was zu tun ist. Der Zyklus laeuft trotzdem weiter — die Dateien im
+   * Ordner sind auch ohne Push nuetzlich (`push-live-save.sh` auf dem Host nimmt sie mit).
+   */
+  if (pushEnabled) {
+    void git("--version", { allowFail: true }).then((version) => {
+      if (version) return;
+      console.warn(
+        "[online-saves] ACHTUNG: `git` ist in dieser Umgebung nicht aufrufbar — der Auto-PUSH kann nicht laufen.\n" +
+          "[online-saves] Exportiert wird weiter in den Ordner, aber nichts landet im Repo.\n" +
+          "[online-saves] Im Docker-Image gehoert `git` in die Paketliste des runner-Stage (siehe Dockerfile).\n" +
+          "[online-saves] Zum Abschalten dieser Meldung: OLY_AUTO_EXPORT_PUSH=0.",
+      );
+    });
+  }
 }

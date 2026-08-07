@@ -789,7 +789,7 @@ describe("game flow controller", () => {
     }));
     const flowFull = buildGameFlowState({
       gameState: gameState({
-        gamePhase: "preseason_management",
+        gamePhase: "season_end_management",
         players: Array.from({ length: 7 }, (_, index) => player(`p-${index}`, "mittel")),
         rosters: roster,
       }),
@@ -799,7 +799,7 @@ describe("game flow controller", () => {
 
     const flowShort = buildGameFlowState({
       gameState: gameState({
-        gamePhase: "preseason_management",
+        gamePhase: "season_end_management",
         players: [player("p-0", "mittel")],
         rosters: [roster[0]!],
       }),
@@ -811,7 +811,7 @@ describe("game flow controller", () => {
   it("never makes 'Spieler verkaufen' the guided next action in the preseason", () => {
     const flow = buildGameFlowState({
       gameState: gameState({
-        gamePhase: "preseason_management",
+        gamePhase: "season_end_management",
         players: [player("p-1", "mittel")],
       }),
       activeTeamId: "M-M",

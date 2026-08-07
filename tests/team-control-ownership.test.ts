@@ -195,7 +195,7 @@ describe("team control ownership", () => {
           },
         },
       },
-      gamePhase: "preseason_management",
+      gamePhase: "season_end_management",
     });
 
     expect(gameState.teams.find((team) => team.teamId === "H-R")?.humanControlled).toBe(false);
@@ -308,7 +308,7 @@ describe("team control ownership", () => {
           },
         },
       },
-      gamePhase: "preseason_management",
+      gamePhase: "season_end_management",
     });
 
     expect(gameState.seasonState.newGameFlow?.selectedTeamId).toBe("H-R");

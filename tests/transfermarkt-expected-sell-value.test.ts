@@ -78,7 +78,7 @@ function createRosterEntry(id: string, playerId: string, partial?: Partial<Roste
 
 function createGameState(input: { players: Player[]; rosters: RosterEntry[] }): GameState {
   return {
-    gamePhase: "preseason_management",
+    gamePhase: "season_end_management",
     season: {
       id: "season-1",
       name: "Season 1",

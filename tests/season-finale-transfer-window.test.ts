@@ -59,20 +59,20 @@ describe("Saisonabschluss: die Checkliste verspricht nichts, was die Phase verbi
   });
 
   it("die erste Station oeffnet Verkaufen, Verlaengern und Training — aber NICHT Kaufen", () => {
-    // Deshalb reicht EIN Schritt in der Liste: `preseason_management` schaltet Verhandeln,
+    // Deshalb reicht EIN Schritt in der Liste: `season_end_management` schaltet Verhandeln,
     // Verkaufen und Training gemeinsam frei — es braucht keine drei Zeilen dafuer.
-    const state = mkState("preseason_management");
+    const state = mkState("season_end_management");
     for (const action of ["renew_contract", "sell_players", "set_training"] as const) {
       expect(evaluateGamePhaseAction(state, action).allowed, `${action} sollte offen sein`).toBe(true);
     }
 
     // GEMELDET: „Man soll noch NICHT kaufen. Kaufen findet in S2 vor MD1 statt! Das muss sauber
-    // getrennt sein". War es nicht: `preseason_management` stand in `TRANSFER_BUY_PHASES`, der
+    // getrennt sein". War es nicht: `season_end_management` stand in `TRANSFER_BUY_PHASES`, der
     // Knopf im Saisonabschluss schaltete genau dorthin, und die Zeile sagte es sogar laut
     // („verkaufen und kaufen sind freigeschaltet"). Ohne den Fix ist diese Zeile rot.
     const kauf = evaluateGamePhaseAction(state, "buy_players");
     expect(kauf.allowed, "Kaufen gehoert nicht ans Saisonende").toBe(false);
-    expect(kauf.reason).toBe("phase_blocked:buy_players:preseason_management");
+    expect(kauf.reason).toBe("phase_blocked:buy_players:season_end_management");
   });
 
   it("Kaufen oeffnet dort, wo Chris es haben will: neue Saison, vor dem 1. Spieltag", () => {
