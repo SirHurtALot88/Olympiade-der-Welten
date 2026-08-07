@@ -3,6 +3,15 @@
   "eintraege": [
     {
       "datum": "2026-08-07",
+      "seite": "Markt · Preseason-Marktplan",
+      "pr": null,
+      "text": "Ein KI-Team mit negativem Kontostand plante gar keine Verkäufe, wenn sein ganzer Kader aus dem Liga-Draft stammte: jeder Spieler trug die Marke „würde unter Einkauf verkauft\" und war damit gesperrt — und Kredite gibt es in Saison 1 nicht. Jetzt verkauft ein Team im Minus so lange, bis das Konto wieder im Plus ist: zuerst den größten Underperformer, solange sein Verlust im Verhältnis zum Erlös steht.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
       "seite": "Server · Spielstand zurückspielen",
       "pr": null,
       "text": "Der Prüflauf beim Zurückspielen eines reparierten Spielstands brach immer mit „attempt to write a readonly database\" ab: die Prüfdatei landete wegen eines fehlenden Schrägstrichs im Wurzelverzeichnis des Containers statt in /tmp, und dort darf der Dienst die WAL-Seitendateien nicht anlegen. Jetzt läuft der Prüflauf durch, und der Spielstand lässt sich wieder einsetzen.",
