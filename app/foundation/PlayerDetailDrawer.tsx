@@ -3649,9 +3649,19 @@ export default function PlayerDetailDrawer({
                       <ul className="player-drawer-discipline-forecast-list">
                         {movedTrainingDisciplines.map((row) => (
                           <li key={`discipline-forecast-${row.disciplineId}`}>
+                            {/* GEMELDET: „veränderung der stats ist hier doppelt gemoppelt da
+                                steht 2x immer der diszi name."
+
+                                `DisciplineIcon` schreibt seine Beschriftung selbst hin
+                                (`showLabel` steht auf true) — daneben stand nochmal derselbe
+                                Name, also „Basketball Basketball +1". Das Icon bleibt hier reines
+                                Bild; der Name kommt aus der Zeile, weil deren Typografie zum Rest
+                                der Liste passt. `label` bleibt gesetzt: ohne sichtbare Schrift ist
+                                das die `aria-label`/`title`-Quelle des Chips. */}
                             <DisciplineIcon
                               disciplineId={row.disciplineId}
                               label={disciplineLabelById.get(row.disciplineId) ?? row.disciplineId}
+                              showLabel={false}
                               className="discipline-icon-chip-inline"
                             />
                             <span className="player-drawer-discipline-forecast-label">

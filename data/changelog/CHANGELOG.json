@@ -2,6 +2,15 @@
   "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
+      "datum": "2026-08-06",
+      "seite": "Spieler · Profil (Karriere)",
+      "pr": null,
+      "text": "In der Trainings-Auswirkung auf die Disziplinen stand jeder Name doppelt — etwa „Basketball Basketball +1“. Das Disziplin-Icon schreibt seine Beschriftung selbst hin, daneben stand nochmal dieselbe. Jetzt steht der Name einmal da; das Icon bleibt als Bild erhalten und behält seinen Tooltip.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
       "datum": "2026-08-05",
       "seite": "Shell · Aktives Team",
       "pr": null,
