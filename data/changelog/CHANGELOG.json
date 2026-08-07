@@ -39,6 +39,15 @@
     },
     {
       "datum": "2026-08-06",
+      "seite": "Spieler · Profil (Karriere)",
+      "pr": null,
+      "text": "In der Trainings-Auswirkung auf die Disziplinen stand jeder Name doppelt — etwa „Basketball Basketball +1“. Das Disziplin-Icon schreibt seine Beschriftung selbst hin, daneben stand nochmal dieselbe. Jetzt steht der Name einmal da; das Icon bleibt als Bild erhalten und behält seinen Tooltip.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-06",
       "seite": "Spieltag · Kopfleiste",
       "pr": null,
       "text": "Oben stand mitten in der Saison dauerhaft „Preseason-Markt blockiert\" mit 124 Blockern — dahinter steckte keine Störung, sondern die Drossel, die KI-Teams davon abhält, ihr Training an jedem Spieltag umzustellen. Diese planmäßigen Abweisungen lösen keinen Alarm mehr aus und werden nicht mehr mitgezählt; echte Blockaden meldet die Leiste unverändert.",
