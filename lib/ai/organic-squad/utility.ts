@@ -52,7 +52,28 @@ const STRAIN_ENABLED = process.env.OLY_DRAFT_STRAIN === "1";
  * fill value quality-aware (capped at core-grade so no star inflation) and cash-scaled so it fades to a
  * no-op exactly when a team can't afford Depth-grade bodies → no below-opt risk. Default OFF.
  */
-const FILLQ_A_ENABLED = process.env.OLY_DRAFT_FILLQA === "1";
+/**
+ * STANDARD AN, seit am Spielstand gemessen wurde, was er bringt.
+ *
+ * CHRIS: „ich will nicht dass die teams nur mit füllspielern aufgefüllt werden sondern eine gute
+ * mischung aus stars, guten spielern und ergaenzungsspielern"
+ *
+ * Der Schalter lag seit dem Einbau auf AUS und war nirgends im Repo oder im Deploy gesetzt — die
+ * Qualitaets-Pyramide existierte also, lief aber nie. Am Klon von Chris' Spielstand gemessen, ab
+ * demselben Zustand nach dem Saisonwechsel und auf dem bereits reparierten Kaderziel:
+ *
+ *   aus                     Kader 337, Kaeufe 103, geliehen 161.3, liegengeblieben 37.2, stark 47
+ *   COMPOSE+FILLQA an       Kader 337, Kaeufe 103, geliehen  79.2, liegengeblieben 20.7, stark 49
+ *   zusaetzlich FILLQB      Kader 332, Kaeufe  98, geliehen 147.2, liegengeblieben 61.3, stark 56
+ *
+ * Die mittlere Zeile ist auf fast jeder Achse besser: gleiche Kadergroesse, gleiche Kaufzahl, halb
+ * so viel Kredit, 17 Mio weniger totes Geld, zwei starke Zugaenge mehr. FILLQB bleibt deshalb AUS —
+ * es kauft zwar die staerksten Kader (56 starke Zugaenge), erkauft das aber mit fuenf Spielern
+ * weniger und doppelt so viel liegengebliebenem Geld, weil es das Kaderziel zusaetzlich trimmt.
+ *
+ * Mit "0" laesst sich der Schalter weiterhin ausschalten.
+ */
+const FILLQ_A_ENABLED = process.env.OLY_DRAFT_FILLQA !== "0";
 
 /**
  * Env flag for ANPASSUNG PEAK (core-axis "one peak" front-load, see peakFrontLoadFactor / buyUtility).

@@ -270,6 +270,76 @@ export function groupDepthRowsByAxis(rows: NlTeamProfileDepthRow[]): NlTeamProfi
   }).filter((group) => group.rows.length > 0);
 }
 
+/**
+ * Achsen-Zusammenfassung für den zugeklappten Gruppenkopf: der Schnitt der Achse
+ * und die stärksten Spieler darin.
+ *
+ * Bewusst aus den VOLLEN `disciplineRatings` gerechnet und nicht aus den Zellen
+ * der Depth-Zeilen: dort stehen je Disziplin nur die besten sechs. Ein Spieler,
+ * der in zwei der fünf Disziplinen einer Achse auftaucht und in den anderen drei
+ * schwach ist, käme aus diesen Zellen mit dem Schnitt seiner zwei guten Werte
+ * heraus — also zu gut. Über alle fünf Disziplinen gemittelt stimmt die
+ * Rangfolge.
+ */
+type NlTeamProfileAxisSummary = {
+  /** Schnitt über alle Kaderspieler und alle Disziplinen dieser Achse. */
+  avgRating: number | null;
+  /** Stärkste Spieler der Achse, nach ihrem Achsen-Schnitt. */
+  topPlayers: Array<{ playerId: string; playerName: string; rating: number }>;
+};
+
+export function buildTeamAxisSummaries(
+  gameState: GameState,
+  teamId: string,
+): Record<NlAxisKey, NlTeamProfileAxisSummary> | null {
+  const rosterPlayerIds = new Set(
+    gameState.rosters.filter((entry) => entry.teamId === teamId).map((entry) => entry.playerId),
+  );
+  if (rosterPlayerIds.size === 0) {
+    return null;
+  }
+  const rosterPlayers = gameState.players.filter((player) => rosterPlayerIds.has(player.id));
+  if (rosterPlayers.length === 0) {
+    return null;
+  }
+
+  const disciplineIdsByAxis = new Map<NlAxisKey, string[]>();
+  for (const discipline of gameState.disciplines) {
+    const axis = DISCIPLINE_CATEGORY_TO_AXIS[discipline.category];
+    disciplineIdsByAxis.set(axis, [...(disciplineIdsByAxis.get(axis) ?? []), discipline.id]);
+  }
+
+  const summaries = {} as Record<NlAxisKey, NlTeamProfileAxisSummary>;
+  for (const { key } of NL_TEAMPROFILE_AXES) {
+    const disciplineIds = disciplineIdsByAxis.get(key) ?? [];
+    const perPlayer = rosterPlayers
+      .map((player) => {
+        const ratings = disciplineIds
+          .map((id) => player.disciplineRatings[id])
+          .filter((rating): rating is number => isFiniteNumber(rating));
+        if (ratings.length === 0) {
+          return null;
+        }
+        return {
+          playerId: player.id,
+          playerName: player.name,
+          rating: ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length,
+        };
+      })
+      .filter((entry): entry is { playerId: string; playerName: string; rating: number } => entry != null)
+      .sort((left, right) => right.rating - left.rating);
+
+    summaries[key] = {
+      avgRating:
+        perPlayer.length > 0
+          ? perPlayer.reduce((sum, entry) => sum + entry.rating, 0) / perPlayer.length
+          : null,
+      topPlayers: perPlayer.slice(0, 6),
+    };
+  }
+  return summaries;
+}
+
 function buildTeamDepthChart(gameState: GameState, teamId: string): NlTeamProfileDepthRow[] | null {
   const rosterEntries = gameState.rosters.filter((entry) => entry.teamId === teamId);
   if (rosterEntries.length === 0) {
@@ -819,6 +889,11 @@ export default function TeamProfileNewLook({
   const depthChartGroups = useMemo(
     () => (depthChart != null ? groupDepthRowsByAxis(depthChart) : null),
     [depthChart],
+  );
+
+  const depthAxisSummaries = useMemo(
+    () => (foundationGameState ? buildTeamAxisSummaries(foundationGameState, data.teamId) : null),
+    [foundationGameState, data.teamId],
   );
 
   const depthChartFallback = useMemo<NlTeamProfileDepthFallbackRow[] | null>(() => {
@@ -1841,6 +1916,7 @@ export default function TeamProfileNewLook({
                 {(depthChartGroups ?? []).map((group) => {
                   const isCollapsed = collapsedDepthAxes.includes(group.axis);
                   const groupBodyId = `nl-teamprofile-depth-axis-${group.axis}`;
+                  const axisSummary = depthAxisSummaries?.[group.axis] ?? null;
                   return (
                     <Fragment key={group.axis}>
                       {/* Kopf und Disziplinen liegen in zwei getrennten <tbody>: so trägt
@@ -1851,7 +1927,12 @@ export default function TeamProfileNewLook({
                         <tr
                           className={`nl-teamprofile-depth-grouprow ${nlToneClass(group.axis)}${isCollapsed ? " is-collapsed" : ""}`}
                         >
-                          <th colSpan={8} scope="colgroup" className="nl-teamprofile-depth-groupcell">
+                          {/* Der Kopf folgt demselben Spaltenraster wie die Disziplin-Zeilen:
+                              Achse links, Schnitt in der Fähig-Spalte, darunter die stärksten
+                              Spieler der Achse in den Rängen 1.–6. So steht die Achsen-Übersicht
+                              auch zugeklappt da — vorher blieb dort eine leere Zeile, in der
+                              nichts als der Name der Achse zu lesen war. */}
+                          <th scope="colgroup" className="nl-teamprofile-depth-groupcell">
                             <button
                               type="button"
                               className="nl-teamprofile-depth-grouptoggle"
@@ -1886,6 +1967,34 @@ export default function TeamProfileNewLook({
                               ) : null}
                             </button>
                           </th>
+                          <td
+                            className="nl-teamprofile-depth-groupavg nl-tnum"
+                            title={`Schnitt über alle Kaderspieler in den ${group.rows.length} ${group.label}-Disziplinen`}
+                          >
+                            {axisSummary?.avgRating != null ? `Ø ${formatNlNumber(axisSummary.avgRating, 0)}` : "—"}
+                          </td>
+                          {[0, 1, 2, 3, 4, 5].map((index) => {
+                            const top = axisSummary?.topPlayers[index] ?? null;
+                            return (
+                              <td key={index} className="nl-teamprofile-depth-cell-wrap">
+                                {top != null ? (
+                                  <button
+                                    type="button"
+                                    className={`nl-teamprofile-depth-cell is-axis ${nlToneClass(getDepthRatingTone(top.rating))}`}
+                                    onClick={() => onOpenPlayer(top.playerId, top.playerId)}
+                                    title={`${top.playerName} · ${group.label} im Schnitt ${formatNlNumber(top.rating, 0)} über ${group.rows.length} Disziplinen`}
+                                  >
+                                    <span className="nl-teamprofile-depth-cell-name">{top.playerName}</span>
+                                    <span className="nl-teamprofile-depth-cell-rating nl-tnum">
+                                      {formatNlNumber(top.rating, 0)}
+                                    </span>
+                                  </button>
+                                ) : (
+                                  <span className="nl-teamprofile-depth-cell is-empty">—</span>
+                                )}
+                              </td>
+                            );
+                          })}
                         </tr>
                       </tbody>
                       <tbody id={groupBodyId} hidden={isCollapsed}>

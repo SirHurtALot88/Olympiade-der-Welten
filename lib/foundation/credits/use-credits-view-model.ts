@@ -89,6 +89,46 @@ export function buildCreditsViewModel(gameState: GameState, teamId: string | nul
       };
     });
 
+  /**
+   * Die Liga-Sicht: jeder Kredit im Spielstand, egal wer ihn hat.
+   *
+   * CHRIS: „der spieler soll im kredite tab ALLE kredite sehen können … welches team hat von
+   * welchem einen kredit genommen, laufzeit raten usw."
+   *
+   * Kein Filter auf `status`: beendete Kredite bleiben sichtbar, sonst verschwindet die Historie
+   * genau dann, wenn sie interessant wird. Sortiert nach „laeuft noch" und dann nach Restschuld,
+   * damit die dicksten offenen Posten oben stehen.
+   */
+  const teamNameById = new Map(gameState.teams.map((entry) => [entry.teamId, entry.name] as const));
+  const leagueLoans = (gameState.seasonState.loans ?? [])
+    .map((loan) => {
+      const lenderTeamId = loan.lenderType === "team" ? (loan.lenderTeamId ?? null) : null;
+      return {
+        id: loan.loanId,
+        borrowerTeamId: loan.borrowerTeamId,
+        borrowerName: teamNameById.get(loan.borrowerTeamId) ?? loan.borrowerTeamId,
+        lenderType: loan.lenderType,
+        lenderTeamId,
+        lenderName:
+          loan.lenderType === "team" ? (teamNameById.get(lenderTeamId ?? "") ?? "Team") : "Bank",
+        principal: loan.principalOriginal,
+        outstanding: loan.principalOutstanding,
+        interestRate: loan.interestRatePerSeason,
+        termSeasons: loan.termSeasons,
+        remainingSeasons: loan.seasonsRemaining,
+        installmentPerSeason: loan.installmentPerSeason,
+        status: loan.status,
+        originatedSeasonId: loan.originatedSeasonId ?? null,
+        missedPayments: loan.missedPayments ?? 0,
+        involvesOwnTeam: loan.borrowerTeamId === teamId || lenderTeamId === teamId,
+      };
+    })
+    .sort((left, right) => {
+      const laeuft = (row: { status: string }) => (row.status === "active" ? 0 : 1);
+      if (laeuft(left) !== laeuft(right)) return laeuft(left) - laeuft(right);
+      return right.outstanding - left.outstanding;
+    });
+
   const isPreseason = evaluateGamePhaseAction(gameState, "credit_borrow").allowed;
   const seasonOne = isSeasonOne(gameState.season.id);
   // Admin-Override (nur Vorschau/Test, siehe FoundationCreditsHost): ignoriert
@@ -134,6 +174,7 @@ export function buildCreditsViewModel(gameState: GameState, teamId: string | nul
     minTermSeasons: MIN_TERM_SEASONS,
     maxTermSeasons: MAX_TERM_SEASONS,
     activeLoans,
+    leagueLoans,
     creditCapacityTotal,
     creditUtilizationRatio,
     annualLoanInstallment,

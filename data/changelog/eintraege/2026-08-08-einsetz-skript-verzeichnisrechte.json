@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-08",
+  "seite": "Betrieb · Spielstand einsetzen",
+  "text": "Nach dem Einsetzen eines Spielstands konnte die App wieder nur lesen — „attempt to write a readonly database\". Das Skript eignete bisher nur die Datenbankdatei dem Dienst-Benutzer zu, nicht das Verzeichnis. SQLite legt beim Schreiben aber Begleitdateien daneben an und braucht dafür Schreibrecht im Ordner; fehlt es, meldet es genau diesen Fehler, obwohl die Datei selbst passt. Das Skript übereignet jetzt das ganze Datenverzeichnis.",
+  "gewicht": "spielblockierend",
+  "version": "0.4"
+}

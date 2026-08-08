@@ -217,20 +217,28 @@ export function buildAllTimeTableModel(input: BuildAllTimeTableModelInput): AllT
         rank: record.rank ?? null,
         points: record.points ?? null,
         /**
-         * MARKTWERT: `marketValueSeasonEnd` zuerst — das ist der Stand NACH dem Trainings-Apply und
-         * der Marktwert-Neuberechnung, also der Wert, mit dem das Team die Saison wirklich beendet
-         * hat. `marketValueTotalEnd`/`marketValueEnd` werden beim Preseason-Patch mit dem
-         * Eintrittsstand der NÄCHSTEN Saison überschrieben und beantworten deshalb eine andere Frage.
+         * WELCHER STAND HIER STEHT — Chris' Vorgabe: „die snapshots für Cash und Marktwert sollen
+         * ja auch erst am anfang der Saison nach den Käufen stattfinden für die ewige Tabelle /
+         * Finanzen." Gemeint ist der Eintrittsstand der FOLGESAISON: Kader gefüllt, Käufe getätigt,
+         * Kredite aufgenommen — das ist der Stand, mit dem das Team wirklich weiterspielt.
          *
-         * CASH: `cashEnd` zuerst — der echte Kontostand zum Snapshot-Zeitpunkt (`team.cash`).
-         * `cashTotal` ist `projectedCash` aus dem Cash-Apply, eine PROGNOSE, die vor Sponsor-
-         * Settlement, Krediten, Gebäuden, Vorstandszielen und Insolvenz-Backstop gebildet wurde.
-         * Sie stand hier vorne — deshalb Chris' Meldung „in der ewigen Tabelle stehen auch noch die
-         * alten Cash-Werte". Ein Prognosewert aus der Vorsaison sieht genau so aus.
+         * Den schreibt `patchCompletedSeasonSnapshotAfterPreseasonBuy` in `marketValueTotalEnd`
+         * (Marktwert) und `cashEntry` (Cash). Ob er gelaufen ist, sagt `entryRosterPatchedAt` —
+         * ungepatchte Snapshots (Altsaves, oder die noch laufende letzte Saison) haben ihn nicht.
+         *
+         * FALLBACK OHNE PATCH, und warum genau in dieser Reihenfolge:
+         *   Marktwert → `marketValueSeasonEnd` (Stand nach dem Trainings-Apply, der echte
+         *   Saisonabschluss). `marketValueTotalEnd` traegt dann noch den Stand VOR der Entwicklung
+         *   und waere die schlechtere Zahl.
+         *   Cash → `cashEnd` (echter Kontostand zum Snapshot). `cashTotal` ist `projectedCash` aus
+         *   dem Cash-Apply, eine PROGNOSE vor Sponsoren, Krediten, Gebaeuden und Backstop — sie
+         *   stand hier einmal vorne, daher Chris' Meldung „in der ewigen Tabelle stehen auch noch
+         *   die alten Cash-Werte". Deshalb ganz hinten.
          */
-        marketValue:
-          record.marketValueSeasonEnd ?? record.marketValueTotalEnd ?? record.marketValueEnd ?? null,
-        cash: record.cashEnd ?? record.cashTotal ?? null,
+        marketValue: snapshot.entryRosterPatchedAt
+          ? (record.marketValueTotalEnd ?? record.marketValueEnd ?? record.marketValueSeasonEnd ?? null)
+          : (record.marketValueSeasonEnd ?? record.marketValueTotalEnd ?? record.marketValueEnd ?? null),
+        cash: record.cashEntry ?? record.cashEnd ?? record.cashTotal ?? null,
       });
     }
 

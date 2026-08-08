@@ -625,6 +625,17 @@ describe("season snapshot service", () => {
     // The roster/salary refresh (the patch's real job) still happens.
     expect(teamA?.rosterEnd).toBe(1);
     expect(teamA?.salaryTotalEnd).toBe(10);
+
+    /**
+     * CHRIS' VORGABE: „die snapshots für Cash und Marktwert sollen ja auch erst am anfang der
+     * Saison nach den Käufen stattfinden für die ewige Tabelle / Finanzen."
+     *
+     * Der Eintrittsstand steht deshalb DANEBEN in `cashEntry` — nicht in `cashEnd`, das der
+     * Abgleich (`getSnapshotCashByTeam`) als Saison-Endstand braucht. Genau diese Trennung ist der
+     * Grund, warum der Patch das Cash bisher gar nicht anfasste.
+     */
+    expect(teamA?.cashEntry).toBe(12.5);
+    expect(teamB?.cashEntry).toBe(30);
   });
 
   // Audit S4 regression: creating a season snapshot must never silently snapshot "the active

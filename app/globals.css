@@ -1066,6 +1066,7 @@ body:has(.oly-auth-status-badge) .oly-bug-report-flag {
 }
 
 .foundation-activity-strip {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1076,6 +1077,67 @@ body:has(.oly-auth-status-badge) .oly-bug-report-flag {
   background:
     linear-gradient(180deg, rgba(18, 24, 36, 0.98), rgba(12, 18, 28, 0.94));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Zugeklappt: keine Umrandung, kein Verlauf — nur der schmale Wiedereinblenden-
+   Knopf, damit von der Zeile praktisch nichts übrig bleibt. */
+.foundation-activity-strip.is-collapsed {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.foundation-activity-collapse {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(226, 232, 245, 0.75);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.foundation-activity-collapse:hover,
+.foundation-activity-collapse:focus-visible {
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(240, 245, 255, 0.95);
+}
+
+.foundation-activity-reopen {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid rgba(130, 156, 205, 0.28);
+  border-radius: 999px;
+  background: rgba(18, 24, 36, 0.9);
+  color: rgba(214, 224, 242, 0.85);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.foundation-activity-reopen:hover,
+.foundation-activity-reopen:focus-visible {
+  border-color: rgba(130, 156, 205, 0.5);
+  color: rgba(240, 245, 255, 0.98);
+}
+
+/* Ein Blocker bleibt auch zugeklappt als roter Punkt erkennbar. */
+.foundation-activity-reopen.is-blocked {
+  border-color: rgba(233, 96, 106, 0.45);
+  color: rgba(246, 176, 181, 0.95);
 }
 
 .foundation-activity-chip {
@@ -64094,6 +64156,62 @@ span.nl-facility-ampel-chip {
   color: var(--nl-ink);
 }
 
+/*
+  ALLE KREDITE DER LIGA — Detail-Tabelle unter der Team-Uebersicht.
+
+  Chris: „der spieler soll im kredite tab ALLE kredite sehen können … welches team hat von welchem
+  einen kredit genommen, laufzeit raten usw." Die Liste darueber fasst pro Team zusammen; hier steht
+  jeder einzelne Kredit. Beendete Kredite bleiben, nur gedaempft.
+*/
+.is-new-look .nl-credits-alle-wrap {
+  overflow-x: auto;
+}
+
+.is-new-look .nl-credits-alle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--nl-font-size-sm, 0.875rem);
+}
+
+.is-new-look .nl-credits-alle th,
+.is-new-look .nl-credits-alle td {
+  padding: var(--nl-space-2, 0.5rem) var(--nl-space-3, 0.75rem);
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--nl-border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.is-new-look .nl-credits-alle th {
+  color: var(--nl-text-muted, rgba(255, 255, 255, 0.6));
+  font-weight: 600;
+}
+
+.is-new-look .nl-credits-alle .nl-credits-alle-num {
+  text-align: right;
+}
+
+/* Eigene Beteiligung hervorheben — als Schuldner ODER als Geldgeber. */
+.is-new-look .nl-credits-alle-row.is-own td {
+  background: var(--nl-surface-raised, rgba(255, 255, 255, 0.04));
+}
+
+/* Beendetes bleibt lesbar, tritt aber zurueck. */
+.is-new-look .nl-credits-alle-row.is-done td {
+  opacity: 0.55;
+}
+
+.is-new-look .nl-credits-alle-du,
+.is-new-look .nl-credits-alle-seit,
+.is-new-look .nl-credits-alle-missed {
+  margin-left: var(--nl-space-2, 0.5rem);
+  font-size: var(--nl-font-size-xs, 0.75rem);
+  color: var(--nl-text-muted, rgba(255, 255, 255, 0.6));
+}
+
+.is-new-look .nl-credits-alle-missed {
+  color: var(--nl-danger, #f26d6d);
+}
+
 .is-new-look .nl-credits-league-list {
   display: flex;
   flex-direction: column;
@@ -66573,6 +66691,28 @@ span.nl-facility-ampel-chip {
   color: var(--nl-risk);
   font-size: 11px;
   font-weight: 700;
+}
+
+/* Die Gruppenzeile trägt jetzt Schnitt und Top-Spieler in denselben Spalten wie
+   die Disziplin-Zeilen. Ihre Zellen bekommen daher die Tönung der Achse, damit
+   der Kopf trotz Spaltenraster als zusammenhängender Block lesbar bleibt. */
+.is-new-look .nl-teamprofile-depth-grouprow > td {
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 10%, transparent);
+  border-bottom: 1px solid var(--nl-line-2);
+}
+
+.is-new-look .nl-teamprofile-depth-groupavg {
+  color: var(--nl-tone, var(--nl-ink));
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Der Achsen-Schnitt eines Spielers ist eine andere Größe als sein Wert in einer
+   einzelnen Disziplin — etwas zurückgenommen, damit die Kopfzeile die Zeilen
+   darunter nicht überstrahlt. */
+.is-new-look .nl-teamprofile-depth-cell.is-axis {
+  min-width: 76px;
+  opacity: 0.92;
 }
 
 /* --- Responsive (nl-teamprofile-fan-/board-/depth-) ------------------ */

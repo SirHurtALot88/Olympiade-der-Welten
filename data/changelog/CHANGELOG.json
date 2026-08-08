@@ -3,6 +3,69 @@
   "eintraege": [
     {
       "datum": "2026-08-08",
+      "seite": "Server · Spielstand-Export",
+      "pr": null,
+      "text": "Im Server-Log stand seit Wochen alle drei Minuten derselbe Fehler: der automatische Export wollte die Spielstände nach GitHub hochladen und scheiterte jedes Mal, weil das Verzeichnis der laufenden App kein Git-Repository ist — dort liegt nur das fertig gebaute Programm, kein Checkout und keine Zugangsdaten. Der Upload aus der App heraus kann deshalb gar nicht gelingen. Statt es endlos zu wiederholen, legt er sich jetzt beim ersten Fehlschlag still und schreibt einmal deutlich, was stattdessen greift: das Skript auf dem Server selbst, das den Spielstand ohnehin regelmäßig hochlädt. Der Export in den Ordner läuft unverändert weiter. Vorübergehende Störungen wie ein Netzausfall werden weiterhin im nächsten Zyklus erneut versucht.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Betrieb · Spielstand einsetzen",
+      "pr": null,
+      "text": "Nach dem Einsetzen eines Spielstands konnte die App wieder nur lesen — „attempt to write a readonly database\". Das Skript eignete bisher nur die Datenbankdatei dem Dienst-Benutzer zu, nicht das Verzeichnis. SQLite legt beim Schreiben aber Begleitdateien daneben an und braucht dafür Schreibrecht im Ordner; fehlt es, meldet es genau diesen Fehler, obwohl die Datei selbst passt. Das Skript übereignet jetzt das ganze Datenverzeichnis.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Finanzen · Ewige Tabelle",
+      "pr": null,
+      "text": "Zwei Dinge am Saisonstart: Erstens steht am Ende des Kauffensters garantiert kein Team mehr im Minus — wer nach Käufen, Kaderfüllung und regulärem Kredit noch negativ ist, bekommt einen Notkredit über genau den Fehlbetrag. Mit Minus in die neue Saison zu gehen bleibt erlaubt, das löst sich jetzt im Fenster auf. Zweitens zeigen ewige Tabelle und Finanzen für eine abgeschlossene Saison den Stand, mit dem das Team wirklich weiterspielt: Marktwert und Cash nach den Käufen der Folgesaison statt des Kaders vom Saisonende, der seit der Verkaufsumstellung nur noch drei bis sieben Spieler groß war. Der Wert dafür wurde bisher nie geschrieben — die Funktion existierte, aber niemand rief sie auf.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Markt · Preseason-Marktplan",
+      "pr": null,
+      "text": "Beim Start der neuen Saison hat der Kader-Füll-Lauf auch für manuell geführte Teams eingekauft — im laufenden Spielstand drei Zugänge für Stronghold Crusaders über zusammen 34,5 Mio. Der Dienst läuft über alle Teams des Spielstands und bekam beim Verdrahten in die Saisonstart-Kette die Schreibgrenze nicht mit, die jeder andere Schritt dieses Laufs hat. Er bekommt sie jetzt: dieselbe KI-Teamliste, die auch Marktplan und Manager-Aktionen benutzen.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Markt · Kauffenster und Kredite",
+      "pr": null,
+      "text": "Die KI-Teams haben Kredite aufgenommen und das Geld dann nicht ausgegeben — von 223,4 Mio geliehenem Geld lagen 134,7 Mio unangetastet auf den Konten, bei vollem Zins und überwiegend an andere Teams gezahlt. Die Ursache lag nicht beim Kredit: für dasselbe Team gab es drei verschiedene Kaderziele. Der kaufende Planer hielt Barbarian Plunderers bei 8 von 8 für fertig, während Sitzung und Kreditprüfung 8 von 9 sahen und für den fehlenden Platz Geld liehen. Jetzt ist der Wert aus dem Identitäts-Blatt die verbindliche Untergrenze, die Trainer-Persönlichkeit darf nur noch daraufsatteln. Ein Kredit wird außerdem vorher gegen den echten Kaufplan geprüft: plant das Team nichts, gibt es keinen Kredit. Und die Qualitäts-Mischung beim Einkauf ist eingeschaltet — mehr Stars und gute Spieler statt Auffüllware. Gemessen am laufenden Spielstand: liegengebliebenes Geld von 134,7 auf 5,3 Mio, Kreditvolumen von 223,4 auf 65,9 Mio, sechs Spieler mehr in den Kadern und statt elf nur noch fünf Teams unter ihrem Optimum.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Neues Spiel · Saison-1-Draft",
+      "pr": null,
+      "text": "Project Suicide startete eine neue Saison mit einem Konto im Minus, und die Saison-Vorprüfung ließ das Spiel dann nicht weiterlaufen. Grund war die Reihenfolge: Nula gehört per Sonderregel immer zu P-S und wird von P-S auch ganz normal bezahlt — nur wurde sie erst nach dem Draft verrechnet. Der Draft plante deshalb mit den vollen 300 Mio statt mit dem, was nach Nula übrig ist, gab 297,6 aus, und die 4,6 für Nula rissen das Konto danach ins Minus. Nula wird jetzt schon beim Anlegen des Spielstands gekauft, damit der Draft mit dem echten Rest rechnet. Am Kader von P-S und an Nulas Vertrag ändert sich nichts.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Saison · Saisonende",
+      "pr": null,
+      "text": "Der Saisonwechsel meldete dauerhaft „Es fehlt noch eine Sponsorenwahl\", obwohl er trotzdem durchlief. Gemeint war der Vertrag für die kommende Saison — und den hat am Saisonende nie jemand, weil die Angebote dort erst erzeugt und erst in der neuen Saison gewählt werden. Der Schritt blockiert und warnt deshalb nicht mehr. Die echte Sponsorenpflicht beim Saisonabschluss bleibt: fehlt der Vertrag für die laufende Saison, geht es weiterhin nicht weiter, und die Saisonfinale-Seite führt dann direkt zu den Sponsoren.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
       "seite": "Markt · Historie",
       "pr": null,
       "text": "Die Transferhistorie ist im Velo-Stil neu geordnet. Oben stehen jetzt Top-Käufe, Top-Verkäufe und die besten Gewinne als echte Top-5-Listen statt je einer Einzelkachel; ein Klick wählt den Deal im Spotlight. Darunter zeigt ein Team-Board alle 32 Teams auf gemeinsamer Skala, das eigene Team klar abgesetzt mit kumulierter Transferbilanz. Der Filterblock ist zu einem schmalen Streifen geschrumpft, die Fokus-Reiter sind weg — alles steht direkt da.",
@@ -41,9 +104,63 @@
       "datum": "2026-08-07",
       "seite": "Markt · Preseason-Marktplan",
       "pr": null,
+      "text": "Das Ausgabebudget eines KI-Teams rechnete mit dem Kontostand vor den Verkäufen desselben Plans — ein Team, das für 118 Mio verkauft, um einzukaufen, durfte das Geld nicht sehen und stand mit Budget null da. Die Erlöse fließen jetzt in die Rechnung ein.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Server · Spielstand zurückspielen",
+      "pr": null,
+      "text": "Nach dem Einsetzen eines reparierten Spielstands war das Spiel eingefroren: „attempt to write a readonly database\". Die Datei wird als root in den Container kopiert, der Dienst läuft aber als eigener Benutzer — lesen ging, schreiben nicht. Das Skript setzt die Besitzrechte jetzt zurück, auf dem Hin- wie auf dem Rückweg.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Markt · Preseason-Marktplan",
+      "pr": null,
+      "text": "KI-Teams blieben zum Saisonstart auf dem Kader-Minimum stehen, obwohl Geld da war. Grund: in der neuen Saison lief nur der pflegende Marktplan, nicht der aufbauende Füll-Lauf aus Saison 1. Der ist jetzt im Kauffenster mit verdrahtet und füllt nach dem Marktlauf bis zum Optimum der Team-Identität — am Spielstand gemessen kein Team mehr unter dem Minimum statt sechs, und nur noch drei unter ihrem Optimum (alle drei aus Geldmangel).",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Markt · Preseason-Marktplan",
+      "pr": null,
       "text": "KI-Teams mit zu kleinem Kader blieben unter dem Minimum stehen und blockierten den Preseason-Markt — obwohl Geld und freie Spieler reichlich da waren. Die Vorschlagsliste war auf drei Spieler fest verdrahtet, egal wie viele fehlten, und die Schrittzahl des Pick-Planers übernahm ungeprüft eine zu kleine Vorgabe. Beides richtet sich jetzt nach dem tatsächlichen Bedarf bis zum Kader-Minimum.",
       "quelle": "gepflegt",
       "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Team · Profil",
+      "pr": null,
+      "text": "Die Achsen-Kopfzeilen im Squad Depth Chart waren zugeklappt leer — jetzt steht dort der Schnitt der Achse und ihre stärksten Spieler auf den Plätzen 1 bis 6, in denselben Spalten wie die Disziplinen darunter. Gerechnet wird über alle fünf Disziplinen einer Achse, damit niemand nach oben rutscht, nur weil er in zweien davon stark ist.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Markt · Preseason-Marktplan",
+      "pr": null,
+      "text": "KI-Teams kauften mitten in der Saisonende-Kette und in der neuen Saison dann gar nicht mehr — der einzige automatische Marktlauf feuerte in der alten Saison und konnte in der Folgesaison nie auslösen. Jetzt gilt für die KI dieselbe Regel wie für dich: am Saisonende wird nur verkauft, gekauft wird im Kauffenster der neuen Saison, und der Verkaufserlös ist dort das Budget.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Finanzen · Kredite",
+      "pr": null,
+      "text": "KI-Teams haben noch nie einen Kredit aufgenommen — der einzige Aufruf dafür hing an einer Marktsitzung, die im laufenden Spiel gar nicht mehr mit Kaufabsicht startet. Im Kauffenster der neuen Saison wird jetzt zweimal geprüft: einmal vorher und einmal nachdem der Markt das Geld ausgegeben hat. Am Spielstand gemessen nehmen dadurch acht Teams einen Kredit auf, meist von einem anderen Team statt von der Bank. Neu ist außerdem: wer mit negativem Cash in die Saison geht, leiht sich das Minus weg, auch wenn der Kader eigentlich voll ist — sonst hätte er im reinen Kauffenster keinen Weg mehr heraus.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
       "version": "0.4"
     },
     {
@@ -53,6 +170,15 @@
       "text": "Ein KI-Team mit negativem Kontostand plante gar keine Verkäufe, wenn sein ganzer Kader aus dem Liga-Draft stammte: jeder Spieler trug die Marke „würde unter Einkauf verkauft\" und war damit gesperrt — und Kredite gibt es in Saison 1 nicht. Jetzt verkauft ein Team im Minus so lange, bis das Konto wieder im Plus ist: zuerst den größten Underperformer, solange sein Verlust im Verhältnis zum Erlös steht.",
       "quelle": "gepflegt",
       "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Markt · Preseason-Marktplan",
+      "pr": null,
+      "text": "Der Marktplan meldete Blockaden, die es gar nicht mehr gab: nachdem die Pick-Engine den Kaufplan ersetzt hatte, blieben Status, Vorschau und Blockierungsgründe auf dem alten Stand stehen. Ein Team, dessen Plan den Kader auf das Minimum bringt, stand trotzdem als „blockiert, Kader zu klein\" da. Beides wird jetzt nach dem Ersetzen neu berechnet.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
       "version": "0.4"
     },
     {
@@ -80,6 +206,15 @@
       "text": "„Neue Saison starten\" tat bei einer Ablehnung des Servers scheinbar gar nichts — der Grund landete nur im Cockpit und war auf der Saisonabschluss-Seite unsichtbar. Jetzt steht er dort, offene Blocker werden im Klartext genannt, und eine fehlende Sponsorenwahl führt mit einem Knopf direkt zu den Sponsoren statt in den Assistenten.",
       "quelle": "gepflegt",
       "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Alle Seiten · Kopfbereich",
+      "pr": null,
+      "text": "Die Statuszeile ganz oben lässt sich jetzt wegklappen — eine Meldung, die tagelang stehen bleibt, hängt sonst dauerhaft über jeder Seite. Zugeklappt bleibt ein schmaler Knopf mit der Zahl der Meldungen, damit nichts spurlos verschwindet; ein Blocker bleibt daran auch weiterhin als solcher erkennbar. Der Zustand wird gemerkt.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
       "version": "0.4"
     },
     {
@@ -116,7 +251,7 @@
       "text": "Das Saisonende kommt jetzt bis zum Ende durch. Vorher konnte man in einer Schleife hängenbleiben: die KI verkaufte, dadurch fielen Teams unter Kadermindestgröße, und der Liga-Draft hielt das für einen abgebrochenen Spielaufbau und kaufte erneut ganze Kader voll — auch für manuell geführte Teams. Ursache war ein Name für zwei gegenteilige Zeitpunkte: die erste Station des Saisonendes hieß genauso wie der frische Spielaufbau. Sie heißt jetzt eigenständig, alte Spielstände werden beim Laden umgeschrieben. Außerdem verkauft die Station „Verkäufe\" endlich wirklich: der Verkaufsdienst war fertig und getestet, wurde vom Saisonende-Assistenten aber nie aufgerufen — KI-Teams gingen mit unverändertem Kader und ohne frisches Geld in die neue Saison, und auf dem Markt lag nichts zu kaufen.",
       "quelle": "gepflegt",
       "gewicht": "grundlegend",
-      "version": "0.4.14"
+      "version": "0.4"
     },
     {
       "datum": "2026-08-05",

@@ -6,10 +6,15 @@ import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-con
 import { applyAiMarketPlanLocally } from "@/lib/ai/ai-market-plan-apply-service";
 import { applyAiManagerPlan, type AiManagerAction, type AiManagerActionType } from "@/lib/ai/ai-manager-apply-service";
 import { applyAiInjuryDepthTopup } from "@/lib/ai/ai-injury-depth-topup-service";
+import { runAutoRosterFillForMatchdaySetup } from "@/lib/ai/auto-roster-fill-service";
+import { AUTO_ROSTER_FILL_CONFIRM_TOKEN } from "@/lib/ai/auto-roster-fill-contract";
 import { buildAiActionBreakdown } from "@/lib/ai/ai-action-breakdown";
 import { AI_PRESEASON_RUN_STALE_MS } from "@/lib/ai/ai-preseason-run-timing";
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
+import { patchCompletedSeasonSnapshotAfterPreseasonBuy } from "@/lib/season/season-snapshot-service";
+import { resolveAiLoanDecision } from "@/lib/ai/ai-loan-decision-service";
+import { applyInsolvencyBackstop, buildLoanOffers, originateLoan } from "@/lib/finance/loan-service";
 import type { AiPreseasonAutomationRunRecord, GameState } from "@/lib/data/olyDataTypes";
 import {
   allowsAiPreseasonManualTeamOverride,
@@ -18,6 +23,7 @@ import {
 } from "@/lib/ai/ai-preseason-manual-team-guard";
 import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
 import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
+import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { resolveAiBulkTeamWriteScope } from "@/lib/room/ai-bulk-team-write-scope";
@@ -277,6 +283,76 @@ async function executeAiPreseasonBackgroundWork(input: {
       persistence,
     });
 
+    /**
+     * KREDITE — der Schritt, den es nie gab.
+     *
+     * GEMELDET: „Kredite sollen verfügbar sein und ich will sehen ob die genutzt werden. Gerade
+     * auch bei teams wie D-P die mit negativem Cash rein gehen. … Wenn kein team sich dafür
+     * interessiert wäre das auch falsch."
+     *
+     * BEFUND, am Klon von Chris' Spielstand gemessen: `resolveAiLoanDecision` qualifiziert Teams
+     * (zwei im Kauffenster), aber im Spielstand stand `seasonState.loans` auf LEER — kein einziger
+     * KI-Kredit, ueber die ganze Historie.
+     *
+     * URSACHE, mit Zeile: der einzige KI-Kredit-Aufruf liegt in
+     * `ai-transfer-window-session-service.ts:704` und haengt an
+     * `isPreseasonBuyPhase && allowBuys`. Der einzige Aufrufer dieser Sitzung im Spiel ist
+     * `season-transition-service.ts` — und der ruft sie mit `phase: "season_end"` und
+     * `allowBuys: false` auf. `phase: "preseason"` benutzen nur noch Skripte. Der Kredit-Hook war
+     * damit im laufenden Spiel unerreichbar; das Kauffenster hier laeuft ueber
+     * `applyAiMarketPlanLocally` und den Fuell-Dienst, die beide nichts von Krediten wissen.
+     *
+     * ZWEI DURCHGAENGE, und der zweite ist der wichtigere. Vor dem Markt liest sich fast jedes Team
+     * als `cash_sufficient` — das Geld ist ja noch da. Erst NACH dem Markt steht fest, wer sich
+     * leergekauft hat und trotzdem unter seinem Kader-Ziel steht. Am Klon gemessen, jeweils ab
+     * demselben Zustand nach dem Saisonwechsel:
+     *
+     *   ohne Kredite       : 0 Kredite, Kader 343, 3 Teams unter Optimum
+     *   nur Pass 1         : 2 Kredite, Kader 342, 3 Teams unter Optimum
+     *   Pass 1 + Pass 2    : 8 Kredite, Kader 346, 2 Teams unter Optimum (A-A 9 -> 11, B-B am Ziel)
+     *
+     * Nach dem Fuell-Lauf wird NICHT mehr geliehen: dann kaeme das Geld zu spaet und waere nur
+     * Zinslast ohne Gegenwert.
+     */
+    const kreditNotizen: string[] = [];
+    const kreditPass = () => {
+      for (const teamId of aiTeamIds) {
+        const aktuell = persistence.getSaveById(saveId);
+        if (!aktuell) break;
+        const entscheidung = resolveAiLoanDecision(aktuell.gameState, teamId);
+        if (!entscheidung.shouldBorrow) continue;
+        // `buildLoanOffers` ist aufsteigend nach Zinssatz sortiert und enthaelt immer die Bank —
+        // es gibt also mindestens ein Angebot, und das erste ist das guenstigste.
+        const angebote = buildLoanOffers(
+          aktuell.gameState,
+          teamId,
+          entscheidung.loanAmount,
+          entscheidung.termSeasons,
+        );
+        const bestes = angebote[0] ?? null;
+        const ergebnis = originateLoan(
+          aktuell.gameState,
+          {
+            borrowerTeamId: teamId,
+            principal: entscheidung.loanAmount,
+            termSeasons: entscheidung.termSeasons,
+            lenderType: bestes?.lenderType ?? "bank",
+            lenderTeamId: bestes?.lenderTeamId ?? undefined,
+          },
+          { execute: true },
+        );
+        if (!ergebnis.ok) {
+          kreditNotizen.push(`ai_loan_abgelehnt:${teamId}:${ergebnis.reason ?? "unbekannt"}`);
+          continue;
+        }
+        persistence.saveSingleplayerState(saveId, ergebnis.gameState);
+        kreditNotizen.push(
+          `ai_loan_borrow:${teamId}:${entscheidung.loanAmount}:${entscheidung.termSeasons}s:${entscheidung.reason}`,
+        );
+      }
+    };
+    kreditPass();
+
     const market = await applyAiMarketPlanLocally({
       source: "sqlite",
       saveId,
@@ -289,25 +365,156 @@ async function executeAiPreseasonBackgroundWork(input: {
       options: {
         includeWarningTeams: false,
         stopOnTeamFailure: false,
+        // Kauffenster der neuen Saison = reine KAUF-Phase (Chris: verkauft wird als separater
+        // Schritt am Saisonende, ueber die Saisonende-Kette). Ein Verkaufslauf hier wuerde die
+        // frisch am Saisonende verkauften Teams ein zweites Mal schrumpfen — und das Fenster
+        // ist fuer den Menschen aus demselben Grund ebenfalls kauf-only
+        // (`isEarlySeasonTransferSetup` zaehlt nur fuers Kaufen, transfer-window-policy).
+        applySellSteps: false,
       },
     });
     const completedTeams = market.results.filter(
       (team) => team.result !== "blocked" && team.result !== "failed_buy" && team.result !== "failed_sell",
     ).length;
+    // Zweiter Kredit-Durchgang: jetzt ist die Kasse leer und die Luecke sichtbar (Begruendung und
+    // Messung oben beim ersten Pass). Er laeuft vor dem Fuell-Lauf, damit das Geld noch wirkt.
+    kreditPass();
+    /**
+     * KADER AUFS OPTIMUM FUELLEN — mit demselben Dienst, der das in Saison 1 tut.
+     *
+     * GEMELDET: „wieso ist die Logik nicht wie beim kaufen in season 1? da haben wir doch auch
+     * teils teams die 10 oder 12 spieler haben?" und „schau dass kein team was das geld hat nur
+     * auf minimum geht"
+     *
+     * Der Kommentar ueber dem Saison-Markt-Zweig sagt „Kader existieren bereits". Seit die
+     * Verkaeufe an das Saisonende gewandert sind, stimmt das nicht mehr: die Teams stehen beim
+     * Saisonstart bei 3 bis 7 Spielern. Saison 1 BAUT Kader auf (`runAiPicksExecutePreview`),
+     * der Marktplan PFLEGT sie nur — fuer einen leergeraeumten Kader ist Pflege das falsche
+     * Werkzeug.
+     *
+     * Am Klon von Chris' Spielstand gemessen, jeweils nach dem Saisonwechsel (Kader 234,
+     * kleinster 3, 20 Teams unter Minimum, 30 unter Optimum):
+     *
+     *   nur Marktplan, VIER Laeufe : Kader 314, kleinster 5, 6 unter Minimum, 13 unter Optimum
+     *   Fuell-Dienst, EIN Lauf     : Kader 350, kleinster 8, 0 unter Minimum,  1 unter Optimum
+     *
+     * `auto-roster-fill-service` zielt auf `teamIdentity.playerOpt` (dort Zeile 205-209), macht
+     * einen Minimum- und danach einen Optimum-Durchgang und hat KEIN Saison-Gate — er lief in
+     * Saison 2 nur nie. Genau das wird hier nachgeholt.
+     *
+     * Er laeuft NACH dem Markt, nicht statt seiner: der Markt macht die strategisch begruendeten
+     * Zugaenge, der Fuell-Lauf schliesst danach die Luecke bis zum Optimum. Wie viel er kauft,
+     * entscheidet weiterhin das Geld — `target_unreachable_cash` ist ein regulaeres Ergebnis.
+     */
+    const rosterFill = await runAutoRosterFillForMatchdaySetup(
+      {
+        source: "sqlite",
+        saveId,
+        seasonId,
+        dryRun: false,
+        confirmToken: AUTO_ROSTER_FILL_CONFIRM_TOKEN,
+        /**
+         * GEMELDET: „S-C hat gekauft. das ist MEIN TEAM. Wie kann das passieren dass die AI da
+         * wieder für kauft."
+         *
+         * Am Spielstand nachgemessen: drei Zugaenge fuer S-C mit `source=ai_roster_fill`. Der
+         * Fuell-Dienst laeuft ohne Einschraenkung ueber ALLE Teams des Spielstands — genau davor
+         * warnt sein eigener Parameter-Kommentar („that was the S6 bug for this path",
+         * `auto-roster-fill-service.ts:129`). Beim Verdrahten in #446 wurde die Einschraenkung
+         * schlicht nicht mitgegeben; die anderen Schritte dieses Laufs haben sie alle
+         * (`teamScope: "ai"`, `teamIds: aiTeamIds`).
+         *
+         * `aiTeamIds` ist die bereits gefilterte Liste: `getAiTeamIds` nimmt nur Teams mit
+         * `controlMode === "ai"`, zieht `getProtectedHumanTeamIds` ab und schneidet zusaetzlich
+         * mit den im Raum beschreibbaren Teams. Genau die darf der Fuell-Lauf anfassen.
+         */
+        callerWritableTeamIds: aiTeamIds,
+      },
+      persistence,
+    );
+    const rosterFillFilled = rosterFill.teams.filter(
+      (team) => team.status === "filled" || team.status === "partially_filled",
+    ).length;
+
     // Owner request: after a season with too many injuries, an AI team should buy one or two
     // cheap depth players. Runs AFTER the regular market pipeline above (so it only tops up
     // whatever that pipeline already did) and is scoped to the same AI-only `aiTeamIds` — see
     // lib/ai/ai-injury-depth-topup-service.ts for the injury signal / cheap-price / afford gating.
     const injuryDepthTopup = applyAiInjuryDepthTopup({ saveId, seasonId, aiTeamIds });
+
+    /**
+     * KEIN MINUS MEHR, WENN DAS FENSTER ZU IST.
+     *
+     * CHRIS' REGEL: „d-p darf negativ in die neue Saison gehen das ist ok! Nur nach dem kaufen und
+     * kredite aufnehmen darf es nicht mehr negativ sein."
+     *
+     * Der regulaere Kredit-Pass oben kann ein Minus stehen lassen: er prueft Kapazitaet und
+     * Tragfaehigkeit, und beides darf nein sagen. Danach hat das Team keinen Weg mehr — verkauft
+     * wird erst am naechsten Saisonende. Der Notkredit ist genau dafuer da (`emergency: true`
+     * umgeht Kapazitaet, Distress-Gate und die S1-Sperre, weil er unfreiwillig ist) und deckt exakt
+     * den Fehlbetrag; Cash steht danach auf 0, die Restschuld laeuft im normalen Kreditsystem.
+     *
+     * Er steht bewusst am ENDE: erst wenn Markt, Fuellung und Verletzungs-Topup fertig sind, steht
+     * der Kontostand fest, mit dem das Team in die Saison geht.
+     */
+    const vorAusgleich = persistence.getSaveById(saveId);
+    let notkredite: Array<{ teamId: string; principal: number }> = [];
+    if (vorAusgleich) {
+      const ausgleich = applyInsolvencyBackstop({ gameState: vorAusgleich.gameState, saveId });
+      if (ausgleich.emergencyLoans.length > 0) {
+        persistence.saveSingleplayerState(saveId, ausgleich.gameState);
+        notkredite = ausgleich.emergencyLoans;
+      }
+      kreditNotizen.push(
+        ...ausgleich.warnings,
+        ...notkredite.map((kredit) => `ai_notkredit:${kredit.teamId}:${kredit.principal}`),
+      );
+    }
+
+    /**
+     * SNAPSHOT DER VORSAISON AUF DEN EINTRITTSSTAND NACHZIEHEN.
+     *
+     * CHRIS' VORGABE: „die snapshots für Cash und Marktwert sollen ja auch erst am anfang der
+     * Saison nach den Käufen stattfinden für die ewige Tabelle / Finanzen."
+     *
+     * BEFUND: `patchCompletedSeasonSnapshotAfterPreseasonBuy` gibt es seit Langem und tut genau
+     * das — aufgerufen hat es im Spiel aber NIEMAND. Die einzigen Aufrufer waren
+     * `scripts/long-run-sandbox-s1-s6.ts:3514` und die Tests. In der ewigen Tabelle stand deshalb
+     * der Stand vom Saisonende; seit die Verkaeufe dorthin gewandert sind (#445) heisst das: Kader
+     * von 3 bis 7 Spielern und ein entsprechend kleiner Marktwert.
+     *
+     * Hier ist der richtige Zeitpunkt: Markt, Fuellung, Verletzungs-Topup und der
+     * Zahlungsausgleich sind durch, der Eintrittsstand steht fest.
+     */
+    let snapshotPatchNotiz: string[] = [];
+    const vorPatch = persistence.getSaveById(saveId);
+    if (vorPatch) {
+      const patch = patchCompletedSeasonSnapshotAfterPreseasonBuy(vorPatch.gameState, seasonId);
+      if (patch.patched) {
+        persistence.saveSingleplayerState(saveId, patch.gameState);
+        snapshotPatchNotiz = [`snapshot_eintrittsstand_gesetzt:${patch.completedSeasonId}`];
+      } else {
+        snapshotPatchNotiz = patch.warnings;
+      }
+    }
+
     const finalRecord: AiPreseasonAutomationRunRecord = {
       ...baseRecord,
       status: market.status === "blocked" ? "failed" : "completed",
       completedAt: nowIso(),
       aiTeamsCompleted: completedTeams,
       managerActionsApplied: managerResult.actions.filter((action) => action.applied).length,
-      transferBuysApplied: market.summary.appliedBuys + injuryDepthTopup.playersBoughtTotal,
+      transferBuysApplied:
+        market.summary.appliedBuys + injuryDepthTopup.playersBoughtTotal + rosterFill.summary.appliedBuys,
       transferSellsApplied: market.summary.appliedSells,
-      warnings: [...managerResult.warnings, ...market.warnings, ...injuryDepthTopup.warnings],
+      warnings: [
+        ...managerResult.warnings,
+        ...market.warnings,
+        ...injuryDepthTopup.warnings,
+        `roster_fill_auf_optimum:${rosterFillFilled}/${rosterFill.teams.length}`,
+        ...kreditNotizen,
+        ...snapshotPatchNotiz,
+      ],
       blockingReasons: [...managerResult.blockers, ...market.blockingReasons],
       actionBreakdown: buildAiActionBreakdown(managerResult.actions),
     };
@@ -419,6 +626,26 @@ export async function POST(request: Request) {
     const aiTeamIds = getAiTeamIds(protectedSave.gameState, callerWritableTeamIds);
     const startedAt = nowIso();
     const setupDraftMode = shouldRunSetupDraft(protectedSave.gameState, aiTeamIds);
+
+    /**
+     * CHRIS' REGEL: „wir verkaufen als separaten schritt zum ende der saison und gekauft wird
+     * erst in der folgesaison."
+     *
+     * Der Season-Market-Lauf gehoert ins Kauffenster der NEUEN Saison. Solange der Spielstand
+     * noch in der Saisonende-Kette steht (`isSeasonEndPhase`), laufen die Verkaeufe dort ueber
+     * den Saisonende-Assistenten (`runSeasonEndAiSellsIfDue`) — ein Marktlauf hier waere ein
+     * zweiter, konkurrierender Schreiber mitten in der Kette. Bewusst wird KEIN Run-Record
+     * geschrieben: der Lauf ist nicht erledigt, sondern verschoben; im Kauffenster der neuen
+     * Saison stoesst der Client ihn unter der neuen Saison-ID regulaer an.
+     */
+    if (!setupDraftMode && isSeasonEndPhase(protectedSave.gameState.gamePhase)) {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: "ai_preseason_deferred_until_new_season_buy_window",
+        run: null,
+      });
+    }
     const baseRecord: AiPreseasonAutomationRunRecord = {
       runId: `ai-preseason-${saveId}-${seasonId}-${Date.now()}`,
       seasonId,

@@ -635,12 +635,19 @@ function buildTeamEntryEconomyFromGameState(
           2,
         )
       : 0;
-  // NOTE: `cashEnd`/`cashTotal` are DELIBERATELY NOT returned here. This patch only refreshes the
-  // previous season's roster/salary/market-value with post-preseason-buy entry state. `cashEnd` is
-  // the TRUE season-end cash carried forward and must be preserved — overwriting it with the current
-  // (post-preseason-spend) team.cash understated season N's cashStart in the reconciliation audit
-  // (getSnapshotCashByTeam) and in the finances view-model sparkline, double-counting the preseason
-  // spend as a false-positive cash_reconciliation_delta_hard.
+  /**
+   * `cashEnd`/`cashTotal` bleiben UNANGETASTET. `cashEnd` ist der wahre Saison-Endstand und die
+   * Bezugsgroesse des Abgleichs (`getSnapshotCashByTeam`); wird er mit dem Stand nach den
+   * Preseason-Ausgaben ueberschrieben, rechnet der Abgleich diese Ausgaben doppelt und meldet ein
+   * falsches `cash_reconciliation_delta_hard`.
+   *
+   * Der Eintrittsstand, den Chris fuer die ewige Tabelle und die Finanzen sehen will („die
+   * snapshots für Cash und Marktwert sollen ja auch erst am anfang der Saison nach den Käufen
+   * stattfinden"), steht deshalb daneben in `cashEntry` — dieselbe Trennung, die es fuer den
+   * Marktwert mit `marketValueSeasonEnd` schon gibt.
+   */
+  const team = gameState.teams.find((entry) => entry.teamId === teamId) ?? null;
+  const cashEntry = team && Number.isFinite(team.cash) ? roundValue(team.cash, 2) : null;
   return {
     rosterEnd: roster.length,
     rosterCountEnd: roster.length,
@@ -648,6 +655,7 @@ function buildTeamEntryEconomyFromGameState(
     salaryTotalEnd: salaryEnd,
     marketValueEnd,
     marketValueTotalEnd: marketValueEnd,
+    cashEntry,
   };
 }
 

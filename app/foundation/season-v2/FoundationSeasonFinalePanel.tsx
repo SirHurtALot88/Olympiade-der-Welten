@@ -256,21 +256,27 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
       action: expiringContracts > 0 && sellWindowOpen ? { label: "Zum Kader", onClick: onOpenRoster } : null,
     },
     /**
-     * Der zweite Schritt, der vorher fehlte.
+     * Der zweite Schritt, der vorher fehlte — jetzt aber nur noch, wenn wirklich etwas klemmt.
      *
-     * `sponsor_choice` blockiert den Saisonwechsel mit `manual_sponsor_choice_pending`, sobald
-     * ein von Hand gefuehrtes Team noch keinen Sponsor hat. Diese Liste kannte den Schritt
-     * nicht — der Start scheiterte also an etwas, das hier nicht einmal erwaehnt war. Steht die
-     * Wahl an, fuehrt diese Zeile direkt zur Sponsorenseite statt in den Cockpit-Assistenten.
+     * Er kam herein, weil der Saisonwechsel an `manual_sponsor_choice_pending` scheiterte, ohne
+     * dass diese Liste den Grund ueberhaupt nannte. Ausloeser war damals die offene Wahl selbst
+     * (`sponsorChoicePending > 0`) — und die steht am Saisonende IMMER offen, weil die Angebote
+     * fuer die neue Saison hier erst erzeugt und erst dort gewaehlt werden.
+     *
+     * CHRIS: „nimm die Warnung raus für Sponsoren, die werden in s2 sauber dann gepickt."
+     *
+     * Der Schritt haengt deshalb jetzt am echten Blocker statt an der offenen Wahl. Er
+     * verschwindet damit im Normalfall — und erscheint weiterhin, wenn der Abschluss-Gate
+     * (`season-completion-service.ts:234`) einen Vertrag fuer die LAUFENDE Saison vermisst. Das
+     * ist der Fall, in dem es wirklich nicht weitergeht, und dann fuehrt die Zeile direkt zur
+     * Sponsorenseite statt in den Cockpit-Assistenten.
      */
-    ...(sponsorChoicePending > 0
+    ...(workflowBlockingReasons.includes("manual_sponsor_choice_pending")
       ? [
           {
             key: "sponsor-choice",
             title:
-              sponsorChoicePending === 1
-                ? "Sponsor wählen"
-                : `Sponsor wählen (${sponsorChoicePending} Teams)`,
+              sponsorChoicePending > 1 ? `Sponsor wählen (${sponsorChoicePending} Teams)` : "Sponsor wählen",
             detail:
               "Ohne Sponsorenvertrag geht der Saisonwechsel nicht weiter. Die Angebote liegen unter Finanzen.",
             state: (readOnly ? "blocked" : "ready") as SeasonFinaleStepState,
