@@ -11,7 +11,7 @@ import {
   getTeamOutstandingDebt,
 } from "@/lib/finance/loan-service";
 import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
-import { getTeamDisplaySalaryTotal, getTeamFacilityUpkeepTotal } from "@/lib/sponsor/sponsor-team-salary-display";
+import { getTeamActualSalaryTotal, getTeamFacilityUpkeepTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import { isSeasonOne } from "@/lib/season/transfer-season-policy";
 import type { CreditsViewModel, TeamCreditState } from "@/lib/foundation/credits/credits-types";
 
@@ -154,10 +154,16 @@ export function buildCreditsViewModel(gameState: GameState, teamId: string | nul
   const creditUtilizationRatio =
     creditCapacityTotal > 0 ? Math.max(0, Math.min(1, outstandingDebt / creditCapacityTotal)) : 0;
 
-  // Tilgung-vs-Cashflow (Grafik-Welle 2): dieselben Helper, die auch die
-  // Sponsoren-/KI-Kalkulation nutzt — keine eigene Wirtschaftslogik hier.
+  // Tilgung-vs-Cashflow (Grafik-Welle 2, F4): der Chart zeigt CASHFLOW,
+  // also die ECHTE Gehaltssumme (`getTeamActualSalaryTotal` = contract.salary,
+  // das Feld, das die Season-End-Resolution abbucht) — dieselbe Zahl wie auf
+  // der Finanzen-Seite. Vorher stand hier die Apron-/Sponsor-GLÄTTUNG
+  // (`getTeamDisplaySalaryTotal`, expectedSalary): 64,1 gegen 52,1 Mio — und
+  // das „Deckungslücke"-Badge behauptete eine Lücke, die es im echten
+  // Cashflow nicht gab. Apron/Sponsor/KI rechnen intern unverändert mit der
+  // Glättung; nur diese Anzeige wechselt die Quelle.
   const annualLoanInstallment = getTeamAnnualLoanInstallment(gameState, teamId);
-  const annualSalaryTotal = getTeamDisplaySalaryTotal(gameState, teamId);
+  const annualSalaryTotal = getTeamActualSalaryTotal(gameState, teamId);
   const annualFacilityUpkeep = getTeamFacilityUpkeepTotal(gameState, teamId);
   const estimatedAnnualRevenue = estimateTeamAnnualRevenue(gameState, teamId);
 

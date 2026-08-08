@@ -204,10 +204,14 @@ export default function FoundationHomeV2Host({
           .filter((warning) => !HOME_HIDDEN_WARNING_KEYS.includes(warning))
           .map(formatHomeWarningLabel),
         topPlayers: overviewDerivations.homeV2TopPlayers,
+        // F4: Radar = Office-Kopf = Markt-Vorschau (Ø Top-6 je Achse).
+        teamAxisAverages: overviewDerivations.homeTeamTopSixAxisStats,
         leagueHeatPools: leaguePlayerHeatPools,
         facilities: overviewDerivations.homeV2Facilities,
         scheduleItems: overviewDerivations.homeV2ScheduleItems,
         inboxItems: overviewDerivations.homeV2InboxItems,
+        // F4: Zähler = volle Entscheidungsliste (identisch zur Inbox).
+        inboxOpenCount: overviewDerivations.homeOpenTaskCount,
         inboxCriticalCount: activeTeamDecisionCriticalInboxItems.length,
         todayCards: overviewDerivations.homeTodayCards,
         onContinue: triggerGlobalNext,

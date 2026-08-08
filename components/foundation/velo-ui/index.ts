@@ -15,6 +15,10 @@
  *
  * Prefer `.velo-*` classes; feature aliases (e.g. `training-v2-rider-orbit`) stay for legacy CSS.
  * Avoid parallel chip styles (`arena-v2-axis-chip`, custom breakdown spans) — use components here.
+ *
+ * Rang-/Wertungs-Farben ("Bestwert → Schlusslicht"): kein Bauteil hier, sondern
+ * lib/foundation/quartile-tone.ts — theme-feste Skala Gold→good→warn→risk.
+ * `accent` traegt NIE eine Bewertung (Paket F2); Ton-Klasse `.nl-tone-gold`.
  */
 export { VeloAxisRail, type VeloAxisRailEntry, type VeloAxisRailProps } from "@/components/foundation/velo-ui/VeloAxisRail";
 export { VeloDivergingBar, type VeloDivergingBarProps } from "@/components/foundation/velo-ui/VeloDivergingBar";

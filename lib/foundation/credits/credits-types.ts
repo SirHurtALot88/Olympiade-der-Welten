@@ -92,7 +92,8 @@ export type TeamCreditState = {
   creditUtilizationRatio: number;
   /** Summe der jährlichen Kreditraten aller aktiven Kredite (`getTeamAnnualLoanInstallment`) — Belastungs-Chart. */
   annualLoanInstallment: number;
-  /** Gehaltssumme des Kaders (`getTeamDisplaySalaryTotal`) — Belastungs-Chart. */
+  /** ECHTE Gehaltssumme des Kaders (`getTeamActualSalaryTotal`, F4) — Belastungs-Chart.
+   *  Cashflow-Zahl wie auf der Finanzen-Seite, NICHT die Apron-/Sponsor-Glättung. */
   annualSalaryTotal: number;
   /** Gebäude-Unterhalt aller gebauten Anlagen (`getTeamFacilityUpkeepTotal`) — Belastungs-Chart. */
   annualFacilityUpkeep: number;

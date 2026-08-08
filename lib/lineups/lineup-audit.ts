@@ -553,12 +553,18 @@ export function buildLineupSaveCta(input: {
     };
   }
 
+  // F4 (Befund L1): der CTA zählte hier BLOCKER-KATEGORIEN („Noch 1 offen"),
+  // direkt neben dem Ring, der SLOTS zählt („0/9 · 9 offen") — zwei Zähler,
+  // zwei Einheiten, dieselbe Wortwahl. Die Slot-Zahl ist die Quelle; der CTA
+  // erfindet keine eigene „Dinge"-Einheit mehr, sondern benennt den Blocker
+  // wörtlich (ein Blocker → sein Text, z. B. „9 Slots offen" — identisch mit
+  // dem Ring) oder zählt ausdrücklich „Blocker".
   const blockerCount = blockers.length;
   return {
     tone: blockers.some((entry) => entry.includes("Konflikt")) ? ("blocked" as const) : ("warning" as const),
-    label: blockerCount > 0 ? `Noch ${blockerCount} ${blockerCount === 1 ? "Ding" : "Dinge"} offen` : "Noch nicht bereit",
+    label: blockerCount === 1 ? blockers[0]! : blockerCount > 1 ? `${blockerCount} Blocker offen` : "Noch nicht bereit",
     detail: blockers.slice(0, 3).join(" · ") || "Bitte offene Punkte zuerst aufraeumen.",
-    buttonLabel: blockerCount > 0 ? `Noch ${blockerCount} offen` : "Noch nicht bereit",
+    buttonLabel: blockerCount === 1 ? blockers[0]! : blockerCount > 1 ? `${blockerCount} Blocker` : "Noch nicht bereit",
   };
 }
 

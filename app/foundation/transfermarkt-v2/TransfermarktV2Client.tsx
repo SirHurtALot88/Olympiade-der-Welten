@@ -7,6 +7,7 @@ import { FoundationShellRouterMarketBuy } from "@/app/foundation/FoundationShell
 import TransfermarktV2NewLook from "@/app/foundation/transfermarkt-v2/TransfermarktV2NewLook";
 import type { ContractShape, Discipline, GameState, Team, TeamControlMode, TeamSeasonObjectiveRecord, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
 import { CONTRACT_SHAPE_LABELS } from "@/lib/foundation/contract-shape-label";
+import { formatNegotiationSignalLabel } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 import { getTransfermarktPortraitModel } from "@/lib/market/transfermarkt-lab";
 import type { TransferHistoryReadResult } from "@/lib/market/transfer-history-read-service";
@@ -413,27 +414,8 @@ function formatReadinessLabel(value: string | null | undefined) {
   return value.replaceAll("_", " ");
 }
 
-function formatNegotiationSignalLabel(value: string) {
-  const labels: Record<string, string> = {
-    insufficient_cash: "Cash reicht für Kauf oder Gesamtpaket noch nicht.",
-    low_team_fit_reduces_acceptance: "Schwacher Teamfit drückt die Zusage.",
-    local_team_not_owned_or_ai_controlled: "Dieses Team ist hier nur Ansicht und kann keine Deals schreiben.",
-    market_bracket_factor_preview_pending: "Marktklasse ist nur grob eingeschätzt.",
-    negotiation_cancelled_after_contact: "Abbruch nach Kontakt bleibt als Vertrauensmalus hängen.",
-    negotiation_rejected_bad_experience: "Die letzte Absage macht die nächste Runde härter.",
-    offer_below_expected_salary: "Angebot liegt unter der aktuellen Forderung.",
-    previous_rejected_offer_reduces_trust: "Spieler ist nach der letzten Runde noch angefressen und verhandelt härter.",
-    preview_only_contract_negotiation: "Verhandlungssimulation — finaler Kauf über „Kauf bestätigen“.",
-    trait_salary_factor_source_missing: "Ein Teil der Trait-Effekte ist noch unscharf.",
-    team_not_found: "Team wurde nicht gefunden.",
-    player_not_found: "Spieler wurde nicht gefunden.",
-    player_not_free_agent_in_scope: "Spieler ist gerade kein freier Zugang.",
-    roster_limit_reached: "Kader ist bereits voll.",
-    salary_source_missing: "Gehaltsbasis fehlt.",
-  };
-
-  return labels[value] ?? value.replaceAll("_", " ");
-}
+// F5: formatNegotiationSignalLabel kommt aus foundation-format-render-helpers —
+// die lokale Duplikat-Map (mit rohem replaceAll-Fallback) ist konsolidiert.
 
 /** Auf Wunsch entfernter Hinweis — Laufzeit-Abweichung ist kein eigener UI-Hinweis mehr. */
 const SUPPRESSED_NEGOTIATION_WARNING_CODES = new Set([

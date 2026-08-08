@@ -4757,6 +4757,18 @@ body:has(.oly-auth-status-badge) .oly-bug-report-flag {
   font-size: 0.92rem;
 }
 
+/* F4: Basis-Etikett an der Office-Achsenzeile — dieselbe Größe wie das
+   Home-Radar (Ø Top-6 je Achse), und das steht sichtbar dran. */
+.foundation-hq-axis-basis {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut, rgba(255, 255, 255, 0.68));
+}
+
 .foundation-hq-captain-picker {
   display: grid;
   gap: 12px;
@@ -15488,6 +15500,27 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   background: var(--heat-danger-bg);
 }
 
+/* F3 (gemessen 1,3:1): die generische Regel `.foundation-shell .metric-card
+   span` (Weiß 68 %) hat mit ihrer höheren Spezifität die Chip-Paarung
+   übermalt — heller Text auf hellem Gold-Grund. Die Paarungen hier
+   wiederholen die Chip-Farben mit gleicher Spezifität wie die generische
+   Regel, damit Text und Grund wieder aus EINEM Paar kommen. */
+.foundation-shell .metric-card span.player-drawer-potential-trend-chip {
+  color: var(--heat-neutral-text);
+}
+
+.foundation-shell .metric-card span.player-drawer-potential-trend-chip.is-positive {
+  color: var(--heat-strong-text);
+}
+
+.foundation-shell .metric-card span.player-drawer-potential-trend-chip.is-warning {
+  color: var(--heat-risk-text);
+}
+
+.foundation-shell .metric-card span.player-drawer-potential-trend-chip.is-negative {
+  color: var(--heat-danger-text);
+}
+
 .player-drawer-potential-visual {
   display: grid;
   gap: 8px;
@@ -17871,7 +17904,10 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 
 .team-drawer-history-table td.team-drawer-history-area.is-social,
 .player-attribute-progress-table td.player-drawer-history-area.is-social {
-  background: rgba(203, 169, 93, 0.58);
+  /* F3 (gemessen 3,76:1): bei 58 % Deckung mischte der dunkle Tabellengrund
+     das Gold so weit ab, dass die dunkle Schrift absoff. 85 % Deckung hält
+     den Goldton und hebt die Paarung auf > 6:1. */
+  background: rgba(203, 169, 93, 0.85);
   color: #14120f;
 }
 
@@ -34420,7 +34456,10 @@ button.market-v2-bucket-card.is-selected {
   width: 12px;
   height: 12px;
   clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
-  background: rgba(255, 255, 255, 0.12);
+  /* F3: leere Sternform bei 12 % Weiß war auf dem Panel unsichtbar (~1,5:1)
+     — gleiche Familie wie .nl-ability-star-track. 38 % hält die Form über
+     der 3:1-Grafik-Schwelle, bleibt aber klar "leer" gegen den Gold-Fill. */
+  background: rgba(255, 255, 255, 0.38);
 }
 
 .training-v2-rider-stars span.is-filled {
@@ -35111,7 +35150,12 @@ button.market-v2-bucket-card.is-selected {
 
 .nl-ability-star-track {
   display: inline-block;
-  color: rgba(103, 89, 61, 0.58);
+  /* F3 (gemessen 1,65:1): die leere Sternbahn war praktisch unsichtbar —
+     man konnte volle Sterne nicht von "keine Wertung" unterscheiden.
+     Entsättigtes Gold-Grau, voll deckend — gemessen 4,8:1 auch auf der
+     hellsten Kartenfläche (Portrait-Karten, rgb(39,35,48)). Sterne bleiben
+     Sterne (Chris) — nur die Bahn wird sichtbar. */
+  color: #a08f66;
 }
 
 .nl-ability-star-fill {
@@ -44411,8 +44455,15 @@ button.foundation-team-portrait-card {
   /* --nl-accent-text = Teamton als TEXT auf dunklem Grund (Navigations-
      Überschriften, Karten-Eyebrows). Getrennt vom Akzent, weil eine dunkle
      Vereinsfarbe als Text sonst im Grund verschwindet — gemessen lagen 13 von
-     32 Teams beim Navigationslabel unter der Lesbarkeitsschwelle. */
-  --nl-accent-text: var(--nl-mut-2);
+     32 Teams beim Navigationslabel unter der Lesbarkeitsschwelle. Mit aktivem
+     Team-Theme setzt buildTeamShellThemeVars das Token per accentTextFor
+     (>= 4,5:1 für alle 32 Teams). Der Default hier gilt für den Standard-Look
+     OHNE Team-Theme: der Standard-Akzent selbst, GEMESSEN 6,30:1 auf
+     --nl-panel und 6,95:1 auf dem Navigationsgrund rgba(8,14,28,0.92) —
+     der frühere Default var(--nl-mut-2) lag bis 2,68:1 und war damit genau
+     der Ton, den das Token eigentlich verhindern soll. Nachgerechnet wird
+     das in tests/nl-accent-text-regel.test.ts. */
+  --nl-accent-text: var(--nl-accent);
   /* Gemeinsamer Fokus-Ring (zusammen mit outline-offset: 2px angewandt) */
   --nl-focus-ring: 2px solid var(--nl-accent);
   /* Achsen (Spiel-Identität) */
@@ -44500,6 +44551,22 @@ button.foundation-team-portrait-card {
 }
 
 /* --- Ton-Klassen: setzen --nl-tone für alle nl-Komponenten ------- */
+/* --nl-tone-text = derselbe Ton, aber als TEXT garantiert lesbar. Für die
+   Semantik-/Achsen-Töne ist das der Ton selbst; nur der Akzent-Ton hebt auf
+   --nl-accent-text an (s. u.). Jede Ton-Klasse definiert BEIDE Variablen,
+   damit ein verschachtelter Tonwechsel nie den Text-Ton des Elternteils
+   mitschleppt. */
+.is-new-look .nl-tone-pow,
+.is-new-look .nl-tone-spe,
+.is-new-look .nl-tone-men,
+.is-new-look .nl-tone-soc,
+.is-new-look .nl-tone-gold,
+.is-new-look .nl-tone-good,
+.is-new-look .nl-tone-warn,
+.is-new-look .nl-tone-risk,
+.is-new-look .nl-tone-neutral {
+  --nl-tone-text: var(--nl-tone);
+}
 .is-new-look .nl-tone-pow {
   --nl-tone: var(--nl-pow);
 }
@@ -44514,6 +44581,10 @@ button.foundation-team-portrait-card {
 }
 .is-new-look .nl-tone-accent {
   --nl-tone: var(--nl-accent);
+  /* Als TEXT braucht der Akzent-Ton die Lesbarkeits-Stufe: eine dunkle
+     Vereinsfarbe verschwindet als Schrift im Grund. Nur Textregeln lesen
+     --nl-tone-text (Rückfall: --nl-tone) — Linien/Flächen bleiben beim Ton. */
+  --nl-tone-text: var(--nl-accent-text, var(--nl-accent));
 }
 .is-new-look .nl-tone-good {
   --nl-tone: var(--nl-good);
@@ -44526,6 +44597,12 @@ button.foundation-team-portrait-card {
 }
 .is-new-look .nl-tone-neutral {
   --nl-tone: var(--nl-mut);
+}
+/* Spitzen-Stufe der Rang-Skala „Bestwert → Schlusslicht" (Paket F2,
+   lib/foundation/quartile-tone.ts): Gold statt Akzent, damit Rang 1 bei
+   rotem Team-Theme nie wie Rang 31 (risk) aussieht. */
+.is-new-look .nl-tone-gold {
+  --nl-tone: var(--nl-gold);
 }
 
 /* --- StatChip: "jeder Stat ist ein Portal" ----------------------- */
@@ -44551,7 +44628,10 @@ button.foundation-team-portrait-card {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 72%, var(--nl-mut));
+  /* --nl-tone-text (gesetzt von .nl-tone-accent) hält die Akzent-Variante
+     lesbar, auch wenn die Teamfarbe dunkel ist; alle anderen Töne fallen
+     unverändert auf --nl-tone zurück. */
+  color: color-mix(in srgb, var(--nl-tone-text, var(--nl-tone, var(--nl-mut))) 72%, var(--nl-mut));
 }
 .is-new-look .nl-stat-chip-help {
   display: inline-flex;
@@ -44678,7 +44758,10 @@ button.foundation-team-portrait-card {
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--nl-mut-2);
+  /* Eyebrows sind informationstragender Sekundärtext → nie --nl-mut-2
+     (gemessen bis 2,68:1). --nl-accent-text ist die Teamfarbe-als-Text-
+     Stufe; ohne Team-Theme der Standard-Akzent (6,30:1 auf Panel). */
+  color: var(--nl-accent-text, var(--nl-accent));
 }
 .is-new-look .nl-card-title {
   margin: 0;
@@ -45700,6 +45783,26 @@ button.foundation-team-portrait-card {
   color: var(--nl-good);
 }
 
+/* F4: „… und N weitere in der Inbox" — benennt den gekappten Rest der
+   Top-5-Anzeige, damit der Karten-Zähler (volle Liste) nie im Widerspruch
+   zur sichtbaren Liste steht. */
+.is-new-look .nl-home-inbox-more {
+  width: 100%;
+  padding: 4px 10px;
+  border: none;
+  background: transparent;
+  color: var(--nl-mut);
+  font-size: var(--nl-fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.is-new-look .nl-home-inbox-more:hover,
+.is-new-look .nl-home-inbox-more:focus-visible {
+  color: var(--nl-ink);
+  text-decoration: underline;
+}
+
 .is-new-look .nl-home-player-list {
   list-style: none;
   margin: 0;
@@ -46639,7 +46742,9 @@ button.foundation-team-portrait-card {
 }
 
 .is-new-look .nl-standings-table .nl-standings-teamcode {
-  color: var(--nl-mut-2);
+  /* Team-Kürzel ist die Identifikation der Zeile — informationstragend,
+     also --nl-mut statt der Deko-Stufe --nl-mut-2 (3,7:1 auf Panel). */
+  color: var(--nl-mut);
 }
 
 /* --- Skeleton / Empty ---------------------------------------------- */
@@ -56770,21 +56875,26 @@ button.foundation-team-portrait-card {
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: color-mix(in srgb, var(--nl-ink, #e8ecf5) 70%, transparent);
+  /* Volle Deckung statt 70%-Ink + Opacity-Stapel — der Doppelrabatt drückte
+     die inaktiven Optionen unter die Lesbarkeitsschwelle. Hierarchie kommt
+     jetzt allein aus dem gedämpften Farbton (--nl-mut, 6,8:1). */
+  color: var(--nl-mut, #93a3bd);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.01em;
   cursor: pointer;
-  opacity: 0.75;
-  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 .foundation-sidebar-viewwidth-option:hover {
-  opacity: 1;
+  color: var(--nl-ink, #e8ecf5);
 }
 .foundation-sidebar-viewwidth-option.is-active {
   background: var(--nl-accent-soft, rgba(90, 210, 140, 0.18));
-  color: var(--nl-accent, #57d08a);
-  opacity: 1;
+  /* GEMESSEN: Akzent-Text auf der Akzent-Soft-Fläche trug nur 3,9:1 —
+     accentTextFor rechnet gegen das Panel, nicht gegen die Soft-Fläche.
+     Volle Tinte auf der getönten Fläche ist die Paarung, die bei jedem
+     Team-Theme hält; die Teamfarbe trägt hier der Grund, nicht die Schrift. */
+  color: var(--nl-ink, #e8ecf5);
 }
 .foundation-sidebar-viewwidth-glyph {
   font-size: 11px;
@@ -64371,7 +64481,9 @@ span.nl-facility-ampel-chip {
 .is-new-look .foundation-sidebar-version-badge {
   border: 1px solid var(--nl-line-2);
   background: var(--nl-bg-2);
-  color: var(--nl-mut-2);
+  /* Versionsnummer ist informationstragend → --nl-mut (6,8:1), nicht
+     --nl-mut-2 (Deko-Stufe, auf --nl-bg-2 nur 3,9:1). */
+  color: var(--nl-mut);
 }
 
 .is-new-look .foundation-sidebar-save-link {
@@ -64384,7 +64496,11 @@ span.nl-facility-ampel-chip {
 }
 
 .is-new-look .foundation-sidebar-group-label {
-  color: var(--nl-mut-2);
+  /* Gruppen-Überschriften (SPIELTAG · TEAM · …) gliedern die Navigation —
+     informationstragend, also lesbare Teamfarbe-als-Text-Stufe statt
+     --nl-mut-2. Ohne Team-Theme ist das der Standard-Akzent (6,95:1 auf
+     dem Navigationsgrund). */
+  color: var(--nl-accent-text, var(--nl-accent));
   opacity: 1;
 }
 
@@ -64630,18 +64746,35 @@ span.nl-facility-ampel-chip {
 
 /* Die klassischen Shell-Buttons (primary/secondary) tragen hartkodiertes
    Legacy-Blau (#4f86d8/#5d8fd6) — auf jeder Seite sichtbar (z.B. "Office
-   öffnen", Flow-Leiste). Im Team-Theme folgen sie dem Team-Akzent; die
+   öffnen", Flow-Leiste). Im neuen Look folgen sie den Akzent-Tokens; die
    Textfarbe kommt aus --nl-accent-ink, damit sie auch auf hellem Silber
-   (S-S) und dunklem Stahl (L-R) lesbar bleibt. Ohne Team-Theme bleibt das
-   gewohnte Blau unverändert. */
-.foundation-shell.is-new-look[data-team-theme] .primary-button {
+   (S-S) und dunklem Stahl (L-R) lesbar bleibt. Gilt bewusst AUCH ohne
+   Team-Theme: das Legacy-Blau trug Weiß bei nur 3,5:1 bzw. 3,2:1 —
+   der Standard-Akzent mit --nl-accent-ink (= --nl-bg) misst 6,9:1. */
+.foundation-shell.is-new-look .primary-button {
   background: var(--nl-accent-fill, var(--nl-accent));
   color: var(--nl-accent-ink);
 }
 
-.foundation-shell.is-new-look[data-team-theme] .secondary-button {
-  background: color-mix(in srgb, var(--nl-accent-fill, var(--nl-accent)) 88%, var(--nl-accent-deep, var(--nl-panel)));
+.foundation-shell.is-new-look .secondary-button {
+  /* GEMESSEN: die frühere 88%-Fill + 12%-Deep-Mischung hob bei hellem
+     Zweitton (S-C: Silber) die Fläche an und drückte die Ink auf 4,43:1.
+     Text-tragende Flächen bleiben deshalb auf --nl-accent-fill (Ink-Garantie
+     per accentFillFor); die Abgrenzung zum Primary übernimmt der Deep-Ring. */
+  background: var(--nl-accent-fill, var(--nl-accent));
   color: var(--nl-accent-ink);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--nl-accent-deep, var(--nl-panel)) 55%, transparent);
+}
+
+/* „Leertaste"-Badge im Weiter-Button: die Legacy-Fassung (82% Weiß auf 16%
+   Weiß über dem Button) maß 3,08:1. Der Text steht jetzt in voller Deckung
+   direkt auf der Akzent-Fläche — --nl-accent-ink garantiert dort >= 4,5:1
+   für alle 32 Teams (accentFillFor) und 6,9:1 im Standard-Look; der Rahmen
+   ersetzt die halbtransparente Füllfläche als Abgrenzung. */
+.foundation-shell.is-new-look .foundation-global-next-button small {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--nl-accent-ink, #fff) 45%, transparent);
+  color: var(--nl-accent-ink, #fff);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -68048,6 +68181,9 @@ span.nl-facility-ampel-chip {
 .is-new-look .nl-legends-podium-name {
   font-weight: 700;
   font-size: 14px;
+  /* F3: ohne explizite Farbe erbte hier Schwarz aus dem Legacy-Body und
+     stand mit 1,15:1 auf den dunklen Medaillen-Karten. */
+  color: var(--nl-ink);
 }
 
 .is-new-look .nl-legends-podium-teams {
@@ -68058,6 +68194,8 @@ span.nl-facility-ampel-chip {
 .is-new-look .nl-legends-podium-value {
   font-size: 18px;
   font-weight: 800;
+  /* F3: siehe .nl-legends-podium-name — Erbfarbe war unlesbar. */
+  color: var(--nl-ink);
 }
 
 .is-new-look .nl-legends-podium-sub {
@@ -71100,7 +71238,12 @@ span.nl-facility-ampel-chip {
 }
 
 .is-new-look td.is-active-sort .nl-ptable-percentile.nl-ptable-metric-rank.is-ovr {
-  background: color-mix(in srgb, var(--nl-gold) 55%, var(--nl-panel-2, #0f1621) 45%);
+  /* F3 (gemessen 3,71:1): Gold ist das hellste der drei Spaltentöne — bei
+     55 % Anteil trug der helle --nl-ink-Text nicht mehr. 42 % ist immer
+     noch sichtbar kräftiger als die 30 % des Grundzustands, hält aber
+     5,4:1 (nachgerechnet gegen --nl-panel-2). PPs/MVS dürfen bei 55 %
+     bleiben, ihre Töne sind dunkler (Akzent 5,6:1, Bronze 6,2:1). */
+  background: color-mix(in srgb, var(--nl-gold) 42%, var(--nl-panel-2, #0f1621) 58%);
 }
 
 .is-new-look td.is-active-sort .nl-ptable-percentile.nl-ptable-metric-rank.is-mvs {
@@ -76724,11 +76867,9 @@ span.nl-facility-ampel-chip {
   box-shadow: inset -1px 0 0 color-mix(in srgb, var(--nl-accent) 26%, transparent);
 }
 
-/* Gruppen-Überschriften (SPIELTAG · TEAM · MARKT · WELT) im Teamton statt
-   in neutralem Grau — sie gliedern die Leiste und sind billig zu färben. */
-.foundation-shell.is-new-look[data-team-theme] .foundation-sidebar-group-label {
-  color: var(--nl-accent-text, var(--nl-accent));
-}
+/* Gruppen-Überschriften (SPIELTAG · TEAM · MARKT · WELT) tragen den Teamton
+   inzwischen in der Basisregel (.is-new-look .foundation-sidebar-group-label
+   nutzt --nl-accent-text) — keine eigene Theme-Regel mehr nötig. */
 
 /* Der aktive Eintrag bekommt eine Akzent-Kante links — die Stelle, an der man
    ohne Hinsehen erkennt, wo man ist. */
@@ -76776,12 +76917,10 @@ span.nl-facility-ampel-chip {
     inset 0 1px 0 color-mix(in srgb, var(--nl-accent) 16%, transparent);
 }
 
-/* Karten-Eyebrows (SCOUTING-PROFIL, GEWINNSTUFEN, …) im Teamton — sie sind
-   über die ganze App verteilt und geben dem Schema Präsenz, ohne dass
-   irgendwo ein Messwert die Farbe wechselt. */
-.is-new-look[data-team-theme] .nl-card-eyebrow {
-  color: var(--nl-accent-text, var(--nl-accent));
-}
+/* Karten-Eyebrows (SCOUTING-PROFIL, GEWINNSTUFEN, …) tragen den Teamton
+   inzwischen in der Basisregel (.is-new-look .nl-card-eyebrow nutzt
+   --nl-accent-text) — eine eigene [data-team-theme]-Regel braucht es nicht
+   mehr, das Token wechselt mit dem Theme von selbst. */
 
 /* Tabellenkopf und Trennlinien: die Flächen, an denen man „Rahmen" am
    ehesten wahrnimmt. */

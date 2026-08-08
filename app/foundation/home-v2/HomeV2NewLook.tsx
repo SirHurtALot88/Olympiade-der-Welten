@@ -62,11 +62,13 @@ function formatObjectiveValue(value: string | number | boolean | null): string {
 }
 
 function getObjectiveTone(status: string): NlTone {
+  // "läuft noch" = neutral, nicht `accent`: Skala enthält `risk`, und die
+  // Teamfarbe darf nie mit einer Bewertung verwechselbar sein (F2-Regel).
   const normalized = status.toLowerCase();
   if (normalized === "completed") return "good";
   if (normalized === "at_risk" || normalized === "failed") return "risk";
   if (normalized === "blocked") return "warn";
-  return "accent";
+  return "neutral";
 }
 
 function getGuvTone(guv: number | null): NlTone {
@@ -273,10 +275,12 @@ export default function HomeV2NewLook({
   showTeamPickerCta = false,
   onOpenTeamPicker,
   topPlayers,
+  teamAxisAverages,
   leagueHeatPools,
   facilities,
   scheduleItems,
   inboxItems,
+  inboxOpenCount,
   inboxCriticalCount = 0,
   todayCards,
   onContinue,
@@ -333,21 +337,16 @@ export default function HomeV2NewLook({
   const animatedLoanInstallment = useCountUp(loanInstallment);
   const hasActiveLoan = loanInstallment != null && loanInstallment > 0;
 
-  // Team-Achsenprofil (#50): Durchschnitt der vier Spiel-Achsen über die
-  // Top-Kader-Spieler — nur reale, endliche Werte, fehlende Achsen fallen
-  // raus. Radar wird nur gerendert, wenn mindestens eine Achse ableitbar ist.
-  const teamAxisProfile: NlRadarAxis[] = (["pow", "spe", "men", "soc"] as NlAxisKey[])
-    .map((key) => {
-      const values = topPlayers
-        .map((player) => player[key])
-        .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
-      if (values.length === 0) {
-        return null;
-      }
-      const average = values.reduce((sum, value) => sum + value, 0) / values.length;
-      return { key, value: Math.round(average) } satisfies NlRadarAxis;
-    })
-    .filter((axis): axis is NlRadarAxis => axis !== null);
+  // Team-Achsenprofil (#50, F4): kommt fertig aus `teamAxisAverages` —
+  // Ø Top-6 je Achse, dieselbe Quelle wie Office-Kopf und Markt-Vorschau.
+  // Vorher rechnete das Radar hier einen eigenen Schnitt über die sechs
+  // Portrait-Spieler und widersprach dem Office (55/40/42/44 vs. 54/39/39/41).
+  const teamAxisProfile: NlRadarAxis[] = teamAxisAverages
+    ? (["pow", "spe", "men", "soc"] as NlAxisKey[]).map((key) => ({
+        key,
+        value: Math.round(teamAxisAverages[key]),
+      }))
+    : [];
 
   // Entwicklungs-Highlights (#51): Aufsteiger = Potenzial deutlich über
   // aktueller Klasse (CA), Risiken = aktuelle Klasse über Potenzial.
@@ -672,7 +671,7 @@ export default function HomeV2NewLook({
                 <div className="nl-home-radar-wrap nl-home-radar-wrap-hero">
                   <NlRadar axes={teamAxisProfile} showValues aria-label="Team-Achsenprofil POW, SPE, MEN, SOC" />
                 </div>
-                <p className="nl-home-radar-note">Ø der Top-{topPlayers.length} nach POW · SPE · MEN · SOC</p>
+                <p className="nl-home-radar-note">Ø Top-6 je Achse — gleiche Basis wie Office &amp; Markt-Vorschau</p>
               </NlCard>
             ) : null}
 
@@ -800,7 +799,9 @@ export default function HomeV2NewLook({
           eyebrow={<span className="nl-home-card-eyebrow-icon"><IconInboxTray /> Entscheidungen</span>}
           title={
             <span className="nl-home-inbox-title">
-              {inboxItems.length} offen
+              {/* F4: Gesamtzahl aus der vollen Entscheidungsliste (wie Inbox),
+                  nicht die Länge der gekappten Anzeige-Liste. */}
+              {inboxOpenCount} offen
               {inboxCriticalCount > 0 ? (
                 <span className={`nl-home-critical-pill ${nlToneClass("risk")}`}>{inboxCriticalCount} kritisch</span>
               ) : null}
@@ -816,7 +817,8 @@ export default function HomeV2NewLook({
             <ul className="nl-home-inbox-list">
               {inboxItems.slice(0, 3).map((item) => (
                 <li key={item.id} className="nl-home-inbox-row">
-                  <button type="button" className={`nl-home-inbox-item ${nlToneClass(item.severity === "critical" ? "risk" : item.severity === "warning" ? "warn" : "accent")}`} onClick={onOpenInbox}>
+                  {/* F2-Regel: Info-Stufe neutral, nicht accent — die Skala enthält risk. */}
+                  <button type="button" className={`nl-home-inbox-item ${nlToneClass(item.severity === "critical" ? "risk" : item.severity === "warning" ? "warn" : "neutral")}`} onClick={onOpenInbox}>
                     <span className="nl-home-inbox-dot" aria-hidden="true" />
                     <span className="sr-only">{item.severity === "critical" ? "kritisch" : item.severity === "warning" ? "Warnung" : "Info"}: </span>
                     <span className="nl-home-inbox-copy">
@@ -840,6 +842,15 @@ export default function HomeV2NewLook({
                   ) : null}
                 </li>
               ))}
+              {/* F4: die Anzeige ist gekappt — der Rest wird benannt statt
+                  verschwiegen, damit Zähler und Liste nie widersprechen. */}
+              {inboxOpenCount > Math.min(inboxItems.length, 3) ? (
+                <li className="nl-home-inbox-row">
+                  <button type="button" className="nl-home-inbox-more" onClick={onOpenInbox}>
+                    … und {inboxOpenCount - Math.min(inboxItems.length, 3)} weitere in der Inbox
+                  </button>
+                </li>
+              ) : null}
             </ul>
           ) : (
             <p className="nl-home-empty-note">Alles erledigt — keine offenen Entscheidungen.</p>

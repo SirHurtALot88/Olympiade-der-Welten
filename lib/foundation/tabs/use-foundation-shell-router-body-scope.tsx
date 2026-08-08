@@ -67,6 +67,7 @@ import {
   formatTransfermarktRatio,
   type TransfermarktTier,
 } from "@/lib/market/transfermarkt-formatting-contract";
+import { computeTeamTopSixAxisStats } from "@/lib/market/transfermarkt-roster-impact";
 import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
 import { LOCAL_TRANSFER_WINDOW_PHASE, getTransferWindowStatus } from "@/lib/market/transfer-window-policy";
 import {
@@ -8379,27 +8380,14 @@ export function useFoundationShellRouterBodyScope({
 
   const selectedHqAxisSummary = null;
 
-  const selectedTeamAverageAxisStats = useMemo(() => {
-    if (rosterPlayers.length === 0) {
-      return null;
-    }
-    const totals = rosterPlayers.reduce(
-      (sum, { player }) => ({
-        pow: sum.pow + (player.coreStats.pow ?? 0),
-        spe: sum.spe + (player.coreStats.spe ?? 0),
-        men: sum.men + (player.coreStats.men ?? 0),
-        soc: sum.soc + (player.coreStats.soc ?? 0),
-      }),
-      { pow: 0, spe: 0, men: 0, soc: 0 },
-    );
-    const count = rosterPlayers.length;
-    return {
-      pow: totals.pow / count,
-      spe: totals.spe / count,
-      men: totals.men / count,
-      soc: totals.soc / count,
-    };
-  }, [rosterPlayers]);
+  // F4 (eine Quelle pro Größe): Office-Kopf und Home-Radar zeigen dieselbe
+  // Achsen-Zusammenfassung — Ø Top-6 je Achse über computeTeamTopSixAxisStats,
+  // dieselbe Basis wie die Markt-Impact-Vorschau. Vorher: Ganzkader-Schnitt
+  // hier gegen Top-6-Portrait-Schnitt im Radar (54/39/39/41 vs. 55/40/42/44).
+  const selectedTeamTopSixAxisStats = useMemo(
+    () => computeTeamTopSixAxisStats(rosterPlayers.map(({ player }) => player)),
+    [rosterPlayers],
+  );
 
   const {
     selectedRosterTableRows,
@@ -9977,24 +9965,29 @@ export function useFoundationShellRouterBodyScope({
     },
     [gameState, playerRatingsById, playerSeasonPerformanceMap, selectedRosterTableRows, shouldBuildHomeV2Overview],
   );
+	  // F4 (eine Quelle pro Größe): Home zählt und listet dieselben Entscheidungen
+	  // wie die Inbox — `activeTeamDecisionInboxItems`, exakt die Liste hinter dem
+	  // Inbox-Zähler (FoundationInboxV2Host `openCount`). Vorher filterte Home hier
+	  // eigenständig (task/warning/critical über alle Team-Items) und zeigte dann
+	  // die Länge der auf 5 gekappten Liste als Gesamtzahl — „5 offen" auf Home
+	  // gegen „11 offen" in der Inbox.
+	  const homeOpenTaskCount = shouldBuildHomeV2Overview ? activeTeamDecisionInboxItems.length : 0;
 	  const homeTasks = useMemo(
 	    () => {
         if (!shouldBuildHomeV2Overview) {
           return [];
         }
-        return filterGameInboxItems(activeTeamInboxItems.length > 0 ? activeTeamInboxItems : gameInboxItems, { includeDismissed: false, includeDone: false })
-	        .filter((item) => item.category === "task" || item.category === "warning" || item.severity === "critical")
-          .sort((left, right) => {
-            const severityOrder: Record<GameInboxItem["severity"], number> = {
-              critical: 0,
-              warning: 1,
-              info: 2,
-            };
-            return severityOrder[left.severity] - severityOrder[right.severity];
-          })
+        const severityOrder: Record<GameInboxItem["severity"], number> = {
+          critical: 0,
+          warning: 1,
+          info: 2,
+        };
+        // Anzeige-Auswahl (Top 5) — der Zähler oben nutzt die VOLLE Liste.
+        return [...activeTeamDecisionInboxItems]
+          .sort((left, right) => severityOrder[left.severity] - severityOrder[right.severity])
 	        .slice(0, 5);
       },
-	    [activeTeamInboxItems, gameInboxItems, shouldBuildHomeV2Overview],
+	    [activeTeamDecisionInboxItems, shouldBuildHomeV2Overview],
 	  );
   const homeTodayCards = useMemo<Array<{
     key: string;
@@ -10038,20 +10031,21 @@ export function useFoundationShellRouterBodyScope({
       {
         key: "tasks",
         kicker: "Aufgaben",
-        title: homeTasks.length > 0 ? `${homeTasks.length} Quest${homeTasks.length === 1 ? "" : "s"}` : "Keine offenen Quests",
+        // F4: Zähler = volle Entscheidungsliste (wie Inbox), nicht die Top-5.
+        title: homeOpenTaskCount > 0 ? `${homeOpenTaskCount} Quest${homeOpenTaskCount === 1 ? "" : "s"}` : "Keine offenen Quests",
         detail: homeTasks[0]?.title ?? "bereit für den nächsten Zug",
         tone: homeTasks.some((task) => task.severity === "critical")
           ? "warning"
-          : homeTasks.length > 0
+          : homeOpenTaskCount > 0
             ? "info"
             : "ready",
-        view: homeTasks.length > 0 ? "inboxV2" : "home",
-        urgency: homeTasks.some((task) => task.severity === "critical") ? 1 : homeTasks.length > 0 ? 4 : 5,
+        view: homeOpenTaskCount > 0 ? "inboxV2" : "home",
+        urgency: homeTasks.some((task) => task.severity === "critical") ? 1 : homeOpenTaskCount > 0 ? 4 : 5,
       },
     ];
     return cards.sort((left, right) => left.urgency - right.urgency);
     },
-    [homeNextMatchdayStatus.openSlots, homeTasks, selectedStandingRow?.points, selectedStandingRow?.rank, shouldBuildHomeV2Overview],
+    [homeNextMatchdayStatus.openSlots, homeOpenTaskCount, homeTasks, selectedStandingRow?.points, selectedStandingRow?.rank, shouldBuildHomeV2Overview],
   );
 	  const homeNewsItems = useMemo(() => {
 	    const sourceItems = activeTeamInboxItems.length > 0 ? activeTeamInboxItems : gameInboxItems;
@@ -10145,13 +10139,21 @@ export function useFoundationShellRouterBodyScope({
     if (!shouldBuildHomeV2Overview) {
       return [];
     }
-    const currentIndex = gameState.season.matchdayIds.indexOf(gameState.matchdayState.matchdayId);
-    return gameState.season.matchdayIds.slice(Math.max(0, currentIndex), currentIndex + 4).map((matchdayId, offset) => ({
-      matchdayId,
-      label: matchdayId,
-      isCurrent: offset === 0,
-      isPast: currentIndex >= 0 && gameState.season.matchdayIds.indexOf(matchdayId) < currentIndex,
-    }));
+    const allMatchdayIds = gameState.season.matchdayIds;
+    const currentIndex = allMatchdayIds.indexOf(gameState.matchdayState.matchdayId);
+    return allMatchdayIds.slice(Math.max(0, currentIndex), currentIndex + 4).map((matchdayId, offset) => {
+      // F5: nie den rohen Slug ("season-2-matchday-1") anzeigen — die Position
+      // in der kanonischen Spieltagsliste ist die Nummer; Rückfall auf die
+      // Slug-Endziffer, falls die ID nicht in der Liste steht.
+      const absoluteIndex = allMatchdayIds.indexOf(matchdayId);
+      const slugNumber = matchdayId.match(/(\d+)\s*$/)?.[1];
+      return {
+        matchdayId,
+        label: absoluteIndex >= 0 ? `Spieltag ${absoluteIndex + 1}` : slugNumber ? `Spieltag ${slugNumber}` : "Spieltag",
+        isCurrent: offset === 0,
+        isPast: currentIndex >= 0 && absoluteIndex < currentIndex,
+      };
+    });
   }, [gameState.matchdayState.matchdayId, gameState.season.matchdayIds, shouldBuildHomeV2Overview]);
   const homeV2BoardObjectives = useMemo(
     () => {
@@ -12085,6 +12087,7 @@ export function useFoundationShellRouterBodyScope({
     historyVisibleRangeLabel,
     homeActiveTeamLogo,
     homeNextMatchdayStatus,
+    homeOpenTaskCount,
     homeTodayCards,
     homeV2BoardObjectives,
     homeV2Facilities,
@@ -12319,7 +12322,7 @@ export function useFoundationShellRouterBodyScope({
     fieldRaceTotalTeams,
     homeFieldRaceRankMovement,
     selectedTeam,
-    selectedTeamAverageAxisStats,
+    selectedTeamTopSixAxisStats,
     selectedTeamCanManage,
     selectedTeamCaptainProfile,
     selectedTeamCaptainCandidates,

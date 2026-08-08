@@ -193,9 +193,11 @@ function getCategoryMeta(category: string) {
 }
 
 function getSeverityTone(severity: InboxV2Item["severity"]): NlTone {
+  // Info-Stufe = neutral, nicht `accent`: die Skala enthält `risk`, und die
+  // Teamfarbe darf nie wie eine Dringlichkeits-Stufe aussehen (F2-Regel).
   if (severity === "critical") return "risk";
   if (severity === "warning") return "warn";
-  return "accent";
+  return "neutral";
 }
 
 function getStatusLabel(item: InboxV2Item): string | null {

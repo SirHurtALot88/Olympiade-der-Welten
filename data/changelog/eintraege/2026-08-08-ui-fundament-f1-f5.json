@@ -1,0 +1,37 @@
+[
+  {
+    "datum": "2026-08-08",
+    "seite": "Alle Seiten",
+    "text": "Teamfarbe als Schrift ist jetzt überall auf eine lesbare Stufe angehoben (Navigations-Überschriften, Karten-Eyebrows, Buttons samt Leertaste-Hinweis) — vorher verschwand sie ohne Team-Theme mit 2,7:1 im Grund; ein Wächter-Test hält die Regel fest.",
+    "gewicht": "grundlegend",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-08",
+    "seite": "Teams · Spieler",
+    "text": "Bewertungsfarben sind von der Teamfarbe getrennt: Bestwerte tragen jetzt Gold statt Vereinsblau — bei rotem Team-Theme sahen Rang 1 und Rang 31 vorher gleich aus; Disziplin-Profil und Spielerlisten-Chips nutzen dieselbe Skala.",
+    "gewicht": "grundlegend",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-08",
+    "seite": "Leaders · Spieler-Detail",
+    "text": "Vier gemessene Kontrast-Ausreißer behoben: Podium-Namen bei den Legenden (1,15:1), Trend-Chip und Social-Zelle im Spieler-Detail, die unsichtbare leere Sternbahn und der OVR-Rang-Chip in der Spielerliste.",
+    "gewicht": "behebung",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-08",
+    "seite": "Home · Kredite · Einsatzliste",
+    "text": "Eine Quelle pro Größe: Home zählt offene Entscheidungen jetzt wie die Inbox, Radar und Office zeigen dieselben Achsenwerte (Ø Top-6), der Kredite-Chart nutzt die echte Gehaltssumme statt der Glättung — das Deckungslücke-Badge wird dadurch korrekt zu Gedeckt —, und der Einsatzlisten-Zähler benennt Blocker statt einer zweiten Zahl.",
+    "gewicht": "grundlegend",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-08",
+    "seite": "Transfermarkt · Home · Lexikon · Generator",
+    "text": "Entwicklersprache raus: Verhandlungshinweise haben eine vollständige deutsche Übersetzung (nie mehr roher Code wie morale former team hostile), der Home-Stepper sagt Spieltag 2 statt season-2-matchday-1, das Lexikon schreibt echte Umlaute, und die Stärkeskala des Generators ist deutsch.",
+    "gewicht": "behebung",
+    "version": "0.4"
+  }
+]

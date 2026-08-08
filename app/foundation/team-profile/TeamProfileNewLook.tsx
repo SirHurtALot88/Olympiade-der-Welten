@@ -181,11 +181,13 @@ function getObjectiveProgressTone(status: "open" | "completed" | "failed" | "at_
   return "neutral";
 }
 
-/** Ton für den Beliebtheitsfaktor (1.0 = Liga-Durchschnitt, siehe team-beliebtheit.ts). */
+/** Ton für den Beliebtheitsfaktor (1.0 = Liga-Durchschnitt, siehe team-beliebtheit.ts).
+ * Mittelfeld = neutral, nicht `accent`: eine Skala mit `risk` darf die
+ * Teamfarbe nicht tragen (F2-Regel), sonst kollidiert Bewertung mit Identität. */
 function getBeliebtheitTone(value: number): NlTone {
   if (value >= 1.1) return "good";
   if (value <= 0.9) return "risk";
-  return "accent";
+  return "neutral";
 }
 
 /**
@@ -199,12 +201,12 @@ const DEPTH_CAPABLE_RATING_FLOOR = 60;
 const DEPTH_FATIGUE_WARN_THRESHOLD = 70;
 
 function getDepthRatingTone(rating: number): NlTone {
-  // Aufsteigende Qualitäts-Skala: rot → gelb → grün → blau(elite). Vorher sprang
-  // sie von gelb (40–59) direkt auf blau (60–79) und zeigte grün erst ab 80 —
-  // die grüne "fähig"-Stufe fehlte damit praktisch immer. Jetzt ist die reale
-  // Fähig-Schwelle (`DEPTH_CAPABLE_RATING_FLOOR`, 60) grün, blau bleibt als
-  // oberste Elite-Stufe (≥80) erhalten.
-  if (rating >= 80) return "accent";
+  // Aufsteigende Qualitäts-Skala: rot → gelb → grün → GOLD (Elite ≥80).
+  // Die Elite-Stufe war vorher `accent` (blau) — seit Paket F2 gilt: eine
+  // Skala mit `risk` trägt nie die Teamfarbe, die Spitzen-Stufe ist das
+  // theme-feste Gold (wie die Rang-Skala in quartile-tone.ts). Die reale
+  // Fähig-Schwelle (`DEPTH_CAPABLE_RATING_FLOOR`, 60) bleibt grün.
+  if (rating >= 80) return "gold";
   if (rating >= DEPTH_CAPABLE_RATING_FLOOR) return "good";
   if (rating >= 40) return "warn";
   return "risk";

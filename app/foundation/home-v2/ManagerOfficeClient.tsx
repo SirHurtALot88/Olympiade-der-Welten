@@ -169,7 +169,7 @@ export type ManagerOfficeClientProps = {
   currentMatchdayDisplayLabel: string;
   selectedTeamCanManage: boolean;
   isReadOnlyMode: boolean;
-  selectedTeamAverageAxisStats: { pow: number; spe: number; men: number; soc: number } | null;
+  selectedTeamTopSixAxisStats: { pow: number; spe: number; men: number; soc: number } | null;
   rosterPlayers: unknown[];
   onNavigate: (view: FoundationViewId) => void;
   onOpenTeam: (teamId: string) => void;
@@ -212,7 +212,7 @@ export function ManagerOfficeClient({
   currentMatchdayDisplayLabel,
   selectedTeamCanManage,
   isReadOnlyMode,
-  selectedTeamAverageAxisStats,
+  selectedTeamTopSixAxisStats,
   rosterPlayers,
   onNavigate,
   onOpenTeam,
@@ -566,17 +566,23 @@ export function ManagerOfficeClient({
                         {selectedTeam && (!selectedTeamCanManage || isReadOnlyMode) ? (
                           <span className="transfer-status-pill is-warning">Nur Ansicht</span>
                         ) : null}
-                        {selectedTeamAverageAxisStats ? (
-                          <VeloStatOrbitRow
-                            ariaLabel="Team Achsen Durchschnitt"
-                            className="foundation-hq-axis-orbit"
-                            stats={{
-                              pow: selectedTeamAverageAxisStats.pow,
-                              spe: selectedTeamAverageAxisStats.spe,
-                              men: selectedTeamAverageAxisStats.men,
-                              soc: selectedTeamAverageAxisStats.soc,
-                            }}
-                          />
+                        {selectedTeamTopSixAxisStats ? (
+                          // F4: dieselbe Größe wie Home-Radar und Markt-Impact —
+                          // Ø Top-6 je Achse (computeTeamTopSixAxisStats), und die
+                          // Basis steht dran.
+                          <span title="Ø der sechs besten Werte je Achse — gleiche Basis wie Home-Radar und Markt-Vorschau">
+                            <VeloStatOrbitRow
+                              ariaLabel="Team-Achsen Ø Top-6"
+                              className="foundation-hq-axis-orbit"
+                              stats={{
+                                pow: selectedTeamTopSixAxisStats.pow,
+                                spe: selectedTeamTopSixAxisStats.spe,
+                                men: selectedTeamTopSixAxisStats.men,
+                                soc: selectedTeamTopSixAxisStats.soc,
+                              }}
+                            />
+                            <span className="foundation-hq-axis-basis">Ø Top-6</span>
+                          </span>
                         ) : null}
 	                    </div>
 	                  </button>
