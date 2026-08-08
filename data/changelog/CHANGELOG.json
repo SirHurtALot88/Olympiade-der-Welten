@@ -3,6 +3,15 @@
   "eintraege": [
     {
       "datum": "2026-08-08",
+      "seite": "Ewige Tabelle",
+      "pr": "#461",
+      "text": "Nach einer abgeschlossenen Saison blieben in der ewigen Tabelle alle Medaillen leer — kein Gold, kein Silber, kein Bronze, dazu kein Ø-Rang und keine Punkte der Vorsaison. Verloren war nie etwas: die Ränge lagen vollständig im Spielstand, sie kamen nur nicht im Browser an. Jetzt stehen die Medaillen wieder da, und ewige Tabelle und Saison-Historie zeigen bei Cash und Marktwert weiterhin jeweils den Stand, der zu ihnen gehört.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
       "seite": "Server · Spielstand-Export",
       "pr": null,
       "text": "Im Server-Log stand seit Wochen alle drei Minuten derselbe Fehler: der automatische Export wollte die Spielstände nach GitHub hochladen und scheiterte jedes Mal, weil das Verzeichnis der laufenden App kein Git-Repository ist — dort liegt nur das fertig gebaute Programm, kein Checkout und keine Zugangsdaten. Der Upload aus der App heraus kann deshalb gar nicht gelingen. Statt es endlos zu wiederholen, legt er sich jetzt beim ersten Fehlschlag still und schreibt einmal deutlich, was stattdessen greift: das Skript auf dem Server selbst, das den Spielstand ohnehin regelmäßig hochlädt. Der Export in den Ordner läuft unverändert weiter. Vorübergehende Störungen wie ein Netzausfall werden weiterhin im nächsten Zyklus erneut versucht.",

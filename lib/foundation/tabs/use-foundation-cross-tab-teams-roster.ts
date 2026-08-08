@@ -512,9 +512,19 @@ export function useFoundationCrossTabTeamsRoster(input: {
               ppSpe: teamEintrag.disciplinePointsByArea.spe,
               ppMen: teamEintrag.disciplinePointsByArea.men,
               ppSoc: teamEintrag.disciplinePointsByArea.soc,
-              cash: teamEintrag.cashEnd,
-              salaryTotal: teamEintrag.salaryEnd,
-              marketValue: teamEintrag.marketValueEnd,
+              /**
+               * Die Kurzfassung traegt die Rohwerte des Schnappschusses, die Auswahl trifft die
+               * Ansicht. Genau diese Reihenfolge stand vorher in der Projektion und ist die der
+               * Historienzeile: SAISONABSCHLUSS. Die Ewige Tabelle waehlt bewusst anders
+               * (Eintrittsstand der Folgesaison) — deshalb darf hier nichts vorab zusammengefasst
+               * werden.
+               */
+              cash: teamEintrag.cashEnd ?? teamEintrag.cashTotal,
+              salaryTotal: teamEintrag.salaryTotalEnd ?? teamEintrag.salaryEnd,
+              marketValue:
+                teamEintrag.marketValueSeasonEnd ??
+                teamEintrag.marketValueTotalEnd ??
+                teamEintrag.marketValueEnd,
               guv: teamEintrag.guv,
               topBuyPlayer: topBuy?.playerName ?? null,
               topBuyPlayerId: topBuy?.playerId ?? null,

@@ -1,5 +1,6 @@
 import type { GameState, SeasonSnapshotRecord } from "@/lib/data/olyDataTypes";
 import { isFiniteNumber } from "@/lib/foundation/foundation-number-utils";
+import { alsSchnappschussErsatz } from "@/lib/persistence/foundation-season-history-projection";
 import { buildAllTimeTableFromSnapshots, resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 
@@ -168,7 +169,21 @@ function pickBestRow(
 
 export function buildAllTimeTableModel(input: BuildAllTimeTableModelInput): AllTimeTableModel {
   const { gameState, liveStandingsByTeamId } = input;
-  const rawSnapshots = gameState.seasonState.seasonSnapshots;
+  /**
+   * ERSATZ FUER DEN BROWSER — gemeldet als „1 Season ist rum aber kein team hat seine medallien
+   * bekommen". Die Anfangsladung streicht `seasonSnapshots` (siehe
+   * `foundation-initial-compact-state`), also zaehlte diese Tabelle ihre Medaillen ueber eine leere
+   * Liste: null Gold, null Silber, null Bronze, dazu kein Ø-Rang und keine kumulierten Punkte der
+   * Vorsaison. Die mitgefahrene Kurzfassung traegt die Raenge, aus denen die Medaillen entstehen.
+   *
+   * Der Vorrang ist wichtig herum: liegen die vollen Schnappschuesse vor (Server, Tests), gewinnen
+   * sie. Die Kurzfassung springt nur ein, wenn gestrichen wurde.
+   */
+  const rawSnapshots =
+    gameState.seasonState.seasonSnapshots ??
+    (gameState.seasonState.foundationSeasonHistory != null
+      ? alsSchnappschussErsatz(gameState.seasonState.foundationSeasonHistory, gameState.teams)
+      : undefined);
   const hasArchive = rawSnapshots !== undefined;
   const snapshots = sortSnapshotsAsc(
     (rawSnapshots ?? []).filter((snapshot) => resolveSeasonSnapshotTeamRecords(snapshot).length > 0),

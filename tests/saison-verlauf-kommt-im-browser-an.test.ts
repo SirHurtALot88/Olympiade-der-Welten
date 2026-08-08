@@ -83,8 +83,18 @@ describe("Saison-Verlauf: die abgeschlossenen Saisons erreichen den Browser", ()
     // Genau die zwei Werte aus der Meldung.
     expect(team?.rank).toBe(19);
     expect(team?.points).toBe(86.3);
+
+    /**
+     * Cash und Marktwert liegen als ROHWERTE bei, nicht vorab zusammengefasst: die Ewige Tabelle
+     * waehlt hier anders als die Historienzeile (Eintrittsstand statt Saisonabschluss), und am
+     * Live-Spielstand weichen die zwei Regeln bei 30 von 32 Teams voneinander ab. Der Schnappschuss
+     * dieses Falls traegt seinen Marktwert unter `marketValueTotalEnd`.
+     */
     expect(team?.cashEnd).toBe(91.32);
-    expect(team?.marketValueEnd).toBe(174.41);
+    expect(team?.marketValueTotalEnd).toBe(174.41);
+    expect(team?.marketValueEnd).toBeNull();
+    // Die Regel der Historienzeile, wie der Verbraucher sie anwendet — unveraendert 174.41.
+    expect(team?.marketValueSeasonEnd ?? team?.marketValueTotalEnd ?? team?.marketValueEnd).toBe(174.41);
   });
 
   it("die vollen Schnappschuesse bleiben gestrichen — sonst waere nichts gewonnen", () => {
