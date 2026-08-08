@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import type { GameState, SponsorOfferComponentKind } from "@/lib/data/olyDataTypes";
 import { estimateTeamAnnualRevenue, getTeamAnnualLoanInterest } from "@/lib/finance/loan-service";
 import { buildApronProjection } from "@/lib/finance/apron-projection";
-import { buildSeasonGuv, computeTeamLoanShares } from "@/lib/finance/season-end-guv";
+import { buildSeasonGuv, computeTeamLoanShareRows } from "@/lib/finance/season-end-guv";
 import { roundValue as round1 } from "@/lib/foundation/foundation-number-utils";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import {
@@ -27,9 +27,11 @@ import { getTeamActualSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-disp
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { FINANCE_SPONSOR_INCOME_COMPONENT_KINDS } from "@/lib/foundation/finances/finances-types";
 import type {
+  FinanceApronStatus,
   FinanceFacilityIncome,
   FinanceFacilityIncomeRow,
   FinanceFacilityUpkeepRow,
+  FinanceLoanCommitments,
   FinancePrizeIncome,
   FinanceSeasonHistoryPoint,
   FinanceSponsorIncome,
@@ -268,28 +270,30 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
   const facilityRows = facilityCash.paidUpkeep.facilities;
   const facilityUpkeepTotal = facilityCash.paidUpkeep.total;
 
-  // --- Kreditzinsen (GuV-Ausgabe) ------------------------------------------
+  // --- Kredite: Rate = Zins + Tilgung (EINE Zerlegung) ----------------------
   // Buchhaltungsmodell (siehe unten bei totalExpenses): NUR der Zinsanteil einer Kreditrate ist eine
   // GuV-Ausgabe. Der Tilgungsanteil (principal) ist eine reine Bilanzbewegung (Cash runter, Restschuld
   // runter, Eigenkapital unverändert) und darf NICHT als Ausgabe zählen — genau symmetrisch dazu, dass
   // die Kreditauszahlung KEINE Einnahme ist (beide laufen über `otherCashMovements`, nicht die GuV).
-  // Deshalb trägt die Kredit-Ausgabenzeile den pro-Kredit-ZINS (principalOutstanding * Zinssatz), nicht
-  // die volle Rate. Pro-Kredit-Rundung = Zinsanteil im Season-End-Settlement, damit Summe (unten,
-  // `getTeamAnnualLoanInterest`) und Zeilen bit-genau übereinstimmen (keine Anteil-/Flow-Chart-Diskrepanz).
-  const activeLoans = (gameState.seasonState.loans ?? []).filter(
-    (loan) => loan.borrowerTeamId === teamId && loan.status === "active",
-  );
-  const loanRows = activeLoans
-    .map((loan) => ({
-      lenderName:
-        loan.lenderType === "team"
-          ? (gameState.teams.find((candidate) => candidate.teamId === loan.lenderTeamId)?.name ?? "Team")
-          : "Bank",
-      installment: round1(loan.principalOutstanding * loan.interestRatePerSeason),
-      outstanding: round1(loan.principalOutstanding),
-    }))
-    .sort((left, right) => right.installment - left.installment);
+  // Die Zerlegung je Kredit kommt aus `computeTeamLoanShareRows` (season-end-guv.ts) — dieselbe
+  // Liste speist die Kreditzins-Ausgabenzeile (Zinsanteil), die GuV-Posten UND die neue
+  // Verpflichtungs-Übersicht (volle Rate + Tilgung). Keine zweite Formel für dieselbe Aufteilung.
+  const loanShareRows = computeTeamLoanShareRows(gameState, teamId);
+  const loanRows = loanShareRows.map((row) => ({
+    lenderName: row.lenderName,
+    // Die Ausgabenzeile trägt den ZINS, nicht die volle Rate (siehe Kommentar oben).
+    installment: row.interest,
+    outstanding: row.outstanding,
+  }));
   const loanInterestTotal = getTeamAnnualLoanInterest(gameState, teamId);
+  const loanPrincipalTotal = round1(loanShareRows.reduce((sum, row) => sum + row.principal, 0));
+  const loanCommitments: FinanceLoanCommitments = {
+    rows: loanShareRows,
+    installmentTotal: round1(loanShareRows.reduce((sum, row) => sum + row.installment, 0)),
+    interestTotal: loanInterestTotal,
+    principalTotal: loanPrincipalTotal,
+    outstandingTotal: round1(loanShareRows.reduce((sum, row) => sum + row.outstanding, 0)),
+  };
 
   // --- Board-Objective-cashDelta (T-108 c) --------------------------------
   // Netto-cashDelta, den die Engine über `buildTeamSeasonObjectiveSettlement` tatsächlich verbucht
@@ -320,21 +324,58 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
   // Betriebs-GuV) und lief der bewusst transferfreien Liga-Vergleichstabelle zuwider. Die Cash-
   // Reconciliation `cashSeasonStart + guv + otherCashMovements == cash` bleibt gültig: otherCashMovements
   // ist eine reine Differenz und absorbiert den nun nicht mehr in der GuV enthaltenen Transfer-Cashfluss.
-  // --- Apron (GuV-Posten) --------------------------------------------------
-  // NEU: der Apron zählt mit. Chris: „Sponsoren + Gebäude + Apron sind doch die möglichen Einkünfte."
+  // --- Apron (GuV-Posten + Linien-Ausweisung) ------------------------------
+  // Der Apron zählt mit. Chris: „Sponsoren + Gebäude + Apron sind doch die möglichen Einkünfte."
   // Er wird erst am Saisonende abgerechnet und hängt am ENDrang — die Zahl ist deshalb eine
-  // Hochrechnung auf den aktuellen Rang, und der Hover sagt das auch. Vorher fehlte er hier ganz,
-  // während der Saisonstand ihn schon als Nebenzeile zeigte: zwei Bildschirme, zwei Zahlen.
-  const apronNettoDelta = (() => {
+  // Hochrechnung auf den aktuellen Rang, und der Hover sagt das auch.
+  // NEU (Chris): „APRON 1 und 2 … separat noch mal ausweisen" — deshalb wird hier die GANZE
+  // Projektion behalten (Linien, Einfrier-Status, Topf), nicht mehr nur das eigene Netto. EIN
+  // `buildApronProjection`-Aufruf speist beides: die Apron-Zeile der GuV UND die Linien-Karte.
+  const apronProjection = (() => {
     try {
       const rankByTeamId = new Map<string, number | null>(
         gameState.teams.map((entry) => [entry.teamId, gameState.seasonState.standings?.[entry.teamId]?.rank ?? null] as const),
       );
-      return buildApronProjection({ gameState, rankByTeamId }).byTeamId.get(teamId) ?? null;
+      return buildApronProjection({ gameState, rankByTeamId });
     } catch {
       return null;
     }
   })();
+  const apronNettoDelta = apronProjection?.byTeamId.get(teamId) ?? null;
+  // Nur der GEBUCHTE Apron zaehlt in die GuV — sonst bricht die Zusage dieses Reiters
+  // (`cashSeasonStart + guv + otherCashMovements == cash`) an einer Hochrechnung.
+  const apronGebucht = (gameState.seasonState.apronSettlementLogs ?? []).some(
+    (log) => log.seasonId === gameState.season.id && log.phase === "season_end",
+  );
+  const apron: FinanceApronStatus | null =
+    apronProjection && apronNettoDelta
+      ? {
+          medianSalary: round1(apronProjection.lines.medianSalary),
+          line1: round1(apronProjection.lines.line1),
+          line2: round1(apronProjection.lines.line2),
+          salaryBasis: round1(apronNettoDelta.salary),
+          // Reine Anzeige-Subtraktionen auf den Projektionswerten — keine zweite Rechnung.
+          distanceLine1: round1(apronNettoDelta.salary - apronProjection.lines.line1),
+          distanceLine2: round1(apronNettoDelta.salary - apronProjection.lines.line2),
+          zone:
+            apronNettoDelta.salary <= apronProjection.lines.line1
+              ? "unter_linie_1"
+              : apronNettoDelta.salary <= apronProjection.lines.line2
+                ? "zwischen_den_linien"
+                : "ueber_linie_2",
+          abgabe: round1(apronNettoDelta.abgabe),
+          ausgleich: round1(apronNettoDelta.ausgleich),
+          nettoDelta: round1(apronNettoDelta.nettoDelta),
+          gedeckelt: apronNettoDelta.gedeckelt,
+          rank: apronNettoDelta.rank,
+          gebucht: apronGebucht,
+          frozenLines: apronProjection.frozenLines,
+          usedReferenceSalary: apronProjection.lines.usedReferenceSalary,
+          topf: round1(apronProjection.topf),
+          zahlerCount: apronProjection.zahlerCount,
+          empfaengerCount: apronProjection.empfaengerCount,
+        }
+      : null;
 
   // DIE EINE GuV (`lib/finance/season-end-guv.ts`) — dieselbe Funktion, die auch der Saisonstand und
   // die Buchung benutzen. Vorher stand hier eine eigene Summenbildung; sie kannte den Apron nicht und
@@ -347,15 +388,12 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
     apronNetto: apronNettoDelta?.nettoDelta ?? 0,
     apronRank: apronNettoDelta?.rank ?? null,
     apronGedeckelt: apronNettoDelta?.gedeckelt ?? false,
-    // Nur der GEBUCHTE Apron zaehlt in die GuV — sonst bricht die Zusage dieses Reiters
-    // (`cashSeasonStart + guv + otherCashMovements == cash`) an einer Hochrechnung.
-    apronGebucht: (gameState.seasonState.apronSettlementLogs ?? []).some(
-      (log) => log.seasonId === gameState.season.id && log.phase === "season_end",
-    ),
+    apronFrozenLines: apronProjection?.frozenLines ?? true,
+    apronGebucht,
     objectiveCashDelta,
     salaryTotal,
     loanInterest: loanInterestTotal,
-    loanPrincipal: computeTeamLoanShares(gameState, teamId).principal,
+    loanPrincipal: loanPrincipalTotal,
     transferNet: null,
   });
   const totalIncome = seasonGuv.einnahmen;
@@ -429,6 +467,12 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
     cashSeasonStart,
     otherCashMovements,
     history,
+    apron,
+    loanCommitments,
+    // Kompakter Initial-Payload strippt das Archiv auf `undefined`; der Archiv-Load der
+    // Finanzen-View (use-foundation-shell-router-body-scope) holt es nach. Solange zeigt die UI
+    // „wird geladen" statt der falschen Behauptung „nicht archiviert".
+    archivePending: gameState.seasonState.seasonSnapshots === undefined,
   };
 
   return { status: "ready", team: teamFinances };

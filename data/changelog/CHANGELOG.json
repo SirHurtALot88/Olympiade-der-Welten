@@ -30,6 +30,42 @@
     },
     {
       "datum": "2026-08-08",
+      "seite": "Finanzen",
+      "pr": null,
+      "text": "Neue Karte Apron & Kredite: Beide Apron-Linien stehen einzeln da — Linie 1 und Linie 2 mit deinem Abstand in Mio, deine Bemessungsgrundlage als Marker im Korridor, dazu die Hochrechnung (Abgabe oder Ausgleich beim aktuellen Rang, Deckel-Hinweis, Netto) und der Liga-Kontext (Median, Zahler, Empfänger, Topf). Daneben die Kreditlast: volle Rate pro Saison, aufgeteilt in Zins (GuV-Ausgabe) und Tilgung (senkt die Restschuld), plus Restschuld und Restlaufzeit je Kredit — auch bei 0, damit klar ist, dass nichts fehlt. Obendrüber die Summe der festen Verpflichtungen: Gehälter + Kreditrate + Apron-Abgabe. Wichtig: Der Apron rechnet absichtlich auf der geglätteten Gehaltssumme (Verträge über die Laufzeit verteilt), die GuV bucht die echte — die Karte erklärt den Unterschied, statt ihn zu verstecken.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Finanzen",
+      "pr": null,
+      "text": "Die Farben sagen wieder die Wahrheit: Einnahmen sind grün, Ausgaben rot/orange — vorher färbte der rote Team-Akzent den Sponsor-Balken zur Blutung um, während die Gehälter blau daneben standen. Jede Kopfzahl zeigt ihre Herkunft (= Sponsor 63,5 / = Gehälter 52,1 + Unterhalt 0,6), die GuV ihre Rechnung. Und die Kopfzahlen stehen ab dem ersten Frame fest: Die Zähler-Animation, die sekundenlang Zwischenstände wie 62,1 statt 63,5 als endgültig zeigte, ist auf der Geldseite raus.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Finanzen",
+      "pr": null,
+      "text": "Cash-Abgleich und Saison-Verlauf laden jetzt das Saisonarchiv nach: Mitten in Season 2 behauptete die Seite, für Season 1 sei kein Saison-Start-Cash archiviert — dabei war er da, nur der schlanke Start-Payload hatte ihn nicht geladen. Jetzt erscheint der echte Abgleich (Saisonstart + GuV + sonstige Bewegungen = Cash), solange geladen wird steht lädt dran, und der Verlauf-Leertext unterscheidet ehrlich zwischen lädt noch, archiviert ohne vergleichbare GuV und wirklich keine Vorsaison.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Finanzen",
+      "pr": null,
+      "text": "Liga-Vergleich entwirrt: GuV p.a. und Cashflow p.a. waren für 26 von 32 Teams identische Zwillingsspalten. Jetzt gibt es eine GuV-Spalte, und nur bei Teams mit laufender Tilgung steht der echte Geldabfluss als beschriftete Zusatzzeile (nach Kreditraten −25,9) direkt in der Zelle. Außerdem: Transfersaldo mit konsistenten Vorzeichen (Käufe −84,2, Verkäufe +0,0, Saldo −84,2), Salary Factor heißt Gehaltsfaktor, der Dein-Team-Chip ist von 3,3:1 auf lesbaren Kontrast angehoben, und die Kreditzins-Ausgabenzeile heißt, was sie ist — Zins, nicht Rate. Der Teamvergleich unten bleibt, wie er ist.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
       "seite": "Markt · Preseason-Marktplan",
       "pr": null,
       "text": "Beim Start der neuen Saison hat der Kader-Füll-Lauf auch für manuell geführte Teams eingekauft — im laufenden Spielstand drei Zugänge für Stronghold Crusaders über zusammen 34,5 Mio. Der Dienst läuft über alle Teams des Spielstands und bekam beim Verdrahten in die Saisonstart-Kette die Schreibgrenze nicht mit, die jeder andere Schritt dieses Laufs hat. Er bekommt sie jetzt: dieselbe KI-Teamliste, die auch Marktplan und Manager-Aktionen benutzen.",

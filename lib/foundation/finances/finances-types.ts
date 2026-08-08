@@ -175,6 +175,82 @@ export type FinanceSeasonHistoryPoint = {
   cash: number | null;
 };
 
+/**
+ * Apron-Ausweisung für das eigene Team: beide Linien einzeln, die eigene Position dazu, plus die
+ * Hochrechnung — Chris: „kannst du bitte auch APRON 1 und 2 … separat noch mal ausweisen?"
+ *
+ * EINE Quelle: alles hier kommt aus `buildApronProjection` (`lib/finance/apron-projection.ts`) —
+ * derselbe Aufruf, der auch den Apron-Posten der GuV speist (`guvPosten`-Zeile „Apron"). Die
+ * Abstände (`distanceLine1/2`) sind reine Anzeige-Subtraktionen auf dessen Werten, keine zweite
+ * Rechnung.
+ *
+ * WICHTIG für die Beschriftung: `salaryBasis` ist die GEGLÄTTETE Gehaltssumme
+ * (`getTeamDisplaySalaryTotal`, Verträge über die Laufzeit verteilt) — die Bemessungsgrundlage des
+ * Apron. Sie ist ABSICHTLICH eine andere Zahl als die echte Gehaltssumme in `expenses.salaries`
+ * (`contract.salary`, das Feld der Season-End-Abbuchung). Die UI muss beide nebeneinander erklären,
+ * sonst liest sich der Unterschied wie ein Rechenfehler (siehe Kopfkommentar apron-service.ts).
+ */
+export type FinanceApronStatus = {
+  /** Median-Gehalt der Liga (geglättet) — Basis beider Linien. */
+  medianSalary: number;
+  /** 1. Apron-Linie (Median × 1,1). */
+  line1: number;
+  /** 2. Apron-Linie (Median × 1,25). */
+  line2: number;
+  /** GEGLÄTTETE Gehaltssumme des eigenen Teams — die Zahl, die gegen die Linien läuft. */
+  salaryBasis: number;
+  /** `salaryBasis − line1` (positiv = drüber). */
+  distanceLine1: number;
+  /** `salaryBasis − line2` (positiv = drüber). */
+  distanceLine2: number;
+  /** Wo die Basis liegt: unter beiden Linien, zwischen ihnen, oder über der 2. Linie. */
+  zone: "unter_linie_1" | "zwischen_den_linien" | "ueber_linie_2";
+  /** Abgabe der Hochrechnung (positiver Betrag; 0 = zahlt nicht). */
+  abgabe: number;
+  /** Anteil am ausgeschütteten Topf (0 = kein Empfänger). */
+  ausgleich: number;
+  /** `ausgleich − abgabe` — identisch mit der Apron-Zeile der GuV-Posten. */
+  nettoDelta: number;
+  /** `true`, wenn der Deckel (halber Wertungsanteil) die Abgabe begrenzt hat. */
+  gedeckelt: boolean;
+  /** Rang, auf den hochgerechnet wurde (`null` = unbekannt → letzter Platz angenommen). */
+  rank: number | null;
+  /** `true` = die Abrechnung dieser Saison ist bereits gebucht (dann ist die Zahl keine Hochrechnung mehr). */
+  gebucht: boolean;
+  /** `false` = Linien noch nicht eingefroren — sie können sich bis zum Saisonende verschieben. */
+  frozenLines: boolean;
+  /** `true` = Frisch-Save-Schranke: Linien aus dem Referenzgehalt statt gemessener Gehälter. */
+  usedReferenceSalary: boolean;
+  /** Liga-Kontext der Hochrechnung. */
+  topf: number;
+  zahlerCount: number;
+  empfaengerCount: number;
+};
+
+/**
+ * Ein laufender Kredit in der Verpflichtungs-Übersicht: volle Rate, zerlegt in Zins (GuV-Ausgabe)
+ * und Tilgung (Bilanzbewegung). Zeilen kommen aus `computeTeamLoanShareRows` (season-end-guv.ts) —
+ * dieselbe Zerlegung, die auch die GuV-Posten `kreditzins`/`kredittilgung` speist.
+ */
+export type FinanceLoanCommitmentRow = {
+  loanId: string;
+  lenderName: string;
+  installment: number;
+  interest: number;
+  principal: number;
+  outstanding: number;
+  remainingSeasons: number;
+};
+
+/** Summen über alle laufenden Kredite — Rate = Zins + Tilgung, je Feld aus derselben Zeilenliste summiert. */
+export type FinanceLoanCommitments = {
+  rows: FinanceLoanCommitmentRow[];
+  installmentTotal: number;
+  interestTotal: number;
+  principalTotal: number;
+  outstandingTotal: number;
+};
+
 /** Ein menschliches Team's Finanzen-Gesamtbild für die laufende Saison — nur das eigene Team (Fog of War). */
 export type TeamFinancesState = {
   teamId: string;
@@ -216,6 +292,19 @@ export type TeamFinancesState = {
   otherCashMovements: number | null;
   /** Saison-für-Saison-Verlauf (bis zu 4 vergangene Saisons + laufende Saison), siehe `FinanceSeasonHistoryPoint`. */
   history: FinanceSeasonHistoryPoint[];
+  /**
+   * Apron-Ausweisung (beide Linien + eigene Position + Hochrechnung) — `null` nur, wenn die
+   * Projektion nicht baubar war (dann sagt die UI das, statt Zahlen zu erfinden).
+   */
+  apron: FinanceApronStatus | null;
+  /** Laufende Kredite als Rate/Zins/Tilgung-Zerlegung — immer gesetzt, auch mit leeren Zeilen (alles 0). */
+  loanCommitments: FinanceLoanCommitments;
+  /**
+   * `true`, solange das Saisonarchiv (`seasonState.seasonSnapshots`) noch nicht geladen ist
+   * (kompakter Initial-Payload strippt es; der Archiv-Load der Finanzen-View holt es nach).
+   * Die UI zeigt dann einen Lade-Hinweis statt der falschen Behauptung „nicht archiviert".
+   */
+  archivePending: boolean;
 };
 
 /** Discriminated view model consumed by the Finanzen UI. */

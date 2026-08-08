@@ -316,23 +316,60 @@ export function computeFacilitySeasonCash(
   };
 }
 
+/** Ein laufender Kredit, in Rate = Zins + Tilgung zerlegt — Feld für Feld die Season-End-Rundung. */
+export type TeamLoanShareRow = {
+  loanId: string;
+  /** "Bank" oder der Name des verleihenden Teams. */
+  lenderName: string;
+  /** Volle Saisonrate (Zins + Tilgung) — das, was wirklich vom Cash abgeht. */
+  installment: number;
+  /** Zinsanteil der Rate — die GuV-Ausgabe. */
+  interest: number;
+  /** Tilgungsanteil der Rate — Bilanzbewegung (Restschuld runter), KEINE GuV-Ausgabe. */
+  principal: number;
+  /** Restschuld heute. */
+  outstanding: number;
+  /** Verbleibende Saisons bis zur letzten Rate. */
+  remainingSeasons: number;
+};
+
+/**
+ * Jeder laufende Kredit eines Teams, in Rate = Zins + Tilgung zerlegt. DIE eine Stelle für diese
+ * Zerlegung: `computeTeamLoanShares` summiert nur noch hierüber, und die Finanzen-Ansicht liest
+ * ihre Kreditzeilen aus derselben Liste — keine zweite Formel für dieselbe Aufteilung.
+ * Rundung je Kredit wie im Season-End-Settlement (`round1`), damit Zeilen und Summen bit-genau
+ * zu `getTeamAnnualLoanInterest` passen.
+ */
+export function computeTeamLoanShareRows(gameState: GameState, teamId: string): TeamLoanShareRow[] {
+  return (gameState.seasonState.loans ?? [])
+    .filter((loan) => loan.borrowerTeamId === teamId && loan.status === "active")
+    .map((loan) => {
+      const installment = round1(loan.installmentPerSeason ?? 0);
+      const interest = round1(loan.principalOutstanding * loan.interestRatePerSeason);
+      return {
+        loanId: loan.loanId,
+        lenderName:
+          loan.lenderType === "team"
+            ? (gameState.teams.find((candidate) => candidate.teamId === loan.lenderTeamId)?.name ?? "Team")
+            : "Bank",
+        installment,
+        interest,
+        principal: Math.max(0, round1(installment - interest)),
+        outstanding: round1(loan.principalOutstanding),
+        remainingSeasons: loan.seasonsRemaining,
+      };
+    })
+    .sort((left, right) => right.installment - left.installment);
+}
+
 /**
  * Zins- und Tilgungsanteil der laufenden Kredite eines Teams — getrennt, weil nur der Zins zählt.
  * Der Zins kommt aus `getTeamAnnualLoanInterest`, damit es auch hier keine zweite Definition gibt.
  */
 export function computeTeamLoanShares(gameState: GameState, teamId: string): { interest: number; principal: number } {
-  const active = (gameState.seasonState.loans ?? []).filter(
-    (loan) => loan.borrowerTeamId === teamId && loan.status === "active",
-  );
   const interest = getTeamAnnualLoanInterest(gameState, teamId);
-  // Tilgung = Rate − Zins, je Kredit gerundet wie im Season-End-Settlement.
-  const principal = round1(
-    active.reduce(
-      (sum, loan) =>
-        sum + Math.max(0, round1(loan.installmentPerSeason ?? 0) - round1(loan.principalOutstanding * loan.interestRatePerSeason)),
-      0,
-    ),
-  );
+  // Tilgung = Rate − Zins, je Kredit gerundet wie im Season-End-Settlement (siehe Rows-Helfer).
+  const principal = round1(computeTeamLoanShareRows(gameState, teamId).reduce((sum, row) => sum + row.principal, 0));
   return { interest, principal };
 }
 

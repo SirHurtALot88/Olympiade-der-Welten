@@ -14,14 +14,18 @@ import {
   StatChip,
   StatChipRow,
   formatNlMoney,
+  formatNlNumber,
+  formatNlSignedMoney,
   nlToneClass,
-  useCountUp,
   type NlTableColumn,
   type NlTableSortDirection,
   type NlTone,
 } from "@/components/foundation/new-look";
+import { VeloRangeBar } from "@/components/foundation/velo-ui";
 import type {
+  FinanceApronStatus,
   FinanceLeagueTableRow,
+  FinanceLoanCommitments,
   FinanceSeasonHistoryPoint,
   FinancesViewModel,
   TeamFinancesState,
@@ -72,10 +76,11 @@ function buildSalaryFactorSub(outlook: SalaryFactorOutlook): string | undefined 
 }
 
 const SALARY_FACTOR_TOOLTIP =
-  "Liga-Ökonomiefaktor der laufenden Season: skaliert die Einnahmenseite — der Sponsor-Topf der Liga " +
-  "entspricht ungefähr Liga-Gehaltssumme × Faktor, Meilenstein-/Preisleitern skalieren mit. Über 1,0 fließt " +
-  "mehr Geld in die Liga als Gehälter kosten (gute Zeiten), unter 1,0 weniger (sparen!). Die nächste Season " +
-  "ist bereits ausgewürfelt (siehe Season-Briefing) — der Pfeil zeigt, wohin sich die Ökonomie entwickelt.";
+  "Liga-Ökonomiefaktor der laufenden Season (engl. „Salary Factor“, derselbe Wert wie im Season-Briefing): " +
+  "skaliert die Einnahmenseite — der Sponsor-Topf der Liga entspricht ungefähr Liga-Gehaltssumme × Faktor, " +
+  "Meilenstein-/Preisleitern skalieren mit. Über 1,0 fließt mehr Geld in die Liga als Gehälter kosten (gute " +
+  "Zeiten), unter 1,0 weniger (sparen!). Die nächste Season ist bereits ausgewürfelt — der Pfeil zeigt, wohin " +
+  "sich die Ökonomie entwickelt.";
 
 // --- Hover-Tooltips: was steckt hinter der jeweiligen Zeile ------------
 // Reine `title`-Strings statt Hover-Cards (siehe Auftrag) — niedrigrisiko
@@ -136,12 +141,30 @@ function buildLoanTooltip(team: TeamFinancesState): string | undefined {
   const loans = team.expenses.loanInstallments.loans;
   if (loans.length === 0) return undefined;
   return loans
-    .map((loan) => `${loan.lenderName}: ${formatNlMoney(loan.installment)} (Restschuld ${formatNlMoney(loan.outstanding)})`)
+    .map((loan) => `${loan.lenderName}: Zins ${formatNlMoney(loan.installment)} (Restschuld ${formatNlMoney(loan.outstanding)})`)
     .join("\n");
 }
 
-/** Eine Zeile der Einnahmen-/Ausgaben-Spalte bzw. ein Segment des Flow-Charts. */
-type FinanceLineItem = { key: string; label: string; amount: number; tone: NlTone; title?: string };
+/**
+ * Eine Zeile der Einnahmen-/Ausgaben-Spalte bzw. ein Segment des Flow-Charts.
+ *
+ * FARBSEMANTIK (Markt-Audit F2): Einnahmen laufen in der Grün-Familie (`good`), Ausgaben in der
+ * Rot/Orange-Familie (`risk`/`warn`) — NIE der Team-Akzent (unter rotem Team-Theme las sich der
+ * Sponsor-Balken wie eine Blutung) und NIE Achsen-Töne (blau/gelb sind Spiel-Identität, keine
+ * Geldsemantik). Mehrere Posten derselben Familie unterscheiden sich per `alpha`, damit die
+ * Legende eindeutig bleibt, ohne die Bedeutung zu wechseln.
+ */
+type FinanceLineItem = {
+  key: string;
+  label: string;
+  /** Kurzform für die Herkunfts-Subzeile der Kopf-Kacheln („= Sponsor 63,5 + Gebäude 0,4"). */
+  shortLabel: string;
+  amount: number;
+  tone: NlTone;
+  /** Deckkraft des Segments/Balkens (Familie bleibt, Stufe unterscheidet). Default 1. */
+  alpha?: number;
+  title?: string;
+};
 
 function buildIncomeLines(team: TeamFinancesState): FinanceLineItem[] {
   const lines: FinanceLineItem[] = [];
@@ -149,8 +172,9 @@ function buildIncomeLines(team: TeamFinancesState): FinanceLineItem[] {
     lines.push({
       key: "sponsor",
       label: team.income.sponsor.totalIsEstimate ? "Sponsor (geschätzt)" : "Sponsor",
+      shortLabel: "Sponsor",
       amount: team.income.sponsor.total,
-      tone: "accent",
+      tone: "good",
       title: buildSponsorTooltip(team),
     });
   }
@@ -158,8 +182,10 @@ function buildIncomeLines(team: TeamFinancesState): FinanceLineItem[] {
     lines.push({
       key: "facilityIncome",
       label: "Gebäude-Einnahmen",
+      shortLabel: "Gebäude",
       amount: team.income.facilityIncome.total,
       tone: "good",
+      alpha: 0.65,
       title: buildFacilityIncomeTooltip(team),
     });
   }
@@ -171,8 +197,10 @@ function buildIncomeLines(team: TeamFinancesState): FinanceLineItem[] {
     lines.push({
       key: "objective",
       label: "Vorstandsziele (Prämie)",
+      shortLabel: "Prämie",
       amount: team.income.objectiveReward,
-      tone: "accent",
+      tone: "good",
+      alpha: 0.4,
       title: "Netto-Prämie erfüllter Vorstandsziele (Board-Objective-Settlement).",
     });
   }
@@ -182,23 +210,35 @@ function buildIncomeLines(team: TeamFinancesState): FinanceLineItem[] {
 function buildExpenseLines(team: TeamFinancesState): FinanceLineItem[] {
   const lines: FinanceLineItem[] = [];
   if (team.expenses.salaries.total > 0) {
-    lines.push({ key: "salaries", label: "Gehälter", amount: team.expenses.salaries.total, tone: "men", title: buildSalaryTooltip(team) });
+    lines.push({
+      key: "salaries",
+      label: "Gehälter",
+      shortLabel: "Gehälter",
+      amount: team.expenses.salaries.total,
+      tone: "risk",
+      title: buildSalaryTooltip(team),
+    });
   }
   if (team.expenses.facilityUpkeep.total > 0) {
     lines.push({
       key: "upkeep",
       label: "Gebäude-Unterhalt",
+      shortLabel: "Unterhalt",
       amount: team.expenses.facilityUpkeep.total,
-      tone: "soc",
+      tone: "warn",
       title: buildFacilityTooltip(team),
     });
   }
   if (team.expenses.loanInstallments.total > 0) {
     lines.push({
       key: "loans",
-      label: "Kreditraten",
+      // Ehrliches Label: diese Zeile trägt den ZINSANTEIL (die GuV-Ausgabe), nicht die volle
+      // Rate — die Tilgung steht in der Verpflichtungs-Karte (Apron & Kredite) daneben.
+      label: "Kreditzins",
+      shortLabel: "Kreditzins",
       amount: team.expenses.loanInstallments.total,
       tone: "risk",
+      alpha: 0.6,
       title: buildLoanTooltip(team),
     });
   }
@@ -210,8 +250,10 @@ function buildExpenseLines(team: TeamFinancesState): FinanceLineItem[] {
     lines.push({
       key: "objective",
       label: "Vorstandsziele (Strafe)",
+      shortLabel: "Strafe",
       amount: team.expenses.objectivePenalty,
       tone: "warn",
+      alpha: 0.6,
       title: "Netto-Strafe verfehlter Vorstandsziele (Board-Objective-Settlement).",
     });
   }
@@ -273,6 +315,7 @@ function FinanceFlowChart({ incomeLines, expenseLines }: { incomeLines: FinanceL
             width={Math.max(0, rect.width)}
             height={FLOW_BAR_H}
             fill={NL_TONE_VAR[rect.tone]}
+            fillOpacity={rect.alpha ?? 1}
             className="nl-fin-flow-seg"
           >
             <title>
@@ -289,6 +332,7 @@ function FinanceFlowChart({ incomeLines, expenseLines }: { incomeLines: FinanceL
             width={Math.max(0, rect.width)}
             height={FLOW_BAR_H}
             fill={NL_TONE_VAR[rect.tone]}
+            fillOpacity={rect.alpha ?? 1}
             className="nl-fin-flow-seg"
           >
             <title>
@@ -302,7 +346,11 @@ function FinanceFlowChart({ incomeLines, expenseLines }: { incomeLines: FinanceL
           <span className="nl-fin-flow-legend-heading">Einnahmen</span>
           {incomeLines.map((line) => (
             <span key={line.key} className="nl-fin-flow-legend-item">
-              <span className="nl-fin-flow-legend-dot" style={{ background: NL_TONE_VAR[line.tone] }} aria-hidden="true" />
+              <span
+                className="nl-fin-flow-legend-dot"
+                style={{ background: NL_TONE_VAR[line.tone], opacity: line.alpha ?? 1 }}
+                aria-hidden="true"
+              />
               <span className="nl-fin-flow-legend-label">{line.label}</span>
               <span className="nl-fin-flow-legend-value nl-tnum">{formatNlMoney(line.amount)}</span>
             </span>
@@ -312,7 +360,11 @@ function FinanceFlowChart({ incomeLines, expenseLines }: { incomeLines: FinanceL
           <span className="nl-fin-flow-legend-heading">Ausgaben</span>
           {expenseLines.map((line) => (
             <span key={line.key} className="nl-fin-flow-legend-item">
-              <span className="nl-fin-flow-legend-dot" style={{ background: NL_TONE_VAR[line.tone] }} aria-hidden="true" />
+              <span
+                className="nl-fin-flow-legend-dot"
+                style={{ background: NL_TONE_VAR[line.tone], opacity: line.alpha ?? 1 }}
+                aria-hidden="true"
+              />
               <span className="nl-fin-flow-legend-label">{line.label}</span>
               <span className="nl-fin-flow-legend-value nl-tnum">{formatNlMoney(line.amount)}</span>
             </span>
@@ -339,15 +391,31 @@ const HISTORY_LABEL_H = 20;
 const HISTORY_BASELINE_Y = HISTORY_H - HISTORY_LABEL_H;
 const HISTORY_BAR_MAX_H = HISTORY_BASELINE_Y - HISTORY_PAD_TOP;
 
-function FinanceHistoryTrend({ history }: { history: FinanceSeasonHistoryPoint[] }) {
+function FinanceHistoryTrend({ history, archivePending }: { history: FinanceSeasonHistoryPoint[]; archivePending: boolean }) {
   const points = history.filter((point) => point.guv != null);
 
   if (points.length <= 1) {
+    // Ehrliche Leerzustände (Markt-Audit F4): „keine abgeschlossene Vorsaison" war mitten in
+    // Season 2 schlicht falsch. Drei Fälle: Archiv lädt noch / Vorsaison archiviert, aber ohne
+    // vergleichbare GuV (alte Formel, bewusst nicht gezeigt) / wirklich keine Vorsaison.
+    const hasArchivedSeason = history.some((point) => !point.isCurrent);
     return (
       <NlEmptyState
         className="nl-fin-flow-empty"
-        title="Saison-Verlauf ab der zweiten Saison verfügbar."
-        message="Für dieses Team liegt noch keine abgeschlossene Vorsaison vor."
+        title={
+          archivePending
+            ? "Saisonarchiv wird geladen …"
+            : hasArchivedSeason
+              ? "Verlauf beginnt mit dem Abschluss der laufenden Saison."
+              : "Saison-Verlauf ab der zweiten Saison verfügbar."
+        }
+        message={
+          archivePending
+            ? undefined
+            : hasArchivedSeason
+              ? "Die Vorsaison ist archiviert, aber noch ohne vergleichbare GuV (alte Rechnung) — ab dem nächsten Saisonende füllt sich der Verlauf."
+              : "Für dieses Team liegt noch keine abgeschlossene Vorsaison vor."
+        }
       />
     );
   }
@@ -415,7 +483,21 @@ function FinanceHistoryTrend({ history }: { history: FinanceSeasonHistoryPoint[]
 }
 
 /** Eine Zeile in der Einnahmen-/Ausgaben-Liste: Label, Betrag, Anteils-Balken, `title`-Hover mit der Aufschlüsselung. */
-function FinanceLine({ label, amount, share, tone, title }: { label: string; amount: number; share: number; tone: NlTone; title?: string }) {
+function FinanceLine({
+  label,
+  amount,
+  share,
+  tone,
+  alpha,
+  title,
+}: {
+  label: string;
+  amount: number;
+  share: number;
+  tone: NlTone;
+  alpha?: number;
+  title?: string;
+}) {
   const pct = Math.round(Math.max(0, Math.min(1, share)) * 1000) / 10;
   return (
     <div className="nl-fin-line" role="listitem" title={title} data-testid="nl-fin-line">
@@ -424,7 +506,7 @@ function FinanceLine({ label, amount, share, tone, title }: { label: string; amo
         <span className="nl-fin-line-value nl-tnum">{formatNlMoney(amount)}</span>
       </div>
       <span className="nl-fin-line-bartrack" aria-hidden="true">
-        <span className="nl-fin-line-bar" style={{ width: `${pct}%`, background: NL_TONE_VAR[tone] }} />
+        <span className="nl-fin-line-bar" style={{ width: `${pct}%`, background: NL_TONE_VAR[tone], opacity: alpha ?? 1 }} />
       </span>
     </div>
   );
@@ -438,25 +520,240 @@ function FinanceLine({ label, amount, share, tone, title }: { label: string; amo
 function TransferSpecialItem({ team }: { team: TeamFinancesState }) {
   const transfer = team.transfer;
   if (!transfer) return null;
+  // Konsistente Vorzeichen (Markt-Audit F6): Käufe sind ein Geldabfluss und stehen NEGATIV, Verkäufe
+  // positiv — dann stimmt die sichtbare Rechnung Käufe + Verkäufe = Saldo, statt dass „Käufe 84,2"
+  // positiv neben einem Saldo von −84,2 steht.
   return (
     <StatChipRow className="nl-fin-kpi-hero" aria-label="Transfers (Sonderposten)">
       <StatChip
-        label="Transfersaldo"
-        value={formatNlMoney(transfer.net)}
-        tone={transfer.net >= 0 ? "good" : "risk"}
-        title="Verkaufserlöse minus Kaufausgaben der laufenden Saison — Sonderposten, NICHT Teil der Betriebs-GuV."
+        label="Käufe"
+        value={formatNlSignedMoney(-transfer.buyTotal)}
+        tone="neutral"
+        title={`${transfer.buyCount} Spieler gekauft — Geldabfluss, deshalb negativ`}
       />
       <StatChip
         label="Verkäufe"
-        value={formatNlMoney(transfer.sellTotal)}
+        value={formatNlSignedMoney(transfer.sellTotal)}
         tone="neutral"
         title={`${transfer.sellCount} Spieler verkauft`}
       />
       <StatChip
-        label="Käufe"
-        value={formatNlMoney(transfer.buyTotal)}
+        label="Transfersaldo"
+        value={formatNlSignedMoney(transfer.net)}
+        tone={transfer.net >= 0 ? "good" : "risk"}
+        sub={`= ${formatNlSignedMoney(-transfer.buyTotal)} + ${formatNlSignedMoney(transfer.sellTotal)}`}
+        title="Verkaufserlöse minus Kaufausgaben der laufenden Saison — Sonderposten, NICHT Teil der Betriebs-GuV."
+      />
+    </StatChipRow>
+  );
+}
+
+// --- Verpflichtungen: Apron-Linien & Kredite ------------------------------
+// CHRIS (M3): „kannst du bitte auch APRON 1 und 2 bei finanzen … separat noch mal ausweist?
+// kredite / tilgungne etc sollen natürlich auch mit rein". Beide Linien einzeln, die eigene
+// Position dazu (Abstand in Mio, nicht nur drüber/drunter), die Hochrechnung daneben — und die
+// Kreditlast (volle Rate, Zins/Tilgung getrennt) in derselben Karte, damit die Summe der festen
+// Verpflichtungen sichtbar wird. EINE Quelle: `team.apron` kommt aus derselben
+// `buildApronProjection`, die auch die Apron-Zeile der GuV speist; die Kreditzerlegung aus
+// `computeTeamLoanShareRows` (season-end-guv.ts), derselben Liste wie GuV-Posten und Ausgabenzeile.
+
+function apronZoneTone(zone: FinanceApronStatus["zone"]): NlTone {
+  if (zone === "unter_linie_1") return "good";
+  if (zone === "zwischen_den_linien") return "warn";
+  return "risk";
+}
+
+function apronZoneLabel(zone: FinanceApronStatus["zone"]): string {
+  if (zone === "unter_linie_1") return "unter Linie 1";
+  if (zone === "zwischen_den_linien") return "zwischen den Linien";
+  return "über Linie 2";
+}
+
+function apronRangeTone(zone: FinanceApronStatus["zone"]): "positive" | "warning" | "negative" {
+  if (zone === "unter_linie_1") return "positive";
+  if (zone === "zwischen_den_linien") return "warning";
+  return "negative";
+}
+
+/** „+14,7 drüber" / „−4,2 drunter" / „genau auf der Linie" — Abstand als Aussage, nicht nur Vorzeichen. */
+function formatApronDistance(distance: number): string {
+  if (Math.round(distance * 10) === 0) return "genau auf der Linie";
+  return `${formatNlSignedMoney(distance)} ${distance > 0 ? "drüber" : "drunter"}`;
+}
+
+function ApronLinesPanel({ apron, actualSalaryTotal }: { apron: FinanceApronStatus | null; actualSalaryTotal: number }) {
+  if (!apron) {
+    return (
+      <NlEmptyState
+        className="nl-fin-flow-empty"
+        title="Apron-Hochrechnung derzeit nicht verfügbar."
+        message="Für diesen Spielstand ließ sich keine Apron-Projektion bauen — es wird nichts geschätzt."
+      />
+    );
+  }
+
+  const projektionLabel = apron.rank != null ? `Hochrechnung auf Platz ${apron.rank}` : "Hochrechnung (Rang unbekannt, letzter Platz angenommen)";
+
+  return (
+    <div className="nl-fin-apron" data-testid="nl-fin-apron">
+      <div className="nl-fin-apron-rows" role="list" aria-label="Apron-Linien">
+        <div className="nl-fin-apron-row" role="listitem" title="1. Apron-Linie = Median-Gehalt der Liga (geglättet) × 1,1. Wer drüber liegt, zahlt auf den Überschuss eine Abgabe.">
+          <span className="nl-fin-apron-row-label">Apron-Linie 1</span>
+          <span className="nl-fin-apron-row-value nl-tnum">{formatNlMoney(apron.line1)}</span>
+          <span className="nl-fin-apron-row-note nl-tnum">{formatApronDistance(apron.distanceLine1)}</span>
+        </div>
+        <div className="nl-fin-apron-row" role="listitem" title="2. Apron-Linie = Median-Gehalt × 1,25. Überschuss über dieser Linie kostet den höheren Satz.">
+          <span className="nl-fin-apron-row-label">Apron-Linie 2</span>
+          <span className="nl-fin-apron-row-value nl-tnum">{formatNlMoney(apron.line2)}</span>
+          <span className="nl-fin-apron-row-note nl-tnum">{formatApronDistance(apron.distanceLine2)}</span>
+        </div>
+        <div
+          className="nl-fin-apron-row is-basis"
+          role="listitem"
+          title="Bemessungsgrundlage des Apron: die GEGLÄTTETE Gehaltssumme (Verträge über die Laufzeit verteilt) — bewusst nicht die echte Saisonsumme der GuV, siehe Hinweis unten."
+        >
+          <span className="nl-fin-apron-row-label">Deine Bemessungsgrundlage</span>
+          <span className="nl-fin-apron-row-value nl-tnum">{formatNlMoney(apron.salaryBasis)}</span>
+          <span className={`nl-fin-apron-row-note ${nlToneClass(apronZoneTone(apron.zone))}`}>{apronZoneLabel(apron.zone)}</span>
+        </div>
+      </div>
+
+      <div className="nl-fin-apron-meter" data-testid="nl-fin-apron-meter">
+        <VeloRangeBar
+          low={apron.line1}
+          high={apron.line2}
+          point={apron.salaryBasis}
+          tone={apronRangeTone(apron.zone)}
+          ariaLabel={`Apron-Korridor ${formatNlMoney(apron.line1)} bis ${formatNlMoney(apron.line2)}, deine Bemessungsgrundlage ${formatNlMoney(apron.salaryBasis)} (${apronZoneLabel(apron.zone)})`}
+        />
+        <span className="nl-fin-apron-meter-caption">Band = Korridor zwischen Linie 1 und 2 · Marker = deine Bemessungsgrundlage</span>
+      </div>
+
+      <div className="nl-fin-apron-projection" data-testid="nl-fin-apron-projection">
+        <span className="nl-fin-apron-projection-label">{apron.gebucht ? "Abrechnung (gebucht)" : projektionLabel}</span>
+        <span className="nl-fin-apron-projection-value nl-tnum">
+          {apron.abgabe > 0 ? `Abgabe ${formatNlMoney(apron.abgabe)}` : apron.ausgleich > 0 ? `Ausgleich ${formatNlMoney(apron.ausgleich)}` : "keine Abgabe, kein Ausgleich"}
+          {apron.gedeckelt ? " · durch den Deckel begrenzt" : ""}
+        </span>
+        <span className="nl-fin-apron-projection-netto nl-tnum" title="Netto-Effekt aufs Cash am Saisonende: Ausgleich minus Abgabe — dieselbe Zahl wie die Apron-Zeile im GuV-Hover.">
+          Netto {formatNlSignedMoney(apron.nettoDelta)}
+        </span>
+      </div>
+
+      <p className="nl-fin-apron-league muted nl-tnum" data-testid="nl-fin-apron-league">
+        Liga: Median {formatNlMoney(apron.medianSalary)} · {apron.zahlerCount} Zahler · {apron.empfaengerCount} Empfänger · Topf {formatNlMoney(apron.topf)}
+      </p>
+
+      <p className="nl-fin-apron-status muted" data-testid="nl-fin-apron-status">
+        {apron.gebucht
+          ? "Die Apron-Abrechnung dieser Saison ist bereits gebucht."
+          : apron.frozenLines
+            ? "Linien für diese Saison eingefroren — gegen sie wird am Saisonende abgerechnet. Abgabe/Ausgleich bleiben bis dahin eine Hochrechnung auf den aktuellen Rang."
+            : "Linien noch nicht eingefroren — sie können sich bis zum Saisonende verschieben. Alles hier ist eine Hochrechnung."}
+        {apron.usedReferenceSalary ? " Frisch-Save: Linien aus dem Referenzgehalt abgeleitet, nicht aus gemessenen Gehältern." : ""}
+      </p>
+
+      {/* Der heikelste Punkt der Karte: hier stehen zwei verschiedene Gehaltssummen nebeneinander,
+          und beide sind richtig. Ohne diesen Satz sähe das wie der Widerspruch aus, den F4 (Fundament)
+          gerade behoben hat — deshalb wird der Unterschied erklärt, nicht versteckt. */}
+      <p className="nl-fin-apron-basis-note muted" data-testid="nl-fin-apron-basis-note">
+        Der Apron rechnet auf der <b>geglätteten</b> Gehaltssumme ({formatNlMoney(apron.salaryBasis)}): Verträge werden über ihre
+        Laufzeit verteilt, Front-/Backloading zählt nicht als Mehrausgabe. Die GuV oben bucht dagegen die <b>echte</b> Saisonsumme
+        ({formatNlMoney(actualSalaryTotal)}). Beide Zahlen sind absichtlich verschieden.
+      </p>
+    </div>
+  );
+}
+
+function LoanCommitmentsPanel({ loans }: { loans: FinanceLoanCommitments }) {
+  return (
+    <div className="nl-fin-commit" data-testid="nl-fin-commit">
+      {/* Chris-Regel „selbst wenn es 0 ist": die vier Chips stehen immer da — „Kreditrate 0" beantwortet
+          die Frage, ob Kredite in den Zahlen stecken; eine fehlende Zeile ließe sie offen. */}
+      <StatChipRow className="nl-fin-commit-chips" aria-label="Kredit-Verpflichtungen">
+        <StatChip
+          label="Kreditrate p. a."
+          value={formatNlMoney(loans.installmentTotal)}
+          tone={loans.installmentTotal > 0 ? "risk" : "neutral"}
+          title="Volle Saisonrate aller laufenden Kredite (Zins + Tilgung) — das, was am Saisonende wirklich vom Cash abgeht."
+        />
+        <StatChip
+          label="davon Zins"
+          value={formatNlMoney(loans.interestTotal)}
+          tone="neutral"
+          sub="GuV-Ausgabe"
+          title="Zinsanteil der Raten — der einzige Teil, der als Ausgabe in die GuV zählt (Zeile „Kreditzins“ oben)."
+        />
+        <StatChip
+          label="davon Tilgung"
+          value={formatNlMoney(loans.principalTotal)}
+          tone="neutral"
+          sub="Bilanz: senkt die Restschuld"
+          title="Tilgungsanteil der Raten — cash-wirksam, aber keine GuV-Ausgabe: Cash runter, Restschuld runter, Eigenkapital unverändert."
+        />
+        <StatChip
+          label="Restschuld"
+          value={formatNlMoney(loans.outstandingTotal)}
+          tone={loans.outstandingTotal > 0 ? "warn" : "neutral"}
+          title="Offene Restschuld aller laufenden Kredite heute."
+        />
+      </StatChipRow>
+      {loans.rows.length > 0 ? (
+        <div className="nl-fin-commit-loans" role="list" aria-label="Laufende Kredite">
+          {loans.rows.map((row) => (
+            <div key={row.loanId} className="nl-fin-commit-loan" role="listitem">
+              <span className="nl-fin-commit-loan-lender">{row.lenderName}</span>
+              <span className="nl-fin-commit-loan-values nl-tnum">
+                Rate {formatNlMoney(row.installment)} (Zins {formatNlMoney(row.interest)} + Tilgung {formatNlMoney(row.principal)}) ·
+                Restschuld {formatNlMoney(row.outstanding)} · noch {row.remainingSeasons} Saison{row.remainingSeasons === 1 ? "" : "s"}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="nl-fin-league-hint muted">Keine laufenden Kredite — Konditionen, Anbieter und Aufnahme stehen im Kredite-Reiter.</p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Kopfzeile der Verpflichtungs-Karte: die Summe der festen Zahlungsverpflichtungen der Saison —
+ * echte Gehälter + volle Kreditrate + Apron-Abgabe (Hochrechnung). Jeder Teil ist beschriftet,
+ * die Summe zeigt ihre Rechnung als Subzeile (keine Zahl ohne Herkunft).
+ */
+function CommitmentSummary({ team }: { team: TeamFinancesState }) {
+  const salary = team.expenses.salaries.total;
+  const rate = team.loanCommitments.installmentTotal;
+  const apronAbgabe = team.apron?.abgabe ?? 0;
+  const total = Number((salary + rate + apronAbgabe).toFixed(1));
+  return (
+    <StatChipRow className="nl-fin-kpi-hero" aria-label="Feste Verpflichtungen der Saison">
+      <StatChip
+        label="Gehälter (echt)"
+        value={formatNlMoney(salary)}
         tone="neutral"
-        title={`${transfer.buyCount} Spieler gekauft`}
+        title="Echte Gehaltssumme der Saison (contract.salary — das Feld der Season-End-Abbuchung), identisch zur Ausgabenzeile „Gehälter“."
+      />
+      <StatChip
+        label="Kreditrate p. a."
+        value={formatNlMoney(rate)}
+        tone="neutral"
+        title="Volle Saisonrate aller laufenden Kredite (Zins + Tilgung)."
+      />
+      <StatChip
+        label="Apron-Abgabe"
+        value={team.apron ? formatNlMoney(apronAbgabe) : "—"}
+        tone={apronAbgabe > 0 ? "warn" : "neutral"}
+        sub={team.apron && !team.apron.gebucht ? "Hochrechnung" : undefined}
+        title="Apron-Abgabe beim aktuellen Rang (siehe Linien-Aufschlüsselung unten) — bis zur Buchung am Saisonende eine Hochrechnung."
+      />
+      <StatChip
+        label="Feste Verpflichtungen"
+        value={formatNlMoney(total)}
+        tone="risk"
+        sub={`= ${formatNlNumber(salary)} + ${formatNlNumber(rate)} + ${formatNlNumber(apronAbgabe)}`}
+        title="Gehälter (echt) + volle Kreditrate + Apron-Abgabe (Hochrechnung) — was diese Saison unabhängig vom sportlichen Verlauf fällig wird."
       />
     </StatChipRow>
   );
@@ -470,10 +767,15 @@ function TransferSpecialItem({ team }: { team: TeamFinancesState }) {
 // = Cash aktuell — reine Anzeige, reused `StatChip`/`StatChipRow`.
 function CashReconciliation({ team }: { team: TeamFinancesState }) {
   if (team.cashSeasonStart == null) {
+    // ZWEI ehrliche Zustände statt einer falschen Behauptung (Markt-Audit F4): solange das
+    // Saisonarchiv noch nachgeladen wird, sagt die Zeile „lädt" — erst wenn es da ist und wirklich
+    // keinen Vorsaison-Stand trägt, sagt sie „nicht archiviert". Vorher stand die zweite Aussage
+    // auch während des Ladens da, mitten in Season 2 mit existierendem Archiv.
     return (
-      <p className="nl-fin-league-hint muted">
-        Cash-Abgleich ab der zweiten Saison verfügbar — für Season 1 ist kein Saison-Start-Cash
-        archiviert.
+      <p className="nl-fin-league-hint muted" data-testid="nl-fin-reconciliation-hint">
+        {team.archivePending
+          ? "Saisonarchiv wird geladen — der Cash-Abgleich erscheint gleich."
+          : "Cash-Abgleich ab der zweiten Saison verfügbar — für die Vorsaison ist kein Saison-Start-Cash archiviert."}
       </p>
     );
   }
@@ -520,8 +822,11 @@ function CashReconciliation({ team }: { team: TeamFinancesState }) {
 // `AllTimeTableNewLook`: lokaler `sortState`, Klick auf denselben Key
 // dreht die Richtung, Klick auf einen neuen Key startet absteigend.
 
-type LeagueSortKey = "cash" | "incomeAnnual" | "expensesAnnual" | "guv" | "cashFlowAnnual" | "marketValue";
+type LeagueSortKey = "cash" | "incomeAnnual" | "expensesAnnual" | "guv" | "marketValue";
 
+// Markt-Audit F3: „GuV p.a." und „Cashflow p.a." waren für 26 von 32 Teams dieselbe Spalte —
+// wirkte wie ein Duplikat. Jetzt EINE GuV-Spalte; wo Kreditraten drücken, steht der echte
+// Geldabfluss als beschriftete Zusatzzeile („nach Kreditraten −25,9") direkt in der Zelle.
 const NL_FIN_LEAGUE_COLUMNS: NlTableColumn<FinanceLeagueTableRow>[] = [
   { key: "rank", label: "#", align: "right", width: "36px" },
   { key: "team", label: "Team" },
@@ -539,22 +844,15 @@ const NL_FIN_LEAGUE_COLUMNS: NlTableColumn<FinanceLeagueTableRow>[] = [
     align: "right",
     sortable: true,
     tooltip:
-      "Gehälter + Gebäude-Unterhalt + Kredit-ZINS (Näherungswert). Ohne Tilgung — die ist keine GuV-Ausgabe, sondern senkt die Schulden. Den echten Geldabfluss zeigt die Spalte „Cashflow p.a.“.",
+      "Gehälter + Gebäude-Unterhalt + Kredit-ZINS (Näherungswert). Ohne Tilgung — die ist keine GuV-Ausgabe, sondern senkt die Schulden; den echten Geldabfluss zeigt die Zusatzzeile „nach Kreditraten“ in der GuV-Spalte.",
   },
   {
     key: "guv",
     label: "GuV p.a.",
     align: "right",
     sortable: true,
-    tooltip: "Einnahmen p.a. minus Ausgaben p.a. (kaufmännisches Ergebnis, ohne Tilgung)",
-  },
-  {
-    key: "cashFlowAnnual",
-    label: "Cashflow p.a.",
-    align: "right",
-    sortable: true,
     tooltip:
-      "Was tatsächlich aufs Konto kommt bzw. abfließt: GuV p.a. minus Kredit-Tilgung. Bei laufenden Krediten niedriger als die GuV.",
+      "Einnahmen p.a. minus Ausgaben p.a. (kaufmännisches Ergebnis, ohne Tilgung). Bei Teams mit laufenden Krediten zeigt die Zusatzzeile „nach Kreditraten“, was nach Abzug der Tilgung wirklich aufs Konto kommt.",
   },
   { key: "marketValue", label: "MW", align: "right", sortable: true, tooltip: "Kader-Marktwert-Summe" },
 ];
@@ -594,18 +892,18 @@ function renderLeagueCell(
     case "expensesAnnual":
       return formatNlMoney(row.expensesAnnual);
     case "guv":
-      return <span className={nlToneClass(guvTone(row.guv))}>{formatNlMoney(row.guv)}</span>;
-    case "cashFlowAnnual":
       return (
-        <span
-          className={nlToneClass(guvTone(row.cashFlowAnnual))}
-          title={
-            row.loanPrincipalAnnual > 0
-              ? `GuV ${formatNlMoney(row.guv)} − Tilgung ${formatNlMoney(row.loanPrincipalAnnual)}`
-              : "Keine laufende Tilgung — Cashflow entspricht der GuV"
-          }
-        >
-          {formatNlMoney(row.cashFlowAnnual)}
+        <span className="nl-fin-league-guv">
+          <span className={nlToneClass(guvTone(row.guv))}>{formatNlMoney(row.guv)}</span>
+          {/* Nur bei Teams mit laufender Tilgung — sonst wäre die Zeile für 26 von 32 Teams ein Echo. */}
+          {row.loanPrincipalAnnual > 0 ? (
+            <span
+              className="nl-fin-league-guv-sub nl-tnum"
+              title={`GuV ${formatNlMoney(row.guv)} − Tilgung ${formatNlMoney(row.loanPrincipalAnnual)} = ${formatNlMoney(row.cashFlowAnnual)} tatsächlicher Geldfluss`}
+            >
+              nach Kreditraten {formatNlMoney(row.cashFlowAnnual)}
+            </span>
+          ) : null}
         </span>
       );
     case "marketValue":
@@ -695,41 +993,46 @@ export default function FoundationFinancesNewLook({
   const incomeLines = team ? buildIncomeLines(team) : [];
   const expenseLines = team ? buildExpenseLines(team) : [];
 
-  const animatedCash = useCountUp(team?.cash ?? null);
-  const animatedIncome = useCountUp(team?.totalIncome ?? null);
-  const animatedExpenses = useCountUp(team?.totalExpenses ?? null);
-  const animatedGuv = useCountUp(team?.guv ?? null);
+  // BEWUSST KEINE Zähler-Animation auf den Kopfzahlen mehr (Markt-Audit F1): `useCountUp` zeigte
+  // sekundenlang Zwischenstände (62,1 statt 63,5) als wären sie endgültig — wer in dem Moment
+  // ablas, nahm 1,4 Mio Differenz mit. Geldzahlen stehen ab dem ersten Frame fest.
+  const incomeSub = incomeLines.length > 0 ? `= ${incomeLines.map((line) => `${line.shortLabel} ${formatNlNumber(line.amount)}`).join(" + ")}` : undefined;
+  const expenseSub =
+    expenseLines.length > 0 ? `= ${expenseLines.map((line) => `${line.shortLabel} ${formatNlNumber(line.amount)}`).join(" + ")}` : undefined;
 
   return (
     <div className="nl-fin" data-testid="foundation-finances" data-new-look="true">
       <NlCard className="nl-fin-header-card" eyebrow="Finanzen" title={teamName}>
         {team ? (
           <StatChipRow className="nl-fin-kpi-hero" aria-label="Finanz-Kennzahlen">
-            <StatChip label="Cash" value={formatNlMoney(animatedCash ?? team.cash)} tone="neutral" />
+            <StatChip label="Cash" value={formatNlMoney(team.cash)} tone="neutral" sub="Stand heute" />
             <StatChip
               label="Einnahmen (Saison)"
-              value={formatNlMoney(animatedIncome ?? team.totalIncome)}
+              value={formatNlMoney(team.totalIncome)}
               tone="good"
+              sub={incomeSub}
               title="Sponsor + Gebäude-Einnahmen + Vorstandsziel-Prämien der laufenden Saison (Transfersaldo separat als Sonderposten)"
             />
             <StatChip
               label="Ausgaben (Saison)"
-              value={formatNlMoney(animatedExpenses ?? team.totalExpenses)}
+              value={formatNlMoney(team.totalExpenses)}
               tone="risk"
-              title="Gehälter + bezahlter Gebäude-Unterhalt + Kreditraten + Vorstandsziel-Strafen der laufenden Saison (Transfersaldo separat als Sonderposten)"
+              sub={expenseSub}
+              title="Gehälter + bezahlter Gebäude-Unterhalt + Kreditzins + Vorstandsziel-Strafen der laufenden Saison (Transfersaldo separat als Sonderposten; Kredit-Tilgung ist Bilanzbewegung, siehe Karte „Apron & Kredite“)"
             />
             <StatChip
               label="GuV"
-              value={formatNlMoney(animatedGuv ?? team.guv)}
+              value={formatNlMoney(team.guv)}
               tone={guvTone(team.guv)}
+              sub={`${formatNlNumber(team.totalIncome)} − ${formatNlNumber(team.totalExpenses)}`}
               title="Einnahmen minus Ausgaben der laufenden Saison"
             />
-            {/* Salary Factor: Wert der laufenden Season + Richtung zur (bereits ausgewürfelten)
+            {/* Gehaltsfaktor: Wert der laufenden Season + Richtung zur (bereits ausgewürfelten)
                 nächsten Season — Tonwahl siehe salaryFactorDirectionTone. Ohne validen Wert
                 bewusst gar kein Chip statt "1,00×"-Fake. */}
             {salaryFactorOutlook.currentFactor != null ? (
               <StatChip
-                label="Salary Factor"
+                label="Gehaltsfaktor"
                 value={formatSalaryFactor(salaryFactorOutlook.currentFactor)}
                 tone={salaryFactorDirectionTone(salaryFactorOutlook.direction)}
                 sub={buildSalaryFactorSub(salaryFactorOutlook)}
@@ -752,6 +1055,28 @@ export default function FoundationFinancesNewLook({
       {team ? (
         <NlCard className="nl-fin-flow-card" eyebrow="Cashflow" title="Einnahmen vs. Ausgaben" data-testid="nl-fin-flow-card">
           <FinanceFlowChart incomeLines={incomeLines} expenseLines={expenseLines} />
+        </NlCard>
+      ) : null}
+
+      {/* Chris (M3): Apron-Linien 1 & 2 einzeln + Kredite/Tilgung in EINER Verpflichtungs-Karte. */}
+      {team ? (
+        <NlCard
+          className="nl-fin-commitments-card"
+          eyebrow="Verpflichtungen"
+          title="Apron & Kredite"
+          data-testid="nl-fin-commitments-card"
+        >
+          <CommitmentSummary team={team} />
+          <div className="nl-fin-commit-columns">
+            <section className="nl-fin-commit-section" aria-label="Apron-Linien">
+              <h3 className="nl-fin-commit-section-title">Apron-Linien</h3>
+              <ApronLinesPanel apron={team.apron} actualSalaryTotal={team.expenses.salaries.total} />
+            </section>
+            <section className="nl-fin-commit-section" aria-label="Kredite und Tilgung">
+              <h3 className="nl-fin-commit-section-title">Kredite &amp; Tilgung</h3>
+              <LoanCommitmentsPanel loans={team.loanCommitments} />
+            </section>
+          </div>
         </NlCard>
       ) : null}
 
@@ -787,7 +1112,7 @@ export default function FoundationFinancesNewLook({
           title="GuV je Saison"
           data-testid="nl-fin-history-card"
         >
-          <FinanceHistoryTrend history={team.history} />
+          <FinanceHistoryTrend history={team.history} archivePending={team.archivePending} />
         </NlCard>
       ) : null}
 
@@ -808,6 +1133,7 @@ export default function FoundationFinancesNewLook({
                     amount={line.amount}
                     share={team.totalIncome > 0 ? line.amount / team.totalIncome : 0}
                     tone={line.tone}
+                    alpha={line.alpha}
                     title={line.title}
                   />
                 ))}
@@ -833,6 +1159,7 @@ export default function FoundationFinancesNewLook({
                     amount={line.amount}
                     share={team.totalExpenses > 0 ? line.amount / team.totalExpenses : 0}
                     tone={line.tone}
+                    alpha={line.alpha}
                     title={line.title}
                   />
                 ))}
