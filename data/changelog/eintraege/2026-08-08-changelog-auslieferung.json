@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-08",
+  "seite": "Info · Changelog",
+  "text": "Der Changelog-Reiter war eine 18.000-Pixel-Scroll-Wand ohne Sprungmarken. Jetzt startet nur die neueste Version aufgeklappt, ältere Versionen liegen hinter einem \"Anzeigen\"-Schalter, und eine Sprungleiste im Kopf springt direkt zu jeder Version. Die zuvor gemessenen 45-60 Sekunden Ladezeit lagen an der einmaligen Dev-Server-Kompilierung der riesigen gemeinsamen Seiten-Module, nicht an der Changelog-Komponente selbst — die lädt keine Daten nach und rendert warm in wenigen Sekunden.",
+  "gewicht": "feinschliff",
+  "version": "0.4"
+}

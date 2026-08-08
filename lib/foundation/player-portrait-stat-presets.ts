@@ -204,10 +204,15 @@ export function buildRosterOverlayStats(input: BuildRosterOverlayInput): Portrai
     stat(
       rankInline ? "MVS" : formatStatLabel("MVS", input.mvsRank),
       rankInline ? formatMetricWithRank(input.playerMvs, input.mvsRank, 1) : formatNumber(input.playerMvs, 1),
-      withMetricTitle(ROSTER_METRIC_TITLES.mvs, {
-        heatClass: getPoolHeatClass(input.playerMvs, input.leagueHeatPools.mvs),
-        ...starTierStatExtra("MVS", input.mvsRank),
-      }),
+      withMetricTitle(
+        // Chris-Regel (S1): bei 0/„—" wird erklärt, nicht versteckt — der leere
+        // MVS sagt dazu, WANN er sich füllt (wie der PPs-Titel es schon tat).
+        input.playerMvs == null ? `${ROSTER_METRIC_TITLES.mvs} — noch keine Wertung, füllt sich ab Spieltag 1` : ROSTER_METRIC_TITLES.mvs,
+        {
+          heatClass: getPoolHeatClass(input.playerMvs, input.leagueHeatPools.mvs),
+          ...starTierStatExtra("MVS", input.mvsRank),
+        },
+      ),
     ),
   );
   if (input.showCaPo && (input.caRating != null || input.poRangeMin != null || input.poRangeMax != null)) {

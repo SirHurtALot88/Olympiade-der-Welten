@@ -68,10 +68,29 @@ export type ClassTrainingGainEstimateInput = {
   trainingFocusBonusPct?: number;
 };
 
+export type ClassTrainingAttributeGain = {
+  attribute: PlayerGeneratorAttributeName;
+  /**
+   * Beitrag dieses Attributs zum `estimatedGain` der Klasse, UNGERUNDET
+   * (`budgetBase × routeMult × share × attributeMultiplier` — exakt der Summand der inneren
+   * Schleife, vor der Summierung abgegriffen). Invariante: `roundTo(Σ gain, 1) === estimatedGain`,
+   * weil `estimatedGain` aus genau dieser Summe gerundet wird — es gibt keine zweite Formel.
+   * Wie `estimatedGain` selbst eine Schätzung, keine Garantie.
+   */
+  gain: number;
+};
+
 export type ClassTrainingGainEstimate = {
   className: ProgressionClassName;
   /** Estimated Trainings-SP gain for this class, rounded to 1 decimal. Estimate, not a guarantee. */
   estimatedGain: number;
+  /**
+   * Per-Attribut-Aufschlüsselung des `estimatedGain` (T6 · Klassen-Stat-Vorschau): welche Attribute
+   * diese Klasse trainiert und mit wie viel SP, absteigend sortiert. Nur Attribute mit positivem
+   * Klassengewicht tauchen auf (negative Gewichte verteilen kein Trainingsbudget — sie sind kein
+   * Verlust, sondern „trainiert nicht"). Leer, wenn die Klasse kein Budget verteilt.
+   */
+  attributeGains: ClassTrainingAttributeGain[];
   developmentRoute: PlayerDevelopmentRouteSuggestion;
   isCurrentClass: boolean;
 };
@@ -137,12 +156,17 @@ export function estimateClassTrainingGains(input: ClassTrainingGainEstimateInput
     const positiveTotal = PROGRESSION_ATTRIBUTE_ORDER.reduce((sum, key) => sum + Math.max(0, profile[key]), 0);
     const developmentRoute = classNameToDevelopmentRoute(className);
 
-    let estimatedGain = 0;
+    // T6 · Klassen-Stat-Vorschau: dieselbe innere Schleife wie bisher, aber die Summanden werden
+    // VOR der Summierung pro Attribut abgegriffen. `estimatedGain` ist ausschließlich die gerundete
+    // Summe dieser Beiträge — Anzeige (pro Attribut) und Gesamtwert können nie auseinanderlaufen,
+    // weil es nur die eine Rechnung gibt.
+    const attributeGains: ClassTrainingAttributeGain[] = [];
+    let estimatedGainRaw = 0;
     if (positiveTotal > 0 && budgetBase > 0) {
       const routeMultiplier = getDevelopmentRouteBonusMultiplier(developmentRoute, trainingFocusAxis, trainingFocusBonusPct);
-      const weightedSum = PROGRESSION_ATTRIBUTE_ORDER.reduce((sum, key) => {
+      for (const key of PROGRESSION_ATTRIBUTE_ORDER) {
         const weight = Math.max(0, profile[key]);
-        if (weight <= 0) return sum;
+        if (weight <= 0) continue;
         const share = weight / positiveTotal;
         // Bevorzugt den echten Engine-Multiplikator (Decke × Achsen-Potenzialraum × Affinität),
         // damit die Schätzung nicht mehr vom tatsächlichen Ergebnis abweicht. Fallback auf die
@@ -153,14 +177,17 @@ export function estimateClassTrainingGains(input: ClassTrainingGainEstimateInput
             ? engineMultiplier
             : getAttributeGrowthMultiplier(input.ceilingStateByAttribute[key] ?? "open") *
               getOrganicGrowthMultiplier(getAttributeAffinityKind(key, affinityProfile));
-        return sum + share * attributeMultiplier;
-      }, 0);
-      estimatedGain = budgetBase * routeMultiplier * weightedSum;
+        const gain = budgetBase * routeMultiplier * share * attributeMultiplier;
+        attributeGains.push({ attribute: key, gain });
+        estimatedGainRaw += gain;
+      }
+      attributeGains.sort((left, right) => right.gain - left.gain);
     }
 
     return {
       className,
-      estimatedGain: roundTo(estimatedGain, 1),
+      estimatedGain: roundTo(estimatedGainRaw, 1),
+      attributeGains,
       developmentRoute,
       isCurrentClass: className === currentClass,
     };

@@ -37,6 +37,20 @@ function getDeltaTone(delta: number | null) {
 const AXIS_LABELS: Record<string, string> = { pow: "POW", spe: "SPE", men: "MEN", soc: "SOC" };
 const AXIS_KEYS = ["pow", "spe", "men", "soc"] as const;
 
+// S2 (Audit „markt"): `report.potentialBand` ist der rohe Enum-Wert ("low"/"medium"/"high"/
+// "elite"/"unknown", siehe `scouting-report-service.ts`) — bisher unübersetzt gerendert (der
+// "low"-Badge aus dem Audit). Dieselbe Übersetzung wie `ScoutingShortlistBoard.tsx`
+// (`POTENTIAL_BAND_LABEL`), hier lokal dupliziert, weil es nur eine Label-Lookup-Tabelle ist,
+// keine berechnete Größe — keine zwei Quellen für eine Zahl, nur zwei Stellen mit derselben
+// Übersetzungstabelle.
+const POTENTIAL_BAND_LABEL: Record<string, string> = {
+  elite: "Elite",
+  high: "Hoch",
+  medium: "Mittel",
+  low: "Niedrig",
+  unknown: "Unbekannt",
+};
+
 export default function ScoutingReportPanel({
   report,
   onOpenPlayer,
@@ -165,7 +179,14 @@ export default function ScoutingReportPanel({
                 )}
               </>
             )}
-            {report.potentialBand ? <span className="scouting-report-potential-band">{report.potentialBand}</span> : null}
+            {report.potentialBand ? (
+              <span
+                className="scouting-report-potential-band"
+                title="Potenzial-Einstufung nach aktuellem Scouting-Stand — wird mit mehr Intel präziser."
+              >
+                {POTENTIAL_BAND_LABEL[report.potentialBand] ?? report.potentialBand}
+              </span>
+            ) : null}
           </div>
           {report.showAxisOrbit && report.axisOrbitStats ? (
             <VeloStatOrbitRow stats={report.axisOrbitStats} ariaLabel="POW SPE MEN SOC" showGrade />

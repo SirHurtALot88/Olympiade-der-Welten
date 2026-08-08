@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-08",
+  "seite": "Verwaltung · Settings",
+  "text": "Der 32-Klub-Picker fürs \"Neues Spiel erstellen\" lag offen mitten in den Settings des laufenden Saves, mit vorausgewähltem Team und \"DEIN TEAM\"-Badge — Verwechslungsgefahr mit der echten Team-Zuordnung. Er ist jetzt standardmäßig eingeklappt. Der Season-Start-Reset steht jetzt in einer eigenen, klar markierten Gefahrenzone statt neben harmlosen Aktionen, \"Löschen\" je Spielstand ist räumlich von \"Klonen\"/\"Snapshot erstellen\" abgesetzt. Der Untertitel erklärt jetzt in Klartext, wofür die Seite gut ist, statt Modell-Doku zu zitieren. \"Warnungen 200\" lässt sich aufklappen und zeigt die echten Meldungen aus dem Daten-Mapping beim Import.",
+  "gewicht": "behebung",
+  "version": "0.4"
+}

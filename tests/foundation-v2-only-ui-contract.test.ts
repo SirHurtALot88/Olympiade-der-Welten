@@ -104,6 +104,10 @@ describe("foundation v2-only ui contract", () => {
     expect(lineupHostText).toContain("shellControlledDraftBoardView");
     expect(foundationText).toContain('activeView === "scoutingCenterV2"');
     expect(foundationText).toContain('activeView === "trainingCompact"');
-    expect(foundationText).toContain('{ id: "forecast", label: "Forecast" }');
+    // Audit TR4 (Paket T5): Der „Forecast"-Unterreiter war kein eigener Inhalt, sondern
+    // ein Scroll-Anker auf dieselbe Seite — Steuerung und Forecast stehen seit der
+    // Steuer-Tabelle in EINER Tabelle. Der Vertrag hält jetzt fest, dass der
+    // Schein-Umschalter NICHT zurückkommt.
+    expect(foundationText).not.toContain('{ id: "forecast", label: "Forecast" }');
   });
 });

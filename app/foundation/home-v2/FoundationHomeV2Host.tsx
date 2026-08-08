@@ -202,7 +202,7 @@ export default function FoundationHomeV2Host({
           gameFlowActionStep.blockers.length > 0 || gameFlowActionStep.warnings.length > 0,
         warnings: overviewDerivations.homeWarnings
           .filter((warning) => !HOME_HIDDEN_WARNING_KEYS.includes(warning))
-          .map(formatHomeWarningLabel),
+          .map((warning) => ({ key: warning, label: formatHomeWarningLabel(warning) })),
         topPlayers: overviewDerivations.homeV2TopPlayers,
         // F4: Radar = Office-Kopf = Markt-Vorschau (Ø Top-6 je Achse).
         teamAxisAverages: overviewDerivations.homeTeamTopSixAxisStats,
@@ -217,6 +217,7 @@ export default function FoundationHomeV2Host({
         onContinue: triggerGlobalNext,
         onOpenTeams: () => onNavigateView("teams"),
         onOpenLineup: () => onNavigateView("lineup"),
+        onOpenArena: () => onNavigateView("matchdayArena"),
         onOpenMarket: () => onNavigateView("marketV2"),
         onOpenTraining: () => onNavigateView("trainingCompact"),
         onOpenOffice: () => navigateHomeTab("office"),

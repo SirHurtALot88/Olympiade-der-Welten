@@ -86,8 +86,11 @@ describe("Die aktive Sortierspalte trägt ihre dunkle Schrift", () => {
   });
 
   it("hält Kopf und Zellen beim selben Wasch, statt sie auseinanderlaufen zu lassen", () => {
-    // Vier Stellen wiederholen den Wasch (generisch + die drei Kennzahl-Spalten).
-    expect(CSS.split("#7fa2d1) 78%").length - 1).toBe(4);
+    // Fünf Stellen wiederholen den Wasch (generisch + die drei Kennzahl-Spalten +
+    // T3: PPs/MVS im "Saison noch leer"-Zustand, aktiv sortiert — derselbe Wasch
+    // statt eines sechsten, eigenen Tons, damit "aktiv sortiert" immer dasselbe
+    // Signal bleibt, auch wenn die Spalte gerade noch leer ist).
+    expect(CSS.split("#7fa2d1) 78%").length - 1).toBe(5);
     expect(CSS).not.toContain("#7fa2d1) 45%");
   });
 });

@@ -12,11 +12,29 @@
     },
     {
       "datum": "2026-08-08",
+      "seite": "Spieltag · Arena",
+      "pr": null,
+      "text": "Vor dem Anpfiff erfindet die Arena kein Ergebnis mehr: statt 32 Schloss-Zeilen, 32× »keine Aufstellung« und einer alphabetisch durchnummerierten Wertung mit Medaillen-Optik zeigt sie jetzt einen eigenen Zustand — deine Einsatzliste als Held mit direktem Knopf, die zwei Disziplinen mit Mutatoren, leere Podeste (»Noch zu vergeben«) und dein Umfeld mit den echten Startplätzen aus der Vorsaison. Der Saison-Rang der Wertung kommt jetzt aus derselben Quelle wie Home und Saisonstand (vorher: Rang 19 im Kopf, Zeile 22 in der Tabelle).",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
       "seite": "Server · Spielstand-Export",
       "pr": null,
       "text": "Im Server-Log stand seit Wochen alle drei Minuten derselbe Fehler: der automatische Export wollte die Spielstände nach GitHub hochladen und scheiterte jedes Mal, weil das Verzeichnis der laufenden App kein Git-Repository ist — dort liegt nur das fertig gebaute Programm, kein Checkout und keine Zugangsdaten. Der Upload aus der App heraus kann deshalb gar nicht gelingen. Statt es endlos zu wiederholen, legt er sich jetzt beim ersten Fehlschlag still und schreibt einmal deutlich, was stattdessen greift: das Skript auf dem Server selbst, das den Spielstand ohnehin regelmäßig hochlädt. Der Export in den Ordner läuft unverändert weiter. Vorübergehende Störungen wie ein Netzausfall werden weiterhin im nächsten Zyklus erneut versucht.",
       "quelle": "gepflegt",
       "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Info · Changelog",
+      "pr": null,
+      "text": "Der Changelog-Reiter war eine 18.000-Pixel-Scroll-Wand ohne Sprungmarken. Jetzt startet nur die neueste Version aufgeklappt, ältere Versionen liegen hinter einem \"Anzeigen\"-Schalter, und eine Sprungleiste im Kopf springt direkt zu jeder Version. Die zuvor gemessenen 45-60 Sekunden Ladezeit lagen an der einmaligen Dev-Server-Kompilierung der riesigen gemeinsamen Seiten-Module, nicht an der Changelog-Komponente selbst — die lädt keine Daten nach und rendert warm in wenigen Sekunden.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
       "version": "0.4"
     },
     {
@@ -84,6 +102,15 @@
     },
     {
       "datum": "2026-08-08",
+      "seite": "Spieltag · Home",
+      "pr": null,
+      "text": "Home hat jetzt eine Handlungszeile ganz oben (»Einsatzliste füllen — 9 Plätze offen« mit echtem Knopf) statt dreier nicht klickbarer »Lineup fehlt«-Hinweise; die OVR-Werte auf den großen Spielerkarten sind wieder vollständig (»77,0 · #48« statt »77,0 …«), PPs/MVS bleiben auch bei 0 sichtbar und erklären sich per Tooltip, und im Board-Kasten steht ein Kapitän-Hinweis mit Draht ins Office. Das Office selbst ist eingedampft: Kapitänwahl als Vergleichstabelle mit Leadership-Balken, Board-Kontext und kompakte Notizen — die fünffach parallelen Aufgaben-Spalten sind weg.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
       "seite": "Inbox",
       "pr": null,
       "text": "Die Inbox hat jetzt EIN Filtersystem und sortiert nach Dringlichkeit: Kritisch → Heute sinnvoll → Kann warten → Berichte, Erledigtes eingeklappt. Das kritische Item ist rot markiert und steht ganz oben (vorher sagte der Kopf 1 kritisch, aber keine Karte war als kritisch erkennbar), die äußeren Kategorie-Reiter mit ihren leeren Alles-erledigt-Seiten sind weg, der Kopf-Zähler zählt dieselbe Basis wie Home, und das Kritisch-Badge ist von 3,1:1 auf gemessene 7,1:1 angehoben.",
@@ -138,6 +165,33 @@
     },
     {
       "datum": "2026-08-08",
+      "seite": "Team · Training",
+      "pr": null,
+      "text": "Die Klassenliste im Training zeigt jetzt pro Klasse, WELCHE Werte sie für diesen Spieler verbessert: z. B. »Mage: +Intelligence 2,0 · +Will 1,4 · +Determination 0,6«, mit allen zwölf Attributen im Tooltip. Das ist keine neue Rechnung — es sind exakt die Beiträge, aus denen die Klassen-Schätzung schon immer summiert wurde, jetzt vor der Summierung sichtbar gemacht (ein Test erzwingt: Summe der Beiträge = Gesamtwert). Werte sind Schätzungen für die laufende Saison, keine Garantie — das sagt der Tooltip dazu.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Markt · Kredite",
+      "pr": null,
+      "text": "Vier kleine Korrekturen auf der Kredite-Seite: das Bestes-Angebot-Badge lag mitten im Anbieternamen, jetzt bricht es sauber daneben um. Die Einnahmen-Referenz im Belastungsbalken lief als abgeschnittener Text aus der Karte, jetzt steht sie als Legendenpunkt daneben. Der Admin-Vorschau-Schalter für die Season-1-Sperre stand offen im Spieler-UI, er ist jetzt hinter einen Dev-Modus verschwunden. Und \"Zins-Range\" zeigte durch einen Substring-Treffer im Lexikon fälschlich die Erklärung von \"Rang\" — jetzt ein eigener, korrekter Tooltip.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Markt · Scouting",
+      "pr": null,
+      "text": "Der Scouting Report zeigte zuerst ein bildschirmfüllendes Vorher/Nachher-Balkendiagramm und erst darunter, wessen Report das überhaupt ist — die Balken-Spiegelung war eine zweite Darstellung derselben Zahlen wie die kompakte Chip-Zeile weiter unten und ist raus, der Spielerkopf steht jetzt zuerst. CA, PO-Decke, Intel und Fee in der Shortlist-Tabelle sowie die Potenzial-Einstufung im Report (vorher roh \"low\") tragen jetzt Erklärungen auf Deutsch. Der eigene \"Empfehlungen\"-Reiter (eine Karte plus zwei Zeilen Text) ist in die Übersicht gefaltet.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
       "seite": "Neues Spiel · Saison-1-Draft",
       "pr": null,
       "text": "Project Suicide startete eine neue Saison mit einem Konto im Minus, und die Saison-Vorprüfung ließ das Spiel dann nicht weiterlaufen. Grund war die Reihenfolge: Nula gehört per Sonderregel immer zu P-S und wird von P-S auch ganz normal bezahlt — nur wurde sie erst nach dem Draft verrechnet. Der Draft plante deshalb mit den vollen 300 Mio statt mit dem, was nach Nula übrig ist, gab 297,6 aus, und die 4,6 für Nula rissen das Konto danach ins Minus. Nula wird jetzt schon beim Anlegen des Spielstands gekauft, damit der Draft mit dem echten Rest rechnet. Am Kader von P-S und an Nulas Vertrag ändert sich nichts.",
@@ -174,11 +228,47 @@
     },
     {
       "datum": "2026-08-08",
+      "seite": "Verwaltung · Settings",
+      "pr": null,
+      "text": "Der 32-Klub-Picker fürs \"Neues Spiel erstellen\" lag offen mitten in den Settings des laufenden Saves, mit vorausgewähltem Team und \"DEIN TEAM\"-Badge — Verwechslungsgefahr mit der echten Team-Zuordnung. Er ist jetzt standardmäßig eingeklappt. Der Season-Start-Reset steht jetzt in einer eigenen, klar markierten Gefahrenzone statt neben harmlosen Aktionen, \"Löschen\" je Spielstand ist räumlich von \"Klonen\"/\"Snapshot erstellen\" abgesetzt. Der Untertitel erklärt jetzt in Klartext, wofür die Seite gut ist, statt Modell-Doku zu zitieren. \"Warnungen 200\" lässt sich aufklappen und zeigt die echten Meldungen aus dem Daten-Mapping beim Import.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Spieler",
+      "pr": null,
+      "text": "Die Namensspalte bleibt beim horizontalen Scrollen stehen — vorher standen Zahlen ohne Spielernamen da. Die vier Spalten-Presets sind jetzt eine sichtbare Reiterleiste über der Tabelle statt im Spalten-Menü versteckt, dazu ein neuer fünfter Reiter Saison, der genau die am Spieltag 1 noch leeren Spalten (PPs, MVS, Einsätze) bündelt. Diese Spalten bleiben sichtbar (Chris' Regel: erklären statt verstecken), verlieren aber ihre laute rote/blaue Spaltenfläche, solange die ganze Liga noch bei 0 steht — ein Tooltip erklärt, dass sie sich ab Spieltag 1 füllen. Eine Legende unter der Tabelle erklärt die Abkürzungen einmal sichtbar.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Team · Ewige Tabelle",
+      "pr": null,
+      "text": "Bei erst einer archivierten Saison waren Ø Rang und Bester Rang spaltenweise identisch — jetzt heißt es dann schlicht Rang, eine Spalte statt zwei (ab der zweiten archivierten Saison kommen beide zurück). Die Verlauf-Kacheln sagen jetzt, was sie zeigen, z. B. Top 8 nach Punkte · dein Team ergänzt, statt den Cut stillschweigend vorauszusetzen. Der Kopf erklärt jetzt, dass die Saisons-Spalte die laufende Saison mitzählt, auch wenn sie gerade erst begonnen hat.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
       "seite": "Saison · Saisonende",
       "pr": null,
       "text": "Der Saisonwechsel meldete dauerhaft „Es fehlt noch eine Sponsorenwahl\", obwohl er trotzdem durchlief. Gemeint war der Vertrag für die kommende Saison — und den hat am Saisonende nie jemand, weil die Angebote dort erst erzeugt und erst in der neuen Saison gewählt werden. Der Schritt blockiert und warnt deshalb nicht mehr. Die echte Sponsorenpflicht beim Saisonabschluss bleibt: fehlt der Vertrag für die laufende Saison, geht es weiterhin nicht weiter, und die Saisonfinale-Seite führt dann direkt zu den Sponsoren.",
       "quelle": "gepflegt",
       "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Team · Training",
+      "pr": null,
+      "text": "Training ist jetzt eine Steuer-Tabelle statt acht Riesenkarten: eine Zeile pro Spieler mit Intensität (L/M/H als Klick-Segment, aktiver Modus gefüllt), Netto-Forecast mit Vergleichsbalken, Belastung und Klassen-Vorschlag — die Seite ist ~1.200 px hoch statt ~5.000. Die 13er-Klassenliste öffnet pro Zeile auf »Alle 13 Klassen«, der Bestwert trägt Gold, die aktive Klasse bleibt markiert. Oben gibt es nur noch EINE Kennzahlen-Zeile: Klick auf Leicht/Mittel/Hart zeigt die Team-Vorschau direkt in denselben Kacheln mit sichtbarer »Simulation«-Marke — geschrieben wird erst über »Übernehmen«. »Wie kommt das zustande?« ist ein Info-Link statt achtmal roter Primärknopf, und der Schein-Unterreiter »Forecast« (er zeigte dieselbe Seite) ist weg.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
       "version": "0.4"
     },
     {
