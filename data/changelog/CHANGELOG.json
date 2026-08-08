@@ -66,6 +66,15 @@
     },
     {
       "datum": "2026-08-08",
+      "seite": "Werkzeuge · Spielstand-Reparatur",
+      "pr": null,
+      "text": "Wer die Auffüllspieler aus einem laufenden Spielstand entfernt, stand bisher vor einem Problem: das Kauffenster läuft beim Saisonstart, mitten in der Saison feuert es nicht mehr. Die Teams hätten also Löcher im Kader und volles Konto behalten. Ein neues Werkzeug holt den Kauf nachträglich nach — genau den organischen Schritt, den die Saisonstart-Kette auch macht, und nur diesen. Manuell geführte Teams bleiben außen vor. Am Spielstand geprobt: 108 Zugänge für 2724,6 Mio, davon 49 starke und 44 mittlere, Kader von 234 auf 342, Teams unter Minimum von 20 auf 1. Ohne den Schalter --apply wird nichts geschrieben.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
       "seite": "Teams · Teamprofil",
       "pr": null,
       "text": "Der Saison-Verlauf stand im Teamprofil über dem Kader und nahm fast einen ganzen Bildschirm ein — wer die Mannschaft ansehen wollte, musste erst daran vorbeiscrollen. Schuld war vor allem das Punkte-Diagramm, das ohne Höhenbegrenzung so hoch wuchs, wie Platz da war. Der Verlauf steht jetzt unter dem Kader und ist auf eine kompakte Höhe begrenzt; sein Inhalt bleibt vollständig.",
