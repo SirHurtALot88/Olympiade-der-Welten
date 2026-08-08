@@ -65573,8 +65573,8 @@ button.is-new-look .nl-thist-season-pill,
 .is-new-look .nl-teamprofile-development-metric {
   display: flex;
   flex-direction: column;
-  gap: var(--nl-s2);
-  padding: var(--nl-s3);
+  gap: var(--nl-s1);
+  padding: var(--nl-s2) var(--nl-s3);
   border: 1px solid var(--nl-line);
   border-radius: var(--nl-r-md);
   background: var(--nl-panel-2);
@@ -65600,14 +65600,30 @@ button.is-new-look .nl-thist-season-pill,
   font-weight: 700;
 }
 
+/*
+  CHRIS: „1. ist das viel zu groß und soll unter die spieler!"
+
+  Der Saison-Verlauf nahm fast einen ganzen Bildschirm ein — vor allem, weil das Balkendiagramm
+  „Punkte" ohne Hoehenbegrenzung so hoch wuchs, wie Platz da war (im gemeldeten Bild ein einzelner
+  Balken ueber mehrere hundert Pixel). Vier Kacheln nebeneinander, jede so hoch: die Karte war
+  groesser als der Kader darunter, den sie eigentlich nur ergaenzt.
+
+  Deshalb sind Kurve und Balken jetzt fest begrenzt und die Kachel enger gesetzt. Der Inhalt bleibt
+  vollstaendig — er ist nur nicht mehr das Erste und Groesste auf der Seite.
+*/
 .is-new-look .nl-teamprofile-development-spark {
   width: 100%;
-  height: 40px;
+  height: 32px;
 }
 
 .is-new-look .nl-teamprofile-development-bars {
   width: 100%;
+  max-height: 96px;
   overflow-x: auto;
+}
+
+.is-new-look .nl-teamprofile-development-bars > * {
+  max-height: 96px;
 }
 
 .is-new-look .nl-teamprofile-development-meta {
